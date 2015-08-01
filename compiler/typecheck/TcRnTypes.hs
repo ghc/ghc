@@ -35,7 +35,7 @@ module TcRnTypes(
 
         -- Typechecker types
         TcTypeEnv, TcIdBinderStack, TcIdBinder(..),
-        TcTyThing(..), PromotionErr(..), TcIdFlavor(..),
+        TcTyThing(..), PromotionErr(..),
         SelfBootInfo(..),
         pprTcTyThingCategory, pprPECategory,
 
@@ -819,7 +819,6 @@ data TcTyThing
 
   | ATcId   {           -- Ids defined in this module; may not be fully zonked
         tct_id     :: TcId,
-        tct_flavor :: TcIdFlavor,
         tct_closed :: TopLevelFlag }   -- See Note [Bindings with closed types]
 
   | ATyVar  Name TcTyVar        -- The type variable to which the lexically scoped type
@@ -833,10 +832,6 @@ data TcTyThing
                      -- Note [Type checking recursive type and class declarations]
 
   | APromotionErr PromotionErr
-
-data TcIdFlavor
-  = TcIdMonomorphic
-  | TcIdUnrestricted
 
 data PromotionErr
   = TyConPE          -- TyCon used in a kind before we are ready

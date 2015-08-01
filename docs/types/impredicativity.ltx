@@ -39,7 +39,7 @@
 \begin{itemize}
 \item The kind of $\leq$ is $* \to * \to Constraint$.
 \item The evidence for $\sigma_1 \leq \sigma_2$ is a function $\sigma_1 \to \sigma_2$.
-\item The canonical forms are $\sigma \leq \alpha$, where $\alpha$ is not a Skolem.
+\item The canonical forms are $(\forall \overline{a}. Q \Rightarrow \sigma) \leq \upsilon$, where $\upsilon$ is either a unification variable or a type family application.
 \item In Haskell code, $\sigma_1 \leq \sigma_2$ is written as {\tt sigma1 <$\sim$ sigma2}.
 \end{itemize}
 
@@ -58,12 +58,16 @@ Type classes & $\mathtt{C}$
 Monomorphic types & $\mu$ & $\coloncolonequals$ & $\alpha \alt a \alt \mu_1 \to \mu_2 \alt \mathsf{T} \; \overline{\mu} \alt \mathsf{F} \; \overline{\mu}$ \\
 Types without top-level $\forall$ & $\tau$ & $\coloncolonequals$ & $\alpha \alt a \alt \sigma_1 \to \sigma_2 \alt \mathsf{T} \; \overline{\sigma} \alt \mathsf{F} \; \overline{\mu}$ \\
 Polymorphic types & $\sigma$ & $\coloncolonequals$ & $\forall \overline{a}. Q \Rightarrow \sigma \alt \tau$ \\
-Constraints & $Q$ & $\coloncolonequals$ & $\epsilon \alt Q_1 \wedge Q_2 \alt \sigma_1 \sim \sigma_2 \alt \sigma_1 \leq \sigma_2 \alt \mathtt{C} \; \overline{\mu}$ \\
-Implications & $I$ & $\coloncolonequals$ & $\epsilon \alt I_1 \wedge I_2 \alt Q \alt \forall \overline{a}. \, (Q \supset I)$ \\
-Canonical constraints & $Q^*$ & $\coloncolonequals$ & $\alpha \sim \sigma \alt \mathsf{F} \; \overline{\mu} \sim \sigma \alt \sigma \leq \alpha \alt \mathtt{C} \; \overline{\mu}$ \\
 \\
-Family-free types & $\xi$ & $\coloncolonequals$ & $\alpha \alt a \alt \xi_1 \to \xi_2 \alt \mathsf{T} \; \overline{\xi}$ \\
-Instantiatiable types & $\psi$ & $\coloncolonequals$ & $a \alt \sigma_1 \to \sigma_2 \alt \mathsf{T} \; \overline{\sigma} \alt \mathsf{F} \; \overline{\mu}$
+Instantiable types & $\psi$ & $\coloncolonequals$ & $a \alt \sigma_1 \to \sigma_2 \alt \mathsf{T} \; \overline{\sigma}$ \\
+Instantiable-or-polymorphic & $\psi^*$ & $\coloncolonequals$ & $\psi \alt \forall \overline{a}. Q \Rightarrow \sigma$ \\
+Non-instantiable types & $\upsilon$ & $\coloncolonequals$ & $\alpha \alt \mathsf{F} \; \overline{\mu}$ \\
+\\
+Constraints & $Q$ & $\coloncolonequals$ & $\epsilon \alt Q_1 \wedge Q_2 \alt \sigma_1 \sim \sigma_2 \alt \psi^*_1 \leq \sigma_2 \alt \mathtt{C} \; \overline{\mu}$ \\
+Implications & $I$ & $\coloncolonequals$ & $\epsilon \alt I_1 \wedge I_2 \alt Q \alt \forall \overline{a}. \, (Q \supset I)$ \\
+Canonical constraints & $Q^*$ & $\coloncolonequals$ & $\upsilon \sim \sigma \alt a \sim \sigma \alt (\forall \overline{a}. Q \Rightarrow \sigma) \leq \upsilon \alt \mathtt{C} \; \overline{\mu}$ \\
+\\
+Family-free types & $\xi$ & $\coloncolonequals$ & $\alpha \alt a \alt \xi_1 \to \xi_2 \alt \mathsf{T} \; \overline{\xi}$
 \end{tabular}
 \end{mdframed}
 \caption{Grammar}
@@ -95,13 +99,10 @@ $$
 \begin{figure}
 $$
 \begin{array}{lrcl}
-\textsc{[$\leq$refl]} & canon\left[\sigma \leq \sigma\right] & = & \epsilon \\
-\textsc{[$\leq$lcon]} & canon\left[\sigma_1 \leq \sigma_2\right] & = & \sigma_1 \sim \sigma_2 \\
-& & & \textrm{where } \sigma_1 \not\equiv \sigma_2, \sigma_1 \not\equiv \forall \overline{a}. Q \Rightarrow \sigma'_1 \\
-% \textsc{[$\leq$l$\forall$var]} & canon\left[(\forall \overline{a}. Q_1 \Rightarrow v) \leq \psi_2 \right] & = & [\overline{a \mapsto \alpha}]v \sim \psi_2 \, \wedge \, [\overline{a \mapsto \alpha}]Q_1 \\
-% & & & \textrm{where } v \textrm{ is a unification variable and } v \in \overline{a} \\
-\textsc{[$\leq$l$\forall$]} & canon\left[(\forall \overline{a}. Q_1 \Rightarrow \sigma_1) \leq \psi_2\right] & = & [\overline{a \mapsto \alpha}]\sigma_1 \leq \sigma_2 \, \wedge \, [\overline{a \mapsto \alpha}]Q_1 \\
-% & & & \textrm{where } v \textrm{ is not a unification variable or } v \not\in \overline{a} \\
+\textsc{[$\leq$l$\tau$r$\tau$]} & canon\left[\tau_1 \leq \tau_2\right] & = & \tau_1 \sim \tau_2 \\
+\textsc{[$\leq$l$\forall\psi$r$\psi$]} & canon\left[(\forall \overline{a}. Q_1 \Rightarrow \psi^*_1) \leq \psi_2\right] & = & [\overline{a \mapsto \alpha}]\psi^*_1 \leq \psi_2 \, \wedge \, [\overline{a \mapsto \alpha}]Q_1 \\
+\textsc{[$\leq$l$\forall\upsilon$r$\psi$]} & canon\left[(\forall \overline{a}. Q_1 \Rightarrow \upsilon_1) \leq \psi_2\right] & = & [\overline{a \mapsto \alpha}]\upsilon_1 \sim \psi_2 \, \wedge \, [\overline{a \mapsto \alpha}]Q_1 \\
+\textsc{[$\leq$l$\forall\upsilon$r$\upsilon$]} & canon\left[(\forall \overline{a}. \upsilon_1) \leq \upsilon_2\right] & = & [\overline{a \mapsto \alpha}]\upsilon_1 \sim \upsilon_2 \\
 \textsc{[$\leq$r$\forall$]} & canon\left[\sigma_1 \leq (\forall \overline{a}. Q_2 \Rightarrow \sigma_2)\right] & = & \forall \overline{a}. \, (Q_2 \supset \sigma_1 \leq \sigma_2) \\
 \end{array}
 $$
@@ -125,7 +126,7 @@ the only constraint being generated is $(\forall\, a.\, \textit{Monoid} \; a \Ri
 
 \item We also disallow applying the rules to quantified types. In that case, we want to apply {\sc [$\leq$r$\forall$]} first, which may in turn lead to an application of the other rules inside the implication.
 
-\item Previously, these rules along with generation and propagation worked very hard to ensure that no constraint of the form $\alpha \leq \sigma$, with $\alpha$ a unification variable, was ever produced.
+\item Previously, these rules along with generation and propagation worked very hard to ensure that no constraint $\alpha \leq \sigma$, with $\alpha$ a unification variable, was ever produced.
 
 Nonetheless, there was still the chance that $\alpha \leq \sigma$ is produced from a constraint involving a type family $\mathsf{F} \; \alpha \leq \sigma$ whose family resolves to a variable $\mathsf{F} \; \alpha \sim \alpha$. Since we do not want to loose confluence, we ensure that this resolves to $\alpha \sim \sigma$ regardless of the order of application of rule {\sc [$\leq$lcon]} and type family rewriting.
 
@@ -272,13 +273,6 @@ We prefer this option for the approximation phase in inference, since it leads t
 
 In the $\Gamma \vdash e : \sigma \leadsto C$ judgement, $\Gamma$ and $e$ are inputs, whereas $\sigma$ and $C$ are outputs. The highlighted parts are changes with respect to the constraint generation judgement in the original {\sc OutsideIn(X)} system.
 
-\highlighttree{
-\begin{prooftree}
-\AxiomC{$x :_\lambda \tau \in \Gamma$}
-\RightLabel{\sc VarCon${}_\lambda$}
-\UnaryInfC{$\Gamma \vdash x : \tau \leadsto \epsilon$}
-\end{prooftree}}
-
 \begin{prooftree}
 \AxiomC{$\alpha$ fresh}
 \AxiomC{$x : \sigma \in \Gamma$}
@@ -288,7 +282,7 @@ In the $\Gamma \vdash e : \sigma \leadsto C$ judgement, $\Gamma$ and $e$ are inp
 
 \begin{prooftree}
 \AxiomC{$\alpha$ fresh}
-\AxiomC{$\Gamma, \highlight{x :_\lambda \alpha} \vdash e : \tau \leadsto C$}
+\AxiomC{$\Gamma, x : \alpha \vdash e : \tau \leadsto C$}
 \RightLabel{\sc Abs}
 \BinaryInfC{$\Gamma \vdash \lambda x. e : \alpha \to \tau \leadsto C$}
 \end{prooftree}
@@ -317,7 +311,7 @@ In the $\Gamma \vdash e : \sigma \leadsto C$ judgement, $\Gamma$ and $e$ are inp
 
 \begin{prooftree}
 \AxiomC{$\Gamma \vdash e_1 : \tau_1 \leadsto C_1$}
-\AxiomC{$\Gamma, \highlight{x :_\lambda \tau_1} \vdash e_2 : \tau_2 \leadsto C_2$}
+\AxiomC{$\Gamma, x : \tau_1 \vdash e_2 : \tau_2 \leadsto C_2$}
 \RightLabel{\sc Let}
 \BinaryInfC{$\Gamma \vdash \textsf{let } x = e_1 \textsf{ in } e_2 : \tau_2 \leadsto C_1 \wedge C_2$}
 \end{prooftree}
@@ -349,34 +343,6 @@ $}
 \UnaryInfC{$\Gamma \vdash \textsf{case } e \textsf{ of } \{ \overline{K_i \, \overline{x_i} \to u_i} \} : \beta \leadsto C \wedge \textsf{T} \, \overline{\gamma} \sim \tau \wedge \bigwedge C'_i$}
 \end{prooftree}
 
-\subsection*{Why $:_\lambda$?}
-
-In principle, the only rule that wuld need to change is that of variables in the term level, which is the point in which instantiation may happen:
-\begin{prooftree}
-\AxiomC{$\alpha$ fresh}
-\AxiomC{$x : \sigma \in \Gamma$}
-\RightLabel{\sc VarCon}
-\BinaryInfC{$\Gamma \vdash x : \alpha \leadsto \highlight{\sigma \leq \alpha}$}
-\end{prooftree}
-Unfortunately, this is not enough. Suppose we have the following piece of code:
-\begin{verbatim}
-(\f -> (f 1, f True)) (if ... then id else not)
-\end{verbatim}
-We want to typecheck it, and we give the argument $f$ a type variable $\alpha$, and each of its appearances the types variables $\beta$ and $\gamma$. The constraints that are generated are:
-\begin{itemize}
-\item $\alpha \leq \beta$ (from the usage in {\tt f 1})
-\item $\alpha \leq \gamma$ (from the usage in {\tt f True})
-\item $(\forall a. \, a \to a) \leq \alpha$ (from {\tt id})
-\item $(Bool \to Bool) \leq \alpha$ (from {\tt not})
-\end{itemize}
-At this point we are stuck, since we have no rule that could be applied. One might think about applying some kind transitivity of $\leq$, but this is just calling trouble, because it is not clear how to do this without losing information.
-
-\
-
-Our solution is to make this situation impossible by generating $\alpha \sim \beta$ and $\alpha \sim \gamma$ instead of their $\leq$ counterparts. We do this by splitting the {\sc [VarCon]} rule in such a way that $\sim$ is generated when the variable comes from an unannotated abstraction or unannotated $\mathsf{let}$. The environment is responsible for keeping track of this fact for each binding, by a small tag, which we denote by $:_\lambda$ in the type rules.
-
-With this change, our initial example leads to an error ({\tt f cannot be applied to both Bool and Int}), from which one can recover by adding an extra annotation. This is a better situation, though, that getting stuck in the middle of the solving process.
-
 \subsection*{With propagation}
 
 \noindent We use propagation to cover two main scenarios:
@@ -394,12 +360,6 @@ f = \x. -> (x 1, x True)
 \noindent In the $\Gamma \vdash_\Downarrow e : \sigma \leadsto C$ judgement, $\Gamma$, $e$ and $\sigma$ are inputs, and only $C$ is an output.
 
 \begin{prooftree}
-\AxiomC{$x :_\lambda \tau \in \Gamma$}
-\RightLabel{\sc VarCon${}_\lambda$}
-\UnaryInfC{$\Gamma \vdash_\Downarrow x : \sigma \leadsto \tau \sim \sigma$}
-\end{prooftree}
-
-\begin{prooftree}
 \AxiomC{$x : \sigma_1 \in \Gamma$}
 \RightLabel{\sc VarCon}
 \UnaryInfC{$\Gamma \vdash_\Downarrow x : \sigma_2 \leadsto \sigma_1 \leq \sigma_2$}
@@ -413,29 +373,15 @@ f = \x. -> (x 1, x True)
 
 \begin{prooftree}
 \AxiomC{$\alpha$, $\beta$ fresh}
-\AxiomC{$\Gamma, x :_\lambda \alpha \vdash_\Downarrow e : \beta \leadsto C$}
+\AxiomC{$\Gamma, x : \alpha \vdash_\Downarrow e : \beta \leadsto C$}
 \RightLabel{\sc AbsVar}
 \BinaryInfC{$\Gamma \vdash_\Downarrow \lambda x. e : \gamma \leadsto C \, \wedge \, \gamma \sim \alpha \to \beta$}
 \end{prooftree}
 
 \begin{prooftree}
-\AxiomC{$\Gamma, x :_\lambda \alpha \vdash_\Downarrow e : \sigma_2 \leadsto C$}
-\RightLabel{\sc AbsArrowVar}
-\UnaryInfC{$\Gamma \vdash_\Downarrow \lambda x. e : \alpha \to \sigma_2 \leadsto C$}
-\end{prooftree}
-
-\begin{prooftree}
-\AxiomC{$\Gamma, x : \forall a. \sigma_1 \vdash_\Downarrow e : \sigma_2 \leadsto C$}
-\RightLabel{\sc AbsArrow$\forall$}
-\UnaryInfC{$\Gamma \vdash_\Downarrow \lambda x. e : (\forall a. \sigma_1) \to \sigma_2 \leadsto C$}
-\end{prooftree}
-
-\begin{prooftree}
-\AxiomC{$\sigma_1 \not\equiv \alpha$}
-\AxiomC{$\sigma_1 \not\equiv \forall a. Q \Rightarrow \sigma$}
-\AxiomC{$\Gamma, x :_{\{\lambda,\_\}} \sigma_1 \vdash_\Downarrow e : \sigma_2 \leadsto C$}
-\RightLabel{\sc AbsArrowRest}
-\TrinaryInfC{$\Gamma \vdash_\Downarrow \lambda x. e : \sigma_1 \to \sigma_2 \leadsto C$}
+\AxiomC{$\Gamma, x : \sigma_1 \vdash_\Downarrow e : \sigma_2 \leadsto C$}
+\RightLabel{\sc AbsArrow}
+\UnaryInfC{$\Gamma \vdash_\Downarrow \lambda x. e : \sigma_1 \to \sigma_2 \leadsto C$}
 \end{prooftree}
 
 \begin{prooftree}
@@ -457,28 +403,15 @@ f = \x. -> (x 1, x True)
 \noLine
 \BinaryInfC{
 $\theta = [\overline{a \to \alpha}] \qquad
-\Gamma \vdash_\Downarrow e_i : \theta(\sigma_i) \leadsto C_i \qquad
-\theta(\sigma_r) \equiv \beta$}
-\RightLabel{\sc AppFunVar}
-\UnaryInfC{$\Gamma \vdash_\Downarrow f \, e_1 \, \dots \, e_n : \sigma \leadsto \bigwedge_i C_i \, \wedge \, \theta(Q) \, \wedge \, \theta(\sigma_r) \sim \sigma$}
-\end{prooftree}
-
-\begin{prooftree}
-\AxiomC{$f \in \Gamma$}
-\AxiomC{$f : \forall \overline{a}. \, \sigma_1 \to \dots \to \sigma_n \to \sigma_r \in \Gamma$}
-\noLine
-\BinaryInfC{
-$\theta = [\overline{a \to \alpha}] \qquad
-\Gamma \vdash_\Downarrow e_i : \theta(\sigma_i) \leadsto C_i \qquad
-\theta(\sigma_r) \not\equiv \beta$}
-\RightLabel{\sc AppFunNonVar}
+\Gamma \vdash_\Downarrow e_i : \theta(\sigma_i) \leadsto C_i$}
+\RightLabel{\sc AppFun}
 \UnaryInfC{$\Gamma \vdash_\Downarrow f \, e_1 \, \dots \, e_n : \sigma \leadsto \bigwedge_i C_i \, \wedge \, \theta(Q) \, \wedge \, \theta(\sigma_r) \leq \sigma$}
 \end{prooftree}
 
 \begin{prooftree}
+\AxiomC{$\alpha \text{ fresh}$}
 \AxiomC{$\Gamma \vdash_\Downarrow e_1 : \alpha \to \sigma \leadsto C_1$}
 \AxiomC{$\Gamma \vdash_\Downarrow e_2 : \alpha \leadsto C_2$}
-\AxiomC{$\alpha \text{ fresh}$}
 \RightLabel{\sc App}
 \TrinaryInfC{$\Gamma \vdash_\Downarrow e_1 \, e_2 : \sigma \leadsto C_1 \, \wedge \, C_2$}
 \end{prooftree}
@@ -491,8 +424,8 @@ $\theta = [\overline{a \to \alpha}] \qquad
 
 \begin{prooftree}
 \AxiomC{$\alpha$ fresh}
-\AxiomC{$\Gamma, x :_\lambda \alpha \vdash_\Downarrow e_1 : \alpha \leadsto C_1$}
-\AxiomC{$\Gamma, x :_\lambda \alpha \vdash_\Downarrow e_2 : \sigma \leadsto C_2$}
+\AxiomC{$\Gamma, x : \alpha \vdash_\Downarrow e_1 : \alpha \leadsto C_1$}
+\AxiomC{$\Gamma, x : \alpha \vdash_\Downarrow e_2 : \sigma \leadsto C_2$}
 \RightLabel{\sc Let}
 \TrinaryInfC{$\Gamma \vdash_\Downarrow \textsf{let } x = e_1 \textsf{ in } e_2 : \sigma \leadsto C_1 \, \wedge \, C_2$}
 \end{prooftree}
@@ -527,19 +460,128 @@ $}
 
 \
 
-\noindent The most surprising rules are {\sc [AppFunVar]} and {\sc [AppFunNonVar]}, which apply when we have a known expression $f$ whose type can be recovered from the environment followed by some other freely-shaped expressions. For example, the case of {\tt f (\\x -> x)} above, where {\tt f} is in the environment. In that case, we compute the type that the first block ought to have, and propagate it to the rest of arguments.
+\noindent The most surprising rule is {\sc [AppFun]}, which applies when we have a known expression $f$ whose type can be recovered from the environment followed by some other freely-shaped expressions. For example, the case of {\tt f ($\backslash$x -> x)} above, where {\tt f} is in the environment. In that case, we compute the type that the first block ought to have, and propagate it to the rest of arguments.
 
 % The reason for including a block of $f_i$s is to cover cases such as {\tt runST $ do ...}, or more clearly {\tt ($) runST (do ...)}, where some combinators are used between functions. Should the rules only include the case $f \, e_1 \, \dots \, f_m$, the fairly common {\tt runST $ do ...} could not be typed without an annotation.
 
-Of course, there is a reason for distinguishing between the cases of the return type being a variable or not, and generating equalities or instantiation constraints. In short, there is a reason for having both {\sc [AppFunVar]} and {\sc [AppFunNonVar]}. Consider the following:
+\subsection*{Why (not) $:_\lambda$?}
+
+In this section, we describe the thought process that led to the rule {\sc [$\leq$lcon]} to be applied to unification variables in the left-hand side, and not only to types headed by a constructor, as we first thought.
+
+\
+
+In principle, the only rule that would need to change is that of variables in the term level, which is the point in which instantiation may happen:
+\begin{prooftree}
+\AxiomC{$\alpha$ fresh}
+\AxiomC{$x : \sigma \in \Gamma$}
+\RightLabel{\sc VarCon}
+\BinaryInfC{$\Gamma \vdash x : \alpha \leadsto \highlight{\sigma \leq \alpha}$}
+\end{prooftree}
+Unfortunately, if {\sc [$\leq$lcon]} cannot be applied to unification variables in the left-hand side, this is not enough. Suppose we have the following piece of code:
+\begin{verbatim}
+(\f -> (f 1, f True)) (if ... then id else not)
+\end{verbatim}
+We want to typecheck it, and we give the argument $f$ a type variable $\alpha$, and each of its appearances the types variables $\beta$ and $\gamma$. The constraints that are generated are:
+\begin{itemize}
+\item $\alpha \leq \beta$ (from the usage in {\tt f 1})
+\item $\alpha \leq \gamma$ (from the usage in {\tt f True})
+\item $(\forall a. \, a \to a) \leq \alpha$ (from {\tt id})
+\item $(Bool \to Bool) \leq \alpha$ (from {\tt not})
+\end{itemize}
+At this point we are stuck, since we have no rule that could be applied. One might think about applying some kind transitivity of $\leq$, but this is just calling trouble, because it is not clear how to do this without losing information.
+
+\
+
+The first solution is to make this situation impossible by generating $\alpha \sim \beta$ and $\alpha \sim \gamma$ instead of their $\leq$ counterparts. We do this by splitting the {\sc [VarCon]} rule in such a way that $\sim$ is generated when the variable comes from an unannotated abstraction or unannotated $\mathsf{let}$. The environment is responsible for keeping track of this fact for each binding, by a small tag, which we denote by $:_\lambda$ in the type rules.
+\begin{prooftree}
+\AxiomC{$\highlight{x :_\lambda \tau} \in \Gamma$}
+\RightLabel{\sc VarCon${}_\lambda$}
+\UnaryInfC{$\Gamma \vdash x : \tau \leadsto \epsilon$}
+\end{prooftree}
+\begin{prooftree}
+\AxiomC{$\alpha$ fresh}
+\AxiomC{$\Gamma, \highlight{x :_\lambda \alpha} \vdash e : \tau \leadsto C$}
+\RightLabel{\sc Abs}
+\BinaryInfC{$\Gamma \vdash \lambda x. e : \alpha \to \tau \leadsto C$}
+\end{prooftree}
+\begin{prooftree}
+\AxiomC{$\Gamma \vdash e_1 : \tau_1 \leadsto C_1$}
+\AxiomC{$\Gamma, \highlight{x :_\lambda \tau_1} \vdash e_2 : \tau_2 \leadsto C_2$}
+\RightLabel{\sc Let}
+\BinaryInfC{$\Gamma \vdash \textsf{let } x = e_1 \textsf{ in } e_2 : \tau_2 \leadsto C_1 \wedge C_2$}
+\end{prooftree}
+With this change, our initial example leads to an error ({\tt f cannot be applied to both Bool and Int}), from which one can recover by adding an extra annotation. This is a better situation, though, that getting stuck in the middle of the solving process.
+
+\
+
+This was not the only change that was needed to ensure that $\alpha \leq \sigma$ is not produced. You need also a special case of the rule {\sc [$\leq$l$\forall$]} when the body of a $\sigma$-type is a single variable:
+$$
+\begin{array}{lrcl}
+\textsc{[$\leq$l$\forall$var]} & canon\left[(\forall \overline{a}. Q_1 \Rightarrow v) \leq \psi_2 \right] & = & [\overline{a \mapsto \alpha}]v \sim \psi_2 \, \wedge \, [\overline{a \mapsto \alpha}]Q_1 \\
+& & & \textrm{where } v \textrm{ is a unification variable and } v \in \overline{a}
+\end{array}
+$$
+And a special case for the {\sc AppFun} rule of propagation:
+\begin{prooftree}
+\AxiomC{$f \in \Gamma$}
+\AxiomC{$f : \forall \overline{a}. \, \sigma_1 \to \dots \to \sigma_n \to \sigma_r \in \Gamma$}
+\noLine
+\BinaryInfC{
+$\theta = [\overline{a \to \alpha}] \qquad
+\Gamma \vdash_\Downarrow e_i : \theta(\sigma_i) \leadsto C_i \qquad
+\theta(\sigma_r) \equiv \beta$}
+\RightLabel{\sc AppFunVar}
+\UnaryInfC{$\Gamma \vdash_\Downarrow f \, e_1 \, \dots \, e_n : \sigma \leadsto \bigwedge_i C_i \, \wedge \, \theta(Q) \, \wedge \, \theta(\sigma_r) \sim \sigma$}
+\end{prooftree}
+For the case of the special {\sc AppFun} rule, consider the following:
 \begin{verbatim}
 data S a = S a
 
 f :: [Char] -> S a
 f x = S (error x)
 \end{verbatim}
-If we apply {\sc [AppFunNonVar]} directly, we instantiate the type of $error :: \forall b. [Char] \to b$ to $[Char] \to \beta$.
-Since we are pushing down a unification variable $\alpha$ because of the previous application of {\sc [AppFunNonVar]} to $S :: \forall a. \, a \to S \; a$, we obtain a constraint $\beta \leq \alpha$. Since there are no more restrictions to either $\alpha$ or $\beta$, we are not stuck in solving.
+If we apply {\sc [AppFun]} directly, we instantiate the type of $error :: \forall b. [Char] \to b$ to $[Char] \to \beta$. Since we are pushing down a unification variable $\alpha$ because of the previous application of {\sc [AppFun]} to $S :: \forall a. \, a \to S \; a$, we obtain a constraint $\beta \leq \alpha$. Since there are no more restrictions to either $\alpha$ or $\beta$, we are not stuck in solving.
+
+\
+
+Nevertheless, you could always end up in the situation described in the notes of the {\sc [$\leq$lcon]} rule, where a type family rewrites to a type variable. It is easier to just make $\alpha \leq \sigma$ rewrite to $\alpha \sim \sigma$ in any case (but when $\sigma$ is headed by $\forall$).
+This solution goes along with the following philosophy of impredicativity in our system:
+\begin{itemize}
+\item The system is impredicative in the sense that a polymorphic function may be instantiated at a polytype. Or more operationally, a unification variable may be unified with a polytype.
+\item But it does not follow that after being filled in with a polytype, a unification variable can then be instantiated.
+\end{itemize}
+
+\subsection*{{\tt f \$ x} is equivalent to {\tt f x}}
+
+One nice property of the system is that the rule {\sc AppFun} applied to the case {\tt f \$ x} for {\tt f} not in the environment is equivalent to the rule {\sc App} applied to {\tt f x}. In the first case we have:
+\begin{prooftree}
+\AxiomC{$\alpha, \beta$ fresh}
+\AxiomC{$\Gamma \vdash_\Downarrow f : \alpha \to \beta \leadsto C_1$}
+\AxiomC{$\Gamma \vdash_\Downarrow x : \alpha \leadsto C_2$}
+\TrinaryInfC{$\Gamma \vdash_\Downarrow f \; \$ \; x : \sigma \leadsto C_1 \wedge C_2 \wedge \beta \leq \sigma$}
+\end{prooftree}
+Note that we know that $\beta \leq \sigma$ will be readily changed to $\beta \sim \sigma$. And by substitution of equals, we get the rule:
+\begin{prooftree}
+\AxiomC{$\alpha$ fresh}
+\AxiomC{$\Gamma \vdash_\Downarrow f : \alpha \to \sigma \leadsto C_1$}
+\AxiomC{$\Gamma \vdash_\Downarrow x : \alpha \leadsto C_2$}
+\TrinaryInfC{$\Gamma \vdash_\Downarrow f \; \$ \; x : \sigma \leadsto C_1 \wedge C_2$}
+\end{prooftree}
+Which is exactly the {\sc App} rule applied to $f \; x$!
+
+\
+
+\noindent Note that this equivalence only holds in the case where {\sc App} would be applied to the expression {\tt f  x}. In particular, if $f \in \Gamma$, the rule {\sc AppFun} is chosen instead. If equivalence between {\tt f \$ x} and {\tt f x} is desired in this case, an extra rule needs to be added:
+\begin{prooftree}
+\AxiomC{$f \in \Gamma$}
+\AxiomC{$f : \forall \overline{a}. \, \sigma_s \to \sigma_r \in \Gamma$}
+\noLine
+\BinaryInfC{
+$\theta = [\overline{a \to \alpha}] \qquad
+\Gamma \vdash_\Downarrow e : \theta(\sigma_s) \leadsto C$}
+\RightLabel{\sc App\$Fun}
+\UnaryInfC{$\Gamma \vdash_\Downarrow f \, \$ \, e : \sigma \leadsto C \, \wedge \, \theta(Q) \, \wedge \, \theta(\sigma_r) \leq \sigma$}
+\end{prooftree}
 
 %\newpage
 \section*{Examples}

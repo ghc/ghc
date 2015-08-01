@@ -1328,16 +1328,16 @@ zonkEvBind env (EvBind { eb_lhs = var, eb_rhs = term, eb_is_given = is_given })
       ; return (EvBind { eb_lhs = var', eb_rhs = term', eb_is_given = is_given }) }
 
 zonkEvInstanceOf :: ZonkEnv -> EvInstanceOf -> TcM EvInstanceOf
-zonkEvInstanceOf _ EvInstanceOfRefl
-  = return EvInstanceOfRefl
-zonkEvInstanceOf env (EvInstanceOfEq co)
-  = do { co' <- zonkTcCoToCo env co
-       ; return (EvInstanceOfEq co') }
 zonkEvInstanceOf env (EvInstanceOfInst tys co q)
   = do { tys' <- mapM (zonkTcTypeToType env) tys
        ; let co' = zonkIdOcc env co
        ; q' <- mapM (zonkEvTerm env) q
        ; return (EvInstanceOfInst tys' co' q') }
+zonkEvInstanceOf env (EvInstanceOfInstEq tys co q)
+  = do { tys' <- mapM (zonkTcTypeToType env) tys
+       ; co' <- zonkTcCoToCo env co
+       ; q' <- mapM (zonkEvTerm env) q
+       ; return (EvInstanceOfInstEq tys' co' q') }
 zonkEvInstanceOf env (EvInstanceOfGen tys qvars bnds i)
   = do { (env', tys') <- zonkTyBndrsX env tys
        ; let qvars' = map (zonkIdOcc env') qvars

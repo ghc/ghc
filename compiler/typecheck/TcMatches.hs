@@ -460,11 +460,10 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
              -- See Note [GroupStmt binder map] in HsExpr
              n_bndr_ids  = zipWith mk_n_bndr n_bndr_names bndr_ids
              bindersMap' = bndr_ids `zip` n_bndr_ids
-             n_bndr_ids' = [(id, TcIdMonomorphic) | id <- n_bndr_ids]
 
        -- Type check the thing in the environment with
        -- these new binders and return the result
-       ; thing <- tcExtendIdEnv n_bndr_ids' (thing_inside elt_ty)
+       ; thing <- tcExtendIdEnv n_bndr_ids (thing_inside elt_ty)
 
        ; return (emptyTransStmt { trS_stmts = stmts', trS_bndrs = bindersMap'
                                 , trS_by = fmap fst by', trS_using = final_using
@@ -632,11 +631,10 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
              -- See Note [GroupStmt binder map] in HsExpr
              n_bndr_ids = zipWith mk_n_bndr n_bndr_names bndr_ids
              bindersMap' = bndr_ids `zip` n_bndr_ids
-             n_bndr_ids' = [(id, TcIdMonomorphic) | id <- n_bndr_ids]
 
        -- Type check the thing in the environment with
        -- these new binders and return the result
-       ; thing <- tcExtendIdEnv n_bndr_ids' (thing_inside new_res_ty)
+       ; thing <- tcExtendIdEnv n_bndr_ids (thing_inside new_res_ty)
 
        ; return (TransStmt { trS_stmts = stmts', trS_bndrs = bindersMap'
                            , trS_by = by', trS_using = final_using
@@ -786,9 +784,8 @@ tcDoStmt ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
         ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
         ; let tup_ids  = zipWith mkLocalId tup_names tup_elt_tys
               tup_ty   = mkBigCoreTupTy tup_elt_tys
-              tup_ids' = [(tup_id, TcIdMonomorphic) | tup_id <- tup_ids]
 
-        ; tcExtendIdEnv tup_ids' $ do
+        ; tcExtendIdEnv tup_ids $ do
         { stmts_ty <- newFlexiTyVarTy liftedTypeKind
         ; (stmts', (ret_op', tup_rets))
                 <- tcStmtsAndThen ctxt tcDoStmt stmts stmts_ty   $ \ inner_res_ty ->

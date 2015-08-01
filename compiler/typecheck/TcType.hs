@@ -65,7 +65,7 @@ module TcType (
   -- Again, newtypes are opaque
   eqType, eqTypes, eqPred, cmpType, cmpTypes, cmpPred, eqTypeX,
   tcEqType, tcEqKind,
-  isSigmaTy, isRhoTy, isOverloadedTy,
+  isSigmaTy, isRhoTy, isOverloadedTy, isUpsilonTy,
   isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
@@ -1423,6 +1423,13 @@ isOverloadedTy ty | Just ty' <- tcView ty = isOverloadedTy ty'
 isOverloadedTy (ForAllTy _ ty) = isOverloadedTy ty
 isOverloadedTy (FunTy a _)     = isPredTy a
 isOverloadedTy _               = False
+
+isUpsilonTy :: Type -> Bool
+isUpsilonTy ty
+  | isSigmaTy ty = False
+  | Just v       <- tcGetTyVar_maybe ty      = not (isImmutableTyVar v)
+  | Just (tc, _) <- tcSplitTyConApp_maybe ty = isFamilyTyCon tc
+  | otherwise    = True
 
 isFloatTy, isDoubleTy, isIntegerTy, isIntTy, isWordTy, isBoolTy,
     isUnitTy, isCharTy, isAnyTy :: Type -> Bool

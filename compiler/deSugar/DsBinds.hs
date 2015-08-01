@@ -1187,18 +1187,19 @@ applyInstanceOf id e
   = pprPanic "The impossible happened" (ppr id)
 
 dsEvInstanceOf :: EvInstanceOf -> CoreExpr -> DsM CoreExpr
-dsEvInstanceOf EvInstanceOfRefl e
-  = return e
-dsEvInstanceOf (EvInstanceOfEq co) e
-  = do { dsTcCoercion co $ \c ->
-           case coercionKind c of
-             Pair ty1 ty2 | ty1 == ty2 -> e  -- No conversion needed
-             _ ->  mkCast e (mkSubCo c) }
 dsEvInstanceOf (EvInstanceOfInst qvars co qs) e
   = do { qs' <- mapM dsEvTerm qs
        ; let exprTy = mkCoreApps e (map Type qvars)
              exprEv = mkCoreApps exprTy qs'
        ; return $ applyInstanceOf co exprEv }
+dsEvInstanceOf (EvInstanceOfInstEq qvars co qs) e
+  = do { qs' <- mapM dsEvTerm qs
+       ; let exprTy = mkCoreApps e (map Type qvars)
+             exprEv = mkCoreApps exprTy qs'
+       ; dsTcCoercion co $ \c ->
+           case coercionKind c of
+             Pair ty1 ty2 | ty1 == ty2 -> exprEv
+             _ -> mkCast exprEv (mkSubCo c) }
 dsEvInstanceOf (EvInstanceOfGen tyvars qvars qs rest) e
   = do { q_binds <- dsTcEvBinds qs
        ; return $ mkCoreLams (tyvars ++ qvars)

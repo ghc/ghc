@@ -371,7 +371,7 @@ tcValBinds top_lvl binds sigs thing_inside
                 -- declared with complete type signatures
                 -- Do not extend the TcIdBinderStack; instead
                 -- we extend it on a per-rhs basis in tcExtendForRhs
-        ; tcExtendLetEnvIds top_lvl [(idName id, id, choose_tc_id_flavor id) | id <- poly_ids] $ do
+        ; tcExtendLetEnvIds top_lvl [(idName id, id) | id <- poly_ids] $ do
             { (binds', (extra_binds', thing)) <- tcBindGroups top_lvl sig_fn prag_fn binds $ do
                    { thing <- thing_inside
                      -- See Note [Pattern synonym builders don't yield dependencies]
@@ -447,8 +447,7 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) thing_inside
 
     go :: [SCC (LHsBind Name)] -> TcM (LHsBinds TcId, thing)
     go (scc:sccs) = do  { (binds1, ids1) <- tc_scc scc
-                        ; let uids1 = map (\x -> (x, choose_tc_id_flavor x)) ids1
-                        ; (binds2, thing) <- tcExtendLetEnv top_lvl uids1 $
+                        ; (binds2, thing) <- tcExtendLetEnv top_lvl ids1 $
                                              go sccs
                         ; return (binds1 `unionBags` binds2, thing) }
     go []         = do  { thing <- thing_inside; return (emptyBag, thing) }
@@ -488,14 +487,8 @@ tc_single top_lvl sig_fn prag_fn lbind thing_inside
   = do { (binds1, ids) <- tcPolyBinds top_lvl sig_fn prag_fn
                                       NonRecursive NonRecursive
                                       [lbind]
-       ; let uids = map (\x -> (x, choose_tc_id_flavor x)) ids
-       ; thing <- tcExtendLetEnv top_lvl uids thing_inside
+       ; thing <- tcExtendLetEnv top_lvl ids thing_inside
        ; return (binds1, thing) }
-
-choose_tc_id_flavor :: Id -> TcIdFlavor
-choose_tc_id_flavor v
-  | Just _ <- tcGetTyVar_maybe (idType v) = TcIdMonomorphic
-  | otherwise = TcIdUnrestricted
 
 -- | No signature or a partial signature
 noCompleteSig :: Maybe TcSigInfo -> Bool
@@ -1363,14 +1356,14 @@ tcMonoBinds _ sig_fn no_gen binds
 
         -- Bring the monomorphic Ids, into scope for the RHSs
         ; let mono_info  = getMonoBindInfo tc_binds
-              rhs_id_env = [(name, mono_id, choose_tc_id_flavor mono_id)
+              rhs_id_env = [(name, mono_id)
                            | (name, mb_sig, mono_id) <- mono_info
                            , noCompleteSig mb_sig ]
                     -- A monomorphic binding for each term variable that lacks
                     -- a type sig.  (Ones with a sig are already in scope.)
 
         ; traceTc "tcMonoBinds" $ vcat [ ppr n <+> ppr id <+> ppr (idType id)
-                                       | (n,id,_) <- rhs_id_env]
+                                       | (n,id) <- rhs_id_env]
         ; binds' <- tcExtendLetEnvIds NotTopLevel rhs_id_env $
                     mapM (wrapLocM tcRhs) tc_binds
         ; return (listToBag binds', mono_info) }

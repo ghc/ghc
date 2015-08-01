@@ -485,7 +485,7 @@ tcExpr (RecordCon (L loc con_name) _ rbinds) res_ty
         ; checkMissingFields data_con rbinds
 
         -- Get type of the constructor
-        ; (con_expr, _, con_sigma) <- tcIdOcc (OccurrenceOf con_name) con_name
+        ; (con_expr, con_sigma) <- tcIdOcc (OccurrenceOf con_name) con_name
         ; (wrap, con_rho) <- instFunTy con_sigma  -- Eagerly instantiate
 
         ; let arity = dataConSourceArity data_con
@@ -945,7 +945,7 @@ tcAppWorker (L loc (HsVar fun_name)) args res_ty
   | fun_name `hasKey` dollarIdKey   -- Note [Typing rule for ($)]
   , ((L actual_loc (HsVar actual_fun_name)) : rest_args) <- args
   = do {   -- Typing without ($)
-         (fun_expr, _, fun_sigma) <- tcIdOcc (OccurrenceOf actual_fun_name) actual_fun_name
+         (fun_expr, fun_sigma) <- tcIdOcc (OccurrenceOf actual_fun_name) actual_fun_name
        ; (wrap, fun_rho) <- instFunTy fun_sigma   -- Eagerly instantiate
        ; result <- tc_app (L actual_loc (mkHsWrap wrap fun_expr)) rest_args fun_rho res_ty
 
@@ -956,7 +956,7 @@ tcAppWorker (L loc (HsVar fun_name)) args res_ty
 
   | otherwise  -- The common case: a variable other than '$', 'tagToEnum, or 'seq',
                --                  applied to a list of arguments
-  = do { (fun_expr, _, fun_sigma) <- tcIdOcc (OccurrenceOf fun_name) fun_name
+  = do { (fun_expr, fun_sigma) <- tcIdOcc (OccurrenceOf fun_name) fun_name
        ; (wrap, fun_rho) <- instFunTy fun_sigma   -- Eagerly instantiate
        ; tc_app (L loc (mkHsWrap wrap fun_expr)) args fun_rho res_ty }
 
@@ -1001,30 +1001,27 @@ tc_app fun_expr args fun_ty res_ty
         ; args1 <- tcArgs fun_expr args expected_arg_tys
 
         -- Both actual_res_ty and res_ty are deeply skolemised
-        -- Split in cases depending on whether res_ty is a variable or not
-        -- When it is, generate a equality constraint instead of instantiation
+        -- Never generate a upsilon <~ sigma constraint
         -- This is needed to compile some programs such as
         -- > data S a = S a
         -- > f :: [Char] -> S a
         -- > f x = S (error x)
         -- Without it, the `a` coming from `f` cannot be unified with
         -- the second type variable of `error`
-        ; case getTyVar_maybe actual_res_ty of
-          { Nothing
-              -> do { ev_res <- addErrCtxtM (funResCtxt True (unLoc fun_expr) actual_res_ty res_ty) $
-                                emitWanted AppOrigin (mkInstanceOfPred actual_res_ty res_ty)
-                    ; return $ TcAppResult
-                       (mkLHsWrapCo co_fun fun_expr)  -- Instantiated function
-                       args1                          -- Arguments
-                                                      -- Coercion to expected result type
-                       (mkWpInstanceOf ev_res) }
-          ; Just _
-              -> do { co_res <- addErrCtxtM (funResCtxt True (unLoc fun_expr) actual_res_ty res_ty) $
-                                unifyType actual_res_ty res_ty
-                    ; return $ TcAppResult
-                       (mkLHsWrapCo co_fun fun_expr)  -- Instantiated function
-                       args1                          -- Arguments
-                       (coToHsWrapper co_res) } } }   -- Coercion to expected result type
+        ; if isUpsilonTy actual_res_ty
+             then do { ev_res <- addErrCtxtM (funResCtxt True (unLoc fun_expr) actual_res_ty res_ty) $
+                                 emitWanted AppOrigin (mkInstanceOfPred actual_res_ty res_ty)
+                     ; return $ TcAppResult
+                        (mkLHsWrapCo co_fun fun_expr)  -- Instantiated function
+                        args1                          -- Arguments
+                                                       -- Coercion to expected result type
+                        (mkWpInstanceOf ev_res) }
+             else do { co_res <- addErrCtxtM (funResCtxt True (unLoc fun_expr) actual_res_ty res_ty) $
+                                 unifyType actual_res_ty res_ty
+                     ; return $ TcAppResult
+                        (mkLHsWrapCo co_fun fun_expr)  -- Instantiated function
+                        args1                          -- Arguments
+                        (coToHsWrapper co_res) } }     -- Coercion to expected result type
 
 mk_app_msg :: Outputable a => a -> SDoc
 mk_app_msg fun = sep [ ptext (sLit "The function") <+> quotes (ppr fun)
@@ -1163,43 +1160,40 @@ tc_infer_assert dflags orig
 tc_check_id :: CtOrigin -> Name -> TcRhoType -> TcM (HsExpr TcId)
 -- Return type is deeply instantiated
 tc_check_id orig id_name res_ty
- = do { (id_expr, flavour, id_ty) <- tcIdOcc orig id_name
-      ; case flavour of
-          TcIdMonomorphic  -- Generate an equality constraint
-            -> do { co <- unifyType id_ty res_ty
-                  ; return (mkHsWrapCo co id_expr) }
+ = do { (id_expr, id_ty) <- tcIdOcc orig id_name
+      ; if isUpsilonTy id_ty
+           then do { co <- unifyType id_ty res_ty
+                   ; return (mkHsWrapCo co id_expr) }
+           else do { ev <- emitWanted orig (mkInstanceOfPred id_ty res_ty)
+                   ; return (mkHsWrap (mkWpInstanceOf ev) id_expr) } }
 
-          TcIdUnrestricted  -- Generate an instance-of constraint
-                 -> do { ev <- emitWanted orig (mkInstanceOfPred id_ty res_ty)
-                       ; return (mkHsWrap (mkWpInstanceOf ev) id_expr) } }
-
-tcIdOcc :: CtOrigin -> Name -> TcM (HsExpr TcId, TcIdFlavor, TcSigmaType)
+tcIdOcc :: CtOrigin -> Name -> TcM (HsExpr TcId, TcSigmaType)
 -- Check an occurrence of an Id in a term
 -- Do not instantiate it, except in the legacy case
 -- of data constructors with a stupid theta
 tcIdOcc orig name
   = do { thing <- tcLookup name
        ; case thing of
-             ATcId { tct_id = id, tct_flavor = flavor }
+             ATcId { tct_id = id }
                -> do { check_naughty id        -- Note [Local record selectors]
                      ; checkThLocalId id
-                     ; return (HsVar id, flavor, idType id) }
+                     ; return (HsVar id, idType id) }
 
              AGlobal (AnId id)
                -> do { check_naughty id
-                     ; return (HsVar id, TcIdUnrestricted, idType id) }
+                     ; return (HsVar id, idType id) }
                     -- A global cannot possibly be ill-staged
                     -- nor does it need the 'lifting' treatment
                     -- hence no checkTh stuff here
 
              AGlobal (AConLike (PatSynCon ps))
                -> do { (expr, res_ty) <- tcPatSynBuilderOcc orig ps
-                     ; return (expr, TcIdMonomorphic, res_ty) }
+                     ; return (expr, res_ty) }
                      -- ToDo: instantiate pattern synonyms lazily
 
              AGlobal (AConLike (RealDataCon con))
                | null (dataConStupidTheta con)
-               -> return (HsVar (dataConWrapId con), TcIdUnrestricted, idType (dataConWrapId con))
+               -> return (HsVar (dataConWrapId con), idType (dataConWrapId con))
                | otherwise  -- Legacy case: always instantiate eagerly
                -> inst_stupid_data_con con
 
@@ -1221,7 +1215,7 @@ tcIdOcc orig name
                  rho'   = substTy subst rho
            ; wrap <- instCall orig tys' theta'
            ; addDataConStupidTheta con tys'
-           ; return (mkHsWrap wrap (HsVar (dataConWrapId con)), TcIdMonomorphic, rho') }
+           ; return (mkHsWrap wrap (HsVar (dataConWrapId con)), rho') }
 
 
 srcSpanPrimLit :: DynFlags -> SrcSpan -> HsExpr TcId

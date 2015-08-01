@@ -27,7 +27,6 @@ import Outputable
 import FastString
 import Bag
 import Data.List( partition )
-import Inst( newWanted )
 
 {-
 Note [Typechecking rules]
@@ -69,10 +68,9 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
               -- the RULE.  c.f. Trac #10072
 
        ; let (id_bndrs, tv_bndrs) = partition isId vars
-             id_bndrs' = [(id_bndr, choose_tc_id_flavor id_bndr) | id_bndr <- id_bndrs]
        ; (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty)
-            <- tcExtendTyVarEnv tv_bndrs  $
-               tcExtendIdEnv    id_bndrs' $
+            <- tcExtendTyVarEnv tv_bndrs $
+               tcExtendIdEnv    id_bndrs $
                do { -- See Note [Solve order for RULES]
                     ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)
                   ; (rhs', rhs_wanted) <- captureConstraints (tcPolyMonoExpr rhs rule_ty)
@@ -137,11 +135,6 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                     (map (noLoc . RuleBndr . noLoc) (qtkvs ++ tpl_ids))
                     (mkHsDictLet (TcEvBinds lhs_binds_var) lhs') fv_lhs
                     (mkHsDictLet (TcEvBinds rhs_binds_var) rhs') fv_rhs) }
-
-choose_tc_id_flavor :: Id -> TcIdFlavor
-choose_tc_id_flavor v
-  | Just _ <- tcGetTyVar_maybe (idType v) = TcIdMonomorphic
-  | otherwise = TcIdUnrestricted
 
 tcRuleBndrs :: [LRuleBndr Name] -> TcM [Var]
 tcRuleBndrs []

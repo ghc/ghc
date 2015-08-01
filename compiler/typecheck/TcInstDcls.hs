@@ -782,8 +782,7 @@ tcInstDecls2 tycl_decls inst_decls
         ; let dm_binds = unionManyBags dm_binds_s
 
           -- (b) instance declarations
-        ; let dm_ids = [(id, TcIdUnrestricted)
-                       | id <- collectHsBindsBinders dm_binds]
+        ; let dm_ids = collectHsBindsBinders dm_binds
               -- Add the default method Ids (again)
               -- See Note [Default methods and instances]
         ; inst_binds_s <- tcExtendLetEnv TopLevel dm_ids $

@@ -18,8 +18,8 @@ module TcEvidence (
   EvLit(..), evTermCoercion,
   EvCallStack(..),
   EvTypeable(..),
-  EvInstanceOf(..), mkInstanceOfRefl, mkInstanceOfEq,
-  mkInstanceOfInst, mkInstanceOfGen,
+  EvInstanceOf(..),
+  mkInstanceOfEq, mkInstanceOfInst, mkInstanceOfInstEq, mkInstanceOfGen,
 
   -- TcCoercion
   TcCoercion(..), TcCoercionR, TcCoercionN,
@@ -781,10 +781,6 @@ data EvCallStack
 {- Note [Evidence for InstanceOf constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-             g : t ~N t
-    --------------------------
-    EvInstanceOfRefl : t <~ t
-
              g : s ~N t
     --------------------------
     EvInstanceOfEq g : s <~ t
@@ -793,19 +789,23 @@ data EvCallStack
     -------------------------------------------------------------------------
     EvInstanceOfInst [t1..tm] g [v1..vn] : (forall a1..am., c1..ck => s) <~ t
 
+                 g : (s[tys/as] ~ t),   vi : ci[tys/as]
+    ---------------------------------------------------------------------------
+    EvInstanceOfInstEq [t1..tm] g [v1..vn] : (forall a1..am., c1..ck => s) <~ t
+
                  forall [a1..an]. [v1:c1,..vn:cn] <binds>. g : s <~ t
     -------------------------------------------------------------------------
     EvInstanceOfGen [a1..an] [v1..vn] <binds> g : s <~ (forall a1..am., c1..ck => t)
 -}
 
 data EvInstanceOf
-  = EvInstanceOfRefl
-
-  | EvInstanceOfEq   TcCoercion  -- ^ term witnessing equality
-
-  | EvInstanceOfInst [Type]      -- ^ type variables to apply
+  = EvInstanceOfInst [Type]      -- ^ type variables to apply
                      EvId        -- ^ witness for inner instantiation
                      [EvTerm]    -- ^ witness for inner constraints
+
+  | EvInstanceOfInstEq [Type]
+                       TcCoercion
+                       [EvTerm]
 
   | EvInstanceOfGen  [TyVar]     -- ^ type variables
                      [EvId]      -- ^ constraint variables
@@ -814,17 +814,17 @@ data EvInstanceOf
 
     deriving ( Data.Data, Data.Typeable )
 
-mkInstanceOfRefl :: Type -> EvTerm
-mkInstanceOfRefl ty
-  = EvInstanceOf ty EvInstanceOfRefl
-
 mkInstanceOfEq :: Type -> TcCoercion -> EvTerm
 mkInstanceOfEq ty co
-  = EvInstanceOf ty (EvInstanceOfEq co)
+  = mkInstanceOfInstEq ty [] co []
 
 mkInstanceOfInst :: Type -> [Type] -> EvId -> [EvVar] -> EvTerm
 mkInstanceOfInst ty vars co q
   = EvInstanceOf ty (EvInstanceOfInst vars co (map EvId q))
+
+mkInstanceOfInstEq :: Type -> [Type] -> TcCoercion -> [EvVar] -> EvTerm
+mkInstanceOfInstEq ty vars co q
+  = EvInstanceOf ty (EvInstanceOfInstEq vars co (map EvId q))
 
 mkInstanceOfGen :: Type -> [TyVar] -> [EvId] -> TcEvBinds -> EvId -> EvTerm
 mkInstanceOfGen ty tyvars qvars bnds co
@@ -1093,9 +1093,8 @@ evVarsOfTypeable ev =
 evVarsOfInstanceOf :: EvInstanceOf -> VarSet
 evVarsOfInstanceOf ev =
   case ev of
-    EvInstanceOfRefl        -> emptyVarSet
-    EvInstanceOfEq   co     -> coVarsOfTcCo co
-    EvInstanceOfInst _ co q -> unitVarSet co `unionVarSet` evVarsOfTerms q
+    EvInstanceOfInst   _ co q -> unitVarSet co `unionVarSet` evVarsOfTerms q
+    EvInstanceOfInstEq _ co q -> coVarsOfTcCo co `unionVarSet` evVarsOfTerms q
     EvInstanceOfGen  _ qvars (EvBinds bs) co ->
       (foldrBag (unionVarSet . go_bind) (unitVarSet co) bs
        `minusVarSet` get_bndrs bs) `minusVarSet` mkVarSet qvars
@@ -1197,10 +1196,10 @@ instance Outputable EvTypeable where
 instance Outputable EvInstanceOf where
   ppr ev =
     case ev of
-      EvInstanceOfRefl     -> ptext (sLit "REFL")
-      EvInstanceOfEq   co  -> ptext (sLit "EQ")   <+> ppr co
       EvInstanceOfInst vars co q
-        -> ptext (sLit "INST") <+> ppr vars <+> ppr q <+> ppr co
+        -> ptext (sLit "INST")   <+> ppr vars <+> ppr q <+> ppr co
+      EvInstanceOfInstEq vars co q
+        -> ptext (sLit "INSTEQ") <+> ppr vars <+> ppr q <+> ppr co
       EvInstanceOfGen  vars qvars b i
         -> ptext (sLit "LET") <+> ppr vars <+> ppr qvars
                               <+> ppr b <+> ppr i
