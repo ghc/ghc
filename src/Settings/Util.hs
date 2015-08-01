@@ -84,7 +84,7 @@ getHsSources = do
 
     (foundSources, missingSources) <- findModuleFiles dirs "*hs"
 
-    -- Generated source files will live in buildPath and have extension "hs"
+    -- Generated source files live in buildPath and have extension "hs"
     let generatedSources = map (\f -> buildPath -/- f <.> "hs") missingSources
 
     return $ foundSources ++ generatedSources
@@ -103,18 +103,21 @@ decodeModule = splitFileName . replaceEq '.' '/'
 -- * a list of module files that have not been found, with paths being relative
 --   to the module directory, e.g. "CodeGen/Platform", and with no extension.
 findModuleFiles :: [FilePath] -> FilePattern -> Expr ([FilePath], [FilePath])
-findModuleFiles dirs ext = do
+findModuleFiles dirs extension = do
     modules <- getPkgDataList Modules
-    let decodedMods = sort . map decodeModule $ modules
-        modDirFiles = map (bimap head sort . unzip)
-                    . groupBy ((==) `on` fst) $ decodedMods
+    let decodedMods    = sort . map decodeModule $ modules
+        modDirFiles    = map (bimap head sort . unzip)
+                       . groupBy ((==) `on` fst) $ decodedMods
+        matchExtension = (?==) ("*" <.> extension)
 
     result <- lift . fmap concat . forM dirs $ \dir -> do
         todo <- filterM (doesDirectoryExist . (dir -/-) . fst) modDirFiles
         forM todo $ \(mDir, mFiles) -> do
-            let files = [ dir -/- mDir -/- mFile <.> ext | mFile <- mFiles ]
-            found <- fmap (map unifyPath) $ getDirectoryFiles "" files
-            return (found, (mDir, map takeBaseName found))
+            let fullDir = dir -/- mDir
+            files <- fmap (filter matchExtension) $ getDirectoryContents fullDir
+            let cmp fe f = compare (dropExtension fe) f
+                found    = intersectOrd cmp files mFiles
+            return (map (fullDir -/-) found, (mDir, map dropExtension found))
 
     let foundFiles   = concatMap fst result
         foundMods    = [ (d, f) | (d, fs) <- map snd result, f <- fs ]

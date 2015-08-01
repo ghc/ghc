@@ -21,7 +21,7 @@ newtype DependencyListKey = DependencyListKey (FilePath, FilePath)
 dependencyList :: FilePath -> FilePath -> Action [FilePath]
 dependencyList depFile objFile = do
     res <- askOracle $ DependencyListKey (depFile, objFile)
-    return $ fromMaybe [] res
+    return . fromMaybe [] $ res
 
 -- Oracle for 'path/dist/*.deps' files
 dependencyListOracle :: Rules ()
@@ -30,11 +30,11 @@ dependencyListOracle = do
         need [file]
         putOracle $ "Reading " ++ file ++ "..."
         contents <- parseMakefile <$> (liftIO $ readFile file)
-        return $ Map.fromList
-               $ map (bimap unifyPath (map unifyPath))
-               $ map (bimap head concat . unzip)
-               $ groupBy ((==) `on` fst)
-               $ sortBy (compare `on` fst) contents
+        return . Map.fromList
+               . map (bimap unifyPath (map unifyPath))
+               . map (bimap head concat . unzip)
+               . groupBy ((==) `on` fst)
+               . sortBy (compare `on` fst) $ contents
     addOracle $ \(DependencyListKey (file, obj)) ->
         Map.lookup (unifyPath obj) <$> deps (unifyPath file)
     return ()

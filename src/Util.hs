@@ -6,7 +6,7 @@ module Util (
     unifyPath, (-/-),
     chunksOfSize,
     putColoured, redError, redError_,
-    bimap, minusOrd
+    bimap, minusOrd, intersectOrd
     ) where
 
 import Data.Char
@@ -71,7 +71,7 @@ redError_ = void . redError
 bimap :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
 bimap f g (x, y) = (f x, g y)
 
--- Depending on Data.List.Ordered only for this function seems an overkill
+-- Depending on Data.List.Ordered only for these two functions seems an overkill
 minusOrd :: Ord a => [a] -> [a] -> [a]
 minusOrd [] _  = []
 minusOrd xs [] = xs
@@ -79,3 +79,13 @@ minusOrd (x:xs) (y:ys) = case compare x y of
     LT -> x : minusOrd xs (y:ys)
     EQ ->     minusOrd xs ys
     GT ->     minusOrd (x:xs) ys
+
+intersectOrd :: (a -> b -> Ordering) -> [a] -> [b] -> [a]
+intersectOrd cmp = loop
+  where
+    loop [] _ = []
+    loop _ [] = []
+    loop (x:xs) (y:ys) = case cmp x y of
+         LT ->     loop xs (y:ys)
+         EQ -> x : loop xs ys
+         GT ->     loop (x:xs) ys
