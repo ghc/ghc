@@ -16,8 +16,11 @@ import Settings.User
 import Settings.Ways
 import Settings.Util
 import Settings.Packages
-import Data.List
-import Control.Applicative
+import Data.Version
+import qualified Distribution.Package                  as D
+import qualified Distribution.PackageDescription       as D
+import qualified Distribution.Verbosity                as D
+import qualified Distribution.PackageDescription.Parse as D
 
 cabalArgs :: Args
 cabalArgs = builder GhcCabal ? do
@@ -33,7 +36,7 @@ cabalArgs = builder GhcCabal ? do
             , libraryArgs
             , with HsColour
             , configureArgs
-            , stage0 ? packageConstraints
+            , packageConstraints
             , withStaged Gcc
             , notStage0 ? with Ld
             , with Ar
@@ -92,20 +95,19 @@ bootPackageDbArgs = do
 dllArgs :: Args
 dllArgs = arg ""
 
+-- TODO: speed up by caching the result in Shake database?
 packageConstraints :: Args
-packageConstraints = do
+packageConstraints = stage0 ? do
     pkgs <- getPackages
     constraints <- lift $ forM pkgs $ \pkg -> do
-        let cabal  = pkgPath pkg -/- pkgCabal pkg
-            prefix = dropExtension (pkgCabal pkg) ++ " == "
+        let cabal = pkgPath pkg -/- pkgCabal pkg
         need [cabal]
-        content <- lines <$> liftIO (readFile cabal)
-        let vs = filter (("ersion:" `isPrefixOf`) . drop 1) content
-        case vs of
-            [v] -> return $ prefix ++ dropWhile (not . isDigit) v
-            _   -> redError $ "Cannot determine package version in '"
-                            ++ cabal ++ "'."
-    append $ concatMap (\c -> ["--constraint", c]) $ constraints
+        description <- liftIO $ D.readPackageDescription D.silent cabal
+        let identifier         = D.package . D.packageDescription $ description
+            version            = showVersion . D.pkgVersion $ identifier
+            D.PackageName name = D.pkgName $ identifier
+        return $ name ++ " == " ++ version
+    append . concatMap (\c -> ["--constraint", c]) $ constraints
 
 -- TODO: should be in a different file
 -- TODO: put all validating options together in one file
