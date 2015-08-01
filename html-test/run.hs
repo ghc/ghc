@@ -13,6 +13,7 @@ import System.Environment
 import System.Exit
 import System.FilePath
 import System.IO
+import System.Process
 
 
 baseDir, rootDir :: FilePath
@@ -24,6 +25,9 @@ srcDir = baseDir </> "src"
 refDir = baseDir </> "ref"
 outDir = baseDir </> "out"
 
+resDir :: FilePath
+resDir = rootDir </> "resources"
+
 
 data Config = Config
     { cfgHaddockPath :: FilePath
@@ -34,6 +38,21 @@ data Config = Config
 main :: IO ()
 main = do
     Config { .. } <- parseArgs =<< getArgs
+
+    env <- Just . (:) ("haddock_datadir", resDir) <$> getEnvironment
+
+    handle <- runProcess' cfgHaddockPath $ processConfig
+        { pcEnv = env
+        , pcArgs = ["--version"]
+        }
+    waitForSuccess "Failed to run `haddock --version`" handle
+
+    handle <- runProcess' cfgHaddockPath $ processConfig
+        { pcEnv = env
+        , pcArgs = ["--ghc-version"]
+        }
+    waitForSuccess "Failed to run `haddock --ghc-version`" handle
+
     putStrLn $ "Files to test: " ++ show cfgFiles
 
 
@@ -92,3 +111,37 @@ haddockPath flags = case mlast [ path | FlagHaddockPath path <- flags ] of
 
 mlast :: [a] -> Maybe a
 mlast = listToMaybe . reverse
+
+
+data ProcessConfig = ProcessConfig
+    { pcArgs :: [String]
+    , pcWorkDir :: Maybe FilePath
+    , pcEnv :: Maybe [(String, String)]
+    , pcStdIn :: Maybe Handle
+    , pcStdOut :: Maybe Handle
+    , pcStdErr :: Maybe Handle
+    }
+
+
+processConfig :: ProcessConfig
+processConfig = ProcessConfig
+    { pcArgs = []
+    , pcWorkDir = Nothing
+    , pcEnv = Nothing
+    , pcStdIn = Nothing
+    , pcStdOut = Nothing
+    , pcStdErr = Nothing
+    }
+
+
+runProcess' :: FilePath -> ProcessConfig -> IO ProcessHandle
+runProcess' path (ProcessConfig { .. }) = runProcess
+    path pcArgs pcWorkDir pcEnv pcStdIn pcStdOut pcStdErr
+
+
+waitForSuccess :: String -> ProcessHandle -> IO ()
+waitForSuccess msg handle = do
+    result <- waitForProcess handle
+    unless (result == ExitSuccess) $ do
+        hPutStrLn stderr $ msg
+        exitFailure
