@@ -37,7 +37,8 @@ buildPackageData target = do
             -- GhcCabal may run the configure script, so we depend on it
             -- We don't know who built the configure script from configure.ac
             whenM (doesFileExist $ configure <.> "ac") $ need [configure]
-            build $ fullTarget target [cabal] GhcCabal files
+            buildWithResources [(ghcPkg, 1)] $ -- GhcCabal calls ghc-pkg too
+                fullTarget target [cabal] GhcCabal files
             whenM (interpretExpr target registerPackage) .
                 buildWithResources [(ghcPkg, 1)] $
                 fullTarget target [cabal] (GhcPkg stage) files
