@@ -12,6 +12,7 @@ import System.Directory
 import System.Environment
 import System.Exit
 import System.FilePath
+import System.IO
 
 
 baseDir, rootDir :: FilePath
@@ -41,11 +42,11 @@ parseArgs args = do
     let (flags, files, errors) = getOpt Permute options args
 
     when (not $ null errors) $ do
-        mapM_ putStrLn errors
+        hPutStr stderr $ concat errors
         exitFailure
 
     when (FlagHelp `elem` flags) $ do
-        putStrLn $ usageInfo "" options
+        hPutStrLn stderr $ usageInfo "" options
         exitSuccess
 
     cfgFiles <- processFileArgs files
