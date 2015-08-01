@@ -17,17 +17,17 @@ buildPackageDependencies target =
         pkg       = Target.package target
         path      = targetPath stage pkg
         buildPath = path -/- "build"
+        dropBuild = (pkgPath pkg ++) . drop (length buildPath)
     in do
-        (buildPath -/- "haskell.deps") %> \file -> do
-            srcs <- interpretExpr target getHsSources
-            build $ fullTarget target srcs (GhcM stage) [file]
+        (buildPath <//> "*.c.deps") %> \depFile -> do
+            let srcFile = dropBuild . dropExtension $ depFile
+            build $ fullTarget target [srcFile] (GccM stage) [depFile]
 
         (buildPath -/- "c.deps") %> \file -> do
             srcs <- pkgDataList $ CSrcs path
-            deps <- forM srcs $ \src -> do
-                let srcFile = pkgPath pkg -/- src
-                    depFile = buildPath -/- takeFileName src <.> "deps"
-                build $ fullTarget target [srcFile] (GccM stage) [depFile]
-                liftIO . readFile $ depFile
+            deps <- forM srcs $ \src -> readFile' $ buildPath -/- src <.> "deps"
             writeFileChanged file (concat deps)
-            liftIO $ removeFiles buildPath ["*.c.deps"]
+
+        (buildPath -/- "haskell.deps") %> \file -> do
+            srcs <- interpretExpr target getHsSources
+            build $ fullTarget target srcs (GhcM stage) [file]
