@@ -15,12 +15,6 @@ import Oracles.Setting
 import Settings.User
 import Settings.Ways
 import Settings.Util
-import Settings.Packages
-import Data.Version
-import qualified Distribution.Package                  as D
-import qualified Distribution.PackageDescription       as D
-import qualified Distribution.Verbosity                as D
-import qualified Distribution.PackageDescription.Parse as D
 
 cabalArgs :: Args
 cabalArgs = builder GhcCabal ? do
@@ -95,18 +89,9 @@ bootPackageDbArgs = do
 dllArgs :: Args
 dllArgs = arg ""
 
--- TODO: speed up by caching the result in Shake database?
 packageConstraints :: Args
 packageConstraints = stage0 ? do
-    pkgs <- getPackages
-    constraints <- lift $ forM pkgs $ \pkg -> do
-        let cabal = pkgPath pkg -/- pkgCabal pkg
-        need [cabal]
-        description <- liftIO $ D.readPackageDescription D.silent cabal
-        let identifier         = D.package . D.packageDescription $ description
-            version            = showVersion . D.pkgVersion $ identifier
-            D.PackageName name = D.pkgName $ identifier
-        return $ name ++ " == " ++ version
+    constraints <- lift . readFileLines $ bootPackageConstraints
     append . concatMap (\c -> ["--constraint", c]) $ constraints
 
 -- TODO: should be in a different file

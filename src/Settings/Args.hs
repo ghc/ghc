@@ -2,12 +2,12 @@ module Settings.Args (
     args
     ) where
 
+import Expression
 import Settings.User
 import Settings.GhcM
 import Settings.GccM
 import Settings.GhcPkg
 import Settings.GhcCabal
-import Expression
 
 args :: Args
 args = defaultArgs <> userArgs

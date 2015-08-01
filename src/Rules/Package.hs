@@ -1,6 +1,4 @@
-module Rules.Package (
-    buildPackage
-    ) where
+module Rules.Package (buildPackage) where
 
 import Base
 import Expression
