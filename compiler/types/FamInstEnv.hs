@@ -891,7 +891,7 @@ topNormaliseType_maybe :: FamInstEnvs -> Type -> Maybe (Coercion, Type)
 --      * type function redex
 --      * data family redex
 --      * newtypes
--- returning an appropriate Representaitonal coercion.  Specifically, if
+-- returning an appropriate Representational coercion.  Specifically, if
 --   topNormaliseType_maybe env ty = Maybe (co, ty')
 -- then
 --   (a) co :: ty ~R ty'

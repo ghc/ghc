@@ -833,7 +833,7 @@ wrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 --      newtype T a = MkT (a,Int)
 --      MkT :: forall a. (a,Int) -> T a
 --      MkT = /\a. \(x:(a,Int)). x `cast` sym (CoT a)
--- where CoT is the coercion TyCon assoicated with the newtype
+-- where CoT is the coercion TyCon associated with the newtype
 --
 -- The call (wrapNewTypeBody T [a] e) returns the
 -- body of the wrapper, namely

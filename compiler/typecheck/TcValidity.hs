@@ -1107,7 +1107,7 @@ So we
     consistent with the instance types [p] y Int
 
 We do *not* assume (at this point) the the bound variables of
-the assoicated type instance decl are the same as for the parent
+the associated type instance decl are the same as for the parent
 instance decl. So, for example,
 
   instance C [p] Int

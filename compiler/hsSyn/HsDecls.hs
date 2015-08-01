@@ -494,7 +494,7 @@ data TyClDecl name
 
     -- For details on above see note [Api annotations] in ApiAnnotation
     DataDecl { tcdLName    :: Located name        -- ^ Type constructor
-             , tcdTyVars   :: LHsTyVarBndrs name  -- ^ Type variables; for an assoicated type
+             , tcdTyVars   :: LHsTyVarBndrs name  -- ^ Type variables; for an associated type
                                                   --   these include outer binders
                                                   -- Eg  class T a where
                                                   --       type F a :: *
