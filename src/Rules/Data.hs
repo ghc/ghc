@@ -35,15 +35,17 @@ buildPackageData (Resources ghcCabal ghcPkg) target = do
         -- TODO: Is this needed? Also check out Paths_cpsa.hs.
         -- , "build" -/- "autogen" -/- ("Paths_" ++ name) <.> "hs"
         ] &%> \files -> do
-            -- GhcCabal may run the configure script, so we depend on it
-            -- We don't know who built the configure script from configure.ac
-            whenM (doesFileExist $ configure <.> "ac") $ need [configure]
-
             -- We configure packages in the order of their dependencies
             deps <- packageDeps . dropExtension . pkgCabal $ pkg
             pkgs <- interpret target packages
             let depPkgs = concatMap (maybeToList . findPackage pkgs) deps
-            need $ map (\p -> targetPath stage p -/- "package-data.mk") depPkgs
+
+            -- GhcCabal may run the configure script, so we depend on it
+            -- We don't know who built the configure script from configure.ac
+            needConfigure <- doesFileExist $ configure <.> "ac"
+
+            need $ [ configure | needConfigure ] ++
+                   [ targetPath stage p -/- "package-data.mk" | p <- depPkgs ]
 
             buildWithResources [(ghcCabal, 1)] $
                 fullTarget target [cabal] GhcCabal files
