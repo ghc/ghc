@@ -1226,9 +1226,9 @@ mkInlinePragma src (inl, match_info) mb_act
 --
 mkImport :: Located CCallConv
          -> Located Safety
-         -> (Located (SourceText,FastString), Located RdrName, LHsType RdrName)
+         -> (Located StringLiteral, Located RdrName, LHsType RdrName)
          -> P (HsDecl RdrName)
-mkImport (L lc cconv) (L ls safety) (L loc (esrc,entity), v, ty)
+mkImport (L lc cconv) (L ls safety) (L loc (StringLiteral esrc entity), v, ty)
   | cconv == PrimCallConv                      = do
   let funcTarget = CFunction (StaticTarget esrc entity Nothing True)
       importSpec = CImport (L lc PrimCallConv) (L ls safety) Nothing funcTarget
@@ -1305,9 +1305,9 @@ parseCImport cconv safety nm str sourceText =
 -- construct a foreign export declaration
 --
 mkExport :: Located CCallConv
-         -> (Located (SourceText,FastString), Located RdrName, LHsType RdrName)
+         -> (Located StringLiteral, Located RdrName, LHsType RdrName)
          -> P (HsDecl RdrName)
-mkExport (L lc cconv) (L le (esrc,entity), v, ty) = do
+mkExport (L lc cconv) (L le (StringLiteral esrc entity), v, ty) = do
   return $ ForD (ForeignExport v ty noForeignExportCoercionYet
                  (CExport (L lc (CExportStatic esrc entity' cconv))
                           (L le (unpackFS entity))))

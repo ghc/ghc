@@ -57,13 +57,14 @@ testOneFile libdir fileName = do
                               ) ast
 
      doWarningTxt :: WarningTxt -> [(String,[Located (SourceText,FastString)])]
-     doWarningTxt ((WarningTxt _ ss))    = [("w",ss)]
-     doWarningTxt ((DeprecatedTxt _ ss)) = [("d",ss)]
+     doWarningTxt ((WarningTxt _ ss))    = [("w",map conv ss)]
+     doWarningTxt ((DeprecatedTxt _ ss)) = [("d",map conv ss)]
 
      doImportDecl :: ImportDecl RdrName
                   -> [(String,[Located (SourceText,FastString)])]
      doImportDecl (ImportDecl _ _ Nothing _ _ _ _ _ _) = []
-     doImportDecl (ImportDecl _ _ (Just ss) _ _ _ _ _ _) = [("i",[noLoc ss])]
+     doImportDecl (ImportDecl _ _ (Just ss) _ _ _ _ _ _)
+                                                     = [("i",[conv (noLoc ss)])]
 
      doCType :: CType -> [(String,[Located (SourceText,FastString)])]
      doCType (CType src (Just (Header hs hf)) c)
@@ -79,10 +80,12 @@ testOneFile libdir fileName = do
      doCCallTarget (StaticTarget s f _ _) = [("st",[(noLoc (s,f))])]
 
      doHsExpr :: HsExpr RdrName -> [(String,[Located (SourceText,FastString)])]
-     doHsExpr (HsCoreAnn src ss _) = [("co",[noLoc ss])]
-     doHsExpr (HsSCC     src ss _) = [("sc",[noLoc ss])]
-     doHsExpr (HsTickPragma src (ss,_,_) _) = [("tp",[noLoc ss])]
+     doHsExpr (HsCoreAnn src ss _) = [("co",[conv (noLoc ss)])]
+     doHsExpr (HsSCC     src ss _) = [("sc",[conv (noLoc ss)])]
+     doHsExpr (HsTickPragma src (ss,_,_) _) = [("tp",[conv (noLoc ss)])]
      doHsExpr _ = []
+
+     conv (GHC.L l (StringLiteral st fs)) = GHC.L l (st,fs)
 
 showAnns anns = "[\n" ++ (intercalate "\n"
    $ map (\((s,k),v)

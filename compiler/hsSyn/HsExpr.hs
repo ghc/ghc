@@ -350,15 +350,15 @@ data HsExpr id
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsSCC       SourceText            -- Note [Pragma source text] in BasicTypes
-                (SourceText,FastString) -- "set cost centre" SCC pragma
-                (LHsExpr id)            -- expr whose cost is to be measured
+                StringLiteral         -- "set cost centre" SCC pragma
+                (LHsExpr id)          -- expr whose cost is to be measured
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# CORE'@,
   --             'ApiAnnotation.AnnVal', 'ApiAnnotation.AnnClose' @'\#-}'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsCoreAnn   SourceText            -- Note [Pragma source text] in BasicTypes
-                (SourceText,FastString) -- hdaume: core annotation
+                StringLiteral         -- hdaume: core annotation
                 (LHsExpr id)
 
   -----------------------------------------------------------
@@ -464,7 +464,7 @@ data HsExpr id
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsTickPragma                      -- A pragma introduced tick
      SourceText                       -- Note [Pragma source text] in BasicTypes
-     ((SourceText,FastString),(Int,Int),(Int,Int))
+     (StringLiteral,(Int,Int),(Int,Int))
                                       -- external span for this tick
      (LHsExpr id)
 
@@ -595,7 +595,7 @@ ppr_expr (HsLit lit)      = ppr lit
 ppr_expr (HsOverLit lit)  = ppr lit
 ppr_expr (HsPar e)        = parens (ppr_lexpr e)
 
-ppr_expr (HsCoreAnn _ (_,s) e)
+ppr_expr (HsCoreAnn _ (StringLiteral _ s) e)
   = vcat [ptext (sLit "HsCoreAnn") <+> ftext s, ppr_lexpr e]
 
 ppr_expr (HsApp e1 e2)
@@ -716,7 +716,7 @@ ppr_expr (ELazyPat e)   = char '~' <> pprParendExpr e
 ppr_expr (EAsPat v e)   = ppr v <> char '@' <> pprParendExpr e
 ppr_expr (EViewPat p e) = ppr p <+> ptext (sLit "->") <+> ppr e
 
-ppr_expr (HsSCC _ (_,lbl) expr)
+ppr_expr (HsSCC _ (StringLiteral _ lbl) expr)
   = sep [ ptext (sLit "{-# SCC") <+> doubleQuotes (ftext lbl) <+> ptext (sLit "#-}"),
           pprParendExpr expr ]
 
@@ -750,7 +750,7 @@ ppr_expr (HsBinTick tickIdTrue tickIdFalse exp)
 ppr_expr (HsTickPragma _ externalSrcLoc exp)
   = pprTicks (ppr exp) $
     hcat [ptext (sLit "tickpragma<"),
-          ppr externalSrcLoc,
+          pprExternalSrcLoc externalSrcLoc,
           ptext (sLit ">("),
           ppr exp,
           ptext (sLit ")")]
@@ -769,6 +769,10 @@ ppr_expr (HsArrForm (L _ (HsVar v)) (Just _) [arg1, arg2])
 ppr_expr (HsArrForm op _ args)
   = hang (ptext (sLit "(|") <+> ppr_lexpr op)
          4 (sep (map (pprCmdArg.unLoc) args) <+> ptext (sLit "|)"))
+
+pprExternalSrcLoc :: (StringLiteral,(Int,Int),(Int,Int)) -> SDoc
+pprExternalSrcLoc (StringLiteral _ src,(n1,n2),(n3,n4))
+  = ppr (src,(n1,n2),(n3,n4))
 
 {-
 HsSyn records exactly where the user put parens, with HsPar.

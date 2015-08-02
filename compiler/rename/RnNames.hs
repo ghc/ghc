@@ -36,7 +36,7 @@ import RdrHsSyn        ( setRdrNameSpace )
 import Outputable
 import Maybes
 import SrcLoc
-import BasicTypes      ( TopLevelFlag(..) )
+import BasicTypes      ( TopLevelFlag(..), StringLiteral(..) )
 import ErrUtils
 import Util
 import FastString
@@ -216,7 +216,7 @@ rnImportDecl this_mod
                            -- or the name of this_mod's package.  Yurgh!
                            -- c.f. GHC.findModule, and Trac #9997
              Nothing         -> True
-             Just (_,pkg_fs) -> pkg_fs == fsLit "this" ||
+             Just (StringLiteral _ pkg_fs) -> pkg_fs == fsLit "this" ||
                             fsToPackageKey pkg_fs == modulePackageKey this_mod))
          (addErr (ptext (sLit "A module cannot import itself:") <+> ppr imp_mod_name))
 
@@ -229,7 +229,7 @@ rnImportDecl this_mod
            | otherwise  -> whenWOptM Opt_WarnMissingImportList $
                            addWarn (missingImportListWarn imp_mod_name)
 
-    ifaces <- loadSrcInterface doc imp_mod_name want_boot (fmap snd mb_pkg)
+    ifaces <- loadSrcInterface doc imp_mod_name want_boot (fmap sl_fs mb_pkg)
 
     -- Compiler sanity check: if the import didn't say
     -- {-# SOURCE #-} we should not get a hi-boot file
@@ -1581,7 +1581,8 @@ printMinimalImports imports_w_usage
       = do { let ImportDecl { ideclName    = L _ mod_name
                             , ideclSource  = is_boot
                             , ideclPkgQual = mb_pkg } = decl
-           ; ifaces <- loadSrcInterface doc mod_name is_boot (fmap snd mb_pkg)
+           ; ifaces <- loadSrcInterface doc mod_name is_boot
+                                        (fmap sl_fs mb_pkg)
            ; let lies = map (L l) (concatMap (to_ie ifaces) used)
            ; return (L l (decl { ideclHiding = Just (False, L l lies) })) }
       where
@@ -1788,11 +1789,11 @@ missingImportListItem ie
 moduleWarn :: ModuleName -> WarningTxt -> SDoc
 moduleWarn mod (WarningTxt _ txt)
   = sep [ ptext (sLit "Module") <+> quotes (ppr mod) <> ptext (sLit ":"),
-          nest 2 (vcat (map (ppr . snd . unLoc) txt)) ]
+          nest 2 (vcat (map (ppr . sl_fs . unLoc) txt)) ]
 moduleWarn mod (DeprecatedTxt _ txt)
   = sep [ ptext (sLit "Module") <+> quotes (ppr mod)
                                 <+> ptext (sLit "is deprecated:"),
-          nest 2 (vcat (map (ppr . snd . unLoc) txt)) ]
+          nest 2 (vcat (map (ppr . sl_fs . unLoc) txt)) ]
 
 packageImportErr :: SDoc
 packageImportErr

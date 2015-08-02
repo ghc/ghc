@@ -27,7 +27,7 @@ module BasicTypes(
 
         FunctionOrData(..),
 
-        WarningTxt(..),
+        WarningTxt(..), StringLiteral(..),
 
         Fixity(..), FixityDirection(..),
         defaultFixity, maxPrecedence, minPrecedence,
@@ -268,20 +268,30 @@ initialVersion = 1
 ************************************************************************
 -}
 
+-- |A String Literal in the source, including its original raw format for use by
+-- source to source manipulation tools.
+data StringLiteral = StringLiteral
+                       { sl_st :: SourceText, -- literal raw source.
+                                              -- See not [Literal source text]
+                         sl_fs :: FastString  -- literal string value
+                       } deriving (Data, Typeable)
+
+instance Eq StringLiteral where
+  (StringLiteral _ a) == (StringLiteral _ b) = a == b
+
 -- reason/explanation from a WARNING or DEPRECATED pragma
--- For SourceText usage, see note [Pragma source text]
 data WarningTxt = WarningTxt (Located SourceText)
-                             [Located (SourceText,FastString)]
+                             [Located StringLiteral]
                 | DeprecatedTxt (Located SourceText)
-                                [Located (SourceText,FastString)]
+                                [Located StringLiteral]
     deriving (Eq, Data, Typeable)
 
 instance Outputable WarningTxt where
     ppr (WarningTxt    _ ws)
-                            = doubleQuotes (vcat (map (ftext . snd . unLoc) ws))
+                         = doubleQuotes (vcat (map (ftext . sl_fs . unLoc) ws))
     ppr (DeprecatedTxt _ ds)
-                            = text "Deprecated:" <+>
-                              doubleQuotes (vcat (map (ftext . snd . unLoc) ds))
+                         = text "Deprecated:" <+>
+                           doubleQuotes (vcat (map (ftext . sl_fs . unLoc) ds))
 
 {-
 ************************************************************************
