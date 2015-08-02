@@ -1,9 +1,8 @@
 module Rules.Cabal (cabalRules) where
 
 import Base
-import Util
 import Stage
-import Package hiding (pkgName, library)
+import Package hiding (library)
 import Expression hiding (package)
 import Settings.Packages
 import Data.List
@@ -19,12 +18,12 @@ cabalRules = do
     bootPackageConstraints %> \file -> do
         pkgs <- interpret (stageTarget Stage0) packages
         constraints <- forM (sort pkgs) $ \pkg -> do
-            let cabal = pkgPath pkg -/- pkgCabal pkg
+            let cabal = pkgCabalPath pkg
             need [cabal]
             description <- liftIO $ readPackageDescription silent cabal
             let identifier       = package . packageDescription $ description
                 version          = showVersion . pkgVersion $ identifier
-                PackageName name = pkgName identifier
+                PackageName name = Distribution.Package.pkgName identifier
             return $ name ++ " == " ++ version
         writeFileChanged file . unlines $ constraints
 
@@ -32,13 +31,13 @@ cabalRules = do
     packageDependencies %> \file -> do
         pkgs <- interpret (stageTarget Stage1) packages
         pkgDeps <- forM (sort pkgs) $ \pkg -> do
-            let cabal = pkgPath pkg -/- pkgCabal pkg
+            let cabal = pkgCabalPath pkg
             need [cabal]
             description <- liftIO $ readPackageDescription silent cabal
             let deps     = collectDeps . condLibrary $ description
                 depNames = [ name | Dependency (PackageName name) _ <- deps ]
-            return . unwords $ (dropExtension $ pkgCabal pkg) : sort depNames
-        writeFileChanged file $ unlines pkgDeps
+            return . unwords $ Package.pkgName pkg : sort depNames
+        writeFileChanged file . unlines $ pkgDeps
 
 collectDeps :: Maybe (CondTree v [Dependency] a) -> [Dependency]
 collectDeps Nothing = []

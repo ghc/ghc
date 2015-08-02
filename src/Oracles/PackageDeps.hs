@@ -6,22 +6,24 @@ module Oracles.PackageDeps (
     ) where
 
 import Base
+import Package
 import Oracles.Base
 import Data.Maybe
 import qualified Data.HashMap.Strict as Map
 import Control.Applicative
 
-newtype PackageDepsKey = PackageDepsKey String
+newtype PackageDepsKey = PackageDepsKey PackageName
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
--- packageDeps depFile objFile is an action that looks up dependencies of an
--- object file (objFile) in a generated dependecy file (depFile).
-packageDeps :: String -> Action [String]
+-- packageDeps name is an action that given a package looks up its dependencies
+-- in Base.packageDependencies file. The dependencies need to be computed by
+-- scanning package cabal files (see Rules.Cabal).
+packageDeps :: Package -> Action [PackageName]
 packageDeps pkg = do
-    res <- askOracle $ PackageDepsKey pkg
+    res <- askOracle . PackageDepsKey . pkgName $ pkg
     return . fromMaybe [] $ res
 
--- Oracle for 'path/dist/*.deps' files
+-- Oracle for the package dependencies file
 packageDepsOracle :: Rules ()
 packageDepsOracle = do
     deps <- newCache $ \_ -> do

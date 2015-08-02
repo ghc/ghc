@@ -40,8 +40,8 @@ base            = library  "base"
 binPackageDb    = library  "bin-package-db"
 binary          = library  "binary"
 bytestring      = library  "bytestring"
-cabal           = library  "Cabal/Cabal" `setCabal` "Cabal.cabal"
-compiler        = topLevel "compiler"    `setCabal` "ghc.cabal"
+cabal           = library  "Cabal"          `setPath` "libraries/Cabal/Cabal"
+compiler        = topLevel "ghc"            `setPath` "compiler"
 containers      = library  "containers"
 deepseq         = library  "deepseq"
 directory       = library  "directory"
@@ -51,7 +51,7 @@ haskeline       = library  "haskeline"
 hoopl           = library  "hoopl"
 hpc             = library  "hpc"
 integerGmp      = library  "integer-gmp"
-integerGmp2     = library  "integer-gmp2" `setCabal` "integer-gmp.cabal"
+integerGmp2     = library  "integer-gmp"    `setPath` "libraries/integer-gmp2"
 integerSimple   = library  "integer-simple"
 parallel        = library  "parallel"
 pretty          = library  "pretty"
@@ -65,8 +65,3 @@ transformers    = library  "transformers"
 unix            = library  "unix"
 win32           = library  "Win32"
 xhtml           = library  "xhtml"
-
--- Note [Cabal name weirdness]
--- Find out if we can move the contents to just Cabal/
--- What is Cabal/cabal-install? Do we need it?
--- A related question about gmp2 -- let's rename the cabal file?

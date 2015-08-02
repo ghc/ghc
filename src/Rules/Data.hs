@@ -13,7 +13,6 @@ import Settings.TargetDirectory
 import Rules.Actions
 import Rules.Resources
 import Data.List
-import Data.Maybe
 import Control.Applicative
 import Control.Monad.Extra
 
@@ -23,7 +22,7 @@ buildPackageData (Resources ghcCabal ghcPkg) target = do
     let stage     = Target.stage target
         pkg       = Target.package target
         path      = targetPath stage pkg
-        cabal     = pkgPath pkg -/- pkgCabal pkg
+        cabal     = pkgCabalPath pkg
         configure = pkgPath pkg -/- "configure"
 
     (path -/-) <$>
@@ -35,17 +34,16 @@ buildPackageData (Resources ghcCabal ghcPkg) target = do
         -- TODO: Is this needed? Also check out Paths_cpsa.hs.
         -- , "build" -/- "autogen" -/- ("Paths_" ++ name) <.> "hs"
         ] &%> \files -> do
-            -- We configure packages in the order of their dependencies
-            deps <- packageDeps . dropExtension . pkgCabal $ pkg
-            pkgs <- interpret target packages
-            let depPkgs = concatMap (maybeToList . findPackage pkgs) deps
-
             -- GhcCabal may run the configure script, so we depend on it
             -- We don't know who built the configure script from configure.ac
-            needConfigure <- doesFileExist $ configure <.> "ac"
+            whenM (doesFileExist $ configure <.> "ac") $ need [configure]
 
-            need $ [ configure | needConfigure ] ++
-                   [ targetPath stage p -/- "package-data.mk" | p <- depPkgs ]
+            -- We configure packages in the order of their dependencies
+            deps <- packageDeps pkg
+            pkgs <- interpret target packages
+            let cmp pkg = compare (pkgName pkg)
+                depPkgs = intersectOrd cmp (sort pkgs) deps
+            need [ targetPath stage p -/- "package-data.mk" | p <- depPkgs ]
 
             buildWithResources [(ghcCabal, 1)] $
                 fullTarget target [cabal] GhcCabal files
@@ -57,10 +55,6 @@ buildPackageData (Resources ghcCabal ghcPkg) target = do
 
             postProcessPackageData $ path -/- "package-data.mk"
 
--- Given a package name findPackage attempts to find it a given package list
-findPackage :: [Package] -> String -> Maybe Package
-findPackage pkgs name = find (\pkg -> dropExtension (pkgCabal pkg) == name) pkgs
-
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'
 -- For example, get rid of
@@ -70,7 +64,6 @@ findPackage pkgs name = find (\pkg -> dropExtension (pkgCabal pkg) == name) pkgs
 -- For example libraries/deepseq/dist-install_VERSION = 1.4.0.0
 -- is replaced by libraries_deepseq_dist-install_VERSION = 1.4.0.0
 -- Reason: Shake's built-in makefile parser doesn't recognise slashes
-
 postProcessPackageData :: FilePath -> Action ()
 postProcessPackageData file = do
     pkgData <- (filter ('$' `notElem`) . lines) <$> liftIO (readFile file)

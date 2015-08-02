@@ -125,10 +125,11 @@ customPackageArgs = do
         [ package integerGmp2 ?
           mconcat [ windowsHost ? builder GhcCabal ?
                     arg "--configure-option=--with-intree-gmp"
-                  , appendCcArgs ["-Ilibraries/integer-gmp2/gmp"] ]
+                  , appendCcArgs ["-I" ++ pkgPath integerGmp2 -/- "gmp"] ]
 
         , package base ?
-          builder GhcCabal ? arg ("--flags=" ++ pkgName integerLibrary)
+          builder GhcCabal ?
+          arg ("--flags=" ++ takeFileName (pkgPath integerLibrary))
 
         , package ghcPrim ?
           builder GhcCabal ? arg "--flag=include-ghc-prim"
