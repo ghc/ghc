@@ -55,6 +55,7 @@ import Pair
 import SrcLoc
 import NameSet
 import FastString
+import Data.List (mapAccumL)
 
 {-
 ************************************************************************
@@ -485,14 +486,22 @@ compatibleBranches (CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
 -- See Note [Storing compatibility] in CoAxiom
 computeAxiomIncomps :: CoAxiom br -> CoAxiom br
 computeAxiomIncomps ax@(CoAxiom { co_ax_branches = branches })
-  = ax { co_ax_branches = go [] branches }
+  = ax { co_ax_branches = go branches }
   where
-    go :: [CoAxBranch] -> BranchList CoAxBranch br -> BranchList CoAxBranch br
-    go prev_branches (FirstBranch br)
-      = FirstBranch (br { cab_incomps = mk_incomps br prev_branches })
-    go prev_branches (NextBranch br tail)
-      = let br' = br { cab_incomps = mk_incomps br prev_branches } in
-        NextBranch br' (go (br' : prev_branches) tail)
+    go :: BranchList CoAxBranch br -> BranchList CoAxBranch br
+    go (FirstBranch br)
+      = FirstBranch (go1 [] br)
+    go (NextBranch br tail)
+      = let br' = go1 [] br in
+        NextBranch br' (snd $ mapAccumL go_list [br'] tail)
+
+    go_list :: [CoAxBranch] -> CoAxBranch -> ([CoAxBranch], CoAxBranch)
+    go_list prev_branches br
+      = let br' = go1 prev_branches br in
+      (br' : prev_branches, br')
+
+    go1 :: [CoAxBranch] -> CoAxBranch -> CoAxBranch
+    go1 prev_branches br = br { cab_incomps = mk_incomps br prev_branches }
 
     mk_incomps :: CoAxBranch -> [CoAxBranch] -> [CoAxBranch]
     mk_incomps br = filter (not . compatibleBranches br)

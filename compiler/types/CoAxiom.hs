@@ -130,17 +130,17 @@ deriving instance Typeable 'Unbranched
 
 data BranchList a (br :: BranchFlag) where
   FirstBranch :: a -> BranchList a br
-  NextBranch :: a -> BranchList a br -> BranchList a Branched
+  NextBranch :: a -> [a] -> BranchList a Branched
 
 -- convert to/from lists
 toBranchList :: [a] -> BranchList a Branched
 toBranchList [] = pprPanic "toBranchList" empty
 toBranchList [b] = FirstBranch b
-toBranchList (h:t) = NextBranch h (toBranchList t)
+toBranchList (h:t) = NextBranch h t
 
 fromBranchList :: BranchList a br -> [a]
 fromBranchList (FirstBranch b) = [b]
-fromBranchList (NextBranch h t) = h : (fromBranchList t)
+fromBranchList (NextBranch h t) = h : t
 
 -- convert from any BranchList to a Branched BranchList
 toBranchedList :: BranchList a br -> BranchList a Branched
@@ -155,45 +155,48 @@ toUnbranchedList _ = pprPanic "toUnbranchedList" empty
 -- length
 brListLength :: BranchList a br -> Int
 brListLength (FirstBranch _) = 1
-brListLength (NextBranch _ t) = 1 + brListLength t
+brListLength (NextBranch _ t) = 1 + length t
 
 -- lookup
 brListNth :: BranchList a br -> BranchIndex -> a
 brListNth (FirstBranch b) 0 = b
 brListNth (NextBranch h _) 0 = h
-brListNth (NextBranch _ t) n = brListNth t (n-1)
+brListNth (NextBranch _ t) n = t !! (n-1)
 brListNth _ _ = pprPanic "brListNth" empty
 
 -- map, fold
 brListMap :: (a -> b) -> BranchList a br -> [b]
 brListMap f (FirstBranch b) = [f b]
-brListMap f (NextBranch h t) = f h : (brListMap f t)
+brListMap f (NextBranch h t) = f h : map f t
 
 brListFoldr :: (a -> b -> b) -> b -> BranchList a br -> b
 brListFoldr f x (FirstBranch b) = f b x
-brListFoldr f x (NextBranch h t) = f h (brListFoldr f x t)
+brListFoldr f x (NextBranch h t) = f h (foldr f x t)
 
 brListMapM :: Monad m => (a -> m b) -> BranchList a br -> m [b]
-brListMapM f (FirstBranch b) = f b >>= \fb -> return [fb]
+brListMapM f (FirstBranch b) = f b >>= return . return
 brListMapM f (NextBranch h t) = do { fh <- f h
-                                   ; ft <- brListMapM f t
+                                   ; ft <- mapM f t
                                    ; return (fh : ft) }
 
 brListFoldlM_ :: forall a b m br. Monad m
               => (a -> b -> m a) -> a -> BranchList b br -> m ()
-brListFoldlM_ f z brs = do { _ <- go z brs
-                           ; return () }
-  where go :: forall br'. a -> BranchList b br' -> m a
-        go acc (FirstBranch b)  = f acc b
-        go acc (NextBranch h t) = do { fh <- f acc h
-                                     ; go fh t }
+brListFoldlM_ f z (FirstBranch b) = do { _ <- f z b
+                                       ; return () }
+brListFoldlM_ f z (NextBranch h t) = do { _ <- go z (h : t)
+                                        ; return () }
+   where go :: a -> [b] -> m a
+         go acc [b]  = f acc b
+         go acc (h : t) = do { fh <- f acc h
+                             ; go fh t }
+         go _ _ = pprPanic "brListFoldlM_" empty -- dead code
 
 -- zipWith
 brListZipWith :: (a -> b -> c) -> BranchList a br1 -> BranchList b br2 -> [c]
 brListZipWith f (FirstBranch a) (FirstBranch b) = [f a b]
 brListZipWith f (FirstBranch a) (NextBranch b _) = [f a b]
 brListZipWith f (NextBranch a _) (FirstBranch b) = [f a b]
-brListZipWith f (NextBranch a ta) (NextBranch b tb) = f a b : brListZipWith f ta tb
+brListZipWith f (NextBranch a ta) (NextBranch b tb) = f a b : zipWith f ta tb
 
 -- pretty-printing
 
