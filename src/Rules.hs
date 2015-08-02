@@ -15,11 +15,10 @@ import Settings.Packages
 import Settings.TargetDirectory
 
 -- generateTargets needs package-data.mk files of all target packages
--- TODO: make interpretDiff total
 generateTargets :: Rules ()
 generateTargets = action $ do
     targets <- fmap concat . forM [Stage0 ..] $ \stage -> do
-        pkgs <- interpret (stageTarget stage) packages
+        pkgs <- interpret (stageTarget stage) getPackages
         fmap concat . forM pkgs $ \pkg -> return
             [ targetPath stage pkg -/- "build/haskell.deps"
             , targetPath stage pkg -/- "build/c.deps" ]

@@ -8,7 +8,7 @@ module Expression (
     Args, Ways, Packages,
     apply, append, appendM, remove,
     appendSub, appendSubD, filterSub, removeSub,
-    interpret, interpretExpr,
+    interpret, interpretDiff,
     getStage, getPackage, getBuilder, getFiles, getFile,
     getDependencies, getDependency, getWay,
     stage, package, builder, stagedBuilder, file, way
@@ -141,16 +141,16 @@ removeSub :: String -> [String] -> Args
 removeSub prefix xs = filterSub prefix (`notElem` xs)
 
 -- Interpret a given expression in a given environment
-interpretExpr :: Target -> Expr a -> Action a
-interpretExpr = flip runReaderT
+interpret :: Target -> Expr a -> Action a
+interpret = flip runReaderT
 
 -- Extract an expression from a difference expression
 fromDiffExpr :: Monoid a => DiffExpr a -> Expr a
 fromDiffExpr = fmap (($ mempty) . fromDiff)
 
 -- Interpret a given difference expression in a given environment
-interpret :: Monoid a => Target -> DiffExpr a -> Action a
-interpret target = interpretExpr target . fromDiffExpr
+interpretDiff :: Monoid a => Target -> DiffExpr a -> Action a
+interpretDiff target = interpret target . fromDiffExpr
 
 -- Convenient getters for target parameters
 getStage :: Expr Stage

@@ -21,7 +21,7 @@ buildWithResources rs target = do
     needBuilder builder
     need deps
     path    <- builderPath builder
-    argList <- interpret target args
+    argList <- interpret target getArgs
     -- The line below forces the rule to be rerun if the args hash has changed
     argsHash <- askArgsHash target
     withResources rs $ do

@@ -22,5 +22,5 @@ askArgsHash = askOracle . ArgsHashKey
 -- Oracle for storing per-target argument list hashes
 argsHashOracle :: Rules ()
 argsHashOracle = do
-    addOracle $ \(ArgsHashKey target) -> hash <$> interpret target args
+    addOracle $ \(ArgsHashKey target) -> hash <$> interpret target getArgs
     return ()

@@ -32,5 +32,5 @@ buildPackageDependencies _ target =
             writeFileChanged file (concat deps)
 
         (buildPath -/- "haskell.deps") %> \file -> do
-            srcs <- interpretExpr target getHsSources
+            srcs <- interpret target getHsSources
             build $ fullTarget target srcs (GhcM stage) [file]

@@ -1,6 +1,4 @@
-module Settings.Args (
-    args
-    ) where
+module Settings.Args (args, getArgs) where
 
 import Expression
 import Settings.User
@@ -11,6 +9,9 @@ import Settings.GhcCabal
 
 args :: Args
 args = defaultArgs <> userArgs
+
+getArgs :: Expr [String]
+getArgs = fromDiffExpr args
 
 -- TODO: add all other settings
 -- TODO: add src-hc-args = -H32m -O

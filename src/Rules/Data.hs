@@ -40,16 +40,16 @@ buildPackageData (Resources ghcCabal ghcPkg) target = do
 
             -- We configure packages in the order of their dependencies
             deps <- packageDeps pkg
-            pkgs <- interpret target packages
-            let cmp pkg = compare (pkgName pkg)
-                depPkgs = intersectOrd cmp (sort pkgs) deps
+            pkgs <- interpret target getPackages
+            let cmp pkg name = compare (pkgName pkg) name
+                depPkgs      = intersectOrd cmp (sort pkgs) deps
             need [ targetPath stage p -/- "package-data.mk" | p <- depPkgs ]
 
             buildWithResources [(ghcCabal, 1)] $
                 fullTarget target [cabal] GhcCabal files
 
             -- TODO: find out of ghc-cabal can be concurrent with ghc-pkg
-            whenM (interpretExpr target registerPackage) .
+            whenM (interpret target registerPackage) .
                 buildWithResources [(ghcPkg, 1)] $
                 fullTarget target [cabal] (GhcPkg stage) files
 

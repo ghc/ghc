@@ -85,7 +85,7 @@ getHsSources = do
     (foundSources, missingSources) <- findModuleFiles dirs "*hs"
 
     -- Generated source files live in buildPath and have extension "hs"
-    let generatedSources = map (\f -> buildPath -/- f <.> "hs") missingSources
+    let generatedSources = [ buildPath -/- s <.> "hs" | s <- missingSources ]
 
     return $ foundSources ++ generatedSources
 
