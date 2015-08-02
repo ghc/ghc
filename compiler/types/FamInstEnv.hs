@@ -274,7 +274,7 @@ Type families are reduced during type inference, but not data families;
 the user explains when to use a data family instance by using contructors
 and pattern matching.
 
-Neverthless it is still useful to have data families in the FamInstEnv:
+Nevertheless it is still useful to have data families in the FamInstEnv:
 
  - For finding overlaps and conflicts
 
