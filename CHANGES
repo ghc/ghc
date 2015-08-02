@@ -6,6 +6,10 @@ Changes in version 2.16.2
 
  * Break up response file arguments on newlines
 
+ * Various HTML fixes (#301, #406, #407, #421)
+
+ * Line anchors in hyperlinked source (#420)
+
 Changes in version 2.16.1
 
  * Don't default to type constructors for out-of-scope names (#253 and

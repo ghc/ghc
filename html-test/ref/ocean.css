@@ -41,6 +41,9 @@ a[href]:link { color: rgb(196,69,29); }
 a[href]:visited { color: rgb(171,105,84); }
 a[href]:hover { text-decoration:underline; }
 
+a[href].def:link, a[href].def:visited { color: black; }
+a[href].def:hover { color: rgb(78, 98, 114); }
+
 /* @end */
 
 /* @group Fonts & Sizes */
@@ -424,30 +427,31 @@ div#style-menu-holder {
   visibility: hidden;
 }
 
-.subs dl {
+.subs ul {
+  list-style: none;
+  display: table;
   margin: 0;
 }
 
-.subs dt {
-  float: left;
-  clear: left;
-  display: block;
-  margin: 1px 0;
+.subs ul li {
+  display: table-row;
 }
 
-.subs dd {
-  float: right;
-  width: 90%;
-  display: block;
+.subs ul li dfn {
+  display: table-cell;
+  font-style: normal;
+  font-weight: bold;
+  margin: 1px 0;
+  white-space: nowrap;
+}
+
+.subs ul li > .doc {
+  display: table-cell;
   padding-left: 0.5em;
   margin-bottom: 0.5em;
 }
 
-.subs dd.empty {
-  display: none;
-}
-
-.subs dd p {
+.subs ul li > .doc p {
   margin: 0;
 }
 
