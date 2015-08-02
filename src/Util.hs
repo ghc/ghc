@@ -64,7 +64,6 @@ putOracle = putColoured Blue
 putBuild :: String -> Action ()
 putBuild = putColoured White
 
-
 -- A more colourful version of error
 redError :: String -> Action a
 redError msg = do

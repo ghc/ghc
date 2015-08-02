@@ -26,7 +26,9 @@ buildPackageDependencies _ target =
 
         (buildPath -/- "c.deps") %> \file -> do
             srcs <- pkgDataList $ CSrcs path
-            deps <- forM srcs $ \src -> readFile' $ buildPath -/- src <.> "deps"
+            let depFiles = [ buildPath -/- src <.> "deps" | src <- srcs ]
+            need depFiles -- increase parallelism by needing all at once
+            deps <- mapM readFile' depFiles
             writeFileChanged file (concat deps)
 
         (buildPath -/- "haskell.deps") %> \file -> do
