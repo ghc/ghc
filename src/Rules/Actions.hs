@@ -1,5 +1,5 @@
 module Rules.Actions (
-    build, buildWithResources, run, verboseRun
+    build, buildWithResources
     ) where
 
 import Base
@@ -16,32 +16,24 @@ import Oracles.ArgsHash
 -- built (that is, track changes in the build system).
 buildWithResources :: [(Resource, Int)] -> FullTarget -> Action ()
 buildWithResources rs target = do
-    need $ Target.dependencies target
+    let builder = Target.builder target
+        deps    = Target.dependencies target
+    needBuilder builder
+    need deps
+    path    <- builderPath builder
     argList <- interpret target args
     -- The line below forces the rule to be rerun if the args hash has changed
     argsHash <- askArgsHash target
-    run rs (Target.builder target) argList
+    withResources rs $ do
+        putBuild $ "/--------\n" ++ "| Running "
+                 ++ show builder ++ " with arguments:"
+        mapM_ (putBuild . ("|   " ++)) $ interestingInfo builder argList
+        putBuild $ "\\--------"
+        quietly $ cmd [path] argList
 
 -- Most targets are built without explicitly acquiring resources
 build :: FullTarget -> Action ()
 build = buildWithResources []
-
--- Run the builder with a given collection of arguments
-verboseRun :: [(Resource, Int)] -> Builder -> [String] -> Action ()
-verboseRun rs builder args = do
-    needBuilder builder
-    path <- builderPath builder
-    withResources rs $ cmd [path] args
-
--- Run the builder with a given collection of arguments printing out a
--- terse commentary with only 'interesting' info for the builder.
-run :: [(Resource, Int)] -> Builder -> [String] -> Action ()
-run rs builder args = do
-    putColoured White $ "/--------\n" ++
-        "| Running " ++ show builder ++ " with arguments:"
-    mapM_ (putColoured White . ("|   " ++)) $ interestingInfo builder args
-    putColoured White $ "\\--------"
-    quietly $ verboseRun rs builder args
 
 interestingInfo :: Builder -> [String] -> [String]
 interestingInfo builder ss = case builder of

@@ -7,3 +7,8 @@
 
 * compiler, was: 25 dirs (24 source dirs + autogen) x 406 modules x 2 extensions = 20300 candidates
 * compiler, now: 25 dirs x 20 module-dirs = 500 candidates
+
+4. Limit parallelism of ghc-cabal & ghc-pkg
+
+* https://mail.haskell.org/pipermail/ghc-commits/2013-May/001712.html
+* see ghc.mk, comment about parallel ghc-pkg invokations 

@@ -6,7 +6,6 @@ module Oracles.WindowsRoot (
 
 import Base
 import Util
-import Oracles.Base
 import Data.List
 
 newtype WindowsRoot = WindowsRoot ()

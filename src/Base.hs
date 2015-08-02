@@ -1,5 +1,6 @@
 module Base (
-    shakeFilesPath, configPath, bootPackageConstraints,
+    shakeFilesPath, configPath,
+    bootPackageConstraints, packageDependencies,
     module Development.Shake,
     module Development.Shake.Util,
     module Development.Shake.Config,
@@ -21,3 +22,6 @@ configPath = "shake/cfg/"
 
 bootPackageConstraints :: FilePath
 bootPackageConstraints = shakeFilesPath ++ "boot-package-constraints"
+
+packageDependencies :: FilePath
+packageDependencies = shakeFilesPath ++ "package-dependencies"

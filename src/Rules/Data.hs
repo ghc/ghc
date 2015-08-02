@@ -7,23 +7,24 @@ import Builder
 import Switches
 import Expression
 import qualified Target
+import Oracles.PackageDeps
+import Settings.Packages
 import Settings.TargetDirectory
 import Rules.Actions
+import Rules.Resources
+import Data.List
+import Data.Maybe
 import Control.Applicative
 import Control.Monad.Extra
 
--- TODO: Add ordering between packages? (see ghc.mk)
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
-buildPackageData :: StagePackageTarget -> Rules ()
-buildPackageData target = do
+buildPackageData :: Resources -> StagePackageTarget -> Rules ()
+buildPackageData (Resources ghcCabal ghcPkg) target = do
     let stage     = Target.stage target
         pkg       = Target.package target
         path      = targetPath stage pkg
         cabal     = pkgPath pkg -/- pkgCabal pkg
         configure = pkgPath pkg -/- "configure"
-
-    -- We do not allow parallel invokations of ghc-pkg (they don't work)
-    ghcPkg <- newResource "ghc-pkg" 1
 
     (path -/-) <$>
         [ "package-data.mk"
@@ -37,12 +38,26 @@ buildPackageData target = do
             -- GhcCabal may run the configure script, so we depend on it
             -- We don't know who built the configure script from configure.ac
             whenM (doesFileExist $ configure <.> "ac") $ need [configure]
-            buildWithResources [(ghcPkg, 1)] $ -- GhcCabal calls ghc-pkg too
+
+            -- We configure packages in the order of their dependencies
+            deps <- packageDeps . dropExtension . pkgCabal $ pkg
+            pkgs <- interpret target packages
+            let depPkgs = concatMap (maybeToList . findPackage pkgs) deps
+            need $ map (\p -> targetPath stage p -/- "package-data.mk") depPkgs
+
+            buildWithResources [(ghcCabal, 1)] $
                 fullTarget target [cabal] GhcCabal files
+
+            -- TODO: find out of ghc-cabal can be concurrent with ghc-pkg
             whenM (interpretExpr target registerPackage) .
                 buildWithResources [(ghcPkg, 1)] $
                 fullTarget target [cabal] (GhcPkg stage) files
+
             postProcessPackageData $ path -/- "package-data.mk"
+
+-- Given a package name findPackage attempts to find it a given package list
+findPackage :: [Package] -> String -> Maybe Package
+findPackage pkgs name = find (\pkg -> dropExtension (pkgCabal pkg) == name) pkgs
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'

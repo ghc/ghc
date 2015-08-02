@@ -10,6 +10,7 @@ import Rules.Cabal
 import Rules.Config
 import Rules.Package
 import Rules.Oracles
+import Rules.Resources
 import Settings.Packages
 import Settings.TargetDirectory
 
@@ -26,7 +27,8 @@ generateTargets = action $ do
 
 -- TODO: add Stage2 (compiler only?)
 packageRules :: Rules ()
-packageRules =
+packageRules = do
+    resources <- resourceRules
     forM_ [Stage0, Stage1] $ \stage -> do
         forM_ knownPackages $ \pkg -> do
-            buildPackage (stagePackageTarget stage pkg)
+            buildPackage resources (stagePackageTarget stage pkg)

@@ -7,3 +7,4 @@ main = shakeArgs shakeOptions{shakeFiles = shakeFilesPath} $ do
     packageRules    -- see module Rules
     configRules     -- see module Rules.Config
     generateTargets -- see module Rules
+

@@ -38,7 +38,3 @@ configOracle = do
         liftIO $ readConfigFile configFile
     addOracle $ \(ConfigKey key) -> Map.lookup key <$> cfg ()
     return ()
-
--- Make oracle's output more distinguishable
-putOracle :: String -> Action ()
-putOracle = putColoured Blue

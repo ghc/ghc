@@ -10,9 +10,10 @@ import Oracles.PackageData
 import Settings.Util
 import Settings.TargetDirectory
 import Rules.Actions
+import Rules.Resources
 
-buildPackageDependencies :: StagePackageTarget -> Rules ()
-buildPackageDependencies target =
+buildPackageDependencies :: Resources -> StagePackageTarget -> Rules ()
+buildPackageDependencies _ target =
     let stage     = Target.stage target
         pkg       = Target.package target
         path      = targetPath stage pkg

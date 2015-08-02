@@ -4,7 +4,7 @@ module Util (
     replaceIf, replaceEq, replaceSeparators,
     unifyPath, (-/-),
     chunksOfSize,
-    putColoured, redError, redError_,
+    putColoured, putOracle, putBuild, redError, redError_,
     bimap, minusOrd, intersectOrd
     ) where
 
@@ -55,6 +55,15 @@ putColoured colour msg = do
     putNormal msg
     liftIO $ setSGR []
     liftIO $ hFlush stdout
+
+-- Make oracle output more distinguishable
+putOracle :: String -> Action ()
+putOracle = putColoured Blue
+
+-- Make build output more distinguishable
+putBuild :: String -> Action ()
+putBuild = putColoured White
+
 
 -- A more colourful version of error
 redError :: String -> Action a

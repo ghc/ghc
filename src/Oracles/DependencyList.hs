@@ -7,7 +7,6 @@ module Oracles.DependencyList (
 
 import Base
 import Util
-import Oracles.Base
 import Data.List
 import Data.Maybe
 import Data.Function
