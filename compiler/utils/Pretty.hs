@@ -204,6 +204,7 @@ import FastTypes
 import Panic
 import Numeric (fromRat)
 import System.IO
+import Prelude hiding (error)
 
 --for a RULES
 import GHC.Base ( unpackCString# )
@@ -648,7 +649,7 @@ p $+$ q = Above p True q
 
 above :: Doc -> Bool -> RDoc -> RDoc
 above (Above p g1 q1)  g2 q2 = above p g1 (above q1 g2 q2)
-above p@(Beside _ _ _) g  q  = aboveNest (reduceDoc p) g (_ILIT(0)) (reduceDoc q)
+above p@(Beside{})     g  q  = aboveNest (reduceDoc p) g (_ILIT(0)) (reduceDoc q)
 above p g q                  = aboveNest p             g (_ILIT(0)) (reduceDoc q)
 
 -- Specfication: aboveNest p g k q = p $g$ (nest k q)
@@ -668,7 +669,8 @@ aboveNest (TextBeside s sl p) g k q = textBeside_ s sl rest
                                       rest = case p of
                                                 Empty -> nilAboveNest g k1 q
                                                 _     -> aboveNest  p g k1 q
-aboveNest _                   _ _ _ = panic "aboveNest: Unhandled case"
+aboveNest (Above {})          _ _ _ = error "aboveNest Above"
+aboveNest (Beside {})         _ _ _ = error "aboveNest Beside"
 
 -- Specification: text s <> nilaboveNest g k q
 --              = text s <> (text "" $g$ nest k q)
@@ -708,7 +710,7 @@ beside (Nest k p)          g q   = nest_ k $! beside p g q
 beside p@(Beside p1 g1 q1) g2 q2
          | g1 == g2              = beside p1 g1 $! beside q1 g2 q2
          | otherwise             = beside (reduceDoc p) g2 q2
-beside p@(Above _ _ _)     g q   = let d = reduceDoc p in d `seq` beside d g q
+beside p@(Above{})         g q   = let d = reduceDoc p in d `seq` beside d g q
 beside (NilAbove p)        g q   = nilAbove_ $! beside p g q
 beside (TextBeside s sl p) g q   = textBeside_ s sl $! rest
                                where
@@ -759,7 +761,8 @@ sep1 g (Nest n p)          k ys = nest_ n (sep1 g p (k -# n) ys)
 sep1 _ (NilAbove p)        k ys = nilAbove_
                                   (aboveNest p False k (reduceDoc (vcat ys)))
 sep1 g (TextBeside s sl p) k ys = textBeside_ s sl (sepNB g p (k -# sl) ys)
-sep1 _ _                   _ _  = panic "sep1: Unhandled case"
+sep1 _ (Above {})          _ _  = error "sep1 Above"
+sep1 _ (Beside {})         _ _  = error "sep1 Beside"
 
 -- Specification: sepNB p k ys = sep1 (text "" <> p) k ys
 -- Called when we have already found some text in the first item
@@ -817,7 +820,8 @@ fill1 g Empty               k ys = mkNest k (fill g ys)
 fill1 g (Nest n p)          k ys = nest_ n (fill1 g p (k -# n) ys)
 fill1 g (NilAbove p)        k ys = nilAbove_ (aboveNest p False k (fill g ys))
 fill1 g (TextBeside s sl p) k ys = textBeside_ s sl (fillNB g p (k -# sl) ys)
-fill1 _ _                   _ _  = panic "fill1: Unhandled case"
+fill1 _ (Above {})          _ _  = error "fill1 Above"
+fill1 _ (Beside {})         _ _  = error "fill1 Beside"
 
 fillNB :: Bool -> Doc -> Int# -> [Doc] -> Doc
 fillNB g (Nest _ p)  k ys   = fillNB g p k ys
@@ -852,7 +856,8 @@ best w_ r_ p
     get w (TextBeside s sl p) = textBeside_ s sl (get1 w sl p)
     get w (Nest k p)          = nest_ k (get (w -# k) p)
     get w (p `Union` q)       = nicest w r (get w p) (get w q)
-    get _ _                   = panic "best/get: Unhandled case"
+    get _ (Above {})          = error "best get Above"
+    get _ (Beside {})         = error "best get Beside"
 
     get1 :: FastInt         -- (Remaining) width of line
          -> FastInt         -- Amount of first line already eaten up
@@ -866,7 +871,8 @@ best w_ r_ p
     get1 w sl (Nest _ p)          = get1 w sl p
     get1 w sl (p `Union` q)       = nicest1 w r sl (get1 w sl p)
                                                    (get1 w sl q)
-    get1 _ _  _                   = panic "best/get1: Unhandled case"
+    get1 _ _  (Above {})          = error "best get1 Above"
+    get1 _ _  (Beside {})         = error "best get1 Beside"
 
 nicest :: FastInt -> FastInt -> Doc -> Doc -> Doc
 nicest w r p q = nicest1 w r (_ILIT(0)) p q
@@ -883,7 +889,10 @@ fits _ NoDoc               = False
 fits _ Empty               = True
 fits _ (NilAbove _)        = True
 fits n (TextBeside _ sl p) = fits (n -# sl) p
-fits _ _                   = panic "fits: Unhandled case"
+fits _ (Above {})          = error "fits Above"
+fits _ (Beside {})         = error "fits Beside"
+fits _ (Union {})          = error "fits Union"
+fits _ (Nest {})           = error "fits Nest"
 
 -- | @first@ returns its first argument if it is non-empty, otherwise its second.
 first :: Doc -> Doc -> Doc
@@ -897,7 +906,8 @@ nonEmptySet Empty              = True
 nonEmptySet (NilAbove _)       = True
 nonEmptySet (TextBeside _ _ p) = nonEmptySet p
 nonEmptySet (Nest _ p)         = nonEmptySet p
-nonEmptySet _                  = panic "nonEmptySet: Unhandled case"
+nonEmptySet (Above {})         = error "nonEmptySet Above"
+nonEmptySet (Beside {})        = error "nonEmptySet Beside"
 
 -- @oneLiner@ returns the one-line members of the given set of @GDoc@s.
 oneLiner :: Doc -> Doc
@@ -907,7 +917,8 @@ oneLiner (NilAbove _)        = NoDoc
 oneLiner (TextBeside s sl p) = textBeside_ s sl (oneLiner p)
 oneLiner (Nest k p)          = nest_ k (oneLiner p)
 oneLiner (p `Union` _)       = oneLiner p
-oneLiner _                   = panic "oneLiner: Unhandled case"
+oneLiner (Above {})          = error "oneLiner Above"
+oneLiner (Beside {})         = error "oneLiner Beside"
 
 
 -- ---------------------------------------------------------------------------
@@ -944,7 +955,8 @@ fullRender OneLineMode _ _ txt end doc
     lay Empty              = end
     lay (NilAbove p)       = spaceText `txt` lay p -- NoDoc always on first line
     lay (TextBeside s _ p) = s `txt` lay p
-    lay _                  = panic "fullRender/OneLineMode/lay: Unhandled case"
+    lay (Above {})         = error "fullRender/OneLineMode Above"
+    lay (Beside {})        = error "fullRender/OneLineMode Beside"
 
 fullRender LeftMode    _ _ txt end doc
   = lay (reduceDoc doc)
@@ -955,7 +967,8 @@ fullRender LeftMode    _ _ txt end doc
     lay Empty              = end
     lay (NilAbove p)       = nlText `txt` lay p -- NoDoc always on first line
     lay (TextBeside s _ p) = s `txt` lay p
-    lay _                  = panic "fullRender/LeftMode/lay: Unhandled case"
+    lay (Above {})         = error "fullRender/LeftMode Above"
+    lay (Beside {})        = error "fullRender/LeftMode Beside"
 
 fullRender m lineLen ribbons txt rest doc
   = display m lineLen ribbonLen txt rest doc'
@@ -991,7 +1004,10 @@ display m page_width ribbon_width txt end doc
                                   lay1 (k +# shift) s sl p )))
 
                     _ -> lay1 k s sl p
-        lay _ _            = panic "display/lay: Unhandled case"
+        lay _ (Above {})   = error "display lay Above"
+        lay _ (Beside {})  = error "display lay Beside"
+        lay _ NoDoc        = error "display lay NoDoc"
+        lay _ (Union {})   = error "display lay Union"
 
         lay1 k s sl p = indent k (s `txt` lay2 (k +# sl) p)
 
@@ -999,7 +1015,10 @@ display m page_width ribbon_width txt end doc
         lay2 k (TextBeside s sl p) = s `txt` (lay2 (k +# sl) p)
         lay2 k (Nest _ p)          = lay2 k p
         lay2 _ Empty               = end
-        lay2 _ _                   = panic "display/lay2: Unhandled case"
+        lay2 _ (Above {})          = error "display lay2 Above"
+        lay2 _ (Beside {})         = error "display lay2 Beside"
+        lay2 _ NoDoc               = error "display lay2 NoDoc"
+        lay2 _ (Union {})          = error "display lay2 Union"
 
         -- optimise long indentations using LitString chunks of 8 spaces
         indent n r | n >=# _ILIT(8) = LStr (sLit "        ") (_ILIT(8)) `txt`
@@ -1090,3 +1109,7 @@ layLeft b (TextBeside s _ p) = put b s >> layLeft b p
     put b (ZStr s)   = bPutFZS  b s
     put b (LStr s l) = bPutLitString b s l
 layLeft _ _                  = panic "layLeft: Unhandled case"
+
+-- Define error=panic, for easier comparison with libraries/pretty.
+error :: String -> a
+error = panic
