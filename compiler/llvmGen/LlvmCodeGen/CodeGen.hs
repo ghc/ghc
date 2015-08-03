@@ -32,6 +32,13 @@ import UniqSupply
 import Unique
 import Util
 
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Writer
+
+#if MIN_VERSION_base(4,8,0)
+#else
+import Data.Monoid ( Monoid, mappend, mempty )
+#endif
 import Data.List ( nub )
 import Data.Maybe ( catMaybes )
 
@@ -287,6 +294,53 @@ genCall (PrimTarget (MO_U_Mul2 w)) [dstH, dstL] [lhs, rhs] = do
         stmts = stmts1 `appOL` stmts2 `appOL`
            toOL [ stmt3 , stmt4, stmt5, stmt6, stmt7, stmt8, storeL, storeH ]
     return (stmts, decls1 ++ decls2)
+
+-- MO_U_QuotRem2 is another case we handle by widening the registers to double
+-- the width and use normal LLVM instructions (similarly to the MO_U_Mul2). The
+-- main difference here is that we need to conmbine two words into one register
+-- and then use both 'udiv' and 'urem' instructions to compute the result.
+genCall (PrimTarget (MO_U_QuotRem2 w)) [dstQ, dstR] [lhsH, lhsL, rhs] = run $ do
+    let width = widthToLlvmInt w
+        bitWidth = widthInBits w
+        width2x = LMInt (bitWidth * 2)
+    -- First zero-extend all parameters to double width.
+    let zeroExtend expr = do
+            var <- liftExprData $ exprToVar expr
+            doExprW width2x $ Cast LM_Zext var width2x
+    lhsExtH <- zeroExtend lhsH
+    lhsExtL <- zeroExtend lhsL
+    rhsExt <- zeroExtend rhs
+    -- Now we combine the first two parameters (that represent the high and low
+    -- bits of the value). So first left-shift the high bits to their position
+    -- and then bit-or them with the low bits.
+    let widthLlvmLit = LMLitVar $ LMIntLit (fromIntegral bitWidth) width
+    lhsExtHShifted <- doExprW width2x $ LlvmOp LM_MO_Shl lhsExtH widthLlvmLit
+    lhsExt <- doExprW width2x $ LlvmOp LM_MO_Or lhsExtHShifted lhsExtL
+    -- Finally, we can call 'udiv' and 'urem' to compute the results.
+    retExtDiv <- doExprW width2x $ LlvmOp LM_MO_UDiv lhsExt rhsExt
+    retExtRem <- doExprW width2x $ LlvmOp LM_MO_URem lhsExt rhsExt
+    -- And since everything is in 2x width, we need to truncate the results and
+    -- then return them.
+    let narrow var = doExprW width $ Cast LM_Trunc var width
+    retDiv <- narrow retExtDiv
+    retRem <- narrow retExtRem
+    dstRegQ <- lift $ getCmmReg (CmmLocal dstQ)
+    dstRegR <- lift $ getCmmReg (CmmLocal dstR)
+    statement $ Store retDiv dstRegQ
+    statement $ Store retRem dstRegR
+  where
+    -- TODO(michalt): Consider extracting this and using in more places.
+    -- Hopefully this should cut down on the noise of accumulating the
+    -- statements and declarations.
+    doExprW :: LlvmType -> LlvmExpression -> WriterT LlvmAccum LlvmM LlvmVar
+    doExprW a b = do
+        (var, stmt) <- lift $ doExpr a b
+        statement stmt
+        return var
+    run :: WriterT LlvmAccum LlvmM () -> LlvmM (LlvmStatements, [LlvmCmmDecl])
+    run action = do
+        LlvmAccum stmts decls <- execWriterT action
+        return (stmts, decls)
 
 -- Handle the MO_{Add,Sub}IntC separately. LLVM versions return a record from
 -- which we need to extract the actual values.
@@ -1767,3 +1821,21 @@ getTBAAMeta u = do
 -- | Returns TBAA meta data for given register
 getTBAARegMeta :: GlobalReg -> LlvmM [MetaAnnot]
 getTBAARegMeta = getTBAAMeta . getTBAA
+
+
+-- | A more convenient way of accumulating LLVM statements and declarations.
+data LlvmAccum = LlvmAccum LlvmStatements [LlvmCmmDecl]
+
+instance Monoid LlvmAccum where
+    mempty = LlvmAccum nilOL []
+    LlvmAccum stmtsA declsA `mappend` LlvmAccum stmtsB declsB =
+        LlvmAccum (stmtsA `mappend` stmtsB) (declsA `mappend` declsB)
+
+liftExprData :: LlvmM ExprData -> WriterT LlvmAccum LlvmM LlvmVar
+liftExprData action = do
+    (var, stmts, decls) <- lift action
+    tell $ LlvmAccum stmts decls
+    return var
+
+statement :: LlvmStatement -> WriterT LlvmAccum LlvmM ()
+statement stmt = tell $ LlvmAccum (unitOL stmt) []
