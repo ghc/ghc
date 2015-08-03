@@ -35,7 +35,6 @@ module RdrHsSyn (
         mkExtName,           -- RdrName -> CLabelString
         mkGadtDecl,          -- [Located RdrName] -> LHsType RdrName -> ConDecl RdrName
         mkSimpleConDecl,
-        mkDeprecatedGadtRecordDecl,
         mkATDefault,
 
         -- Bunch of functions in the parser monad for
@@ -468,25 +467,6 @@ mkPatSynMatchGroup (L _ patsyn_name) (L _ decls) =
         parseErrorSDoc loc $
         text "pattern synonym 'where' clause must bind the pattern synonym's name" <+>
         quotes (ppr patsyn_name) $$ ppr decl
-
-mkDeprecatedGadtRecordDecl :: SrcSpan
-                           -> Located RdrName
-                           -> Located [LConDeclField RdrName]
-                           -> LHsType RdrName
-                           ->  P (LConDecl  RdrName)
--- This one uses the deprecated syntax
---    C { x,y ::Int } :: T a b
--- We give it a RecCon details right away
-mkDeprecatedGadtRecordDecl loc (L con_loc con) flds res_ty
-  = do { data_con <- tyConToDataCon con_loc con
-       ; return (L loc (ConDecl { con_old_rec  = True
-                                , con_names    = [data_con]
-                                , con_explicit = Implicit
-                                , con_qvars    = mkHsQTvs []
-                                , con_cxt      = noLoc []
-                                , con_details  = RecCon flds
-                                , con_res      = ResTyGADT loc res_ty
-                                , con_doc      = Nothing })) }
 
 mkSimpleConDecl :: Located RdrName -> [LHsTyVarBndr RdrName]
                 -> LHsContext RdrName -> HsConDeclDetails RdrName

@@ -82,10 +82,9 @@ import Util             ( looksLikePackageName )
 
 }
 
-{- Last updated: 29 Jul 2015
+{- Last updated: 31 Jul 2015
 
 Conflicts: 47 shift/reduce
-           2  reduce/reduce
 
 If you modify this parser and add a conflict, please update this comment.
 You can learn more about the conflicts by passing 'happy' the -i flag:
@@ -293,29 +292,6 @@ state 950 contains 1 shift/reduce conflicts.
 
     Conflict: 'by'
 
--------------------------------------------------------------------------------
-
-state 1230 contains 1 reduce/reduce conflicts.
-
-    *** tyconsym -> ':' .                                   (rule 653)
-        consym -> ':' .                                     (rule 721)
-
-    Conflict: ')'
-
--------------------------------------------------------------------------------
-
-state 1231 contains 1 reduce/reduce conflicts.
-
-    *** tyconsym -> CONSYM .                                (rule 651)
-        consym -> CONSYM .                                  (rule 720)
-
-    Conflict: ')'
-
-TODO: Why?  (NB: This one has been around for a while; it's quite puzzling
-    because we really shouldn't get confused between tyconsym and consym.
-    Trace the state machine, maybe?)
-
-TODO: Same as State 1230
 
 -------------------------------------------------------------------------------
 -- API Annotations
@@ -1820,18 +1796,24 @@ gadt_constr_with_doc
                 {% return $1 }
 
 gadt_constr :: { LConDecl RdrName }
-                   -- Returns a list because of:   C,D :: ty
+    -- see Note [Difference in parsing GADT and data constructors]
+    -- Returns a list because of:   C,D :: ty
         : con_list '::' sigtype
                 {% do { (anns,gadtDecl) <- mkGadtDecl (unLoc $1) $3
                       ; ams (sLL $1 $> gadtDecl)
                             (mj AnnDcolon $2:anns) } }
 
-                -- Deprecated syntax for GADT record declarations
-        | oqtycon '{' fielddecls '}' '::' sigtype
-                {% do { cd <- mkDeprecatedGadtRecordDecl (comb2 $1 $6) $1 (noLoc $3) $6
-                      ; cd' <- checkRecordSyntax cd
-                      ; ams (L (comb2 $1 $6) (unLoc cd'))
-                            [moc $2,mcc $4,mj AnnDcolon $5] } }
+{- Note [Difference in parsing GADT and data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GADT constructors have simpler syntax than usual data constructors:
+in GADTs, types cannot occur to the left of '::', so they cannot be mixed
+with constructor names (see Note [Parsing data constructors is hard]).
+
+Due to simplified syntax, GADT constructor names (left-hand side of '::')
+use simpler grammar production than usual data constructor names. As a
+consequence, GADT constructor names are resticted (names like '(*)' are
+allowed in usual data constructors, but not in GADTs).
+-}
 
 constrs :: { Located ([AddAnn],[LConDecl RdrName]) }
         : maybe_docnext '=' constrs1    { L (comb2 $2 $3) ([mj AnnEqual $2]
@@ -1862,15 +1844,20 @@ forall :: { Located ([AddAnn],[LHsTyVarBndr RdrName]) }
         | {- empty -}                 { noLoc ([],[]) }
 
 constr_stuff :: { Located (Located RdrName, HsConDeclDetails RdrName) }
--- We parse the constructor declaration
---      C t1 t2
--- as a btype (treating C as a type constructor) and then convert C to be
--- a data constructor.  Reason: it might continue like this:
---      C t1 t2 %: D Int
--- in which case C really would be a type constructor.  We can't resolve this
--- ambiguity till we come across the constructor oprerator :% (or not, more usually)
+    -- see Note [Parsing data constructors is hard]
         : btype                         {% splitCon $1 >>= return.sLL $1 $> }
         | btype conop btype             {  sLL $1 $> ($2, InfixCon $1 $3) }
+
+{- Note [Parsing data constructors is hard]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We parse the constructor declaration
+     C t1 t2
+as a btype (treating C as a type constructor) and then convert C to be
+a data constructor.  Reason: it might continue like this:
+     C t1 t2 %: D Int
+in which case C really would be a type constructor.  We can't resolve this
+ambiguity till we come across the constructor oprerator :% (or not, more usually)
+-}
 
 fielddecls :: { [LConDeclField RdrName] }
         : {- empty -}     { [] }
