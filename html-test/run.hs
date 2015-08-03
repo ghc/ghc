@@ -59,15 +59,16 @@ loadConfig args = do
 
     env <- Just . (:) ("haddock_datadir", resDir) <$> getEnvironment
 
-    let cfgHaddockPath = flagsHaddockPath flags
+    cfgHaddockPath <- pure $ flip fromMaybe (flagsHaddockPath flags) $
+        rootDir </> "dist" </> "build" </> "haddock" </> "haddock"
 
     printVersions env cfgHaddockPath
 
-    cfgFiles <- processFileArgs files
-    cfgGhcPath <- init <$> rawSystemStdout normal cfgHaddockPath
-        ["--print-ghc-path"]
+    cfgGhcPath <- flip fromMaybe (flagsGhcPath flags) <$>
+         init <$> rawSystemStdout normal cfgHaddockPath ["--print-ghc-path"]
 
-    putStrLn $ "Files to test: " ++ show cfgFiles
+    cfgFiles <- processFileArgs files
+
     return $ Config { .. }
 
 
@@ -103,6 +104,7 @@ isSourceFile path = takeExtension path `elem` [".hs", ".lhs"]
 
 data Flag
     = FlagHaddockPath FilePath
+    | FlagGhcPath FilePath
     | FlagHelp
     deriving Eq
 
@@ -111,18 +113,19 @@ options :: [OptDescr Flag]
 options =
     [ Option [] ["haddock-path"] (ReqArg FlagHaddockPath "FILE")
         "path to Haddock executable to exectue tests with"
+    , Option [] ["ghc-path"] (ReqArg FlagGhcPath "FILE")
+        "path to GHC executable"
     , Option ['h'] ["help"] (NoArg FlagHelp)
         "display this help end exit"
     ]
 
 
-flagsHaddockPath :: [Flag] -> FilePath
-flagsHaddockPath flags =
-    case mlast [ path | FlagHaddockPath path <- flags ] of
-        Just path -> path
-        Nothing -> rootDir </> "dist" </> "build" </> "haddock" </> "haddock"
-  where
-    mlast = listToMaybe . reverse
+flagsHaddockPath :: [Flag] -> Maybe FilePath
+flagsHaddockPath flags = mlast [ path | FlagHaddockPath path <- flags ]
+
+
+flagsGhcPath :: [Flag] -> Maybe FilePath
+flagsGhcPath flags = mlast [ path | FlagGhcPath path <- flags ]
 
 
 data ProcessConfig = ProcessConfig
@@ -157,3 +160,7 @@ waitForSuccess msg handle = do
     unless (result == ExitSuccess) $ do
         hPutStrLn stderr $ msg
         exitFailure
+
+
+mlast :: [a] -> Maybe a
+mlast = listToMaybe . reverse
