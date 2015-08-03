@@ -1020,7 +1020,9 @@ coreFlattenTy in_scope = go
                                (m2, ty2') = go m1 ty2 in
                            (m2, AppTy ty1' ty2')
     go m (TyConApp tc tys)
-      | isFamilyTyCon tc
+         -- NB: Don't just check if isFamilyTyCon: this catches *data* families,
+         -- which are generative and thus can be preserved during flattening
+      | not (isGenerativeTyCon tc Nominal)
       = let (m', tv) = coreFlattenTyFamApp in_scope m tc tys in
         (m', mkTyVarTy tv)
 
