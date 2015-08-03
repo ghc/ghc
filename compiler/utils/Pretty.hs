@@ -678,7 +678,7 @@ nilAboveNest :: Bool -> FastInt -> RDoc -> RDoc
 nilAboveNest _ _ Empty       = Empty
                                -- Here's why the "text s <>" is in the spec!
 nilAboveNest g k (Nest k1 q) = nilAboveNest g (k +# k1) q
-nilAboveNest g k q           | (not g) && (k ># _ILIT(0))        -- No newline if no overlap
+nilAboveNest g k q           | not g && k ># _ILIT(0)        -- No newline if no overlap
                              = textBeside_ (Str (spaces k)) k q
                              | otherwise           -- Put them really above
                              = nilAbove_ (mkNest k q)
@@ -704,7 +704,7 @@ p <+> q = Beside p True  q
 -- Specification: beside g p q = p <g> q
 beside :: Doc -> Bool -> RDoc -> RDoc
 beside NoDoc               _ _   = NoDoc
-beside (p1 `Union` p2)     g q   = (beside p1 g q) `union_` (beside p2 g q)
+beside (p1 `Union` p2)     g q   = beside p1 g q `union_` beside p2 g q
 beside Empty               _ q   = q
 beside (Nest k p)          g q   = nest_ k $! beside p g q
 beside p@(Beside p1 g1 q1) g2 q2
@@ -753,7 +753,7 @@ sepX x (p:ps) = sep1 x (reduceDoc p) (_ILIT(0)) ps
 sep1 :: Bool -> RDoc -> FastInt -> [Doc] -> RDoc
 sep1 _ NoDoc               _ _  = NoDoc
 sep1 g (p `Union` q)       k ys = sep1 g p k ys `union_`
-                                  (aboveNest q False k (reduceDoc (vcat ys)))
+                                  aboveNest q False k (reduceDoc (vcat ys))
 
 sep1 g Empty               k ys = mkNest k (sepX g ys)
 sep1 g (Nest n p)          k ys = nest_ n (sep1 g p (k -# n) ys)
@@ -815,7 +815,7 @@ fill g (p:ps) = fill1 g (reduceDoc p) (_ILIT(0)) ps
 fill1 :: Bool -> RDoc -> FastInt -> [Doc] -> Doc
 fill1 _ NoDoc               _ _  = NoDoc
 fill1 g (p `Union` q)       k ys = fill1 g p k ys `union_`
-                                   (aboveNest q False k (fill g ys))
+                                   aboveNest q False k (fill g ys)
 fill1 g Empty               k ys = mkNest k (fill g ys)
 fill1 g (Nest n p)          k ys = nest_ n (fill1 g p (k -# n) ys)
 fill1 g (NilAbove p)        k ys = nilAbove_ (aboveNest p False k (fill g ys))
@@ -994,14 +994,14 @@ display m page_width ribbon_width txt end doc
                     ZigZagMode |  k >=# gap_width
                                -> nlText `txt` (
                                   Str (multi_ch shift '/') `txt` (
-                                  nlText `txt` (
-                                  lay1 (k -# shift) s sl p )))
+                                  nlText `txt`
+                                  lay1 (k -# shift) s sl p ))
 
                                |  k <# _ILIT(0)
                                -> nlText `txt` (
                                   Str (multi_ch shift '\\') `txt` (
-                                  nlText `txt` (
-                                  lay1 (k +# shift) s sl p )))
+                                  nlText `txt`
+                                  lay1 (k +# shift) s sl p ))
 
                     _ -> lay1 k s sl p
         lay _ (Above {})   = error "display lay Above"
@@ -1012,7 +1012,7 @@ display m page_width ribbon_width txt end doc
         lay1 k s sl p = indent k (s `txt` lay2 (k +# sl) p)
 
         lay2 k (NilAbove p)        = nlText `txt` lay k p
-        lay2 k (TextBeside s sl p) = s `txt` (lay2 (k +# sl) p)
+        lay2 k (TextBeside s sl p) = s `txt` lay2 (k +# sl) p
         lay2 k (Nest _ p)          = lay2 k p
         lay2 _ Empty               = end
         lay2 _ (Above {})          = error "display lay2 Above"
