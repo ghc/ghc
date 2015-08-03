@@ -27,16 +27,11 @@ import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Utils
 import Haddock.GhcUtils
 import Haddock.Types
-import Haddock.Syb
 import Haddock.Doc (combineDocumentation)
 
-import           Data.Bits
-import           Data.Char
-import           Data.Data (Data, cast)
 import           Data.List             ( intersperse, sort )
 import qualified Data.Map as Map
 import           Data.Maybe
-import           Data.Word
 import           Text.XHtml hiding     ( name, title, p, quote )
 
 import GHC
@@ -297,7 +292,7 @@ ppTyFam summary associated links instances fixities loc doc decl splice unicode 
       = subEquations qual $ map (ppTyFamEqn . unLoc) eqns
 
       | otherwise
-      = ppInstances links OriginFamily instances docname splice unicode qual
+      = ppInstances links (OriginFamily docname) instances splice unicode qual
 
     -- Individual equation of a closed type family
     ppTyFamEqn TyFamEqn { tfe_tycon = n, tfe_rhs = rhs
@@ -533,31 +528,42 @@ ppClassDecl summary links instances fixities loc d subdocs
     ppMinimal p (Or fs) = wrap $ foldr1 (\a b -> a+++" | "+++b) $ map (ppMinimal False) fs
       where wrap | p = parens | otherwise = id
 
-    instancesBit = ppInstances links OriginClass instances nm
+    instancesBit = ppInstances links (OriginClass nm) instances
         splice unicode qual
 
 ppClassDecl _ _ _ _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
 
 
-data InstOrigin = OriginClass | OriginData | OriginFamily
+data InstOrigin name
+    = OriginClass name
+    | OriginData name
+    | OriginFamily name
+
+
+instance NamedThing name => NamedThing (InstOrigin name) where
+
+    getName (OriginClass name) = getName name
+    getName (OriginData name) = getName name
+    getName (OriginFamily name) = getName name
 
 
 ppInstances :: LinksInfo
-            -> InstOrigin -> [DocInstance DocName] -> DocName
+            -> InstOrigin DocName -> [DocInstance DocName]
             -> Splice -> Unicode -> Qualification
             -> Html
-ppInstances links origin instances baseName splice unicode qual
+ppInstances links origin instances splice unicode qual
   = subInstances qual instName links True (zipWith instDecl [1..] instances)
   -- force Splice = True to use line URLs
   where
-    instName = getOccString $ getName baseName
+    instName = getOccString origin
     instDecl :: Int -> DocInstance DocName -> (SubDecl,Located DocName)
     instDecl no (inst, mdoc, loc) =
         ((ppInstHead links splice unicode qual mdoc origin no inst), loc)
 
 
 ppInstHead :: LinksInfo -> Splice -> Unicode -> Qualification
-           -> Maybe (MDoc DocName) -> InstOrigin -> Int -> InstHead DocName
+           -> Maybe (MDoc DocName)
+           -> InstOrigin DocName -> Int -> InstHead DocName
            -> SubDecl
 ppInstHead links splice unicode qual mdoc origin no ihd@(InstHead {..}) =
     case ihdInstType of
@@ -606,48 +612,17 @@ lookupAnySubdoc :: Eq id1 => id1 -> [(id1, DocForDecl id2)] -> DocForDecl id2
 lookupAnySubdoc n = fromMaybe noDocForDecl . lookup n
 
 
-instanceId :: InstOrigin -> Int -> InstHead DocName -> String
-instanceId orgin no ihd = concat
-    [ qual orgin
+instanceId :: InstOrigin DocName -> Int -> InstHead DocName -> String
+instanceId origin no ihd = concat
+    [ qual origin
+    , ":" ++ getOccString origin
     , ":" ++ (occNameString . getOccName . ihdClsName) ihd
-    , ":" ++ show (instHeadId ihd)
     , ":" ++ show no
     ]
   where
-    qual OriginClass = "ic"
-    qual OriginData = "id"
-    qual OriginFamily = "if"
-
-
--- | Compute unique identifier for given instance.
---
--- This is rather poor way of doing it. Ideally, we would like to have
--- everything wrapped in a stateful monad that allows us to generate unique
--- identifiers as needed. Since introducing such monad would require major
--- refactoring, for now we just generate naive hash for given instance.
---
--- Hashing is very, very trivial and turns a list of 'DocName' to 'Int'. Idea
--- for such simple hash function (djb2) is stolen from
--- <http://stackoverflow.com/questions/9262879/create-a-unique-integer-for-each-string here>.
---
--- Hashing is performed on string representation of `Name`. Why string instead
--- of 'Unique' of that 'Name'? That would be much faster and nicer, yes.
--- However, 'Unique' is not very deterministic, so running it on different
--- configurations would yield different HTML documents. This is not very bad,
--- as nobody cares about these identifiers but it would require us to strip
--- section anchors in testing framework and that is not only inconvenient but
--- also makes testing less viable. And it is only temporary solution so we can
--- live with it.
-instHeadId :: InstHead DocName -> Word64
-instHeadId (InstHead { .. }) =
-    djb2 id . map key $ [ihdClsName] ++ names ihdTypes ++ names ihdKinds
-  where
-    names = everything (++) $
-        maybeToList . (cast :: forall a. Data a => a -> Maybe DocName)
-    key = djb2 (fromIntegral . ord) . occNameString . nameOccName . getName
-
-    djb2 :: (a -> Word64) -> [a] -> Word64
-    djb2 conv = foldl (\h c -> h * 33 `xor` conv c) 5381
+    qual (OriginClass _) = "ic"
+    qual (OriginData _) = "id"
+    qual (OriginFamily _) = "if"
 
 
 -------------------------------------------------------------------------------
@@ -715,7 +690,7 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl
                                      (map unLoc (con_names (unLoc c)))) fixities
       ]
 
-    instancesBit = ppInstances links OriginData instances docname
+    instancesBit = ppInstances links (OriginData docname) instances
         splice unicode qual
 
 
