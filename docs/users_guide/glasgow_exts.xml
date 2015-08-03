@@ -8820,9 +8820,8 @@ consider how one would parse this:
 <para>
 
 The type variables in the head of a <literal>class</literal> or <literal>instance</literal> declaration
-scope over the methods defined in the <literal>where</literal> part.  For example:
-
-
+scope over the methods defined in the <literal>where</literal> part.  You do not even need
+an explicit <literal>forall</literal>.  For example:
 <programlisting>
   class C a where
     op :: [a] -> a
@@ -8831,6 +8830,9 @@ scope over the methods defined in the <literal>where</literal> part.  For exampl
                 ys = reverse xs
             in
             head ys
+
+  instance C b => C [b] where
+    op xs = reverse (head (xs :: [[b]]))
 </programlisting>
 </para>
 </sect3>
