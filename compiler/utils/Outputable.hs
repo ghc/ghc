@@ -496,8 +496,7 @@ angleBrackets d = char '<' <> d <> char '>'
 paBrackets d    = ptext (sLit "[:") <> d <> ptext (sLit ":]")
 
 cparen :: Bool -> SDoc -> SDoc
-
-cparen b d     = SDoc $ Pretty.cparen b . runSDoc d
+cparen b d = SDoc $ Pretty.maybeParens b . runSDoc d
 
 -- 'quotes' encloses something in single quotes...
 -- but it omits them if the thing begins or ends in a single quote

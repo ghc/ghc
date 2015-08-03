@@ -166,10 +166,11 @@ module Pretty (
 
         -- ** Simple derived documents
         semi, comma, colon, space, equals,
-        lparen, rparen, lbrack, rbrack, lbrace, rbrace, cparen,
+        lparen, rparen, lbrack, rbrack, lbrace, rbrace,
 
         -- ** Wrapping documents in delimiters
         parens, brackets, braces, quotes, quote, doubleQuotes,
+        maybeParens,
 
         -- ** Combining documents
         empty,
@@ -369,7 +370,7 @@ showDoc :: Mode -> Int -> Doc -> String
 showDoc mode cols doc = showDocPlus mode cols doc ""
 
 showDocPlus :: Mode -> Int -> Doc -> String -> String
-showDocPlus mode cols doc rest = fullRender mode cols 1.5 string_txt rest doc
+showDocPlus mode cols doc rest = fullRender mode cols 1.5 txtPrinter rest doc
 
 -- ---------------------------------------------------------------------------
 -- Values and Predicates on GDocs and TextDetails
@@ -485,9 +486,9 @@ rbrack = char ']'
 lbrace = char '{'
 rbrace = char '}'
 
-space_text, nl_text :: TextDetails
-space_text = Chr ' '
-nl_text    = Chr '\n'
+spaceText, nlText :: TextDetails
+spaceText = Chr ' '
+nlText    = Chr '\n'
 
 int      :: Int      -> Doc -- ^ @int n = text (show n)@
 integer  :: Integer  -> Doc -- ^ @integer n = text (show n)@
@@ -515,9 +516,9 @@ brackets p     = char '[' <> p <> char ']'
 braces p       = char '{' <> p <> char '}'
 
 -- | Apply 'parens' to 'Doc' if boolean is true.
-cparen :: Bool -> Doc -> Doc
-cparen False = id
-cparen True = parens
+maybeParens :: Bool -> Doc -> Doc
+maybeParens False = id
+maybeParens True = parens
 
 -- ---------------------------------------------------------------------------
 -- Structural operations on GDocs
@@ -567,9 +568,9 @@ hang d1 n d2 = sep [d1, nest n d2]
 -- | @punctuate p [d1, ... dn] = [d1 \<> p, d2 \<> p, ... dn-1 \<> p, dn]@
 punctuate :: Doc -> [Doc] -> [Doc]
 punctuate _ []     = []
-punctuate p (d:ds) = go d ds
-                   where go d []     = [d]
-                         go d (e:es) = (d <> p) : go e es
+punctuate p (x:xs) = go x xs
+                   where go y []     = [y]
+                         go y (z:zs) = (y <> p) : go z zs
 
 -- mkNest checks for Nest's invariant that it doesn't have an Empty inside it
 mkNest :: Int# -> Doc -> Doc
@@ -720,7 +721,7 @@ beside (TextBeside s sl p) g q   = textBeside_ s sl $! rest
 nilBeside :: Bool -> RDoc -> RDoc
 nilBeside _ Empty         = Empty -- Hence the text "" in the spec
 nilBeside g (Nest _ p)    = nilBeside g p
-nilBeside g p | g         = textBeside_ space_text (_ILIT(1)) p
+nilBeside g p | g         = textBeside_ spaceText (_ILIT(1)) p
               | otherwise = p
 
 
@@ -822,11 +823,11 @@ fillNB :: Bool -> Doc -> Int# -> [Doc] -> Doc
 fillNB g (Nest _ p)  k ys   = fillNB g p k ys
                               -- Never triggered, because of invariant (2)
 fillNB _ Empty _ []         = Empty
-fillNB g Empty k (y:ys)     = nilBeside g (fill1 g (oneLiner (reduceDoc y)) k1 ys)
+fillNB g Empty k (y:ys)     = nilBeside g (fill1 g (oneLiner (reduceDoc y)) k' ys)
                               `mkUnion`
                               nilAboveNest False k (fill g (y:ys))
                             where
-                              !k1 | g         = k -# _ILIT(1)
+                              !k' | g         = k -# _ILIT(1)
                                   | otherwise = k
 
 fillNB g p k ys             = fill1 g p k ys
@@ -919,12 +920,12 @@ data Mode = PageMode     -- ^ Normal
           | OneLineMode  -- ^ All on one line
 
 -- | Default TextDetails printer
-string_txt :: TextDetails -> String -> String
-string_txt (Chr c)   s  = c:s
-string_txt (Str s1)  s2 = s1 ++ s2
-string_txt (PStr s1) s2 = unpackFS s1 ++ s2
-string_txt (ZStr s1) s2 = zString s1 ++ s2
-string_txt (LStr s1 _) s2 = unpackLitString s1 ++ s2
+txtPrinter :: TextDetails -> String -> String
+txtPrinter (Chr c)   s  = c:s
+txtPrinter (Str s1)  s2 = s1 ++ s2
+txtPrinter (PStr s1) s2 = unpackFS s1 ++ s2
+txtPrinter (ZStr s1) s2 = zString s1 ++ s2
+txtPrinter (LStr s1 _) s2 = unpackLitString s1 ++ s2
 
 -- | The general rendering interface.
 fullRender :: Mode                     -- ^ Rendering mode
@@ -941,8 +942,7 @@ fullRender OneLineMode _ _ txt end doc
     lay (Union _ q)        = lay q -- Second arg can't be NoDoc
     lay (Nest _ p)         = lay p
     lay Empty              = end
-    lay (NilAbove p)       = space_text `txt` lay p -- NoDoc always on
-                                                    -- first line
+    lay (NilAbove p)       = spaceText `txt` lay p -- NoDoc always on first line
     lay (TextBeside s _ p) = s `txt` lay p
     lay _                  = panic "fullRender/OneLineMode/lay: Unhandled case"
 
@@ -953,41 +953,41 @@ fullRender LeftMode    _ _ txt end doc
     lay (Union p q)        = lay (first p q)
     lay (Nest _ p)         = lay p
     lay Empty              = end
-    lay (NilAbove p)       = nl_text `txt` lay p -- NoDoc always on first line
+    lay (NilAbove p)       = nlText `txt` lay p -- NoDoc always on first line
     lay (TextBeside s _ p) = s `txt` lay p
     lay _                  = panic "fullRender/LeftMode/lay: Unhandled case"
 
-fullRender mode line_length ribbons_per_line txt end doc
-  = display mode line_length ribbon_length txt end best_doc
+fullRender m lineLen ribbons txt rest doc
+  = display m lineLen ribbonLen txt rest doc'
   where
-    best_doc = best hacked_line_length ribbon_length (reduceDoc doc)
+    doc' = best bestLineLen ribbonLen (reduceDoc doc)
 
-    hacked_line_length, ribbon_length :: Int
-    ribbon_length = round (fromIntegral line_length / ribbons_per_line)
-    hacked_line_length = case mode of
+    bestLineLen, ribbonLen :: Int
+    ribbonLen   = round (fromIntegral lineLen / ribbons)
+    bestLineLen = case m of
                       ZigZagMode -> maxBound
-                      _          -> line_length
+                      _          -> lineLen
 
-display :: Mode -> Int -> Int -> (TextDetails -> t -> t) -> t -> Doc -> t
-display mode page_width ribbon_width txt end doc
+display :: Mode -> Int -> Int -> (TextDetails -> a -> a) -> a -> Doc -> a
+display m page_width ribbon_width txt end doc
   = case (iUnbox page_width) -# (iUnbox ribbon_width) of { gap_width ->
     case gap_width `quotFastInt` _ILIT(2) of { shift ->
     let
         lay k (Nest k1 p)  = lay (k +# k1) p
         lay _ Empty        = end
-        lay k (NilAbove p) = nl_text `txt` lay k p
+        lay k (NilAbove p) = nlText `txt` lay k p
         lay k (TextBeside s sl p)
-            = case mode of
+            = case m of
                     ZigZagMode |  k >=# gap_width
-                               -> nl_text `txt` (
+                               -> nlText `txt` (
                                   Str (multi_ch shift '/') `txt` (
-                                  nl_text `txt` (
+                                  nlText `txt` (
                                   lay1 (k -# shift) s sl p )))
 
                                |  k <# _ILIT(0)
-                               -> nl_text `txt` (
+                               -> nlText `txt` (
                                   Str (multi_ch shift '\\') `txt` (
-                                  nl_text `txt` (
+                                  nlText `txt` (
                                   lay1 (k +# shift) s sl p )))
 
                     _ -> lay1 k s sl p
@@ -995,7 +995,7 @@ display mode page_width ribbon_width txt end doc
 
         lay1 k s sl p = indent k (s `txt` lay2 (k +# sl) p)
 
-        lay2 k (NilAbove p)        = nl_text `txt` lay k p
+        lay2 k (NilAbove p)        = nlText `txt` lay k p
         lay2 k (TextBeside s sl p) = s `txt` (lay2 (k +# sl) p)
         lay2 k (Nest _ p)          = lay2 k p
         lay2 _ Empty               = end
