@@ -550,12 +550,19 @@ rnFamInstDecl doc mb_cls tycon pats payload rnPayload
 
 
        ; let all_fvs = fvs `addOneFV` unLoc tycon'
+             awcs = concatMap collectAnonymousWildCardNames pats'
        ; return (tycon',
                  HsWB { hswb_cts = pats', hswb_kvs = kv_names,
-                        hswb_tvs = tv_names, hswb_wcs = [] },
+                        hswb_tvs = tv_names, hswb_wcs = awcs },
                  payload',
                  all_fvs) }
              -- type instance => use, hence addOneFV
+  where
+    collectAnonymousWildCardNames ty
+      = [ wildCardName wc
+        | L _ wc <- snd (collectWildCards ty)
+        , isAnonWildCard wc ]
+
 
 rnTyFamInstDecl :: Maybe (Name, [Name])
                 -> TyFamInstDecl RdrName

@@ -1009,7 +1009,8 @@ tc_fam_ty_pats :: FamTyConShape
 -- (and, if C is poly-kinded, so will its kind parameter).
 
 tc_fam_ty_pats (name, arity, kind)
-               (HsWB { hswb_cts = arg_pats, hswb_kvs = kvars, hswb_tvs = tvars })
+               (HsWB { hswb_cts = arg_pats, hswb_kvs = kvars
+                     , hswb_tvs = tvars, hswb_wcs = wcs })
                kind_checker
   = do { let (fam_kvs, fam_body) = splitForAllTys kind
 
@@ -1029,8 +1030,11 @@ tc_fam_ty_pats (name, arity, kind)
        ; let (arg_kinds, res_kind)
                  = splitKindFunTysN (length arg_pats) $
                    substKiWith fam_kvs fam_arg_kinds fam_body
+             -- Treat (anonymous) wild cards as type variables without a name.
+             -- See Note [Wild cards in family instances]
+             anon_tvs = [L (nameSrcSpan wc) (UserTyVar wc) | wc <- wcs]
              hs_tvs = HsQTvs { hsq_kvs = kvars
-                             , hsq_tvs = userHsTyVarBndrs loc tvars }
+                             , hsq_tvs = anon_tvs ++ userHsTyVarBndrs loc tvars }
 
          -- Kind-check and quantify
          -- See Note [Quantifying over family patterns]
@@ -1113,6 +1117,33 @@ type variables (a,b), but also over the implicitly mentioned kind variables
 none. The role of the kind signature (a :: Maybe k) is to add a constraint
 that 'a' must have that kind, and to bring 'k' into scope.
 
+
+Note [Wild cards in family instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Wild cards can be used in type/data family instance declarations to indicate
+that the name of a type variable doesn't matter. Each wild card will be
+replaced with a new unique type variable. For instance:
+
+    type family F a b :: *
+    type instance F Int _ = Int
+
+is the same as
+
+    type family F a b :: *
+    type instance F Int b = Int
+
+This is implemented as follows: during renaming anonymous wild cards are given
+freshly generated names. These names are collected after renaming
+(rnFamInstDecl) and used to make new type variables during type checking
+(tc_fam_ty_pats). One should not confuse these wild cards with the ones from
+partial type signatures. The latter generate fresh meta-variables whereas the
+former generate fresh skolems.
+
+Named and extra-constraints wild cards are not supported in type/data family
+instance declarations.
+
+Relevant tickets: #3699 and #10586.
 
 ************************************************************************
 *                                                                      *

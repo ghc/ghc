@@ -81,6 +81,15 @@
 		<literal>phantom</literal>, like it is in regular Haskell code.
 	      </para>
 	    </listitem>
+            <listitem>
+              <para>
+                Wildcards can be used in the type arguments of type/data
+                family instance declarations to indicate that the name of a
+                type variable doesn't matter. They will be replaced with new
+                unique type variables. See <xref
+                linkend="data-instance-declarations"/> for more details.
+              </para>
+            </listitem>
        </itemizedlist>
     </sect3>
 

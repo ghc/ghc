@@ -6099,6 +6099,24 @@ data instance GMap (Either a b) v = GMapEither (GMap a v) (GMap b v)
       can be any number.
     </para>
     <para>
+      When the name of a type argument of a data or newtype instance
+      declaration doesn't matter, it can be replaced with an underscore
+      (<literal>_</literal>). This is the same as writing a type variable with
+      a unique name.
+<programlisting>
+data family F a b :: *
+data instance F Int _ = Int
+-- Equivalent to
+data instance F Int b = Int
+</programlisting>
+      This resembles the wildcards that can be used in <xref
+      linkend="partial-type-signatures"/>. However, there are some
+      differences. Only anonymous wildcards are allowed in these instance
+      declarations, named and extra-constraints wildcards are not. No error
+      messages reporting the inferred types are generated, nor does the flag
+      <option>-XPartialTypeSignatures</option> have any effect.
+    </para>
+    <para>
       Data and newtype instance declarations are only permitted when an
       appropriate family declaration is in scope - just as a class instance declaration
       requires the class declaration to be visible.  Moreover, each instance
@@ -6248,6 +6266,13 @@ F Bool             -- WRONG: unsaturated application
 <programlisting>
 type instance Elem [e] = e
 </programlisting>
+    </para>
+
+    <para>
+      Type arguments can be replaced with underscores (<literal>_</literal>)
+      if the names of the arguments don't matter. This is the same as writing
+      type variables with unique names. The same rules apply as for <xref
+      linkend="data-instance-declarations"/>.
     </para>
 
     <para>
@@ -9413,6 +9438,12 @@ foo (x :: _) = (x :: _)
 -- Inferred: forall w_. w_ -> w_
 </programlisting>
 
+<para>
+  Anonymous wildcards <emphasis>can</emphasis> occur in type or data instance
+  declarations. However, these declarations are not partial type signatures
+  and different rules apply. See <xref linkend="data-instance-declarations"/>
+  for more details.
+</para>
 
 <para>
 Partial type signatures can also be used in <xref linkend="template-haskell"/> splices.
