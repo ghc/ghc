@@ -583,20 +583,17 @@ mkUnion :: Doc -> Doc -> Doc
 mkUnion Empty _ = Empty
 mkUnion p q     = p `union_` q
 
--- Arg of a NilAbove is always an RDoc
-nilAbove_ :: Doc -> Doc
+nilAbove_ :: RDoc -> RDoc
 nilAbove_ = NilAbove
 
 -- Arg of a TextBeside is always an RDoc
-textBeside_ :: TextDetails -> FastInt -> Doc -> Doc
+textBeside_ :: TextDetails -> FastInt -> RDoc -> RDoc
 textBeside_ = TextBeside
 
--- Arg of Nest is always an RDoc
-nest_ :: FastInt -> Doc -> Doc
+nest_ :: FastInt -> RDoc -> RDoc
 nest_ = Nest
 
--- Args of union are always RDocs
-union_ :: Doc -> Doc -> Doc
+union_ :: RDoc -> RDoc -> RDoc
 union_ = Union
 
 
@@ -791,7 +788,7 @@ fsep = fill True
 -- layout1 $*$ layout2 | hasMoreThanOneLine layout1 = layout1 $$ layout2
 --                     | otherwise                  = layout1 $+$ layout2
 
-fill :: Bool -> [Doc] -> Doc
+fill :: Bool -> [Doc] -> RDoc
 fill _ []     = empty
 fill g (p:ps) = fill1 g (reduceDoc p) (_ILIT(0)) ps
 
