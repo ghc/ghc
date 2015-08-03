@@ -495,7 +495,7 @@ test('T5642',
            [(wordsize(32), 641085256, 10),
                      # sample from x86/Linux
             # prev:        650000000
-            # 2014-09-03:  753045568 
+            # 2014-09-03:  753045568
             # 2014-12-10:  641085256 Improvements in constraints solver
 
             (wordsize(64), 1282916024, 10)])
@@ -679,3 +679,15 @@ test('T9961',
       ],
      compile,
      ['-O'])
+
+test('T9233',
+    [ only_ways(['normal']),
+      compiler_stats_num_field('bytes allocated',
+        [(wordsize(64), 999826288, 5),
+	         # 999826288   4 Aug 2015   initial value
+	 (wordsize(32), 1, 5)   # Put in your value here if you hit this
+	]),
+      extra_clean(['T9233a.hi', 'T9233a.o'])
+    ],
+    multimod_compile,
+    ['T9233', '-v0 -O2 -fno-spec-constr'])
