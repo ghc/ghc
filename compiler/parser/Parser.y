@@ -82,10 +82,10 @@ import Util             ( looksLikePackageName )
 
 }
 
-{- Last updated: 21 Jun 2015
+{- Last updated: 29 Jul 2015
 
-Conflicts: 49 shift/reduce
-           6  reduce/reduce
+Conflicts: 47 shift/reduce
+           2  reduce/reduce
 
 If you modify this parser and add a conflict, please update this comment.
 You can learn more about the conflicts by passing 'happy' the -i flag:
@@ -117,17 +117,24 @@ follows. Shift parses as if the 'module' keyword follows.
 
 -------------------------------------------------------------------------------
 
-state 49 contains 11 shift/reduce conflicts.
+state 46 contains 2 shift/reduce conflicts.
 
-        context -> btype . '~' btype                        (rule 279)
-        context -> btype .                                  (rule 280)
-    *** type -> btype .                                     (rule 281)
-        type -> btype . qtyconop type                       (rule 282)
-        type -> btype . tyvarop type                        (rule 283)
-        type -> btype . '->' ctype                          (rule 284)
-        type -> btype . '~' btype                           (rule 285)
-        type -> btype . SIMPLEQUOTE qconop type             (rule 286)
-        type -> btype . SIMPLEQUOTE varop type              (rule 287)
+    *** strict_mark -> unpackedness .                       (rule 268)
+        strict_mark -> unpackedness . strictness            (rule 269)
+
+    Conflicts: '~' '!'
+
+-------------------------------------------------------------------------------
+
+state 50 contains 11 shift/reduce conflicts.
+
+        context -> btype .                                  (rule 282)
+    *** type -> btype .                                     (rule 283)
+        type -> btype . qtyconop type                       (rule 284)
+        type -> btype . tyvarop type                        (rule 285)
+        type -> btype . '->' ctype                          (rule 286)
+        type -> btype . SIMPLEQUOTE qconop type             (rule 287)
+        type -> btype . SIMPLEQUOTE varop type              (rule 288)
         btype -> btype . atype                              (rule 299)
 
     Conflicts: ':' '->' '-' '!' '*' '.' '`' VARSYM CONSYM QVARSYM QCONSYM
@@ -147,15 +154,15 @@ The case for '->' involves view patterns rather than type operators:
 
 -------------------------------------------------------------------------------
 
-state 120 contains 15 shift/reduce conflicts.
+state 119 contains 15 shift/reduce conflicts.
 
-        exp -> infixexp . '::' sigtype                      (rule 414)
-        exp -> infixexp . '-<' exp                          (rule 415)
-        exp -> infixexp . '>-' exp                          (rule 416)
-        exp -> infixexp . '-<<' exp                         (rule 417)
-        exp -> infixexp . '>>-' exp                         (rule 418)
-    *** exp -> infixexp .                                   (rule 419)
-        infixexp -> infixexp . qop exp10                    (rule 421)
+        exp -> infixexp . '::' sigtype                      (rule 416)
+        exp -> infixexp . '-<' exp                          (rule 417)
+        exp -> infixexp . '>-' exp                          (rule 418)
+        exp -> infixexp . '-<<' exp                         (rule 419)
+        exp -> infixexp . '>>-' exp                         (rule 420)
+    *** exp -> infixexp .                                   (rule 421)
+        infixexp -> infixexp . qop exp10                    (rule 423)
 
     Conflicts: ':' '::' '-' '!' '*' '-<' '>-' '-<<' '>>-'
                '.' '`' VARSYM CONSYM QVARSYM QCONSYM
@@ -172,9 +179,9 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
-state 281 contains 1 shift/reduce conflicts.
+state 279 contains 1 shift/reduce conflicts.
 
-        rule -> STRING . rule_activation rule_forall infixexp '=' exp    (rule 214)
+        rule -> STRING . rule_activation rule_forall infixexp '=' exp    (rule 215)
 
     Conflict: '[' (empty rule_activation reduces)
 
@@ -190,28 +197,27 @@ a rule instructing how to rewrite the expression '[0] f'.
 
 -------------------------------------------------------------------------------
 
-state 290 contains 11 shift/reduce conflicts.
+state 288 contains 11 shift/reduce conflicts.
 
-    *** type -> btype .                                     (rule 281)
-        type -> btype . qtyconop type                       (rule 282)
-        type -> btype . tyvarop type                        (rule 283)
-        type -> btype . '->' ctype                          (rule 284)
-        type -> btype . '~' btype                           (rule 285)
-        type -> btype . SIMPLEQUOTE qconop type             (rule 286)
-        type -> btype . SIMPLEQUOTE varop type              (rule 287)
+    *** type -> btype .                                     (rule 283)
+        type -> btype . qtyconop type                       (rule 284)
+        type -> btype . tyvarop type                        (rule 285)
+        type -> btype . '->' ctype                          (rule 286)
+        type -> btype . SIMPLEQUOTE qconop type             (rule 287)
+        type -> btype . SIMPLEQUOTE varop type              (rule 288)
         btype -> btype . atype                              (rule 299)
 
     Conflicts: ':' '->' '-' '!' '*' '.' '`' VARSYM CONSYM QVARSYM QCONSYM
 
-Same as State 49, but minus the context productions.
+Same as State 50, but minus the context productions.
 
 -------------------------------------------------------------------------------
 
-state 326 contains 1 shift/reduce conflicts.
+state 324 contains 1 shift/reduce conflicts.
 
-        tup_exprs -> commas . tup_tail                      (rule 502)
-        sysdcon -> '(' commas . ')'                         (rule 610)
-        commas -> commas . ','                              (rule 725)
+        tup_exprs -> commas . tup_tail                      (rule 505)
+        sysdcon_nolist -> '(' commas . ')'                  (rule 616)
+        commas -> commas . ','                              (rule 734)
 
     Conflict: ')' (empty tup_tail reduces)
 
@@ -222,24 +228,24 @@ if -XTupleSections is not specified.
 
 -------------------------------------------------------------------------------
 
-state 378 contains 1 shift/reduce conflicts.
+state 376 contains 1 shift/reduce conflicts.
 
-        tup_exprs -> commas . tup_tail                      (rule 502)
-        sysdcon -> '(#' commas . '#)'                       (rule 612)
-        commas -> commas . ','                              (rule 724)
+        tup_exprs -> commas . tup_tail                      (rule 505)
+        sysdcon_nolist -> '(#' commas . '#)'                (rule 618)
+        commas -> commas . ','                              (rule 734)
 
     Conflict: '#)' (empty tup_tail reduces)
 
-Same as State 320 for unboxed tuples.
+Same as State 324 for unboxed tuples.
 
 -------------------------------------------------------------------------------
 
-state 406 contains 1 shift/reduce conflicts.
+state 404 contains 1 shift/reduce conflicts.
 
-        exp10 -> 'let' binds . 'in' exp                     (rule 423)
-        exp10 -> 'let' binds . 'in' error                   (rule 438)
-        exp10 -> 'let' binds . error                        (rule 439)
-    *** qual -> 'let' binds .                               (rule 576)
+        exp10 -> 'let' binds . 'in' exp                     (rule 425)
+        exp10 -> 'let' binds . 'in' error                   (rule 440)
+        exp10 -> 'let' binds . error                        (rule 441)
+    *** qual -> 'let' binds .                               (rule 579)
 
     Conflict: error
 
@@ -247,45 +253,10 @@ TODO: Why?
 
 -------------------------------------------------------------------------------
 
+state 633 contains 1 shift/reduce conflicts.
 
-state 470 contains 1 shift/reduce conflicts.
-
-    *** strict_mark -> '{-# NOUNPACK' '#-}' .               (rule 268)
-        strict_mark -> '{-# NOUNPACK' '#-}' . '!'           (rule 270)
-
-    Conflict: '!'
-
-TODO: Why?
-
--------------------------------------------------------------------------------
-
-state 471 contains 1 shift/reduce conflicts.
-
-    *** strict_mark -> '{-# UNPACK' '#-}' .                 (rule 267)
-        strict_mark -> '{-# UNPACK' '#-}' . '!'             (rule 269)
-
-    Conflict: '!'
-
-Same as State 462
-
--------------------------------------------------------------------------------
-
-state 502 contains 1 shift/reduce conflicts.
-
-        context -> btype '~' btype .                        (rule 279)
-    *** type -> btype '~' btype .                           (rule 285)
-        btype -> btype . atype                              (rule 299)
-
-    Conflict: '!'
-
-TODO: Why?
-
--------------------------------------------------------------------------------
-
-state 637 contains 1 shift/reduce conflicts.
-
-    *** aexp2 -> ipvar .                                    (rule 462)
-        dbind -> ipvar . '=' exp                            (rule 587)
+    *** aexp2 -> ipvar .                                    (rule 466)
+        dbind -> ipvar . '=' exp                            (rule 590)
 
     Conflict: '='
 
@@ -297,9 +268,9 @@ sensible meaning, namely the lhs of an implicit binding.
 
 -------------------------------------------------------------------------------
 
-state 704 contains 1 shift/reduce conflicts.
+state 699 contains 1 shift/reduce conflicts.
 
-        rule -> STRING rule_activation . rule_forall infixexp '=' exp    (rule 214)
+        rule -> STRING rule_activation . rule_forall infixexp '=' exp    (rule 215)
 
     Conflict: 'forall' (empty rule_forall reduces)
 
@@ -314,44 +285,29 @@ doesn't include 'forall'.
 
 -------------------------------------------------------------------------------
 
-state 775 contains 1 shift/reduce conflicts.
+state 950 contains 1 shift/reduce conflicts.
 
-    *** type -> btype '~' btype .                           (rule 285)
-        btype -> btype . atype                              (rule 299)
-
-    Conflict: '!'
-
-TODO: Why?
-
--------------------------------------------------------------------------------
-
-state 958 contains 1 shift/reduce conflicts.
-
-        transformqual -> 'then' 'group' . 'using' exp       (rule 525)
-        transformqual -> 'then' 'group' . 'by' exp 'using' exp    (rule 526)
-    *** special_id -> 'group' .                             (rule 701)
+        transformqual -> 'then' 'group' . 'using' exp       (rule 528)
+        transformqual -> 'then' 'group' . 'by' exp 'using' exp    (rule 529)
+    *** special_id -> 'group' .                             (rule 711)
 
     Conflict: 'by'
 
-TODO: Why?
-
 -------------------------------------------------------------------------------
 
-state 1237 contains 1 reduce/reduce conflicts.
+state 1230 contains 1 reduce/reduce conflicts.
 
-    *** tyconsym -> ':' .                                   (rule 642)
-        consym -> ':' .                                     (rule 712)
+    *** tyconsym -> ':' .                                   (rule 653)
+        consym -> ':' .                                     (rule 721)
 
     Conflict: ')'
 
-TODO: Same as State 1230
-
 -------------------------------------------------------------------------------
 
-state 1238 contains 1 reduce/reduce conflicts.
+state 1231 contains 1 reduce/reduce conflicts.
 
-    *** tyconsym -> CONSYM .                                (rule 640)
-        consym -> CONSYM .                                  (rule 711)
+    *** tyconsym -> CONSYM .                                (rule 651)
+        consym -> CONSYM .                                  (rule 720)
 
     Conflict: ')'
 
@@ -359,47 +315,9 @@ TODO: Why?  (NB: This one has been around for a while; it's quite puzzling
     because we really shouldn't get confused between tyconsym and consym.
     Trace the state machine, maybe?)
 
--------------------------------------------------------------------------------
-state 1259 contains 1 reduce/reduce conflicts.
-
-        *** tyconsym -> '-' .                                   (rule 651)
-        varsym -> '-' .                                         (rule 694)
-
-        Conflict : ')'
-
-Introduced in "Refactor tuple constraints"
-      (ffc21506894c7887d3620423aaf86bc6113a1071)
--------------------------------------------------------------------------------
-state 1260 contains 1 reduce/reduce conflicts.
-
-        *** tyconsym -> '-' .                                   (rule 651)
-        varsym -> '-' .                                         (rule 694)
-
-        Conflict: ')'
-
-Same as 1259
+TODO: Same as State 1230
 
 -------------------------------------------------------------------------------
-state 1261 contains 1 reduce/reduce conflicts.
-
-        *** tyconsym -> VARSYM .                                (rule 648)
-        varsym_no_minus -> VARSYM .                             (rule 695)
-
-  Conflict: ')'
-
-Same as 1260
-
--------------------------------------------------------------------------------
-state 1262 contains 1 reduce/reduce conflicts.
-
-        *** qtyconsym -> QVARSYM .                              (rule 645)
-        qvarsym1 -> QVARSYM .                                   (rule 692)
-
-        Conflict: ')'
-
-Same as 1260
-
--- -----------------------------------------------------------------------------
 -- API Annotations
 --
 
@@ -756,12 +674,12 @@ qcnames :: { [Located RdrName] }     -- A reversed list
 qcname_ext :: { Located RdrName }       -- Variable or data constructor
                                         -- or tagged type constructor
         :  qcname                   { $1 }
-        |  'type' qcname            {% amms (mkTypeImpExp (sLL $1 $> (unLoc $2)))
+        |  'type' oqtycon           {% amms (mkTypeImpExp (sLL $1 $> (unLoc $2)))
                                             [mj AnnType $1,mj AnnVal $2] }
 
 qcname  :: { Located RdrName }  -- Variable or type constructor
-        :  qvar                         { $1 }
-        |  oqtycon                      { $1 }
+        :  qvar                 { $1 }
+        |  oqtycon_no_varcon    { $1 } -- see Note [Type constructors in export list]
 
 -----------------------------------------------------------------------------
 -- Import Declarations
@@ -2892,6 +2810,33 @@ oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
                                                [mop $1,mj AnnVal $2,mcp $3] }
         | '(' '~' ')'                   {% ams (sLL $1 $> $ eqTyCon_RDR)
                                                [mop $1,mj AnnTilde $2,mcp $3] }
+
+oqtycon_no_varcon :: { Located RdrName }  -- Type constructor which cannot be mistaken
+                                          -- for variable constructor in export lists
+                                          -- see Note [Type constructors in export list]
+        :  qtycon            { $1 }
+        | '(' QCONSYM ')'    {% let name = sL1 $2 $! mkQual tcClsName (getQCONSYM $2)
+                                in ams (sLL $1 $> (unLoc name)) [mop $1,mj AnnVal name,mcp $3] }
+        | '(' CONSYM ')'     {% let name = sL1 $2 $! mkUnqual tcClsName (getCONSYM $2)
+                                in ams (sLL $1 $> (unLoc name)) [mop $1,mj AnnVal name,mcp $3] }
+        | '(' ':' ')'        {% let name = sL1 $2 $! consDataCon_RDR
+                                in ams (sLL $1 $> (unLoc name)) [mop $1,mj AnnVal name,mcp $3] }
+        | '(' '~' ')'        {% ams (sLL $1 $> $ eqTyCon_RDR) [mop $1,mj AnnTilde $2,mcp $3] }
+
+{- Note [Type constructors in export list]
+~~~~~~~~~~~~~~~~~~~~~
+Mixing type constructors and variable constructors in export lists introduces
+ambiguity in grammar: e.g. (*) may be both a type constuctor and a function.
+
+-XExplicitNamespaces allows to disambiguate by explicitly prefixing type
+constructors with 'type' keyword.
+
+This ambiguity causes reduce/reduce conflicts in parser, which are always
+resolved in favour of variable constructors. To get rid of conflicts we demand
+that ambigous type constructors (those, which are formed by the same
+productions as variable constructors) are always prefixed with 'type' keyword.
+Unambigous type constructors may occur both with or without 'type' keyword.
+-}
 
 qtyconop :: { Located RdrName } -- Qualified or unqualified
         : qtyconsym                     { $1 }
