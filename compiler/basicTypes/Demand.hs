@@ -1214,7 +1214,7 @@ splitDmdTy ty@(DmdType _ [] res_ty)       = (resTypeArgDmd res_ty, ty)
 -- what of this demand should we consider, given that the IO action can cleanly
 -- exit?
 -- * We have to kill all strictness demands (i.e. lub with a lazy demand)
--- * We can keep demand information (i.e. lub with an absent deman)
+-- * We can keep demand information (i.e. lub with an absent demand)
 -- * We have to kill definite divergence
 -- * We can keep CPR information.
 -- See Note [IO hack in the demand analyser]

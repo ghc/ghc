@@ -342,7 +342,7 @@ dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There's a hack here for I/O operations.  Consider
      case foo x s of { (# s, r #) -> y }
-Is this strict in 'y'.  Normally yes, but what if 'foo' is an I/O
+Is this strict in 'y'?  Normally yes, but what if 'foo' is an I/O
 operation that simply terminates the program (not in an erroneous way)?
 In that case we should not evaluate 'y' before the call to 'foo'.
 Hackish solution: spot the IO-like situation and add a virtual branch,
@@ -365,14 +365,14 @@ However, consider
 Here it is terribly sad to make 'f' lazy in 's'.  After all,
 getMaskingState# is not going to diverge or throw an exception!  This
 situation actually arises in GHC.IO.Handle.Internals.wantReadableHandle
-(on an MVar not an Int), and make a material difference.
+(on an MVar not an Int), and made a material difference.
 
 So if the scrutinee is a primop call, we *don't* apply the
 state hack:
   - If is a simple, terminating one like getMaskingState,
     applying the hack is over-conservative.
   - If the primop is raise# then it returns bottom, so
-    the case alternatives are alraedy discarded.
+    the case alternatives are already discarded.
   - If the primop can raise a non-IO exception, like
     divide by zero or seg-fault (eg writing an array
     out of bounds) then we don't mind evaluating 'x' first.
