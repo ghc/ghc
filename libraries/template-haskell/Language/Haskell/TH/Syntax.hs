@@ -1229,7 +1229,7 @@ data Lit = CharL Char
 
     -- We could add Int, Float, Double etc, as we do in HsLit,
     -- but that could complicate the
-    -- suppposedly-simple TH.Syntax literal type
+    -- supposedly-simple TH.Syntax literal type
 
 -- | Pattern in Haskell given in @{}@
 data Pat

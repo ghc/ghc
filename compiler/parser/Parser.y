@@ -2826,7 +2826,7 @@ oqtycon_no_varcon :: { Located RdrName }  -- Type constructor which cannot be mi
 {- Note [Type constructors in export list]
 ~~~~~~~~~~~~~~~~~~~~~
 Mixing type constructors and variable constructors in export lists introduces
-ambiguity in grammar: e.g. (*) may be both a type constuctor and a function.
+ambiguity in grammar: e.g. (*) may be both a type constructor and a function.
 
 -XExplicitNamespaces allows to disambiguate by explicitly prefixing type
 constructors with 'type' keyword.

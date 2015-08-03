@@ -108,7 +108,7 @@ union stg_ieee754_dbl
  * Predicates for testing for extreme IEEE fp values.
  */
 
-/* In case you don't suppport IEEE, you'll just get dummy defs.. */
+/* In case you don't support IEEE, you'll just get dummy defs.. */
 #ifdef IEEE_FLOATING_POINT
 
 HsInt

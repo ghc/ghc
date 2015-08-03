@@ -297,7 +297,7 @@ genCall (PrimTarget (MO_U_Mul2 w)) [dstH, dstL] [lhs, rhs] = do
 
 -- MO_U_QuotRem2 is another case we handle by widening the registers to double
 -- the width and use normal LLVM instructions (similarly to the MO_U_Mul2). The
--- main difference here is that we need to conmbine two words into one register
+-- main difference here is that we need to combine two words into one register
 -- and then use both 'udiv' and 'urem' instructions to compute the result.
 genCall (PrimTarget (MO_U_QuotRem2 w)) [dstQ, dstR] [lhsH, lhsL, rhs] = run $ do
     let width = widthToLlvmInt w

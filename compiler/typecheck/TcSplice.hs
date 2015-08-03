@@ -703,7 +703,7 @@ runMeta' show_code ppr_hs run_and_convert expr
 {-
 Note [Exceptions in TH]
 ~~~~~~~~~~~~~~~~~~~~~~~
-Supppose we have something like this
+Suppose we have something like this
         $( f 4 )
 where
         f :: Int -> Q [Dec]

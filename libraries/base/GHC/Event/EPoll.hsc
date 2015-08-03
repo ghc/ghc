@@ -115,7 +115,7 @@ poll ep mtimeout f = do
   let events = epollEvents ep
       fd = epollFd ep
 
-  -- Will return zero if the system call was interupted, in which case
+  -- Will return zero if the system call was interrupted, in which case
   -- we just return (and try again later.)
   n <- A.unsafeLoad events $ \es cap -> case mtimeout of
     Just timeout -> epollWait fd es cap $ fromTimeout timeout

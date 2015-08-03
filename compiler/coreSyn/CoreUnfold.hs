@@ -715,7 +715,7 @@ of extra incentive we give a discount of 10*(1 + n_val_args).
 
 Simon M tried a MUCH bigger discount: (10 * (10 + n_val_args)),
 and said it was an "unambiguous win", but its terribly dangerous
-because a fuction with many many case branches, each finishing with
+because a function with many many case branches, each finishing with
 a constructor, can have an arbitrarily large discount.  This led to
 terrible code bloat: see Trac #6099.
 
@@ -1003,7 +1003,7 @@ nonTriv _       = True
 data CallCtxt
   = BoringCtxt
   | RhsCtxt             -- Rhs of a let-binding; see Note [RHS of lets]
-  | DiscArgCtxt         -- Argument of a fuction with non-zero arg discount
+  | DiscArgCtxt         -- Argument of a function with non-zero arg discount
   | RuleArgCtxt         -- We are somewhere in the argument of a function with rules
 
   | ValAppCtxt          -- We're applied to at least one value arg

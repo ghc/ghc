@@ -160,7 +160,7 @@ data PrintUnqualified = QueryQualify {
 -- | given an /original/ name, this function tells you which module
 -- name it should be qualified with when printing for the user, if
 -- any.  For example, given @Control.Exception.catch@, which is in scope
--- as @Exception.catch@, this fuction will return @Just "Exception"@.
+-- as @Exception.catch@, this function will return @Just "Exception"@.
 -- Note that the return value is a ModuleName, not a Module, because
 -- in source code, names are qualified by ModuleNames.
 type QueryQualifyName = Module -> OccName -> QualifyName
