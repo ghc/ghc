@@ -296,9 +296,6 @@ infixl 6 <>
 infixl 6 <+>
 infixl 5 $$, $+$
 
--- Disable ASSERT checks; they are expensive!
-#define LOCAL_ASSERT(x)
-
 
 -- ---------------------------------------------------------------------------
 -- The Doc data type
@@ -588,33 +585,19 @@ mkUnion p q     = p `union_` q
 
 -- Arg of a NilAbove is always an RDoc
 nilAbove_ :: Doc -> Doc
-nilAbove_ p = LOCAL_ASSERT( _ok p ) NilAbove p
-            where
-              _ok Empty = False
-              _ok _     = True
+nilAbove_ = NilAbove
 
 -- Arg of a TextBeside is always an RDoc
 textBeside_ :: TextDetails -> FastInt -> Doc -> Doc
-textBeside_ s sl p = TextBeside s sl (LOCAL_ASSERT( _ok p ) p)
-                   where
-                     _ok (Nest _ _) = False
-                     _ok _          = True
+textBeside_ = TextBeside
 
 -- Arg of Nest is always an RDoc
 nest_ :: FastInt -> Doc -> Doc
-nest_ k p = Nest k (LOCAL_ASSERT( _ok p ) p)
-          where
-            _ok Empty = False
-            _ok _     = True
+nest_ = Nest
 
 -- Args of union are always RDocs
 union_ :: Doc -> Doc -> Doc
-union_ p q = Union (LOCAL_ASSERT( _ok p ) p) (LOCAL_ASSERT( _ok q ) q)
-           where
-             _ok (TextBeside _ _ _) = True
-             _ok (NilAbove _)       = True
-             _ok (Union _ _)        = True
-             _ok _                  = False
+union_ = Union
 
 
 -- ---------------------------------------------------------------------------
