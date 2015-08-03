@@ -534,19 +534,6 @@ ppClassDecl summary links instances fixities loc d subdocs
 ppClassDecl _ _ _ _ _ _ _ _ _ _ _ = error "declaration type not supported by ppShortClassDecl"
 
 
-data InstOrigin name
-    = OriginClass name
-    | OriginData name
-    | OriginFamily name
-
-
-instance NamedThing name => NamedThing (InstOrigin name) where
-
-    getName (OriginClass name) = getName name
-    getName (OriginData name) = getName name
-    getName (OriginFamily name) = getName name
-
-
 ppInstances :: LinksInfo
             -> InstOrigin DocName -> [DocInstance DocName]
             -> Splice -> Unicode -> Qualification

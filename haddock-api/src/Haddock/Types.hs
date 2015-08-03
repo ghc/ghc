@@ -384,6 +384,24 @@ data InstHead name = InstHead
     , ihdInstType :: InstType name
     }
 
+
+-- | An instance origin information.
+--
+-- This is used primarily in HTML backend to generate unique instance
+-- identifiers (for expandable sections).
+data InstOrigin name
+    = OriginClass name
+    | OriginData name
+    | OriginFamily name
+
+
+instance NamedThing name => NamedThing (InstOrigin name) where
+
+    getName (OriginClass name) = getName name
+    getName (OriginData name) = getName name
+    getName (OriginFamily name) = getName name
+
+
 -----------------------------------------------------------------------------
 -- * Documentation comments
 -----------------------------------------------------------------------------
