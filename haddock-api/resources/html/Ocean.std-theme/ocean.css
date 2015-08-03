@@ -159,6 +159,8 @@ p.caption.expander {
 .instance.collapser, .instance.expander {
   margin-left: 0px;
   background-position: left center;
+  min-width: 9px;
+  min-height: 9px;
 }
 
 

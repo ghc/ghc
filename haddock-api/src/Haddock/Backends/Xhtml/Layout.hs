@@ -205,9 +205,9 @@ subInstHead :: String -- ^ Instance unique id (for anchor generation)
             -> Html -- ^ Header content (instance name and type)
             -> Html
 subInstHead iid hdr =
-    expander << hdr
+    expander noHtml <+> hdr
   where
-    expander = thediv ! collapseControl (instAnchorId iid) False "instance"
+    expander = thespan ! collapseControl (instAnchorId iid) False "instance"
 
 
 subInstDetails :: String -- ^ Instance unique id (for anchor generation)
