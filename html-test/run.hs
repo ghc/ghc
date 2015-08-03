@@ -7,6 +7,9 @@ import Control.Monad
 
 import Data.Maybe
 
+import Distribution.Simple.Utils
+import Distribution.Verbosity
+
 import System.Console.GetOpt
 import System.Directory
 import System.Environment
@@ -31,33 +34,19 @@ resDir = rootDir </> "resources"
 
 data Config = Config
     { cfgHaddockPath :: FilePath
+    , cfgGhcPath :: FilePath
     , cfgFiles :: [FilePath]
     }
 
 
 main :: IO ()
 main = do
-    Config { .. } <- parseArgs =<< getArgs
-
-    env <- Just . (:) ("haddock_datadir", resDir) <$> getEnvironment
-
-    handle <- runProcess' cfgHaddockPath $ processConfig
-        { pcEnv = env
-        , pcArgs = ["--version"]
-        }
-    waitForSuccess "Failed to run `haddock --version`" handle
-
-    handle <- runProcess' cfgHaddockPath $ processConfig
-        { pcEnv = env
-        , pcArgs = ["--ghc-version"]
-        }
-    waitForSuccess "Failed to run `haddock --ghc-version`" handle
-
-    putStrLn $ "Files to test: " ++ show cfgFiles
+    Config { .. } <- loadConfig =<< getArgs
+    return ()
 
 
-parseArgs :: [String] -> IO Config
-parseArgs args = do
+loadConfig :: [String] -> IO Config
+loadConfig args = do
     let (flags, files, errors) = getOpt Permute options args
 
     when (not $ null errors) $ do
@@ -68,10 +57,34 @@ parseArgs args = do
         hPutStrLn stderr $ usageInfo "" options
         exitSuccess
 
-    cfgFiles <- processFileArgs files
-    let cfgHaddockPath = haddockPath flags
+    env <- Just . (:) ("haddock_datadir", resDir) <$> getEnvironment
 
+    let cfgHaddockPath = flagsHaddockPath flags
+
+    printVersions env cfgHaddockPath
+
+    cfgFiles <- processFileArgs files
+    cfgGhcPath <- init <$> rawSystemStdout normal cfgHaddockPath
+        ["--print-ghc-path"]
+
+    putStrLn $ "Files to test: " ++ show cfgFiles
     return $ Config { .. }
+
+
+printVersions :: Maybe [(String, String)] -> FilePath -> IO ()
+printVersions env haddockPath = do
+    handle <- runProcess' haddockPath $ processConfig
+        { pcEnv = env
+        , pcArgs = ["--version"]
+        }
+    waitForSuccess "Failed to run `haddock --version`" handle
+
+    handle <- runProcess' haddockPath $ processConfig
+        { pcEnv = env
+        , pcArgs = ["--ghc-version"]
+        }
+    waitForSuccess "Failed to run `haddock --ghc-version`" handle
+
 
 processFileArgs :: [String] -> IO [FilePath]
 processFileArgs [] = filter isSourceFile <$> getDirectoryContents srcDir
@@ -103,14 +116,13 @@ options =
     ]
 
 
-haddockPath :: [Flag] -> FilePath
-haddockPath flags = case mlast [ path | FlagHaddockPath path <- flags ] of
-    Just path -> path
-    Nothing -> rootDir </> "dist" </> "build" </> "haddock" </> "haddock"
-
-
-mlast :: [a] -> Maybe a
-mlast = listToMaybe . reverse
+flagsHaddockPath :: [Flag] -> FilePath
+flagsHaddockPath flags =
+    case mlast [ path | FlagHaddockPath path <- flags ] of
+        Just path -> path
+        Nothing -> rootDir </> "dist" </> "build" </> "haddock" </> "haddock"
+  where
+    mlast = listToMaybe . reverse
 
 
 data ProcessConfig = ProcessConfig
