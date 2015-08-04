@@ -430,8 +430,7 @@ isEmpty _     = False
 --
 -- an old version inserted tabs being 8 columns apart in the output.
 spaces :: Int -> String
-spaces !n | n <= 0    = ""
-          | otherwise = ' ' : spaces (n - 1)
+spaces !n = replicate n ' '
 
 {-
 Q: What is the reason for negative indentation (i.e. argument to indent
@@ -1000,13 +999,13 @@ display m !page_width !ribbon_width txt end doc
             = case m of
                     ZigZagMode |  k >= gap_width
                                -> nlText `txt` (
-                                  Str (multi_ch shift '/') `txt` (
+                                  Str (replicate shift '/') `txt` (
                                   nlText `txt`
                                   lay1 (k - shift) s sl p ))
 
                                |  k < 0
                                -> nlText `txt` (
-                                  Str (multi_ch shift '\\') `txt` (
+                                  Str (replicate shift '\\') `txt` (
                                   nlText `txt`
                                   lay1 (k + shift) s sl p ))
 
@@ -1036,10 +1035,6 @@ display m !page_width !ribbon_width txt end doc
     in
     lay 0 doc
     }}
-
-multi_ch :: Int -> Char -> String
-multi_ch !n ch | n <= 0    = ""
-               | otherwise = ch : multi_ch (n - 1) ch
 
 printDoc :: Mode -> Int -> Handle -> Doc -> IO ()
 -- printDoc adds a newline to the end
