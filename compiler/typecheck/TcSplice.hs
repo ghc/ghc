@@ -159,7 +159,7 @@ tcTypedBracket brack@(TExpBr expr) res_ty
        ; ps' <- readMutVar ps_ref
        ; texpco <- tcLookupId unsafeTExpCoerceName
        ; tcWrapResult (unLoc (mkHsApp (nlHsTyApp texpco [expr_ty])
-                                      (noLoc (HsTcBracketOut brack ps'))))
+                                              (noLoc (HsTcBracketOut brack ps'))))
                       meta_ty res_ty }
 tcTypedBracket other_brack _
   = pprPanic "tcTypedBracket" (ppr other_brack)

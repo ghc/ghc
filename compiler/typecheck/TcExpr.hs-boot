@@ -14,9 +14,14 @@ tcMonoExpr, tcMonoExprNC ::
        -> TcRhoType
        -> TcM (LHsExpr TcId)
 
+tcMonoExpr_O ::
+          LHsExpr Name
+       -> TcRhoType
+       -> TcM (LHsExpr TcId, CtOrigin)
+
 tcInferSigma, tcInferSigmaNC ::
           LHsExpr Name
-       -> TcM (LHsExpr TcId, TcSigmaType)
+       -> TcM (LHsExpr TcId, TcSigmaType, CtOrigin)
 
 tcInferRho, tcInferRhoNC ::
           LHsExpr Name

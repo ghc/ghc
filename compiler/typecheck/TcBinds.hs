@@ -522,7 +522,7 @@ tcPolyNoGen rec_tc prag_fn tc_sig_fn bind_list
        ; mono_ids' <- mapM tc_mono_info mono_infos
        ; return (binds', mono_ids') }
   where
-    tc_mono_info (name, _, mono_id)
+    tc_mono_info (MBI { mbi_poly_name = name, mbi_mono_id = mono_id })
       = do { mono_ty' <- zonkTcType (idType mono_id)
              -- Zonk, mainly to expose unboxed types to checkStrictBinds
            ; let mono_id' = setIdType mono_id mono_ty'
@@ -564,11 +564,10 @@ tcPolyCheck rec_tc prag_fn
        ; spec_prags <- tcSpecPrags poly_id prag_sigs
        ; poly_id    <- addInlinePrags poly_id prag_sigs
 
-       ; let (_, _, mono_id) = mono_info
-             export = ABE { abe_wrap      = idHsWrapper
+       ; let export = ABE { abe_wrap      = idHsWrapper
                           , abe_inst_wrap = idHsWrapper
                           , abe_poly      = poly_id
-                          , abe_mono      = mono_id
+                          , abe_mono      = mbi_mono_id mono_info
                           , abe_prags     = SpecPrags spec_prags }
              abs_bind = L loc $ AbsBinds
                         { abs_tvs = tvs
@@ -648,15 +647,15 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
              do { (binds', mono_infos)
                     <- tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
                   -- See Note [Instantiate when inferring a type]
-                ; mono_tys <- mapM (zonkTcType . idType . thirdOf3) mono_infos
+                ; mono_tys <- mapM (zonkTcType . idType . mbi_mono_id) mono_infos
+                ; let origs = map mbi_orig mono_infos
                     -- NB: zonk to uncover any foralls
                 ; (wrappers, insted_tys)
-                         -- TODO (RAE): Fix origin
-                    <- mapAndUnzipM (deeplyInstantiate AppOrigin) mono_tys
+                    <- zipWithAndUnzipM deeplyInstantiate origs mono_tys
                 ; return (binds', mono_infos, wrappers, insted_tys) }
 
-       ; let name_taus = [(name, tau) | ((name, _, _), tau)
-                                          <- zip mono_infos insted_tys]
+       ; let name_taus = [ (mbi_poly_name info, tau)
+                         | (info, tau) <- zip mono_infos insted_tys]
        ; traceTc "simplifyInfer call" (ppr name_taus $$ ppr wanted)
        ; (qtvs, givens, _mr_bites, ev_binds)
                  <- simplifyInfer tclvl mono name_taus wanted
@@ -698,7 +697,10 @@ mkExport :: PragFun
 
 -- Pre-condition: the qtvs and theta are already zonked
 
-mkExport prag_fn qtvs inferred_theta (poly_name, mb_sig, mono_id)
+mkExport prag_fn qtvs inferred_theta
+         (MBI { mbi_poly_name = poly_name
+              , mbi_sig       = mb_sig
+              , mbi_mono_id   = mono_id })
          inst_wrap inst_ty
   = do  { inst_ty <- zonkTcType inst_ty
 
@@ -1352,33 +1354,43 @@ tcMonoBinds is_rec sig_fn no_gen
     setSrcSpan b_loc    $
     do  { rhs_ty  <- newReturnTyVarTy openTypeKind
         ; mono_id <- newNoSigLetBndr no_gen name rhs_ty
-        ; (co_fn, matches') <- tcExtendIdBndrs [TcIdBndr mono_id NotTopLevel] $
-                                 -- We extend the error context even for a non-recursive
-                                 -- function so that in type error messages we show the
-                                 -- type of the thing whose rhs we are type checking
-                               tcMatchesFun name inf matches rhs_ty
+        ; (co_fn, matches', orig)
+            <- tcExtendIdBndrs [TcIdBndr mono_id NotTopLevel] $
+                  -- We extend the error context even for a non-recursive
+                  -- function so that in type error messages we show the
+                  -- type of the thing whose rhs we are type checking
+               tcMatchesFun name inf matches rhs_ty
 
         ; return (unitBag $ L b_loc $
                      FunBind { fun_id = L nm_loc mono_id, fun_infix = inf,
                                fun_matches = matches', bind_fvs = fvs,
                                fun_co_fn = co_fn, fun_tick = [] },
-                  [(name, Nothing, mono_id)]) }
+                  [MBI { mbi_poly_name = name
+                       , mbi_sig       = Nothing
+                       , mbi_mono_id   = mono_id
+                       , mbi_orig      = orig }]) }
 
 tcMonoBinds _ sig_fn no_gen binds
   = do  { tc_binds <- mapM (wrapLocM (tcLhs sig_fn no_gen)) binds
 
         -- Bring the monomorphic Ids, into scope for the RHSs
         ; let mono_info  = getMonoBindInfo tc_binds
-              rhs_id_env = [(name, mono_id) | (name, mb_sig, mono_id) <- mono_info
+              rhs_id_env = [(name, mono_id) | MBI { mbi_poly_name = name
+                                                  , mbi_sig       = mb_sig
+                                                  , mbi_mono_id   = mono_id }
+                                                    <- mono_info
                                             , noCompleteSig mb_sig ]
                     -- A monomorphic binding for each term variable that lacks
                     -- a type sig.  (Ones with a sig are already in scope.)
 
         ; traceTc "tcMonoBinds" $ vcat [ ppr n <+> ppr id <+> ppr (idType id)
                                        | (n,id) <- rhs_id_env]
-        ; binds' <- tcExtendLetEnvIds NotTopLevel rhs_id_env $
-                    mapM (wrapLocM tcRhs) tc_binds
-        ; return (listToBag binds', mono_info) }
+        ; (binds', origss) <- tcExtendLetEnvIds NotTopLevel rhs_id_env $
+                              mapAndUnzipM (wrapLocFstM tcRhs) tc_binds
+        ; let info_origs = zipEqual "tcMonoBinds" mono_info (concat origss)
+              mono_info' = [ info { mbi_orig = orig }
+                           | (info, orig) <- info_origs ]
+        ; return (listToBag binds', mono_info') }
 
 ------------------------
 -- tcLhs typechecks the LHS of the bindings, to construct the environment in which
@@ -1400,9 +1412,11 @@ data TcMonoBind         -- Half completed; LHS done, RHS not done
   = TcFunBind  MonoBindInfo  SrcSpan Bool (MatchGroup Name (LHsExpr Name))
   | TcPatBind [MonoBindInfo] (LPat TcId) (GRHSs Name (LHsExpr Name)) TcSigmaType
 
-type MonoBindInfo = (Name, Maybe TcSigInfo, TcId)
-        -- Type signature (if any), and
-        -- the monomorphic bound things
+data MonoBindInfo = MBI { mbi_poly_name :: Name
+                        , mbi_sig       :: Maybe TcSigInfo
+                        , mbi_mono_id   :: TcId
+                        , mbi_orig      :: CtOrigin }
+                               -- origin associated with RHS
 
 tcLhs :: TcSigFun -> LetBndrSpec -> HsBind Name -> TcM TcMonoBind
 tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_infix = inf, fun_matches = matches })
@@ -1417,12 +1431,20 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_infix = inf, fun_matc
         ; let mono_id = mkLocalId mono_name (sig_tau sig) HasSigId
         ; addErrCtxt (typeSigCtxt sig) $
           emitWildcardHoleConstraints (sig_nwcs sig)
-        ; return (TcFunBind (name, Just sig, mono_id) nm_loc inf matches) }
+        ; return (TcFunBind (MBI { mbi_poly_name = name
+                                 , mbi_sig       = Just sig
+                                 , mbi_mono_id   = mono_id
+                                 , mbi_orig      = Shouldn'tHappenOrigin })
+                            nm_loc inf matches) }
 
   | otherwise
   = do  { mono_ty <- newFlexiTyVarTy openTypeKind
         ; mono_id <- newNoSigLetBndr no_gen name mono_ty
-        ; return (TcFunBind (name, Nothing, mono_id) nm_loc inf matches) }
+        ; return (TcFunBind (MBI { mbi_poly_name = name
+                                 , mbi_sig       = Nothing
+                                 , mbi_mono_id   = mono_id
+                                 , mbi_orig      = Shouldn'tHappenOrigin })
+                            nm_loc inf matches) }
 
 -- TODO: emit Hole Constraints for wildcards
 tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
@@ -1432,8 +1454,12 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
                 -- After typechecking the pattern, look up the binder
                 -- names, which the pattern has brought into scope.
               lookup_info :: Name -> TcM MonoBindInfo
-              lookup_info name = do { mono_id <- tcLookupId name
-                                    ; return (name, sig_fn name, mono_id) }
+              lookup_info name
+                = do { mono_id <- tcLookupId name
+                     ; return (MBI { mbi_poly_name = name
+                                   , mbi_sig       = sig_fn name
+                                   , mbi_mono_id   = mono_id
+                                   , mbi_orig      = Shouldn'tHappenOrigin }) }
 
         ; ((pat', infos), pat_ty) <- addErrCtxt (patMonoBindsCtxt pat grhss) $
                                      tcInfer tc_pat
@@ -1444,18 +1470,22 @@ tcLhs _ _ other_bind = pprPanic "tcLhs" (ppr other_bind)
         -- AbsBind, VarBind impossible
 
 -------------------
-tcRhs :: TcMonoBind -> TcM (HsBind TcId)
-tcRhs (TcFunBind info@(_, mb_sig, mono_id) loc inf matches)
+-- the list of CtOrigin return correspond to the MonoBindInfo(s) in the
+-- provided TcMonoBind
+tcRhs :: TcMonoBind -> TcM (HsBind TcId, [CtOrigin])
+tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
+                 loc inf matches)
   = tcExtendForRhs [info]                           $
     tcExtendTyVarEnv2 (lexically_scoped_tvs mb_sig) $
     do  { traceTc "tcRhs: fun bind" (ppr mono_id $$ ppr (idType mono_id))
-        ; (co_fn, matches') <- tcMatchesFun (idName mono_id) inf
-                                            matches (idType mono_id)
-        ; return (FunBind { fun_id = L loc mono_id, fun_infix = inf
-                          , fun_matches = matches'
-                          , fun_co_fn = co_fn
-                          , bind_fvs = placeHolderNamesTc
-                          , fun_tick = [] }) }
+        ; (co_fn, matches', orig) <- tcMatchesFun (idName mono_id) inf
+                                                  matches (idType mono_id)
+        ; return ( FunBind { fun_id = L loc mono_id, fun_infix = inf
+                           , fun_matches = matches'
+                           , fun_co_fn = co_fn
+                           , bind_fvs = placeHolderNamesTc
+                           , fun_tick = [] }
+                 , [orig] ) }
     where
       lexically_scoped_tvs :: Maybe TcSigInfo -> [(Name, TcTyVar)]
       lexically_scoped_tvs (Just (TcSigInfo { sig_tvs = user_tvs, sig_nwcs = hole_tvs }))
@@ -1469,11 +1499,13 @@ tcRhs (TcPatBind infos pat' grhss pat_ty)
     -- That's why we have the special case for a single FunBind in tcMonoBinds
     tcExtendForRhs infos        $
     do  { traceTc "tcRhs: pat bind" (ppr pat' $$ ppr pat_ty)
-        ; grhss' <- addErrCtxt (patMonoBindsCtxt pat' grhss) $
-                    tcGRHSsPat grhss pat_ty
-        ; return (PatBind { pat_lhs = pat', pat_rhs = grhss', pat_rhs_ty = pat_ty
-                          , bind_fvs = placeHolderNamesTc
-                          , pat_ticks = ([],[]) }) }
+        ; (grhss', orig) <- addErrCtxt (patMonoBindsCtxt pat' grhss) $
+                            tcGRHSsPat grhss pat_ty
+        ; return ( PatBind { pat_lhs = pat', pat_rhs = grhss'
+                           , pat_rhs_ty = pat_ty
+                           , bind_fvs = placeHolderNamesTc
+                           , pat_ticks = ([],[]) }
+                 , map (const orig) infos ) }
 
 tcExtendForRhs :: [MonoBindInfo] -> TcM a -> TcM a
 -- Extend the TcIdBinderStack for the RHS of the binding, with
@@ -1488,7 +1520,9 @@ tcExtendForRhs :: [MonoBindInfo] -> TcM a -> TcM a
 -- If we had the *polymorphic* version of f in the TcIdBinderStack, it
 -- would not be reported as relevant, because its type is closed
 tcExtendForRhs infos thing_inside
-  = tcExtendIdBndrs [TcIdBndr mono_id NotTopLevel | (_, _, mono_id) <- infos] thing_inside
+  = tcExtendIdBndrs [ TcIdBndr mono_id NotTopLevel
+                    | MBI { mbi_mono_id = mono_id } <- infos ]
+                    thing_inside
     -- NotTopLevel: it's a monomorphic binding
 
 ---------------------

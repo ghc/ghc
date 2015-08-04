@@ -5,11 +5,11 @@
 Typecheck arrow notation
 -}
 
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RankNTypes, TupleSections #-}
 
 module TcArrows ( tcProc ) where
 
-import {-# SOURCE #-}   TcExpr( tcMonoExpr, tcInferSigma, tcSyntaxOp, tcCheckId, tcPolyExpr )
+import {-# SOURCE #-}   TcExpr( tcMonoExpr, tcInferRho, tcSyntaxOp, tcCheckId, tcPolyExpr )
 
 import HsSyn
 import TcMatches
@@ -144,13 +144,15 @@ tc_cmd env (HsCmdLet binds (L body_loc body)) res_ty
 
 tc_cmd env in_cmd@(HsCmdCase scrut matches _) (stk, res_ty)
   = addErrCtxt (cmdCtxt in_cmd) $ do
-      (scrut', scrut_ty) <- tcInferSigma scrut
-      (wrap, matches') <- tcMatchesCase match_ctxt scrut_ty matches res_ty
+      (scrut', scrut_ty) <- tcInferRho scrut
+      (wrap, matches', _orig)
+        <- tcMatchesCase match_ctxt scrut_ty matches res_ty
       return (HsCmdCase scrut' matches' wrap)
   where
     match_ctxt = MC { mc_what = CaseAlt,
                       mc_body = mc_body }
-    mc_body body res_ty' = tcCmd env body (stk, res_ty')
+    mc_body body res_ty' = (, Shouldn'tHappenOrigin) <$>
+                           tcCmd env body (stk, res_ty')
 
 tc_cmd env (HsCmdIf Nothing pred b1 b2) res_ty    -- Ordinary 'if'
   = do  { pred' <- tcMonoExpr pred boolTy

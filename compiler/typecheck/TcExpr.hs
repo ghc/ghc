@@ -6,9 +6,9 @@ c%
 \section[TcExpr]{Typecheck an expression}
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, TupleSections #-}
 
-module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExprNC,
+module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExpr_O, tcMonoExprNC,
                 tcInferSigma, tcInferSigmaNC, tcInferRho, tcInferRhoNC,
                 tcSyntaxOp, tcCheckId,
                 addExprErrCtxt ) where
@@ -85,12 +85,23 @@ tcPolyExpr expr res_ty
   = addExprErrCtxt expr $
     do { traceTc "tcPolyExpr" (ppr res_ty); tcPolyExprNC expr res_ty }
 
-tcPolyExprNC (L loc expr) res_ty
+tcPolyExprNC expr res_ty
+  = fst <$> tcPolyExprNC_O expr res_ty
+
+-- variant of tcPolyExpr that returns the origin
+tcPolyExprNC_O
+         :: LHsExpr Name        -- Expression to type check
+         -> TcSigmaType         -- Expected type (could be a polytype)
+         -> TcM (LHsExpr TcId, CtOrigin) -- Generalised expr with expected type
+              -- The origin is useful if you ever need to instantiate the type
+
+tcPolyExprNC_O (L loc expr) res_ty
   = setSrcSpan loc $
-    do { traceTc "tcPolyExprNC" (ppr res_ty)
-       ; (wrap, (expr', _)) <- tcSkolemise GenSigCtxt res_ty $ \ _ res_ty ->
-                               tcExpr expr res_ty
-       ; return (L loc (mkHsWrap wrap expr')) }
+    do { traceTc "tcPolyExprNC_O" (ppr res_ty)
+       ; (wrap, (expr', orig))
+           <- tcSkolemise GenSigCtxt res_ty $ \ _ res_ty ->
+              tcExpr expr res_ty
+       ; return (L loc (mkHsWrap wrap expr'), orig) }
 
 ---------------
 tcMonoExpr, tcMonoExprNC
@@ -153,18 +164,17 @@ NB: The res_ty is always deeply skolemised.
 -}
 
 tcExpr :: HsExpr Name -> TcRhoType -> TcM (HsExpr TcId, CtOrigin)
-tcExpr (HsVar name)     res_ty = do { expr <- tcCheckId name res_ty
-                                    ; return (expr, OccurrenceOf name) }
-tcExpr (HsUnboundVar v) res_ty = do { expr <- tcUnboundId v res_ty
-                                    ; return (expr, UnboundOccurrenceOf v) }
+tcExpr (HsVar name)     res_ty = (, OccurrenceOf name) <$> tcCheckId name res_ty
+tcExpr (HsUnboundVar v) res_ty = (, UnboundOccurrenceOf v) <$>
+                                 tcUnboundId v res_ty
 
 tcExpr (HsApp e1 e2) res_ty
   = do { (wrap, fun, args, orig) <- tcApp Nothing e1 [e2] res_ty
        ; return (mkHsWrap wrap $ unLoc $ foldl mkHsApp fun args, orig) }
 
 tcExpr (HsLit lit)   res_ty = do { let lit_ty = hsLitType lit
-                                 ; tcWrapResult (HsLit lit) lit_ty res_ty
-                                                Shouldn'tHappenOrigin }
+                                 ; no_origM $
+                                   tcWrapResult (HsLit lit) lit_ty res_ty }
 
 tcExpr (HsPar expr)   res_ty = do { (expr', orig) <- tcMonoExprNC_O expr res_ty
                                   ; return (HsPar expr', orig) }
@@ -201,22 +211,25 @@ tcExpr (HsIPVar x) res_ty
        ; ip_ty <- newFlexiTyVarTy openTypeKind
        ; let ip_name = mkStrLitTy (hsIPNameFS x)
        ; ip_var <- emitWanted origin (mkClassPred ipClass [ip_name, ip_ty])
-       ; tcWrapResult (fromDict ipClass ip_name ip_ty (HsVar ip_var)) ip_ty res_ty origin }
+       ; (, origin) <$>
+         tcWrapResult (fromDict ipClass ip_name ip_ty (HsVar ip_var))
+                      ip_ty res_ty }
   where
   -- Coerces a dictionary for `IP "x" t` into `t`.
   fromDict ipClass x ty = HsWrap $ mkWpCast $ TcCoercion $
                           unwrapIP $ mkClassPred ipClass [x,ty]
 
 tcExpr (HsLam match) res_ty
-  = do  { (co_fn, match') <- tcMatchLambda match res_ty
-        ; return (mkHsWrap co_fn (HsLam match'), ) }
+  = do  { (co_fn, match', orig) <- tcMatchLambda match res_ty
+        ; return (mkHsWrap co_fn (HsLam match'), orig) }
 
 tcExpr e@(HsLamCase _ matches) res_ty
   = do {(wrap1, [arg_ty], body_ty) <-
             matchExpectedFunTys Expected msg 1 res_ty
-       ; (wrap2, matches') <- tcMatchesCase match_ctxt arg_ty matches body_ty
-       ; return $ mkHsWrap (wrap1 <.> mkWpFun idHsWrapper wrap2 arg_ty body_ty) $
-                  HsLamCase arg_ty matches' }
+       ; (wrap2, matches', orig)
+           <- tcMatchesCase match_ctxt arg_ty matches body_ty
+       ; return (mkHsWrap (wrap1 <.> mkWpFun idHsWrapper wrap2 arg_ty body_ty) $
+                 HsLamCase arg_ty matches', orig) }
   where msg = sep [ ptext (sLit "The function") <+> quotes (ppr e)
                   , ptext (sLit "requires")]
         match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
@@ -225,7 +238,7 @@ tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
  = do { nwc_tvs <- mapM newWildcardVarMetaKind wcs
       ; tcExtendTyVarEnv nwc_tvs $ do {
         sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
-      ; (gen_fn, expr')
+      ; (gen_fn, (expr', orig))
             <- tcSkolemise ExprSigCtxt sig_tc_ty $
                \ skol_tvs res_ty ->
 
@@ -234,13 +247,13 @@ tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
                tcExtendTyVarEnv2
                   [(n,tv) | (Just n, tv) <- findScopedTyVars sig_ty sig_tc_ty skol_tvs] $
 
-               tcPolyExprNC expr res_ty
+               tcPolyExprNC_O expr res_ty
 
       ; let inner_expr = ExprWithTySigOut (mkLHsWrap gen_fn expr') sig_ty
 
       ; addErrCtxt (pprSigCtxt ExprSigCtxt empty (ppr sig_ty)) $
         emitWildcardHoleConstraints (zip wcs nwc_tvs)
-      ; tcWrapResult inner_expr sig_tc_ty res_ty } }
+      ; (, orig) <$> tcWrapResult inner_expr sig_tc_ty res_ty } }
 
 tcExpr (HsType ty _) _
   = failWithTc (sep [ text "Type argument used outside of a function argument:"
@@ -307,16 +320,16 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
        ; arg2' <- tcArg op (arg2, arg2_ty, 2)
        ; op_id <- tcLookupId op_name
        ; let op' = L loc (HsWrap (mkWpTyApps [arg1_ty, arg2_ty]) (HsVar op_id))
-       ; return $ OpApp arg1' op' fix arg2' }
+       ; no_orig (OpApp arg1' op' fix arg2') }
 
   | (L loc (HsVar op_name)) <- op
   , op_name `hasKey` dollarIdKey        -- Note [Typing rule for ($)]
   = do { traceTc "Application rule" (ppr op)
-       ; (arg1', arg1_ty) <- tcInferSigma arg1
+       ; (arg1', arg1_ty, orig1) <- tcInferSigma arg1
 
        ; let doc = ptext (sLit "The first argument of ($) takes")
        ; (wrap_arg1, [arg2_sigma], op_res_ty) <-
-           matchExpectedFunTys (Actual AppOrigin) doc 1 arg1_ty
+           matchExpectedFunTys (Actual orig1) doc 1 arg1_ty
 
          -- We have (arg1 $ arg2)
          -- So: arg1_ty = arg2_ty -> op_res_ty
@@ -337,7 +350,7 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
        ; let a2_ty = mkTyVarTy a2_tv
        ; co_a <- unifyType arg2_sigma a2_ty    -- arg2_sigma ~N a2_ty
 
-       ; wrap_res <- tcSubTypeHR op_res_ty res_ty    -- op_res -> res
+       ; wrap_res <- tcSubTypeHR orig1 op_res_ty res_ty    -- op_res -> res
 
        ; op_id  <- tcLookupId op_name
        ; let op' = L loc (HsWrap (mkWpTyApps [a2_ty, res_ty]) (HsVar op_id))
@@ -353,31 +366,33 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
 
              -- arg2' :: arg2_sigma
              -- wrap_a :: a2_ty "->" arg2_sigma
-       ; return $
-         OpApp (mkLHsWrap wrap1 arg1')
-               op' fix
-               (mkLHsWrapCo co_a arg2') }
+       ; return ( OpApp (mkLHsWrap wrap1 arg1')
+                        op' fix
+                        (mkLHsWrapCo co_a arg2')
+                , orig1 ) }
 
   | otherwise
   = do { traceTc "Non Application rule" (ppr op)
-       ; (wrap, op', [arg1', arg2']) <- tcApp (Just $ mk_op_msg op) AppOrigin
-                                        op [arg1, arg2] res_ty
-       ; return $ mkHsWrap wrap $ OpApp arg1' op' fix arg2' }
+       ; (wrap, op', [arg1', arg2'], orig)
+           <- tcApp (Just $ mk_op_msg op)
+                     op [arg1, arg2] res_ty
+       ; return (mkHsWrap wrap $ OpApp arg1' op' fix arg2', orig) }
 
 -- Right sections, equivalent to \ x -> x `op` expr, or
 --      \ x -> op x expr
 
 tcExpr (SectionR op arg2) res_ty
-  = do { (op', op_ty) <- tcInferFun op
+  = do { (op', op_ty, _) <- tcInferFun op
        ; (wrap_fun, [arg1_ty, arg2_ty], op_res_ty) <-
            matchExpectedFunTys (Actual SectionOrigin) (mk_op_msg op) 2 op_ty
-       ; wrap_res <- tcSubTypeHR (mkFunTy arg1_ty op_res_ty) res_ty
+       ; wrap_res <- tcSubTypeHR SectionOrigin (mkFunTy arg1_ty op_res_ty) res_ty
        ; arg2' <- tcArg op (arg2, arg2_ty, 2)
-       ; return $ mkHsWrap wrap_res $
-         SectionR (mkLHsWrap wrap_fun op') arg2' }
+       ; return ( mkHsWrap wrap_res $
+                  SectionR (mkLHsWrap wrap_fun op') arg2'
+                , SectionOrigin ) }
 
 tcExpr (SectionL arg1 op) res_ty
-  = do { (op', op_ty) <- tcInferFun op
+  = do { (op', op_ty, _) <- tcInferFun op
        ; dflags <- getDynFlags      -- Note [Left sections]
        ; let n_reqd_args | xopt Opt_PostfixOperators dflags = 1
                          | otherwise                        = 2
@@ -385,17 +400,18 @@ tcExpr (SectionL arg1 op) res_ty
        ; (wrap_fn, (arg1_ty:arg_tys), op_res_ty)
            <- matchExpectedFunTys (Actual SectionOrigin)
                 (mk_op_msg op) n_reqd_args op_ty
-       ; wrap_res <- tcSubTypeHR (mkFunTys arg_tys op_res_ty) res_ty
+       ; wrap_res <- tcSubTypeHR SectionOrigin (mkFunTys arg_tys op_res_ty) res_ty
        ; arg1' <- tcArg op (arg1, arg1_ty, 1)
-       ; return $ mkHsWrap wrap_res $
-         SectionL arg1' (mkLHsWrap wrap_fn op') }
+       ; return ( mkHsWrap wrap_res $
+                  SectionL arg1' (mkLHsWrap wrap_fn op')
+                , SectionOrigin ) }
 
 tcExpr (ExplicitTuple tup_args boxity) res_ty
   | all tupArgPresent tup_args
   = do { let tup_tc = tupleTyCon boxity (length tup_args)
        ; (coi, arg_tys) <- matchExpectedTyConApp tup_tc res_ty
        ; tup_args1 <- tcTupArgs tup_args arg_tys
-       ; return $ mkHsWrapCo coi (ExplicitTuple tup_args1 boxity) }
+       ; no_orig $ mkHsWrapCo coi (ExplicitTuple tup_args1 boxity) }
 
   | otherwise
   = -- The tup_args are a mixture of Present and Missing (for tuple sections)
@@ -409,30 +425,33 @@ tcExpr (ExplicitTuple tup_args boxity) res_ty
                = mkFunTys [ty | (ty, L _ (Missing _)) <- arg_tys `zip` tup_args]
                           (mkTyConApp tup_tc arg_tys)
 
-       ; wrap <- tcSubTypeHR actual_res_ty res_ty
+       ; wrap <- tcSubTypeHR Shouldn'tHappenOrigin actual_res_ty res_ty
 
        -- Handle tuple sections where
        ; tup_args1 <- tcTupArgs tup_args arg_tys
 
-       ; return $ mkHsWrap wrap (ExplicitTuple tup_args1 boxity) }
+       ; no_orig $ mkHsWrap wrap (ExplicitTuple tup_args1 boxity) }
 
 tcExpr (ExplicitList _ witness exprs) res_ty
   = case witness of
       Nothing   -> do  { (coi, elt_ty) <- matchExpectedListTy res_ty
                        ; exprs' <- mapM (tc_elt elt_ty) exprs
-                       ; return $ mkHsWrapCo coi (ExplicitList elt_ty Nothing exprs') }
+                       ; no_orig $ mkHsWrapCo coi $
+                                   ExplicitList elt_ty Nothing exprs' }
 
-      Just fln -> do  { list_ty <- newFlexiTyVarTy liftedTypeKind
+      Just fln -> do { list_ty <- newFlexiTyVarTy liftedTypeKind
                      ; fln' <- tcSyntaxOp ListOrigin fln (mkFunTys [intTy, list_ty] res_ty)
                      ; (coi, elt_ty) <- matchExpectedListTy list_ty
                      ; exprs' <- mapM (tc_elt elt_ty) exprs
-                     ; return $ mkHsWrapCo coi (ExplicitList elt_ty (Just fln') exprs') }
+                     ; no_orig $ mkHsWrapCo coi $
+                                 ExplicitList elt_ty (Just fln') exprs' }
      where tc_elt elt_ty expr = tcPolyExpr expr elt_ty
 
 tcExpr (ExplicitPArr _ exprs) res_ty    -- maybe empty
   = do  { (coi, elt_ty) <- matchExpectedPArrTy res_ty
         ; exprs' <- mapM (tc_elt elt_ty) exprs
-        ; return $ mkHsWrapCo coi (ExplicitPArr elt_ty exprs') }
+        ; no_orig $ mkHsWrapCo coi $
+                    ExplicitPArr elt_ty exprs' }
   where
     tc_elt elt_ty expr = tcPolyExpr expr elt_ty
 
@@ -445,9 +464,9 @@ tcExpr (ExplicitPArr _ exprs) res_ty    -- maybe empty
 -}
 
 tcExpr (HsLet binds expr) res_ty
-  = do  { (binds', expr') <- tcLocalBinds binds $
-                             tcMonoExpr expr res_ty
-        ; return (HsLet binds' expr') }
+  = do  { (binds', (expr', orig)) <- tcLocalBinds binds $
+                                     tcMonoExpr_O expr res_ty
+        ; return (HsLet binds' expr', orig) }
 
 tcExpr (HsCase scrut matches) exp_ty
   = do  {  -- We used to typecheck the case alternatives first.
@@ -462,8 +481,9 @@ tcExpr (HsCase scrut matches) exp_ty
           (scrut', scrut_ty) <- tcInferRho scrut
 
         ; traceTc "HsCase" (ppr scrut_ty)
-        ; (wrap, matches') <- tcMatchesCase match_ctxt scrut_ty matches exp_ty
-        ; return $ mkHsWrap wrap $ HsCase scrut' matches' }
+        ; (wrap, matches', orig)
+            <- tcMatchesCase match_ctxt scrut_ty matches exp_ty
+        ; return (mkHsWrap wrap $ HsCase scrut' matches', orig) }
  where
     match_ctxt = MC { mc_what = CaseAlt,
                       mc_body = tcBody }
@@ -475,27 +495,31 @@ tcExpr (HsIf Nothing pred b1 b2) res_ty    -- Ordinary 'if'
        ; tau_ty <- tauTvsForReturnTvs res_ty
        ; b1' <- tcMonoExpr b1 tau_ty
        ; b2' <- tcMonoExpr b2 tau_ty
-       ; tcWrapResult (HsIf Nothing pred' b1' b2') tau_ty res_ty }
+       ; no_origM $ tcWrapResult (HsIf Nothing pred' b1' b2') tau_ty res_ty }
 
 tcExpr (HsIf (Just fun) pred b1 b2) res_ty
   -- Note [Rebindable syntax for if]
-  = do { (wrap, fun', [pred', b1', b2'])
-           <- tcApp (Just herald) IfOrigin (noLoc fun) [pred, b1, b2] res_ty
-       ; return $ mkHsWrap wrap $ (HsIf (Just (unLoc fun')) pred' b1' b2') }
+  = do { (wrap, fun', [pred', b1', b2'], orig)
+           <- tcApp (Just herald) (noLoc fun) [pred, b1, b2] res_ty
+       ; return ( mkHsWrap wrap $
+                  HsIf (Just (unLoc fun')) pred' b1' b2'
+                , orig ) }
   where
     herald = text "Rebindable" <+> quotes (text "if") <+> text "takes"
 
 tcExpr (HsMultiIf _ alts) res_ty
-  = do { alts' <- mapM (wrapLocM $ tcGRHS match_ctxt res_ty) alts
-       ; return $ HsMultiIf res_ty alts' }
+  = do { (alts', origs)
+           <- mapAndUnzipM (wrapLocFstM $ tcGRHS match_ctxt res_ty) alts
+       ; return (HsMultiIf res_ty alts', combineCtOrigins origs) }
   where match_ctxt = MC { mc_what = IfAlt, mc_body = tcBody }
 
 tcExpr (HsDo do_or_lc stmts _) res_ty
-  = tcDoStmts do_or_lc stmts res_ty
+  = do { expr' <- tcDoStmts do_or_lc stmts res_ty
+       ; return (expr', DoOrigin) }
 
 tcExpr (HsProc pat cmd) res_ty
   = do  { (pat', cmd', coi) <- tcProc pat cmd res_ty
-        ; return $ mkHsWrapCo coi (HsProc pat' cmd') }
+        ; no_orig $ mkHsWrapCo coi (HsProc pat' cmd') }
 
 tcExpr (HsStatic expr) res_ty
   = do  { staticPtrTyCon  <- tcLookupTyCon staticPtrTyConName
@@ -516,7 +540,7 @@ tcExpr (HsStatic expr) res_ty
         -- Insert the static form in a global list for later validation.
         ; stWC <- tcg_static_wc <$> getGblEnv
         ; updTcRef stWC (andWC lie)
-        ; return $ mkHsWrapCo co $ HsStatic expr'
+        ; no_orig $ mkHsWrapCo co $ HsStatic expr'
         }
 
 {-
@@ -559,10 +583,11 @@ tcExpr (RecordCon (L loc con_name) _ rbinds) res_ty
               (arg_tys, actual_res_ty) = tcSplitFunTysN con_tau arity
               con_id = dataConWrapId data_con
 
-        ; res_wrap <- tcSubTypeHR actual_res_ty res_ty
+        ; res_wrap <- tcSubTypeHR Shouldn'tHappenOrigin actual_res_ty res_ty
         ; rbinds' <- tcRecordBinds data_con arg_tys rbinds
-        ; return $ mkHsWrap res_wrap $
-          RecordCon (L loc con_id) (mkHsWrap con_wrap con_expr) rbinds' }
+        ; no_orig $ mkHsWrap res_wrap $
+                    RecordCon (L loc con_id)
+                              (mkHsWrap con_wrap con_expr) rbinds' }
 
 {-
 Note [Type of a record update]
@@ -749,7 +774,7 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
               scrut_ty      = TcType.substTy scrut_subst  con1_res_ty
               con1_arg_tys' = map (TcType.substTy result_subst) con1_arg_tys
 
-        ; wrap_res <- tcSubTypeHR rec_res_ty res_ty
+        ; wrap_res <- tcSubTypeHR Shouldn'tHappenOrigin rec_res_ty res_ty
 
         -- STEP 5
         -- Typecheck the thing to be updated, and the bindings
@@ -766,9 +791,9 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
                        | otherwise
                        = idHsWrapper
         -- Phew!
-        ; return $ mkHsWrap wrap_res $
-          RecordUpd (mkLHsWrap scrut_co record_expr') rbinds'
-                    relevant_cons scrut_inst_tys result_inst_tys  }
+        ; no_orig $ mkHsWrap wrap_res $
+                    RecordUpd (mkLHsWrap scrut_co record_expr') rbinds'
+                              relevant_cons scrut_inst_tys result_inst_tys }
   where
     upd_fld_names = hsRecFields rbinds
 
@@ -802,7 +827,7 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
 -}
 
 tcExpr (ArithSeq _ witness seq) res_ty
-  = tcArithSeq witness seq res_ty
+  = no_origM $ tcArithSeq witness seq res_ty
 
 tcExpr (PArrSeq _ seq@(FromTo expr1 expr2)) res_ty
   = do  { (coi, elt_ty) <- matchExpectedPArrTy res_ty
@@ -811,8 +836,8 @@ tcExpr (PArrSeq _ seq@(FromTo expr1 expr2)) res_ty
         ; enumFromToP <- initDsTc $ dsDPHBuiltin enumFromToPVar
         ; enum_from_to <- newMethodFromName (PArrSeqOrigin seq)
                                  (idName enumFromToP) elt_ty
-        ; return $ mkHsWrapCo coi
-                     (PArrSeq enum_from_to (FromTo expr1' expr2')) }
+        ; no_orig $ mkHsWrapCo coi $
+                    PArrSeq enum_from_to (FromTo expr1' expr2') }
 
 tcExpr (PArrSeq _ seq@(FromThenTo expr1 expr2 expr3)) res_ty
   = do  { (coi, elt_ty) <- matchExpectedPArrTy res_ty
@@ -822,8 +847,8 @@ tcExpr (PArrSeq _ seq@(FromThenTo expr1 expr2 expr3)) res_ty
         ; enumFromThenToP <- initDsTc $ dsDPHBuiltin enumFromThenToPVar
         ; eft <- newMethodFromName (PArrSeqOrigin seq)
                       (idName enumFromThenToP) elt_ty        -- !!!FIXME: chak
-        ; return $ mkHsWrapCo coi
-                     (PArrSeq eft (FromThenTo expr1' expr2' expr3')) }
+        ; no_orig $ mkHsWrapCo coi $
+                    PArrSeq eft (FromThenTo expr1' expr2' expr3') }
 
 tcExpr (PArrSeq _ _) _
   = panic "TcExpr.tcExpr: Infinite parallel array!"
@@ -838,9 +863,12 @@ tcExpr (PArrSeq _ _) _
 ************************************************************************
 -}
 
-tcExpr (HsSpliceE splice)        res_ty = tcSpliceExpr splice res_ty
-tcExpr (HsBracket brack)         res_ty = tcTypedBracket   brack res_ty
-tcExpr (HsRnBracketOut brack ps) res_ty = tcUntypedBracket brack ps res_ty
+tcExpr (HsSpliceE splice)        res_ty
+  = no_origM $ tcSpliceExpr splice res_ty
+tcExpr (HsBracket brack)         res_ty
+  = no_origM $ tcTypedBracket   brack res_ty
+tcExpr (HsRnBracketOut brack ps) res_ty
+  = no_origM $ tcUntypedBracket brack ps res_ty
 
 {-
 ************************************************************************
@@ -853,6 +881,15 @@ tcExpr (HsRnBracketOut brack ps) res_ty = tcUntypedBracket brack ps res_ty
 tcExpr other _ = pprPanic "tcMonoExpr" (ppr other)
   -- Include ArrForm, ArrApp, which shouldn't appear at all
   -- Also HsTcBracketOut, HsQuasiQuoteE
+
+
+-- | Like 'return', but attaches 'Shouldn'tHappenOrigin'
+no_orig :: HsExpr TcId -> TcM (HsExpr TcId, CtOrigin)
+no_orig expr = return (expr, Shouldn'tHappenOrigin)
+
+-- | Run an type-checking action and attach a 'Shouldn'tHappenOrigin'
+no_origM :: TcM (HsExpr TcId) -> TcM (HsExpr TcId, CtOrigin)
+no_origM = fmap (, Shouldn'tHappenOrigin)
 
 {-
 ************************************************************************
@@ -975,22 +1012,22 @@ mk_op_msg :: LHsExpr Name -> SDoc
 mk_op_msg op = text "The operator" <+> quotes (ppr op) <+> text "takes"
 
 ----------------
-tcInferFun :: LHsExpr Name -> TcM (LHsExpr TcId, TcSigmaType)
+tcInferFun :: LHsExpr Name -> TcM (LHsExpr TcId, TcSigmaType, CtOrigin)
 -- Infer type of a function
 tcInferFun (L loc (HsVar name))
   = do { (fun, ty) <- setSrcSpan loc (tcInferId name)
                -- Don't wrap a context around a plain Id
-       ; return (L loc fun, ty) }
+       ; return (L loc fun, ty, OccurrenceOf name) }
 
 tcInferFun fun
-  = do { (fun, fun_ty) <- tcInferSigma fun
+  = do { (fun, fun_ty, orig) <- tcInferSigma fun
 
          -- Zonk the function type carefully, to expose any polymorphism
          -- E.g. (( \(x::forall a. a->a). blah ) e)
          -- We can see the rank-2 type of the lambda in time to generalise e
        ; fun_ty' <- zonkTcType fun_ty
 
-       ; return (fun, fun_ty') }
+       ; return (fun, fun_ty', orig) }
 
 ----------------
 tcArgs :: LHsExpr Name                          -- The function (for error messages)
@@ -1033,8 +1070,9 @@ tcSyntaxOp :: CtOrigin -> HsExpr Name -> TcType -> TcM (HsExpr TcId)
 -- Typecheck a syntax operator, checking that it has the specified type
 -- The operator is always a variable at this stage (i.e. renamer output)
 -- This version assumes res_ty is a monotype
-tcSyntaxOp orig (HsVar op) res_ty = do { (expr, rho) <- tcInferIdWithOrig orig op
-                                       ; tcWrapResult expr rho res_ty }
+tcSyntaxOp orig (HsVar op) res_ty
+  = do { (expr, rho) <- tcInferIdWithOrig orig op
+       ; tcWrapResult expr rho res_ty }
 
 tcSyntaxOp _ other         _      = pprPanic "tcSyntaxOp" (ppr other)
 

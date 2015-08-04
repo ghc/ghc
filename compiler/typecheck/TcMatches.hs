@@ -15,7 +15,8 @@ module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambd
        ) where
 
 import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferSigmaNC, tcInferSigma
-                              , tcCheckId, tcMonoExpr, tcMonoExprNC, tcPolyExpr )
+                              , tcCheckId, tcMonoExpr_O
+                              , tcMonoExpr, tcMonoExprNC, tcPolyExpr )
 
 import HsSyn
 import BasicTypes
@@ -66,7 +67,7 @@ See Note [sig_tau may be polymorphic] in TcPat.
 tcMatchesFun :: Name -> Bool
              -> MatchGroup Name (LHsExpr Name)
              -> TcSigmaType     -- Expected type of function
-             -> TcM (HsWrapper, MatchGroup TcId (LHsExpr TcId))
+             -> TcM (HsWrapper, MatchGroup TcId (LHsExpr TcId), CtOrigin)
                                 -- Returns type of body
 tcMatchesFun fun_name inf matches exp_ty
   = do  {  -- Check that they all have the same no of arguments
@@ -78,13 +79,13 @@ tcMatchesFun fun_name inf matches exp_ty
           traceTc "tcMatchesFun" (ppr fun_name $$ ppr exp_ty)
         ; checkArgs fun_name matches
 
-        ; (wrap_gen, (wrap_fun, group))
+        ; (wrap_gen, (wrap_fun, group, orig))
             <- tcSkolemise (FunSigCtxt fun_name True) exp_ty $
                \ _ exp_rho ->
                   -- Note [Polymorphic expected type for tcMatchesFun]
                matchFunTys herald arity exp_rho $ \ pat_tys rhs_ty ->
                tcMatches match_ctxt pat_tys rhs_ty matches
-        ; return (wrap_gen <.> wrap_fun, group) }
+        ; return (wrap_gen <.> wrap_fun, group, orig) }
   where
     arity = matchGroupArity matches
     herald = ptext (sLit "The equation(s) for")
@@ -101,7 +102,7 @@ tcMatchesCase :: (Outputable (body Name)) =>
               -> TcSigmaType                                  -- Type of scrutinee
               -> MatchGroup Name (Located (body Name))        -- The case alternatives
               -> TcRhoType                                    -- Type of whole case expressions
-              -> TcM (HsWrapper, MatchGroup TcId (Located (body TcId)))
+              -> TcM (HsWrapper, MatchGroup TcId (Located (body TcId)), CtOrigin)
                  -- Translated alternatives
                  -- wrapper goes from MatchGroup's ty to expected ty
 
@@ -110,13 +111,13 @@ tcMatchesCase ctxt scrut_ty matches res_ty
   = return (idHsWrapper, MG { mg_alts = []
                             , mg_arg_tys = [scrut_ty]
                             , mg_res_ty = res_ty
-                            , mg_origin = mg_origin matches })
+                            , mg_origin = mg_origin matches }, CaseOrigin)
 
   | otherwise
   = tcMatches ctxt [scrut_ty] res_ty matches
 
 tcMatchLambda :: MatchGroup Name (LHsExpr Name) -> TcRhoType
-              -> TcM (HsWrapper, MatchGroup TcId (LHsExpr TcId))
+              -> TcM (HsWrapper, MatchGroup TcId (LHsExpr TcId), CtOrigin)
 tcMatchLambda match res_ty
   = matchFunTys herald n_pats res_ty  $ \ pat_tys rhs_ty ->
     tcMatches match_ctxt pat_tys rhs_ty match
@@ -133,7 +134,7 @@ tcMatchLambda match res_ty
 -- @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
 
 tcGRHSsPat :: GRHSs Name (LHsExpr Name) -> TcRhoType
-           -> TcM (GRHSs TcId (LHsExpr TcId))
+           -> TcM (GRHSs TcId (LHsExpr TcId), CtOrigin)
 -- Used for pattern bindings
 tcGRHSsPat grhss res_ty = tcGRHSs match_ctxt grhss res_ty
   where
@@ -144,9 +145,9 @@ matchFunTys
   :: SDoc       -- See Note [Herald for matchExpecteFunTys] in TcUnify
   -> Arity
   -> TcRhoType
-  -> ([TcSigmaType] -> TcRhoType -> TcM (HsWrapper, a))
+  -> ([TcSigmaType] -> TcRhoType -> TcM (HsWrapper, a, b))
      -- "a" is always a MatchGroup. wrapper :: a's res_ty "->" TcRhoType
-  -> TcM (HsWrapper, a)
+  -> TcM (HsWrapper, a, b)
      -- wrapper :: (pat_tys -> a's res_ty) "->" res_ty passed in
 
 -- Written in CPS style for historical reasons;
@@ -156,9 +157,9 @@ matchFunTys herald arity res_ty thing_inside
   = do  { (wrap_fun, pat_tys, res_ty')
             <- matchExpectedFunTys Expected herald arity res_ty
             -- wrap_fun :: pat_tys -> res_ty' "->" res_ty
-        ; (wrap_inner, res) <- thing_inside pat_tys res_ty'
+        ; (wrap_inner, res1, res2) <- thing_inside pat_tys res_ty'
         ; let wrap_inner_with_args = mkWpFuns pat_tys wrap_inner
-        ; return (wrap_fun <.> wrap_inner_with_args, res) }
+        ; return (wrap_fun <.> wrap_inner_with_args, res1, res2) }
 
 {-
 ************************************************************************
@@ -174,7 +175,7 @@ tcMatches :: (Outputable (body Name)) => TcMatchCtxt body
           -> [TcSigmaType]      -- Expected pattern types
           -> TcRhoType          -- Expected result-type of the Match.
           -> MatchGroup Name (Located (body Name))
-          -> TcM (HsWrapper, MatchGroup TcId (Located (body TcId)))
+          -> TcM (HsWrapper, MatchGroup TcId (Located (body TcId)), CtOrigin)
                -- wrapper goes from MatchGroup's ty to the expected ty
 
 data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
@@ -182,39 +183,42 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
          mc_body :: Located (body Name)         -- Type checker for a body of
                                                 -- an alternative
                  -> TcRhoType
-                 -> TcM (Located (body TcId)) }
+                 -> TcM (Located (body TcId), CtOrigin) }
 
 tcMatches ctxt pat_tys rhs_ty group@(MG { mg_alts = matches, mg_origin = origin })
   = ASSERT( not (null matches) )        -- Ensure that rhs_ty is filled in
-    do  { (matches', wrap, rhs_ty') <-
-             if isSingletonMatchGroup group
-             then do { matches' <- mapM (tcMatch ctxt pat_tys rhs_ty) matches
-                     ; return (matches', idHsWrapper, rhs_ty) }
-             else do { rhs_ty' <- tauTvsForReturnTvs rhs_ty
+    do  { (matches', wrap, rhs_ty', ct_orig) <-
+             case singletonMatchGroup_maybe group of
+               Just match ->
+                 do { (match', ct_orig) <- tcMatch ctxt pat_tys rhs_ty match
+                    ; return ([match'], idHsWrapper, rhs_ty, ct_orig) }
+               Nothing ->
+                 do { rhs_ty' <- tauTvsForReturnTvs rhs_ty
                       -- TODO (RAE): Document this behavior.
-                     ; matches' <- mapM (tcMatch ctxt pat_tys rhs_ty') matches
-                     ; wrap <- tcSubTypeHR rhs_ty' rhs_ty
-                     ; return (matches', wrap, rhs_ty') }
+                    ; (matches', _)
+                        <- mapAndUnzipM (tcMatch ctxt pat_tys rhs_ty') matches
+                    ; wrap <- tcSubTypeHR Shouldn'tHappenOrigin rhs_ty' rhs_ty
+                    ; return (matches', wrap, rhs_ty', Shouldn'tHappenOrigin) }
         ; return (wrap, MG { mg_alts = matches'
                            , mg_arg_tys = pat_tys
                            , mg_res_ty = rhs_ty'
-                           , mg_origin = origin }) }
+                           , mg_origin = origin }, ct_orig) }
 
 -------------
 tcMatch :: (Outputable (body Name)) => TcMatchCtxt body
         -> [TcSigmaType]        -- Expected pattern types
         -> TcRhoType            -- Expected result-type of the Match.
         -> LMatch Name (Located (body Name))
-        -> TcM (LMatch TcId (Located (body TcId)))
+        -> TcM (LMatch TcId (Located (body TcId)), CtOrigin)
 
 tcMatch ctxt pat_tys rhs_ty match
-  = wrapLocM (tc_match ctxt pat_tys rhs_ty) match
+  = wrapLocFstM (tc_match ctxt pat_tys rhs_ty) match
   where
     tc_match ctxt pat_tys rhs_ty match@(Match _ pats maybe_rhs_sig grhss)
       = add_match_ctxt match $
-        do { (pats', grhss') <- tcPats (mc_what ctxt) pats pat_tys $
-                                tc_grhss ctxt maybe_rhs_sig grhss rhs_ty
-           ; return (Match Nothing pats' Nothing grhss') }
+        do { (pats', (grhss', orig)) <- tcPats (mc_what ctxt) pats pat_tys $
+                                        tc_grhss ctxt maybe_rhs_sig grhss rhs_ty
+           ; return (Match Nothing pats' Nothing grhss', orig) }
 
     tc_grhss ctxt Nothing grhss rhs_ty
       = tcGRHSs ctxt grhss rhs_ty       -- No result signature
@@ -232,7 +236,7 @@ tcMatch ctxt pat_tys rhs_ty match
 
 -------------
 tcGRHSs :: TcMatchCtxt body -> GRHSs Name (Located (body Name)) -> TcRhoType
-        -> TcM (GRHSs TcId (Located (body TcId)))
+        -> TcM (GRHSs TcId (Located (body TcId)), CtOrigin)
 
 -- Notice that we pass in the full res_ty, so that we get
 -- good inference from simple things like
@@ -241,19 +245,21 @@ tcGRHSs :: TcMatchCtxt body -> GRHSs Name (Located (body Name)) -> TcRhoType
 -- but we don't need to do that any more
 
 tcGRHSs ctxt (GRHSs grhss binds) res_ty
-  = do  { (binds', grhss') <- tcLocalBinds binds $
-                              mapM (wrapLocM (tcGRHS ctxt res_ty)) grhss
+  = do  { (binds', (grhss', origs))
+            <- tcLocalBinds binds $
+               mapAndUnzipM (wrapLocFstM (tcGRHS ctxt res_ty)) grhss
 
-        ; return (GRHSs grhss' binds') }
+        ; return (GRHSs grhss' binds', combineCtOrigins origs) }
 
 -------------
 tcGRHS :: TcMatchCtxt body -> TcRhoType -> GRHS Name (Located (body Name))
-       -> TcM (GRHS TcId (Located (body TcId)))
+       -> TcM (GRHS TcId (Located (body TcId)), CtOrigin)
 
 tcGRHS ctxt res_ty (GRHS guards rhs)
-  = do  { (guards', rhs') <- tcStmtsAndThen stmt_ctxt tcGuardStmt guards res_ty $
-                             mc_body ctxt rhs
-        ; return (GRHS guards' rhs') }
+  = do  { (guards', (rhs', orig))
+            <- tcStmtsAndThen stmt_ctxt tcGuardStmt guards res_ty $
+               mc_body ctxt rhs
+        ; return (GRHS guards' rhs', orig) }
   where
     stmt_ctxt  = PatGuard (mc_what ctxt)
 
@@ -295,11 +301,10 @@ tcDoStmts MonadComp stmts res_ty
 
 tcDoStmts ctxt _ _ = pprPanic "tcDoStmts" (pprStmtContext ctxt)
 
-tcBody :: LHsExpr Name -> TcRhoType -> TcM (LHsExpr TcId)
+tcBody :: LHsExpr Name -> TcRhoType -> TcM (LHsExpr TcId, CtOrigin)
 tcBody body res_ty
   = do  { traceTc "tcBody" (ppr res_ty)
-        ; body' <- tcMonoExpr body res_ty
-        ; return body'
+        ; tcMonoExpr_O body res_ty
         }
 
 {-
@@ -372,8 +377,9 @@ tcGuardStmt _ (BodyStmt guard _ _ _) res_ty thing_inside
         ; return (BodyStmt guard' noSyntaxExpr noSyntaxExpr boolTy, thing) }
 
 tcGuardStmt ctxt (BindStmt pat rhs _ _) res_ty thing_inside
-  = do  { (rhs', rhs_ty) <- tcInferSigmaNC rhs    -- Stmt has a context already
-        ; (pat', thing)  <- tcPat (StmtCtxt ctxt) pat rhs_ty $
+  = do  { (rhs', rhs_ty, orig) <- tcInferSigmaNC rhs
+                                   -- Stmt has a context already
+        ; (pat', thing)  <- tcPat_O (StmtCtxt ctxt) orig pat rhs_ty $
                             thing_inside res_ty
         ; return (BindStmt pat' rhs' noSyntaxExpr noSyntaxExpr, thing) }
 
@@ -443,9 +449,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
              --  passed in to tcStmtsAndThen is never looked at
        ; (stmts', (bndr_ids, by'))
             <- tcStmtsAndThen (TransStmtCtxt ctxt) (tcLcStmt m_tc) stmts unused_ty $ \_ -> do
-               { by' <- case by of
-                           Nothing -> return Nothing
-                           Just e  -> do { e_ty <- tcInferSigma e; return (Just e_ty) }
+               { by' <- traverse tcInferSigma by
                ; bndr_ids <- tcLookupLocalIds bndr_names
                ; return (bndr_ids, by') }
 
@@ -462,8 +466,8 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
 
              by_arrow :: Type -> Type     -- Wraps 'ty' to '(a->t) -> ty' if the By is present
              by_arrow = case by' of
-                          Nothing       -> \ty -> ty
-                          Just (_,e_ty) -> \ty -> (alphaTy `mkFunTy` e_ty) `mkFunTy` ty
+                          Nothing         -> \ty -> ty
+                          Just (_,e_ty,_) -> \ty -> (alphaTy `mkFunTy` e_ty) `mkFunTy` ty
 
              tup_ty        = mkBigCoreVarTupTy bndr_ids
              poly_arg_ty   = m_app alphaTy
@@ -491,7 +495,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
        ; thing <- tcExtendIdEnv n_bndr_ids (thing_inside elt_ty)
 
        ; return (emptyTransStmt { trS_stmts = stmts', trS_bndrs = bindersMap'
-                                , trS_by = fmap fst by', trS_using = final_using
+                                , trS_by = fmap fstOf3 by', trS_using = final_using
                                 , trS_form = form }, thing) }
 
 tcLcStmt _ _ stmt _ _

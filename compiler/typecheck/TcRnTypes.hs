@@ -72,7 +72,7 @@ module TcRnTypes(
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
         ctLocDepth, bumpCtLocDepth,
         setCtLocOrigin, setCtLocEnv, setCtLocSpan,
-        CtOrigin(..), pprCtOrigin, pprCtLoc,
+        CtOrigin(..), combineCtOrigins, pprCtOrigin, pprCtLoc,
         pushErrCtxt, pushErrCtxtSameOrigin,
 
         SkolemInfo(..),
@@ -2209,6 +2209,7 @@ data CtOrigin
   | DoOrigin            -- Arising from a do expression
   | MCompOrigin         -- Arising from a monad comprehension
   | IfOrigin            -- Arising from an if statement
+  | CaseOrigin          -- Arising from a case expression
   | ProcOrigin          -- Arising from a proc expression
   | AnnOrigin           -- An annotation
 
@@ -2226,7 +2227,17 @@ data CtOrigin
   | UnboundOccurrenceOf OccName
   | ListOrigin          -- An overloaded list
   | StaticOrigin        -- A static form
-  | Shouldn'tHappenOrigin   -- the user should never see this one
+  | Shouldn'tHappenOrigin   -- the user should never see this one,
+                            -- unlesss ImpredicativeTypes is on, where all
+                            -- bets are off
+
+-- | Combine several origins together. The typechecker arranges so that
+-- whenever multiple "actual" types are combined (like in the result of
+-- a conditional), the types are fully instantiated. So use
+-- Shouldn'tHappenOrigin if multiple types are indeed present.
+combineCtOrigins :: [CtOrigin] -> CtOrigin
+combineCtOrigins [orig] = orig
+combineCtOrigins _      = Shouldn'tHappenOrigin
 
 ctoHerald :: SDoc
 ctoHerald = ptext (sLit "arising from")
@@ -2280,8 +2291,12 @@ pprCtOrigin (DerivOriginCoerce meth ty1 ty2)
        2 (sep [ text "from type" <+> quotes (ppr ty1)
               , nest 2 $ text "to type" <+> quotes (ppr ty2) ])
 
-pprCtO Shouldn'tHappenOrigin
-  = vcat [ text "<< This should not appear in error messages. If you see this"
+pprCtOrigin Shouldn'tHappenOrigin
+  = sdocWithDynFlags $ \dflags ->
+    if xopt Opt_ImpredicativeTypes dflags
+    then text "a situation created by impredicative types"
+    else
+    vcat [ text "<< This should not appear in error messages. If you see this"
          , text "in an error message, please report a bug at"
          , text "https://ghc.haskell.org/trac/ghc/wiki/ReportABug >>" ]
 
@@ -2298,7 +2313,8 @@ pprCtO ExprSigOrigin         = ptext (sLit "an expression type signature")
 pprCtO PatSigOrigin          = ptext (sLit "a pattern type signature")
 pprCtO PatOrigin             = ptext (sLit "a pattern")
 pprCtO ViewPatOrigin         = ptext (sLit "a view pattern")
-pprCtO IfOrigin              = ptext (sLit "an if statement")
+pprCtO IfOrigin              = ptext (sLit "an if expression")
+pprCtO CaseOrigin            = ptext (sLit "a case expression")
 pprCtO (LiteralOrigin lit)   = hsep [ptext (sLit "the literal"), quotes (ppr lit)]
 pprCtO (ArithSeqOrigin seq)  = hsep [ptext (sLit "the arithmetic sequence"), quotes (ppr seq)]
 pprCtO (PArrSeqOrigin seq)   = hsep [ptext (sLit "the parallel array sequence"), quotes (ppr seq)]
