@@ -6,6 +6,7 @@
 import Control.Monad
 
 import Data.Maybe
+import Data.List
 
 import Distribution.InstalledPackageInfo
 import Distribution.Package
@@ -140,7 +141,7 @@ checkFile file = do
     then do
         out <- readFile outFile
         ref <- readFile refFile
-        return $ if haddockEq out ref
+        return $ if haddockEq (outFile, out) (refFile, ref)
             then Pass
             else Fail
     else return NoRef
@@ -285,5 +286,62 @@ mlast :: [a] -> Maybe a
 mlast = listToMaybe . reverse
 
 
-haddockEq :: String -> String -> Bool
-haddockEq _ _ = True -- TODO.
+-- *** OLD TEST RUNNER UTILITY FUNCTIONS ***
+-- These are considered bad and should be replaced as soon as possible.
+
+
+-- | List of modules in which we don't 'stripLinks'
+preserveLinksModules :: [String]
+preserveLinksModules = ["Bug253"]
+
+
+-- | A rather nasty way to drop the Haddock version string from the
+-- end of the generated HTML files so that we don't have to change
+-- every single test every time we change versions. We rely on the the
+-- last paragraph of the document to be the version. We end up with
+-- malformed HTML but we don't care as we never look at it ourselves.
+dropVersion :: String -> String
+dropVersion = reverse . dropTillP . reverse
+  where
+    dropTillP [] = []
+    dropTillP ('p':'<':xs) = xs
+    dropTillP (_:xs) = dropTillP xs
+
+
+haddockEq :: (FilePath, String) -> (FilePath, String) -> Bool
+haddockEq (fn1, file1) (fn2, file2) =
+  maybeStripLinks fn1 (dropVersion file1)
+  == maybeStripLinks fn2 (dropVersion file2)
+
+
+maybeStripLinks :: FilePath -- ^ Module we're considering for stripping
+                -> String -> String
+maybeStripLinks file
+    | takeBaseName file `elem` preserveLinksModules = id
+    | otherwise = stripLinks
+
+
+stripLinks :: String -> String
+stripLinks str =
+  let prefix = "<a href=\"" in
+  case stripPrefix prefix str of
+    Just str' -> case dropWhile (/= '>') (dropWhile (/= '"') str') of
+      [] -> []
+      x:xs -> stripLinks (stripHrefEnd xs)
+    Nothing ->
+      case str of
+        [] -> []
+        x : xs -> x : stripLinks xs
+
+
+stripHrefEnd :: String -> String
+stripHrefEnd s =
+  let pref = "</a" in
+  case stripPrefix pref s of
+    Just str' -> case dropWhile (/= '>') str' of
+      [] -> []
+      x:xs -> xs
+    Nothing ->
+      case s of
+        [] -> []
+        x : xs -> x : stripHrefEnd xs
