@@ -3,6 +3,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 
+import Control.Applicative
 import Control.Monad
 
 import Data.Maybe
@@ -45,6 +46,7 @@ data Config = Config
     , cfgFiles :: [FilePath]
     , cfgHaddockArgs :: [String]
     , cfgHaddockStdOut :: FilePath
+    , cfgDiffTool :: Maybe FilePath
     , cfgEnv :: Environment
     }
 
@@ -80,9 +82,15 @@ checkFiles (Config { .. }) = do
             putStrLn "All tests passed!"
             exitSuccess
         else do
-            putStrLn "Diffing failed cases..."
-            forM_ failed diffModule
+            maybeDiff cfgDiffTool failed
             exitFailure
+
+
+maybeDiff :: Maybe FilePath -> [String] -> IO ()
+maybeDiff Nothing _ = pure ()
+maybeDiff (Just diff) mdls = do
+    putStrLn "Diffing failed cases..."
+    forM_ mdls $ diffModule diff
 
 
 runHaddock :: Config -> IO ()
@@ -139,6 +147,8 @@ loadConfig flags files = do
 
     let cfgHaddockStdOut = fromMaybe "/dev/null" (flagsHaddockStdOut flags)
 
+    cfgDiffTool <- (<|>) <$> pure (flagsDiffTool flags) <*> defaultDiffTool
+
     return $ Config { .. }
 
 
@@ -155,8 +165,8 @@ checkModule mdl = do
         else return NoRef
 
 
-diffModule :: String -> IO ()
-diffModule mdl = do
+diffModule :: FilePath -> String -> IO ()
+diffModule diff mdl = do
     out <- readFile $ outFile mdl
     ref <- readFile $ refFile mdl
     let out' = stripLinks . dropVersion $ out
@@ -165,7 +175,7 @@ diffModule mdl = do
     writeFile refFile' ref'
 
     putStrLn $ "Diff for module " ++ show mdl ++ ":"
-    handle <- runProcess' "diff" $ processConfig
+    handle <- runProcess' diff $ processConfig
         { pcArgs = [outFile', refFile']
         }
     waitForProcess handle >> return ()
@@ -215,6 +225,13 @@ baseDependencies ghcPath = do
     iface file html = "--read-interface=" ++ html ++ "," ++ file
 
 
+defaultDiffTool :: IO (Maybe FilePath)
+defaultDiffTool =
+    liftM listToMaybe . filterM isAvailable $ ["colordiff", "diff"]
+  where
+    isAvailable = liftM isJust . findProgramLocation silent
+
+
 processFileArgs :: [String] -> IO [FilePath]
 processFileArgs [] =
     map toModulePath . filter isSourceFile <$> getDirectoryContents srcDir
@@ -241,6 +258,7 @@ data Flag
     | FlagGhcPath FilePath
     | FlagHaddockOptions String
     | FlagHaddockStdOut FilePath
+    | FlagDiffTool FilePath
     | FlagHelp
     deriving Eq
 
@@ -255,6 +273,8 @@ options =
         "additional options to run Haddock with"
     , Option [] ["haddock-stdout"] (ReqArg FlagHaddockStdOut "FILE")
         "where to redirect Haddock output"
+    , Option [] ["diff-tool"] (ReqArg FlagDiffTool "PATH")
+        "diff tool to use when printing failed cases"
     , Option ['h'] ["help"] (NoArg FlagHelp)
         "display this help end exit"
     ]
@@ -275,6 +295,10 @@ flagsHaddockOptions flags = concat
 
 flagsHaddockStdOut :: [Flag] -> Maybe FilePath
 flagsHaddockStdOut flags = mlast [ path | FlagHaddockStdOut path <- flags ]
+
+
+flagsDiffTool :: [Flag] -> Maybe FilePath
+flagsDiffTool flags = mlast [ path | FlagDiffTool path <- flags ]
 
 
 type Environment = [(String, String)]
