@@ -61,7 +61,7 @@ checkOutput _ = return () -- TODO.
 runHaddock :: Config -> IO ()
 runHaddock (Config { .. }) = do
     handle <- runProcess' cfgHaddockPath $ processConfig
-        { pcArgs = cfgHaddockArgs
+        { pcArgs = cfgHaddockArgs ++ cfgFiles
         , pcEnv = Just $ cfgEnv
         }
     waitForSuccess "Failed to run Haddock on specified test files" handle
@@ -100,6 +100,7 @@ loadConfig flags files = do
         [ pure ["--no-warnings"]
         , pure ["--odir=" ++ outDir]
         , pure ["--pretty-html"]
+        , pure ["--html"]
         , pure ["--optghc=-w"]
         , pure $ flagsHaddockOptions flags
         , baseDependencies cfgGhcPath
