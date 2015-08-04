@@ -181,18 +181,24 @@ baseDependencies ghcPath = do
 
 
 processFileArgs :: [String] -> IO [FilePath]
-processFileArgs [] = filter isSourceFile <$> getDirectoryContents srcDir
+processFileArgs [] =
+    map toModulePath . filter isSourceFile <$> getDirectoryContents srcDir
+  where
+    toModulePath = modulePath . takeBaseName
 processFileArgs args = pure $ map processFileArg args
 
 
 processFileArg :: String -> FilePath
 processFileArg arg
     | isSourceFile arg = arg
-    | otherwise = srcDir </> arg <.> "hs"
+    | otherwise = modulePath arg
 
 
 isSourceFile :: FilePath -> Bool
 isSourceFile path = takeExtension path `elem` [".hs", ".lhs"]
+
+modulePath :: String -> FilePath
+modulePath mdl = srcDir </> mdl <.> "hs"
 
 
 data Flag
