@@ -43,13 +43,13 @@ data Config = Config
     , cfgGhcPath :: FilePath
     , cfgFiles :: [FilePath]
     , cfgHaddockArgs :: [String]
-    } deriving Show
+    , cfgEnv :: Environment
+    }
 
 
 main :: IO ()
 main = do
     cfg <- uncurry loadConfig =<< checkOpt =<< getArgs
-    putStrLn $ show cfg
     runHaddock cfg
     checkOutput cfg
 
@@ -59,7 +59,12 @@ checkOutput _ = return () -- TODO.
 
 
 runHaddock :: Config -> IO ()
-runHaddock _ = return () -- TODO.
+runHaddock (Config { .. }) = do
+    handle <- runProcess' cfgHaddockPath $ processConfig
+        { pcArgs = cfgHaddockArgs
+        , pcEnv = Just $ cfgEnv
+        }
+    waitForSuccess "Failed to run Haddock on specified test files" handle
 
 
 checkOpt :: [String] -> IO ([Flag], [String])
@@ -79,12 +84,12 @@ checkOpt args = do
 
 loadConfig :: [Flag] -> [String] -> IO Config
 loadConfig flags files = do
-    env <- Just . (:) ("haddock_datadir", resDir) <$> getEnvironment
+    cfgEnv <- (:) ("haddock_datadir", resDir) <$> getEnvironment
 
     cfgHaddockPath <- pure $ flip fromMaybe (flagsHaddockPath flags) $
         rootDir </> "dist" </> "build" </> "haddock" </> "haddock"
 
-    printVersions env cfgHaddockPath
+    printVersions cfgEnv cfgHaddockPath
 
     cfgGhcPath <- flip fromMaybe (flagsGhcPath flags) <$>
          init <$> rawSystemStdout normal cfgHaddockPath ["--print-ghc-path"]
@@ -95,7 +100,7 @@ loadConfig flags files = do
         [ pure ["--no-warnings"]
         , pure ["--odir=" ++ outDir]
         , pure ["--pretty-html"]
-        , pure ["--optghc=--w"]
+        , pure ["--optghc=-w"]
         , pure $ flagsHaddockOptions flags
         , baseDependencies cfgGhcPath
         ]
@@ -103,16 +108,16 @@ loadConfig flags files = do
     return $ Config { .. }
 
 
-printVersions :: Maybe [(String, String)] -> FilePath -> IO ()
+printVersions :: Environment -> FilePath -> IO ()
 printVersions env haddockPath = do
     handle <- runProcess' haddockPath $ processConfig
-        { pcEnv = env
+        { pcEnv = Just env
         , pcArgs = ["--version"]
         }
     waitForSuccess "Failed to run `haddock --version`" handle
 
     handle <- runProcess' haddockPath $ processConfig
-        { pcEnv = env
+        { pcEnv = Just env
         , pcArgs = ["--ghc-version"]
         }
     waitForSuccess "Failed to run `haddock --ghc-version`" handle
@@ -185,10 +190,12 @@ flagsHaddockOptions flags = concat
     [ words opts | FlagHaddockOptions opts <- flags ]
 
 
+type Environment = [(String, String)]
+
 data ProcessConfig = ProcessConfig
     { pcArgs :: [String]
     , pcWorkDir :: Maybe FilePath
-    , pcEnv :: Maybe [(String, String)]
+    , pcEnv :: Maybe Environment
     , pcStdIn :: Maybe Handle
     , pcStdOut :: Maybe Handle
     , pcStdErr :: Maybe Handle
