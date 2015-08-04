@@ -455,7 +455,7 @@ instance  Enum Int  where
 -- In particular, we have rules for deforestation
 
 {-# RULES
-"eftInt"        [~1] forall x y. eftInt x y = build (\ c n -> eftIntFB c n x y)
+"eftInt"        [~1] forall x y. eftInt x y = cheapBuild (\ c n -> eftIntFB c n x y)
 "eftIntList"    [1] eftIntFB  (:) [] = eftInt
  #-}
 
@@ -497,7 +497,7 @@ eftIntFB c n x0 y | isTrue# (x0 ># y) = n
 -- See Note [How the Enum rules work]
 {-# RULES
 "efdtInt"       [~1] forall x1 x2 y.
-                     efdtInt x1 x2 y = build (\ c n -> efdtIntFB c n x1 x2 y)
+                     efdtInt x1 x2 y = cheapBuild (\ c n -> efdtIntFB c n x1 x2 y)
 "efdtIntUpList" [1]  efdtIntFB (:) [] = efdtInt
  #-}
 
