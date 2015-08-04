@@ -320,9 +320,9 @@ instance  Enum Char  where
 
 -- See Note [How the Enum rules work]
 {-# RULES
-"eftChar"       [~1] forall x y.        eftChar x y       = build (\c n -> eftCharFB c n x y)
-"efdChar"       [~1] forall x1 x2.      efdChar x1 x2     = build (\ c n -> efdCharFB c n x1 x2)
-"efdtChar"      [~1] forall x1 x2 l.    efdtChar x1 x2 l  = build (\ c n -> efdtCharFB c n x1 x2 l)
+"eftChar"       [~1] forall x y.        eftChar x y       = cheapBuild (\c n -> eftCharFB c n x y)
+"efdChar"       [~1] forall x1 x2.      efdChar x1 x2     = cheapBuild (\ c n -> efdCharFB c n x1 x2)
+"efdtChar"      [~1] forall x1 x2 l.    efdtChar x1 x2 l  = cheapBuild (\ c n -> efdtCharFB c n x1 x2 l)
 "eftCharList"   [1]  eftCharFB  (:) [] = eftChar
 "efdCharList"   [1]  efdCharFB  (:) [] = efdChar
 "efdtCharList"  [1]  efdtCharFB (:) [] = efdtChar
