@@ -75,12 +75,14 @@ checkFiles (Config { .. }) = do
             Pass -> putStrLn "PASS" >> (return Nothing)
             NoRef -> putStrLn "PASS [no .ref]" >> (return Nothing)
 
-    when (null failed) $ do
-        putStrLn "All tests passed!"
-        exitSuccess
-
-    putStrLn "Diffing failed cases..."
-    forM_ failed checkModule
+    if null failed
+        then do
+            putStrLn "All tests passed!"
+            exitSuccess
+        else do
+            putStrLn "Diffing failed cases..."
+            forM_ failed diffModule
+            exitFailure
 
 
 runHaddock :: Config -> IO ()
@@ -154,7 +156,22 @@ checkModule mdl = do
 
 
 diffModule :: String -> IO ()
-diffModule mdl = return ()
+diffModule mdl = do
+    out <- readFile $ outFile mdl
+    ref <- readFile $ refFile mdl
+    let out' = stripLinks . dropVersion $ out
+    let ref' = stripLinks . dropVersion $ ref
+    writeFile outFile' out'
+    writeFile refFile' ref'
+
+    putStrLn $ "Diff for module " ++ show mdl ++ ":"
+    handle <- runProcess' "diff" $ processConfig
+        { pcArgs = [outFile', refFile']
+        }
+    waitForProcess handle >> return ()
+  where
+    outFile' = outFile mdl <.> "nolinks"
+    refFile' = outFile mdl <.> "ref" <.> "nolinks"
 
 
 outFile :: String -> FilePath
