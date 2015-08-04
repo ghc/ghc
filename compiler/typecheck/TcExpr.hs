@@ -1009,19 +1009,20 @@ tc_app fun_expr args fun_ty res_ty
         -- Without it, the `a` coming from `f` cannot be unified with
         -- the second type variable of `error`
         ; if isUpsilonTy actual_res_ty
-             then do { ev_res <- addErrCtxtM (funResCtxt True (unLoc fun_expr) actual_res_ty res_ty) $
+             then do { co_res <- addErrCtxtM (funResCtxt True (unLoc fun_expr) actual_res_ty res_ty) $
+                                 unifyType actual_res_ty res_ty
+                     ; return $ TcAppResult
+                        (mkLHsWrapCo co_fun fun_expr)  -- Instantiated function
+                        args1                          -- Arguments
+                        (coToHsWrapper co_res) }       -- Coercion to expected result type
+             else do { ev_res <- addErrCtxtM (funResCtxt True (unLoc fun_expr) actual_res_ty res_ty) $
                                  emitWanted AppOrigin (mkInstanceOfPred actual_res_ty res_ty)
                      ; return $ TcAppResult
                         (mkLHsWrapCo co_fun fun_expr)  -- Instantiated function
                         args1                          -- Arguments
                                                        -- Coercion to expected result type
-                        (mkWpInstanceOf ev_res) }
-             else do { co_res <- addErrCtxtM (funResCtxt True (unLoc fun_expr) actual_res_ty res_ty) $
-                                 unifyType actual_res_ty res_ty
-                     ; return $ TcAppResult
-                        (mkLHsWrapCo co_fun fun_expr)  -- Instantiated function
-                        args1                          -- Arguments
-                        (coToHsWrapper co_res) } }     -- Coercion to expected result type
+                        (mkWpInstanceOf ev_res) } }
+
 
 mk_app_msg :: Outputable a => a -> SDoc
 mk_app_msg fun = sep [ ptext (sLit "The function") <+> quotes (ppr fun)

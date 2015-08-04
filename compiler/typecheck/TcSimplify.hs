@@ -9,7 +9,8 @@ module TcSimplify(
        solveWantedsTcM,
 
        -- For Rules we need these three
-       solveWanteds, runTcS, instantiateWC
+       solveWanteds, runTcS, approximateWC,
+       instantiateCts
   ) where
 
 #include "HsVersions.h"
@@ -1327,7 +1328,7 @@ defaultTyVar the_tv
   | otherwise = return the_tv    -- The common case
 
 approximateWC :: WantedConstraints -> TcS Cts
-approximateWC = fmap andManyCts . mapM instantiateWC . bagToList . approximateWC_
+approximateWC = instantiateCts . approximateWC_
 
 approximateWC_ :: WantedConstraints -> Cts
 -- Postcondition: Wanted or Derived Cts
@@ -1362,8 +1363,11 @@ approximateWC_ wc
     do_bag :: (a -> Bag c) -> Bag a -> Bag c
     do_bag f = foldrBag (unionBags.f) emptyBag
 
-instantiateWC :: Ct -> TcS Cts
-instantiateWC ct
+instantiateCts :: Cts -> TcS Cts
+instantiateCts = fmap andManyCts . mapM instantiateCt . bagToList
+
+instantiateCt :: Ct -> TcS Cts
+instantiateCt ct
   | isWantedCt ct, InstanceOfPred lhs rhs <- classifyPredType (ctPred ct)
   = do { let loc = ctLoc ct
        ; (_qvars, q, ty) <- deeplySplitInst lhs

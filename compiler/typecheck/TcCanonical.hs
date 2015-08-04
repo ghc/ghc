@@ -1744,19 +1744,19 @@ can_instance_inst ev lhs rhs
          ; let qvars' = map mkTyVarTy qvars
                evars' = map ctev_evar new_ev_qs
          ; if isUpsilonTy ty
-           then do { let inst = mkInstanceOfPred ty rhs
-                   ; new_ev_inst <- newWantedEvVarNC loc inst
-                   ; setWantedEvBind evar
-                       (mkInstanceOfInst lhs qvars' (ctEvId new_ev_inst) evars')
-                   ; emitWorkNC new_ev_qs
-                   ; traceTcS "can_instance_of/INST" (vcat [ ppr new_ev_inst, ppr new_ev_qs ])
-                   ; canInstanceOfNC new_ev_inst }
                 -- if the inner type is upsilon, generate equality
-           else do { let eq = mkTcEqPredRole Nominal ty rhs
+           then do { let eq = mkTcEqPredRole Nominal ty rhs
                    ; new_ev_eq <- newWantedEvVarNC loc eq
                    ; setWantedEvBind evar
                        (mkInstanceOfInstEq lhs qvars' (ctEvCoercion new_ev_eq) evars')
                    ; emitWorkNC new_ev_qs
                    ; traceTcS "can_instance_of/INSTEQ" (vcat [ ppr new_ev_eq, ppr new_ev_qs ])
-                   ; canEqNC new_ev_eq NomEq ty rhs } }
+                   ; canEqNC new_ev_eq NomEq ty rhs }
+           else do { let inst = mkInstanceOfPred ty rhs
+                   ; new_ev_inst <- newWantedEvVarNC loc inst
+                   ; setWantedEvBind evar
+                       (mkInstanceOfInst lhs qvars' (ctEvId new_ev_inst) evars')
+                   ; emitWorkNC new_ev_qs
+                   ; traceTcS "can_instance_of/INST" (vcat [ ppr new_ev_inst, ppr new_ev_qs ])
+                   ; canInstanceOfNC new_ev_inst } }
     _ -> stopWith ev "Given/Derived instanceOf instantiation"

@@ -1429,7 +1429,7 @@ isUpsilonTy ty
   | isSigmaTy ty = False
   | Just v       <- tcGetTyVar_maybe ty      = not (isImmutableTyVar v)
   | Just (tc, _) <- tcSplitTyConApp_maybe ty = isFamilyTyCon tc
-  | otherwise    = True
+  | otherwise    = False
 
 isFloatTy, isDoubleTy, isIntegerTy, isIntTy, isWordTy, isBoolTy,
     isUnitTy, isCharTy, isAnyTy :: Type -> Bool
