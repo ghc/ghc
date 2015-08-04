@@ -746,8 +746,9 @@ funSize :: DynFlags -> [Id] -> Id -> Int -> Int -> ExprSize
 -- Size for functions that are not constructors or primops
 -- Note [Function applications]
 funSize dflags top_args fun n_val_args voids
-  | fun `hasKey` buildIdKey   = buildSize
-  | fun `hasKey` augmentIdKey = augmentSize
+  | fun `hasKey` buildIdKey      = buildSize
+  | fun `hasKey` cheapBuildIdKey = buildSize
+  | fun `hasKey` augmentIdKey    = augmentSize
   | otherwise = SizeIs size arg_discount res_discount
   where
     some_val_args = n_val_args > 0

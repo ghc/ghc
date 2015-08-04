@@ -319,7 +319,7 @@ basicKnownKeyNames
 
         -- List operations
         concatName, filterName, mapName,
-        zipName, foldrName, buildName, augmentName, appendName,
+        zipName, foldrName, buildName, cheapBuildName, augmentName, appendName,
 
         -- FFI primitive types that are not wired-in.
         stablePtrTyConName, ptrTyConName, funPtrTyConName,
@@ -1051,7 +1051,8 @@ groupWithName :: Name
 groupWithName = varQual gHC_EXTS (fsLit "groupWith") groupWithIdKey
 
 -- Random PrelBase functions
-fromStringName, otherwiseIdName, foldrName, buildName, augmentName,
+fromStringName, otherwiseIdName, foldrName,
+    buildName, cheapBuildName, augmentName,
     mapName, appendName, assertName,
     breakpointName, breakpointCondName, breakpointAutoName,
     opaqueTyConName :: Name
@@ -1059,6 +1060,7 @@ fromStringName = varQual dATA_STRING (fsLit "fromString") fromStringClassOpKey
 otherwiseIdName   = varQual gHC_BASE (fsLit "otherwise")  otherwiseIdKey
 foldrName         = varQual gHC_BASE (fsLit "foldr")      foldrIdKey
 buildName         = varQual gHC_BASE (fsLit "build")      buildIdKey
+cheapBuildName    = varQual gHC_BASE (fsLit "cheapBuild") cheapBuildIdKey
 augmentName       = varQual gHC_BASE (fsLit "augment")    augmentIdKey
 mapName           = varQual gHC_BASE (fsLit "map")        mapIdKey
 appendName        = varQual gHC_BASE (fsLit "++")         appendIdKey
@@ -2051,7 +2053,7 @@ typeLitNatDataConKey      = mkPreludeDataConUnique 108
 -}
 
 wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
-    buildIdKey, errorIdKey, foldrIdKey, recSelErrorIdKey,
+    buildIdKey, cheapBuildIdKey, errorIdKey, foldrIdKey, recSelErrorIdKey,
     seqIdKey, irrefutPatErrorIdKey, eqStringIdKey,
     noMethodBindingErrorIdKey, nonExhaustiveGuardsErrorIdKey,
     runtimeErrorIdKey, patErrorIdKey, voidPrimIdKey,
@@ -2085,6 +2087,7 @@ voidPrimIdKey                 = mkPreludeMiscIdUnique 21
 typeErrorIdKey                = mkPreludeMiscIdUnique 22
 divIntIdKey                   = mkPreludeMiscIdUnique 23
 modIntIdKey                   = mkPreludeMiscIdUnique 24
+cheapBuildIdKey               = mkPreludeMiscIdUnique 25
 
 unsafeCoerceIdKey, concatIdKey, filterIdKey, zipIdKey, bindIOIdKey,
     returnIOIdKey, newStablePtrIdKey,
