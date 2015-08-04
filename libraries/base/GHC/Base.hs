@@ -197,6 +197,7 @@ not True = False
 otherwise = True
 
 build = errorWithoutStackTrace "urk"
+cheapBuild = errorWithoutStackTrace "urk"
 foldr = errorWithoutStackTrace "urk"
 #endif
 
@@ -1046,6 +1047,13 @@ build   :: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
 
 build g = g (:) []
 
+-- | 'cheapBuild' is just like build, except that the simplifier views
+-- it as cheap to construct (similar to to a data constructor).
+cheapBuild   :: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
+{-# INLINE CONLIKE [1] cheapBuild #-}
+cheapBuild g = g (:) []
+-- See Note [cheapBuild]
+
 -- | A list producer that can be fused with 'foldr'.
 -- This function is merely
 --
@@ -1060,14 +1068,16 @@ augment :: forall a. (forall b. (a->b->b) -> b -> b) -> [a] -> [a]
 augment g xs = g (:) xs
 
 {-# RULES
-"fold/build"    forall k z (g::forall b. (a->b->b) -> b -> b) .
-                foldr k z (build g) = g k z
+"fold/build"      forall k z (g::forall b. (a->b->b) -> b -> b) .
+                  foldr k z (build g) = g k z
+"fold/cheapBuild" forall k z (g::forall b. (a->b->b) -> b -> b) .
+                  foldr k z (cheapBuild g) = g k z
 
-"foldr/augment" forall k z xs (g::forall b. (a->b->b) -> b -> b) .
-                foldr k z (augment g xs) = g k (foldr k z xs)
+"foldr/augment"   forall k z xs (g::forall b. (a->b->b) -> b -> b) .
+                  foldr k z (augment g xs) = g k (foldr k z xs)
 
-"foldr/id"                        foldr (:) [] = \x  -> x
-"foldr/app"     [1] forall ys. foldr (:) ys = \xs -> xs ++ ys
+"foldr/id"        foldr (:) [] = \x  -> x
+"foldr/app"       [1] forall ys. foldr (:) ys = \xs -> xs ++ ys
         -- Only activate this from phase 1, because that's
         -- when we disable the rule that expands (++) into foldr
 
@@ -1084,16 +1094,40 @@ augment g xs = g (:) xs
 
 "foldr/cons/build" forall k z x (g::forall b. (a->b->b) -> b -> b) .
                            foldr k z (x:build g) = k x (g k z)
+"foldr/cons/cheapBuild"
+                forall k z x (g::forall b. (a->b->b) -> b -> b) .
+                       foldr k z (x:cheapBuild g) = k x (g k z)
 
 "augment/build" forall (g::forall b. (a->b->b) -> b -> b)
                        (h::forall b. (a->b->b) -> b -> b) .
                        augment g (build h) = build (\c n -> g c (h c n))
+"augment/cheapBuild"
+                forall (g::forall b. (a->b->b) -> b -> b)
+                       (h::forall b. (a->b->b) -> b -> b) .
+                       augment g (cheapBuild h) = cheapBuild (\c n -> g c (h c n))
 "augment/nil"   forall (g::forall b. (a->b->b) -> b -> b) .
-                        augment g [] = build g
+                       augment g [] = build g
  #-}
 
 -- This rule is true, but not (I think) useful:
 --      augment g (augment h t) = augment (\cn -> g c (h c n)) t
+
+
+{-
+Note [cheapBuild]
+~~~~~~~~~~~~~~~~~
+cheapBuild is just like build, except that it is CONLIKE
+It is used in situations where fusion is more imortant than sharing,
+ie in situation where its argument function 'g' in (cheapBuild g) is
+cheap.
+Main example: enumerations of one kind or another:
+    f x = let xs = [x..]
+              go = \y. ....go y'....(map (h y) xs)...
+          in ...
+Here we woud like to fuse the map with the [x..].
+
+See Trac #7206.
+-}
 
 ----------------------------------------------
 --              map
