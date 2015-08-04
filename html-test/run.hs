@@ -48,15 +48,25 @@ data Config = Config
 
 main :: IO ()
 main = do
-    cfg <- loadConfig =<< getArgs
+    cfg <- uncurry loadConfig =<< checkOpt =<< getArgs
     putStrLn $ show cfg
+    runHaddock cfg
+    checkOutput cfg
 
 
-loadConfig :: [String] -> IO Config
-loadConfig args = do
+checkOutput :: Config -> IO ()
+checkOutput _ = return () -- TODO.
+
+
+runHaddock :: Config -> IO ()
+runHaddock _ = return () -- TODO.
+
+
+checkOpt :: [String] -> IO ([Flag], [String])
+checkOpt args = do
     let (flags, files, errors) = getOpt Permute options args
 
-    when (not $ null errors) $ do
+    unless (null errors) $ do
         hPutStr stderr $ concat errors
         exitFailure
 
@@ -64,6 +74,11 @@ loadConfig args = do
         hPutStrLn stderr $ usageInfo "" options
         exitSuccess
 
+    return (flags, files)
+
+
+loadConfig :: [Flag] -> [String] -> IO Config
+loadConfig flags files = do
     env <- Just . (:) ("haddock_datadir", resDir) <$> getEnvironment
 
     cfgHaddockPath <- pure $ flip fromMaybe (flagsHaddockPath flags) $
