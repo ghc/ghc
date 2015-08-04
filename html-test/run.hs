@@ -43,6 +43,7 @@ data Config = Config
     , cfgGhcPath :: FilePath
     , cfgFiles :: [FilePath]
     , cfgHaddockArgs :: [String]
+    , cfgHaddockStdOut :: FilePath
     , cfgEnv :: Environment
     }
 
@@ -79,11 +80,11 @@ runHaddock :: Config -> IO ()
 runHaddock (Config { .. }) = do
     putStrLn "Running Haddock process..."
 
-    devNull <- openFile "/dev/null" WriteMode
+    haddockStdOut <- openFile cfgHaddockStdOut WriteMode
     handle <- runProcess' cfgHaddockPath $ processConfig
         { pcArgs = cfgHaddockArgs ++ cfgFiles
         , pcEnv = Just $ cfgEnv
-        , pcStdOut = Just $ devNull
+        , pcStdOut = Just $ haddockStdOut
         }
     waitForSuccess "Failed to run Haddock on specified test files" handle
 
@@ -126,6 +127,8 @@ loadConfig flags files = do
         , pure $ flagsHaddockOptions flags
         , baseDependencies cfgGhcPath
         ]
+
+    let cfgHaddockStdOut = fromMaybe "/dev/null" (flagsHaddockStdOut flags)
 
     return $ Config { .. }
 
@@ -205,6 +208,7 @@ data Flag
     = FlagHaddockPath FilePath
     | FlagGhcPath FilePath
     | FlagHaddockOptions String
+    | FlagHaddockStdOut FilePath
     | FlagHelp
     deriving Eq
 
@@ -217,6 +221,8 @@ options =
         "path to GHC executable"
     , Option [] ["haddock-options"] (ReqArg FlagHaddockOptions "OPTS")
         "additional options to run Haddock with"
+    , Option [] ["haddock-stdout"] (ReqArg FlagHaddockStdOut "FILE")
+        "where to redirect Haddock output"
     , Option ['h'] ["help"] (NoArg FlagHelp)
         "display this help end exit"
     ]
@@ -233,6 +239,10 @@ flagsGhcPath flags = mlast [ path | FlagGhcPath path <- flags ]
 flagsHaddockOptions :: [Flag] -> [String]
 flagsHaddockOptions flags = concat
     [ words opts | FlagHaddockOptions opts <- flags ]
+
+
+flagsHaddockStdOut :: [Flag] -> Maybe FilePath
+flagsHaddockStdOut flags = mlast [ path | FlagHaddockStdOut path <- flags ]
 
 
 type Environment = [(String, String)]
