@@ -162,7 +162,7 @@ module Pretty (
         -- * Constructing documents
 
         -- ** Converting values into documents
-        char, text, ftext, ptext, ztext, zeroWidthText,
+        char, text, ftext, ptext, ztext, sizedText, zeroWidthText,
         int, integer, float, double, rational,
 
         -- ** Simple derived documents
@@ -188,13 +188,16 @@ module Pretty (
         -- * Rendering documents
 
         -- ** Rendering with a particular style
+        Style(..),
+        style,
+        renderStyle,
         Mode(..),
 
         -- ** General rendering
         fullRender,
 
         -- ** GHC-specific rendering
-        printDoc, printDoc_, showDoc,
+        printDoc, printDoc_,
         bufLeftRender -- performance hack
 
   ) where
@@ -361,13 +364,10 @@ data TextDetails = Chr  {-# UNPACK #-} !Char -- ^ A single Char fragment
                    -- a '\0'-terminated array of bytes
 
 instance Show Doc where
-  showsPrec _ doc cont = showDocPlus PageMode 100 doc cont
+  showsPrec _ doc cont = fullRender (mode style) (lineLength style)
+                                    (ribbonsPerLine style)
+                                    txtPrinter cont doc
 
-showDoc :: Mode -> Int -> Doc -> String
-showDoc mode cols doc = showDocPlus mode cols doc ""
-
-showDocPlus :: Mode -> Int -> Doc -> String -> String
-showDocPlus mode cols doc rest = fullRender mode cols 1.5 txtPrinter rest doc
 
 -- ---------------------------------------------------------------------------
 -- Values and Predicates on GDocs and TextDetails
@@ -406,10 +406,14 @@ ptext s = case lengthLS s of {sl -> textBeside_ (LStr s sl) sl Empty}
 ztext :: FastZString -> Doc
 ztext s = case lengthFZS s of {sl -> textBeside_ (ZStr s) sl Empty}
 
+-- | Some text with any width. (@text s = sizedText (length s) s@)
+sizedText :: Int -> String -> Doc
+sizedText l s = textBeside_ (Str s) l Empty
+
 -- | Some text, but without any width. Use for non-printing text
 -- such as a HTML or Latex tags
 zeroWidthText :: String -> Doc
-zeroWidthText s = textBeside_ (Str s) 0 Empty
+zeroWidthText = sizedText 0
 
 -- | The empty document, with no height and no width.
 -- 'empty' is the identity for '<>', '<+>', '$$' and '$+$', and anywhere
@@ -812,14 +816,16 @@ fillNB _ _           k _  | k `seq` False = undefined
 fillNB g (Nest _ p)  k ys   = fillNB g p k ys
                               -- Never triggered, because of invariant (2)
 fillNB _ Empty _ []         = Empty
-fillNB g Empty k (y:ys)     = nilBeside g (fill1 g (oneLiner (reduceDoc y)) k' ys)
-                              `mkUnion`
-                              nilAboveNest False k (fill g (y:ys))
-                            where
-                              k' | g         = k - 1
-                                 | otherwise = k
-
+fillNB g Empty k (y:ys)     = fillNBE g k y ys
 fillNB g p k ys             = fill1 g p k ys
+
+
+fillNBE :: Bool -> Int -> Doc -> [Doc] -> Doc
+fillNBE g k y ys
+  = nilBeside g (fill1 g ((oneLiner . reduceDoc) y) k' ys)
+    -- XXX: TODO: PRETTY: Used to use True here (but GHC used False...)
+    `mkUnion` nilAboveNest False k (fill g (y:ys))
+  where k' = if g then k - 1 else k
 
 
 -- ---------------------------------------------------------------------------
@@ -909,11 +915,27 @@ oneLiner (Beside {})         = error "oneLiner Beside"
 -- ---------------------------------------------------------------------------
 -- Rendering
 
+-- | A rendering style.
+data Style
+  = Style { mode           :: Mode  -- ^ The rendering mode
+          , lineLength     :: Int   -- ^ Length of line, in chars
+          , ribbonsPerLine :: Float -- ^ Ratio of line length to ribbon length
+          }
+
+-- | The default style (@mode=PageMode, lineLength=100, ribbonsPerLine=1.5@).
+style :: Style
+style = Style { lineLength = 100, ribbonsPerLine = 1.5, mode = PageMode }
+
 -- | Rendering mode.
 data Mode = PageMode     -- ^ Normal
           | ZigZagMode   -- ^ With zig-zag cuts
           | LeftMode     -- ^ No indentation, infinitely long lines
           | OneLineMode  -- ^ All on one line
+
+-- | Render the @Doc@ to a String using the given @Style@.
+renderStyle :: Style -> Doc -> String
+renderStyle s = fullRender (mode s) (lineLength s) (ribbonsPerLine s)
+                txtPrinter ""
 
 -- | Default TextDetails printer
 txtPrinter :: TextDetails -> String -> String
@@ -932,28 +954,9 @@ fullRender :: Mode                     -- ^ Rendering mode
            -> Doc                      -- ^ The document
            -> a                        -- ^ Result
 fullRender OneLineMode _ _ txt end doc
-  = lay (reduceDoc doc)
-  where
-    lay NoDoc              = cant_fail
-    lay (Union _ q)        = lay q -- Second arg can't be NoDoc
-    lay (Nest _ p)         = lay p
-    lay Empty              = end
-    lay (NilAbove p)       = spaceText `txt` lay p -- NoDoc always on first line
-    lay (TextBeside s _ p) = s `txt` lay p
-    lay (Above {})         = error "fullRender/OneLineMode Above"
-    lay (Beside {})        = error "fullRender/OneLineMode Beside"
-
+  = easyDisplay spaceText (\_ y -> y) txt end (reduceDoc doc)
 fullRender LeftMode    _ _ txt end doc
-  = lay (reduceDoc doc)
-  where
-    lay NoDoc              = cant_fail
-    lay (Union p q)        = lay (first p q)
-    lay (Nest _ p)         = lay p
-    lay Empty              = end
-    lay (NilAbove p)       = nlText `txt` lay p -- NoDoc always on first line
-    lay (TextBeside s _ p) = s `txt` lay p
-    lay (Above {})         = error "fullRender/LeftMode Above"
-    lay (Beside {})        = error "fullRender/LeftMode Beside"
+  = easyDisplay nlText first txt end (reduceDoc doc)
 
 fullRender m lineLen ribbons txt rest doc
   = display m lineLen ribbonLen txt rest doc'
@@ -965,6 +968,24 @@ fullRender m lineLen ribbons txt rest doc
     bestLineLen = case m of
                       ZigZagMode -> maxBound
                       _          -> lineLen
+
+easyDisplay :: TextDetails
+             -> (Doc -> Doc -> Doc)
+             -> (TextDetails -> a -> a)
+             -> a
+             -> Doc
+             -> a
+easyDisplay nlSpaceText choose txt end
+  = lay
+  where
+    lay NoDoc              = error "easyDisplay: NoDoc"
+    lay (Union p q)        = lay (choose p q)
+    lay (Nest _ p)         = lay p
+    lay Empty              = end
+    lay (NilAbove p)       = nlSpaceText `txt` lay p
+    lay (TextBeside s _ p) = s `txt` lay p
+    lay (Above {})         = error "easyDisplay Above"
+    lay (Beside {})        = error "easyDisplay Beside"
 
 display :: Mode -> Int -> Int -> (TextDetails -> a -> a) -> a -> Doc -> a
 display m !page_width !ribbon_width txt end doc
@@ -1015,9 +1036,6 @@ display m !page_width !ribbon_width txt end doc
     in
     lay 0 doc
     }}
-
-cant_fail :: a
-cant_fail = error "easy_display: NoDoc"
 
 multi_ch :: Int -> Char -> String
 multi_ch !n ch | n <= 0    = ""
@@ -1083,7 +1101,7 @@ bufLeftRender b doc = layLeft b (reduceDoc doc)
 -- closures in all the case branches.
 layLeft :: BufHandle -> Doc -> IO ()
 layLeft b _ | b `seq` False  = undefined -- make it strict in b
-layLeft _ NoDoc              = cant_fail
+layLeft _ NoDoc              = error "layLeft: NoDoc"
 layLeft b (Union p q)        = return () >> layLeft b (first p q)
 layLeft b (Nest _ p)         = return () >> layLeft b p
 layLeft b Empty              = bPutChar b '\n'

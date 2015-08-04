@@ -434,21 +434,24 @@ showSDocDebug dflags d = renderWithStyle dflags d PprDebug
 
 renderWithStyle :: DynFlags -> SDoc -> PprStyle -> String
 renderWithStyle dflags sdoc sty
-  = Pretty.showDoc PageMode (pprCols dflags) $
-    runSDoc sdoc (initSDocContext dflags sty)
+  = let s = Pretty.style{ Pretty.mode = PageMode,
+                          Pretty.lineLength = pprCols dflags }
+    in Pretty.renderStyle s $ runSDoc sdoc (initSDocContext dflags sty)
 
 -- This shows an SDoc, but on one line only. It's cheaper than a full
 -- showSDoc, designed for when we're getting results like "Foo.bar"
 -- and "foo{uniq strictness}" so we don't want fancy layout anyway.
 showSDocOneLine :: DynFlags -> SDoc -> String
 showSDocOneLine dflags d
- = Pretty.showDoc OneLineMode (pprCols dflags) $
-   runSDoc d (initSDocContext dflags defaultUserStyle)
+ = let s = Pretty.style{ Pretty.mode = OneLineMode,
+                         Pretty.lineLength = pprCols dflags } in
+   Pretty.renderStyle s $ runSDoc d (initSDocContext dflags defaultUserStyle)
 
 showSDocDumpOneLine :: DynFlags -> SDoc -> String
 showSDocDumpOneLine dflags d
- = Pretty.showDoc OneLineMode irrelevantNCols $
-   runSDoc d (initSDocContext dflags defaultDumpStyle)
+ = let s = Pretty.style{ Pretty.mode = OneLineMode,
+                         Pretty.lineLength = irrelevantNCols } in
+   Pretty.renderStyle s $ runSDoc d (initSDocContext dflags defaultDumpStyle)
 
 irrelevantNCols :: Int
 -- Used for OneLineMode and LeftMode when number of cols isn't used
