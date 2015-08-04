@@ -815,6 +815,7 @@ fillNB _ _           k _  | k `seq` False = undefined
 fillNB g (Nest _ p)  k ys   = fillNB g p k ys
                               -- Never triggered, because of invariant (2)
 fillNB _ Empty _ []         = Empty
+fillNB g Empty k (Empty:ys) = fillNB g Empty k ys
 fillNB g Empty k (y:ys)     = fillNBE g k y ys
 fillNB g p k ys             = fill1 g p k ys
 
