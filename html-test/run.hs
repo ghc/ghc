@@ -146,13 +146,13 @@ checkModule :: String -> IO CheckResult
 checkModule mdl = do
     hasRef <- doesFileExist $ refFile mdl
     if hasRef
-    then do
-        out <- readFile $ outFile mdl
-        ref <- readFile $ refFile mdl
-        return $ if haddockEq (outFile mdl, out) (refFile mdl, ref)
-            then Pass
-            else Fail
-    else return NoRef
+        then do
+            out <- readFile $ outFile mdl
+            ref <- readFile $ refFile mdl
+            return $ if haddockEq (outFile mdl, out) (refFile mdl, ref)
+                then Pass
+                else Fail
+        else return NoRef
 
 
 diffModule :: String -> IO ()
