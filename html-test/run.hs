@@ -59,22 +59,28 @@ main :: IO ()
 main = do
     cfg <- uncurry loadConfig =<< checkOpt =<< getArgs
     runHaddock cfg
-    checkOutput cfg
+    checkFiles cfg
 
 
-checkOutput :: Config -> IO ()
-checkOutput (Config { .. }) = do
-    putStrLn "Diffing output files..."
-    failFiles <- forM cfgFiles $ \file -> do
-        putStr $ "Checking " ++ takeBaseName file ++ "... "
+checkFiles :: Config -> IO ()
+checkFiles (Config { .. }) = do
+    putStrLn "Testing output files..."
+    failed <- liftM catMaybes . forM cfgFiles $ \file -> do
+        let mdl = takeBaseName file
+        putStr $ "Checking " ++ mdl ++ "... "
 
-        status <- checkFile file
+        status <- checkModule mdl
         case status of
-            Fail -> putStrLn "FAIL" >> (return $ Just file)
+            Fail -> putStrLn "FAIL" >> (return $ Just mdl)
             Pass -> putStrLn "PASS" >> (return Nothing)
             NoRef -> putStrLn "PASS [no .ref]" >> (return Nothing)
 
-    return () -- TODO: Print diff for failed cases.
+    when (null failed) $ do
+        putStrLn "All tests passed!"
+        exitSuccess
+
+    putStrLn "Diffing failed cases..."
+    forM_ failed checkModule
 
 
 runHaddock :: Config -> IO ()
@@ -134,21 +140,29 @@ loadConfig flags files = do
     return $ Config { .. }
 
 
-checkFile :: FilePath -> IO CheckResult
-checkFile file = do
-    hasRef <- doesFileExist refFile
+checkModule :: String -> IO CheckResult
+checkModule mdl = do
+    hasRef <- doesFileExist $ refFile mdl
     if hasRef
     then do
-        out <- readFile outFile
-        ref <- readFile refFile
-        return $ if haddockEq (outFile, out) (refFile, ref)
+        out <- readFile $ outFile mdl
+        ref <- readFile $ refFile mdl
+        return $ if haddockEq (outFile mdl, out) (refFile mdl, ref)
             then Pass
             else Fail
     else return NoRef
-  where
-    outFile = outDir </> mdl <.> "html"
-    refFile = refDir </> mdl <.> "html"
-    mdl = takeBaseName $ file
+
+
+diffModule :: String -> IO ()
+diffModule mdl = return ()
+
+
+outFile :: String -> FilePath
+outFile mdl = outDir </> mdl <.> "html"
+
+
+refFile :: String -> FilePath
+refFile mdl = refDir </> mdl <.> "html"
 
 
 printVersions :: Environment -> FilePath -> IO ()
