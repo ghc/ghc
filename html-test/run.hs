@@ -47,6 +47,12 @@ data Config = Config
     }
 
 
+data CheckResult
+    = Fail
+    | Pass
+    | NoRef
+
+
 main :: IO ()
 main = do
     cfg <- uncurry loadConfig =<< checkOpt =<< getArgs
@@ -55,14 +61,29 @@ main = do
 
 
 checkOutput :: Config -> IO ()
-checkOutput _ = return () -- TODO.
+checkOutput (Config { .. }) = do
+    putStrLn "Diffing output files..."
+    failFiles <- forM cfgFiles $ \file -> do
+        putStr $ "Checking " ++ takeBaseName file ++ "... "
+
+        status <- checkFile file
+        case status of
+            Fail -> putStrLn "FAIL" >> (return $ Just file)
+            Pass -> putStrLn "PASS" >> (return Nothing)
+            NoRef -> putStrLn "PASS [no .ref]" >> (return Nothing)
+
+    return () -- TODO: Print diff for failed cases.
 
 
 runHaddock :: Config -> IO ()
 runHaddock (Config { .. }) = do
+    putStrLn "Running Haddock process..."
+
+    devNull <- openFile "/dev/null" WriteMode
     handle <- runProcess' cfgHaddockPath $ processConfig
         { pcArgs = cfgHaddockArgs ++ cfgFiles
         , pcEnv = Just $ cfgEnv
+        , pcStdOut = Just $ devNull
         }
     waitForSuccess "Failed to run Haddock on specified test files" handle
 
@@ -107,6 +128,23 @@ loadConfig flags files = do
         ]
 
     return $ Config { .. }
+
+
+checkFile :: FilePath -> IO CheckResult
+checkFile file = do
+    hasRef <- doesFileExist refFile
+    if hasRef
+    then do
+        out <- readFile outFile
+        ref <- readFile refFile
+        return $ if haddockEq out ref
+            then Pass
+            else Fail
+    else return NoRef
+  where
+    outFile = outDir </> mdl <.> "html"
+    refFile = refDir </> mdl <.> "html"
+    mdl = takeBaseName $ file
 
 
 printVersions :: Environment -> FilePath -> IO ()
@@ -229,3 +267,7 @@ waitForSuccess msg handle = do
 
 mlast :: [a] -> Maybe a
 mlast = listToMaybe . reverse
+
+
+haddockEq :: String -> String -> Bool
+haddockEq _ _ = True -- TODO.
