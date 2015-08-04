@@ -73,8 +73,9 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                tcExtendIdEnv    id_bndrs $
                do { -- See Note [Solve order for RULES]
                     ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)
-                  ; (lhs_inst_simple, _) <- runTcS (instantiateCts (wc_simple lhs_wanted))
-                  ; let lhs_inst = lhs_wanted { wc_simple = lhs_inst_simple }
+                  ; let lhs_wanted_simple = wc_simple lhs_wanted
+                  ; (lhs_inst_simple, _) <- runTcS (instantiateCts lhs_wanted_simple)
+                  ; let lhs_inst = lhs_wanted { wc_simple = lhs_inst_simple `unionBags` lhs_wanted_simple }
                   ; (rhs', rhs_wanted) <- captureConstraints (tcPolyMonoExpr rhs rule_ty)
                   ; return (lhs', lhs_inst, rhs', rhs_wanted, rule_ty) }
 

@@ -8,9 +8,9 @@ module TcSimplify(
        simplifyTop, simplifyInteractive,
        solveWantedsTcM,
 
-       -- For Rules we need these three
-       solveWanteds, runTcS, approximateWC,
-       instantiateCts
+       -- For Rules we need these
+       solveWanteds, runTcS, runTcSWithEvBinds,
+       approximateWC, instantiateCts
   ) where
 
 #include "HsVersions.h"
