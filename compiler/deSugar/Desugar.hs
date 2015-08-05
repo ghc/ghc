@@ -171,6 +171,7 @@ deSugar hsc_env
         ; let mod_guts = ModGuts {
                 mg_module       = mod,
                 mg_hsc_src      = hsc_src,
+                mg_loc          = mkFileSrcSpan mod_loc,
                 mg_exports      = exports,
                 mg_deps         = deps,
                 mg_used_names   = used_names,
@@ -199,6 +200,12 @@ deSugar hsc_env
               }
         ; return (msgs, Just mod_guts)
         }}}
+
+mkFileSrcSpan :: ModLocation -> SrcSpan
+mkFileSrcSpan mod_loc
+  = case ml_hs_file mod_loc of
+      Just file_path -> mkGeneralSrcSpan (mkFastString file_path)
+      Nothing        -> interactiveSrcSpan   -- Presumably
 
 dsImpSpecs :: [LTcSpecPrag] -> DsM (OrdList (Id,CoreExpr), [CoreRule])
 dsImpSpecs imp_specs

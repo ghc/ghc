@@ -1905,7 +1905,8 @@ withoutAnnots pass guts = do
         liftIO =<< runCoreM <$> fmap removeFlag getHscEnv <*> getRuleBase <*>
                                 getUniqueSupplyM <*> getModule <*>
                                 getVisibleOrphanMods <*>
-                                getPrintUnqualified <*> pure corem
+                                getPrintUnqualified <*> getSrcSpanM <*>
+                                pure corem
   -- Nuke existing ticks in module.
   -- TODO: Ticks in unfoldings. Maybe change unfolding so it removes
   -- them in absence of @Opt_Debug@?

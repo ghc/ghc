@@ -1643,6 +1643,8 @@ mkModGuts mod safe binds =
     ModGuts {
         mg_module       = mod,
         mg_hsc_src      = HsSrcFile,
+        mg_loc          = mkGeneralSrcSpan (moduleNameFS (moduleName mod)),
+                                  -- A bit crude
         mg_exports      = [],
         mg_deps         = noDependencies,
         mg_dir_imps     = emptyModuleEnv,

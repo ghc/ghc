@@ -1054,6 +1054,7 @@ data ModGuts
   = ModGuts {
         mg_module    :: !Module,         -- ^ Module being compiled
         mg_hsc_src   :: HscSource,       -- ^ Whether it's an hs-boot module
+        mg_loc       :: SrcSpan,         -- ^ For error messages from inner passes
         mg_exports   :: ![AvailInfo],    -- ^ What it exports
         mg_deps      :: !Dependencies,   -- ^ What it depends on, directly or
                                          -- otherwise
