@@ -96,10 +96,12 @@ tcPolyExprNC_O
               -- The origin is useful if you ever need to instantiate the type
 
 tcPolyExprNC_O (L loc expr) res_ty
-  = setSrcSpan loc $
-    do { traceTc "tcPolyExprNC_O" (ppr res_ty)
+  = do { traceTc "tcPolyExprNC_O" (ppr res_ty)
        ; (wrap, (expr', orig))
            <- tcSkolemise GenSigCtxt res_ty $ \ _ res_ty ->
+              setSrcSpan loc $
+                -- NB: setSrcSpan *after* skolemising, so we get better
+                -- skolem locations
               tcExpr expr res_ty
        ; return (L loc (mkHsWrap wrap expr'), orig) }
 
@@ -165,16 +167,15 @@ NB: The res_ty is always deeply skolemised.
 
 tcExpr :: HsExpr Name -> TcRhoType -> TcM (HsExpr TcId, CtOrigin)
 tcExpr (HsVar name)     res_ty = (, OccurrenceOf name) <$> tcCheckId name res_ty
-tcExpr (HsUnboundVar v) res_ty = (, UnboundOccurrenceOf v) <$>
-                                 tcUnboundId v res_ty
+tcExpr (HsUnboundVar v) res_ty = tcUnboundId v res_ty
 
 tcExpr (HsApp e1 e2) res_ty
   = do { (wrap, fun, args, orig) <- tcApp Nothing e1 [e2] res_ty
        ; return (mkHsWrap wrap $ unLoc $ foldl mkHsApp fun args, orig) }
 
 tcExpr (HsLit lit)   res_ty = do { let lit_ty = hsLitType lit
-                                 ; no_origM $
-                                   tcWrapResult (HsLit lit) lit_ty res_ty }
+                                 ; tcWrapResult (HsLit lit) lit_ty res_ty
+                                                Shouldn'tHappenOrigin }
 
 tcExpr (HsPar expr)   res_ty = do { (expr', orig) <- tcMonoExprNC_O expr res_ty
                                   ; return (HsPar expr', orig) }
@@ -211,9 +212,8 @@ tcExpr (HsIPVar x) res_ty
        ; ip_ty <- newFlexiTyVarTy openTypeKind
        ; let ip_name = mkStrLitTy (hsIPNameFS x)
        ; ip_var <- emitWanted origin (mkClassPred ipClass [ip_name, ip_ty])
-       ; (, origin) <$>
-         tcWrapResult (fromDict ipClass ip_name ip_ty (HsVar ip_var))
-                      ip_ty res_ty }
+       ; tcWrapResult (fromDict ipClass ip_name ip_ty (HsVar ip_var))
+                      ip_ty res_ty origin }
   where
   -- Coerces a dictionary for `IP "x" t` into `t`.
   fromDict ipClass x ty = HsWrap $ mkWpCast $ TcCoercion $
@@ -253,7 +253,7 @@ tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
 
       ; addErrCtxt (pprSigCtxt ExprSigCtxt empty (ppr sig_ty)) $
         emitWildcardHoleConstraints (zip wcs nwc_tvs)
-      ; (, orig) <$> tcWrapResult inner_expr sig_tc_ty res_ty } }
+      ; tcWrapResult inner_expr sig_tc_ty res_ty orig } }
 
 tcExpr (HsType ty _) _
   = failWithTc (sep [ text "Type argument used outside of a function argument:"
@@ -495,7 +495,8 @@ tcExpr (HsIf Nothing pred b1 b2) res_ty    -- Ordinary 'if'
        ; tau_ty <- tauTvsForReturnTvs res_ty
        ; b1' <- tcMonoExpr b1 tau_ty
        ; b2' <- tcMonoExpr b2 tau_ty
-       ; no_origM $ tcWrapResult (HsIf Nothing pred' b1' b2') tau_ty res_ty }
+       ; tcWrapResult (HsIf Nothing pred' b1' b2') tau_ty res_ty
+                      Shouldn'tHappenOrigin }
 
 tcExpr (HsIf (Just fun) pred b1 b2) res_ty
   -- Note [Rebindable syntax for if]
@@ -1072,7 +1073,7 @@ tcSyntaxOp :: CtOrigin -> HsExpr Name -> TcType -> TcM (HsExpr TcId)
 -- This version assumes res_ty is a monotype
 tcSyntaxOp orig (HsVar op) res_ty
   = do { (expr, rho) <- tcInferIdWithOrig orig op
-       ; tcWrapResult expr rho res_ty }
+       ; fst <$> tcWrapResult expr rho res_ty orig }
 
 tcSyntaxOp _ other         _      = pprPanic "tcSyntaxOp" (ppr other)
 
@@ -1167,7 +1168,7 @@ tcCheckId name res_ty
   = do { (expr, actual_res_ty) <- tcInferId name
        ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr res_ty])
        ; addErrCtxtM (funResCtxt False (HsVar name) actual_res_ty res_ty) $
-         tcWrapResult expr actual_res_ty res_ty }
+         fst <$> tcWrapResult expr actual_res_ty res_ty (OccurrenceOf name) }
 
 ------------------------
 tcInferId :: Name -> TcM (HsExpr TcId, TcSigmaType)
@@ -1264,7 +1265,7 @@ srcSpanPrimLit dflags span
     = HsLit (HsStringPrim "" (unsafeMkByteString
                              (showSDocOneLine dflags (ppr span))))
 
-tcUnboundId :: OccName -> TcRhoType -> TcM (HsExpr TcId)
+tcUnboundId :: OccName -> TcRhoType -> TcM (HsExpr TcId, CtOrigin)
 -- Typechedk an occurrence of an unbound Id
 --
 -- Some of these started life as a true hole "_".  Others might simply
@@ -1281,7 +1282,7 @@ tcUnboundId occ res_ty
       ; let can = CHoleCan { cc_ev = CtWanted ty ev loc, cc_occ = occ
                            , cc_hole = ExprHole }
       ; emitInsoluble can
-      ; tcWrapResult (HsVar ev) ty res_ty }
+      ; tcWrapResult (HsVar ev) ty res_ty (UnboundOccurrenceOf occ) }
 
 {-
 Note [Adding the implicit parameter to 'assert']

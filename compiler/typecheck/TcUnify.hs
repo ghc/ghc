@@ -628,7 +628,7 @@ addSubTypeCtxt ty_actual ty_expected thing_inside
 tcSubType_NC :: UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
 tcSubType_NC ctxt ty_actual ty_expected
   = do { traceTc "tcSubType_NC" (vcat [pprUserTypeCtxt ctxt, ppr ty_actual, ppr ty_expected])
-       ; tc_sub_type origin ctxt ty_actual ty_expected }
+       ; tc_sub_type origin origin ctxt ty_actual ty_expected }
   where
     origin = TypeEqOrigin { uo_actual = ty_actual, uo_expected = ty_expected }
 
@@ -639,13 +639,25 @@ tcSubTypeDS_NC ctxt ty_actual ty_expected
   where
     origin = TypeEqOrigin { uo_actual = ty_actual, uo_expected = ty_expected }
 
+tcSubTypeDS_NC_O :: CtOrigin   -- origin used for instantiation only
+                 -> UserTypeCtxt -> TcSigmaType -> TcRhoType -> TcM HsWrapper
+-- Just like tcSubType, but with the additional precondition that
+-- ty_expected is deeply skolemised
+tcSubTypeDS_NC_O inst_orig ctxt ty_actual ty_expected
+  = tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
+  where
+    eq_orig = TypeEqOrigin { uo_actual = ty_actual, uo_expected = ty_expected }
+
 ---------------
-tc_sub_type :: CtOrigin -> UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
-tc_sub_type origin ctxt ty_actual ty_expected
+tc_sub_type :: CtOrigin   -- origin used when calling uType
+            -> CtOrigin   -- origin used when instantiating
+            -> UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
+tc_sub_type eq_orig inst_orig ctxt ty_actual ty_expected
   | Just tv_actual <- tcGetTyVar_maybe ty_actual -- See Note [Higher rank types]
   = do { lookup_res <- lookupTcTyVar tv_actual
        ; case lookup_res of
-           Filled ty_actual' -> tc_sub_type origin ctxt ty_actual' ty_expected
+           Filled ty_actual' -> tc_sub_type eq_orig inst_orig
+                                            ctxt ty_actual' ty_expected
 
              -- It's tempting to see if tv_actual can unify with a polytype
              -- and, if so, call uType; otherwise, skolemise first. But this
@@ -655,19 +667,23 @@ tc_sub_type origin ctxt ty_actual ty_expected
              -- uType seems safer in the presence of possible refactoring
              -- later.
            Unfilled _        -> coToHsWrapper <$>
-                                uType origin ty_actual ty_expected }
+                                uType eq_orig ty_actual ty_expected }
 
   | otherwise  -- See Note [Deep skolemisation]
   = do { (sk_wrap, inner_wrap) <- tcSkolemise ctxt ty_expected $
                                   \ _ sk_rho ->
-                                  tcSubTypeDS_NC_O origin ctxt ty_actual sk_rho
+                                  tc_sub_type_ds eq_orig inst_orig ctxt
+                                                 ty_actual sk_rho
        ; return (sk_wrap <.> inner_wrap) }
 
 ---------------
-tcSubTypeDS_NC_O :: CtOrigin -> UserTypeCtxt -> TcSigmaType -> TcRhoType -> TcM HsWrapper
+tc_sub_type_ds :: CtOrigin    -- used when calling uType
+               -> CtOrigin    -- used when instantiating
+               -> UserTypeCtxt -> TcSigmaType -> TcRhoType -> TcM HsWrapper
 -- Just like tcSubType, but with the additional precondition that
 -- ty_expected is deeply skolemised
-tcSubTypeDS_NC_O origin ctxt ty_actual ty_expected = go ty_actual ty_expected
+tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
+  = go ty_actual ty_expected
   where
     go ty_a ty_e | Just ty_a' <- tcView ty_a = go ty_a' ty_e
                  | Just ty_e' <- tcView ty_e = go ty_a  ty_e'
@@ -678,8 +694,8 @@ tcSubTypeDS_NC_O origin ctxt ty_actual ty_expected = go ty_actual ty_expected
                Filled ty_a' ->
                  do { traceTc "tcSubTypeDS_NC_O following filled act meta-tyvar:"
                         (ppr tv_a <+> text "-->" <+> ppr ty_a')
-                    ; tcSubTypeDS_NC_O origin ctxt ty_a' ty_e }
-               Unfilled _   -> coToHsWrapper <$> uType origin ty_a ty_e }
+                    ; tc_sub_type_ds eq_orig inst_orig ctxt ty_a' ty_e }
+               Unfilled _   -> coToHsWrapper <$> uType eq_orig ty_a ty_e }
 
     go ty_a ty_e@(TyVarTy tv_e)
       = do { dflags <- getDynFlags
@@ -689,27 +705,28 @@ tcSubTypeDS_NC_O origin ctxt ty_actual ty_expected = go ty_actual ty_expected
                Filled ty_e' ->
                  do { traceTc "tcSubTypeDS_NC_O following filled exp meta-tyvar:"
                         (ppr tv_e <+> text "-->" <+> ppr ty_e')
-                    ; tc_sub_type origin ctxt ty_a ty_e' }
+                    ; tc_sub_type eq_orig inst_orig ctxt ty_a ty_e' }
                Unfilled details
                  |  canUnifyWithPolyType dflags details
                     && isTouchableMetaTyVar tclvl tv_e  -- don't want skolems here
-                 -> coToHsWrapper <$> uType origin ty_a ty_e
+                 -> coToHsWrapper <$> uType eq_orig ty_a ty_e
 
      -- We've avoided instantiating ty_actual just in case ty_expected is
      -- polymorphic. But we've now assiduously determined that it is *not*
      -- polymorphic. So instantiate away. This is needed for e.g. test
      -- typecheck/should_compile/T4284.
                  |  otherwise
-                 -> do { (wrap, rho_a) <- deeplyInstantiate origin ty_a
-                       ; cow <- uType origin rho_a ty_e
+                 -> do { (wrap, rho_a) <- deeplyInstantiate inst_orig ty_a
+                       ; cow <- uType eq_orig rho_a ty_e
                        ; return (coToHsWrapper cow <.> wrap) } }
 
     go (FunTy act_arg act_res) (FunTy exp_arg exp_res)
       | not (isPredTy act_arg)
       , not (isPredTy exp_arg)
       = -- See Note [Co/contra-variance of subsumption checking]
-        do { res_wrap <- tcSubTypeDS_NC_O origin ctxt act_res exp_res
-           ; arg_wrap <- tc_sub_type    origin ctxt exp_arg act_arg
+        do { res_wrap <- tc_sub_type_ds eq_orig inst_orig ctxt act_res exp_res
+           ; arg_wrap <- tc_sub_type    eq_orig Shouldn'tHappenOrigin
+                                                          ctxt exp_arg act_arg
            ; return (mkWpFun arg_wrap res_wrap exp_arg exp_res) }
                -- arg_wrap :: exp_arg ~ act_arg
                -- res_wrap :: act-res ~ exp_res
@@ -717,20 +734,21 @@ tcSubTypeDS_NC_O origin ctxt ty_actual ty_expected = go ty_actual ty_expected
     go ty_a ty_e
       | let (tvs, theta, _) = tcSplitSigmaTy ty_a
       , not (null tvs && null theta)
-      = do { (in_wrap, in_rho) <- topInstantiate origin ty_a
-           ; body_wrap <- tcSubTypeDS_NC ctxt in_rho ty_e
+      = do { (in_wrap, in_rho) <- topInstantiate inst_orig ty_a
+           ; body_wrap <- tcSubTypeDS_NC_O inst_orig ctxt in_rho ty_e
            ; return (body_wrap <.> in_wrap) }
 
       | otherwise   -- Revert to unification
-      = do { cow <- uType origin ty_a ty_e
+      = do { cow <- uType eq_orig ty_a ty_e
            ; return (coToHsWrapper cow) }
 
 -----------------
-tcWrapResult :: HsExpr TcId -> TcSigmaType -> TcRhoType
-             -> TcM (HsExpr TcId)
-tcWrapResult expr actual_ty res_ty
-  = do { cow <- tcSubTypeDS GenSigCtxt actual_ty res_ty
-       ; return $ mkHsWrap cow expr }
+tcWrapResult :: HsExpr TcId -> TcSigmaType -> TcRhoType -> CtOrigin
+             -> TcM (HsExpr TcId, CtOrigin)
+  -- returning the origin is very convenient in TcExpr
+tcWrapResult expr actual_ty res_ty orig
+  = do { cow <- tcSubTypeDS_NC_O orig GenSigCtxt actual_ty res_ty
+       ; return (mkHsWrap cow expr, orig) }
 
 -----------------------------------
 wrapFunResCoercion

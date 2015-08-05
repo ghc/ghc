@@ -33,7 +33,7 @@ import ConLike
 import Inst( topInstantiate, deeplyInstantiate )
 import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
-import Type( pprSigmaTypeExtraCts, tidyOpenTypes )
+import Type( pprSigmaTypeExtraCts, tidyOpenTypes, tidyOpenType )
 import TyCon
 import TcType
 import TysPrim
@@ -647,11 +647,15 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
              do { (binds', mono_infos)
                     <- tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
                   -- See Note [Instantiate when inferring a type]
-                ; mono_tys <- mapM (zonkTcType . idType . mbi_mono_id) mono_infos
-                ; let origs = map mbi_orig mono_infos
-                    -- NB: zonk to uncover any foralls
                 ; (wrappers, insted_tys)
-                    <- zipWithAndUnzipM deeplyInstantiate origs mono_tys
+                    <- tcExtendIdBndrs
+                         [ TcIdBndr mono_id NotTopLevel
+                         | MBI { mbi_mono_id = mono_id } <- mono_infos ] $
+                       mapAndUnzipM deeply_instantiate mono_infos
+                     -- during instantiation, we might encounter an error
+                     -- whose message will want to list these binders as
+                     -- relevant.
+
                 ; return (binds', mono_infos, wrappers, insted_tys) }
 
        ; let name_taus = [ (mbi_poly_name info, tau)
@@ -675,6 +679,14 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
        ; traceTc "Binding:" (ppr (poly_ids `zip` map idType poly_ids))
        ; return (unitBag abs_bind, poly_ids) }
          -- poly_ids are guaranteed zonked by mkExport
+
+  where
+    deeply_instantiate :: MonoBindInfo -> TcM (HsWrapper, TcRhoType)
+    deeply_instantiate (MBI { mbi_mono_id = mono_id, mbi_orig = orig })
+      = do { mono_ty <- zonkTcType (idType mono_id)
+              -- NB: zonk to uncover any foralls
+           ; addErrCtxtM (instErrCtxt mono_id mono_ty) $
+             deeplyInstantiate orig mono_ty }
 
 --------------
 mkExport :: PragFun
@@ -1926,3 +1938,10 @@ typeSigCtxt (TcSigInfo { sig_name = name, sig_tvs = tvs
   = sep [ text "In" <+> pprUserTypeCtxt (FunSigCtxt name False) <> colon
         , nest 2 (pprSigmaTypeExtraCts (isJust extra_cts)
                   (mkSigmaTy (map snd tvs) theta tau)) ]
+
+instErrCtxt :: TcId -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
+instErrCtxt id ty env
+  = do { let (env', ty') = tidyOpenType env ty
+       ; return (env', hang (text "When instantiating" <+> quotes (ppr id) <>
+                             text ", initially inferred to have this type:")
+                          2 (ppr ty')) }
