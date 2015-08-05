@@ -205,7 +205,6 @@ module Pretty (
 import BufWrite
 import FastString
 import Panic
-import Numeric (fromRat)
 import System.IO
 import Prelude hiding (error)
 
@@ -499,8 +498,7 @@ int      n = text (show n)
 integer  n = text (show n)
 float    n = text (show n)
 double   n = text (show n)
-rational n = text (show (fromRat n :: Double))
---rational n = text (show (fromRationalX n)) -- _showRational 30 n)
+rational n = text (show n)
 
 parens       :: Doc -> Doc -- ^ Wrap document in @(...)@
 brackets     :: Doc -> Doc -- ^ Wrap document in @[...]@
