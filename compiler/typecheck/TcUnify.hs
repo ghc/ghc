@@ -12,7 +12,7 @@ module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcSkolemise,
   tcSubTypeHR, tcSubType, tcSubType_NC, tcSubTypeDS, tcSubTypeDS_O,
-  tcSubTypeDS_NC,
+  tcSubTypeDS_NC, tcSubTypeDS_NC_O,
   checkConstraints,
 
   -- Various unifications

@@ -597,7 +597,8 @@ c1 <.> c2    = c1 `WpCompose` c2
 
 mkWpFun :: HsWrapper -> HsWrapper
         -> TcType    -- the "from" type of the first wrapper
-        -> TcType    -- the "to" type of the second wrapper
+        -> TcType    -- either type of the second wrapper (used only when the
+                     -- second wrapper is the identity)
         -> HsWrapper
 mkWpFun WpHole       WpHole       _  _  = WpHole
 mkWpFun WpHole       (WpCast co2) t1 _  = WpCast (mkTcFunCo Representational (mkTcRepReflCo t1) co2)

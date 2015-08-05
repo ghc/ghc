@@ -51,6 +51,7 @@ import PrelNames
 import DynFlags
 import SrcLoc
 import Util
+import VarEnv  ( emptyTidyEnv )
 import ListSetOps
 import Maybes
 import Outputable
@@ -983,24 +984,15 @@ tcApp m_herald orig_fun orig_args res_ty
       = do {   -- Type-check the function
            ; (fun1, fun_sigma, orig) <- tcInferFun fun
 
-               -- Extract its argument types
-           ; (wrap_fun, expected_arg_tys, actual_res_ty)
-                 <- matchExpectedFunTys_Args orig
-                      (m_herald `orElse` mk_app_msg fun)
-                      fun args fun_sigma
+           ; (wrap_fun, args1, actual_res_ty)
+               <- tcArgs fun fun_sigma orig args
+                         (m_herald `orElse` mk_app_msg fun)
 
-           -- Typecheck the result, thereby propagating
-           -- info (if any) from result into the argument types
-           -- Both actual_res_ty and res_ty are deeply skolemised
-           -- Rather like tcWrapResult, but (perhaps for historical reasons)
-           -- we do this before typechecking the arguments
+                -- this is just like tcWrapResult, but the types don't line
+                -- up to call that function
            ; wrap_res <- addFunResCtxt True (unLoc fun) actual_res_ty res_ty $
-                         tcSubTypeDS_NC GenSigCtxt actual_res_ty res_ty
+                         tcSubTypeDS_NC_O orig GenSigCtxt actual_res_ty res_ty
 
-           -- Typecheck the arguments
-           ; args1 <- tcArgs fun args expected_arg_tys
-
-           -- Assemble the result
            ; return (wrap_res, mkLHsWrap wrap_fun fun1, args1, orig) }
 
 mk_app_msg :: LHsExpr Name -> SDoc
@@ -1029,24 +1021,54 @@ tcInferFun fun
        ; return (fun, fun_ty', orig) }
 
 ----------------
-tcArgs :: LHsExpr Name                          -- The function (for error messages)
-       -> [LHsExpr Name] -> [TcSigmaType]       -- Actual arguments and expected arg types
-       -> TcM [LHsExpr TcId]                    -- Resulting args
-
-tcArgs fun orig_args orig_arg_tys = go 1 orig_args orig_arg_tys
+-- | Type-check the arguments to a function, possibly including visible type
+-- applications
+tcArgs :: LHsExpr Name   -- ^ The function itself (for err msgs only)
+       -> TcSigmaType    -- ^ the (uninstantiated) type of the function
+       -> CtOrigin       -- ^ the origin for the function's type
+       -> [LHsExpr Name] -- ^ the args
+       -> SDoc           -- ^ the herald for matchExpectedFunTys
+       -> TcM (HsWrapper, [LHsExpr TcId], TcSigmaType)
+          -- ^ (a wrapper for the function, the tc'd args, result type)
+tcArgs fun orig_fun_ty fun_orig orig_args herald
+  = go 1 orig_fun_ty orig_args
   where
-    go _ [] [] = return []
-    go n (arg:args) all_arg_tys
-      | Just (hs_ty, _) <- isLHsTypeExpr_maybe arg
-      = do { args' <- go (n+1) args all_arg_tys
-           ; return (L (getLoc arg) (HsTypeOut hs_ty) : args') }
+    go _ fun_ty [] = return (idHsWrapper, [], fun_ty)
 
-    go n (arg:args) (arg_ty:arg_tys)
-      = do { arg'  <- tcArg fun (arg, arg_ty, n)
-           ; args' <- go (n+1) args arg_tys
-           ; return (arg':args') }
+    go n fun_ty (arg:args)
+      | Just hs_ty_arg@(hs_ty, _wcs) <- isLHsTypeExpr_maybe arg
+      = do { (wrap1, upsilon_ty) <- topInstantiateInferred fun_orig fun_ty
+               -- wrap1 :: fun_ty "->" upsilon_ty
+           ; case tcSplitForAllTy_maybe upsilon_ty of
+               Just (tv, inner_ty) ->
+                 ASSERT( isSpecifiedTyVar tv )
+                 do { let kind = tyVarKind tv
+                    ; ty_arg <- tcHsTypeApp hs_ty_arg kind
+                    ; let insted_ty = substTyWith [tv] [ty_arg] inner_ty
+                    ; (inner_wrap, args', res_ty) <- go (n+1) insted_ty args
+                   -- inner_wrap :: insted_ty "->" (map typeOf args') -> res_ty
+                    ; let inst_wrap = mkWpTyApps [ty_arg]
+                    ; return ( inner_wrap <.> inst_wrap <.> wrap1
+                             , L (getLoc arg) (HsTypeOut hs_ty) : args'
+                             , res_ty ) }
+               Nothing -> ty_app_err upsilon_ty hs_ty }
 
-    go _ _ _ = pprPanic "tcArgs" (ppr fun $$ ppr orig_args $$ ppr orig_arg_tys)
+      | otherwise   -- not a type application.
+      = do { (wrap, [arg_ty], res_ty)
+               <- matchExpectedFunTys (Actual fun_orig) herald 1 fun_ty
+               -- wrap :: fun_ty "->" arg_ty -> res_ty
+           ; arg' <- tcArg fun (arg, arg_ty, n)
+           ; (inner_wrap, args', inner_res_ty) <- go (n+1) res_ty args
+               -- inner_wrap :: res_ty "->" (map typeOf args') -> inner_res_ty
+           ; return ( mkWpFun idHsWrapper inner_wrap arg_ty res_ty <.> wrap
+                    , arg' : args'
+                    , inner_res_ty ) }
+
+    ty_app_err ty arg
+      = do { (_, ty) <- zonkTidyTcType emptyTidyEnv ty
+           ; failWith $
+               text "Cannot not apply expression of type" <+> quotes (ppr ty) $$
+               text "to a visible type argument" <+> quotes (ppr arg) }
 
 ----------------
 tcArg :: LHsExpr Name                           -- The function (for error messages)
