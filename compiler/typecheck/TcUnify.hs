@@ -726,9 +726,22 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
      -- typecheck/should_compile/T4284.
                  |  otherwise
                  -> do { (wrap, rho_a) <- deeplyInstantiate inst_orig ty_actual
-                       ; cow <- unifyType rho_a ty_expected
-                            -- NB: unifyType, not uType. We want to refresh
-                            -- the TypeEqOrigin to use the inst'ed type
+
+                           -- if we haven't recurred through an arrow, then
+                           -- the eq_orig will list ty_actual. In this case,
+                           -- we want to update the origin to reflect the
+                           -- instantiation. If we *have* recurred through
+                           -- an arrow, it's better not to update.
+                       ; let eq_orig' = case eq_orig of
+                               TypeEqOrigin { uo_actual   = orig_ty_actual
+                                            , uo_expected = orig_ty_expected }
+                                 |  orig_ty_actual `tcEqType` ty_actual
+                                 -> TypeEqOrigin
+                                      { uo_actual = rho_a
+                                      , uo_expected = orig_ty_expected }
+                               _ -> eq_orig
+
+                       ; cow <- uType eq_orig' rho_a ty_expected
                        ; return (coToHsWrapper cow <.> wrap) } }
 
     go (FunTy act_arg act_res) (FunTy exp_arg exp_res)
@@ -761,7 +774,10 @@ tcWrapResult :: HsExpr TcId -> TcSigmaType -> TcRhoType -> CtOrigin
              -> TcM (HsExpr TcId, CtOrigin)
   -- returning the origin is very convenient in TcExpr
 tcWrapResult expr actual_ty res_ty orig
-  = do { cow <- tcSubTypeDS_NC_O orig GenSigCtxt actual_ty res_ty
+  = do { traceTc "tcWrapResult" (vcat [ text "Actual:  " <+> ppr actual_ty
+                                      , text "Expected:" <+> ppr res_ty
+                                      , text "Origin:" <+> pprCtOrigin orig ])
+       ; cow <- tcSubTypeDS_NC_O orig GenSigCtxt actual_ty res_ty
        ; return (mkHsWrap cow expr, orig) }
 
 -----------------------------------
