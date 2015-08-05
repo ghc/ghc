@@ -23,7 +23,7 @@ tcInferSigma, tcInferSigmaNC ::
           LHsExpr Name
        -> TcM (LHsExpr TcId, TcSigmaType, CtOrigin)
 
-tcInferRho, tcInferRhoNC ::
+tcInferRho ::
           LHsExpr Name
        -> TcM (LHsExpr TcId, TcRhoType)
 
