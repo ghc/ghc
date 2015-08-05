@@ -15,6 +15,7 @@ import Oracles.Setting
 import Settings.User
 import Settings.Ways
 import Settings.Util
+import Settings.Packages
 
 cabalArgs :: Args
 cabalArgs = builder GhcCabal ? do

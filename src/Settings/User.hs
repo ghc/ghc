@@ -1,5 +1,4 @@
 module Settings.User (
-    module Settings.Default,
     userArgs, userPackages, userWays, userRtsWays, userTargetDirectory,
     userKnownPackages, integerLibrary,
     buildHaddock, validating, ghciWithDebugger, ghcProfiled,

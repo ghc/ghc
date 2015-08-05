@@ -1,6 +1,7 @@
 module Settings.Ways (
     ways, getWays,
-    rtsWays, getRtsWays
+    rtsWays, getRtsWays,
+    knownWays, knownRtsWays
     ) where
 
 import Way
@@ -8,7 +9,7 @@ import Stage
 import Switches
 import Expression
 import Oracles.Flag
-import Settings.User
+import Settings.User hiding (parallel)
 
 -- Combining default ways with user modifications
 ways :: Ways
@@ -39,3 +40,14 @@ defaultRtsWays = do
         , (dynamic `elem` ways) ?
           append [ dynamic, debugDynamic, threadedDynamic, threadedDebugDynamic
                  , loggingDynamic, threadedLoggingDynamic ] ]
+
+-- These are all ways known to the build system
+knownWays :: [Way]
+knownWays = [vanilla, profiling, logging, parallel, granSim]
+
+knownRtsWays :: [Way]
+knownRtsWays = [ threaded, threadedProfiling, threadedLogging, debug
+               , debugProfiling, threadedDebug, threadedDebugProfiling, dynamic
+               , profilingDynamic, threadedProfilingDynamic, threadedDynamic
+               , threadedDebugDynamic, debugDynamic, loggingDynamic
+               , threadedLoggingDynamic ]
