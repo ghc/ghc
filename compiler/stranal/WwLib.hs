@@ -136,7 +136,8 @@ mkWwBodies dflags fam_envs fun_ty demands res_info one_shots
         ; (useful1, work_args, wrap_fn_str, work_fn_str) <- mkWWstr dflags fam_envs wrap_args
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
-        ; (useful2, wrap_fn_cpr, work_fn_cpr,  cpr_res_ty) <- mkWWcpr fam_envs res_ty res_info
+        ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
+              <- mkWWcpr (gopt Opt_CprAnal dflags) fam_envs res_ty res_info
 
         ; let (work_lam_args, work_call_args) = mkWorkerArgs dflags work_args all_one_shots cpr_res_ty
               worker_args_dmds = [idDemandInfo v | v <- work_call_args, isId v]
@@ -601,7 +602,8 @@ The non-CPR results appear ordered in the unboxed tuple as if by a
 left-to-right traversal of the result structure.
 -}
 
-mkWWcpr :: FamInstEnvs
+mkWWcpr :: Bool
+        -> FamInstEnvs
         -> Type                              -- function body type
         -> DmdResult                         -- CPR analysis results
         -> UniqSM (Bool,                     -- Is w/w'ing useful?
@@ -609,7 +611,11 @@ mkWWcpr :: FamInstEnvs
                    CoreExpr -> CoreExpr,     -- New worker
                    Type)                     -- Type of worker's body
 
-mkWWcpr fam_envs body_ty res
+mkWWcpr opt_CprAnal fam_envs body_ty res
+    -- CPR explicitly turned off (or in -O0)
+  | not opt_CprAnal = return (False, id, id, body_ty)
+    -- CPR is turned on by default for -O and O2
+  | otherwise
   = case returnsCPR_maybe res of
        Nothing      -> return (False, id, id, body_ty)  -- No CPR info
        Just con_tag | Just stuff <- deepSplitCprType_maybe fam_envs con_tag body_ty

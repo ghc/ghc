@@ -112,6 +112,17 @@
                    type errors.
                </para>
            </listitem>
+           <listitem>
+               <para>
+                   Added the option <option>-fcpr-anal</option>.
+
+                   When enabled, the demand analyser performs CPR analysis.
+                   It is implied by <option>-O</option>. Consequently,
+                   <option>-fcpr-off</option> is now removed, run with
+                   <option>-fno-cpr-anal</option> to get the old
+                   <option>-fcpr-off</option> behaviour.
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 

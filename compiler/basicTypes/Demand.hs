@@ -57,7 +57,6 @@ module Demand (
 
 #include "HsVersions.h"
 
-import StaticFlags
 import DynFlags
 import Outputable
 import Var ( Var )
@@ -871,18 +870,13 @@ topRes = Dunno NoCPR
 botRes = Diverges
 
 cprSumRes :: ConTag -> DmdResult
-cprSumRes tag | opt_CprOff = topRes
-              | otherwise  = Dunno $ RetSum tag
+cprSumRes tag = Dunno $ RetSum tag
 
 cprProdRes :: [DmdType] -> DmdResult
-cprProdRes _arg_tys
-  | opt_CprOff = topRes
-  | otherwise  = Dunno $ RetProd
+cprProdRes _arg_tys = Dunno $ RetProd
 
 vanillaCprProdRes :: Arity -> DmdResult
-vanillaCprProdRes _arity
-  | opt_CprOff = topRes
-  | otherwise  = Dunno $ RetProd
+vanillaCprProdRes _arity = Dunno $ RetProd
 
 isTopRes :: DmdResult -> Bool
 isTopRes (Dunno NoCPR) = True
