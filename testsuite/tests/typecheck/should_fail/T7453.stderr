@@ -1,6 +1,6 @@
 
 T7453.hs:10:30: error:
-    Couldn't match expected type ‘t’ with actual type ‘t0’
+    Couldn't match expected type ‘t’ with actual type ‘r0’
       because type variable ‘t’ would escape its scope
     This (rigid, skolem) type variable is bound by
       the type signature for: z :: Id t
@@ -8,13 +8,14 @@ T7453.hs:10:30: error:
     Relevant bindings include
       aux :: Id t (bound at T7453.hs:10:21)
       z :: Id t (bound at T7453.hs:9:11)
-      v :: t0 (bound at T7453.hs:7:7)
-      cast1 :: t0 -> a0 (bound at T7453.hs:7:1)
+      v :: r0 (bound at T7453.hs:7:7)
+      cast1 :: r0 -> a0 (bound at T7453.hs:7:1)
     In the first argument of ‘Id’, namely ‘v’
     In the expression: Id v
+    In an equation for ‘aux’: aux = Id v
 
 T7453.hs:16:33: error:
-    Couldn't match expected type ‘t’ with actual type ‘t0’
+    Couldn't match expected type ‘t’ with actual type ‘r0’
       because type variable ‘t’ would escape its scope
     This (rigid, skolem) type variable is bound by
       the type signature for: z :: () -> t
@@ -22,13 +23,14 @@ T7453.hs:16:33: error:
     Relevant bindings include
       aux :: b0 -> t (bound at T7453.hs:16:21)
       z :: () -> t (bound at T7453.hs:15:11)
-      v :: t0 (bound at T7453.hs:13:7)
-      cast2 :: t0 -> t1 (bound at T7453.hs:13:1)
+      v :: r0 (bound at T7453.hs:13:7)
+      cast2 :: r0 -> t0 (bound at T7453.hs:13:1)
     In the first argument of ‘const’, namely ‘v’
     In the expression: const v
+    In an equation for ‘aux’: aux = const v
 
 T7453.hs:21:15: error:
-    Couldn't match expected type ‘t’ with actual type ‘t0’
+    Couldn't match expected type ‘t’ with actual type ‘r0’
       because type variable ‘t’ would escape its scope
     This (rigid, skolem) type variable is bound by
       the type signature for: z :: t
@@ -36,10 +38,18 @@ T7453.hs:21:15: error:
     Relevant bindings include
       aux :: forall b0. b0 -> t (bound at T7453.hs:22:21)
       z :: t (bound at T7453.hs:21:11)
-      v :: t0 (bound at T7453.hs:19:7)
-      cast3 :: t0 -> t1 (bound at T7453.hs:19:1)
+      v :: r0 (bound at T7453.hs:19:7)
+      cast3 :: r0 -> forall t. t (bound at T7453.hs:19:1)
     In the expression: v
     In an equation for ‘z’:
         z = v
           where
               aux = const v
+    In an equation for ‘cast3’:
+        cast3 v
+          = z
+          where
+              z :: t
+              z = v
+                where
+                    aux = const v

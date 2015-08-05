@@ -1,5 +1,5 @@
 
-T5853.hs:15:52: error:
+T5853.hs:15:46: error:
     Could not deduce: Subst t1 (Elem t2) ~ t2
     from the context: (F t0,
                        Subst t0 (Elem t2) ~ t2,

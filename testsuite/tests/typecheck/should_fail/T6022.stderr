@@ -1,5 +1,5 @@
 
-T6022.hs:3:9: error:
+T6022.hs:3:7: error:
     No instance for (Eq ([a0] -> a0)) arising from a use of ‘==’
       (maybe you haven't applied a function to enough arguments?)
     In the expression: x == head
