@@ -7,6 +7,8 @@
 import Control.Applicative
 import Control.Monad
 
+import Data.Generics.Aliases
+import Data.Generics.Schemes
 import Data.Maybe
 import Data.List
 
@@ -264,7 +266,12 @@ deriving instance Eq Xml.CData
 
 
 strip :: Xml.Element -> Xml.Element
-strip = id -- TODO.
+strip =
+    everywhere (mkT unlink)
+  where
+    unlink attr@(Xml.Attr { attrKey = key })
+        | Xml.qName key == "href" = attr { Xml.attrVal = "" }
+        | otherwise = attr
 
 
 data Flag
