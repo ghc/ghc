@@ -205,15 +205,20 @@ match_fun_tys
 -- If allocated (fresh-meta-var1 -> fresh-meta-var2) and unified, we'd
 -- hide the forall inside a meta-variable
 
-match_fun_tys ea herald orig_fun orig_args orig_ty = go orig_args orig_ty
+match_fun_tys ea herald orig_fun orig_args orig_ty = go orig_args id orig_ty
   where
     -- If     go n ty = (co, [t1,..,tn], ty_r)
     -- then   Actual:   wrap : ty "->" (t1 -> .. -> tn -> ty_r)
     --        Expected: wrap : (t1 -> .. -> tn -> ty_r) "->" ty
 
-    go [] ty = return (idHsWrapper, [], ty)
+    go :: [Maybe (LHsExpr Name)]
+       -> (TcSigmaType -> TcSigmaType)
+            -- this goes from the "remainder type" to the full type
+       -> TcSigmaType   -- the remainder of the type as we're processing
+       -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
+    go [] _ ty = return (idHsWrapper, [], ty)
 
-    go (arg:args) ty
+    go (arg:args) mk_full_ty ty
       | Just (Just hs_ty_arg) <- fmap isLHsTypeExpr_maybe arg
       = do { let origin = case ea of Expected    -> panic "match_fun_tys"
                                      Actual orig -> orig
@@ -225,7 +230,8 @@ match_fun_tys ea herald orig_fun orig_args orig_ty = go orig_args orig_ty
                  do { let kind = tyVarKind tv
                     ; ty_arg <- tcHsTypeApp hs_ty_arg kind
                     ; let insted_ty = substTyWith [tv] [ty_arg] inner_ty
-                    ; (inner_wrap, arg_tys, res_ty) <- go args insted_ty
+                    ; (inner_wrap, arg_tys, res_ty)
+                        <- go args mk_full_ty insted_ty
                         -- inner_wrap :: insted_ty "->" arg_tys -> res_ty
                     ; let inst_wrap = mkWpTyApps [ty_arg]
                         -- inst_wrap :: upsilon_ty "->" insted_ty
@@ -233,32 +239,33 @@ match_fun_tys ea herald orig_fun orig_args orig_ty = go orig_args orig_ty
                              , arg_tys, res_ty ) }
                Nothing -> ty_app_err upsilon_ty (fst hs_ty_arg) }
 
-    go args ty
+    go args mk_full_ty ty
       | not (null tvs && null theta)
       = do { (wrap, (arg_tys, res_ty)) <- exposeRhoType ea ty $ \rho ->
-             do { (inner_wrap, arg_tys, res_ty) <- go args rho
+             do { (inner_wrap, arg_tys, res_ty) <- go args mk_full_ty rho
                 ; return (inner_wrap, (arg_tys, res_ty)) }
            ; return (wrap, arg_tys, res_ty) }
       where
         (tvs, theta, _) = tcSplitSigmaTy ty
 
-    go args ty
-      | Just ty' <- tcView ty = go args ty'
+    go args mk_full_ty ty
+      | Just ty' <- tcView ty = go args mk_full_ty ty'
 
-    go (_arg:args) (FunTy arg_ty res_ty)
+    go (_arg:args) mk_full_ty (FunTy arg_ty res_ty)
       | not (isPredTy arg_ty)
-      = do { (wrap_res, tys, ty_r) <- go args res_ty
+      = do { let mk_full_ty' res_ty' = mk_full_ty (mkFunTy arg_ty res_ty')
+           ; (wrap_res, tys, ty_r) <- go args mk_full_ty' res_ty
            ; let rhs_ty = case ea of
                    Expected -> res_ty
                    Actual _ -> mkFunTys tys ty_r
            ; return ( mkWpFun idHsWrapper wrap_res arg_ty rhs_ty
                     , arg_ty:tys, ty_r ) }
 
-    go args ty@(TyVarTy tv)
+    go args mk_full_ty ty@(TyVarTy tv)
       | ASSERT( isTcTyVar tv) isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
-               Indirect ty' -> go args ty'
+               Indirect ty' -> go args mk_full_ty ty'
                Flexi        -> defer args ty (isReturnTyVar tv) }
 
        -- In all other cases we bale out into ordinary unification
@@ -276,8 +283,8 @@ match_fun_tys ea herald orig_fun orig_args orig_ty = go orig_args orig_ty
        --
        -- But in that case we add specialized type into error context
        -- anyway, because it may be useful. See also Trac #9605.
-    go args ty = addErrCtxtM mk_ctxt $
-                 defer args ty False
+    go args mk_full_ty ty = addErrCtxtM (mk_ctxt (mk_full_ty ty)) $
+                            defer args ty False
 
     ------------
     -- If we decide that a ReturnTv (see Note [ReturnTv] in TcType) should
@@ -306,18 +313,19 @@ match_fun_tys ea herald orig_fun orig_args orig_ty = go orig_args orig_ty
              , hang (text "I do not know enough about the function's type")
                   2 (ppr orig_ty) ]
 
-    mk_ctxt :: TidyEnv -> TcM (TidyEnv, MsgDoc)
-    mk_ctxt env = do { (env', ty) <- zonkTidyTcType env orig_ty
-                     ; let (args, _) = tcSplitFunTys ty
-                           n_actual = length args
-                           (env'', orig_ty') = tidyOpenType env' orig_ty
-                     ; return (env'', mk_msg orig_ty' ty n_actual) }
+    mk_ctxt :: TcSigmaType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
+    mk_ctxt full_ty env
+      = do { (env', ty) <- zonkTidyTcType env full_ty
+           ; let (args, _) = tcSplitFunTys ty
+                 n_actual = length args
+                 (env'', full_ty') = tidyOpenType env' full_ty
+           ; return (env'', mk_msg full_ty' ty n_actual) }
 
     arity = length orig_args
-    mk_msg orig_ty ty n_args
+    mk_msg full_ty ty n_args
       = herald <+> speakNOf arity (text "argument") <> comma $$
         if n_args == arity
-          then ptext (sLit "its type is") <+> quotes (pprType orig_ty) <>
+          then ptext (sLit "its type is") <+> quotes (pprType full_ty) <>
                comma $$
                ptext (sLit "it is specialized to") <+> quotes (pprType ty)
           else sep [ptext (sLit "but its type") <+> quotes (pprType ty),
