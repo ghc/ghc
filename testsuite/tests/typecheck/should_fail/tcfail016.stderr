@@ -9,6 +9,7 @@ tcfail016.hs:9:20: error:
       g :: Expr t0 -> [[Char]] (bound at tcfail016.hs:8:1)
     In the first argument of ‘g’, namely ‘e1’
     In the first argument of ‘(++)’, namely ‘(g e1)’
+    In the expression: (g e1) ++ (g e2)
 
 tcfail016.hs:9:28: error:
     Couldn't match type ‘(t0, Expr t0)’ with ‘Expr t0’
@@ -20,3 +21,4 @@ tcfail016.hs:9:28: error:
       g :: Expr t0 -> [[Char]] (bound at tcfail016.hs:8:1)
     In the first argument of ‘g’, namely ‘e2’
     In the second argument of ‘(++)’, namely ‘(g e2)’
+    In the expression: (g e1) ++ (g e2)

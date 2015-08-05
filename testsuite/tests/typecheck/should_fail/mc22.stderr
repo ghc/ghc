@@ -19,3 +19,5 @@ mc22.hs:10:26: error:
     Relevant bindings include foo :: [t0 [Char]] (bound at mc22.hs:8:1)
     In the expression: take 5
     In a stmt of a monad comprehension: then group using take 5
+    In the expression:
+      [x + 1 | x <- ["Hello", "World"], then group using take 5]
