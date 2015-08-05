@@ -590,7 +590,7 @@ through simplifyInfer and such, remaining unchanged.
 
 There are three problems with this:
  1) Even though `f` does not have a type signature, its type variable `a`
-    is considered "specified" (see Note [Visible type application] in TcExpr),
+    is considered "specified" (see Note [Visible type application] in TcType),
     allowing it to participate in visible type application. Yet, when
     `f` is exported, it will be exported with an *inferred* type variable,
     preventing importing modules from using visible type application with

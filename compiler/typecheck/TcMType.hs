@@ -624,7 +624,7 @@ skolemiseUnboundMetaTyVar tv details
                             then generaliseWildcardVarName tv_name
                             else tv_name
                 -- NB: make a System name. See Note [Visible type application]
-                -- in TcExpr
+                -- in TcType
               final_name = mkSystemNameAt uniq new_tv_name span
               final_kind = defaultKind kind
               final_tv   = mkTcTyVar final_name final_kind details

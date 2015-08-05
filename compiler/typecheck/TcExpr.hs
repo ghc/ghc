@@ -1135,60 +1135,6 @@ With the change, f1 will type-check, because the 'Char' info from
 the signature is propagated into MkQ's argument. With the check
 in the other order, the extra signature in f2 is reqd.
 
-Note [Visible type application]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-TODO (RAE): Move Note?
-
-GHC implements a generalisation of the algorithm described in the
-"Visible Type Application" paper (available from
-http://www.cis.upenn.edu/~sweirich/publications.html). A key part
-of that algorithm is to distinguish user-specified variables from inferred
-variables. For example, the following should typecheck:
-
-  f :: forall a b. a -> b -> b
-  f = const id
-
-  g = const id
-
-  x = f @Int @Bool 5 False
-  y = g 5 @Bool False
-
-The idea is that we wish to allow visible type application when we are
-instantiating a specified, fixed variable. In practice, specified, fixed
-variables are either written in a type signature (or
-annotation), OR are imported from another module. (We could do better here,
-for example by doing SCC analysis on parts of a module and considering any
-type from outside one's SCC to be fully specified, but this is very confusing to
-users. The simple rule above is much more straightforward and predictable.)
-
-So, both of f's quantified variables are specified and may be instantiated.
-But g has no type signature, so only id's variable is specified (because id
-is imported). We write the type of g as forall {a}. a -> forall b. b -> b.
-Note that the a is in braces, meaning it cannot be instantiated with
-visible type application.
-
-Tracking specified vs. inferred variables is done conveniently by looking at
-Names. A System name (from mkSystemName or a variant) is an inferred
-variable; an Internal name is a specified one. Simple. This works out
-because skolemiseUnboundMetaTyVar always produces a System name.
-
-The only wrinkle with this scheme is in tidying. If all inferred names
-are System names, then tidying will append lots of 0s. This pollutes
-interface files and Haddock output. So we convert System tyvars to
-Internal ones during the final zonk. This works because type-checking
-is fully complete, and therefore the distinction between specified and
-inferred is no longer relevant.
-
-If using System vs. Internal to perform type-checking seems suspicious,
-the alternative approach would mean adding a field to ForAllTy to track
-specified vs. inferred. That seems considerably more painful. And, anyway,
-once the (* :: *) branch is merged, this will be redesigned somewhat
-to move away from using Names. That's because the (* :: *) branch already
-has more structure available in ForAllTy, and there, it's easy to squeeze
-in another specified-vs.-inferred bit.
-
-TODO (RAE): Update this Note in the (* :: *) branch when merging.
-
 ************************************************************************
 *                                                                      *
                  tcInferId

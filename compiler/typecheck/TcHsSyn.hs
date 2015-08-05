@@ -1410,7 +1410,7 @@ zonkTyVarOcc env@(ZonkEnv zonk_unbound_tyvar tv_env _) tv
                       Flexi -> do { kind <- {-# SCC "zonkKind1" #-}
                                             zonkTcTypeToType env (tyVarKind tv)
                                     -- See Note [Visible type application]
-                                    -- in TcExpr about the toSpecifiedTyVar
+                                    -- in TcType about the toSpecifiedTyVar
                                   ; zonk_unbound_tyvar (toSpecifiedTyVar $
                                                         setTyVarKind tv kind) }
                       Indirect ty -> do { zty <- zonkTcTypeToType env ty
@@ -1424,7 +1424,7 @@ zonkTyVarOcc env@(ZonkEnv zonk_unbound_tyvar tv_env _) tv
     lookup_in_env    -- Look up in the env just as we do for Ids
       = case lookupVarEnv tv_env tv of
                         -- See Note [Visible type application]
-                        -- in TcExpr about the toSpecifiedTyVar
+                        -- in TcType about the toSpecifiedTyVar
           Nothing  -> return (mkTyVarTy $ toSpecifiedTyVar tv)
           Just tv' -> return (mkTyVarTy tv')
 

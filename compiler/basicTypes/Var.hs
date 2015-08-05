@@ -291,13 +291,13 @@ updateTyVarKindM update tv
        ; return $ tv {varType = k'} }
 
 -- | Change a tyvar's name to be Internal. Used in the final zonk.
--- See also Note [Visible type application] in TcExpr
+-- See also Note [Visible type application] in TcType
 toSpecifiedTyVar :: TyVar -> TyVar
 toSpecifiedTyVar tv = setTyVarName tv (toInternalName (getName tv))
 
 -- | Change a tyvar's name to be System. Used when reading in interface
 -- files with some ids without type signatures.
--- See also Note [Visible type application] in TcExpr
+-- See also Note [Visible type application] in TcType
 toInferredTyVar :: TyVar -> TyVar
 toInferredTyVar tv = setTyVarName tv (toSystemName (getName tv))
 
