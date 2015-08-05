@@ -822,11 +822,14 @@ fillNB g p k ys             = fill1 g p k ys
 
 fillNBE :: Bool -> Int -> Doc -> [Doc] -> Doc
 fillNBE g k y ys
-  = nilBeside g (fill1 g ((oneLiner . reduceDoc) y) k' ys)
+  = nilBeside g (fill1 g ((elideNest . oneLiner . reduceDoc) y) k' ys)
     -- XXX: TODO: PRETTY: Used to use True here (but GHC used False...)
     `mkUnion` nilAboveNest False k (fill g (y:ys))
   where k' = if g then k - 1 else k
 
+elideNest :: Doc -> Doc
+elideNest (Nest _ d) = d
+elideNest d          = d
 
 -- ---------------------------------------------------------------------------
 -- Selecting the best layout
