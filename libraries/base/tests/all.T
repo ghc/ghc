@@ -191,3 +191,10 @@ test('T9681', normal, compile_fail, [''])
 test('T8089', [exit_code(99), run_timeout_multiplier(0.01)],
               compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])
+test('T9848',
+        [ stats_num_field('bytes allocated',
+                          [ (wordsize(64), 51840, 20)
+                          , (wordsize(32), 47348, 20) ])
+        , only_ways(['normal'])],
+      compile_and_run,
+      ['-O'])
