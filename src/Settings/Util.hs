@@ -146,18 +146,3 @@ needBuilder ghc @ (Ghc stage) = do
 needBuilder builder = do
     path <- builderPath builder
     need [path]
-
--- TODO: do '-ticky' in all debug ways?
--- wayHcArgs :: Way -> Args
--- wayHcArgs (Way _ units) = args
---     [ if (Dynamic    `elem` units)
---       then args ["-fPIC", "-dynamic"]
---       else arg "-static"
---     , when (Threaded   `elem` units) $ arg "-optc-DTHREADED_RTS"
---     , when (Debug      `elem` units) $ arg "-optc-DDEBUG"
---     , when (Profiling  `elem` units) $ arg "-prof"
---     , when (Logging    `elem` units) $ arg "-eventlog"
---     , when (Parallel   `elem` units) $ arg "-parallel"
---     , when (GranSim    `elem` units) $ arg "-gransim"
---     , when (units == [Debug] || units == [Debug, Dynamic]) $
---       args ["-ticky", "-DTICKY_TICKY"] ]
