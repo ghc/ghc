@@ -378,42 +378,6 @@ rnLocalValBindsAndThen binds@(ValBindsIn _ sigs) thing_inside
 rnLocalValBindsAndThen bs _ = pprPanic "rnLocalValBindsAndThen" (ppr bs)
 
 
--- Process the fixity declarations, making a FastString -> (Located Fixity) map
--- (We keep the location around for reporting duplicate fixity declarations.)
---
--- Checks for duplicates, but not that only locally defined things are fixed.
--- Note: for local fixity declarations, duplicates would also be checked in
---       check_sigs below.  But we also use this function at the top level.
-
-makeMiniFixityEnv :: [LFixitySig RdrName] -> RnM MiniFixityEnv
-
-makeMiniFixityEnv decls = foldlM add_one_sig emptyFsEnv decls
- where
-   add_one_sig env (L loc (FixitySig names fixity)) =
-     foldlM add_one env [ (loc,name_loc,name,fixity)
-                        | L name_loc name <- names ]
-
-   add_one env (loc, name_loc, name,fixity) = do
-     { -- this fixity decl is a duplicate iff
-       -- the ReaderName's OccName's FastString is already in the env
-       -- (we only need to check the local fix_env because
-       --  definitions of non-local will be caught elsewhere)
-       let { fs = occNameFS (rdrNameOcc name)
-           ; fix_item = L loc fixity };
-
-       case lookupFsEnv env fs of
-         Nothing -> return $ extendFsEnv env fs fix_item
-         Just (L loc' _) -> do
-           { setSrcSpan loc $
-             addErrAt name_loc (dupFixityDecl loc' name)
-           ; return env}
-     }
-
-dupFixityDecl :: SrcSpan -> RdrName -> SDoc
-dupFixityDecl loc rdr_name
-  = vcat [ptext (sLit "Multiple fixity declarations for") <+> quotes (ppr rdr_name),
-          ptext (sLit "also at ") <+> ppr loc]
-
 ---------------------
 
 -- renaming a single bind
@@ -548,6 +512,120 @@ and we don't want to retain the list bound_names. This showed up in
 trac ticket #1136.
 -}
 
+{- *********************************************************************
+*                                                                      *
+          Dependency analysis and other support functions
+*                                                                      *
+********************************************************************* -}
+
+depAnalBinds :: Bag (LHsBind Name, [Name], Uses)
+             -> ([(RecFlag, LHsBinds Name)], DefUses)
+-- Dependency analysis; this is important so that
+-- unused-binding reporting is accurate
+depAnalBinds binds_w_dus
+  = (map get_binds sccs, map get_du sccs)
+  where
+    sccs = depAnal (\(_, defs, _) -> defs)
+                   (\(_, _, uses) -> nameSetElems uses)
+                   (bagToList binds_w_dus)
+
+    get_binds (AcyclicSCC (bind, _, _)) = (NonRecursive, unitBag bind)
+    get_binds (CyclicSCC  binds_w_dus)  = (Recursive, listToBag [b | (b,_,_) <- binds_w_dus])
+
+    get_du (AcyclicSCC (_, bndrs, uses)) = (Just (mkNameSet bndrs), uses)
+    get_du (CyclicSCC  binds_w_dus)      = (Just defs, uses)
+        where
+          defs = mkNameSet [b | (_,bs,_) <- binds_w_dus, b <- bs]
+          uses = unionNameSets [u | (_,_,u) <- binds_w_dus]
+
+---------------------
+-- Bind the top-level forall'd type variables in the sigs.
+-- E.g  f :: a -> a
+--      f = rhs
+--      The 'a' scopes over the rhs
+--
+-- NB: there'll usually be just one (for a function binding)
+--     but if there are many, one may shadow the rest; too bad!
+--      e.g  x :: [a] -> [a]
+--           y :: [(a,a)] -> a
+--           (x,y) = e
+--      In e, 'a' will be in scope, and it'll be the one from 'y'!
+
+mkSigTvFn :: [LSig Name] -> (Name -> [Name])
+-- Return a lookup function that maps an Id Name to the names
+-- of the type variables that should scope over its body..
+mkSigTvFn sigs
+  = \n -> lookupNameEnv env n `orElse` []
+  where
+    extractScopedTyVars :: LHsType Name -> [Name]
+    extractScopedTyVars (L _ (HsForAllTy Explicit _ ltvs _ _)) = hsLKiTyVarNames ltvs
+    extractScopedTyVars _ = []
+
+    env :: NameEnv [Name]
+    env = mkNameEnv [ (name, nwcs ++ extractScopedTyVars ty)  -- Kind variables and type variables
+                      -- nwcs: see Note [Scoping of named wildcards]
+                    | L _ (TypeSig names ty nwcs) <- sigs
+                    , L _ name <- names]
+        -- Note the pattern-match on "Explicit"; we only bind
+        -- type variables from signatures with an explicit top-level for-all
+
+
+{- Note [Scoping of named wildcards]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  f :: _a -> _a
+  f x = let g :: _a -> _a
+            g = ...
+        in ...
+
+Currently, for better or worse, the "_a" variables are all the same. So
+although there is no explicit forall, the "_a" scopes over the definition.
+I don't know if this is a good idea, but there it is.
+-}
+
+-- Process the fixity declarations, making a FastString -> (Located Fixity) map
+-- (We keep the location around for reporting duplicate fixity declarations.)
+--
+-- Checks for duplicates, but not that only locally defined things are fixed.
+-- Note: for local fixity declarations, duplicates would also be checked in
+--       check_sigs below.  But we also use this function at the top level.
+
+makeMiniFixityEnv :: [LFixitySig RdrName] -> RnM MiniFixityEnv
+
+makeMiniFixityEnv decls = foldlM add_one_sig emptyFsEnv decls
+ where
+   add_one_sig env (L loc (FixitySig names fixity)) =
+     foldlM add_one env [ (loc,name_loc,name,fixity)
+                        | L name_loc name <- names ]
+
+   add_one env (loc, name_loc, name,fixity) = do
+     { -- this fixity decl is a duplicate iff
+       -- the ReaderName's OccName's FastString is already in the env
+       -- (we only need to check the local fix_env because
+       --  definitions of non-local will be caught elsewhere)
+       let { fs = occNameFS (rdrNameOcc name)
+           ; fix_item = L loc fixity };
+
+       case lookupFsEnv env fs of
+         Nothing -> return $ extendFsEnv env fs fix_item
+         Just (L loc' _) -> do
+           { setSrcSpan loc $
+             addErrAt name_loc (dupFixityDecl loc' name)
+           ; return env}
+     }
+
+dupFixityDecl :: SrcSpan -> RdrName -> SDoc
+dupFixityDecl loc rdr_name
+  = vcat [ptext (sLit "Multiple fixity declarations for") <+> quotes (ppr rdr_name),
+          ptext (sLit "also at ") <+> ppr loc]
+
+
+{- *********************************************************************
+*                                                                      *
+                Pattern synonym bindings
+*                                                                      *
+********************************************************************* -}
+
 rnPatSynBind :: (Name -> [Name])                -- Signature tyvar function
              -> PatSynBind Name RdrName
              -> RnM (PatSynBind Name Name, [Name], Uses)
@@ -635,59 +713,13 @@ P' which is unsound and rejected).
 
 -}
 
----------------------
-depAnalBinds :: Bag (LHsBind Name, [Name], Uses)
-             -> ([(RecFlag, LHsBinds Name)], DefUses)
--- Dependency analysis; this is important so that
--- unused-binding reporting is accurate
-depAnalBinds binds_w_dus
-  = (map get_binds sccs, map get_du sccs)
-  where
-    sccs = depAnal (\(_, defs, _) -> defs)
-                   (\(_, _, uses) -> nameSetElems uses)
-                   (bagToList binds_w_dus)
+{- *********************************************************************
+*                                                                      *
+                Class/instance method bindings
+*                                                                      *
+********************************************************************* -}
 
-    get_binds (AcyclicSCC (bind, _, _)) = (NonRecursive, unitBag bind)
-    get_binds (CyclicSCC  binds_w_dus)  = (Recursive, listToBag [b | (b,_,_) <- binds_w_dus])
-
-    get_du (AcyclicSCC (_, bndrs, uses)) = (Just (mkNameSet bndrs), uses)
-    get_du (CyclicSCC  binds_w_dus)      = (Just defs, uses)
-        where
-          defs = mkNameSet [b | (_,bs,_) <- binds_w_dus, b <- bs]
-          uses = unionNameSets [u | (_,_,u) <- binds_w_dus]
-
----------------------
--- Bind the top-level forall'd type variables in the sigs.
--- E.g  f :: a -> a
---      f = rhs
---      The 'a' scopes over the rhs
---
--- NB: there'll usually be just one (for a function binding)
---     but if there are many, one may shadow the rest; too bad!
---      e.g  x :: [a] -> [a]
---           y :: [(a,a)] -> a
---           (x,y) = e
---      In e, 'a' will be in scope, and it'll be the one from 'y'!
-
-mkSigTvFn :: [LSig Name] -> (Name -> [Name])
--- Return a lookup function that maps an Id Name to the names
--- of the type variables that should scope over its body..
-mkSigTvFn sigs
-  = \n -> lookupNameEnv env n `orElse` []
-  where
-    extractScopedTyVars :: LHsType Name -> [Name]
-    extractScopedTyVars (L _ (HsForAllTy Explicit _ ltvs _ _)) = hsLKiTyVarNames ltvs
-    extractScopedTyVars _ = []
-
-    env :: NameEnv [Name]
-    env = mkNameEnv [ (name, nwcs ++ extractScopedTyVars ty)  -- Kind variables and type variables
-                    | L _ (TypeSig names ty nwcs) <- sigs
-                    , L _ name <- names]
-        -- Note the pattern-match on "Explicit"; we only bind
-        -- type variables from signatures with an explicit top-level for-all
-
-{-
-@rnMethodBinds@ is used for the method bindings of a class and an instance
+{- @rnMethodBinds@ is used for the method bindings of a class and an instance
 declaration.   Like @rnBinds@ but without dependency analysis.
 
 NOTA BENE: we record each {\em binder} of a method-bind group as a free variable.
