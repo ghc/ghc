@@ -116,7 +116,8 @@ tcMatchesCase ctxt scrut_ty matches res_ty
   | otherwise
   = tcMatches ctxt [scrut_ty] res_ty matches
 
-tcMatchLambda :: MatchGroup Name (LHsExpr Name) -> TcRhoType
+tcMatchLambda :: MatchGroup Name (LHsExpr Name)
+              -> TcRhoType   -- deeply skolemised
               -> TcM (HsWrapper, MatchGroup TcId (LHsExpr TcId), CtOrigin)
 tcMatchLambda match res_ty
   = matchFunTys herald n_pats res_ty  $ \ pat_tys rhs_ty ->
@@ -144,7 +145,7 @@ tcGRHSsPat grhss res_ty = tcGRHSs match_ctxt grhss res_ty
 matchFunTys
   :: SDoc       -- See Note [Herald for matchExpecteFunTys] in TcUnify
   -> Arity
-  -> TcRhoType
+  -> TcRhoType  -- deeply skolemised
   -> ([TcSigmaType] -> TcRhoType -> TcM (HsWrapper, a, b))
      -- "a" is always a MatchGroup. wrapper :: a's res_ty "->" TcRhoType
   -> TcM (HsWrapper, a, b)

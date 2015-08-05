@@ -67,7 +67,7 @@ import Control.Monad
 *                                                                      *
 ************************************************************************
 
-The matchExpected functions operate in one of two modes: "Expected" mode,
+matchExpectedFunTys functions operate in one of two modes: "Expected" mode,
 where the provided type is skolemised before matching, and "Actual" mode,
 where the provided type is instantiated before matching. The produced
 HsWrappers are oriented accordingly.
