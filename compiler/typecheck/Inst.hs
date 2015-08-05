@@ -6,7 +6,7 @@
 The @Inst@ type: dictionaries or method instances
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, TupleSections #-}
 
 module Inst (
        deeplySkolemise,
@@ -15,7 +15,7 @@ module Inst (
        newWanted, newWanteds,
        emitWanted, emitWanteds,
 
-       newNonTrivialOverloadedLit, mkOverLit,
+       newOverloadedLit, newNonTrivialOverloadedLit, mkOverLit,
 
        newClsInst,
        tcGetInsts, tcGetInstEnvs, getOverlapFlag,
@@ -330,6 +330,43 @@ instStupidTheta orig theta
 ************************************************************************
 
 -}
+
+{-
+In newOverloadedLit we convert directly to an Int or Integer if we
+know that's what we want.  This may save some time, by not
+temporarily generating overloaded literals, but it won't catch all
+cases (the rest are caught in lookupInst).
+
+-}
+
+newOverloadedLit :: HsOverLit Name
+                 -> TcSigmaType  -- if nec'y, this type is instantiated...
+                 -> CtOrigin     -- ... using this CtOrigin
+                 -> TcM (HsWrapper, HsOverLit TcId)
+                   -- wrapper :: input type "->" type of result
+newOverloadedLit
+  lit@(OverLit { ol_val = val, ol_rebindable = rebindable }) res_ty res_orig
+  | not rebindable
+    -- all built-in overloaded lits are not higher-rank, so skolemise.
+    -- this is necessary for shortCutLit.
+  = do { (wrap, insted_ty) <- deeplyInstantiate res_orig res_ty
+       ; dflags <- getDynFlags
+       ; case shortCutLit dflags val insted_ty of
+        -- Do not generate a LitInst for rebindable syntax.
+        -- Reason: If we do, tcSimplify will call lookupInst, which
+        --         will call tcSyntaxName, which does unification,
+        --         which tcSimplify doesn't like
+           Just expr -> return ( wrap
+                               , lit { ol_witness = expr, ol_type = insted_ty
+                                     , ol_rebindable = False } )
+           Nothing   -> (wrap, ) <$>
+                        newNonTrivialOverloadedLit orig lit insted_ty }
+
+  | otherwise
+  = do { lit' <- newNonTrivialOverloadedLit orig lit res_ty
+       ; return (idHsWrapper, lit') }
+  where
+    orig = LiteralOrigin lit
 
 -- Does not handle things that 'shortCutLit' can handle. See also
 -- newOverloadedLit in TcUnify

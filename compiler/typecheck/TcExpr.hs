@@ -192,8 +192,10 @@ tcExpr (HsCoreAnn src lbl expr) res_ty
         ; return (HsCoreAnn src lbl expr', orig) }
 
 tcExpr (HsOverLit lit) res_ty
-  = do  { (wrap,  lit') <- newOverloadedLit Expected lit res_ty
-        ; return (mkHsWrap wrap $ HsOverLit lit', LiteralOrigin lit) }
+  = do  { (_wrap,  lit') <- newOverloadedLit lit res_ty
+                                            (Shouldn'tHappenOrigin "HsOverLit")
+        ; MASSERT( isIdHsWrapper _wrap )
+        ; return (HsOverLit lit', LiteralOrigin lit) }
 
 tcExpr (NegApp expr neg_expr) res_ty
   = do  { neg_expr' <- tcSyntaxOp NegateOrigin neg_expr

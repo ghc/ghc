@@ -29,7 +29,6 @@ module TcUnify (
   matchExpectedAppTy,
   matchExpectedFunTys, matchExpectedFunTysPart,
   matchExpectedFunKind,
-  newOverloadedLit,
   wrapFunResCoercion
 
   ) where
@@ -41,10 +40,9 @@ import TypeRep
 import TcMType
 import TcRnMonad
 import TcType
-import TcHsSyn ( shortCutLit )
 import Type
 import TcEvidence
-import Name ( Name, isSystemName )
+import Name ( isSystemName )
 import Inst
 import Kind
 import TyCon
@@ -407,43 +405,6 @@ matchExpectedAppTy orig_ty
         -- try compiling        f x = do { x }
         -- and you'll get a kind mis-match.  It smells, but
         -- not enough to lose sleep over.
-
-{-
-In newOverloadedLit we convert directly to an Int or Integer if we
-know that's what we want.  This may save some time, by not
-temporarily generating overloaded literals, but it won't catch all
-cases (the rest are caught in lookupInst).
-
-This is here because of its dependency on the Expected/Actual
-functions above.
--}
-
-newOverloadedLit :: ExpOrAct
-                 -> HsOverLit Name
-                 -> TcSigmaType
-                 -> TcM (HsWrapper, HsOverLit TcId)
-newOverloadedLit ea
-  lit@(OverLit { ol_val = val, ol_rebindable = rebindable }) res_ty
-  | not rebindable
-    -- all built-in overloaded lits are not higher-rank, so skolemise.
-    -- this is necessary for shortCutLit.
-  = exposeRhoType ea res_ty $ \ res_rho -> liftM (idHsWrapper,) $
-    do { dflags <- getDynFlags
-       ; case shortCutLit dflags val res_rho of
-        -- Do not generate a LitInst for rebindable syntax.
-        -- Reason: If we do, tcSimplify will call lookupInst, which
-        --         will call tcSyntaxName, which does unification,
-        --         which tcSimplify doesn't like
-           Just expr -> return (lit { ol_witness = expr, ol_type = res_rho
-                                    , ol_rebindable = False })
-           Nothing   -> newNonTrivialOverloadedLit orig lit res_rho }
-
-  | otherwise
-  = do { lit' <- newNonTrivialOverloadedLit orig lit res_ty
-       ; return (idHsWrapper, lit') }
-  where
-    orig = LiteralOrigin lit
-
 
 {-
 ************************************************************************

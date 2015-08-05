@@ -636,7 +636,7 @@ tc_pat _ (LitPat simple_lit) pat_ty thing_inside
 tc_pat (PE { pe_orig = pat_orig })
        (NPat (L l over_lit) mb_neg eq) pat_ty thing_inside
   = do  { let orig = LiteralOrigin over_lit
-        ; (wrap, lit') <- newOverloadedLit (Actual pat_orig) over_lit pat_ty
+        ; (wrap, lit') <- newOverloadedLit over_lit pat_ty pat_orig
         ; eq'     <- tcSyntaxOp orig eq (mkFunTys [pat_ty, pat_ty] boolTy)
         ; mb_neg' <- case mb_neg of
                         Nothing  -> return Nothing      -- Positive literal
@@ -651,7 +651,7 @@ tc_pat penv (NPlusKPat (L nm_loc name) (L loc lit) ge minus) pat_ty thing_inside
   = do  { (co, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
         ; let pat_ty' = idType bndr_id
               orig    = LiteralOrigin lit
-        ; (wrap_lit, lit') <- newOverloadedLit (Actual $ pe_orig penv) lit pat_ty'
+        ; (wrap_lit, lit') <- newOverloadedLit lit pat_ty' (pe_orig penv)
 
         -- The '>=' and '-' parts are re-mappable syntax
         ; ge'    <- tcSyntaxOp orig ge    (mkFunTys [pat_ty', pat_ty'] boolTy)
