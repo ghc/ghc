@@ -9926,13 +9926,6 @@ module M where
             Trac #10267</ulink>)
             </para>
           </listitem>
-          <listitem>
-            <para>
-            Partial type signatures (see
-            <ulink url="https://ghc.haskell.org/trac/ghc/ticket/10548">
-            Trac #10548</ulink>)
-            </para>
-          </listitem>
         </itemizedlist>
         </para>
       </listitem>

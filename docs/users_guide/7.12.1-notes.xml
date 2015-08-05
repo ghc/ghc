@@ -178,6 +178,16 @@
                     counterparts.
                 </para>
             </listitem>
+             <listitem>
+                 <para>
+                     Primitive chars (e.g., <literal>[| 'a'# |]</literal>) and
+                     primitive strings (e.g., <literal>[| "abc"# |]</literal>)
+                     can now be quoted with Template Haskell. The
+                     <literal>Lit</literal> data type also has a new
+                     constructor, <literal>CharPrimL</literal>, for primitive
+                     char literals.
+                </para>
+            </listitem>
        </itemizedlist>
     </sect3>
 
