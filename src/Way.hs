@@ -124,11 +124,16 @@ libsuf way @ (Way set) =
         -- e.g., p_ghc7.11.20141222.dll (the result)
         return $ prefix ++ "ghc" ++ version ++ extension
 
--- Detect way from a given file extension. Fails if there is no match.
-detectWay :: FilePath -> Way
-detectWay extension = read prefix
+-- Detect way from a given filename. Returns Nothing if there is no match:
+-- * detectWay "foo/bar.hi"  == Just vanilla
+-- * detectWay "baz.thr_p_o" == Just threadedProfiling
+-- * detectWay "qwe.phi"     == Nothing (expected "qwe.p_hi")
+detectWay :: FilePath -> Maybe Way
+detectWay file = case reads prefix of
+    [(way, "")] -> Just way
+    _           -> Nothing
   where
-    prefix = dropWhileEnd (== '_') . dropWhileEnd (/= '_') $ extension
+    prefix = dropWhileEnd (== '_') . dropWhileEnd (/= '_') $ takeExtension file
 
 -- Instances for storing in the Shake database
 instance Binary Way where
