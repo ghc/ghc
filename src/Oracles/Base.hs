@@ -22,7 +22,7 @@ askConfigWithDefault key defaultAction = do
         Nothing    -> defaultAction
 
 askConfig :: String -> Action String
-askConfig key = askConfigWithDefault key . redError
+askConfig key = askConfigWithDefault key . putError
     $ "Cannot find key '" ++ key ++ "' in configuration files."
 
 -- Oracle for configuration files
@@ -31,7 +31,7 @@ configOracle = do
     let configFile = configPath -/- "system.config"
     cfg <- newCache $ \() -> do
         unlessM (doesFileExist $ configFile <.> "in") $
-            redError_ $ "\nConfiguration file '" ++ (configFile <.> "in")
+            putError_ $ "\nConfiguration file '" ++ (configFile <.> "in")
                       ++ "' is missing; unwilling to proceed."
         need [configFile]
         putOracle $ "Reading " ++ configFile ++ "..."

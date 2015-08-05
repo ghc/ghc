@@ -58,7 +58,7 @@ builderKey builder = case builder of
 builderPath :: Builder -> Action String
 builderPath builder = do
     path <- askConfigWithDefault (builderKey builder) $
-            redError $ "\nCannot find path to '" ++ (builderKey builder)
+            putError $ "\nCannot find path to '" ++ (builderKey builder)
                      ++ "' in configuration files."
     fixAbsolutePathOnWindows $ if null path then "" else path -<.> exe
 

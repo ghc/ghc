@@ -4,7 +4,7 @@ module Util (
     replaceIf, replaceEq, replaceSeparators,
     unifyPath, (-/-),
     chunksOfSize,
-    putColoured, putOracle, putBuild, redError, redError_,
+    putColoured, putOracle, putBuild, putError, putError_,
     bimap, minusOrd, intersectOrd
     ) where
 
@@ -65,13 +65,13 @@ putBuild :: String -> Action ()
 putBuild = putColoured White
 
 -- A more colourful version of error
-redError :: String -> Action a
-redError msg = do
+putError :: String -> Action a
+putError msg = do
     putColoured Red msg
     error $ "GHC build system error: " ++ msg
 
-redError_ :: String -> Action ()
-redError_ = void . redError
+putError_ :: String -> Action ()
+putError_ = void . putError
 
 -- Depending on Data.Bifunctor only for this function seems an overkill
 bimap :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)

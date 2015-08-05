@@ -28,9 +28,9 @@ flag f = do
         SolarisBrokenShld  -> "solaris-broken-shld"
         SplitObjectsBroken -> "split-objects-broken"
         GhcUnregisterised  -> "ghc-unregisterised"
-    value <- askConfigWithDefault key . redError
+    value <- askConfigWithDefault key . putError
         $ "\nFlag '" ++ key ++ "' not set in configuration files."
-    unless (value == "YES" || value == "NO") . redError
+    unless (value == "YES" || value == "NO") . putError
         $ "\nFlag '" ++ key ++ "' is set to '" ++ value
         ++ "' instead of 'YES' or 'NO'."
     return $ value == "YES"
