@@ -8,9 +8,9 @@ tcfail140.hs:10:7: error:
     In an equation for ‘bar’: bar = f 3 9
 
 tcfail140.hs:12:10: error:
-    Couldn't match expected type ‘Integer -> t2’ with actual type ‘Int’
+    Couldn't match expected type ‘Integer -> t1’ with actual type ‘Int’
     Relevant bindings include
-      rot :: t1 -> t2 (bound at tcfail140.hs:12:1)
+      rot :: r0 -> t1 (bound at tcfail140.hs:12:1)
     The operator ‘f’ takes two arguments,
     but its type ‘Int -> Int’ has only one
     In the expression: 3 `f` 4
@@ -33,6 +33,6 @@ tcfail140.hs:16:8: error:
     In the expression: ((\ Just x -> x) :: Maybe a -> a) (Just 1)
 
 tcfail140.hs:19:1: error:
-    Couldn't match expected type ‘t0 -> Bool’ with actual type ‘Int’
+    Couldn't match expected type ‘Int’ with actual type ‘t0 -> Bool’
     The equation(s) for ‘g’ have two arguments,
     but its type ‘Int -> Int’ has only one

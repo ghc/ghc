@@ -1,5 +1,5 @@
 
-tcfail168.hs:7:11:
+tcfail168.hs:7:11: error:
     Couldn't match expected type ‘IO a0’
                 with actual type ‘Char -> IO ()’
     Probable cause: ‘putChar’ is applied to too few arguments
@@ -10,3 +10,9 @@ tcfail168.hs:7:11:
            putChar 'a';
            putChar 'a';
            .... }
+    In an equation for ‘foo’:
+        foo
+          = do { putChar;
+                 putChar 'a';
+                 putChar 'a';
+                 .... }
