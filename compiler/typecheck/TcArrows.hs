@@ -151,7 +151,7 @@ tc_cmd env in_cmd@(HsCmdCase scrut matches _) (stk, res_ty)
   where
     match_ctxt = MC { mc_what = CaseAlt,
                       mc_body = mc_body }
-    mc_body body res_ty' = (, Shouldn'tHappenOrigin) <$>
+    mc_body body res_ty' = (, Shouldn'tHappenOrigin "HsCmdCase") <$>
                            tcCmd env body (stk, res_ty')
 
 tc_cmd env (HsCmdIf Nothing pred b1 b2) res_ty    -- Ordinary 'if'

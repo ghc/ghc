@@ -197,8 +197,10 @@ tcMatches ctxt pat_tys rhs_ty group@(MG { mg_alts = matches, mg_origin = origin 
                       -- TODO (RAE): Document this behavior.
                     ; (matches', _)
                         <- mapAndUnzipM (tcMatch ctxt pat_tys rhs_ty') matches
-                    ; wrap <- tcSubTypeHR Shouldn'tHappenOrigin rhs_ty' rhs_ty
-                    ; return (matches', wrap, rhs_ty', Shouldn'tHappenOrigin) }
+                    ; wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "tcMatches1")
+                                          rhs_ty' rhs_ty
+                    ; return ( matches', wrap, rhs_ty'
+                             , Shouldn'tHappenOrigin "tcMatches2" ) }
         ; return (wrap, MG { mg_alts = matches'
                            , mg_arg_tys = pat_tys
                            , mg_res_ty = rhs_ty'

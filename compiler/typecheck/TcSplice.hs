@@ -161,7 +161,7 @@ tcTypedBracket brack@(TExpBr expr) res_ty
        ; fst <$>
          tcWrapResult (unLoc (mkHsApp (nlHsTyApp texpco [expr_ty])
                                               (noLoc (HsTcBracketOut brack ps'))))
-                      meta_ty res_ty Shouldn'tHappenOrigin }
+                      meta_ty res_ty (Shouldn'tHappenOrigin "tcTypedBracket") }
 tcTypedBracket other_brack _
   = pprPanic "tcTypedBracket" (ppr other_brack)
 
@@ -173,7 +173,7 @@ tcUntypedBracket brack ps res_ty
        ; traceTc "tc_bracket done untyped" (ppr meta_ty)
        ; fst <$>
          tcWrapResult (HsTcBracketOut brack ps') meta_ty res_ty
-                      Shouldn'tHappenOrigin }
+                      (Shouldn'tHappenOrigin "tcUntypedBracket") }
 
 ---------------
 tcBrackTy :: HsBracket Name -> TcM TcType

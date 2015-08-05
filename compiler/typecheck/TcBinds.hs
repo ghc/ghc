@@ -1446,7 +1446,8 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_infix = inf, fun_matc
         ; return (TcFunBind (MBI { mbi_poly_name = name
                                  , mbi_sig       = Just sig
                                  , mbi_mono_id   = mono_id
-                                 , mbi_orig      = Shouldn'tHappenOrigin })
+                                 , mbi_orig      =
+                                     Shouldn'tHappenOrigin "FunBind sig" })
                             nm_loc inf matches) }
 
   | otherwise
@@ -1455,7 +1456,8 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_infix = inf, fun_matc
         ; return (TcFunBind (MBI { mbi_poly_name = name
                                  , mbi_sig       = Nothing
                                  , mbi_mono_id   = mono_id
-                                 , mbi_orig      = Shouldn'tHappenOrigin })
+                                 , mbi_orig      =
+                                     Shouldn'tHappenOrigin "FunBind nosig" })
                             nm_loc inf matches) }
 
 -- TODO: emit Hole Constraints for wildcards
@@ -1471,7 +1473,8 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
                      ; return (MBI { mbi_poly_name = name
                                    , mbi_sig       = sig_fn name
                                    , mbi_mono_id   = mono_id
-                                   , mbi_orig      = Shouldn'tHappenOrigin }) }
+                                   , mbi_orig      =
+                                       Shouldn'tHappenOrigin "PatBind" }) }
 
         ; ((pat', infos), pat_ty) <- addErrCtxt (patMonoBindsCtxt pat grhss) $
                                      tcInfer tc_pat

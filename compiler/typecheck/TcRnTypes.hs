@@ -2227,7 +2227,8 @@ data CtOrigin
   | UnboundOccurrenceOf OccName
   | ListOrigin          -- An overloaded list
   | StaticOrigin        -- A static form
-  | Shouldn'tHappenOrigin   -- the user should never see this one,
+  | Shouldn'tHappenOrigin String
+                            -- the user should never see this one,
                             -- unlesss ImpredicativeTypes is on, where all
                             -- bets are off
 
@@ -2237,7 +2238,8 @@ data CtOrigin
 -- Shouldn'tHappenOrigin if multiple types are indeed present.
 combineCtOrigins :: [CtOrigin] -> CtOrigin
 combineCtOrigins [orig] = orig
-combineCtOrigins _      = Shouldn'tHappenOrigin
+combineCtOrigins origs  = Shouldn'tHappenOrigin $
+                          "combination " ++ show (length origs)
 
 ctoHerald :: SDoc
 ctoHerald = ptext (sLit "arising from")
@@ -2291,13 +2293,13 @@ pprCtOrigin (DerivOriginCoerce meth ty1 ty2)
        2 (sep [ text "from type" <+> quotes (ppr ty1)
               , nest 2 $ text "to type" <+> quotes (ppr ty2) ])
 
-pprCtOrigin Shouldn'tHappenOrigin
+pprCtOrigin (Shouldn'tHappenOrigin note)
   = sdocWithDynFlags $ \dflags ->
     if xopt Opt_ImpredicativeTypes dflags
     then text "a situation created by impredicative types"
     else
     vcat [ text "<< This should not appear in error messages. If you see this"
-         , text "in an error message, please report a bug at"
+         , text "in an error message, please report a bug mentioning" <+> quotes (text note) <+> text "at"
          , text "https://ghc.haskell.org/trac/ghc/wiki/ReportABug >>" ]
 
 pprCtOrigin simple_origin
