@@ -19,7 +19,7 @@ tcfail068.hs:14:9: error:
     In an equation for ‘itgen’:
         itgen n x = runST (newSTArray ((1, 1), n) x)
 
-tcfail068.hs:19:21: error:
+tcfail068.hs:19:9: error:
     Couldn't match type ‘s’ with ‘s1’
     ‘s’ is a rigid type variable bound by
         the type signature for:
@@ -29,17 +29,24 @@ tcfail068.hs:19:21: error:
     ‘s1’ is a rigid type variable bound by
          a type expected by the context: ST s1 (IndTree s a)
          at tcfail068.hs:18:9
-    Expected type: STArray s1 (Int, Int) a
-      Actual type: IndTree s a
+    Expected type: ST s1 (IndTree s a)
+      Actual type: ST s (IndTree s a)
     Relevant bindings include
       arr :: IndTree s a (bound at tcfail068.hs:17:11)
       itiap :: (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
         (bound at tcfail068.hs:17:1)
-    In the first argument of ‘readSTArray’, namely ‘arr’
-    In the first argument of ‘(>>=)’, namely ‘readSTArray arr i’
     In the first argument of ‘runST’, namely
       ‘(readSTArray arr i
         >>= \ val -> writeSTArray arr i (f val) >> return arr)’
+    In the expression:
+      runST
+        (readSTArray arr i
+         >>= \ val -> writeSTArray arr i (f val) >> return arr)
+    In an equation for ‘itiap’:
+        itiap i f arr
+          = runST
+              (readSTArray arr i
+               >>= \ val -> writeSTArray arr i (f val) >> return arr)
 
 tcfail068.hs:24:36: error:
     Couldn't match type ‘s’ with ‘s1’
