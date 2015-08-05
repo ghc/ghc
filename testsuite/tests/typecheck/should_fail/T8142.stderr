@@ -22,3 +22,4 @@ T8142.hs:6:57: error:
       h :: Nu ((,) t0) -> Nu g0 (bound at T8142.hs:6:18)
     In the second argument of ‘(.)’, namely ‘out’
     In the expression: (\ (_, b) -> ((outI . fmap h) b)) . out
+    In an equation for ‘h’: h = (\ (_, b) -> ((outI . fmap h) b)) . out
