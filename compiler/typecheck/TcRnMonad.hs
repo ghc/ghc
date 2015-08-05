@@ -939,14 +939,26 @@ getErrCtxt = do { env <- getLclEnv; return (tcl_ctxt env) }
 setErrCtxt :: [ErrCtxt] -> TcM a -> TcM a
 setErrCtxt ctxt = updLclEnv (\ env -> env { tcl_ctxt = ctxt })
 
+-- | Add a fixed message to the error context. This message should not
+-- do any tidying.
 addErrCtxt :: MsgDoc -> TcM a -> TcM a
 addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
+-- | Add a message to the error context. This message may do tidying.
 addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, MsgDoc)) -> TcM a -> TcM a
 addErrCtxtM ctxt = updCtxt (\ ctxts -> (False, ctxt) : ctxts)
 
+-- | Add a fixed landmark message to the error context. A landmark
+-- message is always sure to be reported, even if there is a lot of
+-- context. It also doesn't count toward the maximum number of contexts
+-- reported.
 addLandmarkErrCtxt :: MsgDoc -> TcM a -> TcM a
-addLandmarkErrCtxt msg = updCtxt (\ctxts -> (True, \env -> return (env,msg)) : ctxts)
+addLandmarkErrCtxt msg = addLandmarkErrCtxtM (\env -> return (env, msg))
+
+-- | Variant of 'addLandmarkErrCtxt' that allows for monadic operations
+-- and tidying.
+addLandmarkErrCtxtM :: (TidyEnv -> TcM (TidyEnv, MsgDoc)) -> TcM a -> TcM a
+addLandmarkErrCtxtM ctxt = updCtxt (\ctxts -> (True, ctxt) : ctxts)
 
 -- Helper function for the above
 updCtxt :: ([ErrCtxt] -> [ErrCtxt]) -> TcM a -> TcM a

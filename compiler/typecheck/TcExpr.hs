@@ -44,7 +44,6 @@ import Type
 import TcEvidence
 import Var
 import VarSet
-import VarEnv
 import TysWiredIn
 import TysPrim( intPrimTy, addrPrimTy )
 import PrimOp( tagToEnumKey )
@@ -54,7 +53,6 @@ import SrcLoc
 import Util
 import ListSetOps
 import Maybes
-import ErrUtils
 import Outputable
 import FastString
 import Control.Monad
@@ -996,7 +994,7 @@ tcApp m_herald orig_fun orig_args res_ty
            -- Both actual_res_ty and res_ty are deeply skolemised
            -- Rather like tcWrapResult, but (perhaps for historical reasons)
            -- we do this before typechecking the arguments
-           ; wrap_res <- addErrCtxtM (funResCtxt True (unLoc fun) actual_res_ty res_ty) $
+           ; wrap_res <- addFunResCtxt True (unLoc fun) actual_res_ty res_ty $
                          tcSubTypeDS_NC GenSigCtxt actual_res_ty res_ty
 
            -- Typecheck the arguments
@@ -1167,7 +1165,7 @@ tcCheckId :: Name -> TcRhoType -> TcM (HsExpr TcId)
 tcCheckId name res_ty
   = do { (expr, actual_res_ty) <- tcInferId name
        ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr res_ty])
-       ; addErrCtxtM (funResCtxt False (HsVar name) actual_res_ty res_ty) $
+       ; addFunResCtxt False (HsVar name) actual_res_ty res_ty $
          fst <$> tcWrapResult expr actual_res_ty res_ty (OccurrenceOf name) }
 
 ------------------------
@@ -1642,36 +1640,45 @@ funAppCtxt fun arg arg_no
                     quotes (ppr fun) <> text ", namely"])
        2 (quotes (ppr arg))
 
-funResCtxt :: Bool  -- There is at least one argument
-           -> HsExpr Name -> TcType -> TcType
-           -> TidyEnv -> TcM (TidyEnv, MsgDoc)
+addFunResCtxt :: Bool  -- There is at least one argument
+              -> HsExpr Name -> TcType -> TcType
+              -> TcM a -> TcM a
 -- When we have a mis-match in the return type of a function
 -- try to give a helpful message about too many/few arguments
 --
 -- Used for naked variables too; but with has_args = False
-funResCtxt has_args fun fun_res_ty env_ty tidy_env
-  = do { fun_res' <- zonkTcType fun_res_ty
-       ; env'     <- zonkTcType env_ty
-       ; let (args_fun, res_fun) = tcSplitFunTys fun_res'
-             (args_env, res_env) = tcSplitFunTys env'
-             n_fun = length args_fun
-             n_env = length args_env
-             info  | n_fun == n_env = Outputable.empty
-                   | n_fun > n_env
-                   , not_fun res_env = ptext (sLit "Probable cause:") <+> quotes (ppr fun)
-                                       <+> ptext (sLit "is applied to too few arguments")
-                   | has_args
-                   , not_fun res_fun = ptext (sLit "Possible cause:") <+> quotes (ppr fun)
-                                       <+> ptext (sLit "is applied to too many arguments")
-                   | otherwise       = Outputable.empty  -- Never suggest that a naked variable is
-                                                         -- applied to too many args!
-       ; return (tidy_env, info) }
+addFunResCtxt has_args fun fun_res_ty env_ty
+  = addLandmarkErrCtxtM (\env -> (env, ) <$> mk_msg)
+      -- NB: use a landmark error context, so that an empty context
+      -- doesn't suppress some more useful context
   where
-    not_fun ty   -- ty is definitely not an arrow type,
-                 -- and cannot conceivably become one
-      = case tcSplitTyConApp_maybe ty of
-          Just (tc, _) -> isAlgTyCon tc
-          Nothing      -> False
+    mk_msg
+      = do { fun_res' <- zonkTcType fun_res_ty
+           ; env'     <- zonkTcType env_ty
+           ; let (args_fun, res_fun) = tcSplitFunTys fun_res'
+                 (args_env, res_env) = tcSplitFunTys env'
+                 n_fun = length args_fun
+                 n_env = length args_env
+                 info  | n_fun == n_env = Outputable.empty
+                       | n_fun > n_env
+                       , not_fun res_env
+                       = ptext (sLit "Probable cause:") <+> quotes (ppr fun)
+                         <+> ptext (sLit "is applied to too few arguments")
+
+                       | has_args
+                       , not_fun res_fun
+                       = ptext (sLit "Possible cause:") <+> quotes (ppr fun)
+                         <+> ptext (sLit "is applied to too many arguments")
+
+                       | otherwise
+                       = Outputable.empty  -- Never suggest that a naked variable is                                         -- applied to too many args!
+           ; return info }
+      where
+        not_fun ty   -- ty is definitely not an arrow type,
+                     -- and cannot conceivably become one
+          = case tcSplitTyConApp_maybe ty of
+              Just (tc, _) -> isAlgTyCon tc
+              Nothing      -> False
 
 badFieldTypes :: [(Name,TcType)] -> SDoc
 badFieldTypes prs
