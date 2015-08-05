@@ -725,7 +725,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
      -- polymorphic. So instantiate away. This is needed for e.g. test
      -- typecheck/should_compile/T4284.
                  |  otherwise
-                 -> do { (wrap, rho_a) <- deeplyInstantiate inst_orig ty_a
+                 -> do { (wrap, rho_a) <- deeplyInstantiate inst_orig ty_actual
                        ; cow <- uType eq_orig rho_a ty_expected
                        ; return (coToHsWrapper cow <.> wrap) } }
 
