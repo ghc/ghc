@@ -623,12 +623,17 @@ union_ = Union
 -- * @(x '$$' y) '<>' z = x '$$' (y '<>' z)@, if @y@ non-empty.
 --
 ($$) :: Doc -> Doc -> Doc
-p $$  q = Above p False q
+p $$  q = above_ p False q
 
 -- | Above, with no overlapping.
 -- '$+$' is associative, with identity 'empty'.
 ($+$) :: Doc -> Doc -> Doc
-p $+$ q = Above p True q
+p $+$ q = above_ p True q
+
+above_ :: Doc -> Bool -> Doc -> Doc
+above_ p _ Empty = p
+above_ Empty _ q = q
+above_ p g q     = Above p g q
 
 above :: Doc -> Bool -> RDoc -> RDoc
 above (Above p g1 q1)  g2 q2 = above p g1 (above q1 g2 q2)
@@ -679,12 +684,17 @@ nilAboveNest g k q           | not g && k > 0      -- No newline if no overlap
 -- | Beside.
 -- '<>' is associative, with identity 'empty'.
 (<>) :: Doc -> Doc -> Doc
-p <>  q = Beside p False q
+p <>  q = beside_ p False q
 
 -- | Beside, separated by space, unless one of the arguments is 'empty'.
 -- '<+>' is associative, with identity 'empty'.
 (<+>) :: Doc -> Doc -> Doc
-p <+> q = Beside p True  q
+p <+> q = beside_ p True  q
+
+beside_ :: Doc -> Bool -> Doc -> Doc
+beside_ p _ Empty = p
+beside_ Empty _ q = q
+beside_ p g q     = Beside p g q
 
 -- Specification: beside g p q = p <g> q
 beside :: Doc -> Bool -> RDoc -> RDoc
