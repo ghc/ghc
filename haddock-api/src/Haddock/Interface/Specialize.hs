@@ -116,7 +116,7 @@ sugar =
     everywhere $ mkT step
   where
     step :: HsType name -> HsType name
-    step = sugarTuples . sugarLists
+    step = sugarOperators . sugarTuples . sugarLists
 
 
 sugarLists :: NamedThing name => HsType name -> HsType name
@@ -143,6 +143,12 @@ sugarTuples typ =
             Just arity -> arity == length apps
             Nothing -> False
     aux _ _ = typ
+
+
+sugarOperators :: NamedThing name => HsType name -> HsType name
+sugarOperators (HsAppTy (L _ (HsAppTy (L loc (HsTyVar name)) la)) lb)
+    | isSymOcc $ getOccName name = mkHsOpTy la (L loc name) lb
+sugarOperators typ = typ
 
 
 -- | Compute arity of given tuple operator.
