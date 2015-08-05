@@ -650,9 +650,11 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
                 tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
 
        ; let name_taus = [(name, idType mono_id) | (name, _, mono_id) <- mono_infos]
+             sig_qtvs   = [ tv | (_, Just sig, _) <- mono_infos
+                               , (_, tv) <- sig_tvs sig ]
        ; traceTc "simplifyInfer call" (ppr name_taus $$ ppr wanted)
        ; (qtvs, givens, _mr_bites, ev_binds)
-                 <- simplifyInfer tclvl mono name_taus wanted
+                 <- simplifyInfer tclvl mono sig_qtvs name_taus wanted
 
        ; let inferred_theta = map evVarPred givens
        ; exports <- checkNoErrs $

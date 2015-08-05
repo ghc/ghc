@@ -58,3 +58,5 @@ test('WildcardInstantiations', normal, compile_fail, [''])
 test('WildcardInTypeFamilyInstanceRHS', normal, compile_fail, [''])
 test('WildcardInTypeSynonymLHS', normal, compile_fail, [''])
 test('WildcardInTypeSynonymRHS', normal, compile_fail, [''])
+test('T10615', normal, compile_fail, [''])
+

@@ -1798,6 +1798,7 @@ tcRnExpr hsc_env rdr_expr
                                       {-# SCC "simplifyInfer" #-}
                                       simplifyInfer tclvl
                                                     False {- No MR for now -}
+                                                    []    {- No sig vars -}
                                                     [(fresh_it, res_ty)]
                                                     lie ;
     -- Wanted constraints from static forms
