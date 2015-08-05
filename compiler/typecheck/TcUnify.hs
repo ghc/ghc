@@ -683,7 +683,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       = -- See Note [Co/contra-variance of subsumption checking]
         do { res_wrap <- tc_sub_type_ds eq_orig inst_orig ctxt act_res exp_res
            ; arg_wrap
-               <- tc_sub_type eq_orig (Shouldn'tHappenOrigin "tc_sub_type_ds")
+               <- tc_sub_type eq_orig (GivenOrigin (SigSkol GenSigCtxt exp_arg))
                               ctxt exp_arg act_arg
            ; return (mkWpFun arg_wrap res_wrap exp_arg exp_res) }
                -- arg_wrap :: exp_arg ~ act_arg
