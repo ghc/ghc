@@ -696,16 +696,17 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
     go ty_a ty_e | Just ty_a' <- tcView ty_a = go ty_a' ty_e
                  | Just ty_e' <- tcView ty_e = go ty_a  ty_e'
 
-    go ty_a@(TyVarTy tv_a) ty_e
+    go (TyVarTy tv_a) ty_e
       = do { lookup_res <- lookupTcTyVar tv_a
            ; case lookup_res of
                Filled ty_a' ->
                  do { traceTc "tcSubTypeDS_NC_O following filled act meta-tyvar:"
                         (ppr tv_a <+> text "-->" <+> ppr ty_a')
                     ; tc_sub_type_ds eq_orig inst_orig ctxt ty_a' ty_e }
-               Unfilled _   -> coToHsWrapper <$> uType eq_orig ty_a ty_e }
+               Unfilled _   -> coToHsWrapper <$> unify }
 
-    go ty_a ty_e@(TyVarTy tv_e)
+
+    go ty_a (TyVarTy tv_e)
       = do { dflags <- getDynFlags
            ; tclvl  <- getTcLevel
            ; lookup_res <- lookupTcTyVar tv_e
@@ -717,7 +718,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
                Unfilled details
                  |  canUnifyWithPolyType dflags details
                     && isTouchableMetaTyVar tclvl tv_e  -- don't want skolems here
-                 -> coToHsWrapper <$> uType eq_orig ty_a ty_e
+                 -> coToHsWrapper <$> unify
 
      -- We've avoided instantiating ty_actual just in case ty_expected is
      -- polymorphic. But we've now assiduously determined that it is *not*
@@ -725,7 +726,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
      -- typecheck/should_compile/T4284.
                  |  otherwise
                  -> do { (wrap, rho_a) <- deeplyInstantiate inst_orig ty_a
-                       ; cow <- uType eq_orig rho_a ty_e
+                       ; cow <- uType eq_orig rho_a ty_expected
                        ; return (coToHsWrapper cow <.> wrap) } }
 
     go (FunTy act_arg act_res) (FunTy exp_arg exp_res)
@@ -747,8 +748,11 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
            ; return (body_wrap <.> in_wrap) }
 
       | otherwise   -- Revert to unification
-      = do { cow <- uType eq_orig ty_a ty_e
+      = do { cow <- unify
            ; return (coToHsWrapper cow) }
+
+     -- use versions without synonyms expanded
+    unify = uType eq_orig ty_actual ty_expected
 
 -----------------
 tcWrapResult :: HsExpr TcId -> TcSigmaType -> TcRhoType -> CtOrigin
