@@ -500,6 +500,17 @@
                     can use the <literal>liftData</literal> function which is
                     now exported from <literal>Language.Haskell.TH.Syntax</literal>.
                </para>
+          </listitem>
+           <listitem>
+               <para>
+                    <literal>Info</literal>'s constructors no longer have
+                    <literal>Fixity</literal> fields. A <literal>qReifyFixity
+                    </literal> function was added to the <literal>Quasi
+                    </literal> type class (as well as the <literal>reifyFixity
+                    </literal> function, specialized for <literal>Q</literal>)
+                    to allow lookup of fixity information for any given
+                    <literal>Name</literal>.
+               </para>
            </listitem>
        </itemizedlist>
     </sect3>

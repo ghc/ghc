@@ -29,6 +29,8 @@ module Language.Haskell.TH(
         -- *** Name lookup
         lookupTypeName,  -- :: String -> Q (Maybe Name)
         lookupValueName, -- :: String -> Q (Maybe Name)
+        -- *** Fixity lookup
+        reifyFixity,
         -- *** Instance lookup
         reifyInstances,
         isInstance,

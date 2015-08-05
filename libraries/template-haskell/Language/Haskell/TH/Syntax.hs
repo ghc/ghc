@@ -64,6 +64,7 @@ class (Applicative m, Monad m) => Quasi m where
   qLookupName :: Bool -> String -> m (Maybe Name)
        -- True <=> type namespace, False <=> value namespace
   qReify          :: Name -> m Info
+  qReifyFixity    :: Name -> m Fixity
   qReifyInstances :: Name -> [Type] -> m [Dec]
        -- Is (n tys) an instance?
        -- Returns list of matching instance Decs
@@ -109,6 +110,7 @@ instance Quasi IO where
 
   qLookupName _ _     = badIO "lookupName"
   qReify _            = badIO "reify"
+  qReifyFixity _      = badIO "reifyFixity"
   qReifyInstances _ _ = badIO "reifyInstances"
   qReifyRoles _       = badIO "reifyRoles"
   qReifyAnnotations _ = badIO "reifyAnnotations"
@@ -343,6 +345,12 @@ and to get information about @D@-the-type, use 'lookupTypeName'.
 reify :: Name -> Q Info
 reify v = Q (qReify v)
 
+{- | @reifyFixity nm@ returns the fixity of @nm@. If a fixity value cannot be
+found, 'defaultFixity' is returned.
+-}
+reifyFixity :: Name -> Q Fixity
+reifyFixity nm = Q (qReifyFixity nm)
+
 {- | @reifyInstances nm tys@ returns a list of visible instances of @nm tys@. That is,
 if @nm@ is the name of a type class, then all instances of this class at the types @tys@
 are returned. Alternatively, if @nm@ is the name of a data family or type family,
@@ -427,6 +435,7 @@ instance Quasi Q where
   qReport           = report
   qRecover          = recover
   qReify            = reify
+  qReifyFixity      = reifyFixity
   qReifyInstances   = reifyInstances
   qReifyRoles       = reifyRoles
   qReifyAnnotations = reifyAnnotations
@@ -1049,7 +1058,6 @@ data Info
        Name
        Type
        ParentName
-       Fixity
 
   -- | A \"plain\" type constructor. \"Fancier\" type constructors are returned using 'PrimTyConI' or 'FamilyI' as appropriate
   | TyConI
@@ -1072,7 +1080,6 @@ data Info
        Name
        Type
        ParentName
-       Fixity
 
   {- |
   A \"value\" variable (as opposed to a type variable, see 'TyVarI').
@@ -1088,7 +1095,6 @@ data Info
        Name
        Type
        (Maybe Dec)
-       Fixity
 
   {- |
   A type variable.

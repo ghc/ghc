@@ -55,16 +55,14 @@ instance Ppr Info where
         <+> (if is_unlifted then text "unlifted" else empty)
         <+> text "type constructor" <+> quotes (ppr name)
         <+> parens (text "arity" <+> int arity)
-    ppr (ClassOpI v ty cls fix)
-      = text "Class op from" <+> ppr cls <> colon <+>
-        vcat [ppr_sig v ty, pprFixity v fix]
-    ppr (DataConI v ty tc fix)
-      = text "Constructor from" <+> ppr tc <> colon <+>
-        vcat [ppr_sig v ty, pprFixity v fix]
+    ppr (ClassOpI v ty cls)
+      = text "Class op from" <+> ppr cls <> colon <+> ppr_sig v ty
+    ppr (DataConI v ty tc)
+      = text "Constructor from" <+> ppr tc <> colon <+> ppr_sig v ty
     ppr (TyVarI v ty)
       = text "Type variable" <+> ppr v <+> equals <+> ppr ty
-    ppr (VarI v ty mb_d fix)
-      = vcat [ppr_sig v ty, pprFixity v fix,
+    ppr (VarI v ty mb_d)
+      = vcat [ppr_sig v ty,
               case mb_d of { Nothing -> empty; Just d -> ppr d }]
 
 ppr_sig :: Name -> Type -> Doc

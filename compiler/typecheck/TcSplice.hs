@@ -779,6 +779,7 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
 
   qLookupName       = lookupName
   qReify            = reify
+  qReifyFixity nm   = lookupThName nm >>= reifyFixity
   qReifyInstances   = reifyInstances
   qReifyRoles       = reifyRoles
   qReifyAnnotations = reifyAnnotations
@@ -1037,20 +1038,18 @@ reifyThing :: TcTyThing -> TcM TH.Info
 
 reifyThing (AGlobal (AnId id))
   = do  { ty <- reifyType (idType id)
-        ; fix <- reifyFixity (idName id)
         ; let v = reifyName id
         ; case idDetails id of
-            ClassOpId cls -> return (TH.ClassOpI v ty (reifyName cls) fix)
-            _             -> return (TH.VarI     v ty Nothing fix)
+            ClassOpId cls -> return (TH.ClassOpI v ty (reifyName cls))
+            _             -> return (TH.VarI     v ty Nothing)
     }
 
 reifyThing (AGlobal (ATyCon tc))   = reifyTyCon tc
 reifyThing (AGlobal (AConLike (RealDataCon dc)))
   = do  { let name = dataConName dc
         ; ty <- reifyType (idType (dataConWrapId dc))
-        ; fix <- reifyFixity name
         ; return (TH.DataConI (reifyName name) ty
-                              (reifyName (dataConOrigTyCon dc)) fix)
+                              (reifyName (dataConOrigTyCon dc)))
         }
 reifyThing (AGlobal (AConLike (PatSynCon ps)))
   = noTH (sLit "pattern synonyms") (ppr $ patSynName ps)
@@ -1059,8 +1058,7 @@ reifyThing (ATcId {tct_id = id})
   = do  { ty1 <- zonkTcType (idType id) -- Make use of all the info we have, even
                                         -- though it may be incomplete
         ; ty2 <- reifyType ty1
-        ; fix <- reifyFixity (idName id)
-        ; return (TH.VarI (reifyName id) ty2 Nothing fix) }
+        ; return (TH.VarI (reifyName id) ty2 Nothing) }
 
 reifyThing (ATyVar tv tv1)
   = do { ty1 <- zonkTcTyVar tv1
@@ -1169,7 +1167,7 @@ reifyClass cls
         ; ops <- concatMapM reify_op op_stuff
         ; tvs' <- reifyTyVars tvs
         ; let dec = TH.ClassD cxt (reifyName cls) tvs' fds' ops
-        ; return (TH.ClassI dec insts ) }
+        ; return (TH.ClassI dec insts) }
   where
     (tvs, fds, theta, _, _, op_stuff) = classExtraBigSig cls
     fds' = map reifyFunDep fds
