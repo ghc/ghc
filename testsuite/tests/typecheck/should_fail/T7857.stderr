@@ -1,10 +1,10 @@
 
 T7857.hs:8:11: error:
-    Could not deduce (PrintfType r0) arising from a use of ‘printf’
+    Could not deduce (PrintfType a0) arising from a use of ‘printf’
     from the context: PrintfArg t0
       bound by the inferred type of g :: PrintfArg t0 => t0 -> b0
       at T7857.hs:8:1-21
-    The type variable ‘r0’ is ambiguous
+    The type variable ‘a0’ is ambiguous
     Note: there are several potential instances:
       instance [safe] (a ~ ()) => PrintfType (IO a)
         -- Defined in ‘Text.Printf’
