@@ -1642,7 +1642,8 @@ relevantBindings want_filtering ctxt ct
            vcat [ ppr ct
                 , pprCtOrigin (ctLocOrigin loc)
                 , ppr ct_tvs
-                , ppr [id | TcIdBndr id _ <- tcl_bndrs lcl_env] ]
+                , pprWithCommas id [ ppr id <+> dcolon <+> ppr (idType id)
+                                   | TcIdBndr id _ <- tcl_bndrs lcl_env ] ]
 
        ; (tidy_env', docs, discards)
               <- go env1 ct_tvs (maxRelevantBinds dflags)
