@@ -56,7 +56,6 @@ import Data.Proxy ( Proxy(..) )
 import GHC.Arr
 import GHC.Base ( Applicative(..), Monad(..), Monoid, Maybe(..),
                   ($), (.), id, flip )
-import qualified GHC.Base as Monad ( mapM )
 import qualified GHC.List as List ( foldr )
 
 -- | Functors representing data structures that can be traversed from
@@ -179,8 +178,6 @@ instance Traversable [] where
     {-# INLINE traverse #-} -- so that traverse can fuse
     traverse f = List.foldr cons_f (pure [])
       where cons_f x ys = (:) <$> f x <*> ys
-
-    mapM = Monad.mapM
 
 instance Traversable (Either a) where
     traverse _ (Left x) = pure (Left x)
