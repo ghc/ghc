@@ -346,11 +346,9 @@ instance Outputable MetaDetails where
   ppr (Indirect ty) = ptext (sLit "Indirect") <+> ppr ty
 
 data MetaInfo
-   = TauTv Bool    -- This MetaTv is an ordinary unification variable
+   = TauTv         -- This MetaTv is an ordinary unification variable
                    -- A TauTv is always filled in with a tau-type, which
                    -- never contains any ForAlls.
-                   -- The boolean is true when the meta var originates
-                   -- from a wildcard.
 
    | ReturnTv      -- Can unify with *anything*. Used to convert a
                    -- type "checking" algorithm into a type inference algorithm.
@@ -372,16 +370,25 @@ data MetaInfo
 -- in the places where we need to an expression has that type
 
 data UserTypeCtxt
-  = FunSigCtxt Name Bool    -- Function type signature, when checking the type
-                            -- Also used for types in SPECIALISE pragmas
-                            -- Bool = True  <=> report redundant class constraints
-                            --        False <=> do not
-                            -- See Note [Tracking redundant constraints] in TcSimplify
+  = FunSigCtxt      -- Function type signature, when checking the type
+                    -- Also used for types in SPECIALISE pragmas
+       Name              -- Name of the function
+       Bool              -- True <=> report redundant constraints
+                            -- This is usually True, but False for
+                            --   * Record selectors (not important here)
+                            --   * Class and instance methods.  Here
+                            --     the code may legitimately be more
+                            --     polymorphic than the signature
+                            --     generated from the class
+                            --     declaration
 
   | InfSigCtxt Name     -- Inferred type for function
   | ExprSigCtxt         -- Expression type signature
+
   | ConArgCtxt Name     -- Data constructor argument
   | TySynCtxt Name      -- RHS of a type synonym decl
+  | PatSynCtxt Name     -- Type sig for a pattern synonym
+                        --   eg  pattern C :: Int -> T
   | PatSigCtxt          -- Type sig in pattern
                         --   eg  f (x::t) = ...
                         --   or  (x::t, y) = e
@@ -530,11 +537,10 @@ pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
   = pp_info <> colon <> ppr tclvl
   where
     pp_info = case info of
-                ReturnTv    -> ptext (sLit "ret")
-                TauTv True  -> ptext (sLit "twc")
-                TauTv False -> ptext (sLit "tau")
-                SigTv       -> ptext (sLit "sig")
-                FlatMetaTv  -> ptext (sLit "fuv")
+                ReturnTv   -> ptext (sLit "ret")
+                TauTv      -> ptext (sLit "tau")
+                SigTv      -> ptext (sLit "sig")
+                FlatMetaTv -> ptext (sLit "fuv")
 
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (FunSigCtxt n _)  = ptext (sLit "the type signature for") <+> quotes (ppr n)
@@ -543,6 +549,7 @@ pprUserTypeCtxt (RuleSigCtxt n)   = ptext (sLit "a RULE for") <+> quotes (ppr n)
 pprUserTypeCtxt ExprSigCtxt       = ptext (sLit "an expression type signature")
 pprUserTypeCtxt (ConArgCtxt c)    = ptext (sLit "the type of the constructor") <+> quotes (ppr c)
 pprUserTypeCtxt (TySynCtxt c)     = ptext (sLit "the RHS of the type synonym") <+> quotes (ppr c)
+pprUserTypeCtxt (PatSynCtxt c)    = ptext (sLit "the type signature for pattern synonym") <+> quotes (ppr c)
 pprUserTypeCtxt ThBrackCtxt       = ptext (sLit "a Template Haskell quotation [t|...|]")
 pprUserTypeCtxt PatSigCtxt        = ptext (sLit "a pattern type signature")
 pprUserTypeCtxt ResSigCtxt        = ptext (sLit "a result type signature")
@@ -568,6 +575,7 @@ pprSigCtxt ctxt extra pp_ty
     pp_sig (FunSigCtxt n _) = pp_n_colon n
     pp_sig (ConArgCtxt n)   = pp_n_colon n
     pp_sig (ForSigCtxt n)   = pp_n_colon n
+    pp_sig (PatSynCtxt n)   = pp_n_colon n
     pp_sig _                = pp_ty
 
     pp_n_colon n = pprPrefixOcc n <+> dcolon <+> pp_ty
@@ -1265,7 +1273,7 @@ canUnifyWithPolyType dflags details kind
   = case details of
       MetaTv { mtv_info = ReturnTv } -> True      -- See Note [ReturnTv]
       MetaTv { mtv_info = SigTv }    -> False
-      MetaTv { mtv_info = TauTv _ }  -> xopt Opt_ImpredicativeTypes dflags
+      MetaTv { mtv_info = TauTv }    -> xopt Opt_ImpredicativeTypes dflags
                                      || isOpenTypeKind kind
                                           -- Note [OpenTypeKind accepts foralls]
       _other                         -> True

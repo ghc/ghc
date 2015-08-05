@@ -282,10 +282,10 @@ checkValidType ctxt ty
                  RuleSigCtxt _  -> rank1
                  TySynCtxt _    -> rank0
 
-                 ExprSigCtxt    -> rank1
-                 FunSigCtxt _ _ -> rank1
-                 InfSigCtxt _   -> ArbitraryRank        -- Inferred type
-                 ConArgCtxt _   -> rank1 -- We are given the type of the entire
+                 ExprSigCtxt     -> rank1
+                 FunSigCtxt {}   -> rank1
+                 InfSigCtxt _    -> ArbitraryRank        -- Inferred type
+                 ConArgCtxt _    -> rank1 -- We are given the type of the entire
                                          -- constructor, hence rank 1
 
                  ForSigCtxt _   -> rank1
@@ -739,6 +739,7 @@ okIPCtxt ThBrackCtxt        = True
 okIPCtxt GhciCtxt           = True
 okIPCtxt SigmaCtxt          = True
 okIPCtxt (DataTyCtxt {})    = True
+okIPCtxt (PatSynCtxt {})    = True
 
 okIPCtxt (ClassSCCtxt {})  = False
 okIPCtxt (InstDeclCtxt {}) = False

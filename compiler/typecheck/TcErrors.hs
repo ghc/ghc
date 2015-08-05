@@ -1701,7 +1701,7 @@ quickFlattenTy (TyConApp tc tys)
     | otherwise
     = do { let (funtys,resttys) = splitAt (tyConArity tc) tys
                 -- Ignore the arguments of the type family funtys
-         ; v <- newMetaTyVar (TauTv False) (typeKind (TyConApp tc funtys))
+         ; v <- newMetaTyVar TauTv (typeKind (TyConApp tc funtys))
          ; flat_resttys <- mapM quickFlattenTy resttys
          ; return (foldl AppTy (mkTyVarTy v) flat_resttys) }
 

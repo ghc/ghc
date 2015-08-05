@@ -1,7 +1,8 @@
 
 T10403.hs:15:7: warning:
     Found hole ‘_’ with inferred constraints: Functor f
-    In the type signature for ‘h1’: _ => _
+    In the type signature for:
+      h1 :: _ => _
 
 T10403.hs:15:12: warning:
     Found type wildcard ‘_’ standing for ‘(a -> b) -> f a -> H f’
@@ -14,7 +15,8 @@ T10403.hs:15:12: warning:
            ‘a’ is a rigid type variable bound by
                the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
                at T10403.hs:17:1
-    In the type signature for ‘h1’: _ => _
+    In the type signature for:
+      h1 :: _ => _
 
 T10403.hs:19:7: warning:
     Found type wildcard ‘_’ standing for ‘(a -> b) -> f a -> H f’
@@ -27,7 +29,8 @@ T10403.hs:19:7: warning:
            ‘a’ is a rigid type variable bound by
                the inferred type of h2 :: Functor f => (a -> b) -> f a -> H f
                at T10403.hs:21:1
-    In the type signature for ‘h2’: _
+    In the type signature for:
+      h2 :: _
 
 T10403.hs:21:1: warning:
     No instance for (Functor f)

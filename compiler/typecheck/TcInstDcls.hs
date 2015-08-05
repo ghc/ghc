@@ -18,7 +18,7 @@ import TcTyClsDecls
 import TcClassDcl( tcClassDecl2,
                    HsSigFun, lookupHsSig, mkHsSigFun,
                    findMethodBind, instantiateMethod )
-import TcPat      ( addInlinePrags, completeSigPolyId, lookupPragEnv, emptyPragEnv )
+import TcPat      ( TcIdSigInfo, addInlinePrags, completeIdSigPolyId, lookupPragEnv, emptyPragEnv )
 import TcRnMonad
 import TcValidity
 import TcMType
@@ -1328,8 +1328,8 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                        HsVar dm_id
 
                  -- A method always has a complete type signature,
-                 -- hence it is safe to call completeSigPolyId
-                 local_meth_id = completeSigPolyId local_meth_sig
+                 -- hence it is safe to call completeIdSigPolyId
+                 local_meth_id = completeIdSigPolyId local_meth_sig
                  meth_bind = mkVarBind local_meth_id (L inst_loc rhs)
                  meth_id1 = meth_id `setInlinePragma` dm_inline_prag
                         -- Copy the inline pragma (if any) from the default
@@ -1377,9 +1377,9 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                            inst_tys sel_id
 
        ; let prags         = lookupPragEnv prag_fn (idName sel_id)
-             -- A method always has a complete type signature, hence
-             -- it is safe to call completeSigPolyId
-             local_meth_id = completeSigPolyId local_meth_sig
+             -- A method always has a complete type signature,
+             -- so it is safe to call cmpleteIdSigPolyId
+             local_meth_id = completeIdSigPolyId local_meth_sig
              lm_bind       = meth_bind { fun_id = L bndr_loc (idName local_meth_id) }
                              -- Substitute the local_meth_name for the binder
                              -- NB: the binding is always a FunBind
@@ -1419,7 +1419,7 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
 
 ------------------------
 mkMethIds :: HsSigFun -> Class -> [TcTyVar] -> [EvVar]
-          -> [TcType] -> Id -> TcM (TcId, TcSigInfo, HsWrapper)
+          -> [TcType] -> Id -> TcM (TcId, TcIdSigInfo, HsWrapper)
 mkMethIds sig_fn clas tyvars dfun_ev_vars inst_tys sel_id
   = do  { poly_meth_name  <- newName (mkClassOpAuxOcc sel_occ)
         ; local_meth_name <- newName sel_occ
@@ -1434,11 +1434,12 @@ mkMethIds sig_fn clas tyvars dfun_ev_vars inst_tys sel_id
                -> setSrcSpan (getLoc lhs_ty) $
                   do { inst_sigs <- xoptM Opt_InstanceSigs
                      ; checkTc inst_sigs (misplacedInstSig sel_name lhs_ty)
-                     ; sig_ty  <- tcHsSigType (FunSigCtxt sel_name True) lhs_ty
+                     ; sig_ty  <- tcHsSigType (FunSigCtxt sel_name False) lhs_ty
                      ; let poly_sig_ty = mkSigmaTy tyvars theta sig_ty
-                     ; tc_sig  <- instTcTySig lhs_ty sig_ty Nothing [] local_meth_name
+                           ctxt = FunSigCtxt sel_name True
+                     ; tc_sig  <- instTcTySig ctxt lhs_ty sig_ty Nothing [] local_meth_name
                      ; hs_wrap <- addErrCtxtM (methSigCtxt sel_name poly_sig_ty poly_meth_ty) $
-                                  tcSubType (FunSigCtxt sel_name False) poly_sig_ty poly_meth_ty
+                                  tcSubType ctxt poly_sig_ty poly_meth_ty
                      ; return (poly_meth_id, tc_sig, hs_wrap) }
 
             Nothing     -- No type signature

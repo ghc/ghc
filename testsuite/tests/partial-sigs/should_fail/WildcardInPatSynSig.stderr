@@ -1,4 +1,5 @@
 
-WildcardInPatSynSig.hs:4:37:
+WildcardInPatSynSig.hs:4:37: error:
     Unexpected wild card: ‘_’
-    In the type signature for ‘Single’: Single :: _ -> [a]
+    In the type signature for pattern synonym ‘Single’:
+      Single :: _ -> [a]

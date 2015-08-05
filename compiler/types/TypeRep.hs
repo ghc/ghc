@@ -32,7 +32,7 @@ module TypeRep (
 
         -- Pretty-printing
         pprType, pprParendType, pprTypeApp, pprTvBndr, pprTvBndrs,
-        pprTyThing, pprTyThingCategory, pprSigmaType, pprSigmaTypeExtraCts,
+        pprTyThing, pprTyThingCategory, pprSigmaType,
         pprTheta, pprForAll, pprUserForAll,
         pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit, suppressKinds,
@@ -562,10 +562,6 @@ pprThetaArrowTy preds  = parens (fsep (punctuate comma (map (ppr_type TopPrec) p
     --            Eq j, Eq k, Eq l) =>
     --           Eq (a, b, c, d, e, f, g, h, i, j, k, l)
 
-pprThetaArrowTyExtra :: ThetaType -> SDoc
-pprThetaArrowTyExtra []    = text "_" <+> darrow
-pprThetaArrowTyExtra preds = parens (fsep (punctuate comma xs)) <+> darrow
-  where xs = (map (ppr_type TopPrec) preds) ++ [text "_"]
 ------------------
 instance Outputable Type where
     ppr ty = pprType ty
@@ -599,7 +595,7 @@ ppr_type p fun_ty@(FunTy ty1 ty2)
 
 ppr_forall_type :: TyPrec -> Type -> SDoc
 ppr_forall_type p ty
-  = maybeParen p FunPrec $ ppr_sigma_type True False ty
+  = maybeParen p FunPrec $ ppr_sigma_type True ty
     -- True <=> we always print the foralls on *nested* quantifiers
     -- Opt_PrintExplicitForalls only affects top-level quantifiers
     -- False <=> we don't print an extra-constraints wildcard
@@ -615,16 +611,14 @@ ppr_tylit _ tl =
     StrTyLit s -> text (show s)
 
 -------------------
-ppr_sigma_type :: Bool -> Bool -> Type -> SDoc
+ppr_sigma_type :: Bool -> Type -> SDoc
 -- First Bool <=> Show the foralls unconditionally
 -- Second Bool <=> Show an extra-constraints wildcard
-ppr_sigma_type show_foralls_unconditionally extra_cts ty
+ppr_sigma_type show_foralls_unconditionally ty
   = sep [ if   show_foralls_unconditionally
           then pprForAll tvs
           else pprUserForAll tvs
-        , if extra_cts
-          then pprThetaArrowTyExtra ctxt
-          else pprThetaArrowTy ctxt
+        , pprThetaArrowTy ctxt
         , pprType tau ]
   where
     (tvs,  rho) = split1 [] ty
@@ -637,10 +631,7 @@ ppr_sigma_type show_foralls_unconditionally extra_cts ty
     split2 ps ty                               = (reverse ps, ty)
 
 pprSigmaType :: Type -> SDoc
-pprSigmaType ty = ppr_sigma_type False False ty
-
-pprSigmaTypeExtraCts :: Bool -> Type -> SDoc
-pprSigmaTypeExtraCts = ppr_sigma_type False
+pprSigmaType ty = ppr_sigma_type False ty
 
 pprUserForAll :: [TyVar] -> SDoc
 -- Print a user-level forall; see Note [When to print foralls]

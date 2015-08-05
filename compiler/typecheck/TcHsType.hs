@@ -19,6 +19,7 @@ module TcHsType (
 
                 -- Kind-checking types
                 -- No kind generalisation, no checkValidType
+        tcWildcardBinders,
         kcHsTyVarBndrs, tcHsTyVarBndrs,
         tcHsLiftedType, tcHsOpenType,
         tcLHsType, tcCheckLHsType, tcCheckLHsTypeAndGen,
@@ -922,6 +923,19 @@ addTypeCtxt (L _ ty) thing
 ************************************************************************
 -}
 
+tcWildcardBinders :: [Name]
+                  -> ([(Name,TcTyVar)] -> TcM a)
+                  -> TcM a
+tcWildcardBinders wcs thing_inside
+  = do { wc_prs <- mapM new_wildcard wcs
+       ; tcExtendTyVarEnv2 wc_prs $
+         thing_inside wc_prs }
+  where
+   new_wildcard :: Name -> TcM (Name, TcTyVar)
+   new_wildcard name = do { kind <- newMetaKindVar
+                          ; tv   <- newFlexiTyVar kind
+                          ; return (name, tv) }
+
 mkKindSigVar :: Name -> TcM KindVar
 -- Use the specified name; don't clone it
 mkKindSigVar n
@@ -1266,16 +1280,15 @@ tcHsPatSigType :: UserTypeCtxt
 tcHsPatSigType ctxt (HsWB { hswb_cts = hs_ty, hswb_kvs = sig_kvs,
                             hswb_tvs = sig_tvs, hswb_wcs = sig_wcs })
   = addErrCtxt (pprSigCtxt ctxt empty (ppr hs_ty)) $
-    do  { kvs <- mapM new_kv sig_kvs
+    tcWildcardBinders sig_wcs $ \ nwc_binds ->
+    do  { emitWildcardHoleConstraints nwc_binds
+        ; kvs <- mapM new_kv sig_kvs
         ; tvs <- mapM new_tv sig_tvs
-        ; nwc_tvs <- mapM newWildcardVarMetaKind sig_wcs
-        ; let nwc_binds = sig_wcs `zip` nwc_tvs
-              ktv_binds = (sig_kvs `zip` kvs) ++ (sig_tvs `zip` tvs)
-        ; sig_ty <- tcExtendTyVarEnv2 (ktv_binds ++ nwc_binds) $
+        ; let ktv_binds = (sig_kvs `zip` kvs) ++ (sig_tvs `zip` tvs)
+        ; sig_ty <- tcExtendTyVarEnv2 ktv_binds $
                     tcHsLiftedType hs_ty
         ; sig_ty <- zonkSigType sig_ty
         ; checkValidType ctxt sig_ty
-        ; emitWildcardHoleConstraints (zip sig_wcs nwc_tvs)
         ; return (sig_ty, ktv_binds, nwc_binds) }
   where
     new_kv name = new_tkv name superKind

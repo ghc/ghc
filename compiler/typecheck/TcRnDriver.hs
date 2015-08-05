@@ -1846,8 +1846,7 @@ tcRnType hsc_env normalise rdr_type
 
         -- Now kind-check the type
         -- It can have any rank or kind
-       ; nwc_tvs <- mapM newWildcardVarMetaKind wcs
-       ; (ty, kind) <- tcExtendTyVarEnv nwc_tvs $
+       ; (ty, kind) <- tcWildcardBinders wcs $ \_ ->
                        tcLHsType rn_type
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]

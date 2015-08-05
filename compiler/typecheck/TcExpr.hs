@@ -218,9 +218,10 @@ tcExpr e@(HsLamCase _ matches) res_ty
         match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
 
 tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
- = do { nwc_tvs <- mapM newWildcardVarMetaKind wcs
-      ; tcExtendTyVarEnv nwc_tvs $ do {
-        sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
+ = tcWildcardBinders wcs $ \ wc_prs ->
+   do { addErrCtxt (pprSigCtxt ExprSigCtxt empty (ppr sig_ty)) $
+        emitWildcardHoleConstraints wc_prs
+      ; sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
       ; (gen_fn, expr')
             <- tcGen ExprSigCtxt sig_tc_ty $ \ skol_tvs res_ty ->
 
@@ -234,9 +235,7 @@ tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
       ; let inner_expr = ExprWithTySigOut (mkLHsWrap gen_fn expr') sig_ty
 
       ; (inst_wrap, rho) <- deeplyInstantiate ExprSigOrigin sig_tc_ty
-      ; addErrCtxt (pprSigCtxt ExprSigCtxt empty (ppr sig_ty)) $
-        emitWildcardHoleConstraints (zip wcs nwc_tvs)
-      ; tcWrapResult (mkHsWrap inst_wrap inner_expr) rho res_ty } }
+      ; tcWrapResult (mkHsWrap inst_wrap inner_expr) rho res_ty }
 
 tcExpr (HsType ty) _
   = failWithTc (text "Can't handle type argument:" <+> ppr ty)
