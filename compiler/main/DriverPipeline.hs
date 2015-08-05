@@ -1903,32 +1903,9 @@ linkBinary' staticLink dflags o_files dep_packages = do
                                                               -- This option must be placed before the library
                                                               -- that defines the symbol."
 
-    pkg_framework_path_opts <-
-        if platformUsesFrameworks platform
-        then do pkg_framework_paths <- getPackageFrameworkPath dflags dep_packages
-                return $ map ("-F" ++) pkg_framework_paths
-        else return []
-
-    framework_path_opts <-
-        if platformUsesFrameworks platform
-        then do let framework_paths = frameworkPaths dflags
-                return $ map ("-F" ++) framework_paths
-        else return []
-
-    pkg_framework_opts <-
-        if platformUsesFrameworks platform
-        then do pkg_frameworks <- getPackageFrameworks dflags dep_packages
-                return $ concat [ ["-framework", fw] | fw <- pkg_frameworks ]
-        else return []
-
-    framework_opts <-
-        if platformUsesFrameworks platform
-        then do let frameworks = cmdlineFrameworks dflags
-                -- reverse because they're added in reverse order from
-                -- the cmd line:
-                return $ concat [ ["-framework", fw]
-                                | fw <- reverse frameworks ]
-        else return []
+    -- frameworks
+    pkg_framework_opts <- getPkgFrameworkOpts dflags platform dep_packages
+    let framework_opts = getFrameworkOpts dflags platform
 
         -- probably _stub.o files
     let extra_ld_inputs = ldInputs dflags
@@ -2017,12 +1994,10 @@ linkBinary' staticLink dflags o_files dep_packages = do
                       ++ extra_ld_inputs
                       ++ map SysTools.Option (
                          rc_objs
-                      ++ framework_path_opts
                       ++ framework_opts
                       ++ pkg_lib_path_opts
                       ++ extraLinkObj:noteLinkObjs
                       ++ pkg_link_opts
-                      ++ pkg_framework_path_opts
                       ++ pkg_framework_opts
                       ++ debug_opts
                       ++ thread_opts
