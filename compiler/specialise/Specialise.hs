@@ -21,7 +21,6 @@ import VarSet
 import VarEnv
 import CoreSyn
 import Rules
-import PprCore          ( pprParendExpr )
 import CoreUtils        ( exprIsTrivial, applyTypeToArgs )
 import CoreFVs          ( exprFreeVars, exprsFreeVars, idFreeVars )
 import UniqSupply
@@ -585,7 +584,7 @@ specProgram guts@(ModGuts { mg_module = this_mod
        ; hpt_rules <- getRuleBase
        ; let rule_base = extendRuleBaseList hpt_rules local_rules
        ; (new_rules, spec_binds) <- specImports dflags this_mod top_env emptyVarSet
-                                                rule_base (ud_calls uds)
+                                                [] rule_base (ud_calls uds)
 
              -- Don't forget to wrap the specialized bindings with bindings
              -- for the needed dictionaries.
@@ -641,13 +640,14 @@ specImports :: DynFlags
             -> SpecEnv          -- Passed in so that all top-level Ids are in scope
             -> VarSet           -- Don't specialise these ones
                                 -- See Note [Avoiding recursive specialisation]
+            -> [Id]             -- Stack of imported functions being specialised
             -> RuleBase         -- Rules from this module and the home package
                                 -- (but not external packages, which can change)
             -> CallDetails      -- Calls for imported things, and floating bindings
             -> CoreM ( [CoreRule]   -- New rules
                      , [CoreBind] ) -- Specialised bindings
                                     -- See Note [Wrapping bindings returned by specImports]
-specImports dflags this_mod top_env done rule_base cds
+specImports dflags this_mod top_env done callers rule_base cds
   -- See Note [Disabling cross-module specialisation]
   | not $ gopt Opt_CrossModuleSpecialise dflags =
     return ([], [])
@@ -660,7 +660,8 @@ specImports dflags this_mod top_env done rule_base cds
     go :: RuleBase -> [CallInfoSet] -> CoreM ([CoreRule], [CoreBind])
     go _ [] = return ([], [])
     go rb (CIS fn calls_for_fn : other_calls)
-      = do { (rules1, spec_binds1) <- specImport dflags this_mod top_env done rb fn $
+      = do { (rules1, spec_binds1) <- specImport dflags this_mod top_env
+                                                 done callers rb fn $
                                       Map.toList calls_for_fn
            ; (rules2, spec_binds2) <- go (extendRuleBaseList rb rules1) other_calls
            ; return (rules1 ++ rules2, spec_binds1 ++ spec_binds2) }
@@ -670,11 +671,12 @@ specImport :: DynFlags
            -> SpecEnv               -- Passed in so that all top-level Ids are in scope
            -> VarSet                -- Don't specialise these
                                     -- See Note [Avoiding recursive specialisation]
+           -> [Id]                  -- Stack of imported functions being specialised
            -> RuleBase              -- Rules from this module
            -> Id -> [CallInfo]      -- Imported function and calls for it
            -> CoreM ( [CoreRule]    -- New rules
                     , [CoreBind] )  -- Specialised bindings
-specImport dflags this_mod top_env done rb fn calls_for_fn
+specImport dflags this_mod top_env done callers rb fn calls_for_fn
   | fn `elemVarSet` done
   = return ([], [])     -- No warning.  This actually happens all the time
                         -- when specialising a recursive function, because
@@ -705,9 +707,11 @@ specImport dflags this_mod top_env done rb fn calls_for_fn
 
               -- Now specialise any cascaded calls
        ; (rules2, spec_binds2) <- -- pprTrace "specImport 2" (ppr fn $$ ppr rules1 $$ ppr spec_binds1) $
-                                  specImports dflags this_mod top_env (extendVarSet done fn)
-                                                     (extendRuleBaseList rb rules1)
-                                                     (ud_calls uds)
+                                  specImports dflags this_mod top_env
+                                              (extendVarSet done fn)
+                                              (fn:callers)
+                                              (extendRuleBaseList rb rules1)
+                                              (ud_calls uds)
 
              -- Don't forget to wrap the specialized bindings with bindings
              -- for the needed dictionaries
@@ -717,14 +721,27 @@ specImport dflags this_mod top_env done rb fn calls_for_fn
 
        ; return (rules2 ++ rules1, final_binds) }
 
+  |  warnMissingSpecs dflags callers
+  = do { warnMsg (vcat [ hang (ptext (sLit "Could not specialise imported function") <+> quotes (ppr fn))
+                            2 (vcat [ ptext (sLit "when specialising") <+> quotes (ppr caller)
+                                    | caller <- callers])
+                      , ifPprDebug (ptext (sLit "calls:") <+> vcat (map (pprCallInfo fn) calls_for_fn))
+                      , ptext (sLit "Probable fix: add INLINEABLE pragma on") <+> quotes (ppr fn) ])
+       ; return ([], []) }
+
   | otherwise
-  = WARN( True, hang (ptext (sLit "specImport discarding:") <+> ppr fn <+> dcolon <+> ppr (idType fn))
-                   2 (  (text "want:" <+> ppr (wantSpecImport dflags unfolding))
-                     $$ (text "stable:" <+> ppr (isStableUnfolding unfolding))
-                     $$ (text "calls:" <+> vcat (map (pprCallInfo fn) calls_for_fn)) ) )
-    return ([], [])
+  = return ([], [])
   where
     unfolding = realIdUnfolding fn   -- We want to see the unfolding even for loop breakers
+
+warnMissingSpecs :: DynFlags -> [Id] -> Bool
+-- See Note [Warning about missed specialisations]
+warnMissingSpecs dflags callers
+  | wopt Opt_WarnAllMissedSpecs dflags = True
+  | null callers                       = False
+  | otherwise                          = all has_inline_prag callers
+  where
+    has_inline_prag id = isAnyInlinePragma (idInlinePragma id)
 
 wantSpecImport :: DynFlags -> Unfolding -> Bool
 -- See Note [Specialise imported INLINABLE things]
@@ -741,7 +758,23 @@ wantSpecImport dflags unf
                -- inside it that we want to specialise
        | otherwise -> False    -- Stable, not INLINE, hence INLINEABLE
 
-{-
+{- Note [Warning about missed specialisations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose
+ * In module Lib, you carefully mark a function 'foo' INLINEABLE
+ * Import Lib(foo) into another module M
+ * Call 'foo' at some specialised type in M
+Then you jolly well expect it to be specialised in M.  But what if
+'foo' calls another fuction 'Lib.bar'.  Then you'd like 'bar' to be
+specialised too.  But if 'bar' is not marked INLINEABLE it may well
+not be specialised.  The warning Opt_WarnMissedSpecs warns about this.
+
+It's more noisy to warning about a missed specialisation opportunity
+for /every/ overloaded imported function, but sometimes useful. That
+is what Opt_WarnAllMissedSpecs does.
+
+ToDo: warn about missed opportunities for local functions.
+
 Note [Specialise imported INLINABLE things]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 What imported functions do we specialise?  The basic set is
@@ -1674,9 +1707,9 @@ instance Outputable CallInfoSet where
                         2 (ppr map)
 
 pprCallInfo :: Id -> CallInfo -> SDoc
-pprCallInfo fn (CallKey mb_tys, (dxs, _))
+pprCallInfo fn (CallKey mb_tys, (_dxs, _))
   = hang (ppr fn)
-       2 (fsep (map ppr_call_key_ty mb_tys ++ map pprParendExpr dxs))
+       2 (fsep (map ppr_call_key_ty mb_tys {- ++ map pprParendExpr _dxs -}))
 
 ppr_call_key_ty :: Maybe Type -> SDoc
 ppr_call_key_ty Nothing   = char '_'

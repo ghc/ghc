@@ -524,7 +524,8 @@ data WarningFlag =
    | Opt_WarnUnsafe
    | Opt_WarnSafe
    | Opt_WarnTrustworthySafe
-   | Opt_WarnPointlessPragmas
+   | Opt_WarnMissedSpecs
+   | Opt_WarnAllMissedSpecs
    | Opt_WarnUnsupportedCallingConventions
    | Opt_WarnUnsupportedLlvmVersion
    | Opt_WarnInlineRuleShadowing
@@ -2907,7 +2908,8 @@ fWarningFlags = [
   flagSpec "warn-orphans"                     Opt_WarnOrphans,
   flagSpec "warn-overflowed-literals"         Opt_WarnOverflowedLiterals,
   flagSpec "warn-overlapping-patterns"        Opt_WarnOverlappingPatterns,
-  flagSpec "warn-pointless-pragmas"           Opt_WarnPointlessPragmas,
+  flagSpec "warn-missed-specialisations"      Opt_WarnMissedSpecs,
+  flagSpec "warn-all-missed-specialisations"  Opt_WarnAllMissedSpecs,
   flagSpec' "warn-safe"                       Opt_WarnSafe setWarnSafe,
   flagSpec "warn-trustworthy-safe"            Opt_WarnTrustworthySafe,
   flagSpec "warn-tabs"                        Opt_WarnTabs,
@@ -3389,7 +3391,6 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnTypedHoles,
         Opt_WarnPartialTypeSignatures,
         Opt_WarnUnrecognisedPragmas,
-        Opt_WarnPointlessPragmas,
         Opt_WarnRedundantConstraints,
         Opt_WarnDuplicateExports,
         Opt_WarnOverflowedLiterals,
@@ -3403,7 +3404,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnAlternativeLayoutRuleTransitional,
         Opt_WarnUnsupportedLlvmVersion,
         Opt_WarnContextQuantification,
-        Opt_WarnTabs
+        Opt_WarnTabs,
+        Opt_WarnMissedSpecs
       ]
 
 minusWOpts :: [WarningFlag]
@@ -3431,7 +3433,8 @@ minusWallOpts
         Opt_WarnOrphans,
         Opt_WarnUnusedDoBind,
         Opt_WarnTrustworthySafe,
-        Opt_WarnUntickedPromotedConstructors
+        Opt_WarnUntickedPromotedConstructors,
+        Opt_WarnAllMissedSpecs
       ]
 
 enableUnusedBinds :: DynP ()
