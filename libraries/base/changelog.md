@@ -48,6 +48,9 @@
   * New function `GHC.IO.interruptible` used to correctly implement
     `Control.Exception.allowInterrupt` (#9516)
 
+  * Made `PatternMatchFail`, `RecSelError`, `RecConError`, `RecUpdError`,
+    `NoMethodError`, and `AssertionFailed` newtypes (#10738)
+
 ## 4.8.1.0  *TBA*
 
   * Bundled with GHC 7.10.2
