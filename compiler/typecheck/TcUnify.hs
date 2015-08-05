@@ -726,7 +726,9 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
      -- typecheck/should_compile/T4284.
                  |  otherwise
                  -> do { (wrap, rho_a) <- deeplyInstantiate inst_orig ty_actual
-                       ; cow <- uType eq_orig rho_a ty_expected
+                       ; cow <- unifyType rho_a ty_expected
+                            -- NB: unifyType, not uType. We want to refresh
+                            -- the TypeEqOrigin to use the inst'ed type
                        ; return (coToHsWrapper cow <.> wrap) } }
 
     go (FunTy act_arg act_res) (FunTy exp_arg exp_res)
