@@ -529,15 +529,15 @@ reduceDoc p              = p
 
 -- | List version of '<>'.
 hcat :: [Doc] -> Doc
-hcat = foldr (<>)  empty
+hcat = reduceAB . foldr (beside_' False) empty
 
 -- | List version of '<+>'.
 hsep :: [Doc] -> Doc
-hsep = foldr (<+>) empty
+hsep = reduceAB . foldr (beside_' True)  empty
 
 -- | List version of '$$'.
 vcat :: [Doc] -> Doc
-vcat = foldr ($$)  empty
+vcat = reduceAB . foldr (above_' False) empty
 
 -- | Nest (or indent) a document by a given number of positions
 -- (which may also be negative).  'nest' satisfies the laws:
@@ -583,6 +583,19 @@ mkNest k p                 = nest_ k p
 mkUnion :: Doc -> Doc -> Doc
 mkUnion Empty _ = Empty
 mkUnion p q     = p `union_` q
+
+beside_' :: Bool -> Doc -> Doc -> Doc
+beside_' _ p Empty = p
+beside_' g p q     = Beside p g q
+
+above_' :: Bool -> Doc -> Doc -> Doc
+above_' _ p Empty = p
+above_' g p q     = Above p g q
+
+reduceAB :: Doc -> Doc
+reduceAB (Above  Empty _ q) = q
+reduceAB (Beside Empty _ q) = q
+reduceAB doc                = doc
 
 nilAbove_ :: RDoc -> RDoc
 nilAbove_ = NilAbove
