@@ -1655,8 +1655,10 @@ addFunResCtxt has_args fun fun_res_ty env_ty
     mk_msg
       = do { fun_res' <- zonkTcType fun_res_ty
            ; env'     <- zonkTcType env_ty
-           ; let (args_fun, res_fun) = tcSplitFunTys fun_res'
-                 (args_env, res_env) = tcSplitFunTys env'
+           ; let (_, _, fun_tau) = tcSplitSigmaTy fun_res'
+                 (_, _, env_tau) = tcSplitSigmaTy env'
+                 (args_fun, res_fun) = tcSplitFunTys fun_tau
+                 (args_env, res_env) = tcSplitFunTys env_tau
                  n_fun = length args_fun
                  n_env = length args_env
                  info  | n_fun == n_env = Outputable.empty
