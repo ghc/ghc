@@ -4,13 +4,12 @@ module Util (
     replaceIf, replaceEq, replaceSeparators,
     unifyPath, (-/-),
     chunksOfSize,
-    putColoured, putOracle, putBuild, putError, putError_,
+    putColoured, putOracle, putBuild, putError,
     bimap, minusOrd, intersectOrd
     ) where
 
 import Base
 import Data.Char
-import Control.Monad
 import System.IO
 import System.Console.ANSI
 
@@ -69,9 +68,6 @@ putError :: String -> Action a
 putError msg = do
     putColoured Red msg
     error $ "GHC build system error: " ++ msg
-
-putError_ :: String -> Action ()
-putError_ = void . putError
 
 -- Depending on Data.Bifunctor only for this function seems an overkill
 bimap :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)

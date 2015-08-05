@@ -31,8 +31,8 @@ configOracle = do
     let configFile = configPath -/- "system.config"
     cfg <- newCache $ \() -> do
         unlessM (doesFileExist $ configFile <.> "in") $
-            putError_ $ "\nConfiguration file '" ++ (configFile <.> "in")
-                      ++ "' is missing; unwilling to proceed."
+            putError $ "\nConfiguration file '" ++ (configFile <.> "in")
+                     ++ "' is missing; unwilling to proceed."
         need [configFile]
         putOracle $ "Reading " ++ configFile ++ "..."
         liftIO $ readConfigFile configFile
