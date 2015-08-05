@@ -168,6 +168,27 @@ matchFunTys herald arity res_ty thing_inside
 \subsection{tcMatch}
 *                                                                      *
 ************************************************************************
+
+Note [Case branches must be taus]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  case ... of
+    ... -> \(x :: forall a. a -> a) -> x
+    ... -> \y -> y
+
+Should that type-check? The problem is that, if we check the second branch
+first, then we'll get a type (b -> b) for the branches, which won't unify
+with the polytype in the first branch. If we check the first branch first,
+then everything is OK. This order-dependency is terrible. So we want only
+proper tau-types in branches. This is what tauTvsForReturnsTvs ensures:
+it gets rid of those pesky ReturnTvs that might unify with polytypes.
+
+But we make a special case for a one-branch case. This is so that
+
+  f = \(x :: forall a. a -> a) -> x
+
+still gets assigned a polytype.
 -}
 
 -- | Type-check a MatchGroup. This deeply instantiates the return
@@ -195,7 +216,7 @@ tcMatches ctxt pat_tys rhs_ty group@(MG { mg_alts = matches, mg_origin = origin 
                     ; return ([match'], idHsWrapper, rhs_ty, ct_orig) }
                Nothing ->
                  do { rhs_ty' <- tauTvsForReturnTvs rhs_ty
-                      -- TODO (RAE): Document this behavior.
+                      -- See Note [Case branches must be taus]
                     ; (matches', _)
                         <- mapAndUnzipM (tcMatch ctxt pat_tys rhs_ty') matches
                     ; wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "tcMatches1")
