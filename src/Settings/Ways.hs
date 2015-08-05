@@ -1,7 +1,6 @@
 module Settings.Ways (
     ways, getWays,
-    rtsWays, getRtsWays,
-    knownWays, knownRtsWays
+    rtsWays, getRtsWays
     ) where
 
 import Way
@@ -40,14 +39,3 @@ defaultRtsWays = do
         , (dynamic `elem` ways) ?
           append [ dynamic, debugDynamic, threadedDynamic, threadedDebugDynamic
                  , loggingDynamic, threadedLoggingDynamic ] ]
-
--- These are all ways known to the build system
-knownWays :: [Way]
-knownWays = [vanilla, profiling, logging, parallel, granSim]
-
-knownRtsWays :: [Way]
-knownRtsWays = [ threaded, threadedProfiling, threadedLogging, debug
-               , debugProfiling, threadedDebug, threadedDebugProfiling, dynamic
-               , profilingDynamic, threadedProfilingDynamic, threadedDynamic
-               , threadedDebugDynamic, debugDynamic, loggingDynamic
-               , threadedLoggingDynamic ]
