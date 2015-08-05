@@ -168,18 +168,16 @@ checkModule mdl = do
                 then Pass
                 else Fail
         else return NoRef
-  where
-    readXml = liftM Xml.parseXMLDoc . readFile
 
 
 diffModule :: FilePath -> String -> IO ()
 diffModule diff mdl = do
-    out <- readFile $ outFile mdl
-    ref <- readFile $ refFile mdl
-    let out' = stripLinks . dropVersion $ out
-    let ref' = stripLinks . dropVersion $ ref
-    writeFile outFile' out'
-    writeFile refFile' ref'
+    Just outXml <- readXml $ outFile mdl
+    Just refXml <- readXml $ refFile mdl
+    let outXml' = strip outXml
+    let refXml' = strip refXml
+    writeFile outFile' $ Xml.ppElement outXml'
+    writeFile refFile' $ Xml.ppElement refXml'
 
     putStrLn $ "Diff for module " ++ show mdl ++ ":"
     handle <- runProcess' diff $ processConfig
@@ -265,12 +263,16 @@ deriving instance Eq Xml.Element
 deriving instance Eq Xml.CData
 
 
+readXml :: FilePath -> IO (Maybe Xml.Element)
+readXml = liftM Xml.parseXMLDoc . readFile
+
+
 strip :: Xml.Element -> Xml.Element
 strip =
     everywhere (mkT unlink)
   where
     unlink attr@(Xml.Attr { attrKey = key })
-        | Xml.qName key == "href" = attr { Xml.attrVal = "" }
+        | Xml.qName key == "href" = attr { Xml.attrVal = "#" }
         | otherwise = attr
 
 
