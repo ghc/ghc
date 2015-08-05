@@ -27,7 +27,7 @@ module TcUnify (
   matchExpectedPArrTy,
   matchExpectedTyConApp,
   matchExpectedAppTy,
-  matchExpectedFunTys,
+  matchExpectedFunTys, matchExpectedFunTysPart,
   matchExpectedFunKind,
   newOverloadedLit,
   wrapFunResCoercion
@@ -168,7 +168,20 @@ matchExpectedFunTys :: ExpOrAct
                     -> Arity
                     -> TcSigmaType
                     -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
-matchExpectedFunTys ea herald arity orig_ty = go arity id orig_ty
+matchExpectedFunTys ea herald arity ty
+  = matchExpectedFunTysPart ea herald arity ty id arity
+
+-- | Variant of 'matchExpectedFunTys' that works when supplied only part
+-- (that is, to the right of some arrows) of the full function type
+matchExpectedFunTysPart :: ExpOrAct
+                        -> SDoc -- See Note [Herald for matchExpectedFunTys]
+                        -> Arity
+                        -> TcSigmaType
+                        -> (TcSigmaType -> TcSigmaType) -- see (*) below
+                        -> Arity   -- overall arity of the function, for errs
+                        -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
+matchExpectedFunTysPart ea herald arity orig_ty mk_full_ty full_arity
+  = go arity mk_full_ty orig_ty
 -- If    matchExpectFunTys n ty = (wrap, [t1,..,tn], ty_r)
 -- then  wrap : ty "->" (t1 -> ... -> tn -> ty_r)
 --
@@ -178,6 +191,13 @@ matchExpectedFunTys ea herald arity orig_ty = go arity id orig_ty
 --              (forall a. ty) -> other
 -- If allocated (fresh-meta-var1 -> fresh-meta-var2) and unified, we'd
 -- hide the forall inside a meta-variable
+
+-- (*) Sometimes it's necessary to call matchExpectedFunTys with only part
+-- (that is, to the right of some arrows) of the type of the function in
+-- question. (See TcExpr.tcArgs.) So, this function takes the part of the
+-- type that matchExpectedFunTys has and returns the full type, from the
+-- beginning. This is helpful for error messages.
+
   where
     -- If     go n ty = (co, [t1,..,tn], ty_r)
     -- then   Actual:   wrap : ty "->" (t1 -> .. -> tn -> ty_r)
@@ -262,8 +282,8 @@ matchExpectedFunTys ea herald arity orig_ty = go arity id orig_ty
            ; return (env'', mk_msg full_ty' ty n_actual) }
 
     mk_msg full_ty ty n_args
-      = herald <+> speakNOf arity (text "argument") <> comma $$
-        if n_args == arity
+      = herald <+> speakNOf full_arity (text "argument") <> comma $$
+        if n_args == full_arity
           then ptext (sLit "its type is") <+> quotes (pprType full_ty) <>
                comma $$
                ptext (sLit "it is specialized to") <+> quotes (pprType ty)

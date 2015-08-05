@@ -1,14 +1,13 @@
 
-T3950.hs:15:13: error:
+T3950.hs:15:8: error:
     Couldn't match kind ‘* -> *’ with ‘*’
     When matching types
       w :: (* -> * -> *) -> *
       Sealed :: (* -> *) -> *
-    Expected type: w (Id p)
-      Actual type: Sealed (Id p0 x0)
+    Expected type: Maybe (w (Id p))
+      Actual type: Maybe (Sealed (Id p0 x0))
     Relevant bindings include
       rp :: Bool -> Maybe (w (Id p)) (bound at T3950.hs:15:1)
-    In the first argument of ‘Just’, namely ‘rp'’
     In the expression: Just rp'
     In an equation for ‘rp’:
         rp _

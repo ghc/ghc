@@ -1038,11 +1038,11 @@ tcArgs :: LHsExpr Name   -- ^ The function itself (for err msgs only)
        -> TcM (HsWrapper, [LHsExpr TcId], TcSigmaType)
           -- ^ (a wrapper for the function, the tc'd args, result type)
 tcArgs fun orig_fun_ty fun_orig orig_args herald
-  = go 1 orig_fun_ty orig_args
+  = go id 1 orig_fun_ty orig_args
   where
-    go _ fun_ty [] = return (idHsWrapper, [], fun_ty)
+    go _ _ fun_ty [] = return (idHsWrapper, [], fun_ty)
 
-    go n fun_ty (arg:args)
+    go mk_full_ty n fun_ty (arg:args)
       | Just hs_ty_arg@(hs_ty, _wcs) <- isLHsTypeExpr_maybe arg
       = do { (wrap1, upsilon_ty) <- topInstantiateInferred fun_orig fun_ty
                -- wrap1 :: fun_ty "->" upsilon_ty
@@ -1052,7 +1052,8 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
                  do { let kind = tyVarKind tv
                     ; ty_arg <- tcHsTypeApp hs_ty_arg kind
                     ; let insted_ty = substTyWith [tv] [ty_arg] inner_ty
-                    ; (inner_wrap, args', res_ty) <- go (n+1) insted_ty args
+                    ; (inner_wrap, args', res_ty)
+                        <- go mk_full_ty (n+1) insted_ty args
                    -- inner_wrap :: insted_ty "->" (map typeOf args') -> res_ty
                     ; let inst_wrap = mkWpTyApps [ty_arg]
                     ; return ( inner_wrap <.> inst_wrap <.> wrap1
@@ -1062,10 +1063,13 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
 
       | otherwise   -- not a type application.
       = do { (wrap, [arg_ty], res_ty)
-               <- matchExpectedFunTys (Actual fun_orig) herald 1 fun_ty
+               <- matchExpectedFunTysPart (Actual fun_orig) herald 1 fun_ty
+                                          mk_full_ty (length orig_args)
                -- wrap :: fun_ty "->" arg_ty -> res_ty
            ; arg' <- tcArg fun (arg, arg_ty, n)
-           ; (inner_wrap, args', inner_res_ty) <- go (n+1) res_ty args
+           ; let mk_full_ty' res_ty' = mk_full_ty (mkFunTy arg_ty res_ty')
+           ; (inner_wrap, args', inner_res_ty)
+               <- go mk_full_ty' (n+1) res_ty args
                -- inner_wrap :: res_ty "->" (map typeOf args') -> inner_res_ty
            ; return ( mkWpFun idHsWrapper inner_wrap arg_ty res_ty <.> wrap
                     , arg' : args'
