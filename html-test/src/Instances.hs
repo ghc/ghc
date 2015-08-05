@@ -3,9 +3,13 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ImpredicativeTypes #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 
 module Instances where
+
+
+newtype (<~~) a b = Xyzzy (b -> (a, a))
 
 
 class Foo f where
@@ -21,6 +25,8 @@ instance Foo []
 instance (Eq a, Foo f) => Foo ((,) (f a))
 instance Foo (Either a)
 instance Foo ((,,) a a)
+instance Foo ((->) a)
+instance Foo ((<~~) a)
 
 
 class Foo f => Bar f a where
