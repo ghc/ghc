@@ -6,3 +6,4 @@ T2534.hs:3:13: error:
     Relevant bindings include foo :: [b0] (bound at T2534.hs:3:1)
     In the first argument of ‘foldr’, namely ‘(>>=)’
     In the expression: foldr (>>=) [] []
+    In an equation for ‘foo’: foo = foldr (>>=) [] []
