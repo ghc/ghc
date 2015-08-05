@@ -489,17 +489,18 @@ rnHsBndrSig :: HsDocContext
 rnHsBndrSig doc (HsWB { hswb_cts = ty@(L loc _) }) thing_inside
   = do { sig_ok <- xoptM Opt_ScopedTypeVariables
        ; unless sig_ok (badSigErr True doc ty)
-       ; let (kv_bndrs, tv_bndrs) = extractHsTyRdrTyVars ty
-       ; name_env <- getLocalRdrEnv
-       ; tv_names <- newLocalBndrsRn [L loc tv | tv <- tv_bndrs
-                                               , not (tv `elemLocalRdrEnv` name_env) ]
-       ; kv_names <- newLocalBndrsRn [L loc kv | kv <- kv_bndrs
-                                               , not (kv `elemLocalRdrEnv` name_env) ]
+       ; rdr_env <- getLocalRdrEnv
+       ; let (kv_bndrs, tv_bndrs) = filterInScope rdr_env $
+                                    extractHsTyRdrTyVars ty
+       ; kv_names <- newLocalBndrsRn (map (L loc) kv_bndrs)
+       ; tv_names <- newLocalBndrsRn (map (L loc) tv_bndrs)
        ; bindLocalNamesFV kv_names $
          bindLocalNamesFV tv_names $
     do { (ty', fvs1, wcs) <- rnLHsTypeWithWildCards doc ty
-       ; (res, fvs2) <- thing_inside (HsWB { hswb_cts = ty', hswb_kvs = kv_names,
-                                             hswb_tvs = tv_names, hswb_wcs = wcs })
+       ; (res, fvs2) <- thing_inside (HsWB { hswb_cts = ty'
+                                           , hswb_kvs = kv_names
+                                           , hswb_tvs = tv_names
+                                           , hswb_wcs = wcs })
        ; return (res, fvs1 `plusFV` fvs2) } }
 
 overlappingKindVars :: HsDocContext -> [RdrName] -> SDoc
