@@ -1,6 +1,7 @@
 #!/usr/bin/env runhaskell
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 
 import Control.Applicative
@@ -25,6 +26,8 @@ import System.Exit
 import System.FilePath
 import System.IO
 import System.Process
+
+import qualified Text.XML.Light as Xml
 
 
 baseDir, rootDir :: FilePath
@@ -157,12 +160,14 @@ checkModule mdl = do
     hasRef <- doesFileExist $ refFile mdl
     if hasRef
         then do
-            out <- readFile $ outFile mdl
-            ref <- readFile $ refFile mdl
-            return $ if haddockEq (outFile mdl, out) (refFile mdl, ref)
+            Just outXml <- readXml $ outFile mdl
+            Just refXml <- readXml $ refFile mdl
+            return $ if strip outXml == strip refXml
                 then Pass
                 else Fail
         else return NoRef
+  where
+    readXml = liftM Xml.parseXMLDoc . readFile
 
 
 diffModule :: FilePath -> String -> IO ()
@@ -251,6 +256,15 @@ isSourceFile path = takeExtension path `elem` [".hs", ".lhs"]
 
 modulePath :: String -> FilePath
 modulePath mdl = srcDir </> mdl <.> "hs"
+
+
+deriving instance Eq Xml.Content
+deriving instance Eq Xml.Element
+deriving instance Eq Xml.CData
+
+
+strip :: Xml.Element -> Xml.Element
+strip = id -- TODO.
 
 
 data Flag
