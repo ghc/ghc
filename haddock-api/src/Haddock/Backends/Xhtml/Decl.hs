@@ -892,7 +892,12 @@ ppr_mono_ty ctxt_prec (HsOpTy ty1 (_, op) ty2) unicode qual
   = maybeParen ctxt_prec pREC_FUN $
     ppr_mono_lty pREC_OP ty1 unicode qual <+> ppr_op <+> ppr_mono_lty pREC_OP ty2 unicode qual
   where
-    ppr_op = ppLDocName qual Infix op
+    -- `(:)` is valid in type signature only as constructor to promoted list
+    -- and needs to be quoted in code so we explicitly quote it here too.
+    ppr_op
+        | (getOccString . getName . unLoc) op == ":" = promoQuote ppr_op'
+        | otherwise = ppr_op'
+    ppr_op' = ppLDocName qual Infix op
 
 ppr_mono_ty ctxt_prec (HsParTy ty) unicode qual
 --  = parens (ppr_mono_lty pREC_TOP ty)
