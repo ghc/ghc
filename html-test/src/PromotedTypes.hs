@@ -2,7 +2,9 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TypeOperators #-}
-module AdvanceTypes where
+
+
+module PromotedTypes where
 
 
 data RevList a = RNil | RevList a :> a
