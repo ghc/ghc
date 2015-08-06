@@ -180,8 +180,10 @@ diffModule diff mdl = do
     writeFile refFile' $ Xml.ppElement refXml'
 
     putStrLn $ "Diff for module " ++ show mdl ++ ":"
+    hFlush stdout
     handle <- runProcess' diff $ processConfig
         { pcArgs = [outFile', refFile']
+        , pcStdOut = Just $ stdout
         }
     waitForProcess handle >> return ()
   where
