@@ -2658,6 +2658,16 @@ not have a type signature, visible type application cannot be used.</para>
   we can have <literal>pair :: forall a. a -> forall b. b -> (a, b)</literal>
   and then say <literal>pair @Bool True @Char</literal> which would have
   type <literal>Char -> (Bool, Char)</literal>.</para></listitem>
+
+  <listitem><para>Partial type signatures (<xref
+  linkend="partial-type-signatures"/>) work nicely with visible type
+  application. If you want to specify only the second type argument to
+  <literal>wurble</literal>, then you can say <literal>wurble @_ @Int</literal>.
+  The first argument is a wildcard, just like in a partial type signature.
+  However, if used in a visible type application, it is <emphasis>not</emphasis>
+  necessary to specify <option>-XPartialTypeSignatures</option> and your
+  code will not generate a warning informing you of the omitted type.
+  </para></listitem>
 </itemizedlist>
 
 </sect3>
