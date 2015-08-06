@@ -1,7 +1,7 @@
 module Util (
     module Data.Char,
     module System.Console.ANSI,
-    replaceIf, replaceEq, replaceSeparators,
+    replaceIf, replaceEq, replaceSeparators, decodeModule,
     unifyPath, (-/-),
     chunksOfSize,
     putColoured, putOracle, putBuild, putError,
@@ -21,6 +21,11 @@ replaceEq from = replaceIf (== from)
 
 replaceSeparators :: Char -> String -> String
 replaceSeparators = replaceIf isPathSeparator
+
+-- Given a module name extract the directory and file names, e.g.:
+-- decodeModule "Data.Functor.Identity" = ("Data/Functor/", "Identity")
+decodeModule :: String -> (FilePath, String)
+decodeModule = splitFileName . replaceEq '.' '/'
 
 -- Normalise a path and convert all path separators to /, even on Windows.
 unifyPath :: FilePath -> FilePath

@@ -89,11 +89,6 @@ getHsSources = do
 
     return $ foundSources ++ generatedSources
 
--- Given a module name extract the directory and file names, e.g.:
--- decodeModule "Data.Functor.Identity" = ("Data/Functor/", "Identity")
-decodeModule :: String -> (FilePath, String)
-decodeModule = splitFileName . replaceEq '.' '/'
-
 -- findModuleFiles scans a list of given directories and finds files matching a
 -- given extension pattern (e.g., "*hs") that correspond to modules of the
 -- currently built package. Missing module files are returned in a separate
