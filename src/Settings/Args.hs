@@ -2,10 +2,12 @@ module Settings.Args (args, getArgs) where
 
 import Expression
 import Settings.User
-import Settings.GhcM
-import Settings.GccM
-import Settings.GhcPkg
-import Settings.GhcCabal
+import Settings.Builders.Ar
+import Settings.Builders.Ld
+import Settings.Builders.Ghc
+import Settings.Builders.Gcc
+import Settings.Builders.GhcPkg
+import Settings.Builders.GhcCabal
 
 args :: Args
 args = defaultArgs <> userArgs
@@ -28,4 +30,8 @@ defaultArgs = mconcat
     , ghcPkgArgs
     , ghcMArgs
     , gccMArgs
+    , ghcArgs
+    , gccArgs
+    , arArgs
+    , ldArgs
     , customPackageArgs ]

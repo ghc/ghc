@@ -1,4 +1,4 @@
-module Settings.GhcCabal (
+module Settings.Builders.GhcCabal (
     cabalArgs, bootPackageDbArgs, customPackageArgs
     ) where
 

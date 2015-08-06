@@ -1,4 +1,4 @@
-module Settings.Gcc (gccArgs, includeGccArgs) where
+module Settings.Builders.Gcc (gccArgs, gccMArgs) where
 
 import Base
 import Util
@@ -7,6 +7,7 @@ import Expression
 import Oracles.PackageData
 import Settings.Util
 
+-- TODO: check code duplication
 gccArgs :: Args
 gccArgs = stagedBuilder Gcc ? do
     path   <- getTargetPath
@@ -19,6 +20,24 @@ gccArgs = stagedBuilder Gcc ? do
             , append $ filter ("//*.c" ?==) deps
             , arg "-o"
             , arg file ]
+
+-- TODO: handle custom $1_$2_MKDEPENDC_OPTS and
+gccMArgs :: Args
+gccMArgs = stagedBuilder GccM ? do
+    path   <- getTargetPath
+    file   <- getFile
+    src    <- getDependency
+    ccArgs <- getPkgDataList CcArgs
+    mconcat
+        [ arg "-E"
+        , arg "-MM"
+        , append ccArgs -- TODO: remove? any other flags?
+        , includeGccArgs
+        , arg "-MF"
+        , arg file
+        , arg "-x"
+        , arg "c"
+        , arg src ]
 
 includeGccArgs :: Args
 includeGccArgs = do

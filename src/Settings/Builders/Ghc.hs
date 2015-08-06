@@ -1,4 +1,4 @@
-module Settings.Ghc (ghcArgs, packageGhcArgs, includeGhcArgs) where
+module Settings.Builders.Ghc (ghcArgs, ghcMArgs) where
 
 import Way
 import Util
@@ -9,7 +9,9 @@ import Expression
 import Oracles.Flag
 import Oracles.PackageData
 import Settings.Util
+import Settings.Ways
 
+-- TODO: check code duplication
 ghcArgs :: Args
 ghcArgs = stagedBuilder Ghc ? do
     way     <- getWay
@@ -36,6 +38,29 @@ ghcArgs = stagedBuilder Ghc ? do
         , arg "-rtsopts"            -- TODO: is this needed?
         , arg "-c", append srcs
         , arg "-o", arg file ]
+
+ghcMArgs :: Args
+ghcMArgs = stagedBuilder GhcM ? do
+    ways    <- getWays
+    hsSrcs  <- getHsSources
+    hsArgs  <- getPkgDataList HsArgs
+    cppArgs <- getPkgDataList CppArgs
+    path    <- getTargetPath
+    let buildPath = path -/- "build"
+    mconcat
+        [ arg "-M"
+        , packageGhcArgs
+        , includeGhcArgs
+        , append hsArgs
+        , append . map ("-optP" ++) $ cppArgs
+        , arg "-odir"        , arg buildPath
+        , arg "-stubdir"     , arg buildPath
+        , arg "-hidir"       , arg buildPath
+        , arg "-dep-makefile", arg $ buildPath -/- "haskell.deps"
+        , append . concatMap (\way -> ["-dep-suffix", wayPrefix way]) $ ways
+        , arg "-no-user-package-db" -- TODO: is this needed?
+        , arg "-rtsopts"            -- TODO: is this needed?
+        , append hsSrcs ]
 
 -- TODO: do '-ticky' in all debug ways?
 wayHcArgs :: Args
