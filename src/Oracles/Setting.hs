@@ -3,7 +3,7 @@ module Oracles.Setting (
     setting, settingList,
     targetPlatform, targetPlatforms, targetOs, targetOss, notTargetOs,
     targetArchs, windowsHost, notWindowsHost, ghcWithInterpreter,
-    ghcEnableTablesNextToCode
+    ghcEnableTablesNextToCode, cmdLineLengthLimit
     ) where
 
 import Base
@@ -96,3 +96,14 @@ ghcWithInterpreter = do
 
 ghcEnableTablesNextToCode :: Action Bool
 ghcEnableTablesNextToCode = targetArchs ["ia64", "powerpc64"]
+
+-- Command lines have limited size on Windows. Since Windows 7 the limit is
+-- 32768 characters (theoretically). In practice we use 31000 to leave some
+-- breathing space for the builder's path & name, auxiliary flags, and other
+-- overheads. Use this function to set limits for other OSs if necessary.
+cmdLineLengthLimit :: Action Int
+cmdLineLengthLimit = do
+    windows <- windowsHost
+    return $ if windows
+             then 31000
+             else 4194304 -- Cabal needs a bit more than 2MB!
