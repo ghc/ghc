@@ -13,8 +13,9 @@ T2431.$WRefl [InlPrag=INLINE] :: forall a. a :~: a
 T2431.$WRefl = \ (@ a) -> T2431.Refl @ a @ a @~ <a>_N
 
 absurd :: forall a. Int :~: Bool -> a
-[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <L,U>b]
-absurd = \ (@ a) (x :: Int :~: Bool) -> case x of _ [Occ=Dead] { }
+[GblId[sig], Arity=1, Caf=NoCafRefs, Str=DmdType <L,U>b]
+absurd =
+  \ (@ a) (ds :: Int :~: Bool) -> case ds of _ [Occ=Dead] { }
 
 
 

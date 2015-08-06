@@ -1,5 +1,5 @@
 
-T9681.hs:3:9:
+T9681.hs:3:7: error:
     No instance for (Num [Char]) arising from a use of ‘+’
     In the expression: 1 + "\n"
     In an equation for ‘foo’: foo = 1 + "\n"
