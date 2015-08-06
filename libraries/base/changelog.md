@@ -19,6 +19,12 @@
 
   * `(,) a` now has a `Monad` instance
 
+  * `ZipList` now has `Foldable` and `Traversable` instances
+
+  * `Identity` now has a `Monoid` instance
+
+  * `()` now has a `Storable` instance
+
   * Redundant typeclass constraints have been removed:
      - `Data.Ratio.{denominator,numerator}` have no `Integral` constraint anymore
      - **TODO**
@@ -29,7 +35,8 @@
 
   * New `GHC.Stack.CallStack` data type
 
-  * `Complex` now has a `Generic` instance
+  * `Complex` now has `Generic`, `Generic1`, `Functor`, `Foldable`, `Traversable`,
+    `Applicative`, and `Monad` instances
 
   * `System.Exit.ExitCode` now has a `Generic` instance
 
