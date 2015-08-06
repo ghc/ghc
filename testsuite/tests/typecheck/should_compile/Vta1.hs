@@ -1,7 +1,6 @@
 {-# LANGUAGE TypeApplications, ScopedTypeVariables, PolyKinds,
-             TypeFamilies, RankNTypes, PartialTypeSignatures,
+             TypeFamilies, RankNTypes,
              FlexibleContexts #-}
-{-# OPTIONS_GHC -fno-warn-partial-type-signatures #-}
 -- tests about visible type application
 
 module Vta1 where

@@ -237,12 +237,11 @@ tcHsTypeApp (hs_ty, wcs) kind
   = do { nwc_tvs <- mapM newWildcardVarMetaKind wcs
        ; tcExtendTyVarEnv nwc_tvs $
     do { ty <- tcCheckLHsType hs_ty kind
-
-       ; addErrCtxt (pprSigCtxt TypeAppCtxt empty (ppr hs_ty)) $
-         emitWildcardHoleConstraints (zip wcs nwc_tvs)
-
        ; checkValidType TypeAppCtxt ty
        ; return ty } }
+        -- NB: we don't call emitWildcardHoleConstraints here, because
+        -- we want any holes in visible type applications to be used
+        -- without fuss. No errors, warnings, extensions, etc.
 
 {-
         These functions are used during knot-tying in
