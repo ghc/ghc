@@ -147,7 +147,10 @@ sugarTuples typ =
 
 sugarOperators :: NamedThing name => HsType name -> HsType name
 sugarOperators (HsAppTy (L _ (HsAppTy (L loc (HsTyVar name)) la)) lb)
-    | isSymOcc $ getOccName name = mkHsOpTy la (L loc name) lb
+    | isSymOcc $ getOccName name' = mkHsOpTy la (L loc name) lb
+    | isBuiltInSyntax name' && getOccString name == "(->)" = HsFunTy la lb
+  where
+    name' = getName name
 sugarOperators typ = typ
 
 
