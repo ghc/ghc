@@ -2620,7 +2620,45 @@ to allow the import or export of a data constructor without its parent type cons
 <sect3 id="visible-type-application">
 <title>Visible type application</title>
 
-TODO
+<para>The <option>-XTypeApplications</option> extension allows you to use
+<emphasis>visible type application</emphasis> in expressions. Here is an
+example: <literal>show (read @Int 5)</literal>. The <literal>@Int</literal>
+is the visible type application; it specifies the value of the type variable
+in <literal>read</literal>'s type.</para>
+
+<para>A visible type application is preceded with an <literal>@</literal>
+sign. (To disambiguate the syntax, the <literal>@</literal> must be
+preceded with a non-identifier letter, usually a space. For example,
+<literal>read@Int 5</literal> would not parse.) It can be used whenever
+the full polymorphic type of the function is known. If the function
+is an identifier (the common case), its type is considered known only when
+the identifier has been given a type signature. If the identifier does
+not have a type signature, visible type application cannot be used.</para>
+
+<para>Here are the details:</para>
+
+<itemizedlist>
+  <listitem><para>If an identifier's type signature does not include an
+  explicit <literal>forall</literal>, the type variable arguments appear
+  in the left-to-right order in which the variables appear in the type.
+  So, <literal>foo :: Monad m => a b -> m (a c)</literal>
+  will have its type variables
+  ordered as <literal>m, a, b, c</literal>.
+  </para></listitem>
+
+  <listitem><para>Class methods' type arguments include the class type
+  variables, followed by any variables an individual method is polymorphic
+  in. So, <literal>class Monad m where return :: a -> m a</literal> means
+  that <literal>return</literal>'s type arguments are <literal>m, a</literal>.
+  </para></listitem>
+
+  <listitem><para>With the <option>-XRankNTypes</option> extension
+  (<xref linkend="universal-quantification"/>), it is possible to declare
+  type arguments somewhere other than the beginning of a type. For example,
+  we can have <literal>pair :: forall a. a -> forall b. b -> (a, b)</literal>
+  and then say <literal>pair @Bool True @Char</literal> which would have
+  type <literal>Char -> (Bool, Char)</literal>.</para></listitem>
+</itemizedlist>
 
 </sect3>
 
@@ -2789,6 +2827,18 @@ The following syntax is stolen:
 	  </para></listitem>
       </varlistentry>
     </variablelist>
+
+    <varlistentry>
+	<term>
+	  <replaceable>varid</replaceable><literal> @</literal>
+	  (as used in an as-pattern, with a space between the identifier
+	  and the <literal>@</literal>)
+	</term>
+	<listitem><para>
+	Stolen by: <option>-XTypeApplications</option>
+	  </para></listitem>
+      </varlistentry>
+
 </para>
 </sect2>
 </sect1>
