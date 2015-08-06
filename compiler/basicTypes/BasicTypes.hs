@@ -27,7 +27,7 @@ module BasicTypes(
 
         FunctionOrData(..),
 
-        WarningTxt(..),
+        WarningTxt(..), StringLiteral(..),
 
         Fixity(..), FixityDirection(..),
         defaultFixity, maxPrecedence, minPrecedence,
@@ -37,7 +37,7 @@ module BasicTypes(
         RecFlag(..), isRec, isNonRec, boolToRecFlag,
         Origin(..), isGenerated,
 
-        RuleName,
+        RuleName, pprRuleName,
 
         TopLevelFlag(..), isTopLevel, isNotTopLevel,
 
@@ -68,8 +68,10 @@ module BasicTypes(
         SwapFlag(..), flipSwap, unSwap, isSwapped,
 
         CompilerPhase(..), PhaseNum,
-        Activation(..), isActive, isActiveIn,
+
+        Activation(..), isActive, isActiveIn, competesWith,
         isNeverActive, isAlwaysActive, isEarlyActive,
+
         RuleMatchInfo(..), isConLike, isFunLike,
         InlineSpec(..), isEmptyInlineSpec,
         InlinePragma(..), defaultInlinePragma, alwaysInlinePragma,
@@ -266,20 +268,30 @@ initialVersion = 1
 ************************************************************************
 -}
 
+-- |A String Literal in the source, including its original raw format for use by
+-- source to source manipulation tools.
+data StringLiteral = StringLiteral
+                       { sl_st :: SourceText, -- literal raw source.
+                                              -- See not [Literal source text]
+                         sl_fs :: FastString  -- literal string value
+                       } deriving (Data, Typeable)
+
+instance Eq StringLiteral where
+  (StringLiteral _ a) == (StringLiteral _ b) = a == b
+
 -- reason/explanation from a WARNING or DEPRECATED pragma
--- For SourceText usage, see note [Pragma source text]
 data WarningTxt = WarningTxt (Located SourceText)
-                             [Located (SourceText,FastString)]
+                             [Located StringLiteral]
                 | DeprecatedTxt (Located SourceText)
-                                [Located (SourceText,FastString)]
+                                [Located StringLiteral]
     deriving (Eq, Data, Typeable)
 
 instance Outputable WarningTxt where
     ppr (WarningTxt    _ ws)
-                            = doubleQuotes (vcat (map (ftext . snd . unLoc) ws))
+                         = doubleQuotes (vcat (map (ftext . sl_fs . unLoc) ws))
     ppr (DeprecatedTxt _ ds)
-                            = text "Deprecated:" <+>
-                              doubleQuotes (vcat (map (ftext . snd . unLoc) ds))
+                         = text "Deprecated:" <+>
+                           doubleQuotes (vcat (map (ftext . sl_fs . unLoc) ds))
 
 {-
 ************************************************************************
@@ -290,6 +302,9 @@ instance Outputable WarningTxt where
 -}
 
 type RuleName = FastString
+
+pprRuleName :: RuleName -> SDoc
+pprRuleName rn = doubleQuotes (ftext rn)
 
 {-
 ************************************************************************
@@ -877,7 +892,7 @@ instance Outputable CompilerPhase where
 
 data Activation = NeverActive
                 | AlwaysActive
-                | ActiveBefore PhaseNum -- Active only *before* this phase
+                | ActiveBefore PhaseNum -- Active only *strictly before* this phase
                 | ActiveAfter PhaseNum  -- Active in this phase and later
                 deriving( Eq, Data, Typeable )  -- Eq used in comparing rules in HsDecls
 
@@ -1077,6 +1092,35 @@ isActiveIn _ NeverActive      = False
 isActiveIn _ AlwaysActive     = True
 isActiveIn p (ActiveAfter n)  = p <= n
 isActiveIn p (ActiveBefore n) = p >  n
+
+competesWith :: Activation -> Activation -> Bool
+-- See Note [Activation competition]
+competesWith NeverActive       _                = False
+competesWith _                 NeverActive      = False
+competesWith AlwaysActive      _                = True
+
+competesWith (ActiveBefore {}) AlwaysActive      = True
+competesWith (ActiveBefore {}) (ActiveBefore {}) = True
+competesWith (ActiveBefore a)  (ActiveAfter b)   = a < b
+
+competesWith (ActiveAfter {})  AlwaysActive      = False
+competesWith (ActiveAfter {})  (ActiveBefore {}) = False
+competesWith (ActiveAfter a)   (ActiveAfter b)   = a >= b
+
+{- Note [Competing activations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Sometimes a RULE and an inlining may compete, or two RULES.
+See Note [Rules and inlining/other rules] in Desugar.
+
+We say that act1 "competes with" act2 iff
+   act1 is active in the phase when act2 *becomes* active
+NB: remember that phases count *down*: 2, 1, 0!
+
+It's too conservative to ensure that the two are never simultaneously
+active.  For example, a rule might be always active, and an inlining
+might switch on in phase 2.  We could switch off the rule, but it does
+no harm.
+-}
 
 isNeverActive, isAlwaysActive, isEarlyActive :: Activation -> Bool
 isNeverActive NeverActive = True

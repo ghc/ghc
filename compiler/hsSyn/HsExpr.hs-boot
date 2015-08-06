@@ -3,9 +3,7 @@
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
-#if __GLASGOW_HASKELL__ > 706
 {-# LANGUAGE RoleAnnotations #-}
-#endif
 
 module HsExpr where
 
@@ -15,31 +13,21 @@ import {-# SOURCE #-} HsPat  ( LPat )
 import PlaceHolder ( DataId )
 import Data.Data hiding ( Fixity )
 
-#if __GLASGOW_HASKELL__ > 706
 type role HsExpr nominal
 type role HsCmd nominal
 type role MatchGroup nominal representational
 type role GRHSs nominal representational
 type role HsSplice nominal
-#endif
 data HsExpr (i :: *)
 data HsCmd  (i :: *)
 data HsSplice (i :: *)
 data MatchGroup (a :: *) (body :: *)
 data GRHSs (a :: *) (body :: *)
 
-#if __GLASGOW_HASKELL__ > 706
 instance Typeable HsSplice
 instance Typeable HsExpr
 instance Typeable MatchGroup
 instance Typeable GRHSs
-#else
-instance Typeable1 HsSplice
-instance Typeable1 HsExpr
-instance Typeable1 HsCmd
-instance Typeable2 MatchGroup
-instance Typeable2 GRHSs
-#endif
 
 instance (DataId id) => Data (HsSplice id)
 instance (DataId id) => Data (HsExpr id)

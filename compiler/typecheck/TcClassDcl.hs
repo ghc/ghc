@@ -19,7 +19,7 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 
 import HsSyn
 import TcEnv
-import TcPat( addInlinePrags, completeSigPolyId )
+import TcPat( addInlinePrags, completeIdSigPolyId, lookupPragEnv, emptyPragEnv )
 import TcEvidence( idHsWrapper )
 import TcBinds
 import TcUnify
@@ -157,7 +157,7 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
         -- And since ds is big, it doesn't get inlined, so we don't get good
         -- default methods.  Better to make separate AbsBinds for each
         ; let (tyvars, _, _, op_items) = classBigSig clas
-              prag_fn     = mkPragFun sigs default_binds
+              prag_fn     = mkPragEnv sigs default_binds
               sig_fn      = mkHsSigFun sigs
               clas_tyvars = snd (tcSuperSkolTyVars tyvars)
               pred        = mkClassPred clas (mkTyVarTys clas_tyvars)
@@ -171,7 +171,7 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
                        -- with redundant constraints; but not for DefMeth, where
                        -- the default method may well be 'error' or something
                     NoDefMeth          -> do { mapM_ (addLocM (badDmPrag sel_id))
-                                                     (prag_fn (idName sel_id))
+                                                     (lookupPragEnv prag_fn (idName sel_id))
                                              ; return emptyBag }
               tc_dm = tcDefMeth clas clas_tyvars this_dict
                                 default_binds sig_fn prag_fn
@@ -184,7 +184,7 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 tcClassDecl2 d = pprPanic "tcClassDecl2" (ppr d)
 
 tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds Name
-          -> HsSigFun -> PragFun -> Id -> Name -> Bool
+          -> HsSigFun -> TcPragEnv -> Id -> Name -> Bool
           -> TcM (LHsBinds TcId)
 -- Generate code for polymorphic default methods only (hence DefMeth)
 -- (Generic default methods have turned into instance decls by now.)
@@ -207,8 +207,8 @@ tcDefMeth clas tyvars this_dict binds_in
                 (ptext (sLit "Ignoring SPECIALISE pragmas on default method")
                  <+> quotes (ppr sel_name))
 
-       ; let hs_ty       = lookupHsSig hs_sig_fn sel_name
-                           `orElse` pprPanic "tc_dm" (ppr sel_name)
+       ; let hs_ty = lookupHsSig hs_sig_fn sel_name
+                     `orElse` pprPanic "tc_dm" (ppr sel_name)
              -- We need the HsType so that we can bring the right
              -- type variables into scope
              --
@@ -225,18 +225,19 @@ tcDefMeth clas tyvars this_dict binds_in
                              -- Substitute the local_meth_name for the binder
                              -- NB: the binding is always a FunBind
 
-       ; local_dm_sig <- instTcTySig hs_ty local_dm_ty Nothing [] local_dm_name
-       ; let local_dm_sig' = local_dm_sig { sig_warn_redundant = warn_redundant }
+             ctxt = FunSigCtxt sel_name warn_redundant
+
+       ; local_dm_sig <- instTcTySig ctxt hs_ty local_dm_ty Nothing [] local_dm_name
         ; (ev_binds, (tc_bind, _))
                <- checkConstraints (ClsSkol clas) tyvars [this_dict] $
-                  tcPolyCheck NonRecursive no_prag_fn local_dm_sig'
+                  tcPolyCheck NonRecursive no_prag_fn local_dm_sig
                               (L bind_loc lm_bind)
 
         ; let export = ABE { abe_poly      = global_dm_id
                            -- We have created a complete type signature in
                            -- instTcTySig, hence it is safe to call
                            -- completeSigPolyId
-                           , abe_mono      = completeSigPolyId local_dm_sig'
+                           , abe_mono      = completeIdSigPolyId local_dm_sig
                            , abe_wrap      = idHsWrapper
                            , abe_inst_wrap = idHsWrapper
                            , abe_prags     = IsDefaultMethod }
@@ -251,8 +252,8 @@ tcDefMeth clas tyvars this_dict binds_in
   | otherwise = pprPanic "tcDefMeth" (ppr sel_id)
   where
     sel_name = idName sel_id
-    prags    = prag_fn sel_name
-    no_prag_fn  _ = []          -- No pragmas for local_meth_id;
+    prags    = lookupPragEnv prag_fn sel_name
+    no_prag_fn = emptyPragEnv   -- No pragmas for local_meth_id;
                                 -- they are all for meth_id
 
 ---------------

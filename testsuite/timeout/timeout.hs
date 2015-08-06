@@ -33,8 +33,8 @@ main = do
           _ -> die ("Can't parse " ++ show secs ++ " as a number of seconds")
       _ -> die ("Bad arguments " ++ show args)
 
-timeoutMsg :: String
-timeoutMsg = "Timeout happened...killing process..."
+timeoutMsg :: String -> String
+timeoutMsg cmd = "Timeout happened...killing process "++cmd++"..."
 
 run :: Int -> String -> IO ()
 #if !defined(mingw32_HOST_OS)
@@ -61,7 +61,7 @@ run secs cmd = do
                 r <- takeMVar m
                 case r of
                   Nothing -> do
-                        hPutStrLn stderr timeoutMsg
+                        hPutStrLn stderr (timeoutMsg cmd)
                         killProcess pid
                         exitWith (ExitFailure 99)
                   Just (Exited r) -> exitWith r
@@ -122,7 +122,7 @@ run secs cmd =
        let millisecs = secs * 1000
        rc <- waitForSingleObject handle (fromIntegral millisecs)
        if rc == cWAIT_TIMEOUT
-           then do hPutStrLn stderr timeoutMsg
+           then do hPutStrLn stderr (timeoutMsg cmd)
                    terminateJobObject job 99
                    exitWith (ExitFailure 99)
            else alloca $ \p_exitCode ->

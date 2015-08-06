@@ -30,9 +30,14 @@ find an overview here:
 Next, clone the repository and all the associated libraries:
 
 ```
-$ git clone http://git.haskell.org/ghc.git
-$ cd ghc
-$ ./sync-all get
+$ git clone --recursive git://git.haskell.org/ghc.git
+```
+
+On Windows, you need an extra repository containing some build tools.
+These can be downloaded for you by configure. This only needs to be done once by running:
+
+```
+$ ./configure --enable-tarballs-autodownload
 ```
 
 First copy `mk/build.mk.sample` to `mk/build.mk` and ensure it has

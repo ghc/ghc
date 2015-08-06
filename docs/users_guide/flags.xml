@@ -54,6 +54,12 @@
             <entry>-fno-print-unicode-syntax</entry>
           </row>
           <row>
+            <entry><option>-fprint-expanded-synonyms</option></entry>
+            <entry>In type errors, also print type-synonym-expanded types.</entry>
+            <entry>dynamic</entry>
+            <entry>-fno-print-expanded-synonyms</entry>
+          </row>
+          <row>
             <entry><option>-ferror-spans</option></entry>
             <entry>output full span in error messages</entry>
             <entry>dynamic</entry>
@@ -701,19 +707,20 @@
       options are enabled using <option>-f*</option> flags.</para>
 
     <informaltable>
-      <tgroup cols="4" align="left" colsep="1" rowsep="1">
+      <tgroup cols="5" align="left" colsep="1" rowsep="1">
         <thead>
           <row>
             <entry>Flag</entry>
             <entry>Description</entry>
             <entry>Static/Dynamic</entry>
             <entry>Reverse</entry>
+            <entry>Since</entry>
           </row>
         </thead>
         <tbody>
           <row>
             <entry><option>-fconstraint-solver-iterations=</option><replaceable>n</replaceable></entry>
-	    <entry>Set the iteration limit for the type-constraint solver. 
+            <entry>Set the iteration limit for the type-constraint solver.
                    The default limit is 4. Typically one iteration
                    suffices; so please yell if you find you need to set
                    it higher than the default. Zero means infinity. </entry>
@@ -722,7 +729,7 @@
 	  </row>
           <row>
             <entry><option>-freduction-depth=</option><replaceable>n</replaceable></entry>
-	    <entry>Set the <link linkend="undecidable-instances">limit for type simplification</link>. 
+	    <entry>Set the <link linkend="undecidable-instances">limit for type simplification</link>.
                    Default is 200; zero means infinity.</entry>
 	    <entry>dynamic</entry>
 	    <entry></entry>
@@ -732,29 +739,34 @@
             <entry>Deprecated. Use <option>-freduction-depth=</option><replaceable>n</replaceable> instead.</entry>
             <entry>dynamic</entry>
             <entry></entry>
+            <entry></entry>
           </row>
           <row>
             <entry><option>-fglasgow-exts</option></entry>
             <entry>Deprecated. Enable most language extensions; see <xref linkend="options-language"/> for exactly which ones.</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-glasgow-exts</option></entry>
+            <entry></entry>
           </row>
           <row>
             <entry><option>-firrefutable-tuples</option></entry>
             <entry>Make tuple pattern matching irrefutable</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-irrefutable-tuples</option></entry>
+            <entry></entry>
           </row>
           <row>
             <entry><option>-fpackage-trust</option></entry>
             <entry>Enable <link linkend="safe-haskell">Safe Haskell</link> trusted package requirement for trustworthy modules.</entry>
             <entry>dynamic</entry>
             <entry><option>-</option></entry>
+            <entry></entry>
           </row>
           <row>
             <entry><option>-ftype-function-depth=</option><replaceable>n</replaceable></entry>
             <entry>Deprecated. Use <option>-freduction-depth=</option><replaceable>n</replaceable> instead.</entry>
             <entry>dynamic</entry>
+            <entry></entry>
             <entry></entry>
           </row>
           <row>
@@ -764,6 +776,7 @@
                 </entry>
             <entry>dynamic</entry>
             <entry><option>-XNoAllowAmbiguousTypes</option></entry>
+            <entry>7.8.1</entry>
           </row>
           <row>
             <entry><option>-XArrows</option></entry>
@@ -771,6 +784,7 @@
                 notation</link> extension</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoArrows</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XAutoDeriveTypeable</option></entry>
@@ -779,54 +793,63 @@
             Implies <option>-XDeriveDataTypeable</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoAutoDeriveTypeable</option></entry>
+            <entry>7.8.1</entry>
           </row>
           <row>
             <entry><option>-XBangPatterns</option></entry>
             <entry>Enable <link linkend="bang-patterns">bang patterns</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoBangPatterns</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XBinaryLiterals</option></entry>
             <entry>Enable support for <link linkend="binary-literals">binary literals</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoBinaryLiterals</option></entry>
+            <entry>7.10.1</entry>
           </row>
           <row>
             <entry><option>-XCApiFFI</option></entry>
             <entry>Enable <link linkend="ffi-capi">the CAPI calling convention</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoCAPIFFI</option></entry>
+            <entry>7.10.1</entry>
           </row>
           <row>
             <entry><option>-XConstrainedClassMethods</option></entry>
             <entry>Enable <link linkend="class-method-types">constrained class methods</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoConstrainedClassMethods</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XConstraintKinds</option></entry>
             <entry>Enable a <link linkend="constraint-kind">kind of constraints</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoConstraintKinds</option></entry>
+            <entry>7.4.1</entry>
           </row>
           <row>
             <entry><option>-XCPP</option></entry>
             <entry>Enable the <link linkend="c-pre-processor">C preprocessor</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoCPP</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XDataKinds</option></entry>
             <entry>Enable <link linkend="promotion">datatype promotion</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoDataKinds</option></entry>
+            <entry>7.4.1</entry>
           </row>
           <row>
             <entry><option>-XDefaultSignatures</option></entry>
             <entry>Enable <link linkend="class-default-signatures">default signatures</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoDefaultSignatures</option></entry>
+            <entry>7.2.1</entry>
           </row>
           <row>
             <entry><option>-XDeriveAnyClass</option></entry>
@@ -834,6 +857,7 @@
                    class</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoDeriveAnyClass</option></entry>
+            <entry>7.10.1</entry>
           </row>
           <row>
             <entry><option>-XDeriveDataTypeable</option></entry>
@@ -841,6 +865,7 @@
               Implied by <option>-XAutoDeriveTypeable</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoDeriveDataTypeable</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XDeriveFunctor</option></entry>
@@ -848,6 +873,7 @@
               Implied by <option>-XDeriveTraversable</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoDeriveFunctor</option></entry>
+            <entry>7.10.1</entry>
           </row>
           <row>
             <entry><option>-XDeriveFoldable</option></entry>
@@ -855,12 +881,14 @@
               Implied by <option>-XDeriveTraversable</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoDeriveFoldable</option></entry>
+            <entry>7.10.1</entry>
           </row>
           <row>
             <entry><option>-XDeriveGeneric</option></entry>
             <entry>Enable <link linkend="deriving-typeable">deriving for the Generic class</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoDeriveGeneric</option></entry>
+            <entry>7.2.1</entry>
           </row>
           <row>
             <entry><option>-XDeriveTraversable</option></entry>
@@ -868,6 +896,7 @@
               Implies <option>-XDeriveFunctor</option> and <option>-XDeriveFoldable</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoDeriveTraversable</option></entry>
+            <entry>7.10.1</entry>
           </row>
           <row>
             <entry><option>-XDisambiguateRecordFields</option></entry>
@@ -875,24 +904,28 @@
               Implied by <option>-XRecordWildCards</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoDisambiguateRecordFields</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XEmptyCase</option></entry>
             <entry>Allow <link linkend="empty-case">empty case alternatives</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoEmptyCase</option></entry>
+            <entry>7.8.1</entry>
           </row>
           <row>
             <entry><option>-XEmptyDataDecls</option></entry>
             <entry>Enable empty data declarations.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoEmptyDataDecls</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XExistentialQuantification</option></entry>
             <entry>Enable <link linkend="existential-quantification">existential quantification</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoExistentialQuantification</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XExplicitForAll</option></entry>
@@ -904,6 +937,7 @@
             </entry>
             <entry>dynamic</entry>
             <entry><option>-XNoExplicitForAll</option></entry>
+            <entry>6.12.1</entry>
           </row>
           <row>
             <entry><option>-XExplicitNamespaces</option></entry>
@@ -912,12 +946,14 @@
                    Implied by <option>-XTypeOperators</option> and <option>-XTypeFamilies</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoExplicitNamespaces</option></entry>
+            <entry>7.6.1</entry>
           </row>
           <row>
             <entry><option>-XExtendedDefaultRules</option></entry>
             <entry>Use GHCi's <link linkend="extended-default-rules">extended default rules</link> in a normal module.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoExtendedDefaultRules</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XFlexibleContexts</option></entry>
@@ -925,6 +961,7 @@
               Implied by <option>-XImplicitParams</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoFlexibleContexts</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XFlexibleInstances</option></entry>
@@ -932,12 +969,14 @@
               Implies <option>-XTypeSynonymInstances</option>. Implied by <option>-XImplicitParams</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoFlexibleInstances</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XForeignFunctionInterface</option></entry>
             <entry>Enable <link linkend="ffi">foreign function interface</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoForeignFunctionInterface</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XFunctionalDependencies</option></entry>
@@ -945,6 +984,7 @@
               Implies <option>-XMultiParamTypeClasses</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoFunctionalDependencies</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XGADTs</option></entry>
@@ -952,6 +992,7 @@
               Implies <option>-XGADTSyntax</option> and <option>-XMonoLocalBinds</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoGADTs</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XGADTSyntax</option></entry>
@@ -959,12 +1000,14 @@
             </entry>
             <entry>dynamic</entry>
             <entry><option>-XNoGADTSyntax</option></entry>
+            <entry>7.2.1</entry>
           </row>
           <row>
             <entry><option>-XGeneralizedNewtypeDeriving</option></entry>
             <entry>Enable <link linkend="newtype-deriving">newtype deriving</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoGeneralizedNewtypeDeriving</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XGenerics</option></entry>
@@ -973,6 +1016,7 @@
               <link linkend="generic-programming">generic programming</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoGenerics</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XImplicitParams</option></entry>
@@ -980,6 +1024,7 @@
               Implies <option>-XFlexibleContexts</option> and <option>-XFlexibleInstances</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoImplicitParams</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XNoImplicitPrelude</option></entry>
@@ -987,6 +1032,7 @@
               Implied by <option>-XRebindableSyntax</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XImplicitPrelude</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XImpredicativeTypes</option></entry>
@@ -994,6 +1040,7 @@
               Implies <option>-XRankNTypes</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoImpredicativeTypes</option></entry>
+            <entry>6.10.1</entry>
           </row>
           <row>
             <entry><option>-XIncoherentInstances</option></entry>
@@ -1001,18 +1048,21 @@
               Implies <option>-XOverlappingInstances</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoIncoherentInstances</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XInstanceSigs</option></entry>
             <entry>Enable <link linkend="instance-sigs">instance signatures</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoInstanceSigs</option></entry>
+            <entry>7.10.1</entry>
           </row>
           <row>
             <entry><option>-XInterruptibleFFI</option></entry>
             <entry>Enable interruptible FFI.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoInterruptibleFFI</option></entry>
+            <entry>7.2.1</entry>
           </row>
           <row>
             <entry><option>-XKindSignatures</option></entry>
@@ -1020,30 +1070,35 @@
               Implied by <option>-XTypeFamilies</option> and <option>-XPolyKinds</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoKindSignatures</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XLambdaCase</option></entry>
             <entry>Enable <link linkend="lambda-case">lambda-case expressions</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoLambdaCase</option></entry>
+            <entry>7.6.1</entry>
           </row>
           <row>
             <entry><option>-XLiberalTypeSynonyms</option></entry>
             <entry>Enable <link linkend="type-synonyms">liberalised type synonyms</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoLiberalTypeSynonyms</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XMagicHash</option></entry>
             <entry>Allow "#" as a <link linkend="magic-hash">postfix modifier on identifiers</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoMagicHash</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XMonadComprehensions</option></entry>
             <entry>Enable <link linkend="monad-comprehensions">monad comprehensions</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoMonadComprehensions</option></entry>
+            <entry>7.2.1</entry>
           </row>
           <row>
             <entry><option>-XMonoLocalBinds</option></entry>
@@ -1052,12 +1107,14 @@
             </entry>
             <entry>dynamic</entry>
             <entry><option>-XNoMonoLocalBinds</option></entry>
+            <entry>6.12.1</entry>
           </row>
           <row>
             <entry><option>-XNoMonomorphismRestriction</option></entry>
             <entry>Disable the <link linkend="monomorphism">monomorphism restriction</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XMonomorphismRestriction</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XMultiParamTypeClasses</option></entry>
@@ -1065,54 +1122,63 @@
               Implied by <option>-XFunctionalDependencies</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoMultiParamTypeClasses</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XMultiWayIf</option></entry>
             <entry>Enable <link linkend="multi-way-if">multi-way if-expressions</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoMultiWayIf</option></entry>
+            <entry>7.6.1</entry>
           </row>
           <row>
             <entry><option>-XNamedFieldPuns</option></entry>
             <entry>Enable <link linkend="record-puns">record puns</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoNamedFieldPuns</option></entry>
+            <entry>6.10.1</entry>
           </row>
           <row>
             <entry><option>-XNamedWildCards</option></entry>
             <entry>Enable <link linkend="named-wildcards">named wildcards</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoNamedWildCards</option></entry>
+            <entry>7.10.1</entry>
           </row>
           <row>
             <entry><option>-XNegativeLiterals</option></entry>
             <entry>Enable support for <link linkend="negative-literals">negative literals</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoNegativeLiterals</option></entry>
+            <entry>7.8.1</entry>
           </row>
           <row>
             <entry><option>-XNoNPlusKPatterns</option></entry>
             <entry>Disable support for <literal>n+k</literal> patterns.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNPlusKPatterns</option></entry>
+            <entry>6.12.1</entry>
           </row>
           <row>
             <entry><option>-XNullaryTypeClasses</option></entry>
             <entry>Deprecated, does nothing. <link linkend="nullary-type-classes">nullary (no parameter) type classes</link> are now enabled using <option>-XMultiParamTypeClasses</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoNullaryTypeClasses</option></entry>
+            <entry>7.8.1</entry>
           </row>
           <row>
             <entry><option>-XNumDecimals</option></entry>
             <entry>Enable support for 'fractional' integer literals.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoNumDecimals</option></entry>
+            <entry>7.8.1</entry>
           </row>
           <row>
             <entry><option>-XOverlappingInstances</option></entry>
             <entry>Enable <link linkend="instance-overlap">overlapping instances</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoOverlappingInstances</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XOverloadedLists</option></entry>
@@ -1120,6 +1186,7 @@
             </entry>
             <entry>dynamic</entry>
             <entry><option>-XNoOverloadedLists</option></entry>
+            <entry>7.8.1</entry>
           </row>
           <row>
             <entry><option>-XOverloadedStrings</option></entry>
@@ -1127,12 +1194,14 @@
             </entry>
             <entry>dynamic</entry>
             <entry><option>-XNoOverloadedStrings</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XPackageImports</option></entry>
             <entry>Enable <link linkend="package-imports">package-qualified imports</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoPackageImports</option></entry>
+            <entry>6.10.1</entry>
           </row>
           <row>
             <entry><option>-XParallelArrays</option></entry>
@@ -1140,6 +1209,7 @@
               Implies <option>-XParallelListComp</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoParallelArrays</option></entry>
+            <entry>7.4.1</entry>
           </row>
           <row>
             <entry><option>-XParallelListComp</option></entry>
@@ -1147,24 +1217,28 @@
               Implied by <option>-XParallelArrays</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoParallelListComp</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XPartialTypeSignatures</option></entry>
             <entry>Enable <link linkend="partial-type-signatures">partial type signatures</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoPartialTypeSignatures</option></entry>
+            <entry>7.10.1</entry>
           </row>
           <row>
             <entry><option>-XPatternGuards</option></entry>
             <entry>Enable <link linkend="pattern-guards">pattern guards</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoPatternGuards</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XPatternSynonyms</option></entry>
             <entry>Enable <link linkend="pattern-synonyms">pattern synonyms</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoPatternSynonyms</option></entry>
+            <entry>7.10.1</entry>
           </row>
           <row>
             <entry><option>-XPolyKinds</option></entry>
@@ -1172,30 +1246,35 @@
                    Implies <option>-XKindSignatures</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoPolyKinds</option></entry>
+            <entry>7.4.1</entry>
           </row>
           <row>
             <entry><option>-XPolymorphicComponents</option></entry>
             <entry>Enable <link linkend="universal-quantification">polymorphic components for data constructors</link>.</entry>
             <entry>dynamic, synonym for <option>-XRankNTypes</option></entry>
             <entry><option>-XNoPolymorphicComponents</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XPostfixOperators</option></entry>
             <entry>Enable <link linkend="postfix-operators">postfix operators</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoPostfixOperators</option></entry>
+            <entry>7.10.1</entry>
           </row>
           <row>
             <entry><option>-XQuasiQuotes</option></entry>
             <entry>Enable <link linkend="th-quasiquotation">quasiquotation</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoQuasiQuotes</option></entry>
+            <entry>6.10.1</entry>
           </row>
           <row>
             <entry><option>-XRank2Types</option></entry>
             <entry>Enable <link linkend="universal-quantification">rank-2 types</link>.</entry>
             <entry>dynamic, synonym for <option>-XRankNTypes</option></entry>
             <entry><option>-XNoRank2Types</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XRankNTypes</option></entry>
@@ -1203,6 +1282,7 @@
               Implied by <option>-XImpredicativeTypes</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoRankNTypes</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XRebindableSyntax</option></entry>
@@ -1210,6 +1290,7 @@
               Implies <option>-XNoImplicitPrelude</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoRebindableSyntax</option></entry>
+            <entry>7.0.1</entry>
           </row>
           <row>
             <entry><option>-XRecordWildCards</option></entry>
@@ -1217,31 +1298,36 @@
               Implies <option>-XDisambiguateRecordFields</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoRecordWildCards</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XRecursiveDo</option></entry>
             <entry>Enable <link linkend="recursive-do-notation">recursive do (mdo) notation</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoRecursiveDo</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XRelaxedPolyRec</option></entry>
-            <entry><emphasis>(deprecated)</emphasis> Relaxed checking for 
+            <entry><emphasis>(deprecated)</emphasis> Relaxed checking for
               <link linkend="typing-binds">mutually-recursive polymorphic functions</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoRelaxedPolyRec</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XRoleAnnotations</option></entry>
             <entry>Enable <link linkend="role-annotations">role annotations</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoRoleAnnotations</option></entry>
+            <entry>7.10.1</entry>
           </row>
           <row>
             <entry><option>-XSafe</option></entry>
             <entry>Enable the <link linkend="safe-haskell">Safe Haskell</link> Safe mode.</entry>
             <entry>dynamic</entry>
             <entry><option>-</option></entry>
+            <entry>7.2.1</entry>
           </row>
           <row>
             <entry><option>-XScopedTypeVariables</option></entry>
@@ -1249,42 +1335,55 @@
               </entry>
             <entry>dynamic</entry>
             <entry><option>-XNoScopedTypeVariables</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XStandaloneDeriving</option></entry>
             <entry>Enable <link linkend="stand-alone-deriving">standalone deriving</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoStandaloneDeriving</option></entry>
+            <entry>6.8.1</entry>
+          </row>
+          <row>
+            <entry><option>-XStrictData</option></entry>
+            <entry>Enable <link linkend="strict-data">default strict datatype fields</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoStrictData</option></entry>
           </row>
           <row>
             <entry><option>-XTemplateHaskell</option></entry>
             <entry>Enable <link linkend="template-haskell">Template Haskell</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoTemplateHaskell</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XNoTraditionalRecordSyntax</option></entry>
             <entry>Disable support for traditional record syntax (as supported by Haskell 98) <literal>C {f = x}</literal></entry>
             <entry>dynamic</entry>
             <entry><option>-XTraditionalRecordSyntax</option></entry>
+            <entry>7.4.1</entry>
           </row>
           <row>
             <entry><option>-XTransformListComp</option></entry>
             <entry>Enable <link linkend="generalised-list-comprehensions">generalised list comprehensions</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoTransformListComp</option></entry>
+            <entry>6.10.1</entry>
           </row>
           <row>
             <entry><option>-XTrustworthy</option></entry>
             <entry>Enable the <link linkend="safe-haskell">Safe Haskell</link> Trustworthy mode.</entry>
             <entry>dynamic</entry>
             <entry><option>-</option></entry>
+            <entry>7.2.1</entry>
           </row>
           <row>
             <entry><option>-XTupleSections</option></entry>
             <entry>Enable <link linkend="tuple-sections">tuple sections</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoTupleSections</option></entry>
+            <entry>7.10.1</entry>
           </row>
           <row>
             <entry><option>-XTypeFamilies</option></entry>
@@ -1293,6 +1392,7 @@
               and <option>-XMonoLocalBinds</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoTypeFamilies</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XTypeOperators</option></entry>
@@ -1300,6 +1400,7 @@
               Implies <option>-XExplicitNamespaces</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoTypeOperators</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XTypeSynonymInstances</option></entry>
@@ -1307,42 +1408,49 @@
               Implied by <option>-XFlexibleInstances</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoTypeSynonymInstances</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XUnboxedTuples</option></entry>
             <entry>Enable <link linkend="unboxed-tuples">unboxed tuples</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoUnboxedTuples</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XUndecidableInstances</option></entry>
             <entry>Enable <link linkend="undecidable-instances">undecidable instances</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoUndecidableInstances</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XUnicodeSyntax</option></entry>
             <entry>Enable <link linkend="unicode-syntax">unicode syntax</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoUnicodeSyntax</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XUnliftedFFITypes</option></entry>
             <entry>Enable unlifted FFI types.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoUnliftedFFITypes</option></entry>
+            <entry>6.8.1</entry>
           </row>
           <row>
             <entry><option>-XUnsafe</option></entry>
             <entry>Enable <link linkend="safe-haskell">Safe Haskell</link> Unsafe mode.</entry>
             <entry>dynamic</entry>
             <entry><option>-</option></entry>
+            <entry>7.4.1</entry>
           </row>
           <row>
             <entry><option>-XViewPatterns</option></entry>
             <entry>Enable <link linkend="view-patterns">view patterns</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoViewPatterns</option></entry>
+            <entry>6.10.1</entry>
           </row>
         </tbody>
       </tgroup>
@@ -1401,7 +1509,8 @@
             <entry>
                 Turn type errors into warnings, <link linkend="defer-type-errors">
                 deferring the error until runtime</link>. Implies
-                <option>-fdefer-typed-holes</option>.
+                <option>-fdefer-typed-holes</option>. See also
+                <option>-fwarn-deferred-type-errors</option>
             </entry>
             <entry>dynamic</entry>
             <entry><option>-fno-defer-type-errors</option></entry>
@@ -1708,6 +1817,16 @@
           </row>
 
           <row>
+            <entry><option>-fwarn-deferred-type-errors</option></entry>
+            <entry>
+                Report warnings when <link linkend="defer-type-errors">deferred type errors</link>
+                are enabled. This option is enabled by default. See <option>-fdefer-type-errors</option>.
+            </entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-deferred-type-errors</option></entry>
+          </row>
+
+          <row>
             <entry><option>-fwarn-typed-holes</option></entry>
             <entry>
                 Report warnings when <link linkend="typed-holes">typed hole</link>
@@ -1753,7 +1872,7 @@
   <sect2>
     <title>Optimisation levels</title>
 
-    <para>These options are described in more detail in <xref linkend="options-optimise"/></para>
+    <para>These options are described in more detail in <xref linkend="options-optimise"/>.</para>
 
     <informaltable>
       <tgroup cols="4" align="left" colsep="1" rowsep="1">
@@ -1848,10 +1967,11 @@
           </row>
 
           <row>
-            <entry><option>-fcpr-off</option></entry>
-            <entry>Switch off CPR analysis in the demand analyser.</entry>
-            <entry>static</entry>
-            <entry>-</entry>
+            <entry><option>-fcpr-anal</option></entry>
+            <entry>Turn on CPR analysis in the demand analyser. Implied by
+                   <option>-O</option>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-cpr-anal</option></entry>
           </row>
 
           <row>
@@ -2160,6 +2280,13 @@
             <entry>Turn on specialisation of overloaded functions. Implied by <option>-O</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-specialise</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fcross-module-specialise</option></entry>
+            <entry>Turn on specialisation of overloaded functions imported from other modules.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-cross-module-specialise</option></entry>
           </row>
 
           <row>
@@ -3256,6 +3383,12 @@
           <row>
             <entry><option>-dsuppress-idinfo</option></entry>
             <entry>Suppress extended information about identifiers where they are bound</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-dsuppress-unfoldings</option></entry>
+            <entry>Suppress the printing of the stable unfolding of a variable at its binding site</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>

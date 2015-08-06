@@ -101,6 +101,12 @@ AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
         EnableBootstrapWithDevelSnaphost=NO
 )
 
+AC_ARG_ENABLE(tarballs-autodownload,
+[AC_HELP_STRING([--enable-tarballs-autodownload],
+                [Automatically download Windows distribution binaries if needed.])],
+        TarballsAutodownload=YES,
+        TarballsAutodownload=NO
+)
 if test "$WithGhc" != ""; then
   FPTOOLS_GHC_VERSION([GhcVersion], [GhcMajVersion], [GhcMinVersion], [GhcPatchLevel])dnl
 
@@ -136,8 +142,8 @@ if test "$WithGhc" = ""
 then
     AC_MSG_ERROR([GHC is required.])
 fi
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.6],
-    [AC_MSG_ERROR([GHC version 7.6 or later is required to compile GHC.])])
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.8],
+    [AC_MSG_ERROR([GHC version 7.8 or later is required to compile GHC.])])
 
 if test `expr $GhcMinVersion % 2` = "1"
 then
@@ -241,7 +247,7 @@ AC_SUBST(SOLARIS_BROKEN_SHLD)
 dnl ** Do an unregisterised build?
 dnl --------------------------------------------------------------
 case "$HostArch" in
-    i386|x86_64|powerpc|arm)
+    i386|x86_64|powerpc|powerpc64|powerpc64le|arm)
         UnregisterisedDefault=NO
         ;;
     *)
@@ -274,12 +280,49 @@ AC_SUBST(WithHc)
 FP_INTREE_GHC_PWD
 FP_FIND_ROOT
 
+fail() {
+    echo >&2
+    echo "$1" >&2
+    exit 1
+}
+
+set_up_tarballs() {
+    local tarball_repo_url="$1"
+    local tarball_dir="$2"
+
+    if ! test -d "${tarball_dir}"
+    then
+        local git_cmd="git clone ${tarball_repo_url} ${tarball_dir}"
+        if test "$TarballsAutodownload" = "NO"
+        then
+            echo >&2
+            echo "ERROR: Windows tarball binary distributions not found." >&2
+            echo "Please rerun configure with --enable-tarballs-autodownload, or clone the repository manually:" >&2
+            echo "  $git_cmd" >&2
+            exit 1
+        fi
+        AC_MSG_NOTICE([Downloading Windows tarball distributions to ${tarball_dir}...])
+        $git_cmd || {
+            rm -f "${tarball_dir}"
+            fail "ERROR: Git clone failed."
+        }
+    else
+        AC_MSG_NOTICE([Using Windows tarball distributions found in ${tarball_dir}...])
+    fi
+}
+
 if test "$HostOS" = "mingw32"
 then
     test -d inplace || mkdir inplace
 
+    # NB. For now just run git clone on the tarball repo
+    ghc_tarball_repo='git://git.haskell.org/ghc-tarballs.git'
+    ghc_tarball_dir='ghc-tarballs'
+    set_up_tarballs "${ghc_tarball_repo}" "${ghc_tarball_dir}"
+
     if test "$HostArch" = "i386"
     then
+
         # NB. If you update the tarballs to a new version of gcc, don't
         # forget to tweak the paths in driver/gcc/gcc.c.
         if ! test -d inplace/mingw ||
@@ -967,6 +1010,42 @@ else
    HavePapi=NO
 fi
 AC_SUBST(HavePapi)
+
+dnl large address space support (see includes/rts/storage/MBlock.h)
+dnl
+dnl Darwin has vm_allocate/vm_protect
+dnl Linux has mmap(MAP_NORESERVE)/madv(MADV_DONTNEED)
+dnl FreeBSD, Solaris and maybe other have MAP_NORESERVE/MADV_FREE
+dnl (They also have MADV_DONTNEED, but it means something else!)
+dnl
+dnl Windows has VirtualAlloc MEM_RESERVE/MEM_COMMIT, however
+dnl it counts page-table space as committed memory, and so quickly
+dnl runs out of paging file when we have multiple processes reserving
+dnl 1TB of address space, we get the following error:
+dnl    VirtualAlloc MEM_RESERVE 1099512676352 bytes failed: The paging file is too small for this operation to complete.
+dnl
+use_large_address_space=no
+if test "$ac_cv_sizeof_void_p" -eq 8 ; then
+   if test "$ghc_host_os" = "darwin" ; then
+           use_large_address_space=yes
+   else
+      AC_CHECK_DECLS([MAP_NORESERVE, MADV_FREE, MADV_DONTNEED],[],[],
+[
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+])
+      if test "$ac_cv_have_decl_MAP_NORESERVE" = "yes" &&
+         test "$ac_cv_have_decl_MADV_FREE" = "yes" ||
+         test "$ac_cv_have_decl_MADV_DONTNEED" = "yes" ; then
+              use_large_address_space=yes
+      fi
+   fi
+fi
+if test "$use_large_address_space" = "yes" ; then
+   AC_DEFINE([USE_LARGE_ADDRESS_SPACE], [1], [Enable single heap address space support])
+fi
 
 if test "$HAVE_DOCBOOK_XSL" = "NO" ||
    test "$XsltprocCmd" = ""

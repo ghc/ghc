@@ -52,7 +52,8 @@ test('T10420',
 
 test('T10294',
      [pre_cmd('$MAKE -s --no-print-directory -C annotation-plugin package.T10294'),
-      clean_cmd('$MAKE -s --no-print-directory -C annotation-plugin clean.T10294')],
+      clean_cmd('$MAKE -s --no-print-directory -C annotation-plugin clean.T10294'),
+      unless(have_dynamic(),expect_broken(10301))],
      run_command,
      ['$MAKE -s --no-print-directory T10294'])
 

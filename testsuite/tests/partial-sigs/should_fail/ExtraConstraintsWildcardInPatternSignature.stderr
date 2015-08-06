@@ -1,0 +1,6 @@
+
+ExtraConstraintsWildcardInPatternSignature.hs:4:11: error:
+    Invalid partial type: _ => _
+    An extra-constraints wild card is only allowed
+    in the top-level context
+    In a pattern type-signature

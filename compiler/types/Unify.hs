@@ -6,7 +6,7 @@ module Unify (
         -- Matching of types:
         --      the "tc" prefix indicates that matching always
         --      respects newtypes (rather than looking through them)
-        tcMatchTy, tcMatchTys, tcMatchTyX,
+        tcMatchTy, tcMatchTys, tcMatchTyX, tcMatchTysX,
         ruleMatchTyX, tcMatchPreds,
 
         MatchEnv(..), matchList,
@@ -77,14 +77,11 @@ tcMatchTy :: TyVarSet           -- Template tyvars
           -> Type               -- Target
           -> Maybe TvSubst      -- One-shot; in principle the template
                                 -- variables could be free in the target
-
 tcMatchTy tmpls ty1 ty2
-  = case match menv emptyTvSubstEnv ty1 ty2 of
-        Just subst_env -> Just (TvSubst in_scope subst_env)
-        Nothing        -> Nothing
+  = tcMatchTyX tmpls init_subst ty1 ty2
   where
-    menv     = ME { me_tmpls = tmpls, me_env = mkRnEnv2 in_scope }
-    in_scope = mkInScopeSet (tmpls `unionVarSet` tyVarsOfType ty2)
+    init_subst = mkTvSubst in_scope emptyTvSubstEnv
+    in_scope   = mkInScopeSet (tmpls `unionVarSet` tyVarsOfType ty2)
         -- We're assuming that all the interesting
         -- tyvars in ty1 are in tmpls
 
@@ -93,18 +90,12 @@ tcMatchTys :: TyVarSet          -- Template tyvars
            -> [Type]            -- Target
            -> Maybe TvSubst     -- One-shot; in principle the template
                                 -- variables could be free in the target
-
 tcMatchTys tmpls tys1 tys2
-  = case match_tys menv emptyTvSubstEnv tys1 tys2 of
-        Just subst_env -> Just (TvSubst in_scope subst_env)
-        Nothing        -> Nothing
+  = tcMatchTysX tmpls init_subst tys1 tys2
   where
-    menv     = ME { me_tmpls = tmpls, me_env = mkRnEnv2 in_scope }
-    in_scope = mkInScopeSet (tmpls `unionVarSet` tyVarsOfTypes tys2)
-        -- We're assuming that all the interesting
-        -- tyvars in tys1 are in tmpls
+    init_subst = mkTvSubst in_scope emptyTvSubstEnv
+    in_scope   = mkInScopeSet (tmpls `unionVarSet` tyVarsOfTypes tys2)
 
--- This is similar, but extends a substitution
 tcMatchTyX :: TyVarSet          -- Template tyvars
            -> TvSubst           -- Substitution to extend
            -> Type              -- Template
@@ -112,10 +103,23 @@ tcMatchTyX :: TyVarSet          -- Template tyvars
            -> Maybe TvSubst
 tcMatchTyX tmpls (TvSubst in_scope subst_env) ty1 ty2
   = case match menv subst_env ty1 ty2 of
-        Just subst_env -> Just (TvSubst in_scope subst_env)
-        Nothing        -> Nothing
+        Just subst_env' -> Just (TvSubst in_scope subst_env')
+        Nothing         -> Nothing
   where
     menv = ME {me_tmpls = tmpls, me_env = mkRnEnv2 in_scope}
+
+tcMatchTysX :: TyVarSet          -- Template tyvars
+            -> TvSubst           -- Substitution to extend
+            -> [Type]            -- Template
+            -> [Type]            -- Target
+            -> Maybe TvSubst     -- One-shot; in principle the template
+                                 -- variables could be free in the target
+tcMatchTysX tmpls (TvSubst in_scope subst_env) tys1 tys2
+  = case match_tys menv subst_env tys1 tys2 of
+        Just subst_env' -> Just (TvSubst in_scope subst_env')
+        Nothing         -> Nothing
+  where
+    menv = ME { me_tmpls = tmpls, me_env = mkRnEnv2 in_scope }
 
 tcMatchPreds
         :: [TyVar]                      -- Bind these

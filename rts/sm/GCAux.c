@@ -118,14 +118,15 @@ revertCAFs( void )
     StgIndStatic *c;
 
     for (c = revertible_caf_list;
-         c != (StgIndStatic *)END_OF_STATIC_LIST;
+         c != (StgIndStatic *)END_OF_CAF_LIST;
          c = (StgIndStatic *)c->static_link)
     {
+        c = (StgIndStatic *)UNTAG_STATIC_LIST_PTR(c);
         SET_INFO((StgClosure *)c, c->saved_info);
         c->saved_info = NULL;
         // could, but not necessary: c->static_link = NULL;
     }
-    revertible_caf_list = (StgIndStatic*)END_OF_STATIC_LIST;
+    revertible_caf_list = (StgIndStatic*)END_OF_CAF_LIST;
 }
 
 void
@@ -134,15 +135,17 @@ markCAFs (evac_fn evac, void *user)
     StgIndStatic *c;
 
     for (c = dyn_caf_list;
-         c != (StgIndStatic*)END_OF_STATIC_LIST;
+         c != (StgIndStatic*)END_OF_CAF_LIST;
          c = (StgIndStatic *)c->static_link)
     {
+        c = (StgIndStatic *)UNTAG_STATIC_LIST_PTR(c);
         evac(user, &c->indirectee);
     }
     for (c = revertible_caf_list;
-         c != (StgIndStatic*)END_OF_STATIC_LIST;
+         c != (StgIndStatic*)END_OF_CAF_LIST;
          c = (StgIndStatic *)c->static_link)
     {
+        c = (StgIndStatic *)UNTAG_STATIC_LIST_PTR(c);
         evac(user, &c->indirectee);
     }
 }

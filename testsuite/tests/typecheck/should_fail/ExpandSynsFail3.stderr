@@ -1,0 +1,11 @@
+ExpandSynsFail3.hs:21:8: error:
+    Couldn't match type ‘Int’ with ‘Bool’
+    Expected type: T (T3, T5, Int)
+      Actual type: T (T5, T3, Bool)
+    Type synonyms expanded:
+    Expected type: T (T3, T3, Int)
+      Actual type: T (T3, T3, Bool)
+    In the first argument of ‘f’, namely
+      ‘(undefined :: T (T5, T3, Bool))’
+    In the expression: f (undefined :: T (T5, T3, Bool))
+    In an equation for ‘a’: a = f (undefined :: T (T5, T3, Bool))

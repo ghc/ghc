@@ -6,6 +6,7 @@ test('AddAndOr4', normal, compile, ['-ddump-types -fno-warn-partial-type-signatu
 test('AddAndOr5', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('AddAndOr6', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('BoolToBool', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
+test('DataFamilyInstanceLHS', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('Defaulting1MROn', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('Defaulting2MROff', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('Defaulting2MROn', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
@@ -43,8 +44,15 @@ test('ShowNamed', normal, compile, ['-ddump-types -fno-warn-partial-type-signatu
 test('SimpleGen', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('SkipMany', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('SomethingShowable', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
+test('TypeFamilyInstanceLHS', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('Uncurry', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('UncurryNamed', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('WarningWildcardInstantiations', normal, compile, ['-ddump-types'])
+test('SplicesUsed', [req_interp, only_compiler_types(['ghc']), when(compiler_profiled(), skip),
+                     extra_clean(['Splices.o', 'Splices.hi'])],
+     multimod_compile, ['SplicesUsed', ''])
+test('TypedSplice', [req_interp, normal], compile, [''])
 test('T10403', normal, compile, [''])
 test('T10438', normal, compile, [''])
+test('T10519', normal, compile, [''])
+test('T10463', normal, compile, [''])

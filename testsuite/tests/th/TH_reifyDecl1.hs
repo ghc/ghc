@@ -63,26 +63,26 @@ data instance DF2 Bool = DBool
 $(return [])
 
 test :: ()
-test = $(let 
-	  display :: Name -> Q ()
-	  display q = do { i <- reify q; runIO $ hPutStrLn stderr (pprint i) }
-	in do { display ''T
-	      ; display ''R
-	      ; display ''List
-	      ; display ''Tree
-	      ; display ''IntList
-	      ; display ''Length
-	      ; display 'Leaf
-	      ; display 'm1
-	      ; display ''C1
-	      ; display ''C2
-	      ; display ''C3
-	      ; display ''AT1
-	      ; display ''AT2
-	      ; display ''TF1
-	      ; display ''TF2
-	      ; display ''DF1
-	      ; display ''DF2
-	      ; [| () |] })
+test = $(let
+      display :: Name -> Q ()
+      display q = do { i <- reify q; runIO $ hPutStrLn stderr (pprint i) }
+    in do { display ''T
+          ; display ''R
+          ; display ''List
+          ; display ''Tree
+          ; display ''IntList
+          ; display ''Length
+          ; display 'Leaf
+          ; display 'm1
+          ; display ''C1
+          ; display ''C2
+          ; display ''C3
+          ; display ''AT1
+          ; display ''AT2
+          ; display ''TF1
+          ; display ''TF2
+          ; display ''DF1
+          ; display ''DF2
+          ; [| () |] })
 
 

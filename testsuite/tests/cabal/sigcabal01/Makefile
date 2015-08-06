@@ -22,7 +22,7 @@ sigcabal01:
 	cd p && $(SETUP) build
 	cd p && $(SETUP) copy
 	cd p && $(SETUP) register --print-ipid > ../p_strict
-	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db=tmp.d -hide-all-packages -package base -package-id "`cat p_lazy` (P as P.Lazy)" -package-id "`cat p_strict` (P as P.Strict)" --make Main.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db=tmp.d -hide-all-packages -package base -package containers -package-id "`cat p_lazy` (P as P.Lazy)" -package-id "`cat p_strict` (P as P.Strict)" --make Main.hs
 	! ./Main
 ifneq "$(CLEANUP)" ""
 	$(MAKE) clean

@@ -14,7 +14,6 @@ def f(name, opts):
         opts.skip = 1
 
 setTestOpts(f)
-setTestOpts(only_compiler_types(['ghc']))
 setTestOpts(only_ways(['normal','ghci']))
 setTestOpts(when(compiler_profiled(), skip))
 
@@ -345,3 +344,10 @@ test('T10047', normal, ghci_script, ['T10047.script'])
 test('T10019', normal, ghci_script, ['T10019.script'])
 test('T10279', normal, compile_fail, ['-v0'])
 test('T10306', normal, compile, ['-v0'])
+test('T10596', normal, compile, ['-v0'])
+test('T10620', normal, compile_and_run, ['-v0'])
+test('T10638', normal, compile_fail, ['-v0'])
+test('T10704',
+     extra_clean(['T10704a.o','T10704a.hi']),
+     multimod_compile_and_run,
+     ['T10704', '-v0'])

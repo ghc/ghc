@@ -208,7 +208,7 @@ setIdInfo id info = info `seq` (lazySetIdInfo id info)
 modifyIdInfo :: (IdInfo -> IdInfo) -> Id -> Id
 modifyIdInfo fn id = setIdInfo id (fn (idInfo id))
 
--- maybeModifyIdInfo tries to avoid unnecesary thrashing
+-- maybeModifyIdInfo tries to avoid unnecessary thrashing
 maybeModifyIdInfo :: Maybe IdInfo -> Id -> Id
 maybeModifyIdInfo (Just new_info) id = lazySetIdInfo id new_info
 maybeModifyIdInfo Nothing         id = id

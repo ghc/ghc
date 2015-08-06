@@ -133,12 +133,59 @@ W_    calcLiveWords  (void);
 
 extern bdescr *exec_block;
 
-#define END_OF_STATIC_LIST ((StgClosure*)1)
-
 void move_STACK  (StgStack *src, StgStack *dest);
 
 /* -----------------------------------------------------------------------------
-   CAF lists
+   Note [STATIC_LINK fields]
+
+   The low 2 bits of the static link field have the following meaning:
+
+   00     we haven't seen this static object before
+
+   01/10  if it equals static_flag, then we saw it in this GC, otherwise
+          we saw it in the previous GC.
+
+   11     ignore during GC.  This value is used in two ways
+          - When we put CAFs on a list (see Note [CAF lists])
+          - a static constructor that was determined to have no CAF
+            references at compile time is given this value, so we
+            don't traverse it during GC
+
+  This choice of values is quite deliberate, because it means we can
+  decide whether a static object should be traversed during GC using a
+  single test:
+
+  bits = link_field & 3;
+  if ((bits | prev_static_flag) != 3) { ... }
+
+  -------------------------------------------------------------------------- */
+
+#define STATIC_BITS 3
+
+#define STATIC_FLAG_A 1
+#define STATIC_FLAG_B 2
+#define STATIC_FLAG_LIST 3
+
+#define END_OF_CAF_LIST ((StgClosure*)STATIC_FLAG_LIST)
+
+// The previous and current values of the static flag.  These flip
+// between STATIC_FLAG_A and STATIC_FLAG_B at each major GC.
+extern nat prev_static_flag, static_flag;
+
+// In the chain of static objects built up during GC, all the link
+// fields are tagged with the current static_flag value.  How to mark
+// the end of the chain?  It must be a special value so that we can
+// tell it is the end of the chain, but note that we're going to store
+// this value in the link field of a static object, which means that
+// during the NEXT GC we should treat it like any other object that
+// has not been visited during this GC.  Therefore, we use static_flag
+// as the sentinel value.
+#define END_OF_STATIC_OBJECT_LIST ((StgClosure*)(StgWord)static_flag)
+
+#define UNTAG_STATIC_LIST_PTR(p) ((StgClosure*)((StgWord)(p) & ~STATIC_BITS))
+
+/* -----------------------------------------------------------------------------
+   Note [CAF lists]
 
    dyn_caf_list  (CAFs chained through static_link)
       This is a chain of all CAFs in the program, used for
@@ -154,6 +201,10 @@ void move_STACK  (StgStack *src, StgStack *dest);
       A chain of CAFs in object code loaded with the RTS linker.
       These CAFs can be reverted to their unevaluated state using
       revertCAFs.
+
+ Pointers in these lists are tagged with STATIC_FLAG_LIST, so when
+ traversing the list remember to untag each pointer with
+ UNTAG_STATIC_LIST_PTR().
  --------------------------------------------------------------------------- */
 
 extern StgIndStatic * dyn_caf_list;

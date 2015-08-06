@@ -55,16 +55,14 @@ instance Ppr Info where
         <+> (if is_unlifted then text "unlifted" else empty)
         <+> text "type constructor" <+> quotes (ppr name)
         <+> parens (text "arity" <+> int arity)
-    ppr (ClassOpI v ty cls fix)
-      = text "Class op from" <+> ppr cls <> colon <+>
-        vcat [ppr_sig v ty, pprFixity v fix]
-    ppr (DataConI v ty tc fix)
-      = text "Constructor from" <+> ppr tc <> colon <+>
-        vcat [ppr_sig v ty, pprFixity v fix]
+    ppr (ClassOpI v ty cls)
+      = text "Class op from" <+> ppr cls <> colon <+> ppr_sig v ty
+    ppr (DataConI v ty tc)
+      = text "Constructor from" <+> ppr tc <> colon <+> ppr_sig v ty
     ppr (TyVarI v ty)
       = text "Type variable" <+> ppr v <+> equals <+> ppr ty
-    ppr (VarI v ty mb_d fix)
-      = vcat [ppr_sig v ty, pprFixity v fix,
+    ppr (VarI v ty mb_d)
+      = vcat [ppr_sig v ty,
               case mb_d of { Nothing -> empty; Just d -> ppr d }]
 
 ppr_sig :: Name -> Type -> Doc
@@ -224,6 +222,7 @@ pprLit i (DoublePrimL x) = parensIf (i > noPrec && x < 0)
                                     (double (fromRational x) <> text "##")
 pprLit i (IntegerL x)    = parensIf (i > noPrec && x < 0) (integer x)
 pprLit _ (CharL c)       = text (show c)
+pprLit _ (CharPrimL c)   = text (show c) <> char '#'
 pprLit _ (StringL s)     = pprString s
 pprLit _ (StringPrimL s) = pprString (bytesToString s) <> char '#'
 pprLit i (RationalL rat) = parensIf (i > noPrec) $
@@ -499,7 +498,15 @@ pprParendType PromotedConsT       = text "(':)"
 pprParendType StarT               = char '*'
 pprParendType ConstraintT         = text "Constraint"
 pprParendType (SigT ty k)         = parens (ppr ty <+> text "::" <+> ppr k)
+pprParendType (WildCardT mbName)  = char '_' <> maybe empty ppr mbName
+pprParendType (InfixT x n y)      = parens (ppr x <+> pprName' Infix n <+> ppr y)
+pprParendType t@(UInfixT {})      = parens (pprUInfixT t)
+pprParendType (ParensT t)         = ppr t
 pprParendType other               = parens (ppr other)
+
+pprUInfixT :: Type -> Doc
+pprUInfixT (UInfixT x n y) = pprUInfixT x <+> pprName' Infix n <+> pprUInfixT y
+pprUInfixT t               = ppr t
 
 instance Ppr Type where
     ppr (ForallT tvars ctxt ty)

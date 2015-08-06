@@ -1,5 +1,5 @@
 TYPE SIGNATURES
-  showTwo :: forall w_a. Show w_a => w_a -> String
+  showTwo :: forall a. Show a => a -> String
 TYPE CONSTRUCTORS
 COERCION AXIOMS
 Dependent modules: []

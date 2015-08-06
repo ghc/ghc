@@ -75,7 +75,7 @@ Therefore the UniqFM is made non-abstract and we use custom fold.
 
 MS 2010/04
 When converting UniqFM to use Data.IntMap, the fold cannot use UniqFM internal
-representation any more. But it is imperative that the assSqueeze stops
+representation any more. But it is imperative that the accSqueeze stops
 the folding if the count gets greater or equal to maxCount. We thus convert
 UniqFM to a (lazy) list, do the fold and stops if necessary, which was
 the most efficient variant tried. Benchmark compiling 10-times SHA1.hs follows.
@@ -111,7 +111,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts excl
                             ArchX86_64    -> 5
                             ArchPPC       -> 16
                             ArchSPARC     -> 14
-                            ArchPPC_64    -> panic "trivColorable ArchPPC_64"
+                            ArchPPC_64 _  -> panic "trivColorable ArchPPC_64"
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
                             ArchARM64     -> panic "trivColorable ArchARM64"
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
@@ -136,7 +136,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcFloat conflicts exclus
                             ArchX86_64    -> 0
                             ArchPPC       -> 0
                             ArchSPARC     -> 22
-                            ArchPPC_64    -> panic "trivColorable ArchPPC_64"
+                            ArchPPC_64 _  -> panic "trivColorable ArchPPC_64"
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
                             ArchARM64     -> panic "trivColorable ArchARM64"
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
@@ -161,7 +161,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
                             ArchX86_64    -> 0
                             ArchPPC       -> 26
                             ArchSPARC     -> 11
-                            ArchPPC_64    -> panic "trivColorable ArchPPC_64"
+                            ArchPPC_64 _  -> panic "trivColorable ArchPPC_64"
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
                             ArchARM64     -> panic "trivColorable ArchARM64"
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
@@ -186,7 +186,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDoubleSSE conflicts ex
                             ArchX86_64    -> 10
                             ArchPPC       -> 0
                             ArchSPARC     -> 0
-                            ArchPPC_64    -> panic "trivColorable ArchPPC_64"
+                            ArchPPC_64 _  -> panic "trivColorable ArchPPC_64"
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
                             ArchARM64     -> panic "trivColorable ArchARM64"
                             ArchAlpha     -> panic "trivColorable ArchAlpha"

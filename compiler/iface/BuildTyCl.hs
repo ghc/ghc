@@ -272,7 +272,7 @@ buildClass tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc_isrec
         ; dict_con <- buildDataCon (panic "buildClass: FamInstEnvs")
                                    datacon_name
                                    False        -- Not declared infix
-                                   (map (const HsNoBang) args)
+                                   (map (const HsLazy) args)
                                    [{- No fields -}]
                                    tvs [{- no existentials -}]
                                    [{- No GADT equalities -}]

@@ -137,7 +137,7 @@ data Pat id
 
   | ConPatOut {
         pat_con     :: Located ConLike,
-        pat_arg_tys :: [Type],          -- The univeral arg types, 1-1 with the universal
+        pat_arg_tys :: [Type],          -- The universal arg types, 1-1 with the universal
                                         -- tyvars of the constructor/pattern synonym
                                         --   Use (conLikeResTy pat_con pat_arg_tys) to get
                                         --   the type of the pattern

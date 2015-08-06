@@ -1,8 +1,8 @@
 
-<interactive>:6:9: error:
+<interactive>:5:9: error:
     Not in scope: ‘System.IO.Unsafe.unsafePerformIO’
 
-<interactive>:7:9: error:
-    Variable not in scope: x :: IO Integer -> t0
+<interactive>:6:9: error:
+    Variable not in scope: x :: IO Integer -> t
 
-<interactive>:8:1: error: Variable not in scope: y
+<interactive>:7:1: error: Variable not in scope: y

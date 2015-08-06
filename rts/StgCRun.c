@@ -302,19 +302,18 @@ StgRunIsImplementedInAssembler(void)
          * restore callee-saves registers.  (Don't stomp on %%rax!)
          */
         "addq %0, %%rsp\n\t"
-        "movq %%rsp, %%rdx\n\t"
-        "addq %1, %%rsp\n\t"
-        "movq 0(%%rdx),%%rbx\n\t"       /* restore the registers saved above */
-        "movq 8(%%rdx),%%rbp\n\t"
-        "movq 16(%%rdx),%%r12\n\t"
-        "movq 24(%%rdx),%%r13\n\t"
-        "movq 32(%%rdx),%%r14\n\t"
-        "movq 40(%%rdx),%%r15\n\t"
+        "movq 0(%%rsp),%%rbx\n\t"       /* restore the registers saved above */
+        "movq 8(%%rsp),%%rbp\n\t"
+        "movq 16(%%rsp),%%r12\n\t"
+        "movq 24(%%rsp),%%r13\n\t"
+        "movq 32(%%rsp),%%r14\n\t"
+        "movq 40(%%rsp),%%r15\n\t"
 #if defined(mingw32_HOST_OS)
-        "movq 48(%%rdx),%%rdi\n\t"
-        "movq 56(%%rdx),%%rsi\n\t"
-        "movq 64(%%rdx),%%xmm6\n\t"
+        "movq 48(%%rsp),%%rdi\n\t"
+        "movq 56(%%rsp),%%rsi\n\t"
+        "movq 64(%%rsp),%%xmm6\n\t"
 #endif
+        "addq %1, %%rsp\n\t"
         "retq"
 
         :
@@ -662,9 +661,17 @@ StgRunIsImplementedInAssembler(void)
 }
 
 #else // linux_HOST_OS
-#error Only linux support for power64 right now.
+#error Only Linux support for power64 right now.
 #endif
 
+#endif
+
+#ifdef powerpc64le_HOST_ARCH
+/* -----------------------------------------------------------------------------
+   PowerPC 64 little endian architecture
+
+   Really everything is in assembler, so we don't have to deal with GCC...
+   -------------------------------------------------------------------------- */
 #endif
 
 /* -----------------------------------------------------------------------------

@@ -14,6 +14,13 @@ data ThreadTree req rsp m =
 ----------------------------------
 newtype ContM req rsp m a = ContM ((a-> ThreadTree req rsp m)-> ThreadTree req rsp m)
 
+instance Functor (ContM req rsp m) where
+   fmap = undefined
+
+instance Applicative (ContM req rsp m) where
+   pure  = undefined
+   (<*>) = undefined
+
 instance Monad m => Monad (ContM req rsp m) where
    m >>= f = contmBind m f
    return  = contmReturn

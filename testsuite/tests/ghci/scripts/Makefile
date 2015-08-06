@@ -48,12 +48,9 @@ T9367:
 T9762_prep:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -O -fhpc -dynamic T9762B.hs
 
-.PHONY: T10408A
-T10408A:
-	'$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 \
-	    -ghci-script T10408A.script -ghci-script T10408B.script < /dev/null
-
-.PHONY: T10408B
-T10408B:
+.PHONY: T10408
+T10408:
+	# `-ghci-script`s should be executed in the order they are specified,
+	# and not be ignored when `-ignore-dot-ghci` is specified.
 	'$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci \
 	    -ghci-script T10408A.script -ghci-script T10408B.script < /dev/null

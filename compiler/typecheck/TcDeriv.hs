@@ -540,7 +540,7 @@ renameDeriv is_boot inst_infos bagBinds
                             , ib_derived = sa } })
         =  ASSERT( null sigs )
            bindLocalNamesFV tyvars $
-           do { (rn_binds, fvs) <- rnMethodBinds (is_cls_nm inst) (\_ -> []) binds
+           do { (rn_binds,_, fvs) <- rnMethodBinds False (is_cls_nm inst) [] binds []
               ; let binds' = InstBindings { ib_binds = rn_binds
                                           , ib_tyvars = tyvars
                                           , ib_pragmas = []
@@ -1147,7 +1147,7 @@ The DeriveAnyClass extension adds a third way to derive instances, based on
 empty instance declarations.
 
 The canonical use case is in combination with GHC.Generics and default method
-signatures. These allow us have have instance declarations be empty, but still
+signatures. These allow us to have instance declarations being empty, but still
 useful, e.g.
 
   data T a = ...blah..blah... deriving( Generic )
@@ -1180,10 +1180,13 @@ cases, standalone deriving can still be used.
 -- the data constructors - but we need to be careful to fall back to the
 -- family tycon (with indexes) in error messages.
 
-data DerivStatus = CanDerive
+data DerivStatus = CanDerive                 -- Standard class, can derive
                  | DerivableClassError SDoc  -- Standard class, but can't do it
                  | DerivableViaInstance      -- See Note [Deriving any class]
                  | NonDerivableClass SDoc    -- Non-standard class
+
+-- A "standard" class is one defined in the Haskell report which GHC knows how
+-- to generate code for, such as Eq, Ord, Ix, etc.
 
 checkSideConditions :: DynFlags -> DerivContext -> Class -> [TcType]
                     -> TyCon -> [Type] -- tycon and its parameters
@@ -1203,7 +1206,9 @@ classArgsErr :: Class -> [Type] -> SDoc
 classArgsErr cls cls_tys = quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "is not a class")
 
 nonStdErr :: Class -> SDoc
-nonStdErr cls = quotes (ppr cls) <+> ptext (sLit "is not a derivable class")
+nonStdErr cls =
+      quotes (ppr cls)
+  <+> ptext (sLit "is not a standard derivable class (Eq, Show, etc.)")
 
 sideConditions :: DerivContext -> Class -> Maybe Condition
 sideConditions mtheta cls
@@ -1219,13 +1224,15 @@ sideConditions mtheta cls
                                            cond_args cls)
   | cls_key == functorClassKey     = Just (checkFlag Opt_DeriveFunctor `andCond`
                                            cond_vanilla `andCond`
-                                           cond_functorOK True)
+                                           cond_functorOK True False)
   | cls_key == foldableClassKey    = Just (checkFlag Opt_DeriveFoldable `andCond`
                                            cond_vanilla `andCond`
-                                           cond_functorOK False) -- Functor/Fold/Trav works ok for rank-n types
+                                           cond_functorOK False True)
+                                           -- Functor/Fold/Trav works ok
+                                           -- for rank-n types
   | cls_key == traversableClassKey = Just (checkFlag Opt_DeriveTraversable `andCond`
                                            cond_vanilla `andCond`
-                                           cond_functorOK False)
+                                           cond_functorOK False False)
   | cls_key == genClassKey         = Just (checkFlag Opt_DeriveGeneric `andCond`
                                            cond_vanilla `andCond`
                                            cond_RepresentableOk)
@@ -1346,14 +1353,14 @@ cond_isProduct (_, rep_tc, _)
 functorLikeClassKeys :: [Unique]
 functorLikeClassKeys = [functorClassKey, foldableClassKey, traversableClassKey]
 
-cond_functorOK :: Bool -> Condition
+cond_functorOK :: Bool -> Bool -> Condition
 -- OK for Functor/Foldable/Traversable class
 -- Currently: (a) at least one argument
 --            (b) don't use argument contravariantly
 --            (c) don't use argument in the wrong place, e.g. data T a = T (X a a)
 --            (d) optionally: don't use function types
 --            (e) no "stupid context" on data type
-cond_functorOK allowFunctions (_, rep_tc, _)
+cond_functorOK allowFunctions allowExQuantifiedLastTyVar (_, rep_tc, _)
   | null tc_tvs
   = NotValid (ptext (sLit "Data type") <+> quotes (ppr rep_tc)
               <+> ptext (sLit "must have some type parameters"))
@@ -1375,6 +1382,9 @@ cond_functorOK allowFunctions (_, rep_tc, _)
 
     check_universal :: DataCon -> Validity
     check_universal con
+      | allowExQuantifiedLastTyVar
+      = IsValid -- See Note [DeriveFoldable with ExistentialQuantification]
+                -- in TcGenDeriv
       | Just tv <- getTyVar_maybe (last (tyConAppArgs (dataConOrigResTy con)))
       , tv `elem` dataConUnivTyVars con
       , not (tv `elemVarSet` tyVarsOfTypes (dataConTheta con))
@@ -1442,7 +1452,7 @@ badCon con msg = ptext (sLit "Constructor") <+> quotes (ppr con) <+> msg
 {-
 Note [Check that the type variable is truly universal]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For Functor, Foldable, Traversable, we must check that the *last argument*
+For Functor and Traversable instances, we must check that the *last argument*
 of the type constructor is used truly universally quantified.  Example
 
    data T a b where
@@ -1460,6 +1470,20 @@ Eg. for T1-T3 we can write
      fmap f (T1 a b) = T1 a (f b)
      fmap f (T2 b c) = T2 (f b) c
      fmap f (T3 x)   = T3 (f x)
+
+We need not perform these checks for Foldable instances, however, since
+functions in Foldable can only consume existentially quantified type variables,
+rather than produce them (as is the case in Functor and Traversable functions.)
+As a result, T can have a derived Foldable instance:
+
+    foldr f z (T1 a b) = f b z
+    foldr f z (T2 b c) = f b z
+    foldr f z (T3 x)   = f x z
+    foldr f z (T4 x)   = f x z
+    foldr f z (T5 x)   = f x z
+    foldr _ z T6       = z
+
+See Note [DeriveFoldable with ExistentialQuantification] in TcGenDeriv.
 
 
 Note [Superclasses of derived instance]
@@ -1528,15 +1552,18 @@ mkNewTypeEqn dflags overlap_mode tvs
   = case checkSideConditions dflags mtheta cls cls_tys rep_tycon rep_tc_args of
       -- Error with standard class
       DerivableClassError msg
-        | might_derive_via_coercible -> bale_out (msg $$ suggest_nd)
+        | might_derive_via_coercible -> bale_out (msg $$ suggest_gnd)
         | otherwise                  -> bale_out msg
+
       -- Must use newtype deriving or DeriveAnyClass
       NonDerivableClass _msg
         -- Too hard, even with newtype deriving
         | newtype_deriving           -> bale_out cant_derive_err
         -- Try newtype deriving!
-        | might_derive_via_coercible -> bale_out (non_std $$ suggest_nd)
-        | otherwise                  -> bale_out non_std
+        -- Here we suggest GeneralizedNewtypeDeriving even in cases where it may
+        -- not be applicable. See Trac #9600.
+        | otherwise                  -> bale_out (non_std $$ suggest_gnd)
+
       -- CanDerive/DerivableViaInstance
       _ -> do when (newtype_deriving && deriveAnyClass) $
                 addWarnTc (sep [ ptext (sLit "Both DeriveAnyClass and GeneralizedNewtypeDeriving are enabled")
@@ -1550,8 +1577,8 @@ mkNewTypeEqn dflags overlap_mode tvs
         bale_out    = bale_out' newtype_deriving
         bale_out' b = failWithTc . derivingThingErr b cls cls_tys inst_ty
 
-        non_std    = nonStdErr cls
-        suggest_nd = ptext (sLit "Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension")
+        non_std     = nonStdErr cls
+        suggest_gnd = ptext (sLit "Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension")
 
         -- Here is the plan for newtype derivings.  We see
         --        newtype T a1...an = MkT (t ak+1...an) deriving (.., C s1 .. sm, ...)
@@ -2127,7 +2154,7 @@ derivingThingErr newtype_deriving clas tys ty why
           $$ nest 2 extra) <> colon,
          nest 2 why]
   where
-    extra | newtype_deriving = ptext (sLit "(even with cunning newtype deriving)")
+    extra | newtype_deriving = ptext (sLit "(even with cunning GeneralizedNewtypeDeriving)")
           | otherwise        = Outputable.empty
     pred = mkClassPred clas (tys ++ [ty])
 

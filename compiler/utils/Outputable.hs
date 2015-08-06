@@ -61,6 +61,7 @@ module Outputable (
         reallyAlwaysQualify, reallyAlwaysQualifyNames,
         alwaysQualify, alwaysQualifyNames, alwaysQualifyModules,
         neverQualify, neverQualifyNames, neverQualifyModules,
+        alwaysQualifyPackages, neverQualifyPackages,
         QualifyName(..), queryQual,
         sdocWithDynFlags, sdocWithPlatform,
         getPprStyle, withPprStyle, withPprStyleDoc,
@@ -159,7 +160,7 @@ data PrintUnqualified = QueryQualify {
 -- | given an /original/ name, this function tells you which module
 -- name it should be qualified with when printing for the user, if
 -- any.  For example, given @Control.Exception.catch@, which is in scope
--- as @Exception.catch@, this fuction will return @Just "Exception"@.
+-- as @Exception.catch@, this function will return @Just "Exception"@.
 -- Note that the return value is a ModuleName, not a Module, because
 -- in source code, names are qualified by ModuleNames.
 type QueryQualifyName = Module -> OccName -> QualifyName
@@ -433,21 +434,24 @@ showSDocDebug dflags d = renderWithStyle dflags d PprDebug
 
 renderWithStyle :: DynFlags -> SDoc -> PprStyle -> String
 renderWithStyle dflags sdoc sty
-  = Pretty.showDoc PageMode (pprCols dflags) $
-    runSDoc sdoc (initSDocContext dflags sty)
+  = let s = Pretty.style{ Pretty.mode = PageMode,
+                          Pretty.lineLength = pprCols dflags }
+    in Pretty.renderStyle s $ runSDoc sdoc (initSDocContext dflags sty)
 
 -- This shows an SDoc, but on one line only. It's cheaper than a full
 -- showSDoc, designed for when we're getting results like "Foo.bar"
 -- and "foo{uniq strictness}" so we don't want fancy layout anyway.
 showSDocOneLine :: DynFlags -> SDoc -> String
 showSDocOneLine dflags d
- = Pretty.showDoc OneLineMode (pprCols dflags) $
-   runSDoc d (initSDocContext dflags defaultUserStyle)
+ = let s = Pretty.style{ Pretty.mode = OneLineMode,
+                         Pretty.lineLength = pprCols dflags } in
+   Pretty.renderStyle s $ runSDoc d (initSDocContext dflags defaultUserStyle)
 
 showSDocDumpOneLine :: DynFlags -> SDoc -> String
 showSDocDumpOneLine dflags d
- = Pretty.showDoc OneLineMode irrelevantNCols $
-   runSDoc d (initSDocContext dflags defaultDumpStyle)
+ = let s = Pretty.style{ Pretty.mode = OneLineMode,
+                         Pretty.lineLength = irrelevantNCols } in
+   Pretty.renderStyle s $ runSDoc d (initSDocContext dflags defaultDumpStyle)
 
 irrelevantNCols :: Int
 -- Used for OneLineMode and LeftMode when number of cols isn't used
@@ -495,8 +499,7 @@ angleBrackets d = char '<' <> d <> char '>'
 paBrackets d    = ptext (sLit "[:") <> d <> ptext (sLit ":]")
 
 cparen :: Bool -> SDoc -> SDoc
-
-cparen b d     = SDoc $ Pretty.cparen b . runSDoc d
+cparen b d = SDoc $ Pretty.maybeParens b . runSDoc d
 
 -- 'quotes' encloses something in single quotes...
 -- but it omits them if the thing begins or ends in a single quote

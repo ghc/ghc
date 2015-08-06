@@ -36,6 +36,11 @@ Common commands:
 
     Displays the value of make variable <var>
 
+  - `make show! VALUE=<var>`
+
+    Same as `make show`, but works right after ./configure (it skips reading
+    package-data.mk files).
+
   - make clean
   - make distclean
   - make maintainer-clean

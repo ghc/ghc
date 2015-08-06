@@ -37,6 +37,20 @@
 
   * `IO` now has a `Monoid` instance
 
+  * Generalize `Debug.Trace.{traceM, traceShowM}` from `Monad` to `Applicative`
+    (#10023)
+
+  * Generalise `forever` from `Monad` to `Applicative`
+
+  * Exported `GiveGCStats`, `DoCostCentres`, `DoHeapProfile`, `DoTrace`,
+    `RtsTime`, and `RtsNat` from `GHC.RTS.Flags`
+
+  * New function `GHC.IO.interruptible` used to correctly implement
+    `Control.Exception.allowInterrupt` (#9516)
+
+  * Made `PatternMatchFail`, `RecSelError`, `RecConError`, `RecUpdError`,
+    `NoMethodError`, and `AssertionFailed` newtypes (#10738)
+
 ## 4.8.1.0  *TBA*
 
   * Bundled with GHC 7.10.2

@@ -24,7 +24,7 @@ class Class2 a => Class3 a where
 instance Class1 Int where
   func1 = id
 
-instance Class3 a => Class2 a where
+instance (Class1 a, Class3 a) => Class2 a where
   func2 = func3
 
 instance Class3 Int where

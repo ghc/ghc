@@ -565,27 +565,26 @@ addLocalInst (home_ie, my_insts) ispec
                  | isGHCi    = deleteFromInstEnv home_ie ispec
                  | otherwise = home_ie
 
-               (_tvs, cls, tys) = instanceHead ispec
                -- If we're compiling sig-of and there's an external duplicate
                -- instance, silently ignore it (that's the instance we're
                -- implementing!)  NB: we still count local duplicate instances
                -- as errors.
                -- See Note [Signature files and type class instances]
-               global_ie
-                    | isJust (tcg_sig_of tcg_env) = emptyInstEnv
-                    | otherwise = eps_inst_env eps
-               inst_envs       = InstEnvs { ie_global  = global_ie
-                                          , ie_local   = home_ie'
-                                          , ie_visible = tcVisibleOrphanMods tcg_env }
-               (matches, _, _) = lookupInstEnv False inst_envs cls tys
-               dups            = filter (identicalClsInstHead ispec) (map fst matches)
+               global_ie | isJust (tcg_sig_of tcg_env) = emptyInstEnv
+                         | otherwise = eps_inst_env eps
+               inst_envs = InstEnvs { ie_global  = global_ie
+                                    , ie_local   = home_ie'
+                                    , ie_visible = tcVisibleOrphanMods tcg_env }
 
-             -- Check functional dependencies
-         ; case checkFunDeps inst_envs ispec of
-             Just specs -> funDepErr ispec specs
-             Nothing    -> return ()
+             -- Check for inconsistent functional dependencies
+         ; let inconsistent_ispecs = checkFunDeps inst_envs ispec
+         ; unless (null inconsistent_ispecs) $
+           funDepErr ispec inconsistent_ispecs
 
              -- Check for duplicate instance decls.
+         ; let (_tvs, cls, tys) = instanceHead ispec
+               (matches, _, _)  = lookupInstEnv False inst_envs cls tys
+               dups             = filter (identicalClsInstHead ispec) (map fst matches)
          ; unless (null dups) $
            dupInstErr ispec (head dups)
 

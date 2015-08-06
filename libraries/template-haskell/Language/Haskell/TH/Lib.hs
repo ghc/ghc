@@ -57,6 +57,8 @@ integerL    :: Integer -> Lit
 integerL    = IntegerL
 charL       :: Char -> Lit
 charL       = CharL
+charPrimL   :: Char -> Lit
+charPrimL   = CharPrimL
 stringL     :: String -> Lit
 stringL     = StringL
 stringPrimL :: [Word8] -> Lit
@@ -516,6 +518,20 @@ varT = return . VarT
 conT :: Name -> TypeQ
 conT = return . ConT
 
+infixT :: TypeQ -> Name -> TypeQ -> TypeQ
+infixT t1 n t2 = do t1' <- t1
+                    t2' <- t2
+                    return (InfixT t1' n t2')
+
+uInfixT :: TypeQ -> Name -> TypeQ -> TypeQ
+uInfixT t1 n t2 = do t1' <- t1
+                     t2' <- t2
+                     return (UInfixT t1' n t2')
+
+parensT :: TypeQ -> TypeQ
+parensT t = do t' <- t
+               return (ParensT t')
+
 appT :: TypeQ -> TypeQ -> TypeQ
 appT t1 t2 = do
            t1' <- t1
@@ -545,6 +561,12 @@ sigT t k
 
 equalityT :: TypeQ
 equalityT = return EqualityT
+
+wildCardT :: TypeQ
+wildCardT = return (WildCardT Nothing)
+
+namedWildCardT :: Name -> TypeQ
+namedWildCardT = return . WildCardT . Just
 
 {-# DEPRECATED classP "As of template-haskell-2.10, constraint predicates (Pred) are just types (Type), in keeping with ConstraintKinds. Please use 'conT' and 'appT'." #-}
 classP :: Name -> [Q Type] -> Q Pred

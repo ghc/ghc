@@ -1,13 +1,15 @@
 
 InstantiatedNamedWildcardsInConstraints.hs:4:14: error:
-    Found hole: _a :: b
+    Found type wildcard ‘_a’ standing for ‘b’
     Where: ‘b’ is a rigid type variable bound by
                the inferred type of foo :: (Enum b, Show b) => b -> (String, b)
                at InstantiatedNamedWildcardsInConstraints.hs:4:8
     To use the inferred type, enable PartialTypeSignatures
-    In the type signature for ‘foo’: (Enum _a, _) => _a -> (String, b)
+    In the type signature for:
+      foo :: (Enum _a, _) => _a -> (String, b)
 
 InstantiatedNamedWildcardsInConstraints.hs:4:18: error:
     Found hole ‘_’ with inferred constraints: Show b
     To use the inferred type, enable PartialTypeSignatures
-    In the type signature for ‘foo’: (Enum _a, _) => _a -> (String, b)
+    In the type signature for:
+      foo :: (Enum _a, _) => _a -> (String, b)

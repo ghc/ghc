@@ -30,7 +30,15 @@ import Platform
 import OrdList
 import UniqSupply
 import Unique
+import Util
 
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Writer
+
+#if MIN_VERSION_base(4,8,0)
+#else
+import Data.Monoid ( Monoid, mappend, mempty )
+#endif
 import Data.List ( nub )
 import Data.Maybe ( catMaybes )
 
@@ -255,6 +263,99 @@ genCall t@(PrimTarget op) [] args
                 `appOL` stmts4 `snocOL` call
     return (stmts, top1 ++ top2)
 
+-- We handle MO_U_Mul2 by simply using a 'mul' instruction, but with operands
+-- twice the width (we first zero-extend them), e.g., on 64-bit arch we will
+-- generate 'mul' on 128-bit operands. Then we only need some plumbing to
+-- extract the two 64-bit values out of 128-bit result.
+genCall (PrimTarget (MO_U_Mul2 w)) [dstH, dstL] [lhs, rhs] = do
+    let width = widthToLlvmInt w
+        bitWidth = widthInBits w
+        width2x = LMInt (bitWidth * 2)
+    -- First zero-extend the operands ('mul' instruction requires the operands
+    -- and the result to be of the same type). Note that we don't use 'castVars'
+    -- because it tries to do LM_Sext.
+    (lhsVar, stmts1, decls1) <- exprToVar lhs
+    (rhsVar, stmts2, decls2) <- exprToVar rhs
+    (lhsExt, stmt3) <- doExpr width2x $ Cast LM_Zext lhsVar width2x
+    (rhsExt, stmt4) <- doExpr width2x $ Cast LM_Zext rhsVar width2x
+    -- Do the actual multiplication (note that the result is also 2x width).
+    (retV, stmt5) <- doExpr width2x $ LlvmOp LM_MO_Mul lhsExt rhsExt
+    -- Extract the lower bits of the result into retL.
+    (retL, stmt6) <- doExpr width $ Cast LM_Trunc retV width
+    -- Now we right-shift the higher bits by width.
+    let widthLlvmLit = LMLitVar $ LMIntLit (fromIntegral bitWidth) width
+    (retShifted, stmt7) <- doExpr width2x $ LlvmOp LM_MO_LShr retV widthLlvmLit
+    -- And extract them into retH.
+    (retH, stmt8) <- doExpr width $ Cast LM_Trunc retShifted width
+    dstRegL <- getCmmReg (CmmLocal dstL)
+    dstRegH <- getCmmReg (CmmLocal dstH)
+    let storeL = Store retL dstRegL
+        storeH = Store retH dstRegH
+        stmts = stmts1 `appOL` stmts2 `appOL`
+           toOL [ stmt3 , stmt4, stmt5, stmt6, stmt7, stmt8, storeL, storeH ]
+    return (stmts, decls1 ++ decls2)
+
+-- MO_U_QuotRem2 is another case we handle by widening the registers to double
+-- the width and use normal LLVM instructions (similarly to the MO_U_Mul2). The
+-- main difference here is that we need to combine two words into one register
+-- and then use both 'udiv' and 'urem' instructions to compute the result.
+genCall (PrimTarget (MO_U_QuotRem2 w)) [dstQ, dstR] [lhsH, lhsL, rhs] = run $ do
+    let width = widthToLlvmInt w
+        bitWidth = widthInBits w
+        width2x = LMInt (bitWidth * 2)
+    -- First zero-extend all parameters to double width.
+    let zeroExtend expr = do
+            var <- liftExprData $ exprToVar expr
+            doExprW width2x $ Cast LM_Zext var width2x
+    lhsExtH <- zeroExtend lhsH
+    lhsExtL <- zeroExtend lhsL
+    rhsExt <- zeroExtend rhs
+    -- Now we combine the first two parameters (that represent the high and low
+    -- bits of the value). So first left-shift the high bits to their position
+    -- and then bit-or them with the low bits.
+    let widthLlvmLit = LMLitVar $ LMIntLit (fromIntegral bitWidth) width
+    lhsExtHShifted <- doExprW width2x $ LlvmOp LM_MO_Shl lhsExtH widthLlvmLit
+    lhsExt <- doExprW width2x $ LlvmOp LM_MO_Or lhsExtHShifted lhsExtL
+    -- Finally, we can call 'udiv' and 'urem' to compute the results.
+    retExtDiv <- doExprW width2x $ LlvmOp LM_MO_UDiv lhsExt rhsExt
+    retExtRem <- doExprW width2x $ LlvmOp LM_MO_URem lhsExt rhsExt
+    -- And since everything is in 2x width, we need to truncate the results and
+    -- then return them.
+    let narrow var = doExprW width $ Cast LM_Trunc var width
+    retDiv <- narrow retExtDiv
+    retRem <- narrow retExtRem
+    dstRegQ <- lift $ getCmmReg (CmmLocal dstQ)
+    dstRegR <- lift $ getCmmReg (CmmLocal dstR)
+    statement $ Store retDiv dstRegQ
+    statement $ Store retRem dstRegR
+  where
+    -- TODO(michalt): Consider extracting this and using in more places.
+    -- Hopefully this should cut down on the noise of accumulating the
+    -- statements and declarations.
+    doExprW :: LlvmType -> LlvmExpression -> WriterT LlvmAccum LlvmM LlvmVar
+    doExprW a b = do
+        (var, stmt) <- lift $ doExpr a b
+        statement stmt
+        return var
+    run :: WriterT LlvmAccum LlvmM () -> LlvmM (LlvmStatements, [LlvmCmmDecl])
+    run action = do
+        LlvmAccum stmts decls <- execWriterT action
+        return (stmts, decls)
+
+-- Handle the MO_{Add,Sub}IntC separately. LLVM versions return a record from
+-- which we need to extract the actual values.
+genCall t@(PrimTarget (MO_AddIntC w)) [dstV, dstO] [lhs, rhs] =
+    genCallWithOverflow t w [dstV, dstO] [lhs, rhs]
+genCall t@(PrimTarget (MO_SubIntC w)) [dstV, dstO] [lhs, rhs] =
+    genCallWithOverflow t w [dstV, dstO] [lhs, rhs]
+
+-- Similar to MO_{Add,Sub}IntC, but MO_Add2 expects the first element of the
+-- return tuple to be the overflow bit and the second element to contain the
+-- actual result of the addition. So we still use genCallWithOverflow but swap
+-- the return registers.
+genCall t@(PrimTarget (MO_Add2 w)) [dstO, dstV] [lhs, rhs] =
+    genCallWithOverflow t w [dstV, dstO] [lhs, rhs]
+
 -- Handle all other foreign calls and prim ops.
 genCall target res args = do
 
@@ -359,6 +460,68 @@ genCall target res args = do
                     let s3 = Store v2 vreg
                     return (allStmts `snocOL` s2 `snocOL` s3
                                 `appOL` retStmt, top1 ++ top2)
+
+-- | Generate a call to an LLVM intrinsic that performs arithmetic operation
+-- with overflow bit (i.e., returns a struct containing the actual result of the
+-- operation and an overflow bit). This function will also extract the overflow
+-- bit and zero-extend it (all the corresponding Cmm PrimOps represent the
+-- overflow "bit" as a usual Int# or Word#).
+genCallWithOverflow
+  :: ForeignTarget -> Width -> [CmmFormal] -> [CmmActual] -> LlvmM StmtData
+genCallWithOverflow t@(PrimTarget op) w [dstV, dstO] [lhs, rhs] = do
+    -- So far this was only tested for the following three CallishMachOps.
+    MASSERT( (op `elem` [MO_Add2 w, MO_AddIntC w, MO_SubIntC w]) )
+    let width = widthToLlvmInt w
+    -- This will do most of the work of generating the call to the intrinsic and
+    -- extracting the values from the struct.
+    (value, overflowBit, (stmts, top)) <-
+      genCallExtract t w (lhs, rhs) (width, i1)
+    -- value is i<width>, but overflowBit is i1, so we need to cast (Cmm expects
+    -- both to be i<width>)
+    (overflow, zext) <- doExpr width $ Cast LM_Zext overflowBit width
+    dstRegV <- getCmmReg (CmmLocal dstV)
+    dstRegO <- getCmmReg (CmmLocal dstO)
+    let storeV = Store value dstRegV
+        storeO = Store overflow dstRegO
+    return (stmts `snocOL` zext `snocOL` storeV `snocOL` storeO, top)
+genCallWithOverflow _ _ _ _ =
+    panic "genCallExtract: wrong ForeignTarget or number of arguments"
+
+-- | A helper function for genCallWithOverflow that handles generating the call
+-- to the LLVM intrinsic and extracting the result from the struct to LlvmVars.
+genCallExtract
+    :: ForeignTarget           -- ^ PrimOp
+    -> Width                   -- ^ Width of the operands.
+    -> (CmmActual, CmmActual)  -- ^ Actual arguments.
+    -> (LlvmType, LlvmType)    -- ^ LLLVM types of the returned sturct.
+    -> LlvmM (LlvmVar, LlvmVar, StmtData)
+genCallExtract target@(PrimTarget op) w (argA, argB) (llvmTypeA, llvmTypeB) = do
+    let width = widthToLlvmInt w
+        argTy = [width, width]
+        retTy = LMStructU [llvmTypeA, llvmTypeB]
+
+    -- Process the arguments.
+    let args_hints = zip [argA, argB] (snd $ foreignTargetHints target)
+    (argsV1, args1, top1) <- arg_vars args_hints ([], nilOL, [])
+    (argsV2, args2) <- castVars $ zip argsV1 argTy
+
+    -- Get the function and make the call.
+    fname <- cmmPrimOpFunctions op
+    (fptr, _, top2) <- getInstrinct fname retTy argTy
+    -- We use StdCall for primops. See also the last case of genCall.
+    (retV, call) <- doExpr retTy $ Call StdCall fptr argsV2 []
+
+    -- This will result in a two element struct, we need to use "extractvalue"
+    -- to get them out of it.
+    (res1, ext1) <- doExpr llvmTypeA (ExtractV retV 0)
+    (res2, ext2) <- doExpr llvmTypeB (ExtractV retV 1)
+
+    let stmts = args1 `appOL` args2 `snocOL` call `snocOL` ext1 `snocOL` ext2
+        tops = top1 ++ top2
+    return (res1, res2, (stmts, tops))
+
+genCallExtract _ _ _ _ =
+    panic "genCallExtract: unsupported ForeignTarget"
 
 -- Handle simple function call that only need simple type casting, of the form:
 --   truncate arg >>= \a -> call(a) >>= zext
@@ -534,12 +697,18 @@ cmmPrimOpFunctions mop = do
 
     (MO_Prefetch_Data _ )-> fsLit "llvm.prefetch"
 
+    MO_AddIntC w    -> fsLit $ "llvm.sadd.with.overflow."
+                             ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    MO_SubIntC w    -> fsLit $ "llvm.ssub.with.overflow."
+                             ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    MO_Add2 w       -> fsLit $ "llvm.uadd.with.overflow."
+                             ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+
     MO_S_QuotRem {}  -> unsupported
     MO_U_QuotRem {}  -> unsupported
     MO_U_QuotRem2 {} -> unsupported
-    MO_Add2 {}       -> unsupported
-    MO_AddIntC {}    -> unsupported
-    MO_SubIntC {}    -> unsupported
+    -- We support MO_U_Mul2 through ordinary LLVM mul instruction, see the
+    -- appropriate case of genCall.
     MO_U_Mul2 {}     -> unsupported
     MO_WriteBarrier  -> unsupported
     MO_Touch         -> unsupported
@@ -1652,3 +1821,21 @@ getTBAAMeta u = do
 -- | Returns TBAA meta data for given register
 getTBAARegMeta :: GlobalReg -> LlvmM [MetaAnnot]
 getTBAARegMeta = getTBAAMeta . getTBAA
+
+
+-- | A more convenient way of accumulating LLVM statements and declarations.
+data LlvmAccum = LlvmAccum LlvmStatements [LlvmCmmDecl]
+
+instance Monoid LlvmAccum where
+    mempty = LlvmAccum nilOL []
+    LlvmAccum stmtsA declsA `mappend` LlvmAccum stmtsB declsB =
+        LlvmAccum (stmtsA `mappend` stmtsB) (declsA `mappend` declsB)
+
+liftExprData :: LlvmM ExprData -> WriterT LlvmAccum LlvmM LlvmVar
+liftExprData action = do
+    (var, stmts, decls) <- lift action
+    tell $ LlvmAccum stmts decls
+    return var
+
+statement :: LlvmStatement -> WriterT LlvmAccum LlvmM ()
+statement stmt = tell $ LlvmAccum (unitOL stmt) []

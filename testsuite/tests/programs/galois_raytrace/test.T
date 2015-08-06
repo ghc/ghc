@@ -1,5 +1,3 @@
-setTestOpts(omit_compiler_types(['hugs']))	# takes much too long
-
 # Floating point differences on x86 using the NCG
 if config.platform.startswith('i386-') and \
        config.platform != 'i386-unknown-openbsd':

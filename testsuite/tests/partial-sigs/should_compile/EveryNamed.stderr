@@ -1,5 +1,5 @@
 TYPE SIGNATURES
-  every :: forall w_a. (w_a -> Bool) -> [w_a] -> Bool
+  every :: forall t. (t -> Bool) -> [t] -> Bool
 TYPE CONSTRUCTORS
 COERCION AXIOMS
 Dependent modules: []

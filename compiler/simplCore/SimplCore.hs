@@ -19,11 +19,11 @@ import Rules            ( mkRuleBase, unionRuleBase,
 import PprCore          ( pprCoreBindings, pprCoreExpr )
 import OccurAnal        ( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
-import CoreUtils        ( coreBindsSize, coreBindsStats, exprSize,
-                          mkTicks, stripTicksTop )
+import CoreStats        ( coreBindsSize, coreBindsStats, exprSize )
+import CoreUtils        ( mkTicks, stripTicksTop )
 import CoreLint         ( showPass, endPass, lintPassResult, dumpPassResult,
                           lintAnnots )
-import Simplify         ( simplTopBinds, simplExpr, simplRule )
+import Simplify         ( simplTopBinds, simplExpr, simplRules )
 import SimplUtils       ( simplEnvForGHCi, activeRule )
 import SimplEnv
 import SimplMonad
@@ -68,15 +68,18 @@ import Plugins          ( installCoreToDos )
 -}
 
 core2core :: HscEnv -> ModGuts -> IO ModGuts
-core2core hsc_env guts
+core2core hsc_env guts@(ModGuts { mg_module  = mod
+                                , mg_loc     = loc
+                                , mg_deps    = deps
+                                , mg_rdr_env = rdr_env })
   = do { us <- mkSplitUniqSupply 's'
        -- make sure all plugins are loaded
 
        ; let builtin_passes = getCoreToDo dflags
-             orph_mods = mkModuleSet (mg_module guts : dep_orphs (mg_deps guts))
+             orph_mods = mkModuleSet (mod : dep_orphs deps)
        ;
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base us mod
-                                    orph_mods print_unqual $
+                                    orph_mods print_unqual loc $
                            do { all_passes <- addPluginPasses builtin_passes
                               ; runCorePasses all_passes guts }
 
@@ -87,15 +90,14 @@ core2core hsc_env guts
        ; return guts2 }
   where
     dflags         = hsc_dflags hsc_env
-    home_pkg_rules = hptRules hsc_env (dep_mods (mg_deps guts))
+    home_pkg_rules = hptRules hsc_env (dep_mods deps)
     hpt_rule_base  = mkRuleBase home_pkg_rules
-    mod            = mg_module guts
+    print_unqual   = mkPrintUnqualified dflags rdr_env
     -- mod: get the module out of the current HscEnv so we can retrieve it from the monad.
     -- This is very convienent for the users of the monad (e.g. plugins do not have to
     -- consume the ModGuts to find the module) but somewhat ugly because mg_module may
     -- _theoretically_ be changed during the Core pipeline (it's part of ModGuts), which
     -- would mean our cached value would go out of date.
-    print_unqual = mkPrintUnqualified dflags (mg_rdr_env guts)
 
 {-
 ************************************************************************
@@ -659,7 +661,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                       -- for imported Ids.  Eg  RULE map my_f = blah
                       -- If we have a substitution my_f :-> other_f, we'd better
                       -- apply it to the rule to, or it'll never match
-                  ; rules1 <- mapM (simplRule env1 Nothing) rules
+                  ; rules1 <- simplRules env1 Nothing rules
 
                   ; return (getFloatBinds env1, rules1) } ;
 

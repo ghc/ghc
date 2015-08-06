@@ -901,6 +901,15 @@ instance Binary WarningTxt where
                       d <- get bh
                       return (DeprecatedTxt s d)
 
+instance Binary StringLiteral where
+  put_ bh (StringLiteral st fs) = do
+            put_ bh st
+            put_ bh fs
+  get bh = do
+            st <- get bh
+            fs <- get bh
+            return (StringLiteral st fs)
+
 instance Binary a => Binary (GenLocated SrcSpan a) where
     put_ bh (L l x) = do
             put_ bh l

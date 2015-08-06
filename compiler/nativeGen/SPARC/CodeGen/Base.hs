@@ -5,7 +5,7 @@ module SPARC.CodeGen.Base (
         Amode(..),
 
         Register(..),
-        setSizeOfRegister,
+        setFormatOfRegister,
 
         getRegisterReg,
         mangleIndexTree
@@ -17,7 +17,7 @@ import SPARC.Instr
 import SPARC.Cond
 import SPARC.AddrMode
 import SPARC.Regs
-import Size
+import Format
 import Reg
 
 import CodeGen.Platform
@@ -76,18 +76,18 @@ data Amode
 --      Otherwise, the parent can decide which register to put it in.
 --
 data Register
-        = Fixed Size Reg InstrBlock
-        | Any   Size (Reg -> InstrBlock)
+        = Fixed Format Reg InstrBlock
+        | Any   Format (Reg -> InstrBlock)
 
 
--- | Change the size field in a Register.
-setSizeOfRegister
-        :: Register -> Size -> Register
+-- | Change the format field in a Register.
+setFormatOfRegister
+        :: Register -> Format -> Register
 
-setSizeOfRegister reg size
+setFormatOfRegister reg format
  = case reg of
-        Fixed _ reg code        -> Fixed size reg code
-        Any _ codefn            -> Any   size codefn
+        Fixed _ reg code        -> Fixed format reg code
+        Any _ codefn            -> Any   format codefn
 
 
 --------------------------------------------------------------------------------
@@ -95,7 +95,7 @@ setSizeOfRegister reg size
 getRegisterReg :: Platform -> CmmReg -> Reg
 
 getRegisterReg _ (CmmLocal (LocalReg u pk))
-        = RegVirtual $ mkVirtualReg u (cmmTypeSize pk)
+        = RegVirtual $ mkVirtualReg u (cmmTypeFormat pk)
 
 getRegisterReg platform (CmmGlobal mid)
   = case globalRegMaybe platform mid of

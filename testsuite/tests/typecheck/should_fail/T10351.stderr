@@ -1,5 +1,6 @@
 
-T10351.hs:6:7: error:
-    No instance for (C [t0]) arising from a use of ‘op’
-    In the expression: op [x]
-    In an equation for ‘f’: f x = op [x]
+T10351.hs:6:1: error:
+    Non type-variable argument in the constraint: C [t]
+    (Use FlexibleContexts to permit this)
+    When checking that ‘f’ has the inferred type
+      f :: forall t. C [t] => t -> ()

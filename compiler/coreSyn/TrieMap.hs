@@ -377,7 +377,7 @@ Note [Empty case alternatives]
   which is utterly wrong (Trac #6097)
 
 We could compare the return type regardless, but the wildly common case
-is that it's unnecesary, so we have two fields (cm_case and cm_ecase)
+is that it's unnecessary, so we have two fields (cm_case and cm_ecase)
 for the two possibilities.  Only cm_ecase looks at the type.
 
 See also Note [Empty case alternatives] in CoreSyn.

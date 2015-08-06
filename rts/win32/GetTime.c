@@ -48,7 +48,7 @@ getProcessCPUTime(void)
 }
 
 // Number of ticks per second used by the QueryPerformanceFrequency
-// implementaiton, represented by a 64-bit union type.
+// implementation, represented by a 64-bit union type.
 static LARGE_INTEGER qpc_frequency = {.QuadPart = 0};
 
 // Initialize qpc_frequency. This function should be called before any call to

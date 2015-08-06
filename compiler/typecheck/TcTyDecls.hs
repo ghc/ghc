@@ -24,7 +24,7 @@ import HsSyn
 import Class
 import Type
 import Kind
-import HscTypes
+import TcRnTypes( SelfBootInfo(..) )
 import TyCon
 import DataCon
 import Var
@@ -34,7 +34,6 @@ import VarEnv
 import VarSet
 import NameSet
 import Coercion ( ltRole )
-import Avail
 import Digraph
 import BasicTypes
 import SrcLoc
@@ -359,7 +358,7 @@ data RecTyInfo = RTI { rti_promotable :: Bool
                      , rti_roles      :: Name -> [Role]
                      , rti_is_rec     :: Name -> RecFlag }
 
-calcRecFlags :: ModDetails -> Bool  -- hs-boot file?
+calcRecFlags :: SelfBootInfo -> Bool  -- hs-boot file?
              -> RoleAnnots -> [TyThing] -> RecTyInfo
 -- The 'boot_names' are the things declared in M.hi-boot, if M is the current module.
 -- Any type constructors in boot_names are automatically considered loop breakers
@@ -381,7 +380,9 @@ calcRecFlags boot_details is_boot mrole_env tyclss
     is_rec n | n `elemNameSet` rec_names = Recursive
              | otherwise                 = NonRecursive
 
-    boot_name_set = availsToNameSet (md_exports boot_details)
+    boot_name_set = case boot_details of
+                      NoSelfBoot                -> emptyNameSet
+                      SelfBoot { sb_tcs = tcs } -> tcs
     rec_names = boot_name_set     `unionNameSet`
                 nt_loop_breakers  `unionNameSet`
                 prod_loop_breakers

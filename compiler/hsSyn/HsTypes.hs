@@ -29,12 +29,14 @@ module HsTypes (
         HsIPName(..), hsIPNameFS,
 
         LBangType, BangType, HsBang(..), HsSrcBang, HsImplBang,
+        SrcStrictness(..), SrcUnpackedness(..),
         getBangType, getBangStrictness,
 
         ConDeclField(..), LConDeclField, pprConDeclFields,
 
         HsWildCardInfo(..), mkAnonWildCardTy, mkNamedWildCardTy,
-        wildCardName, sameWildCard, isAnonWildCard, isNamedWildCard,
+        wildCardName, sameWildCard, sameNamedWildCard,
+        isAnonWildCard, isNamedWildCard,
 
         mkHsQTvs, hsQTvBndrs, isHsKindedTyVar, hsTvbAllKinded,
         mkExplicitHsForAllTy, mkImplicitHsForAllTy, mkQualifiedHsForAllTy,
@@ -61,7 +63,8 @@ import PlaceHolder ( PostTc,PostRn,DataId,PlaceHolder(..) )
 
 import Name( Name )
 import RdrName( RdrName )
-import DataCon( HsBang(..), HsSrcBang, HsImplBang )
+import DataCon( HsBang(..), HsSrcBang, HsImplBang,
+                SrcStrictness(..), SrcUnpackedness(..) )
 import TysPrim( funTyConName )
 import Type
 import HsDoc
@@ -96,7 +99,7 @@ getBangType ty                    = ty
 
 getBangStrictness :: LHsType a -> HsSrcBang
 getBangStrictness (L _ (HsBangTy s _)) = s
-getBangStrictness _                    = HsNoBang
+getBangStrictness _ = HsSrcBang Nothing NoSrcUnpack NoSrcStrictness
 
 {-
 ************************************************************************
@@ -681,6 +684,12 @@ sameWildCard :: Eq name
 sameWildCard (L l1 (AnonWildCard _))   (L l2 (AnonWildCard _))   = l1 == l2
 sameWildCard (L _  (NamedWildCard n1)) (L _  (NamedWildCard n2)) = n1 == n2
 sameWildCard _ _ = False
+
+sameNamedWildCard :: Eq name
+                  => Located (HsWildCardInfo name)
+                  -> Located (HsWildCardInfo name) -> Bool
+sameNamedWildCard (L _  (NamedWildCard n1)) (L _  (NamedWildCard n2)) = n1 == n2
+sameNamedWildCard _ _ = False
 
 splitHsAppTys :: LHsType n -> [LHsType n] -> (LHsType n, [LHsType n])
 splitHsAppTys (L _ (HsAppTy f a)) as = splitHsAppTys f (a:as)

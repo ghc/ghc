@@ -172,13 +172,15 @@ ghciCommands = [
   ("issafe",    keepGoing' isSafeCmd,           completeModule),
   ("kind",      keepGoing' (kindOfType False),  completeIdentifier),
   ("kind!",     keepGoing' (kindOfType True),   completeIdentifier),
-  ("load",      keepGoingPaths loadModule_,     completeHomeModuleOrFile),
+  ("load",      keepGoingPaths (loadModule_ False), completeHomeModuleOrFile),
+  ("load!",     keepGoingPaths (loadModule_ True), completeHomeModuleOrFile),
   ("list",      keepGoing' listCmd,             noCompletion),
   ("module",    keepGoing moduleCmd,            completeSetModule),
   ("main",      keepGoing runMain,              completeFilename),
   ("print",     keepGoing printCmd,             completeExpression),
   ("quit",      quit,                           noCompletion),
-  ("reload",    keepGoing' reloadModule,        noCompletion),
+  ("reload",    keepGoing' (reloadModule False), noCompletion),
+  ("reload!",   keepGoing' (reloadModule True), noCompletion),
   ("run",       keepGoing runRun,               completeFilename),
   ("script",    keepGoing' scriptCmd,           completeFilename),
   ("set",       keepGoing setCmd,               completeSetOptions),
@@ -256,11 +258,13 @@ defFullHelpText =
   "   :issafe [<mod>]             display safe haskell information of module <mod>\n" ++
   "   :kind[!] <type>             show the kind of <type>\n" ++
   "                               (!: also print the normalised type)\n" ++
-  "   :load [*]<module> ...       load module(s) and their dependents\n" ++
+  "   :load[!] [*]<module> ...    load module(s) and their dependents\n" ++
+  "                               (!: defer type errors)\n" ++
   "   :main [<arguments> ...]     run the main function with the given arguments\n" ++
   "   :module [+/-] [*]<mod> ...  set the context for expression evaluation\n" ++
   "   :quit                       exit GHCi\n" ++
-  "   :reload                     reload the current module set\n" ++
+  "   :reload[!]                  reload the current module set\n" ++
+  "                               (!: defer type errors)\n" ++
   "   :run function [<arguments> ...] run the function with the given arguments\n" ++
   "   :script <filename>          run the script <filename>\n" ++
   "   :type <expr>                show the type of <expr>\n" ++
@@ -420,7 +424,10 @@ interactiveUI config srcs maybe_exprs = do
                    stop               = default_stop,
                    editor             = default_editor,
                    options            = [],
-                   line_number        = 1,
+                   -- We initialize line number as 0, not 1, because we use
+                   -- current line number while reporting errors which is
+                   -- incremented after reading a line.
+                   line_number        = 0,
                    break_ctr          = 0,
                    breaks             = [],
                    tickarrays         = emptyModuleEnv,
@@ -532,7 +539,7 @@ runGHCi paths maybe_exprs = do
   let show_prompt = verbosity dflags > 0 || is_tty
 
   -- reset line number
-  modifyGHCiState $ \st -> st{line_number=1}
+  modifyGHCiState $ \st -> st{line_number=0}
 
   case maybe_exprs of
         Nothing ->
@@ -553,7 +560,10 @@ runGHCi paths maybe_exprs = do
                                    -- this used to be topHandlerFastExit, see #2228
             runInputTWithPrefs defaultPrefs defaultSettings $ do
                 -- make `ghc -e` exit nonzero on invalid input, see Trac #7962
-                runCommands' hdle (Just $ hdle (toException $ ExitFailure 1) >> return ()) (return Nothing)
+                _ <- runCommands' hdle
+                     (Just $ hdle (toException $ ExitFailure 1) >> return ())
+                     (return Nothing)
+                return ()
 
   -- and finally, exit
   liftIO $ when (verbosity dflags > 0) $ putStrLn "Leaving GHCi."
@@ -594,6 +604,10 @@ nextInputLine show_prompt is_tty
 checkFileAndDirPerms :: FilePath -> IO Bool
 checkFileAndDirPerms file = do
   file_ok <- checkPerms file
+  -- Do not check dir perms when .ghci doesn't exist, otherwise GHCi will
+  -- print some confusing and useless warnings in some cases (e.g. in
+  -- travis). Note that we can't add a test for this, as all ghci tests should
+  -- run with -ignore-dot-ghci, which means we never get here.
   if file_ok then checkPerms (getDirectory file) else return False
   where
   getDirectory f = case takeDirectory f of
@@ -712,12 +726,16 @@ installInteractivePrint (Just ipFun) exprmode = do
 
 -- | The main read-eval-print loop
 runCommands :: InputT GHCi (Maybe String) -> InputT GHCi ()
-runCommands = runCommands' handler Nothing
+runCommands gCmd = runCommands' handler Nothing gCmd >> return ()
 
 runCommands' :: (SomeException -> GHCi Bool) -- ^ Exception handler
              -> Maybe (GHCi ()) -- ^ Source error handler
-             -> InputT GHCi (Maybe String) -> InputT GHCi ()
-runCommands' eh sourceErrorHandler gCmd = do
+             -> InputT GHCi (Maybe String)
+             -> InputT GHCi (Maybe Bool)
+         -- We want to return () here, but have to return (Maybe Bool)
+         -- because gmask is not polymorphic enough: we want to use
+         -- unmask at two different types.
+runCommands' eh sourceErrorHandler gCmd = gmask $ \unmask -> do
     b <- ghandle (\e -> case fromException e of
                           Just UserInterrupt -> return $ Just False
                           _ -> case fromException e of
@@ -726,12 +744,12 @@ runCommands' eh sourceErrorHandler gCmd = do
                                       return Nothing
                                  _other ->
                                    liftIO (Exception.throwIO e))
-            (runOneCommand eh gCmd)
+            (unmask $ runOneCommand eh gCmd)
     case b of
-      Nothing -> return ()
+      Nothing -> return Nothing
       Just success -> do
-        when (not success) $ maybe (return ()) lift sourceErrorHandler
-        runCommands' eh sourceErrorHandler gCmd
+        unless success $ maybe (return ()) lift sourceErrorHandler
+        unmask $ runCommands' eh sourceErrorHandler gCmd
 
 -- | Evaluate a single line of user input (either :<command> or Haskell code).
 -- A result of Nothing means there was no more input to process.
@@ -1261,7 +1279,7 @@ editFile str =
      code <- liftIO $ system (cmd ++ cmdArgs)
 
      when (code == ExitSuccess)
-       $ reloadModule ""
+       $ reloadModule False ""
 
 -- The user didn't specify a file so we pick one for them.
 -- Our strategy is to pick the first module that failed to load,
@@ -1407,11 +1425,24 @@ checkModule m = do
 -----------------------------------------------------------------------------
 -- :load, :add, :reload
 
+-- | Sets '-fdefer-type-errors' if 'defer' is true, executes 'load' and unsets
+-- '-fdefer-type-errors' again if it has not been set before
+deferredLoad :: Bool -> InputT GHCi SuccessFlag -> InputT GHCi ()
+deferredLoad defer load = do
+  flags <- getDynFlags
+  deferredBefore <- return (gopt Opt_DeferTypeErrors flags)
+  when (defer) $ Monad.void $
+    GHC.setProgramDynFlags $ gopt_set flags Opt_DeferTypeErrors
+  Monad.void $ load
+  flags <- getDynFlags
+  when (not deferredBefore) $ Monad.void $
+    GHC.setProgramDynFlags $ gopt_unset flags Opt_DeferTypeErrors
+
 loadModule :: [(FilePath, Maybe Phase)] -> InputT GHCi SuccessFlag
 loadModule fs = timeIt (const Nothing) (loadModule' fs)
 
-loadModule_ :: [FilePath] -> InputT GHCi ()
-loadModule_ fs = loadModule (zip fs (repeat Nothing)) >> return ()
+loadModule_ :: Bool -> [FilePath] -> InputT GHCi ()
+loadModule_ defer fs = deferredLoad defer (loadModule (zip fs (repeat Nothing)))
 
 loadModule' :: [(FilePath, Maybe Phase)] -> InputT GHCi SuccessFlag
 loadModule' files = do
@@ -1449,13 +1480,10 @@ addModule files = do
 
 
 -- :reload
-reloadModule :: String -> InputT GHCi ()
-reloadModule m = do
-  _ <- doLoad True $
-        if null m then LoadAllTargets
-                  else LoadUpTo (GHC.mkModuleName m)
-  return ()
-
+reloadModule :: Bool -> String -> InputT GHCi ()
+reloadModule defer m = deferredLoad defer load
+  where load = doLoad True $
+               if null m then LoadAllTargets else LoadUpTo (GHC.mkModuleName m)
 
 doLoad :: Bool -> LoadHowMuch -> InputT GHCi SuccessFlag
 doLoad retain_context howmuch = do
@@ -1552,7 +1580,7 @@ keepPackageImports = filterM is_pkg_import
      is_pkg_import :: InteractiveImport -> GHCi Bool
      is_pkg_import (IIModule _) = return False
      is_pkg_import (IIDecl d)
-         = do e <- gtry $ GHC.findModule mod_name (fmap snd $ ideclPkgQual d)
+         = do e <- gtry $ GHC.findModule mod_name (fmap sl_fs $ ideclPkgQual d)
               case e :: Either SomeException Module of
                 Left _  -> return False
                 Right m -> return (not (isHomeModule m))
@@ -1728,7 +1756,7 @@ guessCurrentModule cmd
        case (head imports) of
           IIModule m -> GHC.findModule m Nothing
           IIDecl d   -> GHC.findModule (unLoc (ideclName d))
-                                       (fmap snd $ ideclPkgQual d)
+                                       (fmap sl_fs $ ideclPkgQual d)
 
 -- without bang, show items in context of their parents and omit children
 -- with bang, show class methods and data constructors separately, and
@@ -1925,7 +1953,7 @@ checkAdd ii = do
     IIDecl d -> do
        let modname = unLoc (ideclName d)
            pkgqual = ideclPkgQual d
-       m <- GHC.lookupModule modname (fmap snd pkgqual)
+       m <- GHC.lookupModule modname (fmap sl_fs pkgqual)
        when safe $ do
            t <- GHC.isModuleTrusted m
            when (not t) $ throwGhcException $ ProgramError $ ""

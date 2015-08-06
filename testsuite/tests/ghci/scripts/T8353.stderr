@@ -1,0 +1,25 @@
+
+Defer03.hs:4:5: warning:
+    Couldn't match expected type ‘Int’ with actual type ‘Char’
+    In the expression: 'p'
+    In an equation for ‘a’: a = 'p'
+
+Defer03.hs:4:5: error:
+    Couldn't match expected type ‘Int’ with actual type ‘Char’
+    In the expression: 'p'
+    In an equation for ‘a’: a = 'p'
+
+Defer03.hs:4:5: warning:
+    Couldn't match expected type ‘Int’ with actual type ‘Char’
+    In the expression: 'p'
+    In an equation for ‘a’: a = 'p'
+
+Defer03.hs:4:5: error:
+    Couldn't match expected type ‘Int’ with actual type ‘Char’
+    In the expression: 'p'
+    In an equation for ‘a’: a = 'p'
+
+Defer03.hs:4:5: warning:
+    Couldn't match expected type ‘Int’ with actual type ‘Char’
+    In the expression: 'p'
+    In an equation for ‘a’: a = 'p'

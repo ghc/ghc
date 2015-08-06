@@ -9,6 +9,7 @@ module ShouldCompile where
 
 {-# NOINLINE [1] foo #-}
 foo 1 = 2
+{-# NOINLINE [1] bar #-}
 bar 0 = 1
 
 foobar = 2

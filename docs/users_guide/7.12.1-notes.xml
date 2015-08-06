@@ -36,6 +36,16 @@
            </listitem>
             <listitem>
                 <para>
+                    The parser now supports Haddock comments on GADT data constructors. For example,
+                    <programlisting>
+                      data Expr a where
+                        -- | Just a normal sum
+                        Sum :: Int -> Int -> Expr Int
+                    </programlisting>
+               </para>
+           </listitem>
+            <listitem>
+                <para>
                     Implicit parameters of the new base type
                     <literal>GHC.Stack.CallStack</literal> are treated
                     specially, and automatically solved for the current source
@@ -71,6 +81,15 @@
 		<literal>phantom</literal>, like it is in regular Haskell code.
 	      </para>
 	    </listitem>
+            <listitem>
+              <para>
+                Wildcards can be used in the type arguments of type/data
+                family instance declarations to indicate that the name of a
+                type variable doesn't matter. They will be replaced with new
+                unique type variables. See <xref
+                linkend="data-instance-declarations"/> for more details.
+              </para>
+            </listitem>
        </itemizedlist>
     </sect3>
 
@@ -84,6 +103,25 @@
                     This dumps out a .th.hs file of all Template Haskell declarations in a corresponding .hs file. The idea is that application developers can check this into their repository so that they can grep for identifiers used elsewhere that were defined in Template Haskell.
                     This is similar to using <option>-ddump-to-file</option> with <option>-ddump-splices</option> but it always generates a file instead of being coupled to <option>-ddump-to-file</option> and only outputs code that does not exist in the .hs file and a comment for the splice location in the original file.
                 </para>
+           </listitem>
+           <listitem>
+               <para>
+                   Added the option <option>-fprint-expanded-types</option>.
+
+                   When enabled, GHC also prints type-synonym-expanded types in
+                   type errors.
+               </para>
+           </listitem>
+           <listitem>
+               <para>
+                   Added the option <option>-fcpr-anal</option>.
+
+                   When enabled, the demand analyser performs CPR analysis.
+                   It is implied by <option>-O</option>. Consequently,
+                   <option>-fcpr-off</option> is now removed, run with
+                   <option>-fno-cpr-anal</option> to get the old
+                   <option>-fcpr-off</option> behaviour.
+               </para>
            </listitem>
        </itemizedlist>
     </sect3>
@@ -101,6 +139,11 @@
                     commands now take an optional count allowing the user to move forward or
                     backward in history several steps at a time.
                </para>
+               <para>
+                    Added commands <literal>:load!</literal> and <literal>:reload!</literal>,
+                    effectively setting "-fdefer-type-errors" before loading a module and
+                    unsetting it after loading if it has not been set before (#8353).
+               </para>
            </listitem>
        </itemizedlist>
     </sect3>
@@ -117,7 +160,34 @@
                     Splices and quasi-quotes continue to only be supported by a
                     stage 2 compiler.
                </para>
-           </listitem>
+            </listitem>
+            <listitem>
+                <para>
+                    Partial type signatures can now be used in splices, see <xref linkend="pts-where"/>.
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    <literal>Template Haskell</literal> now supports the use of
+                    <literal>UInfixT</literal> in types to resolve infix
+                    operator fixities, in the same vein as
+                    <literal>UInfixP</literal> and <literal>UInfixE</literal>
+                    in patterns and expressions. <literal>ParensT</literal>
+                    and <literal>InfixT</literal> have also been introduced,
+                    serving the same functions as their pattern and expression
+                    counterparts.
+                </para>
+            </listitem>
+             <listitem>
+                 <para>
+                     Primitive chars (e.g., <literal>[| 'a'# |]</literal>) and
+                     primitive strings (e.g., <literal>[| "abc"# |]</literal>)
+                     can now be quoted with Template Haskell. The
+                     <literal>Lit</literal> data type also has a new
+                     constructor, <literal>CharPrimL</literal>, for primitive
+                     char literals.
+                </para>
+            </listitem>
        </itemizedlist>
     </sect3>
 
@@ -192,6 +262,22 @@
                     <literal>CallStack</literal> is a
                     <literal>[(String, SrcLoc)]</literal>, sorted by most-recent
                     call.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    A new function, <literal>interruptible</literal>, was added
+                    to <literal>GHC.IO</literal> allowing an
+                    <literal>IO</literal> action to be run such that it can be
+                    interrupted by an asynchronous exception, even if exceptions
+                    are masked (except if masked with
+                    <literal>interruptibleMask</literal>).
+                </para>
+                <para>
+                    This was introduced to fix the behavior of
+                    <literal>allowInterrupt</literal>, which would previously
+                    incorrectly allow exceptions in uninterruptible regions
+                    (see Trac #9516).
                </para>
            </listitem>
        </itemizedlist>
@@ -413,6 +499,17 @@
                     instance.  To manually use this default implementation, you
                     can use the <literal>liftData</literal> function which is
                     now exported from <literal>Language.Haskell.TH.Syntax</literal>.
+               </para>
+          </listitem>
+           <listitem>
+               <para>
+                    <literal>Info</literal>'s constructors no longer have
+                    <literal>Fixity</literal> fields. A <literal>qReifyFixity
+                    </literal> function was added to the <literal>Quasi
+                    </literal> type class (as well as the <literal>reifyFixity
+                    </literal> function, specialized for <literal>Q</literal>)
+                    to allow lookup of fixity information for any given
+                    <literal>Name</literal>.
                </para>
            </listitem>
        </itemizedlist>

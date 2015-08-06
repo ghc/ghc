@@ -29,20 +29,12 @@ module CoreUtils (
         exprIsBig, exprIsConLike,
         rhsIsStatic, isCheapApp, isExpandableApp,
 
-        -- * Expression and bindings size
-        coreBindsSize, exprSize,
-        CoreStats(..), coreBindsStats,
-
         -- * Equality
         cheapEqExpr, cheapEqExpr', eqExpr,
         diffExpr, diffBinds,
 
         -- * Eta reduction
         tryEtaReduce,
-
-        -- * Seq
-        seqExpr, seqExprs, seqUnfolding, seqRules,
-        seqIdInfo, megaSeqIdInfo, seqSpecInfo, seqBinds,
 
         -- * Manipulating data constructors and types
         applyTypeToArgs, applyTypeToArg,
@@ -67,8 +59,6 @@ import Name
 import Literal
 import DataCon
 import PrimOp
-import Demand( seqDemand, seqStrictSig )
-import BasicTypes( seqOccInfo )
 import Id
 import IdInfo
 import Type
@@ -208,9 +198,12 @@ applyTypeToArgs e op_ty args
 -- | Wrap the given expression in the coercion safely, dropping
 -- identity coercions and coalescing nested coercions
 mkCast :: CoreExpr -> Coercion -> CoreExpr
-mkCast e co | ASSERT2( coercionRole co == Representational
-                     , ptext (sLit "coercion") <+> ppr co <+> ptext (sLit "passed to mkCast") <+> ppr e <+> ptext (sLit "has wrong role") <+> ppr (coercionRole co) )
-              isReflCo co = e
+mkCast e co
+  | ASSERT2( coercionRole co == Representational
+           , ptext (sLit "coercion") <+> ppr co <+> ptext (sLit "passed to mkCast")
+             <+> ppr e <+> ptext (sLit "has wrong role") <+> ppr (coercionRole co) )
+    isReflCo co
+  = e
 
 mkCast (Coercion e_co) co
   | isCoVarType (pSnd (coercionKind co))
@@ -233,11 +226,11 @@ mkCast (Tick t expr) co
 
 mkCast expr co
   = let Pair from_ty _to_ty = coercionKind co in
---    if to_ty `eqType` from_ty
---    then expr
---    else
-        WARN(not (from_ty `eqType` exprType expr), text "Trying to coerce" <+> text "(" <> ppr expr $$ text "::" <+> ppr (exprType expr) <> text ")" $$ ppr co $$ ppr (coercionType co))
-         (Cast expr co)
+    WARN( not (from_ty `eqType` exprType expr),
+          text "Trying to coerce" <+> text "(" <> ppr expr
+          $$ text "::" <+> ppr (exprType expr) <> text ")"
+          $$ ppr co $$ ppr (coercionType co) )
+    (Cast expr co)
 
 -- | Wraps the given expression in the source annotation, dropping the
 -- annotation if possible.
@@ -1782,221 +1775,6 @@ locBind loc b1 b2 diffs = map addLoc diffs
   where addLoc d            = d $$ nest 2 (parens (text loc <+> bindLoc))
         bindLoc | b1 == b2  = ppr b1
                 | otherwise = ppr b1 <> char '/' <> ppr b2
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Seq stuff}
-*                                                                      *
-************************************************************************
--}
-
-seqExpr :: CoreExpr -> ()
-seqExpr (Var v)         = v `seq` ()
-seqExpr (Lit lit)       = lit `seq` ()
-seqExpr (App f a)       = seqExpr f `seq` seqExpr a
-seqExpr (Lam b e)       = seqBndr b `seq` seqExpr e
-seqExpr (Let b e)       = seqBind b `seq` seqExpr e
-seqExpr (Case e b t as) = seqExpr e `seq` seqBndr b `seq` seqType t `seq` seqAlts as
-seqExpr (Cast e co)     = seqExpr e `seq` seqCo co
-seqExpr (Tick n e)      = seqTickish n `seq` seqExpr e
-seqExpr (Type t)        = seqType t
-seqExpr (Coercion co)   = seqCo co
-
-seqExprs :: [CoreExpr] -> ()
-seqExprs [] = ()
-seqExprs (e:es) = seqExpr e `seq` seqExprs es
-
-seqTickish :: Tickish Id -> ()
-seqTickish ProfNote{ profNoteCC = cc } = cc `seq` ()
-seqTickish HpcTick{} = ()
-seqTickish Breakpoint{ breakpointFVs = ids } = seqBndrs ids
-seqTickish SourceNote{} = ()
-
-seqBndr :: CoreBndr -> ()
-seqBndr b | isTyVar b = seqType (tyVarKind b)
-          | otherwise = seqType (varType b)             `seq`
-                        megaSeqIdInfo (idInfo b)
-
-seqBndrs :: [CoreBndr] -> ()
-seqBndrs [] = ()
-seqBndrs (b:bs) = seqBndr b `seq` seqBndrs bs
-
-seqBinds :: [Bind CoreBndr] -> ()
-seqBinds bs = foldr (seq . seqBind) () bs
-
-seqBind :: Bind CoreBndr -> ()
-seqBind (NonRec b e) = seqBndr b `seq` seqExpr e
-seqBind (Rec prs)    = seqPairs prs
-
-seqPairs :: [(CoreBndr, CoreExpr)] -> ()
-seqPairs [] = ()
-seqPairs ((b,e):prs) = seqBndr b `seq` seqExpr e `seq` seqPairs prs
-
-seqAlts :: [CoreAlt] -> ()
-seqAlts [] = ()
-seqAlts ((c,bs,e):alts) = c `seq` seqBndrs bs `seq` seqExpr e `seq` seqAlts alts
-
-seqRules :: [CoreRule] -> ()
-seqRules [] = ()
-seqRules (Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs } : rules)
-  = seqBndrs bndrs `seq` seqExprs (rhs:args) `seq` seqRules rules
-seqRules (BuiltinRule {} : rules) = seqRules rules
-
-seqUnfolding :: Unfolding -> ()
-seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_is_top = top,
-                uf_is_value = b1, uf_is_work_free = b2,
-                uf_expandable = b3, uf_is_conlike = b4,
-                uf_guidance = g})
-  = seqExpr e `seq` top `seq` b1 `seq` b2 `seq` b3 `seq` b4 `seq` seqGuidance g
-
-seqUnfolding _ = ()
-
-seqGuidance :: UnfoldingGuidance -> ()
-seqGuidance (UnfIfGoodArgs ns n b) = n `seq` sum ns `seq` b `seq` ()
-seqGuidance _                      = ()
-
--- | Just evaluate the 'IdInfo' to WHNF
-seqIdInfo :: IdInfo -> ()
-seqIdInfo info = info `seq` ()
-
--- | Evaluate all the fields of the 'IdInfo' that are generally demanded by the
--- compiler
-megaSeqIdInfo :: IdInfo -> ()
-megaSeqIdInfo info
-  = seqSpecInfo (specInfo info)                 `seq`
-
--- Omitting this improves runtimes a little, presumably because
--- some unfoldings are not calculated at all
---    seqUnfolding (unfoldingInfo info)         `seq`
-
-    seqDemand (demandInfo info)                 `seq`
-    seqStrictSig (strictnessInfo info)          `seq`
-    seqCaf (cafInfo info)                       `seq`
-    seqOneShot (oneShotInfo info)               `seq`
-    seqOccInfo (occInfo info)
-
-seqOneShot :: OneShotInfo -> ()
-seqOneShot l = l `seq` ()
-
-seqSpecInfo :: SpecInfo -> ()
-seqSpecInfo (SpecInfo rules fvs) = seqRules rules `seq` seqVarSet fvs
-
-seqCaf :: CafInfo -> ()
-seqCaf c = c `seq` ()
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{The size of an expression}
-*                                                                      *
-************************************************************************
--}
-
-data CoreStats = CS { cs_tm :: Int    -- Terms
-                    , cs_ty :: Int    -- Types
-                    , cs_co :: Int }  -- Coercions
-
-
-instance Outputable CoreStats where
- ppr (CS { cs_tm = i1, cs_ty = i2, cs_co = i3 })
-   = braces (sep [ptext (sLit "terms:")     <+> intWithCommas i1 <> comma,
-                  ptext (sLit "types:")     <+> intWithCommas i2 <> comma,
-                  ptext (sLit "coercions:") <+> intWithCommas i3])
-
-plusCS :: CoreStats -> CoreStats -> CoreStats
-plusCS (CS { cs_tm = p1, cs_ty = q1, cs_co = r1 })
-       (CS { cs_tm = p2, cs_ty = q2, cs_co = r2 })
-  = CS { cs_tm = p1+p2, cs_ty = q1+q2, cs_co = r1+r2 }
-
-zeroCS, oneTM :: CoreStats
-zeroCS = CS { cs_tm = 0, cs_ty = 0, cs_co = 0 }
-oneTM  = zeroCS { cs_tm = 1 }
-
-sumCS :: (a -> CoreStats) -> [a] -> CoreStats
-sumCS f = foldr (plusCS . f) zeroCS
-
-coreBindsStats :: [CoreBind] -> CoreStats
-coreBindsStats = sumCS bindStats
-
-bindStats :: CoreBind -> CoreStats
-bindStats (NonRec v r) = bindingStats v r
-bindStats (Rec prs)    = sumCS (\(v,r) -> bindingStats v r) prs
-
-bindingStats :: Var -> CoreExpr -> CoreStats
-bindingStats v r = bndrStats v `plusCS` exprStats r
-
-bndrStats :: Var -> CoreStats
-bndrStats v = oneTM `plusCS` tyStats (varType v)
-
-exprStats :: CoreExpr -> CoreStats
-exprStats (Var {})        = oneTM
-exprStats (Lit {})        = oneTM
-exprStats (Type t)        = tyStats t
-exprStats (Coercion c)    = coStats c
-exprStats (App f a)       = exprStats f `plusCS` exprStats a
-exprStats (Lam b e)       = bndrStats b `plusCS` exprStats e
-exprStats (Let b e)       = bindStats b `plusCS` exprStats e
-exprStats (Case e b _ as) = exprStats e `plusCS` bndrStats b `plusCS` sumCS altStats as
-exprStats (Cast e co)     = coStats co `plusCS` exprStats e
-exprStats (Tick _ e)      = exprStats e
-
-altStats :: CoreAlt -> CoreStats
-altStats (_, bs, r) = altBndrStats bs `plusCS` exprStats r
-
-altBndrStats :: [Var] -> CoreStats
--- Charge one for the alternative, not for each binder
-altBndrStats vs = oneTM `plusCS` sumCS (tyStats . varType) vs
-
-tyStats :: Type -> CoreStats
-tyStats ty = zeroCS { cs_ty = typeSize ty }
-
-coStats :: Coercion -> CoreStats
-coStats co = zeroCS { cs_co = coercionSize co }
-
-coreBindsSize :: [CoreBind] -> Int
--- We use coreBindStats for user printout
--- but this one is a quick and dirty basis for
--- the simplifier's tick limit
-coreBindsSize bs = foldr ((+) . bindSize) 0 bs
-
-exprSize :: CoreExpr -> Int
--- ^ A measure of the size of the expressions, strictly greater than 0
--- It also forces the expression pretty drastically as a side effect
--- Counts *leaves*, not internal nodes. Types and coercions are not counted.
-exprSize (Var v)         = v `seq` 1
-exprSize (Lit lit)       = lit `seq` 1
-exprSize (App f a)       = exprSize f + exprSize a
-exprSize (Lam b e)       = bndrSize b + exprSize e
-exprSize (Let b e)       = bindSize b + exprSize e
-exprSize (Case e b t as) = seqType t `seq` exprSize e + bndrSize b + 1 + foldr ((+) . altSize) 0 as
-exprSize (Cast e co)     = (seqCo co `seq` 1) + exprSize e
-exprSize (Tick n e)      = tickSize n + exprSize e
-exprSize (Type t)        = seqType t `seq` 1
-exprSize (Coercion co)   = seqCo co `seq` 1
-
-tickSize :: Tickish Id -> Int
-tickSize (ProfNote cc _ _) = cc `seq` 1
-tickSize _ = 1 -- the rest are strict
-
-bndrSize :: Var -> Int
-bndrSize b | isTyVar b = seqType (tyVarKind b) `seq` 1
-           | otherwise = seqType (idType b)             `seq`
-                         megaSeqIdInfo (idInfo b)       `seq`
-                         1
-
-bndrsSize :: [Var] -> Int
-bndrsSize = sum . map bndrSize
-
-bindSize :: CoreBind -> Int
-bindSize (NonRec b e) = bndrSize b + exprSize e
-bindSize (Rec prs)    = foldr ((+) . pairSize) 0 prs
-
-pairSize :: (Var, CoreExpr) -> Int
-pairSize (b,e) = bndrSize b + exprSize e
-
-altSize :: CoreAlt -> Int
-altSize (c,bs,e) = c `seq` bndrsSize bs + exprSize e
 
 {-
 ************************************************************************

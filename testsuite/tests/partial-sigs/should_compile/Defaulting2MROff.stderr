@@ -1,5 +1,5 @@
 TYPE SIGNATURES
-  bravo :: forall w_. Num w_ => w_
+  bravo :: forall t. Num t => t
 TYPE CONSTRUCTORS
 COERCION AXIOMS
 Dependent modules: []

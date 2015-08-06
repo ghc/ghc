@@ -34,9 +34,10 @@ import GHC.Base () -- For build ordering
 #else
 
 import Foreign
-import Foreign.C
+import Foreign.C hiding (charIsRepresentable)
 import Data.Maybe
 import GHC.Base
+import GHC.Foreign (charIsRepresentable)
 import GHC.IO.Buffer
 import GHC.IO.Encoding.Failure
 import GHC.IO.Encoding.Types
@@ -96,15 +97,27 @@ char_shift :: Int
 char_shift | charSize == 2 = 1
            | otherwise     = 2
 
-iconvEncoding :: String -> IO TextEncoding
+iconvEncoding :: String -> IO (Maybe TextEncoding)
 iconvEncoding = mkIconvEncoding ErrorOnCodingFailure
 
-mkIconvEncoding :: CodingFailureMode -> String -> IO TextEncoding
+-- | Construct an iconv-based 'TextEncoding' for the given character set and
+-- 'CodingFailureMode'.
+--
+-- As iconv is missing in some minimal environments (e.g. #10298), this
+-- checks to ensure that iconv is working properly before returning the
+-- encoding, returning 'Nothing' if not.
+mkIconvEncoding :: CodingFailureMode -> String -> IO (Maybe TextEncoding)
 mkIconvEncoding cfm charset = do
-  return (TextEncoding {
-                textEncodingName = charset,
-                mkTextDecoder = newIConv raw_charset (haskellChar ++ suffix) (recoverDecode cfm) iconvDecode,
-                mkTextEncoder = newIConv haskellChar charset                 (recoverEncode cfm) iconvEncode})
+    let enc = TextEncoding {
+                  textEncodingName = charset,
+                  mkTextDecoder = newIConv raw_charset (haskellChar ++ suffix)
+                                           (recoverDecode cfm) iconvDecode,
+                  mkTextEncoder = newIConv haskellChar charset
+                                           (recoverEncode cfm) iconvEncode}
+    good <- charIsRepresentable enc 'a'
+    return $ if good
+               then Just enc
+               else Nothing
   where
     -- An annoying feature of GNU iconv is that the //PREFIXES only take
     -- effect when they appear on the tocode parameter to iconv_open:

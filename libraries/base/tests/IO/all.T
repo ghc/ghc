@@ -96,7 +96,7 @@ test('readwrite002',
 test('readwrite003', extra_clean(['readwrite003.txt']), compile_and_run, [''])
 
 test('hGetBuf001',
-     [only_compiler_types(['ghc']),
+     [
       when(fast(), skip),
       expect_fail_if_windows],
      compile_and_run, ['-package unix'])
@@ -138,6 +138,7 @@ test('encoding001',
 test('encoding002', normal, compile_and_run, [''])
 test('encoding003', normal, compile_and_run, [''])
 test('encoding004', normal, compile_and_run, [''])
+test('encoding005', normal, compile_and_run, [''])
 
 test('environment001',
      [extra_clean(['environment001'])],

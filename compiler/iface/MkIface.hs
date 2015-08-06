@@ -142,7 +142,7 @@ mkIface :: HscEnv
 
 mkIface hsc_env maybe_old_fingerprint mod_details
          ModGuts{     mg_module       = this_mod,
-                      mg_boot         = is_boot,
+                      mg_hsc_src      = hsc_src,
                       mg_used_names   = used_names,
                       mg_used_th      = used_th,
                       mg_deps         = deps,
@@ -156,7 +156,7 @@ mkIface hsc_env maybe_old_fingerprint mod_details
                       mg_dependent_files = dependent_files
                     }
         = mkIface_ hsc_env maybe_old_fingerprint
-                   this_mod is_boot used_names used_th deps rdr_env fix_env
+                   this_mod hsc_src used_names used_th deps rdr_env fix_env
                    warns hpc_info dir_imp_mods self_trust dependent_files
                    safe_mode mod_details
 
@@ -187,7 +187,7 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
           used_th <- readIORef tc_splice_used
           dep_files <- (readIORef dependent_files)
           mkIface_ hsc_env maybe_old_fingerprint
-                   this_mod (hsc_src == HsBootFile) used_names
+                   this_mod hsc_src used_names
                    used_th deps rdr_env
                    fix_env warns hpc_info (imp_mods imports)
                    (imp_trust_own_pkg imports) dep_files safe_mode mod_details
@@ -231,7 +231,7 @@ mkDependencies
                     -- sort to get into canonical order
                     -- NB. remember to use lexicographic ordering
 
-mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> IsBootInterface
+mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> HscSource
          -> NameSet -> Bool -> Dependencies -> GlobalRdrEnv
          -> NameEnv FixItem -> Warnings -> HpcInfo
          -> ImportedMods -> Bool
@@ -240,7 +240,7 @@ mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> IsBootInterface
          -> ModDetails
          -> IO (Messages, Maybe (ModIface, Bool))
 mkIface_ hsc_env maybe_old_fingerprint
-         this_mod is_boot used_names used_th deps rdr_env fix_env src_warns
+         this_mod hsc_src used_names used_th deps rdr_env fix_env src_warns
          hpc_info dir_imp_mods pkg_trust_req dependent_files safe_mode
          ModDetails{  md_insts     = insts,
                       md_fam_insts = fam_insts,
@@ -281,7 +281,7 @@ mkIface_ hsc_env maybe_old_fingerprint
         intermediate_iface = ModIface {
               mi_module      = this_mod,
               mi_sig_of      = sig_of,
-              mi_boot        = is_boot,
+              mi_hsc_src     = hsc_src,
               mi_deps        = deps,
               mi_usages      = usages,
               mi_exports     = mkIfaceExports exports,
@@ -1331,12 +1331,23 @@ checkDependencies hsc_env summary iface
    this_pkg = thisPackage (hsc_dflags hsc_env)
 
    dep_missing (L _ (ImportDecl { ideclName = L _ mod, ideclPkgQual = pkg })) = do
-     find_res <- liftIO $ findImportedModule hsc_env mod (fmap snd pkg)
+     find_res <- liftIO $ findImportedModule hsc_env mod (fmap sl_fs pkg)
      let reason = moduleNameString mod ++ " changed"
      case find_res of
-        Found _ mod
+        FoundModule h -> check_mod reason (fr_mod h)
+        FoundSigs hs _backing -> check_mods reason (map fr_mod hs)
+        _otherwise  -> return (RecompBecause reason)
+
+   check_mods _ [] = return UpToDate
+   check_mods reason (m:ms) = do
+        r <- check_mod reason m
+        case r of
+            UpToDate -> check_mods reason ms
+            _otherwise -> return r
+
+   check_mod reason mod
           | pkg == this_pkg
-           -> if moduleName mod `notElem` map fst prev_dep_mods
+            = if moduleName mod `notElem` map fst prev_dep_mods
                  then do traceHiDiffs $
                            text "imported module " <> quotes (ppr mod) <>
                            text " not among previous dependencies"
@@ -1344,7 +1355,7 @@ checkDependencies hsc_env summary iface
                  else
                          return UpToDate
           | otherwise
-           -> if pkg `notElem` (map fst prev_dep_pkgs)
+            = if pkg `notElem` (map fst prev_dep_pkgs)
                  then do traceHiDiffs $
                            text "imported module " <> quotes (ppr mod) <>
                            text " is from package " <> quotes (ppr pkg) <>
@@ -1353,7 +1364,6 @@ checkDependencies hsc_env summary iface
                  else
                          return UpToDate
            where pkg = modulePackageKey mod
-        _otherwise  -> return (RecompBecause reason)
 
 needInterface :: Module -> (ModIface -> IfG RecompileRequired)
               -> IfG RecompileRequired
@@ -1718,7 +1728,7 @@ tyConToIfaceDecl env tycon
           to_eq_spec (tv,ty)  = (toIfaceTyVar (tidyTyVar con_env2 tv), tidyToIfaceType con_env2 ty)
 
 toIfaceBang :: TidyEnv -> HsImplBang -> IfaceBang
-toIfaceBang _    HsNoBang            = IfNoBang
+toIfaceBang _    HsLazy              = IfNoBang
 toIfaceBang _   (HsUnpack Nothing)   = IfUnpack
 toIfaceBang env (HsUnpack (Just co)) = IfUnpackCo (toIfaceCoercion (tidyCo env co))
 toIfaceBang _   HsStrict             = IfStrict

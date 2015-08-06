@@ -274,7 +274,7 @@ Type families are reduced during type inference, but not data families;
 the user explains when to use a data family instance by using contructors
 and pattern matching.
 
-Neverthless it is still useful to have data families in the FamInstEnv:
+Nevertheless it is still useful to have data families in the FamInstEnv:
 
  - For finding overlaps and conflicts
 
@@ -891,7 +891,7 @@ topNormaliseType_maybe :: FamInstEnvs -> Type -> Maybe (Coercion, Type)
 --      * type function redex
 --      * data family redex
 --      * newtypes
--- returning an appropriate Representaitonal coercion.  Specifically, if
+-- returning an appropriate Representational coercion.  Specifically, if
 --   topNormaliseType_maybe env ty = Maybe (co, ty')
 -- then
 --   (a) co :: ty ~R ty'
@@ -1045,7 +1045,9 @@ coreFlattenTy in_scope = go
                                (m2, ty2') = go m1 ty2 in
                            (m2, AppTy ty1' ty2')
     go m (TyConApp tc tys)
-      | isFamilyTyCon tc
+         -- NB: Don't just check if isFamilyTyCon: this catches *data* families,
+         -- which are generative and thus can be preserved during flattening
+      | not (isGenerativeTyCon tc Nominal)
       = let (m', tv) = coreFlattenTyFamApp in_scope m tc tys in
         (m', mkTyVarTy tv)
 

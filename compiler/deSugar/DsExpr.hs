@@ -304,7 +304,7 @@ dsExpr (HsSCC _ cc expr@(L loc _)) = do
         mod_name <- getModule
         count <- goptM Opt_ProfCountEntries
         uniq <- newUnique
-        Tick (ProfNote (mkUserCC (snd cc) mod_name loc uniq) count True)
+        Tick (ProfNote (mkUserCC (sl_fs cc) mod_name loc uniq) count True)
                <$> dsLExpr expr
       else dsLExpr expr
 

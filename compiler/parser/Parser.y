@@ -8,14 +8,6 @@
 -- ---------------------------------------------------------------------------
 
 {
-{-# LANGUAGE BangPatterns #-} -- required for versions of Happy before 1.18.6
-{-# OPTIONS -Wwarn -w #-}
--- The above warning suppression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -- | This module provides the generated Happy parser for Haskell. It exports
 -- a number of parsers which may be used in any library that uses the GHC API.
 -- A common usage pattern is to initialize the parser state with a given string
@@ -33,7 +25,7 @@
 module Parser (parseModule, parseImport, parseStatement,
                parseDeclaration, parseExpression, parsePattern,
                parseTypeSignature,
-               parseFullStmt, parseStmt, parseIdentifier,
+               parseStmt, parseIdentifier,
                parseType, parseHeader) where
 
 -- base
@@ -90,10 +82,9 @@ import Util             ( looksLikePackageName )
 
 }
 
-{- Last updated: 30 Mar 2015
+{- Last updated: 31 Jul 2015
 
-Conflicts: 50 shift/reduce
-           2  reduce/reduce
+Conflicts: 47 shift/reduce
 
 If you modify this parser and add a conflict, please update this comment.
 You can learn more about the conflicts by passing 'happy' the -i flag:
@@ -125,17 +116,24 @@ follows. Shift parses as if the 'module' keyword follows.
 
 -------------------------------------------------------------------------------
 
-state 49 contains 11 shift/reduce conflicts.
+state 46 contains 2 shift/reduce conflicts.
 
-        context -> btype . '~' btype                        (rule 279)
-        context -> btype .                                  (rule 280)
-    *** type -> btype .                                     (rule 281)
-        type -> btype . qtyconop type                       (rule 282)
-        type -> btype . tyvarop type                        (rule 283)
-        type -> btype . '->' ctype                          (rule 284)
-        type -> btype . '~' btype                           (rule 285)
-        type -> btype . SIMPLEQUOTE qconop type             (rule 286)
-        type -> btype . SIMPLEQUOTE varop type              (rule 287)
+    *** strict_mark -> unpackedness .                       (rule 268)
+        strict_mark -> unpackedness . strictness            (rule 269)
+
+    Conflicts: '~' '!'
+
+-------------------------------------------------------------------------------
+
+state 50 contains 11 shift/reduce conflicts.
+
+        context -> btype .                                  (rule 282)
+    *** type -> btype .                                     (rule 283)
+        type -> btype . qtyconop type                       (rule 284)
+        type -> btype . tyvarop type                        (rule 285)
+        type -> btype . '->' ctype                          (rule 286)
+        type -> btype . SIMPLEQUOTE qconop type             (rule 287)
+        type -> btype . SIMPLEQUOTE varop type              (rule 288)
         btype -> btype . atype                              (rule 299)
 
     Conflicts: ':' '->' '-' '!' '*' '.' '`' VARSYM CONSYM QVARSYM QCONSYM
@@ -155,15 +153,15 @@ The case for '->' involves view patterns rather than type operators:
 
 -------------------------------------------------------------------------------
 
-state 118 contains 15 shift/reduce conflicts.
+state 119 contains 15 shift/reduce conflicts.
 
-        exp -> infixexp . '::' sigtype                      (rule 414)
-        exp -> infixexp . '-<' exp                          (rule 415)
-        exp -> infixexp . '>-' exp                          (rule 416)
-        exp -> infixexp . '-<<' exp                         (rule 417)
-        exp -> infixexp . '>>-' exp                         (rule 418)
-    *** exp -> infixexp .                                   (rule 419)
-        infixexp -> infixexp . qop exp10                    (rule 421)
+        exp -> infixexp . '::' sigtype                      (rule 416)
+        exp -> infixexp . '-<' exp                          (rule 417)
+        exp -> infixexp . '>-' exp                          (rule 418)
+        exp -> infixexp . '-<<' exp                         (rule 419)
+        exp -> infixexp . '>>-' exp                         (rule 420)
+    *** exp -> infixexp .                                   (rule 421)
+        infixexp -> infixexp . qop exp10                    (rule 423)
 
     Conflicts: ':' '::' '-' '!' '*' '-<' '>-' '-<<' '>>-'
                '.' '`' VARSYM CONSYM QVARSYM QCONSYM
@@ -180,9 +178,9 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
-state 276 contains 1 shift/reduce conflicts.
+state 279 contains 1 shift/reduce conflicts.
 
-        rule -> STRING . rule_activation rule_forall infixexp '=' exp    (rule 214)
+        rule -> STRING . rule_activation rule_forall infixexp '=' exp    (rule 215)
 
     Conflict: '[' (empty rule_activation reduces)
 
@@ -198,28 +196,27 @@ a rule instructing how to rewrite the expression '[0] f'.
 
 -------------------------------------------------------------------------------
 
-state 285 contains 11 shift/reduce conflicts.
+state 288 contains 11 shift/reduce conflicts.
 
-    *** type -> btype .                                     (rule 281)
-        type -> btype . qtyconop type                       (rule 282)
-        type -> btype . tyvarop type                        (rule 283)
-        type -> btype . '->' ctype                          (rule 284)
-        type -> btype . '~' btype                           (rule 285)
-        type -> btype . SIMPLEQUOTE qconop type             (rule 286)
-        type -> btype . SIMPLEQUOTE varop type              (rule 287)
+    *** type -> btype .                                     (rule 283)
+        type -> btype . qtyconop type                       (rule 284)
+        type -> btype . tyvarop type                        (rule 285)
+        type -> btype . '->' ctype                          (rule 286)
+        type -> btype . SIMPLEQUOTE qconop type             (rule 287)
+        type -> btype . SIMPLEQUOTE varop type              (rule 288)
         btype -> btype . atype                              (rule 299)
 
     Conflicts: ':' '->' '-' '!' '*' '.' '`' VARSYM CONSYM QVARSYM QCONSYM
 
-Same as State 49, but minus the context productions.
+Same as State 50, but minus the context productions.
 
 -------------------------------------------------------------------------------
 
-state 320 contains 1 shift/reduce conflicts.
+state 324 contains 1 shift/reduce conflicts.
 
-        tup_exprs -> commas . tup_tail                      (rule 502)
-        sysdcon -> '(' commas . ')'                         (rule 610)
-        commas -> commas . ','                              (rule 725)
+        tup_exprs -> commas . tup_tail                      (rule 505)
+        sysdcon_nolist -> '(' commas . ')'                  (rule 616)
+        commas -> commas . ','                              (rule 734)
 
     Conflict: ')' (empty tup_tail reduces)
 
@@ -230,24 +227,24 @@ if -XTupleSections is not specified.
 
 -------------------------------------------------------------------------------
 
-state 372 contains 1 shift/reduce conflicts.
+state 376 contains 1 shift/reduce conflicts.
 
-        tup_exprs -> commas . tup_tail                      (rule 502)
-        sysdcon -> '(#' commas . '#)'                       (rule 612)
-        commas -> commas . ','                              (rule 724)
+        tup_exprs -> commas . tup_tail                      (rule 505)
+        sysdcon_nolist -> '(#' commas . '#)'                (rule 618)
+        commas -> commas . ','                              (rule 734)
 
     Conflict: '#)' (empty tup_tail reduces)
 
-Same as State 320 for unboxed tuples.
+Same as State 324 for unboxed tuples.
 
 -------------------------------------------------------------------------------
 
-state 400 contains 1 shift/reduce conflicts.
+state 404 contains 1 shift/reduce conflicts.
 
-        exp10 -> 'let' binds . 'in' exp                     (rule 423)
-        exp10 -> 'let' binds . 'in' error                   (rule 438)
-        exp10 -> 'let' binds . error                        (rule 439)
-    *** qual -> 'let' binds .                               (rule 576)
+        exp10 -> 'let' binds . 'in' exp                     (rule 425)
+        exp10 -> 'let' binds . 'in' error                   (rule 440)
+        exp10 -> 'let' binds . error                        (rule 441)
+    *** qual -> 'let' binds .                               (rule 579)
 
     Conflict: error
 
@@ -255,45 +252,10 @@ TODO: Why?
 
 -------------------------------------------------------------------------------
 
+state 633 contains 1 shift/reduce conflicts.
 
-state 462 contains 1 shift/reduce conflicts.
-
-    *** strict_mark -> '{-# NOUNPACK' '#-}' .               (rule 268)
-        strict_mark -> '{-# NOUNPACK' '#-}' . '!'           (rule 270)
-
-    Conflict: '!'
-
-TODO: Why?
-
--------------------------------------------------------------------------------
-
-state 463 contains 1 shift/reduce conflicts.
-
-    *** strict_mark -> '{-# UNPACK' '#-}' .                 (rule 267)
-        strict_mark -> '{-# UNPACK' '#-}' . '!'             (rule 269)
-
-    Conflict: '!'
-
-Same as State 462
-
--------------------------------------------------------------------------------
-
-state 494 contains 1 shift/reduce conflicts.
-
-        context -> btype '~' btype .                        (rule 279)
-    *** type -> btype '~' btype .                           (rule 285)
-        btype -> btype . atype                              (rule 299)
-
-    Conflict: '!'
-
-TODO: Why?
-
--------------------------------------------------------------------------------
-
-state 629 contains 1 shift/reduce conflicts.
-
-    *** aexp2 -> ipvar .                                    (rule 462)
-        dbind -> ipvar . '=' exp                            (rule 587)
+    *** aexp2 -> ipvar .                                    (rule 466)
+        dbind -> ipvar . '=' exp                            (rule 590)
 
     Conflict: '='
 
@@ -305,9 +267,9 @@ sensible meaning, namely the lhs of an implicit binding.
 
 -------------------------------------------------------------------------------
 
-state 696 contains 1 shift/reduce conflicts.
+state 699 contains 1 shift/reduce conflicts.
 
-        rule -> STRING rule_activation . rule_forall infixexp '=' exp    (rule 214)
+        rule -> STRING rule_activation . rule_forall infixexp '=' exp    (rule 215)
 
     Conflict: 'forall' (empty rule_forall reduces)
 
@@ -322,52 +284,16 @@ doesn't include 'forall'.
 
 -------------------------------------------------------------------------------
 
-state 769 contains 1 shift/reduce conflicts.
+state 950 contains 1 shift/reduce conflicts.
 
-    *** type -> btype '~' btype .                           (rule 285)
-        btype -> btype . atype                              (rule 299)
-
-    Conflict: '!'
-
-TODO: Why?
-
--------------------------------------------------------------------------------
-
-state 952 contains 1 shift/reduce conflicts.
-
-        transformqual -> 'then' 'group' . 'using' exp       (rule 525)
-        transformqual -> 'then' 'group' . 'by' exp 'using' exp    (rule 526)
-    *** special_id -> 'group' .                             (rule 701)
+        transformqual -> 'then' 'group' . 'using' exp       (rule 528)
+        transformqual -> 'then' 'group' . 'by' exp 'using' exp    (rule 529)
+    *** special_id -> 'group' .                             (rule 711)
 
     Conflict: 'by'
 
-TODO: Why?
 
 -------------------------------------------------------------------------------
-
-state 1229 contains 1 reduce/reduce conflicts.
-
-    *** tyconsym -> ':' .                                   (rule 642)
-        consym -> ':' .                                     (rule 712)
-
-    Conflict: ')'
-
-TODO: Same as State 1230
-
--------------------------------------------------------------------------------
-
-state 1230 contains 1 reduce/reduce conflicts.
-
-    *** tyconsym -> CONSYM .                                (rule 640)
-        consym -> CONSYM .                                  (rule 711)
-
-    Conflict: ')'
-
-TODO: Why?  (NB: This one has been around for a while; it's quite puzzling
-    because we really shouldn't get confused between tyconsym and consym.
-    Trace the state machine, maybe?)
-
--- -----------------------------------------------------------------------------
 -- API Annotations
 --
 
@@ -563,7 +489,6 @@ TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 %name parseExpression exp
 %name parsePattern pat
 %name parseTypeSignature sigdecl
-%name parseFullStmt   stmt
 %name parseStmt   maybe_stmt
 %name parseIdentifier  identifier
 %name parseType ctype
@@ -726,12 +651,12 @@ qcnames :: { [Located RdrName] }     -- A reversed list
 qcname_ext :: { Located RdrName }       -- Variable or data constructor
                                         -- or tagged type constructor
         :  qcname                   { $1 }
-        |  'type' qcname            {% amms (mkTypeImpExp (sLL $1 $> (unLoc $2)))
+        |  'type' oqtycon           {% amms (mkTypeImpExp (sLL $1 $> (unLoc $2)))
                                             [mj AnnType $1,mj AnnVal $2] }
 
 qcname  :: { Located RdrName }  -- Variable or type constructor
-        :  qvar                         { $1 }
-        |  oqtycon                      { $1 }
+        :  qvar                 { $1 }
+        |  oqtycon_no_varcon    { $1 } -- see Note [Type constructors in export list]
 
 -----------------------------------------------------------------------------
 -- Import Declarations
@@ -777,10 +702,10 @@ maybe_safe :: { ([AddAnn],Bool) }
         : 'safe'                                { ([mj AnnSafe $1],True) }
         | {- empty -}                           { ([],False) }
 
-maybe_pkg :: { ([AddAnn],Maybe (SourceText,FastString)) }
+maybe_pkg :: { ([AddAnn],Maybe StringLiteral) }
         : STRING  {% let pkgFS = getSTRING $1 in
                      if looksLikePackageName (unpackFS pkgFS)
-                        then return ([mj AnnPackageName $1], Just (getSTRINGs $1,pkgFS))
+                        then return ([mj AnnPackageName $1], Just (StringLiteral (getSTRINGs $1) pkgFS))
                         else parseErrorSDoc (getLoc $1) $ vcat [
                              text "parse error" <> colon <+> quotes (ppr pkgFS),
                              text "Version number or non-alphanumeric" <+>
@@ -831,63 +756,63 @@ ops     :: { Located (OrdList (Located RdrName)) }
 
 topdecls :: { OrdList (LHsDecl RdrName) }
         : topdecls ';' topdecl        {% addAnnotation (oll $1) AnnSemi (gl $2)
-                                         >> return ($1 `appOL` $3) }
+                                         >> return ($1 `appOL` unitOL $3) }
         | topdecls ';'                {% addAnnotation (oll $1) AnnSemi (gl $2)
                                          >> return $1 }
-        | topdecl                     { $1 }
+        | topdecl                     { unitOL $1 }
 
-topdecl :: { OrdList (LHsDecl RdrName) }
-        : cl_decl                               { unitOL (sL1 $1 (TyClD (unLoc $1))) }
-        | ty_decl                               { unitOL (sL1 $1 (TyClD (unLoc $1))) }
-        | inst_decl                             { unitOL (sL1 $1 (InstD (unLoc $1))) }
-        | stand_alone_deriving                  { unitOL (sLL $1 $> (DerivD (unLoc $1))) }
-        | role_annot                            { unitOL (sL1 $1 (RoleAnnotD (unLoc $1))) }
-        | 'default' '(' comma_types0 ')'    {% amsu (sLL $1 $> (DefD (DefaultDecl $3)))
+topdecl :: { LHsDecl RdrName }
+        : cl_decl                               { sL1 $1 (TyClD (unLoc $1)) }
+        | ty_decl                               { sL1 $1 (TyClD (unLoc $1)) }
+        | inst_decl                             { sL1 $1 (InstD (unLoc $1)) }
+        | stand_alone_deriving                  { sLL $1 $> (DerivD (unLoc $1)) }
+        | role_annot                            { sL1 $1 (RoleAnnotD (unLoc $1)) }
+        | 'default' '(' comma_types0 ')'    {% ams (sLL $1 $> (DefD (DefaultDecl $3)))
                                                          [mj AnnDefault $1
                                                          ,mop $2,mcp $4] }
-        | 'foreign' fdecl          {% amsu (sLL $1 $> (snd $ unLoc $2))
+        | 'foreign' fdecl          {% ams (sLL $1 $> (snd $ unLoc $2))
                                            (mj AnnForeign $1:(fst $ unLoc $2)) }
-        | '{-# DEPRECATED' deprecations '#-}'   {% amsu (sLL $1 $> $ WarningD (Warnings (getDEPRECATED_PRAGs $1) (fromOL $2)))
+        | '{-# DEPRECATED' deprecations '#-}'   {% ams (sLL $1 $> $ WarningD (Warnings (getDEPRECATED_PRAGs $1) (fromOL $2)))
                                                        [mo $1,mc $3] }
-        | '{-# WARNING' warnings '#-}'          {% amsu (sLL $1 $> $ WarningD (Warnings (getWARNING_PRAGs $1) (fromOL $2)))
+        | '{-# WARNING' warnings '#-}'          {% ams (sLL $1 $> $ WarningD (Warnings (getWARNING_PRAGs $1) (fromOL $2)))
                                                        [mo $1,mc $3] }
-        | '{-# RULES' rules '#-}'               {% amsu (sLL $1 $> $ RuleD (HsRules (getRULES_PRAGs $1) (fromOL $2)))
+        | '{-# RULES' rules '#-}'               {% ams (sLL $1 $> $ RuleD (HsRules (getRULES_PRAGs $1) (fromOL $2)))
                                                        [mo $1,mc $3] }
-        | '{-# VECTORISE' qvar '=' exp '#-}' {% amsu (sLL $1 $> $ VectD (HsVect (getVECT_PRAGs $1) $2 $4))
+        | '{-# VECTORISE' qvar '=' exp '#-}' {% ams (sLL $1 $> $ VectD (HsVect (getVECT_PRAGs $1) $2 $4))
                                                     [mo $1,mj AnnEqual $3
                                                     ,mc $5] }
-        | '{-# NOVECTORISE' qvar '#-}'       {% amsu (sLL $1 $> $ VectD (HsNoVect (getNOVECT_PRAGs $1) $2))
+        | '{-# NOVECTORISE' qvar '#-}'       {% ams (sLL $1 $> $ VectD (HsNoVect (getNOVECT_PRAGs $1) $2))
                                                      [mo $1,mc $3] }
         | '{-# VECTORISE' 'type' gtycon '#-}'
-                                {% amsu (sLL $1 $> $
+                                {% ams (sLL $1 $> $
                                     VectD (HsVectTypeIn (getVECT_PRAGs $1) False $3 Nothing))
                                     [mo $1,mj AnnType $2,mc $4] }
 
         | '{-# VECTORISE_SCALAR' 'type' gtycon '#-}'
-                                {% amsu (sLL $1 $> $
+                                {% ams (sLL $1 $> $
                                     VectD (HsVectTypeIn (getVECT_SCALAR_PRAGs $1) True $3 Nothing))
                                     [mo $1,mj AnnType $2,mc $4] }
 
         | '{-# VECTORISE' 'type' gtycon '=' gtycon '#-}'
-                                {% amsu (sLL $1 $> $
+                                {% ams (sLL $1 $> $
                                     VectD (HsVectTypeIn (getVECT_PRAGs $1) False $3 (Just $5)))
                                     [mo $1,mj AnnType $2,mj AnnEqual $4,mc $6] }
         | '{-# VECTORISE_SCALAR' 'type' gtycon '=' gtycon '#-}'
-                                {% amsu (sLL $1 $> $
+                                {% ams (sLL $1 $> $
                                     VectD (HsVectTypeIn (getVECT_SCALAR_PRAGs $1) True $3 (Just $5)))
                                     [mo $1,mj AnnType $2,mj AnnEqual $4,mc $6] }
 
         | '{-# VECTORISE' 'class' gtycon '#-}'
-                                         {% amsu (sLL $1 $>  $ VectD (HsVectClassIn (getVECT_PRAGs $1) $3))
+                                         {% ams (sLL $1 $>  $ VectD (HsVectClassIn (getVECT_PRAGs $1) $3))
                                                  [mo $1,mj AnnClass $2,mc $4] }
-        | annotation { unitOL $1 }
-        | decl_no_th                            { unLoc $1 }
+        | annotation { $1 }
+        | decl_no_th                            { $1 }
 
         -- Template Haskell Extension
         -- The $(..) form is one possible form of infixexp
         -- but we treat an arbitrary expression just as if
         -- it had a $(..) wrapped around it
-        | infixexp                              { unitOL (sLL $1 $> $ mkSpliceDecl $1) }
+        | infixexp                              { sLL $1 $> $ mkSpliceDecl $1 }
 
 -- Type classes
 --
@@ -1222,8 +1147,8 @@ ptype :: { Located ([AddAnn]
 
 -- Declaration in class bodies
 --
-decl_cls  :: { Located (OrdList (LHsDecl RdrName)) }
-decl_cls  : at_decl_cls                 { sLL $1 $> (unitOL $1) }
+decl_cls  :: { LHsDecl RdrName }
+decl_cls  : at_decl_cls                 { $1 }
           | decl                        { $1 }
 
           -- A 'default' signature used with the generic-programming extension
@@ -1231,22 +1156,22 @@ decl_cls  : at_decl_cls                 { sLL $1 $> (unitOL $1) }
                     {% do { (TypeSig l ty _) <- checkValSig $2 $4
                           ; let err = text "in default signature" <> colon <+>
                                       quotes (ppr ty)
-                          ; ams (sLL $1 $> $ unitOL (sLL $1 $> $ SigD (GenericSig l ty)))
+                          ; ams (sLL $1 $> $ SigD (GenericSig l ty))
                                 [mj AnnDefault $1,mj AnnDcolon $3] } }
 
 decls_cls :: { Located ([AddAnn],OrdList (LHsDecl RdrName)) }  -- Reversed
           : decls_cls ';' decl_cls      {% if isNilOL (snd $ unLoc $1)
                                              then return (sLL $1 $> (mj AnnSemi $2:(fst $ unLoc $1)
-                                                                    , unLoc $3))
+                                                                    , unitOL $3))
                                              else ams (lastOL (snd $ unLoc $1)) [mj AnnSemi $2]
                                            >> return (sLL $1 $> (fst $ unLoc $1
-                                                                ,(snd $ unLoc $1) `appOL` unLoc $3)) }
+                                                                ,(snd $ unLoc $1) `appOL` unitOL $3)) }
           | decls_cls ';'               {% if isNilOL (snd $ unLoc $1)
                                              then return (sLL $1 $> (mj AnnSemi $2:(fst $ unLoc $1)
                                                                                    ,snd $ unLoc $1))
                                              else ams (lastOL (snd $ unLoc $1)) [mj AnnSemi $2]
                                            >> return (sLL $1 $>  (unLoc $1)) }
-          | decl_cls                    { sL1 $1 ([],unLoc $1) }
+          | decl_cls                    { sL1 $1 ([], unitOL $1) }
           | {- empty -}                 { noLoc ([],nilOL) }
 
 decllist_cls
@@ -1270,7 +1195,7 @@ where_cls :: { Located ([AddAnn]
 --
 decl_inst  :: { Located (OrdList (LHsDecl RdrName)) }
 decl_inst  : at_decl_inst               { sLL $1 $> (unitOL (sL1 $1 (InstD (unLoc $1)))) }
-           | decl                       { $1 }
+           | decl                       { sLL $1 $> (unitOL $1) }
 
 decls_inst :: { Located ([AddAnn],OrdList (LHsDecl RdrName)) }   -- Reversed
            : decls_inst ';' decl_inst   {% if isNilOL (snd $ unLoc $1)
@@ -1309,10 +1234,10 @@ where_inst :: { Located ([AddAnn]
 decls   :: { Located ([AddAnn],OrdList (LHsDecl RdrName)) }
         : decls ';' decl    {% if isNilOL (snd $ unLoc $1)
                                  then return (sLL $1 $> (mj AnnSemi $2:(fst $ unLoc $1)
-                                                        , unLoc $3))
+                                                        , unitOL $3))
                                  else do ams (lastOL $ snd $ unLoc $1) [mj AnnSemi $2]
                                            >> return (
-                                          let { this = unLoc $3;
+                                          let { this = unitOL $3;
                                                 rest = snd $ unLoc $1;
                                                 these = rest `appOL` this }
                                           in rest `seq` this `seq` these `seq`
@@ -1322,7 +1247,7 @@ decls   :: { Located ([AddAnn],OrdList (LHsDecl RdrName)) }
                                                           ,snd $ unLoc $1)))
                                   else ams (lastOL $ snd $ unLoc $1) [mj AnnSemi $2]
                                            >> return (sLL $1 $> (unLoc $1)) }
-        | decl                          { sL1 $1 ([],unLoc $1) }
+        | decl                          { sL1 $1 ([], unitOL $1) }
         | {- empty -}                   { noLoc ([],nilOL) }
 
 decllist :: { Located ([AddAnn],OrdList (LHsDecl RdrName)) }
@@ -1435,15 +1360,15 @@ deprecation :: { OrdList (LWarnDecl RdrName) }
              {% amsu (sLL $1 $> $ (Warning (unLoc $1) (DeprecatedTxt (noLoc "") $ snd $ unLoc $2)))
                      (fst $ unLoc $2) }
 
-strings :: { Located ([AddAnn],[Located (SourceText,FastString)]) }
-    : STRING { sL1 $1 ([],[L (gl $1) (getSTRINGs $1,getSTRING $1)]) }
+strings :: { Located ([AddAnn],[Located StringLiteral]) }
+    : STRING { sL1 $1 ([],[L (gl $1) (getStringLiteral $1)]) }
     | '[' stringlist ']' { sLL $1 $> $ ([mos $1,mcs $3],fromOL (unLoc $2)) }
 
-stringlist :: { Located (OrdList (Located (SourceText,FastString))) }
+stringlist :: { Located (OrdList (Located StringLiteral)) }
     : stringlist ',' STRING {% addAnnotation (oll $ unLoc $1) AnnComma (gl $2) >>
                                return (sLL $1 $> (unLoc $1 `snocOL`
-                                                  (L (gl $3) (getSTRINGs $3,getSTRING $3)))) }
-    | STRING                { sLL $1 $> (unitOL (L (gl $1) (getSTRINGs $1,getSTRING $1))) }
+                                                  (L (gl $3) (getStringLiteral $3)))) }
+    | STRING                { sLL $1 $> (unitOL (L (gl $1) (getStringLiteral $1))) }
 
 -----------------------------------------------------------------------------
 -- Annotations
@@ -1491,12 +1416,12 @@ safety :: { Located Safety }
         | 'interruptible'               { sLL $1 $> PlayInterruptible }
 
 fspec :: { Located ([AddAnn]
-                    ,(Located (SourceText,FastString), Located RdrName, LHsType RdrName)) }
+                    ,(Located StringLiteral, Located RdrName, LHsType RdrName)) }
        : STRING var '::' sigtypedoc     { sLL $1 $> ([mj AnnDcolon $3]
                                              ,(L (getLoc $1)
-                                                    (getSTRINGs $1,getSTRING $1), $2, $4)) }
+                                                    (getStringLiteral $1), $2, $4)) }
        |        var '::' sigtypedoc     { sLL $1 $> ([mj AnnDcolon $2]
-                                             ,(noLoc ("",nilFS), $1, $3)) }
+                                             ,(noLoc (StringLiteral "" nilFS), $1, $3)) }
          -- if the entity string is missing, it defaults to the empty string;
          -- the meaning of an empty entity string depends on the calling
          -- convention
@@ -1536,18 +1461,21 @@ sigtypes1 :: { (OrdList (LHsType RdrName)) }      -- Always HsForAllTys
 -- Types
 
 strict_mark :: { Located ([AddAnn],HsBang) }
-        : '!'                        { sL1 $1 ([mj AnnBang $1]
-                                              ,HsSrcBang Nothing                       Nothing      True) }
-        | '{-# UNPACK' '#-}'         { sLL $1 $> ([mo $1,mc $2]
-                                              ,HsSrcBang (Just $ getUNPACK_PRAGs $1)   (Just True)  False) }
-        | '{-# NOUNPACK' '#-}'       { sLL $1 $> ([mo $1,mc $2]
-                                              ,HsSrcBang (Just $ getNOUNPACK_PRAGs $1) (Just False) False) }
-        | '{-# UNPACK' '#-}' '!'     { sLL $1 $> ([mo $1,mc $2,mj AnnBang $3]
-                                              ,HsSrcBang (Just $ getUNPACK_PRAGs $1)   (Just True)  True) }
-        | '{-# NOUNPACK' '#-}' '!'   { sLL $1 $> ([mo $1,mc $2,mj AnnBang $3]
-                                              ,HsSrcBang (Just $ getNOUNPACK_PRAGs $1) (Just False) True) }
-        -- Although UNPACK with no '!' is illegal, we get a
-        -- better error message if we parse it here
+        : strictness { sL1 $1 (let (a, str) = unLoc $1 in (a, HsSrcBang Nothing NoSrcUnpack str)) }
+        | unpackedness { sL1 $1 (let (a, prag, unpk) = unLoc $1 in (a, HsSrcBang prag unpk NoSrcStrictness)) }
+        | unpackedness strictness { sLL $1 $> (let { (a, prag, unpk) = unLoc $1
+                                                   ; (a', str) = unLoc $2 }
+                                                in (a ++ a', HsSrcBang prag unpk str)) }
+        -- Although UNPACK with no '!' without StrictData and UNPACK with '~' are illegal,
+        -- we get a better error message if we parse them here
+
+strictness :: { Located ([AddAnn], SrcStrictness) }
+        : '!' { sL1 $1 ([mj AnnBang $1], SrcStrict) }
+        | '~' { sL1 $1 ([mj AnnTilde $1], SrcLazy) }
+
+unpackedness :: { Located ([AddAnn], Maybe SourceText, SrcUnpackedness) }
+        : '{-# UNPACK' '#-}'   { sLL $1 $> ([mo $1, mc $2], Just $ getUNPACK_PRAGs $1, SrcUnpack) }
+        | '{-# NOUNPACK' '#-}' { sLL $1 $> ([mo $1, mc $2], Just $ getNOUNPACK_PRAGs $1, SrcNoUnpack) }
 
 -- A ctype is a for-all type
 ctype   :: { LHsType RdrName }
@@ -1596,47 +1524,39 @@ ctypedoc :: { LHsType RdrName }
 -- to permit an individual equational constraint without parenthesis.
 -- Thus for some reason we allow    f :: a~b => blah
 -- but not                          f :: ?x::Int => blah
+-- See Note [Parsing ~]
 context :: { LHsContext RdrName }
-        : btype '~'      btype          {% do { (anns,ctx) <- checkContext
-                                                 (sLL $1 $> $ HsEqTy $1 $3)
-                                              ; ams ctx (mj AnnTilde $2:anns) } }
-        | btype                         {% do { (anns,ctx) <- checkContext $1
-                                              ; if null (unLoc ctx)
-                                                 then addAnnotation (gl $1) AnnUnit (gl $1)
-                                                 else return ()
-                                              ; ams ctx anns
-                                              } }
-
+        :  btype                        {% do { (anns,ctx) <- checkContext (splitTilde $1)
+                                                ; if null (unLoc ctx)
+                                                   then addAnnotation (gl $1) AnnUnit (gl $1)
+                                                   else return ()
+                                                ; ams ctx anns
+                                                } }
+-- See Note [Parsing ~]
 type :: { LHsType RdrName }
-        : btype                         { $1 }
+        : btype                         { splitTilde $1 }
         | btype qtyconop type           { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
         | btype tyvarop  type           { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
         | btype '->'     ctype          {% ams $1 [mj AnnRarrow $2]
-                                        >> ams (sLL $1 $> $ HsFunTy $1 $3)
+                                        >> ams (sLL $1 $> $ HsFunTy (splitTilde $1) $3)
                                                [mj AnnRarrow $2] }
-        | btype '~'      btype          {% ams (sLL $1 $> $ HsEqTy $1 $3)
-                                               [mj AnnTilde $2] }
-                                        -- see Note [Promotion]
         | btype SIMPLEQUOTE qconop type  {% ams (sLL $1 $> $ mkHsOpTy $1 $3 $4)
                                                 [mj AnnSimpleQuote $2] }
         | btype SIMPLEQUOTE varop  type  {% ams (sLL $1 $> $ mkHsOpTy $1 $3 $4)
                                                 [mj AnnSimpleQuote $2] }
-
+-- See Note [Parsing ~]
 typedoc :: { LHsType RdrName }
-        : btype                          { $1 }
-        | btype docprev                  { sLL $1 $> $ HsDocTy $1 $2 }
+        : btype                          { splitTilde $1 }
+        | btype docprev                  { sLL $1 $> $ HsDocTy (splitTilde $1) $2 }
         | btype qtyconop type            { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
         | btype qtyconop type docprev    { sLL $1 $> $ HsDocTy (L (comb3 $1 $2 $3) (mkHsOpTy $1 $2 $3)) $4 }
         | btype tyvarop  type            { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
         | btype tyvarop  type docprev    { sLL $1 $> $ HsDocTy (L (comb3 $1 $2 $3) (mkHsOpTy $1 $2 $3)) $4 }
-        | btype '->'     ctypedoc        {% ams (sLL $1 $> $ HsFunTy $1 $3)
+        | btype '->'     ctypedoc        {% ams (sLL $1 $> $ HsFunTy (splitTilde $1) $3)
                                                 [mj AnnRarrow $2] }
-        | btype docprev '->' ctypedoc    {% ams (sLL $1 $> $ HsFunTy (L (comb2 $1 $2)
+        | btype docprev '->' ctypedoc    {% ams (sLL $1 $> $ HsFunTy (L (comb2 (splitTilde $1) $2)
                                                             (HsDocTy $1 $2)) $4)
                                                 [mj AnnRarrow $3] }
-        | btype '~'      btype           {% ams (sLL $1 $> $ HsEqTy $1 $3)
-                                                [mj AnnTilde $2] }
-                                        -- see Note [Promotion]
         | btype SIMPLEQUOTE qconop type  {% ams (sLL $1 $> $ mkHsOpTy $1 $3 $4)
                                                 [mj AnnSimpleQuote $2] }
         | btype SIMPLEQUOTE varop  type  {% ams (sLL $1 $> $ mkHsOpTy $1 $3 $4)
@@ -1761,6 +1681,23 @@ varids0 :: { Located [Located RdrName] }
         : {- empty -}                   { noLoc [] }
         | varids0 tyvar                 { sLL $1 $> ($2 : unLoc $1) }
 
+{-
+Note [Parsing ~]
+~~~~~~~~~~~~~~~~
+
+Due to parsing conflicts between lazyness annotations in data type
+declarations (see strict_mark) and equality types ~'s are always
+parsed as lazyness annotations, and turned into HsEqTy's in the
+correct places using RdrHsSyn.splitTilde.
+
+Since strict_mark is parsed as part of atype which is part of type,
+typedoc and context (where HsEqTy previously appeared) it made most
+sense and was simplest to parse ~ as part of strict_mark and later
+turn them into HsEqTy's.
+
+-}
+
+
 -----------------------------------------------------------------------------
 -- Kinds
 
@@ -1840,10 +1777,10 @@ gadt_constrlist :: { Located ([AddAnn]
         | {- empty -}                            { noLoc ([],[]) }
 
 gadt_constrs :: { Located [LConDecl RdrName] }
-        : gadt_constr ';' gadt_constrs
+        : gadt_constr_with_doc ';' gadt_constrs
                   {% addAnnotation (gl $1) AnnSemi (gl $2)
                      >> return (L (comb2 $1 $3) ($1 : unLoc $3)) }
-        | gadt_constr                   { L (gl $1) [$1] }
+        | gadt_constr_with_doc          { L (gl $1) [$1] }
         | {- empty -}                   { noLoc [] }
 
 -- We allow the following forms:
@@ -1852,19 +1789,32 @@ gadt_constrs :: { Located [LConDecl RdrName] }
 --      D { x,y :: a } :: T a
 --      forall a. Eq a => D { x,y :: a } :: T a
 
+gadt_constr_with_doc :: { LConDecl RdrName }
+gadt_constr_with_doc
+        : maybe_docnext ';' gadt_constr
+                {% return $ addConDoc $3 $1 }
+        | gadt_constr
+                {% return $1 }
+
 gadt_constr :: { LConDecl RdrName }
-                   -- Returns a list because of:   C,D :: ty
+    -- see Note [Difference in parsing GADT and data constructors]
+    -- Returns a list because of:   C,D :: ty
         : con_list '::' sigtype
                 {% do { (anns,gadtDecl) <- mkGadtDecl (unLoc $1) $3
-                      ; ams (sLL $1 $> $ gadtDecl)
+                      ; ams (sLL $1 $> gadtDecl)
                             (mj AnnDcolon $2:anns) } }
 
-                -- Deprecated syntax for GADT record declarations
-        | oqtycon '{' fielddecls '}' '::' sigtype
-                {% do { cd <- mkDeprecatedGadtRecordDecl (comb2 $1 $6) $1 (noLoc $3) $6
-                      ; cd' <- checkRecordSyntax cd
-                      ; ams (L (comb2 $1 $6) (unLoc cd'))
-                            [moc $2,mcc $4,mj AnnDcolon $5] } }
+{- Note [Difference in parsing GADT and data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GADT constructors have simpler syntax than usual data constructors:
+in GADTs, types cannot occur to the left of '::', so they cannot be mixed
+with constructor names (see Note [Parsing data constructors is hard]).
+
+Due to simplified syntax, GADT constructor names (left-hand side of '::')
+use simpler grammar production than usual data constructor names. As a
+consequence, GADT constructor names are resticted (names like '(*)' are
+allowed in usual data constructors, but not in GADTs).
+-}
 
 constrs :: { Located ([AddAnn],[LConDecl RdrName]) }
         : maybe_docnext '=' constrs1    { L (comb2 $2 $3) ([mj AnnEqual $2]
@@ -1895,15 +1845,20 @@ forall :: { Located ([AddAnn],[LHsTyVarBndr RdrName]) }
         | {- empty -}                 { noLoc ([],[]) }
 
 constr_stuff :: { Located (Located RdrName, HsConDeclDetails RdrName) }
--- We parse the constructor declaration
---      C t1 t2
--- as a btype (treating C as a type constructor) and then convert C to be
--- a data constructor.  Reason: it might continue like this:
---      C t1 t2 %: D Int
--- in which case C really would be a type constructor.  We can't resolve this
--- ambiguity till we come across the constructor oprerator :% (or not, more usually)
+    -- see Note [Parsing data constructors is hard]
         : btype                         {% splitCon $1 >>= return.sLL $1 $> }
         | btype conop btype             {  sLL $1 $> ($2, InfixCon $1 $3) }
+
+{- Note [Parsing data constructors is hard]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We parse the constructor declaration
+     C t1 t2
+as a btype (treating C as a type constructor) and then convert C to be
+a data constructor.  Reason: it might continue like this:
+     C t1 t2 %: D Int
+in which case C really would be a type constructor.  We can't resolve this
+ambiguity till we come across the constructor oprerator :% (or not, more usually)
+-}
 
 fielddecls :: { [LConDeclField RdrName] }
         : {- empty -}     { [] }
@@ -1974,14 +1929,14 @@ docdecld :: { LDocDecl }
         | docnamed                              { sL1 $1 (case (unLoc $1) of (n, doc) -> DocCommentNamed n doc) }
         | docsection                            { sL1 $1 (case (unLoc $1) of (n, doc) -> DocGroup n doc) }
 
-decl_no_th :: { Located (OrdList (LHsDecl RdrName)) }
+decl_no_th :: { LHsDecl RdrName }
         : sigdecl               { $1 }
 
         | '!' aexp rhs          {% do { let { e = sLL $1 $2 (SectionR (sL1 $1 (HsVar bang_RDR)) $2) };
                                         pat <- checkPattern empty e;
                                         _ <- ams (sLL $1 $> ())
                                                (fst $ unLoc $3);
-                                        return $ sLL $1 $> $ unitOL $ sLL $1 $> $ ValD $
+                                        return $ sLL $1 $> $ ValD $
                                             PatBind pat (snd $ unLoc $3)
                                                     placeHolderType
                                                     placeHolderNames
@@ -1997,17 +1952,17 @@ decl_no_th :: { Located (OrdList (LHsDecl RdrName)) }
                                           (PatBind (L lh _lhs) _rhs _ _ _) ->
                                                 ams (L lh ()) (fst $2) >> return () } ;
                                         _ <- ams (L l ()) (ann ++ (fst $ unLoc $3));
-                                        return $! (sL l (unitOL $! (sL l $ ValD r))) } }
-        | pattern_synonym_decl  { sLL $1 $> $ unitOL $1 }
-        | docdecl               { sLL $1 $> $ unitOL $1 }
+                                        return $! (sL l $ ValD r) } }
+        | pattern_synonym_decl  { $1 }
+        | docdecl               { $1 }
 
-decl    :: { Located (OrdList (LHsDecl RdrName)) }
+decl    :: { LHsDecl RdrName }
         : decl_no_th            { $1 }
 
         -- Why do we only allow naked declaration splices in top-level
         -- declarations and not here? Short answer: because readFail009
         -- fails terribly with a panic in cvBindsAndSigs otherwise.
-        | splice_exp            { sLL $1 $> $ unitOL (sLL $1 $> $ mkSpliceDecl $1) }
+        | splice_exp            { sLL $1 $> $ mkSpliceDecl $1 }
 
 rhs     :: { Located ([AddAnn],GRHSs RdrName (LHsExpr RdrName)) }
         : '=' exp wherebinds    { sL (comb3 $1 $2 $3)
@@ -2026,30 +1981,30 @@ gdrh :: { LGRHS RdrName (LHsExpr RdrName) }
         : '|' guardquals '=' exp  {% ams (sL (comb2 $1 $>) $ GRHS (unLoc $2) $4)
                                          [mj AnnVbar $1,mj AnnEqual $3] }
 
-sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
+sigdecl :: { LHsDecl RdrName }
         :
         -- See Note [Declaration/signature overlap] for why we need infixexp here
           infixexp '::' sigtypedoc
                         {% do s <- checkValSig $1 $3
                         ; _ <- ams (sLL $1 $> ()) [mj AnnDcolon $2]
-                        ; return (sLL $1 $> $ unitOL (sLL $1 $> $ SigD s)) }
+                        ; return (sLL $1 $> $ SigD s) }
 
         | var ',' sig_vars '::' sigtypedoc
            {% do { let sig = TypeSig ($1 : reverse (unLoc $3)) $5 PlaceHolder
                  ; addAnnotation (gl $1) AnnComma (gl $2)
-                 ; ams (sLL $1 $> $ toOL [ sLL $1 $> $ SigD sig ])
+                 ; ams ( sLL $1 $> $ SigD sig )
                        [mj AnnDcolon $4] } }
 
         | infix prec ops
-              {% ams (sLL $1 $> $ toOL [ sLL $1 $> $ SigD
+              {% ams (sLL $1 $> $ SigD
                         (FixSig (FixitySig (fromOL $ unLoc $3)
-                                (Fixity (unLoc $2) (unLoc $1)))) ])
+                                (Fixity (unLoc $2) (unLoc $1)))))
                      [mj AnnInfix $1,mj AnnVal $2] }
 
-        | pattern_synonym_sig   { sLL $1 $> $ unitOL $ sLL $1 $> . SigD . unLoc $ $1 }
+        | pattern_synonym_sig   { sLL $1 $> . SigD . unLoc $ $1 }
 
         | '{-# INLINE' activation qvar '#-}'
-                {% ams (sLL $1 $> $ unitOL (sLL $1 $> $ SigD (InlineSig $3
+                {% ams ((sLL $1 $> $ SigD (InlineSig $3
                             (mkInlinePragma (getINLINE_PRAGs $1) (getINLINE $1)
                                             (snd $2)))))
                        ((mo $1:fst $2) ++ [mc $4]) }
@@ -2058,25 +2013,24 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
              {% ams (
                  let inl_prag = mkInlinePragma (getSPEC_PRAGs $1)
                                              (EmptyInlineSpec, FunLike) (snd $2)
-                  in sLL $1 $> $
-                            toOL [ sLL $1 $> $ SigD (SpecSig $3 (fromOL $5) inl_prag) ])
+                  in sLL $1 $> $ SigD (SpecSig $3 (fromOL $5) inl_prag))
                     (mo $1:mj AnnDcolon $4:mc $6:(fst $2)) }
 
         | '{-# SPECIALISE_INLINE' activation qvar '::' sigtypes1 '#-}'
-             {% ams (sLL $1 $> $ toOL [ sLL $1 $> $ SigD (SpecSig $3 (fromOL $5)
+             {% ams (sLL $1 $> $ SigD (SpecSig $3 (fromOL $5)
                                (mkInlinePragma (getSPEC_INLINE_PRAGs $1)
-                                               (getSPEC_INLINE $1) (snd $2))) ])
+                                               (getSPEC_INLINE $1) (snd $2))))
                        (mo $1:mj AnnDcolon $4:mc $6:(fst $2)) }
 
         | '{-# SPECIALISE' 'instance' inst_type '#-}'
-                {% ams (sLL $1 $> $ unitOL (sLL $1 $>
-                                  $ SigD (SpecInstSig (getSPEC_PRAGs $1) $3)))
+                {% ams (sLL $1 $>
+                                  $ SigD (SpecInstSig (getSPEC_PRAGs $1) $3))
                        [mo $1,mj AnnInstance $2,mc $4] }
 
         -- AZ TODO: Do we need locations in the name_formula_opt?
         -- A minimal complete definition
         | '{-# MINIMAL' name_boolformula_opt '#-}'
-            {% ams (sLL $1 $> $ unitOL (sLL $1 $> $ SigD (MinimalSig (getMINIMAL_PRAGs $1) (snd $2))))
+            {% ams (sLL $1 $> $ SigD (MinimalSig (getMINIMAL_PRAGs $1) (snd $2)))
                    (mo $1:mc $3:fst $2) }
 
 activation :: { ([AddAnn],Maybe Activation) }
@@ -2180,7 +2134,7 @@ exp10 :: { LHsExpr RdrName }
                                             -- TODO: is LL right here?
                                [mj AnnProc $1,mj AnnRarrow $3] }
 
-        | '{-# CORE' STRING '#-}' exp  {% ams (sLL $1 $> $ HsCoreAnn (getCORE_PRAGs $1) (getSTRINGs $2,getSTRING $2) $4)
+        | '{-# CORE' STRING '#-}' exp  {% ams (sLL $1 $> $ HsCoreAnn (getCORE_PRAGs $1) (getStringLiteral $2) $4)
                                               [mo $1,mj AnnVal $2
                                               ,mc $3] }
                                           -- hdaume: core annotation
@@ -2221,16 +2175,16 @@ optSemi :: { ([Located a],Bool) }
         : ';'         { ([$1],True) }
         | {- empty -} { ([],False) }
 
-scc_annot :: { Located (([AddAnn],SourceText),(SourceText,FastString)) }
+scc_annot :: { Located (([AddAnn],SourceText),StringLiteral) }
         : '{-# SCC' STRING '#-}'      {% do scc <- getSCC $2
                                             ; return $ sLL $1 $>
                                                (([mo $1,mj AnnValStr $2
-                                                ,mc $3],getSCC_PRAGs $1),(getSTRINGs $2,scc)) }
+                                                ,mc $3],getSCC_PRAGs $1),(StringLiteral (getSTRINGs $2) scc)) }
         | '{-# SCC' VARID  '#-}'      { sLL $1 $> (([mo $1,mj AnnVal $2
                                          ,mc $3],getSCC_PRAGs $1)
-                                        ,(unpackFS $ getVARID $2,getVARID $2)) }
+                                        ,(StringLiteral (unpackFS $ getVARID $2) (getVARID $2))) }
 
-hpc_annot :: { Located (([AddAnn],SourceText),((SourceText,FastString),(Int,Int),(Int,Int))) }
+hpc_annot :: { Located (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,Int))) }
       : '{-# GENERATED' STRING INTEGER ':' INTEGER '-' INTEGER ':' INTEGER '#-}'
                                       { sLL $1 $> $ (([mo $1,mj AnnVal $2
                                               ,mj AnnVal $3,mj AnnColon $4
@@ -2238,7 +2192,7 @@ hpc_annot :: { Located (([AddAnn],SourceText),((SourceText,FastString),(Int,Int)
                                               ,mj AnnVal $7,mj AnnColon $8
                                               ,mj AnnVal $9,mc $10],
                                                 getGENERATED_PRAGs $1)
-                                              ,((getSTRINGs $2,getSTRING $2)
+                                              ,((getStringLiteral $2)
                                                ,( fromInteger $ getINTEGER $3
                                                 , fromInteger $ getINTEGER $5
                                                 )
@@ -2849,6 +2803,33 @@ oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
         | '(' '~' ')'                   {% ams (sLL $1 $> $ eqTyCon_RDR)
                                                [mop $1,mj AnnTilde $2,mcp $3] }
 
+oqtycon_no_varcon :: { Located RdrName }  -- Type constructor which cannot be mistaken
+                                          -- for variable constructor in export lists
+                                          -- see Note [Type constructors in export list]
+        :  qtycon            { $1 }
+        | '(' QCONSYM ')'    {% let name = sL1 $2 $! mkQual tcClsName (getQCONSYM $2)
+                                in ams (sLL $1 $> (unLoc name)) [mop $1,mj AnnVal name,mcp $3] }
+        | '(' CONSYM ')'     {% let name = sL1 $2 $! mkUnqual tcClsName (getCONSYM $2)
+                                in ams (sLL $1 $> (unLoc name)) [mop $1,mj AnnVal name,mcp $3] }
+        | '(' ':' ')'        {% let name = sL1 $2 $! consDataCon_RDR
+                                in ams (sLL $1 $> (unLoc name)) [mop $1,mj AnnVal name,mcp $3] }
+        | '(' '~' ')'        {% ams (sLL $1 $> $ eqTyCon_RDR) [mop $1,mj AnnTilde $2,mcp $3] }
+
+{- Note [Type constructors in export list]
+~~~~~~~~~~~~~~~~~~~~~
+Mixing type constructors and variable constructors in export lists introduces
+ambiguity in grammar: e.g. (*) may be both a type constructor and a function.
+
+-XExplicitNamespaces allows to disambiguate by explicitly prefixing type
+constructors with 'type' keyword.
+
+This ambiguity causes reduce/reduce conflicts in parser, which are always
+resolved in favour of variable constructors. To get rid of conflicts we demand
+that ambigous type constructors (those, which are formed by the same
+productions as variable constructors) are always prefixed with 'type' keyword.
+Unambigous type constructors may occur both with or without 'type' keyword.
+-}
+
 qtyconop :: { Located RdrName } -- Qualified or unqualified
         : qtyconsym                     { $1 }
         | '`' qtycon '`'                {% ams (sLL $1 $> (unLoc $2))
@@ -3174,6 +3155,7 @@ getOVERLAPS_PRAGs     (L _ (IToverlaps_prag     src)) = src
 getINCOHERENT_PRAGs   (L _ (ITincoherent_prag   src)) = src
 getCTYPEs             (L _ (ITctype             src)) = src
 
+getStringLiteral l = StringLiteral (getSTRINGs l) (getSTRING l)
 
 getSCC :: Located Token -> P FastString
 getSCC lt = do let s = getSTRING lt

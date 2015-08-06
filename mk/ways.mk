@@ -22,7 +22,7 @@
 #
 # The ways currently defined.
 #
-ALL_WAYS=v p t l s mp debug dyn thr thr_l p_dyn debug_dyn thr_dyn thr_p_dyn thr_debug_dyn thr_p thr_debug debug_p thr_debug_p l_dyn thr_l_dyn
+ALL_WAYS=v p l debug dyn thr thr_l p_dyn debug_dyn thr_dyn thr_p_dyn thr_debug_dyn thr_p thr_debug debug_p thr_debug_p l_dyn thr_l_dyn
 
 #
 # The following ways currently are treated specially,
@@ -43,10 +43,6 @@ WAY_p_HC_OPTS= -static -prof
 # Way 'l':
 WAY_l_NAME=event logging
 WAY_l_HC_OPTS= -static -eventlog
-
-# Way `mp': 
-WAY_mp_NAME=parallel
-WAY_mp_HC_OPTS= -static -parallel
 
 #
 # These ways apply to the RTS only:

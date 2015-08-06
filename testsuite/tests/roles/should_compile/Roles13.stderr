@@ -2,10 +2,12 @@
 ==================== Tidy Core ====================
 Result size of Tidy Core = {terms: 5, types: 9, coercions: 5}
 
+-- RHS size: {terms: 2, types: 2, coercions: 0}
 a :: Wrap Age -> Wrap Age
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType]
 a = \ (ds :: Wrap Age) -> ds
 
+-- RHS size: {terms: 1, types: 0, coercions: 5}
 convert :: Wrap Age -> Int
 [GblId[sig], Arity=1, Caf=NoCafRefs, Str=DmdType]
 convert =

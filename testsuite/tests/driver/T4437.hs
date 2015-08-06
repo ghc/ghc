@@ -33,7 +33,8 @@ expectedGhcOnlyExtensions :: [String]
 expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "AlternativeLayoutRule",
                              "AlternativeLayoutRuleTransitional",
-                             "StaticPointers"]
+                             "StaticPointers",
+                             "StrictData"]
 
 expectedCabalOnlyExtensions :: [String]
 expectedCabalOnlyExtensions = ["Generics",
@@ -47,4 +48,3 @@ expectedCabalOnlyExtensions = ["Generics",
                                "Safe",
                                "Unsafe",
                                "Trustworthy"]
-

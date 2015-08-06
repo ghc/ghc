@@ -1,5 +1,3 @@
-setTestOpts(only_compiler_types(['ghc']))
-
 test('arrowapply1', normal, compile, [''])
 test('arrowapply2', normal, compile, [''])
 test('arrowapply3', normal, compile, [''])
@@ -17,3 +15,4 @@ test('T3964', normal, compile, [''])
 test('T5283', normal, compile, [''])
 test('T5267', expect_broken(5267), compile, [''])
 test('T5022', normal, compile, [''])
+test('T5333', normal, compile, [''])

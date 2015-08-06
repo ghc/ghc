@@ -5,7 +5,6 @@ import subprocess
 #
 # This file is Python source
 #
-config.compiler_type         = 'ghc'
 config.compiler              = 'ghc'
 config.compiler_always_flags = ghc_compiler_always_flags.split()
 

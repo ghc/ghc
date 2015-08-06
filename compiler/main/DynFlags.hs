@@ -100,6 +100,10 @@ module DynFlags (
         parseDynamicFilePragma,
         parseDynamicFlagsFull,
 
+        -- ** Package key cache
+        PackageKeyCache,
+        ShPackageKey(..),
+
         -- ** Available DynFlags
         allFlags,
         flagsAll,
@@ -177,6 +181,8 @@ import Foreign.C        ( CInt(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
 #endif
 import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessage )
+import UniqFM
+import UniqSet
 
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
@@ -331,6 +337,7 @@ data GeneralFlag
    | Opt_PrintExplicitForalls
    | Opt_PrintExplicitKinds
    | Opt_PrintUnicodeSyntax
+   | Opt_PrintExpandedSynonyms
 
    -- optimisation opts
    | Opt_CallArity
@@ -342,6 +349,7 @@ data GeneralFlag
    | Opt_FloatIn
    | Opt_Specialise
    | Opt_SpecialiseAggressively
+   | Opt_CrossModuleSpecialise
    | Opt_StaticArgumentTransformation
    | Opt_CSE
    | Opt_LiberateCase
@@ -370,6 +378,7 @@ data GeneralFlag
    | Opt_DictsStrict                     -- be strict in argument dictionaries
    | Opt_DmdTxDictSel              -- use a special demand transformer for dictionary selectors
    | Opt_Loopification                  -- See Note [Self-recursive tail calls]
+   | Opt_CprAnal
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -407,7 +416,6 @@ data GeneralFlag
    | Opt_HelpfulErrors
    | Opt_DeferTypeErrors
    | Opt_DeferTypedHoles
-   | Opt_Parallel
    | Opt_PIC
    | Opt_SccProfilingOn
    | Opt_Ticky
@@ -441,6 +449,8 @@ data GeneralFlag
    | Opt_SuppressIdInfo
    -- Suppress separate type signatures in core, but leave types on
    -- lambda bound vars
+   | Opt_SuppressUnfoldings
+   -- Suppress the details of even stable unfoldings
    | Opt_SuppressTypeSignatures
    -- Suppress unique ids on variables.
    -- Except for uniques, as some simplifier phases introduce new
@@ -514,7 +524,8 @@ data WarningFlag =
    | Opt_WarnUnsafe
    | Opt_WarnSafe
    | Opt_WarnTrustworthySafe
-   | Opt_WarnPointlessPragmas
+   | Opt_WarnMissedSpecs
+   | Opt_WarnAllMissedSpecs
    | Opt_WarnUnsupportedCallingConventions
    | Opt_WarnUnsupportedLlvmVersion
    | Opt_WarnInlineRuleShadowing
@@ -523,6 +534,7 @@ data WarningFlag =
    | Opt_WarnMissingExportedSigs
    | Opt_WarnUntickedPromotedConstructors
    | Opt_WarnDerivingTypeable
+   | Opt_WarnDeferredTypeErrors
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -644,12 +656,36 @@ data ExtensionFlag
    | Opt_NamedWildCards
    | Opt_StaticPointers
    | Opt_TypeApplications
+   | Opt_StrictData
    deriving (Eq, Enum, Show)
 
 type SigOf = Map ModuleName Module
 
 getSigOf :: DynFlags -> ModuleName -> Maybe Module
 getSigOf dflags n = Map.lookup n (sigOf dflags)
+
+-- NameCache updNameCache
+type PackageKeyEnv = UniqFM
+type PackageKeyCache = PackageKeyEnv ShPackageKey
+
+-- | An elaborated representation of a 'PackageKey', which records
+-- all of the components that go into the hashed 'PackageKey'.
+data ShPackageKey
+    = ShPackageKey {
+          shPackageKeyUnitName          :: !UnitName,
+          shPackageKeyLibraryName       :: !LibraryName,
+          shPackageKeyInsts             :: ![(ModuleName, Module)],
+          shPackageKeyFreeHoles         :: UniqSet ModuleName
+      }
+    | ShDefinitePackageKey {
+          shPackageKey :: !PackageKey
+      }
+    deriving Eq
+
+instance Outputable ShPackageKey where
+    ppr (ShPackageKey pn vh insts fh)
+        = ppr pn <+> ppr vh <+> ppr insts <+> parens (ppr fh)
+    ppr (ShDefinitePackageKey pk) = ppr pk
 
 -- | Contains not only a collection of 'GeneralFlag's but also a plethora of
 -- information relating to the compilation of a single file or GHC session
@@ -695,7 +731,10 @@ data DynFlags = DynFlags {
   solverIterations      :: IntWithInf,   -- ^ Number of iterations in the constraints solver
                                          --   Typically only 1 is needed
 
-  thisPackage           :: PackageKey,   -- ^ name of package currently being compiled
+  thisPackage           :: PackageKey,   -- ^ key of package currently being compiled
+  thisLibraryName       :: LibraryName,
+                            -- ^ the version hash which identifies the textual
+                            --   package being compiled.
 
   -- ways
   ways                  :: [Way],       -- ^ Way flags from the command line
@@ -782,6 +821,7 @@ data DynFlags = DynFlags {
   -- Packages.initPackages
   pkgDatabase           :: Maybe [PackageConfig],
   pkgState              :: PackageState,
+  pkgKeyCache           :: {-# UNPACK #-} !(IORef PackageKeyCache),
 
   -- Temporary files
   -- These have to be IORefs, because the defaultCleanupHandler needs to
@@ -1196,7 +1236,6 @@ data Way
   | WayDebug
   | WayProf
   | WayEventLog
-  | WayPar
   | WayDyn
   deriving (Eq, Ord, Show)
 
@@ -1231,7 +1270,6 @@ wayTag WayDebug    = "debug"
 wayTag WayDyn      = "dyn"
 wayTag WayProf     = "p"
 wayTag WayEventLog = "l"
-wayTag WayPar      = "mp"
 
 wayRTSOnly :: Way -> Bool
 wayRTSOnly (WayCustom {}) = False
@@ -1240,7 +1278,6 @@ wayRTSOnly WayDebug    = True
 wayRTSOnly WayDyn      = False
 wayRTSOnly WayProf     = False
 wayRTSOnly WayEventLog = True
-wayRTSOnly WayPar      = False
 
 wayDesc :: Way -> String
 wayDesc (WayCustom xs) = xs
@@ -1249,7 +1286,6 @@ wayDesc WayDebug    = "Debug"
 wayDesc WayDyn      = "Dynamic"
 wayDesc WayProf     = "Profiling"
 wayDesc WayEventLog = "RTS Event Logging"
-wayDesc WayPar      = "Parallel"
 
 -- Turn these flags on when enabling this way
 wayGeneralFlags :: Platform -> Way -> [GeneralFlag]
@@ -1266,7 +1302,6 @@ wayGeneralFlags _ WayDyn      = [Opt_PIC]
     -- modules of the main program with -fPIC when using -dynamic.
 wayGeneralFlags _ WayProf     = [Opt_SccProfilingOn]
 wayGeneralFlags _ WayEventLog = []
-wayGeneralFlags _ WayPar      = [Opt_Parallel]
 
 -- Turn these flags off when enabling this way
 wayUnsetGeneralFlags :: Platform -> Way -> [GeneralFlag]
@@ -1280,7 +1315,6 @@ wayUnsetGeneralFlags _ WayDyn      = [-- There's no point splitting objects
                                       Opt_SplitObjs]
 wayUnsetGeneralFlags _ WayProf     = []
 wayUnsetGeneralFlags _ WayEventLog = []
-wayUnsetGeneralFlags _ WayPar      = []
 
 wayExtras :: Platform -> Way -> DynFlags -> DynFlags
 wayExtras _ (WayCustom {}) dflags = dflags
@@ -1289,7 +1323,6 @@ wayExtras _ WayDebug    dflags = dflags
 wayExtras _ WayDyn      dflags = dflags
 wayExtras _ WayProf     dflags = dflags
 wayExtras _ WayEventLog dflags = dflags
-wayExtras _ WayPar      dflags = exposePackage' "concurrent" dflags
 
 wayOptc :: Platform -> Way -> [String]
 wayOptc _ (WayCustom {}) = []
@@ -1301,7 +1334,6 @@ wayOptc _ WayDebug      = []
 wayOptc _ WayDyn        = []
 wayOptc _ WayProf       = ["-DPROFILING"]
 wayOptc _ WayEventLog   = ["-DTRACING"]
-wayOptc _ WayPar        = ["-DPAR", "-w"]
 
 wayOptl :: Platform -> Way -> [String]
 wayOptl _ (WayCustom {}) = []
@@ -1319,9 +1351,6 @@ wayOptl _ WayDebug      = []
 wayOptl _ WayDyn        = []
 wayOptl _ WayProf       = []
 wayOptl _ WayEventLog   = []
-wayOptl _ WayPar        = ["-L${PVM_ROOT}/lib/${PVM_ARCH}",
-                           "-lpvm3",
-                           "-lgpvm3"]
 
 wayOptP :: Platform -> Way -> [String]
 wayOptP _ (WayCustom {}) = []
@@ -1330,7 +1359,6 @@ wayOptP _ WayDebug    = []
 wayOptP _ WayDyn      = []
 wayOptP _ WayProf     = ["-DPROFILING"]
 wayOptP _ WayEventLog = ["-DTRACING"]
-wayOptP _ WayPar      = ["-D__PARALLEL_HASKELL__"]
 
 whenGeneratingDynamicToo :: MonadIO m => DynFlags -> m () -> m ()
 whenGeneratingDynamicToo dflags f = ifGeneratingDynamicToo dflags f (return ())
@@ -1446,6 +1474,7 @@ defaultDynFlags mySettings =
         solverIterations        = treatZeroAsInf mAX_SOLVER_ITERATIONS,
 
         thisPackage             = mainPackageKey,
+        thisLibraryName         = LibraryName nilFS,
 
         objectDir               = Nothing,
         dylibInstallName        = Nothing,
@@ -1491,6 +1520,7 @@ defaultDynFlags mySettings =
         pkgDatabase             = Nothing,
         -- This gets filled in with GHC.setSessionDynFlags
         pkgState                = emptyPackageState,
+        pkgKeyCache             = v_unsafePkgKeyCache,
         ways                    = defaultWays mySettings,
         buildTag                = mkBuildTag (defaultWays mySettings),
         rtsBuildTag             = mkBuildTag (defaultWays mySettings),
@@ -1535,7 +1565,7 @@ defaultDynFlags mySettings =
         ufCreationThreshold = 750,
         ufUseThreshold      = 60,
         ufFunAppDiscount    = 60,
-        -- Be fairly keen to inline a fuction if that means
+        -- Be fairly keen to inline a function if that means
         -- we'll be able to pick the right method from a dictionary
         ufDictDiscount      = 30,
         ufKeenessFactor     = 1.5,
@@ -2245,7 +2275,6 @@ dynamic_flags = [
     ------- ways ---------------------------------------------------------------
   , defGhcFlag "prof"           (NoArg (addWay WayProf))
   , defGhcFlag "eventlog"       (NoArg (addWay WayEventLog))
-  , defGhcFlag "parallel"       (NoArg (addWay WayPar))
   , defGhcFlag "smp"
       (NoArg (addWay WayThreaded >> deprecate "Use -threaded instead"))
   , defGhcFlag "debug"          (NoArg (addWay WayDebug))
@@ -2740,6 +2769,7 @@ package_flags = [
                                       upd (setPackageKey name)
                                       deprecate "Use -this-package-key instead")
   , defGhcFlag "this-package-key"   (hasArg setPackageKey)
+  , defGhcFlag "library-name"       (hasArg setLibraryName)
   , defFlag "package-id"            (HasArg exposePackageId)
   , defFlag "package"               (HasArg exposePackage)
   , defFlag "package-key"           (HasArg exposePackageKey)
@@ -2848,6 +2878,7 @@ fWarningFlags = [
   flagSpec' "warn-amp"                        Opt_WarnAMP
     (\_ -> deprecate "it has no effect, and will be removed in GHC 7.12"),
   flagSpec "warn-auto-orphans"                Opt_WarnAutoOrphans,
+  flagSpec "warn-deferred-type-errors"        Opt_WarnDeferredTypeErrors,
   flagSpec "warn-deprecations"                Opt_WarnWarningsDeprecations,
   flagSpec "warn-deprecated-flags"            Opt_WarnDeprecatedFlags,
   flagSpec "warn-deriving-typeable"           Opt_WarnDerivingTypeable,
@@ -2878,7 +2909,8 @@ fWarningFlags = [
   flagSpec "warn-orphans"                     Opt_WarnOrphans,
   flagSpec "warn-overflowed-literals"         Opt_WarnOverflowedLiterals,
   flagSpec "warn-overlapping-patterns"        Opt_WarnOverlappingPatterns,
-  flagSpec "warn-pointless-pragmas"           Opt_WarnPointlessPragmas,
+  flagSpec "warn-missed-specialisations"      Opt_WarnMissedSpecs,
+  flagSpec "warn-all-missed-specialisations"  Opt_WarnAllMissedSpecs,
   flagSpec' "warn-safe"                       Opt_WarnSafe setWarnSafe,
   flagSpec "warn-trustworthy-safe"            Opt_WarnTrustworthySafe,
   flagSpec "warn-tabs"                        Opt_WarnTabs,
@@ -2916,6 +2948,7 @@ dFlags = [
   flagSpec "ppr-ticks"                  Opt_PprShowTicks,
   flagSpec "suppress-coercions"         Opt_SuppressCoercions,
   flagSpec "suppress-idinfo"            Opt_SuppressIdInfo,
+  flagSpec "suppress-unfoldings"        Opt_SuppressUnfoldings,
   flagSpec "suppress-module-prefixes"   Opt_SuppressModulePrefixes,
   flagSpec "suppress-type-applications" Opt_SuppressTypeApplications,
   flagSpec "suppress-type-signatures"   Opt_SuppressTypeSignatures,
@@ -2936,6 +2969,7 @@ fFlags = [
   flagSpec "cmm-elim-common-blocks"           Opt_CmmElimCommonBlocks,
   flagSpec "cmm-sink"                         Opt_CmmSink,
   flagSpec "cse"                              Opt_CSE,
+  flagSpec "cpr-anal"                         Opt_CprAnal,
   flagSpec "defer-type-errors"                Opt_DeferTypeErrors,
   flagSpec "defer-typed-holes"                Opt_DeferTypedHoles,
   flagSpec "dicts-cheap"                      Opt_DictsCheap,
@@ -2980,6 +3014,7 @@ fFlags = [
   flagSpec "print-explicit-foralls"           Opt_PrintExplicitForalls,
   flagSpec "print-explicit-kinds"             Opt_PrintExplicitKinds,
   flagSpec "print-unicode-syntax"             Opt_PrintUnicodeSyntax,
+  flagSpec "print-expanded-synonyms"          Opt_PrintExpandedSynonyms,
   flagSpec "prof-cafs"                        Opt_AutoSccsOnIndividualCafs,
   flagSpec "prof-count-entries"               Opt_ProfCountEntries,
   flagSpec "regs-graph"                       Opt_RegsGraph,
@@ -2991,6 +3026,7 @@ fFlags = [
   flagSpec "spec-constr"                      Opt_SpecConstr,
   flagSpec "specialise"                       Opt_Specialise,
   flagSpec "specialise-aggressively"          Opt_SpecialiseAggressively,
+  flagSpec "cross-module-specialise"          Opt_CrossModuleSpecialise,
   flagSpec "static-argument-transformation"   Opt_StaticArgumentTransformation,
   flagSpec "strictness"                       Opt_Strictness,
   flagSpec "use-rpaths"                       Opt_RPath,
@@ -3177,6 +3213,7 @@ xFlags = [
   flagSpec "ScopedTypeVariables"              Opt_ScopedTypeVariables,
   flagSpec "StandaloneDeriving"               Opt_StandaloneDeriving,
   flagSpec "StaticPointers"                   Opt_StaticPointers,
+  flagSpec "StrictData"                       Opt_StrictData,
   flagSpec' "TemplateHaskell"                 Opt_TemplateHaskell
                                               setTemplateHaskellLoc,
   flagSpec "TraditionalRecordSyntax"          Opt_TraditionalRecordSyntax,
@@ -3218,7 +3255,8 @@ defaultFlags settings
 
     ++ (if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
         then wayGeneralFlags platform WayDyn
-        else [])
+        else [Opt_Static])
+        -- Opt_Static needs to be set if and only if WayDyn is not used (#7478)
 
     where platform = sTargetPlatform settings
 
@@ -3226,6 +3264,12 @@ default_PIC :: Platform -> [GeneralFlag]
 default_PIC platform =
   case (platformOS platform, platformArch platform) of
     (OSDarwin, ArchX86_64) -> [Opt_PIC]
+    (OSOpenBSD, ArchX86_64) -> [Opt_PIC] -- Due to PIE support in
+                                         -- OpenBSD since 5.3 release
+                                         -- (1 May 2013) we need to
+                                         -- always generate PIC. See
+                                         -- #10597 for more
+                                         -- information.
     _                      -> []
 
 impliedGFlags :: [(GeneralFlag, TurnOnFlag, GeneralFlag)]
@@ -3318,8 +3362,10 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_IgnoreAsserts)
     , ([1,2],   Opt_Loopification)
     , ([1,2],   Opt_Specialise)
+    , ([1,2],   Opt_CrossModuleSpecialise)
     , ([1,2],   Opt_Strictness)
     , ([1,2],   Opt_UnboxSmallStrictFields)
+    , ([1,2],   Opt_CprAnal)
 
     , ([2],     Opt_LiberateCase)
     , ([2],     Opt_SpecConstr)
@@ -3345,10 +3391,10 @@ standardWarnings -- see Note [Documenting warning flags]
     = [ Opt_WarnOverlappingPatterns,
         Opt_WarnWarningsDeprecations,
         Opt_WarnDeprecatedFlags,
+        Opt_WarnDeferredTypeErrors,
         Opt_WarnTypedHoles,
         Opt_WarnPartialTypeSignatures,
         Opt_WarnUnrecognisedPragmas,
-        Opt_WarnPointlessPragmas,
         Opt_WarnRedundantConstraints,
         Opt_WarnDuplicateExports,
         Opt_WarnOverflowedLiterals,
@@ -3362,7 +3408,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnAlternativeLayoutRuleTransitional,
         Opt_WarnUnsupportedLlvmVersion,
         Opt_WarnContextQuantification,
-        Opt_WarnTabs
+        Opt_WarnTabs,
+        Opt_WarnMissedSpecs
       ]
 
 minusWOpts :: [WarningFlag]
@@ -3390,7 +3437,8 @@ minusWallOpts
         Opt_WarnOrphans,
         Opt_WarnUnusedDoBind,
         Opt_WarnTrustworthySafe,
-        Opt_WarnUntickedPromotedConstructors
+        Opt_WarnUntickedPromotedConstructors,
+        Opt_WarnAllMissedSpecs
       ]
 
 enableUnusedBinds :: DynP ()
@@ -3724,6 +3772,9 @@ exposePackage' p dflags
 
 setPackageKey :: String -> DynFlags -> DynFlags
 setPackageKey p s =  s{ thisPackage = stringToPackageKey p }
+
+setLibraryName :: String -> DynFlags -> DynFlags
+setLibraryName v s = s{ thisLibraryName = LibraryName (mkFastString v) }
 
 -- -----------------------------------------------------------------------------
 -- | Find the package environment (if one exists)
@@ -4178,6 +4229,8 @@ unsafeGlobalDynFlags = unsafePerformIO $ readIORef v_unsafeGlobalDynFlags
 
 setUnsafeGlobalDynFlags :: DynFlags -> IO ()
 setUnsafeGlobalDynFlags = writeIORef v_unsafeGlobalDynFlags
+
+GLOBAL_VAR(v_unsafePkgKeyCache, emptyUFM, PackageKeyCache)
 
 -- -----------------------------------------------------------------------------
 -- SSE and AVX

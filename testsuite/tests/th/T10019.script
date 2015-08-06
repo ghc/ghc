@@ -1,11 +1,4 @@
 :set -XTemplateHaskell
 import Language.Haskell.TH
 data Option a = Some a | None
-$(reify 'Some >>= litE . integerL . toInteger . length . show)
--- By taking the length we avoid wobbling when the exact uniques
--- chosen by TH change
---
--- This was the original
--- $(reify 'Some >>= stringE . show)
--- which yields
--- "DataConI Ghci1.Some (ForallT [KindedTV a_1627391549 StarT] [] (AppT (AppT ArrowT (VarT a_1627391549)) (AppT (ConT Ghci1.Option) (VarT a_1627391549)))) Ghci1.Option (Fixity 9 InfixL)"
+$(reify 'Some >>= stringE . pprint)

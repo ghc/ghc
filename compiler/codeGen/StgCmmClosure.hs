@@ -514,13 +514,6 @@ getCallMethod dflags _ id _ n_args _cg_loc (Just (self_loop_id, block_id, args))
   -- See Note [Self-recursive tail calls] in StgCmmExpr for more details
   = JumpToIt block_id args
 
-getCallMethod dflags _name _ lf_info _n_args _cg_loc _self_loop_info
-  | nodeMustPointToIt dflags lf_info && gopt Opt_Parallel dflags
-  =     -- If we're parallel, then we must always enter via node.
-        -- The reason is that the closure may have been
-        -- fetched since we allocated it.
-    EnterIt
-
 getCallMethod dflags name id (LFReEntrant _ arity _ _) n_args _cg_loc
               _self_loop_info
   | n_args == 0    = ASSERT( arity /= 0 )
@@ -749,12 +742,11 @@ mkClosureInfo dflags is_static id lf_info tot_wds ptr_wds val_descr
 -- need.  We have a patch for this from Andy Cheadle, but not
 -- incorporated yet. --SDM [6/2004]
 --
---
 -- Previously, eager blackholing was enabled when ticky-ticky
 -- was on. But it didn't work, and it wasn't strictly necessary
 -- to bring back minimal ticky-ticky, so now EAGER_BLACKHOLING
 -- is unconditionally disabled. -- krc 1/2007
-
+--
 -- Static closures are never themselves black-holed.
 
 blackHoleOnEntry :: ClosureInfo -> Bool
@@ -764,10 +756,77 @@ blackHoleOnEntry cl_info
 
   | otherwise
   = case closureLFInfo cl_info of
-        LFReEntrant _ _ _ _          -> False
-        LFLetNoEscape                   -> False
-        LFThunk _ _no_fvs _updatable _ _ -> True
-        _other -> panic "blackHoleOnEntry"      -- Should never happen
+      LFReEntrant _ _ _ _       -> False
+      LFLetNoEscape             -> False
+      LFThunk _ _no_fvs upd _ _ -> upd   -- See Note [Black-holing non-updatable thunks]
+      _other -> panic "blackHoleOnEntry"
+
+{- Note [Black-holing non-updatable thunks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must not black-hole non-updatable (single-entry) thunks otherwise
+we run into issues like Trac #10414. Specifically:
+
+  * There is no reason to black-hole a non-updatable thunk: it should
+    not be competed for by multiple threads
+
+  * It could, conceivably, cause a space leak if we don't black-hole
+    it, if there was a live but never-followed pointer pointing to it.
+    Let's hope that doesn't happen.
+
+  * It is dangerous to black-hole a non-updatable thunk because
+     - is not updated (of course)
+     - hence, if it is black-holed and another thread tries to evalute
+       it, that thread will block forever
+    This actually happened in Trac #10414.  So we do not black-hole
+    non-updatable thunks.
+
+  * How could two threads evaluate the same non-updatable (single-entry)
+    thunk?  See Reid Barton's example below.
+
+  * Only eager blackholing could possibly black-hole a non-updatable
+    thunk, because lazy black-holing only affects thunks with an
+    update frame on the stack.
+
+Here is and example due to Reid Barton (Trac #10414):
+    x = \u []  concat [[1], []]
+with the following definitions,
+
+    concat x = case x of
+        []       -> []
+        (:) x xs -> (++) x (concat xs)
+
+    (++) xs ys = case xs of
+        []         -> ys
+        (:) x rest -> (:) x ((++) rest ys)
+
+Where we use the syntax @\u []@ to denote an updatable thunk and @\s []@ to
+denote a single-entry (i.e. non-updatable) thunk. After a thread evaluates @x@
+to WHNF and calls @(++)@ the heap will contain the following thunks,
+
+    x = 1 : y
+    y = \u []  (++) [] z
+    z = \s []  concat []
+
+Now that the stage is set, consider the follow evaluations by two racing threads
+A and B,
+
+  1. Both threads enter @y@ before either is able to replace it with an
+     indirection
+
+  2. Thread A does the case analysis in @(++)@ and consequently enters @z@,
+     replacing it with a black-hole
+
+  3. At some later point thread B does the same case analysis and also attempts
+     to enter @z@. However, it finds that it has been replaced with a black-hole
+     so it blocks.
+
+  4. Thread A eventually finishes evaluating @z@ (to @[]@) and updates @y@
+     accordingly. It does *not* update @z@, however, as it is single-entry. This
+     leaves Thread B blocked forever on a black-hole which will never be
+     updated.
+
+To avoid this sort of condition we never black-hole non-updatable thunks.
+-}
 
 isStaticClosure :: ClosureInfo -> Bool
 isStaticClosure cl_info = isStaticRep (closureSMRep cl_info)

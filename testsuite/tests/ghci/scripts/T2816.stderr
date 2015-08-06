@@ -1,2 +1,2 @@
 
-<interactive>:2:1: error: Variable not in scope: α
+<interactive>:1:1: error: Variable not in scope: α

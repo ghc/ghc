@@ -44,7 +44,12 @@ module SysTools (
         cleanTempDirs, cleanTempFiles, cleanTempFilesExcept,
         addFilesToClean,
 
-        Option(..)
+        Option(..),
+
+        -- frameworks
+        getPkgFrameworkOpts,
+        getFrameworkOpts
+
 
  ) where
 
@@ -1518,6 +1523,11 @@ linkDynLib dflags0 o_files dep_packages
         -- and last temporary shared object file
     let extra_ld_inputs = ldInputs dflags
 
+    -- frameworks
+    pkg_framework_opts <- getPkgFrameworkOpts dflags platform
+                                              (map packageKey pkgs)
+    let framework_opts = getFrameworkOpts dflags platform
+
     case os of
         OSMinGW32 -> do
             -------------------------------------------------------------
@@ -1603,8 +1613,10 @@ linkDynLib dflags0 o_files dep_packages
                  ++ [ Option "-install_name", Option instName ]
                  ++ map Option lib_path_opts
                  ++ extra_ld_inputs
+                 ++ map Option framework_opts
                  ++ map Option pkg_lib_path_opts
                  ++ map Option pkg_link_opts
+                 ++ map Option pkg_framework_opts
               )
         OSiOS -> throwGhcExceptionIO (ProgramError "dynamic libraries are not supported on iOS target")
         _ -> do
@@ -1633,3 +1645,31 @@ linkDynLib dflags0 o_files dep_packages
                  ++ map Option pkg_lib_path_opts
                  ++ map Option pkg_link_opts
               )
+
+getPkgFrameworkOpts :: DynFlags -> Platform -> [PackageKey] -> IO [String]
+getPkgFrameworkOpts dflags platform dep_packages
+  | platformUsesFrameworks platform = do
+    pkg_framework_path_opts <- do
+        pkg_framework_paths <- getPackageFrameworkPath dflags dep_packages
+        return $ map ("-F" ++) pkg_framework_paths
+
+    pkg_framework_opts <- do
+        pkg_frameworks <- getPackageFrameworks dflags dep_packages
+        return $ concat [ ["-framework", fw] | fw <- pkg_frameworks ]
+
+    return (pkg_framework_path_opts ++ pkg_framework_opts)
+
+  | otherwise = return []
+
+getFrameworkOpts :: DynFlags -> Platform -> [String]
+getFrameworkOpts dflags platform
+  | platformUsesFrameworks platform = framework_path_opts ++ framework_opts
+  | otherwise = []
+  where
+    framework_paths     = frameworkPaths dflags
+    framework_path_opts = map ("-F" ++) framework_paths
+
+    frameworks     = cmdlineFrameworks dflags
+    -- reverse because they're added in reverse order from the cmd line:
+    framework_opts = concat [ ["-framework", fw]
+                            | fw <- reverse frameworks ]

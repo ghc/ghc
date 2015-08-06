@@ -1086,10 +1086,10 @@ flatten_exact_fam_app_fully tc tys
 
         -- Now, look in the cache
        ; mb_ct <- liftTcS $ lookupFlatCache tc xis
-       ; flavour <- getFlavour
+       ; flavour_role <- getFlavourRole
        ; case mb_ct of
            Just (co, rhs_ty, flav)  -- co :: F xis ~ fsk
-             | flav `canDischargeF` flavour
+             | (flav, NomEq) `canDischargeFR` flavour_role
              ->  -- Usable hit in the flat-cache
                  -- We certainly *can* use a Wanted for a Wanted
                 do { traceFlat "flatten/flat-cache hit" $ (ppr tc <+> ppr xis $$ ppr rhs_ty)
@@ -1500,4 +1500,3 @@ unsolved constraints.  The flat form will be
 
 Flatten using the fun-eqs first.
 -}
-

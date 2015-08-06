@@ -36,6 +36,7 @@ module TcRnTypes(
         -- Typechecker types
         TcTypeEnv, TcIdBinderStack, TcIdBinder(..),
         TcTyThing(..), PromotionErr(..),
+        SelfBootInfo(..),
         pprTcTyThingCategory, pprPECategory,
 
         -- Desugaring types
@@ -89,7 +90,7 @@ module TcRnTypes(
 
         CtFlavour(..), ctEvFlavour,
         CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
-        eqCanRewrite, eqCanRewriteFR, canDischarge, canDischargeF,
+        eqCanRewrite, eqCanRewriteFR, canDischarge, canDischargeFR,
 
         -- Pretty printing
         pprEvVarTheta,
@@ -337,8 +338,6 @@ data TcGblEnv
           -- ^ What kind of module (regular Haskell, hs-boot, hsig)
         tcg_sig_of  :: Maybe Module,
           -- ^ Are we being compiled as a signature of an implementation?
-        tcg_mod_name :: Maybe (Located ModuleName),
-          -- ^ @Nothing@: \"module X where\" is omitted
         tcg_impl_rdr_env :: Maybe GlobalRdrEnv,
           -- ^ Environment used only during -sig-of for resolving top level
           -- bindings.  See Note [Signature parameters in TcGblEnv and DynFlags]
@@ -477,6 +476,9 @@ data TcGblEnv
         tcg_hpc       :: AnyHpcUsage,        -- ^ @True@ if any part of the
                                              --  prog uses hpc instrumentation.
 
+        tcg_self_boot :: SelfBootInfo,       -- ^ Whether this module has a
+                                             -- corresponding hi-boot file
+
         tcg_main      :: Maybe Name,         -- ^ The Name of the main
                                              -- function, if this module is
                                              -- the main module.
@@ -559,6 +561,15 @@ data RecFieldEnv
         -- The FieldEnv deals *only* with constructors defined in *this*
         -- module.  For imported modules, we get the same info from the
         -- TypeEnv
+
+data SelfBootInfo
+  = NoSelfBoot    -- No corresponding hi-boot file
+  | SelfBoot
+       { sb_mds :: ModDetails   -- There was a hi-boot file,
+       , sb_tcs :: NameSet      -- defining these TyCons,
+       , sb_ids :: NameSet }    -- and these Ids
+  -- We need this info to compute a safe approximation to
+  -- recursive loops, to avoid infinite inlinings
 
 {-
 Note [Tracking unused binding and imports]
@@ -1903,14 +1914,15 @@ eqCanRewriteFR _                 _                  = False
 
 canDischarge :: CtEvidence -> CtEvidence -> Bool
 -- See Note [canRewriteOrSame]
-canDischarge ev1 ev2 = ctEvFlavour ev1 `canDischargeF` ctEvFlavour ev2
+canDischarge ev1 ev2 = ctEvFlavourRole ev1 `canDischargeFR` ctEvFlavourRole ev2
 
-canDischargeF :: CtFlavour -> CtFlavour -> Bool
-canDischargeF Given  _        = True
-canDischargeF Wanted Wanted   = True
-canDischargeF Wanted Derived  = True
-canDischargeF Derived Derived = True
-canDischargeF _       _       = False
+canDischargeFR :: CtFlavourRole -> CtFlavourRole -> Bool
+canDischargeFR (_, ReprEq)  (_, NomEq)   = False
+canDischargeFR (Given, _)   _            = True
+canDischargeFR (Wanted, _)  (Wanted, _)  = True
+canDischargeFR (Wanted, _)  (Derived, _) = True
+canDischargeFR (Derived, _) (Derived, _) = True
+canDischargeFR _             _           = False
 
 
 {-
@@ -2116,7 +2128,7 @@ pprSkolInfo (InstSC n)        = ptext (sLit "the instance declaration") <> ifPpr
 pprSkolInfo DataSkol          = ptext (sLit "a data type declaration")
 pprSkolInfo FamInstSkol       = ptext (sLit "a family instance declaration")
 pprSkolInfo BracketSkol       = ptext (sLit "a Template Haskell bracket")
-pprSkolInfo (RuleSkol name)   = ptext (sLit "the RULE") <+> doubleQuotes (ftext name)
+pprSkolInfo (RuleSkol name)   = ptext (sLit "the RULE") <+> pprRuleName name
 pprSkolInfo ArrowSkol         = ptext (sLit "an arrow form")
 pprSkolInfo (PatSkol cl mc)   = sep [ pprPatSkolInfo cl
                                     , ptext (sLit "in") <+> pprMatchContext mc ]
@@ -2137,8 +2149,8 @@ pprSigSkolInfo ctxt ty
        _              -> hang (pprUserTypeCtxt ctxt <> colon)
                             2 (ppr ty)
   where
-    pp_sig f = sep [ ptext (sLit "the type signature for:")
-                   , pprPrefixOcc f <+> dcolon <+> ppr ty ]
+    pp_sig f = vcat [ ptext (sLit "the type signature for:")
+                    , nest 2 (pprPrefixOcc f <+> dcolon <+> ppr ty) ]
 
 pprPatSkolInfo :: ConLike -> SDoc
 pprPatSkolInfo (RealDataCon dc)

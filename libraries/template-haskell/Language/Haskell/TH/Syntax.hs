@@ -2,12 +2,8 @@
              DeriveGeneric, FlexibleInstances, DefaultSignatures,
              ScopedTypeVariables, Rank2Types #-}
 
-#if __GLASGOW_HASKELL__ >= 707
 {-# LANGUAGE RoleAnnotations #-}
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
-#else
-{-# OPTIONS_GHC -w #-} -- -fno-warn-inline-rule-shadowing doesn't exist
-#endif
 
 #if MIN_VERSION_base(4,8,0)
 #define HAS_NATURAL
@@ -68,6 +64,7 @@ class (Applicative m, Monad m) => Quasi m where
   qLookupName :: Bool -> String -> m (Maybe Name)
        -- True <=> type namespace, False <=> value namespace
   qReify          :: Name -> m Info
+  qReifyFixity    :: Name -> m Fixity
   qReifyInstances :: Name -> [Type] -> m [Dec]
        -- Is (n tys) an instance?
        -- Returns list of matching instance Decs
@@ -113,6 +110,7 @@ instance Quasi IO where
 
   qLookupName _ _     = badIO "lookupName"
   qReify _            = badIO "reify"
+  qReifyFixity _      = badIO "reifyFixity"
   qReifyInstances _ _ = badIO "reifyInstances"
   qReifyRoles _       = badIO "reifyRoles"
   qReifyAnnotations _ = badIO "reifyAnnotations"
@@ -178,9 +176,7 @@ instance Applicative Q where
 --
 -----------------------------------------------------
 
-#if __GLASGOW_HASKELL__ >= 707
 type role TExp nominal   -- See Note [Role of TExp]
-#endif
 newtype TExp a = TExp { unType :: Exp }
 
 unTypeQ :: Q (TExp a) -> Q Exp
@@ -349,6 +345,12 @@ and to get information about @D@-the-type, use 'lookupTypeName'.
 reify :: Name -> Q Info
 reify v = Q (qReify v)
 
+{- | @reifyFixity nm@ returns the fixity of @nm@. If a fixity value cannot be
+found, 'defaultFixity' is returned.
+-}
+reifyFixity :: Name -> Q Fixity
+reifyFixity nm = Q (qReifyFixity nm)
+
 {- | @reifyInstances nm tys@ returns a list of visible instances of @nm tys@. That is,
 if @nm@ is the name of a type class, then all instances of this class at the types @tys@
 are returned. Alternatively, if @nm@ is the name of a data family or type family,
@@ -433,6 +435,7 @@ instance Quasi Q where
   qReport           = report
   qRecover          = recover
   qReify            = reify
+  qReifyFixity      = reifyFixity
   qReifyInstances   = reifyInstances
   qReifyRoles       = reifyRoles
   qReifyAnnotations = reifyAnnotations
@@ -1055,7 +1058,6 @@ data Info
        Name
        Type
        ParentName
-       Fixity
 
   -- | A \"plain\" type constructor. \"Fancier\" type constructors are returned using 'PrimTyConI' or 'FamilyI' as appropriate
   | TyConI
@@ -1078,7 +1080,6 @@ data Info
        Name
        Type
        ParentName
-       Fixity
 
   {- |
   A \"value\" variable (as opposed to a type variable, see 'TyVarI').
@@ -1094,7 +1095,6 @@ data Info
        Name
        Type
        (Maybe Dec)
-       Fixity
 
   {- |
   A type variable.
@@ -1163,10 +1163,9 @@ But how should we parse @a + b * c@? If we don't know the fixities of
 @+@ and @*@, we don't know whether to parse it as @a + (b * c)@ or @(a
 + b) * c@.
 
-In cases like this, use 'UInfixE' or 'UInfixP', which stand for
-\"unresolved infix expression\" and \"unresolved infix pattern\". When
-the compiler is given a splice containing a tree of @UInfixE@
-applications such as
+In cases like this, use 'UInfixE', 'UInfixP', or 'UInfixT', which stand for
+\"unresolved infix expression/pattern/type\", respectively. When the compiler
+is given a splice containing a tree of @UInfixE@ applications such as
 
 > UInfixE
 >   (UInfixE e1 op1 e2)
@@ -1176,12 +1175,12 @@ applications such as
 it will look up and the fixities of the relevant operators and
 reassociate the tree as necessary.
 
-  * trees will not be reassociated across 'ParensE' or 'ParensP',
+  * trees will not be reassociated across 'ParensE', 'ParensP', or 'ParensT',
     which are of use for parsing expressions like
 
     > (a + b * c) + d * e
 
-  * 'InfixE' and 'InfixP' expressions are never reassociated.
+  * 'InfixE', 'InfixP', and 'InfixT' expressions are never reassociated.
 
   * The 'UInfixE' constructor doesn't support sections. Sections
     such as @(a *)@ have no ambiguity, so 'InfixE' suffices. For longer
@@ -1206,9 +1205,10 @@ reassociate the tree as necessary.
 
     > [| a * b + c |] :: Q Exp
     > [p| a : b : c |] :: Q Pat
+    > [t| T + T |] :: Q Type
 
-    will never contain 'UInfixE', 'UInfixP', 'ParensE', or 'ParensP'
-    constructors.
+    will never contain 'UInfixE', 'UInfixP', 'UInfixT', 'InfixT', 'ParensE',
+    'ParensP', or 'ParensT' constructors.
 
 -}
 
@@ -1230,11 +1230,12 @@ data Lit = CharL Char
          | FloatPrimL Rational
          | DoublePrimL Rational
          | StringPrimL [Word8]  -- ^ A primitive C-style string, type Addr#
+         | CharPrimL Char
     deriving( Show, Eq, Ord, Data, Typeable, Generic )
 
     -- We could add Int, Float, Double etc, as we do in HsLit,
     -- but that could complicate the
-    -- suppposedly-simple TH.Syntax literal type
+    -- supposedly-simple TH.Syntax literal type
 
 -- | Pattern in Haskell given in @{}@
 data Pat
@@ -1467,6 +1468,11 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> -> \<t
           | VarT Name                     -- ^ @a@
           | ConT Name                     -- ^ @T@
           | PromotedT Name                -- ^ @'T@
+          | InfixT Type Name Type         -- ^ @T + T@
+          | UInfixT Type Name Type        -- ^ @T + T@
+                                          --
+                                          -- See "Language.Haskell.TH.Syntax#infix"
+          | ParensT Type                  -- ^ @(T)@
 
           -- See Note [Representing concrete syntax in types]
           | TupleT Int                    -- ^ @(,), (,,), etc.@
@@ -1480,6 +1486,7 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> -> \<t
           | StarT                         -- ^ @*@
           | ConstraintT                   -- ^ @Constraint@
           | LitT TyLit                    -- ^ @0,1,2, etc.@
+          | WildCardT (Maybe Name)        -- ^ @_, _a, etc.@
       deriving( Show, Eq, Ord, Data, Typeable, Generic )
 
 data TyVarBndr = PlainTV  Name            -- ^ @a@

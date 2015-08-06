@@ -1,8 +1,7 @@
 # Args to vtc are: extra compile flags
 
 test('T3103',
-     [only_compiler_types(['ghc']),
-      normal,
+     [
       extra_clean(['Foreign/Ptr.hi', 'Foreign/Ptr.o',
                    'GHC/Base.hi',    'GHC/Base.o',
                    'GHC/Num.hi',     'GHC/Num.o',

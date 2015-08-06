@@ -76,7 +76,7 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
 
        ; let named_taus = (name, pat_ty) : map (\arg -> (getName arg, varType arg)) args
 
-       ; (qtvs, req_dicts, _mr_bites, ev_binds) <- simplifyInfer tclvl False named_taus wanted
+       ; (qtvs, req_dicts, _mr_bites, ev_binds) <- simplifyInfer tclvl False [] named_taus wanted
 
        ; (ex_vars, prov_dicts) <- tcCollectEx lpat'
        ; let univ_tvs   = filter (not . (`elemVarSet` ex_vars)) qtvs
@@ -119,7 +119,7 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
        ; req_dicts <- newEvVars req_theta
 
        -- TODO: find a better SkolInfo
-       ; let skol_info = SigSkol (FunSigCtxt name True) (mkFunTys arg_tys pat_ty)
+       ; let skol_info = SigSkol (PatSynCtxt name) (mkFunTys arg_tys pat_ty)
 
        ; let (arg_names, is_infix) = case details of
                  PrefixPatSyn names      -> (map unLoc names, False)
@@ -372,7 +372,7 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
        ; sig <- instTcTySigFromId builder_id
                 -- See Note [Redundant constraints for builder]
 
-       ; (builder_binds, _) <- tcPolyCheck NonRecursive (const []) sig (noLoc bind)
+       ; (builder_binds, _) <- tcPolyCheck NonRecursive emptyPragEnv sig (noLoc bind)
        ; traceTc "tcPatSynBuilderBind }" $ ppr builder_binds
        ; return builder_binds }
   where

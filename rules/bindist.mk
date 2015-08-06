@@ -11,18 +11,18 @@
 # -----------------------------------------------------------------------------
 
 
-# Add files to the bindist. Invoke like this:
+# Add files to the bindist-list. Invoke like this:
 #
-# $(eval $(call bindist,utils/genapply,ghc.mk))
+# $(eval $(call bindist-list,utils/genapply,ghc.mk))
 
-define bindist
+define bindist-list
 # $1 = name
 # $2 = files
 
-.PHONY: bindist_$1
-bindist: bindist_$1
+.PHONY: bindist-list_$1
+bindist-list: bindist-list_$1
 
-bindist_$1:
+bindist-list_$1:
 	$(foreach i,$2,\
 	    $(call make-command,\
 	        for f in $i; do echo $(BIN_DIST_NAME)/$$$$f >> bindist-list; done \

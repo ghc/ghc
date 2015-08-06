@@ -168,7 +168,7 @@ Only a *class* predicate can give rise to ambiguity
 An *implicit parameter* cannot.  For example:
         foo :: (?x :: [a]) => Int
         foo = length ?x
-is fine.  The call site will suppply a particular 'x'
+is fine.  The call site will supply a particular 'x'
 
 Furthermore, the type variables fixed by an implicit parameter
 propagate to the others.  E.g.
@@ -284,7 +284,7 @@ checkValidType ctxt ty
 
                  ExprSigCtxt    -> rank1
                  TypeAppCtxt    -> rank0
-                 FunSigCtxt _ _ -> rank1
+                 FunSigCtxt {}  -> rank1
                  InfSigCtxt _   -> ArbitraryRank        -- Inferred type
                  ConArgCtxt _   -> rank1 -- We are given the type of the entire
                                          -- constructor, hence rank 1
@@ -742,6 +742,7 @@ okIPCtxt ThBrackCtxt        = True
 okIPCtxt GhciCtxt           = True
 okIPCtxt SigmaCtxt          = True
 okIPCtxt (DataTyCtxt {})    = True
+okIPCtxt (PatSynCtxt {})    = True
 
 okIPCtxt (ClassSCCtxt {})  = False
 okIPCtxt (InstDeclCtxt {}) = False
@@ -1110,7 +1111,7 @@ So we
     consistent with the instance types [p] y Int
 
 We do *not* assume (at this point) the the bound variables of
-the assoicated type instance decl are the same as for the parent
+the associated type instance decl are the same as for the parent
 instance decl. So, for example,
 
   instance C [p] Int

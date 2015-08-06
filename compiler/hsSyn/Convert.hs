@@ -438,10 +438,10 @@ cvt_arg :: (TH.Strict, TH.Type) -> CvtM (LHsType RdrName)
 cvt_arg (NotStrict, ty) = cvtType ty
 cvt_arg (IsStrict,  ty)
   = do { ty' <- cvtType ty
-       ; returnL $ HsBangTy (HsSrcBang Nothing Nothing     True) ty' }
+       ; returnL $ HsBangTy (HsSrcBang Nothing NoSrcUnpack SrcStrict) ty' }
 cvt_arg (Unpacked,  ty)
   = do { ty' <- cvtType ty
-       ; returnL $ HsBangTy (HsSrcBang Nothing (Just True) True) ty' }
+       ; returnL $ HsBangTy (HsSrcBang Nothing SrcUnpack   SrcStrict) ty' }
 
 cvt_id_arg :: (TH.Name, TH.Strict, TH.Type) -> CvtM (LConDeclField RdrName)
 cvt_id_arg (i, str, ty)
@@ -473,16 +473,25 @@ noExistentials = []
 
 cvtForD :: Foreign -> CvtM (ForeignDecl RdrName)
 cvtForD (ImportF callconv safety from nm ty)
+  -- the prim and javascript calling conventions do not support headers
+  -- and are inserted verbatim, analogous to mkImport in RdrHsSyn
+  | callconv == TH.Prim || callconv == TH.JavaScript
+  = mk_imp (CImport (noLoc (cvt_conv callconv)) (noLoc safety') Nothing
+                    (CFunction (StaticTarget from (mkFastString from) Nothing
+                                             True))
+                    (noLoc from))
   | Just impspec <- parseCImport (noLoc (cvt_conv callconv)) (noLoc safety')
                                  (mkFastString (TH.nameBase nm))
                                  from (noLoc from)
-  = do { nm' <- vNameL nm
-       ; ty' <- cvtType ty
-       ; return (ForeignImport nm' ty' noForeignImportCoercionYet impspec)
-       }
+  = mk_imp impspec
   | otherwise
   = failWith $ text (show from) <+> ptext (sLit "is not a valid ccall impent")
   where
+    mk_imp impspec
+      = do { nm' <- vNameL nm
+           ; ty' <- cvtType ty
+           ; return (ForeignImport nm' ty' noForeignImportCoercionYet impspec)
+           }
     safety' = case safety of
                      Unsafe     -> PlayRisky
                      Safe       -> PlaySafe
@@ -738,14 +747,15 @@ We must be quite careful about adding parens:
 
 Note [Converting UInfix]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-When converting @UInfixE@ and @UInfixP@ values, we want to readjust
+When converting @UInfixE@, @UInfixP@, and @UInfixT@ values, we want to readjust
 the trees to reflect the fixities of the underlying operators:
 
   UInfixE x * (UInfixE y + z) ---> (x * y) + z
 
-This is done by the renamer (see @mkOppAppRn@ and @mkConOppPatRn@ in
-RnTypes), which expects that the input will be completely left-biased.
-So we left-bias the trees  of @UInfixP@ and @UInfixE@ that we come across.
+This is done by the renamer (see @mkOppAppRn@, @mkConOppPatRn@, and
+@mkHsOpTyRn@ in RnTypes), which expects that the input will be completely
+right-biased for types and left-biased for everything else. So we left-bias the
+trees of @UInfixP@ and @UInfixE@ and right-bias the trees of @UInfixT@.
 
 Sample input:
 
@@ -764,8 +774,8 @@ Sample output:
     op3
     w
 
-The functions @cvtOpApp@ and @cvtOpAppP@ are responsible for this
-left-biasing.
+The functions @cvtOpApp@, @cvtOpAppP@, and @cvtOpAppT@ are responsible for this
+biasing.
 -}
 
 {- | @cvtOpApp x op y@ converts @op@ and @y@ and produces the operator application @x `op` y@.
@@ -880,6 +890,7 @@ cvtLit (WordPrimL w)   = do { force w; return $ HsWordPrim (show w) w }
 cvtLit (FloatPrimL f)  = do { force f; return $ HsFloatPrim (cvtFractionalLit f) }
 cvtLit (DoublePrimL f) = do { force f; return $ HsDoublePrim (cvtFractionalLit f) }
 cvtLit (CharL c)       = do { force c; return $ HsChar (show c) c }
+cvtLit (CharPrimL c)   = do { force c; return $ HsCharPrim (show c) c }
 cvtLit (StringL s)     = do { let { s' = mkFastString s }
                             ; force s'
                             ; return $ HsString s s' }
@@ -1029,6 +1040,29 @@ cvtTypeKind ty_str ty
            LitT lit
              -> returnL (HsTyLit (cvtTyLit lit))
 
+           WildCardT Nothing
+             -> mk_apps mkAnonWildCardTy tys'
+
+           WildCardT (Just nm)
+             -> do { nm' <- tName nm; mk_apps (mkNamedWildCardTy nm') tys' }
+
+           InfixT t1 s t2
+             -> do { s'  <- tconName s
+                   ; t1' <- cvtType t1
+                   ; t2' <- cvtType t2
+                   ; mk_apps (HsTyVar s') [t1', t2']
+                   }
+
+           UInfixT t1 s t2
+             -> do { t2' <- cvtType t2
+                   ; cvtOpAppT t1 s t2'
+                   } -- Note [Converting UInfix]
+
+           ParensT t
+             -> do { t' <- cvtType t
+                   ; returnL $ HsParTy t'
+                   }
+
            PromotedT nm -> do { nm' <- cName nm; mk_apps (HsTyVar nm') tys' }
                  -- Promoted data constructor; hence cName
 
@@ -1079,6 +1113,21 @@ split_ty_app ty = go ty []
 cvtTyLit :: TH.TyLit -> HsTyLit
 cvtTyLit (NumTyLit i) = HsNumTy (show i) i
 cvtTyLit (StrTyLit s) = HsStrTy s        (fsLit s)
+
+{- | @cvtOpAppT x op y@ converts @op@ and @y@ and produces the operator
+application @x `op` y@. The produced tree of infix types will be right-biased,
+provided @y@ is.
+
+See the @cvtOpApp@ documentation for how this function works.
+-}
+cvtOpAppT :: TH.Type -> TH.Name -> LHsType RdrName -> CvtM (LHsType RdrName)
+cvtOpAppT (UInfixT x op2 y) op1 z
+  = do { l <- cvtOpAppT y op1 z
+       ; cvtOpAppT x op2 l }
+cvtOpAppT x op y
+  = do { op' <- tconNameL op
+       ; x' <- cvtType x
+       ; returnL (mkHsOpTy x' op' y) }
 
 cvtKind :: TH.Kind -> CvtM (LHsKind RdrName)
 cvtKind = cvtTypeKind "kind"

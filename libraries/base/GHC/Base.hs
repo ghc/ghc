@@ -853,9 +853,10 @@ augment g xs = g (:) xs
 -- > map f [x1, x2, ...] == [f x1, f x2, ...]
 
 map :: (a -> b) -> [a] -> [b]
-{-# NOINLINE [1] map #-}    -- We want the RULE to fire first.
-                            -- It's recursive, so won't inline anyway,
-                            -- but saying so is more explicit
+{-# NOINLINE [0] map #-}
+  -- We want the RULEs "map" and "map/coerce" to fire first.
+  -- map is recursive, so won't inline anyway,
+  -- but saying so is more explicit, and silences warnings
 map _ []     = []
 map f (x:xs) = f x : map f xs
 

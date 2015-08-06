@@ -55,9 +55,8 @@ tmp.d
 *.so
 *bindisttest_install___dir_bin_ghc.mk
 *bindisttest_install___dir_bin_ghc.exe.mk
-mk/ghcconfig*_inplace_bin_ghc-stage1.mk
-mk/ghcconfig*_inplace_bin_ghc-stage2.mk
-mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
+mk/ghcconfig*_bin_ghc-*.mk
+mk/ghcconfig*_bin_ghc-*.exe.mk
 *.imports
 
 # -----------------------------------------------------------------------------
@@ -119,6 +118,12 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/cabal/sigcabal01/p_lazy
 /tests/cabal/sigcabal01/p_strict
 /tests/cabal/sigcabal01/containers
+/tests/cabal/sigcabal02/Main
+/tests/cabal/sigcabal02/p_ipid
+/tests/cabal/sigcabal02/q_ipid
+/tests/cabal/sigcabal02/containers
+/tests/cabal/sigcabal02/tmp*
+/tests/cabal/sigcabal02/inst*
 /tests/cabal/local01.package.conf/
 /tests/cabal/local03.package.conf/
 /tests/cabal/local04.package.conf/
@@ -164,6 +169,7 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/codeGen/should_run/SizeOfSmallArray
 /tests/codeGen/should_run/StaticArraySize
 /tests/codeGen/should_run/StaticByteArraySize
+/tests/codeGen/should_run/T10414
 /tests/codeGen/should_run/T10521
 /tests/codeGen/should_run/T10521b
 /tests/codeGen/should_run/T1852
@@ -1215,6 +1221,7 @@ mk/ghcconfig*_inplace_bin_ghc-stage2.exe.mk
 /tests/polykinds/PolyKinds10
 /tests/primops/should_run/T6135
 /tests/primops/should_run/T7689
+/tests/primops/should_run/T10481
 /tests/profiling/should_compile/prof001
 /tests/profiling/should_compile/prof002
 /tests/profiling/should_run/2592

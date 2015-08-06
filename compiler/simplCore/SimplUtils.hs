@@ -14,7 +14,7 @@ module SimplUtils (
         preInlineUnconditionally, postInlineUnconditionally,
         activeUnfolding, activeRule,
         getUnfoldingInRuleMatch,
-        simplEnvForGHCi, updModeForStableUnfoldings,
+        simplEnvForGHCi, updModeForStableUnfoldings, updModeForRuleLHS,
 
         -- The continuation type
         SimplCont(..), DupFlag(..),
@@ -701,7 +701,25 @@ updModeForStableUnfoldings inline_rule_act current_mode
     phaseFromActivation (ActiveAfter n) = Phase n
     phaseFromActivation _               = InitialPhase
 
-{-
+updModeForRuleLHS :: SimplifierMode -> SimplifierMode
+-- See Note [Simplifying rule LHSs]
+updModeForRuleLHS current_mode
+  = current_mode { sm_phase  = InitialPhase
+                 , sm_inline = False
+                 , sm_rules  = False
+                 , sm_eta_expand = False }
+
+{- Note [Simplifying rule LHSs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When simplifying on the LHS of a rule, refrain from all inlining and
+all RULES.  Doing anything to the LHS is plain confusing, because it
+means that what the rule matches is not what the user wrote.
+c.f. Trac #10595, and #10528.
+
+Moreover, inlining (or applying rules) on rule LHSs risks introducing
+Ticks into the LHS, which makes matching trickier. Trac #10665, #10745.
+
+
 Note [Inlining in gentle mode]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Something is inlined if

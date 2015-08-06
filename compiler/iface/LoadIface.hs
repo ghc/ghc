@@ -234,26 +234,61 @@ needWiredInHomeIface _           = False
 ************************************************************************
 -}
 
+-- Note [Un-ambiguous multiple interfaces]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- When a user writes an import statement, this usually causes a *single*
+-- interface file to be loaded.  However, the game is different when
+-- signatures are being imported.  Suppose in packages p and q we have
+-- signatures:
+--
+--  module A where
+--      foo :: Int
+--
+--  module A where
+--      bar :: Int
+--
+-- If both packages are exposed and I am importing A, I should see a
+-- "unified" signature:
+--
+--  module A where
+--      foo :: Int
+--      bar :: Int
+--
+-- The way we achieve this is having the module lookup for A load and return
+-- multiple interface files, which we will then process as if there were
+-- "multiple" imports:
+--
+--  import "p" A
+--  import "q" A
+--
+-- Doing so does not cause any ambiguity, because any overlapping identifiers
+-- are guaranteed to have the same name if the backing implementations of the
+-- two signatures are the same (a condition which is checked by 'Packages'.)
+
+
 -- | Load the interface corresponding to an @import@ directive in
 -- source code.  On a failure, fail in the monad with an error message.
+-- See Note [Un-ambiguous multiple interfaces] for why the return type
+-- is @[ModIface]@
 loadSrcInterface :: SDoc
                  -> ModuleName
                  -> IsBootInterface     -- {-# SOURCE #-} ?
                  -> Maybe FastString    -- "package", if any
-                 -> RnM ModIface
+                 -> RnM [ModIface]
 
 loadSrcInterface doc mod want_boot maybe_pkg
   = do { res <- loadSrcInterface_maybe doc mod want_boot maybe_pkg
        ; case res of
-           Failed err      -> failWithTc err
-           Succeeded iface -> return iface }
+           Failed err       -> failWithTc err
+           Succeeded ifaces -> return ifaces }
 
--- | Like 'loadSrcInterface', but returns a 'MaybeErr'.
+-- | Like 'loadSrcInterface', but returns a 'MaybeErr'.  See also
+-- Note [Un-ambiguous multiple interfaces]
 loadSrcInterface_maybe :: SDoc
                        -> ModuleName
                        -> IsBootInterface     -- {-# SOURCE #-} ?
                        -> Maybe FastString    -- "package", if any
-                       -> RnM (MaybeErr MsgDoc ModIface)
+                       -> RnM (MaybeErr MsgDoc [ModIface])
 
 loadSrcInterface_maybe doc mod want_boot maybe_pkg
   -- We must first find which Module this import refers to.  This involves
@@ -264,7 +299,15 @@ loadSrcInterface_maybe doc mod want_boot maybe_pkg
   = do { hsc_env <- getTopEnv
        ; res <- liftIO $ findImportedModule hsc_env mod maybe_pkg
        ; case res of
-           Found _ mod -> initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
+           FoundModule (FoundHs { fr_mod = mod })
+            -> fmap (fmap (:[]))
+             . initIfaceTcRn
+             $ loadInterface doc mod (ImportByUser want_boot)
+           FoundSigs mods _backing
+            -> initIfaceTcRn $ do
+               ms <- forM mods $ \(FoundHs { fr_mod = mod }) ->
+                          loadInterface doc mod (ImportByUser want_boot)
+               return (sequence ms)
            err         -> return (Failed (cannotFindInterface (hsc_dflags hsc_env) mod err)) }
 
 -- | Load interface directly for a fully qualified 'Module'.  (This is a fairly
@@ -542,20 +585,18 @@ loadDecls :: Bool
           -> [(Fingerprint, IfaceDecl)]
           -> IfL [(Name,TyThing)]
 loadDecls ignore_prags ver_decls
-   = do { mod <- getIfModule
-        ; thingss <- mapM (loadDecl ignore_prags mod) ver_decls
+   = do { thingss <- mapM (loadDecl ignore_prags) ver_decls
         ; return (concat thingss)
         }
 
 loadDecl :: Bool                    -- Don't load pragmas into the decl pool
-         -> Module
           -> (Fingerprint, IfaceDecl)
           -> IfL [(Name,TyThing)]   -- The list can be poked eagerly, but the
                                     -- TyThings are forkM'd thunks
-loadDecl ignore_prags mod (_version, decl)
+loadDecl ignore_prags (_version, decl)
   = do  {       -- Populate the name cache with final versions of all
                 -- the names associated with the decl
-          main_name      <- lookupOrig mod (ifName decl)
+          main_name      <- lookupIfaceTop (ifName decl)
 
         -- Typecheck the thing, lazily
         -- NB. Firstly, the laziness is there in case we never need the
@@ -628,7 +669,7 @@ loadDecl ignore_prags mod (_version, decl)
                            Nothing    ->
                              pprPanic "loadDecl" (ppr main_name <+> ppr n $$ ppr (decl))
 
-        ; implicit_names <- mapM (lookupOrig mod) (ifaceDeclImplicitBndrs decl)
+        ; implicit_names <- mapM lookupIfaceTop (ifaceDeclImplicitBndrs decl)
 
 --         ; traceIf (text "Loading decl for " <> ppr main_name $$ ppr implicit_names)
         ; return $ (main_name, thing) :
@@ -704,7 +745,7 @@ findAndReadIface doc_str mod hi_boot_file
                hsc_env <- getTopEnv
                mb_found <- liftIO (findExactModule hsc_env mod)
                case mb_found of
-                   Found loc mod -> do
+                   FoundExact loc mod -> do
 
                        -- Found file, so read it
                        let file_path = addBootSuffix_maybe hi_boot_file
@@ -721,7 +762,8 @@ findAndReadIface doc_str mod hi_boot_file
                        traceIf (ptext (sLit "...not found"))
                        dflags <- getDynFlags
                        return (Failed (cannotFindInterface dflags
-                                           (moduleName mod) err))
+                                           (moduleName mod)
+                                           (convFindExactResult err)))
     where read_file file_path = do
               traceIf (ptext (sLit "readIFace") <+> text file_path)
               read_result <- readIface mod file_path
@@ -867,7 +909,7 @@ pprModIface :: ModIface -> SDoc
 -- Show a ModIface
 pprModIface iface
  = vcat [ ptext (sLit "interface")
-                <+> ppr (mi_module iface) <+> pp_boot
+                <+> ppr (mi_module iface) <+> pp_hsc_src (mi_hsc_src iface)
                 <+> (if mi_orphan iface then ptext (sLit "[orphan module]") else Outputable.empty)
                 <+> (if mi_finsts iface then ptext (sLit "[family instance module]") else Outputable.empty)
                 <+> (if mi_hpc    iface then ptext (sLit "[hpc]") else Outputable.empty)
@@ -896,8 +938,9 @@ pprModIface iface
         , pprTrustPkg (mi_trust_pkg iface)
         ]
   where
-    pp_boot | mi_boot iface = ptext (sLit "[boot]")
-            | otherwise     = Outputable.empty
+    pp_hsc_src HsBootFile = ptext (sLit "[boot]")
+    pp_hsc_src HsigFile = ptext (sLit "[hsig]")
+    pp_hsc_src HsSrcFile = Outputable.empty
 
 {-
 When printing export lists, we print like this:

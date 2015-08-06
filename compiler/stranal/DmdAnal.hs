@@ -220,8 +220,8 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
         (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
         id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
-        alt_ty3 | io_hack_reqd dc bndrs = deferAfterIO alt_ty2
-                | otherwise             = alt_ty2
+        alt_ty3 | io_hack_reqd scrut dc bndrs = deferAfterIO alt_ty2
+                | otherwise                   = alt_ty2
 
         -- Compute demand on the scrutinee
         -- See Note [Demand on scrutinee of a product case]
@@ -292,29 +292,16 @@ dmdAnal' env dmd (Let (Rec pairs) body)
     body_ty2 `seq`
     (body_ty2,  Let (Rec pairs') body')
 
-io_hack_reqd :: DataCon -> [Var] -> Bool
--- Note [IO hack in the demand analyser]
---
--- There's a hack here for I/O operations.  Consider
---      case foo x s of { (# s, r #) -> y }
--- Is this strict in 'y'.  Normally yes, but what if 'foo' is an I/O
--- operation that simply terminates the program (not in an erroneous way)?
--- In that case we should not evaluate 'y' before the call to 'foo'.
--- Hackish solution: spot the IO-like situation and add a virtual branch,
--- as if we had
---      case foo x s of
---         (# s, r #) -> y
---         other      -> return ()
--- So the 'y' isn't necessarily going to be evaluated
---
--- A more complete example (Trac #148, #1592) where this shows up is:
---      do { let len = <expensive> ;
---         ; when (...) (exitWith ExitSuccess)
---         ; print len }
-io_hack_reqd con bndrs
+io_hack_reqd :: CoreExpr -> DataCon -> [Var] -> Bool
+-- See Note [IO hack in the demand analyser]
+io_hack_reqd scrut con bndrs
   | (bndr:_) <- bndrs
-  = con == unboxedPairDataCon &&
-    idType bndr `eqType` realWorldStatePrimTy
+  , con == unboxedPairDataCon
+  , idType bndr `eqType` realWorldStatePrimTy
+  , (fun, _) <- collectArgs scrut
+  = case fun of
+      Var f -> not (isPrimOpId f)
+      _     -> True
   | otherwise
   = False
 
@@ -350,8 +337,48 @@ dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
         id_dmds       = addCaseBndrDmd case_bndr_dmd dmds
   = (alt_ty, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
 
-{- Note [Demand on the scrutinee of a product case]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+{- Note [IO hack in the demand analyser]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There's a hack here for I/O operations.  Consider
+     case foo x s of { (# s, r #) -> y }
+Is this strict in 'y'?  Normally yes, but what if 'foo' is an I/O
+operation that simply terminates the program (not in an erroneous way)?
+In that case we should not evaluate 'y' before the call to 'foo'.
+Hackish solution: spot the IO-like situation and add a virtual branch,
+as if we had
+     case foo x s of
+        (# s, r #) -> y
+        other      -> return ()
+So the 'y' isn't necessarily going to be evaluated
+
+A more complete example (Trac #148, #1592) where this shows up is:
+     do { let len = <expensive> ;
+        ; when (...) (exitWith ExitSuccess)
+        ; print len }
+
+However, consider
+  f x s = case getMaskingState# s of
+            (# s, r #) ->
+          case x of I# x2 -> ...
+
+Here it is terribly sad to make 'f' lazy in 's'.  After all,
+getMaskingState# is not going to diverge or throw an exception!  This
+situation actually arises in GHC.IO.Handle.Internals.wantReadableHandle
+(on an MVar not an Int), and made a material difference.
+
+So if the scrutinee is a primop call, we *don't* apply the
+state hack:
+  - If is a simple, terminating one like getMaskingState,
+    applying the hack is over-conservative.
+  - If the primop is raise# then it returns bottom, so
+    the case alternatives are already discarded.
+  - If the primop can raise a non-IO exception, like
+    divide by zero or seg-fault (eg writing an array
+    out of bounds) then we don't mind evaluating 'x' first.
+
+Note [Demand on the scrutinee of a product case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When figuring out the demand on the scrutinee of a product case,
 we use the demands of the case alternative, i.e. id_dmds.
 But note that these include the demand on the case binder;
@@ -1053,8 +1080,8 @@ extendEnvForProdAlt env scrut case_bndr dc bndrs
     fam_envs      = ae_fam_envs env
 
     do_con_arg env (id, str)
-       |  ae_virgin env || isStrictDmd (idDemandInfo id)  -- c.f. extendSigsWithLam
-          || (is_var_scrut && isMarkedStrict str)         -- See Note [CPR in a product case alternative]
+       | let is_strict = isStrictDmd (idDemandInfo id) || isMarkedStrict str
+       , ae_virgin env || (is_var_scrut && is_strict)  -- See Note [CPR in a product case alternative]
        , Just (dc,_,_,_) <- deepSplitProductType_maybe fam_envs $ idType id
        = extendAnalEnv NotTopLevel env id (cprProdSig (dataConRepArity dc))
        | otherwise
@@ -1163,15 +1190,18 @@ binders the CPR property.  Specifically
    But then we don't want box it up again when returning it!  We want
    'f2' to have the CPR property, so we give 'x' the CPR property.
 
-   It's a bit delicate because if this case is scrutinising something other
+ * It's a bit delicate because if this case is scrutinising something other
    than an argument the original function, we really don't have the unboxed
    version available.  E.g
       g v = case foo v of
               MkT x y | y>0       -> ...
                       | otherwise -> x
-   Here we don't have the unboxed 'x' available.  Hence the is_var_scrut
-   test when making use of the strictness annoatation.  Slight ad-hoc,
-   but nothing terrible happens if we get it wrong.
+   Here we don't have the unboxed 'x' available.  Hence the
+   is_var_scrut test when making use of the strictness annoatation.
+   Slightly ad-hoc, because even if the scrutinee *is* a variable it
+   might not be a onre of the arguments to the original function, or a
+   sub-component thereof.  But it's simple, and nothing terrible
+   happens if we get it wrong.  e.g. Trac #10694.
 
 Note [Add demands for strict constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1236,14 +1266,14 @@ assuming h is strict:
           C -> x+1
 
 If we notice that 'x' is used strictly, we can give it the CPR
-property; and hence f1 gets the CPR property too.  It's ok to give it
-the CPR property because by the time 'x' is returned (case A above),
-it'll have been evaluated (by the wrapper of 'h' in the example), and
-so the unboxed version will be available.
+property; and hence f1 gets the CPR property too.  It's sound (doesn't
+change strictness) to give it the CPR property because by the time 'x'
+is returned (case A above), it'll have been evaluated (by the wrapper
+of 'h' in the example).
 
 Moreover, if f itself is strict in x, then we'll pass x unboxed to
 f1, and so the boxed version *won't* be available; in that case it's
-more important to give 'x' the CPR property.
+very helpful to give 'x' the CPR property.
 
 Note that
 
@@ -1251,19 +1281,13 @@ Note that
     has product type, else we may get over-optimistic CPR results
     (e.g. from \x -> x!).
 
-  * This works for both lambda and case-alternative binders. For
-    case binders consider
-        g (Left x) = case h x of
-                       A -> x
-                       B -> ...
-                       C -> x+1
-    Since 'h' evaluates x, we'll have it available unboxed even
-    though in this case it won't be passed in unboxed.
+  * See Note [CPR examples]
 
 Note [CPR examples]
 ~~~~~~~~~~~~~~~~~~~~
-Here are some examples, in stranal/should_compile/T10482a.
-The main point: all of these functions can have the CPR property
+Here are some examples (stranal/should_compile/T10482a) of the
+usefulness of Note [CPR in a product case alternative].  The main
+point: all of these functions can have the CPR property.
 
     ------- f1 -----------
     -- x is used strictly by h, so it'll be available

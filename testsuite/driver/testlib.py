@@ -204,21 +204,9 @@ def _extra_ways( name, opts, ways ):
 
 # -----
 
-def omit_compiler_types( compiler_types ):
-   return lambda name, opts, c=compiler_types: _omit_compiler_types(name, opts, c)
-
-def _omit_compiler_types( name, opts, compiler_types ):
-    if config.compiler_type in compiler_types:
-        opts.skip = 1
-
-# -----
-
-def only_compiler_types( compiler_types ):
-   return lambda name, opts, c=compiler_types: _only_compiler_types(name, opts, c)
-
-def _only_compiler_types( name, opts, compiler_types ):
-    if config.compiler_type not in compiler_types:
-        opts.skip = 1
+def only_compiler_types( _compiler_types ):
+   # Don't delete yet. The libraries unix, stm and hpc still call this function.
+   return lambda _name, _opts: None 
 
 # -----
 
@@ -377,24 +365,21 @@ def have_profiling( ):
 def in_tree_compiler( ):
     return config.in_tree_compiler
 
-def compiler_type( compiler ):
-    return config.compiler_type == compiler
-
 def compiler_lt( compiler, version ):
-    return config.compiler_type == compiler and \
-           version_lt(config.compiler_version, version)
+    assert compiler == 'ghc'
+    return version_lt(config.compiler_version, version)
 
 def compiler_le( compiler, version ):
-    return config.compiler_type == compiler and \
-           version_le(config.compiler_version, version)
+    assert compiler == 'ghc'
+    return version_le(config.compiler_version, version)
 
 def compiler_gt( compiler, version ):
-    return config.compiler_type == compiler and \
-           version_gt(config.compiler_version, version)
+    assert compiler == 'ghc'
+    return version_gt(config.compiler_version, version)
 
 def compiler_ge( compiler, version ):
-    return config.compiler_type == compiler and \
-           version_ge(config.compiler_version, version)
+    assert compiler == 'ghc'
+    return version_ge(config.compiler_version, version)
 
 def unregisterised( ):
     return config.unregisterised
@@ -407,14 +392,6 @@ def compiler_debugged( ):
 
 def tag( t ):
     return t in config.compiler_tags
-
-# ---
-
-def namebase( nb ):
-   return lambda opts, nb=nb: _namebase(opts, nb)
-
-def _namebase( opts, nb ):
-    opts.with_namebase = nb
 
 # ---
 
@@ -1049,12 +1026,7 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts, over
     # of whether we expected the compilation to fail or not (successful
     # compilations may generate warnings).
 
-    if getTestOpts().with_namebase == None:
-        namebase = name
-    else:
-        namebase = getTestOpts().with_namebase
-
-    (platform_specific, expected_stderr_file) = platform_wordsize_qualify(namebase, 'stderr')
+    (platform_specific, expected_stderr_file) = platform_wordsize_qualify(name, 'stderr')
     actual_stderr_file = qualify(name, 'comp.stderr')
 
     if not compare_outputs(way, 'stderr',
@@ -1079,12 +1051,7 @@ def compile_cmp_asm( name, way, extra_hc_opts ):
     # of whether we expected the compilation to fail or not (successful
     # compilations may generate warnings).
 
-    if getTestOpts().with_namebase == None:
-        namebase = name
-    else:
-        namebase = getTestOpts().with_namebase
-
-    (platform_specific, expected_asm_file) = platform_wordsize_qualify(namebase, 'asm')
+    (platform_specific, expected_asm_file) = platform_wordsize_qualify(name, 'asm')
     actual_asm_file = qualify(name, 's')
 
     if not compare_outputs(way, 'asm',
@@ -1293,7 +1260,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
 # from /dev/null.  Route output to testname.run.stdout and
 # testname.run.stderr.  Returns the exit code of the run.
 
-def simple_run( name, way, prog, args ):
+def simple_run(name, way, prog, extra_run_opts):
     opts = getTestOpts()
 
     # figure out what to use for stdin
@@ -1319,7 +1286,9 @@ def simple_run( name, way, prog, args ):
 
     stats_file = name + '.stats'
     if len(opts.stats_range_fields) > 0:
-        args += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
+        stats_args = ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
+    else:
+        stats_args = ''
 
     if opts.no_stdin:
         stdin_comes_from = ''
@@ -1333,8 +1302,10 @@ def simple_run( name, way, prog, args ):
         redirection        = ' > {0} 2> {1}'.format(run_stdout, run_stderr)
         redirection_append = ' >> {0} 2>> {1}'.format(run_stdout, run_stderr)
 
-    cmd = prog + ' ' + args + ' '  \
+    # Put extra_run_opts last: extra_run_opts('+RTS foo') should work.
+    cmd = prog + stats_args + ' '  \
         + my_rts_flags + ' '       \
+        + extra_run_opts + ' '     \
         + stdin_comes_from         \
         + redirection
 
@@ -1526,13 +1497,8 @@ def get_compiler_flags(override_flags, noforce):
     return flags
 
 def check_stdout_ok(name, way):
-   if getTestOpts().with_namebase == None:
-       namebase = name
-   else:
-       namebase = getTestOpts().with_namebase
-
    actual_stdout_file   = qualify(name, 'run.stdout')
-   (platform_specific, expected_stdout_file) = platform_wordsize_qualify(namebase, 'stdout')
+   (platform_specific, expected_stdout_file) = platform_wordsize_qualify(name, 'stdout')
 
    def norm(str):
       if platform_specific:
@@ -1554,13 +1520,8 @@ def dump_stdout( name ):
    print(read_no_crs(qualify(name, 'run.stdout')))
 
 def check_stderr_ok(name, way):
-   if getTestOpts().with_namebase == None:
-       namebase = name
-   else:
-       namebase = getTestOpts().with_namebase
-
    actual_stderr_file   = qualify(name, 'run.stderr')
-   (platform_specific, expected_stderr_file) = platform_wordsize_qualify(namebase, 'stderr')
+   (platform_specific, expected_stderr_file) = platform_wordsize_qualify(name, 'stderr')
 
    def norm(str):
       if platform_specific:
@@ -1630,13 +1591,8 @@ def check_prof_ok(name, way):
         print(prof_file + " is empty")
         return(False)
 
-    if getTestOpts().with_namebase == None:
-        namebase = name
-    else:
-        namebase = getTestOpts().with_namebase
-
     (platform_specific, expected_prof_file) = \
-        platform_wordsize_qualify(namebase, 'prof.sample')
+        platform_wordsize_qualify(name, 'prof.sample')
 
     # sample prof file is not required
     if not os.path.exists(expected_prof_file):
@@ -2148,23 +2104,21 @@ def qualify( name, suff ):
 
 # Finding the sample output.  The filename is of the form
 #
-#   <test>.stdout[-<compiler>][-<version>][-ws-<wordsize>][-<platform>]
+#   <test>.stdout[-ws-<wordsize>][-<platform>]
 #
 # and we pick the most specific version available.  The <version> is
 # the major version of the compiler (e.g. 6.8.2 would be "6.8").  For
-# more fine-grained control use if_compiler_lt().
+# more fine-grained control use compiler_lt().
 #
 def platform_wordsize_qualify( name, suff ):
 
     basepath = qualify(name, suff)
 
-    paths = [(platformSpecific, basepath + comp + vers + ws + plat)
+    paths = [(platformSpecific, basepath + ws + plat)
              for (platformSpecific, plat) in [(1, '-' + config.platform),
                                               (1, '-' + config.os),
                                               (0, '')]
-             for ws   in ['-ws-' + config.wordsize, '']
-             for comp in ['-' + config.compiler_type, '']
-             for vers in ['-' + config.compiler_maj_version, '']]
+             for ws in ['-ws-' + config.wordsize, '']]
 
     dir = glob.glob(basepath + '*')
     dir = [normalise_slashes_(d) for d in dir]

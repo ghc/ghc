@@ -78,6 +78,7 @@ REALGOALS=$(filter-out \
     distclean \
     maintainer-clean \
     show \
+    show! \
     echo \
     help \
     test \
@@ -119,7 +120,7 @@ ifeq "$(mingw32_TARGET_OS)" "1"
 	$(MAKE) --no-print-directory -f ghc.mk windows-binary-dist-prep
 else
 	rm -f bindist-list
-	$(MAKE) --no-print-directory -f ghc.mk bindist BINDIST=YES
+	$(MAKE) --no-print-directory -f ghc.mk bindist-list BINDIST=YES
 	$(MAKE) --no-print-directory -f ghc.mk unix-binary-dist-prep
 endif
 
@@ -141,6 +142,10 @@ $(filter clean_%, $(MAKECMDGOALS)) : clean_% :
 .PHONY: bootstrapping-files show echo
 bootstrapping-files show echo:
 	$(MAKE) --no-print-directory -f ghc.mk $@
+
+.PHONY: show!
+show!:
+	$(MAKE) --no-print-directory -f ghc.mk show NO_INCLUDE_PKGDATA=YES
 
 ifeq "$(darwin_TARGET_OS)" "1"
 .PHONY: framework-pkg

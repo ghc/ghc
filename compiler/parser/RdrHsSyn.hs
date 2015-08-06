@@ -35,7 +35,6 @@ module RdrHsSyn (
         mkExtName,           -- RdrName -> CLabelString
         mkGadtDecl,          -- [Located RdrName] -> LHsType RdrName -> ConDecl RdrName
         mkSimpleConDecl,
-        mkDeprecatedGadtRecordDecl,
         mkATDefault,
 
         -- Bunch of functions in the parser monad for
@@ -52,6 +51,7 @@ module RdrHsSyn (
         checkDoAndIfThenElse,
         checkRecordSyntax,
         parseErrorSDoc,
+        splitTilde,
 
         -- Help with processing exports
         ImpExpSubSpec(..),
@@ -467,25 +467,6 @@ mkPatSynMatchGroup (L _ patsyn_name) (L _ decls) =
         parseErrorSDoc loc $
         text "pattern synonym 'where' clause must bind the pattern synonym's name" <+>
         quotes (ppr patsyn_name) $$ ppr decl
-
-mkDeprecatedGadtRecordDecl :: SrcSpan
-                           -> Located RdrName
-                           -> Located [LConDeclField RdrName]
-                           -> LHsType RdrName
-                           ->  P (LConDecl  RdrName)
--- This one uses the deprecated syntax
---    C { x,y ::Int } :: T a b
--- We give it a RecCon details right away
-mkDeprecatedGadtRecordDecl loc (L con_loc con) flds res_ty
-  = do { data_con <- tyConToDataCon con_loc con
-       ; return (L loc (ConDecl { con_old_rec  = True
-                                , con_names    = [data_con]
-                                , con_explicit = Implicit
-                                , con_qvars    = mkHsQTvs []
-                                , con_cxt      = noLoc []
-                                , con_details  = RecCon flds
-                                , con_res      = ResTyGADT loc res_ty
-                                , con_doc      = Nothing })) }
 
 mkSimpleConDecl :: Located RdrName -> [LHsTyVarBndr RdrName]
                 -> LHsContext RdrName -> HsConDeclDetails RdrName
@@ -997,9 +978,10 @@ checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
         -- not be any OpApps inside the e's
 splitBang :: LHsExpr RdrName -> Maybe (LHsExpr RdrName, [LHsExpr RdrName])
 -- Splits (f ! g a b) into (f, [(! g), a, b])
-splitBang (L loc (OpApp l_arg bang@(L _ (HsVar op)) _ r_arg))
-  | op == bang_RDR = Just (l_arg, L loc (SectionR bang arg1) : argns)
+splitBang (L _ (OpApp l_arg bang@(L _ (HsVar op)) _ r_arg))
+  | op == bang_RDR = Just (l_arg, L l' (SectionR bang arg1) : argns)
   where
+    l' = combineLocs bang arg1
     (arg1,argns) = split_bang r_arg []
     split_bang (L _ (HsApp f e)) es = split_bang f (e:es)
     split_bang e                 es = (e,es)
@@ -1057,6 +1039,21 @@ isFunLhs e = go e [] []
                  _ -> return Nothing }
    go _ _ _ = return Nothing
 
+
+-- | Transform btype with strict_mark's into HsEqTy's
+-- (((~a) ~b) c) ~d ==> ((~a) ~ (b c)) ~ d
+splitTilde :: LHsType RdrName -> LHsType RdrName
+splitTilde t = go t
+  where go (L loc (HsAppTy t1 t2))
+          | L _ (HsBangTy (HsSrcBang Nothing NoSrcUnpack SrcLazy) t2') <- t2
+          = L loc (HsEqTy (go t1) t2')
+          | otherwise
+          = case go t1 of
+              (L _ (HsEqTy tl tr)) ->
+                L loc (HsEqTy tl (L (combineLocs tr t2) (HsAppTy tr t2)))
+              t -> L loc (HsAppTy t t2)
+
+        go t = t
 
 ---------------------------------------------------------------------------
 -- Check for monad comprehensions
@@ -1209,9 +1206,9 @@ mkInlinePragma src (inl, match_info) mb_act
 --
 mkImport :: Located CCallConv
          -> Located Safety
-         -> (Located (SourceText,FastString), Located RdrName, LHsType RdrName)
+         -> (Located StringLiteral, Located RdrName, LHsType RdrName)
          -> P (HsDecl RdrName)
-mkImport (L lc cconv) (L ls safety) (L loc (esrc,entity), v, ty)
+mkImport (L lc cconv) (L ls safety) (L loc (StringLiteral esrc entity), v, ty)
   | cconv == PrimCallConv                      = do
   let funcTarget = CFunction (StaticTarget esrc entity Nothing True)
       importSpec = CImport (L lc PrimCallConv) (L ls safety) Nothing funcTarget
@@ -1288,9 +1285,9 @@ parseCImport cconv safety nm str sourceText =
 -- construct a foreign export declaration
 --
 mkExport :: Located CCallConv
-         -> (Located (SourceText,FastString), Located RdrName, LHsType RdrName)
+         -> (Located StringLiteral, Located RdrName, LHsType RdrName)
          -> P (HsDecl RdrName)
-mkExport (L lc cconv) (L le (esrc,entity), v, ty) = do
+mkExport (L lc cconv) (L le (StringLiteral esrc entity), v, ty) = do
   return $ ForD (ForeignExport v ty noForeignExportCoercionYet
                  (CExport (L lc (CExportStatic esrc entity' cconv))
                           (L le (unpackFS entity))))

@@ -1919,21 +1919,49 @@ primop  CasMutVarOp "casMutVar#" GenPrimOp
 section "Exceptions"
 ------------------------------------------------------------------------
 
+{- Note [Strictness for mask/unmask/catch]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this example, which comes from GHC.IO.Handle.Internals:
+   wantReadableHandle3 f ma b st
+     = case ... of
+         DEFAULT -> case ma of MVar a -> ...
+         0#      -> maskAsynchExceptions# (\st -> case ma of MVar a -> ...)
+The outer case just decides whether to mask exceptions, but we don't want
+thereby to hide the strictness in 'ma'!  Hence the use of strictApply1Dmd.
+
+For catch, we know that the first branch will be evaluated, but not
+necessarily the second.  Hence strictApply1Dmd and lazyApply1Dmd
+
+Howver, consider
+    catch# (\st -> case x of ...) (..handler..) st
+We'll see that the entire thing is strict in 'x', so 'x' may be evaluated
+before the catch#.  So fi evaluting 'x' causes a divide-by-zero exception,
+it won't be caught.  This seems acceptable:
+  - x might be evaluated somewhere else outside the catch# anyway
+  - It's an imprecise eception anyway.  Synchronous exceptions (in the
+    IO monad) will never move in this way.
+There was originally a comment
+  "Catch is actually strict in its first argument
+   but we don't want to tell the strictness
+   analyser about that, so that exceptions stay inside it."
+but tracing it back through the commit logs did not give any
+rationale.  And making catch# lazy has performance costs for everyone.
+-}
+
 primop  CatchOp "catch#" GenPrimOp
           (State# RealWorld -> (# State# RealWorld, a #) )
        -> (b -> State# RealWorld -> (# State# RealWorld, a #) )
        -> State# RealWorld
        -> (# State# RealWorld, a #)
    with
-        -- Catch is actually strict in its first argument
-        -- but we don't want to tell the strictness
-        -- analyser about that, so that exceptions stay inside it.
-   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,apply2Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,lazyApply2Dmd,topDmd] topRes }
+                 -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
 
 primop  RaiseOp "raise#" GenPrimOp
-   a -> b
+   b -> o
+      -- NB: the type variable "o" is "a", but with OpenKind
    with
    strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
       -- NB: result is bottom
@@ -1965,7 +1993,8 @@ primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topRes }
+                 -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
 
@@ -1973,7 +2002,7 @@ primop  MaskUninterruptibleOp "maskUninterruptible#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topRes }
    out_of_line = True
    has_side_effects = True
 
@@ -1981,7 +2010,8 @@ primop  UnmaskAsyncExceptionsOp "unmaskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topRes }
+                 -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
 
@@ -2001,7 +2031,8 @@ primop  AtomicallyOp "atomically#" GenPrimOp
       (State# RealWorld -> (# State# RealWorld, a #) )
    -> State# RealWorld -> (# State# RealWorld, a #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topRes }
+                 -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
 
@@ -2027,7 +2058,8 @@ primop  CatchRetryOp "catchRetry#" GenPrimOp
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,apply1Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,lazyApply1Dmd,topDmd] topRes }
+                 -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
 
@@ -2036,7 +2068,8 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
    -> (b -> State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [apply1Dmd,apply2Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,lazyApply2Dmd,topDmd] topRes }
+                 -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
 
@@ -2439,25 +2472,35 @@ primop  TagToEnumOp "tagToEnum#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Bytecode operations"
-        {Support for the bytecode interpreter and linker.}
+        {Support for manipulating bytecode objects used by the interpreter and
+        linker.
+
+        Bytecode objects are heap objects which represent top-level bindings and
+        contain a list of instructions and data needed by these instructions.}
 ------------------------------------------------------------------------
 
 primtype BCO#
-   {Primitive bytecode type.}
+   { Primitive bytecode type. }
 
 primop   AddrToAnyOp "addrToAny#" GenPrimOp
    Addr# -> (# a #)
-   {Convert an {\tt Addr\#} to a followable Any type.}
+   { Convert an {\tt Addr\#} to a followable Any type. }
    with
    code_size = 0
 
 primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
    BCO# -> (# a #)
+   { Wrap a BCO in a {\tt AP_UPD} thunk which will be updated with the value of
+     the BCO when evaluated. }
    with
    out_of_line = True
 
 primop  NewBCOOp "newBCO#" GenPrimOp
    ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# s -> (# State# s, BCO# #)
+   { {\tt newBCO\# instrs lits ptrs arity bitmap} creates a new bytecode object. The
+     resulting object encodes a function of the given arity with the instructions
+     encoded in {\tt instrs}, and a static reference table usage bitmap given by
+     {\tt bitmap}. }
    with
    has_side_effects = True
    out_of_line      = True

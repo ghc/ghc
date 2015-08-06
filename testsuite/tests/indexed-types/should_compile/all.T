@@ -1,4 +1,3 @@
-setTestOpts(only_compiler_types(['ghc']))
 # Keep optimised tests, so we test coercion optimisation
 setTestOpts(omit_ways(['optasm', 'optllvm', 'hpc']))
 
@@ -37,7 +36,7 @@ test('ind2',
      ['ind2', '-v0'])
 test('impexp',
      extra_clean(['Exp.hi', 'Exp.o', 'Imp.hi', 'Imp.o']),
-     multimod_compile, 
+     multimod_compile,
      ['Imp', '-w -no-hs-main -c'])
 
 test('ATLoop',
@@ -260,4 +259,5 @@ test('T10139', normal, compile, [''])
 test('T10340', normal, compile, [''])
 test('T10226', normal, compile, [''])
 test('T10507', normal, compile, [''])
-
+test('T10634', normal, compile, [''])
+test('T10713', normal, compile, [''])

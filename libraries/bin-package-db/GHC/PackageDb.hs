@@ -283,32 +283,17 @@ decodeFromFile file decoder =
               `ioeSetErrorString` msg
         loc = "GHC.PackageDb.readPackageDb"
 
+-- Copied from Cabal's Distribution.Simple.Utils.
 writeFileAtomic :: FilePath -> BS.Lazy.ByteString -> IO ()
 writeFileAtomic targetPath content = do
-  let (targetDir, targetName) = splitFileName targetPath
+  let (targetDir, targetFile) = splitFileName targetPath
   Exception.bracketOnError
-    (openBinaryTempFileWithDefaultPermissions targetDir $ targetName <.> "tmp")
-    (\(tmpPath, hnd) -> hClose hnd >> removeFile tmpPath)
-    (\(tmpPath, hnd) -> do
-        BS.Lazy.hPut hnd content
-        hClose hnd
-#if mingw32_HOST_OS || mingw32_TARGET_OS
-        renameFile tmpPath targetPath
-          -- If the targetPath exists then renameFile will fail
-          `catch` \err -> do
-            exists <- doesFileExist targetPath
-            if exists
-              then do removeFile targetPath
-                      -- Big fat hairy race condition
-                      renameFile tmpPath targetPath
-                      -- If the removeFile succeeds and the renameFile fails
-                      -- then we've lost the atomic property.
-              else throwIO (err :: IOException)
-#else
-        renameFile tmpPath targetPath
-#endif
-        )
-
+    (openBinaryTempFileWithDefaultPermissions targetDir $ targetFile <.> "tmp")
+    (\(tmpPath, handle) -> hClose handle >> removeFile tmpPath)
+    (\(tmpPath, handle) -> do
+        BS.Lazy.hPut handle content
+        hClose handle
+        renameFile tmpPath targetPath)
 
 instance (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
           BinaryStringRep d, BinaryStringRep e) =>

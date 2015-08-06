@@ -17,7 +17,11 @@ test('T3586',
       stats_num_field('bytes allocated', (16102024, 5)),
                         # prev:           16835544 (amd64/Linux)
                         # 2014-07-17:     16102024 (amd64/Linux), general round of updates
-      only_ways(['normal'])
+      only_ways(['normal']),
+
+      # Use `+RTS -G1` for more stable residency measurements. Note [residency].
+      # Only 64-bit as we don't have a good 32-bit test environment at the moment
+      when(wordsize(64), extra_hc_opts('+RTS -G1 -RTS'))
       ],
      compile_and_run,
      ['-O'])
@@ -61,9 +65,13 @@ test('lazy-bs-alloc',
             # 2014-01-28: Widen 1->2% (x86/Windows was at 425212)
       only_ways(['normal']),
       extra_run_opts('../../numeric/should_run/arith011.stdout'),
-      ignore_output
+      ignore_output,
+
+      # Use `+RTS -G1` for more stable residency measurements. Note [residency].
+      # Only 64-bit as we don't have a good 32-bit test environment at the moment
+      when(wordsize(64), extra_hc_opts('+RTS -G1 -RTS'))
       ],
-      # use a suitably big file, without bloating the repo with a new one:
+     # use a suitably big file, without bloating the repo with a new one:
      compile_and_run,
      ['-O'])
 
@@ -75,11 +83,12 @@ test('T876',
               # 2013-02-14: 1263712 (x86_64/Linux)
               # 2014-02-10:   63216 (x86_64/Linux), call arity analysis
 
-           (wordsize(32), 56796, 5) ]),
+           (wordsize(32), 53156, 5) ]),
               # some date:  663712  (Windows, 64-bit machine)
               # 2014-04-04:  56820  (Windows, 64-bit machine)
               # 2014-06-29:  53024  (x86_64/Linux)
               # 2014-12-01:  56796  (Windows)
+              # 2015-07-11:  53156  (x86_64/Linux)
 
       only_ways(['normal']),
       extra_run_opts('10000')

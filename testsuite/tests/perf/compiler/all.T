@@ -29,14 +29,15 @@ setTestOpts(no_lint)
 
 test('T1969',
      [compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
-          [(wordsize(32), 17, 15),
+          [(wordsize(32), 21, 15),
              # 2010-05-17 14 (x86/Windows)
              #            15 (x86/OS X)
              #            19 (x86/OS X)
              # 2013-02-10 13 (x86/Windows)
              # 2013-02-10 14 (x86/OSX)
              # 2013-11-13 17 (x86/Windows, 64bit machine)
-           (wordsize(64), 30, 20)]),
+             # 2015-07-11 21 (x86/Linux, 64bit machine) use +RTS -G1
+           (wordsize(64), 41, 20)]),
              #            28 (amd64/Linux)
              #            34 (amd64/Linux)
              # 2012-09-20 23 (amd64/Linux)
@@ -46,6 +47,7 @@ test('T1969',
              # 2014-09-10 29 (amd64/Linux) post-AMP-cleanup
              # 2013-09-11 30, 10 (amd64/Linux)
              # 2013-09-11 30, 15 (adapt to Phab CI)
+             # 2015-06-03 41, (amd64/Linux) use +RTS -G1
       compiler_stats_num_field('max_bytes_used',
           [(platform('i386-unknown-mingw32'), 5719436, 20),
                                  # 2010-05-17 5717704 (x86/Windows)
@@ -53,12 +55,13 @@ test('T1969',
                                  # 2013-02-10 5030080 (x86/Windows)
                                  # 2013-11-13 7295012 (x86/Windows, 64bit machine)
                                  # 2014-04-24 5719436 (x86/Windows, 64bit machine)
-           (wordsize(32), 5949188, 1),
+           (wordsize(32), 6241108, 1),
              #            6707308 (x86/OS X)
              # 2009-12-31 6149572 (x86/Linux)
              # 2014-01-22 6429864 (x86/Linux)
              # 2014-06-29 5949188 (x86/Linux)
-           (wordsize(64), 10000000, 15)]),
+             # 2015-07-11 6241108 (x86/Linux, 64bit machine) use +RTS -G1
+           (wordsize(64), 11000000, 15)]),
              # 2014-09-10 10463640, 10  # post-AMP-update (somewhat stabelish)
                # looks like the peak is around ~10M, but we're
                # unlikely to GC exactly on the peak.
@@ -67,6 +70,7 @@ test('T1969',
                # See Note [residency] to get an accurate view.
              # 2014-09-14  9684256, 10 # try to lower it a bit more to match Phab's CI
              # 2014-11-03 10584344,    # ghcspeed reports higher numbers consistently
+             # 2015-07-11 11670120 (amd64/Linux)
       compiler_stats_num_field('bytes allocated',
           [(platform('i386-unknown-mingw32'), 301784492, 5),
                                  #            215582916 (x86/Windows)
@@ -74,14 +78,15 @@ test('T1969',
                                  # 2013-02-10 310633884 (x86/Windows)
                                  # 2013-11-13 317975916 (x86/Windows, 64bit machine)
                                  # 2014-04-04 301784492 (x86/Windows, 64bit machine)
-           (wordsize(32), 303300692, 1),
+           (wordsize(32), 288699104, 1),
              #            221667908 (x86/OS X)
              #            274932264 (x86/Linux)
              # 2012-10-08 303930948 (x86/Linux, new codegen)
              # 2013-02-10 322937684 (x86/OSX)
              # 2014-01-22 316103268 (x86/Linux)
              # 2014-06-29 303300692 (x86/Linux)
-           (wordsize(64), 630299456, 5)]),
+             # 2015-07-11 288699104 (x86/Linux, 64-bit machine) use +RTS -G1
+           (wordsize(64), 581460896, 5)]),
              # 17/11/2009 434845560 (amd64/Linux)
              # 08/12/2009 459776680 (amd64/Linux)
              # 17/05/2010 519377728 (amd64/Linux)
@@ -99,11 +104,15 @@ test('T1969',
              # 10/02/2014 660922376 (x86_64/Linux) call arity analysis
              # 17/07/2014 651626680 (x86_64/Linux) roundabout update
              # 10/09/2014 630299456 (x86_64/Linux) post-AMP-cleanup
+             # 03/06/2015 581460896 (x86_64/Linux) use +RTS -G1
       only_ways(['normal']),
 
-      extra_hc_opts('-dcore-lint -static')
+      extra_hc_opts('-dcore-lint -static'),
           # Leave -dcore-lint on for this one test, so that we have something
           # that will catch a regression in -dcore-lint performance.
+
+      # Use `+RTS -G1` for more stable residency measurements. Note [residency].
+      extra_hc_opts('+RTS -G1 -RTS')
       ],
      compile,
      [''])
@@ -123,7 +132,7 @@ else:
 test('T3294',
      [
       compiler_stats_num_field('max_bytes_used', # Note [residency]
-          [(wordsize(32), 26525384, 15),
+          [(wordsize(32), 43196344, 15),
              #            17725476 (x86/OS X)
              #            14593500 (Windows)
              # 2013-02-10 20651576 (x86/Windows)
@@ -131,6 +140,7 @@ test('T3294',
              # 2013-11-13 24009436 (x86/Windows, 64bit machine)
              # 2014-04-24 19882188 (x86/Windows, 64bit machine)
              # 2014-12-22 26525384 (x86/Windows) Increase due to silent superclasses?
+             # 2015-07-11 43196344 (x86/Linux, 64-bit machine) use +RTS -G1
 
            (wordsize(64), 45000000, 20)]),
              # prev:           25753192 (amd64/Linux)
@@ -166,7 +176,10 @@ test('T3294',
             # 12/03/2014: 2705289664 (amd64/Linux) (more call arity improvements)
             # 2014-17-07: 2671595512 (amd64/Linux) (round-about update)
             # 2014-09-10: 2709595808 (amd64/Linux) post-AMP cleanup
-      conf_3294
+      conf_3294,
+
+      # Use `+RTS -G1` for more stable residency measurements. Note [residency].
+      extra_hc_opts('+RTS -G1 -RTS')
       ],
      compile,
      [''])
@@ -234,20 +247,23 @@ test('T4801',
 #               # 10/09/2014: 19296544, 10 (post-AMP-cleanup)
 #               # 14/09/2014: 19585456, 15 (adapt to Phab CI env)
        only_ways(['normal']),
-       extra_hc_opts('-static')
-      ],
+       extra_hc_opts('-static'),
+
+       # Use `+RTS -G1` for more stable residency measurements. Note [residency].
+       extra_hc_opts('+RTS -G1 -RTS')
+       ],
      compile,
      [''])
 
 test('T3064',
-     [# expect_broken( 3064 ),
-      compiler_stats_num_field('peak_megabytes_allocated',# Note [residency]
-          [(wordsize(32), 16, 20),
+     [compiler_stats_num_field('peak_megabytes_allocated',# Note [residency]
+          [(wordsize(32), 28, 20),
             # expected value: 14 (x86/Linux 28-06-2012):
             # 2013-11-13:     18 (x86/Windows, 64bit machine)
             # 2014-01-22:     23 (x86/Linux)
             # 2014-12-22:     23 (x86/Linux) death to silent superclasses
-           (wordsize(64), 32, 20)]),
+            # 2015-07-11      28 (x86/Linux, 64-bit machine) use +RTS -G1
+           (wordsize(64), 54, 20)]),
             # (amd64/Linux):            18
             # (amd64/Linux) 2012-02-07: 26
             # (amd64/Linux) 2013-02-12: 23; increased range to 10%
@@ -260,6 +276,7 @@ test('T3064',
             # (amd64/Linux) 2014-10-13: 38: Stricter seqDmdType
             # (amd64/Linux) 2014-12-22: 27: death to silent superclasses
             # (amd64/Linux) 2015-01-22: 32: Varies from 30 to 34, at least here.
+            # (amd64/Linux) 2015-06-03: 54: use +RTS -G1
 
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 122836340, 10),
@@ -313,7 +330,10 @@ test('T3064',
 #            # (amd64/Linux)         (19/09/2014): 18744992, unknown
 #            # (amd64/Linux)         2014-10-13:   13251728, Stricter seqDmdType
 
-       only_ways(['normal'])
+       only_ways(['normal']),
+
+       # Use `+RTS -G1` for more stable residency measurements. Note [residency].
+       extra_hc_opts('+RTS -G1 -RTS')
       ],
      compile,
      [''])
@@ -325,12 +345,13 @@ test('T4007',
 
 test('T5030',
      [compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 227205560, 10),
+          [(wordsize(32), 201882912, 10),
            # previous:    196457520
            # 2012-10-08:  259547660 (x86/Linux, new codegen)
            # 2013-11-21:  198573456 (x86 Windows, 64 bit machine)
            # 2014-12-10:  227205560 constraint solver got worse again; more aggressive solving
            #                        of family-applications leads to less sharing, I think
+           # 2015-07-11:  201882912 reason unknown
 
            (wordsize(64), 403932600, 10)]),
              # Previously 530000000 (+/- 10%)
@@ -474,7 +495,7 @@ test('T5642',
            [(wordsize(32), 641085256, 10),
                      # sample from x86/Linux
             # prev:        650000000
-            # 2014-09-03:  753045568 
+            # 2014-09-03:  753045568
             # 2014-12-10:  641085256 Improvements in constraints solver
 
             (wordsize(64), 1282916024, 10)])
@@ -559,28 +580,36 @@ test('T9020',
 
 test('T9675',
      [ only_ways(['optasm']),
-       compiler_stats_num_field('max_bytes_used',
-          [(wordsize(64), 22220552, 25),
+       compiler_stats_num_field('max_bytes_used', # Note [residency]
+          [(wordsize(64), 28056344, 15),
           # 2014-10-13    29596552
           # 2014-10-13    26570896   seq the DmdEnv in seqDmdType as well
           # 2014-10-13    18582472   different machines giving different results..
           # 2014-10-13    22220552   use the mean
-           (wordsize(32), 11220552, 25)
+          # 2015-06-21    28056344   switch to `+RTS -G1`, tighten bound to 15%
+           (wordsize(32), 15341228, 15)
+ 	  # 2015-07-11    15341228   (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
-       compiler_stats_num_field('peak_megabytes_allocated',
-          [(wordsize(64), 44, 15),
+       compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
+          [(wordsize(64), 105, 15),
           # 2014-10-13    66
           # 2014-10-13    58         seq the DmdEnv in seqDmdType as well
           # 2014-10-13    49         different machines giving different results...
           # 2014-10-13    53         use the mean
-          # 2014-06-15    44         reduced for some reason
-            (wordsize(32), 25, 15)
+          # 2015-06-15    44         reduced for some reason
+          # 2015-06-21    105        switch to `+RTS -G1`
+            (wordsize(32), 56, 15)
+ 	  # 2015-07-11    56         (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
        compiler_stats_num_field('bytes allocated',
           [(wordsize(64), 544489040, 10)
           # 2014-10-13    544489040
-          ,(wordsize(32), 250000000, 10)
+          ,(wordsize(32), 279480696, 10)
+ 	  # 2015-07-11    279480696  (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
+
+       # Use `+RTS -G1` for more stable residency measurements. Note [residency].
+       extra_hc_opts('+RTS -G1 -RTS')
       ],
      compile,
      [''])
@@ -630,7 +659,9 @@ test('T9872d',
           # 2014-12-18    739189056   Reduce type families even more eagerly
           # 2015-01-07    687562440   TrieMap leaf compression
           # 2015-03-17    726679784   tweak to solver; probably flattens more
-           (wordsize(32), 328810212, 5)
+           (wordsize(32), 350369584, 5)
+          # some date     328810212
+          # 2015-07-11    350369584
           ]),
       ],
      compile,
@@ -648,3 +679,15 @@ test('T9961',
       ],
      compile,
      ['-O'])
+
+test('T9233',
+    [ only_ways(['normal']),
+      compiler_stats_num_field('bytes allocated',
+        [(wordsize(64), 999826288, 5),
+	         # 999826288   4 Aug 2015   initial value
+	 (wordsize(32), 1, 5)   # Put in your value here if you hit this
+	]),
+      extra_clean(['T9233a.hi', 'T9233a.o'])
+    ],
+    multimod_compile,
+    ['T9233', '-v0 -O2 -fno-spec-constr'])

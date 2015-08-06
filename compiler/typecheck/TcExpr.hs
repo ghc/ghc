@@ -226,9 +226,10 @@ tcExpr e@(HsLamCase _ matches) res_ty
         match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
 
 tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
- = do { nwc_tvs <- mapM newWildcardVarMetaKind wcs
-      ; tcExtendTyVarEnv nwc_tvs $ do {
-        sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
+ = tcWildcardBinders wcs $ \ wc_prs ->
+   do { addErrCtxt (pprSigCtxt ExprSigCtxt empty (ppr sig_ty)) $
+        emitWildcardHoleConstraints wc_prs
+      ; sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
       ; (gen_fn, expr')
             <- tcSkolemise ExprSigCtxt sig_tc_ty $
                \ skol_tvs res_ty ->
@@ -242,8 +243,6 @@ tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
 
       ; let inner_expr = ExprWithTySigOut (mkLHsWrap gen_fn expr') sig_ty
 
-      ; addErrCtxt (pprSigCtxt ExprSigCtxt empty (ppr sig_ty)) $
-        emitWildcardHoleConstraints (zip wcs nwc_tvs)
       ; tcWrapResult inner_expr sig_tc_ty res_ty ExprSigOrigin } }
 
 tcExpr (HsType ty _) _
@@ -286,18 +285,15 @@ Note [Typing rule for seq]
 We want to allow
        x `seq` (# p,q #)
 which suggests this type for seq:
-   seq :: forall (a:*) (b:??). a -> b -> b,
-with (b:??) meaning that be can be instantiated with an unboxed tuple.
-But that's ill-kinded!  Function arguments can't be unboxed tuples.
-And indeed, you could not expect to do this with a partially-applied
-'seq'; it's only going to work when it's fully applied.  so it turns
-into
+   seq :: forall (a:*) (b:Open). a -> b -> b,
+with (b:Open) meaning that be can be instantiated with an unboxed
+tuple.  The trouble is that this might accept a partially-applied
+'seq', and I'm just not certain that would work.  I'm only sure it's
+only going to work when it's fully applied, so it turns into
     case x of _ -> (# p,q #)
 
-For a while I slid by by giving 'seq' an ill-kinded type, but then
-the simplifier eta-reduced an application of seq and Lint blew up
-with a kind error.  It seems more uniform to treat 'seq' as if it
-were a language construct.
+So it seems more uniform to treat 'seq' as it it was a language
+construct.
 
 See also Note [seqId magic] in MkId
 -}
@@ -1307,6 +1303,7 @@ tcSeq :: SrcSpan -> Name -> [LHsExpr Name]
       -> TcRhoType -> TcM (HsWrapper, LHsExpr TcId, [LHsExpr TcId])
 -- (seq e1 e2) :: res_ty
 -- We need a special typing rule because res_ty can be unboxed
+-- See Note [Typing rule for seq]
 tcSeq loc fun_name args res_ty
   = do  { fun <- tcLookupId fun_name
         ; (arg1_ty, args1) <- case args of
@@ -1545,7 +1542,7 @@ tcRecordBinds data_con arg_tys (HsRecFields rbinds dd)
       = do { addErrTc (badFieldCon (RealDataCon data_con) field_lbl)
            ; return Nothing }
 
-checkMissingFields :: DataCon -> HsRecordBinds Name -> TcM ()
+checkMissingFields ::  DataCon -> HsRecordBinds Name -> TcM ()
 checkMissingFields data_con rbinds
   | null field_labels   -- Not declared as a record;
                         -- But C{} is still valid if no strict fields
@@ -1582,7 +1579,7 @@ checkMissingFields data_con rbinds
                           field_labels
                           field_strs
 
-    field_strs = dataConSrcBangs data_con
+    field_strs = dataConImplBangs data_con
 
 {-
 ************************************************************************

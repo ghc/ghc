@@ -1,5 +1,3 @@
-setTestOpts(only_compiler_types(['ghc']))
-
 test('base01',
      [normalise_slashes,
       clean_cmd('$MAKE -s clean')],

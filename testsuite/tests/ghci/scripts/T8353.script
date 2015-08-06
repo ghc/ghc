@@ -1,0 +1,22 @@
+-- Test :load! and :reload!
+
+-- main is independent of functions with type errors and thus
+-- executable after load
+-- warnings on type errors are emitted nevertheless
+:load!   Defer03
+
+-- fails to load module due to type errors
+:load    Defer03
+
+-- succeeds again to load module
+:reload!
+
+-- also succeeds, because the module has not been touched since load
+:reload
+
+-- now, after touching, reloading should fail
+:! touch Defer03.hs
+:reload
+
+-- using the deferred version of reload, loading should succeed again
+:reload!

@@ -2,6 +2,7 @@
 ==================== Tidy Core ====================
 Result size of Tidy Core = {terms: 36, types: 29, coercions: 0}
 
+-- RHS size: {terms: 6, types: 3, coercions: 0}
 T7360.$WFoo3 [InlPrag=INLINE] :: Int -> Foo
 [GblId[DataConWrapper],
  Arity=1,
@@ -16,10 +17,12 @@ T7360.$WFoo3 =
   \ (dt [Occ=Once!] :: Int) ->
     case dt of _ [Occ=Dead] { I# dt [Occ=Once] -> T7360.Foo3 dt }
 
+-- RHS size: {terms: 5, types: 2, coercions: 0}
 fun1 [InlPrag=NOINLINE] :: Foo -> ()
 [GblId[sig], Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U>]
 fun1 = \ (ds :: Foo) -> case ds of _ [Occ=Dead] { __DEFAULT -> () }
 
+-- RHS size: {terms: 2, types: 0, coercions: 0}
 T7360.fun5 :: ()
 [GblId,
  Str=DmdType,
@@ -27,6 +30,7 @@ T7360.fun5 :: ()
          WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
 T7360.fun5 = fun1 T7360.Foo1
 
+-- RHS size: {terms: 2, types: 0, coercions: 0}
 T7360.fun4 :: Int
 [GblId,
  Caf=NoCafRefs,
@@ -35,6 +39,7 @@ T7360.fun4 :: Int
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T7360.fun4 = I# 0#
 
+-- RHS size: {terms: 16, types: 12, coercions: 0}
 fun2 :: forall a. [a] -> ((), Int)
 [GblId,
  Arity=1,

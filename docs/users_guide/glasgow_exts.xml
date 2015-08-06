@@ -4086,7 +4086,7 @@ as described in <xref linkend="generic-programming"/>.
 
 <listitem><para> With <option>-XDeriveFunctor</option>, you can derive instances of
 the class <literal>Functor</literal>,
-defined in <literal>GHC.Base</literal>.
+defined in <literal>GHC.Base</literal>. See <xref linkend="deriving-functor"/>.
 </para></listitem>
 
 <listitem><para> With <option>-XDeriveDataTypeable</option>, you can derive instances of
@@ -4097,7 +4097,7 @@ deriving <literal>Typeable</literal>.
 
 <listitem><para> With <option>-XDeriveFoldable</option>, you can derive instances of
 the class <literal>Foldable</literal>,
-defined in <literal>Data.Foldable</literal>.
+defined in <literal>Data.Foldable</literal>. See <xref linkend="deriving-foldable"/>.
 </para></listitem>
 
 <listitem><para> With <option>-XDeriveTraversable</option>, you can derive instances of
@@ -4107,6 +4107,7 @@ instance dictates the instances of <literal>Functor</literal> and
 <literal>Foldable</literal>, you'll probably want to derive them too, so
 <option>-XDeriveTraversable</option> implies
 <option>-XDeriveFunctor</option> and <option>-XDeriveFoldable</option>.
+See <xref linkend="deriving-traversable"/>.
 </para></listitem>
 </itemizedlist>
 You can also use a standalone deriving declaration instead
@@ -4115,6 +4116,260 @@ You can also use a standalone deriving declaration instead
 <para>
 In each case the appropriate class must be in scope before it
 can be mentioned in the <literal>deriving</literal> clause.
+</para>
+</sect2>
+
+<sect2 id="deriving-functor">
+<title>Deriving <literal>Functor</literal> instances</title>
+
+<para>With <option>-XDeriveFunctor</option>, one can derive
+<literal>Functor</literal> instances for data types of kind
+<literal>* -> *</literal>. For example, this declaration:
+
+<programlisting>
+data Example a = Ex a Char (Example a) (Example Char)
+  deriving Functor
+</programlisting>
+
+would generate the following instance:
+
+<programlisting>
+instance Functor Example where
+  fmap f (Ex a1 a2 a3 a4) = Ex (f a1) a2 (fmap f a3) a4
+</programlisting>
+</para>
+
+<para>The basic algorithm for <option>-XDeriveFunctor</option> walks the
+arguments of each constructor of a data type, applying a mapping function
+depending on the type of each argument. Suppose we are deriving
+<literal>Functor</literal> for a data type whose last type parameter is
+<literal>a</literal>. Then we write the derivation of <literal>fmap</literal>
+code over the type variable <literal>a</literal> for type
+<literal>b</literal> as <literal>$(fmap 'a 'b)</literal>.
+
+<itemizedlist>
+<listitem><para>If the argument's type is <literal>a</literal>, then
+map over it.
+
+<programlisting>
+$(fmap 'a 'a) = f
+</programlisting>
+</para></listitem>
+
+<listitem><para>If the argument's type does not mention <literal>a</literal>,
+then do nothing to it.
+
+<programlisting>
+$(fmap 'a 'b) = \x -> x -- when b does not contain a
+</programlisting>
+</para></listitem>
+
+<listitem><para>If the argument has a tuple type, generate map code for each
+of its arguments.
+
+<programlisting>
+$(fmap 'a '(b1,b2)) = \x -> case x of (x1,x2) -> ($(fmap 'a 'b1) x1, $(fmap 'a 'b2) x2)
+</programlisting>
+</para></listitem>
+
+<listitem><para>If the argument's type is a data type that mentions
+<literal>a</literal>, apply <literal>fmap</literal> to it with the generated
+map code for the data type's last type parameter.
+
+<programlisting>
+$(fmap 'a '(T b1 b2)) = fmap $(fmap 'a 'b2) -- when a only occurs in the last parameter, b2
+</programlisting>
+</para></listitem>
+
+<listitem><para>If the argument has a function type, apply generated
+<literal>$(fmap)</literal> code to the result type, and apply generated
+<literal>$(cofmap)</literal> code to the argument type.
+
+<programlisting>
+$(fmap 'a '(b -> c)) = \x b -> $(fmap 'a' 'c) (x ($(cofmap 'a 'b) b))
+</programlisting>
+
+<literal>$(cofmap)</literal> is needed because the type parameter
+<literal>a</literal> can occur in a contravariant position, which means we
+need to derive a function like:
+
+<programlisting>
+cofmap :: (a -> b) -> f b -> f a
+</programlisting>
+
+This is pretty much the same as <literal>$(fmap)</literal>, only without the
+<literal>$(cofmap 'a 'a)</literal> case:
+
+<programlisting>
+$(cofmap 'a 'b)         = \x -> x     -- when b does not contain a
+$(cofmap 'a 'a)         = error "type variable in contravariant position"
+$(cofmap 'a '(b1,b2))   = \x -> case x of (x1,x2) -> ($(cofmap 'a 'b1) x1, $(cofmap 'a 'b2) x2)
+$(cofmap 'a '[b])       = map $(cofmap 'a 'b)
+$(cofmap 'a '(T b1 b2)) = fmap $(cofmap 'a 'b2) -- when a only occurs in the last parameter, b2
+$(cofmap 'a '(b -> c))  = \x b -> $(cofmap 'a' 'c) (x ($(fmap 'a 'c) b))
+</programlisting>
+
+For more information on contravariance, see
+<ulink url="https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/DeriveFunctor#Covariantandcontravariantpositions">
+this wiki page</ulink>.
+</para></listitem>
+</itemizedlist>
+</para>
+
+<para>A data type can have a derived <literal>Functor</literal> instance if:
+
+<itemizedlist>
+<listitem><para>It has at least one type parameter.
+</para></listitem>
+
+<listitem><para>It does not use the last type parameter contravariantly.
+</para></listitem>
+
+<listitem><para>It does not use the last type parameter in the "wrong place"
+in any of the argument data types. For example, in:
+
+<programlisting>
+data Right a = Right [a] (Either Int a)
+</programlisting>
+
+the type parameter <literal>a</literal> is only ever used as the last type
+argument in <literal>[]</literal> and <literal>Either</literal>, so both
+<literal>[a]</literal> and <literal>Either Int a</literal> can be
+<literal>fmap</literal>ped. However, in:
+
+<programlisting>
+data Wrong a = Wrong (Either a a)
+</programlisting>
+
+the type variable <literal>a</literal> appears in a position other than the
+last, so trying to <literal>fmap</literal> an <literal>Either a a</literal>
+value would not typecheck in a <literal>Functor</literal> instance.
+
+Note that there are two exceptions to this rule: tuple and function types, as
+described above.
+</para></listitem>
+
+<listitem><para>Its last type variable cannot be used in a
+<option>-XDatatypeContexts</option> constraint.
+</para></listitem>
+
+<listitem><para>Its last type variable cannot be used in an
+<option>-XExistentialQuantification</option> or <option>-XGADTs</option>
+constraint.
+</para></listitem>
+</itemizedlist>
+
+</para>
+</sect2>
+
+<sect2 id="deriving-foldable">
+<title>Deriving <literal>Foldable</literal> instances</title>
+
+<para>With <option>-XDeriveFoldable</option>, one can derive
+<literal>Foldable</literal> instances for data types of kind
+<literal>* -> *</literal>. For example, this declaration:
+
+<programlisting>
+data Example a = Ex a Char (Example a) (Example Char)
+  deriving Functor
+</programlisting>
+
+would generate the following instance:
+
+<programlisting>
+instance Foldable Example where
+  foldr f z (Ex a1 a2 a3 a4) = f a1 (foldr f z a3)
+  foldMap f (Ex a1 a2 a3 a4) = mappend (f a1)
+                                       (mappend mempty
+                                                (mappend (foldMap f a3)
+                                                         mempty))
+</programlisting>
+
+The algorithm for <option>-XDeriveFoldable</option> is very similar to that of
+<option>-XDeriveFunctor</option>, except that <literal>Foldable</literal>
+instances are not possible for function types. The cases are:
+
+<programlisting>
+$(foldr 'a 'b)         = \x z -> z -- when b does not contain a
+$(foldr 'a 'a)         = f
+$(foldr 'a '(b1,b2))   = \x z -> case x of (x1,x2) -> $(foldr 'a 'b1) x1 ( $(foldr 'a 'b2) x2 z )
+$(foldr 'a '(T b1 b2)) = \x z -> foldr $(foldr 'a 'b2) z x -- when a only occurs in the last parameter, b2
+</programlisting>
+
+Another difference between <option>-XDeriveFoldable</option> and
+<option>-XDeriveFunctor</option> is that <option>-XDeriveFoldable</option>
+instances can be derived for data types with existential constraints. For
+example, the following data type:
+
+<programlisting>
+data E a where
+    E1 :: (a ~ Int) =&gt; a   -> E a
+    E2 ::              Int -> E Int
+    E3 :: (a ~ Int) =&gt; a   -> E Int
+    E4 :: (a ~ Int) =&gt; Int -> E a
+
+deriving instance Foldable E
+</programlisting>
+
+would have the following <literal>Foldable</literal> instance:
+
+<programlisting>
+instance Foldable E where
+    foldr f z (E1 e) = f e z
+    foldr f z (E2 e) = z
+    foldr f z (E3 e) = z
+    foldr f z (E4 e) = z
+
+    foldMap f (E1 e) = f e
+    foldMap f (E2 e) = mempty
+    foldMap f (E3 e) = mempty
+    foldMap f (E4 e) = mempty
+</programlisting>
+
+Notice that only the argument in <literal>E1</literal> is folded over. This is
+because we only fold over constructor arguments (1) whose types are
+syntactically equivalent to the last type parameter and (2) when the last type
+parameter is not refined to a specific type. Only <literal>E1</literal>
+satisfies both of these criteria. For more information, see
+<ulink url="https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/DeriveFunctor">
+this wiki page</ulink>.
+</para>
+</sect2>
+
+<sect2 id="deriving-traversable">
+<title>Deriving <literal>Traversable</literal> instances</title>
+
+<para>With <option>-XDeriveTraversable</option>, one can derive
+<literal>Traversable</literal> instances for data types of kind
+<literal>* -> *</literal>. For example, this declaration:
+
+<programlisting>
+data Example a = Ex a Char (Example a) (Example Char)
+  deriving Functor
+</programlisting>
+
+would generate the following instance:
+
+<programlisting>
+instance Foldable Example where
+  traverse f (Ex a1 a2 a3 a4)
+    = fmap Ex (f a)
+        &lt;*&gt; pure a2
+        &lt;*&gt; traverse f a3
+        &lt;*&gt; pure a4
+</programlisting>
+
+The algorithm for <option>-XDeriveTraversable</option> is very similar to that
+of <option>-XDeriveTraversable</option>, except that
+<literal>Traversable</literal> instances are not possible for function types.
+The cases are:
+
+<programlisting>
+1812   $(traverse 'a 'b)         = pure -- when b does not contain a
+1813   $(traverse 'a 'a)         = f
+1814   $(traverse 'a '(b1,b2))   = \x -> case x of (x1,x2) -> fmap (,) $(traverse 'a 'b1) x1 &lt;*&gt; $(traverse 'a 'b2) x2
+1815   $(traverse 'a '(T b1 b2)) = traverse $(traverse 'a 'b2) -- when a only occurs in the last parameter, b2
+</programlisting>
 </para>
 </sect2>
 
@@ -5058,7 +5313,12 @@ The Paterson Conditions: for each class constraint <literal>(C t1 ... tn)</liter
 <orderedlist>
 <listitem><para>No type variable has more occurrences in the constraint than in the head</para></listitem>
 <listitem><para>The constraint has fewer constructors and variables (taken together
-      and counting repetitions) than the head</para></listitem>
+      and counting repetitions) than the head
+</para></listitem>
+<listitem><para>The constraint mentions no type functions.
+A type function application can in principle expand to a
+type of arbitrary size, and so are rejected out of hand
+</para></listitem>
 </orderedlist>
 </para></listitem>
 
@@ -5906,6 +6166,24 @@ data instance GMap (Either a b) v = GMapEither (GMap a v) (GMap b v)
       can be any number.
     </para>
     <para>
+      When the name of a type argument of a data or newtype instance
+      declaration doesn't matter, it can be replaced with an underscore
+      (<literal>_</literal>). This is the same as writing a type variable with
+      a unique name.
+<programlisting>
+data family F a b :: *
+data instance F Int _ = Int
+-- Equivalent to
+data instance F Int b = Int
+</programlisting>
+      This resembles the wildcards that can be used in <xref
+      linkend="partial-type-signatures"/>. However, there are some
+      differences. Only anonymous wildcards are allowed in these instance
+      declarations, named and extra-constraints wildcards are not. No error
+      messages reporting the inferred types are generated, nor does the flag
+      <option>-XPartialTypeSignatures</option> have any effect.
+    </para>
+    <para>
       Data and newtype instance declarations are only permitted when an
       appropriate family declaration is in scope - just as a class instance declaration
       requires the class declaration to be visible.  Moreover, each instance
@@ -6055,6 +6333,13 @@ F Bool             -- WRONG: unsaturated application
 <programlisting>
 type instance Elem [e] = e
 </programlisting>
+    </para>
+
+    <para>
+      Type arguments can be replaced with underscores (<literal>_</literal>)
+      if the names of the arguments don't matter. This is the same as writing
+      type variables with unique names. The same rules apply as for <xref
+      linkend="data-instance-declarations"/>.
     </para>
 
     <para>
@@ -8627,9 +8912,8 @@ consider how one would parse this:
 <para>
 
 The type variables in the head of a <literal>class</literal> or <literal>instance</literal> declaration
-scope over the methods defined in the <literal>where</literal> part.  For example:
-
-
+scope over the methods defined in the <literal>where</literal> part.  You do not even need
+an explicit <literal>forall</literal>.  For example:
 <programlisting>
   class C a where
     op :: [a] -> a
@@ -8638,6 +8922,9 @@ scope over the methods defined in the <literal>where</literal> part.  For exampl
                 ys = reverse xs
             in
             head ys
+
+  instance C b => C [b] where
+    op xs = reverse (head (xs :: [[b]]))
 </programlisting>
 </para>
 </sect3>
@@ -9209,6 +9496,7 @@ Extra-constraints wildcards cannot be named.
 Partial type signatures are allowed for bindings, pattern and expression signatures.
 In all other contexts, e.g. type class or type family declarations, they are disallowed.
 In the following example a wildcard is used in each of the three possible contexts.
+Extra-constraints wildcards are not supported in pattern or expression signatures.
 </para>
 <programlisting>
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -9216,6 +9504,49 @@ foo :: _
 foo (x :: _) = (x :: _)
 -- Inferred: forall w_. w_ -> w_
 </programlisting>
+
+<para>
+  Anonymous wildcards <emphasis>can</emphasis> occur in type or data instance
+  declarations. However, these declarations are not partial type signatures
+  and different rules apply. See <xref linkend="data-instance-declarations"/>
+  for more details.
+</para>
+
+<para>
+Partial type signatures can also be used in <xref linkend="template-haskell"/> splices.
+</para>
+
+<itemizedlist>
+  <listitem>Declaration splices: partial type signature are fully supported.
+<programlisting>
+{-# LANGUAGE TemplateHaskell, NamedWildCards #-}
+$( [d| foo :: _ => _a -> _a -> _
+       foo x y = x == y|] )
+</programlisting>
+  </listitem>
+  <listitem>Expression splices: anonymous and named wildcards can be used in expression signatures.
+  Extra-constraints wildcards are not supported, just like in regular expression signatures.
+<programlisting>
+{-# LANGUAGE TemplateHaskell, NamedWildCards #-}
+$( [e| foo = (Just True :: _m _) |] )
+</programlisting>
+  </listitem>
+  <listitem>Typed expression splices: the same wildcards as in (untyped) expression splices are supported.
+  </listitem>
+  <listitem>Pattern splices: Template Haskell doesn't support type signatures in pattern splices.
+  Consequently, partial type signatures are not supported either.
+  </listitem>
+  <listitem>Type splices: only anonymous wildcards are supported in type splices.
+  Named and extra-constraints wildcards are not.
+<programlisting>
+{-# LANGUAGE TemplateHaskell #-}
+foo :: $( [t| _ |] ) -> a
+foo x = x
+</programlisting>
+  </listitem>
+</itemizedlist>
+
+
 </sect2>
 </sect1>
 <!-- ==================== Deferring type errors =================  -->
@@ -9249,7 +9580,8 @@ main = print "b"
   <para>
     The flag <literal>-fdefer-type-errors</literal> controls whether type
     errors are deferred to runtime. Type errors will still be emitted as
-    warnings, but will not prevent compilation.
+    warnings, but will not prevent compilation. You can use
+    <literal>-fno-warn-deferred-type-errors</literal> to suppress these warnings.
   </para>
   <para>
     This flag implies the <literal>-fdefer-typed-holes</literal> flag,
@@ -9262,11 +9594,11 @@ main = print "b"
   </para>
   <para>
     At runtime, whenever a term containing a type error would need to be
-    evaluated, the error is converted into a runtime exception.
-    Note that type errors are deferred as much as possible during runtime, but
-    invalid coercions are never performed, even when they would ultimately
-    result in a value of the correct type. For example, given the following
-    code:
+    evaluated, the error is converted into a runtime exception of type
+    <literal>TypeError</literal>. Note that type errors are deferred as much
+    as possible during runtime, but invalid coercions are never performed,
+    even when they would ultimately result in a value of the correct type.
+    For example, given the following code:
 <programlisting>
 x :: Int
 x = 0
@@ -9277,7 +9609,7 @@ y = x
 z :: Int
 z = y
 </programlisting>
-    evaluating <literal>z</literal> will result in a runtime type error.
+    evaluating <literal>z</literal> will result in a runtime <literal>TypeError</literal>.
   </para>
 </sect2>
 <sect2><title>Deferred type errors in GHCi</title>
@@ -9400,7 +9732,8 @@ Wiki page</ulink>.
                              the quotation has type <literal>Q Type</literal>.</para></listitem>
 		    <listitem><para> <literal>[p| ... |]</literal>, where the "..." is a pattern;
                              the quotation has type <literal>Q Pat</literal>.</para></listitem>
-		  </itemizedlist></para></listitem>
+		  </itemizedlist>
+		See <xref linkend="pts-where"/> for using partial type signatures in quotations.</para></listitem>
 
 	      <listitem>
 		<para>
@@ -9633,7 +9966,36 @@ module M where
               </orderedlist>
 	      </para>
 	    </listitem>
-
+      <listitem>
+        <para>
+        Expression quotations accept most Haskell language constructs.
+        However, there are some GHC-specific extensions which expression
+        quotations currently do not support, including
+        <itemizedlist>
+          <listitem>
+            <para>
+            Recursive <literal>do</literal>-statements (see
+            <ulink url="https://ghc.haskell.org/trac/ghc/ticket/1262">
+            Trac #1262</ulink>)
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+            Pattern synonyms (see
+            <ulink url="https://ghc.haskell.org/trac/ghc/ticket/8761">
+            Trac #8761</ulink>)
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+            Typed holes (see
+            <ulink url="https://ghc.haskell.org/trac/ghc/ticket/10267">
+            Trac #10267</ulink>)
+            </para>
+          </listitem>
+        </itemizedlist>
+        </para>
+      </listitem>
 
 	</itemizedlist>
 (Compared to the original paper, there are many differences of detail.
@@ -12150,6 +12512,61 @@ not going to be inlined before the rule has a chance to fire.
 </para>
 </sect2>
 
+<sect2 id="rules-class-methods">
+<title>How rules interact with class methods</title>
+
+<para>
+Giving a RULE for a class method is a bad idea:
+<programlisting>
+class C a where
+  op :: a -> a -> a
+
+instance C Bool where
+  op x y = ...rhs for op at Bool...
+
+{-# RULES "f" op True y = False #-}
+</programlisting>
+In this
+example, <literal>op</literal> is not an ordinary top-level function;
+it is a class method.  GHC rapidly rewrites any occurrences of
+<literal>op</literal>-used-at-type-Bool
+to a specialised function, say <literal>opBool</literal>, where
+<programlisting>
+opBool :: Bool -> Bool -> Bool
+opBool x y = ..rhs for op at Bool...
+</programlisting>
+So the RULE never has a chance to fire, for just the same reasons as in <xref linkend="rules-inline"/>.
+</para>
+<para>
+The solution is to define the instance-specific function yourself, with a pragma to prevent
+it being inlined too early, and give a RULE for it:
+<programlisting>
+instance C Bool where
+  op x y = opBool
+
+opBool :: Bool -> Bool -> Bool
+{-# NOINLINE [1] opBool #-}
+opBool x y = ..rhs for op at Bool...
+
+{-# RULES "f" opBool True y = False #-}
+</programlisting>
+If you want a RULE that truly applies to the overloaded class method, the only way to
+do it is like this:
+<programlisting>
+class C a where
+  op_c :: a -> a -> a
+
+op :: C a => a -> a -> a
+{-# NOINLINE [1] op #-}
+op = op_c
+
+{-# RULES "reassociate" op (op x y) z = op x (op y z) #-}
+</programlisting>
+Now the inlining of <literal>op</literal> is delayed until the rule has a chance to fire.
+The down-side is that instance declarations must define <literal>op_c</literal>, but
+all other uses should go via <literal>op</literal>.
+</para>
+</sect2>
 <sect2>
 <title>List fusion</title>
 
@@ -12976,6 +13393,45 @@ Here are some examples:</para>
 </programlisting>
 
 </sect2>
+
+</sect1>
+
+<sect1 id="strict-haskell">
+  <title>Strict Haskell</title>
+  <indexterm><primary>strict haskell</primary></indexterm>
+
+  <para>High-performance Haskell code (e.g. numeric code) can
+  sometimes be littered with bang patterns, making it harder to
+  read. The reason is that lazy evaluation isn't the right default in
+  this particular code but the programmer has no way to say that
+  except by repeatedly adding bang patterns. Below
+  <option>-XStrictData</option> is detailed that allows the programmer
+  to switch the default behavior on a per-module basis.</para>
+
+  <sect2 id="strict-data">
+    <title>Strict-by-default data types</title>
+
+    <para>Informally the <literal>StrictData</literal> language
+    extension switches data type declarations to be strict by default
+    allowing fields to be lazy by adding a <literal>~</literal> in
+    front of the field.</para>
+
+    <para>When the user writes</para>
+
+    <programlisting>
+      data T = C a
+      data T' = C' ~a
+    </programlisting>
+
+    <para>we interpret it as if she had written</para>
+
+    <programlisting>
+      data T = C !a
+      data T' = C' a
+    </programlisting>
+
+    <para>The extension only affects definitions in this module.</para>
+  </sect2>
 
 </sect1>
 

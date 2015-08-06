@@ -8,9 +8,7 @@ test('T10138', ignore_output, run_command,
 # '-hpcdir' to a different value for each test. Only the `hpc` way does this
 # automatically. This way the tests in this directory can be run concurrently
 # (Main.mix might overlap otherwise).
-setTestOpts([only_compiler_types(['ghc']),
-             only_ways(['hpc']),
-             ])
+setTestOpts(only_ways(['hpc']))
 
 def T2991(cmd):
   # The .mix file for the literate module should have non-zero entries.

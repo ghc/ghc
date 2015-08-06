@@ -176,7 +176,12 @@ disasterHandler exit _ =
   withCAString "%s" $ \fmt ->
     withCAString msgStr $ \msg ->
       errorBelch fmt msg >> exit 1
-  where msgStr = "encountered an exception while trying to report an exception"
+  where
+    msgStr =
+        "encountered an exception while trying to report an exception." ++
+        "One possible reason for this is that we failed while trying to " ++
+        "encode an error message. Check that your locale is configured " ++
+        "properly."
 
 {- Note [Disaster with iconv]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

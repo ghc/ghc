@@ -2,56 +2,59 @@
 ==================== Tidy Core ====================
 Result size of Tidy Core = {terms: 22, types: 14, coercions: 0}
 
+-- RHS size: {terms: 8, types: 3, coercions: 0}
 dl :: Double -> Double
-[GblId[sig],
+[GblId,
  Arity=1,
  Caf=NoCafRefs,
  Str=DmdType <S,1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (ds [Occ=Once!] :: Double) ->
-                 case ds of _ [Occ=Dead] { D# y -> D# (+## y y) }}]
+         Tmpl= \ (x [Occ=Once!] :: Double) ->
+                 case x of _ [Occ=Dead] { D# y -> D# (+## y y) }}]
 dl =
-  \ (ds :: Double) ->
-    case ds of _ [Occ=Dead] { D# y -> D# (+## y y) }
+  \ (x :: Double) -> case x of _ [Occ=Dead] { D# y -> D# (+## y y) }
 
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 dr :: Double -> Double
-[GblId[sig],
+[GblId,
  Arity=1,
  Caf=NoCafRefs,
  Str=DmdType <S,1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (ds [Occ=Once!] :: Double) ->
-                 case ds of _ [Occ=Dead] { D# x -> D# (+## x x) }}]
+         Tmpl= \ (x [Occ=Once!] :: Double) ->
+                 case x of _ [Occ=Dead] { D# x1 -> D# (+## x1 x1) }}]
 dr = dl
 
+-- RHS size: {terms: 8, types: 3, coercions: 0}
 fl :: Float -> Float
-[GblId[sig],
+[GblId,
  Arity=1,
  Caf=NoCafRefs,
  Str=DmdType <S,1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (ds [Occ=Once!] :: Float) ->
-                 case ds of _ [Occ=Dead] { F# y -> F# (plusFloat# y y) }}]
+         Tmpl= \ (x [Occ=Once!] :: Float) ->
+                 case x of _ [Occ=Dead] { F# y -> F# (plusFloat# y y) }}]
 fl =
-  \ (ds :: Float) ->
-    case ds of _ [Occ=Dead] { F# y -> F# (plusFloat# y y) }
+  \ (x :: Float) ->
+    case x of _ [Occ=Dead] { F# y -> F# (plusFloat# y y) }
 
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 fr :: Float -> Float
-[GblId[sig],
+[GblId,
  Arity=1,
  Caf=NoCafRefs,
  Str=DmdType <S,1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (ds [Occ=Once!] :: Float) ->
-                 case ds of _ [Occ=Dead] { F# x -> F# (plusFloat# x x) }}]
+         Tmpl= \ (x [Occ=Once!] :: Float) ->
+                 case x of _ [Occ=Dead] { F# x1 -> F# (plusFloat# x1 x1) }}]
 fr = fl
 
 

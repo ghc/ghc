@@ -197,8 +197,8 @@ thread_static( StgClosure* p )
 
   // keep going until we've threaded all the objects on the linked
   // list...
-  while (p != END_OF_STATIC_LIST) {
-
+  while (p != END_OF_STATIC_OBJECT_LIST) {
+    p = UNTAG_STATIC_LIST_PTR(p);
     info = get_itbl(p);
     switch (info->type) {
 

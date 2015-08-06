@@ -6,7 +6,11 @@
 TcSplice: Template Haskell splices
 -}
 
-{-# LANGUAGE CPP, FlexibleInstances, MagicHash, ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module TcSplice(
@@ -87,7 +91,6 @@ import DsMonad
 import Serialized
 import ErrUtils
 import Util
-import Data.List        ( mapAccumL )
 import Unique
 import VarSet           ( isEmptyVarSet )
 import Data.Maybe
@@ -106,7 +109,7 @@ import GHC.Desugar      ( AnnotationWrapper(..) )
 
 import qualified Data.Map as Map
 import Data.Dynamic  ( fromDynamic, toDyn )
-import Data.Typeable ( typeOf )
+import Data.Typeable ( typeOf, Typeable )
 import Data.Data (Data)
 import GHC.Exts         ( unsafeCoerce# )
 #endif
@@ -702,7 +705,7 @@ runMeta' show_code ppr_hs run_and_convert expr
 {-
 Note [Exceptions in TH]
 ~~~~~~~~~~~~~~~~~~~~~~~
-Supppose we have something like this
+Suppose we have something like this
         $( f 4 )
 where
         f :: Int -> Q [Dec]
@@ -778,6 +781,7 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
 
   qLookupName       = lookupName
   qReify            = reify
+  qReifyFixity nm   = lookupThName nm >>= reifyFixity
   qReifyInstances   = reifyInstances
   qReifyRoles       = reifyRoles
   qReifyAnnotations = reifyAnnotations
@@ -835,11 +839,14 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
       th_modfinalizers_var <- fmap tcg_th_modfinalizers getGblEnv
       updTcRef th_modfinalizers_var (\fins -> fin:fins)
 
+  qGetQ :: forall a. Typeable a => IOEnv (Env TcGblEnv TcLclEnv) (Maybe a)
   qGetQ = do
       th_state_var <- fmap tcg_th_state getGblEnv
       th_state <- readTcRef th_state_var
-      let x = Map.lookup (typeOf x) th_state >>= fromDynamic
-      return x
+      -- See #10596 for why we use a scoped type variable here.
+      -- ToDo: convert @undefined :: a@ to @proxy :: Proxy a@ when
+      -- we drop support for GHC 7.6.
+      return (Map.lookup (typeOf (undefined :: a)) th_state >>= fromDynamic)
 
   qPutQ x = do
       th_state_var <- fmap tcg_th_state getGblEnv
@@ -1033,20 +1040,18 @@ reifyThing :: TcTyThing -> TcM TH.Info
 
 reifyThing (AGlobal (AnId id))
   = do  { ty <- reifyType (idType id)
-        ; fix <- reifyFixity (idName id)
         ; let v = reifyName id
         ; case idDetails id of
-            ClassOpId cls -> return (TH.ClassOpI v ty (reifyName cls) fix)
-            _             -> return (TH.VarI     v ty Nothing fix)
+            ClassOpId cls -> return (TH.ClassOpI v ty (reifyName cls))
+            _             -> return (TH.VarI     v ty Nothing)
     }
 
 reifyThing (AGlobal (ATyCon tc))   = reifyTyCon tc
 reifyThing (AGlobal (AConLike (RealDataCon dc)))
   = do  { let name = dataConName dc
         ; ty <- reifyType (idType (dataConWrapId dc))
-        ; fix <- reifyFixity name
         ; return (TH.DataConI (reifyName name) ty
-                              (reifyName (dataConOrigTyCon dc)) fix)
+                              (reifyName (dataConOrigTyCon dc)))
         }
 reifyThing (AGlobal (AConLike (PatSynCon ps)))
   = noTH (sLit "pattern synonyms") (ppr $ patSynName ps)
@@ -1055,8 +1060,7 @@ reifyThing (ATcId {tct_id = id})
   = do  { ty1 <- zonkTcType (idType id) -- Make use of all the info we have, even
                                         -- though it may be incomplete
         ; ty2 <- reifyType ty1
-        ; fix <- reifyFixity (idName id)
-        ; return (TH.VarI (reifyName id) ty2 Nothing fix) }
+        ; return (TH.VarI (reifyName id) ty2 Nothing) }
 
 reifyThing (ATyVar tv tv1)
   = do { ty1 <- zonkTcTyVar tv1
@@ -1131,16 +1135,12 @@ reifyTyCon tc
 reifyDataCon :: [Type] -> DataCon -> TcM TH.Con
 -- For GADTs etc, see Note [Reifying data constructors]
 reifyDataCon tys dc
-  = do { let (tvs, theta, arg_tys, _) = dataConSig dc
-             subst             = mkTopTvSubst (tvs `zip` tys)   -- Dicard ex_tvs
-             (subst', ex_tvs') = mapAccumL substTyVarBndr subst (dropList tys tvs)
-             theta'   = substTheta subst' theta
-             arg_tys' = substTys subst' arg_tys
+  = do { let (ex_tvs, theta, arg_tys) = dataConInstSig dc tys
              stricts  = map reifyStrict (dataConSrcBangs dc)
              fields   = dataConFieldLabels dc
              name     = reifyName dc
 
-       ; r_arg_tys <- reifyTypes arg_tys'
+       ; r_arg_tys <- reifyTypes arg_tys
 
        ; let main_con | not (null fields)
                       = TH.RecC name (zip3 (map reifyName fields) stricts r_arg_tys)
@@ -1153,12 +1153,12 @@ reifyDataCon tys dc
              [s1,   s2]   = stricts
 
        ; ASSERT( length arg_tys == length stricts )
-         if null ex_tvs' && null theta then
+         if null ex_tvs && null theta then
              return main_con
          else do
-         { cxt <- reifyCxt theta'
-         ; ex_tvs'' <- reifyTyVars ex_tvs'
-         ; return (TH.ForallC ex_tvs'' cxt main_con) } }
+         { cxt <- reifyCxt theta
+         ; ex_tvs' <- reifyTyVars ex_tvs
+         ; return (TH.ForallC ex_tvs' cxt main_con) } }
 
 ------------------------------
 reifyClass :: Class -> TcM TH.Info
@@ -1169,7 +1169,7 @@ reifyClass cls
         ; ops <- concatMapM reify_op op_stuff
         ; tvs' <- reifyTyVars tvs
         ; let dec = TH.ClassD cxt (reifyName cls) tvs' fds' ops
-        ; return (TH.ClassI dec insts ) }
+        ; return (TH.ClassI dec insts) }
   where
     (tvs, fds, theta, _, _, op_stuff) = classExtraBigSig cls
     fds' = map reifyFunDep fds
@@ -1490,12 +1490,13 @@ reifyFixity name
       conv_dir BasicTypes.InfixN = TH.InfixN
 
 reifyStrict :: DataCon.HsSrcBang -> TH.Strict
-reifyStrict HsNoBang                       = TH.NotStrict
-reifyStrict (HsSrcBang _ _ False)          = TH.NotStrict
-reifyStrict (HsSrcBang _ (Just True) True) = TH.Unpacked
-reifyStrict (HsSrcBang _ _     True)       = TH.IsStrict
-reifyStrict HsStrict                       = TH.IsStrict
-reifyStrict (HsUnpack {})                  = TH.Unpacked
+reifyStrict HsLazy                                  = TH.NotStrict
+reifyStrict (HsSrcBang _ _         SrcLazy)         = TH.NotStrict
+reifyStrict (HsSrcBang _ _         NoSrcStrictness) = TH.NotStrict
+reifyStrict (HsSrcBang _ SrcUnpack SrcStrict)       = TH.Unpacked
+reifyStrict (HsSrcBang _ _         SrcStrict)       = TH.IsStrict
+reifyStrict HsStrict                                = TH.IsStrict
+reifyStrict (HsUnpack {})                           = TH.Unpacked
 
 ------------------------------
 lookupThAnnLookup :: TH.AnnLookup -> TcM CoreAnnTarget

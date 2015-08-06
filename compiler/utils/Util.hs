@@ -55,6 +55,7 @@ module Util (
         isEqual, eqListBy, eqMaybeBy,
         thenCmp, cmpList,
         removeSpaces,
+        (<&&>), (<||>),
 
         -- * Edit distance
         fuzzyMatch, fuzzyLookup,
@@ -664,6 +665,10 @@ removeSpaces = dropWhileEndLE isSpace . dropWhile isSpace
 (<&&>) :: Applicative f => f Bool -> f Bool -> f Bool
 (<&&>) = liftA2 (&&)
 infixr 3 <&&> -- same as (&&)
+
+(<||>) :: Applicative f => f Bool -> f Bool -> f Bool
+(<||>) = liftA2 (||)
+infixr 2 <||> -- same as (||)
 
 {-
 ************************************************************************

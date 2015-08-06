@@ -119,6 +119,8 @@ class Foldable t where
     -- | Map each element of the structure to a monoid,
     -- and combine the results.
     foldMap :: Monoid m => (a -> m) -> t a -> m
+    {-# INLINE foldMap #-}
+    -- This INLINE allows more list functions to fuse. See Trac #9848.
     foldMap f = foldr (mappend . f) mempty
 
     -- | Right-associative fold of a structure.

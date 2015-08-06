@@ -15,7 +15,8 @@ module Demand (
         mkProdDmd, mkOnceUsedDmd, mkManyUsedDmd, mkHeadStrict, oneifyDmd,
         getUsage, toCleanDmd,
         absDmd, topDmd, botDmd, seqDmd,
-        lubDmd, bothDmd, apply1Dmd, apply2Dmd,
+        lubDmd, bothDmd,
+        lazyApply1Dmd, lazyApply2Dmd, strictApply1Dmd,
         isTopDmd, isBotDmd, isAbsDmd, isSeqDmd,
         peelUseCall, cleanUseDmd_maybe, strictenDmd, bothCleanDmd,
         addCaseBndrDmd,
@@ -56,7 +57,6 @@ module Demand (
 
 #include "HsVersions.h"
 
-import StaticFlags
 import DynFlags
 import Outputable
 import Var ( Var )
@@ -522,10 +522,11 @@ mkJointDmds ss as = zipWithEqual "mkJointDmds" mkJointDmd ss as
 absDmd :: JointDmd
 absDmd = mkJointDmd Lazy Abs
 
-apply1Dmd, apply2Dmd :: Demand
+lazyApply1Dmd, lazyApply2Dmd, strictApply1Dmd :: Demand
 -- C1(U), C1(C1(U)) respectively
-apply1Dmd = JD { strd = Lazy, absd = Use Many (UCall One Used) }
-apply2Dmd = JD { strd = Lazy, absd = Use Many (UCall One (UCall One Used)) }
+strictApply1Dmd = JD { strd = Str (SCall HeadStr), absd = Use Many (UCall One Used) }
+lazyApply1Dmd   = JD { strd = Lazy, absd = Use Many (UCall One Used) }
+lazyApply2Dmd   = JD { strd = Lazy, absd = Use Many (UCall One (UCall One Used)) }
 
 topDmd :: JointDmd
 topDmd = mkJointDmd Lazy useTop
@@ -839,7 +840,7 @@ bothDmdResult r              _          = r
 -- defaultDmd (r1 `bothDmdResult` r2) = defaultDmd r1 `bothDmd` defaultDmd r2
 -- (See Note [Default demand on free variables] for why)
 
-instance Outputable DmdResult where
+instance Outputable r => Outputable (Termination r) where
   ppr Diverges      = char 'b'
   ppr (Dunno c)     = ppr c
 
@@ -869,18 +870,13 @@ topRes = Dunno NoCPR
 botRes = Diverges
 
 cprSumRes :: ConTag -> DmdResult
-cprSumRes tag | opt_CprOff = topRes
-              | otherwise  = Dunno $ RetSum tag
+cprSumRes tag = Dunno $ RetSum tag
 
 cprProdRes :: [DmdType] -> DmdResult
-cprProdRes _arg_tys
-  | opt_CprOff = topRes
-  | otherwise  = Dunno $ RetProd
+cprProdRes _arg_tys = Dunno $ RetProd
 
 vanillaCprProdRes :: Arity -> DmdResult
-vanillaCprProdRes _arity
-  | opt_CprOff = topRes
-  | otherwise  = Dunno $ RetProd
+vanillaCprProdRes _arity = Dunno $ RetProd
 
 isTopRes :: DmdResult -> Bool
 isTopRes (Dunno NoCPR) = True
@@ -1160,8 +1156,8 @@ nopDmdType = DmdType emptyDmdEnv [] topRes
 botDmdType = DmdType emptyDmdEnv [] botRes
 
 cprProdDmdType :: Arity -> DmdType
-cprProdDmdType _arity
-  = DmdType emptyDmdEnv [] (Dunno RetProd)
+cprProdDmdType arity
+  = DmdType emptyDmdEnv [] (vanillaCprProdRes arity)
 
 isNopDmdType :: DmdType -> Bool
 isNopDmdType (DmdType env [] res)
@@ -1212,7 +1208,7 @@ splitDmdTy ty@(DmdType _ [] res_ty)       = (resTypeArgDmd res_ty, ty)
 -- what of this demand should we consider, given that the IO action can cleanly
 -- exit?
 -- * We have to kill all strictness demands (i.e. lub with a lazy demand)
--- * We can keep demand information (i.e. lub with an absent deman)
+-- * We can keep demand information (i.e. lub with an absent demand)
 -- * We have to kill definite divergence
 -- * We can keep CPR information.
 -- See Note [IO hack in the demand analyser]

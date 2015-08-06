@@ -19,6 +19,7 @@ module TcHsType (
 
                 -- Kind-checking types
                 -- No kind generalisation, no checkValidType
+        tcWildcardBinders,
         kcHsTyVarBndrs, tcHsTyVarBndrs,
         tcHsLiftedType, tcHsOpenType,
         tcLHsType, tcCheckLHsType, tcCheckLHsTypeAndGen,
@@ -234,8 +235,7 @@ tcHsVectInst ty
 -- of the wildcards in the type
 tcHsTypeApp :: (LHsType Name, [Name]) -> Kind -> TcM Type
 tcHsTypeApp (hs_ty, wcs) kind
-  = do { nwc_tvs <- mapM newWildcardVarMetaKind wcs
-       ; tcExtendTyVarEnv nwc_tvs $
+  = tcWildcardBinders wcs $ \ wc_prs ->
     do { ty <- tcCheckLHsType hs_ty kind
        ; checkValidType TypeAppCtxt ty
        ; return ty } }
@@ -936,6 +936,19 @@ addTypeCtxt (L _ ty) thing
 ************************************************************************
 -}
 
+tcWildcardBinders :: [Name]
+                  -> ([(Name,TcTyVar)] -> TcM a)
+                  -> TcM a
+tcWildcardBinders wcs thing_inside
+  = do { wc_prs <- mapM new_wildcard wcs
+       ; tcExtendTyVarEnv2 wc_prs $
+         thing_inside wc_prs }
+  where
+   new_wildcard :: Name -> TcM (Name, TcTyVar)
+   new_wildcard name = do { kind <- newMetaKindVar
+                          ; tv   <- newFlexiTyVar kind
+                          ; return (name, tv) }
+
 mkKindSigVar :: Name -> TcM KindVar
 -- Use the specified name; don't clone it
 mkKindSigVar n
@@ -1256,7 +1269,7 @@ This is bad because throwing away the kind checked type throws away
 its splices.  But too bad for now.  [July 03]
 
 Historical note:
-    We no longer specify that these type variables must be univerally
+    We no longer specify that these type variables must be universally
     quantified (lots of email on the subject).  If you want to put that
     back in, you need to
         a) Do a checkSigTyVars after thing_inside
@@ -1280,16 +1293,15 @@ tcHsPatSigType :: UserTypeCtxt
 tcHsPatSigType ctxt (HsWB { hswb_cts = hs_ty, hswb_kvs = sig_kvs,
                             hswb_tvs = sig_tvs, hswb_wcs = sig_wcs })
   = addErrCtxt (pprSigCtxt ctxt empty (ppr hs_ty)) $
-    do  { kvs <- mapM new_kv sig_kvs
+    tcWildcardBinders sig_wcs $ \ nwc_binds ->
+    do  { emitWildcardHoleConstraints nwc_binds
+        ; kvs <- mapM new_kv sig_kvs
         ; tvs <- mapM new_tv sig_tvs
-        ; nwc_tvs <- mapM newWildcardVarMetaKind sig_wcs
-        ; let nwc_binds = sig_wcs `zip` nwc_tvs
-              ktv_binds = (sig_kvs `zip` kvs) ++ (sig_tvs `zip` tvs)
-        ; sig_ty <- tcExtendTyVarEnv2 (ktv_binds ++ nwc_binds) $
+        ; let ktv_binds = (sig_kvs `zip` kvs) ++ (sig_tvs `zip` tvs)
+        ; sig_ty <- tcExtendTyVarEnv2 ktv_binds $
                     tcHsLiftedType hs_ty
         ; sig_ty <- zonkSigType sig_ty
         ; checkValidType ctxt sig_ty
-        ; emitWildcardHoleConstraints (zip sig_wcs nwc_tvs)
         ; return (sig_ty, ktv_binds, nwc_binds) }
   where
     new_kv name = new_tkv name superKind
