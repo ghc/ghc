@@ -7,9 +7,11 @@ import Util
 import Builder
 import Expression
 import qualified Target
+import Oracles.Setting
+import Oracles.ArgsHash
 import Settings.Args
 import Settings.Util
-import Oracles.ArgsHash
+import Settings.Builders.Ar
 
 -- Build a given target using an appropriate builder and acquiring necessary
 -- resources. Force a rebuilt if the argument list has changed since the last
@@ -29,7 +31,14 @@ buildWithResources rs target = do
                  ++ show builder ++ " with arguments:"
         mapM_ (putBuild . ("|   " ++)) $ interestingInfo builder argList
         putBuild $ "\\--------"
-        quietly $ cmd [path] argList
+        quietly $ if builder /= Ar
+            then cmd [path] argList
+            else do -- Split argument list into chunks as otherwise Ar chokes up
+                maxChunk <- cmdLineLengthLimit
+                let persistentArgs = take arPersistentArgsCount argList
+                    remainingArgs  = drop arPersistentArgsCount argList
+                forM_ (chunksOfSize maxChunk remainingArgs) $ \argsChunk ->
+                    unit . cmd [path] $ persistentArgs ++ argsChunk
 
 -- Most targets are built without explicitly acquiring resources
 build :: FullTarget -> Action ()
