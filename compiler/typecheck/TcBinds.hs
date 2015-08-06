@@ -1802,7 +1802,7 @@ instTcTySig ctxt hs_ty sigma_ty extra_cts nwcs name
                   = CompleteSig $ mkLocalId name sigma_ty HasSigId  -- non-partial
                   | otherwise
                   = PartialSig { sig_name = name, sig_nwcs = nwcs
-                               , sig_cts = extra_ctx, sig_hs_ty = hs_ty }
+                               , sig_cts = extra_cts, sig_hs_ty = hs_ty }
        ; return (TISI { sig_bndr   = bndr
                       , sig_tvs   = findScopedTyVars hs_ty sigma_ty inst_tvs
                       , sig_theta = theta

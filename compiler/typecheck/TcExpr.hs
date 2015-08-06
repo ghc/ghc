@@ -243,7 +243,7 @@ tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
 
       ; let inner_expr = ExprWithTySigOut (mkLHsWrap gen_fn expr') sig_ty
 
-      ; tcWrapResult inner_expr sig_tc_ty res_ty ExprSigOrigin } }
+      ; tcWrapResult inner_expr sig_tc_ty res_ty ExprSigOrigin }
 
 tcExpr (HsType ty _) _
   = failWithTc (sep [ text "Type argument used outside of a function argument:"

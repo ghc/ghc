@@ -238,7 +238,7 @@ tcHsTypeApp (hs_ty, wcs) kind
   = tcWildcardBinders wcs $ \ wc_prs ->
     do { ty <- tcCheckLHsType hs_ty kind
        ; checkValidType TypeAppCtxt ty
-       ; return ty } }
+       ; return ty }
         -- NB: we don't call emitWildcardHoleConstraints here, because
         -- we want any holes in visible type applications to be used
         -- without fuss. No errors, warnings, extensions, etc.
