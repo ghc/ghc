@@ -12,3 +12,4 @@ T3330c.hs:23:43: error:
       plug' :: R f -> Der f x -> x -> f x (bound at T3330c.hs:23:1)
     In the first argument of ‘plug’, namely ‘rf’
     In the first argument of ‘Inl’, namely ‘(plug rf df x)’
+    In the expression: Inl (plug rf df x)

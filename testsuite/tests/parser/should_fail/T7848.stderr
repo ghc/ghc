@@ -1,15 +1,15 @@
 
 T7848.hs:6:57: error:
     Occurs check: cannot construct the infinite type:
-      t3 ~ t0 -> t1 -> t2 -> A -> A -> A -> A -> t3
+      t2 ~ r0 -> t0 -> t1 -> A -> A -> A -> A -> t2
     Relevant bindings include
-      y :: forall t0. t0 -> t1 -> t2 -> A -> A -> A -> A -> t3
+      y :: forall r0. r0 -> t0 -> t1 -> A -> A -> A -> A -> t2
         (bound at T7848.hs:8:9)
-      (&) :: t1 -> t2 -> A -> A -> A -> A -> t3 (bound at T7848.hs:11:9)
-      z :: t2 (bound at T7848.hs:6:12)
-      (&) :: t2 (bound at T7848.hs:6:8)
-      (+) :: t1 (bound at T7848.hs:6:3)
-      x :: t1 -> t2 -> A -> A -> A -> A -> t3 (bound at T7848.hs:6:1)
+      (&) :: t0 -> t1 -> A -> A -> A -> A -> t2 (bound at T7848.hs:11:9)
+      z :: t1 (bound at T7848.hs:6:12)
+      (&) :: t1 (bound at T7848.hs:6:8)
+      (+) :: t0 (bound at T7848.hs:6:3)
+      x :: t0 -> t1 -> A -> A -> A -> A -> t2 (bound at T7848.hs:6:1)
     In the expression: y
     In an equation for ‘x’:
         x (+) ((&)@z) ((:&&) a b) (c :&& d) (e `A` f) (A g h)
@@ -22,15 +22,15 @@ T7848.hs:6:57: error:
               (&) = x
 
 T7848.hs:10:9: error:
-    Couldn't match expected type ‘t1 -> t2 -> A -> A -> A -> A -> t3’
+    Couldn't match expected type ‘t0 -> t1 -> A -> A -> A -> A -> t2’
                 with actual type ‘a’
     ‘a’ is a rigid type variable bound by
         the type signature for: (&) :: a at T7848.hs:10:9
     Relevant bindings include
-      z :: t2 (bound at T7848.hs:6:12)
-      (&) :: t2 (bound at T7848.hs:6:8)
-      (+) :: t1 (bound at T7848.hs:6:3)
-      x :: t1 -> t2 -> A -> A -> A -> A -> t3 (bound at T7848.hs:6:1)
+      z :: t1 (bound at T7848.hs:6:12)
+      (&) :: t1 (bound at T7848.hs:6:8)
+      (+) :: t0 (bound at T7848.hs:6:3)
+      x :: t0 -> t1 -> A -> A -> A -> A -> t2 (bound at T7848.hs:6:1)
     In the SPECIALISE pragma {-# SPECIALIZE (&) :: a #-}
     In an equation for ‘x’:
         x (+) ((&)@z) ((:&&) a b) (c :&& d) (e `A` f) (A g h)

@@ -1,5 +1,5 @@
 
-T9554.hs:11:9:
+T9554.hs:11:9: error:
     Reduction stack overflow; size = 201
     When simplifying the following type:
       F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F Bool)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
@@ -10,7 +10,7 @@ T9554.hs:11:9:
     In the expression: x
     In an equation for ‘foo’: foo x = x
 
-T9554.hs:13:17:
+T9554.hs:13:17: error:
     Reduction stack overflow; size = 201
     When simplifying the following type:
       F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F (F Bool)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
@@ -20,3 +20,5 @@ T9554.hs:13:17:
      you're sure that type checking should terminate)
     In the first argument of ‘foo’, namely ‘Proxy’
     In the expression: foo Proxy
+    In the expression:
+      case foo Proxy of { Proxy -> putStrLn "Made it!" }

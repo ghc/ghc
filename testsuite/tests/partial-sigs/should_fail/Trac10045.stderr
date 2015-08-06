@@ -1,19 +1,19 @@
 
 Trac10045.hs:6:17: error:
-    Found hole: _ :: t1 -> a0 -> t2
-    Where: ‘t1’ is a rigid type variable bound by
-                the inferred type of copy :: Num a0 => t1 -> a0 -> t2
+    Found hole: _ :: t0 -> a0 -> t1
+    Where: ‘t0’ is a rigid type variable bound by
+                the inferred type of copy :: Num a0 => t0 -> a0 -> t1
                 at Trac10045.hs:7:9
-           ‘t2’ is a rigid type variable bound by
-                the inferred type of copy :: Num a0 => t1 -> a0 -> t2
+           ‘t1’ is a rigid type variable bound by
+                the inferred type of copy :: Num a0 => t0 -> a0 -> t1
                 at Trac10045.hs:7:9
            ‘a0’ is a rigid type variable bound by
-                the inferred type of copy :: Num a0 => t1 -> a0 -> t2
+                the inferred type of copy :: Num a0 => t0 -> a0 -> t1
                 at Trac10045.hs:7:9
     To use the inferred type, enable PartialTypeSignatures
     Relevant bindings include
       ws1 :: () (bound at Trac10045.hs:5:11)
-      foo :: Meta -> t0 (bound at Trac10045.hs:5:1)
+      foo :: Meta -> r0 (bound at Trac10045.hs:5:1)
     In the type signature for ‘copy’: _
     In the expression:
       let

@@ -9,3 +9,4 @@ T7729.hs:36:14: error:
         (bound at T7729.hs:36:3)
     In the first argument of ‘(.)’, namely ‘liftPrim’
     In the expression: liftPrim . lift
+    In an equation for ‘liftPrim’: liftPrim = liftPrim . lift

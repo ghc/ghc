@@ -4,3 +4,4 @@ T7354a.hs:5:13: error:
     Relevant bindings include foo :: t0 (bound at T7354a.hs:5:1)
     In the first argument of ‘embed’, namely ‘()’
     In the expression: embed ()
+    In an equation for ‘foo’: foo = embed ()

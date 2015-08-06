@@ -1,12 +1,12 @@
 
 mod71.hs:4:9: error:
-    Found hole: _ :: t1
-    Where: ‘t1’ is a rigid type variable bound by
-                the inferred type of f :: Num a0 => (t1 -> a0 -> t0) -> t0
+    Found hole: _ :: t0
+    Where: ‘t0’ is a rigid type variable bound by
+                the inferred type of f :: Num a0 => (t0 -> a0 -> r0) -> r0
                 at mod71.hs:4:1
     Relevant bindings include
-      x :: t1 -> a0 -> t0 (bound at mod71.hs:4:3)
-      f :: (t1 -> a0 -> t0) -> t0 (bound at mod71.hs:4:1)
+      x :: t0 -> a0 -> r0 (bound at mod71.hs:4:3)
+      f :: (t0 -> a0 -> r0) -> r0 (bound at mod71.hs:4:1)
     In the first argument of ‘x’, namely ‘_’
     In the expression: x _ 1
     In an equation for ‘f’: f x = x _ 1

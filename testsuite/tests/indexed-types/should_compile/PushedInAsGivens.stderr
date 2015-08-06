@@ -12,6 +12,7 @@ PushedInAsGivens.hs:10:31: error:
       bar :: a0 -> (a0, Int) (bound at PushedInAsGivens.hs:9:1)
     In the expression: y
     In the first argument of ‘length’, namely ‘[x, y]’
+    In the expression: length [x, y]
 
 PushedInAsGivens.hs:11:15: error:
     Couldn't match expected type ‘[a0]’ with actual type ‘F Int’

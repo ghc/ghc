@@ -1,5 +1,5 @@
 
-T4179.hs:26:16:
+T4179.hs:26:16: error:
     Couldn't match type ‘A2 (x (A2 (FCon x) -> A3 (FCon x)))’
                    with ‘A2 (FCon x)’
     NB: ‘A2’ is a type function, and may not be injective
@@ -13,3 +13,4 @@ T4179.hs:26:16:
         (bound at T4179.hs:26:1)
     In the first argument of ‘foldDoC’, namely ‘op’
     In the expression: foldDoC op
+    In an equation for ‘fCon’: fCon = foldDoC op

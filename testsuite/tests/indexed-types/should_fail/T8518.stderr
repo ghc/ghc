@@ -15,14 +15,18 @@ T8518.hs:14:18: error:
               rpt i c' z' b' = let ... in rpt (i - 1) c''
 
 T8518.hs:17:78: error:
-    Couldn't match expected type ‘F a1’
-                with actual type ‘Z a1 -> B a1 -> F a1’
+    Couldn't match expected type ‘F a0’
+                with actual type ‘Z a0 -> B a0 -> F a0’
     Relevant bindings include
-      c'' :: a1 (bound at T8518.hs:17:30)
-      b' :: B a1 (bound at T8518.hs:17:21)
-      z' :: Z a1 (bound at T8518.hs:17:18)
-      c' :: a1 (bound at T8518.hs:17:15)
-      rpt :: a0 -> a1 -> Z a1 -> B a1 -> F a1 (bound at T8518.hs:16:9)
+      c'' :: a0 (bound at T8518.hs:17:30)
+      b' :: B a0 (bound at T8518.hs:17:21)
+      z' :: Z a0 (bound at T8518.hs:17:18)
+      c' :: a0 (bound at T8518.hs:17:15)
+      rpt :: a1 -> a0 -> Z a0 -> B a0 -> F a0 (bound at T8518.hs:16:9)
     In the expression: rpt (i - 1) c''
     In the expression:
       let c'' = fromJust (snd <$> (continue c' z' b')) in rpt (i - 1) c''
+    In an equation for ‘rpt’:
+        rpt i c' z' b'
+          = let c'' = fromJust (snd <$> (continue c' z' b'))
+            in rpt (i - 1) c''

@@ -14,17 +14,17 @@ Test10357.hs:6:15: error:
     Perhaps you meant ‘LT’ (imported from Prelude)
 
 Test10357.hs:7:10: error:
-    Variable not in scope: addPoly :: t5 -> t6 -> t4
+    Variable not in scope: addPoly :: t5 -> t7 -> t4
 
 Test10357.hs:7:19: error:
-    Variable not in scope: poly :: t1 -> [Double] -> t7
+    Variable not in scope: poly :: t1 -> [Double] -> t6
 
 Test10357.hs:7:24: error:
     Data constructor not in scope: LE
     Perhaps you meant ‘LT’ (imported from Prelude)
 
 Test10357.hs:7:43: error:
-    Variable not in scope: multPoly :: t7 -> t9 -> t5
+    Variable not in scope: multPoly :: t6 -> t9 -> t5
 
 Test10357.hs:8:19: error:
     Variable not in scope: poly :: t2 -> [Double] -> t8
@@ -34,4 +34,4 @@ Test10357.hs:8:24: error:
     Perhaps you meant ‘LT’ (imported from Prelude)
 
 Test10357.hs:8:43: error:
-    Variable not in scope: multPoly :: t8 -> t9 -> t6
+    Variable not in scope: multPoly :: t8 -> t9 -> t7

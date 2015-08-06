@@ -21,6 +21,7 @@ T2693.hs:19:15: error:
     Relevant bindings include n :: a5 (bound at T2693.hs:19:7)
     In the first argument of ‘fst’, namely ‘x’
     In the first argument of ‘(+)’, namely ‘fst x’
+    In the expression: fst x + snd x
 
 T2693.hs:19:23: error:
     Couldn't match expected type ‘(a3, a5)’ with actual type ‘TFn a4’
@@ -28,6 +29,7 @@ T2693.hs:19:23: error:
     Relevant bindings include n :: a5 (bound at T2693.hs:19:7)
     In the first argument of ‘snd’, namely ‘x’
     In the second argument of ‘(+)’, namely ‘snd x’
+    In the expression: fst x + snd x
 
 T2693.hs:29:20: error:
     Couldn't match type ‘TFn a0’ with ‘PVR a1’
@@ -36,3 +38,7 @@ T2693.hs:29:20: error:
       Actual type: () -> Maybe (TFn a0)
     In the first argument of ‘mapM’, namely ‘g’
     In a stmt of a 'do' block: pvs <- mapM g undefined
+    In the expression:
+      do { pvs <- mapM g undefined;
+           let n = (map pvrX pvs) `min` (map pvrX pvs);
+           undefined }

@@ -11,3 +11,4 @@
         (bound at <interactive>:6:33)
     In the expression: a
     In the expression: [a, b]
+    In an equation for ‘asList’: asList (a, b) = [a, b]

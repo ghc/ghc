@@ -1,16 +1,17 @@
 
 gadt13.hs:15:13: error:
-    Couldn't match expected type ‘t0’
+    Couldn't match expected type ‘r0’
                 with actual type ‘String -> [Char]’
-      ‘t0’ is untouchable
-        inside the constraints: t1 ~ Int
+      ‘r0’ is untouchable
+        inside the constraints: t0 ~ Int
         bound by a pattern with constructor: I :: Int -> Term Int,
                  in an equation for ‘shw’
         at gadt13.hs:15:6-8
-    ‘t0’ is a rigid type variable bound by
-         the inferred type of shw :: Term t1 -> t0 at gadt13.hs:15:1
+    ‘r0’ is a rigid type variable bound by
+         the inferred type of shw :: Term t0 -> r0 at gadt13.hs:15:1
     Possible fix: add a type signature for ‘shw’
     Relevant bindings include
-      shw :: Term t1 -> t0 (bound at gadt13.hs:15:1)
+      shw :: Term t0 -> r0 (bound at gadt13.hs:15:1)
+    Possible cause: ‘(.)’ is applied to too many arguments
     In the expression: ("I " ++) . shows t
     In an equation for ‘shw’: shw (I t) = ("I " ++) . shows t

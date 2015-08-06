@@ -1,17 +1,19 @@
 
 gadt-escape1.hs:19:58: error:
-    Couldn't match type ‘t0’ with ‘ExpGADT Int’
-      ‘t0’ is untouchable
+    Couldn't match type ‘r0’ with ‘ExpGADT Int’
+      ‘r0’ is untouchable
         inside the constraints: t ~ Int
         bound by a pattern with constructor: ExpInt :: Int -> ExpGADT Int,
                  in a case alternative
         at gadt-escape1.hs:19:43-50
-    ‘t0’ is a rigid type variable bound by
-         the inferred type of weird1 :: t0 at gadt-escape1.hs:19:1
+    ‘r0’ is a rigid type variable bound by
+         the inferred type of weird1 :: r0 at gadt-escape1.hs:19:1
     Possible fix: add a type signature for ‘weird1’
-    Expected type: t0
+    Expected type: r0
       Actual type: ExpGADT t
     Relevant bindings include
-      weird1 :: t0 (bound at gadt-escape1.hs:19:1)
+      weird1 :: r0 (bound at gadt-escape1.hs:19:1)
     In the expression: a
     In a case alternative: Hidden (ExpInt _) a -> a
+    In the expression:
+      case (hval :: Hidden) of { Hidden (ExpInt _) a -> a }
