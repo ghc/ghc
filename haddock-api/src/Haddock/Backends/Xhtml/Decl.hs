@@ -874,8 +874,10 @@ ppr_mono_ty _         (HsSpliceTy {})     _ _ = error "ppr_mono_ty HsSpliceTy"
 ppr_mono_ty _         (HsQuasiQuoteTy {}) _ _ = error "ppr_mono_ty HsQuasiQuoteTy"
 ppr_mono_ty _         (HsRecTy {})        _ _ = error "ppr_mono_ty HsRecTy"
 ppr_mono_ty _         (HsCoreTy {})       _ _ = error "ppr_mono_ty HsCoreTy"
-ppr_mono_ty _         (HsExplicitListTy _ tys) u q = quote $ brackets $ hsep $ punctuate comma $ map (ppLType u q) tys
-ppr_mono_ty _         (HsExplicitTupleTy _ tys) u q = quote $ parenList $ map (ppLType u q) tys
+ppr_mono_ty _         (HsExplicitListTy _ tys) u q =
+    promoQuote $ brackets $ hsep $ punctuate comma $ map (ppLType u q) tys
+ppr_mono_ty _         (HsExplicitTupleTy _ tys) u q =
+    promoQuote $ parenList $ map (ppLType u q) tys
 ppr_mono_ty _         (HsWrapTy {})       _ _ = error "ppr_mono_ty HsWrapTy"
 
 ppr_mono_ty ctxt_prec (HsEqTy ty1 ty2) unicode qual

@@ -21,7 +21,7 @@ module Haddock.Backends.Xhtml.Utils (
   keyword, punctuate,
 
   braces, brackets, pabrackets, parens, parenList, ubxParenList,
-  arrow, comma, dcolon, dot, darrow, equals, forallSymbol, quote,
+  arrow, comma, dcolon, dot, darrow, equals, forallSymbol, quote, promoQuote,
 
   hsep, vcat,
 
@@ -148,6 +148,11 @@ char c = toHtml [c]
 
 quote :: Html -> Html
 quote h = char '`' +++ h +++ '`'
+
+
+-- | Promoted type quote (e.g. @'[a, b]@, @'(a, b, c)@).
+promoQuote :: Html -> Html
+promoQuote h = char '\'' +++ h
 
 
 parens, brackets, pabrackets, braces :: Html -> Html
