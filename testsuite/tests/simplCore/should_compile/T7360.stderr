@@ -17,8 +17,8 @@ T7360.$WFoo3 =
     case dt of _ [Occ=Dead] { I# dt [Occ=Once] -> T7360.Foo3 dt }
 
 fun1 [InlPrag=NOINLINE] :: Foo -> ()
-[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U>]
-fun1 = \ (x :: Foo) -> case x of _ [Occ=Dead] { __DEFAULT -> () }
+[GblId[sig], Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U>]
+fun1 = \ (ds :: Foo) -> case ds of _ [Occ=Dead] { __DEFAULT -> () }
 
 T7360.fun5 :: ()
 [GblId,
@@ -42,19 +42,19 @@ fun2 :: forall a. [a] -> ((), Int)
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@ a) (x [Occ=Once!] :: [a]) ->
+         Tmpl= \ (@ a) (ds [Occ=Once!] :: [a]) ->
                  (T7360.fun5,
-                  case x of wild {
+                  case ds of wild {
                     [] -> T7360.fun4;
                     : _ [Occ=Dead] _ [Occ=Dead] ->
                       case GHC.List.$wlenAcc @ a wild 0# of ww2 { __DEFAULT -> I# ww2 }
                   })}]
 fun2 =
-  \ (@ a) (x :: [a]) ->
+  \ (@ a) (ds :: [a]) ->
     (T7360.fun5,
-     case x of wild {
+     case ds of wild {
        [] -> T7360.fun4;
-       : ds ds1 ->
+       : ds1 ds2 ->
          case GHC.List.$wlenAcc @ a wild 0# of ww2 { __DEFAULT -> I# ww2 }
      })
 

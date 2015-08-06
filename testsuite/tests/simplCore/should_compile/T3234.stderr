@@ -13,9 +13,9 @@
 Total ticks:     45
 
 14 PreInlineUnconditionally
-  1 n
+  1 ds1
   1 a
-  1 g
+  1 ds
   1 xs
   1 ys
   1 k
@@ -23,13 +23,13 @@ Total ticks:     45
   1 x
   1 g
   1 h
-  1 n
+  1 ds1
   1 a
   1 lvl
   1 lvl
 2 PostInlineUnconditionally
-  1 c
-  1 c
+  1 ds
+  1 ds
 1 UnfoldingDone 1 GHC.Base.build
 5 RuleFired
   1 ++
@@ -42,13 +42,13 @@ Total ticks:     45
   1 a
   1 b
   1 a
-  1 g
+  1 ds
   1 a
   1 xs
   1 ys
   1 b
-  1 c
-  1 n
+  1 ds
+  1 ds1
   1 a
   1 b
   1 k
@@ -58,8 +58,8 @@ Total ticks:     45
   1 g
   1 h
   1 b
-  1 c
-  1 n
+  1 ds
+  1 ds1
   1 a
 11 SimplifierDone 11
 

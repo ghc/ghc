@@ -11,22 +11,22 @@ T4930.foo1 :: Int
 T4930.foo1 = error @ Int lvl
 
 foo :: Int -> Int
-[GblId,
+[GblId[sig],
  Arity=1,
  Str=DmdType <S,1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (n [Occ=Once!] :: Int) ->
-                 case n of _ [Occ=Dead] { I# x ->
+         Tmpl= \ (ds [Occ=Once!] :: Int) ->
+                 case ds of _ [Occ=Dead] { I# x ->
                  case tagToEnum# @ Bool (<# x 5#) of _ [Occ=Dead] {
                    False -> I# (+# x 5#);
                    True -> T4930.foo1
                  }
                  }}]
 foo =
-  \ (n :: Int) ->
-    case n of _ [Occ=Dead] { I# x ->
+  \ (ds :: Int) ->
+    case ds of _ [Occ=Dead] { I# x ->
     case tagToEnum# @ Bool (<# x 5#) of _ [Occ=Dead] {
       False -> I# (+# x 5#);
       True -> T4930.foo1

@@ -7,7 +7,7 @@ a :: Wrap Age -> Wrap Age
 a = \ (ds :: Wrap Age) -> ds
 
 convert :: Wrap Age -> Int
-[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType]
+[GblId[sig], Arity=1, Caf=NoCafRefs, Str=DmdType]
 convert =
   a
   `cast` (<Wrap Age>_R -> Roles13.NTCo:Wrap[0] Roles13.NTCo:Age[0]

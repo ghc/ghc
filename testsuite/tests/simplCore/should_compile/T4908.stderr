@@ -18,7 +18,7 @@ T4908.f_$s$wf =
 end Rec }
 
 T4908.$wf [InlPrag=[0]] :: Int# -> (Int, Int) -> Bool
-[GblId,
+[GblId[sig],
  Arity=2,
  Caf=NoCafRefs,
  Str=DmdType <S,1*U><L,1*U(A,U(U))>,
@@ -40,7 +40,7 @@ T4908.$wf =
     }
 
 f [InlPrag=INLINE[0]] :: Int -> (Int, Int) -> Bool
-[GblId,
+[GblId[sig],
  Arity=2,
  Caf=NoCafRefs,
  Str=DmdType <S(S),1*U(1*U)><L,1*U(A,U(U))>,

@@ -13,3 +13,4 @@ T7594.hs:33:12: error:
     Relevant bindings include bar2 :: b0 (bound at T7594.hs:33:1)
     In the first argument of ‘app’, namely ‘print’
     In the expression: app print q2
+    In an equation for ‘bar2’: bar2 = app print q2

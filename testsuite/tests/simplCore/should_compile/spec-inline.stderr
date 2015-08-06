@@ -31,7 +31,7 @@ Roman.foo_$s$wgo =
 end Rec }
 
 Roman.$wgo [InlPrag=[0]] :: Maybe Int -> Maybe Int -> Int#
-[GblId,
+[GblId[sig],
  Arity=2,
  Str=DmdType <S,1*U><S,1*U>,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
@@ -97,20 +97,20 @@ Roman.foo1 :: Maybe Int
 Roman.foo1 = Just @ Int Roman.foo2
 
 foo :: Int -> Int
-[GblId,
+[GblId[sig],
  Arity=1,
  Caf=NoCafRefs,
  Str=DmdType <S,1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (n [Occ=Once!] :: Int) ->
-                 case n of n1 { I# _ [Occ=Dead] ->
-                 Roman.foo_go (Just @ Int n1) Roman.foo1
+         Tmpl= \ (ds [Occ=Once!] :: Int) ->
+                 case ds of n { I# _ [Occ=Dead] ->
+                 Roman.foo_go (Just @ Int n) Roman.foo1
                  }}]
 foo =
-  \ (n :: Int) ->
-    case n of _ [Occ=Dead] { I# ipv ->
+  \ (ds :: Int) ->
+    case ds of _ [Occ=Dead] { I# ipv ->
     case Roman.foo_$s$wgo ipv 6# of ww { __DEFAULT -> I# ww }
     }
 

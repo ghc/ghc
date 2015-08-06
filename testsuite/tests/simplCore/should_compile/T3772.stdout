@@ -4,20 +4,20 @@ Result size of Tidy Core = {terms: 26, types: 11, coercions: 0}
 
 Rec {
 $wxs :: Int# -> ()
-[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U>]
+[GblId[sig], Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U>]
 $wxs =
   \ (ww :: Int#) ->
-    case ww of ds1 {
-      __DEFAULT -> $wxs (-# ds1 1#);
+    case ww of ds6 {
+      __DEFAULT -> $wxs (-# ds6 1#);
       1# -> ()
     }
 end Rec }
 
 foo [InlPrag=NOINLINE] :: Int -> ()
-[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U(U)>]
+[GblId[sig], Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U(U)>]
 foo =
-  \ (n :: Int) ->
-    case n of _ [Occ=Dead] { I# y ->
+  \ (ds :: Int) ->
+    case ds of _ [Occ=Dead] { I# y ->
     case tagToEnum# @ Bool (<# 0# y) of _ [Occ=Dead] {
       False -> ();
       True -> $wxs y

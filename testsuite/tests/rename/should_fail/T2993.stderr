@@ -1,4 +1,4 @@
 
 T2993.hs:7:13: error:
-    Variable not in scope: (<**>) :: t1 -> (a0 -> a0) -> t0
+    Variable not in scope: (<**>) :: t0 -> (b0 -> b0) -> t1
     Perhaps you meant ‘<*>’ (imported from Prelude)
