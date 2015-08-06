@@ -152,7 +152,9 @@ loadConfig flags files = do
 
     let cfgHaddockStdOut = fromMaybe "/dev/null" (flagsHaddockStdOut flags)
 
-    cfgDiffTool <- (<|>) <$> pure (flagsDiffTool flags) <*> defaultDiffTool
+    cfgDiffTool <- if FlagNoDiff `elem` flags
+        then pure Nothing
+        else (<|>) <$> pure (flagsDiffTool flags) <*> defaultDiffTool
 
     return $ Config { .. }
 
@@ -302,6 +304,7 @@ data Flag
     | FlagHaddockOptions String
     | FlagHaddockStdOut FilePath
     | FlagDiffTool FilePath
+    | FlagNoDiff
     | FlagHelp
     deriving Eq
 
@@ -318,6 +321,8 @@ options =
         "where to redirect Haddock output"
     , Option [] ["diff-tool"] (ReqArg FlagDiffTool "PATH")
         "diff tool to use when printing failed cases"
+    , Option [] ["no-diff"] (NoArg FlagNoDiff)
+        "do not print diff for failed cases"
     , Option ['h'] ["help"] (NoArg FlagHelp)
         "display this help end exit"
     ]
