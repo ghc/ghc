@@ -84,25 +84,15 @@ tcPolyExpr expr res_ty
   = addExprErrCtxt expr $
     do { traceTc "tcPolyExpr" (ppr res_ty); tcPolyExprNC expr res_ty }
 
-tcPolyExprNC expr res_ty
-  = fst <$> tcPolyExprNC_O expr res_ty
-
--- variant of tcPolyExpr that returns the origin
-tcPolyExprNC_O
-         :: LHsExpr Name        -- Expression to type check
-         -> TcSigmaType         -- Expected type (could be a polytype)
-         -> TcM (LHsExpr TcId, CtOrigin) -- Generalised expr with expected type
-              -- The origin is useful if you ever need to instantiate the type
-
-tcPolyExprNC_O (L loc expr) res_ty
+tcPolyExprNC (L loc expr) res_ty
   = do { traceTc "tcPolyExprNC_O" (ppr res_ty)
-       ; (wrap, (expr', orig))
+       ; (wrap, (expr', _))
            <- tcSkolemise GenSigCtxt res_ty $ \ _ res_ty ->
               setSrcSpan loc $
                 -- NB: setSrcSpan *after* skolemising, so we get better
                 -- skolem locations
               tcExpr expr res_ty
-       ; return (L loc (mkHsWrap wrap expr'), orig) }
+       ; return $ L loc (mkHsWrap wrap expr') }
 
 ---------------
 tcMonoExpr, tcMonoExprNC
@@ -239,7 +229,7 @@ tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
  = do { nwc_tvs <- mapM newWildcardVarMetaKind wcs
       ; tcExtendTyVarEnv nwc_tvs $ do {
         sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
-      ; (gen_fn, (expr', orig))
+      ; (gen_fn, expr')
             <- tcSkolemise ExprSigCtxt sig_tc_ty $
                \ skol_tvs res_ty ->
 
@@ -248,13 +238,13 @@ tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
                tcExtendTyVarEnv2
                   [(n,tv) | (Just n, tv) <- findScopedTyVars sig_ty sig_tc_ty skol_tvs] $
 
-               tcPolyExprNC_O expr res_ty
+               tcPolyExprNC expr res_ty
 
       ; let inner_expr = ExprWithTySigOut (mkLHsWrap gen_fn expr') sig_ty
 
       ; addErrCtxt (pprSigCtxt ExprSigCtxt empty (ppr sig_ty)) $
         emitWildcardHoleConstraints (zip wcs nwc_tvs)
-      ; tcWrapResult inner_expr sig_tc_ty res_ty orig } }
+      ; tcWrapResult inner_expr sig_tc_ty res_ty ExprSigOrigin } }
 
 tcExpr (HsType ty _) _
   = failWithTc (sep [ text "Type argument used outside of a function argument:"
