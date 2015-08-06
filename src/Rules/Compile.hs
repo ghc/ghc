@@ -12,10 +12,6 @@ import Rules.Actions
 import Rules.Resources
 import Data.Maybe
 
-matchBuildResult :: FilePath -> String -> FilePath -> Bool
-matchBuildResult buildPath extension file =
-    (buildPath <//> "*" ++ extension) ?== file && (isJust . detectWay $ file)
-
 compilePackage :: Resources -> StagePackageTarget -> Rules ()
 compilePackage _ target = do
     let stage     = Target.stage target
