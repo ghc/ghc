@@ -10,7 +10,7 @@ module Way ( -- TODO: rename to "Way"?
     loggingDynamic, threadedLoggingDynamic,
 
     wayPrefix, hisuf, osuf, hcsuf, obootsuf, ssuf, libsuf,
-    detectWay
+    detectWay, matchBuildResult
     ) where
 
 import Base
@@ -20,6 +20,7 @@ import Data.List
 import Data.IntSet (IntSet)
 import Control.Applicative
 import qualified Data.IntSet as Set
+import Data.Maybe
 
 data WayUnit = Threaded
              | Debug
@@ -134,6 +135,13 @@ detectWay file = case reads prefix of
     _           -> Nothing
   where
     prefix = dropWhileEnd (== '_') . dropWhileEnd (/= '_') $ takeExtension file
+
+-- Given a path, an extension suffix, and a file name check if the latter:
+-- 1) conforms to pattern 'path//*suffix'
+-- 2) has extension prefixed with a known way tag, i.e. detectWay does not fail
+matchBuildResult :: FilePath -> String -> FilePath -> Bool
+matchBuildResult path suffix file =
+    (path <//> "*" ++ suffix) ?== file && (isJust . detectWay $ file)
 
 -- Instances for storing in the Shake database
 instance Binary Way where
