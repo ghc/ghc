@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
@@ -44,7 +45,7 @@ import GHC.Generics (Generic, Generic1)
 --
 -- @since 4.8.0.0
 newtype Identity a = Identity { runIdentity :: a }
-    deriving (Eq, Ord, Data, Traversable, Generic, Generic1)
+    deriving (Eq, Ord, Data, Monoid, Traversable, Generic, Generic1)
 
 -- | This instance would be equivalent to the derived instances of the
 -- 'Identity' newtype if the 'runIdentity' field were removed

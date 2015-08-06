@@ -106,35 +106,8 @@ static void *
 my_mmap (void *addr, W_ size, int operation)
 {
     void *ret;
-    int prot, flags;
 
-    if (operation & MEM_COMMIT)
-        prot = PROT_READ | PROT_WRITE;
-    else
-        prot = PROT_NONE;
-    if (operation == MEM_RESERVE)
-        flags = MAP_NORESERVE;
-    else if (operation == MEM_COMMIT)
-        flags = MAP_FIXED;
-    else
-        flags = 0;
-
-#if defined(solaris2_HOST_OS) || defined(irix_HOST_OS)
-    {
-        if (operation & MEM_RESERVE)
-        {
-            int fd = open("/dev/zero",O_RDONLY);
-            ret = mmap(addr, size, prot, flags | MAP_PRIVATE, fd, 0);
-            close(fd);
-        }
-        else
-        {
-            ret = mmap(addr, size, prot, flags | MAP_PRIVATE, -1, 0);
-        }
-    }
-#elif hpux_HOST_OS
-    ret = mmap(addr, size, prot, flags | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-#elif darwin_HOST_OS
+#if darwin_HOST_OS
     // Without MAP_FIXED, Apple's mmap ignores addr.
     // With MAP_FIXED, it overwrites already mapped regions, whic
     // mmap(0, ... MAP_FIXED ...) is worst of all: It unmaps the program text
@@ -169,6 +142,35 @@ my_mmap (void *addr, W_ size, int operation)
                    VM_PROT_READ|VM_PROT_WRITE);
     }
 
+#else
+
+    int prot, flags;
+    if (operation & MEM_COMMIT)
+        prot = PROT_READ | PROT_WRITE;
+    else
+        prot = PROT_NONE;
+    if (operation == MEM_RESERVE)
+        flags = MAP_NORESERVE;
+    else if (operation == MEM_COMMIT)
+        flags = MAP_FIXED;
+    else
+        flags = 0;
+
+#if defined(solaris2_HOST_OS) || defined(irix_HOST_OS)
+    {
+        if (operation & MEM_RESERVE)
+        {
+            int fd = open("/dev/zero",O_RDONLY);
+            ret = mmap(addr, size, prot, flags | MAP_PRIVATE, fd, 0);
+            close(fd);
+        }
+        else
+        {
+            ret = mmap(addr, size, prot, flags | MAP_PRIVATE, -1, 0);
+        }
+    }
+#elif hpux_HOST_OS
+    ret = mmap(addr, size, prot, flags | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 #elif linux_HOST_OS
     ret = mmap(addr, size, prot, flags | MAP_ANON | MAP_PRIVATE, -1, 0);
     if (ret == (void *)-1 && errno == EPERM) {
@@ -190,6 +192,7 @@ my_mmap (void *addr, W_ size, int operation)
     }
 #else
     ret = mmap(addr, size, prot, flags | MAP_ANON | MAP_PRIVATE, -1, 0);
+#endif
 #endif
 
     if (ret == (void *)-1) {

@@ -145,6 +145,12 @@ class Storable a where
    peek ptr = peekElemOff ptr 0
    poke ptr = pokeElemOff ptr 0
 
+instance Storable () where
+  sizeOf _ = 0
+  alignment _ = 1
+  peek _ = return ()
+  poke _ _ = return ()
+
 -- System-dependent, but rather obvious instances
 
 instance Storable Bool where
