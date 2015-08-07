@@ -39,6 +39,7 @@ cabalArgs = builder GhcCabal ? do
             , with Happy ]
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
+-- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?
 libraryArgs :: Args
 libraryArgs = do
     ways   <- getWays
