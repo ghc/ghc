@@ -126,15 +126,21 @@ libsuf way @ (Way set) =
         return $ prefix ++ "ghc" ++ version ++ extension
 
 -- Detect way from a given filename. Returns Nothing if there is no match:
--- * detectWay "foo/bar.hi"  == Just vanilla
--- * detectWay "baz.thr_p_o" == Just threadedProfiling
--- * detectWay "qwe.phi"     == Nothing (expected "qwe.p_hi")
+-- * detectWay "foo/bar.hi"                 == Just vanilla
+-- * detectWay "baz.thr_p_o"                == Just threadedProfiling
+-- * detectWay "qwe.phi"                    == Nothing (expected "qwe.p_hi")
+-- * detectWay "xru.p_ghc7.11.20141222.dll" == Just profiling
 detectWay :: FilePath -> Maybe Way
 detectWay file = case reads prefix of
     [(way, "")] -> Just way
     _           -> Nothing
   where
-    prefix = dropWhileEnd (== '_') . dropWhileEnd (/= '_') $ takeExtension file
+    extension = takeExtension file
+    prefixed  = if extension `notElem` ["so", "dll", "dynlib"]
+                then extension
+                else takeExtension . dropExtension .
+                     dropExtension . dropExtension $ file
+    prefix    = dropWhileEnd (== '_') . dropWhileEnd (/= '_') $ prefixed
 
 -- Given a path, an extension suffix, and a file name check if the latter:
 -- 1) conforms to pattern 'path//*suffix'
