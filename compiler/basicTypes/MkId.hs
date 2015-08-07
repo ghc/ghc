@@ -1142,11 +1142,11 @@ oneShotId = pcMiscPrelId oneShotName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
-    ty  = mkForAllTys [alphaTyVar, betaTyVar] (mkFunTy fun_ty fun_ty)
+    ty  = mkForAllTys [openAlphaTyVar, openBetaTyVar] (mkFunTy fun_ty fun_ty)
     fun_ty = mkFunTy alphaTy betaTy
     [body, x] = mkTemplateLocals [fun_ty, alphaTy]
     x' = setOneShotLambda x
-    rhs = mkLams [alphaTyVar, betaTyVar, body, x'] $ Var body `App` Var x
+    rhs = mkLams [openAlphaTyVar, openBetaTyVar, body, x'] $ Var body `App` Var x
 
 
 --------------------------------------------------------------------------------
