@@ -15,6 +15,7 @@
 \usepackage{algpseudocode}
 \usepackage{bigfoot}
 \usepackage{amssymb}
+\usepackage{amsmath}
 \usepackage{framed}
 
 % Alter some LaTeX defaults for better treatment of figures:
@@ -67,9 +68,8 @@ Here are the steps a unit goes through:
     site (unit declaration), or an external unit declaration from
     the indefinite unit database.
 
-    \item The \textbf{dependency solver} takes a \I{unit}
-    and converts it into a
-    directed acyclic graph representing the
+    \item The \textbf{dependency solver} takes a unit
+    and converts it into a directed acyclic graph representing the
     dependency structure of the declarations in a unit.
     It also computes the \I{Module} of each module/signature
     declaration, the \I{UnitKey} of each include, and the overall
@@ -79,16 +79,16 @@ Here are the steps a unit goes through:
     and computes its \I{Shape}.  A \I{Shape} describes precisely what
     a unit provides and requires at the Haskell declaration level (\I{AvailInfo}).
 
-    \item The \textbf{indefinite pipeline} takes the DAG and the shape
+    \item The \textbf{indefinite type checker} takes the DAG and the shape
     and typechecks each module and signature against the indefinite unit
     database.  The type checking results are saved in the indefinite
-    unit database under the \I{IndefiniteUnitId}.
+    unit database under the \I{IndefUnitId}.
 
-    \item The \textbf{definite pipeline} takes the DAG as well as a
+    \item The \textbf{definite type checker and compiler} takes the DAG as well as a
     \emph{hole mapping} specifying how each requirement in the unit
-    is to be filled, and type-checks and compiles the unit against the
-    installed unit database.  The type checking results and object files
-    are saved to the installed unit database under the \I{InstalledUnitId}.
+    is filled, and type-checks and compiles the unit against the
+    installed unit database.  The results are saved to the installed unit database
+    under the \I{InstalledUnitId}.
 \end{enumerate}
 
 \section{Front-end syntax}
@@ -120,61 +120,112 @@ $$
 A (slightly simplified) syntax of Backpack is given in Figure~\ref{fig:syntax}.
 
 \newpage
-\section{Unit renamer}
+\section{Unit databases and the unit renamer}
 
 \begin{figure}[htpb]
 $$
 \begin{array}{rcll}
-  \I{InstalledPackageId} &  & \mbox{Installed package IDs} \\
-  \I{IndefiniteUnitId} & ::= & \I{InstalledPackageId}\, \verb|-|\, p  \\
-  \I{InstalledUnitId} & ::= & \I{IndefiniteUnitId} \verb|(| \, m \; \verb|->| \; \I{Module} \verb|,|\, \ldots\, \verb|)| & \mbox{Also known as \I{UnitKey}} \\
-  \I{Module} & ::= & \I{InstalledUnitId} \verb|:| m \\
+\multicolumn{3}{l}{\mbox{\bf Identifiers}} \\
+  \I{InstalledPackageId} &  & \mbox{Opaque unique identifier} \\
+  \I{IndefUnitId} & ::= & \I{InstalledPackageId}\, \verb|-|\, p  \\
+  \I{UnitKey} & ::= & \I{IndefUnitId} \verb|(|\, \I{HoleMap}\, \verb|)|  \\
+              & | & \verb|HOLE| \\
+  \I{HoleMap} & ::= & \I{ModuleName}\; \verb|->|\; \I{Module}\; \verb|,|\, \ldots \\
+  \I{Module} & ::= & \I{UnitKey} \verb|:| \I{ModuleName}  \\
+  \I{InstalledUnitId} & ::= & \I{UnitKey} \quad \mbox{(with no occurrence of \texttt{HOLE})} \\[1em]
+\multicolumn{3}{l}{\mbox{\bf Unit databases}} \\
+  \I{IndefUnitDb} & ::= & \I{IndefUnitId} \; \verb|->| \; \I{IndefUnitRecord} \verb|,|\, \ldots \\
+  \I{InstalledUnitDb} & ::= & \I{InstalledUnitId} \; \verb|->| \; \I{InstalledUnitRecord} \verb|,|\, \ldots \\
 \end{array}
 $$
 \caption{Unit identification} \label{fig:ids}
 \end{figure}
 
-The unit renamer is responsible for transforming unit names $p$ into \I{IndefiniteUnitId}s, given some current \I{InstalledPackageId} (\I{ThisInstalledPackageId}) and a mapping from $p$ to
-\I{IndefiniteUnitId} (\I{UnitNameMap}).  Its operation on a Backpack file (collection of units) is very simple:
+\subsection{The unit databases}
+
+To install a package so that it is available when other packages are compiled,
+we must record it in some sort of database (which the compiler will query later).
+The obvious design for such a database is for it to record \emph{installed packages},
+each of which has a collection of object files and interfaces from a compilation.
+However, with Backpack, we have to refine this picture in two ways:
+
+\begin{enumerate}
+    \item A package is always a unit of distribution: something that has
+    single authorship and is uploaded to Hackage.  It would seriously hamper
+    modular programming in the small, however, if you always had to create
+    a new package to abstract over some requirements.  Thus, while packages
+    continue to be a unit of distribution, the unit of modularity that the
+    compiler deals with is a unit; a package can contain multiple units.
+    Consequently, the database is a database of \emph{units}, not packages.
+    \item  In Backpack, it may not be possible to \emph{compile} a unit
+    at install time: it may depend on some (as yet) unspecified holes.
+    Thus, we must maintain two databases: the \emph{indefinite unit
+    database}, recording type-checked but uncompiled units, and the
+    \emph{installed unit database}, recording compiled units.  unit
+    database.
+\end{enumerate}
+%
+Thus, there are four closely related types of identifier to be aware of:
+
+\begin{description} \item[Installed package IDs]  Although the unit
+databases record compile products per unit, it is still useful to be
+able to assign an identifier to an installed package as a whole.  Thus,
+the \I{InstalledPackageId} is a hash of the source code, as well as
+build info for the package, such as the Cabal and GHC flags, the
+resolution of textual dependencies, etc.  The IPID is opaque to GHC
+and selected by Cabal, which operates at the level of packages (rather
+than units).
+
+\item[Indefinite unit IDs]  A package contains multiple units; so if an
+installed package ID represents a package with all of its dependencies
+resolved, an indefinite unit ID simply singles out a specific unit in
+this installed package.  Indefinite unit IDs identify entries in the
+\textbf{indefinite unit database}, which contain the results of
+type-checking a unit, but no actual object code. Instead, it has enough
+information so that the indefinite unit can be built into actual code
+when a requirement is filled (which means it includes source code and
+build flags as well.)
+
+\item[Unit keys]  A unit key is an indefinite unit ID, but augmented
+with a \I{HoleMap}, which says how the requirements of the unit are
+instantiated.  Unit keys are assigned when typecheckign both indefinite
+definite units:  a fictitious unit \verb|HOLE| is specified to define
+all unfilled requirements in the unit.  Units instantiated with holes
+are never installed; they are strictly for type-checking (although
+we could generate code for them, which could be linked if the
+\verb|HOLE| symbols are rewritten to their true destinations).
+
+\item[Installed unit IDs]  An installed unit ID is a unit key which has
+no \verb|HOLE|s; it identifies a unit that can be compiled.  The
+\textbf{installed unit database} caches the compilation results of these
+units, so that if a unit is compiled multiple times with the same
+instantiation, this code can be reused. (This database most closely
+resembles the existing installed package database with GHC today.)
+\end{description}
+
+\subsection{The unit renamer}
+
+The unit renamer is responsible for transforming unit names in a
+Backpack file into \I{IndefUnitId}s, so that they can be uniquely
+identified in the indefinite unit database.
+Given the \I{InstalledPackageId} of the package we are compiling (\I{ThisInstalledPackageId})
+and a mapping from $p$ to \I{IndefUnitId} (\I{UnitNameMap}), we rename
+as follows:
 
 \begin{itemize}
     \item Every unit declaration $\verb|unit|\; p$ is renamed to $\I{ThisInstalledPackageId}\, \verb|-|\, p$
     \item Every unit include $\verb|include|\; p$ is renamed to $\I{ThisInstalledPackageId}\, \verb|-|\, p$ if $p$ was declared in the Backpack file; otherwise it is renamed according to \I{UnitNameMap}.
 \end{itemize}
-%
-The purpose of an \emph{IndefiniteUnitId} is to uniquely identify the results of typechecking
-an indefinite unit; similarly, an \emph{InstalledUnitId} uniquely identifies
-the results of compiling a unit with all its holes
-filled.  It thus records a \emph{hole mapping} which specifies how each
-hole was filled.
 
-An \emph{installed package ID} (IPID) is an opaque string provided by
-Cabal which uniquely identifies an installed package.  A recipe for
-computing an IPID would incorporate both the source info, such as the hash of the
-source code distribution tarball, as well as build info, such
-as the selected Cabal and GHC flags, what the provided mapping from
-$p$ to $IndefiniteUnitId$ was, etc.
+The \I{UnitNameMap} is entirely user specified, so there is a great deal
+of flexibility on how it can be created, but the convention we expect to
+be used by Cabal is that a unit name $p$ corresponds to the same-named
+unit in a \emph{package} named $p$.  Packages that don't use Backpack
+only have on unit, which has the same name as package.
 
-\paragraph{The difference between units and packages}
-Cabal packages are:
-
-\begin{itemize}
-    \item The unit of distribution
-    \item The unit that Hackage handles
-    \item The unit of versioning
-    \item The unit of ownership (who maintains it etc) 
-\end{itemize}
-
-Backpack units are the building blocks of modular development;
-there may be multiple units per a Cabal package.  While in theory
-Cabal could do sophisticated things with multiple units in a
-package, we expect Cabal
-to pick a distinguished unit (with the same unit name $p$ as
-the package) which serves as the publically visible unit.
-
-\paragraph{Notational convention}
+\paragraph{Notational conventions}
 In the rest of this document, when it is unambiguous, we will use $p$, $q$ and $r$
-interchangeably with \I{IndefiniteUnitId}, as after unit renaming, there
+interchangeably with \I{IndefUnitId}, as after unit renaming, there
 are no occurrences of unit names.
 
 \newpage
@@ -185,831 +236,212 @@ $$
 \begin{array}{rcll}
   \tilde{d} & ::= & \verb|module|\;    Module \; [exports]\; \verb|where|\; \I{body} \\
     & |   & \verb|signature|\; \I{Module} \; [exports]\; \verb|where|\; \I{body} \\
-    & |   & \verb|include|\; p\,\verb|(|\, m\; \verb|->|\; \I{Module}\,\verb|,|\;\ldots\,\verb|)| \\
-    & |   & \verb|merge|\; \I{Module}\; \verb|of|\; (\I{Module}, \I{IsSource?}) \ldots
+    & |   & \verb|merge|\; \I{Module} \\
+    & |   & \verb|include|\; \I{UnitKey} \\
+  \I{IndefUnitRecord}^{\mathsf{dep}} & ::= & \verb|provides:|\; m\; \verb|->|\; \I{Module}\verb|,|\, \ldots\\
+    & & \verb|requires:|\; m\verb|,|\, \ldots
 \end{array}
 $$
 \caption{Resolved declarations} \label{fig:resolved}
 \end{figure}
 
-The first phase of compilation is defines a directed acyclic graph on
-the source syntax representing the dependency structure of the
-modules/signatures/includes in the unit. This DAG has a node per:
+The dependency solver computes the unfilled requirements of a unit, a
+dependency DAG on the modules/signatures in the unit, and a dependency
+DAG on the includes in the unit.  We assume every referenced $p$ in the
+unit must be recorded in the indefinite unit database, such that we can
+look up $\I{IndefUnitRecord}^{\mathsf{dep}}$.
+
+\paragraph{Computing unfilled requirements}  The unfilled requirements are $R-P$, where $R$ and $P$ are sets of module names computed from the declarations in the following manner:
 
 \begin{itemize}
-    \item Each source-level module, signature and include, and
-    \item Each unfilled requirement (called a ``signature merge'' node).
+    \item $\verb|include|\; p$: union the (domain of the) provisions with $P$ and the requirements with $R$.
+    \item $\verb|module|\; m$: add $m$ to $P$.
+    \item $\verb|signature|\; m$: add $m$ to $R$.
 \end{itemize}
+
+\paragraph{Declaration dependency graph}
+We define a graph where the nodes are as described in Figure~\ref{fig:resolved}:
+there is a node per
+for each module and signature, as well as an extra ``merge'' node for
+every unfilled requirement, merges the interfaces of a local signature and
+any requirements brought in from includes.
 %
-Each module, signature and signature merge node can be identified
-with the tuple $\left(\I{Module}, \I{IsSource?}\right)$, where \I{IsSource?}
-is true for signatures and false for modules and signature merges.
-The four nodes are described in Figure~\ref{fig:resolved}.
+Each node is identified by the tuple $\left(\I{Module}, \I{IsSource?}\right)$, where
+the \I{Module} of a declaration $m$ in unit $p$ is \verb|p(H):m|, where $H$ maps
+each unfilled requirement $n$ to \verb|HOLE:n|, and \I{IsSource?} is true only for signatures.
 
 The edges of the directed graph signify a ``depends on'' relation, and are
 defined as follows:
 
 \begin{itemize}
-    \item A module/signature $m$ depends on $\verb|include|\; p$ if $m$ imports a module provided by $p$.
     \item A module/signature $m$ depends on a module/signature merge $n$ if $m$ imports $n$.
     \item A module/signature $m$ depends on a signature $n$ if $m$ \verb|{-# SOURCE #-}| imports $n$.
     \item A module/signature merge $m$ depends on a local signature $m$ (if it exists).
-    \item A module/signature merge $m$ depends on a $\verb|include|\; p$, if the include requires $m$.
-\end{itemize}
-%
-For compilation, these extra edges can also be defined if they
-do not introduce a cycle:
-
-\begin{itemize}
-    \item An $\verb|include|\; p$ depends on $\verb|include|\; q$ if, for some module name $m$, $p$ requires $m$ and $q$ provides $m$.
-    \item An $\verb|include|\; p$ depends on a module $m$ if $p$ requires a module named $m$.
 \end{itemize}
 %
 If the resulting graph has a cycle, this is an error.
 
-\paragraph{Computing unfilled requirements}  To compute unfilled requirements,
-maintain two sets of module names: the provisions $P$ and the possible requirements $R'$.  For each declaration:
+\paragraph{Include dependency graph}  We define an dependency graph
+between includes, where an $\verb|include|\; p$ depends on
+$\verb|include|\; q$ if, for some module name $m$, $p$ requires $m$ and
+$q$ provides $m$.  If there is a cyclic, then there is cross-unit
+mutual recursion: for now, this is an error.
 
-\begin{itemize}
-    \item $\verb|include|\; p$: union provisions with $P$ and requirements with $R'$.
-    \item $\verb|module|\; m$: add $m$ to $P$
-    \item $\verb|signature|\; m$: add $m$ to $R'$
-\end{itemize}
-%
-The unfilled requirements $R=R'-P$.
+Assuming an acyclic graph, we can compute the \I{UnitKey} of each
+key as follows.  Initialize $\Gamma$, a substitution from holes to \I{Module},
+to the identity substitution. For each $\verb|include|\; p$ in topological
+order, define its \I{UnitKey} to be $p$ with the mapping $\Gamma$ with its
+domain restricted to the requirements of $p$.  Then, for each provision
+$m\; \verb|->|\; \I{Module}$, update $\Gamma$ so that
+$\Gamma(m) = \operatorname{subst} (\Gamma, \I{Module})$
+(where $\operatorname{subst}$ recursively applies the substitution $\Gamma$ in \I{Module}).
 
-\paragraph{Computing the \I{Module} of declarations}
-The \I{Module} of any declaration $m$ in a unit $p$ is simply
-\verb|p(A -> HOLE:A, ...):m|, where the hole map is a map
-from each unfilled requirement $n$ to \verb|HOLE:n|.
-
-\paragraph{Computing the hole mapping of includes}  In absence of mutual
-recursion of includes, the DAG is acyclic with include-include edges.  Process includes
-in this topological order, maintaining a mapping of provided modules $\Gamma$, accumulating
-provisions of includes as we go along.  For each $\verb|include|; p$, the hole map is
-simply the requirements of $p$, mapping $m$ to $\Gamma(m)$ if it is defined, and \verb|HOLE:m| otherwise.
-
-With mutual recursion, we have to use the regular tree unification algorithm described in the Backpack paper.  We omit it from here for now.
+During compilation, the include dependency graph is useful for
+determining a compilation order for included units.
 
 \newpage
-\section{Shaping}
+\section{Shaping pass}
 
 \begin{figure}[htpb]
 $$
 \begin{array}{rcll}
-\I{Shape} & ::= & \verb|provides:|\; m \; \verb|->|\; \I{Module}\; \verb|{|\, \I{AvailInfo} \verb|,|\, \ldots \, \verb|};| \ldots \\
-      &     & \verb|requires:| \; m \; \verb|->|\; \textcolor{white}{\I{Module}}\; \verb|{| \, \I{AvailInfo} \verb|,| \, \ldots \, \verb|}| \verb|;| \ldots \\
+\I{Shape} & ::= & \verb|provides:|\; m \; \verb|->|\; \I{Module}\; \I{ModShape} \verb|;|\; \ldots \\
+      &     & \verb|requires:| \; m \; \verb|->|\; \textcolor{white}{\I{Module}}\; \I{ModShape}  \verb|;|\; \ldots \\
+\I{ModShape} & ::= & \I{AvailInfo}_0 \verb|,|\, \ldots \verb|,|\, \I{AvailInfo}_n \\
 \I{AvailInfo} & ::= & \I{Name} & \mbox{Plain identifiers} \\
           & |   & \I{Name} \, \verb|{| \, \I{Name}_0\verb|,| \, \ldots\verb|,| \, \I{Name}_n \, \verb|}| & \mbox{Type constructors} \\
 \I{Name}   & ::= & \I{Module} \verb|.| \I{OccName} \\
-\I{OccName} & & \mbox{Unqualified name in a namespace}
+\I{OccName} & & \mbox{Unqualified name in a namespace} \\
+\I{IndefUnitRecord}^{\mathsf{shape}} & ::= & \I{Shape}
 \end{array}
 $$
-\caption{Shaping} \label{fig:semantic}
+\caption{Shaping} \label{fig:shaping}
 \end{figure}
 
-Shaping computes a \I{Shape}, whose form is described in Figure~\ref{fig:semantic}.
-A shape describes what modules a unit implements and exports (the \emph{provides})
-and what signatures a unit needs to have filled in (the \emph{requires}).  Both
-provisions and requires are available for import by units which include this
-unit.
+The shaping pass computes the export \I{AvailInfo}s for each node in
+the dependency graph; collectively, these form the \I{Shape} of
+the unit described in Figure~\ref{fig:shaping}.  Equivalently,
+the \I{Shape} of unit specifies what a unit requires and provides
+at the Haskell declaration level.
 
-We incrementally build a shape by starting with an empty
-shape context and adding to it as follows:
+An \I{AvailInfo} names a Haskell declaration that may be exported.
+It may be a plain identifier \I{Name}, or it may be a type constructor,
+in which case it has children \I{Name}s representing the names of the
+data constructors, record selectors, etc.  This level of hierarchy
+makes it possible to use ellipses in an import list, e.g. \verb|TyCon(..)|,
+to selectively import just the logical children of a type constructor.
+Children names have the invariant that they have the same \I{Module} as the parent name.
+In a \I{ModShape}/export list,
+the \I{OccName}s of the plain identifier \I{AvailInfo}s and the \emph{children}
+of type constructor are unique
+(although the top-level \I{Name}s may not have unique \I{OccName}s).
+
+The compilation of every node is associated with a ``shape context'',
+which represents the modules which are transitively depended upon. Let the
+environment shape context is the merge of the shapes of all includes; to
+shape a node:
 
 \begin{enumerate}
-    \item Calculate the shape of a declaration, with respect to the
-        current shape context.  (e.g., by renaming a module/signature,
-        or using the shape from an included unit.)
-    \item Merge this shape into the shape context.
+    \item Merge the environment shape contexts with the shape contexts
+    of all direct dependencies, resulting in the initial shape context.
+    \item Rename the module/signature according to the initial shape context,
+    getting a \I{ModShape}.  Importantly, when renaming the signature \verb|M|,
+    any declarations defined in the signature are assigned a \I{Name}s with the \I{Module} \verb|HOLE:M| (rather than a \I{Module} based on the current unit $p$).
+    \item Merge this \I{ModShape} into the initial shape context
+    (modules go in provisions while signatures go in provisions), the
+    result defining the shape context of this node.
 \end{enumerate}
 
-The final shape context is the shape of the unit as a whole.
-Optionally, we can also compute the renamed syntax trees of
-modules and signatures.
+We now elaborate on these steps in more detail.
 
-In the description below, we'll assume \verb|THIS| is the unit key
-of the unit being processed.
-
-\begin{aside}
-\textbf{\textit{OccName} is implied by \textit{Name}.}
-In Haskell, the following is not valid syntax:
-
-\begin{verbatim}
-    import A (foobar as baz)
-\end{verbatim}
-In particular, a \I{Name} which is in scope will always have the same
-\I{OccName} (even if it may be qualified.)  You might imagine relaxing
-this restriction so that declarations can be used under different \I{OccName}s;
-in such a world, we need a different definition of shape:
-
-\begin{verbatim}
-    Shape ::=
-        provided: ModName -> { OccName -> Name }
-        required: ModName -> { OccName -> Name }
-\end{verbatim}
-Presently, however, such an \I{OccName} annotation would be redundant: it can be inferred from the \I{Name}.
-\end{aside}
-
-\begin{aside}
-\textbf{Holes of a unit are a mapping, not a set.} Why can't the \I{UnitKey} just record a
-set of \I{Module}s, e.g. $\I{UnitKey}\;::= \; \I{SrcUnitKey} \; \verb|{| \; \I{Module} \; \verb|}|$?  Consider:
-
-\begin{verbatim}
-    unit p (A) requires (H1, H2) where
-        signature H1(T) where
-            data T
-        signature H2(T) where
-            data T
-        module A(A(..)) where
-            import qualified H1
-            import qualified H2
-            data A = A H1.T H2.T
-
-    unit q (A12, A21) where
-        module I1(T) where
-            data T = T Int
-        module I2(T) where
-            data T = T Bool
-        include p (A as A12) requires (H1 as I1, H2 as I2)
-        include p (A as A21) requires (H1 as I2, H2 as I1)
-\end{verbatim}
-With a mapping, the first instance of \verb|p| has key \verb|p(H1 -> q():I1, H2 -> q():I2)|
-while the second instance has key \verb|p(H1 -> q():I2, H2 -> q():I1)|; with
-a set, both would have the key \verb|p(q():I1, q():I2)|.
-\end{aside}
-
-
-\begin{aside}
-\textbf{Signatures can require a specific entity.}
-With requirements like \verb|A -> { HOLE:A.T, HOLE:A.foo }|,
-why not specify it as \verb|A -> { T, foo }|,
-e.g., \verb|required: { ModName -> { OccName } }|?  Consider:
-
-\begin{verbatim}
-    unit p () requires (A, B) where
-        signature A(T) where
-            data T
-        signature B(T) where
-            import T
-\end{verbatim}
-The requirements of this unit specify that \verb|A.T| $=$ \verb|B.T|; this
-can be expressed with \I{Name}s as
-
-\begin{verbatim}
-    A -> { HOLE:A.T }
-    B -> { HOLE:A.T }
-\end{verbatim}
-But, without \I{Name}s, the sharing constraint is impossible:  \verb|A -> { T }; B -> { T }|. (NB: \verb|A| and \verb|B| don't have to be implemented with the same module.)
-\end{aside}
-
-\begin{aside}
-\textbf{The \textit{Name} of a value is used to avoid
-ambiguous identifier errors.}  We state that two types
-are equal when their \I{Name}s are the same; however,
-for values, it is less clear why we care.  But consider this example:
-
-\begin{verbatim}
-    unit p (A) requires (H1, H2) where
-        signature H1(x) where
-            x :: Int
-        signature H2(x) where
-            import H1(x)
-        module A(y) where
-            import H1
-            import H2
-            y = x
-\end{verbatim}
-The reference to \verb|x| in \verb|A| is unambiguous, because it is known
-that \verb|x| from \verb|H1| and \verb|x| from \verb|H2| are the same (have
-the same \I{Name}.)  If they were not the same, it would be ambiguous and
-should cause an error.  Knowing the \I{Name} of a value distinguishes
-between these two cases.
-\end{aside}
-
-\begin{aside}
-\textbf{Holes are linear}
-Requirements do not record what \I{Module} represents
-the identity of a requirement, which means that it's not possible to assert
-that hole \verb|A| and hole \verb|B| should be implemented with the same module,
-as might occur with aliasing:
-
-\begin{verbatim}
-    signature A where
-    signature B where
-    alias A = B
-\end{verbatim}
-%
-The benefit of this restriction is that when a requirement is filled,
-it is obvious that this is the only requirement that is filled: you won't
-magically cause some other requirements to be filled.  The downside is
-it's not possible to write a unit which looks for an interface it is
-looking for in one of $n$ names, accepting any name as an acceptable linkage.
-If aliasing was allowed, we'd need a separate physical shaping context,
-to make sure multiple mentions of the same hole were consistent.
-
-\end{aside}
-
-%\newpage
-
-\subsection{\texttt{module M}}
-
-A module declaration provides a module \verb|THIS:M| at module name \verb|M|. It
-has the shape:
-
-\begin{verbatim}
-    provides: M -> THIS:M { exports of renamed M under THIS:M }
-    requires: (nothing)
-\end{verbatim}
-Example:
-
-\begin{verbatim}
-    module A(T) where
-        data T = T
-
-    -- provides: A -> THIS:A { THIS:A.T }
-    -- requires: (nothing)
-\end{verbatim}
-
-\newpage
-\subsection{\texttt{signature M}}
-
-A signature declaration creates a requirement at module name \verb|M|.  It has the shape:
-
-\begin{verbatim}
-    provides: (nothing)
-    requires: M -> { exports of renamed M under HOLE:M }
-\end{verbatim}
-
-\noindent Example:
-
-\begin{verbatim}
-    signature H(T) where
-        data T
-
-    -- provides: H -> (nothing)
-    -- requires: H -> { HOLE:H.T }
-\end{verbatim}
-
-\begin{aside}
-\textbf{In-scope signatures are not provisions}.  We enforce the invariant that
-a provision is always (syntactically) a \verb|module| and a requirement
-is always a \verb|signature|.  This means that if you have a requirement
-and a provision of the same name, the requirement can \emph{always} be filled
-with the provision. Without this invariant, it's not clear if a provision
-will actually fill a signature.  Consider this example, where
-a signature is required and exposed:
-
-\begin{verbatim}
-    unit a-sigs (A) requires (A) where -- ***
-        signature A where
-            data T
-
-    unit a-user (B) requires (A) where
-        signature A where
-            data T
-            x :: T
-        module B where
-            ...
-
-    unit p where
-        include a-sigs
-        include a-user
-\end{verbatim}
-%
-When we consider merging in the shape of \verb|a-user|, does the
-\verb|A| provided by \verb|a-sigs| fill in the \verb|A| requirement
-in \verb|a-user|?  It \emph{should not}, since \verb|a-sigs| does not
-actually provide enough declarations to satisfy \verb|a-user|'s
-requirement: the intended semantics \emph{merges} the requirements
-of \verb|a-sigs| and \verb|a-user|.
-
-
-
-\begin{verbatim}
-    unit a-sigs (M as A) requires (H as A) where
-        signature H(T) where
-            data T
-        module M(T) where
-            import H(T)
-\end{verbatim}
-%
-We rightly should error, since the provision is a module. And in this situation:
-
-\begin{verbatim}
-    unit a-sigs (H as A) requires (H) where
-        signature H(T) where
-            data T
-\end{verbatim}
-%
-The requirements should be merged, but should the merged requirement
-be under the name \verb|H| or \verb|A|?
-
-It may still be possible to use the \verb|(A) requires (A)| syntax to
-indicate exposed signatures, but this would be a mere syntactic
-alternative to \verb|() requires (exposed A)|.
-\end{aside}
-%
-
-\newpage
-\subsection{\texttt{include pkg (X) requires (Y)}}
-
-We merge with the transformed shape of unit \verb|pkg|, where this
-shape is transformed by:
+\subsection{Shapes of includes}
+Given an \verb|include p (X) requires (Y)|, we can look up the shape
+for $p$ from the indefinite package database.  However, an include can
+also rename provisions and requires (where $X$, $Y$ are partial maps
+from module name to module name), which requires transforms the shape
+in the following way:
 
 \begin{itemize}
-    \item Renaming and thinning the provisions according to \verb|(X)|
-    \item Renaming requirements according to \verb|(Y)| (requirements cannot
-          be thinned, so non-mentioned requirements are implicitly passed through.)
-          For each renamed requirement from \verb|Y| to \verb|Y'|,
-          substitute \verb|HOLE:Y| with \verb|HOLE:Y'| in the
-          \I{Module}s and \I{Name}s of the provides and requires.
+    \item For each original provision $m\; \verb|->|\; \ldots$, provide
+          $X (m)\; \verb|->|\; \ldots$ if $X (m)$ is defined.
+    \item For each original requirement $m\; \verb|->|\; \ldots$, require
+          $Y (m)\; \verb|->|\; \ldots$ if $Y (m)$ is defined, and $m$ if it is not.
+          (Non-mentioned requirements are always passed through).
+    \item For each requirement renaming from \verb|M| to \verb|N| in $Y$, substitute
+          all occurrences of \verb|HOLE:M| to \verb|HOLE:N| in the \I{ModShape}
+          of all provisions and requirements.
 \end{itemize}
+
+\subsection{Shape merging}
+Before specifying the how to merge shapes algorithm, we must define some subprocedures
+for unifying and merging lower-level entities such as \I{AvailInfo}s and \I{Name}s,
+which produce \I{Name} substitution that are applied to shapes.
+
+\begin{description}
+    \item[Unify two \textit{Name}s]
+    (produces a \I{Name} and a \I{Name} substitution) \\
+    Error if the names do not have matching \I{OccName}s.  Error if neither name
+    is a hole name.  Otherwise, without loss of generality let $m$ be the hole name
+    and $n$ the other name, return $n$ and the substitution of $m$ to $n$.
+    \item[Merge two sets of \textit{Name}s]
+    (produces a set of \I{Name}s and a \I{Name} substitution) \\
+    Let two \I{Name}s be related if they have the same \I{OccName}.
+    Union the two sets, unifying related names.
+    \item[Unify two \textit{AvailInfo}s]
+    (produces an \I{AvailInfo} and a \I{Name} substitution) \\
+    If both \I{AvailInfo}s are simply
+    a \I{Name}, unify the two \I{Name}s.  If both \I{AvailInfo}s are
+    $\I{Name}\, \verb|{|\, \I{Name}_0\verb|,|\, \ldots\verb|,|\, \I{Name}_n\, \verb|}|$,
+    unify the top-level \I{Name}, apply the substitution to both \I{AvailInfo}s,
+    and return the unified \I{Name} with the union of the child names of the
+    substituted \I{AvailInfo}s.
+    Otherwise, error.
+    \item[Merge two sets of \textit{AvailInfo}s]
+    (produces a set of \I{AvailInfo}s and a \I{Name} substitution) \\
+    Let two \I{AvailInfo}s be related if they both are of the form
+    \I{Name} and have matching \I{OccName}s, or if they both are of
+    the form
+    $\I{Name}\, \verb|{|\, \I{Name}_0\verb|,|\, \ldots\verb|,|\, \I{Name}_n\, \verb|}|$
+    and there exists a child name in each which have matching \I{OccName}s.
+    Union the two sets, unifying related \I{AvailInfo}s.
+    \item[Apply a name substitution on an \textit{AvailInfo}] (produces an \I{AvailInfo}) \\
+    Substitute the top-level \I{Name}, which induces a substitution from
+    \I{Module} to $\I{Module}'$.  Apply this module substitution to each child
+    \I{Name} in the \I{AvailInfo}.
+
+\end{description}
 %
-If there are no thinnings/renamings, you just merge the
-shape unchanged! Here is an example:
-
-\begin{verbatim}
-    unit p (M) requires (H) where
-        signature H where
-            data T
-        module M where
-            import H
-            data S = S T
-
-    unit q (A) where
-        module X where
-            data T = T
-        include p (M as A) requires (H as X)
-\end{verbatim}
-%
-The shape of unit \verb|p| is:
-
-\begin{verbatim}
-    requires: M -> { p(H -> HOLE:H):M.S }
-    provides: H -> { HOLE:H.T }
-\end{verbatim}
-%
-Thus, when we process the \verb|include| in unit \verb|q|,
-we make the following two changes: we rename the provisions,
-and we rename the requirements, substituting \verb|HOLE|s.
-The resulting shape to be merged in is:
-
-\begin{verbatim}
-    provides: A -> { p(H -> HOLE:X):M.S }
-    requires: X -> { HOLE:X.T }
-\end{verbatim}
-%
-After merging this in, the final shape of \verb|q| is:
-
-\begin{verbatim}
-    provides: X -> { q():X.T }              -- from shaping 'module X'
-              A -> { p(H -> q():X):M.S }
-    requires: (nothing)                     -- discharged by provided X
-\end{verbatim}
-
-\newpage
-
-\subsection{Merging}
-
-The shapes we've given for individual declarations have been quite
-simple.  Merging combines two shapes, filling requirements with
-implementations, unifying \I{Name}s, and unioning requirements; it is
-the most complicated part of the shaping process.
-
-The best way to think about merging is that we take two units with
-inputs (requirements) and outputs (provisions) and ``wiring'' them up so
-that outputs feed into inputs.  In the absence
-of mutual recursion, this wiring process is \emph{directed}: the provisions
-of the first unit feed into the requirements of the second unit,
-but never vice versa.  (With mutual recursion, things can go in the opposite
-direction as well.)
-
-Suppose we are merging shape $p$ with shape $q$ (e.g., $p; q$).  Merging
-proceeds as follows:
+Shape merging takes two units with inputs (requirements) and outputs
+(provisions) and ``wires'' them up so that outputs feed into inputs. To
+merge the shape of $p$ with the shape of $q$:
 
 \begin{enumerate}
     \item \emph{Fill every requirement of $q$ with provided modules from
-        $p$.} For each requirement $M$ of $q$ that is provided by $p$ (in particular,
-        all of its required \verb|Name|s are provided),
+        $p$.} For each requirement $M$ of $q$ that is provided by $p$,
         substitute each \I{Module} occurrence of \verb|HOLE:M| with the
-        provided $p\verb|(|M\verb|)|$, unify the names, and remove the requirement from $q$.
-        If the names of the provision are not a superset of the required names, error.
-    \item If mutual recursion is supported, \emph{fill every requirement of $p$ with provided modules from $q$.}
-    \item \emph{Merge leftover requirements.}  For each requirement $M$ of $q$ that is not
-        provided by $p$ but required by $p$, unify the names, and union them together to form the new requirement.  (It's not
-        necessary to substitute \I{Module}s, since they are guaranteed to be the same.)
-    \item \emph{Add provisions of $q$.} Union the provisions of $p$ and $q$, erroring
-        if there is a duplicate that doesn't have the same identity.
+        provided $p\verb|(|M\verb|)|$ (however, do \textbf{NOT} substitute the
+        top-level \I{Module} in a \I{Name}s), merge the \I{AvailInfo}s and apply
+        the resulting \I{Name} substitution, and
+        remove the requirement from $q$.  If the \I{AvailInfo}s of the
+        provision are not a superset of the required \I{AvailInfo}s,
+        error.
+    \item If mutual recursion is supported, \emph{fill every requirement
+        of $p$ with provided modules from $q$.}
+    \item \emph{Merge leftover requirements.}  For each requirement $M$
+        of $q$ that is not provided by $p$ but required by $p$, and let
+        the new requirement be the merge of
+        \I{AvailInfo}s, applying the resulting \I{Name} substitution.
+    \item \emph{Add provisions of $q$.} Union the provisions of $p$ and $q$, (lazily) erroring
+        if there is a duplicate that doesn't have the same \I{Module}.
 \end{enumerate}
-%
-To unify two sets of names, find each pair of names with matching \I{OccName}s $n$ and $m$ and do the following:
 
-\begin{enumerate}
-    \item If both are from holes, pick a canonical representative $m$ and substitute $n$ with $m$.
-    \item If one $n$ is from a hole, substitute $n$ with $m$.
-    \item Otherwise, error if the names are not the same.
-\end{enumerate}
-%
-It is important to note that substitutions on \I{Module}s and substitutions on
-\I{Name}s are disjoint: a substitution from \verb|HOLE:A| to \verb|HOLE:B|
-does \emph{not} substitute inside the name \verb|HOLE:A.T|.
-
-Since merging is the most complicated step of shaping, here are a big
-pile of examples of it in action.
-
-\subsubsection{A simple example}
-
-In the following set of units:
-
-\begin{verbatim}
-    unit p(M) requires (A) where
-        signature A(T) where
-            data T
-        module M(T, S) where
-            import A(T)
-            data S = S T
-
-    unit q where
-        module A where
-            data T = T
-        include p
-\end{verbatim}
-
-When we \verb|include p|, we need to merge the partial shape
-of \verb|q| (with just provides \verb|A|) with the shape
-of \verb|p|.  Here is each step of the merging process:
-
-\begin{verbatim}
-          shape 1                       shape 2
-          --------------------------------------------------------------------------------
-(initial shapes)
-provides: A -> THIS:A { q():A.T }       M -> p(A -> HOLE:A) { HOLE:A.T, p(A -> HOLE:A).S }
-requires: (nothing)                     A ->                { HOLE:A.T }
-
-(after filling requirements)
-provides: A -> THIS:A { q():A.T }       M -> p(A -> THIS:A) { q():A.T, p(A -> THIS:A).S }
-requires: (nothing)                     (nothing)
-
-(after adding provides)
-provides: A -> THIS:A         { q():A.T }
-          M -> p(A -> THIS:A) { q():A.T, p(A -> THIS:A).S }
-requires: (nothing)
-\end{verbatim}
-
-Notice that we substituted \verb|HOLE:A| with \verb|THIS:A|, but \verb|HOLE:A.T| with \verb|q():A.T|.
-
-\subsubsection{Requirements merging can affect provisions}
-
-When a merge results in a substitution, we substitute over both
-requirements and provisions:
-
-\begin{verbatim}
-    signature H(T) where
-        data T
-    module A(T) where
-        import H(T)
-    module B(T) where
-        data T = T
-
-    -- provides: A -> THIS:A { HOLE:H.T }
-    --           B -> THIS:B { THIS:B.T }
-    -- requires: H ->        { HOLE:H.T }
-
-    signature H(T, f) where
-        import B(T)
-        f :: a -> a
-
-    -- provides: A -> THIS:A { THIS:B.T }           -- UPDATED
-    --           B -> THIS:B { THIS:B.T }
-    -- requires: H ->        { THIS:B.T, HOLE:H.f } -- UPDATED
-\end{verbatim}
-
-\subsubsection{Sharing constraints}
-
-Suppose you have two signature which both independently define a type,
-and you would like to assert that these two types are the same.  In the
-ML world, such a constraint is known as a sharing constraint.  Sharing
-constraints can be encoded in Backpacks via clever use of reexports;
-they are also an instructive example for signature merging.
-
-\begin{verbatim}
-    signature A(T) where
-        data T
-    signature B(T) where
-        data T
-
-    -- requires: A -> { HOLE:A.T }
-                 B -> { HOLE:B.T }
-
-    -- the sharing constraint!
-    signature A(T) where
-        import B(T)
-    -- (shape to merge)
-    -- requires: A -> { HOLE:B.T }
-
-    -- (after merge)
-    -- requires: A -> { HOLE:A.T }
-    --           B -> { HOLE:A.T }
-\end{verbatim}
-%
-\Red{I'm pretty sure any choice of \textit{Name} is OK, since the
-subsequent substitution will make it alpha-equivalent.}
-
-\subsection{Export declarations}
-
-If an explicit export declaration is given, the final shape is the
-computed shape, minus any provisions not mentioned in the list, with the
-appropriate renaming applied to provisions and requirements.  (Requirements
-are implicitly passed through if they are not named.)
-If no explicit export declaration is given, the final shape is
-the computed shape, including only provisions which were defined
-in the declarations of the unit.
-
-\begin{aside}
-\textbf{Signature visibility, and defaulting}
-The simplest formulation of requirements is to have them always be
-visible.  Signature visibility could be controlled by associating
-every requirement with a flag indicating if it is importable or
-not: a signature declaration sets a requirement to be visible, and
-an explicit export list can specify if a requirement is to be visible
-or not.
-
-When an export list is absent, we have to pick a default visibility
-for a signature.  If we use the same behavior as with modules,
-a strange situation can occur:
-
-\begin{verbatim}
-    unit p where -- S is visible
-        signature S where
-            x :: True
-
-    unit q where -- use defaulting
-        include p
-        signature S where
-            y :: True
-        module M where
-            import S
-            z = x && y      -- OK
-
-    unit r where
-        include q
-        module N where
-            import S
-            z = y           -- OK
-            z = x           -- ???
-\end{verbatim}
-%
-Absent the second signature declaration in \verb|q|, \verb|S.x| clearly
-should not be visible in \verb|N|.  However, what ought to occur when this signature
-declaration is added?  One interpretation is to say that only some
-(but not all) declarations are provided (\verb|S.x| remains invisible);
-another interpretation is that adding \verb|S| is enough to treat
-the signature as ``in-line'', and all declarations are now provided
-(\verb|S.x| is visible).
-
-The latter interpretation avoids having to keep track of providedness
-per declarations, and means that you can always express defaulting
-behavior by writing an explicit provides declaration on the unit.
-However, it has the odd behavior of making empty signatures semantically
-meaningful:
-
-\begin{verbatim}
-unit q where
-    include p
-    signature S where
-\end{verbatim}
-\end{aside}
-%
-%   SPJ: This would be too complicated (if there's yet a third way)
-
-\clearpage
 \newpage
-
-\subsection{Merging AvailInfos}
-
-We describe how to take two sets of \I{AvailInfo}s and merges them
-into one set.  In the degenerate case where every \I{AvailInfo} is a
-$Name$, this algorithm operates the same as the original algorithm.
-Merging proceeds in two steps: unification and then simple union.
-
-Unification proceeds as follows: for each pair of \I{Name}s with
-matching \I{OccName}s, unify the names.  For each pair of $\I{Name}\, \verb|{|\,
-\I{Name}_0\verb|,|\, \ldots\verb|,|\, \I{Name}_n\, \verb|}|$, where there
-exists some pair of child names with matching \I{OccName}s, unify the
-parent \I{Name}s.  (A single \I{AvailInfo} may participate in multiple such
-pairs.)  A simple identifier and a type constructor \I{AvailInfo} with
-overlapping in-scope names fails to unify.  After unification,
-the simple union combines entries with matching \verb|availName|s (parent
-name in the case of a type constructor), recursively unioning the child
-names of type constructor \I{AvailInfo}s.
-
-Unification of \I{Name}s results in a substitution, and a \I{Name} substitution
-on \I{AvailInfo} is a little unconventional.  Specifically, substitution on $\I{Name}\, \verb|{|\,
-\I{Name}_0\verb|,|\, \ldots\verb|,|\, \I{Name}_n\, \verb|}|$ proceeds specially:
-a substitution from \I{Name} to $\I{Name}'$ induces a substitution from
-\I{Module} to $Module'$ (as the \I{OccName}s of the \I{Name}s are guaranteed
-to be equal), so for each child $\I{Name}_i$, perform the \I{Module}
-substitution.  So for example, the substitution \verb|HOLE:A.T| to \verb|THIS:A.T|
-takes the \I{AvailInfo} \verb|HOLE:A.T { HOLE:A.B, HOLE:A.foo }| to
-\verb|THIS:A.T { THIS:A.B, THIS:A.foo }|.  In particular, substitution
-on children \I{Name}s is \emph{only} carried out by substituting on the outer name;
-we will never directly substitute children.
-
-Unfortunately, there are a number of tricky scenarios:
-
-\paragraph{Merging when type constructors are not in scope}
-
-\begin{verbatim}
-    signature A1(foo) where
-        data A = A { foo :: Int, bar :: Bool }
-
-    signature A2(bar) where
-        data A = A { foo :: Int, bar :: Bool }
-\end{verbatim}
-%
-If we merge \verb|A1| and \verb|A2|, are we supposed to conclude that
-the types \verb|A1.A| and \verb|A2.A| (not in scope!) are the same?
-The answer is no!  Consider these implementations:
-
-\begin{verbatim}
-    module A1(A(..)) where
-        data A = A { foo :: Int, bar :: Bool }
-
-    module A2(A(..)) where
-        data A = A { foo :: Int, bar :: Bool }
-
-    module A(foo, bar) where
-        import A1(foo)
-        import A2(bar)
-\end{verbatim}
-
-Here, \verb|module A1| implements \verb|signature A1|, \verb|module A2| implements \verb|signature A2|,
-and \verb|module A| implements \verb|signature A1| and \verb|signature A2| individually
-and should certainly implement their merge.  This is why we cannot simply
-merge type constructors based on the \I{OccName} of their top-level type;
-merging only occurs between in-scope identifiers.
-
-\paragraph{Does merging a selector merge the type constructor?}
-
-\begin{verbatim}
-    signature A1(A(..)) where
-        data A = A { foo :: Int, bar :: Bool }
-
-    signature A2(A(..)) where
-        data A = A { foo :: Int, bar :: Bool }
-
-    signature A2(foo) where
-        import A1(foo)
-\end{verbatim}
-%
-Does the last signature, which is written in the style of a sharing constraint on \verb|foo|,
-also cause \verb|bar| and the type and constructor \verb|A| to be unified?
-Because a merge of a child name results in a substitution on the parent name,
-the answer is yes.
-
-\paragraph{Incomplete data declarations}
-
-\begin{verbatim}
-    signature A1(A(foo)) where
-        data A = A { foo :: Int }
-
-    signature A2(A(bar)) where
-        data A = A { bar :: Bool }
-\end{verbatim}
-%
-Should \verb|A1| and \verb|A2| merge?  If yes, this would imply
-that data definitions in signatures could only be \emph{partial}
-specifications of their true data types.  This seems complicated,
-which suggests this should not be supported; however, in fact,
-this sort of definition, while disallowed during type checking,
-should be \emph{allowed} during shaping. The reason that the
-shape we abscribe to the signatures \verb|A1| and \verb|A2| are
-equivalent to the shapes for these which should merge:
-
-\begin{verbatim}
-    signature A1(A(foo)) where
-        data A = A { foo :: Int, bar :: Bool }
-
-    signature A2(A(bar)) where
-        data A = A { foo :: Int, bar :: Bool }
-\end{verbatim}
-
-\subsection{Subtyping record selectors as functions}
-
-\begin{verbatim}
-    signature H(A, foo) where
-        data A
-        foo :: A -> Int
-
-    module M(A, foo) where
-        data A = A { foo :: Int, bar :: Bool }
-\end{verbatim}
-%
-Does \verb|M| successfully fill \verb|H|?  If so, it means that anywhere
-a signature requests a function \verb|foo|, we can instead validly
-provide a record selector.  This capability seems quite attractive,
-although in practice record selectors rarely seem to be abstracted this
-way: one reason is that \verb|M.foo| still \emph{is} a record selector,
-and can be used to modify a record.  (Many library authors find this
-suprising!)
-
-Nor does this seem to be an insurmountable instance of the avoidance
-problem:
-as a workaround, \verb|H| can equivalently be written as:
-
-\begin{verbatim}
-    signature H(foo) where
-        data A = A { foo :: Int, bar :: Bool }
-\end{verbatim}
-%
-However, you might not like this, as the otherwise irrelevant \verb|bar| must be mentioned
-in the definition.
-
-In any case, actually implementing this `subtyping' is quite complicated, because we can no
-longer assume that every child name is associated with a parent name.
-The technical difficulty is that we now need to unify a plain identifier
-\I{AvailInfo} (from the signature) with a type constructor \I{AvailInfo}
-(from a module.)  It is not clear what this should mean.
-Consider this situation:
-
-\begin{verbatim}
-    unit p where
-        signature H(A, foo, bar) where
-            data A
-            foo :: A -> Int
-            bar :: A -> Bool
-        module X(A, foo) where
-            import H
-    unit q where
-        include p
-        signature H(bar) where
-            data A = A { foo :: Int, bar :: Bool }
-        module Y where
-            import X(A(..)) -- ???
-\end{verbatim}
-
-Should the wildcard import on \verb|X| be allowed?
-This question is equivalent to whether or not shaping discovers
-whether or not a function is a record selector and propagates this
-information elsewhere.
-If the wildcard is not allowed, here is another situation:
-
-\begin{verbatim}
-    unit p where
-        -- define without record selectors
-        signature X1(A, foo) where
-            data A
-            foo :: A -> Int
-        module M1(A, foo) where
-            import X1
-
-    unit q where
-        -- define with record selectors (X1s unify)
-        signature X1(A(..)) where
-            data A = A { foo :: Int, bar :: Bool }
-        signature X2(A(..)) where
-            data A = A { foo :: Int, bar :: Bool }
-
-        -- export some record selectors
-        signature Y1(bar) where
-            import X1
-        signature Y2(bar) where
-            import X2
-
-    unit r where
-        include p
-        include q
-
-        -- sharing constraint
-        signature Y2(bar) where
-            import Y1(bar)
-
-        -- the payload
-        module Test where
-            import M1(foo)
-            import X2(foo)
-            ... foo ... -- conflict?
-\end{verbatim}
-
-Without the sharing constraint, the \verb|foo|s from \verb|M1| and \verb|X2|
-should conflict.  With it, however, we should conclude that the \verb|foo|s
-are the same, even though the \verb|foo| from \verb|M1| is \emph{not}
-considered a child of \verb|A|, and even though in the sharing constraint
-we \emph{only} unified \verb|bar| (and its parent \verb|A|).  To know that
-\verb|foo| from \verb|M1| should also be unified, we have to know a bit
-more about \verb|A| when the sharing constraint performs unification;
-however, the \I{AvailInfo} will only tell us about what is in-scope, which
-is \emph{not} enough information.
-
-%\newpage
-
-\section{Type checking}
+\section{Indefinite type checker}
 
 \begin{figure}[htpb]
 $$
 \begin{array}{rcll}
-\I{PkgType} & ::= & \I{ModIface}_0 \verb|;|\, \ldots\verb|;|\, \I{ModIface}_n \\[1em]
+\I{IndefUnitRecord} & ::= & \I{ModIface}_0 \verb|;|\, \ldots\verb|;|\, \I{ModIface}_n \\[1em]
 \multicolumn{3}{l}{\mbox{\bf Module interface}} \\
 \I{ModIface} & ::= & \verb|module| \; \I{Module} \; \verb|(| \I{mi\_exports} \verb|)| \; \verb|where| \\
 & & \qquad \I{mi\_decls} \\
@@ -1030,6 +462,8 @@ $$
 $$
 \caption{Module interfaces in GHC} \label{fig:typecheck}
 \end{figure}
+
+\Red{This needs updating.}
 
 In general terms,
 type checking an indefinite unit (a unit with holes) involves
@@ -1287,30 +721,575 @@ Specifically, the correctness condition for a signature is this: \emph{Any \I{Na
 mentioned in the \I{ModIface} of a signature must either be from an external module, or be
 exported by the signature}.
 
-\begin{aside}
-\textbf{Special case export rule for record selectors.}  Here is the analogous case for
-record selectors:
+\section{Appendix: Shaping}
+
+This section clarifies some subtle aspects about shaping.
+
+\subsection{\textit{OccName} is implied by \textit{Name}}
+In Haskell, the following is not valid syntax:
+
 \begin{verbatim}
+    import A (foobar as baz)
+\end{verbatim}
+In particular, a \I{Name} which is in scope will always have the same
+\I{OccName} (even if it may be qualified.)  You might imagine relaxing
+this restriction so that declarations can be used under different \I{OccName}s;
+in such a world, we need a different definition of shape:
+
+\begin{verbatim}
+    Shape ::=
+        provided: ModName -> Module { OccName -> Name }
+        required: ModName ->        { OccName -> Name }
+\end{verbatim}
+Presently, however, such an \I{OccName} annotation would be redundant: it can be inferred from the \I{Name}.
+
+\subsection{Holes of a unit are a mapping, not a set.}
+
+Why can't the \I{UnitKey} just record a
+set of \I{Module}s, e.g. $\I{UnitKey}\;::= \; p \; \verb|{| \; \I{Module} \; \verb|}|$?  Consider:
+
+\begin{verbatim}
+    unit p (A) requires (H1, H2) where
+        signature H1(T) where
+            data T
+        signature H2(T) where
+            data T
+        module A(A(..)) where
+            import qualified H1
+            import qualified H2
+            data A = A H1.T H2.T
+
+    unit q (A12, A21) where
+        module I1(T) where
+            data T = T Int
+        module I2(T) where
+            data T = T Bool
+        include p (A as A12) requires (H1 as I1, H2 as I2)
+        include p (A as A21) requires (H1 as I2, H2 as I1)
+\end{verbatim}
+With a mapping, the first instance of \verb|p| has key \verb|p(H1 -> q():I1, H2 -> q():I2)|
+while the second instance has key \verb|p(H1 -> q():I2, H2 -> q():I1)|; with
+a set, both would have the key \verb|p{q():I1, q():I2}| and be
+indistinguishable.
+
+\subsection{Signatures can require a specific entity.}
+With requirements like \verb|A -> { HOLE:A.T, HOLE:A.foo }|,
+why not specify it as \verb|A -> { T, foo }|,
+e.g., \verb|required: { ModName -> { OccName } }|?  Consider:
+
+\begin{verbatim}
+    unit p () requires (A, B) where
+        signature A(T) where
+            data T
+        signature B(T) where
+            import T
+\end{verbatim}
+The requirements of this unit specify that \verb|A.T| $=$ \verb|B.T|; this
+can be expressed with \I{Name}s as
+
+\begin{verbatim}
+    A -> { HOLE:A.T }
+    B -> { HOLE:A.T }
+\end{verbatim}
+But, without \I{Name}s, the sharing constraint is impossible:  \verb|A -> { T }; B -> { T }|. (NB: \verb|A| and \verb|B| could be filled with different modules, they just have
+to both export the same \verb|T|.)
+
+\subsection{The \textit{Name} of a value is used to avoid
+ambiguous identifier errors.}
+We state that two types
+are equal when their \I{Name}s are the same; however,
+for values, it is less clear why we care.  But consider this example:
+
+\begin{verbatim}
+    unit p (A) requires (H1, H2) where
+        signature H1(x) where
+            x :: Int
+        signature H2(x) where
+            import H1(x)
+        module A(y) where
+            import H1
+            import H2
+            y = x
+\end{verbatim}
+The reference to \verb|x| in \verb|A| is unambiguous, because it is known
+that \verb|x| from \verb|H1| and \verb|x| from \verb|H2| are the same (have
+the same \I{Name}.)  If they were not the same, it would be ambiguous and
+should cause an error.  Knowing the \I{Name} of a value distinguishes
+between these two cases.
+
+\subsection{Holes are linear}
+Requirements do not record what \I{Module} represents
+the identity of a requirement, which means that it's not possible to assert
+that hole \verb|A| and hole \verb|B| should be implemented with the same module,
+as might occur with aliasing:
+
+\begin{verbatim}
+    signature A where
+    signature B where
+    alias A = B
+\end{verbatim}
+%
+The benefit of this restriction is that when a requirement is filled,
+it is obvious that this is the only requirement that is filled: you won't
+magically cause some other requirements to be filled.  The downside is
+it's not possible to write a unit which looks for an interface it is
+looking for in one of $n$ names, accepting any name as an acceptable linkage.
+If aliasing was allowed, we'd need a separate physical shaping context,
+to make sure multiple mentions of the same hole were consistent.
+
+\subsection{A unit does not ``provide'' its signatures}
+We enforce the invariant that
+a provision is always (syntactically) a \verb|module| and a requirement
+is always a \verb|signature|.  This means that if you have a requirement
+and a provision of the same name, the requirement can \emph{always} be filled
+with the provision.
+
+The alternate design, where a unit both requires and provides
+its signatures, makes it unclear if a provision
+will actually fill a signature.  Consider this example, where
+a signature is required and exposed:
+
+\begin{verbatim}
+    unit a-sigs (A) requires (A) where -- ***
+        signature A where
+            data T
+
+    unit a-user (B) requires (A) where
+        signature A where
+            data T
+            x :: T
+        module B where
+            ...
+
     unit p where
-        signature S(foo) where
-            data T = T { foo :: Int }
-        module M(bar) where
-            import S
-            bar = foo
-    unit q where
-        module A(T(..)) where
-            data T = T { foo :: Int }
-        module S(foo) where
-            import A
+        include a-sigs
+        include a-user
+\end{verbatim}
+%
+When we consider merging in the shape of \verb|a-user|, does the
+\verb|A| provided by \verb|a-sigs| fill in the \verb|A| requirement
+in \verb|a-user|?  It \emph{should not}, since \verb|a-sigs| does not
+actually provide enough declarations to satisfy \verb|a-user|'s
+requirement: the intended semantics \emph{merges} the requirements
+of \verb|a-sigs| and \verb|a-user|.
+
+What about this example?
+
+\begin{verbatim}
+    unit a-sigs (M as A) requires (H as A) where
+        signature H(T) where
+            data T
+        module M(T) where
+            import H(T)
+\end{verbatim}
+%
+We rightly should error, since the provision is a module. And in this situation:
+
+\begin{verbatim}
+    unit a-sigs (H as A) requires (H) where
+        signature H(T) where
+            data T
+\end{verbatim}
+%
+The requirements should be merged, but should the merged requirement
+be under the name \verb|H| or \verb|A|?
+
+It may still be possible to use the \verb|(A) requires (A)| syntax to
+indicate exposed signatures, but this would be a mere syntactic
+alternative to \verb|() requires (exposed A)|.
+
+\subsection{Signature visibility, and defaulting}
+The simplest formulation of requirements is to have them always be
+importable.  One proposed enhancement, however, is to allow some
+requirements to be ``non-importable''; that is, they are not visible
+to people who include packages.
+
+One simple way of modeling this is to associate each required module
+with a flag indicating whether or not it is importable or not.  Then, we
+might imagine that an explicit export list could be used to toggle
+whether or not a requirement is visible or not.
+
+However, when an export list is absent, we have to pick a default
+visibility for a signature.  If we use the same behavior as with
+modules, a strange situation can occur:
+
+\begin{verbatim}
+    unit p where -- S is visible
+        signature S where
+            x :: True
+
+    unit q where -- use defaulting
         include p
-        module A where
-            import M
-            ... bar ...
+        signature S where
+            y :: True
+        module M where
+            import S
+            z = x && y      -- OK
+
+    unit r where
+        include q
+        module N where
+            import S
+            z = y           -- OK
+            z = x           -- ???
+\end{verbatim}
+%
+Absent the second signature declaration in \verb|q|, \verb|S.x| clearly
+should not be visible in \verb|N|.  However, what ought to occur when this signature
+declaration is added?  One interpretation is to say that only some
+(but not all) declarations are provided (\verb|S.x| remains invisible);
+another interpretation is that adding \verb|S| is enough to treat
+the signature as ``in-line'', and all declarations are now provided
+(\verb|S.x| is visible).
+
+The latter interpretation avoids having to keep track of providedness
+per declarations, and means that you can always express defaulting
+behavior by writing an explicit provides declaration on the unit.
+However, it has the odd behavior of making empty signatures semantically
+meaningful:
+
+\begin{verbatim}
+unit q where
+    include p
+    signature S where
+\end{verbatim}
+%
+%   SPJ: This would be too complicated (if there's yet a third way)
+
+This is pretty complicated, so signature visibility is not currently
+planned to be implemented.
+
+\subsection{Tricky \textit{AvailInfo} merging scenarios}
+
+\paragraph{Merging when type constructors are not in scope}
+
+\begin{verbatim}
+    signature A1(foo) where
+        data A = A { foo :: Int, bar :: Bool }
+
+    signature A2(bar) where
+        data A = A { foo :: Int, bar :: Bool }
+\end{verbatim}
+%
+If we merge \verb|A1| and \verb|A2|, are we supposed to conclude that
+the types \verb|A1.A| and \verb|A2.A| (not in scope!) are the same?
+The answer is no!  Consider these implementations:
+
+\begin{verbatim}
+    module A1(A(..)) where
+        data A = A { foo :: Int, bar :: Bool }
+
+    module A2(A(..)) where
+        data A = A { foo :: Int, bar :: Bool }
+
+    module A(foo, bar) where
+        import A1(foo)
+        import A2(bar)
 \end{verbatim}
 
-We could reject this, but technically we can find the right substitution
-for \verb|T|, because the export of \verb|foo| is an \I{AvailTC} which
-does mention \verb|T|.
-\end{aside}
+Here, \verb|module A1| implements \verb|signature A1|, \verb|module A2| implements \verb|signature A2|,
+and \verb|module A| implements \verb|signature A1| and \verb|signature A2| individually
+and should certainly implement their merge.  This is why we cannot simply
+merge type constructors based on the \I{OccName} of their top-level type;
+merging only occurs between in-scope identifiers.
+
+\paragraph{Does merging a selector merge the type constructor?}
+
+\begin{verbatim}
+    signature A1(A(..)) where
+        data A = A { foo :: Int, bar :: Bool }
+
+    signature A2(A(..)) where
+        data A = A { foo :: Int, bar :: Bool }
+
+    signature A2(foo) where
+        import A1(foo)
+\end{verbatim}
+%
+Does the last signature, which is written in the style of a sharing constraint on \verb|foo|,
+also cause \verb|bar| and the type and constructor \verb|A| to be unified?
+Because a merge of a child name results in a substitution on the parent name,
+the answer is yes.
+
+\paragraph{Incomplete data declarations}
+
+\begin{verbatim}
+    signature A1(A(foo)) where
+        data A = A { foo :: Int }
+
+    signature A2(A(bar)) where
+        data A = A { bar :: Bool }
+\end{verbatim}
+%
+Should \verb|A1| and \verb|A2| merge?  If yes, this would imply
+that data definitions in signatures could only be \emph{partial}
+specifications of their true data types.  This seems complicated,
+which suggests this should not be supported; however, in fact,
+this sort of definition, while disallowed during type checking,
+should be \emph{allowed} during shaping. The reason that the
+shape we abscribe to the signatures \verb|A1| and \verb|A2| are
+equivalent to the shapes for these which should merge:
+
+\begin{verbatim}
+    signature A1(A(foo)) where
+        data A = A { foo :: Int, bar :: Bool }
+
+    signature A2(A(bar)) where
+        data A = A { foo :: Int, bar :: Bool }
+\end{verbatim}
+
+\subsection{Subtyping record selectors as functions}
+
+\begin{verbatim}
+    signature H(A, foo) where
+        data A
+        foo :: A -> Int
+
+    module M(A, foo) where
+        data A = A { foo :: Int, bar :: Bool }
+\end{verbatim}
+%
+Does \verb|M| successfully fill \verb|H|?  If so, it means that anywhere
+a signature requests a function \verb|foo|, we can instead validly
+provide a record selector.  This capability seems quite attractive,
+although in practice record selectors rarely seem to be abstracted this
+way: one reason is that \verb|M.foo| still \emph{is} a record selector,
+and can be used to modify a record.  (Many library authors find this
+suprising!)
+
+Nor does this seem to be an insurmountable instance of the avoidance
+problem:
+as a workaround, \verb|H| can equivalently be written as:
+
+\begin{verbatim}
+    signature H(foo) where
+        data A = A { foo :: Int, bar :: Bool }
+\end{verbatim}
+%
+However, you might not like this, as the otherwise irrelevant \verb|bar| must be mentioned
+in the definition.
+
+In any case, actually implementing this `subtyping' is quite complicated, because we can no
+longer assume that every child name is associated with a parent name.
+The technical difficulty is that we now need to unify a plain identifier
+\I{AvailInfo} (from the signature) with a type constructor \I{AvailInfo}
+(from a module.)  It is not clear what this should mean.
+Consider this situation:
+
+\begin{verbatim}
+    unit p where
+        signature H(A, foo, bar) where
+            data A
+            foo :: A -> Int
+            bar :: A -> Bool
+        module X(A, foo) where
+            import H
+    unit q where
+        include p
+        signature H(bar) where
+            data A = A { foo :: Int, bar :: Bool }
+        module Y where
+            import X(A(..)) -- ???
+\end{verbatim}
+
+Should the wildcard import on \verb|X| be allowed?
+This question is equivalent to whether or not shaping discovers
+whether or not a function is a record selector and propagates this
+information elsewhere.
+If the wildcard is not allowed, here is another situation:
+
+\begin{verbatim}
+    unit p where
+        -- define without record selectors
+        signature X1(A, foo) where
+            data A
+            foo :: A -> Int
+        module M1(A, foo) where
+            import X1
+
+    unit q where
+        -- define with record selectors (X1s unify)
+        signature X1(A(..)) where
+            data A = A { foo :: Int, bar :: Bool }
+        signature X2(A(..)) where
+            data A = A { foo :: Int, bar :: Bool }
+
+        -- export some record selectors
+        signature Y1(bar) where
+            import X1
+        signature Y2(bar) where
+            import X2
+
+    unit r where
+        include p
+        include q
+
+        -- sharing constraint
+        signature Y2(bar) where
+            import Y1(bar)
+
+        -- the payload
+        module Test where
+            import M1(foo)
+            import X2(foo)
+            ... foo ... -- conflict?
+\end{verbatim}
+
+Without the sharing constraint, the \verb|foo|s from \verb|M1| and \verb|X2|
+should conflict.  With it, however, we should conclude that the \verb|foo|s
+are the same, even though the \verb|foo| from \verb|M1| is \emph{not}
+considered a child of \verb|A|, and even though in the sharing constraint
+we \emph{only} unified \verb|bar| (and its parent \verb|A|).  To know that
+\verb|foo| from \verb|M1| should also be unified, we have to know a bit
+more about \verb|A| when the sharing constraint performs unification;
+however, the \I{AvailInfo} will only tell us about what is in-scope, which
+is \emph{not} enough information.
+
+\subsection{Some examples}
+
+\subsubsection{A simple example}
+
+In the following set of units:
+
+\begin{verbatim}
+    unit p(M) requires (A) where
+        signature A(T) where
+            data T
+        module M(T, S) where
+            import A(T)
+            data S = S T
+
+    unit q where
+        module A where
+            data T = T
+        include p
+\end{verbatim}
+
+When we \verb|include p|, we need to merge the partial shape
+of \verb|q| (with just provides \verb|A|) with the shape
+of \verb|p|.  Here is each step of the merging process:
+
+\begin{verbatim}
+          shape 1                       shape 2
+          --------------------------------------------------------------------------------
+(initial shapes)
+provides: A -> THIS:A { q():A.T }       M -> p(A -> HOLE:A) { HOLE:A.T, p(A -> HOLE:A).S }
+requires: (nothing)                     A ->                { HOLE:A.T }
+
+(after filling requirements)
+provides: A -> THIS:A { q():A.T }       M -> p(A -> THIS:A) { q():A.T, p(A -> THIS:A).S }
+requires: (nothing)                     (nothing)
+
+(after adding provides)
+provides: A -> THIS:A         { q():A.T }
+          M -> p(A -> THIS:A) { q():A.T, p(A -> THIS:A).S }
+requires: (nothing)
+\end{verbatim}
+
+Notice that we substituted \verb|HOLE:A| with \verb|THIS:A|, but \verb|HOLE:A.T| with \verb|q():A.T|.
+
+\subsubsection{Requirements merging can affect provisions}
+
+When a merge results in a substitution, we substitute over both
+requirements and provisions:
+
+\begin{verbatim}
+    signature H(T) where
+        data T
+    module A(T) where
+        import H(T)
+    module B(T) where
+        data T = T
+
+    -- provides: A -> THIS:A { HOLE:H.T }
+    --           B -> THIS:B { THIS:B.T }
+    -- requires: H ->        { HOLE:H.T }
+
+    signature H(T, f) where
+        import B(T)
+        f :: a -> a
+
+    -- provides: A -> THIS:A { THIS:B.T }           -- UPDATED
+    --           B -> THIS:B { THIS:B.T }
+    -- requires: H ->        { THIS:B.T, HOLE:H.f } -- UPDATED
+\end{verbatim}
+
+\subsubsection{Sharing constraints}
+
+Suppose you have two signature which both independently define a type,
+and you would like to assert that these two types are the same.  In the
+ML world, such a constraint is known as a sharing constraint.  Sharing
+constraints can be encoded in Backpacks via clever use of reexports;
+they are also an instructive example for signature merging.
+
+\begin{verbatim}
+    signature A(T) where
+        data T
+    signature B(T) where
+        data T
+
+    -- requires: A -> { HOLE:A.T }
+                 B -> { HOLE:B.T }
+
+    -- the sharing constraint!
+    signature A(T) where
+        import B(T)
+    -- (shape to merge)
+    -- requires: A -> { HOLE:B.T }
+
+    -- (after merge)
+    -- requires: A -> { HOLE:A.T }
+    --           B -> { HOLE:A.T }
+\end{verbatim}
+%
+\Red{I'm pretty sure any choice of \textit{Name} is OK, since the
+subsequent substitution will make it alpha-equivalent.}
+
+\subsection{Export declarations}
+
+If an explicit export declaration is given, the final shape is the
+computed shape, minus any provisions not mentioned in the list, with the
+appropriate renaming applied to provisions and requirements.  (Requirements
+are implicitly passed through if they are not named.)
+If no explicit export declaration is given, the final shape is
+the computed shape, including only provisions which were defined
+in the declarations of the unit.
+
+
+\section{Cabal}
+
+
+%  \I{InstalledUnitId} & ::= & \I{IndefUnitId} \verb|(| \, m \; \verb|->| \; \I{Module} \verb|,|\, \ldots\, \verb|)| & \mbox{Also known as \I{UnitKey}} \\
+%  \I{Module} & ::= & \I{InstalledUnitId} \verb|:| m \\
+
+\paragraph{Indefinite versus installed units}
+The purpose of an \I{IndefUnitId} is to uniquely identify the results of \textbf{typechecking}
+an indefinite unit; whereas an \I{InstalledUnitId} uniquely identifies
+the results of \textbf{compiling} a unit with all its holes
+filled.  Thus, an \I{InstalledUnitId} also records a \emph{hole mapping}
+which specifies how each hole was filled.  If an \I{InstalledUnitId}
+is only partially filled, we may refer to it as a \I{UnitKey} (as these
+are never installed.)
+
+\paragraph{Units versus packages}
+
+Cabal packages are:
+
+\begin{itemize}
+    \item The unit of distribution
+    \item The unit that Hackage handles
+    \item The unit of versioning
+    \item The unit of ownership (who maintains it etc) 
+\end{itemize}
+
+Backpack units are the building blocks of modular development;
+there may be multiple units per a Cabal package.  While in theory
+Cabal could do sophisticated things with multiple units in a
+package, we expect Cabal
+to pick a distinguished unit (with the same unit name $p$ as
+the package) which serves as the publically visible unit.
+
+
+%\newpage
 
 \end{document} % chktex 16
