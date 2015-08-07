@@ -28,6 +28,7 @@ import Outputable
 import Data.Char
 import Data.List
 import Data.Maybe
+import qualified Data.Map as Map
 import Data.Version
 import System.FilePath
 import System.IO
@@ -57,7 +58,8 @@ ppModule dflags iface =
   "" : ppDocumentation dflags (ifaceDoc iface) ++
   ["module " ++ moduleString (ifaceMod iface)] ++
   concatMap (ppExport dflags) (ifaceExportItems iface) ++
-  concatMap (ppInstance dflags) (ifaceInstances iface)
+  concatMap (ppInstance dflags) (ifaceInstances iface) ++
+  concatMap (ppFixity dflags) (Map.toList $ ifaceFixMap iface)
 
 
 ---------------------------------------------------------------------
@@ -232,6 +234,10 @@ ppCtor dflags dat subdocs con
             ResTyH98 -> apps $ map (reL . HsTyVar) $
                         (tcdName dat) : [hsTyVarName v | L _ v@(UserTyVar _) <- hsQTvBndrs $ tyClDeclTyVars dat]
             ResTyGADT _ x -> x
+
+
+ppFixity :: DynFlags -> (Name, Fixity) -> [String]
+ppFixity dflags (name, fixity) = [out dflags (FixitySig [noLoc name] fixity)]
 
 
 ---------------------------------------------------------------------
