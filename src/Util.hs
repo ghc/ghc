@@ -4,7 +4,7 @@ module Util (
     replaceIf, replaceEq, replaceSeparators, decodeModule,
     unifyPath, (-/-),
     chunksOfSize,
-    putColoured, putOracle, putBuild, putError,
+    putColoured, putOracle, putBuild, putSuccess, putError,
     bimap, minusOrd, intersectOrd
     ) where
 
@@ -67,6 +67,12 @@ putOracle = putColoured Blue
 -- Make build output more distinguishable
 putBuild :: String -> Action ()
 putBuild = putColoured White
+
+-- A more colourful version of error
+putSuccess :: String -> Action a
+putSuccess msg = do
+    putColoured Green msg
+    error $ "GHC build system error: " ++ msg
 
 -- A more colourful version of error
 putError :: String -> Action a
