@@ -104,8 +104,8 @@ data FunDepEqn loc
                                  -- Non-empty only for FunDepEqns arising from instance decls
 
           , fd_eqs  :: [Pair Type]  -- Make these pairs of types equal
-          , fd_pred1 :: PredType    -- The FunDepEqn arose from 
-          , fd_pred2 :: PredType    --  combining these two constraints 
+          , fd_pred1 :: PredType    -- The FunDepEqn arose from
+          , fd_pred2 :: PredType    --  combining these two constraints
           , fd_loc :: loc  }
 
 {-
@@ -185,7 +185,7 @@ improveFromAnother _ _ _ = []
 pprEquation :: FunDepEqn a -> SDoc
 pprEquation (FDEqn { fd_qtvs = qtvs, fd_eqs = pairs })
   = vcat [ptext (sLit "forall") <+> braces (pprWithCommas ppr qtvs),
-          nest 2 (vcat [ ppr t1 <+> ptext (sLit "~") <+> ppr t2 
+          nest 2 (vcat [ ppr t1 <+> ptext (sLit "~") <+> ppr t2
                        | Pair t1 t2 <- pairs])]
 
 improveFromInstEnv :: InstEnvs
@@ -382,7 +382,11 @@ checkInstCoverage be_liberal clas theta inst_taus
          conserv_undet_tvs = rs_tvs `minusVarSet` closeOverKinds ls_tvs
             -- closeOverKinds: see Note [Closing over kinds in coverage]
 
-         undet_list = varSetElemsKvsFirst undetermined_tvs
+           -- we do need to tidy, because it's possible that we're about
+           -- to report about a GHC-generated kind variable
+           -- for example, test case polykinds/T10570
+         undet_list = snd $ tidyOpenTyVars emptyTidyEnv $
+                      varSetElemsKvsFirst undetermined_tvs
 
          msg = vcat [ -- text "ls_tvs" <+> ppr ls_tvs
                       -- , text "closed ls_tvs" <+> ppr (closeOverKinds ls_tvs)

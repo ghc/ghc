@@ -964,8 +964,15 @@ checkValidInstance :: UserTypeCtxt -> LHsType Name -> Type
 checkValidInstance ctxt hs_type ty
   | Just (clas,inst_tys) <- getClassPredTys_maybe tau
   , inst_tys `lengthIs` classArity clas
-  = do  { setSrcSpan head_loc (checkValidInstHead ctxt clas inst_tys)
-        ; checkValidTheta ctxt theta
+  = do  { let (tidy_env0, tidy_tys)   = tidyOpenTypes emptyTidyEnv inst_tys
+              (tidy_env1, tidy_theta) = tidyOpenTypes tidy_env0 theta
+              (_,         tidy_ty)    = tidyOpenType  tidy_env1 ty
+           -- even though the inst_tys are user-specified, we still must
+           -- tidy, because of the possibility of kind variables. See,
+           -- for example, test case polykinds/TidyClassKinds
+
+        ; setSrcSpan head_loc (checkValidInstHead ctxt clas tidy_tys)
+        ; checkValidTheta ctxt tidy_theta
 
         -- The Termination and Coverate Conditions
         -- Check that instance inference will terminate (if we care)
@@ -979,12 +986,12 @@ checkValidInstance ctxt hs_type ty
         --   in the constraint than in the head
         ; undecidable_ok <- xoptM Opt_UndecidableInstances
         ; if undecidable_ok
-          then checkAmbiguity ctxt ty
-          else checkInstTermination inst_tys theta
+          then checkAmbiguity ctxt tidy_ty
+          else checkInstTermination tidy_tys tidy_theta
 
-        ; case (checkInstCoverage undecidable_ok clas theta inst_tys) of
-            IsValid  -> return ()   -- Check succeeded
-            NotValid msg -> addErrTc (instTypeErr clas inst_tys msg)
+        ; case (checkInstCoverage undecidable_ok clas tidy_theta tidy_tys) of
+            IsValid      -> return ()   -- Check succeeded
+            NotValid msg -> addErrTc (instTypeErr clas tidy_tys msg)
 
         ; return (tvs, theta, clas, inst_tys) }
 
