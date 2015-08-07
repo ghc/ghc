@@ -2,15 +2,19 @@ module Rules (
     oracleRules, cabalRules, configRules, packageRules, generateTargets
     ) where
 
+import Way
 import Base
 import Util
 import Stage
 import Expression
+import Oracles.PackageData
 import Rules.Cabal
 import Rules.Config
 import Rules.Package
 import Rules.Oracles
 import Rules.Resources
+import Settings.Ways
+import Settings.Util
 import Settings.Packages
 import Settings.TargetDirectory
 
@@ -19,9 +23,21 @@ generateTargets :: Rules ()
 generateTargets = action $ do
     targets <- fmap concat . forM [Stage0 ..] $ \stage -> do
         pkgs <- interpret (stageTarget stage) getPackages
-        fmap concat . forM pkgs $ \pkg -> return
-            [ targetPath stage pkg -/- "build/haskell.deps"
-            , targetPath stage pkg -/- "build/c.deps" ]
+        fmap concat . forM pkgs $ \pkg -> do
+            let target    = stagePackageTarget stage pkg
+                buildPath = targetPath stage pkg -/- "build"
+            buildGhciLib <- interpret target $ getPkgData BuildGhciLib
+            pkgKey       <- interpret target $ getPkgData PackageKey
+            let ghciLib = [ buildPath -/- "HS" ++ pkgKey <.> "o"
+                          | buildGhciLib == "YES" && stage /= Stage0 ]
+
+            ways <- interpret target getWays
+            libs <- forM ways $ \way -> do
+                extension <- libsuf way
+                return $ buildPath -/- "libHS" ++ pkgKey <.> extension
+
+            return $ ghciLib ++ libs
+
     need targets
 
 -- TODO: add Stage2 (compiler only?)
