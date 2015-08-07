@@ -29,34 +29,36 @@ buildPackageLibrary _ target = do
         cSrcs   <- interpret target $ getPkgDataList CSrcs
         modules <- interpret target $ getPkgDataList Modules
 
-        let way    = fromJust . detectWay $ a -- fromJust is safe
-            hsSrcs = map (replaceEq '.' '/') modules
-            cObjs  = [ buildPath -/- src -<.> osuf way | src <-  cSrcs ]
-            hsObjs = [ buildPath -/- src  <.> osuf way | src <- hsSrcs ]
+        let way   = fromJust . detectWay $ a -- fromJust is safe
+            hSrcs = map (replaceEq '.' '/') modules
+            cObjs = [ buildPath -/- src -<.> osuf way | src <- cSrcs ]
+            hObjs = [ buildPath -/- src  <.> osuf way | src <- hSrcs ]
 
-        need $ cObjs ++ hsObjs -- this will create split objects if required
+        need $ cObjs ++ hObjs -- this will create split objects if required
 
         split <- interpret target splitObjects
         splitObjs <- if split
-            then fmap concat $ forM hsSrcs $ \src -> do
+            then fmap concat $ forM hSrcs $ \src -> do
                 let files = buildPath -/- src ++ "_" ++ osuf way ++ "_split/*"
-                getDirectoryFiles "" [files]
+                fmap (map unifyPath) $ getDirectoryFiles "" [files]
             else return []
 
-        build $ fullTarget target (cObjs ++ hsObjs ++ splitObjs) Ar [a]
+        build $ fullTarget target (cObjs ++ hObjs ++ splitObjs) Ar [a]
 
         synopsis <- interpret target $ getPkgData Synopsis
-        putSuccess $ "/--------\n| Successfully built package '"
-            ++ pkgName pkg ++ "' (stage " ++ show stage ++ ")."
+        putSuccess $ "/--------\n| Successfully built package library '"
+            ++ pkgName pkg
+            ++ "' (stage " ++ show stage ++ ", way "++ show way ++ ")."
         putSuccess $ "| Package synopsis: "
             ++ dropWhileEnd isPunctuation synopsis ++ "." ++ "\n\\--------"
 
     -- TODO: this looks fragile as haskell objects can match this rule if their
     -- names start with "HS" and they are on top of the module hierarchy.
-    (buildPath -/- "HS*.o") %> \o -> do
+    priority 2 $ (buildPath -/- "HS*.o") %> \o -> do
         cSrcs   <- interpret target $ getPkgDataList CSrcs
         modules <- interpret target $ getPkgDataList Modules
-        let hsSrcs = map (replaceEq '.' '/') modules
-            cObjs  = [ buildPath -/- src -<.> "o" | src <-  cSrcs ]
-            hsObjs = [ buildPath -/- src  <.> "o" | src <- hsSrcs ]
-        build $ fullTarget target (cObjs ++ hsObjs) Ld [o]
+        let hSrcs = map (replaceEq '.' '/') modules
+            cObjs = [ buildPath -/- src -<.> "o" | src <- cSrcs ]
+            hObjs = [ buildPath -/- src  <.> "o" | src <- hSrcs ]
+        need $ cObjs ++ hObjs
+        build $ fullTarget target (cObjs ++ hObjs) Ld [o]
