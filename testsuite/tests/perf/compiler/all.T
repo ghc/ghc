@@ -416,7 +416,7 @@ test('T783',
             # 2014-09-03: 223377364 (Windows) better specialisation, raft of core-to-core optimisations
             # 2014-12-22: 235002220 (Windows) not sure why
 
-           (wordsize(64), 548288760, 10)]),
+           (wordsize(64), 470738808, 10)]),
             # prev:       349263216 (amd64/Linux)
             # 07/08/2012: 384479856 (amd64/Linux)
             # 29/08/2012: 436927840 (amd64/Linux)
@@ -437,6 +437,8 @@ test('T783',
 	    #    this test seems to be an extreme outlier.)
             # 2015-05-16: 548288760  (amd64/Linux)
 	    #   (improved sequenceBlocks in nativeCodeGen, #10422)
+            # 2015-08-07: 470738808  (amd64/Linux)
+	    #   (simplifying the switch plan code path for simple checks, #10677)
       extra_hc_opts('-static')
       ],
       compile,[''])
