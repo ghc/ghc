@@ -2,5 +2,5 @@
 Defaulting1MROff.hs:6:1: error:
     No instance for (Num t)
     When checking that ‘alpha’ has the inferred type
-      alpha :: forall t. t
+      alpha :: forall t0. t0
     Probable cause: the inferred type is ambiguous

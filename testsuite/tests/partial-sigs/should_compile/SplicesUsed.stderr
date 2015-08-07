@@ -32,39 +32,39 @@ SplicesUsed.hs:10:17: warning:
       charA :: a -> (_)
 
 SplicesUsed.hs:13:14: warning:
-    Found type wildcard ‘_’ standing for ‘a -> Bool’
-    Where: ‘a’ is a rigid type variable bound by
-               the inferred type of filter' :: (a -> Bool) -> [a] -> [a]
-               at SplicesUsed.hs:14:1
+    Found type wildcard ‘_’ standing for ‘a0 -> Bool’
+    Where: ‘a0’ is a rigid type variable bound by
+                the inferred type of filter' :: (a0 -> Bool) -> [a0] -> [a0]
+                at SplicesUsed.hs:14:1
     In the type signature for:
       filter' :: _ -> _ -> _
 
 SplicesUsed.hs:13:14: warning:
-    Found type wildcard ‘_’ standing for ‘[a]’
-    Where: ‘a’ is a rigid type variable bound by
-               the inferred type of filter' :: (a -> Bool) -> [a] -> [a]
-               at SplicesUsed.hs:14:1
+    Found type wildcard ‘_’ standing for ‘[a0]’
+    Where: ‘a0’ is a rigid type variable bound by
+                the inferred type of filter' :: (a0 -> Bool) -> [a0] -> [a0]
+                at SplicesUsed.hs:14:1
     In the type signature for:
       filter' :: _ -> _ -> _
 
 SplicesUsed.hs:13:14: warning:
-    Found type wildcard ‘_’ standing for ‘[a]’
-    Where: ‘a’ is a rigid type variable bound by
-               the inferred type of filter' :: (a -> Bool) -> [a] -> [a]
-               at SplicesUsed.hs:14:1
+    Found type wildcard ‘_’ standing for ‘[a0]’
+    Where: ‘a0’ is a rigid type variable bound by
+                the inferred type of filter' :: (a0 -> Bool) -> [a0] -> [a0]
+                at SplicesUsed.hs:14:1
     In the type signature for:
       filter' :: _ -> _ -> _
 
 SplicesUsed.hs:16:3: warning:
-    Found hole ‘_’ with inferred constraints: Eq a
+    Found hole ‘_’ with inferred constraints: Eq a0
     In the type signature for:
       foo :: _ => _
 
 SplicesUsed.hs:16:3: warning:
-    Found type wildcard ‘_’ standing for ‘a -> a -> Bool’
-    Where: ‘a’ is a rigid type variable bound by
-               the inferred type of foo :: Eq a => a -> a -> Bool
-               at SplicesUsed.hs:16:3
+    Found type wildcard ‘_’ standing for ‘a0 -> a0 -> Bool’
+    Where: ‘a0’ is a rigid type variable bound by
+                the inferred type of foo :: Eq a0 => a0 -> a0 -> Bool
+                at SplicesUsed.hs:16:3
     In the type signature for:
       foo :: _ => _
 
@@ -74,9 +74,9 @@ SplicesUsed.hs:18:3: warning:
       bar :: _a -> _b -> (_a, _b)
 
 SplicesUsed.hs:18:3: warning:
-    Found type wildcard ‘_b’ standing for ‘t’
-    Where: ‘t’ is a rigid type variable bound by
-               the inferred type of bar :: Bool -> t -> (Bool, t)
-               at SplicesUsed.hs:18:3
+    Found type wildcard ‘_b’ standing for ‘t0’
+    Where: ‘t0’ is a rigid type variable bound by
+                the inferred type of bar :: Bool -> t0 -> (Bool, t0)
+                at SplicesUsed.hs:18:3
     In the type signature for:
       bar :: _a -> _b -> (_a, _b)
