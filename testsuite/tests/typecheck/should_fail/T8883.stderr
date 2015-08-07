@@ -1,8 +1,8 @@
 
 T8883.hs:20:1: error:
-    Non type-variable argument in the constraint: Functor (PF a)
+    Non type-variable argument in the constraint: Functor (PF a0)
     (Use FlexibleContexts to permit this)
     When checking that ‘fold’ has the inferred type
-      fold :: forall b a.
-              (Functor (PF a), Regular a) =>
-              (PF a b -> b) -> a -> b
+      fold :: forall b0 a0.
+              (Functor (PF a0), Regular a0) =>
+              (PF a0 b0 -> b0) -> a0 -> b0

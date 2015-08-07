@@ -1,6 +1,6 @@
 
 T10351.hs:6:1: error:
-    Non type-variable argument in the constraint: C [t]
+    Non type-variable argument in the constraint: C [t0]
     (Use FlexibleContexts to permit this)
     When checking that ‘f’ has the inferred type
-      f :: forall t. C [t] => t -> ()
+      f :: forall t0. C [t0] => t0 -> ()

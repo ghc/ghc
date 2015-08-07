@@ -4,6 +4,6 @@ T10570.hs:10:10: error:
       The coverage condition fails in class ‘ConsByIdx2’
         for functional dependency: ‘x -> m’
       Reason: lhs type ‘Int’ does not determine rhs type ‘Proxy’
-      Un-determined variable: k
+      Un-determined variable: k0
       (Use -fprint-explicit-kinds to see the kind variables in the types)
     In the instance declaration for ‘ConsByIdx2 Int a Proxy cls’

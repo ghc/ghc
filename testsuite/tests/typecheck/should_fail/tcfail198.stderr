@@ -1,13 +1,14 @@
 
 tcfail198.hs:6:36: error:
-    Couldn't match expected type ‘a2’ with actual type ‘a1’
-      because type variable ‘a2’ would escape its scope
+    Couldn't match expected type ‘a1’ with actual type ‘a0’
+      because type variable ‘a1’ would escape its scope
     This (rigid, skolem) type variable is bound by
-      an expression type signature: a2
+      an expression type signature: a1
       at tcfail198.hs:6:36-41
     Relevant bindings include
-      xs :: [a1] (bound at tcfail198.hs:6:21)
-      x :: a1 (bound at tcfail198.hs:6:19)
-      f3 :: [a1] -> [a1] (bound at tcfail198.hs:6:6)
+      xs :: [a0] (bound at tcfail198.hs:6:21)
+      x :: a0 (bound at tcfail198.hs:6:19)
+      f3 :: [a0] -> [a0] (bound at tcfail198.hs:6:6)
     In the expression: x :: a
     In the second argument of ‘(++)’, namely ‘[x :: a]’
+    In the expression: xs ++ [x :: a]
