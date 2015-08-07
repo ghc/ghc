@@ -38,7 +38,7 @@ generateTargets = action $ do
 
             return $ ghciLib ++ libs
 
-    need targets
+    need $ reverse targets
 
 -- TODO: add Stage2 (compiler only?)
 packageRules :: Rules ()
