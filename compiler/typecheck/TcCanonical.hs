@@ -1128,7 +1128,7 @@ canEqTyVarTyVar ev eq_rel swapped tv1 tv2
   | incompat_kind   = incompatibleKind ev xi1 k1 xi2 k2
 
 -- We don't do this any more
--- See Note [Orientation of equalities with fmvs] in TcSMonad
+-- See Note [Orientation of equalities with fmvs] in TcFlatten
 --  | isFmvTyVar tv1  = do_fmv swapped            tv1 xi1 xi2 co1 co2
 --  | isFmvTyVar tv2  = do_fmv (flipSwap swapped) tv2 xi2 xi1 co2 co1
 
@@ -1159,7 +1159,7 @@ canEqTyVarTyVar ev eq_rel swapped tv1 tv2
                                , cc_rhs = xi2, cc_eq_rel = eq_rel })
 
 {- We don't do this any more
-   See Note [Orientation of equalities with fmvs] in TcSMonad
+   See Note [Orientation of equalities with fmvs] in TcFlatten
     -- tv1 is the flatten meta-var
     do_fmv swapped tv1 xi1 xi2 co1 co2
       | same_kind

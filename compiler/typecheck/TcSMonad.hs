@@ -994,7 +994,7 @@ Note [Examples of how the inert_model helps completeness]
       [D] d4: fmv2 ~ a
 
   At this point we are stuck so we unflatten this set:
-  See Note [Orientation of equalities with fmvs]
+  See Note [Orientation of equalities with fmvs] in TcFlatten
       [W] w1: F fmv2 ~ fmv1
       [W] w2: UnF fmv1 ~ fmv2
       [W] w5: fmv1 ~ fsk1
