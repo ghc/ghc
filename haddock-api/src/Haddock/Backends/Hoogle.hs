@@ -20,6 +20,8 @@ import InstEnv (ClsInst(..))
 import Haddock.GhcUtils
 import Haddock.Types hiding (Version)
 import Haddock.Utils hiding (out)
+
+import Bag
 import GHC
 import Outputable
 
@@ -154,9 +156,11 @@ ppSig dflags x  = ppSigWithDoc dflags x []
 
 -- note: does not yet output documentation for class methods
 ppClass :: DynFlags -> TyClDecl Name -> [(Name, DocForDecl Name)] -> [String]
-ppClass dflags x subdocs = out dflags x{tcdSigs=[]} :
+ppClass dflags x subdocs = out dflags decl' :
             concatMap (flip (ppSigWithDoc dflags) subdocs . addContext . unL) (tcdSigs x)
     where
+        decl' = x { tcdSigs = [], tcdMeths = emptyBag }
+
         addContext (TypeSig name (L l sig) nwcs) = TypeSig name (L l $ f sig) nwcs
         addContext (MinimalSig src sig) = MinimalSig src sig
         addContext _ = error "expected TypeSig"
