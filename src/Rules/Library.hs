@@ -14,7 +14,6 @@ import Settings.TargetDirectory
 import Rules.Actions
 import Rules.Resources
 import Data.List
-import Data.Maybe
 
 buildPackageLibrary :: Resources -> StagePackageTarget -> Rules ()
 buildPackageLibrary _ target = do
@@ -29,7 +28,7 @@ buildPackageLibrary _ target = do
         cSrcs   <- interpret target $ getPkgDataList CSrcs
         modules <- interpret target $ getPkgDataList Modules
 
-        let way   = fromJust . detectWay $ a -- fromJust is safe
+        let way   = detectWay a
             hSrcs = map (replaceEq '.' '/') modules
             cObjs = [ buildPath -/- src -<.> osuf way | src <- cSrcs ]
             hObjs = [ buildPath -/- src  <.> osuf way | src <- hSrcs ]
@@ -54,11 +53,11 @@ buildPackageLibrary _ target = do
 
     -- TODO: this looks fragile as haskell objects can match this rule if their
     -- names start with "HS" and they are on top of the module hierarchy.
-    priority 2 $ (buildPath -/- "HS*.o") %> \o -> do
+    priority 2 $ (buildPath -/- "HS*.o") %> \obj -> do
         cSrcs   <- interpret target $ getPkgDataList CSrcs
         modules <- interpret target $ getPkgDataList Modules
         let hSrcs = map (replaceEq '.' '/') modules
             cObjs = [ buildPath -/- src -<.> "o" | src <- cSrcs ]
             hObjs = [ buildPath -/- src  <.> "o" | src <- hSrcs ]
         need $ cObjs ++ hObjs
-        build $ fullTarget target (cObjs ++ hObjs) Ld [o]
+        build $ fullTarget target (cObjs ++ hObjs) Ld [obj]

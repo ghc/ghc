@@ -10,7 +10,6 @@ import Oracles.DependencyList
 import Settings.TargetDirectory
 import Rules.Actions
 import Rules.Resources
-import Data.Maybe
 
 compilePackage :: Resources -> StagePackageTarget -> Rules ()
 compilePackage _ target = do
@@ -21,14 +20,16 @@ compilePackage _ target = do
         cDepsFile = buildPath -/- "c.deps"
         hDepsFile = buildPath -/- "haskell.deps"
 
-    matchBuildResult buildPath "hi" ?> \hi -> do
-        let way = fromJust . detectWay $ hi -- fromJust is safe
-        need [hi -<.> osuf way]
+    matchBuildResult buildPath "hi" ?> \hi ->
+        need [ hi -<.> osuf (detectWay hi) ]
+
+    matchBuildResult buildPath "hi-boot" ?> \hiboot ->
+        need [ hiboot -<.> obootsuf (detectWay hiboot) ]
 
     matchBuildResult buildPath "o" ?> \obj -> do
-        let way        = fromJust . detectWay $ obj -- fromJust is safe
-            vanillaObj = takeFileName obj -<.> "o"
-        cDeps <- dependencyList cDepsFile vanillaObj
+        let way  = detectWay obj
+            cObj = takeFileName obj -<.> "o"
+        cDeps <- dependencyList cDepsFile cObj
         hDeps <- dependencyList hDepsFile obj
         let hSrcDeps = filter ("//*hs" ?==) hDeps
 
@@ -43,3 +44,20 @@ compilePackage _ target = do
         if null cDeps
         then build $ fullTargetWithWay target hSrcDeps (Ghc stage) way [obj]
         else build $ fullTarget        target cDeps    (Gcc stage)     [obj]
+
+    matchBuildResult buildPath "o-boot" ?> \obj -> do
+        let way = detectWay obj
+        hDeps <- dependencyList hDepsFile obj
+        let hSrcDeps = filter ("//*hs-boot" ?==) hDeps
+
+        when (null hDeps) $
+            putError $ "Cannot determine sources for '" ++ obj ++ "'."
+
+        need hDeps
+        build $ fullTargetWithWay target hSrcDeps (Ghc stage) way [obj]
+
+-- TODO: add support for -dyno
+-- $1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.hs-boot
+--     $$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
+--     $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno
+--     $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@)))
