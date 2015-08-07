@@ -69,10 +69,8 @@ putBuild :: String -> Action ()
 putBuild = putColoured White
 
 -- A more colourful version of error
-putSuccess :: String -> Action a
-putSuccess msg = do
-    putColoured Green msg
-    error $ "GHC build system error: " ++ msg
+putSuccess :: String -> Action ()
+putSuccess = putColoured Green
 
 -- A more colourful version of error
 putError :: String -> Action a
