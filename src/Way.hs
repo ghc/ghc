@@ -9,8 +9,8 @@ module Way ( -- TODO: rename to "Way"?
     threadedDynamic, threadedDebugDynamic, debugDynamic,
     loggingDynamic, threadedLoggingDynamic,
 
-    wayPrefix, hisuf, osuf, hcsuf, obootsuf, ssuf, libsuf,
-    detectWay, matchBuildResult
+    wayPrefix, hisuf, osuf, hcsuf, obootsuf, hibootsuf, ssuf, libsuf,
+    safeDetectWay, detectWay, matchBuildResult
     ) where
 
 import Base
@@ -103,11 +103,12 @@ wayPrefix way | way == vanilla = ""
               | otherwise      = show way ++ "_"
 
 hisuf, osuf, hcsuf, obootsuf, ssuf :: Way -> String
-osuf     = (++ "o"     ) . wayPrefix
-ssuf     = (++ "s"     ) . wayPrefix
-hisuf    = (++ "hi"    ) . wayPrefix
-hcsuf    = (++ "hc"    ) . wayPrefix
-obootsuf = (++ "o-boot") . wayPrefix
+osuf      = (++ "o"      ) . wayPrefix
+ssuf      = (++ "s"      ) . wayPrefix
+hisuf     = (++ "hi"     ) . wayPrefix
+hcsuf     = (++ "hc"     ) . wayPrefix
+obootsuf  = (++ "o-boot" ) . wayPrefix
+hibootsuf = (++ "hi-boot") . wayPrefix
 
 -- Note: in the previous build system libsuf was mysteriously different
 -- from other suffixes. For example, in the profiling way it used to be
@@ -131,12 +132,12 @@ libsuf way @ (Way set) =
         return $ prefix ++ "ghc" ++ version ++ extension
 
 -- Detect way from a given filename. Returns Nothing if there is no match:
--- * detectWay "foo/bar.hi"                 == Just vanilla
--- * detectWay "baz.thr_p_o"                == Just threadedProfiling
--- * detectWay "qwe.ph_i"                   == Nothing (expected "qwe.p_hi")
--- * detectWay "xru.p_ghc7.11.20141222.dll" == Just profiling
-detectWay :: FilePath -> Maybe Way
-detectWay file = case reads prefix of
+-- * safeDetectWay "foo/bar.hi"                == Just vanilla
+-- * safeDetectWay "baz.thr_p_o"               == Just threadedProfiling
+-- * safeDetectWay "qwe.ph_i"                  == Nothing (expected "qwe.p_hi")
+-- * safeDetectWay "xru.p_ghc7.11.20141222.so" == Just profiling
+safeDetectWay :: FilePath -> Maybe Way
+safeDetectWay file = case reads prefix of
     [(way, "")] -> Just way
     _           -> Nothing
   where
@@ -147,12 +148,16 @@ detectWay file = case reads prefix of
                      dropExtension . dropExtension $ file
     prefix = drop 1 . dropWhileEnd (== '_') . dropWhileEnd (/= '_') $ prefixed
 
--- Given a path, an extension suffix, and a file name check if the latter:
--- 1) conforms to pattern 'path//*suffix'
--- 2) has extension prefixed with a known way tag, i.e. detectWay does not fail
+-- Unsafe version of safeDetectWay. Useful when matchBuildResult has succeeded.
+detectWay :: FilePath -> Way
+detectWay = fromJust . safeDetectWay
+
+-- Given a path, an extension suffix, and a file name check:
+-- 1) the file conforms to pattern 'path//*suffix'
+-- 2) file's extension has a valid way tag (i.e., safeDetectWay does not fail)
 matchBuildResult :: FilePath -> String -> FilePath -> Bool
 matchBuildResult path suffix file =
-    (path <//> "*" ++ suffix) ?== file && (isJust . detectWay $ file)
+    (path <//> "*" ++ suffix) ?== file && isJust (safeDetectWay file)
 
 -- Instances for storing in the Shake database
 instance Binary Way where
