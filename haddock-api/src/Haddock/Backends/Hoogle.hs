@@ -28,7 +28,6 @@ import Outputable
 import Data.Char
 import Data.List
 import Data.Maybe
-import qualified Data.Map as Map
 import Data.Version
 import System.FilePath
 import System.IO
@@ -58,8 +57,7 @@ ppModule dflags iface =
   "" : ppDocumentation dflags (ifaceDoc iface) ++
   ["module " ++ moduleString (ifaceMod iface)] ++
   concatMap (ppExport dflags) (ifaceExportItems iface) ++
-  concatMap (ppInstance dflags) (ifaceInstances iface) ++
-  concatMap (ppFixity dflags) (Map.toList $ ifaceFixMap iface)
+  concatMap (ppInstance dflags) (ifaceInstances iface)
 
 
 ---------------------------------------------------------------------
@@ -124,6 +122,7 @@ ppExport :: DynFlags -> ExportItem Name -> [String]
 ppExport dflags ExportDecl { expItemDecl    = L _ decl
                            , expItemMbDoc   = (dc, _)
                            , expItemSubDocs = subdocs
+                           , expItemFixities = fixities
                            } = ppDocumentation dflags dc ++ f decl
     where
         f (TyClD d@DataDecl{})  = ppData dflags d subdocs
@@ -131,8 +130,10 @@ ppExport dflags ExportDecl { expItemDecl    = L _ decl
         f (TyClD d@ClassDecl{}) = ppClass dflags d subdocs
         f (ForD (ForeignImport name typ _ _)) = ppSig dflags $ TypeSig [name] typ []
         f (ForD (ForeignExport name typ _ _)) = ppSig dflags $ TypeSig [name] typ []
-        f (SigD sig) = ppSig dflags sig
+        f (SigD sig) = ppSig dflags sig ++ ppFixities
         f _ = []
+
+        ppFixities = concatMap (ppFixity dflags) fixities
 ppExport _ _ = []
 
 ppSigWithDoc :: DynFlags -> Sig Name -> [(Name, DocForDecl Name)] -> [String]
