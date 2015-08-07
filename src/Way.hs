@@ -29,7 +29,7 @@ data WayUnit = Threaded
              | Dynamic
              | Parallel
              | GranSim
-             deriving Enum
+             deriving (Eq, Enum)
 
 instance Show WayUnit where
     show unit = case unit of
@@ -61,10 +61,15 @@ instance Show Way where
         tag = intercalate "_" . map show . wayToUnits $ way
 
 instance Read Way where
-    readsPrec _ s =
-        if s == "v"
-        then [(vanilla, "")]
-        else [(wayFromUnits . map read . words . replaceEq '_' ' ' $ s, "")]
+    readsPrec _ s = if s == "v" then [(vanilla, "")] else result
+      where
+        uniqueReads token = case reads token of
+            [(unit, "")] -> Just unit
+            _            -> Nothing
+        units  = map uniqueReads . words . replaceEq '_' ' ' $ s
+        result = if Nothing `elem` units
+                 then []
+                 else [(wayFromUnits . map fromJust $ units, "")]
 
 instance Eq Way where
     Way a == Way b = a == b
@@ -128,7 +133,7 @@ libsuf way @ (Way set) =
 -- Detect way from a given filename. Returns Nothing if there is no match:
 -- * detectWay "foo/bar.hi"                 == Just vanilla
 -- * detectWay "baz.thr_p_o"                == Just threadedProfiling
--- * detectWay "qwe.phi"                    == Nothing (expected "qwe.p_hi")
+-- * detectWay "qwe.ph_i"                   == Nothing (expected "qwe.p_hi")
 -- * detectWay "xru.p_ghc7.11.20141222.dll" == Just profiling
 detectWay :: FilePath -> Maybe Way
 detectWay file = case reads prefix of
@@ -136,11 +141,11 @@ detectWay file = case reads prefix of
     _           -> Nothing
   where
     extension = takeExtension file
-    prefixed  = if extension `notElem` ["so", "dll", "dynlib"]
+    prefixed  = if extension `notElem` [".so", ".dll", ".dynlib"]
                 then extension
                 else takeExtension . dropExtension .
                      dropExtension . dropExtension $ file
-    prefix    = dropWhileEnd (== '_') . dropWhileEnd (/= '_') $ prefixed
+    prefix = drop 1 . dropWhileEnd (== '_') . dropWhileEnd (/= '_') $ prefixed
 
 -- Given a path, an extension suffix, and a file name check if the latter:
 -- 1) conforms to pattern 'path//*suffix'
