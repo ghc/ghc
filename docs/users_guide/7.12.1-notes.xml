@@ -72,6 +72,13 @@
             </listitem>
 	    <listitem>
 	      <para>
+		GHC now supports visible type application, allowing programmers
+		to easily specify how type parameters should be instantiated
+		when calling a function. See <xref linkend="visible-type-application"/> for the details.
+	      </para>
+	    </listitem>
+	    <listitem>
+	      <para>
 		To conform to the common case, the default role assigned to parameters
 		of datatypes declared in <literal>hs-boot</literal> files is
 		<literal>representational</literal>. However, if the constructor(s)
