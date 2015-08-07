@@ -263,6 +263,7 @@ checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Not used for instance decls; checkValidInstance instead
 checkValidType ctxt ty
   = do { traceTc "checkValidType" (ppr ty <+> text "::" <+> ppr (typeKind ty))
+       ; let (_, tidy_ty) = tidyOpenType emptyTidyEnv ty
        ; rankn_flag  <- xoptM Opt_RankNTypes
        ; let gen_rank :: Rank -> Rank
              gen_rank r | rankn_flag = ArbitraryRank
@@ -297,17 +298,17 @@ checkValidType ctxt ty
                                           -- Can't happen; not used for *user* sigs
 
         -- Check the internal validity of the type itself
-       ; check_type ctxt rank ty
+       ; check_type ctxt rank tidy_ty
 
         -- Check that the thing has kind Type, and is lifted if necessary.
         -- Do this *after* check_type, because we can't usefully take
         -- the kind of an ill-formed type such as (a~Int)
-       ; check_kind ctxt ty
+       ; check_kind ctxt tidy_ty
 
        -- Check for ambiguous types.  See Note [When to call checkAmbiguity]
        -- NB: this will happen even for monotypes, but that should be cheap;
        --     and there may be nested foralls for the subtype test to examine
-       ; checkAmbiguity ctxt ty
+       ; checkAmbiguity ctxt tidy_ty
 
        ; traceTc "checkValidType done" (ppr ty <+> text "::" <+> ppr (typeKind ty)) }
 
@@ -593,6 +594,13 @@ applying the instance decl would show up two uses of ?x.  Trac #8912.
 
 checkValidTheta :: UserTypeCtxt -> ThetaType -> TcM ()
 checkValidTheta ctxt theta
+  = checkValidTidyTheta ctxt tidy_theta
+  where
+    (_, tidy_theta) = tidyOpenTypes emptyTidyEnv theta
+
+-- | Variant of 'checkValidTheta' that assumes the input is already tidy
+checkValidTidyTheta :: UserTypeCtxt -> ThetaType -> TcM ()
+checkValidTidyTheta ctxt theta
   = addErrCtxt (checkThetaCtxt ctxt theta) (check_valid_theta ctxt theta)
 
 -------------------------
@@ -972,7 +980,7 @@ checkValidInstance ctxt hs_type ty
            -- for example, test case polykinds/TidyClassKinds
 
         ; setSrcSpan head_loc (checkValidInstHead ctxt clas tidy_tys)
-        ; checkValidTheta ctxt tidy_theta
+        ; checkValidTidyTheta ctxt tidy_theta
 
         -- The Termination and Coverate Conditions
         -- Check that instance inference will terminate (if we care)
