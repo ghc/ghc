@@ -20,9 +20,10 @@ import qualified Data.HashMap.Strict as Map
 -- PackageDataList is used for multiple string options separated by spaces,
 -- such as 'path_MODULES = Data.Array Data.Array.Base ...'.
 -- pkgListData Modules therefore returns ["Data.Array", "Data.Array.Base", ...]
-data PackageData = Version     FilePath
-                 | PackageKey  FilePath
-                 | Synopsis    FilePath
+data PackageData = Version      FilePath
+                 | PackageKey   FilePath
+                 | Synopsis     FilePath
+                 | BuildGhciLib FilePath
 
 data PackageDataList = Modules        FilePath
                      | SrcDirs        FilePath
@@ -51,9 +52,10 @@ askPackageData path key = do
 pkgData :: PackageData -> Action String
 pkgData packageData = do
     let (key, path) = case packageData of
-           Version     path -> ("VERSION"     , path)
-           PackageKey  path -> ("PACKAGE_KEY" , path)
-           Synopsis    path -> ("SYNOPSIS"    , path)
+           Version      path -> ("VERSION"       , path)
+           PackageKey   path -> ("PACKAGE_KEY"   , path)
+           Synopsis     path -> ("SYNOPSIS"      , path)
+           BuildGhciLib path -> ("BUILD_GHCI_LIB", path)
         fullKey = replaceSeparators '_' $ path ++ "_" ++ key
         pkgData = path -/- "package-data.mk"
     res <- askOracle $ PackageDataKey (pkgData, fullKey)
