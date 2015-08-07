@@ -22,15 +22,17 @@ buildPackageDependencies _ target =
     in do
         (buildPath <//> "*.c.deps") %> \depFile -> do
             let srcFile = dropBuild . dropExtension $ depFile
+            need [srcFile]
             build $ fullTarget target [srcFile] (GccM stage) [depFile]
 
         (buildPath -/- "c.deps") %> \file -> do
             srcs <- pkgDataList $ CSrcs path
             let depFiles = [ buildPath -/- src <.> "deps" | src <- srcs ]
-            need depFiles -- increase parallelism by needing all at once
+            need depFiles
             deps <- mapM readFile' depFiles
             writeFileChanged file (concat deps)
 
         (buildPath -/- "haskell.deps") %> \file -> do
             srcs <- interpret target getHsSources
+            need srcs
             build $ fullTarget target srcs (GhcM stage) [file]

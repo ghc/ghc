@@ -21,7 +21,7 @@ buildWithResources rs target = do
     let builder = Target.builder target
         deps    = Target.dependencies target
     needBuilder builder
-    need deps
+    -- need deps -- TODO: think if needs could be done here
     path    <- builderPath builder
     argList <- interpret target getArgs
     -- The line below forces the rule to be rerun if the args hash has changed

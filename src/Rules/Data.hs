@@ -45,6 +45,7 @@ buildPackageData (Resources ghcCabal ghcPkg) target = do
                 depPkgs      = intersectOrd cmp (sort pkgs) deps
             need [ targetPath stage p -/- "package-data.mk" | p <- depPkgs ]
 
+            need [cabal]
             buildWithResources [(ghcCabal, 1)] $
                 fullTarget target [cabal] GhcCabal files
 

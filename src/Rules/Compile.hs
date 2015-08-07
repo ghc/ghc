@@ -35,6 +35,11 @@ compilePackage _ target = do
         when (null cDeps && null hDeps) $
             putError $ "Cannot determine sources for '" ++ obj ++ "'."
 
+        when (not (null cDeps) && not (null hDeps)) $
+            putError $ "Both .c and .hs sources found for '" ++ obj ++ "'."
+
+        need $ hDeps ++ cDeps
+
         if null cDeps
         then build $ fullTargetWithWay target hSrcDeps (Ghc stage) way [obj]
         else build $ fullTarget        target cDeps    (Gcc stage)     [obj]
