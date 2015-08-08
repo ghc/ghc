@@ -2622,7 +2622,7 @@ to allow the import or export of a data constructor without its parent type cons
 
 <para>The <option>-XTypeApplications</option> extension allows you to use
 <emphasis>visible type application</emphasis> in expressions. Here is an
-example: <literal>show (read @Int 5)</literal>. The <literal>@Int</literal>
+example: <literal>show (read @Int "5")</literal>. The <literal>@Int</literal>
 is the visible type application; it specifies the value of the type variable
 in <literal>read</literal>'s type.</para>
 

@@ -72,9 +72,10 @@
             </listitem>
 	    <listitem>
 	      <para>
-		GHC now supports visible type application, allowing programmers
-		to easily specify how type parameters should be instantiated
-		when calling a function. See <xref linkend="visible-type-application"/> for the details.
+		GHC now supports visible type application, allowing
+		programmers to easily specify how type parameters should be
+		instantiated when calling a function. See <xref
+		linkend="visible-type-application"/> for the details.
 	      </para>
 	    </listitem>
 	    <listitem>
