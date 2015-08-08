@@ -14,6 +14,7 @@ import Settings.TargetDirectory
 import Rules.Actions
 import Rules.Resources
 import Data.List
+import qualified System.Directory as IO
 
 buildPackageLibrary :: Resources -> StagePackageTarget -> Rules ()
 buildPackageLibrary _ target = do
@@ -33,13 +34,16 @@ buildPackageLibrary _ target = do
             cObjs = [ buildPath -/- src -<.> osuf way | src <- cSrcs ]
             hObjs = [ buildPath -/- src  <.> osuf way | src <- hSrcs ]
 
-        need $ cObjs ++ hObjs -- this will create split objects if required
+        -- This will create split objects if required (we don't track them)
+        need $ cObjs ++ hObjs
 
         split <- interpret target splitObjects
         splitObjs <- if split
             then fmap concat $ forM hSrcs $ \src -> do
-                let files = buildPath -/- src ++ "_" ++ osuf way ++ "_split/*"
-                fmap (map unifyPath) $ getDirectoryFiles "" [files]
+                let splitPath = buildPath -/- src ++ "_" ++ osuf way ++ "_split"
+                contents <- liftIO $ IO.getDirectoryContents splitPath
+                return . map (splitPath -/-)
+                       . filter (not . all (== '.')) $ contents
             else return []
 
         build $ fullTarget target (cObjs ++ hObjs ++ splitObjs) Ar [a]

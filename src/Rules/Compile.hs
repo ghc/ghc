@@ -27,37 +27,29 @@ compilePackage _ target = do
         need [ hiboot -<.> obootsuf (detectWay hiboot) ]
 
     matchBuildResult buildPath "o" ?> \obj -> do
-        let way  = detectWay obj
-            cObj = takeFileName obj -<.> "o"
-        cDeps <- dependencyList cDepsFile cObj
-        hDeps <- dependencyList hDepsFile obj
-        let hSrcDeps = filter ("//*hs" ?==) hDeps
-
-        when (null cDeps && null hDeps) $
-            putError $ "Cannot determine sources for '" ++ obj ++ "'."
-
-        when (not (null cDeps) && not (null hDeps)) $
-            putError $ "Both .c and .hs sources found for '" ++ obj ++ "'."
-
-        need $ hDeps ++ cDeps
-
-        if null cDeps
-        then build $ fullTargetWithWay target hSrcDeps (Ghc stage) way [obj]
-        else build $ fullTarget        target cDeps    (Gcc stage)     [obj]
+        cDeps <- dependencyList cDepsFile (takeFileName obj -<.> "o")
+        if not (null cDeps)
+        then do -- obj is produced from a C source file
+            need cDeps
+            build $ fullTarget target cDeps (Gcc stage) [obj]
+        else do -- obj is produced from a Haskell source file
+            hDeps <- dependencyList hDepsFile obj
+            when (null hDeps) . putError $
+                "No dependencies found for '" ++ obj ++ "'."
+            let way  = detectWay obj
+                hSrc = head hDeps
+            unless ("//*hs" ?== hSrc) . putError $
+                "No Haskell source file found for '" ++ obj ++ "'."
+            need hDeps
+            build $ fullTargetWithWay target [hSrc] (Ghc stage) way [obj]
 
     matchBuildResult buildPath "o-boot" ?> \obj -> do
-        let way = detectWay obj
         hDeps <- dependencyList hDepsFile obj
-        let hSrcDeps = filter ("//*hs-boot" ?==) hDeps
-
-        when (null hDeps) $
-            putError $ "Cannot determine sources for '" ++ obj ++ "'."
-
+        when (null hDeps) . putError $
+            "No dependencies found for '" ++ obj ++ "'."
+        let way  = detectWay obj
+            hSrc = head hDeps
+        unless ("//*.hs-boot" ?== hSrc) . putError $
+            "No Haskell source file found for '" ++ obj ++ "'."
         need hDeps
-        build $ fullTargetWithWay target hSrcDeps (Ghc stage) way [obj]
-
--- TODO: add support for -dyno
--- $1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.hs-boot
---     $$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
---     $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno
---     $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@)))
+        build $ fullTargetWithWay target [hSrc] (Ghc stage) way [obj]

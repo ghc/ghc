@@ -28,7 +28,7 @@ dependencyListOracle :: Rules ()
 dependencyListOracle = do
     deps <- newCache $ \file -> do
         need [file]
-        putOracle $ "Reading " ++ file ++ "..."
+        putOracle $ "Reading dependencies from " ++ file ++ "..."
         contents <- parseMakefile <$> (liftIO $ readFile file)
         return . Map.fromList
                . map (bimap unifyPath (map unifyPath))
