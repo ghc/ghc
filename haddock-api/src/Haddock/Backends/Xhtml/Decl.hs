@@ -768,9 +768,7 @@ ppDataHeader _ _ _ _ = error "ppDataHeader: illegal argument"
 --------------------------------------------------------------------------------
 
 
-ppBang :: HsBang -> Html
-ppBang HsStrict                  = toHtml "!"
-ppBang (HsUnpack {})             = toHtml "!"
+ppBang :: HsSrcBang -> Html
 ppBang (HsSrcBang _ _ SrcStrict) = toHtml "!"
 ppBang (HsSrcBang _ _ SrcLazy)   = toHtml "~"
 ppBang _                         = noHtml
