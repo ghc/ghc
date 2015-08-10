@@ -159,10 +159,17 @@ ppSig dflags x  = ppSigWithDoc dflags x []
 
 -- note: does not yet output documentation for class methods
 ppClass :: DynFlags -> TyClDecl Name -> [(Name, DocForDecl Name)] -> [String]
-ppClass dflags x subdocs = out dflags decl' :
-            concatMap (flip (ppSigWithDoc dflags) subdocs . addContext . unL) (tcdSigs x)
+ppClass dflags decl subdocs = (out dflags decl' ++ " " ++ ppTyFams) : ppMethods
     where
-        decl' = x { tcdSigs = [], tcdMeths = emptyBag }
+        decl' = decl
+            { tcdSigs = [], tcdMeths = emptyBag
+            , tcdATs = [], tcdATDefs = []
+            }
+
+        ppMethods = concat . map (ppSig' . unLoc) $ tcdSigs decl
+        ppSig' = flip (ppSigWithDoc dflags) subdocs . addContext
+
+        ppTyFams = showSDocUnqual dflags . whereWrapper . map ppr $ tcdATs decl
 
         addContext (TypeSig name (L l sig) nwcs) = TypeSig name (L l $ f sig) nwcs
         addContext (MinimalSig src sig) = MinimalSig src sig
@@ -171,8 +178,8 @@ ppClass dflags x subdocs = out dflags decl' :
         f (HsForAllTy a b c con d) = HsForAllTy a b c (reL (context : unLoc con)) d
         f t = HsForAllTy Implicit Nothing emptyHsQTvs (reL [context]) (reL t)
 
-        context = nlHsTyConApp (tcdName x)
-            (map (reL . HsTyVar . hsTyVarName . unL) (hsQTvBndrs (tyClDeclTyVars x)))
+        context = nlHsTyConApp (tcdName decl)
+            (map (reL . HsTyVar . hsTyVarName . unL) (hsQTvBndrs (tyClDeclTyVars decl)))
 
 
 ppInstance :: DynFlags -> ClsInst -> [String]
@@ -369,3 +376,11 @@ escape = concatMap f
         f '>' = "&gt;"
         f '&' = "&amp;"
         f x = [x]
+
+
+semiSeparate :: [SDoc] -> SDoc
+semiSeparate = sep . punctuate semi
+
+
+whereWrapper :: [SDoc] -> SDoc
+whereWrapper xs = text "where" <+> braces (space <> semiSeparate xs <> space)
