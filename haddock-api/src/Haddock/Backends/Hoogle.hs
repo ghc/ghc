@@ -160,7 +160,7 @@ ppSig dflags x  = ppSigWithDoc dflags x []
 
 -- note: does not yet output documentation for class methods
 ppClass :: DynFlags -> TyClDecl Name -> [(Name, DocForDecl Name)] -> [String]
-ppClass dflags decl subdocs = (out dflags decl' ++ " " ++ ppTyFams) : ppMethods
+ppClass dflags decl subdocs = (out dflags decl' ++ ppTyFams) : ppMethods
     where
         decl' = decl
             { tcdSigs = [], tcdMeths = emptyBag
@@ -170,10 +170,12 @@ ppClass dflags decl subdocs = (out dflags decl' ++ " " ++ ppTyFams) : ppMethods
         ppMethods = concat . map (ppSig' . unLoc) $ tcdSigs decl
         ppSig' = flip (ppSigWithDoc dflags) subdocs . addContext
 
-        ppTyFams = showSDocUnqual dflags . whereWrapper $ concat
-            [ map ppr (tcdATs decl)
-            , map (ppr . tyFamEqnToSyn . unLoc) (tcdATDefs decl)
-            ]
+        ppTyFams
+            | null $ tcdATs decl = ""
+            | otherwise = (" " ++) . showSDocUnqual dflags . whereWrapper $ concat
+                [ map ppr (tcdATs decl)
+                , map (ppr . tyFamEqnToSyn . unLoc) (tcdATDefs decl)
+                ]
 
         whereWrapper elems = vcat'
             [ text "where" <+> lbrace
