@@ -19,20 +19,24 @@ buildPackageDependencies _ target =
         path      = targetPath stage pkg
         buildPath = path -/- "build"
         dropBuild = (pkgPath pkg ++) . drop (length buildPath)
+        hDepFile  = buildPath -/- ".hs-dependencies"
     in do
-        (buildPath <//> "*.c.deps") %> \depFile -> do
-            let srcFile = dropBuild . dropExtension $ depFile
+        (buildPath <//> "*.c.deps") %> \file -> do
+            let srcFile = dropBuild . dropExtension $ file
             need [srcFile]
-            build $ fullTarget target [srcFile] (GccM stage) [depFile]
+            build $ fullTarget target (GccM stage) [srcFile] [file]
 
-        (buildPath -/- "c.deps") %> \file -> do
-            srcs <- pkgDataList $ CSrcs path
-            let depFiles = [ buildPath -/- src <.> "deps" | src <- srcs ]
-            need depFiles
-            deps <- mapM readFile' depFiles
-            writeFileChanged file (concat deps)
-
-        (buildPath -/- "haskell.deps") %> \file -> do
-            srcs <- interpret target getHsSources
+        hDepFile %> \file -> do
+            srcs <- interpret target getPackageSources
             need srcs
-            build $ fullTarget target srcs (GhcM stage) [file]
+            build $ fullTarget target (GhcM stage) srcs [file]
+            liftIO $ removeFiles "." [hDepFile <.> "bak"]
+
+        (buildPath -/- ".dependencies") %> \file -> do
+            cSrcs <- pkgDataList $ CSrcs path
+            let cDepFiles = [ buildPath -/- src <.> "deps" | src <- cSrcs ]
+            need $ hDepFile : cDepFiles -- need all for more parallelism
+            cDeps <- fmap concat $ mapM readFile' cDepFiles
+            hDeps <- readFile' hDepFile
+            writeFileChanged file $ cDeps ++ hDeps
+
