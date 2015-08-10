@@ -24,6 +24,7 @@ import Haddock.Utils hiding (out)
 import Bag
 import GHC
 import Outputable
+import NameSet
 
 import Data.Char
 import Data.List
@@ -169,7 +170,10 @@ ppClass dflags decl subdocs = (out dflags decl' ++ " " ++ ppTyFams) : ppMethods
         ppMethods = concat . map (ppSig' . unLoc) $ tcdSigs decl
         ppSig' = flip (ppSigWithDoc dflags) subdocs . addContext
 
-        ppTyFams = showSDocUnqual dflags . whereWrapper . map ppr $ tcdATs decl
+        ppTyFams = showSDocUnqual dflags . whereWrapper $ concat
+            [ map ppr (tcdATs decl)
+            , map (ppr . tyFamEqnToSyn . unLoc) (tcdATDefs decl)
+            ]
 
         addContext (TypeSig name (L l sig) nwcs) = TypeSig name (L l $ f sig) nwcs
         addContext (MinimalSig src sig) = MinimalSig src sig
@@ -180,6 +184,14 @@ ppClass dflags decl subdocs = (out dflags decl' ++ " " ++ ppTyFams) : ppMethods
 
         context = nlHsTyConApp (tcdName decl)
             (map (reL . HsTyVar . hsTyVarName . unL) (hsQTvBndrs (tyClDeclTyVars decl)))
+
+        tyFamEqnToSyn :: TyFamDefltEqn Name -> TyClDecl Name
+        tyFamEqnToSyn tfe = SynDecl
+            { tcdLName = tfe_tycon tfe
+            , tcdTyVars = tfe_pats tfe
+            , tcdRhs = tfe_rhs tfe
+            , tcdFVs = emptyNameSet
+            }
 
 
 ppInstance :: DynFlags -> ClsInst -> [String]
