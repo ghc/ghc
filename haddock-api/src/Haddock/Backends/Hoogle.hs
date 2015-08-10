@@ -175,6 +175,12 @@ ppClass dflags decl subdocs = (out dflags decl' ++ " " ++ ppTyFams) : ppMethods
             , map (ppr . tyFamEqnToSyn . unLoc) (tcdATDefs decl)
             ]
 
+        whereWrapper elems = vcat'
+            [ text "where" <+> lbrace
+            , nest 4 . vcat . map (<> semi) $ elems
+            , rbrace
+            ]
+
         addContext (TypeSig name (L l sig) nwcs) = TypeSig name (L l $ f sig) nwcs
         addContext (MinimalSig src sig) = MinimalSig src sig
         addContext _ = error "expected TypeSig"
@@ -390,9 +396,6 @@ escape = concatMap f
         f x = [x]
 
 
-semiSeparate :: [SDoc] -> SDoc
-semiSeparate = sep . punctuate semi
-
-
-whereWrapper :: [SDoc] -> SDoc
-whereWrapper xs = text "where" <+> braces (space <> semiSeparate xs <> space)
+-- | Just like 'vcat' but uses '($+$)' instead of '($$)'.
+vcat' :: [SDoc] -> SDoc
+vcat' = foldr ($+$) empty
