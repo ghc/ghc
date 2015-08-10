@@ -129,20 +129,22 @@ mkNewTyConRhs tycon_name tycon con
 ------------------------------------------------------
 buildDataCon :: FamInstEnvs
             -> Name -> Bool
-            -> [HsBang]
-            -> [Name]                   -- Field labels
-            -> [TyVar] -> [TyVar]       -- Univ and ext
-            -> [(TyVar,Type)]           -- Equality spec
-            -> ThetaType                -- Does not include the "stupid theta"
-                                        -- or the GADT equalities
-            -> [Type] -> Type           -- Argument and result types
-            -> TyCon                    -- Rep tycon
-            -> TcRnIf m n DataCon
+            -> [HsSrcBang]
+            -> Maybe [HsImplBang]
+                -- See Note [Bangs on imported data constructors] in MkId
+           -> [Name]                   -- Field labels
+           -> [TyVar] -> [TyVar]       -- Univ and ext
+           -> [(TyVar,Type)]           -- Equality spec
+           -> ThetaType                -- Does not include the "stupid theta"
+                                       -- or the GADT equalities
+           -> [Type] -> Type           -- Argument and result types
+           -> TyCon                    -- Rep tycon
+           -> TcRnIf m n DataCon
 -- A wrapper for DataCon.mkDataCon that
 --   a) makes the worker Id
 --   b) makes the wrapper Id if necessary, including
 --      allocating its unique (hence monadic)
-buildDataCon fam_envs src_name declared_infix arg_stricts field_lbls
+buildDataCon fam_envs src_name declared_infix src_bangs impl_bangs field_lbls
              univ_tvs ex_tvs eq_spec ctxt arg_tys res_ty rep_tycon
   = do  { wrap_name <- newImplicitBinder src_name mkDataConWrapperOcc
         ; work_name <- newImplicitBinder src_name mkDataConWorkerOcc
@@ -155,12 +157,13 @@ buildDataCon fam_envs src_name declared_infix arg_stricts field_lbls
         ; let
                 stupid_ctxt = mkDataConStupidTheta rep_tycon arg_tys univ_tvs
                 data_con = mkDataCon src_name declared_infix
-                                     arg_stricts field_lbls
+                                     src_bangs field_lbls
                                      univ_tvs ex_tvs eq_spec ctxt
                                      arg_tys res_ty rep_tycon
                                      stupid_ctxt dc_wrk dc_rep
                 dc_wrk = mkDataConWorkId work_name data_con
-                dc_rep = initUs_ us (mkDataConRep dflags fam_envs wrap_name data_con)
+                dc_rep = initUs_ us (mkDataConRep dflags fam_envs wrap_name
+                                                  impl_bangs data_con)
 
         ; return data_con }
 
@@ -272,7 +275,8 @@ buildClass tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc_isrec
         ; dict_con <- buildDataCon (panic "buildClass: FamInstEnvs")
                                    datacon_name
                                    False        -- Not declared infix
-                                   (map (const HsLazy) args)
+                                   (map (const no_bang) args)
+                                   (Just (map (const HsLazy) args))
                                    [{- No fields -}]
                                    tvs [{- no existentials -}]
                                    [{- No GADT equalities -}]
@@ -308,6 +312,8 @@ buildClass tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc_isrec
         ; traceIf (text "buildClass" <+> ppr tycon)
         ; return result }
   where
+    no_bang = HsSrcBang Nothing NoSrcUnpack NoSrcStrict
+
     mk_op_item :: Class -> TcMethInfo -> TcRnIf n m ClassOpItem
     mk_op_item rec_clas (op_name, dm_spec, _)
       = do { dm_info <- case dm_spec of

@@ -378,7 +378,17 @@
                 <para>
                     TODO FIXME.
                </para>
-           </listitem>
+            </listitem>
+            <listitem>
+              <para>
+                The <literal>HsBang</literal> type has been removed in
+                favour of <literal>HsSrcBang</literal> and
+                <literal>HsImplBang</literal>. Data constructors now
+                always carry around their strictness annotations as
+                the user wrote them, whether from an imported module
+                or not.
+              </para>
+            </listitem>
        </itemizedlist>
     </sect3>
 

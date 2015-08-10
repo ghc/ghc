@@ -15,7 +15,9 @@ module IfaceSyn (
         IfaceIdInfo(..), IfaceIdDetails(..), IfaceUnfolding(..),
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
         IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
-        IfaceBang(..), IfaceAxBranch(..),
+        IfaceBang(..),
+        IfaceSrcBang(..), SrcUnpackedness(..), SrcStrictness(..),
+        IfaceAxBranch(..),
         IfaceTyConParent(..),
 
         -- Misc
@@ -57,6 +59,7 @@ import TyCon (Role (..))
 import StaticFlags (opt_PprStyle_Debug)
 import Util( filterOut )
 import InstEnv
+import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 
 import Control.Monad
 import System.IO.Unsafe
@@ -196,19 +199,27 @@ data IfaceConDecl
         -- but it's not so easy for the original TyCon/DataCon
         -- So this guarantee holds for IfaceConDecl, but *not* for DataCon
 
-        ifConExTvs   :: [IfaceTvBndr],          -- Existential tyvars
-        ifConEqSpec  :: IfaceEqSpec,            -- Equality constraints
-        ifConCtxt    :: IfaceContext,           -- Non-stupid context
-        ifConArgTys  :: [IfaceType],            -- Arg types
-        ifConFields  :: [IfaceTopBndr],         -- ...ditto... (field labels)
-        ifConStricts :: [IfaceBang]}            -- Empty (meaning all lazy),
-                                                -- or 1-1 corresp with arg tys
+        ifConExTvs   :: [IfaceTvBndr],      -- Existential tyvars
+        ifConEqSpec  :: IfaceEqSpec,        -- Equality constraints
+        ifConCtxt    :: IfaceContext,       -- Non-stupid context
+        ifConArgTys  :: [IfaceType],        -- Arg types
+        ifConFields  :: [IfaceTopBndr],     -- ...ditto... (field labels)
+        ifConStricts :: [IfaceBang],
+          -- Empty (meaning all lazy),
+          -- or 1-1 corresp with arg tys
+          -- See Note [Bangs on imported data constructors] in MkId
+        ifConSrcStricts :: [IfaceSrcBang] } -- empty meaning no src stricts
 
 type IfaceEqSpec = [(IfLclName,IfaceType)]
 
-data IfaceBang  -- This corresponds to an HsImplBang; that is, the final
-                -- implementation decision about the data constructor arg
+-- | This corresponds to an HsImplBang; that is, the final
+-- implementation decision about the data constructor arg
+data IfaceBang
   = IfNoBang | IfStrict | IfUnpack | IfUnpackCo IfaceCoercion
+
+-- | This corresponds to HsSrcBang
+data IfaceSrcBang
+  = IfSrcBang SrcUnpackedness SrcStrictness
 
 data IfaceClsInst
   = IfaceClsInst { ifInstCls  :: IfExtName,                -- See comments with
@@ -1506,7 +1517,7 @@ instance Binary IfaceConDecls where
             _ -> liftM IfNewTyCon $ get bh
 
 instance Binary IfaceConDecl where
-    put_ bh (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
+    put_ bh (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10) = do
         put_ bh a1
         put_ bh a2
         put_ bh a3
@@ -1516,6 +1527,7 @@ instance Binary IfaceConDecl where
         put_ bh a7
         put_ bh a8
         put_ bh a9
+        put_ bh a10
     get bh = do
         a1 <- get bh
         a2 <- get bh
@@ -1526,7 +1538,8 @@ instance Binary IfaceConDecl where
         a7 <- get bh
         a8 <- get bh
         a9 <- get bh
-        return (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9)
+        a10 <- get bh
+        return (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
 
 instance Binary IfaceBang where
     put_ bh IfNoBang        = putByte bh 0
@@ -1541,6 +1554,16 @@ instance Binary IfaceBang where
               1 -> do return IfStrict
               2 -> do return IfUnpack
               _ -> do { a <- get bh; return (IfUnpackCo a) }
+
+instance Binary IfaceSrcBang where
+    put_ bh (IfSrcBang a1 a2) =
+      do put_ bh a1
+         put_ bh a2
+
+    get bh =
+      do a1 <- get bh
+         a2 <- get bh
+         return (IfSrcBang a1 a2)
 
 instance Binary IfaceClsInst where
     put_ bh (IfaceClsInst cls tys dfun flag orph) = do
@@ -1609,7 +1632,7 @@ instance Binary IfaceIdDetails where
         case h of
             0 -> return IfVanillaId
             1 -> do { a <- get bh; b <- get bh; return (IfRecSelId a b) }
-            _ -> return IfDFunId 
+            _ -> return IfDFunId
 
 instance Binary IfaceIdInfo where
     put_ bh NoInfo      = putByte bh 0

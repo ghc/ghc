@@ -285,7 +285,7 @@ pcDataConWithFixity' declared_infix dc_name wrk_key tyvars arg_tys tycon
   = data_con
   where
     data_con = mkDataCon dc_name declared_infix
-                (map (const HsLazy) arg_tys)
+                (map (const no_bang) arg_tys)
                 []      -- No labelled fields
                 tyvars
                 []      -- No existential type variables
@@ -296,6 +296,8 @@ pcDataConWithFixity' declared_infix dc_name wrk_key tyvars arg_tys tycon
                 []      -- No stupid theta
                 (mkDataConWorkId wrk_name data_con)
                 NoDataConRep    -- Wired-in types are too simple to need wrappers
+
+    no_bang = HsSrcBang Nothing NoSrcUnpack NoSrcStrict
 
     modu     = ASSERT( isExternalName dc_name )
                nameModule dc_name
