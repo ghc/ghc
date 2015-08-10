@@ -5,7 +5,7 @@ module Settings.Util (
     getFlag, getSetting, getSettingList,
     getPkgData, getPkgDataList,
     getPackagePath, getTargetPath, getTargetDirectory,
-    getHsSources,
+    getPackageSources,
     appendCcArgs,
     needBuilder
     -- argBuilderPath, argStagedBuilderPath,
@@ -73,8 +73,8 @@ getTargetDirectory :: Expr FilePath
 getTargetDirectory = liftM2 targetDirectory getStage getPackage
 
 -- Find all Haskell source files for the current target
-getHsSources :: Expr [FilePath]
-getHsSources = do
+getPackageSources :: Expr [FilePath]
+getPackageSources = do
     path    <- getTargetPath
     pkgPath <- getPackagePath
     srcDirs <- getPkgDataList SrcDirs
