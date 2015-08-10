@@ -10,7 +10,7 @@ module Expression (
     appendSub, appendSubD, filterSub, removeSub,
     interpret, interpretDiff,
     getStage, getPackage, getBuilder, getFiles, getFile,
-    getDependencies, getDependency, getWay,
+    getSources, getSource, getWay,
     stage, package, builder, stagedBuilder, file, way
     ) where
 
@@ -162,6 +162,20 @@ getPackage = asks Target.package
 getBuilder :: Expr Builder
 getBuilder = asks Target.builder
 
+getWay :: Expr Way
+getWay = asks Target.way
+
+getSources :: Expr [FilePath]
+getSources = asks Target.sources
+
+getSource :: Expr FilePath
+getSource = do
+    target <- ask
+    srcs   <- getSources
+    case srcs of
+        [src] -> return src
+        _     -> error $ "Exactly one source expected in target " ++ show target
+
 getFiles :: Expr [FilePath]
 getFiles = asks Target.files
 
@@ -173,21 +187,6 @@ getFile = do
     case files of
         [file] -> return file
         _      -> error $ "Exactly one file expected in target " ++ show target
-
-getDependencies :: Expr [FilePath]
-getDependencies = asks Target.dependencies
-
-getDependency :: Expr FilePath
-getDependency = do
-    target <- ask
-    deps   <- getDependencies
-    case deps of
-        [dep] -> return dep
-        _     -> error $ "Exactly one dependency expected in target "
-                       ++ show target
-
-getWay :: Expr Way
-getWay = asks Target.way
 
 -- Basic predicates (see Switches.hs for derived predicates)
 stage :: Stage -> Predicate

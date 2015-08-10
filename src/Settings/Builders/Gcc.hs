@@ -12,12 +12,12 @@ gccArgs :: Args
 gccArgs = stagedBuilder Gcc ? do
     path   <- getTargetPath
     file   <- getFile
-    deps   <- getDependencies
+    src    <- getSource
     ccArgs <- getPkgDataList CcArgs
     mconcat [ append ccArgs
             , includeGccArgs
             , arg "-c"
-            , append $ filter ("//*.c" ?==) deps
+            , arg src
             , arg "-o"
             , arg file ]
 
@@ -26,7 +26,7 @@ gccMArgs :: Args
 gccMArgs = stagedBuilder GccM ? do
     path   <- getTargetPath
     file   <- getFile
-    src    <- getDependency
+    src    <- getSource
     ccArgs <- getPkgDataList CcArgs
     mconcat
         [ arg "-E"
@@ -35,6 +35,8 @@ gccMArgs = stagedBuilder GccM ? do
         , includeGccArgs
         , arg "-MF"
         , arg file
+        , arg "-MT"
+        , arg $ dropExtension file -<.> "o"
         , arg "-x"
         , arg "c"
         , arg src ]

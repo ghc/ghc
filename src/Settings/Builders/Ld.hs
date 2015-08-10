@@ -8,8 +8,8 @@ import Settings.Util
 ldArgs :: Args
 ldArgs = builder Ld ? do
     stage    <- getStage
-    objs     <- getDependencies
     file     <- getFile
+    objs     <- getSources
     confArgs <- getSettingList $ ConfLdLinkerArgs stage
     mconcat [ append confArgs
             , arg "-r"

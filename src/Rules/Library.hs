@@ -46,7 +46,7 @@ buildPackageLibrary _ target = do
                        . filter (not . all (== '.')) $ contents
             else return []
 
-        build $ fullTarget target (cObjs ++ hObjs ++ splitObjs) Ar [a]
+        build $ fullTarget target Ar (cObjs ++ hObjs ++ splitObjs) [a]
 
         synopsis <- interpret target $ getPkgData Synopsis
         putSuccess $ "/--------\n| Successfully built package library '"
@@ -64,4 +64,4 @@ buildPackageLibrary _ target = do
             cObjs = [ buildPath -/- src -<.> "o" | src <- cSrcs ]
             hObjs = [ buildPath -/- src  <.> "o" | src <- hSrcs ]
         need $ cObjs ++ hObjs
-        build $ fullTarget target (cObjs ++ hObjs) Ld [obj]
+        build $ fullTarget target Ld (cObjs ++ hObjs) [obj]

@@ -6,8 +6,8 @@ import Settings.Util
 
 arArgs :: Args
 arArgs = builder Ar ? do
-    objs <- getDependencies
     file <- getFile
+    objs <- getSources
     mconcat [ arg "q"
             , arg file
             , append objs ]

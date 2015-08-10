@@ -13,18 +13,18 @@ import GHC.Generics
 
 -- Target captures all parameters relevant to the current build target:
 -- * Stage and Package being built,
--- * dependencies (e.g., source files) that need to be tracked,
 -- * Builder to be invoked,
 -- * Way to be built (set to vanilla for most targets),
+-- * source file(s) to be passed to Builder,
 -- * file(s) to be produced.
 data Target = Target
      {
-        stage        :: Stage,
-        package      :: Package,
-        dependencies :: [FilePath],
-        builder      :: Builder,
-        way          :: Way,
-        files        :: [FilePath]
+        stage   :: Stage,
+        package :: Package,
+        builder :: Builder,
+        way     :: Way,
+        sources :: [FilePath],
+        files   :: [FilePath]
      }
      deriving (Show, Eq, Generic)
 
@@ -35,12 +35,12 @@ type StageTarget = Target
 stageTarget :: Stage -> StageTarget
 stageTarget s = Target
     {
-        stage        = s,
-        package      = error "stageTarget: package not set",
-        dependencies = error "stageTarget: dependencies not set",
-        builder      = error "stageTarget: builder not set",
-        way          = vanilla,
-        files        = error "stageTarget: files not set"
+        stage   = s,
+        package = error "stageTarget: package not set",
+        builder = error "stageTarget: builder not set",
+        way     = vanilla,
+        sources = error "stageTarget: sources not set",
+        files   = error "stageTarget: files not set"
     }
 
 -- StagePackageTarget is a partially constructed Target. Only stage and package
@@ -50,36 +50,35 @@ type StagePackageTarget = Target
 stagePackageTarget :: Stage -> Package -> StagePackageTarget
 stagePackageTarget s p = Target
     {
-        stage        = s,
-        package      = p,
-        dependencies = error "stagePackageTarget: dependencies not set",
-        builder      = error "stagePackageTarget: builder not set",
-        way          = vanilla,
-        files        = error "stagePackageTarget: files not set"
+        stage   = s,
+        package = p,
+        builder = error "stagePackageTarget: builder not set",
+        way     = vanilla,
+        sources = error "stagePackageTarget: sources not set",
+        files   = error "stagePackageTarget: files not set"
     }
 
 -- FullTarget is a Target whose fields are all assigned
 type FullTarget = Target
 
 -- Most targets are built only one way, vanilla, hence we set it by default.
-fullTarget :: StagePackageTarget -> [FilePath] -> Builder -> [FilePath] -> FullTarget
-fullTarget target deps b fs = target
+fullTarget :: StagePackageTarget -> Builder -> [FilePath] -> [FilePath] -> FullTarget
+fullTarget target b srcs fs = target
     {
-        dependencies = deps,
-        builder      = b,
-        way          = vanilla,
-        files        = fs
+        builder = b,
+        way     = vanilla,
+        sources = srcs,
+        files   = fs
     }
 
 -- Use this function to be explicit about the build way.
-fullTargetWithWay :: StagePackageTarget -> [FilePath] -> Builder -> Way
-                  -> [FilePath] -> FullTarget
-fullTargetWithWay target deps b w fs = target
+fullTargetWithWay :: StagePackageTarget -> Builder -> Way -> [FilePath] -> [FilePath] -> FullTarget
+fullTargetWithWay target b w srcs fs = target
     {
-        dependencies = deps,
-        builder      = b,
-        way          = w,
-        files        = fs
+        builder = b,
+        way     = w,
+        sources = srcs,
+        files   = fs
     }
 
 -- Instances for storing in the Shake database

@@ -22,7 +22,7 @@ ghcArgs = stagedBuilder Ghc ? do
     way     <- getWay
     hsArgs  <- getPkgDataList HsArgs
     cppArgs <- getPkgDataList CppArgs
-    srcs    <- getDependencies
+    srcs    <- getSources
     file    <- getFile
     path    <- getTargetPath
     let buildPath = path -/- "build"
@@ -47,7 +47,8 @@ ghcArgs = stagedBuilder Ghc ? do
 ghcMArgs :: Args
 ghcMArgs = stagedBuilder GhcM ? do
     ways    <- getWays
-    hsSrcs  <- getHsSources
+    file    <- getFile
+    srcs    <- getSources
     hsArgs  <- getPkgDataList HsArgs
     cppArgs <- getPkgDataList CppArgs
     path    <- getTargetPath
@@ -61,11 +62,11 @@ ghcMArgs = stagedBuilder GhcM ? do
         , arg "-odir"        , arg buildPath
         , arg "-stubdir"     , arg buildPath
         , arg "-hidir"       , arg buildPath
-        , arg "-dep-makefile", arg $ buildPath -/- "haskell.deps"
+        , arg "-dep-makefile", arg file
         , append . concatMap (\way -> ["-dep-suffix", wayPrefix way]) $ ways
         , arg "-no-user-package-db" -- TODO: is this needed?
         , arg "-rtsopts"            -- TODO: is this needed?
-        , append hsSrcs ]
+        , append srcs ]
 
 -- TODO: do '-ticky' in all debug ways?
 wayHcArgs :: Args

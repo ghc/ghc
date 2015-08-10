@@ -47,12 +47,12 @@ buildPackageData (Resources ghcCabal ghcPkg) target = do
 
             need [cabal]
             buildWithResources [(ghcCabal, 1)] $
-                fullTarget target [cabal] GhcCabal files
+                fullTarget target GhcCabal [cabal] files
 
             -- TODO: find out of ghc-cabal can be concurrent with ghc-pkg
             whenM (interpret target registerPackage) .
                 buildWithResources [(ghcPkg, 1)] $
-                fullTarget target [cabal] (GhcPkg stage) files
+                fullTarget target (GhcPkg stage) [cabal] files
 
             postProcessPackageData $ path -/- "package-data.mk"
 
