@@ -19,13 +19,11 @@ import Settings.Builders.Ar
 buildWithResources :: [(Resource, Int)] -> FullTarget -> Action ()
 buildWithResources rs target = do
     let builder = Target.builder target
-        deps    = Target.dependencies target
     needBuilder builder
-    -- need deps -- TODO: think if needs could be done here
     path    <- builderPath builder
     argList <- interpret target getArgs
     -- The line below forces the rule to be rerun if the args hash has changed
-    argsHash <- askArgsHash target
+    checkArgsHash target
     withResources rs $ do
         putBuild $ "/--------\n" ++ "| Running "
                  ++ show builder ++ " with arguments:"
