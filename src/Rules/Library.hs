@@ -25,7 +25,7 @@ buildPackageLibrary _ target = do
 
     -- TODO: handle dynamic libraries
     matchBuildResult buildPath "a" ?> \a -> do
-        liftIO $ removeFiles "." [a]
+        liftIO $ IO.removeFile a
         cSrcs   <- interpret target $ getPkgDataList CSrcs
         modules <- interpret target $ getPkgDataList Modules
 
