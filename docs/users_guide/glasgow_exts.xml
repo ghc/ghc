@@ -6259,6 +6259,7 @@ type family F a :: k
 </programlisting>
 In this case the kind parameter <literal>k</literal> is actually an implicit
 parameter of the type family.
+    </para>
     </sect3>
 
   <sect3 id="type-instance-declarations">
