@@ -5,13 +5,16 @@ module Util (
     unifyPath, (-/-),
     chunksOfSize,
     putColoured, putOracle, putBuild, putSuccess, putError,
-    bimap, minusOrd, intersectOrd
+    bimap, minusOrd, intersectOrd,
+    removeFile
     ) where
 
 import Base
 import Data.Char
+import Control.Monad
 import System.IO
 import System.Console.ANSI
+import qualified System.Directory as IO
 
 replaceIf :: (a -> Bool) -> a -> [a] -> [a]
 replaceIf p to = map (\from -> if p from then to else from)
@@ -100,3 +103,10 @@ intersectOrd cmp = loop
          LT ->     loop xs (y:ys)
          EQ -> x : loop xs ys
          GT ->     loop (x:xs) ys
+
+-- Convenient helper function for removing a single file that doesn't
+-- necessarily exist.
+removeFile :: FilePath -> Action ()
+removeFile file = do
+    exists <- liftIO $ IO.doesFileExist file
+    when exists . liftIO $ IO.removeFile file

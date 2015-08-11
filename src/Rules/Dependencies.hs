@@ -11,7 +11,6 @@ import Settings.Util
 import Settings.TargetDirectory
 import Rules.Actions
 import Rules.Resources
-import qualified System.Directory as IO
 
 buildPackageDependencies :: Resources -> StagePackageTarget -> Rules ()
 buildPackageDependencies _ target =
@@ -31,7 +30,7 @@ buildPackageDependencies _ target =
             srcs <- interpret target getPackageSources
             need srcs
             build $ fullTarget target (GhcM stage) srcs [file]
-            liftIO . IO.removeFile $ file <.> "bak"
+            removeFile $ file <.> "bak"
 
         (buildPath -/- ".dependencies") %> \file -> do
             cSrcs <- pkgDataList $ CSrcs path

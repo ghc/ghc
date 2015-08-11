@@ -25,7 +25,7 @@ buildPackageLibrary _ target = do
 
     -- TODO: handle dynamic libraries
     matchBuildResult buildPath "a" ?> \a -> do
-        liftIO $ IO.removeFile a
+        removeFile a
         cSrcs   <- interpret target $ getPkgDataList CSrcs
         modules <- interpret target $ getPkgDataList Modules
 
@@ -34,17 +34,17 @@ buildPackageLibrary _ target = do
             cObjs = [ buildPath -/- src -<.> osuf way | src <- cSrcs ]
             hObjs = [ buildPath -/- src  <.> osuf way | src <- hSrcs ]
 
-        -- This will create split objects if required (we don't track them)
+        -- This will create split objects if required (we don't track them
+        -- explicitly as this would needlessly bloat the Shake database).
         need $ cObjs ++ hObjs
 
         split <- interpret target splitObjects
-        splitObjs <- if split
-            then fmap concat $ forM hSrcs $ \src -> do
+        splitObjs <- if not split then return [] else
+            fmap concat $ forM hSrcs $ \src -> do
                 let splitPath = buildPath -/- src ++ "_" ++ osuf way ++ "_split"
                 contents <- liftIO $ IO.getDirectoryContents splitPath
                 return . map (splitPath -/-)
                        . filter (not . all (== '.')) $ contents
-            else return []
 
         build $ fullTarget target Ar (cObjs ++ hObjs ++ splitObjs) [a]
 

@@ -17,8 +17,6 @@ compilePackage _ target = do
         pkg       = Target.package target
         path      = targetPath stage pkg
         buildPath = path -/- "build"
-        cDepsFile = buildPath -/- "c.deps"
-        hDepsFile = buildPath -/- "haskell.deps"
 
     matchBuildResult buildPath "hi" ?> \hi ->
         need [ hi -<.> osuf (detectWay hi) ]
