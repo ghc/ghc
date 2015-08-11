@@ -6247,7 +6247,18 @@ F Char [Int] Bool  -- OK!  Kind: *
 F IO Bool          -- WRONG: kind mismatch in the first argument
 F Bool             -- WRONG: unsaturated application
 </programlisting>
-      </para>
+    </para>
+
+    <para>
+      The result kind annotation is optional and defaults to
+      <literal>*</literal> (like argument kinds) if
+      omitted. Polykinded type families can be
+      declared using a parameter in the kind annotation:
+<programlisting>
+type family F a :: k
+</programlisting>
+In this case the kind parameter <literal>k</literal> is actually an implicit
+parameter of the type family.
     </sect3>
 
   <sect3 id="type-instance-declarations">
@@ -6365,7 +6376,7 @@ type instance G Int Char Float = Double  -- WRONG: must be two type parameters
 	are restricted to be <firstterm>compatible</firstterm>. Two type patterns
 	are compatible if
 <orderedlist>
-<listitem><para>all corresponding types in the patterns are <firstterm>apart</firstterm>, or</para></listitem>
+<listitem><para>all corresponding types and implicit kinds in the patterns are <firstterm>apart</firstterm>, or</para></listitem>
 <listitem><para>the two patterns unify producing a substitution, and the right-hand sides are equal under that substitution.</para></listitem>
 </orderedlist>
         Two types are considered <firstterm>apart</firstterm> if, for all possible
@@ -6392,7 +6403,17 @@ type instance G (Char, a) = [a]  -- ILLEGAL overlap, as [Char] /= [Int]
 </programlisting>
 	Note that this compatibility condition is independent of whether the type family
 	is associated or not, and it is not only a matter of consistency, but
-	one of type safety. </para>
+      one of type safety. </para>
+
+      <para>For a polykinded type family, the kinds are checked for
+      apartness just like types. For example, the following is accepted:
+<programlisting>
+type family J a :: k
+type instance J Int = Bool
+type instance J Int = Maybe
+</programlisting>
+      These instances are compatible because they differ in their implicit kind parameter; the first uses <literal>*</literal> while the second uses <literal>* -> *</literal>.</para>
+
 
 	<para>
 	  The definition for "compatible" uses a notion of "apart", whose definition
