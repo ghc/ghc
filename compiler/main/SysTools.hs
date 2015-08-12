@@ -610,7 +610,7 @@ runClang dflags args = do
     (\(err :: SomeException) -> do
         errorMsg dflags $
             text ("Error running clang! you need clang installed to use the" ++
-                "LLVM backend") $+$
+                  " LLVM backend") $+$
             text "(or GHC tried to execute clang incorrectly)"
         throwIO err
     )
