@@ -357,7 +357,7 @@ download_and_extract() {
 }
 
 set_up_tarballs() {
-    local mingw_base_url="http://repo.msys2.org/mingw"
+    local mingw_base_url="https://downloads.haskell.org/~ghc/mingw"
     local package_prefix="mingw-w64"
 
     local format_url="${mingw_base_url}/${mingw_arch}/${package_prefix}-${mingw_arch}"
