@@ -11,6 +11,7 @@ import Oracles.Setting
 import Oracles.ArgsHash
 import Settings.Args
 import Settings.Util
+import Settings.User
 import Settings.Builders.Ar
 
 -- Build a given target using an appropriate builder and acquiring necessary
@@ -23,7 +24,7 @@ buildWithResources rs target = do
     path    <- builderPath builder
     argList <- interpret target getArgs
     -- The line below forces the rule to be rerun if the args hash has changed
-    checkArgsHash target
+    when trackBuildSystem $ checkArgsHash target
     withResources rs $ do
         putBuild $ "/--------\n" ++ "| Running "
                  ++ show builder ++ " with arguments:"

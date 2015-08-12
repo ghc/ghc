@@ -1,7 +1,7 @@
 module Settings.User (
     userArgs, userPackages, userWays, userRtsWays, userTargetDirectory,
     userKnownPackages, integerLibrary,
-    buildHaddock, validating, ghciWithDebugger, ghcProfiled,
+    trackBuildSystem, buildHaddock, validating, ghciWithDebugger, ghcProfiled,
     dynamicGhcPrograms, laxDependencies
     ) where
 
@@ -42,6 +42,14 @@ integerLibrary = integerGmp2
 -- * Bool: a plain Boolean flag whose value is known at compile time
 -- * Action Bool: a flag whose value can depend on the build environment
 -- * Predicate: a flag depending on the build environment and the current target
+
+-- Set this to True if you are making any changes in the build system and want
+-- appropriate rebuilds to be initiated. Switching this to False speeds things
+-- up a little (particularly zero builds).
+-- WARNING: changing this setting leads to a complete rebuild.
+trackBuildSystem :: Bool
+trackBuildSystem = False
+
 validating :: Bool
 validating = False
 
@@ -59,4 +67,3 @@ laxDependencies = False
 
 buildHaddock :: Predicate
 buildHaddock = return True
-
