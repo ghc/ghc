@@ -46,7 +46,7 @@ integerLibrary = integerGmp2
 -- Set this to True if you are making any changes in the build system and want
 -- appropriate rebuilds to be initiated. Switching this to False speeds things
 -- up a little (particularly zero builds).
--- WARNING: changing this setting leads to a complete rebuild.
+-- WARNING: a complete rebuild is required when changing this setting.
 trackBuildSystem :: Bool
 trackBuildSystem = False
 
