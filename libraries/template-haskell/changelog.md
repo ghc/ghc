@@ -4,6 +4,12 @@
 
   * Bundled with GHC 7.12.1
 
+  * The compiler can now resolve infix operator fixities in types on its own.
+    The `UInfixT` constructor of `Type` is analoguous to `UInfixE` for expressions
+    and can contain a tree of infix type applications which will be reassociated
+    according to the fixities of the operators. The `ParensT` constructor can be
+    used to explicitly group expressions.
+
   * TODO: document API changes and important bugfixes
 
 
