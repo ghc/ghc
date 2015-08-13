@@ -2,10 +2,12 @@
 {-# LANGUAGE StandaloneDeriving #-}
 
 
-module Test.Haddock.Xhtml where
+module Test.Haddock.Xhtml
+    ( Xhtml(..)
+    , parseXhtml, dumpXhtml
+    , stripLinks, stripFooter
+    ) where
 
-
-import Control.Monad
 
 import Data.Generics.Aliases
 import Data.Generics.Schemes
@@ -13,36 +15,42 @@ import Data.Generics.Schemes
 import Text.XML.Light
 
 
-deriving instance Eq Content
+newtype Xhtml = Xhtml
+    { xhtmlElement :: Element
+    } deriving Eq
+
+
+-- TODO: Find a way to avoid warning about orphan instances.
 deriving instance Eq Element
+deriving instance Eq Content
 deriving instance Eq CData
 
 
-readXml :: FilePath -> IO (Maybe Element)
-readXml = liftM parseXMLDoc . readFile
+parseXhtml :: String -> Maybe Xhtml
+parseXhtml = fmap Xhtml . parseXMLDoc
 
 
-strip :: Element -> Element
-strip = stripFooter . stripLinks
+dumpXhtml :: Xhtml -> String
+dumpXhtml = ppElement . xhtmlElement
 
 
-stripLinks :: Element -> Element
+stripLinks :: Xhtml -> Xhtml
 stripLinks =
-    everywhere (mkT unlink)
+    Xhtml . everywhere (mkT unlink) . xhtmlElement
   where
     unlink attr@(Attr { attrKey = key })
         | qName key == "href" = attr { attrVal = "#" }
         | otherwise = attr
 
 
-stripFooter :: Element -> Element
+stripFooter :: Xhtml -> Xhtml
 stripFooter =
-    everywhere (mkT defoot)
+    Xhtml . everywhere (mkT defoot) . xhtmlElement
   where
-    defoot elem
-        | isFooter elem = elem { elContent = [] }
-        | otherwise = elem
-    isFooter elem = any isFooterAttr $ elAttribs elem
+    defoot el
+        | isFooter el = el { elContent = [] }
+        | otherwise = el
+    isFooter el = any isFooterAttr $ elAttribs el
     isFooterAttr (Attr { .. }) = and
         [ qName attrKey == "id"
         , attrVal == "footer"
