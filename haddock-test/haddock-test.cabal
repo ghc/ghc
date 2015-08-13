@@ -19,6 +19,7 @@ library
   build-depends:    base, directory, process, filepath, Cabal, xml, syb
 
   exposed-modules:
+    Test.Haddock
     Test.Haddock.Config
     Test.Haddock.Process
     Test.Haddock.Xhtml
