@@ -14,6 +14,7 @@ stability:            experimental
 
 library
   default-language: Haskell2010
+  ghc-options: -Wall
   hs-source-dirs:   src
   build-depends:    base, directory, process, filepath, Cabal, xml, syb
 
