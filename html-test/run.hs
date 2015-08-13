@@ -9,15 +9,6 @@ import Control.Monad
 import Data.Maybe
 import Data.List
 
-import Distribution.InstalledPackageInfo
-import Distribution.Package
-import Distribution.Simple.Compiler hiding (Flag)
-import Distribution.Simple.GHC
-import Distribution.Simple.PackageIndex
-import Distribution.Simple.Program
-import Distribution.Simple.Utils
-import Distribution.Verbosity
-
 import System.Console.GetOpt
 import System.Directory
 import System.Environment
@@ -54,7 +45,8 @@ data CheckResult
 
 main :: IO ()
 main = do
-    cfg <- uncurry loadConfig =<< checkOpt =<< getArgs
+    let dcfg = defaultDirConfig baseDir
+    cfg <- uncurry (loadConfig dcfg) =<< checkOpt =<< getArgs
     runHaddock cfg
     checkFiles cfg
 
@@ -101,54 +93,6 @@ runHaddock (Config { .. }) = do
     waitForSuccess "Failed to run Haddock on specified test files" handle
 
 
-checkOpt :: [String] -> IO ([Flag], [String])
-checkOpt args = do
-    let (flags, files, errors) = getOpt Permute options args
-
-    unless (null errors) $ do
-        hPutStr stderr $ concat errors
-        exitFailure
-
-    when (FlagHelp `elem` flags) $ do
-        hPutStrLn stderr $ usageInfo "" options
-        exitSuccess
-
-    return (flags, files)
-
-
-loadConfig :: [Flag] -> [String] -> IO Config
-loadConfig flags files = do
-    cfgEnv <- (:) ("haddock_datadir", resDir) <$> getEnvironment
-
-    cfgHaddockPath <- pure $ flip fromMaybe (flagsHaddockPath flags) $
-        rootDir </> "dist" </> "build" </> "haddock" </> "haddock"
-
-    printVersions cfgEnv cfgHaddockPath
-
-    cfgGhcPath <- flip fromMaybe (flagsGhcPath flags) <$>
-         init <$> rawSystemStdout normal cfgHaddockPath ["--print-ghc-path"]
-
-    cfgFiles <- processFileArgs files
-
-    cfgHaddockArgs <- liftM concat . sequence $
-        [ pure ["--no-warnings"]
-        , pure ["--odir=" ++ outDir]
-        , pure ["--pretty-html"]
-        , pure ["--html"]
-        , pure ["--optghc=-w"]
-        , pure $ flagsHaddockOptions flags
-        , baseDependencies cfgGhcPath
-        ]
-
-    let cfgHaddockStdOut = fromMaybe "/dev/null" (flagsHaddockStdOut flags)
-
-    cfgDiffTool <- if FlagNoDiff `elem` flags
-        then pure Nothing
-        else (<|>) <$> pure (flagsDiffTool flags) <*> defaultDiffTool
-
-    return $ Config { .. }
-
-
 checkModule :: String -> IO CheckResult
 checkModule mdl = do
     hasRef <- doesFileExist $ refFile mdl
@@ -189,67 +133,6 @@ outFile mdl = outDir </> mdl <.> "html"
 
 refFile :: String -> FilePath
 refFile mdl = refDir </> mdl <.> "html"
-
-
-printVersions :: Environment -> FilePath -> IO ()
-printVersions env haddockPath = do
-    handle <- runProcess' haddockPath $ processConfig
-        { pcEnv = Just env
-        , pcArgs = ["--version"]
-        }
-    waitForSuccess "Failed to run `haddock --version`" handle
-
-    handle <- runProcess' haddockPath $ processConfig
-        { pcEnv = Just env
-        , pcArgs = ["--ghc-version"]
-        }
-    waitForSuccess "Failed to run `haddock --ghc-version`" handle
-
-
-baseDependencies :: FilePath -> IO [String]
-baseDependencies ghcPath = do
-    (_, _, cfg) <- configure normal (Just ghcPath) Nothing
-        defaultProgramConfiguration
-    pkgIndex <- getInstalledPackages normal [GlobalPackageDB] cfg
-    mapM (getDependency pkgIndex) ["base", "process", "ghc-prim"]
-  where
-    getDependency pkgIndex name = case ifaces pkgIndex name of
-        [] -> do
-            hPutStrLn stderr $ "Couldn't find base test dependency: " ++ name
-            exitFailure
-        (ifArg:_) -> pure ifArg
-    ifaces pkgIndex name = do
-        pkg <- join $ snd <$> lookupPackageName pkgIndex (PackageName name)
-        iface <$> haddockInterfaces pkg <*> haddockHTMLs pkg
-    iface file html = "--read-interface=" ++ html ++ "," ++ file
-
-
-defaultDiffTool :: IO (Maybe FilePath)
-defaultDiffTool =
-    liftM listToMaybe . filterM isAvailable $ ["colordiff", "diff"]
-  where
-    isAvailable = liftM isJust . findProgramLocation silent
-
-
-processFileArgs :: [String] -> IO [FilePath]
-processFileArgs [] =
-    map toModulePath . filter isSourceFile <$> getDirectoryContents srcDir
-  where
-    toModulePath = modulePath . takeBaseName
-processFileArgs args = pure $ map processFileArg args
-
-
-processFileArg :: String -> FilePath
-processFileArg arg
-    | isSourceFile arg = arg
-    | otherwise = modulePath arg
-
-
-isSourceFile :: FilePath -> Bool
-isSourceFile path = takeExtension path `elem` [".hs", ".lhs"]
-
-modulePath :: String -> FilePath
-modulePath mdl = srcDir </> mdl <.> "hs"
 
 
 -- *** OLD TEST RUNNER UTILITY FUNCTIONS ***
