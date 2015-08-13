@@ -83,7 +83,6 @@ cfgResDir = dcfgResDir . cfgDirConfig
 
 data Flag
     = FlagHaddockPath FilePath
-    | FlagGhcPath FilePath
     | FlagHaddockOptions String
     | FlagHaddockStdOut FilePath
     | FlagDiffTool FilePath
@@ -94,10 +93,6 @@ data Flag
 
 flagsHaddockPath :: [Flag] -> Maybe FilePath
 flagsHaddockPath flags = mlast [ path | FlagHaddockPath path <- flags ]
-
-
-flagsGhcPath :: [Flag] -> Maybe FilePath
-flagsGhcPath flags = mlast [ path | FlagGhcPath path <- flags ]
 
 
 flagsHaddockOptions :: [Flag] -> [String]
@@ -117,8 +112,6 @@ options :: [OptDescr Flag]
 options =
     [ Option [] ["haddock-path"] (ReqArg FlagHaddockPath "FILE")
         "path to Haddock executable to exectue tests with"
-    , Option [] ["ghc-path"] (ReqArg FlagGhcPath "FILE")
-        "path to GHC executable"
     , Option [] ["haddock-options"] (ReqArg FlagHaddockOptions "OPTS")
         "additional options to run Haddock with"
     , Option [] ["haddock-stdout"] (ReqArg FlagHaddockStdOut "FILE")
