@@ -8,6 +8,21 @@ import Test.Haddock.Process
 import Test.Haddock.Utils
 
 
+data DirConfig = DirConfig
+    { dcfgSrcDir :: FilePath
+    , dcfgRefDir :: FilePath
+    , dcfgOutDir :: FilePath
+    }
+
+
+defaultDirConfig :: FilePath -> DirConfig
+defaultDirConfig baseDir = DirConfig
+    { dcfgSrcDir = baseDir </> "src"
+    , dcfgRefDir = baseDir </> "ref"
+    , dcfgOutDir = baseDir </> "out"
+    }
+
+
 data Config = Config
     { cfgHaddockPath :: FilePath
     , cfgGhcPath :: FilePath
@@ -16,7 +31,14 @@ data Config = Config
     , cfgHaddockStdOut :: FilePath
     , cfgDiffTool :: Maybe FilePath
     , cfgEnv :: Environment
+    , cfgDirConfig :: DirConfig
     }
+
+
+cfgSrcDir, cfgRefDir, cfgOutDir :: Config -> FilePath
+cfgSrcDir = dcfgSrcDir . cfgDirConfig
+cfgRefDir = dcfgRefDir . cfgDirConfig
+cfgOutDir = dcfgOutDir . cfgDirConfig
 
 
 data Flag
