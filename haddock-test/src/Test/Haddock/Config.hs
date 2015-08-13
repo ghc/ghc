@@ -1,7 +1,12 @@
 {-# LANGUAGE RecordWildCards #-}
 
 
-module Test.Haddock.Config where
+module Test.Haddock.Config
+    ( CheckConfig(..), DirConfig(..), Config(..)
+    , defaultDirConfig
+    , cfgSrcDir, cfgRefDir, cfgOutDir, cfgResDir
+    , parseArgs, checkOpt, loadConfig
+    ) where
 
 
 import Control.Applicative

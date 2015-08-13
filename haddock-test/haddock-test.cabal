@@ -21,8 +21,8 @@ library
   exposed-modules:
     Test.Haddock
     Test.Haddock.Config
-    Test.Haddock.Process
     Test.Haddock.Xhtml
 
   other-modules:
+    Test.Haddock.Process
     Test.Haddock.Utils

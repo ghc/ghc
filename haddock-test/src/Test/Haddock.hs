@@ -2,8 +2,8 @@
 
 
 module Test.Haddock
-    ( module Test.Haddock
-    , module Test.Haddock.Config
+    ( module Test.Haddock.Config
+    , runAndCheck, runHaddock, checkFiles
     ) where
 
 
