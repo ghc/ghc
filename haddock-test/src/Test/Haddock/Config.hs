@@ -30,6 +30,13 @@ import Test.Haddock.Process
 import Test.Haddock.Utils
 
 
+data CheckConfig c = CheckConfig
+    { ccfgRead :: String -> String -> Maybe c
+    , ccfgDump :: c -> String
+    , ccfgEqual :: c -> c -> Bool
+    }
+
+
 data DirConfig = DirConfig
     { dcfgSrcDir :: FilePath
     , dcfgRefDir :: FilePath
@@ -49,22 +56,24 @@ defaultDirConfig baseDir = DirConfig
     rootDir = baseDir </> ".."
 
 
-data Config = Config
+data Config c = Config
     { cfgHaddockPath :: FilePath
     , cfgFiles :: [FilePath]
     , cfgHaddockArgs :: [String]
     , cfgHaddockStdOut :: FilePath
     , cfgDiffTool :: Maybe FilePath
     , cfgEnv :: Environment
+    , cfgCheckConfig :: CheckConfig c
     , cfgDirConfig :: DirConfig
     }
 
 
-cfgSrcDir, cfgRefDir, cfgOutDir, cfgResDir :: Config -> FilePath
+cfgSrcDir, cfgRefDir, cfgOutDir, cfgResDir :: Config c -> FilePath
 cfgSrcDir = dcfgSrcDir . cfgDirConfig
 cfgRefDir = dcfgRefDir . cfgDirConfig
 cfgOutDir = dcfgOutDir . cfgDirConfig
 cfgResDir = dcfgResDir . cfgDirConfig
+
 
 
 data Flag
@@ -133,9 +142,9 @@ checkOpt args = do
     return (flags, files)
 
 
-loadConfig :: DirConfig -> [Flag] -> [String] -> IO Config
-loadConfig cfgDirConfig@(DirConfig { .. }) flags files = do
-    cfgEnv <- (:) ("haddock_datadir", dcfgResDir) <$> getEnvironment
+loadConfig :: CheckConfig c -> DirConfig -> [Flag] -> [String] -> IO (Config c)
+loadConfig ccfg dcfg flags files = do
+    cfgEnv <- (:) ("haddock_datadir", dcfgResDir dcfg) <$> getEnvironment
 
     systemHaddockPath <- List.lookup "HADDOCK_PATH" <$> getEnvironment
     cfgHaddockPath <- case flagsHaddockPath flags <|> systemHaddockPath of
@@ -149,11 +158,11 @@ loadConfig cfgDirConfig@(DirConfig { .. }) flags files = do
 
     printVersions cfgEnv cfgHaddockPath
 
-    cfgFiles <- processFileArgs cfgDirConfig files
+    cfgFiles <- processFileArgs dcfg files
 
     cfgHaddockArgs <- liftM concat . sequence $
         [ pure ["--no-warnings"]
-        , pure ["--odir=" ++ dcfgOutDir]
+        , pure ["--odir=" ++ dcfgOutDir dcfg]
         , pure ["--pretty-html"]
         , pure ["--html"]
         , pure ["--optghc=-w"]
@@ -166,6 +175,9 @@ loadConfig cfgDirConfig@(DirConfig { .. }) flags files = do
     cfgDiffTool <- if FlagNoDiff `elem` flags
         then pure Nothing
         else (<|>) <$> pure (flagsDiffTool flags) <*> defaultDiffTool
+
+    let cfgCheckConfig = ccfg
+    let cfgDirConfig = dcfg
 
     return $ Config { .. }
 

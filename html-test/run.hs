@@ -5,16 +5,26 @@ import System.Environment
 import System.FilePath
 
 import Test.Haddock
+import Test.Haddock.Xhtml
+
+import qualified Text.XML.Light as Xml
 
 
-baseDir :: FilePath
-baseDir = takeDirectory __FILE__
+checkConfig :: CheckConfig Xml.Element
+checkConfig = CheckConfig
+    { ccfgRead = \_ input -> strip <$> Xml.parseXMLDoc input
+    , ccfgDump = Xml.ppElement
+    , ccfgEqual = (==)
+    }
+
+
+dirConfig :: DirConfig
+dirConfig = defaultDirConfig $ takeDirectory __FILE__
 
 
 main :: IO ()
 main = do
-    let dcfg = defaultDirConfig baseDir
-    cfg <- uncurry (loadConfig dcfg) =<< checkOpt =<< getArgs
+    cfg <- uncurry (loadConfig checkConfig dirConfig) =<< checkOpt =<< getArgs
     runHaddock cfg
     checkFiles cfg
 

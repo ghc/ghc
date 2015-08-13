@@ -19,18 +19,16 @@ import System.Process
 
 import Test.Haddock.Config
 import Test.Haddock.Process
-import Test.Haddock.Xhtml
-
-import qualified Text.XML.Light as Xml
 
 
 data CheckResult
     = Fail
     | Pass
     | NoRef
+    | Error String
 
 
-checkFiles :: Config -> IO ()
+checkFiles :: Config c -> IO ()
 checkFiles cfg@(Config { .. }) = do
     putStrLn "Testing output files..."
     failed <- liftM catMaybes . forM cfgFiles $ \file -> do
@@ -42,6 +40,7 @@ checkFiles cfg@(Config { .. }) = do
             Fail -> putStrLn "FAIL" >> (return $ Just mdl)
             Pass -> putStrLn "PASS" >> (return Nothing)
             NoRef -> putStrLn "PASS [no .ref]" >> (return Nothing)
+            Error msg -> putStrLn ("ERROR (" ++ msg ++ ")") >> return Nothing
 
     if null failed
         then do
@@ -52,14 +51,14 @@ checkFiles cfg@(Config { .. }) = do
             exitFailure
 
 
-maybeDiff :: Config -> [String] -> IO ()
+maybeDiff :: Config c -> [String] -> IO ()
 maybeDiff (Config { cfgDiffTool = Nothing }) _ = pure ()
 maybeDiff cfg@(Config { cfgDiffTool = (Just diff) }) mdls = do
     putStrLn "Diffing failed cases..."
     forM_ mdls $ diffModule cfg diff
 
 
-runHaddock :: Config -> IO ()
+runHaddock :: Config c -> IO ()
 runHaddock (Config { .. }) = do
     putStrLn "Running Haddock process..."
 
@@ -72,29 +71,30 @@ runHaddock (Config { .. }) = do
     waitForSuccess "Failed to run Haddock on specified test files" handle
 
 
-checkModule :: Config -> String -> IO CheckResult
+checkModule :: Config c -> String -> IO CheckResult
 checkModule cfg mdl = do
     hasRef <- doesFileExist $ refFile dcfg mdl
     if hasRef
         then do
-            Just outXml <- readXml $ outFile dcfg mdl
-            Just refXml <- readXml $ refFile dcfg mdl
-            return $ if strip outXml == strip refXml
-                then Pass
-                else Fail
+            mout <- ccfgRead ccfg mdl <$> readFile (outFile dcfg mdl)
+            mref <- ccfgRead ccfg mdl <$> readFile (refFile dcfg mdl)
+            return $ case (mout, mref) of
+                (Just out, Just ref)
+                    | ccfgEqual ccfg out ref -> Pass
+                    | otherwise -> Fail
+                _ -> Error "Failed to parse input files"
         else return NoRef
   where
+    ccfg = cfgCheckConfig cfg
     dcfg = cfgDirConfig cfg
 
 
-diffModule :: Config -> FilePath -> String -> IO ()
+diffModule :: Config c -> FilePath -> String -> IO ()
 diffModule cfg diff mdl = do
-    Just outXml <- readXml $ outFile dcfg mdl
-    Just refXml <- readXml $ refFile dcfg mdl
-    let outXml' = strip outXml
-    let refXml' = strip refXml
-    writeFile outFile' $ Xml.ppElement outXml'
-    writeFile refFile' $ Xml.ppElement refXml'
+    Just out <- ccfgRead ccfg mdl <$> readFile (outFile dcfg mdl)
+    Just ref <- ccfgRead ccfg mdl <$> readFile (refFile dcfg mdl)
+    writeFile outFile' $ ccfgDump ccfg out
+    writeFile refFile' $ ccfgDump ccfg ref
 
     putStrLn $ "Diff for module " ++ show mdl ++ ":"
     hFlush stdout
@@ -105,6 +105,7 @@ diffModule cfg diff mdl = do
     waitForProcess handle >> return ()
   where
     dcfg = cfgDirConfig cfg
+    ccfg = cfgCheckConfig cfg
     outFile' = outFile dcfg mdl <.> "nolinks"
     refFile' = outFile dcfg mdl <.> "ref" <.> "nolinks"
 
