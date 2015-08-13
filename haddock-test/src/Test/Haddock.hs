@@ -110,8 +110,8 @@ diffModule cfg diff mdl = do
   where
     dcfg = cfgDirConfig cfg
     ccfg = cfgCheckConfig cfg
-    outFile' = outFile dcfg mdl <.> "nolinks"
-    refFile' = outFile dcfg mdl <.> "ref" <.> "nolinks"
+    outFile' = outFile dcfg mdl <.> "dump"
+    refFile' = outFile dcfg mdl <.> "ref" <.> "dump"
 
 
 outFile :: DirConfig -> String -> FilePath
