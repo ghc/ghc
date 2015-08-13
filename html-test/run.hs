@@ -23,10 +23,7 @@ dirConfig = defaultDirConfig $ takeDirectory __FILE__
 
 
 main :: IO ()
-main = do
-    cfg <- uncurry (loadConfig checkConfig dirConfig) =<< checkOpt =<< getArgs
-    runHaddock cfg
-    checkFiles cfg
+main = runAndCheck =<< parseArgs checkConfig dirConfig =<< getArgs
 
 
 -- *** OLD TEST RUNNER UTILITY FUNCTIONS ***

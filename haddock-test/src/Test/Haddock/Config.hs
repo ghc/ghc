@@ -127,6 +127,10 @@ options =
     ]
 
 
+parseArgs :: CheckConfig c -> DirConfig -> [String] -> IO (Config c)
+parseArgs ccfg dcfg args = uncurry (loadConfig ccfg dcfg) =<< checkOpt args
+
+
 checkOpt :: [String] -> IO ([Flag], [String])
 checkOpt args = do
     let (flags, files, errors) = getOpt Permute options args

@@ -28,6 +28,10 @@ data CheckResult
     | Error String
 
 
+runAndCheck :: Config c -> IO ()
+runAndCheck cfg = runHaddock cfg >> checkFiles cfg
+
+
 checkFiles :: Config c -> IO ()
 checkFiles cfg@(Config { .. }) = do
     putStrLn "Testing output files..."
