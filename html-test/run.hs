@@ -1,4 +1,3 @@
-#!/usr/bin/env runhaskell
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -7,8 +6,6 @@
 import Control.Applicative
 import Control.Monad
 
-import Data.Generics.Aliases
-import Data.Generics.Schemes
 import Data.Maybe
 import Data.List
 
@@ -31,6 +28,10 @@ import System.Process
 
 import qualified Text.XML.Light as Xml
 
+import Test.Haddock.Process
+import Test.Haddock.Config
+import Test.Haddock.Xhtml
+
 
 baseDir, rootDir :: FilePath
 baseDir = takeDirectory __FILE__
@@ -43,17 +44,6 @@ outDir = baseDir </> "out"
 
 resDir :: FilePath
 resDir = rootDir </> "resources"
-
-
-data Config = Config
-    { cfgHaddockPath :: FilePath
-    , cfgGhcPath :: FilePath
-    , cfgFiles :: [FilePath]
-    , cfgHaddockArgs :: [String]
-    , cfgHaddockStdOut :: FilePath
-    , cfgDiffTool :: Maybe FilePath
-    , cfgEnv :: Environment
-    }
 
 
 data CheckResult
@@ -260,133 +250,6 @@ isSourceFile path = takeExtension path `elem` [".hs", ".lhs"]
 
 modulePath :: String -> FilePath
 modulePath mdl = srcDir </> mdl <.> "hs"
-
-
-deriving instance Eq Xml.Content
-deriving instance Eq Xml.Element
-deriving instance Eq Xml.CData
-
-
-readXml :: FilePath -> IO (Maybe Xml.Element)
-readXml = liftM Xml.parseXMLDoc . readFile
-
-
-strip :: Xml.Element -> Xml.Element
-strip = stripFooter . stripLinks
-
-
-stripLinks :: Xml.Element -> Xml.Element
-stripLinks =
-    everywhere (mkT unlink)
-  where
-    unlink attr@(Xml.Attr { attrKey = key })
-        | Xml.qName key == "href" = attr { Xml.attrVal = "#" }
-        | otherwise = attr
-
-
-stripFooter :: Xml.Element -> Xml.Element
-stripFooter =
-    everywhere (mkT defoot)
-  where
-    defoot elem
-        | isFooter elem = elem { Xml.elContent = [] }
-        | otherwise = elem
-    isFooter elem = any isFooterAttr $ Xml.elAttribs elem
-    isFooterAttr (Xml.Attr { .. }) = and
-        [ Xml.qName attrKey == "id"
-        , attrVal == "footer"
-        ]
-
-
-data Flag
-    = FlagHaddockPath FilePath
-    | FlagGhcPath FilePath
-    | FlagHaddockOptions String
-    | FlagHaddockStdOut FilePath
-    | FlagDiffTool FilePath
-    | FlagNoDiff
-    | FlagHelp
-    deriving Eq
-
-
-options :: [OptDescr Flag]
-options =
-    [ Option [] ["haddock-path"] (ReqArg FlagHaddockPath "FILE")
-        "path to Haddock executable to exectue tests with"
-    , Option [] ["ghc-path"] (ReqArg FlagGhcPath "FILE")
-        "path to GHC executable"
-    , Option [] ["haddock-options"] (ReqArg FlagHaddockOptions "OPTS")
-        "additional options to run Haddock with"
-    , Option [] ["haddock-stdout"] (ReqArg FlagHaddockStdOut "FILE")
-        "where to redirect Haddock output"
-    , Option [] ["diff-tool"] (ReqArg FlagDiffTool "PATH")
-        "diff tool to use when printing failed cases"
-    , Option [] ["no-diff"] (NoArg FlagNoDiff)
-        "do not print diff for failed cases"
-    , Option ['h'] ["help"] (NoArg FlagHelp)
-        "display this help end exit"
-    ]
-
-
-flagsHaddockPath :: [Flag] -> Maybe FilePath
-flagsHaddockPath flags = mlast [ path | FlagHaddockPath path <- flags ]
-
-
-flagsGhcPath :: [Flag] -> Maybe FilePath
-flagsGhcPath flags = mlast [ path | FlagGhcPath path <- flags ]
-
-
-flagsHaddockOptions :: [Flag] -> [String]
-flagsHaddockOptions flags = concat
-    [ words opts | FlagHaddockOptions opts <- flags ]
-
-
-flagsHaddockStdOut :: [Flag] -> Maybe FilePath
-flagsHaddockStdOut flags = mlast [ path | FlagHaddockStdOut path <- flags ]
-
-
-flagsDiffTool :: [Flag] -> Maybe FilePath
-flagsDiffTool flags = mlast [ path | FlagDiffTool path <- flags ]
-
-
-type Environment = [(String, String)]
-
-data ProcessConfig = ProcessConfig
-    { pcArgs :: [String]
-    , pcWorkDir :: Maybe FilePath
-    , pcEnv :: Maybe Environment
-    , pcStdIn :: Maybe Handle
-    , pcStdOut :: Maybe Handle
-    , pcStdErr :: Maybe Handle
-    }
-
-
-processConfig :: ProcessConfig
-processConfig = ProcessConfig
-    { pcArgs = []
-    , pcWorkDir = Nothing
-    , pcEnv = Nothing
-    , pcStdIn = Nothing
-    , pcStdOut = Nothing
-    , pcStdErr = Nothing
-    }
-
-
-runProcess' :: FilePath -> ProcessConfig -> IO ProcessHandle
-runProcess' path (ProcessConfig { .. }) = runProcess
-    path pcArgs pcWorkDir pcEnv pcStdIn pcStdOut pcStdErr
-
-
-waitForSuccess :: String -> ProcessHandle -> IO ()
-waitForSuccess msg handle = do
-    result <- waitForProcess handle
-    unless (result == ExitSuccess) $ do
-        hPutStrLn stderr $ msg
-        exitFailure
-
-
-mlast :: [a] -> Maybe a
-mlast = listToMaybe . reverse
 
 
 -- *** OLD TEST RUNNER UTILITY FUNCTIONS ***
