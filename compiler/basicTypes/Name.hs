@@ -127,6 +127,12 @@ data NameSort
   | System              -- A system-defined Id or TyVar.  Typically the
                         -- OccName is very uninformative (like 's')
 
+instance Outputable NameSort where
+  ppr (External _)    = text "external"
+  ppr (WiredIn _ _ _) = text "wired-in"
+  ppr  Internal       = text "internal"
+  ppr  System         = text "system"
+
 -- | BuiltInSyntax is for things like @(:)@, @[]@ and tuples,
 -- which have special syntactic forms.  They aren't in scope
 -- as such.
@@ -216,7 +222,10 @@ isInternalName name = not (isExternalName name)
 isHoleName :: Name -> Bool
 isHoleName = isHoleModule . nameModule
 
-nameModule name = nameModule_maybe name `orElse` pprPanic "nameModule" (ppr name)
+nameModule name =
+  nameModule_maybe name `orElse`
+  pprPanic "nameModule" (ppr (n_sort name) <+> ppr name)
+
 nameModule_maybe :: Name -> Maybe Module
 nameModule_maybe (Name { n_sort = External mod})    = Just mod
 nameModule_maybe (Name { n_sort = WiredIn mod _ _}) = Just mod
