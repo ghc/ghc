@@ -30,7 +30,7 @@ stripIfRequired mdl =
   where
     stripLinks'
         | mdl `elem` preserveLinksModules = id
-        | otherwise = stripFooter
+        | otherwise = stripLinks
 
 
 -- | List of modules in which we don't 'stripLinks'
