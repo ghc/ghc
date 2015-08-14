@@ -5,7 +5,7 @@
 module Test.Haddock.Xhtml
     ( Xhtml(..)
     , parseXhtml, dumpXhtml
-    , stripLinks, stripFooter
+    , stripLinks, stripLinksWhen, stripAnchorsWhen, stripFooter
     ) where
 
 
@@ -35,12 +35,29 @@ dumpXhtml = ppElement . xhtmlElement
 
 
 stripLinks :: Xhtml -> Xhtml
-stripLinks =
-    Xhtml . everywhere (mkT unlink) . xhtmlElement
+stripLinks = stripLinksWhen (const True)
+
+
+stripLinksWhen :: (String -> Bool) -> Xhtml -> Xhtml
+stripLinksWhen p =
+    processAnchors unlink
   where
-    unlink attr@(Attr { attrKey = key })
-        | qName key == "href" = attr { attrVal = "#" }
+    unlink attr@(Attr { attrKey = key, attrVal = val })
+        | qName key == "href" && p val = attr { attrVal = "#" }
         | otherwise = attr
+
+
+stripAnchorsWhen :: (String -> Bool) -> Xhtml -> Xhtml
+stripAnchorsWhen p =
+    processAnchors unname
+  where
+    unname attr@(Attr { attrKey = key, attrVal = val })
+        | qName key == "name" && p val = attr { attrVal = "" }
+        | otherwise = attr
+
+
+processAnchors :: (Attr -> Attr) -> Xhtml -> Xhtml
+processAnchors f = Xhtml . everywhere (mkT f) . xhtmlElement
 
 
 stripFooter :: Xhtml -> Xhtml
