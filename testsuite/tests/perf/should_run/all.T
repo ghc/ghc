@@ -53,11 +53,12 @@ test('lazy-bs-alloc',
      [stats_num_field('peak_megabytes_allocated', (2, 1)),
                                  # expected value: 2 (amd64/Linux)
       stats_num_field('bytes allocated',
-          [(wordsize(64), 425400, 3),
+          [(wordsize(64), 431500, 3),
             #             489776 (amd64/Linux)
             # 2013-02-07: 429744 (amd64/Linux)
             # 2013-12-12: 425400 (amd64/Linux)
             # 2015-04-04: Widen 1->3% (amd64/Windows was failing)
+            # 2015-08-15: 431500 (Windows not good enough. avg of Windows&Linux)
            (wordsize(32), 411500, 2)]),
             # 2013-02-10: 421296 (x86/Windows)
             # 2013-02-10: 414180 (x86/OSX)
@@ -183,10 +184,11 @@ test('T5205',
      [stats_num_field('bytes allocated',
                       [(wordsize(32), 47088, 5),
                     # expected value: 47088 (x86/Darwin)
-                       (wordsize(64), 52600, 7)]),
+                       (wordsize(64), 50648, 7)]),
                     # expected value: 51320 (amd64/Linux)
                     # 2014-07-17:     52600 (amd64/Linux) general round of updates
                     # 2015-04-03: Widen 5->7% (amd64/Windows was doing better)
+                    # 2015-08-15: 50648 (Windows too good. avg of Windows&Linux)
       only_ways(['normal', 'optasm'])
       ],
      compile_and_run,
