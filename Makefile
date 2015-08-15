@@ -31,6 +31,22 @@ default:
 install show:
 	$(MAKE) --no-print-directory -f ghc.mk $@ BINDIST=YES NO_INCLUDE_DEPS=YES
 
+# Note [install-strip]
+#
+# install-strip is like install, but it strips the executable files while
+# installing them.
+#
+# From http://www.gnu.org/prep/standards/html_node/Standard-Targets.html:
+#
+#   "install-strip should not strip the executables in the build directory
+#   which are being copied for installation. It should only strip the copies
+#   that are installed. "
+
+.PHONY: install-strip
+install-strip:
+	# See Note [install-strip].
+	$(MAKE) --no-print-directory -f ghc.mk INSTALL_PROGRAM='$(INSTALL_PROGRAM) -s' install
+
 else
 
 .PHONY: default
@@ -65,6 +81,7 @@ endif
 REALGOALS=$(filter-out \
     binary-dist \
     binary-dist-prep \
+    install-strip \
     sdist sdist-ghc \
     sdist-ghc-prep \
     sdist-windows-tarballs \
@@ -124,6 +141,11 @@ else
 	$(MAKE) --no-print-directory -f ghc.mk bindist-list BINDIST=YES
 	$(MAKE) --no-print-directory -f ghc.mk unix-binary-dist-prep
 endif
+
+.PHONY: install-strip
+install-strip:
+	# See Note [install-strip].
+	$(MAKE) --no-print-directory -f ghc.mk INSTALL_PROGRAM='$(INSTALL_PROGRAM) -s' install
 
 .PHONY: sdist sdist-ghc sdist-ghc-prep sdist-windows-tarballs sdist-windows-tarballs-prep sdist-testsuite sdist-testsuite-prep
 # Just running `./boot && ./configure && make sdist` should work, so skip

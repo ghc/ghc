@@ -66,10 +66,13 @@ $$($1_$2_INPLACE): $1/$2/$$($1_$2_PROG) | $$$$(dir $$$$@)/.
 endif
 
 ifeq "$$($1_$2_INSTALL)" "YES"
+# Don't add to INSTALL_BINS or INSTAL_TOPDIR_BINS, because they will get
+# stripped when calling 'make install-strip', and stripping a Perl script
+# doesn't work.
 ifeq "$$($1_$2_TOPDIR)" "YES"
-INSTALL_TOPDIRS  += $$($1_$2_INPLACE)
+INSTALL_TOPDIR_SCRIPTS += $$($1_$2_INPLACE)
 else
-INSTALL_BINS     += $$($1_$2_INPLACE)
+INSTALL_SCRIPTS += $$($1_$2_INPLACE)
 endif
 endif
 

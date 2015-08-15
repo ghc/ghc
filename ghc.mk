@@ -807,6 +807,11 @@ endif
 define installLibsTo
 # $1 = libraries to install
 # $2 = directory to install to
+#
+# The .dll case calls STRIP_CMD explicitly, instead of `install -s`, because
+# on Win64, "install -s" calls a strip that doesn't understand 64bit binaries.
+# For some reason, this means the DLLs end up non-executable, which means
+# executables that use them just segfault.
 	$(INSTALL_DIR) $2
 	for i in $1; do \
 		case $$i in \
@@ -826,10 +831,13 @@ define installLibsTo
 	done
 endef
 
-install_bins: $(INSTALL_BINS)
+install_bins: $(INSTALL_BINS) $(INSTALL_SCRIPTS)
 	$(INSTALL_DIR) "$(DESTDIR)$(bindir)"
 	for i in $(INSTALL_BINS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i "$(DESTDIR)$(bindir)" ;  \
+	done
+	for i in $(INSTALL_SCRIPTS); do \
+		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i "$(DESTDIR)$(bindir)" ;  \
 	done
 
 install_libs: $(INSTALL_LIBS)
@@ -848,10 +856,13 @@ else
 	"$(MV)" "$(DESTDIR)$(ghclibexecdir)/bin/ghc-stage$(INSTALL_GHC_STAGE)" "$(DESTDIR)$(ghclibexecdir)/bin/ghc"
 endif
 
-install_topdirs: $(INSTALL_TOPDIRS)
+install_topdirs: $(INSTALL_TOPDIR_BINS) $(INSTALL_TOPDIR_SCRIPTS)
 	$(INSTALL_DIR) "$(DESTDIR)$(topdir)"
-	for i in $(INSTALL_TOPDIRS); do \
+	for i in $(INSTALL_TOPDIR_BINS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i "$(DESTDIR)$(topdir)"; \
+	done
+	for i in $(INSTALL_TOPDIR_SCRIPTS); do \
+		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i "$(DESTDIR)$(topdir)"; \
 	done
 
 install_docs: $(INSTALL_DOCS)
@@ -963,8 +974,10 @@ $(eval $(call bindist-list,.,\
     $(libffi_HEADERS) \
     $(INSTALL_LIBEXECS) \
     $(INSTALL_LIBEXEC_SCRIPTS) \
-    $(INSTALL_TOPDIRS) \
+    $(INSTALL_TOPDIR_BINS) \
+    $(INSTALL_TOPDIR_SCRIPTS) \
     $(INSTALL_BINS) \
+    $(INSTALL_SCRIPTS) \
     $(INSTALL_MANPAGES) \
     $(INSTALL_DOCS) \
     $(INSTALL_LIBRARY_DOCS) \
