@@ -591,6 +591,9 @@ def runTest (opts, name, func, args):
 # name  :: String
 # setup :: TestOpts -> IO ()
 def test (name, setup, func, args):
+    if config.only and name not in config.only:
+        return
+
     global aloneTests
     global parallelTests
     global allTestNames
@@ -663,7 +666,6 @@ def test_common_work (name, opts, func, args):
 
         ok_way = lambda way: \
             not getTestOpts().skip \
-            and (config.only == [] or name in config.only) \
             and (getTestOpts().only_ways == None or way in getTestOpts().only_ways) \
             and (config.cmdline_ways == [] or way in config.cmdline_ways) \
             and (not (config.skip_perf_tests and isStatsTest())) \
