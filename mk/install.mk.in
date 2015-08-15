@@ -146,29 +146,8 @@ INSTALL_DOC     = $(INSTALL) -m 644 $1 $2 $(call MK_INSTALL_DEST,$3)
 # Only 1 argument, the directory to create:
 INSTALL_DIR     = $(INSTALL) -m 755 -d $(call MK_INSTALL_DEST,$1)
 
-# cygwin's /bin/install doesn't set file modes correctly if the
-# destination path is a C: style path:
-#
-# $ /bin/install -c -m 644 foo /cygdrive/c/cygwin/home/ian/foo2
-# $ /bin/install -c -m 644 foo c:/cygwin/home/ian/foo3
-# $ ls -l foo*
-# -rw-r--r-- 1 ian None 0 2011-01-06 18:28 foo
-# -rw-r--r-- 1 ian None 0 2011-01-06 18:29 foo2
-# -rwxrwxrwx 1 ian None 0 2011-01-06 18:29 foo3
-#
-# This causes problems for bindisttest/checkBinaries.sh which then
-# thinks that e.g. the userguide HTML files are binaries.
-#
-# We therefore use a /cygdrive path if we are on cygwin (only)
-#   (This will make a Cygwin build run slowly 
-#    because of all those shell invocations.)
-ifeq "$(OSTYPE)" "cygwin"
-MK_INSTALL_DEST = $$(cygpath $1)
-else
 MK_INSTALL_DEST = $1
-endif
 
-#
 # runhaskell and hsc2hs are special, in that other compilers besides
 # GHC might provide them.  Systems with a package manager often come
 # with tools to manage this kind of clash, e.g. RPM's

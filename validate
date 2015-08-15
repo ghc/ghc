@@ -163,10 +163,6 @@ if [ $no_clean -eq 0 ]; then
     $make maintainer-clean NO_CLEAN_GMP=YES
 
     INSTDIR=`pwd`/inst
-    if [ "$OSTYPE" = "cygwin" ]
-    then
-        INSTDIR=`cygpath -m "$INSTDIR"`
-    fi
 
     if [ $use_dph -eq 1 ]; then
         perl -w boot --validate --required-tag=dph
