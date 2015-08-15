@@ -188,7 +188,11 @@ test('T9681', normal, compile_fail, [''])
 #   Probably something like 1s is already enough, but I don't know enough to
 #   make an educated guess how long it needs to be guaranteed to reach the C
 #   call."
-test('T8089', [exit_code(99), run_timeout_multiplier(0.01)],
+test('T8089', [exit_code(99),
+               run_timeout_multiplier(0.01),
+               when(opsys('mingw32'),
+                    expect_broken_for(7325, ['normal', 'hpc', 'optasm'])),
+               ],
               compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])
 test('T9848',
