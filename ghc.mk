@@ -807,29 +807,29 @@ endif
 define installLibsTo
 # $1 = libraries to install
 # $2 = directory to install to
-	$(call INSTALL_DIR,$2)
+	$(INSTALL_DIR) $2
 	for i in $1; do \
 		case $$i in \
 		  *.a) \
-		    $(call INSTALL_DATA,$(INSTALL_OPTS),$$i,$2); \
+		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $2; \
 		    $(RANLIB_CMD) $2/`basename $$i` ;; \
 		  *.dll) \
-		    $(call INSTALL_PROGRAM,$(INSTALL_OPTS),$$i,$2) ; \
+		    $(INSTALL_PROGRAM) $(INSTALL_OPTS) $$i $2 ; \
 		    $(STRIP_CMD) $2/`basename $$i` ;; \
 		  *.so) \
-		    $(call INSTALL_SHLIB,$(INSTALL_OPTS),$$i,$2) ;; \
+		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i $2 ;; \
 		  *.dylib) \
-		    $(call INSTALL_SHLIB,$(INSTALL_OPTS),$$i,$2);; \
+		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i $2;; \
 		  *) \
-		    $(call INSTALL_DATA,$(INSTALL_OPTS),$$i,$2); \
+		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $2; \
 		esac; \
 	done
 endef
 
 install_bins: $(INSTALL_BINS)
-	$(call INSTALL_DIR,"$(DESTDIR)$(bindir)")
+	$(INSTALL_DIR) "$(DESTDIR)$(bindir)"
 	for i in $(INSTALL_BINS); do \
-		$(call INSTALL_PROGRAM,$(INSTALL_BIN_OPTS),$$i,"$(DESTDIR)$(bindir)") ;  \
+		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i "$(DESTDIR)$(bindir)" ;  \
 	done
 
 install_libs: $(INSTALL_LIBS)
@@ -839,9 +839,9 @@ install_libexecs:  $(INSTALL_LIBEXECS)
 ifeq "$(INSTALL_LIBEXECS)" ""
 	@:
 else
-	$(call INSTALL_DIR,"$(DESTDIR)$(ghclibexecdir)/bin")
+	$(INSTALL_DIR) "$(DESTDIR)$(ghclibexecdir)/bin"
 	for i in $(INSTALL_LIBEXECS); do \
-		$(call INSTALL_PROGRAM,$(INSTALL_BIN_OPTS),$$i,"$(DESTDIR)$(ghclibexecdir)/bin"); \
+		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i "$(DESTDIR)$(ghclibexecdir)/bin"; \
 	done
 # We rename ghc-stage2, so that the right program name is used in error
 # messages etc.
@@ -849,32 +849,32 @@ else
 endif
 
 install_topdirs: $(INSTALL_TOPDIRS)
-	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)")
+	$(INSTALL_DIR) "$(DESTDIR)$(topdir)"
 	for i in $(INSTALL_TOPDIRS); do \
-		$(call INSTALL_PROGRAM,$(INSTALL_BIN_OPTS),$$i,"$(DESTDIR)$(topdir)"); \
+		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i "$(DESTDIR)$(topdir)"; \
 	done
 
 install_docs: $(INSTALL_DOCS)
-	$(call INSTALL_DIR,"$(DESTDIR)$(docdir)")
+	$(INSTALL_DIR) "$(DESTDIR)$(docdir)"
 ifneq "$(INSTALL_DOCS)" ""
 	for i in $(INSTALL_DOCS); do \
-		$(call INSTALL_DOC,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(docdir)"); \
+		$(INSTALL_DOC) $(INSTALL_OPTS) $$i "$(DESTDIR)$(docdir)"; \
 	done
 endif
-	$(call INSTALL_DIR,"$(DESTDIR)$(docdir)/html")
-	$(call INSTALL_DOC,$(INSTALL_OPTS),docs/index.html,"$(DESTDIR)$(docdir)/html")
+	$(INSTALL_DIR) "$(DESTDIR)$(docdir)/html"
+	$(INSTALL_DOC) $(INSTALL_OPTS) docs/index.html "$(DESTDIR)$(docdir)/html"
 ifneq "$(INSTALL_LIBRARY_DOCS)" ""
-	$(call INSTALL_DIR,"$(DESTDIR)$(docdir)/html/libraries")
+	$(INSTALL_DIR) "$(DESTDIR)$(docdir)/html/libraries"
 	for i in $(INSTALL_LIBRARY_DOCS); do \
-		$(call INSTALL_DOC,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(docdir)/html/libraries/"); \
+		$(INSTALL_DOC) $(INSTALL_OPTS) $$i "$(DESTDIR)$(docdir)/html/libraries/"; \
 	done
-	$(call INSTALL_DATA,$(INSTALL_OPTS),libraries/prologue.txt,"$(DESTDIR)$(docdir)/html/libraries/")
-	$(call INSTALL_SCRIPT,$(INSTALL_OPTS),libraries/gen_contents_index,"$(DESTDIR)$(docdir)/html/libraries/")
+	$(INSTALL_DATA) $(INSTALL_OPTS) libraries/prologue.txt "$(DESTDIR)$(docdir)/html/libraries/"
+	$(INSTALL_SCRIPT) $(INSTALL_OPTS) libraries/gen_contents_index "$(DESTDIR)$(docdir)/html/libraries/"
 endif
 ifneq "$(INSTALL_HTML_DOC_DIRS)" ""
 	for i in $(INSTALL_HTML_DOC_DIRS); do \
-		$(call INSTALL_DIR,"$(DESTDIR)$(docdir)/html/`basename $$i`"); \
-		$(call INSTALL_DOC,$(INSTALL_OPTS),$$i/*,"$(DESTDIR)$(docdir)/html/`basename $$i`"); \
+		$(INSTALL_DIR) "$(DESTDIR)$(docdir)/html/`basename $$i`"; \
+		$(INSTALL_DOC) $(INSTALL_OPTS) $$i/* "$(DESTDIR)$(docdir)/html/`basename $$i`"; \
 	done
 endif
 
@@ -898,10 +898,10 @@ INSTALL_DISTDIR_compiler = stage2
 # Now we can do the installation
 install_packages: install_libexecs
 install_packages: rts/dist/package.conf.install
-	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)")
+	$(INSTALL_DIR) "$(DESTDIR)$(topdir)"
 	$(call removeTrees,"$(INSTALLED_PACKAGE_CONF)")
-	$(call INSTALL_DIR,"$(INSTALLED_PACKAGE_CONF)")
-	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)/rts")
+	$(INSTALL_DIR) "$(INSTALLED_PACKAGE_CONF)"
+	$(INSTALL_DIR) "$(DESTDIR)$(topdir)/rts"
 	$(call installLibsTo, $(RTS_INSTALL_LIBS), "$(DESTDIR)$(topdir)/rts")
 	$(foreach p, $(INSTALL_PACKAGES),                             \
 	    $(call make-command,                                      \

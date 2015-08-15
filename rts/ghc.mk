@@ -578,8 +578,8 @@ endif
 
 .PHONY: install_libffi_headers
 install_libffi_headers :
-	$(call INSTALL_DIR,"$(DESTDIR)$(ghcheaderdir)")
-	$(call INSTALL_HEADER,$(INSTALL_OPTS),$(libffi_HEADERS),"$(DESTDIR)$(ghcheaderdir)/")
+	$(INSTALL_DIR) "$(DESTDIR)$(ghcheaderdir)"
+	$(INSTALL_HEADER) $(INSTALL_OPTS) $(libffi_HEADERS) "$(DESTDIR)$(ghcheaderdir)/"
 
 # -----------------------------------------------------------------------------
 # cleaning

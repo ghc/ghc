@@ -78,7 +78,7 @@ install: install_utils/ghc-pkg_link
 
 .PHONY: install_utils/ghc-pkg_link
 install_utils/ghc-pkg_link: 
-	$(call INSTALL_DIR,"$(DESTDIR)$(bindir)")
+	$(INSTALL_DIR) "$(DESTDIR)$(bindir)"
 	$(call removeFiles,"$(DESTDIR)$(bindir)/$(CrossCompilePrefix)ghc-pkg")
 	$(LN_S) $(CrossCompilePrefix)ghc-pkg-$(ProjectVersion) "$(DESTDIR)$(bindir)/$(CrossCompilePrefix)ghc-pkg"
 endif

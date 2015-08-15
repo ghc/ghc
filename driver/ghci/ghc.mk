@@ -18,7 +18,7 @@ install: install_driver_ghci
 .PHONY: install_driver_ghci
 install_driver_ghci: WRAPPER=$(DESTDIR)$(bindir)/ghci-$(ProjectVersion)
 install_driver_ghci:
-	$(call INSTALL_DIR,"$(DESTDIR)$(bindir)")
+	$(INSTALL_DIR) "$(DESTDIR)$(bindir)"
 	$(call removeFiles,                                "$(WRAPPER)")
 	$(CREATE_SCRIPT)                                   "$(WRAPPER)"
 	echo '#!$(SHELL)'                               >> "$(WRAPPER)"
@@ -54,7 +54,7 @@ install : install_driver_ghcii
 install_driver_ghcii: GHCII_SCRIPT=$(DESTDIR)$(bindir)/ghcii.sh
 install_driver_ghcii: GHCII_SCRIPT_VERSIONED = $(DESTDIR)$(bindir)/ghcii-$(ProjectVersion).sh
 install_driver_ghcii:
-	$(call INSTALL_DIR,$(DESTDIR)$(bindir))
+	$(INSTALL_DIR) "$(DESTDIR)$(bindir)"
 	$(call removeFiles,"$(GHCII_SCRIPT)")
 	echo "#!$(SHELL)"                                  >> $(GHCII_SCRIPT)
 	echo 'exec "$$(dirname "$$0")"/ghc --interactive "$$@"' >> $(GHCII_SCRIPT)

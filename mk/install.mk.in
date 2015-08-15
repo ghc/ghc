@@ -132,21 +132,15 @@ INSTALL_GROUP =
 #
 CREATE_SCRIPT   = create () { touch "$$1" && chmod 755 "$$1" ; } && create
 CREATE_DATA     = create () { touch "$$1" && chmod 644 "$$1" ; } && create
-# These takes 3 arguments:
-# $1 = flags
-# $2 = files
-# $3 = dest
-INSTALL_PROGRAM = $(INSTALL) -m 755 $1 $2 $(call MK_INSTALL_DEST,$3)
-INSTALL_SCRIPT  = $(INSTALL) -m 755 $1 $2 $(call MK_INSTALL_DEST,$3)
-INSTALL_SHLIB   = $(INSTALL) -m 755 $1 $2 $(call MK_INSTALL_DEST,$3)
-INSTALL_DATA    = $(INSTALL) -m 644 $1 $2 $(call MK_INSTALL_DEST,$3)
-INSTALL_HEADER  = $(INSTALL) -m 644 $1 $2 $(call MK_INSTALL_DEST,$3)
-INSTALL_MAN     = $(INSTALL) -m 644 $1 $2 $(call MK_INSTALL_DEST,$3)
-INSTALL_DOC     = $(INSTALL) -m 644 $1 $2 $(call MK_INSTALL_DEST,$3)
-# Only 1 argument, the directory to create:
-INSTALL_DIR     = $(INSTALL) -m 755 -d $(call MK_INSTALL_DEST,$1)
 
-MK_INSTALL_DEST = $1
+INSTALL_PROGRAM = $(INSTALL) -m 755
+INSTALL_SCRIPT  = $(INSTALL) -m 755
+INSTALL_SHLIB   = $(INSTALL) -m 755
+INSTALL_DATA    = $(INSTALL) -m 644
+INSTALL_HEADER  = $(INSTALL) -m 644
+INSTALL_MAN     = $(INSTALL) -m 644
+INSTALL_DOC     = $(INSTALL) -m 644
+INSTALL_DIR     = $(INSTALL) -m 755 -d
 
 # runhaskell and hsc2hs are special, in that other compilers besides
 # GHC might provide them.  Systems with a package manager often come
