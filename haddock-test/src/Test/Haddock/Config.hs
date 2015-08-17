@@ -68,6 +68,7 @@ data Config c = Config
     , cfgHaddockStdOut :: FilePath
     , cfgDiffTool :: Maybe FilePath
     , cfgEnv :: Environment
+    , cfgAccept :: Bool
     , cfgCheckConfig :: CheckConfig c
     , cfgDirConfig :: DirConfig
     }
@@ -87,6 +88,7 @@ data Flag
     | FlagHaddockStdOut FilePath
     | FlagDiffTool FilePath
     | FlagNoDiff
+    | FlagAccept
     | FlagHelp
     deriving Eq
 
@@ -118,6 +120,8 @@ options =
         "where to redirect Haddock output"
     , Option [] ["diff-tool"] (ReqArg FlagDiffTool "PATH")
         "diff tool to use when printing failed cases"
+    , Option ['a'] ["accept"] (NoArg FlagAccept)
+        "accept generated output"
     , Option [] ["no-diff"] (NoArg FlagNoDiff)
         "do not print diff for failed cases"
     , Option ['h'] ["help"] (NoArg FlagHelp)
@@ -177,6 +181,8 @@ loadConfig ccfg dcfg flags files = do
     cfgDiffTool <- if FlagNoDiff `elem` flags
         then pure Nothing
         else (<|>) <$> pure (flagsDiffTool flags) <*> defaultDiffTool
+
+    let cfgAccept = FlagAccept `elem` flags
 
     let cfgCheckConfig = ccfg
     let cfgDirConfig = dcfg

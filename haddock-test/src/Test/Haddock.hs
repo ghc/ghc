@@ -29,7 +29,11 @@ data CheckResult
 
 
 runAndCheck :: Config c -> IO ()
-runAndCheck cfg = runHaddock cfg >> checkFiles cfg
+runAndCheck cfg = do
+    runHaddock cfg
+    if cfgAccept cfg
+        then acceptFiles cfg
+        else checkFiles cfg
 
 
 checkFiles :: Config c -> IO ()
@@ -53,6 +57,16 @@ checkFiles cfg@(Config { .. }) = do
         else do
             maybeDiff cfg failed
             exitFailure
+
+
+acceptFiles :: Config c -> IO ()
+acceptFiles (Config { cfgFiles = files, cfgDirConfig = dcfg }) = do
+
+    forM_ files $ \file -> do
+        let mdl = takeBaseName file
+        putStr $ "Accepting " ++ mdl ++ "... "
+        copyFile (outFile dcfg mdl) (refFile dcfg mdl)
+        putStrLn "DONE"
 
 
 maybeDiff :: Config c -> [String] -> IO ()
