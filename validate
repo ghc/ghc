@@ -33,6 +33,11 @@ Flags:
 
     THREADS=1 ./validate
 
+  You can also use environment variables to pass extra options to the
+  testsuite. For example:
+
+    TEST='read001 read002' ./validate --testsuite-only --fast
+
 EOF
 }
 
@@ -260,10 +265,8 @@ FAST)
         ;;
 esac
 
-if [ $be_quiet -eq 1 ]; then
+if [ $be_quiet -eq 1 ] && [ -z $VERBOSE ]; then
     TEST_VERBOSITY="VERBOSE=1 NO_PRINT_SUMMARY=YES"
-else
-    TEST_VERBOSITY="VERBOSE=2"
 fi
 
 $make $MAKE_TEST_TARGET stage=2 $BINDIST $TEST_VERBOSITY THREADS=$threads 2>&1 | tee testlog
