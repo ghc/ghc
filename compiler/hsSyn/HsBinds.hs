@@ -289,7 +289,7 @@ That's where AbsBinds comes in.  It looks like this:
 
    AbsBinds { abs_tvs     = [a]
             , abs_exports = [ABE { abe_poly = M.reverse :: forall a. [a] -> [a],
-                                 , abe_mono = reverse :: a -> a}]
+                                 , abe_mono = reverse :: [a] -> [a]}]
             , abs_binds = { reverse :: [a] -> [a]
                                = \xs -> case xs of
                                             []     -> []

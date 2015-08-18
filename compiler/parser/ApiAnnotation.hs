@@ -38,7 +38,7 @@ identifying the specific keyword being captured.
 
 So
 
-> let X = 1 in 2 *x
+> let x = 1 in 2 *x
 
 would result in the AST element
 
