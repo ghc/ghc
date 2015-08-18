@@ -80,6 +80,9 @@ main = do
    initGCStatistics -- See Note [-Bsymbolic and hooks]
    hSetBuffering stdout LineBuffering
    hSetBuffering stderr LineBuffering
+   hSetTranslit stdout
+   hSetTranslit stderr
+
    GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     -- 1. extract the -B flag from the args
     argv0 <- getArgs
