@@ -137,7 +137,7 @@ data LoadHowMuch
 --
 -- This function implements the core of GHC's @--make@ mode.  It preprocesses,
 -- compiles and loads the specified modules, avoiding re-compilation wherever
--- possible.  Depending on the target (see 'DynFlags.hscTarget') compilating
+-- possible.  Depending on the target (see 'DynFlags.hscTarget') compiling
 -- and loading may result in files being created on disk.
 --
 -- Calls the 'defaultWarnErrLogger' after each compiling each module, whether
