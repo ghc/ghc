@@ -291,6 +291,13 @@ dumpSDoc dflags print_unqual flag hdr doc
                             writeIORef gdref (Set.insert fileName gd)
                         createDirectoryIfMissing True (takeDirectory fileName)
                         handle <- openFile fileName mode
+
+                        -- We do not want the dump file to be affected by
+                        -- environment variables, but instead to always use
+                        -- UTF8. See:
+                        -- https://ghc.haskell.org/trac/ghc/ticket/10762
+                        hSetEncoding handle utf8
+
                         doc' <- if null hdr
                                 then return doc
                                 else do t <- getCurrentTime
