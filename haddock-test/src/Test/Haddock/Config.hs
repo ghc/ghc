@@ -238,34 +238,29 @@ defaultDiffTool =
 
 processFileArgs :: DirConfig -> [String] -> IO [TestPackage]
 processFileArgs dcfg [] =
-    processFileArgs dcfg . filter isValidEntry =<< getDirectoryContents srcDir
+    processFileArgs' dcfg . filter isValidEntry =<< getDirectoryContents srcDir
   where
-    isValidEntry entry = entry /= "." && entry /= ".."
+    isValidEntry entry
+        | hasExtension entry = takeExtension entry `elem` [".hs", ".lhs"]
+        | otherwise = entry /= "." && entry /= ".."
     srcDir = dcfgSrcDir dcfg
 processFileArgs dcfg args = processFileArgs' dcfg args
 
 
 processFileArgs' :: DirConfig -> [String] -> IO [TestPackage]
 processFileArgs' dcfg args = do
-    (mdls, dirs) <- partitionM doesDirectoryExist' args
+    (dirs, mdls) <- partitionM doesDirectoryExist' . map takeBaseName $ args
     rootPkg <- pure $ TestPackage
         { tpkgName = ""
-        , tpkgFiles = map (processFileArg dcfg) mdls
+        , tpkgFiles = map (srcDir </>) mdls
         }
     otherPkgs <- forM dirs $ \dir -> do
-        files <- getDirectoryContents dir
+        files <- getDirectoryContents (srcDir </> dir)
         pure $ TestPackage
             { tpkgName = dir
-            , tpkgFiles = map ((dcfgSrcDir dcfg </> dir) </>) files
+            , tpkgFiles = map ((srcDir </> dir) </>) files
             }
     pure $ rootPkg:otherPkgs
   where
-    doesDirectoryExist' path = doesDirectoryExist (dcfgSrcDir dcfg </> path)
-
-
-processFileArg :: DirConfig -> String -> FilePath
-processFileArg dcfg arg
-    | isSourceFile arg = arg
-    | otherwise = dcfgSrcDir dcfg </> arg </> ".hs"
-  where
-    isSourceFile path = takeExtension path `elem` [".hs", ".lhs"]
+    doesDirectoryExist' path = doesDirectoryExist (srcDir </> path)
+    srcDir = dcfgSrcDir dcfg
