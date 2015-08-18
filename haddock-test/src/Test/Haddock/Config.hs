@@ -241,8 +241,8 @@ processFileArgs dcfg [] =
     processFileArgs' dcfg . filter isValidEntry =<< getDirectoryContents srcDir
   where
     isValidEntry entry
-        | hasExtension entry = takeExtension entry `elem` [".hs", ".lhs"]
-        | otherwise = entry /= "." && entry /= ".."
+        | hasExtension entry = isSourceFile entry
+        | otherwise = isRealDir entry
     srcDir = dcfgSrcDir dcfg
 processFileArgs dcfg args = processFileArgs' dcfg args
 
@@ -255,12 +255,24 @@ processFileArgs' dcfg args = do
         , tpkgFiles = map (srcDir </>) mdls
         }
     otherPkgs <- forM dirs $ \dir -> do
-        files <- getDirectoryContents (srcDir </> dir)
+        let srcDir' = srcDir </> dir
+        files <- filterM (isModule dir) =<< getDirectoryContents srcDir'
         pure $ TestPackage
             { tpkgName = dir
-            , tpkgFiles = map ((srcDir </> dir) </>) files
+            , tpkgFiles = map (srcDir' </>) files
             }
     pure $ rootPkg:otherPkgs
   where
     doesDirectoryExist' path = doesDirectoryExist (srcDir </> path)
+    isModule dir file = (isSourceFile file &&) <$>
+        doesFileExist (srcDir </> dir </> file)
+    doesFileExist' dir path = doesFileExist (srcDir </> dir </> path)
     srcDir = dcfgSrcDir dcfg
+
+
+isSourceFile :: FilePath -> Bool
+isSourceFile file = takeExtension file `elem` [".hs", ".lhs"]
+
+
+isRealDir :: FilePath -> Bool
+isRealDir dir = not $ dir `elem` [".", ".."]
