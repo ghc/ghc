@@ -261,7 +261,7 @@ processFileArgs' dcfg args = do
             { tpkgName = dir
             , tpkgFiles = map (srcDir' </>) files
             }
-    pure $ rootPkg:otherPkgs
+    pure . filter (not . null . tpkgFiles) $ rootPkg:otherPkgs
   where
     doesDirectoryExist' path = doesDirectoryExist (srcDir </> path)
     isModule dir file = (isSourceFile file &&) <$>
