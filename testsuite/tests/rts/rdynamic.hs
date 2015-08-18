@@ -11,7 +11,7 @@ module Main(main, f) where
 import Foreign.C.String ( withCString, CString )
 import GHC.Exts         ( addrToAny# )
 import GHC.Ptr          ( Ptr(..), nullPtr )
-import System.Info      ( os )
+import System.Info      ( os, arch )
 import Encoding
 
 main = (loadFunction Nothing "Main" "f" :: IO (Maybe String)) >>= print
@@ -37,7 +37,13 @@ loadFunction mpkg m valsym = do
     else case addrToAny# addr of
            (# hval #) -> return ( Just hval )
   where
-    prefixUnderscore = if elem os ["darwin","mingw32","cygwin"] then "_" else ""
+    prefixUnderscore = case (os, arch) of
+                         ("mingw32", "x86_64") -> ""
+                         ("cygwin" , "x86_64") -> ""
+                         ("mingw32", _       ) -> "_"
+                         ("darwin" , _       ) -> "_"
+                         ("cygwin" , _       ) -> "_"
+                         _                     -> ""
 
 foreign import ccall safe "lookupSymbol" c_lookupSymbol :: CString -> IO (Ptr a)
 foreign import ccall safe "initLinker" c_initLinker :: IO ()

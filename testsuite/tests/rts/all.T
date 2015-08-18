@@ -261,7 +261,6 @@ test('T10017', [ when(opsys('mingw32'), skip)
                , only_ways(threaded_ways), extra_run_opts('+RTS -N2 -RTS') ], compile_and_run, [''])
 
 test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
-                 , when(opsys('mingw32'), expect_broken(9381))
                  # this needs runtime infrastructure to do in ghci:
                  #  '-rdynamic' ghc, load modules only via dlopen(RTLD_BLOBAL) and more.
                  , omit_ways(['ghci'])
