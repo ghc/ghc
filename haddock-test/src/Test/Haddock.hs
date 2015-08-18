@@ -38,7 +38,7 @@ checkFiles :: Config c -> IO ()
 checkFiles cfg@(Config { .. }) = do
     putStrLn "Testing output files..."
 
-    files <- getDirectoryContents (cfgOutDir cfg)
+    files <- ignore <$> getDirectoryContents (cfgOutDir cfg)
     failed <- liftM catMaybes . forM files $ \file -> do
         putStr $ "Checking \"" ++ file ++ "\"... "
 
@@ -56,6 +56,8 @@ checkFiles cfg@(Config { .. }) = do
         else do
             maybeDiff cfg failed
             exitFailure
+  where
+    ignore = filter (not . dcfgCheckIgnore cfgDirConfig)
 
 
 maybeDiff :: Config c -> [FilePath] -> IO ()

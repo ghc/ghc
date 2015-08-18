@@ -53,6 +53,7 @@ data DirConfig = DirConfig
     , dcfgRefDir :: FilePath
     , dcfgOutDir :: FilePath
     , dcfgResDir :: FilePath
+    , dcfgCheckIgnore :: FilePath -> Bool
     }
 
 
@@ -62,6 +63,7 @@ defaultDirConfig baseDir = DirConfig
     , dcfgRefDir = baseDir </> "ref"
     , dcfgOutDir = baseDir </> "out"
     , dcfgResDir = rootDir </> "resources"
+    , dcfgCheckIgnore = const False
     }
   where
     rootDir = baseDir </> ".."
