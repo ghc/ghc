@@ -1,0 +1,5 @@
+#!/bin/bash
+
+export HADDOCK_PATH=$(which haddock)
+LIB_PATH="$(dirname "$BASH_SOURCE")/../haddock-test/src/"
+runhaskell -i:"$LIB_PATH" "Main.hs" $@
