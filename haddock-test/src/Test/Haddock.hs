@@ -69,8 +69,10 @@ maybeDiff cfg@(Config { cfgDiffTool = (Just diff) }) files = do
 
 
 runHaddock :: Config c -> IO ()
-runHaddock (Config { .. }) = do
+runHaddock cfg@(Config { .. }) = do
     haddockStdOut <- openFile cfgHaddockStdOut WriteMode
+
+    createEmptyDirectory $ cfgOutDir cfg
 
     putStrLn "Generating documentation..."
     forM_ cfgPackages $ \tpkg -> do

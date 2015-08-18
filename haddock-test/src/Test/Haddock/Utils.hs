@@ -21,6 +21,10 @@ partitionM p (x:xs) = do
     pure $ if b then (x:ss, fs) else (ss, x:fs)
 
 
+whenM :: Monad m => m Bool -> m () -> m ()
+whenM mb action = mb >>= \b -> when b action
+
+
 getDirectoryTree :: FilePath -> IO [FilePath]
 getDirectoryTree path = do
     (dirs, files) <- partitionM isDirectory =<< contents
@@ -31,3 +35,9 @@ getDirectoryTree path = do
     contents = filter realEntry <$> getDirectoryContents path
     isDirectory entry = doesDirectoryExist $ path </> entry
     realEntry entry = not $ entry == "." || entry == ".."
+
+
+createEmptyDirectory :: FilePath -> IO ()
+createEmptyDirectory path = do
+    whenM (doesDirectoryExist path) $ removeDirectoryRecursive path
+    createDirectory path
