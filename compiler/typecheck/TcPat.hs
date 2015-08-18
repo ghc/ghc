@@ -1073,16 +1073,10 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
                    ; return (sel_id, pat_ty) }
 
     field_tys :: [(FieldLabel, TcType)]
-    field_tys = case con_like of
-        RealDataCon data_con -> zip (dataConFieldLabels data_con) arg_tys
+    field_tys = zip (conLikeFieldLabels con_like) arg_tys
           -- Don't use zipEqual! If the constructor isn't really a record, then
           -- dataConFieldLabels will be empty (and each field in the pattern
           -- will generate an error below).
-        PatSynCon{} -> []
-
-conLikeArity :: ConLike -> Arity
-conLikeArity (RealDataCon data_con) = dataConSourceArity data_con
-conLikeArity (PatSynCon   pat_syn)  = patSynArity pat_syn
 
 tcConArg :: Checker (LPat Name, TcSigmaType) (LPat Id)
 tcConArg (arg_pat, arg_ty) penv thing_inside

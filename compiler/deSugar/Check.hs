@@ -754,9 +754,7 @@ tidy_con con (RecCon (HsRecFields fs _))
                 -- Special case for null patterns; maybe not a record at all
   | otherwise = PrefixCon (map (tidy_lpat.snd) all_pats)
   where
-    arity = case con of
-        RealDataCon dcon -> dataConSourceArity dcon
-        PatSynCon psyn -> patSynArity psyn
+    arity = conLikeArity con
 
      -- pad out all the missing fields with WildPats.
     field_pats = case con of

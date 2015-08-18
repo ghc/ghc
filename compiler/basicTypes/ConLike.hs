@@ -8,17 +8,27 @@
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
 
 module ConLike (
-        ConLike(..)
+          ConLike(..)
+        , conLikeArity
+        , conLikeFieldLabels
+        , conLikeInstOrigArgTys
+        , conLikeExTyVars
+        , conLikeName
+        , conLikeStupidTheta
     ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DataCon (DataCon)
-import {-# SOURCE #-} PatSyn (PatSyn)
+import {-# SOURCE #-} DataCon
+import {-# SOURCE #-} PatSyn
 import Outputable
 import Unique
 import Util
 import Name
+import TyCon
+import BasicTypes
+import {-# SOURCE #-} TypeRep (Type, ThetaType)
+import Var
 
 import Data.Function (on)
 import qualified Data.Data as Data
@@ -79,3 +89,30 @@ instance Data.Data ConLike where
     toConstr _   = abstractConstr "ConLike"
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "ConLike"
+
+
+conLikeArity :: ConLike -> Arity
+conLikeArity (RealDataCon data_con) = dataConSourceArity data_con
+conLikeArity (PatSynCon pat_syn)    = patSynArity pat_syn
+
+conLikeFieldLabels :: ConLike -> [FieldLabel]
+conLikeFieldLabels (RealDataCon data_con) = dataConFieldLabels data_con
+conLikeFieldLabels (PatSynCon _) = []
+
+conLikeInstOrigArgTys :: ConLike -> [Type] -> [Type]
+conLikeInstOrigArgTys (RealDataCon data_con) tys =
+    dataConInstOrigArgTys data_con tys
+conLikeInstOrigArgTys (PatSynCon pat_syn) tys =
+    patSynInstArgTys pat_syn tys
+
+conLikeExTyVars :: ConLike -> [TyVar]
+conLikeExTyVars (RealDataCon dcon1) = dataConExTyVars dcon1
+conLikeExTyVars (PatSynCon psyn1)   = patSynExTyVars psyn1
+
+conLikeName :: ConLike -> Name
+conLikeName (RealDataCon data_con) = dataConName data_con
+conLikeName (PatSynCon pat_syn)    = patSynName pat_syn
+
+conLikeStupidTheta :: ConLike -> ThetaType
+conLikeStupidTheta (RealDataCon data_con) = dataConStupidTheta data_con
+conLikeStupidTheta (PatSynCon {})         = []
