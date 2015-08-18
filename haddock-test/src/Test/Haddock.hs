@@ -19,6 +19,7 @@ import System.Process
 
 import Test.Haddock.Config
 import Test.Haddock.Process
+import Test.Haddock.Utils
 
 
 data CheckResult
@@ -38,7 +39,7 @@ checkFiles :: Config c -> IO ()
 checkFiles cfg@(Config { .. }) = do
     putStrLn "Testing output files..."
 
-    files <- ignore <$> getDirectoryContents (cfgOutDir cfg)
+    files <- ignore <$> getDirectoryTree (cfgOutDir cfg)
     failed <- liftM catMaybes . forM files $ \file -> do
         putStr $ "Checking \"" ++ file ++ "\"... "
 
