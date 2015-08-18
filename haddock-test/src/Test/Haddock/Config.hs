@@ -2,7 +2,7 @@
 
 
 module Test.Haddock.Config
-    ( CheckConfig(..), DirConfig(..), Config(..)
+    ( TestPackage(..), CheckConfig(..), DirConfig(..), Config(..)
     , defaultDirConfig
     , cfgSrcDir, cfgRefDir, cfgOutDir, cfgResDir
     , parseArgs, checkOpt, loadConfig
@@ -35,6 +35,12 @@ import Test.Haddock.Process
 import Test.Haddock.Utils
 
 
+data TestPackage = TestPackage
+    { tpkgName :: String
+    , tpkgFiles :: [FilePath]
+    }
+
+
 data CheckConfig c = CheckConfig
     { ccfgRead :: String -> String -> Maybe c
     , ccfgDump :: c -> String
@@ -63,7 +69,7 @@ defaultDirConfig baseDir = DirConfig
 
 data Config c = Config
     { cfgHaddockPath :: FilePath
-    , cfgFiles :: [FilePath]
+    , cfgPackages :: [TestPackage]
     , cfgHaddockArgs :: [String]
     , cfgHaddockStdOut :: FilePath
     , cfgDiffTool :: Maybe FilePath
@@ -164,7 +170,7 @@ loadConfig ccfg dcfg flags files = do
 
     printVersions cfgEnv cfgHaddockPath
 
-    cfgFiles <- processFileArgs dcfg files
+    cfgPackages <- processFileArgs dcfg files
 
     cfgHaddockArgs <- liftM concat . sequence $
         [ pure ["--no-warnings"]
@@ -230,24 +236,36 @@ defaultDiffTool =
     isAvailable = liftM isJust . findProgramLocation silent
 
 
-processFileArgs :: DirConfig -> [String] -> IO [FilePath]
+processFileArgs :: DirConfig -> [String] -> IO [TestPackage]
 processFileArgs dcfg [] =
-    map toModulePath . filter isSourceFile <$> getDirectoryContents srcDir
+    processFileArgs dcfg . filter isValidEntry =<< getDirectoryContents srcDir
   where
+    isValidEntry entry = entry /= "." && entry /= ".."
     srcDir = dcfgSrcDir dcfg
-    toModulePath = modulePath dcfg . takeBaseName
-processFileArgs dcfg args = pure $ map (processFileArg dcfg) args
+processFileArgs dcfg args = processFileArgs' dcfg args
+
+
+processFileArgs' :: DirConfig -> [String] -> IO [TestPackage]
+processFileArgs' dcfg args = do
+    (mdls, dirs) <- partitionM doesDirectoryExist' args
+    rootPkg <- pure $ TestPackage
+        { tpkgName = ""
+        , tpkgFiles = map (processFileArg dcfg) mdls
+        }
+    otherPkgs <- forM dirs $ \dir -> do
+        files <- getDirectoryContents dir
+        pure $ TestPackage
+            { tpkgName = dir
+            , tpkgFiles = map ((dcfgSrcDir dcfg </> dir) </>) files
+            }
+    pure $ rootPkg:otherPkgs
+  where
+    doesDirectoryExist' path = doesDirectoryExist (dcfgSrcDir dcfg </> path)
 
 
 processFileArg :: DirConfig -> String -> FilePath
 processFileArg dcfg arg
     | isSourceFile arg = arg
-    | otherwise = modulePath dcfg arg
-
-
-isSourceFile :: FilePath -> Bool
-isSourceFile path = takeExtension path `elem` [".hs", ".lhs"]
-
-
-modulePath :: DirConfig -> String -> FilePath
-modulePath dcfg mdl = dcfgSrcDir dcfg </> mdl <.> "hs"
+    | otherwise = dcfgSrcDir dcfg </> arg </> ".hs"
+  where
+    isSourceFile path = takeExtension path `elem` [".hs", ".lhs"]
