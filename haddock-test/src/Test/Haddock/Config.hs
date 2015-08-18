@@ -177,8 +177,6 @@ loadConfig ccfg dcfg flags files = do
     cfgHaddockArgs <- liftM concat . sequence $
         [ pure ["--no-warnings"]
         , pure ["--odir=" ++ dcfgOutDir dcfg]
-        , pure ["--pretty-html"]
-        , pure ["--html"]
         , pure ["--optghc=-w"]
         , pure $ flagsHaddockOptions flags
         , baseDependencies ghcPath

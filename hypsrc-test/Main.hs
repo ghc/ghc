@@ -30,7 +30,14 @@ dirConfig = (defaultDirConfig $ takeDirectory __FILE__)
 
 
 main :: IO ()
-main = runAndCheck =<< parseArgs checkConfig dirConfig =<< getArgs
+main = do
+    cfg <- parseArgs checkConfig dirConfig =<< getArgs
+    runAndCheck $ cfg
+        { cfgHaddockArgs = cfgHaddockArgs cfg ++
+            [ "--pretty-html"
+            , "--hyperlinked-source"
+            ]
+        }
 
 
 checkIgnore :: FilePath -> Bool
