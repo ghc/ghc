@@ -14,6 +14,7 @@ import Rules.Package
 import Rules.Oracles
 import Rules.Resources
 import Settings.Ways
+import Settings.User
 import Settings.Util
 import Settings.Packages
 import Settings.TargetDirectory
@@ -28,15 +29,17 @@ generateTargets = action $ do
                 buildPath = targetPath stage pkg -/- "build"
             buildGhciLib <- interpret target $ getPkgData BuildGhciLib
             pkgKey       <- interpret target $ getPkgData PackageKey
+            buildHaddock <- interpret target $ Settings.User.buildHaddock
             let ghciLib = [ buildPath -/- "HS" ++ pkgKey <.> "o"
                           | buildGhciLib == "YES" && stage /= Stage0 ]
+                haddock = [ pkgHaddockPath pkg | buildHaddock ]
 
             ways <- interpret target getWays
             libs <- forM ways $ \way -> do
                 extension <- libsuf way
                 return $ buildPath -/- "libHS" ++ pkgKey <.> extension
 
-            return $ ghciLib ++ libs
+            return $ ghciLib ++ libs ++ haddock
 
     need $ reverse targets
 
