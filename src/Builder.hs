@@ -19,12 +19,13 @@ import GHC.Generics
 -- Ghc StageN, N > 0, is the one built on stage (N - 1)
 -- GhcPkg Stage0 is the bootstrapping GhcPkg
 -- GhcPkg StageN, N > 0, is the one built on stage 0 (TODO: need only Stage1?)
--- TODO: add Cpp and Haddock builders
+-- TODO: add Cpp builders
 -- TODO: rename Gcc to Cc?
 data Builder = Ar
              | Ld
              | Alex
              | Happy
+             | Haddock
              | HsColour
              | GhcCabal
              | Gcc Stage
@@ -32,28 +33,33 @@ data Builder = Ar
              | GhcM Stage
              | GccM Stage
              | GhcPkg Stage
+             | GhcCabalHsColour
              deriving (Show, Eq, Generic)
 
 -- Configuration files refer to Builders as follows:
+-- TODO: determine paths to utils without looking up configuration files
 builderKey :: Builder -> String
 builderKey builder = case builder of
-    Ar            -> "ar"
-    Ld            -> "ld"
-    Alex          -> "alex"
-    Happy         -> "happy"
-    HsColour      -> "hscolour"
-    GhcCabal      -> "ghc-cabal"
-    Ghc Stage0    -> "system-ghc"
-    Ghc Stage1    -> "ghc-stage1"
-    Ghc Stage2    -> "ghc-stage2"
-    Ghc Stage3    -> "ghc-stage3"
-    Gcc Stage0    -> "system-gcc"
-    Gcc _         -> "gcc"
-    GhcPkg Stage0 -> "system-ghc-pkg"
-    GhcPkg _      -> "ghc-pkg"
-    -- GhcM is currently a synonym for Ghc (to be called with -M flag)
-    GhcM stage    -> builderKey $ Ghc stage
-    GccM stage    -> builderKey $ Gcc stage
+    Ar               -> "ar"
+    Ld               -> "ld"
+    Alex             -> "alex"
+    Happy            -> "happy"
+    Haddock          -> "haddock"
+    HsColour         -> "hscolour"
+    GhcCabal         -> "ghc-cabal"
+    Ghc Stage0       -> "system-ghc"
+    Ghc Stage1       -> "ghc-stage1"
+    Ghc Stage2       -> "ghc-stage2"
+    Ghc Stage3       -> "ghc-stage3"
+    Gcc Stage0       -> "system-gcc"
+    Gcc _            -> "gcc"
+    GhcPkg Stage0    -> "system-ghc-pkg"
+    GhcPkg _         -> "ghc-pkg"
+    -- GhcM/GccM are synonyms for Ghc/Gcc (called with -M and -MM flags)
+    GhcM stage       -> builderKey $ Ghc stage
+    GccM stage       -> builderKey $ Gcc stage
+    -- GhcCabalHsColour is a synonym for GhcCabal (called in hscolour mode)
+    GhcCabalHsColour -> builderKey $ GhcCabal
 
 builderPath :: Builder -> Action String
 builderPath builder = do
