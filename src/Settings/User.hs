@@ -48,7 +48,7 @@ integerLibrary = integerGmp2
 -- up a little (particularly zero builds).
 -- WARNING: a complete rebuild is required when changing this setting.
 trackBuildSystem :: Bool
-trackBuildSystem = False
+trackBuildSystem = True
 
 validating :: Bool
 validating = False
@@ -66,4 +66,4 @@ laxDependencies :: Bool
 laxDependencies = False
 
 buildHaddock :: Predicate
-buildHaddock = return True
+buildHaddock = stage Stage1
