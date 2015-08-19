@@ -5,17 +5,19 @@
 #===================
 
 system-ghc     = @WithGhc@
+system-gcc     = @CC_STAGE0@
+system-ghc-pkg = @GhcPkgCmd@
+gcc            = @WhatGccIsCalled@
+
 ghc-stage1     = @hardtop@/inplace/bin/ghc-stage1
 ghc-stage2     = @hardtop@/inplace/bin/ghc-stage2
 ghc-stage3     = @hardtop@/inplace/bin/ghc-stage3
 
-system-ghc-pkg = @GhcPkgCmd@
 ghc-pkg        = @hardtop@/inplace/bin/ghc-pkg
 
-system-gcc     = @CC_STAGE0@
-gcc            = @WhatGccIsCalled@
-
 ghc-cabal      = @hardtop@/inplace/bin/ghc-cabal
+
+haddock        = @hardtop@/inplace/bin/haddock
 
 ld             = @LdCmd@
 ar             = @ArCmd@
