@@ -7,10 +7,12 @@ import Rules.Compile
 import Rules.Library
 import Rules.Resources
 import Rules.Dependencies
+import Rules.Documentation
 
 buildPackage :: Resources -> StagePackageTarget -> Rules ()
 buildPackage = mconcat
     [ buildPackageData
     , buildPackageDependencies
     , compilePackage
-    , buildPackageLibrary ]
+    , buildPackageLibrary
+    , buildPackageDocumentation ]
