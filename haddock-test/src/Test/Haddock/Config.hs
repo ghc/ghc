@@ -266,7 +266,6 @@ processFileArgs' dcfg args = do
     doesDirectoryExist' path = doesDirectoryExist (srcDir </> path)
     isModule dir file = (isSourceFile file &&) <$>
         doesFileExist (srcDir </> dir </> file)
-    doesFileExist' dir path = doesFileExist (srcDir </> dir </> path)
     srcDir = dcfgSrcDir dcfg
 
 
