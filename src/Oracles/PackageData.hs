@@ -26,6 +26,7 @@ data PackageData = Version      FilePath
                  | BuildGhciLib FilePath
 
 data PackageDataList = Modules        FilePath
+                     | HiddenModules  FilePath
                      | SrcDirs        FilePath
                      | IncludeDirs    FilePath
                      | Deps           FilePath
@@ -66,6 +67,7 @@ pkgDataList :: PackageDataList -> Action [String]
 pkgDataList packageData = do
     let (key, path, defaultValue) = case packageData of
            Modules        path -> ("MODULES"                       , path, "" )
+           HiddenModules  path -> ("HIDDEN_MODULES"                , path, "" )
            SrcDirs        path -> ("HS_SRC_DIRS"                   , path, ".")
            IncludeDirs    path -> ("INCLUDE_DIRS"                  , path, ".")
            Deps           path -> ("DEPS"                          , path, "" )
