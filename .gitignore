@@ -5,6 +5,7 @@
 /html-test/out/
 /hypsrc-test/out/
 /latex-test/out/
+/hoogle-test/out/
 
 /doc/haddock
 /doc/haddock.ps

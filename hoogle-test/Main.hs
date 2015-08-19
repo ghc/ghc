@@ -23,5 +23,9 @@ main :: IO ()
 main = do
     cfg <- parseArgs checkConfig dirConfig =<< getArgs
     runAndCheck $ cfg
-        { cfgHaddockArgs = cfgHaddockArgs cfg ++ ["--hoogle"]
+        { cfgHaddockArgs = cfgHaddockArgs cfg ++
+            [ "--package-name=test"
+            , "--package-version=0.0.0"
+            , "--hoogle"
+            ]
         }
