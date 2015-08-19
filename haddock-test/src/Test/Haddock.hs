@@ -27,6 +27,8 @@ data CheckResult
     | Pass
     | NoRef
     | Error String
+    | Accepted
+    deriving Eq
 
 
 runAndCheck :: Config c -> IO ()
@@ -43,12 +45,13 @@ checkFiles cfg@(Config { .. }) = do
     failed <- liftM catMaybes . forM files $ \file -> do
         putStr $ "Checking \"" ++ file ++ "\"... "
 
-        status <- checkFile cfg file
+        status <- maybeAcceptFile cfg file =<< checkFile cfg file
         case status of
             Fail -> putStrLn "FAIL" >> (return $ Just file)
             Pass -> putStrLn "PASS" >> (return Nothing)
             NoRef -> putStrLn "PASS [no .ref]" >> (return Nothing)
             Error msg -> putStrLn ("ERROR (" ++ msg ++ ")") >> return Nothing
+            Accepted -> putStrLn "ACCEPTED" >> return Nothing
 
     if null failed
         then do
@@ -125,6 +128,14 @@ diffFile cfg diff file = do
     ccfg = cfgCheckConfig cfg
     outFile' = outFile dcfg file <.> "dump"
     refFile' = outFile dcfg file <.> "ref" <.> "dump"
+
+
+maybeAcceptFile :: Config c -> FilePath -> CheckResult -> IO CheckResult
+maybeAcceptFile cfg@(Config { cfgDirConfig = dcfg }) file result
+    | cfgAccept cfg && result `elem` [NoRef, Fail] = do
+        copyFile (outFile dcfg file) (refFile dcfg file)
+        pure Accepted
+maybeAcceptFile _ _ result = pure result
 
 
 outDir :: DirConfig -> TestPackage -> FilePath
