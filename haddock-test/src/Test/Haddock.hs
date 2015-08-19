@@ -73,12 +73,11 @@ maybeDiff cfg@(Config { cfgDiffTool = (Just diff) }) files = do
 
 runHaddock :: Config c -> IO ()
 runHaddock cfg@(Config { .. }) = do
-    haddockStdOut <- openFile cfgHaddockStdOut WriteMode
-
     createEmptyDirectory $ cfgOutDir cfg
 
     putStrLn "Generating documentation..."
     forM_ cfgPackages $ \tpkg -> do
+        haddockStdOut <- openFile cfgHaddockStdOut WriteMode
         handle <- runProcess' cfgHaddockPath $ processConfig
             { pcArgs = concat
                 [ cfgHaddockArgs
