@@ -1,4 +1,4 @@
-module Settings.Builders.Ghc (ghcArgs, ghcMArgs) where
+module Settings.Builders.Ghc (ghcArgs, ghcMArgs, commonGhcArgs) where
 
 import Way
 import Util
@@ -16,61 +16,50 @@ import Settings.Ways
 --     $$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
 --     $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno
 --     $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@)))
--- TODO: check code duplication
 ghcArgs :: Args
 ghcArgs = stagedBuilder Ghc ? do
-    way     <- getWay
-    hsArgs  <- getPkgDataList HsArgs
-    cppArgs <- getPkgDataList CppArgs
-    srcs    <- getSources
-    file    <- getFile
-    path    <- getTargetPath
-    let buildPath = path -/- "build"
-    mconcat
-        [ arg "-hisuf", arg $ hisuf way
-        , arg "-osuf" , arg $  osuf way
-        , arg "-hcsuf", arg $ hcsuf way
-        , wayHcArgs
-        , packageGhcArgs
-        , includeGhcArgs
-        , append hsArgs
-        , append . map ("-optP" ++) $ cppArgs
-        , arg "-odir"   , arg buildPath
-        , arg "-stubdir", arg buildPath
-        , arg "-hidir"  , arg buildPath
-        , splitObjects  ? arg "-split-objs"
-        , arg "-no-user-package-db" -- TODO: is this needed?
-        , arg "-rtsopts"            -- TODO: is this needed?
-        , arg "-c", append srcs
-        , arg "-o", arg file ]
+    file <- getFile
+    srcs <- getSources
+    mconcat [ commonGhcArgs
+            , arg "-c", append srcs
+            , arg "-o", arg file ]
 
 ghcMArgs :: Args
 ghcMArgs = stagedBuilder GhcM ? do
-    ways    <- getWays
-    file    <- getFile
-    srcs    <- getSources
+    ways <- getWays
+    file <- getFile
+    srcs <- getSources
+    mconcat [ arg "-M"
+            , commonGhcArgs
+            , arg "-dep-makefile", arg file
+            , append $ concat [ ["-dep-suffix", wayPrefix way] | way <- ways ]
+            , append srcs ]
+
+-- This is included into ghcArgs, ghcMArgs and haddockArgs.
+commonGhcArgs :: Args
+commonGhcArgs = do
+    way     <- getWay
     hsArgs  <- getPkgDataList HsArgs
     cppArgs <- getPkgDataList CppArgs
     path    <- getTargetPath
     let buildPath = path -/- "build"
-    mconcat
-        [ arg "-M"
-        , packageGhcArgs
-        , includeGhcArgs
-        , append hsArgs
-        , append . map ("-optP" ++) $ cppArgs
-        , arg "-odir"        , arg buildPath
-        , arg "-stubdir"     , arg buildPath
-        , arg "-hidir"       , arg buildPath
-        , arg "-dep-makefile", arg file
-        , append . concatMap (\way -> ["-dep-suffix", wayPrefix way]) $ ways
-        , arg "-no-user-package-db" -- TODO: is this needed?
-        , arg "-rtsopts"            -- TODO: is this needed?
-        , append srcs ]
+    mconcat [ arg "-hisuf", arg $ hisuf way
+            , arg "-osuf" , arg $  osuf way
+            , arg "-hcsuf", arg $ hcsuf way
+            , wayGhcArgs
+            , packageGhcArgs
+            , includeGhcArgs
+            , append hsArgs
+            , append $ map ("-optP" ++) cppArgs
+            , arg "-odir"    , arg buildPath
+            , arg "-stubdir" , arg buildPath
+            , arg "-hidir"   , arg buildPath
+            , splitObjects   ? arg "-split-objs"
+            , arg "-rtsopts" ]          -- TODO: is this needed?
 
 -- TODO: do '-ticky' in all debug ways?
-wayHcArgs :: Args
-wayHcArgs = do
+wayGhcArgs :: Args
+wayGhcArgs = do
     way <- getWay
     mconcat [ if (Dynamic `wayUnit` way)
               then append ["-fPIC", "-dynamic"]
@@ -98,9 +87,9 @@ packageGhcArgs = do
         , stage0 ? arg "-package-db libraries/bootstrapping.conf"
         , if supportsPackageKey || stage /= Stage0
           then mconcat [ arg $ "-this-package-key " ++ pkgKey
-                       , append . map ("-package-key " ++) $ pkgDepKeys ]
-          else mconcat [ arg $ "-package-name" ++ pkgKey
-                       , append . map ("-package " ++) $ pkgDeps ]]
+                       , append $ map ("-package-key " ++) pkgDepKeys ]
+          else mconcat [ arg $ "-package-name " ++ pkgKey
+                       , append $ map ("-package " ++) pkgDeps ]]
 
 includeGhcArgs :: Args
 includeGhcArgs = do
@@ -113,11 +102,17 @@ includeGhcArgs = do
         autogenPath = buildPath -/- "autogen"
     mconcat
         [ arg "-i"
-        , append . map (\dir -> "-i" ++ pkgPath -/- dir) $ srcDirs
         , arg $ "-i" ++ buildPath
         , arg $ "-i" ++ autogenPath
         , arg $ "-I" ++ buildPath
         , arg $ "-I" ++ autogenPath
-        , append . map (\dir -> "-I" ++ pkgPath -/- dir) $ incDirs
+        , append [ "-i" ++ pkgPath -/- dir | dir <- srcDirs ]
+        , append [ "-I" ++ pkgPath -/- dir | dir <- incDirs ]
         , arg "-optP-include", arg $ "-optP" ++ autogenPath -/- "cabal_macros.h"
-        , append . map ("-optP" ++) $ cppArgs ]
+        , append $ map ("-optP" ++) cppArgs ]
+
+-- TODO: see ghc.mk
+-- # And then we strip it out again before building the package:
+-- define libraries/ghc-prim_PACKAGE_MAGIC
+-- libraries/ghc-prim_dist-install_MODULES := $$(filter-out GHC.Prim,$$(libraries/ghc-prim_dist-install_MODULES))
+-- endef

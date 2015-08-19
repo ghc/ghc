@@ -7,6 +7,7 @@ import Settings.Builders.Ld
 import Settings.Builders.Ghc
 import Settings.Builders.Gcc
 import Settings.Builders.GhcPkg
+import Settings.Builders.Haddock
 import Settings.Builders.GhcCabal
 
 args :: Args
@@ -34,4 +35,6 @@ defaultArgs = mconcat
     , gccArgs
     , arArgs
     , ldArgs
+    , ghcCabalHsColourArgs
+    , haddockArgs
     , customPackageArgs ]

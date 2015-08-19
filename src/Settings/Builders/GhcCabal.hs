@@ -1,5 +1,6 @@
 module Settings.Builders.GhcCabal (
-    cabalArgs, bootPackageDbArgs, customPackageArgs
+    cabalArgs, ghcCabalHsColourArgs,
+    bootPackageDbArgs, customPackageArgs
     ) where
 
 import Way
@@ -37,6 +38,14 @@ cabalArgs = builder GhcCabal ? do
             , with Ar
             , with Alex
             , with Happy ]
+
+ghcCabalHsColourArgs :: Args
+ghcCabalHsColourArgs = builder GhcCabalHsColour ? do
+    path <- getPackagePath
+    dir  <- getTargetDirectory
+    mconcat [ arg "hscolour"
+            , arg path
+            , arg dir ]
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 -- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?
@@ -94,7 +103,7 @@ dllArgs = arg ""
 packageConstraints :: Args
 packageConstraints = stage0 ? do
     constraints <- lift . readFileLines $ bootPackageConstraints
-    append . concatMap (\c -> ["--constraint", c]) $ constraints
+    append $ concat [ ["--constraint", c] | c <- constraints ]
 
 -- TODO: should be in a different file
 -- TODO: put all validating options together in one file
@@ -117,8 +126,9 @@ ghcIncludeDirs = [ "includes", "includes/dist"
                  , "includes/dist-ghcconstants/header" ]
 
 cppArgs :: Args
-cppArgs = append . map ("-I" ++ ) $ ghcIncludeDirs
+cppArgs = append $ map ("-I" ++) ghcIncludeDirs
 
+-- TODO: move this somewhere
 customPackageArgs :: Args
 customPackageArgs = do
     stage   <- getStage
