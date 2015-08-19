@@ -1,6 +1,6 @@
 module Settings.Packages (
     module Settings.Default,
-    packages, getPackages, knownPackages
+    packages, getPackages, knownPackages, findKnownPackage
     ) where
 
 import Package
@@ -9,6 +9,7 @@ import Expression
 import Oracles.Setting
 import Settings.User
 import Settings.Default
+import Data.List
 
 -- Combining default list of packages with user modifications
 packages :: Packages
@@ -40,3 +41,11 @@ packagesStage1 = mconcat
 
 knownPackages :: [Package]
 knownPackages = defaultKnownPackages ++ userKnownPackages
+
+-- Note: this is slow but we keep it simple as there not too many packages (30)
+-- We handle integerLibrary in a special way, because packages integerGmp and
+-- integerGmp2 have the same package name -- we return the user-selected one.
+findKnownPackage :: PackageName -> Maybe Package
+findKnownPackage name
+    | name == pkgName integerLibrary = Just integerLibrary
+    | otherwise = find (\pkg -> pkgName pkg == name) knownPackages
