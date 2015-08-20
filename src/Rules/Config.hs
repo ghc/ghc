@@ -2,6 +2,13 @@ module Rules.Config (configRules) where
 
 import Base
 import Util
+import Data.List
+import Control.Monad
+
+-- We add the following line to 'configure.ac' in order to produce configuration
+-- file "system.config" from "system.config.in" by running 'configure' script.
+configCommand :: String
+configCommand = "AC_CONFIG_FILES([" ++ configPath ++ "system.config])"
 
 configRules :: Rules ()
 configRules = do
@@ -11,6 +18,14 @@ configRules = do
         cmd "bash configure" -- TODO: get rid of 'bash'
 
     "configure" %> \out -> do
-        copyFile' (configPath -/- "configure.ac") "configure.ac"
+        -- Make sure 'configure.ac' script contains a line with configCommand
+        script <- fmap lines . liftIO $ readFile "configure.ac"
+        when (configCommand `notElem` script) $ do
+            putBuild $ "Adding '" ++ configCommand ++ "' to configure.ac..."
+            let (before, rest) = break ("AC_CONFIG_FILES" `isPrefixOf`) script
+            when (null rest) $ do
+                putError "No AC_CONFIG_FILES command in configure.ac!"
+            let newScript = unlines $ before ++ [configCommand] ++ rest
+            length newScript `seq` liftIO (writeFile "configure.ac" newScript)
         putBuild "Running autoconf..."
         cmd "bash autoconf" -- TODO: get rid of 'bash'
