@@ -9,8 +9,8 @@ import Util
 import Stage
 import Builder
 import Package
-import Switches
 import Expression
+import Predicates
 import Oracles.Flag
 import Oracles.Setting
 import Settings.User

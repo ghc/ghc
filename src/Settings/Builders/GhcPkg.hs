@@ -2,8 +2,8 @@ module Settings.Builders.GhcPkg (ghcPkgArgs) where
 
 import Util
 import Builder
-import Switches
 import Expression
+import Predicates
 import Settings.Util
 import Settings.Builders.GhcCabal
 

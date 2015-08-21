@@ -7,8 +7,8 @@ module Settings.User (
 
 import Stage
 import Package
-import Switches
 import Expression
+import Predicates
 import Settings.Default
 
 -- No user-specific settings by default

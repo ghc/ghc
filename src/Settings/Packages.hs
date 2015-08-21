@@ -4,8 +4,8 @@ module Settings.Packages (
     ) where
 
 import Package
-import Switches
 import Expression
+import Predicates
 import Oracles.Setting
 import Settings.User
 import Settings.Default

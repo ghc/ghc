@@ -1,8 +1,8 @@
 module Settings.Builders.Ld (ldArgs) where
 
 import Builder
-import Switches (builder)
 import Expression
+import Predicates (builder)
 import Oracles.Setting
 import Settings.Util
 

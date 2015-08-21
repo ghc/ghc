@@ -4,8 +4,8 @@ import Base
 import Util
 import Builder
 import Package
-import Switches (builder, package, stage1)
 import Expression
+import Predicates (builder, package, stage1)
 import Oracles.PackageData
 import Settings.Util
 import Settings.Packages

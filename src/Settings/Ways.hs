@@ -2,8 +2,8 @@ module Settings.Ways (getWays, getRtsWays) where
 
 import Way
 import Stage
-import Switches
 import Expression
+import Predicates
 import Oracles.Flag
 import Settings.User
 

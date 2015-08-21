@@ -6,8 +6,8 @@ import Util
 import Target (PartialTarget (..), fullTarget)
 import Builder
 import Package
-import Switches (splitObjects)
 import Expression
+import Predicates (splitObjects)
 import Oracles.PackageData
 import Settings.Util
 import Settings.TargetDirectory

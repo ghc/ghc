@@ -4,8 +4,8 @@ import Way
 import Util
 import Stage
 import Builder
-import Switches (stagedBuilder, splitObjects, stage0)
 import Expression
+import Predicates (stagedBuilder, splitObjects, stage0)
 import Oracles.Flag
 import Oracles.PackageData
 import Settings.Util

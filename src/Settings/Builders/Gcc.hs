@@ -3,8 +3,8 @@ module Settings.Builders.Gcc (gccArgs, gccMArgs) where
 import Base
 import Util
 import Builder
-import Switches (stagedBuilder)
 import Expression
+import Predicates (stagedBuilder)
 import Oracles.PackageData
 import Settings.Util
 

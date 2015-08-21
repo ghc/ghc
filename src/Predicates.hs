@@ -1,4 +1,4 @@
-module Switches (
+module Predicates (
     stage, package, builder, stagedBuilder, file, way,
     stage0, stage1, stage2, notStage, notStage0,
     registerPackage, splitObjects

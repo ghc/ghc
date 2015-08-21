@@ -5,8 +5,8 @@ import Util
 import Target (PartialTarget (..), fullTarget)
 import Package
 import Builder
-import Switches (registerPackage)
 import Expression
+import Predicates (registerPackage)
 import Oracles.PackageDeps
 import Settings.Packages
 import Settings.TargetDirectory
