@@ -40,7 +40,6 @@ import Format
 import Unique
 import Outputable
 import FastTypes
-import FastBool
 
 {-
         The SPARC has 64 registers of interest; 32 integer registers and 32
@@ -199,13 +198,8 @@ allocatableRegs :: [RealReg]
 allocatableRegs
    = let isFree rr
            = case rr of
-                RealRegSingle r
-                        -> isFastTrue (freeReg r)
-
-                RealRegPair   r1 r2
-                        -> isFastTrue (freeReg r1)
-                        && isFastTrue (freeReg r2)
-
+                RealRegSingle r     -> freeReg r
+                RealRegPair   r1 r2 -> freeReg r1 && freeReg r2
      in filter isFree allRealRegs
 
 

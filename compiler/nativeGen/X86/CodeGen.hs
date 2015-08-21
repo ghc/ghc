@@ -58,7 +58,6 @@ import OrdList
 import Outputable
 import Unique
 import FastString
-import FastBool         ( isFastTrue )
 import DynFlags
 import Util
 
@@ -1176,7 +1175,7 @@ amodeCouldBeClobbered :: Platform -> AddrMode -> Bool
 amodeCouldBeClobbered platform amode = any (regClobbered platform) (addrModeRegs amode)
 
 regClobbered :: Platform -> Reg -> Bool
-regClobbered platform (RegReal (RealRegSingle rr)) = isFastTrue (freeReg platform rr)
+regClobbered platform (RegReal (RealRegSingle rr)) = freeReg platform rr
 regClobbered _ _ = False
 
 -- getOperand: the operand is not required to remain valid across the

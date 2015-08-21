@@ -441,7 +441,6 @@ Library
         BufWrite
         Digraph
         Encoding
-        FastBool
         FastFunctions
         FastMutInt
         FastString

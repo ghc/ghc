@@ -39,7 +39,6 @@ import FastString
 import CLabel
 import Outputable
 import Platform
-import FastBool
 import UniqFM (listToUFM, lookupUFM)
 import UniqSupply
 
@@ -362,9 +361,7 @@ ppc_regUsageOfInstr platform instr
 
 interesting :: Platform -> Reg -> Bool
 interesting _        (RegVirtual _)              = True
-interesting platform (RegReal (RealRegSingle i))
-    = isFastTrue (freeReg platform i)
-
+interesting platform (RegReal (RealRegSingle i)) = freeReg platform i
 interesting _        (RegReal (RealRegPair{}))
     = panic "PPC.Instr.interesting: no reg pairs on this arch"
 

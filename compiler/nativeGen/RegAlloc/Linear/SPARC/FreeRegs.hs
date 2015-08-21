@@ -10,7 +10,6 @@ import Reg
 import CodeGen.Platform
 import Outputable
 import Platform
-import FastBool
 
 import Data.Word
 import Data.Bits
@@ -75,7 +74,7 @@ allocateReg platform
              (FreeRegs g f d)
 
         -- can't allocate free regs
-        | not $ isFastTrue (freeReg platform r)
+        | not $ freeReg platform r
         = pprPanic "SPARC.FreeRegs.allocateReg: not allocating pinned reg" (ppr reg)
         
         -- a general purpose reg
@@ -131,7 +130,7 @@ releaseReg platform
         regs@(FreeRegs g f d)
 
         -- don't release pinned reg
-        | not $ isFastTrue (freeReg platform r)
+        | not $ freeReg platform r
         = regs
 
         -- a general purpose reg

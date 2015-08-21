@@ -58,7 +58,6 @@ import DynFlags
 import Outputable
 import Platform
 import FastTypes
-import FastBool
 
 
 -- | regSqueeze_class reg
@@ -447,6 +446,6 @@ instrClobberedRegs platform
 -- register allocator to attempt to map VRegs to.
 allocatableRegs :: Platform -> [RealReg]
 allocatableRegs platform
-   = let isFree i = isFastTrue (freeReg platform i)
+   = let isFree i = freeReg platform i
      in  map RealRegSingle $ filter isFree (allMachRegNos platform)
 

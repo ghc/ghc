@@ -255,7 +255,7 @@ worst n classN classC
 -- register allocator to attempt to map VRegs to.
 allocatableRegs :: [RegNo]
 allocatableRegs
-   = let isFree i = isFastTrue (freeReg i)
+   = let isFree i = freeReg i
      in  filter isFree allMachRegNos
 
 
