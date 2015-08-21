@@ -13,6 +13,7 @@ import Data.Generics.Aliases
 import Data.Generics.Schemes
 
 import Text.XML.Light
+import Text.XHtml
 
 
 newtype Xhtml = Xhtml
@@ -72,3 +73,21 @@ stripFooter =
         [ qName attrKey == "id"
         , attrVal == "footer"
         ]
+
+
+xmlElementToXhtml :: Element -> Html
+xmlElementToXhtml (Element { .. }) =
+    tag (qName elName) contents ! attrs
+  where
+    contents = mconcat $ map xmlContentToXhtml elContent
+    attrs = map xmlAttrToXhtml elAttribs
+
+
+xmlContentToXhtml :: Content -> Html
+xmlContentToXhtml (Elem el) = xmlElementToXhtml el
+xmlContentToXhtml (Text text) = toHtml $ cdData text
+xmlContentToXhtml (CRef cref) = noHtml
+
+
+xmlAttrToXhtml :: Attr -> HtmlAttr
+xmlAttrToXhtml (Attr { .. }) = strAttr (qName attrKey) attrVal
