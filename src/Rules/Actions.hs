@@ -50,6 +50,7 @@ interestingInfo builder ss = case builder of
     Ghc _    -> prefixAndSuffix 0 4 ss
     GhcM _   -> prefixAndSuffix 1 1 ss
     GhcPkg _ -> prefixAndSuffix 3 0 ss
+    Haddock  -> prefixAndSuffix 1 0 ss
     GhcCabal -> prefixAndSuffix 3 0 ss
     _        -> ss
   where
