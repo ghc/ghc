@@ -5,18 +5,16 @@ import Util
 import Builder
 import Package
 import Expression
-import qualified Target
+import Target (PartialTarget (..), fullTarget)
 import Oracles.PackageData
 import Settings.Util
 import Settings.TargetDirectory
 import Rules.Actions
 import Rules.Resources
 
-buildPackageDependencies :: Resources -> StagePackageTarget -> Rules ()
-buildPackageDependencies _ target =
-    let stage     = Target.stage target
-        pkg       = Target.package target
-        path      = targetPath stage pkg
+buildPackageDependencies :: Resources -> PartialTarget -> Rules ()
+buildPackageDependencies _ target @ (PartialTarget stage pkg) =
+    let path      = targetPath stage pkg
         buildPath = path -/- "build"
         dropBuild = (pkgPath pkg ++) . drop (length buildPath)
         hDepFile  = buildPath -/- ".hs-dependencies"
@@ -27,7 +25,7 @@ buildPackageDependencies _ target =
             build $ fullTarget target (GccM stage) [srcFile] [out]
 
         hDepFile %> \file -> do
-            srcs <- interpret target getPackageSources
+            srcs <- interpretPartial target getPackageSources
             need srcs
             build $ fullTarget target (GhcM stage) srcs [file]
             removeFile $ file <.> "bak"

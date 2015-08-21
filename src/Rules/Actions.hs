@@ -1,12 +1,11 @@
-module Rules.Actions (
-    build, buildWithResources
-    ) where
+module Rules.Actions (build, buildWithResources) where
 
 import Base
 import Util
+import Target hiding (builder)
+import qualified Target
 import Builder
 import Expression
-import qualified Target
 import Oracles.Setting
 import Oracles.ArgsHash
 import Settings.Args
@@ -16,7 +15,7 @@ import Settings.Builders.Ar
 -- Build a given target using an appropriate builder and acquiring necessary
 -- resources. Force a rebuilt if the argument list has changed since the last
 -- built (that is, track changes in the build system).
-buildWithResources :: [(Resource, Int)] -> FullTarget -> Action ()
+buildWithResources :: [(Resource, Int)] -> Target -> Action ()
 buildWithResources rs target = do
     let builder = Target.builder target
     needBuilder laxDependencies builder
@@ -39,7 +38,7 @@ buildWithResources rs target = do
                     unit . cmd [path] $ persistentArgs ++ argsChunk
 
 -- Most targets are built without explicitly acquiring resources
-build :: FullTarget -> Action ()
+build :: Target -> Action ()
 build = buildWithResources []
 
 interestingInfo :: Builder -> [String] -> [String]

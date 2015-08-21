@@ -2,11 +2,11 @@ module Rules.Data (buildPackageData) where
 
 import Base
 import Util
+import Target (PartialTarget (..), fullTarget)
 import Package
 import Builder
 import Switches (registerPackage)
 import Expression
-import qualified Target
 import Oracles.PackageDeps
 import Settings.Packages
 import Settings.TargetDirectory
@@ -17,11 +17,9 @@ import Control.Applicative
 import Control.Monad.Extra
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
-buildPackageData :: Resources -> StagePackageTarget -> Rules ()
-buildPackageData rs target = do
-    let stage     = Target.stage target
-        pkg       = Target.package target
-        path      = targetPath stage pkg
+buildPackageData :: Resources -> PartialTarget -> Rules ()
+buildPackageData rs target @ (PartialTarget stage pkg) = do
+    let path      = targetPath stage pkg
         cabalFile = pkgCabalFile pkg
         configure = pkgPath pkg -/- "configure"
 
@@ -40,7 +38,7 @@ buildPackageData rs target = do
 
             -- We configure packages in the order of their dependencies
             deps <- packageDeps pkg
-            pkgs <- interpret target getPackages
+            pkgs <- interpretPartial target getPackages
             let cmp p name = compare (pkgName p) name
                 depPkgs    = intersectOrd cmp (sort pkgs) deps
             need [ targetPath stage p -/- "package-data.mk" | p <- depPkgs ]
@@ -50,7 +48,7 @@ buildPackageData rs target = do
                 fullTarget target GhcCabal [cabalFile] outs
 
             -- TODO: find out of ghc-cabal can be concurrent with ghc-pkg
-            whenM (interpret target registerPackage) .
+            whenM (interpretPartial target registerPackage) .
                 buildWithResources [(ghcPkg rs, 1)] $
                 fullTarget target (GhcPkg stage) [cabalFile] outs
 

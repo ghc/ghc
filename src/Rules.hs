@@ -6,6 +6,7 @@ import Way
 import Base
 import Util
 import Stage
+import Target (PartialTarget (..))
 import Expression
 import Oracles.PackageData
 import Rules.Cabal
@@ -23,18 +24,18 @@ import Settings.TargetDirectory
 generateTargets :: Rules ()
 generateTargets = action $ do
     targets <- fmap concat . forM [Stage0 ..] $ \stage -> do
-        pkgs <- interpret (stageTarget stage) getPackages
+        pkgs <- interpretWithStage stage getPackages
         fmap concat . forM pkgs $ \pkg -> do
-            let target    = stagePackageTarget stage pkg
+            let target    = PartialTarget stage pkg
                 buildPath = targetPath stage pkg -/- "build"
-            libName     <- interpret target $ getPkgData LibName
-            needGhciLib <- interpret target $ getPkgData BuildGhciLib
-            needHaddock <- interpret target buildHaddock
+            libName     <- interpretPartial target $ getPkgData LibName
+            needGhciLib <- interpretPartial target $ getPkgData BuildGhciLib
+            needHaddock <- interpretPartial target buildHaddock
             let ghciLib = [ buildPath -/- "HS" ++ libName <.> "o"
                           | needGhciLib == "YES" && stage /= Stage0 ]
                 haddock = [ pkgHaddockFile pkg | needHaddock ]
 
-            ways <- interpret target getWays
+            ways <- interpretPartial target getWays
             libs <- forM ways $ \way -> do
                 extension <- libsuf way
                 return $ buildPath -/- "libHS" ++ libName <.> extension
@@ -47,6 +48,6 @@ generateTargets = action $ do
 packageRules :: Rules ()
 packageRules = do
     resources <- resourceRules
-    forM_ [Stage0, Stage1] $ \stage -> do
-        forM_ knownPackages $ \pkg -> do
-            buildPackage resources (stagePackageTarget stage pkg)
+    forM_ [Stage0, Stage1] $ \stage ->
+        forM_ knownPackages $ \pkg ->
+            buildPackage resources $ PartialTarget stage pkg

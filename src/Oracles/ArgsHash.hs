@@ -23,7 +23,7 @@ newtype ArgsHashKey = ArgsHashKey Target
 -- constructors are assumed not to examine target sources, but only append them
 -- to argument lists where appropriate.
 -- TODO: enforce the above assumption via type trickery?
-checkArgsHash :: FullTarget -> Action ()
+checkArgsHash :: Target -> Action ()
 checkArgsHash target = do
     _ <- askOracle . ArgsHashKey $ target { sources = ["src"] } :: Action Int
     return ()

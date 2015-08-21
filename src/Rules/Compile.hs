@@ -4,18 +4,15 @@ import Way
 import Base
 import Util
 import Builder
-import Expression
-import qualified Target
+import Target (PartialTarget (..), fullTarget, fullTargetWithWay)
 import Oracles.Dependencies
 import Settings.TargetDirectory
 import Rules.Actions
 import Rules.Resources
 
-compilePackage :: Resources -> StagePackageTarget -> Rules ()
-compilePackage _ target = do
-    let stage     = Target.stage target
-        pkg       = Target.package target
-        path      = targetPath stage pkg
+compilePackage :: Resources -> PartialTarget -> Rules ()
+compilePackage _ target @ (PartialTarget stage package) = do
+    let path      = targetPath stage package
         buildPath = path -/- "build"
 
     matchBuildResult buildPath "hi" ?> \hi ->

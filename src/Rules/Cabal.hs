@@ -16,7 +16,7 @@ cabalRules :: Rules ()
 cabalRules = do
     -- Cache boot package constraints (to be used in cabalArgs)
     bootPackageConstraints %> \out -> do
-        pkgs <- interpret (stageTarget Stage0) getPackages
+        pkgs <- interpretWithStage Stage0 getPackages
         constraints <- forM (sort pkgs) $ \pkg -> do
             need [pkgCabalFile pkg]
             pd <- liftIO . readPackageDescription silent $ pkgCabalFile pkg
@@ -28,7 +28,7 @@ cabalRules = do
 
     -- Cache package dependencies
     packageDependencies %> \out -> do
-        pkgs <- interpret (stageTarget Stage1) getPackages
+        pkgs <- interpretWithStage Stage1 getPackages
         pkgDeps <- forM (sort pkgs) $ \pkg -> do
             need [pkgCabalFile pkg]
             pd <- liftIO . readPackageDescription silent $ pkgCabalFile pkg

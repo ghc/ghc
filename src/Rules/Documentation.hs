@@ -7,7 +7,7 @@ import Builder
 import Package
 import Expression
 import Oracles.PackageData
-import qualified Target
+import Target (PartialTarget (..), fullTarget, fullTargetWithWay)
 import Settings.TargetDirectory
 import Rules.Actions
 import Rules.Resources
@@ -19,11 +19,9 @@ import Control.Monad.Extra
 -- Note: this build rule creates plenty of files, not just the .haddock one.
 -- All of them go into the 'doc' subdirectory. Pedantically tracking all built
 -- files in the Shake databases seems fragile and unnecesarry.
-buildPackageDocumentation :: Resources -> StagePackageTarget -> Rules ()
-buildPackageDocumentation _ target =
-    let stage       = Target.stage target
-        pkg         = Target.package target
-        cabalFile   = pkgCabalFile pkg
+buildPackageDocumentation :: Resources -> PartialTarget -> Rules ()
+buildPackageDocumentation _ target @ (PartialTarget stage pkg) =
+    let cabalFile   = pkgCabalFile pkg
         haddockFile = pkgHaddockFile pkg
     in when (stage == Stage1) $ do
 
@@ -31,8 +29,8 @@ buildPackageDocumentation _ target =
             whenM (specified HsColour) $ do
                 need [cabalFile]
                 build $ fullTarget target GhcCabalHsColour [cabalFile] []
-            srcs <- interpret target getPackageSources
-            deps <- interpret target $ getPkgDataList DepNames
+            srcs <- interpretPartial target getPackageSources
+            deps <- interpretPartial target $ getPkgDataList DepNames
             let haddocks = [ pkgHaddockFile depPkg
                            | Just depPkg <- map findKnownPackage deps ]
             need $ srcs ++ haddocks

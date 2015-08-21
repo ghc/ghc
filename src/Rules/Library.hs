@@ -1,13 +1,13 @@
 module Rules.Library (buildPackageLibrary) where
 
 import Way
-import Base
+import Base hiding (splitPath)
 import Util
+import Target (PartialTarget (..), fullTarget)
 import Builder
 import Package
-import Switches
+import Switches (splitObjects)
 import Expression
-import qualified Target
 import Oracles.PackageData
 import Settings.Util
 import Settings.TargetDirectory
@@ -16,21 +16,18 @@ import Rules.Resources
 import Data.List
 import qualified System.Directory as IO
 
-buildPackageLibrary :: Resources -> StagePackageTarget -> Rules ()
-buildPackageLibrary _ target = do
-    let stage     = Target.stage target
-        pkg       = Target.package target
-        path      = targetPath stage pkg
+buildPackageLibrary :: Resources -> PartialTarget -> Rules ()
+buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
+    let path      = targetPath stage pkg
         buildPath = path -/- "build"
 
     -- TODO: handle dynamic libraries
     matchBuildResult buildPath "a" ?> \a -> do
         removeFile a
-        cSrcs   <- interpret target $ getPkgDataList CSrcs
-        modules <- interpret target $ getPkgDataList Modules
+        cSrcs <- cSources target
+        hSrcs <- hSources target
 
         let way   = detectWay a
-            hSrcs = map (replaceEq '.' '/') modules
             cObjs = [ buildPath -/- src -<.> osuf way | src <- cSrcs ]
             hObjs = [ buildPath -/- src  <.> osuf way | src <- hSrcs ]
 
@@ -38,7 +35,7 @@ buildPackageLibrary _ target = do
         -- explicitly as this would needlessly bloat the Shake database).
         need $ cObjs ++ hObjs
 
-        split <- interpret target splitObjects
+        split <- interpretPartial target splitObjects
         splitObjs <- if not split then return [] else
             fmap concat $ forM hSrcs $ \src -> do
                 let splitPath = buildPath -/- src ++ "_" ++ osuf way ++ "_split"
@@ -48,7 +45,7 @@ buildPackageLibrary _ target = do
 
         build $ fullTarget target Ar (cObjs ++ hObjs ++ splitObjs) [a]
 
-        synopsis <- interpret target $ getPkgData Synopsis
+        synopsis <- interpretPartial target $ getPkgData Synopsis
         putSuccess $ "/--------\n| Successfully built package library '"
             ++ pkgName pkg
             ++ "' (stage " ++ show stage ++ ", way "++ show way ++ ")."
@@ -58,10 +55,18 @@ buildPackageLibrary _ target = do
     -- TODO: this looks fragile as haskell objects can match this rule if their
     -- names start with "HS" and they are on top of the module hierarchy.
     priority 2 $ (buildPath -/- "HS*.o") %> \obj -> do
-        cSrcs   <- interpret target $ getPkgDataList CSrcs
-        modules <- interpret target $ getPkgDataList Modules
-        let hSrcs = map (replaceEq '.' '/') modules
-            cObjs = [ buildPath -/- src -<.> "o" | src <- cSrcs ]
+        cSrcs <- cSources target
+        hSrcs <- hSources target
+        let cObjs = [ buildPath -/- src -<.> "o" | src <- cSrcs ]
             hObjs = [ buildPath -/- src  <.> "o" | src <- hSrcs ]
         need $ cObjs ++ hObjs
         build $ fullTarget target Ld (cObjs ++ hObjs) [obj]
+
+cSources :: PartialTarget -> Action [FilePath]
+cSources target = interpretPartial target $ getPkgDataList CSrcs
+
+hSources :: PartialTarget -> Action [FilePath]
+hSources target = do
+    modules <- interpretPartial target $ getPkgDataList Modules
+    -- GHC.Prim is special: we do not build it
+    return . map (replaceEq '.' '/') . filter (/= "GHC.Prim") $ modules

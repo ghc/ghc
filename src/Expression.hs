@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Expression (
-    module Target,
     module Data.Monoid,
     module Control.Monad.Reader,
     Expr, DiffExpr, fromDiffExpr,
@@ -8,19 +7,18 @@ module Expression (
     Args, Ways, Packages,
     apply, append, appendM, remove,
     appendSub, appendSubD, filterSub, removeSub,
-    interpret, interpretDiff,
+    interpret, interpretPartial, interpretWithStage, interpretDiff,
     getStage, getPackage, getBuilder, getFiles, getFile,
     getSources, getSource, getWay
     ) where
 
 import Way
 import Base
+import Util
 import Stage
 import Builder
 import Package
-import Target (Target)
-import Target hiding (Target(..))
-import qualified Target
+import Target (Target (..), PartialTarget (..), fromPartial)
 import Data.List
 import Data.Monoid
 import Control.Monad.Reader hiding (liftIO)
@@ -136,6 +134,13 @@ removeSub prefix xs = filterSub prefix (`notElem` xs)
 interpret :: Target -> Expr a -> Action a
 interpret = flip runReaderT
 
+interpretPartial :: PartialTarget -> Expr a -> Action a
+interpretPartial = interpret . fromPartial
+
+interpretWithStage :: Stage -> Expr a -> Action a
+interpretWithStage s = interpretPartial $
+    PartialTarget s (error "interpretWithStage: package not set")
+
 -- Extract an expression from a difference expression
 fromDiffExpr :: Monoid a => DiffExpr a -> Expr a
 fromDiffExpr = fmap (($ mempty) . fromDiff)
@@ -146,36 +151,40 @@ interpretDiff target = interpret target . fromDiffExpr
 
 -- Convenient getters for target parameters
 getStage :: Expr Stage
-getStage = asks Target.stage
+getStage = asks stage
 
 getPackage :: Expr Package
-getPackage = asks Target.package
+getPackage = asks package
 
 getBuilder :: Expr Builder
-getBuilder = asks Target.builder
+getBuilder = asks builder
 
 getWay :: Expr Way
-getWay = asks Target.way
+getWay = asks way
 
 getSources :: Expr [FilePath]
-getSources = asks Target.sources
+getSources = asks sources
 
+-- Run getSources and check that the result contains a single file only
 getSource :: Expr FilePath
 getSource = do
     target <- ask
-    srcs   <- getSources
-    case srcs of
-        [src] -> return src
-        _     -> error $ "Exactly one source expected in target " ++ show target
+    getSingleton getSources $
+        "getSource: exactly one source expected in target " ++ show target
 
 getFiles :: Expr [FilePath]
-getFiles = asks Target.files
+getFiles = asks files
 
--- Run getFiles and check that it contains a single file only
+-- Run getFiles and check that the result contains a single file only
 getFile :: Expr FilePath
 getFile = do
     target <- ask
-    files  <- getFiles
-    case files of
+    getSingleton getFiles $
+        "getFile: exactly one file expected in target " ++ show target
+
+getSingleton :: Expr [a] -> String -> Expr a
+getSingleton expr msg = do
+    list <- expr
+    case list of
         [res] -> return res
-        _     -> error $ "Exactly one file expected in target " ++ show target
+        _     -> lift $ putError msg
