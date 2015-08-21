@@ -3,8 +3,8 @@
 
 
 module Test.Haddock.Xhtml
-    ( Xhtml(..)
-    , parseXhtml, dumpXhtml
+    ( Xml(..)
+    , parseXml, dumpXml
     , stripLinks, stripLinksWhen, stripAnchorsWhen, stripFooter
     ) where
 
@@ -13,11 +13,12 @@ import Data.Generics.Aliases
 import Data.Generics.Schemes
 
 import Text.XML.Light
-import Text.XHtml
+import Text.XHtml (Html, HtmlAttr, (!))
+import qualified Text.XHtml as Xhtml
 
 
-newtype Xhtml = Xhtml
-    { xhtmlElement :: Element
+newtype Xml = Xml
+    { xmlElement :: Element
     } deriving Eq
 
 
@@ -27,19 +28,19 @@ deriving instance Eq Content
 deriving instance Eq CData
 
 
-parseXhtml :: String -> Maybe Xhtml
-parseXhtml = fmap Xhtml . parseXMLDoc
+parseXml :: String -> Maybe Xml
+parseXml = fmap Xml . parseXMLDoc
 
 
-dumpXhtml :: Xhtml -> String
-dumpXhtml = ppElement . xhtmlElement
+dumpXml :: Xml -> String
+dumpXml = Xhtml.renderHtmlFragment. xmlElementToXhtml . xmlElement
 
 
-stripLinks :: Xhtml -> Xhtml
+stripLinks :: Xml -> Xml
 stripLinks = stripLinksWhen (const True)
 
 
-stripLinksWhen :: (String -> Bool) -> Xhtml -> Xhtml
+stripLinksWhen :: (String -> Bool) -> Xml -> Xml
 stripLinksWhen p =
     processAnchors unlink
   where
@@ -48,7 +49,7 @@ stripLinksWhen p =
         | otherwise = attr
 
 
-stripAnchorsWhen :: (String -> Bool) -> Xhtml -> Xhtml
+stripAnchorsWhen :: (String -> Bool) -> Xml -> Xml
 stripAnchorsWhen p =
     processAnchors unname
   where
@@ -57,13 +58,13 @@ stripAnchorsWhen p =
         | otherwise = attr
 
 
-processAnchors :: (Attr -> Attr) -> Xhtml -> Xhtml
-processAnchors f = Xhtml . everywhere (mkT f) . xhtmlElement
+processAnchors :: (Attr -> Attr) -> Xml -> Xml
+processAnchors f = Xml . everywhere (mkT f) . xmlElement
 
 
-stripFooter :: Xhtml -> Xhtml
+stripFooter :: Xml -> Xml
 stripFooter =
-    Xhtml . everywhere (mkT defoot) . xhtmlElement
+    Xml . everywhere (mkT defoot) . xmlElement
   where
     defoot el
         | isFooter el = el { elContent = [] }
@@ -77,7 +78,7 @@ stripFooter =
 
 xmlElementToXhtml :: Element -> Html
 xmlElementToXhtml (Element { .. }) =
-    tag (qName elName) contents ! attrs
+    Xhtml.tag (qName elName) contents ! attrs
   where
     contents = mconcat $ map xmlContentToXhtml elContent
     attrs = map xmlAttrToXhtml elAttribs
@@ -85,9 +86,9 @@ xmlElementToXhtml (Element { .. }) =
 
 xmlContentToXhtml :: Content -> Html
 xmlContentToXhtml (Elem el) = xmlElementToXhtml el
-xmlContentToXhtml (Text text) = toHtml $ cdData text
-xmlContentToXhtml (CRef cref) = noHtml
+xmlContentToXhtml (Text text) = Xhtml.toHtml $ cdData text
+xmlContentToXhtml (CRef _) = Xhtml.noHtml
 
 
 xmlAttrToXhtml :: Attr -> HtmlAttr
-xmlAttrToXhtml (Attr { .. }) = strAttr (qName attrKey) attrVal
+xmlAttrToXhtml (Attr { .. }) = Xhtml.strAttr (qName attrKey) attrVal

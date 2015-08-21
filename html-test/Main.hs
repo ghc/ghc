@@ -10,10 +10,10 @@ import Test.Haddock
 import Test.Haddock.Xhtml
 
 
-checkConfig :: CheckConfig Xhtml
+checkConfig :: CheckConfig Xml
 checkConfig = CheckConfig
-    { ccfgRead = \mdl input -> stripIfRequired mdl <$> parseXhtml input
-    , ccfgDump = dumpXhtml
+    { ccfgRead = \mdl input -> stripIfRequired mdl <$> parseXml input
+    , ccfgDump = dumpXml
     , ccfgEqual = (==)
     }
 
@@ -32,7 +32,7 @@ main = do
         }
 
 
-stripIfRequired :: String -> Xhtml -> Xhtml
+stripIfRequired :: String -> Xml -> Xml
 stripIfRequired mdl =
     stripLinks' . stripFooter
   where

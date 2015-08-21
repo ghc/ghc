@@ -11,10 +11,10 @@ import Test.Haddock
 import Test.Haddock.Xhtml
 
 
-checkConfig :: CheckConfig Xhtml
+checkConfig :: CheckConfig Xml
 checkConfig = CheckConfig
-    { ccfgRead = \_ input -> strip <$> parseXhtml input
-    , ccfgDump = dumpXhtml
+    { ccfgRead = \_ input -> strip <$> parseXml input
+    , ccfgDump = dumpXml
     , ccfgEqual = (==)
     }
   where
