@@ -444,7 +444,6 @@ Library
         FastFunctions
         FastMutInt
         FastString
-        FastTypes
         Fingerprint
         FiniteMap
         GraphBase

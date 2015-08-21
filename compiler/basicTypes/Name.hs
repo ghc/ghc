@@ -86,7 +86,6 @@ import Util
 import Maybes
 import Binary
 import DynFlags
-import FastTypes
 import FastString
 import Outputable
 
@@ -105,8 +104,7 @@ import Data.Data
 data Name = Name {
                 n_sort :: NameSort,     -- What sort of name it is
                 n_occ  :: !OccName,     -- Its occurrence name
-                n_uniq :: FastInt,      -- UNPACK doesn't work, recursive type
---(note later when changing Int# -> FastInt: is that still true about UNPACK?)
+                n_uniq :: {-# UNPACK #-} !Int,
                 n_loc  :: !SrcSpan      -- Definition site
             }
     deriving Typeable
@@ -184,7 +182,7 @@ nameModule              :: Name -> Module
 nameSrcLoc              :: Name -> SrcLoc
 nameSrcSpan             :: Name -> SrcSpan
 
-nameUnique  name = mkUniqueGrimily (iBox (n_uniq name))
+nameUnique  name = mkUniqueGrimily (n_uniq name)
 nameOccName name = n_occ  name
 nameSrcLoc  name = srcSpanStart (n_loc name)
 nameSrcSpan name = n_loc  name
@@ -309,7 +307,7 @@ isSystemName _                        = False
 -- | Create a name which is (for now at least) local to the current module and hence
 -- does not need a 'Module' to disambiguate it from other 'Name's
 mkInternalName :: Unique -> OccName -> SrcSpan -> Name
-mkInternalName uniq occ loc = Name { n_uniq = getKeyFastInt uniq
+mkInternalName uniq occ loc = Name { n_uniq = getKey uniq
                                    , n_sort = Internal
                                    , n_occ = occ
                                    , n_loc = loc }
@@ -324,12 +322,12 @@ mkInternalName uniq occ loc = Name { n_uniq = getKeyFastInt uniq
 
 mkClonedInternalName :: Unique -> Name -> Name
 mkClonedInternalName uniq (Name { n_occ = occ, n_loc = loc })
-  = Name { n_uniq = getKeyFastInt uniq, n_sort = Internal
+  = Name { n_uniq = getKey uniq, n_sort = Internal
          , n_occ = occ, n_loc = loc }
 
 mkDerivedInternalName :: (OccName -> OccName) -> Unique -> Name -> Name
 mkDerivedInternalName derive_occ uniq (Name { n_occ = occ, n_loc = loc })
-  = Name { n_uniq = getKeyFastInt uniq, n_sort = Internal
+  = Name { n_uniq = getKey uniq, n_sort = Internal
          , n_occ = derive_occ occ, n_loc = loc }
 
 -- | Create a name which definitely originates in the given module
@@ -338,13 +336,13 @@ mkExternalName :: Unique -> Module -> OccName -> SrcSpan -> Name
 -- (see Note [The Name Cache] in IfaceEnv), so don't just call mkExternalName
 -- with some fresh unique without populating the Name Cache
 mkExternalName uniq mod occ loc
-  = Name { n_uniq = getKeyFastInt uniq, n_sort = External mod,
+  = Name { n_uniq = getKey uniq, n_sort = External mod,
            n_occ = occ, n_loc = loc }
 
 -- | Create a name which is actually defined by the compiler itself
 mkWiredInName :: Module -> OccName -> Unique -> TyThing -> BuiltInSyntax -> Name
 mkWiredInName mod occ uniq thing built_in
-  = Name { n_uniq = getKeyFastInt uniq,
+  = Name { n_uniq = getKey uniq,
            n_sort = WiredIn mod thing built_in,
            n_occ = occ, n_loc = wiredInSrcSpan }
 
@@ -353,7 +351,7 @@ mkSystemName :: Unique -> OccName -> Name
 mkSystemName uniq occ = mkSystemNameAt uniq occ noSrcSpan
 
 mkSystemNameAt :: Unique -> OccName -> SrcSpan -> Name
-mkSystemNameAt uniq occ loc = Name { n_uniq = getKeyFastInt uniq, n_sort = System
+mkSystemNameAt uniq occ loc = Name { n_uniq = getKey uniq, n_sort = System
                                    , n_occ = occ, n_loc = loc }
 
 mkSystemVarName :: Unique -> FastString -> Name
@@ -371,7 +369,7 @@ mkFCallName uniq str = mkInternalName uniq (mkVarOcc str) noSrcSpan
 -- able to change a Name's Unique to match the cached
 -- one in the thing it's the name of.  If you know what I mean.
 setNameUnique :: Name -> Unique -> Name
-setNameUnique name uniq = name {n_uniq = getKeyFastInt uniq}
+setNameUnique name uniq = name {n_uniq = getKey uniq}
 
 -- This is used for hsigs: we want to use the name of the originally exported
 -- entity, but edit the location to refer to the reexport site
@@ -410,7 +408,7 @@ mkLocalisedOccName this_mod mk_occ name = mk_occ origin (nameOccName name)
 -}
 
 cmpName :: Name -> Name -> Ordering
-cmpName n1 n2 = iBox (n_uniq n1) `compare` iBox (n_uniq n2)
+cmpName n1 n2 = n_uniq n1 `compare` n_uniq n2
 
 stableNameCmp :: Name -> Name -> Ordering
 -- Compare lexicographically
@@ -505,7 +503,7 @@ pprName (Name {n_sort = sort, n_uniq = u, n_occ = occ})
       External mod            -> pprExternal sty uniq mod occ False UserSyntax
       System                  -> pprSystem sty uniq occ
       Internal                -> pprInternal sty uniq occ
-  where uniq = mkUniqueGrimily (iBox u)
+  where uniq = mkUniqueGrimily u
 
 pprExternal :: PprStyle -> Unique -> Module -> OccName -> Bool -> BuiltInSyntax -> SDoc
 pprExternal sty uniq mod occ is_wired is_builtin

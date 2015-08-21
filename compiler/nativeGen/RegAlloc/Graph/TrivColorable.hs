@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, CPP #-}
+{-# LANGUAGE CPP #-}
 
 module RegAlloc.Graph.TrivColorable (
         trivColorable,
@@ -14,10 +14,8 @@ import Reg
 import GraphBase
 
 import UniqFM
-import FastTypes
 import Platform
 import Panic
-
 
 -- trivColorable ---------------------------------------------------------------
 
@@ -55,16 +53,16 @@ import Panic
 --      different regSqueeze function for each.
 --
 accSqueeze
-        :: FastInt
-        -> FastInt
-        -> (reg -> FastInt)
+        :: Int
+        -> Int
+        -> (reg -> Int)
         -> UniqFM reg
-        -> FastInt
+        -> Int
 
 accSqueeze count maxCount squeeze ufm = acc count (eltsUFM ufm)
   where acc count [] = count
-        acc count _ | count >=# maxCount = count
-        acc count (r:rs) = acc (count +# squeeze r) rs
+        acc count _ | count >= maxCount = count
+        acc count (r:rs) = acc (count + squeeze r) rs
 
 {- Note [accSqueeze]
 ~~~~~~~~~~~~~~~~~~~~
@@ -100,13 +98,13 @@ the most efficient variant tried. Benchmark compiling 10-times SHA1.hs follows.
 
 trivColorable
         :: Platform
-        -> (RegClass -> VirtualReg -> FastInt)
-        -> (RegClass -> RealReg    -> FastInt)
+        -> (RegClass -> VirtualReg -> Int)
+        -> (RegClass -> RealReg    -> Int)
         -> Triv VirtualReg RegClass RealReg
 
 trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts exclusions
-        | let !cALLOCATABLE_REGS_INTEGER
-                  = iUnbox (case platformArch platform of
+        | let cALLOCATABLE_REGS_INTEGER
+                  =        (case platformArch platform of
                             ArchX86       -> 3
                             ArchX86_64    -> 5
                             ArchPPC       -> 16
@@ -119,7 +117,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts excl
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
                             ArchJavaScript-> panic "trivColorable ArchJavaScript"
                             ArchUnknown   -> panic "trivColorable ArchUnknown")
-        , count2        <- accSqueeze (_ILIT(0)) cALLOCATABLE_REGS_INTEGER
+        , count2        <- accSqueeze 0 cALLOCATABLE_REGS_INTEGER
                                 (virtualRegSqueeze RcInteger)
                                 conflicts
 
@@ -127,11 +125,11 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts excl
                                 (realRegSqueeze   RcInteger)
                                 exclusions
 
-        = count3 <# cALLOCATABLE_REGS_INTEGER
+        = count3 < cALLOCATABLE_REGS_INTEGER
 
 trivColorable platform virtualRegSqueeze realRegSqueeze RcFloat conflicts exclusions
-        | let !cALLOCATABLE_REGS_FLOAT
-                  = iUnbox (case platformArch platform of
+        | let cALLOCATABLE_REGS_FLOAT
+                  =        (case platformArch platform of
                             ArchX86       -> 0
                             ArchX86_64    -> 0
                             ArchPPC       -> 0
@@ -144,7 +142,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcFloat conflicts exclus
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
                             ArchJavaScript-> panic "trivColorable ArchJavaScript"
                             ArchUnknown   -> panic "trivColorable ArchUnknown")
-        , count2        <- accSqueeze (_ILIT(0)) cALLOCATABLE_REGS_FLOAT
+        , count2        <- accSqueeze 0 cALLOCATABLE_REGS_FLOAT
                                 (virtualRegSqueeze RcFloat)
                                 conflicts
 
@@ -152,11 +150,11 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcFloat conflicts exclus
                                 (realRegSqueeze   RcFloat)
                                 exclusions
 
-        = count3 <# cALLOCATABLE_REGS_FLOAT
+        = count3 < cALLOCATABLE_REGS_FLOAT
 
 trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclusions
-        | let !cALLOCATABLE_REGS_DOUBLE
-                  = iUnbox (case platformArch platform of
+        | let cALLOCATABLE_REGS_DOUBLE
+                  =        (case platformArch platform of
                             ArchX86       -> 6
                             ArchX86_64    -> 0
                             ArchPPC       -> 26
@@ -169,7 +167,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
                             ArchJavaScript-> panic "trivColorable ArchJavaScript"
                             ArchUnknown   -> panic "trivColorable ArchUnknown")
-        , count2        <- accSqueeze (_ILIT(0)) cALLOCATABLE_REGS_DOUBLE
+        , count2        <- accSqueeze 0 cALLOCATABLE_REGS_DOUBLE
                                 (virtualRegSqueeze RcDouble)
                                 conflicts
 
@@ -177,11 +175,11 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
                                 (realRegSqueeze   RcDouble)
                                 exclusions
 
-        = count3 <# cALLOCATABLE_REGS_DOUBLE
+        = count3 < cALLOCATABLE_REGS_DOUBLE
 
 trivColorable platform virtualRegSqueeze realRegSqueeze RcDoubleSSE conflicts exclusions
-        | let !cALLOCATABLE_REGS_SSE
-                  = iUnbox (case platformArch platform of
+        | let cALLOCATABLE_REGS_SSE
+                  =        (case platformArch platform of
                             ArchX86       -> 8
                             ArchX86_64    -> 10
                             ArchPPC       -> 0
@@ -194,7 +192,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDoubleSSE conflicts ex
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
                             ArchJavaScript-> panic "trivColorable ArchJavaScript"
                             ArchUnknown   -> panic "trivColorable ArchUnknown")
-        , count2        <- accSqueeze (_ILIT(0)) cALLOCATABLE_REGS_SSE
+        , count2        <- accSqueeze 0 cALLOCATABLE_REGS_SSE
                                 (virtualRegSqueeze RcDoubleSSE)
                                 conflicts
 
@@ -202,7 +200,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDoubleSSE conflicts ex
                                 (realRegSqueeze   RcDoubleSSE)
                                 exclusions
 
-        = count3 <# cALLOCATABLE_REGS_SSE
+        = count3 < cALLOCATABLE_REGS_SSE
 
 
 -- Specification Code ----------------------------------------------------------

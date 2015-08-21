@@ -57,8 +57,6 @@ import CLabel           ( CLabel )
 import DynFlags
 import Outputable
 import Platform
-import FastTypes
-
 
 -- | regSqueeze_class reg
 --      Calculuate the maximum number of register colors that could be
@@ -66,55 +64,55 @@ import FastTypes
 --      as a neighbour.
 --
 {-# INLINE virtualRegSqueeze #-}
-virtualRegSqueeze :: RegClass -> VirtualReg -> FastInt
+virtualRegSqueeze :: RegClass -> VirtualReg -> Int
 
 virtualRegSqueeze cls vr
  = case cls of
         RcInteger
          -> case vr of
-                VirtualRegI{}           -> _ILIT(1)
-                VirtualRegHi{}          -> _ILIT(1)
-                _other                  -> _ILIT(0)
+                VirtualRegI{}           -> 1
+                VirtualRegHi{}          -> 1
+                _other                  -> 0
 
         RcDouble
          -> case vr of
-                VirtualRegD{}           -> _ILIT(1)
-                VirtualRegF{}           -> _ILIT(0)
-                _other                  -> _ILIT(0)
+                VirtualRegD{}           -> 1
+                VirtualRegF{}           -> 0
+                _other                  -> 0
 
         RcDoubleSSE
          -> case vr of
-                VirtualRegSSE{}         -> _ILIT(1)
-                _other                  -> _ILIT(0)
+                VirtualRegSSE{}         -> 1
+                _other                  -> 0
 
-        _other -> _ILIT(0)
+        _other -> 0
 
 {-# INLINE realRegSqueeze #-}
-realRegSqueeze :: RegClass -> RealReg -> FastInt
+realRegSqueeze :: RegClass -> RealReg -> Int
 realRegSqueeze cls rr
  = case cls of
         RcInteger
          -> case rr of
                 RealRegSingle regNo
-                        | regNo < firstfake -> _ILIT(1)
-                        | otherwise     -> _ILIT(0)
+                        | regNo < firstfake -> 1
+                        | otherwise     -> 0
 
-                RealRegPair{}           -> _ILIT(0)
+                RealRegPair{}           -> 0
 
         RcDouble
          -> case rr of
                 RealRegSingle regNo
-                        | regNo >= firstfake && regNo <= lastfake -> _ILIT(1)
-                        | otherwise     -> _ILIT(0)
+                        | regNo >= firstfake && regNo <= lastfake -> 1
+                        | otherwise     -> 0
 
-                RealRegPair{}           -> _ILIT(0)
+                RealRegPair{}           -> 0
 
         RcDoubleSSE
          -> case rr of
-                RealRegSingle regNo | regNo >= firstxmm -> _ILIT(1)
-                _otherwise                        -> _ILIT(0)
+                RealRegSingle regNo | regNo >= firstxmm -> 1
+                _otherwise                        -> 0
 
-        _other -> _ILIT(0)
+        _other -> 0
 
 -- -----------------------------------------------------------------------------
 -- Immediates

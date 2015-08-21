@@ -6,8 +6,8 @@
 Buffers for scanning string input stored in external arrays.
 -}
 
-{-# LANGUAGE BangPatterns, CPP, MagicHash, UnboxedTuples #-}
-{-# OPTIONS_GHC -O -funbox-strict-fields #-}
+{-# LANGUAGE CPP, MagicHash, UnboxedTuples #-}
+{-# OPTIONS_GHC -O #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
 
@@ -45,7 +45,6 @@ module StringBuffer
 
 import Encoding
 import FastString
-import FastTypes
 import FastFunctions
 import Outputable
 import Util
@@ -232,26 +231,10 @@ lexemeToFastString (StringBuffer buf _ cur) len =
 
 -- -----------------------------------------------------------------------------
 -- Parsing integer strings in various bases
-{-
-byteOff :: StringBuffer -> Int -> Char
-byteOff (StringBuffer buf _ cur) i =
-  inlinePerformIO $ withForeignPtr buf $ \ptr -> do
---    return $! cBox (indexWord8OffFastPtrAsFastChar
---                         (pUnbox ptr) (iUnbox (cur+i)))
---or
---    w <- peek (ptr `plusPtr` (cur+i))
---    return (unsafeChr (fromIntegral (w::Word8)))
--}
--- | XXX assumes ASCII digits only (by using byteOff)
 parseUnsignedInteger :: StringBuffer -> Int -> Integer -> (Char->Int) -> Integer
 parseUnsignedInteger (StringBuffer buf _ cur) len radix char_to_int
   = inlinePerformIO $ withForeignPtr buf $ \ptr -> return $! let
-    --LOL, in implementations where the indexing needs slow unsafePerformIO,
-    --this is less (not more) efficient than using the IO monad explicitly
-    --here.
-    !ptr' = pUnbox ptr
-    byteOff i = cBox (indexWord8OffFastPtrAsFastChar ptr' (iUnbox (cur + i)))
     go i x | i == len  = x
-           | otherwise = case byteOff i of
+           | otherwise = case fst (utf8DecodeChar (ptr `plusPtr` (cur + i))) of
                char -> go (i + 1) (x * radix + toInteger (char_to_int char))
   in go 0 0

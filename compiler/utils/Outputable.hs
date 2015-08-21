@@ -72,9 +72,9 @@ module Outputable (
         mkUserStyle, cmdlineParserStyle, Depth(..),
 
         -- * Error handling and debugging utilities
-        pprPanic, pprSorry, assertPprPanic, pprPanicFastInt, pprPgmError,
+        pprPanic, pprSorry, assertPprPanic, pprPgmError,
         pprTrace, warnPprTrace,
-        trace, pgmError, panic, sorry, panicFastInt, assertPanic,
+        trace, pgmError, panic, sorry, assertPanic,
         pprDebugAndThen,
     ) where
 
@@ -87,7 +87,6 @@ import {-# SOURCE #-}   OccName( OccName )
 import {-# SOURCE #-}   StaticFlags( opt_PprStyle_Debug, opt_NoDebugOutput )
 
 import FastString
-import FastTypes
 import qualified Pretty
 import Util
 import Platform
@@ -1031,10 +1030,6 @@ pprTrace :: String -> SDoc -> a -> a
 pprTrace str doc x
    | opt_NoDebugOutput = x
    | otherwise         = pprDebugAndThen unsafeGlobalDynFlags trace (text str) doc x
-
-pprPanicFastInt :: String -> SDoc -> FastInt
--- ^ Specialization of pprPanic that can be safely used with 'FastInt'
-pprPanicFastInt heading pretty_msg = panicDocFastInt heading pretty_msg
 
 warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
 -- ^ Just warn about an assertion failure, recording the given file and line number.

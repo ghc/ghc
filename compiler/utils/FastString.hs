@@ -93,7 +93,6 @@ module FastString
 #include "HsVersions.h"
 
 import Encoding
-import FastTypes
 import FastFunctions
 import Panic
 import Util
@@ -531,8 +530,8 @@ tailFS (FastString _ _ bs _) =
 consFS :: Char -> FastString -> FastString
 consFS c fs = mkFastString (c : unpackFS fs)
 
-uniqueOfFS :: FastString -> FastInt
-uniqueOfFS (FastString u _ _ _) = iUnbox u
+uniqueOfFS :: FastString -> Int
+uniqueOfFS (FastString u _ _ _) = u
 
 nilFS :: FastString
 nilFS = mkFastString ""
@@ -561,23 +560,14 @@ hPutFS handle fs = BS.hPut handle $ fastStringToByteString fs
 -- -----------------------------------------------------------------------------
 -- LitStrings, here for convenience only.
 
--- hmm, not unboxed (or rather FastPtr), interesting
---a.k.a. Ptr CChar, Ptr Word8, Ptr (), hmph.  We don't
---really care about C types in naming, where we can help it.
 type LitString = Ptr Word8
 --Why do we recalculate length every time it's requested?
 --If it's commonly needed, we should perhaps have
---data LitString = LitString {-#UNPACK#-}!(FastPtr Word8) {-#UNPACK#-}!FastInt
+--data LitString = LitString {-#UNPACK#-}!Addr# {-#UNPACK#-}!Int#
 
 mkLitString# :: Addr# -> LitString
 mkLitString# a# = Ptr a#
---can/should we use FastTypes here?
---Is this likely to be memory-preserving if only used on constant strings?
---should we inline it? If lucky, that would make a CAF that wouldn't
---be computationally repeated... although admittedly we're not
---really intending to use mkLitString when __GLASGOW_HASKELL__...
---(I wonder, is unicode / multi-byte characters allowed in LitStrings
--- at all?)
+
 {-# INLINE mkLitString #-}
 mkLitString :: String -> LitString
 mkLitString s =
@@ -594,31 +584,10 @@ mkLitString s =
  )
 
 unpackLitString :: LitString -> String
-unpackLitString p_ = case pUnbox p_ of
- p -> unpack (_ILIT(0))
-  where
-    unpack n = case indexWord8OffFastPtrAsFastChar p n of
-      ch -> if ch `eqFastChar` _CLIT('\0')
-            then [] else cBox ch : unpack (n +# _ILIT(1))
+unpackLitString (Ptr p) = unpackCString# p
 
 lengthLS :: LitString -> Int
 lengthLS = ptrStrLength
-
--- for now, use a simple String representation
---no, let's not do that right now - it's work in other places
-#if 0
-type LitString = String
-
-mkLitString :: String -> LitString
-mkLitString = id
-
-unpackLitString :: LitString -> String
-unpackLitString = id
-
-lengthLS :: LitString -> Int
-lengthLS = length
-
-#endif
 
 -- -----------------------------------------------------------------------------
 -- under the carpet

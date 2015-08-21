@@ -39,7 +39,6 @@ import Format
 
 import Unique
 import Outputable
-import FastTypes
 
 {-
         The SPARC has 64 registers of interest; 32 integer registers and 32
@@ -81,60 +80,60 @@ classOfRealReg reg
 --      as a neighbour.
 --
 {-# INLINE virtualRegSqueeze #-}
-virtualRegSqueeze :: RegClass -> VirtualReg -> FastInt
+virtualRegSqueeze :: RegClass -> VirtualReg -> Int
 
 virtualRegSqueeze cls vr
  = case cls of
         RcInteger
          -> case vr of
-                VirtualRegI{}           -> _ILIT(1)
-                VirtualRegHi{}          -> _ILIT(1)
-                _other                  -> _ILIT(0)
+                VirtualRegI{}           -> 1
+                VirtualRegHi{}          -> 1
+                _other                  -> 0
 
         RcFloat
          -> case vr of
-                VirtualRegF{}           -> _ILIT(1)
-                VirtualRegD{}           -> _ILIT(2)
-                _other                  -> _ILIT(0)
+                VirtualRegF{}           -> 1
+                VirtualRegD{}           -> 2
+                _other                  -> 0
 
         RcDouble
          -> case vr of
-                VirtualRegF{}           -> _ILIT(1)
-                VirtualRegD{}           -> _ILIT(1)
-                _other                  -> _ILIT(0)
+                VirtualRegF{}           -> 1
+                VirtualRegD{}           -> 1
+                _other                  -> 0
 
-        _other -> _ILIT(0)
+        _other -> 0
 
 {-# INLINE realRegSqueeze #-}
-realRegSqueeze :: RegClass -> RealReg -> FastInt
+realRegSqueeze :: RegClass -> RealReg -> Int
 
 realRegSqueeze cls rr
  = case cls of
         RcInteger
          -> case rr of
                 RealRegSingle regNo
-                        | regNo < 32    -> _ILIT(1)
-                        | otherwise     -> _ILIT(0)
+                        | regNo < 32    -> 1
+                        | otherwise     -> 0
 
-                RealRegPair{}           -> _ILIT(0)
+                RealRegPair{}           -> 0
 
         RcFloat
          -> case rr of
                 RealRegSingle regNo
-                        | regNo < 32    -> _ILIT(0)
-                        | otherwise     -> _ILIT(1)
+                        | regNo < 32    -> 0
+                        | otherwise     -> 1
 
-                RealRegPair{}           -> _ILIT(2)
+                RealRegPair{}           -> 2
 
         RcDouble
          -> case rr of
                 RealRegSingle regNo
-                        | regNo < 32    -> _ILIT(0)
-                        | otherwise     -> _ILIT(1)
+                        | regNo < 32    -> 0
+                        | otherwise     -> 1
 
-                RealRegPair{}           -> _ILIT(1)
+                RealRegPair{}           -> 1
 
-        _other -> _ILIT(0)
+        _other -> 0
 
 -- | All the allocatable registers in the machine,
 --      including register pairs.

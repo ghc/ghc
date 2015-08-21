@@ -27,7 +27,6 @@ import Format
 
 import Outputable
 import Unique
-import FastTypes
 import Platform
 
 import qualified X86.Regs       as X86
@@ -37,7 +36,7 @@ import qualified PPC.Regs       as PPC
 
 import qualified SPARC.Regs     as SPARC
 
-targetVirtualRegSqueeze :: Platform -> RegClass -> VirtualReg -> FastInt
+targetVirtualRegSqueeze :: Platform -> RegClass -> VirtualReg -> Int
 targetVirtualRegSqueeze platform
     = case platformArch platform of
       ArchX86       -> X86.virtualRegSqueeze
@@ -54,7 +53,7 @@ targetVirtualRegSqueeze platform
       ArchUnknown   -> panic "targetVirtualRegSqueeze ArchUnknown"
 
 
-targetRealRegSqueeze :: Platform -> RegClass -> RealReg -> FastInt
+targetRealRegSqueeze :: Platform -> RegClass -> RealReg -> Int
 targetRealRegSqueeze platform
     = case platformArch platform of
       ArchX86       -> X86.realRegSqueeze
