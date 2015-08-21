@@ -29,12 +29,13 @@ packagesStage0 = mconcat
     [ append [binPackageDb, binary, cabal, compiler, hoopl, hpc, transformers]
     , notWindowsHost ? notTargetOs "ios" ? append [terminfo] ]
 
+-- TODO: what do we do with parallel, stm, random, primitive, vector and dph?
 packagesStage1 :: Packages
 packagesStage1 = mconcat
     [ packagesStage0
     , append [ array, base, bytestring, containers, deepseq, directory
-             , filepath, ghcPrim, haskeline, integerLibrary, parallel
-             , pretty, primitive, process, stm, templateHaskell, time ]
+             , filepath, ghcPrim, haskeline, integerLibrary, pretty, process
+             , templateHaskell, time ]
     , windowsHost    ? append [win32]
     , notWindowsHost ? append [unix]
     , buildHaddock   ? append [xhtml] ]
@@ -43,9 +44,5 @@ knownPackages :: [Package]
 knownPackages = defaultKnownPackages ++ userKnownPackages
 
 -- Note: this is slow but we keep it simple as there not too many packages (30)
--- We handle integerLibrary in a special way, because packages integerGmp and
--- integerGmp2 have the same package name -- we return the user-selected one.
 findKnownPackage :: PackageName -> Maybe Package
-findKnownPackage name
-    | name == pkgName integerLibrary = Just integerLibrary
-    | otherwise = find (\pkg -> pkgName pkg == name) knownPackages
+findKnownPackage name = find (\pkg -> pkgName pkg == name) knownPackages
