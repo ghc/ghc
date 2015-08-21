@@ -10,8 +10,7 @@ module Expression (
     appendSub, appendSubD, filterSub, removeSub,
     interpret, interpretDiff,
     getStage, getPackage, getBuilder, getFiles, getFile,
-    getSources, getSource, getWay,
-    stage, package, builder, stagedBuilder, file, way
+    getSources, getSource, getWay
     ) where
 
 import Way
@@ -29,13 +28,6 @@ import Control.Monad.Reader hiding (liftIO)
 -- Expr a is a computation that produces a value of type Action a and can read
 -- parameters of the current build Target.
 type Expr a = ReaderT Target Action a
-
--- If values of type a form a Monoid then so do computations of type Expr a:
--- * the empty computation returns the identity element of the underlying type
--- * two computations can be combined by combining their results
-instance Monoid a => Monoid (Expr a) where
-    mempty  = return mempty
-    mappend = liftM2 mappend
 
 -- Diff a holds functions of type a -> a and is equipped with a Monoid instance.
 -- We could use Dual (Endo a) instead of Diff a, but the former may look scary.
@@ -105,7 +97,7 @@ p ?? (t, f) = p ? t <> notP p ? f
 
 -- A monadic version of append
 appendM :: Monoid a => Action a -> DiffExpr a
-appendM mx = lift mx >>= append
+appendM = (append =<<) . lift
 
 -- appendSub appends a list of sub-arguments to all arguments starting with a
 -- given prefix. If there is no argument with such prefix then a new argument
@@ -185,29 +177,5 @@ getFile = do
     target <- ask
     files  <- getFiles
     case files of
-        [file] -> return file
-        _      -> error $ "Exactly one file expected in target " ++ show target
-
--- Basic predicates (see Switches.hs for derived predicates)
-stage :: Stage -> Predicate
-stage s = liftM (s ==) getStage
-
-package :: Package -> Predicate
-package p = liftM (p ==) getPackage
-
--- For unstaged builders, e.g. GhcCabal
-builder :: Builder -> Predicate
-builder b = liftM (b ==) getBuilder
-
--- For staged builders, e.g. Ghc Stage
-stagedBuilder :: (Stage -> Builder) -> Predicate
-stagedBuilder sb = do
-    stage <- getStage
-    builder <- getBuilder
-    return $ builder == sb stage
-
-file :: FilePattern -> Predicate
-file f = liftM (any (f ?==)) getFiles
-
-way :: Way -> Predicate
-way w = liftM (w ==) getWay
+        [res] -> return res
+        _     -> error $ "Exactly one file expected in target " ++ show target

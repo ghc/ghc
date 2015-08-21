@@ -1,14 +1,39 @@
 module Switches (
+    stage, package, builder, stagedBuilder, file, way,
     stage0, stage1, stage2, notStage, notStage0,
     registerPackage, splitObjects
     ) where
 
+import Way
+import Base
 import Stage
+import Package
+import Builder
 import Expression
-import Settings.Util
 import Settings.Default
 import Oracles.Flag
 import Oracles.Setting
+
+-- Basic predicates (see Switches.hs for derived predicates)
+stage :: Stage -> Predicate
+stage s = liftM (s ==) getStage
+
+package :: Package -> Predicate
+package p = liftM (p ==) getPackage
+
+-- For unstaged builders, e.g. GhcCabal
+builder :: Builder -> Predicate
+builder b = liftM (b ==) getBuilder
+
+-- For staged builders, e.g. Ghc Stage
+stagedBuilder :: (Stage -> Builder) -> Predicate
+stagedBuilder sb = (builder . sb) =<< getStage
+
+file :: FilePattern -> Predicate
+file f = liftM (any (f ?==)) getFiles
+
+way :: Way -> Predicate
+way w = liftM (w ==) getWay
 
 -- Derived predicates
 stage0 :: Predicate
@@ -32,13 +57,12 @@ registerPackage = return True
 
 splitObjects :: Predicate
 splitObjects = do
-    stage    <- getStage -- We don't split bootstrap (stage 0) packages
-    package  <- getPackage -- We don't split compiler
-    broken   <- getFlag SplitObjectsBroken
-    ghcUnreg <- getFlag GhcUnregisterised
-    goodArch <- lift $ targetArchs [ "i386", "x86_64", "powerpc", "sparc" ]
-    goodOs   <- lift $ targetOss   [ "mingw32", "cygwin32", "linux"
-                                   , "darwin", "solaris2", "freebsd"
-                                   , "dragonfly", "netbsd", "openbsd"]
-    return $ stage == Stage1 && package /= compiler && not broken
-           && not ghcUnreg && goodArch && goodOs
+    goodStage <- notStage0 -- We don't split bootstrap (stage 0) packages
+    goodPkg   <- notP $ package compiler -- We don't split compiler
+    broken    <- lift $ flag SplitObjectsBroken
+    ghcUnreg  <- lift $ flag GhcUnregisterised
+    goodArch  <- lift $ targetArchs [ "i386", "x86_64", "powerpc", "sparc" ]
+    goodOs    <- lift $ targetOss   [ "mingw32", "cygwin32", "linux", "darwin"
+                                    , "solaris2", "freebsd", "dragonfly"
+                                    , "netbsd", "openbsd" ]
+    return $ goodStage && goodPkg && not broken && not ghcUnreg && goodArch && goodOs
