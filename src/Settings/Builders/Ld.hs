@@ -1,18 +1,16 @@
 module Settings.Builders.Ld (ldArgs) where
 
 import Builder
+import Switches (builder)
 import Expression
 import Oracles.Setting
 import Settings.Util
 
 ldArgs :: Args
 ldArgs = builder Ld ? do
-    stage    <- getStage
-    file     <- getFile
-    objs     <- getSources
-    confArgs <- getSettingList $ ConfLdLinkerArgs stage
-    mconcat [ append confArgs
+    file <- getFile
+    objs <- getSources
+    mconcat [ argStagedSettingList ConfLdLinkerArgs
             , arg "-r"
-            , arg "-o"
-            , arg file
+            , arg "-o", arg file
             , append objs ]

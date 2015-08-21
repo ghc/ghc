@@ -1,6 +1,6 @@
 module Oracles.Flag (
     Flag (..), flag,
-    supportsPackageKey, crossCompiling, gccIsClang, gccLt46,
+    crossCompiling, gccIsClang, gccLt46,
     platformSupportsSharedLibs, ghcWithSMP, ghcWithNativeCodeGen
     ) where
 
@@ -34,9 +34,6 @@ flag f = do
         $ "\nFlag '" ++ key ++ "' is set to '" ++ value
         ++ "' instead of 'YES' or 'NO'."
     return $ value == "YES"
-
-supportsPackageKey :: Action Bool
-supportsPackageKey = flag SupportsPackageKey
 
 crossCompiling :: Action Bool
 crossCompiling = flag CrossCompiling

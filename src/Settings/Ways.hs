@@ -1,27 +1,18 @@
-module Settings.Ways (
-    ways, getWays,
-    rtsWays, getRtsWays
-    ) where
+module Settings.Ways (getWays, getRtsWays) where
 
 import Way
 import Stage
 import Switches
 import Expression
 import Oracles.Flag
-import Settings.User hiding (parallel)
+import Settings.User
 
 -- Combining default ways with user modifications
-ways :: Ways
-ways = defaultWays <> userWays
-
-rtsWays :: Ways
-rtsWays = defaultRtsWays <> userRtsWays
-
 getWays :: Expr [Way]
-getWays = fromDiffExpr ways
+getWays = fromDiffExpr $ defaultWays <> userWays
 
 getRtsWays :: Expr [Way]
-getRtsWays = fromDiffExpr rtsWays
+getRtsWays = fromDiffExpr $ defaultRtsWays <> userRtsWays
 
 -- These are default ways
 defaultWays :: Ways

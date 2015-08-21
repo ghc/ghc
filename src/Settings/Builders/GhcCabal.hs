@@ -68,13 +68,12 @@ libraryArgs = do
 
 configureArgs :: Args
 configureArgs = do
-    stage <- getStage
     let conf key = appendSubD $ "--configure-option=" ++ key
         cFlags   = mconcat [ ccArgs
                            , remove ["-Werror"]
-                           , argSettingList $ ConfCcArgs stage ]
-        ldFlags  = ldArgs <> (argSettingList $ ConfGccLinkerArgs stage)
-        cppFlags = cppArgs <> (argSettingList $ ConfCppArgs stage)
+                           , argStagedSettingList ConfCcArgs ]
+        ldFlags  = ldArgs  <> (argStagedSettingList ConfGccLinkerArgs)
+        cppFlags = cppArgs <> (argStagedSettingList ConfCppArgs)
     mconcat
         [ conf "CFLAGS"   cFlags
         , conf "LDFLAGS"  ldFlags
@@ -86,7 +85,7 @@ configureArgs = do
         , conf "--with-gmp-libraries"   $ argSettingList GmpLibDirs
         -- TODO: why TargetPlatformFull and not host?
         , crossCompiling ? (conf "--host" $ argSetting TargetPlatformFull)
-        , conf "--with-cc" . argM . builderPath $ Gcc stage ]
+        , conf "--with-cc" $ argStagedBuilderPath Gcc ]
 
 bootPackageDbArgs :: Args
 bootPackageDbArgs = do
@@ -128,16 +127,21 @@ ghcIncludeDirs = [ "includes", "includes/dist"
 cppArgs :: Args
 cppArgs = append $ map ("-I" ++) ghcIncludeDirs
 
+-- TODO: Is this needed?
+-- ifeq "$(GMP_PREFER_FRAMEWORK)" "YES"
+-- libraries/integer-gmp_CONFIGURE_OPTS += --with-gmp-framework-preferred
+-- endif
+
 -- TODO: move this somewhere
 customPackageArgs :: Args
 customPackageArgs = do
-    stage   <- getStage
-    rtsWays <- getRtsWays
+    nextStage <- fmap succ getStage
+    rtsWays   <- getRtsWays
     mconcat
-        [ package integerGmp2 ?
+        [ package integerGmp ?
           mconcat [ windowsHost ? builder GhcCabal ?
                     arg "--configure-option=--with-intree-gmp"
-                  , appendCcArgs ["-I" ++ pkgPath integerGmp2 -/- "gmp"] ]
+                  , appendCcArgs ["-I" ++ pkgPath integerGmp -/- "gmp"] ]
 
         , package base ?
           builder GhcCabal ?
@@ -148,8 +152,8 @@ customPackageArgs = do
 
         , package compiler ?
           builder GhcCabal ?
-          mconcat [ arg $ "--ghc-option=-DSTAGE=" ++ show (succ stage)
-                  , arg $ "--flags=stage" ++ show (succ stage)
+          mconcat [ arg $ "--ghc-option=-DSTAGE=" ++ show nextStage
+                  , arg $ "--flags=stage" ++ show nextStage
                   , arg "--disable-library-for-ghci"
                   , targetOs "openbsd" ? arg "--ld-options=-E"
                   , flag GhcUnregisterised ? arg "--ghc-option=-DNO_REGS"
@@ -173,7 +177,7 @@ customPackageArgs = do
         ]
 
 withBuilderKey :: Builder -> String
-withBuilderKey builder = case builder of
+withBuilderKey b = case b of
     Ar       -> "--with-ar="
     Ld       -> "--with-ld="
     Gcc _    -> "--with-gcc="
@@ -186,12 +190,10 @@ withBuilderKey builder = case builder of
 
 -- Expression 'with Gcc' appends "--with-gcc=/path/to/gcc" and needs Gcc.
 with :: Builder -> Args
-with builder = specified builder ? do
-    path <- lift $ builderPath builder
-    lift $ needBuilder builder
-    append [withBuilderKey builder ++ path]
+with b = specified b ? do
+    path <- lift $ builderPath b
+    lift $ needBuilder laxDependencies b
+    append [withBuilderKey b ++ path]
 
 withStaged :: (Stage -> Builder) -> Args
-withStaged sb = do
-    stage <- getStage
-    with $ sb stage
+withStaged sb = (with . sb) =<< getStage

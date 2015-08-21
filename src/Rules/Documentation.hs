@@ -21,20 +21,19 @@ import Control.Monad.Extra
 -- files in the Shake databases seems fragile and unnecesarry.
 buildPackageDocumentation :: Resources -> StagePackageTarget -> Rules ()
 buildPackageDocumentation _ target =
-    let stage   = Target.stage target
-        pkg     = Target.package target
-        name    = pkgName pkg
-        cabal   = pkgCabalPath pkg
-        haddock = pkgHaddockPath pkg
+    let stage       = Target.stage target
+        pkg         = Target.package target
+        cabalFile   = pkgCabalFile pkg
+        haddockFile = pkgHaddockFile pkg
     in when (stage == Stage1) $ do
 
-        haddock %> \file -> do
+        haddockFile %> \file -> do
             whenM (specified HsColour) $ do
-                need [cabal]
-                build $ fullTarget target GhcCabalHsColour [cabal] []
+                need [cabalFile]
+                build $ fullTarget target GhcCabalHsColour [cabalFile] []
             srcs <- interpret target getPackageSources
             deps <- interpret target $ getPkgDataList DepNames
-            let haddocks = [ pkgHaddockPath depPkg
+            let haddocks = [ pkgHaddockFile depPkg
                            | Just depPkg <- map findKnownPackage deps ]
             need $ srcs ++ haddocks
             let haddockWay = if dynamicGhcPrograms then dynamic else vanilla

@@ -24,5 +24,5 @@ windowsRootOracle = do
         let root = dropWhileEnd isSpace out
         putOracle $ "Detected root on Windows: " ++ root
         return root
-    addOracle $ \WindowsRoot{} -> root ()
+    _ <- addOracle $ \WindowsRoot{} -> root ()
     return ()

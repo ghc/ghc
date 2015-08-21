@@ -3,7 +3,7 @@ module Rules.Cabal (cabalRules) where
 import Base
 import Stage
 import Package hiding (library)
-import Expression hiding (package)
+import Expression
 import Settings.Packages
 import Data.List
 import Data.Version
@@ -15,29 +15,27 @@ import Distribution.PackageDescription.Parse
 cabalRules :: Rules ()
 cabalRules = do
     -- Cache boot package constraints (to be used in cabalArgs)
-    bootPackageConstraints %> \file -> do
+    bootPackageConstraints %> \out -> do
         pkgs <- interpret (stageTarget Stage0) getPackages
         constraints <- forM (sort pkgs) $ \pkg -> do
-            let cabal = pkgCabalPath pkg
-            need [cabal]
-            description <- liftIO $ readPackageDescription silent cabal
-            let identifier       = package . packageDescription $ description
+            need [pkgCabalFile pkg]
+            pd <- liftIO . readPackageDescription silent $ pkgCabalFile pkg
+            let identifier       = package . packageDescription $ pd
                 version          = showVersion . pkgVersion $ identifier
                 PackageName name = Distribution.Package.pkgName identifier
             return $ name ++ " == " ++ version
-        writeFileChanged file . unlines $ constraints
+        writeFileChanged out . unlines $ constraints
 
     -- Cache package dependencies
-    packageDependencies %> \file -> do
+    packageDependencies %> \out -> do
         pkgs <- interpret (stageTarget Stage1) getPackages
         pkgDeps <- forM (sort pkgs) $ \pkg -> do
-            let cabal = pkgCabalPath pkg
-            need [cabal]
-            description <- liftIO $ readPackageDescription silent cabal
-            let deps     = collectDeps . condLibrary $ description
+            need [pkgCabalFile pkg]
+            pd <- liftIO . readPackageDescription silent $ pkgCabalFile pkg
+            let deps     = collectDeps . condLibrary $ pd
                 depNames = [ name | Dependency (PackageName name) _ <- deps ]
             return . unwords $ Package.pkgName pkg : sort depNames
-        writeFileChanged file . unlines $ pkgDeps
+        writeFileChanged out . unlines $ pkgDeps
 
 collectDeps :: Maybe (CondTree v [Dependency] a) -> [Dependency]
 collectDeps Nothing = []

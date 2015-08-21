@@ -31,5 +31,5 @@ packageDepsOracle = do
         contents <- readFileLines packageDependencies
         return . Map.fromList
                $ [ (head ps, tail ps) | line <- contents, let ps = words line ]
-    addOracle $ \(PackageDepsKey pkg) -> Map.lookup pkg <$> deps ()
+    _ <- addOracle $ \(PackageDepsKey pkg) -> Map.lookup pkg <$> deps ()
     return ()

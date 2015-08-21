@@ -4,7 +4,7 @@ import Base
 import Util
 import Builder
 import Package
-import Switches
+import Switches (builder, package, stage1)
 import Expression
 import Oracles.PackageData
 import Settings.Util
@@ -35,7 +35,7 @@ haddockArgs = builder Haddock ? do
         , append $ map ("--hide=" ++) hidden
         , append $ [ "--read-interface=../" ++ dep
                      ++ ",../" ++ dep ++ "/src/%{MODULE/./-}.html\\#%{NAME},"
-                     ++ pkgHaddockPath depPkg
+                     ++ pkgHaddockFile depPkg
                    | (dep, depName) <- zip deps depNames
                    , Just depPkg <- [findKnownPackage depName] ]
         , append [ "--optghc=" ++ opt | opt <- ghcOpts ]
@@ -51,6 +51,7 @@ customPackageArgs :: Args
 customPackageArgs = mconcat
     [ package compiler ? stage1 ?
       arg "--optghc=-DSTAGE=2" ]
+    -- TODO: move to getPackageSources
     -- , package ghcPrim  ? stage1 ?
     --   arg "libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs" ]
 

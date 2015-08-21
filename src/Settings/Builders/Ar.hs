@@ -1,6 +1,7 @@
 module Settings.Builders.Ar (arArgs, arPersistentArgsCount) where
 
 import Builder
+import Switches (builder)
 import Expression
 import Settings.Util
 

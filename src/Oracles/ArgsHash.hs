@@ -25,11 +25,11 @@ newtype ArgsHashKey = ArgsHashKey Target
 -- TODO: enforce the above assumption via type trickery?
 checkArgsHash :: FullTarget -> Action ()
 checkArgsHash target = do
-    tmp <- askOracle . ArgsHashKey $ target { sources = ["src"] } :: Action Int
+    _ <- askOracle . ArgsHashKey $ target { sources = ["src"] } :: Action Int
     return ()
 
 -- Oracle for storing per-target argument list hashes
 argsHashOracle :: Rules ()
 argsHashOracle = do
-    addOracle $ \(ArgsHashKey target) -> hash <$> interpret target getArgs
+    _ <- addOracle $ \(ArgsHashKey target) -> hash <$> interpret target getArgs
     return ()

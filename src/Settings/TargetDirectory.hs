@@ -1,5 +1,5 @@
 module Settings.TargetDirectory (
-    targetDirectory, targetPath, pkgHaddockPath
+    targetDirectory, targetPath, pkgHaddockFile
     ) where
 
 import Base
@@ -18,6 +18,6 @@ targetPath stage pkg = pkgPath pkg -/- targetDirectory stage pkg
 
 -- Relative path to a package haddock file, e.g.:
 -- "libraries/array/dist-install/doc/html/array/array.haddock"
-pkgHaddockPath :: Package -> FilePath
-pkgHaddockPath pkg @ (Package name _) =
+pkgHaddockFile :: Package -> FilePath
+pkgHaddockFile pkg @ (Package name _) =
     targetPath Stage1 pkg -/- "doc/html" -/- name -/- name <.> "haddock"

@@ -21,10 +21,10 @@ buildPackageDependencies _ target =
         dropBuild = (pkgPath pkg ++) . drop (length buildPath)
         hDepFile  = buildPath -/- ".hs-dependencies"
     in do
-        (buildPath <//> "*.c.deps") %> \file -> do
-            let srcFile = dropBuild . dropExtension $ file
+        (buildPath <//> "*.c.deps") %> \out -> do
+            let srcFile = dropBuild . dropExtension $ out
             need [srcFile]
-            build $ fullTarget target (GccM stage) [srcFile] [file]
+            build $ fullTarget target (GccM stage) [srcFile] [out]
 
         hDepFile %> \file -> do
             srcs <- interpret target getPackageSources

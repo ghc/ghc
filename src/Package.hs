@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Package (
-    Package (..), PackageName, pkgCabalPath,
+    Package (..), PackageName, pkgCabalFile,
     library, topLevel, setPath
     ) where
 
@@ -22,8 +22,8 @@ data Package = Package
      deriving Generic
 
 -- Relative path to cabal file, e.g.: "libraries/Cabal/Cabal/Cabal.cabal"
-pkgCabalPath :: Package -> FilePath
-pkgCabalPath pkg = pkgPath pkg -/- pkgName pkg <.> "cabal"
+pkgCabalFile :: Package -> FilePath
+pkgCabalFile pkg = pkgPath pkg -/- pkgName pkg <.> "cabal"
 
 instance Show Package where
     show = pkgName

@@ -4,7 +4,7 @@ import Base
 import Util
 import Package
 import Builder
-import Switches
+import Switches (registerPackage)
 import Expression
 import qualified Target
 import Oracles.PackageDeps
@@ -18,11 +18,11 @@ import Control.Monad.Extra
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 buildPackageData :: Resources -> StagePackageTarget -> Rules ()
-buildPackageData (Resources ghcCabal ghcPkg) target = do
+buildPackageData rs target = do
     let stage     = Target.stage target
         pkg       = Target.package target
         path      = targetPath stage pkg
-        cabal     = pkgCabalPath pkg
+        cabalFile = pkgCabalFile pkg
         configure = pkgPath pkg -/- "configure"
 
     (path -/-) <$>
@@ -33,7 +33,7 @@ buildPackageData (Resources ghcCabal ghcPkg) target = do
         , "build" -/- "autogen" -/- "cabal_macros.h"
         -- TODO: Is this needed? Also check out Paths_cpsa.hs.
         -- , "build" -/- "autogen" -/- ("Paths_" ++ name) <.> "hs"
-        ] &%> \files -> do
+        ] &%> \outs -> do
             -- GhcCabal may run the configure script, so we depend on it
             -- We don't know who built the configure script from configure.ac
             whenM (doesFileExist $ configure <.> "ac") $ need [configure]
@@ -41,18 +41,18 @@ buildPackageData (Resources ghcCabal ghcPkg) target = do
             -- We configure packages in the order of their dependencies
             deps <- packageDeps pkg
             pkgs <- interpret target getPackages
-            let cmp pkg name = compare (pkgName pkg) name
-                depPkgs      = intersectOrd cmp (sort pkgs) deps
+            let cmp p name = compare (pkgName p) name
+                depPkgs    = intersectOrd cmp (sort pkgs) deps
             need [ targetPath stage p -/- "package-data.mk" | p <- depPkgs ]
 
-            need [cabal]
-            buildWithResources [(ghcCabal, 1)] $
-                fullTarget target GhcCabal [cabal] files
+            need [cabalFile]
+            buildWithResources [(ghcCabal rs, 1)] $
+                fullTarget target GhcCabal [cabalFile] outs
 
             -- TODO: find out of ghc-cabal can be concurrent with ghc-pkg
             whenM (interpret target registerPackage) .
-                buildWithResources [(ghcPkg, 1)] $
-                fullTarget target (GhcPkg stage) [cabal] files
+                buildWithResources [(ghcPkg rs, 1)] $
+                fullTarget target (GhcPkg stage) [cabalFile] outs
 
             postProcessPackageData $ path -/- "package-data.mk"
 

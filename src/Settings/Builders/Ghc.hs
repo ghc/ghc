@@ -4,7 +4,7 @@ import Way
 import Util
 import Stage
 import Builder
-import Switches
+import Switches (stagedBuilder, splitObjects, stage0)
 import Expression
 import Oracles.Flag
 import Oracles.PackageData
@@ -32,7 +32,7 @@ ghcMArgs = stagedBuilder GhcM ? do
     mconcat [ arg "-M"
             , commonGhcArgs
             , arg "-dep-makefile", arg file
-            , append $ concat [ ["-dep-suffix", wayPrefix way] | way <- ways ]
+            , append $ concat [ ["-dep-suffix", wayPrefix w] | w <- ways ]
             , append srcs ]
 
 -- This is included into ghcArgs, ghcMArgs and haddockArgs.
@@ -78,18 +78,16 @@ packageGhcArgs = do
     stage              <- getStage
     supportsPackageKey <- getFlag SupportsPackageKey
     pkgKey             <- getPkgData PackageKey
-    pkgDepKeys         <- getPkgDataList DepKeys
-    pkgDeps            <- getPkgDataList Deps
+    pkgDepIds          <- getPkgDataList DepIds
     mconcat
         [ arg "-hide-all-packages"
         , arg "-no-user-package-db"
         , arg "-include-pkg-deps"
         , stage0 ? arg "-package-db libraries/bootstrapping.conf"
         , if supportsPackageKey || stage /= Stage0
-          then mconcat [ arg $ "-this-package-key " ++ pkgKey
-                       , append $ map ("-package-key " ++) pkgDepKeys ]
-          else mconcat [ arg $ "-package-name " ++ pkgKey
-                       , append $ map ("-package " ++) pkgDeps ]]
+          then arg $ "-this-package-key " ++ pkgKey
+          else arg $ "-package-name "     ++ pkgKey
+        , append $ map ("-package-id " ++) pkgDepIds ]
 
 includeGhcArgs :: Args
 includeGhcArgs = do

@@ -7,6 +7,7 @@ module Settings.User (
 
 import Stage
 import Package
+import Switches
 import Expression
 import Settings.Default
 
@@ -36,7 +37,7 @@ userTargetDirectory = defaultTargetDirectory
 
 -- Choose integer library: integerGmp, integerGmp2 or integerSimple
 integerLibrary :: Package
-integerLibrary = integerGmp2
+integerLibrary = integerGmp
 
 -- User-defined flags. Note the following type semantics:
 -- * Bool: a plain Boolean flag whose value is known at compile time
@@ -62,6 +63,10 @@ ghciWithDebugger = False
 ghcProfiled :: Bool
 ghcProfiled = False
 
+-- When laxDependencies flag is set to True, dependencies on the GHC executable
+-- are turned into order-only dependencies to avoid needless recompilation when
+-- making changes to GHC's sources. In certain situations this can lead to build
+-- failures, in which case you should reset the flag (at least temporarily).
 laxDependencies :: Bool
 laxDependencies = False
 

@@ -3,6 +3,7 @@ module Settings.Builders.Gcc (gccArgs, gccMArgs) where
 import Base
 import Util
 import Builder
+import Switches (stagedBuilder)
 import Expression
 import Oracles.PackageData
 import Settings.Util
@@ -10,7 +11,6 @@ import Settings.Util
 -- TODO: check code duplication
 gccArgs :: Args
 gccArgs = stagedBuilder Gcc ? do
-    path   <- getTargetPath
     file   <- getFile
     src    <- getSource
     ccArgs <- getPkgDataList CcArgs
@@ -24,28 +24,25 @@ gccArgs = stagedBuilder Gcc ? do
 -- TODO: handle custom $1_$2_MKDEPENDC_OPTS and
 gccMArgs :: Args
 gccMArgs = stagedBuilder GccM ? do
-    path   <- getTargetPath
     file   <- getFile
     src    <- getSource
     ccArgs <- getPkgDataList CcArgs
-    mconcat
-        [ arg "-E"
-        , arg "-MM"
-        , append ccArgs -- TODO: remove? any other flags?
-        , includeGccArgs
-        , arg "-MF"
-        , arg file
-        , arg "-MT"
-        , arg $ dropExtension file -<.> "o"
-        , arg "-x"
-        , arg "c"
-        , arg src ]
+    mconcat [ arg "-E"
+            , arg "-MM"
+            , append ccArgs -- TODO: remove? any other flags?
+            , includeGccArgs
+            , arg "-MF"
+            , arg file
+            , arg "-MT"
+            , arg $ dropExtension file -<.> "o"
+            , arg "-x"
+            , arg "c"
+            , arg src ]
 
 includeGccArgs :: Args
 includeGccArgs = do
     path    <- getTargetPath
     pkgPath <- getPackagePath
-    pkg     <- getPackage
     iDirs   <- getPkgDataList IncludeDirs
     dDirs   <- getPkgDataList DepIncludeDirs
     mconcat

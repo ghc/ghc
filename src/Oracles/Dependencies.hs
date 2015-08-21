@@ -45,5 +45,5 @@ dependenciesOracle = do
                               . groupBy ((==) `on` fst)
                               . sortBy (compare `on` fst) $ contents
 
-    addOracle $ \(DependenciesKey (file, obj)) -> Map.lookup obj <$> deps file
+    _ <- addOracle $ \(DependenciesKey (file, obj)) -> Map.lookup obj <$> deps file
     return ()

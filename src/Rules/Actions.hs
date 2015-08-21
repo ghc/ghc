@@ -10,7 +10,6 @@ import qualified Target
 import Oracles.Setting
 import Oracles.ArgsHash
 import Settings.Args
-import Settings.Util
 import Settings.User
 import Settings.Builders.Ar
 
@@ -20,7 +19,7 @@ import Settings.Builders.Ar
 buildWithResources :: [(Resource, Int)] -> FullTarget -> Action ()
 buildWithResources rs target = do
     let builder = Target.builder target
-    needBuilder builder
+    needBuilder laxDependencies builder
     path    <- builderPath builder
     argList <- interpret target getArgs
     -- The line below forces the rule to be rerun if the args hash has changed
@@ -55,11 +54,11 @@ interestingInfo builder ss = case builder of
     GhcCabal -> prefixAndSuffix 3 0 ss
     _        -> ss
   where
-    prefixAndSuffix n m ss =
-        if length ss <= n + m + 1
-        then ss
-        else take n ss
+    prefixAndSuffix n m list =
+        if length list <= n + m + 1
+        then list
+        else take n list
              ++ ["... skipping "
-             ++ show (length ss - n - m)
+             ++ show (length list - n - m)
              ++ " arguments ..."]
-             ++ drop (length ss - m) ss
+             ++ drop (length list - m) list

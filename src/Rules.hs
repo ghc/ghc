@@ -27,17 +27,17 @@ generateTargets = action $ do
         fmap concat . forM pkgs $ \pkg -> do
             let target    = stagePackageTarget stage pkg
                 buildPath = targetPath stage pkg -/- "build"
-            buildGhciLib <- interpret target $ getPkgData BuildGhciLib
-            pkgKey       <- interpret target $ getPkgData PackageKey
-            buildHaddock <- interpret target $ Settings.User.buildHaddock
-            let ghciLib = [ buildPath -/- "HS" ++ pkgKey <.> "o"
-                          | buildGhciLib == "YES" && stage /= Stage0 ]
-                haddock = [ pkgHaddockPath pkg | buildHaddock ]
+            libName     <- interpret target $ getPkgData LibName
+            needGhciLib <- interpret target $ getPkgData BuildGhciLib
+            needHaddock <- interpret target buildHaddock
+            let ghciLib = [ buildPath -/- "HS" ++ libName <.> "o"
+                          | needGhciLib == "YES" && stage /= Stage0 ]
+                haddock = [ pkgHaddockFile pkg | needHaddock ]
 
             ways <- interpret target getWays
             libs <- forM ways $ \way -> do
                 extension <- libsuf way
-                return $ buildPath -/- "libHS" ++ pkgKey <.> extension
+                return $ buildPath -/- "libHS" ++ libName <.> extension
 
             return $ ghciLib ++ libs ++ haddock
 

@@ -1,6 +1,7 @@
 import Base
 import Rules
 
+main :: IO ()
 main = shakeArgs shakeOptions{shakeFiles = shakeFilesPath} $ do
     oracleRules     -- see module Rules.Oracles
     cabalRules      -- see module Rules.Cabal

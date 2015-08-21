@@ -1,30 +1,23 @@
 module Settings.Util (
-    -- Primitive settings elements
     arg, argM,
-    argSetting, argSettingList,
-    getFlag, getSetting, getSettingList,
+    argSetting, argSettingList, argStagedSettingList, argStagedBuilderPath,
+    getFlag, getSetting, getSettingList, getStagedSettingList,
     getPkgData, getPkgDataList,
-    getPackagePath, getTargetDirectory, getTargetPath, getHaddockPath,
+    getPackagePath, getTargetDirectory, getTargetPath, getHaddockFile,
     getPackageSources,
-    appendCcArgs,
-    needBuilder
-    -- argBuilderPath, argStagedBuilderPath,
-    -- argPackageKey, argPackageDeps, argPackageDepKeys, argSrcDirs,
-    -- argIncludeDirs, argDepIncludeDirs,
-    -- argConcat, argConcatPath, argConcatSpace,
-    -- argPairs, argPrefix, argPrefixPath,
-    -- argPackageConstraints,
+    appendCcArgs
     ) where
 
 import Base
 import Util
+import Stage
 import Builder
 import Package
+import Switches
 import Expression
 import Oracles.Flag
 import Oracles.Setting
 import Oracles.PackageData
-import Settings.User
 import Settings.TargetDirectory
 import Data.List
 import Data.Function
@@ -34,13 +27,19 @@ arg :: String -> Args
 arg = append . return
 
 argM :: Action String -> Args
-argM = appendM . fmap return
+argM = (arg =<<) . lift
 
 argSetting :: Setting -> Args
 argSetting = argM . setting
 
 argSettingList :: SettingList -> Args
 argSettingList = appendM . settingList
+
+argStagedSettingList :: (Stage -> SettingList) -> Args
+argStagedSettingList ss = (argSettingList . ss) =<< getStage
+
+argStagedBuilderPath :: (Stage -> Builder) -> Args
+argStagedBuilderPath sb = (argM . builderPath . sb) =<< getStage
 
 getFlag :: Flag -> Expr Bool
 getFlag = lift . flag
@@ -51,17 +50,14 @@ getSetting = lift . setting
 getSettingList :: SettingList -> Expr [String]
 getSettingList = lift . settingList
 
+getStagedSettingList :: (Stage -> SettingList) -> Expr [String]
+getStagedSettingList ss = lift . settingList . ss =<< getStage
+
 getPkgData :: (FilePath -> PackageData) -> Expr String
-getPkgData key = do
-    stage <- getStage
-    pkg   <- getPackage
-    lift . pkgData . key $ targetPath stage pkg
+getPkgData key = lift . pkgData . key =<< getTargetPath
 
 getPkgDataList :: (FilePath -> PackageDataList) -> Expr [String]
-getPkgDataList key = do
-    stage <- getStage
-    pkg   <- getPackage
-    lift . pkgDataList . key $ targetPath stage pkg
+getPkgDataList key = lift . pkgDataList . key =<< getTargetPath
 
 getPackagePath :: Expr FilePath
 getPackagePath = liftM pkgPath getPackage
@@ -72,18 +68,18 @@ getTargetDirectory = liftM2 targetDirectory getStage getPackage
 getTargetPath :: Expr FilePath
 getTargetPath = liftM2 targetPath getStage getPackage
 
-getHaddockPath :: Expr FilePath
-getHaddockPath = liftM pkgHaddockPath getPackage
+getHaddockFile :: Expr FilePath
+getHaddockFile = liftM pkgHaddockFile getPackage
 
 -- Find all Haskell source files for the current target
 getPackageSources :: Expr [FilePath]
 getPackageSources = do
-    path    <- getTargetPath
-    pkgPath <- getPackagePath
-    srcDirs <- getPkgDataList SrcDirs
+    path        <- getTargetPath
+    packagePath <- getPackagePath
+    srcDirs     <- getPkgDataList SrcDirs
 
     let buildPath = path -/- "build"
-        dirs      = (buildPath -/- "autogen") : map (pkgPath -/-) srcDirs
+        dirs      = (buildPath -/- "autogen") : map (packagePath -/-) srcDirs
 
     (foundSources, missingSources) <- findModuleFiles dirs "*hs"
 
@@ -127,20 +123,8 @@ findModuleFiles dirs extension = do
 -- Pass arguments to Gcc and corresponding lists of sub-arguments of GhcCabal
 appendCcArgs :: [String] -> Args
 appendCcArgs xs = do
-    stage <- getStage
-    mconcat [ builder (Gcc stage)  ? append xs
-            , builder (GccM stage) ? append xs
-            , builder GhcCabal     ? appendSub "--configure-option=CFLAGS" xs
-            , builder GhcCabal     ? appendSub "--gcc-options" xs ]
+    mconcat [ stagedBuilder Gcc  ? append xs
+            , stagedBuilder GccM ? append xs
+            , builder GhcCabal   ? appendSub "--configure-option=CFLAGS" xs
+            , builder GhcCabal   ? appendSub "--gcc-options" xs ]
 
--- Make sure a builder exists on the given path and rebuild it if out of date.
--- If laxDependencies is true (Settings/User.hs) then we do not rebuild GHC
--- even if it is out of date (can save a lot of build time when changing GHC).
-needBuilder :: Builder -> Action ()
-needBuilder ghc @ (Ghc stage) = do
-    path <- builderPath ghc
-    if laxDependencies then orderOnly [path] else need [path]
-
-needBuilder builder = do
-    path <- builderPath builder
-    need [path]

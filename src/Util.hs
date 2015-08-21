@@ -40,20 +40,18 @@ a -/- b = unifyPath $ a </> b
 
 infixr 6 -/-
 
--- (chunksOfSize size ss) splits a list of strings 'ss' into chunks not
+-- (chunksOfSize size strings) splits a given list of strings into chunks not
 -- exceeding the given 'size'.
 chunksOfSize :: Int -> [String] -> [[String]]
 chunksOfSize _    [] = []
-chunksOfSize size ss = reverse chunk : chunksOfSize size rest
+chunksOfSize size strings = reverse chunk : chunksOfSize size rest
   where
-    (chunk, rest) = go [] 0 ss
-    go chunk _         []     = (chunk, [])
-    go chunk chunkSize (s:ss) = let newSize = chunkSize + length s
-                                    (newChunk, rest) = go (s:chunk) newSize ss
-                                in
-                                if newSize > size
-                                then (chunk   , s:ss)
-                                else (newChunk, rest)
+    (chunk, rest) = go [] 0 strings
+    go res _         []     = (res, [])
+    go res chunkSize (s:ss) =
+        if newSize > size then (chunk, s:ss) else go (s:res) newSize ss
+      where
+        newSize = chunkSize + length s
 
 -- A more colourful version of Shake's putNormal
 putColoured :: Color -> String -> Action ()

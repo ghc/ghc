@@ -36,5 +36,5 @@ configOracle = do
         need [configFile]
         putOracle $ "Reading " ++ configFile ++ "..."
         liftIO $ readConfigFile configFile
-    addOracle $ \(ConfigKey key) -> Map.lookup key <$> cfg ()
+    _ <- addOracle $ \(ConfigKey key) -> Map.lookup key <$> cfg ()
     return ()

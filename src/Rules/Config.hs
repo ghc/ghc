@@ -12,12 +12,13 @@ configCommand = "AC_CONFIG_FILES([" ++ configPath ++ "system.config])"
 
 configRules :: Rules ()
 configRules = do
-    configPath -/- "system.config" %> \out -> do
+    configPath -/- "system.config" %> \_ -> do
         need [configPath -/- "system.config.in", "configure"]
         putBuild "Running configure..."
         cmd "bash configure" -- TODO: get rid of 'bash'
 
-    "configure" %> \out -> do
+    -- TODO: this rule won't rebuild if configure.ac is changed. Worth fixing?
+    "configure" %> \_ -> do
         -- Make sure 'configure.ac' script contains a line with configCommand
         script <- fmap lines . liftIO $ readFile "configure.ac"
         when (configCommand `notElem` script) $ do
