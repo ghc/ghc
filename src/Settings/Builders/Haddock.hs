@@ -26,6 +26,7 @@ haddockArgs = builder Haddock ? do
     ghcOpts  <- fromDiffExpr commonGhcArgs
     mconcat
         [ arg $ "--odir=" ++ takeDirectory file
+        , arg "--verbosity=0"
         , arg "--no-tmp-comp-dir"
         , arg $ "--dump-interface=" ++ file
         , arg "--html"
@@ -39,12 +40,14 @@ haddockArgs = builder Haddock ? do
                    | (dep, depName) <- zip deps depNames
                    , Just depPkg <- [findKnownPackage depName] ]
         , append [ "--optghc=" ++ opt | opt <- ghcOpts ]
-        , arg "--source-module=src/%{MODULE/./-}.html"
-        , arg "--source-entity=src/%{MODULE/./-}.html\\#%{NAME}"
+        , specified HsColour ?
+          arg "--source-module=src/%{MODULE/./-}.html"
+        , specified HsColour ?
+          arg "--source-entity=src/%{MODULE/./-}.html\\#%{NAME}"
         , customPackageArgs
         , append srcs
         , arg "+RTS"
-        , arg $ "-t" ++ file <.> "t"
+        , arg $ "-t" ++ path </> "haddock.t"
         , arg "--machine-readable" ]
 
 customPackageArgs :: Args
