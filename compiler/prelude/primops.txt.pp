@@ -1115,7 +1115,13 @@ primop  SizeofByteArrayOp "sizeofByteArray#" GenPrimOp
 
 primop  SizeofMutableByteArrayOp "sizeofMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int#
-   {Return the size of the array in bytes.}
+   {Return the size of the array in bytes. Note that this is deprecated as it is
+   unsafe in the presence of concurrent resize operations on the same byte
+   array. See {\tt getSizeofMutableByteArray}.}
+
+primop  GetSizeofMutableByteArrayOp "getSizeofMutableByteArray#" GenPrimOp
+   MutableByteArray# s -> State# s -> (# State# s, Int# #)
+   {Return the number of elements in the array.}
 
 primop IndexByteArrayOp_Char "indexCharArray#" GenPrimOp
    ByteArray# -> Int# -> Char#

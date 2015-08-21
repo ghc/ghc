@@ -327,6 +327,11 @@ emitPrimOp dflags [res] SizeofByteArrayOp [arg]
 emitPrimOp dflags [res] SizeofMutableByteArrayOp [arg]
    = emitPrimOp dflags [res] SizeofByteArrayOp [arg]
 
+--  #define getSizzeofMutableByteArrayzh(r,a) \
+--      r = ((StgArrWords *)(a))->bytes
+emitPrimOp dflags [res] GetSizeofMutableByteArrayOp [arg]
+   = emitAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
+
 
 --  #define touchzh(o)                  /* nothing */
 emitPrimOp _ res@[] TouchOp args@[_arg]

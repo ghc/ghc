@@ -34,6 +34,7 @@ import Control.Monad
 
 import ExtsCompat46
 import GHC.IO ( IO(..) )
+import System.IO.Unsafe ( unsafeDupablePerformIO )
 
 data BreakArray = BA (MutableByteArray# RealWorld)
 
@@ -73,7 +74,16 @@ safeIndex :: DynFlags -> BreakArray -> Int -> Bool
 safeIndex dflags array index = index < size dflags array && index >= 0
 
 size :: DynFlags -> BreakArray -> Int
-size dflags (BA array) = (I# (sizeofMutableByteArray# array)) `div` wORD_SIZE dflags
+size dflags (BA array) = size `div` wORD_SIZE dflags
+  where
+    -- We want to keep this operation pure. The mutable byte array
+    -- is never resized so this is safe.
+    size = unsafeDupablePerformIO $ sizeofMutableByteArray array
+
+    sizeofMutableByteArray :: MutableByteArray# RealWorld -> IO Int
+    sizeofMutableByteArray arr =
+        IO $ \s -> case getSizeofMutableByteArray# arr s of
+                       (# s', n# #) -> (# s', I# n# #)
 
 allocBA :: Int -> IO BreakArray
 allocBA (I# sz) = IO $ \s1 ->
