@@ -49,7 +49,7 @@ chunksOfSize size strings = reverse chunk : chunksOfSize size rest
     (chunk, rest) = go [] 0 strings
     go res _         []     = (res, [])
     go res chunkSize (s:ss) =
-        if newSize > size then (chunk, s:ss) else go (s:res) newSize ss
+        if newSize > size then (res, s:ss) else go (s:res) newSize ss
       where
         newSize = chunkSize + length s
 
