@@ -1,4 +1,4 @@
-module Way ( -- TODO: rename to "Way"?
+module Way (
     WayUnit (..),
     Way, wayFromUnits, wayUnit,
 
@@ -13,7 +13,7 @@ module Way ( -- TODO: rename to "Way"?
     safeDetectWay, detectWay, matchBuildResult
     ) where
 
-import Base
+import Base hiding (unit)
 import Util
 import Oracles.Setting
 import Data.List
@@ -74,6 +74,7 @@ instance Read Way where
 instance Eq Way where
     Way a == Way b = a == b
 
+vanilla, profiling, logging, parallel, granSim :: Way
 vanilla   = wayFromUnits []
 profiling = wayFromUnits [Profiling]
 logging   = wayFromUnits [Logging]
@@ -82,6 +83,11 @@ granSim   = wayFromUnits [GranSim]
 
 -- RTS only ways
 -- TODO: do we need to define *only* these? Shall we generalise/simplify?
+threaded, threadedProfiling, threadedLogging, debug, debugProfiling,
+    threadedDebug, threadedDebugProfiling, dynamic, profilingDynamic,
+    threadedProfilingDynamic, threadedDynamic, threadedDebugDynamic,
+    debugDynamic, loggingDynamic, threadedLoggingDynamic :: Way
+
 threaded                 = wayFromUnits [Threaded]
 threadedProfiling        = wayFromUnits [Threaded, Profiling]
 threadedLogging          = wayFromUnits [Threaded, Logging]
@@ -102,7 +108,7 @@ wayPrefix :: Way -> String
 wayPrefix way | way == vanilla = ""
               | otherwise      = show way ++ "_"
 
-hisuf, osuf, hcsuf, obootsuf, ssuf :: Way -> String
+osuf, ssuf, hisuf, hcsuf, obootsuf, hibootsuf :: Way -> String
 osuf      = (++ "o"      ) . wayPrefix
 ssuf      = (++ "s"      ) . wayPrefix
 hisuf     = (++ "hi"     ) . wayPrefix
