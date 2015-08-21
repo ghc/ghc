@@ -1544,7 +1544,8 @@ nodeMapElts = Map.elems
 warnUnnecessarySourceImports :: GhcMonad m => [SCC ModSummary] -> m ()
 warnUnnecessarySourceImports sccs = do
   dflags <- getDynFlags
-  logWarnings (listToBag (concatMap (check dflags . flattenSCC) sccs))
+  when (wopt Opt_WarnUnusedImports dflags)
+    (logWarnings (listToBag (concatMap (check dflags . flattenSCC) sccs)))
   where check dflags ms =
            let mods_in_this_cycle = map ms_mod_name ms in
            [ warn dflags i | m <- ms, i <- ms_home_srcimps m,
