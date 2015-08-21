@@ -1,6 +1,6 @@
-{-# LANGUAGE DeriveGeneric, TypeSynonymInstances #-}
+{-# LANGUAGE DeriveGeneric, FlexibleInstances #-}
 module Target (
-    Target (..), StageTarget (..), StagePackageTarget (..), FullTarget (..),
+    Target (..), StageTarget, StagePackageTarget, FullTarget,
     stageTarget, stagePackageTarget, fullTarget, fullTargetWithWay,
     ) where
 
@@ -10,6 +10,8 @@ import Stage
 import Package
 import Builder
 import GHC.Generics
+import Data.Monoid
+import Control.Monad.Reader
 
 -- Target captures all parameters relevant to the current build target:
 -- * Stage and Package being built,
@@ -27,6 +29,14 @@ data Target = Target
         files   :: [FilePath]
      }
      deriving (Show, Eq, Generic)
+
+-- If values of type 'a' form a Monoid then we can also derive a Monoid instance
+-- for values of type 'ReaderT Target Action a':
+-- * the empty computation returns the identity element of the underlying type
+-- * two computations can be combined by combining their results
+instance Monoid a => Monoid (ReaderT Target Action a) where
+    mempty  = return mempty
+    mappend = liftM2 mappend
 
 -- StageTarget is a partially constructed Target. Only stage is guaranteed to
 -- be assigned.
