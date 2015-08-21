@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Builder (
-    Builder (..), builderKey, builderPath, specified
+    Builder (..), builderKey, builderPath, specified, needBuilder
     ) where
 
 import Base
@@ -61,7 +61,7 @@ builderKey builder = case builder of
     -- GhcCabalHsColour is a synonym for GhcCabal (called in hscolour mode)
     GhcCabalHsColour -> builderKey $ GhcCabal
 
-builderPath :: Builder -> Action String
+builderPath :: Builder -> Action FilePath
 builderPath builder = do
     path <- askConfigWithDefault (builderKey builder) $
             putError $ "\nCannot find path to '" ++ (builderKey builder)
@@ -70,6 +70,21 @@ builderPath builder = do
 
 specified :: Builder -> Action Bool
 specified = fmap (not . null) . builderPath
+
+-- Make sure a builder exists on the given path and rebuild it if out of date.
+-- If laxDependencies is True then we do not rebuild GHC even if it is out of
+-- date (can save a lot of build time when changing GHC).
+needBuilder :: Bool -> Builder -> Action ()
+needBuilder laxDependencies builder = do
+    path <- builderPath builder
+    if laxDependencies && allowOrderOnlyDependency builder
+    then orderOnly [path]
+    else need      [path]
+  where
+    allowOrderOnlyDependency :: Builder -> Bool
+    allowOrderOnlyDependency (Ghc  _) = True
+    allowOrderOnlyDependency (GhcM _) = True
+    allowOrderOnlyDependency _ = False
 
 -- On Windows: if the path starts with "/", prepend it with the correct path to
 -- the root, e.g: "/usr/local/bin/ghc.exe" => "C:/msys/usr/local/bin/ghc.exe".
@@ -83,12 +98,6 @@ fixAbsolutePathOnWindows path = do
         return . unifyPath $ root ++ drop 1 path
     else
         return path
-
--- When LaxDeps flag is set ('lax-dependencies = YES' in user.config),
--- dependencies on the GHC executable are turned into order-only dependencies
--- to avoid needless recompilation when making changes to GHC's sources. In
--- certain situations this can lead to build failures, in which case you
--- should reset the flag (at least temporarily).
 
 -- Instances for storing in the Shake database
 instance Binary Builder
