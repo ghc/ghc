@@ -3,8 +3,8 @@ module Settings.Default (
 
     array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
     deepseq, directory, filepath, ghcPrim, haskeline, hoopl, hpc, integerGmp,
-    integerGmp2, integerSimple, parallel, pretty, primitive, process, stm,
-    templateHaskell, terminfo, time, transformers, unix, win32, xhtml
+    integerSimple, parallel, pretty, primitive, process, stm, templateHaskell,
+    terminfo, time, transformers, unix, win32, xhtml
     ) where
 
 import Stage
@@ -29,12 +29,16 @@ defaultTargetDirectory stage package
 defaultKnownPackages :: [Package]
 defaultKnownPackages =
     [ array, base, binPackageDb, binary, bytestring, cabal, compiler
-    , containers, deepseq, directory, filepath, ghcPrim, haskeline
-    , hoopl, hpc, integerGmp, integerGmp2, integerSimple, parallel
-    , pretty, primitive, process, stm, templateHaskell, terminfo, time
-    , transformers, unix, win32, xhtml ]
+    , containers, deepseq, directory, filepath, ghcPrim, haskeline, hoopl, hpc
+    , integerGmp, integerSimple, parallel, pretty, primitive, process, stm
+    , templateHaskell, terminfo, time, transformers, unix, win32, xhtml ]
 
 -- Package definitions
+array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
+    deepseq, directory, filepath, ghcPrim, haskeline, hoopl, hpc, integerGmp,
+    integerSimple, parallel, pretty, primitive, process, stm, templateHaskell,
+    terminfo, time, transformers, unix, win32, xhtml :: Package
+
 array           = library  "array"
 base            = library  "base"
 binPackageDb    = library  "bin-package-db"
@@ -51,7 +55,6 @@ haskeline       = library  "haskeline"
 hoopl           = library  "hoopl"
 hpc             = library  "hpc"
 integerGmp      = library  "integer-gmp"
-integerGmp2     = library  "integer-gmp"    `setPath` "libraries/integer-gmp2"
 integerSimple   = library  "integer-simple"
 parallel        = library  "parallel"
 pretty          = library  "pretty"
