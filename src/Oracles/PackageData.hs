@@ -8,7 +8,6 @@ module Oracles.PackageData (
 import Base
 import Util
 import Data.List
-import Data.Maybe
 import Control.Applicative
 import qualified Data.HashMap.Strict as Map
 
@@ -22,6 +21,7 @@ import qualified Data.HashMap.Strict as Map
 -- pkgListData Modules therefore returns ["Data.Array", "Data.Array.Base", ...]
 data PackageData = Version      FilePath
                  | PackageKey   FilePath
+                 | LibName      FilePath
                  | Synopsis     FilePath
                  | BuildGhciLib FilePath
 
@@ -30,7 +30,7 @@ data PackageDataList = Modules        FilePath
                      | SrcDirs        FilePath
                      | IncludeDirs    FilePath
                      | Deps           FilePath
-                     | DepKeys        FilePath
+                     | DepIds         FilePath
                      | DepNames       FilePath
                      | CppArgs        FilePath
                      | HsArgs         FilePath
@@ -41,59 +41,47 @@ data PackageDataList = Modules        FilePath
 newtype PackageDataKey = PackageDataKey (FilePath, String)
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
--- TODO: is this needed?
 askPackageData :: FilePath -> String -> Action String
 askPackageData path key = do
     let fullKey = replaceSeparators '_' $ path ++ "_" ++ key
-        pkgData = path -/- "package-data.mk"
-    value <- askOracle $ PackageDataKey (pkgData, fullKey)
-    return $ fromMaybe
-        (error $ "No key '" ++ key ++ "' in " ++ pkgData ++ ".") value
+        file    = path -/- "package-data.mk"
+    maybeValue <- askOracle $ PackageDataKey (file, fullKey)
+    case maybeValue of
+        Nothing    -> putError $ "No key '" ++ key ++ "' in " ++ file ++ "."
+        Just value -> return value
 
 pkgData :: PackageData -> Action String
-pkgData packageData = do
-    let (key, path) = case packageData of
-           Version      path -> ("VERSION"       , path)
-           PackageKey   path -> ("PACKAGE_KEY"   , path)
-           Synopsis     path -> ("SYNOPSIS"      , path)
-           BuildGhciLib path -> ("BUILD_GHCI_LIB", path)
-        fullKey = replaceSeparators '_' $ path ++ "_" ++ key
-        pkgData = path -/- "package-data.mk"
-    res <- askOracle $ PackageDataKey (pkgData, fullKey)
-    return $ fromMaybe
-        (error $ "No key '" ++ key ++ "' in " ++ pkgData ++ ".") res
+pkgData packageData = case packageData of
+    Version      path -> askPackageData path "VERSION"
+    PackageKey   path -> askPackageData path "PACKAGE_KEY"
+    LibName      path -> askPackageData path "LIB_NAME"
+    Synopsis     path -> askPackageData path "SYNOPSIS"
+    BuildGhciLib path -> askPackageData path "BUILD_GHCI_LIB"
 
 pkgDataList :: PackageDataList -> Action [String]
-pkgDataList packageData = do
-    let (key, path, defaultValue) = case packageData of
-           Modules        path -> ("MODULES"                       , path, "" )
-           HiddenModules  path -> ("HIDDEN_MODULES"                , path, "" )
-           SrcDirs        path -> ("HS_SRC_DIRS"                   , path, ".")
-           IncludeDirs    path -> ("INCLUDE_DIRS"                  , path, ".")
-           Deps           path -> ("DEPS"                          , path, "" )
-           DepKeys        path -> ("DEP_KEYS"                      , path, "" )
-           DepNames       path -> ("DEP_NAMES"                     , path, "" )
-           CppArgs        path -> ("CPP_OPTS"                      , path, "" )
-           HsArgs         path -> ("HC_OPTS"                       , path, "" )
-           CcArgs         path -> ("CC_OPTS"                       , path, "" )
-           CSrcs          path -> ("C_SRCS"                        , path, "" )
-           DepIncludeDirs path -> ("DEP_INCLUDE_DIRS_SINGLE_QUOTED", path, "" )
-        fullKey = replaceSeparators '_' $ path ++ "_" ++ key
-        pkgData = path -/- "package-data.mk"
-        unquote = dropWhile (== '\'') . dropWhileEnd (== '\'')
-    res <- askOracle $ PackageDataKey (pkgData, fullKey)
-    return $ map unquote $ words $ case res of
-        Nothing    -> error $ "No key '" ++ key ++ "' in " ++ pkgData ++ "."
-        Just ""    -> defaultValue
-        Just value -> value
+pkgDataList packageData = fmap (map unquote . words) $ case packageData of
+    Modules        path -> askPackageData path "MODULES"
+    HiddenModules  path -> askPackageData path "HIDDEN_MODULES"
+    SrcDirs        path -> askPackageData path "HS_SRC_DIRS"
+    IncludeDirs    path -> askPackageData path "INCLUDE_DIRS"
+    Deps           path -> askPackageData path "DEPS"
+    DepIds         path -> askPackageData path "DEP_IPIDS"
+    DepNames       path -> askPackageData path "DEP_NAMES"
+    CppArgs        path -> askPackageData path "CPP_OPTS"
+    HsArgs         path -> askPackageData path "HC_OPTS"
+    CcArgs         path -> askPackageData path "CC_OPTS"
+    CSrcs          path -> askPackageData path "C_SRCS"
+    DepIncludeDirs path -> askPackageData path "DEP_INCLUDE_DIRS_SINGLE_QUOTED"
+  where
+    unquote = dropWhile (== '\'') . dropWhileEnd (== '\'')
 
 -- Oracle for 'package-data.mk' files
 packageDataOracle :: Rules ()
 packageDataOracle = do
-    pkgData <- newCache $ \file -> do
+    pkgDataContents <- newCache $ \file -> do
         need [file]
         putOracle $ "Reading " ++ file ++ "..."
         liftIO $ readConfigFile file
-    addOracle $ \(PackageDataKey (file, key)) ->
-        Map.lookup key <$> pkgData (unifyPath file)
+    _ <- addOracle $ \(PackageDataKey (file, key)) ->
+        Map.lookup key <$> pkgDataContents file
     return ()
