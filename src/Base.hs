@@ -1,18 +1,17 @@
 module Base (
-    shakeFilesPath, configPath,
-    bootPackageConstraints, packageDependencies,
     module Development.Shake,
-    module Development.Shake.Util,
-    module Development.Shake.Config,
     module Development.Shake.Classes,
-    module Development.Shake.FilePath
+    module Development.Shake.Config,
+    module Development.Shake.FilePath,
+    module Development.Shake.Util,
+    shakeFilesPath, configPath, bootPackageConstraints, packageDependencies
     ) where
 
-import Development.Shake
-import Development.Shake.Util
-import Development.Shake.Config
+import Development.Shake hiding (unit)
 import Development.Shake.Classes
+import Development.Shake.Config
 import Development.Shake.FilePath
+import Development.Shake.Util
 
 shakeFilesPath :: FilePath
 shakeFilesPath = "_build/"

@@ -1,12 +1,10 @@
-{-# LANGUAGE DeriveGeneric, FlexibleInstances #-}
-
-module Stage (
-    Stage (..)
-    ) where
+{-# LANGUAGE DeriveGeneric #-}
+module Stage (Stage (..)) where
 
 import Base
-import GHC.Generics
+import GHC.Generics (Generic)
 
+-- TODO: rename to something more meaningful, e.g. Stage0 -> Boot.
 data Stage = Stage0 | Stage1 | Stage2 | Stage3 deriving (Eq, Enum, Generic)
 
 instance Show Stage where

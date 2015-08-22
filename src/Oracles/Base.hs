@@ -1,18 +1,23 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 
 module Oracles.Base (
-    askConfigWithDefault, askConfig, configOracle,
-    putOracle
+    module Base,
+    module Control.Applicative,
+    module Util,
+    askConfig, askConfigWithDefault, configOracle
     ) where
 
 import Base
 import Util
-import Control.Applicative
-import Control.Monad.Extra
+import Control.Applicative hiding ((*>))
 import qualified Data.HashMap.Strict as Map
 
 newtype ConfigKey = ConfigKey String
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
+
+askConfig :: String -> Action String
+askConfig key = askConfigWithDefault key . putError
+    $ "Cannot find key '" ++ key ++ "' in configuration files."
 
 askConfigWithDefault :: String -> Action String -> Action String
 askConfigWithDefault key defaultAction = do
@@ -20,10 +25,6 @@ askConfigWithDefault key defaultAction = do
     case maybeValue of
         Just value -> return value
         Nothing    -> defaultAction
-
-askConfig :: String -> Action String
-askConfig key = askConfigWithDefault key . putError
-    $ "Cannot find key '" ++ key ++ "' in configuration files."
 
 -- Oracle for configuration files
 configOracle :: Rules ()

@@ -10,7 +10,6 @@ import Oracles.PackageData
 import Settings.Util
 import Settings.Packages
 import Settings.Builders.Ghc
-import Settings.TargetDirectory
 
 haddockArgs :: Args
 haddockArgs = builder Haddock ? do

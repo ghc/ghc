@@ -14,7 +14,6 @@ import Rules.Resources
 import Settings.Util
 import Settings.User
 import Settings.Packages
-import Control.Monad.Extra
 
 -- Note: this build rule creates plenty of files, not just the .haddock one.
 -- All of them go into the 'doc' subdirectory. Pedantically tracking all built

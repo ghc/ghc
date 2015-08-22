@@ -9,7 +9,6 @@ import Predicates
 import Oracles.Setting
 import Settings.User
 import Settings.Default
-import Data.List
 
 -- Combining default list of packages with user modifications
 packages :: Packages

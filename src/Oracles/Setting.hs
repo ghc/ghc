@@ -6,7 +6,6 @@ module Oracles.Setting (
     ghcEnableTablesNextToCode, cmdLineLengthLimit
     ) where
 
-import Base
 import Stage
 import Oracles.Base
 

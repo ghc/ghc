@@ -1,17 +1,17 @@
 {-# LANGUAGE DeriveGeneric, FlexibleInstances #-}
 module Target (
     Target (..), PartialTarget (..),
-    fromPartial, fullTarget, fullTargetWithWay,
+    fromPartial, fullTarget, fullTargetWithWay
     ) where
 
-import Way
 import Base
-import Stage
-import Package
 import Builder
-import GHC.Generics
-import Data.Monoid
 import Control.Monad.Reader
+import GHC.Generics (Generic)
+import Package
+import Stage
+import Way
+import Util
 
 -- Target captures all parameters relevant to the current build target:
 -- * Stage and Package being built,

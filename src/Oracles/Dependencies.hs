@@ -7,8 +7,6 @@ module Oracles.Dependencies (
 
 import Base
 import Util
-import Data.List
-import Data.Function
 import qualified Data.HashMap.Strict as Map
 import Control.Applicative
 

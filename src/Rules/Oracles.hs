@@ -1,16 +1,13 @@
-module Rules.Oracles (
-    oracleRules
-    ) where
+module Rules.Oracles (oracleRules) where
 
 import Base
-import Oracles.Base
 import Oracles.ArgsHash
-import Oracles.PackageData
-import Oracles.WindowsRoot
-import Oracles.PackageDeps
+import Oracles.Base
 import Oracles.Dependencies
+import Oracles.PackageData
+import Oracles.PackageDeps
+import Oracles.WindowsRoot
 import Settings.User
-import Control.Monad
 
 oracleRules :: Rules ()
 oracleRules = do

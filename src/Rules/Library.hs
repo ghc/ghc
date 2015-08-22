@@ -1,20 +1,14 @@
 module Rules.Library (buildPackageLibrary) where
 
-import Way
-import Base hiding (splitPath)
-import Util
-import Target (PartialTarget (..), fullTarget)
-import Builder
-import Package
+import Base hiding (splitPath, getDirectoryContents)
 import Expression
-import Predicates (splitObjects)
 import Oracles.PackageData
-import Settings.Util
-import Settings.TargetDirectory
+import Predicates (splitObjects)
 import Rules.Actions
 import Rules.Resources
-import Data.List
-import qualified System.Directory as IO
+import Settings.Util
+import System.Directory (getDirectoryContents)
+import Target (PartialTarget (..), fullTarget)
 
 buildPackageLibrary :: Resources -> PartialTarget -> Rules ()
 buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
@@ -23,7 +17,7 @@ buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
 
     -- TODO: handle dynamic libraries
     matchBuildResult buildPath "a" ?> \a -> do
-        removeFile a
+        removeFileIfExists a
         cSrcs <- cSources target
         hSrcs <- hSources target
 
@@ -39,7 +33,7 @@ buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
         splitObjs <- if not split then return [] else
             fmap concat $ forM hSrcs $ \src -> do
                 let splitPath = buildPath -/- src ++ "_" ++ osuf way ++ "_split"
-                contents <- liftIO $ IO.getDirectoryContents splitPath
+                contents <- liftIO $ getDirectoryContents splitPath
                 return . map (splitPath -/-)
                        . filter (not . all (== '.')) $ contents
 

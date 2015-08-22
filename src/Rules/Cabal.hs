@@ -5,7 +5,6 @@ import Stage
 import Package hiding (library)
 import Expression
 import Settings.Packages
-import Data.List
 import Data.Version
 import Distribution.Package
 import Distribution.Verbosity

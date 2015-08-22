@@ -1,14 +1,12 @@
 {-# LANGUAGE DeriveGeneric #-}
-
 module Package (
-    Package (..), PackageName, pkgCabalFile,
-    library, topLevel, setPath
+    Package (..), PackageName, pkgCabalFile, setPath,
+    library, topLevel
     ) where
 
 import Base
+import GHC.Generics (Generic)
 import Util
-import Data.Function
-import GHC.Generics
 
 -- It is helpful to distinguish package names from strings.
 type PackageName = String

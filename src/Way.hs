@@ -1,6 +1,5 @@
 module Way (
-    WayUnit (..),
-    Way, wayFromUnits, wayUnit,
+    WayUnit (..), Way, wayUnit,
 
     vanilla, profiling, logging, parallel, granSim,
     threaded, threadedProfiling, threadedLogging,
@@ -13,14 +12,11 @@ module Way (
     safeDetectWay, detectWay, matchBuildResult
     ) where
 
-import Base hiding (unit)
-import Util
-import Oracles.Setting
-import Data.List
+import Base
 import Data.IntSet (IntSet)
-import Control.Applicative
 import qualified Data.IntSet as Set
-import Data.Maybe
+import Oracles.Setting
+import Util hiding (unit)
 
 data WayUnit = Threaded
              | Debug
@@ -168,7 +164,7 @@ matchBuildResult path suffix file =
 -- Instances for storing in the Shake database
 instance Binary Way where
     put = put . show
-    get = read <$> get
+    get = fmap read get
 
 instance Hashable Way where
     hashWithSalt salt = hashWithSalt salt . show

@@ -5,12 +5,9 @@ module Oracles.PackageDeps (
     packageDepsOracle
     ) where
 
-import Base
 import Package
 import Oracles.Base
-import Data.Maybe
 import qualified Data.HashMap.Strict as Map
-import Control.Applicative
 
 newtype PackageDepsKey = PackageDepsKey PackageName
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)

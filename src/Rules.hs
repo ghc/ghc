@@ -1,26 +1,17 @@
-module Rules (
-    oracleRules, cabalRules, configRules, packageRules, generateTargets
-    ) where
+module Rules (generateTargets, packageRules) where
 
-import Way
 import Base
-import Util
-import Stage
-import Target (PartialTarget (..))
 import Expression
 import Oracles.PackageData
-import Rules.Cabal
-import Rules.Config
 import Rules.Package
-import Rules.Oracles
 import Rules.Resources
-import Settings.Ways
+import Settings.Packages
 import Settings.User
 import Settings.Util
-import Settings.Packages
-import Settings.TargetDirectory
+import Settings.Ways
+import Target (PartialTarget (..))
 
--- generateTargets needs package-data.mk files of all target packages
+-- generateTargets needs top-level build targets
 generateTargets :: Rules ()
 generateTargets = action $ do
     targets <- fmap concat . forM [Stage0 ..] $ \stage -> do

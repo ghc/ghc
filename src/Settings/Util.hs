@@ -1,4 +1,5 @@
 module Settings.Util (
+    module Settings.TargetDirectory,
     arg, argM,
     argSetting, argSettingList, argStagedSettingList, argStagedBuilderPath,
     getFlag, getSetting, getSettingList, getStagedSettingList,
@@ -9,7 +10,6 @@ module Settings.Util (
     ) where
 
 import Base
-import Util
 import Stage
 import Builder
 import Package
@@ -19,8 +19,6 @@ import Oracles.Flag
 import Oracles.Setting
 import Oracles.PackageData
 import Settings.TargetDirectory
-import Data.List
-import Data.Function
 
 -- A single argument.
 arg :: String -> Args

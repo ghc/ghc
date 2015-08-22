@@ -4,15 +4,11 @@ module Predicates (
     registerPackage, splitObjects
     ) where
 
-import Way
 import Base
-import Stage
-import Package
-import Builder
 import Expression
-import Settings.Default
 import Oracles.Flag
 import Oracles.Setting
+import Settings.Default
 
 -- Basic predicates (see Switches.hs for derived predicates)
 stage :: Stage -> Predicate

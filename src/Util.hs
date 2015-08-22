@@ -1,20 +1,28 @@
 module Util (
+    module Control.Monad.Extra,
     module Data.Char,
+    module Data.Function,
+    module Data.List,
+    module Data.Maybe,
+    module Data.Monoid,
     module System.Console.ANSI,
-    replaceIf, replaceEq, replaceSeparators, decodeModule,
-    unifyPath, (-/-),
-    chunksOfSize,
+    replaceEq, replaceSeparators, decodeModule,
+    unifyPath, (-/-), chunksOfSize,
     putColoured, putOracle, putBuild, putSuccess, putError,
     bimap, minusOrd, intersectOrd,
-    removeFile
+    removeFileIfExists
     ) where
 
-import Base
+import Base hiding (doesFileExist)
+import Control.Monad.Extra
 import Data.Char
-import Control.Monad
-import System.IO
+import Data.Function
+import Data.List
+import Data.Maybe
+import Data.Monoid
 import System.Console.ANSI
-import qualified System.Directory as IO
+import System.Directory (doesFileExist, removeFile)
+import System.IO
 
 replaceIf :: (a -> Bool) -> a -> [a] -> [a]
 replaceIf p to = map (\from -> if p from then to else from)
@@ -69,11 +77,11 @@ putOracle = putColoured Blue
 putBuild :: String -> Action ()
 putBuild = putColoured White
 
--- A more colourful version of error
+-- A more colourful version of success message
 putSuccess :: String -> Action ()
 putSuccess = putColoured Green
 
--- A more colourful version of error
+-- A more colourful version of error message
 putError :: String -> Action a
 putError msg = do
     putColoured Red msg
@@ -102,9 +110,6 @@ intersectOrd cmp = loop
          EQ -> x : loop xs ys
          GT ->     loop (x:xs) ys
 
--- Convenient helper function for removing a single file that doesn't
--- necessarily exist.
-removeFile :: FilePath -> Action ()
-removeFile file = do
-    exists <- liftIO $ IO.doesFileExist file
-    when exists . liftIO $ IO.removeFile file
+-- Convenient helper function for removing a file that doesn't necessarily exist
+removeFileIfExists :: FilePath -> Action ()
+removeFileIfExists file = liftIO . whenM (doesFileExist file) $ removeFile file

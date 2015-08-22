@@ -2,7 +2,6 @@ module Settings.Builders.Gcc (gccArgs, gccMArgs) where
 
 import Base
 import Util
-import Builder
 import Expression
 import Predicates (stagedBuilder)
 import Oracles.PackageData
@@ -41,10 +40,10 @@ gccMArgs = stagedBuilder GccM ? do
 
 includeGccArgs :: Args
 includeGccArgs = do
-    path    <- getTargetPath
-    pkgPath <- getPackagePath
-    iDirs   <- getPkgDataList IncludeDirs
-    dDirs   <- getPkgDataList DepIncludeDirs
+    pkg   <- getPackage
+    path  <- getTargetPath
+    iDirs <- getPkgDataList IncludeDirs
+    dDirs <- getPkgDataList DepIncludeDirs
     mconcat
         [ arg $ "-I" ++ path -/- "build/autogen"
-        , append . map (\dir -> "-I" ++ pkgPath -/- dir) $ iDirs ++ dDirs ]
+        , append . map (\dir -> "-I" ++ pkgPath pkg -/- dir) $ iDirs ++ dDirs ]

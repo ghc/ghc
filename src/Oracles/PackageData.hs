@@ -7,7 +7,6 @@ module Oracles.PackageData (
 
 import Base
 import Util
-import Data.List
 import Control.Applicative
 import qualified Data.HashMap.Strict as Map
 

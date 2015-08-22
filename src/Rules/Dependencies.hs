@@ -8,7 +8,6 @@ import Expression
 import Target (PartialTarget (..), fullTarget)
 import Oracles.PackageData
 import Settings.Util
-import Settings.TargetDirectory
 import Rules.Actions
 import Rules.Resources
 
@@ -28,7 +27,7 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
             srcs <- interpretPartial target getPackageSources
             need srcs
             build $ fullTarget target (GhcM stage) srcs [file]
-            removeFile $ file <.> "bak"
+            removeFileIfExists $ file <.> "bak"
 
         (buildPath -/- ".dependencies") %> \file -> do
             cSrcs <- pkgDataList $ CSrcs path

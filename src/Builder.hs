@@ -1,17 +1,12 @@
 {-# LANGUAGE DeriveGeneric #-}
-
-module Builder (
-    Builder (..), builderKey, builderPath, specified, needBuilder
-    ) where
+module Builder (Builder (..), builderPath, specified, needBuilder) where
 
 import Base
-import Util
-import Stage
-import Data.List
+import GHC.Generics
 import Oracles.Base
 import Oracles.Setting
 import Oracles.WindowsRoot
-import GHC.Generics
+import Stage
 
 -- A Builder is an external command invoked in separate process using Shake.cmd
 --

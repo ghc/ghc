@@ -1,9 +1,7 @@
-module Rules.Resources (
-    resourceRules, Resources(..)
-    ) where
+module Rules.Resources (resourceRules, Resources (..)) where
 
 import Base
-import Control.Monad
+import Util
 
 data Resources = Resources
     {

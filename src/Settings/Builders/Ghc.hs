@@ -1,9 +1,6 @@
 module Settings.Builders.Ghc (ghcArgs, ghcMArgs, commonGhcArgs) where
 
-import Way
 import Util
-import Stage
-import Builder
 import Expression
 import Predicates (stagedBuilder, splitObjects, stage0)
 import Oracles.Flag
@@ -91,8 +88,8 @@ packageGhcArgs = do
 
 includeGhcArgs :: Args
 includeGhcArgs = do
+    pkg     <- getPackage
     path    <- getTargetPath
-    pkgPath <- getPackagePath
     srcDirs <- getPkgDataList SrcDirs
     incDirs <- getPkgDataList IncludeDirs
     cppArgs <- getPkgDataList CppArgs
@@ -104,8 +101,8 @@ includeGhcArgs = do
         , arg $ "-i" ++ autogenPath
         , arg $ "-I" ++ buildPath
         , arg $ "-I" ++ autogenPath
-        , append [ "-i" ++ pkgPath -/- dir | dir <- srcDirs ]
-        , append [ "-I" ++ pkgPath -/- dir | dir <- incDirs ]
+        , append [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
+        , append [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
         , arg "-optP-include", arg $ "-optP" ++ autogenPath -/- "cabal_macros.h"
         , append $ map ("-optP" ++) cppArgs ]
 

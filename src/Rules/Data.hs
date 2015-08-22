@@ -12,9 +12,6 @@ import Settings.Packages
 import Settings.TargetDirectory
 import Rules.Actions
 import Rules.Resources
-import Data.List
-import Control.Applicative
-import Control.Monad.Extra
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 buildPackageData :: Resources -> PartialTarget -> Rules ()
@@ -23,7 +20,7 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
         cabalFile = pkgCabalFile pkg
         configure = pkgPath pkg -/- "configure"
 
-    (path -/-) <$>
+    fmap (path -/-)
         [ "package-data.mk"
         , "haddock-prologue.txt"
         , "inplace-pkg-config"
@@ -65,7 +62,7 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
 -- Reason: Shake's built-in makefile parser doesn't recognise slashes
 postProcessPackageData :: FilePath -> Action ()
 postProcessPackageData file = do
-    pkgData <- (filter ('$' `notElem`) . lines) <$> liftIO (readFile file)
+    pkgData <- fmap (filter ('$' `notElem`) . lines) . liftIO $ readFile file
     length pkgData `seq` writeFileLines file $ map processLine pkgData
       where
         processLine line = replaceSeparators '_' prefix ++ suffix

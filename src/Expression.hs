@@ -1,9 +1,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Expression (
-    module Data.Monoid,
     module Control.Monad.Reader,
+    module Builder,
+    module Package,
+    module Stage,
+    module Util,
+    module Way,
     Expr, DiffExpr, fromDiffExpr,
-    Predicate, PredicateLike (..), applyPredicate, (??),
+    Predicate, (?), (??), notP, applyPredicate,
     Args, Ways, Packages,
     apply, append, appendM, remove,
     appendSub, appendSubD, filterSub, removeSub,
@@ -12,16 +16,14 @@ module Expression (
     getSources, getSource, getWay
     ) where
 
-import Way
 import Base
-import Util
-import Stage
 import Builder
+import Control.Monad.Reader
 import Package
+import Stage
 import Target (Target (..), PartialTarget (..), fromPartial)
-import Data.List
-import Data.Monoid
-import Control.Monad.Reader hiding (liftIO)
+import Util
+import Way
 
 -- Expr a is a computation that produces a value of type Action a and can read
 -- parameters of the current build Target.
@@ -119,7 +121,7 @@ appendSubD :: String -> Args -> Args
 appendSubD prefix diffExpr = fromDiffExpr diffExpr >>= appendSub prefix
 
 filterSub :: String -> (String -> Bool) -> Args
-filterSub prefix p = apply . map $ filterSubstr
+filterSub prefix p = apply $ map filterSubstr
   where
     filterSubstr s
         | prefix `isPrefixOf` s = unwords . filter p . words $ s
