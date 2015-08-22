@@ -7,7 +7,6 @@ module Test.Haddock.Process where
 import Control.Monad
 
 import System.Exit
-import System.FilePath
 import System.IO
 import System.Process
 
