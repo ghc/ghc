@@ -1,14 +1,11 @@
 module Rules.Data (buildPackageData) where
 
-import Target (PartialTarget (..), fullTarget)
-import Package
-import Builder
 import Expression
-import Predicates (registerPackage)
 import Oracles
-import Settings
+import Predicates (registerPackage)
 import Rules.Actions
 import Rules.Resources
+import Settings
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 buildPackageData :: Resources -> PartialTarget -> Rules ()

@@ -17,6 +17,8 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as Set
 import Oracles
 
+-- Note: order of constructors is important for compatibility with the old build
+-- system, e.g. we want "thr_p", not "p_thr" (see instance Show Way).
 data WayUnit = Threaded
              | Debug
              | Profiling

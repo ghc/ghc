@@ -7,10 +7,10 @@ module GHC (
     defaultKnownPackages, defaultTargetDirectory
     ) where
 
-import Stage
 import Package
+import Stage
 
--- These are all packages we know about. Build rules will be generated for
+-- These are all GHC packages we know about. Build rules will be generated for
 -- all of them. However, not all of these packages will be built. For example,
 -- package 'win32' is built only on Windows.
 -- Settings/Packages.hs defines default conditions for building each package,
@@ -58,11 +58,12 @@ unix            = library  "unix"
 win32           = library  "Win32"
 xhtml           = library  "xhtml"
 
--- Build results will be placed into a target directory with the following
+-- GHC build results will be placed into target directories with the following
 -- typical structure:
--- * build/           : contains compiled object code
--- * doc/             : produced by haddock
--- * package-data.mk  : contains output of ghc-cabal applied to pkgCabal
+-- * build/          : contains compiled object code
+-- * doc/            : produced by haddock
+-- * package-data.mk : contains output of ghc-cabal applied to pkgCabal
+-- TODO: simplify to just 'show stage'?
 defaultTargetDirectory :: Stage -> Package -> FilePath
 defaultTargetDirectory stage package
     | package == compiler = "stage" ++ show (fromEnum stage + 1)

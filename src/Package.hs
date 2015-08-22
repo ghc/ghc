@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Package (
-    Package (..), PackageName, pkgCabalFile, setPath,
-    library, topLevel
+    Package (..), PackageName, pkgCabalFile, setPath, library, topLevel
     ) where
 
 import Base
@@ -22,15 +21,6 @@ data Package = Package
 pkgCabalFile :: Package -> FilePath
 pkgCabalFile pkg = pkgPath pkg -/- pkgName pkg <.> "cabal"
 
-instance Show Package where
-    show = pkgName
-
-instance Eq Package where
-    (==) = (==) `on` pkgName
-
-instance Ord Package where
-    compare = compare `on` pkgName
-
 library :: PackageName -> Package
 library name = Package name ("libraries" -/- name)
 
@@ -39,6 +29,15 @@ topLevel name = Package name name
 
 setPath :: Package -> FilePath -> Package
 setPath pkg path = pkg { pkgPath = path }
+
+instance Show Package where
+    show = pkgName
+
+instance Eq Package where
+    (==) = (==) `on` pkgName
+
+instance Ord Package where
+    compare = compare `on` pkgName
 
 -- Instances for storing in the Shake database
 instance Binary Package

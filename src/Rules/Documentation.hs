@@ -1,12 +1,7 @@
 module Rules.Documentation (buildPackageDocumentation) where
 
-import Way
-import Stage
-import Builder
-import Package
 import Expression
-import Oracles.PackageData
-import Target (PartialTarget (..), fullTarget, fullTargetWithWay)
+import Oracles
 import Rules.Actions
 import Rules.Resources
 import Settings

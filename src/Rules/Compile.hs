@@ -1,13 +1,10 @@
 module Rules.Compile (compilePackage) where
 
-import Way
-import Base
-import Builder
-import Target (PartialTarget (..), fullTarget, fullTargetWithWay)
-import Oracles.Dependencies
-import Settings
+import Expression
+import Oracles
 import Rules.Actions
 import Rules.Resources
+import Settings
 
 compilePackage :: Resources -> PartialTarget -> Rules ()
 compilePackage _ target @ (PartialTarget stage package) = do

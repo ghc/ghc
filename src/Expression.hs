@@ -9,6 +9,7 @@ module Expression (
     Expr, DiffExpr, fromDiffExpr,
     Predicate, (?), applyPredicate,
     Args, Ways, Packages,
+    Target, PartialTarget (..), fromPartial, fullTarget, fullTargetWithWay,
     apply, append, appendM, remove,
     appendSub, appendSubD, filterSub, removeSub,
     interpret, interpretPartial, interpretWithStage, interpretDiff,
@@ -21,7 +22,7 @@ import Builder
 import Control.Monad.Reader
 import Package
 import Stage
-import Target (Target (..), PartialTarget (..), fromPartial)
+import Target
 import Way
 
 -- Expr a is a computation that produces a value of type Action a and can read
@@ -85,10 +86,6 @@ instance PredicateLike Bool where
 
 instance PredicateLike (Action Bool) where
     (?)  = applyPredicate . lift
-
--- An equivalent of if-then-else for predicates
--- (??) :: (PredicateLike a, Monoid m) => a -> (Expr m, Expr m) -> Expr m
--- p ?? (t, f) = p ? t <> notP p ? f
 
 -- A monadic version of append
 appendM :: Monoid a => Action a -> DiffExpr a

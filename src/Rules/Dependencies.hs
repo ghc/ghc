@@ -1,13 +1,10 @@
 module Rules.Dependencies (buildPackageDependencies) where
 
-import Builder
-import Package
 import Expression
-import Target (PartialTarget (..), fullTarget)
-import Oracles.PackageData
-import Settings
+import Oracles
 import Rules.Actions
 import Rules.Resources
+import Settings
 
 buildPackageDependencies :: Resources -> PartialTarget -> Rules ()
 buildPackageDependencies _ target @ (PartialTarget stage pkg) =

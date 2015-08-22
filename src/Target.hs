@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveGeneric, FlexibleInstances #-}
 module Target (
-    Target (..), PartialTarget (..),
-    fromPartial, fullTarget, fullTargetWithWay
+    Target (..), PartialTarget (..), fromPartial, fullTarget, fullTargetWithWay
     ) where
 
 import Base

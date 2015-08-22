@@ -1,13 +1,12 @@
 module Rules.Library (buildPackageLibrary) where
 
 import Expression hiding (splitPath)
-import Oracles.PackageData
+import Oracles
 import Predicates (splitObjects)
 import Rules.Actions
 import Rules.Resources
 import Settings
 import qualified System.Directory as IO
-import Target (PartialTarget (..), fullTarget)
 
 buildPackageLibrary :: Resources -> PartialTarget -> Rules ()
 buildPackageLibrary _ target @ (PartialTarget stage pkg) = do

@@ -1,14 +1,13 @@
 module Rules.Cabal (cabalRules) where
 
-import Stage
-import Package hiding (library)
-import Expression
-import Settings
 import Data.Version
 import Distribution.Package
 import Distribution.Verbosity
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
+import Expression
+import Package hiding (library)
+import Settings
 
 cabalRules :: Rules ()
 cabalRules = do
