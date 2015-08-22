@@ -40,10 +40,10 @@ stage2 :: Predicate
 stage2 = stage Stage2
 
 notStage :: Stage -> Predicate
-notStage = notP . stage
+notStage = liftM not . stage
 
 notStage0 :: Predicate
-notStage0 = notP stage0
+notStage0 = liftM not stage0
 
 -- TODO: Actually, we don't register compiler in some circumstances -- fix.
 registerPackage :: Predicate
@@ -52,7 +52,7 @@ registerPackage = return True
 splitObjects :: Predicate
 splitObjects = do
     goodStage <- notStage0 -- We don't split bootstrap (stage 0) packages
-    goodPkg   <- notP $ package compiler -- We don't split compiler
+    goodPkg   <- liftM not $ package compiler -- We don't split compiler
     broken    <- lift $ flag SplitObjectsBroken
     ghcUnreg  <- lift $ flag GhcUnregisterised
     goodArch  <- lift $ targetArchs [ "i386", "x86_64", "powerpc", "sparc" ]

@@ -7,7 +7,7 @@ module Expression (
     module Stage,
     module Way,
     Expr, DiffExpr, fromDiffExpr,
-    Predicate, (?), (??), notP, applyPredicate,
+    Predicate, (?), applyPredicate,
     Args, Ways, Packages,
     apply, append, appendM, remove,
     appendSub, appendSubD, filterSub, removeSub,
@@ -63,7 +63,7 @@ append x = apply (<> x)
 
 -- 3) remove given elements from a list expression
 remove :: Eq a => [a] -> DiffExpr [a]
-remove xs = apply . filter $ (`notElem` xs)
+remove xs = apply $ filter (`notElem` xs)
 
 -- 4) apply a predicate to an expression
 applyPredicate :: Monoid a => Predicate -> Expr a -> Expr a
@@ -74,25 +74,21 @@ applyPredicate predicate expr = do
 -- A convenient operator for predicate application
 class PredicateLike a where
     (?)  :: Monoid m => a -> Expr m -> Expr m
-    notP :: a -> Predicate
 
 infixr 8 ?
 
 instance PredicateLike Predicate where
     (?)  = applyPredicate
-    notP = liftM not
 
 instance PredicateLike Bool where
     (?)  = applyPredicate . return
-    notP = return . not
 
 instance PredicateLike (Action Bool) where
     (?)  = applyPredicate . lift
-    notP = lift . fmap not
 
 -- An equivalent of if-then-else for predicates
-(??) :: (PredicateLike a, Monoid m) => a -> (Expr m, Expr m) -> Expr m
-p ?? (t, f) = p ? t <> notP p ? f
+-- (??) :: (PredicateLike a, Monoid m) => a -> (Expr m, Expr m) -> Expr m
+-- p ?? (t, f) = p ? t <> notP p ? f
 
 -- A monadic version of append
 appendM :: Monoid a => Action a -> DiffExpr a

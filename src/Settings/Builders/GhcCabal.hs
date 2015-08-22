@@ -102,13 +102,12 @@ packageConstraints = stage0 ? do
 -- TODO: put all validating options together in one file
 ccArgs :: Args
 ccArgs = validating ? do
-    let gccGe46 = notP gccLt46
+    let notClang = fmap not gccIsClang
     mconcat [ arg "-Werror"
             , arg "-Wall"
-            , gccIsClang ??
-              ( arg "-Wno-unknown-pragmas" <>
-                gccGe46 ? windowsHost ? arg "-Werror=unused-but-set-variable"
-              , gccGe46 ? arg "-Wno-error=inline" )]
+            , gccIsClang ? arg "-Wno-unknown-pragmas"
+            , notClang ? gccGe46 ? notWindowsHost ? arg "-Werror=unused-but-set-variable"
+            , notClang ? gccGe46 ? arg "-Wno-error=inline" ]
 
 ldArgs :: Args
 ldArgs = mempty
@@ -151,8 +150,8 @@ customPackageArgs = do
                   , arg "--disable-library-for-ghci"
                   , targetOs "openbsd" ? arg "--ld-options=-E"
                   , flag GhcUnregisterised ? arg "--ghc-option=-DNO_REGS"
-                  , notP ghcWithSMP ? arg "--ghc-option=-DNOSMP"
-                  , notP ghcWithSMP ? arg "--ghc-option=-optc-DNOSMP"
+                  , fmap not ghcWithSMP ? arg "--ghc-option=-DNOSMP"
+                  , fmap not ghcWithSMP ? arg "--ghc-option=-optc-DNOSMP"
                   , (threaded `elem` rtsWays) ?
                     notStage0 ? arg "--ghc-option=-optc-DTHREADED_RTS"
                   , ghcWithNativeCodeGen ? arg "--flags=ncg"
@@ -160,7 +159,7 @@ customPackageArgs = do
                     notStage0 ? arg "--flags=ghci"
                   , ghcWithInterpreter ?
                     ghcEnableTablesNextToCode ?
-                    notP (flag GhcUnregisterised) ?
+                    fmap not (flag GhcUnregisterised) ?
                     notStage0 ? arg "--ghc-option=-DGHCI_TABLES_NEXT_TO_CODE"
                   , ghcWithInterpreter ?
                     ghciWithDebugger ?
