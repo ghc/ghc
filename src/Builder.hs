@@ -11,48 +11,45 @@ import Stage
 -- Ghc Stage0 is the bootstrapping compiler
 -- Ghc StageN, N > 0, is the one built on stage (N - 1)
 -- GhcPkg Stage0 is the bootstrapping GhcPkg
--- GhcPkg StageN, N > 0, is the one built on stage 0 (TODO: need only Stage1?)
+-- GhcPkg StageN, N > 0, is the one built in Stage0 (TODO: need only Stage1?)
 -- TODO: add Cpp builders
 -- TODO: rename Gcc to Cc?
-data Builder = Ar
-             | Ld
-             | Alex
-             | Happy
-             | Haddock
-             | HsColour
-             | GhcCabal
+data Builder = Alex
+             | Ar
              | Gcc Stage
-             | Ghc Stage
-             | GhcM Stage
              | GccM Stage
-             | GhcPkg Stage
+             | Ghc Stage
+             | GhcCabal
              | GhcCabalHsColour
+             | GhcM Stage
+             | GhcPkg Stage
+             | Haddock
+             | Happy
+             | HsColour
+             | Ld
              deriving (Show, Eq, Generic)
 
 -- Configuration files refer to Builders as follows:
--- TODO: determine paths to utils without looking up configuration files
 builderKey :: Builder -> String
 builderKey builder = case builder of
-    Ar               -> "ar"
-    Ld               -> "ld"
     Alex             -> "alex"
-    Happy            -> "happy"
-    Haddock          -> "haddock"
-    HsColour         -> "hscolour"
-    GhcCabal         -> "ghc-cabal"
+    Ar               -> "ar"
+    Gcc Stage0       -> "system-gcc"
+    Gcc _            -> "gcc"
+    GccM stage       -> builderKey $ Gcc stage -- Synonym for 'Gcc -MM'
     Ghc Stage0       -> "system-ghc"
     Ghc Stage1       -> "ghc-stage1"
     Ghc Stage2       -> "ghc-stage2"
     Ghc Stage3       -> "ghc-stage3"
-    Gcc Stage0       -> "system-gcc"
-    Gcc _            -> "gcc"
+    GhcM stage       -> builderKey $ Ghc stage -- Synonym for 'Ghc -M'
+    GhcCabal         -> "ghc-cabal"
+    GhcCabalHsColour -> builderKey $ GhcCabal -- Synonym for 'GhcCabal hscolour'
     GhcPkg Stage0    -> "system-ghc-pkg"
     GhcPkg _         -> "ghc-pkg"
-    -- GhcM/GccM are synonyms for Ghc/Gcc (called with -M and -MM flags)
-    GhcM stage       -> builderKey $ Ghc stage
-    GccM stage       -> builderKey $ Gcc stage
-    -- GhcCabalHsColour is a synonym for GhcCabal (called in hscolour mode)
-    GhcCabalHsColour -> builderKey $ GhcCabal
+    Happy            -> "happy"
+    Haddock          -> "haddock"
+    HsColour         -> "hscolour"
+    Ld               -> "ld"
 
 builderPath :: Builder -> Action FilePath
 builderPath builder = do
@@ -77,7 +74,7 @@ needBuilder laxDependencies builder = do
     allowOrderOnlyDependency :: Builder -> Bool
     allowOrderOnlyDependency (Ghc  _) = True
     allowOrderOnlyDependency (GhcM _) = True
-    allowOrderOnlyDependency _ = False
+    allowOrderOnlyDependency _        = False
 
 -- On Windows: if the path starts with "/", prepend it with the correct path to
 -- the root, e.g: "/usr/local/bin/ghc.exe" => "C:/msys/usr/local/bin/ghc.exe".
