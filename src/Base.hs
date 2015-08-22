@@ -50,14 +50,16 @@ packageDependencies :: FilePath
 packageDependencies = shakeFilesPath ++ "package-dependencies"
 
 -- Utility functions
-replaceIf :: (a -> Bool) -> a -> [a] -> [a]
-replaceIf p to = map (\from -> if p from then to else from)
-
+-- Find and replace all occurrences of a value in a list
 replaceEq :: Eq a => a -> a -> [a] -> [a]
 replaceEq from = replaceIf (== from)
 
+-- Find and replace all occurrences of path separators in a String with a Char
 replaceSeparators :: Char -> String -> String
 replaceSeparators = replaceIf isPathSeparator
+
+replaceIf :: (a -> Bool) -> a -> [a] -> [a]
+replaceIf p to = map (\from -> if p from then to else from)
 
 -- Given a module name extract the directory and file names, e.g.:
 -- decodeModule "Data.Functor.Identity" = ("Data/Functor/", "Identity")
