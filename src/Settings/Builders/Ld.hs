@@ -2,8 +2,8 @@ module Settings.Builders.Ld (ldArgs) where
 
 import Builder
 import Expression
+import Oracles
 import Predicates (builder)
-import Oracles.Setting
 import Settings.Util
 
 ldArgs :: Args

@@ -1,4 +1,5 @@
 module Util (
+    module Control.Applicative,
     module Control.Monad.Extra,
     module Data.Char,
     module Data.Function,
@@ -14,6 +15,7 @@ module Util (
     ) where
 
 import Base hiding (doesFileExist)
+import Control.Applicative
 import Control.Monad.Extra
 import Data.Char
 import Data.Function

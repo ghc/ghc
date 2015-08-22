@@ -6,8 +6,7 @@ module Predicates (
 
 import Base
 import Expression
-import Oracles.Flag
-import Oracles.Setting
+import Oracles
 import Settings.Default
 
 -- Basic predicates (see Switches.hs for derived predicates)

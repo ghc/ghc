@@ -15,7 +15,7 @@ module Way (
 import Base
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as Set
-import Oracles.Setting
+import Oracles
 import Util hiding (unit)
 
 data WayUnit = Threaded

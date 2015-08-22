@@ -6,7 +6,7 @@ import Target hiding (builder)
 import qualified Target
 import Builder
 import Expression
-import Oracles.Setting
+import Oracles
 import Oracles.ArgsHash
 import Settings.Args
 import Settings.User

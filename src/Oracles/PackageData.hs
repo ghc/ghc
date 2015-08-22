@@ -7,7 +7,6 @@ module Oracles.PackageData (
 
 import Base
 import Util
-import Control.Applicative
 import qualified Data.HashMap.Strict as Map
 
 -- For each (PackageData path) the file 'path/package-data.mk' contains

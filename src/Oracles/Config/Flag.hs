@@ -1,11 +1,13 @@
-module Oracles.Flag (
+module Oracles.Config.Flag (
     Flag (..), flag,
     crossCompiling, gccIsClang, gccLt46,
     platformSupportsSharedLibs, ghcWithSMP, ghcWithNativeCodeGen
     ) where
 
-import Oracles.Base
-import Oracles.Setting
+import Base
+import Util
+import Oracles.Config
+import Oracles.Config.Setting
 
 data Flag = GccIsClang
           | GccLt46

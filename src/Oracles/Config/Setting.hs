@@ -1,4 +1,4 @@
-module Oracles.Setting (
+module Oracles.Config.Setting (
     Setting (..), SettingList (..),
     setting, settingList,
     targetPlatform, targetPlatforms, targetOs, targetOss, notTargetOs,
@@ -6,8 +6,9 @@ module Oracles.Setting (
     ghcEnableTablesNextToCode, cmdLineLengthLimit
     ) where
 
+import Base
 import Stage
-import Oracles.Base
+import Oracles.Config
 
 -- Each Setting comes from the system.config file, e.g. 'target-os = mingw32'.
 -- setting TargetOs looks up the config file and returns "mingw32".

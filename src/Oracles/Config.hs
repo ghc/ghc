@@ -1,15 +1,8 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
-
-module Oracles.Base (
-    module Base,
-    module Control.Applicative,
-    module Util,
-    askConfig, askConfigWithDefault, configOracle
-    ) where
+module Oracles.Config (askConfig, askConfigWithDefault, configOracle) where
 
 import Base
 import Util
-import Control.Applicative hiding ((*>))
 import qualified Data.HashMap.Strict as Map
 
 newtype ConfigKey = ConfigKey String

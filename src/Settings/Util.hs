@@ -15,9 +15,7 @@ import Builder
 import Package
 import Expression
 import Predicates
-import Oracles.Flag
-import Oracles.Setting
-import Oracles.PackageData
+import Oracles
 import Settings.TargetDirectory
 
 -- A single argument.

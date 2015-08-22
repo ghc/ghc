@@ -11,8 +11,7 @@ import Builder
 import Package
 import Expression
 import Predicates
-import Oracles.Flag
-import Oracles.Setting
+import Oracles
 import Settings.User
 import Settings.Ways
 import Settings.Util

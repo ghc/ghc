@@ -5,8 +5,9 @@ module Oracles.PackageDeps (
     packageDepsOracle
     ) where
 
+import Base
+import Util
 import Package
-import Oracles.Base
 import qualified Data.HashMap.Strict as Map
 
 newtype PackageDepsKey = PackageDepsKey PackageName

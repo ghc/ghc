@@ -8,7 +8,7 @@ import Base
 import Target
 import Expression
 import Settings.Args
-import Control.Applicative
+import Settings.User
 
 newtype ArgsHashKey = ArgsHashKey Target
     deriving (Show, Eq, Typeable, Binary, Hashable, NFData)
@@ -30,6 +30,6 @@ checkArgsHash target = do
 
 -- Oracle for storing per-target argument list hashes
 argsHashOracle :: Rules ()
-argsHashOracle = do
+argsHashOracle = when trackBuildSystem $ do
     _ <- addOracle $ \(ArgsHashKey target) -> hash <$> interpret target getArgs
     return ()

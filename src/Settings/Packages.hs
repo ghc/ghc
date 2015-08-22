@@ -6,7 +6,7 @@ module Settings.Packages (
 import Package
 import Expression
 import Predicates
-import Oracles.Setting
+import Oracles
 import Settings.User
 import Settings.Default
 

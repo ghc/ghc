@@ -2,10 +2,9 @@
 module Builder (Builder (..), builderPath, specified, needBuilder) where
 
 import Base
-import GHC.Generics
-import Oracles.Base
-import Oracles.Setting
-import Oracles.WindowsRoot
+import Util
+import GHC.Generics (Generic)
+import Oracles
 import Stage
 
 -- A Builder is an external command invoked in separate process using Shake.cmd

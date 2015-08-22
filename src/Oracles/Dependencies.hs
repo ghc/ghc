@@ -8,7 +8,6 @@ module Oracles.Dependencies (
 import Base
 import Util
 import qualified Data.HashMap.Strict as Map
-import Control.Applicative
 
 newtype DependenciesKey = DependenciesKey (FilePath, FilePath)
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)

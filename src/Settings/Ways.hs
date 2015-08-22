@@ -4,7 +4,7 @@ import Way
 import Stage
 import Expression
 import Predicates
-import Oracles.Flag
+import Oracles
 import Settings.User
 
 -- Combining default ways with user modifications
