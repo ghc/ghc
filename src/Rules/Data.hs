@@ -1,7 +1,5 @@
 module Rules.Data (buildPackageData) where
 
-import Base
-import Util
 import Target (PartialTarget (..), fullTarget)
 import Package
 import Builder

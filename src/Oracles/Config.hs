@@ -2,7 +2,6 @@
 module Oracles.Config (askConfig, askConfigWithDefault, configOracle) where
 
 import Base
-import Util
 import qualified Data.HashMap.Strict as Map
 
 newtype ConfigKey = ConfigKey String

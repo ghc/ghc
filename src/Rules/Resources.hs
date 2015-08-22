@@ -1,7 +1,6 @@
 module Rules.Resources (resourceRules, Resources (..)) where
 
 import Base
-import Util
 
 data Resources = Resources
     {

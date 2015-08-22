@@ -6,7 +6,6 @@ module Oracles.PackageDeps (
     ) where
 
 import Base
-import Util
 import Package
 import qualified Data.HashMap.Strict as Map
 

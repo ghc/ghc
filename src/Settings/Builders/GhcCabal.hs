@@ -4,8 +4,6 @@ module Settings.Builders.GhcCabal (
     ) where
 
 import Way
-import Base
-import Util
 import Stage
 import Builder
 import Package

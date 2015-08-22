@@ -5,7 +5,6 @@ module Oracles.Config.Flag (
     ) where
 
 import Base
-import Util
 import Oracles.Config
 import Oracles.Config.Setting
 

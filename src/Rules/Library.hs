@@ -1,13 +1,12 @@
 module Rules.Library (buildPackageLibrary) where
 
-import Base hiding (splitPath, getDirectoryContents)
-import Expression
+import Expression hiding (splitPath)
 import Oracles.PackageData
 import Predicates (splitObjects)
 import Rules.Actions
 import Rules.Resources
 import Settings
-import System.Directory (getDirectoryContents)
+import qualified System.Directory as IO
 import Target (PartialTarget (..), fullTarget)
 
 buildPackageLibrary :: Resources -> PartialTarget -> Rules ()
@@ -33,7 +32,7 @@ buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
         splitObjs <- if not split then return [] else
             fmap concat $ forM hSrcs $ \src -> do
                 let splitPath = buildPath -/- src ++ "_" ++ osuf way ++ "_split"
-                contents <- liftIO $ getDirectoryContents splitPath
+                contents <- liftIO $ IO.getDirectoryContents splitPath
                 return . map (splitPath -/-)
                        . filter (not . all (== '.')) $ contents
 

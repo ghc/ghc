@@ -1,7 +1,6 @@
 module Rules.Documentation (buildPackageDocumentation) where
 
 import Way
-import Base
 import Stage
 import Builder
 import Package

@@ -1,7 +1,5 @@
 module Settings.Builders.Gcc (gccArgs, gccMArgs) where
 
-import Base
-import Util
 import Expression
 import Predicates (stagedBuilder)
 import Oracles.PackageData

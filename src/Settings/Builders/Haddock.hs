@@ -1,7 +1,5 @@
 module Settings.Builders.Haddock (haddockArgs) where
 
-import Base
-import Util
 import Builder
 import Package
 import Expression

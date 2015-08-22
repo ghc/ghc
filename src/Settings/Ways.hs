@@ -1,6 +1,5 @@
 module Settings.Ways (getWays, getRtsWays) where
 
-import Way
 import Stage
 import Expression
 import Predicates

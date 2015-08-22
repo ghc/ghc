@@ -2,7 +2,6 @@ module Rules.Compile (compilePackage) where
 
 import Way
 import Base
-import Util
 import Builder
 import Target (PartialTarget (..), fullTarget, fullTargetWithWay)
 import Oracles.Dependencies

@@ -3,7 +3,6 @@ module Settings.TargetDirectory (
     ) where
 
 import Base
-import Util
 import Stage
 import Package
 import Settings.User

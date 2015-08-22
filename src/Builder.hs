@@ -2,7 +2,6 @@
 module Builder (Builder (..), builderPath, specified, needBuilder) where
 
 import Base
-import Util
 import GHC.Generics (Generic)
 import Oracles
 import Stage

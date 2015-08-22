@@ -1,7 +1,6 @@
 module Rules.Package (buildPackage) where
 
 import Base
-import Expression
 import Rules.Compile
 import Rules.Data
 import Rules.Dependencies

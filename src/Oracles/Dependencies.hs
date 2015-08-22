@@ -6,7 +6,6 @@ module Oracles.Dependencies (
     ) where
 
 import Base
-import Util
 import qualified Data.HashMap.Strict as Map
 
 newtype DependenciesKey = DependenciesKey (FilePath, FilePath)

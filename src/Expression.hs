@@ -1,10 +1,10 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Expression (
+    module Base,
     module Control.Monad.Reader,
     module Builder,
     module Package,
     module Stage,
-    module Util,
     module Way,
     Expr, DiffExpr, fromDiffExpr,
     Predicate, (?), (??), notP, applyPredicate,
@@ -22,7 +22,6 @@ import Control.Monad.Reader
 import Package
 import Stage
 import Target (Target (..), PartialTarget (..), fromPartial)
-import Util
 import Way
 
 -- Expr a is a computation that produces a value of type Action a and can read

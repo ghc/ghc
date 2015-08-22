@@ -1,7 +1,5 @@
 module Rules.Dependencies (buildPackageDependencies) where
 
-import Base
-import Util
 import Builder
 import Package
 import Expression

@@ -1,4 +1,4 @@
-module Settings.Args (args, getArgs) where
+module Settings.Args (args, getArgs, arPersistentArgsCount) where
 
 import Expression
 import Settings

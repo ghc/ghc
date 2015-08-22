@@ -9,7 +9,6 @@ module Settings.Util (
     appendCcArgs
     ) where
 
-import Base
 import Stage
 import Builder
 import Package

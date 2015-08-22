@@ -1,14 +1,10 @@
 module Rules (generateTargets, packageRules) where
 
-import Base
 import Expression
 import Oracles.PackageData
 import Rules.Package
 import Rules.Resources
-import Settings.Packages
-import Settings.User
-import Settings.Util
-import Settings.Ways
+import Settings
 import Target (PartialTarget (..))
 
 -- generateTargets needs top-level build targets

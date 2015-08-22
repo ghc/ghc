@@ -4,7 +4,6 @@ module Predicates (
     registerPackage, splitObjects
     ) where
 
-import Base
 import Expression
 import GHC
 import Oracles

@@ -12,11 +12,10 @@ module Way (
     safeDetectWay, detectWay, matchBuildResult
     ) where
 
-import Base
+import Base hiding (unit)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as Set
 import Oracles
-import Util hiding (unit)
 
 data WayUnit = Threaded
              | Debug

@@ -1,6 +1,5 @@
 module Settings.Builders.Ghc (ghcArgs, ghcMArgs, commonGhcArgs) where
 
-import Util
 import Expression
 import Predicates (stagedBuilder, splitObjects, stage0)
 import Oracles

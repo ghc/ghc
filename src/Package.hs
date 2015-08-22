@@ -6,7 +6,6 @@ module Package (
 
 import Base
 import GHC.Generics (Generic)
-import Util
 
 -- It is helpful to distinguish package names from strings.
 type PackageName = String

@@ -1,6 +1,5 @@
 module Settings.Builders.GhcPkg (ghcPkgArgs) where
 
-import Util
 import Builder
 import Expression
 import Predicates

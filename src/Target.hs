@@ -11,7 +11,6 @@ import GHC.Generics (Generic)
 import Package
 import Stage
 import Way
-import Util
 
 -- Target captures all parameters relevant to the current build target:
 -- * Stage and Package being built,

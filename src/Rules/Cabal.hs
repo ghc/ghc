@@ -1,6 +1,5 @@
 module Rules.Cabal (cabalRules) where
 
-import Base
 import Stage
 import Package hiding (library)
 import Expression

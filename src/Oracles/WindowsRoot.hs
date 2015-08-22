@@ -5,7 +5,6 @@ module Oracles.WindowsRoot (
     ) where
 
 import Base
-import Util
 
 newtype WindowsRoot = WindowsRoot ()
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)

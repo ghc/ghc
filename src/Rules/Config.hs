@@ -1,7 +1,6 @@
 module Rules.Config (configRules) where
 
 import Base
-import Util
 
 -- We add the following line to 'configure.ac' in order to produce configuration
 -- file "system.config" from "system.config.in" by running 'configure' script.
