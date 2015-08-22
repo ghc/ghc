@@ -2,7 +2,7 @@ module Settings.Builders.Ghc (ghcArgs, ghcMArgs, commonGhcArgs) where
 
 import Expression
 import Oracles
-import Predicates (stagedBuilder, splitObjects, stage0)
+import Predicates (stagedBuilder, splitObjects, stage0, notStage0)
 import Settings
 
 -- TODO: add support for -dyno
@@ -15,6 +15,12 @@ ghcArgs = stagedBuilder Ghc ? do
     file <- getFile
     srcs <- getSources
     mconcat [ commonGhcArgs
+            , arg "-H32m"
+            , stage0    ? arg "-O"
+            , notStage0 ? arg "-O2"
+            , arg "-Wall"
+            , arg "-fwarn-tabs"
+            , splitObjects ? arg "-split-objs"
             , arg "-c", append srcs
             , arg "-o", arg file ]
 
@@ -25,6 +31,7 @@ ghcMArgs = stagedBuilder GhcM ? do
     srcs <- getSources
     mconcat [ arg "-M"
             , commonGhcArgs
+            , arg "-include-pkg-deps"
             , arg "-dep-makefile", arg file
             , append $ concat [ ["-dep-suffix", wayPrefix w] | w <- ways ]
             , append srcs ]
@@ -46,10 +53,9 @@ commonGhcArgs = do
             , append hsArgs
             , append $ map ("-optP" ++) cppArgs
             , arg "-odir"    , arg buildPath
-            , arg "-stubdir" , arg buildPath
             , arg "-hidir"   , arg buildPath
-            , splitObjects   ? arg "-split-objs"
-            , arg "-rtsopts" ]          -- TODO: is this needed?
+            , arg "-stubdir" , arg buildPath
+            , arg "-rtsopts" ] -- TODO: ifeq "$(HC_VERSION_GE_6_13)" "YES"
 
 -- TODO: do '-ticky' in all debug ways?
 wayGhcArgs :: Args
@@ -76,7 +82,6 @@ packageGhcArgs = do
     mconcat
         [ arg "-hide-all-packages"
         , arg "-no-user-package-db"
-        , arg "-include-pkg-deps"
         , stage0 ? arg "-package-db libraries/bootstrapping.conf"
         , if supportsPackageKey || stage /= Stage0
           then arg $ "-this-package-key " ++ pkgKey
@@ -89,19 +94,17 @@ includeGhcArgs = do
     path    <- getTargetPath
     srcDirs <- getPkgDataList SrcDirs
     incDirs <- getPkgDataList IncludeDirs
-    cppArgs <- getPkgDataList CppArgs
     let buildPath   = path -/- "build"
         autogenPath = buildPath -/- "autogen"
-    mconcat
-        [ arg "-i"
-        , arg $ "-i" ++ buildPath
-        , arg $ "-i" ++ autogenPath
-        , arg $ "-I" ++ buildPath
-        , arg $ "-I" ++ autogenPath
-        , append [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
-        , append [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
-        , arg "-optP-include", arg $ "-optP" ++ autogenPath -/- "cabal_macros.h"
-        , append $ map ("-optP" ++) cppArgs ]
+    mconcat [ arg "-i"
+            , arg $ "-i" ++ buildPath
+            , arg $ "-i" ++ autogenPath
+            , arg $ "-I" ++ buildPath
+            , arg $ "-I" ++ autogenPath
+            , append [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
+            , append [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
+            , arg "-optP-include"
+            , arg $ "-optP" ++ autogenPath -/- "cabal_macros.h" ]
 
 -- TODO: see ghc.mk
 -- # And then we strip it out again before building the package:
