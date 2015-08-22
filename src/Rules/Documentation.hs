@@ -8,12 +8,9 @@ import Package
 import Expression
 import Oracles.PackageData
 import Target (PartialTarget (..), fullTarget, fullTargetWithWay)
-import Settings.TargetDirectory
 import Rules.Actions
 import Rules.Resources
-import Settings.Util
-import Settings.User
-import Settings.Packages
+import Settings
 
 -- Note: this build rule creates plenty of files, not just the .haddock one.
 -- All of them go into the 'doc' subdirectory. Pedantically tracking all built

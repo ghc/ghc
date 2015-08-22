@@ -1,21 +1,17 @@
 module Settings.Packages (
-    module Settings.Default,
-    packages, getPackages, knownPackages, findKnownPackage
+    module GHC,
+    getPackages, knownPackages, findKnownPackage
     ) where
 
-import Package
 import Expression
-import Predicates
+import GHC
 import Oracles
+import Predicates
 import Settings.User
-import Settings.Default
 
 -- Combining default list of packages with user modifications
-packages :: Packages
-packages = defaultPackages <> userPackages
-
 getPackages :: Expr [Package]
-getPackages = fromDiffExpr packages
+getPackages = fromDiffExpr $ defaultPackages <> userPackages
 
 -- These are the packages we build by default
 defaultPackages :: Packages

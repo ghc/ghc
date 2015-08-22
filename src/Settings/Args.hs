@@ -1,7 +1,7 @@
 module Settings.Args (args, getArgs) where
 
 import Expression
-import Settings.User
+import Settings
 import Settings.Builders.Ar
 import Settings.Builders.Ld
 import Settings.Builders.Ghc
@@ -19,7 +19,6 @@ getArgs = fromDiffExpr args
 -- TODO: add all other settings
 -- TODO: add src-hc-args = -H32m -O
 -- TODO: GhcStage2HcOpts=-O2 unless GhcUnregisterised
--- TODO: libraries/ghc-prim_dist-install_MODULES := $$(filter-out GHC.Prim, ...
 -- TODO: compiler/stage1/build/Parser_HC_OPTS += -O0 -fno-ignore-interface-pragmas
 -- TODO: compiler/main/GhcMake_HC_OPTS        += -auto-all
 -- TODO: compiler_stage2_HADDOCK_OPTS += --optghc=-DSTAGE=2

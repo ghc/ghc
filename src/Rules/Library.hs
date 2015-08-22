@@ -6,7 +6,7 @@ import Oracles.PackageData
 import Predicates (splitObjects)
 import Rules.Actions
 import Rules.Resources
-import Settings.Util
+import Settings
 import System.Directory (getDirectoryContents)
 import Target (PartialTarget (..), fullTarget)
 

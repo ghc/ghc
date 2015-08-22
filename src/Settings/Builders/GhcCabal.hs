@@ -12,10 +12,7 @@ import Package
 import Expression
 import Predicates
 import Oracles
-import Settings.User
-import Settings.Ways
-import Settings.Util
-import Settings.Packages
+import Settings
 
 cabalArgs :: Args
 cabalArgs = builder GhcCabal ? do

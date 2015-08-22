@@ -6,7 +6,7 @@ import Util
 import Builder
 import Target (PartialTarget (..), fullTarget, fullTargetWithWay)
 import Oracles.Dependencies
-import Settings.TargetDirectory
+import Settings
 import Rules.Actions
 import Rules.Resources
 

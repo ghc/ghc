@@ -4,7 +4,7 @@ import Base
 import Stage
 import Package hiding (library)
 import Expression
-import Settings.Packages
+import Settings
 import Data.Version
 import Distribution.Package
 import Distribution.Verbosity

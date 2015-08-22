@@ -4,8 +4,7 @@ import Util
 import Expression
 import Predicates (stagedBuilder, splitObjects, stage0)
 import Oracles
-import Settings.Util
-import Settings.Ways
+import Settings
 
 -- TODO: add support for -dyno
 -- $1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.hs-boot

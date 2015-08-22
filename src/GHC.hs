@@ -1,31 +1,20 @@
-module Settings.Default (
-    defaultTargetDirectory, defaultKnownPackages,
-
+module GHC (
     array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
     deepseq, directory, filepath, ghcPrim, haskeline, hoopl, hpc, integerGmp,
     integerSimple, parallel, pretty, primitive, process, stm, templateHaskell,
-    terminfo, time, transformers, unix, win32, xhtml
+    terminfo, time, transformers, unix, win32, xhtml,
+
+    defaultKnownPackages, defaultTargetDirectory
     ) where
 
 import Stage
 import Package
 
--- Build results will be placed into a target directory with the following
--- typical structure:
--- * build/           : contains compiled object code
--- * doc/             : produced by haddock
--- * package-data.mk  : contains output of ghc-cabal applied to pkgCabal
-defaultTargetDirectory :: Stage -> Package -> FilePath
-defaultTargetDirectory stage package
-    | package == compiler = "stage" ++ show (fromEnum stage + 1)
-    | stage   == Stage0   = "dist-boot"
-    | otherwise           = "dist-install"
-
 -- These are all packages we know about. Build rules will be generated for
 -- all of them. However, not all of these packages will be built. For example,
 -- package 'win32' is built only on Windows.
 -- Settings/Packages.hs defines default conditions for building each package,
--- which can be overridden in UserSettings.hs.
+-- which can be overridden in Settings/User.hs.
 defaultKnownPackages :: [Package]
 defaultKnownPackages =
     [ array, base, binPackageDb, binary, bytestring, cabal, compiler
@@ -68,3 +57,14 @@ transformers    = library  "transformers"
 unix            = library  "unix"
 win32           = library  "Win32"
 xhtml           = library  "xhtml"
+
+-- Build results will be placed into a target directory with the following
+-- typical structure:
+-- * build/           : contains compiled object code
+-- * doc/             : produced by haddock
+-- * package-data.mk  : contains output of ghc-cabal applied to pkgCabal
+defaultTargetDirectory :: Stage -> Package -> FilePath
+defaultTargetDirectory stage package
+    | package == compiler = "stage" ++ show (fromEnum stage + 1)
+    | stage   == Stage0   = "dist-boot"
+    | otherwise           = "dist-install"

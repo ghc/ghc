@@ -7,9 +7,8 @@ import Package
 import Builder
 import Expression
 import Predicates (registerPackage)
-import Oracles.PackageDeps
-import Settings.Packages
-import Settings.TargetDirectory
+import Oracles
+import Settings
 import Rules.Actions
 import Rules.Resources
 
@@ -62,8 +61,8 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
 -- Reason: Shake's built-in makefile parser doesn't recognise slashes
 postProcessPackageData :: FilePath -> Action ()
 postProcessPackageData file = do
-    pkgData <- fmap (filter ('$' `notElem`) . lines) . liftIO $ readFile file
-    length pkgData `seq` writeFileLines file $ map processLine pkgData
+    contents <- fmap (filter ('$' `notElem`) . lines) . liftIO $ readFile file
+    length contents `seq` writeFileLines file $ map processLine contents
       where
         processLine line = replaceSeparators '_' prefix ++ suffix
           where

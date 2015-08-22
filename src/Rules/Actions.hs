@@ -8,8 +8,8 @@ import Builder
 import Expression
 import Oracles
 import Oracles.ArgsHash
+import Settings
 import Settings.Args
-import Settings.User
 import Settings.Builders.Ar
 
 -- Build a given target using an appropriate builder and acquiring necessary

@@ -5,11 +5,9 @@ module Settings.User (
     dynamicGhcPrograms, laxDependencies
     ) where
 
-import Stage
-import Package
 import Expression
+import GHC
 import Predicates
-import Settings.Default
 
 -- No user-specific settings by default
 -- TODO: rename to userArgs

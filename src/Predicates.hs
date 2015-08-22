@@ -6,8 +6,8 @@ module Predicates (
 
 import Base
 import Expression
+import GHC
 import Oracles
-import Settings.Default
 
 -- Basic predicates (see Switches.hs for derived predicates)
 stage :: Stage -> Predicate

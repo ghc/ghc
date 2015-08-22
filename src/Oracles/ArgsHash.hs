@@ -7,8 +7,8 @@ module Oracles.ArgsHash (
 import Base
 import Target
 import Expression
+import Settings
 import Settings.Args
-import Settings.User
 
 newtype ArgsHashKey = ArgsHashKey Target
     deriving (Show, Eq, Typeable, Binary, Hashable, NFData)

@@ -7,7 +7,7 @@ import Package
 import Expression
 import Target (PartialTarget (..), fullTarget)
 import Oracles.PackageData
-import Settings.Util
+import Settings
 import Rules.Actions
 import Rules.Resources
 
