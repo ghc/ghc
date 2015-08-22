@@ -6,7 +6,6 @@ module Settings.User (
     ) where
 
 import Expression
-import GHC
 import Predicates
 
 -- No user-specific settings by default
@@ -69,4 +68,4 @@ laxDependencies :: Bool
 laxDependencies = False
 
 buildHaddock :: Predicate
-buildHaddock = stage Stage1
+buildHaddock = return True

@@ -1,7 +1,7 @@
-module Settings.Args (args, getArgs, arPersistentArgsCount) where
+module Settings.Args (getArgs) where
 
 import Expression
-import Settings
+import Settings.User
 import Settings.Builders.Ar
 import Settings.Builders.Ld
 import Settings.Builders.Ghc
@@ -10,11 +10,8 @@ import Settings.Builders.GhcPkg
 import Settings.Builders.Haddock
 import Settings.Builders.GhcCabal
 
-args :: Args
-args = defaultArgs <> userArgs
-
 getArgs :: Expr [String]
-getArgs = fromDiffExpr args
+getArgs = fromDiffExpr $ defaultArgs <> userArgs
 
 -- TODO: add all other settings
 -- TODO: add src-hc-args = -H32m -O

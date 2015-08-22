@@ -1,8 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
-
-module Oracles.WindowsRoot (
-    windowsRoot, windowsRootOracle
-    ) where
+module Oracles.WindowsRoot (windowsRoot, windowsRootOracle) where
 
 import Base
 

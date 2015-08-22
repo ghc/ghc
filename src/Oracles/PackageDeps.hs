@@ -1,9 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
-
-module Oracles.PackageDeps (
-    packageDeps,
-    packageDepsOracle
-    ) where
+module Oracles.PackageDeps (packageDeps, packageDepsOracle) where
 
 import Base
 import Package

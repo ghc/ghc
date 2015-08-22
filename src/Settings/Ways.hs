@@ -1,9 +1,7 @@
 module Settings.Ways (getWays, getRtsWays) where
 
-import Stage
 import Expression
 import Predicates
-import Oracles
 import Settings.User
 
 -- Combining default ways with user modifications
@@ -17,7 +15,7 @@ getRtsWays = fromDiffExpr $ defaultRtsWays <> userRtsWays
 defaultWays :: Ways
 defaultWays = mconcat
     [                              append [vanilla] -- always build vanilla
-    , notStage Stage0            ? append [profiling]
+    , notStage0                  ? append [profiling]
     , platformSupportsSharedLibs ? append [dynamic] ]
 
 defaultRtsWays :: Ways

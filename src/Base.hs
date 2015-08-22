@@ -1,6 +1,7 @@
 module Base (
     module Control.Applicative,
     module Control.Monad.Extra,
+    module Control.Monad.Reader,
     module Data.Char,
     module Data.Function,
     module Data.List,
@@ -22,6 +23,7 @@ module Base (
 
 import Control.Applicative
 import Control.Monad.Extra
+import Control.Monad.Reader
 import Data.Char
 import Data.Function
 import Data.List

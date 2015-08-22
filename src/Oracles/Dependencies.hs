@@ -1,9 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
-
-module Oracles.Dependencies (
-    dependencies,
-    dependenciesOracle
-    ) where
+module Oracles.Dependencies (dependencies, dependenciesOracle) where
 
 import Base
 import qualified Data.HashMap.Strict as Map

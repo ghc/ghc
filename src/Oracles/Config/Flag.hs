@@ -1,5 +1,5 @@
 module Oracles.Config.Flag (
-    Flag (..), flag,
+    Flag (..), flag, getFlag,
     crossCompiling, gccIsClang, gccGe46,
     platformSupportsSharedLibs, ghcWithSMP, ghcWithNativeCodeGen
     ) where
@@ -8,30 +8,33 @@ import Base
 import Oracles.Config
 import Oracles.Config.Setting
 
-data Flag = GccIsClang
+data Flag = CrossCompiling
+          | GccIsClang
           | GccLt46
-          | CrossCompiling
-          | SupportsPackageKey
+          | GhcUnregisterised
           | SolarisBrokenShld
           | SplitObjectsBroken
-          | GhcUnregisterised
+          | SupportsPackageKey
 
 flag :: Flag -> Action Bool
 flag f = do
     key <- return $ case f of
+        CrossCompiling     -> "cross-compiling"
         GccIsClang         -> "gcc-is-clang"
         GccLt46            -> "gcc-lt-46"
-        CrossCompiling     -> "cross-compiling"
-        SupportsPackageKey -> "supports-package-key"
+        GhcUnregisterised  -> "ghc-unregisterised"
         SolarisBrokenShld  -> "solaris-broken-shld"
         SplitObjectsBroken -> "split-objects-broken"
-        GhcUnregisterised  -> "ghc-unregisterised"
+        SupportsPackageKey -> "supports-package-key"
     value <- askConfigWithDefault key . putError
         $ "\nFlag '" ++ key ++ "' not set in configuration files."
     unless (value == "YES" || value == "NO") . putError
         $ "\nFlag '" ++ key ++ "' is set to '" ++ value
         ++ "' instead of 'YES' or 'NO'."
     return $ value == "YES"
+
+getFlag :: Flag -> ReaderT a Action Bool
+getFlag = lift . flag
 
 crossCompiling :: Action Bool
 crossCompiling = flag CrossCompiling

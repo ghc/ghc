@@ -1,8 +1,8 @@
 module Settings.Builders.Ghc (ghcArgs, ghcMArgs, commonGhcArgs) where
 
 import Expression
-import Predicates (stagedBuilder, splitObjects, stage0)
 import Oracles
+import Predicates (stagedBuilder, splitObjects, stage0)
 import Settings
 
 -- TODO: add support for -dyno
@@ -33,9 +33,9 @@ ghcMArgs = stagedBuilder GhcM ? do
 commonGhcArgs :: Args
 commonGhcArgs = do
     way     <- getWay
+    path    <- getTargetPath
     hsArgs  <- getPkgDataList HsArgs
     cppArgs <- getPkgDataList CppArgs
-    path    <- getTargetPath
     let buildPath = path -/- "build"
     mconcat [ arg "-hisuf", arg $ hisuf way
             , arg "-osuf" , arg $  osuf way

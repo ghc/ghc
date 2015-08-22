@@ -1,9 +1,8 @@
 module Settings.Builders.GhcPkg (ghcPkgArgs) where
 
-import Builder
 import Expression
 import Predicates
-import Settings.Util
+import Settings
 import Settings.Builders.GhcCabal
 
 ghcPkgArgs :: Args

@@ -5,7 +5,6 @@ module Target (
 
 import Base
 import Builder
-import Control.Monad.Reader
 import GHC.Generics (Generic)
 import Package
 import Stage
@@ -52,6 +51,7 @@ fromPartial (PartialTarget s p) = Target
         files   = error "fromPartial: files not set"
     }
 
+-- Construct a full target by augmenting a PartialTarget with missing fields.
 -- Most targets are built only one way, vanilla, hence we set it by default.
 fullTarget :: PartialTarget -> Builder -> [FilePath] -> [FilePath] -> Target
 fullTarget (PartialTarget s p) b srcs fs = Target

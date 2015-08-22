@@ -1,15 +1,9 @@
 module Settings.Builders.GhcCabal (
-    cabalArgs, ghcCabalHsColourArgs,
-    bootPackageDbArgs, customPackageArgs
+    cabalArgs, ghcCabalHsColourArgs, bootPackageDbArgs, customPackageArgs
     ) where
 
-import Way
-import Stage
-import Builder
-import Package
 import Expression
 import Predicates
-import Oracles
 import Settings
 
 cabalArgs :: Args
@@ -73,11 +67,10 @@ configureArgs = do
         , conf "LDFLAGS"  ldFlags
         , conf "CPPFLAGS" cppFlags
         , appendSubD "--gcc-options" $ cFlags <> ldFlags
-        , conf "--with-iconv-includes"  $ argSettingList IconvIncludeDirs
-        , conf "--with-iconv-libraries" $ argSettingList IconvLibDirs
-        , conf "--with-gmp-includes"    $ argSettingList GmpIncludeDirs
-        , conf "--with-gmp-libraries"   $ argSettingList GmpLibDirs
-        -- TODO: why TargetPlatformFull and not host?
+        , conf "--with-iconv-includes"    $ argSettingList IconvIncludeDirs
+        , conf "--with-iconv-libraries"   $ argSettingList IconvLibDirs
+        , conf "--with-gmp-includes"      $ argSettingList GmpIncludeDirs
+        , conf "--with-gmp-libraries"     $ argSettingList GmpLibDirs
         , crossCompiling ? (conf "--host" $ argSetting TargetPlatformFull)
         , conf "--with-cc" $ argStagedBuilderPath Gcc ]
 
@@ -190,3 +183,27 @@ with b = specified b ? do
 
 withStaged :: (Stage -> Builder) -> Args
 withStaged sb = (with . sb) =<< getStage
+
+argM :: Action String -> Args
+argM = (arg =<<) . lift
+
+argSetting :: Setting -> Args
+argSetting = argM . setting
+
+argSettingList :: SettingList -> Args
+argSettingList = (append =<<) . lift . settingList
+
+argStagedSettingList :: (Stage -> SettingList) -> Args
+argStagedSettingList ss = (argSettingList . ss) =<< getStage
+
+argStagedBuilderPath :: (Stage -> Builder) -> Args
+argStagedBuilderPath sb = (argM . builderPath . sb) =<< getStage
+
+-- Pass arguments to Gcc and corresponding lists of sub-arguments of GhcCabal
+appendCcArgs :: [String] -> Args
+appendCcArgs xs = do
+    mconcat [ stagedBuilder Gcc  ? append xs
+            , stagedBuilder GccM ? append xs
+            , builder GhcCabal   ? appendSub "--configure-option=CFLAGS" xs
+            , builder GhcCabal   ? appendSub "--gcc-options" xs ]
+

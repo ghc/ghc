@@ -1,12 +1,10 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
-module Oracles.ArgsHash (
-    checkArgsHash, argsHashOracle
-    ) where
+module Oracles.ArgsHash (checkArgsHash, argsHashOracle) where
 
-import Target
 import Expression
 import Settings
 import Settings.Args
+import Target
 
 newtype ArgsHashKey = ArgsHashKey Target
     deriving (Show, Eq, Typeable, Binary, Hashable, NFData)

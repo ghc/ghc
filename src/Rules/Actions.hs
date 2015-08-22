@@ -5,6 +5,7 @@ import Oracles
 import Oracles.ArgsHash
 import Settings
 import Settings.Args
+import Settings.Builders.Ar
 import qualified Target
 
 -- Build a given target using an appropriate builder and acquiring necessary

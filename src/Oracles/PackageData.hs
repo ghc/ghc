@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
-
 module Oracles.PackageData (
     PackageData (..), PackageDataList (..),
     pkgData, pkgDataList, packageDataOracle

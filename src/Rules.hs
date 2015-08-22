@@ -17,16 +17,16 @@ generateTargets = action $ do
             libName     <- interpretPartial target $ getPkgData LibName
             needGhciLib <- interpretPartial target $ getPkgData BuildGhciLib
             needHaddock <- interpretPartial target buildHaddock
-            let ghciLib = [ buildPath -/- "HS" ++ libName <.> "o"
-                          | needGhciLib == "YES" && stage /= Stage0 ]
-                haddock = [ pkgHaddockFile pkg | needHaddock ]
-
-            ways <- interpretPartial target getWays
+            ways        <- interpretPartial target getWays
+            let ghciLib = buildPath -/- "HS" ++ libName <.> "o"
+                haddock = pkgHaddockFile pkg
             libs <- forM ways $ \way -> do
                 extension <- libsuf way
                 return $ buildPath -/- "libHS" ++ libName <.> extension
 
-            return $ ghciLib ++ libs ++ haddock
+            return $  [ ghciLib | needGhciLib == "YES" && stage == Stage1 ]
+                   ++ [ haddock | needHaddock          && stage == Stage1 ]
+                   ++ libs
 
     need $ reverse targets
 

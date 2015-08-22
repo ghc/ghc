@@ -1,12 +1,9 @@
 module Settings.Builders.Haddock (haddockArgs) where
 
-import Builder
-import Package
 import Expression
-import Predicates (builder, package, stage1)
-import Oracles.PackageData
-import Settings.Util
-import Settings.Packages
+import Predicates hiding (file)
+import Oracles
+import Settings
 import Settings.Builders.Ghc
 
 haddockArgs :: Args

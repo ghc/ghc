@@ -1,25 +1,21 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Expression (
     module Base,
-    module Control.Monad.Reader,
     module Builder,
     module Package,
     module Stage,
     module Way,
     Expr, DiffExpr, fromDiffExpr,
-    Predicate, (?), applyPredicate,
-    Args, Ways, Packages,
+    Predicate, (?), applyPredicate, Args, Ways, Packages,
     Target, PartialTarget (..), fromPartial, fullTarget, fullTargetWithWay,
-    apply, append, appendM, remove,
-    appendSub, appendSubD, filterSub, removeSub,
+    apply, append, arg, remove, appendSub, appendSubD, filterSub, removeSub,
     interpret, interpretPartial, interpretWithStage, interpretDiff,
-    getStage, getPackage, getBuilder, getFiles, getFile,
-    getSources, getSource, getWay
+    getStage, getPackage, getBuilder, getFiles, getSources, getWay,
+    getSource, getFile
     ) where
 
 import Base
 import Builder
-import Control.Monad.Reader
 import Package
 import Stage
 import Target
@@ -72,6 +68,10 @@ applyPredicate predicate expr = do
     bool <- predicate
     if bool then expr else return mempty
 
+-- Add a single String argument to Args
+arg :: String -> Args
+arg = append . return
+
 -- A convenient operator for predicate application
 class PredicateLike a where
     (?)  :: Monoid m => a -> Expr m -> Expr m
@@ -86,10 +86,6 @@ instance PredicateLike Bool where
 
 instance PredicateLike (Action Bool) where
     (?)  = applyPredicate . lift
-
--- A monadic version of append
-appendM :: Monoid a => Action a -> DiffExpr a
-appendM = (append =<<) . lift
 
 -- appendSub appends a list of sub-arguments to all arguments starting with a
 -- given prefix. If there is no argument with such prefix then a new argument

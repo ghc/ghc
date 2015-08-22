@@ -1,6 +1,6 @@
 module Oracles.Config.Setting (
     Setting (..), SettingList (..),
-    setting, settingList,
+    setting, settingList, getSetting, getSettingList,
     targetPlatform, targetPlatforms, targetOs, targetOss, notTargetOs,
     targetArchs, windowsHost, notWindowsHost, ghcWithInterpreter,
     ghcEnableTablesNextToCode, cmdLineLengthLimit
@@ -53,6 +53,12 @@ settingList key = fmap words $ askConfig $ case key of
     IconvLibDirs            -> "iconv-lib-dirs"
     GmpIncludeDirs          -> "gmp-include-dirs"
     GmpLibDirs              -> "gmp-lib-dirs"
+
+getSetting :: Setting -> ReaderT a Action String
+getSetting = lift . setting
+
+getSettingList :: SettingList -> ReaderT a Action [String]
+getSettingList = lift . settingList
 
 matchSetting :: Setting -> [String] -> Action Bool
 matchSetting key values = do

@@ -1,18 +1,15 @@
 module Settings.Builders.Gcc (gccArgs, gccMArgs) where
 
 import Expression
+import Oracles
 import Predicates (stagedBuilder)
-import Oracles.PackageData
-import Settings.Util
+import Settings
 
--- TODO: check code duplication
 gccArgs :: Args
 gccArgs = stagedBuilder Gcc ? do
-    file   <- getFile
-    src    <- getSource
-    ccArgs <- getPkgDataList CcArgs
-    mconcat [ append ccArgs
-            , includeGccArgs
+    file <- getFile
+    src  <- getSource
+    mconcat [ commonGccArgs
             , arg "-c"
             , arg src
             , arg "-o"
@@ -21,13 +18,11 @@ gccArgs = stagedBuilder Gcc ? do
 -- TODO: handle custom $1_$2_MKDEPENDC_OPTS and
 gccMArgs :: Args
 gccMArgs = stagedBuilder GccM ? do
-    file   <- getFile
-    src    <- getSource
-    ccArgs <- getPkgDataList CcArgs
+    file <- getFile
+    src  <- getSource
     mconcat [ arg "-E"
             , arg "-MM"
-            , append ccArgs -- TODO: remove? any other flags?
-            , includeGccArgs
+            , commonGccArgs
             , arg "-MF"
             , arg file
             , arg "-MT"
@@ -36,12 +31,13 @@ gccMArgs = stagedBuilder GccM ? do
             , arg "c"
             , arg src ]
 
-includeGccArgs :: Args
-includeGccArgs = do
-    pkg   <- getPackage
-    path  <- getTargetPath
-    iDirs <- getPkgDataList IncludeDirs
-    dDirs <- getPkgDataList DepIncludeDirs
-    mconcat
-        [ arg $ "-I" ++ path -/- "build/autogen"
-        , append . map (\dir -> "-I" ++ pkgPath pkg -/- dir) $ iDirs ++ dDirs ]
+commonGccArgs :: Args
+commonGccArgs = do
+    pkg    <- getPackage
+    path   <- getTargetPath
+    iDirs  <- getPkgDataList IncludeDirs
+    dDirs  <- getPkgDataList DepIncludeDirs
+    ccArgs <- getPkgDataList CcArgs
+    mconcat [ append ccArgs
+            , arg $ "-I" ++ path -/- "build/autogen"
+            , append [ "-I" ++ pkgPath pkg -/- dir | dir <- iDirs ++ dDirs ]]

@@ -1,11 +1,8 @@
 module Settings.Packages (
-    module GHC,
     getPackages, knownPackages, findKnownPackage
     ) where
 
 import Expression
-import GHC
-import Oracles
 import Predicates
 import Settings.User
 
@@ -21,7 +18,7 @@ defaultPackages = mconcat
 
 packagesStage0 :: Packages
 packagesStage0 = mconcat
-    [ append [binPackageDb, binary, cabal, compiler, hoopl, hpc, transformers]
+    [ append [ binPackageDb, binary, cabal, compiler, hoopl, hpc, transformers ]
     , notWindowsHost ? notTargetOs "ios" ? append [terminfo] ]
 
 -- TODO: what do we do with parallel, stm, random, primitive, vector and dph?

@@ -2,9 +2,7 @@ module Settings.TargetDirectory (
     targetDirectory, targetPath, pkgHaddockFile
     ) where
 
-import Base
-import Stage
-import Package
+import Expression
 import Settings.User
 
 -- User can override the default target directory settings given below

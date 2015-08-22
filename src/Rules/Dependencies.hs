@@ -31,4 +31,3 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
             cDeps <- fmap concat $ mapM readFile' cDepFiles
             hDeps <- readFile' hDepFile
             writeFileChanged file $ cDeps ++ hDeps
-
