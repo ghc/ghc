@@ -1,6 +1,6 @@
 module Oracles.Config.Flag (
     Flag (..), flag,
-    crossCompiling, gccIsClang, gccLt46,
+    crossCompiling, gccIsClang, gccGe46,
     platformSupportsSharedLibs, ghcWithSMP, ghcWithNativeCodeGen
     ) where
 
@@ -39,8 +39,8 @@ crossCompiling = flag CrossCompiling
 gccIsClang :: Action Bool
 gccIsClang = flag GccIsClang
 
-gccLt46 :: Action Bool
-gccLt46 = flag GccLt46
+gccGe46 :: Action Bool
+gccGe46 = fmap not $ flag GccLt46
 
 platformSupportsSharedLibs :: Action Bool
 platformSupportsSharedLibs = do
