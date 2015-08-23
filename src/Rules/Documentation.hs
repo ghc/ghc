@@ -10,10 +10,10 @@ import Settings
 -- All of them go into the 'doc' subdirectory. Pedantically tracking all built
 -- files in the Shake databases seems fragile and unnecesarry.
 buildPackageDocumentation :: Resources -> PartialTarget -> Rules ()
-buildPackageDocumentation _ target @ (PartialTarget _ pkg) =
+buildPackageDocumentation _ target @ (PartialTarget stage pkg) =
     let cabalFile   = pkgCabalFile pkg
         haddockFile = pkgHaddockFile pkg
-    in do
+    in when (stage == Stage1) $ do
         haddockFile %> \file -> do
             whenM (specified HsColour) $ do
                 need [cabalFile]
