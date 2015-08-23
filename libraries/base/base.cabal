@@ -207,6 +207,8 @@ Library
         GHC.Environment
         GHC.Err
         GHC.Exception
+        GHC.ExecutionStack
+        GHC.ExecutionStack.Internal
         GHC.Exts
         GHC.Fingerprint
         GHC.Fingerprint.Type
