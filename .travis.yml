@@ -22,6 +22,7 @@ before_install:
  - cabal install
  - cd ..
  - (cd haddock-api/ && cabal install --only-dependencies --enable-tests && cabal configure --enable-tests && cabal build && cabal test && cabal install)
+ - (cd haddock-test/ && cabal install --only-dependencies --enable-tests && cabal configure --enable-tests && cabal build && cabal install)
 
 script:
  - cabal configure --enable-tests && cabal build && cabal test
