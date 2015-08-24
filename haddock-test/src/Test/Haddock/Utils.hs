@@ -41,3 +41,10 @@ createEmptyDirectory :: FilePath -> IO ()
 createEmptyDirectory path = do
     whenM (doesDirectoryExist path) $ removeDirectoryRecursive path
     createDirectory path
+
+
+-- | Just like 'copyFile' but output directory path is not required to exist.
+copyFile' :: FilePath -> FilePath -> IO ()
+copyFile' old new = do
+    createDirectoryIfMissing True $ takeDirectory new
+    copyFile old new

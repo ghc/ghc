@@ -132,7 +132,7 @@ diffFile cfg diff file = do
 maybeAcceptFile :: Config c -> FilePath -> CheckResult -> IO CheckResult
 maybeAcceptFile cfg@(Config { cfgDirConfig = dcfg }) file result
     | cfgAccept cfg && result `elem` [NoRef, Fail] = do
-        copyFile (outFile dcfg file) (refFile dcfg file)
+        copyFile' (outFile dcfg file) (refFile dcfg file)
         pure Accepted
 maybeAcceptFile _ _ result = pure result
 
