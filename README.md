@@ -57,6 +57,7 @@ example setup using cabal sandboxes.
   cabal sandbox init
   cabal sandbox add-source haddock-library
   cabal sandbox add-source haddock-api
+  cabal sandbox add-source haddock-test
   # adjust -j to the number of cores you want to use
   cabal install -j4 --dependencies-only --enable-tests
   cabal configure --enable-tests
