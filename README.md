@@ -46,7 +46,7 @@ format.
 
 Please create issues when you have any problems and pull requests if you have some code.
 
-###### Hacking
+##### Hacking
 
 To get started you'll need a latest GHC release installed.
 
@@ -59,30 +59,30 @@ Clone the repository:
 
 and then proceed using your favourite build tool.
 
-####### Using Cabal sandboxes
+###### Using Cabal sandboxes
 
 ```bash
-  cabal sandbox init
-  cabal sandbox add-source haddock-library
-  cabal sandbox add-source haddock-api
-  cabal sandbox add-source haddock-test
-  # adjust -j to the number of cores you want to use
-  cabal install -j4 --dependencies-only --enable-tests
-  cabal configure --enable-tests
-  cabal build -j4
-  # run the test suite
-  export HADDOCK_PATH="dist/build/haddock/haddock"
-  cabal test
+cabal sandbox init
+cabal sandbox add-source haddock-library
+cabal sandbox add-source haddock-api
+cabal sandbox add-source haddock-test
+# adjust -j to the number of cores you want to use
+cabal install -j4 --dependencies-only --enable-tests
+cabal configure --enable-tests
+cabal build -j4
+# run the test suite
+export HADDOCK_PATH="dist/build/haddock/haddock"
+cabal test
 ```
 
-####### Using Stack
+###### Using Stack
 
 ```bash
-  stack init
-  stack install
-  # run the test suite
-  export HADDOCK_PATH="$HOME/.local/bin/haddock"
-  stack test
+stack init
+stack install
+# run the test suite
+export HADDOCK_PATH="$HOME/.local/bin/haddock"
+stack test
 ```
 
 
