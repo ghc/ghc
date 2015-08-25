@@ -423,13 +423,6 @@ endif
 endif
 PACKAGES_STAGE1 += haskeline
 
-# We normally install only the packages down to this point
-REGULAR_INSTALL_PACKAGES := $(addprefix libraries/,$(PACKAGES_STAGE1))
-ifneq "$(Stage1Only)" "YES"
-REGULAR_INSTALL_PACKAGES += compiler
-endif
-REGULAR_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
-
 ifneq "$(CrossCompiling)" "YES"
 define addExtraPackage
 ifeq "$2" "-"
@@ -450,18 +443,12 @@ endef
 $(eval $(call foreachLibrary,addExtraPackage))
 endif
 
-# If we want to just install everything, then we want all the packages
-SUPERSIZE_INSTALL_PACKAGES := $(addprefix libraries/,$(PACKAGES_STAGE1))
+# We install all packages that we build.
+INSTALL_PACKAGES := $(addprefix libraries/,$(PACKAGES_STAGE1))
 ifneq "$(Stage1Only)" "YES"
-SUPERSIZE_INSTALL_PACKAGES += compiler
+INSTALL_PACKAGES += compiler
 endif
-SUPERSIZE_INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
-
-ifeq "$(InstallExtraPackages)" "NO"
-INSTALL_PACKAGES := $(REGULAR_INSTALL_PACKAGES)
-else
-INSTALL_PACKAGES := $(SUPERSIZE_INSTALL_PACKAGES)
-endif
+INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
 
 endif # CLEANING
 

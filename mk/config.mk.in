@@ -302,12 +302,6 @@ SupportsSplitObjs := $(strip \
 SplitObjs=$(SupportsSplitObjs)
 
 # ----------------------------------------------------------------------------
-# Package-related things
-
-# Whether to install the extra packages
-InstallExtraPackages = NO
-
-# ----------------------------------------------------------------------------
 
 # There are a number of things which technically depend on GHC (e.g. if
 # ghc changes then Haskell files may be compiled differently, or Cabal
@@ -768,9 +762,9 @@ else
 HSCOLOUR_SRCS = YES
 endif
 
-# Build DPH?
+# Build and install DPH?
 BUILD_DPH = NO
-# Build the "extra" packages (see ./packages)?
+# Build and install the "extra" packages (see ./packages)?
 BUILD_EXTRA_PKGS = NO
 
 ################################################################################

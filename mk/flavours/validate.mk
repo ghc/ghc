@@ -12,11 +12,14 @@ BUILD_DOCBOOK_PDF  = NO
 ifeq "$(ValidateHpc)" "YES"
 GhcStage2HcOpts   += -fhpc -hpcdir $(TOP)/testsuite/hpc_output/
 endif
+
 ifeq "$(ValidateSpeed)" "SLOW"
 GhcStage2HcOpts   += -DDEBUG
 endif
 
-InstallExtraPackages = YES
+ifneq "$(ValidateSpeed)" "FAST"
+BUILD_EXTRA_PKGS=YES
+endif
 
 WERROR             = -Werror
 
@@ -40,5 +43,5 @@ WERROR             = -Werror
 # markup is correct, so we turn off PS and PDF doc building when
 # validating.
 #
-# We set InstallExtraPackages=YES, because we want to install the "extra"
-# packages, so that we can test them.
+# We set BUILD_EXTRA_PKGS=YES to build the "extra" packages (see ./packages),
+# so that we can test them.
