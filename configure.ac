@@ -1066,24 +1066,34 @@ dnl runs out of paging file when we have multiple processes reserving
 dnl 1TB of address space, we get the following error:
 dnl    VirtualAlloc MEM_RESERVE 1099512676352 bytes failed: The paging file is too small for this operation to complete.
 dnl
+
+AC_ARG_ENABLE(large-address-space,
+    [AC_HELP_STRING([--enable-large-address-space],
+        [Use a single large address space on 64 bit systems (enabled by default on 64 bit platforms)])],
+    EnableLargeAddressSpace=$enableval,
+    EnableLargeAddressSpace=yes
+)
+
 use_large_address_space=no
 if test "$ac_cv_sizeof_void_p" -eq 8 ; then
-   if test "$ghc_host_os" = "darwin" ; then
-           use_large_address_space=yes
-   else
-      AC_CHECK_DECLS([MAP_NORESERVE, MADV_FREE, MADV_DONTNEED],[],[],
-[
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/mman.h>
-#include <fcntl.h>
-])
-      if test "$ac_cv_have_decl_MAP_NORESERVE" = "yes" &&
-         test "$ac_cv_have_decl_MADV_FREE" = "yes" ||
-         test "$ac_cv_have_decl_MADV_DONTNEED" = "yes" ; then
-              use_large_address_space=yes
-      fi
-   fi
+    if test "x$EnableLargeAddressSpace" = "xyes" ; then
+        if test "$ghc_host_os" = "darwin" ; then
+            use_large_address_space=yes
+        else
+            AC_CHECK_DECLS([MAP_NORESERVE, MADV_FREE, MADV_DONTNEED],[],[],
+                [
+                #include <unistd.h>
+                #include <sys/types.h>
+                #include <sys/mman.h>
+                #include <fcntl.h>
+            ])
+            if test "$ac_cv_have_decl_MAP_NORESERVE" = "yes" &&
+                test "$ac_cv_have_decl_MADV_FREE" = "yes" ||
+                test "$ac_cv_have_decl_MADV_DONTNEED" = "yes" ; then
+                    use_large_address_space=yes
+            fi
+        fi
+    fi
 fi
 if test "$use_large_address_space" = "yes" ; then
    AC_DEFINE([USE_LARGE_ADDRESS_SPACE], [1], [Enable single heap address space support])
