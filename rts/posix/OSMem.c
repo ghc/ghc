@@ -156,7 +156,7 @@ my_mmap (void *addr, W_ size, int operation)
     else
         flags = 0;
 
-#if defined(solaris2_HOST_OS) || defined(irix_HOST_OS)
+#if defined(irix_HOST_OS)
     {
         if (operation & MEM_RESERVE)
         {
