@@ -213,6 +213,11 @@ printVersions env haddockPath = do
 
 baseDependencies :: FilePath -> IO [String]
 baseDependencies ghcPath = do
+    -- The 'getInstalledPackages' crashes if used when "GHC_PACKAGE_PATH" is
+    -- set to some value. I am not sure why is that happening and what are the
+    -- consequences of unsetting it - but looks like it works (for now).
+    unsetEnv "GHC_PACKAGE_PATH"
+
     (_, _, cfg) <- configure normal (Just ghcPath) Nothing
         defaultProgramConfiguration
     pkgIndex <- getInstalledPackages normal [GlobalPackageDB] cfg
