@@ -1,7 +1,7 @@
-SRC_HC_OPTS        = -O -H64m -fllvm
+SRC_HC_OPTS        = -O -H64m
 GhcStage1HcOpts    = -O2
 GhcStage2HcOpts    = -O2 -fllvm
-GhcLibHcOpts       = -O2
+GhcLibHcOpts       = -O2 -fllvm
 BUILD_PROF_LIBS    = YES
 #SplitObjs
 HADDOCK_DOCS       = NO
