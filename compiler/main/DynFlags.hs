@@ -1913,7 +1913,7 @@ parseSigOf str = case filter ((=="").snd) (readP_to_S parse str) of
             m <- tok $ parseModule
             return (n, m)
         parseModule = do
-            pk <- munch1 (\c -> isAlphaNum c || c `elem` "-_")
+            pk <- munch1 (\c -> isAlphaNum c || c `elem` "-_.")
             _ <- R.char ':'
             m <- parseModuleName
             return (mkModule (stringToPackageKey pk) m)
@@ -4072,6 +4072,7 @@ compilerInfo dflags
        ("Support parallel --make",     "YES"),
        ("Support reexported-modules",  "YES"),
        ("Support thinning and renaming package flags", "YES"),
+       ("Requires unified installed package IDs", "YES"),
        ("Uses package keys",           "YES"),
        ("Dynamic by default",          if dYNAMIC_BY_DEFAULT dflags
                                        then "YES" else "NO"),

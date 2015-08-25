@@ -1,7 +1,7 @@
 name: "testpkg"
 version: 4.0
 id: testpkg-4.0-XXX
-key: testpkg-4.0
+key: testpkg-4.0-XXX
 license: BSD3
 copyright: (c) The Univsersity of Glasgow 2004
 maintainer: glasgow-haskell-users@haskell.org

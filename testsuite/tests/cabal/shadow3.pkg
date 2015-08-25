@@ -1,5 +1,6 @@
 name: shadow
 version: 1
-id: shadow-1-YYY
-key: shadow-1
+id: shadow-1-XXX
+key: shadow-1-XXX
+abi: bbb
 depends:

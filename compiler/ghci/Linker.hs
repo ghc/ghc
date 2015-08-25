@@ -1091,8 +1091,7 @@ linkPackages' dflags new_pks pls = do
 
         | Just pkg_cfg <- lookupPackage dflags new_pkg
         = do {  -- Link dependents first
-               pkgs' <- link pkgs [ resolveInstalledPackageId dflags ipid
-                                  | ipid <- depends pkg_cfg ]
+               pkgs' <- link pkgs (depends pkg_cfg)
                 -- Now link the package itself
              ; linkPackage dflags pkg_cfg
              ; return (new_pkg : pkgs') }

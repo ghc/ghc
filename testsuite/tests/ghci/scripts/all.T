@@ -1,8 +1,5 @@
 # coding=utf8
 
-def normaliseTransformersPackageKey(str):
-    return re.sub('transformers-[^@]+@[A-Za-z0-9]+', 'transformers-<VERSION>@<HASH>', str)
-
 setTestOpts(when(compiler_profiled(), skip))
 
 test('ghci001', combined_output, ghci_script, ['ghci001.script'])
@@ -126,7 +123,7 @@ test('T5836', normal, ghci_script, ['T5836.script'])
 test('T5979',
     [reqlib('transformers'),
      normalise_slashes,
-     normalise_errmsg_fun(normaliseTransformersPackageKey)],
+     normalise_version("transformers")],
     ghci_script, ['T5979.script'])
 test('T5975a',
      [pre_cmd('touch föøbàr1.hs'),

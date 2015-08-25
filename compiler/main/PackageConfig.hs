@@ -128,7 +128,6 @@ pprPackageConfig InstalledPackageInfo {..} =
       field "name"                 (ppr packageName),
       field "version"              (text (showVersion packageVersion)),
       field "id"                   (ppr installedPackageId),
-      field "key"                  (ppr packageKey),
       field "exposed"              (ppr exposed),
       field "exposed-modules"
         (if all isExposedModule exposedModules

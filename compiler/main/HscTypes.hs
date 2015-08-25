@@ -1543,15 +1543,8 @@ Note [Printing package keys]
 In the old days, original names were tied to PackageIds, which directly
 corresponded to the entities that users wrote in Cabal files, and were perfectly
 suitable for printing when we need to disambiguate packages.  However, with
-PackageKey, the situation is different.  First, the key is not a human readable
-at all, so we need to consult the package database to find the appropriate
-PackageId to display.  Second, there may be multiple copies of a library visible
-with the same PackageId, in which case we need to disambiguate.  For now,
-we just emit the actual package key (which the user can go look up); however,
-another scheme is to (recursively) say which dependencies are different.
-
-NB: When we extend package keys to also have holes, we will have to disambiguate
-those as well.
+PackageKey, the situation can be different: if the key is instantiated with
+some holes, we should try to give the user some more useful information.
 -}
 
 -- | Creates some functions that work out the best ways to format
