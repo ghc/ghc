@@ -175,15 +175,7 @@ wired in ones are defined in TysWiredIn etc.
 basicKnownKeyNames :: [Name]
 basicKnownKeyNames
  = genericTyConNames
- ++ [   -- Type constructors (synonyms especially)
-        ioTyConName, ioDataConName,
-        runMainIOName,
-        rationalTyConName,
-        stringTyConName,
-        ratioDataConName,
-        ratioTyConName,
-
-        --  Classes.  *Must* include:
+ ++ [   --  Classes.  *Must* include:
         --      classes that are grabbed by key (e.g., eqClassKey)
         --      classes in "Class.standardClassKeys" (quite a few)
         eqClassName,                    -- mentioned, derivable
@@ -206,6 +198,11 @@ basicKnownKeyNames
         foldableClassName,
         traversableClassName,
 
+        -- The IO type
+        -- See Note [TyConRepNames for non-wired-in TyCons]
+        ioTyConName, ioDataConName,
+        runMainIOName,
+
         -- Typeable
         typeableClassName,
         typeRepTyConName,
@@ -222,11 +219,14 @@ basicKnownKeyNames
         negateName, minusName, geName, eqName,
 
         -- Conversion functions
+        rationalTyConName,
+        ratioTyConName, ratioDataConName,
         fromRationalName, fromIntegerName,
         toIntegerName, toRationalName,
         fromIntegralName, realToFracName,
 
         -- String stuff
+        stringTyConName,
         fromStringName,
 
         -- Enum stuff
@@ -331,7 +331,8 @@ basicKnownKeyNames
         toAnnotationWrapperName
 
         -- The Ordering type
-        , orderingTyConName, ltDataConName, eqDataConName, gtDataConName
+        , orderingTyConName
+        , ltDataConName, eqDataConName, gtDataConName
 
         -- The SPEC type for SpecConstr
         , specTyConName
