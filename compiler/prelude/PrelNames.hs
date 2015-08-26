@@ -767,18 +767,18 @@ runMainIOName :: Name
 runMainIOName = varQual gHC_TOP_HANDLER (fsLit "runMainIO") runMainKey
 
 orderingTyConName, ltDataConName, eqDataConName, gtDataConName :: Name
-orderingTyConName = tcQual   gHC_TYPES (fsLit "Ordering") orderingTyConKey
-ltDataConName     = conName gHC_TYPES (fsLit "LT") ltDataConKey
-eqDataConName     = conName gHC_TYPES (fsLit "EQ") eqDataConKey
-gtDataConName     = conName gHC_TYPES (fsLit "GT") gtDataConKey
+orderingTyConName = tcQual  gHC_TYPES (fsLit "Ordering") orderingTyConKey
+ltDataConName     = dcQual gHC_TYPES (fsLit "LT") ltDataConKey
+eqDataConName     = dcQual gHC_TYPES (fsLit "EQ") eqDataConKey
+gtDataConName     = dcQual gHC_TYPES (fsLit "GT") gtDataConKey
 
 specTyConName :: Name
 specTyConName     = tcQual gHC_TYPES (fsLit "SPEC") specTyConKey
 
 eitherTyConName, leftDataConName, rightDataConName :: Name
 eitherTyConName   = tcQual  dATA_EITHER (fsLit "Either") eitherTyConKey
-leftDataConName   = conName dATA_EITHER (fsLit "Left")   leftDataConKey
-rightDataConName  = conName dATA_EITHER (fsLit "Right")  rightDataConKey
+leftDataConName   = dcQual dATA_EITHER (fsLit "Left")   leftDataConKey
+rightDataConName  = dcQual dATA_EITHER (fsLit "Right")  rightDataConKey
 
 -- Generics (types)
 v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
@@ -939,7 +939,7 @@ integerTyConName, mkIntegerName, integerSDataConName,
     andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
     shiftLIntegerName, shiftRIntegerName :: Name
 integerTyConName      = tcQual  gHC_INTEGER_TYPE (fsLit "Integer")           integerTyConKey
-integerSDataConName   = conName gHC_INTEGER_TYPE (fsLit n)                   integerSDataConKey
+integerSDataConName   = dcQual gHC_INTEGER_TYPE (fsLit n)                   integerSDataConKey
   where n = case cIntegerLibraryType of
             IntegerGMP    -> "S#"
             IntegerSimple -> panic "integerSDataConName evaluated for integer-simple"
@@ -992,7 +992,7 @@ rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
     realToFracName :: Name
 rationalTyConName   = tcQual  gHC_REAL (fsLit "Rational")     rationalTyConKey
 ratioTyConName      = tcQual  gHC_REAL (fsLit "Ratio")        ratioTyConKey
-ratioDataConName    = conName gHC_REAL (fsLit ":%")           ratioDataConKey
+ratioDataConName    = dcQual  gHC_REAL (fsLit ":%")           ratioDataConKey
 realClassName       = clsQual gHC_REAL (fsLit "Real")         realClassKey
 integralClassName   = clsQual gHC_REAL (fsLit "Integral")     integralClassKey
 realFracClassName   = clsQual gHC_REAL (fsLit "RealFrac")     realFracClassKey
@@ -1097,10 +1097,10 @@ ghciIoClassName = clsQual gHC_GHCI (fsLit "GHCiSandboxIO") ghciIoClassKey
 ghciStepIoMName = varQual gHC_GHCI (fsLit "ghciStepIO") ghciStepIoMClassOpKey
 
 -- IO things
-ioTyConName, ioDataConName, thenIOName, bindIOName, returnIOName,
-    failIOName :: Name
+ioTyConName, ioDataConName,
+  thenIOName, bindIOName, returnIOName, failIOName :: Name
 ioTyConName       = tcQual  gHC_TYPES (fsLit "IO")       ioTyConKey
-ioDataConName     = conName gHC_TYPES (fsLit "IO")       ioDataConKey
+ioDataConName     = dcQual  gHC_TYPES (fsLit "IO")       ioDataConKey
 thenIOName        = varQual gHC_BASE  (fsLit "thenIO")   thenIOIdKey
 bindIOName        = varQual gHC_BASE  (fsLit "bindIO")   bindIOIdKey
 returnIOName      = varQual gHC_BASE  (fsLit "returnIO") returnIOIdKey
@@ -1179,11 +1179,11 @@ ipClassName         = clsQual gHC_CLASSES (fsLit "IP") ipClassNameKey
 -- Source Locations
 callStackDataConName, callStackTyConName, srcLocDataConName :: Name
 callStackDataConName
-  = conName gHC_STACK (fsLit "CallStack") callStackDataConKey
+  = dcQual gHC_STACK  (fsLit "CallStack") callStackDataConKey
 callStackTyConName
   = tcQual  gHC_STACK (fsLit "CallStack") callStackTyConKey
 srcLocDataConName
-  = conName gHC_SRCLOC (fsLit "SrcLoc")   srcLocDataConKey
+  = dcQual gHC_SRCLOC (fsLit "SrcLoc")   srcLocDataConKey
 
 -- plugins
 pLUGINS :: Module
@@ -1198,7 +1198,7 @@ staticPtrInfoTyConName =
 
 staticPtrInfoDataConName :: Name
 staticPtrInfoDataConName =
-    conName gHC_STATICPTR (fsLit "StaticPtrInfo") staticPtrInfoDataConKey
+    dcQual gHC_STATICPTR (fsLit "StaticPtrInfo") staticPtrInfoDataConKey
 
 staticPtrTyConName :: Name
 staticPtrTyConName =
@@ -1206,11 +1206,11 @@ staticPtrTyConName =
 
 staticPtrDataConName :: Name
 staticPtrDataConName =
-    conName gHC_STATICPTR (fsLit "StaticPtr") staticPtrDataConKey
+    dcQual gHC_STATICPTR (fsLit "StaticPtr") staticPtrDataConKey
 
 fingerprintDataConName :: Name
 fingerprintDataConName =
-    conName gHC_FINGERPRINT_TYPE (fsLit "Fingerprint") fingerprintDataConKey
+    dcQual gHC_FINGERPRINT_TYPE (fsLit "Fingerprint") fingerprintDataConKey
 
 {-
 ************************************************************************
@@ -1222,18 +1222,16 @@ fingerprintDataConName =
 All these are original names; hence mkOrig
 -}
 
-varQual, tcQual, clsQual :: Module -> FastString -> Unique -> Name
+varQual, tcQual, clsQual, dcQual :: Module -> FastString -> Unique -> Name
 varQual  = mk_known_key_name varName
 tcQual   = mk_known_key_name tcName
 clsQual  = mk_known_key_name clsName
+dcQual   = mk_known_key_name dataName
 
 mk_known_key_name :: NameSpace -> Module -> FastString -> Unique -> Name
 mk_known_key_name space modu str unique
   = mkExternalName unique modu (mkOccNameFS space str) noSrcSpan
 
-conName :: Module -> FastString -> Unique -> Name
-conName modu occ unique
-  = mkExternalName unique modu (mkOccNameFS dataName occ) noSrcSpan
 
 {-
 ************************************************************************
