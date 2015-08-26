@@ -1875,8 +1875,17 @@ toIfaceIdDetails VanillaId                      = IfVanillaId
 toIfaceIdDetails (DFunId {})                    = IfDFunId
 toIfaceIdDetails (RecSelId { sel_naughty = n
                            , sel_tycon = tc })  = IfRecSelId (toIfaceTyCon tc) n
-toIfaceIdDetails other                          = pprTrace "toIfaceIdDetails" (ppr other)
-                                                  IfVanillaId   -- Unexpected
+
+  -- Currently we don't persist these three "advisory" IdInfos
+  -- through interface files.  We easily could if it mattered
+toIfaceIdDetails PatSynId     = IfVanillaId
+toIfaceIdDetails ReflectionId = IfVanillaId
+toIfaceIdDetails DefMethId    = IfVanillaId
+
+  -- The remaining cases are all "implicit Ids" which don't
+  -- appear in interface files at all
+toIfaceIdDetails other = pprTrace "toIfaceIdDetails" (ppr other)
+                         IfVanillaId   -- Unexpected; the other
 
 toIfaceIdInfo :: IdInfo -> IfaceIdInfo
 toIfaceIdInfo id_info
