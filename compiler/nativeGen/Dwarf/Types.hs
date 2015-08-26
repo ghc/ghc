@@ -337,7 +337,8 @@ pprFrameBlock oldUws (DwarfFrameBlock blockLbl hasInfo uws)
 
 -- | Get DWARF register ID for a given GlobalReg
 dwarfGlobalRegNo :: Platform -> GlobalReg -> Word8
-dwarfGlobalRegNo p = maybe 0 (dwarfRegNo p . RegReal) . globalRegMaybe p
+dwarfGlobalRegNo p UnwindReturnReg = dwarfReturnRegNo p
+dwarfGlobalRegNo p reg = maybe 0 (dwarfRegNo p . RegReal) $ globalRegMaybe p reg
 
 -- | Generate code for setting the unwind information for a register,
 -- optimized using its known old value in the table. Note that "Sp" is

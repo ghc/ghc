@@ -815,6 +815,9 @@ globalRegMaybe CurrentTSO               = Just (RealRegSingle REG_CurrentTSO)
 # ifdef REG_CurrentNursery
 globalRegMaybe CurrentNursery           = Just (RealRegSingle REG_CurrentNursery)
 # endif
+# ifdef REG_MachSp
+globalRegMaybe MachSp                   = Just (RealRegSingle REG_MachSp)
+# endif
 globalRegMaybe _                        = Nothing
 #elif MACHREGS_NO_REGS
 globalRegMaybe _ = Nothing

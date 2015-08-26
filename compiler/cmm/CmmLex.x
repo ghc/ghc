@@ -110,6 +110,8 @@ $white_no_nl+           ;
   CurrentNursery        { global_reg CurrentNursery }
   HpAlloc               { global_reg HpAlloc }
   BaseReg               { global_reg BaseReg }
+  MachSp                { global_reg MachSp }
+  UnwindReturnReg       { global_reg UnwindReturnReg }
 
   $namebegin $namechar* { name }
 

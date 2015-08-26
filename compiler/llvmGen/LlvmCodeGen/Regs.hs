@@ -76,6 +76,7 @@ lmGlobalReg dflags suf reg
         ZmmReg 4       -> zmmGlobal $ "ZMM4" ++ suf
         ZmmReg 5       -> zmmGlobal $ "ZMM5" ++ suf
         ZmmReg 6       -> zmmGlobal $ "ZMM6" ++ suf
+        MachSp         -> wordGlobal $ "MachSp" ++ suf
         _other         -> panic $ "LlvmCodeGen.Reg: GlobalReg (" ++ (show reg)
                                 ++ ") not supported!"
         -- LongReg, HpLim, CCSS, CurrentTSO, CurrentNusery, HpAlloc
