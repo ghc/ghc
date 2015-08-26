@@ -23,9 +23,9 @@ module BinIface (
 import TcRnMonad
 import TyCon
 import ConLike
-import DataCon    (dataConName, dataConWorkId, dataConTyCon)
+import DataCon    ( dataConName, dataConWorkId, dataConTyCon )
 import PrelInfo   ( knownKeyNames )
-import Id         (idName, isDataConWorkId_maybe)
+import Id         ( idName, isDataConWorkId_maybe )
 import TysWiredIn
 import IfaceEnv
 import HscTypes
@@ -303,7 +303,6 @@ serialiseName bh name _ = do
 
 knownKeyNamesMap :: UniqFM Name
 knownKeyNamesMap = listToUFM_Directly [(nameUnique n, n) | n <- knownKeyNames]
-
 
 -- See Note [Symbol table representation of names]
 putName :: BinDictionary -> BinSymbolTable -> BinHandle -> Name -> IO ()
