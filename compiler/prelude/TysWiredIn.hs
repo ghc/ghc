@@ -103,10 +103,8 @@ import NameSet          ( NameSet, mkNameSet, elemNameSet )
 import BasicTypes       ( Arity, RecFlag(..), Boxity(..),
                            TupleSort(..) )
 import ForeignCall
-import Unique           ( incrUnique,
-                          mkTupleTyConUnique, mkTupleDataConUnique,
-                          mkCTupleTyConUnique, mkPArrDataConUnique )
 import SrcLoc           ( noSrcSpan )
+import Unique
 import Data.Array
 import FastString
 import Outputable
@@ -196,11 +194,6 @@ boolTyConName, falseDataConName, trueDataConName :: Name
 boolTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Bool") boolTyConKey boolTyCon
 falseDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "False") falseDataConKey falseDataCon
 trueDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "True")  trueDataConKey  trueDataCon
-
-listTyConName, nilDataConName, consDataConName :: Name
-listTyConName     = mkWiredInTyConName   BuiltInSyntax gHC_TYPES (fsLit "[]") listTyConKey listTyCon
-nilDataConName    = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "[]") nilDataConKey nilDataCon
-consDataConName   = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit ":") consDataConKey consDataCon
 
 wordTyConName, wordDataConName, word8TyConName, word8DataConName :: Name
 wordTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Word")   wordTyConKey     wordTyCon
@@ -541,58 +534,10 @@ unboxedPairDataCon = tupleDataCon Unboxed 2
 {-
 ************************************************************************
 *                                                                      *
-\subsection[TysWiredIn-boxed-prim]{The ``boxed primitive'' types (@Char@, @Int@, etc)}
+     The ``boxed primitive'' types (@Char@, @Int@, etc)
 *                                                                      *
 ************************************************************************
 -}
-
-eqTyCon :: TyCon
-eqTyCon = mkAlgTyCon eqTyConName
-            (ForAllTy kv $ mkArrowKinds [k, k] constraintKind)
-            [kv, a, b]
-            [Nominal, Nominal, Nominal]
-            Nothing
-            []      -- No stupid theta
-            (DataTyCon [eqBoxDataCon] False)
-            NoParentTyCon
-            NonRecursive
-            False
-            Nothing   -- No parent for constraint-kinded types
-  where
-    kv = kKiVar
-    k = mkTyVarTy kv
-    a:b:_ = tyVarList k
-
-eqBoxDataCon :: DataCon
-eqBoxDataCon = pcDataCon eqBoxDataConName args [TyConApp eqPrimTyCon (map mkTyVarTy args)] eqTyCon
-  where
-    kv = kKiVar
-    k = mkTyVarTy kv
-    a:b:_ = tyVarList k
-    args = [kv, a, b]
-
-
-coercibleTyCon :: TyCon
-coercibleTyCon = mkClassTyCon
-    coercibleTyConName kind tvs [Nominal, Representational, Representational]
-    rhs coercibleClass NonRecursive
-  where kind = (ForAllTy kv $ mkArrowKinds [k, k] constraintKind)
-        kv = kKiVar
-        k = mkTyVarTy kv
-        a:b:_ = tyVarList k
-        tvs = [kv, a, b]
-        rhs = DataTyCon [coercibleDataCon] False
-
-coercibleDataCon :: DataCon
-coercibleDataCon = pcDataCon coercibleDataConName args [TyConApp eqReprPrimTyCon (map mkTyVarTy args)] coercibleTyCon
-  where
-    kv = kKiVar
-    k = mkTyVarTy kv
-    a:b:_ = tyVarList k
-    args = [kv, a, b]
-
-coercibleClass :: Class
-coercibleClass = mkClass (tyConTyVars coercibleTyCon) [] [] [] [] [] (mkAnd []) coercibleTyCon
 
 charTy :: Type
 charTy = mkTyConTy charTyCon
@@ -661,7 +606,7 @@ doubleDataCon = pcDataCon doubleDataConName [] [doublePrimTy] doubleTyCon
 {-
 ************************************************************************
 *                                                                      *
-\subsection[TysWiredIn-Bool]{The @Bool@ type}
+              The Bool type
 *                                                                      *
 ************************************************************************
 
@@ -741,22 +686,22 @@ gtDataConId = dataConWorkId gtDataCon
 {-
 ************************************************************************
 *                                                                      *
-\subsection[TysWiredIn-List]{The @List@ type (incl ``build'' magic)}
+            The List type
+   Special syntax, deeply wired in,
+   but otherwise an ordinary algebraic data type
 *                                                                      *
 ************************************************************************
 
-Special syntax, deeply wired in, but otherwise an ordinary algebraic
-data types:
-\begin{verbatim}
-data [] a = [] | a : (List a)
-data () = ()
-data (,) a b = (,,) a b
-...
-\end{verbatim}
+       data [] a = [] | a : (List a)
 -}
 
 mkListTy :: Type -> Type
 mkListTy ty = mkTyConApp listTyCon [ty]
+
+listTyConName, nilDataConName, consDataConName :: Name
+listTyConName     = mkWiredInTyConName   BuiltInSyntax gHC_TYPES (fsLit "[]") listTyConKey listTyCon
+nilDataConName    = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "[]") nilDataConKey nilDataCon
+consDataConName   = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit ":") consDataConKey consDataCon
 
 listTyCon :: TyCon
 listTyCon = pcTyCon False Recursive True
@@ -779,10 +724,9 @@ consDataCon = pcDataConWithFixity True {- Declared infix -}
 -- We can't use (mkListTy alphaTy) in the defn of consDataCon, else mkListTy
 -- gets the over-specific type (Type -> Type)
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-\subsection[TysWiredIn-Tuples]{The @Tuple@ types}
+            The tuple types
 *                                                                      *
 ************************************************************************
 
@@ -839,10 +783,10 @@ mkBoxedTupleTy tys = mkTupleTy Boxed tys
 unitTy :: Type
 unitTy = mkTupleTy Boxed []
 
-{-
-************************************************************************
+
+{- *********************************************************************
 *                                                                      *
-\subsection[TysWiredIn-PArr]{The @[::]@ type}
+        The parallel-array type,  [::]
 *                                                                      *
 ************************************************************************
 
@@ -930,3 +874,57 @@ promotedOrderingTyCon = promoteTyCon orderingTyCon
 promotedLTDataCon     = promoteDataCon ltDataCon
 promotedEQDataCon     = promoteDataCon eqDataCon
 promotedGTDataCon     = promoteDataCon gtDataCon
+
+{- *********************************************************************
+*                                                                      *
+                         Type equalities
+*                                                                      *
+********************************************************************* -}
+
+eqTyCon :: TyCon
+eqTyCon = mkAlgTyCon eqTyConName
+            (ForAllTy kv $ mkArrowKinds [k, k] constraintKind)
+            [kv, a, b]
+            [Nominal, Nominal, Nominal]
+            Nothing
+            []      -- No stupid theta
+            (DataTyCon [eqBoxDataCon] False)
+            NoParentTyCon
+            NonRecursive
+            False
+            Nothing   -- No parent for constraint-kinded types
+  where
+    kv = kKiVar
+    k = mkTyVarTy kv
+    a:b:_ = tyVarList k
+
+eqBoxDataCon :: DataCon
+eqBoxDataCon = pcDataCon eqBoxDataConName args [TyConApp eqPrimTyCon (map mkTyVarTy args)] eqTyCon
+  where
+    kv = kKiVar
+    k = mkTyVarTy kv
+    a:b:_ = tyVarList k
+    args = [kv, a, b]
+
+
+coercibleTyCon :: TyCon
+coercibleTyCon = mkClassTyCon
+    coercibleTyConName kind tvs [Nominal, Representational, Representational]
+    rhs coercibleClass NonRecursive
+  where kind = (ForAllTy kv $ mkArrowKinds [k, k] constraintKind)
+        kv = kKiVar
+        k = mkTyVarTy kv
+        a:b:_ = tyVarList k
+        tvs = [kv, a, b]
+        rhs = DataTyCon [coercibleDataCon] False
+
+coercibleDataCon :: DataCon
+coercibleDataCon = pcDataCon coercibleDataConName args [TyConApp eqReprPrimTyCon (map mkTyVarTy args)] coercibleTyCon
+  where
+    kv = kKiVar
+    k = mkTyVarTy kv
+    a:b:_ = tyVarList k
+    args = [kv, a, b]
+
+coercibleClass :: Class
+coercibleClass = mkClass (tyConTyVars coercibleTyCon) [] [] [] [] [] (mkAnd []) coercibleTyCon
