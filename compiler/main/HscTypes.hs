@@ -93,7 +93,7 @@ module HscTypes (
         -- * Information on imports and exports
         WhetherHasOrphans, IsBootInterface, Usage(..),
         Dependencies(..), noDependencies,
-        NameCache(..), OrigNameCache,
+        NameCache(..), OrigNameCache, updNameCacheIO,
         IfaceExport,
 
         -- * Warnings
@@ -2360,6 +2360,12 @@ data NameCache
                 nsNames :: !OrigNameCache
                 -- ^ Ensures that one original name gets one unique
    }
+
+updNameCacheIO :: HscEnv
+               -> (NameCache -> (NameCache, c))  -- The updating function
+               -> IO c
+updNameCacheIO hsc_env upd_fn
+  = atomicModifyIORef' (hsc_NC hsc_env) upd_fn
 
 -- | Per-module cache of original 'OccName's given 'Name's
 type OrigNameCache   = ModuleEnv (OccEnv Name)
