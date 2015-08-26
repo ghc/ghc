@@ -406,73 +406,6 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
     hangP s x = text "" $$ hang (ptext (sLit s)) 2 x
 
-{-
-genTypeableTyConReps :: DynFlags ->
-                        [LTyClDecl Name] ->
-                        [LInstDecl Name] ->
-                        TcM (Bag (LHsBind RdrName, LSig RdrName))
-genTypeableTyConReps dflags decls insts =
-  do tcs1 <- mapM tyConsFromDecl decls
-     tcs2 <- mapM tyConsFromInst insts
-     return $ listToBag [ genTypeableTyConRep dflags loc tc
-                                          | (loc,tc) <- concat (tcs1 ++ tcs2) ]
-  where
-
-  tyConFromDataCon (L l n) = do dc <- tcLookupDataCon n
-                                return (do tc <- promoteDataCon_maybe dc
-                                           return (l,tc))
-
-  -- Promoted data constructors from a data declaration, or
-  -- a data-family instance.
-  tyConsFromDataRHS = fmap catMaybes
-                    . mapM tyConFromDataCon
-                    . concatMap (con_names . unLoc)
-                    . dd_cons
-
-  -- Tycons from a data-family declaration; not promotable.
-  tyConFromDataFamDecl FamilyDecl { fdLName = L loc name } =
-    do tc <- tcLookupTyCon name
-       return (loc,tc)
-
-
-  -- tycons from a type-level declaration
-  tyConsFromDecl (L _ d)
-
-    -- data or newtype declaration: promoted tycon, tycon, promoted ctrs.
-    | isDataDecl d =
-      do let L loc name = tcdLName d
-         tc           <- tcLookupTyCon name
-         promotedCtrs <- tyConsFromDataRHS (tcdDataDefn d)
-         let tyCons = (loc,tc) : promotedCtrs
-
-         return (case promotableTyCon_maybe tc of
-                   Nothing -> tyCons
-                   Just kc -> (loc,kc) : tyCons)
-
-    -- data family: just the type constructor;  these are not promotable.
-    | isDataFamilyDecl d =
-      do res <- tyConFromDataFamDecl (tcdFam d)
-         return [res]
-
-    -- class: the type constructors of associated data families
-    | isClassDecl d =
-      let isData FamilyDecl { fdInfo = DataFamily } = True
-          isData _ = False
-
-      in mapM tyConFromDataFamDecl (filter isData (map unLoc (tcdATs d)))
-
-    | otherwise = return []
-
-
-  tyConsFromInst (L _ d) =
-    case d of
-      ClsInstD ci      -> fmap concat
-                        $ mapM (tyConsFromDataRHS . dfid_defn . unLoc)
-                        $ cid_datafam_insts ci
-      DataFamInstD dfi -> tyConsFromDataRHS (dfid_defn dfi)
-      TyFamInstD {}    -> return []
--}
-
 -- Prints the representable type family instance
 pprRepTy :: FamInst -> SDoc
 pprRepTy fi@(FamInst { fi_tys = lhs })
@@ -685,13 +618,10 @@ deriveStandalone (L loc (DerivDecl deriv_ty overlap_mode))
        ; case tcSplitTyConApp_maybe inst_ty of
            Just (tc, tc_args)
               | className cls == typeableClassName
-              -> do warn <- woptM Opt_WarnDerivingTypeable
-                    when warn
-                       $ addWarnTc
-                       $ text "Standalone deriving `Typeable` has no effect."
+              -> do warnUselessTypeable
                     return []
 
-              | isAlgTyCon tc  -- All other classes
+              | isAlgTyCon tc || isDataFamilyTyCon tc  -- All other classes
               -> do { spec <- mkEqnHelp (fmap unLoc overlap_mode)
                                         tvs cls cls_tys tc tc_args (Just theta)
                     ; return [spec] }
@@ -701,6 +631,13 @@ deriveStandalone (L loc (DerivDecl deriv_ty overlap_mode))
                  ptext (sLit "The last argument of the instance must be a data or newtype application")
         }
 
+
+warnUselessTypeable :: TcM ()
+warnUselessTypeable
+  = do { warn <- woptM Opt_WarnDerivingTypeable
+       ; when warn $ addWarnTc
+                   $ ptext (sLit "Deriving") <+> quotes (ppr typeableClassName) <+>
+                     ptext (sLit "has no effect: all types now auto-derive Typeable") }
 
 ------------------------------------------------------------------
 deriveTyData :: [TyVar] -> TyCon -> [Type]   -- LHS of data or data instance
@@ -723,10 +660,7 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
                 -- so the argument kind 'k' is not decomposable by splitKindFunTys
                 -- as is the case for all other derivable type classes
         ; if className cls == typeableClassName
-          then do warn <- woptM Opt_WarnDerivingTypeable
-                  when warn
-                     $ addWarnTc
-                     $ text "Deriving `Typeable` has no effect."
+          then do warnUselessTypeable
                   return []
           else
 
