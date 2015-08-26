@@ -11,7 +11,6 @@
 \usepackage{color}
 \usepackage{footnote}
 \usepackage{float}
-\usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{bigfoot}
 \usepackage{amssymb}
@@ -127,7 +126,7 @@ $$
 \begin{array}{rcll}
 \multicolumn{3}{l}{\mbox{\bf Identifiers}} \\
   \I{InstalledPackageId} &  & \mbox{Opaque unique identifier} \\
-  \I{IndefUnitId} & ::= & \I{InstalledPackageId}\, \verb|-|\, p  \\
+  \I{IndefUnitId} & ::= & \I{InstalledPackageId}\, \verb|/|\, p  \\
   \I{UnitKey} & ::= & \I{IndefUnitId} \verb|(|\, \I{HoleMap}\, \verb|)|  \\
               & | & \verb|HOLE| \\
   \I{HoleMap} & ::= & \I{ModuleName}\; \verb|->|\; \I{Module}\; \verb|,|\, \ldots \\
@@ -570,10 +569,10 @@ EPT, we type check and load
 into the EPT the \I{ModDetails} of the \I{Module} in the \I{Name},
 and then check the EPT again. (\verb|importDecl|)
 
-\subsection{\textit{ModName} to \textit{ModIface}}
+\subsection{\textit{ModuleName} to \textit{ModIface}}
 
 In all cases, the \I{mi\_exports} can be calculated directly from the
-shaping process, which specifies exactly for each \I{ModName} in scope
+shaping process, which specifies exactly for each \I{ModuleName} in scope
 what will be brought into scope.
 
 \paragraph{Modules} Modules are straightforward, as for any
@@ -582,7 +581,7 @@ with it (the \I{ModIface} for when we type-checked the (unique) \verb|module|
 declaration.)
 
 \paragraph{Signatures} For signatures, there may be multiple \I{ModIface}s
-associated with a \I{ModName} in scope, e.g. in this situation:
+associated with a \I{ModuleName} in scope, e.g. in this situation:
 
 \begin{verbatim}
     unit p where
@@ -721,6 +720,76 @@ Specifically, the correctness condition for a signature is this: \emph{Any \I{Na
 mentioned in the \I{ModIface} of a signature must either be from an external module, or be
 exported by the signature}.
 
+\newpage
+\section{Installation}
+
+This section defines the syntax for the file-system format of the \I{IndefUnitDb}.
+Like entries in the installed unit database, an entry is a sequence of fields
+with values.
+
+Indefinite unit entries share some entries in common with entries in the installed
+unit database:
+
+\begin{description}
+    \item[\texttt{id:}] \I{InstalledPackageId} \newline
+        The unique identifier of an installed package.  This combined
+        with \texttt{unit-name} uniquely identifies an entry in the
+        installed unit database.
+    \item[\texttt{unit-name:}] \I{UnitName} \newline
+        The unit name of the installed unit.  This is unique per a package.
+        Unlike for the installed unit database, this entry is mandatory for
+        indefinite units.
+    \item[\texttt{exposed:}] \verb|True| or \verb|False| \newline
+        Whether or not this package is exposed, i.e. it is available for
+        \verb|include| under its \verb|unit-name| (this is used to compute
+        the default \I{UnitNameMap} when GHC is called by itself).
+    \item[\texttt{import-dirs:}] \I{FilePath} \newline
+        Where interface files for this unit can be found.
+    \item[\texttt{exposed-modules:}] \I{ModuleName} or \I{ModuleName} \texttt{from} \I{Module} \newline
+        The set of exposed modules from this unit, including reexports from
+        other units.
+\end{description}
+%
+As well as all non-essential, Cabal-specific metadata; e.g. \texttt{name}, \texttt{version}, \ldots (\texttt{data-dir} and \texttt{haddock} probably)
+Here are new entries for indefinite units:
+
+\begin{description}
+    \item[\texttt{requires:}] \I{ModuleName} \ldots \newline
+        The set of module names which are requirements of this unit.
+        (Installed units instead record \texttt{instantiated-with}, which
+        specifies how each requirement was instantiated.)
+    \item[\texttt{source-dir:}] \I{FilePath} \newline
+        The path to the original source of the package.
+    \item[\texttt{setup-executable:}] \I{FilePath} \newline
+        The path to the \texttt{Setup} executable as described by the Cabal
+        specification which is capable of building and installing the package
+        using \texttt{./Setup instantiate} (new),
+        \texttt{./Setup build}, \texttt{./Setup copy} and
+        \texttt{./Setup register}.
+    \item[\texttt{package-config:}] \I{FilePath} \newline
+        The path to the package configuration saved when the indefinite
+        unit was installed.  This should contain all of the relevant configuration
+        information necessary to build a package, except how its requirements
+        are instantiated.
+\end{description}
+%
+The string representation of \I{Module} is worth remarking upon.  In
+this specification, \I{Module} is a recursive data structure.  For
+installed packages, it is acceptable to flatten \I{Module} into a
+hash representing the \I{UnitKey} and the \I{ModuleName}, as the \I{UnitKey}
+is an \I{InstalledUnitId} which has an entry in the database.  However,
+this is unacceptable for indefinite units, because we don't have an
+entry per \I{UnitKey}.  So, for \I{UnitKey}s in the indefinite unit database,
+the full tree is written out, subject to this syntax:
+
+\begin{verbatim}
+Module ::= UnitKey ":" ModuleName
+UnitKey ::= InstalledPackageId
+          [ "/" UnitName "(" HoleMap ")" ]
+          | "HOLE"
+HoleMap ::= ModuleName "->" Module "," ...
+\end{verbatim}
+
 \section{Appendix: Shaping}
 
 This section clarifies some subtle aspects about shaping.
@@ -738,8 +807,8 @@ in such a world, we need a different definition of shape:
 
 \begin{verbatim}
     Shape ::=
-        provided: ModName -> Module { OccName -> Name }
-        required: ModName ->        { OccName -> Name }
+        provided: ModuleName -> Module { OccName -> Name }
+        required: ModuleName ->        { OccName -> Name }
 \end{verbatim}
 Presently, however, such an \I{OccName} annotation would be redundant: it can be inferred from the \I{Name}.
 
@@ -775,7 +844,7 @@ indistinguishable.
 \subsection{Signatures can require a specific entity.}
 With requirements like \verb|A -> { HOLE:A.T, HOLE:A.foo }|,
 why not specify it as \verb|A -> { T, foo }|,
-e.g., \verb|required: { ModName -> { OccName } }|?  Consider:
+e.g., \verb|required: { ModuleName -> { OccName } }|?  Consider:
 
 \begin{verbatim}
     unit p () requires (A, B) where
