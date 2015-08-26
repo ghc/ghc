@@ -8,9 +8,9 @@
 {-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables #-}
 
 module TcBinds ( tcLocalBinds, tcTopBinds, tcRecSelBinds,
-                 tcHsBootSigs, tcPolyCheck,
+                 tcValBinds, tcHsBootSigs, tcPolyCheck,
                  tcSpecPrags, tcSpecWrapper,
-                 tcVectDecls,
+                 tcVectDecls, addTypecheckedBinds,
                  TcSigInfo(..), TcSigFun,
                  TcPragEnv, mkPragEnv,
                  instTcTySig, instTcTySigFromId, findScopedTyVars,
@@ -65,6 +65,21 @@ import Control.Monad
 import Data.List (partition)
 
 #include "HsVersions.h"
+
+{- *********************************************************************
+*                                                                      *
+               A useful helper function
+*                                                                      *
+********************************************************************* -}
+
+addTypecheckedBinds :: TcGblEnv -> [LHsBinds Id] -> TcGblEnv
+addTypecheckedBinds tcg_env binds
+  | isHsBoot (tcg_src tcg_env) = tcg_env
+    -- Do not add the code for record-selector bindings
+    -- when compiling hs-boot files
+  | otherwise = tcg_env { tcg_binds = foldr unionBags
+                                            (tcg_binds tcg_env)
+                                            binds }
 
 {-
 ************************************************************************
@@ -169,10 +184,8 @@ tcTopBinds (ValBindsOut binds sigs)
                ; return (gbl, lcl) }
         ; specs <- tcImpPrags sigs   -- SPECIALISE prags for imported Ids
 
-        ; let { tcg_env' = tcg_env { tcg_binds = foldr (unionBags . snd)
-                                                       (tcg_binds tcg_env)
-                                                       binds'
-                                   , tcg_imp_specs = specs ++ tcg_imp_specs tcg_env } }
+        ; let { tcg_env' = tcg_env { tcg_imp_specs = specs ++ tcg_imp_specs tcg_env }
+                           `addTypecheckedBinds` map snd binds' }
 
         ; return (tcg_env', tcl_env) }
         -- The top level bindings are flattened into a giant
@@ -182,15 +195,17 @@ tcTopBinds (ValBindsIn {}) = panic "tcTopBinds"
 
 tcRecSelBinds :: HsValBinds Name -> TcM TcGblEnv
 tcRecSelBinds (ValBindsOut binds sigs)
-  = tcExtendGlobalValEnv [sel_id | L _ (IdSig sel_id) <- sigs] $
-    do { (rec_sel_binds, tcg_env) <- discardWarnings (tcValBinds TopLevel binds sigs getGblEnv)
+  = -- tcExtendGlobalValEnv [sel_id | L _ (IdSig sel_id) <- sigs] $
+    -- this envt extension happens in tcValBinds
+    do { (rec_sel_binds, tcg_env) <- discardWarnings $
+                                     tcValBinds TopLevel binds sigs getGblEnv
        ; let tcg_env'
               | isHsBoot (tcg_src tcg_env) = tcg_env
               | otherwise = tcg_env { tcg_binds = foldr (unionBags . snd)
                                                         (tcg_binds tcg_env)
                                                         rec_sel_binds }
-              -- Do not add the code for record-selector bindings when
-              -- compiling hs-boot files
+              -- Do not add the code for record-selector bindings
+              -- when compiling hs-boot files
        ; return tcg_env' }
 tcRecSelBinds (ValBindsIn {}) = panic "tcRecSelBinds"
 

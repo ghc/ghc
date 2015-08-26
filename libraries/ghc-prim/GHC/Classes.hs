@@ -1,4 +1,4 @@
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE CPP, Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, StandaloneDeriving, BangPatterns,
              KindSignatures, DataKinds, ConstraintKinds,
               MultiParamTypeClasses, FunctionalDependencies #-}
@@ -28,19 +28,28 @@
 -----------------------------------------------------------------------------
 
 module GHC.Classes(
+    -- * Implicit paramaters
     IP(..),
+
+    -- * Equality and ordering
     Eq(..), eqInt, neInt,
     Ord(..), gtInt, geInt, leInt, ltInt, compareInt, compareInt#,
+
+    -- * Functions over Bool
     (&&), (||), not,
+
+    -- * Integer arithmetic
     divInt#, modInt#
  ) where
 
 -- GHC.Magic is used in some derived instances
 import GHC.Magic ()
+import GHC.IntWord64
 import GHC.Prim
 import GHC.Tuple
 import GHC.Types
 
+#include "MachDeps.h"
 
 infix  4  ==, /=, <, <=, >=, >
 infixr 3  &&
@@ -136,6 +145,31 @@ instance Eq Int where
 eqInt, neInt :: Int -> Int -> Bool
 (I# x) `eqInt` (I# y) = isTrue# (x ==# y)
 (I# x) `neInt` (I# y) = isTrue# (x /=# y)
+
+#if WORD_SIZE_IN_BITS < 64
+instance Eq TyCon where
+  (==) (TyCon hi1 lo1 _ _) (TyCon hi2 lo2 _ _)
+       = isTrue# (hi1 `eqWord64#` hi2) && isTrue# (lo1 `eqWord64#` lo2)
+instance Ord TyCon where
+  compare (TyCon hi1 lo1 _ _) (TyCon hi2 lo2 _ _)
+    | isTrue# (hi1 `gtWord64#` hi2) = GT
+    | isTrue# (hi1 `ltWord64#` hi2) = LT
+    | isTrue# (lo1 `gtWord64#` lo2) = GT
+    | isTrue# (lo1 `ltWord64#` lo2) = LT
+    | True                = EQ
+#else
+instance Eq TyCon where
+  (==) (TyCon hi1 lo1 _ _) (TyCon hi2 lo2 _ _)
+       = isTrue# (hi1 `eqWord#` hi2) && isTrue# (lo1 `eqWord#` lo2)
+instance Ord TyCon where
+  compare (TyCon hi1 lo1 _ _) (TyCon hi2 lo2 _ _)
+    | isTrue# (hi1 `gtWord#` hi2) = GT
+    | isTrue# (hi1 `ltWord#` hi2) = LT
+    | isTrue# (lo1 `gtWord#` lo2) = GT
+    | isTrue# (lo1 `ltWord#` lo2) = LT
+    | True              = EQ
+#endif
+
 
 -- | The 'Ord' class is used for totally ordered datatypes.
 --

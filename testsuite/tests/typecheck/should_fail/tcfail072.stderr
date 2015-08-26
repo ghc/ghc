@@ -8,10 +8,10 @@ tcfail072.hs:23:13: error:
     The type variable ‘p0’ is ambiguous
     These potential instances exist:
       instance Ord Ordering -- Defined in ‘GHC.Classes’
+      instance Ord TyCon -- Defined in ‘GHC.Classes’
       instance Ord Integer
         -- Defined in ‘integer-gmp-1.0.0.0:GHC.Integer.Type’
-      instance Ord a => Ord (Maybe a) -- Defined in ‘GHC.Base’
-      ...plus 22 others
+      ...plus 23 others
       ...plus one instance involving out-of-scope types
       (use -fprint-potential-instances to see them all)
     In the expression: g A

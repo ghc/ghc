@@ -35,7 +35,8 @@ module DataCon (
         dataConSrcBangs,
         dataConSourceArity, dataConRepArity, dataConRepRepArity,
         dataConIsInfix,
-        dataConWorkId, dataConWrapId, dataConWrapId_maybe, dataConImplicitIds,
+        dataConWorkId, dataConWrapId, dataConWrapId_maybe,
+        dataConImplicitTyThings,
         dataConRepStrictness, dataConImplBangs, dataConBoxer,
 
         splitDataProductType_maybe,
@@ -46,16 +47,18 @@ module DataCon (
         isBanged, isMarkedStrict, eqHsBang, isSrcStrict, isSrcUnpacked,
 
         -- ** Promotion related functions
-        promoteKind, promoteDataCon, promoteDataCon_maybe
+        promoteDataCon, promoteDataCon_maybe,
+        promoteType, promoteKind,
+        isPromotableType, computeTyConPromotability,
     ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-} MkId( DataConBoxer )
 import Type
+import ForeignCall( CType )
 import TypeRep( Type(..) )  -- Used in promoteType
 import PrelNames( liftedTypeKindTyConKey )
-import ForeignCall( CType )
 import Coercion
 import Kind
 import Unify
@@ -72,11 +75,11 @@ import BasicTypes
 import FastString
 import Module
 import VarEnv
+import NameSet
 import Binary
 
 import qualified Data.Data as Data
 import qualified Data.Typeable
-import Data.Maybe
 import Data.Char
 import Data.Word
 import Data.List( mapAccumL, find )
@@ -399,8 +402,8 @@ data DataCon
                                 -- Used for Template Haskell and 'deriving' only
                                 -- The actual fixity is stored elsewhere
 
-        dcPromoted :: Maybe TyCon    -- The promoted TyCon if this DataCon is promotable
-                                     -- See Note [Promoted data constructors] in TyCon
+        dcPromoted :: Promoted TyCon    -- The promoted TyCon if this DataCon is promotable
+                                        -- See Note [Promoted data constructors] in TyCon
   }
   deriving Data.Typeable.Typeable
 
@@ -671,7 +674,9 @@ isMarkedStrict _               = True   -- All others are strict
 -- | Build a new data constructor
 mkDataCon :: Name
           -> Bool           -- ^ Is the constructor declared infix?
-          -> [HsSrcBang]       -- ^ Strictness/unpack annotations, from user
+          -> Promoted TyConRepName -- ^ Whether promoted, and if so the TyConRepName
+                                   --   for the promoted TyCon
+          -> [HsSrcBang]    -- ^ Strictness/unpack annotations, from user
           -> [FieldLabel]   -- ^ Field labels for the constructor,
                             -- if it is a record, otherwise empty
           -> [TyVar]        -- ^ Universally quantified type variables
@@ -688,7 +693,7 @@ mkDataCon :: Name
           -> DataCon
   -- Can get the tag from the TyCon
 
-mkDataCon name declared_infix
+mkDataCon name declared_infix prom_info
           arg_stricts   -- Must match orig_arg_tys 1-1
           fields
           univ_tvs ex_tvs
@@ -733,15 +738,12 @@ mkDataCon name declared_infix
              mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
 
     mb_promoted   -- See Note [Promoted data constructors] in TyCon
-      | isJust (promotableTyCon_maybe rep_tycon)
-          -- The TyCon is promotable only if all its datacons
-          -- are, so the promoteType for prom_kind should succeed
-      = Just (mkPromotedDataCon con name (getUnique name) prom_kind roles)
-      | otherwise
-      = Nothing
-    prom_kind = promoteType (dataConUserType con)
-    roles = map (const Nominal)          (univ_tvs ++ ex_tvs) ++
-            map (const Representational) orig_arg_tys
+      = case prom_info of
+          NotPromoted     -> NotPromoted
+          Promoted rep_nm -> Promoted (mkPromotedDataCon con name rep_nm prom_kind prom_roles)
+    prom_kind  = promoteType (dataConUserType con)
+    prom_roles = map (const Nominal)          (univ_tvs ++ ex_tvs) ++
+                 map (const Representational) orig_arg_tys
 
 eqSpecPreds :: [(TyVar,Type)] -> ThetaType
 eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv) ty | (tv,ty) <- spec ]
@@ -824,11 +826,13 @@ dataConWrapId dc = case dcRep dc of
 
 -- | Find all the 'Id's implicitly brought into scope by the data constructor. Currently,
 -- the union of the 'dataConWorkId' and the 'dataConWrapId'
-dataConImplicitIds :: DataCon -> [Id]
-dataConImplicitIds (MkData { dcWorkId = work, dcRep = rep})
-  = case rep of
-       NoDataConRep               -> [work]
-       DCR { dcr_wrap_id = wrap } -> [wrap,work]
+dataConImplicitTyThings :: DataCon -> [TyThing]
+dataConImplicitTyThings (MkData { dcWorkId = work, dcRep = rep })
+  = [AnId work] ++ wrap_ids
+  where
+    wrap_ids = case rep of
+                 NoDataConRep               -> []
+                 DCR { dcr_wrap_id = wrap } -> [AnId wrap]
 
 -- | The labels for the fields of this particular 'DataCon'
 dataConFieldLabels :: DataCon -> [FieldLabel]
@@ -1073,59 +1077,111 @@ dataConCannotMatch tys con
 {-
 ************************************************************************
 *                                                                      *
-              Building an algebraic data type
+                 Promotion
+
+   These functions are here becuase
+   - isPromotableTyCon calls dataConFullSig
+   - mkDataCon calls promoteType
+   - It's nice to keep the promotion stuff together
 *                                                                      *
 ************************************************************************
 
-buildAlgTyCon is here because it is called from TysWiredIn, which in turn
-depends on DataCon, but not on BuildTyCl.
--}
+Note [The overall promotion story]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here is the overall plan.
 
-buildAlgTyCon :: Name
-              -> [TyVar]               -- ^ Kind variables and type variables
-              -> [Role]
-              -> Maybe CType
-              -> ThetaType             -- ^ Stupid theta
-              -> AlgTyConRhs
-              -> RecFlag
-              -> Bool                  -- ^ True <=> this TyCon is promotable
-              -> Bool                  -- ^ True <=> was declared in GADT syntax
-              -> TyConParent
-              -> TyCon
+* Compared to a TyCon T, the promoted 'T has
+     same Name (and hence Unique)
+     same TyConRepName
+  In future the two will collapse into one anyhow.
 
-buildAlgTyCon tc_name ktvs roles cType stupid_theta rhs
-              is_rec is_promotable gadt_syn parent
-  = tc
-  where
-    kind = mkPiKinds ktvs liftedTypeKind
+* Compared to a DataCon K, the promoted 'K (a type constructor) has
+      same Name (and hence Unique)
+  But it has a fresh TyConRepName; after all, the DataCon doesn't have
+  a TyConRepName at all.  (See Note [Grand plan for Typeable] in TcTypeable
+  for TyConRepName.)
 
-    -- tc and mb_promoted_tc are mutually recursive
-    tc = mkAlgTyCon tc_name kind ktvs roles cType stupid_theta
-                    rhs parent is_rec gadt_syn
-                    mb_promoted_tc
+  Why does 'K have the same unique as K?  It's acceptable because we don't
+  mix types and terms, so we won't get them confused.  And it's helpful mainly
+  so that we know when to print 'K as a qualified name in error message. The
+  PrintUnqualified stuff depends on whether K is lexically in scope.. but 'K
+  never is!
 
-    mb_promoted_tc
-      | is_promotable = Just (mkPromotedTyCon tc (promoteKind kind))
-      | otherwise     = Nothing
+* It follows that the tick-mark (eg 'K) is not part of the Occ name of
+  either promoted data constructors or type constructors. Instead,
+  pretty-printing: the pretty-printer prints a tick in front of
+     - promoted DataCons (always)
+     - promoted TyCons (with -dppr-debug)
+  See TyCon.pprPromotionQuote
 
-{-
-************************************************************************
-*                                                                      *
-        Promoting of data types to the kind level
-*                                                                      *
-************************************************************************
+* For a promoted data constructor K, the pipeline goes like this:
+    User writes (in a type):      K or 'K
+    Parser produces OccName:      K{tc} or K{d}, respectively
+    Renamer makes Name:           M.K{d}_r62   (i.e. same unique as DataCon K)
+                                     and K{tc} has been turned into K{d}
+                                     provided it was unambiguous
+    Typechecker makes TyCon:      PromotedDataCon MK{d}_r62
 
-These two 'promoted..' functions are here because
- * They belong together
- * 'promoteDataCon' depends on DataCon stuff
+
+Note [Checking whether a group is promotable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We only want to promote a TyCon if all its data constructors
+are promotable; it'd be very odd to promote some but not others.
+
+But the data constructors may mention this or other TyCons.
+
+So we treat the recursive uses as all OK (ie promotable) and
+do one pass to check that each TyCon is promotable.
+
+Currently type synonyms are not promotable, though that
+could change.
 -}
 
 promoteDataCon :: DataCon -> TyCon
-promoteDataCon (MkData { dcPromoted = Just tc }) = tc
+promoteDataCon (MkData { dcPromoted = Promoted tc }) = tc
 promoteDataCon dc = pprPanic "promoteDataCon" (ppr dc)
 
-promoteDataCon_maybe :: DataCon -> Maybe TyCon
+promoteDataCon_maybe :: DataCon -> Promoted TyCon
 promoteDataCon_maybe (MkData { dcPromoted = mb_tc }) = mb_tc
+
+computeTyConPromotability :: NameSet -> TyCon -> Bool
+computeTyConPromotability rec_tycons tc
+  =  isAlgTyCon tc    -- Only algebraic; not even synonyms
+                     -- (we could reconsider the latter)
+  && ok_kind (tyConKind tc)
+  && case algTyConRhs tc of
+       DataTyCon { data_cons = cs } -> all ok_con cs
+       TupleTyCon { data_con = c }  -> ok_con c
+       NewTyCon { data_con = c }    -> ok_con c
+       AbstractTyCon {}             -> False
+  where
+    ok_kind kind = all isLiftedTypeKind args && isLiftedTypeKind res
+            where  -- Checks for * -> ... -> * -> *
+              (args, res) = splitKindFunTys kind
+
+    -- See Note [Promoted data constructors] in TyCon
+    ok_con con = all (isLiftedTypeKind . tyVarKind) ex_tvs
+              && null eq_spec   -- No constraints
+              && null theta
+              && all (isPromotableType rec_tycons) orig_arg_tys
+       where
+         (_, ex_tvs, eq_spec, theta, orig_arg_tys, _) = dataConFullSig con
+
+
+isPromotableType :: NameSet -> Type -> Bool
+-- Must line up with promoteType
+-- But the function lives here because we must treat the
+-- *recursive* tycons as promotable
+isPromotableType rec_tcs con_arg_ty
+  = go con_arg_ty
+  where
+    go (TyConApp tc tys) =  tys `lengthIs` tyConArity tc
+                         && (tyConName tc `elemNameSet` rec_tcs
+                             || isPromotableTyCon tc)
+                         && all go tys
+    go (FunTy arg res)   = go arg && go res
+    go (TyVarTy {})      = True
+    go _                 = False
 
 {-
 Note [Promoting a Type to a Kind]
@@ -1156,7 +1212,7 @@ promoteType ty
     kvs = [ mkKindVar (tyVarName tv) superKind | tv <- tvs ]
     env = zipVarEnv tvs kvs
 
-    go (TyConApp tc tys) | Just prom_tc <- promotableTyCon_maybe tc
+    go (TyConApp tc tys) | Promoted prom_tc <- promotableTyCon_maybe tc
                          = mkTyConApp prom_tc (map go tys)
     go (FunTy arg res)   = mkArrowKind (go arg) (go res)
     go (TyVarTy tv)      | Just kv <- lookupVarEnv env tv
@@ -1208,3 +1264,41 @@ splitDataProductType_maybe ty
   = Just (tycon, ty_args, con, dataConInstArgTys con ty_args)
   | otherwise
   = Nothing
+
+{-
+************************************************************************
+*                                                                      *
+              Building an algebraic data type
+*                                                                      *
+************************************************************************
+
+buildAlgTyCon is here because it is called from TysWiredIn, which can
+depend on this module, but not on BuildTyCl.
+-}
+
+buildAlgTyCon :: Name
+              -> [TyVar]               -- ^ Kind variables and type variables
+              -> [Role]
+              -> Maybe CType
+              -> ThetaType             -- ^ Stupid theta
+              -> AlgTyConRhs
+              -> RecFlag
+              -> Bool                  -- ^ True <=> this TyCon is promotable
+              -> Bool                  -- ^ True <=> was declared in GADT syntax
+              -> AlgTyConFlav
+              -> TyCon
+
+buildAlgTyCon tc_name ktvs roles cType stupid_theta rhs
+              is_rec is_promotable gadt_syn parent
+  = tc
+  where
+    kind = mkPiKinds ktvs liftedTypeKind
+
+    -- tc and mb_promoted_tc are mutually recursive
+    tc = mkAlgTyCon tc_name kind ktvs roles cType stupid_theta
+                    rhs parent is_rec gadt_syn
+                    mb_promoted_tc
+
+    mb_promoted_tc
+      | is_promotable = Promoted (mkPromotedTyCon tc (promoteKind kind))
+      | otherwise     = NotPromoted

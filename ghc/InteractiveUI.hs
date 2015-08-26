@@ -1342,7 +1342,7 @@ defineMacro overwrite s = do
     step <- getGhciStepIO
     expr <- GHC.parseExpr definition
     -- > ghciStepIO . definition :: String -> IO String
-    let stringTy = nlHsTyVar $ getRdrName stringTyConName
+    let stringTy = nlHsTyVar stringTy_RDR
         ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
         body = nlHsVar compose_RDR `mkHsApp` step `mkHsApp` expr
         tySig = stringTy `nlHsFunTy` ioM
@@ -1392,7 +1392,7 @@ cmdCmd str = handleSourceError GHC.printException $ do
 getGhciStepIO :: GHCi (LHsExpr RdrName)
 getGhciStepIO = do
   ghciTyConName <- GHC.getGHCiMonad
-  let stringTy = nlHsTyVar $ getRdrName stringTyConName
+  let stringTy = nlHsTyVar stringTy_RDR
       ghciM = nlHsTyVar (getRdrName ghciTyConName) `nlHsAppTy` stringTy
       ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
       body = nlHsVar (getRdrName ghciStepIoMName)

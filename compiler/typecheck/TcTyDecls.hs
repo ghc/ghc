@@ -14,28 +14,33 @@ files for imported data types.
 module TcTyDecls(
         calcRecFlags, RecTyInfo(..),
         calcSynCycles, calcClassCycles,
+
+        -- * Roles
         RoleAnnots, extractRoleAnnots, emptyRoleAnnots, lookupRoleAnnots,
-        mkDefaultMethodIds, mkRecSelBinds, mkOneRecordSelector
+
+        -- * Implicits
+        tcAddImplicits
     ) where
 
 #include "HsVersions.h"
 
 import TcRnMonad
 import TcEnv
+import TcTypeable( mkTypeableBinds )
+import TcBinds( tcValBinds, addTypecheckedBinds )
+import TypeRep( Type(..) )
 import TcType
 import TysWiredIn( unitTy )
 import MkCore( rEC_SEL_ERROR_ID )
-import TypeRep
 import HsSyn
 import Class
 import Type
+import HscTypes
 import TyCon
-import ConLike
 import DataCon
 import Name
 import NameEnv
 import RdrName ( mkVarUnqual )
-import Var ( tyVarKind )
 import Id
 import IdInfo
 import VarEnv
@@ -379,7 +384,7 @@ calcRecFlags boot_details is_boot mrole_env tyclss
                    -- Recursion of newtypes/data types can happen via
                    -- the class TyCon, so tyclss includes the class tycons
 
-    is_promotable = all (isPromotableTyCon rec_tycon_names) all_tycons
+    is_promotable = all (computeTyConPromotability rec_tycon_names) all_tycons
 
     roles = inferRoles is_boot mrole_env all_tycons
 
@@ -469,70 +474,6 @@ findLoopBreakers deps
     go edges = [ name
                | CyclicSCC ((tc,_,_) : edges') <- stronglyConnCompFromEdgedVerticesR edges,
                  name <- tyConName tc : go edges']
-
-{-
-************************************************************************
-*                                                                      *
-                  Promotion calculation
-*                                                                      *
-************************************************************************
-
-See Note [Checking whether a group is promotable]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We only want to promote a TyCon if all its data constructors
-are promotable; it'd be very odd to promote some but not others.
-
-But the data constructors may mention this or other TyCons.
-
-So we treat the recursive uses as all OK (ie promotable) and
-do one pass to check that each TyCon is promotable.
-
-Currently type synonyms are not promotable, though that
-could change.
--}
-
-isPromotableTyCon :: NameSet -> TyCon -> Bool
-isPromotableTyCon rec_tycons tc
-  =  isAlgTyCon tc    -- Only algebraic; not even synonyms
-                      -- (we could reconsider the latter)
-  && ok_kind (tyConKind tc)
-  && case algTyConRhs tc of
-       DataTyCon { data_cons = cs }   -> all ok_con cs
-       NewTyCon { data_con = c }      -> ok_con c
-       AbstractTyCon {}               -> False
-       DataFamilyTyCon {}             -> False
-       TupleTyCon { tup_sort = sort } -> case sort of
-                                           BoxedTuple      -> True
-                                           UnboxedTuple    -> False
-                                           ConstraintTuple -> False
-  where
-    ok_kind kind = all isLiftedTypeKind args && isLiftedTypeKind res
-            where  -- Checks for * -> ... -> * -> *
-              (args, res) = splitKindFunTys kind
-
-    -- See Note [Promoted data constructors] in TyCon
-    ok_con con = all (isLiftedTypeKind . tyVarKind) ex_tvs
-              && null eq_spec   -- No constraints
-              && null theta
-              && all (isPromotableType rec_tycons) orig_arg_tys
-       where
-         (_, ex_tvs, eq_spec, theta, orig_arg_tys, _) = dataConFullSig con
-
-
-isPromotableType :: NameSet -> Type -> Bool
--- Must line up with DataCon.promoteType
--- But the function lives here because we must treat the
--- *recursive* tycons as promotable
-isPromotableType rec_tcs con_arg_ty
-  = go con_arg_ty
-  where
-    go (TyConApp tc tys) =  tys `lengthIs` tyConArity tc
-                         && (tyConName tc `elemNameSet` rec_tcs
-                             || isJust (promotableTyCon_maybe tc))
-                         && all go tys
-    go (FunTy arg res)   = go arg && go res
-    go (TyVarTy {})      = True
-    go _                 = False
 
 {-
 ************************************************************************
@@ -859,6 +800,27 @@ updateRoleEnv name n role
                               RIS { role_env = role_env', update = True }
                          else state )
 
+
+{- *********************************************************************
+*                                                                      *
+                Building implicits
+*                                                                      *
+********************************************************************* -}
+
+tcAddImplicits :: [TyThing] -> TcM TcGblEnv
+tcAddImplicits tyclss
+  = discardWarnings $
+    tcExtendGlobalEnvImplicit implicit_things  $
+    tcExtendGlobalValEnv def_meth_ids          $
+    do { (rec_sel_ids, rec_sel_binds)   <- mkRecSelBinds tycons
+       ; (typeable_ids, typeable_binds) <- mkTypeableBinds tycons
+       ; gbl_env <- tcExtendGlobalValEnv (rec_sel_ids ++ typeable_ids) getGblEnv
+       ; return (gbl_env `addTypecheckedBinds` (rec_sel_binds ++ typeable_binds)) }
+ where
+   implicit_things = concatMap implicitTyThings tyclss
+   tycons          = [tc | ATyCon tc <- tyclss]
+   def_meth_ids    = mkDefaultMethodIds tyclss
+
 {-
 ************************************************************************
 *                                                                      *
@@ -893,53 +855,49 @@ must bring the default method Ids into scope first (so they can be seen
 when typechecking the [d| .. |] quote, and typecheck them later.
 -}
 
-mkRecSelBinds :: [TyThing] -> HsValBinds Name
--- NB We produce *un-typechecked* bindings, rather like 'deriving'
---    This makes life easier, because the later type checking will add
---    all necessary type abstractions and applications
+mkRecSelBinds :: [TyCon] -> TcM ([Id], [LHsBinds Id])
 mkRecSelBinds tycons
-  = ValBindsOut [(NonRecursive, b) | b <- binds] sigs
-  where
-    (sigs, binds) = unzip rec_sels
-    rec_sels = map mkRecSelBind [ (tc,fld)
-                                | ATyCon tc <- tycons
-                                , fld <- tyConFieldLabels tc ]
+  = do { -- We generate *un-typechecked* bindings in mkRecSelBind, and
+         -- then typecheck them, rather like 'deriving'. This makes life
+         -- easier, because the later type checking will add all necessary
+         -- type abstractions and applications
 
+         let sel_binds :: [(RecFlag, LHsBinds Name)]
+             sel_sigs  :: [LSig Name]
+             (sel_sigs, sel_binds)
+                = mapAndUnzip mkRecSelBind [ (tc,fld)
+                                           | tc <- tycons
+                                           , fld <- tyConFieldLabels tc ]
+             sel_ids = [sel_id | L _ (IdSig sel_id) <- sel_sigs]
+       ; (sel_binds, _) <- tcValBinds TopLevel sel_binds sel_sigs (return ())
+       ; return (sel_ids, map snd sel_binds) }
 
-mkRecSelBind :: (TyCon, FieldLabel) -> (LSig Name, LHsBinds Name)
+mkRecSelBind :: (TyCon, FieldLabel) -> (LSig Name, (RecFlag, LHsBinds Name))
 mkRecSelBind (tycon, fl)
-  = mkOneRecordSelector all_cons (RecSelData tycon) fl
-  where
-    all_cons     = map RealDataCon (tyConDataCons tycon)
-
-mkOneRecordSelector :: [ConLike] -> RecSelParent -> FieldLabel
-              -> (LSig Name, LHsBinds Name)
-mkOneRecordSelector all_cons idDetails fl =
-    (L loc (IdSig sel_id), unitBag (L loc sel_bind))
+  = (L loc (IdSig sel_id), (NonRecursive, unitBag (L loc sel_bind)))
   where
     loc    = getSrcSpan sel_name
+    sel_id = mkExportedLocalId rec_details sel_name sel_ty
     lbl      = flLabel fl
     sel_name = flSelector fl
-
-    sel_id = mkExportedLocalId rec_details sel_name sel_ty
-    rec_details = RecSelId { sel_tycon = idDetails, sel_naughty = is_naughty }
+    rec_details = RecSelId { sel_tycon = tycon, sel_naughty = is_naughty }
 
     -- Find a representative constructor, con1
-
-    cons_w_field = conLikesWithFields all_cons [lbl]
+    all_cons     = tyConDataCons tycon
+    cons_w_field = tyConDataConsWithFields tycon [lbl]
     con1 = ASSERT( not (null cons_w_field) ) head cons_w_field
+
     -- Selector type; Note [Polymorphic selectors]
-    field_ty   = conLikeFieldType con1 lbl
+    field_ty   = dataConFieldType con1 lbl
+    data_ty    = dataConOrigResTy con1
     data_tvs   = tyVarsOfType data_ty
     is_naughty = not (tyVarsOfType field_ty `subVarSet` data_tvs)
     (field_tvs, field_theta, field_tau) = tcSplitSigmaTy field_ty
     sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
            | otherwise  = mkForAllTys (varSetElemsKvsFirst $
                                        data_tvs `extendVarSetList` field_tvs) $
-                          mkPhiTy (conLikeStupidTheta con1) $   -- Urgh!
+                          mkPhiTy (dataConStupidTheta con1) $   -- Urgh!
                           mkPhiTy field_theta               $   -- Urgh!
-                          -- req_theta is empty for normal DataCon
-                          mkPhiTy req_theta                 $
                           mkFunTy data_ty field_tau
 
     -- Make the binding: sel (C2 { fld = x }) = x
@@ -976,14 +934,8 @@ mkOneRecordSelector all_cons idDetails fl =
         --              data instance T Int a where
         --                 A :: { fld :: Int } -> T Int Bool
         --                 B :: { fld :: Int } -> T Int Char
-    dealt_with :: ConLike -> Bool
-    dealt_with (PatSynCon _) = False -- We can't predict overlap
-    dealt_with con@(RealDataCon dc) =
-      con `elem` cons_w_field || dataConCannotMatch inst_tys dc
-
-    (univ_tvs, _, eq_spec, _, req_theta, _, data_ty) = conLikeFullSig con1
-
-    inst_tys = substTyVars (mkTopTvSubst eq_spec) univ_tvs
+    dealt_with con = con `elem` cons_w_field || dataConCannotMatch inst_tys con
+    inst_tys = substTyVars (mkTopTvSubst (dataConEqSpec con1)) (dataConUnivTyVars con1)
 
     unit_rhs = mkLHsTupleExpr []
     msg_lit = HsStringPrim "" (fastStringToByteString lbl)

@@ -41,7 +41,7 @@ module HsUtils(
   mkPatSynBind,
 
   -- Literals
-  mkHsIntegral, mkHsFractional, mkHsIsString, mkHsString,
+  mkHsIntegral, mkHsFractional, mkHsIsString, mkHsString, mkHsStringPrimLit,
 
   -- Patterns
   mkNPat, mkNPlusKPat, nlVarPat, nlLitPat, nlConVarPat, nlConVarPatName, nlConPat,
@@ -318,6 +318,10 @@ unqualQuasiQuote = mkRdrUnqual (mkVarOccFS (fsLit "quasiquote"))
 
 mkHsString :: String -> HsLit
 mkHsString s = HsString s (mkFastString s)
+
+mkHsStringPrimLit :: FastString -> HsLit
+mkHsStringPrimLit fs
+  = HsStringPrim (unpackFS fs) (fastStringToByteString fs)
 
 -------------
 userHsTyVarBndrs :: SrcSpan -> [name] -> [Located (HsTyVarBndr name)]

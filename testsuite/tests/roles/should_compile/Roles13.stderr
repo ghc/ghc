@@ -1,17 +1,62 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 5, types: 9, coercions: 5}
+Result size of Tidy Core = {terms: 42, types: 18, coercions: 5}
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+a :: TrName
+[GblId, Caf=NoCafRefs, Str=DmdType]
+a = TrNameS "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+a1 :: TrName
+[GblId, Caf=NoCafRefs, Str=DmdType]
+a1 = TrNameS "Roles13"#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0}
+Roles13.$trModule :: Module
+[GblId[ReflectionId], Caf=NoCafRefs, Str=DmdType]
+Roles13.$trModule = Module a a1
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+a2 :: TrName
+[GblId, Caf=NoCafRefs, Str=DmdType]
+a2 = TrNameS "Age"#
+
+-- RHS size: {terms: 5, types: 0, coercions: 0}
+Roles13.$tcAge :: TyCon
+[GblId[ReflectionId], Caf=NoCafRefs, Str=DmdType]
+Roles13.$tcAge = TyCon 0## 0## Roles13.$trModule a2
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+a3 :: TrName
+[GblId, Caf=NoCafRefs, Str=DmdType]
+a3 = TrNameS "'MkWrap"#
+
+-- RHS size: {terms: 5, types: 0, coercions: 0}
+Roles13.$tc'MkWrap :: TyCon
+[GblId[ReflectionId], Caf=NoCafRefs, Str=DmdType]
+Roles13.$tc'MkWrap = TyCon 0## 0## Roles13.$trModule a3
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+a4 :: TrName
+[GblId, Caf=NoCafRefs, Str=DmdType]
+a4 = TrNameS "Wrap"#
+
+-- RHS size: {terms: 5, types: 0, coercions: 0}
+Roles13.$tcWrap :: TyCon
+[GblId[ReflectionId], Caf=NoCafRefs, Str=DmdType]
+Roles13.$tcWrap = TyCon 0## 0## Roles13.$trModule a4
 
 -- RHS size: {terms: 2, types: 2, coercions: 0}
-a :: Wrap Age -> Wrap Age
+a5 :: Wrap Age -> Wrap Age
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType]
-a = \ (ds :: Wrap Age) -> ds
+a5 = \ (ds :: Wrap Age) -> ds
 
 -- RHS size: {terms: 1, types: 0, coercions: 5}
 convert :: Wrap Age -> Int
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType]
 convert =
-  a
+  a5
   `cast` (<Wrap Age>_R -> Roles13.NTCo:Wrap[0] Roles13.NTCo:Age[0]
           :: (Wrap Age -> Wrap Age) ~R# (Wrap Age -> Int))
 

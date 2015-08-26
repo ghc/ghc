@@ -1,16 +1,16 @@
 Stopped at break012.hs:(1,1)-(5,18)
-_result :: (t, a1 -> a1, (), a -> a -> a) = _
+_result :: (t, a3 -> a3, (), a2 -> a2 -> a2) = _
 Stopped at break012.hs:5:10-18
-_result :: (t, a1 -> a1, (), a -> a -> a) = _
+_result :: (t, a3 -> a3, (), a2 -> a2 -> a2) = _
 a :: t = _
-b :: a2 -> a2 = _
+b :: a4 -> a4 = _
 c :: () = _
-d :: a -> a -> a = _
+d :: a2 -> a2 -> a2 = _
 a :: t
-b :: a2 -> a2
+b :: a4 -> a4
 c :: ()
-d :: a -> a -> a
+d :: a2 -> a2 -> a2
 a = (_t1::t)
-b = (_t2::a2 -> a2)
+b = (_t2::a4 -> a4)
 c = (_t3::())
-d = (_t4::a -> a -> a)
+d = (_t4::a2 -> a2 -> a2)

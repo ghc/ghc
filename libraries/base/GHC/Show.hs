@@ -194,6 +194,16 @@ showWord w# cs
 
 deriving instance Show a => Show (Maybe a)
 
+instance Show TyCon where
+  showsPrec p (TyCon _ _ _ tc_name) = showsPrec p tc_name
+
+instance Show TrName where
+  showsPrec _ (TrNameS s) = showString (unpackCString# s)
+  showsPrec _ (TrNameD s) = showString s
+
+instance Show Module where
+  showsPrec _ (Module p m) = shows p . (':' :) . shows m
+
 --------------------------------------------------------------
 -- Show instances for the first few tuple
 --------------------------------------------------------------

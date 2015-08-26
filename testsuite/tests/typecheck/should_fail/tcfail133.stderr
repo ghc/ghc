@@ -7,11 +7,10 @@ tcfail133.hs:68:7: error:
     prevents the constraint ‘(Show r0)’ from being solved.
     Probable fix: use a type annotation to specify what ‘r0’ should be.
     These potential instances exist:
+      instance Show Module -- Defined in ‘GHC.Show’
       instance Show Ordering -- Defined in ‘GHC.Show’
-      instance Show Integer -- Defined in ‘GHC.Show’
-      instance (Show a, Show b, Number a, Digit b) => Show (a :@ b)
-        -- Defined at tcfail133.hs:11:54
-      ...plus 25 others
+      instance Show TrName -- Defined in ‘GHC.Show’
+      ...plus 28 others
       (use -fprint-potential-instances to see them all)
     In the expression: show
     In the expression: show $ add (One :@ Zero) (One :@ One)

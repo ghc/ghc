@@ -37,7 +37,7 @@ test('T1969',
              # 2013-02-10 14 (x86/OSX)
              # 2013-11-13 17 (x86/Windows, 64bit machine)
              # 2015-07-11 21 (x86/Linux, 64bit machine) use +RTS -G1
-           (wordsize(64), 41, 20)]),
+           (wordsize(64), 55, 20)]),
              #            28 (amd64/Linux)
              #            34 (amd64/Linux)
              # 2012-09-20 23 (amd64/Linux)
@@ -48,6 +48,7 @@ test('T1969',
              # 2013-09-11 30, 10 (amd64/Linux)
              # 2013-09-11 30, 15 (adapt to Phab CI)
              # 2015-06-03 41, (amd64/Linux) use +RTS -G1
+             # 2015-10-28 55, (amd64/Linux) emit Typeable at definition site
       compiler_stats_num_field('max_bytes_used',
           [(platform('i386-unknown-mingw32'), 5719436, 20),
                                  # 2010-05-17 5717704 (x86/Windows)
@@ -61,7 +62,7 @@ test('T1969',
              # 2014-01-22 6429864 (x86/Linux)
              # 2014-06-29 5949188 (x86/Linux)
              # 2015-07-11 6241108 (x86/Linux, 64bit machine) use +RTS -G1
-           (wordsize(64), 11000000, 15)]),
+           (wordsize(64), 15017528, 15)]),
              # 2014-09-10 10463640, 10  # post-AMP-update (somewhat stabelish)
                # looks like the peak is around ~10M, but we're
                # unlikely to GC exactly on the peak.
@@ -71,6 +72,7 @@ test('T1969',
              # 2014-09-14  9684256, 10 # try to lower it a bit more to match Phab's CI
              # 2014-11-03 10584344,    # ghcspeed reports higher numbers consistently
              # 2015-07-11 11670120 (amd64/Linux)
+             # 2015-10-28 15017528 (amd64/Linux) emit typeable at definition site
       compiler_stats_num_field('bytes allocated',
           [(platform('i386-unknown-mingw32'), 301784492, 5),
                                  #            215582916 (x86/Windows)
@@ -86,7 +88,7 @@ test('T1969',
              # 2014-01-22 316103268 (x86/Linux)
              # 2014-06-29 303300692 (x86/Linux)
              # 2015-07-11 288699104 (x86/Linux, 64-bit machine) use +RTS -G1
-           (wordsize(64), 581460896, 5)]),
+           (wordsize(64), 737455896, 5)]),
              # 17/11/2009 434845560 (amd64/Linux)
              # 08/12/2009 459776680 (amd64/Linux)
              # 17/05/2010 519377728 (amd64/Linux)
@@ -105,6 +107,7 @@ test('T1969',
              # 17/07/2014 651626680 (x86_64/Linux) roundabout update
              # 10/09/2014 630299456 (x86_64/Linux) post-AMP-cleanup
              # 03/06/2015 581460896 (x86_64/Linux) use +RTS -G1
+             # 28/10/2015 737455896 (x86_64/Linux) emit Typeable at definition site
       only_ways(['normal']),
 
       extra_hc_opts('-dcore-lint -static'),
@@ -142,7 +145,7 @@ test('T3294',
              # 2014-12-22 26525384 (x86/Windows) Increase due to silent superclasses?
              # 2015-07-11 43196344 (x86/Linux, 64-bit machine) use +RTS -G1
 
-           (wordsize(64), 45000000, 20)]),
+           (wordsize(64), 96127384, 20)]),
              # prev:           25753192 (amd64/Linux)
              # 29/08/2012:     37724352 (amd64/Linux)
              #  (increase due to new codegen, see #7198)
@@ -156,6 +159,9 @@ test('T3294',
              #  (reason unknown, setting expected value somewhere in between)
              # 2015-01-22:     45000000  (amd64/Linux)
              #  varies between 40959592 and 52914488... increasing to +-20%
+             # 2015-10-28:     96127384  (amd64/Linux)
+             #  D757: emit Typeable instances at site of type definition
+             #  Opened #11030 to track this surprisingly large regression
 
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 1377050640, 5),
@@ -215,12 +221,13 @@ test('T4801',
            # 2014-01-22:  211198056 (x86/Linux)
            # 2014-09-03:  185242032 (Windows laptop)
            # 2014-12-01:  203962148 (Windows laptop)
-           (wordsize(64), 382056344, 10)]),
+           (wordsize(64), 434278248, 10)]),
             # prev:       360243576 (amd64/Linux)
             # 19/10/2012: 447190832 (amd64/Linux) (-fPIC turned on)
             # 19/10/2012: 392409984 (amd64/Linux) (-fPIC turned off)
             # 2014-04-08: 362939272 (amd64/Linux) cumulation of various smaller improvements over recent commits
             # 2014-10-08: 382056344 (amd64/Linux) stricter foldr2 488e95b
+            # 2015-10-28: 434278248 (amd64/Linux) emit Typeable at definition site
 
 ###################################
 # deactivated for now, as this metric became too volatile recently
@@ -416,7 +423,7 @@ test('T783',
             # 2014-09-03: 223377364 (Windows) better specialisation, raft of core-to-core optimisations
             # 2014-12-22: 235002220 (Windows) not sure why
 
-           (wordsize(64), 470738808, 10)]),
+           (wordsize(64), 526230456, 10)]),
             # prev:       349263216 (amd64/Linux)
             # 07/08/2012: 384479856 (amd64/Linux)
             # 29/08/2012: 436927840 (amd64/Linux)
@@ -429,16 +436,18 @@ test('T783',
             #   (fix previous fix for #8456)
             # 2014-07-17: 640031840 (amd64/Linux)
             #   (general round of updates)
-            # 2014-08-29: 441932632  (amd64/Linux)
+            # 2014-08-29: 441932632 (amd64/Linux)
             #   (better specialisation, raft of core-to-core optimisations)
-            # 2014-08-29: 719814352  (amd64/Linux)
-	    #   (changed order of cmm block causes analyses to allocate much more,
-	    #    but the changed order is slighly better in terms of runtime, and
-	    #    this test seems to be an extreme outlier.)
-            # 2015-05-16: 548288760  (amd64/Linux)
-	    #   (improved sequenceBlocks in nativeCodeGen, #10422)
-            # 2015-08-07: 470738808  (amd64/Linux)
-	    #   (simplifying the switch plan code path for simple checks, #10677)
+            # 2014-08-29: 719814352 (amd64/Linux)
+            #   (changed order of cmm block causes analyses to allocate much more,
+            #      but the changed order is slighly better in terms of runtime, and
+            #      this test seems to be an extreme outlier.)
+            # 2015-05-16: 548288760 (amd64/Linux)
+            #   (improved sequenceBlocks in nativeCodeGen, #10422)
+            # 2015-08-07: 470738808 (amd64/Linux)
+            #   (simplifying the switch plan code path for simple checks, #10677)
+            # 2015-08-28: 526230456 (amd64/Linux)
+            #    (D757: Emit Typeable instances at site of type definition)
       extra_hc_opts('-static')
       ],
       compile,[''])
@@ -477,7 +486,7 @@ test('T5321FD',
             #  (increase due to new codegen)
             # 2014-07-31: 211699816 (Windows) (-11%)
             #  (due to better optCoercion, 5e7406d9, #9233)
-           (wordsize(64), 470895536, 10)])
+           (wordsize(64), 532365376, 10)])
             # prev:       418306336
             # 29/08/2012: 492905640
             #  (increase due to new codegen)
@@ -494,6 +503,8 @@ test('T5321FD',
             # 2015-08-10: 470895536
             #  (undefined now takes an implicit parameter and GHC -O0 does
             #  not recognize that the application is bottom)
+            # 2015-10-28: 532365376
+            #  D757: emit Typeable instances at site of type definition
       ],
       compile,[''])
 
@@ -506,7 +517,7 @@ test('T5642',
             # 2014-09-03:  753045568
             # 2014-12-10:  641085256 Improvements in constraints solver
 
-            (wordsize(64), 1282916024, 10)])
+            (wordsize(64), 1412808976, 10)])
             # prev:        1300000000
             # 2014-07-17:  1358833928 (general round of updates)
             # 2014-08-07:  1402242360 (caused by 1fc60ea)
@@ -517,6 +528,7 @@ test('T5642',
             #                          It's a bizarre program with LOTS of data types)
             # 2014-09-10:  1536924976 post-AMP-cleanup
             # 2014-12-10:  1282916024 Improvements in constraints solver
+            # 2015-10-28:  1412808976 Emit Typeable at definition site
       ],
       compile,['-O'])
 
@@ -611,8 +623,9 @@ test('T9675',
  	  # 2015-07-11    56         (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 544489040, 10)
+          [(wordsize(64), 608284152, 10)
           # 2014-10-13    544489040
+          # 2015-10-28    608284152  emit Typeable at definition site
           ,(wordsize(32), 279480696, 10)
  	  # 2015-07-11    279480696  (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
@@ -679,10 +692,11 @@ test('T9872d',
 test('T9961',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 663978160, 5),
+          [(wordsize(64), 708680480, 5),
           # 2015-01-12    807117816   Initally created
           # 2015-spring   772510192   Got better
           # 2015-05-22    663978160   Fix for #10370 improves it more
+          # 2015-10-28    708680480   Emit Typeable at definition site
            (wordsize(32), 375647160, 5)
           ]),
       ],

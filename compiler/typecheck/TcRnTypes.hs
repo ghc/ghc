@@ -477,6 +477,9 @@ data TcGblEnv
         -- Things defined in this module, or (in GHCi)
         -- in the declarations for a single GHCi command.
         -- For the latter, see Note [The interactive package] in HscTypes
+        tcg_tr_module :: Maybe Id,           -- Id for $trModule :: GHC.Types.Module
+                                             -- for which every module has a top-level defn
+                                             -- except in GHCi in which case we have Nothing
         tcg_binds     :: LHsBinds Id,        -- Value bindings in this module
         tcg_sigs      :: NameSet,            -- ...Top-level names that *lack* a signature
         tcg_imp_specs :: [LTcSpecPrag],      -- ...SPECIALISE prags for imported Ids
@@ -898,7 +901,7 @@ pprPECategory RecDataConPE = ptext (sLit "Data constructor")
 pprPECategory NoDataKinds  = ptext (sLit "Data constructor")
 
 {- Note [Bindings with closed types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
 
   f x = let g ys = map not ys
@@ -914,6 +917,8 @@ Definition:
 iff
    a) all its free variables are imported, or are let-bound with closed types
    b) generalisation is not restricted by the monomorphism restriction
+
+Invariant: a closed variable has no free type variables in its type.
 
 Under OutsideIn we are free to generalise a closed let-binding.
 This is an extension compared to the JFP paper on OutsideIn, which

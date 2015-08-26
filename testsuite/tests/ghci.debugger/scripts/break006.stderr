@@ -12,7 +12,7 @@
                Show (f a) =>
                Show (Alt f a)
         -- Defined in ‘Data.Monoid’
-      ...plus 33 others
+      ...plus 36 others
       (use -fprint-potential-instances to see them all)
     In a stmt of an interactive GHCi command: print it
 
@@ -29,6 +29,6 @@
                Show (f a) =>
                Show (Alt f a)
         -- Defined in ‘Data.Monoid’
-      ...plus 33 others
+      ...plus 36 others
       (use -fprint-potential-instances to see them all)
     In a stmt of an interactive GHCi command: print it
