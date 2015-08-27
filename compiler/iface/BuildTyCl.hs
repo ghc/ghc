@@ -341,3 +341,21 @@ Here we can't use a newtype either, even though there is only
 one field, because equality predicates are unboxed, and classes
 are boxed.
 -}
+
+newImplicitBinder :: Name                       -- Base name
+                  -> (OccName -> OccName)       -- Occurrence name modifier
+                  -> TcRnIf m n Name            -- Implicit name
+-- Called in BuildTyCl to allocate the implicit binders of type/class decls
+-- For source type/class decls, this is the first occurrence
+-- For iface ones, the LoadIface has alrady allocated a suitable name in the cache
+newImplicitBinder base_name mk_sys_occ
+  | Just mod <- nameModule_maybe base_name
+  = newGlobalBinder mod occ loc
+  | otherwise           -- When typechecking a [d| decl bracket |],
+                        -- TH generates types, classes etc with Internal names,
+                        -- so we follow suit for the implicit binders
+  = do  { uniq <- newUnique
+        ; return (mkInternalName uniq occ loc) }
+  where
+    occ = mk_sys_occ (nameOccName base_name)
+    loc = nameSrcSpan base_name
