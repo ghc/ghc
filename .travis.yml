@@ -53,4 +53,6 @@ script:
  # * But use VERBOSE=2 (the default, but not when using --quiet) otherwise
  # the testsuite might not print output for over 10 minutes (more likely so
  # when DEBUG_STAGE2=NO), causing Travis to again kill our job.
+ # * Use --fast, to stay within the time limits set by Travis.
+ # See Note [validate and testsuite speed] in toplevel Makefile.
  - THREADS=3 SKIP_PERF_TESTS=YES VERBOSE=2 ./validate --fast --quiet

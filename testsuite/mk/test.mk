@@ -247,10 +247,14 @@ else
 set_list_broken = 
 endif
 
-ifeq "$(fast)" "YES"
-setfast = -e config.fast=1
+# See Note [validate and testsuite speed] in toplevel Makefile.
+ifneq "$(SPEED)" ""
+setspeed = -e config.speed="$(SPEED)"
+else ifeq "$(fast)" "YES"
+# Backward compatibility. Maybe some people are running 'make accept fast=YES'?
+setspeed = -e config.speed=2
 else
-setfast = 
+setspeed =
 endif
 
 ifeq "$(accept)" "YES"
@@ -259,7 +263,7 @@ else
 setaccept = 
 endif
 
-.PHONY: all boot test verbose accept fast list_broken
+.PHONY: all boot test verbose accept fast slow list_broken
 
 all: test
 
@@ -278,7 +282,7 @@ test: $(TIMEOUT_PROGRAM)
 		$(patsubst %, --way=%, $(WAY)) \
 		$(patsubst %, --skipway=%, $(SKIPWAY)) \
 		$(set_list_broken) \
-		$(setfast) \
+		$(setspeed) \
 		$(setaccept)
 
 verbose: test
@@ -287,7 +291,11 @@ accept:
 	$(MAKE) accept=YES
 
 fast:
-	$(MAKE) fast=YES
+	# See Note [validate and testsuite speed] in toplevel Makefile.
+	$(MAKE) SPEED=2
+
+slow:
+	$(MAKE) SPEED=0
 
 list_broken:
 	$(MAKE) list_broken=YES

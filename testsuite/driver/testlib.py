@@ -333,7 +333,7 @@ def ghci_dynamic( ):
     return config.ghc_dynamic
 
 def fast():
-    return config.fast
+    return config.speed == 2
 
 def platform( plat ):
     return config.platform == plat
@@ -674,9 +674,10 @@ def test_common_work (name, opts, func, args):
         # Which ways we are asked to skip
         do_ways = list(filter (ok_way,all_ways))
 
-        # In fast mode, we skip all but one way
-        if config.fast and len(do_ways) > 0:
-            do_ways = [do_ways[0]]
+        # Only run all ways in slow mode.
+        # See Note [validate and testsuite speed] in toplevel Makefile.
+        if config.speed > 0:
+            do_ways = do_ways[:1]
 
         if not config.clean_only:
             # Run the required tests...

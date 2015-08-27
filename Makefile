@@ -83,6 +83,7 @@ REALGOALS=$(filter-out \
     help \
     test \
     fulltest \
+    slowtest \
     fasttest \
   ,$(MAKECMDGOALS))
 
@@ -159,10 +160,36 @@ endif
 
 endif
 
+# Note [validate and testsuite speed]
+#
+# There are 3 different validate and testsuite speed settings:
+# fast, normal and slow.
+#
+#                              how    how   used
+#           cd tests  config.  many   many  by
+# validate  && make   speed=   tests  ways  whom
+# =============================================================================
+# --fast    fast      2        some   1     Travis (to stay within time limit)
+# --normal  test      1        all    1     Phabricator (slow takes too long?)
+# --slow    slow      0        all    all   Nightly (slow is ok)
+#
+#           accept    1        all    1
+#
+# `make accept` should run all tests exactly once. There is no point in
+# accepting a test for multiple ways, since it should produce the same output
+# for all ways.
+#
+# To make sure all .stderr and .stdout files in the testsuite are never
+# out-of-date, it is useful if Phabricator, via a normal `./validate` and `make
+# test`, runs each test at least once.
 .PHONY: fasttest
 fasttest:
 	$(MAKE) -C testsuite/tests CLEANUP=1 SUMMARY_FILE=../../testsuite_summary.txt fast
 
-.PHONY: fulltest test
-fulltest test:
+.PHONY: test
+test:
 	$(MAKE) -C testsuite/tests CLEANUP=1 SUMMARY_FILE=../../testsuite_summary.txt
+
+.PHONY: slowtest fulltest
+slowtest fulltest:
+	$(MAKE) -C testsuite/tests CLEANUP=1 SUMMARY_FILE=../../testsuite_summary.txt slow

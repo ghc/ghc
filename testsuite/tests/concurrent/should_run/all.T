@@ -111,11 +111,7 @@ test('performGC', [ only_ways(['threaded1','threaded2'])
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
 
-def f( name, opts ):
-  if config.fast:
-     opts.skip = 1
-
-setTestOpts(f)
+setTestOpts(when(fast(), skip))
 
 test('conc001', normal, compile_and_run, [''])
 test('conc002', normal, compile_and_run, [''])

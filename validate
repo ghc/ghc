@@ -18,9 +18,9 @@ Flags:
                     compiler the test suite covers.
                     2008-07-01: 63% slower than the default.
                     HTML generated here: testsuite/hpc_output/hpc_index.html
-  --fast            Omit dyn way, omit binary distribution
-  --slow            Build stage2 with -DDEBUG. Skips tests that call
-                    compiler_stats_num_field.
+  --fast            Omit binary distribution. Omit certain tests.
+  --slow            Build stage2 with -DDEBUG. Run tests for all WAYS,
+                    but skip those that call compiler_stats_num_field.
                     2008-07-01: 14% slower than the default.
   --dph             Also build libraries/dph and run associated tests.
   --quiet           More pretty build log.
@@ -248,11 +248,11 @@ fi
 
 case "$speed" in
 SLOW)
-        MAKE_TEST_TARGET=fulltest
+        MAKE_TEST_TARGET=slowtest
         BINDIST="BINDIST=YES"
         ;;
 NORMAL)
-        MAKE_TEST_TARGET=fasttest
+        MAKE_TEST_TARGET=test
         BINDIST="BINDIST=YES"
         ;;
 FAST)
