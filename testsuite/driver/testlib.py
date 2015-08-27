@@ -1407,10 +1407,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
         stdin_file = qualify(name, 'stdin')
 
     if os.path.exists(stdin_file):
-        stdin = open(stdin_file, 'r')
         os.system('cat ' + stdin_file + ' >>' + qscriptname)
-
-    script.close()
 
     flags = ' '.join(get_compiler_flags(override_flags=None, noforce=False) +
                      config.way_flags(name)[way])
