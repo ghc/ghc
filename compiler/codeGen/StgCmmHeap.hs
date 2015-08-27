@@ -46,6 +46,7 @@ import Id ( Id )
 import Module
 import DynFlags
 import FastString( mkFastString, fsLit )
+import Panic( sorry )
 
 #if __GLASGOW_HASKELL__ >= 709
 import Prelude hiding ((<*>))
@@ -532,8 +533,16 @@ heapCheck checkStack checkYield do_gc code
     -- that the conditionals on hpHw don't cause a black hole
     do  { dflags <- getDynFlags
         ; let mb_alloc_bytes
+                 | hpHw > mBLOCK_SIZE = sorry $ unlines
+                    [" Trying to allocate more than "++show mBLOCK_SIZE++" bytes.",
+                     "",
+                     "This is currently not possible due to a limitation of GHC's code generator.",
+                     "See http://hackage.haskell.org/trac/ghc/ticket/4505 for details.",
+                     "Suggestion: read data from a file instead of having large static data",
+                     "structures in code."]
                  | hpHw > 0  = Just (mkIntExpr dflags (hpHw * (wORD_SIZE dflags)))
                  | otherwise = Nothing
+                 where mBLOCK_SIZE = bLOCKS_PER_MBLOCK dflags * bLOCK_SIZE_W dflags
               stk_hwm | checkStack = Just (CmmLit CmmHighStackMark)
                       | otherwise  = Nothing
         ; codeOnly $ do_checks stk_hwm checkYield mb_alloc_bytes do_gc
