@@ -2327,6 +2327,7 @@ texp :: { LHsExpr RdrName }
         -- inside parens.
         | infixexp qop        { sLL $1 $> $ SectionL $1 $2 }
         | qopm infixexp       { sLL $1 $> $ SectionR $1 $2 }
+        | '::' sigtype        { sLL $1 $> $ TySigSection $2 PlaceHolder }
 
        -- View patterns get parenthesized above
         | exp '->' texp   {% ams (sLL $1 $> $ EViewPat $1 $3) [mj AnnRarrow $2] }

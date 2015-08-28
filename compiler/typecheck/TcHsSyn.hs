@@ -651,6 +651,10 @@ zonkExpr env (SectionR op expr)
        new_expr <- zonkLExpr env expr
        return (SectionR new_op new_expr)
 
+-- FIXME: is this really right?
+zonkExpr env (tysig@TySigSectionOut {}) = pure tysig
+zonkExpr env (tysig@TySigSection {}) = panic "zonkExpr TySigSection"
+
 zonkExpr env (ExplicitTuple tup_args boxed)
   = do { new_tup_args <- mapM zonk_tup_arg tup_args
        ; return (ExplicitTuple new_tup_args boxed) }

@@ -276,6 +276,11 @@ dsExpr (SectionR op expr) = do
     return (bindNonRec y_id y_core $
             Lam x_id (mkCoreAppsDs core_op [Var x_id, Var y_id]))
 
+dsExpr (TySigSectionOut _ ty co) = do
+    --  (\(x:ty) -> x) |> co
+    arg_var <- newSysLocalDs ty
+    return $ Lam arg_var (Var arg_var)
+
 dsExpr (ExplicitTuple tup_args boxity)
   = do { let go (lam_vars, args) (L _ (Missing ty))
                     -- For every missing expression, we need
@@ -673,6 +678,7 @@ dsExpr (HsTickPragma _ _ expr) = do
 
 -- HsSyn constructs that just shouldn't be here:
 dsExpr (ExprWithTySig {})  = panic "dsExpr:ExprWithTySig"
+dsExpr (TySigSection  {})  = panic "dsExpr:TySigSection"
 dsExpr (HsBracket     {})  = panic "dsExpr:HsBracket"
 dsExpr (HsArrApp      {})  = panic "dsExpr:HsArrApp"
 dsExpr (HsArrForm     {})  = panic "dsExpr:HsArrForm"

@@ -36,6 +36,7 @@ import StaticFlags( opt_PprStyle_Debug )
 import Outputable
 import FastString
 import Type
+import Coercion
 
 -- libraries:
 import Data.Data hiding (Fixity)
@@ -186,6 +187,15 @@ data HsExpr id
                 (LHsExpr id)    -- operator
   | SectionR    (LHsExpr id)    -- operator; see Note [Sections in HsSyn]
                 (LHsExpr id)    -- operand
+
+  -- | Type-signature operator sections
+
+  | TySigSection    (LHsType id)
+                    (PostRn id [Name])  -- wildcards
+
+  | TySigSectionOut (LHsType Name)
+                    (PostTc id Type)
+                    (PostTc id Coercion)
 
   -- | Used for explicit tuples and sections thereof
   --
@@ -642,6 +652,12 @@ ppr_expr (SectionR op expr)
     pp_prefixly = hang (hsep [text "( \\ x_ ->", ppr op, ptext (sLit "x_")])
                        4 (pp_expr <> rparen)
     pp_infixly v = sep [pprInfixOcc v, pp_expr]
+
+ppr_expr (TySigSection sig _)
+  = hang dcolon 4 (ppr sig)
+
+ppr_expr (TySigSectionOut sig _ _)
+  = hang dcolon 4 (ppr sig)
 
 ppr_expr (ExplicitTuple exprs boxity)
   = tupleParens (boxityTupleSort boxity) (fcat (ppr_tup_args $ map unLoc exprs))

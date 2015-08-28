@@ -373,6 +373,15 @@ tcExpr (SectionL arg1 op) res_ty
        ; return $ mkHsWrapCo co_res $
          SectionL arg1' (mkLHsWrapCo co_fn op') }
 
+tcExpr (TySigSection sig_ty wcs) res_ty
+ = tcWildcardBinders wcs $ \ wc_prs ->
+   do { addErrCtxt (pprSigCtxt ExprSigCtxt empty (ppr sig_ty)) $
+        emitWildcardHoleConstraints wc_prs
+      ; sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
+      ; co <- unifyType (mkFunTy sig_tc_ty sig_tc_ty) res_ty -- TcM TcCoercion
+      ; return $ mkHsWrapCo co (TySigSectionOut sig_ty res_ty (panic "FIXME"))
+      }
+
 tcExpr (ExplicitTuple tup_args boxity) res_ty
   | all tupArgPresent tup_args
   = do { let tup_tc = tupleTyCon boxity (length tup_args)

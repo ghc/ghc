@@ -176,6 +176,10 @@ rnExpr (HsPar (L loc (section@(SectionR {}))))
   = do  { (section', fvs) <- rnSection section
         ; return (HsPar (L loc section'), fvs) }
 
+rnExpr (HsPar (L loc (section@(TySigSection {}))))
+  = do  { (section', fvs) <- rnSection section
+        ; return (HsPar (L loc section'), fvs) }
+
 rnExpr (HsPar e)
   = do  { (e', fvs_e) <- rnLExpr e
         ; return (HsPar e', fvs_e) }
@@ -184,6 +188,9 @@ rnExpr expr@(SectionL {})
   = do  { addErr (sectionErr expr); rnSection expr }
 rnExpr expr@(SectionR {})
   = do  { addErr (sectionErr expr); rnSection expr }
+rnExpr expr@(TySigSection {})
+  = do  { addErr (sectionErr expr); rnSection expr }
+
 
 ---------------------------------------------
 rnExpr (HsCoreAnn src ann expr)
@@ -399,6 +406,10 @@ rnSection section@(SectionL expr op)
         ; (op', fvs_op)     <- rnLExpr op
         ; checkSectionPrec InfixL section op' expr'
         ; return (SectionL expr' op', fvs_op `plusFV` fvs_expr) }
+
+rnSection (TySigSection pty PlaceHolder)
+  = do  { (pty', fvTy, wcs) <- rnLHsTypeWithWildCards ExprWithTySigCtx pty
+        ; return (TySigSection pty' wcs, fvTy) }
 
 rnSection other = pprPanic "rnSection" (ppr other)
 
