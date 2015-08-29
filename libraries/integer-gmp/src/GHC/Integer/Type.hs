@@ -1014,8 +1014,25 @@ timesBigNatWord x@(BN# x#) y#
   where
     nx# = sizeofBigNat# x
 
+-- | Specialised version of
+--
+-- > bitBigNat = shiftLBigNat (wordToBigNat 1##)
+--
+-- avoiding a few redundant allocations
 bitBigNat :: Int# -> BigNat
-bitBigNat i# = shiftLBigNat (wordToBigNat 1##) i# -- FIXME
+bitBigNat i#
+  | isTrue# (i#  <#  0#) = zeroBigNat -- or maybe 'nullBigNat'?
+  | isTrue# (i# ==#  0#) = oneBigNat
+  | True = runS $ do
+      mbn@(MBN# mba#) <- newBigNat# (li# +# 1#)
+      -- FIXME: do we really need to zero-init MBAs returned by 'newByteArray#'?
+      -- clear all limbs (except for the most-significant limb)
+      _ <- svoid (setByteArray# mba# 0# (li# `uncheckedIShiftL#` GMP_LIMB_SHIFT#) 0#)
+      -- set single bit in most-significant limb
+      _ <- svoid (writeBigNat# mbn li# (uncheckedShiftL# 1## bi#))
+      unsafeFreezeBigNat# mbn
+  where
+    (# li#, bi# #) = quotRemInt# i# GMP_LIMB_BITS#
 
 testBitBigNat :: BigNat -> Int# -> Bool
 testBitBigNat bn i#
