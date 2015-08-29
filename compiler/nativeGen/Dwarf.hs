@@ -30,6 +30,7 @@ import qualified Compiler.Hoopl as H
 -- | Generate DWARF/debug information
 dwarfGen :: DynFlags -> ModLocation -> UniqSupply -> [DebugBlock]
             -> IO (SDoc, UniqSupply)
+dwarfGen _  _      us [] = return (empty, us)
 dwarfGen df modLoc us blocks = do
 
   -- Convert debug data structures to DWARF info records
@@ -43,6 +44,8 @@ dwarfGen df modLoc us blocks = do
         , dwName = fromMaybe "" (ml_hs_file modLoc)
         , dwCompDir = addTrailingPathSeparator compPath
         , dwProducer = cProjectName ++ " " ++ cProjectVersion
+        , dwLowLabel = dblCLabel $ head procs
+        , dwHighLabel = mkAsmTempEndLabel $ dblCLabel $ last procs
         , dwLineLabel = dwarfLineLabel
         }
 
@@ -57,7 +60,8 @@ dwarfGen df modLoc us blocks = do
   let abbrevSct = pprAbbrevDecls haveSrc
 
   -- .debug_info section: Information records on procedures and blocks
-  let (unitU, us') = takeUniqFromSupply us
+  let -- unique to identify start and end compilation unit .debug_inf
+      (unitU, us') = takeUniqFromSupply us
       infoSct = vcat [ dwarfInfoSection
                      , compileUnitHeader unitU
                      , pprDwarfInfo haveSrc dwarfUnit

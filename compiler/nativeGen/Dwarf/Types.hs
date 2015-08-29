@@ -44,6 +44,8 @@ data DwarfInfo
                      , dwName :: String
                      , dwProducer :: String
                      , dwCompDir :: String
+                     , dwLowLabel :: CLabel
+                     , dwHighLabel :: CLabel
                      , dwLineLabel :: LitString }
   | DwarfSubprogram { dwChildren :: [DwarfInfo]
                     , dwName :: String
@@ -82,6 +84,8 @@ pprAbbrevDecls haveDebugLine =
        , (dW_AT_language, dW_FORM_data4)
        , (dW_AT_comp_dir, dW_FORM_string)
        , (dW_AT_use_UTF8, dW_FORM_flag_present)  -- not represented in body
+       , (dW_AT_low_pc,   dW_FORM_addr)
+       , (dW_AT_high_pc,  dW_FORM_addr)
        ] ++
        (if haveDebugLine
         then [ (dW_AT_stmt_list, dW_FORM_data4) ]
@@ -112,12 +116,15 @@ pprDwarfInfo haveSrc d
 -- that the binary format of this is paramterized in @abbrevDecls@ and
 -- has to be kept in synch.
 pprDwarfInfoOpen :: Bool -> DwarfInfo -> SDoc
-pprDwarfInfoOpen haveSrc (DwarfCompileUnit _ name producer compDir lineLbl) =
+pprDwarfInfoOpen haveSrc (DwarfCompileUnit _ name producer compDir lowLabel
+                                           highLabel lineLbl) =
   pprAbbrev DwAbbrCompileUnit
   $$ pprString name
   $$ pprString producer
   $$ pprData4 dW_LANG_Haskell
   $$ pprString compDir
+  $$ pprWord (ppr lowLabel)
+  $$ pprWord (ppr highLabel)
   $$ if haveSrc
      then sectionOffset lineLbl dwarfLineLabel
      else empty
