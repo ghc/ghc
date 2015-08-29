@@ -9,6 +9,8 @@ import os
 import string
 import getopt
 import platform
+import shutil
+import tempfile
 import time
 import re
 
@@ -277,10 +279,31 @@ else:
     # set stdout to unbuffered (is this the best way to do it?)
     sys.stdout = os.fdopen(sys.__stdout__.fileno(), "w", 0)
 
+# Create a unique temporary directory inside '/tmp/ghctest'.
+ghctestdir = os.path.join(tempfile.gettempdir(), 'ghctest')
+# Don't start from scratch (i.e. don't rmtree(ghctestdir)). Running
+# 'make test' while another 'make test' hasn't completed yet should work.
+#shutil.rmtree(ghctestdir, ignore_errors=True)
+mkdirp(ghctestdir)
+tempdir = normalise_slashes_(tempfile.mkdtemp('', '', dir=ghctestdir))
+
+def cleanup_and_exit(exitcode):
+    if config.cleanup:
+        shutil.rmtree(tempdir, ignore_errors=True)
+        try:
+            os.rmdir(ghctestdir)
+        except OSError as e:
+            if e.errno == errno.ENOTEMPTY:
+                # Only delete ghctestdir if it is empty.
+                pass
+            else:
+                raise
+    exit(exitcode)
+
 # First collect all the tests to be run
 for file in t_files:
     if_verbose(2, '====> Scanning %s' % file)
-    newTestDir(os.path.dirname(file))
+    newTestDir(tempdir, os.path.dirname(file))
     try:
         exec(open(file).read())
     except Exception:
@@ -291,7 +314,7 @@ for file in t_files:
 if config.only:
     # See Note [Mutating config.only]
     sys.stderr.write("ERROR: tests not found: {0}\n".format(list(config.only)))
-    sys.exit(1)
+    cleanup_and_exit(1)
 
 if config.list_broken:
     global brokens
@@ -327,5 +350,4 @@ else:
     if config.summary_file != '':
         summary(t, open(config.summary_file, 'w'))
 
-sys.exit(0)
-
+cleanup_and_exit(0)

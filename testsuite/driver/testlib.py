@@ -22,6 +22,7 @@ import subprocess
 
 from testglobals import *
 from testutil import *
+from extra_files import extra_src_files
 
 try:
     basestring
@@ -274,6 +275,12 @@ def extra_clean( files ):
 
 def _extra_clean( name, opts, v ):
     opts.clean_files = v
+
+def extra_files(files):
+    return lambda name, opts: _extra_files(name, opts, files)
+
+def _extra_files(name, opts, files):
+    opts.extra_files.extend(files)
 
 # -----
 
@@ -543,13 +550,27 @@ def executeSetups(fs, name, opts):
 # -----------------------------------------------------------------------------
 # The current directory of tests
 
-def newTestDir( dir ):
+def newTestDir(tempdir, dir):
+    # Hack. A few tests depend on files in ancestor directories
+    # (e.g. extra_files(['../../../../libraries/base/dist-install/haddock.t']))
+    # Make sure tempdir is sufficiently "deep", such that copying/linking those
+    # files won't cause any problems.
+    #
+    # If you received a framework failure about adding an extra level:
+    #  * add one extra '../' to the startswith('../../../../../') in do_test
+    #  * add one more number here:
+    tempdir = os.path.join(tempdir, '1', '2', '3')
+
     global thisdir_settings
     # reset the options for this test directory
-    thisdir_settings = lambda name, opts, dir=dir: _newTestDir( name, opts, dir )
+    def settings(name, opts, tempdir=tempdir, dir=dir):
+        return _newTestDir(name, opts, tempdir, dir)
+    thisdir_settings = settings
 
-def _newTestDir( name, opts, dir ):
-    opts.testdir = dir
+
+def _newTestDir(name, opts, tempdir, dir):
+    opts.srcdir = os.path.join(os.getcwd(), dir)
+    opts.testdir = os.path.join(tempdir, dir, name)
     opts.compiler_always_flags = config.compiler_always_flags
 
 # -----------------------------------------------------------------------------
@@ -683,18 +704,48 @@ def test_common_work (name, opts, func, args):
             other_ways = list(filter(lambda way: way not in opts.extra_ways, do_ways))
             do_ways = other_ways[:1] + explicit_ways
 
+        # Find all files in the source directory that this test
+        # depends on. Do this only once for all ways.
+        # Generously add all filenames that start with the name of
+        # the test to this set, as a convenience to test authors.
+        # They will have to use the `extra_files` setup function to
+        # specify all other files that their test depends on (but
+        # this seems to be necessary for only about 10% of all
+        # tests).
+        files = set((f for f in os.listdir(opts.srcdir)
+                        if f.startswith(name)))
+        for filename in (opts.extra_files + extra_src_files.get(name, [])):
+            if filename.startswith('../../../../../'):
+                framework_fail(name, 'whole-test',
+                    'add extra level to testlib.py:newTestDir for: ' + filename)
+
+            elif filename.startswith('/'):
+                framework_fail(name, 'whole-test',
+                    'no absolute paths in extra_files please: ' + filename)
+
+            elif '*' in filename:
+                # Don't use wildcards in extra_files too much, as
+                # globbing is slow.
+                files.update((os.path.relpath(f, opts.srcdir)
+                            for f in glob.iglob(in_srcdir(filename))))
+
+            else:
+                files.add(filename)
+
         if not config.clean_only:
             # Run the required tests...
             for way in do_ways:
                 if stopping():
                     break
-                do_test (name, way, func, args)
+                do_test(name, way, func, args, files)
 
             for way in all_ways:
                 if way not in do_ways:
                     skiptest (name,way)
 
         if config.cleanup and (config.clean_only or do_ways):
+            cleanup()
+        elif False: # TODO. Delete this code.
             pretest_cleanup(name)
             clean([name + suff for suff in [
                        '', '.exe', '.exe.manifest', '.genscript',
@@ -755,6 +806,7 @@ def test_common_work (name, opts, func, args):
         framework_fail(name, 'runTest', 'Unhandled exception: ' + str(e))
 
 def clean(strs):
+    return # TODO. Delete this function.
     for str in strs:
         if (str.endswith('.package.conf') or
             str.startswith('package.conf.') and not str.endswith('/*')):
@@ -782,7 +834,9 @@ def clean_full_path(name):
                 if e2.errno != errno.ENOENT:
                     print(e2)
 
-def do_test(name, way, func, args):
+def do_test(name, way, func, args, files):
+    opts = getTestOpts()
+
     full_name = name + '(' + way + ')'
 
     try:
@@ -791,6 +845,66 @@ def do_test(name, way, func, args):
                     [t.n_unexpected_passes, \
                      t.n_unexpected_failures, \
                      t.n_framework_failures]))
+
+        # Clean up prior to the test, so that we can't spuriously conclude
+        # that it passed on the basis of old run outputs.
+        cleanup()
+
+        # Link all source files for this test into a new directory in
+        # /tmp, and run the test in that directory. This makes it
+        # possible to run tests in parallel, without modification, that
+        # would otherwise (accidentally) write to the same output file.
+        # It also makes it easier to keep the testsuite clean.
+
+        for filename in files:
+            src = in_srcdir(filename)
+            dst = in_testdir(filename)
+
+            if os.path.isfile(src):
+                dirname = os.path.dirname(dst)
+                if dirname:
+                    mkdirp(dirname)
+                try:
+                    link_or_copy_file(src, dst)
+                except OSError as e:
+                    if e.errno == errno.EEXIST and os.path.isfile(dst):
+                        # Some tests depend on files from ancestor
+                        # directories (e.g. '../shell.hs'). It is
+                        # possible such a file was already copied over
+                        # for another test, since cleanup() doesn't
+                        # delete them.
+                        pass
+                    else:
+                        raise
+            elif os.path.isdir(src):
+                os.makedirs(dst)
+                lndir(src, dst)
+            else:
+                if not config.haddock and os.path.splitext(filename)[1] == '.t':
+                    # When using a ghc built without haddock support, .t
+                    # files are rightfully missing. Don't
+                    # framework_fail. Test will be skipped later.
+                    pass
+                else:
+                    framework_fail(name, way,
+                        'extra_file does not exist: ' + filename)
+
+        if not files:
+            # Always create the testdir, even when no files were copied
+            # (because user forgot to specify extra_files setup function), to
+            # prevent the confusing error: can't cd to <testdir>.
+            os.makedirs(opts.testdir)
+
+        if func.__name__ == 'run_command' or opts.pre_cmd:
+            # When running 'MAKE' make sure 'TOP' still points to the
+            # root of the testsuite.
+            src_makefile = in_srcdir('Makefile')
+            dst_makefile = in_testdir('Makefile')
+            if os.path.exists(src_makefile):
+                with open(src_makefile, 'r') as src:
+                    makefile = re.sub('TOP=.*', 'TOP=' + config.top, src.read(), 1)
+                    with open(dst_makefile, 'w') as dst:
+                        dst.write(makefile)
 
         if config.use_threads:
             t.lock.release()
@@ -1262,7 +1376,7 @@ def simple_run(name, way, prog, extra_run_opts):
         use_stdin = opts.stdin
     else:
         stdin_file = add_suffix(name, 'stdin')
-        if os.path.exists(in_testdir(stdin_file)):
+        if os.path.exists(in_srcdir(stdin_file)):
             use_stdin = stdin_file
         else:
             use_stdin = '/dev/null'
@@ -1393,9 +1507,9 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     # figure out what to use for stdin
     if getTestOpts().stdin != '':
-        stdin_file = in_testdir(getTestOpts().stdin)
+        stdin_file = in_srcdir(opts.stdin)
     else:
-        stdin_file = qualify(name, 'stdin')
+        stdin_file = in_srcdir(name, 'stdin')
 
     if os.path.exists(stdin_file):
         os.system('cat ' + stdin_file + ' >>' + qscriptname)
@@ -1603,11 +1717,12 @@ def check_prof_ok(name, way):
 def compare_outputs(way, kind, normaliser, expected_file, actual_file,
                     whitespace_normaliser=lambda x:x):
 
-    expected_path = in_testdir(expected_file)
+    expected_path = in_srcdir(expected_file)
     actual_path = in_testdir(actual_file)
 
     if os.path.exists(expected_path):
         expected_str = normaliser(read_no_crs(expected_path))
+        # Create the .normalised file in the testdir, not in the srcdir.
         expected_normalised_file = add_suffix(expected_file, 'normalised')
         expected_normalised_path = in_testdir(expected_normalised_file)
     else:
@@ -1651,7 +1766,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
             return 1
         elif config.accept:
             if_verbose(1, 'No output. Deleting {0}.'.format(expected_path))
-            rm_no_fail(expected_path)
+            os.remove(expected_path)
             return 1
         else:
             return 0
@@ -2108,6 +2223,7 @@ if config.have_profiling:
     gsNotWorking();
 
 def rm_no_fail( file ):
+   return # TODO. Delete this function.
    try:
        os.remove( file )
    finally:
@@ -2138,11 +2254,13 @@ def replace_suffix( name, suffix ):
     return base + '.' + suffix
 
 def in_testdir(name, suffix=''):
-    return getTestOpts().testdir + '/' + add_suffix(name, suffix)
+    return os.path.join(getTestOpts().testdir, add_suffix(name, suffix))
 
 def qualify( name, suff ):
     return in_testdir(add_suffix(name, suff))
 
+def in_srcdir(name, suffix=''):
+    return os.path.join(getTestOpts().srcdir, add_suffix(name, suffix))
 
 # Finding the sample output.  The filename is of the form
 #
@@ -2150,7 +2268,7 @@ def qualify( name, suff ):
 #
 def find_expected_file(name, suff):
     basename = add_suffix(name, suff)
-    basepath = in_testdir(basename)
+    basepath = in_srcdir(basename)
 
     files = [(platformSpecific, basename + ws + plat)
              for (platformSpecific, plat) in [(1, '-' + config.platform),
@@ -2162,7 +2280,7 @@ def find_expected_file(name, suff):
     dir = [normalise_slashes_(d) for d in dir]
 
     for (platformSpecific, f) in files:
-       if in_testdir(f) in dir:
+       if in_srcdir(f) in dir:
             return (platformSpecific,f)
 
     return (0, basename)
@@ -2170,6 +2288,7 @@ def find_expected_file(name, suff):
 # Clean up prior to the test, so that we can't spuriously conclude
 # that it passed on the basis of old run outputs.
 def pretest_cleanup(name):
+   return # TODO. Delete this function.
    if getTestOpts().outputdir != None:
        odir = in_testdir(getTestOpts().outputdir)
        try:
@@ -2190,6 +2309,10 @@ def pretest_cleanup(name):
    # rm_nofail(qualify("o"))
    # rm_nofail(qualify(""))
    # not interested in the return code
+
+def cleanup():
+    shutil.rmtree(getTestOpts().testdir, ignore_errors=True)
+
 
 # -----------------------------------------------------------------------------
 # Return a list of all the files ending in '.T' below directories roots.

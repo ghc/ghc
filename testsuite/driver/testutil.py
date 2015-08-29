@@ -1,7 +1,10 @@
 # -----------------------------------------------------------------------------
 # Utils
 
+import errno
+import os
 import subprocess
+import shutil
 
 def version_to_ints(v):
     return [ int(x) for x in v.split('.') ]
@@ -36,3 +39,32 @@ def getStdout(cmd_and_args):
     if stderr:
         raise Exception("stderr from command: " + str(cmd_and_args))
     return stdout
+
+def mkdirp(path):
+    try:
+        os.makedirs(path)
+    except OSError as e:
+        if e.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
+
+def lndir(srcdir, dstdir):
+    # Create symlinks for all files in src directory.
+    # Not all developers might have lndir installed.
+    # os.system('lndir -silent {0} {1}'.format(srcdir, dstdir))
+    for filename in os.listdir(srcdir):
+        src = os.path.join(srcdir, filename)
+        dst = os.path.join(dstdir, filename)
+        if os.path.isfile(src):
+            link_or_copy_file(src, dst)
+        else:
+            os.mkdir(dst)
+            lndir(src, dst)
+
+# On Windows, os.symlink is not defined. Except when using msys2, as ghc
+# does. Then it copies the source file, instead of creating a symbolic
+# link to it. We define the following function to make this magic more
+# explicit/discoverable. You are enouraged to use it instead of
+# os.symlink.
+link_or_copy_file = getattr(os, "symlink", shutil.copyfile)
