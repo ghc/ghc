@@ -3,11 +3,15 @@ module Dwarf.Types
     DwarfInfo(..)
   , pprDwarfInfo
   , pprAbbrevDecls
+    -- * Dwarf address range table
+  , DwarfARange(..)
+  , pprDwarfARange
     -- * Dwarf frame
   , DwarfFrame(..), DwarfFrameProc(..), DwarfFrameBlock(..)
   , pprDwarfFrame
     -- * Utilities
   , pprByte
+  , pprHalf
   , pprData4'
   , pprDwWord
   , pprWord
@@ -25,6 +29,7 @@ import Encoding
 import FastString
 import Outputable
 import Platform
+import Unique
 import Reg
 
 import Dwarf.Constants
@@ -126,7 +131,7 @@ pprDwarfInfoOpen haveSrc (DwarfCompileUnit _ name producer compDir lowLabel
   $$ pprWord (ppr lowLabel)
   $$ pprWord (ppr highLabel)
   $$ if haveSrc
-     then sectionOffset lineLbl dwarfLineLabel
+     then sectionOffset (ptext lineLbl) (ptext dwarfLineLabel)
      else empty
 pprDwarfInfoOpen _ (DwarfSubprogram _ name label) = sdocWithDynFlags $ \df ->
   pprAbbrev DwAbbrSubprogram
@@ -146,6 +151,44 @@ pprDwarfInfoOpen _ (DwarfBlock _ label marker) = sdocWithDynFlags $ \df ->
 -- | Close a DWARF info record with children
 pprDwarfInfoClose :: SDoc
 pprDwarfInfoClose = pprAbbrev DwAbbrNull
+
+-- | A DWARF address range. This is used by the debugger to quickly locate
+-- which compilation unit a given address belongs to. This type assumes
+-- a non-segmented address-space.
+data DwarfARange
+  = DwarfARange
+    { dwArngStartLabel :: CLabel
+    , dwArngEndLabel   :: CLabel
+    , dwArngUnitUnique :: Unique
+      -- ^ from which the corresponding label in @.debug_info@ is derived
+    }
+
+-- | Print assembler directives corresponding to a DWARF @.debug_aranges@
+-- address table entry.
+pprDwarfARange :: DwarfARange -> SDoc
+pprDwarfARange arng = sdocWithPlatform $ \plat ->
+  let wordSize = platformWordSize plat
+      paddingSize = 4 :: Int
+      -- header is 12 bytes long.
+      -- entry is 8 bytes (32-bit platform) or 16 bytes (64-bit platform).
+      -- pad such that first entry begins at multiple of entry size.
+      pad n = vcat $ replicate n $ pprByte 0
+      initialLength = 8 + paddingSize + 2*2*wordSize
+      length = ppr (dwArngEndLabel arng)
+               <> char '-' <> ppr (dwArngStartLabel arng)
+  in pprDwWord (ppr initialLength)
+     $$ pprHalf 2
+     $$ sectionOffset (ppr $ mkAsmTempLabel $ dwArngUnitUnique arng)
+                      (ptext dwarfInfoLabel)
+     $$ pprByte (fromIntegral wordSize)
+     $$ pprByte 0
+     $$ pad paddingSize
+     -- beginning of body
+     $$ pprWord (ppr $ dwArngStartLabel arng)
+     $$ pprWord length
+     -- terminus
+     $$ pprWord (char '0')
+     $$ pprWord (char '0')
 
 -- | Information about unwind instructions for a procedure. This
 -- corresponds to a "Common Information Entry" (CIE) in DWARF.
@@ -366,6 +409,10 @@ wordAlign = sdocWithPlatform $ \plat ->
 pprByte :: Word8 -> SDoc
 pprByte x = ptext (sLit "\t.byte ") <> ppr (fromIntegral x :: Word)
 
+-- | Assembly for a two-byte constant integer
+pprHalf :: Word16 -> SDoc
+pprHalf x = ptext (sLit "\t.hword ") <> ppr (fromIntegral x :: Word)
+
 -- | Assembly for a constant DWARF flag
 pprFlag :: Bool -> SDoc
 pprFlag f = pprByte (if f then 0xff else 0x00)
@@ -442,9 +489,9 @@ escapeChar c
 -- us to just reference the target directly, and will figure out on
 -- their own that we actually need an offset. Finally, Windows has
 -- a special directive to refer to relative offsets. Fun.
-sectionOffset :: LitString -> LitString -> SDoc
+sectionOffset :: SDoc -> SDoc -> SDoc
 sectionOffset target section = sdocWithPlatform $ \plat ->
   case platformOS plat of
-    OSDarwin  -> pprDwWord (ptext target <> char '-' <> ptext section)
-    OSMinGW32 -> text "\t.secrel32 " <> ptext target
-    _other    -> pprDwWord (ptext target)
+    OSDarwin  -> pprDwWord (target <> char '-' <> section)
+    OSMinGW32 -> text "\t.secrel32 " <> target
+    _other    -> pprDwWord target

@@ -115,12 +115,13 @@ dW_OP_call_frame_cfa = 0x9c
 
 -- | Dwarf section declarations
 dwarfInfoSection, dwarfAbbrevSection, dwarfLineSection,
-  dwarfFrameSection, dwarfGhcSection :: SDoc
-dwarfInfoSection   = dwarfSection "info"
-dwarfAbbrevSection = dwarfSection "abbrev"
-dwarfLineSection   = dwarfSection "line"
-dwarfFrameSection  = dwarfSection "frame"
-dwarfGhcSection    = dwarfSection "ghc"
+  dwarfFrameSection, dwarfGhcSection, dwarfARangesSection :: SDoc
+dwarfInfoSection    = dwarfSection "info"
+dwarfAbbrevSection  = dwarfSection "abbrev"
+dwarfLineSection    = dwarfSection "line"
+dwarfFrameSection   = dwarfSection "frame"
+dwarfGhcSection     = dwarfSection "ghc"
+dwarfARangesSection = dwarfSection "aranges"
 
 dwarfSection :: String -> SDoc
 dwarfSection name = sdocWithPlatform $ \plat -> ftext $ mkFastString $
