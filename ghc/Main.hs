@@ -80,8 +80,18 @@ main = do
    initGCStatistics -- See Note [-Bsymbolic and hooks]
    hSetBuffering stdout LineBuffering
    hSetBuffering stderr LineBuffering
-   hSetTranslit stdout
-   hSetTranslit stderr
+
+   -- Handle GHC-specific character encoding flags, allowing us to control how
+   -- GHC produces output regardless of OS.
+   env <- getEnvironment
+   case lookup "GHC_CHARENC" env of
+    Just "UTF-8" -> do
+     hSetEncoding stdout utf8
+     hSetEncoding stderr utf8
+    _ -> do
+     -- Avoid GHC erroring out when trying to display unhandled characters
+     hSetTranslit stdout
+     hSetTranslit stderr
 
    GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     -- 1. extract the -B flag from the args
