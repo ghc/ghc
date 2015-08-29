@@ -66,7 +66,8 @@ pprAbbrev :: DwarfAbbrev -> SDoc
 pprAbbrev = pprLEBWord . fromIntegral . fromEnum
 
 -- | Abbreviation declaration. This explains the binary encoding we
--- use for representing @DwarfInfo@.
+-- use for representing 'DwarfInfo'. Be aware that this must be updated
+-- along with 'pprDwarfInfo'.
 pprAbbrevDecls :: Bool -> SDoc
 pprAbbrevDecls haveDebugLine =
   let mkAbbrev abbr tag chld flds =
@@ -76,11 +77,11 @@ pprAbbrevDecls haveDebugLine =
   in dwarfAbbrevSection $$
      ptext dwarfAbbrevLabel <> colon $$
      mkAbbrev DwAbbrCompileUnit dW_TAG_compile_unit dW_CHILDREN_yes
-       ([ (dW_AT_name, dW_FORM_string)
+       ([(dW_AT_name,     dW_FORM_string)
        , (dW_AT_producer, dW_FORM_string)
        , (dW_AT_language, dW_FORM_data4)
        , (dW_AT_comp_dir, dW_FORM_string)
-       , (dW_AT_use_UTF8, dW_FORM_flag)
+       , (dW_AT_use_UTF8, dW_FORM_flag_present)  -- not represented in body
        ] ++
        (if haveDebugLine
         then [ (dW_AT_stmt_list, dW_FORM_data4) ]
@@ -117,7 +118,6 @@ pprDwarfInfoOpen haveSrc (DwarfCompileUnit _ name producer compDir lineLbl) =
   $$ pprString producer
   $$ pprData4 dW_LANG_Haskell
   $$ pprString compDir
-  $$ pprFlag True -- use UTF8
   $$ if haveSrc
      then sectionOffset lineLbl dwarfLineLabel
      else empty
