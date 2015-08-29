@@ -35,7 +35,7 @@ static boolish insample = 0;			/* true when in sample  */
 static floatish lastsample;			/* the last sample time */
 
 static void GetHpLine PROTO((FILE *));		/* forward */
-static void GetHpTok  PROTO((FILE *));		/* forward */
+static void GetHpTok  PROTO((FILE *, int));	/* forward */
 
 static struct entry *GetEntry PROTO((char *));	/* forward */
 
@@ -77,7 +77,7 @@ GetHpFile(FILE *infp)
     linenum = 1;
     lastsample = 0.0;
 
-    GetHpTok(infp);
+    GetHpTok(infp, 1);
 
     while (endfile == 0) {
 	GetHpLine(infp);
@@ -122,49 +122,49 @@ GetHpLine(FILE *infp)
 
     switch (thetok) {
     case JOB_TOK:
-	GetHpTok(infp);
+	GetHpTok(infp, 0);
 	if (thetok != STRING_TOK) {
 	    Error("%s, line %d: string must follow JOB", hpfile, linenum);
         }
 	jobstring = thestring;
 	gotjob = 1;
-        GetHpTok(infp);
+        GetHpTok(infp, 1);
 	break;
 
     case DATE_TOK:
-	GetHpTok(infp);
+	GetHpTok(infp, 0);
 	if (thetok != STRING_TOK) {
 	    Error("%s, line %d: string must follow DATE", hpfile, linenum);
         }
 	datestring = thestring;
 	gotdate = 1;
-        GetHpTok(infp);
+        GetHpTok(infp, 1);
 	break;
 
     case SAMPLE_UNIT_TOK:
-	GetHpTok(infp);
+	GetHpTok(infp, 0);
 	if (thetok != STRING_TOK) {
 	    Error("%s, line %d: string must follow SAMPLE_UNIT", hpfile, 
 	          linenum);
         }
 	sampleunitstring = thestring;
 	gotsampleunit = 1;
-        GetHpTok(infp);
+        GetHpTok(infp, 1);
 	break;
 
     case VALUE_UNIT_TOK:
-        GetHpTok(infp);
+        GetHpTok(infp, 0);
 	if (thetok != STRING_TOK) {
 	    Error("%s, line %d: string must follow VALUE_UNIT", hpfile, 
 	          linenum);
         }
 	valueunitstring = thestring;
 	gotvalueunit = 1;
-        GetHpTok(infp);
+        GetHpTok(infp, 1);
 	break;
 
     case MARK_TOK:
-	GetHpTok(infp);
+	GetHpTok(infp, 0);
         if (thetok != FLOAT_TOK) {
             Error("%s, line %d, floating point number must follow MARK",
 	          hpfile, linenum);
@@ -182,12 +182,12 @@ GetHpLine(FILE *infp)
 	    }
 	}
 	markmap[ nmarks++ ] = thefloatish; 
-        GetHpTok(infp);
+        GetHpTok(infp, 1);
         break;
 
     case BEGIN_SAMPLE_TOK: 
 	insample = 1;
-	GetHpTok(infp); 
+	GetHpTok(infp, 0);
 	if (thetok != FLOAT_TOK) {
 	    Error("%s, line %d, floating point number must follow BEGIN_SAMPLE",	          hpfile, linenum);
 	}
@@ -207,28 +207,28 @@ GetHpLine(FILE *infp)
 	    }
 	}
 	samplemap[ nsamples ] = thefloatish;
-	GetHpTok(infp);
+	GetHpTok(infp, 1);
 	break;
 
     case END_SAMPLE_TOK: 
 	insample = 0;
-	GetHpTok(infp); 
+	GetHpTok(infp, 0);
 	if (thetok != FLOAT_TOK) {
 	    Error("%s, line %d: floating point number must follow END_SAMPLE", 
                   hpfile, linenum);
 	}
         nsamples++;
-	GetHpTok(infp);
+	GetHpTok(infp, 1);
 	break;
 
     case IDENTIFIER_TOK:
-	GetHpTok(infp);
+	GetHpTok(infp, 0);
 	if (thetok != INTEGER_TOK) {
 	    Error("%s, line %d: integer must follow identifier", hpfile, 
                   linenum);
 	}
         StoreSample(GetEntry(theident), nsamples, thefloatish);
-	GetHpTok(infp); 
+	GetHpTok(infp, 1);
         break;
 
     case EOF_TOK:
@@ -274,10 +274,12 @@ TokenToString(token t)
  *	the corresponding value is also assigned to "theinteger"
  *	or "thefloatish" as appropriate; in the case of identifiers 
  *	it is assigned to "theident".
+ *
+ *	startline argument should be true for the first token on a line
  */
 
 static void
-GetHpTok(FILE *infp)
+GetHpTok(FILE *infp, int startline)
 {
 
     while (isspace(ch)) {		/* skip whitespace */
@@ -290,7 +292,8 @@ GetHpTok(FILE *infp)
 	return;
     }
 
-    if (isdigit(ch)) {
+    if (isdigit(ch) && !startline) {
+	/* there should not be numbers at start of line */
 	thetok = GetNumber(infp);
 	return;
     } else if (ch == '\"') {
@@ -298,7 +301,6 @@ GetHpTok(FILE *infp)
 	thetok = STRING_TOK;
 	return;
     } else if (IsIdChar(ch)) {
-	ASSERT(! (isdigit(ch)));	/* ch can't be a digit here */
 	GetIdent(infp);
 	if (!isupper((int)theident[0])) {
 	    thetok = IDENTIFIER_TOK;

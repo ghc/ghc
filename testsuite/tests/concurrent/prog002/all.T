@@ -11,7 +11,6 @@ else:
 
 test('concprog002',
      [only_ways(['threaded2','threaded2_hT']),
-      expect_broken_for(10661, ['threaded2_hT']),
       extra_ways(ways),
       exit_code(1),
       when(fast(), skip),
