@@ -1665,7 +1665,8 @@ checkDuplicates db_stack pkg multi_instance update = do
         uncasep = map toLower . display
         dups = filter ((== uncasep pkgid) . uncasep) (map sourcePackageId pkgs)
 
-  when (not update && not (null dups)) $ verror ForceAll $
+  when (not update && not multi_instance
+                   && not (null dups)) $ verror ForceAll $
         "Package names may be treated case-insensitively in the future.\n"++
         "Package " ++ display pkgid ++
         " overlaps with: " ++ unwords (map display dups)
