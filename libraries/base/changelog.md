@@ -56,6 +56,8 @@
   * Made `PatternMatchFail`, `RecSelError`, `RecConError`, `RecUpdError`,
     `NoMethodError`, and `AssertionFailed` newtypes (#10738)
 
+  * The `Generic` instance for `Proxy` is now poly-kinded (#10775)
+
 ## 4.8.1.0  *Jul 2015*
 
   * Bundled with GHC 7.10.2

@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE PolyKinds              #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -576,10 +577,10 @@ import Data.Proxy
 --------------------------------------------------------------------------------
 
 -- | Void: used for datatypes without constructors
-data V1 p
+data V1 (p :: *)
 
 -- | Unit: used for constructors without arguments
-data U1 p = U1
+data U1 (p :: *) = U1
   deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Used for marking occurrences of the parameter
@@ -587,30 +588,30 @@ newtype Par1 p = Par1 { unPar1 :: p }
   deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Recursive calls of kind * -> *
-newtype Rec1 f p = Rec1 { unRec1 :: f p }
+newtype Rec1 f (p :: *) = Rec1 { unRec1 :: f p }
   deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Constants, additional parameters and recursion of kind *
-newtype K1 i c p = K1 { unK1 :: c }
+newtype K1 (i :: *) c (p :: *) = K1 { unK1 :: c }
   deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Meta-information (constructor names, etc.)
-newtype M1 i c f p = M1 { unM1 :: f p }
+newtype M1 (i :: *) (c :: *) f (p :: *) = M1 { unM1 :: f p }
   deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Sums: encode choice between constructors
 infixr 5 :+:
-data (:+:) f g p = L1 (f p) | R1 (g p)
+data (:+:) f g (p :: *) = L1 (f p) | R1 (g p)
   deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Products: encode multiple arguments to constructors
 infixr 6 :*:
-data (:*:) f g p = f p :*: g p
+data (:*:) f g (p :: *) = f p :*: g p
   deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Composition of functors
 infixr 7 :.:
-newtype (:.:) f g p = Comp1 { unComp1 :: f (g p) }
+newtype (:.:) f (g :: * -> *) (p :: *) = Comp1 { unComp1 :: f (g p) }
   deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Tag for K1: recursion (of kind *)
@@ -643,22 +644,22 @@ type S1 = M1 S
 
 
 -- | Class for datatypes that represent datatypes
-class Datatype d where
+class Datatype (d :: *) where
   -- | The name of the datatype (unqualified)
-  datatypeName :: t d (f :: * -> *) a -> [Char]
+  datatypeName :: t d (f :: * -> *) (a :: *) -> [Char]
   -- | The fully-qualified name of the module where the type is declared
-  moduleName   :: t d (f :: * -> *) a -> [Char]
+  moduleName   :: t d (f :: * -> *) (a :: *) -> [Char]
   -- | The package name of the module where the type is declared
-  packageName :: t d (f :: * -> *) a -> [Char]
+  packageName :: t d (f :: * -> *) (a :: *) -> [Char]
   -- | Marks if the datatype is actually a newtype
-  isNewtype    :: t d (f :: * -> *) a -> Bool
+  isNewtype    :: t d (f :: * -> *) (a :: *) -> Bool
   isNewtype _ = False
 
 
 -- | Class for datatypes that represent records
-class Selector s where
+class Selector (s :: *) where
   -- | The name of the selector
-  selName :: t s (f :: * -> *) a -> [Char]
+  selName :: t s (f :: * -> *) (a :: *) -> [Char]
 
 -- | Used for constructor fields without a name
 data NoSelector
@@ -666,16 +667,16 @@ data NoSelector
 instance Selector NoSelector where selName _ = ""
 
 -- | Class for datatypes that represent data constructors
-class Constructor c where
+class Constructor (c :: *) where
   -- | The name of the constructor
-  conName :: t c (f :: * -> *) a -> [Char]
+  conName :: t c (f :: * -> *) (a :: *) -> [Char]
 
   -- | The fixity of the constructor
-  conFixity :: t c (f :: * -> *) a -> Fixity
+  conFixity :: t c (f :: * -> *) (a :: *) -> Fixity
   conFixity _ = Prefix
 
   -- | Marks if this constructor is a record
-  conIsRecord :: t c (f :: * -> *) a -> Bool
+  conIsRecord :: t c (f :: * -> *) (a :: *) -> Bool
   conIsRecord _ = False
 
 
