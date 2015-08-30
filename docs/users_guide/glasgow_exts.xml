@@ -1095,13 +1095,13 @@ For example, consider
 data T a where
   MkT :: (Show b) => a -> b -> T a
 
-f1 :: (Eq a, Num a) => MkT a -> String
+f1 :: (Eq a, Num a) => T a -> String
 f1 (MkT 42 x) = show x
 
 pattern ExNumPat :: (Show b) => (Num a, Eq a) => b -> T a
 pattern ExNumPat x = MkT 42 x
 
-f2 :: (Eq a, Num a) => MkT a -> String
+f2 :: (Eq a, Num a) => T a -> String
 f2 (ExNumPat x) = show x
 </programlisting>
 Here <literal>f1</literal> does not use pattern synonyms.  To match against the
