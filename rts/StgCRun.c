@@ -159,6 +159,8 @@ StgWord8 *win32AllocStack(void)
  * stack isn't aligned, and calling exitWith from Haskell invokes
  * shutdownHaskellAndExit using a C call.
  *
+ * If you edit the sequence below be sure to update the unwinding information
+ * for stg_stop_thread in StgStartup.cmm.
  */
 
 static void GNUC3_ATTRIBUTE(used)

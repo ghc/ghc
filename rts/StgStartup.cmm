@@ -62,6 +62,18 @@ INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
        be an info table on top of the stack).
     */
 
+    /*
+       Here we setup the stack unwinding annotation necessary to allow
+       debuggers to find their way back to the C stack.
+
+       This is a bit fiddly as we assume the layout of the stack prepared
+       for us by StgRun.
+     */
+#ifdef x86_64_HOST_ARCH
+    unwind MachSp = MachSp + RESERVED_C_STACK_BYTES + 0x38 + 8
+    unwind UnwindReturnReg = W_[MachSp + RESERVED_C_STACK_BYTES + 0x38]
+#endif
+
     Sp = Sp + SIZEOF_StgStopFrame - WDS(2);
     Sp(1) = R1;
     Sp(0) = stg_enter_info;
