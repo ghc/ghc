@@ -254,6 +254,11 @@ See also Note [Wrappers for data instance tycons] in MkId.hs
   So a data type family is not an injective type function. It's just a
   data type with some axioms that connect it to other data types.
 
+* The tyConTyVars of the representation tycon are the tyvars that the
+  user wrote in the patterns. This is important in TcDeriv, where we
+  bring these tyvars into scope before type-checking the deriving
+  clause. This fact is arranged for in TcInstDecls.tcDataFamInstDecl.
+
 Note [Associated families and their parent class]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 *Associated* families are just like *non-associated* families, except
@@ -673,16 +678,7 @@ data TyConParent
                         -- See Note [Associated families and their parent class]
 
   -- | Type constructors representing an instance of a *data* family.
-  -- Parameters:
-  --
-  --  1) The type family in question
-  --
-  --  2) Instance types; free variables are the 'tyConTyVars'
-  --  of the current 'TyCon' (not the family one). INVARIANT:
-  --  the number of types matches the arity of the family 'TyCon'
-  --
-  --  3) A 'CoTyCon' identifying the representation
-  --  type with the type instance family
+  -- See Note [Data type families] and source comments for more info.
   | FamInstTyCon          -- See Note [Data type families]
         (CoAxiom Unbranched)  -- The coercion axiom.
                -- A *Representational* coercion,

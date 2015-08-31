@@ -1230,7 +1230,7 @@ tcTyClsInstDecls tycl_decls inst_decls deriv_decls
       -- Note [AFamDataCon: not promoting data family constructors]
    do { tcg_env <- tcTyAndClassDecls tycl_decls ;
       ; setGblEnv tcg_env $
-        tcInstDecls1 (tyClGroupConcat tycl_decls) inst_decls deriv_decls }
+        tcInstDecls1 tycl_decls inst_decls deriv_decls }
   where
     -- get_cons extracts the *constructor* bindings of the declaration
     get_cons :: LInstDecl Name -> [Name]

@@ -15,7 +15,7 @@ module TcTyClsDecls (
         -- data/type family instance declarations
         kcDataDefn, tcConDecls, dataDeclChecks, checkValidTyCon,
         tcFamTyPats, tcTyFamInstEqn, famTyConShape,
-        tcAddTyFamInstCtxt, tcAddDataFamInstCtxt,
+        tcAddTyFamInstCtxt, tcMkDataFamInstCtxt, tcAddDataFamInstCtxt,
         wrongKindOfFamily, dataConCtxt, badDataConTyCon
     ) where
 
@@ -721,7 +721,7 @@ tcFamDecl1 parent
        ; tc_kind <- kcLookupKind tc_name
        ; let fam_tc_shape = (tc_name, length (hsQTvBndrs tvs), tc_kind)
 
-       ; branches <- mapM (tcTyFamInstEqn fam_tc_shape) eqns
+       ; branches <- mapM (tcTyFamInstEqn fam_tc_shape Nothing) eqns
          -- Do not attempt to drop equations dominated by earlier
          -- ones here; in the case of mutual recursion with a data
          -- type, we get a knot-tying failure.  Instead we check
@@ -950,17 +950,18 @@ kcTyFamInstEqn fam_tc_shape
     (L loc (TyFamEqn { tfe_pats = pats, tfe_rhs = hs_ty }))
   = setSrcSpan loc $
     discardResult $
-    tc_fam_ty_pats fam_tc_shape pats (discardResult . (tcCheckLHsType hs_ty))
+    tc_fam_ty_pats fam_tc_shape Nothing -- not an associated type
+                   pats (discardResult . (tcCheckLHsType hs_ty))
 
-tcTyFamInstEqn :: FamTyConShape -> LTyFamInstEqn Name -> TcM CoAxBranch
+tcTyFamInstEqn :: FamTyConShape -> Maybe ClsInfo -> LTyFamInstEqn Name -> TcM CoAxBranch
 -- Needs to be here, not in TcInstDcls, because closed families
 -- (typechecked here) have TyFamInstEqns
-tcTyFamInstEqn fam_tc_shape@(fam_tc_name,_,_)
+tcTyFamInstEqn fam_tc_shape@(fam_tc_name,_,_) mb_clsinfo
     (L loc (TyFamEqn { tfe_tycon = L _ eqn_tc_name
                      , tfe_pats = pats
                      , tfe_rhs = hs_ty }))
   = setSrcSpan loc $
-    tcFamTyPats fam_tc_shape pats (discardResult . (tcCheckLHsType hs_ty)) $
+    tcFamTyPats fam_tc_shape mb_clsinfo pats (discardResult . (tcCheckLHsType hs_ty)) $
        \tvs' pats' res_kind ->
     do { checkTc (fam_tc_name == eqn_tc_name)
                  (wrongTyFamName fam_tc_name eqn_tc_name)
@@ -1042,6 +1043,7 @@ famTyConShape fam_tc
     , tyConKind fam_tc )
 
 tc_fam_ty_pats :: FamTyConShape
+               -> Maybe ClsInfo
                -> HsWithBndrs Name [LHsType Name] -- Patterns
                -> (TcKind -> TcM ())              -- Kind checker for RHS
                                                   -- result is ignored
@@ -1057,24 +1059,28 @@ tc_fam_ty_pats :: FamTyConShape
 -- In that case, the type variable 'a' will *already be in scope*
 -- (and, if C is poly-kinded, so will its kind parameter).
 
-tc_fam_ty_pats (name, arity, kind)
+tc_fam_ty_pats (name, arity, kind) mb_clsinfo
                (HsWB { hswb_cts = arg_pats, hswb_kvs = kvars
                      , hswb_tvs = tvars, hswb_wcs = wcs })
                kind_checker
   = do { let (fam_kvs, fam_body) = splitForAllTys kind
 
-         -- We wish to check that the pattern has the right number of arguments
-         -- in checkValidFamPats (in TcValidity), so we can do the check *after*
-         -- we're done with the knot. But, the splitKindFunTysN below will panic
-         -- if there are *too many* patterns. So, we do a preliminary check here.
-         -- Note that we don't have enough information at hand to do a full check,
-         -- as that requires the full declared arity of the family, which isn't
-         -- nearby.
+         -- The splitKindFunTysN below will panic
+         -- if there are too many patterns. So, we do a validity check here.
        ; checkTc (length arg_pats == arity) $
          wrongNumberOfParmsErr arity
 
-         -- Instantiate with meta kind vars
-       ; fam_arg_kinds <- mapM (const newMetaKindVar) fam_kvs
+         -- Instantiate with meta kind vars (or instance kinds)
+       ; fam_arg_kinds <- case mb_clsinfo of
+           Nothing            -> mapM (const newMetaKindVar) fam_kvs
+           Just (_, mini_env) -> mapM mk_arg_kind fam_kvs
+             where
+               mk_arg_kind kv
+                 | Just kind <- lookupVarEnv mini_env kv
+                 = return kind
+                 | otherwise
+                 = newMetaKindVar
+
        ; loc <- getSrcSpanM
        ; let (arg_kinds, res_kind)
                  = splitKindFunTysN (length arg_pats) $
@@ -1095,15 +1101,16 @@ tc_fam_ty_pats (name, arity, kind)
 
 -- See Note [tc_fam_ty_pats vs tcFamTyPats]
 tcFamTyPats :: FamTyConShape
+            -> Maybe ClsInfo
             -> HsWithBndrs Name [LHsType Name] -- patterns
             -> (TcKind -> TcM ())              -- kind-checker for RHS
             -> ([TKVar]              -- Kind and type variables
                 -> [TcType]          -- Kind and type arguments
                 -> Kind -> TcM a)
             -> TcM a
-tcFamTyPats fam_shape@(name,_,_) pats kind_checker thing_inside
+tcFamTyPats fam_shape@(name,_,_) mb_clsinfo pats kind_checker thing_inside
   = do { (fam_arg_kinds, typats, res_kind)
-            <- tc_fam_ty_pats fam_shape pats kind_checker
+            <- tc_fam_ty_pats fam_shape mb_clsinfo pats kind_checker
        ; let all_args = fam_arg_kinds ++ typats
 
             -- Find free variables (after zonking) and turn
@@ -2194,18 +2201,23 @@ tcAddTyFamInstCtxt :: TyFamInstDecl Name -> TcM a -> TcM a
 tcAddTyFamInstCtxt decl
   = tcAddFamInstCtxt (ptext (sLit "type instance")) (tyFamInstDeclName decl)
 
+tcMkDataFamInstCtxt :: DataFamInstDecl Name -> SDoc
+tcMkDataFamInstCtxt decl
+  = tcMkFamInstCtxt (pprDataFamInstFlavour decl <+> text "instance")
+                    (unLoc (dfid_tycon decl))
+
 tcAddDataFamInstCtxt :: DataFamInstDecl Name -> TcM a -> TcM a
 tcAddDataFamInstCtxt decl
-  = tcAddFamInstCtxt (pprDataFamInstFlavour decl <+> ptext (sLit "instance"))
-                     (unLoc (dfid_tycon decl))
+  = addErrCtxt (tcMkDataFamInstCtxt decl)
+
+tcMkFamInstCtxt :: SDoc -> Name -> SDoc
+tcMkFamInstCtxt flavour tycon
+  = hsep [ text "In the" <+> flavour <+> text "declaration for"
+         , quotes (ppr tycon) ]
 
 tcAddFamInstCtxt :: SDoc -> Name -> TcM a -> TcM a
 tcAddFamInstCtxt flavour tycon thing_inside
-  = addErrCtxt ctxt thing_inside
-  where
-     ctxt = hsep [ptext (sLit "In the") <+> flavour
-                  <+> ptext (sLit "declaration for"),
-                  quotes (ppr tycon)]
+  = addErrCtxt (tcMkFamInstCtxt flavour tycon) thing_inside
 
 tcAddClosedTypeFamilyDeclCtxt :: TyCon -> TcM a -> TcM a
 tcAddClosedTypeFamilyDeclCtxt tc

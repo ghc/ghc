@@ -8,7 +8,7 @@ Handles @deriving@ clauses on @data@ declarations.
 
 {-# LANGUAGE CPP #-}
 
-module TcDeriv ( tcDeriving ) where
+module TcDeriv ( tcDeriving, DerivInfo(..), mkDerivInfos ) where
 
 #include "HsVersions.h"
 
@@ -19,9 +19,8 @@ import TcRnMonad
 import FamInst
 import TcErrors( reportAllUnsolved )
 import TcValidity( validDerivPred )
+import TcClassDcl( tcMkDeclCtxt )
 import TcEnv
-import TcTyClsDecls( tcFamTyPats, famTyConShape, tcAddDataFamInstCtxt, kcDataDefn )
-import TcClassDcl( tcAddDeclCtxt )      -- Small helper
 import TcGenDeriv                       -- Deriv stuff
 import TcGenGenerics
 import InstEnv
@@ -331,6 +330,33 @@ See Trac #3221.  Consider
 Are T1 and T2 unused?  Well, no: the deriving clause expands to mention
 both of them.  So we gather defs/uses from deriving just like anything else.
 
+-}
+
+-- | Stuff needed to process a `deriving` clause
+data DerivInfo = DerivInfo { di_rep_tc :: TyCon
+                             -- ^ The data tycon for normal datatypes,
+                             -- or the *representation* tycon for data families
+                           , di_preds  :: [LHsType Name]
+                           , di_ctxt   :: SDoc -- ^ error context
+                           }
+
+-- | Extract `deriving` clauses of proper data type (skips data families)
+mkDerivInfos :: [TyClGroup Name] -> TcM [DerivInfo]
+mkDerivInfos tycls = concatMapM mk_derivs tycls
+  where
+    mk_derivs (TyClGroup { group_tyclds = decls })
+      = concatMapM (mk_deriv . unLoc) decls
+
+    mk_deriv decl@(DataDecl { tcdLName = L _ data_name
+                            , tcdDataDefn =
+                                HsDataDefn { dd_derivs = Just (L _ preds) } })
+      = do { tycon <- tcLookupTyCon data_name
+           ; return [DerivInfo { di_rep_tc = tycon, di_preds = preds
+                               , di_ctxt = tcMkDeclCtxt decl }] }
+    mk_deriv _ = return []
+
+{-
+
 ************************************************************************
 *                                                                      *
 \subsection[TcDeriv-driver]{Top-level function for \tr{derivings}}
@@ -338,11 +364,10 @@ both of them.  So we gather defs/uses from deriving just like anything else.
 ************************************************************************
 -}
 
-tcDeriving  :: [LTyClDecl Name]  -- All type constructors
-            -> [LInstDecl Name]  -- All instance declarations
+tcDeriving  :: [DerivInfo]       -- All `deriving` clauses
             -> [LDerivDecl Name] -- All stand-alone deriving declarations
             -> TcM (TcGblEnv, Bag (InstInfo Name), HsValBinds Name)
-tcDeriving tycl_decls inst_decls deriv_decls
+tcDeriving deriv_infos deriv_decls
   = recoverM (do { g <- getGblEnv
                  ; return (g, emptyBag, emptyValBindsOut)}) $
     do  {       -- Fish the "deriving"-related information out of the TcEnv
@@ -350,7 +375,7 @@ tcDeriving tycl_decls inst_decls deriv_decls
           is_boot <- tcIsHsBootOrSig
         ; traceTc "tcDeriving" (ppr is_boot)
 
-        ; early_specs <- makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
+        ; early_specs <- makeDerivSpecs is_boot deriv_infos deriv_decls
         ; traceTc "tcDeriving 1" (ppr early_specs)
 
         -- for each type, determine the auxliary declarations that are common
@@ -501,6 +526,20 @@ So we want to signal a user of the data constructor 'MkP'.
 This is the reason behind the (Maybe Name) part of the return type
 of genInst.
 
+Note [Why we don't pass rep_tc into deriveTyData]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Down in the bowels of mkEqnHelp, we need to convert the fam_tc back into
+the rep_tc by means of a lookup. And yet we have the rep_tc right here!
+Why look it up again? Answer: it's just easier this way.
+We drop some number of arguments from the end of the datatype definition
+in deriveTyData. The arguments are dropped from the fam_tc.
+This action may drop a *different* number of arguments
+passed to the rep_tc, depending on how many free variables, etc., the
+dropped patterns have.
+
+Also, this technique carries over the kind substitution from deriveTyData
+nicely.
+
 ************************************************************************
 *                                                                      *
                 From HsSyn to DerivSpec
@@ -511,15 +550,13 @@ of genInst.
 -}
 
 makeDerivSpecs :: Bool
-               -> [LTyClDecl Name]
-               -> [LInstDecl Name]
+               -> [DerivInfo]
                -> [LDerivDecl Name]
                -> TcM [EarlyDerivSpec]
-makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
-  = do  { eqns1 <- concatMapM (recoverM (return []) . deriveTyDecl)     tycl_decls
-        ; eqns2 <- concatMapM (recoverM (return []) . deriveInstDecl)   inst_decls
-        ; eqns3 <- concatMapM (recoverM (return []) . deriveStandalone) deriv_decls
-        ; let eqns = eqns1 ++ eqns2 ++ eqns3
+makeDerivSpecs is_boot deriv_infos deriv_decls
+  = do  { eqns1 <- concatMapM (recoverM (return []) . deriveDerivInfo)  deriv_infos
+        ; eqns2 <- concatMapM (recoverM (return []) . deriveStandalone) deriv_decls
+        ; let eqns = eqns1 ++ eqns2
 
         ; if is_boot then   -- No 'deriving' at all in hs-boot files
               do { unless (null eqns) (add_deriv_err (head eqns))
@@ -532,63 +569,21 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
                     2 (ptext (sLit "Use an instance declaration instead")))
 
 ------------------------------------------------------------------
-deriveTyDecl :: LTyClDecl Name -> TcM [EarlyDerivSpec]
-deriveTyDecl (L _ decl@(DataDecl { tcdLName = L _ tc_name
-                                 , tcdDataDefn = HsDataDefn { dd_derivs = preds } }))
-  = tcAddDeclCtxt decl $
-    do { tc <- tcLookupTyCon tc_name
-       ; let tvs  = tyConTyVars tc
-             tys  = mkTyVarTys tvs
+-- | Process a `deriving` clause
+deriveDerivInfo :: DerivInfo -> TcM [EarlyDerivSpec]
+deriveDerivInfo (DerivInfo { di_rep_tc = rep_tc, di_preds = preds
+                           , di_ctxt = err_ctxt })
+  = addErrCtxt err_ctxt $
+    concatMapM (deriveTyData tvs tc tys) preds
+  where
+    tvs = tyConTyVars rep_tc
+    (tc, tys) = case tyConFamInstSig_maybe rep_tc of
+                        -- data family:
+                  Just (fam_tc, pats, _) -> (fam_tc, pats)
+      -- NB: deriveTyData wants the *user-specified*
+      -- name. See Note [Why we don't pass rep_tc into deriveTyData]
 
-       ; case preds of
-          Just (L _ preds') -> concatMapM (deriveTyData tvs tc tys) preds'
-          Nothing           -> return [] }
-
-deriveTyDecl _ = return []
-
-------------------------------------------------------------------
-deriveInstDecl :: LInstDecl Name -> TcM [EarlyDerivSpec]
-deriveInstDecl (L _ (TyFamInstD {})) = return []
-deriveInstDecl (L _ (DataFamInstD { dfid_inst = fam_inst }))
-  = deriveFamInst fam_inst
-deriveInstDecl (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = fam_insts } }))
-  = concatMapM (deriveFamInst . unLoc) fam_insts
-
-------------------------------------------------------------------
-deriveFamInst :: DataFamInstDecl Name -> TcM [EarlyDerivSpec]
-deriveFamInst decl@(DataFamInstDecl
-                       { dfid_tycon = L _ tc_name, dfid_pats = pats
-                       , dfid_defn
-                         = defn@(HsDataDefn { dd_derivs = Just (L _ preds) }) })
-  = tcAddDataFamInstCtxt decl $
-    do { fam_tc <- tcLookupTyCon tc_name
-       ; tcFamTyPats (famTyConShape fam_tc) pats (kcDataDefn defn) $
-             -- kcDataDefn defn: see Note [Finding the LHS patterns]
-         \ tvs' pats' _ ->
-           concatMapM (deriveTyData tvs' fam_tc pats') preds }
-
-deriveFamInst _ = return []
-
-{-
-Note [Finding the LHS patterns]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When kind polymorphism is in play, we need to be careful.  Here is
-Trac #9359:
-  data Cmp a where
-    Sup :: Cmp a
-    V   :: a -> Cmp a
-
-  data family   CmpInterval (a :: Cmp k) (b :: Cmp k) :: *
-  data instance CmpInterval (V c) Sup = Starting c deriving( Show )
-
-So CmpInterval is kind-polymorphic, but the data instance is not
-   CmpInterval :: forall k. Cmp k -> Cmp k -> *
-   data instance CmpInterval * (V (c::*)) Sup = Starting c deriving( Show )
-
-Hence, when deriving the type patterns in deriveFamInst, we must kind
-check the RHS (the data constructor 'Starting c') as well as the LHS,
-so that we correctly see the instantiation to *.
--}
+                  _ -> (rep_tc, mkTyVarTys tvs)     -- datatype
 
 ------------------------------------------------------------------
 deriveStandalone :: LDerivDecl Name -> TcM [EarlyDerivSpec]
@@ -669,8 +664,8 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
           let (arg_kinds, _)  = splitKindFunTys cls_arg_kind
               n_args_to_drop  = length arg_kinds
               n_args_to_keep  = tyConArity tc - n_args_to_drop
-              args_to_drop    = drop n_args_to_keep tc_args
-              tc_args_to_keep = take n_args_to_keep tc_args
+              (tc_args_to_keep, args_to_drop)
+                              = splitAt n_args_to_keep tc_args
               inst_ty_kind    = typeKind (mkTyConApp tc tc_args_to_keep)
               dropped_tvs     = tyVarsOfTypes args_to_drop
 

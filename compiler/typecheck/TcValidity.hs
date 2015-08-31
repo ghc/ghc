@@ -11,7 +11,7 @@ module TcValidity (
   checkValidTheta, checkValidFamPats,
   checkValidInstance, validDerivPred,
   checkInstTermination,
-  checkValidCoAxiom, checkValidCoAxBranch,
+  ClsInfo, checkValidCoAxiom, checkValidCoAxBranch,
   checkConsistentFamInst,
   arityErr, badATErr
   ) where
@@ -130,7 +130,7 @@ unless the instance is available *here*.
 
 Note [When to call checkAmbiguity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We call checkAmbiguity 
+We call checkAmbiguity
    (a) on user-specified type signatures
    (b) in checkValidType
 
@@ -1145,10 +1145,13 @@ But if the 'b' didn't scope, we would make F's instance too
 poly-kinded.
 -}
 
+-- | Extra information needed when type-checking associated types. The 'Class' is
+-- the enclosing class, and the @VarEnv Type@ maps class variables to their
+-- instance types.
+type ClsInfo       = (Class, VarEnv Type)
+
 checkConsistentFamInst
-               :: Maybe ( Class
-                        , VarEnv Type )  -- ^ Class of associated type
-                                         -- and instantiation of class TyVars
+               :: Maybe ClsInfo
                -> TyCon              -- ^ Family tycon
                -> [TyVar]            -- ^ Type variables of the family instance
                -> [Type]             -- ^ Type patterns from instance
@@ -1268,8 +1271,8 @@ checkValidCoAxiom (CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
 -- Check that a "type instance" is well-formed (which includes decidability
 -- unless -XUndecidableInstances is given).
 --
-checkValidCoAxBranch :: Maybe ( Class, VarEnv Type )
-                    -> TyCon -> CoAxBranch -> TcM ()
+checkValidCoAxBranch :: Maybe ClsInfo
+                     -> TyCon -> CoAxBranch -> TcM ()
 checkValidCoAxBranch mb_clsinfo fam_tc
                     (CoAxBranch { cab_tvs = tvs, cab_lhs = typats
                                 , cab_rhs = rhs, cab_loc = loc })
@@ -1404,4 +1407,3 @@ fv_type (ForAllTy tyvar ty) = filter (/= tyvar) (fv_type ty)
 
 fvTypes :: [Type] -> [TyVar]
 fvTypes tys = concat (map fvType tys)
-
