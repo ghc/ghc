@@ -62,7 +62,6 @@ char *EventDesc[] = {
   [EVENT_MIGRATE_THREAD]      = "Migrate thread",
   [EVENT_THREAD_WAKEUP]       = "Wakeup thread",
   [EVENT_THREAD_LABEL]        = "Thread label",
-  [EVENT_STARTUP]             = "Create capabilities",
   [EVENT_CAP_CREATE]          = "Create capability",
   [EVENT_CAP_DELETE]          = "Delete capability",
   [EVENT_CAP_DISABLE]         = "Disable capability",
@@ -312,7 +311,6 @@ initEventLogging(void)
                                + sizeof(EventThreadID);
             break;
 
-        case EVENT_STARTUP:         // (cap_count)
         case EVENT_CAP_CREATE:      // (cap)
         case EVENT_CAP_DELETE:      // (cap)
         case EVENT_CAP_ENABLE:      // (cap)
@@ -1020,18 +1018,6 @@ void postMsg(char *msg, va_list ap)
 void postCapMsg(Capability *cap, char *msg, va_list ap)
 {
     postLogMsg(&capEventBuf[cap->no], EVENT_LOG_MSG, msg, ap);
-}
-
-void postEventStartup(EventCapNo n_caps)
-{
-    ACQUIRE_LOCK(&eventBufMutex);
-    ensureRoomForEvent(&eventBuf, EVENT_STARTUP);
-
-    // Post a STARTUP event with the number of capabilities
-    postEventHeader(&eventBuf, EVENT_STARTUP);
-    postCapNo(&eventBuf, n_caps);
-
-    RELEASE_LOCK(&eventBufMutex);
 }
 
 void postUserEvent(Capability *cap, EventTypeNum type, char *msg)

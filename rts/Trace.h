@@ -242,8 +242,6 @@ void traceThreadLabel_(Capability *cap,
 
 void traceThreadStatus_ (StgTSO *tso);
 
-void traceEventStartup_ (int n_caps);
-
 /*
  * Events for describing capabilities and capability sets in the eventlog
  *
@@ -298,7 +296,6 @@ void traceTaskDelete_ (Task       *task);
 #define debugTraceCap(class, cap, str, ...) /* nothing */
 #define traceThreadStatus(class, tso) /* nothing */
 #define traceThreadLabel_(cap, tso, label) /* nothing */
-INLINE_HEADER void traceEventStartup_ (int n_caps STG_UNUSED) {};
 #define traceCapEvent(cap, tag) /* nothing */
 #define traceCapsetEvent(tag, capset, info) /* nothing */
 #define traceWallClockTime_() /* nothing */
@@ -350,9 +347,6 @@ void dtraceUserMarkerWrapper(Capability *cap, char *msg);
     HASKELLEVENT_CREATE_SPARK_THREAD(cap, spark_tid)
 #define dtraceThreadLabel(cap, tso, label)              \
     HASKELLEVENT_THREAD_LABEL(cap, tso, label)
-INLINE_HEADER void dtraceStartup (int num_caps) {
-    HASKELLEVENT_STARTUP(num_caps);
-}
 #define dtraceCapCreate(cap)                            \
     HASKELLEVENT_CAP_CREATE(cap)
 #define dtraceCapDelete(cap)                            \
@@ -442,7 +436,6 @@ INLINE_HEADER void dtraceStartup (int num_caps) {
 #define dtraceRequestParGc(cap)                         /* nothing */
 #define dtraceCreateSparkThread(cap, spark_tid)         /* nothing */
 #define dtraceThreadLabel(cap, tso, label)              /* nothing */
-INLINE_HEADER void dtraceStartup (int num_caps STG_UNUSED) {};
 #define dtraceUserMsg(cap, msg)                         /* nothing */
 #define dtraceUserMarker(cap, msg)                      /* nothing */
 #define dtraceGcIdle(cap)                               /* nothing */
@@ -708,23 +701,6 @@ INLINE_HEADER void traceEventHeapLive(Capability *cap         STG_UNUSED,
 {
     traceHeapEvent(cap, EVENT_HEAP_LIVE, heap_capset, heap_live);
     dtraceEventHeapLive(heap_capset, heap_live);
-}
-
-/* TODO: at some point we should remove this event, it's covered by
- * the cap create/delete events.
- */
-INLINE_HEADER void traceEventStartup(void)
-{
-    int n_caps;
-#ifdef THREADED_RTS
-    // XXX n_capabilities hasn't been initialised yet
-    n_caps = RtsFlags.ParFlags.nNodes;
-#else
-    n_caps = 1;
-#endif
-
-    traceEventStartup_(n_caps);
-    dtraceStartup(n_caps);
 }
 
 INLINE_HEADER void traceCapsetCreate(CapsetID   capset      STG_UNUSED,

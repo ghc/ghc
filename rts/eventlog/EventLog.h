@@ -49,8 +49,6 @@ void postUserEvent(Capability *cap, EventTypeNum type, char *msg);
 
 void postCapMsg(Capability *cap, char *msg, va_list ap);
 
-void postEventStartup(EventCapNo n_caps);
-
 /*
  * Post an event relating to a capability itself (create/delete/etc)
  */
