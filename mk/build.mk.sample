@@ -2,8 +2,7 @@
 # A Sample build.mk
 #
 # Uncomment one of the following BuildFlavour settings to get the desired
-# overall build type, and then tweak the options in the relevant section
-# below.
+# overall build type.
 
 # -------- Build profiles -----------------------------------------------------
 # Uncomment one of these to select a build profile below:
@@ -51,17 +50,23 @@
 # Bench build configured for a cross-compiler
 #BuildFlavour = bench-cross
 
+# Use the same settings as validate.
+#BuildFlavour = validate
+
+ifneq "$(BuildFlavour)" ""
+include mk/flavours/$(BuildFlavour).mk
+endif
+
 # -------- Miscellaneous variables --------------------------------------------
 
 # Set to V = 0 to get prettier build output.
-# Please use V = 1 when reporting GHC bugs.
-V = 1
+# Please use V=1 (the default) when reporting GHC bugs.
+#V=0
 
 # Should all enabled warnings (see mk/warnings.mk) be turned into errors?
 #WERROR=-Werror
 
 # After stage 1 and the libraries have been built, you can uncomment this line:
-
 #stage=2
 
 # Then stage 1 will not be touched by the build system, until
@@ -80,254 +85,5 @@ V = 1
 # (other sometimes useful configure-options: `--with-gmp-{includes,libraries}`)
 #libraries/integer-gmp_CONFIGURE_OPTS += --configure-option=--with-intree-gmp
 
-# ----------- A Performance/Distribution build --------------------------------
-
-ifeq "$(BuildFlavour)" "perf"
-
-# perf matches the default settings, repeated here for comparison:
-
-SRC_HC_OPTS        = -O -H64m
-GhcStage1HcOpts    = -O
-GhcStage2HcOpts    = -O2
-GhcLibHcOpts       = -O2
-BUILD_PROF_LIBS    = YES
-#SplitObjs
-#HADDOCK_DOCS
-#BUILD_DOCBOOK_HTML
-#BUILD_DOCBOOK_PS
-#BUILD_DOCBOOK_PDF
-
-endif
-
-# ---------------- Perf build using LLVM --------------------------------------
-
-ifeq "$(BuildFlavour)" "perf-llvm"
-
-SRC_HC_OPTS        = -O -H64m -fllvm
-GhcStage1HcOpts    = -O -fllvm
-GhcStage2HcOpts    = -O2 -fllvm
-GhcLibHcOpts       = -O2
-BUILD_PROF_LIBS    = YES
-#SplitObjs
-#HADDOCK_DOCS
-#BUILD_DOCBOOK_HTML
-#BUILD_DOCBOOK_PS
-#BUILD_DOCBOOK_PDF
-
-endif
-
-# ------- A Perf build configured for cross-compilation ----------------------
-
-ifeq "$(BuildFlavour)" "perf-cross"
-
-SRC_HC_OPTS        = -O -H64m -fllvm
-GhcStage1HcOpts    = -O2
-GhcStage2HcOpts    = -O2 -fllvm
-GhcLibHcOpts       = -O2
-BUILD_PROF_LIBS    = YES
-#SplitObjs
-HADDOCK_DOCS       = NO
-BUILD_DOCBOOK_HTML = NO
-BUILD_DOCBOOK_PS   = NO
-BUILD_DOCBOOK_PDF  = NO
-
-INTEGER_LIBRARY      = integer-simple
-Stage1Only           = YES
-DYNAMIC_BY_DEFAULT   = NO
-DYNAMIC_GHC_PROGRAMS = NO
-
-endif
-
-# -------- A Fast build -------------------------------------------------------
-
-ifeq "$(BuildFlavour)" "quickest"
-
-SRC_HC_OPTS        = -H64m -O0
-GhcStage1HcOpts    = -O
-GhcStage2HcOpts    = -O0
-GhcLibHcOpts       = -O0
-BUILD_PROF_LIBS    = NO
-SplitObjs          = NO
-HADDOCK_DOCS       = NO
-BUILD_DOCBOOK_HTML = NO
-BUILD_DOCBOOK_PS   = NO
-BUILD_DOCBOOK_PDF  = NO
-
-endif
-
-# -------- A Fast build with optimised libs -----------------------------------
-
-ifeq "$(BuildFlavour)" "quick"
-
-SRC_HC_OPTS        = -H64m -O0
-GhcStage1HcOpts    = -O
-GhcStage2HcOpts    = -O0
-GhcLibHcOpts       = -O
-BUILD_PROF_LIBS    = NO
-SplitObjs          = NO
-HADDOCK_DOCS       = NO
-BUILD_DOCBOOK_HTML = NO
-BUILD_DOCBOOK_PS   = NO
-BUILD_DOCBOOK_PDF  = NO
-
-endif
-
-# -------- A Fast build with optimised libs using LLVM ------------------------
-
-ifeq "$(BuildFlavour)" "quick-llvm"
-
-SRC_HC_OPTS        = -H64m -O0 -fllvm
-GhcStage1HcOpts    = -O -fllvm
-GhcStage2HcOpts    = -O0 -fllvm
-GhcLibHcOpts       = -O -fllvm
-BUILD_PROF_LIBS    = NO
-SplitObjs          = NO
-HADDOCK_DOCS       = NO
-BUILD_DOCBOOK_HTML = NO
-BUILD_DOCBOOK_PS   = NO
-BUILD_DOCBOOK_PDF  = NO
-
-endif
-
-# -------- A Fast build configured for cross-compilation ----------------------
-
-ifeq "$(BuildFlavour)" "quick-cross"
-
-SRC_HC_OPTS        = -H64m -O0
-GhcStage1HcOpts    = -O
-GhcStage2HcOpts    = -O0 -fllvm
-GhcLibHcOpts       = -O -fllvm
-BUILD_PROF_LIBS    = NO
-SplitObjs          = NO
-HADDOCK_DOCS       = NO
-BUILD_DOCBOOK_HTML = NO
-BUILD_DOCBOOK_PS   = NO
-BUILD_DOCBOOK_PDF  = NO
-
-INTEGER_LIBRARY      = integer-simple
-Stage1Only           = YES
-DYNAMIC_BY_DEFAULT   = NO
-DYNAMIC_GHC_PROGRAMS = NO
-
-endif
-
-# -------- Profile the stage2 compiler ----------------------------------------
-
-ifeq "$(BuildFlavour)" "prof"
-
-SRC_HC_OPTS        = -H64m -O0
-GhcStage1HcOpts    = -O
-GhcStage2HcOpts    = -O
-GhcLibHcOpts       = -O
-BUILD_PROF_LIBS    = YES
-SplitObjs          = NO
-HADDOCK_DOCS       = NO
-BUILD_DOCBOOK_HTML = NO
-BUILD_DOCBOOK_PS   = NO
-BUILD_DOCBOOK_PDF  = NO
-
-GhcProfiled        = YES
-
-endif
-
-# -------- A Development build (stage 1) --------------------------------------
-
-ifeq "$(BuildFlavour)" "devel1"
-
-SRC_HC_OPTS        = -H64m -O
-GhcStage1HcOpts    = -O0 -DDEBUG
-GhcStage2HcOpts    = -O
-GhcLibHcOpts       = -O -dcore-lint
-BUILD_PROF_LIBS    = NO
-SplitObjs          = NO
-HADDOCK_DOCS       = NO
-BUILD_DOCBOOK_HTML = NO
-BUILD_DOCBOOK_PS   = NO
-BUILD_DOCBOOK_PDF  = NO
-
-LAX_DEPENDENCIES   = YES
-
-endif
-
-# -------- A Development build (stage 2) --------------------------------------
-
-ifeq "$(BuildFlavour)" "devel2"
-
-SRC_HC_OPTS        = -H64m -O
-GhcStage1HcOpts    = -O
-GhcStage2HcOpts    = -O0 -DDEBUG
-GhcLibHcOpts       = -O -dcore-lint
-BUILD_PROF_LIBS    = NO
-SplitObjs          = NO
-HADDOCK_DOCS       = NO
-BUILD_DOCBOOK_HTML = NO
-BUILD_DOCBOOK_PS   = NO
-BUILD_DOCBOOK_PDF  = NO
-
-LAX_DEPENDENCIES   = YES
-
-endif
-
-# -------- A bench build with optimised libs -----------------------------------
-
-ifeq "$(BuildFlavour)" "bench"
-
-SRC_HC_OPTS        = -O -H64m
-GhcStage1HcOpts    = -O
-GhcStage2HcOpts    = -O0
-GhcLibHcOpts       = -O2
-BUILD_PROF_LIBS    = NO
-SplitObjs          = NO
-HADDOCK_DOCS       = NO
-BUILD_DOCBOOK_HTML = NO
-BUILD_DOCBOOK_PS   = NO
-BUILD_DOCBOOK_PDF  = NO
-
-endif
-
-# ---------------- Bench build using LLVM --------------------------------------
-
-ifeq "$(BuildFlavour)" "bench-llvm"
-
-SRC_HC_OPTS        = -O -H64m
-GhcStage1HcOpts    = -O -fllvm
-GhcStage2HcOpts    = -O0 -fllvm
-GhcLibHcOpts       = -O2 -fllvm
-BUILD_PROF_LIBS    = NO
-SplitObjs          = NO
-HADDOCK_DOCS       = NO
-BUILD_DOCBOOK_HTML = NO
-BUILD_DOCBOOK_PS   = NO
-BUILD_DOCBOOK_PDF  = NO
-
-endif
-
-# ------- A Bench build configured for cross-compilation ----------------------
-
-ifeq "$(BuildFlavour)" "bench-cross"
-
-SRC_HC_OPTS        = -O -H64m
-GhcStage1HcOpts    = -O
-GhcStage2HcOpts    = -O0
-GhcLibHcOpts       = -O2
-BUILD_PROF_LIBS    = NO
-SplitObjs          = NO
-HADDOCK_DOCS       = NO
-BUILD_DOCBOOK_HTML = NO
-BUILD_DOCBOOK_PS   = NO
-BUILD_DOCBOOK_PDF  = NO
-
-INTEGER_LIBRARY      = integer-simple
-Stage1Only           = YES
-DYNAMIC_BY_DEFAULT   = NO
-DYNAMIC_GHC_PROGRAMS = NO
-
-endif
-
-# -----------------------------------------------------------------------------
-# Other settings that might be useful
-
-# NoFib settings
-NoFibWays =
+# Don't strip debug and other unneeded symbols from libraries and executables.
 STRIP_CMD = :
-
