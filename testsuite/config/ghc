@@ -13,6 +13,8 @@ config.hpc                   = 'hpc'
 config.gs                    = 'gs'
 config.confdir               = '.'
 
+config.libs_have_debug_info = libs_have_debug_info
+
 # By default, the 'normal' and 'hpc' ways are enabled. In addition, certain
 # ways are enabled automatically if this GHC supports them. Ways that fall in
 # this group are 'optasm', 'optllvm', 'profasm', 'threaded1', 'threaded2',
@@ -183,6 +185,8 @@ def get_compiler_info():
         config.package_conf_cache_file = compilerInfoDict["Global Package DB"] + '/package.cache'
     except:
         config.package_conf_cache_file = ''
+
+    config.rts_with_libdw = compilerInfoDict["RTS expects libdw"] == "YES"
 
     # See Note [WayFlags]
     if config.ghc_dynamic:

@@ -410,6 +410,9 @@ def unregisterised( ):
 def compiler_profiled( ):
     return config.compiler_profiled
 
+def rts_with_libdw( ):
+    return config.rts_with_libdw
+
 def compiler_debugged( ):
     return config.compiler_debugged
 
