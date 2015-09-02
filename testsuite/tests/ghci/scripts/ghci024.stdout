@@ -9,6 +9,7 @@ other dynamic, non-language, flag settings:
   -fforce-recomp
   -fimplicit-import-qualified
 warning settings:
+  -fno-warn-missed-specialisations
   -fno-warn-tabs
 ~~~~~~~~~~ Testing :set -a
 options currently set: none.
