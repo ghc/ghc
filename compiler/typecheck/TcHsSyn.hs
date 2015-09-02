@@ -1008,10 +1008,13 @@ zonkRecUpdFields :: ZonkEnv -> [LHsRecUpdField TcId] -> TcM [LHsRecUpdField TcId
 zonkRecUpdFields env = mapM zonk_rbind
   where
     zonk_rbind (L l fld)
-      = do { new_ids  <- mapM (zonkIdBndr env) (hsRecUpdFieldSel fld)
-           ; new_expr <- zonkLExpr env (hsRecUpdFieldArg fld)
-           ; return (L l (fld { hsRecUpdFieldSel = new_ids
-                              , hsRecUpdFieldArg = new_expr })) }
+      = do { new_id   <- wrapLocM (zonkFieldOcc env) (hsRecUpdFieldOcc fld)
+           ; new_expr <- zonkLExpr env (hsRecFieldArg fld)
+           ; return (L l (fld { hsRecFieldLbl = fmap toUnambiguous new_id
+                              , hsRecFieldArg = new_expr })) }
+
+    toUnambiguous :: FieldOcc Id -> FieldOcc' Id (UpdField Id)
+    toUnambiguous (FieldOcc lbl x) = FieldOcc lbl (Unambiguous x)
 
 -------------------------------------------------------------------------
 mapIPNameTc :: (a -> TcM b) -> Either (Located HsIPName) a

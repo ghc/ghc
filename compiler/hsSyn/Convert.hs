@@ -705,7 +705,7 @@ cvtl e = wrapL (cvt e)
                               ; flds' <- mapM cvtFld flds
                               ; return $ RecordCon c' noPostTcExpr (HsRecFields flds' Nothing)}
     cvt (RecUpdE e flds) = do { e' <- cvtl e
-                              ; flds' <- mapM cvtUpdFld flds
+                              ; flds' <- mapM cvtFld flds
                               ; return $ RecordUpd e' flds' [] [] [] }
     cvt (StaticE e)      = fmap HsStatic $ cvtl e
 
@@ -725,20 +725,12 @@ and the above expression would be reassociated to
 which we don't want.
 -}
 
-cvtFld :: (TH.Name, TH.Exp) -> CvtM (LHsRecField RdrName (LHsExpr RdrName))
+cvtFld :: (TH.Name, TH.Exp) -> CvtM (LHsRecField' RdrName name (LHsExpr RdrName))
 cvtFld (v,e)
   = do  { v' <- vNameL v; e' <- cvtl e
         ; return (noLoc $ HsRecField { hsRecFieldLbl = fmap mkFieldOcc v'
                                      , hsRecFieldArg = e'
                                      , hsRecPun      = False}) }
-
-cvtUpdFld :: (TH.Name, TH.Exp) -> CvtM (LHsRecUpdField RdrName)
-cvtUpdFld (v,e)
-  = do  { v' <- vNameL v; e' <- cvtl e
-        ; return (noLoc $ HsRecUpdField { hsRecUpdFieldLbl = v'
-                                        , hsRecUpdFieldSel = PlaceHolder
-                                        , hsRecUpdFieldArg = e'
-                                        , hsRecUpdPun = False}) }
 
 cvtDD :: Range -> CvtM (ArithSeqInfo RdrName)
 cvtDD (FromR x)           = do { x' <- cvtl x; return $ From x' }

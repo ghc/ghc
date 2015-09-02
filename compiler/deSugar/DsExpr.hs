@@ -579,7 +579,7 @@ dsExpr expr@(RecordUpd record_expr fields
       -- of the record selector, and we must not make that a local binder
       -- else we shadow other uses of the record selector
       -- Hence 'lcl_id'.  Cf Trac #2735
-    ds_field (L _ rec_field) = do { rhs <- dsLExpr (hsRecUpdFieldArg rec_field)
+    ds_field (L _ rec_field) = do { rhs <- dsLExpr (hsRecFieldArg rec_field)
                                   ; let fld_id = unLoc (hsRecUpdFieldId rec_field)
                                   ; lcl_id <- newSysLocalDs (idType fld_id)
                                   ; return (idName fld_id, lcl_id, rhs) }

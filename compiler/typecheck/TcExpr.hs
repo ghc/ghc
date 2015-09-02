@@ -27,6 +27,7 @@ import BasicTypes
 import Inst
 import TcBinds
 import FamInst          ( tcGetFamInstEnvs, tcLookupDataFamInst )
+import RnEnv            ( lookupGlobalOccRn_overloaded )
 import TcEnv
 import TcArrows
 import TcMatches
@@ -659,19 +660,20 @@ tcExpr (RecordUpd record_expr rbnds _ _ _) res_ty
         -- STEP -1  See Note [Disambiguating record updates]
         -- After this we know that rbinds is unambiguous
         rbinds <- disambiguateRecordBinds record_expr rbnds res_ty
-        ; let upd_flds      = hsRecUpdFieldsUnambiguous rbinds
-              upd_fld_occs  = map fst upd_flds
-              upd_fld_names = map snd upd_flds
+        ; let upd_flds = map (unLoc . hsRecFieldLbl . unLoc) rbinds
+              upd_fld_occs = map (occNameFS . rdrNameOcc . rdrNameFieldOcc) upd_flds
+              sel_ids      = map (fromUpdField . selectorFieldOcc) upd_flds
 
         -- STEP 0
         -- Check that the field names are really field names
-        ; sel_ids <- mapM tcLookupId upd_fld_names
                         -- The renamer has already checked that
                         -- selectors are all in scope
         ; let bad_guys = [ setSrcSpan loc $ addErrTc (notSelector fld_name)
-                         | (fld, sel_id) <- rbinds `zip` sel_ids,
+                         | fld <- rbinds,
+                           let sel_id = fromUpdField (selectorFieldOcc (unLoc (hsRecFieldLbl (unLoc fld)))),
                            not (isRecordSelector sel_id),       -- Excludes class ops
-                           let L loc fld_name = hsRecUpdFieldId (unLoc fld) ]
+                           let L loc upd_fld = hsRecFieldSel (unLoc fld)
+                               fld_name = idName (fromUpdField upd_fld) ]
         ; unless (null bad_guys) (sequence bad_guys >> failM)
 
         -- STEP 1
@@ -1408,9 +1410,9 @@ signature to be omitted.
 -}
 
 disambiguateRecordBinds :: LHsExpr Name -> [LHsRecUpdField Name] -> Type
-                                 -> TcM [LHsRecUpdField Name]
+                                 -> TcM [LHsRecField' Id (UpdField Id) (LHsExpr Name)]
 disambiguateRecordBinds record_expr rbnds res_ty
-  | unambiguous = return rbnds -- Always the case if DuplicateRecordFields is off
+  | Just rbnds' <- unambiguous = mapM look rbnds' -- Always the case if DuplicateRecordFields is off
   | otherwise   = do
       { fam_inst_envs      <- tcGetFamInstEnvs
       ; rbnds_with_parents <- fmap (zip rbnds) $ mapM getParents rbnds
@@ -1425,9 +1427,17 @@ disambiguateRecordBinds record_expr rbnds res_ty
                         Nothing -> failWithTc badOverloadedUpdate }
           _ -> failWithTc badOverloadedUpdate }
   where
-    unambiguous  = all (isSingle . hsRecUpdFieldSel . unLoc) rbnds
-    isSingle [_] = True
-    isSingle _   = False
+    unambiguous = mapM isSingle rbnds
+
+    isSingle :: LHsRecUpdField Name -> Maybe (LHsRecUpdField Name, Name)
+    isSingle x = case unLoc (hsRecFieldSel (unLoc x)) of
+                   Unambiguous sel_name -> Just (x, sel_name)
+                   Ambiguous{}          -> Nothing
+
+    look :: (LHsRecUpdField Name, Name) -> TcM (LHsRecField' Id (UpdField Id) (LHsExpr Name))
+    look (L l x, n) = do i <- tcLookupId n
+                         let L loc (FieldOcc lbl _) = hsRecFieldLbl x
+                         return $ L l x { hsRecFieldLbl = L loc (FieldOcc lbl (Unambiguous i)) }
 
     -- Extract the outermost TyCon of a type, if there is one; for
     -- data families this is the representation tycon (because that's
@@ -1443,7 +1453,11 @@ disambiguateRecordBinds record_expr rbnds res_ty
 
     -- Look up the parent tycon for each candidate record selector.
     getParents :: LHsRecUpdField Name -> RnM [(TyCon, Name)]
-    getParents x = mapM lookupParent $ hsRecUpdFieldSel $ unLoc x
+    getParents x = case unLoc (hsRecFieldSel (unLoc x)) of
+                    Unambiguous sel_name -> fmap return $ lookupParent sel_name
+                    Ambiguous   _        -> do {
+           Just (Right xs) <- lookupGlobalOccRn_overloaded True (rdrNameFieldOcc (unLoc (hsRecFieldLbl (unLoc x))))
+         ; mapM (lookupParent . selectorFieldOcc) xs }
       where
         lookupParent name = do { id <- tcLookupId name
                                ; ASSERT (isRecordSelector id)
@@ -1454,19 +1468,26 @@ disambiguateRecordBinds record_expr rbnds res_ty
     -- that parent, e.g. if the user writes
     --     r { x = e } :: T
     -- where T does not have field x.
-    chooseParent :: TyCon -> [(LHsRecUpdField Name, [(TyCon, Name)])] -> RnM [LHsRecUpdField Name]
-    chooseParent p rbnds | null orphans = return rbnds'
+    chooseParent :: TyCon -> [(LHsRecUpdField Name, [(TyCon, Name)])] -> RnM [LHsRecField' Id (UpdField Id) (LHsExpr Name)]
+    chooseParent p rbnds | null orphans = mapM foo rbnds'
                          | otherwise    = failWithTc (orphanFields p orphans)
       where
         (orphans, rbnds') = partitionWith pickParent rbnds
 
+        foo :: (LHsRecUpdField Name, Name) -> RnM (LHsRecField' Id (UpdField Id) (LHsExpr Name))
+        foo (L l fld, name) = do id <- tcLookupId name
+                                 let L loc fo = hsRecFieldLbl fld
+                                     lbl = rdrNameFieldOcc fo
+                                 return $ L l fld { hsRecFieldLbl = L loc (FieldOcc lbl (Unambiguous id)) }
+
         -- Returns Right fld' if fld can have parent p, or Left lbl if not.
+        -- TODO refactor
         pickParent :: (LHsRecUpdField Name, [(TyCon, Name)]) ->
-                          Either (Located RdrName) (LHsRecUpdField Name)
+                          Either (Located RdrName) (LHsRecUpdField Name, Name)
         pickParent (L l fld, xs)
             = case lookup p xs of
-                  Just name -> Right (L l fld{ hsRecUpdFieldSel = [name] })
-                  Nothing   -> Left (hsRecUpdFieldLbl fld)
+                  Just name -> Right (L l fld, name)
+                  Nothing   -> Left (fmap rdrNameFieldOcc (hsRecFieldLbl fld))
 
     -- A type signature on the record expression must be "obvious",
     -- i.e. the outermost constructor ignoring parentheses.
@@ -1519,25 +1540,23 @@ tcRecordBinds data_con arg_tys (HsRecFields rbinds dd)
 tcRecordUpd
         :: DataCon
         -> [TcType]     -- Expected type for each field
-        -> [LHsRecUpdField Name]
+        -> [LHsRecField' Id (UpdField Id) (LHsExpr Name)]
         -> TcM [LHsRecUpdField TcId]
 
 tcRecordUpd data_con arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
   where
     flds_w_tys = zipEqual "tcRecordUpd" (map flLabel $ dataConFieldLabels data_con) arg_tys
 
-    do_bind :: LHsRecUpdField Name -> TcM (Maybe (LHsRecUpdField TcId))
-    do_bind (L l fld@(HsRecUpdField { hsRecUpdFieldLbl = L loc lbl
-                                    , hsRecUpdFieldSel = [sel_name]
-                                    , hsRecUpdFieldArg = rhs }))
-      = do { let f = L loc (FieldOcc lbl sel_name)
+    do_bind :: LHsRecField' Id (UpdField Id) (LHsExpr Name) -> TcM (Maybe (LHsRecUpdField TcId))
+    do_bind (L l fld@(HsRecField { hsRecFieldLbl = L loc (FieldOcc lbl upd)
+                                 , hsRecFieldArg = rhs }))
+      = do { let sel_id = fromUpdField upd
+                 f = L loc (FieldOcc lbl (idName sel_id))
            ; mb <- tcRecordField data_con flds_w_tys f rhs
            ; case mb of
                Nothing         -> return Nothing
-               Just (f', rhs') -> return (Just (L l (fld { hsRecUpdFieldLbl = L loc lbl
-                                                         , hsRecUpdFieldSel = [selectorFieldOcc (unLoc f')]
-                                                         , hsRecUpdFieldArg = rhs' }))) }
-    do_bind _ = panic "tcRecordUpd/do_bind: field with no selector or ambiguous selector"
+               Just (f', rhs') -> return (Just (L l (fld { hsRecFieldLbl = L loc (FieldOcc lbl (Unambiguous (selectorFieldOcc (unLoc f'))))
+                                                         , hsRecFieldArg = rhs' }))) }
 
 tcRecordField :: DataCon -> Assoc FieldLabelString Type -> LFieldOcc Name -> LHsExpr Name
               -> TcM (Maybe (LFieldOcc Id, LHsExpr Id))
@@ -1662,7 +1681,7 @@ badFieldTypes prs
        2 (vcat [ ppr f <+> dcolon <+> ppr ty | (f,ty) <- prs ])
 
 badFieldsUpd
-  :: [LHsRecUpdField Name] -- Field names that don't belong to a single datacon
+  :: [LHsRecField' Id (UpdField Id) (LHsExpr Name)] -- Field names that don't belong to a single datacon
   -> [DataCon] -- Data cons of the type which the first field name belongs to
   -> SDoc
 badFieldsUpd rbinds data_cons
@@ -1697,7 +1716,7 @@ badFieldsUpd rbinds data_cons
     membership :: [(FieldLabelString, [Bool])]
     membership = sortMembership $
         map (\fld -> (fld, map (Set.member fld) fieldLabelSets)) $
-          map (occNameFS . rdrNameOcc . unLoc . hsRecUpdFieldLbl . unLoc) rbinds
+          map (occNameFS . rdrNameOcc . rdrNameFieldOcc . unLoc . hsRecFieldLbl . unLoc) rbinds
 
     fieldLabelSets :: [Set.Set FieldLabelString]
     fieldLabelSets = map (Set.fromList . map flLabel . dataConFieldLabels) data_cons
@@ -1769,7 +1788,7 @@ noPossibleParents rbinds
   = hang (ptext (sLit "No type has all these fields:"))
        2 (pprQuotedList fields)
   where
-    fields = map (hsRecUpdFieldLbl . unLoc) rbinds
+    fields = map (hsRecFieldLbl . unLoc) rbinds
 
 badOverloadedUpdate :: SDoc
 badOverloadedUpdate = ptext (sLit "Record update is ambiguous, and requires a type signature")

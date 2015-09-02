@@ -1184,11 +1184,13 @@ repFields (HsRecFields { rec_flds = flds })
 repUpdFields :: [LHsRecUpdField Name] -> DsM (Core [TH.Q TH.FieldExp])
 repUpdFields = repList fieldExpQTyConName rep_fld
   where
-    rep_fld (L l fld) = case hsRecUpdFieldSel fld of
-      [sel_name] -> do { fn <- lookupLOcc (L l sel_name)
-                       ; e  <- repLE (hsRecUpdFieldArg fld)
-                       ; repFieldExp fn e }
-      _          -> notHandled "ambiguous record updates" (ppr fld)
+    rep_fld :: LHsRecUpdField Name -> DsM (Core (TH.Q TH.FieldExp))
+    rep_fld (L l fld) = case hsRecFieldLbl fld of
+      L _ (FieldOcc _ (Unambiguous sel_name))
+        -> do { fn <- lookupLOcc (L l sel_name)
+              ; e  <- repLE (hsRecFieldArg fld)
+              ; repFieldExp fn e }
+      _ -> notHandled "ambiguous record updates" (ppr fld)
 
 
 

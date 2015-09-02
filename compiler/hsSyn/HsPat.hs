@@ -19,11 +19,11 @@ module HsPat (
 
         HsConDetails(..),
         HsConPatDetails, hsConPatArgs,
-        HsRecFields(..), HsRecField(..), LHsRecField,
-        HsRecUpdField(..), LHsRecUpdField,
+        HsRecFields(..), HsRecField, HsRecField'(..), LHsRecField, LHsRecField',
+        HsRecUpdField, LHsRecUpdField, UpdField(..),
         hsRecFields, hsRecFieldSel, hsRecFieldId,
-        hsRecUpdFieldsUnambiguous,
-        hsRecUpdFieldId,
+        -- hsRecUpdFieldsUnambiguous,
+        hsRecUpdFieldId, hsRecUpdFieldOcc,
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
@@ -39,7 +39,7 @@ import {-# SOURCE #-} HsExpr            (SyntaxExpr, LHsExpr, HsSplice, pprLExpr
 -- friends:
 import HsBinds
 import HsLit
-import PlaceHolder ( PostRn,PostTc,DataId )
+import PlaceHolder -- ( PostRn,PostTc,DataId )
 import HsTypes
 import TcEvidence
 import BasicTypes
@@ -262,25 +262,18 @@ type LHsRecField id arg = Located (HsRecField id arg)
 -- |  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual',
 --
 -- For details on above see note [Api annotations] in ApiAnnotation
-data HsRecField id arg = HsRecField {
-        hsRecFieldLbl  :: LFieldOcc id,
+type HsRecField id arg = HsRecField' id id arg
+type LHsRecField' id name arg = Located (HsRecField' id name arg)
+
+data HsRecField' id name arg = HsRecField {
+        hsRecFieldLbl :: LFieldOcc' id name,
         hsRecFieldArg :: arg,           -- ^ Filled in by renamer when punning
         hsRecPun      :: Bool           -- ^ Note [Punning]
   } deriving (Typeable)
-deriving instance (DataId id, Data arg) => Data (HsRecField id arg)
+deriving instance (Data id, Data name, Data (PostRn id name), Data arg) => Data (HsRecField' id name arg)
 
 type LHsRecUpdField id = Located (HsRecUpdField id)
-
--- | Represents an record field update; these differ from 'HsRecField'
--- (used for record construction and pattern matching) in that they
--- cannot have dot-dot patterns but can have ambiguous selectors.
-data HsRecUpdField id = HsRecUpdField {
-        hsRecUpdFieldLbl :: Located RdrName,
-        hsRecUpdFieldSel :: PostRn id [id], -- ^ Note [HsRecUpdField selector]
-        hsRecUpdFieldArg :: LHsExpr id,   -- ^ Filled in by renamer when punning
-        hsRecUpdPun      :: Bool          -- ^ Note [Punning]
-  } deriving (Typeable)
-deriving instance (DataId id) => Data (HsRecUpdField id)
+type HsRecUpdField  id = HsRecField' id (UpdField id) (LHsExpr id)
 
 -- Note [Punning]
 -- ~~~~~~~~~~~~~~
@@ -295,6 +288,7 @@ deriving instance (DataId id) => Data (HsRecUpdField id)
 --    T { A.x } means T { A.x = x }
 
 
+-- TODO update note
 -- Note [HsRecUpdField selector]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -329,26 +323,29 @@ deriving instance (DataId id) => Data (HsRecUpdField id)
 hsRecFields :: HsRecFields id arg -> [PostRn id id]
 hsRecFields rbinds = map (unLoc . hsRecFieldSel . unLoc) (rec_flds rbinds)
 
-hsRecFieldSel :: HsRecField id arg -> Located (PostRn id id)
+hsRecFieldSel :: HsRecField' id name arg -> Located (PostRn id name)
 hsRecFieldSel = fmap selectorFieldOcc . hsRecFieldLbl
 
 hsRecFieldId :: HsRecField Id arg -> Located Id
 hsRecFieldId = hsRecFieldSel
 
+hsRecUpdFieldId :: HsRecUpdField Id -> Located Id
+hsRecUpdFieldId = fmap selectorFieldOcc . hsRecUpdFieldOcc
 
+hsRecUpdFieldOcc :: HsRecUpdField Id -> LFieldOcc Id
+hsRecUpdFieldOcc x = case hsRecFieldSel x of
+                      L l (Unambiguous id) -> L l (FieldOcc rdr id)
+                      L l (Ambiguous   id) -> L l (FieldOcc rdr id)
+  where
+    rdr = rdrNameFieldOcc (unLoc (hsRecFieldLbl x))
+
+{-
 hsRecUpdFieldsUnambiguous :: PostRn id [id] ~ [id] =>
                              [LHsRecUpdField id] -> [(FieldLabelString, id)]
-hsRecUpdFieldsUnambiguous = map $ \ (L _ x) -> case hsRecUpdFieldSel x of
-    [sel_name] -> (occNameFS $ rdrNameOcc $ unLoc $ hsRecUpdFieldLbl x, sel_name)
-    _          -> error "hsRecUpdFieldsUnambigous"
-
-hsRecUpdFieldId_maybe :: PostRn id [id] ~ [id] => HsRecUpdField id -> Maybe (Located id)
-hsRecUpdFieldId_maybe x = case hsRecUpdFieldSel x of
-                            [sel_name] -> Just $ L (getLoc (hsRecUpdFieldLbl x)) sel_name
-                            _          -> Nothing
-
-hsRecUpdFieldId :: PostRn id [id] ~ [id] => HsRecUpdField id -> Located id
-hsRecUpdFieldId = expectJust "hsRecUpdFieldId" . hsRecUpdFieldId_maybe
+hsRecUpdFieldsUnambiguous = map $ \ (L _ x) -> case hsRecFieldSel x of
+    Unambiguous sel_name -> (occNameFS $ rdrNameOcc $ unLoc $ hsRecUpdFieldLbl x, sel_name)
+    Ambiguous _          -> error "hsRecUpdFieldsUnambigous"
+-}
 
 
 {-
@@ -438,15 +435,9 @@ instance (Outputable arg)
           dotdot = ptext (sLit "..") <+> ifPprDebug (ppr (drop n flds))
 
 instance (Outputable arg)
-      => Outputable (HsRecField id arg) where
+      => Outputable (HsRecField' id name arg) where
   ppr (HsRecField { hsRecFieldLbl = f, hsRecFieldArg = arg,
                     hsRecPun = pun })
-    = ppr f <+> (ppUnless pun $ equals <+> ppr arg)
-
-instance (OutputableBndr id)
-      => Outputable (HsRecUpdField id) where
-  ppr (HsRecUpdField { hsRecUpdFieldLbl = f, hsRecUpdFieldArg = arg,
-                    hsRecUpdPun = pun })
     = ppr f <+> (ppUnless pun $ equals <+> ppr arg)
 
 

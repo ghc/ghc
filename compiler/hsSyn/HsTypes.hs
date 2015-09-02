@@ -33,7 +33,7 @@ module HsTypes (
 
         ConDeclField(..), LConDeclField, pprConDeclFields,
 
-        FieldOcc(..), LFieldOcc, mkFieldOcc,
+        FieldOcc, FieldOcc'(..), LFieldOcc, LFieldOcc', mkFieldOcc,
         rdrNameFieldOcc, selectorFieldOcc,
 
         HsWildCardInfo(..), mkAnonWildCardTy, mkNamedWildCardTy,
@@ -555,25 +555,27 @@ data ConDeclField name  -- Record fields have Haddoc docs on them
 deriving instance (DataId name) => Data (ConDeclField name)
 
 
+type LFieldOcc' id name = Located (FieldOcc' id name)
 type LFieldOcc name = Located (FieldOcc name)
+type FieldOcc name = FieldOcc' name name
 
 -- | Represents an *occurrence* of an unambiguous field.  We store
 -- both the 'RdrName' the user originally wrote, and after the
 -- renamer, the selector function.
-data FieldOcc name = FieldOcc RdrName (PostRn name name)
+data FieldOcc' id name = FieldOcc RdrName (PostRn id name)
   deriving Typeable
-deriving instance (DataId name) => Data (FieldOcc name)
+deriving instance (Data name, Data id, Data (PostRn id name)) => Data (FieldOcc' id name)
 
-instance Outputable (FieldOcc name) where
+instance Outputable (FieldOcc' id name) where
   ppr = ppr . rdrNameFieldOcc
 
-mkFieldOcc :: RdrName -> FieldOcc RdrName
+mkFieldOcc :: RdrName -> FieldOcc' RdrName name
 mkFieldOcc rdr = FieldOcc rdr PlaceHolder
 
-rdrNameFieldOcc :: FieldOcc name -> RdrName
+rdrNameFieldOcc :: FieldOcc' id name -> RdrName
 rdrNameFieldOcc (FieldOcc rdr _) = rdr
 
-selectorFieldOcc :: FieldOcc name -> PostRn name name
+selectorFieldOcc :: FieldOcc' id name -> PostRn id name
 selectorFieldOcc (FieldOcc _ sel) = sel
 
 

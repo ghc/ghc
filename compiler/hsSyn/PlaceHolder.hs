@@ -2,6 +2,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module PlaceHolder where
 
@@ -99,9 +101,21 @@ type DataId id =
   , Data (PostRn id Bool)
   , Data (PostRn id Name)
   , Data (PostRn id [Name])
-  , Data (PostRn id [id])
+--  , Data (PostRn id [id])
+  , Data (PostRn id (UpdField id))
   , Data (PostRn id id)
   , Data (PostTc id Type)
   , Data (PostTc id Coercion)
   , Data (PostTc id id)
   )
+
+
+
+-- Here because this depends on PostTc, but needs to appear in DataId
+data UpdField id = Unambiguous id
+                 | Ambiguous (PostTc id id)
+deriving instance (Data id, Data (PostTc id id)) => Data (UpdField id)
+
+fromUpdField :: UpdField Id -> Id
+fromUpdField (Unambiguous id) = id
+fromUpdField (Ambiguous   id) = id
