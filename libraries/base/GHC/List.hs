@@ -355,9 +355,11 @@ match on everything past the :, which is just the tail of scanl.
 -- and thus must be applied to non-empty lists.
 
 foldr1                  :: (a -> a -> a) -> [a] -> a
-foldr1 _ [x]            =  x
-foldr1 f (x:xs)         =  f x (foldr1 f xs)
-foldr1 _ []             =  errorEmptyList "foldr1"
+foldr1 f = go
+  where go [x]            =  x
+        go (x:xs)         =  f x (go xs)
+        go []             =  errorEmptyList "foldr1"
+{-# INLINE [0] foldr1 #-}
 
 -- | 'scanr' is the right-to-left dual of 'scanl'.
 -- Note that
