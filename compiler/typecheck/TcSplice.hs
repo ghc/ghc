@@ -817,10 +817,12 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
         = mapM_ bindName (collectHsBindBinders binds)
       checkTopDecl (SigD _)
         = return ()
+      checkTopDecl (AnnD _)
+        = return ()
       checkTopDecl (ForD (ForeignImport (L _ name) _ _ _))
         = bindName name
       checkTopDecl _
-        = addErr $ text "Only function, value, and foreign import declarations may be added with addTopDecl"
+        = addErr $ text "Only function, value, annotation, and foreign import declarations may be added with addTopDecl"
 
       bindName :: RdrName -> TcM ()
       bindName (Exact n)

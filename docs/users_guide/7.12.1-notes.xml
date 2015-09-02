@@ -188,6 +188,12 @@
                      char literals.
                 </para>
             </listitem>
+             <listitem>
+                 <para>
+                     <literal>addTopDecls</literal> now accepts annotation
+                     pragmas.
+                </para>
+            </listitem>
        </itemizedlist>
     </sect3>
 
