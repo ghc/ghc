@@ -9721,8 +9721,8 @@ Wiki page</ulink>.
 	      </listitem>
 
 	      <listitem><para>
-		  A quasi-quotation can appear in either a pattern context or an
-		  expression context and is also written in Oxford brackets:
+                 A quasi-quotation can appear in a pattern, type, expression, or
+                 declaration context and is also written in Oxford brackets:
 		  <itemizedlist>
 		    <listitem><para> <literal>[<replaceable>varid</replaceable>| ... |]</literal>,
                         where the "..." is an arbitrary string; a full description of the
@@ -9868,6 +9868,17 @@ f n = \ [haskell|y|] -> y+n
 		declaration group, but no more.
 	      </para>
 
+        <para>
+    Unlike normal declaration splices, declaration quasiquoters
+    do not cause a break. These quasiquoters are expanded before
+    the rest of the declaration group is processed, and the
+    declarations they generate are merged into the surrounding
+    declaration group. Consequently, the type environment seen
+    by <literal>reify</literal> from a declaration quasiquoter
+    will not include anything from the quasiquoter's declaration
+    group.
+        </para>
+
 	      <para>
 		Concretely, consider the following code
 <programlisting>
@@ -9876,6 +9887,8 @@ module M where
    f x = x
    $(th1 4)
    h y = k y y $(blah1)
+   [qq|blah|]
+   k x y = x + y
    $(th2 10)
    w z = $(blah2)
 </programlisting>
@@ -9917,6 +9930,23 @@ module M where
 		    <literal>$(blah2)</literal> would see the same definitions
 		    as the splice <literal>$(th2...)</literal>.
 		  </para>
+		</listitem>
+		<listitem>
+      <para>
+        The body of <literal>h</literal> <emphasis>is</emphasis>
+        able to refer to the function <literal>k</literal>
+        appearing on the other side of the declaration
+        quasiquoter, as quasiquoters never cause a declaration
+        group to be broken up.
+      </para>
+      <para>
+        A <literal>reify</literal> inside the
+        <literal>qq</literal> quasiquoter would be able to see
+        the definition of <literal>f</literal> from the
+        preceding declaration group, but not the definitions of
+        <literal>h</literal> or <literal>k</literal>, or any
+        definitions from subsequent declaration groups.
+      </para>
 		</listitem>
               </orderedlist>
 	      </para>
@@ -10219,6 +10249,11 @@ in which a quasi-quote can occur.
 A quasi-quote is expanded by applying the appropriate parser to the string
 enclosed by the Oxford brackets.  The context of the quasi-quote (expression, pattern,
 type, declaration) determines which of the parsers is called.
+</para></listitem>
+<listitem><para>
+Unlike normal declaration splices of the form <literal>$(...)</literal>,
+declaration quasi-quotes do not cause a declaration group break. See
+<xref linkend="th-syntax"/> for more information.
 </para></listitem>
 </itemizedlist>
 </para>

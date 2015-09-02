@@ -194,6 +194,18 @@
                      pragmas.
                 </para>
             </listitem>
+             <listitem>
+                 <para>
+                     Internally, the implementation of quasi-quotes has been
+                     unified with that of normal Template Haskell splices. Under
+                     the previous implementation, top-level declaration
+                     quasi-quotes did not cause a break in the declaration
+                     groups, unlike splices of the form
+                     <literal>$(...)</literal>. This behavior has been
+                     preserved under the new implementation, and is now
+                     recognized and documented in <xref linked="th-syntax"/>.
+                </para>
+            </listitem>
        </itemizedlist>
     </sect3>
 
@@ -255,16 +267,19 @@
            </listitem>
             <listitem>
                 <para>
-                    The functions <literal>error</literal>,
-                    <literal>undefined</literal>, and
-                    <literal>assertError</literal> now take an implicit
-                    <literal>CallStack</literal> parameter, and will
-                    output a formatted call stack alongside the error
-                    message.
+                    A new module <literal>GHC.SrcLoc</literal> was added,
+                    exporting a new type <literal>SrcLoc</literal>. A
+                    <literal>SrcLoc</literal> contains package, module,
+                    and file names, as well as start and end positions.
                </para>
+           </listitem>
+            <listitem>
                 <para>
-                    See <xref linkend="implicit-parameters-special"/> for a description of the
-                    implicit call stack feature.
+                    A new type <literal>CallStack</literal> was added for use
+                    with the new implicit callstack parameters. A
+                    <literal>CallStack</literal> is a
+                    <literal>[(String, SrcLoc)]</literal>, sorted by most-recent
+                    call.
                </para>
            </listitem>
             <listitem>
@@ -401,22 +416,6 @@
             <listitem>
                 <para>
                     Version number XXXXX (was 0.3.1.0)
-               </para>
-           </listitem>
-            <listitem>
-                <para>
-                    A new type <literal>SrcLoc</literal> was added. A
-                    <literal>SrcLoc</literal> contains package, module,
-                    and file names, as well as start and end positions.
-               </para>
-           </listitem>
-            <listitem>
-                <para>
-                    A new type <literal>CallStack</literal> was added for use
-                    with the new implicit callstack parameters. A
-                    <literal>CallStack</literal> is a
-                    <literal>[(String, SrcLoc)]</literal>, sorted by most-recent
-                    call.
                </para>
            </listitem>
        </itemizedlist>

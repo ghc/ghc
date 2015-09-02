@@ -13,7 +13,7 @@ module RnSource (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} RnExpr( rnLExpr )
-import {-# SOURCE #-} RnSplice ( rnSpliceDecl )
+import {-# SOURCE #-} RnSplice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import HsSyn
 import RdrName
@@ -1509,6 +1509,13 @@ addl gp (L l d : ds) = add gp l d ds
 
 add :: HsGroup RdrName -> SrcSpan -> HsDecl RdrName -> [LHsDecl RdrName]
     -> RnM (HsGroup RdrName, Maybe (SpliceDecl RdrName, [LHsDecl RdrName]))
+
+-- #10047: Declaration QuasiQuoters are expanded immediately, without
+--         causing a group split
+add gp _ (SpliceD (SpliceDecl (L _ qq@HsQuasiQuote{}) _)) ds
+  = do { (ds', _) <- rnTopSpliceDecls qq
+       ; addl gp (ds' ++ ds)
+       }
 
 add gp loc (SpliceD splice@(SpliceDecl _ flag)) ds
   = do { -- We've found a top-level splice.  If it is an *implicit* one
