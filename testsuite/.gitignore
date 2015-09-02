@@ -1481,6 +1481,7 @@ mk/ghcconfig*_bin_ghc*.exe.mk
 /tests/typecheck/should_fail/tcfail149
 /tests/typecheck/should_run/Defer01
 /tests/typecheck/should_run/IPRun
+/tests/typecheck/should_run/IPLocation
 /tests/typecheck/should_run/T1624
 /tests/typecheck/should_run/T1735
 /tests/typecheck/should_run/T2722
