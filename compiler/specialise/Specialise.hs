@@ -738,6 +738,7 @@ warnMissingSpecs :: DynFlags -> [Id] -> Bool
 -- See Note [Warning about missed specialisations]
 warnMissingSpecs dflags callers
   | wopt Opt_WarnAllMissedSpecs dflags = True
+  | not (wopt Opt_WarnMissedSpecs dflags) = False
   | null callers                       = False
   | otherwise                          = all has_inline_prag callers
   where
