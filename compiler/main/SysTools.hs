@@ -412,7 +412,7 @@ runCc dflags args =   do
       args1 = map Option (getOpts dflags opt_c)
       args2 = args0 ++ args1 ++ args
   mb_env <- getGccEnv args2
-  runSomethingFiltered dflags cc_filter "C Compiler" p args2 mb_env
+  runSomethingResponseFile dflags cc_filter "C Compiler" p args2 mb_env
  where
   -- discard some harmless warnings from gcc that we can't turn off
   cc_filter = unlines . doFilter . lines
@@ -926,7 +926,7 @@ runLink dflags args = do
       args1     = map Option (getOpts dflags opt_l)
       args2     = args0 ++ linkargs ++ args1 ++ args
   mb_env <- getGccEnv args2
-  runSomethingFiltered dflags ld_filter "Linker" p args2 mb_env
+  runSomethingResponseFile dflags ld_filter "Linker" p args2 mb_env
   where
     ld_filter = case (platformOS (targetPlatform dflags)) of
                   OSSolaris2 -> sunos_ld_filter
@@ -1253,6 +1253,58 @@ runSomething :: DynFlags
 
 runSomething dflags phase_name pgm args =
   runSomethingFiltered dflags id phase_name pgm args Nothing
+
+-- | Run a command, placing the arguments in an external response file.
+--
+-- This command is used in order to avoid overlong command line arguments on
+-- Windows. The command line arguments are first written to an external,
+-- temporary response file, and then passed to the linker via @filepath.
+-- response files for passing them in. See:
+--
+--     https://gcc.gnu.org/wiki/Response_Files
+--     https://ghc.haskell.org/trac/ghc/ticket/10777
+runSomethingResponseFile
+  :: DynFlags -> (String->String) -> String -> String -> [Option]
+  -> Maybe [(String,String)] -> IO ()
+
+runSomethingResponseFile dflags filter_fn phase_name pgm args mb_env =
+    runSomethingWith dflags phase_name pgm args $ \real_args -> do
+        fp <- getResponseFile real_args
+        let args = ['@':fp]
+        r <- builderMainLoop dflags filter_fn pgm args mb_env
+        return (r,())
+  where
+    getResponseFile args = do
+      fp <- newTempName dflags "rsp"
+      withFile fp WriteMode $ \h -> do
+          hSetEncoding h utf8
+          hPutStr h $ unlines $ map escape args
+      return fp
+
+    -- Note: Response files have backslash-escaping, double quoting, and are
+    -- whitespace separated (some implementations use newline, others any
+    -- whitespace character). Therefore, escape any backslashes, newlines, and
+    -- double quotes in the argument, and surround the content with double
+    -- quotes.
+    --
+    -- Another possibility that could be considered would be to convert
+    -- backslashes in the argument to forward slashes. This would generally do
+    -- the right thing, since backslashes in general only appear in arguments
+    -- as part of file paths on Windows, and the forward slash is accepted for
+    -- those. However, escaping is more reliable, in case somehow a backslash
+    -- appears in a non-file.
+    escape x = concat
+        [ "\""
+        , concatMap
+            (\c ->
+                case c of
+                    '\\' -> "\\\\"
+                    '\n' -> "\\n"
+                    '\"' -> "\\\""
+                    _    -> [c])
+            x
+        , "\""
+        ]
 
 runSomethingFiltered
   :: DynFlags -> (String->String) -> String -> String -> [Option]
