@@ -32,7 +32,7 @@ test('T367_letnoescape',
 test('T1980', normal, compile_and_run, [''])
 test('T2910', normal, compile_and_run, [''])
 test('T2910a', normal, compile_and_run, [''])
-test('T3279', normal, compile_and_run, [''])
+test('T3279', expect_broken_for(10712, opt_ways), compile_and_run, [''])
 
 # This test takes a long time with the default context switch interval
 test('T3429', extra_run_opts('+RTS -C0.001 -RTS'), compile_and_run, [''])
@@ -129,11 +129,12 @@ test('conc009', exit_code(1), compile_and_run, [''])
 test('conc010', normal, compile_and_run, [''])
 
 # conc012(ghci) needs a smaller stack, or it takes forever
-test('conc012', extra_run_opts('+RTS -K8m -RTS'), compile_and_run, [''])
+test('conc012',
+     [extra_run_opts('+RTS -K8m -RTS'), expect_broken_for(10712, opt_ways)],
+     compile_and_run, [''])
 
 test('conc013', normal, compile_and_run, [''])
-
-test('conc014', normal, compile_and_run, [''])
+test('conc014', expect_broken_for(10712, opt_ways), compile_and_run, [''])
 test('conc015', normal, compile_and_run, [''])
 test('conc015a', normal, compile_and_run, [''])
 test('conc016', omit_ways(['threaded2']), # see comment in conc016.hs
