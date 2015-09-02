@@ -61,7 +61,7 @@ import Var
 -- import RnEnv( FastStringEnv, mkFsEnv, lookupFsEnv )
 import TysWiredIn
 import TysPrim
-import PrelNames( funTyConKey, ipClassName )
+import PrelNames( funTyConKey )
 import Name
 import BasicTypes
 import Binary
@@ -636,7 +636,7 @@ pprIfaceTypeApp tc args = sdocWithDynFlags (pprTyTcApp TopPrec tc args)
 
 pprTyTcApp :: TyPrec -> IfaceTyCon -> IfaceTcArgs -> DynFlags -> SDoc
 pprTyTcApp ctxt_prec tc tys dflags
-  | ifaceTyConName tc == ipClassName
+  | ifaceTyConName tc == getName ipTyCon
   , ITC_Type (IfaceLitTy (IfaceStrTyLit n)) (ITC_Type ty ITC_Nil) <- tys
   = char '?' <> ftext n <> ptext (sLit "::") <> ppr_ty TopPrec ty
 

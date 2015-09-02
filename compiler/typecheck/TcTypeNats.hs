@@ -29,7 +29,7 @@ import TysWiredIn ( typeNatKind, typeSymbolKind
                   , promotedEQDataCon
                   , promotedGTDataCon
                   )
-import TysPrim    ( tyVarList, mkArrowKinds )
+import TysPrim    ( mkArrowKinds, mkTemplateTyVars )
 import PrelNames  ( gHC_TYPELITS
                   , typeNatAddTyFamNameKey
                   , typeNatMulTyFamNameKey
@@ -106,7 +106,7 @@ typeNatLeqTyCon :: TyCon
 typeNatLeqTyCon =
   mkFamilyTyCon name
     (mkArrowKinds [ typeNatKind, typeNatKind ] boolKind)
-    (take 2 $ tyVarList typeNatKind)
+    (mkTemplateTyVars [ typeNatKind, typeNatKind ])
     (BuiltInSynFamTyCon ops)
     NoParentTyCon
 
@@ -123,7 +123,7 @@ typeNatCmpTyCon :: TyCon
 typeNatCmpTyCon =
   mkFamilyTyCon name
     (mkArrowKinds [ typeNatKind, typeNatKind ] orderingKind)
-    (take 2 $ tyVarList typeNatKind)
+    (mkTemplateTyVars [ typeNatKind, typeNatKind ])
     (BuiltInSynFamTyCon ops)
     NoParentTyCon
 
@@ -140,7 +140,7 @@ typeSymbolCmpTyCon :: TyCon
 typeSymbolCmpTyCon =
   mkFamilyTyCon name
     (mkArrowKinds [ typeSymbolKind, typeSymbolKind ] orderingKind)
-    (take 2 $ tyVarList typeSymbolKind)
+    (mkTemplateTyVars [ typeSymbolKind, typeSymbolKind ])
     (BuiltInSynFamTyCon ops)
     NoParentTyCon
 
@@ -162,7 +162,7 @@ mkTypeNatFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
 mkTypeNatFunTyCon2 op tcb =
   mkFamilyTyCon op
     (mkArrowKinds [ typeNatKind, typeNatKind ] typeNatKind)
-    (take 2 $ tyVarList typeNatKind)
+    (mkTemplateTyVars [ typeNatKind, typeNatKind ])
     (BuiltInSynFamTyCon tcb)
     NoParentTyCon
 

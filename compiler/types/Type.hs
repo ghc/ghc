@@ -163,7 +163,7 @@ import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( eqTyCon, coercibleTyCon, typeNatKind, typeSymbolKind )
 import PrelNames ( eqTyConKey, coercibleTyConKey,
-                   ipClassNameKey, openTypeKindTyConKey,
+                   ipTyConKey, openTypeKindTyConKey,
                    constraintKindTyConKey, liftedTypeKindTyConKey )
 import CoAxiom
 
@@ -908,10 +908,10 @@ isIPPred ty = case tyConAppTyCon_maybe ty of
     _       -> False
 
 isIPTyCon :: TyCon -> Bool
-isIPTyCon tc = tc `hasKey` ipClassNameKey
+isIPTyCon tc = tc `hasKey` ipTyConKey
 
 isIPClass :: Class -> Bool
-isIPClass cls = cls `hasKey` ipClassNameKey
+isIPClass cls = cls `hasKey` ipTyConKey
   -- Class and it corresponding TyCon have the same Unique
 
 isCTupleClass :: Class -> Bool

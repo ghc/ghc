@@ -46,8 +46,8 @@
            </listitem>
             <listitem>
                 <para>
-                    Implicit parameters of the new base type
-                    <literal>GHC.Stack.CallStack</literal> are treated
+                    Implicit parameters of the new ghc-prim type
+                    <literal>GHC.Types.CallStack</literal> are treated
                     specially, and automatically solved for the current source
                     location. For example
                     <programlisting>
@@ -66,7 +66,7 @@
                     parameter does not matter.
                </para>
                 <para>
-                    See the release notes for base for a description of the
+                    See the release notes for ghc-prim for a description of the
                     <literal>CallStack</literal> type.
                </para>
             </listitem>
@@ -249,19 +249,16 @@
            </listitem>
             <listitem>
                 <para>
-                    A new module <literal>GHC.SrcLoc</literal> was added,
-                    exporting a new type <literal>SrcLoc</literal>. A
-                    <literal>SrcLoc</literal> contains package, module,
-                    and file names, as well as start and end positions.
+                    The functions <literal>error</literal>,
+                    <literal>undefined</literal>, and
+                    <literal>assertError</literal> now take an implicit
+                    <literal>CallStack</literal> parameter, and will
+                    output a formatted call stack alongside the error
+                    message.
                </para>
-           </listitem>
-            <listitem>
                 <para>
-                    A new type <literal>CallStack</literal> was added for use
-                    with the new implicit callstack parameters. A
-                    <literal>CallStack</literal> is a
-                    <literal>[(String, SrcLoc)]</literal>, sorted by most-recent
-                    call.
+                    See <xref linkend="implicit-parameters-special"/> for a description of the
+                    implicit call stack feature.
                </para>
            </listitem>
             <listitem>
@@ -398,6 +395,22 @@
             <listitem>
                 <para>
                     Version number XXXXX (was 0.3.1.0)
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    A new type <literal>SrcLoc</literal> was added. A
+                    <literal>SrcLoc</literal> contains package, module,
+                    and file names, as well as start and end positions.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    A new type <literal>CallStack</literal> was added for use
+                    with the new implicit callstack parameters. A
+                    <literal>CallStack</literal> is a
+                    <literal>[(String, SrcLoc)]</literal>, sorted by most-recent
+                    call.
                </para>
            </listitem>
        </itemizedlist>

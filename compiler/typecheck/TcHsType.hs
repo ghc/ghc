@@ -72,7 +72,7 @@ import Util
 
 import Data.Maybe( isNothing )
 import Control.Monad ( unless, when, zipWithM )
-import PrelNames( ipClassName, funTyConKey, allNameStrings )
+import PrelNames( funTyConKey, allNameStrings )
 
 {-
         ----------------------------
@@ -490,7 +490,6 @@ tc_hs_type hs_ty@(HsExplicitTupleTy _ tys) exp_kind
 tc_hs_type ipTy@(HsIParamTy n ty) exp_kind
   = do { ty' <- tc_lhs_type ty ekLifted
        ; checkExpectedKind ipTy constraintKind exp_kind
-       ; ipClass <- tcLookupClass ipClassName
        ; let n' = mkStrLitTy $ hsIPNameFS n
        ; return (mkClassPred ipClass [n',ty'])
        }

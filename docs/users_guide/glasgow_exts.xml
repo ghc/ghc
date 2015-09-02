@@ -8124,9 +8124,9 @@ inner binding of <literal>?x</literal>, so <literal>(f 9)</literal> will return
 </para>
 </sect3>
 
-<sect3><title>Special implicit parameters</title>
+<sect3 id="implicit-parameters-special"><title>Special implicit parameters</title>
 <para>
-GHC treats implicit parameters of type <literal>GHC.Stack.CallStack</literal>
+GHC treats implicit parameters of type <literal>GHC.Types.CallStack</literal>
 specially, by resolving them to the current location in the program. Consider:
 <programlisting>
   f :: String

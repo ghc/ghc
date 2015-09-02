@@ -20,9 +20,9 @@ import CoAxiom(sfInteractTop, sfInteractInert)
 
 import Var
 import TcType
-import PrelNames ( knownNatClassName, knownSymbolClassName, ipClassNameKey,
+import PrelNames ( knownNatClassName, knownSymbolClassName,
                    callStackTyConKey, typeableClassName )
-import TysWiredIn ( typeNatKind, typeSymbolKind )
+import TysWiredIn ( ipClass, typeNatKind, typeSymbolKind )
 import Id( idType )
 import Class
 import TyCon
@@ -704,7 +704,7 @@ interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs
          else
             continueWith workItem }
 
-  | cls `hasKey` ipClassNameKey
+  | cls == ipClass
   , isGiven ev_w
   = interactGivenIP inerts workItem
 
@@ -1755,7 +1755,7 @@ Other notes:
 -- i.e.   (IP "name" CallStack)
 isCallStackIP :: CtLoc -> Class -> [Type] -> Maybe (EvTerm -> EvCallStack)
 isCallStackIP loc cls tys
-  | cls `hasKey` ipClassNameKey
+  | cls == ipClass
   , [_ip_name, ty] <- tys
   , Just (tc, _) <- splitTyConApp_maybe ty
   , tc `hasKey` callStackTyConKey

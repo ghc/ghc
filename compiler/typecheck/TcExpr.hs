@@ -46,7 +46,7 @@ import Var
 import VarSet
 import VarEnv
 import TysWiredIn
-import TysPrim( intPrimTy, addrPrimTy )
+import TysPrim( intPrimTy )
 import PrimOp( tagToEnumKey )
 import PrelNames
 import DynFlags
@@ -191,7 +191,6 @@ tcExpr (NegApp expr neg_expr) res_ty
 
 tcExpr (HsIPVar x) res_ty
   = do { let origin = IPOccOrigin x
-       ; ipClass <- tcLookupClass ipClassName
            {- Implicit parameters must have a *tau-type* not a.
               type scheme.  We enforce this by creating a fresh
               type variable as its type.  (Because res_ty may not
@@ -1067,25 +1066,19 @@ tcInferIdWithOrig orig id_name
   = do { dflags <- getDynFlags
        ; if gopt Opt_IgnoreAsserts dflags
          then tc_infer_id orig id_name
-         else tc_infer_assert dflags orig }
+         else tc_infer_assert orig }
 
   | otherwise
   = tc_infer_id orig id_name
 
-tc_infer_assert :: DynFlags -> CtOrigin -> TcM (HsExpr TcId, TcRhoType)
+tc_infer_assert :: CtOrigin -> TcM (HsExpr TcId, TcRhoType)
 -- Deal with an occurrence of 'assert'
 -- See Note [Adding the implicit parameter to 'assert']
-tc_infer_assert dflags orig
-  = do { sloc <- getSrcSpanM
-       ; assert_error_id <- tcLookupId assertErrorName
+tc_infer_assert orig
+  = do { assert_error_id <- tcLookupId assertErrorName
        ; (wrap, id_rho) <- deeplyInstantiate orig (idType assert_error_id)
-       ; let (arg_ty, res_ty) = case tcSplitFunTy_maybe id_rho of
-                                   Nothing      -> pprPanic "assert type" (ppr id_rho)
-                                   Just arg_res -> arg_res
-       ; ASSERT( arg_ty `tcEqType` addrPrimTy )
-         return (HsApp (L sloc (mkHsWrap wrap (HsVar assert_error_id)))
-                       (L sloc (srcSpanPrimLit dflags sloc))
-                , res_ty) }
+       ; return (mkHsWrap wrap (HsVar assert_error_id), id_rho)
+       }
 
 tc_infer_id :: CtOrigin -> Name -> TcM (HsExpr TcId, TcRhoType)
 -- Return type is deeply instantiated
@@ -1133,17 +1126,12 @@ tc_infer_id orig id_name
       | isNaughtyRecordSelector id = failWithTc (naughtyRecordSel id)
       | otherwise                  = return ()
 
-srcSpanPrimLit :: DynFlags -> SrcSpan -> HsExpr TcId
-srcSpanPrimLit dflags span
-    = HsLit (HsStringPrim "" (unsafeMkByteString
-                             (showSDocOneLine dflags (ppr span))))
-
 {-
 Note [Adding the implicit parameter to 'assert']
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The typechecker transforms (assert e1 e2) to (assertError "Foo.hs:27"
-e1 e2).  This isn't really the Right Thing because there's no way to
-"undo" if you want to see the original source code in the typechecker
+The typechecker transforms (assert e1 e2) to (assertError e1 e2).
+This isn't really the Right Thing because there's no way to "undo"
+if you want to see the original source code in the typechecker
 output.  We'll have fix this in due course, when we care more about
 being able to reconstruct the exact original program.
 

@@ -248,7 +248,6 @@ Library
         GHC.StaticPtr
         GHC.STRef
         GHC.Show
-        GHC.SrcLoc
         GHC.Stable
         GHC.Stack
         GHC.Stats

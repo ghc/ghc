@@ -1088,7 +1088,7 @@ proxyHashId
     ty      = mkForAllTys [kv, tv] (mkProxyPrimTy k t)
     kv      = kKiVar
     k       = mkTyVarTy kv
-    tv:_    = tyVarList k
+    [tv]    = mkTemplateTyVars [k]
     t       = mkTyVarTy tv
 
 ------------------------------------------------

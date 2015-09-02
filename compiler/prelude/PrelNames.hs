@@ -320,9 +320,6 @@ basicKnownKeyNames
         -- Type-level naturals
         knownNatClassName, knownSymbolClassName,
 
-        -- Implicit parameters
-        ipClassName,
-
         -- Source locations
         callStackDataConName, callStackTyConName,
         srcLocDataConName,
@@ -1172,18 +1169,14 @@ knownNatClassName     = clsQual gHC_TYPELITS (fsLit "KnownNat") knownNatClassNam
 knownSymbolClassName :: Name
 knownSymbolClassName  = clsQual gHC_TYPELITS (fsLit "KnownSymbol") knownSymbolClassNameKey
 
--- Implicit parameters
-ipClassName :: Name
-ipClassName         = clsQual gHC_CLASSES (fsLit "IP") ipClassNameKey
-
 -- Source Locations
 callStackDataConName, callStackTyConName, srcLocDataConName :: Name
 callStackDataConName
-  = dcQual gHC_STACK  (fsLit "CallStack") callStackDataConKey
+  = dcQual gHC_TYPES  (fsLit "CallStack") callStackDataConKey
 callStackTyConName
-  = tcQual  gHC_STACK (fsLit "CallStack") callStackTyConKey
+  = tcQual  gHC_TYPES (fsLit "CallStack") callStackTyConKey
 srcLocDataConName
-  = dcQual gHC_SRCLOC (fsLit "SrcLoc")   srcLocDataConKey
+  = dcQual gHC_TYPES (fsLit "SrcLoc")   srcLocDataConKey
 
 -- plugins
 pLUGINS :: Module
@@ -1311,9 +1304,6 @@ knownSymbolClassNameKey = mkPreludeClassUnique 43
 
 ghciIoClassKey :: Unique
 ghciIoClassKey = mkPreludeClassUnique 44
-
-ipClassNameKey :: Unique
-ipClassNameKey = mkPreludeClassUnique 45
 
 {-
 ************************************************************************
@@ -1540,6 +1530,14 @@ callStackTyConKey = mkPreludeTyConUnique 182
 typeRepTyConKey :: Unique
 typeRepTyConKey = mkPreludeTyConUnique 183
 
+-- Implicit Parameters
+ipTyConKey :: Unique
+ipTyConKey = mkPreludeTyConUnique 184
+
+ipCoNameKey :: Unique
+ipCoNameKey = mkPreludeTyConUnique 185
+
+
 ---------------- Template Haskell -------------------
 --      USES TyConUniques 200-299
 -----------------------------------------------------
@@ -1614,6 +1612,9 @@ fingerprintDataConKey                   = mkPreludeDataConUnique 35
 callStackDataConKey, srcLocDataConKey :: Unique
 callStackDataConKey                     = mkPreludeDataConUnique 36
 srcLocDataConKey                        = mkPreludeDataConUnique 37
+
+ipDataConKey :: Unique
+ipDataConKey                            = mkPreludeDataConUnique 38
 
 {-
 ************************************************************************

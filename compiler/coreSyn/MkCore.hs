@@ -717,19 +717,30 @@ errorName :: Name
 errorName = mkWiredInIdName gHC_ERR (fsLit "error") errorIdKey eRROR_ID
 
 eRROR_ID :: Id
-eRROR_ID = pc_bottoming_Id1 errorName errorTy
+eRROR_ID = pc_bottoming_Id2 errorName errorTy
 
 errorTy  :: Type   -- See Note [Error and friends have an "open-tyvar" forall]
-errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] openAlphaTy)
+errorTy  = mkSigmaTy [openAlphaTyVar] []
+             (mkFunTys [ mkClassPred
+                           ipClass
+                           [ mkStrLitTy (fsLit "callStack")
+                           , mkTyConTy callStackTyCon ]
+                       , mkListTy charTy]
+                       openAlphaTy)
 
 undefinedName :: Name
 undefinedName = mkWiredInIdName gHC_ERR (fsLit "undefined") undefinedKey uNDEFINED_ID
 
 uNDEFINED_ID :: Id
-uNDEFINED_ID = pc_bottoming_Id0 undefinedName undefinedTy
+uNDEFINED_ID = pc_bottoming_Id1 undefinedName undefinedTy
 
 undefinedTy  :: Type   -- See Note [Error and friends have an "open-tyvar" forall]
-undefinedTy  = mkSigmaTy [openAlphaTyVar] [] openAlphaTy
+undefinedTy  = mkSigmaTy [openAlphaTyVar] []
+                 (mkFunTy (mkClassPred
+                             ipClass
+                             [ mkStrLitTy (fsLit "callStack")
+                             , mkTyConTy callStackTyCon ])
+                          openAlphaTy)
 
 {-
 Note [Error and friends have an "open-tyvar" forall]
@@ -773,10 +784,11 @@ pc_bottoming_Id1 name ty
     strict_sig = mkClosedStrictSig [evalDmd] botRes
     -- These "bottom" out, no matter what their arguments
 
-pc_bottoming_Id0 :: Name -> Type -> Id
--- Same but arity zero
-pc_bottoming_Id0 name ty
+pc_bottoming_Id2 :: Name -> Type -> Id
+-- Same but arity two
+pc_bottoming_Id2 name ty
  = mkVanillaGlobalWithInfo name ty bottoming_info
  where
     bottoming_info = vanillaIdInfo `setStrictnessInfo` strict_sig
-    strict_sig = mkClosedStrictSig [] botRes
+                                   `setArityInfo`      2
+    strict_sig = mkClosedStrictSig [evalDmd, evalDmd] botRes
