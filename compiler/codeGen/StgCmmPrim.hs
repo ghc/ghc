@@ -417,7 +417,9 @@ emitPrimOp _      []  WriteSmallArrayOp [obj,ix,v] = doWriteSmallPtrArrayOp obj 
 -- Getting the size of pointer arrays
 
 emitPrimOp dflags [res] SizeofArrayOp [arg]
-   = emit $ mkAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags + oFFSET_StgMutArrPtrs_ptrs dflags) (bWord dflags))
+   = emit $ mkAssign (CmmLocal res) (cmmLoadIndexW dflags arg
+    (fixedHdrSizeW dflags + bytesToWordsRoundUp dflags (oFFSET_StgMutArrPtrs_ptrs dflags))
+        (bWord dflags))
 emitPrimOp dflags [res] SizeofMutableArrayOp [arg]
    = emitPrimOp dflags [res] SizeofArrayOp [arg]
 emitPrimOp dflags [res] SizeofArrayArrayOp [arg]
@@ -428,7 +430,8 @@ emitPrimOp dflags [res] SizeofMutableArrayArrayOp [arg]
 emitPrimOp dflags [res] SizeofSmallArrayOp [arg] =
     emit $ mkAssign (CmmLocal res)
     (cmmLoadIndexW dflags arg
-     (fixedHdrSizeW dflags + oFFSET_StgSmallMutArrPtrs_ptrs dflags) (bWord dflags))
+     (fixedHdrSizeW dflags + bytesToWordsRoundUp dflags (oFFSET_StgSmallMutArrPtrs_ptrs dflags))
+        (bWord dflags))
 emitPrimOp dflags [res] SizeofSmallMutableArrayOp [arg] =
     emitPrimOp dflags [res] SizeofSmallArrayOp [arg]
 
