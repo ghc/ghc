@@ -69,3 +69,4 @@ test('T457', [ only_ways(['normal','optasm']), exit_code(1) ], compile_and_run, 
 
 test('T9128', normal, compile_and_run, [''])
 test('T9390', normal, compile_and_run, [''])
+test('T10830', extra_run_opts('+RTS -K100k -RTS'), compile_and_run, [''])
