@@ -338,6 +338,7 @@ data GeneralFlag
    | Opt_PrintExplicitKinds
    | Opt_PrintUnicodeSyntax
    | Opt_PrintExpandedSynonyms
+   | Opt_PrintPotentialInstances
 
    -- optimisation opts
    | Opt_CallArity
@@ -3014,6 +3015,7 @@ fFlags = [
   flagSpec "print-explicit-kinds"             Opt_PrintExplicitKinds,
   flagSpec "print-unicode-syntax"             Opt_PrintUnicodeSyntax,
   flagSpec "print-expanded-synonyms"          Opt_PrintExpandedSynonyms,
+  flagSpec "print-potential-instances"        Opt_PrintPotentialInstances,
   flagSpec "prof-cafs"                        Opt_AutoSccsOnIndividualCafs,
   flagSpec "prof-count-entries"               Opt_ProfCountEntries,
   flagSpec "regs-graph"                       Opt_RegsGraph,

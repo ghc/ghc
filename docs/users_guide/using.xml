@@ -894,6 +894,16 @@ ghc -c Foo.hs
         </listitem>
       </varlistentry>
 
+      <varlistentry>
+        <term><option>--fprint-potential-instances</option>
+          <indexterm><primary><option>-fprint-potential-instances</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>When GHC can't find an instance for a class, it displays a short list of some
+                in the instances it knows about.  With this flag it prints <emphasis>all</emphasis>
+                the instances it knows about.
+          </para></listitem>
+      </varlistentry>
 
       <varlistentry>
         <term><option>-fprint-explicit-foralls, -fprint-explicit-kinds, -fprint-unicode-syntax</option>

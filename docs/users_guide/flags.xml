@@ -36,6 +36,12 @@
             <entry>-</entry>
           </row>
           <row>
+            <entry><option>-fprint-potential-instances</option></entry>
+            <entry>display all available instances in type error messages</entry>
+            <entry>dynamic</entry>
+            <entry>-fno-print-potential-instances</entry>
+          </row>
+          <row>
             <entry><option>-fprint-explicit-foralls</option></entry>
             <entry>Print explicit <literal>forall</literal> quantification in types. See also <option>-XExplicitForAll</option></entry>
             <entry>dynamic</entry>
