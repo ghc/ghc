@@ -1798,6 +1798,10 @@ def rawSystemWithTimeout(cmd_and_args):
     if r == 98:
         # The python timeout program uses 98 to signal that ^C was pressed
         stopNow()
+    if r == 99 and getTestOpts().exit_code != 99:
+        # Only print a message when timeout killed the process unexpectedly.
+        cmd = cmd_and_args[-1]
+        if_verbose(1, 'Timeout happened...killed process "{}"...\n'.format(cmd))
     return r
 
 # cmd is a complex command in Bourne-shell syntax
