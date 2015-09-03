@@ -3718,7 +3718,7 @@ clearPkgConf = upd $ \s -> s { extraPkgConfs = const [] }
 
 parseModuleName :: ReadP ModuleName
 parseModuleName = fmap mkModuleName
-                $ munch1 (\c -> isAlphaNum c || c `elem` ".")
+                $ munch1 (\c -> isAlphaNum c || c `elem` "_.")
 
 parsePackageFlag :: (String -> PackageArg) -- type of argument
                  -> String                 -- string to parse
