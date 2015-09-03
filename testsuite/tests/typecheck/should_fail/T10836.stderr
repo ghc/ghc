@@ -1,0 +1,14 @@
+
+T10836.hs:5:5: error:
+    Type family equations violate injectivity annotation:
+      Foo Int = Int
+      Foo Bool = Int
+    In the equations for closed type family ‘Foo’
+    In the type family declaration for ‘Foo’
+
+T10836.hs:9:5: error:
+    Type family equations violate injectivity annotation:
+      Bar Int = Int
+      Bar Bool = Int
+    In the equations for closed type family ‘Bar’
+    In the type family declaration for ‘Bar’
