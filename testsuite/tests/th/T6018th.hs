@@ -84,7 +84,6 @@ $( do { decl@([ClosedTypeFamilyD _ _ _ (Just inj) _]) <-
                         Bak Int  = Char
                         Bak Char = Int
                         Bak a    = a |]
-      ; runIO $ putStrLn (pprint inj)
       ; return decl
       }
  )
