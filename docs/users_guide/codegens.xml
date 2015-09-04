@@ -46,9 +46,9 @@
 
     <para>To install LLVM and Clang:
       <itemizedlist>
-        <listitem><emphasis>Linux</emphasis>: Use your package management tool.
+        <listitem><para><emphasis>Linux</emphasis>: Use your package management tool.</para>
         </listitem>
-        <listitem><emphasis>Mac OS X</emphasis>: Clang is included by
+        <listitem><para><emphasis>Mac OS X</emphasis>: Clang is included by
         default on recent OS X machines when XCode is installed (from
         <literal>10.6</literal> and later). LLVM is not included. In
         order to use the LLVM based code generator, you should install
@@ -56,12 +56,12 @@
         url="http://mxcl.github.com/homebrew/">Homebrew</ulink>
         package manager for OS X. Alternatively you can download
         binaries for LLVM and Clang from <ulink
-        url="http://llvm.org/releases/download.html">here</ulink>.
+        url="http://llvm.org/releases/download.html">here</ulink>.</para>
         </listitem>
 
-        <listitem><emphasis>Windows</emphasis>: You should download binaries for
+        <listitem><para><emphasis>Windows</emphasis>: You should download binaries for
           LLVM and clang from
-          <ulink url="http://llvm.org/releases/download.html">here</ulink>.
+          <ulink url="http://llvm.org/releases/download.html">here</ulink>.</para>
         </listitem>
       </itemizedlist>
     </para>
