@@ -415,6 +415,8 @@ maximum xs              =  foldl1 max xs
 strictMaximum           :: (Ord a) => [a] -> a
 strictMaximum []        =  errorEmptyList "maximum"
 strictMaximum xs        =  foldl1' max xs
+{-# SPECIALIZE  strictMaximum :: [Int] -> Int #-}
+{-# SPECIALIZE  strictMaximum :: [Integer] -> Integer #-}
 
 -- | 'minimum' returns the minimum value from a list,
 -- which must be non-empty, finite, and of an ordered type.
@@ -433,6 +435,8 @@ minimum xs              =  foldl1 min xs
 strictMinimum           :: (Ord a) => [a] -> a
 strictMinimum []        =  errorEmptyList "minimum"
 strictMinimum xs        =  foldl1' min xs
+{-# SPECIALIZE  strictMinimum :: [Int] -> Int #-}
+{-# SPECIALIZE  strictMinimum :: [Integer] -> Integer #-}
 
 
 -- | 'iterate' @f x@ returns an infinite list of repeated applications
