@@ -121,20 +121,13 @@ if test "$WithGhc" != ""; then
   GhcMinVersion2=`echo "$GhcMinVersion" | sed 's/^\\(.\\)$/0\\1/'`
   GhcCanonVersion="$GhcMajVersion$GhcMinVersion2"
 
-  BOOTSTRAPPING_GHC_INFO_FIELD([OS_STAGE0],[target os])
   BOOTSTRAPPING_GHC_INFO_FIELD([CC_STAGE0],[C compiler command])
   dnl ToDo, once "ld command" is reliably available.
   dnl Then, we can remove the LD_STAGE0 hack in mk/build-package-date.mk
   dnl BOOTSTRAPPING_GHC_INFO_FIELD([LD_STAGE0],[ld command])
-  if test "x$OS_STAGE0" != "xOSDarwin"; then
-    BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
-    BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags])
-    BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file])
-  else
-    AR_STAGE0='$(AR)'
-    AR_OPTS_STAGE0='$(AR_OPTS)'
-    ArSupportsAtFile_STAGE0='$(ArSupportsAtFile)'
-  fi
+  BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
+  BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags])
+  BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file])
 fi
 
 dnl ** Must have GHC to build GHC
