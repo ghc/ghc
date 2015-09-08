@@ -372,6 +372,16 @@ gtResult OrdGE      = true_Expr
 gtResult OrdGT      = true_Expr
 
 ------------
+combineResult :: OrdOp -> RdrName
+-- Knowing a1 ? b2 and a2 ? b2?,
+-- how do we combine that to obtain (a1,a2) ? (b1,b2)
+combineResult OrdCompare = mappend_diamond_RDR
+combineResult OrdLT      = or_RDR
+combineResult OrdLE      = and_RDR
+combineResult OrdGE      = and_RDR
+combineResult OrdGT      = or_RDR
+
+------------
 gen_Ord_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
 gen_Ord_binds loc tycon
   | null tycon_data_cons        -- No data-cons => invoke bale-out case
@@ -491,31 +501,18 @@ mkCompareFields :: TyCon -> OrdOp -> [Type] -> LHsExpr RdrName
 mkCompareFields tycon op tys
   = go tys as_RDRs bs_RDRs
   where
+    -- Build a chain of calls to the current operator for each field, combined
+    -- with the appropriate combinator from combineResult.
     go []   _      _          = eqResult op
-    go [ty] (a:_)  (b:_)
-      | isUnLiftedType ty     = unliftedOrdOp tycon ty op a b
-      | otherwise             = genOpApp (nlHsVar a) (ordMethRdr op) (nlHsVar b)
-    go (ty:tys) (a:as) (b:bs) = mk_compare ty a b
-                                  (ltResult op)
-                                  (go tys as bs)
-                                  (gtResult op)
+    go [ty] (a:_)  (b:_)      = mk_compare ty a b
+    go (ty:tys) (a:as) (b:bs) = genOpApp (mk_compare ty a b) (combineResult op) (go tys as bs)
     go _ _ _ = panic "mkCompareFields"
 
-    -- (mk_compare ty a b) generates
-    --    (case (compare a b) of { LT -> <lt>; EQ -> <eq>; GT -> <bt> })
-    -- but with suitable special cases for
-    mk_compare ty a b lt eq gt
+    mk_compare ty a b
       | isUnLiftedType ty
-      = unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
+      = unliftedOrdOp tycon ty op a b
       | otherwise
-      = nlHsCase (nlHsPar (nlHsApp (nlHsApp (nlHsVar compare_RDR) a_expr) b_expr))
-          [mkSimpleHsAlt (nlNullaryConPat ltTag_RDR) lt,
-           mkSimpleHsAlt (nlNullaryConPat eqTag_RDR) eq,
-           mkSimpleHsAlt (nlNullaryConPat gtTag_RDR) gt]
-      where
-        a_expr = nlHsVar a
-        b_expr = nlHsVar b
-        (lt_op, _, eq_op, _, _) = primOrdOps "Ord" tycon ty
+      = genOpApp (nlHsVar a) (ordMethRdr op) (nlHsVar b)
 
 unliftedOrdOp :: TyCon -> Type -> OrdOp -> RdrName -> RdrName -> LHsExpr RdrName
 unliftedOrdOp tycon ty op a b

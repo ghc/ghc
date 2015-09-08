@@ -611,9 +611,10 @@ compose_RDR :: RdrName
 compose_RDR             = varQual_RDR gHC_BASE (fsLit ".")
 
 not_RDR, getTag_RDR, succ_RDR, pred_RDR, minBound_RDR, maxBound_RDR,
-    and_RDR, range_RDR, inRange_RDR, index_RDR,
+    and_RDR, or_RDR, range_RDR, inRange_RDR, index_RDR,
     unsafeIndex_RDR, unsafeRangeSize_RDR :: RdrName
 and_RDR                 = varQual_RDR gHC_CLASSES (fsLit "&&")
+or_RDR                  = varQual_RDR gHC_CLASSES (fsLit "||")
 not_RDR                 = varQual_RDR gHC_CLASSES (fsLit "not")
 getTag_RDR              = varQual_RDR gHC_BASE (fsLit "getTag")
 succ_RDR                = varQual_RDR gHC_ENUM (fsLit "succ")
@@ -724,7 +725,7 @@ notAssocDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "NotAssociative")
 
 
 fmap_RDR, pure_RDR, ap_RDR, foldable_foldr_RDR, foldMap_RDR,
-    traverse_RDR, mempty_RDR, mappend_RDR :: RdrName
+    traverse_RDR, mempty_RDR, mappend_RDR, mappend_diamond_RDR :: RdrName
 fmap_RDR                = varQual_RDR gHC_BASE (fsLit "fmap")
 pure_RDR                = nameRdrName pureAName
 ap_RDR                  = nameRdrName apAName
@@ -733,6 +734,7 @@ foldMap_RDR             = varQual_RDR dATA_FOLDABLE       (fsLit "foldMap")
 traverse_RDR            = varQual_RDR dATA_TRAVERSABLE    (fsLit "traverse")
 mempty_RDR              = varQual_RDR gHC_BASE            (fsLit "mempty")
 mappend_RDR             = varQual_RDR gHC_BASE            (fsLit "mappend")
+mappend_diamond_RDR     = varQual_RDR dATA_MONOID         (fsLit "<>")
 
 ----------------------
 varQual_RDR, tcQual_RDR, clsQual_RDR, dataQual_RDR
