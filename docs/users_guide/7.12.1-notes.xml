@@ -100,6 +100,15 @@
                     See <xref linkend="injective-ty-fams"/> for details.
                </para>
            </listitem>
+
+           <listitem>
+               <para>
+                   Due to a <ulink href="https://ghc.haskell.org/trac/ghc/ticket/10826">
+                       security issue
+                   </ulink>, Safe Haskell now forbids annotations in programs marked as
+                   <literal>-XSafe</literal>
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
