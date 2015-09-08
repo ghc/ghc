@@ -50,8 +50,8 @@ module GHC.Show
         where
 
 import GHC.Base
-import GHC.Num
 import GHC.List ((!!), foldr1, break)
+import GHC.Num
 
 -- | The @shows@ functions return a function that prepends the
 -- output 'String' to an existing 'String'.  This allows constant-time
