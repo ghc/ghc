@@ -147,7 +147,13 @@ include mk/custom-settings.mk
 SRC_CC_OPTS     += $(WERROR)
 SRC_HC_OPTS     += $(WERROR)
 
+# -----------------------------------------------------------------------------
+# Check for inconsistent settings, after reading mk/build.mk.
+# Although mk/config.mk should always contain consistent settings (set by
+# configure), mk/build.mk can contain pretty much anything.
+
 ifneq "$(CLEANING)" "YES"
+
 ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
 ifeq "$(findstring dyn,$(GhcLibWays))" ""
 $(error dyn is not in $$(GhcLibWays), but $$(DYNAMIC_GHC_PROGRAMS) is YES)
@@ -157,12 +163,45 @@ ifeq "$(findstring v,$(GhcLibWays))" ""
 $(error v is not in $$(GhcLibWays), and $$(DYNAMIC_GHC_PROGRAMS) is not YES)
 endif
 endif
+
 ifeq "$(GhcProfiled)" "YES"
 ifeq "$(findstring p,$(GhcLibWays))" ""
 $(error p is not in $$(GhcLibWays), and $$(GhcProfiled) is YES)
 endif
 endif
+
+ifeq "$(BUILD_DOCBOOK_HTML)" "YES"
+ifeq "$(XSLTPROC)" ""
+$(error BUILD_DOCBOOK_HTML=YES, but `xsltproc` was not found. \
+  Install `xsltproc`, then rerun `./configure`. \
+  See https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation)
 endif
+ifeq "$(HAVE_DOCBOOK_XSL)" "NO"
+$(error BUILD_DOCBOOK_HTML=YES, but DocBook XSL stylesheets were not found. \
+  Install `docbook-xsl`, then rerun `./configure`. \
+  See https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation)
+endif
+endif
+
+ifneq "$(BUILD_DOCBOOK_PS) $(BUILD_DOCBOOK_PDF)" "NO NO"
+ifeq "$(DBLATEX)" ""
+$(error BUILD_DOCBOOK_PS or BUILD_DOCBOOK_PDF=YES, but `dblatex` was not found. \
+  Install `dblatex`, then rerun `./configure`. \
+  See https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation)
+endif
+endif
+
+ifeq "$(HSCOLOUR_SRCS)" "YES"
+ifeq "$(HSCOLOUR_CMD)" ""
+$(error HSCOLOUR_SRCS=YES, but HSCOLOUR_CMD is empty. \
+  Run `cabal install hscolour`, then rerun `./configure`. \
+  See https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation)
+endif
+endif
+
+endif # CLEANING
+
+# -----------------------------------------------------------------------------
 
 ifeq "$(phase)" ""
 phase = final
