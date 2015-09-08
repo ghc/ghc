@@ -776,6 +776,12 @@
       Wiki</ulink>.
     </para>
 
+    <para>
+    Additionally, the use of <link linkend="annotations">annotations</link>
+    is forbidden, as that would allow bypassing Safe Haskell restrictions.
+    See <ulink url="https://ghc.haskell.org/trac/ghc/ticket/10826">ticket #10826</ulink>.
+    </para>
+
   </sect2>
 
 </sect1>
