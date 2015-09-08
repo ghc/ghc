@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="release-7-10-3">
+  <title>Release notes for version 7.10.3</title>
+
+  <para>
+    The 7.10.3 release is a bugfix release, with over 70+ bug fixes
+    relative to 7.10.1. The major fixes are listed below. For the full
+    list with more detail, see the <ulink
+    url="https://ghc.haskell.org/trac/ghc/milestone/7.10.3">GHC 7.10.3
+    milestone</ulink> on our bug tracker.
+  </para>
+
+  <sect2>
+    <title>GHC</title>
+
+    <itemizedlist>
+      <listitem>
+        <para>
+          Due to a <ulink href="https://ghc.haskell.org/trac/ghc/ticket/10826">
+          security issue
+          </ulink>, Safe Haskell now forbids annotations in programs marked as
+          <literal>-XSafe</literal>
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+
+  <sect2>
+    <title>Libraries</title>
+
+    <sect3>
+        <title>base</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 4.8.1.0 (was 4.8.0.0)
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                    The <literal>Lifetime</literal> datatype (and its
+                    constructors) are now exported from
+                    <literal>GHC.Event</literal>.
+                </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>binary</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.7.5.0 (was 0.7.3.0)
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Cabal</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.22.4.0 (was 1.22.2.0).
+               </para>
+           </listitem>
+       </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>ghc</title>
+        <itemizedlist>
+       </itemizedlist>
+    </sect3>
+  </sect2>
+
+  <sect2>
+    <title>Known bugs</title>
+    <itemizedlist>
+   </itemizedlist>
+  </sect2>
+</sect1>
