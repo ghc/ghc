@@ -725,7 +725,7 @@ notAssocDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "NotAssociative")
 
 
 fmap_RDR, pure_RDR, ap_RDR, foldable_foldr_RDR, foldMap_RDR,
-    traverse_RDR, mempty_RDR, mappend_RDR, mappend_diamond_RDR :: RdrName
+    traverse_RDR, mempty_RDR, mappend_RDR, thenCmp_RDR :: RdrName
 fmap_RDR                = varQual_RDR gHC_BASE (fsLit "fmap")
 pure_RDR                = nameRdrName pureAName
 ap_RDR                  = nameRdrName apAName
@@ -734,7 +734,7 @@ foldMap_RDR             = varQual_RDR dATA_FOLDABLE       (fsLit "foldMap")
 traverse_RDR            = varQual_RDR dATA_TRAVERSABLE    (fsLit "traverse")
 mempty_RDR              = varQual_RDR gHC_BASE            (fsLit "mempty")
 mappend_RDR             = varQual_RDR gHC_BASE            (fsLit "mappend")
-mappend_diamond_RDR     = varQual_RDR dATA_MONOID         (fsLit "<>")
+thenCmp_RDR             = varQual_RDR gHC_BASE            (fsLit "thenCmp")
 
 ----------------------
 varQual_RDR, tcQual_RDR, clsQual_RDR, dataQual_RDR

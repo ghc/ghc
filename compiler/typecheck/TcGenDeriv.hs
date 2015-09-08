@@ -375,7 +375,7 @@ gtResult OrdGT      = true_Expr
 combineResult :: OrdOp -> RdrName
 -- Knowing a1 ? b2 and a2 ? b2?,
 -- how do we combine that to obtain (a1,a2) ? (b1,b2)
-combineResult OrdCompare = mappend_diamond_RDR
+combineResult OrdCompare = thenCmp_RDR
 combineResult OrdLT      = or_RDR
 combineResult OrdLE      = and_RDR
 combineResult OrdGE      = and_RDR
