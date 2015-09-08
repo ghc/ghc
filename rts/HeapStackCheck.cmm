@@ -610,10 +610,10 @@ stg_block_putmvar (P_ mvar, P_ val)
    }
 }
 
-stg_block_blackhole
+stg_block_blackhole (P_ node)
 {
     Sp_adj(-2);
-    Sp(1) = R1;
+    Sp(1) = node;
     Sp(0) = stg_enter_info;
     BLOCK_GENERIC;
 }
