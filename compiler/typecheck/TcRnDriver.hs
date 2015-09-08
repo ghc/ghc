@@ -1089,9 +1089,9 @@ rnTopSrcDecls :: HsGroup RdrName -> TcM (TcGblEnv, HsGroup Name)
 -- Fails if there are any errors
 rnTopSrcDecls group
  = do { -- Rename the source decls
-        traceTc "rn12" empty ;
+        traceRn (text "rn12") ;
         (tcg_env, rn_decls) <- checkNoErrs $ rnSrcDecls group ;
-        traceTc "rn13" empty ;
+        traceRn (text "rn13") ;
 
         -- save the renamed syntax, if we want it
         let { tcg_env'

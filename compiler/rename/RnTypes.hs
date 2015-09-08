@@ -868,7 +868,7 @@ mkOpAppRn e1 op fix e2                  -- Default case, no rearrangment
 
 ----------------------------
 get_op :: LHsExpr Name -> Name
--- An unbound name could be either HsVar or HsUnboundVra
+-- An unbound name could be either HsVar or HsUnboundVar
 -- See RnExpr.rnUnboundVar
 get_op (L _ (HsVar n))          = n
 get_op (L _ (HsUnboundVar occ)) = mkUnboundName (mkRdrUnqual occ)

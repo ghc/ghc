@@ -11,6 +11,7 @@ import Annotations ( Annotation, CoreAnnTarget )
 #ifdef GHCI
 import HsSyn      ( LHsType, LPat, LHsDecl )
 import RdrName    ( RdrName )
+import TcRnTypes  ( SpliceType )
 import qualified Language.Haskell.TH as TH
 #endif
 
@@ -29,7 +30,7 @@ tcTypedBracket :: HsBracket Name
 runAnnotation     :: CoreAnnTarget -> LHsExpr Name -> TcM Annotation
 
 #ifdef GHCI
-tcTopSpliceExpr :: Bool -> TcM (LHsExpr TcId) -> TcM (LHsExpr TcId)
+tcTopSpliceExpr :: SpliceType -> TcM (LHsExpr TcId) -> TcM (LHsExpr TcId)
 
 runMetaE :: LHsExpr TcId -> TcM (LHsExpr RdrName)
 runMetaP :: LHsExpr TcId -> TcM (LPat RdrName)

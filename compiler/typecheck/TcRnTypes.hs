@@ -47,7 +47,8 @@ module TcRnTypes(
         DsMetaEnv, DsMetaVal(..),
 
         -- Template Haskell
-        ThStage(..), PendingStuff(..), topStage, topAnnStage, topSpliceStage,
+        ThStage(..), SpliceType(..), PendingStuff(..),
+        topStage, topAnnStage, topSpliceStage,
         ThLevel, impLevel, outerLevel, thLevel,
 
         -- Arrows
@@ -734,12 +735,13 @@ instance Outputable TcIdBinder where
 -- Template Haskell stages and levels
 ---------------------------
 
+data SpliceType = Typed | Untyped
+
 data ThStage    -- See Note [Template Haskell state diagram] in TcSplice
-  = Splice      -- Inside a top-level splice splice
-                -- This code will be run *at compile time*;
-                --   the result replaces the splice
-                -- Binding level = 0
-      Bool      -- True if in a typed splice, False otherwise
+  = Splice SpliceType -- Inside a top-level splice
+                      -- This code will be run *at compile time*;
+                      --   the result replaces the splice
+                      -- Binding level = 0
 
   | Comp        -- Ordinary Haskell code
                 -- Binding level = 1
@@ -760,8 +762,8 @@ data PendingStuff
 
 topStage, topAnnStage, topSpliceStage :: ThStage
 topStage       = Comp
-topAnnStage    = Splice False
-topSpliceStage = Splice False
+topAnnStage    = Splice Untyped
+topSpliceStage = Splice Untyped
 
 instance Outputable ThStage where
    ppr (Splice _)  = text "Splice"

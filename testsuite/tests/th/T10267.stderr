@@ -1,0 +1,46 @@
+
+T10267.hs:8:1: error:
+    Found hole: _ :: a0
+    Where: ‘a0’ is a rigid type variable bound by
+                the type signature for:
+                  j :: a0 -> a0
+                at T10267.hs:8:1
+    Relevant bindings include
+      x :: a0 (bound at T10267.hs:8:1)
+      j :: a0 -> a0 (bound at T10267.hs:8:1)
+    In the expression: _
+    In an equation for ‘j’: j x = _
+
+T10267.hs:8:1: error:
+    Found hole: _foo :: a0 -> a0
+    Where: ‘a0’ is a rigid type variable bound by
+                the type signature for:
+                  i :: a0 -> a0
+                at T10267.hs:8:1
+    Or perhaps ‘_foo’ is mis-spelled, or not in scope
+    Relevant bindings include i :: a0 -> a0 (bound at T10267.hs:8:1)
+    In the expression: _foo
+    In an equation for ‘i’: i = _foo
+
+T10267.hs:14:3: error:
+    Found hole: _foo :: a -> a
+    Where: ‘a’ is a rigid type variable bound by
+               the type signature for:
+                 k :: a -> a
+               at T10267.hs:14:3
+    Or perhaps ‘_foo’ is mis-spelled, or not in scope
+    Relevant bindings include k :: a -> a (bound at T10267.hs:14:3)
+    In the expression: _foo
+    In an equation for ‘k’: k = _foo
+
+T10267.hs:23:3: error:
+    Found hole: _ :: a
+    Where: ‘a’ is a rigid type variable bound by
+               the type signature for:
+                 l :: a -> a
+               at T10267.hs:23:3
+    Relevant bindings include
+      x :: a (bound at T10267.hs:23:3)
+      l :: a -> a (bound at T10267.hs:23:3)
+    In the expression: _
+    In an equation for ‘l’: l x = _

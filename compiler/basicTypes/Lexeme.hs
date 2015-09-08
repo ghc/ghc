@@ -140,7 +140,9 @@ okTcOcc _ = False
 -- with an acceptable letter?
 okVarIdOcc :: String -> Bool
 okVarIdOcc str = okIdOcc str &&
-                 not (str `Set.member` reservedIds)
+                 -- admit "_" as a valid identifier.  Required to support typed
+                 -- holes in Template Haskell.  See #10267
+                 (str == "_" || not (str `Set.member` reservedIds))
 
 -- | Is this an acceptable symbolic variable name, assuming it starts
 -- with an acceptable character?
@@ -223,6 +225,7 @@ okSymChar c
       ModifierSymbol       -> True
       OtherSymbol          -> True
       _                    -> False
+
 
 -- | All reserved identifiers. Taken from section 2.4 of the 2010 Report.
 reservedIds :: Set.Set String

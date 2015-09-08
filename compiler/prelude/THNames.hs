@@ -27,6 +27,7 @@ templateHaskellNames :: [Name]
 templateHaskellNames = [
     returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName, mkNameLName,
+    mkNameSName,
     liftStringName,
     unTypeName,
     unTypeQName,
@@ -52,7 +53,7 @@ templateHaskellNames = [
     tupEName, unboxedTupEName,
     condEName, multiIfEName, letEName, caseEName, doEName, compEName,
     fromEName, fromThenEName, fromToEName, fromThenToEName,
-    listEName, sigEName, recConEName, recUpdEName, staticEName,
+    listEName, sigEName, recConEName, recUpdEName, staticEName, unboundVarEName,
     -- FieldExp
     fieldExpName,
     -- Body
@@ -184,7 +185,7 @@ kindTyConName     = thTc (fsLit "Kind")           kindTyConKey
 
 returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName,
-    mkNameLName, liftStringName, unTypeName, unTypeQName,
+    mkNameLName, mkNameSName, liftStringName, unTypeName, unTypeQName,
     unsafeTExpCoerceName :: Name
 returnQName    = thFun (fsLit "returnQ")   returnQIdKey
 bindQName      = thFun (fsLit "bindQ")     bindQIdKey
@@ -197,6 +198,7 @@ mkNameG_vName  = thFun (fsLit "mkNameG_v")  mkNameG_vIdKey
 mkNameG_dName  = thFun (fsLit "mkNameG_d")  mkNameG_dIdKey
 mkNameG_tcName = thFun (fsLit "mkNameG_tc") mkNameG_tcIdKey
 mkNameLName    = thFun (fsLit "mkNameL")    mkNameLIdKey
+mkNameSName    = thFun (fsLit "mkNameS")    mkNameSIdKey
 unTypeName     = thFun (fsLit "unType")     unTypeIdKey
 unTypeQName    = thFun (fsLit "unTypeQ")    unTypeQIdKey
 unsafeTExpCoerceName = thFun (fsLit "unsafeTExpCoerce") unsafeTExpCoerceIdKey
@@ -252,7 +254,7 @@ clauseName = libFun (fsLit "clause") clauseIdKey
 varEName, conEName, litEName, appEName, infixEName, infixAppName,
     sectionLName, sectionRName, lamEName, lamCaseEName, tupEName,
     unboxedTupEName, condEName, multiIfEName, letEName, caseEName,
-    doEName, compEName, staticEName :: Name
+    doEName, compEName, staticEName, unboundVarEName :: Name
 varEName        = libFun (fsLit "varE")        varEIdKey
 conEName        = libFun (fsLit "conE")        conEIdKey
 litEName        = libFun (fsLit "litE")        litEIdKey
@@ -284,6 +286,7 @@ sigEName        = libFun (fsLit "sigE")        sigEIdKey
 recConEName     = libFun (fsLit "recConE")     recConEIdKey
 recUpdEName     = libFun (fsLit "recUpdE")     recUpdEIdKey
 staticEName     = libFun (fsLit "staticE")     staticEIdKey
+unboundVarEName = libFun (fsLit "unboundVarE") unboundVarEIdKey
 
 -- type FieldExp = ...
 fieldExpName :: Name
@@ -576,7 +579,8 @@ kindTyConKey            = mkPreludeTyConUnique 232
 
 returnQIdKey, bindQIdKey, sequenceQIdKey, liftIdKey, newNameIdKey,
     mkNameIdKey, mkNameG_vIdKey, mkNameG_dIdKey, mkNameG_tcIdKey,
-    mkNameLIdKey, unTypeIdKey, unTypeQIdKey, unsafeTExpCoerceIdKey :: Unique
+    mkNameLIdKey, mkNameSIdKey, unTypeIdKey, unTypeQIdKey,
+    unsafeTExpCoerceIdKey :: Unique
 returnQIdKey        = mkPreludeMiscIdUnique 200
 bindQIdKey          = mkPreludeMiscIdUnique 201
 sequenceQIdKey      = mkPreludeMiscIdUnique 202
@@ -587,9 +591,10 @@ mkNameG_vIdKey       = mkPreludeMiscIdUnique 206
 mkNameG_dIdKey       = mkPreludeMiscIdUnique 207
 mkNameG_tcIdKey      = mkPreludeMiscIdUnique 208
 mkNameLIdKey         = mkPreludeMiscIdUnique 209
-unTypeIdKey          = mkPreludeMiscIdUnique 210
-unTypeQIdKey         = mkPreludeMiscIdUnique 211
-unsafeTExpCoerceIdKey = mkPreludeMiscIdUnique 212
+mkNameSIdKey         = mkPreludeMiscIdUnique 210
+unTypeIdKey          = mkPreludeMiscIdUnique 211
+unTypeQIdKey         = mkPreludeMiscIdUnique 212
+unsafeTExpCoerceIdKey = mkPreludeMiscIdUnique 213
 
 
 -- data Lit = ...
@@ -647,7 +652,8 @@ varEIdKey, conEIdKey, litEIdKey, appEIdKey, infixEIdKey, infixAppIdKey,
     unboxedTupEIdKey, condEIdKey, multiIfEIdKey,
     letEIdKey, caseEIdKey, doEIdKey, compEIdKey,
     fromEIdKey, fromThenEIdKey, fromToEIdKey, fromThenToEIdKey,
-    listEIdKey, sigEIdKey, recConEIdKey, recUpdEIdKey, staticEIdKey :: Unique
+    listEIdKey, sigEIdKey, recConEIdKey, recUpdEIdKey, staticEIdKey,
+    unboundVarEIdKey :: Unique
 varEIdKey         = mkPreludeMiscIdUnique 270
 conEIdKey         = mkPreludeMiscIdUnique 271
 litEIdKey         = mkPreludeMiscIdUnique 272
@@ -675,6 +681,7 @@ sigEIdKey         = mkPreludeMiscIdUnique 293
 recConEIdKey      = mkPreludeMiscIdUnique 294
 recUpdEIdKey      = mkPreludeMiscIdUnique 295
 staticEIdKey      = mkPreludeMiscIdUnique 296
+unboundVarEIdKey  = mkPreludeMiscIdUnique 297
 
 -- type FieldExp = ...
 fieldExpIdKey :: Unique

@@ -128,6 +128,10 @@ Template Haskell
 -  Partial type signatures can now be used in splices, see
    :ref:`pts-where`.
 
+-  ``Template Haskell`` now fully supports typed holes and quoting unbound
+   variables.  This means it is now possible to use pattern splices nested
+   inside quotation brackets.
+
 -  ``Template Haskell`` now supports the use of ``UInfixT`` in types to
    resolve infix operator fixities, in the same vein as ``UInfixP`` and
    ``UInfixE`` in patterns and expressions. ``ParensT`` and ``InfixT``

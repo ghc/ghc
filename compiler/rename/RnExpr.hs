@@ -83,19 +83,15 @@ finishHsVar name
 
 rnUnboundVar :: RdrName -> RnM (HsExpr Name, FreeVars)
 rnUnboundVar v
- = do { stage <- getStage
-      ; if isUnqual v && not (in_untyped_bracket stage)
+ = do { if isUnqual v
         then -- Treat this as a "hole"
              -- Do not fail right now; instead, return HsUnboundVar
              -- and let the type checker report the error
              return (HsUnboundVar (rdrNameOcc v), emptyFVs)
 
-        else -- Fail immediately (qualified name, or in untyped bracket)
+        else -- Fail immediately (qualified name)
              do { n <- reportUnboundName v
                 ; return (HsVar n, emptyFVs) } }
-  where
-    in_untyped_bracket (Brack _ (RnPendingUntyped {})) = True
-    in_untyped_bracket _ = False
 
 rnExpr (HsVar v)
   = do { mb_name <- lookupOccRn_overloaded False v

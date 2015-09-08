@@ -300,6 +300,9 @@ fieldExp s e = do { e' <- e; return (s,e') }
 staticE :: ExpQ -> ExpQ
 staticE = fmap StaticE
 
+unboundVarE :: Name -> ExpQ
+unboundVarE s = return (UnboundVarE s)
+
 -- ** 'arithSeqE' Shortcuts
 fromE :: ExpQ -> ExpQ
 fromE x = do { a <- x; return (ArithSeqE (FromR a)) }

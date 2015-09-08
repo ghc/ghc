@@ -1167,6 +1167,11 @@ repE (ArithSeq _ _ aseq) =
 
 repE (HsSpliceE splice)    = repSplice splice
 repE (HsStatic e)          = repLE e >>= rep2 staticEName . (:[]) . unC
+repE (HsUnboundVar name)   = do
+                               occ   <- occNameLit name
+                               sname <- repNameS occ
+                               repUnboundVar sname
+
 repE e@(PArrSeq {})        = notHandled "Parallel arrays" (ppr e)
 repE e@(HsCoreAnn {})      = notHandled "Core annotations" (ppr e)
 repE e@(HsSCC {})          = notHandled "Cost centres" (ppr e)
@@ -1572,10 +1577,10 @@ globalVar name
   | isExternalName name
   = do  { MkC mod <- coreStringLit name_mod
         ; MkC pkg <- coreStringLit name_pkg
-        ; MkC occ <- occNameLit name
+        ; MkC occ <- nameLit name
         ; rep2 mk_varg [pkg,mod,occ] }
   | otherwise
-  = do  { MkC occ <- occNameLit name
+  = do  { MkC occ <- nameLit name
         ; MkC uni <- coreIntLit (getKey (getUnique name))
         ; rep2 mkNameLName [occ,uni] }
   where
@@ -1612,13 +1617,16 @@ wrapGenSyms binds body@(MkC b)
     go _ [] = return body
     go var_ty ((name,id) : binds)
       = do { MkC body'  <- go var_ty binds
-           ; lit_str    <- occNameLit name
+           ; lit_str    <- nameLit name
            ; gensym_app <- repGensym lit_str
            ; repBindQ var_ty elt_ty
                       gensym_app (MkC (Lam id body')) }
 
-occNameLit :: Name -> DsM (Core String)
-occNameLit n = coreStringLit (occNameString (nameOccName n))
+nameLit :: Name -> DsM (Core String)
+nameLit n = coreStringLit (occNameString (nameOccName n))
+
+occNameLit :: OccName -> DsM (Core String)
+occNameLit name = coreStringLit (occNameString name)
 
 
 -- %*********************************************************************
@@ -2136,6 +2144,9 @@ mk_lit (HsIntegral _ i)   = mk_integer  i
 mk_lit (HsFractional f)   = mk_rational f
 mk_lit (HsIsString _ s)   = mk_string   s
 
+repNameS :: Core String -> DsM (Core TH.Name)
+repNameS (MkC name) = rep2 mkNameSName [name]
+
 --------------- Miscellaneous -------------------
 
 repGensym :: Core String -> DsM (Core (TH.Q TH.Name))
@@ -2149,6 +2160,9 @@ repBindQ ty_a ty_b (MkC x) (MkC y)
 repSequenceQ :: Type -> Core [TH.Q a] -> DsM (Core (TH.Q [a]))
 repSequenceQ ty_a (MkC list)
   = rep2 sequenceQName [Type ty_a, list]
+
+repUnboundVar :: Core TH.Name -> DsM (Core TH.ExpQ)
+repUnboundVar (MkC name) = rep2 unboundVarEName [name]
 
 ------------ Lists -------------------
 -- turn a list of patterns into a single pattern matching a list

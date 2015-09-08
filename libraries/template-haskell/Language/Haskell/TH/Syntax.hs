@@ -1032,6 +1032,9 @@ mkNameG :: NameSpace -> String -> String -> String -> Name
 mkNameG ns pkg modu occ
   = Name (mkOccName occ) (NameG ns (mkPkgName pkg) (mkModName modu))
 
+mkNameS :: String -> Name
+mkNameS n = Name (mkOccName n) NameS
+
 mkNameG_v, mkNameG_tc, mkNameG_d :: String -> String -> String -> Name
 mkNameG_v  = mkNameG VarName
 mkNameG_tc = mkNameG TcClsName
@@ -1415,6 +1418,7 @@ data Exp
   | RecConE Name [FieldExp]            -- ^ @{ T { x = y, z = w } }@
   | RecUpdE Exp [FieldExp]             -- ^ @{ (f x) { z = w } }@
   | StaticE Exp                        -- ^ @{ static e }@
+  | UnboundVarE Name                   -- ^ @{ _x }@ (hole)
   deriving( Show, Eq, Ord, Data, Typeable, Generic )
 
 type FieldExp = (Name,Exp)

@@ -9349,42 +9349,28 @@ on.
    This abbreviation makes top-level declaration slices quieter and less
    intimidating.
 
--  Outermost pattern splices may bind variables. By "outermost" here, we
-   refer to a pattern splice that occurs outside of any quotation
-   brackets. For example,
+-  Pattern splices introduce variable binders but scoping of variables in
+   expressions inside the pattern's scope is only checked when a splice is
+   run.  Note that pattern splices that occur outside of any quotation
+   brackets are run at compile time.  Pattern splices occurring inside a
+   quotation bracket are *not* run at compile time; they are run when the
+   bracket is spliced in, sometime later.  For example,
 
    ::
 
-       mkPat :: Bool -> Q Pat
-       mkPat True  = [p| (x, y) |]
-       mkPat False = [p| (y, x) |]
+       mkPat :: Q Pat
+       mkPat = [p| (x, y) |]
 
        -- in another module:
        foo :: (Char, String) -> String
-       foo $(mkPat True) = x : y
+       foo $(mkPat) = x : z
 
-       bar :: (String, Char) -> String
-       bar $(mkPat False) = x : y
+       bar :: Q Exp
+       bar = [| \ $(mkPat) -> x : w |]
 
--  Nested pattern splices do *not* bind variables. By "nested" here, we
-   refer to a pattern splice occurring within a quotation bracket.
-   Continuing the example from the last bullet:
-
-   ::
-
-       baz :: Bool -> Q Exp
-       baz b = [| quux $(mkPat b) = x + y |]
-
-   would fail with ``x`` and ``y`` being out of scope.
-
-   The difference in treatment of outermost and nested pattern splices
-   is because outermost splices are run at compile time. GHC can then
-   use the result of running the splice when analysing the expressions
-   within the pattern's scope. Nested splices, on the other hand, are
-   *not* run at compile time; they are run when the bracket is spliced
-   in, sometime later. Since nested pattern splices may refer to local
-   variables, there is no way for GHC to know, at splice compile time,
-   what variables are bound, so it binds none.
+   will fail with ``z`` being out of scope in the definition of ``foo`` but it
+   will *not* fail with ``w`` being out of scope in the definition of ``bar``.
+   That will only happen when ``bar`` is spliced.
 
 -  A pattern quasiquoter *may* generate binders that scope over the
    right-hand side of a definition because these binders are in scope
