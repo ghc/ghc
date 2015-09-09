@@ -249,12 +249,14 @@ if (ghc_with_smp == 0):
 else:
    skip_if_not_smp = normal
 
-test('setnumcapabilities001',
-     [ only_ways(['threaded1','threaded2']),
-       extra_run_opts('4 12 2000'),
-       reqlib('parallel'),
-       skip_if_not_smp ],
-     compile_and_run, [''])
+# Commented out, instead of marked expect_broken, because it fails only
+# sometimes. See #10860.
+#test('setnumcapabilities001',
+#     [ only_ways(['threaded1','threaded2']),
+#       extra_run_opts('4 12 2000'),
+#       reqlib('parallel'),
+#       skip_if_not_smp ],
+#     compile_and_run, [''])
 
 # omit ghci, which can't handle unboxed tuples:
 test('compareAndSwap', [omit_ways(['ghci','hpc']), reqlib('primitive')], compile_and_run, [''])
