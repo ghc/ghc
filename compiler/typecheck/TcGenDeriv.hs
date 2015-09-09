@@ -372,16 +372,6 @@ gtResult OrdGE      = true_Expr
 gtResult OrdGT      = true_Expr
 
 ------------
-combineResult :: OrdOp -> RdrName
--- Knowing a1 ? b2 and a2 ? b2?,
--- how do we combine that to obtain (a1,a2) ? (b1,b2)
-combineResult OrdCompare = thenCmp_RDR
-combineResult OrdLT      = or_RDR
-combineResult OrdLE      = and_RDR
-combineResult OrdGE      = and_RDR
-combineResult OrdGT      = or_RDR
-
-------------
 gen_Ord_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
 gen_Ord_binds loc tycon
   | null tycon_data_cons        -- No data-cons => invoke bale-out case
@@ -499,20 +489,32 @@ mkCompareFields :: TyCon -> OrdOp -> [Type] -> LHsExpr RdrName
 -- Generates nested comparisons for (a1,a2...) against (b1,b2,...)
 -- where the ai,bi have the given types
 mkCompareFields tycon op tys
-  = go tys as_RDRs bs_RDRs
+  = go (zip3 tys as_RDRs bs_RDRs)
   where
-    -- Build a chain of calls to the current operator for each field, combined
-    -- with the appropriate combinator from combineResult.
-    go []   _      _          = eqResult op
-    go [ty] (a:_)  (b:_)      = mk_compare ty a b
-    go (ty:tys) (a:as) (b:bs) = genOpApp (mk_compare ty a b) (combineResult op) (go tys as bs)
-    go _ _ _ = panic "mkCompareFields"
+    -- With one field, we can simply use the current operator.
+    -- With two fields, we have use `compare` on the first.
+    -- With more than two fields, we use `compare` on all but the first, and
+    -- combine the result with thenCmp.
+    go []    = eqResult op
+    go [arg] = mk_op arg
+    go args
+        | OrdCompare <- op
+        = mk_compares args
+        | otherwise
+        = nlHsCase (nlHsPar (mk_compares (init args)))
+          [mkSimpleHsAlt (nlNullaryConPat ltTag_RDR) (ltResult op),
+           mkSimpleHsAlt (nlNullaryConPat eqTag_RDR) (mk_op (last args)),
+           mkSimpleHsAlt (nlNullaryConPat gtTag_RDR) (gtResult op)]
 
-    mk_compare ty a b
-      | isUnLiftedType ty
-      = unliftedOrdOp tycon ty op a b
-      | otherwise
-      = genOpApp (nlHsVar a) (ordMethRdr op) (nlHsVar b)
+    mk_op (ty, a, b)
+      | isUnLiftedType ty     = unliftedOrdOp tycon ty op a b
+      | otherwise             = genOpApp (nlHsVar a) (ordMethRdr op) (nlHsVar b)
+
+    mk_compares args  = foldr1 (`genOpApp` thenCmp_RDR) (map mk_compare args)
+
+    mk_compare (ty, a, b)
+      | isUnLiftedType ty     = unliftedOrdOp tycon ty (OrdCompare) a b
+      | otherwise             = genOpApp (nlHsVar a) (compare_RDR) (nlHsVar b)
 
 unliftedOrdOp :: TyCon -> Type -> OrdOp -> RdrName -> RdrName -> LHsExpr RdrName
 unliftedOrdOp tycon ty op a b
