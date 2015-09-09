@@ -32,7 +32,8 @@ module GHC.Classes(
     Eq(..), eqInt, neInt,
     Ord(..), gtInt, geInt, leInt, ltInt, compareInt, compareInt#,
     (&&), (||), not,
-    divInt#, modInt#
+    divInt#, modInt#,
+    thenCmp
  ) where
 
 -- GHC.Magic is used in some derived instances
@@ -295,6 +296,12 @@ False || x              =  x
 not                     :: Bool -> Bool
 not True                =  False
 not False               =  True
+
+-- This is used by the derived code for Ord, so put it here
+thenCmp :: Ordering -> Ordering -> Ordering
+LT `thenCmp` _ = LT
+EQ `thenCmp` y = y
+GT `thenCmp` _ = GT
 
 
 ------------------------------------------------------------------------
