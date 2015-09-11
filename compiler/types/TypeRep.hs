@@ -16,7 +16,7 @@ Note [The Type-related module hierarchy]
 -}
 
 {-# LANGUAGE CPP, DeriveDataTypeable, DeriveFunctor, DeriveFoldable,
-             DeriveTraversable, DataKinds #-}
+             DeriveTraversable #-}
 {-# OPTIONS_HADDOCK hide #-}
 -- We expose the relevant stuff from this module via the Type module
 

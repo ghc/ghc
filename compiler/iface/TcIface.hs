@@ -6,7 +6,7 @@
 Type checking of type signatures in interface files
 -}
 
-{-# LANGUAGE CPP, DataKinds #-}
+{-# LANGUAGE CPP #-}
 
 module TcIface (
         tcLookupImported_maybe,

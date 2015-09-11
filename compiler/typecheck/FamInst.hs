@@ -1,6 +1,6 @@
 -- The @FamInst@ type: family instance heads
 
-{-# LANGUAGE CPP, GADTs, DataKinds #-}
+{-# LANGUAGE CPP, GADTs #-}
 
 module FamInst (
         FamInstEnvs, tcGetFamInstEnvs,

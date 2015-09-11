@@ -12,7 +12,7 @@ have a standard form, namely:
 - primitive operations
 -}
 
-{-# LANGUAGE CPP, DataKinds #-}
+{-# LANGUAGE CPP #-}
 
 module MkId (
         mkDictFunId, mkDictFunTy, mkDictSelId, mkDictSelRhs,
