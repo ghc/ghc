@@ -423,7 +423,8 @@ makeInjectivityErrors
    -> [CoAxBranch] -- ^ List of injectivity conflicts
    -> [(SDoc, SrcSpan)]
 makeInjectivityErrors tycon axiom inj conflicts
-  = let lhs             = coAxBranchLHS axiom
+  = ASSERT2( any id inj, text "No injective type variables" )
+    let lhs             = coAxBranchLHS axiom
         rhs             = coAxBranchRHS axiom
 
         are_conflicts   = not $ null conflicts
