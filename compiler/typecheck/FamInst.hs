@@ -33,8 +33,9 @@ import Util
 import RdrName
 import DataCon ( dataConName )
 import Maybes
+import Type
+import TypeRep
 import TcMType
-import TcType
 import Name
 import Panic
 import VarSet
@@ -440,6 +441,78 @@ makeInjectivityErrors tycon axiom inj conflicts
         ++ errorIf inj_tvs_unused (unusedInjectiveVarsErr unused_inj_tvs)
         ++ errorIf tf_headed       tfHeadedErr
         ++ errorIf wrong_bare_rhs (bareVariableInRHSErr   bare_variables)
+
+
+-- | Return a list of type variables that the function is injective in and that
+-- do not appear on injective positions in the RHS of a family instance
+-- declaration.
+unusedInjTvsInRHS :: [Bool] -> [Type] -> Type -> TyVarSet
+-- INVARIANT: [Bool] list contains at least one True value
+-- See Note [Verifying injectivity annotation]. This function implements fourth
+-- check described there.
+-- In theory, instead of implementing this whole check in this way, we could
+-- attempt to unify equation with itself.  We would reject exactly the same
+-- equations but this method gives us more precise error messages by returning
+-- precise names of variables that are not mentioned in the RHS.
+unusedInjTvsInRHS injList lhs rhs =
+  injLHSVars `minusVarSet` injRhsVars
+    where
+      -- set of type and kind variables in which type family is injective
+      injLHSVars = tyVarsOfTypes (filterByList injList lhs)
+
+      -- set of type variables appearing in the RHS on an injective position.
+      -- For all returned variables we assume their associated kind variables
+      -- also appear in the RHS.
+      injRhsVars = closeOverKinds $ collectInjVars rhs
+
+      -- Collect all type variables that are either arguments to a type
+      -- constructor or to injective type families.
+      collectInjVars :: Type -> VarSet
+      collectInjVars ty | Just (ty1, ty2) <- splitAppTy_maybe ty
+        = collectInjVars ty1 `unionVarSet` collectInjVars ty2
+      collectInjVars (TyVarTy v)
+        = unitVarSet v
+      collectInjVars (TyConApp tc tys)
+        | isTypeFamilyTyCon tc = collectInjTFVars tys
+                                                 (familyTyConInjectivityInfo tc)
+        | otherwise            = mapUnionVarSet collectInjVars tys
+      collectInjVars (LitTy {})
+        = emptyVarSet
+      collectInjVars (FunTy arg res)
+        = collectInjVars arg `unionVarSet` collectInjVars res
+      collectInjVars (AppTy fun arg)
+        = collectInjVars fun `unionVarSet` collectInjVars arg
+      -- no forall types in the RHS of a type family
+      collectInjVars (ForAllTy _ _)    =
+          panic "unusedInjTvsInRHS.collectInjVars"
+
+      collectInjTFVars :: [Type] -> Injectivity -> VarSet
+      collectInjTFVars _ NotInjective
+          = emptyVarSet
+      collectInjTFVars tys (Injective injList)
+          = mapUnionVarSet collectInjVars (filterByList injList tys)
+
+
+-- | Is type headed by a type family application?
+isTFHeaded :: Type -> Bool
+-- See Note [Verifying injectivity annotation]. This function implements third
+-- check described there.
+isTFHeaded ty | Just ty' <- tcView ty
+              = isTFHeaded ty'
+isTFHeaded ty | (TyConApp tc args) <- ty
+              , isTypeFamilyTyCon tc
+              = tyConArity tc == length args
+isTFHeaded _  = False
+
+
+-- | If a RHS is a bare type variable return a set of LHS patterns that are not
+-- bare type variables.
+bareTvInRHSViolated :: [Type] -> Type -> [Type]
+-- See Note [Verifying injectivity annotation]. This function implements second
+-- check described there.
+bareTvInRHSViolated pats rhs | isTyVarTy rhs
+   = filter (not . isTyVarTy) pats
+bareTvInRHSViolated _ _ = []
 
 
 conflictInstErr :: FamInst -> [FamInstMatch] -> TcRn ()
