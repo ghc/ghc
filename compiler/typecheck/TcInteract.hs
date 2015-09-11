@@ -1378,8 +1378,7 @@ reduce_top_fun_eq old_ev fsk ax_co rhs_ty
   = shortCutReduction old_ev fsk ax_co tc tc_args
        -- Try shortcut; see Note [Short cut for top-level reaction]
 
-  | ASSERT( not (isDerived old_ev) )   -- CFunEqCan is never Derived
-    isGiven old_ev  -- Not shortcut
+  | isGiven old_ev  -- Not shortcut
   = do { let final_co = mkTcSymCo (ctEvCoercion old_ev) `mkTcTransCo` ax_co
               -- final_co :: fsk ~ rhs_ty
        ; new_ev <- newGivenEvVar deeper_loc (mkTcEqPred (mkTyVarTy fsk) rhs_ty,
@@ -1387,6 +1386,7 @@ reduce_top_fun_eq old_ev fsk ax_co rhs_ty
        ; emitWorkNC [new_ev] -- Non-cannonical; that will mean we flatten rhs_ty
        ; stopWith old_ev "Fun/Top (given)" }
 
+  -- So old_ev is Wanted or Derived
   | not (fsk `elemVarSet` tyVarsOfType rhs_ty)
   = do { dischargeFmv old_ev fsk ax_co rhs_ty
        ; traceTcS "doTopReactFunEq" $
@@ -1396,8 +1396,16 @@ reduce_top_fun_eq old_ev fsk ax_co rhs_ty
 
   | otherwise -- We must not assign ufsk := ...ufsk...!
   = do { alpha_ty <- newFlexiTcSTy (tyVarKind fsk)
-       ; new_ev <- newWantedEvVarNC loc (mkTcEqPred alpha_ty rhs_ty)
-       ; emitWorkNC [new_ev]
+       ; let pred = mkTcEqPred alpha_ty rhs_ty
+       ; new_ev <- case old_ev of
+           CtWanted {}  -> do { ev <- newWantedEvVarNC loc pred
+                              ; updWorkListTcS (extendWorkListEq (mkNonCanonical ev))
+                              ; return ev }
+           CtDerived {} -> do { ev <- newDerivedNC loc pred
+                              ; updWorkListTcS (extendWorkListDerived loc ev)
+                              ; return ev }
+           _ -> pprPanic "reduce_top_fun_eq" (ppr old_ev)
+
             -- By emitting this as non-canonical, we deal with all
             -- flattening, occurs-check, and ufsk := ufsk issues
        ; let final_co = ax_co `mkTcTransCo` mkTcSymCo (ctEvCoercion new_ev)
@@ -1536,6 +1544,8 @@ dischargeFmv :: CtEvidence -> TcTyVar -> TcCoercion -> TcType -> TcS ()
 -- Then set fmv := xi,
 --      set ev := co
 --      kick out any inert things that are now rewritable
+--
+-- Does not evaluate 'co' if 'ev' is Derived
 dischargeFmv ev fmv co xi
   = ASSERT2( not (fmv `elemVarSet` tyVarsOfType xi), ppr ev $$ ppr fmv $$ ppr xi )
     do { setEvBindIfWanted ev (EvCoercion co)

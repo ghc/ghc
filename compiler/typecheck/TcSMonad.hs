@@ -6,7 +6,7 @@ module TcSMonad (
     -- The work list
     WorkList(..), isEmptyWorkList, emptyWorkList,
     extendWorkListNonEq, extendWorkListCt, extendWorkListDerived,
-    extendWorkListCts, appendWorkList,
+    extendWorkListCts, extendWorkListEq, appendWorkList,
     selectNextWorkItem,
     workListSize, workListWantedCount,
     updWorkListTcS,
@@ -25,7 +25,7 @@ module TcSMonad (
     -- Evidence creation and transformation
     Freshness(..), freshGoals, isFresh,
 
-    newTcEvBinds, newWantedEvVar, newWantedEvVarNC,
+    newTcEvBinds, newWantedEvVar, newWantedEvVarNC, newDerivedNC,
     unifyTyVar, unflattenFmv, reportUnifications,
     setEvBind, setWantedEvBind, setEvBindIfWanted,
     newEvVar, newGivenEvVar, newGivenEvVars,
@@ -539,8 +539,10 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
 
        , inert_funeqs :: FunEqMap Ct
               -- All CFunEqCans; index is the whole family head type.
-              -- Hence (by CFunEqCan invariants),
-              -- all Nominal, and all Given/Wanted (no Derived)
+              -- All Nominal (that's an invarint of all CFunEqCans)
+              -- We can get Derived ones from e.g.
+              --   (a) flattening derived equalities
+              --   (b) emitDerivedShadows
 
        , inert_dicts :: DictMap Ct
               -- Dictionaries only, index is the class
@@ -1560,7 +1562,7 @@ After solving the Givens we take two things out of the inert set
            We get [D] 1 <= n, and we must remove it!
          Otherwise we unflatten it more then once, and assign
          to its fmv more than once...disaster.
-     It's ok to remove them because they turned ont not to
+     It's ok to remove them because they turned not not to
      yield an insoluble, and hence have now done their work.
 -}
 

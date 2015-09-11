@@ -1146,7 +1146,6 @@ data Ct
        --   * isTypeFamilyTyCon cc_fun
        --   * typeKind (F xis) = tyVarKind fsk
        --   * always Nominal role
-       --   * always Given or Wanted, never Derived
       cc_ev     :: CtEvidence,  -- See Note [Ct/evidence invariant]
       cc_fun    :: TyCon,       -- A type function
 
