@@ -3043,7 +3043,7 @@ foldl f z (Stream step s _) = foldl_loop SPEC z s
           </term>
           <listitem>
             <para><emphasis>On by default.</emphasis>
-            Specialise <literal>INLINABLE</literal> (<xreg linked="inlinable-pragma"/>)
+            Specialise <literal>INLINABLE</literal> (<xref linkend="inlinable-pragma"/>)
             type-class-overloaded functions imported from other modules for the
             types at which they are called in this module. Note that specialisation must
             be enabled (by <literal>-fspecialise</literal>) for this to have any effect.

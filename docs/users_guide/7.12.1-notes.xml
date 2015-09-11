@@ -222,7 +222,7 @@
                      groups, unlike splices of the form
                      <literal>$(...)</literal>. This behavior has been
                      preserved under the new implementation, and is now
-                     recognized and documented in <xref linked="th-syntax"/>.
+                     recognized and documented in <xref linkend="th-syntax"/>.
                 </para>
             </listitem>
        </itemizedlist>
