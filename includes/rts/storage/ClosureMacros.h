@@ -314,13 +314,13 @@ EXTERN_INLINE StgOffset pap_sizeW( StgPAP* x );
 EXTERN_INLINE StgOffset pap_sizeW( StgPAP* x )
 { return PAP_sizeW(x->n_args); }
 
-EXTERN_INLINE StgWord arr_words_words( StgArrWords* x);
-EXTERN_INLINE StgWord arr_words_words( StgArrWords* x)
+EXTERN_INLINE StgWord arr_words_words( StgArrBytes* x);
+EXTERN_INLINE StgWord arr_words_words( StgArrBytes* x)
 { return ROUNDUP_BYTES_TO_WDS(x->bytes); }
 
-EXTERN_INLINE StgOffset arr_words_sizeW( StgArrWords* x );
-EXTERN_INLINE StgOffset arr_words_sizeW( StgArrWords* x )
-{ return sizeofW(StgArrWords) + arr_words_words(x); }
+EXTERN_INLINE StgOffset arr_words_sizeW( StgArrBytes* x );
+EXTERN_INLINE StgOffset arr_words_sizeW( StgArrBytes* x )
+{ return sizeofW(StgArrBytes) + arr_words_words(x); }
 
 EXTERN_INLINE StgOffset mut_arr_ptrs_sizeW( StgMutArrPtrs* x );
 EXTERN_INLINE StgOffset mut_arr_ptrs_sizeW( StgMutArrPtrs* x )
@@ -381,7 +381,7 @@ closure_sizeW_ (StgClosure *p, StgInfoTable *info)
     case IND_PERM:
         return sizeofW(StgInd);
     case ARR_WORDS:
-        return arr_words_sizeW((StgArrWords *)p);
+        return arr_words_sizeW((StgArrBytes *)p);
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:

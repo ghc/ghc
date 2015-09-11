@@ -57,11 +57,11 @@ stg_newByteArrayzh ( W_ n )
     MAYBE_GC_N(stg_newByteArrayzh, n);
 
     payload_words = ROUNDUP_BYTES_TO_WDS(n);
-    words = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
+    words = BYTES_TO_WDS(SIZEOF_StgArrBytes) + payload_words;
     ("ptr" p) = ccall allocate(MyCapability() "ptr",words);
-    TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
+    TICK_ALLOC_PRIM(SIZEOF_StgArrBytes,WDS(payload_words),0);
     SET_HDR(p, stg_ARR_WORDS_info, CCCS);
-    StgArrWords_bytes(p) = n;
+    StgArrBytes_bytes(p) = n;
     return (p);
 }
 
@@ -80,7 +80,7 @@ stg_newPinnedByteArrayzh ( W_ n )
     payload_words = ROUNDUP_BYTES_TO_WDS(bytes);
     /* When we actually allocate memory, we need to allow space for the
        header: */
-    bytes = bytes + SIZEOF_StgArrWords;
+    bytes = bytes + SIZEOF_StgArrBytes;
     /* And we want to align to BA_ALIGN bytes, so we need to allow space
        to shift up to BA_ALIGN - 1 bytes: */
     bytes = bytes + BA_ALIGN - 1;
@@ -88,14 +88,14 @@ stg_newPinnedByteArrayzh ( W_ n )
     words = ROUNDUP_BYTES_TO_WDS(bytes);
 
     ("ptr" p) = ccall allocatePinned(MyCapability() "ptr", words);
-    TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
+    TICK_ALLOC_PRIM(SIZEOF_StgArrBytes,WDS(payload_words),0);
 
     /* Now we need to move p forward so that the payload is aligned
        to BA_ALIGN bytes: */
-    p = p + ((-p - SIZEOF_StgArrWords) & BA_MASK);
+    p = p + ((-p - SIZEOF_StgArrBytes) & BA_MASK);
 
     SET_HDR(p, stg_ARR_WORDS_info, CCCS);
-    StgArrWords_bytes(p) = n;
+    StgArrBytes_bytes(p) = n;
     return (p);
 }
 
@@ -118,7 +118,7 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
 
     /* When we actually allocate memory, we need to allow space for the
        header: */
-    bytes = bytes + SIZEOF_StgArrWords;
+    bytes = bytes + SIZEOF_StgArrBytes;
     /* And we want to align to <alignment> bytes, so we need to allow space
        to shift up to <alignment - 1> bytes: */
     bytes = bytes + alignment - 1;
@@ -126,15 +126,15 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
     words = ROUNDUP_BYTES_TO_WDS(bytes);
 
     ("ptr" p) = ccall allocatePinned(MyCapability() "ptr", words);
-    TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
+    TICK_ALLOC_PRIM(SIZEOF_StgArrBytes,WDS(payload_words),0);
 
     /* Now we need to move p forward so that the payload is aligned
        to <alignment> bytes. Note that we are assuming that
        <alignment> is a power of 2, which is technically not guaranteed */
-    p = p + ((-p - SIZEOF_StgArrWords) & (alignment - 1));
+    p = p + ((-p - SIZEOF_StgArrBytes) & (alignment - 1));
 
     SET_HDR(p, stg_ARR_WORDS_info, CCCS);
-    StgArrWords_bytes(p) = n;
+    StgArrBytes_bytes(p) = n;
     return (p);
 }
 
@@ -143,11 +143,11 @@ stg_shrinkMutableByteArrayzh ( gcptr mba, W_ new_size )
 // MutableByteArray# s -> Int# -> State# s -> State# s
 {
    ASSERT(new_size >= 0);
-   ASSERT(new_size <= StgArrWords_bytes(mba));
+   ASSERT(new_size <= StgArrBytes_bytes(mba));
 
-   OVERWRITING_CLOSURE_OFS(mba, (BYTES_TO_WDS(SIZEOF_StgArrWords) +
+   OVERWRITING_CLOSURE_OFS(mba, (BYTES_TO_WDS(SIZEOF_StgArrBytes) +
                                  ROUNDUP_BYTES_TO_WDS(new_size)));
-   StgArrWords_bytes(mba) = new_size;
+   StgArrBytes_bytes(mba) = new_size;
    LDV_RECORD_CREATE(mba);
 
    return ();
@@ -169,9 +169,9 @@ stg_resizzeMutableByteArrayzh ( gcptr mba, W_ new_size )
    new_size_wds = ROUNDUP_BYTES_TO_WDS(new_size);
 
    if (new_size_wds <= BYTE_ARR_WDS(mba)) {
-      OVERWRITING_CLOSURE_OFS(mba, (BYTES_TO_WDS(SIZEOF_StgArrWords) +
+      OVERWRITING_CLOSURE_OFS(mba, (BYTES_TO_WDS(SIZEOF_StgArrBytes) +
                                     new_size_wds));
-      StgArrWords_bytes(mba) = new_size;
+      StgArrBytes_bytes(mba) = new_size;
       LDV_RECORD_CREATE(mba);
 
       return (mba);
@@ -186,7 +186,7 @@ stg_resizzeMutableByteArrayzh ( gcptr mba, W_ new_size )
 
       // copy over old content
       prim %memcpy(BYTE_ARR_CTS(new_mba), BYTE_ARR_CTS(mba),
-                   StgArrWords_bytes(mba), SIZEOF_W);
+                   StgArrBytes_bytes(mba), SIZEOF_W);
 
       return (new_mba);
    }
@@ -199,7 +199,7 @@ stg_casIntArrayzh( gcptr arr, W_ ind, W_ old, W_ new )
 {
     W_ p, h;
 
-    p = arr + SIZEOF_StgArrWords + WDS(ind);
+    p = arr + SIZEOF_StgArrBytes + WDS(ind);
     (h) = ccall cas(p, old, new);
 
     return(h);
@@ -1927,7 +1927,7 @@ stg_newBCOzh ( P_ instrs,
     i = 0;
 for:
     if (i < BYTE_ARR_WDS(bitmap_arr)) {
-        StgBCO_bitmap(bco,i) = StgArrWords_payload(bitmap_arr,i);
+        StgBCO_bitmap(bco,i) = StgArrBytes_payload(bitmap_arr,i);
         i = i + 1;
         goto for;
     }
@@ -1988,7 +1988,7 @@ stg_unpackClosurezh ( P_ closure )
 out:
 
     W_ ptrs_arr_sz, ptrs_arr_cards, nptrs_arr_sz;
-    nptrs_arr_sz = SIZEOF_StgArrWords   + WDS(nptrs);
+    nptrs_arr_sz = SIZEOF_StgArrBytes   + WDS(nptrs);
     ptrs_arr_cards = mutArrPtrsCardWords(ptrs);
     ptrs_arr_sz  = SIZEOF_StgMutArrPtrs + WDS(ptrs) + WDS(ptrs_arr_cards);
 
@@ -2016,7 +2016,7 @@ for:
        is promoted. */
 
     SET_HDR(nptrs_arr, stg_ARR_WORDS_info, CCCS);
-    StgArrWords_bytes(nptrs_arr) = WDS(nptrs);
+    StgArrBytes_bytes(nptrs_arr) = WDS(nptrs);
     p = 0;
 for2:
     if(p < nptrs) {

@@ -412,9 +412,9 @@ wanteds = concat
           ,closureSize  Both "StgSmallMutArrPtrs"
           ,closureField Both "StgSmallMutArrPtrs" "ptrs"
 
-          ,closureSize    Both "StgArrWords"
-          ,closureField   Both "StgArrWords" "bytes"
-          ,closurePayload C    "StgArrWords" "payload"
+          ,closureSize    Both "StgArrBytes"
+          ,closureField   Both "StgArrBytes" "bytes"
+          ,closurePayload C    "StgArrBytes" "payload"
 
           ,closureField  C    "StgTSO"      "_link"
           ,closureField  C    "StgTSO"      "global_link"

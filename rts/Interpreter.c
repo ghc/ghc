@@ -843,7 +843,7 @@ run_BCO:
         case bci_BRK_FUN:
         {
             int arg1_brk_array, arg2_array_index, arg3_freeVars;
-            StgArrWords *breakPoints;
+            StgArrBytes *breakPoints;
             int returning_from_break;     // are we resuming execution from a breakpoint?
                                           //  if yes, then don't break this time around
             StgClosure *ioAction;         // the io action to run at a breakpoint
@@ -864,7 +864,7 @@ run_BCO:
             // and continue executing
             if (!returning_from_break)
             {
-               breakPoints = (StgArrWords *) BCO_PTR(arg1_brk_array);
+               breakPoints = (StgArrBytes *) BCO_PTR(arg1_brk_array);
 
                // stop the current thread if either the
                // "rts_stop_next_breakpoint" flag is true OR if the

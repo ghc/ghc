@@ -297,8 +297,8 @@ printClosure( StgClosure *obj )
         {
             StgWord i;
             debugBelch("ARR_WORDS(\"");
-            for (i=0; i<arr_words_words((StgArrWords *)obj); i++)
-              debugBelch("%" FMT_Word, (W_)((StgArrWords *)obj)->payload[i]);
+            for (i=0; i<arr_words_words((StgArrBytes *)obj); i++)
+              debugBelch("%" FMT_Word, (W_)((StgArrBytes *)obj)->payload[i]);
             debugBelch("\")\n");
             break;
         }

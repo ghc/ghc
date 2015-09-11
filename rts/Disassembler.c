@@ -33,7 +33,7 @@ disInstr ( StgBCO *bco, int pc )
 
    StgWord16*     instrs      = (StgWord16*)(bco->instrs->payload);
 
-   StgArrWords*   literal_arr = bco->literals;
+   StgArrBytes*   literal_arr = bco->literals;
    StgWord*       literals    = (StgWord*)(&literal_arr->payload[0]);
 
    StgMutArrPtrs* ptrs_arr    = bco->ptrs;

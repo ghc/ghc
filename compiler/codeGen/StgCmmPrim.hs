@@ -318,17 +318,17 @@ emitPrimOp dflags [] WriteMutVarOp [mutv,var]
                 [(CmmReg (CmmGlobal BaseReg), AddrHint), (mutv,AddrHint)]
 
 --  #define sizzeofByteArrayzh(r,a) \
---     r = ((StgArrWords *)(a))->bytes
+--     r = ((StgArrBytes *)(a))->bytes
 emitPrimOp dflags [res] SizeofByteArrayOp [arg]
    = emit $ mkAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
 
 --  #define sizzeofMutableByteArrayzh(r,a) \
---      r = ((StgArrWords *)(a))->bytes
+--      r = ((StgArrBytes *)(a))->bytes
 emitPrimOp dflags [res] SizeofMutableByteArrayOp [arg]
    = emitPrimOp dflags [res] SizeofByteArrayOp [arg]
 
 --  #define getSizzeofMutableByteArrayzh(r,a) \
---      r = ((StgArrWords *)(a))->bytes
+--      r = ((StgArrBytes *)(a))->bytes
 emitPrimOp dflags [res] GetSizeofMutableByteArrayOp [arg]
    = emitAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
 
@@ -1640,7 +1640,7 @@ doNewByteArrayOp res_r n = do
 
     base <- allocHeapClosure rep info_ptr curCCS
                      [ (mkIntExpr dflags n,
-                        hdr_size + oFFSET_StgArrWords_bytes dflags)
+                        hdr_size + oFFSET_StgArrBytes_bytes dflags)
                      ]
 
     emit $ mkAssign (CmmLocal res_r) base
