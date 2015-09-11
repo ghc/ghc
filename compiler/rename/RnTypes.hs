@@ -22,7 +22,7 @@ module RnTypes (
         -- Binding related stuff
         warnContextQuantification, warnUnusedForAlls,
         bindSigTyVarsFV, bindHsTyVars, rnHsBndrSig, rnLHsTyVarBndr,
-        extractHsTyRdrTyVars, extractHsTysRdrTyVars, extractTyVarBndrNames,
+        extractHsTyRdrTyVars, extractHsTysRdrTyVars,
         extractRdrKindSigVars, extractDataDefnKindVars,
         filterInScope
   ) where
@@ -48,7 +48,6 @@ import Outputable
 import FastString
 import Maybes
 import Data.List        ( nub, nubBy, deleteFirstsBy )
-import qualified Data.Set as Set
 import Control.Monad    ( unless, when )
 
 #if __GLASGOW_HASKELL__ < 709
@@ -1122,17 +1121,6 @@ extractHsTysRdrTyVars :: [LHsType RdrName] -> FreeKiTyVars
 extractHsTysRdrTyVars ty
   = case extract_ltys ty ([],[]) of
      (kvs, tvs) -> (nub kvs, nub tvs)
-
--- Extracts variable names used in a type variable binder. Note that HsType
--- represents data and type constructors as type variables and so this function
--- will also return data and type constructors.
-extractTyVarBndrNames :: LHsTyVarBndr RdrName -> Set.Set RdrName
-extractTyVarBndrNames (L _ (UserTyVar name))
-  = Set.singleton name
-extractTyVarBndrNames (L _ (KindedTyVar (L _ name) k))
-  = Set.singleton name `Set.union` (Set.fromList tvs)
-                       `Set.union` (Set.fromList kvs)
-    where (kvs, tvs) = extractHsTyRdrTyVars k
 
 extractRdrKindSigVars :: LFamilyResultSig RdrName -> [RdrName]
 extractRdrKindSigVars (L _ resultSig)

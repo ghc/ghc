@@ -12,7 +12,6 @@ module TcValidity (
   checkValidInstance, validDerivPred,
   checkInstTermination,
   checkValidCoAxiom, checkValidCoAxBranch,
-  checkTyFamFreeness,
   checkConsistentFamInst,
   arityErr, badATErr
   ) where

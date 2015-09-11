@@ -11,9 +11,7 @@ module FamInst (
         newFamInst,
 
         -- * Injectivity
-        makeInjectivityErrors,
-
-        tfHeadedErr, bareVariableInRHSErr
+        makeInjectivityErrors
     ) where
 
 import HscTypes

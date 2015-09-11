@@ -32,8 +32,7 @@ module Outputable (
         sep, cat,
         fsep, fcat,
         hang, punctuate, ppWhen, ppUnless,
-        speakNth, speakNTimes, speakN, speakNOf, plural,
-        thirdPerson, isOrAre, doOrDoes,
+        speakNth, speakN, speakNOf, plural, isOrAre, doOrDoes,
 
         coloured, PprColour, colType, colCoerc, colDataCon,
         colBinder, bold, keyword,
@@ -976,16 +975,6 @@ speakNOf 0 d = ptext (sLit "no") <+> d <> char 's'
 speakNOf 1 d = ptext (sLit "one") <+> d                 -- E.g. "one argument"
 speakNOf n d = speakN n <+> d <> char 's'               -- E.g. "three arguments"
 
--- | Converts a strictly positive integer into a number of times:
---
--- > speakNTimes 1 = text "once"
--- > speakNTimes 2 = text "twice"
--- > speakNTimes 4 = text "4 times"
-speakNTimes :: Int {- >=1 -} -> SDoc
-speakNTimes t | t == 1     = ptext (sLit "once")
-              | t == 2     = ptext (sLit "twice")
-              | otherwise  = speakN t <+> ptext (sLit "times")
-
 -- | Determines the pluralisation suffix appropriate for the length of a list:
 --
 -- > plural [] = char 's'
@@ -994,16 +983,6 @@ speakNTimes t | t == 1     = ptext (sLit "once")
 plural :: [a] -> SDoc
 plural [_] = empty  -- a bit frightening, but there you are
 plural _   = char 's'
-
--- | Determines the suffix to use in 3rd person singular depending on the length
--- of a list:
---
--- > thirdPerson [] = empty
--- > thirdPerson ["Hello"] = char 's'
--- > thirdPerson ["Hello", "World"] = empty
-thirdPerson :: [a] -> SDoc
-thirdPerson [_] = char 's'
-thirdPerson  _  = empty
 
 -- | Determines the form of to be appropriate for the length of a list:
 --
