@@ -162,10 +162,8 @@ tcTyClGroup tyclds
            -- expects well-formed TyCons
        ; tcExtendGlobalEnv tyclss $ do
        { traceTc "Starting validity check" (ppr tyclss)
-       ; checkNoErrs $
-         mapM_ (recoverM (return ()) . checkValidTyCl) tyclss
+       ; mapM_ (recoverM (return ()) . checkValidTyCl) tyclss
            -- We recover, which allows us to report multiple validity errors
-           -- the checkNoErrs is necessary to fix #7175.
        ; mapM_ (recoverM (return ()) . checkValidRoleAnnots role_annots) tyclss
            -- See Note [Check role annotations in a second pass]
 
@@ -1285,6 +1283,9 @@ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl        -- Data types
                       ResTyGADT ls ty -> ResTyGADT ls <$> zonkTcTypeToType ze ty
 
        ; let (univ_tvs, ex_tvs, eq_preds, res_ty') = rejigConRes tmpl_tvs res_tmpl qtkvs res_ty
+             -- NB: this is a /lazy/ binding, so we pass four thunks to buildDataCon
+             --     without yet forcing the guards in rejigConRes
+             -- See Note [Checking GADT return types]
 
        ; fam_envs <- tcGetFamInstEnvs
        ; let
@@ -1375,7 +1376,7 @@ There is a delicacy around checking the return types of a datacon. The
 central problem is dealing with a declaration like
 
   data T a where
-    MkT :: a -> Q a
+    MkT :: T a -> Q a
 
 Note that the return type of MkT is totally bogus. When creating the T
 tycon, we also need to create the MkT datacon, which must have a "rejigged"
@@ -1383,14 +1384,17 @@ return type. That is, the MkT datacon's type must be transformed to have
 a uniform return type with explicit coercions for GADT-like type parameters.
 This rejigging is what rejigConRes does. The problem is, though, that checking
 that the return type is appropriate is much easier when done over *Type*,
-not *HsType*.
+not *HsType*, and doing a call to tcMatchTy will loop because T isn't fully
+defined yet.
 
-So, we want to make rejigConRes lazy and then check the validity of the return
-type in checkValidDataCon. But, if the return type is bogus, rejigConRes can't
-work -- it will have a failed pattern match. Luckily, if we run
-checkValidDataCon before ever looking at the rejigged return type
-(checkValidDataCon checks the dataConUserType, which is not rejigged!), we
-catch the error before forcing the rejigged type and panicking.
+So, we want to make rejigConRes lazy and then check the validity of
+the return type in checkValidDataCon.  To do this we /always/ return a
+4-tuple from rejigConRes (so that we can extract ret_ty from it, which
+checkValidDataCon needs), but the first three fields may be bogus if
+the return type isn't valid (the last equation for rejigConRes).
+
+This is better than an earlier solution which reduced the number of
+errors reported in one pass.  See Trac #7175, and #10836.
 -}
 
 -- Example
@@ -1432,20 +1436,27 @@ rejigConRes tmpl_tvs res_tmpl dc_tvs (ResTyGADT _ res_ty)
         --          z
         -- Existentials are the leftover type vars: [x,y]
         -- So we return ([a,b,z], [x,y], [a~(x,y),b~z], T [(x,y)] z z)
+  | Just subst <- tcMatchTy (mkVarSet tmpl_tvs) res_tmpl res_ty
+  , (univ_tvs, eq_spec) <- foldr (choose subst) ([], []) tmpl_tvs
+  , let ex_tvs = dc_tvs `minusList` univ_tvs
   = (univ_tvs, ex_tvs, eq_spec, res_ty)
-  where
-    Just subst = tcMatchTy (mkVarSet tmpl_tvs) res_tmpl res_ty
-                -- This 'Just' pattern is sure to match, because if not
-                -- checkValidDataCon will complain first.
-                -- But care: this only works if the result of rejigConRes
-                --           is not demanded until checkValidDataCon has
-                --           first succeeded
-                -- See Note [Checking GADT return types]
 
-                -- /Lazily/ figure out the univ_tvs etc
-                -- Each univ_tv is either a dc_tv or a tmpl_tv
-    (univ_tvs, eq_spec) = foldr choose ([], []) tmpl_tvs
-    choose tmpl (univs, eqs)
+  | otherwise
+        -- If the return type of the data constructor doesn't match the parent
+        -- type constructor, or the arity is wrong, the tcMatchTy will fail
+        --    e.g   data T a b where
+        --            T1 :: Maybe a   -- Wrong tycon
+        --            T2 :: T [a]     -- Wrong arity
+        -- We are detect that later, in checkValidDataCon, but meanwhile
+        -- we must do *something*, not just crash.  So we do something simple
+        -- albeit bogus, relying on checkValidDataCon to check the
+        --  bad-result-type error before seeing that the other fields look odd
+        -- See Note [Checking GADT return types]
+  = (tmpl_tvs, dc_tvs `minusList` tmpl_tvs, [], res_ty)
+  where
+    -- Figure out the univ_tvs etc
+    -- Each univ_tv is either a dc_tv or a tmpl_tv
+    choose subst tmpl (univs, eqs)
       | Just ty <- lookupTyVar subst tmpl
       = case tcGetTyVar_maybe ty of
           Just tv | not (tv `elem` univs)
@@ -1454,7 +1465,6 @@ rejigConRes tmpl_tvs res_tmpl dc_tvs (ResTyGADT _ res_ty)
                      where  -- see Note [Substitution in template variables kinds]
                        new_tmpl = updateTyVarKind (substTy subst) tmpl
       | otherwise = pprPanic "tcResultType" (ppr res_ty)
-    ex_tvs = dc_tvs `minusList` univ_tvs
 
 {-
 Note [Substitution in template variables kinds]
@@ -1633,9 +1643,10 @@ checkValidDataCon dflags existential_ok tc con
     do  { -- Check that the return type of the data constructor
           -- matches the type constructor; eg reject this:
           --   data T a where { MkT :: Bogus a }
-          -- c.f. Note [Check role annotations in a second pass]
-          --  and Note [Checking GADT return types]
-          let tc_tvs = tyConTyVars tc
+          -- It's important to do this first:
+          --  see Note [Checking GADT return types]
+          --  and c.f. Note [Check role annotations in a second pass]
+          let tc_tvs      = tyConTyVars tc
               res_ty_tmpl = mkFamilyTyConApp tc (mkTyVarTys tc_tvs)
               orig_res_ty = dataConOrigResTy con
         ; traceTc "checkValidDataCon" (vcat
