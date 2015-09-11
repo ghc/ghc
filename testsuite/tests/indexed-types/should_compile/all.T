@@ -262,4 +262,4 @@ test('T10507', normal, compile, [''])
 test('T10634', normal, compile, [''])
 test('T10713', normal, compile, [''])
 test('T10753', normal, compile, [''])
-
+test('T10806', normal, compile_fail, [''])
