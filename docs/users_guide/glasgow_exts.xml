@@ -1888,7 +1888,7 @@ fmap         GHC.Base               forall a b. (a-&gt;b) -&gt; n a -&gt; n b
 mzip         Control.Monad.Zip      forall a b. m a -&gt; m b -&gt; m (a,b)
 </programlisting>
 The comprehension should typecheck when its desugaring would typecheck,
-except that (as discussed in <xref linkend=""/>)
+except that (as discussed in <xref linkend="generalised-list-comprehensions"/>)
 in the "then f" and "then group using f" clauses,
 when the "by b" qualifier is omitted, argument f should have a polymorphic type.
 In particular, "then Data.List.sort" and
