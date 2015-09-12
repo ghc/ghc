@@ -2082,7 +2082,7 @@ genCCall _ is32Bit target dest_regs args = do
                                 MOV format (OpReg rdx) (OpReg reg_h),
                                 MOV format (OpReg rax) (OpReg reg_l)]
                return code
-        _ -> panic "genCCall: Wrong number of arguments/results for add2"
+        _ -> panic "genCCall: Wrong number of arguments/results for mul2"
 
     _ -> if is32Bit
          then genCCall32' dflags target dest_regs args
