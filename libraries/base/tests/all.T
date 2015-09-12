@@ -77,10 +77,13 @@ test('dynamic002',      normal, compile_and_run, [''])
 test('dynamic003',      extra_run_opts('+RTS -K32m -RTS'), compile_and_run, [''])
 test('dynamic004',      omit_ways(['normal', 'threaded1', 'ghci']), compile_and_run, [''])
 test('dynamic005',      normal, compile_and_run, [''])
-test('enum01',          when(fast(), skip), compile_and_run, [''])
-test('enum02',          when(fast(), skip), compile_and_run, [''])
-test('enum03',          when(fast(), skip), compile_and_run, [''])
-test('enum04', 		normal, compile_and_run, [''])
+
+enum_setups = [when(fast(), skip), when(opsys('mingw32'), expect_broken(9399))]
+test('enum01',          enum_setups, compile_and_run, [''])
+test('enum02',          enum_setups, compile_and_run, [''])
+test('enum03',          enum_setups, compile_and_run, [''])
+test('enum04',          normal, compile_and_run, [''])
+
 test('exceptionsrun001', expect_broken_for(10712, opt_ways), compile_and_run, [''])
 test('exceptionsrun002', 	normal, compile_and_run, [''])
 test('foldableArray',   normal, compile_and_run, [''])
