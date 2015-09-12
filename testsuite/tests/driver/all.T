@@ -382,7 +382,10 @@ test('T7060',
 test('T7130', normal, compile_fail, ['-fflul-laziness'])
 test('T7563', when(unregisterised(), skip), run_command,
      ['$MAKE -s --no-print-directory T7563'])
-test('T6037', normal, run_command,
+test('T6037',
+     # The testsuite doesn't know how to set a non-Unicode locale on Windows or Mac OS X
+     [when(opsys('mingw32'), expect_fail), when(opsys('darwin'), expect_fail)],
+     run_command,
      ['$MAKE -s --no-print-directory T6037'])
 test('T2507',
      # The testsuite doesn't know how to set a non-Unicode locale on Windows or Mac OS X
