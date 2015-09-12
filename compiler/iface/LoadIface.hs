@@ -235,61 +235,26 @@ needWiredInHomeIface _           = False
 ************************************************************************
 -}
 
--- Note [Un-ambiguous multiple interfaces]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- When a user writes an import statement, this usually causes a *single*
--- interface file to be loaded.  However, the game is different when
--- signatures are being imported.  Suppose in packages p and q we have
--- signatures:
---
---  module A where
---      foo :: Int
---
---  module A where
---      bar :: Int
---
--- If both packages are exposed and I am importing A, I should see a
--- "unified" signature:
---
---  module A where
---      foo :: Int
---      bar :: Int
---
--- The way we achieve this is having the module lookup for A load and return
--- multiple interface files, which we will then process as if there were
--- "multiple" imports:
---
---  import "p" A
---  import "q" A
---
--- Doing so does not cause any ambiguity, because any overlapping identifiers
--- are guaranteed to have the same name if the backing implementations of the
--- two signatures are the same (a condition which is checked by 'Packages'.)
-
-
 -- | Load the interface corresponding to an @import@ directive in
 -- source code.  On a failure, fail in the monad with an error message.
--- See Note [Un-ambiguous multiple interfaces] for why the return type
--- is @[ModIface]@
 loadSrcInterface :: SDoc
                  -> ModuleName
                  -> IsBootInterface     -- {-# SOURCE #-} ?
                  -> Maybe FastString    -- "package", if any
-                 -> RnM [ModIface]
+                 -> RnM ModIface
 
 loadSrcInterface doc mod want_boot maybe_pkg
   = do { res <- loadSrcInterface_maybe doc mod want_boot maybe_pkg
        ; case res of
-           Failed err       -> failWithTc err
-           Succeeded ifaces -> return ifaces }
+           Failed err      -> failWithTc err
+           Succeeded iface -> return iface }
 
--- | Like 'loadSrcInterface', but returns a 'MaybeErr'.  See also
--- Note [Un-ambiguous multiple interfaces]
+-- | Like 'loadSrcInterface', but returns a 'MaybeErr'.
 loadSrcInterface_maybe :: SDoc
                        -> ModuleName
                        -> IsBootInterface     -- {-# SOURCE #-} ?
                        -> Maybe FastString    -- "package", if any
-                       -> RnM (MaybeErr MsgDoc [ModIface])
+                       -> RnM (MaybeErr MsgDoc ModIface)
 
 loadSrcInterface_maybe doc mod want_boot maybe_pkg
   -- We must first find which Module this import refers to.  This involves
@@ -298,12 +263,9 @@ loadSrcInterface_maybe doc mod want_boot maybe_pkg
   -- interface; it will call the Finder again, but the ModLocation will be
   -- cached from the first search.
   = do { hsc_env <- getTopEnv
-       -- ToDo: findImportedModule should return a list of interfaces
        ; res <- liftIO $ findImportedModule hsc_env mod maybe_pkg
        ; case res of
-           Found _ mod -> fmap (fmap (:[]))
-                        . initIfaceTcRn
-                        $ loadInterface doc mod (ImportByUser want_boot)
+           Found _ mod -> initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
            err         -> return (Failed (cannotFindInterface (hsc_dflags hsc_env) mod err)) }
 
 -- | Load interface directly for a fully qualified 'Module'.  (This is a fairly
