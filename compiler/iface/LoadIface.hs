@@ -298,17 +298,12 @@ loadSrcInterface_maybe doc mod want_boot maybe_pkg
   -- interface; it will call the Finder again, but the ModLocation will be
   -- cached from the first search.
   = do { hsc_env <- getTopEnv
+       -- ToDo: findImportedModule should return a list of interfaces
        ; res <- liftIO $ findImportedModule hsc_env mod maybe_pkg
        ; case res of
-           FoundModule (FoundHs { fr_mod = mod })
-            -> fmap (fmap (:[]))
-             . initIfaceTcRn
-             $ loadInterface doc mod (ImportByUser want_boot)
-           FoundSigs mods _backing
-            -> initIfaceTcRn $ do
-               ms <- forM mods $ \(FoundHs { fr_mod = mod }) ->
-                          loadInterface doc mod (ImportByUser want_boot)
-               return (sequence ms)
+           Found _ mod -> fmap (fmap (:[]))
+                        . initIfaceTcRn
+                        $ loadInterface doc mod (ImportByUser want_boot)
            err         -> return (Failed (cannotFindInterface (hsc_dflags hsc_env) mod err)) }
 
 -- | Load interface directly for a fully qualified 'Module'.  (This is a fairly
@@ -746,7 +741,7 @@ findAndReadIface doc_str mod hi_boot_file
                hsc_env <- getTopEnv
                mb_found <- liftIO (findExactModule hsc_env mod)
                case mb_found of
-                   FoundExact loc mod -> do
+                   Found loc mod -> do
 
                        -- Found file, so read it
                        let file_path = addBootSuffix_maybe hi_boot_file
@@ -763,8 +758,7 @@ findAndReadIface doc_str mod hi_boot_file
                        traceIf (ptext (sLit "...not found"))
                        dflags <- getDynFlags
                        return (Failed (cannotFindInterface dflags
-                                           (moduleName mod)
-                                           (convFindExactResult err)))
+                                           (moduleName mod) err))
     where read_file file_path = do
               traceIf (ptext (sLit "readIFace") <+> text file_path)
               read_result <- readIface mod file_path

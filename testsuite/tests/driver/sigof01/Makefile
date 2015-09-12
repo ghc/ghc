@@ -21,9 +21,3 @@ sigof01m:
 	mkdir tmp_sigof01m
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) -outputdir tmp_sigof01m --make Main.hs -sig-of "B is main:A" -o tmp_sigof01m/Main
 	tmp_sigof01m/Main
-
-sigof01i:
-	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) --interactive -v0 -ignore-dot-ghci Main.hs -sig-of "B is main:A" < sigof01i.script
-
-sigof01i2:
-	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) --interactive -v0 -ignore-dot-ghci -sig-of "B is main:A" < sigof01i2.script

@@ -1361,20 +1361,6 @@ showRichTokenStream ts = go startLoc ts ""
 -- | Takes a 'ModuleName' and possibly a 'PackageKey', and consults the
 -- filesystem and package database to find the corresponding 'Module', 
 -- using the algorithm that is used for an @import@ declaration.
---
--- However, there is a twist for local modules, see #2682.
---
--- The full algorithm:
--- IF it's a package qualified import for a REMOTE package (not @this_pkg@ or
--- this), do a normal lookup.
--- OTHERWISE see if it is ALREADY loaded, and use it if it is.
--- OTHERWISE do a normal lookup, but reject the result if the found result
--- is from the LOCAL package (@this_pkg@).
---
--- For signatures, we return the BACKING implementation to keep the API
--- consistent with what we had before. (ToDo: create a new GHC API which
--- can deal with signatures.)
---
 findModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
 findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
   let 
@@ -1385,23 +1371,17 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
     Just pkg | fsToPackageKey pkg /= this_pkg && pkg /= fsLit "this" -> liftIO $ do
       res <- findImportedModule hsc_env mod_name maybe_pkg
       case res of
-        FoundModule h -> return (fr_mod h)
-        FoundSigs _ backing -> return backing
+        Found _ m -> return m
         err       -> throwOneError $ noModError dflags noSrcSpan mod_name err
     _otherwise -> do
       home <- lookupLoadedHomeModule mod_name
       case home of
-        -- TODO: This COULD be a signature
         Just m  -> return m
         Nothing -> liftIO $ do
            res <- findImportedModule hsc_env mod_name maybe_pkg
            case res of
-             FoundModule (FoundHs { fr_mod = m, fr_loc = loc })
-                | modulePackageKey m /= this_pkg -> return m
-                | otherwise -> modNotLoadedError dflags m loc
-             FoundSigs (FoundHs { fr_loc = loc, fr_mod = m }:_) backing
-                | modulePackageKey m /= this_pkg -> return backing
-                | otherwise -> modNotLoadedError dflags m loc
+             Found loc m | modulePackageKey m /= this_pkg -> return m
+                         | otherwise -> modNotLoadedError dflags m loc
              err -> throwOneError $ noModError dflags noSrcSpan mod_name err
 
 modNotLoadedError :: DynFlags -> Module -> ModLocation -> IO a
@@ -1422,13 +1402,11 @@ lookupModule mod_name (Just pkg) = findModule mod_name (Just pkg)
 lookupModule mod_name Nothing = withSession $ \hsc_env -> do
   home <- lookupLoadedHomeModule mod_name
   case home of
-    -- TODO: This COULD be a signature
     Just m  -> return m
     Nothing -> liftIO $ do
       res <- findExposedPackageModule hsc_env mod_name Nothing
       case res of
-        FoundModule (FoundHs { fr_mod = m }) -> return m
-        FoundSigs _ backing -> return backing
+        Found _ m -> return m
         err       -> throwOneError $ noModError (hsc_dflags hsc_env) noSrcSpan mod_name err
 
 lookupLoadedHomeModule :: GhcMonad m => ModuleName -> m (Maybe Module)

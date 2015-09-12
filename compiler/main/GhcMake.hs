@@ -1818,10 +1818,7 @@ findSummaryBySourceFile summaries file
         [] -> Nothing
         (x:_) -> Just x
 
--- | Summarise a module, and pick up source and timestamp.
--- Returns @Nothing@ if the module is excluded via @excl_mods@ or is an
--- external package module (which we don't compile), otherwise returns the
--- new module summary (or an error saying why we couldn't summarise it).
+-- Summarise a module, and pick up source and timestamp.
 summariseModule
           :: HscEnv
           -> NodeMap ModSummary -- Map of old summaries
@@ -1883,25 +1880,13 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
         uncacheModule hsc_env wanted_mod
         found <- findImportedModule hsc_env wanted_mod Nothing
         case found of
-             -- TODO: When we add -alias support, we can validly find
-             -- multiple signatures in the home package; need to make this
-             -- logic more flexible in that case.
-             FoundModule (FoundHs { fr_loc = location, fr_mod = mod })
+             Found location mod
                 | isJust (ml_hs_file location) ->
                         -- Home package
                          just_found location mod
                 | otherwise ->
                         -- Drop external-pkg
                         ASSERT(modulePackageKey mod /= thisPackage dflags)
-                        return Nothing
-
-             FoundSigs hs _backing
-                | Just (FoundHs { fr_loc = location, fr_mod = mod })
-                  <- find (isJust . ml_hs_file . fr_loc) hs ->
-                        just_found location mod
-                | otherwise ->
-                        ASSERT(all (\h -> modulePackageKey (fr_mod h)
-                                            /= thisPackage dflags) hs)
                         return Nothing
 
              err -> return $ Just $ Left $ noModError dflags loc wanted_mod err

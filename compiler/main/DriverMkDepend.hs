@@ -249,7 +249,7 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps
                 -- we've done it once during downsweep
           r <- findImportedModule hsc_env imp pkg
         ; case r of
-            FoundModule (FoundHs { fr_loc = loc })
+            Found loc _
                 -- Home package: just depend on the .hi or hi-boot file
                 | isJust (ml_hs_file loc) || include_pkg_deps
                 -> return (Just (addBootSuffix_maybe is_boot (ml_hi_file loc)))
@@ -257,9 +257,6 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps
                 -- Not in this package: we don't need a dependency
                 | otherwise
                 -> return Nothing
-
-            -- TODO: FoundSignature.  For now, we assume home package
-            -- "signature" dependencies look like FoundModule.
 
             fail ->
                 let dflags = hsc_dflags hsc_env

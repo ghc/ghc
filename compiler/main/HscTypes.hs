@@ -10,7 +10,7 @@
 module HscTypes (
         -- * compilation state
         HscEnv(..), hscEPS,
-        FinderCache, FindResult(..), FoundHs(..), FindExactResult(..),
+        FinderCache, FindResult(..),
         Target(..), TargetId(..), pprTarget, pprTargetId,
         ModuleGraph, emptyMG,
         HscStatus(..),
@@ -674,30 +674,15 @@ prepareAnnotations hsc_env mb_guts = do
 -- modules along the search path. On @:load@, we flush the entire
 -- contents of this cache.
 --
-type FinderCache = ModuleEnv FindExactResult
-
--- | The result of search for an exact 'Module'.
-data FindExactResult
-    = FoundExact ModLocation Module
-        -- ^ The module/signature was found
-    | NoPackageExact PackageKey
-    | NotFoundExact
-        { fer_paths     :: [FilePath]
-        , fer_pkg       :: Maybe PackageKey
-        }
-
--- | A found module or signature; e.g. anything with an interface file
-data FoundHs = FoundHs { fr_loc :: ModLocation
-                       , fr_mod :: Module
-                       -- , fr_origin :: ModuleOrigin
-                       }
+-- Although the @FinderCache@ range is 'FindResult' for convenience,
+-- in fact it will only ever contain 'Found' or 'NotFound' entries.
+--
+type FinderCache = ModuleEnv FindResult
 
 -- | The result of searching for an imported module.
 data FindResult
-  = FoundModule FoundHs
+  = Found ModLocation Module
         -- ^ The module was found
-  | FoundSigs [FoundHs] Module
-        -- ^ Signatures were found, with some backing implementation
   | NoPackage PackageKey
         -- ^ The requested package was not found
   | FoundMultiple [(Module, ModuleOrigin)]
@@ -2093,15 +2078,6 @@ type IsBootInterface = Bool
 -- Invariant: the dependencies of a module @M@ never includes @M@.
 --
 -- Invariant: none of the lists contain duplicates.
---
--- NB: While this contains information about all modules and packages below
--- this one in the the import *hierarchy*, this may not accurately reflect
--- the full runtime dependencies of the module.  This is because this module may
--- have imported a boot module, in which case we'll only have recorded the
--- dependencies from the hs-boot file, not the actual hs file. (This is
--- unavoidable: usually, the actual hs file will have been compiled *after*
--- we wrote this interface file.)  See #936, and also @getLinkDeps@ in
--- @compiler/ghci/Linker.hs@ for code which cares about this distinction.
 data Dependencies
   = Deps { dep_mods   :: [(ModuleName, IsBootInterface)]
                         -- ^ All home-package modules transitively below this one

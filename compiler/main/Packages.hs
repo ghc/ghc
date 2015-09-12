@@ -132,10 +132,9 @@ import qualified Data.Set as Set
 -- in a different DLL, by setting the DLL flag.
 
 -- | Given a module name, there may be multiple ways it came into scope,
--- possibly simultaneously.  For a given particular implementation (e.g.
--- original module, or even a signature module), this data type tracks all the
--- possible ways it could have come into scope.  Warning: don't use the record
--- functions, they're partial!
+-- possibly simultaneously.  This data type tracks all the possible ways
+-- it could have come into scope.  Warning: don't use the record functions,
+-- they're partial!
 data ModuleOrigin =
     -- | Module is hidden, and thus never will be available for import.
     -- (But maybe the user didn't realize), so we'll still keep track
@@ -159,7 +158,7 @@ data ModuleOrigin =
       }
 
 instance Outputable ModuleOrigin where
-    ppr ModHidden = text "hidden module" -- NB: cannot be signature
+    ppr ModHidden = text "hidden module"
     ppr (ModOrigin e res rhs f) = sep (punctuate comma (
         (case e of
             Nothing -> []
@@ -176,18 +175,17 @@ instance Outputable ModuleOrigin where
         (if f then [text "package flag"] else [])
         ))
 
--- | Smart constructor for a module which is in @exposed-modules@ or
--- @exposed-signatures@.  Takes as an argument whether or not the defining
--- package is exposed.
-fromExposed :: Bool -> ModuleOrigin
-fromExposed e = ModOrigin (Just e) [] [] False
+-- | Smart constructor for a module which is in @exposed-modules@.  Takes
+-- as an argument whether or not the defining package is exposed.
+fromExposedModules :: Bool -> ModuleOrigin
+fromExposedModules e = ModOrigin (Just e) [] [] False
 
--- | Smart constructor for a module which is in @reexported-modules@
--- or @reexported-signatures@.  Takes as an argument whether or not the
--- reexporting package is expsed, and also its 'PackageConfig'.
-fromReexported :: Bool -> PackageConfig -> ModuleOrigin
-fromReexported True pkg = ModOrigin Nothing [pkg] [] False
-fromReexported False pkg = ModOrigin Nothing [] [pkg] False
+-- | Smart constructor for a module which is in @reexported-modules@.  Takes
+-- as an argument whether or not the reexporting package is expsed, and
+-- also its 'PackageConfig'.
+fromReexportedModules :: Bool -> PackageConfig -> ModuleOrigin
+fromReexportedModules True pkg = ModOrigin Nothing [pkg] [] False
+fromReexportedModules False pkg = ModOrigin Nothing [] [pkg] False
 
 -- | Smart constructor for a module which was bound by a package flag.
 fromFlag :: ModuleOrigin
@@ -229,40 +227,11 @@ type PackageConfigMap = PackageKeyMap PackageConfig
 type VisibilityMap =
     PackageKeyMap (Bool, [(ModuleName, ModuleName)], FastString)
 
--- | Alias for 'Module' indicating we expect the interface in question to
--- be for a signature.
-type Signature = Module
-
--- | Alias for 'ModuleOrigin' indicating we expect it to describe a signature.
-type SignatureOrigin = ModuleOrigin
-
--- | This is the main lookup structure we use to handle imports, which map
--- from 'ModuleName' to 'ModuleDb', which describes all possible implementations
--- which are available under a module name.
-type ModuleNameDb = Map ModuleName ModuleDb
-
--- | This is an auxiliary structure per module name, and it's a map of
--- backing implementations to more information about them.  This is a map
--- so it's easy to tell if we're bringing in an implementation for a name
--- which is already in scope (and thus non-conflicting.)
-type ModuleDb = Map Module ModuleDesc
-
--- | Per backing implementation, there may be multiple signatures available
--- exporting subsets of its interface; we need to track all of them.
-type SignatureDb = Map Signature SignatureOrigin
-
--- | Combined module description for a module: includes 'ModuleOrigin'
--- describing the backing implementation, as well as 'SignatureDb' for any
--- signatures of the module in question.
-data ModuleDesc = MD ModuleOrigin SignatureDb
-
-instance Outputable ModuleDesc where
-    ppr (MD o m) = ppr o <+> parens (ppr m)
-
-instance Monoid ModuleDesc where
-    mempty = MD mempty Map.empty
-    mappend (MD o m) (MD o' m') = MD (o `mappend` o')
-                                     (Map.unionWith mappend m m')
+-- | Map from 'ModuleName' to 'Module' to all the origins of the bindings
+-- in scope.  The 'PackageConf' is not cached, mostly for convenience reasons
+-- (since this is the slow path, we'll just look it up again).
+type ModuleToPkgConfAll =
+    Map ModuleName (Map Module ModuleOrigin)
 
 data PackageState = PackageState {
   -- | A mapping of 'PackageKey' to 'PackageConfig'.  This list is adjusted
@@ -280,7 +249,7 @@ data PackageState = PackageState {
   -- | This is a full map from 'ModuleName' to all modules which may possibly
   -- be providing it.  These providers may be hidden (but we'll still want
   -- to report them in error messages), or it may be an ambiguous import.
-  moduleNameDb         :: ModuleNameDb,
+  moduleToPkgConfAll    :: ModuleToPkgConfAll,
 
   -- | This is a map from 'InstalledPackageId' to 'PackageKey', since GHC
   -- internally deals in package keys but the database may refer to installed
@@ -292,7 +261,7 @@ emptyPackageState :: PackageState
 emptyPackageState = PackageState {
     pkgIdMap = emptyUFM,
     preloadPackages = [],
-    moduleNameDb = Map.empty,
+    moduleToPkgConfAll = Map.empty,
     installedPackageIdMap = Map.empty
     }
 
@@ -1058,7 +1027,7 @@ mkPackageState dflags0 pkgs0 preload0 = do
   let pstate = PackageState{
     preloadPackages     = dep_preload,
     pkgIdMap            = pkg_db,
-    moduleNameDb  = mkModuleNameDb dflags pkg_db ipid_map vis_map,
+    moduleToPkgConfAll  = mkModuleToPkgConfAll dflags pkg_db ipid_map vis_map,
     installedPackageIdMap = ipid_map
     }
   return (pstate, new_dep_preload, this_package)
@@ -1067,70 +1036,62 @@ mkPackageState dflags0 pkgs0 preload0 = do
 -- -----------------------------------------------------------------------------
 -- | Makes the mapping from module to package info
 
-mkModuleNameDb
+mkModuleToPkgConfAll
   :: DynFlags
   -> PackageConfigMap
   -> InstalledPackageIdMap
   -> VisibilityMap
-  -> ModuleNameDb
-mkModuleNameDb dflags pkg_db ipid_map vis_map =
+  -> ModuleToPkgConfAll
+mkModuleToPkgConfAll dflags pkg_db ipid_map vis_map =
     foldl' extend_modmap emptyMap (eltsUFM pkg_db)
  where
   emptyMap = Map.empty
-  sing pk m = Map.singleton (mkModule pk m)
+  sing pk m _ = Map.singleton (mkModule pk m)
   addListTo = foldl' merge
   merge m (k, v) = Map.insertWith (Map.unionWith mappend) k v m
+  setOrigins m os = fmap (const os) m
   extend_modmap modmap pkg = addListTo modmap theBindings
    where
-    theBindings :: [(ModuleName, ModuleDb)]
+    theBindings :: [(ModuleName, Map Module ModuleOrigin)]
     theBindings | Just (b,rns,_) <- lookupUFM vis_map (packageConfigId pkg)
                               = newBindings b rns
                 | otherwise   = newBindings False []
 
     newBindings :: Bool
                 -> [(ModuleName, ModuleName)]
-                -> [(ModuleName, ModuleDb)]
+                -> [(ModuleName, Map Module ModuleOrigin)]
     newBindings e rns  = es e ++ hiddens ++ map rnBinding rns
 
     rnBinding :: (ModuleName, ModuleName)
-              -> (ModuleName, ModuleDb)
-    rnBinding (orig, new) = (new, fmap applyFlag origEntry)
+              -> (ModuleName, Map Module ModuleOrigin)
+    rnBinding (orig, new) = (new, setOrigins origEntry fromFlag)
      where origEntry = case lookupUFM esmap orig of
             Just r -> r
             Nothing -> throwGhcException (CmdLineError (showSDoc dflags
                         (text "package flag: could not find module name" <+>
                             ppr orig <+> text "in package" <+> ppr pk)))
 
-    applyFlag (MD _ sigs) = MD fromFlag (fmap (const fromFlag) sigs)
-
-    es :: Bool -> [(ModuleName, ModuleDb)]
+    es :: Bool -> [(ModuleName, Map Module ModuleOrigin)]
     es e = do
-     ExposedModule m exposedReexport exposedSignature <- exposed_mods
-     let (pk', m', origin') =
+     -- TODO: signature support
+     ExposedModule m exposedReexport _exposedSignature <- exposed_mods
+     let (pk', m', pkg', origin') =
           case exposedReexport of
-           Nothing -> (pk, m, fromExposed e)
+           Nothing -> (pk, m, pkg, fromExposedModules e)
            Just (OriginalModule ipid' m') ->
-            let (pk', pkg') = ipid_lookup ipid'
-            in (pk', m', fromReexported e pkg')
-     return $ case exposedSignature of
-        Nothing -> (m, sing pk' m' (MD origin' Map.empty))
-        Just (OriginalModule ipid'' m'') ->
-            let (pk'', _) = ipid_lookup ipid''
-            in (m, sing pk'' m'' (MD mempty (sing pk' m' origin')))
+            let pk' = expectJust "mkModuleToPkgConf" (Map.lookup ipid' ipid_map)
+                pkg' = pkg_lookup pk'
+            in (pk', m', pkg', fromReexportedModules e pkg')
+     return (m, sing pk' m' pkg' origin')
 
-
-    esmap :: UniqFM ModuleDb
+    esmap :: UniqFM (Map Module ModuleOrigin)
     esmap = listToUFM (es False) -- parameter here doesn't matter, orig will
                                  -- be overwritten
 
-    hiddens :: [(ModuleName, ModuleDb)]
-    hiddens = [(m, sing pk m (MD ModHidden Map.empty)) | m <- hidden_mods]
+    hiddens = [(m, sing pk m pkg ModHidden) | m <- hidden_mods]
 
     pk = packageConfigId pkg
-    pkg_lookup = expectJust "mkModuleNameDb" . lookupPackage' pkg_db
-    ipid_lookup ipid =
-        let pk = expectJust "mkModuleNameDb" (Map.lookup ipid ipid_map)
-        in (pk, pkg_lookup pk)
+    pkg_lookup = expectJust "mkModuleToPkgConf" . lookupPackage' pkg_db
 
     exposed_mods = exposedModules pkg
     hidden_mods = hiddenModules pkg
@@ -1240,20 +1201,16 @@ lookupModuleInAllPackages :: DynFlags
                           -> [(Module, PackageConfig)]
 lookupModuleInAllPackages dflags m
   = case lookupModuleWithSuggestions dflags m Nothing of
-      LookupFound (m,_) -> [(m,get_pkg m)]
-      LookupMultiple rs -> map (\(m,_) -> (m,get_pkg m)) rs
+      LookupFound a b -> [(a,b)]
+      LookupMultiple rs -> map f rs
+        where f (m,_) = (m, expectJust "lookupModule" (lookupPackage dflags
+                                                         (modulePackageKey m)))
       _ -> []
-      where get_pkg = expectJust "lookupModule" . lookupPackage dflags
-                                                . modulePackageKey
 
 -- | The result of performing a lookup
 data LookupResult =
     -- | Found the module uniquely, nothing else to do
-    LookupFound (Module, ModuleOrigin)
-    -- | We found (possibly multiple) signatures with a unique backing
-    -- implementation: they should be "merged" together.  For good measure,
-    -- the backing implementation is recorded too.
-  | LookupFoundSigs [(Module, ModuleOrigin)] Module
+    LookupFound Module PackageConfig
     -- | Multiple modules with the same name in scope
   | LookupMultiple [(Module, ModuleOrigin)]
     -- | No modules found, but there were some hidden ones with
@@ -1263,39 +1220,6 @@ data LookupResult =
     -- | Nothing found, here are some suggested different names
   | LookupNotFound [ModuleSuggestion] -- suggestions
 
-instance Monoid LookupResult where
-    mempty = LookupNotFound []
-
-    LookupNotFound s1   `mappend` LookupNotFound s2
-        = LookupNotFound (s1 ++ s2)
-    LookupNotFound{}    `mappend` l                 = l
-    l                   `mappend` LookupNotFound{}  = l
-
-    LookupHidden x1 y1  `mappend` LookupHidden x2 y2
-        = LookupHidden (x1 ++ x2) (y1 ++ y2)
-    LookupHidden{}      `mappend` l                 = l
-    l                   `mappend` LookupHidden{}    = l
-
-    LookupFound m1      `mappend` LookupFound m2
-        = ASSERT(fst m1 /= fst m2)             LookupMultiple [m1, m2]
-    LookupFound m       `mappend` LookupMultiple ms
-        = ASSERT(not (any ((==fst m).fst) ms)) LookupMultiple (m:ms)
-    LookupFound m       `mappend` LookupFoundSigs ms check
-        | fst m == check    = LookupFound m
-        | otherwise         = LookupMultiple (m:ms)
-    l1 `mappend` l2@LookupFound{}
-        = l2 `mappend` l1
-
-    LookupMultiple ms1  `mappend` LookupFoundSigs ms2 _
-        = LookupMultiple (ms1 ++ ms2)
-    LookupMultiple ms1  `mappend` LookupMultiple ms2
-        = LookupMultiple (ms1 ++ ms2)
-    l1  `mappend` l2@LookupMultiple{}
-        = l2 `mappend` l1
-
-    LookupFoundSigs ms1 m1 `mappend` LookupFoundSigs ms2 m2
-        = ASSERT(m1 /= m2)                     LookupMultiple (ms1 ++ ms2)
-
 data ModuleSuggestion = SuggestVisible ModuleName Module ModuleOrigin
                       | SuggestHidden ModuleName Module ModuleOrigin
 
@@ -1304,28 +1228,23 @@ lookupModuleWithSuggestions :: DynFlags
                             -> Maybe FastString
                             -> LookupResult
 lookupModuleWithSuggestions dflags m mb_pn
-  = case Map.lookup m (moduleNameDb pkg_state) of
+  = case Map.lookup m (moduleToPkgConfAll pkg_state) of
         Nothing -> LookupNotFound suggestions
-        Just xs -> mconcat (LookupNotFound suggestions
-                           :map classify (Map.toList xs))
+        Just xs ->
+          case foldl' classify ([],[],[]) (Map.toList xs) of
+            ([], [], []) -> LookupNotFound suggestions
+            (_, _, [(m, _)])             -> LookupFound m (mod_pkg m)
+            (_, _, exposed@(_:_))        -> LookupMultiple exposed
+            (hidden_pkg, hidden_mod, []) -> LookupHidden hidden_pkg hidden_mod
   where
-    classify (m, MD origin0 sigs0) =
+    classify (hidden_pkg, hidden_mod, exposed) (m, origin0) =
       let origin = filterOrigin mb_pn (mod_pkg m) origin0
-          r = (m, origin)
+          x = (m, origin)
       in case origin of
-          ModHidden                -> LookupHidden [] [r]
-          _ | originVisible origin -> LookupFound r
-            | otherwise ->
-                let sigs = do (back_m, back_origin0) <- Map.toList sigs0
-                              let back_origin = filterOrigin mb_pn
-                                                             (mod_pkg back_m)
-                                                             back_origin0
-                              guard (originVisible back_origin)
-                              return (back_m, back_origin)
-                in case sigs of
-                    [] | originEmpty origin -> LookupNotFound []
-                       | otherwise          -> LookupHidden [r] []
-                    _ -> LookupFoundSigs sigs m
+          ModHidden                  -> (hidden_pkg,   x:hidden_mod, exposed)
+          _ | originEmpty origin     -> (hidden_pkg,   hidden_mod,   exposed)
+            | originVisible origin   -> (hidden_pkg,   hidden_mod,   x:exposed)
+            | otherwise              -> (x:hidden_pkg, hidden_mod,   exposed)
 
     pkg_lookup = expectJust "lookupModuleWithSuggestions" . lookupPackage dflags
     pkg_state = pkgState dflags
@@ -1360,18 +1279,17 @@ lookupModuleWithSuggestions dflags m mb_pn
     all_mods :: [(String, ModuleSuggestion)]     -- All modules
     all_mods = sortBy (comparing fst) $
         [ (moduleNameString m, suggestion)
-        | (m, e) <- Map.toList (moduleNameDb (pkgState dflags))
+        | (m, e) <- Map.toList (moduleToPkgConfAll (pkgState dflags))
         , suggestion <- map (getSuggestion m) (Map.toList e)
         ]
-    -- For now, don't suggest implemented signatures
-    getSuggestion name (mod, MD origin _) =
+    getSuggestion name (mod, origin) =
         (if originVisible origin then SuggestVisible else SuggestHidden)
             name mod origin
 
 listVisibleModuleNames :: DynFlags -> [ModuleName]
 listVisibleModuleNames dflags =
-    map fst (filter visible (Map.toList (moduleNameDb (pkgState dflags))))
-  where visible (_, ms) = any (\(MD o _) -> originVisible o) (Map.elems ms)
+    map fst (filter visible (Map.toList (moduleToPkgConfAll (pkgState dflags))))
+  where visible (_, ms) = any originVisible (Map.elems ms)
 
 -- | Find all the 'PackageConfig' in both the preload packages from 'DynFlags' and corresponding to the list of
 -- 'PackageConfig's
@@ -1510,7 +1428,7 @@ pprPackagesSimple = pprPackagesWith pprIPI
 -- | Show the mapping of modules to where they come from.
 pprModuleMap :: DynFlags -> SDoc
 pprModuleMap dflags =
-  vcat (map pprLine (Map.toList (moduleNameDb (pkgState dflags))))
+  vcat (map pprLine (Map.toList (moduleToPkgConfAll (pkgState dflags))))
     where
       pprLine (m,e) = ppr m $$ nest 50 (vcat (map (pprEntry m) (Map.toList e)))
       pprEntry m (m',o)

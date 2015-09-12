@@ -118,12 +118,6 @@ mk/ghcconfig*_bin_ghc*.exe.mk
 /tests/cabal/sigcabal01/p_lazy
 /tests/cabal/sigcabal01/p_strict
 /tests/cabal/sigcabal01/containers
-/tests/cabal/sigcabal02/Main
-/tests/cabal/sigcabal02/p_ipid
-/tests/cabal/sigcabal02/q_ipid
-/tests/cabal/sigcabal02/containers
-/tests/cabal/sigcabal02/tmp*
-/tests/cabal/sigcabal02/inst*
 /tests/cabal/local01.package.conf/
 /tests/cabal/local03.package.conf/
 /tests/cabal/local04.package.conf/

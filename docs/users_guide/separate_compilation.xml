@@ -970,11 +970,6 @@ ghc -c A.hs
       written in a subset of Haskell essentially identical to that of
       <literal>hs-boot</literal> files.</para>
 
-      <para>Signatures can be installed like ordinary module files,
-      and when multiple signatures are brought into scope under the same
-      module name, they are merged together if their backing implementations
-      are the same.</para>
-
       <para>There is one important gotcha with the current implementation:
       currently, instances from backing implementations will "leak" code that
       uses signatures, and explicit instance declarations in signatures are
