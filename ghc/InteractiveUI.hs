@@ -1,5 +1,11 @@
-{-# LANGUAGE CPP, MagicHash, NondecreasingIndentation, TupleSections,
-             RecordWildCards #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
+
 {-# OPTIONS -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
@@ -25,6 +31,9 @@ module InteractiveUI (
 import qualified GhciMonad ( args, runStmt )
 import GhciMonad hiding ( args, runStmt )
 import GhciTags
+import GhciTypes
+import GhciInfo
+import GhciFind
 import Debugger
 
 -- The GHC interface
@@ -33,7 +42,7 @@ import ErrUtils
 import GhcMonad ( modifySession )
 import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
-             TyThing(..), Phase, BreakIndex, Resume, SingleStep, Ghc,
+             TyThing(..), Phase, BreakIndex, Resume, SingleStep, Ghc, getModuleGraph,
              handleSourceError )
 import HsImpExp
 import HsSyn
@@ -80,6 +89,7 @@ import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
 import Data.List ( find, group, intercalate, intersperse, isPrefixOf, nub,
                    partition, sort, sortBy )
 import Data.Maybe
+import qualified Data.Map as M
 
 import Exception hiding (catch)
 
@@ -192,6 +202,10 @@ ghciCommands = [
   ("steplocal", keepGoing stepLocalCmd,         completeIdentifier),
   ("stepmodule",keepGoing stepModuleCmd,        completeIdentifier),
   ("type",      keepGoing' typeOfExpr,          completeExpression),
+  ("type-at",   keepGoing' typeAt,              completeExpression),
+  ("all-types", keepGoing' allTypes,            completeExpression),
+  ("uses",      keepGoing' findAllUses,         completeExpression),
+  ("loc-at",    keepGoing' locationAt,          completeExpression),
   ("trace",     keepGoing traceCmd,             completeExpression),
   ("undef",     keepGoing undefineMacro,        completeMacro),
   ("unset",     keepGoing unsetOptions,         completeSetOptions)
@@ -268,6 +282,15 @@ defFullHelpText =
   "   :run function [<arguments> ...] run the function with the given arguments\n" ++
   "   :script <filename>          run the script <filename>\n" ++
   "   :type <expr>                show the type of <expr>\n" ++
+  "   :type-at <loc>              show the type of <loc> of format: \n" ++
+  "                               <filename> <line> <col> <end-line> <end-col> <text>\n" ++
+  "                               text is used for when the span is out of date\n" ++
+  "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
+  "   :loc-at <loc>               return the location of the identifier at <loc> of format: \n" ++
+  "                               <filename> <line> <col> <end-line> <end-col> <text>\n" ++
+  "                               text is used for when the span is out of date\n" ++
+  "   :all-types                  return a list of all types in the project including\n" ++
+  "                               sub-expressions and local bindings\n" ++
   "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
   "   :!<command>                 run the shell command <command>\n" ++
   "\n" ++
@@ -314,6 +337,7 @@ defFullHelpText =
   "    +r            revert top-level expressions after each evaluation\n" ++
   "    +s            print timing/memory stats after each evaluation\n" ++
   "    +t            print type after evaluation\n" ++
+  "    +c            collect type/location info after loading modules\n" ++
   "    -<flags>      most GHC command line flags can also be set here\n" ++
   "                         (eg. -v2, -XFlexibleInstances, etc.)\n" ++
   "                    for GHCi-specific flags, see User's Guide,\n"++
@@ -439,6 +463,7 @@ interactiveUI config srcs maybe_exprs = do
                    ghc_e              = isJust maybe_exprs,
                    short_help         = shortHelpText config,
                    long_help          = fullHelpText config,
+                   mod_infos          = M.empty,
                    lastErrorLocations = lastErrLocationsRef
                  }
 
@@ -1463,8 +1488,16 @@ loadModule' files = do
   _ <- GHC.load LoadAllTargets
 
   GHC.setTargets targets
-  doLoad False LoadAllTargets
-
+  flag <- doLoad False LoadAllTargets
+  doCollectInfo <- lift (isOptionSet CollectInfo)
+  case flag of
+    Succeeded | doCollectInfo -> do
+      loaded <- getModuleGraph >>= filterM GHC.isLoaded . map GHC.ms_mod_name
+      v <- lift (fmap mod_infos getGHCiState)
+      !newInfos <- collectInfo v loaded
+      lift (modifyGHCiState (\s -> s { mod_infos = newInfos }))
+    _ -> return ()
+  return flag
 
 -- :add
 addModule :: [FilePath] -> InputT GHCi ()
@@ -1614,6 +1647,144 @@ typeOfExpr str
   $ do
        ty <- GHC.exprType str
        printForUser $ sep [text str, nest 2 (dcolon <+> pprTypeForUser ty)]
+
+-----------------------------------------------------------------------------
+-- :type-at
+
+typeAt :: String -> InputT GHCi ()
+typeAt str =
+  handleSourceError
+    GHC.printException
+    (case parseSpan str of
+       Left err -> liftIO (putStr err)
+       Right (fp,sl,sc,el,ec,sample) ->
+         do infos <- fmap mod_infos (lift getGHCiState)
+            result <- findType infos fp sample sl sc el ec
+            case result of
+              Left err -> liftIO (putStrLn err)
+              Right (info, ty) ->
+                printForUserModInfo (modinfoInfo info)
+                  (sep [text sample,nest 2 (dcolon <+> ppr ty)]))
+
+-----------------------------------------------------------------------------
+-- :uses
+
+findAllUses :: String -> InputT GHCi ()
+findAllUses str =
+  handleSourceError GHC.printException $
+  case parseSpan str of
+    Left err -> liftIO (putStr err)
+    Right (fp,sl,sc,el,ec,sample) ->
+      do infos <- fmap mod_infos (lift getGHCiState)
+         result <- findNameUses infos fp sample sl sc el ec
+         case result of
+           Left err -> liftIO (putStrLn err)
+           Right uses ->
+             forM_ uses
+                   (\sp ->
+                      case sp of
+                        RealSrcSpan rs ->
+                          liftIO (putStrLn (showSpan rs))
+                        UnhelpfulSpan fs ->
+                          liftIO (putStrLn (unpackFS fs)))
+  where showSpan span' =
+          unpackFS (srcSpanFile span') ++
+          ":(" ++
+          show (srcSpanStartLine span') ++
+          "," ++
+          show (srcSpanStartCol span') ++
+          ")-(" ++
+          show (srcSpanEndLine span') ++
+          "," ++
+          show (srcSpanEndCol span') ++
+          ")"
+
+-----------------------------------------------------------------------------
+-- :all-types
+
+allTypes :: String -> InputT GHCi ()
+allTypes _ =
+  handleSourceError
+    GHC.printException
+    (do infos <- fmap mod_infos (lift getGHCiState)
+        forM_ (M.elems infos)
+              (\mi ->
+                 forM_ (modinfoSpans mi) (printSpan mi)))
+  where printSpan mi (SpanInfo sl sc el ec mty _) =
+          do df <- GHC.getSessionDynFlags
+             case (ml_hs_file (GHC.ms_location (modinfoSummary mi)))  of
+               Just fp ->
+                 case mty of
+                   Nothing -> return ()
+                   Just ty ->
+                     liftIO
+                       (putStrLn
+                          (concat [fp ++":"
+                                   -- GHC exposes a 1-based column number because reasons.
+                                  ,"(" ++ show sl ++ "," ++ show (1+sc)  ++ ")-(" ++
+                                   show el ++ "," ++ show (1+ec)  ++ "): "
+                                  ,flatten (showSDocForUser
+                                              df
+                                              neverQualify
+                                              (pprTypeForUser ty))]))
+               Nothing -> return ()
+          where flatten = unwords . words
+
+-----------------------------------------------------------------------------
+-- :loc-at
+
+locationAt :: String -> InputT GHCi ()
+locationAt str =
+  handleSourceError GHC.printException $
+  case parseSpan str of
+    Left err -> liftIO (putStr err)
+    Right (fp,sl,sc,el,ec,sample) ->
+      do infos <- fmap mod_infos (lift getGHCiState)
+         result <- findLoc infos fp sample sl sc el ec
+         case result of
+           Left err -> liftIO (putStrLn err)
+           Right sp ->
+             case sp of
+               RealSrcSpan rs ->
+                 liftIO (putStrLn (showSpan rs))
+               UnhelpfulSpan fs ->
+                 liftIO (putStrLn (unpackFS fs))
+  where showSpan span' =
+          unpackFS (srcSpanFile span')  ++ ":(" ++
+          show (srcSpanStartLine span')  ++ "," ++
+          show (srcSpanStartCol span')  ++
+          ")-(" ++
+          show (srcSpanEndLine span')  ++ "," ++
+          show (srcSpanEndCol span') ++ ")"
+
+-----------------------------------------------------------------------------
+-- Helpers for locationAt/typeAt
+
+-- | Parse a span: <module-name/filepath> <sl> <sc> <el> <ec> <string>
+parseSpan :: String -> Either String (FilePath,Int,Int,Int,Int,String)
+parseSpan s =
+  case result of
+    Left err -> Left err
+    Right r -> Right r
+  where result =
+          case span (/= ' ') s of
+            (fp,s') ->
+              do (sl,s1) <- extractInt s'
+                 (sc,s2) <- extractInt s1
+                 (el,s3) <- extractInt s2
+                 (ec,st) <- extractInt s3
+                 -- GHC exposes a 1-based column number because reasons.
+                 Right (fp,sl,sc-1,el,ec-1,st)
+        extractInt s' =
+          case span (/= ' ') (dropWhile1 (== ' ') s') of
+            (reads -> [(i,_)],s'') ->
+              Right (i,dropWhile1 (== ' ') s'')
+            _ ->
+              Left ("Expected integer in " ++ s')
+          where dropWhile1 _ [] = []
+                dropWhile1 p xs@(x:xs')
+                  | p x = xs'
+                  | otherwise = xs
 
 -----------------------------------------------------------------------------
 -- :kind
@@ -2325,6 +2496,7 @@ strToGHCiOpt "m" = Just Multiline
 strToGHCiOpt "s" = Just ShowTiming
 strToGHCiOpt "t" = Just ShowType
 strToGHCiOpt "r" = Just RevertCAFs
+strToGHCiOpt "c" = Just CollectInfo
 strToGHCiOpt _   = Nothing
 
 optToStr :: GHCiOption -> String
@@ -2332,6 +2504,7 @@ optToStr Multiline  = "m"
 optToStr ShowTiming = "s"
 optToStr ShowType   = "t"
 optToStr RevertCAFs = "r"
+optToStr CollectInfo = "c"
 
 
 -- ---------------------------------------------------------------------------

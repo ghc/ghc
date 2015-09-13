@@ -20,12 +20,16 @@ module GhciMonad (
         getDynFlags,
 
         runStmt, runDecls, resume, timeIt, recordBreak, revertCAFs,
+        printForUserNeverQualify, printForUserModInfo,
 
         printForUser, printForUserPartWay, prettyLocations,
         initInterpBuffering, turnOffBuffering, flushInterpBuffers,
     ) where
 
 #include "HsVersions.h"
+
+import GhciTypes
+import Data.Map.Strict (Map)
 
 import qualified GHC
 import GhcMonad         hiding (liftIO)
@@ -110,6 +114,7 @@ data GHCiState = GHCiState
         -- help text to display to a user
         short_help :: String,
         long_help  :: String,
+        mod_infos  :: !(Map ModuleName ModInfo),
         lastErrorLocations :: IORef [(FastString, Int)]
      }
 
@@ -120,6 +125,7 @@ data GHCiOption
         | ShowType              -- show the type of expressions
         | RevertCAFs            -- revert CAFs after every evaluation
         | Multiline             -- use multiline commands
+        | CollectInfo           -- collect and cache information about modules after load
         deriving Eq
 
 data BreakLocation
@@ -250,6 +256,18 @@ unsetOption :: GHCiOption -> GHCi ()
 unsetOption opt
  = do st <- getGHCiState
       setGHCiState (st{ options = filter (/= opt) (options st) })
+
+printForUserNeverQualify :: GhcMonad m => SDoc -> m ()
+printForUserNeverQualify doc = do
+  dflags <- getDynFlags
+  liftIO $ Outputable.printForUser dflags stdout neverQualify doc
+
+printForUserModInfo :: GhcMonad m => GHC.ModuleInfo -> SDoc -> m ()
+printForUserModInfo info doc = do
+  dflags <- getDynFlags
+  mUnqual <- GHC.mkPrintUnqualifiedForModule info
+  unqual <- maybe GHC.getPrintUnqual return mUnqual
+  liftIO $ Outputable.printForUser dflags stdout unqual doc
 
 printForUser :: GhcMonad m => SDoc -> m ()
 printForUser doc = do

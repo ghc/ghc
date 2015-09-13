@@ -43,19 +43,28 @@ Executable ghc
 
     GHC-Options: -Wall
     if flag(ghci)
-        Build-depends: deepseq >= 1.4 && < 1.5
+        Build-depends:
+            containers == 0.5.*,
+            deepseq    == 1.4.*,
+            time       == 1.5.*
         CPP-Options: -DGHCI
         GHC-Options: -fno-warn-name-shadowing
         Other-Modules:
-            InteractiveUI
+            GhciFind
+            GhciInfo
             GhciMonad
             GhciTags
+            GhciTypes
+            InteractiveUI
         Build-Depends: transformers, haskeline
         Other-Extensions:
+            BangPatterns
             FlexibleInstances
             MagicHash
+            RecordWildCards
             TupleSections
             UnboxedTuples
+            ViewPatterns
 
     Other-Extensions:
         CPP
