@@ -246,10 +246,10 @@ pprFormat x
                 FF32        -> sLit "fs"
                 FF64        -> sLit "fd"
                 _        -> panic "PPC.Ppr.pprFormat: no match")
-                
-                
+
+
 pprCond :: Cond -> SDoc
-pprCond c 
+pprCond c
  = ptext (case c of {
                 ALWAYS  -> sLit "";
                 EQQ        -> sLit "eq";        NE    -> sLit "ne";
@@ -373,7 +373,7 @@ pprDataItem lit
         ppr_item II64 (CmmInt x _) dflags
            | not(archPPC_64 dflags) =
                 [ptext (sLit "\t.long\t")
-                    <> int (fromIntegral 
+                    <> int (fromIntegral
                         (fromIntegral (x `shiftR` 32) :: Word32)),
                  ptext (sLit "\t.long\t")
                     <> int (fromIntegral (fromIntegral x :: Word32))]
@@ -511,7 +511,7 @@ pprInstr (LI reg imm) = hcat [
         ptext (sLit ", "),
         pprImm imm
     ]
-pprInstr (MR reg1 reg2) 
+pprInstr (MR reg1 reg2)
     | reg1 == reg2 = empty
     | otherwise = hcat [
         char '\t',
@@ -749,7 +749,7 @@ pprInstr (RLWINM reg1 reg2 sh mb me) = hcat [
         ptext (sLit ", "),
         int me
     ]
-    
+
 pprInstr (FADD fmt reg1 reg2 reg3) = pprBinaryF (sLit "fadd") fmt reg1 reg2 reg3
 pprInstr (FSUB fmt reg1 reg2 reg3) = pprBinaryF (sLit "fsub") fmt reg1 reg2 reg3
 pprInstr (FMUL fmt reg1 reg2 reg3) = pprBinaryF (sLit "fmul") fmt reg1 reg2 reg3
@@ -874,7 +874,7 @@ pprBinaryF op fmt reg1 reg2 reg3 = hcat [
         ptext (sLit ", "),
         pprReg reg3
     ]
-    
+
 pprRI :: RI -> SDoc
 pprRI (RIReg r) = pprReg r
 pprRI (RIImm r) = pprImm r
