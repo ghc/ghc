@@ -710,6 +710,21 @@ pprInstr (EXTS fmt reg1 reg2) = hcat [
 pprInstr (NEG reg1 reg2) = pprUnary (sLit "neg") reg1 reg2
 pprInstr (NOT reg1 reg2) = pprUnary (sLit "not") reg1 reg2
 
+pprInstr (SR II32 reg1 reg2 (RIImm (ImmInt i))) | i < 0  || i > 31 =
+    -- Handle the case where we are asked to shift a 32 bit register by
+    -- less than zero or more than 31 bits. We convert this into a clear
+    -- of the destination register.
+    -- Fixes ticket http://ghc.haskell.org/trac/ghc/ticket/5900
+    pprInstr (XOR reg1 reg2 (RIReg reg2))
+
+pprInstr (SL II32 reg1 reg2 (RIImm (ImmInt i))) | i < 0  || i > 31 =
+    -- As aboce for SR, but for left shifts.
+    -- Fixes ticket http://ghc.haskell.org/trac/ghc/ticket/10870
+    pprInstr (XOR reg1 reg2 (RIReg reg2))
+
+pprInstr (SRA II32 reg1 reg2 (RIImm (ImmInt i))) | i < 0  || i > 31 =
+    pprInstr (XOR reg1 reg2 (RIReg reg2))
+
 pprInstr (SL fmt reg1 reg2 ri) =
          let op = case fmt of
                        II32 -> "slw"
@@ -717,12 +732,6 @@ pprInstr (SL fmt reg1 reg2 ri) =
                        _    -> panic "PPC.Ppr.pprInstr: shift illegal size"
          in pprLogic (sLit op) reg1 reg2 (limitShiftRI fmt ri)
 
-pprInstr (SR II32 reg1 reg2 (RIImm (ImmInt i))) | i > 31 || i < 0 =
-    -- Handle the case where we are asked to shift a 32 bit register by
-    -- less than zero or more than 31 bits. We convert this into a clear
-    -- of the destination register.
-    -- Fixes ticket http://ghc.haskell.org/trac/ghc/ticket/5900
-    pprInstr (XOR reg1 reg2 (RIReg reg2))
 pprInstr (SR fmt reg1 reg2 ri) =
          let op = case fmt of
                        II32 -> "srw"
