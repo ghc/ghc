@@ -343,13 +343,10 @@ initSysTools mbMinusB
                     sPgm_l   = (ld_prog, ld_args),
                     sPgm_dll = (mkdll_prog,mkdll_args),
                     sPgm_T   = touch_path,
-                    sPgm_sysman  = top_dir ++ "/ghc/rts/parallel/SysMan",
                     sPgm_windres = windres_path,
                     sPgm_libtool = libtool_path,
                     sPgm_lo  = (lo_prog,[]),
                     sPgm_lc  = (lc_prog,[]),
-                    -- Hans: this isn't right in general, but you can
-                    -- elaborate it in the same way as the others
                     sOpt_L       = [],
                     sOpt_P       = [],
                     sOpt_F       = [],
