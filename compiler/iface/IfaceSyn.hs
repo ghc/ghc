@@ -53,13 +53,14 @@ import Module
 import SrcLoc
 import Fingerprint
 import Binary
-import BooleanFormula ( BooleanFormula )
+import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
 import HsBinds
 import TyCon ( Role (..), Injectivity(..) )
 import StaticFlags (opt_PprStyle_Debug)
 import Util( filterOut, filterByList )
 import InstEnv
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
+import Lexeme (isLexSym)
 
 import Control.Monad
 import System.IO.Unsafe
@@ -529,6 +530,15 @@ instance HasOccName IfaceDecl where
 instance Outputable IfaceDecl where
   ppr = pprIfaceDecl showAll
 
+{-
+Note [Minimal complete definition] ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The minimal complete definition should only be included if a complete
+class definition is shown. Since the minimal complete definition is
+anonymous we can't reuse the same mechanism that is used for the
+filtering of method signatures. Instead we just check if anything at all is
+filtered and hide it in that case.
+-}
+
 data ShowSub
   = ShowSub
       { ss_ppr_bndr :: OccName -> SDoc  -- Pretty-printer for binders in IfaceDecl
@@ -549,6 +559,12 @@ showAll = ShowSub { ss_how_much = ShowIface, ss_ppr_bndr = ppr }
 ppShowIface :: ShowSub -> SDoc -> SDoc
 ppShowIface (ShowSub { ss_how_much = ShowIface }) doc = doc
 ppShowIface _                                     _   = Outputable.empty
+
+-- show if all sub-components or the complete interface is shown
+ppShowAllSubs :: ShowSub -> SDoc -> SDoc -- Note [Minimal complete definition]
+ppShowAllSubs (ShowSub { ss_how_much = ShowSome [] }) doc = doc
+ppShowAllSubs (ShowSub { ss_how_much = ShowIface }) doc = doc
+ppShowAllSubs _                                      _   = Outputable.empty
 
 ppShowRhs :: ShowSub -> SDoc -> SDoc
 ppShowRhs (ShowSub { ss_how_much = ShowHeader }) _   = Outputable.empty
@@ -662,11 +678,12 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
 pprIfaceDecl ss (IfaceClass { ifATs = ats, ifSigs = sigs, ifRec = isrec
                             , ifCtxt   = context, ifName  = clas
                             , ifTyVars = tyvars,  ifRoles = roles
-                            , ifFDs    = fds })
+                            , ifFDs    = fds, ifMinDef = minDef })
   = vcat [ pprRoles (== Nominal) (pprPrefixIfDeclBndr ss clas) tyvars roles
          , ptext (sLit "class") <+> pprIfaceDeclHead context ss clas tyvars
                                 <+> pprFundeps fds <+> pp_where
-         , nest 2 (vcat [vcat asocs, vcat dsigs, pprec])]
+         , nest 2 (vcat [ vcat asocs, vcat dsigs, pprec
+                        , ppShowAllSubs ss (pprMinDef minDef)])]
     where
       pp_where = ppShowRhs ss $ ppUnless (null sigs && null ats) (ptext (sLit "where"))
 
@@ -683,6 +700,13 @@ pprIfaceDecl ss (IfaceClass { ifATs = ats, ifSigs = sigs, ifRec = isrec
       maybeShowSig sg
         | showSub ss sg = Just $  pprIfaceClassOp ss sg
         | otherwise     = Nothing
+
+      pprMinDef :: BooleanFormula IfLclName -> SDoc
+      pprMinDef minDef = ppUnless (isTrue minDef) $ -- hide empty definitions
+        ptext (sLit "{-# MINIMAL") <+>
+        pprBooleanFormula
+          (\_ def -> cparen (isLexSym def) (ppr def)) 0 minDef <+>
+        ptext (sLit "#-}")
 
 pprIfaceDecl ss (IfaceSynonym { ifName   = tc
                               , ifTyVars = tv

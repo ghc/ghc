@@ -11,6 +11,7 @@ TYPE CONSTRUCTORS
     Promotable
   class Zork s a b | a -> b where
     huh :: Q s a chain -> ST s ()
+    {-# MINIMAL huh #-}
 COERCION AXIOMS
   axiom NTCo:Zork ::
       Zork s a b = forall chain. Q s a chain -> ST s ()

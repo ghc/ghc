@@ -7,8 +7,10 @@ type family CmpNat (a :: Nat) (b :: Nat) :: Ordering
 type family CmpSymbol (a :: Symbol) (b :: Symbol) :: Ordering
 class KnownNat (n :: Nat) where
   natSing :: SNat n
+  {-# MINIMAL natSing #-}
 class KnownSymbol (n :: Symbol) where
   symbolSing :: SSymbol n
+  {-# MINIMAL symbolSing #-}
 data SomeNat where
   SomeNat :: KnownNat n => (Proxy n) -> SomeNat
 data SomeSymbol where
