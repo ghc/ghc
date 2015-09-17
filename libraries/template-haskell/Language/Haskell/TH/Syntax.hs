@@ -842,15 +842,47 @@ data NameSpace = VarName        -- ^ Variables
 
 type Uniq = Int
 
--- | The name without its module prefix
+-- | The name without its module prefix.
+--
+-- ==== __Examples__
+--
+-- >>> nameBase ''Data.Either.Either
+-- "Either"
+-- >>> nameBase (mkName "foo")
+-- "foo"
+-- >>> nameBase (mkName "Module.foo")
+-- "foo"
 nameBase :: Name -> String
 nameBase (Name occ _) = occString occ
 
--- | Module prefix of a name, if it exists
+-- | Module prefix of a name, if it exists.
+--
+-- ==== __Examples__
+--
+-- >>> nameModule ''Data.Either.Either"
+-- Just "Data.Either"
+-- >>> nameModule (mkName "foo")
+-- Nothing
+-- >>> nameModule (mkName "Module.foo")
+-- Just "Module"
 nameModule :: Name -> Maybe String
 nameModule (Name _ (NameQ m))     = Just (modString m)
 nameModule (Name _ (NameG _ _ m)) = Just (modString m)
 nameModule _                      = Nothing
+
+-- | A name's package, if it exists.
+--
+-- ==== __Examples__
+--
+-- >>> namePackage ''Data.Either.Either"
+-- Just "base"
+-- >>> namePackage (mkName "foo")
+-- Nothing
+-- >>> namePackage (mkName "Module.foo")
+-- Nothing
+namePackage :: Name -> Maybe String
+namePackage (Name _ (NameG _ p _)) = Just (pkgString p)
+namePackage _                      = Nothing
 
 {- |
 Generate a capturable name. Occurrences of such names will be

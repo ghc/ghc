@@ -50,6 +50,7 @@ module Language.Haskell.TH(
         -- ** Deconstructing names
         nameBase,       -- :: Name -> String
         nameModule,     -- :: Name -> Maybe String
+        namePackage,    -- :: Name -> Maybe String
         -- ** Built-in names
         tupleTypeName, tupleDataName,   -- Int -> Name
         unboxedTupleTypeName, unboxedTupleDataName, -- :: Int -> Name

@@ -10,6 +10,8 @@
     according to the fixities of the operators. The `ParensT` constructor can be
     used to explicitly group expressions.
 
+  * Add `namePackage`
+
   * TODO: document API changes and important bugfixes
 
 

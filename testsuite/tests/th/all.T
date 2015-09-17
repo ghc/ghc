@@ -352,3 +352,4 @@ test('T10704',
      multimod_compile_and_run,
      ['T10704', '-v0'])
 test('T6018th', normal, compile_fail, ['-v0'])
+test('TH_namePackage', normal, compile_and_run, ['-v0'])
