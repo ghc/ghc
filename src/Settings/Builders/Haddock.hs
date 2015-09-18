@@ -1,8 +1,8 @@
 module Settings.Builders.Haddock (haddockArgs) where
 
 import Expression
-import Predicates hiding (file)
 import Oracles
+import Predicates hiding (file)
 import Settings
 import Settings.Builders.Ghc
 

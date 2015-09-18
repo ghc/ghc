@@ -1,11 +1,11 @@
 module Rules.Cabal (cabalRules) where
 
+import Expression
 import Data.Version
 import Distribution.Package
-import Distribution.Verbosity
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
-import Expression
+import Distribution.Verbosity
 import Package hiding (library)
 import Settings
 

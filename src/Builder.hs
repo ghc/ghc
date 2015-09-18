@@ -36,14 +36,14 @@ builderKey builder = case builder of
     Ar               -> "ar"
     Gcc Stage0       -> "system-gcc"
     Gcc _            -> "gcc"
-    GccM stage       -> builderKey $ Gcc stage -- Synonym for 'Gcc -MM'
+    GccM stage       -> builderKey $ Gcc stage -- synonym for 'Gcc -MM'
     Ghc Stage0       -> "system-ghc"
     Ghc Stage1       -> "ghc-stage1"
     Ghc Stage2       -> "ghc-stage2"
     Ghc Stage3       -> "ghc-stage3"
-    GhcM stage       -> builderKey $ Ghc stage -- Synonym for 'Ghc -M'
+    GhcM stage       -> builderKey $ Ghc stage -- synonym for 'Ghc -M'
     GhcCabal         -> "ghc-cabal"
-    GhcCabalHsColour -> builderKey $ GhcCabal -- Synonym for 'GhcCabal hscolour'
+    GhcCabalHsColour -> builderKey $ GhcCabal -- synonym for 'GhcCabal hscolour'
     GhcPkg Stage0    -> "system-ghc-pkg"
     GhcPkg _         -> "ghc-pkg"
     Happy            -> "happy"
@@ -72,9 +72,10 @@ needBuilder laxDependencies builder = do
     else need      [path]
   where
     allowOrderOnlyDependency :: Builder -> Bool
-    allowOrderOnlyDependency (Ghc  _) = True
-    allowOrderOnlyDependency (GhcM _) = True
-    allowOrderOnlyDependency _        = False
+    allowOrderOnlyDependency b = case b of
+        Ghc  _ -> True
+        GhcM _ -> True
+        _      -> False
 
 -- On Windows: if the path starts with "/", prepend it with the correct path to
 -- the root, e.g: "/usr/local/bin/ghc.exe" => "C:/msys/usr/local/bin/ghc.exe".

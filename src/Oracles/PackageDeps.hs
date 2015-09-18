@@ -2,8 +2,8 @@
 module Oracles.PackageDeps (packageDeps, packageDepsOracle) where
 
 import Base
-import Package
 import qualified Data.HashMap.Strict as Map
+import Package
 
 newtype PackageDepsKey = PackageDepsKey PackageName
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)

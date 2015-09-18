@@ -1,14 +1,14 @@
 module Settings.Args (getArgs) where
 
 import Expression
-import Settings.User
 import Settings.Builders.Ar
-import Settings.Builders.Ld
-import Settings.Builders.Ghc
 import Settings.Builders.Gcc
+import Settings.Builders.Ghc
+import Settings.Builders.GhcCabal
 import Settings.Builders.GhcPkg
 import Settings.Builders.Haddock
-import Settings.Builders.GhcCabal
+import Settings.Builders.Ld
+import Settings.User
 
 getArgs :: Expr [String]
 getArgs = fromDiffExpr $ defaultArgs <> userArgs

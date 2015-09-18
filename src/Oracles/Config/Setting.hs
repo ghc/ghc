@@ -7,8 +7,8 @@ module Oracles.Config.Setting (
     ) where
 
 import Base
-import Stage
 import Oracles.Config
+import Stage
 
 -- Each Setting comes from the system.config file, e.g. 'target-os = mingw32'.
 -- setting TargetOs looks up the config file and returns "mingw32".

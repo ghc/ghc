@@ -1,6 +1,5 @@
 module Settings.Builders.Ar (arArgs, arPersistentArgsCount) where
 
-import Builder
 import Expression
 import Predicates (builder)
 

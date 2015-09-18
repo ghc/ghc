@@ -1,6 +1,4 @@
-module Settings.Packages (
-    getPackages, knownPackages, findKnownPackage
-    ) where
+module Settings.Packages (getPackages, knownPackages, findKnownPackage) where
 
 import Expression
 import Predicates
