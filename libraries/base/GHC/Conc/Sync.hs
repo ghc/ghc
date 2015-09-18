@@ -748,7 +748,7 @@ catchSTM (STM m) handler = STM $ catchSTM# m handler'
 -- subsequent transcations, (ii) the invariant failure is indicated
 -- by raising an exception.
 checkInv :: STM a -> STM ()
-checkInv (STM m) = STM (\s -> (check# m) s)
+checkInv (STM m) = STM (\s -> case (check# m) s of s' -> (# s', () #))
 
 -- | alwaysSucceeds adds a new invariant that must be true when passed
 -- to alwaysSucceeds, at the end of the current transaction, and at

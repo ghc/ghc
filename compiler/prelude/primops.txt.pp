@@ -2081,7 +2081,7 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
 
 primop  Check "check#" GenPrimOp
       (State# RealWorld -> (# State# RealWorld, a #) )
-   -> (State# RealWorld -> (# State# RealWorld, () #) )
+   -> (State# RealWorld -> State# RealWorld)
    with
    out_of_line = True
    has_side_effects = True
@@ -2332,7 +2332,7 @@ primtype Weak# b
 -- note that tyvar "o" denotes openAlphaTyVar
 
 primop  MkWeakOp "mkWeak#" GenPrimOp
-   o -> b -> c -> State# RealWorld -> (# State# RealWorld, Weak# b #)
+   o -> b -> (State# RealWorld -> State# RealWorld) -> State# RealWorld -> (# State# RealWorld, Weak# b #)
    with
    has_side_effects = True
    out_of_line      = True
@@ -2364,7 +2364,7 @@ primop  DeRefWeakOp "deRefWeak#" GenPrimOp
 
 primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
    Weak# a -> State# RealWorld -> (# State# RealWorld, Int#,
-              (State# RealWorld -> (# State# RealWorld, () #)) #)
+              (State# RealWorld -> State# RealWorld) #)
    with
    has_side_effects = True
    out_of_line      = True
