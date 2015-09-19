@@ -570,16 +570,16 @@ unusedInjectiveVarsErr unused_tyvars errorBuilder tyfamEqn
                   = if not (null tyVars)
                     then text "Injective type variable" <> plural tyVars <+>
                          pprQuotedList tyVars <+> doOrDoes tyVars <+>
-                         text "not appear on injective position."
+                         text "not appear on the right-hand side."
                     else empty
               kiVarsSDoc
                   = if not (null kiVars)
                     then text "Injective kind variable" <> plural kiVars <+>
                          pprQuotedList kiVars <+> isOrAre kiVars <+>
-                         text "not inferable from the RHS type variables."
+                         text "not inferrable from the RHS type variables."
                     else empty
           in tyVarsSDoc $$ kiVarsSDoc $$
-             text "In the RHS of type family equation:"
+             text "In the type family equation:"
 
 -- | Build error message for equation that has a type family call at the top
 -- level of RHS
