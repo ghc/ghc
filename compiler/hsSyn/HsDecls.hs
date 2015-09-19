@@ -670,7 +670,7 @@ instance OutputableBndr name
 
       | otherwise       -- Laid out
       = vcat [ top_matter <+> ptext (sLit "where")
-             , nest 2 $ pprDeclList (map ppr ats ++
+             , nest 2 $ pprDeclList (map (pprFamilyDecl NotTopLevel . unLoc) ats ++
                                      map ppr_fam_deflt_eqn at_defs ++
                                      pprLHsBindsForUser methods sigs) ]
       where
@@ -695,7 +695,7 @@ pprTyClDeclFlavour :: TyClDecl a -> SDoc
 pprTyClDeclFlavour (ClassDecl {})   = ptext (sLit "class")
 pprTyClDeclFlavour (SynDecl {})     = ptext (sLit "type")
 pprTyClDeclFlavour (FamDecl { tcdFam = FamilyDecl { fdInfo = info }})
-  = pprFlavour info
+  = pprFlavour info <+> text "family"
 pprTyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_ND = nd } })
   = ppr nd
 
@@ -885,36 +885,45 @@ return type) default to *.
 -}
 
 instance (OutputableBndr name) => Outputable (FamilyDecl name) where
-  ppr (FamilyDecl { fdInfo = info, fdLName = ltycon
-                  , fdTyVars = tyvars, fdResultSig = L _ result
-                  , fdInjectivityAnn = mb_inj })
-      = vcat [ pprFlavour info <+> pp_vanilla_decl_head ltycon tyvars [] <+>
-               pp_kind <+> pp_inj <+> pp_where
-             , nest 2 $ pp_eqns ]
-        where
-          pp_kind = case result of
-                      NoSig            -> empty
-                      KindSig  kind    -> dcolon <+> ppr kind
-                      TyVarSig tv_bndr -> text "=" <+> ppr tv_bndr
-          pp_inj = case mb_inj of
-                     Just (L _ (InjectivityAnn lhs rhs)) ->
-                       hsep [ text "|", ppr lhs, text "->", hsep (map ppr rhs) ]
-                     Nothing -> empty
-          (pp_where, pp_eqns) = case info of
-            ClosedTypeFamily mb_eqns ->
-              ( ptext (sLit "where")
-              , case mb_eqns of
-                  Nothing   -> ptext (sLit "..")
-                  Just eqns -> vcat $ map ppr_fam_inst_eqn eqns )
-            _ -> (empty, empty)
+  ppr = pprFamilyDecl TopLevel
+
+pprFamilyDecl :: OutputableBndr name => TopLevelFlag -> FamilyDecl name -> SDoc
+pprFamilyDecl top_level (FamilyDecl { fdInfo = info, fdLName = ltycon
+                                    , fdTyVars = tyvars
+                                    , fdResultSig = L _ result
+                                    , fdInjectivityAnn = mb_inj })
+  = vcat [ pprFlavour info <+> pp_top_level <+>
+           pp_vanilla_decl_head ltycon tyvars [] <+>
+           pp_kind <+> pp_inj <+> pp_where
+         , nest 2 $ pp_eqns ]
+  where
+    pp_top_level = case top_level of
+                     TopLevel    -> text "family"
+                     NotTopLevel -> empty
+
+    pp_kind = case result of
+                NoSig            -> empty
+                KindSig  kind    -> dcolon <+> ppr kind
+                TyVarSig tv_bndr -> text "=" <+> ppr tv_bndr
+    pp_inj = case mb_inj of
+               Just (L _ (InjectivityAnn lhs rhs)) ->
+                 hsep [ text "|", ppr lhs, text "->", hsep (map ppr rhs) ]
+               Nothing -> empty
+    (pp_where, pp_eqns) = case info of
+      ClosedTypeFamily mb_eqns ->
+        ( ptext (sLit "where")
+        , case mb_eqns of
+            Nothing   -> ptext (sLit "..")
+            Just eqns -> vcat $ map ppr_fam_inst_eqn eqns )
+      _ -> (empty, empty)
 
 pprFlavour :: FamilyInfo name -> SDoc
-pprFlavour DataFamily            = ptext (sLit "data family")
-pprFlavour OpenTypeFamily        = ptext (sLit "type family")
-pprFlavour (ClosedTypeFamily {}) = ptext (sLit "type family")
+pprFlavour DataFamily            = ptext (sLit "data")
+pprFlavour OpenTypeFamily        = ptext (sLit "type")
+pprFlavour (ClosedTypeFamily {}) = ptext (sLit "type")
 
 instance Outputable (FamilyInfo name) where
-  ppr = pprFlavour
+  ppr info = pprFlavour info <+> text "family"
 
 
 
@@ -1325,7 +1334,7 @@ ppr_fam_deflt_eqn :: OutputableBndr name => LTyFamDefltEqn name -> SDoc
 ppr_fam_deflt_eqn (L _ (TyFamEqn { tfe_tycon = tycon
                                  , tfe_pats  = tvs
                                  , tfe_rhs   = rhs }))
-    = pp_vanilla_decl_head tycon tvs [] <+> equals <+> ppr rhs
+    = text "type" <+> pp_vanilla_decl_head tycon tvs [] <+> equals <+> ppr rhs
 
 instance (OutputableBndr name) => Outputable (DataFamInstDecl name) where
   ppr = pprDataFamInstDecl TopLevel
