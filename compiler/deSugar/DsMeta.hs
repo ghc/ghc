@@ -251,7 +251,7 @@ repTyClD (L loc (DataDecl { tcdLName = tc, tcdTyVars = tvs, tcdDataDefn = defn }
 repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
                              tcdTyVars = tvs, tcdFDs = fds,
                              tcdSigs = sigs, tcdMeths = meth_binds,
-                             tcdATs = ats, tcdATDefs = [] }))
+                             tcdATs = ats, tcdATDefs = atds }))
   = do { cls1 <- lookupLOcc cls         -- See note [Binders and occurrences]
        ; dec  <- addTyVarBinds tvs $ \bndrs ->
            do { cxt1   <- repLContext cxt
@@ -259,16 +259,12 @@ repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
               ; binds1 <- rep_binds meth_binds
               ; fds1   <- repLFunDeps fds
               ; ats1   <- repFamilyDecls ats
-              ; decls1 <- coreList decQTyConName (ats1 ++ sigs1 ++ binds1)
+              ; atds1  <- repAssocTyFamDefaults atds
+              ; decls1 <- coreList decQTyConName (ats1 ++ atds1 ++ sigs1 ++ binds1)
               ; repClass cxt1 cls1 bndrs fds1 decls1
               }
        ; return $ Just (loc, dec)
        }
-
--- Un-handled cases
-repTyClD (L loc d) = putSrcSpanDs loc $
-                     do { warnDs (hang ds_msg 4 (ppr d))
-                        ; return Nothing }
 
 -------------------------
 repRoleD :: LRoleAnnotDecl Name -> DsM (SrcSpan, Core TH.DecQ)
@@ -375,6 +371,22 @@ repInjectivityAnn (Just (L _ (InjectivityAnn lhs rhs))) =
 
 repFamilyDecls :: [LFamilyDecl Name] -> DsM [Core TH.DecQ]
 repFamilyDecls fds = liftM de_loc (mapM repFamilyDecl fds)
+
+repAssocTyFamDefaults :: [LTyFamDefltEqn Name] -> DsM [Core TH.DecQ]
+repAssocTyFamDefaults = mapM rep_deflt
+  where
+     -- very like repTyFamEqn, but different in the details
+    rep_deflt :: LTyFamDefltEqn Name -> DsM (Core TH.DecQ)
+    rep_deflt (L _ (TyFamEqn { tfe_tycon = tc
+                             , tfe_pats  = bndrs
+                             , tfe_rhs   = rhs }))
+      = addTyClTyVarBinds bndrs $ \ _ ->
+        do { tc1  <- lookupLOcc tc
+           ; tys1 <- repLTys (hsLTyVarBndrsToTypes bndrs)
+           ; tys2 <- coreList typeQTyConName tys1
+           ; rhs1 <- repLTy rhs
+           ; eqn1 <- repTySynEqn tys2 rhs1
+           ; repTySynInst tc1 eqn1 }
 
 -------------------------
 mk_extra_tvs :: Located Name -> LHsTyVarBndrs Name
@@ -596,9 +608,6 @@ repAnnProv (TypeAnnProvenance (L _ n))
        ; rep2 typeAnnotationName [ n' ] }
 repAnnProv ModuleAnnProvenance
   = rep2 moduleAnnotationName []
-
-ds_msg :: SDoc
-ds_msg = ptext (sLit "Cannot desugar this Template Haskell declaration:")
 
 -------------------------------------------------------
 --                      Constructors

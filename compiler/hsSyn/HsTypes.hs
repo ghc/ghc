@@ -47,6 +47,7 @@ module HsTypes (
         hsExplicitTvs,
         hsTyVarName, mkHsWithBndrs, hsLKiTyVarNames,
         hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsLTyVarLocNames,
+        hsLTyVarBndrsToTypes,
         splitLHsInstDeclTy_maybe,
         splitHsClassTy_maybe, splitLHsClassTy_maybe,
         splitHsFunType,
@@ -658,6 +659,20 @@ hsLTyVarLocName = fmap hsTyVarName
 
 hsLTyVarLocNames :: LHsTyVarBndrs name -> [Located name]
 hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvBndrs qtvs)
+
+-- | Convert a LHsTyVarBndr to an equivalent LHsType. Used in Template Haskell
+-- quoting for type family equations.
+hsLTyVarBndrToType :: LHsTyVarBndr name -> LHsType name
+hsLTyVarBndrToType = fmap cvt
+  where cvt (UserTyVar n)                     = HsTyVar n
+        cvt (KindedTyVar (L name_loc n) kind) = HsKindSig (L name_loc (HsTyVar n))
+                                                          kind
+
+-- | Convert a LHsTyVarBndrs to a list of types. Used in Template Haskell
+-- quoting for type family equations. Works on *type* variable only, no kind
+-- vars.
+hsLTyVarBndrsToTypes :: LHsTyVarBndrs name -> [LHsType name]
+hsLTyVarBndrsToTypes (HsQTvs { hsq_tvs = tvbs }) = map hsLTyVarBndrToType tvbs
 
 ---------------------
 mkAnonWildCardTy :: HsType RdrName
