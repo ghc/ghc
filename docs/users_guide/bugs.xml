@@ -101,13 +101,25 @@ main = do args &lt;- getArgs
 <programlisting>
     (let x = 42 in x == 42 == True)</programlisting></para>
 	</listitem>
+
+	<listitem>
+	  <para>The Haskell Report allows you to put a unary
+	  <literal>-</literal> preceding certain expressions headed by
+	  keywords, allowing constructs like <literal>- case x of
+	  ...</literal> or <literal>- do { ... }</literal>. GHC does
+	  not allow this. Instead, unary <literal>-</literal> is
+	  allowed before only expressions that could potentially
+	  be applied as a function.
+	  </para>
+	</listitem>
+
       </itemizedlist>
     </sect3>
 
   <sect3 id="infelicities-exprs-pats">
       <title>Expressions and patterns</title>
 
-    <para>In its default mode, GHC makes some programs slightly more defined 
+    <para>In its default mode, GHC makes some programs slightly more defined
     than they should be. For example, consider
     <programlisting>
 f :: [a] -> b -> b
