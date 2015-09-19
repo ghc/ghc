@@ -1763,7 +1763,7 @@ classToIfaceDecl env clas
 
     toIfaceAT :: ClassATItem -> IfaceAT
     toIfaceAT (ATI tc def)
-      = IfaceAT if_decl (fmap (tidyToIfaceType env2) def)
+      = IfaceAT if_decl (fmap (tidyToIfaceType env2 . fst) def)
       where
         (env2, if_decl) = tyConToIfaceDecl env1 tc
 

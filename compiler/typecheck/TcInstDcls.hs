@@ -572,7 +572,7 @@ tcATDefault loc inst_subst defined_ats (ATI fam_tc defs)
    -- Example:   class C a where { type F a b :: *; type F a b = () }
    --            instance C [x]
    -- Then we want to generate the decl:   type F [x] b = ()
-  | Just rhs_ty <- defs
+  | Just (rhs_ty, _loc) <- defs
   = do { let (subst', pat_tys') = mapAccumL subst_tv inst_subst
                                             (tyConTyVars fam_tc)
              rhs'     = substTy subst' rhs_ty
@@ -580,6 +580,11 @@ tcATDefault loc inst_subst defined_ats (ATI fam_tc defs)
              tvs'     = varSetElemsKvsFirst tv_set'
        ; rep_tc_name <- newFamInstTyConName (L loc (tyConName fam_tc)) pat_tys'
        ; let axiom = mkSingleCoAxiom Nominal rep_tc_name tvs' fam_tc pat_tys' rhs'
+           -- NB: no validity check. We check validity of default instances
+           -- in the class definition. Because type instance arguments cannot
+           -- be type family applications and cannot be polytypes, the
+           -- validity check is redundant.
+
        ; traceTc "mk_deflt_at_instance" (vcat [ ppr fam_tc, ppr rhs_ty
                                               , pprCoAxiom axiom ])
        ; fam_inst <- ASSERT( tyVarsOfType rhs' `subVarSet` tv_set' )

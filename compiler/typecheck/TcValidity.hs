@@ -12,6 +12,7 @@ module TcValidity (
   checkValidInstance, validDerivPred,
   checkInstTermination,
   ClsInfo, checkValidCoAxiom, checkValidCoAxBranch,
+  checkValidTyFamEqn,
   checkConsistentFamInst,
   arityErr, badATErr
   ) where
@@ -1276,6 +1277,19 @@ checkValidCoAxBranch :: Maybe ClsInfo
 checkValidCoAxBranch mb_clsinfo fam_tc
                     (CoAxBranch { cab_tvs = tvs, cab_lhs = typats
                                 , cab_rhs = rhs, cab_loc = loc })
+  = checkValidTyFamEqn mb_clsinfo fam_tc tvs typats rhs loc
+
+-- | Do validity checks on a type family equation, including consistency
+-- with any enclosing class instance head, termination, and lack of
+-- polytypes.
+checkValidTyFamEqn :: Maybe ClsInfo
+                   -> TyCon   -- ^ of the type family
+                   -> [TyVar] -- ^ bound tyvars in the equation
+                   -> [Type]  -- ^ type patterns
+                   -> Type    -- ^ rhs
+                   -> SrcSpan
+                   -> TcM ()
+checkValidTyFamEqn mb_clsinfo fam_tc tvs typats rhs loc
   = setSrcSpan loc $
     do { checkValidFamPats fam_tc tvs typats
 
@@ -1329,7 +1343,8 @@ checkValidFamPats :: TyCon -> [TyVar] -> [Type] -> TcM ()
 --         type instance F (T a) = a
 -- c) Have the right number of patterns
 checkValidFamPats fam_tc tvs ty_pats
-  = ASSERT( length ty_pats == tyConArity fam_tc )
+  = ASSERT2( length ty_pats == tyConArity fam_tc
+           , ppr ty_pats $$ ppr fam_tc $$ ppr (tyConArity fam_tc) )
       -- A family instance must have exactly the same number of type
       -- parameters as the family declaration.  You can't write
       --     type family F a :: * -> *

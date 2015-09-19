@@ -914,9 +914,9 @@ tcClassATs class_name parent ats at_defs
                   ; return (ATI fam_tc atd) }
 
 -------------------------
-tcDefaultAssocDecl :: TyCon                  -- ^ Family TyCon
-                   -> [LTyFamDefltEqn Name]  -- ^ Defaults
-                   -> TcM (Maybe Type)       -- ^ Type checked RHS
+tcDefaultAssocDecl :: TyCon                         -- ^ Family TyCon
+                   -> [LTyFamDefltEqn Name]         -- ^ Defaults
+                   -> TcM (Maybe (Type, SrcSpan))   -- ^ Type checked RHS
 tcDefaultAssocDecl _ []
   = return Nothing  -- No default declaration
 
@@ -941,7 +941,7 @@ tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = L _ tc_name
        ; let fam_tc_tvs = tyConTyVars fam_tc
              subst = zipTopTvSubst tvs (mkTyVarTys fam_tc_tvs)
        ; return ( ASSERT( equalLength fam_tc_tvs tvs )
-                  Just (substTy subst rhs_ty) ) }
+                  Just (substTy subst rhs_ty, loc) ) }
     -- We check for well-formedness and validity later, in checkValidClass
 
 -------------------------
@@ -1821,13 +1821,19 @@ checkValidClass cls
             = when (tyVarsOfType pred `subVarSet` cls_tv_set)
                    (addErrTc (badMethPred sel_id pred))
 
-    check_at (ATI fam_tc _)
-      | cls_arity > 0   -- Check that the associated type mentions at least
+    check_at (ATI fam_tc m_dflt_rhs)
+      = do { checkTc (cls_arity == 0 || any (`elemVarSet` cls_tv_set) fam_tvs)
+                     (noClassTyVarErr cls fam_tc)
+                        -- Check that the associated type mentions at least
                         -- one of the class type variables
-      = checkTc (any (`elemVarSet` cls_tv_set) (tyConTyVars fam_tc))
-                (noClassTyVarErr cls fam_tc)
-      | otherwise       -- The check is disabled for nullary type classes,
-      = return ()       -- since there is no possible ambiguity (Trac #10020)
+                        -- The check is disabled for nullary type classes,
+                        -- since there is no possible ambiguity (Trac #10020)
+           ; whenIsJust m_dflt_rhs $ \ (rhs, loc) ->
+             checkValidTyFamEqn (Just (cls, mini_env)) fam_tc
+                                fam_tvs (mkTyVarTys fam_tvs) rhs loc }
+        where
+          fam_tvs = tyConTyVars fam_tc
+    mini_env = zipVarEnv tyvars (mkTyVarTys tyvars)
 
 checkFamFlag :: Name -> TcM ()
 -- Check that we don't use families without -XTypeFamilies

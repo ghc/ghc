@@ -1,4 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+  -- this is needed because |FamHelper a x| /< |Fam a x|
 module ShouldCompile where
 
 class Cls a where
