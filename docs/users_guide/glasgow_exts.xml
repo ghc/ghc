@@ -3017,8 +3017,11 @@ GHC allows type constructors, classes, and type variables to be operators, and
 to be written infix, very much like expressions.  More specifically:
 <itemizedlist>
 <listitem><para>
-  A type constructor or class can be an operator, beginning with a colon; e.g. <literal>:*:</literal>.
-  The lexical syntax is the same as that for data constructors.
+  A type constructor or class can be any non-reserved operator.
+  Symbols used in types are always like capitalized identifiers; they
+  are never variables. Note that this is different from the lexical
+  syntax of data constructors, which are required to begin with a
+  <literal>:</literal>.
   </para></listitem>
 <listitem><para>
   Data type and type-synonym declarations can be written infix, parenthesised
