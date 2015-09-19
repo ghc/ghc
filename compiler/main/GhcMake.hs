@@ -325,18 +325,20 @@ load how_much = do
             a_root_is_Main = any ((==main_mod).ms_mod) mod_graph
             do_linking = a_root_is_Main || no_hs_main || ghcLink dflags == LinkDynLib || ghcLink dflags == LinkStaticLib
 
-          when (ghcLink dflags == LinkBinary
-                && isJust ofile && not do_linking) $
-            liftIO $ debugTraceMsg dflags 1 $
-                text ("Warning: output was redirected with -o, " ++
-                      "but no output will be generated\n" ++
-                      "because there is no " ++
-                      moduleNameString (moduleName main_mod) ++ " module.")
-
           -- link everything together
           linkresult <- liftIO $ link (ghcLink dflags) dflags do_linking (hsc_HPT hsc_env1)
 
-          loadFinish Succeeded linkresult
+          if ghcLink dflags == LinkBinary && isJust ofile && not do_linking
+             then do
+                liftIO $ errorMsg dflags $ text
+                   ("output was redirected with -o, " ++
+                    "but no output will be generated\n" ++
+                    "because there is no " ++
+                    moduleNameString (moduleName main_mod) ++ " module.")
+                -- This should be an error, not a warning (#10895).
+                loadFinish Failed linkresult
+             else
+                loadFinish Succeeded linkresult
 
      else
        -- Tricky.  We need to back out the effects of compiling any
