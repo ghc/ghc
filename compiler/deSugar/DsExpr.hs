@@ -58,6 +58,7 @@ import Bag
 import Outputable
 import FastString
 
+import IfaceEnv
 import IdInfo
 import Data.IORef       ( atomicModifyIORef', modifyIORef )
 
@@ -985,10 +986,9 @@ badMonadBind rhs elt_ty flag_doc
 --
 mkSptEntryName :: SrcSpan -> DsM Name
 mkSptEntryName loc = do
-    uniq <- newUnique
     mod  <- getModule
     occ  <- mkWrapperName "sptEntry"
-    return $ mkExternalName uniq mod occ loc
+    newGlobalBinder mod occ loc
   where
     mkWrapperName what
       = do dflags <- getDynFlags
