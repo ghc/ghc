@@ -756,7 +756,7 @@ ppr_forall_co p ty
 pprCoAxiom :: CoAxiom br -> SDoc
 pprCoAxiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
   = hang (ptext (sLit "axiom") <+> ppr ax <+> dcolon)
-       2 (vcat (map (pprCoAxBranch tc) $ fromBranchList branches))
+       2 (vcat (map (pprCoAxBranch tc) $ fromBranches branches))
 
 pprCoAxBranch :: TyCon -> CoAxBranch -> SDoc
 pprCoAxBranch fam_tc (CoAxBranch { cab_tvs = tvs
@@ -1215,7 +1215,7 @@ mkNewTypeCo name tycon tvs roles rhs_ty
             , co_ax_implicit = True  -- See Note [Implicit axioms] in TyCon
             , co_ax_role     = Representational
             , co_ax_tc       = tycon
-            , co_ax_branches = FirstBranch branch }
+            , co_ax_branches = unbranched branch }
   where branch = CoAxBranch { cab_loc     = getSrcSpan name
                             , cab_tvs     = tvs
                             , cab_lhs     = mkTyVarTys tvs

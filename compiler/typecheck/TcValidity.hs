@@ -1224,9 +1224,10 @@ wrongATArgErr ty instTy =
 
 checkValidCoAxiom :: CoAxiom Branched -> TcM ()
 checkValidCoAxiom (CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
-  = do { _ <- brListMapM (checkValidCoAxBranch Nothing fam_tc) branches
-       ; brListFoldlM_ check_branch_compat [] branches }
+  = do { _ <- mapM (checkValidCoAxBranch Nothing fam_tc) branch_list
+       ; foldlM_ check_branch_compat [] branch_list }
   where
+    branch_list = fromBranches branches
     injectivity = familyTyConInjectivityInfo fam_tc
 
     check_branch_compat :: [CoAxBranch]    -- previous branches in reverse order

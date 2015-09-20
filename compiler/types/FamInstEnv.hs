@@ -60,6 +60,7 @@ import Pair
 import SrcLoc
 import NameSet
 import FastString
+import Data.Function ( on )
 
 {-
 ************************************************************************
@@ -250,10 +251,9 @@ mkImportedFamInst fam mb_tcs axiom
       fi_flavor = flavor }
   where
      -- See Note [Lazy axiom match]
-     ~(CoAxiom { co_ax_branches =
-       ~(FirstBranch ~(CoAxBranch { cab_lhs = tys
-                                  , cab_tvs = tvs
-                                  , cab_rhs = rhs })) }) = axiom
+     ~(CoAxBranch { cab_lhs = tys
+                  , cab_tvs = tvs
+                  , cab_rhs = rhs }) = coAxiomSingleBranch axiom
 
          -- Derive the flavor for an imported FamInst rather disgustingly
          -- Maybe we should store it in the IfaceFamInst?
@@ -353,7 +353,7 @@ familyInstances (pkg_fie, home_fie) fam
 -- Used in the implementation of ":info" in GHCi.
 orphNamesOfFamInst :: FamInst -> NameSet
 orphNamesOfFamInst fam_inst
-  = orphNamesOfTypes (concat (brListMap cab_lhs (coAxiomBranches axiom)))
+  = orphNamesOfTypes (concat (map cab_lhs (fromBranches $ coAxiomBranches axiom)))
     `extendNameSet` getName (coAxiomTyCon axiom)
   where
     axiom = fi_axiom fam_inst
@@ -382,8 +382,8 @@ identicalFamInstHead :: FamInst -> FamInst -> Bool
 -- Used for overriding in GHCi
 identicalFamInstHead (FamInst { fi_axiom = ax1 }) (FamInst { fi_axiom = ax2 })
   =  coAxiomTyCon ax1 == coAxiomTyCon ax2
-  && brListLength brs1 == brListLength brs2
-  && and (brListZipWith identical_branch brs1 brs2)
+  && numBranches brs1 == numBranches brs2
+  && and ((zipWith identical_branch `on` fromBranches) brs1 brs2)
   where
     brs1 = coAxiomBranches ax1
     brs2 = coAxiomBranches ax2
@@ -528,14 +528,10 @@ injectiveBranches injectivity
 -- See Note [Storing compatibility] in CoAxiom
 computeAxiomIncomps :: CoAxiom br -> CoAxiom br
 computeAxiomIncomps ax@(CoAxiom { co_ax_branches = branches })
-  = ax { co_ax_branches = go [] branches }
+  = ax { co_ax_branches = mapAccumBranches go branches }
   where
-    go :: [CoAxBranch] -> BranchList CoAxBranch br -> BranchList CoAxBranch br
-    go prev_branches (FirstBranch br)
-      = FirstBranch (br { cab_incomps = mk_incomps br prev_branches })
-    go prev_branches (NextBranch br tail)
-      = let br' = br { cab_incomps = mk_incomps br prev_branches } in
-        NextBranch br' (go (br' : prev_branches) tail)
+    go :: [CoAxBranch] -> CoAxBranch -> CoAxBranch
+    go prev_branches br = br { cab_incomps = mk_incomps br prev_branches }
 
     mk_incomps :: CoAxBranch -> [CoAxBranch] -> [CoAxBranch]
     mk_incomps br = filter (not . compatibleBranches br)
@@ -583,7 +579,7 @@ mkBranchedCoAxiom ax_name fam_tc branches
             , co_ax_tc       = fam_tc
             , co_ax_role     = Nominal
             , co_ax_implicit = False
-            , co_ax_branches = toBranchList branches }
+            , co_ax_branches = manyBranches branches }
 
 mkUnbranchedCoAxiom :: Name -> TyCon -> CoAxBranch -> CoAxiom Unbranched
 mkUnbranchedCoAxiom ax_name fam_tc branch
@@ -592,7 +588,7 @@ mkUnbranchedCoAxiom ax_name fam_tc branch
             , co_ax_tc       = fam_tc
             , co_ax_role     = Nominal
             , co_ax_implicit = False
-            , co_ax_branches = FirstBranch (branch { cab_incomps = [] }) }
+            , co_ax_branches = unbranched (branch { cab_incomps = [] }) }
 
 mkSingleCoAxiom :: Role -> Name
                 -> [TyVar] -> TyCon -> [Type] -> Type
@@ -606,7 +602,7 @@ mkSingleCoAxiom role ax_name tvs fam_tc lhs_tys rhs_ty
             , co_ax_tc       = fam_tc
             , co_ax_role     = role
             , co_ax_implicit = False
-            , co_ax_branches = FirstBranch (branch { cab_incomps = [] }) }
+            , co_ax_branches = unbranched (branch { cab_incomps = [] }) }
   where
     branch = mkCoAxBranch tvs lhs_tys rhs_ty (getSrcSpan ax_name)
 
@@ -815,7 +811,7 @@ lookupFamInstEnvInjectivityConflicts injList (pkg_ie, home_ie)
 
       lookup_inj_fam_conflicts ie
           | isOpenFamilyTyCon fam, Just (FamIE insts) <- lookupUFM ie fam
-          = map (brFromUnbranchedSingleton . co_ax_branches . fi_axiom) $
+          = map (coAxiomSingleBranch . fi_axiom) $
             filter isInjConflict insts
           | otherwise = []
 
@@ -1017,7 +1013,7 @@ chooseBranch axiom tys
   = do { let num_pats = coAxiomNumPats axiom
              (target_tys, extra_tys) = splitAt num_pats tys
              branches = coAxiomBranches axiom
-       ; (ind, inst_tys) <- findBranch (fromBranchList branches) target_tys
+       ; (ind, inst_tys) <- findBranch (fromBranches branches) target_tys
        ; return (ind, inst_tys ++ extra_tys) }
 
 -- The axiom must *not* be oversaturated

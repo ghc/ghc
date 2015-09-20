@@ -1125,7 +1125,8 @@ reifyTyCon tc
                              instances) }
          else do { eqns <-
                      case isClosedSynFamilyTyConWithAxiom_maybe tc of
-                       Just ax -> brListMapM reifyAxBranch $ coAxiomBranches ax
+                       Just ax -> mapM reifyAxBranch $
+                                  fromBranches $ coAxiomBranches ax
                        Nothing -> return []
                  ; return (TH.FamilyI
                       (TH.ClosedTypeFamilyD (reifyName tc) tvs' resultSig

@@ -62,11 +62,7 @@ import Control.Arrow ( first, second )
 newFamInst :: FamFlavor -> CoAxiom Unbranched -> TcRnIf gbl lcl FamInst
 -- Freshen the type variables of the FamInst branches
 -- Called from the vectoriser monad too, hence the rather general type
-newFamInst flavor axiom@(CoAxiom { co_ax_branches = FirstBranch branch
-                                 , co_ax_tc = fam_tc })
-  | CoAxBranch { cab_tvs = tvs
-               , cab_lhs = lhs
-               , cab_rhs = rhs } <- branch
+newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
   = do { (subst, tvs') <- freshenTyVarBndrs tvs
        ; return (FamInst { fi_fam      = tyConName fam_tc
                          , fi_flavor   = flavor
@@ -75,6 +71,11 @@ newFamInst flavor axiom@(CoAxiom { co_ax_branches = FirstBranch branch
                          , fi_tys      = substTys subst lhs
                          , fi_rhs      = substTy  subst rhs
                          , fi_axiom    = axiom }) }
+  where
+    CoAxBranch { cab_tvs = tvs
+               , cab_lhs = lhs
+               , cab_rhs = rhs } = coAxiomSingleBranch axiom
+
 
 {-
 ************************************************************************
@@ -401,7 +402,7 @@ checkForInjectivityConflicts instEnvs famInst
     | isTypeFamilyTyCon tycon
     -- type family is injective in at least one argument
     , Injective inj <- familyTyConInjectivityInfo tycon = do
-    { let axiom = brFromUnbranchedSingleton (co_ax_branches (fi_axiom famInst))
+    { let axiom = coAxiomSingleBranch (fi_axiom famInst)
           conflicts = lookupFamInstEnvInjectivityConflicts inj instEnvs famInst
           -- see Note [Verifying injectivity annotation] in FamInstEnv
           errs = makeInjectivityErrors tycon axiom inj conflicts

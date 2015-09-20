@@ -1575,11 +1575,12 @@ coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches
  = IfaceAxiom { ifName       = name
               , ifTyCon      = toIfaceTyCon tycon
               , ifRole       = role
-              , ifAxBranches = brListMap (coAxBranchToIfaceBranch tycon
-                                            (brListMap coAxBranchLHS branches))
-                                         branches }
+              , ifAxBranches = map (coAxBranchToIfaceBranch tycon
+                                     (map coAxBranchLHS branch_list))
+                                   branch_list }
  where
-   name = getOccName ax
+   branch_list = fromBranches branches
+   name        = getOccName ax
 
 -- 2nd parameter is the list of branch LHSs, for conversion from incompatible branches
 -- to incompatible indices
@@ -1679,7 +1680,7 @@ tyConToIfaceDecl env tycon
     to_if_fam_flav OpenSynFamilyTyCon        = IfaceOpenSynFamilyTyCon
     to_if_fam_flav (ClosedSynFamilyTyCon (Just ax))
       = IfaceClosedSynFamilyTyCon (Just (axn, ibr))
-      where defs = fromBranchList $ coAxiomBranches ax
+      where defs = fromBranches $ coAxiomBranches ax
             ibr  = map (coAxBranchToIfaceBranch' tycon) defs
             axn  = coAxiomName ax
     to_if_fam_flav (ClosedSynFamilyTyCon Nothing)

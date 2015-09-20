@@ -24,7 +24,7 @@ import PrelNames ( knownNatClassName, knownSymbolClassName,
                    callStackTyConKey, typeableClassName )
 import TysWiredIn ( ipClass, typeNatKind, typeSymbolKind )
 import Id( idType )
-import CoAxiom ( Eqn, CoAxiom(..), CoAxBranch(..), fromBranchList )
+import CoAxiom ( Eqn, CoAxiom(..), CoAxBranch(..), fromBranches )
 import Class
 import TyCon
 import DataCon( dataConWrapId )
@@ -1450,7 +1450,7 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
   | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe fam_tc
   , Injective injective_args <- familyTyConInjectivityInfo fam_tc
   = concatMapM (injImproveEqns injective_args) $
-      buildImprovementData (fromBranchList (co_ax_branches ax))
+      buildImprovementData (fromBranches (co_ax_branches ax))
                            cab_lhs cab_rhs Just
 
   | otherwise

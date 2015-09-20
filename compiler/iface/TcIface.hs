@@ -450,7 +450,7 @@ tc_iface_decl _ _ (IfaceAxiom { ifName = ax_occ, ifTyCon = tc
                              , co_ax_name     = tc_name
                              , co_ax_tc       = tc_tycon
                              , co_ax_role     = role
-                             , co_ax_branches = toBranchList tc_branches
+                             , co_ax_branches = manyBranches tc_branches
                              , co_ax_implicit = False }
        ; return (ACoAxiom axiom) }
 

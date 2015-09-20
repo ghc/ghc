@@ -1040,8 +1040,11 @@ checkBootTyCon tc1 tc2
     eqClosedFamilyAx (Just _) Nothing = False
     eqClosedFamilyAx (Just (CoAxiom { co_ax_branches = branches1 }))
                      (Just (CoAxiom { co_ax_branches = branches2 }))
-      =  brListLength branches1 == brListLength branches2
-      && (and $ brListZipWith eqClosedFamilyBranch branches1 branches2)
+      =  numBranches branches1 == numBranches branches2
+      && (and $ zipWith eqClosedFamilyBranch branch_list1 branch_list2)
+      where
+        branch_list1 = fromBranches branches1
+        branch_list2 = fromBranches branches2
 
     eqClosedFamilyBranch (CoAxBranch { cab_tvs = tvs1, cab_lhs = lhs1, cab_rhs = rhs1 })
                          (CoAxBranch { cab_tvs = tvs2, cab_lhs = lhs2, cab_rhs = rhs2 })
