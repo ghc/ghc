@@ -12,7 +12,6 @@
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Abstract syntax of global declarations.
 --
@@ -1114,15 +1113,16 @@ instance (OutputableBndr name) => Outputable (ConDecl name) where
     ppr = pprConDecl
 
 pprConDecl :: OutputableBndr name => ConDecl name -> SDoc
-pprConDecl (ConDecl { con_names = cons, con_explicit = expl, con_qvars = tvs
+pprConDecl (ConDecl { con_names = [L _ con]  -- NB: non-GADT means 1 con
+                    , con_explicit = expl, con_qvars = tvs
                     , con_cxt = cxt, con_details = details
                     , con_res = ResTyH98, con_doc = doc })
   = sep [ppr_mbDoc doc, pprHsForAll expl tvs cxt, ppr_details details]
   where
-    ppr_details (InfixCon t1 t2) = hsep [ppr t1, pprInfixOcc cons, ppr t2]
-    ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc cons
+    ppr_details (InfixCon t1 t2) = hsep [ppr t1, pprInfixOcc con, ppr t2]
+    ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc con
                                    : map (pprParendHsType . unLoc) tys)
-    ppr_details (RecCon fields)  = ppr_con_names cons
+    ppr_details (RecCon fields)  = pprPrefixOcc con
                                  <+> pprConDeclFields (unLoc fields)
 
 pprConDecl (ConDecl { con_names = cons, con_explicit = expl, con_qvars = tvs
@@ -1146,18 +1146,12 @@ pprConDecl decl@(ConDecl { con_details = InfixCon ty1 ty2, con_res = ResTyGADT {
         -- so if we ever trip over one (albeit I can't see how that
         -- can happen) print it like a prefix one
 
+-- this fallthrough would happen with a non-GADT-syntax ConDecl with more
+-- than one constructor, which should indeed be impossible
+pprConDecl (ConDecl { con_names = cons }) = pprPanic "pprConDecl" (ppr cons)
+
 ppr_con_names :: (OutputableBndr name) => [Located name] -> SDoc
-ppr_con_names [x] = ppr x
-ppr_con_names xs  = interpp'SP xs
-
-instance (Outputable name) => OutputableBndr [Located name] where
-  pprBndr _bs xs = cat $ punctuate comma (map ppr xs)
-
-  pprPrefixOcc [x] = ppr x
-  pprPrefixOcc xs  = cat $ punctuate comma (map ppr xs)
-
-  pprInfixOcc [x] = ppr x
-  pprInfixOcc xs  = cat $ punctuate comma (map ppr xs)
+ppr_con_names = pprWithCommas (pprPrefixOcc . unLoc)
 
 {-
 ************************************************************************

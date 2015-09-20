@@ -354,3 +354,4 @@ test('T10704',
 test('T6018th', normal, compile_fail, ['-v0'])
 test('TH_namePackage', normal, compile_and_run, ['-v0'])
 test('T10811', normal, compile, ['-v0'])
+test('T10810', normal, compile, ['-v0'])
