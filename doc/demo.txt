@@ -11,4 +11,9 @@
 4. Limit parallelism of ghc-cabal & ghc-pkg
 
 * https://mail.haskell.org/pipermail/ghc-commits/2013-May/001712.html
-* see ghc.mk, comment about parallel ghc-pkg invokations 
+* see ghc.mk, comment about parallel ghc-pkg invokations
+
+5. Discovered dead code in the old build system, e.g:
+
+* Alex3 variable not needed as Alex 3.1 is required.
+* There are no generated *.y/*.ly files, hence they can never be in the build directory.

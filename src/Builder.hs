@@ -26,6 +26,7 @@ data Builder = Alex
              | Haddock
              | Happy
              | HsColour
+             | Hsc2Hs
              | Ld
              deriving (Show, Eq, Generic)
 
@@ -49,6 +50,7 @@ builderKey builder = case builder of
     Happy            -> "happy"
     Haddock          -> "haddock"
     HsColour         -> "hscolour"
+    Hsc2Hs           -> "hsc2hs"
     Ld               -> "ld"
 
 builderPath :: Builder -> Action FilePath

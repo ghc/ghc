@@ -19,6 +19,8 @@ ghc-cabal      = @hardtop@/inplace/bin/ghc-cabal
 
 haddock        = @hardtop@/inplace/bin/haddock
 
+hsc2hs         = @hardtop@/inplace/bin/hsc2hs
+
 ld             = @LdCmd@
 ar             = @ArCmd@
 alex           = @AlexCmd@

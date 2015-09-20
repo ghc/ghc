@@ -1,12 +1,14 @@
 module Settings.Args (getArgs) where
 
 import Expression
+import Settings.Builders.Alex
 import Settings.Builders.Ar
 import Settings.Builders.Gcc
 import Settings.Builders.Ghc
 import Settings.Builders.GhcCabal
 import Settings.Builders.GhcPkg
 import Settings.Builders.Haddock
+import Settings.Builders.Happy
 import Settings.Builders.Ld
 import Settings.User
 
@@ -23,14 +25,16 @@ getArgs = fromDiffExpr $ defaultArgs <> userArgs
 -- TODO: is GhcHcOpts=-Rghc-timing needed?
 defaultArgs :: Args
 defaultArgs = mconcat
-    [ cabalArgs
-    , ghcPkgArgs
-    , ghcMArgs
-    , gccMArgs
-    , ghcArgs
-    , gccArgs
+    [ alexArgs
     , arArgs
-    , ldArgs
+    , cabalArgs
+    , customPackageArgs
+    , ghcArgs
     , ghcCabalHsColourArgs
+    , ghcMArgs
+    , ghcPkgArgs
+    , gccArgs
+    , gccMArgs
     , haddockArgs
-    , customPackageArgs ]
+    , happyArgs
+    , ldArgs ]
