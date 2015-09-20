@@ -712,7 +712,9 @@ cvtl e = wrapL (cvt e)
                               ; return $ RecordCon c' noPostTcExpr (HsRecFields flds' Nothing)}
     cvt (RecUpdE e flds) = do { e' <- cvtl e
                               ; flds' <- mapM cvtFld flds
-                              ; return $ RecordUpd e' (HsRecFields flds' Nothing) [] [] [] }
+                              ; return $ RecordUpd e'
+                                          (HsRecFields flds' Nothing)
+                                          PlaceHolder PlaceHolder PlaceHolder }
     cvt (StaticE e)      = fmap HsStatic $ cvtl e
 
 {- Note [Dropping constructors]

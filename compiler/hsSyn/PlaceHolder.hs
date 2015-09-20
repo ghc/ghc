@@ -12,6 +12,7 @@ import NameSet
 import RdrName
 import Var
 import Coercion
+import DataCon (DataCon)
 
 import Data.Data hiding ( Fixity )
 import BasicTypes       (Fixity)
@@ -102,4 +103,6 @@ type DataId id =
 
   , Data (PostTc id Type)
   , Data (PostTc id Coercion)
+  , Data (PostTc id [Type])
+  , Data (PostTc id [DataCon])
   )
