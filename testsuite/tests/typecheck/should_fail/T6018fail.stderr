@@ -42,13 +42,13 @@ T6018fail.hs:37:15: error:
 
 T6018fail.hs:42:15: error:
     Type family equation violates injectivity annotation.
-    Injective type variable ‘b’ does not appear on the right-hand side.
+    Type variable ‘b’ cannot be inferred from the right-hand side.
     In the type family equation:
       J Int b c = Char
 
 T6018fail.hs:46:15: error:
     Type family equation violates injectivity annotation.
-    Injective type variable ‘n’ does not appear on the right-hand side.
+    Type variable ‘n’ cannot be inferred from the right-hand side.
     In the type family equation:
       K ('S n) m = 'S m
 
@@ -59,26 +59,30 @@ T6018fail.hs:51:15: error:
 
 T6018fail.hs:59:10: error:
     Type family equation violates injectivity annotation.
-    Injective kind variable ‘k’ is not inferrable from the RHS type variables.
+    Kind variable ‘k’ cannot be inferred from the right-hand side.
+    (enabling -fprint-explicit-kinds might help)
     In the type family equation:
       PolyKindVarsF '[] = '[]
 
 T6018fail.hs:62:15: error:
     Type family equation violates injectivity annotation.
-    Injective kind variable ‘k1’ is not inferrable from the RHS type variables.
+    Kind variable ‘k1’ cannot be inferred from the right-hand side.
+    (enabling -fprint-explicit-kinds might help)
     In the type family equation:
       PolyKindVars '[] = '[]
 
 T6018fail.hs:66:15: error:
     Type family equation violates injectivity annotation.
-    Injective kind variable ‘k’ is not inferrable from the RHS type variables.
+    Kind variable ‘k’ cannot be inferred from the right-hand side.
+    (enabling -fprint-explicit-kinds might help)
     In the type family equation:
     forall (k :: BOX) (a :: k) (b :: k). Fc a b = Int
 
 T6018fail.hs:70:15: error:
     Type family equation violates injectivity annotation.
-    Injective type variables ‘a’, ‘b’ do not appear on the right-hand side.
-    Injective kind variable ‘k’ is not inferrable from the RHS type variables.
+    Type and kind variables ‘k’, ‘a’, ‘b’
+    cannot be inferred from the right-hand side.
+    (enabling -fprint-explicit-kinds might help)
     In the type family equation:
     forall (k :: BOX) (a :: k) (b :: k). Gc a b = Int
 
@@ -115,7 +119,7 @@ T6018fail.hs:103:15: error:
 
 T6018fail.hs:106:15: error:
     Type family equation violates injectivity annotation.
-    Injective type variable ‘b’ does not appear on the right-hand side.
+    Type variable ‘b’ cannot be inferred from the right-hand side.
     In the type family equation:
       G4 a b = [a]
 
@@ -126,14 +130,15 @@ T6018fail.hs:110:15: error:
 
 T6018fail.hs:113:15: error:
     Type family equation violates injectivity annotation.
-    Injective type variable ‘a’ does not appear on the right-hand side.
+    Type variable ‘a’ cannot be inferred from the right-hand side.
     In the type family equation:
       G6 [a] = [HF1 a]
 
 T6018fail.hs:118:15: error:
     Type family equation violates injectivity annotation.
-    Injective type variable ‘c’ does not appear on the right-hand side.
-    Injective kind variable ‘k’ is not inferrable from the RHS type variables.
+    Type and kind variables ‘k’, ‘c’
+    cannot be inferred from the right-hand side.
+    (enabling -fprint-explicit-kinds might help)
     In the type family equation:
     forall (k :: BOX) a b (c :: k). G7 a b c = [G7a a b c]
 

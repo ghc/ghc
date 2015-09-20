@@ -559,27 +559,28 @@ conflictInjInstErr conflictingEqns errorBuilder tyfamEqn
 unusedInjectiveVarsErr :: TyVarSet -> InjErrorBuilder -> CoAxBranch
                        -> (SDoc, SrcSpan)
 unusedInjectiveVarsErr unused_tyvars errorBuilder tyfamEqn
-  = errorBuilder (injectivityErrorHerald True $$
-                  mkUnusedInjectiveVarsErr unused_tyvars) [tyfamEqn]
+  = errorBuilder (injectivityErrorHerald True $$ unusedInjectiveVarsErr)
+                 [tyfamEqn]
     where
-      mkUnusedInjectiveVarsErr :: TyVarSet -> SDoc
-      mkUnusedInjectiveVarsErr unused_tyvars =
-          let tyVars = varSetElems $ filterVarSet isTypeVar unused_tyvars
-              kiVars = varSetElems $ filterVarSet isKindVar unused_tyvars
-              tyVarsSDoc
-                  = if not (null tyVars)
-                    then text "Injective type variable" <> plural tyVars <+>
-                         pprQuotedList tyVars <+> doOrDoes tyVars <+>
-                         text "not appear on the right-hand side."
-                    else empty
-              kiVarsSDoc
-                  = if not (null kiVars)
-                    then text "Injective kind variable" <> plural kiVars <+>
-                         pprQuotedList kiVars <+> isOrAre kiVars <+>
-                         text "not inferrable from the RHS type variables."
-                    else empty
-          in tyVarsSDoc $$ kiVarsSDoc $$
-             text "In the type family equation:"
+      tvs = varSetElemsKvsFirst unused_tyvars
+      has_types = any isTypeVar tvs
+      has_kinds = any isKindVar tvs
+
+      doc = sep [ what <+> text "variable" <>
+                  plural tvs <+> pprQuotedList tvs
+                , text "cannot be inferred from the right-hand side." ]
+      what = case (has_types, has_kinds) of
+               (True, True)   -> text "Type and kind"
+               (True, False)  -> text "Type"
+               (False, True)  -> text "Kind"
+               (False, False) -> pprPanic "mkUnusedInjectiveVarsErr" $
+                                 ppr unused_tyvars
+      print_kinds_info = sdocWithDynFlags $ \ dflags ->
+                         if has_kinds && not (gopt Opt_PrintExplicitKinds dflags)
+                         then text "(enabling -fprint-explicit-kinds might help)"
+                         else empty
+      unusedInjectiveVarsErr = doc $$ print_kinds_info $$
+                               text "In the type family equation:"
 
 -- | Build error message for equation that has a type family call at the top
 -- level of RHS
