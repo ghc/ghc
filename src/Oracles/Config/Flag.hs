@@ -16,6 +16,8 @@ data Flag = CrossCompiling
           | SplitObjectsBroken
           | SupportsPackageKey
 
+-- Note, if a flag is set to empty string we treat it as set to NO. This seems
+-- fragile, but some flags do behave like this, e.g. GccIsClang.
 flag :: Flag -> Action Bool
 flag f = do
     key <- return $ case f of
@@ -28,7 +30,7 @@ flag f = do
         SupportsPackageKey -> "supports-package-key"
     value <- askConfigWithDefault key . putError
         $ "\nFlag '" ++ key ++ "' not set in configuration files."
-    unless (value == "YES" || value == "NO") . putError
+    unless (value == "YES" || value == "NO" || value == "") . putError
         $ "\nFlag '" ++ key ++ "' is set to '" ++ value
         ++ "' instead of 'YES' or 'NO'."
     return $ value == "YES"
