@@ -68,7 +68,7 @@ module TcType (
   isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
-  isPredTy, isTyVarClassPred, isTyVarExposed,
+  isPredTy, isTyVarClassPred, isTyVarExposed, isTyVarUnderDatatype,
   checkValidClsArgs, hasTyVarHead,
   isRigidEqPred, isRigidTy,
 
@@ -1465,6 +1465,25 @@ isTyVarExposed _  (FunTy {})      = False
 isTyVarExposed tv (AppTy fun arg) = isTyVarExposed tv fun
                                  || isTyVarExposed tv arg
 isTyVarExposed _  (ForAllTy {})   = False
+
+-- | Does the given tyvar appear under a type generative w.r.t.
+-- representational equality? See Note [Occurs check error] in
+-- TcCanonical for the motivation for this function.
+isTyVarUnderDatatype :: TcTyVar -> TcType -> Bool
+isTyVarUnderDatatype tv = go False
+  where
+    go under_dt ty | Just ty' <- tcView ty = go under_dt ty'
+    go under_dt (TyVarTy tv') = under_dt && (tv == tv')
+    go under_dt (TyConApp tc tys) = let under_dt' = under_dt ||
+                                                    isGenerativeTyCon tc
+                                                      Representational
+                                    in any (go under_dt') tys
+    go _        (LitTy {}) = False
+    go _        (FunTy arg res) = go True arg || go True res
+    go under_dt (AppTy fun arg) = go under_dt fun || go under_dt arg
+    go under_dt (ForAllTy tv' inner_ty)
+      | tv' == tv = False
+      | otherwise = go under_dt inner_ty
 
 isRigidTy :: TcType -> Bool
 isRigidTy ty

@@ -963,7 +963,10 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
                             -- be oriented the other way round;
                             -- see TcCanonical.canEqTyVarTyVar
   || isSigTyVar tv1 && not (isTyVarTy ty2)
-  || ctEqRel ct == ReprEq  -- the cases below don't really apply to ReprEq
+  || pprTrace "RAE1" (ppr ct $$ ppr tv1 $$ ppr ty2 $$
+                      ppr (isTyVarUnderDatatype tv1 ty2))
+     (ctEqRel ct == ReprEq && not (isTyVarUnderDatatype tv1 ty2))
+     -- the cases below don't really apply to ReprEq (except occurs check)
   = mkErrorMsgFromCt ctxt ct (vcat [ misMatchOrCND ctxt ct oriented ty1 ty2
                                    , extraTyVarInfo ctxt tv1 ty2
                                    , extra ])
@@ -975,7 +978,8 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   = mkErrorMsgFromCt ctxt ct $ (kindErrorMsg (mkTyVarTy tv1) ty2 $$ extra)
 
   | OC_Occurs <- occ_check_expand
-  , NomEq <- ctEqRel ct      -- reporting occurs check for Coercible is strange
+  , ctEqRel ct == NomEq || isTyVarUnderDatatype tv1 ty2
+         -- See Note [Occurs check error] in TcCanonical
   = do { let occCheckMsg = addArising (ctOrigin ct) $
                            hang (text "Occurs check: cannot construct the infinite type:")
                               2 (sep [ppr ty1, char '~', ppr ty2])
