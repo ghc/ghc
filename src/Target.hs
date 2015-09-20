@@ -60,8 +60,8 @@ fullTarget (PartialTarget s p) b srcs fs = Target
         package = p,
         builder = b,
         way     = vanilla,
-        sources = srcs,
-        files   = fs
+        sources = map unifyPath srcs,
+        files   = map unifyPath fs
     }
 
 -- Use this function to be explicit about the build way.
