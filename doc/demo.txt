@@ -13,7 +13,9 @@
 * https://mail.haskell.org/pipermail/ghc-commits/2013-May/001712.html
 * see ghc.mk, comment about parallel ghc-pkg invokations
 
-5. Discovered dead code in the old build system, e.g:
+5. Discovered dead & duplicated code in the old build system, e.g:
 
-* Alex3 variable not needed as Alex 3.1 is required.
-* There are no generated *.y/*.ly files, hence they can never be in the build directory.
+* Alex3 variable not needed as Alex 3.1 is required
+* There are no generated *.y/*.ly files, hence they can never be in the build directory
+* hsc2hs gets multuple "--cflag=-I$1/$2/build/autogen" flags in one invokation
+* No generated Haskell files actually require copying of *.(l)hs-boot files
