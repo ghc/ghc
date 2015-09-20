@@ -216,7 +216,11 @@ checkAmbiguity ctxt ty
        ; (_wrap, wanted) <- addErrCtxtM (mk_msg ty') $
                             captureConstraints $
                             tcSubType_NC ctxt ty' ty'
-       ; simplifyAmbiguityCheck ty wanted
+       ; whenNoErrs $  -- only run the simplifier if we have a clean
+                       -- environment. Otherwise we might trip.
+                       -- example: indexed-types/should_fail/BadSock
+                       -- fails in DEBUG mode without this
+         simplifyAmbiguityCheck ty wanted
 
        ; traceTc "Done ambiguity check for" (ppr ty) }
  where

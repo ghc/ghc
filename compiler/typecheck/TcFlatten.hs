@@ -1038,7 +1038,9 @@ flatten_fam_app, flatten_exact_fam_app, flatten_exact_fam_app_fully
   --   flatten_exact_fam_app_fully lifts out the application to top level
   -- Postcondition: Coercion :: Xi ~ F tys
 flatten_fam_app tc tys  -- Can be over-saturated
-    = ASSERT( tyConArity tc <= length tys )  -- Type functions are saturated
+    = ASSERT2( tyConArity tc <= length tys
+             , ppr tc $$ ppr (tyConArity tc) $$ ppr tys)
+                 -- Type functions are saturated
                  -- The type function might be *over* saturated
                  -- in which case the remaining arguments should
                  -- be dealt with by AppTys
