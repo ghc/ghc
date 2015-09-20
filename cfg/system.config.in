@@ -5,14 +5,14 @@
 #===================
 
 system-ghc     = @WithGhc@
-system-gcc     = @CC_STAGE0@
-system-ghc-pkg = @GhcPkgCmd@
-gcc            = @WhatGccIsCalled@
-
 ghc-stage1     = @hardtop@/inplace/bin/ghc-stage1
 ghc-stage2     = @hardtop@/inplace/bin/ghc-stage2
 ghc-stage3     = @hardtop@/inplace/bin/ghc-stage3
 
+system-gcc     = @CC_STAGE0@
+gcc            = @WhatGccIsCalled@
+
+system-ghc-pkg = @GhcPkgCmd@
 ghc-pkg        = @hardtop@/inplace/bin/ghc-pkg
 
 ghc-cabal      = @hardtop@/inplace/bin/ghc-cabal
@@ -49,13 +49,19 @@ target-os            = @TargetOS_CPP@
 target-arch          = @TargetArch_CPP@
 target-platform-full = @TargetPlatformFull@
 
-host-os-cpp          = @HostOS_CPP@
+host-os              = @HostOS_CPP@
+host-arch            = @HostArch_CPP@
 
 cross-compiling      = @CrossCompiling@
 
 dynamic-extension    = @soext_target@
 
+ghc-major-version    = @GhcMajVersion@
+ghc-minor-version    = @GhcMinVersion@
+ghc-patch-level      = @GhcPatchLevel@
+
 project-version      = @ProjectVersion@
+project-version-int  = @ProjectVersionInt@
 
 # Compilation and linking flags:
 #===============================
