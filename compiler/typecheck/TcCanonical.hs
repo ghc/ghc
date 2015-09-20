@@ -933,6 +933,23 @@ of can_eq_nc. We know that this can't loop forever because we require that
 flattening the RHS actually made progress. (If it didn't, then we really
 *should* fail with an occurs-check!)
 
+Note [Occurs check error]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have an occurs check error, are we necessarily hosed? Say our
+tyvar is tv1 and the type it appears in is xi2. Because xi2 is function
+free, then if we're computing w.r.t. nominal equality, then, yes, we're
+hosed. Nothing good can come from (a ~ [a]). If we're computing w.r.t.
+representational equality, this is a little subtler. Once again, (a ~R [a])
+is a bad thing, but (a ~R N a) for a newtype N might be just fine. This
+means also that (a ~ b a) might be fine, because `b` might become a newtype.
+
+So, we must check: does tv1 appear in xi2 under any type constructor that
+is generative w.r.t. representational equality? That's what isTyVarUnderDatatype
+does. (The other name I considered, isTyVarUnderTyConGenerativeWrtReprEq was
+a bit verbose. And the shorter name gets the point across.)
+
+See also #10715, which induced this addition.
+
 -}
 
 canCFunEqCan :: CtEvidence
@@ -1039,12 +1056,14 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 xi2 co2
   | otherwise  -- Occurs check error
   = rewriteEqEvidence ev eq_rel swapped xi1 xi2 co1 co2
     `andWhenContinue` \ new_ev ->
-    case eq_rel of
-      NomEq  -> do { emitInsoluble (mkNonCanonical new_ev)
+    if eq_rel == NomEq || isTyVarUnderDatatype tv1 xi2
+      -- See Note [Occurs check error]
+
+    then do { emitInsoluble (mkNonCanonical new_ev)
               -- If we have a ~ [a], it is not canonical, and in particular
               -- we don't want to rewrite existing inerts with it, otherwise
               -- we'd risk divergence in the constraint solver
-                   ; stopWith new_ev "Occurs check" }
+            ; stopWith new_ev "Occurs check" }
 
         -- A representational equality with an occurs-check problem isn't
         -- insoluble! For example:
@@ -1052,9 +1071,9 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 xi2 co2
         -- We might learn that b is the newtype Id.
         -- But, the occurs-check certainly prevents the equality from being
         -- canonical, and we might loop if we were to use it in rewriting.
-      ReprEq -> do { traceTcS "Occurs-check in representational equality"
+    else do { traceTcS "Occurs-check in representational equality"
                               (ppr xi1 $$ ppr xi2)
-                   ; continueWith (CIrredEvCan { cc_ev = new_ev }) }
+            ; continueWith (CIrredEvCan { cc_ev = new_ev }) }
   where
     xi1 = mkTyVarTy tv1
     co1 = mkTcReflCo (eqRelRole eq_rel) xi1
