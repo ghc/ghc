@@ -1,5 +1,5 @@
 # Test +RTS -G1 here (it isn't tested anywhere else)
-setTestOpts(extra_ways(['g1']))
+setTestOpts(unless(fast(), extra_ways(['g1'])))
 
 test('cgrun001', normal, compile_and_run, [''])
 test('cgrun002', normal, compile_and_run, [''])

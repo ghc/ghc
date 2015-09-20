@@ -191,11 +191,14 @@ endif
 #           cd tests  config.  many   many  by
 # validate  && make   speed=   tests  ways  whom
 # =============================================================================
-# --fast    fast      2        some   1     Travis (to stay within time limit)
-# --normal  test      1        all    1     Phabricator (slow takes too long?)
+# --fast    fast      2        some   1+exs Travis (to stay within time limit)
+# --normal  test      1        all    1+exs Phabricator (slow takes too long?)
 # --slow    slow      0        all    all   Nightly (slow is ok)
 #
 #           accept    1        all    1
+#
+# `--fast` and `--normal` run one default way, as well as any other ways which
+# are explicitly requested by the test using extra_ways().
 #
 # `make accept` should run all tests exactly once. There is no point in
 # accepting a test for multiple ways, since it should produce the same output

@@ -676,8 +676,15 @@ def test_common_work (name, opts, func, args):
 
         # Only run all ways in slow mode.
         # See Note [validate and testsuite speed] in toplevel Makefile.
-        if config.speed > 0:
+        if config.accept:
+            # Only ever run one way
             do_ways = do_ways[:1]
+        elif config.speed > 0:
+            # However, if we EXPLICITLY asked for a way (with extra_ways)
+            # please test it!
+            explicit_ways = filter(lambda way: way in opts.extra_ways, do_ways)
+            other_ways = filter(lambda way: way not in opts.extra_ways, do_ways)
+            do_ways = other_ways[:1] + explicit_ways
 
         if not config.clean_only:
             # Run the required tests...
