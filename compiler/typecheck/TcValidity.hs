@@ -1224,7 +1224,7 @@ wrongATArgErr ty instTy =
 
 checkValidCoAxiom :: CoAxiom Branched -> TcM ()
 checkValidCoAxiom (CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
-  = do { _ <- mapM (checkValidCoAxBranch Nothing fam_tc) branch_list
+  = do { mapM_ (checkValidCoAxBranch Nothing fam_tc) branch_list
        ; foldlM_ check_branch_compat [] branch_list }
   where
     branch_list = fromBranches branches
