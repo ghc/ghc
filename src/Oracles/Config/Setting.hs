@@ -3,7 +3,7 @@ module Oracles.Config.Setting (
     setting, settingList, getSetting, getSettingList,
     targetPlatform, targetPlatforms, targetOs, targetOss, notTargetOs,
     targetArchs, windowsHost, notWindowsHost, ghcWithInterpreter,
-    ghcEnableTablesNextToCode, cmdLineLengthLimit
+    ghcEnableTablesNextToCode, ghcCanonVersion, cmdLineLengthLimit
     ) where
 
 import Base
@@ -16,32 +16,42 @@ import Stage
 -- SettingList is used for multiple string values separated by spaces, such
 -- as 'gmp-include-dirs = a b'.
 -- settingList GmpIncludeDirs therefore returns a list of strings ["a", "b"].
-data Setting = TargetOs
-             | TargetArch
-             | TargetPlatformFull
-             | HostOsCpp
-             | DynamicExtension
-             | ProjectVersion
+data Setting = DynamicExtension
+             | GhcMajorVersion
+             | GhcMinorVersion
+             | GhcPatchLevel
              | GhcSourcePath
+             | HostArch
+             | HostOs
+             | ProjectVersion
+             | ProjectVersionInt
+             | TargetArch
+             | TargetOs
+             | TargetPlatformFull
 
 data SettingList = ConfCcArgs Stage
+                 | ConfCppArgs Stage
                  | ConfGccLinkerArgs Stage
                  | ConfLdLinkerArgs Stage
-                 | ConfCppArgs Stage
-                 | IconvIncludeDirs
-                 | IconvLibDirs
                  | GmpIncludeDirs
                  | GmpLibDirs
+                 | IconvIncludeDirs
+                 | IconvLibDirs
 
 setting :: Setting -> Action String
 setting key = askConfig $ case key of
-    TargetOs           -> "target-os"
-    TargetArch         -> "target-arch"
-    TargetPlatformFull -> "target-platform-full"
-    HostOsCpp          -> "host-os-cpp"
     DynamicExtension   -> "dynamic-extension"
-    ProjectVersion     -> "project-version"
+    GhcMajorVersion    -> "ghc-major-version"
+    GhcMinorVersion    -> "ghc-minor-version"
+    GhcPatchLevel      -> "ghc-patch-level"
     GhcSourcePath      -> "ghc-source-path"
+    HostArch           -> "host-arch"
+    HostOs             -> "host-os"
+    ProjectVersion     -> "project-version"
+    ProjectVersionInt  -> "project-version-int"
+    TargetArch         -> "target-arch"
+    TargetOs           -> "target-os"
+    TargetPlatformFull -> "target-platform-full"
 
 settingList :: SettingList -> Action [String]
 settingList key = fmap words $ askConfig $ case key of
@@ -49,10 +59,10 @@ settingList key = fmap words $ askConfig $ case key of
     ConfCppArgs       stage -> "conf-cpp-args-stage"        ++ show stage
     ConfGccLinkerArgs stage -> "conf-gcc-linker-args-stage" ++ show stage
     ConfLdLinkerArgs  stage -> "conf-ld-linker-args-stage"  ++ show stage
-    IconvIncludeDirs        -> "iconv-include-dirs"
-    IconvLibDirs            -> "iconv-lib-dirs"
     GmpIncludeDirs          -> "gmp-include-dirs"
     GmpLibDirs              -> "gmp-lib-dirs"
+    IconvIncludeDirs        -> "iconv-include-dirs"
+    IconvLibDirs            -> "iconv-lib-dirs"
 
 getSetting :: Setting -> ReaderT a Action String
 getSetting = lift . setting
@@ -84,9 +94,7 @@ targetArchs :: [String] -> Action Bool
 targetArchs = matchSetting TargetArch
 
 windowsHost :: Action Bool
-windowsHost = do
-    hostOsCpp <- setting HostOsCpp
-    return $ hostOsCpp `elem` ["mingw32", "cygwin32"]
+windowsHost = matchSetting HostOs ["mingw32", "cygwin32"]
 
 notWindowsHost :: Action Bool
 notWindowsHost = fmap not windowsHost
@@ -102,6 +110,15 @@ ghcWithInterpreter = do
 
 ghcEnableTablesNextToCode :: Action Bool
 ghcEnableTablesNextToCode = targetArchs ["ia64", "powerpc64"]
+
+-- Canonicalised GHC version number, used for integer version comparisons. We
+-- expand GhcMinorVersion to two digits by adding a leading zero if necessary.
+ghcCanonVersion :: Action String
+ghcCanonVersion = do
+    ghcMajorVersion <- setting GhcMajorVersion
+    ghcMinorVersion <- setting GhcMinorVersion
+    let leadingZero = [ '0' | length ghcMinorVersion == 1 ]
+    return $ ghcMajorVersion ++ leadingZero ++ ghcMinorVersion
 
 -- Command lines have limited size on Windows. Since Windows 7 the limit is
 -- 32768 characters (theoretically). In practice we use 31000 to leave some
