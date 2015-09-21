@@ -1,4 +1,4 @@
-{-# LANGUAGE -fwarn-unusued-bindings #-}
+{-# OPTIONS_GHC -fwarn-unused-binds #-}
 
 module T10347 (N, mkN) where
 
