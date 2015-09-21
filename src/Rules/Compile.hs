@@ -19,7 +19,7 @@ compilePackage _ target @ (PartialTarget stage package) = do
 
     matchBuildResult buildPath "o" ?> \obj -> do
         (src, deps) <- dependencies buildPath obj
-        need deps
+        need $ src : deps
         if ("//*.c" ?== src)
         then build $ fullTarget target (Gcc stage) [src] [obj]
         else do
@@ -28,6 +28,6 @@ compilePackage _ target @ (PartialTarget stage package) = do
 
     matchBuildResult buildPath "o-boot" ?> \obj -> do
         (src, deps) <- dependencies buildPath obj
-        need deps
+        need $ src : deps
         let way = detectWay obj
         build $ fullTargetWithWay target (Ghc stage) way [src] [obj]
