@@ -165,7 +165,7 @@ lintCmmLast :: BlockSet -> CmmNode O C -> CmmLint ()
 lintCmmLast labels node = case node of
   CmmBranch id -> checkTarget id
 
-  CmmCondBranch e t f -> do
+  CmmCondBranch e t f _ -> do
             dflags <- getDynFlags
             mapM_ checkTarget [t,f]
             _ <- lintCmmExpr e

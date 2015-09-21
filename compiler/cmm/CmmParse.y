@@ -1268,7 +1268,7 @@ cmmRawIf cond then_id = do
 -- branching to true_id if so, and falling through otherwise.
 emitCond (BoolTest e) then_id = do
   else_id <- newBlockId
-  emit (mkCbranch e then_id else_id)
+  emit (mkCbranch e then_id else_id Nothing)
   emitLabel else_id
 emitCond (BoolNot (BoolTest (CmmMachOp op args))) then_id
   | Just op' <- maybeInvertComparison op

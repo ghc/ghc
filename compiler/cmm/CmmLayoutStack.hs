@@ -884,7 +884,7 @@ areaToSp _ _ _ _ other = other
 optStackCheck :: CmmNode O C -> CmmNode O C
 optStackCheck n = -- Note [Always false stack check]
  case n of
-   CmmCondBranch (CmmLit (CmmInt 0 _)) _true false -> CmmBranch false
+   CmmCondBranch (CmmLit (CmmInt 0 _)) _true false _ -> CmmBranch false
    other -> other
 
 

@@ -137,7 +137,7 @@ hash_block block =
         hash_node (CmmStore e e') = hash_e e + hash_e e'
         hash_node (CmmUnsafeForeignCall t _ as) = hash_tgt t + hash_list hash_e as
         hash_node (CmmBranch _) = 23 -- NB. ignore the label
-        hash_node (CmmCondBranch p _ _) = hash_e p
+        hash_node (CmmCondBranch p _ _ _) = hash_e p
         hash_node (CmmCall e _ _ _ _ _) = hash_e e
         hash_node (CmmForeignCall t _ _ _ _ _ _) = hash_tgt t
         hash_node (CmmSwitch e _) = hash_e e
@@ -247,8 +247,8 @@ eqBlockBodyWith eqBid block block'
 
 eqLastWith :: (BlockId -> BlockId -> Bool) -> CmmNode O C -> CmmNode O C -> Bool
 eqLastWith eqBid (CmmBranch bid1) (CmmBranch bid2) = eqBid bid1 bid2
-eqLastWith eqBid (CmmCondBranch c1 t1 f1) (CmmCondBranch c2 t2 f2) =
-  c1 == c2 && eqBid t1 t2 && eqBid f1 f2
+eqLastWith eqBid (CmmCondBranch c1 t1 f1 l1) (CmmCondBranch c2 t2 f2 l2) =
+  c1 == c2 && l1 == l2 && eqBid t1 t2 && eqBid f1 f2
 eqLastWith eqBid (CmmCall t1 c1 g1 a1 r1 u1) (CmmCall t2 c2 g2 a2 r2 u2) =
   t1 == t2 && eqMaybeWith eqBid c1 c2 && a1 == a2 && r1 == r2 && u1 == u2 && g1 == g2
 eqLastWith eqBid (CmmSwitch e1 ids1) (CmmSwitch e2 ids2) =

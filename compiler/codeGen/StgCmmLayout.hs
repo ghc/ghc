@@ -226,9 +226,10 @@ slowCall fun stg_args
                                                   (mkIntExpr dflags n_args)
 
              tscope <- getTickScope
-             emit (mkCbranch (cmmIsTagged dflags funv) is_tagged_lbl slow_lbl
+             emit (mkCbranch (cmmIsTagged dflags funv)
+                             is_tagged_lbl slow_lbl (Just True)
                    <*> mkLabel is_tagged_lbl tscope
-                   <*> mkCbranch correct_arity fast_lbl slow_lbl
+                   <*> mkCbranch correct_arity fast_lbl slow_lbl (Just True)
                    <*> mkLabel fast_lbl tscope
                    <*> fast_code
                    <*> mkBranch end_lbl

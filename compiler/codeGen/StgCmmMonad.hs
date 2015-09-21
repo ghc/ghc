@@ -831,7 +831,7 @@ mkCmmIfThenElse e tbranch fbranch = do
   endif <- newLabelC
   tid   <- newLabelC
   fid   <- newLabelC
-  return $ catAGraphs [ mkCbranch e tid fid
+  return $ catAGraphs [ mkCbranch e tid fid Nothing
                       , mkLabel tid tscp, tbranch, mkBranch endif
                       , mkLabel fid tscp, fbranch, mkLabel endif tscp ]
 
@@ -839,14 +839,14 @@ mkCmmIfGoto :: CmmExpr -> BlockId -> FCode CmmAGraph
 mkCmmIfGoto e tid = do
   endif <- newLabelC
   tscp  <- getTickScope
-  return $ catAGraphs [ mkCbranch e tid endif, mkLabel endif tscp ]
+  return $ catAGraphs [ mkCbranch e tid endif Nothing, mkLabel endif tscp ]
 
 mkCmmIfThen :: CmmExpr -> CmmAGraph -> FCode CmmAGraph
 mkCmmIfThen e tbranch = do
   endif <- newLabelC
   tid   <- newLabelC
   tscp  <- getTickScope
-  return $ catAGraphs [ mkCbranch e tid endif
+  return $ catAGraphs [ mkCbranch e tid endif Nothing
                       , mkLabel tid tscp, tbranch, mkLabel endif tscp ]
 
 

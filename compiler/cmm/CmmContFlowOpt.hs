@@ -282,12 +282,15 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
           -- This helps the native codegen a little bit, and probably has no
           -- effect on LLVM.  It's convenient to do it here, where we have the
           -- information about predecessors.
+          --
+          -- NB., only do this if the branch does not have a
+          -- likeliness annotation.
           swapcond_last
-            | CmmCondBranch cond t f <- shortcut_last
+            | CmmCondBranch cond t f Nothing <- shortcut_last
             , numPreds f > 1
             , hasOnePredecessor t
             , Just cond' <- maybeInvertCmmExpr cond
-            = CmmCondBranch cond' f t
+            = CmmCondBranch cond' f t Nothing
 
             | otherwise
             = shortcut_last
@@ -354,21 +357,25 @@ replaceLabels env g
      lookup id = mapLookup id env `orElse` id
 
      txnode :: CmmNode e x -> CmmNode e x
-     txnode (CmmBranch bid)         = CmmBranch (lookup bid)
-     txnode (CmmCondBranch p t f)   = mkCmmCondBranch (exp p) (lookup t) (lookup f)
-     txnode (CmmSwitch e ids)       = CmmSwitch (exp e) (mapSwitchTargets lookup ids)
-     txnode (CmmCall t k rg a res r) = CmmCall (exp t) (liftM lookup k) rg a res r
-     txnode fc@CmmForeignCall{}     = fc{ args = map exp (args fc)
-                                        , succ = lookup (succ fc) }
-     txnode other                   = mapExpDeep exp other
+     txnode (CmmBranch bid) = CmmBranch (lookup bid)
+     txnode (CmmCondBranch p t f l) =
+       mkCmmCondBranch (exp p) (lookup t) (lookup f) l
+     txnode (CmmSwitch e ids) =
+       CmmSwitch (exp e) (mapSwitchTargets lookup ids)
+     txnode (CmmCall t k rg a res r) =
+       CmmCall (exp t) (liftM lookup k) rg a res r
+     txnode fc@CmmForeignCall{} =
+       fc{ args = map exp (args fc), succ = lookup (succ fc) }
+     txnode other = mapExpDeep exp other
 
      exp :: CmmExpr -> CmmExpr
      exp (CmmLit (CmmBlock bid))                = CmmLit (CmmBlock (lookup bid))
      exp (CmmStackSlot (Young id) i) = CmmStackSlot (Young (lookup id)) i
      exp e                                      = e
 
-mkCmmCondBranch :: CmmExpr -> Label -> Label -> CmmNode O C
-mkCmmCondBranch p t f = if t == f then CmmBranch t else CmmCondBranch p t f
+mkCmmCondBranch :: CmmExpr -> Label -> Label -> Maybe Bool -> CmmNode O C
+mkCmmCondBranch p t f l =
+  if t == f then CmmBranch t else CmmCondBranch p t f l
 
 -- Build a map from a block to its set of predecessors.
 predMap :: [CmmBlock] -> BlockEnv Int

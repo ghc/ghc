@@ -119,7 +119,7 @@ stmtToInstrs stmt = case stmt of
     CmmStore addr src    -> genStore addr src
 
     CmmBranch id         -> genBranch id
-    CmmCondBranch arg true false
+    CmmCondBranch arg true false _      -- TODO: likely annotation
                          -> genCondBranch arg true false
     CmmSwitch arg ids    -> genSwitch arg ids
 

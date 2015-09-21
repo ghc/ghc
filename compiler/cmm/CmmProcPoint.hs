@@ -295,7 +295,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                   add_if_branch_to_pp block rst =
                     case lastNode block of
                       CmmBranch id          -> add_if_pp id rst
-                      CmmCondBranch _ ti fi -> add_if_pp ti (add_if_pp fi rst)
+                      CmmCondBranch _ ti fi _ -> add_if_pp ti (add_if_pp fi rst)
                       CmmSwitch _ ids       -> foldr add_if_pp rst $ switchTargetsToList ids
                       _                     -> rst
 
@@ -382,7 +382,7 @@ replaceBranches env cmmg
 
     last :: CmmNode O C -> CmmNode O C
     last (CmmBranch id)          = CmmBranch (lookup id)
-    last (CmmCondBranch e ti fi) = CmmCondBranch e (lookup ti) (lookup fi)
+    last (CmmCondBranch e ti fi l) = CmmCondBranch e (lookup ti) (lookup fi) l
     last (CmmSwitch e ids)       = CmmSwitch e (mapSwitchTargets lookup ids)
     last l@(CmmCall {})          = l { cml_cont = Nothing }
             -- NB. remove the continuation of a CmmCall, since this
