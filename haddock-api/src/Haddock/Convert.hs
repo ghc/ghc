@@ -173,7 +173,7 @@ synifyTyCon coax tc
               ClosedSynFamilyTyCon mb -> case mb of
                   Just (CoAxiom { co_ax_branches = branches })
                           -> return $ ClosedTypeFamily $ Just $
-                               brListMap (noLoc . synifyAxBranch tc) branches
+                               map (noLoc . synifyAxBranch tc) (fromBranches branches)
                   Nothing -> return $ ClosedTypeFamily $ Just []
               BuiltInSynFamTyCon {}
                 -> return $ ClosedTypeFamily $ Just []
