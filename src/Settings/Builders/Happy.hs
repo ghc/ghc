@@ -5,8 +5,8 @@ import Predicates (builder)
 
 happyArgs :: Args
 happyArgs = builder Happy ? do
-    file <- getFile
     src  <- getSource
+    file <- getFile
     mconcat [ arg "-agc"
             , arg "--strict"
             , arg src

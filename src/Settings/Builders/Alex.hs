@@ -6,8 +6,8 @@ import Predicates (builder, package)
 
 alexArgs :: Args
 alexArgs = builder Alex ? do
-    file <- getFile
     src  <- getSource
+    file <- getFile
     mconcat [ arg "-g"
             , package compiler ? arg "--latin1"
             , arg src

@@ -1,5 +1,6 @@
 module Settings.Builders.GhcCabal (
-    cabalArgs, ghcCabalHsColourArgs, bootPackageDbArgs, customPackageArgs
+    cabalArgs, ghcCabalHsColourArgs, bootPackageDbArgs, customPackageArgs,
+    ccArgs, ccWarnings, argStagedSettingList
     ) where
 
 import Expression
@@ -54,6 +55,7 @@ libraryArgs = do
              then  "--enable-shared"
              else "--disable-shared" ]
 
+-- TODO: LD_OPTS?
 configureArgs :: Args
 configureArgs = do
     let conf key = appendSubD $ "--configure-option=" ++ key
@@ -94,7 +96,11 @@ packageConstraints = stage0 ? do
 -- TODO: should be in a different file
 -- TODO: put all validating options together in one file
 ccArgs :: Args
-ccArgs = validating ? do
+ccArgs = validating ? ccWarnings
+
+-- TODO: should be in a different file
+ccWarnings :: Args
+ccWarnings = do
     let notClang = fmap not gccIsClang
     mconcat [ arg "-Werror"
             , arg "-Wall"
