@@ -47,6 +47,7 @@ import DataCon
 import Maybes
 import RdrName
 import Name
+import NameEnv
 import NameSet
 import TyCon
 import TcType
@@ -441,18 +442,19 @@ pprRepTy fi@(FamInst { fi_tys = lhs })
 -- As of 24 April 2012, this only shares MetaTyCons between derivations of
 -- Generic and Generic1; thus the types and logic are quite simple.
 type CommonAuxiliary = MetaTyCons
-type CommonAuxiliaries = [(TyCon, CommonAuxiliary)] -- NSF what is a more efficient map type?
+type CommonAuxiliaries = NameEnv CommonAuxiliary
 
 commonAuxiliaries :: [DerivSpec ()] -> TcM (CommonAuxiliaries, BagDerivStuff)
-commonAuxiliaries = foldM snoc ([], emptyBag) where
+commonAuxiliaries = foldM snoc (emptyNameEnv, emptyBag) where
   snoc acc@(cas, stuff) (DS {ds_name = nm, ds_cls = cls, ds_tc = rep_tycon})
     | getUnique cls `elem` [genClassKey, gen1ClassKey] =
       extendComAux $ genGenericMetaTyCons rep_tycon (nameModule nm)
     | otherwise = return acc
    where extendComAux m -- don't run m if its already in the accumulator
-           | any ((rep_tycon ==) . fst) cas = return acc
+           | elemNameEnv (tyConName rep_tycon) cas = return acc
            | otherwise = do (ca, new_stuff) <- m
-                            return $ ((rep_tycon, ca) : cas, stuff `unionBags` new_stuff)
+                            return ( extendNameEnv cas (tyConName rep_tycon) ca
+                                   , stuff `unionBags` new_stuff)
 
 renameDeriv :: Bool
             -> [InstInfo RdrName]
@@ -1982,7 +1984,8 @@ genInst comauxs
   | otherwise
   = do { (meth_binds, deriv_stuff) <- genDerivStuff loc clas
                                         dfun_name rep_tycon
-                                        (lookup rep_tycon comauxs)
+                                        (lookupNameEnv comauxs
+                                                       (tyConName rep_tycon))
        ; inst_spec <- newDerivClsInst theta spec
        ; traceTc "newder" (ppr inst_spec)
        ; let inst_info = InstInfo { iSpec   = inst_spec
