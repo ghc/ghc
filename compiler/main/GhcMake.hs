@@ -162,9 +162,12 @@ load how_much = do
     -- (see msDeps)
     let all_home_mods = [ms_mod_name s
                         | s <- mod_graph, not (isBootSummary s)]
-        bad_boot_mods = [s        | s <- mod_graph, isBootSummary s,
-                                    not (ms_mod_name s `elem` all_home_mods)]
-    ASSERT( null bad_boot_mods ) return ()
+    -- TODO: Figure out what the correct form of this assert is. It's violated
+    -- when you have HsBootMerge nodes in the graph: then you'll have hs-boot
+    -- files without corresponding hs files.
+    --  bad_boot_mods = [s        | s <- mod_graph, isBootSummary s,
+    --                              not (ms_mod_name s `elem` all_home_mods)]
+    -- ASSERT( null bad_boot_mods ) return ()
 
     -- check that the module given in HowMuch actually exists, otherwise
     -- topSortModuleGraph will bomb later.
