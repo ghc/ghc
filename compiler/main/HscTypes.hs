@@ -2474,7 +2474,7 @@ instance Outputable ModSummary where
                                 <> text (hscSourceString (ms_hsc_src ms)) <> comma,
                           text "ms_textual_imps =" <+> ppr (ms_textual_imps ms),
                           text "ms_srcimps =" <+> ppr (ms_srcimps ms),
-                          if not (null (ms_merge_imps ms))
+                          if not (null (snd (ms_merge_imps ms)))
                             then text "ms_merge_imps =" <+> ppr (ms_merge_imps ms)
                             else empty]),
              char '}'
