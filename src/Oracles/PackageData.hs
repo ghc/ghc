@@ -15,24 +15,29 @@ import qualified Data.HashMap.Strict as Map
 -- PackageDataList is used for multiple string options separated by spaces,
 -- such as 'path_MODULES = Data.Array Data.Array.Base ...'.
 -- pkgListData Modules therefore returns ["Data.Array", "Data.Array.Base", ...]
-data PackageData = Version      FilePath
-                 | PackageKey   FilePath
+data PackageData = BuildGhciLib FilePath
                  | LibName      FilePath
+                 | PackageKey   FilePath
                  | Synopsis     FilePath
-                 | BuildGhciLib FilePath
+                 | Version      FilePath
 
-data PackageDataList = Modules        FilePath
-                     | HiddenModules  FilePath
-                     | SrcDirs        FilePath
-                     | IncludeDirs    FilePath
-                     | Deps           FilePath
-                     | DepIds         FilePath
-                     | DepNames       FilePath
-                     | CppArgs        FilePath
-                     | HsArgs         FilePath
-                     | CcArgs         FilePath
+data PackageDataList = CcArgs         FilePath
                      | CSrcs          FilePath
+                     | CppArgs        FilePath
+                     | DepCcArgs      FilePath
+                     | DepExtraLibs   FilePath
+                     | DepIds         FilePath
                      | DepIncludeDirs FilePath
+                     | DepLdArgs      FilePath
+                     | DepLibDirs     FilePath
+                     | DepNames       FilePath
+                     | Deps           FilePath
+                     | HiddenModules  FilePath
+                     | HsArgs         FilePath
+                     | IncludeDirs    FilePath
+                     | LdArgs         FilePath
+                     | Modules        FilePath
+                     | SrcDirs        FilePath
 
 newtype PackageDataKey = PackageDataKey (FilePath, String)
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
@@ -48,26 +53,31 @@ askPackageData path key = do
 
 pkgData :: PackageData -> Action String
 pkgData packageData = case packageData of
-    Version      path -> askPackageData path "VERSION"
-    PackageKey   path -> askPackageData path "PACKAGE_KEY"
-    LibName      path -> askPackageData path "LIB_NAME"
-    Synopsis     path -> askPackageData path "SYNOPSIS"
     BuildGhciLib path -> askPackageData path "BUILD_GHCI_LIB"
+    LibName      path -> askPackageData path "LIB_NAME"
+    PackageKey   path -> askPackageData path "PACKAGE_KEY"
+    Synopsis     path -> askPackageData path "SYNOPSIS"
+    Version      path -> askPackageData path "VERSION"
 
 pkgDataList :: PackageDataList -> Action [String]
 pkgDataList packageData = fmap (map unquote . words) $ case packageData of
-    Modules        path -> askPackageData path "MODULES"
-    HiddenModules  path -> askPackageData path "HIDDEN_MODULES"
-    SrcDirs        path -> askPackageData path "HS_SRC_DIRS"
-    IncludeDirs    path -> askPackageData path "INCLUDE_DIRS"
-    Deps           path -> askPackageData path "DEPS"
-    DepIds         path -> askPackageData path "DEP_IPIDS"
-    DepNames       path -> askPackageData path "DEP_NAMES"
-    CppArgs        path -> askPackageData path "CPP_OPTS"
-    HsArgs         path -> askPackageData path "HC_OPTS"
     CcArgs         path -> askPackageData path "CC_OPTS"
     CSrcs          path -> askPackageData path "C_SRCS"
+    CppArgs        path -> askPackageData path "CPP_OPTS"
+    DepCcArgs      path -> askPackageData path "DEP_CC_OPTS"
+    DepExtraLibs   path -> askPackageData path "DEP_EXTRA_LIBS"
+    DepIds         path -> askPackageData path "DEP_IPIDS"
     DepIncludeDirs path -> askPackageData path "DEP_INCLUDE_DIRS_SINGLE_QUOTED"
+    DepLibDirs     path -> askPackageData path "DEP_LIB_DIRS_SINGLE_QUOTED"
+    DepLdArgs      path -> askPackageData path "DEP_LD_OPTS"
+    DepNames       path -> askPackageData path "DEP_NAMES"
+    Deps           path -> askPackageData path "DEPS"
+    HiddenModules  path -> askPackageData path "HIDDEN_MODULES"
+    HsArgs         path -> askPackageData path "HC_OPTS"
+    IncludeDirs    path -> askPackageData path "INCLUDE_DIRS"
+    LdArgs         path -> askPackageData path "LD_OPTS"
+    Modules        path -> askPackageData path "MODULES"
+    SrcDirs        path -> askPackageData path "HS_SRC_DIRS"
   where
     unquote = dropWhile (== '\'') . dropWhileEnd (== '\'')
 
