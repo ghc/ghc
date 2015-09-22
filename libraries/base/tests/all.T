@@ -162,6 +162,10 @@ test('topHandler03',
       ignore_output,
       signal_exit_code(15)
      ], compile_and_run, [''])
+test('topHandler04',
+     [when(opsys('mingw32'), skip),
+      exit_code(1)
+     ], compile_and_run, [''])
 
 
 test('T8766',

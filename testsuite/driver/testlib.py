@@ -1691,9 +1691,9 @@ def normalise_callstacks(str):
     def repl(matches):
         location = matches.group(1)
         location = normalise_slashes_(location)
-        return ', called at {}:<line>:<column> in'.format(location)
+        return ', called at {}:<line>:<column> in <package-id>:'.format(location)
     # Ignore line number differences in call stacks (#10834).
-    return re.sub(', called at (.+):[\\d]+:[\\d]+ in', repl, str)
+    return re.sub(', called at (.+):[\\d]+:[\\d]+ in [\\w\-\.]+:', repl, str)
 
 def normalise_errmsg( str ):
     # remove " error:" and lower-case " Warning:" to make patch for

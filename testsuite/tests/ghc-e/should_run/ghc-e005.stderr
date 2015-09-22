@@ -1,1 +1,3 @@
 ghc-e005-prog: foo
+CallStack:
+  error, called at ghc-e005.hs:12:10 in main:Main
