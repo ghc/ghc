@@ -4222,6 +4222,13 @@ instance dictates the instances of <literal>Functor</literal> and
 <option>-XDeriveFunctor</option> and <option>-XDeriveFoldable</option>.
 See <xref linkend="deriving-traversable"/>.
 </para></listitem>
+
+<listitem><para> With <option>-XDeriveLift</option>, you can derive instances
+of the class <literal>Lift</literal>, defined in the
+<literal>Language.Haskell.TH.Syntax</literal> module of the
+<literal>template-haskell</literal> package.
+See <xref linkend="deriving-lift"/>.
+</para></listitem>
 </itemizedlist>
 You can also use a standalone deriving declaration instead
 (see <xref linkend="stand-alone-deriving"/>).
@@ -4541,6 +4548,84 @@ instance Typeable "Hello" -- Type-level symbols
 
 
 </itemizedlist>
+
+</para>
+
+</sect2>
+
+<sect2 id="deriving-lift">
+<title>Deriving <literal>Lift</literal> instances</title>
+
+<para>The class <literal>Lift</literal>, unlike other derivable classes, lives
+in <literal>template-haskell</literal> instead of <literal>base</literal>.
+Having a data type be an instance of <literal>Lift</literal> permits its values
+to be promoted to Template Haskell expressions (of type
+<literal>ExpQ</literal>), which can then be spliced into Haskell source code.
+</para>
+
+<para>Here is an example of how one can derive <literal>Lift</literal>:
+
+<programlisting>
+{-# LANGUAGE DeriveLift #-}
+module Bar where
+
+import Language.Haskell.TH.Syntax
+
+data Foo a = Foo a | a :^: a deriving Lift
+
+{-
+instance (Lift a) => Lift (Foo a) where
+    lift (Foo a)
+      = appE
+          (conE
+            (mkNameG_d "package-name" "Bar" "Foo"))
+          (lift a)
+    lift (u :^: v)
+      = infixApp
+          (lift u)
+          (conE
+            (mkNameG_d "package-name" "Bar" ":^:"))
+          (lift v)
+-}
+
+-----
+{-# LANGUAGE TemplateHaskell #-}
+module Baz where
+
+import Bar
+import Language.Haskell.TH.Lift
+
+foo :: Foo String
+foo = $(lift $ Foo "foo")
+
+fooExp :: Lift a => Foo a -> Q Exp
+fooExp f = [| f |]
+</programlisting>
+
+<option>-XDeriveLift</option> also works for certain unboxed types
+(<literal>Addr#</literal>, <literal>Char#</literal>,
+<literal>Double#</literal>, <literal>Float#</literal>,
+<literal>Int#</literal>, and <literal>Word#</literal>):
+
+<programlisting>
+{-# LANGUAGE DeriveLift, MagicHash #-}
+module Unboxed where
+
+import GHC.Exts
+import Language.Haskell.TH.Syntax
+
+data IntHash = IntHash Int# deriving Lift
+
+{-
+instance Lift IntHash where
+    lift (IntHash i)
+      = appE
+          (conE
+            (mkNameG_d "package-name" "Unboxed" "IntHash"))
+          (litE
+            (intPrimL (toInteger (I# i))))
+-}
+</programlisting>
 
 </para>
 
@@ -10041,6 +10126,70 @@ Wiki page</ulink>.
 	          may also be given as an argument to the <literal>reify</literal> function.
 	         </para>
 		</listitem>
+
+        <listitem>
+          <para>
+            It is possible for a splice to expand to an expression that contain
+            names which are not in scope at the site of the splice. As an
+            example, consider the following code:
+
+<programlisting>
+module Bar where
+
+import Language.Haskell.TH
+
+add1 :: Int -> Q Exp
+add1 x = [| x + 1 |]
+</programlisting>
+
+          Now consider a splice using <literal>add1</literal> in a separate
+          module:
+
+<programlisting>
+module Foo where
+
+import Bar
+
+two :: Int
+two = $(add1 1)
+</programlisting>
+
+          Template Haskell cannot know what the argument to
+          <literal>add1</literal> will be at the function's definition site, so
+          a lifting mechanism is used to promote <literal>x</literal> into a
+          value of type <literal>Q Exp</literal>. This functionality is exposed
+          to the user as the <literal>Lift</literal> typeclass in the
+          <literal>Language.Haskell.TH.Syntax</literal> module. If a type has a
+          <literal>Lift</literal> instance, then any of its values can be
+          lifted to a Template Haskell expression:
+
+<programlisting>
+class Lift t where
+  lift :: t -> Q Exp
+</programlisting>
+
+          In general, if GHC sees an expression within Oxford brackets (e.g.,
+          <literal>[| foo bar |]</literal>, then GHC looks up each name within
+          the brackets. If a name is global (e.g., suppose
+          <literal>foo</literal> comes from an import or a top-level
+          declaration), then the fully qualified name is used directly in the
+          quotation. If the name is local (e.g., suppose <literal>bar</literal>
+          is bound locally in the function definition
+          <literal>mkFoo bar = [| foo bar |]</literal>), then GHC uses
+          <literal>lift</literal> on it (so GHC pretends
+          <literal>[| foo bar |]</literal> actually contains
+          <literal>[| foo $(lift bar) |]</literal>). Local names, which are not
+          in scope at splice locations, are actually evaluated when the
+          quotation is processed.
+
+          The <literal>template-haskell</literal> library provides
+          <literal>Lift</literal> instances for many common data types.
+          Furthermore, it is possible to derive <literal>Lift</literal>
+          instances automatically by using the <option>-XDeriveLift</option>
+          language extension. See <xref linkend="deriving-lift" /> for more
+          information.
+          </para>
+        </listitem>
 
 	      <listitem><para> You may omit the <literal>$(...)</literal> in a top-level declaration splice.
               Simply writing an expression (rather than a declaration) implies a splice.  For example, you can write

@@ -9,7 +9,8 @@ module THNames where
 import PrelNames( mk_known_key_name )
 import Module( Module, mkModuleNameFS, mkModule, thPackageKey )
 import Name( Name )
-import OccName( tcName, dataName, varName )
+import OccName( tcName, clsName, dataName, varName )
+import RdrName( RdrName, nameRdrName )
 import Unique
 import FastString
 
@@ -122,6 +123,9 @@ templateHaskellNames = [
     -- AnnTarget
     valueAnnotationName, typeAnnotationName, moduleAnnotationName,
 
+    -- The type classes
+    liftClassName,
+
     -- And the tycons
     qTyConName, nameTyConName, patTyConName, fieldPatTyConName, matchQTyConName,
     clauseQTyConName, expQTyConName, fieldExpTyConName, predTyConName,
@@ -143,15 +147,19 @@ qqLib = mkTHModule (fsLit "Language.Haskell.TH.Quote")
 mkTHModule :: FastString -> Module
 mkTHModule m = mkModule thPackageKey (mkModuleNameFS m)
 
-libFun, libTc, thFun, thTc, thCon, qqFun :: FastString -> Unique -> Name
+libFun, libTc, thFun, thTc, thCls, thCon, qqFun :: FastString -> Unique -> Name
 libFun = mk_known_key_name OccName.varName  thLib
 libTc  = mk_known_key_name OccName.tcName   thLib
 thFun  = mk_known_key_name OccName.varName  thSyn
 thTc   = mk_known_key_name OccName.tcName   thSyn
+thCls  = mk_known_key_name OccName.clsName  thSyn
 thCon  = mk_known_key_name OccName.dataName thSyn
 qqFun  = mk_known_key_name OccName.varName  qqLib
 
 -------------------- TH.Syntax -----------------------
+liftClassName :: Name
+liftClassName = thCls (fsLit "Lift") liftClassKey
+
 qTyConName, nameTyConName, fieldExpTyConName, patTyConName,
     fieldPatTyConName, expTyConName, decTyConName, typeTyConName,
     tyVarBndrTyConName, matchTyConName, clauseTyConName, funDepTyConName,
@@ -511,6 +519,12 @@ quoteExpName        = qqFun (fsLit "quoteExp")  quoteExpKey
 quotePatName        = qqFun (fsLit "quotePat")  quotePatKey
 quoteDecName        = qqFun (fsLit "quoteDec")  quoteDecKey
 quoteTypeName       = qqFun (fsLit "quoteType") quoteTypeKey
+
+-- ClassUniques available: 200-299
+-- Check in PrelNames if you want to change this
+
+liftClassKey :: Unique
+liftClassKey = mkPreludeClassUnique 200
 
 -- TyConUniques available: 200-299
 -- Check in PrelNames if you want to change this
@@ -873,3 +887,34 @@ valueAnnotationIdKey, typeAnnotationIdKey, moduleAnnotationIdKey :: Unique
 valueAnnotationIdKey  = mkPreludeMiscIdUnique 490
 typeAnnotationIdKey   = mkPreludeMiscIdUnique 491
 moduleAnnotationIdKey = mkPreludeMiscIdUnique 492
+
+{-
+************************************************************************
+*                                                                      *
+                        RdrNames
+*                                                                      *
+************************************************************************
+-}
+
+lift_RDR, mkNameG_dRDR, mkNameG_vRDR :: RdrName
+lift_RDR     = nameRdrName liftName
+mkNameG_dRDR = nameRdrName mkNameG_dName
+mkNameG_vRDR = nameRdrName mkNameG_vName
+
+-- data Exp = ...
+conE_RDR, litE_RDR, appE_RDR, infixApp_RDR :: RdrName
+conE_RDR     = nameRdrName conEName
+litE_RDR     = nameRdrName litEName
+appE_RDR     = nameRdrName appEName
+infixApp_RDR = nameRdrName infixAppName
+
+-- data Lit = ...
+stringL_RDR, intPrimL_RDR, wordPrimL_RDR, floatPrimL_RDR,
+    doublePrimL_RDR, stringPrimL_RDR, charPrimL_RDR :: RdrName
+stringL_RDR     = nameRdrName stringLName
+intPrimL_RDR    = nameRdrName intPrimLName
+wordPrimL_RDR   = nameRdrName wordPrimLName
+floatPrimL_RDR  = nameRdrName floatPrimLName
+doublePrimL_RDR = nameRdrName doublePrimLName
+stringPrimL_RDR = nameRdrName stringPrimLName
+charPrimL_RDR   = nameRdrName charPrimLName

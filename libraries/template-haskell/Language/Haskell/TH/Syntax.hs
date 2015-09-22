@@ -470,7 +470,30 @@ sequenceQ = sequence
 --
 -----------------------------------------------------
 
+-- | A 'Lift' instance can have any of its values turned into a Template
+-- Haskell expression. This is needed when a value used within a Template
+-- Haskell quotation is bound outside the Oxford brackets (@[| ... |]@) but not
+-- at the top level. As an example:
+--
+-- > add1 :: Int -> Q Exp
+-- > add1 x = [| x + 1 |]
+--
+-- Template Haskell has no way of knowing what value @x@ will take on at
+-- splice-time, so it requires the type of @x@ to be an instance of 'Lift'.
+--
+-- 'Lift' instances can be derived automatically by use of the @-XDeriveLift@
+-- GHC language extension:
+--
+-- > {-# LANGUAGE DeriveLift #-}
+-- > module Foo where
+-- >
+-- > import Language.Haskell.TH.Syntax
+-- >
+-- > data Bar a = Bar1 a (Bar a) | Bar2 String
+-- >   deriving Lift
 class Lift t where
+  -- | Turn a value into a Template Haskell expression, suitable for use in
+  -- a splice.
   lift :: t -> Q Exp
   default lift :: Data t => t -> Q Exp
   lift = liftData

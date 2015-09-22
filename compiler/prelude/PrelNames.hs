@@ -599,6 +599,11 @@ minus_RDR               = nameRdrName minusName
 times_RDR               = varQual_RDR  gHC_NUM (fsLit "*")
 plus_RDR                = varQual_RDR gHC_NUM (fsLit "+")
 
+toInteger_RDR, toRational_RDR, fromIntegral_RDR :: RdrName
+toInteger_RDR           = nameRdrName toIntegerName
+toRational_RDR          = nameRdrName toRationalName
+fromIntegral_RDR        = nameRdrName fromIntegralName
+
 fromString_RDR :: RdrName
 fromString_RDR          = nameRdrName fromStringName
 
@@ -1304,6 +1309,10 @@ knownSymbolClassNameKey = mkPreludeClassUnique 43
 
 ghciIoClassKey :: Unique
 ghciIoClassKey = mkPreludeClassUnique 44
+
+---------------- Template Haskell -------------------
+--      USES ClassUniques 200-299
+-----------------------------------------------------
 
 {-
 ************************************************************************

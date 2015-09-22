@@ -127,6 +127,10 @@ test('TH_ghci1', normal, ghci_script, ['TH_ghci1.script'])
 
 test('TH_linePragma', normal, compile_fail, ['-v0'])
 
+test('T1830',
+     extra_clean(['T1830a.o','T1830a.hi']),
+     multimod_compile_and_run,
+     ['T1830', '-v0'])
 test('T2700', normal, compile, ['-v0'])
 test('T2817', normal, compile, ['-v0'])
 test('T2713', normal, compile_fail, ['-v0'])

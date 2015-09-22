@@ -25,7 +25,7 @@ module TcGenDeriv (
         mkCoerceClassMethEqn,
         gen_Newtype_binds,
         genAuxBinds,
-        ordOpTbl, boxConTbl,
+        ordOpTbl, boxConTbl, litConTbl,
         mkRdrFunBind
     ) where
 
@@ -44,6 +44,9 @@ import PrelInfo
 import FamInstEnv( FamInst )
 import MkCore ( eRROR_ID )
 import PrelNames hiding (error_RDR)
+import THNames
+import Module ( moduleName, moduleNameString
+              , modulePackageKey, packageKeyString )
 import MkId ( coerceId )
 import PrimOp
 import SrcLoc
@@ -130,8 +133,8 @@ genDerivedBinds dflags fix_env clas loc tycon
                , (dataClassKey,        gen_Data_binds dflags)
                , (functorClassKey,     gen_Functor_binds)
                , (foldableClassKey,    gen_Foldable_binds)
-               , (traversableClassKey, gen_Traversable_binds) ]
-
+               , (traversableClassKey, gen_Traversable_binds)
+               , (liftClassKey,        gen_Lift_binds) ]
 
 -- Nothing: we can (try to) derive it via Generics
 -- Just s:  we can't, reason s
@@ -1887,6 +1890,90 @@ gen_Traversable_binds loc tycon
 {-
 ************************************************************************
 *                                                                      *
+                        Lift instances
+*                                                                      *
+************************************************************************
+
+Example:
+
+    data Foo a = Foo a | a :^: a deriving Lift
+
+    ==>
+
+    instance (Lift a) => Lift (Foo a) where
+        lift (Foo a)
+          = appE
+              (conE
+                (mkNameG_d "package-name" "ModuleName" "Foo"))
+              (lift a)
+        lift (u :^: v)
+          = infixApp
+              (lift u)
+              (conE
+                (mkNameG_d "package-name" "ModuleName" ":^:"))
+              (lift v)
+
+Note that (mkNameG_d "package-name" "ModuleName" "Foo") is equivalent to what
+'Foo would be when using the -XTemplateHaskell extension. To make sure that
+-XDeriveLift can be used on stage-1 compilers, however, we expliticly invoke
+makeG_d.
+-}
+
+gen_Lift_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
+gen_Lift_binds loc tycon
+  | null data_cons = (unitBag (L loc $ mkFunBind (L loc lift_RDR)
+                       [mkMatch [nlWildPat] errorMsg_Expr emptyLocalBinds])
+                     , emptyBag)
+  | otherwise = (unitBag lift_bind, emptyBag)
+  where
+    errorMsg_Expr = nlHsVar error_RDR `nlHsApp` nlHsLit
+        (mkHsString $ "Can't lift value of empty datatype " ++ tycon_str)
+
+    lift_bind = mk_FunBind loc lift_RDR (map pats_etc data_cons)
+    data_cons = tyConDataCons tycon
+    tycon_str = occNameString . nameOccName . tyConName $ tycon
+
+    pats_etc data_con
+      = ([con_pat], lift_Expr)
+       where
+            con_pat      = nlConVarPat data_con_RDR as_needed
+            data_con_RDR = getRdrName data_con
+            con_arity    = dataConSourceArity data_con
+            as_needed    = take con_arity as_RDRs
+            lifted_as    = zipWithEqual "mk_lift_app" mk_lift_app
+                             tys_needed as_needed
+            tycon_name   = tyConName tycon
+            is_infix     = dataConIsInfix data_con
+            tys_needed   = dataConOrigArgTys data_con
+
+            mk_lift_app ty a
+              | not (isUnLiftedType ty) = nlHsApp (nlHsVar lift_RDR)
+                                                  (nlHsVar a)
+              | otherwise = nlHsApp (nlHsVar litE_RDR)
+                              (primLitOp (mkBoxExp (nlHsVar a)))
+              where (primLitOp, mkBoxExp) = primLitOps "Lift" tycon ty
+
+            pkg_name = packageKeyString . modulePackageKey
+                     . nameModule $ tycon_name
+            mod_name = moduleNameString . moduleName . nameModule $ tycon_name
+            con_name = occNameString . nameOccName . dataConName $ data_con
+
+            conE_Expr = nlHsApp (nlHsVar conE_RDR)
+                                (nlHsApps mkNameG_dRDR
+                                  (map (nlHsLit . mkHsString)
+                                    [pkg_name, mod_name, con_name]))
+
+            lift_Expr
+              | is_infix  = nlHsApps infixApp_RDR [a1, conE_Expr, a2]
+              | otherwise = foldl mk_appE_app conE_Expr lifted_as
+            (a1:a2:_) = lifted_as
+
+mk_appE_app :: LHsExpr RdrName -> LHsExpr RdrName -> LHsExpr RdrName
+mk_appE_app a b = nlHsApps appE_RDR [a, b]
+
+{-
+************************************************************************
+*                                                                      *
                      Newtype-deriving instances
 *                                                                      *
 ************************************************************************
@@ -2106,6 +2193,20 @@ primOrdOps :: String    -- The class involved
 -- See Note [Deriving and unboxed types] in TcDeriv
 primOrdOps str tycon ty = assoc_ty_id str tycon ordOpTbl ty
 
+primLitOps :: String -- The class involved
+           -> TyCon  -- The tycon involved
+           -> Type   -- The type
+           -> ( LHsExpr RdrName -> LHsExpr RdrName -- Constructs a Q Exp value
+              , LHsExpr RdrName -> LHsExpr RdrName -- Constructs a boxed value
+              )
+primLitOps str tycon ty = ( assoc_ty_id str tycon litConTbl ty
+                          , \v -> nlHsVar boxRDR `nlHsApp` v
+                          )
+  where
+    boxRDR
+      | ty == addrPrimTy = unpackCString_RDR
+      | otherwise = assoc_ty_id str tycon boxConTbl ty
+
 ordOpTbl :: [(Type, (RdrName, RdrName, RdrName, RdrName, RdrName))]
 ordOpTbl
  =  [(charPrimTy  , (ltChar_RDR  , leChar_RDR  , eqChar_RDR  , geChar_RDR  , gtChar_RDR  ))
@@ -2132,6 +2233,26 @@ postfixModTbl
     ,(wordPrimTy  , "##")
     ,(floatPrimTy , "#" )
     ,(doublePrimTy, "##")
+    ]
+
+litConTbl :: [(Type, LHsExpr RdrName -> LHsExpr RdrName)]
+litConTbl
+  = [(charPrimTy  , nlHsApp (nlHsVar charPrimL_RDR))
+    ,(intPrimTy   , nlHsApp (nlHsVar intPrimL_RDR)
+                      . nlHsApp (nlHsVar toInteger_RDR))
+    ,(wordPrimTy  , nlHsApp (nlHsVar wordPrimL_RDR)
+                      . nlHsApp (nlHsVar toInteger_RDR))
+    ,(addrPrimTy  , nlHsApp (nlHsVar stringPrimL_RDR)
+                      . nlHsApp (nlHsApp
+                          (nlHsVar map_RDR)
+                          (compose_RDR `nlHsApps`
+                            [ nlHsVar fromIntegral_RDR
+                            , nlHsVar fromEnum_RDR
+                            ])))
+    ,(floatPrimTy , nlHsApp (nlHsVar floatPrimL_RDR)
+                      . nlHsApp (nlHsVar toRational_RDR))
+    ,(doublePrimTy, nlHsApp (nlHsVar doublePrimL_RDR)
+                      . nlHsApp (nlHsVar toRational_RDR))
     ]
 
 -- | Lookup `Type` in an association list.

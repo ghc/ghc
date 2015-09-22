@@ -613,6 +613,7 @@ data ExtensionFlag
    | Opt_DeriveGeneric            -- Allow deriving Generic/1
    | Opt_DefaultSignatures        -- Allow extra signatures for defmeths
    | Opt_DeriveAnyClass           -- Allow deriving any class
+   | Opt_DeriveLift               -- Allow deriving Lift
 
    | Opt_TypeSynonymInstances
    | Opt_FlexibleContexts
@@ -3133,6 +3134,7 @@ xFlags = [
   flagSpec "DeriveFoldable"                   Opt_DeriveFoldable,
   flagSpec "DeriveFunctor"                    Opt_DeriveFunctor,
   flagSpec "DeriveGeneric"                    Opt_DeriveGeneric,
+  flagSpec "DeriveLift"                       Opt_DeriveLift,
   flagSpec "DeriveTraversable"                Opt_DeriveTraversable,
   flagSpec "DisambiguateRecordFields"         Opt_DisambiguateRecordFields,
   flagSpec "DoAndIfThenElse"                  Opt_DoAndIfThenElse,

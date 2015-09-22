@@ -223,6 +223,13 @@
                      <literal>$(...)</literal>. This behavior has been
                      preserved under the new implementation, and is now
                      recognized and documented in <xref linkend="th-syntax"/>.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                     The <literal>Lift</literal> class is now derivable via
+                     the <option>-XDeriveLift</option> extension. See
+                     <xref linkend="deriving-lift"/> for more information.
                 </para>
             </listitem>
        </itemizedlist>

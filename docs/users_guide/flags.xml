@@ -905,6 +905,12 @@
             <entry>7.2.1</entry>
           </row>
           <row>
+            <entry><option>-XDeriveLift</option></entry>
+            <entry>Enable <link linkend="deriving-lift">deriving for the Lift class</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoDeriveLift</option></entry>
+          </row>
+          <row>
             <entry><option>-XDeriveTraversable</option></entry>
             <entry>Enable <link linkend="deriving-extra">deriving for the Traversable class</link>.
               Implies <option>-XDeriveFunctor</option> and <option>-XDeriveFoldable</option>.</entry>

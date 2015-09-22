@@ -54,6 +54,7 @@ import TcType
 import Var
 import VarSet
 import PrelNames
+import THNames ( liftClassKey )
 import SrcLoc
 import Util
 import Outputable
@@ -1170,6 +1171,9 @@ sideConditions mtheta cls
   | cls_key == gen1ClassKey        = Just (checkFlag Opt_DeriveGeneric `andCond`
                                            cond_vanilla `andCond`
                                            cond_Representable1Ok)
+  | cls_key == liftClassKey        = Just (checkFlag Opt_DeriveLift `andCond`
+                                           cond_vanilla `andCond`
+                                           cond_args cls)
   | otherwise                      = Nothing
   where
     cls_key = getUnique cls
@@ -1257,6 +1261,7 @@ cond_args cls (_, tc, _)
      | cls_key == eqClassKey   = check_in arg_ty ordOpTbl
      | cls_key == ordClassKey  = check_in arg_ty ordOpTbl
      | cls_key == showClassKey = check_in arg_ty boxConTbl
+     | cls_key == liftClassKey = check_in arg_ty litConTbl
      | otherwise               = False    -- Read, Ix etc
 
     check_in :: Type -> [(Type,a)] -> Bool
@@ -1355,20 +1360,20 @@ std_class_via_coercible :: Class -> Bool
 -- because giving so gives the same results as generating the boilerplate
 std_class_via_coercible clas
   = classKey clas `elem` [eqClassKey, ordClassKey, ixClassKey, boundedClassKey]
-        -- Not Read/Show because they respect the type
+        -- Not Read/Show/Lift because they respect the type
         -- Not Enum, because newtypes are never in Enum
 
 
 non_coercible_class :: Class -> Bool
--- *Never* derive Read, Show, Typeable, Data, Generic, Generic1 by Coercible,
--- even with -XGeneralizedNewtypeDeriving
+-- *Never* derive Read, Show, Typeable, Data, Generic, Generic1, Lift
+-- by Coercible, even with -XGeneralizedNewtypeDeriving
 -- Also, avoid Traversable, as the Coercible-derived instance and the "normal"-derived
 -- instance behave differently if there's a non-lawful Applicative out there.
 -- Besides, with roles, Coercible-deriving Traversable is ill-roled.
 non_coercible_class cls
   = classKey cls `elem` ([ readClassKey, showClassKey, dataClassKey
                          , genClassKey, gen1ClassKey, typeableClassKey
-                         , traversableClassKey ])
+                         , traversableClassKey, liftClassKey ])
 
 new_dfun_name :: Class -> TyCon -> TcM Name
 new_dfun_name clas tycon        -- Just a simple wrapper
