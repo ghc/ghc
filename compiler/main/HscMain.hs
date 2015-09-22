@@ -804,8 +804,7 @@ hscMergeFrontEnd hsc_env mod_summary = do
 -- 'TcGblEnv' resulting from type-checking.
 hscFileFrontEnd :: ModSummary -> Hsc TcGblEnv
 hscFileFrontEnd mod_summary = do
-    MASSERT( ms_hsc_src mod_summary == HsBootFile ||
-             ms_hsc_src mod_summary == HsSrcFile )
+    MASSERT( ms_hsc_src mod_summary == HsBootFile || ms_hsc_src mod_summary == HsSrcFile )
     hpm <- hscParse' mod_summary
     hsc_env <- getHscEnv
     tcg_env <- tcRnModule' hsc_env mod_summary False hpm
