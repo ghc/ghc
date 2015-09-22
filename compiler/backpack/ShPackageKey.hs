@@ -17,6 +17,7 @@ module ShPackageKey(
 
 import Module
 import Packages
+import Encoding
 import FastString
 import UniqFM
 import UniqSet
@@ -26,11 +27,8 @@ import DynFlags
 
 import System.IO.Unsafe ( unsafePerformIO )
 import Control.Monad
-import Numeric
 import Data.IORef
 import GHC.Fingerprint
-import Data.Word
-import qualified Data.Char as Char
 import Data.List
 import Data.Function
 
@@ -237,44 +235,7 @@ canonicalizeModule dflags m = do
             | Just m' <- lookup (moduleName m) insts -> m'
         _ -> m
 
-{-
-************************************************************************
-*                                                                      *
-                        Base 62
-*                                                                      *
-************************************************************************
--}
-
---------------------------------------------------------------------------
--- Base 62
-
--- The base-62 code is based off of 'locators'
--- ((c) Operational Dynamics Consulting, BSD3 licensed)
-
--- Note: Instead of base-62 encoding a single 128-bit integer
--- (ceil(21.49) characters), we'll base-62 a pair of 64-bit integers
--- (2 * ceil(10.75) characters).  Luckily for us, it's the same number of
--- characters!  In the long term, this should go in GHC.Fingerprint,
--- but not now...
-
--- | Size of a 64-bit word when written as a base-62 string
-word64Base62Len :: Int
-word64Base62Len = 11
-
--- | Converts a 64-bit word into a base-62 string
-toBase62 :: Word64 -> String
-toBase62 w = pad ++ str
-  where
-    pad = replicate len '0'
-    len = word64Base62Len - length str -- 11 == ceil(64 / lg 62)
-    str = showIntAtBase 62 represent w ""
-    represent :: Int -> Char
-    represent x
-        | x < 10 = Char.chr (48 + x)
-        | x < 36 = Char.chr (65 + x - 10)
-        | x < 62 = Char.chr (97 + x - 36)
-        | otherwise = error ("represent (base 62): impossible!")
-
 fingerprintPackageKey :: Fingerprint -> PackageKey
 fingerprintPackageKey (Fingerprint a b)
-    = stringToPackageKey (toBase62 a ++ toBase62 b)
+    = stringToPackageKey (toBase62Padded a ++ toBase62Padded b)
+      -- See Note [Base 62 encoding 128-bit integers]
