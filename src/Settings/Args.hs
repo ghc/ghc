@@ -4,6 +4,7 @@ import Expression
 import Settings.Builders.Alex
 import Settings.Builders.Ar
 import Settings.Builders.Gcc
+import Settings.Builders.GenPrimopCode
 import Settings.Builders.Ghc
 import Settings.Builders.GhcCabal
 import Settings.Builders.GhcPkg
@@ -30,12 +31,13 @@ defaultArgs = mconcat
     , arArgs
     , cabalArgs
     , customPackageArgs
+    , gccArgs
+    , gccMArgs
+    , genPrimopCodeArgs
     , ghcArgs
     , ghcCabalHsColourArgs
     , ghcMArgs
     , ghcPkgArgs
-    , gccArgs
-    , gccMArgs
     , haddockArgs
     , happyArgs
     , hsc2HsArgs
