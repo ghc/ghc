@@ -2,7 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE TypeFamilies #-}
-module T1830a where
+module T1830_3a where
 
 import GHC.Exts
 import Language.Haskell.TH.Syntax (Lift(..))

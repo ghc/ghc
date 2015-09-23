@@ -1,4 +1,4 @@
-module T1830 where
+module T1830_1 where
 
 import Language.Haskell.TH.Syntax (Lift)
 

@@ -2,7 +2,7 @@
 module Main where
 
 import Language.Haskell.TH.Syntax (lift)
-import T1830a
+import T1830_3a
 
 main :: IO ()
 main = do
