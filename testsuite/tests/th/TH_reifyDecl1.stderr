@@ -20,8 +20,6 @@ class TH_reifyDecl1.C2 (a_0 :: *)
                                                   a_0 -> GHC.Types.Int
 instance TH_reifyDecl1.C2 GHC.Types.Int
 class TH_reifyDecl1.C3 (a_0 :: *)
-    where type TH_reifyDecl1.AT1 (a_0 :: *) :: *
-          data TH_reifyDecl1.AT2 (a_0 :: *) :: *
 instance TH_reifyDecl1.C3 GHC.Types.Int
 type family TH_reifyDecl1.AT1 (a_0 :: *) :: *
 type instance TH_reifyDecl1.AT1 GHC.Types.Int = GHC.Types.Bool
