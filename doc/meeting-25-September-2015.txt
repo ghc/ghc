@@ -1,0 +1,35 @@
+Shaking up GHC meeting, 25 September 2015
+
+Things to discuss:
+================================================
+
+1. Better names for build stages
+
+* Currently we have Stage0, Stage1, etc. It is not particularly clear
+from the names what they stand for. We no longer need to stick to
+numbers and can pick more helpful names, for example:
+
+Stage0 -> Boot    
+Stage1 -> Interim 
+Stage2 -> Install 
+Stage3 -> Selftest
+
+
+
+
+i. Unclear abstractions Builder/BuildRule...
+
+ii. Limits to build parallelism: GHC crashes during parallel builds. Also ghc-pkg and ghc-cabal are apparently not thread-safe, so I had to use Shake resources to limit the parallelism...
+
+
+2. Do we need a name for the new build system?
+
+* At least we need a name for the folder in the GHC tree
+
+* If we call it 'shake' there may be a confusion with the Shake library.
+
+* In future discussions/announcements/etc. calling it 'the new shake-based
+  build system' is overly verbose. Calling it 'shake' is confusing.
+
+* I haven't thought about any names yet, just checking whether we want to. 
+
