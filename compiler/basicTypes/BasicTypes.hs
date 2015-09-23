@@ -37,7 +37,7 @@ module BasicTypes(
         RecFlag(..), isRec, isNonRec, boolToRecFlag,
         Origin(..), isGenerated,
 
-        RuleName,
+        RuleName, pprRuleName,
 
         TopLevelFlag(..), isTopLevel, isNotTopLevel,
 
@@ -282,6 +282,9 @@ instance Outputable WarningTxt where
 -}
 
 type RuleName = FastString
+
+pprRuleName :: RuleName -> SDoc
+pprRuleName rn = doubleQuotes (ftext rn)
 
 {-
 ************************************************************************
