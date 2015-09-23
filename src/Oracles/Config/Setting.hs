@@ -20,11 +20,17 @@ data Setting = DynamicExtension
              | GhcMajorVersion
              | GhcMinorVersion
              | GhcPatchLevel
+             | GhcVersion
              | GhcSourcePath
              | HostArch
              | HostOs
+             | ProjectGitCommitId
+             | ProjectName
              | ProjectVersion
              | ProjectVersionInt
+             | ProjectPatchLevel
+             | ProjectPatchLevel1
+             | ProjectPatchLevel2
              | TargetArch
              | TargetOs
              | TargetPlatformFull
@@ -44,11 +50,17 @@ setting key = askConfig $ case key of
     GhcMajorVersion    -> "ghc-major-version"
     GhcMinorVersion    -> "ghc-minor-version"
     GhcPatchLevel      -> "ghc-patch-level"
+    GhcVersion         -> "ghc-version"
     GhcSourcePath      -> "ghc-source-path"
     HostArch           -> "host-arch"
     HostOs             -> "host-os"
+    ProjectGitCommitId -> "project-git-commit-id"
+    ProjectName        -> "project-name"
     ProjectVersion     -> "project-version"
     ProjectVersionInt  -> "project-version-int"
+    ProjectPatchLevel  -> "project-patch-level"
+    ProjectPatchLevel1 -> "project-patch-level1"
+    ProjectPatchLevel2 -> "project-patch-level2"
     TargetArch         -> "target-arch"
     TargetOs           -> "target-os"
     TargetPlatformFull -> "target-platform-full"
