@@ -177,8 +177,5 @@ isEmptyMVar (MVar mv#) = IO $ \ s# ->
 -- "System.Mem.Weak" for more about finalizers.
 addMVarFinalizer :: MVar a -> IO () -> IO ()
 addMVarFinalizer (MVar m) (IO finalizer) =
-    IO $ \s -> case mkWeak# m () finalizer' s of { (# s1, _ #) -> (# s1, () #) }
-  where
-    finalizer' :: State# RealWorld -> State# RealWorld
-    finalizer' s' = case finalizer s' of (# s'', () #) -> s''
+    IO $ \s -> case mkWeak# m () finalizer s of { (# s1, _ #) -> (# s1, () #) }
 

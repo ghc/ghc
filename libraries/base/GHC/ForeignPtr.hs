@@ -296,14 +296,9 @@ addForeignPtrConcFinalizer_ (PlainForeignPtr r) finalizer = do
   if noFinalizers
      then IO $ \s ->
               case r of { IORef (STRef r#) ->
-              case mkWeak# r# () finalizer' s of {  (# s1, _ #) ->
-              (# s1, () #) }}
+              case mkWeak# r# () (unIO $ foreignPtrFinalizer r) s of {
+                (# s1, _ #) -> (# s1, () #) }}
      else return ()
-  where
-    finalizer' :: State# RealWorld -> State# RealWorld
-    finalizer' s =
-      case unIO (foreignPtrFinalizer r) s of
-        (# s', () #) -> s'
 addForeignPtrConcFinalizer_ f@(MallocPtr fo r) finalizer = do
   noFinalizers <- insertHaskellFinalizer r finalizer
   if noFinalizers
@@ -312,10 +307,8 @@ addForeignPtrConcFinalizer_ f@(MallocPtr fo r) finalizer = do
                   (# s1, _ #) -> (# s1, () #)
      else return ()
   where
-    finalizer' :: State# RealWorld -> State# RealWorld
-    finalizer' s =
-      case unIO (foreignPtrFinalizer r >> touch f) s of
-        (# s', () #) -> s'
+    finalizer' :: State# RealWorld -> (# State# RealWorld, () #)
+    finalizer' = unIO (foreignPtrFinalizer r >> touch f)
 
 addForeignPtrConcFinalizer_ _ _ =
   error "GHC.ForeignPtr: attempt to add a finalizer to plain pointer"
@@ -375,7 +368,7 @@ foreignPtrFinalizer r = do
   case fs of
     NoFinalizers -> return ()
     CFinalizers w -> IO $ \s -> case finalizeWeak# w s of
-        (# s1, 1#, f #) -> case f s1 of s2 -> (# s2, () #)
+        (# s1, 1#, f #) -> f s1
         (# s1, _, _ #) -> (# s1, () #)
     HaskellFinalizers actions -> sequence_ actions
 

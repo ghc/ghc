@@ -2332,7 +2332,8 @@ primtype Weak# b
 -- note that tyvar "o" denotes openAlphaTyVar
 
 primop  MkWeakOp "mkWeak#" GenPrimOp
-   o -> b -> (State# RealWorld -> State# RealWorld) -> State# RealWorld -> (# State# RealWorld, Weak# b #)
+   o -> b -> (State# RealWorld -> (# State# RealWorld, c #))
+     -> State# RealWorld -> (# State# RealWorld, Weak# b #)
    with
    has_side_effects = True
    out_of_line      = True
@@ -2364,7 +2365,12 @@ primop  DeRefWeakOp "deRefWeak#" GenPrimOp
 
 primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
    Weak# a -> State# RealWorld -> (# State# RealWorld, Int#,
-              (State# RealWorld -> State# RealWorld) #)
+              (State# RealWorld -> (# State# RealWorld, b #) ) #)
+   { Finalize a weak pointer. The return value is an unboxed tuple
+     containing the new state of the world and an "unboxed Maybe",
+     represented by an {\tt Int#} and a (possibly invalid) finalization
+     action. An {\tt Int#} of {\tt 1} indicates that the finalizer is valid. The
+     return value {\tt b} from the finalizer should be ignored. }
    with
    has_side_effects = True
    out_of_line      = True

@@ -101,10 +101,7 @@ mkWeak  :: k                            -- ^ key
         -> IO (Weak v)                  -- ^ returns: a weak pointer object
 
 mkWeak key val (Just (IO finalizer)) = IO $ \s ->
-   case mkWeak# key val finalizer' s of { (# s1, w #) -> (# s1, Weak w #) }
-  where
-    finalizer' :: State# RealWorld -> State# RealWorld
-    finalizer' s' = case finalizer s' of (# s'', () #) -> s''
+   case mkWeak# key val finalizer s of { (# s1, w #) -> (# s1, Weak w #) }
 mkWeak key val Nothing = IO $ \s ->
    case mkWeakNoFinalizer# key val s of { (# s1, w #) -> (# s1, Weak w #) }
 
@@ -129,7 +126,7 @@ finalize :: Weak v -> IO ()
 finalize (Weak w) = IO $ \s ->
    case finalizeWeak# w s of
         (# s1, 0#, _ #) -> (# s1, () #) -- already dead, or no finalizer
-        (# s1, _,  f #) -> case f s1 of s2 -> (# s2, () #)
+        (# s1, _,  f #) -> f s1
 
 {-
 Instance Eq (Weak v) where
