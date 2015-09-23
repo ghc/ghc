@@ -53,6 +53,8 @@ import Data.Maybe
 import Control.Exception
 import System.IO
 import System.IO.Unsafe         ( unsafePerformIO )
+import GHC.IO.Encoding.UTF8     ( mkUTF8 )
+import GHC.IO.Encoding.Failure  ( CodingFailureMode(IgnoreCodingFailure) )
 
 import GHC.Exts
 
@@ -131,14 +133,16 @@ skipBOM h size offset =
     then do
       -- Validate assumption that handle is in binary mode.
       ASSERTM( hGetEncoding h >>= return . isNothing )
-      -- Temporarily select text mode to make `hLookAhead` and
-      -- `hGetChar` return full Unicode characters.
-      bracket_ (hSetBinaryMode h False) (hSetBinaryMode h True) $ do
+      -- Temporarily select utf8 encoding with error ignoring,
+      -- to make `hLookAhead` and `hGetChar` return full Unicode characters.
+      bracket_ (hSetEncoding h safeEncoding) (hSetBinaryMode h True) $ do
         c <- hLookAhead h
         if c == '\xfeff'
           then hGetChar h >> hTell h
           else return offset
     else return offset
+  where
+    safeEncoding = mkUTF8 IgnoreCodingFailure
 
 newUTF8StringBuffer :: ForeignPtr Word8 -> Ptr Word8 -> Int -> IO StringBuffer
 newUTF8StringBuffer buf ptr size = do
