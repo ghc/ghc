@@ -213,7 +213,9 @@ getAllocationCounter = do
 -- to 100K, but tunable with the @+RTS -xq@ option) so that it can handle
 -- the exception and perform any necessary clean up.  If it exhausts
 -- this additional allowance, another 'AllocationLimitExceeded' exception
--- is sent, and so forth.
+-- is sent, and so forth.  Like other asynchronous exceptions, the
+-- 'AllocationLimitExceeded' exception is deferred while the thread is inside
+-- 'mask' or an exception handler in 'catch'.
 --
 -- Note that memory allocation is unrelated to /live memory/, also
 -- known as /heap residency/.  A thread can allocate a large amount of

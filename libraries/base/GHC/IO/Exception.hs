@@ -98,8 +98,8 @@ instance Show Deadlock where
 -----
 
 -- |This thread has exceeded its allocation limit.  See
--- 'GHC.Conc.setAllocationCounter' and
--- 'GHC.Conc.enableAllocationLimit'.
+-- 'System.Mem.setAllocationCounter' and
+-- 'System.Mem.enableAllocationLimit'.
 --
 -- @since 4.8.0.0
 data AllocationLimitExceeded = AllocationLimitExceeded

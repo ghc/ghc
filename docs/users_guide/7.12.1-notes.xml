@@ -324,6 +324,18 @@
                     (see Trac #9516).
                </para>
            </listitem>
+           <listitem>
+                <para>
+                    Per-thread allocation counters
+                    (<literal>setAllocationCounter</literal> and
+                    <literal>getAllocationCounter</literal>) and limits
+                    (<literal>enableAllocationLimit</literal>,
+                    <literal>disableAllocationLimit</literal> are now
+                    available from <literal>System.Mem</literal>.
+                    Previously this functionality was only available
+                    from <literal>GHC.Conc</literal>.
+                </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
