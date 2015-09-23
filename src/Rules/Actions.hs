@@ -24,14 +24,22 @@ buildWithResources rs target = do
                  ++ show builder ++ " with arguments:"
         mapM_ (putBuild . ("|   " ++)) $ interestingInfo builder argList
         putBuild $ "\\--------"
-        quietly $ if builder /= Ar
-            then cmd [path] argList
-            else do -- Split argument list into chunks as otherwise Ar chokes up
+        quietly $ case builder of
+            Ar -> do -- Split argument list into chunks as otherwise Ar chokes up
                 maxChunk <- cmdLineLengthLimit
                 let persistentArgs = take arPersistentArgsCount argList
                     remainingArgs  = drop arPersistentArgsCount argList
                 forM_ (chunksOfSize maxChunk remainingArgs) $ \argsChunk ->
                     unit . cmd [path] $ persistentArgs ++ argsChunk
+
+            GenPrimopCode -> do
+                let src  = head $ Target.sources target -- TODO: ugly
+                    file = head $ Target.files   target
+                input <- readFile' src
+                Stdout output <- cmd (Stdin input) [path] argList
+                writeFileChanged file output
+
+            _  -> cmd [path] argList
 
 -- Most targets are built without explicitly acquiring resources
 build :: Target -> Action ()
