@@ -141,7 +141,7 @@ synifyAxiom ax@(CoAxiom { co_ax_tc = tc })
 
 -- | Turn type constructors into type class declarations
 synifyTyCon :: Maybe (CoAxiom br) -> TyCon -> Either ErrMsg (TyClDecl Name)
-synifyTyCon coax tc
+synifyTyCon _coax tc
   | isFunTyCon tc || isPrimTyCon tc
   = return $
     DataDecl { tcdLName = synifyName tc
@@ -164,42 +164,37 @@ synifyTyCon coax tc
                                       , dd_derivs = Nothing }
            , tcdFVs = placeHolderNamesTc }
 
-  | isTypeFamilyTyCon tc
-  = case famTyConFlav_maybe tc of
-      Just rhs ->
-        let resultVar = famTcResVar tc
-            info = case rhs of
-              OpenSynFamilyTyCon -> return OpenTypeFamily
-              ClosedSynFamilyTyCon mb -> case mb of
-                  Just (CoAxiom { co_ax_branches = branches })
-                          -> return $ ClosedTypeFamily $ Just $
-                               map (noLoc . synifyAxBranch tc) (fromBranches branches)
-                  Nothing -> return $ ClosedTypeFamily $ Just []
-              BuiltInSynFamTyCon {}
-                -> return $ ClosedTypeFamily $ Just []
-              AbstractClosedSynFamilyTyCon {}
-                -> return $ ClosedTypeFamily Nothing
-        in info >>= \i ->
-           return (FamDecl (FamilyDecl { fdInfo = i
-                          , fdLName = synifyName tc
-                          , fdTyVars = synifyTyVars (tyConTyVars tc)
-                          , fdResultSig =
-                              synifyFamilyResultSig resultVar (tyConResKind tc)
-                          , fdInjectivityAnn =
-                              synifyInjectivityAnn  resultVar (tyConTyVars tc)
-                                               (familyTyConInjectivityInfo tc)
-                          }))
-      Nothing -> Left "synifyTyCon: impossible open type synonym?"
+synifyTyCon _coax tc
+  | Just flav <- famTyConFlav_maybe tc
+  = case flav of
+      -- Type families
+      OpenSynFamilyTyCon -> mkFamDecl OpenTypeFamily
+      ClosedSynFamilyTyCon mb
+        | Just (CoAxiom { co_ax_branches = branches }) <- mb
+          -> mkFamDecl $ ClosedTypeFamily $ Just
+            $ map (noLoc . synifyAxBranch tc) (fromBranches branches)
+        | otherwise
+          -> mkFamDecl $ ClosedTypeFamily $ Just []
+      BuiltInSynFamTyCon {}
+        -> mkFamDecl $ ClosedTypeFamily $ Just []
+      AbstractClosedSynFamilyTyCon {}
+        -> mkFamDecl $ ClosedTypeFamily Nothing
+      DataFamilyTyCon {}
+        -> mkFamDecl DataFamily
+  where
+    resultVar = famTcResVar tc
+    mkFamDecl i = return $ FamDecl $
+      FamilyDecl { fdInfo = i
+                 , fdLName = synifyName tc
+                 , fdTyVars = synifyTyVars (tyConTyVars tc)
+                 , fdResultSig =
+                       synifyFamilyResultSig resultVar (tyConResKind tc)
+                 , fdInjectivityAnn =
+                       synifyInjectivityAnn  resultVar (tyConTyVars tc)
+                                       (familyTyConInjectivityInfo tc)
+                 }
 
-  | isDataFamilyTyCon tc
-  = --(why no "isOpenAlgTyCon"?)
-    case algTyConRhs tc of
-        DataFamilyTyCon -> return $
-          FamDecl (FamilyDecl DataFamily (synifyName tc)
-                              (synifyTyVars (tyConTyVars tc))
-                              (noLoc NoSig) -- always kind '*'
-                              Nothing)      -- no injectivity
-        _ -> Left "synifyTyCon: impossible open data type?"
+synifyTyCon coax tc
   | Just ty <- synTyConRhs_maybe tc
   = return $ SynDecl { tcdLName = synifyName tc
                      , tcdTyVars = synifyTyVars (tyConTyVars tc)
