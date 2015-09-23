@@ -219,17 +219,14 @@ class Arrow a => ArrowChoice a where
     -- | Feed marked inputs through the argument arrow, passing the
     --   rest through unchanged to the output.
     left :: a b c -> a (Either b d) (Either c d)
+    left = (+++ id)
 
     -- | A mirror image of 'left'.
     --
     --   The default definition may be overridden with a more efficient
     --   version if desired.
     right :: a b c -> a (Either d b) (Either d c)
-    right f = arr mirror >>> left f >>> arr mirror
-      where
-        mirror :: Either x y -> Either y x
-        mirror (Left x) = Right x
-        mirror (Right y) = Left y
+    right = (id +++)
 
     -- | Split the input between the two argument arrows, retagging
     --   and merging their outputs.
@@ -238,7 +235,11 @@ class Arrow a => ArrowChoice a where
     --   The default definition may be overridden with a more efficient
     --   version if desired.
     (+++) :: a b c -> a b' c' -> a (Either b b') (Either c c')
-    f +++ g = left f >>> right g
+    f +++ g = left f >>> arr mirror >>> left g >>> arr mirror
+      where
+        mirror :: Either x y -> Either y x
+        mirror (Left x) = Right x
+        mirror (Right y) = Left y
 
     -- | Fanin: Split the input between the two argument arrows and
     --   merge their outputs.
