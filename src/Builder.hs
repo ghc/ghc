@@ -18,6 +18,7 @@ data Builder = Alex
              | Ar
              | Gcc Stage
              | GccM Stage
+             | GenPrimopCode
              | Ghc Stage
              | GhcCabal
              | GhcCabalHsColour
@@ -38,6 +39,7 @@ builderKey builder = case builder of
     Gcc Stage0       -> "system-gcc"
     Gcc _            -> "gcc"
     GccM stage       -> builderKey $ Gcc stage -- synonym for 'Gcc -MM'
+    GenPrimopCode    -> "genprimopcode"
     Ghc Stage0       -> "system-ghc"
     Ghc Stage1       -> "ghc-stage1"
     Ghc Stage2       -> "ghc-stage2"
