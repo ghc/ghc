@@ -21,6 +21,8 @@ haddock        = @hardtop@/inplace/bin/haddock
 
 hsc2hs         = @hardtop@/inplace/bin/hsc2hs
 
+genprimopcode  = @hardtop@/inplace/bin/genprimopcode
+
 ld             = @LdCmd@
 ar             = @ArCmd@
 alex           = @AlexCmd@
@@ -45,23 +47,30 @@ ghc-source-path      = @hardtop@
 # Information about host and target systems:
 #===========================================
 
-target-os            = @TargetOS_CPP@
-target-arch          = @TargetArch_CPP@
-target-platform-full = @TargetPlatformFull@
+target-os             = @TargetOS_CPP@
+target-arch           = @TargetArch_CPP@
+target-platform-full  = @TargetPlatformFull@
 
-host-os              = @HostOS_CPP@
-host-arch            = @HostArch_CPP@
+host-os               = @HostOS_CPP@
+host-arch             = @HostArch_CPP@
 
-cross-compiling      = @CrossCompiling@
+cross-compiling       = @CrossCompiling@
 
-dynamic-extension    = @soext_target@
+dynamic-extension     = @soext_target@
 
-ghc-major-version    = @GhcMajVersion@
-ghc-minor-version    = @GhcMinVersion@
-ghc-patch-level      = @GhcPatchLevel@
+ghc-version           = @GhcVersion@
+ghc-major-version     = @GhcMajVersion@
+ghc-minor-version     = @GhcMinVersion@
+ghc-patch-level       = @GhcPatchLevel@
 
-project-version      = @ProjectVersion@
-project-version-int  = @ProjectVersionInt@
+project-name          = @ProjectName@
+project-version       = @ProjectVersion@
+project-version-int   = @ProjectVersionInt@
+project-patch-level   = @ProjectPatchLevel@
+project-patch-level1  = @ProjectPatchLevel1@
+project-patch-level2  = @ProjectPatchLevel2@
+project-git-commit-id = @ProjectGitCommitId@
+
 
 # Compilation and linking flags:
 #===============================
