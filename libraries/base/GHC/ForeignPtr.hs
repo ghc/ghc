@@ -248,11 +248,18 @@ addForeignPtrFinalizer :: FinalizerPtr a -> ForeignPtr a -> IO ()
 -- finalizer will run /before/ all other finalizers for the same
 -- object which have already been registered.
 addForeignPtrFinalizer (FunPtr fp) (ForeignPtr p c) = case c of
-  PlainForeignPtr r -> f r >> return ()
-  MallocPtr     _ r -> f r >> return ()
+  PlainForeignPtr r -> insertCFinalizer r fp 0# nullAddr# p ()
+  MallocPtr     _ r -> insertCFinalizer r fp 0# nullAddr# p c
   _ -> error "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer"
- where
-    f r = insertCFinalizer r fp 0# nullAddr# p
+
+-- Note [MallocPtr finalizers] (#10904)
+--
+-- When we have C finalizers for a MallocPtr, the memory is
+-- heap-resident and would normally be recovered by the GC before the
+-- finalizers run.  To prevent the memory from being reused too early,
+-- we attach the MallocPtr constructor to the "value" field of the
+-- weak pointer when we call mkWeak# in ensureCFinalizerWeak below.
+-- The GC will keep this field alive until the finalizers have run.
 
 addForeignPtrFinalizerEnv ::
   FinalizerEnvPtr env a -> Ptr env -> ForeignPtr a -> IO ()
@@ -261,11 +268,9 @@ addForeignPtrFinalizerEnv ::
 -- finalizer.  The environment passed to the finalizer is fixed by the
 -- second argument to 'addForeignPtrFinalizerEnv'
 addForeignPtrFinalizerEnv (FunPtr fp) (Ptr ep) (ForeignPtr p c) = case c of
-  PlainForeignPtr r -> f r >> return ()
-  MallocPtr     _ r -> f r >> return ()
+  PlainForeignPtr r -> insertCFinalizer r fp 1# ep p ()
+  MallocPtr     _ r -> insertCFinalizer r fp 1# ep p c
   _ -> error "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer"
- where
-    f r = insertCFinalizer r fp 1# ep p
 
 addForeignPtrConcFinalizer :: ForeignPtr a -> IO () -> IO ()
 -- ^This function adds a finalizer to the given @ForeignPtr@.  The
@@ -327,9 +332,9 @@ insertHaskellFinalizer r f = do
 data MyWeak = MyWeak (Weak# ())
 
 insertCFinalizer ::
-  IORef Finalizers -> Addr# -> Int# -> Addr# -> Addr# -> IO ()
-insertCFinalizer r fp flag ep p = do
-  MyWeak w <- ensureCFinalizerWeak r
+  IORef Finalizers -> Addr# -> Int# -> Addr# -> Addr# -> value -> IO ()
+insertCFinalizer r fp flag ep p val = do
+  MyWeak w <- ensureCFinalizerWeak r val
   IO $ \s -> case addCFinalizerToWeak# fp p flag ep w s of
       (# s1, 1# #) -> (# s1, () #)
 
@@ -337,16 +342,17 @@ insertCFinalizer r fp flag ep p = do
       -- has finalized w by calling foreignPtrFinalizer. We retry now.
       -- This won't be an infinite loop because that thread must have
       -- replaced the content of r before calling finalizeWeak#.
-      (# s1, _ #) -> unIO (insertCFinalizer r fp flag ep p) s1
+      (# s1, _ #) -> unIO (insertCFinalizer r fp flag ep p val) s1
 
-ensureCFinalizerWeak :: IORef Finalizers -> IO MyWeak
-ensureCFinalizerWeak ref@(IORef (STRef r#)) = do
+ensureCFinalizerWeak :: IORef Finalizers -> value -> IO MyWeak
+ensureCFinalizerWeak ref@(IORef (STRef r#)) value = do
   fin <- readIORef ref
   case fin of
       CFinalizers weak -> return (MyWeak weak)
       HaskellFinalizers{} -> noMixingError
       NoFinalizers -> IO $ \s ->
-          case mkWeakNoFinalizer# r# () s of { (# s1, w #) ->
+          case mkWeakNoFinalizer# r# (unsafeCoerce# value) s of { (# s1, w #) ->
+             -- See Note [MallocPtr finalizers] (#10904)
           case atomicModifyMutVar# r# (update w) s1 of
               { (# s2, (weak, needKill ) #) ->
           if needKill

@@ -329,3 +329,7 @@ test('T9839_06', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_
 # in 'epoll' and 'select' backends on reading from EBADF
 # mingw32 skip as UNIX pipe and close(fd) is used to exercise the problem
 test('T10590', [ignore_output, when(opsys('mingw32'),skip)], compile_and_run, [''])
+
+# 20000 was easily enough to trigger the bug with 7.10
+test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000') ],
+               compile_and_run, ['T10904lib.c'])
