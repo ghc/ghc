@@ -32,6 +32,11 @@ buildWithResources rs target = do
                 forM_ (chunksOfSize maxChunk remainingArgs) $ \argsChunk ->
                     unit . cmd [path] $ persistentArgs ++ argsChunk
 
+            HsCpp -> do
+                let file = head $ Target.files target  -- TODO: ugly
+                Stdout output <- cmd [path] argList
+                writeFileChanged file output
+
             GenPrimopCode -> do
                 let src  = head $ Target.sources target -- TODO: ugly
                     file = head $ Target.files   target

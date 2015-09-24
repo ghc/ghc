@@ -30,6 +30,7 @@ data Builder = Alex
              | Haddock
              | Happy
              | HsColour
+             | HsCpp
              | Hsc2Hs
              | Ld
              | Unlit
@@ -58,6 +59,7 @@ builderKey builder = case builder of
     Haddock          -> "haddock"
     HsColour         -> "hscolour"
     Hsc2Hs           -> "hsc2hs"
+    HsCpp            -> "hs-cpp"
     Ld               -> "ld"
     Unlit            -> "unlit"
 

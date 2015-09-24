@@ -4,7 +4,7 @@ import Expression
 import Oracles
 import Predicates (builder, stage0, notStage0)
 import Settings
-import Settings.Builders.GhcCabal
+import Settings.Builders.GhcCabal hiding (cppArgs)
 
 hsc2HsArgs :: Args
 hsc2HsArgs = builder Hsc2Hs ? do

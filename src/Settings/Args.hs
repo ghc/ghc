@@ -11,6 +11,7 @@ import Settings.Builders.GhcPkg
 import Settings.Builders.Haddock
 import Settings.Builders.Happy
 import Settings.Builders.Hsc2Hs
+import Settings.Builders.HsCpp
 import Settings.Builders.Ld
 import Settings.User
 
@@ -41,4 +42,5 @@ defaultArgs = mconcat
     , haddockArgs
     , happyArgs
     , hsc2HsArgs
+    , hsCppArgs
     , ldArgs ]

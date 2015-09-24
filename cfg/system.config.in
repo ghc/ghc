@@ -23,6 +23,8 @@ hsc2hs         = @hardtop@/inplace/bin/hsc2hs
 
 genprimopcode  = @hardtop@/inplace/bin/genprimopcode
 
+hs-cpp         = @HaskellCPPCmd@ @HaskellCPPArgs@
+
 unlit          = @hardtop@/inplace/lib/unlit
 ghc-split      = @hardtop@/inplace/lib/ghc-split
 
