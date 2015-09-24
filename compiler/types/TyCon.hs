@@ -50,6 +50,7 @@ module TyCon(
         isBuiltInSynFamTyCon_maybe,
         isUnLiftedTyCon,
         isGadtSyntaxTyCon, isDistinctTyCon, isDistinctAlgRhs,
+        isInjectiveTyCon, isGenerativeTyCon, isGenInjAlgRhs,
         isTyConAssoc, tyConAssoc_maybe,
         isRecursiveTyCon,
         isImplicitTyCon,
@@ -1218,6 +1219,42 @@ isDataTyCon (AlgTyCon {algTcRhs = rhs})
         AbstractTyCon {}   -> False      -- We don't know, so return False
 isDataTyCon (TupleTyCon {tyConTupleSort = sort}) = isBoxed (tupleSortBoxity sort)
 isDataTyCon _ = False
+
+-- | 'isInjectiveTyCon' is true of 'TyCon's for which this property holds
+-- (where X is the role passed in):
+--   If (T a1 b1 c1) ~X (T a2 b2 c2), then (a1 ~X1 a2), (b1 ~X2 b2), and (c1 ~X3 c2)
+-- (where X1, X2, and X3, are the roles given by tyConRolesX tc X)
+-- See also Note [Decomposing equalities] in TcCanonical
+isInjectiveTyCon :: TyCon -> Role -> Bool
+isInjectiveTyCon _                             Phantom          = False
+isInjectiveTyCon (FunTyCon {})                 _                = True
+isInjectiveTyCon (AlgTyCon {})                 Nominal          = True
+isInjectiveTyCon (AlgTyCon {algTcRhs = rhs})   Representational
+  = isGenInjAlgRhs rhs
+isInjectiveTyCon (TupleTyCon {})               _                = True
+isInjectiveTyCon (SynonymTyCon {})             _                = False
+isInjectiveTyCon (FamilyTyCon {})              _                = False
+isInjectiveTyCon (PrimTyCon {})                _                = True
+isInjectiveTyCon (PromotedDataCon {})          _                = True
+isInjectiveTyCon (PromotedTyCon {ty_con = tc}) r
+  = isInjectiveTyCon tc r
+
+-- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds
+-- (where X is the role passed in):
+--   If (T tys ~X t), then (t's head ~X T).
+-- See also Note [Decomposing equalities] in TcCanonical
+isGenerativeTyCon :: TyCon -> Role -> Bool
+isGenerativeTyCon = isInjectiveTyCon
+  -- as it happens, generativity and injectivity coincide, but there's
+  -- no a priori reason this must be the case
+
+-- | Is this an 'AlgTyConRhs' of a 'TyCon' that is generative and injective
+-- with respect to representational equality?
+isGenInjAlgRhs :: AlgTyConRhs -> Bool
+isGenInjAlgRhs (DataTyCon {})           = True
+isGenInjAlgRhs (DataFamilyTyCon {})     = False
+isGenInjAlgRhs (AbstractTyCon distinct) = distinct
+isGenInjAlgRhs (NewTyCon {})            = False
 
 -- | 'isDistinctTyCon' is true of 'TyCon's that are equal only to
 -- themselves, even via representational coercions (except for unsafeCoerce).
