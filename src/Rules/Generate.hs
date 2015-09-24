@@ -1,6 +1,7 @@
 module Rules.Generate (generatePackageCode) where
 
 import Expression
+import GHC
 import Oracles
 import Rules.Actions
 import Rules.Resources
@@ -27,7 +28,7 @@ generatePackageCode _ target @ (PartialTarget stage package) =
         packagePath = pkgPath package
         buildPath   = path -/- "build"
     in do -- TODO: do we need to copy *.(l)hs-boot files here? Never happens?
-        buildPath </> "*.hs" %> \file -> do
+        buildPath -/- "*.hs" %> \file -> do
             dirs  <- interpretPartial target $ getPkgDataList SrcDirs
             files <- getDirectoryFiles "" $
                 [ packagePath </> d </> takeBaseName file <.> "*" | d <- dirs ]
@@ -39,30 +40,47 @@ generatePackageCode _ target @ (PartialTarget stage package) =
             need [src]
             build $ fullTarget target builder [src] [file]
 
-        path -/- "build/GHC/PrimopWrappers.hs" %> \file -> do
-            need [primops]
-            build $ fullTarget target GenPrimopCode [primops] [file]
+        -- TODO: why different folders for generated files?
+        fmap (buildPath -/-)
+            [ "GHC/PrimopWrappers.hs"
+            , "autogen/GHC/Prim.hs"
+            , "*.hs-incl" ] |%> \file -> do
+                need [primops]
+                build $ fullTarget target GenPrimopCode [primops] [file]
 
-        priority 2.0 $ path -/- "build/Config.hs" %> \file -> do
-            config <- generateConfig
+        priority 2.0 $ buildPath -/- "Config.hs" %> \file -> do
+            config <- interpretPartial target generateConfig
             writeFileChanged file config
+            putBuild $ "| Successfully generated '" ++ file ++ "'."
 
-generateConfig :: Action String
+-- TODO: do we need ghc-split? Always or is it platform specific?
+generateConfig :: Expr String
 generateConfig = do
-    cProjectName        <- setting ProjectName
-    cProjectGitCommitId <- setting ProjectGitCommitId
-    cProjectVersion     <- setting ProjectVersion
-    cProjectVersionInt  <- setting ProjectVersionInt
-    cProjectPatchLevel  <- setting ProjectPatchLevel
-    cProjectPatchLevel1 <- setting ProjectPatchLevel1
-    cProjectPatchLevel2 <- setting ProjectPatchLevel2
-    cBooterVersion      <- setting GhcVersion
-    cIntegerLibraryType <- case integerLibrary of
-        integerGmp    -> return "IntegerGMP"
-        integerSimple -> return "IntegerSimple"
-        _ -> putError $ "Unknown integer library: " ++ integerLibrary ++ "."
-    cSupportsSplitObjs  <- yesNo splitObjects
-    return "{-# LANGUAGE CPP #-}\n"
+    cProjectName        <- getSetting ProjectName
+    cProjectGitCommitId <- getSetting ProjectGitCommitId
+    cProjectVersion     <- getSetting ProjectVersion
+    cProjectVersionInt  <- getSetting ProjectVersionInt
+    cProjectPatchLevel  <- getSetting ProjectPatchLevel
+    cProjectPatchLevel1 <- getSetting ProjectPatchLevel1
+    cProjectPatchLevel2 <- getSetting ProjectPatchLevel2
+    cBooterVersion      <- getSetting GhcVersion
+    let cIntegerLibraryType | integerLibrary == integerGmp    = "IntegerGMP"
+                            | integerLibrary == integerSimple = "IntegerSimple"
+                            | otherwise = error $ "Unknown integer library: "
+                                          ++ show integerLibrary ++ "."
+        yesNo = lift . fmap (\x -> if x then "YES" else "NO")
+    cSupportsSplitObjs         <- yesNo supportsSplitObjects
+    cGhcWithInterpreter        <- yesNo ghcWithInterpreter
+    cGhcWithNativeCodeGen      <- yesNo ghcWithNativeCodeGen
+    cGhcWithSMP                <- yesNo ghcWithSMP
+    cGhcEnableTablesNextToCode <- yesNo ghcEnableTablesNextToCode
+    cLeadingUnderscore         <- yesNo $ flag LeadingUnderscore
+    cGHC_UNLIT_PGM             <- fmap takeFileName $ getBuilderPath Unlit
+    cGHC_SPLIT_PGM             <- fmap takeBaseName $ getBuilderPath GhcSplit
+    cLibFFI                    <- lift useLibFFIForAdjustors
+    rtsWays                    <- getRtsWays
+    let cGhcRTSWays = unwords $ map show rtsWays
+    return $ "{-# LANGUAGE CPP #-}\n"
         ++ "module Config where\n"
         ++ "\n"
         ++ "#include \"ghc_boot_platform.h\"\n"
@@ -79,50 +97,48 @@ generateConfig = do
         ++ "cTargetPlatformString = TargetPlatform_NAME\n"
         ++ "\n"
         ++ "cProjectName          :: String\n"
-        ++ "cProjectName          = " ++ cProjectName ++ "\n"
+        ++ "cProjectName          = \"" ++ cProjectName ++ "\"\n"
         ++ "cProjectGitCommitId   :: String\n"
-        ++ "cProjectGitCommitId   = " ++ cProjectGitCommitId ++ "\n"
+        ++ "cProjectGitCommitId   = \"" ++ cProjectGitCommitId ++ "\"\n"
         ++ "cProjectVersion       :: String\n"
-        ++ "cProjectVersion       = " ++ cProjectVersion ++ "\n"
+        ++ "cProjectVersion       = \"" ++ cProjectVersion ++ "\"\n"
         ++ "cProjectVersionInt    :: String\n"
-        ++ "cProjectVersionInt    = " ++ cProjectVersionInt ++ "\n"
+        ++ "cProjectVersionInt    = \"" ++ cProjectVersionInt ++ "\"\n"
         ++ "cProjectPatchLevel    :: String\n"
-        ++ "cProjectPatchLevel    = " ++ cProjectPatchLevel ++ "\n"
+        ++ "cProjectPatchLevel    = \"" ++ cProjectPatchLevel ++ "\"\n"
         ++ "cProjectPatchLevel1   :: String\n"
-        ++ "cProjectPatchLevel1   = " ++ cProjectPatchLevel1 ++ "\n"
+        ++ "cProjectPatchLevel1   = \"" ++ cProjectPatchLevel1 ++ "\"\n"
         ++ "cProjectPatchLevel2   :: String\n"
-        ++ "cProjectPatchLevel2   = " ++ cProjectPatchLevel2 ++ "\n"
+        ++ "cProjectPatchLevel2   = \"" ++ cProjectPatchLevel2 ++ "\"\n"
         ++ "cBooterVersion        :: String\n"
-        ++ "cBooterVersion        = " ++ cBooterVersion ++ "\n"
+        ++ "cBooterVersion        = \"" ++ cBooterVersion ++ "\"\n"
         ++ "cStage                :: String\n"
         ++ "cStage                = show (STAGE :: Int)\n"
         ++ "cIntegerLibrary       :: String\n"
-        ++ "cIntegerLibrary       = " ++ pkgName integerLibrary ++ "\n"
+        ++ "cIntegerLibrary       = \"" ++ pkgName integerLibrary ++ "\"\n"
         ++ "cIntegerLibraryType   :: IntegerLibrary\n"
         ++ "cIntegerLibraryType   = " ++ cIntegerLibraryType ++ "\n"
         ++ "cSupportsSplitObjs    :: String\n"
-        ++ "cSupportsSplitObjs    = " ++ cSupportsSplitObjs ++ "\n"
+        ++ "cSupportsSplitObjs    = \"" ++ cSupportsSplitObjs ++ "\"\n"
         ++ "cGhcWithInterpreter   :: String\n"
-        ++ "cGhcWithInterpreter   = "YES"\n"
+        ++ "cGhcWithInterpreter   = \"" ++ cGhcWithInterpreter ++ "\"\n"
         ++ "cGhcWithNativeCodeGen :: String\n"
-        ++ "cGhcWithNativeCodeGen = "YES"\n"
+        ++ "cGhcWithNativeCodeGen = \"" ++ cGhcWithNativeCodeGen ++ "\"\n"
         ++ "cGhcWithSMP           :: String\n"
-        ++ "cGhcWithSMP           = "YES"\n"
+        ++ "cGhcWithSMP           = \"" ++ cGhcWithSMP ++ "\"\n"
         ++ "cGhcRTSWays           :: String\n"
-        ++ "cGhcRTSWays           = "l debug thr thr_debug thr_l thr_p "\n"
+        ++ "cGhcRTSWays           = \"" ++ cGhcRTSWays ++ "\"\n"
         ++ "cGhcEnableTablesNextToCode :: String\n"
-        ++ "cGhcEnableTablesNextToCode = "YES"\n"
+        ++ "cGhcEnableTablesNextToCode = \"" ++ cGhcEnableTablesNextToCode ++ "\"\n"
         ++ "cLeadingUnderscore    :: String\n"
-        ++ "cLeadingUnderscore    = "NO"\n"
+        ++ "cLeadingUnderscore    = \"" ++ cLeadingUnderscore ++ "\"\n"
         ++ "cGHC_UNLIT_PGM        :: String\n"
-        ++ "cGHC_UNLIT_PGM        = "unlit.exe"\n"
+        ++ "cGHC_UNLIT_PGM        = \"" ++ cGHC_UNLIT_PGM ++ "\"\n"
         ++ "cGHC_SPLIT_PGM        :: String\n"
-        ++ "cGHC_SPLIT_PGM        = "ghc-split"\n"
+        ++ "cGHC_SPLIT_PGM        = \"" ++ cGHC_SPLIT_PGM ++ "\"\n"
         ++ "cLibFFI               :: Bool\n"
-        ++ "cLibFFI               = False\n"
+        ++ "cLibFFI               = " ++ show cLibFFI ++ "\n"
         ++ "cGhcThreaded :: Bool\n"
-        ++ "cGhcThreaded = True\n"
+        ++ "cGhcThreaded = " ++ show (threaded `elem` rtsWays) ++ "\n"
         ++ "cGhcDebugged :: Bool\n"
-        ++ "cGhcDebugged = False\n"
-
-
+        ++ "cGhcDebugged = " ++ show ghcDebugged ++ "\n"
