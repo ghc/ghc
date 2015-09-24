@@ -37,14 +37,17 @@ getPackageSources = do
     srcDirs     <- getPkgDataList SrcDirs
 
     let buildPath = path -/- "build"
-        dirs      = (buildPath -/- "autogen") : map (packagePath -/-) srcDirs
+        autogen   = buildPath -/- "autogen"
+        dirs      = autogen : map (packagePath -/-) srcDirs
 
     (foundSources, missingSources) <- findModuleFiles dirs "*hs"
 
-    -- Generated source files live in buildPath and have extension "hs"
+    -- Generated source files live in buildPath and have extension "hs"...
     let generatedSources = [ buildPath -/- s <.> "hs" | s <- missingSources ]
+    -- ...except that GHC/Prim.hs lives in autogen. TODO: fix?
+        fixGhcPrim = replaceEq (buildPath -/- "GHC/Prim.hs") (autogen -/- "GHC/Prim.hs")
 
-    return $ foundSources ++ generatedSources
+    return $ foundSources ++ fixGhcPrim generatedSources
 
 -- findModuleFiles scans a list of given directories and finds files matching a
 -- given extension pattern (e.g., "*hs") that correspond to modules of the
