@@ -23,7 +23,8 @@ hsc2hs         = @hardtop@/inplace/bin/hsc2hs
 
 genprimopcode  = @hardtop@/inplace/bin/genprimopcode
 
-hs-cpp         = @HaskellCPPCmd@ @HaskellCPPArgs@
+hs-cpp         = @HaskellCPPCmd@
+hs-cpp-args    = @HaskellCPPArgs@
 
 unlit          = @hardtop@/inplace/lib/unlit
 ghc-split      = @hardtop@/inplace/lib/ghc-split
@@ -37,8 +38,9 @@ hscolour       = @HSCOLOUR@
 # Information about builders:
 #============================
 
-gcc-is-clang = @GccIsClang@
-gcc-lt-46    = @GccLT46@
+gcc-is-clang        = @GccIsClang@
+gcc-lt-46           = @GccLT46@
+ar-supports-at-file = @ArSupportsAtFile@
 
 # Build options:
 #===============
@@ -50,15 +52,24 @@ ghc-unregisterised   = @Unregisterised@
 ghc-source-path      = @hardtop@
 leading-underscore   = @LeadingUnderscore@
 
-# Information about host and target systems:
-#===========================================
+# Information about build, host and target systems:
+#==================================================
 
-target-os             = @TargetOS_CPP@
-target-arch           = @TargetArch_CPP@
-target-platform-full  = @TargetPlatformFull@
+build-platform        = @BuildPlatform@
+build-arch            = @BuildArch_CPP@
+build-os              = @BuildOS_CPP@
+build-vendor          = @BuildVendor_CPP@
 
-host-os               = @HostOS_CPP@
+host-platform         = @HostPlatform@
 host-arch             = @HostArch_CPP@
+host-os               = @HostOS_CPP@
+host-vendor           = @HostVendor_CPP@
+
+target-platform       = @TargetPlatform@
+target-platform-full  = @TargetPlatformFull@
+target-arch           = @TargetArch_CPP@
+target-os             = @TargetOS_CPP@
+target-vendor         = @TargetVendor_CPP@
 
 cross-compiling       = @CrossCompiling@
 
