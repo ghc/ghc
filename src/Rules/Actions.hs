@@ -1,7 +1,6 @@
 module Rules.Actions (build, buildWithResources) where
 
 import Expression
-import Oracles
 import Oracles.ArgsHash
 import Settings
 import Settings.Args
@@ -18,19 +17,13 @@ buildWithResources rs target = do
     path    <- builderPath builder
     argList <- interpret target getArgs
     -- The line below forces the rule to be rerun if the args hash has changed
-    when trackBuildSystem $ checkArgsHash target
+    checkArgsHash target
     withResources rs $ do
-        putBuild $ "/--------\n" ++ "| Running "
-                 ++ show builder ++ " with arguments:"
+        putBuild $ "/--------\n| Running " ++ show builder ++ " with arguments:"
         mapM_ (putBuild . ("|   " ++)) $ interestingInfo builder argList
         putBuild $ "\\--------"
         quietly $ case builder of
-            Ar -> do -- Split argument list into chunks as otherwise Ar chokes up
-                maxChunk <- cmdLineLengthLimit
-                let persistentArgs = take arPersistentArgsCount argList
-                    remainingArgs  = drop arPersistentArgsCount argList
-                forM_ (chunksOfSize maxChunk remainingArgs) $ \argsChunk ->
-                    unit . cmd [path] $ persistentArgs ++ argsChunk
+            Ar -> arCmd path argList
 
             HsCpp -> do
                 let file = head $ Target.files target  -- TODO: ugly
@@ -63,14 +56,14 @@ interestingInfo builder ss = case builder of
     Haddock  -> prefixAndSuffix 1 0 ss
     Happy    -> prefixAndSuffix 0 3 ss
     Hsc2Hs   -> prefixAndSuffix 0 3 ss
+    HsCpp    -> prefixAndSuffix 0 1 ss
     Ld       -> prefixAndSuffix 4 0 ss
     _        -> ss
   where
     prefixAndSuffix n m list =
-        if length list <= n + m + 1
+        let len = length list in
+        if len <= n + m + 1
         then list
         else take n list
-             ++ ["... skipping "
-             ++ show (length list - n - m)
-             ++ " arguments ..."]
-             ++ drop (length list - m) list
+             ++ ["... skipping " ++ show (len - n - m) ++ " arguments ..."]
+             ++ drop (len - m) list
