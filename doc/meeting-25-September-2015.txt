@@ -3,7 +3,20 @@ Shaking up GHC meeting, 25 September 2015
 Things to discuss:
 ================================================
 
-1. Better names for build stages
+1. Progress report
+
+
+++ Dealing with seemingly dead-code artefacts of the old build systems. I used to carefully migrate all code to the new build system, but it is getting more in the way of readability. New proposal: drop all such suspicious instances and bring them back only if things break. Example:
+
+C:/msys/home/chEEtah/ghc/inplace/mingw/bin/gcc.exe -E -undef -traditional -P -Iincludes -Iincludes/dist -Iincludes/dist-derivedconstants/header -Iincludes/dist-ghcconstants/header  -Icompiler/stage2 -x c compiler/prelude/primops.txt.pp | grep -v '^#pragma GCC' > compiler/stage2/build/primops.txt
+
+But primops.txt.pp has no lines containing #pragma GCC! Dead code?
+
+++ Zero build is 7 seconds
+
+++ .hs-incl includes are currently not tracked properly (e.g. ghc -MM does not list them). See Dependencies.hs
+
+++ Better names for build stages
 
 * Currently we have Stage0, Stage1, etc. It is not particularly clear
 from the names what they stand for. We no longer need to stick to
@@ -21,8 +34,10 @@ i. Unclear abstractions Builder/BuildRule...
 
 ii. Limits to build parallelism: GHC crashes during parallel builds. Also ghc-pkg and ghc-cabal are apparently not thread-safe, so I had to use Shake resources to limit the parallelism...
 
+iii. Discuss the need for command line options, e.g. make GhcDebugged=YES. This is a bit annoying to implement since Settings.User seems fairly readable, but recompiling the build systems for changing a flag may be annoying too.
 
-2. Do we need a name for the new build system?
+
+iv. Do we need a name for the new build system?
 
 * At least we need a name for the folder in the GHC tree
 
