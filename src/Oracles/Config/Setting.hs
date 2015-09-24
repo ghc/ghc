@@ -1,9 +1,9 @@
 module Oracles.Config.Setting (
     Setting (..), SettingList (..),
     setting, settingList, getSetting, getSettingList,
-    targetPlatform, targetPlatforms, targetOs, targetOss, notTargetOs,
-    targetArchs, windowsHost, notWindowsHost, ghcWithInterpreter,
-    ghcEnableTablesNextToCode, ghcCanonVersion, cmdLineLengthLimit
+    anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs, windowsHost,
+    ghcWithInterpreter, ghcEnableTablesNextToCode, useLibFFIForAdjustors,
+    ghcCanonVersion, cmdLineLengthLimit
     ) where
 
 import Base
@@ -83,45 +83,37 @@ getSettingList :: SettingList -> ReaderT a Action [String]
 getSettingList = lift . settingList
 
 matchSetting :: Setting -> [String] -> Action Bool
-matchSetting key values = do
-    value <- setting key
-    return $ value `elem` values
+matchSetting key values = fmap (`elem` values) $ setting key
 
-targetPlatforms :: [String] -> Action Bool
-targetPlatforms = matchSetting TargetPlatformFull
+anyTargetPlatform :: [String] -> Action Bool
+anyTargetPlatform = matchSetting TargetPlatformFull
 
-targetPlatform :: String -> Action Bool
-targetPlatform s = targetPlatforms [s]
+anyTargetOs :: [String] -> Action Bool
+anyTargetOs = matchSetting TargetOs
 
-targetOss :: [String] -> Action Bool
-targetOss = matchSetting TargetOs
+anyTargetArch :: [String] -> Action Bool
+anyTargetArch = matchSetting TargetArch
 
-targetOs :: String -> Action Bool
-targetOs s = targetOss [s]
-
-notTargetOs :: String -> Action Bool
-notTargetOs = fmap not . targetOs
-
-targetArchs :: [String] -> Action Bool
-targetArchs = matchSetting TargetArch
+anyHostOs :: [String] -> Action Bool
+anyHostOs = matchSetting HostOs
 
 windowsHost :: Action Bool
-windowsHost = matchSetting HostOs ["mingw32", "cygwin32"]
-
-notWindowsHost :: Action Bool
-notWindowsHost = fmap not windowsHost
+windowsHost = anyHostOs ["mingw32", "cygwin32"]
 
 ghcWithInterpreter :: Action Bool
 ghcWithInterpreter = do
-    goodOs <- targetOss [ "mingw32", "cygwin32", "linux", "solaris2"
-                        , "freebsd", "dragonfly", "netbsd", "openbsd"
-                        , "darwin", "kfreebsdgnu" ]
-    goodArch <- targetArchs [ "i386", "x86_64", "powerpc", "sparc"
-                            , "sparc64", "arm" ]
+    goodOs <- anyTargetOs [ "mingw32", "cygwin32", "linux", "solaris2"
+                          , "freebsd", "dragonfly", "netbsd", "openbsd"
+                          , "darwin", "kfreebsdgnu" ]
+    goodArch <- anyTargetArch [ "i386", "x86_64", "powerpc", "sparc"
+                              , "sparc64", "arm" ]
     return $ goodOs && goodArch
 
 ghcEnableTablesNextToCode :: Action Bool
-ghcEnableTablesNextToCode = targetArchs ["ia64", "powerpc64"]
+ghcEnableTablesNextToCode = notM $ anyTargetArch ["ia64", "powerpc64", "powerpc64le"]
+
+useLibFFIForAdjustors :: Action Bool
+useLibFFIForAdjustors = notM $ anyTargetArch ["i386", "x86_64"]
 
 -- Canonicalised GHC version number, used for integer version comparisons. We
 -- expand GhcMinorVersion to two digits by adding a leading zero if necessary.
