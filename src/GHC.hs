@@ -1,8 +1,8 @@
 module GHC (
     array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
-    deepseq, directory, filepath, ghcPrim, haskeline, hoopl, hpc, integerGmp,
-    integerSimple, parallel, pretty, primitive, process, stm, templateHaskell,
-    terminfo, time, transformers, unix, win32, xhtml,
+    deepseq, directory, filepath, ghc, ghcPrim, haskeline, hoopl, hpc,
+    integerGmp, integerSimple, parallel, pretty, primitive, process, stm,
+    templateHaskell, terminfo, time, transformers, unix, win32, xhtml,
 
     defaultKnownPackages, defaultTargetDirectory
     ) where
@@ -18,15 +18,15 @@ import Stage
 defaultKnownPackages :: [Package]
 defaultKnownPackages =
     [ array, base, binPackageDb, binary, bytestring, cabal, compiler
-    , containers, deepseq, directory, filepath, ghcPrim, haskeline, hoopl, hpc
-    , integerGmp, integerSimple, parallel, pretty, primitive, process, stm
+    , containers, deepseq, directory, filepath, ghc, ghcPrim, haskeline, hoopl
+    , hpc, integerGmp, integerSimple, parallel, pretty, primitive, process, stm
     , templateHaskell, terminfo, time, transformers, unix, win32, xhtml ]
 
 -- Package definitions
 array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
-    deepseq, directory, filepath, ghcPrim, haskeline, hoopl, hpc, integerGmp,
-    integerSimple, parallel, pretty, primitive, process, stm, templateHaskell,
-    terminfo, time, transformers, unix, win32, xhtml :: Package
+    deepseq, directory, filepath, ghc, ghcPrim, haskeline, hoopl, hpc,
+    integerGmp, integerSimple, parallel, pretty, primitive, process, stm,
+    templateHaskell, terminfo, time, transformers, unix, win32, xhtml :: Package
 
 array           = library  "array"
 base            = library  "base"
@@ -39,6 +39,7 @@ containers      = library  "containers"
 deepseq         = library  "deepseq"
 directory       = library  "directory"
 filepath        = library  "filepath"
+ghc             = topLevel "ghc-bin"        `setPath` "ghc"
 ghcPrim         = library  "ghc-prim"
 haskeline       = library  "haskeline"
 hoopl           = library  "hoopl"
@@ -67,5 +68,6 @@ xhtml           = library  "xhtml"
 defaultTargetDirectory :: Stage -> Package -> FilePath
 defaultTargetDirectory stage package
     | package == compiler = "stage" ++ show (fromEnum stage + 1)
+    | package == ghc      = "stage" ++ show (fromEnum stage + 1)
     | stage   == Stage0   = "dist-boot"
     | otherwise           = "dist-install"

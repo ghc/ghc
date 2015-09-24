@@ -166,6 +166,12 @@ customPackageArgs = do
                   , ghcProfiled ?
                     notStage0 ? arg "--ghc-pkg-option=--force"
                   ]
+        , package ghc ?
+          builder GhcCabal ?
+          mconcat [ arg $ "--flags=stage" ++ show nextStage
+                  , ghcWithInterpreter ?
+                    notStage0 ? arg "--flags=ghci"
+                  ]
         ]
 
 withBuilderKey :: Builder -> String

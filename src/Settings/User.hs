@@ -15,7 +15,7 @@ userArgs = mempty
 
 -- Control which packages get to be built
 userPackages :: Packages
-userPackages = mempty
+userPackages = remove [ghc]
 
 -- Add new user-defined packages
 userKnownPackages :: [Package]
