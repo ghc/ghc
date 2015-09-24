@@ -13,14 +13,17 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
         buildPath = path -/- "build"
         dropBuild = (pkgPath pkg ++) . drop (length buildPath)
         hDepFile  = buildPath -/- ".hs-dependencies"
+        platformH = targetPath stage compiler -/- "ghc_boot_platform.h"
     in do
         (buildPath <//> "*.c.deps") %> \out -> do
             let srcFile = dropBuild . dropExtension $ out
+            when (pkg == compiler) $ need [platformH]
             need [srcFile]
             build $ fullTarget target (GccM stage) [srcFile] [out]
 
         hDepFile %> \file -> do
             srcs <- interpretPartial target getPackageSources
+            when (pkg == compiler) $ need [platformH]
             need srcs
             build $ fullTarget target (GhcM stage) srcs [file]
             removeFileIfExists $ file <.> "bak"

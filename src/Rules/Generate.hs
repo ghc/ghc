@@ -7,8 +7,8 @@ import Rules.Actions
 import Rules.Resources
 import Settings
 
-primops :: FilePath
-primops = "compiler/stage1/build/primops.txt"
+primopsSource :: FilePath
+primopsSource = "compiler/prelude/primops.txt.pp"
 
 -- The following generators and corresponding source extensions are supported:
 knownGenerators :: [ (Builder, String) ]
@@ -23,15 +23,17 @@ determineBuilder file = fmap fst $ find (\(_, e) -> e == ext) knownGenerators
     ext = takeExtension file
 
 generatePackageCode :: Resources -> PartialTarget -> Rules ()
-generatePackageCode _ target @ (PartialTarget stage package) =
-    let path        = targetPath stage package
-        packagePath = pkgPath package
+generatePackageCode _ target @ (PartialTarget stage pkg) =
+    let path        = targetPath stage pkg
+        packagePath = pkgPath pkg
         buildPath   = path -/- "build"
+        primopsTxt  = targetPath stage compiler -/- "build/primops.txt"
+        platformH   = targetPath stage compiler -/- "ghc_boot_platform.h"
     in do -- TODO: do we need to copy *.(l)hs-boot files here? Never happens?
         buildPath -/- "*.hs" %> \file -> do
             dirs  <- interpretPartial target $ getPkgDataList SrcDirs
             files <- getDirectoryFiles "" $
-                [ packagePath </> d </> takeBaseName file <.> "*" | d <- dirs ]
+                [ packagePath -/- d -/- takeBaseName file <.> "*" | d <- dirs ]
             let gens = [ (f, b) | f <- files, Just b <- [determineBuilder f] ]
             when (length gens /= 1) . putError $
                 "Exactly one generator expected for " ++ file
@@ -40,22 +42,36 @@ generatePackageCode _ target @ (PartialTarget stage package) =
             need [src]
             build $ fullTarget target builder [src] [file]
 
+        when (pkg == compiler) $ primopsTxt %> \file -> do
+            need [platformH, primopsSource]
+            build $ fullTarget target HsCpp [primopsSource] [file]
+
         -- TODO: why different folders for generated files?
+        -- TODO: needing platformH is ugly and fragile
         fmap (buildPath -/-)
             [ "GHC/PrimopWrappers.hs"
             , "autogen/GHC/Prim.hs"
             , "*.hs-incl" ] |%> \file -> do
-                need [primops]
-                build $ fullTarget target GenPrimopCode [primops] [file]
+                need [primopsTxt]
+                build $ fullTarget target GenPrimopCode [primopsTxt] [file]
 
         priority 2.0 $ buildPath -/- "Config.hs" %> \file -> do
-            config <- interpretPartial target generateConfig
-            writeFileChanged file config
+            contents <- interpretPartial target generateConfigHs
+            writeFileChanged file contents
             putBuild $ "| Successfully generated '" ++ file ++ "'."
 
+        when (pkg == compiler) $ platformH %> \file -> do
+            contents <- interpretPartial target generatePlatformH
+            writeFileChanged file contents
+            putBuild $ "| Successfully generated '" ++ file ++ "'."
+
+quote :: String -> String
+quote s = "\"" ++ s ++ "\""
+
 -- TODO: do we need ghc-split? Always or is it platform specific?
-generateConfig :: Expr String
-generateConfig = do
+-- TODO: add tracking
+generateConfigHs :: Expr String
+generateConfigHs = do
     cProjectName        <- getSetting ProjectName
     cProjectGitCommitId <- getSetting ProjectGitCommitId
     cProjectVersion     <- getSetting ProjectVersion
@@ -80,65 +96,118 @@ generateConfig = do
     cLibFFI                    <- lift useLibFFIForAdjustors
     rtsWays                    <- getRtsWays
     let cGhcRTSWays = unwords $ map show rtsWays
-    return $ "{-# LANGUAGE CPP #-}\n"
-        ++ "module Config where\n"
-        ++ "\n"
-        ++ "#include \"ghc_boot_platform.h\"\n"
-        ++ "\n"
-        ++ "data IntegerLibrary = IntegerGMP\n"
-        ++ "                    | IntegerSimple\n"
-        ++ "                    deriving Eq\n"
-        ++ "\n"
-        ++ "cBuildPlatformString :: String\n"
-        ++ "cBuildPlatformString = BuildPlatform_NAME\n"
-        ++ "cHostPlatformString :: String\n"
-        ++ "cHostPlatformString = HostPlatform_NAME\n"
-        ++ "cTargetPlatformString :: String\n"
-        ++ "cTargetPlatformString = TargetPlatform_NAME\n"
-        ++ "\n"
-        ++ "cProjectName          :: String\n"
-        ++ "cProjectName          = \"" ++ cProjectName ++ "\"\n"
-        ++ "cProjectGitCommitId   :: String\n"
-        ++ "cProjectGitCommitId   = \"" ++ cProjectGitCommitId ++ "\"\n"
-        ++ "cProjectVersion       :: String\n"
-        ++ "cProjectVersion       = \"" ++ cProjectVersion ++ "\"\n"
-        ++ "cProjectVersionInt    :: String\n"
-        ++ "cProjectVersionInt    = \"" ++ cProjectVersionInt ++ "\"\n"
-        ++ "cProjectPatchLevel    :: String\n"
-        ++ "cProjectPatchLevel    = \"" ++ cProjectPatchLevel ++ "\"\n"
-        ++ "cProjectPatchLevel1   :: String\n"
-        ++ "cProjectPatchLevel1   = \"" ++ cProjectPatchLevel1 ++ "\"\n"
-        ++ "cProjectPatchLevel2   :: String\n"
-        ++ "cProjectPatchLevel2   = \"" ++ cProjectPatchLevel2 ++ "\"\n"
-        ++ "cBooterVersion        :: String\n"
-        ++ "cBooterVersion        = \"" ++ cBooterVersion ++ "\"\n"
-        ++ "cStage                :: String\n"
-        ++ "cStage                = show (STAGE :: Int)\n"
-        ++ "cIntegerLibrary       :: String\n"
-        ++ "cIntegerLibrary       = \"" ++ pkgName integerLibrary ++ "\"\n"
-        ++ "cIntegerLibraryType   :: IntegerLibrary\n"
-        ++ "cIntegerLibraryType   = " ++ cIntegerLibraryType ++ "\n"
-        ++ "cSupportsSplitObjs    :: String\n"
-        ++ "cSupportsSplitObjs    = \"" ++ cSupportsSplitObjs ++ "\"\n"
-        ++ "cGhcWithInterpreter   :: String\n"
-        ++ "cGhcWithInterpreter   = \"" ++ cGhcWithInterpreter ++ "\"\n"
-        ++ "cGhcWithNativeCodeGen :: String\n"
-        ++ "cGhcWithNativeCodeGen = \"" ++ cGhcWithNativeCodeGen ++ "\"\n"
-        ++ "cGhcWithSMP           :: String\n"
-        ++ "cGhcWithSMP           = \"" ++ cGhcWithSMP ++ "\"\n"
-        ++ "cGhcRTSWays           :: String\n"
-        ++ "cGhcRTSWays           = \"" ++ cGhcRTSWays ++ "\"\n"
-        ++ "cGhcEnableTablesNextToCode :: String\n"
-        ++ "cGhcEnableTablesNextToCode = \"" ++ cGhcEnableTablesNextToCode ++ "\"\n"
-        ++ "cLeadingUnderscore    :: String\n"
-        ++ "cLeadingUnderscore    = \"" ++ cLeadingUnderscore ++ "\"\n"
-        ++ "cGHC_UNLIT_PGM        :: String\n"
-        ++ "cGHC_UNLIT_PGM        = \"" ++ cGHC_UNLIT_PGM ++ "\"\n"
-        ++ "cGHC_SPLIT_PGM        :: String\n"
-        ++ "cGHC_SPLIT_PGM        = \"" ++ cGHC_SPLIT_PGM ++ "\"\n"
-        ++ "cLibFFI               :: Bool\n"
-        ++ "cLibFFI               = " ++ show cLibFFI ++ "\n"
-        ++ "cGhcThreaded :: Bool\n"
-        ++ "cGhcThreaded = " ++ show (threaded `elem` rtsWays) ++ "\n"
-        ++ "cGhcDebugged :: Bool\n"
-        ++ "cGhcDebugged = " ++ show ghcDebugged ++ "\n"
+    return $ unlines
+        [ "{-# LANGUAGE CPP #-}"
+        , "module Config where"
+        , ""
+        , "#include \"ghc_boot_platform.h\""
+        , ""
+        , "data IntegerLibrary = IntegerGMP"
+        , "                    | IntegerSimple"
+        , "                    deriving Eq"
+        , ""
+        , "cBuildPlatformString :: String"
+        , "cBuildPlatformString = BuildPlatform_NAME"
+        , "cHostPlatformString :: String"
+        , "cHostPlatformString = HostPlatform_NAME"
+        , "cTargetPlatformString :: String"
+        , "cTargetPlatformString = TargetPlatform_NAME"
+        , ""
+        , "cProjectName          :: String"
+        , "cProjectName          = " ++ quote cProjectName
+        , "cProjectGitCommitId   :: String"
+        , "cProjectGitCommitId   = " ++ quote cProjectGitCommitId
+        , "cProjectVersion       :: String"
+        , "cProjectVersion       = " ++ quote cProjectVersion
+        , "cProjectVersionInt    :: String"
+        , "cProjectVersionInt    = " ++ quote cProjectVersionInt
+        , "cProjectPatchLevel    :: String"
+        , "cProjectPatchLevel    = " ++ quote cProjectPatchLevel
+        , "cProjectPatchLevel1   :: String"
+        , "cProjectPatchLevel1   = " ++ quote cProjectPatchLevel1
+        , "cProjectPatchLevel2   :: String"
+        , "cProjectPatchLevel2   = " ++ quote cProjectPatchLevel2
+        , "cBooterVersion        :: String"
+        , "cBooterVersion        = " ++ quote cBooterVersion
+        , "cStage                :: String"
+        , "cStage                = show (STAGE :: Int)"
+        , "cIntegerLibrary       :: String"
+        , "cIntegerLibrary       = " ++ quote (pkgName integerLibrary)
+        , "cIntegerLibraryType   :: IntegerLibrary"
+        , "cIntegerLibraryType   = " ++ cIntegerLibraryType
+        , "cSupportsSplitObjs    :: String"
+        , "cSupportsSplitObjs    = " ++ quote cSupportsSplitObjs
+        , "cGhcWithInterpreter   :: String"
+        , "cGhcWithInterpreter   = " ++ quote cGhcWithInterpreter
+        , "cGhcWithNativeCodeGen :: String"
+        , "cGhcWithNativeCodeGen = " ++ quote cGhcWithNativeCodeGen
+        , "cGhcWithSMP           :: String"
+        , "cGhcWithSMP           = " ++ quote cGhcWithSMP
+        , "cGhcRTSWays           :: String"
+        , "cGhcRTSWays           = " ++ quote cGhcRTSWays
+        , "cGhcEnableTablesNextToCode :: String"
+        , "cGhcEnableTablesNextToCode = " ++ quote cGhcEnableTablesNextToCode
+        , "cLeadingUnderscore    :: String"
+        , "cLeadingUnderscore    = " ++ quote cLeadingUnderscore
+        , "cGHC_UNLIT_PGM        :: String"
+        , "cGHC_UNLIT_PGM        = " ++ quote cGHC_UNLIT_PGM
+        , "cGHC_SPLIT_PGM        :: String"
+        , "cGHC_SPLIT_PGM        = " ++ quote cGHC_SPLIT_PGM
+        , "cLibFFI               :: Bool"
+        , "cLibFFI               = " ++ show cLibFFI
+        , "cGhcThreaded :: Bool"
+        , "cGhcThreaded = " ++ show (threaded `elem` rtsWays)
+        , "cGhcDebugged :: Bool"
+        , "cGhcDebugged = " ++ show ghcDebugged ]
+
+generatePlatformH :: Expr String
+generatePlatformH = do
+    stage <- getStage
+    let cppify = replaceEq '-' '_' . replaceEq '.' '_'
+        chooseSetting x y = getSetting $ if stage == Stage0 then x else y
+    buildPlatform  <- chooseSetting BuildPlatform HostPlatform
+    buildArch      <- chooseSetting BuildArch     HostArch
+    buildOs        <- chooseSetting BuildOs       HostOs
+    buildVendor    <- chooseSetting BuildVendor   HostVendor
+    hostPlatform   <- chooseSetting HostPlatform  TargetPlatform
+    hostArch       <- chooseSetting HostArch      TargetArch
+    hostOs         <- chooseSetting HostOs        TargetOs
+    hostVendor     <- chooseSetting HostVendor    TargetVendor
+    targetPlatform <- getSetting TargetPlatform
+    targetArch     <- getSetting TargetArch
+    targetOs       <- getSetting TargetOs
+    targetVendor   <- getSetting TargetVendor
+    return $ unlines
+        [ "#ifndef __PLATFORM_H__"
+        , "#define __PLATFORM_H__"
+        , ""
+        , "#define BuildPlatform_NAME  " ++ quote buildPlatform
+        , "#define HostPlatform_NAME   " ++ quote hostPlatform
+        , "#define TargetPlatform_NAME " ++ quote targetPlatform
+        , ""
+        , "#define " ++ cppify buildPlatform  ++ "_BUILD 1"
+        , "#define " ++ cppify hostPlatform   ++ "_HOST 1"
+        , "#define " ++ cppify targetPlatform ++ "_TARGET 1"
+        , ""
+        , "#define " ++ buildArch  ++ "_BUILD_ARCH 1"
+        , "#define " ++ hostArch   ++ "_HOST_ARCH 1"
+        , "#define " ++ targetArch ++ "_TARGET_ARCH 1"
+        , "#define BUILD_ARCH "  ++ quote buildArch
+        , "#define HOST_ARCH "   ++ quote hostArch
+        , "#define TARGET_ARCH " ++ quote targetArch
+        , ""
+        , "#define " ++ buildOs  ++ "_BUILD_OS 1"
+        , "#define " ++ hostOs   ++ "_HOST_OS 1"
+        , "#define " ++ targetOs ++ "_TARGET_OS 1"
+        , "#define BUILD_OS "  ++ quote buildOs
+        , "#define HOST_OS "   ++ quote hostOs
+        , "#define TARGET_OS " ++ quote targetOs
+        , ""
+        , "#define " ++ buildVendor  ++ "_BUILD_VENDOR 1"
+        , "#define " ++ hostVendor   ++ "_HOST_VENDOR 1"
+        , "#define " ++ targetVendor ++ "_TARGET_VENDOR  1"
+        , "#define BUILD_VENDOR "  ++ quote buildVendor
+        , "#define HOST_VENDOR "   ++ quote hostVendor
+        , "#define TARGET_VENDOR " ++ quote targetVendor
+        , ""
+        , "#endif /* __PLATFORM_H__ */" ]
