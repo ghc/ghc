@@ -20,12 +20,12 @@ newtype ArgsHashKey = ArgsHashKey Target
 -- to argument lists where appropriate.
 -- TODO: enforce the above assumption via type trickery?
 checkArgsHash :: Target -> Action ()
-checkArgsHash target = do
+checkArgsHash target = when trackBuildSystem $ do
     _ <- askOracle . ArgsHashKey $ target { sources = ["src"] } :: Action Int
     return ()
 
 -- Oracle for storing per-target argument list hashes
 argsHashOracle :: Rules ()
-argsHashOracle = when trackBuildSystem $ do
+argsHashOracle = do
     _ <- addOracle $ \(ArgsHashKey target) -> hash <$> interpret target getArgs
     return ()
