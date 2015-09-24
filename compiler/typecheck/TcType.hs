@@ -68,7 +68,7 @@ module TcType (
   isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
-  isPredTy, isTyVarClassPred, isTyVarExposed,
+  isPredTy, isTyVarClassPred, isTyVarExposed, isTyVarUnderDatatype,
 
   ---------------------------------
   -- Misc type manipulators
