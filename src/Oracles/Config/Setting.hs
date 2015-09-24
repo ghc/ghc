@@ -10,13 +10,18 @@ import Base
 import Oracles.Config
 import Stage
 
+-- TODO: reduce the variety of similar flags (e.g. CPP and non-CPP versions).
 -- Each Setting comes from the system.config file, e.g. 'target-os = mingw32'.
 -- setting TargetOs looks up the config file and returns "mingw32".
 --
 -- SettingList is used for multiple string values separated by spaces, such
 -- as 'gmp-include-dirs = a b'.
 -- settingList GmpIncludeDirs therefore returns a list of strings ["a", "b"].
-data Setting = DynamicExtension
+data Setting = BuildArch
+             | BuildOs
+             | BuildPlatform
+             | BuildVendor
+             | DynamicExtension
              | GhcMajorVersion
              | GhcMinorVersion
              | GhcPatchLevel
@@ -24,6 +29,8 @@ data Setting = DynamicExtension
              | GhcSourcePath
              | HostArch
              | HostOs
+             | HostPlatform
+             | HostVendor
              | ProjectGitCommitId
              | ProjectName
              | ProjectVersion
@@ -33,7 +40,9 @@ data Setting = DynamicExtension
              | ProjectPatchLevel2
              | TargetArch
              | TargetOs
+             | TargetPlatform
              | TargetPlatformFull
+             | TargetVendor
 
 data SettingList = ConfCcArgs Stage
                  | ConfCppArgs Stage
@@ -41,11 +50,16 @@ data SettingList = ConfCcArgs Stage
                  | ConfLdLinkerArgs Stage
                  | GmpIncludeDirs
                  | GmpLibDirs
+                 | HsCppArgs
                  | IconvIncludeDirs
                  | IconvLibDirs
 
 setting :: Setting -> Action String
 setting key = askConfig $ case key of
+    BuildArch          -> "build-arch"
+    BuildOs            -> "build-os"
+    BuildPlatform      -> "build-platform"
+    BuildVendor        -> "build-vendor"
     DynamicExtension   -> "dynamic-extension"
     GhcMajorVersion    -> "ghc-major-version"
     GhcMinorVersion    -> "ghc-minor-version"
@@ -54,6 +68,8 @@ setting key = askConfig $ case key of
     GhcSourcePath      -> "ghc-source-path"
     HostArch           -> "host-arch"
     HostOs             -> "host-os"
+    HostPlatform       -> "host-platform"
+    HostVendor         -> "host-vendor"
     ProjectGitCommitId -> "project-git-commit-id"
     ProjectName        -> "project-name"
     ProjectVersion     -> "project-version"
@@ -63,7 +79,9 @@ setting key = askConfig $ case key of
     ProjectPatchLevel2 -> "project-patch-level2"
     TargetArch         -> "target-arch"
     TargetOs           -> "target-os"
+    TargetPlatform     -> "target-platform"
     TargetPlatformFull -> "target-platform-full"
+    TargetVendor       -> "target-vendor"
 
 settingList :: SettingList -> Action [String]
 settingList key = fmap words $ askConfig $ case key of
@@ -73,6 +91,7 @@ settingList key = fmap words $ askConfig $ case key of
     ConfLdLinkerArgs  stage -> "conf-ld-linker-args-stage"  ++ show stage
     GmpIncludeDirs          -> "gmp-include-dirs"
     GmpLibDirs              -> "gmp-lib-dirs"
+    HsCppArgs               -> "hs-cpp-args"
     IconvIncludeDirs        -> "iconv-include-dirs"
     IconvLibDirs            -> "iconv-lib-dirs"
 
