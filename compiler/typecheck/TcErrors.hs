@@ -819,9 +819,9 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
                       ppr (isTyVarUnderDatatype tv1 ty2))
      (ctEqRel ct == ReprEq && not (isTyVarUnderDatatype tv1 ty2))
      -- the cases below don't really apply to ReprEq (except occurs check)
-  = mkErrorMsgFromCt ctxt ct (vcat [ misMatchOrCND ctxt ct oriented ty1 ty2
-                                   , extraTyVarInfo ctxt tv1 ty2
-                                   , extra ])
+  = mkErrorMsg ctxt ct (vcat [ misMatchOrCND ctxt ct oriented ty1 ty2
+                             , extraTyVarInfo ctxt tv1 ty2
+                             , extra ])
 
   -- So tv is a meta tyvar (or started that way before we
   -- generalised it).  So presumably it is an *untouchable*
