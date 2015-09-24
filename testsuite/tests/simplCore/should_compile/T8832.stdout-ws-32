@@ -6,3 +6,4 @@ w = GHC.Types.W# 0##
 w8 = GHC.Word.W8# 0##
 w16 = GHC.Word.W16# 0##
 w32 = GHC.Word.W32# 0##
+z = 0
