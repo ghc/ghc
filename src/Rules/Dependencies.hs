@@ -1,6 +1,7 @@
 module Rules.Dependencies (buildPackageDependencies) where
 
 import Expression
+import GHC
 import Oracles
 import Rules.Actions
 import Rules.Resources
@@ -30,4 +31,23 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
             need $ hDepFile : cDepFiles -- need all for more parallelism
             cDeps <- fmap concat $ mapM readFile' cDepFiles
             hDeps <- readFile' hDepFile
-            writeFileChanged file $ cDeps ++ hDeps
+            -- TODO: very ugly and fragile
+            let hsIncl hs incl = buildPath -/- hs <.> "o" ++ " : "
+                              ++ buildPath -/- incl ++ "\n"
+                extraDeps = if pkg /= compiler then [] else
+                       hsIncl "PrelNames" "primop-vector-uniques.hs-incl"
+                    ++ hsIncl "PrimOp"    "primop-data-decl.hs-incl"
+                    ++ hsIncl "PrimOp"    "primop-tag.hs-incl"
+                    ++ hsIncl "PrimOp"    "primop-list.hs-incl"
+                    ++ hsIncl "PrimOp"    "primop-strictness.hs-incl"
+                    ++ hsIncl "PrimOp"    "primop-fixity.hs-incl"
+                    ++ hsIncl "PrimOp"    "primop-primop-info.hs-incl"
+                    ++ hsIncl "PrimOp"    "primop-out-of-line.hs-incl"
+                    ++ hsIncl "PrimOp"    "primop-has-side-effects.hs-incl"
+                    ++ hsIncl "PrimOp"    "primop-can-fail.hs-incl"
+                    ++ hsIncl "PrimOp"    "primop-code-size.hs-incl"
+                    ++ hsIncl "PrimOp"    "primop-commutable.hs-incl"
+                    ++ hsIncl "TysPrim"   "primop-vector-tys-exports.hs-incl"
+                    ++ hsIncl "TysPrim"   "primop-vector-tycons.hs-incl"
+                    ++ hsIncl "TysPrim"   "primop-vector-tys.hs-incl"
+            writeFileChanged file $ cDeps ++ hDeps ++ extraDeps
