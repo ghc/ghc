@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
-module Builder (Builder (..), builderPath, specified, needBuilder) where
+module Builder (
+    Builder (..), builderPath, getBuilderPath, specified, needBuilder
+    ) where
 
 import Base
 import GHC.Generics (Generic)
@@ -24,11 +26,13 @@ data Builder = Alex
              | GhcCabalHsColour
              | GhcM Stage
              | GhcPkg Stage
+             | GhcSplit
              | Haddock
              | Happy
              | HsColour
              | Hsc2Hs
              | Ld
+             | Unlit
              deriving (Show, Eq, Generic)
 
 -- Configuration files refer to Builders as follows:
@@ -49,11 +53,13 @@ builderKey builder = case builder of
     GhcCabalHsColour -> builderKey $ GhcCabal -- synonym for 'GhcCabal hscolour'
     GhcPkg Stage0    -> "system-ghc-pkg"
     GhcPkg _         -> "ghc-pkg"
+    GhcSplit         -> "ghc-split"
     Happy            -> "happy"
     Haddock          -> "haddock"
     HsColour         -> "hscolour"
     Hsc2Hs           -> "hsc2hs"
     Ld               -> "ld"
+    Unlit            -> "unlit"
 
 builderPath :: Builder -> Action FilePath
 builderPath builder = do
@@ -61,6 +67,9 @@ builderPath builder = do
             putError $ "\nCannot find path to '" ++ (builderKey builder)
                      ++ "' in configuration files."
     fixAbsolutePathOnWindows $ if null path then "" else path -<.> exe
+
+getBuilderPath :: Builder -> ReaderT a Action FilePath
+getBuilderPath = lift . builderPath
 
 specified :: Builder -> Action Bool
 specified = fmap (not . null) . builderPath

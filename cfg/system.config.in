@@ -23,6 +23,9 @@ hsc2hs         = @hardtop@/inplace/bin/hsc2hs
 
 genprimopcode  = @hardtop@/inplace/bin/genprimopcode
 
+unlit          = @hardtop@/inplace/lib/unlit
+ghc-split      = @hardtop@/inplace/lib/ghc-split
+
 ld             = @LdCmd@
 ar             = @ArCmd@
 alex           = @AlexCmd@
@@ -43,6 +46,7 @@ solaris-broken-shld  = @SOLARIS_BROKEN_SHLD@
 split-objects-broken = @SplitObjsBroken@
 ghc-unregisterised   = @Unregisterised@
 ghc-source-path      = @hardtop@
+leading-underscore   = @LeadingUnderscore@
 
 # Information about host and target systems:
 #===========================================
