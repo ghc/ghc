@@ -24,7 +24,7 @@ hsc2HsArgs = builder Hsc2Hs ? do
                else getSetting ProjectVersionInt
     mconcat [ arg $ "--cc=" ++ ccPath
             , arg $ "--ld=" ++ ccPath
-            , notWindowsHost ? arg "--cross-safe"
+            , notM windowsHost ? arg "--cross-safe"
             , append $ map ("-I"       ++) gmpDirs
             , append $ map ("--cflag=" ++) cFlags
             , append $ map ("--lflag=" ++) lFlags

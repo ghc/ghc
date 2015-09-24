@@ -101,12 +101,12 @@ ccArgs = validating ? ccWarnings
 -- TODO: should be in a different file
 ccWarnings :: Args
 ccWarnings = do
-    let notClang = fmap not gccIsClang
+    let gccGe46 = notM $ (flag GccIsClang ||^ flag GccLt46)
     mconcat [ arg "-Werror"
             , arg "-Wall"
-            , gccIsClang ? arg "-Wno-unknown-pragmas"
-            , notClang ? gccGe46 ? notWindowsHost ? arg "-Werror=unused-but-set-variable"
-            , notClang ? gccGe46 ? arg "-Wno-error=inline" ]
+            , flag GccIsClang ? arg "-Wno-unknown-pragmas"
+            , gccGe46 ? notM windowsHost ? arg "-Werror=unused-but-set-variable"
+            , gccGe46 ? arg "-Wno-error=inline" ]
 
 ldArgs :: Args
 ldArgs = mempty
@@ -147,10 +147,10 @@ customPackageArgs = do
           mconcat [ arg $ "--ghc-option=-DSTAGE=" ++ show nextStage
                   , arg $ "--flags=stage" ++ show nextStage
                   , arg "--disable-library-for-ghci"
-                  , targetOs "openbsd" ? arg "--ld-options=-E"
+                  , anyTargetOs ["openbsd"] ? arg "--ld-options=-E"
                   , flag GhcUnregisterised ? arg "--ghc-option=-DNO_REGS"
-                  , fmap not ghcWithSMP ? arg "--ghc-option=-DNOSMP"
-                  , fmap not ghcWithSMP ? arg "--ghc-option=-optc-DNOSMP"
+                  , notM ghcWithSMP ? arg "--ghc-option=-DNOSMP"
+                  , notM ghcWithSMP ? arg "--ghc-option=-optc-DNOSMP"
                   , (threaded `elem` rtsWays) ?
                     notStage0 ? arg "--ghc-option=-optc-DTHREADED_RTS"
                   , ghcWithNativeCodeGen ? arg "--flags=ncg"
@@ -158,7 +158,7 @@ customPackageArgs = do
                     notStage0 ? arg "--flags=ghci"
                   , ghcWithInterpreter ?
                     ghcEnableTablesNextToCode ?
-                    fmap not (flag GhcUnregisterised) ?
+                    notM (flag GhcUnregisterised) ?
                     notStage0 ? arg "--ghc-option=-DGHCI_TABLES_NEXT_TO_CODE"
                   , ghcWithInterpreter ?
                     ghciWithDebugger ?
@@ -183,7 +183,7 @@ withBuilderKey b = case b of
 -- Expression 'with Gcc' appends "--with-gcc=/path/to/gcc" and needs Gcc.
 with :: Builder -> Args
 with b = specified b ? do
-    path <- lift $ builderPath b
+    path <- getBuilderPath b
     lift $ needBuilder laxDependencies b
     append [withBuilderKey b ++ path]
 
