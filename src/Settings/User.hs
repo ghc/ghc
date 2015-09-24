@@ -1,8 +1,8 @@
 module Settings.User (
-    userArgs, userPackages, userWays, userRtsWays, userTargetDirectory,
+    userArgs, userPackages, userLibWays, userRtsWays, userTargetDirectory,
     userKnownPackages, integerLibrary,
     trackBuildSystem, buildHaddock, validating, ghciWithDebugger, ghcProfiled,
-    dynamicGhcPrograms, laxDependencies
+    ghcDebugged, dynamicGhcPrograms, laxDependencies
     ) where
 
 import Expression
@@ -21,9 +21,9 @@ userPackages = mempty
 userKnownPackages :: [Package]
 userKnownPackages = []
 
--- Control which ways are built
-userWays :: Ways
-userWays = mempty
+-- Control which ways libraries and rts are built
+userLibWays :: Ways
+userLibWays = mempty
 
 userRtsWays :: Ways
 userRtsWays = mempty
@@ -59,6 +59,10 @@ ghciWithDebugger = False
 
 ghcProfiled :: Bool
 ghcProfiled = False
+
+-- TODO: do we need to be able to set this from command line?
+ghcDebugged :: Bool
+ghcDebugged = False
 
 -- When laxDependencies flag is set to True, dependencies on the GHC executable
 -- are turned into order-only dependencies to avoid needless recompilation when
