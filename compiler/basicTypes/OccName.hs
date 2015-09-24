@@ -60,7 +60,7 @@ module OccName (
         mkDerivedTyConOcc, mkNewTyCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
         mkClassDataConOcc, mkDictOcc, mkIPOcc,
-        mkSpecOcc, mkForeignExportOcc, mkRepEqOcc, mkGenOcc1, mkGenOcc2,
+        mkSpecOcc, mkForeignExportOcc, mkRepEqOcc,
         mkGenD, mkGenR, mkGen1R, mkGenRCo, mkGenC, mkGenS,
         mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
         mkSuperDictSelOcc, mkSuperDictAuxOcc,
@@ -109,6 +109,7 @@ import FastString
 import Outputable
 import Lexeme
 import Binary
+import Module
 import Data.Char
 import Data.Data
 
@@ -602,8 +603,8 @@ mkDataConWrapperOcc, mkWorkerOcc,
         mkMatcherOcc, mkBuilderOcc,
         mkDefaultMethodOcc,
         mkGenDefMethodOcc, mkDerivedTyConOcc, mkClassDataConOcc, mkDictOcc,
-        mkIPOcc, mkSpecOcc, mkForeignExportOcc, mkRepEqOcc, mkGenOcc1, mkGenOcc2,
-        mkGenD, mkGenR, mkGen1R, mkGenRCo,
+        mkIPOcc, mkSpecOcc, mkForeignExportOcc, mkRepEqOcc,
+        mkGenR, mkGen1R, mkGenRCo,
         mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,
         mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc
@@ -634,19 +635,29 @@ mkCon2TagOcc        = mk_simple_deriv varName  "$con2tag_"
 mkTag2ConOcc        = mk_simple_deriv varName  "$tag2con_"
 mkMaxTagOcc         = mk_simple_deriv varName  "$maxtag_"
 
--- Generic derivable classes (old)
-mkGenOcc1           = mk_simple_deriv varName  "$gfrom"
-mkGenOcc2           = mk_simple_deriv varName  "$gto"
+-- Generic deriving mechanism
 
--- Generic deriving mechanism (new)
-mkGenD         = mk_simple_deriv tcName "D1"
+-- | Generate a module-unique name, to be used e.g. while generating new names
+-- for Generics types. We use module package key to avoid name clashes when
+-- package imports is used.
+mkModPrefix :: Module -> String
+mkModPrefix mod = pk ++ "_" ++ mn
+  where
+    pk = packageKeyString (modulePackageKey mod)
+    mn = moduleNameString (moduleName mod)
 
-mkGenC :: OccName -> Int -> OccName
-mkGenC occ m   = mk_deriv tcName ("C1_" ++ show m) (occNameString occ)
+mkGenD :: Module -> OccName -> OccName
+mkGenD mod = mk_simple_deriv tcName ("D1_" ++ mkModPrefix mod ++ "_")
 
-mkGenS :: OccName -> Int -> Int -> OccName
-mkGenS occ m n = mk_deriv tcName ("S1_" ++ show m ++ "_" ++ show n)
-                   (occNameString occ)
+mkGenC :: Module -> OccName -> Int -> OccName
+mkGenC mod occ m   =
+  mk_deriv tcName ("C1_" ++ show m) $
+    mkModPrefix mod ++ "_" ++ occNameString occ
+
+mkGenS :: Module -> OccName -> Int -> Int -> OccName
+mkGenS mod occ m n =
+  mk_deriv tcName ("S1_" ++ show m ++ "_" ++ show n) $
+    mkModPrefix mod ++ "_" ++ occNameString occ
 
 mkGenR   = mk_simple_deriv tcName "Rep_"
 mkGen1R  = mk_simple_deriv tcName "Rep1_"

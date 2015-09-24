@@ -447,11 +447,15 @@ type CommonAuxiliaries = NameEnv CommonAuxiliary
 
 commonAuxiliaries :: [DerivSpec ()] -> TcM (CommonAuxiliaries, BagDerivStuff)
 commonAuxiliaries = foldM snoc (emptyNameEnv, emptyBag) where
-  snoc acc@(cas, stuff) (DS {ds_name = nm, ds_cls = cls, ds_tc = rep_tycon})
+  snoc :: (CommonAuxiliaries, BagDerivStuff)
+       -> DerivSpec () -> TcM (CommonAuxiliaries, BagDerivStuff)
+  snoc acc@(cas, stuff) (DS {ds_cls = cls, ds_tc = rep_tycon})
     | getUnique cls `elem` [genClassKey, gen1ClassKey] =
-      extendComAux $ genGenericMetaTyCons rep_tycon (nameModule nm)
+      extendComAux $ genGenericMetaTyCons rep_tycon
     | otherwise = return acc
-   where extendComAux m -- don't run m if its already in the accumulator
+   where extendComAux :: TcM (MetaTyCons, BagDerivStuff)
+                      -> TcM (CommonAuxiliaries, BagDerivStuff)
+         extendComAux m -- don't run m if its already in the accumulator
            | elemNameEnv (tyConName rep_tycon) cas = return acc
            | otherwise = do (ca, new_stuff) <- m
                             return ( extendNameEnv cas (tyConName rep_tycon) ca
@@ -922,7 +926,7 @@ mk_data_eqn :: Maybe OverlapMode -> [TyVar] -> Class
             -> TcM EarlyDerivSpec
 mk_data_eqn overlap_mode tvs cls tycon tc_args rep_tc rep_tc_args mtheta
   = do loc                  <- getSrcSpanM
-       dfun_name            <- new_dfun_name cls tycon
+       dfun_name            <- newDFunName' cls tycon
        case mtheta of
         Nothing -> do --Infer context
             inferred_constraints <- inferConstraints cls inst_tys rep_tc rep_tc_args
@@ -1375,13 +1379,6 @@ non_coercible_class cls
                          , genClassKey, gen1ClassKey, typeableClassKey
                          , traversableClassKey, liftClassKey ])
 
-new_dfun_name :: Class -> TyCon -> TcM Name
-new_dfun_name clas tycon        -- Just a simple wrapper
-  = do { loc <- getSrcSpanM     -- The location of the instance decl, not of the tycon
-        ; newDFunName clas [mkTyConApp tycon []] loc }
-        -- The type passed to newDFunName is only used to generate
-        -- a suitable string; hence the empty type arg list
-
 badCon :: DataCon -> SDoc -> SDoc
 badCon con msg = ptext (sLit "Constructor") <+> quotes (ppr con) <+> msg
 
@@ -1465,7 +1462,7 @@ mkNewTypeEqn dflags overlap_mode tvs
     might_derive_via_coercible && ((newtype_deriving && not deriveAnyClass)
                                   || std_class_via_coercible cls)
   = do traceTc "newtype deriving:" (ppr tycon <+> ppr rep_tys <+> ppr all_preds)
-       dfun_name <- new_dfun_name cls tycon
+       dfun_name <- newDFunName' cls tycon
        loc <- getSrcSpanM
        case mtheta of
         Just theta -> return $ GivenTheta $ DS
@@ -2009,9 +2006,9 @@ genDerivStuff :: SrcSpan -> Class -> Name -> TyCon
               -> TcM (LHsBinds RdrName, BagDerivStuff)
 genDerivStuff loc clas dfun_name tycon comaux_maybe
   | let ck = classKey clas
-  , ck `elem` [genClassKey, gen1ClassKey]   -- Special case because monadic
-  = let gk = if ck == genClassKey then Gen0 else Gen1
-        -- TODO NSF: correctly identify when we're building Both instead of One
+  , -- Special case because monadic
+    Just gk <- lookup ck [(genClassKey, Gen0), (gen1ClassKey, Gen1)]
+  = let -- TODO NSF: correctly identify when we're building Both instead of One
         Just metaTyCons = comaux_maybe -- well-guarded by commonAuxiliaries and genInst
     in do
       (binds, faminst) <- gen_Generic_binds gk tycon metaTyCons (nameModule dfun_name)

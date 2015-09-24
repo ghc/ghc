@@ -55,4 +55,4 @@ test('T9359', normal, compile, [''])
 test('T4896', normal, compile, [''])
 test('T7947', extra_clean(['T7947a.o', 'T7947a.hi', 'T7947b.o', 'T7947b.hi']), multimod_compile, ['T7947', '-v0'])
 test('T10561', normal, compile_fail, [''])
-
+test('T10487', extra_clean(['T10487_M.o', 'T10487_M.hi']), multimod_compile, ['T10487', '-v0'])

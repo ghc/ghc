@@ -54,7 +54,8 @@ module TcEnv(
         topIdLvl, isBrackStage,
 
         -- New Ids
-        newLocalName, newDFunName, newFamInstTyConName, newFamInstAxiomName,
+        newLocalName, newDFunName, newDFunName', newFamInstTyConName,
+        newFamInstAxiomName,
         mkStableIdFromString, mkStableIdFromName,
         mkWrapperName
   ) where
@@ -740,11 +741,9 @@ simpleInstInfoTyCon :: InstInfo a -> TyCon
   -- i.e. one of the form       instance (...) => C (T a b c) where ...
 simpleInstInfoTyCon inst = tcTyConAppTyCon (simpleInstInfoTy inst)
 
-{-
-Make a name for the dict fun for an instance decl.  It's an *external*
-name, like otber top-level names, and hence must be made with newGlobalBinder.
--}
-
+-- | Make a name for the dict fun for an instance decl.  It's an *external*
+-- name, like other top-level names, and hence must be made with
+-- newGlobalBinder.
 newDFunName :: Class -> [Type] -> SrcSpan -> TcM Name
 newDFunName clas tys loc
   = do  { is_boot <- tcIsHsBootOrSig
@@ -753,6 +752,15 @@ newDFunName clas tys loc
                             concatMap (occNameString.getDFunTyKey) tys
         ; dfun_occ <- chooseUniqueOccTc (mkDFunOcc info_string is_boot)
         ; newGlobalBinder mod dfun_occ loc }
+
+-- | Special case of 'newDFunName' to generate dict fun name for a single TyCon.
+newDFunName' :: Class -> TyCon -> TcM Name
+newDFunName' clas tycon        -- Just a simple wrapper
+  = do { loc <- getSrcSpanM     -- The location of the instance decl,
+                                -- not of the tycon
+       ; newDFunName clas [mkTyConApp tycon []] loc }
+       -- The type passed to newDFunName is only used to generate
+       -- a suitable string; hence the empty type arg list
 
 {-
 Make a name for the representation tycon of a family instance.  It's an
