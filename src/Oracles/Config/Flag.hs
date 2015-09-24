@@ -8,7 +8,8 @@ import Base
 import Oracles.Config
 import Oracles.Config.Setting
 
-data Flag = CrossCompiling
+data Flag = ArSupportsAtFile
+          | CrossCompiling
           | GccIsClang
           | GccLt46
           | GhcUnregisterised
@@ -22,6 +23,7 @@ data Flag = CrossCompiling
 flag :: Flag -> Action Bool
 flag f = do
     key <- return $ case f of
+        ArSupportsAtFile   -> "ar-supports-at-file"
         CrossCompiling     -> "cross-compiling"
         GccIsClang         -> "gcc-is-clang"
         GccLt46            -> "gcc-lt-46"
