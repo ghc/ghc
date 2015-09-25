@@ -832,6 +832,19 @@ void traceEnd (void)
 }
 #endif /* DEBUG */
 
+#if defined(STAT_PROFILE)
+
+void traceStatProfileSamples(Capability *cap, bool own_cap,
+                             uint32_t sample_by, uint32_t sample_type,
+                             uint32_t cnt, void **samples, uint32_t *weights)
+{
+    if (eventlog_enabled)
+        postStatProfileSamples(cap, own_cap, sample_by, sample_type, cnt,
+                                samples, weights);
+}
+
+#endif /* STAT_PROFILE */
+
 #endif /* TRACING */
 
 // If DTRACE is enabled, but neither DEBUG nor TRACING, we need a C land

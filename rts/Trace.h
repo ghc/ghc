@@ -312,6 +312,18 @@ void traceProcSourceNote(const char *name,
                          uint32_t start_line, uint32_t start_col,
                          uint32_t end_line, uint32_t end_col);
 
+/* Statistical profiling */
+#if defined(STAT_PROFILE)
+/* SAMPLE_BY_*: Various things we can trigger samples on */
+
+/* SAMPLE_TYPE_*: Various things we can collect in our samples */
+#define SAMPLE_TYPE_INSTR_PTR     0
+
+void traceStatProfileSamples(Capability *cap, bool own_cap,
+                             uint32_t sample_by, uint32_t sample_type,
+                             uint32_t cnt, void **samples, uint32_t *weights);
+#endif /* STAT_PROFILE */
+
 #else /* !TRACING */
 
 #define traceSchedEvent(cap, tag, tso, other) /* nothing */
