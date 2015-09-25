@@ -11,7 +11,8 @@ generateTargets :: Rules ()
 generateTargets = action $ do
     targets <- fmap concat . forM [Stage0 ..] $ \stage -> do
         pkgs <- interpretWithStage stage getPackages
-        fmap concat . forM pkgs $ \pkg -> do
+        let (libPkgs, programPkgs) = partition isLibrary pkgs
+        libTargets <- fmap concat . forM libPkgs $ \pkg -> do
             let target    = PartialTarget stage pkg
                 buildPath = targetPath stage pkg -/- "build"
             libName     <- interpretPartial target $ getPkgData LibName
@@ -27,6 +28,10 @@ generateTargets = action $ do
             return $  [ ghciLib | needGhciLib == "YES" && stage == Stage1 ]
                    ++ [ haddock | needHaddock          && stage == Stage1 ]
                    ++ libs
+
+        let programTargets = map (fromJust . programPath stage) programPkgs
+
+        return $ libTargets ++ programTargets
 
     need $ reverse targets
 

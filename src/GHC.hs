@@ -4,9 +4,10 @@ module GHC (
     integerGmp, integerSimple, parallel, pretty, primitive, process, stm,
     templateHaskell, terminfo, time, transformers, unix, win32, xhtml,
 
-    defaultKnownPackages, defaultTargetDirectory
+    defaultKnownPackages, defaultTargetDirectory, defaultProgramPath
     ) where
 
+import Base
 import Package
 import Stage
 
@@ -66,8 +67,16 @@ xhtml           = library  "xhtml"
 -- * package-data.mk : contains output of ghc-cabal applied to pkgCabal
 -- TODO: simplify to just 'show stage'?
 defaultTargetDirectory :: Stage -> Package -> FilePath
-defaultTargetDirectory stage package
-    | package == compiler = "stage" ++ show (fromEnum stage + 1)
-    | package == ghc      = "stage" ++ show (fromEnum stage + 1)
-    | stage   == Stage0   = "dist-boot"
-    | otherwise           = "dist-install"
+defaultTargetDirectory stage pkg
+    | pkg   == compiler = "stage" ++ show (fromEnum stage + 1)
+    | pkg   == ghc      = "stage" ++ show (fromEnum stage + 1)
+    | stage == Stage0   = "dist-boot"
+    | otherwise         = "dist-install"
+
+defaultProgramPath :: Stage -> Package -> Maybe FilePath
+defaultProgramPath stage pkg
+    | pkg == ghc = program $ "ghc-stage" ++ show (fromEnum stage + 1)
+    | otherwise  = Nothing
+  where
+    program name = Just $ pkgPath pkg -/- defaultTargetDirectory stage pkg
+                                      -/- "build/tmp" -/- name <.> exe

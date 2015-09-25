@@ -5,6 +5,8 @@ module Settings.TargetDirectory (
 import Expression
 import Settings.User
 
+-- TODO: move to Settings.hs?
+
 -- User can override the default target directory settings given below
 targetDirectory :: Stage -> Package -> FilePath
 targetDirectory = userTargetDirectory

@@ -16,16 +16,16 @@ defaultPackages = mconcat
 
 packagesStage0 :: Packages
 packagesStage0 = mconcat
-    [ append [ binPackageDb, binary, cabal, compiler, ghc, hoopl, hpc, transformers ]
+    [ append [ binPackageDb, binary, cabal, compiler, ghc, hoopl, hpc
+             , templateHaskell, transformers ]
     , notM windowsHost ? notM (anyHostOs ["ios"]) ? append [terminfo] ]
 
 -- TODO: what do we do with parallel, stm, random, primitive, vector and dph?
 packagesStage1 :: Packages
 packagesStage1 = mconcat
     [ packagesStage0
-    , append [ array, base, bytestring, containers, deepseq, directory
-             , filepath, ghc, ghcPrim, haskeline, integerLibrary, pretty
-             , process, templateHaskell, time ]
+    , append [ array, base, bytestring, containers, deepseq, directory, filepath
+             , ghcPrim, haskeline, integerLibrary, pretty, process, time ]
     , windowsHost      ? append [win32]
     , notM windowsHost ? append [unix]
     , buildHaddock     ? append [xhtml] ]

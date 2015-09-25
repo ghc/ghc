@@ -17,7 +17,6 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
     fmap (path -/-)
         [ "package-data.mk"
         , "haddock-prologue.txt"
-        , "inplace-pkg-config"
         , "setup-config"
         , "build" -/- "autogen" -/- "cabal_macros.h"
         -- TODO: Is this needed? Also check out Paths_cpsa.hs.
@@ -39,7 +38,8 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
                 fullTarget target GhcCabal [cabalFile] outs
 
             -- TODO: find out of ghc-cabal can be concurrent with ghc-pkg
-            whenM (interpretPartial target registerPackage) .
+            when (isLibrary pkg) .
+                whenM (interpretPartial target registerPackage) .
                 buildWithResources [(ghcPkg rs, 1)] $
                 fullTarget target (GhcPkg stage) [cabalFile] outs
 

@@ -3,7 +3,7 @@ module Settings (
     module Settings.TargetDirectory,
     module Settings.User,
     module Settings.Ways,
-    getPkgData, getPkgDataList,
+    getPkgData, getPkgDataList, programPath, isLibrary,
     getPackagePath, getTargetDirectory, getTargetPath, getPackageSources,
     ) where
 
@@ -28,6 +28,12 @@ getPkgData key = lift . pkgData . key =<< getTargetPath
 
 getPkgDataList :: (FilePath -> PackageDataList) -> Expr [String]
 getPkgDataList key = lift . pkgDataList . key =<< getTargetPath
+
+programPath :: Stage -> Package -> Maybe FilePath
+programPath = userProgramPath
+
+isLibrary :: Package -> Bool
+isLibrary pkg = programPath Stage0 pkg == Nothing
 
 -- Find all Haskell source files for the current target. TODO: simplify.
 getPackageSources :: Expr [FilePath]

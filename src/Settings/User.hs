@@ -1,6 +1,6 @@
 module Settings.User (
     userArgs, userPackages, userLibWays, userRtsWays, userTargetDirectory,
-    userKnownPackages, integerLibrary,
+    userProgramPath, userKnownPackages, integerLibrary,
     trackBuildSystem, buildHaddock, validating, ghciWithDebugger, ghcProfiled,
     ghcDebugged, dynamicGhcPrograms, laxDependencies
     ) where
@@ -15,7 +15,7 @@ userArgs = mempty
 
 -- Control which packages get to be built
 userPackages :: Packages
-userPackages = remove [ghc]
+userPackages = mempty
 
 -- Add new user-defined packages
 userKnownPackages :: [Package]
@@ -28,9 +28,13 @@ userLibWays = mempty
 userRtsWays :: Ways
 userRtsWays = mempty
 
--- Control where build results go (see Settings.Default for an example)
+-- Control where build results go (see GHC.hs for defaults)
 userTargetDirectory :: Stage -> Package -> FilePath
 userTargetDirectory = defaultTargetDirectory
+
+-- Control how built programs are called (see GHC.hs for defaults)
+userProgramPath :: Stage -> Package -> Maybe FilePath
+userProgramPath = defaultProgramPath
 
 -- Choose integer library: integerGmp, integerGmp2 or integerSimple
 integerLibrary :: Package
