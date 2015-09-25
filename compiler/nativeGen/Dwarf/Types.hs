@@ -370,21 +370,21 @@ pprSetUnwind plat g  (_, uw)
 pprUnwindExpr :: Bool -> UnwindExpr -> SDoc
 pprUnwindExpr spIsCFA expr
   = sdocWithPlatform $ \plat ->
-    let ppr (UwConst i)
+    let pprE (UwConst i)
           | i >= 0 && i < 32 = pprByte (dW_OP_lit0 + fromIntegral i)
           | otherwise        = pprByte dW_OP_consts $$ pprLEBInt i -- lazy...
-        ppr (UwReg Sp i) | spIsCFA
+        pprE (UwReg Sp i) | spIsCFA
                              = if i == 0
                                then pprByte dW_OP_call_frame_cfa
                                else ppr (UwPlus (UwReg Sp 0) (UwConst i))
-        ppr (UwReg g i)      = pprByte (dW_OP_breg0+dwarfGlobalRegNo plat g) $$
+        pprE (UwReg g i)      = pprByte (dW_OP_breg0+dwarfGlobalRegNo plat g) $$
                                pprLEBInt i
-        ppr (UwDeref u)      = ppr u $$ pprByte dW_OP_deref
-        ppr (UwPlus u1 u2)   = ppr u1 $$ ppr u2 $$ pprByte dW_OP_plus
-        ppr (UwMinus u1 u2)  = ppr u1 $$ ppr u2 $$ pprByte dW_OP_minus
-        ppr (UwTimes u1 u2)  = ppr u1 $$ ppr u2 $$ pprByte dW_OP_mul
+        pprE (UwDeref u)      = pprE u $$ pprByte dW_OP_deref
+        pprE (UwPlus u1 u2)   = pprE u1 $$ pprE u2 $$ pprByte dW_OP_plus
+        pprE (UwMinus u1 u2)  = pprE u1 $$ pprE u2 $$ pprByte dW_OP_minus
+        pprE (UwTimes u1 u2)  = pprE u1 $$ pprE u2 $$ pprByte dW_OP_mul
     in ptext (sLit "\t.byte 1f-.-1") $$
-       ppr expr $$
+       pprE expr $$
        ptext (sLit "1:")
 
 -- | Generate code for re-setting the unwind information for a
