@@ -134,6 +134,24 @@ void postTaskMigrateEvent (EventTaskId taskId,
 
 void postTaskDeleteEvent (EventTaskId taskId);
 
+/*
+ * Events for emitting debug information describing the program to the eventlog
+ *
+ * These are used by LibdwScrape to emit information from the DWARF annotations
+ * in the loaded modules to the event log for later use by debugging and
+ * analysis tools.
+ */
+
+void postProcEvent(const char *name);
+
+void postProcEndEvent(void);
+
+void postProcRangeEvent(StgWord start, StgWord end);
+
+void postProcSourceNoteEvent(const char *name,
+                             uint32_t start_line, uint32_t start_col,
+                             uint32_t end_line, uint32_t end_col);
+
 void postHeapProfBegin(StgWord8 profile_id);
 
 void postHeapProfSampleBegin(StgInt era);

@@ -650,6 +650,30 @@ void traceHeapProfSampleCostCentre(StgWord8 profile_id,
 }
 #endif
 
+void traceProc(const char *name)
+{
+    if (eventlog_enabled) postProcEvent(name);
+}
+
+void traceProcEnd()
+{
+    if (eventlog_enabled) postProcEndEvent();
+}
+
+void traceProcRange(StgWord start, StgWord end)
+{
+    if (eventlog_enabled) postProcRangeEvent(start, end);
+}
+
+void traceProcSourceNote(const char *name,
+                         uint32_t start_line, uint32_t start_col,
+                         uint32_t end_line, uint32_t end_col)
+{
+    if (eventlog_enabled)
+        postProcSourceNoteEvent(name, start_line, start_col,
+                                end_line, end_col);
+}
+
 #if defined(DEBUG)
 static void vtraceCap_stderr(Capability *cap, char *msg, va_list ap)
 {
