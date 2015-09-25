@@ -383,7 +383,7 @@ pprUnwindExpr spIsCFA expr
         pprE (UwPlus u1 u2)   = pprE u1 $$ pprE u2 $$ pprByte dW_OP_plus
         pprE (UwMinus u1 u2)  = pprE u1 $$ pprE u2 $$ pprByte dW_OP_minus
         pprE (UwTimes u1 u2)  = pprE u1 $$ pprE u2 $$ pprByte dW_OP_mul
-    in ptext (sLit "\t.byte 1f-.-1") $$
+    in ptext (sLit "\t.uleb128 1f-.-1") $$ -- DW_FORM_block length
        pprE expr $$
        ptext (sLit "1:")
 
