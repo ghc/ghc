@@ -2,7 +2,7 @@ module Rules.Cabal (cabalRules) where
 
 import Expression
 import Data.Version
-import Distribution.Package
+import Distribution.Package hiding (Package)
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
 import Distribution.Verbosity
@@ -29,7 +29,9 @@ cabalRules = do
         pkgDeps <- forM (sort pkgs) $ \pkg -> do
             need [pkgCabalFile pkg]
             pd <- liftIO . readPackageDescription silent $ pkgCabalFile pkg
-            let deps     = collectDeps . condLibrary $ pd
+            let depsLib  = collectDeps $ condLibrary pd
+                depsExes = map (collectDeps . Just . snd) $ condExecutables pd
+                deps     = concat $ depsLib : depsExes
                 depNames = [ name | Dependency (PackageName name) _ <- deps ]
             return . unwords $ Package.pkgName pkg : sort depNames
         writeFileChanged out . unlines $ pkgDeps

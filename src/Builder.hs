@@ -16,6 +16,7 @@ import Stage
 -- GhcPkg StageN, N > 0, is the one built in Stage0 (TODO: need only Stage1?)
 -- TODO: add Cpp builders
 -- TODO: rename Gcc to Cc?
+-- TODO: do we really need staged builders?
 data Builder = Alex
              | Ar
              | Gcc Stage
