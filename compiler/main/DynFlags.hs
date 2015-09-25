@@ -470,9 +470,6 @@ data GeneralFlag
    | Opt_DistrustAllPackages
    | Opt_PackageTrust
 
-   -- debugging flags
-   | Opt_Debug
-
    deriving (Eq, Show, Enum)
 
 data WarningFlag =
@@ -676,6 +673,7 @@ data DynFlags = DynFlags {
   sigOf                 :: SigOf,       -- ^ Compiling an hs-boot against impl.
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
   optLevel              :: Int,         -- ^ Optimisation level
+  debugLevel            :: Int,         -- ^ How much debug information to produce
   simplPhases           :: Int,         -- ^ Number of simplifier phases
   maxSimplIterations    :: Int,         -- ^ Max simplifier iterations
   ruleCheck             :: Maybe String,
@@ -1424,6 +1422,7 @@ defaultDynFlags mySettings =
         sigOf                   = Map.empty,
         verbosity               = 0,
         optLevel                = 0,
+        debugLevel              = 0,
         simplPhases             = 2,
         maxSimplIterations      = 4,
         ruleCheck               = Nothing,
@@ -2719,7 +2718,7 @@ dynamic_flags = [
   , defGhcFlag "fno-PIC"       (NoArg (unSetGeneralFlag Opt_PIC))
 
          ------ Debugging flags ----------------------------------------------
-  , defGhcFlag "g"             (NoArg (setGeneralFlag Opt_Debug))
+  , defGhcFlag "g"             (OptIntSuffix setDebugLevel)
  ]
  ++ map (mkFlag turnOn  ""     setGeneralFlag  ) negatableFlags
  ++ map (mkFlag turnOff "no-"  unSetGeneralFlag) negatableFlags
@@ -3724,6 +3723,9 @@ setVerboseCore2Core = setDumpFlag' Opt_D_verbose_core2core
 
 setVerbosity :: Maybe Int -> DynP ()
 setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })
+
+setDebugLevel :: Maybe Int -> DynP ()
+setDebugLevel mb_n = upd (\dfs -> dfs{ debugLevel = mb_n `orElse` 2 })
 
 addCmdlineHCInclude :: String -> DynP ()
 addCmdlineHCInclude a = upd (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes s})

@@ -34,10 +34,11 @@ dwarfGen _  _      us [] = return (empty, us)
 dwarfGen df modLoc us blocks = do
 
   -- Convert debug data structures to DWARF info records
-  -- We strip out block information, as it is not currently useful for
-  -- anything. In future we might want to only do this for -g1.
+  -- We strip out block information when running with -g0 or -g1.
   let procs = debugSplitProcs blocks
-      stripBlocks dbg = dbg { dblBlocks = [] }
+      stripBlocks dbg
+        | debugLevel df < 2 = dbg { dblBlocks = [] }
+        | otherwise         = dbg
   compPath <- getCurrentDirectory
   let lowLabel = dblCLabel $ head procs
       highLabel = mkAsmTempEndLabel $ dblCLabel $ last procs

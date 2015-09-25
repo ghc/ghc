@@ -32,4 +32,11 @@ codegenOptions =
          , flagDescription = "Generate object code"
          , flagType = DynamicFlag
          }
+  , flag { flagName = "-g⟨n⟩"
+         , flagDescription =
+           "Produce DWARF debug information in compiled object files." ++
+           "⟨n⟩ can be 0, 1, or 2, with higher numbers producing richer " ++
+           "output. If ⟨n⟩ is omitted level 2 is assumed."
+         , flagType = DynamicFlag
+         }
   ]

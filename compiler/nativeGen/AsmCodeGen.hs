@@ -301,7 +301,7 @@ finishNativeGen :: Instruction instr
 finishNativeGen dflags modLoc bufh@(BufHandle _ _ h) us ngs
  = do
         -- Write debug data and finish
-        let emitDw = gopt Opt_Debug dflags && not (gopt Opt_SplitObjs dflags)
+        let emitDw = debugLevel dflags > 0 && not (gopt Opt_SplitObjs dflags)
         us' <- if not emitDw then return us else do
           (dwarf, us') <- dwarfGen dflags modLoc us (ngs_debug ngs)
           emitNativeCode dflags bufh dwarf
@@ -367,7 +367,7 @@ cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
         Right (cmms, cmm_stream') -> do
 
           -- Generate debug information
-          let debugFlag = gopt Opt_Debug dflags
+          let debugFlag = debugLevel dflags > 0
               !ndbgs | debugFlag = cmmDebugGen modLoc cmms
                      | otherwise = []
               dbgMap = debugToMap ndbgs
@@ -445,7 +445,7 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap us
         -- force evaluation all this stuff to avoid space leaks
         {-# SCC "seqString" #-} evaluate $ seqString (showSDoc dflags $ vcat $ map ppr imports)
 
-        let !labels' = if gopt Opt_Debug dflags
+        let !labels' = if debugLevel dflags > 0
                        then cmmDebugLabels isMetaInstr native else []
             !natives' = if dopt Opt_D_dump_asm_stats dflags
                         then native : ngs_natives ngs else []

@@ -64,7 +64,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
            pprSectionAlign (Section Text lbl) $$
            pprLabel lbl $$ -- blocks guaranteed not null, so label needed
            vcat (map (pprBasicBlock top_info) blocks) $$
-           (if gopt Opt_Debug dflags
+           (if debugLevel dflags > 0
             then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
            pprSizeDecl lbl
 
@@ -84,7 +84,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
             <+> char '-'
             <+> ppr (mkDeadStripPreventer info_lbl)
        else empty) $$
-      (if gopt Opt_Debug dflags
+      (if debugLevel dflags > 0
        then ppr (mkAsmTempEndLabel info_lbl) <> char ':' else empty) $$
       pprSizeDecl info_lbl
 
@@ -102,7 +102,7 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
     maybe_infotable $$
     pprLabel asmLbl $$
     vcat (map pprInstr instrs) $$
-    (if gopt Opt_Debug dflags
+    (if debugLevel dflags > 0
      then ppr (mkAsmTempEndLabel asmLbl) <> char ':' else empty)
   where
     asmLbl = mkAsmTempLabel (getUnique blockid)
