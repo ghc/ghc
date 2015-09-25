@@ -4,23 +4,63 @@ Things to discuss:
 ================================================
 
 1. Progress report
+------------------
+
+Done:
+* Build all libraries and compiler
+* Generate code (alex, happy, hsc2hs, genprimopcode, Config.hs, ghc_boot_platform.h)
+* Track changes in the build system
+* Extract accurate package dependencies from .cabal files
+* Improve complexity when searching for module files (40x)
+
+Todo:                                   Target:
+* Build utils, rts                      October
+* Better dependencies (.hs-incl etc.)   November
+* Support command line options          December
+* Validate                              November-December (GHC 8.0?)
+* Documentation                         December-January
+
+Notes:
+* Zero build: under 7 seconds
+* Full build (when compilation not required): under 12 minutes on 4 cores
+* Limited parallelism: ghc-cabal/ghc-pkg not thread-safe, ghc fails on > 4 cores
+* Codebase growing: 50 files
 
 
-++ Dealing with seemingly dead-code artefacts of the old build systems. I used to carefully migrate all code to the new build system, but it is getting more in the way of readability. New proposal: drop all such suspicious instances and bring them back only if things break. Example:
+2. Seemingly dead-code
+----------------------
+
+I used to carefully migrate all code to the new build system even when it seemed dead, but this is often getting in the way of readability. New proposal: drop all such suspicious instances and bring them back only if/when things break. 
+
+Example (generating primops.txt):
 
 C:/msys/home/chEEtah/ghc/inplace/mingw/bin/gcc.exe -E -undef -traditional -P -Iincludes -Iincludes/dist -Iincludes/dist-derivedconstants/header -Iincludes/dist-ghcconstants/header  -Icompiler/stage2 -x c compiler/prelude/primops.txt.pp | grep -v '^#pragma GCC' > compiler/stage2/build/primops.txt
 
-But primops.txt.pp has no lines containing #pragma GCC! Dead code?
+But primops.txt.pp has no lines containing #pragma GCC. Dead code?
 
-++ Zero build is 7 seconds
+Another example (generating ghc_boot_platform.h):
 
-++ .hs-incl includes are currently not tracked properly (e.g. ghc -MM does not list them). See Dependencies.hs
+ifeq "$(TargetOS_CPP)" "irix"
+    @echo "#ifndef $(IRIX_MAJOR)_TARGET_OS"                   >> $@
+    @echo "#define $(IRIX_MAJOR)_TARGET_OS 1"                 >> $@
+    @echo "#endif"                                            >> $@
+endif
 
-++ Better names for build stages
+But IRIX_MAJOR is never set anywhere in the build system. Dead code?
 
-* Currently we have Stage0, Stage1, etc. It is not particularly clear
-from the names what they stand for. We no longer need to stick to
-numbers and can pick more helpful names, for example:
+
+3. Command line options
+-----------------------
+
+Discuss the need for command line options, e.g. 'make GhcDebugged=YES'. Do we need to  support all options as in the old build system?
+
+Settings.User is fairly readable, so perhaps some options may be changeable only by editing this file and recompiling the build system (typically takes negligible time compared to building). This will simplify things. Can we come up with a must-have list for command line options?
+
+
+4. Better names for build stages
+--------------------------------
+
+Currently we have Stage0, Stage1, etc. It is not particularly clear from the names what they stand for (as a newcomer to the build system I used to look up what these numbers stand for all the time). Shall we use this opportunity to pick more helpful names, for example:
 
 Stage0 -> Boot    
 Stage1 -> Interim 
@@ -28,18 +68,10 @@ Stage2 -> Install
 Stage3 -> Selftest
 
 
+5. Do we need a name for the new build system?
+----------------------------------------------
 
-
-i. Unclear abstractions Builder/BuildRule...
-
-ii. Limits to build parallelism: GHC crashes during parallel builds. Also ghc-pkg and ghc-cabal are apparently not thread-safe, so I had to use Shake resources to limit the parallelism...
-
-iii. Discuss the need for command line options, e.g. make GhcDebugged=YES. This is a bit annoying to implement since Settings.User seems fairly readable, but recompiling the build systems for changing a flag may be annoying too.
-
-
-iv. Do we need a name for the new build system?
-
-* At least we need a name for the folder in the GHC tree
+* At least we need a name for the folder in the GHC tree.
 
 * If we call it 'shake' there may be a confusion with the Shake library.
 
@@ -47,4 +79,3 @@ iv. Do we need a name for the new build system?
   build system' is overly verbose. Calling it 'shake' is confusing.
 
 * I haven't thought about any names yet, just checking whether we want to. 
-
