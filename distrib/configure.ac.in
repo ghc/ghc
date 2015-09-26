@@ -197,6 +197,16 @@ if test "x$BinDistNeedsLibdw" = "xYES" ; then
   )
 fi
 
+dnl ** Have perf_event?
+dnl --------------------------------------------------------------
+BinDistNeedsPerfEvent=@HavePerfEvent@
+if test "x$BinDistNeedsPerfEvent" = "xYES" ; then
+  AC_CHECK_HEADER([linux/perf_event.h],
+    [UsePerfEvent=YES],
+    [AC_MSG_ERROR([Binary distribution was built with perf_event support but target system doesn't have supported])]
+  )
+fi
+
 FP_SETTINGS
 
 #

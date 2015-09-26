@@ -41,12 +41,6 @@ statProfileDumpBlackholeSamples(Capability *cap)
     }
 }
 
-INLINE_HEADER void
-statProfileDumpSamples(Capability *cap)
-{
-    statProfileDumpHeapSamples(cap);
-    statProfileDumpBlackholeSamples(cap);
-}
 #else
 
 INLINE_HEADER void
@@ -55,9 +49,38 @@ statProfileDumpHeapSamples(Capability *cap STG_UNUSED) { }
 INLINE_HEADER void
 statProfileDumpBlackholeSamples(Capability *cap STG_UNUSED) { }
 
-INLINE_HEADER void
-statProfileDumpSamples(Capability *cap STG_UNUSED) { }
-
 #endif /* STAT_PROFILE */
+
+
+#if defined(STAT_PROFILE) && defined(HAVE_PERF_EVENT)
+
+INLINE_HEADER void
+statProfileDumpPerfEventSamples(Capability *cap)
+{
+    // See Note [Statistical profiling of black-hole allocations]
+    if (cap->perf_event_sample_count) {
+        traceStatProfileSamples(cap, true, SAMPLE_BY_PERF_EVENT,
+                                SAMPLE_TYPE_INSTR_PTR,
+                                cap->perf_event_sample_count,
+                                cap->perf_event_samples, NULL);
+        cap->perf_event_sample_count = 0;
+    }
+}
+
+#else
+
+INLINE_HEADER void
+statProfileDumpPerfEventSamples(Capability *cap STG_UNUSED) { }
+
+#endif /* STAT_PROFILE && HAVE_PERF_EVENT */
+
+
+INLINE_HEADER void
+statProfileDumpSamples(Capability *cap)
+{
+    statProfileDumpHeapSamples(cap);
+    statProfileDumpBlackholeSamples(cap);
+    statProfileDumpPerfEventSamples(cap);
+}
 
 #include "EndPrivate.h"

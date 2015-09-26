@@ -317,6 +317,7 @@ void traceProcSourceNote(const char *name,
 /* SAMPLE_BY_*: Various things we can trigger samples on */
 #define SAMPLE_BY_HEAP_ALLOC      1
 #define SAMPLE_BY_BLACKHOLE       2
+#define SAMPLE_BY_PERF_EVENT      3
 
 /* SAMPLE_TYPE_*: Various things we can collect in our samples */
 #define SAMPLE_TYPE_INSTR_PTR     0

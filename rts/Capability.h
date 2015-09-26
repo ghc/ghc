@@ -121,6 +121,11 @@ struct Capability_ {
     int blackhole_sample_count;
     void **blackhole_samples;
 
+#if defined(HAVE_PERF_EVENT)
+    int perf_event_sample_count;
+    void **perf_event_samples;
+#endif
+
 #if defined(THREADED_RTS)
     // Worker Tasks waiting in the wings.  Singly-linked.
     Task *spare_workers;

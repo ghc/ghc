@@ -401,6 +401,9 @@ FFIIncludeDir=@FFIIncludeDir@
 #     rts/Libdw.c:set_initial_registers()
 GhcRtsWithLibdw=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64),@UseLibdw@,NO))
 
+# Include support for Linux perf_event interface
+GhcRtsWithPerfEvent = @HavePerfEvent@
+
 ################################################################################
 #
 #		Paths (see paths.mk)
