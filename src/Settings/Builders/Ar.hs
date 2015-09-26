@@ -5,12 +5,9 @@ import Oracles
 import Predicates (builder)
 
 arArgs :: Args
-arArgs = builder Ar ? do
-    file <- getFile
-    objs <- getSources
-    mconcat [ arg "q"
-            , arg file
-            , append objs ]
+arArgs = builder Ar ? mconcat [ arg "q"
+                              , arg =<< getOutput
+                              , append =<< getInputs ]
 
 -- This count includes arg "q" and arg file parameters in arArgs (see above).
 -- Update this value appropriately when changing arArgs.

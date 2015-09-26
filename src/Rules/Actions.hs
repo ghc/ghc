@@ -26,13 +26,13 @@ buildWithResources rs target = do
             Ar -> arCmd path argList
 
             HsCpp -> do
-                let file = head $ Target.files target  -- TODO: ugly
+                let file = head $ Target.outputs target  -- TODO: ugly
                 Stdout output <- cmd [path] argList
                 writeFileChanged file output
 
             GenPrimopCode -> do
-                let src  = head $ Target.sources target -- TODO: ugly
-                    file = head $ Target.files   target
+                let src  = head $ Target.inputs target -- TODO: ugly
+                    file = head $ Target.outputs target
                 input <- readFile' src
                 Stdout output <- cmd (Stdin input) [path] argList
                 writeFileChanged file output

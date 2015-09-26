@@ -10,8 +10,8 @@ module Expression (
     Target, PartialTarget (..), fromPartial, fullTarget, fullTargetWithWay,
     apply, append, arg, remove, appendSub, appendSubD, filterSub, removeSub,
     interpret, interpretPartial, interpretWithStage, interpretDiff,
-    getStage, getPackage, getBuilder, getFiles, getSources, getWay,
-    getSource, getFile
+    getStage, getPackage, getBuilder, getOutputs, getInputs, getWay,
+    getInput, getOutput
     ) where
 
 import Base
@@ -152,25 +152,25 @@ getBuilder = asks builder
 getWay :: Expr Way
 getWay = asks way
 
-getSources :: Expr [FilePath]
-getSources = asks sources
+getInputs :: Expr [FilePath]
+getInputs = asks inputs
 
--- Run getSources and check that the result contains a single file only
-getSource :: Expr FilePath
-getSource = do
+-- Run getInputs and check that the result contains a single input file only
+getInput :: Expr FilePath
+getInput = do
     target <- ask
-    getSingleton getSources $
-        "getSource: exactly one source expected in target " ++ show target
+    getSingleton getInputs $
+        "getInput: exactly one input file expected in target " ++ show target
 
-getFiles :: Expr [FilePath]
-getFiles = asks files
+getOutputs :: Expr [FilePath]
+getOutputs = asks outputs
 
--- Run getFiles and check that the result contains a single file only
-getFile :: Expr FilePath
-getFile = do
+-- Run getOutputs and check that the result contains a output file only
+getOutput :: Expr FilePath
+getOutput = do
     target <- ask
-    getSingleton getFiles $
-        "getFile: exactly one file expected in target " ++ show target
+    getSingleton getOutputs $
+        "getOutput: exactly one output file expected in target " ++ show target
 
 getSingleton :: Expr [a] -> String -> Expr a
 getSingleton expr msg = do

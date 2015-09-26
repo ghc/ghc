@@ -8,8 +8,7 @@ import Settings.Builders.Ghc
 
 haddockArgs :: Args
 haddockArgs = builder Haddock ? do
-    file     <- getFile
-    srcs     <- getSources
+    output   <- getOutput
     pkg      <- getPackage
     path     <- getTargetPath
     version  <- getPkgData Version
@@ -19,10 +18,10 @@ haddockArgs = builder Haddock ? do
     depNames <- getPkgDataList DepNames
     ghcOpts  <- fromDiffExpr commonGhcArgs
     mconcat
-        [ arg $ "--odir=" ++ takeDirectory file
+        [ arg $ "--odir=" ++ takeDirectory output
         , arg "--verbosity=0"
         , arg "--no-tmp-comp-dir"
-        , arg $ "--dump-interface=" ++ file
+        , arg $ "--dump-interface=" ++ output
         , arg "--html"
         , arg "--hoogle"
         , arg $ "--title=" ++ pkgName pkg ++ "-" ++ version ++ ": " ++ synopsis
@@ -39,7 +38,7 @@ haddockArgs = builder Haddock ? do
         , specified HsColour ?
           arg "--source-entity=src/%{MODULE/./-}.html\\#%{NAME}"
         , customPackageArgs
-        , append srcs
+        , append =<< getInputs
         , arg "+RTS"
         , arg $ "-t" ++ path </> "haddock.t"
         , arg "--machine-readable" ]

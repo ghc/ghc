@@ -27,7 +27,7 @@ stagedBuilder :: (Stage -> Builder) -> Predicate
 stagedBuilder sb = (builder . sb) =<< getStage
 
 file :: FilePattern -> Predicate
-file f = fmap (any (f ?==)) getFiles
+file f = fmap (any (f ?==)) getOutputs
 
 way :: Way -> Predicate
 way w = fmap (w ==) getWay

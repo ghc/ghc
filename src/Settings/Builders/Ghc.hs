@@ -11,30 +11,25 @@ import Settings
 --     $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno
 --     $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@)))
 ghcArgs :: Args
-ghcArgs = stagedBuilder Ghc ? do
-    file <- getFile
-    srcs <- getSources
-    mconcat [ commonGhcArgs
-            , arg "-H32m"
-            , stage0    ? arg "-O"
-            , notStage0 ? arg "-O2"
-            , arg "-Wall"
-            , arg "-fwarn-tabs"
-            , splitObjects ? arg "-split-objs"
-            , arg "-c", append srcs
-            , arg "-o", arg file ]
+ghcArgs = stagedBuilder Ghc ? mconcat [ commonGhcArgs
+                                      , arg "-H32m"
+                                      , stage0    ? arg "-O"
+                                      , notStage0 ? arg "-O2"
+                                      , arg "-Wall"
+                                      , arg "-fwarn-tabs"
+                                      , splitObjects ? arg "-split-objs"
+                                      , arg "-c", append =<< getInputs
+                                      , arg "-o", arg =<< getOutput ]
 
 ghcMArgs :: Args
 ghcMArgs = stagedBuilder GhcM ? do
     ways <- getWays
-    file <- getFile
-    srcs <- getSources
     mconcat [ arg "-M"
             , commonGhcArgs
             , arg "-include-pkg-deps"
-            , arg "-dep-makefile", arg file
+            , arg "-dep-makefile", arg =<< getOutput
             , append $ concat [ ["-dep-suffix", wayPrefix w] | w <- ways ]
-            , append srcs ]
+            , append =<< getInputs ]
 
 -- This is included into ghcArgs, ghcMArgs and haddockArgs.
 commonGhcArgs :: Args

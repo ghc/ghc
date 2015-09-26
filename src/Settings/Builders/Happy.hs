@@ -4,10 +4,7 @@ import Expression
 import Predicates (builder)
 
 happyArgs :: Args
-happyArgs = builder Happy ? do
-    src  <- getSource
-    file <- getFile
-    mconcat [ arg "-agc"
-            , arg "--strict"
-            , arg src
-            , arg "-o", arg file ]
+happyArgs = builder Happy ? mconcat [ arg "-agc"
+                                    , arg "--strict"
+                                    , arg =<< getInput
+                                    , arg "-o", arg =<< getOutput ]

@@ -9,8 +9,6 @@ import Settings.Builders.GhcCabal hiding (cppArgs)
 hsc2HsArgs :: Args
 hsc2HsArgs = builder Hsc2Hs ? do
     stage   <- getStage
-    src     <- getSource
-    file    <- getFile
     ccPath  <- lift . builderPath $ Gcc stage
     gmpDirs <- getSettingList GmpIncludeDirs
     cFlags  <- getCFlags
@@ -34,8 +32,8 @@ hsc2HsArgs = builder Hsc2Hs ? do
             , notStage0 ? arg ("--cflag=-D" ++ tArch ++ "_HOST_ARCH=1")
             , notStage0 ? arg ("--cflag=-D" ++ tOs   ++ "_HOST_OS=1"  )
             , arg ("--cflag=-D__GLASGOW_HASKELL__=" ++ version)
-            , arg src
-            , arg "-o", arg file ]
+            , arg =<< getInput
+            , arg "-o", arg =<< getOutput ]
 
 getCFlags :: Expr [String]
 getCFlags = fromDiffExpr $ do

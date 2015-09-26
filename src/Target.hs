@@ -22,8 +22,8 @@ data Target = Target
         package :: Package,
         builder :: Builder,
         way     :: Way,
-        sources :: [FilePath], -- input
-        files   :: [FilePath]  -- output
+        inputs  :: [FilePath],
+        outputs :: [FilePath]
      }
      deriving (Show, Eq, Generic)
 
@@ -47,8 +47,8 @@ fromPartial (PartialTarget s p) = Target
         package = p,
         builder = error "fromPartial: builder not set",
         way     = error "fromPartial: way not set",
-        sources = error "fromPartial: sources not set",
-        files   = error "fromPartial: files not set"
+        inputs  = error "fromPartial: inputs not set",
+        outputs = error "fromPartial: outputs not set"
     }
 
 -- Construct a full target by augmenting a PartialTarget with missing fields.
@@ -60,8 +60,8 @@ fullTarget (PartialTarget s p) b srcs fs = Target
         package = p,
         builder = b,
         way     = vanilla,
-        sources = map unifyPath srcs,
-        files   = map unifyPath fs
+        inputs  = map unifyPath srcs,
+        outputs = map unifyPath fs
     }
 
 -- Use this function to be explicit about the build way.

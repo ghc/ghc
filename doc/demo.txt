@@ -19,3 +19,5 @@
 * There are no generated *.y/*.ly files, hence they can never be in the build directory
 * hsc2hs gets multuple "--cflag=-I$1/$2/build/autogen" flags in one invokation
 * No generated Haskell files actually require copying of *.(l)hs-boot files
+* Postprocessing primops.txt to remove lines starting with '#pragma GCC'
+* Use of IRIX_MAJOR variable that is never set while generating ghc_platform_boot.h

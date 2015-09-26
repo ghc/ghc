@@ -6,30 +6,24 @@ import Predicates (stagedBuilder)
 import Settings
 
 gccArgs :: Args
-gccArgs = stagedBuilder Gcc ? do
-    file <- getFile
-    src  <- getSource
-    mconcat [ commonGccArgs
-            , arg "-c"
-            , arg src
-            , arg "-o"
-            , arg file ]
+gccArgs = stagedBuilder Gcc ? mconcat [ commonGccArgs
+                                      , arg "-c", arg =<< getInput
+                                      , arg "-o", arg =<< getOutput ]
 
 -- TODO: handle custom $1_$2_MKDEPENDC_OPTS and
 gccMArgs :: Args
 gccMArgs = stagedBuilder GccM ? do
-    file <- getFile
-    src  <- getSource
+    output <- getOutput
     mconcat [ arg "-E"
             , arg "-MM"
             , commonGccArgs
             , arg "-MF"
-            , arg file
+            , arg output
             , arg "-MT"
-            , arg $ dropExtension file -<.> "o"
+            , arg $ dropExtension output -<.> "o"
             , arg "-x"
             , arg "c"
-            , arg src ]
+            , arg =<< getInput ]
 
 commonGccArgs :: Args
 commonGccArgs = do

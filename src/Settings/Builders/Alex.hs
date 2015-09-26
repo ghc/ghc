@@ -5,15 +5,12 @@ import GHC (compiler)
 import Predicates (builder, package)
 
 alexArgs :: Args
-alexArgs = builder Alex ? do
-    src  <- getSource
-    file <- getFile
-    mconcat [ arg "-g"
-            , package compiler ? arg "--latin1"
-            , arg src
-            , arg "-o", arg file ]
+alexArgs = builder Alex ? mconcat [ arg "-g"
+                                  , package compiler ? arg "--latin1"
+                                  , arg =<< getInput
+                                  , arg "-o", arg =<< getOutput ]
 
--- TODO:
+-- TODO: separate arguments into builder-specific and package-specific
 -- compilierArgs = package compiler ? builder Alex ? arg "awe"
 
 -- args = mconcat
