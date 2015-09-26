@@ -1202,12 +1202,13 @@ reifyClass cls
   = do  { cxt <- reifyCxt theta
         ; inst_envs <- tcGetInstEnvs
         ; insts <- reifyClassInstances cls (InstEnv.classInstances inst_envs cls)
+        ; assocTys <- concatMapM reifyAT ats
         ; ops <- concatMapM reify_op op_stuff
         ; tvs' <- reifyTyVars tvs
-        ; let dec = TH.ClassD cxt (reifyName cls) tvs' fds' ops
+        ; let dec = TH.ClassD cxt (reifyName cls) tvs' fds' (assocTys ++ ops)
         ; return (TH.ClassI dec insts) }
   where
-    (tvs, fds, theta, _, _, op_stuff) = classExtraBigSig cls
+    (tvs, fds, theta, _, ats, op_stuff) = classExtraBigSig cls
     fds' = map reifyFunDep fds
     reify_op (op, def_meth)
       = do { ty <- reifyType (idType op)
@@ -1218,6 +1219,29 @@ reifyClass cls
                      ; gdm_ty <- reifyType (idType gdm_id)
                      ; return [TH.SigD nm' ty, TH.DefaultSigD nm' gdm_ty] }
                 _ -> return [TH.SigD nm' ty] }
+
+    reifyAT :: ClassATItem -> TcM [TH.Dec]
+    reifyAT (ATI tycon def) = do
+      tycon' <- reifyTyCon tycon
+      case tycon' of
+        TH.FamilyI dec _ -> do
+          let (tyName, tyArgs) = tfNames dec
+          (dec :) <$> maybe (return [])
+                            (fmap (:[]) . reifyDefImpl tyName tyArgs . fst)
+                            def
+        _ -> pprPanic "reifyAT" (text (show tycon'))
+
+    reifyDefImpl :: TH.Name -> [TH.Name] -> Type -> TcM TH.Dec
+    reifyDefImpl n args ty =
+      TH.TySynInstD n . TH.TySynEqn (map TH.VarT args) <$> reifyType ty
+
+    tfNames :: TH.Dec -> (TH.Name, [TH.Name])
+    tfNames (TH.OpenTypeFamilyD   n args _ _)   = (n, map bndrName args)
+    tfNames d = pprPanic "tfNames" (text (show d))
+
+    bndrName :: TH.TyVarBndr -> TH.Name
+    bndrName (TH.PlainTV n)    = n
+    bndrName (TH.KindedTV n _) = n
 
 ------------------------------
 -- | Annotate (with TH.SigT) a type if the first parameter is True
