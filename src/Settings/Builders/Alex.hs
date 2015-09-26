@@ -12,3 +12,10 @@ alexArgs = builder Alex ? do
             , package compiler ? arg "--latin1"
             , arg src
             , arg "-o", arg file ]
+
+-- TODO:
+-- compilierArgs = package compiler ? builder Alex ? arg "awe"
+
+-- args = mconcat
+--     [ alexArgs
+--     , compilerArgs ]

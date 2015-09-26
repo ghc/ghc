@@ -14,11 +14,12 @@ Done:
 * Improve complexity when searching for module files (40x)
 
 Todo:                                   Target:
-* Build utils, rts                      October
+* Build utils, rts & put in GHC tree    October
 * Better dependencies (.hs-incl etc.)   November
 * Support command line options          December
-* Validate                              November-December (GHC 8.0?)
+* Validate                              November-December
 * Documentation                         December-January
+* Journal paper + provenance			December-February
 
 Notes:
 * Zero build: under 7 seconds
@@ -26,6 +27,14 @@ Notes:
 * Limited parallelism: ghc-cabal/ghc-pkg not thread-safe, ghc fails on > 4 cores
 * Codebase growing: 50 files
 
+Things to do:
+-- Use OrderOnly for ordering ghc-cabal's
+-- Fix parallel invokations of ghc-cabal
+-- Fix GHC -M to handle .hs-incl (--make already knows how to do that) instead of writing a new parser. Maybe already done -- find a flag!
+-- Rename files -> outputs, sources -> inputs
+-- Start separating general bits from GHC bits. A separate package for Args maybe
+-- Look up Bazel and Buck
+-- Decompose args into builder-specific and package-specific
 
 2. Seemingly dead-code
 ----------------------
@@ -46,7 +55,7 @@ ifeq "$(TargetOS_CPP)" "irix"
     @echo "#endif"                                            >> $@
 endif
 
-But IRIX_MAJOR is never set anywhere in the build system. Dead code?
+But IRIX_MAJOR is never set anywhere in the build system. Dead code? YES
 
 
 3. Command line options
@@ -55,6 +64,12 @@ But IRIX_MAJOR is never set anywhere in the build system. Dead code?
 Discuss the need for command line options, e.g. 'make GhcDebugged=YES'. Do we need to  support all options as in the old build system?
 
 Settings.User is fairly readable, so perhaps some options may be changeable only by editing this file and recompiling the build system (typically takes negligible time compared to building). This will simplify things. Can we come up with a must-have list for command line options?
+
+-- Try to support these first:
+* EXTRA_HC_OPTS = file "asd" ? arg ".."
+* EXTRA_CC_OPTS 
+* GhcDebugged = True
+* make 2
 
 
 4. Better names for build stages
@@ -79,3 +94,5 @@ Stage3 -> Selftest
   build system' is overly verbose. Calling it 'shake' is confusing.
 
 * I haven't thought about any names yet, just checking whether we want to. 
+
+-- Use mk2

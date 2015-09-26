@@ -22,8 +22,8 @@ data Target = Target
         package :: Package,
         builder :: Builder,
         way     :: Way,
-        sources :: [FilePath],
-        files   :: [FilePath]
+        sources :: [FilePath], -- input
+        files   :: [FilePath]  -- output
      }
      deriving (Show, Eq, Generic)
 
