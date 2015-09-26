@@ -118,11 +118,8 @@ handleGhcExceptions =
   -- error messages propagated as exceptions
   handleGhcException $ \e -> do
     hFlush stdout
-    case e of
-      PhaseFailed _ code -> exitWith code
-      _ -> do
-        print (e :: GhcException)
-        exitFailure
+    print (e :: GhcException)
+    exitFailure
 
 
 -------------------------------------------------------------------------------
