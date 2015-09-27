@@ -525,7 +525,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
   = ppModuleContents qual exports +++
     description +++
     synopsis +++
-    divInterface (maybe_doc_hdr +++ bdy)
+    divInterface (maybe_doc_hdr +++ bdy +++ orphans)
   where
     exports = numberSectionHeadings (ifaceRnExportItems iface)
 
@@ -563,6 +563,9 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
     bdy =
       foldr (+++) noHtml $
         mapMaybe (processExport False linksInfo unicode qual) exports
+
+    orphans = (h1 << "Orphan instances") +++
+      ppOrphanInstances linksInfo (ifaceRnOrphanInstances iface) False unicode qual
 
     linksInfo = (maybe_source_url, maybe_wiki_url)
 

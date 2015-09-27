@@ -31,7 +31,7 @@ module Haddock.Backends.Xhtml.Layout (
   subConstructors,
   subEquations,
   subFields,
-  subInstances, subInstHead, subInstDetails,
+  subInstances, subOrphanInstances, subInstHead, subInstDetails,
   subMethods,
   subMinimal,
 
@@ -200,7 +200,16 @@ subInstances qual nm lnks splice = maybe noHtml wrap . instTable
     subCaption = paragraph ! collapseControl id_ True "caption" << "Instances"
     id_ = makeAnchorId $ "i:" ++ nm
 
- 
+
+subOrphanInstances :: Qualification
+                   -> LinksInfo -> Bool
+                   -> [(SubDecl,Located DocName)] -> Html
+subOrphanInstances qual lnks splice  = maybe noHtml id . instTable
+  where
+    instTable = fmap (thediv ! collapseSection id_ True [] <<) . subTableSrc qual lnks splice
+    id_ = makeAnchorId $ "orphans"
+
+
 subInstHead :: String -- ^ Instance unique id (for anchor generation)
             -> Html -- ^ Header content (instance name and type)
             -> Html

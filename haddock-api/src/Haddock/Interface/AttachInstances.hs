@@ -61,7 +61,28 @@ attachInstances expInfo ifaces instIfaceMap = mapM attach ifaces
     attach iface = do
       newItems <- mapM (attachToExportItem expInfo iface ifaceMap instIfaceMap)
                        (ifaceExportItems iface)
-      return $ iface { ifaceExportItems = newItems }
+      let orphanInstances = attachOrphanInstances expInfo iface ifaceMap instIfaceMap (ifaceInstances iface)
+      return $ iface { ifaceExportItems = newItems
+                     , ifaceOrphanInstances = orphanInstances
+                     }
+
+spanName :: NamedThing a => a -> InstHead e -> GenLocated SrcSpan e -> GenLocated SrcSpan e
+spanName s (InstHead { ihdClsName = clsn }) (L instL instn) =
+    let s1 = getSrcSpan s
+        sn = if srcSpanFileName_maybe s1 == srcSpanFileName_maybe instL
+                then instn
+                else clsn
+    in L (getSrcSpan s) sn
+
+attachOrphanInstances :: ExportInfo -> Interface -> IfaceMap -> InstIfaceMap -> [ClsInst] -> [DocInstance Name]
+attachOrphanInstances expInfo iface ifaceMap instIfaceMap cls_instances =
+  [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap, spanName n (synifyInstHead i) (L noSrcSpan n))
+  | let is = [ (instanceHead' i, getName i) | i <- cls_instances, isOrphan (is_orphan i) ]
+  , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
+  , not $ isInstanceHidden expInfo cls tys
+  ]
+  where
+    -- spanName: attach the location to the name that is the same file as the instance location
 
 
 attachToExportItem :: ExportInfo -> Interface -> IfaceMap -> InstIfaceMap
@@ -107,13 +128,7 @@ attachToExportItem expInfo iface ifaceMap instIfaceMap export =
       ] }
 
     attachFixities e = e
-    -- spanName: attach the location to the name that is the same file as the instance location
-    spanName s (InstHead { ihdClsName = clsn }) (L instL instn) =
-        let s1 = getSrcSpan s
-            sn = if srcSpanFileName_maybe s1 == srcSpanFileName_maybe instL
-                    then instn
-                    else clsn
-        in L (getSrcSpan s) sn
+
     -- spanName on Either
     spanNameE s (Left e) _ =  L (getSrcSpan s) (Left e)
     spanNameE s (Right ok) linst =

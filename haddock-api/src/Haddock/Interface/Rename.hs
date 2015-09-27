@@ -47,13 +47,16 @@ renameInterface dflags renamingEnv warnings iface =
 
       (rnArgMap, missingNames3) = runRnFM localEnv (mapM (mapM renameDoc) (ifaceArgMap iface))
 
-      (finalModuleDoc, missingNames4)
+      (renamedOrphanInstances, missingNames4)
+        = runRnFM localEnv (mapM renameDocInstance (ifaceOrphanInstances iface))
+
+      (finalModuleDoc, missingNames5)
         = runRnFM localEnv (renameDocumentation (ifaceDoc iface))
 
       -- combine the missing names and filter out the built-ins, which would
-      -- otherwise allways be missing.
+      -- otherwise always be missing.
       missingNames = nub $ filter isExternalName  -- XXX: isExternalName filters out too much
-                    (missingNames1 ++ missingNames2 ++ missingNames3 ++ missingNames4)
+                    (missingNames1 ++ missingNames2 ++ missingNames3 ++ missingNames4 ++ missingNames5)
 
       -- filter out certain built in type constructors using their string
       -- representation. TODO: use the Name constants from the GHC API.
@@ -72,7 +75,8 @@ renameInterface dflags renamingEnv warnings iface =
     return $ iface { ifaceRnDoc         = finalModuleDoc,
                      ifaceRnDocMap      = rnDocMap,
                      ifaceRnArgMap      = rnArgMap,
-                     ifaceRnExportItems = renamedExportItems }
+                     ifaceRnExportItems = renamedExportItems,
+                     ifaceRnOrphanInstances = renamedOrphanInstances}
 
 
 --------------------------------------------------------------------------------
@@ -504,6 +508,13 @@ renameDataFamInstD (DataFamInstDecl { dfid_tycon = tc, dfid_pats = pats_w_bndrs,
                                        = HsWB pats' PlaceHolder PlaceHolder PlaceHolder
                                  , dfid_defn = defn', dfid_fvs = placeHolderNames }) }
 
+renameDocInstance :: DocInstance Name -> RnM (DocInstance DocName)
+renameDocInstance (inst, idoc, L l n) = do
+  inst' <- renameInstHead inst
+  n' <- rename n
+  idoc' <- mapM renameDoc idoc
+  return (inst', idoc',L l n')
+
 renameExportItem :: ExportItem Name -> RnM (ExportItem DocName)
 renameExportItem item = case item of
   ExportModule mdl -> return (ExportModule mdl)
@@ -514,11 +525,7 @@ renameExportItem item = case item of
     decl' <- renameLDecl decl
     doc'  <- renameDocForDecl doc
     subs' <- mapM renameSub subs
-    instances' <- forM instances $ \(inst, idoc, L l n) -> do
-      inst' <- renameInstHead inst
-      n' <- rename n
-      idoc' <- mapM renameDoc idoc
-      return (inst', idoc',L l n')
+    instances' <- forM instances renameDocInstance
     fixities' <- forM fixities $ \(name, fixity) -> do
       name' <- lookupRn name
       return (name', fixity)

@@ -16,7 +16,7 @@
 module Haddock.Backends.Xhtml.Decl (
   ppDecl,
 
-  ppTyName, ppTyFamHeader, ppTypeApp,
+  ppTyName, ppTyFamHeader, ppTypeApp, ppOrphanInstances,
   tyvarNames
 ) where
 
@@ -546,6 +546,21 @@ ppInstances links origin instances splice unicode qual
     instDecl :: Int -> DocInstance DocName -> (SubDecl,Located DocName)
     instDecl no (inst, mdoc, loc) =
         ((ppInstHead links splice unicode qual mdoc origin no inst), loc)
+
+
+ppOrphanInstances :: LinksInfo
+                  -> [DocInstance DocName]
+                  -> Splice -> Unicode -> Qualification
+                  -> Html
+ppOrphanInstances links instances splice unicode qual
+  = subOrphanInstances qual links True (zipWith instDecl [1..] instances)
+  where
+    instOrigin :: InstHead name -> InstOrigin name
+    instOrigin inst = OriginClass (ihdClsName inst)
+
+    instDecl :: Int -> DocInstance DocName -> (SubDecl,Located DocName)
+    instDecl no (inst, mdoc, loc) =
+        ((ppInstHead links splice unicode qual mdoc (instOrigin inst) no inst), loc)
 
 
 ppInstHead :: LinksInfo -> Splice -> Unicode -> Qualification
