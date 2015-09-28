@@ -204,8 +204,9 @@ subInstances qual nm lnks splice = maybe noHtml wrap . instTable
 subOrphanInstances :: Qualification
                    -> LinksInfo -> Bool
                    -> [(SubDecl,Located DocName)] -> Html
-subOrphanInstances qual lnks splice  = maybe noHtml id . instTable
+subOrphanInstances qual lnks splice  = maybe noHtml wrap . instTable
   where
+    wrap = ((h1 << "Orphan instances") +++)
     instTable = fmap (thediv ! collapseSection id_ True [] <<) . subTableSrc qual lnks splice
     id_ = makeAnchorId $ "orphans"
 

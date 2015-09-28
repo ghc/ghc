@@ -564,7 +564,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
       foldr (+++) noHtml $
         mapMaybe (processExport False linksInfo unicode qual) exports
 
-    orphans = (h1 << "Orphan instances") +++
+    orphans =
       ppOrphanInstances linksInfo (ifaceRnOrphanInstances iface) False unicode qual
 
     linksInfo = (maybe_source_url, maybe_wiki_url)
