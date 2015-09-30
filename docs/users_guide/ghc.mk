@@ -10,28 +10,41 @@
 #
 # -----------------------------------------------------------------------------
 
-docs/users_guide_GENERATED_DOCBOOK_SOURCES := \
-	docs/users_guide/users_guide.xml                \
-	docs/users_guide/what_glasgow_exts_does.gen.xml
 
-# sort remove duplicates
-docs/users_guide_DOCBOOK_SOURCES :=                           \
-    $(sort $(docs/users_guide_GENERATED_DOCBOOK_SOURCES)      \
-           $(wildcard docs/users_guide/*.xml)                 \
-           $(basename $(wildcard docs/users_guide/*.xml.in)))
+docs/users_guide_RST_SOURCES := \
+		$(utils/mkUserGuidePart_GENERATED_RST_SOURCES) \
+		$(wildcard docs/users_guide/*.rst)
 
-$(docs/users_guide_GENERATED_DOCBOOK_SOURCES): %.xml: $(mkUserGuidePart_INPLACE)
-	$(mkUserGuidePart_INPLACE) $@
+$(eval $(call sphinx,docs/users_guide,users_guide))
 
-$(eval $(call docbook,docs/users_guide,users_guide))
+html_docs/users_guide : docs/users_guide/images/prof_scc.svg
 
-$(eval $(call clean-target,docs/users_guide,gen,$(docs/users_guide_GENERATED_DOCBOOK_SOURCES)))
+# man page
+docs/users_guide_MAN_RST_SOURCES := docs/users_guide/ghc.rst
 
-html_docs/users_guide : docs/users_guide/users_guide/prof_scc.eps
+MAN_SECTION := 1
+MAN_PAGES := docs/users_guide/ghc.1
 
-docs/users_guide/users_guide/prof_scc.eps : \
-		docs/users_guide/prof_scc.eps \
-		docs/users_guide/users_guide/index.html
-	$(CP) $< $@
-# dep. on d/u/u/index.html is to make sure that the d/u/u dir is created first
+ifneq "$(BINDIST)" "YES"
+$(MAN_PAGES): $(docs/users_guide_MAN_RST_SOURCES) $(utils/mkUserGuidePart_GENERATED_RST_SOURCES)
+	$(SPHINXBUILD) -b man docs/users_guide docs/users_guide
+endif
 
+man : $(MAN_PAGES)
+
+ifeq "$(BUILD_MAN)" "YES"
+ifeq "$(phase)" "final"
+$(eval $(call all-target,users_guide/man,$(MAN_PAGES)))
+endif
+
+INSTALL_MANPAGES += $(MAN_PAGES)
+
+install: install_man
+
+.PHONY: install_man
+install_man: $(MAN_PAGES)
+	$(INSTALL_DIR) "$(DESTDIR)$(mandir)"
+	$(INSTALL_DIR) "$(DESTDIR)$(mandir)/man$(MAN_SECTION)"
+	$(INSTALL_MAN) $(INSTALL_OPTS) $(MAN_PAGES) "$(DESTDIR)$(mandir)/man$(MAN_SECTION)"
+
+endif

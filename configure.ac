@@ -768,10 +768,11 @@ then
     HSCOLOUR=`cygpath -m ${HSCOLOUR}`
 fi
 
-dnl ** check for DocBook toolchain
-FP_CHECK_DOCBOOK_DTD
-FP_DOCBOOK_XSL
-FP_PROG_DBLATEX
+dnl ** check for Sphinx toolchain
+AC_PATH_PROG(SPHINXBUILD,sphinx-build)
+
+dnl ** check for xelatex
+AC_PATH_PROG(XELATEX,xelatex)
 
 dnl ** check for ghc-pkg command
 FP_PROG_GHC_PKG
@@ -1092,25 +1093,22 @@ if test "$use_large_address_space" = "yes" ; then
    AC_DEFINE([USE_LARGE_ADDRESS_SPACE], [1], [Enable single heap address space support])
 fi
 
-if test "$HAVE_DOCBOOK_XSL" = "NO" ||
-   test "$XsltprocCmd" = ""
-then
-    BUILD_DOCBOOK_HTML=NO
+if test -n "$SPHINXBUILD"; then
+    BUILD_MAN=YES
+    BUILD_SPHINX_HTML=YES
+    if test -n "$XELATEX"; then
+        BUILD_SPHINX_PDF=YES
+    else
+        BUILD_SPHINX_PDF=NO
+    fi
 else
-    BUILD_DOCBOOK_HTML=YES
+    BUILD_MAN=NO
+    BUILD_SPHINX_HTML=NO
+    BUILD_SPHINX_PDF=NO
 fi
-AC_SUBST(BUILD_DOCBOOK_HTML)
-
-if test "$DblatexCmd" = ""
-then
-    BUILD_DOCBOOK_PS=NO
-    BUILD_DOCBOOK_PDF=NO
-else
-    BUILD_DOCBOOK_PS=YES
-    BUILD_DOCBOOK_PDF=YES
-fi
-AC_SUBST(BUILD_DOCBOOK_PS)
-AC_SUBST(BUILD_DOCBOOK_PDF)
+AC_SUBST(BUILD_MAN)
+AC_SUBST(BUILD_SPHINX_HTML)
+AC_SUBST(BUILD_SPHINX_PDF)
 
 LIBRARY_VERSION(base)
 LIBRARY_VERSION(Cabal, Cabal/Cabal)
@@ -1122,7 +1120,7 @@ if grep '	' compiler/ghc.cabal.in 2>&1 >/dev/null; then
    AC_MSG_ERROR([compiler/ghc.cabal.in contains tab characters; please remove them])
 fi
 
-AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal settings docs/users_guide/ug-book.xml docs/users_guide/ug-ent.xml docs/index.html libraries/prologue.txt distrib/configure.ac])
+AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal settings docs/users_guide/ghc_config.py docs/index.html libraries/prologue.txt distrib/configure.ac])
 AC_OUTPUT
 
 # We got caught by
@@ -1181,8 +1179,8 @@ echo ["\
    Happy        : $HappyCmd ($HappyVersion)
    Alex         : $AlexCmd ($AlexVersion)
    Perl         : $PerlCmd
-   dblatex      : $DblatexCmd
-   xsltproc     : $XsltprocCmd
+   sphinx-build : $SPHINXBUILD
+   xelatex      : $XELATEX
 
    Using LLVM tools
       llc   : $LlcCmd
@@ -1199,9 +1197,8 @@ echo ["\
 fi
 
 echo ["\
-   Can build DocBook HTML documentation : $BUILD_DOCBOOK_HTML
-   Can build DocBook PS documentation   : $BUILD_DOCBOOK_PS
-   Can build DocBook PDF documentation  : $BUILD_DOCBOOK_PDF"]
+   Building Sphinx HTML documentation : $BUILD_SPHINX_HTML
+   Building Sphinx PDF documentation  : $BUILD_SPHINX_PDF"]
 
 echo ["----------------------------------------------------------------------
 "]

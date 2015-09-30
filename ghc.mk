@@ -14,8 +14,6 @@
 #
 #   * remove old Makefiles, add new stubs for building in subdirs
 #     * docs/Makefile
-#     * docs/docbook-cheat-sheet/Makefile
-#     * docs/man/Makefile
 #     * docs/storage-mgmt/Makefile
 #     * docs/vh/Makefile
 #     * rts/dotnet/Makefile
@@ -170,23 +168,18 @@ $(error p is not in $$(GhcLibWays), and $$(GhcProfiled) is YES)
 endif
 endif
 
-ifeq "$(BUILD_DOCBOOK_HTML)" "YES"
-ifeq "$(XSLTPROC)" ""
-$(error BUILD_DOCBOOK_HTML=YES, but `xsltproc` was not found. \
-  Install `xsltproc`, then rerun `./configure`. \
-  See https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation)
-endif
-ifeq "$(HAVE_DOCBOOK_XSL)" "NO"
-$(error BUILD_DOCBOOK_HTML=YES, but DocBook XSL stylesheets were not found. \
-  Install `docbook-xsl`, then rerun `./configure`. \
+ifeq "$(BUILD_SPHINX_HTML)" "YES"
+ifeq "$(SPHINXBUILD)" ""
+$(error BUILD_SPHINX_HTML=YES, but `sphinx-build` was not found. \
+  Install `sphinx-build`, then rerun `./configure`. \
   See https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation)
 endif
 endif
 
-ifneq "$(BUILD_DOCBOOK_PS) $(BUILD_DOCBOOK_PDF)" "NO NO"
-ifeq "$(DBLATEX)" ""
-$(error BUILD_DOCBOOK_PS or BUILD_DOCBOOK_PDF=YES, but `dblatex` was not found. \
-  Install `dblatex`, then rerun `./configure`. \
+ifeq "$(BUILD_SPHINX_PDF)" "YES"
+ifeq "$(XELATEX)" ""
+$(error BUILD_SPHINX_PDF=YES, but `xelatex` was not found. \
+  Install `xelatex`, then rerun `./configure`. \
   See https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation)
 endif
 endif
@@ -347,7 +340,7 @@ include rules/manual-package-config.mk
 # -----------------------------------------------------------------------------
 # Docs
 
-include rules/docbook.mk
+include rules/sphinx.mk
 
 # -----------------------------------------------------------------------------
 # Making bindists and sdists
@@ -666,7 +659,6 @@ BUILD_DIRS += utils/runghc
 BUILD_DIRS += ghc
 BUILD_DIRS += utils/mkUserGuidePart
 BUILD_DIRS += docs/users_guide
-BUILD_DIRS += docs/man
 BUILD_DIRS += utils/count_lines
 BUILD_DIRS += utils/compare_sizes
 
@@ -689,7 +681,7 @@ ifeq "$(HADDOCK_DOCS)" "NO"
 BUILD_DIRS := $(filter-out utils/haddock,$(BUILD_DIRS))
 BUILD_DIRS := $(filter-out utils/haddock/doc,$(BUILD_DIRS))
 endif
-ifeq "$(BUILD_DOCBOOK_HTML) $(BUILD_DOCBOOK_PS) $(BUILD_DOCBOOK_PDF)" "NO NO NO"
+ifeq "$(BUILD_SPHINX_HTML) $(BUILD_SPHINX_PDF)" "NO NO NO"
 # Don't to build this little utility if we're not building the User's Guide.
 BUILD_DIRS := $(filter-out utils/mkUserGuidePart,$(BUILD_DIRS))
 endif
@@ -927,7 +919,12 @@ endif
 ifneq "$(INSTALL_HTML_DOC_DIRS)" ""
 	for i in $(INSTALL_HTML_DOC_DIRS); do \
 		$(INSTALL_DIR) "$(DESTDIR)$(docdir)/html/`basename $$i`"; \
-		$(INSTALL_DOC) $(INSTALL_OPTS) $$i/* "$(DESTDIR)$(docdir)/html/`basename $$i`"; \
+    for f in $$i/*; do \
+# We filter out the directories so install doesn't choke on them \
+      if test -f $$f; then \
+		    $(INSTALL_DOC) $(INSTALL_OPTS) "$$f" "$(DESTDIR)$(docdir)/html/`basename $$i`"; \
+      fi \
+    done \
 	done
 endif
 
@@ -1052,9 +1049,8 @@ unix-binary-dist-prep:
 	"$(MKDIRHIER)" $(BIN_DIST_PREP_DIR)
 	set -e; for i in packages LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh settings.in ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
 	echo "HADDOCK_DOCS       = $(HADDOCK_DOCS)"       >> $(BIN_DIST_MK)
-	echo "BUILD_DOCBOOK_HTML = $(BUILD_DOCBOOK_HTML)" >> $(BIN_DIST_MK)
-	echo "BUILD_DOCBOOK_PS   = $(BUILD_DOCBOOK_PS)"   >> $(BIN_DIST_MK)
-	echo "BUILD_DOCBOOK_PDF  = $(BUILD_DOCBOOK_PDF)"  >> $(BIN_DIST_MK)
+	echo "BUILD_SPHINX_HTML  = $(BUILD_SPHINX_HTML)"  >> $(BIN_DIST_MK)
+	echo "BUILD_SPHINX_PDF   = $(BUILD_SPHINX_PDF)"   >> $(BIN_DIST_MK)
 	echo "BUILD_MAN          = $(BUILD_MAN)"          >> $(BIN_DIST_MK)
 	echo "override ghc-cabal_INPLACE = utils/ghc-cabal/dist-install/build/tmp/ghc-cabal-bindist" >> $(BIN_DIST_MK)
 	echo "UseSystemLibFFI    = $(UseSystemLibFFI)"    >> $(BIN_DIST_MK)
@@ -1340,6 +1336,7 @@ distclean : clean
 	$(call removeFiles,settings)
 	$(call removeFiles,docs/users_guide/ug-book.xml)
 	$(call removeFiles,docs/users_guide/ug-ent.xml)
+	$(call removeFiles,docs/users_guide/ghc_config.py)
 	$(call removeFiles,docs/index.html)
 	$(call removeFiles,libraries/prologue.txt)
 	$(call removeFiles,distrib/configure.ac)

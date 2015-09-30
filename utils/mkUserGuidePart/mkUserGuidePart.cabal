@@ -14,6 +14,37 @@ cabal-version: >=1.10
 Executable mkUserGuidePart
     Default-Language: Haskell2010
     Main-Is: Main.hs
+    Other-Modules:
+        Types
+        DList
+        Table
+        Options
+        Options.CodeGen
+        Options.CompilerDebugging
+        Options.Cpp
+        Options.FindingImports
+        Options.Interactive
+        Options.InterfaceFiles
+        Options.KeepingIntermediates
+        Options.Language
+        Options.Linking
+        Options.Misc
+        Options.Modes
+        Options.OptimizationLevels
+        Options.Optimizations
+        Options.Packages
+        Options.PhasePrograms
+        Options.Phases
+        Options.PhaseSpecific
+        Options.PlatformSpecific
+        Options.Plugin
+        Options.Profiling
+        Options.ProgramCoverage
+        Options.RecompilationChecking
+        Options.RedirectingOutput
+        Options.TemporaryFiles
+        Options.Verbosity
+        Options.Warnings
     Build-Depends: base       >= 3   && < 5,
                    ghc
 

@@ -5,9 +5,9 @@ GhcLibHcOpts       = -O2 -fllvm
 BUILD_PROF_LIBS    = YES
 #SplitObjs
 HADDOCK_DOCS       = NO
-BUILD_DOCBOOK_HTML = NO
-BUILD_DOCBOOK_PS   = NO
-BUILD_DOCBOOK_PDF  = NO
+BUILD_SPHINX_HTML  = NO
+BUILD_SPHINX_PS    = NO
+BUILD_SPHINX_PDF   = NO
 
 INTEGER_LIBRARY      = integer-simple
 Stage1Only           = YES

@@ -41,9 +41,8 @@ before_install:
 script:
  # do  not build docs
  - echo 'HADDOCK_DOCS       = NO' >> mk/validate.mk
- - echo 'BUILD_DOCBOOK_HTML = NO' >> mk/validate.mk
- - echo 'BUILD_DOCBOOK_PS   = NO' >> mk/validate.mk
- - echo 'BUILD_DOCBOOK_PDF  = NO' >> mk/validate.mk
+ - echo 'BUILD_SPHINX_HTML  = NO' >> mk/validate.mk
+ - echo 'BUILD_SPHINX_PDF   = NO' >> mk/validate.mk
  # do not build dynamic libraries
  - echo 'DYNAMIC_GHC_PROGRAMS = NO' >> mk/validate.mk
  - echo 'GhcLibWays = v' >> mk/validate.mk

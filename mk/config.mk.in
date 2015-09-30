@@ -755,21 +755,14 @@ HSCOLOUR_CMD   = @HSCOLOUR@
 TIME_CMD       = @TimeCmd@
 
 #-----------------------------------------------------------------------------
-# DocBook XML stuff
+# Sphinx stuff
 
-BUILD_DOCBOOK_HTML       = @BUILD_DOCBOOK_HTML@
-BUILD_DOCBOOK_PS         = @BUILD_DOCBOOK_PS@
-BUILD_DOCBOOK_PDF        = @BUILD_DOCBOOK_PDF@
-DBLATEX                  = @DblatexCmd@
-# filename.as.url=0 is needed with dblatex 0.3.4 (#7486)
-DBLATEX_OPTS             = -P 'filename.as.url=0' -P 'latex.unicode.use=1'
-XSLTPROC                 = @XsltprocCmd@
-XMLLINT                  = @XmllintCmd@
-HAVE_DOCBOOK_XSL	 = @HAVE_DOCBOOK_XSL@
-XSLTPROC_HTML_STYLESHEET = http://docbook.sourceforge.net/release/xsl/current/html/chunk.xsl
-XSLTPROC_LABEL_OPTS	 = --stringparam toc.section.depth 3 \
-			   --stringparam section.autolabel 1 \
-			   --stringparam section.label.includes.component.label 1
+SPHINXBUILD              = @SPHINXBUILD@
+BUILD_MAN                = @BUILD_MAN@
+BUILD_SPHINX_HTML        = @BUILD_SPHINX_HTML@
+BUILD_SPHINX_PDF         = @BUILD_SPHINX_PDF@
+SPHINXOPTS               = -D latex_paper_size=letter
+XELATEX                  = @XELATEX@
 
 #-----------------------------------------------------------------------------
 # 		FPtools support software

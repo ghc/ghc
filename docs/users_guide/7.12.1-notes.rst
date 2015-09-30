@@ -1,0 +1,332 @@
+.. _release-7-12-1:
+
+Release notes for version 7.12.1
+================================
+
+The significant changes to the various parts of the compiler are listed
+in the following sections. There have also been numerous bug fixes and
+performance improvements over the 7.10 branch.
+
+Highlights
+----------
+
+The highlights, since the 7.10 branch, are:
+
+-  TODO FIXME
+
+Full details
+------------
+
+Language
+~~~~~~~~
+
+-  TODO FIXME.
+
+-  The parser now supports Haddock comments on GADT data constructors.
+   For example,
+
+   ::
+
+                             data Expr a where
+                               -- | Just a normal sum
+                               Sum :: Int -> Int -> Expr Int
+
+-  Implicit parameters of the new ghc-prim type ``GHC.Types.CallStack``
+   are treated specially, and automatically solved for the current
+   source location. For example
+
+   ::
+
+                             f = print (?stk :: CallStack)
+
+   will print the singleton stack containing the occurrence of ``?stk``.
+   If there is another ``CallStack`` implicit in-scope, the new location
+   will be appended to the existing stack, e.g.
+
+   ::
+
+                             f :: (?stk :: CallStack) => IO ()
+                             f = print (?stk :: CallStack)
+
+   will print the occurrence of ``?stk`` and the call-site of ``f``. The
+   name of the implicit parameter does not matter.
+
+   See the release notes for ghc-prim for a description of the
+   ``CallStack`` type.
+
+-  To conform to the common case, the default role assigned to
+   parameters of datatypes declared in ``hs-boot`` files is
+   ``representational``. However, if the constructor(s) for the datatype
+   are given, it makes sense to do normal role inference. This is now
+   implemented, effectively making the default role for non-abstract
+   datatypes in ``hs-boot`` files to be ``phantom``, like it is in
+   regular Haskell code.
+
+-  Wildcards can be used in the type arguments of type/data family
+   instance declarations to indicate that the name of a type variable
+   doesn't matter. They will be replaced with new unique type variables.
+   See :ref:`data-instance-declarations` for more details.
+
+-  GHC now allows to declare type families as injective. Injectivity
+   information can then be used by the typechecker. See
+   :ref:`injective-ty-fams` for details.
+
+-  Due to a :ghc-ticket:`security issue <10826>`, Safe Haskell now forbids
+   annotations in programs marked as ``-XSafe``.
+
+
+Compiler
+~~~~~~~~
+
+-  Added the option ``-dth-dec-file``. This dumps out a .th.hs file of
+   all Template Haskell declarations in a corresponding .hs file. The
+   idea is that application developers can check this into their
+   repository so that they can grep for identifiers used elsewhere that
+   were defined in Template Haskell. This is similar to using
+   ``-ddump-to-file`` with ``-ddump-splices`` but it always generates a
+   file instead of being coupled to ``-ddump-to-file`` and only outputs
+   code that does not exist in the .hs file and a comment for the splice
+   location in the original file.
+
+-  Added the option ``-fprint-expanded-types``. When enabled, GHC also
+   prints type-synonym-expanded types in type errors.
+
+-  Added the option ``-fcpr-anal``. When enabled, the demand analyser
+   performs CPR analysis. It is implied by ``-O``. Consequently,
+   ``-fcpr-off`` is now removed, run with ``-fno-cpr-anal`` to get the
+   old ``-fcpr-off`` behaviour.
+
+GHCi
+~~~~
+
+-  ``Main`` with an explicit module header but without ``main`` is now
+   an error (#7765).
+
+   The ``:back`` and ``:forward`` commands now take an optional count
+   allowing the user to move forward or backward in history several
+   steps at a time.
+
+   Added commands ``:load!`` and ``:reload!``, effectively setting
+   "-fdefer-type-errors" before loading a module and unsetting it after
+   loading if it has not been set before (#8353).
+
+Template Haskell
+~~~~~~~~~~~~~~~~
+
+-  The ``TemplateHaskell`` now no longer automatically errors when used
+   with a stage 1 compiler (i.e. GHC without interpreter support); in
+   particular, plain Haskell quotes (not quasi-quotes) can now be
+   compiled without erroring. Splices and quasi-quotes continue to only
+   be supported by a stage 2 compiler.
+
+-  Partial type signatures can now be used in splices, see
+   :ref:`pts-where`.
+
+-  ``Template Haskell`` now supports the use of ``UInfixT`` in types to
+   resolve infix operator fixities, in the same vein as ``UInfixP`` and
+   ``UInfixE`` in patterns and expressions. ``ParensT`` and ``InfixT``
+   have also been introduced, serving the same functions as their
+   pattern and expression counterparts.
+
+-  Primitive chars (e.g., ``[| 'a'# |]``) and primitive strings (e.g.,
+   ``[| "abc"# |]``) can now be quoted with Template Haskell. The
+   ``Lit`` data type also has a new constructor, ``CharPrimL``, for
+   primitive char literals.
+
+-  ``addTopDecls`` now accepts annotation pragmas.
+
+-  Internally, the implementation of quasi-quotes has been unified with
+   that of normal Template Haskell splices. Under the previous
+   implementation, top-level declaration quasi-quotes did not cause a
+   break in the declaration groups, unlike splices of the form
+   ``$(...)``. This behavior has been preserved under the new
+   implementation, and is now recognized and documented in
+   :ref:`th-syntax`.
+
+-  The ``Lift`` class is now derivable via the ``-XDeriveLift`` extension. See
+   :ref:`deriving-lift` for more information.
+
+
+Runtime system
+~~~~~~~~~~~~~~
+
+-  TODO FIXME.
+
+Build system
+~~~~~~~~~~~~
+
+-  TODO FIXME.
+
+Package system
+~~~~~~~~~~~~~~
+
+-  TODO FIXME.
+
+Libraries
+---------
+
+array
+~~~~~
+
+-  Version number XXXXX (was 0.5.0.0)
+
+base
+~~~~
+
+-  Version number XXXXX (was 4.7.0.0)
+
+-  A new module ``GHC.SrcLoc`` was added, exporting a new type
+   ``SrcLoc``. A ``SrcLoc`` contains package, module, and file names, as
+   well as start and end positions.
+
+-  A new type ``CallStack`` was added for use with the new implicit
+   callstack parameters. A ``CallStack`` is a ``[(String, SrcLoc)]``,
+   sorted by most-recent call.
+
+-  A new function, ``interruptible``, was added to ``GHC.IO`` allowing
+   an ``IO`` action to be run such that it can be interrupted by an
+   asynchronous exception, even if exceptions are masked (except if
+   masked with ``interruptibleMask``).
+
+   This was introduced to fix the behavior of ``allowInterrupt``, which
+   would previously incorrectly allow exceptions in uninterruptible
+   regions (see :ghc-ticket:`9516`).
+
+-  Per-thread allocation counters (``setAllocationCounter`` and
+   ``getAllocationCounter``) and limits (``enableAllocationLimit``,
+   ``disableAllocationLimit`` are now available from ``System.Mem``. Previously
+   this functionality was only available from ``GHC.Conc``.
+
+
+bin-package-db
+~~~~~~~~~~~~~~
+
+-  This is an internal package, and should not be used.
+
+binary
+~~~~~~
+
+-  Version number XXXXX (was 0.7.1.0)
+
+bytestring
+~~~~~~~~~~
+
+-  Version number XXXXX (was 0.10.4.0)
+
+Cabal
+~~~~~
+
+-  Version number XXXXX (was 1.18.1.3)
+
+containers
+~~~~~~~~~~
+
+-  Version number XXXXX (was 0.5.4.0)
+
+deepseq
+~~~~~~~
+
+-  Version number XXXXX (was 1.3.0.2)
+
+directory
+~~~~~~~~~
+
+-  Version number XXXXX (was 1.2.0.2)
+
+filepath
+~~~~~~~~
+
+-  Version number XXXXX (was 1.3.0.2)
+
+ghc
+~~~
+
+-  TODO FIXME.
+
+-  The ``HsBang`` type has been removed in favour of ``HsSrcBang`` and
+   ``HsImplBang``. Data constructors now always carry around their
+   strictness annotations as the user wrote them, whether from an
+   imported module or not.
+
+ghc-prim
+~~~~~~~~
+
+-  Version number XXXXX (was 0.3.1.0)
+
+haskell98
+~~~~~~~~~
+
+-  Version number XXXXX (was 2.0.0.3)
+
+haskell2010
+~~~~~~~~~~~
+
+-  Version number XXXXX (was 1.1.1.1)
+
+hoopl
+~~~~~
+
+-  Version number XXXXX (was 3.10.0.0)
+
+hpc
+~~~
+
+-  Version number XXXXX (was 0.6.0.1)
+
+integer-gmp
+~~~~~~~~~~~
+
+-  Version number XXXXX (was 0.5.1.0)
+
+old-locale
+~~~~~~~~~~
+
+-  Version number XXXXX (was 1.0.0.6)
+
+old-time
+~~~~~~~~
+
+-  Version number XXXXX (was 1.1.0.2)
+
+process
+~~~~~~~
+
+-  Version number XXXXX (was 1.2.0.0)
+
+template-haskell
+~~~~~~~~~~~~~~~~
+
+-  Version number XXXXX (was 2.9.0.0)
+
+-  The ``Lift`` type class for lifting values into Template Haskell
+   splices now has a default signature ``lift :: Data a => a -> Q Exp``,
+   which means that you do not have to provide an explicit
+   implementation of ``lift`` for types which have a ``Data`` instance.
+   To manually use this default implementation, you can use the
+   ``liftData`` function which is now exported from
+   ``Language.Haskell.TH.Syntax``.
+
+-  ``Info``'s constructors no longer have ``Fixity`` fields. A
+   ``qReifyFixity`` function was added to the ``Quasi`` type class (as
+   well as the ``reifyFixity`` function, specialized for ``Q``) to allow
+   lookup of fixity information for any given ``Name``.
+
+time
+~~~~
+
+-  Version number XXXXX (was 1.4.1)
+
+unix
+~~~~
+
+-  Version number XXXXX (was 2.7.0.0)
+
+Win32
+~~~~~
+
+-  Version number XXXXX (was 2.3.0.1)
+
+Known bugs
+----------
+
+-  TODO FIXME

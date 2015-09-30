@@ -5,8 +5,8 @@ GhcLibHcOpts       = -O
 BUILD_PROF_LIBS    = YES
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
-BUILD_DOCBOOK_HTML = NO
-BUILD_DOCBOOK_PS   = NO
-BUILD_DOCBOOK_PDF  = NO
+BUILD_SPHINX_HTML  = NO
+BUILD_SPHINX_PS    = NO
+BUILD_SPHINX_PDF   = NO
 
 GhcProfiled        = YES

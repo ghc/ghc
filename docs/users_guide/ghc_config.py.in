@@ -1,0 +1,9 @@
+extlinks = {
+    'base-ref': ('../libraries/base-@LIBRARY_base_VERSION@/%s', ''),
+    'cabal-ref': ('../libraries/Cabal-@LIBRARY_Cabal_VERSION@/%s', ''),
+    'ghc-prim-ref': ('../libraries/ghc-prim-@LIBRARY_ghc_prim_VERSION@/%s', ''),
+    'ghc-ticket': ('http://ghc.haskell.org/trac/ghc/ticket/%s', 'Trac #'),
+    'ghc-wiki': ('http://ghc.haskell.org/trac/ghc/wiki/%s', 'Trac #'),
+}
+
+version = @GhcVersion@
