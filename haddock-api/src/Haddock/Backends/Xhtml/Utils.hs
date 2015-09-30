@@ -195,7 +195,7 @@ dot = toHtml "."
 
 -- | Generate a named anchor
 namedAnchor :: String -> Html -> Html
-namedAnchor n = anchor ! [XHtml.name n]
+namedAnchor n = anchor ! [XHtml.identifier n]
 
 
 linkedAnchor :: String -> Html -> Html

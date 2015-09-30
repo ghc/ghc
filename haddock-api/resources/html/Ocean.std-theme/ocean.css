@@ -381,21 +381,16 @@ div#style-menu-holder {
 #interface h5 + div.top {
  	margin-top: 1em;
 }
-#interface p.src .link {
+#interface .src .selflink,
+#interface .src .link {
   float: right;
   color: #919191;
-  border-left: 1px solid #919191;
   background: #f0f0f0;
   padding: 0 0.5em 0.2em;
-  margin: 0 -0.5em 0 0.5em;
+  margin: 0 -0.5em 0 0;
 }
-
-#interface td.src .link {
-  float: right;
-  color: #919191;
+#interface .src .selflink {
   border-left: 1px solid #919191;
-  background: #f0f0f0;
-  padding: 0 0.5em 0.2em;
   margin: 0 -0.5em 0 0.5em;
 }
 
