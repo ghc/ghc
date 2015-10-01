@@ -996,14 +996,14 @@ Example
 
    ...fInt...fInt...fInt...
 
-Here f occurs just once, in the RHS of f1. But if we inline it there
+Here f occurs just once, in the RHS of fInt. But if we inline it there
 we'll lose the opportunity to inline at each of fInt's call sites.
 The INLINE pragma will only inline when the application is saturated
 for exactly this reason; and we don't want PreInlineUnconditionally
 to second-guess it.  A live example is Trac #3736.
     c.f. Note [Stable unfoldings and postInlineUnconditionally]
 
-Note [Top-level botomming Ids]
+Note [Top-level bottoming Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Don't inline top-level Ids that are bottoming, even if they are used just
 once, because FloatOut has gone to some trouble to extract them out.
