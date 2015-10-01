@@ -40,7 +40,7 @@ standard “packages” of warnings:
     code. The warnings that are *not* enabled by ``-Wall`` are
     ``-fwarn-incomplete-uni-patterns``,
     ``-fwarn-incomplete-record-updates``,
-    ``-fwarn-monomorphism-restriction``, ``-fwarn-auto-orphans``,
+    ``-fwarn-monomorphism-restriction``,
     ``-fwarn-implicit-prelude``, ``-fwarn-missing-local-sigs``,
     ``-fwarn-missing-exported-sigs``, ``-fwarn-missing-import-lists``
     and ``-fwarn-identities``.
@@ -563,10 +563,9 @@ command line.
 
         f x = do { _ignore <- this; _ignore <- that; return (the other) }
 
-``-fwarn-orphans, -fwarn-auto-orphans``
+``-fwarn-orphans``
     .. index::
        single: -fwarn-orphans
-       single: -fwarn-auto-orphans
        single: orphan instances, warning
        single: orphan rules, warning
 
@@ -584,10 +583,7 @@ command line.
     otherwise be of any use. See :ref:`orphan-modules` for details.
 
     The flag ``-fwarn-orphans`` warns about user-written orphan rules or
-    instances. The flag ``-fwarn-auto-orphans`` warns about
-    automatically-generated orphan rules, notably as a result of
-    specialising functions, for type classes (``Specialise``) or
-    argument values (``-fspec-constr``).
+    instances.
 
 ``-fwarn-overlapping-patterns``
     .. index::

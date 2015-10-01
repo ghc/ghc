@@ -381,12 +381,12 @@ dsRule (L loc (HsRule name rule_act vars lhs _tv_lhs rhs _fv_rhs))
               fn_name   = idName fn_id
               final_rhs = simpleOptExpr rhs''    -- De-crap it
               rule_name = snd (unLoc name)
-              rule      = mkRule this_mod False {- Not auto -} is_local
-                                 rule_name rule_act fn_name final_bndrs args
-                                 final_rhs
               arg_ids = varSetElems (exprsSomeFreeVars isId args `delVarSetList` final_bndrs)
 
         ; dflags <- getDynFlags
+        ; rule <- dsMkUserRule this_mod is_local
+                         rule_name rule_act fn_name final_bndrs args
+                         final_rhs
         ; when (wopt Opt_WarnInlineRuleShadowing dflags) $
           warnRuleShadowing rule_name rule_act fn_id arg_ids
 

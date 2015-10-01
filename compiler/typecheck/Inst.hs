@@ -441,7 +441,21 @@ newClsInst overlap_mode dfun_name tvs theta clas tys
              -- Not sure if this is really the right place to do so,
              -- but it'll do fine
        ; oflag <- getOverlapFlag overlap_mode
-       ; return (mkLocalInstance dfun oflag tvs' clas tys') }
+       ; let inst = mkLocalInstance dfun oflag tvs' clas tys'
+       ; dflags <- getDynFlags
+       ; warnIf (isOrphan (is_orphan inst) && wopt Opt_WarnOrphans dflags) (instOrphWarn inst)
+       ; return inst }
+
+instOrphWarn :: ClsInst -> SDoc
+instOrphWarn inst
+  = hang (ptext (sLit "Orphan instance:")) 2 (pprInstanceHdr inst)
+    $$ text "To avoid this"
+    $$ nest 4 (vcat possibilities)
+  where
+    possibilities =
+      text "move the instance declaration to the module of the class or of the type, or" :
+      text "wrap the type with a newtype and declare the instance on the new type." :
+      []
 
 tcExtendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
   -- Add new locally-defined instances

@@ -203,7 +203,9 @@ instanceSig ispec = tcSplitDFunTy (idType (is_dfun ispec))
 mkLocalInstance :: DFunId -> OverlapFlag
                 -> [TyVar] -> Class -> [Type]
                 -> ClsInst
--- Used for local instances, where we can safely pull on the DFunId
+-- Used for local instances, where we can safely pull on the DFunId.
+-- Consider using newClsInst instead; this will also warn if
+-- the instance is an orphan.
 mkLocalInstance dfun oflag tvs cls tys
   = ClsInst { is_flag = oflag, is_dfun = dfun
             , is_tvs = tvs

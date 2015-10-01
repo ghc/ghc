@@ -155,12 +155,12 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-fno-warn-name-shadowing"
          }
-  , flag { flagName = "-fwarn-orphans, -fwarn-auto-orphans"
+  , flag { flagName = "-fwarn-orphans"
          , flagDescription =
            "warn when the module contains :ref:`orphan instance declarations "++
            "or rewrite rules <orphan-modules>`"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-orphans, -fno-warn-auto-orphans"
+         , flagReverse = "-fno-warn-orphans"
          }
   , flag { flagName = "-fwarn-overlapping-patterns"
          , flagDescription = "warn about overlapping patterns"

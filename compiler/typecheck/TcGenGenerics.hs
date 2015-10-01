@@ -14,7 +14,6 @@ module TcGenGenerics (canDoGenerics, canDoGenerics1,
                       MetaTyCons, genGenericMetaTyCons,
                       gen_Generic_binds, get_gen1_constrained_tys) where
 
-import DynFlags
 import HsSyn
 import Type
 import Kind             ( isKind )
@@ -33,15 +32,14 @@ import BasicTypes
 import TysPrim
 import TysWiredIn
 import PrelNames
-import InstEnv
 import TcEnv
-import MkId
 import TcRnMonad
 import HscTypes
 import ErrUtils( Validity(..), andValid )
 import BuildTyCl
 import SrcLoc
 import Bag
+import Inst
 import VarSet (elemVarSet)
 import Outputable
 import FastString
@@ -113,8 +111,7 @@ genGenericMetaTyCons tc =
 -- both the tycon declarations and related instances
 metaTyConsToDerivStuff :: TyCon -> MetaTyCons -> TcM BagDerivStuff
 metaTyConsToDerivStuff tc metaDts =
-  do  dflags <- getDynFlags
-      dClas <- tcLookupClass datatypeClassName
+  do  dClas <- tcLookupClass datatypeClassName
       d_dfun_name <- newDFunName' dClas tc
       cClas <- tcLookupClass constructorClassName
       c_dfun_names <- sequence [ (conTy,) <$> newDFunName' cClas tc
@@ -129,16 +126,18 @@ metaTyConsToDerivStuff tc metaDts =
       let
         (dBinds,cBinds,sBinds) = mkBindsMetaD fix_env tc
         mk_inst clas tc dfun_name
-          = mkLocalInstance (mkDictFunId dfun_name [] [] clas tys)
-                            OverlapFlag { overlapMode   = (NoOverlap "")
-                                        , isSafeOverlap = safeLanguageOn dflags }
-                            [] clas tys
+          = newClsInst (Just (NoOverlap "")) dfun_name [] [] clas tys
           where
             tys = [mkTyConTy tc]
 
+
+      let d_metaTycon = metaD metaDts
+      d_inst <- mk_inst dClas d_metaTycon d_dfun_name
+      c_insts <- sequence [ mk_inst cClas c ds | (c, ds) <- c_dfun_names ]
+      s_insts <- mapM (mapM (\(s,ds) -> mk_inst sClas s ds)) s_dfun_names
+
+      let
         -- Datatype
-        d_metaTycon = metaD metaDts
-        d_inst   = mk_inst dClas d_metaTycon d_dfun_name
         d_binds  = InstBindings { ib_binds = dBinds
                                 , ib_tyvars = []
                                 , ib_pragmas = []
@@ -147,7 +146,6 @@ metaTyConsToDerivStuff tc metaDts =
         d_mkInst = DerivInst (InstInfo { iSpec = d_inst, iBinds = d_binds })
 
         -- Constructor
-        c_insts = [ mk_inst cClas c ds | (c, ds) <- c_dfun_names ]
         c_binds = [ InstBindings { ib_binds = c
                                  , ib_tyvars = []
                                  , ib_pragmas = []
@@ -158,7 +156,6 @@ metaTyConsToDerivStuff tc metaDts =
                    | (is,bs) <- myZip1 c_insts c_binds ]
 
         -- Selector
-        s_insts = map (map (\(s,ds) -> mk_inst sClas s ds)) s_dfun_names
         s_binds = [ [ InstBindings { ib_binds = s
                                    , ib_tyvars = []
                                    , ib_pragmas = []

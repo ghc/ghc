@@ -460,7 +460,7 @@ makeSimpleIface :: HscEnv -> Maybe ModIface -> TcGblEnv -> ModDetails
                 -> IO (ModIface,Bool)
 makeSimpleIface hsc_env maybe_old_iface tc_result details = runHsc hsc_env $ do
     safe_mode <- hscGetSafeMode tc_result
-    ioMsgMaybe $ do
+    liftIO $ do
         mkIfaceTc hsc_env (fmap mi_iface_hash maybe_old_iface) safe_mode
                   details tc_result
 
@@ -1216,7 +1216,7 @@ hscSimpleIface' tc_result mb_old_iface = do
     safe_mode <- hscGetSafeMode tc_result
     (new_iface, no_change)
         <- {-# SCC "MkFinalIface" #-}
-           ioMsgMaybe $
+           liftIO $
                mkIfaceTc hsc_env mb_old_iface safe_mode details tc_result
     -- And the answer is ...
     liftIO $ dumpIfaceStats hsc_env
@@ -1244,7 +1244,7 @@ hscNormalIface' simpl_result mb_old_iface = do
     -- until after code output
     (new_iface, no_change)
         <- {-# SCC "MkFinalIface" #-}
-           ioMsgMaybe $
+           liftIO $
                mkIface hsc_env mb_old_iface details simpl_result
 
     liftIO $ dumpIfaceStats hsc_env

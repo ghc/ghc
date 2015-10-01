@@ -13,7 +13,7 @@ lower levels it is preserved with @let@/@letrec@s).
 {-# LANGUAGE CPP #-}
 
 module DsBinds ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, dsSpec,
-                 dsHsWrapper, dsTcEvBinds, dsTcEvBinds_s, dsEvBinds
+                 dsHsWrapper, dsTcEvBinds, dsTcEvBinds_s, dsEvBinds, dsMkUserRule
   ) where
 
 #include "HsVersions.h"
@@ -69,7 +69,7 @@ import DynFlags
 import FastString
 import Util
 import MonadUtils
-import Control.Monad(liftM)
+import Control.Monad(liftM,when)
 import Fingerprint(Fingerprint(..), fingerprintString)
 
 {-
@@ -450,7 +450,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              spec_id   = mkLocalId spec_name spec_ty
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
-             rule =  mkRule this_mod False {- Not auto -} is_local_id
+       ; rule <- dsMkUserRule this_mod is_local_id
                         (mkFastString ("SPEC " ++ showPpr dflags poly_name))
                         rule_act poly_name
                         rule_bndrs args
@@ -503,6 +503,17 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              | otherwise   = spec_prag_act                   -- Specified by user
 
 
+dsMkUserRule :: Module -> Bool -> RuleName -> Activation
+       -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> DsM CoreRule
+dsMkUserRule this_mod is_local name act fn bndrs args rhs = do
+    let rule = mkRule this_mod False is_local name act fn bndrs args rhs
+    dflags <- getDynFlags
+    when (isOrphan (ru_orphan rule) && wopt Opt_WarnOrphans dflags) $
+        warnDs (ruleOrphWarn rule)
+    return rule
+
+ruleOrphWarn :: CoreRule -> SDoc
+ruleOrphWarn rule = ptext (sLit "Orphan rule:") <+> ppr rule
 
 {- Note [SPECIALISE on INLINE functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
