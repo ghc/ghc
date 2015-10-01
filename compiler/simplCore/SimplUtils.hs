@@ -1039,7 +1039,7 @@ preInlineUnconditionally dflags env top_lvl bndr rhs
     act = idInlineActivation bndr
     try_once in_lam int_cxt     -- There's one textual occurrence
         | not in_lam = isNotTopLevel top_lvl || early_phase
-        | otherwise  = int_cxt && canInlineInLam rhs
+        | otherwise  = (int_cxt && canInlineInLam rhs) || isSingleUsed (idDemandInfo bndr)
 
 -- Be very careful before inlining inside a lambda, because (a) we must not
 -- invalidate occurrence information, and (b) we want to avoid pushing a

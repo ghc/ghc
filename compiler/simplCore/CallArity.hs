@@ -510,7 +510,7 @@ callArityAnal arity int (Let bind e)
 -- Which bindings should we look at?
 -- See Note [Which variables are interesting]
 isInteresting :: Var -> Bool
-isInteresting v = 0 < length (typeArity (idType v))
+isInteresting v = True -- 0 < length (typeArity (idType v))
 
 interestingBinds :: CoreBind -> [Var]
 interestingBinds = filter isInteresting . bindersOf
@@ -531,7 +531,7 @@ callArityBind boring_vars ae_body int (NonRec v rhs)
   | otherwise
   = -- pprTrace "callArityBind:NonRec"
     --          (vcat [ppr v, ppr ae_body, ppr int, ppr ae_rhs, ppr safe_arity])
-    (final_ae, NonRec v' rhs')
+    (final_ae, NonRec v'' rhs')
   where
     is_thunk = not (exprIsHNF rhs)
     -- If v is boring, we will not find it in ae_body, but always assume (0, False)
@@ -561,6 +561,9 @@ callArityBind boring_vars ae_body int (NonRec v rhs)
     final_ae = addCrossCoCalls called_by_v called_with_v $ ae_rhs' `lubRes` resDel v ae_body
 
     v' = v `setIdCallArity` trimmed_arity
+
+    v'' | called_once = v' `setIdDemandInfo` oneifyDmd (idDemandInfo v')
+        | otherwise   = v'
 
 
 -- Recursive let. See Note [Recursion and fixpointing]
