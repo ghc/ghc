@@ -224,7 +224,7 @@ compileOne' m_tc_result mHscMessage
                        do (iface, _changed, details) <- hscSimpleIface hsc_env tc_result mb_old_hash
                           return (HomeModInfo{ hm_details  = details,
                                                hm_iface    = iface,
-                                               hm_linkable = maybe_old_linkable })
+                                               hm_linkable = Nothing })
                    _ -> do guts0 <- hscDesugar hsc_env summary tc_result
                            guts <- hscSimplify hsc_env guts0
                            (iface, _changed, details, cgguts) <- hscNormalIface hsc_env guts mb_old_hash
@@ -255,7 +255,7 @@ compileOne' m_tc_result mHscMessage
                       when (gopt Opt_WriteInterface dflags) $
                          hscWriteIface dflags iface changed summary
                       let linkable = if isHsBoot src_flavour
-                                     then maybe_old_linkable
+                                     then Nothing
                                      else Just (LM (ms_hs_date summary) this_mod [])
                       return (HomeModInfo{ hm_details  = details,
                                            hm_iface    = iface,
@@ -273,7 +273,7 @@ compileOne' m_tc_result mHscMessage
                           return (HomeModInfo{
                                     hm_details  = details,
                                     hm_iface    = iface,
-                                    hm_linkable = maybe_old_linkable })
+                                    hm_linkable = Nothing })
 
                    HsSrcFile ->
                         do guts0 <- hscDesugar hsc_env summary tc_result
