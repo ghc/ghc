@@ -65,7 +65,7 @@ module TcType (
   eqType, eqTypes, eqPred, cmpType, cmpTypes, cmpPred, eqTypeX,
   tcEqType, tcEqKind,
   isSigmaTy, isRhoTy, isOverloadedTy,
-  isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
+  isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarExposed, isTyVarUnderDatatype,
@@ -1439,6 +1439,11 @@ isUnitTy       = is_tc unitTyConKey
 isCharTy       = is_tc charTyConKey
 isAnyTy        = is_tc anyTyConKey
 
+-- | Does a type represent a floating-point number?
+isFloatingTy :: Type -> Bool
+isFloatingTy ty = isFloatTy ty || isDoubleTy ty
+
+-- | Is a type 'String'?
 isStringTy :: Type -> Bool
 isStringTy ty
   = case tcSplitTyConApp_maybe ty of

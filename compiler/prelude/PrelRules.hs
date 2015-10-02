@@ -241,19 +241,19 @@ primOpRules nm CharGeOp   = mkRelOpRule nm (>=) [ boundsCmp Ge ]
 primOpRules nm CharLeOp   = mkRelOpRule nm (<=) [ boundsCmp Le ]
 primOpRules nm CharLtOp   = mkRelOpRule nm (<)  [ boundsCmp Lt ]
 
-primOpRules nm FloatGtOp  = mkFloatingRelOpRule nm (>)  []
-primOpRules nm FloatGeOp  = mkFloatingRelOpRule nm (>=) []
-primOpRules nm FloatLeOp  = mkFloatingRelOpRule nm (<=) []
-primOpRules nm FloatLtOp  = mkFloatingRelOpRule nm (<)  []
-primOpRules nm FloatEqOp  = mkFloatingRelOpRule nm (==) [ litEq True ]
-primOpRules nm FloatNeOp  = mkFloatingRelOpRule nm (/=) [ litEq False ]
+primOpRules nm FloatGtOp  = mkFloatingRelOpRule nm (>)
+primOpRules nm FloatGeOp  = mkFloatingRelOpRule nm (>=)
+primOpRules nm FloatLeOp  = mkFloatingRelOpRule nm (<=)
+primOpRules nm FloatLtOp  = mkFloatingRelOpRule nm (<)
+primOpRules nm FloatEqOp  = mkFloatingRelOpRule nm (==)
+primOpRules nm FloatNeOp  = mkFloatingRelOpRule nm (/=)
 
-primOpRules nm DoubleGtOp = mkFloatingRelOpRule nm (>)  []
-primOpRules nm DoubleGeOp = mkFloatingRelOpRule nm (>=) []
-primOpRules nm DoubleLeOp = mkFloatingRelOpRule nm (<=) []
-primOpRules nm DoubleLtOp = mkFloatingRelOpRule nm (<)  []
-primOpRules nm DoubleEqOp = mkFloatingRelOpRule nm (==) [ litEq True ]
-primOpRules nm DoubleNeOp = mkFloatingRelOpRule nm (/=) [ litEq False ]
+primOpRules nm DoubleGtOp = mkFloatingRelOpRule nm (>)
+primOpRules nm DoubleGeOp = mkFloatingRelOpRule nm (>=)
+primOpRules nm DoubleLeOp = mkFloatingRelOpRule nm (<=)
+primOpRules nm DoubleLtOp = mkFloatingRelOpRule nm (<)
+primOpRules nm DoubleEqOp = mkFloatingRelOpRule nm (==)
+primOpRules nm DoubleNeOp = mkFloatingRelOpRule nm (/=)
 
 primOpRules nm WordGtOp   = mkRelOpRule nm (>)  [ boundsCmp Gt ]
 primOpRules nm WordGeOp   = mkRelOpRule nm (>=) [ boundsCmp Ge ]
@@ -284,29 +284,49 @@ mkPrimOpRule nm arity rules = Just $ mkBasicRule nm arity (msum rules)
 mkRelOpRule :: Name -> (forall a . Ord a => a -> a -> Bool)
             -> [RuleM CoreExpr] -> Maybe CoreRule
 mkRelOpRule nm cmp extra
-  = mkPrimOpRule nm 2 $ rules ++ extra
+  = mkPrimOpRule nm 2 $
+    binaryCmpLit cmp : equal_rule : extra
   where
-    rules = [ binaryCmpLit cmp
-            , do equalArgs
-              -- x `cmp` x does not depend on x, so
-              -- compute it for the arbitrary value 'True'
-              -- and use that result
-                 dflags <- getDynFlags
-                 return (if cmp True True
-                         then trueValInt  dflags
-                         else falseValInt dflags) ]
+        -- x `cmp` x does not depend on x, so
+        -- compute it for the arbitrary value 'True'
+        -- and use that result
+    equal_rule = do { equalArgs
+                    ; dflags <- getDynFlags
+                    ; return (if cmp True True
+                              then trueValInt  dflags
+                              else falseValInt dflags) }
 
--- Note [Rules for floating-point comparisons]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- We need different rules for floating-point values because for floats
--- it is not true that x = x. The special case when this does not occur
--- are NaNs.
+{- Note [Rules for floating-point comparisons]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We need different rules for floating-point values because for floats
+it is not true that x = x (for NaNs); so we do not want the equal_rule
+rule that mkRelOpRule uses.
+
+Note also that, in the case of equality/inequality, we do /not/
+want to switch to a case-expression.  For example, we do not want
+to convert
+   case (eqFloat# x 3.8#) of
+     True -> this
+     False -> that
+to
+  case x of
+    3.8#::Float# -> this
+    _            -> that
+See Trac #9238.  Reason: comparing floating-point values for equality
+delicate, and we don't want to implement that delicacy in the code for
+case expressions.  So we make it an invariant of Core that a case
+expression never scrutinises a Float# or Double#.
+
+This transformation is what the litEq rule does;
+see Note [The litEq rule: converting equality to case].
+So we /refrain/ from using litEq for mkFloatingRelOpRule.
+-}
 
 mkFloatingRelOpRule :: Name -> (forall a . Ord a => a -> a -> Bool)
-                    -> [RuleM CoreExpr] -> Maybe CoreRule
-mkFloatingRelOpRule nm cmp extra -- See Note [Rules for floating-point comparisons]
-  = mkPrimOpRule nm 2 $ binaryCmpLit cmp : extra
+                    -> Maybe CoreRule
+-- See Note [Rules for floating-point comparisons]
+mkFloatingRelOpRule nm cmp
+  = mkPrimOpRule nm 2 [binaryCmpLit cmp]
 
 -- common constants
 zeroi, onei, zerow, onew :: DynFlags -> Literal
@@ -428,24 +448,27 @@ doubleOp2 op dflags (MachDouble f1) (MachDouble f2)
 doubleOp2 _ _ _ _ = Nothing
 
 --------------------------
--- This stuff turns
---      n ==# 3#
--- into
---      case n of
---        3# -> True
---        m  -> False
---
--- This is a Good Thing, because it allows case-of case things
--- to happen, and case-default absorption to happen.  For
--- example:
---
---      if (n ==# 3#) || (n ==# 4#) then e1 else e2
--- will transform to
---      case n of
---        3# -> e1
---        4# -> e1
---        m  -> e2
--- (modulo the usual precautions to avoid duplicating e1)
+{- Note [The litEq rule: converting equality to case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This stuff turns
+     n ==# 3#
+into
+     case n of
+       3# -> True
+       m  -> False
+
+This is a Good Thing, because it allows case-of case things
+to happen, and case-default absorption to happen.  For
+example:
+
+     if (n ==# 3#) || (n ==# 4#) then e1 else e2
+will transform to
+     case n of
+       3# -> e1
+       4# -> e1
+       m  -> e2
+(modulo the usual precautions to avoid duplicating e1)
+-}
 
 litEq :: Bool  -- True <=> equality, False <=> inequality
       -> RuleM CoreExpr
