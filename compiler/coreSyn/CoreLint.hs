@@ -31,6 +31,7 @@ import Literal
 import DataCon
 import TysWiredIn
 import TysPrim
+import TcType ( isFloatingTy )
 import Var
 import VarEnv
 import VarSet
@@ -615,6 +616,15 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
      ; alt_ty   <- lintInTy alt_ty
      ; var_ty   <- lintInTy (idType var)
 
+     -- See Note [Rules for floating-point comparisons] in PrelRules
+     ; let isLitPat (LitAlt _, _ , _) = True
+           isLitPat _                 = False
+     ; checkL (not $ isFloatingTy scrut_ty && any isLitPat alts)
+         (ptext (sLit $ "Lint warning: Scrutinising floating-point " ++
+                        "expression with literal pattern in case " ++
+                        "analysis (see Trac #9238).")
+          $$ text "scrut" <+> ppr scrut)
+
      ; case tyConAppTyCon_maybe (idType var) of
          Just tycon
               | debugIsOn &&
@@ -665,6 +675,26 @@ instantiations between kind coercions and type coercions. We lint the
 kind coercions and produce the following substitution which is to be
 applied in the type variables:
   k_ag   ~~>   * -> *
+
+Note [No alternatives lint check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Case expressions with no alternatives are odd beasts, and worth looking at
+in the linter (cf Trac #10180).  We check two things:
+
+* exprIsHNF is false: certainly, it would be terribly wrong if the
+  scrutinee was already in head normal form.
+
+* exprIsBottom is true: we should be able to see why GHC believes the
+  scrutinee is diverging for sure.
+
+In principle, the first check is redundant: exprIsBottom == True will
+always imply exprIsHNF == False.  But the first check is reliable: If
+exprIsHNF == True, then there definitely is a problem (exprIsHNF errs
+on the right side).  If the second check triggers then it may be the
+case that the compiler got smarter elsewhere, and the empty case is
+correct, but that exprIsBottom is unable to see it. In particular, the
+empty-type check in exprIsBottom is an approximation. Therefore, this
+check is not fully reliable, and we keep both around.
 
 ************************************************************************
 *                                                                      *
