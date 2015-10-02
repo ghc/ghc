@@ -150,8 +150,14 @@ traceShowId a = trace (show a) a
 
 {-|
 Like 'trace' but returning unit in an arbitrary 'Applicative' context. Allows
-for convenient use in do-notation. Note that the application of 'trace' is not
-an action in the 'Applicative' context, as 'traceIO' is in the 'IO' type.
+for convenient use in do-notation.
+
+Note that the application of 'traceM' is not an action in the 'Applicative'
+context, as 'traceIO' is in the 'IO' type. While the fresh bindings in the
+following example will force the 'traceM' expressions to be reduced every time
+the @do@-block is executed, @traceM "not crashed"@ would only be reduced once,
+and the message would only be printed once.  If your monad is in 'MonadIO',
+@liftIO . traceIO@ may be a better option.
 
 > ... = do
 >   x <- ...
