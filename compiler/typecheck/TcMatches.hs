@@ -890,6 +890,8 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
       ; let fun_ty = mkFunTys pat_tys body_ty
 
        -- NB. do the <$>,<*> operators first, we don't want type errors here
+       --     i.e. goOps before goArgs
+       -- See Note [Treat rebindable syntax first]
       ; let (ops, args) = unzip pairs
       ; ops' <- goOps fun_ty (zip3 ops (ts ++ [rhs_ty]) exp_tys)
 
