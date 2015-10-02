@@ -1,13 +1,11 @@
 
-T10715.hs:9:13: error:
+T10715.hs:9:13:
     Couldn't match representation of type ‘a’ with that of ‘X a’
-    ‘a’ is a rigid type variable bound by
-        the type signature for:
-          doCoerce :: Coercible a (X a) => a -> X a
-        at T10715.hs:9:13
+      ‘a’ is a rigid type variable bound by
+          the type signature for doCoerce :: Coercible a (X a) => a -> X a
+          at T10715.hs:9:13
     Inaccessible code in
-      the type signature for:
-        doCoerce :: Coercible a (X a) => a -> X a
+      the type signature for doCoerce :: Coercible a (X a) => a -> X a
     In the ambiguity check for the type signature for ‘doCoerce’:
       doCoerce :: forall a. Coercible a (X a) => a -> X a
     To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
