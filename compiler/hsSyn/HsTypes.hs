@@ -35,8 +35,10 @@ module HsTypes (
 
         ConDeclField(..), LConDeclField, pprConDeclFields,
 
-        FieldOcc, FieldOcc'(..), LFieldOcc, LFieldOcc', mkFieldOcc,
-        rdrNameFieldOcc, selectorFieldOcc,
+        FieldOcc(..), LFieldOcc, mkFieldOcc,
+        AmbiguousFieldOcc(..), mkAmbiguousFieldOcc,
+        rdrNameAmbiguousFieldOcc, selectorAmbiguousFieldOcc,
+        unambiguousFieldOcc, ambiguousFieldOcc,
 
         HsWildCardInfo(..), mkAnonWildCardTy, mkNamedWildCardTy,
         wildCardName, sameWildCard, sameNamedWildCard,
@@ -66,6 +68,7 @@ import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
 import PlaceHolder ( PostTc,PostRn,DataId,PlaceHolder(..) )
 
+import Id( Id )
 import Name( Name )
 import RdrName( RdrName )
 import DataCon( HsSrcBang(..), HsImplBang(..),
@@ -557,29 +560,53 @@ data ConDeclField name  -- Record fields have Haddoc docs on them
 deriving instance (DataId name) => Data (ConDeclField name)
 
 
-type LFieldOcc' id name = Located (FieldOcc' id name)
 type LFieldOcc name = Located (FieldOcc name)
-type FieldOcc name = FieldOcc' name name
 
 -- | Represents an *occurrence* of an unambiguous field.  We store
 -- both the 'RdrName' the user originally wrote, and after the
 -- renamer, the selector function.
-data FieldOcc' id name = FieldOcc RdrName (PostRn id name)
+data FieldOcc name = FieldOcc { rdrNameFieldOcc  :: RdrName
+                              , selectorFieldOcc :: PostRn name name
+                              }
   deriving Typeable
-deriving instance (Data name, Data id, Data (PostRn id name)) => Data (FieldOcc' id name)
+deriving instance (Data name, Data (PostRn name name)) => Data (FieldOcc name)
 
-instance Outputable (FieldOcc' id name) where
+instance Outputable (FieldOcc name) where
   ppr = ppr . rdrNameFieldOcc
 
-mkFieldOcc :: RdrName -> FieldOcc' RdrName name
+mkFieldOcc :: RdrName -> FieldOcc RdrName
 mkFieldOcc rdr = FieldOcc rdr PlaceHolder
 
-rdrNameFieldOcc :: FieldOcc' id name -> RdrName
-rdrNameFieldOcc (FieldOcc rdr _) = rdr
 
-selectorFieldOcc :: FieldOcc' id name -> PostRn id name
-selectorFieldOcc (FieldOcc _ sel) = sel
+data AmbiguousFieldOcc name
+  = Unambiguous RdrName (PostRn name name)
+  | Ambiguous   RdrName (PostTc name name)
+  deriving (Typeable)
+deriving instance ( Data name
+                  , Data (PostRn name name)
+                  , Data (PostTc name name))
+                  => Data (AmbiguousFieldOcc name)
 
+instance Outputable (AmbiguousFieldOcc name) where
+  ppr = ppr . rdrNameAmbiguousFieldOcc
+
+mkAmbiguousFieldOcc :: RdrName -> AmbiguousFieldOcc RdrName
+mkAmbiguousFieldOcc rdr = Unambiguous rdr PlaceHolder
+
+rdrNameAmbiguousFieldOcc :: AmbiguousFieldOcc name -> RdrName
+rdrNameAmbiguousFieldOcc (Unambiguous rdr _) = rdr
+rdrNameAmbiguousFieldOcc (Ambiguous   rdr _) = rdr
+
+selectorAmbiguousFieldOcc :: AmbiguousFieldOcc Id -> Id
+selectorAmbiguousFieldOcc (Unambiguous _ sel) = sel
+selectorAmbiguousFieldOcc (Ambiguous   _ sel) = sel
+
+unambiguousFieldOcc :: AmbiguousFieldOcc Id -> FieldOcc Id
+unambiguousFieldOcc (Unambiguous rdr sel) = FieldOcc rdr sel
+unambiguousFieldOcc (Ambiguous   rdr sel) = FieldOcc rdr sel
+
+ambiguousFieldOcc :: FieldOcc Id -> AmbiguousFieldOcc Id
+ambiguousFieldOcc (FieldOcc rdr sel) = Unambiguous rdr sel
 
 {-
 Note [ConDeclField names]

@@ -103,7 +103,6 @@ type DataId id =
   , Data (PostRn id Name)
   , Data (PostRn id [Name])
 --  , Data (PostRn id [id])
-  , Data (PostRn id (UpdField id))
   , Data (PostRn id id)
   , Data (PostTc id Type)
   , Data (PostTc id Coercion)
@@ -111,14 +110,3 @@ type DataId id =
   , Data (PostTc id [Type])
   , Data (PostTc id [DataCon])
   )
-
-
-
--- Here because this depends on PostTc, but needs to appear in DataId
-data UpdField id = Unambiguous id
-                 | Ambiguous (PostTc id id)
-deriving instance (Data id, Data (PostTc id id)) => Data (UpdField id)
-
-fromUpdField :: UpdField Id -> Id
-fromUpdField (Unambiguous id) = id
-fromUpdField (Ambiguous   id) = id

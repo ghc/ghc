@@ -708,10 +708,10 @@ cvtl e = wrapL (cvt e)
     cvt (SigE e t)       = do { e' <- cvtl e; t' <- cvtType t
                               ; return $ ExprWithTySig e' t' PlaceHolder }
     cvt (RecConE c flds) = do { c' <- cNameL c
-                              ; flds' <- mapM cvtFld flds
+                              ; flds' <- mapM (cvtFld mkFieldOcc) flds
                               ; return $ RecordCon c' noPostTcExpr (HsRecFields flds' Nothing)}
     cvt (RecUpdE e flds) = do { e' <- cvtl e
-                              ; flds' <- mapM cvtFld flds
+                              ; flds' <- mapM (cvtFld mkAmbiguousFieldOcc) flds
                               ; return $ RecordUpd e' flds'
                                           PlaceHolder PlaceHolder PlaceHolder }
     cvt (StaticE e)      = fmap HsStatic $ cvtl e
@@ -732,10 +732,10 @@ and the above expression would be reassociated to
 which we don't want.
 -}
 
-cvtFld :: (TH.Name, TH.Exp) -> CvtM (LHsRecField' RdrName name (LHsExpr RdrName))
-cvtFld (v,e)
+cvtFld :: (RdrName -> t) -> (TH.Name, TH.Exp) -> CvtM (LHsRecField' t (LHsExpr RdrName))
+cvtFld f (v,e)
   = do  { v' <- vNameL v; e' <- cvtl e
-        ; return (noLoc $ HsRecField { hsRecFieldLbl = fmap mkFieldOcc v'
+        ; return (noLoc $ HsRecField { hsRecFieldLbl = fmap f v'
                                      , hsRecFieldArg = e'
                                      , hsRecPun      = False}) }
 

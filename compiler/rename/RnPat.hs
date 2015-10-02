@@ -667,10 +667,11 @@ rnHsRecUpdFields flds
     doc = ptext (sLit "constructor field name")
 
     rn_fld :: Bool -> Bool -> LHsRecUpdField RdrName -> RnM (LHsRecUpdField Name, FreeVars)
-    rn_fld pun_ok overload_ok (L l (HsRecField { hsRecFieldLbl = L loc (FieldOcc lbl _)
+    rn_fld pun_ok overload_ok (L l (HsRecField { hsRecFieldLbl = L loc f
                                                , hsRecFieldArg = arg
-                                              , hsRecPun      = pun }))
-      = do { sel <- setSrcSpan loc $
+                                               , hsRecPun      = pun }))
+      = do { let lbl = rdrNameAmbiguousFieldOcc f
+           ; sel <- setSrcSpan loc $
                       -- Defer renaming of overloaded fields to the typechecker
                       -- See Note [Disambiguating record updates] in TcExpr
                       if overload_ok
@@ -689,10 +690,11 @@ rnHsRecUpdFields flds
            ; let fvs' = case sel of
                           Left sel_name -> fvs `addOneFV` sel_name
                           Right _       -> fvs
+                 lbl' = case sel of
+                          Left sel_name -> L loc (Unambiguous lbl sel_name)
+                          Right _       -> L loc (Ambiguous   lbl PlaceHolder)
 
-           ; return (L l (HsRecField { hsRecFieldLbl = case sel of
-                                                               Left sel_name -> L loc (FieldOcc lbl (Unambiguous sel_name))
-                                                               Right _       -> L loc (FieldOcc lbl (Ambiguous PlaceHolder))
+           ; return (L l (HsRecField { hsRecFieldLbl = lbl'
                                      , hsRecFieldArg = arg''
                                      , hsRecPun      = pun }), fvs') }
 
@@ -700,15 +702,18 @@ rnHsRecUpdFields flds
         -- Each list represents a RdrName that occurred more than once
         -- (the list contains all occurrences)
         -- Each list in dup_fields is non-empty
-    (_, dup_flds) = removeDups compare (getFieldLbls flds)
+    (_, dup_flds) = removeDups compare (getFieldUpdLbls flds)
 
 
 
 getFieldIds :: [LHsRecField Name arg] -> [Name]
 getFieldIds flds = map (unLoc . hsRecFieldSel . unLoc) flds
 
-getFieldLbls :: [LHsRecField' id name arg] -> [RdrName]
+getFieldLbls :: [LHsRecField id arg] -> [RdrName]
 getFieldLbls flds = map (rdrNameFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds
+
+getFieldUpdLbls :: [LHsRecUpdField id] -> [RdrName]
+getFieldUpdLbls flds = map (rdrNameAmbiguousFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds
 
 needFlagDotDot :: HsRecFieldContext -> SDoc
 needFlagDotDot ctxt = vcat [ptext (sLit "Illegal `..' in record") <+> pprRFC ctxt,

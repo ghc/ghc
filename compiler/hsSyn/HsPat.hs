@@ -19,11 +19,11 @@ module HsPat (
 
         HsConDetails(..),
         HsConPatDetails, hsConPatArgs,
-        HsRecFields(..), HsRecField, HsRecField'(..), LHsRecField, LHsRecField',
-        HsRecUpdField, LHsRecUpdField, UpdField(..),
+        HsRecFields(..), HsRecField'(..), LHsRecField',
+        HsRecField, LHsRecField,
+        HsRecUpdField, LHsRecUpdField,
         hsRecFields, hsRecFieldSel, hsRecFieldId,
-        -- hsRecUpdFieldsUnambiguous,
-        hsRecUpdFieldId, hsRecUpdFieldOcc,
+        hsRecUpdFieldId, hsRecUpdFieldOcc, hsRecUpdFieldRdr,
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
@@ -47,6 +47,7 @@ import BasicTypes
 import PprCore          ( {- instance OutputableBndr TyVar -} )
 import TysWiredIn
 import Var
+import RdrName ( RdrName )
 import ConLike
 import DataCon
 import TyCon
@@ -255,23 +256,22 @@ deriving instance (DataId id, Data arg) => Data (HsRecFields id arg)
 --                     the first 'n' being the user-written ones
 --                     and the remainder being 'filled in' implicitly
 
-type LHsRecField id arg = Located (HsRecField id arg)
+type LHsRecField' id arg = Located (HsRecField' id arg)
+type LHsRecField  id arg = Located (HsRecField  id arg)
+type LHsRecUpdField id   = Located (HsRecUpdField id)
+
+type HsRecField    id arg = HsRecField' (FieldOcc id) arg
+type HsRecUpdField id     = HsRecField' (AmbiguousFieldOcc id) (LHsExpr id)
 
 -- |  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual',
 --
 -- For details on above see note [Api annotations] in ApiAnnotation
-type HsRecField id arg = HsRecField' id id arg
-type LHsRecField' id name arg = Located (HsRecField' id name arg)
-
-data HsRecField' id name arg = HsRecField {
-        hsRecFieldLbl :: LFieldOcc' id name,
+data HsRecField' id arg = HsRecField {
+        hsRecFieldLbl :: Located id,
         hsRecFieldArg :: arg,           -- ^ Filled in by renamer when punning
         hsRecPun      :: Bool           -- ^ Note [Punning]
-  } deriving (Typeable)
-deriving instance (Data id, Data name, Data (PostRn id name), Data arg) => Data (HsRecField' id name arg)
+  } deriving (Data, Typeable)
 
-type LHsRecUpdField id = Located (HsRecUpdField id)
-type HsRecUpdField  id = HsRecField' id (UpdField id) (LHsExpr id)
 
 -- Note [Punning]
 -- ~~~~~~~~~~~~~~
@@ -321,29 +321,20 @@ type HsRecUpdField  id = HsRecField' id (UpdField id) (LHsExpr id)
 hsRecFields :: HsRecFields id arg -> [PostRn id id]
 hsRecFields rbinds = map (unLoc . hsRecFieldSel . unLoc) (rec_flds rbinds)
 
-hsRecFieldSel :: HsRecField' id name arg -> Located (PostRn id name)
+hsRecFieldSel :: HsRecField name arg -> Located (PostRn name name)
 hsRecFieldSel = fmap selectorFieldOcc . hsRecFieldLbl
 
 hsRecFieldId :: HsRecField Id arg -> Located Id
 hsRecFieldId = hsRecFieldSel
 
-hsRecUpdFieldId :: HsRecUpdField Id -> Located Id
+hsRecUpdFieldRdr :: HsRecUpdField id -> Located RdrName
+hsRecUpdFieldRdr = fmap rdrNameAmbiguousFieldOcc . hsRecFieldLbl
+
+hsRecUpdFieldId :: HsRecField' (AmbiguousFieldOcc Id) arg -> Located Id
 hsRecUpdFieldId = fmap selectorFieldOcc . hsRecUpdFieldOcc
 
-hsRecUpdFieldOcc :: HsRecUpdField Id -> LFieldOcc Id
-hsRecUpdFieldOcc x = case hsRecFieldSel x of
-                      L l (Unambiguous id) -> L l (FieldOcc rdr id)
-                      L l (Ambiguous   id) -> L l (FieldOcc rdr id)
-  where
-    rdr = rdrNameFieldOcc (unLoc (hsRecFieldLbl x))
-
-{-
-hsRecUpdFieldsUnambiguous :: PostRn id [id] ~ [id] =>
-                             [LHsRecUpdField id] -> [(FieldLabelString, id)]
-hsRecUpdFieldsUnambiguous = map $ \ (L _ x) -> case hsRecFieldSel x of
-    Unambiguous sel_name -> (occNameFS $ rdrNameOcc $ unLoc $ hsRecUpdFieldLbl x, sel_name)
-    Ambiguous _          -> error "hsRecUpdFieldsUnambigous"
--}
+hsRecUpdFieldOcc :: HsRecField' (AmbiguousFieldOcc Id) arg -> LFieldOcc Id
+hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hsRecFieldLbl
 
 
 {-
@@ -432,8 +423,8 @@ instance (Outputable arg)
         where
           dotdot = ptext (sLit "..") <+> ifPprDebug (ppr (drop n flds))
 
-instance (Outputable arg)
-      => Outputable (HsRecField' id name arg) where
+instance (Outputable id, Outputable arg)
+      => Outputable (HsRecField' id arg) where
   ppr (HsRecField { hsRecFieldLbl = f, hsRecFieldArg = arg,
                     hsRecPun = pun })
     = ppr f <+> (ppUnless pun $ equals <+> ppr arg)
