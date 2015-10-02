@@ -458,8 +458,9 @@ gHC_PARR' = mkBaseModule (fsLit "GHC.PArr")
 gHC_SRCLOC :: Module
 gHC_SRCLOC = mkBaseModule (fsLit "GHC.SrcLoc")
 
-gHC_STACK :: Module
+gHC_STACK, gHC_STACK_TYPES :: Module
 gHC_STACK = mkBaseModule (fsLit "GHC.Stack")
+gHC_STACK_TYPES = mkBaseModule (fsLit "GHC.Stack.Types")
 
 gHC_STATICPTR :: Module
 gHC_STATICPTR = mkBaseModule (fsLit "GHC.StaticPtr")
@@ -1178,11 +1179,11 @@ knownSymbolClassName  = clsQual gHC_TYPELITS (fsLit "KnownSymbol") knownSymbolCl
 -- Source Locations
 callStackDataConName, callStackTyConName, srcLocDataConName :: Name
 callStackDataConName
-  = dcQual gHC_TYPES  (fsLit "CallStack") callStackDataConKey
+  = dcQual gHC_STACK_TYPES  (fsLit "CallStack") callStackDataConKey
 callStackTyConName
-  = tcQual  gHC_TYPES (fsLit "CallStack") callStackTyConKey
+  = tcQual gHC_STACK_TYPES  (fsLit "CallStack") callStackTyConKey
 srcLocDataConName
-  = dcQual gHC_TYPES (fsLit "SrcLoc")   srcLocDataConKey
+  = dcQual gHC_STACK_TYPES  (fsLit "SrcLoc")    srcLocDataConKey
 
 -- plugins
 pLUGINS :: Module

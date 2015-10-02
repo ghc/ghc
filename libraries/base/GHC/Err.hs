@@ -23,7 +23,8 @@
 
 module GHC.Err( absentErr, error, undefined ) where
 import GHC.CString ()
-import GHC.Types
+import GHC.Types (Char)
+import GHC.Stack.Types
 import GHC.Prim
 import GHC.Integer ()   -- Make sure Integer is compiled first
                         -- because GHC depends on it in a wired-in way
