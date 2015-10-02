@@ -2,8 +2,10 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
   class C1 a where
     meth1 :: a -> a
+    {-# MINIMAL meth1 #-}
   class C3 a where
     meth3 :: a -> Syn1 a
+    {-# MINIMAL meth3 #-}
   type Syn1 a = [a]
 COERCION AXIOMS
   axiom Roles4.NTCo:C1 :: C1 a = a -> a

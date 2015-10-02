@@ -22,10 +22,6 @@ module MkCore (
         -- * Constructing equality evidence boxes
         mkEqBox,
 
-        -- * Constructing general big tuples
-        -- $big_tuples
-        mkChunkified,
-
         -- * Constructing small tuples
         mkCoreVarTup, mkCoreVarTupTy, mkCoreTup,
 
@@ -42,6 +38,9 @@ module MkCore (
         -- * Constructing list expressions
         mkNilExpr, mkConsExpr, mkListExpr,
         mkFoldrExpr, mkBuildExpr,
+
+        -- * Constructing Maybe expressions
+        mkNothingExpr, mkJustExpr,
 
         -- * Error Ids
         mkRuntimeErrorApp, mkImpossibleExpr, errorIds,
@@ -64,6 +63,7 @@ import HscTypes
 import TysWiredIn
 import PrelNames
 
+import HsUtils          ( mkChunkified, chunkify )
 import TcType           ( mkSigmaTy )
 import Type
 import Coercion
@@ -79,7 +79,6 @@ import UniqSupply
 import BasicTypes
 import Util
 import Pair
-import Constants
 import DynFlags
 
 import Data.Char        ( ord )
@@ -274,6 +273,7 @@ mkCharExpr c = mkConApp charDataCon [mkCharLit c]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @String@
 mkStringExpr   :: MonadThings m => String     -> m CoreExpr  -- Result :: String
+
 -- | Create a 'CoreExpr' which will evaluate to a string morally equivalent to the given @FastString@
 mkStringExprFS :: MonadThings m => FastString -> m CoreExpr  -- Result :: String
 
@@ -314,47 +314,6 @@ mkEqBox co = ASSERT2( typeKind ty2 `eqKind` k, ppr co $$ ppr ty1 $$ ppr ty2 $$ p
 *                                                                      *
 ************************************************************************
 -}
-
--- $big_tuples
--- #big_tuples#
---
--- GHCs built in tuples can only go up to 'mAX_TUPLE_SIZE' in arity, but
--- we might concievably want to build such a massive tuple as part of the
--- output of a desugaring stage (notably that for list comprehensions).
---
--- We call tuples above this size \"big tuples\", and emulate them by
--- creating and pattern matching on >nested< tuples that are expressible
--- by GHC.
---
--- Nesting policy: it's better to have a 2-tuple of 10-tuples (3 objects)
--- than a 10-tuple of 2-tuples (11 objects), so we want the leaves of any
--- construction to be big.
---
--- If you just use the 'mkBigCoreTup', 'mkBigCoreVarTupTy', 'mkTupleSelector'
--- and 'mkTupleCase' functions to do all your work with tuples you should be
--- fine, and not have to worry about the arity limitation at all.
-
--- | Lifts a \"small\" constructor into a \"big\" constructor by recursive decompositon
-mkChunkified :: ([a] -> a)      -- ^ \"Small\" constructor function, of maximum input arity 'mAX_TUPLE_SIZE'
-             -> [a]             -- ^ Possible \"big\" list of things to construct from
-             -> a               -- ^ Constructed thing made possible by recursive decomposition
-mkChunkified small_tuple as = mk_big_tuple (chunkify as)
-  where
-        -- Each sub-list is short enough to fit in a tuple
-    mk_big_tuple [as] = small_tuple as
-    mk_big_tuple as_s = mk_big_tuple (chunkify (map small_tuple as_s))
-
-chunkify :: [a] -> [[a]]
--- ^ Split a list into lists that are small enough to have a corresponding
--- tuple arity. The sub-lists of the result all have length <= 'mAX_TUPLE_SIZE'
--- But there may be more than 'mAX_TUPLE_SIZE' sub-lists
-chunkify xs
-  | n_xs <= mAX_TUPLE_SIZE = [xs]
-  | otherwise              = split xs
-  where
-    n_xs     = length xs
-    split [] = []
-    split xs = take mAX_TUPLE_SIZE xs : split (drop mAX_TUPLE_SIZE xs)
 
 {-
 Creating tuples and their types for Core expressions
@@ -604,6 +563,24 @@ mkBuildExpr elt_ty mk_build_inside = do
 {-
 ************************************************************************
 *                                                                      *
+             Manipulating Maybe data type
+*                                                                      *
+************************************************************************
+-}
+
+
+-- | Makes a Nothing for the specified type
+mkNothingExpr :: Type -> CoreExpr
+mkNothingExpr ty = mkConApp nothingDataCon [Type ty]
+
+-- | Makes a Just from a value of the specified type
+mkJustExpr :: Type -> CoreExpr -> CoreExpr
+mkJustExpr ty val = mkConApp justDataCon [Type ty, val]
+
+
+{-
+************************************************************************
+*                                                                      *
                       Error expressions
 *                                                                      *
 ************************************************************************
@@ -716,19 +693,30 @@ errorName :: Name
 errorName = mkWiredInIdName gHC_ERR (fsLit "error") errorIdKey eRROR_ID
 
 eRROR_ID :: Id
-eRROR_ID = pc_bottoming_Id1 errorName errorTy
+eRROR_ID = pc_bottoming_Id2 errorName errorTy
 
 errorTy  :: Type   -- See Note [Error and friends have an "open-tyvar" forall]
-errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] openAlphaTy)
+errorTy  = mkSigmaTy [openAlphaTyVar] []
+             (mkFunTys [ mkClassPred
+                           ipClass
+                           [ mkStrLitTy (fsLit "callStack")
+                           , mkTyConTy callStackTyCon ]
+                       , mkListTy charTy]
+                       openAlphaTy)
 
 undefinedName :: Name
 undefinedName = mkWiredInIdName gHC_ERR (fsLit "undefined") undefinedKey uNDEFINED_ID
 
 uNDEFINED_ID :: Id
-uNDEFINED_ID = pc_bottoming_Id0 undefinedName undefinedTy
+uNDEFINED_ID = pc_bottoming_Id1 undefinedName undefinedTy
 
 undefinedTy  :: Type   -- See Note [Error and friends have an "open-tyvar" forall]
-undefinedTy  = mkSigmaTy [openAlphaTyVar] [] openAlphaTy
+undefinedTy  = mkSigmaTy [openAlphaTyVar] []
+                 (mkFunTy (mkClassPred
+                             ipClass
+                             [ mkStrLitTy (fsLit "callStack")
+                             , mkTyConTy callStackTyCon ])
+                          openAlphaTy)
 
 {-
 Note [Error and friends have an "open-tyvar" forall]
@@ -772,10 +760,11 @@ pc_bottoming_Id1 name ty
     strict_sig = mkClosedStrictSig [evalDmd] botRes
     -- These "bottom" out, no matter what their arguments
 
-pc_bottoming_Id0 :: Name -> Type -> Id
--- Same but arity zero
-pc_bottoming_Id0 name ty
+pc_bottoming_Id2 :: Name -> Type -> Id
+-- Same but arity two
+pc_bottoming_Id2 name ty
  = mkVanillaGlobalWithInfo name ty bottoming_info
  where
     bottoming_info = vanillaIdInfo `setStrictnessInfo` strict_sig
-    strict_sig = mkClosedStrictSig [] botRes
+                                   `setArityInfo`      2
+    strict_sig = mkClosedStrictSig [evalDmd, evalDmd] botRes

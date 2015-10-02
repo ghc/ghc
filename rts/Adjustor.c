@@ -250,15 +250,15 @@ typedef struct _IA64FunDesc {
 static void *
 stgAllocStable(size_t size_in_bytes, StgStablePtr *stable)
 {
-  StgArrWords* arr;
+  StgArrBytes* arr;
   nat data_size_in_words, total_size_in_words;
   
   /* round up to a whole number of words */
   data_size_in_words  = ROUNDUP_BYTES_TO_WDS(size_in_bytes);
-  total_size_in_words = sizeofW(StgArrWords) + data_size_in_words;
+  total_size_in_words = sizeofW(StgArrBytes) + data_size_in_words;
   
   /* allocate and fill it in */
-  arr = (StgArrWords *)allocate(total_size_in_words);
+  arr = (StgArrBytes *)allocate(total_size_in_words);
   SET_ARR_HDR(arr, &stg_ARR_WORDS_info, CCCS, size_in_bytes);
  
   /* obtain a stable ptr */

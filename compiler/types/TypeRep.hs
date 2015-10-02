@@ -15,7 +15,8 @@ Note [The Type-related module hierarchy]
   Coercion imports Type
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, DeriveFunctor, DeriveFoldable,
+             DeriveTraversable #-}
 {-# OPTIONS_HADDOCK hide #-}
 -- We expose the relevant stuff from this module via the Type module
 
@@ -32,7 +33,7 @@ module TypeRep (
 
         -- Pretty-printing
         pprType, pprParendType, pprTypeApp, pprTvBndr, pprTvBndrs,
-        pprTyThing, pprTyThingCategory, pprSigmaType, pprSigmaTypeExtraCts,
+        pprTyThing, pprTyThingCategory, pprSigmaType,
         pprTheta, pprForAll, pprUserForAll,
         pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit, suppressKinds,
@@ -82,7 +83,7 @@ import StaticFlags( opt_PprStyle_Debug )
 
 -- libraries
 import Data.List( mapAccumL, partition )
-import qualified Data.Data        as Data hiding ( TyCon )
+import qualified Data.Data as Data hiding ( TyCon )
 
 {-
 ************************************************************************
@@ -305,9 +306,7 @@ isKindVar v = isTKVar v && isSuperKind (varType v)
 
 tyVarsOfType :: Type -> VarSet
 -- ^ NB: for type synonyms tyVarsOfType does /not/ expand the synonym
--- tyVarsOfType returns only the free variables of a type
--- For example, tyVarsOfType (a::k) returns {a}, not including the
--- kind variable {k}
+-- tyVarsOfType returns free variables of a type, including kind variables.
 tyVarsOfType (TyVarTy v)         = unitVarSet v
 tyVarsOfType (TyConApp _ tys)    = tyVarsOfTypes tys
 tyVarsOfType (LitTy {})          = emptyVarSet
@@ -407,7 +406,7 @@ instance NamedThing TyThing where       -- Can't put this with the type
 -- the in-scope set is not relevant
 --
 -- 3. The substitution is only applied ONCE! This is because
--- in general such application will not reached a fixed point.
+-- in general such application will not reach a fixed point.
 data TvSubst
   = TvSubst InScopeSet  -- The in-scope type and kind variables
             TvSubstEnv  -- Substitutes both type and kind variables
@@ -562,10 +561,6 @@ pprThetaArrowTy preds  = parens (fsep (punctuate comma (map (ppr_type TopPrec) p
     --            Eq j, Eq k, Eq l) =>
     --           Eq (a, b, c, d, e, f, g, h, i, j, k, l)
 
-pprThetaArrowTyExtra :: ThetaType -> SDoc
-pprThetaArrowTyExtra []    = text "_" <+> darrow
-pprThetaArrowTyExtra preds = parens (fsep (punctuate comma xs)) <+> darrow
-  where xs = (map (ppr_type TopPrec) preds) ++ [text "_"]
 ------------------
 instance Outputable Type where
     ppr ty = pprType ty
@@ -599,7 +594,7 @@ ppr_type p fun_ty@(FunTy ty1 ty2)
 
 ppr_forall_type :: TyPrec -> Type -> SDoc
 ppr_forall_type p ty
-  = maybeParen p FunPrec $ ppr_sigma_type True False ty
+  = maybeParen p FunPrec $ ppr_sigma_type True ty
     -- True <=> we always print the foralls on *nested* quantifiers
     -- Opt_PrintExplicitForalls only affects top-level quantifiers
     -- False <=> we don't print an extra-constraints wildcard
@@ -615,16 +610,14 @@ ppr_tylit _ tl =
     StrTyLit s -> text (show s)
 
 -------------------
-ppr_sigma_type :: Bool -> Bool -> Type -> SDoc
+ppr_sigma_type :: Bool -> Type -> SDoc
 -- First Bool <=> Show the foralls unconditionally
 -- Second Bool <=> Show an extra-constraints wildcard
-ppr_sigma_type show_foralls_unconditionally extra_cts ty
+ppr_sigma_type show_foralls_unconditionally ty
   = sep [ if   show_foralls_unconditionally
           then pprForAll tvs
           else pprUserForAll tvs
-        , if extra_cts
-          then pprThetaArrowTyExtra ctxt
-          else pprThetaArrowTy ctxt
+        , pprThetaArrowTy ctxt
         , pprType tau ]
   where
     (tvs,  rho) = split1 [] ty
@@ -637,10 +630,7 @@ ppr_sigma_type show_foralls_unconditionally extra_cts ty
     split2 ps ty                               = (reverse ps, ty)
 
 pprSigmaType :: Type -> SDoc
-pprSigmaType ty = ppr_sigma_type False False ty
-
-pprSigmaTypeExtraCts :: Bool -> Type -> SDoc
-pprSigmaTypeExtraCts = ppr_sigma_type False
+pprSigmaType ty = ppr_sigma_type False ty
 
 pprUserForAll :: [TyVar] -> SDoc
 -- Print a user-level forall; see Note [When to print foralls]
@@ -712,7 +702,7 @@ pprTyTcApp :: TyPrec -> TyCon -> [Type] -> SDoc
 -- Used for types only; so that we can make a
 -- special case for type-level lists
 pprTyTcApp p tc tys
-  | tc `hasKey` ipClassNameKey
+  | tc `hasKey` ipTyConKey
   , [LitTy (StrTyLit n),ty] <- tys
   = maybeParen p FunPrec $
     char '?' <> ftext n <> ptext (sLit "::") <> ppr_type TopPrec ty

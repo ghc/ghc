@@ -988,8 +988,7 @@ callishMachOps = listToUFM $
     memcpyLikeTweakArgs :: (Int -> CallishMachOp) -> [CmmExpr] -> (CallishMachOp, [CmmExpr])
     memcpyLikeTweakArgs op [] = pgmError "memcpy-like function requires at least one argument"
     memcpyLikeTweakArgs op args@(_:_) =
-        -- Force alignment with result to ensure pprPgmError fires
-        align `seq` (op align, args')
+        (op align, args')
       where
         args' = init args
         align = case last args of
@@ -1269,7 +1268,7 @@ cmmRawIf cond then_id = do
 -- branching to true_id if so, and falling through otherwise.
 emitCond (BoolTest e) then_id = do
   else_id <- newBlockId
-  emit (mkCbranch e then_id else_id)
+  emit (mkCbranch e then_id else_id Nothing)
   emitLabel else_id
 emitCond (BoolNot (BoolTest (CmmMachOp op args))) then_id
   | Just op' <- maybeInvertComparison op

@@ -13,72 +13,134 @@
 \maketitle
 
 Backpack is a new module system for Haskell, intended to enable
-``separate modular development'': a style of development where
-application-writers can develop against abstract interfaces or
-\emph{signatures}, while separately library-writers write software which
-implement these interfaces.  Backpack was originally described in a
-POPL'14 paper \url{http://plv.mpi-sws.org/backpack/}, but the point of
-this document is to describe the syntax of a language you might actually
-be able to \emph{write}, as well as describe some of the changes to the
-design we've made since this paper.
+``separate modular development'', where application-writers depend on
+libraries by programming against abstract interfaces instead of specific
+implementations.  Our goal is to reduce software coupling, and let the
+type system and compiler assist developers when they are developing
+large software systems.  Backpack was originally described in a POPL'14
+paper \url{http://plv.mpi-sws.org/backpack/}, but this document is
+intended to describe the syntax of a language you might actually be able
+to \emph{write}, i.e., from the perspective of a software developer.
 
-\paragraph{Examples}
-
-Before we dive in, here are some examples of Backpack files to whet
-your appetite:
+\paragraph{Examples of Backpack ``in the large''}
+In the standard practice of large-scale software development today,
+users organize code into libraries.  Here is a very simple example of
+some Haskell code structured in this way:
 
 \begin{verbatim}
-package p(A) where
-    module A(a) where
-        a = True
+unit p where
+    module A where
+        x = True
+        y = False
 
-package q(B, C) where
+unit q where
     include p
-    module B(b) where
+    module B where
         import A
-        b = a
-    module C(c) where
-        import B
-        c = b
+        b = x
 \end{verbatim}
 
-In this example package \verb|p| exports a single module \verb|A|; package \verb|q| exports
-two modules, and includes package \verb|p| so that its modules are in
-scope.  The form of a \verb|package| and a \verb|module| are quite similar:
-a package can express an explicit export list of modules in much the same
-way a module exports identifiers. \\
+\verb|p| is a reusable unit (or package/library if you like) which
+provides a single module \verb|A|.  \verb|q| depends on \verb|p| by
+directly including it, bringing all of the modules of \verb|p| into scope for
+import.
 
-Here is a more complicated Backpack file taking advantage of the availability
-of signatures in Backpack.  This example omits the actual module bodies: GHC
-will automatically look for them in appropriate files (e.g. \verb|p/Map.hsig|,
-\verb|p/P/Types.hs|, \verb|p/P.hs|, \verb|q/QMap.hs| and \verb|q/Q.hs|).
+There is a downside to writing code this way: without editing your
+source code, you can't actually swap out \verb|p| with another version
+(maybe \verb|p-2.0|, or perhaps even a version of \verb|p| written by someone else).
+Traditionally, this is overcome by relying on an extralinguistic mechanism,
+the \emph{package manager}, which indirects \verb|include p| so that
+it can refer to some other piece of code.
+
+Backpack offers a different, in-language way of expressing dependency
+without committing to an implementation:
 
 \begin{verbatim}
-package p (P) requires (Map) where
-    include base
-    signature Map
-    module P.Types
-    module P
-
-package q (Q) where
-    include base
-    module QMap
-    include p (P) requires (Map as QMap)
-    module Q
+unit q where
+    require p
+    module B where
+        import A
+        b = x
 \end{verbatim}
 
-Package \verb|p| provides a module \verb|P|, but it also \emph{requires}
-a module \verb|Map| (which must fulfill the specification described
-in \verb|signature Map|).  This makes it an \emph{indefinite package}:
-a package which isn't fully implemented, and cannot be compiled into
-executable code until its ``hole'' (\verb|Map|) is filled.
-It also sports an internal module named \verb|P.Types| which
-is missing from the export list, and thus not exported.
+Or, equivalently:
 
-Package \verb|q|, on the other hand, is a \emph{definite package}; as it
-has no requirements, it can be compiled.  When it includes \verb|p|
-into scope, it also fills the \verb|Map| requirement with an
-implementation \verb|QMap|.
+\begin{verbatim}
+unit p-interface where
+    signature A where
+        x :: Bool
+        y :: Bool
+unit q where
+    include p-interface
+    module B where
+        import A
+        b = x
+\end{verbatim}
+
+With the \verb|require| keyword, Backpack automatically computes
+\verb|p-interface|, which expresses the abstract interface of \verb|p|.
+\verb|q| utilizes a subset of this interface (unused requirements
+don't ``count''), resulting in this final version of \verb|q|:
+
+\begin{verbatim}
+unit q where
+    signature A where
+        x :: Bool
+    module B where
+        import A
+        b = x
+\end{verbatim}
+
+The technical innovation of Backpack is that the indefinite version of \verb|q|, which
+does not depend on a specific implementation of \verb|p|, still composes
+naturally and in the \emph{same} way that the definite version of
+\verb|q|.  That is to say, you can take a hierarchy of libraries that \verb|include| one
+another (today's situation) and replace each \verb|include| with a
+\verb|require|. The result is a reusable set of components with
+explicitly defined requirements.  If the inferred requirements are not
+general enough, a signature can be written explicitly.
+
+Finally, the package manager serves a new role: it can be used to select
+a combination of components which fulfill all the requirements.  Unlike
+dependency resolution with version numbers, with interfaces the package
+manager can do this \emph{completely} precisely.
+
+\paragraph{Examples of Backpack ``in the small''}
+Although Backpack was originally designed for library-scale development,
+it can also be used for small-scale modular development,
+similar to ML modules.  Here is a simple example of writing an
+associated list implementation that is parametrized over the key:
+
+\begin{verbatim}
+    unit assoc-map where
+        signature H where
+            data T
+            eq :: T -> T -> Bool
+        module Assoc where
+            import H
+            mylookup :: T -> [(T, a)] -> Maybe a
+            mylookup x xs = fmap snd (find (eq x) xs)
+    unit main where
+        module AbsInt where
+            type T = Int
+            eq x y = abs x == abs y
+        include assoc-map (Assoc as AbsIntAssoc) requires (T as AbsInt)
+        module Main where
+            import AbsIntAssoc
+            import Prelude
+            main = print (mylookup -1 [(1,"yes"),(-2,"no")])
+\end{verbatim}
+
+For example, in Haskell there are many different kinds of ``string''-like
+data types: \verb|String| (a linked list of characters), \verb|ByteString|
+(an unstructured raw bytestring) and \verb|Text| (a UTF-8 encoded bytestring).
+Many libraries, e.g., parsers, need to work on any string-like input which
+a user might want to give them.
+
+A more full example of a Backpack version of some real library
+code can be found in Appendix~\ref{sec:tagstream-example}.
+
+
 
 \section{The Backpack file}
 
@@ -162,7 +224,7 @@ modules and signatures.}
 A signature, denoted with \verb|signature| in a Backpack file and a file
 with the \verb|hsig| extension on the file system, represents a (type) signature for a
 Haskell module. It can contain type signatures, data declarations, type
-classes, type class instances and reexports(!), but it cannot contain any
+classes, type class instances and reexports, but it cannot contain any
 value definitions.\footnote{Signatures are the backbone of the Backpack
 module system.  A signature can be used to type-check client code which
 uses a module (without the module implementation), or to verify that an
@@ -417,7 +479,7 @@ and, symmetrically, ascription in an include hides identifiers:
             ... private ... -- ERROR
 \end{verbatim}
 
-\Red{OBSERVATION: thinning is subsumed by transparent signature ascription, but NOT renaming.  Thus RENAMING does not commute across signature ascription; you must do it either before or after.  Syntax for this is tricky.}
+\Red{Observation: thinning is subsumed by transparent signature ascription, but NOT renaming.  Thus RENAMING does not commute across signature ascription; you must do it either before or after.  Syntax for this is tricky.}
 
 \paragraph{Syntactic sugar for anonymous packages}
 
@@ -461,6 +523,101 @@ pkgexp ::= pkgname
          | "package" [exports] "where" pkgbody
          | pkgbody
          | path
+\end{verbatim}
+
+\newpage
+\label{sec:tagstream-example}
+\section{\texttt{tagstream-conduit} example}
+
+When someone recently asked on Haskell Reddit what the ``precise problem Backpack
+addresses'' was, Chris Doner offered a nice example from the
+\verb|tagstream-conduit|.  The existing implementation, at \url{http://hackage.haskell.org/package/tagstream-conduit-0.5.5.1/docs/Text-HTML-TagStream-Entities.html}, uses a data type
+to define a ``module'' which is then used to implement two modules in the
+library, a variant for \verb|ByteString| and a variant for \verb|Text|.
+
+Here is how this would be done in Backpack:
+
+\Red{This still contains some syntax which I haven't fully explained.}
+
+\begin{verbatim}
+    -- | This is an ordinary module which defines some types
+    -- which are exported by the package.
+    module Text.HTML.TagStream.Types where
+        data Token' s = Text s
+                      | ...
+
+    -- | This provides a 'Decoder' implementation for 'ByteString's.
+    -- We define 'Str' to be 'ByteString' and implement a few
+    -- functions manually, as well as reexport existing functions
+    -- from some libraries.  We don't plan to publically export
+    -- these from the package.
+    module Decoder.ByteString (
+        module Decoder.ByteString,
+        Builder, break, drop, uncons
+    ) where
+        import Data.ByteString
+        import Data.ByteString.Builder
+        type Str = ByteString
+        toStr = toByteString
+        fromStr = fromByteString
+        decodeEntity = ...
+
+    -- | This provides a 'Decoder' implementation for 'Text', much
+    -- the same as 'Decoder.ByteString'.
+    module Decoder.Text (
+        module Decoder.Text,
+        Builder, break, drop, uncons
+    ) where
+        import Data.Text
+        import Data.Text.Lazy.Builder
+        type Str = Text
+        toStr = toText
+        fromStr = fromText
+        decodeEntity = ...
+
+    -- | This defines the "functor"; the module implementing entity
+    -- decoding, 'Entities', is parametrized by an abstract interface
+    -- 'Decoder' which describes two types, 'Str' and 'Builder', as
+    -- well as operations on them which are avaiable for the implementation.
+    unit decoder where
+        signature Decoder where
+            data Str
+            data Builder
+            toStr :: Builder -> Str
+            break :: (Char -> Bool) -> Str -> (Str, Str)
+            fromStr :: Str -> Builder
+            drop :: Int -> Str -> Str
+            decodeEntity :: Str -> Maybe Str
+            uncons :: Str -> Maybe (Char, Str)
+        module Entities where
+            import Text.HTML.TagStream.Types
+            import Data.Conduit
+            import Decoder
+            decodeEntities :: Monad m => Conduit (Token' Str) m (Token' Str)
+            decodeEntities = ...
+
+    -- | Finally, these two lines instantiate 'Entities' twice;
+    -- once with 'Decoder.ByteString', and once as 'Decoder.Text'.
+    include decoder (Entities as Text.HTML.TagStream.ByteString)
+                    requires (Decoder as Decoder.ByteString)
+    include decoder (Entities as Text.HTML.TagStream.Text)
+                    requires (Decoder as Decoder.Text)
+\end{verbatim}
+
+Without having the source-code inline, the out-of-line Backpack file
+would look something like this:
+
+\begin{verbatim}
+    module Text.HTML.TagStream.Types -- Text/HTML/TagStream/Types.hs
+    module Decoder.ByteString        -- Decoder/ByteString.hs
+    module Decoder.Text              -- Decoder/Text.hs
+    unit decoder where
+        signature Decoder -- decoder/Decoder.hsig
+        module Entities   -- decoder/Entities.hs
+    include decoder (Entities as Text.HTML.TagStream.ByteString)
+                    requires (Decoder as Decoder.ByteString)
+    include decoder (Entities as Text.HTML.TagStream.Text)
+                    requires (Decoder as Decoder.Text)
 \end{verbatim}
 
 \end{document}

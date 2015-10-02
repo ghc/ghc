@@ -12,6 +12,8 @@ module TcAnnotations ( tcAnnotations, annCtxt ) where
 #ifdef GHCI
 import {-# SOURCE #-} TcSplice ( runAnnotation )
 import Module
+import DynFlags
+import Control.Monad ( when )
 #endif
 
 import HsSyn
@@ -47,7 +49,14 @@ tcAnnotation (L loc ann@(HsAnnotation _ provenance expr)) = do
     let target = annProvenanceToTarget mod provenance
 
     -- Run that annotation and construct the full Annotation data structure
-    setSrcSpan loc $ addErrCtxt (annCtxt ann) $ runAnnotation target expr
+    setSrcSpan loc $ addErrCtxt (annCtxt ann) $ do
+      -- See #10826 -- Annotations allow one to bypass Safe Haskell.
+      dflags <- getDynFlags
+      when (safeLanguageOn dflags) $ failWithTc safeHsErr
+      runAnnotation target expr
+    where
+      safeHsErr = vcat [ ptext (sLit "Annotations are not compatible with Safe Haskell.")
+                  , ptext (sLit "See https://ghc.haskell.org/trac/ghc/ticket/10826") ]
 
 annProvenanceToTarget :: Module -> AnnProvenance Name -> AnnTarget Name
 annProvenanceToTarget _   (ValueAnnProvenance (L _ name)) = NamedTarget name

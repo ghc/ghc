@@ -8,6 +8,7 @@ other dynamic, non-language, flag settings:
   -fno-ghci-history
   -fimplicit-import-qualified
 warning settings:
+  -fno-warn-missed-specialisations
 Should fail, GADTs is not enabled
 options currently set: none.
 base language is: Haskell2010
@@ -22,6 +23,7 @@ other dynamic, non-language, flag settings:
   -fno-ghci-history
   -fimplicit-import-qualified
 warning settings:
+  -fno-warn-missed-specialisations
 Should work, GADTs is in force from :set
 options currently set: none.
 base language is: Haskell2010
@@ -35,6 +37,7 @@ other dynamic, non-language, flag settings:
   -fno-ghci-history
   -fimplicit-import-qualified
 warning settings:
+  -fno-warn-missed-specialisations
 Should fail, GADTs is now disabled
 base language is: Haskell2010
 with the following modifiers:
@@ -50,5 +53,6 @@ other dynamic, non-language, flag settings:
   -fno-ghci-history
   -fimplicit-import-qualified
 warning settings:
+  -fno-warn-missed-specialisations
 Should fail, GADTs is only enabled at the prompt
 C :: T Int

@@ -14,7 +14,7 @@ module TyCon(
 
         AlgTyConRhs(..), visibleDataCons,
         TyConParent(..), isNoParent,
-        FamTyConFlav(..), Role(..),
+        FamTyConFlav(..), Role(..), Injectivity(..),
 
         -- ** Field labels
         tyConFieldLabels, tyConFieldLabelEnv, tyConDataConsWithFields,
@@ -50,6 +50,7 @@ module TyCon(
         isFamilyTyCon, isOpenFamilyTyCon,
         isTypeFamilyTyCon, isDataFamilyTyCon,
         isOpenTypeFamilyTyCon, isClosedSynFamilyTyConWithAxiom_maybe,
+        familyTyConInjectivityInfo,
         isBuiltInSynFamTyCon_maybe,
         isUnLiftedTyCon,
         isGadtSyntaxTyCon, isInjectiveTyCon, isGenerativeTyCon, isGenInjAlgRhs,
@@ -74,7 +75,9 @@ module TyCon(
         tyConFlavour,
         tyConTuple_maybe, tyConClass_maybe,
         tyConFamInst_maybe, tyConFamInstSig_maybe, tyConFamilyCoercion_maybe,
-        synTyConDefn_maybe, synTyConRhs_maybe, famTyConFlav_maybe,
+        tyConFamilyResVar_maybe,
+        synTyConDefn_maybe, synTyConRhs_maybe,
+        famTyConFlav_maybe, famTcResVar,
         algTyConRhs,
         newTyConRhs, newTyConEtadArity, newTyConEtadRhs,
         unwrapNewTyCon_maybe, unwrapNewTyConEtad_maybe,
@@ -102,6 +105,7 @@ module TyCon(
 import {-# SOURCE #-} TypeRep ( Kind, Type, PredType )
 import {-# SOURCE #-} DataCon ( DataCon, dataConExTyVars, dataConFieldLabels )
 
+import Binary
 import Var
 import Class
 import BasicTypes
@@ -159,9 +163,7 @@ Note [Type synonym families]
     a FamilyTyCon 'G', whose FamTyConFlav is ClosedSynFamilyTyCon, with the
     appropriate CoAxiom representing the equations
 
-* In the future we might want to support
-    * injective type families (allow decomposition)
-  but we don't at the moment [2013]
+We also support injective type families -- see Note [Injective type families]
 
 Note [Data type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -259,6 +261,11 @@ See also Note [Wrappers for data instance tycons] in MkId.hs
   So a data type family is not an injective type function. It's just a
   data type with some axioms that connect it to other data types.
 
+* The tyConTyVars of the representation tycon are the tyvars that the
+  user wrote in the patterns. This is important in TcDeriv, where we
+  bring these tyvars into scope before type-checking the deriving
+  clause. This fact is arranged for in TcInstDecls.tcDataFamInstDecl.
+
 Note [Associated families and their parent class]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 *Associated* families are just like *non-associated* families, except
@@ -307,6 +314,28 @@ tuples' parameters are at role R. Each primitive tycon declares its roles;
 it's worth noting that (~#)'s parameters are at role N. Promoted data
 constructors' type arguments are at role R. All kind arguments are at role
 N.
+
+Note [Injective type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We allow injectivity annotations for type families (both open and closed):
+
+  type family F (a :: k) (b :: k) = r | r -> a
+  type family G a b = res | res -> a b where ...
+
+Injectivity information is stored in the `famTcInj` field of `FamilyTyCon`.
+`famTcInj` maybe stores a list of Bools, where each entry corresponds to a
+single element of `tyConTyVars` (both lists should have identical length). If no
+injectivity annotation was provided `famTcInj` is Nothing. From this follows an
+invariant that if `famTcInj` is a Just then at least one element in the list
+must be True.
+
+See also:
+ * [Injectivity annotation] in HsDecls
+ * [Renaming injectivity annotation] in RnSource
+ * [Verifying injectivity annotation] in FamInstEnv
+ * [Type inference for type families with injectivity] in TcInteract
+
 
 ************************************************************************
 *                                                                      *
@@ -467,19 +496,27 @@ data TyCon
                                  -- Precisely, this list scopes over:
                                  --
                                  -- 1. The 'algTcStupidTheta'
-                                 -- 2. The cached types in 'algTyConRhs.NewTyCon'
+                                 -- 2. The cached types in algTyConRhs.NewTyCon
                                  -- 3. The family instance types if present
                                  --
                                  -- Note that it does /not/ scope over the data
                                  -- constructors.
 
+        famTcResVar  :: Maybe Name,   -- ^ Name of result type variable, used
+                                      -- for pretty-printing with --show-iface
+                                      -- and for reifying TyCon in Template
+                                      -- Haskell
+
         famTcFlav    :: FamTyConFlav, -- ^ Type family flavour: open, closed,
                                       -- abstract, built-in. See comments for
                                       -- FamTyConFlav
 
-        famTcParent  :: TyConParent   -- ^ TyCon of enclosing class for
+        famTcParent  :: TyConParent,  -- ^ TyCon of enclosing class for
                                       -- associated type families
 
+        famTcInj     :: Injectivity   -- ^ is this a type family injective in
+                                      -- its type variables? Nothing if no
+                                      -- injectivity annotation was given
     }
 
   -- | Primitive types; cannot be defined in Haskell. This includes
@@ -649,16 +686,7 @@ data TyConParent
                         -- See Note [Associated families and their parent class]
 
   -- | Type constructors representing an instance of a *data* family.
-  -- Parameters:
-  --
-  --  1) The type family in question
-  --
-  --  2) Instance types; free variables are the 'tyConTyVars'
-  --  of the current 'TyCon' (not the family one). INVARIANT:
-  --  the number of types matches the arity of the family 'TyCon'
-  --
-  --  3) A 'CoTyCon' identifying the representation
-  --  type with the type instance family
+  -- See Note [Data type families] and source comments for more info.
   | FamInstTyCon          -- See Note [Data type families]
         (CoAxiom Unbranched)  -- The coercion axiom.
                -- A *Representational* coercion,
@@ -703,6 +731,11 @@ isNoParent NoParentTyCon = True
 isNoParent _             = False
 
 --------------------
+
+data Injectivity
+  = NotInjective
+  | Injective [Bool]   -- Length is 1-1 with tyConTyVars (incl kind vars)
+  deriving( Eq )
 
 -- | Information pertaining to the expansion of a type synonym (@type@)
 data FamTyConFlav
@@ -1156,17 +1189,19 @@ mkSynonymTyCon name kind tyvars roles rhs
     }
 
 -- | Create a type family 'TyCon'
-mkFamilyTyCon:: Name -> Kind -> [TyVar] -> FamTyConFlav -> TyConParent
-             -> TyCon
-mkFamilyTyCon name kind tyvars flav parent
+mkFamilyTyCon:: Name -> Kind -> [TyVar] -> Maybe Name -> FamTyConFlav
+             -> TyConParent -> Injectivity -> TyCon
+mkFamilyTyCon name kind tyvars resVar flav parent inj
   = FamilyTyCon
       { tyConUnique = nameUnique name
       , tyConName   = name
       , tyConKind   = kind
       , tyConArity  = length tyvars
       , tyConTyVars = tyvars
+      , famTcResVar = resVar
       , famTcFlav   = flav
       , famTcParent = parent
+      , famTcInj    = inj
       }
 
 
@@ -1426,6 +1461,7 @@ isTypeFamilyTyCon :: TyCon -> Bool
 isTypeFamilyTyCon (FamilyTyCon {}) = True
 isTypeFamilyTyCon _                = False
 
+-- | Is this an open type family TyCon?
 isOpenTypeFamilyTyCon :: TyCon -> Bool
 isOpenTypeFamilyTyCon (FamilyTyCon {famTcFlav = OpenSynFamilyTyCon }) = True
 isOpenTypeFamilyTyCon _                                               = False
@@ -1437,6 +1473,12 @@ isClosedSynFamilyTyConWithAxiom_maybe
   (FamilyTyCon {famTcFlav = ClosedSynFamilyTyCon mb}) = mb
 isClosedSynFamilyTyConWithAxiom_maybe _               = Nothing
 
+-- | Try to read the injectivity information from a FamilyTyCon. Only
+-- FamilyTyCons can be injective so for every other TyCon this function panics.
+familyTyConInjectivityInfo :: TyCon -> Injectivity
+familyTyConInjectivityInfo (FamilyTyCon { famTcInj = inj }) = inj
+familyTyConInjectivityInfo _ = panic "familyTyConInjectivityInfo"
+
 isBuiltInSynFamTyCon_maybe :: TyCon -> Maybe BuiltInSynFamily
 isBuiltInSynFamTyCon_maybe
   (FamilyTyCon {famTcFlav = BuiltInSynFamTyCon ops }) = Just ops
@@ -1447,8 +1489,8 @@ isDataFamilyTyCon :: TyCon -> Bool
 isDataFamilyTyCon (AlgTyCon {algTcRhs = DataFamilyTyCon {}}) = True
 isDataFamilyTyCon _ = False
 
--- | Are we able to extract informationa 'TyVar' to class argument list
--- mappping from a given 'TyCon'?
+-- | Are we able to extract information 'TyVar' to class argument list
+-- mapping from a given 'TyCon'?
 isTyConAssoc :: TyCon -> Bool
 isTyConAssoc tc = isJust (tyConAssoc_maybe tc)
 
@@ -1652,6 +1694,11 @@ algTyConRhs :: TyCon -> AlgTyConRhs
 algTyConRhs (AlgTyCon {algTcRhs = rhs}) = rhs
 algTyConRhs other = pprPanic "algTyConRhs" (ppr other)
 
+-- | Extract type variable naming the result of injective type family
+tyConFamilyResVar_maybe :: TyCon -> Maybe Name
+tyConFamilyResVar_maybe (FamilyTyCon {famTcResVar = res}) = res
+tyConFamilyResVar_maybe _                                 = Nothing
+
 -- | Get the list of roles for the type parameters of a TyCon
 tyConRoles :: TyCon -> [Role]
 -- See also Note [TyCon Role signatures]
@@ -1847,6 +1894,16 @@ instance Data.Data TyCon where
     toConstr _   = abstractConstr "TyCon"
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "TyCon"
+
+instance Binary Injectivity where
+    put_ bh NotInjective   = putByte bh 0
+    put_ bh (Injective xs) = putByte bh 1 >> put_ bh xs
+
+    get bh = do { h <- getByte bh
+                ; case h of
+                    0 -> return NotInjective
+                    _ -> do { xs <- get bh
+                            ; return (Injective xs) } }
 
 {-
 ************************************************************************

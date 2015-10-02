@@ -59,7 +59,6 @@ import PrelNames
 import TysPrim          ( realWorldStatePrimTy )
 import Bag
 import Util
-import FastTypes
 import FastString
 import Outputable
 import ForeignCall
@@ -332,17 +331,17 @@ calcUnfoldingGuidance dflags (Tick t expr)
   | not (tickishIsCode t)  -- non-code ticks don't matter for unfolding
   = calcUnfoldingGuidance dflags expr
 calcUnfoldingGuidance dflags expr
-  = case sizeExpr dflags (iUnbox bOMB_OUT_SIZE) val_bndrs body of
+  = case sizeExpr dflags bOMB_OUT_SIZE val_bndrs body of
       TooBig -> UnfNever
       SizeIs size cased_bndrs scrut_discount
-        | uncondInline expr n_val_bndrs (iBox size)
+        | uncondInline expr n_val_bndrs size
         -> UnfWhen { ug_unsat_ok = unSaturatedOk
                    , ug_boring_ok =  boringCxtOk
                    , ug_arity = n_val_bndrs }   -- Note [INLINE for small functions]
         | otherwise
         -> UnfIfGoodArgs { ug_args  = map (mk_discount cased_bndrs) val_bndrs
-                         , ug_size  = iBox size
-                         , ug_res   = iBox scrut_discount }
+                         , ug_size  = size
+                         , ug_res   = scrut_discount }
 
   where
     (bndrs, body) = collectBinders expr
@@ -469,7 +468,7 @@ uncondInline rhs arity size
   | otherwise = exprIsTrivial rhs        -- See Note [INLINE for small functions] (4)
 
 sizeExpr :: DynFlags
-         -> FastInt         -- Bomb out if it gets bigger than this
+         -> Int             -- Bomb out if it gets bigger than this
          -> [Id]            -- Arguments; we're interested in which of these
                             -- get case'd
          -> CoreExpr
@@ -525,7 +524,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
                 -- the case when we are scrutinising an argument variable
           alts_size (SizeIs tot tot_disc tot_scrut)  -- Size of all alternatives
                     (SizeIs max _        _)          -- Size of biggest alternative
-                = SizeIs tot (unitBag (v, iBox (_ILIT(20) +# tot -# max)) `unionBags` tot_disc) tot_scrut
+                = SizeIs tot (unitBag (v, 20 + tot - max) `unionBags` tot_disc) tot_scrut
                         -- If the variable is known, we produce a discount that
                         -- will take us back to 'max', the size of the largest alternative
                         -- The 1+ is a little discount for reduced allocation in the caller
@@ -605,22 +604,22 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
         -- These addSize things have to be here because
         -- I don't want to give them bOMB_OUT_SIZE as an argument
     addSizeN TooBig          _  = TooBig
-    addSizeN (SizeIs n xs d) m  = mkSizeIs bOMB_OUT_SIZE (n +# iUnbox m) xs d
+    addSizeN (SizeIs n xs d) m  = mkSizeIs bOMB_OUT_SIZE (n + m) xs d
 
         -- addAltSize is used to add the sizes of case alternatives
     addAltSize TooBig            _      = TooBig
     addAltSize _                 TooBig = TooBig
     addAltSize (SizeIs n1 xs d1) (SizeIs n2 ys d2)
-        = mkSizeIs bOMB_OUT_SIZE (n1 +# n2)
+        = mkSizeIs bOMB_OUT_SIZE (n1 + n2)
                                  (xs `unionBags` ys)
-                                 (d1 +# d2)   -- Note [addAltSize result discounts]
+                                 (d1 + d2) -- Note [addAltSize result discounts]
 
         -- This variant ignores the result discount from its LEFT argument
         -- It's used when the second argument isn't part of the result
     addSizeNSD TooBig            _      = TooBig
     addSizeNSD _                 TooBig = TooBig
     addSizeNSD (SizeIs n1 xs _) (SizeIs n2 ys d2)
-        = mkSizeIs bOMB_OUT_SIZE (n1 +# n2)
+        = mkSizeIs bOMB_OUT_SIZE (n1 + n2)
                                  (xs `unionBags` ys)
                                  d2  -- Ignore d1
 
@@ -648,7 +647,7 @@ classOpSize :: DynFlags -> [Id] -> [CoreExpr] -> ExprSize
 classOpSize _ _ []
   = sizeZero
 classOpSize dflags top_args (arg1 : other_args)
-  = SizeIs (iUnbox size) arg_discount (_ILIT(0))
+  = SizeIs size arg_discount 0
   where
     size = 20 + (10 * length other_args)
     -- If the class op is scrutinising a lambda bound dictionary then
@@ -665,7 +664,7 @@ funSize :: DynFlags -> [Id] -> Id -> Int -> Int -> ExprSize
 funSize dflags top_args fun n_val_args voids
   | fun `hasKey` buildIdKey   = buildSize
   | fun `hasKey` augmentIdKey = augmentSize
-  | otherwise = SizeIs (iUnbox size) arg_discount (iUnbox res_discount)
+  | otherwise = SizeIs size arg_discount res_discount
   where
     some_val_args = n_val_args > 0
 
@@ -689,13 +688,13 @@ funSize dflags top_args fun n_val_args voids
 
 conSize :: DataCon -> Int -> ExprSize
 conSize dc n_val_args
-  | n_val_args == 0 = SizeIs (_ILIT(0)) emptyBag (_ILIT(10))    -- Like variables
+  | n_val_args == 0 = SizeIs 0 emptyBag 10    -- Like variables
 
 -- See Note [Unboxed tuple size and result discount]
-  | isUnboxedTupleCon dc = SizeIs (_ILIT(0)) emptyBag (iUnbox (10 * (1 + n_val_args)))
+  | isUnboxedTupleCon dc = SizeIs 0 emptyBag (10 * (1 + n_val_args))
 
 -- See Note [Constructor size and result discount]
-  | otherwise = SizeIs (_ILIT(10)) emptyBag (iUnbox (10 * (1 + n_val_args)))
+  | otherwise = SizeIs 10 emptyBag (10 * (1 + n_val_args))
 
 {-
 Note [Constructor size and result discount]
@@ -715,7 +714,7 @@ of extra incentive we give a discount of 10*(1 + n_val_args).
 
 Simon M tried a MUCH bigger discount: (10 * (10 + n_val_args)),
 and said it was an "unambiguous win", but its terribly dangerous
-because a fuction with many many case branches, each finishing with
+because a function with many many case branches, each finishing with
 a constructor, can have an arbitrarily large discount.  This led to
 terrible code bloat: see Trac #6099.
 
@@ -780,7 +779,7 @@ primOpSize op n_val_args
 
 
 buildSize :: ExprSize
-buildSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(40))
+buildSize = SizeIs 0 emptyBag 40
         -- We really want to inline applications of build
         -- build t (\cn -> e) should cost only the cost of e (because build will be inlined later)
         -- Indeed, we should add a result_discount becuause build is
@@ -789,13 +788,13 @@ buildSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(40))
         -- The "4" is rather arbitrary.
 
 augmentSize :: ExprSize
-augmentSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(40))
+augmentSize = SizeIs 0 emptyBag 40
         -- Ditto (augment t (\cn -> e) ys) should cost only the cost of
         -- e plus ys. The -2 accounts for the \cn
 
 -- When we return a lambda, give a discount if it's used (applied)
 lamScrutDiscount :: DynFlags -> ExprSize -> ExprSize
-lamScrutDiscount dflags (SizeIs n vs _) = SizeIs n vs (iUnbox (ufFunAppDiscount dflags))
+lamScrutDiscount dflags (SizeIs n vs _) = SizeIs n vs (ufFunAppDiscount dflags)
 lamScrutDiscount _      TooBig          = TooBig
 
 {-
@@ -853,36 +852,41 @@ In a function application (f a b)
 Code for manipulating sizes
 -}
 
-data ExprSize = TooBig
-              | SizeIs FastInt          -- Size found
-                       !(Bag (Id,Int))  -- Arguments cased herein, and discount for each such
-                       FastInt          -- Size to subtract if result is scrutinised
-                                        -- by a case expression
+-- | The size of an candidate expression for unfolding
+data ExprSize
+    = TooBig
+    | SizeIs { _es_size_is  :: {-# UNPACK #-} !Int -- ^ Size found
+             , _es_args     :: !(Bag (Id,Int))
+               -- ^ Arguments cased herein, and discount for each such
+             , _es_discount :: {-# UNPACK #-} !Int
+               -- ^ Size to subtract if result is scrutinised by a case
+               -- expression
+             }
 
 instance Outputable ExprSize where
   ppr TooBig         = ptext (sLit "TooBig")
-  ppr (SizeIs a _ c) = brackets (int (iBox a) <+> int (iBox c))
+  ppr (SizeIs a _ c) = brackets (int a <+> int c)
 
 -- subtract the discount before deciding whether to bale out. eg. we
 -- want to inline a large constructor application into a selector:
 --      tup = (a_1, ..., a_99)
 --      x = case tup of ...
 --
-mkSizeIs :: FastInt -> FastInt -> Bag (Id, Int) -> FastInt -> ExprSize
-mkSizeIs max n xs d | (n -# d) ># max = TooBig
-                    | otherwise       = SizeIs n xs d
+mkSizeIs :: Int -> Int -> Bag (Id, Int) -> Int -> ExprSize
+mkSizeIs max n xs d | (n - d) > max = TooBig
+                    | otherwise     = SizeIs n xs d
 
 maxSize :: ExprSize -> ExprSize -> ExprSize
 maxSize TooBig         _                                  = TooBig
 maxSize _              TooBig                             = TooBig
-maxSize s1@(SizeIs n1 _ _) s2@(SizeIs n2 _ _) | n1 ># n2  = s1
+maxSize s1@(SizeIs n1 _ _) s2@(SizeIs n2 _ _) | n1 > n2   = s1
                                               | otherwise = s2
 
 sizeZero :: ExprSize
 sizeN :: Int -> ExprSize
 
-sizeZero = SizeIs (_ILIT(0))  emptyBag (_ILIT(0))
-sizeN n  = SizeIs (iUnbox n) emptyBag (_ILIT(0))
+sizeZero = SizeIs 0 emptyBag 0
+sizeN n  = SizeIs n emptyBag 0
 
 {-
 ************************************************************************
@@ -899,7 +903,7 @@ actual arguments.
 
 couldBeSmallEnoughToInline :: DynFlags -> Int -> CoreExpr -> Bool
 couldBeSmallEnoughToInline dflags threshold rhs
-  = case sizeExpr dflags (iUnbox threshold) [] body of
+  = case sizeExpr dflags threshold [] body of
        TooBig -> False
        _      -> True
   where
@@ -1003,7 +1007,7 @@ nonTriv _       = True
 data CallCtxt
   = BoringCtxt
   | RhsCtxt             -- Rhs of a let-binding; see Note [RHS of lets]
-  | DiscArgCtxt         -- Argument of a fuction with non-zero arg discount
+  | DiscArgCtxt         -- Argument of a function with non-zero arg discount
   | RuleArgCtxt         -- We are somewhere in the argument of a function with rules
 
   | ValAppCtxt          -- We're applied to at least one value arg

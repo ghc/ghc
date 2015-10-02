@@ -876,7 +876,8 @@ emitEnter fun = do
        ; tscope <- getTickScope
        ; emit $
            copyout <*>
-           mkCbranch (cmmIsTagged dflags (CmmReg nodeReg)) lret lcall <*>
+           mkCbranch (cmmIsTagged dflags (CmmReg nodeReg))
+                     lret lcall Nothing <*>
            outOfLine lcall (the_call,tscope) <*>
            mkLabel lret tscope <*>
            copyin

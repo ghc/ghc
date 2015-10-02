@@ -48,7 +48,6 @@ import PrelNames
 import Type
 import TyCon
 import Outputable
-import FastTypes
 import FastString
 import BasicTypes
 import Binary
@@ -422,21 +421,21 @@ cmpLit (MachFloat     a)   (MachFloat      b)   = a `compare` b
 cmpLit (MachDouble    a)   (MachDouble     b)   = a `compare` b
 cmpLit (MachLabel     a _ _) (MachLabel      b _ _) = a `compare` b
 cmpLit (LitInteger    a _) (LitInteger     b _) = a `compare` b
-cmpLit lit1                lit2                 | litTag lit1 <# litTag lit2 = LT
-                                                | otherwise                  = GT
+cmpLit lit1                lit2                 | litTag lit1 < litTag lit2 = LT
+                                                | otherwise                 = GT
 
-litTag :: Literal -> FastInt
-litTag (MachChar      _)   = _ILIT(1)
-litTag (MachStr       _)   = _ILIT(2)
-litTag (MachNullAddr)      = _ILIT(3)
-litTag (MachInt       _)   = _ILIT(4)
-litTag (MachWord      _)   = _ILIT(5)
-litTag (MachInt64     _)   = _ILIT(6)
-litTag (MachWord64    _)   = _ILIT(7)
-litTag (MachFloat     _)   = _ILIT(8)
-litTag (MachDouble    _)   = _ILIT(9)
-litTag (MachLabel _ _ _)   = _ILIT(10)
-litTag (LitInteger  {})    = _ILIT(11)
+litTag :: Literal -> Int
+litTag (MachChar      _)   = 1
+litTag (MachStr       _)   = 2
+litTag (MachNullAddr)      = 3
+litTag (MachInt       _)   = 4
+litTag (MachWord      _)   = 5
+litTag (MachInt64     _)   = 6
+litTag (MachWord64    _)   = 7
+litTag (MachFloat     _)   = 8
+litTag (MachDouble    _)   = 9
+litTag (MachLabel _ _ _)   = 10
+litTag (LitInteger  {})    = 11
 
 {-
         Printing
@@ -535,4 +534,4 @@ hashInteger i = 1 + abs (fromInteger (i `rem` 10000))
                 -- since we use * to combine hash values
 
 hashFS :: FastString -> Int
-hashFS s = iBox (uniqueOfFS s)
+hashFS s = uniqueOfFS s

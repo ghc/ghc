@@ -56,7 +56,6 @@ import Unique
 import Util
 import Maybes
 import Outputable
-import FastTypes
 import StaticFlags
 import FastString
 
@@ -69,7 +68,7 @@ import FastString
 -}
 
 -- | A set of variables that are in scope at some point
-data InScopeSet = InScope (VarEnv Var) FastInt
+data InScopeSet = InScope (VarEnv Var) {-# UNPACK #-} !Int
         -- The (VarEnv Var) is just a VarSet.  But we write it like
         -- this to remind ourselves that you can look up a Var in
         -- the InScopeSet. Typically the InScopeSet contains the
@@ -81,7 +80,7 @@ data InScopeSet = InScope (VarEnv Var) FastInt
         --            the case in the past, when we had a grevious hack
         --            mapping var1 to var2.
         --
-        -- The FastInt is a kind of hash-value used by uniqAway
+        -- The Int is a kind of hash-value used by uniqAway
         -- For example, it might be the size of the set
         -- INVARIANT: it's not zero; we use it as a multiplier in uniqAway
 
@@ -89,25 +88,25 @@ instance Outputable InScopeSet where
   ppr (InScope s _) = ptext (sLit "InScope") <+> ppr s
 
 emptyInScopeSet :: InScopeSet
-emptyInScopeSet = InScope emptyVarSet (_ILIT(1))
+emptyInScopeSet = InScope emptyVarSet 1
 
 getInScopeVars ::  InScopeSet -> VarEnv Var
 getInScopeVars (InScope vs _) = vs
 
 mkInScopeSet :: VarEnv Var -> InScopeSet
-mkInScopeSet in_scope = InScope in_scope (_ILIT(1))
+mkInScopeSet in_scope = InScope in_scope 1
 
 extendInScopeSet :: InScopeSet -> Var -> InScopeSet
-extendInScopeSet (InScope in_scope n) v = InScope (extendVarEnv in_scope v v) (n +# _ILIT(1))
+extendInScopeSet (InScope in_scope n) v = InScope (extendVarEnv in_scope v v) (n + 1)
 
 extendInScopeSetList :: InScopeSet -> [Var] -> InScopeSet
 extendInScopeSetList (InScope in_scope n) vs
    = InScope (foldl (\s v -> extendVarEnv s v v) in_scope vs)
-                    (n +# iUnbox (length vs))
+                    (n + length vs)
 
 extendInScopeSetSet :: InScopeSet -> VarEnv Var -> InScopeSet
 extendInScopeSetSet (InScope in_scope n) vs
-   = InScope (in_scope `plusVarEnv` vs) (n +# iUnbox (sizeUFM vs))
+   = InScope (in_scope `plusVarEnv` vs) (n + sizeUFM vs)
 
 delInScopeSet :: InScopeSet -> Var -> InScopeSet
 delInScopeSet (InScope in_scope n) v = InScope (in_scope `delVarEnv` v) n
@@ -141,19 +140,19 @@ uniqAway in_scope var
 uniqAway' :: InScopeSet -> Var -> Var
 -- This one *always* makes up a new variable
 uniqAway' (InScope set n) var
-  = try (_ILIT(1))
+  = try 1
   where
     orig_unique = getUnique var
     try k
-          | debugIsOn && (k ># _ILIT(1000))
-          = pprPanic "uniqAway loop:" (ppr (iBox k) <+> text "tries" <+> ppr var <+> int (iBox n))
-          | uniq `elemVarSetByKey` set = try (k +# _ILIT(1))
-          | debugIsOn && opt_PprStyle_Debug && (k ># _ILIT(3))
-          = pprTrace "uniqAway:" (ppr (iBox k) <+> text "tries" <+> ppr var <+> int (iBox n))
+          | debugIsOn && (k > 1000)
+          = pprPanic "uniqAway loop:" (ppr k <+> text "tries" <+> ppr var <+> int n)
+          | uniq `elemVarSetByKey` set = try (k + 1)
+          | debugIsOn && opt_PprStyle_Debug && (k > 3)
+          = pprTrace "uniqAway:" (ppr k <+> text "tries" <+> ppr var <+> int n)
             setVarUnique var uniq
           | otherwise = setVarUnique var uniq
           where
-            uniq = deriveUnique orig_unique (iBox (n *# k))
+            uniq = deriveUnique orig_unique (n * k)
 
 {-
 ************************************************************************

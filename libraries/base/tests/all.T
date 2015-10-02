@@ -77,11 +77,14 @@ test('dynamic002',      normal, compile_and_run, [''])
 test('dynamic003',      extra_run_opts('+RTS -K32m -RTS'), compile_and_run, [''])
 test('dynamic004',      omit_ways(['normal', 'threaded1', 'ghci']), compile_and_run, [''])
 test('dynamic005',      normal, compile_and_run, [''])
-test('enum01',          when(fast(), skip), compile_and_run, [''])
-test('enum02',          when(fast(), skip), compile_and_run, [''])
-test('enum03',          when(fast(), skip), compile_and_run, [''])
-test('enum04', 		normal, compile_and_run, [''])
-test('exceptionsrun001', 	normal, compile_and_run, [''])
+
+enum_setups = [when(fast(), skip), when(opsys('mingw32'), expect_broken(9399))]
+test('enum01',          enum_setups, compile_and_run, [''])
+test('enum02',          enum_setups, compile_and_run, [''])
+test('enum03',          enum_setups, compile_and_run, [''])
+test('enum04',          normal, compile_and_run, [''])
+
+test('exceptionsrun001', expect_broken_for(10712, opt_ways), compile_and_run, [''])
 test('exceptionsrun002', 	normal, compile_and_run, [''])
 test('foldableArray',   normal, compile_and_run, [''])
 test('list001'	,	when(fast(), skip), compile_and_run, [''])
@@ -159,6 +162,10 @@ test('topHandler03',
       ignore_output,
       signal_exit_code(15)
      ], compile_and_run, [''])
+test('topHandler04',
+     [when(opsys('mingw32'), skip),
+      exit_code(1)
+     ], compile_and_run, [''])
 
 
 test('T8766',
@@ -188,6 +195,17 @@ test('T9681', normal, compile_fail, [''])
 #   Probably something like 1s is already enough, but I don't know enough to
 #   make an educated guess how long it needs to be guaranteed to reach the C
 #   call."
-test('T8089', [exit_code(99), run_timeout_multiplier(0.01)],
+test('T8089', [exit_code(99),
+               run_timeout_multiplier(0.01),
+               when(opsys('mingw32'),
+                    expect_broken_for(7325, ['normal', 'hpc', 'optasm'])),
+               ],
               compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])
+test('T9848',
+        [ stats_num_field('bytes allocated',
+                          [ (wordsize(64), 51840, 20)
+                          , (wordsize(32), 47348, 20) ])
+        , only_ways(['normal'])],
+      compile_and_run,
+      ['-O'])

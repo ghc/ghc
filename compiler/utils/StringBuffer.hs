@@ -6,8 +6,8 @@
 Buffers for scanning string input stored in external arrays.
 -}
 
-{-# LANGUAGE BangPatterns, CPP, MagicHash, UnboxedTuples #-}
-{-# OPTIONS_GHC -O -funbox-strict-fields #-}
+{-# LANGUAGE CPP, MagicHash, UnboxedTuples #-}
+{-# OPTIONS_GHC -O #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
 
@@ -45,7 +45,6 @@ module StringBuffer
 
 import Encoding
 import FastString
-import FastTypes
 import FastFunctions
 import Outputable
 import Util
@@ -54,6 +53,8 @@ import Data.Maybe
 import Control.Exception
 import System.IO
 import System.IO.Unsafe         ( unsafePerformIO )
+import GHC.IO.Encoding.UTF8     ( mkUTF8 )
+import GHC.IO.Encoding.Failure  ( CodingFailureMode(IgnoreCodingFailure) )
 
 import GHC.Exts
 
@@ -132,14 +133,16 @@ skipBOM h size offset =
     then do
       -- Validate assumption that handle is in binary mode.
       ASSERTM( hGetEncoding h >>= return . isNothing )
-      -- Temporarily select text mode to make `hLookAhead` and
-      -- `hGetChar` return full Unicode characters.
-      bracket_ (hSetBinaryMode h False) (hSetBinaryMode h True) $ do
+      -- Temporarily select utf8 encoding with error ignoring,
+      -- to make `hLookAhead` and `hGetChar` return full Unicode characters.
+      bracket_ (hSetEncoding h safeEncoding) (hSetBinaryMode h True) $ do
         c <- hLookAhead h
         if c == '\xfeff'
           then hGetChar h >> hTell h
           else return offset
     else return offset
+  where
+    safeEncoding = mkUTF8 IgnoreCodingFailure
 
 newUTF8StringBuffer :: ForeignPtr Word8 -> Ptr Word8 -> Int -> IO StringBuffer
 newUTF8StringBuffer buf ptr size = do
@@ -232,26 +235,10 @@ lexemeToFastString (StringBuffer buf _ cur) len =
 
 -- -----------------------------------------------------------------------------
 -- Parsing integer strings in various bases
-{-
-byteOff :: StringBuffer -> Int -> Char
-byteOff (StringBuffer buf _ cur) i =
-  inlinePerformIO $ withForeignPtr buf $ \ptr -> do
---    return $! cBox (indexWord8OffFastPtrAsFastChar
---                         (pUnbox ptr) (iUnbox (cur+i)))
---or
---    w <- peek (ptr `plusPtr` (cur+i))
---    return (unsafeChr (fromIntegral (w::Word8)))
--}
--- | XXX assumes ASCII digits only (by using byteOff)
 parseUnsignedInteger :: StringBuffer -> Int -> Integer -> (Char->Int) -> Integer
 parseUnsignedInteger (StringBuffer buf _ cur) len radix char_to_int
   = inlinePerformIO $ withForeignPtr buf $ \ptr -> return $! let
-    --LOL, in implementations where the indexing needs slow unsafePerformIO,
-    --this is less (not more) efficient than using the IO monad explicitly
-    --here.
-    !ptr' = pUnbox ptr
-    byteOff i = cBox (indexWord8OffFastPtrAsFastChar ptr' (iUnbox (cur + i)))
     go i x | i == len  = x
-           | otherwise = case byteOff i of
+           | otherwise = case fst (utf8DecodeChar (ptr `plusPtr` (cur + i))) of
                char -> go (i + 1) (x * radix + toInteger (char_to_int char))
   in go 0 0

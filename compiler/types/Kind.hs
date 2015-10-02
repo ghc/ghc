@@ -19,7 +19,7 @@ module Kind (
         pprKind, pprParendKind,
 
         -- ** Deconstructing Kinds
-        kindAppResult, synTyConResKind,
+        kindAppResult, tyConResKind,
         splitKindFunTys, splitKindFunTysN, splitKindFunTy_maybe,
 
         -- ** Predicates on Kinds
@@ -119,13 +119,14 @@ splitKindFunTysN n (FunTy a r) = case splitKindFunTysN (n-1) r of
                                    (as, k) -> (a:as, k)
 splitKindFunTysN n k = pprPanic "splitKindFunTysN" (ppr n <+> ppr k)
 
--- | Find the result 'Kind' of a type synonym,
+-- | Find the result 'Kind' of a type synonym or a type family,
 -- after applying it to its 'arity' number of type variables
 -- Actually this function works fine on data types too,
 -- but they'd always return '*', so we never need to ask
-synTyConResKind :: TyCon -> Kind
-synTyConResKind tycon = kindAppResult (ptext (sLit "synTyConResKind") <+> ppr tycon)
-                                      (tyConKind tycon) (map mkTyVarTy (tyConTyVars tycon))
+tyConResKind :: TyCon -> Kind
+tyConResKind tycon =
+    kindAppResult (ptext (sLit "tyConResKind") <+> ppr tycon)
+                  (tyConKind tycon) (map mkTyVarTy (tyConTyVars tycon))
 
 -- | See "Type#kind_subtyping" for details of the distinction between these 'Kind's
 isOpenTypeKind, isUnliftedTypeKind,

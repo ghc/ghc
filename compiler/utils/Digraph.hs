@@ -4,7 +4,7 @@
 -- For Functor SCC. ToDo: Remove me when 7.10 is released
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Digraph(
-        Graph, graphFromVerticesAndAdjacency, graphFromEdgedVertices,
+        Graph, graphFromEdgedVertices,
 
         SCC(..), Node, flattenSCC, flattenSCCs,
         stronglyConnCompG,
@@ -95,24 +95,6 @@ type Node key payload = (payload, key, [key])
 
 emptyGraph :: Graph a
 emptyGraph = Graph (array (1, 0) []) (error "emptyGraph") (const Nothing)
-
-graphFromVerticesAndAdjacency
-        :: Ord key
-        => [(node, key)]
-        -> [(key, key)]  -- First component is source vertex key,
-                         -- second is target vertex key (thing depended on)
-                         -- Unlike the other interface I insist they correspond to
-                         -- actual vertices because the alternative hides bugs. I can't
-                         -- do the same thing for the other one for backcompat reasons.
-        -> Graph (node, key)
-graphFromVerticesAndAdjacency []       _     = emptyGraph
-graphFromVerticesAndAdjacency vertices edges = Graph graph vertex_node (key_vertex . key_extractor)
-  where key_extractor = snd
-        (bounds, vertex_node, key_vertex, _) = reduceNodesIntoVertices vertices key_extractor
-        key_vertex_pair (a, b) = (expectJust "graphFromVerticesAndAdjacency" $ key_vertex a,
-                                  expectJust "graphFromVerticesAndAdjacency" $ key_vertex b)
-        reduced_edges = map key_vertex_pair edges
-        graph = buildG bounds reduced_edges
 
 graphFromEdgedVertices
         :: Ord key

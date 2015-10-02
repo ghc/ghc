@@ -34,6 +34,7 @@
                     TODO FIXME.
                </para>
            </listitem>
+
             <listitem>
                 <para>
                     The parser now supports Haddock comments on GADT data constructors. For example,
@@ -46,8 +47,8 @@
            </listitem>
             <listitem>
                 <para>
-                    Implicit parameters of the new base type
-                    <literal>GHC.Stack.CallStack</literal> are treated
+                    Implicit parameters of the new ghc-prim type
+                    <literal>GHC.Types.CallStack</literal> are treated
                     specially, and automatically solved for the current source
                     location. For example
                     <programlisting>
@@ -66,10 +67,11 @@
                     parameter does not matter.
                </para>
                 <para>
-                    See the release notes for base for a description of the
+                    See the release notes for ghc-prim for a description of the
                     <literal>CallStack</literal> type.
                </para>
             </listitem>
+
 	    <listitem>
 	      <para>
 		To conform to the common case, the default role assigned to parameters
@@ -81,6 +83,32 @@
 		<literal>phantom</literal>, like it is in regular Haskell code.
 	      </para>
 	    </listitem>
+            <listitem>
+              <para>
+                Wildcards can be used in the type arguments of type/data
+                family instance declarations to indicate that the name of a
+                type variable doesn't matter. They will be replaced with new
+                unique type variables. See <xref
+                linkend="data-instance-declarations"/> for more details.
+              </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    GHC now allows to declare type families as injective.
+                    Injectivity information can then be used by the typechecker.
+                    See <xref linkend="injective-ty-fams"/> for details.
+               </para>
+           </listitem>
+
+           <listitem>
+               <para>
+                   Due to a <ulink href="https://ghc.haskell.org/trac/ghc/ticket/10826">
+                       security issue
+                   </ulink>, Safe Haskell now forbids annotations in programs marked as
+                   <literal>-XSafe</literal>
+               </para>
+           </listitem>
        </itemizedlist>
     </sect3>
 
@@ -101,6 +129,17 @@
 
                    When enabled, GHC also prints type-synonym-expanded types in
                    type errors.
+               </para>
+           </listitem>
+           <listitem>
+               <para>
+                   Added the option <option>-fcpr-anal</option>.
+
+                   When enabled, the demand analyser performs CPR analysis.
+                   It is implied by <option>-O</option>. Consequently,
+                   <option>-fcpr-off</option> is now removed, run with
+                   <option>-fno-cpr-anal</option> to get the old
+                   <option>-fcpr-off</option> behaviour.
                </para>
            </listitem>
        </itemizedlist>
@@ -144,6 +183,53 @@
             <listitem>
                 <para>
                     Partial type signatures can now be used in splices, see <xref linkend="pts-where"/>.
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    <literal>Template Haskell</literal> now supports the use of
+                    <literal>UInfixT</literal> in types to resolve infix
+                    operator fixities, in the same vein as
+                    <literal>UInfixP</literal> and <literal>UInfixE</literal>
+                    in patterns and expressions. <literal>ParensT</literal>
+                    and <literal>InfixT</literal> have also been introduced,
+                    serving the same functions as their pattern and expression
+                    counterparts.
+                </para>
+            </listitem>
+             <listitem>
+                 <para>
+                     Primitive chars (e.g., <literal>[| 'a'# |]</literal>) and
+                     primitive strings (e.g., <literal>[| "abc"# |]</literal>)
+                     can now be quoted with Template Haskell. The
+                     <literal>Lit</literal> data type also has a new
+                     constructor, <literal>CharPrimL</literal>, for primitive
+                     char literals.
+                </para>
+            </listitem>
+             <listitem>
+                 <para>
+                     <literal>addTopDecls</literal> now accepts annotation
+                     pragmas.
+                </para>
+            </listitem>
+             <listitem>
+                 <para>
+                     Internally, the implementation of quasi-quotes has been
+                     unified with that of normal Template Haskell splices. Under
+                     the previous implementation, top-level declaration
+                     quasi-quotes did not cause a break in the declaration
+                     groups, unlike splices of the form
+                     <literal>$(...)</literal>. This behavior has been
+                     preserved under the new implementation, and is now
+                     recognized and documented in <xref linkend="th-syntax"/>.
+               </para>
+           </listitem>
+            <listitem>
+                <para>
+                     The <literal>Lift</literal> class is now derivable via
+                     the <option>-XDeriveLift</option> extension. See
+                     <xref linkend="deriving-lift"/> for more information.
                 </para>
             </listitem>
        </itemizedlist>
@@ -221,6 +307,34 @@
                     <literal>[(String, SrcLoc)]</literal>, sorted by most-recent
                     call.
                </para>
+           </listitem>
+            <listitem>
+                <para>
+                    A new function, <literal>interruptible</literal>, was added
+                    to <literal>GHC.IO</literal> allowing an
+                    <literal>IO</literal> action to be run such that it can be
+                    interrupted by an asynchronous exception, even if exceptions
+                    are masked (except if masked with
+                    <literal>interruptibleMask</literal>).
+                </para>
+                <para>
+                    This was introduced to fix the behavior of
+                    <literal>allowInterrupt</literal>, which would previously
+                    incorrectly allow exceptions in uninterruptible regions
+                    (see Trac #9516).
+               </para>
+           </listitem>
+           <listitem>
+                <para>
+                    Per-thread allocation counters
+                    (<literal>setAllocationCounter</literal> and
+                    <literal>getAllocationCounter</literal>) and limits
+                    (<literal>enableAllocationLimit</literal>,
+                    <literal>disableAllocationLimit</literal> are now
+                    available from <literal>System.Mem</literal>.
+                    Previously this functionality was only available
+                    from <literal>GHC.Conc</literal>.
+                </para>
            </listitem>
        </itemizedlist>
     </sect3>
@@ -320,7 +434,17 @@
                 <para>
                     TODO FIXME.
                </para>
-           </listitem>
+            </listitem>
+            <listitem>
+              <para>
+                The <literal>HsBang</literal> type has been removed in
+                favour of <literal>HsSrcBang</literal> and
+                <literal>HsImplBang</literal>. Data constructors now
+                always carry around their strictness annotations as
+                the user wrote them, whether from an imported module
+                or not.
+              </para>
+            </listitem>
        </itemizedlist>
     </sect3>
 
@@ -441,6 +565,17 @@
                     instance.  To manually use this default implementation, you
                     can use the <literal>liftData</literal> function which is
                     now exported from <literal>Language.Haskell.TH.Syntax</literal>.
+               </para>
+          </listitem>
+           <listitem>
+               <para>
+                    <literal>Info</literal>'s constructors no longer have
+                    <literal>Fixity</literal> fields. A <literal>qReifyFixity
+                    </literal> function was added to the <literal>Quasi
+                    </literal> type class (as well as the <literal>reifyFixity
+                    </literal> function, specialized for <literal>Q</literal>)
+                    to allow lookup of fixity information for any given
+                    <literal>Name</literal>.
                </para>
            </listitem>
        </itemizedlist>

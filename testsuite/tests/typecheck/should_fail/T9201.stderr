@@ -1,5 +1,5 @@
 
-T9201.hs:6:17:
+T9201.hs:6:17: error:
     The first argument of ‘f’ should have kind ‘x1’,
       but ‘a’ has kind ‘y1’
     In the type ‘d a (f a)’

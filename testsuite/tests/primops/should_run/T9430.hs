@@ -34,6 +34,23 @@ checkW (expX, expY) op (W# a) (W# b) =
                     "Expected " ++ show expX ++ " and " ++ show expY
                         ++ " but got " ++ show (W# x) ++ " and " ++ show (W# y)
 
+checkW2
+    :: (Word, Word)  -- ^ expected results
+    -> (Word# -> Word# -> Word# -> (# Word#, Word# #))
+                     -- ^ primop
+    -> Word          -- ^ first argument
+    -> Word          -- ^ second argument
+    -> Word          -- ^ third argument
+    -> Maybe String  -- ^ maybe error
+checkW2 (expX, expY) op (W# a) (W# b) (W# c) =
+    case op a b c of
+        (# x, y #)
+            | W# x == expX && W# y == expY -> Nothing
+            | otherwise ->
+                Just $
+                    "Expected " ++ show expX ++ " and " ++ show expY
+                        ++ " but got " ++ show (W# x) ++ " and " ++ show (W# y)
+
 check :: String -> Maybe String -> IO ()
 check s (Just err) = error $ "Error for " ++ s ++ ": " ++ err
 check _ Nothing    = return ()
@@ -91,3 +108,21 @@ main = do
       checkW (2, maxBound - 2) timesWord2# maxBound 3
     check "timesWord2# 3 maxBound" $
       checkW (2, maxBound - 2) timesWord2# 3 maxBound
+
+    check "quotRemWord2# 0 0 1" $ checkW2 (0, 0) quotRemWord2# 0 0 1
+    check "quotRemWord2# 0 4 2" $ checkW2 (2, 0) quotRemWord2# 0 4 2
+    check "quotRemWord2# 0 7 3" $ checkW2 (2, 1) quotRemWord2# 0 7 3
+    check "quotRemWord2# 1 0 (2 ^ 63)" $
+      checkW2 (2, 0) quotRemWord2# 1 0 (2 ^ 63)
+    check "quotRemWord2# 1 1 (2 ^ 63)" $
+      checkW2 (2, 1) quotRemWord2# 1 1 (2 ^ 63)
+    check "quotRemWord2# 1 0 maxBound" $
+      checkW2 (1, 1) quotRemWord2# 1 0 maxBound
+    check "quotRemWord2# 2 0 maxBound" $
+      checkW2 (2, 2) quotRemWord2# 2 0 maxBound
+    check "quotRemWord2# 1 maxBound maxBound" $
+      checkW2 (2, 1) quotRemWord2# 1 maxBound maxBound
+    check "quotRemWord2# (2 ^ 63) 0 maxBound" $
+      checkW2 (2 ^ 63, 2 ^ 63) quotRemWord2# (2 ^ 63) 0 maxBound
+    check "quotRemWord2# (2 ^ 63) maxBound maxBound" $
+      checkW2 (2 ^ 63 + 1, 2 ^ 63) quotRemWord2# (2 ^ 63) maxBound maxBound

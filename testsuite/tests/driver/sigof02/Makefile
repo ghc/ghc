@@ -11,11 +11,13 @@ sigof02:
 	rm -rf tmp_sigof02
 	mkdir tmp_sigof02
 	'$(GHC_PKG)' field containers key | sed 's/^.*: *//' > tmp_sigof02/containers
-	'$(TEST_HC)' $(S02_OPTS) -c Map.hsig -sig-of "Map is `cat tmp_sigof02/containers`:Data.Map.Strict"
+	'$(TEST_HC)' $(S02_OPTS) -c Map.hs-boot -sig-of "Map is `cat tmp_sigof02/containers`:Data.Map.Strict"
+	'$(TEST_HC)' $(S02_OPTS) --merge-requirements Map
 	'$(TEST_HC)' $(S02_OPTS) -c Main.hs
 	'$(TEST_HC)' $(S02_OPTS) -package containers tmp_sigof02/Main.o -o tmp_sigof02/StrictMain
 	! ./tmp_sigof02/StrictMain
-	'$(TEST_HC)' $(S02_OPTS) -c Map.hsig -sig-of "Map is `cat tmp_sigof02/containers`:Data.Map.Lazy"
+	'$(TEST_HC)' $(S02_OPTS) -c Map.hs-boot -sig-of "Map is `cat tmp_sigof02/containers`:Data.Map.Lazy"
+	'$(TEST_HC)' $(S02_OPTS) --merge-requirements Map
 	'$(TEST_HC)' $(S02_OPTS) -c Main.hs
 	'$(TEST_HC)' $(S02_OPTS) -package containers tmp_sigof02/Main.o -o tmp_sigof02/LazyMain
 	./tmp_sigof02/LazyMain
@@ -24,7 +26,8 @@ S02T_OPTS=$(TEST_HC_OPTS_NO_RECOMP) -fno-code -fwrite-interface -outputdir tmp_s
 sigof02t:
 	rm -rf tmp_sigof02t
 	mkdir tmp_sigof02t
-	'$(TEST_HC)' $(S02T_OPTS) -c Map.hsig
+	'$(TEST_HC)' $(S02T_OPTS) -c Map.hs-boot
+	'$(TEST_HC)' $(S02T_OPTS) --merge-requirements Map
 	'$(TEST_HC)' $(S02T_OPTS) -c Main.hs
 
 S02M_OPTS=$(TEST_HC_OPTS_NO_RECOMP) -outputdir tmp_sigof02m
@@ -47,8 +50,10 @@ sigof02d:
 	rm -rf tmp_sigof02d
 	mkdir tmp_sigof02d
 	'$(GHC_PKG)' field containers key | sed 's/^.*: *//' > tmp_sigof02d/containers
-	'$(TEST_HC)' $(S02D_OPTS) -c Map.hsig -sig-of "Map is `cat tmp_sigof02d/containers`:Data.Map.Lazy, MapAsSet is `cat tmp_sigof02d/containers`:Data.Map.Lazy"
-	'$(TEST_HC)' $(S02D_OPTS) -c MapAsSet.hsig -sig-of "Map is `cat tmp_sigof02d/containers`:Data.Map.Lazy, MapAsSet is `cat tmp_sigof02d/containers`:Data.Map.Lazy"
+	'$(TEST_HC)' $(S02D_OPTS) -c Map.hs-boot -sig-of "Map is `cat tmp_sigof02d/containers`:Data.Map.Lazy, MapAsSet is `cat tmp_sigof02d/containers`:Data.Map.Lazy"
+	'$(TEST_HC)' $(S02D_OPTS) --merge-requirements Map
+	'$(TEST_HC)' $(S02D_OPTS) -c MapAsSet.hs-boot -sig-of "Map is `cat tmp_sigof02d/containers`:Data.Map.Lazy, MapAsSet is `cat tmp_sigof02d/containers`:Data.Map.Lazy"
+	'$(TEST_HC)' $(S02D_OPTS) --merge-requirements MapAsSet
 	'$(TEST_HC)' $(S02D_OPTS) -c Double.hs
 	'$(TEST_HC)' $(S02D_OPTS) -package containers tmp_sigof02d/Main.o -o tmp_sigof02d/Double
 	./tmp_sigof02d/Double
@@ -57,8 +62,10 @@ S02DT_OPTS=$(TEST_HC_OPTS_NO_RECOMP) -outputdir tmp_sigof02dt -i -itmp_sigof02dt
 sigof02dt:
 	rm -rf tmp_sigof02dt
 	mkdir tmp_sigof02dt
-	'$(TEST_HC)' $(S02DT_OPTS) -c Map.hsig
-	'$(TEST_HC)' $(S02DT_OPTS) -c MapAsSet.hsig
+	'$(TEST_HC)' $(S02DT_OPTS) -c Map.hs-boot
+	'$(TEST_HC)' $(S02DT_OPTS) --merge-requirements Map
+	'$(TEST_HC)' $(S02DT_OPTS) -c MapAsSet.hs-boot
+	'$(TEST_HC)' $(S02DT_OPTS) --merge-requirements MapAsSet
 	! '$(TEST_HC)' $(S02DT_OPTS) -c Double.hs
 
 sigof02dm:

@@ -12,6 +12,6 @@ $(x)
 -- subsequently be reified
 $(do f <- reify ''F
      case f of
-       FamilyI (ClosedTypeFamilyD _ _ _ []) _ -> return []
-       _                                      -> error $ show f
+       FamilyI (ClosedTypeFamilyD _ _ _ _ []) _ -> return []
+       _                                        -> error $ show f
  )

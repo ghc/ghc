@@ -1,5 +1,5 @@
 
-WildcardInInstanceSig.hs:4:35:
+WildcardInInstanceSig.hs:5:13: error:
     Unexpected wild card: ‘_’
     In the type signature for ‘negate’: negate :: _
     In the instance declaration for ‘Num Bool’

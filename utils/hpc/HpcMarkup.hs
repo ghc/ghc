@@ -479,15 +479,12 @@ instance Monoid ModuleSummary where
 
 writeFileUsing :: String -> String -> IO ()
 writeFileUsing filename text = do
-  let dest_dir = dropWhileEndLE (\ x -> x /= '/') $ filename
-
 -- We need to check for the dest_dir each time, because we use sub-dirs for
 -- packages, and a single .tix file might contain information about
 -- many package.
 
   -- create the dest_dir if needed
-  when (not (null dest_dir)) $
-    createDirectoryIfMissing True dest_dir
+  createDirectoryIfMissing True (takeDirectory filename)
 
   writeFile filename text
 

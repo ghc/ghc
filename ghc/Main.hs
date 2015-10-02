@@ -22,7 +22,7 @@ import CmdLineParser
 -- Implementations of the various modes (--show-iface, mkdependHS. etc.)
 import LoadIface        ( showIface )
 import HscMain          ( newHscEnv )
-import DriverPipeline   ( oneShot, compileFile )
+import DriverPipeline   ( oneShot, compileFile, mergeRequirement )
 import DriverMkDepend   ( doMkDependHS )
 #ifdef GHCI
 import InteractiveUI    ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
@@ -80,6 +80,19 @@ main = do
    initGCStatistics -- See Note [-Bsymbolic and hooks]
    hSetBuffering stdout LineBuffering
    hSetBuffering stderr LineBuffering
+
+   -- Handle GHC-specific character encoding flags, allowing us to control how
+   -- GHC produces output regardless of OS.
+   env <- getEnvironment
+   case lookup "GHC_CHARENC" env of
+    Just "UTF-8" -> do
+     hSetEncoding stdout utf8
+     hSetEncoding stderr utf8
+    _ -> do
+     -- Avoid GHC erroring out when trying to display unhandled characters
+     hSetTranslit stdout
+     hSetTranslit stderr
+
    GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     -- 1. extract the -B flag from the args
     argv0 <- getArgs
@@ -143,6 +156,7 @@ main' postLoadMode dflags0 args flagWarnings = do
                DoMake          -> (CompManager, dflt_target,    LinkBinary)
                DoMkDependHS    -> (MkDepend,    dflt_target,    LinkBinary)
                DoAbiHash       -> (OneShot,     dflt_target,    LinkBinary)
+               DoMergeRequirements -> (OneShot, dflt_target,    LinkBinary)
                _               -> (OneShot,     dflt_target,    LinkBinary)
 
   let dflags1 = case lang of
@@ -237,6 +251,7 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoInteractive          -> ghciUI srcs Nothing
        DoEval exprs           -> ghciUI srcs $ Just $ reverse exprs
        DoAbiHash              -> abiHash (map fst srcs)
+       DoMergeRequirements           -> doMergeRequirements (map fst srcs)
        ShowPackages           -> liftIO $ showPackages dflags6
 
   liftIO $ dumpFinalStats dflags6
@@ -442,14 +457,16 @@ data PostLoadMode
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
   | DoAbiHash               -- ghc --abi-hash
   | ShowPackages            -- ghc --show-packages
+  | DoMergeRequirements            -- ghc --merge-requirements
 
 doMkDependHSMode, doMakeMode, doInteractiveMode,
-  doAbiHashMode, showPackagesMode :: Mode
+  doAbiHashMode, showPackagesMode, doMergeRequirementsMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
 doInteractiveMode = mkPostLoadMode DoInteractive
 doAbiHashMode = mkPostLoadMode DoAbiHash
 showPackagesMode = mkPostLoadMode ShowPackages
+doMergeRequirementsMode = mkPostLoadMode DoMergeRequirements
 
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
@@ -585,6 +602,7 @@ mode_flags =
   , defFlag "C"            (PassFlag (setMode (stopBeforeMode HCc)))
   , defFlag "S"            (PassFlag (setMode (stopBeforeMode (As False))))
   , defFlag "-make"        (PassFlag (setMode doMakeMode))
+  , defFlag "-merge-requirements" (PassFlag (setMode doMergeRequirementsMode))
   , defFlag "-interactive" (PassFlag (setMode doInteractiveMode))
   , defFlag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
   , defFlag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
@@ -685,6 +703,16 @@ doMake srcs  = do
     when (failed ok_flag) (liftIO $ exitWith (ExitFailure 1))
     return ()
 
+-- ----------------------------------------------------------------------------
+-- Run --merge-requirements mode
+
+doMergeRequirements :: [String] -> Ghc ()
+doMergeRequirements srcs = mapM_ doMergeRequirement srcs
+
+doMergeRequirement :: String -> Ghc ()
+doMergeRequirement src = do
+    hsc_env <- getSession
+    liftIO $ mergeRequirement hsc_env (mkModuleName src)
 
 -- ---------------------------------------------------------------------------
 -- --show-iface mode
@@ -834,12 +862,11 @@ abiHash strs = do
          let modname = mkModuleName str
          r <- findImportedModule hsc_env modname Nothing
          case r of
-           FoundModule h -> return [fr_mod h]
-           FoundSigs hs _ -> return (map fr_mod hs)
+           Found _ m -> return m
            _error    -> throwGhcException $ CmdLineError $ showSDoc dflags $
                           cannotFindInterface dflags modname r
 
-  mods <- fmap concat (mapM find_it strs)
+  mods <- mapM find_it strs
 
   let get_iface modl = loadUserInterface False (text "abiHash") modl
   ifaces <- initIfaceCheck hsc_env $ mapM get_iface mods

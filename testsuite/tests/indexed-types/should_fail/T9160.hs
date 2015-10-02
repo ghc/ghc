@@ -8,7 +8,7 @@ $( do { cls_nm <- newName "C"
       ; k_nm   <- newName "k"
       ; f_nm   <- newName "F"
       ; return [ClassD [] cls_nm [KindedTV a_nm (VarT k_nm)] []
-                    [FamilyD TypeFam f_nm [] (Just (VarT k_nm))]] } )
+                   [OpenTypeFamilyD f_nm [] (KindSig (VarT k_nm)) Nothing ]] } )
 
 -- Splices in:
 --     class C (a :: k) where
@@ -16,4 +16,3 @@ $( do { cls_nm <- newName "C"
 
 instance C (a :: *) where
   type F = Maybe   -- Should be illegal
-

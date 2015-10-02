@@ -688,8 +688,8 @@ gen_primop_tag (Info _ entries)
               tagOf_type : zipWith f primop_entries [1 :: Int ..])
      where
         primop_entries = concatMap desugarVectorSpec $ filter is_primop entries
-        tagOf_type = "tagOf_PrimOp :: PrimOp -> FastInt"
-        f i n = "tagOf_PrimOp " ++ cons i ++ " = _ILIT(" ++ show n ++ ")"
+        tagOf_type = "primOpTag :: PrimOp -> Int"
+        f i n = "primOpTag " ++ cons i ++ " = " ++ show n
         max_def_type = "maxPrimOpTag :: Int"
         max_def      = "maxPrimOpTag = " ++ show (length primop_entries)
 

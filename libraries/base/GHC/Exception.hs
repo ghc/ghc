@@ -2,6 +2,8 @@
 {-# LANGUAGE NoImplicitPrelude
            , ExistentialQuantification
            , MagicHash
+           , RecordWildCards
+           , PatternSynonyms
   #-}
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -22,9 +24,12 @@
 module GHC.Exception
        ( Exception(..)    -- Class
        , throw
-       , SomeException(..), ErrorCall(..), ArithException(..)
+       , SomeException(..), ErrorCall(..), pattern ErrorCall, ArithException(..)
        , divZeroException, overflowException, ratioZeroDenomException
-       , errorCallException
+       , errorCallException, errorCallWithCallStackException
+       , showCallStack, popCallStack, showSrcLoc
+         -- re-export CallStack and SrcLoc from GHC.Types
+       , CallStack(..), SrcLoc(..)
        ) where
 
 import Data.Maybe
@@ -158,16 +163,60 @@ throw e = raise# (toException e)
 
 -- |This is thrown when the user calls 'error'. The @String@ is the
 -- argument given to 'error'.
-newtype ErrorCall = ErrorCall String
+data ErrorCall = ErrorCallWithLocation String String
     deriving (Eq, Ord)
+
+pattern ErrorCall err <- ErrorCallWithLocation err _ where
+  ErrorCall err = ErrorCallWithLocation err ""
 
 instance Exception ErrorCall
 
 instance Show ErrorCall where
-    showsPrec _ (ErrorCall err) = showString err
+  showsPrec _ (ErrorCallWithLocation err "") = showString err
+  showsPrec _ (ErrorCallWithLocation err loc) = showString (err ++ '\n' : loc)
 
 errorCallException :: String -> SomeException
 errorCallException s = toException (ErrorCall s)
+
+errorCallWithCallStackException :: String -> CallStack -> SomeException
+errorCallWithCallStackException s stk
+  = toException (ErrorCallWithLocation s (showCallStack (popCallStack stk)))
+
+
+-- | Pretty print 'SrcLoc'
+--
+-- @since 4.8.2.0
+showSrcLoc :: SrcLoc -> String
+showSrcLoc SrcLoc {..}
+  = foldr (++) ""
+      [ srcLocFile, ":"
+      , show srcLocStartLine, ":"
+      , show srcLocStartCol, " in "
+      , srcLocPackage, ":", srcLocModule
+      ]
+
+-- | Pretty print 'CallStack'
+--
+-- @since 4.8.2.0
+showCallStack :: CallStack -> String
+showCallStack (CallStack stk@(_:_))
+  = unlines ("CallStack:" : map (indent . showCallSite) stk)
+  where
+  -- Data.OldList isn't available yet, so we repeat the definition here
+  unlines [] = []
+  unlines [l] = l
+  unlines (l:ls) = l ++ '\n' : unlines ls
+  indent l = "  " ++ l
+  showCallSite (f, loc) = f ++ ", called at " ++ showSrcLoc loc
+showCallStack _ = error "CallStack cannot be empty!"
+
+
+-- | Remove the most recent callsite from the 'CallStack'
+--
+-- @since 4.8.2.0
+popCallStack :: CallStack -> CallStack
+popCallStack (CallStack (_:rest)) = CallStack rest
+popCallStack _ = error "CallStack cannot be empty!"
 
 -- |Arithmetic exceptions.
 data ArithException

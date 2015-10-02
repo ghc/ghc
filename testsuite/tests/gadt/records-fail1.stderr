@@ -1,5 +1,2 @@
 
-records-fail1.hs:7:1: error:
-    Constructors T1 and T4 have a common field ‘x’,
-      but have different result types
-    In the data type declaration for ‘T’
+records-fail1.hs:18:6: error: parse error on input ‘{’

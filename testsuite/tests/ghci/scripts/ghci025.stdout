@@ -9,6 +9,7 @@ class C a b where
   c2 :: (N b, S b) => a -> b
   c3 :: a1 -> b
   c4 :: a1 -> b
+  {-# MINIMAL c1, c2, c3, c4 #-}
 c1 :: (C a b, N b) => a -> b
 c2 :: (C a b, N b, S b) => a -> b
 c3 :: C a b => forall a. a -> b
@@ -30,6 +31,7 @@ class Applicative m => Monad (m :: * -> *) where
   (>>) :: m a -> m b -> m b
   return :: a -> m a
   fail :: String -> m a
+  {-# MINIMAL (>>=) #-}
 -- imported via Data.Maybe
 catMaybes :: [Maybe a] -> [a]
 fromJust :: Maybe a -> a
@@ -50,6 +52,7 @@ Nothing :: Maybe a
 class Eq a where
   (==) :: a -> a -> Bool
   (/=) :: a -> a -> Bool
+  {-# MINIMAL (==) | (/=) #-}
 -- imported via Prelude, T
 Prelude.length :: Foldable t => forall a. t a -> Int
 -- imported via T
@@ -68,6 +71,7 @@ class C a b where
   c2 :: (N b, S b) => a -> b
   c3 :: a1 -> b
   c4 :: a1 -> b
+  {-# MINIMAL c1, c2, c3, c4 #-}
 c1 :: (C a b, N b) => a -> b
 c2 :: (C a b, N b, S b) => a -> b
 c3 :: C a b => forall a. a -> b
@@ -82,6 +86,7 @@ class C a b where
   c2 :: (N b, S b) => a -> b
   c3 :: forall a1. a1 -> b
   c4 :: forall a1. a1 -> b
+  {-# MINIMAL c1, c2, c3, c4 #-}
 c1 :: forall a b. (C a b, N b) => a -> b
 c2 :: forall a b. (C a b, N b, S b) => a -> b
 c3 :: forall a b. C a b => forall a. a -> b

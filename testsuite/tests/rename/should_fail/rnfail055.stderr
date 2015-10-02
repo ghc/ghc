@@ -87,8 +87,10 @@ RnFail055.hs-boot:28:1: error:
     Main module: class C2 a b where
                    m2 :: a -> b
                    m2' :: a -> b
+                   {-# MINIMAL m2, m2' #-}
     Boot file:   class C2 a b where
                    m2 :: a -> b
+                   {-# MINIMAL m2 #-}
     The methods do not match: There are different numbers of methods
 
 RnFail055.hs-boot:29:1: error:

@@ -125,7 +125,7 @@ lookupEnv (Env e) n = lookup n e
 -- All primitive operators
 --
 -- There is no Op_apply, Op_false, Op_true and Op_if
--- (because they appear explcitly in the rules).
+-- (because they appear explicitly in the rules).
 
 data GMLOp
    = Op_acos

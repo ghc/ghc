@@ -384,8 +384,10 @@ has a strictly-increased level compared to the ambient level outside
 the let binding.
 -}
 
-simplifyInfer :: TcLevel          -- Used when generating the constraints
+simplifyInfer :: TcLevel               -- Used when generating the constraints
               -> Bool                  -- Apply monomorphism restriction
+              -> [TcTyVar]             -- The quantified tyvars of any signatures
+                                       --   see Note [Which type variables to quantify]
               -> [(Name, TcTauType)]   -- Variables to be generalised,
                                        -- and their tau-types
               -> WantedConstraints
@@ -395,7 +397,7 @@ simplifyInfer :: TcLevel          -- Used when generating the constraints
                                     --   so the results type is not as general as
                                     --   it could be
                       TcEvBinds)    -- ... binding these evidence variables
-simplifyInfer rhs_tclvl apply_mr name_taus wanteds
+simplifyInfer rhs_tclvl apply_mr sig_qtvs name_taus wanteds
   | isEmptyWC wanteds
   = do { gbl_tvs <- tcGetGlobalTyVars
        ; qtkvs <- quantifyTyVars gbl_tvs (tyVarsOfTypes (map snd name_taus))
@@ -472,7 +474,7 @@ simplifyInfer rhs_tclvl apply_mr name_taus wanteds
        ; zonked_taus <- mapM (TcM.zonkTcType . snd) name_taus
        ; let zonked_tau_tvs = tyVarsOfTypes zonked_taus
        ; (qtvs, bound_theta, mr_bites)
-             <- decideQuantification apply_mr quant_pred_candidates zonked_tau_tvs
+             <- decideQuantification apply_mr sig_qtvs quant_pred_candidates zonked_tau_tvs
 
          -- Emit an implication constraint for the
          -- remaining constraints from the RHS
@@ -564,18 +566,19 @@ and the quantified constraints are empty.
 
 decideQuantification
     :: Bool                       -- Apply monomorphism restriction
+    -> [TcTyVar]
     -> [PredType] -> TcTyVarSet   -- Constraints and type variables from RHS
     -> TcM ( [TcTyVar]       -- Quantify over these tyvars (skolems)
            , [PredType]      -- and this context (fully zonked)
            , Bool )          -- Did the MR bite?
 -- See Note [Deciding quantification]
-decideQuantification apply_mr constraints zonked_tau_tvs
+decideQuantification apply_mr sig_qtvs constraints zonked_tau_tvs
   | apply_mr     -- Apply the Monomorphism restriction
   = do { gbl_tvs <- tcGetGlobalTyVars
        ; let constrained_tvs = tyVarsOfTypes constraints
              mono_tvs = gbl_tvs `unionVarSet` constrained_tvs
              mr_bites = constrained_tvs `intersectsVarSet` zonked_tau_tvs
-       ; qtvs <- quantifyTyVars mono_tvs zonked_tau_tvs
+       ; qtvs <- quantify_tvs mono_tvs zonked_tau_tvs
        ; traceTc "decideQuantification 1" (vcat [ppr constraints, ppr gbl_tvs, ppr mono_tvs, ppr qtvs])
        ; return (qtvs, [], mr_bites) }
 
@@ -583,7 +586,7 @@ decideQuantification apply_mr constraints zonked_tau_tvs
   = do { gbl_tvs <- tcGetGlobalTyVars
        ; let mono_tvs     = growThetaTyVars (filter isEqPred constraints) gbl_tvs
              tau_tvs_plus = growThetaTyVars constraints zonked_tau_tvs
-       ; qtvs        <- quantifyTyVars mono_tvs tau_tvs_plus
+       ; qtvs        <- quantify_tvs mono_tvs tau_tvs_plus
        ; constraints <- zonkTcThetaType constraints
               -- quantifyTyVars turned some meta tyvars into
               -- quantified skolems, so we have to zonk again
@@ -594,6 +597,12 @@ decideQuantification apply_mr constraints zonked_tau_tvs
        ; traceTc "decideQuantification 2" (vcat [ppr constraints, ppr gbl_tvs, ppr mono_tvs
                                                 , ppr tau_tvs_plus, ppr qtvs, ppr min_theta])
        ; return (qtvs, min_theta, False) }
+
+  where
+    quantify_tvs mono_tvs tau_tvs   -- See Note [Which type variable to quantify]
+      | null sig_qtvs = quantifyTyVars mono_tvs tau_tvs
+      | otherwise     = quantifyTyVars (mono_tvs `delVarSetList`    sig_qtvs)
+                                       (tau_tvs  `extendVarSetList` sig_qtvs)
 
 ------------------
 pickQuantifiablePreds :: TyVarSet         -- Quantifying over these
@@ -651,7 +660,34 @@ growThetaTyVars theta tvs
        where
          pred_tvs = tyVarsOfType pred
 
-{-
+{- Note [Which type variables to quantify]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When choosing type variables to quantify, the basic plan is to
+quantify over all type variables that are
+ * free in the tau_tvs, and
+ * not forced to be monomorphic (mono_tvs),
+   for example by being free in the environment
+
+However, for a pattern binding, or with wildards, we might
+be doing inference *in the presence of a type signature*.
+Mostly, if there is a signature we use CheckGen, not InferGen,
+but with pattern bindings or wildcards we might do inference
+and still have a type signature.  For example:
+   f :: _ -> a
+   f x = ...
+or
+   p :: a -> a
+   (p,q) = e
+In both cases we use plan InferGen, and hence call simplifyInfer.
+But those 'a' variables are skolems, and we should be sure to quantify
+over them, regardless of the monomorphism restriction etc.  If we
+don't, when reporting a type error we panic when we find that a
+skolem isn't bound by any enclosing implication.
+
+That's why we pass sig_qtvs to simplifyInfer, and make sure (in
+quantify_tvs) that we do quantify over them.  Trac #10615 is
+a case in point.
+
 Note [Quantifying over equality constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Should we quantify over an equality constraint (s ~ t)?  In general, we don't.
@@ -1082,6 +1118,9 @@ warnRedundantGivens (SigSkol ctxt _)
        FunSigCtxt _ warn_redundant -> warn_redundant
        ExprSigCtxt                 -> True
        _                           -> False
+  -- To think about: do we want to report redundant givens for
+  -- pattern synonyms, PatSynCtxt? c.f Trac #9953, comment:21.
+
 warnRedundantGivens (InstSkol {}) = True
 warnRedundantGivens _             = False
 
@@ -1201,9 +1240,12 @@ works:
      we do an ambiguity check on the type (which would find that one
      of the Ord a constraints was redundant), and then we check that
      the definition has that type (which might find that both are
-     redundant).  We don't want to report the same error twice, so
-     we disable it for the ambiguity check.  Hence the flag in
-     TcType.FunSigCtxt.
+     redundant).  We don't want to report the same error twice, so we
+     disable it for the ambiguity check.  Hence using two different
+     FunSigCtxts, one with the warn-redundant field set True, and the
+     other set False in
+        - TcBinds.tcSpecPrag
+        - TcBinds.tcTySig
 
   This decision is taken in setImplicationStatus, rather than TcErrors
   so that we can discard implication constraints that we don't need.

@@ -1,5 +1,5 @@
 # Test +RTS -G1 here (it isn't tested anywhere else)
-setTestOpts(extra_ways(['g1']))
+setTestOpts(unless(fast(), extra_ways(['g1'])))
 
 test('cgrun001', normal, compile_and_run, [''])
 test('cgrun002', normal, compile_and_run, [''])
@@ -131,7 +131,8 @@ test('T9013', omit_ways(['ghci']),  # ghci doesn't support unboxed tuples
 test('T9340', normal, compile_and_run, [''])
 test('cgrun074', normal, compile_and_run, [''])
 test('CmmSwitchTest', when(fast(), skip), compile_and_run, [''])
-test('T10245', expect_broken(10246), compile_and_run, [''])
+# Skipping WAY=ghci, because it is not broken.
+test('T10245', [omit_ways(['ghci']), expect_broken(10246)], compile_and_run, [''])
 test('T10246', expect_broken(10246), compile_and_run, [''])
 test('T10414', [only_ways(['threaded2']), extra_ways(['threaded2'])],
      compile_and_run, ['-feager-blackholing'])

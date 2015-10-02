@@ -174,7 +174,7 @@ function. (If the arguments were expressions, we would have to build
 their closures first.)
 
 There is no constructor for a lone variable; it would appear as
-@StgApp var [] _@.
+@StgApp var []@.
 -}
 
 type GenStgLiveVars occ = UniqSet occ
@@ -191,7 +191,7 @@ data GenStgExpr bndr occ
 *                                                                      *
 ************************************************************************
 
-There are a specialised forms of application, for constructors,
+There are specialised forms of application, for constructors,
 primitives, and literals.
 -}
 

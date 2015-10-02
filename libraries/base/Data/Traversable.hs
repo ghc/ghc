@@ -46,7 +46,9 @@ module Data.Traversable (
     foldMapDefault,
     ) where
 
-import Control.Applicative ( Const(..) )
+-- It is convenient to use 'Const' here but this means we must
+-- define a few instances here which really belong in Control.Applicative
+import Control.Applicative ( Const(..), ZipList(..) )
 import Data.Either ( Either(..) )
 import Data.Foldable ( Foldable )
 import Data.Functor
@@ -56,7 +58,6 @@ import Data.Proxy ( Proxy(..) )
 import GHC.Arr
 import GHC.Base ( Applicative(..), Monad(..), Monoid, Maybe(..),
                   ($), (.), id, flip )
-import qualified GHC.Base as Monad ( mapM )
 import qualified GHC.List as List ( foldr )
 
 -- | Functors representing data structures that can be traversed from
@@ -180,8 +181,6 @@ instance Traversable [] where
     traverse f = List.foldr cons_f (pure [])
       where cons_f x ys = (:) <$> f x <*> ys
 
-    mapM = Monad.mapM
-
 instance Traversable (Either a) where
     traverse _ (Left x) = pure (Left x)
     traverse f (Right y) = Right <$> f y
@@ -219,6 +218,9 @@ instance Traversable First where
 
 instance Traversable Last where
     traverse f (Last x) = Last <$> traverse f x
+
+instance Traversable ZipList where
+    traverse f (ZipList x) = ZipList <$> traverse f x
 
 -- general functions
 

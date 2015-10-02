@@ -9,6 +9,6 @@ import GHC.TypeLits
 -- caused a crash, because it has no equations
 $(do x <- reify ''(+)
      case x of
-       FamilyI (ClosedTypeFamilyD _ _ _ []) _ -> return []
-       _                                      -> error $ show x
+       FamilyI (ClosedTypeFamilyD _ _ _ _ []) _ -> return []
+       _                                        -> error $ show x
  )

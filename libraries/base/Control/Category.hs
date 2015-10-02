@@ -2,6 +2,9 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
+{-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
+    -- The RULES for the methods of class Category may never fire
+    -- e.g. identity/left, identity/right, association;  see Trac #10528
 
 -----------------------------------------------------------------------------
 -- |

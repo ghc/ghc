@@ -122,7 +122,8 @@ data IdDetails
                                 --  b) when desugaring a RecordCon we can get
                                 --     from the Id back to the data con]
 
-  | ClassOpId Class             -- ^ The 'Id' is a superclass selector or class operation of a class
+  | ClassOpId Class             -- ^ The 'Id' is a superclass selector,
+                                -- or class operation of a class
 
   | PrimOpId PrimOp             -- ^ The 'Id' is for a primitive operator
   | FCallId ForeignCall         -- ^ The 'Id' is for a foreign call
@@ -133,6 +134,19 @@ data IdDetails
        -- Bool = True <=> the class has only one method, so may be
        --                  implemented with a newtype, so it might be bad
        --                  to be strict on this dictionary
+
+  -- The rest are distinguished only for debugging reasons
+  -- e.g. to suppress them in -ddump-types
+  -- Currently we don't persist these through interface file
+  -- (see MkIface.toIfaceIdDetails), but we easily could if it mattered
+
+  | DefMethId                   -- ^ A default-method Id, either polymorphic or generic
+
+  | ReflectionId                -- ^ A top-level Id to support runtime reflection
+                                -- e.g. $trModule, or $tcT
+
+  | PatSynId                    -- ^ A top-level Id to support pattern synonyms;
+                                -- the builder or matcher for the patern synonym
 
 coVarDetails :: IdDetails
 coVarDetails = VanillaId
@@ -145,6 +159,9 @@ pprIdDetails VanillaId = empty
 pprIdDetails other     = brackets (pp other)
  where
    pp VanillaId         = panic "pprIdDetails"
+   pp DefMethId         = ptext (sLit "DefMethId")
+   pp ReflectionId      = ptext (sLit "ReflectionId")
+   pp PatSynId          = ptext (sLit "PatSynId")
    pp (DataConWorkId _) = ptext (sLit "DataCon")
    pp (DataConWrapId _) = ptext (sLit "DataConWrapper")
    pp (ClassOpId {})    = ptext (sLit "ClassOp")

@@ -637,7 +637,7 @@ scavenge_block (bdescr *bd)
 
     case ARR_WORDS:
         // nothing to follow
-        p += arr_words_sizeW((StgArrWords *)p);
+        p += arr_words_sizeW((StgArrBytes *)p);
         break;
 
     case MUT_ARR_PTRS_CLEAN:

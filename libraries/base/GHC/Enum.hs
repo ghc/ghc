@@ -344,6 +344,7 @@ instance  Enum Char  where
     {-# INLINE enumFromThenTo #-}
     enumFromThenTo (C# x1) (C# x2) (C# y) = efdtChar (ord# x1) (ord# x2) (ord# y)
 
+-- See Note [How the Enum rules work]
 {-# RULES
 "eftChar"       [~1] forall x y.        eftChar x y       = build (\c n -> eftCharFB c n x y)
 "efdChar"       [~1] forall x1 x2.      efdChar x1 x2     = build (\ c n -> efdCharFB c n x1 x2)
@@ -482,6 +483,13 @@ instance  Enum Int  where
 "eftIntList"    [1] eftIntFB  (:) [] = eftInt
  #-}
 
+{- Note [How the Enum rules work]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Phase 2: eftInt ---> build . eftIntFB
+* Phase 1: inline build; eftIntFB (:) --> eftInt
+* Phase 0: optionally inline eftInt
+-}
+
 {-# NOINLINE [1] eftInt #-}
 eftInt :: Int# -> Int# -> [Int]
 -- [x1..x2]
@@ -510,6 +518,7 @@ eftIntFB c n x0 y | isTrue# (x0 ># y) = n
 -- efdInt and efdtInt deal with [a,b..] and [a,b..c].
 -- The code is more complicated because of worries about Int overflow.
 
+-- See Note [How the Enum rules work]
 {-# RULES
 "efdtInt"       [~1] forall x1 x2 y.
                      efdtInt x1 x2 y = build (\ c n -> efdtIntFB c n x1 x2 y)
@@ -667,16 +676,36 @@ instance  Enum Integer  where
     enumFromTo x lim       = enumDeltaToInteger x 1     lim
     enumFromThenTo x y lim = enumDeltaToInteger x (y-x) lim
 
+-- See Note [How the Enum rules work]
 {-# RULES
-"enumDeltaInteger"      [~1] forall x y.  enumDeltaInteger x y     = build (\c _ -> enumDeltaIntegerFB c x y)
-"efdtInteger"           [~1] forall x y l.enumDeltaToInteger x y l = build (\c n -> enumDeltaToIntegerFB c n x y l)
-"enumDeltaInteger"      [1] enumDeltaIntegerFB   (:)    = enumDeltaInteger
-"enumDeltaToInteger"    [1] enumDeltaToIntegerFB (:) [] = enumDeltaToInteger
+"enumDeltaInteger"      [~1] forall x y.   enumDeltaInteger x y         = build (\c _ -> enumDeltaIntegerFB c x y)
+"efdtInteger"           [~1] forall x d l. enumDeltaToInteger x d l     = build (\c n -> enumDeltaToIntegerFB  c n x d l)
+"efdtInteger1"          [~1] forall x l.   enumDeltaToInteger x 1 l     = build (\c n -> enumDeltaToInteger1FB c n x l)
+
+"enumDeltaToInteger1FB" [1] forall c n x.  enumDeltaToIntegerFB c n x 1 = enumDeltaToInteger1FB c n x
+
+"enumDeltaInteger"      [1] enumDeltaIntegerFB    (:)     = enumDeltaInteger
+"enumDeltaToInteger"    [1] enumDeltaToIntegerFB  (:) []  = enumDeltaToInteger
+"enumDeltaToInteger1"   [1] enumDeltaToInteger1FB (:) []  = enumDeltaToInteger1
  #-}
+
+{- Note [Enum Integer rules for literal 1]
+The "1" rules above specialise for the common case where delta = 1,
+so that we can avoid the delta>=0 test in enumDeltaToIntegerFB.
+Then enumDeltaToInteger1FB is nice and small and can be inlined,
+which would allow the constructor to be inlined and good things to happen.
+
+We match on the literal "1" both in phase 2 (rule "efdtInteger1") and
+phase 1 (rule "enumDeltaToInteger1FB"), just for belt and braces
+
+We do not do it for Int this way because hand-tuned code already exists, and
+the special case varies more from the general case, due to the issue of overflows.
+-}
 
 {-# NOINLINE [0] enumDeltaIntegerFB #-}
 enumDeltaIntegerFB :: (Integer -> b -> b) -> Integer -> Integer -> b
-enumDeltaIntegerFB c x d = x `seq` (x `c` enumDeltaIntegerFB c (x+d) d)
+enumDeltaIntegerFB c x d = go x
+  where go x = x `seq` (x `c` go (x+d))
 
 {-# NOINLINE [1] enumDeltaInteger #-}
 enumDeltaInteger :: Integer -> Integer -> [Integer]
@@ -693,20 +722,28 @@ enumDeltaToIntegerFB c n x delta lim
   | delta >= 0 = up_fb c n x delta lim
   | otherwise  = dn_fb c n x delta lim
 
-{-# RULES
-"enumDeltaToInteger1"   [0] forall c n x . enumDeltaToIntegerFB c n x 1 = up_fb c n x 1
- #-}
--- This rule ensures that in the common case (delta = 1), we do not do the check here,
--- and also that we have the chance to inline up_fb, which would allow the constructor to be
--- inlined and good things to happen.
--- We do not do it for Int this way because hand-tuned code already exists, and
--- the special case varies more from the general case, due to the issue of overflows.
+{-# NOINLINE [0] enumDeltaToInteger1FB #-}
+-- Don't inline this until RULE "enumDeltaToInteger" has had a chance to fire
+enumDeltaToInteger1FB :: (Integer -> a -> a) -> a
+                      -> Integer -> Integer -> a
+enumDeltaToInteger1FB c n x0 lim = go (x0 :: Integer)
+                      where
+                        go x | x > lim   = n
+                             | otherwise = x `c` go (x+1)
 
 {-# NOINLINE [1] enumDeltaToInteger #-}
 enumDeltaToInteger :: Integer -> Integer -> Integer -> [Integer]
 enumDeltaToInteger x delta lim
   | delta >= 0 = up_list x delta lim
   | otherwise  = dn_list x delta lim
+
+{-# NOINLINE [1] enumDeltaToInteger1 #-}
+enumDeltaToInteger1 :: Integer -> Integer -> [Integer]
+-- Special case for Delta = 1
+enumDeltaToInteger1 x0 lim = go (x0 :: Integer)
+                      where
+                        go x | x > lim   = []
+                             | otherwise = x : go (x+1)
 
 up_fb :: (Integer -> a -> a) -> a -> Integer -> Integer -> Integer -> a
 up_fb c n x0 delta lim = go (x0 :: Integer)

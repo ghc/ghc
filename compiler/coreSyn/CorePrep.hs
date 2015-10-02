@@ -30,7 +30,6 @@ import Type
 import Literal
 import Coercion
 import TcEnv
-import TcRnMonad
 import TyCon
 import Demand
 import Var
@@ -57,8 +56,13 @@ import Config
 import Name             ( NamedThing(..), nameSrcSpan )
 import SrcLoc           ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import Data.Bits
+import MonadUtils       ( mapAccumLM )
 import Data.List        ( mapAccumL )
 import Control.Monad
+
+#if __GLASGOW_HASKELL__ < 710
+import Control.Applicative
+#endif
 
 {-
 -- ---------------------------------------------------------------------------
@@ -1153,21 +1157,21 @@ data CorePrepEnv = CPE {
 lookupMkIntegerName :: DynFlags -> HscEnv -> IO Id
 lookupMkIntegerName dflags hsc_env
     = guardIntegerUse dflags $ liftM tyThingId $
-      initTcForLookup hsc_env (tcLookupGlobal mkIntegerName)
+      lookupGlobal hsc_env mkIntegerName
 
 lookupIntegerSDataConName :: DynFlags -> HscEnv -> IO (Maybe DataCon)
 lookupIntegerSDataConName dflags hsc_env = case cIntegerLibraryType of
-    IntegerGMP -> guardIntegerUse dflags $ liftM Just $
-                  initTcForLookup hsc_env (tcLookupDataCon integerSDataConName)
+    IntegerGMP -> guardIntegerUse dflags $ liftM (Just . tyThingDataCon) $
+                  lookupGlobal hsc_env integerSDataConName
     IntegerSimple -> return Nothing
 
 -- | Helper for 'lookupMkIntegerName' and 'lookupIntegerSDataConName'
 guardIntegerUse :: DynFlags -> IO a -> IO a
 guardIntegerUse dflags act
   | thisPackage dflags == primPackageKey
-    = return $ panic "Can't use Integer in ghc-prim"
+  = return $ panic "Can't use Integer in ghc-prim"
   | thisPackage dflags == integerPackageKey
-    = return $ panic "Can't use Integer in integer-*"
+  = return $ panic "Can't use Integer in integer-*"
   | otherwise = act
 
 mkInitialCorePrepEnv :: DynFlags -> HscEnv -> IO CorePrepEnv

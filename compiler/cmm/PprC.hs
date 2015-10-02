@@ -249,7 +249,7 @@ pprStmt stmt =
           = pprCall fn cconv hresults hargs
 
     CmmBranch ident          -> pprBranch ident
-    CmmCondBranch expr yes no -> pprCondBranch expr yes no
+    CmmCondBranch expr yes no _ -> pprCondBranch expr yes no
     CmmCall { cml_target = expr } -> mkJMP_ (pprExpr expr) <> semi
     CmmSwitch arg ids        -> sdocWithDynFlags $ \dflags ->
                                 pprSwitch dflags arg ids
@@ -1042,7 +1042,7 @@ te_Stmt (CmmUnsafeForeignCall target rs es)
   = do  te_Target target
         mapM_ te_temp rs
         mapM_ te_Expr es
-te_Stmt (CmmCondBranch e _ _)   = te_Expr e
+te_Stmt (CmmCondBranch e _ _ _) = te_Expr e
 te_Stmt (CmmSwitch e _)         = te_Expr e
 te_Stmt (CmmCall { cml_target = e }) = te_Expr e
 te_Stmt _                       = return ()

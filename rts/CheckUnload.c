@@ -188,7 +188,7 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd)
 
             case ARR_WORDS:
                 prim = rtsTrue;
-                size = arr_words_sizeW((StgArrWords*)p);
+                size = arr_words_sizeW((StgArrBytes*)p);
                 break;
 
             case MUT_ARR_PTRS_CLEAN:

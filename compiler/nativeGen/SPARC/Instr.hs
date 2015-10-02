@@ -43,7 +43,6 @@ import BlockId
 import DynFlags
 import Cmm
 import FastString
-import FastBool
 import Outputable
 import Platform
 
@@ -279,8 +278,8 @@ interesting :: Platform -> Reg -> Bool
 interesting platform reg
  = case reg of
         RegVirtual _                    -> True
-        RegReal (RealRegSingle r1)      -> isFastTrue (freeReg platform r1)
-        RegReal (RealRegPair r1 _)      -> isFastTrue (freeReg platform r1)
+        RegReal (RealRegSingle r1)      -> freeReg platform r1
+        RegReal (RealRegPair r1 _)      -> freeReg platform r1
 
 
 

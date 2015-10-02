@@ -16,6 +16,7 @@ test('drvfail016',
      extra_clean(['drvfail016.hi-boot', 'drvfail016.o-boot']),
      run_command,
      ['$MAKE --no-print-directory -s drvfail016'])
+test('T1830_1', normal, compile_fail, [''])
 test('T2394', normal, compile_fail, [''])
 # T2604 was removed as it was out of date re: fixing #9858
 test('T2701', normal, compile_fail, [''])
@@ -51,6 +52,8 @@ test('T6147', normal, compile_fail, [''])
 test('T8851', normal, compile_fail, [''])
 test('T9071', normal, multimod_compile_fail, ['T9071',''])
 test('T9071_2', normal, compile_fail, [''])
+test('T9600',  normal, compile_fail, [''])
+test('T9600-1', normal, compile_fail, [''])
 test('T9687', normal, compile_fail, [''])
 
 test('T8984', normal, compile_fail, [''])

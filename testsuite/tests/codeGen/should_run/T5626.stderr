@@ -1,1 +1,4 @@
 T5626: Prelude.undefined
+CallStack:
+  error, called at libraries/base/GHC/Err.hs:42:14 in base:GHC.Err
+  undefined, called at T5626.hs:6:30 in main:Main

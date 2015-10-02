@@ -13,6 +13,7 @@
 #include "rts/Bytecodes.h"  /* for InstrPtr */
 
 #include "sm/Storage.h"
+#include "Hash.h"
 #include "Printer.h"
 #include "RtsUtils.h"
 
@@ -28,14 +29,6 @@
  * ------------------------------------------------------------------------*/
 
 static void    printStdObjPayload( StgClosure *obj );
-#ifdef USING_LIBBFD
-static void    reset_table   ( int size );
-static void    prepare_table ( void );
-static void    insert        ( StgWord value, const char *name );
-#endif
-#if 0 /* unused but might be useful sometime */
-static rtsBool lookup_name   ( char *name, StgWord *result );
-#endif
 
 /* --------------------------------------------------------------------------
  * Printer
@@ -304,8 +297,8 @@ printClosure( StgClosure *obj )
         {
             StgWord i;
             debugBelch("ARR_WORDS(\"");
-            for (i=0; i<arr_words_words((StgArrWords *)obj); i++)
-              debugBelch("%" FMT_Word, (W_)((StgArrWords *)obj)->payload[i]);
+            for (i=0; i<arr_words_words((StgArrBytes *)obj); i++)
+              debugBelch("%" FMT_Word, (W_)((StgArrBytes *)obj)->payload[i]);
             debugBelch("\")\n");
             break;
         }
@@ -593,69 +586,17 @@ void printTSO( StgTSO *tso )
 
 /* --------------------------------------------------------------------------
  * Simple lookup table
- *
- * Current implementation is pretty dumb!
+ * address -> function name
  * ------------------------------------------------------------------------*/
 
-struct entry {
-    StgWord value;
-    const char *name;
-};
-
-static nat table_size;
-static struct entry* table;
-
-#ifdef USING_LIBBFD
-static nat max_table_size;
-
-static void reset_table( int size )
-{
-    max_table_size = size;
-    table_size = 0;
-    table = (struct entry *)stgMallocBytes(size * sizeof(struct entry), "Printer.c:reset_table()");
-}
-
-static void prepare_table( void )
-{
-    /* Could sort it...  */
-}
-
-static void insert( StgWord value, const char *name )
-{
-    if ( table_size >= max_table_size ) {
-        barf( "Symbol table overflow\n" );
-    }
-    table[table_size].value = value;
-    table[table_size].name = name;
-    table_size = table_size + 1;
-}
-#endif
-
-#if 0
-static rtsBool lookup_name( char *name, StgWord *result )
-{
-    nat i;
-    for( i = 0; i < table_size && strcmp(name,table[i].name) != 0; ++i ) {
-    }
-    if (i < table_size) {
-        *result = table[i].value;
-        return rtsTrue;
-    } else {
-        return rtsFalse;
-    }
-}
-#endif
+static HashTable * add_to_fname_table = NULL;
 
 const char *lookupGHCName( void *addr )
 {
-    nat i;
-    for( i = 0; i < table_size && table[i].value != (StgWord) addr; ++i ) {
-    }
-    if (i < table_size) {
-        return table[i].name;
-    } else {
+    if (add_to_fname_table == NULL)
         return NULL;
-    }
+
+    return lookupHashTable(add_to_fname_table, (StgWord)addr);
 }
 
 /* --------------------------------------------------------------------------
@@ -727,11 +668,6 @@ extern void DEBUG_LoadSymbols( char *name )
         if (storage_needed < 0) {
             barf("can't read symbol table");
         }
-#if 0
-        if (storage_needed == 0) {
-            debugBelch("no storage needed");
-        }
-#endif
         symbol_table = (asymbol **) stgMallocBytes(storage_needed,"DEBUG_LoadSymbols");
 
         number_of_symbols = bfd_canonicalize_symtab (abfd, symbol_table);
@@ -740,10 +676,15 @@ extern void DEBUG_LoadSymbols( char *name )
             barf("can't canonicalise symbol table");
         }
 
+        if (add_to_fname_table == NULL)
+            add_to_fname_table = allocHashTable();
+
         for( i = 0; i != number_of_symbols; ++i ) {
             symbol_info info;
             bfd_get_symbol_info(abfd,symbol_table[i],&info);
             if (isReal(info.type, info.name)) {
+                insertHashTable(add_to_fname_table,
+                                info.value, (void*)info.name);
                 num_real_syms += 1;
             }
         }
@@ -753,19 +694,8 @@ extern void DEBUG_LoadSymbols( char *name )
                          number_of_symbols, num_real_syms)
                  );
 
-        reset_table( num_real_syms );
-
-        for( i = 0; i != number_of_symbols; ++i ) {
-            symbol_info info;
-            bfd_get_symbol_info(abfd,symbol_table[i],&info);
-            if (isReal(info.type, info.name)) {
-                insert( info.value, info.name );
-            }
-        }
-
         stgFree(symbol_table);
     }
-    prepare_table();
 }
 
 #else /* USING_LIBBFD */

@@ -47,7 +47,7 @@ import Type
 import Kind (returnsConstraintKind)
 import Coercion hiding (substCo)
 import TysWiredIn ( eqBoxDataCon, coercibleDataCon, mkListTy
-                  , mkBoxedTupleTy, stringTy, typeNatKind, typeSymbolKind )
+                  , mkBoxedTupleTy, charTy, typeNatKind, typeSymbolKind )
 import Id
 import MkId(proxyHashId)
 import Class
@@ -67,9 +67,7 @@ import Bag
 import BasicTypes hiding ( TopLevel )
 import DynFlags
 import FastString
-import ErrUtils( MsgDoc )
 import Util
-import Control.Monad( when )
 import MonadUtils
 import Control.Monad(liftM)
 import Fingerprint(Fingerprint(..), fingerprintString)
@@ -460,8 +458,10 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
 
        ; spec_rhs <- dsHsWrapper spec_co poly_rhs
 
-       ; when (isInlinePragma id_inl && wopt Opt_WarnPointlessPragmas dflags)
-              (warnDs (specOnInline poly_name))
+-- Commented out: see Note [SPECIALISE on INLINE functions]
+--       ; when (isInlinePragma id_inl)
+--              (warnDs $ ptext (sLit "SPECIALISE pragma on INLINE function probably won't fire:")
+--                        <+> quotes (ppr poly_name))
 
        ; return (Just (unitOL (spec_id, spec_rhs), rule))
             -- NB: do *not* use makeCorePair on (spec_id,spec_rhs), because
@@ -503,11 +503,20 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              | otherwise   = spec_prag_act                   -- Specified by user
 
 
-specOnInline :: Name -> MsgDoc
-specOnInline f = ptext (sLit "SPECIALISE pragma on INLINE function probably won't fire:")
-                 <+> quotes (ppr f)
 
-{-
+{- Note [SPECIALISE on INLINE functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We used to warn that using SPECIALISE for a function marked INLINE
+would be a no-op; but it isn't!  Especially with worker/wrapper split
+we might have
+   {-# INLINE f #-}
+   f :: Ord a => Int -> a -> ...
+   f d x y = case x of I# x' -> $wf d x' y
+
+We might want to specialise 'f' so that we in turn specialise '$wf'.
+We can't even /name/ '$wf' in the source code, so we can't specialise
+it even if we wanted to.  Trac #10721 is a case in point.
+
 Note [Activation pragmas for SPECIALISE]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 From a user SPECIALISE pragma for f, we generate
@@ -798,7 +807,7 @@ dsHsWrapper (WpFun c1 c2 t1 _) e = do { x <- newSysLocalDs t1
                                       ; e2 <- dsHsWrapper c2 (e `mkCoreAppDs` e1)
                                       ; return (Lam x e2) }
 dsHsWrapper (WpCast co)       e = ASSERT(tcCoercionRole co == Representational)
-                                  dsTcCoercion co (mkCast e)
+                                  dsTcCoercion co (mkCastDs e)
 dsHsWrapper (WpEvLam ev)      e = return $ Lam ev e
 dsHsWrapper (WpTyLam tv)      e = return $ Lam tv e
 dsHsWrapper (WpEvApp    tm)   e = liftM (App e) (dsEvTerm tm)
@@ -839,7 +848,7 @@ dsEvTerm (EvId v) = return (Var v)
 
 dsEvTerm (EvCast tm co)
   = do { tm' <- dsEvTerm tm
-       ; dsTcCoercion co $ mkCast tm' }
+       ; dsTcCoercion co $ mkCastDs tm' }
                         -- 'v' is always a lifted evidence variable so it is
                         -- unnecessary to call varToCoreExpr v here.
 
@@ -920,7 +929,7 @@ dsEvTypeable ev =
                 $ mkLams [mkWildValBinder proxyT] (Var repName)
 
      -- package up the method as `Typeable` dictionary
-     return $ mkCast method $ mkSymCo $ getTypeableCo tyCl ty
+     return $ mkCastDs method $ mkSymCo $ getTypeableCo tyCl ty
 
   where
   -- co: method -> Typeable k t
@@ -933,7 +942,7 @@ dsEvTypeable ev =
   getRep tc (ev,t) =
     do typeableExpr <- dsEvTerm ev
        let co     = getTypeableCo tc t
-           method = mkCast typeableExpr co
+           method = mkCastDs typeableExpr co
            proxy  = mkTyApps (Var proxyHashId) [typeKind t, t]
        return (mkApps method [proxy])
 
@@ -1005,7 +1014,7 @@ dsEvCallStack cs = do
   let srcLocTy     = mkTyConTy srcLocTyCon
   let mkSrcLoc l =
         liftM (mkCoreConApps srcLocDataCon)
-              (sequence [ mkStringExprFS (packageKeyFS $ modulePackageKey m)
+              (sequence [ mkStringExpr (showPpr df $ modulePackageKey m)
                         , mkStringExprFS (moduleNameFS $ moduleName m)
                         , mkStringExprFS (srcSpanFile l)
                         , return $ mkIntExprInt df (srcSpanStartLine l)
@@ -1014,7 +1023,10 @@ dsEvCallStack cs = do
                         , return $ mkIntExprInt df (srcSpanEndCol l)
                         ])
 
-  let callSiteTy = mkBoxedTupleTy [stringTy, srcLocTy]
+  -- Be careful to use [Char] instead of String here to avoid
+  -- unnecessary dependencies on GHC.Base, particularly when
+  -- building GHC.Err.absentError
+  let callSiteTy = mkBoxedTupleTy [mkListTy charTy, srcLocTy]
 
   matchId         <- newSysLocalDs $ mkListTy callSiteTy
 
@@ -1042,7 +1054,7 @@ dsEvCallStack cs = do
                   -- so we use unwrapIP to strip the dictionary wrapper
                   -- See Note [Overview of implicit CallStacks]
                   let ip_co = unwrapIP (exprType tmExpr)
-                  return (pushCS nameExpr locExpr (mkCast tmExpr ip_co))
+                  return (pushCS nameExpr locExpr (mkCastDs tmExpr ip_co))
   case cs of
     EvCsTop name loc tm -> mkPush name loc tm
     EvCsPushCall name loc tm -> mkPush (occNameFS $ getOccName name) loc tm

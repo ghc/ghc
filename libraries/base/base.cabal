@@ -142,11 +142,13 @@ Library
         Data.Int
         Data.Ix
         Data.List
+        Data.List.NonEmpty
         Data.Maybe
         Data.Monoid
         Data.Ord
         Data.Proxy
         Data.Ratio
+        Data.Semigroup
         Data.STRef
         Data.STRef.Lazy
         Data.STRef.Strict
@@ -248,7 +250,6 @@ Library
         GHC.StaticPtr
         GHC.STRef
         GHC.Show
-        GHC.SrcLoc
         GHC.Stable
         GHC.Stack
         GHC.Stats

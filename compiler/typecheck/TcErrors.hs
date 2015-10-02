@@ -33,6 +33,7 @@ import Id
 import Var
 import VarSet
 import VarEnv
+import NameSet
 import Bag
 import ErrUtils         ( ErrMsg, pprLocErrMsg )
 import BasicTypes
@@ -962,7 +963,10 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
                             -- be oriented the other way round;
                             -- see TcCanonical.canEqTyVarTyVar
   || isSigTyVar tv1 && not (isTyVarTy ty2)
-  || ctEqRel ct == ReprEq  -- the cases below don't really apply to ReprEq
+  || pprTrace "RAE1" (ppr ct $$ ppr tv1 $$ ppr ty2 $$
+                      ppr (isTyVarUnderDatatype tv1 ty2))
+     (ctEqRel ct == ReprEq && not (isTyVarUnderDatatype tv1 ty2))
+     -- the cases below don't really apply to ReprEq (except occurs check)
   = mkErrorMsgFromCt ctxt ct (vcat [ misMatchOrCND ctxt ct oriented ty1 ty2
                                    , extraTyVarInfo ctxt tv1 ty2
                                    , extra ])
@@ -974,7 +978,8 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   = mkErrorMsgFromCt ctxt ct $ (kindErrorMsg (mkTyVarTy tv1) ty2 $$ extra)
 
   | OC_Occurs <- occ_check_expand
-  , NomEq <- ctEqRel ct      -- reporting occurs check for Coercible is strange
+  , ctEqRel ct == NomEq || isTyVarUnderDatatype tv1 ty2
+         -- See Note [Occurs check error] in TcCanonical
   = do { let occCheckMsg = addArising (ctOrigin ct) $
                            hang (text "Occurs check: cannot construct the infinite type:")
                               2 (sep [ppr ty1, char '~', ppr ty2])
@@ -1530,10 +1535,9 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
 
     potential_msg
       = ppWhen (not (null unifiers) && want_potential orig) $
-        hang (if isSingleton unifiers
-              then ptext (sLit "Note: there is a potential instance available:")
-              else ptext (sLit "Note: there are several potential instances:"))
-           2 (ppr_insts (sortBy fuzzyClsInstCmp unifiers))
+        sdocWithDynFlags $ \dflags ->
+        getPprStyle $ \sty ->
+        pprPotentials dflags sty (ptext (sLit "Potential instances:")) unifiers
 
     -- Report "potential instances" only when the constraint arises
     -- directly from the user's use of an overloaded function
@@ -1587,8 +1591,10 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
                   sep [ptext (sLit "Matching givens (or their superclasses):")
                       , nest 2 (vcat matching_givens)]
 
-             ,  sep [ptext (sLit "Matching instances:"),
-                     nest 2 (vcat [pprInstances ispecs, pprInstances unifiers])]
+             ,  sdocWithDynFlags $ \dflags ->
+                getPprStyle $ \sty ->
+                pprPotentials dflags sty (ptext (sLit "Matching instances:")) $
+                ispecs ++ unifiers
 
              ,  ppWhen (null matching_givens && isSingleton matches && null unifiers) $
                 -- Intuitively, some given matched the wanted in their
@@ -1670,17 +1676,86 @@ show_fixes []     = empty
 show_fixes (f:fs) = sep [ ptext (sLit "Possible fix:")
                         , nest 2 (vcat (f : map (ptext (sLit "or") <+>) fs))]
 
-ppr_insts :: [ClsInst] -> SDoc
-ppr_insts insts
-  = pprInstances (take 3 insts) $$ dot_dot_message
-  where
-    n_extra = length insts - 3
-    dot_dot_message
-       | n_extra <= 0 = empty
-       | otherwise    = ptext (sLit "...plus")
-                        <+> speakNOf n_extra (ptext (sLit "other"))
+pprPotentials :: DynFlags -> PprStyle -> SDoc -> [ClsInst] -> SDoc
+-- See Note [Displaying potential instances]
+pprPotentials dflags sty herald insts
+  | null insts
+  = empty
 
-----------------------
+  | null show_these
+  = hang herald
+       2 (vcat [ not_in_scope_msg empty
+               , flag_hint ])
+
+  | otherwise
+  = hang herald
+       2 (vcat [ pprInstances show_these
+               , ppWhen (n_in_scope_hidden > 0) $
+                 ptext (sLit "...plus")
+                   <+> speakNOf n_in_scope_hidden (ptext (sLit "other"))
+               , not_in_scope_msg (ptext (sLit "...plus"))
+               , flag_hint ])
+  where
+    n_show = 3 :: Int
+    show_potentials = gopt Opt_PrintPotentialInstances dflags
+
+    (in_scope, not_in_scope) = partition inst_in_scope insts
+    sorted = sortBy fuzzyClsInstCmp in_scope
+    show_these | show_potentials = sorted
+               | otherwise       = take n_show sorted
+    n_in_scope_hidden = length sorted - length show_these
+
+       -- "in scope" means that all the type constructors
+       -- are lexically in scope; these instances are likely
+       -- to be more useful
+    inst_in_scope :: ClsInst -> Bool
+    inst_in_scope cls_inst = foldNameSet ((&&) . name_in_scope) True $
+                             orphNamesOfTypes (is_tys cls_inst)
+
+    name_in_scope name
+      | isBuiltInSyntax name
+      = True -- E.g. (->)
+      | Just mod <- nameModule_maybe name
+      = qual_in_scope (qualName sty mod (nameOccName name))
+      | otherwise
+      = True
+
+    qual_in_scope :: QualifyName -> Bool
+    qual_in_scope NameUnqual    = True
+    qual_in_scope (NameQual {}) = True
+    qual_in_scope _             = False
+
+    not_in_scope_msg herald
+      | null not_in_scope
+      = empty
+      | otherwise
+      = hang (herald <+> speakNOf (length not_in_scope)
+                                  (ptext (sLit "instance involving out-of-scope types")))
+           2 (ppWhen show_potentials (pprInstances not_in_scope))
+
+    flag_hint = ppUnless (show_potentials || length show_these == length insts) $
+                ptext (sLit "(use -fprint-potential-instances to see them all)")
+
+{- Note [Displaying potential instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When showing a list of instances for
+  - overlapping instances (show ones that match)
+  - no such instance (show ones that could match)
+we want to give it a bit of structure.  Here's the plan
+
+* Say that an instance is "in scope" if all of the
+  type constructors it mentions are lexically in scope.
+  These are the ones most likely to be useful to the programmer.
+
+* Show at most n_show in-scope instances,
+  and summarise the rest ("plus 3 others")
+
+* Summarise the not-in-scope instances ("plus 4 not in scope")
+
+* Add the flag -fshow-potential-instances which replaces the
+  summary with the full list
+-}
+
 quickFlattenTy :: TcType -> TcM TcType
 -- See Note [Flattening in error message generation]
 quickFlattenTy ty | Just ty' <- tcView ty = quickFlattenTy ty'
@@ -1701,13 +1776,12 @@ quickFlattenTy (TyConApp tc tys)
     | otherwise
     = do { let (funtys,resttys) = splitAt (tyConArity tc) tys
                 -- Ignore the arguments of the type family funtys
-         ; v <- newMetaTyVar (TauTv False) (typeKind (TyConApp tc funtys))
+         ; v <- newMetaTyVar TauTv (typeKind (TyConApp tc funtys))
          ; flat_resttys <- mapM quickFlattenTy resttys
          ; return (foldl AppTy (mkTyVarTy v) flat_resttys) }
 
-{-
-Note [Flattening in error message generation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Flattening in error message generation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider (C (Maybe (F x))), where F is a type function, and we have
 instances
                 C (Maybe Int) and C (Maybe a)

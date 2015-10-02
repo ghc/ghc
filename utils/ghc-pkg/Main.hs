@@ -973,7 +973,7 @@ registerPackage input verbosity my_flags multi_instance
       infoLn "done."
 
   -- report any warnings from the parse phase
-  _ <- reportValidateErrors [] ws
+  _ <- reportValidateErrors verbosity [] ws
          (display (sourcePackageId pkg) ++ ": Warning: ") Nothing
 
   -- validate the expanded pkg, but register the unexpanded
@@ -1465,13 +1465,13 @@ checkConsistency verbosity my_flags = do
                                                        True True
          if null es
             then do when (not simple_output) $ do
-                      _ <- reportValidateErrors [] ws "" Nothing
+                      _ <- reportValidateErrors verbosity [] ws "" Nothing
                       return ()
                     return []
             else do
               when (not simple_output) $ do
                   reportError ("There are problems in package " ++ display (sourcePackageId p) ++ ":")
-                  _ <- reportValidateErrors es ws "  " Nothing
+                  _ <- reportValidateErrors verbosity es ws "  " Nothing
                   return ()
               return [p]
 
@@ -1550,9 +1550,9 @@ liftIO :: IO a -> Validate a
 liftIO k = V (k >>= \a -> return (a,[],[]))
 
 -- returns False if we should die
-reportValidateErrors :: [ValidateError] -> [ValidateWarning]
+reportValidateErrors :: Verbosity -> [ValidateError] -> [ValidateWarning]
                      -> String -> Maybe Force -> IO Bool
-reportValidateErrors es ws prefix mb_force = do
+reportValidateErrors verbosity es ws prefix mb_force = do
   mapM_ (warn . (prefix++)) ws
   oks <- mapM report es
   return (and oks)
@@ -1560,7 +1560,8 @@ reportValidateErrors es ws prefix mb_force = do
     report (f,s)
       | Just force <- mb_force
       = if (force >= f)
-           then do reportError (prefix ++ s ++ " (ignoring)")
+           then do when (verbosity >= Normal) $
+                        reportError (prefix ++ s ++ " (ignoring)")
                    return True
            else if f < CannotForce
                    then do reportError (prefix ++ s ++ " (use --force to override)")
@@ -1584,7 +1585,8 @@ validatePackageConfig pkg verbosity db_stack
   (_,es,ws) <- runValidate $
                  checkPackageConfig pkg verbosity db_stack
                                     multi_instance update
-  ok <- reportValidateErrors es ws (display (sourcePackageId pkg) ++ ": ") (Just force)
+  ok <- reportValidateErrors verbosity es ws
+          (display (sourcePackageId pkg) ++ ": ") (Just force)
   when (not ok) $ exitWith (ExitFailure 1)
 
 checkPackageConfig :: InstalledPackageInfo
@@ -1665,7 +1667,8 @@ checkDuplicates db_stack pkg multi_instance update = do
         uncasep = map toLower . display
         dups = filter ((== uncasep pkgid) . uncasep) (map sourcePackageId pkgs)
 
-  when (not update && not (null dups)) $ verror ForceAll $
+  when (not update && not multi_instance
+                   && not (null dups)) $ verror ForceAll $
         "Package names may be treated case-insensitively in the future.\n"++
         "Package " ++ display pkgid ++
         " overlaps with: " ++ unwords (map display dups)

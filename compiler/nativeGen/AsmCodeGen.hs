@@ -1046,12 +1046,12 @@ cmmStmtConFold stmt
                  args' <- mapM (cmmExprConFold DataReference) args
                  return $ CmmUnsafeForeignCall target' regs args'
 
-        CmmCondBranch test true false
+        CmmCondBranch test true false likely
            -> do test' <- cmmExprConFold DataReference test
                  return $ case test' of
                    CmmLit (CmmInt 0 _) -> CmmBranch false
                    CmmLit (CmmInt _ _) -> CmmBranch true
-                   _other -> CmmCondBranch test' true false
+                   _other -> CmmCondBranch test' true false likely
 
         CmmSwitch expr ids
            -> do expr' <- cmmExprConFold DataReference expr

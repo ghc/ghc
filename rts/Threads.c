@@ -602,7 +602,15 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
                   "allocating new stack chunk of size %d bytes",
                   chunk_size * sizeof(W_));
 
+    // Charge the current thread for allocating stack.  Stack usage is
+    // non-deterministic, because the chunk boundaries might vary from
+    // run to run, but accounting for this is better than not
+    // accounting for it, since a deep recursion will otherwise not be
+    // subject to allocation limits.
+    cap->r.rCurrentTSO = tso;
     new_stack = (StgStack*) allocate(cap, chunk_size);
+    cap->r.rCurrentTSO = NULL;
+
     SET_HDR(new_stack, &stg_STACK_info, old_stack->header.prof.ccs);
     TICK_ALLOC_STACK(chunk_size);
 

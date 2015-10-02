@@ -25,10 +25,13 @@ to get a visibly-bottom value.
 -}
 
 module GHC.Exception ( SomeException, errorCallException,
+                       errorCallWithCallStackException,
                        divZeroException, overflowException, ratioZeroDenomException
     ) where
-import GHC.Types( Char )
+import GHC.Types( Char, CallStack )
 
 data SomeException
 divZeroException, overflowException, ratioZeroDenomException  :: SomeException
+
 errorCallException :: [Char] -> SomeException
+errorCallWithCallStackException :: [Char] -> CallStack -> SomeException

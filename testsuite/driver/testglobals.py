@@ -54,8 +54,8 @@ class TestConfig:
         # Verbosity level
         self.verbose = 3
 
-        # run the "fast" version of the test suite
-        self.fast = 0
+        # See Note [validate and testsuite speed] in toplevel Makefile.
+        self.speed = 1
 
         self.list_broken = False
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE QuasiQuotes #-}
 
 module Main where
@@ -89,6 +90,30 @@ patterns = [
     [p16|unused|] -> True
  ]
 
+--------------------------------------------------------------------------------
+--                                  Types                                     --
+--------------------------------------------------------------------------------
+
+-------------- Completely-unresolved types
+_t1  = 1 `Plus` (1 `Times` 1) :: $( int $+? (int $*? int) )
+_t2  = 1 `Plus` (1 `Times` 1) :: $( (int $+? int) $*? int )
+_t3  = (1 `Plus` 1) `Plus` 1  :: $( int $+? (int $+? int) )
+_t4  = (1 `Plus` 1) `Plus` 1  :: $( (int $+? int) $+? int )
+-------------- Completely-resolved types
+_t5  = 1 `Plus` (1 `Times` 1) :: $( int $+! (int $*! int) )
+_t6  = (1 `Plus` 1) `Times` 1 :: $( (int $+! int) $*! int )
+_t7  = 1 `Plus` (1 `Plus` 1)  :: $( int $+! (int $+! int) )
+_t8  = (1 `Plus` 1) `Plus` 1  :: $( (int $+! int) $+! int )
+-------------- Mixed resolved/unresolved
+_t9  = ((1 `Plus` 1) `Times` 1) `Plus` 1 :: $( (int $+! int) $*? (int $+? int) )
+_t10 = 1 `Plus` (1 `Times` (1 `Plus` 1)) :: $( (int $+? int) $*? (int $+! int) )
+_t11 = (1 `Plus` 1) `Times` (1 `Plus` 1) :: $( (int $+? int) $*! (int $+! int) )
+_t12 = (1 `Plus` 1) `Times` (1 `Plus` 1) :: $( (int $+? int) $*! (int $+? int) )
+-------------- Parens
+_t13 = (1 `Plus` (1 `Times` 1)) `Plus` (1 `Times` 1) :: $( ((parensT ((int $+? int) $*? int)) $+? int) $*? int )
+_t14 = (1 `Plus` 1) `Times` (1 `Plus` 1)             :: $( (parensT (int $+? int)) $*? (parensT (int $+? int)) )
+_t15 = (1 `Plus` (1 `Times` 1)) `Plus` 1             :: $( parensT ((int $+? int) $*? (int $+? int)) )
+
 main = do
   mapM_ print exprs
   mapM_ print patterns
@@ -97,13 +122,19 @@ main = do
   runQ [|(N :* N) :+ N|] >>= print
   runQ [p|N :* N :+ N|] >>= print
   runQ [p|(N :* N) :+ N|] >>= print
+  runQ [t|Int * Int + Int|] >>= print
+  runQ [t|(Int * Int) + Int|] >>= print
 
   -- pretty-printing of unresolved infix expressions
   let ne = ConE $ mkName "N"
       np = ConP (mkName "N") []
+      nt = ConT (mkName "Int")
       plusE = ConE (mkName ":+")
       plusP = (mkName ":+")
+      plusT = (mkName "+")
   putStrLn $ pprint (InfixE (Just ne) plusE (Just $ UInfixE ne plusE (UInfixE ne plusE ne)))
   putStrLn $ pprint (ParensE ne)
   putStrLn $ pprint (InfixP np plusP (UInfixP np plusP (UInfixP np plusP np)))
   putStrLn $ pprint (ParensP np)
+  putStrLn $ pprint (InfixT nt plusT (UInfixT nt plusT (UInfixT nt plusT nt)))
+  putStrLn $ pprint (ParensT nt)

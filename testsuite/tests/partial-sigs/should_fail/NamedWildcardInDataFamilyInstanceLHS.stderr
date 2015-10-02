@@ -1,0 +1,4 @@
+
+NamedWildcardInDataFamilyInstanceLHS.hs:8:21: error:
+    Unexpected wild card: ‘_a’
+    In the data type declaration for ‘Sing’

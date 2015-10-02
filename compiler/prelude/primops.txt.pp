@@ -1115,7 +1115,13 @@ primop  SizeofByteArrayOp "sizeofByteArray#" GenPrimOp
 
 primop  SizeofMutableByteArrayOp "sizeofMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int#
-   {Return the size of the array in bytes.}
+   {Return the size of the array in bytes. Note that this is deprecated as it is
+   unsafe in the presence of concurrent resize operations on the same byte
+   array. See {\tt getSizeofMutableByteArray}.}
+
+primop  GetSizeofMutableByteArrayOp "getSizeofMutableByteArray#" GenPrimOp
+   MutableByteArray# s -> State# s -> (# State# s, Int# #)
+   {Return the number of elements in the array.}
 
 primop IndexByteArrayOp_Char "indexCharArray#" GenPrimOp
    ByteArray# -> Int# -> Char#
@@ -1960,7 +1966,8 @@ primop  CatchOp "catch#" GenPrimOp
    has_side_effects = True
 
 primop  RaiseOp "raise#" GenPrimOp
-   a -> b
+   b -> o
+      -- NB: the type variable "o" is "a", but with OpenKind
    with
    strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
       -- NB: result is bottom
@@ -2074,7 +2081,7 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
 
 primop  Check "check#" GenPrimOp
       (State# RealWorld -> (# State# RealWorld, a #) )
-   -> (State# RealWorld -> (# State# RealWorld, () #) )
+   -> (State# RealWorld -> State# RealWorld)
    with
    out_of_line = True
    has_side_effects = True
@@ -2325,7 +2332,8 @@ primtype Weak# b
 -- note that tyvar "o" denotes openAlphaTyVar
 
 primop  MkWeakOp "mkWeak#" GenPrimOp
-   o -> b -> c -> State# RealWorld -> (# State# RealWorld, Weak# b #)
+   o -> b -> (State# RealWorld -> (# State# RealWorld, c #))
+     -> State# RealWorld -> (# State# RealWorld, Weak# b #)
    with
    has_side_effects = True
    out_of_line      = True
@@ -2357,7 +2365,12 @@ primop  DeRefWeakOp "deRefWeak#" GenPrimOp
 
 primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
    Weak# a -> State# RealWorld -> (# State# RealWorld, Int#,
-              (State# RealWorld -> (# State# RealWorld, () #)) #)
+              (State# RealWorld -> (# State# RealWorld, b #) ) #)
+   { Finalize a weak pointer. The return value is an unboxed tuple
+     containing the new state of the world and an "unboxed Maybe",
+     represented by an {\tt Int#} and a (possibly invalid) finalization
+     action. An {\tt Int#} of {\tt 1} indicates that the finalizer is valid. The
+     return value {\tt b} from the finalizer should be ignored. }
    with
    has_side_effects = True
    out_of_line      = True

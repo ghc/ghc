@@ -14,7 +14,7 @@ module SimplUtils (
         preInlineUnconditionally, postInlineUnconditionally,
         activeUnfolding, activeRule,
         getUnfoldingInRuleMatch,
-        simplEnvForGHCi, updModeForStableUnfoldings,
+        simplEnvForGHCi, updModeForStableUnfoldings, updModeForRuleLHS,
 
         -- The continuation type
         SimplCont(..), DupFlag(..),
@@ -701,7 +701,25 @@ updModeForStableUnfoldings inline_rule_act current_mode
     phaseFromActivation (ActiveAfter n) = Phase n
     phaseFromActivation _               = InitialPhase
 
-{-
+updModeForRuleLHS :: SimplifierMode -> SimplifierMode
+-- See Note [Simplifying rule LHSs]
+updModeForRuleLHS current_mode
+  = current_mode { sm_phase  = InitialPhase
+                 , sm_inline = False
+                 , sm_rules  = False
+                 , sm_eta_expand = False }
+
+{- Note [Simplifying rule LHSs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When simplifying on the LHS of a rule, refrain from all inlining and
+all RULES.  Doing anything to the LHS is plain confusing, because it
+means that what the rule matches is not what the user wrote.
+c.f. Trac #10595, and #10528.
+
+Moreover, inlining (or applying rules) on rule LHSs risks introducing
+Ticks into the LHS, which makes matching trickier. Trac #10665, #10745.
+
+
 Note [Inlining in gentle mode]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Something is inlined if
@@ -978,14 +996,14 @@ Example
 
    ...fInt...fInt...fInt...
 
-Here f occurs just once, in the RHS of f1. But if we inline it there
+Here f occurs just once, in the RHS of fInt. But if we inline it there
 we'll lose the opportunity to inline at each of fInt's call sites.
 The INLINE pragma will only inline when the application is saturated
 for exactly this reason; and we don't want PreInlineUnconditionally
 to second-guess it.  A live example is Trac #3736.
     c.f. Note [Stable unfoldings and postInlineUnconditionally]
 
-Note [Top-level botomming Ids]
+Note [Top-level bottoming Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Don't inline top-level Ids that are bottoming, even if they are used just
 once, because FloatOut has gone to some trouble to extract them out.

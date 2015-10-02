@@ -19,24 +19,8 @@ ifeq "$3" ""
 $$(error Stage not given for distdir-opts $1 $2)
 endif
 
-ifeq "$3" "0"
-# This is a bit of a hack.
-# If we are compiling something with the bootstrapping compiler on
-# cygwin, and it uses an include file from the rts (say), then we
-# need to stop mkdependC from generating a dependincy on
-#     c:/ghc/rts/include/Rts.h
-# as that confuses make. So we use -isystem instead of -I, which stops
-# these dependencies from being generated. Technically this is wrong if
-# we depend on a library that is built inside the build tree, and we
-# use headers from that library, but currently I don't think that's the
-# case.
-$1_$2_DEP_INCLUDE_DIRS_FLAG = -isystem
-else
-$1_$2_DEP_INCLUDE_DIRS_FLAG = -I
-endif
-
 ifneq ($$(strip $$($1_$2_DEP_INCLUDE_DIRS_SINGLE_QUOTED)),)
-$1_$2_CC_INC_FLAGS := $$(subst $$(space)',$$(space)$$($1_$2_DEP_INCLUDE_DIRS_FLAG)',$$(space)$$($1_$2_DEP_INCLUDE_DIRS_SINGLE_QUOTED))
+$1_$2_CC_INC_FLAGS := $$(subst $$(space)',$$(space)-I',$$(space)$$($1_$2_DEP_INCLUDE_DIRS_SINGLE_QUOTED))
 endif
 
 # The CONF_CC_OPTS_STAGE$3 options are what we use to get gcc to

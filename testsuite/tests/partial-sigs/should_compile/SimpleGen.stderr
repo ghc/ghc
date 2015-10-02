@@ -1,5 +1,5 @@
 TYPE SIGNATURES
-  bar :: forall w_. w_ -> Bool
+  bar :: forall t. t -> Bool
 TYPE CONSTRUCTORS
 COERCION AXIOMS
 Dependent modules: []

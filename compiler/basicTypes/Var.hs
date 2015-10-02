@@ -75,7 +75,6 @@ import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, vanillaIdInfo, 
 import Name hiding (varName)
 import Unique
 import Util
-import FastTypes
 import FastString
 import Outputable
 
@@ -154,7 +153,8 @@ data Var
   = TyVar {  -- Type and kind variables
              -- see Note [Kind and type variables]
         varName    :: !Name,
-        realUnique :: FastInt,       -- Key for fast comparison
+        realUnique :: {-# UNPACK #-} !Int,
+                                     -- ^ Key for fast comparison
                                      -- Identical to the Unique in the name,
                                      -- cached here for speed
         varType    :: Kind           -- ^ The type or kind of the 'Var' in question
@@ -164,13 +164,13 @@ data Var
                                         -- Used for kind variables during
                                         -- inference, as well
         varName        :: !Name,
-        realUnique     :: FastInt,
+        realUnique     :: {-# UNPACK #-} !Int,
         varType        :: Kind,
         tc_tv_details  :: TcTyVarDetails }
 
   | Id {
         varName    :: !Name,
-        realUnique :: FastInt,
+        realUnique :: {-# UNPACK #-} !Int,
         varType    :: Type,
         idScope    :: IdScope,
         id_details :: IdDetails,        -- Stable, doesn't change
@@ -228,13 +228,13 @@ instance Uniquable Var where
   getUnique = varUnique
 
 instance Eq Var where
-    a == b = realUnique a ==# realUnique b
+    a == b = realUnique a == realUnique b
 
 instance Ord Var where
-    a <= b = realUnique a <=# realUnique b
-    a <  b = realUnique a <#  realUnique b
-    a >= b = realUnique a >=# realUnique b
-    a >  b = realUnique a >#  realUnique b
+    a <= b = realUnique a <= realUnique b
+    a <  b = realUnique a <  realUnique b
+    a >= b = realUnique a >= realUnique b
+    a >  b = realUnique a >  realUnique b
     a `compare` b = varUnique a `compare` varUnique b
 
 instance Data Var where
@@ -244,16 +244,16 @@ instance Data Var where
   dataTypeOf _ = mkNoRepType "Var"
 
 varUnique :: Var -> Unique
-varUnique var = mkUniqueGrimily (iBox (realUnique var))
+varUnique var = mkUniqueGrimily (realUnique var)
 
 setVarUnique :: Var -> Unique -> Var
 setVarUnique var uniq
-  = var { realUnique = getKeyFastInt uniq,
+  = var { realUnique = getKey uniq,
           varName = setNameUnique (varName var) uniq }
 
 setVarName :: Var -> Name -> Var
 setVarName var new_name
-  = var { realUnique = getKeyFastInt (getUnique new_name),
+  = var { realUnique = getKey (getUnique new_name),
           varName = new_name }
 
 setVarType :: Id -> Type -> Id
@@ -292,7 +292,7 @@ updateTyVarKindM update tv
 
 mkTyVar :: Name -> Kind -> TyVar
 mkTyVar name kind = TyVar { varName    = name
-                          , realUnique = getKeyFastInt (nameUnique name)
+                          , realUnique = getKey (nameUnique name)
                           , varType  = kind
                         }
 
@@ -300,7 +300,7 @@ mkTcTyVar :: Name -> Kind -> TcTyVarDetails -> TyVar
 mkTcTyVar name kind details
   = -- NB: 'kind' may be a coercion kind; cf, 'TcMType.newMetaCoVar'
     TcTyVar {   varName    = name,
-                realUnique = getKeyFastInt (nameUnique name),
+                realUnique = getKey (nameUnique name),
                 varType  = kind,
                 tc_tv_details = details
         }
@@ -317,7 +317,7 @@ mkKindVar :: Name -> SuperKind -> KindVar
 -- to superKind here.
 mkKindVar name kind = TyVar
   { varName    = name
-  , realUnique = getKeyFastInt (nameUnique name)
+  , realUnique = getKey (nameUnique name)
   , varType    = kind }
 
 {-
@@ -358,7 +358,7 @@ mkExportedLocalVar details name ty info
 mk_id :: Name -> Type -> IdScope -> IdDetails -> IdInfo -> Id
 mk_id name ty scope details info
   = Id { varName    = name,
-         realUnique = getKeyFastInt (nameUnique name),
+         realUnique = getKey (nameUnique name),
          varType    = ty,
          idScope    = scope,
          id_details = details,

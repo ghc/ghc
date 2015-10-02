@@ -48,10 +48,6 @@ module Binary
    lazyGet,
    lazyPut,
 
-   ByteArray(..),
-   getByteArray,
-   putByteArray,
-
    UserData(..), getUserData, setUserData,
    newReadState, newWriteState,
    putDictionary, getDictionary, putFS,
@@ -86,10 +82,6 @@ import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
 import System.IO.Error          ( mkIOError, eofErrorType )
 import GHC.Real                 ( Ratio(..) )
-import ExtsCompat46
-import GHC.Word                 ( Word8(..) )
-
-import GHC.IO ( IO(..) )
 
 type BinArray = ForeignPtr Word8
 
@@ -484,6 +476,10 @@ instance Binary Integer where
                     _ -> fail ("Binary Integer: got " ++ show str)
 
     {-
+    -- This code is currently commented out.
+    -- See https://ghc.haskell.org/trac/ghc/ticket/3379#comment:10 for
+    -- discussion.
+
     put_ bh (S# i#) = do putByte bh 0; put_ bh (I# i#)
     put_ bh (J# s# a#) = do
         putByte bh 1
@@ -501,11 +497,6 @@ instance Binary Integer where
                   sz <- get bh
                   (BA a#) <- getByteArray bh sz
                   return (J# s# a#)
--}
-
--- As for the rest of this code, even though this module
--- exports it, it doesn't seem to be used anywhere else
--- in GHC!
 
 putByteArray :: BinHandle -> ByteArray# -> Int# -> IO ()
 putByteArray bh a s# = loop 0#
@@ -526,8 +517,9 @@ getByteArray bh (I# sz) = do
                 loop (n +# 1#)
   loop 0#
   freezeByteArray arr
+    -}
 
-
+{-
 data ByteArray = BA ByteArray#
 data MBA = MBA (MutableByteArray# RealWorld)
 
@@ -549,6 +541,7 @@ writeByteArray arr i (W8# w) = IO $ \s ->
 indexByteArray :: ByteArray# -> Int# -> Word8
 indexByteArray a# n# = W8# (indexWord8Array# a# n#)
 
+-}
 instance (Binary a) => Binary (Ratio a) where
     put_ bh (a :% b) = do put_ bh a; put_ bh b
     get bh = do a <- get bh; b <- get bh; return (a :% b)
@@ -900,6 +893,15 @@ instance Binary WarningTxt where
               _ -> do s <- get bh
                       d <- get bh
                       return (DeprecatedTxt s d)
+
+instance Binary StringLiteral where
+  put_ bh (StringLiteral st fs) = do
+            put_ bh st
+            put_ bh fs
+  get bh = do
+            st <- get bh
+            fs <- get bh
+            return (StringLiteral st fs)
 
 instance Binary a => Binary (GenLocated SrcSpan a) where
     put_ bh (L l x) = do

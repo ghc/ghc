@@ -9,7 +9,7 @@ Typechecking class declarations
 {-# LANGUAGE CPP #-}
 
 module TcClassDcl ( tcClassSigs, tcClassDecl2,
-                    findMethodBind, instantiateMethod, 
+                    findMethodBind, instantiateMethod,
                     tcClassMinimalDef,
                     HsSigFun, mkHsSigFun, lookupHsSig, emptyHsSigs,
                     tcMkDeclCtxt, tcAddDeclCtxt, badMethodErr
@@ -19,7 +19,7 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 
 import HsSyn
 import TcEnv
-import TcPat( addInlinePrags, completeSigPolyId, lookupPragEnv, emptyPragEnv )
+import TcPat( addInlinePrags, completeIdSigPolyId, lookupPragEnv, emptyPragEnv )
 import TcEvidence( idHsWrapper )
 import TcBinds
 import TcUnify
@@ -207,8 +207,8 @@ tcDefMeth clas tyvars this_dict binds_in
                 (ptext (sLit "Ignoring SPECIALISE pragmas on default method")
                  <+> quotes (ppr sel_name))
 
-       ; let hs_ty       = lookupHsSig hs_sig_fn sel_name
-                           `orElse` pprPanic "tc_dm" (ppr sel_name)
+       ; let hs_ty = lookupHsSig hs_sig_fn sel_name
+                     `orElse` pprPanic "tc_dm" (ppr sel_name)
              -- We need the HsType so that we can bring the right
              -- type variables into scope
              --
@@ -225,18 +225,19 @@ tcDefMeth clas tyvars this_dict binds_in
                              -- Substitute the local_meth_name for the binder
                              -- NB: the binding is always a FunBind
 
-       ; local_dm_sig <- instTcTySig hs_ty local_dm_ty Nothing [] local_dm_name
-       ; let local_dm_sig' = local_dm_sig { sig_warn_redundant = warn_redundant }
+             ctxt = FunSigCtxt sel_name warn_redundant
+
+       ; local_dm_sig <- instTcTySig ctxt hs_ty local_dm_ty Nothing [] local_dm_name
         ; (ev_binds, (tc_bind, _))
                <- checkConstraints (ClsSkol clas) tyvars [this_dict] $
-                  tcPolyCheck NonRecursive no_prag_fn local_dm_sig'
+                  tcPolyCheck NonRecursive no_prag_fn local_dm_sig
                               (L bind_loc lm_bind)
 
         ; let export = ABE { abe_poly  = global_dm_id
                            -- We have created a complete type signature in
                            -- instTcTySig, hence it is safe to call
                            -- completeSigPolyId
-                           , abe_mono  = completeSigPolyId local_dm_sig'
+                           , abe_mono  = completeIdSigPolyId local_dm_sig
                            , abe_wrap  = idHsWrapper
                            , abe_prags = IsDefaultMethod }
               full_bind = AbsBinds { abs_tvs      = tyvars

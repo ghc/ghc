@@ -213,7 +213,9 @@ getAllocationCounter = do
 -- to 100K, but tunable with the @+RTS -xq@ option) so that it can handle
 -- the exception and perform any necessary clean up.  If it exhausts
 -- this additional allowance, another 'AllocationLimitExceeded' exception
--- is sent, and so forth.
+-- is sent, and so forth.  Like other asynchronous exceptions, the
+-- 'AllocationLimitExceeded' exception is deferred while the thread is inside
+-- 'mask' or an exception handler in 'catch'.
 --
 -- Note that memory allocation is unrelated to /live memory/, also
 -- known as /heap residency/.  A thread can allocate a large amount of
@@ -748,7 +750,7 @@ catchSTM (STM m) handler = STM $ catchSTM# m handler'
 -- subsequent transcations, (ii) the invariant failure is indicated
 -- by raising an exception.
 checkInv :: STM a -> STM ()
-checkInv (STM m) = STM (\s -> (check# m) s)
+checkInv (STM m) = STM (\s -> case (check# m) s of s' -> (# s', () #))
 
 -- | alwaysSucceeds adds a new invariant that must be true when passed
 -- to alwaysSucceeds, at the end of the current transaction, and at
@@ -875,9 +877,7 @@ uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
          (hFlush stdout) `catchAny` (\ _ -> return ())
          let msg = case cast ex of
                Just Deadlock -> "no threads to run:  infinite loop or deadlock?"
-               _ -> case cast ex of
-                    Just (ErrorCall s) -> s
-                    _                  -> showsPrec 0 se ""
+               _                  -> showsPrec 0 se ""
          withCString "%s" $ \cfmt ->
           withCString msg $ \cmsg ->
             errorBelch cfmt cmsg

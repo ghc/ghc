@@ -36,6 +36,12 @@
             <entry>-</entry>
           </row>
           <row>
+            <entry><option>-fprint-potential-instances</option></entry>
+            <entry>display all available instances in type error messages</entry>
+            <entry>dynamic</entry>
+            <entry>-fno-print-potential-instances</entry>
+          </row>
+          <row>
             <entry><option>-fprint-explicit-foralls</option></entry>
             <entry>Print explicit <literal>forall</literal> quantification in types. See also <option>-XExplicitForAll</option></entry>
             <entry>dynamic</entry>
@@ -720,7 +726,7 @@
         <tbody>
           <row>
             <entry><option>-fconstraint-solver-iterations=</option><replaceable>n</replaceable></entry>
-	    <entry>Set the iteration limit for the type-constraint solver. 
+            <entry>Set the iteration limit for the type-constraint solver.
                    The default limit is 4. Typically one iteration
                    suffices; so please yell if you find you need to set
                    it higher than the default. Zero means infinity. </entry>
@@ -729,7 +735,7 @@
 	  </row>
           <row>
             <entry><option>-freduction-depth=</option><replaceable>n</replaceable></entry>
-	    <entry>Set the <link linkend="undecidable-instances">limit for type simplification</link>. 
+	    <entry>Set the <link linkend="undecidable-instances">limit for type simplification</link>.
                    Default is 200; zero means infinity.</entry>
 	    <entry>dynamic</entry>
 	    <entry></entry>
@@ -785,6 +791,14 @@
             <entry>dynamic</entry>
             <entry><option>-XNoArrows</option></entry>
             <entry>6.8.1</entry>
+          </row>
+          <row>
+            <entry><option>-XApplicativeDo</option></entry>
+            <entry>Enable <link linkend="applicative-do">Applicative
+            do-notation desugaring</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoApplicativeDo</option></entry>
+            <entry>7.12.1</entry>
           </row>
           <row>
             <entry><option>-XAutoDeriveTypeable</option></entry>
@@ -889,6 +903,12 @@
             <entry>dynamic</entry>
             <entry><option>-XNoDeriveGeneric</option></entry>
             <entry>7.2.1</entry>
+          </row>
+          <row>
+            <entry><option>-XDeriveLift</option></entry>
+            <entry>Enable <link linkend="deriving-lift">deriving for the Lift class</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoDeriveLift</option></entry>
           </row>
           <row>
             <entry><option>-XDeriveTraversable</option></entry>
@@ -1309,7 +1329,7 @@
           </row>
           <row>
             <entry><option>-XRelaxedPolyRec</option></entry>
-            <entry><emphasis>(deprecated)</emphasis> Relaxed checking for 
+            <entry><emphasis>(deprecated)</emphasis> Relaxed checking for
               <link linkend="typing-binds">mutually-recursive polymorphic functions</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoRelaxedPolyRec</option></entry>
@@ -1343,6 +1363,12 @@
             <entry>dynamic</entry>
             <entry><option>-XNoStandaloneDeriving</option></entry>
             <entry>6.8.1</entry>
+          </row>
+          <row>
+            <entry><option>-XStrictData</option></entry>
+            <entry>Enable <link linkend="strict-data">default strict datatype fields</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoStrictData</option></entry>
           </row>
           <row>
             <entry><option>-XTemplateHaskell</option></entry>
@@ -1961,10 +1987,11 @@
           </row>
 
           <row>
-            <entry><option>-fcpr-off</option></entry>
-            <entry>Switch off CPR analysis in the demand analyser.</entry>
-            <entry>static</entry>
-            <entry>-</entry>
+            <entry><option>-fcpr-anal</option></entry>
+            <entry>Turn on CPR analysis in the demand analyser. Implied by
+                   <option>-O</option>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-cpr-anal</option></entry>
           </row>
 
           <row>

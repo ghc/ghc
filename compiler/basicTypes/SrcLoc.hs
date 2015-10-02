@@ -42,6 +42,7 @@ module SrcLoc (
         mkGeneralSrcSpan, mkSrcSpan, mkRealSrcSpan,
         noSrcSpan,
         wiredInSrcSpan,         -- Something wired into the compiler
+        interactiveSrcSpan,
         srcLocSpan, realSrcLocSpan,
         combineSrcSpans,
 
@@ -132,7 +133,7 @@ mkRealSrcLoc x line col = SrcLoc x line col
 noSrcLoc, generatedSrcLoc, interactiveSrcLoc :: SrcLoc
 noSrcLoc          = UnhelpfulLoc (fsLit "<no location info>")
 generatedSrcLoc   = UnhelpfulLoc (fsLit "<compiler-generated code>")
-interactiveSrcLoc = UnhelpfulLoc (fsLit "<interactive session>")
+interactiveSrcLoc = UnhelpfulLoc (fsLit "<interactive>")
 
 -- | Creates a "bad" 'SrcLoc' that has no detailed information about its location
 mkGeneralSrcLoc :: FastString -> SrcLoc
@@ -279,9 +280,10 @@ data SrcSpan =
                                      -- derive Show for Token
 
 -- | Built-in "bad" 'SrcSpan's for common sources of location uncertainty
-noSrcSpan, wiredInSrcSpan :: SrcSpan
-noSrcSpan      = UnhelpfulSpan (fsLit "<no location info>")
-wiredInSrcSpan = UnhelpfulSpan (fsLit "<wired into compiler>")
+noSrcSpan, wiredInSrcSpan, interactiveSrcSpan :: SrcSpan
+noSrcSpan          = UnhelpfulSpan (fsLit "<no location info>")
+wiredInSrcSpan     = UnhelpfulSpan (fsLit "<wired into compiler>")
+interactiveSrcSpan = UnhelpfulSpan (fsLit "<interactive>")
 
 -- | Create a "bad" 'SrcSpan' that has not location information
 mkGeneralSrcSpan :: FastString -> SrcSpan

@@ -52,8 +52,6 @@ import DataCon
 import TyCon
 import Outputable
 import Type
-import RdrName
-import OccName
 import SrcLoc
 import FastString
 import Maybes

@@ -220,9 +220,12 @@ pprNode node = pp_node <+> pp_debug
       CmmBranch ident -> ptext (sLit "goto") <+> ppr ident <> semi
 
       -- if (expr) goto t; else goto f;
-      CmmCondBranch expr t f ->
+      CmmCondBranch expr t f l ->
           hsep [ ptext (sLit "if")
                , parens(ppr expr)
+               , case l of
+                   Nothing -> empty
+                   Just b -> parens (ptext (sLit "likely:") <+> ppr b)
                , ptext (sLit "goto")
                , ppr t <> semi
                , ptext (sLit "else goto")

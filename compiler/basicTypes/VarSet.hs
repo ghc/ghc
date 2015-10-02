@@ -27,6 +27,7 @@ module VarSet (
 import Var      ( Var, TyVar, CoVar, Id )
 import Unique
 import UniqSet
+import UniqFM( disjointUFM )
 
 {-
 ************************************************************************
@@ -98,7 +99,7 @@ lookupVarSet    = lookupUniqSet
 mapVarSet       = mapUniqSet
 sizeVarSet      = sizeUniqSet
 filterVarSet    = filterUniqSet
-extendVarSet_C = addOneToUniqSet_C
+extendVarSet_C  = addOneToUniqSet_C
 delVarSetByKey  = delOneFromUniqSet_Directly
 elemVarSetByKey = elemUniqSet_Directly
 partitionVarSet = partitionUniqSet
@@ -107,7 +108,7 @@ mapUnionVarSet get_set xs = foldr (unionVarSet . get_set) emptyVarSet xs
 
 -- See comments with type signatures
 intersectsVarSet s1 s2 = not (s1 `disjointVarSet` s2)
-disjointVarSet   s1 s2 = isEmptyVarSet (s1 `intersectVarSet` s2)
+disjointVarSet   s1 s2 = disjointUFM s1 s2
 subVarSet        s1 s2 = isEmptyVarSet (s1 `minusVarSet` s2)
 
 fixVarSet :: (VarSet -> VarSet)   -- Map the current set to a new set

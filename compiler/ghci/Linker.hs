@@ -562,29 +562,23 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
         -- 3.  For each dependent module, find its linkable
         --     This will either be in the HPT or (in the case of one-shot
-        --     compilation) we may need to use maybe_getFileLinkable.
-        --     If the module is actually a signature, there won't be a
-        --     linkable (thus catMaybes)
+        --     compilation) we may need to use maybe_getFileLinkable
       ; let { osuf = objectSuf dflags }
-      ; lnks_needed <- fmap Maybes.catMaybes
-                     $ mapM (get_linkable osuf) mods_needed
+      ; lnks_needed <- mapM (get_linkable osuf) mods_needed
 
       ; return (lnks_needed, pkgs_needed) }
   where
     dflags = hsc_dflags hsc_env
     this_pkg = thisPackage dflags
 
-    -- | Given a list of modules @mods@, recursively discover all external
-    -- package and local module (according to @this_pkg@) dependencies.
-    --
-    -- The 'ModIface' contains the transitive closure of the module dependencies
-    -- within the current package, *except* for boot modules: if we encounter
-    -- a boot module, we have to find its real interface and discover the
-    -- dependencies of that.  Hence we need to traverse the dependency
-    -- tree recursively.  See bug #936, testcase ghci/prog007.
-    follow_deps :: [Module]                     -- modules to follow
-                -> UniqSet ModuleName           -- accum. module dependencies
-                -> UniqSet PackageKey           -- accum. package dependencies
+        -- The ModIface contains the transitive closure of the module dependencies
+        -- within the current package, *except* for boot modules: if we encounter
+        -- a boot module, we have to find its real interface and discover the
+        -- dependencies of that.  Hence we need to traverse the dependency
+        -- tree recursively.  See bug #936, testcase ghci/prog007.
+    follow_deps :: [Module]             -- modules to follow
+                -> UniqSet ModuleName         -- accum. module dependencies
+                -> UniqSet PackageKey          -- accum. package dependencies
                 -> IO ([ModuleName], [PackageKey]) -- result
     follow_deps []     acc_mods acc_pkgs
         = return (uniqSetToList acc_mods, uniqSetToList acc_pkgs)
@@ -607,7 +601,6 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
                     where is_boot (m,True)  = Left m
                           is_boot (m,False) = Right m
 
-            -- Boot module dependencies which must be processed recursively
             boot_deps' = filter (not . (`elementOfUniqSet` acc_mods)) boot_deps
             acc_mods'  = addListToUniqSet acc_mods (moduleName mod : mod_deps)
             acc_pkgs'  = addListToUniqSet acc_pkgs $ map fst pkg_deps
@@ -638,37 +631,30 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
     get_linkable osuf mod_name      -- A home-package module
         | Just mod_info <- lookupUFM hpt mod_name
-        = adjust_linkable (hm_iface mod_info)
-            (Maybes.expectJust "getLinkDeps" (hm_linkable mod_info))
+        = adjust_linkable (Maybes.expectJust "getLinkDeps" (hm_linkable mod_info))
         | otherwise
         = do    -- It's not in the HPT because we are in one shot mode,
                 -- so use the Finder to get a ModLocation...
-                -- ezyang: I don't actually know how to trigger this codepath,
-                -- seeing as this is GHCi logic. Template Haskell, maybe?
              mb_stuff <- findHomeModule hsc_env mod_name
              case mb_stuff of
-                  FoundExact loc mod -> found loc mod
+                  Found loc mod -> found loc mod
                   _ -> no_obj mod_name
         where
             found loc mod = do {
                 -- ...and then find the linkable for it
                mb_lnk <- findObjectLinkableMaybe mod loc ;
-               iface <- initIfaceCheck hsc_env $
-                            loadUserInterface False (text "getLinkDeps2") mod ;
                case mb_lnk of {
                   Nothing  -> no_obj mod ;
-                  Just lnk -> adjust_linkable iface lnk
+                  Just lnk -> adjust_linkable lnk
               }}
 
-            adjust_linkable iface lnk
-                -- Signatures have no linkables! Don't return one.
-                | mi_hsc_src iface == HsigFile = return Nothing
+            adjust_linkable lnk
                 | Just new_osuf <- replace_osuf = do
                         new_uls <- mapM (adjust_ul new_osuf)
                                         (linkableUnlinked lnk)
-                        return (Just lnk{ linkableUnlinked=new_uls })
+                        return lnk{ linkableUnlinked=new_uls }
                 | otherwise =
-                        return (Just lnk)
+                        return lnk
 
             adjust_ul new_osuf (DotO file) = do
                 MASSERT(osuf `isSuffixOf` file)

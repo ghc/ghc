@@ -28,7 +28,9 @@ module HsTypes (
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
 
-        LBangType, BangType, HsBang(..), HsSrcBang, HsImplBang,
+        LBangType, BangType,
+        HsSrcBang(..), HsImplBang(..),
+        SrcStrictness(..), SrcUnpackedness(..),
         getBangType, getBangStrictness,
 
         ConDeclField(..), LConDeclField, pprConDeclFields,
@@ -48,6 +50,7 @@ module HsTypes (
         hsExplicitTvs,
         hsTyVarName, mkHsWithBndrs, hsLKiTyVarNames,
         hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsLTyVarLocNames,
+        hsLTyVarBndrsToTypes,
         splitLHsInstDeclTy_maybe,
         splitHsClassTy_maybe, splitLHsClassTy_maybe,
         splitHsFunType,
@@ -63,13 +66,12 @@ import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
 import PlaceHolder ( PostTc,PostRn,DataId,PlaceHolder(..) )
 
-import Name( Name, getOccName, occNameString )
-import RdrName( RdrName, rdrNameOcc )
-import DataCon( HsBang(..), HsSrcBang, HsImplBang )
+import Name( Name )
+import RdrName( RdrName )
+import DataCon( HsSrcBang(..), HsImplBang(..),
+                SrcStrictness(..), SrcUnpackedness(..) )
 import TysPrim( funTyConName )
 import Type
-import TysWiredIn
-import PrelNames( ipClassName )
 import HsDoc
 import BasicTypes
 import SrcLoc
@@ -102,7 +104,7 @@ getBangType ty                    = ty
 
 getBangStrictness :: LHsType a -> HsSrcBang
 getBangStrictness (L _ (HsBangTy s _)) = s
-getBangStrictness _                    = HsNoBang
+getBangStrictness _ = (HsSrcBang Nothing NoSrcUnpack NoSrcStrict)
 
 {-
 ************************************************************************
@@ -203,7 +205,7 @@ mkHsWithBndrs x = HsWB { hswb_cts = x, hswb_kvs = PlaceHolder
 --------------------------------------------------
 -- | These names are used early on to store the names of implicit
 -- parameters.  They completely disappear after type-checking.
-newtype HsIPName = HsIPName FastString-- ?x
+newtype HsIPName = HsIPName FastString
   deriving( Eq, Data, Typeable )
 
 hsIPNameFS :: HsIPName -> FastString
@@ -706,6 +708,20 @@ hsLTyVarLocName = fmap hsTyVarName
 
 hsLTyVarLocNames :: LHsTyVarBndrs name -> [Located name]
 hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvBndrs qtvs)
+
+-- | Convert a LHsTyVarBndr to an equivalent LHsType. Used in Template Haskell
+-- quoting for type family equations.
+hsLTyVarBndrToType :: LHsTyVarBndr name -> LHsType name
+hsLTyVarBndrToType = fmap cvt
+  where cvt (UserTyVar n)                     = HsTyVar n
+        cvt (KindedTyVar (L name_loc n) kind) = HsKindSig (L name_loc (HsTyVar n))
+                                                          kind
+
+-- | Convert a LHsTyVarBndrs to a list of types. Used in Template Haskell
+-- quoting for type family equations. Works on *type* variable only, no kind
+-- vars.
+hsLTyVarBndrsToTypes :: LHsTyVarBndrs name -> [LHsType name]
+hsLTyVarBndrsToTypes (HsQTvs { hsq_tvs = tvbs }) = map hsLTyVarBndrToType tvbs
 
 ---------------------
 mkAnonWildCardTy :: HsType RdrName

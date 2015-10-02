@@ -24,7 +24,6 @@ module BufWrite (
   ) where
 
 import FastString
-import FastTypes
 import FastMutInt
 
 import Control.Monad    ( when )
@@ -97,16 +96,15 @@ bPutCStringLen b@(BufHandle buf r hdl) cstr@(ptr, len) = do
                 copyBytes (buf `plusPtr` i) ptr len
                 writeFastMutInt r (i + len)
 
-bPutLitString :: BufHandle -> LitString -> FastInt -> IO ()
-bPutLitString b@(BufHandle buf r hdl) a len_ = a `seq` do
-  let len = iBox len_
+bPutLitString :: BufHandle -> LitString -> Int -> IO ()
+bPutLitString b@(BufHandle buf r hdl) a len = a `seq` do
   i <- readFastMutInt r
   if (i+len) >= buf_size
         then do hPutBuf hdl buf i
                 writeFastMutInt r 0
                 if (len >= buf_size)
                     then hPutBuf hdl a len
-                    else bPutLitString b a len_
+                    else bPutLitString b a len
         else do
                 copyBytes (buf `plusPtr` i) a len
                 writeFastMutInt r (i+len)

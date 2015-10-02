@@ -19,6 +19,7 @@ module TcHsType (
 
                 -- Kind-checking types
                 -- No kind generalisation, no checkValidType
+        tcWildcardBinders,
         kcHsTyVarBndrs, tcHsTyVarBndrs,
         tcHsLiftedType, tcHsOpenType,
         tcLHsType, tcCheckLHsType, tcCheckLHsTypeAndGen,
@@ -71,7 +72,7 @@ import Util
 
 import Data.Maybe( isNothing )
 import Control.Monad ( unless, when, zipWithM )
-import PrelNames( ipClassName, funTyConKey, allNameStrings )
+import PrelNames( funTyConKey, allNameStrings )
 
 {-
         ----------------------------
@@ -489,7 +490,6 @@ tc_hs_type hs_ty@(HsExplicitTupleTy _ tys) exp_kind
 tc_hs_type ipTy@(HsIParamTy n ty) exp_kind
   = do { ty' <- tc_lhs_type ty ekLifted
        ; checkExpectedKind ipTy constraintKind exp_kind
-       ; ipClass <- tcLookupClass ipClassName
        ; let n' = mkStrLitTy $ hsIPNameFS n
        ; return (mkClassPred ipClass [n',ty'])
        }
@@ -922,6 +922,19 @@ addTypeCtxt (L _ ty) thing
 ************************************************************************
 -}
 
+tcWildcardBinders :: [Name]
+                  -> ([(Name,TcTyVar)] -> TcM a)
+                  -> TcM a
+tcWildcardBinders wcs thing_inside
+  = do { wc_prs <- mapM new_wildcard wcs
+       ; tcExtendTyVarEnv2 wc_prs $
+         thing_inside wc_prs }
+  where
+   new_wildcard :: Name -> TcM (Name, TcTyVar)
+   new_wildcard name = do { kind <- newMetaKindVar
+                          ; tv   <- newFlexiTyVar kind
+                          ; return (name, tv) }
+
 mkKindSigVar :: Name -> TcM KindVar
 -- Use the specified name; don't clone it
 mkKindSigVar n
@@ -937,7 +950,7 @@ kcScopedKindVars :: [Name] -> TcM a -> TcM a
 -- bind each scoped kind variable (k in this case) to a fresh
 -- kind skolem variable
 kcScopedKindVars kv_ns thing_inside
-  = do { kvs <- mapM (\n -> newSigTyVar n superKind) kv_ns
+  = do { kvs <- mapM newSigKindVar kv_ns
                      -- NB: use mutable signature variables
        ; tcExtendTyVarEnv2 (kv_ns `zip` kvs) thing_inside }
 
@@ -952,8 +965,8 @@ kcHsTyVarBndrs :: Bool    -- ^ True <=> the decl being checked has a CUSK
                                   -- with the other info
 kcHsTyVarBndrs cusk (HsQTvs { hsq_kvs = kv_ns, hsq_tvs = hs_tvs }) thing_inside
   = do { kvs <- if cusk
-                then mapM mkKindSigVar kv_ns
-                else mapM (\n -> newSigTyVar n superKind) kv_ns
+                then mapM mkKindSigVar  kv_ns
+                else mapM newSigKindVar kv_ns
        ; tcExtendTyVarEnv2 (kv_ns `zip` kvs) $
     do { nks <- mapM (kc_hs_tv . unLoc) hs_tvs
        ; (res_kind, stuff) <- tcExtendKindEnv nks thing_inside
@@ -1142,7 +1155,8 @@ tcTyClTyVars tycon (HsQTvs { hsq_kvs = hs_kvs, hsq_tvs = hs_tvs }) thing_inside
                               -- There may be fewer of these than the kvs of
                               -- the type constructor, of course
     do { thing <- tcLookup tycon
-       ; let { kind = case thing of
+       ; let { kind = case thing of -- The kind of the tycon has been worked out
+                                    -- by the previous pass, and is fully zonked
                         AThing kind -> kind
                         _ -> panic "tcTyClTyVars"
                      -- We only call tcTyClTyVars during typechecking in
@@ -1158,11 +1172,12 @@ tcTyClTyVars tycon (HsQTvs { hsq_kvs = hs_kvs, hsq_tvs = hs_tvs }) thing_inside
     -- e.g.   class C a_29 where
     --           type T b_30 a_29 :: *
     -- Here the a_29 is shared
-    tc_hs_tv (L _ (UserTyVar n))        kind = return (mkTyVar n kind)
+    tc_hs_tv (L _ (UserTyVar n)) kind
+       = return (mkTyVar n kind)
     tc_hs_tv (L _ (KindedTyVar (L _ n) hs_k)) kind
-                                        = do { tc_kind <- tcLHsKind hs_k
-                                             ; checkKind kind tc_kind
-                                             ; return (mkTyVar n kind) }
+       = do { tc_kind <- tcLHsKind hs_k
+            ; checkKind kind tc_kind
+            ; return (mkTyVar n kind) }
 
 -----------------------------------
 tcDataKindSig :: Kind -> TcM [TyVar]
@@ -1266,16 +1281,15 @@ tcHsPatSigType :: UserTypeCtxt
 tcHsPatSigType ctxt (HsWB { hswb_cts = hs_ty, hswb_kvs = sig_kvs,
                             hswb_tvs = sig_tvs, hswb_wcs = sig_wcs })
   = addErrCtxt (pprSigCtxt ctxt empty (ppr hs_ty)) $
-    do  { kvs <- mapM new_kv sig_kvs
+    tcWildcardBinders sig_wcs $ \ nwc_binds ->
+    do  { emitWildcardHoleConstraints nwc_binds
+        ; kvs <- mapM new_kv sig_kvs
         ; tvs <- mapM new_tv sig_tvs
-        ; nwc_tvs <- mapM newWildcardVarMetaKind sig_wcs
-        ; let nwc_binds = sig_wcs `zip` nwc_tvs
-              ktv_binds = (sig_kvs `zip` kvs) ++ (sig_tvs `zip` tvs)
-        ; sig_ty <- tcExtendTyVarEnv2 (ktv_binds ++ nwc_binds) $
+        ; let ktv_binds = (sig_kvs `zip` kvs) ++ (sig_tvs `zip` tvs)
+        ; sig_ty <- tcExtendTyVarEnv2 ktv_binds $
                     tcHsLiftedType hs_ty
         ; sig_ty <- zonkSigType sig_ty
         ; checkValidType ctxt sig_ty
-        ; emitWildcardHoleConstraints (zip sig_wcs nwc_tvs)
         ; return (sig_ty, ktv_binds, nwc_binds) }
   where
     new_kv name = new_tkv name superKind

@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, ExistentialQuantification #-}
+{-# LANGUAGE NoImplicitPrelude, ExistentialQuantification, PatternSynonyms #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -56,6 +56,7 @@ module Control.Exception (
         RecSelError(..),
         RecUpdError(..),
         ErrorCall(..),
+        pattern ErrorCall,
         TypeError(..),
 
         -- * Throwing exceptions
@@ -106,6 +107,7 @@ module Control.Exception (
         uninterruptibleMask_,
         MaskingState(..),
         getMaskingState,
+        interruptible,
         allowInterrupt,
 
         -- *** Applying @mask@ to an exception handler
@@ -134,7 +136,7 @@ module Control.Exception (
 import Control.Exception.Base
 
 import GHC.Base
-import GHC.IO (unsafeUnmask)
+import GHC.IO (interruptible)
 
 -- | You need this when using 'catches'.
 data Handler a = forall e . Exception e => Handler (e -> IO a)
@@ -215,14 +217,14 @@ A typical use of 'tryJust' for recovery looks like this:
 -- | When invoked inside 'mask', this function allows a masked
 -- asynchronous exception to be raised, if one exists.  It is
 -- equivalent to performing an interruptible operation (see
--- #interruptible#), but does not involve any actual blocking.
+-- #interruptible), but does not involve any actual blocking.
 --
 -- When called outside 'mask', or inside 'uninterruptibleMask', this
 -- function has no effect.
 --
 -- @since 4.4.0.0
 allowInterrupt :: IO ()
-allowInterrupt = unsafeUnmask $ return ()
+allowInterrupt = interruptible $ return ()
 
 {- $async
 

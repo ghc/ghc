@@ -49,7 +49,7 @@ import Var
 import VarSet
 import VarEnv
 import TysWiredIn
-import TysPrim( intPrimTy, addrPrimTy )
+import TysPrim( intPrimTy )
 import PrimOp( tagToEnumKey )
 import PrelNames
 import DynFlags
@@ -194,7 +194,6 @@ tcExpr (NegApp expr neg_expr) res_ty
 
 tcExpr (HsIPVar x) res_ty
   = do { let origin = IPOccOrigin x
-       ; ipClass <- tcLookupClass ipClassName
            {- Implicit parameters must have a *tau-type* not a.
               type scheme.  We enforce this by creating a fresh
               type variable as its type.  (Because res_ty may not
@@ -221,9 +220,10 @@ tcExpr e@(HsLamCase _ matches) res_ty
         match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
 
 tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
- = do { nwc_tvs <- mapM newWildcardVarMetaKind wcs
-      ; tcExtendTyVarEnv nwc_tvs $ do {
-        sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
+ = tcWildcardBinders wcs $ \ wc_prs ->
+   do { addErrCtxt (pprSigCtxt ExprSigCtxt empty (ppr sig_ty)) $
+        emitWildcardHoleConstraints wc_prs
+      ; sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
       ; (gen_fn, expr')
             <- tcGen ExprSigCtxt sig_tc_ty $ \ skol_tvs res_ty ->
 
@@ -237,9 +237,7 @@ tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
       ; let inner_expr = ExprWithTySigOut (mkLHsWrap gen_fn expr') sig_ty
 
       ; (inst_wrap, rho) <- deeplyInstantiate ExprSigOrigin sig_tc_ty
-      ; addErrCtxt (pprSigCtxt ExprSigCtxt empty (ppr sig_ty)) $
-        emitWildcardHoleConstraints (zip wcs nwc_tvs)
-      ; tcWrapResult (mkHsWrap inst_wrap inner_expr) rho res_ty } }
+      ; tcWrapResult (mkHsWrap inst_wrap inner_expr) rho res_ty }
 
 tcExpr (HsType ty) _
   = failWithTc (text "Can't handle type argument:" <+> ppr ty)
@@ -1070,25 +1068,19 @@ tcInferIdWithOrig orig lbl id_name
   = do { dflags <- getDynFlags
        ; if gopt Opt_IgnoreAsserts dflags
          then tc_infer_id orig lbl id_name
-         else tc_infer_assert dflags orig }
+         else tc_infer_assert orig }
 
   | otherwise
   = tc_infer_id orig lbl id_name
 
-tc_infer_assert :: DynFlags -> CtOrigin -> TcM (HsExpr TcId, TcRhoType)
+tc_infer_assert :: CtOrigin -> TcM (HsExpr TcId, TcRhoType)
 -- Deal with an occurrence of 'assert'
 -- See Note [Adding the implicit parameter to 'assert']
-tc_infer_assert dflags orig
-  = do { sloc <- getSrcSpanM
-       ; assert_error_id <- tcLookupId assertErrorName
+tc_infer_assert orig
+  = do { assert_error_id <- tcLookupId assertErrorName
        ; (wrap, id_rho) <- deeplyInstantiate orig (idType assert_error_id)
-       ; let (arg_ty, res_ty) = case tcSplitFunTy_maybe id_rho of
-                                   Nothing      -> pprPanic "assert type" (ppr id_rho)
-                                   Just arg_res -> arg_res
-       ; ASSERT( arg_ty `tcEqType` addrPrimTy )
-         return (HsApp (L sloc (mkHsWrap wrap (HsVar assert_error_id)))
-                       (L sloc (srcSpanPrimLit dflags sloc))
-                , res_ty) }
+       ; return (mkHsWrap wrap (HsVar assert_error_id), id_rho)
+       }
 
 tc_infer_id :: CtOrigin -> RdrName -> Name -> TcM (HsExpr TcId, TcRhoType)
 -- Return type is deeply instantiated
@@ -1136,17 +1128,12 @@ tc_infer_id orig lbl id_name
       | isNaughtyRecordSelector id = failWithTc (naughtyRecordSel lbl)
       | otherwise                  = return ()
 
-srcSpanPrimLit :: DynFlags -> SrcSpan -> HsExpr TcId
-srcSpanPrimLit dflags span
-    = HsLit (HsStringPrim "" (unsafeMkByteString
-                             (showSDocOneLine dflags (ppr span))))
-
 {-
 Note [Adding the implicit parameter to 'assert']
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The typechecker transforms (assert e1 e2) to (assertError "Foo.hs:27"
-e1 e2).  This isn't really the Right Thing because there's no way to
-"undo" if you want to see the original source code in the typechecker
+The typechecker transforms (assert e1 e2) to (assertError e1 e2).
+This isn't really the Right Thing because there's no way to "undo"
+if you want to see the original source code in the typechecker
 output.  We'll have fix this in due course, when we care more about
 being able to reconstruct the exact original program.
 
@@ -1579,7 +1566,7 @@ tcRecordField data_con flds_w_tys (L loc (FieldOcc lbl sel_name)) rhs
         field_lbl = occNameFS $ rdrNameOcc lbl
 
 
-checkMissingFields :: DataCon -> HsRecordBinds Name -> TcM ()
+checkMissingFields ::  DataCon -> HsRecordBinds Name -> TcM ()
 checkMissingFields data_con rbinds
   | null field_labels   -- Not declared as a record;
                         -- But C{} is still valid if no strict fields
@@ -1611,8 +1598,12 @@ checkMissingFields data_con rbinds
 
     field_names_used = hsRecFields rbinds
     field_labels     = dataConFieldLabels data_con
-    field_info       = zipEqual "missingFields" field_labels field_strs
-    field_strs       = dataConSrcBangs data_con
+
+    field_info = zipEqual "missingFields"
+                          field_labels
+                          field_strs
+
+    field_strs = dataConImplBangs data_con
 
     fl `elemField` flds = any (\ fl' -> flSelector fl == fl') flds
 

@@ -15,4 +15,4 @@ utils/mkUserGuidePart_PACKAGE              = mkUserGuidePart
 utils/mkUserGuidePart_dist_PROGNAME        = mkUserGuidePart
 utils/mkUserGuidePart_dist_INSTALL_INPLACE = YES
 
-$(eval $(call build-prog,utils/mkUserGuidePart,dist,1))
+$(eval $(call build-prog,utils/mkUserGuidePart,dist,2))

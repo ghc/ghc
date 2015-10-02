@@ -36,7 +36,7 @@ module GHC.IO (
         catchException, catchAny, throwIO,
         mask, mask_, uninterruptibleMask, uninterruptibleMask_,
         MaskingState(..), getMaskingState,
-        unsafeUnmask,
+        unsafeUnmask, interruptible,
         onException, bracket, finally, evaluate
     ) where
 
@@ -340,6 +340,22 @@ unblock = unsafeUnmask
 
 unsafeUnmask :: IO a -> IO a
 unsafeUnmask (IO io) = IO $ unmaskAsyncExceptions# io
+
+-- | Allow asynchronous exceptions to be raised even inside 'mask', making
+-- the operation interruptible (see the discussion of "Interruptible operations"
+-- in 'Control.Exception').
+--
+-- When called outside 'mask', or inside 'uninterruptibleMask', this
+-- function has no effect.
+--
+-- /Since: 4.8.2.0/
+interruptible :: IO a -> IO a
+interruptible act = do
+  st <- getMaskingState
+  case st of
+    Unmasked              -> act
+    MaskedInterruptible   -> unsafeUnmask act
+    MaskedUninterruptible -> act
 
 blockUninterruptible :: IO a -> IO a
 blockUninterruptible (IO io) = IO $ maskUninterruptible# io

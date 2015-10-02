@@ -104,12 +104,25 @@ type WarnMsg = ErrMsg
 
 data Severity
   = SevOutput
-  | SevDump
+  | SevFatal
   | SevInteractive
+
+  | SevDump
+    -- Log messagse intended for compiler developers
+    -- No file/line/column stuff
+
   | SevInfo
+    -- Log messages intended for end users.
+    -- No file/line/column stuff.
+
   | SevWarning
   | SevError
-  | SevFatal
+    -- SevWarning and SevError are used for warnings and errors
+    --   o The message has a file/line/column heading,
+    --     plus "warning:" or "error:",
+    --     added by mkLocMessags
+    --   o Output is intended for end users
+
 
 instance Show ErrMsg where
     show em = errMsgShortString em
@@ -277,6 +290,13 @@ dumpSDoc dflags print_unqual flag hdr doc
                             writeIORef gdref (Set.insert fileName gd)
                         createDirectoryIfMissing True (takeDirectory fileName)
                         handle <- openFile fileName mode
+
+                        -- We do not want the dump file to be affected by
+                        -- environment variables, but instead to always use
+                        -- UTF8. See:
+                        -- https://ghc.haskell.org/trac/ghc/ticket/10762
+                        hSetEncoding handle utf8
+
                         doc' <- if null hdr
                                 then return doc
                                 else do t <- getCurrentTime

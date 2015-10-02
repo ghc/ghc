@@ -5,12 +5,13 @@ import SrcLoc (SrcSpan)
 
 data Severity
   = SevOutput
-  | SevDump
+  | SevFatal
   | SevInteractive
+  | SevDump
   | SevInfo
   | SevWarning
   | SevError
-  | SevFatal
+
 
 type MsgDoc = SDoc
 

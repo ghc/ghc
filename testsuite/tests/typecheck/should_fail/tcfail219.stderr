@@ -1,3 +1,4 @@
-[1 of 1] Compiling ShouldFail[sig of Data.Bool] ( tcfail219.hsig, nothing )
+[1 of 1] Compiling ShouldFail[boot] ( tcfail219.hs-boot, tcfail219.o )
 
-tcfail219.hsig:1:1: Not in scope: type constructor or class ‘Booly’
+tcfail219.hs-boot:1:1: error:
+    Not in scope: type constructor or class ‘Booly’

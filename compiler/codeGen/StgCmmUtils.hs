@@ -558,7 +558,7 @@ mk_float_switch :: Width -> CmmExpr -> BlockId
               -> FCode CmmAGraph
 mk_float_switch rep scrut deflt _bounds [(lit,blk)]
   = do dflags <- getDynFlags
-       return $ mkCbranch (cond dflags) deflt blk
+       return $ mkCbranch (cond dflags) deflt blk Nothing
   where
     cond dflags = CmmMachOp ne [scrut, CmmLit cmm_lit]
       where

@@ -282,7 +282,7 @@ in TcSMonad, which has this example:
 Suppose we are trying to solve
   [G] d1 : Ord a
   [W] d2 : C [a]
-If we (bogusly) added the superclass of d2 as Gievn we'd have
+If we (bogusly) added the superclass of d2 as Given we'd have
   [G] d1 : Ord a
   [W] d2 : C [a]
   [G] d3 : Ord [a]   -- Superclass of d2, bogus
@@ -292,7 +292,7 @@ Then we'll use the instance decl to give
   [G] d3 : Ord [a]   -- Superclass of d2, bogus
   [W] d4: Ord [a]
 
-ANd now we could bogusly solve d4 from d3.
+And now we could bogusly solve d4 from d3.
 ---------- End of historical note -----------
 
 Note [Add superclasses only during canonicalisation]
@@ -938,7 +938,7 @@ If we see (T s1 t1 ~ T s2 t2), then we can just decompose to
   (s1 ~ s2, t1 ~ t2)
 and push those back into the work list.  But if
   s1 = K k1    s2 = K k2
-then we will jus decomopose s1~s2, and it might be better to
+then we will just decomopose s1~s2, and it might be better to
 do so on the spot.  An important special case is where s1=s2,
 and we get just Refl.
 
@@ -1016,6 +1016,23 @@ and the Id newtype is unwrapped. This is assured by requiring only flat
 types in canEqTyVar *and* having the newtype-unwrapping check above
 the tyvar check in can_eq_nc.
 
+Note [Occurs check error]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have an occurs check error, are we necessarily hosed? Say our
+tyvar is tv1 and the type it appears in is xi2. Because xi2 is function
+free, then if we're computing w.r.t. nominal equality, then, yes, we're
+hosed. Nothing good can come from (a ~ [a]). If we're computing w.r.t.
+representational equality, this is a little subtler. Once again, (a ~R [a])
+is a bad thing, but (a ~R N a) for a newtype N might be just fine. This
+means also that (a ~ b a) might be fine, because `b` might become a newtype.
+
+So, we must check: does tv1 appear in xi2 under any type constructor that
+is generative w.r.t. representational equality? That's what isTyVarUnderDatatype
+does. (The other name I considered, isTyVarUnderTyConGenerativeWrtReprEq was
+a bit verbose. And the shorter name gets the point across.)
+
+See also #10715, which induced this addition.
+
 -}
 
 canCFunEqCan :: CtEvidence
@@ -1091,12 +1108,14 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 xi2
   | otherwise  -- Occurs check error
   = rewriteEqEvidence ev eq_rel swapped xi1 xi2 co1 co2
     `andWhenContinue` \ new_ev ->
-    case eq_rel of
-      NomEq  -> do { emitInsoluble (mkNonCanonical new_ev)
+    if eq_rel == NomEq || isTyVarUnderDatatype tv1 xi2
+      -- See Note [Occurs check error]
+
+    then do { emitInsoluble (mkNonCanonical new_ev)
               -- If we have a ~ [a], it is not canonical, and in particular
               -- we don't want to rewrite existing inerts with it, otherwise
               -- we'd risk divergence in the constraint solver
-                   ; stopWith new_ev "Occurs check" }
+            ; stopWith new_ev "Occurs check" }
 
         -- A representational equality with an occurs-check problem isn't
         -- insoluble! For example:
@@ -1104,9 +1123,9 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 xi2
         -- We might learn that b is the newtype Id.
         -- But, the occurs-check certainly prevents the equality from being
         -- canonical, and we might loop if we were to use it in rewriting.
-      ReprEq -> do { traceTcS "Occurs-check in representational equality"
+    else do { traceTcS "Occurs-check in representational equality"
                               (ppr xi1 $$ ppr xi2)
-                   ; continueWith (CIrredEvCan { cc_ev = new_ev }) }
+            ; continueWith (CIrredEvCan { cc_ev = new_ev }) }
   where
     role = eqRelRole eq_rel
     xi1  = mkTyVarTy tv1
@@ -1128,7 +1147,7 @@ canEqTyVarTyVar ev eq_rel swapped tv1 tv2
   | incompat_kind   = incompatibleKind ev xi1 k1 xi2 k2
 
 -- We don't do this any more
--- See Note [Orientation of equalities with fmvs] in TcSMonad
+-- See Note [Orientation of equalities with fmvs] in TcFlatten
 --  | isFmvTyVar tv1  = do_fmv swapped            tv1 xi1 xi2 co1 co2
 --  | isFmvTyVar tv2  = do_fmv (flipSwap swapped) tv2 xi2 xi1 co2 co1
 
@@ -1159,7 +1178,7 @@ canEqTyVarTyVar ev eq_rel swapped tv1 tv2
                                , cc_rhs = xi2, cc_eq_rel = eq_rel })
 
 {- We don't do this any more
-   See Note [Orientation of equalities with fmvs] in TcSMonad
+   See Note [Orientation of equalities with fmvs] in TcFlatten
     -- tv1 is the flatten meta-var
     do_fmv swapped tv1 xi1 xi2 co1 co2
       | same_kind

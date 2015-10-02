@@ -1,1 +1,3 @@
 SafeLang09: This curry is poisoned!
+CallStack:
+  error, called at ./SafeLang09_B.hs:14:13 in main:SafeLang09_B

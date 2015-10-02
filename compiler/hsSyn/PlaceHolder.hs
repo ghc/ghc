@@ -14,6 +14,7 @@ import NameSet
 import RdrName
 import Var
 import Coercion
+import DataCon (DataCon)
 
 import Data.Data hiding ( Fixity )
 import BasicTypes       (Fixity)
@@ -73,7 +74,7 @@ Historically these have been filled in with place holder values of the form
 
   panic "error message"
 
-This has meant the AST is difficult to traverse using standed generic
+This has meant the AST is difficult to traverse using standard generic
 programming techniques. The problem is addressed by introducing
 pass-specific data types, implemented as a pair of open type families,
 one for PostTc and one for PostRn. These are then explicitly populated
@@ -107,6 +108,8 @@ type DataId id =
   , Data (PostTc id Type)
   , Data (PostTc id Coercion)
   , Data (PostTc id id)
+  , Data (PostTc id [Type])
+  , Data (PostTc id [DataCon])
   )
 
 

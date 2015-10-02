@@ -30,6 +30,7 @@ import qualified Compiler.Hoopl as H
 -- | Generate DWARF/debug information
 dwarfGen :: DynFlags -> ModLocation -> UniqSupply -> [DebugBlock]
             -> IO (SDoc, UniqSupply)
+dwarfGen _  _      us [] = return (empty, us)
 dwarfGen df modLoc us blocks = do
 
   -- Convert debug data structures to DWARF info records
@@ -38,11 +39,15 @@ dwarfGen df modLoc us blocks = do
   let procs = debugSplitProcs blocks
       stripBlocks dbg = dbg { dblBlocks = [] }
   compPath <- getCurrentDirectory
-  let dwarfUnit = DwarfCompileUnit
+  let lowLabel = dblCLabel $ head procs
+      highLabel = mkAsmTempEndLabel $ dblCLabel $ last procs
+      dwarfUnit = DwarfCompileUnit
         { dwChildren = map (procToDwarf df) (map stripBlocks procs)
         , dwName = fromMaybe "" (ml_hs_file modLoc)
         , dwCompDir = addTrailingPathSeparator compPath
         , dwProducer = cProjectName ++ " " ++ cProjectVersion
+        , dwLowLabel = lowLabel
+        , dwHighLabel = highLabel
         , dwLineLabel = dwarfLineLabel
         }
 
@@ -57,8 +62,10 @@ dwarfGen df modLoc us blocks = do
   let abbrevSct = pprAbbrevDecls haveSrc
 
   -- .debug_info section: Information records on procedures and blocks
-  let (unitU, us') = takeUniqFromSupply us
-      infoSct = vcat [ dwarfInfoSection
+  let -- unique to identify start and end compilation unit .debug_inf
+      (unitU, us') = takeUniqFromSupply us
+      infoSct = vcat [ ptext dwarfInfoLabel <> colon
+                     , dwarfInfoSection
                      , compileUnitHeader unitU
                      , pprDwarfInfo haveSrc dwarfUnit
                      , compileUnitFooter unitU
@@ -75,18 +82,23 @@ dwarfGen df modLoc us blocks = do
                  ptext dwarfFrameLabel <> colon $$
                  pprDwarfFrame (debugFrame framesU procs)
 
-  return (infoSct $$ abbrevSct $$ lineSct $$ frameSct, us'')
+  -- .aranges section: Information about the bounds of compilation units
+  let aranges = dwarfARangesSection $$
+                pprDwarfARange (DwarfARange lowLabel highLabel unitU)
+
+  return (infoSct $$ abbrevSct $$ lineSct $$ frameSct $$ aranges, us'')
 
 -- | Header for a compilation unit, establishing global format
 -- parameters
 compileUnitHeader :: Unique -> SDoc
 compileUnitHeader unitU = sdocWithPlatform $ \plat ->
-  let cuLabel = mkAsmTempLabel unitU
+  let cuLabel = mkAsmTempLabel unitU  -- sits right before initialLength field
       length = ppr (mkAsmTempEndLabel cuLabel) <> char '-' <> ppr cuLabel
-  in vcat [ ptext (sLit "\t.long ") <> length  -- compilation unit size
-          , ppr cuLabel <> colon
-          , ptext (sLit "\t.word 3")           -- DWARF version
-          , sectionOffset dwarfAbbrevLabel dwarfAbbrevLabel
+               <> ptext (sLit "-4")       -- length of initialLength field
+  in vcat [ ppr cuLabel <> colon
+          , ptext (sLit "\t.long ") <> length  -- compilation unit size
+          , pprHalf 3                          -- DWARF version
+          , sectionOffset (ptext dwarfAbbrevLabel) (ptext dwarfAbbrevLabel)
                                                -- abbrevs offset
           , ptext (sLit "\t.byte ") <> ppr (platformWordSize plat) -- word size
           ]

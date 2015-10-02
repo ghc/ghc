@@ -101,13 +101,25 @@ main = do args &lt;- getArgs
 <programlisting>
     (let x = 42 in x == 42 == True)</programlisting></para>
 	</listitem>
+
+	<listitem>
+	  <para>The Haskell Report allows you to put a unary
+	  <literal>-</literal> preceding certain expressions headed by
+	  keywords, allowing constructs like <literal>- case x of
+	  ...</literal> or <literal>- do { ... }</literal>. GHC does
+	  not allow this. Instead, unary <literal>-</literal> is
+	  allowed before only expressions that could potentially
+	  be applied as a function.
+	  </para>
+	</listitem>
+
       </itemizedlist>
     </sect3>
 
   <sect3 id="infelicities-exprs-pats">
       <title>Expressions and patterns</title>
 
-    <para>In its default mode, GHC makes some programs slightly more defined 
+    <para>In its default mode, GHC makes some programs slightly more defined
     than they should be. For example, consider
     <programlisting>
 f :: [a] -> b -> b
@@ -475,6 +487,21 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
     <title>Bugs in GHC</title>
 
     <itemizedlist>
+      <listitem>
+        <para>GHC's runtime system implements cooperative multitasking, with
+        context switching potentially occurring only when a program allocates.
+        This means that programs that do not allocate may never context switch.
+        See
+        <ulink url="https://ghc.haskell.org/trac/ghc/ticket/367">Trac #367</ulink>
+        for further discussion.
+        </para>
+        <para>If you are hit by this, you may want to compile the affected module
+        with <literal>-fno-omit-yields</literal>. This flag ensures that yield points
+        are inserted at every function entrypoint (at the expense of a bit of
+        performance).
+        </para>
+      </listitem>
+
       <listitem>
 	<para> GHC can warn about non-exhaustive or overlapping
         patterns (see <xref linkend="options-sanity"/>), and usually

@@ -30,6 +30,7 @@ import Panic
 import SrcLoc
 import Data.List
 import FastString
+import BasicTypes ( StringLiteral(..) )
 
 import Exception
 import ErrUtils
@@ -198,9 +199,9 @@ processDeps dflags _ _ _ _ (CyclicSCC nodes)
     throwGhcExceptionIO (ProgramError (showSDoc dflags $ GHC.cyclicModuleErr nodes))
 
 processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
+  | Just src_file <- msHsFilePath node
   = do  { let extra_suffixes = depSuffixes dflags
               include_pkg_deps = depIncludePkgDeps dflags
-              src_file  = msHsFilePath node
               obj_file  = msObjFilePath node
               obj_files = insertSuffixes obj_file extra_suffixes
 
@@ -226,7 +227,7 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
                 -- Emit a dependency for each import
 
         ; let do_imps is_boot idecls = sequence_
-                    [ do_imp loc is_boot (fmap snd $ ideclPkgQual i) mod
+                    [ do_imp loc is_boot (fmap sl_fs $ ideclPkgQual i) mod
                     | L loc i <- idecls,
                       let mod = unLoc (ideclName i),
                       mod `notElem` excl_mods ]
@@ -234,6 +235,10 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
         ; do_imps True  (ms_srcimps node)
         ; do_imps False (ms_imps node)
         }
+
+  | otherwise
+  = ASSERT( ms_hsc_src node == HsBootMerge )
+    panic "HsBootMerge not supported in DriverMkDepend yet"
 
 
 findDependency  :: HscEnv
@@ -248,7 +253,7 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps
                 -- we've done it once during downsweep
           r <- findImportedModule hsc_env imp pkg
         ; case r of
-            FoundModule (FoundHs { fr_loc = loc })
+            Found loc _
                 -- Home package: just depend on the .hi or hi-boot file
                 | isJust (ml_hs_file loc) || include_pkg_deps
                 -> return (Just (addBootSuffix_maybe is_boot (ml_hi_file loc)))
@@ -256,9 +261,6 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps
                 -- Not in this package: we don't need a dependency
                 | otherwise
                 -> return Nothing
-
-            -- TODO: FoundSignature.  For now, we assume home package
-            -- "signature" dependencies look like FoundModule.
 
             fail ->
                 let dflags = hsc_dflags hsc_env

@@ -58,7 +58,6 @@ import OrdList
 import Outputable
 import Unique
 import FastString
-import FastBool         ( isFastTrue )
 import DynFlags
 import Util
 
@@ -178,9 +177,10 @@ stmtToInstrs stmt = do
        -> genCCall dflags is32Bit target result_regs args
 
     CmmBranch id          -> genBranch id
-    CmmCondBranch arg true false -> do b1 <- genCondJump true arg
-                                       b2 <- genBranch false
-                                       return (b1 `appOL` b2)
+    CmmCondBranch arg true false _ -> do
+      b1 <- genCondJump true arg
+      b2 <- genBranch false
+      return (b1 `appOL` b2)
     CmmSwitch arg ids -> do dflags <- getDynFlags
                             genSwitch dflags arg ids
     CmmCall { cml_target = arg
@@ -1176,7 +1176,7 @@ amodeCouldBeClobbered :: Platform -> AddrMode -> Bool
 amodeCouldBeClobbered platform amode = any (regClobbered platform) (addrModeRegs amode)
 
 regClobbered :: Platform -> Reg -> Bool
-regClobbered platform (RegReal (RealRegSingle rr)) = isFastTrue (freeReg platform rr)
+regClobbered platform (RegReal (RealRegSingle rr)) = freeReg platform rr
 regClobbered _ _ = False
 
 -- getOperand: the operand is not required to remain valid across the
@@ -2083,7 +2083,7 @@ genCCall _ is32Bit target dest_regs args = do
                                 MOV format (OpReg rdx) (OpReg reg_h),
                                 MOV format (OpReg rax) (OpReg reg_l)]
                return code
-        _ -> panic "genCCall: Wrong number of arguments/results for add2"
+        _ -> panic "genCCall: Wrong number of arguments/results for mul2"
 
     _ -> if is32Bit
          then genCCall32' dflags target dest_regs args

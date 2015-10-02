@@ -59,7 +59,7 @@ import Text.ParserCombinators.ReadPrec
 
 import Data.Maybe
 
-import GHC.Unicode       ( isDigit )
+import GHC.Unicode
 import GHC.Num
 import GHC.Real
 import GHC.Float
@@ -311,6 +311,8 @@ choose sps = foldr ((+++) . try_one) pfail sps
 --------------------------------------------------------------
 -- Simple instances of Read
 --------------------------------------------------------------
+
+deriving instance Read GeneralCategory
 
 instance Read Char where
   readPrec =

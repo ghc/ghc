@@ -67,7 +67,7 @@ implementSwitchPlan dflags scope expr = go
         let lt | signed    = cmmSLtWord
                | otherwise = cmmULtWord
             scrut = lt dflags expr $ CmmLit $ mkWordCLit dflags i
-            lastNode = CmmCondBranch scrut bid1 bid2
+            lastNode = CmmCondBranch scrut bid1 bid2 Nothing
             lastBlock = emptyBlock `blockJoinTail` lastNode
         return (lastBlock, newBlocks1++newBlocks2)
     go (IfEqual i l ids2)
@@ -75,7 +75,7 @@ implementSwitchPlan dflags scope expr = go
         (bid2, newBlocks2) <- go' ids2
 
         let scrut = cmmNeWord dflags expr $ CmmLit $ mkWordCLit dflags i
-            lastNode = CmmCondBranch scrut bid2 l
+            lastNode = CmmCondBranch scrut bid2 l Nothing
             lastBlock = emptyBlock `blockJoinTail` lastNode
         return (lastBlock, newBlocks2)
 

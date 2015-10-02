@@ -9,7 +9,7 @@ rebindable6.hs:106:17: error:
       f :: IO a (bound at rebindable6.hs:104:17)
       test_do :: IO a -> IO (Maybe b) -> IO b
         (bound at rebindable6.hs:104:9)
-    Note: there is a potential instance available:
+    Potential instances:
       instance HasSeq (IO a -> IO b -> IO b)
         -- Defined at rebindable6.hs:52:18
     In a stmt of a 'do' block: f
@@ -28,7 +28,7 @@ rebindable6.hs:107:17: error:
       arising from a do statement
       (maybe you haven't applied a function to enough arguments?)
     The type variable ‘t1’ is ambiguous
-    Note: there is a potential instance available:
+    Potential instances:
       instance HasFail (String -> IO a)
         -- Defined at rebindable6.hs:57:18
     In a stmt of a 'do' block: Just (b :: b) <- g
@@ -52,7 +52,7 @@ rebindable6.hs:108:17: error:
       g :: IO (Maybe b) (bound at rebindable6.hs:104:19)
       test_do :: IO a -> IO (Maybe b) -> IO b
         (bound at rebindable6.hs:104:9)
-    Note: there is a potential instance available:
+    Potential instances:
       instance HasReturn (a -> IO a) -- Defined at rebindable6.hs:42:18
     In a stmt of a 'do' block: return b
     In the expression:

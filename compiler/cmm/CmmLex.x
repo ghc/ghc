@@ -189,10 +189,10 @@ pop :: Action
 pop _span _buf _len = popLexState >> lexToken
 
 special_char :: Action
-special_char span buf len = return (L span (CmmT_SpecChar (currentChar buf)))
+special_char span buf _len = return (L span (CmmT_SpecChar (currentChar buf)))
 
 kw :: CmmToken -> Action
-kw tok span buf len = return (L span tok)
+kw tok span _buf _len = return (L span tok)
 
 global_regN :: (Int -> GlobalReg) -> Action
 global_regN con span buf len
@@ -201,7 +201,7 @@ global_regN con span buf len
         n = parseUnsignedInteger buf' (len-1) 10 octDecDigit
 
 global_reg :: GlobalReg -> Action
-global_reg r span buf len = return (L span (CmmT_GlobalReg r))
+global_reg r span _buf _len = return (L span (CmmT_GlobalReg r))
 
 strtoken :: (String -> CmmToken) -> Action
 strtoken f span buf len =
@@ -319,7 +319,7 @@ lexToken = do
     AlexSkip inp2 _ -> do
         setInput inp2
         lexToken
-    AlexToken inp2@(end,buf2) len t -> do
+    AlexToken inp2@(end,_buf2) len t -> do
         setInput inp2
         let span = mkRealSrcSpan loc1 end
         span `seq` setLastToken span len

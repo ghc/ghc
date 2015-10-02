@@ -1,7 +1,9 @@
 T7861: T7861.hs:10:5: error:
     Couldn't match type ‘a’ with ‘[a]’
     ‘a’ is a rigid type variable bound by
-        the type signature for: f :: (forall b. a) -> a at T7861.hs:9:6
+        the type signature for:
+          f :: (forall b. a) -> a
+        at T7861.hs:9:6
     Expected type: (forall b. a) -> a
       Actual type: (forall b. a) -> [a]
     Relevant bindings include

@@ -185,7 +185,7 @@ module GHC (
         isPrimTyCon, isFunTyCon,
         isFamilyTyCon, isOpenFamilyTyCon, isOpenTypeFamilyTyCon,
         tyConClass_maybe,
-        synTyConRhs_maybe, synTyConDefn_maybe, synTyConResKind,
+        synTyConRhs_maybe, synTyConDefn_maybe, tyConResKind,
 
         -- ** Type variables
         TyVar,
@@ -305,7 +305,7 @@ import RdrName
 import qualified HsSyn -- hack as we want to reexport the whole module
 import HsSyn
 import Type     hiding( typeKind )
-import Kind             ( synTyConResKind )
+import Kind             ( tyConResKind )
 import TcType           hiding( typeKind )
 import Id
 import TysPrim          ( alphaTyVars )
@@ -636,32 +636,15 @@ parseDynamicFlags :: MonadIO m =>
                   -> m (DynFlags, [Located String], [Located String])
 parseDynamicFlags = parseDynamicFlagsCmdLine
 
-{- Note [GHCi and -O]
-~~~~~~~~~~~~~~~~~~~~~
-When using optimization, the compiler can introduce several things
-(such as unboxed tuples) into the intermediate code, which GHCi later
-chokes on since the bytecode interpreter can't handle this (and while
-this is arguably a bug these aren't handled, there are no plans to fix
-it.)
-
-While the driver pipeline always checks for this particular erroneous
-combination when parsing flags, we also need to check when we update
-the flags; this is because API clients may parse flags but update the
-DynFlags afterwords, before finally running code inside a session (see
-T10052 and #10052).
--}
-
 -- | Checks the set of new DynFlags for possibly erroneous option
 -- combinations when invoking 'setSessionDynFlags' and friends, and if
 -- found, returns a fixed copy (if possible).
 checkNewDynFlags :: MonadIO m => DynFlags -> m DynFlags
-checkNewDynFlags dflags
-  -- See Note [GHCi and -O]
-  | Left e <- checkOptLevel (optLevel dflags) dflags
-    = do liftIO $ warningMsg dflags (text e)
-         return (dflags { optLevel = 0 })
-  | otherwise
-    = return dflags
+checkNewDynFlags dflags = do
+  -- See Note [DynFlags consistency]
+  let (dflags', warnings) = makeDynFlagsConsistent dflags
+  liftIO $ handleFlagWarnings dflags warnings
+  return dflags'
 
 -- %************************************************************************
 -- %*                                                                      *
@@ -1007,7 +990,7 @@ compileCore simplify fn = do
    _ <- load LoadAllTargets
    -- Then find dependencies
    modGraph <- depanal [] True
-   case find ((== fn) . msHsFilePath) modGraph of
+   case find ((== Just fn) . msHsFilePath) modGraph of
      Just modSummary -> do
        -- Now we have the module name;
        -- parse, typecheck and desugar the module
@@ -1381,20 +1364,6 @@ showRichTokenStream ts = go startLoc ts ""
 -- | Takes a 'ModuleName' and possibly a 'PackageKey', and consults the
 -- filesystem and package database to find the corresponding 'Module', 
 -- using the algorithm that is used for an @import@ declaration.
---
--- However, there is a twist for local modules, see #2682.
---
--- The full algorithm:
--- IF it's a package qualified import for a REMOTE package (not @this_pkg@ or
--- this), do a normal lookup.
--- OTHERWISE see if it is ALREADY loaded, and use it if it is.
--- OTHERWISE do a normal lookup, but reject the result if the found result
--- is from the LOCAL package (@this_pkg@).
---
--- For signatures, we return the BACKING implementation to keep the API
--- consistent with what we had before. (ToDo: create a new GHC API which
--- can deal with signatures.)
---
 findModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
 findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
   let 
@@ -1405,23 +1374,17 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
     Just pkg | fsToPackageKey pkg /= this_pkg && pkg /= fsLit "this" -> liftIO $ do
       res <- findImportedModule hsc_env mod_name maybe_pkg
       case res of
-        FoundModule h -> return (fr_mod h)
-        FoundSigs _ backing -> return backing
+        Found _ m -> return m
         err       -> throwOneError $ noModError dflags noSrcSpan mod_name err
     _otherwise -> do
       home <- lookupLoadedHomeModule mod_name
       case home of
-        -- TODO: This COULD be a signature
         Just m  -> return m
         Nothing -> liftIO $ do
            res <- findImportedModule hsc_env mod_name maybe_pkg
            case res of
-             FoundModule (FoundHs { fr_mod = m, fr_loc = loc })
-                | modulePackageKey m /= this_pkg -> return m
-                | otherwise -> modNotLoadedError dflags m loc
-             FoundSigs (FoundHs { fr_loc = loc, fr_mod = m }:_) backing
-                | modulePackageKey m /= this_pkg -> return backing
-                | otherwise -> modNotLoadedError dflags m loc
+             Found loc m | modulePackageKey m /= this_pkg -> return m
+                         | otherwise -> modNotLoadedError dflags m loc
              err -> throwOneError $ noModError dflags noSrcSpan mod_name err
 
 modNotLoadedError :: DynFlags -> Module -> ModLocation -> IO a
@@ -1442,13 +1405,11 @@ lookupModule mod_name (Just pkg) = findModule mod_name (Just pkg)
 lookupModule mod_name Nothing = withSession $ \hsc_env -> do
   home <- lookupLoadedHomeModule mod_name
   case home of
-    -- TODO: This COULD be a signature
     Just m  -> return m
     Nothing -> liftIO $ do
       res <- findExposedPackageModule hsc_env mod_name Nothing
       case res of
-        FoundModule (FoundHs { fr_mod = m }) -> return m
-        FoundSigs _ backing -> return backing
+        Found _ m -> return m
         err       -> throwOneError $ noModError (hsc_dflags hsc_env) noSrcSpan mod_name err
 
 lookupLoadedHomeModule :: GhcMonad m => ModuleName -> m (Maybe Module)

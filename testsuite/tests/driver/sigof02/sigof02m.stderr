@@ -1,1 +1,4 @@
 StrictMain: Prelude.undefined
+CallStack:
+  error, called at libraries/base/GHC/Err.hs:42:14 in base:GHC.Err
+  undefined, called at Main.hs:6:22 in main:Main

@@ -1,0 +1,9 @@
+"Either"
+"foo"
+"foo"
+Just "Data.Either"
+Nothing
+Just "Module"
+Just "base"
+Nothing
+Nothing

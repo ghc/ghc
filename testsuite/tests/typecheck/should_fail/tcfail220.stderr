@@ -1,9 +1,9 @@
-[1 of 1] Compiling ShouldFail[sig of Prelude] ( tcfail220.hsig, nothing )
+[1 of 1] Compiling ShouldFail[boot] ( tcfail220.hs-boot, tcfail220.o )
 
-tcfail220.hsig:4:1: error:
-    Type constructor ‘Maybe’ has conflicting definitions in the module
-    and its hsig file
-    Main module: data Maybe a = Nothing | Just a
-    Hsig file:  type role Maybe phantom phantom
-                data Maybe a b = Nothing
+tcfail220.hs-boot:4:1: error:
+    Type constructor ‘Either’ has conflicting definitions in the module
+    and its signature file
+    Main module: data Either a b = Left a | Right b
+    Signature file:  type role Either representational phantom phantom
+                     data Either a b c = Left a
     The types have different kinds

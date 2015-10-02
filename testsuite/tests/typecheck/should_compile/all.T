@@ -283,7 +283,7 @@ test('T2433', extra_clean(['T2433_Help.hi', 'T2433_Help.o']),
      multimod_compile, ['T2433', '-v0'])
 test('T2494', normal, compile_fail, [''])
 test('T2494-2', normal, compile, [''])
-test('T2497', expect_broken_for(10657, ['optasm', 'optllvm']), compile, [''])
+test('T2497', normal, compile, [''])
 
 
 # Omitting temporarily
@@ -357,7 +357,8 @@ test('tc262', normal, compile, [''])
 test('tc263',
     extra_clean(['Tc263_Help.o','Tc263_Help.hi']),
     multimod_compile, ['tc263','-v0'])
-test('tc264', normal, multimod_compile, ['tc264.hsig', '-sig-of "ShouldCompile is base:Data.STRef"'])
+test('tc264', normal, multimod_compile, ['tc264.hs-boot', '-sig-of "ShouldCompile is base:Data.STRef"'])
+test('tc265', compile_timeout_multiplier(0.01), compile, [''])
 
 test('GivenOverlapping', normal, compile, [''])
 test('GivenTypeSynonym', normal, compile, [''])
@@ -385,6 +386,9 @@ test('T6055', normal, compile, [''])
 test('DfltProb1', normal, compile, [''])
 test('DfltProb2', normal, compile, [''])
 test('T6134', normal, compile, [''])
+test('T6018', extra_clean(['T6018.hi' , 'T6018.o'
+                          ,'T6018A.hi', 'T6018A.o'])
+            , multimod_compile, ['T6018', ''])
 test('TcLambdaCase', when(compiler_lt('ghc', '7.5'), skip), compile, [''])
 test('T7147', normal, compile, [''])
 test('T7171',normal,run_command,
@@ -458,7 +462,7 @@ test('T10390', normal, compile, [''])
 test('T8555', normal, compile, [''])
 test('T8799', normal, compile, [''])
 test('T10423', normal, compile, [''])
-test('T10489', normal, compile, [''])
+test('T10489', unless(compiler_debugged(), skip), compile, [''])
 test('T10348', normal, compile, [''])
 test('T10494', normal, compile, [''])
 test('T10493', normal, compile, [''])
@@ -468,3 +472,8 @@ test('T10562', normal, compile, [''])
 test('T10564', normal, compile, [''])
 test('T10632', normal, compile, [''])
 test('T10642', normal, compile, [''])
+test('T10744', normal, compile, [''])
+test('update-existential', normal, compile, [''])
+test('T10347', expect_broken(10347), compile, [''])
+test('T10770a', expect_broken(10770), compile, [''])
+test('T10770b', expect_broken(10770), compile, [''])

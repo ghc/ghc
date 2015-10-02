@@ -23,6 +23,11 @@ Quick start:  the following gives you a default build:
     $ make
     $ make install
 
+  On Windows, you need an extra repository containing some build tools.
+  These can be downloaded for you by configure. This only needs to be done once by running:
+
+    $ ./configure --enable-tarballs-autodownload
+
 The "perl boot" step is only necessary if this is a tree checked out
 from git.  For source distributions downloaded from GHC's web site,
 this step has already been performed.

@@ -9,11 +9,11 @@ test('sigof01m',
      ['$MAKE -s --no-print-directory sigof01m'])
 
 test('sigof01i',
-     normal,
+     [],
      run_command,
      ['$MAKE -s --no-print-directory sigof01i'])
 
 test('sigof01i2',
-     normal,
+     [],
      run_command,
      ['$MAKE -s --no-print-directory sigof01i2'])

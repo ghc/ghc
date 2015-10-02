@@ -670,7 +670,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
         return thread_AP((StgAP *)p);
 
     case ARR_WORDS:
-        return p + arr_words_sizeW((StgArrWords *)p);
+        return p + arr_words_sizeW((StgArrBytes *)p);
 
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:

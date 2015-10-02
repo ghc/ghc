@@ -692,7 +692,7 @@ rnHsRecUpdFields flds
 
            ; return (L l (HsRecField { hsRecFieldLbl = case sel of
                                                                Left sel_name -> L loc (FieldOcc lbl (Unambiguous sel_name))
-                                                               Right xs      -> L loc (FieldOcc lbl (Ambiguous PlaceHolder))
+                                                               Right _       -> L loc (FieldOcc lbl (Ambiguous PlaceHolder))
                                      , hsRecFieldArg = arg''
                                      , hsRecPun      = pun }), fvs') }
 

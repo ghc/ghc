@@ -6,7 +6,7 @@ The deriving code for the Generic class
 (equivalent to the code in TcGenDeriv, for other classes)
 -}
 
-{-# LANGUAGE CPP, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, ScopedTypeVariables, TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 module TcGenGenerics (canDoGenerics, canDoGenerics1,
@@ -25,7 +25,7 @@ import TyCon
 import FamInstEnv       ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import FamInst
 import Module           ( Module, moduleName, moduleNameString
-                        , modulePackageKey, packageKeyString )
+                        , modulePackageKey, packageKeyString, getModule )
 import IfaceEnv         ( newGlobalBinder )
 import Name      hiding ( varName )
 import RdrName
@@ -71,18 +71,18 @@ gen_Generic_binds gk tc metaTyCons mod = do
   repTyInsts <- tc_mkRepFamInsts gk tc metaTyCons mod
   return (mkBindsRep gk tc, repTyInsts)
 
-genGenericMetaTyCons :: TyCon -> Module -> TcM (MetaTyCons, BagDerivStuff)
-genGenericMetaTyCons tc mod =
-  do  loc <- getSrcSpanM
-      let
+genGenericMetaTyCons :: TyCon -> TcM (MetaTyCons, BagDerivStuff)
+genGenericMetaTyCons tc =
+  do  let
         tc_name   = tyConName tc
+        mod       = nameModule tc_name
         tc_cons   = tyConDataCons tc
         tc_arits  = map dataConSourceArity tc_cons
 
         tc_occ    = nameOccName tc_name
-        d_occ     = mkGenD tc_occ
-        c_occ m   = mkGenC tc_occ m
-        s_occ m n = mkGenS tc_occ m n
+        d_occ     = mkGenD mod tc_occ
+        c_occ m   = mkGenC mod tc_occ m
+        s_occ m n = mkGenS mod tc_occ m n
 
         mkTyCon name = ASSERT( isExternalName name )
                        buildAlgTyCon name [] [] Nothing [] distinctAbstractTyConRhs
@@ -91,11 +91,14 @@ genGenericMetaTyCons tc mod =
                                           False          -- Not GADT syntax
                                           NoParentTyCon
 
-      d_name  <- newGlobalBinder mod d_occ loc
+      loc <- getSrcSpanM
+      -- we generate new names in current module
+      currentMod <- getModule
+      d_name  <- newGlobalBinder currentMod d_occ loc
       c_names <- forM (zip [0..] tc_cons) $ \(m,_) ->
-                    newGlobalBinder mod (c_occ m) loc
+                    newGlobalBinder currentMod (c_occ m) loc
       s_names <- forM (zip [0..] tc_arits) $ \(m,a) -> forM [0..a-1] $ \n ->
-                    newGlobalBinder mod (s_occ m n) loc
+                    newGlobalBinder currentMod (s_occ m n) loc
 
       let metaDTyCon  = mkTyCon d_name
           metaCTyCons = map mkTyCon c_names
@@ -103,23 +106,22 @@ genGenericMetaTyCons tc mod =
 
           metaDts = MetaTyCons metaDTyCon metaCTyCons metaSTyCons
 
-      -- pprTrace "rep0" (ppr rep0_tycon) $
       (,) metaDts `fmap` metaTyConsToDerivStuff tc metaDts
 
 -- both the tycon declarations and related instances
 metaTyConsToDerivStuff :: TyCon -> MetaTyCons -> TcM BagDerivStuff
 metaTyConsToDerivStuff tc metaDts =
-  do  loc <- getSrcSpanM
-      dflags <- getDynFlags
+  do  dflags <- getDynFlags
       dClas <- tcLookupClass datatypeClassName
-      let new_dfun_name clas tycon = newDFunName clas [mkTyConApp tycon []] loc
-      d_dfun_name <- new_dfun_name dClas tc
+      d_dfun_name <- newDFunName' dClas tc
       cClas <- tcLookupClass constructorClassName
-      c_dfun_names <- sequence [ new_dfun_name cClas tc | _ <- metaC metaDts ]
+      c_dfun_names <- sequence [ (conTy,) <$> newDFunName' cClas tc
+                               | conTy <- metaC metaDts ]
       sClas <- tcLookupClass selectorClassName
-      s_dfun_names <- sequence (map sequence [ [ new_dfun_name sClas tc
-                                               | _ <- x ]
-                                             | x <- metaS metaDts ])
+      s_dfun_names <-
+        sequence (map sequence [ [ (selector,) <$> newDFunName' sClas tc
+                                 | selector <- selectors ]
+                               | selectors <- metaS metaDts ])
       fix_env <- getFixityEnv
 
       let
@@ -143,9 +145,7 @@ metaTyConsToDerivStuff tc metaDts =
         d_mkInst = DerivInst (InstInfo { iSpec = d_inst, iBinds = d_binds })
 
         -- Constructor
-        c_metaTycons = metaC metaDts
-        c_insts = [ mk_inst cClas c ds
-                  | (c, ds) <- myZip1 c_metaTycons c_dfun_names ]
+        c_insts = [ mk_inst cClas c ds | (c, ds) <- c_dfun_names ]
         c_binds = [ InstBindings { ib_binds = c
                                  , ib_tyvars = []
                                  , ib_pragmas = []
@@ -156,9 +156,7 @@ metaTyConsToDerivStuff tc metaDts =
                    | (is,bs) <- myZip1 c_insts c_binds ]
 
         -- Selector
-        s_metaTycons = metaS metaDts
-        s_insts = map (map (\(s,ds) -> mk_inst sClas s ds))
-                      (myZip2 s_metaTycons s_dfun_names)
+        s_insts = map (map (\(s,ds) -> mk_inst sClas s ds)) s_dfun_names
         s_binds = [ [ InstBindings { ib_binds = s
                                    , ib_tyvars = []
                                    , ib_pragmas = []

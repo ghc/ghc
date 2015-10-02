@@ -24,8 +24,10 @@ Common commands:
     Shows the targets available in <dir>
 
   - make install
+  - make install-strip
 
-    Installs GHC, libraries and tools under $(prefix)
+    Installs GHC, libraries and tools under $(prefix). The install-strip
+    variant strips executable files while installing them.
 
   - make sdist
   - make binary-dist
@@ -33,13 +35,10 @@ Common commands:
     Builds a source or binary distribution respectively
 
   - `make show VALUE=<var>`
-
-    Displays the value of make variable <var>
-
   - `make show! VALUE=<var>`
 
-    Same as `make show`, but works right after ./configure (it skips reading
-    package-data.mk files).
+    Show the value of make variable <var>. The show! variant works right after
+    ./configure (it skips reading package-data.mk files).
 
   - make clean
   - make distclean
@@ -76,9 +75,11 @@ Using `make` in subdirectories
 
     Make documentation in this directory (if any)
 
-  - `make show VALUE=var`
+  - `make show VALUE=<var>`
+  - `make show! VALUE=<var>`
 
-    Show the value of $(var)
+    Show the value of make variable <var>. The show! variant works right after
+    ./configure (it skips reading package-data.mk files).
 
   - `make <file>`
 

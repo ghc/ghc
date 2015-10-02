@@ -13,7 +13,7 @@
 
 <interactive>:1:1:
     Arrow command found where an expression was expected:
-      () ↣ () ↢ () ⤜ () ⤛ ()
+      () ⤚ () ⤙ () ⤜ () ⤛ ()
 
 <interactive>:13:15:
     Couldn't match expected type ‘()’ with actual type ‘Bool’

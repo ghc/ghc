@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
@@ -38,7 +39,7 @@ module Control.Exception.Base (
         RecConError(..),
         RecSelError(..),
         RecUpdError(..),
-        ErrorCall(..),
+        ErrorCall(..), pattern ErrorCall,
         TypeError(..), -- #10284, custom error type for deferred type errors
 
         -- * Throwing exceptions
@@ -297,7 +298,7 @@ bracketOnError before after thing =
 
 -- |A pattern match failed. The @String@ gives information about the
 -- source location of the pattern.
-data PatternMatchFail = PatternMatchFail String
+newtype PatternMatchFail = PatternMatchFail String
 
 instance Show PatternMatchFail where
     showsPrec _ (PatternMatchFail err) = showString err
@@ -311,7 +312,7 @@ instance Exception PatternMatchFail
 -- multiple constructors, where some fields are in one constructor
 -- but not another. The @String@ gives information about the source
 -- location of the record selector.
-data RecSelError = RecSelError String
+newtype RecSelError = RecSelError String
 
 instance Show RecSelError where
     showsPrec _ (RecSelError err) = showString err
@@ -323,7 +324,7 @@ instance Exception RecSelError
 -- |An uninitialised record field was used. The @String@ gives
 -- information about the source location where the record was
 -- constructed.
-data RecConError = RecConError String
+newtype RecConError = RecConError String
 
 instance Show RecConError where
     showsPrec _ (RecConError err) = showString err
@@ -337,7 +338,7 @@ instance Exception RecConError
 -- multiple constructors, where some fields are in one constructor
 -- but not another. The @String@ gives information about the source
 -- location of the record update.
-data RecUpdError = RecUpdError String
+newtype RecUpdError = RecUpdError String
 
 instance Show RecUpdError where
     showsPrec _ (RecUpdError err) = showString err
@@ -349,7 +350,7 @@ instance Exception RecUpdError
 -- |A class method without a definition (neither a default definition,
 -- nor a definition in the appropriate instance) was called. The
 -- @String@ gives information about which method it was.
-data NoMethodError = NoMethodError String
+newtype NoMethodError = NoMethodError String
 
 instance Show NoMethodError where
     showsPrec _ (NoMethodError err) = showString err

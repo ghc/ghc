@@ -127,6 +127,10 @@ test('TH_ghci1', normal, ghci_script, ['TH_ghci1.script'])
 
 test('TH_linePragma', normal, compile_fail, ['-v0'])
 
+test('T1830_3',
+     extra_clean(['T1830_3a.o','T1830_3a.hi']),
+     multimod_compile_and_run,
+     ['T1830_3', '-v0'])
 test('T2700', normal, compile, ['-v0'])
 test('T2817', normal, compile, ['-v0'])
 test('T2713', normal, compile_fail, ['-v0'])
@@ -347,3 +351,12 @@ test('T10306', normal, compile, ['-v0'])
 test('T10596', normal, compile, ['-v0'])
 test('T10620', normal, compile_and_run, ['-v0'])
 test('T10638', normal, compile_fail, ['-v0'])
+test('T10704',
+     extra_clean(['T10704a.o','T10704a.hi']),
+     multimod_compile_and_run,
+     ['T10704', '-v0'])
+test('T6018th', normal, compile_fail, ['-v0'])
+test('TH_namePackage', normal, compile_and_run, ['-v0'])
+test('T10811', normal, compile, ['-v0'])
+test('T10810', normal, compile, ['-v0'])
+test('T10891', normal, compile, ['-v0'])

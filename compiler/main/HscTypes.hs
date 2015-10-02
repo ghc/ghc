@@ -10,7 +10,7 @@
 module HscTypes (
         -- * compilation state
         HscEnv(..), hscEPS,
-        FinderCache, FindResult(..), FoundHs(..), FindExactResult(..),
+        FinderCache, FindResult(..),
         Target(..), TargetId(..), pprTarget, pprTargetId,
         ModuleGraph, emptyMG,
         HscStatus(..),
@@ -29,7 +29,7 @@ module HscTypes (
 
         -- * Information about the module being compiled
         -- (re-exported from DriverPhases)
-        HscSource(..), isHsBootOrSig, hscSourceString,
+        HscSource(..), isHsBoot, hscSourceString,
 
 
         -- * State relating to modules in this package
@@ -93,7 +93,7 @@ module HscTypes (
         -- * Information on imports and exports
         WhetherHasOrphans, IsBootInterface, Usage(..),
         Dependencies(..), noDependencies,
-        NameCache(..), OrigNameCache,
+        NameCache(..), OrigNameCache, updNameCacheIO,
         IfaceExport,
 
         -- * Warnings
@@ -162,7 +162,7 @@ import PatSyn
 import PrelNames        ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
 import Packages hiding  ( Version(..) )
 import DynFlags
-import DriverPhases     ( Phase, HscSource(..), isHsBootOrSig, hscSourceString )
+import DriverPhases     ( Phase, HscSource(..), isHsBoot, hscSourceString )
 import BasicTypes
 import IfaceSyn
 import CoreSyn          ( CoreRule, CoreVect )
@@ -202,7 +202,7 @@ data HscStatus
     = HscNotGeneratingCode
     | HscUpToDate
     | HscUpdateBoot
-    | HscUpdateSig
+    | HscUpdateBootMerge
     | HscRecomp CgGuts ModSummary
 
 -- -----------------------------------------------------------------------------
@@ -674,30 +674,15 @@ prepareAnnotations hsc_env mb_guts = do
 -- modules along the search path. On @:load@, we flush the entire
 -- contents of this cache.
 --
-type FinderCache = ModuleEnv FindExactResult
-
--- | The result of search for an exact 'Module'.
-data FindExactResult
-    = FoundExact ModLocation Module
-        -- ^ The module/signature was found
-    | NoPackageExact PackageKey
-    | NotFoundExact
-        { fer_paths     :: [FilePath]
-        , fer_pkg       :: Maybe PackageKey
-        }
-
--- | A found module or signature; e.g. anything with an interface file
-data FoundHs = FoundHs { fr_loc :: ModLocation
-                       , fr_mod :: Module
-                       -- , fr_origin :: ModuleOrigin
-                       }
+-- Although the @FinderCache@ range is 'FindResult' for convenience,
+-- in fact it will only ever contain 'Found' or 'NotFound' entries.
+--
+type FinderCache = ModuleEnv FindResult
 
 -- | The result of searching for an imported module.
 data FindResult
-  = FoundModule FoundHs
+  = Found ModLocation Module
         -- ^ The module was found
-  | FoundSigs [FoundHs] Module
-        -- ^ Signatures were found, with some backing implementation
   | NoPackage PackageKey
         -- ^ The requested package was not found
   | FoundMultiple [(Module, ModuleOrigin)]
@@ -1054,6 +1039,7 @@ data ModGuts
   = ModGuts {
         mg_module    :: !Module,         -- ^ Module being compiled
         mg_hsc_src   :: HscSource,       -- ^ Whether it's an hs-boot module
+        mg_loc       :: SrcSpan,         -- ^ For error messages from inner passes
         mg_exports   :: ![AvailInfo],    -- ^ What it exports
         mg_deps      :: !Dependencies,   -- ^ What it depends on, directly or
                                          -- otherwise
@@ -2093,15 +2079,6 @@ type IsBootInterface = Bool
 -- Invariant: the dependencies of a module @M@ never includes @M@.
 --
 -- Invariant: none of the lists contain duplicates.
---
--- NB: While this contains information about all modules and packages below
--- this one in the the import *hierarchy*, this may not accurately reflect
--- the full runtime dependencies of the module.  This is because this module may
--- have imported a boot module, in which case we'll only have recorded the
--- dependencies from the hs-boot file, not the actual hs file. (This is
--- unavoidable: usually, the actual hs file will have been compiled *after*
--- we wrote this interface file.)  See #936, and also @getLinkDeps@ in
--- @compiler/ghci/Linker.hs@ for code which cares about this distinction.
 data Dependencies
   = Deps { dep_mods   :: [(ModuleName, IsBootInterface)]
                         -- ^ All home-package modules transitively below this one
@@ -2361,6 +2338,12 @@ data NameCache
                 -- ^ Ensures that one original name gets one unique
    }
 
+updNameCacheIO :: HscEnv
+               -> (NameCache -> (NameCache, c))  -- The updating function
+               -> IO c
+updNameCacheIO hsc_env upd_fn
+  = atomicModifyIORef' (hsc_NC hsc_env) upd_fn
+
 -- | Per-module cache of original 'OccName's given 'Name's
 type OrigNameCache   = ModuleEnv (OccEnv Name)
 
@@ -2428,6 +2411,8 @@ data ModSummary
           -- ^ Source imports of the module
         ms_textual_imps :: [Located (ImportDecl RdrName)],
           -- ^ Non-source imports of the module from the module *text*
+        ms_merge_imps   :: (Bool, [Module]),
+          -- ^ Non-textual imports computed for HsBootMerge
         ms_hspp_file    :: FilePath,
           -- ^ Filename of preprocessed source file
         ms_hspp_opts    :: DynFlags,
@@ -2471,8 +2456,10 @@ ms_imps ms =
 -- The ModLocation is stable over successive up-sweeps in GHCi, wheres
 -- the ms_hs_date and imports can, of course, change
 
-msHsFilePath, msHiFilePath, msObjFilePath :: ModSummary -> FilePath
-msHsFilePath  ms = expectJust "msHsFilePath" (ml_hs_file  (ms_location ms))
+msHsFilePath :: ModSummary -> Maybe FilePath
+msHsFilePath  ms = ml_hs_file  (ms_location ms)
+
+msHiFilePath, msObjFilePath :: ModSummary -> FilePath
 msHiFilePath  ms = ml_hi_file  (ms_location ms)
 msObjFilePath ms = ml_obj_file (ms_location ms)
 
@@ -2487,7 +2474,10 @@ instance Outputable ModSummary where
                           text "ms_mod =" <+> ppr (ms_mod ms)
                                 <> text (hscSourceString (ms_hsc_src ms)) <> comma,
                           text "ms_textual_imps =" <+> ppr (ms_textual_imps ms),
-                          text "ms_srcimps =" <+> ppr (ms_srcimps ms)]),
+                          text "ms_srcimps =" <+> ppr (ms_srcimps ms),
+                          if not (null (snd (ms_merge_imps ms)))
+                            then text "ms_merge_imps =" <+> ppr (ms_merge_imps ms)
+                            else empty]),
              char '}'
             ]
 
@@ -2495,29 +2485,20 @@ showModMsg :: DynFlags -> HscTarget -> Bool -> ModSummary -> String
 showModMsg dflags target recomp mod_summary
   = showSDoc dflags $
         hsep [text (mod_str ++ replicate (max 0 (16 - length mod_str)) ' '),
-              char '(', text (normalise $ msHsFilePath mod_summary) <> comma,
+              char '(',
+              case msHsFilePath mod_summary of
+                Just path -> text (normalise path) <> comma
+                Nothing -> text "nothing" <> comma,
               case target of
                   HscInterpreted | recomp
                              -> text "interpreted"
                   HscNothing -> text "nothing"
-                  _ | HsigFile == ms_hsc_src mod_summary -> text "nothing"
-                    | otherwise -> text (normalise $ msObjFilePath mod_summary),
+                  _ -> text (normalise $ msObjFilePath mod_summary),
               char ')']
  where
     mod     = moduleName (ms_mod mod_summary)
     mod_str = showPpr dflags mod
-                ++ hscSourceString' dflags mod (ms_hsc_src mod_summary)
-
--- | Variant of hscSourceString which prints more information for signatures.
--- This can't live in DriverPhases because this would cause a module loop.
-hscSourceString' :: DynFlags -> ModuleName -> HscSource -> String
-hscSourceString' _ _ HsSrcFile   = ""
-hscSourceString' _ _ HsBootFile  = "[boot]"
-hscSourceString' dflags mod HsigFile =
-     "[" ++ (maybe "abstract sig"
-               (("sig of "++).showPpr dflags)
-               (getSigOf dflags mod)) ++ "]"
-    -- NB: -sig-of could be missing if we're just typechecking
+                ++ hscSourceString (ms_hsc_src mod_summary)
 
 {-
 ************************************************************************

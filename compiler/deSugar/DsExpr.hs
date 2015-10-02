@@ -33,6 +33,7 @@ import TcType
 import Coercion ( Role(..) )
 import TcEvidence
 import TcRnMonad
+import TcHsSyn
 import Type
 import CoreSyn
 import CoreUtils
@@ -57,6 +58,7 @@ import Bag
 import Outputable
 import FastString
 
+import IfaceEnv
 import IdInfo
 import Data.IORef       ( atomicModifyIORef', modifyIORef )
 
@@ -302,7 +304,7 @@ dsExpr (HsSCC _ cc expr@(L loc _)) = do
         mod_name <- getModule
         count <- goptM Opt_ProfCountEntries
         uniq <- newUnique
-        Tick (ProfNote (mkUserCC (snd cc) mod_name loc uniq) count True)
+        Tick (ProfNote (mkUserCC (sl_fs cc) mod_name loc uniq) count True)
                <$> dsLExpr expr
       else dsLExpr expr
 
@@ -819,7 +821,7 @@ dsDo stmts
     goL [] = panic "dsDo"
     goL (L loc stmt:lstmts) = putSrcSpanDs loc (go loc stmt lstmts)
 
-    go _ (LastStmt body _) stmts
+    go _ (LastStmt body _ _) stmts
       = ASSERT( null stmts ) dsLExpr body
         -- The 'return' op isn't used for 'do' expressions
 
@@ -846,13 +848,45 @@ dsDo stmts
             ; match_code <- handle_failure pat match fail_op
             ; return (mkApps bind_op' [rhs', Lam var match_code]) }
 
+    go _ (ApplicativeStmt args mb_join body_ty) stmts
+      = do {
+             let
+               (pats, rhss) = unzip (map (do_arg . snd) args)
+
+               do_arg (ApplicativeArgOne pat expr) =
+                 (pat, dsLExpr expr)
+               do_arg (ApplicativeArgMany stmts ret pat) =
+                 (pat, dsDo (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
+
+               arg_tys = map hsLPatType pats
+
+           ; rhss' <- sequence rhss
+           ; ops' <- mapM dsExpr (map fst args)
+
+           ; let body' = noLoc $ HsDo DoExpr stmts body_ty
+
+           ; let fun = L noSrcSpan $ HsLam $
+                   MG { mg_alts = [mkSimpleMatch pats body']
+                      , mg_arg_tys = arg_tys
+                      , mg_res_ty = body_ty
+                      , mg_origin = Generated }
+
+           ; fun' <- dsLExpr fun
+           ; let mk_ap_call l (op,r) = mkApps op [l,r]
+                 expr = foldl mk_ap_call fun' (zip ops' rhss')
+           ; case mb_join of
+               Nothing -> return expr
+               Just join_op ->
+                 do { join_op' <- dsExpr join_op
+                    ; return (App join_op' expr) } }
+
     go loc (RecStmt { recS_stmts = rec_stmts, recS_later_ids = later_ids
                     , recS_rec_ids = rec_ids, recS_ret_fn = return_op
                     , recS_mfix_fn = mfix_op, recS_bind_fn = bind_op
                     , recS_rec_rets = rec_rets, recS_ret_ty = body_ty }) stmts
       = goL (new_bind_stmt : stmts)  -- rec_ids can be empty; eg  rec { print 'x' }
       where
-        new_bind_stmt = L loc $ BindStmt (mkBigLHsPatTup later_pats)
+        new_bind_stmt = L loc $ BindStmt (mkBigLHsPatTupId later_pats)
                                          mfix_app bind_op
                                          noSyntaxExpr  -- Tuple cannot fail
 
@@ -865,9 +899,9 @@ dsDo stmts
         mfix_arg     = noLoc $ HsLam (MG { mg_alts = [mkSimpleMatch [mfix_pat] body]
                                          , mg_arg_tys = [tup_ty], mg_res_ty = body_ty
                                          , mg_origin = Generated })
-        mfix_pat     = noLoc $ LazyPat $ mkBigLHsPatTup rec_tup_pats
+        mfix_pat     = noLoc $ LazyPat $ mkBigLHsPatTupId rec_tup_pats
         body         = noLoc $ HsDo DoExpr (rec_stmts ++ [ret_stmt]) body_ty
-        ret_app      = nlHsApp (noLoc return_op) (mkBigLHsTup rets)
+        ret_app      = nlHsApp (noLoc return_op) (mkBigLHsTupId rets)
         ret_stmt     = noLoc $ mkLastStmt ret_app
                      -- This LastStmt will be desugared with dsDo,
                      -- which ignores the return_op in the LastStmt,
@@ -952,10 +986,9 @@ badMonadBind rhs elt_ty flag_doc
 --
 mkSptEntryName :: SrcSpan -> DsM Name
 mkSptEntryName loc = do
-    uniq <- newUnique
     mod  <- getModule
     occ  <- mkWrapperName "sptEntry"
-    return $ mkExternalName uniq mod occ loc
+    newGlobalBinder mod occ loc
   where
     mkWrapperName what
       = do dflags <- getDynFlags

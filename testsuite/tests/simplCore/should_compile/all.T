@@ -202,7 +202,7 @@ test('T5996',
      ['$MAKE -s --no-print-directory T5996'])
 test('T8537', normal, compile, [''])
 test('T8832',
-     expect_broken(8832),
+     normal,
      run_command,
      ['$MAKE -s --no-print-directory T8832 T8832_WORDSIZE_OPTS=' +
       ('-DT8832_WORDSIZE_64' if wordsize(64) else '')])
@@ -223,3 +223,5 @@ test('T10083',
      expect_broken(10083),
      run_command,
      ['$MAKE -s --no-print-directory T10083'])
+test('T10689', normal, compile, [''])
+test('T10689a', normal, compile, [''])

@@ -10,7 +10,9 @@ module TcValidity (
   expectedKindInCtxt,
   checkValidTheta, checkValidFamPats,
   checkValidInstance, validDerivPred,
-  checkInstTermination, checkValidTyFamInst, checkTyFamFreeness,
+  checkInstTermination,
+  ClsInfo, checkValidCoAxiom, checkValidCoAxBranch,
+  checkValidTyFamEqn,
   checkConsistentFamInst,
   arityErr, badATErr
   ) where
@@ -36,6 +38,9 @@ import TyCon
 import HsSyn            -- HsType
 import TcRnMonad        -- TcType, amongst others
 import FunDeps
+import FamInstEnv  ( isDominatedBy, injectiveBranches,
+                     InjectivityCheckResult(..) )
+import FamInst     ( makeInjectivityErrors )
 import Name
 import VarEnv
 import VarSet
@@ -126,7 +131,7 @@ unless the instance is available *here*.
 
 Note [When to call checkAmbiguity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We call checkAmbiguity 
+We call checkAmbiguity
    (a) on user-specified type signatures
    (b) in checkValidType
 
@@ -168,7 +173,7 @@ Only a *class* predicate can give rise to ambiguity
 An *implicit parameter* cannot.  For example:
         foo :: (?x :: [a]) => Int
         foo = length ?x
-is fine.  The call site will suppply a particular 'x'
+is fine.  The call site will supply a particular 'x'
 
 Furthermore, the type variables fixed by an implicit parameter
 propagate to the others.  E.g.
@@ -211,7 +216,11 @@ checkAmbiguity ctxt ty
        ; (_wrap, wanted) <- addErrCtxtM (mk_msg ty') $
                             captureConstraints $
                             tcSubType_NC ctxt ty' ty'
-       ; simplifyAmbiguityCheck ty wanted
+       ; whenNoErrs $  -- only run the simplifier if we have a clean
+                       -- environment. Otherwise we might trip.
+                       -- example: indexed-types/should_fail/BadSock
+                       -- fails in DEBUG mode without this
+         simplifyAmbiguityCheck ty wanted
 
        ; traceTc "Done ambiguity check for" (ppr ty) }
  where
@@ -282,10 +291,10 @@ checkValidType ctxt ty
                  RuleSigCtxt _  -> rank1
                  TySynCtxt _    -> rank0
 
-                 ExprSigCtxt    -> rank1
-                 FunSigCtxt _ _ -> rank1
-                 InfSigCtxt _   -> ArbitraryRank        -- Inferred type
-                 ConArgCtxt _   -> rank1 -- We are given the type of the entire
+                 ExprSigCtxt     -> rank1
+                 FunSigCtxt {}   -> rank1
+                 InfSigCtxt _    -> ArbitraryRank        -- Inferred type
+                 ConArgCtxt _    -> rank1 -- We are given the type of the entire
                                          -- constructor, hence rank 1
 
                  ForSigCtxt _   -> rank1
@@ -739,6 +748,7 @@ okIPCtxt ThBrackCtxt        = True
 okIPCtxt GhciCtxt           = True
 okIPCtxt SigmaCtxt          = True
 okIPCtxt (DataTyCtxt {})    = True
+okIPCtxt (PatSynCtxt {})    = True
 
 okIPCtxt (ClassSCCtxt {})  = False
 okIPCtxt (InstDeclCtxt {}) = False
@@ -998,7 +1008,7 @@ checkValidInstance ctxt hs_type ty
 Note [Paterson conditions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Termination test: the so-called "Paterson conditions" (see Section 5 of
-"Understanding functionsl dependencies via Constraint Handling Rules,
+"Understanding functional dependencies via Constraint Handling Rules,
 JFP Jan 2007).
 
 We check that each assertion in the context satisfies:
@@ -1107,7 +1117,7 @@ So we
     consistent with the instance types [p] y Int
 
 We do *not* assume (at this point) the the bound variables of
-the assoicated type instance decl are the same as for the parent
+the associated type instance decl are the same as for the parent
 instance decl. So, for example,
 
   instance C [p] Int
@@ -1140,10 +1150,13 @@ But if the 'b' didn't scope, we would make F's instance too
 poly-kinded.
 -}
 
+-- | Extra information needed when type-checking associated types. The 'Class' is
+-- the enclosing class, and the @VarEnv Type@ maps class variables to their
+-- instance types.
+type ClsInfo       = (Class, VarEnv Type)
+
 checkConsistentFamInst
-               :: Maybe ( Class
-                        , VarEnv Type )  -- ^ Class of associated type
-                                         -- and instantiation of class TyVars
+               :: Maybe ClsInfo
                -> TyCon              -- ^ Family tycon
                -> [TyVar]            -- ^ Type variables of the family instance
                -> [Type]             -- ^ Type patterns from instance
@@ -1209,14 +1222,79 @@ wrongATArgErr ty instTy =
 ************************************************************************
 -}
 
+checkValidCoAxiom :: CoAxiom Branched -> TcM ()
+checkValidCoAxiom (CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
+  = do { mapM_ (checkValidCoAxBranch Nothing fam_tc) branch_list
+       ; foldlM_ check_branch_compat [] branch_list }
+  where
+    branch_list = fromBranches branches
+    injectivity = familyTyConInjectivityInfo fam_tc
+
+    check_branch_compat :: [CoAxBranch]    -- previous branches in reverse order
+                        -> CoAxBranch      -- current branch
+                        -> TcM [CoAxBranch]-- current branch : previous branches
+    -- Check for
+    --   (a) this banch is dominated by previous ones
+    --   (b) failure of injectivity
+    check_branch_compat prev_branches cur_branch
+      | cur_branch `isDominatedBy` prev_branches
+      = do { addWarnAt (coAxBranchSpan cur_branch) $
+             inaccessibleCoAxBranch fam_tc cur_branch
+           ; return prev_branches }
+      | otherwise
+      = do { check_injectivity prev_branches cur_branch
+           ; return (cur_branch : prev_branches) }
+
+     -- Injectivity check: check whether a new (CoAxBranch) can extend
+     -- already checked equations without violating injectivity
+     -- annotation supplied by the user.
+     -- See Note [Verifying injectivity annotation] in FamInstEnv
+    check_injectivity prev_branches cur_branch
+      | Injective inj <- injectivity
+      = do { let conflicts =
+                     fst $ foldl (gather_conflicts inj prev_branches cur_branch)
+                                 ([], 0) prev_branches
+           ; mapM_ (\(err, span) -> setSrcSpan span $ addErr err)
+                   (makeInjectivityErrors fam_tc cur_branch inj conflicts) }
+      | otherwise
+      = return ()
+
+    gather_conflicts inj prev_branches cur_branch (acc, n) branch
+               -- n is 0-based index of branch in prev_branches
+      = case injectiveBranches inj cur_branch branch of
+          InjectivityUnified ax1 ax2
+            | ax1 `isDominatedBy` (replace_br prev_branches n ax2)
+                -> (acc, n + 1)
+            | otherwise
+                -> (branch : acc, n + 1)
+          InjectivityAccepted -> (acc, n + 1)
+
+    -- Replace n-th element in the list. Assumes 0-based indexing.
+    replace_br :: [CoAxBranch] -> Int -> CoAxBranch -> [CoAxBranch]
+    replace_br brs n br = take n brs ++ [br] ++ drop (n+1) brs
+
+
 -- Check that a "type instance" is well-formed (which includes decidability
 -- unless -XUndecidableInstances is given).
 --
-checkValidTyFamInst :: Maybe ( Class, VarEnv Type )
-                    -> TyCon -> CoAxBranch -> TcM ()
-checkValidTyFamInst mb_clsinfo fam_tc
+checkValidCoAxBranch :: Maybe ClsInfo
+                     -> TyCon -> CoAxBranch -> TcM ()
+checkValidCoAxBranch mb_clsinfo fam_tc
                     (CoAxBranch { cab_tvs = tvs, cab_lhs = typats
                                 , cab_rhs = rhs, cab_loc = loc })
+  = checkValidTyFamEqn mb_clsinfo fam_tc tvs typats rhs loc
+
+-- | Do validity checks on a type family equation, including consistency
+-- with any enclosing class instance head, termination, and lack of
+-- polytypes.
+checkValidTyFamEqn :: Maybe ClsInfo
+                   -> TyCon   -- ^ of the type family
+                   -> [TyVar] -- ^ bound tyvars in the equation
+                   -> [Type]  -- ^ type patterns
+                   -> Type    -- ^ rhs
+                   -> SrcSpan
+                   -> TcM ()
+checkValidTyFamEqn mb_clsinfo fam_tc tvs typats rhs loc
   = setSrcSpan loc $
     do { checkValidFamPats fam_tc tvs typats
 
@@ -1270,7 +1348,8 @@ checkValidFamPats :: TyCon -> [TyVar] -> [Type] -> TcM ()
 --         type instance F (T a) = a
 -- c) Have the right number of patterns
 checkValidFamPats fam_tc tvs ty_pats
-  = ASSERT( length ty_pats == tyConArity fam_tc )
+  = ASSERT2( length ty_pats == tyConArity fam_tc
+           , ppr ty_pats $$ ppr fam_tc $$ ppr (tyConArity fam_tc) )
       -- A family instance must have exactly the same number of type
       -- parameters as the family declaration.  You can't write
       --     type family F a :: * -> *
@@ -1293,6 +1372,14 @@ isTyFamFree :: Type -> Bool
 isTyFamFree = null . tcTyFamInsts
 
 -- Error messages
+
+inaccessibleCoAxBranch :: TyCon -> CoAxBranch -> SDoc
+inaccessibleCoAxBranch fam_tc (CoAxBranch { cab_tvs = tvs
+                                          , cab_lhs = lhs
+                                          , cab_rhs = rhs })
+  = ptext (sLit "Type family instance equation is overlapped:") $$
+    hang (pprUserForAll tvs)
+       2 (hang (pprTypeApp fam_tc lhs) 2 (equals <+> (ppr rhs)))
 
 tyFamInstIllegalErr :: Type -> SDoc
 tyFamInstIllegalErr ty
@@ -1340,4 +1427,3 @@ fv_type (ForAllTy tyvar ty) = filter (/= tyvar) (fv_type ty)
 
 fvTypes :: [Type] -> [TyVar]
 fvTypes tys = concat (map fvType tys)
-

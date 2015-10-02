@@ -355,9 +355,11 @@ match on everything past the :, which is just the tail of scanl.
 -- and thus must be applied to non-empty lists.
 
 foldr1                  :: (a -> a -> a) -> [a] -> a
-foldr1 _ [x]            =  x
-foldr1 f (x:xs)         =  f x (foldr1 f xs)
-foldr1 _ []             =  errorEmptyList "foldr1"
+foldr1 f = go
+  where go [x]            =  x
+        go (x:xs)         =  f x (go xs)
+        go []             =  errorEmptyList "foldr1"
+{-# INLINE [0] foldr1 #-}
 
 -- | 'scanr' is the right-to-left dual of 'scanl'.
 -- Note that
@@ -398,39 +400,27 @@ scanr1 f (x:xs)         =  f x q : qs
 -- It is a special case of 'Data.List.maximumBy', which allows the
 -- programmer to supply their own comparison function.
 maximum                 :: (Ord a) => [a] -> a
-{-# INLINE [1] maximum #-}
+{-# INLINEABLE maximum #-}
 maximum []              =  errorEmptyList "maximum"
 maximum xs              =  foldl1 max xs
 
-{-# RULES
-  "maximumInt"     maximum = (strictMaximum :: [Int]     -> Int);
-  "maximumInteger" maximum = (strictMaximum :: [Integer] -> Integer)
- #-}
-
--- We can't make the overloaded version of maximum strict without
--- changing its semantics (max might not be strict), but we can for
--- the version specialised to 'Int'.
-strictMaximum           :: (Ord a) => [a] -> a
-strictMaximum []        =  errorEmptyList "maximum"
-strictMaximum xs        =  foldl1' max xs
+-- We want this to be specialized so that with a strict max function, GHC
+-- produces good code. Note that to see if this is happending, one has to
+-- look at -ddump-prep, not -ddump-core!
+{-# SPECIALIZE  maximum :: [Int] -> Int #-}
+{-# SPECIALIZE  maximum :: [Integer] -> Integer #-}
 
 -- | 'minimum' returns the minimum value from a list,
 -- which must be non-empty, finite, and of an ordered type.
 -- It is a special case of 'Data.List.minimumBy', which allows the
 -- programmer to supply their own comparison function.
 minimum                 :: (Ord a) => [a] -> a
-{-# INLINE [1] minimum #-}
+{-# INLINEABLE minimum #-}
 minimum []              =  errorEmptyList "minimum"
 minimum xs              =  foldl1 min xs
 
-{-# RULES
-  "minimumInt"     minimum = (strictMinimum :: [Int]     -> Int);
-  "minimumInteger" minimum = (strictMinimum :: [Integer] -> Integer)
- #-}
-
-strictMinimum           :: (Ord a) => [a] -> a
-strictMinimum []        =  errorEmptyList "minimum"
-strictMinimum xs        =  foldl1' min xs
+{-# SPECIALIZE  minimum :: [Int] -> Int #-}
+{-# SPECIALIZE  minimum :: [Integer] -> Integer #-}
 
 
 -- | 'iterate' @f x@ returns an infinite list of repeated applications

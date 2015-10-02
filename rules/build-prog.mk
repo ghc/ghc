@@ -302,7 +302,7 @@ endif
 ifeq "$$($1_$2_WANT_INSTALLED_WRAPPER)" "YES"
 INSTALL_LIBEXECS += $1/$2/build/tmp/$$($1_$2_PROG)
 else ifeq "$$($1_$2_TOPDIR)" "YES"
-INSTALL_TOPDIRS  += $1/$2/build/tmp/$$($1_$2_PROG)
+INSTALL_TOPDIR_BINS += $1/$2/build/tmp/$$($1_$2_PROG)
 else
 INSTALL_BINS     += $1/$2/build/tmp/$$($1_$2_PROG)
 endif

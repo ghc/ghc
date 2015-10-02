@@ -1,5 +1,6 @@
 class Foo a where
   foo :: a -> a
+  {-# MINIMAL foo #-}
 data T = A.T
 mkT :: T
 x :: Bool

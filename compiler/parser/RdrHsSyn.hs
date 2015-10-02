@@ -35,7 +35,6 @@ module RdrHsSyn (
         mkExtName,           -- RdrName -> CLabelString
         mkGadtDecl,          -- [Located RdrName] -> LHsType RdrName -> ConDecl RdrName
         mkSimpleConDecl,
-        mkDeprecatedGadtRecordDecl,
         mkATDefault,
 
         -- Bunch of functions in the parser monad for
@@ -52,6 +51,7 @@ module RdrHsSyn (
         checkDoAndIfThenElse,
         checkRecordSyntax,
         parseErrorSDoc,
+        splitTilde,
 
         -- Help with processing exports
         ImpExpSubSpec(..),
@@ -213,13 +213,13 @@ mkTyFamInstEqn lhs rhs
                  ann) }
 
 mkDataFamInst :: SrcSpan
-         -> NewOrData
-         -> Maybe (Located CType)
-         -> Located (Maybe (LHsContext RdrName), LHsType RdrName)
-         -> Maybe (LHsKind RdrName)
-         -> [LConDecl RdrName]
-         -> Maybe (Located [LHsType RdrName])
-         -> P (LInstDecl RdrName)
+              -> NewOrData
+              -> Maybe (Located CType)
+              -> Located (Maybe (LHsContext RdrName), LHsType RdrName)
+              -> Maybe (LHsKind RdrName)
+              -> [LConDecl RdrName]
+              -> Maybe (Located [LHsType RdrName])
+              -> P (LInstDecl RdrName)
 mkDataFamInst loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
   = do { (tc, tparams,ann) <- checkTyClHdr False tycl_hdr
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
@@ -238,15 +238,18 @@ mkTyFamInst loc eqn
 
 mkFamDecl :: SrcSpan
           -> FamilyInfo RdrName
-          -> LHsType RdrName   -- LHS
-          -> Maybe (LHsKind RdrName) -- Optional kind signature
+          -> LHsType RdrName                   -- LHS
+          -> Located (FamilyResultSig RdrName) -- Optional result signature
+          -> Maybe (LInjectivityAnn RdrName)   -- Injectivity annotation
           -> P (LTyClDecl RdrName)
-mkFamDecl loc info lhs ksig
-  = do { (tc, tparams,ann) <- checkTyClHdr False lhs
+mkFamDecl loc info lhs ksig injAnn
+  = do { (tc, tparams, ann) <- checkTyClHdr False lhs
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; tyvars <- checkTyVarsP (ppr info) equals_or_where tc tparams
-       ; return (L loc (FamDecl (FamilyDecl { fdInfo = info, fdLName = tc
-                                            , fdTyVars = tyvars, fdKindSig = ksig }))) }
+       ; return (L loc (FamDecl (FamilyDecl{ fdInfo      = info, fdLName = tc
+                                           , fdTyVars    = tyvars
+                                           , fdResultSig = ksig
+                                           , fdInjectivityAnn = injAnn }))) }
   where
     equals_or_where = case info of
                         DataFamily          -> empty
@@ -468,25 +471,6 @@ mkPatSynMatchGroup (L _ patsyn_name) (L _ decls) =
         parseErrorSDoc loc $
         text "pattern synonym 'where' clause must bind the pattern synonym's name" <+>
         quotes (ppr patsyn_name) $$ ppr decl
-
-mkDeprecatedGadtRecordDecl :: SrcSpan
-                           -> Located RdrName
-                           -> Located [LConDeclField RdrName]
-                           -> LHsType RdrName
-                           ->  P (LConDecl  RdrName)
--- This one uses the deprecated syntax
---    C { x,y ::Int } :: T a b
--- We give it a RecCon details right away
-mkDeprecatedGadtRecordDecl loc (L con_loc con) flds res_ty
-  = do { data_con <- tyConToDataCon con_loc con
-       ; return (L loc (ConDecl { con_old_rec  = True
-                                , con_names    = [data_con]
-                                , con_explicit = Implicit
-                                , con_qvars    = mkHsQTvs []
-                                , con_cxt      = noLoc []
-                                , con_details  = RecCon flds
-                                , con_res      = ResTyGADT loc res_ty
-                                , con_doc      = Nothing })) }
 
 mkSimpleConDecl :: Located RdrName -> [LHsTyVarBndr RdrName]
                 -> LHsContext RdrName -> HsConDeclDetails RdrName
@@ -1060,6 +1044,21 @@ isFunLhs e = go e [] []
    go _ _ _ = return Nothing
 
 
+-- | Transform btype with strict_mark's into HsEqTy's
+-- (((~a) ~b) c) ~d ==> ((~a) ~ (b c)) ~ d
+splitTilde :: LHsType RdrName -> LHsType RdrName
+splitTilde t = go t
+  where go (L loc (HsAppTy t1 t2))
+          | L _ (HsBangTy (HsSrcBang Nothing NoSrcUnpack SrcLazy) t2') <- t2
+          = L loc (HsEqTy (go t1) t2')
+          | otherwise
+          = case go t1 of
+              (L _ (HsEqTy tl tr)) ->
+                L loc (HsEqTy tl (L (combineLocs tr t2) (HsAppTy tr t2)))
+              t -> L loc (HsAppTy t t2)
+
+        go t = t
+
 ---------------------------------------------------------------------------
 -- Check for monad comprehensions
 --
@@ -1121,8 +1120,8 @@ checkCmdLStmt :: ExprLStmt RdrName -> P (CmdLStmt RdrName)
 checkCmdLStmt = locMap checkCmdStmt
 
 checkCmdStmt :: SrcSpan -> ExprStmt RdrName -> P (CmdStmt RdrName)
-checkCmdStmt _ (LastStmt e r) =
-    checkCommand e >>= (\c -> return $ LastStmt c r)
+checkCmdStmt _ (LastStmt e s r) =
+    checkCommand e >>= (\c -> return $ LastStmt c s r)
 checkCmdStmt _ (BindStmt pat e b f) =
     checkCommand e >>= (\c -> return $ BindStmt pat c b f)
 checkCmdStmt _ (BodyStmt e t g ty) =
@@ -1181,7 +1180,8 @@ mkRecConstrOrUpdate (L l (HsVar c)) _ (fs,dd)
   = return (RecordCon (L l c) noPostTcExpr (mk_rec_fields fs dd))
 mkRecConstrOrUpdate exp@(L l _) _ (fs,dd)
   | dd        = parseErrorSDoc l (text "You cannot use `..' in a record update")
-  | otherwise = return (RecordUpd exp (map (fmap mk_rec_upd_field) fs) [] [] [])
+  | otherwise = return (RecordUpd exp (map (fmap mk_rec_upd_field) fs)
+                      PlaceHolder PlaceHolder PlaceHolder)
 
 mk_rec_fields :: [LHsRecField id arg] -> Bool -> HsRecFields id arg
 mk_rec_fields fs False = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
@@ -1215,9 +1215,9 @@ mkInlinePragma src (inl, match_info) mb_act
 --
 mkImport :: Located CCallConv
          -> Located Safety
-         -> (Located (SourceText,FastString), Located RdrName, LHsType RdrName)
+         -> (Located StringLiteral, Located RdrName, LHsType RdrName)
          -> P (HsDecl RdrName)
-mkImport (L lc cconv) (L ls safety) (L loc (esrc,entity), v, ty)
+mkImport (L lc cconv) (L ls safety) (L loc (StringLiteral esrc entity), v, ty)
   | cconv == PrimCallConv                      = do
   let funcTarget = CFunction (StaticTarget esrc entity Nothing True)
       importSpec = CImport (L lc PrimCallConv) (L ls safety) Nothing funcTarget
@@ -1294,9 +1294,9 @@ parseCImport cconv safety nm str sourceText =
 -- construct a foreign export declaration
 --
 mkExport :: Located CCallConv
-         -> (Located (SourceText,FastString), Located RdrName, LHsType RdrName)
+         -> (Located StringLiteral, Located RdrName, LHsType RdrName)
          -> P (HsDecl RdrName)
-mkExport (L lc cconv) (L le (esrc,entity), v, ty) = do
+mkExport (L lc cconv) (L le (StringLiteral esrc entity), v, ty) = do
   return $ ForD (ForeignExport v ty noForeignExportCoercionYet
                  (CExport (L lc (CExportStatic esrc entity' cconv))
                           (L le (unpackFS entity))))

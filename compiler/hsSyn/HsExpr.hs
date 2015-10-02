@@ -39,6 +39,7 @@ import Type
 
 -- libraries:
 import Data.Data hiding (Fixity)
+import Data.Maybe (isNothing)
 
 {-
 ************************************************************************
@@ -294,11 +295,12 @@ data HsExpr id
                 [LHsRecUpdField id]
 --              (HsMatchGroup Id)  -- Filled in by the type checker to be
 --                                 -- a match that does the job
-                [DataCon]          -- Filled in by the type checker to the
-                                   -- _non-empty_ list of DataCons that have
-                                   -- all the upd'd fields
-                [PostTc id Type]   -- Argument types of *input* record type
-                [PostTc id Type]   --              and  *output* record type
+                (PostTc id [DataCon])
+                -- Filled in by the type checker to the
+                -- _non-empty_ list of DataCons that have
+                -- all the upd'd fields
+                (PostTc id [Type])  -- Argument types of *input* record type
+                (PostTc id [Type])  --              and  *output* record type
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon
 
@@ -352,15 +354,15 @@ data HsExpr id
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsSCC       SourceText            -- Note [Pragma source text] in BasicTypes
-                (SourceText,FastString) -- "set cost centre" SCC pragma
-                (LHsExpr id)            -- expr whose cost is to be measured
+                StringLiteral         -- "set cost centre" SCC pragma
+                (LHsExpr id)          -- expr whose cost is to be measured
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# CORE'@,
   --             'ApiAnnotation.AnnVal', 'ApiAnnotation.AnnClose' @'\#-}'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsCoreAnn   SourceText            -- Note [Pragma source text] in BasicTypes
-                (SourceText,FastString) -- hdaume: core annotation
+                StringLiteral         -- hdaume: core annotation
                 (LHsExpr id)
 
   -----------------------------------------------------------
@@ -466,7 +468,7 @@ data HsExpr id
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsTickPragma                      -- A pragma introduced tick
      SourceText                       -- Note [Pragma source text] in BasicTypes
-     ((SourceText,FastString),(Int,Int),(Int,Int))
+     (StringLiteral,(Int,Int),(Int,Int))
                                       -- external span for this tick
      (LHsExpr id)
 
@@ -597,7 +599,7 @@ ppr_expr (HsLit lit)      = ppr lit
 ppr_expr (HsOverLit lit)  = ppr lit
 ppr_expr (HsPar e)        = parens (ppr_lexpr e)
 
-ppr_expr (HsCoreAnn _ (_,s) e)
+ppr_expr (HsCoreAnn _ (StringLiteral _ s) e)
   = vcat [ptext (sLit "HsCoreAnn") <+> ftext s, ppr_lexpr e]
 
 ppr_expr (HsApp e1 e2)
@@ -656,7 +658,6 @@ ppr_expr (ExplicitTuple exprs boxity)
     punc (Missing {} : _) = comma
     punc []               = empty
 
---avoid using PatternSignatures for stage1 code portability
 ppr_expr (HsLam matches)
   = pprMatches (LambdaExpr :: HsMatchContext id) matches
 
@@ -718,7 +719,7 @@ ppr_expr (ELazyPat e)   = char '~' <> pprParendExpr e
 ppr_expr (EAsPat v e)   = ppr v <> char '@' <> pprParendExpr e
 ppr_expr (EViewPat p e) = ppr p <+> ptext (sLit "->") <+> ppr e
 
-ppr_expr (HsSCC _ (_,lbl) expr)
+ppr_expr (HsSCC _ (StringLiteral _ lbl) expr)
   = sep [ ptext (sLit "{-# SCC") <+> doubleQuotes (ftext lbl) <+> ptext (sLit "#-}"),
           pprParendExpr expr ]
 
@@ -752,7 +753,7 @@ ppr_expr (HsBinTick tickIdTrue tickIdFalse exp)
 ppr_expr (HsTickPragma _ externalSrcLoc exp)
   = pprTicks (ppr exp) $
     hcat [ptext (sLit "tickpragma<"),
-          ppr externalSrcLoc,
+          pprExternalSrcLoc externalSrcLoc,
           ptext (sLit ">("),
           ppr exp,
           ptext (sLit ")")]
@@ -772,6 +773,10 @@ ppr_expr (HsArrForm op _ args)
   = hang (ptext (sLit "(|") <+> ppr_lexpr op)
          4 (sep (map (pprCmdArg.unLoc) args) <+> ptext (sLit "|)"))
 ppr_expr (HsSingleRecFld f) = ppr f
+
+pprExternalSrcLoc :: (StringLiteral,(Int,Int),(Int,Int)) -> SDoc
+pprExternalSrcLoc (StringLiteral _ src,(n1,n2),(n3,n4))
+  = ppr (src,(n1,n2),(n3,n4))
 
 {-
 HsSyn records exactly where the user put parens, with HsPar.
@@ -987,7 +992,6 @@ ppr_cmd (HsCmdApp c e)
     collect_args (L _ (HsCmdApp fun arg)) args = collect_args fun (arg:args)
     collect_args fun args = (fun, args)
 
---avoid using PatternSignatures for stage1 code portability
 ppr_cmd (HsCmdLam matches)
   = pprMatches (LambdaExpr :: HsMatchContext id) matches
 
@@ -1269,12 +1273,15 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
   = LastStmt  -- Always the last Stmt in ListComp, MonadComp, PArrComp,
               -- and (after the renamer) DoExpr, MDoExpr
               -- Not used for GhciStmtCtxt, PatGuard, which scope over other stuff
-               body
-               (SyntaxExpr idR)   -- The return operator, used only for MonadComp
-                                  -- For ListComp, PArrComp, we use the baked-in 'return'
-                                  -- For DoExpr, MDoExpr, we don't appply a 'return' at all
-                                  -- See Note [Monad Comprehensions]
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLarrow'
+          body
+          Bool               -- True <=> return was stripped by ApplicativeDo
+          (SyntaxExpr idR)   -- The return operator, used only for
+                             -- MonadComp For ListComp, PArrComp, we
+                             -- use the baked-in 'return' For DoExpr,
+                             -- MDoExpr, we don't apply a 'return' at
+                             -- all See Note [Monad Comprehensions] |
+                             -- - 'ApiAnnotation.AnnKeywordId' :
+                             -- 'ApiAnnotation.AnnLarrow'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | BindStmt (LPat idL)
@@ -1283,6 +1290,20 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
              (SyntaxExpr idR) -- The fail operator
              -- The fail operator is noSyntaxExpr
              -- if the pattern match can't fail
+
+  -- | 'ApplicativeStmt' represents an applicative expression built with
+  -- <$> and <*>.  It is generated by the renamer, and is desugared into the
+  -- appropriate applicative expression by the desugarer, but it is intended
+  -- to be invisible in error messages.
+  --
+  -- For full details, see Note [ApplicativeDo] in RnExpr
+  --
+  | ApplicativeStmt
+             [ ( SyntaxExpr idR
+               , ApplicativeArg idL idR) ]
+                      -- [(<$>, e1), (<*>, e2), ..., (<*>, en)]
+             (Maybe (SyntaxExpr idR))  -- 'join', if necessary
+             (PostTc idR Type)     -- Type of the body
 
   | BodyStmt body              -- See Note [BodyStmt]
              (SyntaxExpr idR)  -- The (>>) operator
@@ -1377,6 +1398,17 @@ data ParStmtBlock idL idR
         (SyntaxExpr idR)   -- The return operator
   deriving( Typeable )
 deriving instance (DataId idL, DataId idR) => Data (ParStmtBlock idL idR)
+
+data ApplicativeArg idL idR
+  = ApplicativeArgOne            -- pat <- expr (pat must be irrefutable)
+      (LPat idL)
+      (LHsExpr idL)
+  | ApplicativeArgMany           -- do { stmts; return vars }
+      [ExprLStmt idL]            -- stmts
+      (SyntaxExpr idL)           -- return (v1,..,vn), or just (v1,..,vn)
+      (LPat idL)                 -- (v1,...,vn)
+  deriving( Typeable )
+deriving instance (DataId idL, DataId idR) => Data (ApplicativeArg idL idR)
 
 {-
 Note [The type of bind in Stmts]
@@ -1523,9 +1555,12 @@ instance (OutputableBndr idL, OutputableBndr idR, Outputable body)
          => Outputable (StmtLR idL idR body) where
     ppr stmt = pprStmt stmt
 
-pprStmt :: (OutputableBndr idL, OutputableBndr idR, Outputable body)
+pprStmt :: forall idL idR body . (OutputableBndr idL, OutputableBndr idR, Outputable body)
         => (StmtLR idL idR body) -> SDoc
-pprStmt (LastStmt expr _)         = ifPprDebug (ptext (sLit "[last]")) <+> ppr expr
+pprStmt (LastStmt expr ret_stripped _)
+  = ifPprDebug (ptext (sLit "[last]")) <+>
+       (if ret_stripped then ptext (sLit "return") else empty) <+>
+       ppr expr
 pprStmt (BindStmt pat expr _ _)   = hsep [ppr pat, larrow, ppr expr]
 pprStmt (LetStmt binds)           = hsep [ptext (sLit "let"), pprBinds binds]
 pprStmt (BodyStmt expr _ _ _)     = ppr expr
@@ -1540,6 +1575,45 @@ pprStmt (RecStmt { recS_stmts = segment, recS_rec_ids = rec_ids
     vcat [ ppr_do_stmts segment
          , ifPprDebug (vcat [ ptext (sLit "rec_ids=") <> ppr rec_ids
                             , ptext (sLit "later_ids=") <> ppr later_ids])]
+
+pprStmt (ApplicativeStmt args mb_join _)
+  = getPprStyle $ \style ->
+      if userStyle style
+         then pp_for_user
+         else pp_debug
+  where
+  -- make all the Applicative stuff invisible in error messages by
+  -- flattening the whole ApplicativeStmt nest back to a sequence
+  -- of statements.
+   pp_for_user = vcat $ punctuate semi $ concatMap flattenArg args
+
+   -- ppr directly rather than transforming here, becuase we need to
+   -- inject a "return" which is hard when we're polymorphic in the id
+   -- type.
+   flattenStmt :: ExprLStmt idL -> [SDoc]
+   flattenStmt (L _ (ApplicativeStmt args _ _)) = concatMap flattenArg args
+   flattenStmt stmt = [ppr stmt]
+
+   flattenArg (_, ApplicativeArgOne pat expr) =
+     [ppr (BindStmt pat expr noSyntaxExpr noSyntaxExpr :: ExprStmt idL)]
+   flattenArg (_, ApplicativeArgMany stmts _ _) =
+     concatMap flattenStmt stmts
+
+   pp_debug =
+     let
+         ap_expr = sep (punctuate (ptext (sLit " |")) (map pp_arg args))
+     in
+       if isNothing mb_join
+          then ap_expr
+          else ptext (sLit "join") <+> parens ap_expr
+
+   pp_arg (_, ApplicativeArgOne pat expr) =
+     ppr (BindStmt pat expr noSyntaxExpr noSyntaxExpr :: ExprStmt idL)
+   pp_arg (_, ApplicativeArgMany stmts return pat) =
+     ppr pat <+>
+     ptext (sLit "<-") <+>
+     ppr (HsDo DoExpr (stmts ++ [noLoc (LastStmt (noLoc return) False noSyntaxExpr)])
+           (error "pprStmt"))
 
 pprTransformStmt :: OutputableBndr id => [id] -> LHsExpr id -> Maybe (LHsExpr id) -> SDoc
 pprTransformStmt bndrs using by
@@ -1580,7 +1654,7 @@ pprComp :: (OutputableBndr id, Outputable body)
         => [LStmt id body] -> SDoc
 pprComp quals     -- Prints:  body | qual1, ..., qualn
   | not (null quals)
-  , L _ (LastStmt body _) <- last quals
+  , L _ (LastStmt body _ _) <- last quals
   = hang (ppr body <+> char '|') 2 (pprQuals (dropTail 1 quals))
   | otherwise
   = pprPanic "pprComp" (pprQuals quals)
@@ -1965,7 +2039,7 @@ pprMatchInCtxt ctxt match  = hang (ptext (sLit "In") <+> pprMatchContext ctxt <>
 
 pprStmtInCtxt :: (OutputableBndr idL, OutputableBndr idR, Outputable body)
                => HsStmtContext idL -> StmtLR idL idR body -> SDoc
-pprStmtInCtxt ctxt (LastStmt e _)
+pprStmtInCtxt ctxt (LastStmt e _ _)
   | isListCompExpr ctxt      -- For [ e | .. ], do not mutter about "stmts"
   = hang (ptext (sLit "In the expression:")) 2 (ppr e)
 

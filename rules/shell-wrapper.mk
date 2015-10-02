@@ -77,7 +77,7 @@ install: install_$1_$2_wrapper
 .PHONY: install_$1_$2_wrapper
 install_$1_$2_wrapper: WRAPPER=$$(DESTDIR)$$(bindir)/$(CrossCompilePrefix)$$($1_$2_INSTALL_SHELL_WRAPPER_NAME)
 install_$1_$2_wrapper:
-	$$(call INSTALL_DIR,"$$(DESTDIR)$$(bindir)")
+	$$(INSTALL_DIR) "$$(DESTDIR)$$(bindir)"
 	$$(call removeFiles,                                        "$$(WRAPPER)")
 	$$(CREATE_SCRIPT)                                           "$$(WRAPPER)"
 	echo '#!$$(SHELL)'                                       >> "$$(WRAPPER)"

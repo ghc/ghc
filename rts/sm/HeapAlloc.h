@@ -52,7 +52,12 @@
 #ifdef USE_LARGE_ADDRESS_SPACE
 
 extern W_ mblock_address_space_begin;
+#if aarch64_HOST_ARCH
+# define MBLOCK_SPACE_SIZE      ((StgWord)1 << 38) /* 1/4 TB */
+#else
 # define MBLOCK_SPACE_SIZE      ((StgWord)1 << 40) /* 1 TB */
+#endif
+
 # define HEAP_ALLOCED(p)        ((W_)(p) >= mblock_address_space_begin && \
                                  (W_)(p) < (mblock_address_space_begin +  \
                                             MBLOCK_SPACE_SIZE))

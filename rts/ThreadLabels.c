@@ -20,11 +20,19 @@
 
 #if defined(DEBUG)
 
+#if defined(THREADED_RTS)
+static Mutex threadLabels_mutex;
+#endif /* THREADED_RTS */
+
 static HashTable * threadLabels = NULL;
 
 void
 initThreadLabelTable(void)
 {
+#if defined(THREADED_RTS)
+  initMutex(&threadLabels_mutex);
+#endif /* THREADED_RTS */
+
   if (threadLabels == NULL) {
     threadLabels = allocHashTable();
   }
@@ -33,33 +41,53 @@ initThreadLabelTable(void)
 void
 freeThreadLabelTable(void)
 {
+    ACQUIRE_LOCK(&threadLabels_mutex);
+
     if (threadLabels != NULL) {
         freeHashTable(threadLabels, stgFree);
         threadLabels = NULL;
     }
+
+    RELEASE_LOCK(&threadLabels_mutex);
 }
 
 static void
 updateThreadLabel(StgWord key, void *data)
 {
   removeThreadLabel(key);
+
+  ACQUIRE_LOCK(&threadLabels_mutex);
+
   insertHashTable(threadLabels,key,data);
+
+  RELEASE_LOCK(&threadLabels_mutex);
 }
 
 void *
 lookupThreadLabel(StgWord key)
 {
-  return lookupHashTable(threadLabels,key);
+  void * result;
+  ACQUIRE_LOCK(&threadLabels_mutex);
+
+  result = lookupHashTable(threadLabels,key);
+
+  RELEASE_LOCK(&threadLabels_mutex);
+
+  return result;
 }
 
 void
 removeThreadLabel(StgWord key)
 {
+  ACQUIRE_LOCK(&threadLabels_mutex);
+
   void * old = NULL;
   if ((old = lookupHashTable(threadLabels,key))) {
     removeHashTable(threadLabels,key,old);
     stgFree(old);
   }
+
+  RELEASE_LOCK(&threadLabels_mutex);
 }
 
 #endif /* DEBUG */

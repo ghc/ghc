@@ -56,7 +56,6 @@ import Maybes
 import UniqSupply
 import ErrUtils (Severity(..))
 import Outputable
-import FastBool hiding ( fastOr )
 import SrcLoc
 import FastString
 import qualified ErrUtils as Err
@@ -1319,7 +1318,7 @@ hasCafRefs dflags this_pkg this_mod p@(_,cvt_integer) arity expr
   | is_caf || mentions_cafs = MayHaveCafRefs
   | otherwise               = NoCafRefs
  where
-  mentions_cafs   = isFastTrue (cafRefsE p expr)
+  mentions_cafs   = cafRefsE p expr
   is_dynamic_name = isDllName dflags this_pkg this_mod
   is_caf = not (arity > 0 || rhsIsStatic (targetPlatform dflags) is_dynamic_name cvt_integer expr)
 
@@ -1329,38 +1328,34 @@ hasCafRefs dflags this_pkg this_mod p@(_,cvt_integer) arity expr
   -- CorePrep later on, and we don't want to duplicate that
   -- knowledge in rhsIsStatic below.
 
-cafRefsE :: CafRefEnv -> Expr a -> FastBool
+cafRefsE :: CafRefEnv -> Expr a -> Bool
 cafRefsE p (Var id)            = cafRefsV p id
 cafRefsE p (Lit lit)           = cafRefsL p lit
-cafRefsE p (App f a)           = fastOr (cafRefsE p f) (cafRefsE p) a
+cafRefsE p (App f a)           = cafRefsE p f || cafRefsE p a
 cafRefsE p (Lam _ e)           = cafRefsE p e
-cafRefsE p (Let b e)           = fastOr (cafRefsEs p (rhssOfBind b)) (cafRefsE p) e
-cafRefsE p (Case e _bndr _ alts) = fastOr (cafRefsE p e) (cafRefsEs p) (rhssOfAlts alts)
+cafRefsE p (Let b e)           = cafRefsEs p (rhssOfBind b) || cafRefsE p e
+cafRefsE p (Case e _bndr _ alts) = cafRefsE p e || cafRefsEs p (rhssOfAlts alts)
 cafRefsE p (Tick _n e)         = cafRefsE p e
 cafRefsE p (Cast e _co)        = cafRefsE p e
-cafRefsE _ (Type _)            = fastBool False
-cafRefsE _ (Coercion _)        = fastBool False
+cafRefsE _ (Type _)            = False
+cafRefsE _ (Coercion _)        = False
 
-cafRefsEs :: CafRefEnv -> [Expr a] -> FastBool
-cafRefsEs _ []     = fastBool False
-cafRefsEs p (e:es) = fastOr (cafRefsE p e) (cafRefsEs p) es
+cafRefsEs :: CafRefEnv -> [Expr a] -> Bool
+cafRefsEs _ []     = False
+cafRefsEs p (e:es) = cafRefsE p e || cafRefsEs p es
 
-cafRefsL :: CafRefEnv -> Literal -> FastBool
+cafRefsL :: CafRefEnv -> Literal -> Bool
 -- Don't forget that mk_integer id might have Caf refs!
 -- We first need to convert the Integer into its final form, to
 -- see whether mkInteger is used.
 cafRefsL p@(_, cvt_integer) (LitInteger i _) = cafRefsE p (cvt_integer i)
-cafRefsL _                  _                = fastBool False
+cafRefsL _                  _                = False
 
-cafRefsV :: CafRefEnv -> Id -> FastBool
+cafRefsV :: CafRefEnv -> Id -> Bool
 cafRefsV (subst, _) id
-  | not (isLocalId id)                = fastBool (mayHaveCafRefs (idCafInfo id))
-  | Just id' <- lookupVarEnv subst id = fastBool (mayHaveCafRefs (idCafInfo id'))
-  | otherwise                         = fastBool False
-
-fastOr :: FastBool -> (a -> FastBool) -> a -> FastBool
--- hack for lazy-or over FastBool.
-fastOr a f x = fastBool (isFastTrue a || isFastTrue (f x))
+  | not (isLocalId id)                = mayHaveCafRefs (idCafInfo id)
+  | Just id' <- lookupVarEnv subst id = mayHaveCafRefs (idCafInfo id')
+  | otherwise                         = False
 
 {-
 ------------------------------------------------------------------------------

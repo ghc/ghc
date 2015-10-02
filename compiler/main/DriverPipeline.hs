@@ -13,7 +13,7 @@
 module DriverPipeline (
         -- Run a series of compilation steps in a pipeline, for a
         -- collection of source files.
-   oneShot, compileFile,
+   oneShot, compileFile, mergeRequirement,
 
         -- Interfaces for the batch-mode driver
    linkBinary,
@@ -22,6 +22,9 @@ module DriverPipeline (
    preprocess,
    compileOne, compileOne',
    link,
+
+        -- Misc utility
+   makeMergeRequirementSummary,
 
         -- Exports for hooks to override runPhase and link
    PhasePlus(..), CompPipeline(..), PipeEnv(..), PipeState(..),
@@ -61,6 +64,7 @@ import MonadUtils
 import Platform
 import TcRnTypes
 import Hooks
+import MkIface
 
 import Exception
 import Data.IORef       ( readIORef )
@@ -71,6 +75,7 @@ import Control.Monad
 import Data.List        ( isSuffixOf )
 import Data.Maybe
 import Data.Char
+import Data.Time
 
 -- ---------------------------------------------------------------------------
 -- Pre-process
@@ -128,55 +133,74 @@ compileOne' :: Maybe TcGblEnv
 compileOne' m_tc_result mHscMessage
             hsc_env0 summary mod_index nmods mb_old_iface maybe_old_linkable
             source_modified0
+ | HsBootMerge <- ms_hsc_src summary
+ = do -- Do a boot merge instead!  For now, something very simple
+      output_fn <- getOutputFilename next_phase
+                        Temporary basename dflags next_phase (Just location)
+      e <- genericHscMergeRequirement mHscMessage
+                hsc_env summary mb_old_iface (mod_index, nmods)
+
+      case e of
+       -- TODO: dedup
+       Left iface ->
+           do details <- genModDetails hsc_env iface
+              return (HomeModInfo{ hm_details  = details,
+                                   hm_iface    = iface,
+                                   hm_linkable = maybe_old_linkable })
+       Right (iface0, mb_old_hash) ->
+        case hsc_lang of
+          HscInterpreted ->
+           do (iface, _no_change) <- mkIfaceDirect hsc_env mb_old_hash iface0
+              details <- genModDetails hsc_env iface
+              -- Merges don't need to link in any bytecode, unlike
+              -- HsSrcFiles.
+              let linkable = LM (ms_hs_date summary) this_mod []
+              return (HomeModInfo{ hm_details  = details,
+                                   hm_iface    = iface,
+                                   hm_linkable = Just linkable })
+
+          HscNothing ->
+           do (iface, no_change) <- mkIfaceDirect hsc_env mb_old_hash iface0
+              details <- genModDetails hsc_env iface
+              when (gopt Opt_WriteInterface dflags) $
+                 hscWriteIface dflags iface no_change summary
+              let linkable = LM (ms_hs_date summary) this_mod []
+              return (HomeModInfo{ hm_details  = details,
+                                   hm_iface    = iface,
+                                   hm_linkable = Just linkable })
+          _ ->
+           do (iface, no_change) <- mkIfaceDirect hsc_env mb_old_hash iface0
+              hscWriteIface dflags iface no_change summary
+
+              -- #10660: Use the pipeline instead of calling
+              -- compileEmptyStub directly, so -dynamic-too gets
+              -- handled properly
+              let mod_name = ms_mod_name summary
+              _ <- runPipeline StopLn hsc_env
+                                (output_fn,
+                                 Just (HscOut src_flavour
+                                              mod_name HscUpdateBootMerge))
+                                (Just basename)
+                                Persistent
+                                (Just location)
+                                Nothing
+
+              details <- genModDetails hsc_env iface
+
+              o_time <- getModificationUTCTime object_filename
+              let linkable =
+                      LM o_time this_mod [DotO object_filename]
+              return (HomeModInfo{ hm_details  = details,
+                                   hm_iface    = iface,
+                                   hm_linkable = Just linkable })
+
+ | otherwise
  = do
-   let dflags0     = ms_hspp_opts summary
-       this_mod    = ms_mod summary
-       src_flavour = ms_hsc_src summary
-       location    = ms_location summary
-       input_fn    = expectJust "compile:hs" (ml_hs_file location)
-       input_fnpp  = ms_hspp_file summary
-       mod_graph   = hsc_mod_graph hsc_env0
-       needsTH     = any (xopt Opt_TemplateHaskell . ms_hspp_opts) mod_graph
-       needsQQ     = any (xopt Opt_QuasiQuotes     . ms_hspp_opts) mod_graph
-       needsLinker = needsTH || needsQQ
-       isDynWay    = any (== WayDyn) (ways dflags0)
-       isProfWay   = any (== WayProf) (ways dflags0)
-   -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
-   -- the linker can correctly load the object files.
-   let dflags1 = if needsLinker && dynamicGhc && not isDynWay && not isProfWay
-                  then gopt_set dflags0 Opt_BuildDynamicToo
-                  else dflags0
 
    debugTraceMsg dflags1 2 (text "compile: input file" <+> text input_fnpp)
-
-   let basename = dropExtension input_fn
-
-  -- We add the directory in which the .hs files resides) to the import path.
-  -- This is needed when we try to compile the .hc file later, if it
-  -- imports a _stub.h file that we created here.
-   let current_dir = takeDirectory basename
-       old_paths   = includePaths dflags1
-       dflags      = dflags1 { includePaths = current_dir : old_paths }
-       hsc_env     = hsc_env0 {hsc_dflags = dflags}
-
-   -- Figure out what lang we're generating
-   let hsc_lang = hscTarget dflags
-   -- ... and what the next phase should be
-   let next_phase = hscPostBackendPhase dflags src_flavour hsc_lang
-   -- ... and what file to generate the output into
+   -- What file to generate the output into?
    output_fn <- getOutputFilename next_phase
                         Temporary basename dflags next_phase (Just location)
-
-   -- -fforce-recomp should also work with --make
-   let force_recomp = gopt Opt_ForceRecomp dflags
-       source_modified
-         | force_recomp = SourceModified
-         | otherwise = source_modified0
-       object_filename = ml_obj_file location
-
-   let always_do_basic_recompilation_check = case hsc_lang of
-                                             HscInterpreted -> True
-                                             _ -> False
 
    e <- genericHscCompileGetFrontendResult
             always_do_basic_recompilation_check
@@ -196,7 +220,7 @@ compileOne' m_tc_result mHscMessage
            case hsc_lang of
                HscInterpreted ->
                    case ms_hsc_src summary of
-                   t | isHsBootOrSig t ->
+                   HsBootFile ->
                        do (iface, _changed, details) <- hscSimpleIface hsc_env tc_result mb_old_hash
                           return (HomeModInfo{ hm_details  = details,
                                                hm_iface    = iface,
@@ -230,7 +254,7 @@ compileOne' m_tc_result mHscMessage
                    do (iface, changed, details) <- hscSimpleIface hsc_env tc_result mb_old_hash
                       when (gopt Opt_WriteInterface dflags) $
                          hscWriteIface dflags iface changed summary
-                      let linkable = if isHsBootOrSig src_flavour
+                      let linkable = if isHsBoot src_flavour
                                      then maybe_old_linkable
                                      else Just (LM (ms_hs_date summary) this_mod [])
                       return (HomeModInfo{ hm_details  = details,
@@ -239,39 +263,17 @@ compileOne' m_tc_result mHscMessage
 
                _ ->
                    case ms_hsc_src summary of
+                   HsBootMerge -> panic "This driver can't handle it"
                    HsBootFile ->
                        do (iface, changed, details) <- hscSimpleIface hsc_env tc_result mb_old_hash
                           hscWriteIface dflags iface changed summary
+
                           touchObjectFile dflags object_filename
-                          return (HomeModInfo{ hm_details  = details,
-                                               hm_iface    = iface,
-                                               hm_linkable = maybe_old_linkable })
 
-                   HsigFile ->
-                       do (iface, changed, details) <-
-                                    hscSimpleIface hsc_env tc_result mb_old_hash
-                          hscWriteIface dflags iface changed summary
-
-                          -- #10660: Use the pipeline instead of calling
-                          -- compileEmptyStub directly, so -dynamic-too gets
-                          -- handled properly
-                          let mod_name = ms_mod_name summary
-                          _ <- runPipeline StopLn hsc_env
-                                            (output_fn,
-                                             Just (HscOut src_flavour mod_name HscUpdateSig))
-                                            (Just basename)
-                                            Persistent
-                                            (Just location)
-                                            Nothing
-
-                          -- Same as Hs
-                          o_time <- getModificationUTCTime object_filename
-                          let linkable =
-                                  LM o_time this_mod [DotO object_filename]
-
-                          return (HomeModInfo{ hm_details  = details,
-                                               hm_iface    = iface,
-                                               hm_linkable = Just linkable })
+                          return (HomeModInfo{
+                                    hm_details  = details,
+                                    hm_iface    = iface,
+                                    hm_linkable = maybe_old_linkable })
 
                    HsSrcFile ->
                         do guts0 <- hscDesugar hsc_env summary tc_result
@@ -295,6 +297,51 @@ compileOne' m_tc_result mHscMessage
                            return (HomeModInfo{ hm_details  = details,
                                                 hm_iface    = iface,
                                                 hm_linkable = Just linkable })
+ where dflags0     = ms_hspp_opts summary
+       this_mod    = ms_mod summary
+       src_flavour = ms_hsc_src summary
+       location    = ms_location summary
+       input_fn    = expectJust "compile:hs" (ml_hs_file location)
+       input_fnpp  = ms_hspp_file summary
+       mod_graph   = hsc_mod_graph hsc_env0
+       needsTH     = any (xopt Opt_TemplateHaskell . ms_hspp_opts) mod_graph
+       needsQQ     = any (xopt Opt_QuasiQuotes     . ms_hspp_opts) mod_graph
+       needsLinker = needsTH || needsQQ
+       isDynWay    = any (== WayDyn) (ways dflags0)
+       isProfWay   = any (== WayProf) (ways dflags0)
+
+       -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
+       -- the linker can correctly load the object files.
+
+       dflags1 = if needsLinker && dynamicGhc && not isDynWay && not isProfWay
+                  then gopt_set dflags0 Opt_BuildDynamicToo
+                  else dflags0
+
+       basename = dropExtension input_fn
+
+       -- We add the directory in which the .hs files resides) to the import
+       -- path.  This is needed when we try to compile the .hc file later, if it
+       -- imports a _stub.h file that we created here.
+       current_dir = takeDirectory basename
+       old_paths   = includePaths dflags1
+       dflags      = dflags1 { includePaths = current_dir : old_paths }
+       hsc_env     = hsc_env0 {hsc_dflags = dflags}
+
+       -- Figure out what lang we're generating
+       hsc_lang = hscTarget dflags
+       -- ... and what the next phase should be
+       next_phase = hscPostBackendPhase dflags src_flavour hsc_lang
+
+       -- -fforce-recomp should also work with --make
+       force_recomp = gopt Opt_ForceRecomp dflags
+       source_modified
+         | force_recomp = SourceModified
+         | otherwise = source_modified0
+       object_filename = ml_obj_file location
+
+       always_do_basic_recompilation_check = case hsc_lang of
+                                             HscInterpreted -> True
+                                             _ -> False
 
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support)
@@ -510,6 +557,50 @@ oneShot :: HscEnv -> Phase -> [(String, Maybe Phase)] -> IO ()
 oneShot hsc_env stop_phase srcs = do
   o_files <- mapM (compileFile hsc_env stop_phase) srcs
   doLink (hsc_dflags hsc_env) stop_phase o_files
+
+-- | Constructs a 'ModSummary' for a "signature merge" node.
+-- This is a simplified construction function which only checks
+-- for a local hs-boot file.
+makeMergeRequirementSummary :: HscEnv -> Bool -> ModuleName -> IO ModSummary
+makeMergeRequirementSummary hsc_env obj_allowed mod_name = do
+    let dflags = hsc_dflags hsc_env
+    location <- liftIO $ mkHomeModLocation2 dflags mod_name
+                         (moduleNameSlashes mod_name) (hiSuf dflags)
+    obj_timestamp <-
+         if isObjectTarget (hscTarget dflags) || obj_allowed -- bug #1205
+             then liftIO $ modificationTimeIfExists (ml_obj_file location)
+             else return Nothing
+    r <- findHomeModule hsc_env mod_name
+    let has_local_boot = case r of
+                            Found _ _ -> True
+                            _ -> False
+    src_timestamp <- case obj_timestamp of
+                        Just date -> return date
+                        Nothing -> getCurrentTime -- something fake
+    return ModSummary {
+            ms_mod = mkModule (thisPackage dflags) mod_name,
+            ms_hsc_src = HsBootMerge,
+            ms_location = location,
+            ms_hs_date = src_timestamp,
+            ms_obj_date = obj_timestamp,
+            ms_iface_date = Nothing,
+            -- TODO: fill this in with all the imports eventually
+            ms_srcimps = [],
+            ms_textual_imps = [],
+            ms_merge_imps = (has_local_boot, []),
+            ms_hspp_file = "FAKE",
+            ms_hspp_opts = dflags,
+            ms_hspp_buf = Nothing
+            }
+
+-- | Top-level entry point for @ghc -merge-requirement ModName@.
+mergeRequirement :: HscEnv -> ModuleName -> IO ()
+mergeRequirement hsc_env mod_name = do
+    mod_summary <- makeMergeRequirementSummary hsc_env True mod_name
+    -- Based off of GhcMake handling
+    _ <- liftIO $ compileOne' Nothing Nothing hsc_env mod_summary 1 1 Nothing
+                              Nothing SourceUnmodified
+    return ()
 
 compileFile :: HscEnv -> Phase -> (FilePath, Maybe Phase) -> IO FilePath
 compileFile hsc_env stop_phase (src, mb_phase) = do
@@ -992,7 +1083,8 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
                                         ms_obj_date  = Nothing,
                                         ms_iface_date   = Nothing,
                                         ms_textual_imps = imps,
-                                        ms_srcimps      = src_imps }
+                                        ms_srcimps      = src_imps,
+                                        ms_merge_imps = (False, []) }
 
   -- run the compiler!
         result <- liftIO $ hscCompileOneShot hsc_env'
@@ -1024,7 +1116,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                    -- stamp file for the benefit of Make
                    liftIO $ touchObjectFile dflags o_file
                    return (RealPhase next_phase, o_file)
-            HscUpdateSig ->
+            HscUpdateBootMerge ->
                 do -- We need to create a REAL but empty .o file
                    -- because we are going to attempt to put it in a library
                    PipeState{hsc_env=hsc_env'} <- getPipeState
@@ -1818,32 +1910,9 @@ linkBinary' staticLink dflags o_files dep_packages = do
                                                               -- This option must be placed before the library
                                                               -- that defines the symbol."
 
-    pkg_framework_path_opts <-
-        if platformUsesFrameworks platform
-        then do pkg_framework_paths <- getPackageFrameworkPath dflags dep_packages
-                return $ map ("-F" ++) pkg_framework_paths
-        else return []
-
-    framework_path_opts <-
-        if platformUsesFrameworks platform
-        then do let framework_paths = frameworkPaths dflags
-                return $ map ("-F" ++) framework_paths
-        else return []
-
-    pkg_framework_opts <-
-        if platformUsesFrameworks platform
-        then do pkg_frameworks <- getPackageFrameworks dflags dep_packages
-                return $ concat [ ["-framework", fw] | fw <- pkg_frameworks ]
-        else return []
-
-    framework_opts <-
-        if platformUsesFrameworks platform
-        then do let frameworks = cmdlineFrameworks dflags
-                -- reverse because they're added in reverse order from
-                -- the cmd line:
-                return $ concat [ ["-framework", fw]
-                                | fw <- reverse frameworks ]
-        else return []
+    -- frameworks
+    pkg_framework_opts <- getPkgFrameworkOpts dflags platform dep_packages
+    let framework_opts = getFrameworkOpts dflags platform
 
         -- probably _stub.o files
     let extra_ld_inputs = ldInputs dflags
@@ -1932,12 +2001,10 @@ linkBinary' staticLink dflags o_files dep_packages = do
                       ++ extra_ld_inputs
                       ++ map SysTools.Option (
                          rc_objs
-                      ++ framework_path_opts
                       ++ framework_opts
                       ++ pkg_lib_path_opts
                       ++ extraLinkObj:noteLinkObjs
                       ++ pkg_link_opts
-                      ++ pkg_framework_path_opts
                       ++ pkg_framework_opts
                       ++ debug_opts
                       ++ thread_opts
@@ -2184,7 +2251,7 @@ writeInterfaceOnlyMode dflags =
 -- | What phase to run after one of the backend code generators has run
 hscPostBackendPhase :: DynFlags -> HscSource -> HscTarget -> Phase
 hscPostBackendPhase _ HsBootFile _    =  StopLn
-hscPostBackendPhase _ HsigFile _      =  StopLn
+hscPostBackendPhase _ HsBootMerge _    =  StopLn
 hscPostBackendPhase dflags _ hsc_lang =
   case hsc_lang of
         HscC -> HCc

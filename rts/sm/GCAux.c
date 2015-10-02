@@ -121,6 +121,7 @@ revertCAFs( void )
          c != (StgIndStatic *)END_OF_CAF_LIST;
          c = (StgIndStatic *)c->static_link)
     {
+        c = (StgIndStatic *)UNTAG_STATIC_LIST_PTR(c);
         SET_INFO((StgClosure *)c, c->saved_info);
         c->saved_info = NULL;
         // could, but not necessary: c->static_link = NULL;

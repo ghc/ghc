@@ -25,12 +25,13 @@ module UniqSupply (
   ) where
 
 import Unique
-import FastTypes
 
 import GHC.IO
 
 import MonadUtils
 import Control.Monad
+import Data.Bits
+import Data.Char
 
 {-
 ************************************************************************
@@ -45,7 +46,7 @@ import Control.Monad
 -- also manufacture an arbitrary number of further 'UniqueSupply' values,
 -- which will be distinct from the first and from all others.
 data UniqSupply
-  = MkSplitUniqSupply FastInt   -- make the Unique with this
+  = MkSplitUniqSupply {-# UNPACK #-} !Int -- make the Unique with this
                    UniqSupply UniqSupply
                                 -- when split => these two supplies
 
@@ -67,7 +68,7 @@ takeUniqFromSupply :: UniqSupply -> (Unique, UniqSupply)
 -- ^ Obtain the 'Unique' from this particular 'UniqSupply', and a new supply
 
 mkSplitUniqSupply c
-  = case fastOrd (cUnbox c) `shiftLFastInt` _ILIT(24) of
+  = case ord c `shiftL` 24 of
      mask -> let
         -- here comes THE MAGIC:
 
@@ -75,11 +76,11 @@ mkSplitUniqSupply c
         mk_supply
           -- NB: Use unsafeInterleaveIO for thread-safety.
           = unsafeInterleaveIO (
-                genSym      >>= \ u_ -> case iUnbox u_ of { u -> (
+                genSym      >>= \ u ->
                 mk_supply   >>= \ s1 ->
                 mk_supply   >>= \ s2 ->
-                return (MkSplitUniqSupply (mask `bitOrFastInt` u) s1 s2)
-            )})
+                return (MkSplitUniqSupply (mask .|. u) s1 s2)
+            )
        in
        mk_supply
 
@@ -88,9 +89,9 @@ foreign import ccall unsafe "genSym" genSym :: IO Int
 splitUniqSupply (MkSplitUniqSupply _ s1 s2) = (s1, s2)
 listSplitUniqSupply  (MkSplitUniqSupply _ s1 s2) = s1 : listSplitUniqSupply s2
 
-uniqFromSupply  (MkSplitUniqSupply n _ _)  = mkUniqueGrimily (iBox n)
-uniqsFromSupply (MkSplitUniqSupply n _ s2) = mkUniqueGrimily (iBox n) : uniqsFromSupply s2
-takeUniqFromSupply (MkSplitUniqSupply n s1 _) = (mkUniqueGrimily (iBox n), s1)
+uniqFromSupply  (MkSplitUniqSupply n _ _)  = mkUniqueGrimily n
+uniqsFromSupply (MkSplitUniqSupply n _ s2) = mkUniqueGrimily n : uniqsFromSupply s2
+takeUniqFromSupply (MkSplitUniqSupply n s1 _) = (mkUniqueGrimily n, s1)
 
 {-
 ************************************************************************

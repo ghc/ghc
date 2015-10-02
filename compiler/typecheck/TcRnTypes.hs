@@ -581,6 +581,7 @@ We gather three sorts of usage information
    This usage info is mainly gathered by the renamer's
    gathering of free-variables
 
+AMG TODO update me please
  * tcg_used_rdrnames
       Records used *imported* (not locally-defined) RdrNames
       Used only to report unused import declarations
@@ -1147,7 +1148,6 @@ data Ct
        --   * isTypeFamilyTyCon cc_fun
        --   * typeKind (F xis) = tyVarKind fsk
        --   * always Nominal role
-       --   * always Given or Wanted, never Derived
       cc_ev     :: CtEvidence,  -- See Note [Ct/evidence invariant]
       cc_fun    :: TyCon,       -- A type function
 
@@ -2129,7 +2129,7 @@ pprSkolInfo (InstSC n)        = ptext (sLit "the instance declaration") <> ifPpr
 pprSkolInfo DataSkol          = ptext (sLit "a data type declaration")
 pprSkolInfo FamInstSkol       = ptext (sLit "a family instance declaration")
 pprSkolInfo BracketSkol       = ptext (sLit "a Template Haskell bracket")
-pprSkolInfo (RuleSkol name)   = ptext (sLit "the RULE") <+> doubleQuotes (ftext name)
+pprSkolInfo (RuleSkol name)   = ptext (sLit "the RULE") <+> pprRuleName name
 pprSkolInfo ArrowSkol         = ptext (sLit "an arrow form")
 pprSkolInfo (PatSkol cl mc)   = sep [ pprPatSkolInfo cl
                                     , ptext (sLit "in") <+> pprMatchContext mc ]
@@ -2150,8 +2150,8 @@ pprSigSkolInfo ctxt ty
        _              -> hang (pprUserTypeCtxt ctxt <> colon)
                             2 (ppr ty)
   where
-    pp_sig f = sep [ ptext (sLit "the type signature for:")
-                   , pprPrefixOcc f <+> dcolon <+> ppr ty ]
+    pp_sig f = vcat [ ptext (sLit "the type signature for:")
+                    , nest 2 (pprPrefixOcc f <+> dcolon <+> ppr ty) ]
 
 pprPatSkolInfo :: ConLike -> SDoc
 pprPatSkolInfo (RealDataCon dc)

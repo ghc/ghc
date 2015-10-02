@@ -33,22 +33,10 @@ then
     cd dist-haddock
 
     HADDOCK=../../inplace/bin/haddock
+    HADDOCK_FILES=`find ../ -name *.haddock | sort`
     HADDOCK_ARGS="-p ../prologue.txt"
-    for REPO in `grep '^libraries/[^ ]*  *- ' ../../packages | sed -e 's#libraries/##' -e 's/ .*//'`
+    for HADDOCK_FILE in $HADDOCK_FILES
     do
-        if [ -f "../$REPO/ghc-packages" ]
-        then
-            LIBS="`cat ../$REPO/ghc-packages`"
-            LIBROOT="../$REPO"
-        else
-            LIBS="$REPO"
-            LIBROOT=".."
-        fi
-        for LIB in $LIBS
-        do
-            HADDOCK_FILE="$LIBROOT/$LIB/dist-install/doc/html/$LIB/$LIB.haddock"
-            if [ -f "$HADDOCK_FILE" ]
-            then
                 LIBPATH=`echo "$HADDOCK_FILE" | sed 's#/dist-install.*##'`
                 NAME=`echo "$HADDOCK_FILE" | sed 's#.*/##' | sed 's#\.haddock$##'`
                 # It's easier to portably remove tabs with tr than to try to get
@@ -56,8 +44,6 @@ then
                 VERSION=`grep -i '^version:' $LIBPATH/$NAME.cabal | sed 's/.*://' | tr -d ' \t'`
                 HADDOCK_ARG="--read-interface=${NAME}-${VERSION},$HADDOCK_FILE"
                 HADDOCK_ARGS="$HADDOCK_ARGS $HADDOCK_ARG"
-            fi
-        done
     done
 else
     HADDOCK=../../../../../bin/haddock

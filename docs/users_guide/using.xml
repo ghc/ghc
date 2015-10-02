@@ -894,6 +894,16 @@ ghc -c Foo.hs
         </listitem>
       </varlistentry>
 
+      <varlistentry>
+        <term><option>--fprint-potential-instances</option>
+          <indexterm><primary><option>-fprint-potential-instances</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>When GHC can't find an instance for a class, it displays a short list of some
+                in the instances it knows about.  With this flag it prints <emphasis>all</emphasis>
+                the instances it knows about.
+          </para></listitem>
+      </varlistentry>
 
       <varlistentry>
         <term><option>-fprint-explicit-foralls, -fprint-explicit-kinds, -fprint-unicode-syntax</option>
@@ -1086,7 +1096,7 @@ test.hs:(5,4)-(6,7):
     <option>-fwarn-warnings-deprecations</option>,
     <option>-fwarn-deprecated-flags</option>,
     <option>-fwarn-unrecognised-pragmas</option>,
-    <option>-fwarn-pointless-pragmas</option>,
+    <option>-fwarn-missed-specialisations</option>,
     <option>-fwarn-duplicate-constraints</option>,
     <option>-fwarn-duplicate-exports</option>,
     <option>-fwarn-overflowed-literals</option>,
@@ -1287,16 +1297,24 @@ test.hs:(5,4)-(6,7):
       </varlistentry>
 
       <varlistentry>
-        <term><option>-fwarn-pointless-pragmas</option>:</term>
+        <term><option>-fwarn-missed-specialisations</option>, <option>-fwarn-all-missed-specialisations</option>:</term>
         <listitem>
-          <indexterm><primary><option>-fwarn-pointless-pragmas</option></primary>
-          </indexterm>
+          <indexterm><primary><option>-fwarn-missed-specialisations</option></primary></indexterm>
+          <indexterm><primary><option>-fwarn-all-missed-specialisations</option></primary></indexterm>
           <indexterm><primary>warnings</primary></indexterm>
           <indexterm><primary>pragmas</primary></indexterm>
-          <para>Causes a warning to be emitted when GHC detects that a
-          module contains a pragma that has no effect.</para>
+          <para>Emits a warning if GHC cannot specialise a function that is
+                imported and overloaded, usually because the function needs an
+                <literal>INLINEABLE</literal> pragma..  The "all" form reports all
+                such situations.  The "non-all" form only reports when the situation
+                arises during specialisation of an imported function; presumably teh latter
+                was marked <literal>INLINEABLE</literal> so that it would specialise
+                but if it, in turn, calls other functions that are not specialised
+                you won't get the performance boost you expect.</para>
 
-          <para>This option is on by default.</para>
+          <para><option>-fwarn-missed-specialisations</option> is on by default;
+                <option>-fwarn-all-missed-specialisations</option> is implied by <option>-Wall</option>.
+          </para>
         </listitem>
       </varlistentry>
 
@@ -3025,7 +3043,7 @@ foldl f z (Stream step s _) = foldl_loop SPEC z s
           </term>
           <listitem>
             <para><emphasis>On by default.</emphasis>
-            Specialise <literal>INLINABLE</literal> (<xreg linked="inlinable-pragma"/>)
+            Specialise <literal>INLINABLE</literal> (<xref linkend="inlinable-pragma"/>)
             type-class-overloaded functions imported from other modules for the
             types at which they are called in this module. Note that specialisation must
             be enabled (by <literal>-fspecialise</literal>) for this to have any effect.

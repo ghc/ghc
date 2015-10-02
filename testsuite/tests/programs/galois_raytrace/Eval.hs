@@ -248,7 +248,7 @@ doPrimOp primOp op args
       types = getPrimOpType primOp
 
 
--- Render is somewhat funny, becauase it can only get called at top level.
+-- Render is somewhat funny, because it can only get called at top level.
 -- All other operations are purely functional.
 
 doAllOp :: PrimOp -> GMLOp -> Stack -> IO Stack
@@ -325,7 +325,7 @@ mainEval prog = do { stk <- eval (State emptyEnv [] prog)
                              }
 -}
 
-done = "Items still on stack at (successfull) termination of program"
+done = "Items still on stack at (successful) termination of program"
 
 ------------------------------------------------------------------------------
 -- testing

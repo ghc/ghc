@@ -1,0 +1,10 @@
+SRC_HC_OPTS        = -O -H64m -fllvm
+GhcStage1HcOpts    = -O
+GhcStage2HcOpts    = -O0
+GhcLibHcOpts       = -O2
+BUILD_PROF_LIBS    = NO
+SplitObjs          = NO
+HADDOCK_DOCS       = NO
+BUILD_DOCBOOK_HTML = NO
+BUILD_DOCBOOK_PS   = NO
+BUILD_DOCBOOK_PDF  = NO

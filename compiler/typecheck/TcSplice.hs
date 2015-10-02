@@ -703,7 +703,7 @@ runMeta' show_code ppr_hs run_and_convert expr
 {-
 Note [Exceptions in TH]
 ~~~~~~~~~~~~~~~~~~~~~~~
-Supppose we have something like this
+Suppose we have something like this
         $( f 4 )
 where
         f :: Int -> Q [Dec]
@@ -779,6 +779,7 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
 
   qLookupName       = lookupName
   qReify            = reify
+  qReifyFixity nm   = lookupThName nm >>= reifyFixity
   qReifyInstances   = reifyInstances
   qReifyRoles       = reifyRoles
   qReifyAnnotations = reifyAnnotations
@@ -816,10 +817,12 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
         = mapM_ bindName (collectHsBindBinders binds)
       checkTopDecl (SigD _)
         = return ()
+      checkTopDecl (AnnD _)
+        = return ()
       checkTopDecl (ForD (ForeignImport (L _ name) _ _ _))
         = bindName name
       checkTopDecl _
-        = addErr $ text "Only function, value, and foreign import declarations may be added with addTopDecl"
+        = addErr $ text "Only function, value, annotation, and foreign import declarations may be added with addTopDecl"
 
       bindName :: RdrName -> TcM ()
       bindName (Exact n)
@@ -1037,20 +1040,18 @@ reifyThing :: TcTyThing -> TcM TH.Info
 
 reifyThing (AGlobal (AnId id))
   = do  { ty <- reifyType (idType id)
-        ; fix <- reifyFixity (idName id)
         ; let v = reifyName id
         ; case idDetails id of
-            ClassOpId cls -> return (TH.ClassOpI v ty (reifyName cls) fix)
-            _             -> return (TH.VarI     v ty Nothing fix)
+            ClassOpId cls -> return (TH.ClassOpI v ty (reifyName cls))
+            _             -> return (TH.VarI     v ty Nothing)
     }
 
 reifyThing (AGlobal (ATyCon tc))   = reifyTyCon tc
 reifyThing (AGlobal (AConLike (RealDataCon dc)))
   = do  { let name = dataConName dc
         ; ty <- reifyType (idType (dataConWrapId dc))
-        ; fix <- reifyFixity name
         ; return (TH.DataConI (reifyName name) ty
-                              (reifyName (dataConOrigTyCon dc)) fix)
+                              (reifyName (dataConOrigTyCon dc)))
         }
 reifyThing (AGlobal (AConLike (PatSynCon ps)))
   = noTH (sLit "pattern synonyms") (ppr $ patSynName ps)
@@ -1059,8 +1060,7 @@ reifyThing (ATcId {tct_id = id})
   = do  { ty1 <- zonkTcType (idType id) -- Make use of all the info we have, even
                                         -- though it may be incomplete
         ; ty2 <- reifyType ty1
-        ; fix <- reifyFixity (idName id)
-        ; return (TH.VarI (reifyName id) ty2 Nothing fix) }
+        ; return (TH.VarI (reifyName id) ty2 Nothing) }
 
 reifyThing (ATyVar tv tv1)
   = do { ty1 <- zonkTcTyVar tv1
@@ -1088,7 +1088,52 @@ reifyTyCon tc
   | isPrimTyCon tc
   = return (TH.PrimTyConI (reifyName tc) (tyConArity tc) (isUnLiftedTyCon tc))
 
-  | isFamilyTyCon tc
+  | isTypeFamilyTyCon tc
+  = do { let tvs      = tyConTyVars tc
+             kind     = tyConKind tc
+             resVar   = famTcResVar tc
+
+             -- we need the *result kind* (see #8884)
+             (kvs, mono_kind) = splitForAllTys kind
+                                -- tyConArity includes *kind* params
+             (_, res_kind)    = splitKindFunTysN (tyConArity tc - length kvs)
+                                                 mono_kind
+       ; kind' <- reifyKind res_kind
+       ; let (resultSig, injectivity) =
+                 case resVar of
+                   Nothing   -> (TH.KindSig kind', Nothing)
+                   Just name ->
+                     let thName   = reifyName name
+                         injAnnot = familyTyConInjectivityInfo tc
+                         sig = TH.TyVarSig (TH.KindedTV thName kind')
+                         inj = case injAnnot of
+                                 NotInjective -> Nothing
+                                 Injective ms ->
+                                     Just (TH.InjectivityAnn thName injRHS)
+                                   where
+                                     injRHS = map (reifyName . tyVarName)
+                                                  (filterByList ms tvs)
+                     in (sig, inj)
+       ; tvs' <- reifyTyVars tvs
+       ; if isOpenTypeFamilyTyCon tc
+         then do { fam_envs <- tcGetFamInstEnvs
+                 ; instances <- reifyFamilyInstances tc
+                                  (familyInstances fam_envs tc)
+                 ; return (TH.FamilyI
+                             (TH.OpenTypeFamilyD (reifyName tc) tvs'
+                                                 resultSig injectivity)
+                             instances) }
+         else do { eqns <-
+                     case isClosedSynFamilyTyConWithAxiom_maybe tc of
+                       Just ax -> mapM reifyAxBranch $
+                                  fromBranches $ coAxiomBranches ax
+                       Nothing -> return []
+                 ; return (TH.FamilyI
+                      (TH.ClosedTypeFamilyD (reifyName tc) tvs' resultSig
+                                            injectivity eqns)
+                      []) } }
+
+  | isDataFamilyTyCon tc
   = do { let tvs      = tyConTyVars tc
              kind     = tyConKind tc
 
@@ -1100,19 +1145,10 @@ reifyTyCon tc
        ; kind' <- fmap Just (reifyKind res_kind)
 
        ; tvs' <- reifyTyVars tvs
-       ; flav' <- reifyFamFlavour tc
-       ; case flav' of
-         { Left flav ->  -- open type/data family
-             do { fam_envs <- tcGetFamInstEnvs
-                ; instances <- reifyFamilyInstances tc
-                                 (familyInstances fam_envs tc)
-                ; return (TH.FamilyI
-                            (TH.FamilyD flav (reifyName tc) tvs' kind')
-                            instances) }
-         ; Right eqns -> -- closed type family
-             return (TH.FamilyI
-                      (TH.ClosedTypeFamilyD (reifyName tc) tvs' kind' eqns)
-                      []) } }
+       ; fam_envs <- tcGetFamInstEnvs
+       ; instances <- reifyFamilyInstances tc (familyInstances fam_envs tc)
+       ; return (TH.FamilyI
+                       (TH.DataFamilyD (reifyName tc) tvs' kind') instances) }
 
   | Just (tvs, rhs) <- synTyConDefn_maybe tc  -- Vanilla type synonym
   = do { rhs' <- reifyType rhs
@@ -1166,12 +1202,13 @@ reifyClass cls
   = do  { cxt <- reifyCxt theta
         ; inst_envs <- tcGetInstEnvs
         ; insts <- reifyClassInstances cls (InstEnv.classInstances inst_envs cls)
+        ; assocTys <- concatMapM reifyAT ats
         ; ops <- concatMapM reify_op op_stuff
         ; tvs' <- reifyTyVars tvs
-        ; let dec = TH.ClassD cxt (reifyName cls) tvs' fds' ops
-        ; return (TH.ClassI dec insts ) }
+        ; let dec = TH.ClassD cxt (reifyName cls) tvs' fds' (assocTys ++ ops)
+        ; return (TH.ClassI dec insts) }
   where
-    (tvs, fds, theta, _, _, op_stuff) = classExtraBigSig cls
+    (tvs, fds, theta, _, ats, op_stuff) = classExtraBigSig cls
     fds' = map reifyFunDep fds
     reify_op (op, def_meth)
       = do { ty <- reifyType (idType op)
@@ -1182,6 +1219,29 @@ reifyClass cls
                      ; gdm_ty <- reifyType (idType gdm_id)
                      ; return [TH.SigD nm' ty, TH.DefaultSigD nm' gdm_ty] }
                 _ -> return [TH.SigD nm' ty] }
+
+    reifyAT :: ClassATItem -> TcM [TH.Dec]
+    reifyAT (ATI tycon def) = do
+      tycon' <- reifyTyCon tycon
+      case tycon' of
+        TH.FamilyI dec _ -> do
+          let (tyName, tyArgs) = tfNames dec
+          (dec :) <$> maybe (return [])
+                            (fmap (:[]) . reifyDefImpl tyName tyArgs . fst)
+                            def
+        _ -> pprPanic "reifyAT" (text (show tycon'))
+
+    reifyDefImpl :: TH.Name -> [TH.Name] -> Type -> TcM TH.Dec
+    reifyDefImpl n args ty =
+      TH.TySynInstD n . TH.TySynEqn (map TH.VarT args) <$> reifyType ty
+
+    tfNames :: TH.Dec -> (TH.Name, [TH.Name])
+    tfNames (TH.OpenTypeFamilyD   n args _ _)   = (n, map bndrName args)
+    tfNames d = pprPanic "tfNames" (text (show d))
+
+    bndrName :: TH.TyVarBndr -> TH.Name
+    bndrName (TH.PlainTV n)    = n
+    bndrName (TH.KindedTV n _) = n
 
 ------------------------------
 -- | Annotate (with TH.SigT) a type if the first parameter is True
@@ -1336,21 +1396,6 @@ reifyCxt   = mapM reifyPred
 reifyFunDep :: ([TyVar], [TyVar]) -> TH.FunDep
 reifyFunDep (xs, ys) = TH.FunDep (map reifyName xs) (map reifyName ys)
 
-reifyFamFlavour :: TyCon -> TcM (Either TH.FamFlavour [TH.TySynEqn])
-reifyFamFlavour tc
-  | isOpenTypeFamilyTyCon tc = return $ Left TH.TypeFam
-  | isDataFamilyTyCon     tc = return $ Left TH.DataFam
-  | Just flav <- famTyConFlav_maybe tc = case flav of
-      OpenSynFamilyTyCon           -> return $ Left TH.TypeFam
-      AbstractClosedSynFamilyTyCon -> return $ Right []
-      BuiltInSynFamTyCon _         -> return $ Right []
-      ClosedSynFamilyTyCon Nothing -> return $ Right []
-      ClosedSynFamilyTyCon (Just ax)
-        -> do { eqns <- brListMapM reifyAxBranch $ coAxiomBranches ax
-              ; return $ Right eqns }
-  | otherwise
-  = panic "TcSplice.reifyFamFlavour: not a type family"
-
 reifyTyVars :: [TyVar]
             -> TcM [TH.TyVarBndr]
 reifyTyVars tvs = mapM reify_tv $ filter isTypeVar tvs
@@ -1490,12 +1535,10 @@ reifyFixity name
       conv_dir BasicTypes.InfixN = TH.InfixN
 
 reifyStrict :: DataCon.HsSrcBang -> TH.Strict
-reifyStrict HsNoBang                       = TH.NotStrict
-reifyStrict (HsSrcBang _ _ False)          = TH.NotStrict
-reifyStrict (HsSrcBang _ (Just True) True) = TH.Unpacked
-reifyStrict (HsSrcBang _ _     True)       = TH.IsStrict
-reifyStrict HsStrict                       = TH.IsStrict
-reifyStrict (HsUnpack {})                  = TH.Unpacked
+reifyStrict (HsSrcBang _ _         SrcLazy)     = TH.NotStrict
+reifyStrict (HsSrcBang _ _         NoSrcStrict) = TH.NotStrict
+reifyStrict (HsSrcBang _ SrcUnpack SrcStrict)   = TH.Unpacked
+reifyStrict (HsSrcBang _ _         SrcStrict)   = TH.IsStrict
 
 ------------------------------
 lookupThAnnLookup :: TH.AnnLookup -> TcM CoreAnnTarget

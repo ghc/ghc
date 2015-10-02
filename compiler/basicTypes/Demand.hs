@@ -57,7 +57,6 @@ module Demand (
 
 #include "HsVersions.h"
 
-import StaticFlags
 import DynFlags
 import Outputable
 import Var ( Var )
@@ -871,18 +870,13 @@ topRes = Dunno NoCPR
 botRes = Diverges
 
 cprSumRes :: ConTag -> DmdResult
-cprSumRes tag | opt_CprOff = topRes
-              | otherwise  = Dunno $ RetSum tag
+cprSumRes tag = Dunno $ RetSum tag
 
 cprProdRes :: [DmdType] -> DmdResult
-cprProdRes _arg_tys
-  | opt_CprOff = topRes
-  | otherwise  = Dunno $ RetProd
+cprProdRes _arg_tys = Dunno $ RetProd
 
 vanillaCprProdRes :: Arity -> DmdResult
-vanillaCprProdRes _arity
-  | opt_CprOff = topRes
-  | otherwise  = Dunno $ RetProd
+vanillaCprProdRes _arity = Dunno $ RetProd
 
 isTopRes :: DmdResult -> Bool
 isTopRes (Dunno NoCPR) = True
@@ -1162,8 +1156,8 @@ nopDmdType = DmdType emptyDmdEnv [] topRes
 botDmdType = DmdType emptyDmdEnv [] botRes
 
 cprProdDmdType :: Arity -> DmdType
-cprProdDmdType _arity
-  = DmdType emptyDmdEnv [] (Dunno RetProd)
+cprProdDmdType arity
+  = DmdType emptyDmdEnv [] (vanillaCprProdRes arity)
 
 isNopDmdType :: DmdType -> Bool
 isNopDmdType (DmdType env [] res)
@@ -1214,7 +1208,7 @@ splitDmdTy ty@(DmdType _ [] res_ty)       = (resTypeArgDmd res_ty, ty)
 -- what of this demand should we consider, given that the IO action can cleanly
 -- exit?
 -- * We have to kill all strictness demands (i.e. lub with a lazy demand)
--- * We can keep demand information (i.e. lub with an absent deman)
+-- * We can keep demand information (i.e. lub with an absent demand)
 -- * We have to kill definite divergence
 -- * We can keep CPR information.
 -- See Note [IO hack in the demand analyser]

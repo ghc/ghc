@@ -388,7 +388,7 @@ checkClosure( StgClosure* p )
     }
 
     case ARR_WORDS:
-            return arr_words_sizeW((StgArrWords *)p);
+            return arr_words_sizeW((StgArrBytes *)p);
 
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:

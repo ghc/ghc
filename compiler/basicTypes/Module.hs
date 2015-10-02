@@ -10,6 +10,7 @@ the keys.
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Module
     (
@@ -19,6 +20,7 @@ module Module
         moduleNameFS,
         moduleNameString,
         moduleNameSlashes, moduleNameColons,
+        moduleStableString,
         mkModuleName,
         mkModuleNameFS,
         stableModuleNameCmp,
@@ -208,6 +210,13 @@ moduleNameFS (ModuleName mod) = mod
 
 moduleNameString :: ModuleName -> String
 moduleNameString (ModuleName mod) = unpackFS mod
+
+-- | Get a string representation of a 'Module' that's unique and stable
+-- across recompilations.
+-- eg. "$aeson_70dylHtv1FFGeai1IoxcQr$Data.Aeson.Types.Internal"
+moduleStableString :: Module -> String
+moduleStableString Module{..} =
+  "$" ++ packageKeyString modulePackageKey ++ "$" ++ moduleNameString moduleName
 
 mkModuleName :: String -> ModuleName
 mkModuleName s = ModuleName (mkFastString s)

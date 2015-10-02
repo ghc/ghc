@@ -19,8 +19,13 @@ module FamInstEnv (
         computeAxiomIncomps,
 
         FamInstMatch(..),
-        lookupFamInstEnv, lookupFamInstEnvConflicts,
-        isDominatedBy,
+        lookupFamInstEnv, lookupFamInstEnvConflicts, lookupFamInstEnvByTyCon,
+
+        isDominatedBy, apartnessCheck,
+
+        -- Injectivity
+        InjectivityCheckResult(..),
+        lookupFamInstEnvInjectivityConflicts, injectiveBranches,
 
         -- Normalisation
         topNormaliseType, topNormaliseType_maybe,
@@ -55,6 +60,7 @@ import Pair
 import SrcLoc
 import NameSet
 import FastString
+import Data.Function ( on )
 
 {-
 ************************************************************************
@@ -80,8 +86,9 @@ Note [FamInsts and CoAxioms]
 -}
 
 data FamInst  -- See Note [FamInsts and CoAxioms]
-  = FamInst { fi_axiom  :: CoAxiom Unbranched  -- The new coercion axiom introduced
-                                               -- by this family instance
+  = FamInst { fi_axiom  :: CoAxiom Unbranched -- The new coercion axiom
+                                              -- introduced by this family
+                                              -- instance
             , fi_flavor :: FamFlavor
 
             -- Everything below here is a redundant,
@@ -94,14 +101,14 @@ data FamInst  -- See Note [FamInsts and CoAxioms]
             , fi_tcs   :: [Maybe Name]  -- Top of type args
                 -- INVARIANT: fi_tcs = roughMatchTcs fi_tys
 
-                -- Used for "proper matching"; ditto
+            -- Used for "proper matching"; ditto
             , fi_tvs    :: [TyVar]      -- Template tyvars for full match
                                  -- Like ClsInsts, these variables are always
                                  -- fresh. See Note [Template tyvars are fresh]
                                  -- in InstEnv
+                                 -- INVARIANT: fi_tvs = coAxiomTyVars fi_axiom
 
             , fi_tys    :: [Type]       --   and its arg types
-                -- INVARIANT: fi_tvs = coAxiomTyVars fi_axiom
 
             , fi_rhs    :: Type         --   the RHS, with its freshened vars
             }
@@ -244,10 +251,9 @@ mkImportedFamInst fam mb_tcs axiom
       fi_flavor = flavor }
   where
      -- See Note [Lazy axiom match]
-     ~(CoAxiom { co_ax_branches =
-       ~(FirstBranch ~(CoAxBranch { cab_lhs = tys
-                                  , cab_tvs = tvs
-                                  , cab_rhs = rhs })) }) = axiom
+     ~(CoAxBranch { cab_lhs = tys
+                  , cab_tvs = tvs
+                  , cab_rhs = rhs }) = coAxiomSingleBranch axiom
 
          -- Derive the flavor for an imported FamInst rather disgustingly
          -- Maybe we should store it in the IfaceFamInst?
@@ -274,7 +280,7 @@ Type families are reduced during type inference, but not data families;
 the user explains when to use a data family instance by using contructors
 and pattern matching.
 
-Neverthless it is still useful to have data families in the FamInstEnv:
+Nevertheless it is still useful to have data families in the FamInstEnv:
 
  - For finding overlaps and conflicts
 
@@ -347,7 +353,7 @@ familyInstances (pkg_fie, home_fie) fam
 -- Used in the implementation of ":info" in GHCi.
 orphNamesOfFamInst :: FamInst -> NameSet
 orphNamesOfFamInst fam_inst
-  = orphNamesOfTypes (concat (brListMap cab_lhs (coAxiomBranches axiom)))
+  = orphNamesOfTypes (concat (map cab_lhs (fromBranches $ coAxiomBranches axiom)))
     `extendNameSet` getName (coAxiomTyCon axiom)
   where
     axiom = fi_axiom fam_inst
@@ -376,8 +382,8 @@ identicalFamInstHead :: FamInst -> FamInst -> Bool
 -- Used for overriding in GHCi
 identicalFamInstHead (FamInst { fi_axiom = ax1 }) (FamInst { fi_axiom = ax2 })
   =  coAxiomTyCon ax1 == coAxiomTyCon ax2
-  && brListLength brs1 == brListLength brs2
-  && and (brListZipWith identical_branch brs1 brs2)
+  && numBranches brs1 == numBranches brs2
+  && and ((zipWith identical_branch `on` fromBranches) brs1 brs2)
   where
     brs1 = coAxiomBranches ax1
     brs2 = coAxiomBranches ax2
@@ -441,8 +447,7 @@ potentially-overlapping group is closed.
 
 As another example, consider this:
 
-type family G x
-type instance where
+type family G x where
   G Int = Bool
   G a   = Double
 
@@ -480,19 +485,53 @@ compatibleBranches (CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
         -> True
       _ -> False
 
+-- | Result of testing two type family equations for injectiviy.
+data InjectivityCheckResult
+   = InjectivityAccepted
+    -- ^ Either RHSs are distinct or unification of RHSs leads to unification of
+    -- LHSs
+   | InjectivityUnified CoAxBranch CoAxBranch
+    -- ^ RHSs unify but LHSs don't unify under that substitution.  Relevant for
+    -- closed type families where equation after unification might be
+    -- overlpapped (in which case it is OK if they don't unify).  Constructor
+    -- stores axioms after unification.
+
+-- | Check whether two type family axioms don't violate injectivity annotation.
+injectiveBranches :: [Bool] -> CoAxBranch -> CoAxBranch
+                  -> InjectivityCheckResult
+injectiveBranches injectivity
+                  ax1@(CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
+                  ax2@(CoAxBranch { cab_lhs = lhs2, cab_rhs = rhs2 })
+  -- See Note [Verifying injectivity annotation]. This function implements first
+  -- check described there.
+  = let getInjArgs  = filterByList injectivity
+    in case tcUnifyTyWithTFs True rhs1 rhs2 of -- True = two-way pre-unification
+       Nothing -> InjectivityAccepted -- RHS are different, so equations are
+                                      -- injective.
+       Just subst -> -- RHS unify under a substitution
+        let lhs1Subst = Type.substTys subst (getInjArgs lhs1)
+            lhs2Subst = Type.substTys subst (getInjArgs lhs2)
+        -- If LHSs are equal under the substitution used for RHSs then this pair
+        -- of equations does not violate injectivity annotation. If LHSs are not
+        -- equal under that substitution then this pair of equations violates
+        -- injectivity annotation, but for closed type families it still might
+        -- be the case that one LHS after substitution is unreachable.
+        in if eqTypes lhs1Subst lhs2Subst
+           then InjectivityAccepted
+           else InjectivityUnified ( ax1 { cab_lhs = Type.substTys subst lhs1
+                                         , cab_rhs = Type.substTy  subst rhs1 })
+                                   ( ax2 { cab_lhs = Type.substTys subst lhs2
+                                         , cab_rhs = Type.substTy  subst rhs2 })
+
 -- takes a CoAxiom with unknown branch incompatibilities and computes
 -- the compatibilities
 -- See Note [Storing compatibility] in CoAxiom
 computeAxiomIncomps :: CoAxiom br -> CoAxiom br
 computeAxiomIncomps ax@(CoAxiom { co_ax_branches = branches })
-  = ax { co_ax_branches = go [] branches }
+  = ax { co_ax_branches = mapAccumBranches go branches }
   where
-    go :: [CoAxBranch] -> BranchList CoAxBranch br -> BranchList CoAxBranch br
-    go prev_branches (FirstBranch br)
-      = FirstBranch (br { cab_incomps = mk_incomps br prev_branches })
-    go prev_branches (NextBranch br tail)
-      = let br' = br { cab_incomps = mk_incomps br prev_branches } in
-        NextBranch br' (go (br' : prev_branches) tail)
+    go :: [CoAxBranch] -> CoAxBranch -> CoAxBranch
+    go prev_branches br = br { cab_incomps = mk_incomps br prev_branches }
 
     mk_incomps :: CoAxBranch -> [CoAxBranch] -> [CoAxBranch]
     mk_incomps br = filter (not . compatibleBranches br)
@@ -540,7 +579,7 @@ mkBranchedCoAxiom ax_name fam_tc branches
             , co_ax_tc       = fam_tc
             , co_ax_role     = Nominal
             , co_ax_implicit = False
-            , co_ax_branches = toBranchList branches }
+            , co_ax_branches = manyBranches branches }
 
 mkUnbranchedCoAxiom :: Name -> TyCon -> CoAxBranch -> CoAxiom Unbranched
 mkUnbranchedCoAxiom ax_name fam_tc branch
@@ -549,7 +588,7 @@ mkUnbranchedCoAxiom ax_name fam_tc branch
             , co_ax_tc       = fam_tc
             , co_ax_role     = Nominal
             , co_ax_implicit = False
-            , co_ax_branches = FirstBranch (branch { cab_incomps = [] }) }
+            , co_ax_branches = unbranched (branch { cab_incomps = [] }) }
 
 mkSingleCoAxiom :: Role -> Name
                 -> [TyVar] -> TyCon -> [Type] -> Type
@@ -563,7 +602,7 @@ mkSingleCoAxiom role ax_name tvs fam_tc lhs_tys rhs_ty
             , co_ax_tc       = fam_tc
             , co_ax_role     = role
             , co_ax_implicit = False
-            , co_ax_branches = FirstBranch (branch { cab_incomps = [] }) }
+            , co_ax_branches = unbranched (branch { cab_incomps = [] }) }
   where
     branch = mkCoAxBranch tvs lhs_tys rhs_ty (getSrcSpan ax_name)
 
@@ -603,6 +642,14 @@ instance Outputable FamInstMatch where
   ppr (FamInstMatch { fim_instance = inst
                     , fim_tys      = tys })
     = ptext (sLit "match with") <+> parens (ppr inst) <+> ppr tys
+
+lookupFamInstEnvByTyCon :: FamInstEnvs -> TyCon -> [FamInst]
+lookupFamInstEnvByTyCon (pkg_ie, home_ie) fam_tc
+  = get pkg_ie ++ get home_ie
+  where
+    get ie = case lookupUFM ie fam_tc of
+               Nothing          -> []
+               Just (FamIE fis) -> fis
 
 lookupFamInstEnv
     :: FamInstEnvs
@@ -645,6 +692,133 @@ lookupFamInstEnvConflicts envs fam_inst@(FamInst { fi_axiom = new_axiom })
 
     noSubst = panic "lookupFamInstEnvConflicts noSubst"
     new_branch = coAxiomSingleBranch new_axiom
+
+--------------------------------------------------------------------------------
+--                 Type family injectivity checking bits                      --
+--------------------------------------------------------------------------------
+
+{- Note [Verifying injectivity annotation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Injectivity means that the RHS of a type family uniquely determines the LHS (see
+Note [Type inference for type families with injectivity]).  User informs about
+injectivity using an injectivity annotation and it is GHC's task to verify that
+that annotation is correct wrt. to type family equations. Whenever we see a new
+equation of a type family we need to make sure that adding this equation to
+already known equations of a type family does not violate injectivity annotation
+supplied by the user (see Note [Injectivity annotation]).  Of course if the type
+family has no injectivity annotation then no check is required.  But if a type
+family has injectivity annotation we need to make sure that the following
+conditions hold:
+
+1. For each pair of *different* equations of a type family, one of the following
+   conditions holds:
+
+   A:  RHSs are different.
+
+   B1: OPEN TYPE FAMILIES: If the RHSs can be unified under some substitution
+       then it must be possible to unify the LHSs under the same substitution.
+       Example:
+
+          type family FunnyId a = r | r -> a
+          type instance FunnyId Int = Int
+          type instance FunnyId a = a
+
+       RHSs of these two equations unify under [ a |-> Int ] substitution.
+       Under this substitution LHSs are equal therefore these equations don't
+       violate injectivity annotation.
+
+   B2: CLOSED TYPE FAMILIES: If the RHSs can be unified under some
+       substitution then either the LHSs unify under the same substitution or
+       the LHS of the latter equation is overlapped by earlier equations.
+       Example 1:
+
+          type family SwapIntChar a = r | r -> a where
+              SwapIntChar Int  = Char
+              SwapIntChar Char = Int
+              SwapIntChar a    = a
+
+       Say we are checking the last two equations. RHSs unify under [ a |->
+       Int ] substitution but LHSs don't. So we apply the substitution to LHS
+       of last equation and check whether it is overlapped by any of previous
+       equations. Since it is overlapped by the first equation we conclude
+       that pair of last two equations does not violate injectivity
+       annotation.
+
+   A special case of B is when RHSs unify with an empty substitution ie. they
+   are identical.
+
+   If any of the above two conditions holds we conclude that the pair of
+   equations does not violate injectivity annotation. But if we find a pair
+   of equations where neither of the above holds we report that this pair
+   violates injectivity annotation because for a given RHS we don't have a
+   unique LHS. (Note that (B) actually implies (A).)
+
+   Note that we only take into account these LHS patterns that were declared
+   as injective.
+
+2. If a RHS of a type family equation is a bare type variable then
+   all LHS variables (including implicit kind variables) also have to be bare.
+   In other words, this has to be a sole equation of that type family and it has
+   to cover all possible patterns.  So for example this definition will be
+   rejected:
+
+      type family W1 a = r | r -> a
+      type instance W1 [a] = a
+
+   If it were accepted we could call `W1 [W1 Int]`, which would reduce to
+   `W1 Int` and then by injectivity we could conclude that `[W1 Int] ~ Int`,
+   which is bogus.
+
+3. If a RHS of a type family equation is a type family application then the type
+   family is rejected as not injective.
+
+4. If a LHS type variable that is declared as injective is not mentioned on
+   injective position in the RHS then the type family is rejected as not
+   injective.  "Injective position" means either an argument to a type
+   constructor or argument to a type family on injective position.
+
+See also Note [Injective type families] in TyCon
+-}
+
+
+-- | Check whether an open type family equation can be added to already existing
+-- instance environment without causing conflicts with supplied injectivity
+-- annotations.  Returns list of conflicting axioms (type instance
+-- declarations).
+lookupFamInstEnvInjectivityConflicts
+    :: [Bool]         -- injectivity annotation for this type family instance
+                      -- INVARIANT: list contains at least one True value
+    ->  FamInstEnvs   -- all type instances seens so far
+    ->  FamInst       -- new type instance that we're checking
+    -> [CoAxBranch]   -- conflicting instance delcarations
+lookupFamInstEnvInjectivityConflicts injList (pkg_ie, home_ie)
+                             fam_inst@(FamInst { fi_axiom = new_axiom })
+  -- See Note [Verifying injectivity annotation]. This function implements
+  -- check (1.B1) for open type families described there.
+  = lookup_inj_fam_conflicts home_ie ++ lookup_inj_fam_conflicts pkg_ie
+    where
+      fam        = famInstTyCon fam_inst
+      new_branch = coAxiomSingleBranch new_axiom
+
+      -- filtering function used by `lookup_inj_fam_conflicts` to check whether
+      -- a pair of equations conflicts with the injectivity annotation.
+      isInjConflict (FamInst { fi_axiom = old_axiom })
+          | InjectivityAccepted <-
+            injectiveBranches injList (coAxiomSingleBranch old_axiom) new_branch
+          = False -- no conflict
+          | otherwise = True
+
+      lookup_inj_fam_conflicts ie
+          | isOpenFamilyTyCon fam, Just (FamIE insts) <- lookupUFM ie fam
+          = map (coAxiomSingleBranch . fi_axiom) $
+            filter isInjConflict insts
+          | otherwise = []
+
+
+--------------------------------------------------------------------------------
+--                    Type family overlap checking bits                       --
+--------------------------------------------------------------------------------
 
 {-
 Note [Family instance overlap conflicts]
@@ -721,8 +895,8 @@ lookup_fam_inst_env' match_fun ie fam match_tys
 lookup_fam_inst_env           -- The worker, local to this module
     :: MatchFun
     -> FamInstEnvs
-    -> TyCon -> [Type]          -- What we are looking for
-    -> [FamInstMatch]           -- Successful matches
+    -> TyCon -> [Type]        -- What we are looking for
+    -> [FamInstMatch]         -- Successful matches
 
 -- Precondition: the tycon is saturated (or over-saturated)
 
@@ -814,7 +988,6 @@ reduceTyFamApp_maybe envs role tc tys
   , FamInstMatch { fim_instance = fam_inst
                  , fim_tys =      inst_tys } : _ <- lookupFamInstEnv envs tc tys
       -- NB: Allow multiple matches because of compatible overlap
-
   = let ax     = famInstAxiom fam_inst
         co     = mkUnbranchedAxInstCo role ax inst_tys
         ty     = pSnd (coercionKind co)
@@ -840,37 +1013,53 @@ chooseBranch axiom tys
   = do { let num_pats = coAxiomNumPats axiom
              (target_tys, extra_tys) = splitAt num_pats tys
              branches = coAxiomBranches axiom
-       ; (ind, inst_tys) <- findBranch (fromBranchList branches) 0 target_tys
+       ; (ind, inst_tys) <- findBranch (fromBranches branches) target_tys
        ; return (ind, inst_tys ++ extra_tys) }
 
 -- The axiom must *not* be oversaturated
 findBranch :: [CoAxBranch]             -- branches to check
-           -> BranchIndex              -- index of current branch
            -> [Type]                   -- target types
            -> Maybe (BranchIndex, [Type])
-findBranch (CoAxBranch { cab_tvs = tpl_tvs, cab_lhs = tpl_lhs, cab_incomps = incomps }
-              : rest) ind target_tys
-  = case tcMatchTys (mkVarSet tpl_tvs) tpl_lhs target_tys of
-      Just subst -- matching worked. now, check for apartness.
-        |  all (isSurelyApart
-                . tcUnifyTysFG instanceBindFun flattened_target
-                . coAxBranchLHS) incomps
-        -> -- matching worked & we're apart from all incompatible branches. success
-           Just (ind, substTyVars subst tpl_tvs)
+findBranch branches target_tys
+  = go 0 branches
+  where
+    go ind (branch@(CoAxBranch { cab_tvs = tpl_tvs, cab_lhs = tpl_lhs
+                               , cab_incomps = incomps }) : rest)
+      = let in_scope = mkInScopeSet (unionVarSets $
+                            map (tyVarsOfTypes . coAxBranchLHS) incomps)
+            -- See Note [Flattening] below
+            flattened_target = flattenTys in_scope target_tys
+        in case tcMatchTys (mkVarSet tpl_tvs) tpl_lhs target_tys of
+        Just subst -- matching worked. now, check for apartness.
+          |  apartnessCheck flattened_target branch
+          -> -- matching worked & we're apart from all incompatible branches.
+             -- success
+             Just (ind, substTyVars subst tpl_tvs)
 
-      -- failure. keep looking
-      _ -> findBranch rest (ind+1) target_tys
+        -- failure. keep looking
+        _ -> go (ind+1) rest
 
-  where isSurelyApart SurelyApart = True
-        isSurelyApart _           = False
+    -- fail if no branches left
+    go _ [] = Nothing
 
-        -- See Note [Flattening] below
-        flattened_target = flattenTys in_scope target_tys
-        in_scope = mkInScopeSet (unionVarSets $
-                                 map (tyVarsOfTypes . coAxBranchLHS) incomps)
-
--- fail if no branches left
-findBranch [] _ _ = Nothing
+-- | Do an apartness check, as described in the "Closed Type Families" paper
+-- (POPL '14). This should be used when determining if an equation
+-- ('CoAxBranch') of a closed type family can be used to reduce a certain target
+-- type family application.
+apartnessCheck :: [Type]     -- ^ /flattened/ target arguments. Make sure
+                             -- they're flattened! See Note [Flattening].
+                             -- (NB: This "flat" is a different
+                             -- "flat" than is used in TcFlatten.)
+               -> CoAxBranch -- ^ the candidate equation we wish to use
+                             -- Precondition: this matches the target
+               -> Bool       -- ^ True <=> equation can fire
+apartnessCheck flattened_target (CoAxBranch { cab_incomps = incomps })
+  = all (isSurelyApart
+         . tcUnifyTysFG instanceBindFun flattened_target
+         . coAxBranchLHS) incomps
+  where
+    isSurelyApart SurelyApart = True
+    isSurelyApart _           = False
 
 {-
 ************************************************************************
@@ -891,7 +1080,7 @@ topNormaliseType_maybe :: FamInstEnvs -> Type -> Maybe (Coercion, Type)
 --      * type function redex
 --      * data family redex
 --      * newtypes
--- returning an appropriate Representaitonal coercion.  Specifically, if
+-- returning an appropriate Representational coercion.  Specifically, if
 --   topNormaliseType_maybe env ty = Maybe (co, ty')
 -- then
 --   (a) co :: ty ~R ty'
@@ -1045,7 +1234,9 @@ coreFlattenTy in_scope = go
                                (m2, ty2') = go m1 ty2 in
                            (m2, AppTy ty1' ty2')
     go m (TyConApp tc tys)
-      | isFamilyTyCon tc
+         -- NB: Don't just check if isFamilyTyCon: this catches *data* families,
+         -- which are generative and thus can be preserved during flattening
+      | not (isGenerativeTyCon tc Nominal)
       = let (m', tv) = coreFlattenTyFamApp in_scope m tc tys in
         (m', mkTyVarTy tv)
 

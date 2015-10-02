@@ -27,6 +27,9 @@ class (RealFrac a, Floating a) => RealFloat a where
   isNegativeZero :: a -> Bool
   isIEEE :: a -> Bool
   atan2 :: a -> a -> a
+  {-# MINIMAL floatRadix, floatDigits, floatRange, decodeFloat,
+              encodeFloat, isNaN, isInfinite, isDenormalized, isNegativeZero,
+              isIEEE #-}
   	-- Defined in ‘GHC.Float’
 instance RealFloat Float -- Defined in ‘GHC.Float’
 instance RealFloat Double -- Defined in ‘GHC.Float’

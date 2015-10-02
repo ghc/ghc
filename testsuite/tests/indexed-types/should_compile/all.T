@@ -36,7 +36,7 @@ test('ind2',
      ['ind2', '-v0'])
 test('impexp',
      extra_clean(['Exp.hi', 'Exp.o', 'Imp.hi', 'Imp.o']),
-     multimod_compile, 
+     multimod_compile,
      ['Imp', '-w -no-hs-main -c'])
 
 test('ATLoop',
@@ -260,3 +260,7 @@ test('T10340', normal, compile, [''])
 test('T10226', normal, compile, [''])
 test('T10507', normal, compile, [''])
 test('T10634', normal, compile, [''])
+test('T10713', normal, compile, [''])
+test('T10753', normal, compile, [''])
+test('T10806', normal, compile_fail, [''])
+test('T10815', normal, compile, [''])

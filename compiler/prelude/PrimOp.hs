@@ -38,7 +38,6 @@ import BasicTypes       ( Arity, Fixity(..), FixityDirection(..), Boxity(..) )
 import ForeignCall      ( CLabelString )
 import Unique           ( Unique, mkPrimOpIdUnique )
 import Outputable
-import FastTypes
 import FastString
 import Module           ( PackageKey )
 
@@ -56,25 +55,20 @@ These are in \tr{state-interface.verb} order.
 -- data PrimOp = ...
 #include "primop-data-decl.hs-incl"
 
--- Used for the Ord instance
-
-primOpTag :: PrimOp -> Int
-primOpTag op = iBox (tagOf_PrimOp op)
-
 -- supplies
--- tagOf_PrimOp :: PrimOp -> FastInt
+-- primOpTag :: PrimOp -> Int
 #include "primop-tag.hs-incl"
-tagOf_PrimOp _ = error "tagOf_PrimOp: unknown primop"
+primOpTag _ = error "primOpTag: unknown primop"
 
 
 instance Eq PrimOp where
-    op1 == op2 = tagOf_PrimOp op1 ==# tagOf_PrimOp op2
+    op1 == op2 = primOpTag op1 == primOpTag op2
 
 instance Ord PrimOp where
-    op1 <  op2 =  tagOf_PrimOp op1 <# tagOf_PrimOp op2
-    op1 <= op2 =  tagOf_PrimOp op1 <=# tagOf_PrimOp op2
-    op1 >= op2 =  tagOf_PrimOp op1 >=# tagOf_PrimOp op2
-    op1 >  op2 =  tagOf_PrimOp op1 ># tagOf_PrimOp op2
+    op1 <  op2 =  primOpTag op1 < primOpTag op2
+    op1 <= op2 =  primOpTag op1 <= primOpTag op2
+    op1 >= op2 =  primOpTag op1 >= primOpTag op2
+    op1 >  op2 =  primOpTag op1 > primOpTag op2
     op1 `compare` op2 | op1 < op2  = LT
                       | op1 == op2 = EQ
                       | otherwise  = GT

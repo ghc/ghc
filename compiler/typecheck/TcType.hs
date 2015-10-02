@@ -68,7 +68,7 @@ module TcType (
   isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
-  isPredTy, isTyVarClassPred, isTyVarExposed,
+  isPredTy, isTyVarClassPred, isTyVarExposed, isTyVarUnderDatatype,
   checkValidClsArgs, hasTyVarHead,
   isRigidEqPred, isRigidTy,
 
@@ -82,7 +82,7 @@ module TcType (
 
   ---------------------------------
   -- Predicate types
-  mkMinimalBySCs, transSuperClasses, transSuperClassesPred, 
+  mkMinimalBySCs, transSuperClasses, transSuperClassesPred,
   immSuperClasses,
   isImprovementPred,
 
@@ -346,11 +346,9 @@ instance Outputable MetaDetails where
   ppr (Indirect ty) = ptext (sLit "Indirect") <+> ppr ty
 
 data MetaInfo
-   = TauTv Bool    -- This MetaTv is an ordinary unification variable
+   = TauTv         -- This MetaTv is an ordinary unification variable
                    -- A TauTv is always filled in with a tau-type, which
                    -- never contains any ForAlls.
-                   -- The boolean is true when the meta var originates
-                   -- from a wildcard.
 
    | ReturnTv      -- Can unify with *anything*. Used to convert a
                    -- type "checking" algorithm into a type inference algorithm.
@@ -372,16 +370,25 @@ data MetaInfo
 -- in the places where we need to an expression has that type
 
 data UserTypeCtxt
-  = FunSigCtxt Name Bool    -- Function type signature, when checking the type
-                            -- Also used for types in SPECIALISE pragmas
-                            -- Bool = True  <=> report redundant class constraints
-                            --        False <=> do not
-                            -- See Note [Tracking redundant constraints] in TcSimplify
+  = FunSigCtxt      -- Function type signature, when checking the type
+                    -- Also used for types in SPECIALISE pragmas
+       Name              -- Name of the function
+       Bool              -- True <=> report redundant constraints
+                            -- This is usually True, but False for
+                            --   * Record selectors (not important here)
+                            --   * Class and instance methods.  Here
+                            --     the code may legitimately be more
+                            --     polymorphic than the signature
+                            --     generated from the class
+                            --     declaration
 
   | InfSigCtxt Name     -- Inferred type for function
   | ExprSigCtxt         -- Expression type signature
+
   | ConArgCtxt Name     -- Data constructor argument
   | TySynCtxt Name      -- RHS of a type synonym decl
+  | PatSynCtxt Name     -- Type sig for a pattern synonym
+                        --   eg  pattern C :: Int -> T
   | PatSigCtxt          -- Type sig in pattern
                         --   eg  f (x::t) = ...
                         --   or  (x::t, y) = e
@@ -530,11 +537,10 @@ pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
   = pp_info <> colon <> ppr tclvl
   where
     pp_info = case info of
-                ReturnTv    -> ptext (sLit "ret")
-                TauTv True  -> ptext (sLit "twc")
-                TauTv False -> ptext (sLit "tau")
-                SigTv       -> ptext (sLit "sig")
-                FlatMetaTv  -> ptext (sLit "fuv")
+                ReturnTv   -> ptext (sLit "ret")
+                TauTv      -> ptext (sLit "tau")
+                SigTv      -> ptext (sLit "sig")
+                FlatMetaTv -> ptext (sLit "fuv")
 
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (FunSigCtxt n _)  = ptext (sLit "the type signature for") <+> quotes (ppr n)
@@ -543,6 +549,7 @@ pprUserTypeCtxt (RuleSigCtxt n)   = ptext (sLit "a RULE for") <+> quotes (ppr n)
 pprUserTypeCtxt ExprSigCtxt       = ptext (sLit "an expression type signature")
 pprUserTypeCtxt (ConArgCtxt c)    = ptext (sLit "the type of the constructor") <+> quotes (ppr c)
 pprUserTypeCtxt (TySynCtxt c)     = ptext (sLit "the RHS of the type synonym") <+> quotes (ppr c)
+pprUserTypeCtxt (PatSynCtxt c)    = ptext (sLit "the type signature for pattern synonym") <+> quotes (ppr c)
 pprUserTypeCtxt ThBrackCtxt       = ptext (sLit "a Template Haskell quotation [t|...|]")
 pprUserTypeCtxt PatSigCtxt        = ptext (sLit "a pattern type signature")
 pprUserTypeCtxt ResSigCtxt        = ptext (sLit "a result type signature")
@@ -568,6 +575,7 @@ pprSigCtxt ctxt extra pp_ty
     pp_sig (FunSigCtxt n _) = pp_n_colon n
     pp_sig (ConArgCtxt n)   = pp_n_colon n
     pp_sig (ForSigCtxt n)   = pp_n_colon n
+    pp_sig (PatSynCtxt n)   = pp_n_colon n
     pp_sig _                = pp_ty
 
     pp_n_colon n = pprPrefixOcc n <+> dcolon <+> pp_ty
@@ -1251,8 +1259,8 @@ occurCheckExpand dflags tv ty
     -- it and try again.
     go ty@(TyConApp tc tys)
       = case do { tys <- mapM go tys; return (mkTyConApp tc tys) } of
-          OC_OK ty 
-              | impredicative || isTauTyCon tc 
+          OC_OK ty
+              | impredicative || isTauTyCon tc
               -> return ty  -- First try to eliminate the tyvar from the args
               | otherwise
               -> OC_Forall  -- A type synonym with a forall on the RHS
@@ -1265,7 +1273,7 @@ canUnifyWithPolyType dflags details kind
   = case details of
       MetaTv { mtv_info = ReturnTv } -> True      -- See Note [ReturnTv]
       MetaTv { mtv_info = SigTv }    -> False
-      MetaTv { mtv_info = TauTv _ }  -> xopt Opt_ImpredicativeTypes dflags
+      MetaTv { mtv_info = TauTv }    -> xopt Opt_ImpredicativeTypes dflags
                                      || isOpenTypeKind kind
                                           -- Note [OpenTypeKind accepts foralls]
       _other                         -> True
@@ -1302,7 +1310,7 @@ Note [Kind polymorphic type classes]
     class C f where...   -- C :: forall k. k -> Constraint
     g :: forall (f::*). C f => f -> f
 
-Here the (C f) in the signature is really (C * f), and we 
+Here the (C f) in the signature is really (C * f), and we
 don't want to complain that the * isn't a type variable!
 -}
 
@@ -1323,7 +1331,7 @@ checkValidClsArgs flexible_contexts kts
   | otherwise         = all hasTyVarHead tys
   where
     (_, tys) = span isKind kts  -- see Note [Kind polymorphic type classes]
-   
+
 hasTyVarHead :: Type -> Bool
 -- Returns true of (a t1 .. tn), where 'a' is a type variable
 hasTyVarHead ty                 -- Haskell 98 allows predicates of form
@@ -1381,7 +1389,7 @@ immSuperClasses cls tys
 
 isImprovementPred :: PredType -> Bool
 -- Either it's an equality, or has some functional dependency
-isImprovementPred ty 
+isImprovementPred ty
   = case classifyPredType ty of
       EqPred NomEq t1 t2 -> not (t1 `tcEqType` t2)
       EqPred ReprEq _ _  -> False
@@ -1457,6 +1465,25 @@ isTyVarExposed _  (FunTy {})      = False
 isTyVarExposed tv (AppTy fun arg) = isTyVarExposed tv fun
                                  || isTyVarExposed tv arg
 isTyVarExposed _  (ForAllTy {})   = False
+
+-- | Does the given tyvar appear under a type generative w.r.t.
+-- representational equality? See Note [Occurs check error] in
+-- TcCanonical for the motivation for this function.
+isTyVarUnderDatatype :: TcTyVar -> TcType -> Bool
+isTyVarUnderDatatype tv = go False
+  where
+    go under_dt ty | Just ty' <- tcView ty = go under_dt ty'
+    go under_dt (TyVarTy tv') = under_dt && (tv == tv')
+    go under_dt (TyConApp tc tys) = let under_dt' = under_dt ||
+                                                    isGenerativeTyCon tc
+                                                      Representational
+                                    in any (go under_dt') tys
+    go _        (LitTy {}) = False
+    go _        (FunTy arg res) = go True arg || go True res
+    go under_dt (AppTy fun arg) = go under_dt fun || go under_dt arg
+    go under_dt (ForAllTy tv' inner_ty)
+      | tv' == tv = False
+      | otherwise = go under_dt inner_ty
 
 isRigidTy :: TcType -> Bool
 isRigidTy ty
@@ -1572,8 +1599,9 @@ orphNamesOfCoCon :: CoAxiom br -> NameSet
 orphNamesOfCoCon (CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
   = orphNamesOfTyCon tc `unionNameSet` orphNamesOfCoAxBranches branches
 
-orphNamesOfCoAxBranches :: BranchList CoAxBranch br -> NameSet
-orphNamesOfCoAxBranches = brListFoldr (unionNameSet . orphNamesOfCoAxBranch) emptyNameSet
+orphNamesOfCoAxBranches :: Branches br -> NameSet
+orphNamesOfCoAxBranches
+  = foldr (unionNameSet . orphNamesOfCoAxBranch) emptyNameSet . fromBranches
 
 orphNamesOfCoAxBranch :: CoAxBranch -> NameSet
 orphNamesOfCoAxBranch (CoAxBranch { cab_lhs = lhs, cab_rhs = rhs })
@@ -1871,4 +1899,3 @@ size_type (ForAllTy _ ty)   = size_type ty
 
 sizeTypes :: [Type] -> TypeSize
 sizeTypes tys = sum (map sizeType tys)
-
