@@ -1,7 +1,7 @@
 
 tcfail098.hs:12:10:
     Could not deduce (Bar a0)
-    from the context (Bar a)
+    from the context: (Bar a)
       bound by an instance declaration: Bar a => Bar Bool
       at tcfail098.hs:12:10-26
     The type variable ‘a0’ is ambiguous

@@ -1,7 +1,7 @@
 
 tcfail080.hs:27:1:
     Could not deduce (Collection c0 a)
-    from the context (Collection c a)
+    from the context: (Collection c a)
       bound by the inferred type for ‘q’: Collection c a => a -> Bool
       at tcfail080.hs:27:1-27
     The type variable ‘c0’ is ambiguous

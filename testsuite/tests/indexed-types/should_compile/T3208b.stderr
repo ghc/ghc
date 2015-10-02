@@ -1,7 +1,7 @@
 
 T3208b.hs:15:10:
-    Could not deduce (STerm o0 ~ OTerm o0)
-    from the context (OTerm a ~ STerm a, OBJECT a, SUBST a)
+    Could not deduce: (STerm o0 ~ OTerm o0)
+    from the context: (OTerm a ~ STerm a, OBJECT a, SUBST a)
       bound by the type signature for
                  fce' :: (OTerm a ~ STerm a, OBJECT a, SUBST a) => a -> c
       at T3208b.hs:14:9-56
@@ -10,8 +10,8 @@ T3208b.hs:15:10:
     In an equation for ‘fce'’: fce' f = fce (apply f)
 
 T3208b.hs:15:15:
-    Could not deduce (OTerm o0 ~ OTerm a)
-    from the context (OTerm a ~ STerm a, OBJECT a, SUBST a)
+    Could not deduce: (OTerm o0 ~ OTerm a)
+    from the context: (OTerm a ~ STerm a, OBJECT a, SUBST a)
       bound by the type signature for
                  fce' :: (OTerm a ~ STerm a, OBJECT a, SUBST a) => a -> c
       at T3208b.hs:14:9-56

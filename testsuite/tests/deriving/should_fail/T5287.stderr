@@ -1,7 +1,7 @@
 
 T5287.hs:6:10:
     Could not deduce (A a oops0)
-    from the context (A a oops)
+    from the context: (A a oops)
       bound by an instance declaration: A a oops => Read (D a)
       at T5287.hs:6:10-31
     The type variable ‘oops0’ is ambiguous

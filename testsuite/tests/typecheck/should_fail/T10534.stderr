@@ -1,7 +1,7 @@
 
 T10534a.hs:9:10:
-    Could not deduce (a ~ b)
-    from the context (Coercible (DF a) (DF b))
+    Could not deduce: (a ~ b)
+    from the context: (Coercible (DF a) (DF b))
       bound by the type signature for
                  silly :: Coercible (DF a) (DF b) => a -> b
       at T10534a.hs:9:10-42

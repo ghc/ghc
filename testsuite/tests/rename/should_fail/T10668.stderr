@@ -1,5 +1,5 @@
 
-T10668.hs:3:27: error:
+T10668.hs:3:27:
     In module ‘Data.Type.Equality’:
       ‘Refl’ is a data constructor of ‘(:~:)’
     To import it use

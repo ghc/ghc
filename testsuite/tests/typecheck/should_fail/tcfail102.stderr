@@ -4,7 +4,7 @@ tcfail102.hs:1:14: Warning:
 
 tcfail102.hs:9:15:
     Could not deduce (Integral (Ratio a)) arising from a use of ‘p’
-    from the context (Integral a)
+    from the context: (Integral a)
       bound by the type signature for
                  f :: Integral a => P (Ratio a) -> P (Ratio a)
       at tcfail102.hs:8:6-45
