@@ -437,6 +437,15 @@ pprInstr (LD fmt reg addr) = hcat [
         ptext (sLit ", "),
         pprAddr addr
     ]
+pprInstr (LDFAR fmt reg (AddrRegImm source off)) =
+   sdocWithPlatform $ \platform -> vcat [
+         pprInstr (ADDIS (tmpReg platform) source (HA off)),
+         pprInstr (LD fmt reg (AddrRegImm (tmpReg platform) (LO off)))
+    ]
+
+pprInstr (LDFAR _ _ _) =
+   panic "PPC.Ppr.pprInstr LDFAR: no match"
+
 pprInstr (LA fmt reg addr) = hcat [
         char '\t',
         ptext (sLit "l"),
@@ -467,6 +476,14 @@ pprInstr (ST fmt reg addr) = hcat [
         ptext (sLit ", "),
         pprAddr addr
     ]
+pprInstr (STFAR fmt reg (AddrRegImm source off)) =
+   sdocWithPlatform $ \platform -> vcat [
+         pprInstr (ADDIS (tmpReg platform) source (HA off)),
+         pprInstr (ST fmt reg (AddrRegImm (tmpReg platform) (LO off)))
+    ]
+
+pprInstr (STFAR _ _ _) =
+   panic "PPC.Ppr.pprInstr STFAR: no match"
 pprInstr (STU fmt reg addr) = hcat [
         char '\t',
         ptext (sLit "st"),
@@ -798,6 +815,22 @@ pprInstr (FETCHTOC reg lab) = vcat [
 pprInstr LWSYNC = ptext (sLit "\tlwsync")
 
 pprInstr NOP = ptext (sLit "\tnop")
+
+pprInstr (UPDATE_SP fmt amount@(ImmInt offset))
+   | fits16Bits offset = vcat [
+       pprInstr (LD fmt r0 (AddrRegImm sp (ImmInt 0))),
+       pprInstr (STU fmt r0 (AddrRegImm sp amount))
+     ]
+
+pprInstr (UPDATE_SP fmt amount)
+   = sdocWithPlatform $ \platform ->
+       let tmp = tmpReg platform in
+         vcat [
+           pprInstr (LD fmt r0 (AddrRegImm sp (ImmInt 0))),
+           pprInstr (ADDIS tmp sp (HA amount)),
+           pprInstr (ADD tmp tmp (RIImm (LO amount))),
+           pprInstr (STU fmt r0 (AddrRegReg sp tmp))
+         ]
 
 -- pprInstr _ = panic "pprInstr (ppc)"
 

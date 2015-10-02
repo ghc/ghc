@@ -874,17 +874,25 @@ freeRegBase _ = True
 
 #elif MACHREGS_powerpc
 
-freeReg 0 = False -- Hack: r0 can't be used in all insns,
-                  -- but it's actually free
+freeReg 0 = False -- Used by code setting the back chain pointer
+                  -- in stack reallocations on Linux
+                  -- r0 is not usable in all insns so also reserved
+                  -- on Darwin.
 freeReg 1 = False -- The Stack Pointer
 # if !MACHREGS_darwin
 -- most non-darwin powerpc OSes use r2 as a TOC pointer or something like that
 freeReg 2 = False
--- TODO: make this conditonal for ppc64 ELF
-freeReg 13 = False -- reserved for system thread ID
--- TODO: do not reserve r30 in ppc64 ELF
+freeReg 13 = False -- reserved for system thread ID on 64 bit
 -- at least linux in -fPIC relies on r30 in PLT stubs
 freeReg 30 = False
+{- TODO: reserve r13 on 64 bit systems only and r30 on 32 bit respectively.
+   For now we use r30 on 64 bit and r13 on 32 bit as a temporary register
+   in stack handling code. See compiler/nativeGen/PPC/Ppr.hs.
+
+   Later we might want to reserve r13 and r30 only where it is required.
+   Then use r12 as temporary register, which is also what the C ABI does.
+-}
+
 # endif
 # ifdef REG_Base
 freeReg REG_Base  = False
