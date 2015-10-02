@@ -1,7 +1,10 @@
 
 T10285.hs:8:17:
-    Could not deduce (a ~ b)
-    from the context (Coercible (N a) (N b))
+    Could not deduce: (Coercible a b)
+      arising from trying to show that the representations of
+        ‘a’ and
+        ‘b’ are the same
+    from the context: (Coercible (N a) (N b))
       bound by a pattern with constructor
                  Coercion :: forall (k :: BOX) (a :: k) (b :: k).
                              Coercible a b =>
