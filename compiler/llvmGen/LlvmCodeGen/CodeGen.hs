@@ -15,7 +15,6 @@ import BlockId
 import CodeGen.Platform ( activeStgRegs, callerSaves )
 import CLabel
 import Cmm
-import CPrim
 import PprCmm
 import CmmUtils
 import CmmSwitch
@@ -226,16 +225,58 @@ genCall t@(PrimTarget (MO_Ctz w)) dsts args =
 genCall t@(PrimTarget (MO_BSwap w)) dsts args =
     genCallSimpleCast w t dsts args
 
-genCall (PrimTarget (MO_AtomicRead _)) [dst] [addr] = do
-  dstV <- getCmmReg (CmmLocal dst)
-  (v1, stmts, top) <- genLoad True addr (localRegType dst)
-  let stmt1 = Store v1 dstV
-  return (stmts `snocOL` stmt1, top)
+genCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] = do
+    (addrVar, stmts1, decls1) <- exprToVar addr
+    (nVar, stmts2, decls2) <- exprToVar n
+    let targetTy = widthToLlvmInt width
+        ptrExpr = Cast LM_Inttoptr addrVar (pLift targetTy)
+    (ptrVar, stmt3) <- doExpr (pLift targetTy) ptrExpr
+    dstVar <- getCmmReg (CmmLocal dst)
+    let op = case amop of
+               AMO_Add  -> LAO_Add
+               AMO_Sub  -> LAO_Sub
+               AMO_And  -> LAO_And
+               AMO_Nand -> LAO_Nand
+               AMO_Or   -> LAO_Or
+               AMO_Xor  -> LAO_Xor
+    (retVar, stmt4) <- doExpr targetTy $ AtomicRMW op ptrVar nVar SyncSeqCst
+    let stmt5 = Store retVar dstVar
+    let stmts = stmts1 `appOL` stmts2 `snocOL`
+                stmt3 `snocOL` stmt4 `snocOL` stmt5
+    return (stmts, decls1++decls2)
 
--- TODO: implement these properly rather than calling to RTS functions.
--- genCall t@(PrimTarget (MO_AtomicWrite width)) [] [addr, val] = undefined
--- genCall t@(PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] = undefined
--- genCall t@(PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] = undefined
+genCall (PrimTarget (MO_AtomicRead _)) [dst] [addr] = do
+    dstV <- getCmmReg (CmmLocal dst)
+    (v1, stmts, top) <- genLoad True addr (localRegType dst)
+    let stmt1 = Store v1 dstV
+    return (stmts `snocOL` stmt1, top)
+
+genCall (PrimTarget (MO_Cmpxchg _width)) [dst] [addr, old, new] = do
+    (addrVar, stmts1, decls1) <- exprToVar addr
+    (oldVar, stmts2, decls2) <- exprToVar old
+    (newVar, stmts3, decls3) <- exprToVar new
+    let targetTy = getVarType oldVar
+        ptrExpr = Cast LM_Inttoptr addrVar (pLift targetTy)
+    (ptrVar, stmt4) <- doExpr (pLift targetTy) ptrExpr
+    dstVar <- getCmmReg (CmmLocal dst)
+    (retVar, stmt5) <- doExpr (LMStructU [targetTy,i1])
+                       $ CmpXChg ptrVar oldVar newVar SyncSeqCst SyncSeqCst
+    (retVar', stmt6) <- doExpr targetTy $ ExtractV retVar 0
+    let stmt7 = Store retVar' dstVar
+        stmts = stmts1 `appOL` stmts2 `appOL` stmts3 `snocOL`
+                stmt4 `snocOL` stmt5 `snocOL` stmt6 `snocOL` stmt7
+    return (stmts, decls1 ++ decls2 ++ decls3)
+
+genCall (PrimTarget (MO_AtomicWrite _width)) [] [addr, val] = do
+    (addrVar, stmts1, decls1) <- exprToVar addr
+    (valVar, stmts2, decls2) <- exprToVar val
+    let ptrTy = pLift $ getVarType valVar
+        ptrExpr = Cast LM_Inttoptr addrVar ptrTy
+    (ptrVar, stmt3) <- doExpr ptrTy ptrExpr
+    let stmts4 = unitOL $ Expr
+                 $ AtomicRMW LAO_Xchg ptrVar valVar SyncSeqCst
+        stmts = stmts1 `appOL` stmts2 `snocOL` stmt3 `appOL` stmts4
+    return (stmts, decls1++decls2)
 
 -- Handle memcpy function specifically since llvm's intrinsic version takes
 -- some extra parameters.
@@ -715,10 +756,9 @@ cmmPrimOpFunctions mop = do
     MO_UF_Conv _     -> unsupported
 
     MO_AtomicRead _  -> unsupported
-
-    MO_AtomicRMW w amop -> fsLit $ atomicRMWLabel w amop
-    MO_Cmpxchg w        -> fsLit $ cmpxchgLabel w
-    MO_AtomicWrite w    -> fsLit $ atomicWriteLabel w
+    MO_AtomicRMW _ _ -> unsupported
+    MO_AtomicWrite _ -> unsupported
+    MO_Cmpxchg _     -> unsupported
 
 -- | Tail function calls
 genJump :: CmmExpr -> [GlobalReg] -> LlvmM StmtData

@@ -87,6 +87,22 @@ data LlvmSyncOrdering
   | SyncSeqCst
   deriving (Show, Eq)
 
+-- | LLVM atomic operations. Please see the @atomicrmw@ instruction in
+-- the LLVM documentation for a complete description.
+data LlvmAtomicOp
+  = LAO_Xchg
+  | LAO_Add
+  | LAO_Sub
+  | LAO_And
+  | LAO_Nand
+  | LAO_Or
+  | LAO_Xor
+  | LAO_Max
+  | LAO_Min
+  | LAO_Umax
+  | LAO_Umin
+  deriving (Show, Eq)
+
 -- | Llvm Statements
 data LlvmStatement
   {- |
@@ -250,13 +266,35 @@ data LlvmExpression
   | GetElemPtr Bool LlvmVar [LlvmVar]
 
   {- |
-     Cast the variable from to the to type. This is an abstraction of three
-     cast operators in Llvm, inttoptr, prttoint and bitcast.
+    Cast the variable from to the to type. This is an abstraction of three
+    cast operators in Llvm, inttoptr, prttoint and bitcast.
        * cast: Cast type
        * from: Variable to cast
        * to:   type to cast to
   -}
   | Cast LlvmCastOp LlvmVar LlvmType
+
+  {- |
+    Atomic read-modify-write operation
+       * op:       Atomic operation
+       * addr:     Address to modify
+       * operand:  Operand to operation
+       * ordering: Ordering requirement
+  -}
+  | AtomicRMW LlvmAtomicOp LlvmVar LlvmVar LlvmSyncOrdering
+
+  {- |
+    Compare-and-exchange operation
+       * addr:     Address to modify
+       * old:      Expected value
+       * new:      New value
+       * suc_ord:  Ordering required in success case
+       * fail_ord: Ordering required in failure case, can be no stronger than
+                   suc_ord
+
+    Result is an @i1@, true if store was successful.
+  -}
+  | CmpXChg LlvmVar LlvmVar LlvmVar LlvmSyncOrdering LlvmSyncOrdering
 
   {- |
     Call a function. The result is the value of the expression.

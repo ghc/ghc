@@ -262,7 +262,7 @@ pLift LMVoid     = error "Voids are unliftable"
 pLift LMMetadata = error "Metadatas are unliftable"
 pLift x          = LMPointer x
 
--- | Lower a variable of 'LMPointer' type.
+-- | Lift a variable to 'LMPointer' type.
 pVarLift :: LlvmVar -> LlvmVar
 pVarLift (LMGlobalVar s t l x a c) = LMGlobalVar s (pLift t) l x a c
 pVarLift (LMLocalVar  s t        ) = LMLocalVar  s (pLift t)

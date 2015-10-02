@@ -245,6 +245,8 @@ ppLlvmExpression expr
         Load       ptr              -> ppLoad ptr
         ALoad      ord st ptr       -> ppALoad ord st ptr
         Malloc     tp amount        -> ppMalloc tp amount
+        AtomicRMW  aop tgt src ordering -> ppAtomicRMW aop tgt src ordering
+        CmpXChg    addr old new s_ord f_ord -> ppCmpXChg addr old new s_ord f_ord
         Phi        tp precessors    -> ppPhi tp precessors
         Asm        asm c ty v se sk -> ppAsm asm c ty v se sk
         MExpr      meta expr        -> ppMetaExpr meta expr
@@ -326,6 +328,30 @@ ppSyncOrdering SyncAcquire   = text "acquire"
 ppSyncOrdering SyncRelease   = text "release"
 ppSyncOrdering SyncAcqRel    = text "acq_rel"
 ppSyncOrdering SyncSeqCst    = text "seq_cst"
+
+ppAtomicOp :: LlvmAtomicOp -> SDoc
+ppAtomicOp LAO_Xchg = text "xchg"
+ppAtomicOp LAO_Add  = text "add"
+ppAtomicOp LAO_Sub  = text "sub"
+ppAtomicOp LAO_And  = text "and"
+ppAtomicOp LAO_Nand = text "nand"
+ppAtomicOp LAO_Or   = text "or"
+ppAtomicOp LAO_Xor  = text "xor"
+ppAtomicOp LAO_Max  = text "max"
+ppAtomicOp LAO_Min  = text "min"
+ppAtomicOp LAO_Umax = text "umax"
+ppAtomicOp LAO_Umin = text "umin"
+
+ppAtomicRMW :: LlvmAtomicOp -> LlvmVar -> LlvmVar -> LlvmSyncOrdering -> SDoc
+ppAtomicRMW aop tgt src ordering =
+  text "atomicrmw" <+> ppAtomicOp aop <+> ppr tgt <> comma
+  <+> ppr src <+> ppSyncOrdering ordering
+
+ppCmpXChg :: LlvmVar -> LlvmVar -> LlvmVar
+          -> LlvmSyncOrdering -> LlvmSyncOrdering -> SDoc
+ppCmpXChg addr old new s_ord f_ord =
+  text "cmpxchg" <+> ppr addr <> comma <+> ppr old <> comma <+> ppr new
+  <+> ppSyncOrdering s_ord <+> ppSyncOrdering f_ord
 
 -- XXX: On x86, vector types need to be 16-byte aligned for aligned access, but
 -- we have no way of guaranteeing that this is true with GHC (we would need to
