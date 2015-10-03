@@ -18,8 +18,7 @@ This is where we do all the grimy bindings' generation.
 module TcGenDeriv (
         BagDerivStuff, DerivStuff(..),
 
-        canDeriveAnyClass,
-        genDerivedBinds,
+        hasBuiltinDeriving, canDeriveAnyClass,
         FFoldType(..), functorLikeTraverse,
         deepSubtypesContaining, foldDataConArgs,
         mkCoerceClassMethEqn,
@@ -75,7 +74,6 @@ import StaticFlags( opt_PprStyle_Debug )
 
 import ListSetOps ( assocMaybe )
 import Data.List  ( partition, intersperse )
-import Data.Maybe ( isNothing )
 
 type BagDerivStuff = Bag DerivStuff
 
@@ -101,26 +99,26 @@ data DerivStuff     -- Please add this auxiliary stuff
 {-
 ************************************************************************
 *                                                                      *
-                Top level function
+                Class deriving diagnostics
 *                                                                      *
 ************************************************************************
+
+Only certain blessed classes can be used in a deriving clause. These classes
+are listed below in the definition of hasBuiltinDeriving (with the exception
+of Generic and Generic1, which are handled separately in TcGenGenerics).
+
+A class might be able to be used in a deriving clause if it -XDeriveAnyClass
+is willing to support it. The canDeriveAnyClass function checks if this is
+the case.
 -}
 
-genDerivedBinds :: DynFlags -> (Name -> Fixity) -> Class -> SrcSpan -> TyCon
-                -> ( LHsBinds RdrName  -- The method bindings of the instance declaration
-                   , BagDerivStuff)    -- Specifies extra top-level declarations needed
-                                       -- to support the instance declaration
-genDerivedBinds dflags fix_env clas loc tycon
-  | Just gen_fn <- assocMaybe gen_list (getUnique clas)
-  = gen_fn loc tycon
-
-  | otherwise
-  -- Deriving any class simply means giving an empty instance, so no
-  -- bindings have to be generated.
-  = ASSERT2( isNothing (canDeriveAnyClass dflags tycon clas)
-           , ppr "genDerivStuff: bad derived class" <+> ppr clas )
-    (emptyBag, emptyBag)
-
+hasBuiltinDeriving :: DynFlags
+                   -> (Name -> Fixity)
+                   -> Class
+                   -> Maybe (SrcSpan
+                             -> TyCon
+                             -> (LHsBinds RdrName, BagDerivStuff))
+hasBuiltinDeriving dflags fix_env clas = assocMaybe gen_list (getUnique clas)
   where
     gen_list :: [(Unique, SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff))]
     gen_list = [ (eqClassKey,          gen_Eq_binds)

@@ -19,7 +19,7 @@ import TcRnMonad
 import FamInst
 import TcErrors( reportAllUnsolved )
 import TcValidity( validDerivPred )
-import TcClassDcl( tcMkDeclCtxt )
+import TcClassDcl( tcATDefault, tcMkDeclCtxt )
 import TcEnv
 import TcGenDeriv                       -- Deriv stuff
 import TcGenGenerics
@@ -52,6 +52,7 @@ import NameSet
 import TyCon
 import TcType
 import Var
+import VarEnv
 import VarSet
 import PrelNames
 import THNames ( liftClassKey )
@@ -1986,6 +1987,7 @@ genInst comauxs
   | otherwise
   = do { (meth_binds, deriv_stuff) <- genDerivStuff loc clas
                                         dfun_name rep_tycon
+                                        tys tvs
                                         (lookupNameEnv comauxs
                                                        (tyConName rep_tycon))
        ; inst_spec <- newDerivClsInst theta spec
@@ -2001,12 +2003,15 @@ genInst comauxs
   where
     rhs_ty = newTyConInstRhs rep_tycon rep_tc_args
 
-genDerivStuff :: SrcSpan -> Class -> Name -> TyCon
+-- Generate the bindings needed for a derived class that isn't handled by
+-- -XGeneralizedNewtypeDeriving.
+genDerivStuff :: SrcSpan -> Class -> Name -> TyCon -> [Type] -> [TyVar]
               -> Maybe CommonAuxiliary
               -> TcM (LHsBinds RdrName, BagDerivStuff)
-genDerivStuff loc clas dfun_name tycon comaux_maybe
+genDerivStuff loc clas dfun_name tycon inst_tys tyvars comaux_maybe
+  -- Special case for DeriveGeneric
   | let ck = classKey clas
-  , -- Special case because monadic
+  ,
     Just gk <- lookup ck [(genClassKey, Gen0), (gen1ClassKey, Gen1)]
   = let -- TODO NSF: correctly identify when we're building Both instead of One
         Just metaTyCons = comaux_maybe -- well-guarded by commonAuxiliaries and genInst
@@ -2014,10 +2019,35 @@ genDerivStuff loc clas dfun_name tycon comaux_maybe
       (binds, faminst) <- gen_Generic_binds gk tycon metaTyCons (nameModule dfun_name)
       return (binds, unitBag (DerivFamInst faminst))
 
-  | otherwise                      -- Non-monadic generators
+  -- Not deriving Generic(1), so we first check if the compiler has built-in
+  -- support for deriving the class in question.
+  | otherwise
   = do { dflags <- getDynFlags
        ; fix_env <- getDataConFixityFun tycon
-       ; return (genDerivedBinds dflags fix_env clas loc tycon) }
+       ; case hasBuiltinDeriving dflags fix_env clas of
+              Just gen_fn -> return (gen_fn loc tycon)
+              Nothing -> genDerivAnyClass dflags }
+
+  where
+    genDerivAnyClass :: DynFlags -> TcM (LHsBinds RdrName, BagDerivStuff)
+    genDerivAnyClass dflags =
+      do { -- If there isn't compiler support for deriving the class, our last
+           -- resort is -XDeriveAnyClass (since -XGeneralizedNewtypeDeriving
+           -- fell through).
+          let mini_env   = mkVarEnv (classTyVars clas `zip` inst_tys)
+              mini_subst = mkTvSubst (mkInScopeSet (mkVarSet tyvars)) mini_env
+
+         ; tyfam_insts <-
+             ASSERT2( isNothing (canDeriveAnyClass dflags tycon clas)
+                    , ppr "genDerivStuff: bad derived class" <+> ppr clas )
+             mapM (tcATDefault False loc mini_subst emptyNameSet)
+                  (classATItems clas)
+         ; return ( emptyBag -- No method bindings are needed...
+                  , listToBag (map DerivFamInst (concat tyfam_insts))
+                  -- ...but we may need to generate binding for associated type
+                  -- family default instances.
+                  -- See Note [DeriveAnyClass and default family instances]
+                  ) }
 
 getDataConFixityFun :: TyCon -> TcM (Name -> Fixity)
 -- If the TyCon is locally defined, we want the local fixity env;
@@ -2057,6 +2087,31 @@ representation type.
 
 See the paper "Safe zero-cost coercions for Hsakell".
 
+Note [DeriveAnyClass and default family instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When a class has a associated type family with a default instance, e.g.:
+
+  class C a where
+    type T a
+    type T a = Char
+
+then there are a couple of scenarios in which a user would expect T a to
+default to Char. One is when an instance declaration for C is given without
+an implementation for T:
+
+  instance C Int
+
+Another scenario in which this can occur is when the -XDeriveAnyClass extension
+is used:
+
+  data Example = Example deriving (C, Generic)
+
+In the latter case, we must take care to check if C has any associated type
+families with default instances, because -XDeriveAnyClass will never provide
+an implementation for them. We "fill in" the default instances using the
+tcATDefault function from TcClsDcl (which is also used in TcInstDcls to handle
+the empty instance declaration case).
 
 ************************************************************************
 *                                                                      *

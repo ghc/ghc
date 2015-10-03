@@ -78,6 +78,9 @@ Language
    arguments with certain unlifted types. See :ref:`generic-programming` for
    more details.
 
+-  The ``-XDeriveAnyClass`` extension now fills in associated type family
+   default instances when deriving a class that contains them.
+
 Compiler
 ~~~~~~~~
 

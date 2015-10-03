@@ -4118,10 +4118,52 @@ With ``-XDeriveAnyClass`` you can derive any other class. The compiler
 will simply generate an empty instance. The instance context will be
 generated according to the same rules used when deriving ``Eq``. This is
 mostly useful in classes whose `minimal set <#minimal-pragma>`__ is
-empty, and especially when writing `generic
-functions <#generic-programming>`__. In case you try to derive some
+empty, and especially when writing
+`generic functions <#generic-programming>`__. In case you try to derive some
 class on a newtype, and ``-XGeneralizedNewtypeDeriving`` is also on,
 ``-XDeriveAnyClass`` takes precedence.
+
+As an example, consider a simple pretty-printer class ``SPretty``, which outputs
+pretty strings: ::
+
+    {-# LANGUAGE DefaultSignatures, DeriveAnyClass #-}
+
+    class SPretty a where
+      sPpr :: a -> String
+      default sPpr :: Show a => a -> String
+      sPpr = show
+
+If a user does not provide a manual implementation for ``sPpr``, then it will
+default to ``show``. Now we can leverage the ``-XDeriveAnyClass`` extension to
+easily implement a ``SPretty`` instance for a new data type: ::
+
+    data Foo = Foo deriving (Show, SPretty)
+
+The above code is equivalent to: ::
+
+    data Foo = Foo deriving Show
+    instance SPretty Foo
+
+That is, an ``SPretty Foo`` instance will be created with empty implementations
+for all methods. Since we are using ``-XDefaultSignatures`` in this example, a
+default implementation of ``sPpr`` is filled in automatically.
+
+Similarly, ``-XDeriveAnyClass`` can be used to fill in default instances for
+associated type families: ::
+
+    {-# LANGUAGE DeriveAnyClass, TypeFamilies #-}
+
+    class Sizable a where
+      type Size a
+      type Size a = Int
+
+    data Bar = Bar deriving Sizable
+
+    doubleBarSize :: Size Bar -> Size Bar
+    doubleBarSize s = 2*s
+
+Since ``-XDeriveAnyClass`` does not generate an instance definition for ``Size
+Bar``, it will default to ``Int``.
 
 .. _type-class-extensions:
 
