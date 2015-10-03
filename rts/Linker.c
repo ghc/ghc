@@ -3631,21 +3631,17 @@ ocFlushInstructionCache( ObjectCode *oc )
 
 
 /* --------------------------------------------------------------------------
- * PEi386 specifics (Win32 targets)
+ * PEi386(+) specifics (Win32 targets)
  * ------------------------------------------------------------------------*/
 
 /* The information for this linker comes from
       Microsoft Portable Executable
       and Common Object File Format Specification
-      revision 5.1 January 1998
-   which SimonM says comes from the MS Developer Network CDs.
+      revision 8.3 February 2013
 
-   It can be found there (on older CDs), but can also be found
-   online at:
+   It can be found online at:
 
-      http://www.microsoft.com/hwdev/hardware/PECOFF.asp
-
-   (this is Rev 6.0 from February 1999).
+      https://msdn.microsoft.com/en-us/windows/hardware/gg463119.aspx
 
    Things move, so if that fails, try searching for it via
 
@@ -3666,6 +3662,17 @@ ocFlushInstructionCache( ObjectCode *oc )
 
    John Levine's book "Linkers and Loaders" contains useful
    info on PE too.
+
+   The PE specification doesn't specify how to do the actual
+   relocations. For this reason, and because both PE and ELF are
+   based on COFF, the relocations for the PEi386+ code is based on
+   the ELF relocations for the equivalent relocation type.
+
+   The ELF ABI can be found at
+
+   http://www.x86-64.org/documentation/abi.pdf
+
+   The current code is based on version 0.99.6 - October 2013
 */
 
 
@@ -3742,28 +3749,31 @@ typedef
 /* Note use of MYIMAGE_* since IMAGE_* are already defined in
    windows.h -- for the same purpose, but I want to know what I'm
    getting, here. */
-#define MYIMAGE_FILE_RELOCS_STRIPPED     0x0001
-#define MYIMAGE_FILE_EXECUTABLE_IMAGE    0x0002
-#define MYIMAGE_FILE_DLL                 0x2000
-#define MYIMAGE_FILE_SYSTEM              0x1000
-#define MYIMAGE_FILE_BYTES_REVERSED_HI   0x8000
-#define MYIMAGE_FILE_BYTES_REVERSED_LO   0x0080
-#define MYIMAGE_FILE_32BIT_MACHINE       0x0100
+#define MYIMAGE_FILE_RELOCS_STRIPPED        0x0001
+#define MYIMAGE_FILE_EXECUTABLE_IMAGE       0x0002
+#define MYIMAGE_FILE_DLL                    0x2000
+#define MYIMAGE_FILE_SYSTEM                 0x1000
+#define MYIMAGE_FILE_BYTES_REVERSED_HI      0x8000
+#define MYIMAGE_FILE_BYTES_REVERSED_LO      0x0080
+#define MYIMAGE_FILE_32BIT_MACHINE          0x0100
 
 /* From PE spec doc, section 5.4.2 and 5.4.4 */
-#define MYIMAGE_SYM_CLASS_EXTERNAL       2
-#define MYIMAGE_SYM_CLASS_STATIC         3
-#define MYIMAGE_SYM_UNDEFINED            0
+#define MYIMAGE_SYM_CLASS_EXTERNAL          2
+#define MYIMAGE_SYM_CLASS_STATIC            3
+#define MYIMAGE_SYM_UNDEFINED               0
 
-/* From PE spec doc, section 4.1 */
-#define MYIMAGE_SCN_CNT_CODE             0x00000020
-#define MYIMAGE_SCN_CNT_INITIALIZED_DATA 0x00000040
-#define MYIMAGE_SCN_LNK_COMDAT           0x00001000
-#define MYIMAGE_SCN_LNK_NRELOC_OVFL      0x01000000
+/* From PE spec doc, section 3.1 */
+#define MYIMAGE_SCN_CNT_CODE                0x00000020
+#define MYIMAGE_SCN_CNT_INITIALIZED_DATA    0x00000040
+#define MYIMAGE_SCN_CNT_UNINITIALIZED_DATA  0x00000080
+#define MYIMAGE_SCN_LNK_COMDAT              0x00001000
+#define MYIMAGE_SCN_LNK_NRELOC_OVFL         0x01000000
+#define MYIMAGE_SCN_LNK_REMOVE              0x00000800
+#define MYIMAGE_SCN_MEM_DISCARDABLE         0x02000000
 
 /* From PE spec doc, section 5.2.1 */
-#define MYIMAGE_REL_I386_DIR32           0x0006
-#define MYIMAGE_REL_I386_REL32           0x0014
+#define MYIMAGE_REL_I386_DIR32              0x0006
+#define MYIMAGE_REL_I386_REL32              0x0014
 
 static int verifyCOFFHeader ( COFF_header *hdr, pathchar *filename);
 
@@ -4357,8 +4367,9 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       UChar* end;
       UInt32 sz;
 
+      /* By default consider all section as CODE or DATA, which means we want to load them. */
       SectionKind kind
-         = SECTIONKIND_OTHER;
+          = SECTIONKIND_CODE_OR_RODATA;
       COFF_section* sectab_i
          = (COFF_section*)
            myindex ( sizeof_COFF_section, sectab, i );
@@ -4367,34 +4378,20 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 
       IF_DEBUG(linker, debugBelch("section name = %s\n", secname ));
 
-#     if 0
-      /* I'm sure this is the Right Way to do it.  However, the
-         alternative of testing the sectab_i->Name field seems to
-         work ok with Cygwin.
-
-         EZY: We should strongly consider using this style, because
-         it lets us pick up sections that should be added (e.g.
-         for a while the linker did not work due to missing .eh_frame
-         in this section.)
-      */
+      /* The PE file section flag indicates whether the section contains code or data. */
       if (sectab_i->Characteristics & MYIMAGE_SCN_CNT_CODE ||
           sectab_i->Characteristics & MYIMAGE_SCN_CNT_INITIALIZED_DATA)
          kind = SECTIONKIND_CODE_OR_RODATA;
-#     endif
 
-      if (0==strcmp(".text",(char*)secname)           ||
-          0==strcmp(".text.startup",(char*)secname)   ||
-          0==strcmp(".text.unlikely", (char*)secname) ||
-          0==strncmp(".text$",(char*)secname, 6)      ||
-          /* See Note [.rdata section group] */
-          (0==strncmp(".rdata",(char*)secname, 6) &&
-           0!=strcmp(".rdata$zzz", (char*)secname))   ||
-          0==strcmp(".eh_frame", (char*)secname)      ||
-          0==strcmp(".rodata",(char*)secname))
-         kind = SECTIONKIND_CODE_OR_RODATA;
-      if (0==strcmp(".data",(char*)secname) ||
-          0==strcmp(".bss",(char*)secname))
+      /* Check next if it contains any uninitialized data */
+      if (sectab_i->Characteristics & MYIMAGE_SCN_CNT_UNINITIALIZED_DATA)
          kind = SECTIONKIND_RWDATA;
+
+      /* Finally check if it can be discarded. This will also ignore .debug sections */
+      if (sectab_i->Characteristics & MYIMAGE_SCN_MEM_DISCARDABLE ||
+          sectab_i->Characteristics & MYIMAGE_SCN_LNK_REMOVE)
+          kind = SECTIONKIND_OTHER;
+
       if (0==strcmp(".ctors", (char*)secname))
          kind = SECTIONKIND_INIT_ARRAY;
 
@@ -4405,57 +4402,13 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       start = ((UChar*)(oc->image)) + sectab_i->PointerToRawData;
       end   = start + sz - 1;
 
-      if (kind == SECTIONKIND_OTHER
-          /* Ignore sections called which contain stabs debugging
-             information. */
-          && 0 != strcmp(".stab", (char*)secname)
-          && 0 != strcmp(".stabstr", (char*)secname)
-          /* Ignore sections called which contain exception information. */
-          && 0 != strncmp(".pdata", (char*)secname, 6)
-          && 0 != strncmp(".xdata", (char*)secname, 6)
-          /* ignore section generated from .ident */
-          && 0!= strncmp(".debug", (char*)secname, 6)
-          /* ignore unknown section that appeared in gcc 3.4.5(?) */
-          && 0!= strcmp(".reloc", (char*)secname)
-          /* See Note [.rdata section group] */
-          && 0 != strcmp(".rdata$zzz", (char*)secname)
-          /* ignore linker directive sections */
-          && 0 != strcmp(".drectve", (char*)secname)
-         ) {
-          IF_DEBUG(linker, debugBelch("Unknown PEi386 section name `%s' (while processing: %" PATH_FMT")", secname, oc->fileName));
-      }
-
       if (kind != SECTIONKIND_OTHER && end >= start) {
-          if ((((size_t)(start)) % 4) != 0) {
-              errorBelch("Misaligned section %s: %p", (char*)secname, start);
-              stgFree(secname);
-              return 0;
-          }
-
          addSection(oc, kind, start, end);
          addProddableBlock(oc, start, end - start + 1);
       }
 
       stgFree(secname);
    }
-
-/*
-  Note [.rdata section group]
-
-  Most of the sections .rdata group section we want to load
-  and consider a SECTIONKIND_CODE_OR_RODATA section.
-  With the exception of .rdata$zzz which is just a section
-  containing the GCC version:
-
-  Contents of section .rdata$zzz:
-   0000 4743433a 20285265 76332c20 4275696c  GCC: (Rev3, Buil
-   0010 74206279 204d5359 53322070 726f6a65  t by MSYS2 proje
-   0020 63742920 352e322e 30000000 00000000  ct) 5.2.0.......
-
-  Because we're inspecting the group members one by one, we shouldn't
-  consider this code since we can't load it. Instead consider it an OTHER
-  section.
-*/
 
    /* Copy exported symbols into the ObjectCode. */
 
@@ -4466,10 +4419,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
    for (i = 0; i < oc->n_symbols; i++)
       oc->symbols[i] = NULL;
 
-   i = 0;
-   while (1) {
+   for (i = 0; i < oc->n_symbols; i++) {
       COFF_symbol* symtab_i;
-      if (i >= (Int32)(hdr->NumberOfSymbols)) break;
       symtab_i = (COFF_symbol*)
                  myindex ( sizeof_COFF_symbol, symtab, i );
 
@@ -4548,7 +4499,6 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       }
 
       i += symtab_i->NumberOfAuxSymbols;
-      i++;
    }
 
    return 1;
@@ -4639,16 +4589,15 @@ ocResolve_PEi386 ( ObjectCode* oc )
 
       char *secname = cstring_from_section_name(sectab_i->Name, strtab);
 
-      /* Ignore sections called which contain stabs debugging
-         information. */
-      if (0 == strcmp(".stab", (char*)secname)
-          || 0 == strcmp(".stabstr", (char*)secname)
-          || 0 == strncmp(".pdata", (char*)secname, 6)
-          || 0 == strncmp(".xdata", (char*)secname, 6)
-          || 0 == strncmp(".debug", (char*)secname, 6)
-          || 0 == strcmp(".rdata$zzz", (char*)secname)) {
-          stgFree(secname);
-          continue;
+      /* Ignore sections called which contain stabs debugging information. */
+      if (    0 == strcmp(".stab", (char*)secname)
+           || 0 == strcmp(".stabstr", (char*)secname)
+           || 0 == strncmp(".pdata", (char*)secname, 6)
+           || 0 == strncmp(".xdata", (char*)secname, 6)
+           || 0 == strncmp(".debug", (char*)secname, 6)
+           || 0 == strcmp(".rdata$zzz", (char*)secname)) {
+           stgFree(secname);
+           continue;
       }
 
       stgFree(secname);
@@ -4766,8 +4715,17 @@ ocResolve_PEi386 ( ObjectCode* oc )
                *(UInt32 *)pP = ((UInt32)S) + A - ((UInt32)(size_t)pP) - 4;
                break;
 #elif defined(x86_64_HOST_ARCH)
-            case 2:  /* R_X86_64_32 */
-            case 17: /* R_X86_64_32S */
+            case 1: /* R_X86_64_64 (ELF constant 1) - IMAGE_REL_AMD64_ADDR64 (PE constant 1) */
+               {
+                   UInt64 A;
+                   checkProddableBlock(oc, pP, 8);
+                   A = *(UInt64*)pP;
+                   *(UInt64 *)pP = ((UInt64)S) + ((UInt64)A);
+                   break;
+               }
+            case 2: /* R_X86_64_32 (ELF constant 10) - IMAGE_REL_AMD64_ADDR32 (PE constant 2) */
+            case 3: /* R_X86_64_32S (ELF constant 11) - IMAGE_REL_AMD64_ADDR32NB (PE constant 3) */
+            case 17: /* R_X86_64_32S ELF constant, no PE mapping. See note [ELF constant in PE file] */
                {
                    size_t v;
                    v = S + ((size_t)A);
@@ -4777,14 +4735,14 @@ ocResolve_PEi386 ( ObjectCode* oc )
                        /* And retry */
                        v = S + ((size_t)A);
                        if (v >> 32) {
-                           barf("R_X86_64_32[S]: High bits are set in %zx for %s",
+                           barf("IMAGE_REL_AMD64_ADDR32[NB]: High bits are set in %zx for %s",
                                 v, (char *)symbol);
                        }
                    }
                    *(UInt32 *)pP = (UInt32)v;
                    break;
                }
-            case 4: /* R_X86_64_PC32 */
+            case 4: /* R_X86_64_PC32 (ELF constant 2) - IMAGE_REL_AMD64_REL32 (PE constant 4) */
                {
                    intptr_t v;
                    v = ((intptr_t)S) + ((intptr_t)(Int32)A) - ((intptr_t)pP) - 4;
@@ -4795,20 +4753,12 @@ ocResolve_PEi386 ( ObjectCode* oc )
                        /* And retry */
                        v = ((intptr_t)S) + ((intptr_t)(Int32)A) - ((intptr_t)pP) - 4;
                        if ((v >> 32) && ((-v) >> 32)) {
-                           barf("R_X86_64_PC32: High bits are set in %zx for %s",
+                           barf("IMAGE_REL_AMD64_REL32: High bits are set in %zx for %s",
                                 v, (char *)symbol);
                        }
                    }
                    *(UInt32 *)pP = (UInt32)v;
                    break;
-               }
-            case 1: /* R_X86_64_64 */
-               {
-                 UInt64 A;
-                 checkProddableBlock(oc, pP, 8);
-                 A = *(UInt64*)pP;
-                 *(UInt64 *)pP = ((UInt64)S) + ((UInt64)A);
-                 break;
                }
 #endif
             default:
@@ -4823,6 +4773,21 @@ ocResolve_PEi386 ( ObjectCode* oc )
    IF_DEBUG(linker, debugBelch("completed %" PATH_FMT, oc->fileName));
    return 1;
 }
+
+/*
+  Note [ELF constant in PE file]
+
+  For some reason, the PE files produced by GHC contain a linux
+  relocation constant 17 (0x11) in the object files. As far as I (Phyx-) can tell
+  this constant doesn't seem like it's coming from GHC, or at least I could not find
+  anything in the .s output that GHC produces which specifies the relocation type.
+
+  This leads me to believe that this is a bug in GAS. However because this constant is
+  there we must deal with it. This is done by mapping it to the equivalent in behaviour PE
+  relocation constant 0x03.
+
+  See #9907
+*/
 
 static int
 ocRunInit_PEi386 ( ObjectCode *oc )
