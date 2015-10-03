@@ -38,6 +38,8 @@ module PPC.Regs (
         makeImmediate,
         fReg,
         sp, r3, r4, r27, r28, r30,
+        r0, sp, r3, r4, r27, r28, r30,
+        tmpReg,
         f1, f20, f21,
 
         allocatableRegs
@@ -296,7 +298,8 @@ point registers.
 fReg :: Int -> RegNo
 fReg x = (32 + x)
 
-sp, r3, r4, r27, r28, r30, f1, f20, f21 :: Reg
+r0, sp, r3, r4, r27, r28, r30, f1, f20, f21 :: Reg
+r0      = regSingle 0
 sp      = regSingle 1
 r3      = regSingle 3
 r4      = regSingle 4
@@ -314,3 +317,10 @@ allocatableRegs :: Platform -> [RealReg]
 allocatableRegs platform
    = let isFree i = isFastTrue (freeReg platform i)
      in  map RealRegSingle $ filter isFree allMachRegNos
+
+-- temporary register for compiler use
+tmpReg :: Platform -> Reg
+tmpReg platform =
+       case platformArch platform of
+       ArchPPC      -> regSingle 13
+       _            -> panic "PPC.Regs.tmpReg: unknowm arch"

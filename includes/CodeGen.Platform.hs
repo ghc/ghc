@@ -875,8 +875,11 @@ freeRegBase _ = fastBool True
 
 #elif MACHREGS_powerpc
 
-freeReg 0 = fastBool False -- Hack: r0 can't be used in all insns,
-                           -- but it's actually free
+freeReg 0 = fastBool False
+                  -- Used by code setting the back chain pointer
+                  -- in stack reallocations on Linux
+                  -- r0 is not usable in all insns so also reserved
+                  -- on Darwin.
 freeReg 1 = fastBool False -- The Stack Pointer
 # if !MACHREGS_darwin
 -- most non-darwin powerpc OSes use r2 as a TOC pointer or something like that
