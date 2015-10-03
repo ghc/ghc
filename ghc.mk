@@ -171,7 +171,8 @@ endif
 ifeq "$(BUILD_SPHINX_HTML)" "YES"
 ifeq "$(SPHINXBUILD)" ""
 $(error BUILD_SPHINX_HTML=YES, but `sphinx-build` was not found. \
-  Install `sphinx-build`, then rerun `./configure`. \
+  Create a file `mk/validate.mk` containing `BUILD_SPHINX_HTML=NO` \
+  (when validating), or install `sphinx-build` and rerun `./configure`. \
   See https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation)
 endif
 endif

@@ -1197,8 +1197,8 @@ echo ["\
 fi
 
 echo ["\
-   Building Sphinx HTML documentation : $BUILD_SPHINX_HTML
-   Building Sphinx PDF documentation  : $BUILD_SPHINX_PDF"]
+   Tools to build Sphinx HTML documentation available: $BUILD_SPHINX_HTML
+   Tools to build Sphinx PDF documentation available: $BUILD_SPHINX_PDF"]
 
 echo ["----------------------------------------------------------------------
 "]
