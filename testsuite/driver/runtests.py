@@ -209,6 +209,9 @@ from testlib import *
 if windows or darwin:
     pkginfo = getStdout([config.ghc_pkg, 'dump'])
     topdir = config.libdir
+    if windows:
+        mingw = os.path.join(topdir, '../mingw/bin')
+        os.environ['PATH'] = os.pathsep.join([os.environ.get("PATH", ""), mingw])
     for line in pkginfo.split('\n'):
         if line.startswith('library-dirs:'):
             path = line.rstrip()
