@@ -370,7 +370,9 @@ genericTyConNames = [
     compTyConName, rTyConName, pTyConName, dTyConName,
     cTyConName, sTyConName, rec0TyConName, par0TyConName,
     d1TyConName, c1TyConName, s1TyConName, noSelTyConName,
-    repTyConName, rep1TyConName
+    repTyConName, rep1TyConName, uRecTyConName,
+    uAddrTyConName, uCharTyConName, uDoubleTyConName,
+    uFloatTyConName, uIntTyConName, uWordTyConName
   ]
 
 {-
@@ -687,7 +689,11 @@ u1DataCon_RDR, par1DataCon_RDR, rec1DataCon_RDR,
   conName_RDR, conFixity_RDR, conIsRecord_RDR,
   noArityDataCon_RDR, arityDataCon_RDR, selName_RDR,
   prefixDataCon_RDR, infixDataCon_RDR, leftAssocDataCon_RDR,
-  rightAssocDataCon_RDR, notAssocDataCon_RDR :: RdrName
+  rightAssocDataCon_RDR, notAssocDataCon_RDR,
+  uAddrDataCon_RDR, uCharDataCon_RDR, uDoubleDataCon_RDR,
+  uFloatDataCon_RDR, uIntDataCon_RDR, uWordDataCon_RDR,
+  uAddrHash_RDR, uCharHash_RDR, uDoubleHash_RDR,
+  uFloatHash_RDR, uIntHash_RDR, uWordHash_RDR :: RdrName
 
 u1DataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "U1")
 par1DataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "Par1")
@@ -728,6 +734,19 @@ leftAssocDataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "LeftAssociative")
 rightAssocDataCon_RDR = dataQual_RDR gHC_GENERICS (fsLit "RightAssociative")
 notAssocDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "NotAssociative")
 
+uAddrDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "UAddr")
+uCharDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "UChar")
+uDoubleDataCon_RDR = dataQual_RDR gHC_GENERICS (fsLit "UDouble")
+uFloatDataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "UFloat")
+uIntDataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "UInt")
+uWordDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "UWord")
+
+uAddrHash_RDR   = varQual_RDR gHC_GENERICS (fsLit "uAddr#")
+uCharHash_RDR   = varQual_RDR gHC_GENERICS (fsLit "uChar#")
+uDoubleHash_RDR = varQual_RDR gHC_GENERICS (fsLit "uDouble#")
+uFloatHash_RDR  = varQual_RDR gHC_GENERICS (fsLit "uFloat#")
+uIntHash_RDR    = varQual_RDR gHC_GENERICS (fsLit "uInt#")
+uWordHash_RDR   = varQual_RDR gHC_GENERICS (fsLit "uWord#")
 
 fmap_RDR, pure_RDR, ap_RDR, foldable_foldr_RDR, foldMap_RDR,
     traverse_RDR, mempty_RDR, mappend_RDR :: RdrName
@@ -789,7 +808,9 @@ v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
   compTyConName, rTyConName, pTyConName, dTyConName,
   cTyConName, sTyConName, rec0TyConName, par0TyConName,
   d1TyConName, c1TyConName, s1TyConName, noSelTyConName,
-  repTyConName, rep1TyConName :: Name
+  repTyConName, rep1TyConName, uRecTyConName,
+  uAddrTyConName, uCharTyConName, uDoubleTyConName,
+  uFloatTyConName, uIntTyConName, uWordTyConName :: Name
 
 v1TyConName  = tcQual gHC_GENERICS (fsLit "V1") v1TyConKey
 u1TyConName  = tcQual gHC_GENERICS (fsLit "U1") u1TyConKey
@@ -817,6 +838,14 @@ noSelTyConName = tcQual gHC_GENERICS (fsLit "NoSelector") noSelTyConKey
 
 repTyConName  = tcQual gHC_GENERICS (fsLit "Rep")  repTyConKey
 rep1TyConName = tcQual gHC_GENERICS (fsLit "Rep1") rep1TyConKey
+
+uRecTyConName      = tcQual gHC_GENERICS (fsLit "URec") uRecTyConKey
+uAddrTyConName     = tcQual gHC_GENERICS (fsLit "UAddr") uAddrTyConKey
+uCharTyConName     = tcQual gHC_GENERICS (fsLit "UChar") uCharTyConKey
+uDoubleTyConName   = tcQual gHC_GENERICS (fsLit "UDouble") uDoubleTyConKey
+uFloatTyConName    = tcQual gHC_GENERICS (fsLit "UFloat") uFloatTyConKey
+uIntTyConName      = tcQual gHC_GENERICS (fsLit "UInt") uIntTyConKey
+uWordTyConName     = tcQual gHC_GENERICS (fsLit "UWord") uWordTyConKey
 
 -- Base strings Strings
 unpackCStringName, unpackCStringFoldrName,
@@ -1469,7 +1498,9 @@ v1TyConKey, u1TyConKey, par1TyConKey, rec1TyConKey,
   compTyConKey, rTyConKey, pTyConKey, dTyConKey,
   cTyConKey, sTyConKey, rec0TyConKey, par0TyConKey,
   d1TyConKey, c1TyConKey, s1TyConKey, noSelTyConKey,
-  repTyConKey, rep1TyConKey :: Unique
+  repTyConKey, rep1TyConKey, uRecTyConKey,
+  uAddrTyConKey, uCharTyConKey, uDoubleTyConKey,
+  uFloatTyConKey, uIntTyConKey, uWordTyConKey :: Unique
 
 v1TyConKey    = mkPreludeTyConUnique 135
 u1TyConKey    = mkPreludeTyConUnique 136
@@ -1498,21 +1529,29 @@ noSelTyConKey = mkPreludeTyConUnique 154
 repTyConKey  = mkPreludeTyConUnique 155
 rep1TyConKey = mkPreludeTyConUnique 156
 
+uRecTyConKey    = mkPreludeTyConUnique 157
+uAddrTyConKey   = mkPreludeTyConUnique 158
+uCharTyConKey   = mkPreludeTyConUnique 159
+uDoubleTyConKey = mkPreludeTyConUnique 160
+uFloatTyConKey  = mkPreludeTyConUnique 161
+uIntTyConKey    = mkPreludeTyConUnique 162
+uWordTyConKey   = mkPreludeTyConUnique 163
+
 -- Type-level naturals
 typeNatKindConNameKey, typeSymbolKindConNameKey,
   typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey,
   typeNatLeqTyFamNameKey, typeNatSubTyFamNameKey
   , typeSymbolCmpTyFamNameKey, typeNatCmpTyFamNameKey
   :: Unique
-typeNatKindConNameKey     = mkPreludeTyConUnique 160
-typeSymbolKindConNameKey  = mkPreludeTyConUnique 161
-typeNatAddTyFamNameKey    = mkPreludeTyConUnique 162
-typeNatMulTyFamNameKey    = mkPreludeTyConUnique 163
-typeNatExpTyFamNameKey    = mkPreludeTyConUnique 164
-typeNatLeqTyFamNameKey    = mkPreludeTyConUnique 165
-typeNatSubTyFamNameKey    = mkPreludeTyConUnique 166
-typeSymbolCmpTyFamNameKey = mkPreludeTyConUnique 167
-typeNatCmpTyFamNameKey    = mkPreludeTyConUnique 168
+typeNatKindConNameKey     = mkPreludeTyConUnique 164
+typeSymbolKindConNameKey  = mkPreludeTyConUnique 165
+typeNatAddTyFamNameKey    = mkPreludeTyConUnique 166
+typeNatMulTyFamNameKey    = mkPreludeTyConUnique 167
+typeNatExpTyFamNameKey    = mkPreludeTyConUnique 168
+typeNatLeqTyFamNameKey    = mkPreludeTyConUnique 169
+typeNatSubTyFamNameKey    = mkPreludeTyConUnique 170
+typeSymbolCmpTyFamNameKey = mkPreludeTyConUnique 171
+typeNatCmpTyFamNameKey    = mkPreludeTyConUnique 172
 
 ntTyConKey:: Unique
 ntTyConKey = mkPreludeTyConUnique 174

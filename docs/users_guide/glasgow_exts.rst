@@ -12004,6 +12004,48 @@ we show generic serialization:
 Typically this class will not be exported, as it only makes sense to
 have instances for the representation types.
 
+Unlifted representation types
+-----------------------------
+
+The data family ``URec`` is provided to enable generic programming over
+datatypes with certain unlifted arguments. There are six instances corresponding
+to common unlifted types: ::
+
+    data family URec a p
+
+    data instance URec (Ptr ()) p = UAddr   { uAddr#   :: Addr#   }
+    data instance URec Char     p = UChar   { uChar#   :: Char#   }
+    data instance URec Double   p = UDouble { uDouble# :: Double# }
+    data instance URec Int      p = UInt    { uInt#    :: Int#    }
+    data instance URec Float    p = UFloat  { uFloat#  :: Float#  }
+    data instance URec Word     p = UWord   { uWord#   :: Word#   }
+
+Six type synonyms are provided for convenience: ::
+
+    type UAddr   = URec (Ptr ())
+    type UChar   = URec Char
+    type UDouble = URec Double
+    type UFloat  = URec Float
+    type UInt    = URec Int
+    type UWord   = URec Word
+
+As an example, this data declaration: ::
+
+    data IntHash = IntHash Int#
+      deriving Generic
+
+results in the following ``Generic`` instance: ::
+
+    instance Generic IntHash where
+      type Rep IntHash =
+        D1 D1IntHash
+          (C1 C1_0IntHash
+            (S1 NoSelector UInt))
+
+A user could provide, for example, a ``GSerialize UInt`` instance so that a
+``Serialize IntHash`` instance could be easily defined in terms of
+``GSerialize``.
+
 Generic defaults
 ----------------
 

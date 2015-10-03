@@ -5,13 +5,14 @@
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE IncoherentInstances        #-} -- :-/
 {-# LANGUAGE DefaultSignatures          #-}
+{-# LANGUAGE MagicHash                  #-}
 
 module GShow (
   -- * Generic show class
     GShow(..)
   ) where
 
-
+import GHC.Exts
 import GHC.Generics
 
 --------------------------------------------------------------------------------
@@ -36,10 +37,10 @@ instance (GShow c) => GShow' (K1 i c) where
 -- No instances for P or Rec because gshow is only applicable to types of kind *
 
 instance (GShow' a, Constructor c) => GShow' (M1 C c a) where
-  gshowsPrec' _ n c@(M1 x) = 
+  gshowsPrec' _ n c@(M1 x) =
     case (fixity, conIsTuple c) of
-      (Prefix,False) -> showParen (n > 10 && not (isNullary x)) 
-                         ( showString (conName c) 
+      (Prefix,False) -> showParen (n > 10 && not (isNullary x))
+                         ( showString (conName c)
                          . if (isNullary x) then id else showChar ' '
                          . showBraces t (gshowsPrec' t 10 x))
       (Prefix,True)  -> showParen (n > 10) (showBraces t (gshowsPrec' t 10 x))
@@ -58,7 +59,7 @@ instance (GShow' a, Constructor c) => GShow' (M1 C c a) where
             conIsTuple c = case conName c of
                              ('(':',':_) -> True
                              otherwise   -> False
-  
+
   isNullary (M1 x) = isNullary x
 
 instance (Selector s, GShow' a) => GShow' (M1 S s a) where
@@ -85,12 +86,23 @@ instance (GShow' a, GShow' b) => GShow' (a :*: b) where
     gshowsPrec' t n     a . showChar ','    . gshowsPrec' t n     b
   gshowsPrec' t@Pref    n (a :*: b) =
     gshowsPrec' t (n+1) a . showChar ' '    . gshowsPrec' t (n+1) b
-  
+
   -- If we have a product then it is not a nullary constructor
   isNullary _ = False
 
+-- Unboxed instances
+instance GShow' UChar where
+  gshowsPrec' _ _ (UChar c)   = showsPrec 0 (C# c) . showChar '#'
+instance GShow' UDouble where
+  gshowsPrec' _ _ (UDouble d) = showsPrec 0 (D# d) . showString "##"
+instance GShow' UFloat where
+  gshowsPrec' _ _ (UFloat f)  = showsPrec 0 (F# f) . showChar '#'
+instance GShow' UInt where
+  gshowsPrec' _ _ (UInt i)    = showsPrec 0 (I# i) . showChar '#'
+instance GShow' UWord where
+  gshowsPrec' _ _ (UWord w)   = showsPrec 0 (W# w) . showString "##"
 
-class GShow a where 
+class GShow a where
   gshowsPrec :: Int -> a -> ShowS
   default gshowsPrec :: (Generic a, GShow' (Rep a)) => Int -> a -> ShowS
   gshowsPrec n = gshowsPrec' Pref n . from
@@ -100,13 +112,15 @@ class GShow a where
 
   gshow :: a -> String
   gshow x = gshows x ""
-  
+
 
 -- Base types instances
 instance GShow Char   where gshowsPrec = showsPrec
+instance GShow Double where gshowsPrec = showsPrec
 instance GShow Int    where gshowsPrec = showsPrec
 instance GShow Float  where gshowsPrec = showsPrec
 instance GShow String where gshowsPrec = showsPrec
+instance GShow Word   where gshowsPrec = showsPrec
 instance GShow Bool   where gshowsPrec = showsPrec
 
 intersperse :: a -> [a] -> [a]

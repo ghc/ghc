@@ -74,6 +74,9 @@ Language
 -  Due to a :ghc-ticket:`security issue <10826>`, Safe Haskell now forbids
    annotations in programs marked as ``-XSafe``.
 
+-  Generic instances can be derived for data types whose constructors have
+   arguments with certain unlifted types. See :ref:`generic-programming` for
+   more details.
 
 Compiler
 ~~~~~~~~
