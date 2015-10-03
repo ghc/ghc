@@ -1324,9 +1324,6 @@ clean_bindistprep:
 	$(call removeTrees,bindistprep/)
 
 distclean : clean
-# Clean the files that ./validate creates.
-	$(call removeFiles,mk/are-validating.mk)
-
 # Clean the files that we ask ./configure to create.
 	$(call removeFiles,mk/config.mk)
 	$(call removeFiles,mk/install.mk)
