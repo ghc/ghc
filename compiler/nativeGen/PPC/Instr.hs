@@ -74,15 +74,13 @@ instance Instruction Instr where
 ppc_mkStackAllocInstr :: Platform -> Int -> Instr
 ppc_mkStackAllocInstr platform amount
   = case platformArch platform of
-      ArchPPC -> -- SUB II32 (OpImm (ImmInt amount)) (OpReg esp)
-                 ADD sp sp (RIImm (ImmInt (-amount)))
+      ArchPPC -> UPDATE_SP II32 (ImmInt (-amount))
       arch -> panic $ "ppc_mkStackAllocInstr " ++ show arch
 
 ppc_mkStackDeallocInstr :: Platform -> Int -> Instr
 ppc_mkStackDeallocInstr platform amount
   = case platformArch platform of
-      ArchPPC -> -- ADD II32 (OpImm (ImmInt amount)) (OpReg esp)
-                 ADD sp sp (RIImm (ImmInt amount))
+      ArchPPC -> UPDATE_SP II32 (ImmInt amount)
       arch -> panic $ "ppc_mkStackDeallocInstr " ++ show arch
 
 --
@@ -183,8 +181,10 @@ data Instr
 
     -- Loads and stores.
     | LD      Size Reg AddrMode     -- Load size, dst, src
+    | LDFAR   Size Reg AddrMode     -- Load format, dst, src 32 bit offset
     | LA      Size Reg AddrMode     -- Load arithmetic size, dst, src
     | ST      Size Reg AddrMode     -- Store size, src, dst
+    | STFAR   Size Reg AddrMode     -- Store format, src, dst 32 bit offset
     | STU     Size Reg AddrMode     -- Store with Update size, src, dst
     | LIS     Reg Imm               -- Load Immediate Shifted dst, src
     | LI      Reg Imm               -- Load Immediate dst, src
@@ -258,6 +258,9 @@ data Instr
 
     | LWSYNC                    -- memory barrier
 
+    | UPDATE_SP Size Imm        -- expand/shrink spill area on C stack
+                                -- pseudo-instruction
+
 
 -- | Get the registers that are being used by this instruction.
 -- regUsage doesn't need to do any trickery for jumps and such.
@@ -269,8 +272,10 @@ ppc_regUsageOfInstr :: Platform -> Instr -> RegUsage
 ppc_regUsageOfInstr platform instr
  = case instr of
     LD      _ reg addr       -> usage (regAddr addr, [reg])
+    LDFAR   _ reg addr       -> usage (regAddr addr, [reg])
     LA      _ reg addr       -> usage (regAddr addr, [reg])
     ST      _ reg addr       -> usage (reg : regAddr addr, [])
+    STFAR   _ reg addr       -> usage (reg : regAddr addr, [])
     STU     _ reg addr       -> usage (reg : regAddr addr, [])
     LIS     reg _            -> usage ([], [reg])
     LI      reg _            -> usage ([], [reg])
@@ -321,6 +326,7 @@ ppc_regUsageOfInstr platform instr
     MFCR    reg             -> usage ([], [reg])
     MFLR    reg             -> usage ([], [reg])
     FETCHPC reg             -> usage ([], [reg])
+    UPDATE_SP _ _           -> usage ([], [sp])
     _                       -> noUsage
   where
     usage (src, dst) = RU (filter (interesting platform) src)
@@ -347,8 +353,10 @@ ppc_patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
 ppc_patchRegsOfInstr instr env
  = case instr of
     LD      sz reg addr     -> LD sz (env reg) (fixAddr addr)
+    LDFAR   fmt reg addr    -> LDFAR fmt (env reg) (fixAddr addr)
     LA      sz reg addr     -> LA sz (env reg) (fixAddr addr)
     ST      sz reg addr     -> ST sz (env reg) (fixAddr addr)
+    STFAR   fmt reg addr    -> STFAR fmt (env reg) (fixAddr addr)
     STU     sz reg addr     -> STU sz (env reg) (fixAddr addr)
     LIS     reg imm         -> LIS (env reg) imm
     LI      reg imm         -> LI (env reg) imm
@@ -464,8 +472,10 @@ ppc_mkSpillInstr dflags reg delta slot
                 RcInteger -> II32
                 RcDouble  -> FF64
                 _      -> panic "PPC.Instr.mkSpillInstr: no match"
-    in ST sz reg (AddrRegImm sp (ImmInt (off-delta)))
-
+        instr = case makeImmediate W32 True (off-delta) of
+                   Just _  -> ST
+                   Nothing -> STFAR -- pseudo instruction: 32 bit offsets
+    in instr sz reg (AddrRegImm sp (ImmInt (off-delta)))
 
 ppc_mkLoadInstr
    :: DynFlags
@@ -482,7 +492,10 @@ ppc_mkLoadInstr dflags reg delta slot
                 RcInteger -> II32
                 RcDouble  -> FF64
                 _         -> panic "PPC.Instr.mkLoadInstr: no match"
-    in LD sz reg (AddrRegImm sp (ImmInt (off-delta)))
+        instr = case makeImmediate W32 True (off-delta) of
+                Just _  -> LD
+                Nothing -> LDFAR -- pseudo instruction: 32 bit offsets
+    in instr sz reg (AddrRegImm sp (ImmInt (off-delta)))
 
 
 -- | The maximum number of bytes required to spill a register. PPC32
