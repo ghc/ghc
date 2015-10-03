@@ -1327,19 +1327,15 @@ handleProc pgm phase_name proc = do
     (rc, r) <- proc `catchIO` handler
     case rc of
       ExitSuccess{} -> return r
-      ExitFailure n
-        -- rawSystem returns (ExitFailure 127) if the exec failed for any
-        -- reason (eg. the program doesn't exist).  This is the only clue
-        -- we have, but we need to report something to the user because in
-        -- the case of a missing program there will otherwise be no output
-        -- at all.
-       | n == 127  -> does_not_exist
-       | otherwise -> throwGhcExceptionIO (PhaseFailed phase_name rc)
+      ExitFailure n -> throwGhcExceptionIO (
+            ProgramError ("`" ++ pgm ++ "'" ++
+                          " failed in phase `" ++ phase_name ++ "'." ++
+                          " (Exit code: " ++ show n ++ ")"))
   where
     handler err =
        if IO.isDoesNotExistError err
           then does_not_exist
-          else IO.ioError err
+          else throwGhcExceptionIO (ProgramError $ show err)
 
     does_not_exist = throwGhcExceptionIO (InstallationError ("could not execute: " ++ pgm))
 
@@ -1473,7 +1469,7 @@ traceCmd dflags phase_name cmd_line action
   where
     handle_exn _verb exn = do { debugTraceMsg dflags 2 (char '\n')
                               ; debugTraceMsg dflags 2 (ptext (sLit "Failed:") <+> text cmd_line <+> text (show exn))
-                              ; throwGhcExceptionIO (PhaseFailed phase_name (ExitFailure 1)) }
+                              ; throwGhcExceptionIO (ProgramError (show exn))}
 
 {-
 ************************************************************************

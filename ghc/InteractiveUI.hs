@@ -3214,7 +3214,6 @@ showException se =
            -- omit the location for CmdLineError:
            Just (CmdLineError s)    -> putException s
            -- ditto:
-           Just ph@(PhaseFailed {}) -> putException (showGhcException ph "")
            Just other_ghc_ex        -> putException (show other_ghc_ex)
            Nothing                  ->
                case fromException se of

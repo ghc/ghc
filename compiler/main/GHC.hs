@@ -398,7 +398,6 @@ defaultErrorHandler fm (FlushOut flushOut) inner =
             (\ge -> liftIO $ do
                 flushOut
                 case ge of
-                     PhaseFailed _ code -> exitWith code
                      Signal _ -> exitWith (ExitFailure 1)
                      _ -> do fatalErrorMsg'' fm (show ge)
                              exitWith (ExitFailure 1)

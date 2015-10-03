@@ -446,3 +446,10 @@ test('T10182',
      extra_clean(['T10182.o', 'T10182a.o', 'T10182.o-boot', 'T10182.hi', 'T10182a.hi', 'T10182.hi-boot']),
      run_command,
      ['$MAKE -s --no-print-directory T10182'])
+     
+test('T365',
+     [extra_clean(['test_preprocessor.txt']),
+      pre_cmd('touch test_preprocessor.txt'),
+      unless(opsys('mingw32'), skip)],
+      compile_fail,
+      [''])
