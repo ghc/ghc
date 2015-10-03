@@ -228,6 +228,7 @@ warnAboutEmptyEnumerations dflags fromExpr mThnExpr toExpr
     else if tc == word16TyConName then check (undefined :: Word16)
     else if tc == word32TyConName then check (undefined :: Word32)
     else if tc == word64TyConName then check (undefined :: Word64)
+    else if tc == integerTyConName then check (undefined :: Integer)
     else return ()
 
   | otherwise = return ()
