@@ -64,7 +64,6 @@ import MonadUtils
 import Platform
 import TcRnTypes
 import Hooks
-import MkIface
 
 import Exception
 import Data.IORef       ( readIORef )
@@ -133,173 +132,90 @@ compileOne' :: Maybe TcGblEnv
 compileOne' m_tc_result mHscMessage
             hsc_env0 summary mod_index nmods mb_old_iface maybe_old_linkable
             source_modified0
- | HsBootMerge <- ms_hsc_src summary
- = do -- Do a boot merge instead!  For now, something very simple
-      output_fn <- getOutputFilename next_phase
-                        Temporary basename dflags next_phase (Just location)
-      e <- genericHscMergeRequirement mHscMessage
-                hsc_env summary mb_old_iface (mod_index, nmods)
-
-      case e of
-       -- TODO: dedup
-       Left iface ->
-           do details <- genModDetails hsc_env iface
-              return (HomeModInfo{ hm_details  = details,
-                                   hm_iface    = iface,
-                                   hm_linkable = maybe_old_linkable })
-       Right (iface0, mb_old_hash) ->
-        case hsc_lang of
-          HscInterpreted ->
-           do (iface, _no_change) <- mkIfaceDirect hsc_env mb_old_hash iface0
-              details <- genModDetails hsc_env iface
-              -- Merges don't need to link in any bytecode, unlike
-              -- HsSrcFiles.
-              let linkable = LM (ms_hs_date summary) this_mod []
-              return (HomeModInfo{ hm_details  = details,
-                                   hm_iface    = iface,
-                                   hm_linkable = Just linkable })
-
-          HscNothing ->
-           do (iface, no_change) <- mkIfaceDirect hsc_env mb_old_hash iface0
-              details <- genModDetails hsc_env iface
-              when (gopt Opt_WriteInterface dflags) $
-                 hscWriteIface dflags iface no_change summary
-              let linkable = LM (ms_hs_date summary) this_mod []
-              return (HomeModInfo{ hm_details  = details,
-                                   hm_iface    = iface,
-                                   hm_linkable = Just linkable })
-          _ ->
-           do (iface, no_change) <- mkIfaceDirect hsc_env mb_old_hash iface0
-              hscWriteIface dflags iface no_change summary
-
-              -- #10660: Use the pipeline instead of calling
-              -- compileEmptyStub directly, so -dynamic-too gets
-              -- handled properly
-              let mod_name = ms_mod_name summary
-              _ <- runPipeline StopLn hsc_env
-                                (output_fn,
-                                 Just (HscOut src_flavour
-                                              mod_name HscUpdateBootMerge))
-                                (Just basename)
-                                Persistent
-                                (Just location)
-                                Nothing
-
-              details <- genModDetails hsc_env iface
-
-              o_time <- getModificationUTCTime object_filename
-              let linkable =
-                      LM o_time this_mod [DotO object_filename]
-              return (HomeModInfo{ hm_details  = details,
-                                   hm_iface    = iface,
-                                   hm_linkable = Just linkable })
-
- | otherwise
  = do
 
    debugTraceMsg dflags1 2 (text "compile: input file" <+> text input_fnpp)
-   -- What file to generate the output into?
-   output_fn <- getOutputFilename next_phase
-                        Temporary basename dflags next_phase (Just location)
 
-   e <- genericHscCompileGetFrontendResult
-            always_do_basic_recompilation_check
-            m_tc_result mHscMessage
-            hsc_env summary source_modified mb_old_iface (mod_index, nmods)
+   (status, hmi0) <- hscIncrementalCompile
+                        always_do_basic_recompilation_check
+                        m_tc_result mHscMessage
+                        hsc_env summary source_modified mb_old_iface (mod_index, nmods)
 
-   case e of
-       Left iface ->
-           do details <- genModDetails hsc_env iface
-              MASSERT(isJust maybe_old_linkable || isNoLink (ghcLink dflags))
-              return (HomeModInfo{ hm_details  = details,
-                                   hm_iface    = iface,
-                                   hm_linkable = maybe_old_linkable })
+   case (status, hsc_lang) of
+        (HscUpToDate, _) ->
+            ASSERT( isJust maybe_old_linkable || isNoLink (ghcLink dflags) )
+            return hmi0 { hm_linkable = maybe_old_linkable }
+        (HscNotGeneratingCode, HscNothing) ->
+            let mb_linkable = if isHsBoot src_flavour
+                                then Nothing
+                                -- TODO: Questionable.
+                                else Just (LM (ms_hs_date summary) this_mod [])
+            in return hmi0 { hm_linkable = mb_linkable }
+        (HscNotGeneratingCode, _) -> panic "compileOne HscNotGeneratingCode"
+        (_, HscNothing) -> panic "compileOne HscNothing"
+        (HscUpdateBoot, HscInterpreted) -> do
+            return hmi0
+        (HscUpdateBoot, _) -> do
+            touchObjectFile dflags object_filename
+            return hmi0
+        (HscUpdateBootMerge, HscInterpreted) ->
+            let linkable = LM (ms_hs_date summary) this_mod []
+            in return hmi0 { hm_linkable = Just linkable }
+        (HscUpdateBootMerge, _) -> do
+            output_fn <- getOutputFilename next_phase
+                            Temporary basename dflags next_phase (Just location)
 
-       Right (tc_result, mb_old_hash) ->
-           -- run the compiler
-           case hsc_lang of
-               HscInterpreted ->
-                   case ms_hsc_src summary of
-                   HsBootFile ->
-                       do (iface, _changed, details) <- hscSimpleIface hsc_env tc_result mb_old_hash
-                          return (HomeModInfo{ hm_details  = details,
-                                               hm_iface    = iface,
-                                               hm_linkable = Nothing })
-                   _ -> do guts0 <- hscDesugar hsc_env summary tc_result
-                           guts <- hscSimplify hsc_env guts0
-                           (iface, _changed, details, cgguts) <- hscNormalIface hsc_env guts mb_old_hash
-                           (hasStub, comp_bc, modBreaks) <- hscInteractive hsc_env cgguts summary
+            -- #10660: Use the pipeline instead of calling
+            -- compileEmptyStub directly, so -dynamic-too gets
+            -- handled properly
+            _ <- runPipeline StopLn hsc_env
+                              (output_fn,
+                               Just (HscOut src_flavour
+                                            mod_name HscUpdateBootMerge))
+                              (Just basename)
+                              Persistent
+                              (Just location)
+                              Nothing
+            o_time <- getModificationUTCTime object_filename
+            let linkable = LM o_time this_mod [DotO object_filename]
+            return hmi0 { hm_linkable = Just linkable }
+        (HscRecomp cgguts summary, HscInterpreted) -> do
+            (hasStub, comp_bc, modBreaks) <- hscInteractive hsc_env cgguts summary
 
-                           stub_o <- case hasStub of
-                                     Nothing -> return []
-                                     Just stub_c -> do
-                                         stub_o <- compileStub hsc_env stub_c
-                                         return [DotO stub_o]
+            stub_o <- case hasStub of
+                      Nothing -> return []
+                      Just stub_c -> do
+                          stub_o <- compileStub hsc_env stub_c
+                          return [DotO stub_o]
 
-                           let hs_unlinked = [BCOs comp_bc modBreaks]
-                               unlinked_time = ms_hs_date summary
-                             -- Why do we use the timestamp of the source file here,
-                             -- rather than the current time?  This works better in
-                             -- the case where the local clock is out of sync
-                             -- with the filesystem's clock.  It's just as accurate:
-                             -- if the source is modified, then the linkable will
-                             -- be out of date.
-                           let linkable = LM unlinked_time this_mod
-                                          (hs_unlinked ++ stub_o)
+            let hs_unlinked = [BCOs comp_bc modBreaks]
+                unlinked_time = ms_hs_date summary
+              -- Why do we use the timestamp of the source file here,
+              -- rather than the current time?  This works better in
+              -- the case where the local clock is out of sync
+              -- with the filesystem's clock.  It's just as accurate:
+              -- if the source is modified, then the linkable will
+              -- be out of date.
+            let linkable = LM unlinked_time (ms_mod summary)
+                           (hs_unlinked ++ stub_o)
+            return hmi0 { hm_linkable = Just linkable }
+        (HscRecomp cgguts summary, _) -> do
+            output_fn <- getOutputFilename next_phase
+                            Temporary basename dflags next_phase (Just location)
+            -- We're in --make mode: finish the compilation pipeline.
+            _ <- runPipeline StopLn hsc_env
+                              (output_fn,
+                               Just (HscOut src_flavour mod_name (HscRecomp cgguts summary)))
+                              (Just basename)
+                              Persistent
+                              (Just location)
+                              Nothing
+                  -- The object filename comes from the ModLocation
+            o_time <- getModificationUTCTime object_filename
+            let linkable = LM o_time this_mod [DotO object_filename]
+            return hmi0 { hm_linkable = Just linkable }
 
-                           return (HomeModInfo{ hm_details  = details,
-                                                hm_iface    = iface,
-                                                hm_linkable = Just linkable })
-               HscNothing ->
-                   do (iface, changed, details) <- hscSimpleIface hsc_env tc_result mb_old_hash
-                      when (gopt Opt_WriteInterface dflags) $
-                         hscWriteIface dflags iface changed summary
-                      let linkable = if isHsBoot src_flavour
-                                     then Nothing
-                                     else Just (LM (ms_hs_date summary) this_mod [])
-                      return (HomeModInfo{ hm_details  = details,
-                                           hm_iface    = iface,
-                                           hm_linkable = linkable })
-
-               _ ->
-                   case ms_hsc_src summary of
-                   HsBootMerge -> panic "This driver can't handle it"
-                   HsBootFile ->
-                       do (iface, changed, details) <- hscSimpleIface hsc_env tc_result mb_old_hash
-                          hscWriteIface dflags iface changed summary
-
-                          touchObjectFile dflags object_filename
-
-                          return (HomeModInfo{
-                                    hm_details  = details,
-                                    hm_iface    = iface,
-                                    hm_linkable = Nothing })
-
-                   HsSrcFile ->
-                        do guts0 <- hscDesugar hsc_env summary tc_result
-                           guts <- hscSimplify hsc_env guts0
-                           (iface, changed, details, cgguts) <- hscNormalIface hsc_env guts mb_old_hash
-                           hscWriteIface dflags iface changed summary
-
-                           -- We're in --make mode: finish the compilation pipeline.
-                           let mod_name = ms_mod_name summary
-                           _ <- runPipeline StopLn hsc_env
-                                             (output_fn,
-                                              Just (HscOut src_flavour mod_name (HscRecomp cgguts summary)))
-                                             (Just basename)
-                                             Persistent
-                                             (Just location)
-                                             Nothing
-                                 -- The object filename comes from the ModLocation
-                           o_time <- getModificationUTCTime object_filename
-                           let linkable = LM o_time this_mod [DotO object_filename]
-
-                           return (HomeModInfo{ hm_details  = details,
-                                                hm_iface    = iface,
-                                                hm_linkable = Just linkable })
  where dflags0     = ms_hspp_opts summary
-       this_mod    = ms_mod summary
-       src_flavour = ms_hsc_src summary
        location    = ms_location summary
        input_fn    = expectJust "compile:hs" (ml_hs_file location)
        input_fnpp  = ms_hspp_file summary
@@ -309,6 +225,13 @@ compileOne' m_tc_result mHscMessage
        needsLinker = needsTH || needsQQ
        isDynWay    = any (== WayDyn) (ways dflags0)
        isProfWay   = any (== WayProf) (ways dflags0)
+
+
+       src_flavour = ms_hsc_src summary
+       this_mod = ms_mod summary
+       mod_name = ms_mod_name summary
+       next_phase = hscPostBackendPhase dflags src_flavour hsc_lang
+       object_filename = ml_obj_file location
 
        -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
        -- the linker can correctly load the object files.
@@ -329,15 +252,12 @@ compileOne' m_tc_result mHscMessage
 
        -- Figure out what lang we're generating
        hsc_lang = hscTarget dflags
-       -- ... and what the next phase should be
-       next_phase = hscPostBackendPhase dflags src_flavour hsc_lang
 
        -- -fforce-recomp should also work with --make
        force_recomp = gopt Opt_ForceRecomp dflags
        source_modified
          | force_recomp = SourceModified
          | otherwise = source_modified0
-       object_filename = ml_obj_file location
 
        always_do_basic_recompilation_check = case hsc_lang of
                                              HscInterpreted -> True
@@ -1087,8 +1007,9 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
                                         ms_merge_imps = (False, []) }
 
   -- run the compiler!
-        result <- liftIO $ hscCompileOneShot hsc_env'
-                               mod_summary source_unchanged
+        let msg hsc_env _ what _ = oneShotMsg hsc_env what
+        (result, _) <- liftIO $ hscIncrementalCompile True Nothing (Just msg) hsc_env'
+                            mod_summary source_unchanged Nothing (1,1)
 
         return (HscOut src_flavour mod_name result,
                 panic "HscOut doesn't have an input filename")

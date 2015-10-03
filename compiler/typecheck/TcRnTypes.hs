@@ -28,6 +28,9 @@ module TcRnTypes(
         IfGblEnv(..), IfLclEnv(..),
         tcVisibleOrphanMods,
 
+        -- Frontend types (shouldn't really be here)
+        FrontendResult(..),
+
         -- Renamer types
         ErrCtxt, RecFieldEnv(..),
         ImportAvails(..), emptyImportAvails, plusImportAvails,
@@ -325,6 +328,10 @@ data DsMetaVal
 *                                                                      *
 ************************************************************************
 -}
+
+data FrontendResult
+        = FrontendTypecheck TcGblEnv
+        | FrontendMerge     ModIface
 
 -- | 'TcGblEnv' describes the top-level of the module at the
 -- point at which the typechecker is finished work.
