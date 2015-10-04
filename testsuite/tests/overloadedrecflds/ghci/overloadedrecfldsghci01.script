@@ -1,3 +1,4 @@
+
 :set -XDuplicateRecordFields
 data S = MkS { foo :: Int }
 data T a = MkT { foo :: Bool, bar :: a -> a }
