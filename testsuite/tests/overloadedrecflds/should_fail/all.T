@@ -11,3 +11,8 @@ test('overloadedrecfldsfail06',
 test('overloadedrecfldsfail07', normal, compile_fail, [''])
 test('overloadedrecfldsfail08', normal, compile_fail, [''])
 test('overloadedrecfldsfail09', normal, compile_fail, [''])
+test('overloadedrecfldsfail10',
+     extra_clean([ 'OverloadedRecFldsFail10_A.hi', 'OverloadedRecFldsFail10_A.o'
+                 , 'OverloadedRecFldsFail10_B.hi', 'OverloadedRecFldsFail10_B.o'
+                 , 'OverloadedRecFldsFail10_C.hi', 'OverloadedRecFldsFail10_C.o']),
+     multimod_compile_fail, ['overloadedrecfldsfail10', ''])

@@ -95,8 +95,12 @@ is possible to have
   AvailTC F [F, MkFInt, MkFBool]
     [FieldLabel "foo" True $sel:foo:MkFInt, FieldLabel "foo" False foo].
 
-AMG TODO: but if we do this with two identically-named things,
-something must go wrong on re-export?
+If the two data instances are defined in different modules, both
+without `-XDuplicateRecordFields`, it will be impossible to export
+them from the same module (even with `-XDuplicateRecordfields`
+enabled), because they would be represented identically.  The
+workaround here is to enable `-XDuplicateRecordFields` on the defining
+modules.
 -}
 
 -- | Compare lexicographically
