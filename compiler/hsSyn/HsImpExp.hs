@@ -197,19 +197,6 @@ ieName (IEThingWith (L _ n) _ _) = n
 ieName (IEThingAll  (L _ n))     = n
 ieName _ = panic "ieName failed pattern match!"
 
-{-
--- AMG TODO get rid of?
-ieNames :: IE a -> [a]
-ieNames (IEVar       (L _ n)      ) = [n]
-ieNames (IEThingAbs  (L _ n)      ) = [n]
-ieNames (IEThingAll  (L _ n)      ) = [n]
-ieNames (IEThingWith (L _ n) ns fs) = n : map unLoc ns ++ availFieldsNames fs
-ieNames (IEModuleContents _       ) = []
-ieNames (IEGroup          _ _     ) = []
-ieNames (IEDoc            _       ) = []
-ieNames (IEDocNamed       _       ) = []
--}
-
 pprImpExp :: (HasOccName name, OutputableBndr name) => name -> SDoc
 pprImpExp name = type_pref <+> pprPrefixOcc name
     where
