@@ -949,7 +949,7 @@ addUsedGRE warn_if_deprec gre
   = do { unless (isLocalGRE gre) $
          do { env <- getGblEnv
             ; traceRn (text "addUsedGRE 1" <+> ppr gre)
-            ; updMutVar (tcg_used_gres env) (\ env -> extendNameEnv_C plusGRE env (gre_name gre) gre) }
+            ; updMutVar (tcg_used_gres env) (gre :) }
 
        ; when warn_if_deprec $
          warnIfDeprecated gre }
@@ -960,7 +960,7 @@ addUsedGREs :: [GlobalRdrElt] -> RnM ()
 addUsedGREs gres
   = do { env <- getGblEnv
        ; traceRn (text "addUsedGREs 2" <+> ppr gres)
-       ; updMutVar (tcg_used_gres env) (\ env -> extendNameEnvList_C plusGRE env [ (gre_name gre, gre) | gre <- gres, not (isLocalGRE gre)]) }
+       ; updMutVar (tcg_used_gres env) (filter (not . isLocalGRE) gres ++) }
 
 warnIfDeprecated :: GlobalRdrElt -> RnM ()
 warnIfDeprecated gre@(GRE { gre_name = name, gre_imp = iss })

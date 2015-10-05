@@ -43,7 +43,7 @@ module RdrName (
         localRdrEnvElts, delLocalRdrEnvList,
 
         -- * Global mapping of 'RdrName' to 'GlobalRdrElt's
-        GlobalRdrEnv, emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv, plusGRE,
+        GlobalRdrEnv, emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv,
         lookupGlobalRdrEnv, extendGlobalRdrEnv, greOccName, shadowNames,
         pprGlobalRdrEnv, globalRdrEnvElts,
         lookupGRE_RdrName, lookupGRE_Name, lookupGRE_Field_Name, getGRE_NameQualifier_maybes,

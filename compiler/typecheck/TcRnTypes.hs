@@ -383,7 +383,7 @@ data TcGblEnv
           -- here about transative trusted packaage requirements.
 
         tcg_dus :: DefUses,   -- ^ What is defined in this module and what is used.
-        tcg_used_gres :: TcRef (NameEnv GlobalRdrElt),
+        tcg_used_gres :: TcRef [GlobalRdrElt],
           -- See Note [Tracking unused binding and imports]
 
         tcg_keep :: TcRef NameSet,
