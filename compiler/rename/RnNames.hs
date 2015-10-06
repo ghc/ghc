@@ -1502,7 +1502,7 @@ warnUnusedImportDecls gbl_env
              fld_env = mkFieldEnv rdr_env
 
        ; let usage :: [ImportDeclUsage]
-             usage = findImportUsage user_imports rdr_env uses sel_uses fld_env
+             usage = findImportUsage user_imports rdr_env uses sel_uses
 
        ; traceRn (vcat [ ptext (sLit "Uses:") <+> ppr uses
                        , ptext (sLit "Selector uses:") <+> ppr sel_uses
@@ -1541,16 +1541,15 @@ findImportUsage :: [LImportDecl Name]
                 -> GlobalRdrEnv
                 -> [RdrName]
                 -> Set.Set (FieldOcc Name)
-                -> NameEnv (FieldLabelString, Name)
                 -> [ImportDeclUsage]
 
-findImportUsage imports rdr_env rdrs sel_names fld_env
+findImportUsage imports rdr_env rdrs sel_names
   = map unused_decl imports
   where
     import_usage :: ImportMap
     import_usage
-      = foldr (extendImportMap fld_env rdr_env . Right)
-       (foldr (extendImportMap fld_env rdr_env . Left) Map.empty rdrs)
+      = foldr (extendImportMap_Field rdr_env)
+       (foldr (extendImportMap rdr_env) Map.empty rdrs)
        (Set.elems sel_names)
 
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
@@ -1591,27 +1590,29 @@ findImportUsage imports rdr_env rdrs sel_names fld_env
        -- imported Num(signum).  We don't want to complain that
        -- Num is not itself mentioned.  Hence the two cases in add_unused_with.
 
--- AMG TODO clean this up
-extendImportMap :: NameEnv (FieldLabelString, Name)
-                -> GlobalRdrEnv
-                -> Either RdrName (FieldOcc Name)
+extendImportMap :: GlobalRdrEnv
+                -> RdrName
                 -> ImportMap -> ImportMap
--- For a used RdrName, find all the import decls that brought
+extendImportMap rdr_env rdr =
+  extendImportMap_GRE (lookupGRE_RdrName rdr rdr_env)
+
+extendImportMap_Field :: GlobalRdrEnv
+                      -> FieldOcc Name
+                      -> ImportMap -> ImportMap
+extendImportMap_Field rdr_env (FieldOcc rdr sel) =
+    extendImportMap_GRE (pickGREs rdr (lookupGRE_Field_Name rdr_env sel lbl))
+  where
+    lbl = occNameFS (rdrNameOcc rdr)
+
+-- For a single used GRE, find all the import decls that brought
 -- it into scope; choose one of them (bestImport), and record
 -- the RdrName in that import decl's entry in the ImportMap
-extendImportMap fld_env rdr_env rdr_or_sel imp_map
-  | Left rdr <- rdr_or_sel
-  , [gre] <- lookupGRE_RdrName rdr rdr_env
+extendImportMap_GRE :: [GlobalRdrElt] -> ImportMap -> ImportMap
+extendImportMap_GRE gres imp_map
+  | [gre] <- gres
   , GRE { gre_lcl = lcl, gre_imp = imps } <- gre
   , not lcl
   = add_imp gre (bestImport imps) imp_map
-
-  | Right (FieldOcc rdr sel) <- rdr_or_sel
-  , [gre] <- pickGREs rdr (lookupGRE_Field_Name rdr_env sel (occNameFS (rdrNameOcc rdr)))
-  , GRE { gre_lcl = lcl, gre_imp = imps } <- gre
-  , not lcl
-  = add_imp gre (bestImport imps) imp_map
-
   | otherwise
   = imp_map
   where
