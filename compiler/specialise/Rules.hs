@@ -180,7 +180,6 @@ mkRule this_mod is_auto is_local name act fn bndrs args rhs
         -- A rule is an orphan only if none of the variables
         -- mentioned on its left-hand side are locally defined
     lhs_names = nameSetElems (extendNameSet (exprsOrphNames args) fn)
-        -- TODO: copied from ruleLhsOrphNames
 
         -- Since rules get eventually attached to one of the free names
         -- from the definition when compiling the ABI hash, we should make

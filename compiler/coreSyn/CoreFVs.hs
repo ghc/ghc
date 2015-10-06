@@ -24,7 +24,7 @@ module CoreFVs (
         idUnfoldingVars, idFreeVars, idRuleAndUnfoldingVars,
         idRuleVars, idRuleRhsVars, stableUnfoldingVars,
         ruleRhsFreeVars, ruleFreeVars, rulesFreeVars,
-        ruleLhsOrphNames, ruleLhsFreeIds, exprsOrphNames,
+        ruleLhsFreeIds, exprsOrphNames,
         vectsFreeVars,
 
         -- * Core syntax tree annotation with free variables
@@ -214,21 +214,6 @@ tickish_fvs _ = noVars
 *                                                                      *
 ************************************************************************
 -}
-
--- | ruleLhsOrphNames is used when deciding whether
--- a rule is an orphan.  In particular, suppose that T is defined in this
--- module; we want to avoid declaring that a rule like:
---
--- > fromIntegral T = fromIntegral_T
---
--- is an orphan. Of course it isn't, and declaring it an orphan would
--- make the whole module an orphan module, which is bad.
-ruleLhsOrphNames :: CoreRule -> NameSet
-ruleLhsOrphNames (BuiltinRule { ru_fn = fn }) = unitNameSet fn
-ruleLhsOrphNames (Rule { ru_fn = fn, ru_args = tpl_args })
-  = extendNameSet (exprsOrphNames tpl_args) fn
-                -- No need to delete bndrs, because
-                -- exprsOrphNames finds only External names
 
 -- | Finds the free /external/ names of an expression, notably
 -- including the names of type constructors (which of course do not show
