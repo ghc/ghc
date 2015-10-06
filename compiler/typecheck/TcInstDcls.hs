@@ -567,7 +567,7 @@ tcATDefault inst_subst defined_ats (ATI fam_tc defs)
    -- Example:   class C a where { type F a b :: *; type F a b = () }
    --            instance C [x]
    -- Then we want to generate the decl:   type F [x] b = ()
-  | Just rhs_ty <- defs
+  | Just (rhs_ty, _loc) <- defs
   = do { let (subst', pat_tys') = mapAccumL subst_tv inst_subst
                                             (tyConTyVars fam_tc)
              rhs'     = substTy subst' rhs_ty

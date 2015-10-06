@@ -29,6 +29,7 @@ import Name
 import BasicTypes
 import Unique
 import Util
+import SrcLoc
 import Outputable
 import FastString
 import BooleanFormula (BooleanFormula)
@@ -100,7 +101,8 @@ data DefMeth = NoDefMeth                -- No default method
 
 data ClassATItem
   = ATI TyCon         -- See Note [Associated type tyvar names]
-        (Maybe Type)  -- Default associated type (if any) from this template
+        (Maybe (Type, SrcSpan))
+                      -- Default associated type (if any) from this template
                       -- Note [Associated type defaults]
 
 type ClassMinimalDef = BooleanFormula Name -- Required methods
@@ -147,6 +149,8 @@ Note that
    the default Type rhs
 
 The @mkClass@ function fills in the indirect superclasses.
+
+The SrcSpan is for the entire original declaration.
 -}
 
 mkClass :: [TyVar]

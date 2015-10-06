@@ -930,8 +930,8 @@ checkBootTyCon tc1 tc2
                  (text "The associated type defaults differ")
 
        -- Ignore the location of the defaults
-       eqATDef Nothing    Nothing    = True
-       eqATDef (Just ty1) (Just ty2) = eqTypeX env ty1 ty2
+       eqATDef Nothing             Nothing             = True
+       eqATDef (Just (ty1, _loc1)) (Just (ty2, _loc2)) = eqTypeX env ty1 ty2
        eqATDef _ _ = False
 
        eqFD (as1,bs1) (as2,bs2) =

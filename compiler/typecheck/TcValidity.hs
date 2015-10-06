@@ -11,8 +11,8 @@ module TcValidity (
   checkValidTheta, checkValidFamPats,
   checkValidInstance, validDerivPred,
   checkInstTermination, checkValidTyFamInst, checkTyFamFreeness,
-  checkConsistentFamInst,
-  arityErr, badATErr
+  checkValidTyFamEqn, checkConsistentFamInst,
+  arityErr, badATErr, ClsInfo
   ) where
 
 #include "HsVersions.h"
@@ -1071,6 +1071,11 @@ But if the 'b' didn't scope, we would make F's instance too
 poly-kinded.
 -}
 
+-- | Extra information needed when type-checking associated types. The 'Class' is
+-- the enclosing class, and the @VarEnv Type@ maps class variables to their
+-- instance types.
+type ClsInfo       = (Class, VarEnv Type)
+
 checkConsistentFamInst
                :: Maybe ( Class
                         , VarEnv Type )  -- ^ Class of associated type
@@ -1148,6 +1153,19 @@ checkValidTyFamInst :: Maybe ( Class, VarEnv Type )
 checkValidTyFamInst mb_clsinfo fam_tc
                     (CoAxBranch { cab_tvs = tvs, cab_lhs = typats
                                 , cab_rhs = rhs, cab_loc = loc })
+  = checkValidTyFamEqn mb_clsinfo fam_tc tvs typats rhs loc
+
+-- | Do validity checks on a type family equation, including consistency
+-- with any enclosing class instance head, termination, and lack of
+-- polytypes.
+checkValidTyFamEqn :: Maybe ClsInfo
+                   -> TyCon   -- ^ of the type family
+                   -> [TyVar] -- ^ bound tyvars in the equation
+                   -> [Type]  -- ^ type patterns
+                   -> Type    -- ^ rhs
+                   -> SrcSpan
+                   -> TcM ()
+checkValidTyFamEqn mb_clsinfo fam_tc tvs typats rhs loc
   = setSrcSpan loc $
     do { checkValidFamPats fam_tc tvs typats
 

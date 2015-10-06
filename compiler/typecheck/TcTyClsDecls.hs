@@ -852,9 +852,9 @@ tcClassATs class_name parent ats at_defs
                   ; return (ATI fam_tc atd) }
 
 -------------------------
-tcDefaultAssocDecl :: TyCon                  -- ^ Family TyCon
-                   -> [LTyFamDefltEqn Name]  -- ^ Defaults
-                   -> TcM (Maybe Type)       -- ^ Type checked RHS
+tcDefaultAssocDecl :: TyCon                          -- ^ Family TyCon
+                   -> [LTyFamDefltEqn Name]          -- ^ Defaults
+                   -> TcM (Maybe (Type, SrcSpan))    -- ^ Type checked RHS
 tcDefaultAssocDecl _ []
   = return Nothing  -- No default declaration
 
@@ -879,7 +879,7 @@ tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = L _ tc_name
        ; let fam_tc_tvs = tyConTyVars fam_tc
              subst = zipTopTvSubst tvs (mkTyVarTys fam_tc_tvs)
        ; return ( ASSERT( equalLength fam_tc_tvs tvs )
-                  Just (substTy subst rhs_ty) ) }
+                  Just (substTy subst rhs_ty, loc) ) }
     -- We check for well-formedness and validity later, in checkValidClass
 
 -------------------------
@@ -1667,8 +1667,9 @@ checkValidClass cls
         ; mapM_ check_at_defs at_stuff  }
   where
     (tyvars, fundeps, theta, _, at_stuff, op_stuff) = classExtraBigSig cls
-    cls_arity = count isTypeVar tyvars    -- Ignore kind variables
+    cls_arity  = count isTypeVar tyvars    -- Ignore kind variables
     cls_tv_set = mkVarSet tyvars
+    mini_env   = zipVarEnv tyvars (mkTyVarTys tyvars)
 
     check_op constrained_class_methods (sel_id, dm)
       = addErrCtxt (classOpCtxt sel_id tau) $ do
@@ -1709,9 +1710,14 @@ checkValidClass cls
                 -- in the context of a for-all must mention at least one quantified
                 -- type variable.  What a mess!
 
-    check_at_defs (ATI fam_tc _)
-      = check_mentions (mkVarSet (tyConTyVars fam_tc))
-                       (ptext (sLit "associated type") <+> quotes (ppr fam_tc))
+    check_at_defs (ATI fam_tc m_dflt_rhs)
+      = do { check_mentions (mkVarSet fam_tvs) $
+               ptext (sLit "associated type") <+> quotes (ppr fam_tc)
+           ; whenIsJust m_dflt_rhs $ \ (rhs, loc) ->
+             checkValidTyFamEqn (Just (cls, mini_env)) fam_tc
+                                fam_tvs (mkTyVarTys fam_tvs) rhs loc }
+      where
+        fam_tvs = tyConTyVars fam_tc
 
     check_mentions :: TyVarSet -> SDoc -> TcM ()
        -- Check that the thing (method or associated type) mentions at least

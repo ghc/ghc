@@ -413,7 +413,7 @@ tc_iface_decl _parent ignore_prags
                       Just def -> forkM (mk_at_doc tc)                 $
                                   extendIfaceTyVarEnv (tyConTyVars tc) $
                                   do { tc_def <- tcIfaceType def
-                                     ; return (Just tc_def) }
+                                     ; return (Just (tc_def, noSrcSpan)) }
                   -- Must be done lazily in case the RHS of the defaults mention
                   -- the type constructor being defined here
                   -- e.g.   type AT a; type AT b = AT [b]   Trac #8002
@@ -533,7 +533,7 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
         ; con <- buildDataCon (pprPanic "tcIfaceDataCons: FamInstEnvs" (ppr name))
                        name is_infix
                        stricts     -- Pass the HsImplBangs (i.e. final decisions
-                                   -- to buildDataCon; it'll use these to guide 
+                                   -- to buildDataCon; it'll use these to guide
                                    -- the construction of a worker
                        lbl_names
                        tc_tyvars ex_tyvars

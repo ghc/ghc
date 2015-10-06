@@ -133,4 +133,5 @@ test('T9662', normal, compile_fail, [''])
 test('T7862', normal, compile_fail, [''])
 test('T9896', normal, compile_fail, [''])
 test('T6088', normal, compile_fail, [''])
-
+test('T10817', normal, compile_fail, [''])
+test('T10899', normal, compile_fail, [''])
