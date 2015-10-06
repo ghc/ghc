@@ -45,7 +45,7 @@ import FastStringEnv
 import ListSetOps
 
 import Control.Monad
-import Data.Either      ( partitionEithers )
+import Data.Either      ( partitionEithers, isRight, rights )
 import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Ord         ( comparing )
@@ -871,7 +871,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                                        -- See the AvailTC Invariant in Avail.hs
                             (n1:ns1) | n1 == name -> ns1
                                      | otherwise  -> ns
-           case lookupChildrenImport subnames subflds rdr_ns of
+           case lookupChildren (map Left subnames ++ map Right subflds) rdr_ns of
              Nothing                      -> failLookupWith BadImport
              Just (childnames, childflds) ->
                case mb_parent of
@@ -1020,8 +1020,8 @@ mkChildEnv gres = foldr add emptyNameEnv gres
 findChildren :: NameEnv [a] -> Name -> [a]
 findChildren env n = lookupNameEnv env n `orElse` []
 
-lookupChildren :: (a -> FastString) -> [a] -> [Located RdrName]
-               -> [Maybe (Located [a])]
+lookupChildren :: [Either Name FieldLabel] -> [Located RdrName]
+               -> Maybe ([Located Name], [Located FieldLabel])
 -- (lookupChildren all_kids rdr_items) maps each rdr_item to its
 -- corresponding Name all_kids, if the former exists
 -- The matching is done by FastString, not OccName, so that
@@ -1029,50 +1029,30 @@ lookupChildren :: (a -> FastString) -> [a] -> [Located RdrName]
 -- will correctly find AssocTy among the all_kids of Cls, even though
 -- the RdrName for AssocTy may have a (bogus) DataName namespace
 -- (Really the rdr_items should be FastStrings in the first place.)
-lookupChildren f all_kids rdr_items
-  -- = map (lookupFsEnv kid_env . occNameFS . rdrNameOcc) rdr_items
-  = map doOne rdr_items
+lookupChildren all_kids rdr_items
+  = do xs <- mapM doOne rdr_items
+       return (fmap concat (partitionEithers xs))
   where
     doOne (L l r) = case (lookupFsEnv kid_env . occNameFS . rdrNameOcc) r of
-      Just n -> Just (L l n)
-      Nothing -> Nothing
+      Just [Left n]            -> Just (Left (L l n))
+      Just rs | all isRight rs -> Just (Right (map (L l) (rights rs)))
+      _                        -> Nothing
 
     -- See Note [Children for duplicate record fields]
     kid_env = extendFsEnvList_C (++) emptyFsEnv
-                      [(f x, [x]) | x <- all_kids]
-
-
-lookupChildrenImport :: [Name] -> [FieldLabel] -> [Located RdrName] -> Maybe ([Located Name], [Located FieldLabel])
-lookupChildrenImport subnames subflds rdr_ns = do
-    xs <- sequence $ lookupChildren (either (occNameFS . nameOccName) flLabel) subs rdr_ns
-    return $ partitionEithers (concatMap (\ (L l e) -> map (either (Left . L l) (Right . L l)) e) xs)
-  where
-    subs = map Left subnames ++ map Right subflds
-
-
-lookupChildrenExport :: [GlobalRdrElt] -> [Located RdrName] -> Maybe ([GlobalRdrElt], [Located Name], [Located FieldLabel])
-lookupChildrenExport gres rdrs = do
-    lgress <- sequence $ lookupChildren (occNameFS . greOccName) gres rdrs
-    let gres = concat $ map unLoc lgress
-        (non_flds, flds) = partitionEithers [ classifyGRE l gre
-                                            | L l gres <- lgress
-                                            , gre <- gres
-                                            ]
-    return (gres, non_flds, flds)
-  where
-    classifyGRE l gre = case gre_par gre of
-      FldParent _ Nothing    -> Right (L l (FieldLabel (occNameFS (nameOccName (gre_name gre))) False (gre_name gre)))
-      FldParent _ (Just lbl) -> Right (L l (FieldLabel lbl True (gre_name gre)))
-      _                      -> Left  (L l (gre_name gre))
+                      [(either (occNameFS . nameOccName) flLabel x, [x]) | x <- all_kids]
 
 
 classifyGREs :: [GlobalRdrElt] -> ([Name], [FieldLabel])
 classifyGREs = partitionEithers . map classifyGRE
+
+classifyGRE :: GlobalRdrElt -> Either Name FieldLabel
+classifyGRE gre = case gre_par gre of
+  FldParent _ Nothing -> Right (FieldLabel (occNameFS (nameOccName n)) False n)
+  FldParent _ (Just lbl) -> Right (FieldLabel lbl True n)
+  _                      -> Left  n
   where
-    classifyGRE gre = case gre_par gre of
-      FldParent _ Nothing    -> Right (FieldLabel (occNameFS (nameOccName (gre_name gre))) False (gre_name gre))
-      FldParent _ (Just lbl) -> Right (FieldLabel lbl True (gre_name gre))
-      _                      -> Left  (gre_name gre)
+    n = gre_name gre
 
 
 -- | Combines 'AvailInfo's from the same family
@@ -1309,14 +1289,15 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     lookup_ie ie@(IEThingWith (L l rdr) sub_rdrs sub_flds) = ASSERT2(null sub_flds, ppr sub_flds)
           do name <- lookupGlobalOccRn rdr
+             let gres = findChildren kids_env name
              if isUnboundName name
                 then return ( IEThingWith (L l name) [] []
                             , AvailTC name [name] [] )
-                else case lookupChildrenExport (findChildren kids_env name) sub_rdrs of
+                else case lookupChildren (map classifyGRE gres) sub_rdrs of
                        Nothing -> do addErr (exportItemErr ie)
                                      return ( IEThingWith (L l name) [] []
                                             , AvailTC name [name] [] )
-                       Just (gres, non_flds, flds) ->
+                       Just (non_flds, flds) ->
                          do addUsedKids rdr gres
                             return ( IEThingWith (L l name) non_flds flds
                                    , AvailTC name (name:map unLoc non_flds) (map unLoc flds) )
