@@ -329,6 +329,14 @@ data DsMetaVal
 ************************************************************************
 -}
 
+-- | 'FrontendResult' describes the result of running the
+-- frontend of a Haskell module.  Usually, you'll get
+-- a 'FrontendTypecheck', since running the frontend involves
+-- typechecking a program, but for an hs-boot merge you'll
+-- just get a ModIface, since no actual typechecking occurred.
+--
+-- This data type really should be in HscTypes, but it needs
+-- to have a TcGblEnv which is only defined here.
 data FrontendResult
         = FrontendTypecheck TcGblEnv
         | FrontendMerge     ModIface
