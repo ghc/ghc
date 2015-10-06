@@ -1522,6 +1522,30 @@ as we would normally do.
 That's why the whole transformation is part of the same process that
 floats let-bindings and constructor arguments out of RHSs.  In particular,
 it is guarded by the doFloatFromRhs call in simplLazyBind.
+
+Note [Which type variables to abstract over]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Abstract only over the type variables free in the rhs wrt which the
+new binding is abstracted.  Note that
+
+  * The naive approach of abstracting wrt the
+    tyvars free in the Id's /type/ fails. Consider:
+        /\ a b -> let t :: (a,b) = (e1, e2)
+                      x :: a     = fst t
+                  in ...
+    Here, b isn't free in x's type, but we must nevertheless
+    abstract wrt b as well, because t's type mentions b.
+    Since t is floated too, we'd end up with the bogus:
+         poly_t = /\ a b -> (e1, e2)
+         poly_x = /\ a   -> fst (poly_t a *b*)
+
+  * We must do closeOverKinds.  Example (Trac #10934):
+       f = /\k (f:k->*) (a:k). let t = AccFailure @ (f a) in ...
+    Here we want to float 't', but we must remember to abstract over
+    'k' as well, even though it is not explicitly mentioned in the RHS,
+    otherwise we get
+       t = /\ (f:k->*) (a:k). AccFailure @ (f a)
+    which is obviously bogus.
 -}
 
 abstractFloats :: [OutTyVar] -> SimplEnv -> OutExpr -> SimplM ([OutBind], OutExpr)
@@ -1542,23 +1566,12 @@ abstractFloats main_tvs body_env body
            ; return (subst', (NonRec poly_id poly_rhs)) }
       where
         rhs' = CoreSubst.substExpr (text "abstract_floats2") subst rhs
-        tvs_here = varSetElemsKvsFirst (main_tv_set `intersectVarSet` exprSomeFreeVars isTyVar rhs')
 
-                -- Abstract only over the type variables free in the rhs
-                -- wrt which the new binding is abstracted.  But the naive
-                -- approach of abstract wrt the tyvars free in the Id's type
-                -- fails. Consider:
-                --      /\ a b -> let t :: (a,b) = (e1, e2)
-                --                    x :: a     = fst t
-                --                in ...
-                -- Here, b isn't free in x's type, but we must nevertheless
-                -- abstract wrt b as well, because t's type mentions b.
-                -- Since t is floated too, we'd end up with the bogus:
-                --      poly_t = /\ a b -> (e1, e2)
-                --      poly_x = /\ a   -> fst (poly_t a *b*)
-                -- So for now we adopt the even more naive approach of
-                -- abstracting wrt *all* the tyvars.  We'll see if that
-                -- gives rise to problems.   SLPJ June 98
+        -- tvs_here: see Note [Which type variables to abstract over]
+        tvs_here = varSetElemsKvsFirst         $
+                   intersectVarSet main_tv_set $
+                   closeOverKinds              $
+                   exprSomeFreeVars isTyVar rhs'
 
     abstract subst (Rec prs)
        = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly tvs_here) ids
