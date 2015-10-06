@@ -1,5 +1,3 @@
-setTestOpts(only_compiler_types(['ghc']))
-
 test('PolyKinds09', normal, compile_and_run, [''])
 test('PolyKinds10', normal, compile_and_run, [''])
 
@@ -114,3 +112,4 @@ test('T9838', normal, multimod_compile, ['T9838.hs','-v0'])
 test('T9574', normal, compile_fail, [''])
 test('T9833', normal, compile, [''])
 test('T7908', normal, compile, [''])
+test('T10934', normal, compile, [''])
