@@ -407,6 +407,9 @@ syntaxNameCtxt name orig ty tidy_env
 -}
 
 getOverlapFlag :: Maybe OverlapMode -> TcM OverlapFlag
+-- Construct the OverlapFlag from the global module flags,
+-- but if the overlap_mode argument is (Just m),
+--     set the OverlapMode to 'm'
 getOverlapFlag overlap_mode
   = do  { dflags <- getDynFlags
         ; let overlap_ok    = xopt Opt_OverlappingInstances dflags
