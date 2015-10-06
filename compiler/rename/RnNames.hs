@@ -862,7 +862,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
             -> do nameAvail <- lookup_name tc
                   return ([mkIEThingAbs l nameAvail], [])
 
-        IEThingWith (L l rdr_tc) rdr_ns rdr_fs -> do
+        IEThingWith (L l rdr_tc) rdr_ns rdr_fs -> ASSERT2(null rdr_fs, ppr rdr_fs) do
            (name, AvailTC _ ns subflds, mb_parent) <- lookup_name rdr_tc
 
            -- Look up the children in the sub-names of the parent
@@ -871,28 +871,22 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                                        -- See the AvailTC Invariant in Avail.hs
                             (n1:ns1) | n1 == name -> ns1
                                      | otherwise  -> ns
-               subs = map Left subnames ++ map Right subflds
-               cs   = rdr_ns ++ availFieldsRdrNames rdr_fs
-               mb_children = lookupChildren (either (occNameFS . nameOccName) flLabel) subs cs
-
-           (childnames, childflds) <- if any isNothing mb_children
-              then failLookupWith BadImport
-                   -- AMG TODO this is hideous:
-              else return (partitionEithers (concatMap (\ (L l e) -> map (either (Left . L l) (Right . L l)) e) (catMaybes mb_children)))
-
-           case mb_parent of
-             -- non-associated ty/cls
-             Nothing
-               -> return ([(IEThingWith (L l name) childnames childflds,
-                           AvailTC name (name:map unLoc childnames) (map unLoc childflds))],
-                          [])
-             -- associated ty
-             Just parent
-               -> return ([(IEThingWith (L l name) childnames childflds,
-                            AvailTC name (map unLoc childnames) (map unLoc childflds)),
-                           (IEThingWith (L l name) childnames childflds,
-                            AvailTC parent [name] [])],
-                          [])
+           case lookupChildrenImport subnames subflds rdr_ns of
+             Nothing                      -> failLookupWith BadImport
+             Just (childnames, childflds) ->
+               case mb_parent of
+                 -- non-associated ty/cls
+                 Nothing
+                   -> return ([(IEThingWith (L l name) childnames childflds,
+                               AvailTC name (name:map unLoc childnames) (map unLoc childflds))],
+                              [])
+                 -- associated ty
+                 Just parent
+                   -> return ([(IEThingWith (L l name) childnames childflds,
+                                AvailTC name (map unLoc childnames) (map unLoc childflds)),
+                               (IEThingWith (L l name) childnames childflds,
+                                AvailTC parent [name] [])],
+                              [])
 
         _other -> failLookupWith IllegalImport
         -- could be IEModuleContents, IEGroup, IEDoc, IEDocNamed
@@ -1000,8 +994,8 @@ gresFromIE decl_spec (L loc ie, avail)
 
 
 {-
-Note [ChildNames for overloaded record fields]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Children for duplicate record fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the module
 
     {-# LANGUAGE DuplicateRecordFields #-}
@@ -1011,12 +1005,9 @@ Consider the module
       data instance F Bool = MkFBool { foo :: Bool }
 
 The `foo` in the export list refers to *both* selectors! For this
-reason, an OverloadedFldChild contains a list of selector names, not
-just a single name.
-
-AMG TODO: figure out how this works and document it or simplify it!
+reason, lookupChildren builds an environment that maps the FastString
+to a list of items, rather than a single item.
 -}
-
 
 mkChildEnv :: [GlobalRdrElt] -> NameEnv [GlobalRdrElt]
 mkChildEnv gres = foldr add emptyNameEnv gres
@@ -1046,9 +1037,42 @@ lookupChildren f all_kids rdr_items
       Just n -> Just (L l n)
       Nothing -> Nothing
 
-    -- AMG TODO explain why we can have duplicates here
+    -- See Note [Children for duplicate record fields]
     kid_env = extendFsEnvList_C (++) emptyFsEnv
                       [(f x, [x]) | x <- all_kids]
+
+
+lookupChildrenImport :: [Name] -> [FieldLabel] -> [Located RdrName] -> Maybe ([Located Name], [Located FieldLabel])
+lookupChildrenImport subnames subflds rdr_ns = do
+    xs <- sequence $ lookupChildren (either (occNameFS . nameOccName) flLabel) subs rdr_ns
+    return $ partitionEithers (concatMap (\ (L l e) -> map (either (Left . L l) (Right . L l)) e) xs)
+  where
+    subs = map Left subnames ++ map Right subflds
+
+
+lookupChildrenExport :: [GlobalRdrElt] -> [Located RdrName] -> Maybe ([GlobalRdrElt], [Located Name], [Located FieldLabel])
+lookupChildrenExport gres rdrs = do
+    lgress <- sequence $ lookupChildren (occNameFS . greOccName) gres rdrs
+    let gres = concat $ map unLoc lgress
+        (non_flds, flds) = partitionEithers [ classifyGRE l gre
+                                            | L l gres <- lgress
+                                            , gre <- gres
+                                            ]
+    return (gres, non_flds, flds)
+  where
+    classifyGRE l gre = case gre_par gre of
+      FldParent _ Nothing    -> Right (L l (FieldLabel (occNameFS (nameOccName (gre_name gre))) False (gre_name gre)))
+      FldParent _ (Just lbl) -> Right (L l (FieldLabel lbl True (gre_name gre)))
+      _                      -> Left  (L l (gre_name gre))
+
+
+classifyGREs :: [GlobalRdrElt] -> ([Name], [FieldLabel])
+classifyGREs = partitionEithers . map classifyGRE
+  where
+    classifyGRE gre = case gre_par gre of
+      FldParent _ Nothing    -> Right (FieldLabel (occNameFS (nameOccName (gre_name gre))) False (gre_name gre))
+      FldParent _ (Just lbl) -> Right (FieldLabel lbl True (gre_name gre))
+      _                      -> Left  (gre_name gre)
 
 
 -- | Combines 'AvailInfo's from the same family
@@ -1271,6 +1295,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     lookup_ie ie@(IEThingAll (L l rdr))
         = do name <- lookupGlobalOccRn rdr
              let gres = findChildren kids_env name
+                 (non_flds, flds) = classifyGREs gres
              addUsedKids rdr gres
              warnDodgyExports <- woptM Opt_WarnDodgyExports
              when (null gres) $
@@ -1279,48 +1304,22 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                   else -- This occurs when you export T(..), but
                        -- only import T abstractly, or T is a synonym.
                        addErr (exportItemErr ie)
-
-             -- AMG TODO tidy up the following
-             let non_flds = [ gre_name gre | gre <- gres, not (isRecFldGRE gre) ]
-                 flds     = [ FieldLabel lbl is_overloaded (gre_name gre) | gre <- gres
-                            , FldParent _ mb_lbl <- [gre_par gre]
-                            , let (lbl, is_overloaded) = case mb_lbl of
-                                                           Nothing -> (occNameFS (nameOccName (gre_name gre)), False)
-                                                           Just x  -> (x, True)
-                            ]
-
              return ( IEThingAll (L l name)
                     , AvailTC name (name:non_flds) flds )
 
-    lookup_ie ie@(IEThingWith (L l rdr) sub_rdrs sub_flds)
-        = do name <- lookupGlobalOccRn rdr
+    lookup_ie ie@(IEThingWith (L l rdr) sub_rdrs sub_flds) = ASSERT2(null sub_flds, ppr sub_flds)
+          do name <- lookupGlobalOccRn rdr
              if isUnboundName name
                 then return ( IEThingWith (L l name) [] []
                             , AvailTC name [name] [] )
-                else do
-             let cs      = sub_rdrs ++ availFieldsRdrNames sub_flds
-                 mb_gres = lookupChildren (occNameFS . greOccName) (findChildren kids_env name) cs
-             if any isNothing mb_gres
-                then do addErr (exportItemErr ie)
-                        return ( IEThingWith (L l name) [] []
-                               , AvailTC name [name] [] )
-                else do let lgress = catMaybes mb_gres
-                            gres   = concat $ map unLoc lgress
-                            non_flds = [ L l (gre_name gre) | L l gres <- lgress
-                                       , gre <- gres
-                                       , not (isRecFldGRE gre)
-                                       ]
-                            flds     = [ L l (FieldLabel lbl is_overloaded (gre_name gre))
-                                       | L l gres <- lgress
-                                       , gre <- gres
-                                       , FldParent _ mb_lbl <- [gre_par gre]
-                                       , let (lbl, is_overloaded) = case mb_lbl of
-                                                                      Nothing -> (occNameFS (nameOccName (gre_name gre)), False)
-                                                                      Just x  -> (x, True)
-                                       ]
-                        addUsedGREs gres
-                        return ( IEThingWith (L l name) non_flds flds
-                               , AvailTC name (name:map unLoc non_flds) (map unLoc flds) )
+                else case lookupChildrenExport (findChildren kids_env name) sub_rdrs of
+                       Nothing -> do addErr (exportItemErr ie)
+                                     return ( IEThingWith (L l name) [] []
+                                            , AvailTC name [name] [] )
+                       Just (gres, non_flds, flds) ->
+                         do addUsedKids rdr gres
+                            return ( IEThingWith (L l name) non_flds flds
+                                   , AvailTC name (name:map unLoc non_flds) (map unLoc flds) )
 
     lookup_ie _ = panic "lookup_ie"    -- Other cases covered earlier
 
@@ -1348,12 +1347,6 @@ isDoc (IEDocNamed _) = True
 isDoc (IEGroup _ _)  = True
 isDoc _ = False
 
--- AMG TODO really?
-availFieldsRdrNames :: [Located (FieldLbl RdrName)] -> [Located RdrName]
-availFieldsRdrNames = map (fmap availFieldRdrName)
-  where
-    availFieldRdrName fl | flIsOverloaded fl = mkVarUnqual (flLabel fl)
-                         | otherwise         = flSelector fl
 
 -------------------------------
 isModuleExported :: Bool -> ModuleName -> GlobalRdrElt -> Bool
