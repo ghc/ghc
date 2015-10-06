@@ -437,26 +437,20 @@ instance Outputable Parent where
 
 plusParent :: Parent -> Parent -> Parent
 -- See Note [Combining parents]
-plusParent (ParentIs n)    p2 = hasParentIs n p2
-plusParent (FldParent n f) p2 = hasFldParent n f p2
-plusParent p1 (ParentIs n)    = hasParentIs n p1
-plusParent p1 (FldParent n f) = hasFldParent n f p1
-plusParent NoParent NoParent  = NoParent
+plusParent p1@(ParentIs _)    p2 = hasParent p1 p2
+plusParent p1@(FldParent _ _) p2 = hasParent p1 p2
+plusParent p1 p2@(ParentIs _)    = hasParent p2 p1
+plusParent p1 p2@(FldParent _ _) = hasParent p2 p1
+plusParent NoParent NoParent     = NoParent
 
-hasParentIs :: Name -> Parent -> Parent
+hasParent :: Parent -> Parent -> Parent
 #ifdef DEBUG
-hasParentIs n (ParentIs n')
-  | n /= n' = pprPanic "hasParentIs" (ppr n <+> ppr n')  -- Parents should agree
+hasParent p NoParent = p
+hasParent p p'
+  | p /= p' = pprPanic "hasParent" (ppr p <+> ppr p')  -- Parents should agree
 #endif
-hasParentIs n _  = ParentIs n
+hasParent p _  = p
 
-hasFldParent :: Name -> Maybe FieldLabelString -> Parent -> Parent
-#ifdef DEBUG
-hasFldParent n f (FldParent n' f')
-  | n /= n' || f /= f'    -- Parents should agree
-    = pprPanic "hasFldParent" (ppr n <+> ppr f <+> ppr n' <+> ppr f')
-#endif
-hasFldParent n f _  = FldParent n f
 
 {- Note [GlobalRdrElt provenance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
