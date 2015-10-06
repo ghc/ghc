@@ -578,6 +578,14 @@ mkFieldOcc :: RdrName -> FieldOcc RdrName
 mkFieldOcc rdr = FieldOcc rdr PlaceHolder
 
 
+-- | Represents an *occurrence* of a field that is potentially
+-- ambiguous after the renamer, with the ambiguity resolved by the
+-- typechecker.  We always store the 'RdrName' that the user
+-- originally wrote, and store the selector function after the renamer
+-- (for unambiguous occurrences) or the typechecker (for ambiguous
+-- occurrences).
+--
+-- See Note [HsRecField and HsRecUpdField] in HsPat
 data AmbiguousFieldOcc name
   = Unambiguous RdrName (PostRn name name)
   | Ambiguous   RdrName (PostTc name name)

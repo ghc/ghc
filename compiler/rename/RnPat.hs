@@ -648,7 +648,6 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
     (_, dup_flds) = removeDups compare (getFieldLbls flds)
 
 
--- TODO unduplicate?
 rnHsRecUpdFields
     :: [LHsRecUpdField RdrName]
     -> RnM ([LHsRecUpdField Name], FreeVars)

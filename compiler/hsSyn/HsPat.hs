@@ -286,18 +286,24 @@ data HsRecField' id arg = HsRecField {
 --    T { A.x } means T { A.x = x }
 
 
--- TODO update note
--- Note [HsRecUpdField selector]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Note [HsRecField and HsRecUpdField]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
--- A HsRecUpdField always contains a label (in hsRecUpdFieldLbl)
--- giving the thing the user wrote, but thanks to
--- DuplicateRecordFields this may not unambiguously correspond to
--- a Name.  The hsRecUpdFieldSel is filled in by the renamer
--- (RnPat.rnHsRecUpdFields) to contain a list of the candidate
--- selector function names.  The typechecker (tcExpr) then
--- disambiguates the record update, so after the typechecker the list
--- will always be a singleton.
+-- A HsRecField (used for record construction and pattern matching)
+-- contains an unambiguous occurrence of a field (i.e. a FieldOcc).
+-- We can't just store the Name, because thanks to
+-- DuplicateRecordFields this may not correspond to the label the user
+-- wrote.
+--
+-- A HsRecUpdField (used for record update) contains a potentially
+-- ambiguous occurrence of a field (an AmbiguousFieldOcc).  The
+-- renamer will fill in the selector function if it can, but if the
+-- selector is ambiguous the renamer will defer to the typechecker.
+-- After the typechecker, a unique selector will have been determined.
+--
+-- The renamer produces an Unambiguous result if it can, rather than
+-- just doing the lookup in the typechecker, so that completely
+-- unambiguous updates can be represented by 'DsMeta.repUpdFields'.
 --
 -- For example, suppose we have:
 --
@@ -306,17 +312,18 @@ data HsRecField' id arg = HsRecField {
 --
 --     f z = (z { x = 3 }) :: S
 --
--- After the renamer, the HsRecUpdField corresponding to the record
--- update will have
+-- The parsed HsRecUpdField corresponding to the record update will have:
 --
---     hsRecUpdFieldLbl = "x"
---     hsRecUpdFieldSel = [$sel:x:MkS, $sel:x:MkT]
+--     hsRecFieldLbl = Unambiguous "x" PlaceHolder :: AmbiguousFieldOcc RdrName
 --
--- and the typechecker will determine that $sel:x:MkS is meant.
+-- After the renamer, this will become:
 --
--- We fill in hsRecUpdFieldSel in the renamer, rather than just doing
--- the lookup in the typechecker, so that completely unambiguous
--- updates can be represented by 'DsMeta.repUpdFields'.
+--     hsRecFieldLbl = Ambiguous   "x" PlaceHolder :: AmbiguousFieldOcc Name
+--
+-- (note that the Unambiguous constructor is not type-correct here).
+-- The typechecker will determine the particular selector:
+--
+--     hsRecFieldLbl = Unambiguous "x" $sel:x:MkS  :: AmbiguousFieldOcc Id
 
 hsRecFields :: HsRecFields id arg -> [PostRn id id]
 hsRecFields rbinds = map (unLoc . hsRecFieldSel . unLoc) (rec_flds rbinds)
