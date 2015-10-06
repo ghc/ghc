@@ -1398,33 +1398,37 @@ signature to be omitted.
 disambiguateRecordBinds :: LHsExpr Name -> [LHsRecUpdField Name] -> Type
                                  -> TcM [LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name)]
 disambiguateRecordBinds record_expr rbnds res_ty
-  | Just rbnds' <- unambiguous = mapM look rbnds' -- Always the case if DuplicateRecordFields is off
-  | otherwise   = do
+  = case mapM isUnambiguous rbnds of
+                     -- Always the case if DuplicateRecordFields is off
+     Just rbnds' -> lookupSelectors rbnds'
+     Nothing     -> do
       { fam_inst_envs      <- tcGetFamInstEnvs
       ; rbnds_with_parents <- fmap (zip rbnds) $ mapM getParents rbnds
-      ; case possibleParents rbnds_with_parents of
-          []  -> failWithTc (noPossibleParents rbnds)
-          [p] -> chooseParent p rbnds_with_parents
-          _ | Just p <- tyConOf fam_inst_envs res_ty -> chooseParent p rbnds_with_parents
-          _ | Just sig_ty <- obviousSig (unLoc record_expr) ->
+      ; p <- case possibleParents rbnds_with_parents of
+               []  -> failWithTc (noPossibleParents rbnds)
+               [p] -> return p
+               _ | Just p <- tyConOf fam_inst_envs res_ty -> return p
+               _ | Just sig_ty <- obviousSig (unLoc record_expr) ->
                  do { sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
                     ; case tyConOf fam_inst_envs sig_tc_ty of
-                        Just p  -> chooseParent p rbnds_with_parents
+                        Just p  -> return p
                         Nothing -> failWithTc badOverloadedUpdate }
-          _ -> failWithTc badOverloadedUpdate }
+               _ -> failWithTc badOverloadedUpdate
+      ; assignParent p rbnds_with_parents }
   where
-    unambiguous = mapM isSingle rbnds
+    isUnambiguous :: LHsRecUpdField Name -> Maybe (LHsRecUpdField Name, Name)
+    isUnambiguous x = case unLoc (hsRecFieldLbl (unLoc x)) of
+                        Unambiguous _ sel_name -> Just (x, sel_name)
+                        Ambiguous{}            -> Nothing
 
-    isSingle :: LHsRecUpdField Name -> Maybe (LHsRecUpdField Name, Name)
-    isSingle x = case unLoc (hsRecFieldLbl (unLoc x)) of
-                   Unambiguous _ sel_name -> Just (x, sel_name)
-                   Ambiguous{}            -> Nothing
-
-    look :: (LHsRecUpdField Name, Name) -> TcM (LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name))
-    look (L l x, n) = do i <- tcLookupId n
-                         let L loc af = hsRecFieldLbl x
-                             lbl      = rdrNameAmbiguousFieldOcc af
-                         return $ L l x { hsRecFieldLbl = L loc (Unambiguous lbl i) }
+    lookupSelectors :: [(LHsRecUpdField Name, Name)] -> TcM [LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name)]
+    lookupSelectors = mapM look
+      where
+        look :: (LHsRecUpdField Name, Name) -> TcM (LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name))
+        look (L l x, n) = do i <- tcLookupId n
+                             let L loc af = hsRecFieldLbl x
+                                 lbl      = rdrNameAmbiguousFieldOcc af
+                             return $ L l x { hsRecFieldLbl = L loc (Unambiguous lbl i) }
 
     -- Extract the outermost TyCon of a type, if there is one; for
     -- data families this is the representation tycon (because that's
@@ -1440,40 +1444,36 @@ disambiguateRecordBinds record_expr rbnds res_ty
 
     -- Look up the parent tycon for each candidate record selector.
     getParents :: LHsRecUpdField Name -> RnM [(TyCon, Name)]
-    getParents x = case unLoc (hsRecFieldLbl (unLoc x)) of
-                    Unambiguous _ sel_name -> fmap return $ lookupParent sel_name
+    getParents (L _ fld) = case unLoc (hsRecFieldLbl fld) of
+                    Unambiguous _ sel_name -> fmap singleton $ lookupParent sel_name
                     Ambiguous   _ _        -> do {
-           Just (Right xs) <- lookupGlobalOccRn_overloaded True (unLoc (hsRecUpdFieldRdr (unLoc x)))
+           Just (Right xs) <- lookupGlobalOccRn_overloaded True (unLoc (hsRecUpdFieldRdr fld))
          ; mapM (lookupParent . selectorFieldOcc) xs }
-      where
-        lookupParent name = do { id <- tcLookupId name
-                               ; ASSERT (isRecordSelector id)
-                                 return (recordSelectorTyCon id, name) }
+
+    lookupParent :: Name -> RnM (TyCon, Name)
+    lookupParent name = do { id <- tcLookupId name
+                           ; ASSERT (isRecordSelector id)
+                             return (recordSelectorTyCon id, name) }
 
     -- Make all the fields unambiguous by choosing the given parent.
     -- Fails with an error if any of the ambiguous fields cannot have
     -- that parent, e.g. if the user writes
     --     r { x = e } :: T
     -- where T does not have field x.
-    chooseParent :: TyCon -> [(LHsRecUpdField Name, [(TyCon, Name)])] -> RnM [LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name)]
-    chooseParent p rbnds | null orphans = mapM foo rbnds'
+    assignParent :: TyCon -> [(LHsRecUpdField Name, [(TyCon, Name)])]
+                 -> RnM [LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name)]
+    assignParent p rbnds | null orphans = lookupSelectors rbnds'
                          | otherwise    = failWithTc (orphanFields p orphans)
       where
         (orphans, rbnds') = partitionWith pickParent rbnds
 
-        foo :: (LHsRecUpdField Name, Name) -> RnM (LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name))
-        foo (L l fld, name) = do id <- tcLookupId name
-                                 let L loc lbl = hsRecUpdFieldRdr fld
-                                 return $ L l fld { hsRecFieldLbl = L loc (Unambiguous lbl id) }
-
-        -- Returns Right fld' if fld can have parent p, or Left lbl if not.
-        -- TODO refactor
-        pickParent :: (LHsRecUpdField Name, [(TyCon, Name)]) ->
-                          Either (Located RdrName) (LHsRecUpdField Name, Name)
-        pickParent (L l fld, xs)
+        -- Returns Right if fld can have parent p, or Left lbl if not.
+        pickParent :: (LHsRecUpdField Name, [(TyCon, Name)])
+                   -> Either (Located RdrName) (LHsRecUpdField Name, Name)
+        pickParent (fld, xs)
             = case lookup p xs of
-                  Just name -> Right (L l fld, name)
-                  Nothing   -> Left (fmap rdrNameAmbiguousFieldOcc (hsRecFieldLbl fld))
+                  Just name -> Right (fld, name)
+                  Nothing   -> Left (hsRecUpdFieldRdr (unLoc fld))
 
     -- A type signature on the record expression must be "obvious",
     -- i.e. the outermost constructor ignoring parentheses.
