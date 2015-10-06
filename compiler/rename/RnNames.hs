@@ -1471,7 +1471,7 @@ reportUnusedNames _export_decls gbl_env
     used_as_selector :: Set.Set (FieldOcc Name) -> GlobalRdrElt -> Bool
     used_as_selector sel_uses gre
       = isRecFldGRE gre && any ((==) (gre_name gre) . selectorFieldOcc) sel_uses
-          -- AMG TODO use a map instead?
+
 
 {-
 *********************************************************

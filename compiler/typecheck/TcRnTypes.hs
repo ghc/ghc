@@ -583,7 +583,6 @@ We gather three sorts of usage information
    This usage info is mainly gathered by the renamer's
    gathering of free-variables
 
-AMG TODO update me please
  * tcg_used_rdrnames
       Records used *imported* (not locally-defined) RdrNames
       Used only to report unused import declarations
@@ -593,8 +592,8 @@ AMG TODO update me please
       is unnecessary.  This info isn't present in Names.
 
  * tcg_used_selectors
-      Records the Names of record selectors that are used
-      by the DuplicateRecordFields extension. These
+      Records the record selectors that are used
+      by the DuplicateRecordFields extension.  These
       may otherwise be missed from tcg_used_rdrnames as a
       single RdrName might refer to multiple fields.
 
