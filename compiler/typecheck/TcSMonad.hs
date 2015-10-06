@@ -15,7 +15,7 @@ module TcSMonad (
     TcS, runTcS, runTcSWithEvBinds,
     failTcS, tryTcS, nestTcS, nestImplicTcS, recoverTcS,
 
-    runTcPluginTcS, addUsedGREsTcS, deferTcSForAllEq,
+    runTcPluginTcS, addUsedRdrNamesTcS, deferTcSForAllEq,
 
     -- Tracing etc
     panicTcS, traceTcS,
@@ -125,8 +125,8 @@ import TyCon
 import TcErrors   ( solverDepthErrorTcS )
 
 import Name
-import RdrName (GlobalRdrEnv, GlobalRdrElt)
-import RnEnv (addUsedGREs)
+import RdrName (RdrName, GlobalRdrEnv)
+import RnEnv (addUsedRdrNames)
 import Var
 import VarEnv
 import VarSet
@@ -2527,8 +2527,8 @@ tcLookupClass c = wrapTcS $ TcM.tcLookupClass c
 -- Setting names as used (used in the deriving of Coercible evidence)
 -- Too hackish to expose it to TcS? In that case somehow extract the used
 -- constructors from the result of solveInteract
-addUsedGREsTcS :: [GlobalRdrElt] -> TcS ()
-addUsedGREsTcS gres = wrapTcS  $ addUsedGREs gres
+addUsedRdrNamesTcS :: [RdrName] -> TcS ()
+addUsedRdrNamesTcS names = wrapTcS  $ addUsedRdrNames names
 
 -- Various smaller utilities [TODO, maybe will be absorbed in the instance matcher]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

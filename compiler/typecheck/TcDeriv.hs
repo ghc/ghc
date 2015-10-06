@@ -808,14 +808,14 @@ mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta
                                  any not_in_scope data_con_names)
              not_in_scope dc  = null (lookupGRE_Name rdr_env dc)
 
-             -- Make a GRE that will do for each DataCon
+             -- Make a Qual RdrName that will do for each DataCon
              -- so we can report it as used (Trac #7969)
-             gres = [ gre
-                    | dc_name <- data_con_names
-                    , gre : _ <- [lookupGRE_Name rdr_env dc_name]
-                    ]
+             data_con_rdrs = [ greUsedRdrName gre
+                             | dc_name <- data_con_names
+                             , gre : _ <- [lookupGRE_Name rdr_env dc_name]
+                             , not (isLocalGRE gre) ]
 
-       ; addUsedGREs gres
+       ; addUsedRdrNames data_con_rdrs
        ; unless (isNothing mtheta || not hidden_data_cons)
                 (bale_out (derivingHiddenErr tycon))
 

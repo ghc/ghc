@@ -611,11 +611,11 @@ can_eq_newtype_nc rdr_env ev swapped co ty1 ty1' ty2 ps_ty2
 -- | Mark all the datacons of the given 'TyCon' as used in this module,
 -- avoiding "redundant import" warnings.
 markDataConsAsUsed :: GlobalRdrEnv -> TyCon -> TcS ()
-markDataConsAsUsed rdr_env tc = addUsedGREsTcS
-  [ gre
+markDataConsAsUsed rdr_env tc = addUsedRdrNamesTcS
+  [ greUsedRdrName gre
   | dc <- tyConDataCons tc
   , gre : _  <- return $ lookupGRE_Name rdr_env (dataConName dc)
-  ]
+  , not (isLocalGRE gre) ]
 
 ---------
 -- ^ Decompose a type application.
