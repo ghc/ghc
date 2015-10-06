@@ -27,7 +27,7 @@ import BasicTypes
 import Inst
 import TcBinds
 import FamInst          ( tcGetFamInstEnvs, tcLookupDataFamInst )
-import RnEnv            ( lookupGlobalOccRn_overloaded )
+import RnEnv            ( lookupGlobalOccRn_overloaded, addUsedSelector )
 import TcEnv
 import TcArrows
 import TcMatches
@@ -1428,6 +1428,7 @@ disambiguateRecordBinds record_expr rbnds res_ty
         look (L l x, n) = do i <- tcLookupId n
                              let L loc af = hsRecFieldLbl x
                                  lbl      = rdrNameAmbiguousFieldOcc af
+                             addUsedSelector (FieldOcc lbl n)
                              return $ L l x { hsRecFieldLbl = L loc (Unambiguous lbl i) }
 
     -- Extract the outermost TyCon of a type, if there is one; for

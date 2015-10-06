@@ -385,7 +385,7 @@ data TcGblEnv
 
         tcg_dus :: DefUses,   -- ^ What is defined in this module and what is used.
         tcg_used_rdrnames :: TcRef (Set RdrName),
-        tcg_used_selectors :: TcRef NameSet,
+        tcg_used_selectors :: TcRef (Set (FieldOcc Name)),
           -- See Note [Tracking unused binding and imports]
 
         tcg_keep :: TcRef NameSet,

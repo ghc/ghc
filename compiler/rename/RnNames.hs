@@ -1468,9 +1468,10 @@ reportUnusedNames _export_decls gbl_env
     is_unused_local gre = isLocalGRE gre && isExternalName (gre_name gre)
 
     -- Remove uses of record selectors recorded in the typechecker
-    used_as_selector :: NameSet -> GlobalRdrElt -> Bool
+    used_as_selector :: Set.Set (FieldOcc Name) -> GlobalRdrElt -> Bool
     used_as_selector sel_uses gre
-      = isRecFldGRE gre && gre_name gre `elemNameSet` sel_uses
+      = isRecFldGRE gre && any ((==) (gre_name gre) . selectorFieldOcc) sel_uses
+          -- AMG TODO use a map instead?
 
 {-
 *********************************************************
@@ -1504,7 +1505,7 @@ warnUnusedImportDecls gbl_env
              usage = findImportUsage user_imports rdr_env uses sel_uses fld_env
 
        ; traceRn (vcat [ ptext (sLit "Uses:") <+> ppr uses
-                       , ptext (sLit "Selector uses:") <+> ppr (nameSetElems sel_uses)
+                       , ptext (sLit "Selector uses:") <+> ppr sel_uses
                        , ptext (sLit "Import usage") <+> ppr usage])
        ; whenWOptM Opt_WarnUnusedImports $
          mapM_ (warnUnusedImport fld_env) usage
@@ -1539,7 +1540,7 @@ type ImportMap = Map SrcLoc [AvailInfo]  -- See [The ImportMap]
 findImportUsage :: [LImportDecl Name]
                 -> GlobalRdrEnv
                 -> [RdrName]
-                -> NameSet
+                -> Set.Set (FieldOcc Name)
                 -> NameEnv (FieldLabelString, Name)
                 -> [ImportDeclUsage]
 
@@ -1550,7 +1551,7 @@ findImportUsage imports rdr_env rdrs sel_names fld_env
     import_usage
       = foldr (extendImportMap fld_env rdr_env . Right)
        (foldr (extendImportMap fld_env rdr_env . Left) Map.empty rdrs)
-       (nameSetElems sel_names)
+       (Set.elems sel_names)
 
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
       = (decl, nubAvails used_avails, nameSetElems unused_imps)
@@ -1590,9 +1591,10 @@ findImportUsage imports rdr_env rdrs sel_names fld_env
        -- imported Num(signum).  We don't want to complain that
        -- Num is not itself mentioned.  Hence the two cases in add_unused_with.
 
+-- AMG TODO clean this up
 extendImportMap :: NameEnv (FieldLabelString, Name)
                 -> GlobalRdrEnv
-                -> Either RdrName Name
+                -> Either RdrName (FieldOcc Name)
                 -> ImportMap -> ImportMap
 -- For a used RdrName, find all the import decls that brought
 -- it into scope; choose one of them (bestImport), and record
@@ -1604,9 +1606,8 @@ extendImportMap fld_env rdr_env rdr_or_sel imp_map
   , not lcl
   = add_imp gre (bestImport imps) imp_map
 
-  | Right sel <- rdr_or_sel
-  , Just (lbl, _) <- lookupNameEnv fld_env sel
-  , [gre] <- lookupGRE_Field_Name rdr_env sel lbl
+  | Right (FieldOcc rdr sel) <- rdr_or_sel
+  , [gre] <- pickGREs rdr (lookupGRE_Field_Name rdr_env sel (occNameFS (rdrNameOcc rdr)))
   , GRE { gre_lcl = lcl, gre_imp = imps } <- gre
   , not lcl
   = add_imp gre (bestImport imps) imp_map

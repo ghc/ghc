@@ -26,6 +26,7 @@ module RnEnv (
         lookupSyntaxName, lookupSyntaxNames, lookupIfThenElse,
         lookupGreAvailRn,
         getLookupOccRn, addUsedRdrNames,
+        addUsedSelector,
 
         newLocalBndrRn, newLocalBndrsRn,
         bindLocalNames, bindLocalNamesFV,
@@ -480,7 +481,7 @@ lookupSubBndrOcc warnIfDeprec parent doc rdr_name
                 --     The latter does pickGREs, but we want to allow 'x'
                 --     even if only 'M.x' is in scope
             [gre] | isOverloadedRecFldGRE gre ->
-                     do { addUsedSelector (gre_name gre)
+                     do { addUsedSelector (FieldOcc rdr_name (gre_name gre))
                         ; return (gre_name gre) }
                   | otherwise ->
                      do { addUsedRdrName warnIfDeprec gre (used_rdr_name gre)
@@ -868,7 +869,7 @@ lookupGlobalOccRn_overloaded overload_ok rdr_name
         ; case lookupGRE_RdrName rdr_name env of
                 []    -> return Nothing
                 [gre] | isOverloadedRecFldGRE gre
-                         -> do { addUsedRdrName True gre rdr_name
+                         -> do { addUsedSelector (FieldOcc rdr_name (gre_name gre))
                                ; return (Just (Right [FieldOcc rdr_name $ gre_name gre])) }
                       | otherwise
                          -> do { addUsedRdrName True gre rdr_name
@@ -953,11 +954,12 @@ Note [Handling of deprecations]
      - the things exported by a module export 'module M'
 -}
 
-addUsedSelector :: Name -> RnM ()
+addUsedSelector :: FieldOcc Name -> RnM ()
 -- Record usage of record selectors by DuplicateRecordFields
 addUsedSelector n = do { env <- getGblEnv
+                       ; traceRn (text "addUsedSelector " <+> ppr n)
                        ; updMutVar (tcg_used_selectors env)
-                                   (\s -> extendNameSet s n) }
+                                   (\s -> Set.insert n s) }
 
 addUsedRdrName :: Bool -> GlobalRdrElt -> RdrName -> RnM ()
 -- Record usage of imported RdrNames

@@ -569,6 +569,8 @@ data FieldOcc name = FieldOcc { rdrNameFieldOcc  :: RdrName
                               , selectorFieldOcc :: PostRn name name
                               }
   deriving Typeable
+deriving instance Eq (PostRn name name) => Eq (FieldOcc name)
+deriving instance Ord (PostRn name name) => Ord (FieldOcc name)
 deriving instance (Data name, Data (PostRn name name)) => Data (FieldOcc name)
 
 instance Outputable (FieldOcc name) where
