@@ -330,7 +330,7 @@ checkOptions mode dflags srcs objs = do
    when ((filter (not . wayRTSOnly) (ways dflags) /= interpWays)
          && isInterpretiveMode mode) $
       do throwGhcException (UsageError
-                   "--interactive can't be used with -prof.")
+                   "--interactive can't be used with -prof or -static.")
         -- -ohi sanity check
    if (isJust (outputHi dflags) &&
       (isCompManagerMode mode || srcs `lengthExceeds` 1))
