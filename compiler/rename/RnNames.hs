@@ -46,6 +46,7 @@ import ListSetOps
 
 import Control.Monad
 import Data.Either      ( partitionEithers, isRight, rights )
+import qualified Data.Foldable as Foldable
 import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Ord         ( comparing )
@@ -1470,7 +1471,7 @@ reportUnusedNames _export_decls gbl_env
     -- Remove uses of record selectors recorded in the typechecker
     used_as_selector :: Set.Set (FieldOcc Name) -> GlobalRdrElt -> Bool
     used_as_selector sel_uses gre
-      = isRecFldGRE gre && any ((==) (gre_name gre) . selectorFieldOcc) sel_uses
+      = isRecFldGRE gre && Foldable.any ((==) (gre_name gre) . selectorFieldOcc) sel_uses
 
 
 {-
