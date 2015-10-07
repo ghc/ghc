@@ -875,8 +875,9 @@ lookupGlobalOccRn_overloaded overload_ok rdr_name
                          -> do { addUsedRdrName True gre rdr_name
                                ; return (Just (Left (gre_name gre))) }
                 gres  | all isRecFldGRE gres && overload_ok
-                         -> do { mapM_ (\ gre -> addUsedRdrName True gre rdr_name) gres
-                               ; return (Just (Right (map (FieldOcc rdr_name . gre_name) gres))) }
+                            -- Don't record usage for ambiguous selectors
+                            -- until we know which is meant
+                         -> return (Just (Right (map (FieldOcc rdr_name . gre_name) gres)))
                 gres     -> do { addNameClashErrRn rdr_name gres
                                ; return (Just (Left (gre_name (head gres)))) } }
 
