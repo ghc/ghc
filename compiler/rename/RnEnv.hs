@@ -480,7 +480,7 @@ lookupSubBndrOcc warnIfDeprec parent doc rdr_name
                 -- NB: lookupGlobalRdrEnv, not lookupGRE_RdrName!
                 --     The latter does pickGREs, but we want to allow 'x'
                 --     even if only 'M.x' is in scope
-            [gre] | isOverloadedRecFldGRE gre ->
+            [gre] | isRecFldGRE gre ->
                      do { addUsedSelector (FieldOcc rdr_name (gre_name gre))
                         ; return (gre_name gre) }
                   | otherwise ->
@@ -868,9 +868,10 @@ lookupGlobalOccRn_overloaded overload_ok rdr_name
   = do  { env <- getGlobalRdrEnv
         ; case lookupGRE_RdrName rdr_name env of
                 []    -> return Nothing
-                [gre] | isOverloadedRecFldGRE gre
-                         -> do { addUsedSelector (FieldOcc rdr_name (gre_name gre))
-                               ; return (Just (Right [FieldOcc rdr_name $ gre_name gre])) }
+                [gre] | isRecFldGRE gre
+                         -> do { let fld_occ = FieldOcc rdr_name (gre_name gre)
+                               ; addUsedSelector fld_occ
+                               ; return (Just (Right [fld_occ])) }
                       | otherwise
                          -> do { addUsedRdrName True gre rdr_name
                                ; return (Just (Left (gre_name gre))) }
@@ -1887,12 +1888,10 @@ warnUnusedGRE gre@(GRE { gre_name = name, gre_lcl = lcl, gre_imp = is })
 -- | Make a map from selector names to field labels and parent tycon
 -- names, to be used when reporting unused record fields.
 mkFieldEnv :: GlobalRdrEnv -> NameEnv (FieldLabelString, Name)
-mkFieldEnv rdr_env = mkNameEnv [ (gre_name gre, (lbl, par_is par))
+mkFieldEnv rdr_env = mkNameEnv [ (gre_name gre, (lbl, par_is (gre_par gre)))
                                | gres <- occEnvElts rdr_env
                                , gre <- gres
-                               , isOverloadedRecFldGRE gre
-                               , let par      = gre_par gre
-                                     Just lbl = par_lbl par
+                               , Just lbl <- [greLabel gre]
                                ]
 
 reportable :: Name -> Bool

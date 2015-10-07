@@ -54,7 +54,7 @@ module RdrName (
         greUsedRdrName, greRdrNames, greSrcSpan, greQualModName,
 
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
-        GlobalRdrElt(..), isLocalGRE, isRecFldGRE, isOverloadedRecFldGRE, greLabel,
+        GlobalRdrElt(..), isLocalGRE, isRecFldGRE, greLabel,
         unQualOK, qualSpecOK, unQualSpecOK,
         pprNameProvenance,
         Parent(..),
@@ -715,11 +715,6 @@ isLocalGRE (GRE {gre_lcl = lcl }) = lcl
 isRecFldGRE :: GlobalRdrElt -> Bool
 isRecFldGRE (GRE {gre_par = FldParent{}}) = True
 isRecFldGRE _                             = False
-
-isOverloadedRecFldGRE :: GlobalRdrElt -> Bool
-isOverloadedRecFldGRE (GRE {gre_par = FldParent{par_lbl = Just _}})
-                        = True
-isOverloadedRecFldGRE _ = False
 
 -- Returns the field label of this GRE, if it has one
 greLabel :: GlobalRdrElt -> Maybe FieldLabelString
