@@ -298,6 +298,11 @@ getCoreToDo dflags
 
         maybe_rule_check (Phase 0),
 
+        runWhen call_arity $ CoreDoPasses
+            [ CoreDoCallArity
+            , simpl_phase 0 ["post-late-call-arity"] max_iter
+            ],
+
                 -- Case-liberation for -O2.  This should be after
                 -- strictness analysis and the simplification which follows it.
         runWhen liberate_case (CoreDoPasses [
