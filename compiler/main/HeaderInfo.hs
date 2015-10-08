@@ -37,6 +37,7 @@ import Maybes
 import Bag              ( emptyBag, listToBag, unitBag )
 import MonadUtils
 import Exception
+import BasicTypes
 
 import Control.Monad
 import System.IO
@@ -54,7 +55,9 @@ getImports :: DynFlags
                            --   reporting parse error locations.
            -> FilePath     -- ^ The original source filename (used for locations
                            --   in the function result)
-           -> IO ([Located (ImportDecl RdrName)], [Located (ImportDecl RdrName)], Located ModuleName)
+           -> IO ([(Maybe FastString, Located ModuleName)],
+                  [(Maybe FastString, Located ModuleName)],
+                  Located ModuleName)
               -- ^ The source imports, normal imports, and the module name.
 getImports dflags buf filename source_filename = do
   let loc  = mkRealSrcLoc (mkFastString filename) 1 1
@@ -83,8 +86,11 @@ getImports dflags buf filename source_filename = do
                 implicit_prelude = xopt Opt_ImplicitPrelude dflags
                 implicit_imports = mkPrelImports (unLoc mod) main_loc
                                                  implicit_prelude imps
+                convImport (L _ i) = (fmap sl_fs (ideclPkgQual i), ideclName i)
               in
-              return (src_idecls, implicit_imports ++ ordinary_imps, mod)
+              return (map convImport src_idecls,
+                      map convImport (implicit_imports ++ ordinary_imps),
+                      mod)
 
 mkPrelImports :: ModuleName
               -> SrcSpan    -- Attribute the "import Prelude" to this location

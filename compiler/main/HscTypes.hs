@@ -2406,9 +2406,9 @@ data ModSummary
           -- ^ Timestamp of hi file, if we *only* are typechecking (it is
           -- 'Nothing' otherwise.
           -- See Note [Recompilation checking when typechecking only] and #9243
-        ms_srcimps      :: [Located (ImportDecl RdrName)],
+        ms_srcimps      :: [(Maybe FastString, Located ModuleName)],
           -- ^ Source imports of the module
-        ms_textual_imps :: [Located (ImportDecl RdrName)],
+        ms_textual_imps :: [(Maybe FastString, Located ModuleName)],
           -- ^ Non-source imports of the module from the module *text*
         ms_merge_imps   :: (Bool, [Module]),
           -- ^ Non-textual imports computed for HsBootMerge
@@ -2424,26 +2424,12 @@ data ModSummary
 ms_mod_name :: ModSummary -> ModuleName
 ms_mod_name = moduleName . ms_mod
 
-ms_imps :: ModSummary -> [Located (ImportDecl RdrName)]
+ms_imps :: ModSummary -> [(Maybe FastString, Located ModuleName)]
 ms_imps ms =
   ms_textual_imps ms ++
   map mk_additional_import (dynFlagDependencies (ms_hspp_opts ms))
   where
-    -- This is a not-entirely-satisfactory means of creating an import
-    -- that corresponds to an import that did not occur in the program
-    -- text, such as those induced by the use of plugins (the -plgFoo
-    -- flag)
-    mk_additional_import mod_nm = noLoc $ ImportDecl {
-      ideclSourceSrc = Nothing,
-      ideclName      = noLoc mod_nm,
-      ideclPkgQual   = Nothing,
-      ideclSource    = False,
-      ideclImplicit  = True, -- Maybe implicit because not "in the program text"
-      ideclQualified = False,
-      ideclAs        = Nothing,
-      ideclHiding    = Nothing,
-      ideclSafe      = False
-    }
+    mk_additional_import mod_nm = (Nothing, noLoc mod_nm)
 
 -- The ModLocation contains both the original source filename and the
 -- filename of the cleaned-up source file after all preprocessing has been

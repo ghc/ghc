@@ -34,10 +34,8 @@ import ErrUtils
 import Finder
 import GhcMonad
 import HeaderInfo
-import HsSyn
 import HscTypes
 import Module
-import RdrName          ( RdrName )
 import TcIface          ( typecheckIface )
 import TcRnMonad        ( initIfaceCheck )
 
@@ -1720,9 +1718,9 @@ msDeps s =
             then [ (noLoc (moduleName (ms_mod s)), IsBoot) ]
             else []
 
-home_imps :: [Located (ImportDecl RdrName)] -> [Located ModuleName]
-home_imps imps = [ ideclName i |  L _ i <- imps,
-                                  isLocal (fmap sl_fs $ ideclPkgQual i) ]
+home_imps :: [(Maybe FastString, Located ModuleName)] -> [Located ModuleName]
+home_imps imps = [ lmodname |  (mb_pkg, lmodname) <- imps,
+                                  isLocal mb_pkg ]
   where isLocal Nothing = True
         isLocal (Just pkg) | pkg == fsLit "this" = True -- "this" is special
         isLocal _ = False

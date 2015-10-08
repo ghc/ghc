@@ -16,7 +16,6 @@ module DriverMkDepend (
 
 import qualified GHC
 import GhcMonad
-import HsSyn            ( ImportDecl(..) )
 import DynFlags
 import Util
 import HscTypes
@@ -30,7 +29,6 @@ import Panic
 import SrcLoc
 import Data.List
 import FastString
-import BasicTypes ( StringLiteral(..) )
 
 import Exception
 import ErrUtils
@@ -227,9 +225,8 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
                 -- Emit a dependency for each import
 
         ; let do_imps is_boot idecls = sequence_
-                    [ do_imp loc is_boot (fmap sl_fs $ ideclPkgQual i) mod
-                    | L loc i <- idecls,
-                      let mod = unLoc (ideclName i),
+                    [ do_imp loc is_boot mb_pkg mod
+                    | (mb_pkg, L loc mod) <- idecls,
                       mod `notElem` excl_mods ]
 
         ; do_imps True  (ms_srcimps node)
@@ -379,7 +376,7 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
           pp_ms loop_breaker $$ vcat (map pp_group groups)
         where
           (boot_only, others) = partition is_boot_only mss
-          is_boot_only ms = not (any in_group (map (ideclName.unLoc) (ms_imps ms)))
+          is_boot_only ms = not (any in_group (map snd (ms_imps ms)))
           in_group (L _ m) = m `elem` group_mods
           group_mods = map (moduleName . ms_mod) mss
 
@@ -388,8 +385,8 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
           groups = GHC.topSortModuleGraph True all_others Nothing
 
     pp_ms summary = text mod_str <> text (take (20 - length mod_str) (repeat ' '))
-                       <+> (pp_imps empty (map (ideclName.unLoc) (ms_imps summary)) $$
-                            pp_imps (ptext (sLit "{-# SOURCE #-}")) (map (ideclName.unLoc) (ms_srcimps summary)))
+                       <+> (pp_imps empty (map snd (ms_imps summary)) $$
+                            pp_imps (ptext (sLit "{-# SOURCE #-}")) (map snd (ms_srcimps summary)))
         where
           mod_str = moduleNameString (moduleName (ms_mod summary))
 
