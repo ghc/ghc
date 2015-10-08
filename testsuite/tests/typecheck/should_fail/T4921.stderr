@@ -1,18 +1,20 @@
 
 T4921.hs:10:9: error:
-    No instance for (C a0 b1) arising from a use of ‘f’
-    The type variables ‘b1’, ‘a0’ are ambiguous
+    Ambiguous type variables ‘b1’, ‘a0’ arising from a use of ‘f’
+    prevents the constraint ‘(C a0 b1)’ from being solved.
     Relevant bindings include x :: a0 (bound at T4921.hs:10:1)
-    Potential instances:
+    Probable fix: use a type annotation to specify what ‘b1’, ‘a0’ should be.
+    These potential instance exist:
       instance C Int Char -- Defined at T4921.hs:7:10
     In the first argument of ‘fst’, namely ‘f’
     In the expression: fst f
     In an equation for ‘x’: x = fst f
 
 T4921.hs:12:9: error:
-    No instance for (C Int b0) arising from a use of ‘f’
-    The type variable ‘b0’ is ambiguous
-    Potential instances:
+    Ambiguous type variable ‘b0’ arising from a use of ‘f’
+    prevents the constraint ‘(C Int b0)’ from being solved.
+    Probable fix: use a type annotation to specify what ‘b0’ should be.
+    These potential instance exist:
       instance C Int Char -- Defined at T4921.hs:7:10
     In the first argument of ‘fst’, namely ‘f’
     In the expression: fst f :: Int

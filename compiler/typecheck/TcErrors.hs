@@ -1062,7 +1062,7 @@ mkEqInfoMsg ct ty1 ty2
     mb_fun2 = isTyFun_maybe ty2
 
     ambig_msg | isJust mb_fun1 || isJust mb_fun2
-              = snd (mkAmbigMsg ct)
+              = snd (mkAmbigMsg False ct)
               | otherwise = empty
 
     tyfun_msg | Just tc1 <- mb_fun1
@@ -1521,23 +1521,50 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
     givens        = getUserGivens ctxt
     all_tyvars    = all isTyVarTy tys
 
+
     cannot_resolve_msg :: Ct -> SDoc -> SDoc
     cannot_resolve_msg ct binds_msg
-      = vcat [ addArising orig no_inst_msg
+      = vcat [ no_inst_msg
              , nest 2 extra_note
              , vcat (pp_givens givens)
              , ppWhen (has_ambig_tvs && not (null unifiers && null givens))
-               (vcat [ ambig_msg, binds_msg, potential_msg ])
+               (vcat [ ppUnless lead_with_ambig ambig_msg, binds_msg, potential_msg ])
              , show_fixes (add_to_ctxt_fixes has_ambig_tvs ++ drv_fixes) ]
       where
-        (has_ambig_tvs, ambig_msg) = mkAmbigMsg ct
         orig = ctOrigin ct
+        -- See Note [Highlighting ambiguous type variables]
+        lead_with_ambig = has_ambig_tvs && not (any isRuntimeUnkSkol ambig_tvs)
+                        && not (null unifiers) && null givens
 
-    potential_msg
-      = ppWhen (not (null unifiers) && want_potential orig) $
-        sdocWithDynFlags $ \dflags ->
-        getPprStyle $ \sty ->
-        pprPotentials dflags sty (ptext (sLit "Potential instances:")) unifiers
+        (has_ambig_tvs, ambig_msg) = mkAmbigMsg lead_with_ambig ct
+        ambig_tvs = getAmbigTkvs ct
+
+        no_inst_msg
+          | lead_with_ambig
+          = ambig_msg <+> pprArising orig
+              $$ text "prevents the constraint" <+>  quotes (pprParendType pred)
+              <+> text "from being solved."
+
+          | null givens
+          = addArising orig $ text "No instance for"
+            <+> pprParendType pred
+
+          | otherwise
+          = addArising orig $ text "Could not deduce"
+            <+> pprParendType pred
+
+        potential_msg
+          = ppWhen (not (null unifiers) && want_potential orig) $
+            sdocWithDynFlags $ \dflags ->
+            getPprStyle $ \sty ->
+            pprPotentials dflags sty potential_hdr unifiers
+
+        potential_hdr
+          = vcat [ ppWhen lead_with_ambig $
+                     text "Probable fix: use a type annotation to specify what"
+                     <+> pprQuotedList ambig_tvs <+> text "should be."
+                 , ptext (sLit "These potential instance") <> plural unifiers
+                   <+> text "exist:"]
 
     -- Report "potential instances" only when the constraint arises
     -- directly from the user's use of an overloaded function
@@ -1556,10 +1583,6 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
 
     ppr_skol (PatSkol dc _) = ptext (sLit "the data constructor") <+> quotes (ppr dc)
     ppr_skol skol_info      = ppr skol_info
-
-    no_inst_msg
-      | null givens && null matches = ptext (sLit "No instance for")  <+> pprParendType pred
-      | otherwise                   = ptext (sLit "Could not deduce") <+> pprParendType pred
 
     extra_note | any isFunTy (filterOut isKind tys)
                = ptext (sLit "(maybe you haven't applied a function to enough arguments?)")
@@ -1647,6 +1670,24 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
                     , nest 2 (vcat [pprInstances $ unsafe_ispecs])
                     ]
              ]
+
+{- Note [Highlighting ambiguous type variables]
+-----------------------------------------------
+When we encounter ambiguous type variables (i.e. type variables
+that remain metavariables after type inference), we need a few more
+conditions before we can reason that *ambiguity* prevents constraints
+from being solved:
+  - We can't have any givens, as encountering a typeclass error
+    with given constraints just means we couldn't deduce
+    a solution satisfying those constraints and as such couldn't
+    bind the type variable to a known type.
+  - If we don't have any unifiers, we don't even have potential
+    instances from which an ambiguity could arise.
+  - Lastly, I don't want to mess with error reporting for
+    unknown runtime types so we just fall back to the old message there.
+Once these conditions are satisfied, we can safely say that ambiguity prevents
+the constraint from being solved. -}
+
 
 usefulContext :: ReportErrCtxt -> TcPredType -> [SkolemInfo]
 usefulContext ctxt pred
@@ -1814,19 +1855,19 @@ This test suggests -fprint-explicit-kinds when all the ambiguous type
 variables are kind variables.
 -}
 
-mkAmbigMsg :: Ct -> (Bool, SDoc)
-mkAmbigMsg ct
+mkAmbigMsg :: Bool -- True when message has to be at beginning of sentence
+           -> Ct -> (Bool, SDoc)
+mkAmbigMsg prepend_msg ct
   | null ambig_tkvs = (False, empty)
   | otherwise       = (True,  msg)
   where
-    ambig_tkv_set = filterVarSet isAmbiguousTyVar (tyVarsOfCt ct)
-    ambig_tkvs    = varSetElems ambig_tkv_set
+    ambig_tkvs = getAmbigTkvs ct
     (ambig_kvs, ambig_tvs) = partition isKindVar ambig_tkvs
 
     msg | any isRuntimeUnkSkol ambig_tkvs  -- See Note [Runtime skolems]
-        =  vcat [ ptext (sLit "Cannot resolve unknown runtime type") <> plural ambig_tvs
-                     <+> pprQuotedList ambig_tvs
-                , ptext (sLit "Use :print or :force to determine these types")]
+        = vcat [ ptext (sLit "Cannot resolve unknown runtime type")
+                 <> plural ambig_tvs <+> pprQuotedList ambig_tvs
+               , ptext (sLit "Use :print or :force to determine these types")]
 
         | not (null ambig_tvs)
         = pp_ambig (ptext (sLit "type")) ambig_tvs
@@ -1836,6 +1877,11 @@ mkAmbigMsg ct
                , sdocWithDynFlags suggest_explicit_kinds ]
 
     pp_ambig what tkvs
+      | prepend_msg -- "Ambiguous type variable 't0'"
+      = ptext (sLit "Ambiguous") <+> what <+> ptext (sLit "variable")
+        <> plural tkvs <+> pprQuotedList tkvs
+
+      | otherwise -- "The type variable 't0' is ambiguous"
       = ptext (sLit "The") <+> what <+> ptext (sLit "variable") <> plural tkvs
         <+> pprQuotedList tkvs <+> is_or_are tkvs <+> ptext (sLit "ambiguous")
 
@@ -1845,6 +1891,13 @@ mkAmbigMsg ct
     suggest_explicit_kinds dflags  -- See Note [Suggest -fprint-explicit-kinds]
       | gopt Opt_PrintExplicitKinds dflags = empty
       | otherwise = ptext (sLit "Use -fprint-explicit-kinds to see the kind arguments")
+
+getAmbigTkvs :: Ct -> [Var]
+getAmbigTkvs ct
+  = varSetElems ambig_tkv_set
+  where
+    ambig_tkv_set = filterVarSet isAmbiguousTyVar (tyVarsOfCt ct)
+
 
 pprSkol :: SkolemInfo -> SrcLoc -> SDoc
 pprSkol UnkSkol   _

@@ -67,9 +67,10 @@
     In an equation for ‘j’: j = myOp 23
 
 ../../typecheck/should_run/Defer01.hs:43:10: warning:
-    No instance for (Num a1) arising from the literal ‘23’
-    The type variable ‘a1’ is ambiguous
-    Potential instances:
+    Ambiguous type variable ‘a1’ arising from the literal ‘23’
+    prevents the constraint ‘(Num a1)’ from being solved.
+    Probable fix: use a type annotation to specify what ‘a1’ should be.
+    These potential instances exist:
       instance Num Integer -- Defined in ‘GHC.Num’
       instance Num Double -- Defined in ‘GHC.Float’
       instance Num Float -- Defined in ‘GHC.Float’

@@ -6,7 +6,7 @@ tcfail072.hs:23:13: error:
                  g :: (Ord p, Ord q) => AB p q -> Bool
       at tcfail072.hs:22:6-38
     The type variable ‘p0’ is ambiguous
-    Potential instances:
+    These potential instances exist:
       instance Ord Ordering -- Defined in ‘GHC.Classes’
       instance Ord Integer
         -- Defined in ‘integer-gmp-1.0.0.0:GHC.Integer.Type’

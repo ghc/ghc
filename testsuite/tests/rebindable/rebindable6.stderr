@@ -1,15 +1,16 @@
 
 rebindable6.hs:106:17: error:
-    No instance for (HasSeq (IO a -> t0 -> IO b))
-      arising from a do statement
+    Ambiguous type variable ‘t0’ arising from a do statement
+    prevents the constraint ‘(HasSeq
+                                (IO a -> t0 -> IO b))’ from being solved.
       (maybe you haven't applied a function to enough arguments?)
-    The type variable ‘t0’ is ambiguous
     Relevant bindings include
       g :: IO (Maybe b) (bound at rebindable6.hs:104:19)
       f :: IO a (bound at rebindable6.hs:104:17)
       test_do :: IO a -> IO (Maybe b) -> IO b
         (bound at rebindable6.hs:104:9)
-    Potential instances:
+    Probable fix: use a type annotation to specify what ‘t0’ should be.
+    These potential instance exist:
       instance HasSeq (IO a -> IO b -> IO b)
         -- Defined at rebindable6.hs:52:18
     In a stmt of a 'do' block: f
@@ -24,11 +25,12 @@ rebindable6.hs:106:17: error:
                  return b }
 
 rebindable6.hs:107:17: error:
-    No instance for (HasFail ([Char] -> t1))
-      arising from a do statement
+    Ambiguous type variable ‘t1’ arising from a do statement
+    prevents the constraint ‘(HasFail
+                                ([Char] -> t1))’ from being solved.
       (maybe you haven't applied a function to enough arguments?)
-    The type variable ‘t1’ is ambiguous
-    Potential instances:
+    Probable fix: use a type annotation to specify what ‘t1’ should be.
+    These potential instance exist:
       instance HasFail (String -> IO a)
         -- Defined at rebindable6.hs:57:18
     In a stmt of a 'do' block: Just (b :: b) <- g
@@ -43,16 +45,16 @@ rebindable6.hs:107:17: error:
                  return b }
 
 rebindable6.hs:108:17: error:
-    No instance for (HasReturn (b -> t1))
-      arising from a use of ‘return’
+    Ambiguous type variable ‘t1’ arising from a use of ‘return’
+    prevents the constraint ‘(HasReturn (b -> t1))’ from being solved.
       (maybe you haven't applied a function to enough arguments?)
-    The type variable ‘t1’ is ambiguous
     Relevant bindings include
       b :: b (bound at rebindable6.hs:107:23)
       g :: IO (Maybe b) (bound at rebindable6.hs:104:19)
       test_do :: IO a -> IO (Maybe b) -> IO b
         (bound at rebindable6.hs:104:9)
-    Potential instances:
+    Probable fix: use a type annotation to specify what ‘t1’ should be.
+    These potential instance exist:
       instance HasReturn (a -> IO a) -- Defined at rebindable6.hs:42:18
     In a stmt of a 'do' block: return b
     In the expression:
