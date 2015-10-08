@@ -1058,7 +1058,7 @@ pattern_synonym_decl :: { LHsDecl RdrName }
 
 pattern_synonym_lhs :: { (Located RdrName, HsPatSynDetails (Located RdrName)) }
         : con vars0 { ($1, PrefixPatSyn $2) }
-        | varid consym varid { ($2, InfixPatSyn $1 $3) }
+        | varid conop varid { ($2, InfixPatSyn $1 $3) }
 
 vars0 :: { [Located RdrName] }
         : {- empty -}                 { [] }
