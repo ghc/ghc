@@ -271,7 +271,7 @@ getCoreToDo dflags
             -- Csg.calc, where an arg of timesDouble thereby becomes strict.
 
         runWhen call_arity $ CoreDoPasses
-            [ CoreDoCallArity
+            [ CoreDoCallArity False
             , simpl_phase 0 ["post-call-arity"] max_iter
             ],
 
@@ -299,7 +299,7 @@ getCoreToDo dflags
         maybe_rule_check (Phase 0),
 
         runWhen call_arity $ CoreDoPasses
-            [ CoreDoCallArity
+            [ CoreDoCallArity True
             , simpl_phase 0 ["post-late-call-arity"] max_iter
             ],
 
@@ -380,8 +380,8 @@ doCorePass (CoreDoFloatOutwards f)   = {-# SCC "FloatOutwards" #-}
 doCorePass CoreDoStaticArgs          = {-# SCC "StaticArgs" #-}
                                        doPassU doStaticArgs
 
-doCorePass CoreDoCallArity           = {-# SCC "CallArity" #-}
-                                       doPassD callArityAnalProgram
+doCorePass (CoreDoCallArity l)       = {-# SCC "CallArity" #-}
+                                       doPassD (callArityAnalProgram l)
 
 doCorePass CoreDoStrictness          = {-# SCC "NewStranal" #-}
                                        doPassDFM dmdAnalProgram

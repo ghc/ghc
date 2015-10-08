@@ -399,31 +399,32 @@ the case for Core!
 
 -- Main entry point
 
-callArityAnalProgram :: DynFlags -> CoreProgram -> CoreProgram
-callArityAnalProgram _dflags binds = binds'
+callArityAnalProgram :: Bool -> DynFlags -> CoreProgram -> CoreProgram
+callArityAnalProgram late _dflags binds = binds'
   where
-    (_, binds') = callArityTopLvl [] emptyVarSet binds
+    (_, binds') = callArityTopLvl late [] emptyVarSet binds
 
 -- See Note [Analysing top-level-binds]
-callArityTopLvl :: [Var] -> VarSet -> [CoreBind] -> (CallArityRes, [CoreBind])
-callArityTopLvl exported _ []
+callArityTopLvl :: Bool -> [Var] -> VarSet -> [CoreBind] -> (CallArityRes, [CoreBind])
+callArityTopLvl _ exported _ []
     = ( calledMultipleTimes $ (emptyUnVarGraph, mkVarEnv $ [(v, 0) | v <- exported])
       , [] )
-callArityTopLvl exported int1 (b:bs)
+callArityTopLvl late exported int1 (b:bs)
     = (ae2, b':bs')
   where
     int2 = bindersOf b
     exported' = filter isExportedId int2 ++ exported
-    int' = int1 `addInterestingBinds` b
-    (ae1, bs') = callArityTopLvl exported' int' bs
-    (ae2, b')  = callArityBind (boringBinds b) ae1 int1 b
+    int' = addInterestingBinds late int1 b
+    (ae1, bs') = callArityTopLvl late exported' int' bs
+    (ae2, b')  = callArityBind late (boringBinds late b) ae1 int1 b
 
 
-callArityRHS :: CoreExpr -> CoreExpr
-callArityRHS = snd . callArityAnal 0 emptyVarSet
+callArityRHS :: Bool -> CoreExpr -> CoreExpr
+callArityRHS late = snd . callArityAnal late 0 emptyVarSet
 
 -- The main analysis function. See Note [Analysis type signature]
 callArityAnal ::
+    Bool ->    -- Is this a late, more aggressive run?
     Arity ->  -- The arity this expression is called with
     VarSet -> -- The set of interesting variables
     CoreExpr ->  -- The expression to analyse
@@ -432,51 +433,51 @@ callArityAnal ::
         -- and the expression with IdInfo updated
 
 -- The trivial base cases
-callArityAnal _     _   e@(Lit _)
+callArityAnal _ _     _   e@(Lit _)
     = (emptyArityRes, e)
-callArityAnal _     _   e@(Type _)
+callArityAnal _ _     _   e@(Type _)
     = (emptyArityRes, e)
-callArityAnal _     _   e@(Coercion _)
+callArityAnal _ _     _   e@(Coercion _)
     = (emptyArityRes, e)
 -- The transparent cases
-callArityAnal arity int (Tick t e)
-    = second (Tick t) $ callArityAnal arity int e
-callArityAnal arity int (Cast e co)
-    = second (\e -> Cast e co) $ callArityAnal arity int e
+callArityAnal late arity int (Tick t e)
+    = second (Tick t) $ callArityAnal late arity int e
+callArityAnal late arity int (Cast e co)
+    = second (\e -> Cast e co) $ callArityAnal late arity int e
 
 -- The interesting case: Variables, Lambdas, Lets, Applications, Cases
-callArityAnal arity int e@(Var v)
+callArityAnal _ arity int e@(Var v)
     | v `elemVarSet` int
     = (unitArityRes v arity, e)
     | otherwise
     = (emptyArityRes, e)
 
 -- Non-value lambdas are ignored
-callArityAnal arity int (Lam v e) | not (isId v)
-    = second (Lam v) $ callArityAnal arity (int `delVarSet` v) e
+callArityAnal late arity int (Lam v e) | not (isId v)
+    = second (Lam v) $ callArityAnal late arity (int `delVarSet` v) e
 
 -- We have a lambda that may be called multiple times, so its free variables
 -- can all be co-called.
-callArityAnal 0     int (Lam v e)
+callArityAnal late 0     int (Lam v e)
     = (ae', Lam v e')
   where
-    (ae, e') = callArityAnal 0 (int `delVarSet` v) e
+    (ae, e') = callArityAnal late 0 (int `delVarSet` v) e
     ae' = calledMultipleTimes ae
 -- We have a lambda that we are calling. decrease arity.
-callArityAnal arity int (Lam v e)
+callArityAnal late arity int (Lam v e)
     = (ae, Lam v e')
   where
-    (ae, e') = callArityAnal (arity - 1) (int `delVarSet` v) e
+    (ae, e') = callArityAnal late (arity - 1) (int `delVarSet` v) e
 
 -- Application. Increase arity for the called expresion, nothing to know about
 -- the second
-callArityAnal arity int (App e (Type t))
-    = second (\e -> App e (Type t)) $ callArityAnal arity int e
-callArityAnal arity int (App e1 e2)
+callArityAnal late arity int (App e (Type t))
+    = second (\e -> App e (Type t)) $ callArityAnal late arity int e
+callArityAnal late arity int (App e1 e2)
     = (final_ae, App e1' e2')
   where
-    (ae1, e1') = callArityAnal (arity + 1) int e1
-    (ae2, e2') = callArityAnal 0           int e2
+    (ae1, e1') = callArityAnal late (arity + 1) int e1
+    (ae2, e2') = callArityAnal late 0           int e2
     -- If the argument is trivial (e.g. a variable), then it will _not_ be
     -- let-bound in the Core to STG transformation (CorePrep actually),
     -- so no sharing will happen here, and we have to assume many calls.
@@ -485,49 +486,50 @@ callArityAnal arity int (App e1 e2)
     final_ae = ae1 `both` ae2'
 
 -- Case expression.
-callArityAnal arity int (Case scrut bndr ty alts)
+callArityAnal late arity int (Case scrut bndr ty alts)
     = -- pprTrace "callArityAnal:Case"
       --          (vcat [ppr scrut, ppr final_ae])
       (final_ae, Case scrut' bndr ty alts')
   where
     (alt_aes, alts') = unzip $ map go alts
-    go (dc, bndrs, e) = let (ae, e') = callArityAnal arity int e
+    go (dc, bndrs, e) = let (ae, e') = callArityAnal late arity int e
                         in  (ae, (dc, bndrs, e'))
     alt_ae = lubRess alt_aes
-    (scrut_ae, scrut') = callArityAnal 0 int scrut
+    (scrut_ae, scrut') = callArityAnal late 0 int scrut
     final_ae = scrut_ae `both` alt_ae
 
 -- For lets, use callArityBind
-callArityAnal arity int (Let bind e)
+callArityAnal late arity int (Let bind e)
   = -- pprTrace "callArityAnal:Let"
     --          (vcat [ppr v, ppr arity, ppr n, ppr final_ae ])
     (final_ae, Let bind' e')
   where
-    int_body = int `addInterestingBinds` bind
-    (ae_body, e') = callArityAnal arity int_body e
-    (final_ae, bind') = callArityBind (boringBinds bind) ae_body int bind
+    int_body = addInterestingBinds late int bind
+    (ae_body, e') = callArityAnal late arity int_body e
+    (final_ae, bind') = callArityBind late (boringBinds late bind) ae_body int bind
 
 -- Which bindings should we look at?
 -- See Note [Which variables are interesting]
-isInteresting :: Var -> Bool
-isInteresting v = True -- 0 < length (typeArity (idType v))
+isInteresting :: Bool -> Var -> Bool
+isInteresting True  _ = True
+isInteresting False v = 0 < length (typeArity (idType v))
 
-interestingBinds :: CoreBind -> [Var]
-interestingBinds = filter isInteresting . bindersOf
+interestingBinds :: Bool -> CoreBind -> [Var]
+interestingBinds late = filter (isInteresting late) . bindersOf
 
-boringBinds :: CoreBind -> VarSet
-boringBinds = mkVarSet . filter (not . isInteresting) . bindersOf
+boringBinds :: Bool -> CoreBind -> VarSet
+boringBinds late = mkVarSet . filter (not . isInteresting late) . bindersOf
 
-addInterestingBinds :: VarSet -> CoreBind -> VarSet
-addInterestingBinds int bind
+addInterestingBinds :: Bool -> VarSet -> CoreBind -> VarSet
+addInterestingBinds late int bind
     = int `delVarSetList`    bindersOf bind -- Possible shadowing
-          `extendVarSetList` interestingBinds bind
+          `extendVarSetList` interestingBinds late bind
 
 -- Used for both local and top-level binds
 -- Second argument is the demand from the body
-callArityBind :: VarSet -> CallArityRes -> VarSet -> CoreBind -> (CallArityRes, CoreBind)
+callArityBind :: Bool -> VarSet -> CallArityRes -> VarSet -> CoreBind -> (CallArityRes, CoreBind)
 -- Non-recursive let
-callArityBind boring_vars ae_body int (NonRec v rhs)
+callArityBind late boring_vars ae_body int (NonRec v rhs)
   | otherwise
   = -- pprTrace "callArityBind:NonRec"
     --          (vcat [ppr v, ppr ae_body, ppr int, ppr ae_rhs, ppr safe_arity])
@@ -547,7 +549,7 @@ callArityBind boring_vars ae_body int (NonRec v rhs)
     -- See Note [Trimming arity]
     trimmed_arity = trimArity v safe_arity
 
-    (ae_rhs, rhs') = callArityAnal trimmed_arity int rhs
+    (ae_rhs, rhs') = callArityAnal late trimmed_arity int rhs
 
 
     ae_rhs'| called_once     = ae_rhs
@@ -567,7 +569,7 @@ callArityBind boring_vars ae_body int (NonRec v rhs)
 
 
 -- Recursive let. See Note [Recursion and fixpointing]
-callArityBind boring_vars ae_body int b@(Rec binds)
+callArityBind late boring_vars ae_body int b@(Rec binds)
   = -- (if length binds > 300 then
     -- pprTrace "callArityBind:Rec"
     --           (vcat [ppr (Rec binds'), ppr ae_body, ppr int, ppr ae_rhs]) else id) $
@@ -576,7 +578,7 @@ callArityBind boring_vars ae_body int b@(Rec binds)
     -- See Note [Taking boring variables into account]
     any_boring = any (`elemVarSet` boring_vars) [ i | (i, _) <- binds]
 
-    int_body = int `addInterestingBinds` b
+    int_body = addInterestingBinds late int b
     (ae_rhs, binds') = fix initial_binds
     final_ae = bindersOf b `resDelList` ae_rhs
 
@@ -614,7 +616,7 @@ callArityBind boring_vars ae_body int b@(Rec binds)
                   -- See Note [Trimming arity]
                   trimmed_arity = trimArity i safe_arity
 
-                  (ae_rhs, rhs') = callArityAnal trimmed_arity int_body rhs
+                  (ae_rhs, rhs') = callArityAnal late trimmed_arity int_body rhs
 
                   ae_rhs' | called_once     = ae_rhs
                           | safe_arity == 0 = ae_rhs -- If it is not a function, its body is evaluated only once

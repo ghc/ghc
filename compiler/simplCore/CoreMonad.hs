@@ -129,7 +129,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreLiberateCase
   | CoreDoPrintCore
   | CoreDoStaticArgs
-  | CoreDoCallArity
+  | CoreDoCallArity Bool
   | CoreDoStrictness
   | CoreDoWorkerWrapper
   | CoreDoSpecialising
@@ -155,7 +155,7 @@ instance Outputable CoreToDo where
   ppr (CoreDoFloatOutwards f)  = ptext (sLit "Float out") <> parens (ppr f)
   ppr CoreLiberateCase         = ptext (sLit "Liberate case")
   ppr CoreDoStaticArgs         = ptext (sLit "Static argument")
-  ppr CoreDoCallArity          = ptext (sLit "Called arity analysis")
+  ppr (CoreDoCallArity _)      = ptext (sLit "Called arity analysis")
   ppr CoreDoStrictness         = ptext (sLit "Demand analysis")
   ppr CoreDoWorkerWrapper      = ptext (sLit "Worker Wrapper binds")
   ppr CoreDoSpecialising       = ptext (sLit "Specialise")
