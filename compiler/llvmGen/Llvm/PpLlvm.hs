@@ -117,7 +117,6 @@ ppLlvmMeta (MetaNamed n m)
 
 -- | Print out an LLVM metadata value.
 ppLlvmMetaExpr :: MetaExpr -> SDoc
-ppLlvmMetaExpr (MetaVar (LMLitVar (LMNullLit _))) = text "null"
 ppLlvmMetaExpr (MetaStr    s ) = text "!" <> doubleQuotes (ftext s)
 ppLlvmMetaExpr (MetaNode   n ) = text "!" <> int n
 ppLlvmMetaExpr (MetaVar    v ) = ppr v
@@ -274,12 +273,17 @@ ppCall ct fptr args attrs = case fptr of
                 ++ "local var of pointer function type."
 
     where
-        ppCall' (LlvmFunctionDecl _ _ cc ret _ _ _) =
+        ppCall' (LlvmFunctionDecl _ _ cc ret argTy params _) =
             let tc = if ct == TailCall then text "tail " else empty
                 ppValues = hsep $ punctuate comma $ map ppCallMetaExpr args
+                ppArgTy  = (ppCommaJoin $ map fst params) <>
+                           (case argTy of
+                               VarArgs   -> text ", ..."
+                               FixedArgs -> empty)
+                fnty = space <> lparen <> ppArgTy <> rparen <> char '*'
                 attrDoc = ppSpaceJoin attrs
             in  tc <> text "call" <+> ppr cc <+> ppr ret
-                    <+> ppName fptr <> lparen <+> ppValues
+                    <> fnty <+> ppName fptr <> lparen <+> ppValues
                     <+> rparen <+> attrDoc
 
         -- Metadata needs to be marked as having the `metadata` type when used
@@ -358,11 +362,8 @@ ppCmpXChg addr old new s_ord f_ord =
 -- of specifying alignment.
 
 ppLoad :: LlvmVar -> SDoc
-ppLoad var = text "load" <+> derefType <+> ppr var <> align
+ppLoad var = text "load" <+> ppr var <> align
   where
-    derefType = case getVarType var of
-                    LMPointer x -> ppr x <> comma
-                    _ -> empty
     align | isVector . pLower . getVarType $ var = text ", align 1"
           | otherwise = empty
 
@@ -372,10 +373,7 @@ ppALoad ord st var = sdocWithDynFlags $ \dflags ->
       align     = text ", align" <+> ppr alignment
       sThreaded | st        = text " singlethread"
                 | otherwise = empty
-      derefType = case getVarType var of
-                    LMPointer x -> ppr x <> comma
-                    _ -> empty
-  in text "load atomic" <+> derefType <+> ppr var <> sThreaded <+> ppSyncOrdering ord <> align
+  in text "load atomic" <+> ppr var <> sThreaded <+> ppSyncOrdering ord <> align
 
 ppStore :: LlvmVar -> LlvmVar -> SDoc
 ppStore val dst
@@ -411,10 +409,7 @@ ppGetElementPtr :: Bool -> LlvmVar -> [LlvmVar] -> SDoc
 ppGetElementPtr inb ptr idx =
   let indexes = comma <+> ppCommaJoin idx
       inbound = if inb then text "inbounds" else empty
-      derefType = case getVarType ptr of
-                    LMPointer x -> ppr x <> comma
-                    _ -> error "ppGetElementPtr"
-  in text "getelementptr" <+> inbound <+> derefType <+> ppr ptr <> indexes
+  in text "getelementptr" <+> inbound <+> ppr ptr <> indexes
 
 
 ppReturn :: Maybe LlvmVar -> SDoc

@@ -12,7 +12,8 @@ module LlvmCodeGen.Base (
         LiveGlobalRegs,
         LlvmUnresData, LlvmData, UnresLabel, UnresStatic,
 
-        LlvmVersion, supportedLlvmVersion,
+        LlvmVersion, defaultLlvmVersion, minSupportLlvmVersion,
+        maxSupportLlvmVersion,
 
         LlvmM,
         runLlvm, liftStream, withClearVars, varLookup, varInsert,
@@ -173,9 +174,15 @@ llvmPtrBits dflags = widthInBits $ typeWidth $ gcWord dflags
 -- | LLVM Version Number
 type LlvmVersion = Int
 
--- | The LLVM Version that is currently supported.
-supportedLlvmVersion :: LlvmVersion
-supportedLlvmVersion = 37
+-- | The LLVM Version we assume if we don't know
+defaultLlvmVersion :: LlvmVersion
+defaultLlvmVersion = 36
+
+minSupportLlvmVersion :: LlvmVersion
+minSupportLlvmVersion = 36
+
+maxSupportLlvmVersion :: LlvmVersion
+maxSupportLlvmVersion = 36
 
 -- ----------------------------------------------------------------------------
 -- * Environment Handling

@@ -581,7 +581,6 @@ instance Outputable LlvmCallConvention where
   ppr CC_Ccc       = text "ccc"
   ppr CC_Fastcc    = text "fastcc"
   ppr CC_Coldcc    = text "coldcc"
-  ppr (CC_Ncc 10)  = text "ghccc"
   ppr (CC_Ncc i)   = text "cc " <> ppr i
   ppr CC_X86_Stdcc = text "x86_stdcallcc"
 

@@ -553,7 +553,7 @@ esac
 # tools we are looking for. In the past, GHC supported a number of
 # versions of LLVM simultaneously, but that stopped working around
 # 3.5/3.6 release of LLVM.
-LlvmVersion=3.7
+LlvmVersion=3.6
 AC_SUBST([LlvmVersion])
 
 dnl ** Which LLVM llc to use?

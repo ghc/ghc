@@ -47,16 +47,21 @@ llvmCodeGen dflags h us cmm_stream
        showPass dflags "LLVM CodeGen"
 
        -- get llvm version, cache for later use
-       ver <- (fromMaybe supportedLlvmVersion) `fmap` figureLlvmVersion dflags
+       ver <- (fromMaybe defaultLlvmVersion) `fmap` figureLlvmVersion dflags
        writeIORef (llvmVersion dflags) ver
 
        -- warn if unsupported
        debugTraceMsg dflags 2
             (text "Using LLVM version:" <+> text (show ver))
        let doWarn = wopt Opt_WarnUnsupportedLlvmVersion dflags
-       when (ver /= supportedLlvmVersion && doWarn) $
-           putMsg dflags (text "You are using an unsupported version of LLVM!"
+       when (ver < minSupportLlvmVersion && doWarn) $
+           errorMsg dflags (text "You are using an old version of LLVM that"
+                            <> text " isn't supported anymore!"
                             $+$ text "We will try though...")
+       when (ver > maxSupportLlvmVersion && doWarn) $
+           putMsg dflags (text "You are using a new version of LLVM that"
+                          <> text " hasn't been tested yet!"
+                          $+$ text "We will try though...")
 
        -- run code generation
        runLlvm dflags ver bufh us $
