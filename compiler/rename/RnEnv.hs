@@ -26,7 +26,7 @@ module RnEnv (
         lookupSyntaxName, lookupSyntaxNames, lookupIfThenElse,
         lookupGreAvailRn,
         getLookupOccRn, addUsedRdrNames,
-        addUsedSelector,
+        addUsedRdrName,
 
         newLocalBndrRn, newLocalBndrsRn,
         bindLocalNames, bindLocalNamesFV,
@@ -480,11 +480,7 @@ lookupSubBndrOcc warnIfDeprec parent doc rdr_name
                 -- NB: lookupGlobalRdrEnv, not lookupGRE_RdrName!
                 --     The latter does pickGREs, but we want to allow 'x'
                 --     even if only 'M.x' is in scope
-            [gre] | isRecFldGRE gre ->
-                     do { addUsedSelector (FieldOcc rdr_name (gre_name gre))
-                        ; return (gre_name gre) }
-                  | otherwise ->
-                     do { addUsedRdrName warnIfDeprec gre (used_rdr_name gre)
+            [gre] -> do { addUsedRdrName warnIfDeprec gre (used_rdr_name gre)
                           -- Add a usage; this is an *occurrence* site
                         ; return (gre_name gre) }
             []    -> do { ns <- lookupQualifiedNameGHCi rdr_name
@@ -869,8 +865,8 @@ lookupGlobalOccRn_overloaded overload_ok rdr_name
         ; case lookupGRE_RdrName rdr_name env of
                 []    -> return Nothing
                 [gre] | isRecFldGRE gre
-                         -> do { let fld_occ = FieldOcc rdr_name (gre_name gre)
-                               ; addUsedSelector fld_occ
+                         -> do { addUsedRdrName True gre rdr_name
+                               ; let fld_occ = FieldOcc rdr_name (gre_name gre)
                                ; return (Just (Right [fld_occ])) }
                       | otherwise
                          -> do { addUsedRdrName True gre rdr_name
@@ -956,24 +952,30 @@ Note [Handling of deprecations]
      - the things exported by a module export 'module M'
 -}
 
-addUsedSelector :: FieldOcc Name -> RnM ()
--- Record usage of record selectors by DuplicateRecordFields
-addUsedSelector n = do { env <- getGblEnv
-                       ; traceRn (text "addUsedSelector " <+> ppr n)
-                       ; updMutVar (tcg_used_selectors env)
-                                   (\s -> Set.insert n s) }
-
 addUsedRdrName :: Bool -> GlobalRdrElt -> RdrName -> RnM ()
 -- Record usage of imported RdrNames
 addUsedRdrName warn_if_deprec gre rdr
-  = do { unless (isLocalGRE gre) $
-         do { env <- getGblEnv
-            ; traceRn (text "addUsedRdrName 1" <+> ppr gre)
-            ; updMutVar (tcg_used_rdrnames env)
-                        (\s -> Set.insert rdr s) }
+  = do { if isRecFldGRE gre
+           then addUsedSelector (FieldOcc rdr (gre_name gre))
+           else unless (isLocalGRE gre) $ addOneUsedRdrName rdr
 
        ; when warn_if_deprec $
          warnIfDeprecated gre }
+
+addUsedSelector :: FieldOcc Name -> RnM ()
+-- Record usage of record selectors by DuplicateRecordFields
+addUsedSelector n
+  = do { env <- getGblEnv
+       ; traceRn (text "addUsedSelector " <+> ppr n)
+       ; updMutVar (tcg_used_selectors env)
+                   (\s -> Set.insert n s) }
+
+addOneUsedRdrName :: RdrName -> RnM ()
+addOneUsedRdrName rdr
+  = do { env <- getGblEnv
+       ; traceRn (text "addUsedRdrName 1" <+> ppr rdr)
+       ; updMutVar (tcg_used_rdrnames env)
+                   (\s -> Set.insert rdr s) }
 
 addUsedRdrNames :: [RdrName] -> RnM ()
 -- Record used sub-binders

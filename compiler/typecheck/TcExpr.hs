@@ -27,7 +27,7 @@ import BasicTypes
 import Inst
 import TcBinds
 import FamInst          ( tcGetFamInstEnvs, tcLookupDataFamInst )
-import RnEnv            ( lookupGlobalOccRn_overloaded, addUsedSelector )
+import RnEnv            ( addUsedRdrName )
 import TcEnv
 import TcArrows
 import TcMatches
@@ -1428,7 +1428,6 @@ disambiguateRecordBinds record_expr rbnds res_ty
         look (L l x, n) = do i <- tcLookupId n
                              let L loc af = hsRecFieldLbl x
                                  lbl      = rdrNameAmbiguousFieldOcc af
-                             addUsedSelector (FieldOcc lbl n)
                              return $ L l x { hsRecFieldLbl = L loc (Unambiguous lbl i) }
 
     -- Extract the outermost TyCon of a type, if there is one; for
@@ -1440,41 +1439,49 @@ disambiguateRecordBinds record_expr rbnds res_ty
 
     -- Calculate the list of possible parent tycons, by taking the
     -- intersection of the possibilities for each field.
-    possibleParents :: [(LHsRecUpdField Name, [(TyCon, Name)])] -> [TyCon]
+    possibleParents :: [(LHsRecUpdField Name, [(TyCon, a)])] -> [TyCon]
     possibleParents = foldr1 intersect . map (\ (_, xs) -> map fst xs)
 
     -- Look up the parent tycon for each candidate record selector.
-    getParents :: LHsRecUpdField Name -> RnM [(TyCon, Name)]
-    getParents (L _ fld) = case unLoc (hsRecFieldLbl fld) of
-                    Unambiguous _ sel_name -> fmap singleton $ lookupParent sel_name
-                    Ambiguous   _ _        -> do {
-           Just (Right xs) <- lookupGlobalOccRn_overloaded True (unLoc (hsRecUpdFieldRdr fld))
-         ; mapM (lookupParent . selectorFieldOcc) xs }
+    getParents :: LHsRecUpdField Name -> RnM [(TyCon, GlobalRdrElt)]
+    getParents (L _ fld) = do
+         { env <- getGlobalRdrEnv
+         ; let gres = lookupGRE_RdrName (unLoc (hsRecUpdFieldRdr fld)) env
+         ; mapM lookupParent gres }
 
-    lookupParent :: Name -> RnM (TyCon, Name)
-    lookupParent name = do { id <- tcLookupId name
-                           ; ASSERT (isRecordSelector id)
-                             return (recordSelectorTyCon id, name) }
+    lookupParent :: GlobalRdrElt -> RnM (TyCon, GlobalRdrElt)
+    lookupParent gre = do { id <- tcLookupId (gre_name gre)
+                          ; ASSERT (isRecordSelector id)
+                            return (recordSelectorTyCon id, gre) }
 
     -- Make all the fields unambiguous by choosing the given parent.
     -- Fails with an error if any of the ambiguous fields cannot have
     -- that parent, e.g. if the user writes
     --     r { x = e } :: T
     -- where T does not have field x.
-    assignParent :: TyCon -> [(LHsRecUpdField Name, [(TyCon, Name)])]
+    assignParent :: TyCon -> [(LHsRecUpdField Name, [(TyCon, GlobalRdrElt)])]
                  -> RnM [LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name)]
-    assignParent p rbnds | null orphans = lookupSelectors rbnds'
-                         | otherwise    = failWithTc (orphanFields p orphans)
+    assignParent p rbnds
+      | null orphans = do rbnds'' <- mapM f rbnds'
+                          lookupSelectors rbnds''
+      | otherwise    = failWithTc (orphanFields p orphans)
       where
         (orphans, rbnds') = partitionWith pickParent rbnds
 
+        -- AMG TODO explain why this is fiddly
+        f (fld, gre, was_unambiguous)
+            = do { unless was_unambiguous $ do
+                     let L loc rdr = hsRecUpdFieldRdr (unLoc fld)
+                     setSrcSpan loc $ addUsedRdrName True gre rdr
+                 ; return (fld, gre_name gre) }
+
         -- Returns Right if fld can have parent p, or Left lbl if not.
-        pickParent :: (LHsRecUpdField Name, [(TyCon, Name)])
-                   -> Either (Located RdrName) (LHsRecUpdField Name, Name)
+        pickParent :: (LHsRecUpdField Name, [(TyCon, GlobalRdrElt)])
+                   -> Either (Located RdrName) (LHsRecUpdField Name, GlobalRdrElt, Bool)
         pickParent (fld, xs)
             = case lookup p xs of
-                  Just name -> Right (fld, name)
-                  Nothing   -> Left (hsRecUpdFieldRdr (unLoc fld))
+                  Just gre -> Right (fld, gre, null (tail xs))
+                  Nothing  -> Left  (hsRecUpdFieldRdr (unLoc fld))
 
     -- A type signature on the record expression must be "obvious",
     -- i.e. the outermost constructor ignoring parentheses.
