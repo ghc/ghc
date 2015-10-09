@@ -28,6 +28,7 @@ Thumbs.db
 *.depend*
 *.dyn_o
 *.dyn_hi
+__pycache__
 
 log
 tags
