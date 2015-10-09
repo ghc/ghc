@@ -613,7 +613,7 @@ runClang dflags args = do
     )
 
 -- | Figure out which version of LLVM we are running this session
-figureLlvmVersion :: DynFlags -> IO (Maybe Int)
+figureLlvmVersion :: DynFlags -> IO (Maybe (Int, Int))
 figureLlvmVersion dflags = do
   let (pgm,opts) = pgm_lc dflags
       args = filter notNull (map showOpt opts)
@@ -626,17 +626,18 @@ figureLlvmVersion dflags = do
              (pin, pout, perr, _) <- runInteractiveProcess pgm args'
                                              Nothing Nothing
              {- > llc -version
-                  Low Level Virtual Machine (http://llvm.org/):
-                    llvm version 2.8 (Ubuntu 2.8-0Ubuntu1)
+                  LLVM (http://llvm.org/):
+                    LLVM version 3.5.2
                     ...
              -}
              hSetBinaryMode pout False
              _     <- hGetLine pout
-             vline <- hGetLine pout
-             v     <- case filter isDigit vline of
-                            []      -> fail "no digits!"
-                            [x]     -> fail $ "only 1 digit! (" ++ show x ++ ")"
-                            (x:y:_) -> return ((read [x,y]) :: Int)
+             vline <- dropWhile (not . isDigit) `fmap` hGetLine pout
+             v     <- case span (/= '.') vline of
+                        ("",_)  -> fail "no digits!"
+                        (x,y) -> return (read x
+                                        , read $ takeWhile isDigit $ drop 1 y)
+
              hClose pin
              hClose pout
              hClose perr

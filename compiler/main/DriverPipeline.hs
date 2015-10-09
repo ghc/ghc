@@ -66,7 +66,6 @@ import TcRnTypes
 import Hooks
 
 import Exception
-import Data.IORef       ( readIORef )
 import System.Directory
 import System.FilePath
 import System.IO
@@ -1259,14 +1258,7 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
         -- assembler, so we use clang as the assembler instead. (#5636)
         let whichAsProg | hscTarget dflags == HscLlvm &&
                           platformOS (targetPlatform dflags) == OSDarwin
-                        = do
-                            -- be careful what options we call clang with
-                            -- see #5903 and #7617 for bugs caused by this.
-                            llvmVer <- liftIO $ figureLlvmVersion dflags
-                            return $ case llvmVer of
-                                Just n | n >= 30 -> SysTools.runClang
-                                _                -> SysTools.runAs
-
+                        = return SysTools.runClang
                         | otherwise = return SysTools.runAs
 
         as_prog <- whichAsProg
@@ -1408,18 +1400,15 @@ runPhase (RealPhase SplitAs) _input_fn dflags
 
 runPhase (RealPhase LlvmOpt) input_fn dflags
   = do
-    ver <- liftIO $ readIORef (llvmVersion dflags)
-
     let opt_lvl  = max 0 (min 2 $ optLevel dflags)
         -- don't specify anything if user has specified commands. We do this
         -- for opt but not llc since opt is very specifically for optimisation
         -- passes only, so if the user is passing us extra options we assume
         -- they know what they are doing and don't get in the way.
         optFlag  = if null (getOpts dflags opt_lo)
-                       then map SysTools.Option $ words (llvmOpts ver !! opt_lvl)
+                       then map SysTools.Option $ words (llvmOpts !! opt_lvl)
                        else []
-        tbaa | ver < 29                 = "" -- no tbaa in 2.8 and earlier
-             | gopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
+        tbaa | gopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
              | otherwise                = "--enable-tbaa=false"
 
 
@@ -1433,22 +1422,19 @@ runPhase (RealPhase LlvmOpt) input_fn dflags
                 ++ [SysTools.Option tbaa])
 
     return (RealPhase LlvmLlc, output_fn)
-  where 
+  where
         -- we always (unless -optlo specified) run Opt since we rely on it to
         -- fix up some pretty big deficiencies in the code we generate
-        llvmOpts ver = [ "-mem2reg -globalopt"
-                       , if ver >= 34 then "-O1 -globalopt" else "-O1"
-                         -- LLVM 3.4 -O1 doesn't eliminate aliases reliably (bug #8855)
-                       , "-O2"
-                       ]
+        llvmOpts =  [ "-mem2reg -globalopt"
+                    , "-O1 -globalopt"
+                    , "-O2"
+                    ]
 
 -----------------------------------------------------------------------------
 -- LlvmLlc phase
 
 runPhase (RealPhase LlvmLlc) input_fn dflags
   = do
-    ver <- liftIO $ readIORef (llvmVersion dflags)
-
     let opt_lvl = max 0 (min 2 $ optLevel dflags)
         -- iOS requires external references to be loaded indirectly from the
         -- DATA segment or dyld traps at runtime writing into TEXT: see #7722
@@ -1456,8 +1442,7 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
                | gopt Opt_PIC dflags                         = "pic"
                | not (gopt Opt_Static dflags)                = "dynamic-no-pic"
                | otherwise                                   = "static"
-        tbaa | ver < 29                 = "" -- no tbaa in 2.8 and earlier
-             | gopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
+        tbaa | gopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
              | otherwise                = "--enable-tbaa=false"
 
     -- hidden debugging flag '-dno-llvm-mangler' to skip mangling
@@ -1465,13 +1450,8 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
                          False                            -> LlvmMangle
                          True | gopt Opt_SplitObjs dflags -> Splitter
                          True                             -> As False
-                        
-    output_fn <- phaseOutputFilename next_phase
 
-    -- AVX can cause LLVM 3.2 to generate a C-like frame pointer
-    -- prelude, see #9391
-    when (ver == 32 && isAvxEnabled dflags) $ liftIO $ errorMsg dflags $ text
-      "Note: LLVM 3.2 has known problems with AVX instructions (see trac #9391)"
+    output_fn <- phaseOutputFilename next_phase
 
     liftIO $ SysTools.runLlvmLlc dflags
                 ([ SysTools.Option (llvmOpts !! opt_lvl),
@@ -1482,7 +1462,7 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
                 ++ map SysTools.Option fpOpts
                 ++ map SysTools.Option abiOpts
                 ++ map SysTools.Option sseOpts
-                ++ map SysTools.Option (avxOpts ver)
+                ++ map SysTools.Option avxOpts
                 ++ map SysTools.Option avx512Opts
                 ++ map SysTools.Option stackAlignOpts)
 
@@ -1495,7 +1475,7 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
         -- On ARMv7 using LLVM, LLVM fails to allocate floating point registers
         -- while compiling GHC source code. It's probably due to fact that it
         -- does not enable VFP by default. Let's do this manually here
-        fpOpts = case platformArch (targetPlatform dflags) of 
+        fpOpts = case platformArch (targetPlatform dflags) of
                    ArchARM ARMv7 ext _ -> if (elem VFPv3 ext)
                                       then ["-mattr=+v7,+vfp3"]
                                       else if (elem VFPv3D16 ext)
@@ -1518,11 +1498,10 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
                 | isSseEnabled dflags    = ["-mattr=+sse"]
                 | otherwise              = []
 
-        avxOpts ver | isAvx512fEnabled dflags = ["-mattr=+avx512f"]
-                    | isAvx2Enabled dflags    = ["-mattr=+avx2"]
-                    | isAvxEnabled dflags     = ["-mattr=+avx"]
-                    | ver == 32               = ["-mattr=-avx"] -- see #9391
-                    | otherwise               = []
+        avxOpts | isAvx512fEnabled dflags = ["-mattr=+avx512f"]
+                | isAvx2Enabled dflags    = ["-mattr=+avx2"]
+                | isAvxEnabled dflags     = ["-mattr=+avx"]
+                | otherwise               = []
 
         avx512Opts =
           [ "-mattr=+avx512cd" | isAvx512cdEnabled dflags ] ++

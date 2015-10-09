@@ -568,6 +568,8 @@ data LlvmCallConvention
   -- does not support varargs and requires the prototype of all callees to
   -- exactly match the prototype of the function definition.
   | CC_Coldcc
+  -- | The GHC-specific 'registerised' calling convention.
+  | CC_Ghc
   -- | Any calling convention may be specified by number, allowing
   -- target-specific calling conventions to be used. Target specific calling
   -- conventions start at 64.
@@ -581,6 +583,7 @@ instance Outputable LlvmCallConvention where
   ppr CC_Ccc       = text "ccc"
   ppr CC_Fastcc    = text "fastcc"
   ppr CC_Coldcc    = text "coldcc"
+  ppr CC_Ghc       = text "ghccc"
   ppr (CC_Ncc i)   = text "cc " <> ppr i
   ppr CC_X86_Stdcc = text "x86_stdcallcc"
 

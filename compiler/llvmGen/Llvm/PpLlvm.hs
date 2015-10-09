@@ -117,6 +117,7 @@ ppLlvmMeta (MetaNamed n m)
 
 -- | Print out an LLVM metadata value.
 ppLlvmMetaExpr :: MetaExpr -> SDoc
+ppLlvmMetaExpr (MetaVar (LMLitVar (LMNullLit _))) = text "null"
 ppLlvmMetaExpr (MetaStr    s ) = text "!" <> doubleQuotes (ftext s)
 ppLlvmMetaExpr (MetaNode   n ) = text "!" <> int n
 ppLlvmMetaExpr (MetaVar    v ) = ppr v
@@ -280,7 +281,7 @@ ppCall ct fptr args attrs = case fptr of
                            (case argTy of
                                VarArgs   -> text ", ..."
                                FixedArgs -> empty)
-                fnty = space <> lparen <> ppArgTy <> rparen <> char '*'
+                fnty = space <> lparen <> ppArgTy <> rparen
                 attrDoc = ppSpaceJoin attrs
             in  tc <> text "call" <+> ppr cc <+> ppr ret
                     <> fnty <+> ppName fptr <> lparen <+> ppValues
@@ -362,8 +363,9 @@ ppCmpXChg addr old new s_ord f_ord =
 -- of specifying alignment.
 
 ppLoad :: LlvmVar -> SDoc
-ppLoad var = text "load" <+> ppr var <> align
+ppLoad var = text "load" <+> ppr derefType <> comma <+> ppr var <> align
   where
+    derefType = pLower $ getVarType var
     align | isVector . pLower . getVarType $ var = text ", align 1"
           | otherwise = empty
 
@@ -373,7 +375,9 @@ ppALoad ord st var = sdocWithDynFlags $ \dflags ->
       align     = text ", align" <+> ppr alignment
       sThreaded | st        = text " singlethread"
                 | otherwise = empty
-  in text "load atomic" <+> ppr var <> sThreaded <+> ppSyncOrdering ord <> align
+      derefType = pLower $ getVarType var
+  in text "load atomic" <+> ppr derefType <> comma <+> ppr var <> sThreaded
+            <+> ppSyncOrdering ord <> align
 
 ppStore :: LlvmVar -> LlvmVar -> SDoc
 ppStore val dst
@@ -409,7 +413,9 @@ ppGetElementPtr :: Bool -> LlvmVar -> [LlvmVar] -> SDoc
 ppGetElementPtr inb ptr idx =
   let indexes = comma <+> ppCommaJoin idx
       inbound = if inb then text "inbounds" else empty
-  in text "getelementptr" <+> inbound <+> ppr ptr <> indexes
+      derefType = pLower $ getVarType ptr
+  in text "getelementptr" <+> inbound <+> ppr derefType <> comma <+> ppr ptr
+                            <> indexes
 
 
 ppReturn :: Maybe LlvmVar -> SDoc
