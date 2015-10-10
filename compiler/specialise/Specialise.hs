@@ -449,7 +449,7 @@ The SpecEnv of an Id maps a list of types (the template) to an expression
 
         [Type]  |->  Expr
 
-For example, if f has this SpecInfo:
+For example, if f has this RuleInfo:
 
         [Int, a]  ->  \d:Ord Int. f' a
 

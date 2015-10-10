@@ -1218,7 +1218,7 @@ cpCloneBndr env bndr
        -- so that we can drop more stuff as dead code.
        -- See also Note [Dead code in CorePrep]
        let bndr'' = bndr' `setIdUnfolding` noUnfolding
-                          `setIdSpecialisation` emptySpecInfo
+                          `setIdSpecialisation` emptyRuleInfo
        return (extendCorePrepEnv env bndr bndr'', bndr'')
 
   | otherwise   -- Top level things, which we don't want

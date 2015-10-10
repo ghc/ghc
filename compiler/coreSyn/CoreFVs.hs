@@ -408,7 +408,7 @@ idRuleAndUnfoldingVars id = ASSERT( isId id)
                             idUnfoldingVars id
 
 idRuleVars ::Id -> VarSet  -- Does *not* include CoreUnfolding vars
-idRuleVars id = ASSERT( isId id) specInfoFreeVars (idSpecialisation id)
+idRuleVars id = ASSERT( isId id) ruleInfoFreeVars (idSpecialisation id)
 
 idUnfoldingVars :: Id -> VarSet
 -- Produce free vars for an unfolding, but NOT for an ordinary

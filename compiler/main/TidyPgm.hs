@@ -832,7 +832,7 @@ dffvLetBndr :: Bool -> Id -> DFFV ()
 --       we say "True" if we are exposing that unfolding
 dffvLetBndr vanilla_unfold id
   = do { go_unf (unfoldingInfo idinfo)
-       ; mapM_ go_rule (specInfoRules (specInfo idinfo)) }
+       ; mapM_ go_rule (ruleInfoRules (ruleInfo idinfo)) }
   where
     idinfo = idInfo id
 

@@ -573,17 +573,17 @@ setIdDemandInfo id dmd = modifyIdInfo (`setDemandInfo` dmd) id
 
 -- See Note [Specialisations and RULES in IdInfo] in IdInfo.hs
 
-idSpecialisation :: Id -> SpecInfo
-idSpecialisation id = specInfo (idInfo id)
+idSpecialisation :: Id -> RuleInfo
+idSpecialisation id = ruleInfo (idInfo id)
 
 idCoreRules :: Id -> [CoreRule]
-idCoreRules id = specInfoRules (idSpecialisation id)
+idCoreRules id = ruleInfoRules (idSpecialisation id)
 
 idHasRules :: Id -> Bool
-idHasRules id = not (isEmptySpecInfo (idSpecialisation id))
+idHasRules id = not (isEmptyRuleInfo (idSpecialisation id))
 
-setIdSpecialisation :: Id -> SpecInfo -> Id
-setIdSpecialisation id spec_info = modifyIdInfo (`setSpecInfo` spec_info) id
+setIdSpecialisation :: Id -> RuleInfo -> Id
+setIdSpecialisation id spec_info = modifyIdInfo (`setRuleInfo` spec_info) id
 
         ---------------------------------
         -- CAF INFO
