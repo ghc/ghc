@@ -12,8 +12,6 @@ test('ghcilink002',
 
 test('ghcilink003',
      [
-       # still cannot load libstdc++ on Windows.  See also #4468.
-       when(opsys('mingw32'), expect_broken(5289)),
        unless(doing_ghci, skip),
        extra_clean(['dir003/*','dir003'])
      ],
@@ -36,8 +34,6 @@ test('ghcilink005',
 
 test('ghcilink006',
      [
-       # still cannot load libstdc++ on Windows.  See also #4468.
-       when(opsys('mingw32'), expect_broken(5289)),
        unless(doing_ghci, skip),
        extra_clean(['dir006/ghcilink006.package.conf/*', 'dir006/*','dir006'])
      ],
@@ -47,9 +43,7 @@ test('ghcilink006',
 test('T3333',
      [extra_clean(['T3333.o']),
      unless(doing_ghci, skip),
-     unless(opsys('linux') or ghci_dynamic(), expect_broken(3333))],
+     unless(ghci_dynamic(), expect_broken(3333))],
      run_command,
      ['$MAKE -s --no-print-directory T3333'])
 
-test('T1407', when(opsys('mingw32'), expect_broken(1407)),
-     ghci_script, ['T1407.script'])

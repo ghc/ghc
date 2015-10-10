@@ -1200,7 +1200,7 @@ locateLib dflags is_hs dirs lib
     --       for a dynamic library (#5289)
     --   otherwise, assume loadDLL can find it
     --
-  = findDll `orElse` findArchive `orElse` tryGcc `orElse` assumeDll
+  = findDll `orElse` findArchive `orElse` tryGcc `orElse` tryGccPrefixed `orElse` assumeDll
 
   | not dynamicGhc
     -- When the GHC package was not compiled as dynamic library
@@ -1221,6 +1221,7 @@ locateLib dflags is_hs dirs lib
      hs_dyn_lib_file = mkHsSOName platform hs_dyn_lib_name
 
      so_name = mkSOName platform lib
+     lib_so_name = "lib" ++ so_name
      dyn_lib_file = case (arch, os) of
                              (ArchX86_64, OSSolaris2) -> "64" </> so_name
                              _ -> so_name
@@ -1230,7 +1231,8 @@ locateLib dflags is_hs dirs lib
      findArchive    = liftM (fmap Archive) $ findFile dirs arch_file
      findHSDll      = liftM (fmap DLLPath) $ findFile dirs hs_dyn_lib_file
      findDll        = liftM (fmap DLLPath) $ findFile dirs dyn_lib_file
-     tryGcc         = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags so_name dirs
+     tryGcc         = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags so_name     dirs
+     tryGccPrefixed = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags lib_so_name dirs
 
      assumeDll   = return (DLL lib)
      infixr `orElse`
@@ -1242,7 +1244,9 @@ locateLib dflags is_hs dirs lib
 
 searchForLibUsingGcc :: DynFlags -> String -> [FilePath] -> IO (Maybe FilePath)
 searchForLibUsingGcc dflags so dirs = do
-   str <- askCc dflags (map (FileOption "-L") dirs
+   -- GCC does not seem to extend the library search path (using -L) when using
+   -- --print-file-name. So instead pass it a new base location.
+   str <- askCc dflags (map (FileOption "-B") dirs
                           ++ [Option "--print-file-name", Option so])
    let file = case lines str of
                 []  -> ""

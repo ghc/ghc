@@ -208,8 +208,7 @@ test('T9878',
     [extra_clean(['T9878.hi','T9878.o'])],
     ghci_script, ['T9878.script'])
 test('T9878b',
-    [ when(opsys('mingw32'), expect_broken(9878)),
-      extra_run_opts('-fobject-code'),
+    [ extra_run_opts('-fobject-code'),
       extra_clean(['T9878b.hi','T9878b.o'])],
     ghci_script, ['T9878b.script'])
 test('T10018', normal, ghci_script, ['T10018.script'])
