@@ -43,7 +43,7 @@ test('ghcilink006',
 test('T3333',
      [extra_clean(['T3333.o']),
      unless(doing_ghci, skip),
-     unless(ghci_dynamic(), expect_broken(3333))],
+     unless(opsys('linux') or ghci_dynamic(), expect_broken(3333))],
      run_command,
      ['$MAKE -s --no-print-directory T3333'])
 
