@@ -13,13 +13,16 @@
 
 # Build Sphinx documentation
 
+# We are careful not to use the same directory the doctree files for the
+# various Sphinx targets as make may run them in parallel (see #10950).
+
 define sphinx
 $(call trace, sphinx($1,$2))
 $(call profStart, sphinx($1,$2))
 # $1 = dir
 # $2 = docname
 
-$(call clean-target,$1,sphinx,$1/.doctrees $1/build-html/ $1/build-pdf $1/$2.pdf)
+$(call clean-target,$1,sphinx,$1/.doctrees-html/ $1/.doctrees-pdf/ $1/build-html/ $1/build-pdf/ $1/$2.pdf)
 
 # empty "all_$1" target just in case we're not building docs at all
 $(call all-target,$1,)
@@ -37,7 +40,7 @@ html : html_$1
 
 ifneq "$$(BINDIST)" "YES"
 $1/build-html/$2/index.html: $1/conf.py $$($1_RST_SOURCES)
-	$(SPHINXBUILD) -b html -d $1/.doctrees $(SPHINXOPTS) $1 $1/build-html/$2
+	$(SPHINXBUILD) -b html -d $1/.doctrees-html $(SPHINXOPTS) $1 $1/build-html/$2
 endif
 
 
@@ -54,7 +57,7 @@ pdf : pdf_$1
 
 ifneq "$$(BINDIST)" "YES"
 $1/$2.pdf: $$($1_RST_SOURCES)
-	$(SPHINXBUILD) -b latex -d $1/.doctrees $(SPHINXOPTS) $1 $1/build-pdf/$2
+	$(SPHINXBUILD) -b latex -d $1/.doctrees-pdf $(SPHINXOPTS) $1 $1/build-pdf/$2
 	cd $1/build-pdf/$2 ; xelatex $2.tex
 	cd $1/build-pdf/$2 ; xelatex $2.tex
 	cp $1/build-pdf/$2/$2.pdf $1/$2.pdf
