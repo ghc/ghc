@@ -497,7 +497,6 @@ Library
         Vectorise
         Hoopl.Dataflow
         Hoopl
-        ShPackageKey
 --        CgInfoTbls used in ghci/DebuggerUtils
 --        CgHeapery  mkVirtHeapOffsets used in ghci
 

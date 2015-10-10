@@ -100,10 +100,6 @@ module DynFlags (
         parseDynamicFilePragma,
         parseDynamicFlagsFull,
 
-        -- ** Package key cache
-        PackageKeyCache,
-        ShPackageKey(..),
-
         -- ** Available DynFlags
         allFlags,
         flagsAll,
@@ -181,8 +177,6 @@ import Foreign.C        ( CInt(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
 #endif
 import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessage )
-import UniqFM
-import UniqSet
 
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
@@ -666,29 +660,6 @@ type SigOf = Map ModuleName Module
 getSigOf :: DynFlags -> ModuleName -> Maybe Module
 getSigOf dflags n = Map.lookup n (sigOf dflags)
 
--- NameCache updNameCache
-type PackageKeyEnv = UniqFM
-type PackageKeyCache = PackageKeyEnv ShPackageKey
-
--- | An elaborated representation of a 'PackageKey', which records
--- all of the components that go into the hashed 'PackageKey'.
-data ShPackageKey
-    = ShPackageKey {
-          shPackageKeyUnitName          :: !UnitName,
-          shPackageKeyLibraryName       :: !LibraryName,
-          shPackageKeyInsts             :: ![(ModuleName, Module)],
-          shPackageKeyFreeHoles         :: UniqSet ModuleName
-      }
-    | ShDefinitePackageKey {
-          shPackageKey :: !PackageKey
-      }
-    deriving Eq
-
-instance Outputable ShPackageKey where
-    ppr (ShPackageKey pn vh insts fh)
-        = ppr pn <+> ppr vh <+> ppr insts <+> parens (ppr fh)
-    ppr (ShDefinitePackageKey pk) = ppr pk
-
 -- | Contains not only a collection of 'GeneralFlag's but also a plethora of
 -- information relating to the compilation of a single file or GHC session
 data DynFlags = DynFlags {
@@ -734,9 +705,6 @@ data DynFlags = DynFlags {
                                          --   Typically only 1 is needed
 
   thisPackage           :: PackageKey,   -- ^ key of package currently being compiled
-  thisLibraryName       :: LibraryName,
-                            -- ^ the version hash which identifies the textual
-                            --   package being compiled.
 
   -- ways
   ways                  :: [Way],       -- ^ Way flags from the command line
@@ -823,7 +791,6 @@ data DynFlags = DynFlags {
   -- Packages.initPackages
   pkgDatabase           :: Maybe [PackageConfig],
   pkgState              :: PackageState,
-  pkgKeyCache           :: {-# UNPACK #-} !(IORef PackageKeyCache),
 
   -- Temporary files
   -- These have to be IORefs, because the defaultCleanupHandler needs to
@@ -1473,7 +1440,6 @@ defaultDynFlags mySettings =
         solverIterations        = treatZeroAsInf mAX_SOLVER_ITERATIONS,
 
         thisPackage             = mainPackageKey,
-        thisLibraryName         = LibraryName nilFS,
 
         objectDir               = Nothing,
         dylibInstallName        = Nothing,
@@ -1519,7 +1485,6 @@ defaultDynFlags mySettings =
         pkgDatabase             = Nothing,
         -- This gets filled in with GHC.setSessionDynFlags
         pkgState                = emptyPackageState,
-        pkgKeyCache             = v_unsafePkgKeyCache,
         ways                    = defaultWays mySettings,
         buildTag                = mkBuildTag (defaultWays mySettings),
         rtsBuildTag             = mkBuildTag (defaultWays mySettings),
@@ -2768,7 +2733,6 @@ package_flags = [
                                       upd (setPackageKey name)
                                       deprecate "Use -this-package-key instead")
   , defGhcFlag "this-package-key"   (hasArg setPackageKey)
-  , defGhcFlag "library-name"       (hasArg setLibraryName)
   , defFlag "package-id"            (HasArg exposePackageId)
   , defFlag "package"               (HasArg exposePackage)
   , defFlag "package-key"           (HasArg exposePackageKey)
@@ -3773,9 +3737,6 @@ exposePackage' p dflags
 setPackageKey :: String -> DynFlags -> DynFlags
 setPackageKey p s =  s{ thisPackage = stringToPackageKey p }
 
-setLibraryName :: String -> DynFlags -> DynFlags
-setLibraryName v s = s{ thisLibraryName = LibraryName (mkFastString v) }
-
 -- -----------------------------------------------------------------------------
 -- | Find the package environment (if one exists)
 --
@@ -4265,8 +4226,6 @@ unsafeGlobalDynFlags = unsafePerformIO $ readIORef v_unsafeGlobalDynFlags
 
 setUnsafeGlobalDynFlags :: DynFlags -> IO ()
 setUnsafeGlobalDynFlags = writeIORef v_unsafeGlobalDynFlags
-
-GLOBAL_VAR(v_unsafePkgKeyCache, emptyUFM, PackageKeyCache)
 
 -- -----------------------------------------------------------------------------
 -- SSE and AVX

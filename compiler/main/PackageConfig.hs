@@ -12,18 +12,13 @@ module PackageConfig (
         -- * PackageKey
         packageConfigId,
 
-        -- * LibraryName
-        LibraryName(..),
-
         -- * The PackageConfig type: information about a package
         PackageConfig,
         InstalledPackageInfo(..),
         InstalledPackageId(..),
         SourcePackageId(..),
         PackageName(..),
-        UnitName(..),
         Version(..),
-        packageUnitName,
         defaultPackageConfig,
         installedPackageIdString,
         sourcePackageIdString,
@@ -59,8 +54,6 @@ type PackageConfig = InstalledPackageInfo
 newtype InstalledPackageId = InstalledPackageId FastString deriving (Eq, Ord)
 newtype SourcePackageId    = SourcePackageId    FastString deriving (Eq, Ord)
 newtype PackageName        = PackageName        FastString deriving (Eq, Ord)
-newtype UnitName           = UnitName           FastString deriving (Eq, Ord)
-newtype LibraryName        = LibraryName        FastString deriving (Eq, Ord)
 
 instance BinaryStringRep InstalledPackageId where
   fromStringRep = InstalledPackageId . mkFastStringByteString
@@ -74,10 +67,6 @@ instance BinaryStringRep PackageName where
   fromStringRep = PackageName . mkFastStringByteString
   toStringRep (PackageName s) = fastStringToByteString s
 
-instance BinaryStringRep LibraryName where
-  fromStringRep = LibraryName . mkFastStringByteString
-  toStringRep (LibraryName s) = fastStringToByteString s
-
 instance Uniquable InstalledPackageId where
   getUnique (InstalledPackageId n) = getUnique n
 
@@ -89,12 +78,6 @@ instance Uniquable PackageName where
 
 instance Outputable InstalledPackageId where
   ppr (InstalledPackageId str) = ftext str
-
-instance Outputable UnitName where
-  ppr (UnitName str) = ftext str
-
-instance Outputable LibraryName where
-  ppr (LibraryName str) = ftext str
 
 instance Outputable SourcePackageId where
   ppr (SourcePackageId str) = ftext str
@@ -188,7 +171,3 @@ pprPackageConfig InstalledPackageInfo {..} =
 -- | Get the GHC 'PackageKey' right out of a Cabalish 'PackageConfig'
 packageConfigId :: PackageConfig -> PackageKey
 packageConfigId = packageKey
-
-packageUnitName :: PackageConfig -> UnitName
-packageUnitName pkg = let PackageName fs = packageName pkg
-                      in UnitName fs
