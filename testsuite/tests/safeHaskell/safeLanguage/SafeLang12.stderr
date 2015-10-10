@@ -4,7 +4,8 @@ SafeLang12.hs:2:14: warning:
 
 SafeLang12_B.hs:2:14: warning:
     -XTemplateHaskell is not allowed in Safe Haskell; ignoring -XTemplateHaskell
-[1 of 3] Compiling SafeLang12_B     ( SafeLang12_B.hs, SafeLang12_B.o )
+[1 of 3] Compiling SafeLang12_A     ( SafeLang12_A.hs, SafeLang12_A.o )
+[2 of 3] Compiling SafeLang12_B     ( SafeLang12_B.hs, SafeLang12_B.o )
 
 SafeLang12_B.hs:5:1: error:
     Language.Haskell.TH: Can't be safely imported!

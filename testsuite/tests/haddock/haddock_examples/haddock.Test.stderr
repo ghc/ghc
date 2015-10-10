@@ -1,17 +1,17 @@
-[1 of 3] Compiling Visible          ( Visible.hs, Visible.o )
-
-==================== Parser ====================
-module Visible where
-visible :: Int -> Int
-visible a = a
-
-
-[2 of 3] Compiling Hidden           ( Hidden.hs, Hidden.o )
+[1 of 3] Compiling Hidden           ( Hidden.hs, Hidden.o )
 
 ==================== Parser ====================
 module Hidden where
 hidden :: Int -> Int
 hidden a = a
+
+
+[2 of 3] Compiling Visible          ( Visible.hs, Visible.o )
+
+==================== Parser ====================
+module Visible where
+visible :: Int -> Int
+visible a = a
 
 
 [3 of 3] Compiling Test             ( Test.hs, Test.o )

@@ -1,0 +1,30 @@
+{-# LANGUAGE RankNTypes, DatatypeContexts, CApiFFI, GADTs, TypeFamilies, DefaultSignatures, MultiParamTypeClasses, FunctionalDependencies, PatternSynonyms #-}
+
+-- Reflexivity test, bang on the units with as much
+-- stuff as we can.
+unit p where
+    signature H where
+        data T a = MkT (S a)
+        data S a = MkS a
+
+-- keept his synced up!
+unit q where
+    signature H where
+        data T a = MkT (S a)
+        data S a = MkS a
+
+unit r where
+    dependency p[H=<H>]
+    dependency q[H=<H>]
+    module M where
+        import H
+        x = MkT (MkS True)
+
+unit h-impl where
+    module H where
+        data T a = MkT (S a)
+        data S a = MkS a
+
+unit s where
+    dependency h-impl
+    dependency r[H=h-impl:H]

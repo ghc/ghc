@@ -1,9 +1,0 @@
-
-Double.hs:11:20: error:
-    • Couldn't match expected type ‘MapAsSet.Map k0 a0’
-                  with actual type ‘Map.Map Int [Char]’
-      NB: ‘Map.Map’ is defined at Map.hsig:15:1-12
-          ‘MapAsSet.Map’ is defined at MapAsSet.hsig:7:1-12
-    • In the first argument of ‘keysSet’, namely ‘x’
-      In the first argument of ‘print’, namely ‘(keysSet x)’
-      In a stmt of a 'do' block: print (keysSet x)

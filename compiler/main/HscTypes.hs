@@ -73,6 +73,9 @@ module HscTypes (
         -- * Interfaces
         ModIface(..), mkIfaceWarnCache, mkIfaceHashCache, mkIfaceFixCache,
         emptyIfaceWarnCache, mi_boot, mi_fix,
+        mi_semantic_module,
+        mi_free_holes,
+        renameFreeHoles,
 
         -- * Fixity
         FixityEnv, FixItem(..), lookupFixity, emptyFixityEnv,
@@ -139,9 +142,9 @@ import ByteCodeTypes
 import InteractiveEvalTypes ( Resume )
 import GHCi.Message         ( Pipe )
 import GHCi.RemoteTypes
-import UniqFM
 #endif
 
+import UniqFM
 import HsSyn
 import RdrName
 import Avail
@@ -191,6 +194,7 @@ import Binary
 import ErrUtils
 import Platform
 import Util
+import UniqDSet
 import GHC.Serialized   ( Serialized )
 
 import Foreign
@@ -770,9 +774,13 @@ prepareAnnotations hsc_env mb_guts = do
 -- Although the @FinderCache@ range is 'FindResult' for convenience,
 -- in fact it will only ever contain 'Found' or 'NotFound' entries.
 --
-type FinderCache = ModuleEnv FindResult
+type FinderCache = VirginModuleEnv FindResult
 
 -- | The result of searching for an imported module.
+--
+-- NB: FindResult manages both user source-import lookups
+-- (which can result in 'Module') as well as direct imports
+-- for interfaces (which always result in 'VirginModule').
 data FindResult
   = Found ModLocation Module
         -- ^ The module was found
@@ -936,6 +944,42 @@ mi_boot iface = mi_hsc_src iface == HsBootFile
 mi_fix :: ModIface -> OccName -> Fixity
 mi_fix iface name = mi_fix_fn iface name `orElse` defaultFixity
 
+-- | The semantic module for this interface; e.g., if it's a interface
+-- for a signature, if 'mi_module' is @p[A=<A>]:A@, 'mi_semantic_module'
+-- will be @<A>@.
+mi_semantic_module :: ModIface -> Module
+mi_semantic_module iface = case mi_sig_of iface of
+                            Nothing -> mi_module iface
+                            Just mod -> mod
+
+-- | The "precise" free holes, e.g., the signatures that this
+-- 'ModIface' depends on.
+mi_free_holes :: ModIface -> UniqDSet ModuleName
+mi_free_holes iface =
+  case splitModuleInsts (mi_module iface) of
+    (_, Just insts)
+        -- A mini-hack: we rely on the fact that 'renameFreeHoles'
+        -- drops things that aren't holes.
+        -> renameFreeHoles (mkUniqDSet cands) insts
+    _   -> emptyUniqDSet
+  where
+    cands = map fst (dep_mods (mi_deps iface))
+
+-- | Given a set of free holes, and a unit identifier, rename
+-- the free holes according to the instantiation of the unit
+-- identifier.  For example, if we have A and B free, and
+-- our unit identity is @p[A=<C>,B=impl:B]@, the renamed free
+-- holes are just C.
+renameFreeHoles :: UniqDSet ModuleName -> [(ModuleName, Module)] -> UniqDSet ModuleName
+renameFreeHoles fhs insts =
+    unionManyUniqDSets (map lookup_impl (uniqDSetToList fhs))
+  where
+    hmap = listToUFM insts
+    lookup_impl mod_name
+        | Just mod <- lookupUFM hmap mod_name = moduleFreeHoles mod
+        -- It wasn't actually a hole
+        | otherwise                           = emptyUniqDSet
+
 instance Binary ModIface where
    put_ bh (ModIface {
                  mi_module    = mod,
@@ -964,6 +1008,7 @@ instance Binary ModIface where
                  mi_trust     = trust,
                  mi_trust_pkg = trust_pkg }) = do
         put_ bh mod
+        put_ bh sig_of
         put_ bh hsc_src
         put_ bh iface_hash
         put_ bh mod_hash
@@ -987,10 +1032,10 @@ instance Binary ModIface where
         put_ bh hpc_info
         put_ bh trust
         put_ bh trust_pkg
-        put_ bh sig_of
 
    get bh = do
-        mod_name    <- get bh
+        mod         <- get bh
+        sig_of      <- get bh
         hsc_src     <- get bh
         iface_hash  <- get bh
         mod_hash    <- get bh
@@ -1014,9 +1059,8 @@ instance Binary ModIface where
         hpc_info    <- get bh
         trust       <- get bh
         trust_pkg   <- get bh
-        sig_of      <- get bh
         return (ModIface {
-                 mi_module      = mod_name,
+                 mi_module      = mod,
                  mi_sig_of      = sig_of,
                  mi_hsc_src     = hsc_src,
                  mi_iface_hash  = iface_hash,
@@ -1997,7 +2041,10 @@ lookupType dflags hpt pte name
        Just hm -> lookupNameEnv (md_types (hm_details hm)) name
        Nothing -> lookupNameEnv pte name
   where
-    mod = ASSERT2( isExternalName name, ppr name ) nameModule name
+    mod = ASSERT2( isExternalName name, ppr name )
+          if isHoleName name
+            then mkModule (thisPackage dflags) (moduleName (nameModule name))
+            else nameModule name
 
 -- | As 'lookupType', but with a marginally easier-to-use interface
 -- if you have a 'HscEnv'
@@ -2280,6 +2327,11 @@ data Usage
         -- contents don't change.  This previously lead to odd
         -- recompilation behaviors; see #8114
   }
+  -- | A requirement which was merged into this one.
+  | UsageMergedRequirement {
+        usg_mod :: Module,
+        usg_mod_hash :: Fingerprint
+  }
     deriving( Eq )
         -- The export list field is (Just v) if we depend on the export list:
         --      i.e. we imported the module directly, whether or not we
@@ -2314,6 +2366,11 @@ instance Binary Usage where
         put_ bh (usg_file_path usg)
         put_ bh (usg_file_hash usg)
 
+    put_ bh usg@UsageMergedRequirement{} = do
+        putByte bh 3
+        put_ bh (usg_mod      usg)
+        put_ bh (usg_mod_hash usg)
+
     get bh = do
         h <- getByte bh
         case h of
@@ -2334,6 +2391,10 @@ instance Binary Usage where
             fp   <- get bh
             hash <- get bh
             return UsageFile { usg_file_path = fp, usg_file_hash = hash }
+          3 -> do
+            mod <- get bh
+            hash <- get bh
+            return UsageMergedRequirement { usg_mod = mod, usg_mod_hash = hash }
           i -> error ("Binary.get(Usage): " ++ show i)
 
 {-
@@ -2387,6 +2448,16 @@ data ExternalPackageState
                 -- * Fixities
                 --
                 -- * Deprecations and warnings
+
+        eps_free_holes :: ModuleEnv (UniqDSet ModuleName),
+                -- ^ Cache for 'mi_free_holes'.  Ordinarily, we can rely on
+                -- the 'eps_PIT' for this information, EXCEPT that when
+                -- we do dependency analysis, we need to look at the
+                -- 'Dependencies' of our imports to determine what their
+                -- precise free holes are ('moduleFreeHolesPrecise').  We
+                -- don't want to repeatedly reread in the interface
+                -- for every import, so cache it here.  When the PIT
+                -- gets filled in we can drop these entries.
 
         eps_PTE :: !PackageTypeEnv,
                 -- ^ Result of typechecking all the external package
@@ -2519,6 +2590,9 @@ data ModSummary
           -- ^ Source imports of the module
         ms_textual_imps :: [(Maybe FastString, Located ModuleName)],
           -- ^ Non-source imports of the module from the module *text*
+        ms_parsed_mod   :: Maybe HsParsedModule,
+          -- ^ The parsed, nonrenamed source, if we have it.  This is also
+          -- used to support "inline module syntax" in Backpack files.
         ms_hspp_file    :: FilePath,
           -- ^ Filename of preprocessed source file
         ms_hspp_opts    :: DynFlags,
@@ -2577,24 +2651,12 @@ showModMsg dflags target recomp mod_summary
                   HscInterpreted | recomp
                              -> text "interpreted"
                   HscNothing -> text "nothing"
-                  _ | HsigFile == ms_hsc_src mod_summary -> text "nothing"
-                    | otherwise -> text (normalise $ msObjFilePath mod_summary),
+                  _ -> text (normalise $ msObjFilePath mod_summary),
               char ')']
  where
     mod     = moduleName (ms_mod mod_summary)
     mod_str = showPpr dflags mod
-                ++ hscSourceString' dflags mod (ms_hsc_src mod_summary)
-
--- | Variant of hscSourceString which prints more information for signatures.
--- This can't live in DriverPhases because this would cause a module loop.
-hscSourceString' :: DynFlags -> ModuleName -> HscSource -> String
-hscSourceString' _ _ HsSrcFile   = ""
-hscSourceString' _ _ HsBootFile  = "[boot]"
-hscSourceString' dflags mod HsigFile =
-     "[" ++ (maybe "abstract sig"
-               (("sig of "++).showPpr dflags)
-               (getSigOf dflags mod)) ++ "]"
-    -- NB: -sig-of could be missing if we're just typechecking
+                ++ hscSourceString (ms_hsc_src mod_summary)
 
 {-
 ************************************************************************

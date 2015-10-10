@@ -102,6 +102,10 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /tests/arrows/should_run/arrowrun002
 /tests/arrows/should_run/arrowrun003
 /tests/arrows/should_run/arrowrun004
+/tests/backpack/should_run/bkprun01
+/tests/backpack/should_run/bkprun02
+/tests/backpack/should_run/bkprun03
+/tests/backpack/should_run/bkprun04
 /tests/boxy/T2193
 /tests/cabal/1750.hs
 /tests/cabal/1750.out

@@ -615,6 +615,12 @@ data Token
   | ITstock
   | ITanyclass
 
+  -- Backpack tokens
+  | ITunit
+  | ITsignature
+  | ITdependency
+  | ITrequires
+
   -- Pragmas, see  note [Pragma source text] in BasicTypes
   | ITinline_prag       SourceText InlineSpec RuleMatchInfo
   | ITspec_prag         SourceText                -- SPECIALISE
@@ -824,6 +830,10 @@ reservedWordsFM = listToUFM $
          ( "capi",           ITcapiconv,      xbit CApiFfiBit),
          ( "prim",           ITprimcallconv,  xbit FfiBit),
          ( "javascript",     ITjavascriptcallconv, xbit FfiBit),
+
+         ( "unit",           ITunit,          0 ),
+         ( "dependency",     ITdependency,       0 ),
+         ( "signature",      ITsignature,     0 ),
 
          ( "rec",            ITrec,           xbit ArrowsBit .|.
                                               xbit RecursiveDoBit),

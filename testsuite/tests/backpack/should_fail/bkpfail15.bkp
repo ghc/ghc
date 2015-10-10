@@ -1,0 +1,12 @@
+unit p where
+    signature A where
+    signature Q where
+        f :: Int
+    module P where
+unit q where
+    module Q where
+        f = True
+-- This should error, but there's no instantiation check
+-- without a dependency on P
+unit r where
+    dependency p[Q=q:Q,A=<A>]

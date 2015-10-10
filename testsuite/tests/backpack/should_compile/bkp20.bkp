@@ -1,0 +1,22 @@
+{-# LANGUAGE TypeFamilies #-}
+
+unit p where
+    signature H where
+        type family Elem c
+
+unit q where
+    signature H where
+        type family Elem c
+
+unit r where
+    dependency p[H=<H>]
+    dependency q[H=<H>]
+    module M where
+        import H
+        type instance Elem Bool = Int
+
+unit h-impl where
+    module H where
+        type family Elem c
+unit s where
+    dependency r[H=h-impl:H]

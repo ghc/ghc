@@ -1,0 +1,28 @@
+unit bar where
+    signature A(bar) where
+        data A = A { foo :: Int, bar :: Bool }
+
+unit foo where
+    signature A(foo) where
+        data A = A { foo :: Int, bar :: Bool }
+
+unit impl where
+    module A1 where
+        data A = A { foo :: Int, bar :: Bool }
+    module A2 where
+        data A = A { foo :: Int, bar :: Bool }
+    module A(foo, bar) where
+        import A1(foo)
+        import A2(bar)
+
+-- Kind of boring test now haha
+
+unit barimpl where
+    dependency bar[A=impl:A]
+
+unit fooimpl where
+    dependency foo[A=impl:A]
+
+unit foobarimpl where
+    dependency foo[A=impl:A]
+    dependency bar[A=impl:A]

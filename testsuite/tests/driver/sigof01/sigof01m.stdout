@@ -1,7 +1,0 @@
-[1 of 3] Compiling A                ( A.hs, tmp_sigof01m/A.o )
-[2 of 3] Compiling B[sig of A]      ( B.hsig, nothing )
-[3 of 3] Compiling Main             ( Main.hs, tmp_sigof01m/Main.o )
-Linking tmp_sigof01m/Main ...
-False
-T
-True

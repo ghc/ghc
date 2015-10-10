@@ -24,6 +24,7 @@ import LoadIface        ( showIface )
 import HscMain          ( newHscEnv )
 import DriverPipeline   ( oneShot, compileFile )
 import DriverMkDepend   ( doMkDependHS )
+import DriverBkp   ( doBackpack )
 #ifdef GHCI
 import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
@@ -42,7 +43,7 @@ import Module           ( ModuleName )
 import Config
 import Constants
 import HscTypes
-import Packages         ( pprPackages, pprPackagesSimple, pprModuleMap )
+import Packages         ( pprPackages, pprPackagesSimple )
 import DriverPhases
 import BasicTypes       ( failed )
 import StaticFlags
@@ -164,6 +165,7 @@ main' postLoadMode dflags0 args flagWarnings = do
                DoInteractive   -> (CompManager, HscInterpreted, LinkInMemory)
                DoEval _        -> (CompManager, HscInterpreted, LinkInMemory)
                DoMake          -> (CompManager, dflt_target,    LinkBinary)
+               DoBackpack _    -> (CompManager, dflt_target,    LinkBinary)
                DoMkDependHS    -> (MkDepend,    dflt_target,    LinkBinary)
                DoAbiHash       -> (OneShot,     dflt_target,    LinkBinary)
                _               -> (OneShot,     dflt_target,    LinkBinary)
@@ -240,10 +242,6 @@ main' postLoadMode dflags0 args flagWarnings = do
         liftIO $ hPutStrLn stderr ("Hsc static flags: " ++ unwords staticFlags)
 
 
-  when (dopt Opt_D_dump_mod_map dflags6) . liftIO $
-    printInfoForUser (dflags6 { pprCols = 200 })
-                     (pkgQual dflags6) (pprModuleMap dflags6)
-
   liftIO $ initUniqSupply (initialUnique dflags6) (uniqueIncrement dflags6)
         ---------------- Final sanity checking -----------
   liftIO $ checkOptions postLoadMode dflags6 srcs objs
@@ -262,6 +260,7 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoAbiHash              -> abiHash (map fst srcs)
        ShowPackages           -> liftIO $ showPackages dflags6
        DoFrontend f           -> doFrontend f srcs
+       DoBackpack b           -> doBackpack b
 
   liftIO $ dumpFinalStats dflags6
 
@@ -463,6 +462,7 @@ data PostLoadMode
   | StopBefore Phase        -- ghc -E | -C | -S
                             -- StopBefore StopLn is the default
   | DoMake                  -- ghc --make
+  | DoBackpack String       -- ghc --backpack foo.bkp
   | DoInteractive           -- ghc --interactive
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
   | DoAbiHash               -- ghc --abi-hash
@@ -488,6 +488,9 @@ doEvalMode str = mkPostLoadMode (DoEval [str])
 
 doFrontendMode :: String -> Mode
 doFrontendMode str = mkPostLoadMode (DoFrontend (mkModuleName str))
+
+doBackpackMode :: String -> Mode
+doBackpackMode str = mkPostLoadMode (DoBackpack str)
 
 mkPostLoadMode :: PostLoadMode -> Mode
 mkPostLoadMode = Right . Right
@@ -618,6 +621,7 @@ mode_flags =
   , defFlag "C"            (PassFlag (setMode (stopBeforeMode HCc)))
   , defFlag "S"            (PassFlag (setMode (stopBeforeMode (As False))))
   , defFlag "-make"        (PassFlag (setMode doMakeMode))
+  , defFlag "-backpack"    (SepArg   (\s -> setMode (doBackpackMode s) "-backpack"))
   , defFlag "-interactive" (PassFlag (setMode doInteractiveMode))
   , defFlag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
   , defFlag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))

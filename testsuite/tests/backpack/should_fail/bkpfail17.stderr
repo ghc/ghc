@@ -1,0 +1,16 @@
+[1 of 2] Processing p
+  [1 of 1] Compiling ShouldFail[sig]  ( p/ShouldFail.hsig, nothing )
+[2 of 2] Processing q
+  Instantiating q
+  [1 of 1] Including p[ShouldFail=base-4.9.0.0:Prelude]
+    Instantiating p[ShouldFail=base-4.9.0.0:Prelude]
+    [1 of 1] Compiling ShouldFail[sig]  ( p/ShouldFail.hsig, bkpfail17.out/p/p-2W6J7O3LvroH97zGxbPEGF/ShouldFail.o )
+
+<no location info>: error:
+    Type constructor ‘Data.Either.Either’ has conflicting definitions in the module
+    and its hsig file
+    Main module: data Data.Either.Either a b
+                   = Data.Either.Left a | Data.Either.Right b
+    Hsig file:  type role Data.Either.Either representational phantom phantom
+                data Data.Either.Either a b c = Data.Either.Left a
+    The types have different kinds

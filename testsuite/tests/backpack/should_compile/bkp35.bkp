@@ -1,0 +1,28 @@
+{-# LANGUAGE FlexibleInstances #-}
+unit p where
+    signature A where
+        data K a
+        instance Read a => Show (K a)
+unit q where
+    signature A where
+        data K a
+        instance Show a => Show (K a)
+unit r where
+    dependency p[A=<A>]
+    dependency q[A=<A>]
+    -- At the moment, the merge arbitrarily picks one of the
+    -- instances to make available, so only one of these statements
+    -- will typecheck.  Somehow need an OR constraint (but type
+    -- class solver doesn't backtrack, so that ain't gonna work).
+    --
+    -- It's actually a bit interesting to decide what this should
+    -- be: "instance Show a" would satisfy both of these, but
+    -- nothing else seems to work (incoherent instance is not
+    -- enough because GHC could pick the wrong instance and then
+    -- fail to solve the constraint.)
+    module R where
+        import A
+        f :: Show a => K a -> String
+        f = show
+        g :: Read a => K a -> String
+        g = show

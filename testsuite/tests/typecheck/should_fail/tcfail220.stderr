@@ -1,9 +1,0 @@
-[1 of 1] Compiling ShouldFail[sig of Prelude] ( tcfail220.hsig, nothing )
-
-tcfail220.hsig:4:1: error:
-    Type constructor ‘Either’ has conflicting definitions in the module
-    and its hsig file
-    Main module: data Either a b = Left a | Data.Either.Right b
-    Hsig file:  type role Either representational phantom phantom
-                data Either a b c = Left a
-    The types have different kinds

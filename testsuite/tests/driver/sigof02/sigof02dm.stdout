@@ -1,8 +1,0 @@
-[1 of 3] Compiling MapAsSet[sig of Data.Map.Lazy] ( MapAsSet.hsig, nothing )
-[2 of 3] Compiling Map[sig of Data.Map.Lazy] ( Map.hsig, nothing )
-[3 of 3] Compiling Main             ( Double.hs, tmp_sigof02dm/Main.o )
-Linking tmp_sigof02dm/Double ...
-False
-fromList [0,6]
-[(0,"foo"),(6,"foo")]
-fromList [(0,"foo"),(6,"foo")]

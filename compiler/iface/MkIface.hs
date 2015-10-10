@@ -19,6 +19,7 @@ module MkIface (
         checkOldIface,  -- See if recompilation is required, by
                         -- comparing version information
         RecompileRequired(..), recompileRequired,
+        mkIfaceExports,
 
         tyThingToIfaceDecl -- Converting things to their Iface equivalents
  ) where
@@ -165,10 +166,12 @@ mkIfaceTc :: HscEnv
           -> IO (ModIface, Bool)
 mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
   tc_result@TcGblEnv{ tcg_mod = this_mod,
+                      tcg_semantic_mod = semantic_mod,
                       tcg_src = hsc_src,
                       tcg_imports = imports,
                       tcg_rdr_env = rdr_env,
                       tcg_fix_env = fix_env,
+                      tcg_merged = merged,
                       tcg_warns = warns,
                       tcg_hpc = other_hpc_info,
                       tcg_th_splice_used = tc_splice_used,
@@ -180,7 +183,7 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
           let hpc_info = emptyHpcInfo other_hpc_info
           used_th <- readIORef tc_splice_used
           dep_files <- (readIORef dependent_files)
-          usages <- mkUsageInfo hsc_env this_mod (imp_mods imports) used_names dep_files
+          usages <- mkUsageInfo hsc_env semantic_mod (imp_mods imports) used_names dep_files merged
           mkIface_ hsc_env maybe_old_fingerprint
                    this_mod hsc_src
                    used_th deps rdr_env
@@ -212,7 +215,8 @@ mkIface_ hsc_env maybe_old_fingerprint
 --      to expose in the interface
 
   = do
-    let entities = typeEnvElts type_env
+    let semantic_mod = canonicalizeHomeModule (hsc_dflags hsc_env) (moduleName this_mod)
+        entities = typeEnvElts type_env
         decls  = [ tyThingToIfaceDecl entity
                  | entity <- entities,
                    let name = getName entity,
@@ -220,8 +224,12 @@ mkIface_ hsc_env maybe_old_fingerprint
                       -- No implicit Ids and class tycons in the interface file
                    not (isWiredInName name),
                       -- Nor wired-in things; the compiler knows about them anyhow
-                   nameIsLocalOrFrom this_mod name  ]
+                   nameIsLocalOrFrom semantic_mod name  ]
                       -- Sigh: see Note [Root-main Id] in TcRnDriver
+                      -- NB: ABSOLUTELY need to check against semantic_mod,
+                      -- because all of the names in an hsig p[H=<H>]:H
+                      -- are going to be for <H>, not the former id!
+                      -- See Note [Identity versus semantic module]
 
         fixities    = sortBy (comparing fst)
           [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
@@ -235,11 +243,14 @@ mkIface_ hsc_env maybe_old_fingerprint
         iface_vect_info = flattenVectInfo vect_info
         trust_info  = setSafeMode safe_mode
         annotations = map mkIfaceAnnotation anns
-        sig_of = getSigOf dflags (moduleName this_mod)
 
         intermediate_iface = ModIface {
               mi_module      = this_mod,
-              mi_sig_of      = sig_of,
+              -- Need to record this because it depends on the -instantiated-with flag
+              -- which could change
+              mi_sig_of      = if semantic_mod == this_mod
+                                then Nothing
+                                else Just semantic_mod,
               mi_hsc_src     = hsc_src,
               mi_deps        = deps,
               mi_usages      = usages,
@@ -349,21 +360,32 @@ writeIfaceFile dflags hi_file_path new_iface
 mkHashFun
         :: HscEnv                       -- needed to look up versions
         -> ExternalPackageState         -- ditto
-        -> (Name -> Fingerprint)
-mkHashFun hsc_env eps
-  = \name ->
-      let
-        mod = ASSERT2( isExternalName name, ppr name ) nameModule name
-        occ = nameOccName name
-        iface = lookupIfaceByModule dflags hpt pit mod `orElse`
-                   pprPanic "lookupVers2" (ppr mod <+> ppr occ)
-      in
-        snd (mi_hash_fn iface occ `orElse`
-                  pprPanic "lookupVers1" (ppr mod <+> ppr occ))
+        -> (Name -> IO Fingerprint)
+mkHashFun hsc_env eps name
+  | isHoleModule orig_mod
+  = lookup (mkModule (thisPackage dflags) (moduleName orig_mod))
+  | otherwise
+  = lookup orig_mod
   where
       dflags = hsc_dflags hsc_env
-      hpt    = hsc_HPT hsc_env
-      pit    = eps_PIT eps
+      hpt = hsc_HPT hsc_env
+      pit = eps_PIT eps
+      occ = nameOccName name
+      orig_mod = nameModule name
+      lookup mod = do
+        MASSERT2( isExternalName name, ppr name )
+        iface <- case lookupIfaceByModule dflags hpt pit mod of
+                  Just iface -> return iface
+                  Nothing -> do
+                      -- This can occur when we're writing out ifaces for
+                      -- requirements; we didn't do any /real/ typechecking
+                      -- so there's no guarantee everything is loaded.
+                      -- Kind of a heinous hack.
+                      iface <- initIfaceLoad hsc_env . withException
+                            $ loadInterface (text "lookupVers2") mod ImportBySystem
+                      return iface
+        return $ snd (mi_hash_fn iface occ `orElse`
+                  pprPanic "lookupVers1" (ppr mod <+> ppr occ))
 
 -- ---------------------------------------------------------------------------
 -- Compute fingerprints for the interface
@@ -385,6 +407,8 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
         -- visible about the declaration that a client can depend on.
         -- see IfaceDeclABI below.
        declABI :: IfaceDecl -> IfaceDeclABI
+       -- TODO: I'm not sure if this should be semantic_mod or this_mod.
+       -- See also Note [Identity versus semantic module]
        declABI decl = (this_mod, decl, extras)
         where extras = declExtras fix_fn ann_fn non_orph_rules non_orph_insts
                                   non_orph_fis decl
@@ -398,7 +422,10 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
 
        name_module n = ASSERT2( isExternalName n, ppr n ) nameModule n
        localOccs = map (getUnique . getParent . getOccName)
-                        . filter ((== this_mod) . name_module)
+                        -- NB: names always use semantic module, so
+                        -- filtering must be on the semantic module!
+                        -- See Note [Identity versus semantic module]
+                        . filter ((== semantic_mod) . name_module)
                         . nonDetEltsUFM
                    -- It's OK to use nonDetEltsUFM as localOccs is only
                    -- used to construct the edges and
@@ -434,10 +461,16 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
            -- wired-in names don't have fingerprints
           | otherwise
           = ASSERT2( isExternalName name, ppr name )
-            let hash | nameModule name /= this_mod =  global_hash_fn name
-                     | otherwise = snd (lookupOccEnv local_env (getOccName name)
+            let hash | nameModule name /= semantic_mod =  global_hash_fn name
+                     -- Get it from the REAL interface!!
+                     -- This will trigger when we compile an hsig file
+                     -- and we know a backing impl for it.
+                     -- See Note [Identity versus semantic module]
+                     | semantic_mod /= this_mod
+                     , not (isHoleModule semantic_mod) = global_hash_fn name
+                     | otherwise = return (snd (lookupOccEnv local_env (getOccName name)
                            `orElse` pprPanic "urk! lookup local fingerprint"
-                                       (ppr name)) -- (undefined,fingerprint0))
+                                       (ppr name)))
                 -- This panic indicates that we got the dependency
                 -- analysis wrong, because we needed a fingerprint for
                 -- an entity that wasn't in the environment.  To debug
@@ -445,7 +478,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                 -- pprTraces below, run the compile again, and inspect
                 -- the output and the generated .hi file with
                 -- --show-iface.
-            in put_ bh hash
+            in hash >>= put_ bh
 
         -- take a strongly-connected group of declarations and compute
         -- its fingerprint.
@@ -591,6 +624,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
 
   where
     this_mod = mi_module iface0
+    semantic_mod = mi_semantic_module iface0
     dflags = hsc_dflags hsc_env
     this_pkg = thisPackage dflags
     (non_orph_insts, orph_insts) = mkOrphMap ifInstOrph    (mi_insts iface0)
@@ -1038,9 +1072,8 @@ checkVersions hsc_env mod_summary iface
 
        ; recomp <- checkFlagHash hsc_env iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
-       ; if getSigOf (hsc_dflags hsc_env) (moduleName (mi_module iface))
-                /= mi_sig_of iface
-            then return (RecompBecause "sig-of changed", Nothing) else do {
+       ; recomp <- checkHsig mod_summary iface
+       ; if recompileRequired recomp then return (recomp, Nothing) else do {
        ; recomp <- checkDependencies hsc_env mod_summary iface
        ; if recompileRequired recomp then return (recomp, Just iface) else do {
 
@@ -1066,6 +1099,18 @@ checkVersions hsc_env mod_summary iface
     -- This is a bit of a hack really
     mod_deps :: DModuleNameEnv (ModuleName, IsBootInterface)
     mod_deps = mkModDeps (dep_mods (mi_deps iface))
+
+-- | Check if an hsig file needs recompilation because its
+-- implementing module has changed.
+checkHsig :: ModSummary -> ModIface -> IfG RecompileRequired
+checkHsig mod_summary iface = do
+    dflags <- getDynFlags
+    let outer_mod = ms_mod mod_summary
+        inner_mod = canonicalizeHomeModule dflags (moduleName outer_mod)
+    MASSERT( thisPackage dflags == moduleUnitId outer_mod )
+    case inner_mod == mi_semantic_module iface of
+        True -> up_to_date (text "implementing module unchanged")
+        False -> return (RecompBecause "implementing module changed")
 
 -- | Check the flags haven't changed
 checkFlagHash :: HscEnv -> ModIface -> IfG RecompileRequired
@@ -1146,7 +1191,6 @@ needInterface mod continue
                   -- import and it's been deleted
       Succeeded iface -> continue iface
 
-
 -- | Given the usage information extracted from the old
 -- M.hi file for the module being compiled, figure out
 -- whether M needs to be recompiled.
@@ -1161,6 +1205,11 @@ checkModUsage _this_pkg UsagePackageModule{
         -- individual entity usages, so if the ABI hash changes we must
         -- recompile.  This is safe but may entail more recompilation when
         -- a dependent package has changed.
+
+checkModUsage _ UsageMergedRequirement{ usg_mod = mod, usg_mod_hash = old_mod_hash }
+  = needInterface mod $ \iface -> do
+    let reason = moduleNameString (moduleName mod) ++ " changed (raw)"
+    checkModuleFingerprint reason old_mod_hash (mi_mod_hash iface)
 
 checkModUsage this_pkg UsageHomeModule{
                                 usg_mod_name = mod_name,

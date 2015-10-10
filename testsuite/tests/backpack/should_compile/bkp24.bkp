@@ -1,0 +1,30 @@
+unit p where
+    signature A where
+        data A
+    signature B where
+        data B
+    module P where
+        import A
+        import B
+        data P = M A B
+unit a where
+    module A where
+        data A = A
+unit b where
+    module B where
+        data B = B
+unit q where
+    dependency p[A=a:A,B=<B>]
+    dependency a
+    module Q where
+        import A
+        import B
+        import P
+        data Q = Q P A B
+unit r where
+    dependency q[B=b:B]
+    dependency b
+    module R where
+        import B
+        import Q
+        data R = R Q B

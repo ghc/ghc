@@ -1,0 +1,7 @@
+
+q/H.hsig:2:1: error:
+    Identifier ‘x’ has conflicting definitions in the module
+    and its hsig file
+    Main module: x :: ghc-prim-0.5.0.0:GHC.Types.Int
+    Hsig file:  x :: ghc-prim-0.5.0.0:GHC.Types.Bool
+    The two types are different

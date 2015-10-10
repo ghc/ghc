@@ -11,6 +11,8 @@ Type checking of type signatures in interface files
 module TcIface (
         tcLookupImported_maybe,
         importDecl, checkWiredInTyCon, tcHiBootIface, typecheckIface,
+        typecheckIfacesForMerging,
+        typecheckIfaceForInstantiate,
         tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
         tcIfaceVectInfo, tcIfaceAnnotations,
         tcIfaceExpr,    -- Desired by HERMIT (Trac #7683)
@@ -68,6 +70,7 @@ import Util
 import FastString
 import BasicTypes hiding ( SuccessFlag(..) )
 import ListSetOps
+import GHC.Fingerprint
 
 import Data.List
 import Control.Monad
@@ -146,7 +149,7 @@ knots are tied through the EPS.  No problem!
 typecheckIface :: ModIface      -- Get the decls from here
                -> IfG ModDetails
 typecheckIface iface
-  = initIfaceLcl (mi_module iface) (text "typecheckIface") (mi_boot iface) $ do
+  = initIfaceLcl (mi_semantic_module iface) (text "typecheckIface") (mi_boot iface) $ do
         {       -- Get the right set of decls and rules.  If we are compiling without -O
                 -- we discard pragmas before typechecking, so that we don't "see"
                 -- information that we shouldn't.  From a versioning point of view
@@ -167,7 +170,7 @@ typecheckIface iface
         ; anns      <- tcIfaceAnnotations (mi_anns iface)
 
                 -- Vectorisation information
-        ; vect_info <- tcIfaceVectInfo (mi_module iface) type_env (mi_vect_info iface)
+        ; vect_info <- tcIfaceVectInfo (mi_semantic_module iface) type_env (mi_vect_info iface)
 
                 -- Exports
         ; exports <- ifaceExportNames (mi_exports iface)
@@ -187,6 +190,151 @@ typecheckIface iface
                               , md_exports   = exports
                               }
     }
+
+{-
+************************************************************************
+*                                                                      *
+                Typechecking for merging
+*                                                                      *
+************************************************************************
+-}
+
+-- | Returns true if an 'IfaceDecl' is for @data T@ (an abstract data type)
+isAbstractIfaceDecl :: IfaceDecl -> Bool
+isAbstractIfaceDecl IfaceData{ ifCons = IfAbstractTyCon _ } = True
+isAbstractIfaceDecl _ = False
+
+-- | Merge two 'IfaceDecl's together, preferring a non-abstract one.  If
+-- both are non-abstract we pick one arbitrarily (and check for consistency
+-- later.)
+mergeIfaceDecl :: IfaceDecl -> IfaceDecl -> IfaceDecl
+mergeIfaceDecl d1 d2
+    | isAbstractIfaceDecl d1 = d2
+    | isAbstractIfaceDecl d2 = d1
+    -- It doesn't matter; we'll check for consistency later when
+    -- we merge, see 'mergeSignatures'
+    | otherwise              = d1
+
+-- | Merge two 'OccEnv's of 'IfaceDecl's by 'OccName'.
+mergeIfaceDecls :: OccEnv IfaceDecl -> OccEnv IfaceDecl -> OccEnv IfaceDecl
+mergeIfaceDecls = plusOccEnv_C mergeIfaceDecl
+
+-- | This is a very interesting function.  Like typecheckIface, we want
+-- to type check an interface file into a ModDetails.  However, the use-case
+-- for these ModDetails is different: we want to compare all of the
+-- ModDetails to ensure they define compatible declarations, and then
+-- merge them together.  So in particular, we have to take a different
+-- strategy for knot-tying: we first speculatively merge the declarations
+-- to get the "base" truth for what we believe the types will be
+-- (this is "type computation.")  Then we read everything in and check
+-- for compatibility.
+--
+-- Consider this example:
+--
+--      H :: [ data A;      type B = A              ]
+--      H :: [ type A = C;              data C      ]
+--      H :: [ type A = (); data B;     type C = B; ]
+--
+-- We attempt to make a type synonym cycle, which is solved if we
+-- take the hint that @type A = ()@.  But actually we can and should
+-- reject this: the 'Name's of C and () are different, so the declarations
+-- of A are incompatible. (Thus there's no problem if we pick a
+-- particular declaration of 'A' over another.)
+--
+-- Here's another one:
+--
+--      H :: [ data Int;    type B = Int;           ]
+--      H :: [ type Int=C;              data C      ]
+--      H :: [ export Int;  data B;     type C = B; ]
+--
+-- We'll properly reject this too: a reexport of Int is a data
+-- constructor, whereas type Int=C is a type synonym: incompatible
+-- types.
+--
+-- Perhaps the renamer is too fussy when it comes to ambiguity (requiring
+-- original names to match, rather than just the types after type synonym
+-- expansion) to match, but that's what we have for Haskell today.
+typecheckIfacesForMerging :: Module -> [ModIface] -> IORef TypeEnv -> IfM lcl (TypeEnv, [ModDetails])
+typecheckIfacesForMerging mod ifaces tc_env_var =
+  -- cannot be boot (False)
+  initIfaceLcl mod (text "typecheckIfacesForMerging") False $ do
+    ignore_prags <- goptM Opt_IgnoreInterfacePragmas
+    -- Build the initial environment
+    -- NB: Don't include dfuns here, because we don't want to
+    -- serialize them out.  See Note [Bogus DFun renamings]
+    let mk_decl_env decls
+            = mkOccEnv [ (ifName decl, decl)
+                       | decl <- decls
+                       , case decl of
+                            IfaceId { ifIdDetails = IfDFunId } -> False -- exclude DFuns
+                            _ -> True ]
+        decl_envs = map (mk_decl_env . map snd . mi_decls) ifaces
+                        :: [OccEnv IfaceDecl]
+        decl_env = foldl' mergeIfaceDecls emptyOccEnv decl_envs
+                        ::  OccEnv IfaceDecl
+    -- TODO: change loadDecls to accept w/o Fingerprint
+    names_w_things <- loadDecls ignore_prags (map (\x -> (fingerprint0, x))
+                                                  (occEnvElts decl_env))
+    let global_type_env = mkNameEnv names_w_things
+    writeMutVar tc_env_var global_type_env
+
+    -- OK, now typecheck each ModIface using this environment
+    details <- forM ifaces $ \iface -> do
+        -- DO NOT load these decls into the mutable variable: we did
+        -- that already!
+        decls     <- loadDecls ignore_prags (mi_decls iface)
+        let type_env = mkNameEnv decls
+        -- But note that we use this type_env to typecheck references to DFun
+        -- in 'IfaceInst'
+        insts     <- mapM (tcIfaceInstWithDFunTypeEnv type_env) (mi_insts iface)
+        fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
+        rules     <- tcIfaceRules ignore_prags (mi_rules iface)
+        anns      <- tcIfaceAnnotations (mi_anns iface)
+        vect_info <- tcIfaceVectInfo (mi_semantic_module iface) type_env (mi_vect_info iface)
+        exports   <- ifaceExportNames (mi_exports iface)
+        return $ ModDetails { md_types     = type_env
+                            , md_insts     = insts
+                            , md_fam_insts = fam_insts
+                            , md_rules     = rules
+                            , md_anns      = anns
+                            , md_vect_info = vect_info
+                            , md_exports   = exports
+                            }
+    return (global_type_env, details)
+
+-- | Typecheck a signature 'ModIface' under the assumption that we have
+-- instantiated it under some implementation (recorded in 'mi_semantic_module')
+-- and want to check if the implementation fills the signature.
+--
+-- This needs to operate slightly differently than 'typecheckIface'
+-- because (1) we have a 'NameShape', from the exports of the
+-- implementing module, which we will use to give our top-level
+-- declarations the correct 'Name's even when the implementor
+-- provided them with a reexport, and (2) we have to deal with
+-- DFun silliness (see Note [Bogus DFun renamings])
+typecheckIfaceForInstantiate :: NameShape -> ModIface -> IfM lcl ModDetails
+typecheckIfaceForInstantiate nsubst iface =
+  initIfaceLclWithSubst (mi_semantic_module iface)
+                        (text "typecheckIfaceForInstantiate")
+                        (mi_boot iface) nsubst $ do
+    ignore_prags <- goptM Opt_IgnoreInterfacePragmas
+    decls     <- loadDecls ignore_prags (mi_decls iface)
+    let type_env = mkNameEnv decls
+    -- See Note [Bogus DFun renamings]
+    insts     <- mapM (tcIfaceInstWithDFunTypeEnv type_env) (mi_insts iface)
+    fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
+    rules     <- tcIfaceRules ignore_prags (mi_rules iface)
+    anns      <- tcIfaceAnnotations (mi_anns iface)
+    vect_info <- tcIfaceVectInfo (mi_semantic_module iface) type_env (mi_vect_info iface)
+    exports   <- ifaceExportNames (mi_exports iface)
+    return $ ModDetails { md_types     = type_env
+                        , md_insts     = insts
+                        , md_fam_insts = fam_insts
+                        , md_rules     = rules
+                        , md_anns      = anns
+                        , md_vect_info = vect_info
+                        , md_exports   = exports
+                        }
 
 {-
 ************************************************************************
@@ -701,6 +849,24 @@ tcIfaceInst (IfaceClsInst { ifDFun = dfun_name, ifOFlag = oflag
                           , ifInstOrph = orph })
   = do { dfun <- forkM (text "Dict fun" <+> ppr dfun_name) $
                  tcIfaceExtId dfun_name
+       ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
+       ; return (mkImportedInstance cls mb_tcs' dfun_name dfun oflag orph) }
+
+-- | Typecheck an 'IfaceClsInst', but rather than using 'tcIfaceGlobal',
+-- resolve the 'ifDFun' using a passed in 'TypeEnv'.
+--
+-- Why do we do it this way?  See Note [Bogus DFun renamings]
+tcIfaceInstWithDFunTypeEnv :: TypeEnv -> IfaceClsInst -> IfL ClsInst
+tcIfaceInstWithDFunTypeEnv tenv
+            (IfaceClsInst { ifDFun = dfun_name, ifOFlag = oflag
+                          , ifInstCls = cls, ifInstTys = mb_tcs
+                          , ifInstOrph = orph })
+  = do { dfun <- case lookupTypeEnv tenv dfun_name of
+                    Nothing -> pprPanic "tcIfaceInstWithDFunTypeEnv"
+                        (ppr dfun_name $$ ppr tenv)
+                    Just (AnId dfun) -> return dfun
+                    Just tything -> pprPanic "tcIfaceInstWithDFunTypeEnv"
+                        (ppr dfun_name <+> ppr tything)
        ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
        ; return (mkImportedInstance cls mb_tcs' dfun_name dfun oflag orph) }
 

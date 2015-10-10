@@ -125,7 +125,8 @@ module TcRnTypes(
 
         -- Misc other types
         TcId, TcIdSet,
-        Hole(..), holeOcc
+        Hole(..), holeOcc,
+        NameShape(..)
 
   ) where
 
@@ -171,6 +172,7 @@ import Outputable
 import ListSetOps
 import FastString
 import qualified GHC.LanguageExtensions as LangExt
+import Fingerprint
 
 import Control.Monad (ap, liftM, msum)
 #if __GLASGOW_HASKELL__ > 710
@@ -187,6 +189,34 @@ import GHCi.RemoteTypes
 
 import qualified Language.Haskell.TH as TH
 #endif
+
+-- | A 'NameShape' is a substitution on 'Name's that can be used
+-- to refine the identities of a hole while we are renaming interfaces
+-- (see 'RnModIface').  Specifically, a 'NameShape' for
+-- 'ns_module_name' @A@, defines a mapping from @{A.T}@
+-- (for some 'OccName' @T@) to some arbitrary other 'Name'.
+--
+-- The most intruiging thing about a 'NameShape', however, is
+-- how it's constructed.  A 'NameShape' is *implied* by the
+-- exported 'AvailInfo's of the implementor of an interface:
+-- if an implementor of signature @<H>@ exports @M.T@, you implicitly
+-- define a substitution from @{H.T}@ to @M.T@.  So a 'NameShape'
+-- is computed from the list of 'AvailInfo's that are exported
+-- by the implementation of a module, or successively merged
+-- together by the export lists of signatures which are joining
+-- together.
+--
+-- It's not the most obvious way to go about doing this, but it
+-- does seem to work!
+--
+-- NB: Can't boot this and put it in NameShape because then we
+-- start pulling in too many DynFlags things.
+data NameShape = NameShape {
+        ns_mod_name :: ModuleName,
+        ns_exports :: [AvailInfo],
+        ns_map :: OccEnv Name
+    }
+
 
 {-
 ************************************************************************
@@ -274,6 +304,8 @@ data IfLclEnv
         -- The module for the current IfaceDecl
         -- So if we see   f = \x -> x
         -- it means M.f = \x -> x, where M is the if_mod
+        -- NB: This is a semantic module, see
+        -- Note [Identity versus semantic module]
         if_mod :: Module,
 
         -- Whether or not the IfaceDecl came from a boot
@@ -287,6 +319,8 @@ data IfLclEnv
                 -- Where the interface came from:
                 --      .hi file, or GHCi state, or ext core
                 -- plus which bit is currently being examined
+
+        if_nsubst :: Maybe NameShape,
 
         if_tv_env  :: FastStringEnv TyVar,     -- Nested tyvar bindings
         if_id_env  :: FastStringEnv Id         -- Nested id binding
@@ -381,6 +415,42 @@ data DsMetaVal
 data FrontendResult
         = FrontendTypecheck TcGblEnv
 
+-- Note [Identity versus semantic module]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- When typechecking an hsig file, it is convenient to keep track
+-- of two different "this module" identifiers:
+--
+--      - The IDENTITY module is simply thisPackage + the module
+--        name; i.e. it uniquely *identifies* the interface file
+--        we're compiling.  For example, p[A=<A>]:A is an
+--        identity module identifying the requirement named A
+--        from library p.
+--
+--      - The SEMANTIC module, which is the actual module that
+--        this signature is intended to represent (e.g. if
+--        we have a identity module p[A=base:Data.IORef]:A,
+--        then the semantic module is base:Data.IORef)
+--
+-- Which one should you use?
+--
+--      - In the desugarer and later phases of compilation,
+--        identity and semantic modules coincide, since we never compile
+--        signatures (we just generate blank object files for
+--        hsig files.)
+--
+--      - For any code involving Names, we want semantic modules.
+--        See lookupIfaceTop in IfaceEnv, mkIface and addFingerprints
+--        in MkIface, and tcLookupGlobal in TcEnv
+--
+--      - When reading interfaces, we want the identity module to
+--        identify the specific interface we want (such interfaces
+--        should never be loaded into the EPS).  However, if a
+--        hole module <A> is requested, we look for A.hi
+--        in the home library we are compiling.  (See LoadIface.)
+--        Similarly, in RnNames we check for self-imports using
+--        identity modules, to allow signatures to import their implementor.
+
+
 -- | 'TcGblEnv' describes the top-level of the module at the
 -- point at which the typechecker is finished work.
 -- It is this structure that is handed on to the desugarer
@@ -389,13 +459,10 @@ data FrontendResult
 data TcGblEnv
   = TcGblEnv {
         tcg_mod     :: Module,         -- ^ Module being compiled
+        tcg_semantic_mod :: Module,    -- ^ If a signature, the backing module
+            -- See also Note [Identity versus semantic module]
         tcg_src     :: HscSource,
           -- ^ What kind of module (regular Haskell, hs-boot, hsig)
-        tcg_sig_of  :: Maybe Module,
-          -- ^ Are we being compiled as a signature of an implementation?
-        tcg_impl_rdr_env :: Maybe GlobalRdrEnv,
-          -- ^ Environment used only during -sig-of for resolving top level
-          -- bindings.  See Note [Signature parameters in TcGblEnv and DynFlags]
 
         tcg_rdr_env :: GlobalRdrEnv,   -- ^ Top level envt; used during renaming
         tcg_default :: Maybe [Type],
@@ -482,6 +549,10 @@ data TcGblEnv
         tcg_dfun_n  :: TcRef OccSet,
           -- ^ Allows us to choose unique DFun names.
 
+        tcg_merged :: [(Module, Fingerprint)],
+          -- ^ The requirements we merged with; we always have to recompile
+          -- if any of these changed.
+
         -- The next fields accumulate the payload of the module
         -- The binds, rules and foreign-decl fields are collected
         -- initially in un-zonked form and are finally zonked in tcRnSrcDecls
@@ -559,63 +630,22 @@ data TcGblEnv
         tcg_tc_plugins :: [TcPluginSolver],
         -- ^ A list of user-defined plugins for the constraint solver.
 
+        tcg_top_loc :: RealSrcSpan,
+        -- ^ The RealSrcSpan this module came from
+
         tcg_static_wc :: TcRef WantedConstraints
           -- ^ Wanted constraints of static forms.
     }
 
+-- NB: topModIdentity, not topModSemantic!
+-- Definition sites of orphan identities will be identity modules, not semantic
+-- modules.
 tcVisibleOrphanMods :: TcGblEnv -> ModuleSet
 tcVisibleOrphanMods tcg_env
     = mkModuleSet (tcg_mod tcg_env : imp_orphs (tcg_imports tcg_env))
 
--- Note [Signature parameters in TcGblEnv and DynFlags]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- When compiling signature files, we need to know which implementation
--- we've actually linked against the signature.  There are three seemingly
--- redundant places where this information is stored: in DynFlags, there
--- is sigOf, and in TcGblEnv, there is tcg_sig_of and tcg_impl_rdr_env.
--- Here's the difference between each of them:
---
--- * DynFlags.sigOf is global per invocation of GHC.  If we are compiling
---   with --make, there may be multiple signature files being compiled; in
---   which case this parameter is a map from local module name to implementing
---   Module.
---
--- * HscEnv.tcg_sig_of is global per the compilation of a single file, so
---   it is simply the result of looking up tcg_mod in the DynFlags.sigOf
---   parameter.  It's setup in TcRnMonad.initTc.  This prevents us
---   from having to repeatedly do a lookup in DynFlags.sigOf.
---
--- * HscEnv.tcg_impl_rdr_env is a RdrEnv that lets us look up names
---   according to the sig-of module.  It's setup in TcRnDriver.tcRnSignature.
---   Here is an example showing why we need this map:
---
---  module A where
---      a = True
---
---  module ASig where
---      import B
---      a :: Bool
---
---  module B where
---      b = False
---
--- When we compile ASig --sig-of main:A, the default
--- global RdrEnv (tcg_rdr_env) has an entry for b, but not for a
--- (we never imported A).  So we have to look in a different environment
--- to actually get the original name.
---
--- By the way, why do we need to do the lookup; can't we just use A:a
--- as the name directly?  Well, if A is reexporting the entity from another
--- module, then the original name needs to be the real original name:
---
---  module C where
---      a = True
---
---  module A(a) where
---      import C
-
 instance ContainsModule TcGblEnv where
-    extractModule env = tcg_mod env
+    extractModule env = tcg_semantic_mod env
 
 type RecFieldEnv = NameEnv [FieldLabel]
         -- Maps a constructor name *in this module*
@@ -2875,6 +2905,9 @@ data CtOrigin
                             -- the user should never see this one,
                             -- unlesss ImpredicativeTypes is on, where all
                             -- bets are off
+  | InstProvidedOrigin Module ClsInst
+        -- Skolem variable arose when we were testing if an instance
+        -- is solvable or not.
 
 -- | A thing that can be stored for error message generation only.
 -- It is stored with a function to zonk and tidy the thing.
@@ -3068,6 +3101,11 @@ pprCtOrigin (Shouldn'tHappenOrigin note)
 pprCtOrigin (ProvCtxtOrigin PSB{ psb_id = (L _ name) })
   = hang (ctoHerald <+> text "the \"provided\" constraints claimed by")
        2 (text "the signature of" <+> quotes (ppr name))
+
+pprCtOrigin (InstProvidedOrigin mod cls_inst)
+  = vcat [ text "arising when attempting to show that"
+         , ppr cls_inst
+         , text "is provided by" <+> quotes (ppr mod)]
 
 pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin

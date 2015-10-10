@@ -1,0 +1,18 @@
+[1 of 4] Processing p
+  [1 of 1] Compiling H[sig]           ( p/H.hsig, nothing )
+[2 of 4] Processing r
+  [1 of 2] Compiling H[sig]           ( r/H.hsig, nothing )
+  [2 of 2] Compiling M                ( r/M.hs, nothing )
+[3 of 4] Processing h-impl
+  Instantiating h-impl
+  [1 of 1] Compiling H                ( h-impl/H.hs, bkp12.out/h-impl/H.o )
+[4 of 4] Processing s
+  Instantiating s
+  [1 of 2] Including h-impl
+  [2 of 2] Including r[H=h-impl:H]
+    Instantiating r[H=h-impl:H]
+    [1 of 1] Including p[H=h-impl:H]
+      Instantiating p[H=h-impl:H]
+      [1 of 1] Compiling H[sig]           ( p/H.hsig, bkp12.out/p/p-5FYQgnNkfSvBT5yogOxPpf/H.o )
+    [1 of 2] Compiling H[sig]           ( r/H.hsig, bkp12.out/r/r-5FYQgnNkfSvBT5yogOxPpf/H.o )
+    [2 of 2] Compiling M                ( r/M.hs, bkp12.out/r/r-5FYQgnNkfSvBT5yogOxPpf/M.o )

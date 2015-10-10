@@ -1,9 +1,0 @@
-[1 of 2] Compiling Map[sig of Data.Map.Strict] ( Map.hsig, nothing )
-[2 of 2] Compiling Main             ( Main.hs, tmp_sigof02m/Main.o )
-Linking tmp_sigof02m/StrictMain ...
-[1 of 2] Compiling Map[sig of Data.Map.Lazy] ( Map.hsig, nothing ) [sig-of changed]
-[2 of 2] Compiling Main             ( Main.hs, tmp_sigof02m/Main.o ) [Map changed]
-Linking tmp_sigof02m/LazyMain ...
-False
-[(0,"foo"),(6,"foo")]
-fromList [(0,"foo"),(6,"foo")]

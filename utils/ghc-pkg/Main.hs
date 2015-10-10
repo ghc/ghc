@@ -18,7 +18,6 @@ import qualified GHC.PackageDb as GhcPkg
 import GHC.PackageDb (BinaryStringRep(..))
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 import qualified Data.Graph as Graph
-import qualified Data.Version as V
 import qualified Distribution.ModuleName as ModuleName
 import Distribution.ModuleName (ModuleName)
 import Distribution.InstalledPackageInfo as Cabal
@@ -27,7 +26,9 @@ import Distribution.ParseUtils
 import Distribution.Package hiding (installedUnitId)
 import Distribution.Text
 import Distribution.Version
+import Distribution.Backpack
 import Distribution.Simple.Utils (fromUTF8, toUTF8, writeUTF8File, readUTF8File)
+import qualified Data.Version as Version
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
 import System.Directory ( getAppUserDataDirectory, createDirectoryIfMissing,
@@ -52,6 +53,8 @@ import System.IO.Error
 import GHC.IO.Exception (IOErrorType(InappropriateType))
 import Data.List
 import Control.Concurrent
+import qualified Data.Set as Set
+import qualified Data.Map as Map
 
 import qualified Data.ByteString.Char8 as BS
 
@@ -1083,19 +1086,22 @@ updateDBCache verbosity db = do
       hPutChar handle c
 
 type PackageCacheFormat = GhcPkg.InstalledPackageInfo
+                            ComponentId
                             PackageIdentifier
                             PackageName
                             UnitId
+                            OpenUnitId
                             ModuleName
-                            Module
+                            OpenModule
 
 convertPackageInfoToCacheFormat :: InstalledPackageInfo -> PackageCacheFormat
 convertPackageInfoToCacheFormat pkg =
     GhcPkg.InstalledPackageInfo {
        GhcPkg.unitId             = installedUnitId pkg,
+       GhcPkg.instantiatedWith   = instantiatedWith pkg,
        GhcPkg.sourcePackageId    = sourcePackageId pkg,
        GhcPkg.packageName        = packageName pkg,
-       GhcPkg.packageVersion     = V.Version (versionNumbers (packageVersion pkg)) [],
+       GhcPkg.packageVersion     = Version.Version (versionNumbers (packageVersion pkg)) [],
        GhcPkg.depends            = depends pkg,
        GhcPkg.abiHash            = unAbiHash (abiHash pkg),
        GhcPkg.importDirs         = importDirs pkg,
@@ -1118,6 +1124,10 @@ convertPackageInfoToCacheFormat pkg =
     }
   where convertExposed (ExposedModule n reexport) = (n, reexport)
 
+instance GhcPkg.BinaryStringRep ComponentId where
+  fromStringRep = mkComponentId . fromStringRep
+  toStringRep   = toStringRep . display
+
 instance GhcPkg.BinaryStringRep PackageName where
   fromStringRep = mkPackageName . fromStringRep
   toStringRep   = toStringRep . display
@@ -1127,10 +1137,6 @@ instance GhcPkg.BinaryStringRep PackageIdentifier where
                 . simpleParse . fromStringRep
   toStringRep = toStringRep . display
 
-instance GhcPkg.BinaryStringRep UnitId where
-  fromStringRep = mkUnitId . fromStringRep
-  toStringRep (SimpleUnitId cid) = toStringRep (unComponentId cid)
-
 instance GhcPkg.BinaryStringRep ModuleName where
   fromStringRep = ModuleName.fromString . fromStringRep
   toStringRep   = toStringRep . display
@@ -1139,9 +1145,20 @@ instance GhcPkg.BinaryStringRep String where
   fromStringRep = fromUTF8 . BS.unpack
   toStringRep   = BS.pack . toUTF8
 
-instance GhcPkg.DbModuleRep UnitId ModuleName Module where
-  fromDbModule (GhcPkg.DbModule uid mod_name) = Module uid mod_name
-  toDbModule (Module uid mod_name) = GhcPkg.DbModule uid mod_name
+instance GhcPkg.BinaryStringRep UnitId where
+  fromStringRep = fromMaybe (error "BinaryStringRep UnitId")
+                . simpleParse . fromStringRep
+  toStringRep   = toStringRep . display
+
+instance GhcPkg.DbUnitIdModuleRep ComponentId OpenUnitId ModuleName OpenModule where
+  fromDbModule (GhcPkg.DbModule uid mod_name) = OpenModule uid mod_name
+  fromDbModule (GhcPkg.DbModuleVar mod_name) = OpenModuleVar mod_name
+  toDbModule (OpenModule uid mod_name) = GhcPkg.DbModule uid mod_name
+  toDbModule (OpenModuleVar mod_name) = GhcPkg.DbModuleVar mod_name
+  fromDbUnitId (GhcPkg.DbUnitId cid insts) = IndefFullUnitId cid (Map.fromList insts)
+  fromDbUnitId (GhcPkg.DbHashedUnitId cid bs) = DefiniteUnitId (DefUnitId (UnitId cid (fmap fromStringRep bs)))
+  toDbUnitId (IndefFullUnitId cid insts) = GhcPkg.DbUnitId cid (Map.toList insts)
+  toDbUnitId (DefiniteUnitId (DefUnitId (UnitId cid mb_hash))) = GhcPkg.DbHashedUnitId cid (fmap toStringRep mb_hash)
 
 -- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Trusting, Distrusting, Unregistering are all similar
@@ -1609,7 +1626,8 @@ checkPackageConfig pkg verbosity db_stack
   checkDuplicateModules pkg
   checkExposedModules db_stack pkg
   checkOtherModules pkg
-  mapM_ (checkHSLib verbosity (libraryDirs pkg)) (hsLibraries pkg)
+  let has_code = Set.null (openModuleSubstFreeHoles (Map.fromList (instantiatedWith pkg)))
+  when has_code $ mapM_ (checkHSLib verbosity (libraryDirs pkg)) (hsLibraries pkg)
   -- ToDo: check these somehow?
   --    extra_libraries :: [String],
   --    c_includes      :: [String],
@@ -1785,12 +1803,13 @@ checkDuplicateModules pkg
 -- question is NOT a signature (however, if it is a reexport, then it's fine
 -- for the original module to be a signature.)
 checkModule :: String
-                    -> PackageDBStack
-                    -> InstalledPackageInfo
-                    -> Module
-                    -> Validate ()
+            -> PackageDBStack
+            -> InstalledPackageInfo
+            -> OpenModule
+            -> Validate ()
+checkModule _ _ _ (OpenModuleVar _) = error "Impermissible reexport"
 checkModule field_name db_stack pkg
-    (Module definingPkgId definingModule) =
+    (OpenModule (DefiniteUnitId (DefUnitId definingPkgId)) definingModule) =
   let mpkg = if definingPkgId == installedUnitId pkg
               then Just pkg
               else PackageIndex.lookupUnitId ipix definingPkgId
@@ -1821,7 +1840,6 @@ checkModule field_name db_stack pkg
                                "that is reexported but not defined in the " ++
                                "defining package " ++ display definingPkgId)
             _ -> return ()
-
   where
     all_pkgs = allPackagesInStack db_stack
     ipix     = PackageIndex.fromList all_pkgs
@@ -1832,6 +1850,10 @@ checkModule field_name db_stack pkg
       return (Graph.path depgraph thispkg otherpkg)
     (depgraph, _, graphVertex) =
       PackageIndex.dependencyGraph (PackageIndex.insert pkg ipix)
+
+checkModule _ _ _ (OpenModule (IndefFullUnitId _ _) _) =
+    -- TODO: add some checks here
+    return ()
 
 
 -- ---------------------------------------------------------------------------

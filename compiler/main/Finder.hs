@@ -86,7 +86,7 @@ removeFromFinderCache :: IORef FinderCache -> Module -> IO ()
 removeFromFinderCache ref key =
   atomicModifyIORef' ref $ \c -> (delModuleEnv c key, ())
 
-lookupFinderCache :: IORef FinderCache -> Module -> IO (Maybe FindResult)
+lookupFinderCache :: IORef FinderCache -> VirginModule -> IO (Maybe FindResult)
 lookupFinderCache ref key = do
    c <- readIORef ref
    return $! lookupModuleEnv c key
@@ -131,7 +131,7 @@ findPluginModule hsc_env mod_name =
 -- reading the interface for a module mentioned by another interface,
 -- for example (a "system import").
 
-findExactModule :: HscEnv -> Module -> IO FindResult
+findExactModule :: HscEnv -> VirginModule -> IO FindResult
 findExactModule hsc_env mod =
     let dflags = hsc_dflags hsc_env
     in if moduleUnitId mod == thisPackage dflags
@@ -205,7 +205,7 @@ findLookupResult hsc_env r = case r of
                        , fr_mods_hidden = []
                        , fr_suggestions = suggest })
 
-modLocationCache :: HscEnv -> Module -> IO FindResult -> IO FindResult
+modLocationCache :: HscEnv -> VirginModule -> IO FindResult -> IO FindResult
 modLocationCache hsc_env mod do_this = do
   m <- lookupFinderCache (hsc_FC hsc_env) mod
   case m of
@@ -281,7 +281,7 @@ findHomeModule hsc_env mod_name =
 
 
 -- | Search for a module in external packages only.
-findPackageModule :: HscEnv -> Module -> IO FindResult
+findPackageModule :: HscEnv -> VirginModule -> IO FindResult
 findPackageModule hsc_env mod = do
   let
         dflags = hsc_dflags hsc_env
@@ -298,7 +298,7 @@ findPackageModule hsc_env mod = do
 -- the 'PackageConfig' must be consistent with the unit id in the 'Module'.
 -- The redundancy is to avoid an extra lookup in the package state
 -- for the appropriate config.
-findPackageModule_ :: HscEnv -> Module -> PackageConfig -> IO FindResult
+findPackageModule_ :: HscEnv -> VirginModule -> PackageConfig -> IO FindResult
 findPackageModule_ hsc_env mod pkg_conf =
   ASSERT( moduleUnitId mod == packageConfigId pkg_conf )
   modLocationCache hsc_env mod $

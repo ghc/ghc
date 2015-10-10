@@ -208,40 +208,16 @@ newTopSrcBinder (L loc rdr_name)
                 -- module name, we we get a confusing "M.T is not in scope" error later
 
         ; stage <- getStage
-        ; env <- getGblEnv
         ; if isBrackStage stage then
                 -- We are inside a TH bracket, so make an *Internal* name
                 -- See Note [Top-level Names in Template Haskell decl quotes] in RnNames
              do { uniq <- newUnique
                 ; return (mkInternalName uniq (rdrNameOcc rdr_name) loc) }
-          else case tcg_impl_rdr_env env of
-            Just gr ->
-                -- We're compiling --sig-of, so resolve with respect to this
-                -- module.
-                -- See Note [Signature parameters in TcGblEnv and DynFlags]
-             do { case lookupGlobalRdrEnv gr (rdrNameOcc rdr_name) of
-                    -- Be sure to override the loc so that we get accurate
-                    -- information later
-                    [GRE{ gre_name = n }] -> do
-                      -- NB: Just adding this line will not work:
-                      --    addUsedGRE True gre
-                      -- see Note [Signature lazy interface loading] for
-                      -- more details.
-                      return (setNameLoc n loc)
-                    _ -> do
-                      { -- NB: cannot use reportUnboundName rdr_name
-                        -- because it looks up in the wrong RdrEnv
-                        -- ToDo: more helpful error messages
-                      ; addErr (unknownNameErr (pprNonVarNameSpace
-                            (occNameSpace (rdrNameOcc rdr_name))) rdr_name)
-                      ; return (mkUnboundNameRdr rdr_name)
-                      }
-                }
-            Nothing ->
-                -- Normal case
+          else
              do { this_mod <- getModule
                 ; traceRn (text "newTopSrcBinder" <+> (ppr this_mod $$ ppr rdr_name $$ ppr loc))
-                ; newGlobalBinder this_mod (rdrNameOcc rdr_name) loc } }
+                ; newGlobalBinder this_mod (rdrNameOcc rdr_name) loc }
+        }
 
 {-
 *********************************************************
@@ -1216,6 +1192,14 @@ data HsSigCtxt
   | RoleAnnotCtxt NameSet    -- A role annotation, with the names of all types
                              -- in the group
 
+instance Outputable HsSigCtxt where
+    ppr (TopSigCtxt ns) = text "TopSigCtxt" <+> ppr ns
+    ppr (LocalBindCtxt ns) = text "LocalBindCtxt" <+> ppr ns
+    ppr (ClsDeclCtxt n) = text "ClsDeclCtxt" <+> ppr n
+    ppr (InstDeclCtxt ns) = text "InstDeclCtxt" <+> ppr ns
+    ppr (HsBootCtxt ns) = text "HsBootCtxt" <+> ppr ns
+    ppr (RoleAnnotCtxt ns) = text "RoleAnnotCtxt" <+> ppr ns
+
 lookupSigOccRn :: HsSigCtxt
                -> Sig RdrName
                -> Located RdrName -> RnM (Located Name)
@@ -1398,7 +1382,7 @@ lookupFixity is a bit strange.
 * Nested local fixity decls are put in the local fixity env, which we
   find with getFixtyEnv
 
-* Imported fixities are found in the HIT or PIT
+* Imported fixities are found in the PIT
 
 * Top-level fixity decls in this module may be for Names that are
     either  Global         (constructors, class operations)

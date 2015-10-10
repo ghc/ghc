@@ -51,7 +51,6 @@ import ForeignCall
 import Annotations( AnnPayload, AnnTarget )
 import BasicTypes
 import Outputable
-import FastString
 import Module
 import SrcLoc
 import Fingerprint
@@ -126,7 +125,7 @@ data IfaceDecl
                  ifName    :: IfaceTopBndr,             -- Name of the class TyCon
                  ifRoles   :: [Role],                   -- Roles
                  ifBinders :: [IfaceTyConBinder],
-                 ifFDs     :: [FunDep FastString],      -- Functional dependencies
+                 ifFDs     :: [FunDep IfLclName],      -- Functional dependencies
                  ifATs     :: [IfaceAT],                -- Associated type families
                  ifSigs    :: [IfaceClassOp],           -- Method signatures
                  ifMinDef  :: BooleanFormula IfLclName  -- Minimal complete definition

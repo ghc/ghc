@@ -1,7 +1,9 @@
 module Packages where
--- Well, this is kind of stupid...
-import {-# SOURCE #-} Module (UnitId)
-import {-# SOURCE #-} DynFlags (DynFlags)
+import {-# SOURCE #-} DynFlags(DynFlags)
+import {-# SOURCE #-} Module(ComponentId, UnitId)
 data PackageState
-unitIdPackageIdString :: DynFlags -> UnitId -> Maybe String
+data PackageConfigMap
 emptyPackageState :: PackageState
+componentIdString :: DynFlags -> ComponentId -> Maybe String
+improveUnitId :: PackageConfigMap -> UnitId -> UnitId
+getPackageConfigMap :: DynFlags -> PackageConfigMap

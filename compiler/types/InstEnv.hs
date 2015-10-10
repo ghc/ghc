@@ -446,6 +446,10 @@ classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = 
 
 -- | Checks for an exact match of ClsInst in the instance environment.
 -- We use this when we do signature checking in TcRnDriver
+-- TODO: This will report that Show [Foo] is a member of an
+-- instance environment containing Show a => Show [a], even if
+-- Show Foo is not in the environment.  Could try to make this
+-- a bit more precise.
 memberInstEnv :: InstEnv -> ClsInst -> Bool
 memberInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm } ) =
     maybe False (\(ClsIE items) -> any (identicalClsInstHead ins_item) items)

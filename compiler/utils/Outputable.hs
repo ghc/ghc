@@ -178,7 +178,7 @@ type QueryQualifyName = Module -> OccName -> QualifyName
 type QueryQualifyModule = Module -> Bool
 
 -- | For a given package, we need to know whether to print it with
--- the unit id to disambiguate it.
+-- the component id to disambiguate it.
 type QueryQualifyPackage = UnitId -> Bool
 
 -- See Note [Printing original names] in HscTypes

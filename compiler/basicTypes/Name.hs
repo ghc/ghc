@@ -531,7 +531,12 @@ pprExternal sty uniq mod occ is_wired is_builtin
                                       pprNameSpaceBrief (occNameSpace occ),
                                       pprUnique uniq])
   | BuiltInSyntax <- is_builtin = ppr_occ_name occ  -- Never qualify builtin syntax
-  | otherwise                   = pprModulePrefix sty mod occ <> ppr_occ_name occ
+  | otherwise                   =
+        if isHoleModule mod
+            then case qualName sty mod occ of
+                    NameUnqual -> ppr_occ_name occ
+                    _ -> braces (ppr (moduleName mod) <> dot <> ppr_occ_name occ)
+            else pprModulePrefix sty mod occ <> ppr_occ_name occ
   where
     pp_mod = sdocWithDynFlags $ \dflags ->
              if gopt Opt_SuppressModulePrefixes dflags

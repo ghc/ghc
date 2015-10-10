@@ -1,7 +1,7 @@
-[1 of 5] Compiling T6018Bfail       ( T6018Bfail.hs, T6018Bfail.o )
-[2 of 5] Compiling T6018Cfail       ( T6018Cfail.hs, T6018Cfail.o )
-[3 of 5] Compiling T6018Dfail       ( T6018Dfail.hs, T6018Dfail.o )
-[4 of 5] Compiling T6018Afail       ( T6018Afail.hs, T6018Afail.o )
+[1 of 5] Compiling T6018Afail       ( T6018Afail.hs, T6018Afail.o )
+[2 of 5] Compiling T6018Bfail       ( T6018Bfail.hs, T6018Bfail.o )
+[3 of 5] Compiling T6018Cfail       ( T6018Cfail.hs, T6018Cfail.o )
+[4 of 5] Compiling T6018Dfail       ( T6018Dfail.hs, T6018Dfail.o )
 [5 of 5] Compiling T6018fail        ( T6018fail.hs, T6018fail.o )
 
 T6018Afail.hs:7:15: error:

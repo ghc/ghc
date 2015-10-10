@@ -357,7 +357,6 @@ test('tc262', normal, compile, [''])
 test('tc263',
     extra_clean(['Tc263_Help.o','Tc263_Help.hi']),
     multimod_compile, ['tc263','-v0'])
-test('tc264', normal, multimod_compile, ['tc264.hsig', '-sig-of "ShouldCompile is base:Data.STRef"'])
 test('tc265', compile_timeout_multiplier(0.01), compile, [''])
 test('tc266',
      [extra_clean(['Tc266.hi-boot', 'Tc266.o-boot', 'Tc266a.hi', 'Tc266a.o', 'Tc266.hi', 'Tc266.o']), run_timeout_multiplier(0.01)] ,

@@ -1,0 +1,20 @@
+Shape for p-impls
+provides: P -> p-impls():P
+               hello
+          Q -> p-impls():Q
+               p-impls():P.hello, world
+requires:
+==== Package p-impls ====
+[1 of 2] Compiling P                ( p-impls/P.hs, nothing )
+[2 of 2] Compiling Q                ( p-impls/Q.hs, nothing )
+Shape for q
+provides: P -> p-impls():P
+               hello
+          Q -> p-impls():Q
+               p-impls():P.hello, world
+          Main -> q():Main
+                  main
+requires:
+==== Package q ====
+[1 of 2] Including p-impls
+[2 of 2] Compiling Main             ( q/Main.hs, nothing )

@@ -1,0 +1,16 @@
+-- Paper example from Backpack'14
+
+unit ab-sigs where
+    signature A where
+        x :: Bool
+    signature B where
+        y :: Bool
+
+unit abcd-holes where
+    dependency ab-sigs[A=<A>,B=<B>]
+    module C where
+        x = False
+    module D where
+        import qualified A
+        import qualified C
+        z = A.x && C.x

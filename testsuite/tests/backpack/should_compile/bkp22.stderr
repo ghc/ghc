@@ -1,0 +1,18 @@
+[1 of 4] Processing ab-sigs
+unit ab-sigs[B=<B>, A=<A>]
+  [1 of 2] Compiling A[sig]           ( ab-sigs/A.hsig, nothing )
+  [2 of 2] Compiling B[sig]           ( ab-sigs/B.hsig, nothing )
+[2 of 4] Processing ab
+unit ab[B=<B>]
+- include ab-sigs[B=<B>, A=<A>] []
+  [1 of 2] Compiling B[sig]           ( ab/B.hsig, nothing )
+  [2 of 2] Compiling A                ( ab/A.hs, nothing )
+[3 of 4] Processing ba
+unit ba[A=<A>]
+- include ab-sigs[B=<B>, A=<A>] []
+  [1 of 2] Compiling A[sig]           ( ba/A.hsig, nothing )
+  [2 of 2] Compiling B                ( ba/B.hs, nothing )
+[4 of 4] Processing ab-rec
+  Instantiating ab-rec
+
+bkp22.bkp:19:1: error: cycles not supported

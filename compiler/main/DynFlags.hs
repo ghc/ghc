@@ -53,8 +53,8 @@ module DynFlags (
         wWarningFlags,
         dynFlagDependencies,
         tablesNextToCode, mkTablesNextToCode,
-        SigOf, getSigOf,
         makeDynFlagsConsistent,
+        thisUnitIdComponentId,
 
         Way(..), mkBuildTag, wayRTSOnly, addWay', updateWays,
         wayGeneralFlags, wayUnsetGeneralFlags,
@@ -97,6 +97,7 @@ module DynFlags (
         setTmpDir,
         setUnitId,
         interpretPackageEnv,
+        canonicalizeHomeModule,
 
         -- ** Parsing DynFlags
         parseDynamicFlagsCmdLine,
@@ -164,7 +165,6 @@ import CmdLineParser
 import Constants
 import Panic
 import Util
-import UniqFM
 import Maybes
 import MonadUtils
 import qualified Pretty
@@ -334,6 +334,7 @@ data DumpFlag
    | Opt_D_dump_occur_anal
    | Opt_D_dump_parsed
    | Opt_D_dump_rn
+   | Opt_D_dump_shape
    | Opt_D_dump_simpl
    | Opt_D_dump_simpl_iterations
    | Opt_D_dump_spec
@@ -642,11 +643,6 @@ instance Show SafeHaskellMode where
 instance Outputable SafeHaskellMode where
     ppr = text . show
 
-type SigOf = ModuleNameEnv Module
-
-getSigOf :: DynFlags -> ModuleName -> Maybe Module
-getSigOf dflags n = lookupUFM (sigOf dflags) n
-
 -- | Contains not only a collection of 'GeneralFlag's but also a plethora of
 -- information relating to the compilation of a single file or GHC session
 data DynFlags = DynFlags {
@@ -654,8 +650,6 @@ data DynFlags = DynFlags {
   ghcLink               :: GhcLink,
   hscTarget             :: HscTarget,
   settings              :: Settings,
-  -- See Note [Signature parameters in TcGblEnv and DynFlags]
-  sigOf                 :: SigOf,       -- ^ Compiling an hs-boot against impl.
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
   optLevel              :: Int,         -- ^ Optimisation level
   debugLevel            :: Int,         -- ^ How much debug information to produce
@@ -694,7 +688,9 @@ data DynFlags = DynFlags {
   solverIterations      :: IntWithInf,   -- ^ Number of iterations in the constraints solver
                                          --   Typically only 1 is needed
 
-  thisPackage           :: UnitId,   -- ^ key of package currently being compiled
+  thisPackage           :: UnitId,   -- ^ unit id of package currently being compiled.
+                                     --   Not properly initialized until initPackages
+  thisUnitIdInsts       :: [(ModuleName, Module)],
 
   -- ways
   ways                  :: [Way],       -- ^ Way flags from the command line
@@ -1159,8 +1155,11 @@ isNoLink _      = False
 -- is used.
 data PackageArg =
       PackageArg String    -- ^ @-package@, by 'PackageName'
-    | UnitIdArg String     -- ^ @-package-id@, by 'UnitId'
+    | UnitIdArg UnitId     -- ^ @-package-id@, by 'UnitId'
   deriving (Eq, Show)
+instance Outputable PackageArg where
+    ppr (PackageArg pn) = text "package" <+> text pn
+    ppr (UnitIdArg uid) = text "unit" <+> ppr uid
 
 -- | Represents the renaming that may be associated with an exposed
 -- package, e.g. the @rns@ part of @-package "foo (rns)"@.
@@ -1178,6 +1177,8 @@ data ModRenaming = ModRenaming {
     modRenamings :: [(ModuleName, ModuleName)] -- ^ Bring module @m@ into scope
                                                --   under name @n@.
   } deriving (Eq)
+instance Outputable ModRenaming where
+    ppr (ModRenaming b rns) = ppr b <+> parens (ppr rns)
 
 -- | Flags for manipulating the set of non-broken packages.
 newtype IgnorePackageFlag = IgnorePackage String -- ^ @-ignore-package@
@@ -1196,6 +1197,10 @@ data PackageFlag
   deriving (Eq)
 -- NB: equality instance is used by InteractiveUI to test if
 -- package flags have changed.
+
+instance Outputable PackageFlag where
+    ppr (ExposePackage n arg rn) = text n <> braces (ppr arg <+> ppr rn)
+    ppr (HidePackage str) = text "-hide-package" <+> text str
 
 defaultHscTarget :: Platform -> HscTarget
 defaultHscTarget = defaultObjectTarget
@@ -1452,7 +1457,6 @@ defaultDynFlags mySettings =
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
         hscTarget               = defaultHscTarget (sTargetPlatform mySettings),
-        sigOf                   = emptyUFM,
         verbosity               = 0,
         optLevel                = 0,
         debugLevel              = 0,
@@ -1484,6 +1488,7 @@ defaultDynFlags mySettings =
         solverIterations        = treatZeroAsInf mAX_SOLVER_ITERATIONS,
 
         thisPackage             = mainUnitId,
+        thisUnitIdInsts         = [],
 
         objectDir               = Nothing,
         dylibInstallName        = Nothing,
@@ -1782,6 +1787,7 @@ dopt f dflags = (fromEnum f `IntSet.member` dumpFlags dflags)
           enableIfVerbose Opt_D_dump_vt_trace               = False
           enableIfVerbose Opt_D_dump_tc                     = False
           enableIfVerbose Opt_D_dump_rn                     = False
+          enableIfVerbose Opt_D_dump_shape                  = False
           enableIfVerbose Opt_D_dump_rn_stats               = False
           enableIfVerbose Opt_D_dump_hi_diffs               = False
           enableIfVerbose Opt_D_verbose_core2core           = False
@@ -1997,26 +2003,29 @@ setOutputFile f d = d { outputFile = f}
 setDynOutputFile f d = d { dynOutputFile = f}
 setOutputHi   f d = d { outputHi   = f}
 
-parseSigOf :: String -> SigOf
-parseSigOf str = case filter ((=="").snd) (readP_to_S parse str) of
+parseUnitIdInsts :: String -> [(ModuleName, Module)]
+parseUnitIdInsts str = case filter ((=="").snd) (readP_to_S parse str) of
     [(r, "")] -> r
-    _ -> throwGhcException $ CmdLineError ("Can't parse -sig-of: " ++ str)
-  where parse = listToUFM <$> sepBy parseEntry (R.char ',')
+    _ -> throwGhcException $ CmdLineError ("Can't parse -instantiated-with: " ++ str)
+  where parse = sepBy parseEntry (R.char ',')
         parseEntry = do
-            n <- tok $ parseModuleName
-            -- ToDo: deprecate this 'is' syntax?
-            tok $ ((string "is" >> return ()) +++ (R.char '=' >> return ()))
-            m <- tok $ parseModule
+            n <- parseModuleName
+            _ <- R.char '='
+            m <- parseModuleId
             return (n, m)
-        parseModule = do
-            pk <- munch1 (\c -> isAlphaNum c || c `elem` "-_.")
-            _ <- R.char ':'
-            m <- parseModuleName
-            return (mkModule (stringToUnitId pk) m)
-        tok m = skipSpaces >> m
 
-setSigOf :: String -> DynFlags -> DynFlags
-setSigOf s d = d { sigOf = parseSigOf s }
+setUnitIdInsts :: String -> DynFlags -> DynFlags
+setUnitIdInsts s d = updateWithInsts (parseUnitIdInsts s) d
+
+updateWithInsts :: [(ModuleName, Module)] -> DynFlags -> DynFlags
+updateWithInsts insts d =
+    -- Overwrite the instances, the instances are "indefinite"
+    d { thisPackage     =
+          if not (null insts) && all (\(x,y) -> mkHoleModule x == y) insts
+            then newUnitId (unitIdComponentId (thisPackage d)) insts
+            else thisPackage d
+      , thisUnitIdInsts = insts
+      }
 
 addPluginModuleName :: String -> DynFlags -> DynFlags
 addPluginModuleName name d = d { pluginModNames = (mkModuleName name) : (pluginModNames d) }
@@ -2358,7 +2367,7 @@ dynamic_flags_deps = [
                  -- as specifing that the number of
                  -- parallel builds is equal to the
                  -- result of getNumProcessors
-  , make_ord_flag defFlag "sig-of"   (sepArg setSigOf)
+  , make_ord_flag defFlag "instantiated-with"   (sepArg setUnitIdInsts)
 
     -- RTS options -------------------------------------------------------------
   , make_ord_flag defFlag "H"           (HasArg (\s -> upd (\d ->
@@ -2719,6 +2728,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_worker_wrapper)
   , make_ord_flag defGhcFlag "ddump-rn-trace"
         (setDumpFlag Opt_D_dump_rn_trace)
+  , make_ord_flag defGhcFlag "ddump-shape"
+        (setDumpFlag Opt_D_dump_shape)
   , make_ord_flag defGhcFlag "ddump-if-trace"
         (setDumpFlag Opt_D_dump_if_trace)
   , make_ord_flag defGhcFlag "ddump-cs-trace"
@@ -4280,22 +4291,18 @@ removeGlobalPkgConf = upd $ \s -> s { extraPkgConfs = filter isNotGlobal . extra
 clearPkgConf :: DynP ()
 clearPkgConf = upd $ \s -> s { extraPkgConfs = const [] }
 
-parseModuleName :: ReadP ModuleName
-parseModuleName = fmap mkModuleName
-                $ munch1 (\c -> isAlphaNum c || c `elem` "_.")
-
 parsePackageFlag :: String                 -- the flag
-                 -> (String -> PackageArg) -- type of argument
+                 -> ReadP PackageArg       -- type of argument
                  -> String                 -- string to parse
                  -> PackageFlag
-parsePackageFlag flag constr str
+parsePackageFlag flag arg_parse str
  = case filter ((=="").snd) (readP_to_S parse str) of
     [(r, "")] -> r
     _ -> throwGhcException $ CmdLineError ("Can't parse package flag: " ++ str)
   where doc = flag ++ " " ++ str
         parse = do
-            pkg <- tok $ munch1 (\c -> isAlphaNum c || c `elem` ":-_.")
-            let mk_expose = ExposePackage doc (constr pkg)
+            pkg_arg <- tok arg_parse
+            let mk_expose = ExposePackage doc pkg_arg
             ( do _ <- tok $ string "with"
                  fmap (mk_expose . ModRenaming True) parseRns
              <++ fmap (mk_expose . ModRenaming False) parseRns
@@ -4320,13 +4327,13 @@ exposePackage, exposePackageId, hidePackage,
 exposePackage p = upd (exposePackage' p)
 exposePackageId p =
   upd (\s -> s{ packageFlags =
-    parsePackageFlag "-package-id" UnitIdArg p : packageFlags s })
+    parsePackageFlag "-package-id" parseUnitIdArg p : packageFlags s })
 exposePluginPackage p =
   upd (\s -> s{ pluginPackageFlags =
-    parsePackageFlag "-plugin-package" PackageArg p : pluginPackageFlags s })
+    parsePackageFlag "-plugin-package" parsePackageArg p : pluginPackageFlags s })
 exposePluginPackageId p =
   upd (\s -> s{ pluginPackageFlags =
-    parsePackageFlag "-plugin-package-id" UnitIdArg p : pluginPackageFlags s })
+    parsePackageFlag "-plugin-package-id" parseUnitIdArg p : pluginPackageFlags s })
 hidePackage p =
   upd (\s -> s{ packageFlags = HidePackage p : packageFlags s })
 ignorePackage p =
@@ -4340,10 +4347,38 @@ distrustPackage p = exposePackage p >>
 exposePackage' :: String -> DynFlags -> DynFlags
 exposePackage' p dflags
     = dflags { packageFlags =
-            parsePackageFlag "-package" PackageArg p : packageFlags dflags }
+            parsePackageFlag "-package" parsePackageArg p : packageFlags dflags }
+
+parsePackageArg :: ReadP PackageArg
+parsePackageArg =
+    fmap PackageArg (munch1 (\c -> isAlphaNum c || c `elem` ":-_."))
+
+parseUnitIdArg :: ReadP PackageArg
+parseUnitIdArg =
+    fmap UnitIdArg parseUnitId
+
+
+thisUnitIdComponentId :: DynFlags -> ComponentId
+thisUnitIdComponentId = unitIdComponentId . thisPackage
 
 setUnitId :: String -> DynFlags -> DynFlags
-setUnitId p s =  s{ thisPackage = stringToUnitId p }
+setUnitId p d =
+    updateWithInsts (thisUnitIdInsts d) $ d{ thisPackage = uid }
+  where
+    uid =
+        case filter ((=="").snd) (readP_to_S parseUnitId p) of
+            [(r, "")] -> r
+            _ -> throwGhcException $ CmdLineError ("Can't parse component id: " ++ p)
+
+-- | Given a 'ModuleName' of a signature in the home library, find
+-- out how it is instantiated.  E.g., the canonical form of
+-- A in @p[A=q[]:A]@ is @q[]:A@.
+canonicalizeHomeModule :: DynFlags -> ModuleName -> Module
+canonicalizeHomeModule dflags mod_name =
+    case lookup mod_name (thisUnitIdInsts dflags) of
+        Nothing  -> mkModule (thisPackage dflags) mod_name
+        Just mod -> mod
+
 
 -- -----------------------------------------------------------------------------
 -- | Find the package environment (if one exists)

@@ -1,0 +1,14 @@
+[1 of 2] Processing p
+  [1 of 1] Compiling H[abstract sig]  ( p/H.hsig, nothing )
+[2 of 2] Processing q
+  [1 of 4] Compiling A[abstract sig]  ( q/A.hsig, nothing )
+  [2 of 4] Compiling T                ( q/T.hs, nothing )
+  [3 of 4] Compiling H                ( q/H.hs, nothing )
+  [4 of 4] Including p
+
+bkpfail07.bkp:7:9: error:
+    Type constructor ‘T.T’ has conflicting definitions in the module
+    and its hsig file
+    Main module: data T.T = T.T Bool
+    Hsig file:  data T.T = T.T Int
+    The constructors do not match: The types for ‘T.T’ differ

@@ -1,6 +1,0 @@
-[1 of 1] Compiling ShouldFail[sig of Prelude] ( tcfail221.hsig, nothing )
-
-tcfail221.hsig:2:10:
-    Duplicate instance declarations:
-      instance Show Int -- Defined at tcfail221.hsig:2:10
-      instance Show Int -- Defined at tcfail221.hsig:3:10

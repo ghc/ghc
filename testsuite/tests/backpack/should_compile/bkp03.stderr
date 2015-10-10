@@ -1,0 +1,25 @@
+[1 of 2] Processing q
+/--- Shape for q
+provides: T -> q(hole:X, hole:H):T
+               hole:X.X{X, X}, T{T, T}
+requires: X -> X{X, X}
+          H -> q(hole:X, hole:H):T.T{T, T}, f
+\---
+  [1 of 3] Compiling X[sig]           ( q/X.hsig, nothing )
+  [2 of 3] Compiling T                ( q/T.hs, nothing )
+  [3 of 3] Compiling H[sig]           ( q/H.hsig, nothing )
+[2 of 2] Processing p
+/--- Shape for p
+provides: T -> q(hole:X, hole:H):T
+               p(hole:X, hole:H):XImpl.X{X, X}, T{T, T}
+          XImpl -> p(hole:X, hole:H):XImpl
+                   X{X, X}
+          A -> p(hole:X, hole:H):A
+               q(hole:X, hole:H):T.T{T}
+requires: X -> p(hole:X, hole:H):XImpl.X{X, X}
+          H -> q(hole:X, hole:H):T.T{T, T}, f
+\---
+  [1 of 4] Compiling XImpl            ( p/XImpl.hs, nothing )
+  [2 of 4] Compiling X[sig]           ( p/X.hsig, nothing )
+  [3 of 4] Compiling H[sig]           ( p/H.hsig, nothing )
+  [4 of 4] Compiling A                ( p/A.hs, nothing )

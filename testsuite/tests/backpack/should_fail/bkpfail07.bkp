@@ -1,0 +1,10 @@
+unit p where
+    signature H where
+        data T = T Int
+unit q where
+    signature A where -- indefinite version
+    module T where
+        data T = T Bool
+    module H(T(..)) where
+        import T
+    dependency p[H=<H>]

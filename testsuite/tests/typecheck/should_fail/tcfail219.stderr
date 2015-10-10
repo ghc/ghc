@@ -1,3 +1,0 @@
-[1 of 1] Compiling ShouldFail[sig of Data.Bool] ( tcfail219.hsig, nothing )
-
-tcfail219.hsig:1:1: Not in scope: type constructor or class ‘Booly’

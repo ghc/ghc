@@ -1,0 +1,21 @@
+test('bkpfail01', normal, backpack_typecheck_fail, [''])
+test('bkpfail03', normal, backpack_typecheck_fail, [''])
+test('bkpfail04', normal, backpack_typecheck_fail, [''])
+test('bkpfail05', normal, backpack_compile_fail, [''])
+test('bkpfail06', normal, backpack_compile_fail, [''])
+test('bkpfail07', expect_broken(0), backpack_typecheck_fail, ['']) # could fix this but not priority
+test('bkpfail09', normal, backpack_compile_fail, [''])
+test('bkpfail10', normal, backpack_compile_fail, [''])
+test('bkpfail11', normal, backpack_compile_fail, [''])
+test('bkpfail12', normal, backpack_compile_fail, [''])
+test('bkpfail13', normal, backpack_compile_fail, [''])
+test('bkpfail14', normal, backpack_compile_fail, [''])
+test('bkpfail15', expect_broken(0), backpack_compile_fail, ['']) # we don't error here...
+test('bkpfail16', normal, backpack_compile_fail, [''])
+test('bkpfail17', normal, backpack_compile_fail, [''])
+test('bkpfail18', normal, backpack_compile_fail, [''])
+test('bkpfail19', normal, backpack_compile_fail, [''])
+test('bkpfail20', normal, backpack_compile_fail, [''])
+test('bkpfail21', normal, backpack_compile_fail, [''])
+# it does fail, but not quite in the right way yet...
+test('bkpfail22', expect_broken(0), backpack_compile_fail, [''])

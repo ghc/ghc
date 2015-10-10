@@ -46,7 +46,7 @@ module TcRnMonad(
   debugTc,
 
   -- * Typechecker global environment
-  setModule, getIsGHCi, getGHCiMonad, getInteractivePrintName,
+  getIsGHCi, getGHCiMonad, getInteractivePrintName,
   tcIsHsBootOrSig, tcSelfBootInfo, getGlobalRdrEnv,
   getRdrEnvs, getImports,
   getFixityEnv, extendFixityEnv, getRecFieldEnv,
@@ -119,11 +119,14 @@ module TcRnMonad(
   initIfaceTcRn,
   initIfaceCheck,
   initIfaceLcl,
+  initIfaceLclWithSubst,
   initIfaceLoad,
   getIfModule,
   failIfM,
   forkM_maybe,
   forkM,
+
+  withException,
 
   -- * Types etc.
   module TcRnTypes,
@@ -165,6 +168,7 @@ import Panic
 import Util
 import Annotations
 import BasicTypes( TopLevelFlag )
+import Maybes
 
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -240,9 +244,11 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
 #endif /* GHCI */
 
                 tcg_mod            = mod,
+                tcg_semantic_mod   =
+                    if thisPackage dflags == moduleUnitId mod
+                        then canonicalizeHomeModule dflags (moduleName mod)
+                        else mod,
                 tcg_src            = hsc_src,
-                tcg_sig_of         = getSigOf dflags (moduleName mod),
-                tcg_impl_rdr_env   = Nothing,
                 tcg_rdr_env        = emptyGlobalRdrEnv,
                 tcg_fix_env        = emptyNameEnv,
                 tcg_field_env      = emptyNameEnv,
@@ -264,7 +270,12 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_dus            = emptyDUs,
 
                 tcg_rn_imports     = [],
-                tcg_rn_exports     = maybe_rn_syntax [],
+                tcg_rn_exports     =
+                    if hsc_src == HsigFile
+                        -- Always retain renamed syntax, so that we can give
+                        -- better errors.  (TODO: how?)
+                        then Just []
+                        else maybe_rn_syntax [],
                 tcg_rn_decls       = maybe_rn_syntax emptyRnGroup,
                 tcg_tr_module      = Nothing,
                 tcg_binds          = emptyLHsBinds,
@@ -280,6 +291,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_fords          = [],
                 tcg_vects          = [],
                 tcg_patsyns        = [],
+                tcg_merged         = [],
                 tcg_dfun_n         = dfun_n_var,
                 tcg_keep           = keep_var,
                 tcg_doc_hdr        = Nothing,
@@ -289,6 +301,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_safeInfer      = infer_var,
                 tcg_dependent_files = dependent_files_var,
                 tcg_tc_plugins     = [],
+                tcg_top_loc        = loc,
                 tcg_static_wc      = static_wc_var
              } ;
              lcl_env = TcLclEnv {
@@ -516,6 +529,16 @@ getEpsAndHpt :: TcRnIf gbl lcl (ExternalPackageState, HomePackageTable)
 getEpsAndHpt = do { env <- getTopEnv; eps <- readMutVar (hsc_EPS env)
                   ; return (eps, hsc_HPT env) }
 
+-- | A convenient wrapper for taking a @MaybeErr MsgDoc a@ and throwing
+-- an exception if it is an error.
+withException :: TcRnIf gbl lcl (MaybeErr MsgDoc a) -> TcRnIf gbl lcl a
+withException do_this = do
+    r <- do_this
+    dflags <- getDynFlags
+    case r of
+        Failed err -> liftIO $ throwGhcExceptionIO (ProgramError (showSDoc dflags err))
+        Succeeded result -> return result
+
 {-
 ************************************************************************
 *                                                                      *
@@ -718,9 +741,6 @@ traceOptIf flag doc
 *                                                                      *
 ************************************************************************
 -}
-
-setModule :: Module -> TcRn a -> TcRn a
-setModule mod thing_inside = updGblEnv (\env -> env { tcg_mod = mod }) thing_inside
 
 getIsGHCi :: TcRn Bool
 getIsGHCi = do { mod <- getModule
@@ -1619,6 +1639,7 @@ mkIfLclEnv mod loc boot
                    = IfLclEnv { if_mod     = mod,
                                 if_loc     = loc,
                                 if_boot    = boot,
+                                if_nsubst  = Nothing,
                                 if_tv_env  = emptyFsEnv,
                                 if_id_env  = emptyFsEnv }
 
@@ -1628,9 +1649,18 @@ mkIfLclEnv mod loc boot
 initIfaceTcRn :: IfG a -> TcRn a
 initIfaceTcRn thing_inside
   = do  { tcg_env <- getGblEnv
+        ; dflags <- getDynFlags
+        ; let mod = tcg_semantic_mod tcg_env
+              -- When we are instantiating a signature, we DEFINITELY
+              -- do not want to knot tie.
+              is_instantiate = unitIdIsDefinite (thisPackage dflags) &&
+                               not (null (thisUnitIdInsts dflags))
         ; let { if_env = IfGblEnv {
                             if_doc = text "initIfaceTcRn",
-                            if_rec_types = Just (tcg_mod tcg_env, get_type_env)
+                            if_rec_types =
+                                if is_instantiate
+                                    then Nothing
+                                    else Just (mod, get_type_env)
                          }
               ; get_type_env = readTcRef (tcg_type_env_var tcg_env) }
         ; setEnvs (if_env, ()) thing_inside }
@@ -1663,6 +1693,13 @@ initIfaceCheck doc hsc_env do_this
 initIfaceLcl :: Module -> SDoc -> Bool -> IfL a -> IfM lcl a
 initIfaceLcl mod loc_doc hi_boot_file thing_inside
   = setLclEnv (mkIfLclEnv mod loc_doc hi_boot_file) thing_inside
+
+-- | Initialize interface typechecking, but with a 'NameShape'
+-- to apply when typechecking top-level 'OccName's (see
+-- 'lookupIfaceTop')
+initIfaceLclWithSubst :: Module -> SDoc -> Bool -> NameShape -> IfL a -> IfM lcl a
+initIfaceLclWithSubst mod loc_doc hi_boot_file nsubst thing_inside
+  = setLclEnv ((mkIfLclEnv mod loc_doc hi_boot_file) { if_nsubst = Just nsubst }) thing_inside
 
 getIfModule :: IfL Module
 getIfModule = do { env <- getLclEnv; return (if_mod env) }

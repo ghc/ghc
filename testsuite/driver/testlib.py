@@ -677,7 +677,7 @@ def get_package_cache_timestamp():
         except:
             return 0.0
 
-do_not_copy = ('.hi', '.o', '.dyn_hi', '.dyn_o') # 12112
+do_not_copy = ('.hi', '.o', '.dyn_hi', '.dyn_o', '.out') # 12112
 
 def test_common_work (name, opts, func, args):
     try:
@@ -938,6 +938,21 @@ def compile( name, way, extra_hc_opts ):
 def compile_fail( name, way, extra_hc_opts ):
     return do_compile( name, way, 1, '', [], extra_hc_opts )
 
+def backpack_typecheck( name, way, extra_hc_opts ):
+    return do_compile( name, way, 0, '', [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=1 )
+
+def backpack_typecheck_fail( name, way, extra_hc_opts ):
+    return do_compile( name, way, 1, '', [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=1 )
+
+def backpack_compile( name, way, extra_hc_opts ):
+    return do_compile( name, way, 0, '', [], extra_hc_opts, backpack=1 )
+
+def backpack_compile_fail( name, way, extra_hc_opts ):
+    return do_compile( name, way, 1, '', [], extra_hc_opts, backpack=1 )
+
+def backpack_run( name, way, extra_hc_opts ):
+    return compile_and_run__( name, way, '', [], extra_hc_opts, backpack=1 )
+
 def multimod_compile( name, way, top_mod, extra_hc_opts ):
     return do_compile( name, way, 0, top_mod, [], extra_hc_opts )
 
@@ -950,7 +965,7 @@ def multi_compile( name, way, top_mod, extra_mods, extra_hc_opts ):
 def multi_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
     return do_compile( name, way, 1, top_mod, extra_mods, extra_hc_opts)
 
-def do_compile(name, way, should_fail, top_mod, extra_mods, extra_hc_opts):
+def do_compile(name, way, should_fail, top_mod, extra_mods, extra_hc_opts, **kwargs):
     # print 'Compile only, extra args = ', extra_hc_opts
 
     result = extras_build( way, extra_mods, extra_hc_opts )
@@ -958,7 +973,7 @@ def do_compile(name, way, should_fail, top_mod, extra_mods, extra_hc_opts):
        return result
     extra_hc_opts = result['hc_opts']
 
-    result = simple_build(name, way, extra_hc_opts, should_fail, top_mod, 0, 1)
+    result = simple_build(name, way, extra_hc_opts, should_fail, top_mod, 0, 1, **kwargs)
 
     if badResult(result):
         return result
@@ -1005,7 +1020,7 @@ def compile_cmp_asm( name, way, extra_hc_opts ):
 # -----------------------------------------------------------------------------
 # Compile-and-run tests
 
-def compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts ):
+def compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts, backpack=0 ):
     # print 'Compile and run, extra args = ', extra_hc_opts
 
     result = extras_build( way, extra_mods, extra_hc_opts )
@@ -1016,7 +1031,7 @@ def compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts ):
     if way.startswith('ghci'): # interpreted...
         return interpreter_run(name, way, extra_hc_opts, top_mod)
     else: # compiled...
-        result = simple_build(name, way, extra_hc_opts, 0, top_mod, 1, 1)
+        result = simple_build(name, way, extra_hc_opts, 0, top_mod, 1, 1, backpack = backpack)
         if badResult(result):
             return result
 
@@ -1102,7 +1117,7 @@ def extras_build( way, extra_mods, extra_hc_opts ):
 
     return {'passFail' : 'pass', 'hc_opts' : extra_hc_opts}
 
-def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf):
+def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, backpack = False):
     opts = getTestOpts()
 
     # Redirect stdout and stderr to the same file
@@ -1112,7 +1127,10 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf):
     if top_mod != '':
         srcname = top_mod
     elif addsuf:
-        srcname = add_hs_lhs_suffix(name)
+        if backpack:
+            srcname = add_suffix(name, 'bkp')
+        else:
+            srcname = add_hs_lhs_suffix(name)
     else:
         srcname = name
 
@@ -1120,6 +1138,12 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf):
         to_do = '--make '
         if link:
             to_do = to_do + '-o ' + name
+    elif backpack:
+        if link:
+            to_do = '-o ' + name + ' '
+        else:
+            to_do = ''
+        to_do = to_do + '--backpack '
     elif link:
         to_do = '-o ' + name
     else:
@@ -1128,6 +1152,8 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf):
     stats_file = name + '.comp.stats'
     if opts.compiler_stats_range_fields:
         extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
+    if backpack:
+        extra_hc_opts += ' -outputdir ' + name + '.out'
 
     # Required by GHC 7.3+, harmless for earlier versions:
     if (getTestOpts().c_src or

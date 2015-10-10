@@ -133,6 +133,7 @@ Library
         cbits/genSym.c
 
     hs-source-dirs:
+        backpack
         basicTypes
         cmm
         codeGen
@@ -159,6 +160,10 @@ Library
         vectorise
 
     Exposed-Modules:
+        DriverBkp
+        BkpSyn
+        NameShape
+        RnModIface
         Avail
         BasicTypes
         ConLike
@@ -423,6 +428,7 @@ Library
         TcPat
         TcPatSyn
         TcRnDriver
+        TcBackpack
         TcRnMonad
         TcRnTypes
         TcRules

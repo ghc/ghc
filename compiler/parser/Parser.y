@@ -22,7 +22,7 @@
 --       buffer = stringToStringBuffer str
 --       parseState = mkPState flags buffer location
 -- @
-module Parser (parseModule, parseImport, parseStatement,
+module Parser (parseModule, parseSignature, parseImport, parseStatement, parseBackpack,
                parseDeclaration, parseExpression, parsePattern,
                parseTypeSignature,
                parseStmt, parseIdentifier,
@@ -41,6 +41,8 @@ import HsSyn
 -- compiler/main
 import HscTypes         ( IsBootInterface, WarningTxt(..) )
 import DynFlags
+import BkpSyn
+import PackageConfig
 
 -- compiler/utils
 import OrdList
@@ -371,6 +373,10 @@ output it generates.
  'stock'        { L _ ITstock }    -- for DerivingStrategies extension
  'anyclass'     { L _ ITanyclass } -- for DerivingStrategies extension
 
+ 'unit'         { L _ ITunit }
+ 'signature'    { L _ ITsignature }
+ 'dependency'   { L _ ITdependency }
+
  '{-# INLINE'             { L _ (ITinline_prag _ _ _) } -- INLINE or INLINABLE
  '{-# SPECIALISE'         { L _ (ITspec_prag _) }
  '{-# SPECIALISE_INLINE'  { L _ (ITspec_inline_prag _ _) }
@@ -487,6 +493,7 @@ TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 
 -- Exported parsers
 %name parseModule module
+%name parseSignature signature
 %name parseImport importdecl
 %name parseStatement stmt
 %name parseDeclaration topdecl
@@ -496,6 +503,7 @@ TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 %name parseStmt   maybe_stmt
 %name parseIdentifier  identifier
 %name parseType ctype
+%name parseBackpack backpack
 %partial parseHeader header
 %%
 
@@ -510,6 +518,92 @@ identifier :: { Located RdrName }
                                [mj AnnOpenP $1,mu AnnRarrow $2,mj AnnCloseP $3] }
 
 -----------------------------------------------------------------------------
+-- Backpack stuff
+
+backpack :: { [LHsUnit PackageName] }
+         : implicit_top units close { fromOL $2 }
+         | '{' units '}'            { fromOL $2 }
+
+units :: { OrdList (LHsUnit PackageName) }
+         : units ';' unit { $1 `appOL` unitOL $3 }
+         | units ';'      { $1 }
+         | unit           { unitOL $1 }
+
+unit :: { LHsUnit PackageName }
+        : 'unit' pkgname 'where' unitbody
+            { sL1 $1 $ HsUnit { hsunitName = $2
+                              , hsunitBody = fromOL $4 } }
+
+unitid :: { LHsUnitId PackageName }
+        : pkgname                  { sL1 $1 $ HsUnitId $1 [] }
+        | pkgname '[' msubsts ']'  { sLL $1 $> $ HsUnitId $1 (fromOL $3) }
+
+msubsts :: { OrdList (LHsModuleSubst PackageName) }
+        : msubsts ',' msubst { $1 `appOL` unitOL $3 }
+        | msubsts ','        { $1 }
+        | msubst             { unitOL $1 }
+
+msubst :: { LHsModuleSubst PackageName }
+        : modid '=' moduleid { sLL $1 $> $ ($1, $3) }
+        | modid VARSYM modid VARSYM { sLL $1 $> $ ($1, sLL $2 $> $ HsModuleVar $3) }
+
+moduleid :: { LHsModuleId PackageName }
+          : VARSYM modid VARSYM { sLL $1 $> $ HsModuleVar $2 }
+          | unitid ':' modid    { sLL $1 $> $ HsModuleId $1 $3 }
+
+pkgname :: { Located PackageName }
+        : STRING     { sL1 $1 $ PackageName (getSTRING $1) }
+        | litpkgname { sL1 $1 $ PackageName (unLoc $1) }
+
+litpkgname_segment :: { Located FastString }
+        : VARID  { sL1 $1 $ getVARID $1 }
+        | CONID  { sL1 $1 $ getCONID $1 }
+        | special_id { $1 }
+
+litpkgname :: { Located FastString }
+        : litpkgname_segment { $1 }
+        -- a bit of a hack, means p - b is parsed same as p-b, enough for now.
+        | litpkgname_segment '-' litpkgname  { sLL $1 $> $ appendFS (unLoc $1) (consFS '-' (unLoc $3)) }
+
+mayberns :: { Maybe [LRenaming] }
+        : {- empty -} { Nothing }
+        | '(' rns ')' { Just (fromOL $2) }
+
+rns :: { OrdList LRenaming }
+        : rns ',' rn { $1 `appOL` unitOL $3 }
+        | rns ','    { $1 }
+        | rn         { unitOL $1 }
+
+rn :: { LRenaming }
+        : modid 'as' modid { sLL $1 $> $ Renaming (unLoc $1) (unLoc $3) }
+        | modid            { sL1 $1    $ Renaming (unLoc $1) (unLoc $1) }
+
+unitbody :: { OrdList (LHsUnitDecl PackageName) }
+        : '{'     unitdecls '}'   { $2 }
+        | vocurly unitdecls close { $2 }
+
+unitdecls :: { OrdList (LHsUnitDecl PackageName) }
+        : unitdecls ';' unitdecl { $1 `appOL` unitOL $3 }
+        | unitdecls ';'         { $1 }
+        | unitdecl              { unitOL $1 }
+
+unitdecl :: { LHsUnitDecl PackageName }
+        : maybedocheader 'module' modid maybemodwarning maybeexports 'where' body
+             -- XXX not accurate
+             { sL1 $2 $ DeclD ModuleD $3 (Just (sL1 $2 (HsModule (Just $3) $5 (fst $ snd $7) (snd $ snd $7) $4 $1))) }
+        | maybedocheader 'signature' modid maybemodwarning maybeexports 'where' body
+             { sL1 $2 $ DeclD SignatureD $3 (Just (sL1 $2 (HsModule (Just $3) $5 (fst $ snd $7) (snd $ snd $7) $4 $1))) }
+        -- NB: MUST have maybedocheader here, otherwise shift-reduce conflict
+        -- will prevent us from parsing both forms.
+        | maybedocheader 'module' modid
+             { sL1 $2 $ DeclD ModuleD $3 Nothing }
+        | maybedocheader 'signature' modid
+             { sL1 $2 $ DeclD SignatureD $3 Nothing }
+        | 'dependency' unitid mayberns
+             { sL1 $1 $ IncludeD (IncludeDecl { idUnitId = $2
+                                              , idModRenaming = $3 }) }
+
+-----------------------------------------------------------------------------
 -- Module Header
 
 -- The place for module deprecation is really too restrictive, but if it
@@ -518,6 +612,14 @@ identifier :: { Located RdrName }
 -- introduction of a new pragma DEPRECATED_MODULE, but this is not very nice,
 -- either, and DEPRECATED is only expected to be used by people who really
 -- know what they are doing. :-)
+
+signature :: { Located (HsModule RdrName) }
+       : maybedocheader 'signature' modid maybemodwarning maybeexports 'where' body
+             {% fileSrcSpan >>= \ loc ->
+                ams (L loc (HsModule (Just $3) $5 (fst $ snd $7)
+                              (snd $ snd $7) $4 $1)
+                    )
+                    ([mj AnnModule $2, mj AnnWhere $6] ++ fst $7) }
 
 module :: { Located (HsModule RdrName) }
        : maybedocheader 'module' modid maybemodwarning maybeexports 'where' body
@@ -537,6 +639,9 @@ maybedocheader :: { Maybe LHsDocString }
         | {- empty -}             { Nothing }
 
 missing_module_keyword :: { () }
+        : {- empty -}                           {% pushModuleContext }
+
+implicit_top :: { () }
         : {- empty -}                           {% pushModuleContext }
 
 maybemodwarning :: { Maybe (Located WarningTxt) }
@@ -582,6 +687,10 @@ cvtopdecls :: { [LHsDecl RdrName] }
 
 header  :: { Located (HsModule RdrName) }
         : maybedocheader 'module' modid maybemodwarning maybeexports 'where' header_body
+                {% fileSrcSpan >>= \ loc ->
+                   ams (L loc (HsModule (Just $3) $5 $7 [] $4 $1
+                          )) [mj AnnModule $2,mj AnnWhere $6] }
+        | maybedocheader 'signature' modid maybemodwarning maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    ams (L loc (HsModule (Just $3) $5 $7 [] $4 $1
                           )) [mj AnnModule $2,mj AnnWhere $6] }
@@ -3093,6 +3202,9 @@ special_id
         | 'group'               { sL1 $1 (fsLit "group") }
         | 'stock'               { sL1 $1 (fsLit "stock") }
         | 'anyclass'            { sL1 $1 (fsLit "anyclass") }
+        | 'unit'                { sL1 $1 (fsLit "unit") }
+        | 'dependency'          { sL1 $1 (fsLit "dependency") }
+        | 'signature'           { sL1 $1 (fsLit "signature") }
 
 special_sym :: { Located FastString }
 special_sym : '!'       {% ams (sL1 $1 (fsLit "!")) [mj AnnBang $1] }

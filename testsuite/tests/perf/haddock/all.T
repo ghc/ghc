@@ -52,7 +52,7 @@ test('haddock.base',
 test('haddock.Cabal',
      [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 20619433656, 5)
+          [(wordsize(64), 21554874976, 5)
             # 2012-08-14: 3255435248 (amd64/Linux)
             # 2012-08-29: 3324606664 (amd64/Linux, new codegen)
             # 2012-10-08: 3373401360 (amd64/Linux)
@@ -89,6 +89,7 @@ test('haddock.Cabal',
             #   of new modules; if you exclude them from the haddock run
             #   the stats are comparable.
             # 2016-10-01: 20619433656 (amd64/Linux) - Cabal update
+            # 2016-10-03: 21554874976 (amd64/Linux) - Cabal update
 
           ,(platform('i386-unknown-mingw32'), 3293415576, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)

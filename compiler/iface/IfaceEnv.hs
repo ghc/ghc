@@ -11,6 +11,7 @@ module IfaceEnv (
         extendIfaceIdEnv, extendIfaceTyVarEnv,
         tcIfaceLclId, tcIfaceTyVar, lookupIfaceVar,
         lookupIfaceTyVar, extendIfaceEnvs,
+        setNameModule,
 
         ifaceExportNames,
 
@@ -174,6 +175,12 @@ externaliseName mod name
              ns'   = ns { nsNames = extendNameCache (nsNames ns) mod occ name' }
          in (ns', name') }
 
+-- | Set the 'Module' of a 'Name'.
+setNameModule :: Maybe Module -> Name -> TcRnIf m n Name
+setNameModule Nothing n = return n
+setNameModule (Just m) n =
+    newGlobalBinder m (nameOccName n) (nameSrcSpan n)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -330,8 +337,25 @@ extendIfaceEnvs tcvs thing_inside
 
 lookupIfaceTop :: OccName -> IfL Name
 -- Look up a top-level name from the current Iface module
-lookupIfaceTop occ
-  = do  { env <- getLclEnv; lookupOrig (if_mod env) occ }
+lookupIfaceTop occ = do
+    lcl_env <- getLclEnv
+    -- NB: this is a semantic module, see
+    -- Note [Identity versus semantic module]
+    mod <- getIfModule
+    case if_nsubst lcl_env of
+        -- NOT substNameShape because 'getIfModule' returns the
+        -- renamed module (d'oh!)
+        Just nsubst ->
+            case lookupOccEnv (ns_map nsubst) occ of
+              Just n' ->
+                -- I thought this would be help but it turns out
+                -- n' doesn't have any useful information. Drat!
+                -- return (setNameLoc n' (nameSrcSpan n))
+                return n'
+              -- This case can occur when we encounter a DFun;
+              -- see Note [Bogus DFun renamings]
+              Nothing -> lookupOrig mod occ
+        _ -> lookupOrig mod occ
 
 newIfaceName :: OccName -> IfL Name
 newIfaceName occ
