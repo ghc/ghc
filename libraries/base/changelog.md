@@ -66,6 +66,9 @@
     `GHC.Generics` as part of making GHC generics capable of handling
     unlifted types (#10868)
 
+  * Keep `shift{L,R}` on `Integer` with negative shift-arguments from
+	segfaulting (#10571)
+
 ## 4.8.1.0  *Jul 2015*
 
   * Bundled with GHC 7.10.2

@@ -515,15 +515,7 @@ instance Bits Integer where
    complement = complementInteger
    shift x i@(I# i#) | i >= 0    = shiftLInteger x i#
                      | otherwise = shiftRInteger x (negateInt# i#)
-   shiftL x i@(I# i#)
-     | i < 0        = error "Bits.shiftL(Integer): negative shift"
-     | otherwise    = shiftLInteger x i#
-   shiftR x i@(I# i#)
-     | i < 0        = error "Bits.shiftR(Integer): negative shift"
-     | otherwise    = shiftRInteger x i#
-
    testBit x (I# i) = testBitInteger x i
-
    zeroBits   = 0
 
 #if HAVE_INTEGER_GMP1
