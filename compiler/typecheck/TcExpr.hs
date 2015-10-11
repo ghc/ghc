@@ -1468,7 +1468,9 @@ disambiguateRecordBinds record_expr rbnds res_ty
       where
         (orphans, rbnds') = partitionWith pickParent rbnds
 
-        -- AMG TODO explain why this is fiddly
+        -- Previously ambiguous fields must be marked as used now that
+        -- we know which one is meant, but unambiguous ones shouldn't
+        -- be recorded again (giving duplicate deprecation warnings).
         f (fld, gre, was_unambiguous)
             = do { unless was_unambiguous $ do
                      let L loc rdr = hsRecUpdFieldRdr (unLoc fld)
