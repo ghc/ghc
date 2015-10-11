@@ -445,9 +445,9 @@ compiler_stage1_PACKAGE_KEY = $(subst .$(ProjectPatchLevel),,$(compiler_stage1_P
 compiler_stage1_LIB_NAME = $(subst .$(ProjectPatchLevel),,$(compiler_stage1_LIB_NAME))
 endef
 
-# NB: the PACKAGE_KEY munging has no effect for new-style package keys
+# NB: the PACKAGE_KEY munging has no effect for new-style unit ids
 # (which indeed, have nothing version like in them, but are important for
-# old-style package keys which do.)  The subst operation is idempotent, so
+# old-style unit ids which do.)  The subst operation is idempotent, so
 # as long as we do it at least once we should be good.
 
 # Don't register the non-munged package

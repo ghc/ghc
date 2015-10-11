@@ -50,7 +50,7 @@ codeOutput :: DynFlags
            -> FilePath
            -> ModLocation
            -> ForeignStubs
-           -> [PackageKey]
+           -> [UnitId]
            -> Stream IO RawCmmGroup ()                       -- Compiled C--
            -> IO (FilePath,
                   (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}))
@@ -100,7 +100,7 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 outputC :: DynFlags
         -> FilePath
         -> Stream IO RawCmmGroup ()
-        -> [PackageKey]
+        -> [UnitId]
         -> IO ()
 
 outputC dflags filenm cmm_stream packages
@@ -115,7 +115,7 @@ outputC dflags filenm cmm_stream packages
        --   * -#include options from the cmdline and OPTIONS pragmas
        --   * the _stub.h file, if there is one.
        --
-       let rts = getPackageDetails dflags rtsPackageKey
+       let rts = getPackageDetails dflags rtsUnitId
 
        let cc_injects = unlines (map mk_include (includes rts))
            mk_include h_file =
@@ -124,7 +124,7 @@ outputC dflags filenm cmm_stream packages
                '<':_      -> "#include "++h_file
                _          -> "#include \""++h_file++"\""
 
-       let pkg_names = map packageKeyString packages
+       let pkg_names = map unitIdString packages
 
        doOutput filenm $ \ h -> do
           hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
@@ -208,7 +208,7 @@ outputForeignStubs dflags mod location stubs
 
         -- we need the #includes from the rts package for the stub files
         let rts_includes =
-               let rts_pkg = getPackageDetails dflags rtsPackageKey in
+               let rts_pkg = getPackageDetails dflags rtsUnitId in
                concatMap mk_include (includes rts_pkg)
             mk_include i = "#include \"" ++ i ++ "\"\n"
 

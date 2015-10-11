@@ -1076,17 +1076,17 @@ type PackageCacheFormat = GhcPkg.InstalledPackageInfo
                             String     -- installed package id
                             String     -- src package id
                             String     -- package name
-                            String     -- package key
+                            String     -- unit id
                             ModuleName -- module name
 
 convertPackageInfoToCacheFormat :: InstalledPackageInfo -> PackageCacheFormat
 convertPackageInfoToCacheFormat pkg =
     GhcPkg.InstalledPackageInfo {
-       GhcPkg.installedPackageId = display (installedComponentId pkg),
+       GhcPkg.componentId = display (installedComponentId pkg),
        GhcPkg.sourcePackageId    = display (sourcePackageId pkg),
        GhcPkg.packageName        = display (packageName pkg),
        GhcPkg.packageVersion     = packageVersion pkg,
-       GhcPkg.packageKey            = display (installedComponentId pkg),
+       GhcPkg.unitId            = display (installedComponentId pkg),
        GhcPkg.depends            = map display (depends pkg),
        GhcPkg.abiHash            = let AbiHash abi = abiHash pkg
                                    in abi,
@@ -1328,7 +1328,7 @@ showPackageDot verbosity myflags = do
 -- -----------------------------------------------------------------------------
 -- Prints the highest (hidden or exposed) version of a package
 
--- ToDo: This is no longer well-defined with package keys, because the
+-- ToDo: This is no longer well-defined with unit ids, because the
 -- dependencies may be varying versions
 latestPackage ::  Verbosity -> [Flag] -> PackageIdentifier -> IO ()
 latestPackage verbosity my_flags pkgid = do

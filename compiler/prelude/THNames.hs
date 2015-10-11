@@ -7,7 +7,7 @@
 module THNames where
 
 import PrelNames( mk_known_key_name )
-import Module( Module, mkModuleNameFS, mkModule, thPackageKey )
+import Module( Module, mkModuleNameFS, mkModule, thUnitId )
 import Name( Name )
 import OccName( tcName, clsName, dataName, varName )
 import RdrName( RdrName, nameRdrName )
@@ -145,7 +145,7 @@ thLib = mkTHModule (fsLit "Language.Haskell.TH.Lib")
 qqLib = mkTHModule (fsLit "Language.Haskell.TH.Quote")
 
 mkTHModule :: FastString -> Module
-mkTHModule m = mkModule thPackageKey (mkModuleNameFS m)
+mkTHModule m = mkModule thUnitId (mkModuleNameFS m)
 
 libFun, libTc, thFun, thTc, thCls, thCon, qqFun :: FastString -> Unique -> Name
 libFun = mk_known_key_name OccName.varName  thLib

@@ -1541,7 +1541,7 @@ linesPlatform xs =
 
 #endif
 
-linkDynLib :: DynFlags -> [String] -> [PackageKey] -> IO ()
+linkDynLib :: DynFlags -> [String] -> [UnitId] -> IO ()
 linkDynLib dflags0 o_files dep_packages
  = do
     let -- This is a rather ugly hack to fix dynamically linked
@@ -1587,7 +1587,7 @@ linkDynLib dflags0 o_files dep_packages
                       OSMinGW32 ->
                           pkgs
                       _ ->
-                          filter ((/= rtsPackageKey) . packageConfigId) pkgs
+                          filter ((/= rtsUnitId) . packageConfigId) pkgs
     let pkg_link_opts = let (package_hs_libs, extra_libs, other_flags) = collectLinkOpts dflags pkgs_no_rts
                         in  package_hs_libs ++ extra_libs ++ other_flags
 
@@ -1597,7 +1597,7 @@ linkDynLib dflags0 o_files dep_packages
 
     -- frameworks
     pkg_framework_opts <- getPkgFrameworkOpts dflags platform
-                                              (map packageKey pkgs)
+                                              (map unitId pkgs)
     let framework_opts = getFrameworkOpts dflags platform
 
     case os of
@@ -1718,7 +1718,7 @@ linkDynLib dflags0 o_files dep_packages
                  ++ map Option pkg_link_opts
               )
 
-getPkgFrameworkOpts :: DynFlags -> Platform -> [PackageKey] -> IO [String]
+getPkgFrameworkOpts :: DynFlags -> Platform -> [UnitId] -> IO [String]
 getPkgFrameworkOpts dflags platform dep_packages
   | platformUsesFrameworks platform = do
     pkg_framework_path_opts <- do

@@ -758,7 +758,7 @@ implementation backing a signature:
 To specify multiple signatures, use a comma-separated list. The
 ``-sig-of`` parameter is required to specify the backing implementations
 of all home modules, even in one-shot compilation mode. At the moment,
-you must specify the full module name (package key, colon, and then
+you must specify the full module name (unit ID, colon, and then
 module name), although in the future we may support more user-friendly
 syntax.
 

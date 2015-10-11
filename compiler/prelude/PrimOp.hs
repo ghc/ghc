@@ -39,7 +39,7 @@ import ForeignCall      ( CLabelString )
 import Unique           ( Unique, mkPrimOpIdUnique )
 import Outputable
 import FastString
-import Module           ( PackageKey )
+import Module           ( UnitId )
 
 {-
 ************************************************************************
@@ -617,7 +617,7 @@ pprPrimOp other_op = pprOccName (primOpOcc other_op)
 ************************************************************************
 -}
 
-data PrimCall = PrimCall CLabelString PackageKey
+data PrimCall = PrimCall CLabelString UnitId
 
 instance Outputable PrimCall where
   ppr (PrimCall lbl pkgId)

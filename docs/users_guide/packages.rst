@@ -224,7 +224,7 @@ The GHC command line options that control packages are:
     .. index::
        single: -this-package-key
 
-    Tells GHC the the module being compiled forms part of package key
+    Tells GHC the the module being compiled forms part of unit ID
     ⟨pkg-key⟩; internally, these keys are used to determine type equality
     and linker symbols.
 
@@ -237,7 +237,7 @@ The GHC command line options that control packages are:
     determined by Cabal; a usual recipe for a library name is that it is
     the hash source package identifier of a package, as well as the
     version hashes of all its textual dependencies. GHC will then use
-    this library name to generate more package keys.
+    this library name to generate more unit IDs.
 
 ``-trust ⟨pkg⟩``
     .. index::
@@ -834,7 +834,7 @@ Additionally, the following flags are accepted by ``ghc-pkg``:
     .. index::
        single: --package-key; ghc-pkg option
 
-    Causes ``ghc-pkg`` to interpret arguments as package keys (e.g., an
+    Causes ``ghc-pkg`` to interpret arguments as unit IDs (e.g., an
     identifier like ``I5BErHzyOm07EBNpKBEeUv``). Package keys are used
     to prefix symbol names GHC produces (e.g.,
     ``6VWy06pWzzJq9evDvK2d4w6_DataziByteStringziInternal_unsafePackLenChars_info``),

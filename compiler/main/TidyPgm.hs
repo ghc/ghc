@@ -1123,7 +1123,7 @@ tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
 
 ------------------------
 tidyTopBind  :: DynFlags
-             -> PackageKey
+             -> UnitId
              -> Module
              -> (Integer -> CoreExpr)
              -> UnfoldEnv
@@ -1311,7 +1311,7 @@ type CafRefEnv = (VarEnv Id, Integer -> CoreExpr)
   -- The Integer -> CoreExpr is the desugaring function for Integer literals
   -- See Note [Disgusting computation of CafRefs]
 
-hasCafRefs :: DynFlags -> PackageKey -> Module
+hasCafRefs :: DynFlags -> UnitId -> Module
            -> CafRefEnv -> Arity -> CoreExpr
            -> CafInfo
 hasCafRefs dflags this_pkg this_mod p@(_,cvt_integer) arity expr

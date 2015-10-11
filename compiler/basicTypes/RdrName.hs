@@ -868,7 +868,7 @@ data ImpDeclSpec
                                    -- the defining module for this thing!
 
                                    -- TODO: either should be Module, or there
-                                   -- should be a Maybe PackageKey here too.
+                                   -- should be a Maybe UnitId here too.
         is_as       :: ModuleName, -- ^ Import alias, e.g. from @as M@ (or @Muggle@ if there is no @as@ clause)
         is_qual     :: Bool,       -- ^ Was this import qualified?
         is_dloc     :: SrcSpan     -- ^ The location of the entire import declaration

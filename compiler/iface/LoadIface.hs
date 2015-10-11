@@ -515,13 +515,13 @@ wantHiBootFile dflags eps mod from
                      -- The boot-ness of the requested interface,
                      -- based on the dependencies in directly-imported modules
   where
-    this_package = thisPackage dflags == modulePackageKey mod
+    this_package = thisPackage dflags == moduleUnitId mod
 
 badSourceImport :: Module -> SDoc
 badSourceImport mod
   = hang (ptext (sLit "You cannot {-# SOURCE #-} import a module from another package"))
        2 (ptext (sLit "but") <+> quotes (ppr mod) <+> ptext (sLit "is from package")
-          <+> quotes (ppr (modulePackageKey mod)))
+          <+> quotes (ppr (moduleUnitId mod)))
 
 -----------------------------------------------------
 --      Loading type/class/value decls
@@ -710,7 +710,7 @@ findAndReadIface doc_str mod hi_boot_file
                                                            (ml_hi_file loc)
 
                        -- See Note [Home module load error]
-                       if thisPackage dflags == modulePackageKey mod &&
+                       if thisPackage dflags == moduleUnitId mod &&
                           not (isOneShot (ghcMode dflags))
                            then return (Failed (homeModError mod loc))
                            else do r <- read_file file_path

@@ -64,6 +64,6 @@ Library
         cbits/popcnt.c
         cbits/word2float.c
 
-    -- We need to set the package key to ghc-prim (without a version number)
+    -- We need to set the unit ID to ghc-prim (without a version number)
     -- as it's magic.
     ghc-options: -this-package-key ghc-prim

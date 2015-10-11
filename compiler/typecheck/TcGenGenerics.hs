@@ -24,7 +24,7 @@ import TyCon
 import FamInstEnv       ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import FamInst
 import Module           ( Module, moduleName, moduleNameString
-                        , modulePackageKey, packageKeyString, getModule )
+                        , moduleUnitId, unitIdString, getModule )
 import IfaceEnv         ( newGlobalBinder )
 import Name      hiding ( varName )
 import RdrName
@@ -748,7 +748,7 @@ mkBindsMetaD fix_env tycon = (dtBinds, allConBinds, allSelBinds)
                            $ tyConName_user
         moduleName_matches = mkStringLHS . moduleNameString . moduleName
                            . nameModule . tyConName $ tycon
-        pkgName_matches    = mkStringLHS . packageKeyString . modulePackageKey
+        pkgName_matches    = mkStringLHS . unitIdString . moduleUnitId
                            . nameModule . tyConName $ tycon
         isNewtype_matches  = [mkSimpleHsAlt nlWildPat (nlHsVar true_RDR)]
 

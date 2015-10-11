@@ -68,11 +68,11 @@ import System.Directory
 --
 data InstalledPackageInfo instpkgid srcpkgid srcpkgname pkgkey modulename
    = InstalledPackageInfo {
-       installedPackageId :: instpkgid,
+       componentId :: instpkgid,
        sourcePackageId    :: srcpkgid,
        packageName        :: srcpkgname,
        packageVersion     :: Version,
-       packageKey         :: pkgkey,
+       unitId         :: pkgkey,
        abiHash            :: String,
        depends            :: [pkgkey],
        importDirs         :: [FilePath],
@@ -146,11 +146,11 @@ emptyInstalledPackageInfo :: (BinaryStringRep a, BinaryStringRep b,
                           => InstalledPackageInfo a b c d e
 emptyInstalledPackageInfo =
   InstalledPackageInfo {
-       installedPackageId = fromStringRep BS.empty,
+       componentId = fromStringRep BS.empty,
        sourcePackageId    = fromStringRep BS.empty,
        packageName        = fromStringRep BS.empty,
        packageVersion     = Version [] [],
-       packageKey         = fromStringRep BS.empty,
+       unitId         = fromStringRep BS.empty,
        abiHash            = "",
        depends            = [],
        importDirs         = [],
@@ -301,8 +301,8 @@ instance (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
           BinaryStringRep d, BinaryStringRep e) =>
          Binary (InstalledPackageInfo a b c d e) where
   put (InstalledPackageInfo
-         installedPackageId sourcePackageId
-         packageName packageVersion packageKey
+         componentId sourcePackageId
+         packageName packageVersion unitId
          abiHash depends importDirs
          hsLibraries extraLibraries extraGHCiLibraries libraryDirs
          frameworks frameworkDirs
@@ -311,11 +311,11 @@ instance (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
          haddockInterfaces haddockHTMLs
          exposedModules hiddenModules instantiatedWith
          exposed trusted) = do
-    put (toStringRep installedPackageId)
+    put (toStringRep componentId)
     put (toStringRep sourcePackageId)
     put (toStringRep packageName)
     put packageVersion
-    put (toStringRep packageKey)
+    put (toStringRep unitId)
     put abiHash
     put (map toStringRep depends)
     put importDirs
@@ -338,11 +338,11 @@ instance (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
     put trusted
 
   get = do
-    installedPackageId <- get
+    componentId <- get
     sourcePackageId    <- get
     packageName        <- get
     packageVersion     <- get
-    packageKey         <- get
+    unitId         <- get
     abiHash            <- get
     depends            <- get
     importDirs         <- get
@@ -364,10 +364,10 @@ instance (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
     exposed            <- get
     trusted            <- get
     return (InstalledPackageInfo
-              (fromStringRep installedPackageId)
+              (fromStringRep componentId)
               (fromStringRep sourcePackageId)
               (fromStringRep packageName) packageVersion
-              (fromStringRep packageKey)
+              (fromStringRep unitId)
               abiHash
               (map fromStringRep depends)
               importDirs

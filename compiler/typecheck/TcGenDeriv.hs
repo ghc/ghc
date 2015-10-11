@@ -45,7 +45,7 @@ import MkCore ( eRROR_ID )
 import PrelNames hiding (error_RDR)
 import THNames
 import Module ( moduleName, moduleNameString
-              , modulePackageKey, packageKeyString )
+              , moduleUnitId, unitIdString )
 import MkId ( coerceId )
 import PrimOp
 import SrcLoc
@@ -1951,7 +1951,7 @@ gen_Lift_binds loc tycon
                               (primLitOp (mkBoxExp (nlHsVar a)))
               where (primLitOp, mkBoxExp) = primLitOps "Lift" tycon ty
 
-            pkg_name = packageKeyString . modulePackageKey
+            pkg_name = unitIdString . moduleUnitId
                      . nameModule $ tycon_name
             mod_name = moduleNameString . moduleName . nameModule $ tycon_name
             con_name = occNameString . nameOccName . dataConName $ data_con

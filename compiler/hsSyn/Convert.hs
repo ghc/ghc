@@ -1304,8 +1304,8 @@ mk_ghc_ns TH.VarName   = OccName.varName
 mk_mod :: TH.ModName -> ModuleName
 mk_mod mod = mkModuleName (TH.modString mod)
 
-mk_pkg :: TH.PkgName -> PackageKey
-mk_pkg pkg = stringToPackageKey (TH.pkgString pkg)
+mk_pkg :: TH.PkgName -> UnitId
+mk_pkg pkg = stringToUnitId (TH.pkgString pkg)
 
 mk_uniq :: Int -> Unique
 mk_uniq u = mkUniqueGrimily u

@@ -217,7 +217,7 @@ rnImportDecl this_mod
                            -- c.f. GHC.findModule, and Trac #9997
              Nothing         -> True
              Just (StringLiteral _ pkg_fs) -> pkg_fs == fsLit "this" ||
-                            fsToPackageKey pkg_fs == modulePackageKey this_mod))
+                            fsToUnitId pkg_fs == moduleUnitId this_mod))
          (addErr (ptext (sLit "A module cannot import itself:") <+> ppr imp_mod_name))
 
     -- Check for a missing import list (Opt_WarnMissingImportList also
@@ -332,7 +332,7 @@ calculateAvails dflags iface mod_safe' want_boot =
                             imp_mod : dep_finsts deps
              | otherwise  = dep_finsts deps
 
-      pkg = modulePackageKey (mi_module iface)
+      pkg = moduleUnitId (mi_module iface)
 
       -- Does this import mean we now require our own pkg
       -- to be trusted? See Note [Trust Own Package]

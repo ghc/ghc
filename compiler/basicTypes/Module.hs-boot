@@ -2,7 +2,7 @@ module Module where
 
 data Module
 data ModuleName
-data PackageKey
+data UnitId
 moduleName :: Module -> ModuleName
-modulePackageKey :: Module -> PackageKey
-packageKeyString :: PackageKey -> String
+moduleUnitId :: Module -> UnitId
+unitIdString :: UnitId -> String

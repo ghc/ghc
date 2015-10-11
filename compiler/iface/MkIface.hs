@@ -243,12 +243,12 @@ mkDependencies
                 --  on M.hi-boot, and hence that we should do the hi-boot consistency
                 --  check.)
 
-          pkgs | th_used   = insertList thPackageKey (imp_dep_pkgs imports)
+          pkgs | th_used   = insertList thUnitId (imp_dep_pkgs imports)
                | otherwise = imp_dep_pkgs imports
 
           -- Set the packages required to be Safe according to Safe Haskell.
           -- See Note [RnNames . Tracking Trust Transitively]
-          sorted_pkgs = sortBy stablePackageKeyCmp pkgs
+          sorted_pkgs = sortBy stableUnitIdCmp pkgs
           trust_pkgs  = imp_trust_pkgs imports
           dep_pkgs'   = map (\x -> (x, x `elem` trust_pkgs)) sorted_pkgs
 
@@ -571,7 +571,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    -- tracked by the usage on the ABI hash of package modules that we import.
    let orph_mods
         = filter (/= this_mod) -- Note [Do not update EPS with your own hi-boot]
-        . filter ((== this_pkg) . modulePackageKey)
+        . filter ((== this_pkg) . moduleUnitId)
         $ dep_orphs sorted_deps
    dep_orphan_hashes <- getOrphanHashes hsc_env orph_mods
 
@@ -683,7 +683,7 @@ getOrphanHashes hsc_env mods = do
 sortDependencies :: Dependencies -> Dependencies
 sortDependencies d
  = Deps { dep_mods   = sortBy (compare `on` (moduleNameFS.fst)) (dep_mods d),
-          dep_pkgs   = sortBy (stablePackageKeyCmp `on` fst) (dep_pkgs d),
+          dep_pkgs   = sortBy (stableUnitIdCmp `on` fst) (dep_pkgs d),
           dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
           dep_finsts = sortBy stableModuleCmp (dep_finsts d) }
 
@@ -994,7 +994,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
                                         -- things in *this* module
       = Nothing
 
-      | modulePackageKey mod /= this_pkg
+      | moduleUnitId mod /= this_pkg
       = Just UsagePackageModule{ usg_mod      = mod,
                                  usg_mod_hash = mod_hash,
                                  usg_safe     = imp_safe }
@@ -1322,7 +1322,7 @@ checkDependencies hsc_env summary iface
                          return (RecompBecause reason)
                  else
                          return UpToDate
-           where pkg = modulePackageKey mod
+           where pkg = moduleUnitId mod
         _otherwise  -> return (RecompBecause reason)
 
 needInterface :: Module -> (ModIface -> IfG RecompileRequired)
@@ -1351,7 +1351,7 @@ needInterface mod continue
 -- | Given the usage information extracted from the old
 -- M.hi file for the module being compiled, figure out
 -- whether M needs to be recompiled.
-checkModUsage :: PackageKey -> Usage -> IfG RecompileRequired
+checkModUsage :: UnitId -> Usage -> IfG RecompileRequired
 checkModUsage _this_pkg UsagePackageModule{
                                 usg_mod = mod,
                                 usg_mod_hash = old_mod_hash }
