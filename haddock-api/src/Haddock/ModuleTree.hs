@@ -15,7 +15,7 @@ module Haddock.ModuleTree ( ModuleTree(..), mkModuleTree ) where
 import Haddock.Types ( MDoc )
 
 import GHC           ( Name )
-import Module        ( Module, moduleNameString, moduleName, modulePackageKey, packageKeyString )
+import Module        ( Module, moduleNameString, moduleName, moduleUnitId, unitIdString )
 import DynFlags      ( DynFlags )
 import Packages      ( lookupPackage )
 import PackageConfig ( sourcePackageIdString )
@@ -28,10 +28,10 @@ mkModuleTree :: DynFlags -> Bool -> [(Module, Maybe (MDoc Name))] -> [ModuleTree
 mkModuleTree dflags showPkgs mods =
   foldr fn [] [ (splitModule mdl, modPkg mdl, modSrcPkg mdl, short) | (mdl, short) <- mods ]
   where
-    modPkg mod_ | showPkgs = Just (packageKeyString (modulePackageKey mod_))
+    modPkg mod_ | showPkgs = Just (unitIdString (moduleUnitId mod_))
                 | otherwise = Nothing
     modSrcPkg mod_ | showPkgs = fmap sourcePackageIdString
-                                     (lookupPackage dflags (modulePackageKey mod_))
+                                     (lookupPackage dflags (moduleUnitId mod_))
                    | otherwise = Nothing
     fn (mod_,pkg,srcPkg,short) = addToTrees mod_ pkg srcPkg short
 

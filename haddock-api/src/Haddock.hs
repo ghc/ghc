@@ -255,8 +255,8 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
     allVisibleIfaces = [ i | i <- allIfaces, OptHide `notElem` instOptions i ]
 
     pkgMod           = ifaceMod (head ifaces)
-    pkgKey           = modulePackageKey pkgMod
-    pkgStr           = Just (packageKeyString pkgKey)
+    pkgKey           = moduleUnitId pkgMod
+    pkgStr           = Just (unitIdString pkgKey)
     pkgNameVer       = modulePackageInfo dflags flags pkgMod
 
     (srcBase, srcModule, srcEntity, srcLEntity) = sourceUrls flags
@@ -353,7 +353,7 @@ modulePackageInfo dflags flags modu =
     cmdline <|> pkgDb
   where
     cmdline = (,) <$> optPackageName flags <*> optPackageVersion flags
-    pkgDb = (\pkg -> (packageName pkg, packageVersion pkg)) <$> lookupPackage dflags (modulePackageKey modu)
+    pkgDb = (\pkg -> (packageName pkg, packageVersion pkg)) <$> lookupPackage dflags (moduleUnitId modu)
 
 
 -------------------------------------------------------------------------------

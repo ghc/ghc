@@ -271,7 +271,7 @@ links ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice (Documented n m
         -- TODO: do something about type instances. They will point to
         -- the module defining the type family, which is wrong.
         origMod = nameModule n
-        origPkg = modulePackageKey origMod
+        origPkg = moduleUnitId origMod
 
         fname = case loc of
           RealSrcSpan l -> unpackFS (srcSpanFile l)

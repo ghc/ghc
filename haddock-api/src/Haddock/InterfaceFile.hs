@@ -14,7 +14,7 @@
 -- Reading and writing the .haddock interface file
 -----------------------------------------------------------------------------
 module Haddock.InterfaceFile (
-  InterfaceFile(..), ifModule, ifPackageKey,
+  InterfaceFile(..), ifUnitId, ifModule,
   readInterfaceFile, nameCacheFromGhc, freshNameCache, NameCacheAccessor,
   writeInterfaceFile, binaryInterfaceVersion, binaryInterfaceVersionCompatibility
 ) where
@@ -57,8 +57,11 @@ ifModule if_ =
     [] -> error "empty InterfaceFile"
     iface:_ -> instMod iface
 
-ifPackageKey :: InterfaceFile -> PackageKey
-ifPackageKey = modulePackageKey . ifModule
+ifUnitId :: InterfaceFile -> UnitId
+ifUnitId if_ =
+  case ifInstalledIfaces if_ of
+    [] -> error "empty InterfaceFile"
+    iface:_ -> moduleUnitId $ instMod iface
 
 
 binaryInterfaceMagic :: Word32
@@ -312,7 +315,7 @@ getSymbolTable bh namecache = do
   return (namecache', arr)
 
 
-type OnDiskName = (PackageKey, ModuleName, OccName)
+type OnDiskName = (UnitId, ModuleName, OccName)
 
 
 fromOnDiskName
@@ -342,7 +345,7 @@ fromOnDiskName _ nc (pid, mod_name, occ) =
 serialiseName :: BinHandle -> Name -> UniqFM (Int,Name) -> IO ()
 serialiseName bh name _ = do
   let modu = nameModule name
-  put_ bh (modulePackageKey modu, moduleName modu, nameOccName name)
+  put_ bh (moduleUnitId modu, moduleName modu, nameOccName name)
 
 
 -------------------------------------------------------------------------------
