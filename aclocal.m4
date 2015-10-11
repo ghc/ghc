@@ -568,10 +568,18 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $3="$$3 -D_HPUX_SOURCE"
         $5="$$5 -D_HPUX_SOURCE"
         ;;
-    arm*linux*       | \
-    aarch64*linux*   )
-        # On arm/linux, aarch64/linux, arm/android and aarch64/android, tell
-        # gcc to link using the gold linker.
+    arm*linux*)
+        # On arm/linux and arm/android, tell gcc to generate Arm
+        # instructions (ie not Thumb) and to link using the gold linker.
+        # Forcing LD to be ld.gold is done in FIND_LD m4 macro.
+        $2="$$2 -marm"
+        $3="$$3 -fuse-ld=gold -Wl,-z,noexecstack"
+        $4="$$4 -z noexecstack"
+        ;;
+
+    aarch64*linux*)
+        # On aarch64/linux and aarch64/android, tell gcc to link using the
+        # gold linker.
         # Forcing LD to be ld.gold is done in FIND_LD m4 macro.
         $3="$$3 -fuse-ld=gold -Wl,-z,noexecstack"
         $4="$$4 -z noexecstack"

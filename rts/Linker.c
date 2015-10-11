@@ -5564,6 +5564,11 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 #ifdef arm_HOST_ARCH
          // Thumb instructions have bit 0 of symbol's st_value set
          is_target_thm = S & 0x1;
+
+         if (is_target_thm)
+            errorBelch( "Symbol `%s' requires Thumb linkage which is not "
+                        "currently supported.\n", symbol );
+
          T = sym.st_info & STT_FUNC && is_target_thm;
 
          // Make sure we clear bit 0. Strictly speaking we should have done
