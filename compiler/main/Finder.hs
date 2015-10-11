@@ -663,6 +663,6 @@ cantFindErr cannot_find _ dflags mod_name find_result
                  = parens (ptext (sLit "needs flag -package-key")
                     <+> ppr (modulePackageKey mod))
               | (pkg:_) <- rhs
-                 = parens (ptext (sLit "needs flag -package-key")
+                 = parens (ptext (sLit "needs flag -package-id")
                     <+> ppr (packageConfigId pkg))
               | otherwise = Outputable.empty
