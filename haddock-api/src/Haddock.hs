@@ -222,7 +222,7 @@ renderStep dflags flags qual pkgs interfaces = do
   let
     ifaceFiles = map snd pkgs
     installedIfaces = concatMap ifInstalledIfaces ifaceFiles
-    srcMap = Map.fromList [ (ifPackageKey if_, x) | ((_, Just x), if_) <- pkgs ]
+    srcMap = Map.fromList [ (ifUnitId if_, x) | ((_, Just x), if_) <- pkgs ]
   render dflags flags qual interfaces installedIfaces srcMap
 
 
@@ -247,8 +247,8 @@ render dflags flags qual ifaces installedIfaces srcMap = do
     allVisibleIfaces = [ i | i <- allIfaces, OptHide `notElem` instOptions i ]
 
     pkgMod           = ifaceMod (head ifaces)
-    pkgKey            = modulePackageKey pkgMod
-    pkgStr           = Just (packageKeyString pkgKey)
+    pkgKey            = moduleUnitId pkgMod
+    pkgStr           = Just (unitIdString pkgKey)
     (pkgName,pkgVer) = modulePackageInfo dflags flags pkgMod
 
     (srcBase, srcModule, srcEntity, srcLEntity) = sourceUrls flags
@@ -314,7 +314,7 @@ modulePackageInfo dflags flags modu =
   (fromMaybe (packageName pkg) (optPackageName flags),
    fromMaybe (packageVersion pkg) (optPackageVersion flags))
   where
-    pkg = getPackageDetails dflags (modulePackageKey modu)
+    pkg = getPackageDetails dflags (moduleUnitId modu)
 
 
 -------------------------------------------------------------------------------
