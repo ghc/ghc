@@ -219,17 +219,17 @@ mkJumpToAddr dflags a = case platformArch (targetPlatform dflags) of
                  , fromIntegral ((w64 `shiftR` 32) .&. 0x0000FFFF) ]
 
     ArchARM { } ->
-        -- Generates Thumb sequence,
+        -- Generates Arm sequence,
         --      ldr r1, [pc, #0]
         --      bx r1
         --
         -- which looks like:
         --     00000000 <.addr-0x8>:
-        --     0:       4900        ldr    r1, [pc]      ; 8 <.addr>
-        --     4:       4708        bx     r1
+        --     0:       00109fe5    ldr    r1, [pc]      ; 8 <.addr>
+        --     4:       11ff2fe1    bx     r1
         let w32 = fromIntegral (funPtrToInt a) :: Word32
-        in Left [ 0x49, 0x00
-                , 0x47, 0x08
+        in Left [ 0x00, 0x10, 0x9f, 0xe5
+                , 0x11, 0xff, 0x2f, 0xe1
                 , byte0 w32, byte1 w32, byte2 w32, byte3 w32]
 
     arch ->
