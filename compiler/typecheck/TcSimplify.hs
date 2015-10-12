@@ -18,6 +18,7 @@ import Bag
 import Class         ( classKey )
 import Class         ( Class )
 import DynFlags      ( ExtensionFlag( Opt_AllowAmbiguousTypes )
+                     , WarningFlag ( Opt_WarnMonomorphism )
                      , DynFlags( solverIterations ) )
 import Inst
 import Id            ( idType )
@@ -393,16 +394,13 @@ simplifyInfer :: TcLevel               -- Used when generating the constraints
               -> WantedConstraints
               -> TcM ([TcTyVar],    -- Quantify over these type variables
                       [EvVar],      -- ... and these constraints (fully zonked)
-                      Bool,         -- The monomorphism restriction did something
-                                    --   so the results type is not as general as
-                                    --   it could be
                       TcEvBinds)    -- ... binding these evidence variables
 simplifyInfer rhs_tclvl apply_mr sig_qtvs name_taus wanteds
   | isEmptyWC wanteds
   = do { gbl_tvs <- tcGetGlobalTyVars
        ; qtkvs <- quantifyTyVars gbl_tvs (tyVarsOfTypes (map snd name_taus))
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
-       ; return (qtkvs, [], False, emptyTcEvBinds) }
+       ; return (qtkvs, [], emptyTcEvBinds) }
 
   | otherwise
   = do { traceTc "simplifyInfer {"  $ vcat
@@ -473,8 +471,8 @@ simplifyInfer rhs_tclvl apply_mr sig_qtvs name_taus wanteds
          -- Decide what type variables and constraints to quantify
        ; zonked_taus <- mapM (TcM.zonkTcType . snd) name_taus
        ; let zonked_tau_tvs = tyVarsOfTypes zonked_taus
-       ; (qtvs, bound_theta, mr_bites)
-             <- decideQuantification apply_mr sig_qtvs quant_pred_candidates zonked_tau_tvs
+       ; (qtvs, bound_theta) <- decideQuantification apply_mr sig_qtvs name_taus
+                                                     quant_pred_candidates zonked_tau_tvs
 
          -- Emit an implication constraint for the
          -- remaining constraints from the RHS
@@ -525,11 +523,10 @@ simplifyInfer rhs_tclvl apply_mr sig_qtvs name_taus wanteds
               , ptext (sLit "promote_tvs=") <+> ppr promote_tvs
               , ptext (sLit "bound_theta =") <+> vcat [ ppr v <+> dcolon <+> ppr (idType v)
                                                         | v <- bound_ev_vars]
-              , ptext (sLit "mr_bites =") <+> ppr mr_bites
               , ptext (sLit "qtvs =") <+> ppr qtvs
               , ptext (sLit "implic =") <+> ppr implic ]
 
-       ; return ( qtvs, bound_ev_vars, mr_bites, TcEvBinds ev_binds_var) }
+       ; return ( qtvs, bound_ev_vars, TcEvBinds ev_binds_var) }
 
 {-
 ************************************************************************
@@ -567,20 +564,30 @@ and the quantified constraints are empty.
 decideQuantification
     :: Bool                       -- Apply monomorphism restriction
     -> [TcTyVar]
+    -> [(Name, TcTauType)]        -- Variables to be generalised (just for error msg)
     -> [PredType] -> TcTyVarSet   -- Constraints and type variables from RHS
     -> TcM ( [TcTyVar]       -- Quantify over these tyvars (skolems)
-           , [PredType]      -- and this context (fully zonked)
-           , Bool )          -- Did the MR bite?
+           , [PredType])     -- and this context (fully zonked)
 -- See Note [Deciding quantification]
-decideQuantification apply_mr sig_qtvs constraints zonked_tau_tvs
+decideQuantification apply_mr sig_qtvs name_taus constraints zonked_tau_tvs
   | apply_mr     -- Apply the Monomorphism restriction
   = do { gbl_tvs <- tcGetGlobalTyVars
        ; let constrained_tvs = tyVarsOfTypes constraints
              mono_tvs = gbl_tvs `unionVarSet` constrained_tvs
              mr_bites = constrained_tvs `intersectsVarSet` zonked_tau_tvs
        ; qtvs <- quantify_tvs mono_tvs zonked_tau_tvs
-       ; traceTc "decideQuantification 1" (vcat [ppr constraints, ppr gbl_tvs, ppr mono_tvs, ppr qtvs])
-       ; return (qtvs, [], mr_bites) }
+       ; traceTc "decideQuantification 1" (vcat [ppr constraints, ppr gbl_tvs, ppr mono_tvs
+                                                , ppr qtvs, ppr mr_bites])
+
+       -- Warn about the monomorphism restriction
+       ; warn_mono <- woptM Opt_WarnMonomorphism
+       ; warnTc (warn_mono && mr_bites) $
+         hang (ptext (sLit "The Monomorphism Restriction applies to the binding")
+               <> plural bndrs <+> ptext (sLit "for") <+> pp_bndrs)
+             2 (ptext (sLit "Consider giving a type signature for")
+                <+> if isSingleton bndrs then pp_bndrs else ptext (sLit "these binders"))
+
+       ; return (qtvs, []) }
 
   | otherwise
   = do { gbl_tvs <- tcGetGlobalTyVars
@@ -596,9 +603,11 @@ decideQuantification apply_mr sig_qtvs constraints zonked_tau_tvs
 
        ; traceTc "decideQuantification 2" (vcat [ppr constraints, ppr gbl_tvs, ppr mono_tvs
                                                 , ppr tau_tvs_plus, ppr qtvs, ppr min_theta])
-       ; return (qtvs, min_theta, False) }
+       ; return (qtvs, min_theta) }
 
   where
+    bndrs    = map fst name_taus
+    pp_bndrs = pprWithCommas (quotes . ppr) bndrs
     quantify_tvs mono_tvs tau_tvs   -- See Note [Which type variable to quantify]
       | null sig_qtvs = quantifyTyVars mono_tvs tau_tvs
       | otherwise     = quantifyTyVars (mono_tvs `delVarSetList`    sig_qtvs)

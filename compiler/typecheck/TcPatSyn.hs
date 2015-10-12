@@ -76,7 +76,7 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
 
        ; let named_taus = (name, pat_ty) : map (\arg -> (getName arg, varType arg)) args
 
-       ; (qtvs, req_dicts, _mr_bites, ev_binds) <- simplifyInfer tclvl False [] named_taus wanted
+       ; (qtvs, req_dicts, ev_binds) <- simplifyInfer tclvl False [] named_taus wanted
 
        ; (ex_vars, prov_dicts) <- tcCollectEx lpat'
        ; let univ_tvs   = filter (not . (`elemVarSet` ex_vars)) qtvs
