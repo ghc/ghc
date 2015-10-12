@@ -314,7 +314,6 @@ instance Arrow a => Applicative (ArrowMonad a) where
    ArrowMonad f <*> ArrowMonad x = ArrowMonad (f &&& x >>> arr (uncurry id))
 
 instance ArrowApply a => Monad (ArrowMonad a) where
-    return x = ArrowMonad (arr (\_ -> x))
     ArrowMonad m >>= f = ArrowMonad $
         m >>> arr (\x -> let ArrowMonad h = f x in (h, ())) >>> app
 

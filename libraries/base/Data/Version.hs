@@ -36,7 +36,8 @@ module Data.Version (
         makeVersion
   ) where
 
-import Control.Monad    ( Monad(..), liftM )
+import Data.Functor     ( Functor(..) )
+import Control.Applicative ( Applicative(..) )
 import Data.Bool        ( (&&) )
 import Data.Char        ( isDigit, isAlphaNum )
 import Data.Eq
@@ -120,9 +121,9 @@ showVersion (Version branch tags)
 -- | A parser for versions in the format produced by 'showVersion'.
 --
 parseVersion :: ReadP Version
-parseVersion = do branch <- sepBy1 (liftM read (munch1 isDigit)) (char '.')
-                  tags   <- many (char '-' >> munch1 isAlphaNum)
-                  return Version{versionBranch=branch, versionTags=tags}
+parseVersion = do branch <- sepBy1 (fmap read (munch1 isDigit)) (char '.')
+                  tags   <- many (char '-' *> munch1 isAlphaNum)
+                  pure Version{versionBranch=branch, versionTags=tags}
 
 -- | Construct tag-less 'Version'
 --

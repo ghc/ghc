@@ -213,5 +213,4 @@ instance Applicative Complex where
   f :+ g <*> a :+ b = f a :+ g b
 
 instance Monad Complex where
-  return a = a :+ a
   a :+ b >>= f = realPart (f a) :+ imagPart (f b)

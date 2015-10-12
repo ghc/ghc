@@ -189,7 +189,6 @@ instance Applicative NonEmpty where
   (<*>) = ap
 
 instance Monad NonEmpty where
-  return a = a :| []
   ~(a :| as) >>= f = b :| (bs ++ bs')
     where b :| bs = f a
           bs' = as >>= toList . f

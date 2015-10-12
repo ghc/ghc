@@ -88,7 +88,6 @@ instance Applicative Identity where
     (<*>)    = coerce
 
 instance Monad Identity where
-    return   = Identity
     m >>= k  = k (runIdentity m)
 
 instance MonadFix Identity where

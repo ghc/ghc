@@ -96,7 +96,7 @@ instance Monad m => Functor (WrappedMonad m) where
     fmap f (WrapMonad v) = WrapMonad (liftM f v)
 
 instance Monad m => Applicative (WrappedMonad m) where
-    pure = WrapMonad . return
+    pure = WrapMonad . pure
     WrapMonad f <*> WrapMonad v = WrapMonad (f `ap` v)
 
 instance MonadPlus m => Alternative (WrappedMonad m) where

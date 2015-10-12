@@ -196,9 +196,9 @@ instance Traversable Proxy where
     {-# INLINE traverse #-}
     sequenceA _ = pure Proxy
     {-# INLINE sequenceA #-}
-    mapM _ _ = return Proxy
+    mapM _ _ = pure Proxy
     {-# INLINE mapM #-}
-    sequence _ = return Proxy
+    sequence _ = pure Proxy
     {-# INLINE sequence #-}
 
 instance Traversable (Const m) where

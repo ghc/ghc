@@ -332,8 +332,7 @@ instance Applicative Min where
   Min f <*> Min x = Min (f x)
 
 instance Monad Min where
-  return = Min
-  _ >> a = a
+  (>>) = (*>)
   Min a >>= f = f a
 
 instance MonadFix Min where
@@ -389,8 +388,7 @@ instance Applicative Max where
   Max f <*> Max x = Max (f x)
 
 instance Monad Max where
-  return = Max
-  _ >> a = a
+  (>>) = (*>)
   Max a >>= f = f a
 
 instance MonadFix Max where
@@ -476,8 +474,7 @@ instance Applicative First where
   First f <*> First x = First (f x)
 
 instance Monad First where
-  return = First
-  _ >> a = a
+  (>>) = (*>)
   First a >>= f = f a
 
 instance MonadFix First where
@@ -523,8 +520,7 @@ instance Applicative Last where
   Last f <*> Last x = Last (f x)
 
 instance Monad Last where
-  return = Last
-  _ >> a = a
+  (>>) = (*>)
   Last a >>= f = f a
 
 instance MonadFix Last where
@@ -584,14 +580,13 @@ instance Applicative Option where
   pure a = Option (Just a)
   Option a <*> Option b = Option (a <*> b)
 
-instance Monad Option where
-  return = pure
+  Option Nothing  *>  _ = Option Nothing
+  _               *>  b = b
 
+instance Monad Option where
   Option (Just a) >>= k = k a
   _               >>= _ = Option Nothing
-
-  Option Nothing  >>  _ = Option Nothing
-  _               >>  b = b
+  (>>) = (*>)
 
 instance Alternative Option where
   empty = Option Nothing
