@@ -8,7 +8,7 @@ module TcSimplify(
        simplifyTop, simplifyInteractive,
        solveWantedsTcM,
 
-       -- For Rules we need these twoo
+       -- For Rules we need these two
        solveWanteds, runTcS
   ) where
 
@@ -77,7 +77,7 @@ simplifyTop wanteds
        ; unless (isEmptyCts unsafe_ol) $ do {
            -- grab current error messages and clear, warnAllUnsolved will
            -- update error messages which we'll grab and then restore saved
-           -- messges.
+           -- messages.
            ; errs_var  <- getErrsVar
            ; saved_msg <- TcRn.readTcRef errs_var
            ; TcRn.writeTcRef errs_var emptyMessages
@@ -182,15 +182,15 @@ We have considered two design choices for where/when to apply defaulting.
    (i) Do it in SimplCheck mode only /whenever/ you try to solve some
        simple constraints, maybe deep inside the context of implications.
        This used to be the case in GHC 7.4.1.
-   (ii) Do it in a tight loop at simplifyTop, once all other constraint has
+   (ii) Do it in a tight loop at simplifyTop, once all other constraints have
         finished. This is the current story.
 
 Option (i) had many disadvantages:
-   a) First it was deep inside the actual solver,
-   b) Second it was dependent on the context (Infer a type signature,
+   a) Firstly, it was deep inside the actual solver.
+   b) Secondly, it was dependent on the context (Infer a type signature,
       or Check a type signature, or Interactive) since we did not want
       to always start defaulting when inferring (though there is an exception to
-      this see Note [Default while Inferring])
+      this, see Note [Default while Inferring]).
    c) It plainly did not work. Consider typecheck/should_compile/DfltProb2.hs:
           f :: Int -> Bool
           f x = const True (\y -> let w :: a -> a
@@ -203,7 +203,8 @@ Option (i) had many disadvantages:
 
 Instead our new defaulting story is to pull defaulting out of the solver loop and
 go with option (i), implemented at SimplifyTop. Namely:
-     - First have a go at solving the residual constraint of the whole program
+     - First, have a go at solving the residual constraint of the whole
+       program
      - Try to approximate it with a simple constraint
      - Figure out derived defaulting equations for that simple constraint
      - Go round the loop again if you did manage to get some equations
@@ -258,7 +259,7 @@ than one path, this alternative doesn't work.
 Note [Safe Haskell Overlapping Instances Implementation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-How is this implemented? It's compilcated! So we'll step through it all:
+How is this implemented? It's complicated! So we'll step through it all:
 
  1) `InstEnv.lookupInstEnv` -- Performs instance resolution, so this is where
  we check if a particular type-class method call is safe or unsafe. We do this
@@ -266,19 +267,20 @@ How is this implemented? It's compilcated! So we'll step through it all:
  list of instances that are unsafe to overlap. When the method call is safe,
  the list is null.
 
- 2) `TcInteract.matchClassInst` -- This module drives the instance resolution /
- dictionary generation. The return type is `LookupInstResult`, which either
- says no instance matched, or one found and if it was a safe or unsafe overlap.
+ 2) `TcInteract.matchClassInst` -- This module drives the instance resolution
+ / dictionary generation. The return type is `LookupInstResult`, which either
+ says no instance matched, or one found, and if it was a safe or unsafe
+ overlap.
 
  3) `TcInteract.doTopReactDict` -- Takes a dictionary / class constraint and
  tries to resolve it by calling (in part) `matchClassInst`. The resolving
  mechanism has a work list (of constraints) that it process one at a time. If
  the constraint can't be resolved, it's added to an inert set. When compiling
- an `-XSafe` or `-XTrustworthy` module we follow this approach as we know
+ an `-XSafe` or `-XTrustworthy` module, we follow this approach as we know
  compilation should fail. These are handled as normal constraint resolution
  failures from here-on (see step 6).
 
- Otherwise, we may be inferring safety (or using `-fwarn-unsafe`) and
+ Otherwise, we may be inferring safety (or using `-fwarn-unsafe`), and
  compilation should succeed, but print warnings and/or mark the compiled module
  as `-XUnsafe`. In this case, we call `insertSafeOverlapFailureTcS` which adds
  the unsafe (but resolved!) constraint to the `inert_safehask` field of
@@ -298,12 +300,12 @@ How is this implemented? It's compilcated! So we'll step through it all:
  instance constraints, it calls `TcErrors.warnAllUnsolved`. Both functions
  convert constraints into a warning message for the user.
 
- 6) `TcErrors.*Unsolved` -- Generates error messages for conastraints by
+ 6) `TcErrors.*Unsolved` -- Generates error messages for constraints by
  actually calling `InstEnv.lookupInstEnv` again! Yes, confusing, but all we
- know is the constraint that is unresolved or unsafe. For dictionary, this is
- know we need a dictionary of type C, but not what instances are available and
- how they overlap. So we once again call `lookupInstEnv` to figure that out so
- we can generate a helpful error message.
+ know is the constraint that is unresolved or unsafe. For dictionary, all we
+ know is that we need a dictionary of type C, but not what instances are
+ available and how they overlap. So we once again call `lookupInstEnv` to
+ figure that out so we can generate a helpful error message.
 
  7) `TcSimplify.simplifyTop` -- In the case of `warnAllUnsolved` for resolved,
  but unsafe dictionary constraints, we collect the generated warning message
@@ -345,7 +347,7 @@ simplifyInteractive wanteds
 
 ------------------
 simplifyDefault :: ThetaType    -- Wanted; has no type variables in it
-                -> TcM ()       -- Succeeds iff the constraint is soluble
+                -> TcM ()       -- Succeeds if the constraint is soluble
 simplifyDefault theta
   = do { traceTc "simplifyInteractive" empty
        ; wanted <- newWanteds DefaultOrigin theta
@@ -411,7 +413,7 @@ simplifyInfer rhs_tclvl apply_mr sig_qtvs name_taus wanteds
              ]
 
               -- Historical note: Before step 2 we used to have a
-              -- HORRIBLE HACK described in Note [Avoid unecessary
+              -- HORRIBLE HACK described in Note [Avoid unnecessary
               -- constraint simplification] but, as described in Trac
               -- #4361, we have taken in out now.  That's why we start
               -- with step 2!
@@ -449,7 +451,7 @@ simplifyInfer rhs_tclvl apply_mr sig_qtvs name_taus wanteds
                       ; gbl_tvs <- tcGetGlobalTyVars
                             -- Miminise quant_cand.  We are not interested in any evidence
                             -- produced, because we are going to simplify wanted_transformed
-                            -- again later. All we want here is the predicates over which to
+                            -- again later. All we want here are the predicates over which to
                             -- quantify.
                             --
                             -- If any meta-tyvar unifications take place (unlikely), we'll
@@ -558,7 +560,7 @@ If the monomorphism restriction does not apply, then we quantify as follows:
     created skolems.
 
 If the MR does apply, mono_tvs includes all the constrained tyvars,
-and the quantified constraints are empty.
+and the quantified constraints are empty/insoluble
 -}
 
 decideQuantification
@@ -566,8 +568,8 @@ decideQuantification
     -> [TcTyVar]
     -> [(Name, TcTauType)]        -- Variables to be generalised (just for error msg)
     -> [PredType] -> TcTyVarSet   -- Constraints and type variables from RHS
-    -> TcM ( [TcTyVar]       -- Quantify over these tyvars (skolems)
-           , [PredType])     -- and this context (fully zonked)
+    -> TcM ( [TcTyVar]            -- Quantify over these tyvars (skolems)
+           , [PredType])          -- and this context (fully zonked)
 -- See Note [Deciding quantification]
 decideQuantification apply_mr sig_qtvs name_taus constraints zonked_tau_tvs
   | apply_mr     -- Apply the Monomorphism restriction
@@ -617,7 +619,7 @@ decideQuantification apply_mr sig_qtvs name_taus constraints zonked_tau_tvs
 pickQuantifiablePreds :: TyVarSet         -- Quantifying over these
                       -> TcThetaType      -- Proposed constraints to quantify
                       -> TcM TcThetaType  -- A subset that we can actually quantify
--- This function decides whether a particular constraint shoudl be
+-- This function decides whether a particular constraint should be
 -- quantified over, given the type variables that are being quantified
 pickQuantifiablePreds qtvs theta
   = do { let flex_ctxt = True   -- Quantify over non-tyvar constraints, even without
@@ -675,11 +677,11 @@ When choosing type variables to quantify, the basic plan is to
 quantify over all type variables that are
  * free in the tau_tvs, and
  * not forced to be monomorphic (mono_tvs),
-   for example by being free in the environment
+   for example by being free in the environment.
 
-However, for a pattern binding, or with wildards, we might
+However, for a pattern binding, or with wildcards, we might
 be doing inference *in the presence of a type signature*.
-Mostly, if there is a signature we use CheckGen, not InferGen,
+Mostly, if there is a signature, we use CheckGen, not InferGen,
 but with pattern bindings or wildcards we might do inference
 and still have a type signature.  For example:
    f :: _ -> a
@@ -705,7 +707,7 @@ its call site.  (At worst, imagine (Int ~ Bool)).
 
 However, consider this
          forall a. (F [a] ~ Int) => blah
-Should we quantify over the (F [a] ~ Int).  Perhaps yes, because at the call
+Should we quantify over the (F [a] ~ Int)?  Perhaps yes, because at the call
 site we will know 'a', and perhaps we have instance  F [Bool] = Int.
 So we *do* quantify over a type-family equality where the arguments mention
 the quantified variables.
@@ -713,7 +715,7 @@ the quantified variables.
 Note [Growing the tau-tvs using constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 (growThetaTyVars insts tvs) is the result of extending the set
-    of tyvars tvs using all conceivable links from pred
+    of tyvars, tvs, using all conceivable links from pred
 
 E.g. tvs = {a}, preds = {H [a] b, K (b,Int) c, Eq e}
 Then growThetaTyVars preds tvs = {a,b,c}
@@ -766,7 +768,7 @@ it before doing the isInsolubleWC test!  (Trac #8262)
 Note [Default while Inferring]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Our current plan is that defaulting only happens at simplifyTop and
-not simplifyInfer.  This may lead to some insoluble deferred constraints
+not simplifyInfer.  This may lead to some insoluble deferred constraints.
 Example:
 
 instance D g => C g Int b
@@ -778,14 +780,14 @@ Now, if we try to default (alpha := Int) we will be able to refine the implicati
   (forall b. 0 => C gamma Int b)
 which can then be simplified further to
   (forall b. 0 => D gamma)
-Finally we /can/ approximate this implication with (D gamma) and infer the quantified
+Finally, we /can/ approximate this implication with (D gamma) and infer the quantified
 type:  forall g. D g => g -> g
 
 Instead what will currently happen is that we will get a quantified type
 (forall g. g -> g) and an implication:
        forall g. 0 => (forall b. 0 => C g alpha b) /\ Num alpha
 
-which, even if the simplifyTop defaults (alpha := Int) we will still be left with an
+Which, even if the simplifyTop defaults (alpha := Int) we will still be left with an
 unsolvable implication:
        forall g. 0 => (forall b. 0 => D g)
 
@@ -793,8 +795,8 @@ The concrete example would be:
        h :: C g a s => g -> a -> ST s a
        f (x::gamma) = (\_ -> x) (runST (h x (undefined::alpha)) + 1)
 
-But it is quite tedious to do defaulting and resolve the implication constraints and
-we have not observed code breaking because of the lack of defaulting in inference so
+But it is quite tedious to do defaulting and resolve the implication constraints, and
+we have not observed code breaking because of the lack of defaulting in inference, so
 we don't do it for now.
 
 
@@ -810,7 +812,7 @@ mkMinimalBySCs does. Then, simplifyInfer uses the minimal constraint
 to check the original wanted.
 
 
-Note [Avoid unecessary constraint simplification]
+Note [Avoid unnecessary constraint simplification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     -------- NB NB NB (Jun 12) -------------
     This note not longer applies; see the notes with Trac #4361.
@@ -873,9 +875,9 @@ to compile, and it will run fine unless we evaluate `a`. This is what
 `deferErrorsToRuntime` does.
 
 It does this by keeping track of which errors correspond to which coercion
-in TcErrors (with ErrEnv). TcErrors.reportTidyWanteds does not print the errors
-and does not fail if -fdefer-type-errors is on, so that we can continue
-compilation. The errors are turned into warnings in `reportUnsolved`.
+in TcErrors (with ErrEnv). TcErrors.reportTidyWanteds does not print the
+errors, and does not fail if -fdefer-type-errors is on, so that we can
+continue compilation. The errors are turned into warnings in `reportUnsolved`.
 -}
 
 solveWantedsTcM :: [CtEvidence] -> TcM WantedConstraints
@@ -1137,10 +1139,10 @@ neededEvVars :: EvBindMap -> VarSet -> VarSet
 -- Find all the evidence variables that are "needed",
 --    and then delete all those bound by the evidence bindings
 -- A variable is "needed" if
---  a) it is free in the RHS of a Wanted EvBind (add_wanted)
---  b) it is free in the RHS of an EvBind whose LHS is needed (transClo)
+--  a) it is free in the RHS of a Wanted EvBind (add_wanted),
+--  b) it is free in the RHS of an EvBind whose LHS is needed (transClo),
 --  c) it is in the ic_need_evs of a nested implication (initial_seeds)
---     (after removing the givens)
+--     (after removing the givens).
 neededEvVars ev_binds initial_seeds
  = needed `minusVarSet` bndrs
  where
@@ -1177,7 +1179,7 @@ constraints of a type signature (or instance declaration) are
 redundant, and can be omitted.  Here is an overview of how it
 works:
 
------ What is a redudant constraint?
+----- What is a redundant constraint?
 
 * The things that can be redundant are precisely the Given
   constraints of an implication.
@@ -1189,7 +1191,7 @@ works:
   b) It is not needed by the Wanted constraints covered by the
      implication E.g.
        f :: Eq a => a -> Bool
-       f x = True  -- Equality not uesd
+       f x = True  -- Equality not used
 
 *  To find (a), when we have two Given constraints,
    we must be careful to drop the one that is a naked variable (if poss).
@@ -1209,20 +1211,20 @@ works:
 * When the constraint solver finishes solving all the wanteds in
   an implication, it sets its status to IC_Solved
 
-  - The ics_dead field of IC_Solved records the subset of the ic_given
-    of this implication that are redundant (not needed).
+  - The ics_dead field, of IC_Solved, records the subset of this implication's
+    ic_given that are redundant (not needed).
 
   - The ics_need field of IC_Solved then records all the
-    in-scope (given) evidence variables, bound by the context, that
+    in-scope (given) evidence variables bound by the context, that
     were needed to solve this implication, including all its nested
     implications.  (We remove the ic_given of this implication from
     the set, of course.)
 
 * We compute which evidence variables are needed by an implication
   in setImplicationStatus.  A variable is needed if
-    a) it is free in the RHS of a Wanted EvBind
-    b) it is free in the RHS of an EvBind whose LHS is needed
-    c) it is in the ics_need of a nested implication
+    a) it is free in the RHS of a Wanted EvBind,
+    b) it is free in the RHS of an EvBind whose LHS is needed,
+    c) it is in the ics_need of a nested implication.
 
 * We need to be careful not to discard an implication
   prematurely, even one that is fully solved, because we might
@@ -1230,7 +1232,7 @@ works:
   report a constraint as redundant.  But we can discard it once
   its free vars have been incorporated into its parent; or if it
   simply has no free vars. This careful discarding is also
-  handled in setImplicationStatus
+  handled in setImplicationStatus.
 
 ----- Reporting redundant constraints
 
@@ -1578,7 +1580,7 @@ We generate constraint, for (x::T alpha) and (y :: beta):
 
 If we float the equality (beta ~ Int) outside of the first implication and
 the equality (beta ~ Bool) out of the second we get an insoluble constraint.
-But if we just leave them inside the implications we unify alpha := beta and
+But if we just leave them inside the implications, we unify alpha := beta and
 solve everything.
 
 Principle:
@@ -1653,7 +1655,7 @@ Which of the simple equalities can we float out?  Obviously, only
 ones that don't mention the skolem-bound variables.  But that is
 over-eager. Consider
    [2] forall a. F a beta[1] ~ gamma[2], G beta[1] gamma[2] ~ Int
-The second constraint doesn't mention 'a'.  But if we float it
+The second constraint doesn't mention 'a'.  But if we float it,
 we'll promote gamma[2] to gamma'[1].  Now suppose that we learn that
 beta := Bool, and F a Bool = a, and G Bool _ = Int.  Then we'll
 we left with the constraint
@@ -1678,7 +1680,7 @@ happen.  In particular:
 
    Float out equalities of form (alpaha ~ ty) or (ty ~ alpha), where
 
-   * alpha is a meta-tyvar
+   * alpha is a meta-tyvar.
 
    * And the equality is kind-compatible
 
@@ -1859,5 +1861,5 @@ Here, we get a complaint when checking the type signature for g,
 that g isn't polymorphic enough; but then we get another one when
 dealing with the (Num a) context arising from f's definition;
 we try to unify a with Int (to default it), but find that it's
-already been unified with the rigid variable from g's type sig
+already been unified with the rigid variable from g's type sig.
 -}
