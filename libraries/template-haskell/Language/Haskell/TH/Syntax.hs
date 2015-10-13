@@ -38,6 +38,7 @@ import Data.Int
 import Data.Word
 import Data.Ratio
 import GHC.Generics     ( Generic )
+import GHC.Lexeme       ( startsVarSym, startsVarId )
 
 #ifdef HAS_NATURAL
 import Numeric.Natural
@@ -645,10 +646,10 @@ dataToQa mkCon mkLit appCon antiQ t =
       Nothing ->
           case constrRep constr of
             AlgConstr _ ->
-                appCon (mkCon conName) conArgs
+                appCon (mkCon funOrConName) conArgs
               where
-                conName :: Name
-                conName =
+                funOrConName :: Name
+                funOrConName =
                     case showConstr constr of
                       "(:)"       -> Name (mkOccName ":")
                                           (NameG DataName
@@ -662,12 +663,22 @@ dataToQa mkCon mkLit appCon antiQ t =
                                           (NameG DataName
                                                 (mkPkgName "ghc-prim")
                                                 (mkModName "GHC.Tuple"))
-                      con         -> mkNameG_d (tyConPackage tycon)
-                                               (tyConModule tycon)
-                                               con
+                      -- It is possible for a Data instance to be defined such
+                      -- that toConstr uses a Constr defined using a function,
+                      -- not a data constructor. In such a case, we must take
+                      -- care to build the Name using mkNameG_v (for values),
+                      -- not mkNameG_d (for data constructors).
+                      -- See Trac #10796.
+                      fun@(x:_)   | startsVarSym x || startsVarId x
+                                  -> mkNameG_v tyconPkg tyconMod fun
+                      con         -> mkNameG_d tyconPkg tyconMod con
                   where
                     tycon :: TyCon
                     tycon = (typeRepTyCon . typeOf) t
+
+                    tyconPkg, tyconMod :: String
+                    tyconPkg = tyConPackage tycon
+                    tyconMod = tyConModule  tycon
 
                 conArgs :: [Q q]
                 conArgs = gmapQ (dataToQa mkCon mkLit appCon antiQ) t
@@ -691,8 +702,17 @@ dataToExpQ  ::  Data a
             =>  (forall b . Data b => b -> Maybe (Q Exp))
             ->  a
             ->  Q Exp
-dataToExpQ = dataToQa conE litE (foldl appE)
-    where conE s =  return (ConE s)
+dataToExpQ = dataToQa varOrConE litE (foldl appE)
+    where
+          -- Make sure that VarE is used if the Constr value relies on a
+          -- function underneath the surface (instead of a constructor).
+          -- See Trac #10796.
+          varOrConE s =
+            case nameSpace s of
+                 Just VarName  -> return (VarE s)
+                 Just DataName -> return (ConE s)
+                 _ -> fail $ "Can't construct an expression from name "
+                          ++ showName s
           appE x y = do { a <- x; b <- y; return (AppE a b)}
           litE c = return (LitE c)
 
@@ -710,8 +730,13 @@ dataToPatQ  ::  Data a
             ->  Q Pat
 dataToPatQ = dataToQa id litP conP
     where litP l = return (LitP l)
-          conP n ps = do ps' <- sequence ps
-                         return (ConP n ps')
+          conP n ps =
+            case nameSpace n of
+                Just DataName -> do
+                    ps' <- sequence ps
+                    return (ConP n ps')
+                _ -> fail $ "Can't construct a pattern from name "
+                         ++ showName n
 
 -----------------------------------------------------
 --              Names and uniques
@@ -855,13 +880,13 @@ data NameFlavour
                 -- An original name (occurrences only, not binders)
                 -- Need the namespace too to be sure which
                 -- thing we are naming
-  deriving ( Typeable, Data, Eq, Ord, Generic )
+  deriving ( Typeable, Data, Eq, Ord, Show, Generic )
 
 data NameSpace = VarName        -- ^ Variables
                | DataName       -- ^ Data constructors
                | TcClsName      -- ^ Type constructors and classes; Haskell has them
                                 -- in the same name space for now.
-               deriving( Eq, Ord, Data, Typeable, Generic )
+               deriving( Eq, Ord, Show, Data, Typeable, Generic )
 
 type Uniq = Int
 
@@ -906,6 +931,26 @@ nameModule _                      = Nothing
 namePackage :: Name -> Maybe String
 namePackage (Name _ (NameG _ p _)) = Just (pkgString p)
 namePackage _                      = Nothing
+
+-- | Returns whether a name represents an occurrence of a top-level variable
+-- ('VarName'), data constructor ('DataName'), type constructor, or type class
+-- ('TcClsName'). If we can't be sure, it returns 'Nothing'.
+--
+-- ==== __Examples__
+--
+-- >>> nameSpace 'Prelude.id
+-- Just VarName
+-- >>> nameSpace (mkName "id")
+-- Nothing -- only works for top-level variable names
+-- >>> nameSpace 'Data.Maybe.Just
+-- Just DataName
+-- >>> nameSpace ''Data.Maybe.Maybe
+-- Just TcClsName
+-- >>> nameSpace ''Data.Ord.Ord
+-- Just TcClsName
+nameSpace :: Name -> Maybe NameSpace
+nameSpace (Name _ (NameG ns _ _)) = Just ns
+nameSpace _                       = Nothing
 
 {- |
 Generate a capturable name. Occurrences of such names will be

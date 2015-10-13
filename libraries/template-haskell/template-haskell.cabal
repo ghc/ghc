@@ -48,6 +48,7 @@ Library
 
     build-depends:
         base       >= 4.6 && < 4.9,
+        ghc-boot,
         pretty     == 1.1.*
 
     -- We need to set the package key to template-haskell (without a

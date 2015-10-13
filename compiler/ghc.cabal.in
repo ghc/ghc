@@ -55,7 +55,7 @@ Library
                    template-haskell,
                    hpc,
                    transformers,
-                   bin-package-db,
+                   ghc-boot,
                    hoopl
 
     if os(windows)

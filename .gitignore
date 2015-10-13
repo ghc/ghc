@@ -119,12 +119,12 @@ _darcs/
 /libffi/stamp*
 /libffi/package.conf.install
 /libffi/package.conf.install.raw
-/libraries/bin-package-db/GNUmakefile
-/libraries/bin-package-db/ghc.mk
 /libraries/bootstrapping.conf
 /libraries/prologue.txt
 /libraries/doc-index*.html
 /libraries/frames.html
+/libraries/ghc-boot/GNUmakefile
+/libraries/ghc-boot/ghc.mk
 /libraries/haddock-util.js
 /libraries/hslogo-16.png
 /libraries/index-frames.html

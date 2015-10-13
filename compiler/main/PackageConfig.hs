@@ -37,7 +37,7 @@ import Module
 import Unique
 
 -- -----------------------------------------------------------------------------
--- Our PackageConfig type is the InstalledPackageInfo from bin-package-db,
+-- Our PackageConfig type is the InstalledPackageInfo from ghc-boot,
 -- which is similar to a subset of the InstalledPackageInfo type from Cabal.
 
 type PackageConfig = InstalledPackageInfo

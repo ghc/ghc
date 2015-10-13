@@ -204,11 +204,6 @@ base
    this functionality was only available from ``GHC.Conc``.
 
 
-bin-package-db
-~~~~~~~~~~~~~~
-
--  This is an internal package, and should not be used.
-
 binary
 ~~~~~~
 
@@ -253,6 +248,24 @@ ghc
    ``HsImplBang``. Data constructors now always carry around their
    strictness annotations as the user wrote them, whether from an
    imported module or not.
+
+-  Moved `startsVarSym`, `startsVarId`, `startsConSym`, `startsConId`,
+   `startsVarSymASCII`, and `isVarSymChar` from `Lexeme` to the `GHC.Lemexe`
+   module of the `ghc-boot` library.
+
+ghc-boot
+~~~~~~~~
+
+-  This is an internal package. Use with caution.
+
+-  This package was renamed from `bin-package-db` to reflect its new purpose
+   of containing intra-GHC functionality that needs to be shared across
+   multiple GHC boot libraries.
+
+-  Added `GHC.Lexeme`, which contains functions for determining if a
+   character can be the first letter of a variable or data constructor in
+   Haskell, as defined by GHC. (These functions were moved from `Lexeme`
+   in `ghc`.)
 
 ghc-prim
 ~~~~~~~~
