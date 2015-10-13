@@ -1461,13 +1461,11 @@ extendImportMap :: GlobalRdrEnv -> RdrName -> ImportMap -> ImportMap
 -- it into scope; choose one of them (bestImport), and record
 -- the RdrName in that import decl's entry in the ImportMap
 extendImportMap rdr_env rdr imp_map
-  | [gre] <- lookupGRE_RdrName rdr rdr_env
-  , GRE { gre_lcl = lcl, gre_imp = imps } <- gre
-  , not lcl
-  = add_imp gre (bestImport imps) imp_map
-  | otherwise
-  = imp_map
+  = foldr recordRdrName imp_map nonLocalGREs
   where
+    recordRdrName gre m = add_imp gre (bestImport (gre_imp gre)) m
+    nonLocalGREs = filter (not . gre_lcl) (lookupGRE_RdrName rdr rdr_env)
+
     add_imp :: GlobalRdrElt -> ImportSpec -> ImportMap -> ImportMap
     add_imp gre (ImpSpec { is_decl = imp_decl_spec }) imp_map
       = Map.insertWith add decl_loc [avail] imp_map
