@@ -2970,13 +2970,11 @@ simplRules env mb_new_nm rules
       = return rule
 
     simpl_rule rule@(Rule { ru_bndrs = bndrs, ru_args = args
-                          , ru_fn = fn_name, ru_rhs = rhs
-                          , ru_act = act })
-      = do { (env, bndrs') <- simplBinders env bndrs
-           ; let lhs_env = updMode updModeForRuleLHS env
-                 rhs_env = updMode (updModeForStableUnfoldings act) env
-           ; args' <- mapM (simplExpr lhs_env) args
-           ; rhs'  <- simplExpr rhs_env rhs
+                          , ru_fn = fn_name, ru_rhs = rhs })
+      = do { (env', bndrs') <- simplBinders env bndrs
+           ; let rule_env = updMode updModeForRules env'
+           ; args' <- mapM (simplExpr rule_env) args
+           ; rhs'  <- simplExpr rule_env rhs
            ; return (rule { ru_bndrs = bndrs'
                           , ru_fn    = mb_new_nm `orElse` fn_name
                           , ru_args  = args'
