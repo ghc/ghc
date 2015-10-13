@@ -37,7 +37,6 @@ module PPC.Regs (
         fits16Bits,
         makeImmediate,
         fReg,
-        sp, r3, r4, r27, r28, r30,
         r0, sp, r3, r4, r27, r28, r30,
         tmpReg,
         f1, f20, f21,
