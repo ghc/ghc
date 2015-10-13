@@ -3576,223 +3576,294 @@ mentioned in the ``deriving`` clause.
 Deriving ``Functor`` instances
 ------------------------------
 
-With ``-XDeriveFunctor``, one can derive ``Functor`` instances for data
-types of kind ``* -> *``. For example, this declaration:
-
-::
+With ``-XDeriveFunctor``, one can derive ``Functor`` instances for data types
+of kind ``* -> *``. For example, this declaration::
 
     data Example a = Ex a Char (Example a) (Example Char)
       deriving Functor
 
-would generate the following instance:
-
-::
+would generate the following instance: ::
 
     instance Functor Example where
       fmap f (Ex a1 a2 a3 a4) = Ex (f a1) a2 (fmap f a3) a4
 
 The basic algorithm for ``-XDeriveFunctor`` walks the arguments of each
-constructor of a data type, applying a mapping function depending on the
-type of each argument. Suppose we are deriving ``Functor`` for a data
-type whose last type parameter is ``a``. Then we write the derivation of
-``fmap`` code over the type variable ``a`` for type ``b`` as
-``$(fmap 'a 'b)``.
+constructor of a data type, applying a mapping function depending on the type
+of each argument. If a plain type variable is found that is syntactically
+equivalent to the last type parameter of the data type (``a`` in the above
+example), then we apply the function ``f`` directly to it. If a type is
+encountered that is not syntactically equivalent to the last type parameter
+*but does mention* the last type parameter somewhere in it, then a recursive
+call to ``fmap`` is made. If a type is found which doesn't mention the last
+type paramter at all, then it is left alone.
 
--  If the argument's type is ``a``, then map over it.
+The second of those cases, in which a type is unequal to the type parameter but
+does contain the type parameter, can be surprisingly tricky. For example, the
+following example compiles::
 
-   ::
+    newtype Right a = Right (Either Int a) deriving Functor
 
-       $(fmap 'a 'a) = f
+Modifying the code slightly, however, produces code which will not compile::
 
--  If the argument's type does not mention ``a``, then do nothing to it.
+    newtype Wrong a = Wrong (Either a Int) deriving Functor
 
-   ::
+The difference involves the placement of the last type parameter, ``a``. In the
+``Right`` case, ``a`` occurs within the type ``Either Int a``, and moreover, it
+appears as the last type argument of ``Either``. In the ``Wrong`` case,
+however, ``a`` is not the last type argument to ``Either``; rather, ``Int`` is.
 
-       $(fmap 'a 'b) = \x -> x -- when b does not contain a
+This distinction is important because of the way ``-XDeriveFunctor`` works. The
+derived ``Functor Right`` instance would be::
 
--  If the argument has a tuple type, generate map code for each of its
-   arguments.
+    instance Functor Right where
+      fmap f (Right a) = Right (fmap f a)
 
-   ::
+Given a value of type ``Right a``, GHC must produce a value of type
+``Right b``. Since the argument to the ``Right`` constructor has type
+``Either Int a``, the code recursively calls ``fmap`` on it to produce a value
+of type ``Either Int b``, which is used in turn to construct a final value of
+type ``Right b``.
 
-       $(fmap 'a '(b1,b2)) = \x -> case x of (x1,x2) -> ($(fmap 'a 'b1) x1, $(fmap 'a 'b2) x2)
+The generated code for the ``Functor Wrong`` instance would look exactly the
+same, except with ``Wrong`` replacing every occurrence of ``Right``. The
+problem is now that ``fmap`` is being applied recursively to a value of type
+``Either a Int``. This cannot possibly produce a value of type
+``Either b Int``, as ``fmap`` can only change the last type parameter! This
+causes the generated code to be ill-typed.
 
--  If the argument's type is a data type that mentions ``a``, apply
-   ``fmap`` to it with the generated map code for the data type's last
-   type parameter.
+As a general rule, if a data type has a derived ``Functor`` instance and its
+last type parameter occurs on the right-hand side of the data declaration, then
+either it must (1) occur bare (e.g., ``newtype Id a = a``), or (2) occur as the
+last argument of a type constructor (as in ``Right`` above).
 
-   ::
+There are two exceptions to this rule:
 
-       $(fmap 'a '(T b1 b2)) = fmap $(fmap 'a 'b2) -- when a only occurs in the last parameter, b2
+#. Tuple types. When a non-unit tuple is used on the right-hand side of a data
+   declaration, ``-XDeriveFunctor`` treats it as a product of distinct types.
+   In other words, the following code::
 
--  If the argument has a function type, apply generated ``$(fmap)`` code
-   to the result type, and apply generated ``$(cofmap)`` code to the
-   argument type.
+       newtype Triple a = Triple (a, Int, [a]) deriving Functor
 
-   ::
+   Would result in a generated ``Functor`` instance like so::
 
-       $(fmap 'a '(b -> c)) = \x b -> $(fmap 'a' 'c) (x ($(cofmap 'a 'b) b))
+       instance Functor Triple where
+         fmap f (Triple a) =
+           Triple (case a of
+                        (a1, a2, a3) -> (f a1, a2, fmap f a3))
 
-   ``$(cofmap)`` is needed because the type parameter ``a`` can occur in
-   a contravariant position, which means we need to derive a function
-   like:
+   That is, ``-XDeriveFunctor`` pattern-matches its way into tuples and maps
+   over each type that constitutes the tuple. The generated code is
+   reminiscient of what would be generated from
+   ``data Triple a = Triple a Int [a]``, except with extra machinery to handle
+   the tuple.
 
-   ::
+#. Function types. The last type parameter can appear anywhere in a function
+   type as long as it occurs in a *covariant* position. To illustrate what this
+   means, consider the following three examples::
 
-       cofmap :: (a -> b) -> f b -> f a
+       newtype CovFun1 a = CovFun1 (Int -> a) deriving Functor
+       newtype CovFun2 a = CovFun2 ((a -> Int) -> a) deriving Functor
+       newtype CovFun3 a = CovFun3 (((Int -> a) -> Int) -> a) deriving Functor
 
-   This is pretty much the same as ``$(fmap)``, only without the
-   ``$(cofmap 'a 'a)`` case:
+   All three of these examples would compile without issue. On the other hand::
 
-   ::
+       newtype ContraFun1 a = ContraFun1 (a -> Int) deriving Functor
+       newtype ContraFun2 a = ContraFun2 ((Int -> a) -> Int) deriving Functor
+       newtype ContraFun3 a = ContraFun3 (((a -> Int) -> a) -> Int) deriving Functor
 
-       $(cofmap 'a 'b)         = \x -> x     -- when b does not contain a
-       $(cofmap 'a 'a)         = error "type variable in contravariant position"
-       $(cofmap 'a '(b1,b2))   = \x -> case x of (x1,x2) -> ($(cofmap 'a 'b1) x1, $(cofmap 'a 'b2) x2)
-       $(cofmap 'a '[b])       = map $(cofmap 'a 'b)
-       $(cofmap 'a '(T b1 b2)) = fmap $(cofmap 'a 'b2) -- when a only occurs in the last parameter, b2
-       $(cofmap 'a '(b -> c))  = \x b -> $(cofmap 'a' 'c) (x ($(fmap 'a 'c) b))
+   While these examples look similar, none of them would successfully compile.
+   This is because all occurrences of the last type parameter ``a`` occur in *contravariant* positions, not covariant ones.
 
-   For more information on contravariance, see
-   :ghc-wiki:`this wiki page <Commentary/Compiler/DeriveFunctor#Covariantandcontravariantpositions>`.
+   Intuitively, a covariant type is *produced*, and a contravariant type is
+   *consumed*. Most types in Haskell are covariant, but the function type is
+   special in that the lefthand side of a function arrow reverses variance. If
+   a function type ``a -> b`` appears in a covariant position (e.g.,
+   ``CovFun1`` above), then ``a`` is in a contravariant position and ``b`` is
+   in a covariant position. Similarly, if ``a -> b`` appears in a contravariant
+   position (e.g., ``CovFun2`` above), then ``a`` is in ``a`` covariant
+   position and ``b`` is in a contravariant position.
 
-A data type can have a derived ``Functor`` instance if:
+   To see why a data type with a contravariant occurrence of its last type
+   parameter cannot have a derived ``Functor`` instance, let's suppose that a
+   ``Functor ContraFun1`` instance exists. The implementation would look
+   something like this::
 
--  It has at least one type parameter.
+       instance Functor ContraFun1 where
+         fmap f (ContraFun g) = ContraFun (\x -> _)
 
--  It does not use the last type parameter contravariantly.
+   We have ``f :: a -> b``, ``g :: a -> Int``, and ``x :: b``. Using these, we
+   must somehow fill in the hole (denoted with an underscore) with a value of
+   type ``Int``. What are our options?
 
--  It does not use the last type parameter in the "wrong place" in any
-   of the argument data types. For example, in:
+   We could try applying ``g`` to ``x``. This won't work though, as ``g``
+   expects an argument of type ``a``, and ``x :: b``. Even worse, we can't turn
+   ``x`` into something of type ``a``, since ``f`` also needs an argument of
+   type ``a``! In short, there's no good way to make this work.
 
-   ::
+   On the other hand, a derived ``Functor`` instances for the ``CovFun``\ s are
+   within the realm of possibility::
 
-       data Right a = Right [a] (Either Int a)
+       instance Functor CovFun1 where
+         fmap f (CovFun1 g) = CovFun1 (\x -> f (g x))
 
-   the type parameter ``a`` is only ever used as the last type argument
-   in ``[]`` and ``Either``, so both ``[a]`` and ``Either Int a`` can be
-   ``fmap``\ ped. However, in:
+       instance Functor CovFun2 where
+         fmap f (CovFun2 g) = CovFun2 (\h -> f (g (\x -> h (f x))))
 
-   ::
+       instance Functor CovFun3 where
+         fmap f (CovFun3 g) = CovFun3 (\h -> f (g (\k -> h (\x -> f (k x)))))
 
-       data Wrong a = Wrong (Either a a)
+There are some other scenarios in which a derived ``Functor`` instance will
+fail to compile:
 
-   the type variable ``a`` appears in a position other than the last, so
-   trying to ``fmap`` an ``Either a a`` value would not typecheck in a
-   ``Functor`` instance. Note that there are two exceptions to this
-   rule: tuple and function types, as described above.
+#. A data type has no type parameters (e.g., ``data Nothing = Nothing``).
 
--  Its last type variable cannot be used in a ``-XDatatypeContexts``
-   constraint.
+#. A data type's last type variable is used in a ``-XDatatypeContexts``
+   constraint (e.g., ``data Ord a => O a = O a``).
 
--  Its last type variable cannot be used in an
-   ``-XExistentialQuantification`` or ``-XGADTs`` constraint.
+#. A data type's last type variable is used in an
+   ``-XExistentialQuantification`` constraint, or is refined in a GADT. For
+   example, ::
+
+       data T a b where
+           T4 :: Ord b => b -> T a b
+           T5 :: b -> T b b
+           T6 :: T a (b,b)
+
+       deriving instance Functor (T a)
+
+   would not compile successfully due to the way in which ``b`` is constrained.
 
 .. _deriving-foldable:
 
 Deriving ``Foldable`` instances
 -------------------------------
 
-With ``-XDeriveFoldable``, one can derive ``Foldable`` instances for
-data types of kind ``* -> *``. For example, this declaration:
-
-::
+With ``-XDeriveFoldable``, one can derive ``Foldable`` instances for data types
+of kind ``* -> *``. For example, this declaration::
 
     data Example a = Ex a Char (Example a) (Example Char)
-      deriving Functor
+      deriving Foldable
 
-would generate the following instance:
-
-::
+would generate the following instance::
 
     instance Foldable Example where
       foldr f z (Ex a1 a2 a3 a4) = f a1 (foldr f z a3)
-      foldMap f (Ex a1 a2 a3 a4) = mappend (f a1)
-                                           (mappend mempty
-                                                    (mappend (foldMap f a3)
-                                                             mempty))
+      foldMap f (Ex a1 a2 a3 a4) = mappend (f a1) (foldMap f a3)
 
-The algorithm for ``-XDeriveFoldable`` is very similar to that of
-``-XDeriveFunctor``, except that ``Foldable`` instances are not possible
-for function types. The cases are:
+The algorithm for ``-XDeriveFoldable`` is adapted from the ``-XDeriveFunctor``
+algorithm, but it generates definitions for ``foldMap`` and ``foldr`` instead
+of ``fmap``. Here are the differences between the generated code in each
+extension:
 
-::
+#. When a bare type variable ``a`` is encountered, ``-XDeriveFunctor`` would
+   generate ``f a`` for an ``fmap`` definition. ``-XDeriveFoldable`` would
+   generate ``f a z`` for ``foldr``, and ``f a`` for ``foldMap``.
 
-    $(foldr 'a 'b)         = \x z -> z -- when b does not contain a
-    $(foldr 'a 'a)         = f
-    $(foldr 'a '(b1,b2))   = \x z -> case x of (x1,x2) -> $(foldr 'a 'b1) x1 ( $(foldr 'a 'b2) x2 z )
-    $(foldr 'a '(T b1 b2)) = \x z -> foldr $(foldr 'a 'b2) z x -- when a only occurs in the last parameter, b2
+#. When a type that is not syntactically equivalent to ``a``, but which does
+   contain ``a``, is encountered, ``-XDeriveFunctor`` recursively calls
+   ``fmap`` on it. Similarly, ``-XDeriveFoldable`` would recursively call
+   ``foldr`` and ``foldMap``.
 
-Another difference between ``-XDeriveFoldable`` and ``-XDeriveFunctor``
-is that ``-XDeriveFoldable`` instances can be derived for data types
-with existential constraints. For example, the following data type:
+#. When a type that does not mention ``a`` is encountered, ``-XDeriveFunctor``
+   leaves it alone. On the other hand, ``-XDeriveFoldable`` would generate
+   ``z`` (the state value) for ``foldr`` and ``mempty`` for ``foldMap``.
 
-::
+#. ``-XDeriveFunctor`` puts everything back together again at the end by
+   invoking the constructor. ``-XDeriveFoldable``, however, builds up a value
+   of some type. For ``foldr``, this is accomplished by chaining applications
+   of ``f`` and recursive ``foldr`` calls on the state value ``z``. For
+   ``foldMap``, this happens by combining all values with ``mappend``.
 
-    data E a where
-        E1 :: (a ~ Int) => a   -> E a
-        E2 ::              Int -> E Int
-        E3 :: (a ~ Int) => a   -> E Int
-        E4 :: (a ~ Int) => Int -> E a
+There are some other differences regarding what data types can have derived
+``Foldable`` instances:
 
-    deriving instance Foldable E
+#. Data types containing function types on the right-hand side cannot have
+   derived ``Foldable`` instances.
 
-would have the following ``Foldable`` instance:
+#. ``Foldable`` instances can be derived for data types in which the last type
+   parameter is existentially constrained or refined in a GADT. For example,
+   this data type::
 
-::
+       data E a where
+           E1 :: (a ~ Int) =&gt; a   -> E a
+           E2 ::              Int -> E Int
+           E3 :: (a ~ Int) =&gt; a   -> E Int
+           E4 :: (a ~ Int) =&gt; Int -> E a
 
-    instance Foldable E where
-        foldr f z (E1 e) = f e z
-        foldr f z (E2 e) = z
-        foldr f z (E3 e) = z
-        foldr f z (E4 e) = z
+       deriving instance Foldable E
 
-        foldMap f (E1 e) = f e
-        foldMap f (E2 e) = mempty
-        foldMap f (E3 e) = mempty
-        foldMap f (E4 e) = mempty
+   would have the following generated ``Foldable`` instance::
 
-Notice that only the argument in ``E1`` is folded over. This is because
-we only fold over constructor arguments (1) whose types are
-syntactically equivalent to the last type parameter and (2) when the
-last type parameter is not refined to a specific type. Only ``E1``
-satisfies both of these criteria. For more information, see `this wiki
-page :ghc-wiki:<Commentary/Compiler/DeriveFunctor>`.
+       instance Foldable E where
+           foldr f z (E1 e) = f e z
+           foldr f z (E2 e) = z
+           foldr f z (E3 e) = z
+           foldr f z (E4 e) = z
+
+           foldMap f (E1 e) = f e
+           foldMap f (E2 e) = mempty
+           foldMap f (E3 e) = mempty
+           foldMap f (E4 e) = mempty
+
+   Notice how every constructor of ``E`` utilizes some sort of existential
+   quantification, but only the argument of ``E1`` is actually "folded over".
+   This is because we make a deliberate choice to only fold over universally
+   polymorphic types that are syntactically equivalent to the last type
+   parameter. In particular:
+
+  -  We don't fold over the arguments of ``E1`` or ``E4`` beacause even though
+     ``(a ~ Int)``, ``Int`` is not syntactically equivalent to ``a``.
+
+  -  We don't fold over the argument of ``E3`` because ``a`` is not universally
+     polymorphic. The ``a`` in ``E3`` is (implicitly) existentially quantified,
+     so it is not the same as the last type parameter of ``E``.
 
 .. _deriving-traversable:
 
 Deriving ``Traversable`` instances
 ----------------------------------
 
-With ``-XDeriveTraversable``, one can derive ``Traversable`` instances
-for data types of kind ``* -> *``. For example, this declaration:
-
-::
+With ``-XDeriveTraversable``, one can derive ``Traversable`` instances for data
+types of kind ``* -> *``. For example, this declaration::
 
     data Example a = Ex a Char (Example a) (Example Char)
-      deriving Functor
+      deriving (Functor, Foldable, Traversable)
 
-would generate the following instance:
+would generate the following ``Traversable`` instance::
 
-::
-
-    instance Foldable Example where
+    instance Traversable Example where
       traverse f (Ex a1 a2 a3 a4)
-        = fmap Ex (f a)
-            <*> pure a2
-            <*> traverse f a3
-            <*> pure a4
+        = fmap Ex (f a1) <*> traverse f a3
 
-The algorithm for ``-XDeriveTraversable`` is very similar to that of
-``-XDeriveTraversable``, except that ``Traversable`` instances are not
-possible for function types. The cases are:
+The algorithm for ``-XDeriveTraversable`` is adapted from the
+``-XDeriveFunctor`` algorithm, but it generates a definition for ``traverse``
+instead of ``fmap``. Here are the differences between the generated code in
+each extension:
 
-::
+#. When a bare type variable ``a`` is encountered, both ``-XDeriveFunctor`` and
+   ``-XDeriveTraversable`` would generate ``f a`` for an ``fmap`` and
+   ``traverse`` definition, respectively.
 
-    1812   $(traverse 'a 'b)         = pure -- when b does not contain a
-    1813   $(traverse 'a 'a)         = f
-    1814   $(traverse 'a '(b1,b2))   = \x -> case x of (x1,x2) -> fmap (,) $(traverse 'a 'b1) x1 <*> $(traverse 'a 'b2) x2
-    1815   $(traverse 'a '(T b1 b2)) = traverse $(traverse 'a 'b2) -- when a only occurs in the last parameter, b2
+#. When a type that is not syntactically equivalent to ``a``, but which does
+   contain ``a``, is encountered, ``-XDeriveFunctor`` recursively calls
+   ``fmap`` on it. Similarly, ``-XDeriveTraversable`` would recursively call
+   ``traverse``.
+
+#. When a type that does not mention ``a`` is encountered, ``-XDeriveFunctor``
+   leaves it alone. On the other hand, ``-XDeriveTravserable`` would call
+   ``pure`` on the value of that type.
+
+#. ``-XDeriveFunctor`` puts everything back together again at the end by
+   invoking the constructor. ``-XDeriveTraversable`` does something similar,
+   but it works in an ``Applicative`` context by chaining everything together
+   with ``(<*>)``.
+
+Unlike ``-XDeriveFunctor``, ``-XDeriveTraversable`` cannot be used on data
+types containing a function type on the right-hand side.
+
+For a full specification of the algorithms used in ``-XDeriveFunctor``,
+``-XDeriveFoldable``, and ``-XDeriveTraversable``, see
+:ghc-wiki:`this wiki page <Commentary/Compiler/DeriveFunctor>`.
 
 .. _deriving-typeable:
 
