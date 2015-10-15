@@ -55,10 +55,6 @@ import qualified Data.Set as Set
 import System.FilePath  ((</>))
 import System.IO
 
-#if __GLASGOW_HASKELL__ < 709
-import Data.Monoid      ( mconcat )
-#endif
-
 {-
 ************************************************************************
 *                                                                      *
