@@ -2301,7 +2301,7 @@ pprCtOrigin simple_origin
 ----------------
 pprCtO :: CtOrigin -> SDoc  -- Ones that are short one-liners
 pprCtO (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
-pprCtO (OccurrenceOfRecSel name) = hsep [ptext (sLit "a use of the record selector"), quotes (ppr name)]
+pprCtO (OccurrenceOfRecSel name) = hsep [ptext (sLit "a use of"), quotes (ppr name)]
 pprCtO AppOrigin             = ptext (sLit "an application")
 pprCtO (IPOccOrigin name)    = hsep [ptext (sLit "a use of implicit parameter"), quotes (ppr name)]
 pprCtO RecordUpdOrigin       = ptext (sLit "a record update")
