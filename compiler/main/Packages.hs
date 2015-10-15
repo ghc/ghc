@@ -875,7 +875,7 @@ mkPackageState dflags0 pkgs0 preload0 = do
 
       ignored  = ignorePackages ignore_flags pkgs0_unique
 
-      isBroken = (`Map.member` ignored).unitId
+      isBroken = (`Map.member` ignored) . unitId
       pkgs0' = filter (not . isBroken) pkgs0_unique
 
       broken   = findBroken pkgs0'
