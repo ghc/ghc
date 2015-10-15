@@ -112,8 +112,9 @@ import CoAxiom  ( Role )
 import Class    ( Class )
 import TyCon    ( TyCon )
 import ConLike  ( ConLike(..) )
-import DataCon  ( DataCon, FieldLabel, dataConUserType, dataConOrigArgTys )
+import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
 import PatSyn   ( PatSyn, patSynType )
+import FieldLabel ( FieldLabel )
 import TcType
 import Annotations
 import InstEnv

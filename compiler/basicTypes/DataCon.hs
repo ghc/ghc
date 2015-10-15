@@ -31,7 +31,7 @@ module DataCon (
         dataConStupidTheta,
         dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
         dataConInstOrigArgTys, dataConRepArgTys,
-        dataConFieldLabels, dataConFieldLabel, dataConFieldType,
+        dataConFieldLabels, dataConFieldType,
         dataConSrcBangs,
         dataConSourceArity, dataConRepArity, dataConRepRepArity,
         dataConIsInfix,
@@ -76,11 +76,10 @@ import Binary
 
 import qualified Data.Data as Data
 import qualified Data.Typeable
-import Data.List
 import Data.Maybe
 import Data.Char
 import Data.Word
-import Data.List( mapAccumL )
+import Data.List( mapAccumL, find )
 
 {-
 Data constructor representation
@@ -835,16 +834,12 @@ dataConImplicitIds (MkData { dcWorkId = work, dcRep = rep})
 dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConFieldLabels = dcFields
 
--- | Extract the 'FieldLabel' and type for any given field of the 'DataCon'
-dataConFieldLabel :: DataCon -> FieldLabelString -> (FieldLabel, Type)
-dataConFieldLabel con lbl
-  = case find ((== lbl) . flLabel . fst) (dcFields con `zip` dcOrigArgTys con) of
-      Just x  -> x
-      Nothing -> pprPanic "dataConFieldLabel" (ppr con <+> ppr lbl)
-
 -- | Extract the type for any given labelled field of the 'DataCon'
 dataConFieldType :: DataCon -> FieldLabelString -> Type
-dataConFieldType con lbl = snd $ dataConFieldLabel con lbl
+dataConFieldType con label
+  = case find ((== label) . flLabel . fst) (dcFields con `zip` dcOrigArgTys con) of
+      Just (_, ty) -> ty
+      Nothing -> pprPanic "dataConFieldType" (ppr con <+> ppr label)
 
 -- | Strictness/unpack annotations, from user; or, for imported
 -- DataCons, from the interface file
