@@ -40,15 +40,21 @@
 static void checkAddress (HashTable *addrs, void *addr)
 {
     ObjectCode *oc;
+    int i;
 
     if (!lookupHashTable(addrs, (W_)addr)) {
         insertHashTable(addrs, (W_)addr, addr);
 
         for (oc = unloaded_objects; oc; oc = oc->next) {
-            if ((W_)addr >= (W_)oc->image &&
-                (W_)addr <  (W_)oc->image + oc->fileSize) {
-                oc->referenced = 1;
-                break;
+            for (i = 0; i < oc->n_sections; i++) {
+                if (oc->sections[i].kind != SECTIONKIND_OTHER) {
+                    if ((W_)addr >= (W_)oc->sections[i].start &&
+                        (W_)addr <  (W_)oc->sections[i].start
+                                    + oc->sections[i].size) {
+                        oc->referenced = 1;
+                        return;
+                    }
+                }
             }
         }
     }
