@@ -106,6 +106,7 @@ import UniqFM
 import Unique
 import Util             hiding ( eqListBy )
 import FastString
+import FastStringEnv
 import Maybes
 import ListSetOps
 import Binary
@@ -1080,11 +1081,13 @@ mkIfaceExports exports
   where
     sort_subs :: AvailInfo -> AvailInfo
     sort_subs (Avail n) = Avail n
-    sort_subs (AvailTC n []) = AvailTC n []
-    sort_subs (AvailTC n (m:ms))
-       | n==m      = AvailTC n (m:sortBy stableNameCmp ms)
-       | otherwise = AvailTC n (sortBy stableNameCmp (m:ms))
+    sort_subs (AvailTC n [] fs) = AvailTC n [] (sort_flds fs)
+    sort_subs (AvailTC n (m:ms) fs)
+       | n==m      = AvailTC n (m:sortBy stableNameCmp ms) (sort_flds fs)
+       | otherwise = AvailTC n (sortBy stableNameCmp (m:ms)) (sort_flds fs)
        -- Maintain the AvailTC Invariant
+
+    sort_flds = sortBy (stableNameCmp `on` flSelector)
 
 {-
 Note [Orignal module]
@@ -1604,7 +1607,7 @@ tyConToIfaceDecl env tycon
                   ifTyVars  = if_tc_tyvars,
                   ifRoles   = tyConRoles tycon,
                   ifCtxt    = tidyToIfaceContext tc_env1 (tyConStupidTheta tycon),
-                  ifCons    = ifaceConDecls (algTyConRhs tycon),
+                  ifCons    = ifaceConDecls (algTyConRhs tycon) (algTcFields tycon),
                   ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
                   ifGadtSyntax = isGadtSyntaxTyCon tycon,
                   ifPromotable = isJust (promotableTyCon_maybe tycon),
@@ -1618,7 +1621,7 @@ tyConToIfaceDecl env tycon
                   ifTyVars     = funAndPrimTyVars,
                   ifRoles      = tyConRoles tycon,
                   ifCtxt       = [],
-                  ifCons       = IfDataTyCon [],
+                  ifCons       = IfDataTyCon [] False [],
                   ifRec        = boolToRecFlag False,
                   ifGadtSyntax = False,
                   ifPromotable = False,
@@ -1652,11 +1655,11 @@ tyConToIfaceDecl env tycon
       = IfaceBuiltInSynFamTyCon
 
 
-    ifaceConDecls (NewTyCon { data_con = con })     = IfNewTyCon  (ifaceConDecl con)
-    ifaceConDecls (DataTyCon { data_cons = cons })  = IfDataTyCon (map ifaceConDecl cons)
-    ifaceConDecls (DataFamilyTyCon {})              = IfDataFamTyCon
-    ifaceConDecls (TupleTyCon { data_con = con })   = IfDataTyCon [ifaceConDecl con]
-    ifaceConDecls (AbstractTyCon distinct)          = IfAbstractTyCon distinct
+    ifaceConDecls (NewTyCon { data_con = con })    flds = IfNewTyCon  (ifaceConDecl con) (ifaceOverloaded flds) (ifaceFields flds)
+    ifaceConDecls (DataTyCon { data_cons = cons }) flds = IfDataTyCon (map ifaceConDecl cons) (ifaceOverloaded flds) (ifaceFields flds)
+    ifaceConDecls (DataFamilyTyCon {})             _    = IfDataFamTyCon
+    ifaceConDecls (TupleTyCon { data_con = con })  _    = IfDataTyCon [ifaceConDecl con] False []
+    ifaceConDecls (AbstractTyCon distinct)         _    = IfAbstractTyCon distinct
         -- The AbstractTyCon case happens when a TyCon has been trimmed
         -- during tidying.
         -- Furthermore, tyThingToIfaceDecl is also used in TcRnDriver
@@ -1672,7 +1675,7 @@ tyConToIfaceDecl env tycon
                     ifConEqSpec  = map to_eq_spec eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env2 theta,
                     ifConArgTys  = map (tidyToIfaceType con_env2) arg_tys,
-                    ifConFields  = map getOccName
+                    ifConFields  = map (nameOccName . flSelector)
                                        (dataConFieldLabels data_con),
                     ifConStricts = map (toIfaceBang con_env2)
                                        (dataConImplBangs data_con),
@@ -1693,6 +1696,11 @@ tyConToIfaceDecl env tycon
 
           (con_env2, ex_tvs') = tidyTyVarBndrs con_env1 ex_tvs
           to_eq_spec (tv,ty)  = (toIfaceTyVar (tidyTyVar con_env2 tv), tidyToIfaceType con_env2 ty)
+
+    ifaceOverloaded flds = case fsEnvElts flds of
+                             fl:_ -> flIsOverloaded fl
+                             []   -> False
+    ifaceFields flds = map flLabel $ fsEnvElts flds
 
 toIfaceBang :: TidyEnv -> HsImplBang -> IfaceBang
 toIfaceBang _    HsLazy              = IfNoBang

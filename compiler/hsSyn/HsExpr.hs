@@ -135,6 +135,8 @@ data HsExpr id
                              -- Turned into HsVar by type checker, to support deferred
                              --   type errors.  (The HsUnboundVar only has an OccName.)
 
+  | HsSingleRecFld (FieldOcc id) -- ^ Variable that corresponds to a record selector
+
   | HsIPVar   HsIPName       -- ^ Implicit parameter
   | HsOverLit (HsOverLit id) -- ^ Overloaded literals
 
@@ -290,7 +292,7 @@ data HsExpr id
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | RecordUpd   (LHsExpr id)
-                (HsRecordBinds id)
+                [LHsRecUpdField id]
 --              (HsMatchGroup Id)  -- Filled in by the type checker to be
 --                                 -- a match that does the job
                 (PostTc id [DataCon])
@@ -700,7 +702,7 @@ ppr_expr (RecordCon con_id _ rbinds)
   = hang (ppr con_id) 2 (ppr rbinds)
 
 ppr_expr (RecordUpd aexp rbinds _ _ _)
-  = hang (pprLExpr aexp) 2 (ppr rbinds)
+  = hang (pprLExpr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
 
 ppr_expr (ExprWithTySig expr sig _)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
@@ -770,6 +772,7 @@ ppr_expr (HsArrForm (L _ (HsVar v)) (Just _) [arg1, arg2])
 ppr_expr (HsArrForm op _ args)
   = hang (ptext (sLit "(|") <+> ppr_lexpr op)
          4 (sep (map (pprCmdArg.unLoc) args) <+> ptext (sLit "|)"))
+ppr_expr (HsSingleRecFld f) = ppr f
 
 pprExternalSrcLoc :: (StringLiteral,(Int,Int),(Int,Int)) -> SDoc
 pprExternalSrcLoc (StringLiteral _ src,(n1,n2),(n3,n4))
@@ -821,6 +824,7 @@ hsExprNeedsParens (HsRnBracketOut {}) = False
 hsExprNeedsParens (HsTcBracketOut {}) = False
 hsExprNeedsParens (HsDo sc _ _)
        | isListCompExpr sc            = False
+hsExprNeedsParens (HsSingleRecFld{})  = False
 hsExprNeedsParens _ = True
 
 
@@ -833,6 +837,7 @@ isAtomicHsExpr (HsIPVar {})      = True
 isAtomicHsExpr (HsUnboundVar {}) = True
 isAtomicHsExpr (HsWrap _ e)      = isAtomicHsExpr e
 isAtomicHsExpr (HsPar e)         = isAtomicHsExpr (unLoc e)
+isAtomicHsExpr (HsSingleRecFld{}) = True
 isAtomicHsExpr _                 = False
 
 {-

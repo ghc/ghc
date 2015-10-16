@@ -69,6 +69,7 @@ module GHC (
         modInfoTyThings,
         modInfoTopLevelScope,
         modInfoExports,
+        modInfoExportsWithSelectors,
         modInfoInstances,
         modInfoIsExportedName,
         modInfoLookupName,
@@ -175,7 +176,7 @@ module GHC (
         isPrimOpId, isFCallId, isClassOpId_maybe,
         isDataConWorkId, idDataCon,
         isBottomingId, isDictonaryId,
-        recordSelectorFieldLabel,
+        recordSelectorTyCon,
 
         -- ** Type constructors
         TyCon,
@@ -880,7 +881,7 @@ typecheckModule pmod = do
        tm_checked_module_info =
          ModuleInfo {
            minf_type_env  = md_types details,
-           minf_exports   = availsToNameSet $ md_exports details,
+           minf_exports   = md_exports details,
            minf_rdr_env   = Just (tcg_rdr_env tc_gbl_env),
            minf_instances = fixSafeInstances safe $ md_insts details,
            minf_iface     = Nothing,
@@ -1071,7 +1072,7 @@ getPrintUnqual = withSession $ \hsc_env ->
 -- | Container for information about a 'Module'.
 data ModuleInfo = ModuleInfo {
         minf_type_env  :: TypeEnv,
-        minf_exports   :: NameSet, -- ToDo, [AvailInfo] like ModDetails?
+        minf_exports   :: [AvailInfo],
         minf_rdr_env   :: Maybe GlobalRdrEnv,   -- Nothing for a compiled/package mod
         minf_instances :: [ClsInst],
         minf_iface     :: Maybe ModIface,
@@ -1107,14 +1108,13 @@ getPackageModuleInfo hsc_env mdl
         iface <- hscGetModuleInterface hsc_env mdl
         let 
             avails = mi_exports iface
-            names  = availsToNameSet avails
             pte    = eps_PTE eps
             tys    = [ ty | name <- concatMap availNames avails,
                             Just ty <- [lookupTypeEnv pte name] ]
         --
         return (Just (ModuleInfo {
                         minf_type_env  = mkTypeEnv tys,
-                        minf_exports   = names,
+                        minf_exports   = avails,
                         minf_rdr_env   = Just $! availsToGlobalRdrEnv (moduleName mdl) avails,
                         minf_instances = error "getModuleInfo: instances for package module unimplemented",
                         minf_iface     = Just iface,
@@ -1136,7 +1136,7 @@ getHomeModuleInfo hsc_env mdl =
           iface   = hm_iface hmi
       return (Just (ModuleInfo {
                         minf_type_env  = md_types details,
-                        minf_exports   = availsToNameSet (md_exports details),
+                        minf_exports   = md_exports details,
                         minf_rdr_env   = mi_globals $! hm_iface hmi,
                         minf_instances = md_insts details,
                         minf_iface     = Just iface,
@@ -1155,7 +1155,10 @@ modInfoTopLevelScope minf
   = fmap (map gre_name . globalRdrEnvElts) (minf_rdr_env minf)
 
 modInfoExports :: ModuleInfo -> [Name]
-modInfoExports minf = nameSetElems $! minf_exports minf
+modInfoExports minf = concatMap availNames $! minf_exports minf
+
+modInfoExportsWithSelectors :: ModuleInfo -> [Name]
+modInfoExportsWithSelectors minf = concatMap availNamesWithSelectors $! minf_exports minf
 
 -- | Returns the instances defined by the specified module.
 -- Warning: currently unimplemented for package modules.
@@ -1163,7 +1166,7 @@ modInfoInstances :: ModuleInfo -> [ClsInst]
 modInfoInstances = minf_instances
 
 modInfoIsExportedName :: ModuleInfo -> Name -> Bool
-modInfoIsExportedName minf name = elemNameSet name (minf_exports minf)
+modInfoIsExportedName minf name = elemNameSet name (availsToNameSet (minf_exports minf))
 
 mkPrintUnqualifiedForModule :: GhcMonad m =>
                                ModuleInfo

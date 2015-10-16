@@ -35,6 +35,11 @@ module HsTypes (
 
         ConDeclField(..), LConDeclField, pprConDeclFields,
 
+        FieldOcc(..), LFieldOcc, mkFieldOcc,
+        AmbiguousFieldOcc(..), mkAmbiguousFieldOcc,
+        rdrNameAmbiguousFieldOcc, selectorAmbiguousFieldOcc,
+        unambiguousFieldOcc, ambiguousFieldOcc,
+
         HsWildCardInfo(..), mkAnonWildCardTy, mkNamedWildCardTy,
         wildCardName, sameWildCard, sameNamedWildCard,
         isAnonWildCard, isNamedWildCard,
@@ -63,6 +68,7 @@ import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
 import PlaceHolder ( PostTc,PostRn,DataId,PlaceHolder(..) )
 
+import Id( Id )
 import Name( Name )
 import RdrName( RdrName )
 import DataCon( HsSrcBang(..), HsImplBang(..),
@@ -543,14 +549,94 @@ type LConDeclField name = Located (ConDeclField name)
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 data ConDeclField name  -- Record fields have Haddoc docs on them
-  = ConDeclField { cd_fld_names :: [Located name],
-                   cd_fld_type  :: LBangType name,
-                   cd_fld_doc   :: Maybe LHsDocString }
+  = ConDeclField { cd_fld_names :: [LFieldOcc name],
+                                   -- ^ See Note [ConDeclField names]
+                   cd_fld_type :: LBangType name,
+                   cd_fld_doc  :: Maybe LHsDocString }
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
   deriving (Typeable)
 deriving instance (DataId name) => Data (ConDeclField name)
+
+
+type LFieldOcc name = Located (FieldOcc name)
+
+-- | Represents an *occurrence* of an unambiguous field.  We store
+-- both the 'RdrName' the user originally wrote, and after the
+-- renamer, the selector function.
+data FieldOcc name = FieldOcc { rdrNameFieldOcc  :: RdrName
+                              , selectorFieldOcc :: PostRn name name
+                              }
+  deriving Typeable
+deriving instance Eq (PostRn name name) => Eq (FieldOcc name)
+deriving instance Ord (PostRn name name) => Ord (FieldOcc name)
+deriving instance (Data name, Data (PostRn name name)) => Data (FieldOcc name)
+
+instance Outputable (FieldOcc name) where
+  ppr = ppr . rdrNameFieldOcc
+
+mkFieldOcc :: RdrName -> FieldOcc RdrName
+mkFieldOcc rdr = FieldOcc rdr PlaceHolder
+
+
+-- | Represents an *occurrence* of a field that is potentially
+-- ambiguous after the renamer, with the ambiguity resolved by the
+-- typechecker.  We always store the 'RdrName' that the user
+-- originally wrote, and store the selector function after the renamer
+-- (for unambiguous occurrences) or the typechecker (for ambiguous
+-- occurrences).
+--
+-- See Note [HsRecField and HsRecUpdField] in HsPat
+data AmbiguousFieldOcc name
+  = Unambiguous RdrName (PostRn name name)
+  | Ambiguous   RdrName (PostTc name name)
+  deriving (Typeable)
+deriving instance ( Data name
+                  , Data (PostRn name name)
+                  , Data (PostTc name name))
+                  => Data (AmbiguousFieldOcc name)
+
+instance Outputable (AmbiguousFieldOcc name) where
+  ppr = ppr . rdrNameAmbiguousFieldOcc
+
+mkAmbiguousFieldOcc :: RdrName -> AmbiguousFieldOcc RdrName
+mkAmbiguousFieldOcc rdr = Unambiguous rdr PlaceHolder
+
+rdrNameAmbiguousFieldOcc :: AmbiguousFieldOcc name -> RdrName
+rdrNameAmbiguousFieldOcc (Unambiguous rdr _) = rdr
+rdrNameAmbiguousFieldOcc (Ambiguous   rdr _) = rdr
+
+selectorAmbiguousFieldOcc :: AmbiguousFieldOcc Id -> Id
+selectorAmbiguousFieldOcc (Unambiguous _ sel) = sel
+selectorAmbiguousFieldOcc (Ambiguous   _ sel) = sel
+
+unambiguousFieldOcc :: AmbiguousFieldOcc Id -> FieldOcc Id
+unambiguousFieldOcc (Unambiguous rdr sel) = FieldOcc rdr sel
+unambiguousFieldOcc (Ambiguous   rdr sel) = FieldOcc rdr sel
+
+ambiguousFieldOcc :: FieldOcc Id -> AmbiguousFieldOcc Id
+ambiguousFieldOcc (FieldOcc rdr sel) = Unambiguous rdr sel
+
+{-
+Note [ConDeclField names]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A ConDeclField contains a list of field occurrences: these always
+include the field label as the user wrote it.  After the renamer, it
+will additionally contain the identity of the selector function in the
+second component.
+
+Due to DuplicateRecordFields, the OccName of the selector function
+may have been mangled, which is why we keep the original field label
+separately.  For example, when DuplicateRecordFields is enabled
+
+    data T = MkT { x :: Int }
+
+gives
+
+    ConDeclField { cd_fld_names = [L _ (FieldOcc "x" $sel:x:MkT)], ... }.
+-}
 
 -----------------------
 -- A valid type must have a for-all at the top of the type, or of the fn arg
@@ -800,6 +886,7 @@ splitHsFunType orig_ty@(L _ (HsAppTy t1 t2))
     go _                     _   = ([], orig_ty)  -- Failure to match
 
 splitHsFunType other = ([], other)
+
 
 ignoreParens :: LHsType name -> LHsType name
 ignoreParens (L _ (HsParTy ty)) = ignoreParens ty

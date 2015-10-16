@@ -12,13 +12,18 @@
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module HsPat (
         Pat(..), InPat, OutPat, LPat,
 
         HsConDetails(..),
         HsConPatDetails, hsConPatArgs,
-        HsRecFields(..), HsRecField(..), LHsRecField, hsRecFields,
+        HsRecFields(..), HsRecField'(..), LHsRecField',
+        HsRecField, LHsRecField,
+        HsRecUpdField, LHsRecUpdField,
+        hsRecFields, hsRecFieldSel, hsRecFieldId,
+        hsRecUpdFieldId, hsRecUpdFieldOcc, hsRecUpdFieldRdr,
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
@@ -34,7 +39,7 @@ import {-# SOURCE #-} HsExpr            (SyntaxExpr, LHsExpr, HsSplice, pprLExpr
 -- friends:
 import HsBinds
 import HsLit
-import PlaceHolder ( PostTc,DataId )
+import PlaceHolder -- ( PostRn,PostTc,DataId )
 import HsTypes
 import TcEvidence
 import BasicTypes
@@ -42,6 +47,7 @@ import BasicTypes
 import PprCore          ( {- instance OutputableBndr TyVar -} )
 import TysWiredIn
 import Var
+import RdrName ( RdrName )
 import ConLike
 import DataCon
 import TyCon
@@ -49,9 +55,9 @@ import Outputable
 import Type
 import SrcLoc
 import FastString
+import Maybes
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
-import Data.Maybe
 
 type InPat id  = LPat id        -- No 'Out' constructors
 type OutPat id = LPat id        -- No 'In' constructors
@@ -233,7 +239,8 @@ data HsRecFields id arg         -- A bunch of record fields
         -- Used for both expressions and patterns
   = HsRecFields { rec_flds   :: [LHsRecField id arg],
                   rec_dotdot :: Maybe Int }  -- Note [DotDot fields]
-  deriving (Data, Typeable)
+  deriving (Typeable)
+deriving instance (DataId id, Data arg) => Data (HsRecFields id arg)
 
 -- Note [DotDot fields]
 -- ~~~~~~~~~~~~~~~~~~~~
@@ -249,15 +256,22 @@ data HsRecFields id arg         -- A bunch of record fields
 --                     the first 'n' being the user-written ones
 --                     and the remainder being 'filled in' implicitly
 
-type LHsRecField id arg = Located (HsRecField id arg)
--- |  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual',
+type LHsRecField' id arg = Located (HsRecField' id arg)
+type LHsRecField  id arg = Located (HsRecField  id arg)
+type LHsRecUpdField id   = Located (HsRecUpdField id)
 
+type HsRecField    id arg = HsRecField' (FieldOcc id) arg
+type HsRecUpdField id     = HsRecField' (AmbiguousFieldOcc id) (LHsExpr id)
+
+-- |  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual',
+--
 -- For details on above see note [Api annotations] in ApiAnnotation
-data HsRecField id arg = HsRecField {
-        hsRecFieldId  :: Located id,
-        hsRecFieldArg :: arg,           -- Filled in by renamer
-        hsRecPun      :: Bool           -- Note [Punning]
+data HsRecField' id arg = HsRecField {
+        hsRecFieldLbl :: Located id,
+        hsRecFieldArg :: arg,           -- ^ Filled in by renamer when punning
+        hsRecPun      :: Bool           -- ^ Note [Punning]
   } deriving (Data, Typeable)
+
 
 -- Note [Punning]
 -- ~~~~~~~~~~~~~~
@@ -271,8 +285,64 @@ data HsRecField id arg = HsRecField {
 -- If the original field was qualified, we un-qualify it, thus
 --    T { A.x } means T { A.x = x }
 
-hsRecFields :: HsRecFields id arg -> [id]
-hsRecFields rbinds = map (unLoc . hsRecFieldId . unLoc) (rec_flds rbinds)
+
+-- Note [HsRecField and HsRecUpdField]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-- A HsRecField (used for record construction and pattern matching)
+-- contains an unambiguous occurrence of a field (i.e. a FieldOcc).
+-- We can't just store the Name, because thanks to
+-- DuplicateRecordFields this may not correspond to the label the user
+-- wrote.
+--
+-- A HsRecUpdField (used for record update) contains a potentially
+-- ambiguous occurrence of a field (an AmbiguousFieldOcc).  The
+-- renamer will fill in the selector function if it can, but if the
+-- selector is ambiguous the renamer will defer to the typechecker.
+-- After the typechecker, a unique selector will have been determined.
+--
+-- The renamer produces an Unambiguous result if it can, rather than
+-- just doing the lookup in the typechecker, so that completely
+-- unambiguous updates can be represented by 'DsMeta.repUpdFields'.
+--
+-- For example, suppose we have:
+--
+--     data S = MkS { x :: Int }
+--     data T = MkT { x :: Int }
+--
+--     f z = (z { x = 3 }) :: S
+--
+-- The parsed HsRecUpdField corresponding to the record update will have:
+--
+--     hsRecFieldLbl = Unambiguous "x" PlaceHolder :: AmbiguousFieldOcc RdrName
+--
+-- After the renamer, this will become:
+--
+--     hsRecFieldLbl = Ambiguous   "x" PlaceHolder :: AmbiguousFieldOcc Name
+--
+-- (note that the Unambiguous constructor is not type-correct here).
+-- The typechecker will determine the particular selector:
+--
+--     hsRecFieldLbl = Unambiguous "x" $sel:x:MkS  :: AmbiguousFieldOcc Id
+
+hsRecFields :: HsRecFields id arg -> [PostRn id id]
+hsRecFields rbinds = map (unLoc . hsRecFieldSel . unLoc) (rec_flds rbinds)
+
+hsRecFieldSel :: HsRecField name arg -> Located (PostRn name name)
+hsRecFieldSel = fmap selectorFieldOcc . hsRecFieldLbl
+
+hsRecFieldId :: HsRecField Id arg -> Located Id
+hsRecFieldId = hsRecFieldSel
+
+hsRecUpdFieldRdr :: HsRecUpdField id -> Located RdrName
+hsRecUpdFieldRdr = fmap rdrNameAmbiguousFieldOcc . hsRecFieldLbl
+
+hsRecUpdFieldId :: HsRecField' (AmbiguousFieldOcc Id) arg -> Located Id
+hsRecUpdFieldId = fmap selectorFieldOcc . hsRecUpdFieldOcc
+
+hsRecUpdFieldOcc :: HsRecField' (AmbiguousFieldOcc Id) arg -> LFieldOcc Id
+hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hsRecFieldLbl
+
 
 {-
 ************************************************************************
@@ -351,7 +421,7 @@ pprConArgs (PrefixCon pats) = sep (map pprParendLPat pats)
 pprConArgs (InfixCon p1 p2) = sep [pprParendLPat p1, pprParendLPat p2]
 pprConArgs (RecCon rpats)   = ppr rpats
 
-instance (OutputableBndr id, Outputable arg)
+instance (Outputable arg)
       => Outputable (HsRecFields id arg) where
   ppr (HsRecFields { rec_flds = flds, rec_dotdot = Nothing })
         = braces (fsep (punctuate comma (map ppr flds)))
@@ -360,11 +430,12 @@ instance (OutputableBndr id, Outputable arg)
         where
           dotdot = ptext (sLit "..") <+> ifPprDebug (ppr (drop n flds))
 
-instance (OutputableBndr id, Outputable arg)
-      => Outputable (HsRecField id arg) where
-  ppr (HsRecField { hsRecFieldId = f, hsRecFieldArg = arg,
+instance (Outputable id, Outputable arg)
+      => Outputable (HsRecField' id arg) where
+  ppr (HsRecField { hsRecFieldLbl = f, hsRecFieldArg = arg,
                     hsRecPun = pun })
     = ppr f <+> (ppUnless pun $ equals <+> ppr arg)
+
 
 {-
 ************************************************************************

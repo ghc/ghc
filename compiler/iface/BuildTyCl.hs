@@ -136,7 +136,7 @@ buildDataCon :: FamInstEnvs
             -> [HsSrcBang]
             -> Maybe [HsImplBang]
                 -- See Note [Bangs on imported data constructors] in MkId
-           -> [Name]                   -- Field labels
+           -> [FieldLabel]             -- Field labels
            -> [TyVar] -> [TyVar]       -- Univ and ext
            -> [(TyVar,Type)]           -- Equality spec
            -> ThetaType                -- Does not include the "stupid theta"

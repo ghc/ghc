@@ -259,6 +259,9 @@ zonkIdBndrs env ids = mapM (zonkIdBndr env) ids
 zonkTopBndrs :: [TcId] -> TcM [Id]
 zonkTopBndrs ids = zonkIdBndrs emptyZonkEnv ids
 
+zonkFieldOcc :: ZonkEnv -> FieldOcc TcId -> TcM (FieldOcc Id)
+zonkFieldOcc env (FieldOcc lbl sel) = fmap (FieldOcc lbl) $ zonkIdBndr env sel
+
 zonkEvBndrsX :: ZonkEnv -> [EvVar] -> TcM (ZonkEnv, [Var])
 zonkEvBndrsX = mapAccumLM zonkEvBndrX
 
@@ -714,7 +717,7 @@ zonkExpr env (RecordUpd expr rbinds cons in_tys out_tys)
   = do  { new_expr    <- zonkLExpr env expr
         ; new_in_tys  <- mapM (zonkTcTypeToType env) in_tys
         ; new_out_tys <- mapM (zonkTcTypeToType env) out_tys
-        ; new_rbinds  <- zonkRecFields env rbinds
+        ; new_rbinds  <- zonkRecUpdFields env rbinds
         ; return (RecordUpd new_expr new_rbinds cons new_in_tys new_out_tys) }
 
 zonkExpr env (ExprWithTySigOut e ty)
@@ -1019,9 +1022,18 @@ zonkRecFields env (HsRecFields flds dd)
         ; return (HsRecFields flds' dd) }
   where
     zonk_rbind (L l fld)
-      = do { new_id   <- wrapLocM (zonkIdBndr env) (hsRecFieldId fld)
+      = do { new_id   <- wrapLocM (zonkFieldOcc env) (hsRecFieldLbl fld)
            ; new_expr <- zonkLExpr env (hsRecFieldArg fld)
-           ; return (L l (fld { hsRecFieldId = new_id
+           ; return (L l (fld { hsRecFieldLbl = new_id
+                              , hsRecFieldArg = new_expr })) }
+
+zonkRecUpdFields :: ZonkEnv -> [LHsRecUpdField TcId] -> TcM [LHsRecUpdField TcId]
+zonkRecUpdFields env = mapM zonk_rbind
+  where
+    zonk_rbind (L l fld)
+      = do { new_id   <- wrapLocM (zonkFieldOcc env) (hsRecUpdFieldOcc fld)
+           ; new_expr <- zonkLExpr env (hsRecFieldArg fld)
+           ; return (L l (fld { hsRecFieldLbl = fmap ambiguousFieldOcc new_id
                               , hsRecFieldArg = new_expr })) }
 
 -------------------------------------------------------------------------

@@ -3,6 +3,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveFunctor      #-}
 {-# LANGUAGE DeriveFoldable     #-}
 {-# LANGUAGE DeriveTraversable  #-}
 {-# LANGUAGE FlexibleInstances  #-}
@@ -522,9 +523,7 @@ pprUserRealSpan show_path (SrcSpanPoint src_path line col)
 
 -- | We attach SrcSpans to lots of things, so let's have a datatype for it.
 data GenLocated l e = L l e
-  deriving (Eq, Ord, Typeable, Data)
-deriving instance Foldable    (GenLocated l)
-deriving instance Traversable (GenLocated l)
+  deriving (Eq, Ord, Typeable, Data, Functor, Foldable, Traversable)
 
 type Located e = GenLocated SrcSpan e
 type RealLocated e = GenLocated RealSrcSpan e
@@ -559,9 +558,6 @@ eqLocated a b = unLoc a == unLoc b
 -- | Tests the ordering of the two located things
 cmpLocated :: Ord a => Located a -> Located a -> Ordering
 cmpLocated a b = unLoc a `compare` unLoc b
-
-instance Functor (GenLocated l) where
-  fmap f (L l e) = L l (f e)
 
 instance (Outputable l, Outputable e) => Outputable (GenLocated l e) where
   ppr (L l e) = -- TODO: We can't do this since Located was refactored into

@@ -225,7 +225,8 @@ mkDataFamInst loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataFamInstD (
-                  DataFamInstDecl { dfid_tycon = tc, dfid_pats = mkHsWithBndrs tparams
+                  DataFamInstDecl { dfid_tycon = tc
+                                  , dfid_pats = mkHsWithBndrs tparams
                                   , dfid_defn = defn, dfid_fvs = placeHolderNames }))) }
 
 mkTyFamInst :: SrcSpan
@@ -1177,13 +1178,18 @@ mkRecConstrOrUpdate
 mkRecConstrOrUpdate (L l (HsVar c)) _ (fs,dd)
   | isRdrDataCon c
   = return (RecordCon (L l c) noPostTcExpr (mk_rec_fields fs dd))
-mkRecConstrOrUpdate exp _ (fs,dd)
-  = return (RecordUpd exp (mk_rec_fields fs dd)
+mkRecConstrOrUpdate exp@(L l _) _ (fs,dd)
+  | dd        = parseErrorSDoc l (text "You cannot use `..' in a record update")
+  | otherwise = return (RecordUpd exp (map (fmap mk_rec_upd_field) fs)
                       PlaceHolder PlaceHolder PlaceHolder)
 
 mk_rec_fields :: [LHsRecField id arg] -> Bool -> HsRecFields id arg
 mk_rec_fields fs False = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
 mk_rec_fields fs True  = HsRecFields { rec_flds = fs, rec_dotdot = Just (length fs) }
+
+mk_rec_upd_field :: HsRecField RdrName (LHsExpr RdrName) -> HsRecUpdField RdrName
+mk_rec_upd_field (HsRecField (L loc (FieldOcc rdr _)) arg pun)
+  = HsRecField (L loc (Unambiguous rdr PlaceHolder)) arg pun
 
 mkInlinePragma :: String -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
                -> InlinePragma
@@ -1320,7 +1326,7 @@ mkModuleImpExp n@(L l name) subs =
       | isVarNameSpace (rdrNameSpace name) -> IEVar       n
       | otherwise                          -> IEThingAbs  (L l name)
     ImpExpAll                              -> IEThingAll  (L l name)
-    ImpExpList xs                          -> IEThingWith (L l name) xs
+    ImpExpList xs                          -> IEThingWith (L l name) xs []
 
 mkTypeImpExp :: Located RdrName   -- TcCls or Var name space
              -> P (Located RdrName)

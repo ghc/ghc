@@ -14,6 +14,7 @@ module RnEnv (
         lookupLocalOccThLvl_maybe,
         lookupTypeOccRn, lookupKindOccRn,
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
+        lookupOccRn_overloaded, lookupGlobalOccRn_overloaded,
         reportUnboundName, unknownNameSuggestions,
 
         HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn,
@@ -25,6 +26,7 @@ module RnEnv (
         lookupSyntaxName, lookupSyntaxNames, lookupIfThenElse,
         lookupGreAvailRn,
         getLookupOccRn, addUsedRdrNames,
+        addUsedRdrName,
 
         newLocalBndrRn, newLocalBndrsRn,
         bindLocalNames, bindLocalNamesFV,
@@ -38,7 +40,8 @@ module RnEnv (
         addFvRn, mapFvRn, mapMaybeFvRn, mapFvRnCPS,
         warnUnusedMatches,
         warnUnusedTopBinds, warnUnusedLocalBinds,
-        dataTcOccs, kindSigErr, perhapsForallMsg,
+        mkFieldEnv,
+        dataTcOccs, kindSigErr, perhapsForallMsg, unknownSubordinateErr,
         HsDocContext(..), docOfHsDocContext
     ) where
 
@@ -49,18 +52,17 @@ import IfaceEnv
 import HsSyn
 import RdrName
 import HscTypes
-import TcEnv            ( tcLookupDataCon, tcLookupField, isBrackStage )
+import TcEnv
 import TcRnMonad
 import RdrHsSyn         ( setRdrNameSpace )
-import Id               ( isRecordSelector )
 import Name
 import NameSet
 import NameEnv
 import Avail
 import Module
 import ConLike
-import DataCon          ( dataConFieldLabels, dataConTyCon )
-import TyCon            ( isTupleTyCon, tyConArity )
+import DataCon
+import TyCon
 import PrelNames        ( mkUnboundName, isUnboundName, rOOT_MAIN, forall_tv_RDR )
 import ErrUtils         ( MsgDoc )
 import BasicTypes       ( Fixity(..), FixityDirection(..), minPrecedence, defaultFixity )
@@ -413,7 +415,7 @@ lookupInstDeclBndr cls what rdr
                                 -- warnings when a deprecated class
                                 -- method is defined. We only warn
                                 -- when it's used
-                          (ParentIs cls) doc rdr }
+                          (Just cls) doc rdr }
   where
     doc = what <+> ptext (sLit "of class") <+> quotes (ppr cls)
 
@@ -428,7 +430,7 @@ lookupFamInstName Nothing tc_rdr     -- Family instance; tc_rdr is an *occurrenc
   = lookupLocatedOccRn tc_rdr
 
 -----------------------------------------------
-lookupConstructorFields :: Name -> RnM [Name]
+lookupConstructorFields :: Name -> RnM [FieldLabel]
 -- Look up the fields of a given constructor
 --   *  For constructors from this module, use the record field env,
 --      which is itself gathered from the (as yet un-typechecked)
@@ -441,7 +443,7 @@ lookupConstructorFields :: Name -> RnM [Name]
 lookupConstructorFields con_name
   = do  { this_mod <- getModule
         ; if nameIsLocalOrFrom this_mod con_name then
-          do { RecFields field_env _ <- getRecFieldEnv
+          do { field_env <- getRecFieldEnv
              ; return (lookupNameEnv field_env con_name `orElse` []) }
           else
           do { con <- tcLookupDataCon con_name
@@ -459,10 +461,9 @@ lookupConstructorFields con_name
 -- Arguably this should work, because the reference to 'fld' is
 -- unambiguous because there is only one field id 'fld' in scope.
 -- But currently it's rejected.
-
 lookupSubBndrOcc :: Bool
-                 -> Parent  -- NoParent   => just look it up as usual
-                            -- ParentIs p => use p to disambiguate
+                 -> Maybe Name  -- Nothing => just look it up as usual
+                                -- Just p  => use parent p to disambiguate
                  -> SDoc -> RdrName
                  -> RnM Name
 lookupSubBndrOcc warnIfDeprec parent doc rdr_name
@@ -497,24 +498,25 @@ lookupSubBndrOcc warnIfDeprec parent doc rdr_name
       | isQual rdr_name = rdr_name
       | otherwise       = greUsedRdrName gre
 
-lookupSubBndrGREs :: GlobalRdrEnv -> Parent -> RdrName -> [GlobalRdrElt]
--- If Parent = NoParent, just do a normal lookup
--- If Parent = Parent p then find all GREs that
+lookupSubBndrGREs :: GlobalRdrEnv -> Maybe Name -> RdrName -> [GlobalRdrElt]
+-- If parent = Nothing, just do a normal lookup
+-- If parent = Just p then find all GREs that
 --   (a) have parent p
 --   (b) for Unqual, are in scope qualified or unqualified
 --       for Qual, are in scope with that qualification
 lookupSubBndrGREs env parent rdr_name
   = case parent of
-      NoParent   -> pickGREs rdr_name gres
-      ParentIs p
+      Nothing               -> pickGREs rdr_name gres
+      Just p
         | isUnqual rdr_name -> filter (parent_is p) gres
         | otherwise         -> filter (parent_is p) (pickGREs rdr_name gres)
 
   where
     gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
 
-    parent_is p (GRE { gre_par = ParentIs p' }) = p == p'
-    parent_is _ _                               = False
+    parent_is p (GRE { gre_par = ParentIs p' })             = p == p'
+    parent_is p (GRE { gre_par = FldParent { par_is = p'}}) = p == p'
+    parent_is _ _                                           = False
 
 {-
 Note [Family instance binders]
@@ -823,6 +825,60 @@ lookupGlobalOccRn_maybe rdr_name
                 Just gre -> return (Just (gre_name gre)) }
 
 
+-- | Like 'lookupOccRn_maybe', but with a more informative result if
+-- the 'RdrName' happens to be a record selector:
+--
+--   * Nothing         -> name not in scope (no error reported)
+--   * Just (Left x)   -> name uniquely refers to x,
+--                        or there is a name clash (reported)
+--   * Just (Right xs) -> name refers to one or more record selectors;
+--                        if overload_ok was False, this list will be
+--                        a singleton.
+lookupOccRn_overloaded  :: Bool -> RdrName -> RnM (Maybe (Either Name [FieldOcc Name]))
+lookupOccRn_overloaded overload_ok rdr_name
+  = do { local_env <- getLocalRdrEnv
+       ; case lookupLocalRdrEnv local_env rdr_name of {
+          Just name -> return (Just (Left name)) ;
+          Nothing   -> do
+       { mb_name <- lookupGlobalOccRn_overloaded overload_ok rdr_name
+       ; case mb_name of {
+           Just name -> return (Just name) ;
+           Nothing   -> do
+       { ns <- lookupQualifiedNameGHCi rdr_name
+                      -- This test is not expensive,
+                      -- and only happens for failed lookups
+       ; case ns of
+           (n:_) -> return $ Just $ Left n  -- Unlikely to be more than one...?
+           []    -> return Nothing  } } } } }
+
+lookupGlobalOccRn_overloaded :: Bool -> RdrName -> RnM (Maybe (Either Name [FieldOcc Name]))
+lookupGlobalOccRn_overloaded overload_ok rdr_name
+  | Just n <- isExact_maybe rdr_name   -- This happens in derived code
+  = do { n' <- lookupExactOcc n; return (Just (Left n')) }
+
+  | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
+  = do { n <- lookupOrig rdr_mod rdr_occ
+       ; return (Just (Left n)) }
+
+  | otherwise
+  = do  { env <- getGlobalRdrEnv
+        ; case lookupGRE_RdrName rdr_name env of
+                []    -> return Nothing
+                [gre] | isRecFldGRE gre
+                         -> do { addUsedRdrName True gre rdr_name
+                               ; let fld_occ = FieldOcc rdr_name (gre_name gre)
+                               ; return (Just (Right [fld_occ])) }
+                      | otherwise
+                         -> do { addUsedRdrName True gre rdr_name
+                               ; return (Just (Left (gre_name gre))) }
+                gres  | all isRecFldGRE gres && overload_ok
+                            -- Don't record usage for ambiguous selectors
+                            -- until we know which is meant
+                         -> return (Just (Right (map (FieldOcc rdr_name . gre_name) gres)))
+                gres     -> do { addNameClashErrRn rdr_name gres
+                               ; return (Just (Left (gre_name (head gres)))) } }
+
+
 --------------------------------------------------
 --      Lookup in the Global RdrEnv of the module
 --------------------------------------------------
@@ -899,14 +955,27 @@ Note [Handling of deprecations]
 addUsedRdrName :: Bool -> GlobalRdrElt -> RdrName -> RnM ()
 -- Record usage of imported RdrNames
 addUsedRdrName warn_if_deprec gre rdr
-  = do { unless (isLocalGRE gre) $
-         do { env <- getGblEnv
-            ; traceRn (text "addUsedRdrName 1" <+> ppr gre)
-            ; updMutVar (tcg_used_rdrnames env)
-                        (\s -> Set.insert rdr s) }
+  = do { if isRecFldGRE gre
+           then addUsedSelector (FieldOcc rdr (gre_name gre))
+           else unless (isLocalGRE gre) $ addOneUsedRdrName rdr
 
        ; when warn_if_deprec $
          warnIfDeprecated gre }
+
+addUsedSelector :: FieldOcc Name -> RnM ()
+-- Record usage of record selectors by DuplicateRecordFields
+addUsedSelector n
+  = do { env <- getGblEnv
+       ; traceRn (text "addUsedSelector " <+> ppr n)
+       ; updMutVar (tcg_used_selectors env)
+                   (\s -> Set.insert n s) }
+
+addOneUsedRdrName :: RdrName -> RnM ()
+addOneUsedRdrName rdr
+  = do { env <- getGblEnv
+       ; traceRn (text "addUsedRdrName 1" <+> ppr rdr)
+       ; updMutVar (tcg_used_rdrnames env)
+                   (\s -> Set.insert rdr s) }
 
 addUsedRdrNames :: [RdrName] -> RnM ()
 -- Record used sub-binders
@@ -934,13 +1003,14 @@ warnIfDeprecated gre@(GRE { gre_name = name, gre_imp = iss })
   | otherwise
   = return ()
   where
+    occ = greOccName gre
     name_mod = ASSERT2( isExternalName name, ppr name ) nameModule name
-    doc = ptext (sLit "The name") <+> quotes (ppr name) <+> ptext (sLit "is mentioned explicitly")
+    doc = ptext (sLit "The name") <+> quotes (ppr occ) <+> ptext (sLit "is mentioned explicitly")
 
     mk_msg imp_spec txt
       = sep [ sep [ ptext (sLit "In the use of")
-                    <+> pprNonVarNameSpace (occNameSpace (nameOccName name))
-                    <+> quotes (ppr name)
+                    <+> pprNonVarNameSpace (occNameSpace occ)
+                    <+> quotes (ppr occ)
                   , parens imp_msg <> colon ]
             , ppr txt ]
       where
@@ -953,8 +1023,9 @@ lookupImpDeprec :: ModIface -> GlobalRdrElt -> Maybe WarningTxt
 lookupImpDeprec iface gre
   = mi_warn_fn iface (gre_name gre) `mplus`  -- Bleat if the thing,
     case gre_par gre of                      -- or its parent, is warn'd
-       ParentIs p -> mi_warn_fn iface p
-       NoParent   -> Nothing
+       ParentIs  p              -> mi_warn_fn iface p
+       FldParent { par_is = p } -> mi_warn_fn iface p
+       NoParent                 -> Nothing
 
 {-
 Note [Used names with interface not loaded]
@@ -1134,7 +1205,7 @@ lookupBindGroupOcc ctxt what rdr_name
   where
     lookup_cls_op cls
       = do { env <- getGlobalRdrEnv
-           ; let gres = lookupSubBndrGREs env (ParentIs cls) rdr_name
+           ; let gres = lookupSubBndrGREs env (Just cls) rdr_name
            ; case gres of
                []      -> return (Left (unknownSubordinateErr doc rdr_name))
                (gre:_) -> return (Right (gre_name gre)) }
@@ -1541,18 +1612,10 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
     is_shadowed_gre :: GlobalRdrElt -> RnM Bool
         -- Returns False for record selectors that are shadowed, when
         -- punning or wild-cards are on (cf Trac #2723)
-    is_shadowed_gre gre@(GRE { gre_par = ParentIs _ })
+    is_shadowed_gre gre | isRecFldGRE gre
         = do { dflags <- getDynFlags
-             ; if (xopt Opt_RecordPuns dflags || xopt Opt_RecordWildCards dflags)
-               then do { is_fld <- is_rec_fld gre; return (not is_fld) }
-               else return True }
+             ; return $ not (xopt Opt_RecordPuns dflags || xopt Opt_RecordWildCards dflags) }
     is_shadowed_gre _other = return True
-
-    is_rec_fld gre      -- Return True for record selector ids
-        | isLocalGRE gre = do { RecFields _ fld_set <- getRecFieldEnv
-                              ; return (gre_name gre `elemNameSet` fld_set) }
-        | otherwise      = do { sel_id <- tcLookupField (gre_name gre)
-                              ; return (isRecordSelector sel_id) }
 
 {-
 ************************************************************************
@@ -1772,7 +1835,7 @@ warnUnusedTopBinds gres
          let isBoot = tcg_src env == HsBootFile
          let noParent gre = case gre_par gre of
                             NoParent -> True
-                            ParentIs _ -> False
+                            _        -> False
              -- Don't warn about unused bindings with parents in
              -- .hs-boot files, as you are sometimes required to give
              -- unused bindings (trac #3449).
@@ -1797,24 +1860,41 @@ warnUnusedGREs :: [GlobalRdrElt] -> RnM ()
 warnUnusedGREs gres = mapM_ warnUnusedGRE gres
 
 warnUnusedLocals :: [Name] -> RnM ()
-warnUnusedLocals names = mapM_ warnUnusedLocal names
+warnUnusedLocals names = do
+    fld_env <- mkFieldEnv <$> getGlobalRdrEnv
+    mapM_ (warnUnusedLocal fld_env) names
 
-warnUnusedLocal :: Name -> RnM ()
-warnUnusedLocal name
+warnUnusedLocal :: NameEnv (FieldLabelString, Name) -> Name -> RnM ()
+warnUnusedLocal fld_env name
   = when (reportable name) $
-    addUnusedWarning name (nameSrcSpan name)
+    addUnusedWarning occ (nameSrcSpan name)
                      (ptext (sLit "Defined but not used"))
+  where
+    occ = case lookupNameEnv fld_env name of
+              Just (fl, _) -> mkVarOccFS fl
+              Nothing      -> nameOccName name
 
 warnUnusedGRE :: GlobalRdrElt -> RnM ()
-warnUnusedGRE (GRE { gre_name = name, gre_lcl = lcl, gre_imp = is })
-  | lcl       = warnUnusedLocal name
+warnUnusedGRE gre@(GRE { gre_name = name, gre_lcl = lcl, gre_imp = is })
+  | lcl       = do fld_env <- mkFieldEnv <$> getGlobalRdrEnv
+                   warnUnusedLocal fld_env name
   | otherwise = when (reportable name) (mapM_ warn is)
   where
-    warn spec = addUnusedWarning name span msg
+    occ = greOccName gre
+    warn spec = addUnusedWarning occ span msg
         where
            span = importSpecLoc spec
            pp_mod = quotes (ppr (importSpecModule spec))
            msg = ptext (sLit "Imported from") <+> pp_mod <+> ptext (sLit "but not used")
+
+-- | Make a map from selector names to field labels and parent tycon
+-- names, to be used when reporting unused record fields.
+mkFieldEnv :: GlobalRdrEnv -> NameEnv (FieldLabelString, Name)
+mkFieldEnv rdr_env = mkNameEnv [ (gre_name gre, (lbl, par_is (gre_par gre)))
+                               | gres <- occEnvElts rdr_env
+                               , gre <- gres
+                               , Just lbl <- [greLabel gre]
+                               ]
 
 reportable :: Name -> Bool
 reportable name
@@ -1823,17 +1903,18 @@ reportable name
                                   -- from Data.Tuple
   | otherwise = not (startsWithUnderscore (nameOccName name))
 
-addUnusedWarning :: Name -> SrcSpan -> SDoc -> RnM ()
-addUnusedWarning name span msg
+addUnusedWarning :: OccName -> SrcSpan -> SDoc -> RnM ()
+addUnusedWarning occ span msg
   = addWarnAt span $
     sep [msg <> colon,
-         nest 2 $ pprNonVarNameSpace (occNameSpace (nameOccName name))
-                        <+> quotes (ppr name)]
+         nest 2 $ pprNonVarNameSpace (occNameSpace occ)
+                        <+> quotes (ppr occ)]
 
 addNameClashErrRn :: RdrName -> [GlobalRdrElt] -> RnM ()
 addNameClashErrRn rdr_name gres
-  | all isLocalGRE gres  -- If there are two or more *local* defns, we'll have reported
-  = return ()            -- that already, and we don't want an error cascade
+  | all isLocalGRE gres && not (all isRecFldGRE gres)
+               -- If there are two or more *local* defns, we'll have reported
+  = return ()  -- that already, and we don't want an error cascade
   | otherwise
   = addErr (vcat [ptext (sLit "Ambiguous occurrence") <+> quotes (ppr rdr_name),
                   ptext (sLit "It could refer to") <+> vcat (msg1 : msgs)])
@@ -1841,7 +1922,10 @@ addNameClashErrRn rdr_name gres
     (np1:nps) = gres
     msg1 = ptext  (sLit "either") <+> mk_ref np1
     msgs = [ptext (sLit "    or") <+> mk_ref np | np <- nps]
-    mk_ref gre = sep [quotes (ppr (gre_name gre)) <> comma, pprNameProvenance gre]
+    mk_ref gre = sep [nom <> comma, pprNameProvenance gre]
+      where nom = case gre_par gre of
+                    FldParent { par_lbl = Just lbl } -> text "the field" <+> quotes (ppr lbl)
+                    _                                -> quotes (ppr (gre_name gre))
 
 shadowedNameWarn :: OccName -> [SDoc] -> SDoc
 shadowedNameWarn occ shadowed_locs

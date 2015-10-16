@@ -647,6 +647,7 @@ data ExtensionFlag
    | Opt_MultiWayIf
    | Opt_BinaryLiterals
    | Opt_NegativeLiterals
+   | Opt_DuplicateRecordFields
    | Opt_EmptyCase
    | Opt_PatternSynonyms
    | Opt_PartialTypeSignatures
@@ -3100,6 +3101,7 @@ xFlags = [
   flagSpec "DoAndIfThenElse"                  Opt_DoAndIfThenElse,
   flagSpec' "DoRec"                           Opt_RecursiveDo
     (deprecatedForExtension "RecursiveDo"),
+  flagSpec "DuplicateRecordFields"            Opt_DuplicateRecordFields,
   flagSpec "EmptyCase"                        Opt_EmptyCase,
   flagSpec "EmptyDataDecls"                   Opt_EmptyDataDecls,
   flagSpec "ExistentialQuantification"        Opt_ExistentialQuantification,
@@ -3278,6 +3280,9 @@ impliedXFlags
 
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFunctor)
     , (Opt_DeriveTraversable, turnOn, Opt_DeriveFoldable)
+
+    -- Duplicate record fields require field disambiguation
+    , (Opt_DuplicateRecordFields, turnOn, Opt_DisambiguateRecordFields)
   ]
 
 -- Note [Documenting optimisation flags]

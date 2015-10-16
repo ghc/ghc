@@ -71,6 +71,7 @@ module OccName (
         mkPDatasTyConOcc, mkPDatasDataConOcc,
         mkPReprTyConOcc,
         mkPADFunOcc,
+        mkRecFldSelOcc,
 
         -- ** Deconstruction
         occNameFS, occNameString, occNameSpace,
@@ -106,35 +107,13 @@ import DynFlags
 import UniqFM
 import UniqSet
 import FastString
+import FastStringEnv
 import Outputable
 import Lexeme
 import Binary
 import Module
 import Data.Char
 import Data.Data
-
-{-
-************************************************************************
-*                                                                      *
-              FastStringEnv
-*                                                                      *
-************************************************************************
-
-FastStringEnv can't be in FastString because the env depends on UniqFM
--}
-
-type FastStringEnv a = UniqFM a         -- Keyed by FastString
-
-
-emptyFsEnv  :: FastStringEnv a
-lookupFsEnv :: FastStringEnv a -> FastString -> Maybe a
-extendFsEnv :: FastStringEnv a -> FastString -> a -> FastStringEnv a
-mkFsEnv     :: [(FastString,a)] -> FastStringEnv a
-
-emptyFsEnv  = emptyUFM
-lookupFsEnv = lookupUFM
-extendFsEnv = addToUFM
-mkFsEnv     = listToUFM
 
 {-
 ************************************************************************
@@ -685,6 +664,10 @@ mkPDataTyConOcc    = mk_simple_deriv_with tcName   "VP:"
 mkPDatasTyConOcc   = mk_simple_deriv_with tcName   "VPs:"
 mkPDataDataConOcc  = mk_simple_deriv_with dataName "VPD:"
 mkPDatasDataConOcc = mk_simple_deriv_with dataName "VPDs:"
+
+-- Overloaded record field selectors
+mkRecFldSelOcc :: String -> OccName
+mkRecFldSelOcc   = mk_deriv varName "$sel"
 
 mk_simple_deriv :: NameSpace -> String -> OccName -> OccName
 mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)

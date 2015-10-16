@@ -25,7 +25,7 @@ import Outputable
 import Unique
 import Util
 import Name
-import TyCon
+import FieldLabel
 import BasicTypes
 import {-# SOURCE #-} TypeRep (Type, ThetaType)
 import Var

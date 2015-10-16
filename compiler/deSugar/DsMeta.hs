@@ -56,10 +56,10 @@ import DynFlags
 import FastString
 import ForeignCall
 import Util
+import Maybes
 import MonadUtils
 
 import Data.ByteString ( unpack )
-import Data.Maybe
 import Control.Monad
 import Data.List
 
@@ -1144,7 +1144,7 @@ repE (RecordCon c _ flds)
         repRecCon x fs }
 repE (RecordUpd e flds _ _ _)
  = do { x <- repLE e;
-        fs <- repFields flds;
+        fs <- repUpdFields flds;
         repRecUpd x fs }
 
 repE (ExprWithTySig e ty _) = do { e1 <- repLE e; t1 <- repLTy ty; repSigExp e1 t1 }
@@ -1223,9 +1223,21 @@ repFields :: HsRecordBinds Name -> DsM (Core [TH.Q TH.FieldExp])
 repFields (HsRecFields { rec_flds = flds })
   = repList fieldExpQTyConName rep_fld flds
   where
-    rep_fld (L _ fld) = do { fn <- lookupLOcc (hsRecFieldId fld)
+    rep_fld :: LHsRecField Name (LHsExpr Name) -> DsM (Core (TH.Q TH.FieldExp))
+    rep_fld (L _ fld) = do { fn <- lookupLOcc (hsRecFieldSel fld)
                            ; e  <- repLE (hsRecFieldArg fld)
                            ; repFieldExp fn e }
+
+repUpdFields :: [LHsRecUpdField Name] -> DsM (Core [TH.Q TH.FieldExp])
+repUpdFields = repList fieldExpQTyConName rep_fld
+  where
+    rep_fld :: LHsRecUpdField Name -> DsM (Core (TH.Q TH.FieldExp))
+    rep_fld (L l fld) = case unLoc (hsRecFieldLbl fld) of
+      Unambiguous _ sel_name -> do { fn <- lookupLOcc (L l sel_name)
+                                   ; e  <- repLE (hsRecFieldArg fld)
+                                   ; repFieldExp fn e }
+      _                      -> notHandled "ambiguous record updates" (ppr fld)
+
 
 
 -----------------------------------------------------------------------------
@@ -1452,7 +1464,8 @@ repP (ConPatIn dc details)
                                 repPinfix p1' con_str p2' }
    }
  where
-   rep_fld (L _ fld) = do { MkC v <- lookupLOcc (hsRecFieldId fld)
+   rep_fld :: LHsRecField Name (LPat Name) -> DsM (Core (TH.Name,TH.PatQ))
+   rep_fld (L _ fld) = do { MkC v <- lookupLOcc (hsRecFieldSel fld)
                           ; MkC p <- repLP (hsRecFieldArg fld)
                           ; rep2 fieldPatName [v,p] }
 
@@ -1926,7 +1939,9 @@ repConstr con (RecCon (L _ ips))
          ; rep2 recCName [unC con, unC arg_vtys] }
     where
       rep_ip (L _ ip) = mapM (rep_one_ip (cd_fld_type ip)) (cd_fld_names ip)
-      rep_one_ip t n = do { MkC v  <- lookupLOcc n
+
+      rep_one_ip :: LBangType Name -> LFieldOcc Name -> DsM (Core a)
+      rep_one_ip t n = do { MkC v  <- lookupOcc (selectorFieldOcc $ unLoc n)
                           ; MkC ty <- repBangTy  t
                           ; rep2 varStrictTypeName [v,ty] }
 

@@ -2,6 +2,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module PlaceHolder where
 
@@ -100,9 +102,11 @@ type DataId id =
   , Data (PostRn id Bool)
   , Data (PostRn id Name)
   , Data (PostRn id [Name])
-
+--  , Data (PostRn id [id])
+  , Data (PostRn id id)
   , Data (PostTc id Type)
   , Data (PostTc id Coercion)
+  , Data (PostTc id id)
   , Data (PostTc id [Type])
   , Data (PostTc id [DataCon])
   )

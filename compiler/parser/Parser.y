@@ -1916,7 +1916,7 @@ fielddecl :: { LConDeclField RdrName }
                                               -- A list because of   f,g :: Int
         : maybe_docnext sig_vars '::' ctype maybe_docprev
             {% ams (L (comb2 $2 $4)
-                      (ConDeclField (reverse (unLoc $2)) $4 ($1 `mplus` $5)))
+                      (ConDeclField (reverse (map (fmap (flip FieldOcc PlaceHolder)) (unLoc $2))) $4 ($1 `mplus` $5)))
                    [mj AnnDcolon $3] }
 
 -- We allow the odd-looking 'inst_type' in a deriving clause, so that
@@ -2658,13 +2658,13 @@ fbinds1 :: { ([AddAnn],([LHsRecField RdrName (LHsExpr RdrName)], Bool)) }
         | '..'                          { ([mj AnnDotdot $1],([],   True)) }
 
 fbind   :: { LHsRecField RdrName (LHsExpr RdrName) }
-        : qvar '=' texp {% ams  (sLL $1 $> $ HsRecField $1 $3             False)
+        : qvar '=' texp {% ams  (sLL $1 $> $ HsRecField (fmap mkFieldOcc $1) $3 False)
                                 [mj AnnEqual $2] }
                         -- RHS is a 'texp', allowing view patterns (Trac #6038)
                         -- and, incidentaly, sections.  Eg
                         -- f (R { x = show -> s }) = ...
 
-        | qvar          { sLL $1 $> $ HsRecField $1 placeHolderPunRhs True }
+        | qvar          { sLL $1 $> $ HsRecField (fmap mkFieldOcc $1) placeHolderPunRhs True }
                         -- In the punning case, use a place-holder
                         -- The renamer fills in the final value
 

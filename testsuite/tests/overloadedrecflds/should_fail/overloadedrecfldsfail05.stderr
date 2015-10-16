@@ -1,0 +1,6 @@
+
+overloadedrecfldsfail05.hs:7:16: warning:
+    Defined but not used: ‘foo’
+
+<no location info>: error: 
+Failing due to -Werror.

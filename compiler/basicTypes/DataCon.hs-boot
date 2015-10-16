@@ -1,7 +1,8 @@
 module DataCon where
 import Var( TyVar )
 import Name( Name, NamedThing )
-import {-# SOURCE #-} TyCon( TyCon, FieldLabel )
+import {-# SOURCE #-} TyCon( TyCon )
+import FieldLabel ( FieldLabel )
 import Unique ( Uniquable )
 import Outputable ( Outputable, OutputableBndr )
 import BasicTypes (Arity)

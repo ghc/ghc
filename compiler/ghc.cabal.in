@@ -159,6 +159,7 @@ Library
         Demand
         Debug
         Exception
+        FieldLabel
         GhcMonad
         Hooks
         Id
@@ -444,6 +445,7 @@ Library
         FastFunctions
         FastMutInt
         FastString
+        FastStringEnv
         Fingerprint
         FiniteMap
         GraphBase

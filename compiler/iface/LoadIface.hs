@@ -68,6 +68,7 @@ import Util
 import FastString
 import Fingerprint
 import Hooks
+import FieldLabel
 
 import Control.Monad
 import Data.IORef
@@ -907,14 +908,14 @@ When printing export lists, we print like this:
 -}
 
 pprExport :: IfaceExport -> SDoc
-pprExport (Avail n)      = ppr n
-pprExport (AvailTC _ []) = Outputable.empty
-pprExport (AvailTC n (n':ns))
-  | n==n'     = ppr n <> pp_export ns
-  | otherwise = ppr n <> char '|' <> pp_export (n':ns)
+pprExport (Avail n)         = ppr n
+pprExport (AvailTC _ [] []) = Outputable.empty
+pprExport (AvailTC n ns0 fs) = case ns0 of
+                                 (n':ns) | n==n' -> ppr n <> pp_export ns fs
+                                 _               -> ppr n <> char '|' <> pp_export ns0 fs
   where
-    pp_export []    = Outputable.empty
-    pp_export names = braces (hsep (map ppr names))
+    pp_export []    [] = Outputable.empty
+    pp_export names fs = braces (hsep (map ppr names ++ map (ppr . flLabel) fs))
 
 pprUsage :: Usage -> SDoc
 pprUsage usage@UsagePackageModule{}

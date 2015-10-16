@@ -1,0 +1,4 @@
+
+overloadedrecfldsfail11.hs:3:13: error:
+    The deprecation for ‘foo’ lacks an accompanying binding
+      (The deprecation must be given where ‘foo’ is declared)

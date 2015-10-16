@@ -32,7 +32,7 @@ module TcRnTypes(
         FrontendResult(..),
 
         -- Renamer types
-        ErrCtxt, RecFieldEnv(..),
+        ErrCtxt, RecFieldEnv,
         ImportAvails(..), emptyImportAvails, plusImportAvails,
         WhereFrom(..), mkModDeps,
 
@@ -117,6 +117,7 @@ import TyCon    ( TyCon )
 import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
 import PatSyn   ( PatSyn, patSynType )
+import FieldLabel ( FieldLabel )
 import TcType
 import Annotations
 import InstEnv
@@ -400,6 +401,7 @@ data TcGblEnv
 
         tcg_dus :: DefUses,   -- ^ What is defined in this module and what is used.
         tcg_used_rdrnames :: TcRef (Set RdrName),
+        tcg_used_selectors :: TcRef (Set (FieldOcc Name)),
           -- See Note [Tracking unused binding and imports]
 
         tcg_keep :: TcRef NameSet,
@@ -564,13 +566,9 @@ tcVisibleOrphanMods tcg_env
 instance ContainsModule TcGblEnv where
     extractModule env = tcg_mod env
 
-data RecFieldEnv
-  = RecFields (NameEnv [Name])  -- Maps a constructor name *in this module*
-                                -- to the fields for that constructor
-              NameSet           -- Set of all fields declared *in this module*;
-                                -- used to suppress name-shadowing complaints
-                                -- when using record wild cards
-                                -- E.g.  let fld = e in C {..}
+type RecFieldEnv = NameEnv [FieldLabel]
+        -- Maps a constructor name *in this module*
+        -- to the fields for that constructor.
         -- This is used when dealing with ".." notation in record
         -- construction and pattern matching.
         -- The FieldEnv deals *only* with constructors defined in *this*
@@ -589,7 +587,7 @@ data SelfBootInfo
 {-
 Note [Tracking unused binding and imports]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We gather two sorts of usage information
+We gather three sorts of usage information
  * tcg_dus (defs/uses)
       Records *defined* Names (local, top-level)
           and *used*    Names (local or imported)
@@ -608,6 +606,12 @@ We gather two sorts of usage information
       tell whether the reference was qualified or unqualified, which
       is esssential in deciding whether a particular import decl
       is unnecessary.  This info isn't present in Names.
+
+ * tcg_used_selectors
+      Records the record selectors that are used
+      by the DuplicateRecordFields extension.  These
+      may otherwise be missed from tcg_used_rdrnames as a
+      single RdrName might refer to multiple fields.
 
 
 ************************************************************************
@@ -2193,6 +2197,7 @@ data CtOrigin
 
   -- All the others are for *wanted* constraints
   | OccurrenceOf Name              -- Occurrence of an overloaded identifier
+  | OccurrenceOfRecSel RdrName     -- Occurrence of a record selector
   | AppOrigin                      -- An application of some kind
 
   | SpecPragOrigin UserTypeCtxt    -- Specialisation pragma for
@@ -2311,6 +2316,7 @@ pprCtOrigin simple_origin
 ----------------
 pprCtO :: CtOrigin -> SDoc  -- Ones that are short one-liners
 pprCtO (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
+pprCtO (OccurrenceOfRecSel name) = hsep [ptext (sLit "a use of"), quotes (ppr name)]
 pprCtO AppOrigin             = ptext (sLit "an application")
 pprCtO (IPOccOrigin name)    = hsep [ptext (sLit "a use of implicit parameter"), quotes (ppr name)]
 pprCtO RecordUpdOrigin       = ptext (sLit "a record update")

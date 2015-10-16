@@ -453,7 +453,7 @@ cvt_id_arg :: (TH.Name, TH.Strict, TH.Type) -> CvtM (LConDeclField RdrName)
 cvt_id_arg (i, str, ty)
   = do  { i' <- vNameL i
         ; ty' <- cvt_arg (str,ty)
-        ; return $ noLoc (ConDeclField { cd_fld_names = [i']
+        ; return $ noLoc (ConDeclField { cd_fld_names = [fmap (flip FieldOcc PlaceHolder) i']
                                        , cd_fld_type =  ty'
                                        , cd_fld_doc = Nothing}) }
 
@@ -708,12 +708,11 @@ cvtl e = wrapL (cvt e)
     cvt (SigE e t)       = do { e' <- cvtl e; t' <- cvtType t
                               ; return $ ExprWithTySig e' t' PlaceHolder }
     cvt (RecConE c flds) = do { c' <- cNameL c
-                              ; flds' <- mapM cvtFld flds
+                              ; flds' <- mapM (cvtFld mkFieldOcc) flds
                               ; return $ RecordCon c' noPostTcExpr (HsRecFields flds' Nothing)}
     cvt (RecUpdE e flds) = do { e' <- cvtl e
-                              ; flds' <- mapM cvtFld flds
-                              ; return $ RecordUpd e'
-                                          (HsRecFields flds' Nothing)
+                              ; flds' <- mapM (cvtFld mkAmbiguousFieldOcc) flds
+                              ; return $ RecordUpd e' flds'
                                           PlaceHolder PlaceHolder PlaceHolder }
     cvt (StaticE e)      = fmap HsStatic $ cvtl e
 
@@ -733,11 +732,12 @@ and the above expression would be reassociated to
 which we don't want.
 -}
 
-cvtFld :: (TH.Name, TH.Exp) -> CvtM (LHsRecField RdrName (LHsExpr RdrName))
-cvtFld (v,e)
+cvtFld :: (RdrName -> t) -> (TH.Name, TH.Exp) -> CvtM (LHsRecField' t (LHsExpr RdrName))
+cvtFld f (v,e)
   = do  { v' <- vNameL v; e' <- cvtl e
-        ; return (noLoc $ HsRecField { hsRecFieldId = v', hsRecFieldArg = e'
-                                     , hsRecPun = False}) }
+        ; return (noLoc $ HsRecField { hsRecFieldLbl = fmap f v'
+                                     , hsRecFieldArg = e'
+                                     , hsRecPun      = False}) }
 
 cvtDD :: Range -> CvtM (ArithSeqInfo RdrName)
 cvtDD (FromR x)           = do { x' <- cvtl x; return $ From x' }
@@ -955,8 +955,9 @@ cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField RdrName (LPat RdrName))
 cvtPatFld (s,p)
   = do  { s' <- vNameL s; p' <- cvtPat p
-        ; return (noLoc $ HsRecField { hsRecFieldId = s', hsRecFieldArg = p'
-                                     , hsRecPun = False}) }
+        ; return (noLoc $ HsRecField { hsRecFieldLbl = fmap mkFieldOcc s'
+                                     , hsRecFieldArg = p'
+                                     , hsRecPun      = False}) }
 
 {- | @cvtOpAppP x op y@ converts @op@ and @y@ and produces the operator application @x `op` y@.
 The produced tree of infix patterns will be left-biased, provided @x@ is.

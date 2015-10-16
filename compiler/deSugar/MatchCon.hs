@@ -25,6 +25,7 @@ import Util
 import ListSetOps ( runs )
 import Id
 import NameEnv
+import FieldLabel ( flSelector )
 import SrcLoc
 import DynFlags
 import Outputable
@@ -137,7 +138,7 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
     ConPatOut { pat_con = L _ con1, pat_arg_tys = arg_tys, pat_wrap = wrapper1,
                 pat_tvs = tvs1, pat_dicts = dicts1, pat_args = args1 }
               = firstPat eqn1
-    fields1 = conLikeFieldLabels con1
+    fields1 = map flSelector (conLikeFieldLabels con1)
 
     val_arg_tys = conLikeInstOrigArgTys con1 inst_tys
     inst_tys = ASSERT( tvs1 `equalLength` ex_tvs )

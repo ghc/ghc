@@ -506,6 +506,8 @@ compiler_stage2_dll0_MODULES = \
 	FastFunctions \
 	FastMutInt \
 	FastString \
+	FastStringEnv \
+	FieldLabel \
 	Fingerprint \
 	FiniteMap \
 	ForeignCall \

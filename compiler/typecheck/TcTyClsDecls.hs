@@ -55,6 +55,8 @@ import Module
 import Name
 import NameSet
 import NameEnv
+import RdrName
+import RnEnv
 import Outputable
 import Maybes
 import Unify
@@ -1262,10 +1264,10 @@ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl        -- Data types
        ; (ctxt, arg_tys, res_ty, field_lbls, stricts)
            <- tcHsTyVarBndrs hs_tvs $ \ _ ->
               do { ctxt    <- tcHsContext hs_ctxt
-                 ; details <- tcConArgs new_or_data hs_details
+                 ; btys    <- tcConArgs new_or_data hs_details
                  ; res_ty  <- tcConRes hs_res_ty
-                 ; let (field_lbls, btys) = details
-                       (arg_tys, stricts) = unzip btys
+                 ; field_lbls <- lookupConstructorFields (unLoc $ head names)
+                 ; let (arg_tys, stricts) = unzip btys
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
                  }
 
@@ -1332,23 +1334,22 @@ tcConIsInfix con details (ResTyGADT _ _)
 
 
 tcConArgs :: NewOrData -> HsConDeclDetails Name
-          -> TcM ([Name], [(TcType, HsSrcBang)])
+          -> TcM [(TcType, HsSrcBang)]
 tcConArgs new_or_data (PrefixCon btys)
-  = do { btys' <- mapM (tcConArg new_or_data) btys
-       ; return ([], btys') }
+  = mapM (tcConArg new_or_data) btys
 tcConArgs new_or_data (InfixCon bty1 bty2)
   = do { bty1' <- tcConArg new_or_data bty1
        ; bty2' <- tcConArg new_or_data bty2
-       ; return ([], [bty1', bty2']) }
+       ; return [bty1', bty2'] }
 tcConArgs new_or_data (RecCon fields)
-  = do { btys' <- mapM (tcConArg new_or_data) btys
-       ; return (field_names, btys') }
+  = mapM (tcConArg new_or_data) btys
   where
     -- We need a one-to-one mapping from field_names to btys
     combined = map (\(L _ f) -> (cd_fld_names f,cd_fld_type f)) (unLoc fields)
-    explode (ns,ty) = zip (map unLoc ns) (repeat ty)
+    explode (ns,ty) = zip ns (repeat ty)
     exploded = concatMap explode combined
-    (field_names,btys) = unzip exploded
+    (_,btys) = unzip exploded
+
 
 tcConArg :: NewOrData -> LHsType Name -> TcM (TcType, HsSrcBang)
 tcConArg new_or_data bty
@@ -1594,7 +1595,7 @@ checkValidTyCon tc
     data_cons = tyConDataCons tc
 
     groups = equivClasses cmp_fld (concatMap get_fields data_cons)
-    cmp_fld (f1,_) (f2,_) = f1 `compare` f2
+    cmp_fld (f1,_) (f2,_) = flLabel f1 `compare` flLabel f2
     get_fields con = dataConFieldLabels con `zip` repeat con
         -- dataConFieldLabels may return the empty list, which is fine
 
@@ -1622,18 +1623,19 @@ checkValidTyCon tc
         where
         (tvs1, _, _, res1) = dataConSig con1
         ts1 = mkVarSet tvs1
-        fty1 = dataConFieldType con1 label
+        fty1 = dataConFieldType con1 lbl
+        lbl = flLabel label
 
         checkOne (_, con2)    -- Do it bothways to ensure they are structurally identical
-            = do { checkFieldCompat label con1 con2 ts1 res1 res2 fty1 fty2
-                 ; checkFieldCompat label con2 con1 ts2 res2 res1 fty2 fty1 }
+            = do { checkFieldCompat lbl con1 con2 ts1 res1 res2 fty1 fty2
+                 ; checkFieldCompat lbl con2 con1 ts2 res2 res1 fty2 fty1 }
             where
                 (tvs2, _, _, res2) = dataConSig con2
                 ts2 = mkVarSet tvs2
-                fty2 = dataConFieldType con2 label
+                fty2 = dataConFieldType con2 lbl
     check_fields [] = panic "checkValidTyCon/check_fields []"
 
-checkFieldCompat :: Name -> DataCon -> DataCon -> TyVarSet
+checkFieldCompat :: FieldLabelString -> DataCon -> DataCon -> TyVarSet
                  -> Type -> Type -> Type -> Type -> TcM ()
 checkFieldCompat fld con1 con2 tvs1 res1 res2 fty1 fty2
   = do  { checkTc (isJust mb_subst1) (resultTypeMisMatch fld con1 con2)
@@ -2030,24 +2032,26 @@ mkRecSelBinds tycons
     (sigs, binds) = unzip rec_sels
     rec_sels = map mkRecSelBind [ (tc,fld)
                                 | ATyCon tc <- tycons
-                                , fld <- tyConFields tc ]
+                                , fld <- tyConFieldLabels tc ]
+
 
 mkRecSelBind :: (TyCon, FieldLabel) -> (LSig Name, LHsBinds Name)
-mkRecSelBind (tycon, sel_name)
+mkRecSelBind (tycon, fl)
   = (L loc (IdSig sel_id), unitBag (L loc sel_bind))
   where
     loc    = getSrcSpan sel_name
     sel_id = mkExportedLocalId rec_details sel_name sel_ty
+    lbl      = flLabel fl
+    sel_name = flSelector fl
     rec_details = RecSelId { sel_tycon = tycon, sel_naughty = is_naughty }
 
     -- Find a representative constructor, con1
     all_cons     = tyConDataCons tycon
-    cons_w_field = [ con | con <- all_cons
-                   , sel_name `elem` dataConFieldLabels con ]
+    cons_w_field = tyConDataConsWithFields tycon [lbl]
     con1 = ASSERT( not (null cons_w_field) ) head cons_w_field
 
     -- Selector type; Note [Polymorphic selectors]
-    field_ty   = dataConFieldType con1 sel_name
+    field_ty   = dataConFieldType con1 lbl
     data_ty    = dataConOrigResTy con1
     data_tvs   = tyVarsOfType data_ty
     is_naughty = not (tyVarsOfType field_ty `subVarSet` data_tvs)
@@ -2070,7 +2074,7 @@ mkRecSelBind (tycon, sel_name)
                                  (L loc (HsVar field_var))
     mk_sel_pat con = ConPatIn (L loc (getName con)) (RecCon rec_fields)
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
-    rec_field  = noLoc (HsRecField { hsRecFieldId = sel_lname
+    rec_field  = noLoc (HsRecField { hsRecFieldLbl = L loc (FieldOcc (mkVarUnqual lbl) sel_name)
                                    , hsRecFieldArg = L loc (VarPat field_var)
                                    , hsRecPun = False })
     sel_lname = L loc sel_name
@@ -2097,14 +2101,7 @@ mkRecSelBind (tycon, sel_name)
     inst_tys = substTyVars (mkTopTvSubst (dataConEqSpec con1)) (dataConUnivTyVars con1)
 
     unit_rhs = mkLHsTupleExpr []
-    msg_lit = HsStringPrim "" $ unsafeMkByteString $
-              occNameString (getOccName sel_name)
-
----------------
-tyConFields :: TyCon -> [FieldLabel]
-tyConFields tc
-  | isAlgTyCon tc = nub (concatMap dataConFieldLabels (tyConDataCons tc))
-  | otherwise     = []
+    msg_lit = HsStringPrim "" (fastStringToByteString lbl)
 
 {-
 Note [Polymorphic selectors]
@@ -2232,13 +2229,13 @@ tcAddClosedTypeFamilyDeclCtxt tc
     ctxt = ptext (sLit "In the equations for closed type family") <+>
            quotes (ppr tc)
 
-resultTypeMisMatch :: Name -> DataCon -> DataCon -> SDoc
+resultTypeMisMatch :: FieldLabelString -> DataCon -> DataCon -> SDoc
 resultTypeMisMatch field_name con1 con2
   = vcat [sep [ptext (sLit "Constructors") <+> ppr con1 <+> ptext (sLit "and") <+> ppr con2,
                 ptext (sLit "have a common field") <+> quotes (ppr field_name) <> comma],
           nest 2 $ ptext (sLit "but have different result types")]
 
-fieldTypeMisMatch :: Name -> DataCon -> DataCon -> SDoc
+fieldTypeMisMatch :: FieldLabelString -> DataCon -> DataCon -> SDoc
 fieldTypeMisMatch field_name con1 con2
   = sep [ptext (sLit "Constructors") <+> ppr con1 <+> ptext (sLit "and") <+> ppr con2,
          ptext (sLit "give different types for field"), quotes (ppr field_name)]

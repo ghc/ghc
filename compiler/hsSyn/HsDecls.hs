@@ -1228,11 +1228,10 @@ deriving instance (DataId name) => Data (TyFamInstDecl name)
 type LDataFamInstDecl name = Located (DataFamInstDecl name)
 data DataFamInstDecl name
   = DataFamInstDecl
-       { dfid_tycon :: Located name
-       , dfid_pats  :: HsTyPats name      -- LHS
-       , dfid_defn  :: HsDataDefn  name   -- RHS
-       , dfid_fvs   :: PostRn name NameSet } -- Free vars for
-                                             -- dependency analysis
+       { dfid_tycon     :: Located name
+       , dfid_pats      :: HsTyPats   name       -- LHS
+       , dfid_defn      :: HsDataDefn name       -- RHS
+       , dfid_fvs       :: PostRn name NameSet } -- Free vars for dependency analysis
     -- ^
     --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnData',
     --           'ApiAnnotation.AnnNewType','ApiAnnotation.AnnInstance',
