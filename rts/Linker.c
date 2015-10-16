@@ -1758,7 +1758,9 @@ initLinker_ (int retain_cafs)
     addDLLHandle(WSTR("*.exe"), GetModuleHandle(NULL));
 #endif
 
+#ifdef USE_MMAP
     m32_allocator_init(&allocator);
+#endif
 
     IF_DEBUG(linker, debugBelch("initLinker: done\n"));
     return;
