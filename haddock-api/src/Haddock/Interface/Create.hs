@@ -337,15 +337,16 @@ subordinates instMap decl = case decl of
     classSubs dd = [ (name, doc, typeDocs d) | (L _ d, doc) <- classDecls dd
                    , name <- getMainDeclBinder d, not (isValD d)
                    ]
+    dataSubs :: HsDataDefn Name -> [(Name, [HsDocString], Map Int HsDocString)]
     dataSubs dd = constrs ++ fields
       where
         cons = map unL $ (dd_cons dd)
         constrs = [ (unL cname, maybeToList $ fmap unL $ con_doc c, M.empty)
                   | c <- cons, cname <- con_names c ]
-        fields  = [ (unL n, maybeToList $ fmap unL doc, M.empty)
+        fields  = [ (selectorFieldOcc n, maybeToList $ fmap unL doc, M.empty)
                   | RecCon flds <- map con_details cons
                   , L _ (ConDeclField ns _ doc) <- (unLoc flds)
-                  , n <- ns ]
+                  , L _ n <- ns ]
 
 -- | Extract function argument docs from inside types.
 typeDocs :: HsDecl Name -> Map Int HsDocString
@@ -507,7 +508,7 @@ mkExportItems
     lookupExport (IEVar (L _ x))         = declWith x
     lookupExport (IEThingAbs (L _ t))    = declWith t
     lookupExport (IEThingAll (L _ t))    = declWith t
-    lookupExport (IEThingWith (L _ t) _) = declWith t
+    lookupExport (IEThingWith (L _ t) _ _) = declWith t
     lookupExport (IEModuleContents (L _ m)) =
       moduleExports thisMod m dflags warnings gre exportedNames decls modMap instIfaceMap maps fixMap splices
     lookupExport (IEGroup lev docStr)  = return $
@@ -802,7 +803,7 @@ extractDecl name mdl decl
                           , L _ ConDecl { con_details = RecCon rec } <- dd_cons (dfid_defn d)
                           , ConDeclField { cd_fld_names = ns } <- map unLoc (unLoc rec)
                           , L _ n <- ns
-                          , n == name
+                          , selectorFieldOcc n == name
                       ]
         in case matches of
           [d0] -> extractDecl name mdl (noLoc . InstD $ DataFamInstD d0)
@@ -833,11 +834,13 @@ extractRecSel _ _ _ _ [] = error "extractRecSel: selector not found"
 
 extractRecSel nm mdl t tvs (L _ con : rest) =
   case con_details con of
-    RecCon (L _ fields) | ((n,L _ (ConDeclField _nn ty _)) : _) <- matching_fields fields ->
-      L (getLoc n) (TypeSig [noLoc nm] (noLoc (HsFunTy data_ty (getBangType ty))) [])
+    RecCon (L _ fields) | ((l,L _ (ConDeclField _nn ty _)) : _) <- matching_fields fields ->
+      L l (TypeSig [noLoc nm] (noLoc (HsFunTy data_ty (getBangType ty))) [])
     _ -> extractRecSel nm mdl t tvs rest
  where
-  matching_fields flds = [ (n,f) | f@(L _ (ConDeclField ns _ _)) <- flds, n <- ns, unLoc n == nm ]
+  matching_fields :: [LConDeclField Name] -> [(SrcSpan, LConDeclField Name)]
+  matching_fields flds = [ (l,f) | f@(L _ (ConDeclField ns _ _)) <- flds
+                                 , L l n <- ns, selectorFieldOcc n == nm ]
   data_ty
     | ResTyGADT _ ty <- con_res con = ty
     | otherwise = foldl' (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar t)) tvs

@@ -25,9 +25,10 @@ import qualified Pretty
 import GHC
 import OccName
 import Name                 ( nameOccName )
-import RdrName              ( rdrNameOcc )
+import RdrName              ( rdrNameOcc, mkRdrUnqual )
 import FastString           ( unpackFS, unpackLitString, zString )
 import Outputable           ( panic)
+import PrelNames            ( mkUnboundName )
 
 import qualified Data.Map as Map
 import System.Directory
@@ -688,12 +689,12 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
 
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField DocName ->  LaTeX
 ppSideBySideField subdocs unicode (ConDeclField names ltype _) =
-  decltt (cat (punctuate comma (map (ppBinder . nameOccName . getName . unL) names))
+  decltt (cat (punctuate comma (map (ppBinder . rdrNameOcc . rdrNameFieldOcc . unLoc) names))
     <+> dcolon unicode <+> ppLType unicode ltype) <-> rDoc mbDoc
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
     -- Where there is more than one name, they all have the same documentation
-    mbDoc = lookup (unL $ head names) subdocs >>= fmap _doc . combineDocumentation . fst
+    mbDoc = lookup (selectorFieldOcc $ unLoc $ head names) subdocs >>= fmap _doc . combineDocumentation . fst
 
 -- {-
 -- ppHsFullConstr :: HsConDecl -> LaTeX
@@ -902,7 +903,9 @@ ppr_mono_ty ctxt_prec (HsForAllTy expl extra tvs ctxt ty) unicode
   = maybeParen ctxt_prec pREC_FUN $
     hsep [ppForAll expl tvs ctxt' unicode, ppr_mono_lty pREC_TOP ty unicode]
  where
-   anonWC = HsWildCardTy (AnonWildCard PlaceHolder)
+   anonWC :: HsType DocName
+   anonWC = HsWildCardTy (AnonWildCard (Undocumented underscore))
+   underscore = mkUnboundName (mkRdrUnqual (mkTyVarOcc "_"))
    ctxt'
      | Just loc <- extra = (++ [L loc anonWC]) `fmap` ctxt
      | otherwise         = ctxt

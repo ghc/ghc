@@ -273,7 +273,7 @@ renameLContext (L loc context) = do
   return (L loc context')
 
 renameWildCardInfo :: HsWildCardInfo Name -> RnM (HsWildCardInfo DocName)
-renameWildCardInfo (AnonWildCard  _)    = pure (AnonWildCard PlaceHolder)
+renameWildCardInfo (AnonWildCard  name) = AnonWildCard  <$> rename name
 renameWildCardInfo (NamedWildCard name) = NamedWildCard <$> rename name
 
 renameInstHead :: InstHead Name -> RnM (InstHead DocName)
@@ -429,11 +429,15 @@ renameCon decl@(ConDecl { con_names = lnames, con_qvars = ltyvars
 
 renameConDeclFieldField :: LConDeclField Name -> RnM (LConDeclField DocName)
 renameConDeclFieldField (L l (ConDeclField names t doc)) = do
-  names' <- mapM renameL names
+  names' <- mapM renameLFieldOcc names
   t'   <- renameLType t
   doc' <- mapM renameLDocHsSyn doc
   return $ L l (ConDeclField names' t' doc')
 
+renameLFieldOcc :: LFieldOcc Name -> RnM (LFieldOcc DocName)
+renameLFieldOcc (L l (FieldOcc lbl sel)) = do
+  sel' <- rename sel
+  return $ L l (FieldOcc lbl sel')
 
 renameSig :: Sig Name -> RnM (Sig DocName)
 renameSig sig = case sig of
