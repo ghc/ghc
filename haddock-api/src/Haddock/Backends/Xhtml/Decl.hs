@@ -38,6 +38,8 @@ import GHC
 import GHC.Exts
 import Name
 import BooleanFormula
+import RdrName ( rdrNameOcc, mkRdrUnqual )
+import PrelNames            ( mkUnboundName )
 
 ppDecl :: Bool -> LinksInfo -> LHsDecl DocName
        -> DocForDecl DocName -> [DocInstance DocName] -> [(DocName, Fixity)]
@@ -741,18 +743,18 @@ ppSideBySideConstr subdocs fixities unicode qual (L _ con) = (decl, mbDoc, field
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Unicode -> Qualification
                   -> ConDeclField DocName -> SubDecl
 ppSideBySideField subdocs unicode qual (ConDeclField names ltype _) =
-  (hsep (punctuate comma (map ((ppBinder False) . nameOccName . getName . unL) names)) <+> dcolon unicode <+> ppLType unicode qual ltype,
+  (hsep (punctuate comma (map ((ppBinder False) . rdrNameOcc . rdrNameFieldOcc . unLoc) names)) <+> dcolon unicode <+> ppLType unicode qual ltype,
     mbDoc,
     [])
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
     -- Where there is more than one name, they all have the same documentation
-    mbDoc = lookup (unL $ head names) subdocs >>= combineDocumentation . fst
+    mbDoc = lookup (selectorFieldOcc $ unLoc $ head names) subdocs >>= combineDocumentation . fst
 
 
 ppShortField :: Bool -> Unicode -> Qualification -> ConDeclField DocName -> Html
 ppShortField summary unicode qual (ConDeclField names ltype _)
-  = hsep (punctuate comma (map ((ppBinder summary) . nameOccName . getName . unL) names))
+  = hsep (punctuate comma (map ((ppBinder summary) . rdrNameOcc . rdrNameFieldOcc . unLoc) names))
     <+> dcolon unicode <+> ppLType unicode qual ltype
 
 
@@ -874,7 +876,8 @@ ppr_mono_ty ctxt_prec (HsForAllTy expl extra tvs ctxt ty) unicode qual
   = maybeParen ctxt_prec pREC_FUN $ ppForAllCon expl tvs ctxt' unicode qual
                                     <+> ppr_mono_lty pREC_TOP ty unicode qual
  where
-   anonWC = HsWildCardTy (AnonWildCard PlaceHolder)
+   anonWC = HsWildCardTy (AnonWildCard (Undocumented underscore))
+   underscore = mkUnboundName (mkRdrUnqual (mkTyVarOcc "_"))
    ctxt'
      | Just loc <- extra = (++ [L loc anonWC]) `fmap` ctxt
      | otherwise         = ctxt

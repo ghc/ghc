@@ -63,6 +63,7 @@ import Haddock.GhcUtils
 
 import GHC
 import Name
+import HsTypes (selectorFieldOcc)
 
 import Control.Monad ( liftM )
 import Data.Char ( isAlpha, isAlphaNum, isAscii, ord, chr )
@@ -162,7 +163,9 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
           -- it's the best we can do.
         InfixCon _ _ -> Just d
       where
-        field_avail (L _ (ConDeclField ns _ _)) = all (\n -> unLoc n `elem` names) ns
+        field_avail :: LConDeclField Name -> Bool
+        field_avail (L _ (ConDeclField fs _ _))
+            = all (\f -> selectorFieldOcc (unLoc f) `elem` names) fs
         field_types flds = [ t | ConDeclField _ t _ <- flds ]
 
     keep _ = Nothing
