@@ -36,11 +36,15 @@ endif
 endif
 
 # Note [inconsistent distdirs]
+#
 # hack: the DEPS_LIBS mechanism assumes that the distdirs for packages
 # that depend on each other are the same, but that is not the case for
 # ghc where we use stage1/stage2 rather than dist/dist-install.
 # Really we should use a consistent scheme for distdirs, but in the
 # meantime we work around it by defining ghc-<ver>_dist-install_way_LIB:
+#
+# A similar hack is applied to the PROGRAM_DEP_LIB mechanism in
+# rules/build-package.mk.
 ifeq "$$($1_PACKAGE) $2" "ghc stage2"
 $$($1_$2_COMPONENT_ID)_dist-install_$3_LIB = $$($1_$2_$3_LIB)
 endif

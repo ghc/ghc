@@ -135,6 +135,14 @@ $$(foreach way,$$($1_$2_WAYS),$$(eval \
 $1_$2_PROGRAM_DEP_LIB = $$($1_$2_v_LIB) $$($1_$2_dyn_LIB)
 $$($1_$2_COMPONENT_ID)_$2_PROGRAM_DEP_LIB = $$($1_$2_PROGRAM_DEP_LIB)
 
+# See Note [inconsistent distdirs] in rules/build-package-way.mk.
+ifeq "$$($1_PACKAGE) $2" "ghc stage1"
+$$($1_$2_COMPONENT_ID)_dist-boot_PROGRAM_DEP_LIB = $$($1_$2_PROGRAM_DEP_LIB)
+endif
+ifeq "$$($1_PACKAGE) $2" "ghc stage2"
+$$($1_$2_COMPONENT_ID)_dist-install_PROGRAM_DEP_LIB = $$($1_$2_PROGRAM_DEP_LIB)
+endif
+
 # C and S files are possibly built the "dyn" way.
 ifeq "$$(BuildSharedLibs)" "YES"
 $(call c-objs,$1,$2,dyn)

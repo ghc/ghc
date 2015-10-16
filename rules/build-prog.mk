@@ -190,12 +190,7 @@ ifneq "$$(BINDIST)" "YES"
 # necessarily set when this part of the makefile is read
 $1/$2/build/tmp/$$($1_$2_PROG) $1/$2/build/tmp/$$($1_$2_PROG).dll : \
     $$(foreach dep,$$($1_$2_DEP_COMPONENT_IDS),\
-        $$(if $$(filter ghc%,$$(dep)),\
-            $(if $(filter 0,$3),$$(compiler_stage1_PROGRAM_DEP_LIB),\
-            $(if $(filter 1,$3),$$(compiler_stage2_PROGRAM_DEP_LIB),\
-            $(if $(filter 2,$3),$$(compiler_stage2_PROGRAM_DEP_LIB),\
-            $$(error Bad build stage)))),\
-        $$$$($$(dep)_dist-$(if $(filter 0,$3),boot,install)_PROGRAM_DEP_LIB)))
+        $$$$($$(dep)_dist-$(if $(filter 0,$3),boot,install)_PROGRAM_DEP_LIB))
 
 $1_$2_PROG_NEEDS_C_WRAPPER = NO
 $1_$2_PROG_INPLACE = $$($1_$2_PROG)
