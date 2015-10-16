@@ -222,7 +222,7 @@ rnImportDecl this_mod
                            -- c.f. GHC.findModule, and Trac #9997
              Nothing         -> True
              Just (StringLiteral _ pkg_fs) -> pkg_fs == fsLit "this" ||
-                            fsToPackageKey pkg_fs == modulePackageKey this_mod))
+                            fsToUnitId pkg_fs == moduleUnitId this_mod))
          (addErr (ptext (sLit "A module cannot import itself:") <+> ppr imp_mod_name))
 
     -- Check for a missing import list (Opt_WarnMissingImportList also
@@ -337,7 +337,7 @@ calculateAvails dflags iface mod_safe' want_boot =
                             imp_mod : dep_finsts deps
              | otherwise  = dep_finsts deps
 
-      pkg = modulePackageKey (mi_module iface)
+      pkg = moduleUnitId (mi_module iface)
 
       -- Does this import mean we now require our own pkg
       -- to be trusted? See Note [Trust Own Package]
@@ -1601,18 +1601,16 @@ extendImportMap_Field rdr_env (FieldOcc rdr sel) =
   where
     lbl = occNameFS (rdrNameOcc rdr)
 
--- For a single used GRE, find all the import decls that brought
+-- For each of a list of used GREs, find all the import decls that brought
 -- it into scope; choose one of them (bestImport), and record
 -- the RdrName in that import decl's entry in the ImportMap
 extendImportMap_GRE :: [GlobalRdrElt] -> ImportMap -> ImportMap
 extendImportMap_GRE gres imp_map
-  | [gre] <- gres
-  , GRE { gre_lcl = lcl, gre_imp = imps } <- gre
-  , not lcl
-  = add_imp gre (bestImport imps) imp_map
-  | otherwise
-  = imp_map
+  = foldr recordRdrName imp_map nonLocalGREs
   where
+    recordRdrName gre m = add_imp gre (bestImport (gre_imp gre)) m
+    nonLocalGREs = filter (not . gre_lcl) gres
+
     add_imp :: GlobalRdrElt -> ImportSpec -> ImportMap -> ImportMap
     add_imp gre (ImpSpec { is_decl = imp_decl_spec }) imp_map
       = Map.insertWith add decl_loc [avail] imp_map

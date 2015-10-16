@@ -1239,7 +1239,7 @@ CONLIKE thing (modulo lets).
 Note [Lone variables]   See also Note [Interaction of exprIsWorkFree and lone variables]
 ~~~~~~~~~~~~~~~~~~~~~   which appears below
 The "lone-variable" case is important.  I spent ages messing about
-with unsatisfactory varaints, but this is nice.  The idea is that if a
+with unsatisfactory variants, but this is nice.  The idea is that if a
 variable appears all alone
 
         as an arg of lazy fn, or rhs    BoringCtxt

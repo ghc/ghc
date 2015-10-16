@@ -400,7 +400,7 @@ test('T8959a',
 
 test('T703', normal, run_command, ['$MAKE -s --no-print-directory T703'])
 test('T2182', normal, run_command, ['$MAKE -s --no-print-directory T2182'])
-test('T8101', normal, compile, ['-Wall -fno-code'])
+test('T8101', expect_broken(10600), compile, ['-Wall -fno-code'])
 test('T8101b', expect_broken(10600), multimod_compile,
      ['T8101b', '-Wall -fno-code'])
 
@@ -446,3 +446,10 @@ test('T10182',
      extra_clean(['T10182.o', 'T10182a.o', 'T10182.o-boot', 'T10182.hi', 'T10182a.hi', 'T10182.hi-boot']),
      run_command,
      ['$MAKE -s --no-print-directory T10182'])
+     
+test('T365',
+     [extra_clean(['test_preprocessor.txt']),
+      pre_cmd('touch test_preprocessor.txt'),
+      unless(opsys('mingw32'), skip)],
+      compile_fail,
+      [''])

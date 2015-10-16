@@ -28,6 +28,9 @@ module TcRnTypes(
         IfGblEnv(..), IfLclEnv(..),
         tcVisibleOrphanMods,
 
+        -- Frontend types (shouldn't really be here)
+        FrontendResult(..),
+
         -- Renamer types
         ErrCtxt, RecFieldEnv,
         ImportAvails(..), emptyImportAvails, plusImportAvails,
@@ -326,6 +329,18 @@ data DsMetaVal
 *                                                                      *
 ************************************************************************
 -}
+
+-- | 'FrontendResult' describes the result of running the
+-- frontend of a Haskell module.  Usually, you'll get
+-- a 'FrontendTypecheck', since running the frontend involves
+-- typechecking a program, but for an hs-boot merge you'll
+-- just get a ModIface, since no actual typechecking occurred.
+--
+-- This data type really should be in HscTypes, but it needs
+-- to have a TcGblEnv which is only defined here.
+data FrontendResult
+        = FrontendTypecheck TcGblEnv
+        | FrontendMerge     ModIface
 
 -- | 'TcGblEnv' describes the top-level of the module at the
 -- point at which the typechecker is finished work.
@@ -985,17 +1000,17 @@ data ImportAvails
           -- compiling M might not need to consult X.hi, but X
           -- is still listed in M's dependencies.
 
-        imp_dep_pkgs :: [PackageKey],
+        imp_dep_pkgs :: [UnitId],
           -- ^ Packages needed by the module being compiled, whether directly,
           -- or via other modules in this package, or via modules imported
           -- from other packages.
 
-        imp_trust_pkgs :: [PackageKey],
+        imp_trust_pkgs :: [UnitId],
           -- ^ This is strictly a subset of imp_dep_pkgs and records the
           -- packages the current module needs to trust for Safe Haskell
           -- compilation to succeed. A package is required to be trusted if
           -- we are dependent on a trustworthy module in that package.
-          -- While perhaps making imp_dep_pkgs a tuple of (PackageKey, Bool)
+          -- While perhaps making imp_dep_pkgs a tuple of (UnitId, Bool)
           -- where True for the bool indicates the package is required to be
           -- trusted is the more logical  design, doing so complicates a lot
           -- of code not concerned with Safe Haskell.

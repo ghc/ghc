@@ -1015,7 +1015,7 @@ abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
         -- We are going to lambda-abstract, so nuke any IdInfo,
         -- and add the tyvars of the Id (if necessary)
     zap v | isId v = WARN( isStableUnfolding (idUnfolding v) ||
-                           not (isEmptySpecInfo (idSpecialisation v)),
+                           not (isEmptyRuleInfo (idSpecialisation v)),
                            text "absVarsOf: discarding info on" <+> ppr v )
                      setIdInfo v vanillaIdInfo
           | otherwise = v

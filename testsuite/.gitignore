@@ -128,6 +128,7 @@ mk/ghcconfig*_bin_ghc*.exe.mk
 /tests/cabal/localT1750.package.conf/
 /tests/cabal/localshadow1.package.conf/
 /tests/cabal/localshadow2.package.conf/
+/tests/cabal/localshadow3.package.conf/
 /tests/cabal/package.conf.*/
 /tests/cabal/recache_reexport_db/package.cache
 /tests/cabal/shadow.hs

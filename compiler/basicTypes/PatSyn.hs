@@ -13,7 +13,7 @@ module PatSyn (
 
         -- ** Type deconstruction
         patSynName, patSynArity, patSynIsInfix,
-        patSynArgs, patSynTyDetails, patSynType,
+        patSynArgs, patSynType,
         patSynMatcher, patSynBuilder,
         patSynExTyVars, patSynSig,
         patSynInstArgTys, patSynInstResTy,
@@ -31,7 +31,6 @@ import Util
 import BasicTypes
 import FastString
 import Var
-import HsBinds( HsPatSynDetails(..) )
 
 import qualified Data.Data as Data
 import qualified Data.Typeable
@@ -285,13 +284,6 @@ patSynArity = psArity
 
 patSynArgs :: PatSyn -> [Type]
 patSynArgs = psArgs
-
-patSynTyDetails :: PatSyn -> HsPatSynDetails Type
-patSynTyDetails (MkPatSyn { psInfix = is_infix, psArgs = arg_tys })
-  | is_infix, [left,right] <- arg_tys
-  = InfixPatSyn left right
-  | otherwise
-  = PrefixPatSyn arg_tys
 
 patSynExTyVars :: PatSyn -> [TyVar]
 patSynExTyVars = psExTyVars

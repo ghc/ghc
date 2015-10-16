@@ -330,7 +330,7 @@ checkOptions mode dflags srcs objs = do
    when ((filter (not . wayRTSOnly) (ways dflags) /= interpWays)
          && isInterpretiveMode mode) $
       do throwGhcException (UsageError
-                   "--interactive can't be used with -prof.")
+                   "--interactive can't be used with -prof or -static.")
         -- -ohi sanity check
    if (isJust (outputHi dflags) &&
       (isCompManagerMode mode || srcs `lengthExceeds` 1))
@@ -839,8 +839,8 @@ Generates a combined hash of the ABI for modules Data.Foo and
 System.Bar.  The modules must already be compiled, and appropriate -i
 options may be necessary in order to find the .hi files.
 
-This is used by Cabal for generating the InstalledPackageId for a
-package.  The InstalledPackageId must change when the visible ABI of
+This is used by Cabal for generating the ComponentId for a
+package.  The ComponentId must change when the visible ABI of
 the package chagnes, so during registration Cabal calls ghc --abi-hash
 to get a hash of the package's ABI.
 -}

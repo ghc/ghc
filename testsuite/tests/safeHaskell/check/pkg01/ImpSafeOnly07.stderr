@@ -1,6 +1,6 @@
 
 <no location info>: error:
-    The package (bytestring-0.10.6.0) is required to be trusted but it isn't!
+    The package (base-4.8.2.0) is required to be trusted but it isn't!
 
 <no location info>: error:
-    The package (base-4.8.2.0) is required to be trusted but it isn't!
+    The package (bytestring-0.10.6.0) is required to be trusted but it isn't!

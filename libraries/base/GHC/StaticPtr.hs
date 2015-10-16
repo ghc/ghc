@@ -83,7 +83,7 @@ foreign import ccall unsafe hs_spt_lookup :: Ptr () -> IO (Ptr a)
 -- | Miscelaneous information available for debugging purposes.
 data StaticPtrInfo = StaticPtrInfo
     { -- | Package key of the package where the static pointer is defined
-      spInfoPackageKey  :: String
+      spInfoUnitId  :: String
       -- | Name of the module where the static pointer is defined
     , spInfoModuleName :: String
       -- | An internal name that is distinct for every static pointer defined in

@@ -7,7 +7,7 @@
 module CoreSeq (
         -- * Utilities for forcing Core structures
         seqExpr, seqExprs, seqUnfolding, seqRules,
-        megaSeqIdInfo, seqSpecInfo, seqBinds,
+        megaSeqIdInfo, seqRuleInfo, seqBinds,
     ) where
 
 import CoreSyn
@@ -24,7 +24,7 @@ import Id( Id, idInfo )
 -- compiler
 megaSeqIdInfo :: IdInfo -> ()
 megaSeqIdInfo info
-  = seqSpecInfo (specInfo info)                 `seq`
+  = seqRuleInfo (ruleInfo info)                 `seq`
 
 -- Omitting this improves runtimes a little, presumably because
 -- some unfoldings are not calculated at all
@@ -39,8 +39,8 @@ megaSeqIdInfo info
 seqOneShot :: OneShotInfo -> ()
 seqOneShot l = l `seq` ()
 
-seqSpecInfo :: SpecInfo -> ()
-seqSpecInfo (SpecInfo rules fvs) = seqRules rules `seq` seqVarSet fvs
+seqRuleInfo :: RuleInfo -> ()
+seqRuleInfo (RuleInfo rules fvs) = seqRules rules `seq` seqVarSet fvs
 
 seqCaf :: CafInfo -> ()
 seqCaf c = c `seq` ()

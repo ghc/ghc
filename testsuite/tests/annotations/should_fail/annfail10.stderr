@@ -1,8 +1,9 @@
 
 annfail10.hs:9:1: error:
-    No instance for (Data a0) arising from an annotation
-    The type variable ‘a0’ is ambiguous
-    Potential instances:
+    Ambiguous type variable ‘a0’ arising from an annotation
+    prevents the constraint ‘(Data a0)’ from being solved.
+    Probable fix: use a type annotation to specify what ‘a0’ should be.
+    These potential instances exist:
       instance (Data a, Data b) => Data (Either a b)
         -- Defined in ‘Data.Data’
       instance Data All -- Defined in ‘Data.Data’
@@ -13,9 +14,10 @@ annfail10.hs:9:1: error:
     In the annotation: {-# ANN f 1 #-}
 
 annfail10.hs:9:11: error:
-    No instance for (Num a0) arising from the literal ‘1’
-    The type variable ‘a0’ is ambiguous
-    Potential instances:
+    Ambiguous type variable ‘a0’ arising from the literal ‘1’
+    prevents the constraint ‘(Num a0)’ from being solved.
+    Probable fix: use a type annotation to specify what ‘a0’ should be.
+    These potential instances exist:
       instance forall (k :: BOX) (f :: k -> *) (a :: k).
                Num (f a) =>
                Num (Alt f a)

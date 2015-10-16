@@ -1,9 +1,10 @@
 
 tcfail008.hs:3:5: error:
-    No instance for (Num a0) arising from the literal ‘1’
-    The type variable ‘a0’ is ambiguous
+    Ambiguous type variable ‘a0’ arising from the literal ‘1’
+    prevents the constraint ‘(Num a0)’ from being solved.
     Relevant bindings include o :: [a0] (bound at tcfail008.hs:3:1)
-    Potential instances:
+    Probable fix: use a type annotation to specify what ‘a0’ should be.
+    These potential instances exist:
       instance Num Integer -- Defined in ‘GHC.Num’
       instance Num Double -- Defined in ‘GHC.Float’
       instance Num Float -- Defined in ‘GHC.Float’

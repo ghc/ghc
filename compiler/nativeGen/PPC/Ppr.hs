@@ -246,10 +246,10 @@ pprFormat x
                 FF32        -> sLit "fs"
                 FF64        -> sLit "fd"
                 _        -> panic "PPC.Ppr.pprFormat: no match")
-                
-                
+
+
 pprCond :: Cond -> SDoc
-pprCond c 
+pprCond c
  = ptext (case c of {
                 ALWAYS  -> sLit "";
                 EQQ        -> sLit "eq";        NE    -> sLit "ne";
@@ -373,7 +373,7 @@ pprDataItem lit
         ppr_item II64 (CmmInt x _) dflags
            | not(archPPC_64 dflags) =
                 [ptext (sLit "\t.long\t")
-                    <> int (fromIntegral 
+                    <> int (fromIntegral
                         (fromIntegral (x `shiftR` 32) :: Word32)),
                  ptext (sLit "\t.long\t")
                     <> int (fromIntegral (fromIntegral x :: Word32))]
@@ -437,6 +437,15 @@ pprInstr (LD fmt reg addr) = hcat [
         ptext (sLit ", "),
         pprAddr addr
     ]
+pprInstr (LDFAR fmt reg (AddrRegImm source off)) =
+   sdocWithPlatform $ \platform -> vcat [
+         pprInstr (ADDIS (tmpReg platform) source (HA off)),
+         pprInstr (LD fmt reg (AddrRegImm (tmpReg platform) (LO off)))
+    ]
+
+pprInstr (LDFAR _ _ _) =
+   panic "PPC.Ppr.pprInstr LDFAR: no match"
+
 pprInstr (LA fmt reg addr) = hcat [
         char '\t',
         ptext (sLit "l"),
@@ -467,6 +476,14 @@ pprInstr (ST fmt reg addr) = hcat [
         ptext (sLit ", "),
         pprAddr addr
     ]
+pprInstr (STFAR fmt reg (AddrRegImm source off)) =
+   sdocWithPlatform $ \platform -> vcat [
+         pprInstr (ADDIS (tmpReg platform) source (HA off)),
+         pprInstr (ST fmt reg (AddrRegImm (tmpReg platform) (LO off)))
+    ]
+
+pprInstr (STFAR _ _ _) =
+   panic "PPC.Ppr.pprInstr STFAR: no match"
 pprInstr (STU fmt reg addr) = hcat [
         char '\t',
         ptext (sLit "st"),
@@ -494,7 +511,7 @@ pprInstr (LI reg imm) = hcat [
         ptext (sLit ", "),
         pprImm imm
     ]
-pprInstr (MR reg1 reg2) 
+pprInstr (MR reg1 reg2)
     | reg1 == reg2 = empty
     | otherwise = hcat [
         char '\t',
@@ -693,6 +710,21 @@ pprInstr (EXTS fmt reg1 reg2) = hcat [
 pprInstr (NEG reg1 reg2) = pprUnary (sLit "neg") reg1 reg2
 pprInstr (NOT reg1 reg2) = pprUnary (sLit "not") reg1 reg2
 
+pprInstr (SR II32 reg1 reg2 (RIImm (ImmInt i))) | i < 0  || i > 31 =
+    -- Handle the case where we are asked to shift a 32 bit register by
+    -- less than zero or more than 31 bits. We convert this into a clear
+    -- of the destination register.
+    -- Fixes ticket http://ghc.haskell.org/trac/ghc/ticket/5900
+    pprInstr (XOR reg1 reg2 (RIReg reg2))
+
+pprInstr (SL II32 reg1 reg2 (RIImm (ImmInt i))) | i < 0  || i > 31 =
+    -- As aboce for SR, but for left shifts.
+    -- Fixes ticket http://ghc.haskell.org/trac/ghc/ticket/10870
+    pprInstr (XOR reg1 reg2 (RIReg reg2))
+
+pprInstr (SRA II32 reg1 reg2 (RIImm (ImmInt i))) | i < 0  || i > 31 =
+    pprInstr (XOR reg1 reg2 (RIReg reg2))
+
 pprInstr (SL fmt reg1 reg2 ri) =
          let op = case fmt of
                        II32 -> "slw"
@@ -700,12 +732,6 @@ pprInstr (SL fmt reg1 reg2 ri) =
                        _    -> panic "PPC.Ppr.pprInstr: shift illegal size"
          in pprLogic (sLit op) reg1 reg2 (limitShiftRI fmt ri)
 
-pprInstr (SR II32 reg1 reg2 (RIImm (ImmInt i))) | i > 31 || i < 0 =
-    -- Handle the case where we are asked to shift a 32 bit register by
-    -- less than zero or more than 31 bits. We convert this into a clear
-    -- of the destination register.
-    -- Fixes ticket http://ghc.haskell.org/trac/ghc/ticket/5900
-    pprInstr (XOR reg1 reg2 (RIReg reg2))
 pprInstr (SR fmt reg1 reg2 ri) =
          let op = case fmt of
                        II32 -> "srw"
@@ -732,7 +758,7 @@ pprInstr (RLWINM reg1 reg2 sh mb me) = hcat [
         ptext (sLit ", "),
         int me
     ]
-    
+
 pprInstr (FADD fmt reg1 reg2 reg3) = pprBinaryF (sLit "fadd") fmt reg1 reg2 reg3
 pprInstr (FSUB fmt reg1 reg2 reg3) = pprBinaryF (sLit "fsub") fmt reg1 reg2 reg3
 pprInstr (FMUL fmt reg1 reg2 reg3) = pprBinaryF (sLit "fmul") fmt reg1 reg2 reg3
@@ -799,6 +825,22 @@ pprInstr LWSYNC = ptext (sLit "\tlwsync")
 
 pprInstr NOP = ptext (sLit "\tnop")
 
+pprInstr (UPDATE_SP fmt amount@(ImmInt offset))
+   | fits16Bits offset = vcat [
+       pprInstr (LD fmt r0 (AddrRegImm sp (ImmInt 0))),
+       pprInstr (STU fmt r0 (AddrRegImm sp amount))
+     ]
+
+pprInstr (UPDATE_SP fmt amount)
+   = sdocWithPlatform $ \platform ->
+       let tmp = tmpReg platform in
+         vcat [
+           pprInstr (LD fmt r0 (AddrRegImm sp (ImmInt 0))),
+           pprInstr (ADDIS tmp sp (HA amount)),
+           pprInstr (ADD tmp tmp (RIImm (LO amount))),
+           pprInstr (STU fmt r0 (AddrRegReg sp tmp))
+         ]
+
 -- pprInstr _ = panic "pprInstr (ppc)"
 
 
@@ -841,7 +883,7 @@ pprBinaryF op fmt reg1 reg2 reg3 = hcat [
         ptext (sLit ", "),
         pprReg reg3
     ]
-    
+
 pprRI :: RI -> SDoc
 pprRI (RIReg r) = pprReg r
 pprRI (RIImm r) = pprImm r

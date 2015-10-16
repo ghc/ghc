@@ -1246,7 +1246,7 @@ scExpr' env (Let (NonRec bndr rhs) body)
 
         ; return (body_usg { scu_calls = scu_calls body_usg `delVarEnv` bndr' }
                     `combineUsage` spec_usg,  -- Note [spec_usg includes rhs_usg]
-                  mkLets [NonRec b r | (b,r) <- specInfoBinds rhs_info specs] body')
+                  mkLets [NonRec b r | (b,r) <- ruleInfoBinds rhs_info specs] body')
         }
 
 
@@ -1269,7 +1269,7 @@ scExpr' env (Let (Rec prs) body)
                 -- See Note [Local recursive groups]
 
         ; let all_usg = spec_usg `combineUsage` body_usg  -- Note [spec_usg includes rhs_usg]
-              bind'   = Rec (concat (zipWith specInfoBinds rhs_infos specs))
+              bind'   = Rec (concat (zipWith ruleInfoBinds rhs_infos specs))
 
         ; return (all_usg { scu_calls = scu_calls all_usg `delVarEnvList` bndrs' },
                   Let bind' body') }
@@ -1379,7 +1379,7 @@ scTopBind env body_usage (Rec prs)
                                          body_usage rhs_infos
 
         ; return (body_usage `combineUsage` spec_usage,
-                  Rec (concat (zipWith specInfoBinds rhs_infos specs))) }
+                  Rec (concat (zipWith ruleInfoBinds rhs_infos specs))) }
   where
     (bndrs,rhss) = unzip prs
     force_spec   = any (forceSpecBndr env) bndrs
@@ -1406,8 +1406,8 @@ scRecRhs env (bndr,rhs)
                 -- Two pats are the same if they match both ways
 
 ----------------------
-specInfoBinds :: RhsInfo -> [OneSpec] -> [(Id,CoreExpr)]
-specInfoBinds (RI { ri_fn = fn, ri_new_rhs = new_rhs }) specs
+ruleInfoBinds :: RhsInfo -> [OneSpec] -> [(Id,CoreExpr)]
+ruleInfoBinds (RI { ri_fn = fn, ri_new_rhs = new_rhs }) specs
   = [(id,rhs) | OS _ _ id rhs <- specs] ++
               -- First the specialised bindings
 
@@ -1434,7 +1434,7 @@ data RhsInfo
        , ri_arg_occs  :: [ArgOcc]      -- Info on how the xs occur in body
     }
 
-data SpecInfo = SI [OneSpec]            -- The specialisations we have generated
+data RuleInfo = SI [OneSpec]            -- The specialisations we have generated
 
                    Int                  -- Length of specs; used for numbering them
 
@@ -1505,13 +1505,13 @@ specialise
    :: ScEnv
    -> CallEnv                     -- Info on newly-discovered calls to this function
    -> RhsInfo
-   -> SpecInfo                    -- Original RHS plus patterns dealt with
-   -> UniqSM (ScUsage, SpecInfo)  -- New specialised versions and their usage
+   -> RuleInfo                    -- Original RHS plus patterns dealt with
+   -> UniqSM (ScUsage, RuleInfo)  -- New specialised versions and their usage
 
 -- See Note [spec_usg includes rhs_usg]
 
 -- Note: this only generates *specialised* bindings
--- The original binding is added by specInfoBinds
+-- The original binding is added by ruleInfoBinds
 --
 -- Note: the rhs here is the optimised version of the original rhs
 -- So when we make a specialised copy of the RHS, we're starting
@@ -1692,7 +1692,7 @@ calcSpecStrictness fn qvars pats
 Note [spec_usg includes rhs_usg]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In calls to 'specialise', the returned ScUsage must include the rhs_usg in
-the passed-in SpecInfo, unless there are no calls at all to the function.
+the passed-in RuleInfo, unless there are no calls at all to the function.
 
 The caller can, indeed must, assume this.  He should not combine in rhs_usg
 himself, or he'll get rhs_usg twice -- and that can lead to an exponential

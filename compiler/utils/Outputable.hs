@@ -82,7 +82,7 @@ import {-# SOURCE #-}   DynFlags( DynFlags,
                                   targetPlatform, pprUserLength, pprCols,
                                   useUnicode, useUnicodeSyntax,
                                   unsafeGlobalDynFlags )
-import {-# SOURCE #-}   Module( PackageKey, Module, ModuleName, moduleName )
+import {-# SOURCE #-}   Module( UnitId, Module, ModuleName, moduleName )
 import {-# SOURCE #-}   OccName( OccName )
 import {-# SOURCE #-}   StaticFlags( opt_PprStyle_Debug, opt_NoDebugOutput )
 
@@ -169,8 +169,8 @@ type QueryQualifyName = Module -> OccName -> QualifyName
 type QueryQualifyModule = Module -> Bool
 
 -- | For a given package, we need to know whether to print it with
--- the package key to disambiguate it.
-type QueryQualifyPackage = PackageKey -> Bool
+-- the unit id to disambiguate it.
+type QueryQualifyPackage = UnitId -> Bool
 
 -- See Note [Printing original names] in HscTypes
 data QualifyName   -- Given P:M.T

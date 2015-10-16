@@ -36,7 +36,6 @@ import Control.Concurrent
 import Data.Dynamic
 import Debug.Trace        ( trace )
 import System.IO.Unsafe
-import System.Exit
 import System.Environment
 
 #ifndef mingw32_HOST_OS
@@ -63,11 +62,8 @@ import System.Mem.Weak  ( Weak, deRefWeak )
 --  assumed to contain a location already, so we don't print one).
 
 data GhcException
-  = PhaseFailed  String         -- name of phase
-                 ExitCode       -- an external phase (eg. cpp) failed
-
   -- | Some other fatal signal (SIGHUP,SIGTERM)
-  | Signal Int
+  = Signal Int
 
   -- | Prints the short usage msg after the error
   | UsageError   String
@@ -135,11 +131,6 @@ showGhcException exception
         UsageError str
          -> showString str . showChar '\n' . showString short_usage
 
-        PhaseFailed phase code
-         -> showString "phase `" . showString phase .
-            showString "' failed (exitcode = " . shows (int_code code) .
-            showString ")"
-
         CmdLineError str        -> showString str
         PprProgramError str  _  ->
             showGhcException (ProgramError (str ++ "\n<<details unavailable>>"))
@@ -163,11 +154,6 @@ showGhcException exception
                 "sorry! (unimplemented feature or known bug)\n"
                  ++ "  (GHC version " ++ cProjectVersion ++ " for " ++ TargetPlatform_NAME ++ "):\n\t"
                  ++ s ++ "\n"
-
-  where int_code code =
-          case code of
-                ExitSuccess   -> (0::Int)
-                ExitFailure x -> x
 
 
 throwGhcException :: GhcException -> a

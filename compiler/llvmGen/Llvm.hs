@@ -20,6 +20,9 @@ module Llvm (
         LlvmBlocks, LlvmBlock(..), LlvmBlockId,
         LlvmParamAttr(..), LlvmParameter,
 
+        -- * Atomic operations
+        LlvmAtomicOp(..),
+
         -- * Fence synchronization
         LlvmSyncOrdering(..),
 

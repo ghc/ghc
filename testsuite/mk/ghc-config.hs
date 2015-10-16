@@ -34,6 +34,12 @@ main = do
         _ -> "package-conf"
   putStrLn $ "GhcPackageDbFlag" ++ '=':pkgdb_flag
 
+  let minGhcVersion711 = case lookup "Project version" fields of
+        Just v
+          | parseVersion v >= [7,11] -> "YES"
+        _ -> "NO"
+  putStrLn $ "MinGhcVersion711" ++ '=':minGhcVersion711
+
 
 getGhcFieldOrFail :: [(String,String)] -> String -> String -> IO ()
 getGhcFieldOrFail fields mkvar key

@@ -1168,9 +1168,9 @@ lookupIntegerSDataConName dflags hsc_env = case cIntegerLibraryType of
 -- | Helper for 'lookupMkIntegerName' and 'lookupIntegerSDataConName'
 guardIntegerUse :: DynFlags -> IO a -> IO a
 guardIntegerUse dflags act
-  | thisPackage dflags == primPackageKey
+  | thisPackage dflags == primUnitId
   = return $ panic "Can't use Integer in ghc-prim"
-  | thisPackage dflags == integerPackageKey
+  | thisPackage dflags == integerUnitId
   = return $ panic "Can't use Integer in integer-*"
   | otherwise = act
 
@@ -1218,7 +1218,7 @@ cpCloneBndr env bndr
        -- so that we can drop more stuff as dead code.
        -- See also Note [Dead code in CorePrep]
        let bndr'' = bndr' `setIdUnfolding` noUnfolding
-                          `setIdSpecialisation` emptySpecInfo
+                          `setIdSpecialisation` emptyRuleInfo
        return (extendCorePrepEnv env bndr bndr'', bndr'')
 
   | otherwise   -- Top level things, which we don't want

@@ -14,7 +14,6 @@ module Hooks ( Hooks
              , tcForeignImportsHook
              , tcForeignExportsHook
              , hscFrontendHook
-             , hscCompileOneShotHook
              , hscCompileCoreExprHook
              , ghcPrimIfaceHook
              , runPhaseHook
@@ -58,14 +57,12 @@ import Data.Maybe
 emptyHooks :: Hooks
 emptyHooks = Hooks Nothing Nothing Nothing Nothing Nothing
                    Nothing Nothing Nothing Nothing Nothing Nothing
-                   Nothing
 
 data Hooks = Hooks
   { dsForeignsHook         :: Maybe ([LForeignDecl Id] -> DsM (ForeignStubs, OrdList (Id, CoreExpr)))
   , tcForeignImportsHook   :: Maybe ([LForeignDecl Name] -> TcM ([Id], [LForeignDecl Id], Bag GlobalRdrElt))
   , tcForeignExportsHook   :: Maybe ([LForeignDecl Name] -> TcM (LHsBinds TcId, [LForeignDecl TcId], Bag GlobalRdrElt))
-  , hscFrontendHook        :: Maybe (ModSummary -> Hsc TcGblEnv)
-  , hscCompileOneShotHook  :: Maybe (HscEnv -> ModSummary -> SourceModified -> IO HscStatus)
+  , hscFrontendHook        :: Maybe (ModSummary -> Hsc FrontendResult)
   , hscCompileCoreExprHook :: Maybe (HscEnv -> SrcSpan -> CoreExpr -> IO HValue)
   , ghcPrimIfaceHook       :: Maybe ModIface
   , runPhaseHook           :: Maybe (PhasePlus -> FilePath -> DynFlags -> CompPipeline (PhasePlus, FilePath))

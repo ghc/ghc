@@ -74,19 +74,19 @@ instance Instruction Instr where
 
 ppc_mkStackAllocInstr :: Platform -> Int -> Instr
 ppc_mkStackAllocInstr platform amount
-  = case platformArch platform of
-      ArchPPC    -> -- SUB II32 (OpImm (ImmInt amount)) (OpReg esp)
-                    ADD sp sp (RIImm (ImmInt (-amount)))
-      ArchPPC_64 _ -> STU II64 sp (AddrRegImm sp (ImmInt (-amount)))
-      arch       -> panic $ "ppc_mkStackAllocInstr " ++ show arch
+  = ppc_mkStackAllocInstr' platform (-amount)
 
 ppc_mkStackDeallocInstr :: Platform -> Int -> Instr
 ppc_mkStackDeallocInstr platform amount
+  = ppc_mkStackAllocInstr' platform amount
+
+ppc_mkStackAllocInstr' :: Platform -> Int -> Instr
+ppc_mkStackAllocInstr' platform amount
   = case platformArch platform of
-      ArchPPC    -> -- ADD II32 (OpImm (ImmInt amount)) (OpReg esp)
-                    ADD sp sp (RIImm (ImmInt amount))
-      ArchPPC_64 _ -> ADD sp sp (RIImm (ImmInt amount))
-      arch       -> panic $ "ppc_mkStackDeallocInstr " ++ show arch
+    ArchPPC      -> UPDATE_SP II32 (ImmInt amount)
+    ArchPPC_64 _ -> UPDATE_SP II64 (ImmInt amount)
+    _            -> panic $ "ppc_mkStackAllocInstr' "
+                            ++ show (platformArch platform)
 
 --
 -- See note [extra spill slots] in X86/Instr.hs
@@ -186,8 +186,10 @@ data Instr
 
     -- Loads and stores.
     | LD      Format Reg AddrMode   -- Load format, dst, src
+    | LDFAR   Format Reg AddrMode   -- Load format, dst, src 32 bit offset
     | LA      Format Reg AddrMode   -- Load arithmetic format, dst, src
     | ST      Format Reg AddrMode   -- Store format, src, dst
+    | STFAR   Format Reg AddrMode   -- Store format, src, dst 32 bit offset
     | STU     Format Reg AddrMode   -- Store with Update format, src, dst
     | LIS     Reg Imm               -- Load Immediate Shifted dst, src
     | LI      Reg Imm               -- Load Immediate dst, src
@@ -277,6 +279,8 @@ data Instr
     | NOP                       -- no operation, PowerPC 64 bit
                                 -- needs this as place holder to
                                 -- reload TOC pointer
+    | UPDATE_SP Format Imm      -- expand/shrink spill area on C stack
+                                -- pseudo-instruction
 
 -- | Get the registers that are being used by this instruction.
 -- regUsage doesn't need to do any trickery for jumps and such.
@@ -288,8 +292,10 @@ ppc_regUsageOfInstr :: Platform -> Instr -> RegUsage
 ppc_regUsageOfInstr platform instr
  = case instr of
     LD      _ reg addr       -> usage (regAddr addr, [reg])
+    LDFAR   _ reg addr       -> usage (regAddr addr, [reg])
     LA      _ reg addr       -> usage (regAddr addr, [reg])
     ST      _ reg addr       -> usage (reg : regAddr addr, [])
+    STFAR   _ reg addr       -> usage (reg : regAddr addr, [])
     STU     _ reg addr       -> usage (reg : regAddr addr, [])
     LIS     reg _            -> usage ([], [reg])
     LI      reg _            -> usage ([], [reg])
@@ -349,6 +355,7 @@ ppc_regUsageOfInstr platform instr
     MFLR    reg             -> usage ([], [reg])
     FETCHPC reg             -> usage ([], [reg])
     FETCHTOC reg _          -> usage ([], [reg])
+    UPDATE_SP _ _           -> usage ([], [sp])
     _                       -> noUsage
   where
     usage (src, dst) = RU (filter (interesting platform) src)
@@ -373,8 +380,10 @@ ppc_patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
 ppc_patchRegsOfInstr instr env
  = case instr of
     LD      fmt reg addr    -> LD fmt (env reg) (fixAddr addr)
+    LDFAR   fmt reg addr    -> LDFAR fmt (env reg) (fixAddr addr)
     LA      fmt reg addr    -> LA fmt (env reg) (fixAddr addr)
     ST      fmt reg addr    -> ST fmt (env reg) (fixAddr addr)
+    STFAR   fmt reg addr    -> STFAR fmt (env reg) (fixAddr addr)
     STU     fmt reg addr    -> STU fmt (env reg) (fixAddr addr)
     LIS     reg imm         -> LIS (env reg) imm
     LI      reg imm         -> LI (env reg) imm
@@ -505,7 +514,11 @@ ppc_mkSpillInstr dflags reg delta slot
                                 _       -> II64
                 RcDouble  -> FF64
                 _         -> panic "PPC.Instr.mkSpillInstr: no match"
-    in ST fmt reg (AddrRegImm sp (ImmInt (off-delta)))
+        instr = case makeImmediate W32 True (off-delta) of
+                Just _  -> ST
+                Nothing -> STFAR -- pseudo instruction: 32 bit offsets
+
+    in instr fmt reg (AddrRegImm sp (ImmInt (off-delta)))
 
 
 ppc_mkLoadInstr
@@ -526,7 +539,11 @@ ppc_mkLoadInstr dflags reg delta slot
                                  _       -> II64
                 RcDouble  -> FF64
                 _         -> panic "PPC.Instr.mkLoadInstr: no match"
-    in LD fmt reg (AddrRegImm sp (ImmInt (off-delta)))
+        instr = case makeImmediate W32 True (off-delta) of
+                Just _  -> LD
+                Nothing -> LDFAR -- pseudo instruction: 32 bit offsets
+
+    in instr fmt reg (AddrRegImm sp (ImmInt (off-delta)))
 
 
 -- | The maximum number of bytes required to spill a register. PPC32

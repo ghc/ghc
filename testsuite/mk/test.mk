@@ -44,9 +44,11 @@ TEST_HC_OPTS = -fforce-recomp -dcore-lint -dcmm-lint -dno-debug-output -no-user-
 #
 TEST_HC_OPTS += -fno-warn-tabs
 
+ifeq "$(MinGhcVersion711)" "YES"
 # Don't warn about missing specialisations. They can only occur with `-O`, but
 # we want tests to produce the same output for all test ways.
 TEST_HC_OPTS += -fno-warn-missed-specialisations
+endif
 
 RUNTEST_OPTS =
 

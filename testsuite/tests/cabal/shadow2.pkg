@@ -1,5 +1,5 @@
 name: shadowdep
 version: 1
 id: shadowdep-1-XXX
-key: shadowdep-1
+key: shadowdep-1-XXX
 depends: shadow-1-XXX

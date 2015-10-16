@@ -6,11 +6,11 @@
 
 module Lexeme (
           -- * Lexical characteristics of Haskell names
-  
+
           -- | Use these functions to figure what kind of name a 'FastString'
           -- represents; these functions do /not/ check that the identifier
           -- is valid.
-  
+
         isLexCon, isLexVar, isLexId, isLexSym,
         isLexConId, isLexConSym, isLexVarId, isLexVarSym,
         startsVarSym, startsVarId, startsConSym, startsConId,
@@ -32,6 +32,8 @@ import Util ((<||>))
 
 import Data.Char
 import qualified Data.Set as Set
+
+import GHC.Lexeme
 
 {-
 
@@ -86,22 +88,6 @@ isLexVarSym fs                          -- Infix identifiers e.g. "+"
       (c:cs) -> startsVarSym c && all isVarSymChar cs
         -- See Note [Classification of generated names]
 
--------------
-startsVarSym, startsVarId, startsConSym, startsConId :: Char -> Bool
-startsVarSym c = startsVarSymASCII c || (ord c > 0x7f && isSymbol c)  -- Infix Ids
-startsConSym c = c == ':'               -- Infix data constructors
-startsVarId c  = c == '_' || case generalCategory c of  -- Ordinary Ids
-  LowercaseLetter -> True
-  OtherLetter     -> True   -- See #1103
-  _               -> False
-startsConId c  = isUpper c || c == '('  -- Ordinary type constructors and data constructors
-
-startsVarSymASCII :: Char -> Bool
-startsVarSymASCII c = c `elem` "!#$%&*+./<=>?@\\^|~-"
-
-isVarSymChar :: Char -> Bool
-isVarSymChar c = c == ':' || startsVarSym c
-
 {-
 
 ************************************************************************
@@ -113,7 +99,7 @@ isVarSymChar c = c == ':' || startsVarSym c
 -}
 
 ----------------------
--- External interface 
+-- External interface
 ----------------------
 
 -- | Is this an acceptable variable name?
@@ -237,7 +223,7 @@ okSymChar c
       ModifierSymbol       -> True
       OtherSymbol          -> True
       _                    -> False
-    
+
 -- | All reserved identifiers. Taken from section 2.4 of the 2010 Report.
 reservedIds :: Set.Set String
 reservedIds = Set.fromList [ "case", "class", "data", "default", "deriving"

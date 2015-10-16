@@ -82,6 +82,7 @@ import qualified Stream
 
 import Data.List
 import Data.Maybe
+import Data.Ord         ( comparing )
 import Control.Exception
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Applicative(..))
@@ -428,12 +429,15 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap us
              cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap
                           cmm count
 
-        let newFileIds = fileIds' `minusUFM` fileIds
+        -- Generate .file directives for every new file that has been
+        -- used. Note that it is important that we generate these in
+        -- ascending order, as Clang's 3.6 assembler complains.
+        let newFileIds = sortBy (comparing snd) $ eltsUFM $ fileIds' `minusUFM` fileIds
             pprDecl (f,n) = ptext (sLit "\t.file ") <> ppr n <+>
                             doubleQuotes (ftext f)
 
         emitNativeCode dflags h $ vcat $
-          map pprDecl (eltsUFM newFileIds) ++
+          map pprDecl newFileIds ++
           map (pprNatCmmDecl ncgImpl) native
 
         -- force evaluation all this stuff to avoid space leaks
@@ -1118,15 +1122,15 @@ cmmExprNative referenceKind expr = do
         CmmReg (CmmGlobal EagerBlackholeInfo)
           | arch == ArchPPC && not (gopt Opt_PIC dflags)
           -> cmmExprNative referenceKind $
-             CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageKey (fsLit "__stg_EAGER_BLACKHOLE_info")))
+             CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit "__stg_EAGER_BLACKHOLE_info")))
         CmmReg (CmmGlobal GCEnter1)
           | arch == ArchPPC && not (gopt Opt_PIC dflags)
           -> cmmExprNative referenceKind $
-             CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageKey (fsLit "__stg_gc_enter_1")))
+             CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit "__stg_gc_enter_1")))
         CmmReg (CmmGlobal GCFun)
           | arch == ArchPPC && not (gopt Opt_PIC dflags)
           -> cmmExprNative referenceKind $
-             CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageKey (fsLit "__stg_gc_fun")))
+             CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit "__stg_gc_fun")))
 
         other
            -> return other

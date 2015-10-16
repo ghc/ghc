@@ -15,7 +15,7 @@ import CoreSyn
 import HscTypes
 import CSE              ( cseProgram )
 import Rules            ( mkRuleBase, unionRuleBase,
-                          extendRuleBaseList, ruleCheckProgram, addSpecInfo, )
+                          extendRuleBaseList, ruleCheckProgram, addRuleInfo, )
 import PprCore          ( pprCoreBindings, pprCoreExpr )
 import OccurAnal        ( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
@@ -871,7 +871,7 @@ shortOutIndirections binds
     -- These exported Ids are the subjects  of the indirection-elimination
     exp_ids            = map fst $ varEnvElts ind_env
     exp_id_set         = mkVarSet exp_ids
-    no_need_to_flatten = all (null . specInfoRules . idSpecialisation) exp_ids
+    no_need_to_flatten = all (null . ruleInfoRules . idSpecialisation) exp_ids
     binds'             = concatMap zap binds
 
     zap (NonRec bndr rhs) = [NonRec b r | (b,r) <- zapPair (bndr,rhs)]
@@ -929,7 +929,7 @@ hasShortableIdInfo :: Id -> Bool
 -- so we can safely discard it
 -- See Note [Messing up the exported Id's IdInfo]
 hasShortableIdInfo id
-  =  isEmptySpecInfo (specInfo info)
+  =  isEmptyRuleInfo (ruleInfo info)
   && isDefaultInlinePragma (inlinePragInfo info)
   && not (isStableUnfolding (unfoldingInfo info))
   where
@@ -951,8 +951,8 @@ transferIdInfo exported_id local_id
     transfer exp_info = exp_info `setStrictnessInfo`    strictnessInfo local_info
                                  `setUnfoldingInfo`     unfoldingInfo local_info
                                  `setInlinePragInfo`    inlinePragInfo local_info
-                                 `setSpecInfo`          addSpecInfo (specInfo exp_info) new_info
-    new_info = setSpecInfoHead (idName exported_id)
-                               (specInfo local_info)
+                                 `setRuleInfo`          addRuleInfo (ruleInfo exp_info) new_info
+    new_info = setRuleInfoHead (idName exported_id)
+                               (ruleInfo local_info)
         -- Remember to set the function-name field of the
         -- rules as we transfer them from one function to another

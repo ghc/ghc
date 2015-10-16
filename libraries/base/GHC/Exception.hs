@@ -37,6 +37,7 @@ import Data.Typeable (Typeable, cast)
    -- loop: Data.Typeable -> GHC.Err -> GHC.Exception
 import GHC.Base
 import GHC.Show
+import GHC.Stack.Types
 
 {- |
 The @SomeException@ type is the root of the exception type hierarchy.

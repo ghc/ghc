@@ -28,7 +28,8 @@ module GHC.Exception ( SomeException, errorCallException,
                        errorCallWithCallStackException,
                        divZeroException, overflowException, ratioZeroDenomException
     ) where
-import GHC.Types( Char, CallStack )
+import GHC.Types ( Char )
+import GHC.Stack.Types ( CallStack )
 
 data SomeException
 divZeroException, overflowException, ratioZeroDenomException  :: SomeException

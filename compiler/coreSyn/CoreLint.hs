@@ -32,6 +32,7 @@ import Literal
 import DataCon
 import TysWiredIn
 import TysPrim
+import TcType ( isFloatingTy )
 import Var
 import VarEnv
 import VarSet
@@ -661,6 +662,15 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
         ; checkL (exprIsBottom scrut)
           (ptext (sLit "No alternatives for a case scrutinee not known to diverge for sure:") <+> ppr scrut)
         }
+
+     -- See Note [Rules for floating-point comparisons] in PrelRules
+     ; let isLitPat (LitAlt _, _ , _) = True
+           isLitPat _                 = False
+     ; checkL (not $ isFloatingTy scrut_ty && any isLitPat alts)
+         (ptext (sLit $ "Lint warning: Scrutinising floating-point " ++
+                        "expression with literal pattern in case " ++
+                        "analysis (see Trac #9238).")
+          $$ text "scrut" <+> ppr scrut)
 
      ; case tyConAppTyCon_maybe (idType var) of
          Just tycon

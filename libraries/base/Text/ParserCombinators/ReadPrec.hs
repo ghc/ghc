@@ -75,11 +75,10 @@ instance Functor ReadPrec where
   fmap h (P f) = P (\n -> fmap h (f n))
 
 instance Applicative ReadPrec where
-    pure = return
+    pure x  = P (\_ -> pure x)
     (<*>) = ap
 
 instance Monad ReadPrec where
-  return x  = P (\_ -> return x)
   fail s    = P (\_ -> fail s)
   P f >>= k = P (\n -> do a <- f n; let P f' = k a in f' n)
 

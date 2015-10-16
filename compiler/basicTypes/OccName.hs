@@ -617,12 +617,12 @@ mkMaxTagOcc         = mk_simple_deriv varName  "$maxtag_"
 -- Generic deriving mechanism
 
 -- | Generate a module-unique name, to be used e.g. while generating new names
--- for Generics types. We use module package key to avoid name clashes when
+-- for Generics types. We use module unit id to avoid name clashes when
 -- package imports is used.
 mkModPrefix :: Module -> String
 mkModPrefix mod = pk ++ "_" ++ mn
   where
-    pk = packageKeyString (modulePackageKey mod)
+    pk = unitIdString (moduleUnitId mod)
     mn = moduleNameString (moduleName mod)
 
 mkGenD :: Module -> OccName -> OccName

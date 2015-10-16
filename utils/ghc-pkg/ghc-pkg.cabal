@@ -25,7 +25,7 @@ Executable ghc-pkg
                    filepath,
                    Cabal,
                    binary,
-                   bin-package-db,
+                   ghc-boot,
                    bytestring
     if !os(windows)
         Build-Depends: unix,

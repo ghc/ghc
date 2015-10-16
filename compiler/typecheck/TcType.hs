@@ -65,7 +65,7 @@ module TcType (
   eqType, eqTypes, eqPred, cmpType, cmpTypes, cmpPred, eqTypeX,
   tcEqType, tcEqKind,
   isSigmaTy, isRhoTy, isOverloadedTy,
-  isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
+  isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarExposed, isTyVarUnderDatatype,
@@ -433,6 +433,7 @@ data UserTypeCtxt
 
 newtype TcLevel = TcLevel Int deriving( Eq, Ord )
   -- See Note [TcLevel and untouchable type variables] for what this Int is
+  -- See also Note [TcLevel assignment]
 
 {-
 Note [TcLevel and untouchable type variables]
@@ -457,7 +458,6 @@ Note [TcLevel and untouchable type variables]
     (GivenInv)  The free variables of the ic_given of an
                 implication are all untouchable; ie their level
                 numbers are LESS THAN the ic_tclvl of the implication
-
 
 Note [Skolem escape prevention]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -491,15 +491,35 @@ emerges. If we (wrongly) spontaneously solved it to get uf := beta,
 the whole implication disappears but when we pop out again we are left with
 (F Int ~ uf) which will be unified by our final zonking stage and
 uf will get unified *once more* to (F Int).
+
+Note [TcLevel assignment]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+We arrange the TcLevels like this
+
+   1   Top level
+   2     Flatten-meta-vars of level 3
+   3   First-level implication constraints
+   4     Flatten-meta-vars of level 5
+   5   Second-level implication constraints
+   ...etc...
+
+The even-numbered levels are for the flatten-meta-variables assigned
+at the next level in.  Eg for a second-level implication conststraint
+(level 5), the flatten meta-vars are level 4, which makes them untouchable.
+The flatten meta-vars could equally well all have level 0, or just NotALevel
+since they do not live across implications.
 -}
 
 fmvTcLevel :: TcLevel -> TcLevel
+-- See Note [TcLevel assignment]
 fmvTcLevel (TcLevel n) = TcLevel (n-1)
 
 topTcLevel :: TcLevel
+-- See Note [TcLevel assignment]
 topTcLevel = TcLevel 1   -- 1 = outermost level
 
 pushTcLevel :: TcLevel -> TcLevel
+-- See Note [TcLevel assignment]
 pushTcLevel (TcLevel us) = TcLevel (us + 2)
 
 strictlyDeeperThan :: TcLevel -> TcLevel -> Bool
@@ -1439,6 +1459,11 @@ isUnitTy       = is_tc unitTyConKey
 isCharTy       = is_tc charTyConKey
 isAnyTy        = is_tc anyTyConKey
 
+-- | Does a type represent a floating-point number?
+isFloatingTy :: Type -> Bool
+isFloatingTy ty = isFloatTy ty || isDoubleTy ty
+
+-- | Is a type 'String'?
 isStringTy :: Type -> Bool
 isStringTy ty
   = case tcSplitTyConApp_maybe ty of

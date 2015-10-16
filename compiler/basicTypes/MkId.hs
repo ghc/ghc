@@ -295,7 +295,7 @@ mkDictSelId name clas
                    -- for why alwaysInlinePragma
 
          | otherwise
-         = base_info `setSpecInfo` mkSpecInfo [rule]
+         = base_info `setRuleInfo` mkRuleInfo [rule]
                    -- Add a magic BuiltinRule, but no unfolding
                    -- so that the rule is always available to fire.
                    -- See Note [ClassOp/DFun selection] in TcInstDcls
@@ -952,7 +952,7 @@ mkPrimOpId prim_op
     id   = mkGlobalId (PrimOpId prim_op) name ty info
 
     info = noCafIdInfo
-           `setSpecInfo`          mkSpecInfo (maybeToList $ primOpRules name prim_op)
+           `setRuleInfo`          mkRuleInfo (maybeToList $ primOpRules name prim_op)
            `setArityInfo`         arity
            `setStrictnessInfo`    strict_sig
            `setInlinePragInfo`    neverInlinePragma
@@ -1125,7 +1125,7 @@ seqId = pcMiscPrelId seqName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` inline_prag
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
-                       `setSpecInfo`       mkSpecInfo [seq_cast_rule]
+                       `setRuleInfo`       mkRuleInfo [seq_cast_rule]
 
     inline_prag = alwaysInlinePragma `setInlinePragmaActivation` ActiveAfter 0
                   -- Make 'seq' not inline-always, so that simpleOptExpr

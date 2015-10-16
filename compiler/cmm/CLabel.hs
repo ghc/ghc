@@ -161,14 +161,14 @@ data CLabel
 
   -- | A label from a .cmm file that is not associated with a .hs level Id.
   | CmmLabel
-        PackageKey               -- what package the label belongs to.
+        UnitId               -- what package the label belongs to.
         FastString              -- identifier giving the prefix of the label
         CmmLabelInfo            -- encodes the suffix of the label
 
   -- | A label with a baked-in \/ algorithmically generated name that definitely
   --    comes from the RTS. The code for it must compile into libHSrts.a \/ libHSrts.so
   --    If it doesn't have an algorithmically generated name then use a CmmLabel
-  --    instead and give it an appropriate PackageKey argument.
+  --    instead and give it an appropriate UnitId argument.
   | RtsLabel
         RtsLabelInfo
 
@@ -244,7 +244,7 @@ data CLabel
 data ForeignLabelSource
 
    -- | Label is in a named package
-   = ForeignLabelInPackage      PackageKey
+   = ForeignLabelInPackage      UnitId
 
    -- | Label is in some external, system package that doesn't also
    --   contain compiled Haskell code, and is not associated with any .hi files.
@@ -418,27 +418,27 @@ mkDirty_MUT_VAR_Label, mkSplitMarkerLabel, mkUpdInfoLabel,
     mkArrWords_infoLabel, mkSMAP_FROZEN_infoLabel, mkSMAP_FROZEN0_infoLabel,
     mkSMAP_DIRTY_infoLabel :: CLabel
 mkDirty_MUT_VAR_Label           = mkForeignLabel (fsLit "dirty_MUT_VAR") Nothing ForeignLabelInExternalPackage IsFunction
-mkSplitMarkerLabel              = CmmLabel rtsPackageKey (fsLit "__stg_split_marker")    CmmCode
-mkUpdInfoLabel                  = CmmLabel rtsPackageKey (fsLit "stg_upd_frame")         CmmInfo
-mkBHUpdInfoLabel                = CmmLabel rtsPackageKey (fsLit "stg_bh_upd_frame" )     CmmInfo
-mkIndStaticInfoLabel            = CmmLabel rtsPackageKey (fsLit "stg_IND_STATIC")        CmmInfo
-mkMainCapabilityLabel           = CmmLabel rtsPackageKey (fsLit "MainCapability")        CmmData
-mkMAP_FROZEN_infoLabel          = CmmLabel rtsPackageKey (fsLit "stg_MUT_ARR_PTRS_FROZEN") CmmInfo
-mkMAP_FROZEN0_infoLabel         = CmmLabel rtsPackageKey (fsLit "stg_MUT_ARR_PTRS_FROZEN0") CmmInfo
-mkMAP_DIRTY_infoLabel           = CmmLabel rtsPackageKey (fsLit "stg_MUT_ARR_PTRS_DIRTY") CmmInfo
-mkEMPTY_MVAR_infoLabel          = CmmLabel rtsPackageKey (fsLit "stg_EMPTY_MVAR")        CmmInfo
-mkTopTickyCtrLabel              = CmmLabel rtsPackageKey (fsLit "top_ct")                CmmData
-mkCAFBlackHoleInfoTableLabel    = CmmLabel rtsPackageKey (fsLit "stg_CAF_BLACKHOLE")     CmmInfo
-mkCAFBlackHoleEntryLabel        = CmmLabel rtsPackageKey (fsLit "stg_CAF_BLACKHOLE")     CmmEntry
-mkArrWords_infoLabel            = CmmLabel rtsPackageKey (fsLit "stg_ARR_WORDS")         CmmInfo
-mkSMAP_FROZEN_infoLabel         = CmmLabel rtsPackageKey (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN") CmmInfo
-mkSMAP_FROZEN0_infoLabel        = CmmLabel rtsPackageKey (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN0") CmmInfo
-mkSMAP_DIRTY_infoLabel          = CmmLabel rtsPackageKey (fsLit "stg_SMALL_MUT_ARR_PTRS_DIRTY") CmmInfo
+mkSplitMarkerLabel              = CmmLabel rtsUnitId (fsLit "__stg_split_marker")    CmmCode
+mkUpdInfoLabel                  = CmmLabel rtsUnitId (fsLit "stg_upd_frame")         CmmInfo
+mkBHUpdInfoLabel                = CmmLabel rtsUnitId (fsLit "stg_bh_upd_frame" )     CmmInfo
+mkIndStaticInfoLabel            = CmmLabel rtsUnitId (fsLit "stg_IND_STATIC")        CmmInfo
+mkMainCapabilityLabel           = CmmLabel rtsUnitId (fsLit "MainCapability")        CmmData
+mkMAP_FROZEN_infoLabel          = CmmLabel rtsUnitId (fsLit "stg_MUT_ARR_PTRS_FROZEN") CmmInfo
+mkMAP_FROZEN0_infoLabel         = CmmLabel rtsUnitId (fsLit "stg_MUT_ARR_PTRS_FROZEN0") CmmInfo
+mkMAP_DIRTY_infoLabel           = CmmLabel rtsUnitId (fsLit "stg_MUT_ARR_PTRS_DIRTY") CmmInfo
+mkEMPTY_MVAR_infoLabel          = CmmLabel rtsUnitId (fsLit "stg_EMPTY_MVAR")        CmmInfo
+mkTopTickyCtrLabel              = CmmLabel rtsUnitId (fsLit "top_ct")                CmmData
+mkCAFBlackHoleInfoTableLabel    = CmmLabel rtsUnitId (fsLit "stg_CAF_BLACKHOLE")     CmmInfo
+mkCAFBlackHoleEntryLabel        = CmmLabel rtsUnitId (fsLit "stg_CAF_BLACKHOLE")     CmmEntry
+mkArrWords_infoLabel            = CmmLabel rtsUnitId (fsLit "stg_ARR_WORDS")         CmmInfo
+mkSMAP_FROZEN_infoLabel         = CmmLabel rtsUnitId (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN") CmmInfo
+mkSMAP_FROZEN0_infoLabel        = CmmLabel rtsUnitId (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN0") CmmInfo
+mkSMAP_DIRTY_infoLabel          = CmmLabel rtsUnitId (fsLit "stg_SMALL_MUT_ARR_PTRS_DIRTY") CmmInfo
 
 -----
 mkCmmInfoLabel,   mkCmmEntryLabel, mkCmmRetInfoLabel, mkCmmRetLabel,
   mkCmmCodeLabel, mkCmmDataLabel,  mkCmmClosureLabel
-        :: PackageKey -> FastString -> CLabel
+        :: UnitId -> FastString -> CLabel
 
 mkCmmInfoLabel      pkg str     = CmmLabel pkg str CmmInfo
 mkCmmEntryLabel     pkg str     = CmmLabel pkg str CmmEntry
@@ -652,7 +652,7 @@ needsCDecl (RtsLabel _)                 = False
 needsCDecl (CmmLabel pkgId _ _)
         -- Prototypes for labels defined in the runtime system are imported
         --      into HC files via includes/Stg.h.
-        | pkgId == rtsPackageKey         = False
+        | pkgId == rtsUnitId         = False
 
         -- For other labels we inline one into the HC file directly.
         | otherwise                     = True
@@ -858,11 +858,11 @@ idInfoLabelType info =
 -- @labelDynamic@ returns @True@ if the label is located
 -- in a DLL, be it a data reference or not.
 
-labelDynamic :: DynFlags -> PackageKey -> Module -> CLabel -> Bool
+labelDynamic :: DynFlags -> UnitId -> Module -> CLabel -> Bool
 labelDynamic dflags this_pkg this_mod lbl =
   case lbl of
    -- is the RTS in a DLL or not?
-   RtsLabel _           -> not (gopt Opt_Static dflags) && (this_pkg /= rtsPackageKey)
+   RtsLabel _           -> not (gopt Opt_Static dflags) && (this_pkg /= rtsUnitId)
 
    IdLabel n _ _        -> isDllName dflags this_pkg this_mod n
 
@@ -895,7 +895,7 @@ labelDynamic dflags this_pkg this_mod lbl =
             -- libraries
             True
 
-   PlainModuleInitLabel m -> not (gopt Opt_Static dflags) && this_pkg /= (modulePackageKey m)
+   PlainModuleInitLabel m -> not (gopt Opt_Static dflags) && this_pkg /= (moduleUnitId m)
 
    HpcTicksLabel m        -> not (gopt Opt_Static dflags) && this_mod /= m
 

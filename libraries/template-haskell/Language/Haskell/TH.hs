@@ -51,6 +51,7 @@ module Language.Haskell.TH(
         nameBase,       -- :: Name -> String
         nameModule,     -- :: Name -> Maybe String
         namePackage,    -- :: Name -> Maybe String
+        nameSpace,      -- :: Name -> Maybe NameSpace
         -- ** Built-in names
         tupleTypeName, tupleDataName,   -- Int -> Name
         unboxedTupleTypeName, unboxedTupleDataName, -- :: Int -> Name

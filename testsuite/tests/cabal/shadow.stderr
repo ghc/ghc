@@ -1,4 +1,4 @@
-<command line>: cannot satisfy -package shadowdep: 
-    shadowdep-1-XXX is unusable due to missing or recursive dependencies:
-      shadow-1-XXX
-    (use -v for more information)
+<command line>: package db: duplicate packages with incompatible ABIs:
+    shadow-1-XXX has ABIs: aaa, bbb
+<command line>: package db: duplicate packages with incompatible ABIs:
+    shadow-1-XXX has ABIs: aaa, bbb

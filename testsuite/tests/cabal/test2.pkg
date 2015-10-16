@@ -1,7 +1,7 @@
 name: "testpkg"
 version: 2.0
 id: testpkg-2.0-XXX
-key: testpkg-2.0
+key: testpkg-2.0-XXX
 license: BSD3
 copyright: (c) The Univsersity of Glasgow 2004
 maintainer: glasgow-haskell-users@haskell.org
@@ -17,4 +17,4 @@ hidden-modules: B, "C.D", "C.E"
 import-dirs: /usr/local/lib/testpkg,  "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg, "c:/Program Files/testpkg"
 include-dirs: /usr/local/include/testpkg, "c:/Program Files/testpkg"
-hs-libraries: testpkg-2.0
+hs-libraries: testpkg-2.0-XXX

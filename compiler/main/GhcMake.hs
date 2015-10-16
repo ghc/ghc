@@ -34,10 +34,8 @@ import ErrUtils
 import Finder
 import GhcMonad
 import HeaderInfo
-import HsSyn
 import HscTypes
 import Module
-import RdrName          ( RdrName )
 import TcIface          ( typecheckIface )
 import TcRnMonad        ( initIfaceCheck )
 
@@ -1627,7 +1625,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         calcDeps summ
           | HsBootFile <- ms_hsc_src summ
           , Just m <- getSigOf (hsc_dflags hsc_env) (moduleName (ms_mod summ))
-          , modulePackageKey m == thisPackage (hsc_dflags hsc_env)
+          , moduleUnitId m == thisPackage (hsc_dflags hsc_env)
                       = (noLoc (moduleName m), NotBoot) : msDeps summ
           | otherwise = msDeps summ
 
@@ -1720,9 +1718,9 @@ msDeps s =
             then [ (noLoc (moduleName (ms_mod s)), IsBoot) ]
             else []
 
-home_imps :: [Located (ImportDecl RdrName)] -> [Located ModuleName]
-home_imps imps = [ ideclName i |  L _ i <- imps,
-                                  isLocal (fmap sl_fs $ ideclPkgQual i) ]
+home_imps :: [(Maybe FastString, Located ModuleName)] -> [Located ModuleName]
+home_imps imps = [ lmodname |  (mb_pkg, lmodname) <- imps,
+                                  isLocal mb_pkg ]
   where isLocal Nothing = True
         isLocal (Just pkg) | pkg == fsLit "this" = True -- "this" is special
         isLocal _ = False
@@ -1922,7 +1920,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                          just_found location mod
                 | otherwise ->
                         -- Drop external-pkg
-                        ASSERT(modulePackageKey mod /= thisPackage dflags)
+                        ASSERT(moduleUnitId mod /= thisPackage dflags)
                         return Nothing
 
              err -> return $ Just $ Left $ noModError dflags loc wanted_mod err

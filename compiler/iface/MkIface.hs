@@ -111,7 +111,6 @@ import Maybes
 import ListSetOps
 import Binary
 import Fingerprint
-import Bag
 import Exception
 
 import Control.Monad
@@ -136,11 +135,10 @@ mkIface :: HscEnv
         -> Maybe Fingerprint    -- The old fingerprint, if we have it
         -> ModDetails           -- The trimmed, tidied interface
         -> ModGuts              -- Usages, deprecations, etc
-        -> IO (Messages,
-               Maybe (ModIface, -- The new one
-                      Bool))    -- True <=> there was an old Iface, and the
-                                --          new one is identical, so no need
-                                --          to write it
+        -> IO (ModIface, -- The new one
+               Bool)     -- True <=> there was an old Iface, and the
+                         --          new one is identical, so no need
+                         --          to write it
 
 mkIface hsc_env maybe_old_fingerprint mod_details
          ModGuts{     mg_module       = this_mod,
@@ -199,7 +197,7 @@ mkIfaceTc :: HscEnv
           -> SafeHaskellMode    -- The safe haskell mode
           -> ModDetails         -- gotten from mkBootModDetails, probably
           -> TcGblEnv           -- Usages, deprecations, etc
-          -> IO (Messages, Maybe (ModIface, Bool))
+          -> IO (ModIface, Bool)
 mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
   tc_result@TcGblEnv{ tcg_mod = this_mod,
                       tcg_src = hsc_src,
@@ -246,12 +244,12 @@ mkDependencies
                 --  on M.hi-boot, and hence that we should do the hi-boot consistency
                 --  check.)
 
-          pkgs | th_used   = insertList thPackageKey (imp_dep_pkgs imports)
+          pkgs | th_used   = insertList thUnitId (imp_dep_pkgs imports)
                | otherwise = imp_dep_pkgs imports
 
           -- Set the packages required to be Safe according to Safe Haskell.
           -- See Note [RnNames . Tracking Trust Transitively]
-          sorted_pkgs = sortBy stablePackageKeyCmp pkgs
+          sorted_pkgs = sortBy stableUnitIdCmp pkgs
           trust_pkgs  = imp_trust_pkgs imports
           dep_pkgs'   = map (\x -> (x, x `elem` trust_pkgs)) sorted_pkgs
 
@@ -269,7 +267,7 @@ mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> HscSource
          -> [FilePath]
          -> SafeHaskellMode
          -> ModDetails
-         -> IO (Messages, Maybe (ModIface, Bool))
+         -> IO (ModIface, Bool)
 mkIface_ hsc_env maybe_old_fingerprint
          this_mod hsc_src used_names used_th deps rdr_env fix_env src_warns
          hpc_info dir_imp_mods pkg_trust_req dependent_files safe_mode
@@ -355,38 +353,17 @@ mkIface_ hsc_env maybe_old_fingerprint
                    addFingerprints hsc_env maybe_old_fingerprint
                                    intermediate_iface decls
 
-    -- Warn about orphans
-    -- See Note [Orphans and auto-generated rules]
-    let warn_orphs      = wopt Opt_WarnOrphans dflags
-        warn_auto_orphs = wopt Opt_WarnAutoOrphans dflags
-        orph_warnings   --- Laziness means no work done unless -fwarn-orphans
-          | warn_orphs || warn_auto_orphs = rule_warns `unionBags` inst_warns
-          | otherwise                     = emptyBag
-        errs_and_warns = (orph_warnings, emptyBag)
-        unqual = mkPrintUnqualified dflags rdr_env
-        inst_warns = listToBag [ instOrphWarn dflags unqual d
-                               | (d,i) <- insts `zip` iface_insts
-                               , isOrphan (ifInstOrph i) ]
-        rule_warns = listToBag [ ruleOrphWarn dflags unqual this_mod r
-                               | r <- iface_rules
-                               , isOrphan (ifRuleOrph r)
-                               , if ifRuleAuto r then warn_auto_orphs
-                                                 else warn_orphs ]
+    -- Debug printing
+    dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE"
+                  (pprModIface new_iface)
 
-    if errorsFound dflags errs_and_warns
-      then return ( errs_and_warns, Nothing )
-      else do
-        -- Debug printing
-        dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE"
-                      (pprModIface new_iface)
+    -- bug #1617: on reload we weren't updating the PrintUnqualified
+    -- correctly.  This stems from the fact that the interface had
+    -- not changed, so addFingerprints returns the old ModIface
+    -- with the old GlobalRdrEnv (mi_globals).
+    let final_iface = new_iface{ mi_globals = maybeGlobalRdrEnv rdr_env }
 
-        -- bug #1617: on reload we weren't updating the PrintUnqualified
-        -- correctly.  This stems from the fact that the interface had
-        -- not changed, so addFingerprints returns the old ModIface
-        -- with the old GlobalRdrEnv (mi_globals).
-        let final_iface = new_iface{ mi_globals = maybeGlobalRdrEnv rdr_env }
-
-        return (errs_and_warns, Just (final_iface, no_change_at_all))
+    return (final_iface, no_change_at_all)
   where
 
      dflags = hsc_dflags hsc_env
@@ -595,7 +572,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    -- tracked by the usage on the ABI hash of package modules that we import.
    let orph_mods
         = filter (/= this_mod) -- Note [Do not update EPS with your own hi-boot]
-        . filter ((== this_pkg) . modulePackageKey)
+        . filter ((== this_pkg) . moduleUnitId)
         $ dep_orphs sorted_deps
    dep_orphan_hashes <- getOrphanHashes hsc_env orph_mods
 
@@ -707,7 +684,7 @@ getOrphanHashes hsc_env mods = do
 sortDependencies :: Dependencies -> Dependencies
 sortDependencies d
  = Deps { dep_mods   = sortBy (compare `on` (moduleNameFS.fst)) (dep_mods d),
-          dep_pkgs   = sortBy (stablePackageKeyCmp `on` fst) (dep_pkgs d),
+          dep_pkgs   = sortBy (stableUnitIdCmp `on` fst) (dep_pkgs d),
           dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
           dep_finsts = sortBy stableModuleCmp (dep_finsts d) }
 
@@ -726,25 +703,6 @@ mkIfaceAnnCache anns
     env = mkOccEnv_C (flip (++)) (map pair anns)
 
 {-
-Note [Orphans and auto-generated rules]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we specialise an INLINEABLE function, or when we have
--fspecialise-aggressively, we auto-generate RULES that are orphans.
-We don't want to warn about these, at least not by default, or we'd
-generate a lot of warnings.  Hence -fwarn-auto-orphans.
-
-Indeed, we don't even treat the module as an oprhan module if it has
-auto-generated *rule* orphans.  Orphan modules are read every time we
-compile, so they are pretty obtrusive and slow down every compilation,
-even non-optimised ones.  (Reason: for type class instances it's a
-type correctness issue.)  But specialisation rules are strictly for
-*optimisation* only so it's fine not to read the interface.
-
-What this means is that a SPEC rules from auto-specialisation in
-module M will be used in other modules only if M.hi has been read for
-some other reason, which is actually pretty likely.
-
-
 ************************************************************************
 *                                                                      *
           The ABI of an IfaceDecl
@@ -946,27 +904,6 @@ oldMD5 dflags bh = do
         return $! readHexFingerprint hash_str
 -}
 
-instOrphWarn :: DynFlags -> PrintUnqualified -> ClsInst -> WarnMsg
-instOrphWarn dflags unqual inst
-  = mkWarnMsg dflags (getSrcSpan inst) unqual $
-    hang (ptext (sLit "Orphan instance:")) 2 (pprInstanceHdr inst)
-    $$ text "To avoid this"
-    $$ nest 4 (vcat possibilities)
-  where
-    possibilities =
-      text "move the instance declaration to the module of the class or of the type, or" :
-      text "wrap the type with a newtype and declare the instance on the new type." :
-      []
-
-ruleOrphWarn :: DynFlags -> PrintUnqualified -> Module -> IfaceRule -> WarnMsg
-ruleOrphWarn dflags unqual mod rule
-  = mkWarnMsg dflags silly_loc unqual $
-    ptext (sLit "Orphan rule:") <+> ppr rule
-  where
-    silly_loc = srcLocSpan (mkSrcLoc (moduleNameFS (moduleName mod)) 1 1)
-    -- We don't have a decent SrcSpan for a Rule, not even the CoreRule
-    -- Could readily be fixed by adding a SrcSpan to CoreRule, if we wanted to
-
 ----------------------
 -- mkOrphMap partitions instance decls or rules into
 --      (a) an OccEnv for ones that are not orphans,
@@ -1058,7 +995,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
                                         -- things in *this* module
       = Nothing
 
-      | modulePackageKey mod /= this_pkg
+      | moduleUnitId mod /= this_pkg
       = Just UsagePackageModule{ usg_mod      = mod,
                                  usg_mod_hash = mod_hash,
                                  usg_safe     = imp_safe }
@@ -1366,8 +1303,8 @@ checkDependencies hsc_env summary iface
 
    this_pkg = thisPackage (hsc_dflags hsc_env)
 
-   dep_missing (L _ (ImportDecl { ideclName = L _ mod, ideclPkgQual = pkg })) = do
-     find_res <- liftIO $ findImportedModule hsc_env mod (fmap sl_fs pkg)
+   dep_missing (mb_pkg, L _ mod) = do
+     find_res <- liftIO $ findImportedModule hsc_env mod (mb_pkg)
      let reason = moduleNameString mod ++ " changed"
      case find_res of
         Found _ mod
@@ -1388,7 +1325,7 @@ checkDependencies hsc_env summary iface
                          return (RecompBecause reason)
                  else
                          return UpToDate
-           where pkg = modulePackageKey mod
+           where pkg = moduleUnitId mod
         _otherwise  -> return (RecompBecause reason)
 
 needInterface :: Module -> (ModIface -> IfG RecompileRequired)
@@ -1417,7 +1354,7 @@ needInterface mod continue
 -- | Given the usage information extracted from the old
 -- M.hi file for the module being compiled, figure out
 -- whether M needs to be recompiled.
-checkModUsage :: PackageKey -> Usage -> IfG RecompileRequired
+checkModUsage :: UnitId -> Usage -> IfG RecompileRequired
 checkModUsage _this_pkg UsagePackageModule{
                                 usg_mod = mod,
                                 usg_mod_hash = old_mod_hash }

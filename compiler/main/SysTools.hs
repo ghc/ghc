@@ -613,7 +613,7 @@ runClang dflags args = do
     )
 
 -- | Figure out which version of LLVM we are running this session
-figureLlvmVersion :: DynFlags -> IO (Maybe Int)
+figureLlvmVersion :: DynFlags -> IO (Maybe (Int, Int))
 figureLlvmVersion dflags = do
   let (pgm,opts) = pgm_lc dflags
       args = filter notNull (map showOpt opts)
@@ -626,17 +626,18 @@ figureLlvmVersion dflags = do
              (pin, pout, perr, _) <- runInteractiveProcess pgm args'
                                              Nothing Nothing
              {- > llc -version
-                  Low Level Virtual Machine (http://llvm.org/):
-                    llvm version 2.8 (Ubuntu 2.8-0Ubuntu1)
+                  LLVM (http://llvm.org/):
+                    LLVM version 3.5.2
                     ...
              -}
              hSetBinaryMode pout False
              _     <- hGetLine pout
-             vline <- hGetLine pout
-             v     <- case filter isDigit vline of
-                            []      -> fail "no digits!"
-                            [x]     -> fail $ "only 1 digit! (" ++ show x ++ ")"
-                            (x:y:_) -> return ((read [x,y]) :: Int)
+             vline <- dropWhile (not . isDigit) `fmap` hGetLine pout
+             v     <- case span (/= '.') vline of
+                        ("",_)  -> fail "no digits!"
+                        (x,y) -> return (read x
+                                        , read $ takeWhile isDigit $ drop 1 y)
+
              hClose pin
              hClose pout
              hClose perr
@@ -1327,19 +1328,15 @@ handleProc pgm phase_name proc = do
     (rc, r) <- proc `catchIO` handler
     case rc of
       ExitSuccess{} -> return r
-      ExitFailure n
-        -- rawSystem returns (ExitFailure 127) if the exec failed for any
-        -- reason (eg. the program doesn't exist).  This is the only clue
-        -- we have, but we need to report something to the user because in
-        -- the case of a missing program there will otherwise be no output
-        -- at all.
-       | n == 127  -> does_not_exist
-       | otherwise -> throwGhcExceptionIO (PhaseFailed phase_name rc)
+      ExitFailure n -> throwGhcExceptionIO (
+            ProgramError ("`" ++ takeBaseName pgm ++ "'" ++
+                          " failed in phase `" ++ phase_name ++ "'." ++
+                          " (Exit code: " ++ show n ++ ")"))
   where
     handler err =
        if IO.isDoesNotExistError err
           then does_not_exist
-          else IO.ioError err
+          else throwGhcExceptionIO (ProgramError $ show err)
 
     does_not_exist = throwGhcExceptionIO (InstallationError ("could not execute: " ++ pgm))
 
@@ -1473,7 +1470,7 @@ traceCmd dflags phase_name cmd_line action
   where
     handle_exn _verb exn = do { debugTraceMsg dflags 2 (char '\n')
                               ; debugTraceMsg dflags 2 (ptext (sLit "Failed:") <+> text cmd_line <+> text (show exn))
-                              ; throwGhcExceptionIO (PhaseFailed phase_name (ExitFailure 1)) }
+                              ; throwGhcExceptionIO (ProgramError (show exn))}
 
 {-
 ************************************************************************
@@ -1544,7 +1541,7 @@ linesPlatform xs =
 
 #endif
 
-linkDynLib :: DynFlags -> [String] -> [PackageKey] -> IO ()
+linkDynLib :: DynFlags -> [String] -> [UnitId] -> IO ()
 linkDynLib dflags0 o_files dep_packages
  = do
     let -- This is a rather ugly hack to fix dynamically linked
@@ -1590,7 +1587,7 @@ linkDynLib dflags0 o_files dep_packages
                       OSMinGW32 ->
                           pkgs
                       _ ->
-                          filter ((/= rtsPackageKey) . packageConfigId) pkgs
+                          filter ((/= rtsUnitId) . packageConfigId) pkgs
     let pkg_link_opts = let (package_hs_libs, extra_libs, other_flags) = collectLinkOpts dflags pkgs_no_rts
                         in  package_hs_libs ++ extra_libs ++ other_flags
 
@@ -1600,7 +1597,7 @@ linkDynLib dflags0 o_files dep_packages
 
     -- frameworks
     pkg_framework_opts <- getPkgFrameworkOpts dflags platform
-                                              (map packageKey pkgs)
+                                              (map unitId pkgs)
     let framework_opts = getFrameworkOpts dflags platform
 
     case os of
@@ -1721,7 +1718,7 @@ linkDynLib dflags0 o_files dep_packages
                  ++ map Option pkg_link_opts
               )
 
-getPkgFrameworkOpts :: DynFlags -> Platform -> [PackageKey] -> IO [String]
+getPkgFrameworkOpts :: DynFlags -> Platform -> [UnitId] -> IO [String]
 getPkgFrameworkOpts dflags platform dep_packages
   | platformUsesFrameworks platform = do
     pkg_framework_path_opts <- do

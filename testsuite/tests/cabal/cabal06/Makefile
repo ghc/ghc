@@ -4,7 +4,7 @@ include $(TOP)/mk/test.mk
 
 SETUP=../Setup -v0
 
-# This test is for packages whose package IDs overlap, but whose package keys
+# This test is for packages whose package IDs overlap, but whose IPIDs
 # do not.
 #
 #   1. install p-1.0
@@ -15,7 +15,7 @@ SETUP=../Setup -v0
 #   6. install r-1.0 asking for p-1.0
 #
 # The notable steps are (4), which previously would have required a reinstall,
-# and (6), where the dependency solver picks between two package keys with the
+# and (6), where the dependency solver picks between two IPIDs with the
 # same package ID based on their depenencies.
 #
 # ./Setup configure is pretty dumb, so we spoonfeed it precisely the
@@ -29,7 +29,7 @@ cabal06: clean
 	cd p-1.0 && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/inst-a' --ghc-pkg-options='--enable-multi-instance'
 	cd p-1.0 && $(SETUP) build
 	cd p-1.0 && $(SETUP) copy
-	cd p-1.0 && $(SETUP) register
+	(cd p-1.0 && $(SETUP) register --print-ipid) > tmp_p_1_0
 	cd q && $(SETUP) clean
 	cd q && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/inst-b' --ghc-pkg-options='--enable-multi-instance'
 	cd q && $(SETUP) build
@@ -39,16 +39,16 @@ cabal06: clean
 	cd p-1.1 && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/inst-c' --ghc-pkg-options='--enable-multi-instance'
 	cd p-1.1 && $(SETUP) build
 	cd p-1.1 && $(SETUP) copy
-	cd p-1.1 && $(SETUP) register
+	(cd p-1.1 && $(SETUP) register --print-ipid) > tmp_p_1_1
 	cd q && $(SETUP) clean
 	cd q && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --constraint="p==1.1" --prefix='$(PWD)/inst-d' --ghc-pkg-options='--enable-multi-instance'
 	cd q && $(SETUP) build
 	cd q && $(SETUP) copy
 	(cd q && $(SETUP) register --print-ipid) > tmp_second_q
 	@echo "Does the first instance of q depend on p-1.0?"
-	'$(GHC_PKG)' field --ipid `cat tmp_first_q` depends -f tmp.d | grep p-1.0 | wc -l | sed 's/[[:space:]]//g'
+	'$(GHC_PKG)' field --ipid `cat tmp_first_q` depends -f tmp.d | grep `cat tmp_p_1_0` | wc -l | sed 's/[[:space:]]//g'
 	@echo "Does the second instance of q depend on p-1.0?"
-	'$(GHC_PKG)' field --ipid `cat tmp_second_q` depends -f tmp.d | grep p-1.1 | wc -l | sed 's/[[:space:]]//g'
+	'$(GHC_PKG)' field --ipid `cat tmp_second_q` depends -f tmp.d | grep `cat tmp_p_1_1` | wc -l | sed 's/[[:space:]]//g'
 	cd r && $(SETUP) clean
 	cd r && ../Setup configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --dependency="q=`cat ../tmp_first_q`" --constraint="p==1.0" --prefix='$(PWD)/inst-e' --ghc-pkg-options='--enable-multi-instance'
 	cd r && $(SETUP) build

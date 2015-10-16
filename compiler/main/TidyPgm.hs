@@ -832,7 +832,7 @@ dffvLetBndr :: Bool -> Id -> DFFV ()
 --       we say "True" if we are exposing that unfolding
 dffvLetBndr vanilla_unfold id
   = do { go_unf (unfoldingInfo idinfo)
-       ; mapM_ go_rule (specInfoRules (specInfo idinfo)) }
+       ; mapM_ go_rule (ruleInfoRules (ruleInfo idinfo)) }
   where
     idinfo = idInfo id
 
@@ -1123,7 +1123,7 @@ tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
 
 ------------------------
 tidyTopBind  :: DynFlags
-             -> PackageKey
+             -> UnitId
              -> Module
              -> (Integer -> CoreExpr)
              -> UnfoldEnv
@@ -1311,7 +1311,7 @@ type CafRefEnv = (VarEnv Id, Integer -> CoreExpr)
   -- The Integer -> CoreExpr is the desugaring function for Integer literals
   -- See Note [Disgusting computation of CafRefs]
 
-hasCafRefs :: DynFlags -> PackageKey -> Module
+hasCafRefs :: DynFlags -> UnitId -> Module
            -> CafRefEnv -> Arity -> CoreExpr
            -> CafInfo
 hasCafRefs dflags this_pkg this_mod p@(_,cvt_integer) arity expr

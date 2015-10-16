@@ -1646,14 +1646,14 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
 
         if config.verbose >= 1 and _expect_pass(way):
             # See Note [Output comparison].
-            r = os.system('diff -uw {} {}'.format(expected_normalised_path,
-                                                  actual_normalised_path))
+            r = os.system('diff -uw {0} {1}'.format(expected_normalised_path,
+                                                    actual_normalised_path))
 
             # If for some reason there were no non-whitespace differences,
             # then do a full diff
             if r == 0:
-                r = os.system('diff -u {} {}'.format(expected_normalised_path,
-                                                     actual_normalised_path))
+                r = os.system('diff -u {0} {1}'.format(expected_normalised_path,
+                                                       actual_normalised_path))
 
         if config.accept and (getTestOpts().expect == 'fail' or
                               way in getTestOpts().expect_fail_for):
@@ -1691,7 +1691,7 @@ def normalise_callstacks(str):
     def repl(matches):
         location = matches.group(1)
         location = normalise_slashes_(location)
-        return ', called at {}:<line>:<column> in <package-id>:'.format(location)
+        return ', called at {0}:<line>:<column> in <package-id>:'.format(location)
     # Ignore line number differences in call stacks (#10834).
     return re.sub(', called at (.+):[\\d]+:[\\d]+ in [\\w\-\.]+:', repl, str)
 
@@ -1818,7 +1818,7 @@ def rawSystemWithTimeout(cmd_and_args):
     if r == 99 and getTestOpts().exit_code != 99:
         # Only print a message when timeout killed the process unexpectedly.
         cmd = cmd_and_args[-1]
-        if_verbose(1, 'Timeout happened...killed process "{}"...\n'.format(cmd))
+        if_verbose(1, 'Timeout happened...killed process "{0}"...\n'.format(cmd))
     return r
 
 # cmd is a complex command in Bourne-shell syntax

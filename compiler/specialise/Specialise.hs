@@ -449,7 +449,7 @@ The SpecEnv of an Id maps a list of types (the template) to an expression
 
         [Type]  |->  Expr
 
-For example, if f has this SpecInfo:
+For example, if f has this RuleInfo:
 
         [Int, a]  ->  \d:Ord Int. f' a
 
@@ -1323,6 +1323,26 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
                                         `setIdUnfolding`  spec_unf
 
            ; return (Just ((spec_f_w_arity, spec_rhs), final_uds, spec_env_rule)) } }
+
+{-
+Note [Orphans and auto-generated rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we specialise an INLINEABLE function, or when we have
+-fspecialise-aggressively, we auto-generate RULES that are orphans.
+We don't want to warn about these, or we'd generate a lot of warnings.
+Thus, we only warn about user-specified orphan rules.
+
+Indeed, we don't even treat the module as an orphan module if it has
+auto-generated *rule* orphans.  Orphan modules are read every time we
+compile, so they are pretty obtrusive and slow down every compilation,
+even non-optimised ones.  (Reason: for type class instances it's a
+type correctness issue.)  But specialisation rules are strictly for
+*optimisation* only so it's fine not to read the interface.
+
+What this means is that a SPEC rules from auto-specialisation in
+module M will be used in other modules only if M.hi has been read for
+some other reason, which is actually pretty likely.
+-}
 
 bindAuxiliaryDicts
         :: SpecEnv

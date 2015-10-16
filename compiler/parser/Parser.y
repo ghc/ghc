@@ -1148,7 +1148,7 @@ pattern_synonym_decl :: { LHsDecl RdrName }
 
 pattern_synonym_lhs :: { (Located RdrName, HsPatSynDetails (Located RdrName)) }
         : con vars0 { ($1, PrefixPatSyn $2) }
-        | varid consym varid { ($2, InfixPatSyn $1 $3) }
+        | varid conop varid { ($2, InfixPatSyn $1 $3) }
 
 vars0 :: { [Located RdrName] }
         : {- empty -}                 { [] }
@@ -2182,37 +2182,6 @@ exp10 :: { LHsExpr RdrName }
                                           -- hdaume: core annotation
         | fexp                         { $1 }
 
-        -- parsing error messages go below here
-        | '\\' apat apats opt_asig '->' error        {% parseErrorSDoc (combineLocs $1 $5) $ text
-                                                        "parse error in lambda: no expression after '->'"
-                                                     }
-        | '\\' error                                 {% parseErrorSDoc (getLoc $1) $ text
-                                                        "parse error: naked lambda expression '\'"
-                                                     }
-        | 'let' binds 'in' error                     {% parseErrorSDoc (combineLocs $1 $2) $ text
-                                                        "parse error in let binding: missing expression after 'in'"
-                                                     }
-        | 'let' binds error                          {% parseErrorSDoc (combineLocs $1 $2) $ text
-                                                        "parse error in let binding: missing required 'in'"
-                                                     }
-        | 'let' error                                {% parseErrorSDoc (getLoc $1) $ text
-                                                        "parse error: naked let binding"
-                                                     }
-        | 'if' exp optSemi 'then' exp optSemi
-          'else' error                               {% hintIf (combineLocs $1 $5) "else clause empty" }
-        | 'if' exp optSemi 'then' exp optSemi error  {% hintIf (combineLocs $1 $5) "missing required else clause" }
-        | 'if' exp optSemi 'then' error              {% hintIf (combineLocs $1 $2) "then clause empty" }
-        | 'if' exp optSemi error                     {% hintIf (combineLocs $1 $2) "missing required then and else clauses" }
-        | 'if' error                                 {% hintIf (getLoc $1) "naked if statement" }
-        | 'case' exp 'of' error                      {% parseErrorSDoc (combineLocs $1 $2) $ text
-                                                        "parse error in case statement: missing list after '->'"
-                                                     }
-        | 'case' exp error                           {% parseErrorSDoc (combineLocs $1 $2) $ text
-                                                        "parse error in case statement: missing required 'of'"
-                                                     }
-        | 'case' error                               {% parseErrorSDoc (getLoc $1) $ text
-                                                        "parse error: naked case statement"
-                                                     }
 optSemi :: { ([Located a],Bool) }
         : ';'         { ([$1],True) }
         | {- empty -} { ([],False) }

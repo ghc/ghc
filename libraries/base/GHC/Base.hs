@@ -309,7 +309,6 @@ instance Monoid a => Applicative ((,) a) where
     (u, f) <*> (v, x) = (u `mappend` v, f x)
 
 instance Monoid a => Monad ((,) a) where
-    return x = (mempty, x)
     (u, a) >>= k = case k a of (v, b) -> (u `mappend` v, b)
 
 instance Monoid a => Monoid (IO a) where
@@ -626,7 +625,6 @@ instance Applicative ((->) a) where
     (<*>) f g x = f x (g x)
 
 instance Monad ((->) r) where
-    return = const
     f >>= k = \ r -> k (f r) r
 
 instance Functor ((,) a) where
@@ -652,7 +650,6 @@ instance  Monad Maybe  where
 
     (>>) = (*>)
 
-    return              = Just
     fail _              = Nothing
 
 -- -----------------------------------------------------------------------------
@@ -735,8 +732,6 @@ instance Monad []  where
     xs >>= f             = [y | x <- xs, y <- f x]
     {-# INLINE (>>) #-}
     (>>) = (*>)
-    {-# INLINE return #-}
-    return x            = [x]
     {-# INLINE fail #-}
     fail _              = []
 
@@ -1063,18 +1058,19 @@ asTypeOf                =  const
 ----------------------------------------------
 
 instance  Functor IO where
-   fmap f x = x >>= (return . f)
+   fmap f x = x >>= (pure . f)
 
 instance Applicative IO where
-    pure = return
-    (<*>) = ap
+    {-# INLINE pure #-}
+    {-# INLINE (*>) #-}
+    pure   = returnIO
+    m *> k = m >>= \ _ -> k
+    (<*>)  = ap
 
 instance  Monad IO  where
-    {-# INLINE return #-}
     {-# INLINE (>>)   #-}
     {-# INLINE (>>=)  #-}
-    m >> k    = m >>= \ _ -> k
-    return    = returnIO
+    (>>)      = (*>)
     (>>=)     = bindIO
     fail s    = failIO s
 

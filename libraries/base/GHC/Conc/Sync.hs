@@ -626,19 +626,19 @@ unSTM :: STM a -> (State# RealWorld -> (# State# RealWorld, a #))
 unSTM (STM a) = a
 
 instance  Functor STM where
-   fmap f x = x >>= (return . f)
+   fmap f x = x >>= (pure . f)
 
 instance Applicative STM where
-  pure = return
+  {-# INLINE pure #-}
+  {-# INLINE (*>) #-}
+  pure x = returnSTM x
   (<*>) = ap
+  m *> k = thenSTM m k
 
 instance  Monad STM  where
-    {-# INLINE return #-}
-    {-# INLINE (>>)   #-}
     {-# INLINE (>>=)  #-}
-    m >> k      = thenSTM m k
-    return x    = returnSTM x
     m >>= k     = bindSTM m k
+    (>>) = (*>)
 
 bindSTM :: STM a -> (a -> STM b) -> STM b
 bindSTM (STM m) k = STM ( \s ->

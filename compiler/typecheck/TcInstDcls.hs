@@ -15,7 +15,7 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
 import HsSyn
 import TcBinds
 import TcTyClsDecls
-import TcClassDcl( tcClassDecl2,
+import TcClassDcl( tcClassDecl2, tcATDefault,
                    HsSigFun, lookupHsSig, mkHsSigFun,
                    findMethodBind, instantiateMethod )
 import TcPat      ( TcIdSigInfo, addInlinePrags, completeIdSigPolyId, lookupPragEnv, emptyPragEnv )
@@ -32,7 +32,6 @@ import TcDeriv
 import TcEnv
 import TcHsType
 import TcUnify
-import Coercion   ( pprCoAxiom {- , isReflCo, mkSymCo, mkSubCo -} )
 import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
 import Type
 import TcEvidence
@@ -62,7 +61,7 @@ import BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
 
 import Control.Monad
 import Maybes
-import Data.List  ( mapAccumL, partition )
+import Data.List  ( partition )
 
 {-
 Typechecking instance declarations is done in two passes. The first
@@ -537,7 +536,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
         ; let defined_ats = mkNameSet (map (tyFamInstDeclName . unLoc) ats)
                             `unionNameSet`
                             mkNameSet (map (unLoc . dfid_tycon . unLoc) adts)
-        ; tyfam_insts1 <- mapM (tcATDefault loc mini_subst defined_ats)
+        ; tyfam_insts1 <- mapM (tcATDefault True loc mini_subst defined_ats)
                                (classATItems clas)
 
         -- Finally, construct the Core representation of the instance.
@@ -558,51 +557,6 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
         ; return ( [inst_info], tyfam_insts0 ++ concat tyfam_insts1 ++ datafam_insts
                  , deriv_infos ) }
 
-
-tcATDefault :: SrcSpan -> TvSubst -> NameSet -> ClassATItem -> TcM [FamInst]
--- ^ Construct default instances for any associated types that
--- aren't given a user definition
--- Returns [] or singleton
-tcATDefault loc inst_subst defined_ats (ATI fam_tc defs)
-  -- User supplied instances ==> everything is OK
-  | tyConName fam_tc `elemNameSet` defined_ats
-  = return []
-
-  -- No user instance, have defaults ==> instatiate them
-   -- Example:   class C a where { type F a b :: *; type F a b = () }
-   --            instance C [x]
-   -- Then we want to generate the decl:   type F [x] b = ()
-  | Just (rhs_ty, _loc) <- defs
-  = do { let (subst', pat_tys') = mapAccumL subst_tv inst_subst
-                                            (tyConTyVars fam_tc)
-             rhs'     = substTy subst' rhs_ty
-             tv_set'  = tyVarsOfTypes pat_tys'
-             tvs'     = varSetElemsKvsFirst tv_set'
-       ; rep_tc_name <- newFamInstTyConName (L loc (tyConName fam_tc)) pat_tys'
-       ; let axiom = mkSingleCoAxiom Nominal rep_tc_name tvs' fam_tc pat_tys' rhs'
-           -- NB: no validity check. We check validity of default instances
-           -- in the class definition. Because type instance arguments cannot
-           -- be type family applications and cannot be polytypes, the
-           -- validity check is redundant.
-
-       ; traceTc "mk_deflt_at_instance" (vcat [ ppr fam_tc, ppr rhs_ty
-                                              , pprCoAxiom axiom ])
-       ; fam_inst <- ASSERT( tyVarsOfType rhs' `subVarSet` tv_set' )
-                     newFamInst SynFamilyInst axiom
-       ; return [fam_inst] }
-
-   -- No defaults ==> generate a warning
-  | otherwise  -- defs = Nothing
-  = do { warnMissingMethodOrAT "associated type" (tyConName fam_tc)
-       ; return [] }
-  where
-    subst_tv subst tc_tv
-      | Just ty <- lookupVarEnv (getTvSubstEnv subst) tc_tv
-      = (subst, ty)
-      | otherwise
-      = (extendTvSubst subst tc_tv ty', ty')
-      where
-        ty' = mkTyVarTy (updateTyVarKind (substTy subst) tc_tv)
 
 {-
 ************************************************************************
@@ -1575,16 +1529,6 @@ derivBindCtxt sel_id clas tys
           , nest 2 (ptext (sLit "in a derived instance for")
                     <+> quotes (pprClassPred clas tys) <> colon)
           , nest 2 $ ptext (sLit "To see the code I am typechecking, use -ddump-deriv") ]
-
-warnMissingMethodOrAT :: String -> Name -> TcM ()
-warnMissingMethodOrAT what name
-  = do { warn <- woptM Opt_WarnMissingMethods
-       ; traceTc "warn" (ppr name <+> ppr warn <+> ppr (not (startsWithUnderscore (getOccName name))))
-       ; warnTc (warn  -- Warn only if -fwarn-missing-methods
-                 && not (startsWithUnderscore (getOccName name)))
-                                        -- Don't warn about _foo methods
-                (ptext (sLit "No explicit") <+> text what <+> ptext (sLit "or default declaration for")
-                 <+> quotes (ppr name)) }
 
 warnUnsatisfiedMinimalDefinition :: ClassMinimalDef -> TcM ()
 warnUnsatisfiedMinimalDefinition mindef

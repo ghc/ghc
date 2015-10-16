@@ -82,7 +82,6 @@ instance Applicative Dual where
     (<*>)    = coerce
 
 instance Monad Dual where
-    return   = Dual
     m >>= k  = k (getDual m)
 
 -- | The monoid of endomorphisms under composition.
@@ -126,7 +125,6 @@ instance Applicative Sum where
     (<*>)    = coerce
 
 instance Monad Sum where
-    return   = Sum
     m >>= k  = k (getSum m)
 
 -- | Monoid under multiplication.
@@ -146,7 +144,6 @@ instance Applicative Product where
     (<*>)    = coerce
 
 instance Monad Product where
-    return   = Product
     m >>= k  = k (getProduct m)
 
 -- $MaybeExamples

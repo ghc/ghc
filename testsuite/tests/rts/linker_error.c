@@ -51,12 +51,12 @@ int main (int argc, char *argv[])
     for (i=0; i < ITERATIONS; i++) {
         r = loadObj(obj);
         if (!r) {
-            debugBelch("loadObj(%s) failed", obj);
+            debugBelch("loadObj(%s) failed\n", obj);
             continue;
         }
         r = resolveObjs();
         if (!r) {
-            debugBelch("resolveObjs failed");
+            debugBelch("resolveObjs failed\n");
             unloadObj(obj);
             continue;
         }

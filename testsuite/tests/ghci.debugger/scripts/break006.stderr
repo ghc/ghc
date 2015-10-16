@@ -4,7 +4,7 @@
     Cannot resolve unknown runtime type ‘t1’
     Use :print or :force to determine these types
     Relevant bindings include it :: t1 (bound at <interactive>:5:1)
-    Potential instances:
+    These potential instances exist:
       instance (Show a, Show b) => Show (Either a b)
         -- Defined in ‘Data.Either’
       instance Show All -- Defined in ‘Data.Monoid’
@@ -21,7 +21,7 @@
     Cannot resolve unknown runtime type ‘t1’
     Use :print or :force to determine these types
     Relevant bindings include it :: t1 (bound at <interactive>:7:1)
-    Potential instances:
+    These potential instances exist:
       instance (Show a, Show b) => Show (Either a b)
         -- Defined in ‘Data.Either’
       instance Show All -- Defined in ‘Data.Monoid’

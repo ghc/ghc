@@ -90,8 +90,6 @@ instance Applicative Proxy where
     {-# INLINE (<*>) #-}
 
 instance Monad Proxy where
-    return _ = Proxy
-    {-# INLINE return #-}
     _ >>= _ = Proxy
     {-# INLINE (>>=) #-}
 

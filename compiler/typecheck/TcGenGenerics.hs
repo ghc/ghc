@@ -14,7 +14,6 @@ module TcGenGenerics (canDoGenerics, canDoGenerics1,
                       MetaTyCons, genGenericMetaTyCons,
                       gen_Generic_binds, get_gen1_constrained_tys) where
 
-import DynFlags
 import HsSyn
 import Type
 import Kind             ( isKind )
@@ -25,28 +24,29 @@ import TyCon
 import FamInstEnv       ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import FamInst
 import Module           ( Module, moduleName, moduleNameString
-                        , modulePackageKey, packageKeyString, getModule )
+                        , moduleUnitId, unitIdString, getModule )
 import IfaceEnv         ( newGlobalBinder )
 import Name      hiding ( varName )
 import RdrName
 import BasicTypes
+import TysPrim
 import TysWiredIn
 import PrelNames
-import InstEnv
 import TcEnv
-import MkId
 import TcRnMonad
 import HscTypes
 import ErrUtils( Validity(..), andValid )
 import BuildTyCl
 import SrcLoc
 import Bag
+import Inst
 import VarSet (elemVarSet)
 import Outputable
 import FastString
 import Util
 
 import Control.Monad (mplus,forM)
+import Data.Maybe (isJust)
 
 #include "HsVersions.h"
 
@@ -111,8 +111,7 @@ genGenericMetaTyCons tc =
 -- both the tycon declarations and related instances
 metaTyConsToDerivStuff :: TyCon -> MetaTyCons -> TcM BagDerivStuff
 metaTyConsToDerivStuff tc metaDts =
-  do  dflags <- getDynFlags
-      dClas <- tcLookupClass datatypeClassName
+  do  dClas <- tcLookupClass datatypeClassName
       d_dfun_name <- newDFunName' dClas tc
       cClas <- tcLookupClass constructorClassName
       c_dfun_names <- sequence [ (conTy,) <$> newDFunName' cClas tc
@@ -127,16 +126,18 @@ metaTyConsToDerivStuff tc metaDts =
       let
         (dBinds,cBinds,sBinds) = mkBindsMetaD fix_env tc
         mk_inst clas tc dfun_name
-          = mkLocalInstance (mkDictFunId dfun_name [] [] clas tys)
-                            OverlapFlag { overlapMode   = (NoOverlap "")
-                                        , isSafeOverlap = safeLanguageOn dflags }
-                            [] clas tys
+          = newClsInst (Just (NoOverlap "")) dfun_name [] [] clas tys
           where
             tys = [mkTyConTy tc]
 
+
+      let d_metaTycon = metaD metaDts
+      d_inst <- mk_inst dClas d_metaTycon d_dfun_name
+      c_insts <- sequence [ mk_inst cClas c ds | (c, ds) <- c_dfun_names ]
+      s_insts <- mapM (mapM (\(s,ds) -> mk_inst sClas s ds)) s_dfun_names
+
+      let
         -- Datatype
-        d_metaTycon = metaD metaDts
-        d_inst   = mk_inst dClas d_metaTycon d_dfun_name
         d_binds  = InstBindings { ib_binds = dBinds
                                 , ib_tyvars = []
                                 , ib_pragmas = []
@@ -145,7 +146,6 @@ metaTyConsToDerivStuff tc metaDts =
         d_mkInst = DerivInst (InstInfo { iSpec = d_inst, iBinds = d_binds })
 
         -- Constructor
-        c_insts = [ mk_inst cClas c ds | (c, ds) <- c_dfun_names ]
         c_binds = [ InstBindings { ib_binds = c
                                  , ib_tyvars = []
                                  , ib_pragmas = []
@@ -156,7 +156,6 @@ metaTyConsToDerivStuff tc metaDts =
                    | (is,bs) <- myZip1 c_insts c_binds ]
 
         -- Selector
-        s_insts = map (map (\(s,ds) -> mk_inst sClas s ds)) s_dfun_names
         s_binds = [ [ InstBindings { ib_binds = s
                                    , ib_tyvars = []
                                    , ib_pragmas = []
@@ -278,14 +277,19 @@ canDoGenerics tc tc_args
         -- it relies on instantiating *polymorphic* sum and product types
         -- at the argument types of the constructors
     bad_con dc = if (any bad_arg_type (dataConOrigArgTys dc))
-                  then (NotValid (ppr dc <+> text "must not have unlifted or polymorphic arguments"))
+                  then (NotValid (ppr dc <+> text
+                    "must not have exotic unlifted or polymorphic arguments"))
                   else (if (not (isVanillaDataCon dc))
                           then (NotValid (ppr dc <+> text "must be a vanilla data constructor"))
                           else IsValid)
 
         -- Nor can we do the job if it's an existential data constructor,
         -- Nor if the args are polymorphic types (I don't think)
-    bad_arg_type ty = isUnLiftedType ty || not (isTauTy ty)
+    bad_arg_type ty = (isUnLiftedType ty && not (allowedUnliftedTy ty))
+                      || not (isTauTy ty)
+
+allowedUnliftedTy :: Type -> Bool
+allowedUnliftedTy = isJust . unboxedRepRDRs
 
 mergeErrors :: [Validity] -> Validity
 mergeErrors []             = IsValid
@@ -586,23 +590,29 @@ tc_mkRepTy ::  -- Gen0_ or Gen1_, for Rep or Rep1
             -> TcM Type
 tc_mkRepTy gk_ tycon metaDts =
   do
-    d1    <- tcLookupTyCon d1TyConName
-    c1    <- tcLookupTyCon c1TyConName
-    s1    <- tcLookupTyCon s1TyConName
-    nS1   <- tcLookupTyCon noSelTyConName
-    rec0  <- tcLookupTyCon rec0TyConName
-    rec1  <- tcLookupTyCon rec1TyConName
-    par1  <- tcLookupTyCon par1TyConName
-    u1    <- tcLookupTyCon u1TyConName
-    v1    <- tcLookupTyCon v1TyConName
-    plus  <- tcLookupTyCon sumTyConName
-    times <- tcLookupTyCon prodTyConName
-    comp  <- tcLookupTyCon compTyConName
+    d1      <- tcLookupTyCon d1TyConName
+    c1      <- tcLookupTyCon c1TyConName
+    s1      <- tcLookupTyCon s1TyConName
+    nS1     <- tcLookupTyCon noSelTyConName
+    rec0    <- tcLookupTyCon rec0TyConName
+    rec1    <- tcLookupTyCon rec1TyConName
+    par1    <- tcLookupTyCon par1TyConName
+    u1      <- tcLookupTyCon u1TyConName
+    v1      <- tcLookupTyCon v1TyConName
+    plus    <- tcLookupTyCon sumTyConName
+    times   <- tcLookupTyCon prodTyConName
+    comp    <- tcLookupTyCon compTyConName
+    uAddr   <- tcLookupTyCon uAddrTyConName
+    uChar   <- tcLookupTyCon uCharTyConName
+    uDouble <- tcLookupTyCon uDoubleTyConName
+    uFloat  <- tcLookupTyCon uFloatTyConName
+    uInt    <- tcLookupTyCon uIntTyConName
+    uWord   <- tcLookupTyCon uWordTyConName
 
     let mkSum' a b = mkTyConApp plus  [a,b]
         mkProd a b = mkTyConApp times [a,b]
         mkComp a b = mkTyConApp comp  [a,b]
-        mkRec0 a   = mkTyConApp rec0  [a]
+        mkRec0 a   = mkBoxTy uAddr uChar uDouble uFloat uInt uWord rec0 a
         mkRec1 a   = mkTyConApp rec1  [a]
         mkPar1     = mkTyConTy  par1
         mkD    a   = mkTyConApp d1    [metaDTyCon, sumP (tyConDataCons a)]
@@ -649,6 +659,28 @@ tc_mkRepTy gk_ tycon metaDts =
         metaSTyCons = map (map mkTyConTy) (metaS metaDts)
 
     return (mkD tycon)
+
+-- Given the TyCons for each URec-related type synonym, check to see if the
+-- given type is an unlifted type that generics understands. If so, return
+-- its representation type. Otherwise, return Rec0.
+-- See Note [Generics and unlifted types]
+mkBoxTy :: TyCon -- UAddr
+        -> TyCon -- UChar
+        -> TyCon -- UDouble
+        -> TyCon -- UFloat
+        -> TyCon -- UInt
+        -> TyCon -- UWord
+        -> TyCon -- Rec0
+        -> Type
+        -> Type
+mkBoxTy uAddr uChar uDouble uFloat uInt uWord rec0 ty
+  | ty == addrPrimTy   = mkTyConTy uAddr
+  | ty == charPrimTy   = mkTyConTy uChar
+  | ty == doublePrimTy = mkTyConTy uDouble
+  | ty == floatPrimTy  = mkTyConTy uFloat
+  | ty == intPrimTy    = mkTyConTy uInt
+  | ty == wordPrimTy   = mkTyConTy uWord
+  | otherwise          = mkTyConApp rec0 [ty]
 
 --------------------------------------------------------------------------------
 -- Meta-information
@@ -716,7 +748,7 @@ mkBindsMetaD fix_env tycon = (dtBinds, allConBinds, allSelBinds)
                            $ tyConName_user
         moduleName_matches = mkStringLHS . moduleNameString . moduleName
                            . nameModule . tyConName $ tycon
-        pkgName_matches    = mkStringLHS . packageKeyString . modulePackageKey
+        pkgName_matches    = mkStringLHS . unitIdString . moduleUnitId
                            . nameModule . tyConName $ tycon
         isNewtype_matches  = [mkSimpleHsAlt nlWildPat (nlHsVar true_RDR)]
 
@@ -781,20 +813,20 @@ mk1Sum gk_ us i n datacon = (from_alt, to_alt)
     from_alt     = (nlConVarPat datacon_rdr datacon_vars, from_alt_rhs)
     from_alt_rhs = mkM1_E (genLR_E i n (mkProd_E gk_ us' datacon_varTys))
 
-    to_alt     = (mkM1_P (genLR_P i n (mkProd_P gk us' datacon_vars)), to_alt_rhs)
-                 -- These M1s are meta-information for the datatype
+    to_alt     = ( mkM1_P (genLR_P i n (mkProd_P gk us' datacon_varTys))
+                 , to_alt_rhs
+                 ) -- These M1s are meta-information for the datatype
     to_alt_rhs = case gk_ of
       Gen0_DC        -> nlHsVarApps datacon_rdr datacon_vars
       Gen1_DC argVar -> nlHsApps datacon_rdr $ map argTo datacon_varTys
         where
           argTo (var, ty) = converter ty `nlHsApp` nlHsVar var where
             converter = argTyFold argVar $ ArgTyAlg
-              {ata_rec0 = const $ nlHsVar unK1_RDR,
+              {ata_rec0 = nlHsVar . unboxRepRDR,
                ata_par1 = nlHsVar unPar1_RDR,
                ata_rec1 = const $ nlHsVar unRec1_RDR,
                ata_comp = \_ cnv -> (nlHsVar fmap_RDR `nlHsApp` cnv)
                                     `nlHsCompose` nlHsVar unComp1_RDR}
-
 
 
 -- Generates the L1/R1 sum pattern
@@ -832,35 +864,54 @@ mkProd_E gk_ _ varTys = mkM1_E (foldBal prod appVars)
     prod a b = prodDataCon_RDR `nlHsApps` [a,b]
 
 wrapArg_E :: GenericKind_DC -> (RdrName, Type) -> LHsExpr RdrName
-wrapArg_E Gen0_DC          (var, _)  = mkM1_E (k1DataCon_RDR `nlHsVarApps` [var])
+wrapArg_E Gen0_DC          (var, ty) = mkM1_E $
+                            boxRepRDR ty `nlHsVarApps` [var]
                          -- This M1 is meta-information for the selector
-wrapArg_E (Gen1_DC argVar) (var, ty) = mkM1_E $ converter ty `nlHsApp` nlHsVar var
+wrapArg_E (Gen1_DC argVar) (var, ty) = mkM1_E $
+                            converter ty `nlHsApp` nlHsVar var
                          -- This M1 is meta-information for the selector
   where converter = argTyFold argVar $ ArgTyAlg
-          {ata_rec0 = const $ nlHsVar k1DataCon_RDR,
+          {ata_rec0 = nlHsVar . boxRepRDR,
            ata_par1 = nlHsVar par1DataCon_RDR,
            ata_rec1 = const $ nlHsVar rec1DataCon_RDR,
            ata_comp = \_ cnv -> nlHsVar comp1DataCon_RDR `nlHsCompose`
                                   (nlHsVar fmap_RDR `nlHsApp` cnv)}
 
+boxRepRDR :: Type -> RdrName
+boxRepRDR = maybe k1DataCon_RDR fst . unboxedRepRDRs
 
+unboxRepRDR :: Type -> RdrName
+unboxRepRDR = maybe unK1_RDR snd . unboxedRepRDRs
+
+-- Retrieve the RDRs associated with each URec data family instance
+-- constructor. See Note [Generics and unlifted types]
+unboxedRepRDRs :: Type -> Maybe (RdrName, RdrName)
+unboxedRepRDRs ty
+  | ty == addrPrimTy   = Just (uAddrDataCon_RDR,   uAddrHash_RDR)
+  | ty == charPrimTy   = Just (uCharDataCon_RDR,   uCharHash_RDR)
+  | ty == doublePrimTy = Just (uDoubleDataCon_RDR, uDoubleHash_RDR)
+  | ty == floatPrimTy  = Just (uFloatDataCon_RDR,  uFloatHash_RDR)
+  | ty == intPrimTy    = Just (uIntDataCon_RDR,    uIntHash_RDR)
+  | ty == wordPrimTy   = Just (uWordDataCon_RDR,   uWordHash_RDR)
+  | otherwise          = Nothing
 
 -- Build a product pattern
-mkProd_P :: GenericKind   -- Gen0 or Gen1
-         -> US                  -- Base for unique names
-               -> [RdrName]     -- List of variables to match
-               -> LPat RdrName  -- Resulting product pattern
-mkProd_P _  _ []   = mkM1_P (nlNullaryConPat u1DataCon_RDR)
-mkProd_P gk _ vars = mkM1_P (foldBal prod appVars)
+mkProd_P :: GenericKind       -- Gen0 or Gen1
+         -> US                -- Base for unique names
+         -> [(RdrName, Type)] -- List of variables to match,
+                              --   along with their types
+         -> LPat RdrName      -- Resulting product pattern
+mkProd_P _  _ []     = mkM1_P (nlNullaryConPat u1DataCon_RDR)
+mkProd_P gk _ varTys = mkM1_P (foldBal prod appVars)
                      -- These M1s are meta-information for the constructor
   where
-    appVars = map (wrapArg_P gk) vars
+    appVars = unzipWith (wrapArg_P gk) varTys
     prod a b = prodDataCon_RDR `nlConPat` [a,b]
 
-wrapArg_P :: GenericKind -> RdrName -> LPat RdrName
-wrapArg_P Gen0 v = mkM1_P (k1DataCon_RDR `nlConVarPat` [v])
+wrapArg_P :: GenericKind -> RdrName -> Type -> LPat RdrName
+wrapArg_P Gen0 v ty = mkM1_P (boxRepRDR ty `nlConVarPat` [v])
                    -- This M1 is meta-information for the selector
-wrapArg_P Gen1 v = m1DataCon_RDR `nlConVarPat` [v]
+wrapArg_P Gen1 v _  = m1DataCon_RDR `nlConVarPat` [v]
 
 mkGenericLocal :: US -> RdrName
 mkGenericLocal u = mkVarUnqual (mkFastString ("g" ++ show u))
@@ -883,3 +934,17 @@ foldBal' _  x []  = x
 foldBal' _  _ [y] = y
 foldBal' op x l   = let (a,b) = splitAt (length l `div` 2) l
                     in foldBal' op x a `op` foldBal' op x b
+
+{-
+Note [Generics and unlifted types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Normally, all constants are marked with K1/Rec0. The exception to this rule is
+when a data constructor has an unlifted argument (e.g., Int#, Char#, etc.). In
+that case, we must use a data family instance of URec (from GHC.Generics) to
+mark it. As a result, before we can generate K1 or unK1, we must first check
+to see if the type is actually one of the unlifted types for which URec has a
+data family instance; if so, we generate that instead.
+
+See wiki:Commentary/Compiler/GenericDeriving#Handlingunliftedtypes for more
+details on why URec is implemented the way it is.
+-}
