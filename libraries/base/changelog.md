@@ -72,6 +72,9 @@
   * Add `forkOSWithUnmask` to `Control.Concurrent`, which is like
     `forkIOWithUnmask`, but the child is run in a bound thread.
 
+  * The `MINIMAL` definition of `Arrow` is now `arr AND (first OR (***))`.
+
+  * The `MINIMAL` definition of `ArrowChoice` is now `left OR (+++)`.
 
 ## 4.8.1.0  *Jul 2015*
 
