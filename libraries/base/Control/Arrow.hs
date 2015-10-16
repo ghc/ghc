@@ -86,6 +86,7 @@ infixr 1 ^<<, <<^
 -- which may be overridden for efficiency.
 
 class Category a => Arrow a where
+    {-# MINIMAL arr, (first | (***)) #-}
 
     -- | Lift a function to an arrow.
     arr :: (b -> c) -> a b c
@@ -215,6 +216,7 @@ instance MonadPlus m => ArrowPlus (Kleisli m) where
 -- be overridden for efficiency.
 
 class Arrow a => ArrowChoice a where
+    {-# MINIMAL (left | (+++)) #-}
 
     -- | Feed marked inputs through the argument arrow, passing the
     --   rest through unchanged to the output.
