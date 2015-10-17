@@ -4736,7 +4736,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
        addSection(&sections[oc->n_sections-1],
                   SECTIONKIND_RWDATA, SECTION_MALLOC,
                   bss, globalBssSize, 0, 0, 0);
-       debugBelch("bss @ %p %" FMT_Word "\n", bss, globalBssSize);
+       IF_DEBUG(linker, debugBelch("bss @ %p %" FMT_Word "\n", bss, globalBssSize));
        addProddableBlock(oc, bss, globalBssSize);
    } else {
        addSection(&sections[oc->n_sections-1],
@@ -4781,7 +4781,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
             Allocate zeroed space for it from the BSS section */
           addr = bss;
           bss = (void *)((StgWord)bss + (StgWord)symtab_i->Value);
-          debugBelch("bss symbol @ %p %u\n", addr, symtab_i->Value);
+          IF_DEBUG(linker, debugBelch("bss symbol @ %p %u\n", addr, symtab_i->Value));
       }
 
       if (addr != NULL ) {
