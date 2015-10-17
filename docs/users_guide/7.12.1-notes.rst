@@ -108,13 +108,15 @@ GHCi
 -  ``Main`` with an explicit module header but without ``main`` is now
    an error (#7765).
 
-   The ``:back`` and ``:forward`` commands now take an optional count
+-  The ``:back`` and ``:forward`` commands now take an optional count
    allowing the user to move forward or backward in history several
    steps at a time.
 
-   Added commands ``:load!`` and ``:reload!``, effectively setting
+-  Added commands ``:load!`` and ``:reload!``, effectively setting
    "-fdefer-type-errors" before loading a module and unsetting it after
    loading if it has not been set before (#8353).
+
+-  ``ghci -e`` now behaves like ``ghc -e`` (#9360).
 
 Template Haskell
 ~~~~~~~~~~~~~~~~

@@ -492,6 +492,10 @@ isDoMakeMode :: Mode -> Bool
 isDoMakeMode (Right (Right DoMake)) = True
 isDoMakeMode _ = False
 
+isDoEvalMode :: Mode -> Bool
+isDoEvalMode (Right (Right (DoEval _))) = True
+isDoEvalMode _ = False
+
 #ifdef GHCI
 isInteractiveMode :: PostLoadMode -> Bool
 isInteractiveMode DoInteractive = True
@@ -629,6 +633,15 @@ setMode newMode newFlag = liftEwM $ do
                       | isShowGhcUsageMode newMode &&
                         isDoInteractiveMode oldMode ->
                             ((showGhciUsageMode, newFlag), [])
+
+                    -- If we have both -e and --interactive then -e always wins
+                    _ | isDoEvalMode oldMode &&
+                        isDoInteractiveMode newMode ->
+                            ((oldMode, oldFlag), [])
+                      | isDoEvalMode newMode &&
+                        isDoInteractiveMode oldMode ->
+                            ((newMode, newFlag), [])
+
                     -- Otherwise, --help/--version/--numeric-version always win
                       | isDominantFlag oldMode -> ((oldMode, oldFlag), [])
                       | isDominantFlag newMode -> ((newMode, newFlag), [])

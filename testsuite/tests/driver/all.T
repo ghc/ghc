@@ -453,3 +453,6 @@ test('T365',
       unless(opsys('mingw32'), skip)],
       compile_fail,
       [''])
+
+test('T9360a', normal, run_command, ['{compiler} --interactive -e ""'])
+test('T9360b', normal, run_command, ['{compiler} -e "" --interactive'])
