@@ -56,6 +56,9 @@
   * Made `PatternMatchFail`, `RecSelError`, `RecConError`, `RecUpdError`,
     `NoMethodError`, and `AssertionFailed` newtypes (#10738)
 
+  * New module `Control.Monad.IO.Class` (previously provided by `transformers`
+    package). (#10773)
+
   * The `Generic` instance for `Proxy` is now poly-kinded (#10775)
 
   * add `Data.List.NonEmpty` and `Data.Semigroup` (to become

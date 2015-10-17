@@ -115,6 +115,7 @@ Library
         Control.Monad
         Control.Monad.Fix
         Control.Monad.Instances
+        Control.Monad.IO.Class
         Control.Monad.ST
         Control.Monad.ST.Lazy
         Control.Monad.ST.Lazy.Safe
