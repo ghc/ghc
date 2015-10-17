@@ -489,6 +489,14 @@ rts_PACKAGE_CPP_OPTS += '-DFFI_LIB="C$(LIBFFI_NAME)"'
 
 endif
 
+#-----------------------------------------------------------------------------
+# Add support for reading DWARF debugging information, if available
+
+ifeq "$(GhcRtsWithLibdw)" "YES"
+rts_CC_OPTS          += -DUSE_LIBDW
+rts_PACKAGE_CPP_OPTS += -DUSE_LIBDW
+endif
+
 # -----------------------------------------------------------------------------
 # dependencies
 

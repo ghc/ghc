@@ -91,6 +91,11 @@ dnl --------------------------------------------------------------
 FIND_LD([LdCmd])
 AC_SUBST([LdCmd])
 
+dnl ** Have libdw?
+dnl --------------------------------------------------------------
+AC_CHECK_LIB(dw, dwfl_begin, [HaveLibdw=YES], [HaveLibdw=NO])
+AC_SUBST(HaveLibdw)
+
 FP_GCC_VERSION
 AC_PROG_CPP
 

@@ -56,6 +56,10 @@ extra-libraries:
 #if USE_PAPI
                              , "papi"
 #endif
+#ifdef USE_LIBDW
+                             , "elf"
+                             , "dw"             /* for backtraces */
+#endif
 
 #ifdef INSTALLING
 include-dirs:           INCLUDE_DIR PAPI_INCLUDE_DIR FFI_INCLUDE_DIR
