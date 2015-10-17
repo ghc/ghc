@@ -15,6 +15,7 @@
 #include "RtsUtils.h"
 #include "Prelude.h"
 #include "Stable.h"
+#include "Libdw.h"
 
 #ifdef alpha_HOST_ARCH
 # if defined(linux_HOST_OS)
@@ -526,6 +527,25 @@ shutdown_handler(int sig STG_UNUSED)
 }
 
 /* -----------------------------------------------------------------------------
+ * SIGUSR2 handler.
+ *
+ * We try to give the user an indication of what we are currently doing
+ * in response to SIGUSR2.
+ * -------------------------------------------------------------------------- */
+static void
+backtrace_handler(int sig STG_UNUSED)
+{
+#ifdef USE_LIBDW
+    LibDwSession *session = libdw_init();
+    Backtrace *bt = libdw_get_backtrace(session);
+    libdw_print_backtrace(session, stderr, bt);
+    backtrace_free(bt);
+#else
+    fprintf(stderr, "This build does not support backtraces.\n");
+#endif
+}
+
+/* -----------------------------------------------------------------------------
  * An empty signal handler, currently used for SIGPIPE
  * -------------------------------------------------------------------------- */
 static void
@@ -669,6 +689,16 @@ initDefaultHandlers(void)
     if (sigaction(SIGPIPE, &action, &oact) != 0) {
         sysErrorBelch("warning: failed to install SIGPIPE handler");
     }
+
+#ifdef USE_LIBDW
+    // Print a backtrace on SIGUSR2
+    action.sa_handler = backtrace_handler;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = 0;
+    if (sigaction(SIGUSR2, &action, &oact) != 0) {
+        sysErrorBelch("warning: failed to install SIGUSR2 handler");
+    }
+#endif
 
     set_sigtstp_action(rtsTrue);
 }
