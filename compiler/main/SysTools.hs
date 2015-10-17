@@ -881,10 +881,10 @@ getCompilerInfo' dflags = do
       -- Try to grab the info from the process output.
       parseCompilerInfo _stdo stde _exitc
         -- Regular GCC
-        | any ("gcc version" `isPrefixOf`) stde =
+        | any ("gcc version" `isInfixOf`) stde =
           return GCC
         -- Regular clang
-        | any ("clang version" `isPrefixOf`) stde =
+        | any ("clang version" `isInfixOf`) stde =
           return Clang
         -- XCode 5.1 clang
         | any ("Apple LLVM version 5.1" `isPrefixOf`) stde =

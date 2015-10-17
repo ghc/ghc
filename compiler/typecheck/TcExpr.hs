@@ -1451,7 +1451,7 @@ disambiguateRecordBinds record_expr rbnds res_ty
 
     lookupParent :: GlobalRdrElt -> RnM (TyCon, GlobalRdrElt)
     lookupParent gre = do { id <- tcLookupId (gre_name gre)
-                          ; ASSERT (isRecordSelector id)
+                          ; ASSERT(isRecordSelector id)
                             return (recordSelectorTyCon id, gre) }
 
     -- Make all the fields unambiguous by choosing the given parent.
