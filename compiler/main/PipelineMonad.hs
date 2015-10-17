@@ -27,11 +27,11 @@ instance Functor CompPipeline where
     fmap = liftM
 
 instance Applicative CompPipeline where
-    pure = return
+    pure a = P $ \_env state -> return (state, a)
     (<*>) = ap
 
 instance Monad CompPipeline where
-  return a = P $ \_env state -> return (state, a)
+  return = pure
   P m >>= k = P $ \env state -> do (state',a) <- m env state
                                    unP (k a) env state'
 

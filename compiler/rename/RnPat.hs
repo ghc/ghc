@@ -102,11 +102,11 @@ instance Functor CpsRn where
     fmap = liftM
 
 instance Applicative CpsRn where
-    pure = return
+    pure x = CpsRn (\k -> k x)
     (<*>) = ap
 
 instance Monad CpsRn where
-  return x = CpsRn (\k -> k x)
+  return = pure
   (CpsRn m) >>= mk = CpsRn (\k -> m (\v -> unCpsRn (mk v) k))
 
 runCps :: CpsRn a -> RnM (a, FreeVars)

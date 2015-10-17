@@ -643,11 +643,11 @@ instance Functor RuleM where
     fmap = liftM
 
 instance Applicative RuleM where
-    pure = return
+    pure x = RuleM $ \_ _ _ -> Just x
     (<*>) = ap
 
 instance Monad RuleM where
-  return x = RuleM $ \_ _ _ -> Just x
+  return = pure
   RuleM f >>= g = RuleM $ \dflags iu e -> case f dflags iu e of
     Nothing -> Nothing
     Just r -> runRuleM (g r) dflags iu e

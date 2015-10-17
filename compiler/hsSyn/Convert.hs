@@ -86,11 +86,11 @@ instance Functor CvtM where
     fmap = liftM
 
 instance Applicative CvtM where
-    pure = return
+    pure x = CvtM $ \loc -> Right (loc,x)
     (<*>) = ap
 
 instance Monad CvtM where
-  return x       = CvtM $ \loc -> Right (loc,x)
+  return = pure
   (CvtM m) >>= k = CvtM $ \loc -> case m loc of
                                   Left err -> Left err
                                   Right (loc',v) -> unCvtM (k v) loc'

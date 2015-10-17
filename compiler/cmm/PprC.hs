@@ -1005,12 +1005,12 @@ instance Functor TE where
       fmap = liftM
 
 instance Applicative TE where
-      pure = return
+      pure a = TE $ \s -> (a, s)
       (<*>) = ap
 
 instance Monad TE where
    TE m >>= k  = TE $ \s -> case m s of (a, s') -> unTE (k a) s'
-   return a    = TE $ \s -> (a, s)
+   return = pure
 
 te_lbl :: CLabel -> TE ()
 te_lbl lbl = TE $ \(temps,lbls) -> ((), (temps, Map.insert lbl () lbls))

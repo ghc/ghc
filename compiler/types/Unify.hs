@@ -708,11 +708,11 @@ instance Functor UM where
       fmap = liftM
 
 instance Applicative UM where
-      pure = return
+      pure a = UM (\_tvs subst  -> Unifiable (a, subst))
       (<*>) = ap
 
 instance Monad UM where
-  return a = UM (\_tvs subst  -> Unifiable (a, subst))
+  return   = pure
   fail _   = UM (\_tvs _subst -> SurelyApart) -- failed pattern match
   m >>= k  = UM (\tvs  subst  -> case unUM m tvs subst of
                            Unifiable (v, subst') -> unUM (k v) tvs subst'

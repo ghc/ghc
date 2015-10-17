@@ -805,11 +805,11 @@ instance Functor RoleM where
     fmap = liftM
 
 instance Applicative RoleM where
-    pure = return
+    pure x = RM $ \_ state -> (x, state)
     (<*>) = ap
 
 instance Monad RoleM where
-  return x = RM $ \_ state -> (x, state)
+  return = pure
   a >>= f  = RM $ \m_info state -> let (a', state') = unRM a m_info state in
                                    unRM (f a') m_info state'
 

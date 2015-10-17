@@ -1491,11 +1491,11 @@ instance Functor LintM where
       fmap = liftM
 
 instance Applicative LintM where
-      pure = return
+      pure x = LintM $ \ _ errs -> (Just x, errs)
       (<*>) = ap
 
 instance Monad LintM where
-  return x = LintM (\ _ errs -> (Just x, errs))
+  return = pure
   fail err = failWithL (text err)
   m >>= k  = LintM (\ env errs ->
                        let (res, errs') = unLintM m env errs in

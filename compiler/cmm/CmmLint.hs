@@ -217,7 +217,7 @@ instance Functor CmmLint where
       fmap = liftM
 
 instance Applicative CmmLint where
-      pure = return
+      pure a = CmmLint (\_ -> Right a)
       (<*>) = ap
 
 instance Monad CmmLint where
@@ -225,7 +225,7 @@ instance Monad CmmLint where
                                 case m dflags of
                                 Left e -> Left e
                                 Right a -> unCL (k a) dflags
-  return a = CmmLint (\_ -> Right a)
+  return = pure
 
 instance HasDynFlags CmmLint where
     getDynFlags = CmmLint (\dflags -> Right dflags)

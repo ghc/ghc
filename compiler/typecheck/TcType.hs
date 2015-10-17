@@ -1203,11 +1203,11 @@ instance Functor OccCheckResult where
       fmap = liftM
 
 instance Applicative OccCheckResult where
-      pure = return
+      pure = OC_OK
       (<*>) = ap
 
 instance Monad OccCheckResult where
-  return x = OC_OK x
+  return            = pure
   OC_OK x     >>= k = k x
   OC_Forall   >>= _ = OC_Forall
   OC_NonTyVar >>= _ = OC_NonTyVar

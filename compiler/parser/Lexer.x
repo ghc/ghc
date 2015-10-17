@@ -1730,11 +1730,11 @@ instance Functor P where
   fmap = liftM
 
 instance Applicative P where
-  pure  = return
+  pure = returnP
   (<*>) = ap
 
 instance Monad P where
-  return = returnP
+  return = pure
   (>>=) = thenP
   fail = failP
 

@@ -314,13 +314,14 @@ instance Functor LintM where
       fmap = liftM
 
 instance Applicative LintM where
-      pure = return
+      pure a = LintM $ \_loc _scope errs -> (a, errs)
       (<*>) = ap
+      (*>)  = thenL_
 
 instance Monad LintM where
-    return a = LintM $ \_loc _scope errs -> (a, errs)
+    return = pure
     (>>=) = thenL
-    (>>)  = thenL_
+    (>>)  = (*>)
 
 thenL :: LintM a -> (a -> LintM b) -> LintM b
 thenL m k = LintM $ \loc scope errs

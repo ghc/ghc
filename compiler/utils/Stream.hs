@@ -46,11 +46,11 @@ instance Monad f => Functor (Stream f a) where
   fmap = liftM
 
 instance Monad m => Applicative (Stream m a) where
-  pure  = return
+  pure a = Stream (return (Left a))
   (<*>) = ap
 
 instance Monad m => Monad (Stream m a) where
-  return a = Stream (return (Left a))
+  return = pure
 
   Stream m >>= k = Stream $ do
                 r <- m

@@ -231,13 +231,14 @@ instance Functor MassageM where
       fmap = liftM
 
 instance Applicative MassageM where
-      pure = return
+      pure x = MassageM (\_ ccs -> (ccs, x))
       (<*>) = ap
+      (*>) = thenMM_
 
 instance Monad MassageM where
-    return x = MassageM (\_ ccs -> (ccs, x))
+    return = pure
     (>>=) = thenMM
-    (>>)  = thenMM_
+    (>>)  = (*>)
 
 -- the initMM function also returns the final CollectedCCs
 

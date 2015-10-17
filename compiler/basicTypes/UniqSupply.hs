@@ -105,9 +105,9 @@ takeUniqFromSupply (MkSplitUniqSupply n s1 _) = (mkUniqueGrimily n, s1)
 newtype UniqSM result = USM { unUSM :: UniqSupply -> (# result, UniqSupply #) }
 
 instance Monad UniqSM where
-  return = returnUs
+  return = pure
   (>>=) = thenUs
-  (>>)  = thenUs_
+  (>>)  = (*>)
 
 instance Functor UniqSM where
     fmap f (USM x) = USM (\us -> case x us of

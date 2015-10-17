@@ -89,12 +89,12 @@ instance Functor CmmParse where
       fmap = liftM
 
 instance Applicative CmmParse where
-      pure = return
+      pure = returnExtFC
       (<*>) = ap
 
 instance Monad CmmParse where
   (>>=) = thenExtFC
-  return = returnExtFC
+  return = pure
 
 instance HasDynFlags CmmParse where
     getDynFlags = EC (\_ _ d -> do dflags <- getDynFlags

@@ -214,11 +214,11 @@ instance Functor Hsc where
     fmap = liftM
 
 instance Applicative Hsc where
-    pure = return
+    pure a = Hsc $ \_ w -> return (a, w)
     (<*>) = ap
 
 instance Monad Hsc where
-    return a    = Hsc $ \_ w -> return (a, w)
+    return = pure
     Hsc m >>= k = Hsc $ \e w -> do (a, w1) <- m e w
                                    case k a of
                                        Hsc k' -> k' e w1

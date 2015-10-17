@@ -555,12 +555,10 @@ type CoreIOEnv = IOEnv CoreReader
 newtype CoreM a = CoreM { unCoreM :: CoreState -> CoreIOEnv (a, CoreState, CoreWriter) }
 
 instance Functor CoreM where
-    fmap f ma = do
-        a <- ma
-        return (f a)
+    fmap = liftM
 
 instance Monad CoreM where
-    return x = CoreM (\s -> nop s x)
+    return = pure
     mx >>= f = CoreM $ \s -> do
             (x, s', w1) <- unCoreM mx s
             (y, s'', w2) <- unCoreM (f x) s'
@@ -568,10 +566,11 @@ instance Monad CoreM where
             return $ seq w (y, s'', w)
             -- forcing w before building the tuple avoids a space leak
             -- (Trac #7702)
+
 instance A.Applicative CoreM where
-    pure = return
+    pure x = CoreM $ \s -> nop s x
     (<*>) = ap
-    (*>) = (>>)
+    m *> k = m >>= \_ -> k
 
 instance MonadPlus IO => A.Alternative CoreM where
     empty = mzero

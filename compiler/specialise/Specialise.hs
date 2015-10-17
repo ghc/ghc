@@ -2077,7 +2077,7 @@ instance Functor SpecM where
     fmap = liftM
 
 instance Applicative SpecM where
-    pure = return
+    pure x = SpecM $ return x
     (<*>) = ap
 
 instance Monad SpecM where
@@ -2085,7 +2085,7 @@ instance Monad SpecM where
                                case f y of
                                    SpecM z ->
                                        z
-    return x = SpecM $ return x
+    return = pure
     fail str = SpecM $ fail str
 
 instance MonadUnique SpecM where

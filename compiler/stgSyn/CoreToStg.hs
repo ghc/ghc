@@ -990,11 +990,11 @@ instance Functor LneM where
     fmap = liftM
 
 instance Applicative LneM where
-    pure = return
+    pure = returnLne
     (<*>) = ap
 
 instance Monad LneM where
-    return = returnLne
+    return = pure
     (>>=)  = thenLne
 
 instance MonadFix LneM where

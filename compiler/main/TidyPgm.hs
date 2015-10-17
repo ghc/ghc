@@ -771,11 +771,11 @@ instance Functor DFFV where
     fmap = liftM
 
 instance Applicative DFFV where
-    pure = return
+    pure a = DFFV $ \_ st -> (st, a)
     (<*>) = ap
 
 instance Monad DFFV where
-  return a = DFFV $ \_ st -> (st, a)
+  return = pure
   (DFFV m) >>= k = DFFV $ \env st ->
     case m env st of
        (st',a) -> case k a of

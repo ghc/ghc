@@ -2158,11 +2158,11 @@ instance Functor TcS where
   fmap f m = TcS $ fmap f . unTcS m
 
 instance Applicative TcS where
-  pure  = return
+  pure x = TcS (\_ -> return x)
   (<*>) = ap
 
 instance Monad TcS where
-  return x  = TcS (\_ -> return x)
+  return = pure
   fail err  = TcS (\_ -> fail err)
   m >>= k   = TcS (\ebs -> unTcS m ebs >>= \r -> unTcS (k r) ebs)
 

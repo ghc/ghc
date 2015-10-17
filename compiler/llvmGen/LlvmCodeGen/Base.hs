@@ -208,11 +208,11 @@ instance Functor LlvmM where
                                   return (f x, env')
 
 instance Applicative LlvmM where
-    pure = return
+    pure x = LlvmM $ \env -> return (x, env)
     (<*>) = ap
 
 instance Monad LlvmM where
-    return x = LlvmM $ \env -> return (x, env)
+    return = pure
     m >>= f  = LlvmM $ \env -> do (x, env') <- runLlvmM m env
                                   runLlvmM (f x) env'
 

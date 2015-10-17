@@ -1632,13 +1632,14 @@ instance Functor BcM where
     fmap = liftM
 
 instance Applicative BcM where
-    pure = return
+    pure = returnBc
     (<*>) = ap
+    (*>) = thenBc_
 
 instance Monad BcM where
   (>>=) = thenBc
-  (>>)  = thenBc_
-  return = returnBc
+  (>>)  = (*>)
+  return = pure
 
 instance HasDynFlags BcM where
     getDynFlags = BcM $ \st -> return (st, bcm_dflags st)

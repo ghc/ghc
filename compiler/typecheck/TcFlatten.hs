@@ -528,7 +528,7 @@ newtype FlatM a
   = FlatM { runFlatM :: FlattenEnv -> TcS a }
 
 instance Monad FlatM where
-  return x = FlatM $ const (return x)
+  return = pure
   m >>= k  = FlatM $ \env ->
              do { a  <- runFlatM m env
                 ; runFlatM (k a) env }
@@ -537,7 +537,7 @@ instance Functor FlatM where
   fmap = liftM
 
 instance Applicative FlatM where
-  pure  = return
+  pure x = FlatM $ const (pure x)
   (<*>) = ap
 
 liftTcS :: TcS a -> FlatM a

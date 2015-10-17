@@ -979,11 +979,11 @@ instance Functor CmmOptM where
     fmap = liftM
 
 instance Applicative CmmOptM where
-    pure = return
+    pure x = CmmOptM $ \_ _ imports -> (# x, imports #)
     (<*>) = ap
 
 instance Monad CmmOptM where
-  return x = CmmOptM $ \_ _ imports -> (# x, imports #)
+  return = pure
   (CmmOptM f) >>= g =
     CmmOptM $ \dflags this_mod imports ->
                 case f dflags this_mod imports of

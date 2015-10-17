@@ -1016,11 +1016,11 @@ instance Functor TM where
     fmap = liftM
 
 instance Applicative TM where
-    pure = return
+    pure a = TM $ \ _env st -> (a,noFVs,st)
     (<*>) = ap
 
 instance Monad TM where
-  return a = TM $ \ _env st -> (a,noFVs,st)
+  return = pure
   (TM m) >>= k = TM $ \ env st ->
                                 case m env st of
                                   (r1,fv1,st1) ->

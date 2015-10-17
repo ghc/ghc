@@ -58,13 +58,14 @@ unIOEnv (IOEnv m) = m
 
 instance Monad (IOEnv m) where
     (>>=)  = thenM
-    (>>)   = thenM_
-    return = returnM
+    (>>)   = (*>)
+    return = pure
     fail _ = failM -- Ignore the string
 
 instance Applicative (IOEnv m) where
     pure = returnM
     IOEnv f <*> IOEnv x = IOEnv (\ env -> f env <*> x env )
+    (*>) = thenM_
 
 instance Functor (IOEnv m) where
     fmap f (IOEnv m) = IOEnv (\ env -> fmap f (m env))

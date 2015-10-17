@@ -2364,11 +2364,11 @@ instance Functor     TcPluginM where
   fmap = liftM
 
 instance Applicative TcPluginM where
-  pure  = return
+  pure x = TcPluginM (const $ pure x)
   (<*>) = ap
 
 instance Monad TcPluginM where
-  return x = TcPluginM (const $ return x)
+  return = pure
   fail x   = TcPluginM (const $ fail x)
   TcPluginM m >>= k =
     TcPluginM (\ ev -> do a <- m ev

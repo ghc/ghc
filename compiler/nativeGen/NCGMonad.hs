@@ -92,12 +92,12 @@ instance Functor NatM where
       fmap = liftM
 
 instance Applicative NatM where
-      pure = return
+      pure = returnNat
       (<*>) = ap
 
 instance Monad NatM where
   (>>=) = thenNat
-  return = returnNat
+  return = pure
 
 
 thenNat :: NatM a -> (a -> NatM b) -> NatM b
