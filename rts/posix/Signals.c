@@ -690,7 +690,6 @@ initDefaultHandlers(void)
         sysErrorBelch("warning: failed to install SIGPIPE handler");
     }
 
-#ifdef USE_LIBDW
     // Print a backtrace on SIGUSR2
     action.sa_handler = backtrace_handler;
     sigemptyset(&action.sa_mask);
@@ -698,7 +697,6 @@ initDefaultHandlers(void)
     if (sigaction(SIGUSR2, &action, &oact) != 0) {
         sysErrorBelch("warning: failed to install SIGUSR2 handler");
     }
-#endif
 
     set_sigtstp_action(rtsTrue);
 }
