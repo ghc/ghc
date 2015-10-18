@@ -1515,11 +1515,11 @@ instance Functor Validate where
     fmap = liftM
 
 instance Applicative Validate where
-    pure = return
+    pure a = V $ pure (a, [], [])
     (<*>) = ap
 
 instance Monad Validate where
-   return a = V $ return (a, [], [])
+   return = pure
    m >>= k = V $ do
       (a, es, ws) <- runValidate m
       (b, es', ws') <- runValidate (k a)
