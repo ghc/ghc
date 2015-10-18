@@ -154,11 +154,10 @@ instance Functor PprM where
       fmap = liftM
 
 instance Applicative PprM where
-      pure = return
+      pure x = PprM $ \s -> (x, s)
       (<*>) = ap
 
 instance Monad PprM where
-    return x = PprM $ \s -> (x, s)
     m >>= k  = PprM $ \s -> let (x, s') = runPprM m s
                             in runPprM (k x) s'
 

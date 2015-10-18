@@ -159,9 +159,8 @@ runQ :: Quasi m => Q a -> m a
 runQ (Q m) = m
 
 instance Monad Q where
-  return x   = Q (return x)
   Q m >>= k  = Q (m >>= \x -> unQ (k x))
-  Q m >> Q n = Q (m >> n)
+  (>>) = (*>)
   fail s     = report True s >> Q (fail "Q monad failure")
 
 instance Functor Q where
@@ -170,6 +169,7 @@ instance Functor Q where
 instance Applicative Q where
   pure x = Q (pure x)
   Q f <*> Q x = Q (f <*> x)
+  Q m *> Q n = Q (m *> n)
 
 -----------------------------------------------------
 --
