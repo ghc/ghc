@@ -217,7 +217,10 @@ if windows or darwin:
         if line.startswith('library-dirs:'):
             path = line.rstrip()
             path = re.sub('^library-dirs: ', '', path)
-            path = re.sub('\\$topdir', topdir, path)
+            # Use string.replace instead of re.sub, because re.sub
+            # interprets backslashes in the replacement string as
+            # escape sequences.
+            path = path.replace('$topdir', topdir)
             if path.startswith('"'):
                 path = re.sub('^"(.*)"$', '\\1', path)
                 path = re.sub('\\\\(.)', '\\1', path)
