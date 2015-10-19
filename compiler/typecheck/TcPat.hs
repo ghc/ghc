@@ -1069,9 +1069,9 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
            [] -> failWith (badFieldCon con_like lbl)
 
                 -- The normal case, when the field comes from the right constructor
-           (pat_ty : extras) ->
-                ASSERT( null extras )
-                return pat_ty
+           (pat_ty : extras) -> do
+                traceTc "find_field" (ppr pat_ty <+> ppr extras)
+                ASSERT( null extras ) (return pat_ty)
 
     field_tys :: [(FieldLabel, TcType)]
     field_tys = zip (conLikeFieldLabels con_like) arg_tys

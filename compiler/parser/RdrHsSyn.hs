@@ -1192,7 +1192,7 @@ mkRecConstrOrUpdate (L l (HsVar c)) _ (fs,dd)
 mkRecConstrOrUpdate exp@(L l _) _ (fs,dd)
   | dd        = parseErrorSDoc l (text "You cannot use `..' in a record update")
   | otherwise = return (RecordUpd exp (map (fmap mk_rec_upd_field) fs)
-                      PlaceHolder PlaceHolder PlaceHolder)
+                      PlaceHolder PlaceHolder PlaceHolder PlaceHolder)
 
 mk_rec_fields :: [LHsRecField id arg] -> Bool -> HsRecFields id arg
 mk_rec_fields fs False = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }

@@ -526,7 +526,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
        fingerprint_group (local_env, decls_w_hashes) (AcyclicSCC abi)
           = do let hash_fn = mk_put_name local_env
                    decl = abiDecl abi
-               -- pprTrace "fingerprinting" (ppr (ifName decl) ) $ do
+               --pprTrace "fingerprinting" (ppr (ifName decl) ) $ do
                hash <- computeFingerprint hash_fn abi
                env' <- extend_hash_env local_env (hash,decl)
                return (env', (hash,decl) : decls_w_hashes)
@@ -1522,6 +1522,7 @@ patSynToIfaceDecl ps
                 , ifPatReqCtxt    = tidyToIfaceContext env2 req_theta
                 , ifPatArgs       = map (tidyToIfaceType env2) args
                 , ifPatTy         = tidyToIfaceType env2 rhs_ty
+                , ifFieldLabels   = (patSynFieldLabels ps)
                 }
   where
     (univ_tvs, req_theta, ex_tvs, prov_theta, args, rhs_ty) = patSynSig ps
@@ -1843,12 +1844,16 @@ toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
   -- Put into the interface file any IdInfo that CoreTidy.tidyLetBndr
   -- has left on the Id.  See Note [IdInfo on nested let-bindings] in IfaceSyn
 
---------------------------
+--------------------------t
 toIfaceIdDetails :: IdDetails -> IfaceIdDetails
 toIfaceIdDetails VanillaId                      = IfVanillaId
 toIfaceIdDetails (DFunId {})                    = IfDFunId
 toIfaceIdDetails (RecSelId { sel_naughty = n
-                           , sel_tycon = tc })  = IfRecSelId (toIfaceTyCon tc) n
+                           , sel_tycon = tc })  =
+  let iface = case tc of
+                RecSelData ty_con -> Left (toIfaceTyCon ty_con)
+                RecSelPatSyn pat_syn -> Right (patSynToIfaceDecl pat_syn)
+  in IfRecSelId iface n
 
   -- Currently we don't persist these three "advisory" IdInfos
   -- through interface files.  We easily could if it mattered

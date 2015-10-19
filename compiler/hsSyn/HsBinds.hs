@@ -257,7 +257,7 @@ data PatSynBind idL idR
           psb_def  :: LPat idR,                      -- ^ Right-hand side
           psb_dir  :: HsPatSynDir idR                -- ^ Directionality
   } deriving (Typeable)
-deriving instance (DataId idL, DataId idR )
+deriving instance (DataId idL, DataId idR)
   => Data (PatSynBind idL idR)
 
 {-
@@ -525,6 +525,9 @@ instance (OutputableBndr idL, OutputableBndr idR) => Outputable (PatSynBind idL 
       (is_infix, ppr_details) = case details of
           InfixPatSyn v1 v2 -> (True, hsep [ppr v1, pprInfixOcc psyn, ppr v2])
           PrefixPatSyn vs   -> (False, hsep (pprPrefixOcc psyn : map ppr vs))
+          RecordPatSyn vs   ->
+            (False, pprPrefixOcc psyn
+                      <> braces (sep (punctuate comma (map ppr vs))))
 
       ppr_rhs = case dir of
           Unidirectional           -> ppr_simple (ptext (sLit "<-"))
@@ -625,7 +628,7 @@ data Sig name
       --          'ApiAnnotation.AnnComma'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-    TypeSig 
+    TypeSig
        [Located name]         -- LHS of the signature; e.g.  f,g,h :: blah
        (LHsType name)         -- RHS of the signature
        (PostRn name [Name])   -- Wildcards (both named and anonymous) of the RHS
@@ -897,37 +900,97 @@ pprMinimalSig bf = ptext (sLit "MINIMAL") <+> ppr (fmap unLoc bf)
 data HsPatSynDetails a
   = InfixPatSyn a a
   | PrefixPatSyn [a]
-  deriving (Data, Typeable)
+  | RecordPatSyn [RecordPatSynField a]
+  deriving (Typeable, Data)
+
+
+-- See Note [Record PatSyn Fields]
+data RecordPatSynField a
+  = RecordPatSynField {
+      recordPatSynSelectorId :: a  -- Selector name visible in rest of the file
+      , recordPatSynPatVar :: a
+      -- Filled in by renamer, the name used internally
+      -- by the pattern
+      } deriving (Typeable, Data)
+
+
+
+{-
+Note [Record PatSyn Fields]
+
+Consider the following two pattern synonyms.
+
+pattern P x y = ([x,True], [y,'v'])
+pattern Q{ x, y } =([x,True], [y,'v'])
+
+In P, we just have two local binders, x and y.
+
+In Q, we have local binders but also top-level record selectors
+x :: ([Bool], [Char]) -> Bool and similarly for y.
+
+It would make sense to support record-like syntax
+
+pattern Q{ x=x1, y=y1 } = ([x1,True], [y1,'v'])
+
+when we have a different name for the local and top-level binder
+the distinction between the two names clear
+
+-}
+instance Functor RecordPatSynField where
+    fmap f (RecordPatSynField visible hidden) =
+      RecordPatSynField (f visible) (f hidden)
+
+instance Outputable a => Outputable (RecordPatSynField a) where
+    ppr (RecordPatSynField v _) = ppr v
+
+instance Foldable RecordPatSynField  where
+    foldMap f (RecordPatSynField visible hidden) =
+      f visible `mappend` f hidden
+
+instance Traversable RecordPatSynField where
+    traverse f (RecordPatSynField visible hidden) =
+      RecordPatSynField <$> f visible <*> f hidden
+
 
 instance Functor HsPatSynDetails where
     fmap f (InfixPatSyn left right) = InfixPatSyn (f left) (f right)
     fmap f (PrefixPatSyn args) = PrefixPatSyn (fmap f args)
+    fmap f (RecordPatSyn args) = RecordPatSyn (map (fmap f) args)
 
 instance Foldable HsPatSynDetails where
     foldMap f (InfixPatSyn left right) = f left `mappend` f right
     foldMap f (PrefixPatSyn args) = foldMap f args
+    foldMap f (RecordPatSyn args) = foldMap (foldMap f) args
 
     foldl1 f (InfixPatSyn left right) = left `f` right
     foldl1 f (PrefixPatSyn args) = Data.List.foldl1 f args
+    foldl1 f (RecordPatSyn args) =
+      Data.List.foldl1 f (map (Data.Foldable.foldl1 f) args)
 
     foldr1 f (InfixPatSyn left right) = left `f` right
     foldr1 f (PrefixPatSyn args) = Data.List.foldr1 f args
+    foldr1 f (RecordPatSyn args) =
+      Data.List.foldr1 f (map (Data.Foldable.foldr1 f) args)
 
 -- TODO: After a few more versions, we should probably use these.
 #if __GLASGOW_HASKELL__ >= 709
     length (InfixPatSyn _ _) = 2
     length (PrefixPatSyn args) = Data.List.length args
+    length (RecordPatSyn args) = Data.List.length args
 
     null (InfixPatSyn _ _) = False
     null (PrefixPatSyn args) = Data.List.null args
+    null (RecordPatSyn args) = Data.List.null args
 
     toList (InfixPatSyn left right) = [left, right]
     toList (PrefixPatSyn args) = args
+    toList (RecordPatSyn args) = foldMap toList args
 #endif
 
 instance Traversable HsPatSynDetails where
     traverse f (InfixPatSyn left right) = InfixPatSyn <$> f left <*> f right
     traverse f (PrefixPatSyn args) = PrefixPatSyn <$> traverse f args
+    traverse f (RecordPatSyn args) = RecordPatSyn <$> traverse (traverse f) args
 
 data HsPatSynDir id
   = Unidirectional

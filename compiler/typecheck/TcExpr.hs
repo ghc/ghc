@@ -7,6 +7,7 @@ c%
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcMonoExprNC,
                 tcInferRho, tcInferRhoNC,
@@ -32,14 +33,16 @@ import TcEnv
 import TcArrows
 import TcMatches
 import TcHsType
-import TcPatSyn( tcPatSynBuilderOcc )
+import TcPatSyn( tcPatSynBuilderOcc, nonBidirectionalErr )
 import TcPat
 import TcMType
 import TcType
 import DsMonad
 import Id
+import IdInfo
 import ConLike
 import DataCon
+import PatSyn
 import Name
 import RdrName
 import TyCon
@@ -535,20 +538,21 @@ to support expressions like this:
 -}
 
 tcExpr (RecordCon (L loc con_name) _ rbinds) res_ty
-  = do  { data_con <- tcLookupDataCon con_name
+  = do  { con_like <- tcLookupConLike con_name
 
         -- Check for missing fields
-        ; checkMissingFields data_con rbinds
+        ; checkMissingFields con_like rbinds
 
         ; (con_expr, con_tau) <- tcInferId con_name
-        ; let arity = dataConSourceArity data_con
+        ; let arity = conLikeArity con_like
               (arg_tys, actual_res_ty) = tcSplitFunTysN con_tau arity
-              con_id = dataConWrapId data_con
-
-        ; co_res <- unifyType actual_res_ty res_ty
-        ; rbinds' <- tcRecordBinds data_con arg_tys rbinds
-        ; return $ mkHsWrapCo co_res $
-          RecordCon (L loc con_id) con_expr rbinds' }
+        ; case conLikeWrapId_maybe con_like of
+               Nothing -> nonBidirectionalErr (conLikeName con_like)
+               Just con_id -> do {
+                  co_res <- unifyType actual_res_ty res_ty
+                ; rbinds' <- tcRecordBinds con_like arg_tys rbinds
+                ; return $ mkHsWrapCo co_res $
+                    RecordCon (L loc con_id) con_expr rbinds' } }
 
 {-
 Note [Type of a record update]
@@ -651,51 +655,108 @@ In the outgoing (HsRecordUpd scrut binds cons in_inst_tys out_inst_tys):
   * in_inst_tys, out_inst_tys have same length, and instantiate the
         *representation* tycon of the data cons.  In Note [Data
         family example], in_inst_tys = [t1,t2], out_inst_tys = [t3,t2]
+
+Note [Mixed Record Field Updates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Consider the following pattern synonym.
+
+  data MyRec = MyRec { foo :: Int, qux :: String }
+
+  pattern HisRec{f1, f2} = MyRec{foo = f1, qux=f2}
+
+This allows updates such as the following
+
+  updater :: MyRec -> MyRec
+  updater a = a {f1 = 1 }
+
+It would also make sense to allow the following update (which we reject).
+
+  updater a = a {f1 = 1, qux = "two" } ==? MyRec 1 "two"
+
+This leads to confusing behaviour when the selectors in fact refer the same
+field.
+
+  updater a = a {f1 = 1, foo = 2} ==? ???
+
+For this reason, we reject a mixture of pattern synonym and normal record
+selectors in the same update block. Although of course we still allow the
+following.
+
+  updater a = (a {f1 = 1}) {foo = 2}
+
+  > updater (MyRec 0 "str")
+  MyRec 2 "str"
+
 -}
 
-tcExpr (RecordUpd record_expr rbnds _ _ _) res_ty
-  = ASSERT( notNull rbnds ) do {
+tcExpr (RecordUpd record_expr rbnds _ _ _ _ ) res_ty
+  = ASSERT( notNull rbnds )
+    do  {
         -- STEP -1  See Note [Disambiguating record updates]
         -- After this we know that rbinds is unambiguous
         rbinds <- disambiguateRecordBinds record_expr rbnds res_ty
         ; let upd_flds = map (unLoc . hsRecFieldLbl . unLoc) rbinds
               upd_fld_occs = map (occNameFS . rdrNameOcc . rdrNameAmbiguousFieldOcc) upd_flds
               sel_ids      = map selectorAmbiguousFieldOcc upd_flds
-
         -- STEP 0
         -- Check that the field names are really field names
-                        -- The renamer has already checked that
-                        -- selectors are all in scope
+        -- and they are all field names for proper records or
+        -- all field names for pattern synonyms.
         ; let bad_guys = [ setSrcSpan loc $ addErrTc (notSelector fld_name)
                          | fld <- rbinds,
+                           -- Excludes class ops
                            let L loc sel_id = hsRecUpdFieldId (unLoc fld),
-                           not (isRecordSelector sel_id),       -- Excludes class ops
+                           not (isRecordSelector sel_id),
                            let fld_name = idName sel_id ]
         ; unless (null bad_guys) (sequence bad_guys >> failM)
+        -- See note [Mixed Record Selectors]
+        ; let (data_sels, pat_syn_sels) =
+                partition isDataConRecordSelector sel_ids
+        ; MASSERT( all isPatSynRecordSelector pat_syn_sels )
+        ; checkTc ( null data_sels || null pat_syn_sels )
+                  ( mixedSelectors data_sels pat_syn_sels )
 
         -- STEP 1
         -- Figure out the tycon and data cons from the first field name
         ; let   -- It's OK to use the non-tc splitters here (for a selector)
               sel_id : _  = sel_ids
-              tycon       = recordSelectorTyCon sel_id          -- We've failed already if
-              data_cons   = tyConDataCons tycon                 -- it's not a field label
+              mtycon  =
+                case idDetails sel_id of
+                  RecSelId (RecSelData tycon) _ -> Just tycon
+                  _ -> Nothing
+              con_likes  =
+                case idDetails sel_id of
+                  RecSelId (RecSelData tc) _ ->
+                    map RealDataCon (tyConDataCons tc)
+                  RecSelId (RecSelPatSyn ps) _ ->
+                    [PatSynCon ps]
+                  _ -> panic "tcRecordUpd"
                 -- NB: for a data type family, the tycon is the instance tycon
 
-              relevant_cons   = tyConDataConsWithFields tycon upd_fld_occs
+              relevant_cons   = conLikesWithFields con_likes upd_fld_occs
                 -- A constructor is only relevant to this process if
                 -- it contains *all* the fields that are being updated
                 -- Other ones will cause a runtime error if they occur
 
-                -- Take apart a representative constructor
-              con1 = ASSERT( not (null relevant_cons) ) head relevant_cons
-              (con1_tvs, _, _, _, con1_arg_tys, _) = dataConFullSig con1
-              con1_flds = map flLabel $ dataConFieldLabels con1
-              con1_res_ty = mkFamilyTyConApp tycon (mkTyVarTys con1_tvs)
-
         -- Step 2
         -- Check that at least one constructor has all the named fields
         -- i.e. has an empty set of bad fields returned by badFields
-        ; checkTc (not (null relevant_cons)) (badFieldsUpd rbinds data_cons)
+        ; checkTc (not (null relevant_cons)) (badFieldsUpd rbinds con_likes)
+
+        -- Take apart a representative constructor
+        ; let con1 = ASSERT( not (null relevant_cons) ) head relevant_cons
+              (con1_tvs, _, _, _prov_theta, req_theta, con1_arg_tys, _) =
+                conLikeFullSig con1
+              con1_flds = map flLabel $ conLikeFieldLabels con1
+              def_res_ty  = conLikeResTy con1
+              con1_res_ty =
+                (maybe def_res_ty mkFamilyTyConApp mtycon) (mkTyVarTys con1_tvs)
+
+        -- Check that we're not dealing with a unidirectional pattern
+        -- synonym
+        ; unless (isJust $ conLikeWrapId_maybe con1)
+                  (nonBidirectionalErr (conLikeName con1))
 
         -- STEP 3    Note [Criteria for update]
         -- Check that each updated field is polymorphic; that is, its type
@@ -745,18 +806,25 @@ tcExpr (RecordUpd record_expr rbnds _ _ _) res_ty
         ; rbinds'      <- tcRecordUpd con1 con1_arg_tys' rbinds
 
         -- STEP 6: Deal with the stupid theta
-        ; let theta' = substTheta scrut_subst (dataConStupidTheta con1)
+        ; let theta' = substTheta scrut_subst (conLikeStupidTheta con1)
         ; instStupidTheta RecordUpdOrigin theta'
 
         -- Step 7: make a cast for the scrutinee, in the case that it's from a type family
-        ; let scrut_co | Just co_con <- tyConFamilyCoercion_maybe tycon
+        ; let scrut_co | Just co_con <- tyConFamilyCoercion_maybe =<< mtycon
                        = mkWpCast (mkTcUnbranchedAxInstCo Representational co_con scrut_inst_tys)
                        | otherwise
                        = idHsWrapper
+
+        -- Step 8: Check that the req constraints are satisfied
+        -- For normal data constructors req_theta is empty but we must do
+        -- this check for pattern synonyms.
+        ; let req_theta' = substTheta scrut_subst req_theta
+        ; req_wrap <- instCallConstraints RecordUpdOrigin req_theta'
+
         -- Phew!
         ; return $ mkHsWrapCo co_res $
           RecordUpd (mkLHsWrap scrut_co record_expr') rbinds'
-                    relevant_cons scrut_inst_tys result_inst_tys  }
+                    relevant_cons scrut_inst_tys result_inst_tys req_wrap }
 
 tcExpr (HsSingleRecFld f) res_ty
     = tcCheckRecSelId f res_ty
@@ -1314,12 +1382,17 @@ naughtiness in both branches.  c.f. TcTyClsBindings.mkAuxBinds.
 ************************************************************************
 -}
 
-getFixedTyVars :: [FieldLabelString] -> [TyVar] -> [DataCon] -> TyVarSet
+getFixedTyVars :: [FieldLabelString] -> [TyVar] -> [ConLike] -> TyVarSet
 -- These tyvars must not change across the updates
-getFixedTyVars upd_fld_occs tvs1 cons
+getFixedTyVars upd_fld_occs univ_tvs cons
       = mkVarSet [tv1 | con <- cons
-                      , let (tvs, theta, arg_tys, _) = dataConSig con
-                            flds = dataConFieldLabels con
+                      , let (u_tvs, _, eqspec, prov_theta
+                             , req_theta, arg_tys, _)
+                              = conLikeFullSig con
+                            theta = eqSpecPreds eqspec
+                                     ++ prov_theta
+                                     ++ req_theta
+                            flds = conLikeFieldLabels con
                             fixed_tvs = exactTyVarsOfTypes fixed_tys
                                     -- fixed_tys: See Note [Type of a record update]
                                         `unionVarSet` tyVarsOfTypes theta
@@ -1330,7 +1403,7 @@ getFixedTyVars upd_fld_occs tvs1 cons
 
                             fixed_tys = [ty | (fl, ty) <- zip flds arg_tys
                                             , not (flLabel fl `elem` upd_fld_occs)]
-                      , (tv1,tv) <- tvs1 `zip` tvs      -- Discards existentials in tvs
+                      , (tv1,tv) <- univ_tvs `zip` u_tvs
                       , tv `elemVarSet` fixed_tvs ]
 
 {-
@@ -1403,15 +1476,15 @@ disambiguateRecordBinds record_expr rbnds res_ty
      Just rbnds' -> lookupSelectors rbnds'
      Nothing     -> do
       { fam_inst_envs      <- tcGetFamInstEnvs
-      ; rbnds_with_parents <- fmap (zip rbnds) $ mapM getParents rbnds
-      ; p <- case possibleParents rbnds_with_parents of
+      ; (rbnds_with_parents) <- fmap (zip rbnds) $ mapM getParents rbnds
+      ; (p :: RecSelParent) <- case possibleParents (map snd rbnds_with_parents) of
                []  -> failWithTc (noPossibleParents rbnds)
                [p] -> return p
-               _ | Just p <- tyConOf fam_inst_envs res_ty -> return p
+               _ | Just p <- tyConOf fam_inst_envs res_ty -> return (RecSelData p)
                _ | Just sig_ty <- obviousSig (unLoc record_expr) ->
                  do { sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
                     ; case tyConOf fam_inst_envs sig_tc_ty of
-                        Just p  -> return p
+                        Just p  -> return (RecSelData p)
                         Nothing -> failWithTc badOverloadedUpdate }
                _ -> failWithTc badOverloadedUpdate
       ; assignParent p rbnds_with_parents }
@@ -1439,17 +1512,17 @@ disambiguateRecordBinds record_expr rbnds res_ty
 
     -- Calculate the list of possible parent tycons, by taking the
     -- intersection of the possibilities for each field.
-    possibleParents :: [(LHsRecUpdField Name, [(TyCon, a)])] -> [TyCon]
-    possibleParents = foldr1 intersect . map (\ (_, xs) -> map fst xs)
+    possibleParents :: [[(RecSelParent, a)]] -> [RecSelParent]
+    possibleParents = foldr1 intersect . map (map fst)
 
     -- Look up the parent tycon for each candidate record selector.
-    getParents :: LHsRecUpdField Name -> RnM [(TyCon, GlobalRdrElt)]
+    getParents :: LHsRecUpdField Name -> RnM [(RecSelParent, GlobalRdrElt)]
     getParents (L _ fld) = do
          { env <- getGlobalRdrEnv
          ; let gres = lookupGRE_RdrName (unLoc (hsRecUpdFieldRdr fld)) env
          ; mapM lookupParent gres }
 
-    lookupParent :: GlobalRdrElt -> RnM (TyCon, GlobalRdrElt)
+    lookupParent :: GlobalRdrElt -> RnM (RecSelParent, GlobalRdrElt)
     lookupParent gre = do { id <- tcLookupId (gre_name gre)
                           ; ASSERT(isRecordSelector id)
                             return (recordSelectorTyCon id, gre) }
@@ -1459,7 +1532,7 @@ disambiguateRecordBinds record_expr rbnds res_ty
     -- that parent, e.g. if the user writes
     --     r { x = e } :: T
     -- where T does not have field x.
-    assignParent :: TyCon -> [(LHsRecUpdField Name, [(TyCon, GlobalRdrElt)])]
+    assignParent :: RecSelParent -> [(LHsRecUpdField Name, [(RecSelParent, GlobalRdrElt)])]
                  -> RnM [LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name)]
     assignParent p rbnds
       | null orphans = do rbnds'' <- mapM f rbnds'
@@ -1478,7 +1551,7 @@ disambiguateRecordBinds record_expr rbnds res_ty
                  ; return (fld, gre_name gre) }
 
         -- Returns Right if fld can have parent p, or Left lbl if not.
-        pickParent :: (LHsRecUpdField Name, [(TyCon, GlobalRdrElt)])
+        pickParent :: (LHsRecUpdField Name, [(RecSelParent, GlobalRdrElt)])
                    -> Either (Located RdrName) (LHsRecUpdField Name, GlobalRdrElt, Bool)
         pickParent (fld, xs)
             = case lookup p xs of
@@ -1512,36 +1585,38 @@ This extends OK when the field types are universally quantified.
 -}
 
 tcRecordBinds
-        :: DataCon
+        :: ConLike
         -> [TcType]     -- Expected type for each field
         -> HsRecordBinds Name
         -> TcM (HsRecordBinds TcId)
 
-tcRecordBinds data_con arg_tys (HsRecFields rbinds dd)
+tcRecordBinds con_like arg_tys (HsRecFields rbinds dd)
   = do  { mb_binds <- mapM do_bind rbinds
         ; return (HsRecFields (catMaybes mb_binds) dd) }
   where
-    flds_w_tys = zipEqual "tcRecordBinds" (map flLabel $ dataConFieldLabels data_con) arg_tys
+    fields = map flLabel $ conLikeFieldLabels con_like
+    flds_w_tys = zipEqual "tcRecordBinds" fields arg_tys
 
-    do_bind :: LHsRecField Name (LHsExpr Name) -> TcM (Maybe (LHsRecField TcId (LHsExpr TcId)))
+    do_bind :: LHsRecField Name (LHsExpr Name)
+            -> TcM (Maybe (LHsRecField TcId (LHsExpr TcId)))
     do_bind (L l fld@(HsRecField { hsRecFieldLbl = f
                                  , hsRecFieldArg = rhs }))
 
-      = do { mb <- tcRecordField data_con flds_w_tys f rhs
+      = do { mb <- tcRecordField con_like flds_w_tys f rhs
            ; case mb of
                Nothing         -> return Nothing
                Just (f', rhs') -> return (Just (L l (fld { hsRecFieldLbl = f'
                                                           , hsRecFieldArg = rhs' }))) }
 
 tcRecordUpd
-        :: DataCon
+        :: ConLike
         -> [TcType]     -- Expected type for each field
         -> [LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name)]
         -> TcM [LHsRecUpdField TcId]
 
-tcRecordUpd data_con arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
+tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
   where
-    flds_w_tys = zipEqual "tcRecordUpd" (map flLabel $ dataConFieldLabels data_con) arg_tys
+    flds_w_tys = zipEqual "tcRecordUpd" (map flLabel $ conLikeFieldLabels con_like) arg_tys
 
     do_bind :: LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name) -> TcM (Maybe (LHsRecUpdField TcId))
     do_bind (L l fld@(HsRecField { hsRecFieldLbl = L loc af
@@ -1549,15 +1624,15 @@ tcRecordUpd data_con arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
       = do { let lbl = rdrNameAmbiguousFieldOcc af
                  sel_id = selectorAmbiguousFieldOcc af
                  f = L loc (FieldOcc lbl (idName sel_id))
-           ; mb <- tcRecordField data_con flds_w_tys f rhs
+           ; mb <- tcRecordField con_like flds_w_tys f rhs
            ; case mb of
                Nothing         -> return Nothing
                Just (f', rhs') -> return (Just (L l (fld { hsRecFieldLbl = L loc (Unambiguous lbl (selectorFieldOcc (unLoc f')))
                                                          , hsRecFieldArg = rhs' }))) }
 
-tcRecordField :: DataCon -> Assoc FieldLabelString Type -> LFieldOcc Name -> LHsExpr Name
+tcRecordField :: ConLike -> Assoc FieldLabelString Type -> LFieldOcc Name -> LHsExpr Name
               -> TcM (Maybe (LFieldOcc Id, LHsExpr Id))
-tcRecordField data_con flds_w_tys (L loc (FieldOcc lbl sel_name)) rhs
+tcRecordField con_like flds_w_tys (L loc (FieldOcc lbl sel_name)) rhs
   | Just field_ty <- assocMaybe flds_w_tys field_lbl
       = addErrCtxt (fieldCtxt field_lbl) $
         do { rhs' <- tcPolyExprNC rhs field_ty
@@ -1569,30 +1644,30 @@ tcRecordField data_con flds_w_tys (L loc (FieldOcc lbl sel_name)) rhs
                 --      but is a LocalId with the appropriate type of the RHS
                 --          (so the desugarer knows the type of local binder to make)
            ; return (Just (L loc (FieldOcc lbl field_id), rhs')) }
-  | otherwise
-      = do { addErrTc (badFieldCon (RealDataCon data_con) field_lbl)
+      | otherwise
+      = do { addErrTc (badFieldCon con_like field_lbl)
            ; return Nothing }
   where
         field_lbl = occNameFS $ rdrNameOcc lbl
 
 
-checkMissingFields ::  DataCon -> HsRecordBinds Name -> TcM ()
-checkMissingFields data_con rbinds
+checkMissingFields ::  ConLike -> HsRecordBinds Name -> TcM ()
+checkMissingFields con_like rbinds
   | null field_labels   -- Not declared as a record;
                         -- But C{} is still valid if no strict fields
   = if any isBanged field_strs then
         -- Illegal if any arg is strict
-        addErrTc (missingStrictFields data_con [])
+        addErrTc (missingStrictFields con_like [])
     else
         return ()
 
   | otherwise = do              -- A record
     unless (null missing_s_fields)
-           (addErrTc (missingStrictFields data_con missing_s_fields))
+           (addErrTc (missingStrictFields con_like missing_s_fields))
 
     warn <- woptM Opt_WarnMissingFields
     unless (not (warn && notNull missing_ns_fields))
-           (warnTc True (missingFields data_con missing_ns_fields))
+           (warnTc True (missingFields con_like missing_ns_fields))
 
   where
     missing_s_fields
@@ -1607,13 +1682,13 @@ checkMissingFields data_con rbinds
           ]
 
     field_names_used = hsRecFields rbinds
-    field_labels     = dataConFieldLabels data_con
+    field_labels     = conLikeFieldLabels con_like
 
     field_info = zipEqual "missingFields"
                           field_labels
                           field_strs
 
-    field_strs = dataConImplBangs data_con
+    field_strs = conLikeImplBangs con_like
 
     fl `elemField` flds = any (\ fl' -> flSelector fl == fl') flds
 
@@ -1683,7 +1758,7 @@ badFieldTypes prs
 
 badFieldsUpd
   :: [LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name)] -- Field names that don't belong to a single datacon
-  -> [DataCon] -- Data cons of the type which the first field name belongs to
+  -> [ConLike] -- Data cons of the type which the first field name belongs to
   -> SDoc
 badFieldsUpd rbinds data_cons
   = hang (ptext (sLit "No constructor has all these fields:"))
@@ -1720,7 +1795,7 @@ badFieldsUpd rbinds data_cons
           map (occNameFS . rdrNameOcc . rdrNameAmbiguousFieldOcc . unLoc . hsRecFieldLbl . unLoc) rbinds
 
     fieldLabelSets :: [Set.Set FieldLabelString]
-    fieldLabelSets = map (Set.fromList . map flLabel . dataConFieldLabels) data_cons
+    fieldLabelSets = map (Set.fromList . map flLabel . conLikeFieldLabels) data_cons
 
     -- Sort in order of increasing number of True, so that a smaller
     -- conflicting set can be found.
@@ -1766,7 +1841,25 @@ notSelector :: Name -> SDoc
 notSelector field
   = hsep [quotes (ppr field), ptext (sLit "is not a record selector")]
 
-missingStrictFields :: DataCon -> [FieldLabelString] -> SDoc
+mixedSelectors :: [Id] -> [Id] -> SDoc
+mixedSelectors data_sels@(dc_rep_id:_) pat_syn_sels@(ps_rep_id:_)
+  = ptext
+      (sLit "Cannot use a mixture of pattern synonym and record selectors") $$
+    ptext (sLit "Record selectors defined by")
+      <+> quotes (ppr (tyConName rep_dc))
+      <> text ":"
+      <+> pprWithCommas ppr data_sels $$
+    ptext (sLit "Pattern synonym selectors defined by")
+      <+> quotes (ppr (patSynName rep_ps))
+      <> text ":"
+      <+> pprWithCommas ppr pat_syn_sels
+  where
+    RecSelPatSyn rep_ps = recordSelectorTyCon ps_rep_id
+    RecSelData rep_dc = recordSelectorTyCon dc_rep_id
+mixedSelectors _ _ = panic "TcExpr: mixedSelectors emptylists"
+
+
+missingStrictFields :: ConLike -> [FieldLabelString] -> SDoc
 missingStrictFields con fields
   = header <> rest
   where
@@ -1777,7 +1870,7 @@ missingStrictFields con fields
     header = ptext (sLit "Constructor") <+> quotes (ppr con) <+>
              ptext (sLit "does not have the required strict field(s)")
 
-missingFields :: DataCon -> [FieldLabelString] -> SDoc
+missingFields :: ConLike -> [FieldLabelString] -> SDoc
 missingFields con fields
   = ptext (sLit "Fields of") <+> quotes (ppr con) <+> ptext (sLit "not initialised:")
         <+> pprWithCommas ppr fields
@@ -1794,7 +1887,7 @@ noPossibleParents rbinds
 badOverloadedUpdate :: SDoc
 badOverloadedUpdate = ptext (sLit "Record update is ambiguous, and requires a type signature")
 
-orphanFields :: TyCon -> [Located RdrName] -> SDoc
+orphanFields :: RecSelParent -> [Located RdrName] -> SDoc
 orphanFields p flds
   = hang (ptext (sLit "Type") <+> ppr p <+>
              ptext (sLit "does not have field") <> plural flds <> colon)

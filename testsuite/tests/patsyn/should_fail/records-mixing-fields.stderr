@@ -1,0 +1,17 @@
+
+records-mixing-fields.hs:1:1: error:
+    The IO action ‘main’ is not defined in module ‘Main’
+
+records-mixing-fields.hs:10:14: error:
+    Cannot use a mixture of pattern synonym and record selectors
+    Record selectors defined by ‘MyRec’: qux
+    Pattern synonym selectors defined by ‘HisRec’: f1
+    In the expression: a {f1 = 1, qux = "two"}
+    In an equation for ‘updater1’: updater1 a = a {f1 = 1, qux = "two"}
+
+records-mixing-fields.hs:12:14: error:
+    Cannot use a mixture of pattern synonym and record selectors
+    Record selectors defined by ‘MyRec’: foo
+    Pattern synonym selectors defined by ‘HisRec’: f1
+    In the expression: a {f1 = 1, foo = 2}
+    In an equation for ‘updater2’: updater2 a = a {f1 = 1, foo = 2}

@@ -7,7 +7,7 @@
 {-# LANGUAGE CPP, NondecreasingIndentation #-}
 
 module RnNames (
-        rnImports, getLocalNonValBinders,
+        rnImports, getLocalNonValBinders, newRecordSelector,
         rnExports, extendGlobalRdrEnvRn,
         gresFromAvails,
         calculateAvails,
@@ -587,21 +587,12 @@ getLocalNonValBinders fixity_env
     new_tc overload_ok tc_decl -- NOT for type/data instances
         = do { let (bndrs, flds) = hsLTyClDeclBinders tc_decl
              ; names@(main_name : sub_names) <- mapM newTopSrcBinder bndrs
-             ; flds' <- mapM (new_rec_sel overload_ok sub_names) flds
+             ; flds' <- mapM (newRecordSelector overload_ok sub_names) flds
              ; let fld_env = case unLoc tc_decl of
                      DataDecl { tcdDataDefn = d } -> mk_fld_env d names flds'
                      _                            -> []
              ; return (AvailTC main_name names flds', fld_env) }
 
-    new_rec_sel :: Bool -> [Name] -> LFieldOcc RdrName -> RnM FieldLabel
-    new_rec_sel _ [] _ = error "new_rec_sel: datatype has no constructors!"
-    new_rec_sel overload_ok (dc:_) (L loc (FieldOcc fld _)) =
-      do { sel_name <- newTopSrcBinder $ L loc $ mkRdrUnqual sel_occ
-         ; return $ fl { flSelector = sel_name } }
-      where
-        lbl     = occNameFS $ rdrNameOcc fld
-        fl      = mkFieldLabelOccs lbl (nameOccName dc) overload_ok
-        sel_occ = flSelector fl
 
     -- Calculate the mapping from constructor names to fields, which
     -- will go in tcg_field_env. It's convenient to do this here where
@@ -652,7 +643,7 @@ getLocalNonValBinders fixity_env
         = do { main_name <- lookupFamInstName mb_cls (dfid_tycon ti_decl)
              ; let (bndrs, flds) = hsDataFamInstBinders ti_decl
              ; sub_names <- mapM newTopSrcBinder bndrs
-             ; flds' <- mapM (new_rec_sel overload_ok sub_names) flds
+             ; flds' <- mapM (newRecordSelector overload_ok sub_names) flds
              ; let avail    = AvailTC (unLoc main_name) sub_names flds'
                                   -- main_name is not bound here!
                    fld_env  = mk_fld_env (dfid_defn ti_decl) sub_names flds'
@@ -661,6 +652,16 @@ getLocalNonValBinders fixity_env
     new_loc_di :: Bool -> Maybe Name -> LDataFamInstDecl RdrName
                    -> RnM (AvailInfo, [(Name, [FieldLabel])])
     new_loc_di overload_ok mb_cls (L _ d) = new_di overload_ok mb_cls d
+
+newRecordSelector :: Bool -> [Name] -> LFieldOcc RdrName -> RnM FieldLabel
+newRecordSelector _ [] _ = error "newRecordSelector: datatype has no constructors!"
+newRecordSelector overload_ok (dc:_) (L loc (FieldOcc fld _)) =
+  do { sel_name <- newTopSrcBinder $ L loc $ mkRdrUnqual sel_occ
+     ; return $ fl { flSelector = sel_name } }
+  where
+    lbl     = occNameFS $ rdrNameOcc fld
+    fl      = mkFieldLabelOccs lbl (nameOccName dc) overload_ok
+    sel_occ = flSelector fl
 
 {-
 Note [Looking up family names in family instances]
@@ -959,7 +960,7 @@ trimAvail :: AvailInfo -> Name -> AvailInfo
 trimAvail (Avail n)         _ = Avail n
 trimAvail (AvailTC n ns fs) m = case find ((== m) . flSelector) fs of
     Just x  -> AvailTC n [] [x]
-    Nothing -> ASSERT(m `elem` ns) AvailTC n [m] []
+    Nothing -> ASSERT( m `elem` ns ) AvailTC n [m] []
 
 -- | filters 'AvailInfo's by the given predicate
 filterAvails  :: (Name -> Bool) -> [AvailInfo] -> [AvailInfo]
@@ -1159,6 +1160,7 @@ rnExports explicit_mod exports
                         --       turns out to be out of scope
 
         ; (rn_exports, avails) <- exports_from_avail real_exports rdr_env imports this_mod
+        ; traceRn (ppr avails)
         ; let final_avails = nubAvails avails    -- Combine families
               final_ns     = availsToNameSetWithSelectors final_avails
 
@@ -1186,7 +1188,7 @@ exports_from_avail Nothing rdr_env _imports _this_mod
                 | gre <- globalRdrEnvElts rdr_env
                 , isLocalGRE gre ]
    in
-   return (Nothing, avails)
+    return (Nothing, avails)
 
 exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
   = do (ie_names, _, exports) <- foldlM do_litem emptyExportAccum rdr_items

@@ -5,6 +5,7 @@ import Data.Data (Data,Typeable)
 
 data Type
 data TyThing
+data TvSubst
 
 type PredType = Type
 type Kind = Type

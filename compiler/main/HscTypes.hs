@@ -148,7 +148,7 @@ import VarEnv
 import VarSet
 import Var
 import Id
-import IdInfo           ( IdDetails(..) )
+import IdInfo           ( IdDetails(..), RecSelParent(..))
 import Type
 
 import ApiAnnotation    ( ApiAnns )
@@ -1691,11 +1691,14 @@ implicitConLikeThings :: ConLike -> [TyThing]
 implicitConLikeThings (RealDataCon dc)
   = map AnId (dataConImplicitIds dc)
     -- For data cons add the worker and (possibly) wrapper
-
 implicitConLikeThings (PatSynCon {})
   = []  -- Pattern synonyms have no implicit Ids; the wrapper and matcher
         -- are not "implicit"; they are simply new top-level bindings,
         -- and they have their own declaration in an interface file
+        -- Unless a record pat syn when there are implicit selectors
+        -- They are still not included here as `implicitConLikeThings` is
+        -- used by `tcTyClsDecls` whilst pattern synonyms are typed checked
+        -- by `tcTopValBinds`.
 
 implicitClassThings :: Class -> [TyThing]
 implicitClassThings cl
@@ -1764,9 +1767,11 @@ tyThingParent_maybe (ATyCon tc)   = case tyConAssoc_maybe tc of
                                       Just cls -> Just (ATyCon (classTyCon cls))
                                       Nothing  -> Nothing
 tyThingParent_maybe (AnId id)     = case idDetails id of
-                                         RecSelId { sel_tycon = tc } -> Just (ATyCon tc)
-                                         ClassOpId cls               -> Just (ATyCon (classTyCon cls))
-                                         _other                      -> Nothing
+                                      RecSelId { sel_tycon = RecSelData tc } ->
+                                          Just (ATyCon tc)
+                                      ClassOpId cls               ->
+                                          Just (ATyCon (classTyCon cls))
+                                      _other                      -> Nothing
 tyThingParent_maybe _other = Nothing
 
 tyThingsTyVars :: [TyThing] -> TyVarSet

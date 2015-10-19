@@ -500,6 +500,7 @@ tcRnSrcDecls explicit_mod_hdr exports decls
       ; failIfErrsM     -- Don't zonk if there have been errors
                         -- It's a waste of time; and we may get debug warnings
                         -- about strangely-typed TyCons!
+      ; traceTc "Tc10" empty
 
         -- Zonk the final code.  This must be done last.
         -- Even simplifyTop may do some unification.
@@ -518,6 +519,7 @@ tcRnSrcDecls explicit_mod_hdr exports decls
             <- {-# SCC "zonkTopDecls" #-}
                zonkTopDecls all_ev_binds binds exports sig_ns rules vects
                             imp_specs fords ;
+      ; traceTc "Tc11" empty
 
       ; let { final_type_env = extendTypeEnvWithIds type_env bind_ids
             ; tcg_env' = tcg_env { tcg_binds    = binds',
@@ -1102,7 +1104,6 @@ rnTopSrcDecls group
 
                 -- Dump trace of renaming part
         rnDump (ppr rn_decls) ;
-
         return (tcg_env', rn_decls)
    }
 
