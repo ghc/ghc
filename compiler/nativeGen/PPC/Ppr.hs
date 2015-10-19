@@ -624,14 +624,22 @@ pprInstr (EXTS sz reg1 reg2) = hcat [
 pprInstr (NEG reg1 reg2) = pprUnary (sLit "neg") reg1 reg2
 pprInstr (NOT reg1 reg2) = pprUnary (sLit "not") reg1 reg2
 
-pprInstr (SLW reg1 reg2 ri) = pprLogic (sLit "slw") reg1 reg2 (limitShiftRI ri)
 
-pprInstr (SRW reg1 reg2 (RIImm (ImmInt i))) | i > 31 || i < 0 =
+pprInstr (SRW reg1 reg2 (RIImm (ImmInt i))) | i < 0  || i > 31 =
     -- Handle the case where we are asked to shift a 32 bit register by
     -- less than zero or more than 31 bits. We convert this into a clear
     -- of the destination register.
     -- Fixes ticket http://ghc.haskell.org/trac/ghc/ticket/5900
     pprInstr (XOR reg1 reg2 (RIReg reg2))
+
+pprInstr (SLW reg1 reg2 (RIImm (ImmInt i))) | i < 0  || i > 31 =
+    -- As aboce for SR, but for left shifts.
+    -- Fixes ticket http://ghc.haskell.org/trac/ghc/ticket/10870
+    pprInstr (XOR reg1 reg2 (RIReg reg2))
+
+
+pprInstr (SLW reg1 reg2 ri) = pprLogic (sLit "slw") reg1 reg2 (limitShiftRI ri)
+
 pprInstr (SRW reg1 reg2 ri) = pprLogic (sLit "srw") reg1 reg2 (limitShiftRI ri)
 
 pprInstr (SRAW reg1 reg2 ri) = pprLogic (sLit "sraw") reg1 reg2 (limitShiftRI ri)
