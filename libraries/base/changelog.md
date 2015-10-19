@@ -2,6 +2,9 @@
 
 ## 4.8.2.0  *TBA*
 
+  * The restore operation provided by `mask` and `uninterruptibleMask` now
+    restores the previous masking state whatever the current masking state is.
+
   * Bundled with GHC 7.12.1
 
   * `Alt`, `Dual`, `First`, `Last`, `Product`, and `Sum` now have `Data`,
