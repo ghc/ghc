@@ -263,11 +263,18 @@ mkSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
 -- but if she wrote, say,
 --      f x            then behave as if she'd written $(f x)
 --                     ie a SpliceD
+--
+-- Typed splices are not allowed at the top level, thus we do not represent them
+-- as spliced declaration.  See #10945
 mkSpliceDecl lexpr@(L loc expr)
-  | HsSpliceE splice <- expr = SpliceD (SpliceDecl (L loc splice) ExplicitSplice)
-  | otherwise                = SpliceD (SpliceDecl (L loc splice) ImplicitSplice)
-  where
-    splice = mkUntypedSplice lexpr
+  | HsSpliceE splice@(HsUntypedSplice {}) <- expr
+  = SpliceD (SpliceDecl (L loc splice) ExplicitSplice)
+
+  | HsSpliceE splice@(HsQuasiQuote {}) <- expr
+  = SpliceD (SpliceDecl (L loc splice) ExplicitSplice)
+
+  | otherwise
+  = SpliceD (SpliceDecl (L loc (mkUntypedSplice lexpr)) ImplicitSplice)
 
 mkRoleAnnotDecl :: SrcSpan
                 -> Located RdrName                   -- type being annotated
