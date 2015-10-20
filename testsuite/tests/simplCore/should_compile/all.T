@@ -213,4 +213,7 @@ test('T10176', only_ways(['optasm']), compile, [''])
 test('T10602', only_ways(['optasm']), multimod_compile, ['T10602','-v0'])
 test('T10627', only_ways(['optasm']), compile, [''])
 test('T10689', normal, compile, [''])
-test('T10689a', normal, compile, [''])
+# T10698a was introduced by 3772c67f56c05cd5130c793376a9e09d5cc0e78a for 7.10.3
+# which was backported 8.0 from but the testcase relies on a parser change that
+# isn't present in 7.10.3
+test('T10689a', expect_broken(None), compile, [''])
