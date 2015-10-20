@@ -609,7 +609,7 @@ genericHscFrontend mod_summary =
 genericHscFrontend' :: ModSummary -> Hsc FrontendResult
 genericHscFrontend' mod_summary
     | ms_hsc_src mod_summary == HsBootMerge
-    = FrontendMerge `fmap` hscMergeFrontEnd mod_summary
+    = FrontendInterface `fmap` hscMergeFrontEnd mod_summary
     | otherwise
     = FrontendTypecheck `fmap` hscFileFrontEnd mod_summary
 
@@ -662,7 +662,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
                        ms_hsc_src mod_summary == HsSrcFile
                        then finish              hsc_env mod_summary tc_result mb_old_hash
                        else finishTypecheckOnly hsc_env mod_summary tc_result mb_old_hash
-                FrontendMerge raw_iface ->
+                FrontendInterface raw_iface ->
                             finishMerge         hsc_env mod_summary raw_iface mb_old_hash
             liftIO $ hscMaybeWriteIface dflags (hm_iface hmi) no_change mod_summary
             return (status, hmi)

@@ -341,7 +341,7 @@ data DsMetaVal
 -- to have a TcGblEnv which is only defined here.
 data FrontendResult
         = FrontendTypecheck TcGblEnv
-        | FrontendMerge     ModIface
+        | FrontendInterface ModIface
 
 -- | 'TcGblEnv' describes the top-level of the module at the
 -- point at which the typechecker is finished work.
