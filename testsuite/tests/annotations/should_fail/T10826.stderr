@@ -1,5 +1,5 @@
 
-T10826.hs:6:1: error:
+T10826.hs:6:1:
     Annotations are not compatible with Safe Haskell.
     See https://ghc.haskell.org/trac/ghc/ticket/10826
     In the annotation:
