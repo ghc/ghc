@@ -633,16 +633,18 @@ tcGetDefaultTys
         { integer_ty <- tcMetaTy integerTyConName
         ; checkWiredInTyCon doubleTyCon
         ; string_ty <- tcMetaTy stringTyConName
-        ; let deflt_tys = opt_deflt extended_defaults unitTy  -- Note [Default unitTy]
+        ; list_ty <- tcMetaTy listTyConName
+        ; let deflt_tys = opt_deflt extended_defaults [unitTy, list_ty]
+                          -- Note [Extended defaults]
                           ++ [integer_ty, doubleTy]
-                          ++ opt_deflt ovl_strings string_ty
+                          ++ opt_deflt ovl_strings [string_ty]
         ; return (deflt_tys, flags) } } }
   where
-    opt_deflt True  ty = [ty]
+    opt_deflt True  xs = xs
     opt_deflt False _  = []
 
 {-
-Note [Default unitTy]
+Note [Extended defaults]
 ~~~~~~~~~~~~~~~~~~~~~
 In interative mode (or with -XExtendedDefaultRules) we add () as the first type we
 try when defaulting.  This has very little real impact, except in the following case.
@@ -654,6 +656,9 @@ default the 'a' to (), rather than to Integer (which is what would otherwise hap
 and then GHCi doesn't attempt to print the ().  So in interactive mode, we add
 () to the list of defaulting types.  See Trac #1200.
 
+Additonally, the list type [] is added as a default specialization for
+Traversable and Foldable. As such the default default list now has types of
+varying kinds, e.g. ([] :: * -> *)  and (Integer :: *).
 
 ************************************************************************
 *                                                                      *

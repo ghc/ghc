@@ -1022,10 +1022,10 @@ is given, the following additional differences apply:
    single-parameter type classes.
 
 -  Rule 3 above is relaxed this: At least one of the classes ``Ci`` is
-   numeric, or is ``Show``, ``Eq``, or ``Ord``.
+   numeric, or is ``Show``, ``Eq``, ``Ord``, ``Foldable`` or ``Traversable``.
 
--  The unit type ``()`` is added to the start of the standard list of
-   types which are tried when doing type defaulting.
+-  The unit type ``()`` and the list type ``[]`` are added to the start of
+   the standard list of types which are tried when doing type defaulting.
 
 The last point means that, for example, this program:
 

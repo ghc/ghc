@@ -346,13 +346,16 @@ check_kind ctxt ty
 -- Depending on the context, we might accept any kind (for instance, in a TH
 -- splice), or only certain kinds (like in type signatures).
 expectedKindInCtxt :: UserTypeCtxt -> Maybe Kind
-expectedKindInCtxt (TySynCtxt _)  = Nothing -- Any kind will do
-expectedKindInCtxt ThBrackCtxt    = Nothing
-expectedKindInCtxt GhciCtxt       = Nothing
-expectedKindInCtxt (ForSigCtxt _) = Just liftedTypeKind
-expectedKindInCtxt InstDeclCtxt   = Just constraintKind
-expectedKindInCtxt SpecInstCtxt   = Just constraintKind
-expectedKindInCtxt _              = Just openTypeKind
+expectedKindInCtxt (TySynCtxt _)   = Nothing -- Any kind will do
+expectedKindInCtxt ThBrackCtxt     = Nothing
+expectedKindInCtxt GhciCtxt        = Nothing
+-- The types in a 'default' decl can have varying kinds
+-- See Note [Extended defaults]" in TcEnv
+expectedKindInCtxt DefaultDeclCtxt = Nothing
+expectedKindInCtxt (ForSigCtxt _)  = Just liftedTypeKind
+expectedKindInCtxt InstDeclCtxt    = Just constraintKind
+expectedKindInCtxt SpecInstCtxt    = Just constraintKind
+expectedKindInCtxt _               = Just openTypeKind
 
 {-
 Note [Higher rank types]
