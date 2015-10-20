@@ -1023,7 +1023,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
 
         case result of
             HscNotGeneratingCode ->
-                return (RealPhase next_phase,
+                return (RealPhase StopLn,
                         panic "No output filename from Hsc when no-code")
             HscUpToDate ->
                 do liftIO $ touchObjectFile dflags o_file
@@ -1035,7 +1035,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                 do -- In the case of hs-boot files, generate a dummy .o-boot
                    -- stamp file for the benefit of Make
                    liftIO $ touchObjectFile dflags o_file
-                   return (RealPhase next_phase, o_file)
+                   return (RealPhase StopLn, o_file)
             HscUpdateBootMerge ->
                 do -- We need to create a REAL but empty .o file
                    -- because we are going to attempt to put it in a library
@@ -1043,7 +1043,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                    let input_fn = expectJust "runPhase" (ml_hs_file location)
                        basename = dropExtension input_fn
                    liftIO $ compileEmptyStub dflags hsc_env' basename location
-                   return (RealPhase next_phase, o_file)
+                   return (RealPhase StopLn, o_file)
             HscRecomp cgguts mod_summary
               -> do output_fn <- phaseOutputFilename next_phase
 
