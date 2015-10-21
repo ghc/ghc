@@ -15,7 +15,6 @@ import Module
 import OccName
 import Name
 import Outputable
-import Platform
 import Util
 
 import Data.Char
@@ -96,15 +95,9 @@ dataConInfoPtrToName x = do
    getConDescAddress dflags ptr
     | ghciTablesNextToCode = do
        let ptr' = ptr `plusPtr` (- wORD_SIZE dflags)
-       -- offsetToString is really an StgWord, but we have to jump
-       -- through some hoops due to the way that our StgWord Haskell
-       -- type is the same on 32 and 64bit platforms
-       offsetToString <- case platformWordSize (targetPlatform dflags) of
-                         4 -> do w <- peek ptr'
-                                 return (fromIntegral (w :: Word32))
-                         8 -> do w <- peek ptr'
-                                 return (fromIntegral (w :: Word32))
-                         w -> panic ("getConDescAddress: Unknown platformWordSize: " ++ show w)
+       -- NB. the offset must be read as an Int32 not a Word32, so
+       -- that the sign is preserved when converting to an Int.
+       offsetToString <- fromIntegral <$> (peek ptr' :: IO Int32)
        return $ (ptr `plusPtr` stdInfoTableSizeB dflags) `plusPtr` offsetToString
     | otherwise =
        peek $ intPtrToPtr $ ptrToIntPtr ptr + fromIntegral (stdInfoTableSizeB dflags)
