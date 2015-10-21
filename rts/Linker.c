@@ -2233,10 +2233,9 @@ static StgWord getPageSize(void)
 {
     static StgWord pagesize = 0;
     if (pagesize == 0) {
-        return sysconf(_SC_PAGESIZE);
-    } else {
-        return pagesize;
+        pagesize = sysconf(_SC_PAGESIZE);
     }
+    return pagesize;
 }
 
 static StgWord roundUpToPage (StgWord size)
