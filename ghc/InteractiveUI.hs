@@ -630,7 +630,7 @@ checkPerms file =
       -- #8248: Improving warning to include a possible fix.
       putStrLn $ "*** WARNING: " ++ file ++
                  " is writable by someone else, IGNORING!" ++
-                 "\nSuggested fix: execute 'chmod 644 " ++ file ++ "'"
+                 "\nSuggested fix: execute 'chmod go-w " ++ file ++ "'"
     return ok
 #endif
 
