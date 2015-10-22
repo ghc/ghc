@@ -79,6 +79,11 @@ libraries/pretty_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports
 
 # primitive has a warning about deprecated use of GHC.IOBase
 libraries/primitive_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports
+# primitive uses deprecated Control.Monad.Trans.Error
+libraries/primitive_dist-install_EXTRA_HC_OPTS += -Wno-deprecations
+
+# See https://github.com/haskell/random/pull/20
+libraries/random_dist-install_EXTRA_HC_OPTS += -Wno-redundant-constraints
 
 # temporarily turn off unused-imports warnings for terminfo
 libraries/terminfo_dist-boot_EXTRA_HC_OPTS += -fno-warn-unused-imports

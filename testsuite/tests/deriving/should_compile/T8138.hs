@@ -22,7 +22,7 @@ mutableByteArrayFromList xs = do
     loop arr 0 xs
     return arr
   where
-    loop :: (Prim a) => MutableByteArray s -> Int -> [a] -> ST s ()
+    loop :: MutableByteArray s -> Int -> [a] -> ST s ()
     loop _ _ [] = return ()
 
     loop arr i (x : xs) = do
