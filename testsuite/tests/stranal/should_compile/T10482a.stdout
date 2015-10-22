@@ -1,4 +1,4 @@
+Foo.$wf4 [InlPrag=[0], Occ=LoopBreaker] :: Int# -> Int# -> Int#
 Foo.$wf2 [InlPrag=[0], Occ=LoopBreaker] :: Int# -> Int# -> Int#
 Foo.$wf1 [InlPrag=[0], Occ=LoopBreaker] :: Int# -> Int#
 Foo.$wf3 [InlPrag=[0], Occ=LoopBreaker] :: Int# -> Int# -> Int#
-Foo.$wf4 [InlPrag=[0], Occ=LoopBreaker] :: Int# -> Int# -> Int#

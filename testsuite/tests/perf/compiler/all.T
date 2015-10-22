@@ -578,11 +578,12 @@ test('T9020',
           [(wordsize(32), 343005716, 10),
            # Original:    381360728
            # 2014-07-31:  343005716 (Windows) (general round of updates)
-           (wordsize(64), 680162056, 10)])
+           (wordsize(64), 786189008, 10)])
            # prev:        795469104
            # 2014-07-17:  728263536 (general round of updates)
            # 2014-09-10:  785871680 post-AMP-cleanup
            # 2014-11-03:  680162056 Further Applicative and Monad adjustments
+           # 2015-10-21:  786189008 Make stronglyConnCompFromEdgedVertices deterministic
       ],
       compile,[''])
 
