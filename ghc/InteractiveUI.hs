@@ -614,7 +614,7 @@ checkPerms name =
       -- #8248: Improving warning to include a possible fix.
       putStrLn $ "*** WARNING: " ++ name ++
                  " is writable by someone else, IGNORING!" ++
-                 "\nSuggested fix: execute 'chmod 644 " ++ name ++ "'"
+                 "\nSuggested fix: execute 'chmod go-w " ++ file ++ "'"
     return ok
 #endif
 
