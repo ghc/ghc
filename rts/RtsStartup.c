@@ -34,6 +34,7 @@
 #include "Globals.h"
 #include "FileLock.h"
 #include "LinkerInternals.h"
+#include "LibdwPool.h"
 
 #if defined(PROFILING)
 # include "ProfHeap.h"
@@ -163,6 +164,9 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 #ifdef TRACING
     initTracing();
 #endif
+
+    /* Initialise libdw session pool */
+    libdwPoolInit();
 
     /* initialise scheduler data structures (needs to be done before
      * initStorage()).

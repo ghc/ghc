@@ -39,7 +39,10 @@
 #define RTS_LIBDW_SYMBOLS                       \
       SymE_HasProto(backtraceFree)              \
       SymE_HasProto(libdwGetBacktrace)          \
-      SymE_HasProto(libdwLookupLocation)
+      SymE_HasProto(libdwLookupLocation)        \
+      SymE_HasProto(libdwPoolTake)              \
+      SymE_HasProto(libdwPoolRelease)           \
+      SymE_HasProto(libdwPoolClear)
 #else
 #define RTS_LIBDW_SYMBOLS
 #endif /* USE_LIBDW */
