@@ -739,7 +739,7 @@ ifneq "$(BINDIST)" "YES"
 
 ifneq "$(BOOTSTRAPPING_CONF)" ""
 ifeq "$(wildcard $(BOOTSTRAPPING_CONF))" ""
-$(shell $(GHC_PKG) init $(BOOTSTRAPPING_CONF))
+$(shell "$(GHC_PKG)" init $(BOOTSTRAPPING_CONF))
 endif
 endif
 
