@@ -947,11 +947,14 @@ checkValSig lhs@(L l _) ty
                        ppr lhs <+> text "::" <+> ppr ty)
                    $$ text hint)
   where
-    hint = if foreign_RDR `looks_like` lhs
-           then "Perhaps you meant to use ForeignFunctionInterface?"
-           else if default_RDR `looks_like` lhs
-                then "Perhaps you meant to use DefaultSignatures?"
-                else "Should be of form <variable> :: <type>"
+    hint | foreign_RDR `looks_like` lhs =
+           "Perhaps you meant to use ForeignFunctionInterface?"
+         | default_RDR `looks_like` lhs =
+           "Perhaps you meant to use DefaultSignatures?"
+         | pattern_RDR `looks_like` lhs =
+           "Perhaps you meant to use PatternSynonyms?"
+         | otherwise =
+           "Should be of form <variable> :: <type>"
     -- A common error is to forget the ForeignFunctionInterface flag
     -- so check for that, and suggest.  cf Trac #3805
     -- Sadly 'foreign import' still barfs 'parse error' because 'import' is a keyword
@@ -961,6 +964,7 @@ checkValSig lhs@(L l _) ty
 
     foreign_RDR = mkUnqual varName (fsLit "foreign")
     default_RDR = mkUnqual varName (fsLit "default")
+    pattern_RDR = mkUnqual varName (fsLit "pattern")
 
 
 checkDoAndIfThenElse :: LHsExpr RdrName
