@@ -91,12 +91,6 @@ volatile StgWord recent_activity = ACTIVITY_YES;
  */
 volatile StgWord sched_state = SCHED_RUNNING;
 
-/*  This is used in `TSO.h' and gcc 2.96 insists that this variable actually
- *  exists - earlier gccs apparently didn't.
- *  -= chak
- */
-StgTSO dummy_tso;
-
 /*
  * This mutex protects most of the global scheduler data in
  * the THREADED_RTS runtime.
