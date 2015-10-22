@@ -1393,7 +1393,7 @@ AC_DEFUN([FP_PROG_GHC_PKG],
 # so we sed off -stage[0-9]$. However, if we are told to use
 # ghc-6.12.1 then we want to use ghc-pkg-6.12.1, so we keep any
 # other suffix.
-fp_ghc_pkg_guess=`echo $WithGhc | sed -e 's/-stage@<:@0-9@:>@$//' -e 's,ghc\(@<:@^/\\@:>@*\)$,ghc-pkg\1,'`
+fp_ghc_pkg_guess=`echo "$WithGhc" | sed -e 's/-stage@<:@0-9@:>@$//' -e 's,ghc\(@<:@^/\\@:>@*\)$,ghc-pkg\1,'`
 if "$fp_ghc_pkg_guess" list > /dev/null 2>&1; then
   fp_cv_matching_ghc_pkg=$fp_ghc_pkg_guess
 else
