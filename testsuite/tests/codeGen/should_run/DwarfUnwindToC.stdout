@@ -1,0 +1,52 @@
+3
+Stack trace:
+    set_initial_registers (rts/Libdw.c:278.0)
+    dwfl_thread_getframes
+    
+    dwfl_getthreads
+    dwfl_getthread_frames
+    libdw_get_backtrace (rts/Libdw.c:249.0)
+    base_GHCziExecutionStackziInternal_collectStackTrace1_info (libraries/base/GHC/ExecutionStack/Internal.hsc:194.1)
+    base_GHCziExecutionStack_showStackTrace1_info (libraries/base/GHC/ExecutionStack.hs:47.1)
+    base_GHCziBase_bindIO1_info (libraries/base/GHC/Base.hs:1081.1)
+    base_GHCziBase_thenIO1_info (libraries/base/GHC/Base.hs:1084.1)
+    base_GHCziBase_thenIO1_info (libraries/base/GHC/Base.hs:1084.1)
+    stg_catch_frame_info (rts/Exception.cmm:370.1)
+    stg_stop_thread_info (rts/StgStartup.cmm:42.1)
+
+2
+Stack trace:
+    set_initial_registers (rts/Libdw.c:278.0)
+    dwfl_thread_getframes
+    
+    dwfl_getthreads
+    dwfl_getthread_frames
+    libdw_get_backtrace (rts/Libdw.c:249.0)
+    base_GHCziExecutionStackziInternal_collectStackTrace1_info (libraries/base/GHC/ExecutionStack/Internal.hsc:194.1)
+    base_GHCziExecutionStack_showStackTrace1_info (libraries/base/GHC/ExecutionStack.hs:47.1)
+    base_GHCziBase_bindIO1_info (libraries/base/GHC/Base.hs:1081.1)
+    base_GHCziBase_thenIO1_info (libraries/base/GHC/Base.hs:1084.1)
+    base_GHCziBase_thenIO1_info (libraries/base/GHC/Base.hs:1084.1)
+    base_GHCziBase_thenIO1_info (libraries/base/GHC/Base.hs:1084.1)
+    stg_catch_frame_info (rts/Exception.cmm:370.1)
+    stg_stop_thread_info (rts/StgStartup.cmm:42.1)
+
+1
+Stack trace:
+    set_initial_registers (rts/Libdw.c:278.0)
+    dwfl_thread_getframes
+    
+    dwfl_getthreads
+    dwfl_getthread_frames
+    libdw_get_backtrace (rts/Libdw.c:249.0)
+    base_GHCziExecutionStackziInternal_collectStackTrace1_info (libraries/base/GHC/ExecutionStack/Internal.hsc:194.1)
+    base_GHCziExecutionStack_showStackTrace1_info (libraries/base/GHC/ExecutionStack.hs:47.1)
+    base_GHCziBase_bindIO1_info (libraries/base/GHC/Base.hs:1081.1)
+    base_GHCziBase_thenIO1_info (libraries/base/GHC/Base.hs:1084.1)
+    base_GHCziBase_thenIO1_info (libraries/base/GHC/Base.hs:1084.1)
+    base_GHCziBase_thenIO1_info (libraries/base/GHC/Base.hs:1084.1)
+    base_GHCziBase_thenIO1_info (libraries/base/GHC/Base.hs:1084.1)
+    stg_catch_frame_info (rts/Exception.cmm:370.1)
+    stg_stop_thread_info (rts/StgStartup.cmm:42.1)
+
+"Hello"

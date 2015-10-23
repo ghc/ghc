@@ -77,8 +77,6 @@ test('cgrun069', omit_ways(['ghci']), multi_compile_and_run,
 test('cgrun070', normal, compile_and_run, [''])
 test('cgrun071', normal, compile_and_run, [''])
 test('cgrun072', normal, compile_and_run, [''])
-test('cgrun075', normal, compile_and_run, [''])
-test('cgrun076', normal, compile_and_run, [''])
 
 test('T1852', normal, compile_and_run, [''])
 test('T1861', extra_run_opts('0'), compile_and_run, [''])
@@ -95,7 +93,6 @@ test('T5626', exit_code(1), compile_and_run, [''])
 test('T5747', when(arch('i386'), extra_hc_opts('-msse2')), compile_and_run, ['-O2'])
 test('T5785', normal, compile_and_run, [''])
 test('setByteArray', normal, compile_and_run, [''])
-test('compareByteArrays', normal, compile_and_run, [''])
 
 test('T6146', normal, compile_and_run, [''])
 test('T5900', normal, compile_and_run, [''])
@@ -167,3 +164,4 @@ test('T13825-unit',
      ['-package ghc'])
 test('T14619', normal, compile_and_run, [''])
 test('T14754', normal, compile_and_run, [''])
+test('DwarfUnwindToC', [when(not rts_with_libdw() or not libs_have_debug_info(), skip)], compile_and_run, [''])
