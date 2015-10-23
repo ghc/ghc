@@ -77,14 +77,18 @@ typedef struct Location_ {
     StgWord32 colno;
 } __attribute__((packed)) Location;
 
-#ifdef USE_LIBDW
+struct LibdwSession_;
+typedef struct LibdwSession_ LibdwSession;
 
+/* Free a backtrace */
 void backtraceFree(Backtrace *bt);
 
-#else
+/* Request a backtrace of the current stack state.
+ * May return NULL if a backtrace can't be acquired. */
+Backtrace *libdwGetBacktrace(LibdwSession *session);
 
-INLINE_HEADER void backtraceFree(Backtrace *bt STG_UNUSED) { }
-
-#endif /* USE_LIBDW */
+/* Lookup Location information for the given address.
+ * Returns 0 if successful, 1 if address could not be found. */
+int libdwLookupLocation(LibdwSession *session, Location *loc, StgPtr pc);
 
 #endif /* RTS_LIBDW_H */

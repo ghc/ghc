@@ -6,15 +6,15 @@
  *
  * --------------------------------------------------------------------------*/
 
+#include "Rts.h"
+#include "RtsUtils.h"
+#include "Libdw.h"
+
 #ifdef USE_LIBDW
 
 #include <elfutils/libdwfl.h>
 #include <dwarf.h>
 #include <unistd.h>
-
-#include "Rts.h"
-#include "Libdw.h"
-#include "RtsUtils.h"
 
 static BacktraceChunk *backtraceAllocChunk(BacktraceChunk *next) {
     BacktraceChunk *chunk = stgMallocBytes(sizeof(BacktraceChunk),
@@ -328,5 +328,19 @@ static const Dwfl_Thread_Callbacks thread_cbs = {
     .memory_read = memory_read,
     .set_initial_registers = set_initial_registers,
 };
+
+#else /* !USE_LIBDW */
+
+void backtraceFree(Backtrace *bt STG_UNUSED) { }
+
+Backtrace *libdwGetBacktrace(LibdwSession *session STG_UNUSED) {
+    return NULL;
+}
+
+int libdwLookupLocation(LibdwSession *session STG_UNUSED,
+                        Location *loc STG_UNUSED,
+                        StgPtr pc STG_UNUSED) {
+    return 1;
+}
 
 #endif /* USE_LIBDW */
