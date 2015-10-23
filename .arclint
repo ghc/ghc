@@ -8,7 +8,7 @@
     },
     "merge-conflict": {
       "type": "merge-conflict",
-      "exclude": "(\\.rst$)",
+      "exclude": "(\\.rst$)"
     },
     "nolint": {
       "type": "nolint"
