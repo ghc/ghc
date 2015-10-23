@@ -18,6 +18,7 @@ import UniqSupply
 import Dwarf.Constants
 import Dwarf.Types
 
+import Control.Monad    ( mfilter )
 import Data.Maybe
 import Data.List        ( sortBy )
 import Data.Ord         ( comparing )
@@ -172,23 +173,33 @@ parent, B.
 -- | Generate DWARF info for a procedure debug block
 procToDwarf :: DynFlags -> DebugBlock -> DwarfInfo
 procToDwarf df prc
-  = DwarfSubprogram { dwChildren = foldr blockToDwarf [] $ dblBlocks prc
+  = DwarfSubprogram { dwChildren = map (blockToDwarf df) (dblBlocks prc)
                     , dwName     = case dblSourceTick prc of
                          Just s@SourceNote{} -> sourceName s
                          _otherwise -> showSDocDump df $ ppr $ dblLabel prc
                     , dwLabel    = dblCLabel prc
+                    , dwParent   = fmap mkAsmTempDieLabel
+                                   $ mfilter (/= dblCLabel prc)
+                                   $ fmap dblCLabel (dblParent prc)
+                      -- Omit parent if it would be self-referential
                     }
 
 -- | Generate DWARF info for a block
-blockToDwarf :: DebugBlock -> [DwarfInfo] -> [DwarfInfo]
-blockToDwarf blk dws
-  | isJust (dblPosition blk) = dw : dws
-  | otherwise                = nested ++ dws -- block was optimized out, flatten
-  where nested = foldr blockToDwarf [] $ dblBlocks blk
-        dw = DwarfBlock { dwChildren = nested
-                        , dwLabel    = dblCLabel blk
-                        , dwMarker   = mkAsmTempLabel (dblLabel blk)
-                        }
+blockToDwarf :: DynFlags -> DebugBlock -> DwarfInfo
+blockToDwarf df blk
+  = DwarfBlock { dwChildren = concatMap (tickToDwarf df) (dblTicks blk)
+                              ++ map (blockToDwarf df) (dblBlocks blk)
+               , dwLabel    = dblCLabel blk
+               , dwMarker   = marker
+               }
+  where
+    marker
+      | Just _ <- dblPosition blk = Just $ mkAsmTempLabel $ dblLabel blk
+      | otherwise                 = Nothing   -- block was optimized out
+
+tickToDwarf :: DynFlags -> Tickish () -> [DwarfInfo]
+tickToDwarf _  (SourceNote ss _) = [DwarfSrcNote ss]
+tickToDwarf _ _ = []
 
 -- | Generates the data for the debug frame section, which encodes the
 -- desired stack unwind behaviour for the debugger

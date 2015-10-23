@@ -46,6 +46,7 @@ module CLabel (
         mkAsmTempLabel,
         mkAsmTempDerivedLabel,
         mkAsmTempEndLabel,
+        mkAsmTempDieLabel,
 
         mkPlainModuleInitLabel,
 
@@ -561,6 +562,11 @@ mkAsmTempEndLabel :: CLabel -> CLabel
 mkAsmTempEndLabel l = mkAsmTempDerivedLabel l (fsLit "_end")
 mkPlainModuleInitLabel :: Module -> CLabel
 mkPlainModuleInitLabel mod      = PlainModuleInitLabel mod
+
+-- | Construct a label for a DWARF Debug Information Entity (DIE)
+-- describing another symbol.
+mkAsmTempDieLabel :: CLabel -> CLabel
+mkAsmTempDieLabel l = mkAsmTempDerivedLabel l (fsLit "_die")
 
 -- -----------------------------------------------------------------------------
 -- Convert between different kinds of label

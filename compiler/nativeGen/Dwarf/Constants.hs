@@ -22,7 +22,8 @@ dW_TAG_compile_unit, dW_TAG_subroutine_type,
   dW_TAG_file_type, dW_TAG_subprogram, dW_TAG_lexical_block,
   dW_TAG_base_type, dW_TAG_structure_type, dW_TAG_pointer_type,
   dW_TAG_array_type, dW_TAG_subrange_type, dW_TAG_typedef,
-  dW_TAG_variable, dW_TAG_arg_variable, dW_TAG_auto_variable :: Word
+  dW_TAG_variable, dW_TAG_arg_variable, dW_TAG_auto_variable,
+  dW_TAG_ghc_src_note :: Word
 dW_TAG_array_type      = 1
 dW_TAG_lexical_block   = 11
 dW_TAG_pointer_type    = 15
@@ -37,6 +38,8 @@ dW_TAG_subprogram      = 46
 dW_TAG_variable        = 52
 dW_TAG_auto_variable   = 256
 dW_TAG_arg_variable    = 257
+
+dW_TAG_ghc_src_note    = 0x5b00
 
 -- * Dwarf attributes
 dW_AT_name, dW_AT_stmt_list, dW_AT_low_pc, dW_AT_high_pc, dW_AT_language,
@@ -54,19 +57,41 @@ dW_AT_frame_base        = 0x40
 dW_AT_use_UTF8          = 0x53
 dW_AT_MIPS_linkage_name = 0x2007
 
--- * Abbrev declaration
+-- * Custom DWARF attributes
+-- Chosen a more or less random section of the vendor-extensible region
+
+-- ** Describing C-- blocks
+-- These appear in DW_TAG_lexical_scope DIEs corresponding to C-- blocks
+dW_AT_ghc_tick_parent :: Word
+dW_AT_ghc_tick_parent     = 0x2b20
+
+-- ** Describing source notes
+-- These appear in DW_TAG_ghc_src_note DIEs
+dW_AT_ghc_span_file, dW_AT_ghc_span_start_line,
+  dW_AT_ghc_span_start_col, dW_AT_ghc_span_end_line,
+  dW_AT_ghc_span_end_col :: Word
+dW_AT_ghc_span_file       = 0x2b00
+dW_AT_ghc_span_start_line = 0x2b01
+dW_AT_ghc_span_start_col  = 0x2b02
+dW_AT_ghc_span_end_line   = 0x2b03
+dW_AT_ghc_span_end_col    = 0x2b04
+
+
+-- * Abbrev declarations
 dW_CHILDREN_no, dW_CHILDREN_yes :: Word8
 dW_CHILDREN_no  = 0
 dW_CHILDREN_yes = 1
 
-dW_FORM_addr, dW_FORM_data4, dW_FORM_string, dW_FORM_flag,
-  dW_FORM_block1, dW_FORM_ref4, dW_FORM_flag_present :: Word
+dW_FORM_addr, dW_FORM_data2, dW_FORM_data4, dW_FORM_string, dW_FORM_flag,
+  dW_FORM_block1, dW_FORM_ref4, dW_FORM_ref_addr, dW_FORM_flag_present :: Word
 dW_FORM_addr   = 0x01
+dW_FORM_data2  = 0x05
 dW_FORM_data4  = 0x06
 dW_FORM_string = 0x08
 dW_FORM_flag   = 0x0c
 dW_FORM_block1 = 0x0a
-dW_FORM_ref4   = 0x13
+dW_FORM_ref_addr     = 0x10
+dW_FORM_ref4         = 0x13
 dW_FORM_flag_present = 0x19
 
 -- * Dwarf native types
