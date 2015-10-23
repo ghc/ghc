@@ -4513,6 +4513,10 @@ ocVerifyImage_ELF ( ObjectCode* oc )
 #elif defined(EM_AMD64)
       case EM_AMD64: IF_DEBUG(linker,debugBelch( "amd64" )); break;
 #endif
+#ifdef EM_AARCH64
+      case EM_AARCH64: IF_DEBUG(linker,debugBelch( "aarch64" )); break;
+#endif
+
       default:       IF_DEBUG(linker,debugBelch( "unknown" ));
                      errorBelch("%s: unknown architecture (e_machine == %d)"
                                 , oc->fileName, ehdr->e_machine);
@@ -5332,7 +5336,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #if defined(SHN_XINDEX)
    Elf_Word* shndx_table = get_shndx_table((Elf_Ehdr*)ehdrC);
 #endif
-#if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+#if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(aarch64_HOST_ARCH)
    /* This #ifdef only serves to avoid unused-var warnings. */
    Elf_Addr targ = (Elf_Addr) oc->sections[target_shndx].start;
 #endif
@@ -5350,7 +5354,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
    }
 
    for (j = 0; j < nent; j++) {
-#if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+#if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(aarch64_HOST_ARCH)
       /* This #ifdef only serves to avoid unused-var warnings. */
       Elf_Addr  offset = rtab[j].r_offset;
       Elf_Addr  P      = targ + offset;
@@ -5654,6 +5658,50 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
           break;
       }
 #endif
+
+	case R_AARCH64_ABS64:
+          puts ("\n\nAArch64: ELF relocation(RelA) R_AARCH64_ABS64");
+          *(Elf64_Xword *)P = S + A;
+          break;
+
+	case R_AARCH64_ADR_PREL_PG_HI21:
+          puts ("\n\nAArch64: ELF relocation(RelA) R_AARCH64_ADR_PREL_PG_HI21");
+          {
+            uint64_t final_address = (uint64_t) rtab + rtab[j].r_offset ;
+            // Operation: Page(S+A) - Page(P)
+            uint64_t result = ((S + A) & ~0xfffULL) - (final_address & ~0xfffULL);
+
+printf ("ehdrC: %p\nrtab : %p\n\n", ehdrC, rtab) ;
+
+printf ("rtab 0x%lx + 0x%lx -> 0x%lx\n", (uint64_t) rtab, (uint64_t) rtab[j].r_offset, final_address) ;
+printf ("S 0x%lx + A 0x%lx : 0x%lx\n", S, A, S + A) ;
+printf ("result 0x%lx\n", result) ;
+
+            // Check that -2^32 <= X < 2^32
+            if (result >> 32)
+                 barf ("%s: overflow check failed for relocation", oc->fileName);
+
+            *(Elf64_Xword *)P &= 0x9f00001fU;
+            // Immediate goes in bits 30:29 + 5:23 of ADRP instruction, taken
+            // from bits 32:12 of X.
+            *(Elf64_Xword *)P |= ((result & 0x3000U) << (29 - 12));
+            *(Elf64_Xword *)P |= ((result & 0x1ffffc000ULL) >> (14 - 5));
+          }
+          break;
+
+	case R_AARCH64_CALL26:
+	case R_AARCH64_JUMP26:
+          puts ("\n\nAArch64: ELF relocation(RelA) R_AARCH64_CALL26/JUMP64");
+          {
+              // These two are handled in the same way.
+          }
+          break;
+
+	case R_AARCH64_ADD_ABS_LO12_NC:
+          puts ("\n\nAArch64: ELF relocation(RelA) R_AARCH64_ADD_ABS_LO12_NC");
+          {
+          }
+          break;
 
          default:
             errorBelch("%s: unhandled ELF relocation(RelA) type %" FMT_Word "\n",
