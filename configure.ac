@@ -772,15 +772,15 @@ fi
 
 dnl ** check for Sphinx toolchain
 AC_PATH_PROG(SPHINXBUILD,sphinx-build)
-AC_CACHE_CHECK([for version of sphinx-build], sphinx_version,
+AC_CACHE_CHECK([for version of sphinx-build], fp_cv_sphinx_version,
 changequote(, )dnl
 [if test -n "$SPHINXBUILD"; then
-  sphinx_version=`"$SPHINXBUILD" --version 2>&1 | sed 's/Sphinx\( (sphinx-build)\)\? v\?\([0-9]\.[0-9]\.[0-9]\)/\2/' | head -n1`;
+  fp_cv_sphinx_version=`"$SPHINXBUILD" --version 2>&1 | sed 's/Sphinx\( (sphinx-build)\)\? v\?\([0-9]\.[0-9]\.[0-9]\)/\2/' | head -n1`;
 fi;
 changequote([, ])dnl
 ])
-FP_COMPARE_VERSIONS([$sphinx_version],-lt,1.0.0,
-    [AC_MSG_ERROR([Sphinx version 1.0.0 or later is required to build documentation]); SPHINXBUILD=;])
+FP_COMPARE_VERSIONS([$fp_cv_sphinx_version],-lt,1.0.0,
+    [AC_MSG_WARN([Sphinx version 1.0.0 or later is required to build documentation]); SPHINXBUILD=;])
 
 dnl ** check for xelatex
 AC_PATH_PROG(XELATEX,xelatex)
