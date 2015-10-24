@@ -5216,15 +5216,17 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #else
           StgInt64 off = value - P;
           if (off >= 0x7fffffffL || off < -0x80000000L) {
-#if X86_64_ELF_NONPIC_HACK
-              StgInt64 pltAddress = (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
+              if (X86_64_ELF_NONPIC_HACK) {
+                  StgInt64 pltAddress =
+                      (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
                                                 -> jumpIsland;
-              off = pltAddress + A - P;
-#else
-              errorBelch("R_X86_64_PC32 relocation out of range: %s = %p\nRecompile %s with -fPIC.",
-                         symbol, off, oc->fileName );
-              return 0;
-#endif
+                  off = pltAddress + A - P;
+              } else {
+                  errorBelch("R_X86_64_PC32 relocation out of range: %s = %"
+                             PRId64 "d\nRecompile %s with -fPIC.",
+                             symbol, off, oc->fileName );
+                  return 0;
+              }
           }
           *(Elf64_Word *)P = (Elf64_Word)off;
 #endif
@@ -5243,15 +5245,17 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
           barf("R_X86_64_32 relocation, but ALWAYS_PIC.");
 #else
           if (value >= 0x7fffffffL) {
-#if X86_64_ELF_NONPIC_HACK
-              StgInt64 pltAddress = (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
+              if (X86_64_ELF_NONPIC_HACK) {
+                  StgInt64 pltAddress =
+                      (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
                                                 -> jumpIsland;
-              value = pltAddress + A;
-#else
-              errorBelch("R_X86_64_32 relocation out of range: %s = %p\nRecompile %s with -fPIC.",
+                  value = pltAddress + A;
+              } else {
+                  errorBelch("R_X86_64_32 relocation out of range: %s = %"
+                         PRId64 "d\nRecompile %s with -fPIC.",
                          symbol, value, oc->fileName );
-              return 0;
-#endif
+                  return 0;
+              }
           }
           *(Elf64_Word *)P = (Elf64_Word)value;
 #endif
@@ -5262,15 +5266,17 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
           barf("R_X86_64_32S relocation, but ALWAYS_PIC.");
 #else
           if ((StgInt64)value > 0x7fffffffL || (StgInt64)value < -0x80000000L) {
-#if X86_64_ELF_NONPIC_HACK
-              StgInt64 pltAddress = (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
+              if (X86_64_ELF_NONPIC_HACK) {
+                  StgInt64 pltAddress =
+                      (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
                                                 -> jumpIsland;
-              value = pltAddress + A;
-#else
-              errorBelch("R_X86_64_32S relocation out of range: %s = %p\nRecompile %s with -fPIC.",
+                  value = pltAddress + A;
+              } else {
+                  errorBelch("R_X86_64_32S relocation out of range: %s = %"
+                         PRId64 "d\nRecompile %s with -fPIC.",
                          symbol, value, oc->fileName );
-              return 0;
-#endif
+                  return 0;
+              }
           }
           *(Elf64_Sword *)P = (Elf64_Sword)value;
 #endif
