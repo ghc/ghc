@@ -37,11 +37,7 @@ command ``ghci``:
 ::
 
     $ ghci
-    GHCi, version 6.12.1: http://www.haskell.org/ghc/  :? for help
-    Loading package ghc-prim ... linking ... done.
-    Loading package integer-gmp ... linking ... done.
-    Loading package base ... linking ... done.
-    Loading package ffi-1.0 ... linking ... done.
+    GHCi, version 8.0.1: http://www.haskell.org/ghc/  :? for help
     Prelude>
 
 There may be a short pause while GHCi loads the prelude and standard
