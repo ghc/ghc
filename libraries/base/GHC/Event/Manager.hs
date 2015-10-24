@@ -307,7 +307,7 @@ step mgr@EventManager{..} = do
 -- event manager ought to be woken.
 --
 -- Note that the event manager is generally implemented in terms of the
--- platform's @selectg@ or @epoll@ system call, which tend to vary in
+-- platform's @select@ or @epoll@ system call, which tend to vary in
 -- what sort of fds are permitted. For instance, waiting on regular files
 -- is not allowed on many platforms.
 registerFd_ :: EventManager -> IOCallback -> Fd -> Event -> Lifetime
