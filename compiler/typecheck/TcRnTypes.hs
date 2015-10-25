@@ -50,6 +50,11 @@ module TcRnTypes(
         -- Arrows
         ArrowCtxt(..),
 
+        -- TcSigInfo
+        TcSigInfo(..), TcIdSigInfo(..), TcPatSynInfo(..), TcIdSigBndr(..),
+        findScopedTyVars, isPartialSig, noCompleteSig, tcSigInfoName,
+        completeIdSigPolyId, completeSigPolyId_maybe, completeIdSigPolyId_maybe,
+
         -- Canonical constraints
         Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, pprCts,
         singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
@@ -66,6 +71,7 @@ module TcRnTypes(
         andWC, unionsWC, addSimples, addImplics, mkSimpleWC, addInsols,
         dropDerivedWC, dropDerivedSimples, dropDerivedInsols,
         isDroppableDerivedLoc, insolubleImplic, trulyInsoluble,
+        arisesFromGivens,
 
         Implication(..), ImplicStatus(..), isInsolubleStatus,
         SubGoalDepth, initialSubGoalDepth,
@@ -76,7 +82,7 @@ module TcRnTypes(
         CtOrigin(..), pprCtOrigin, pprCtLoc,
         pushErrCtxt, pushErrCtxtSameOrigin,
 
-        SkolemInfo(..),
+        SkolemInfo(..), pprSigSkolInfo, pprSkolInfo,
 
         CtEvidence(..),
         mkGivenLoc,
@@ -114,6 +120,7 @@ import TyCon    ( TyCon )
 import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
 import PatSyn   ( PatSyn, patSynType )
+import Id       ( idName )
 import TcType
 import Annotations
 import InstEnv
@@ -1077,6 +1084,203 @@ instance Outputable WhereFrom where
   ppr ImportBySystem                       = ptext (sLit "{- SYSTEM -}")
   ppr ImportByPlugin                       = ptext (sLit "{- PLUGIN -}")
 
+
+{- *********************************************************************
+*                                                                      *
+                Type signatures
+*                                                                      *
+********************************************************************* -}
+
+data TcSigInfo = TcIdSig     TcIdSigInfo
+               | TcPatSynSig TcPatSynInfo
+
+data TcIdSigInfo
+  = TISI
+      { sig_bndr  :: TcIdSigBndr
+
+      , sig_skols :: [(Name, TcTyVar)]
+            -- Instantiated type and kind variables SKOLEMS
+            -- The Name is the Name that the renamer chose;
+            --   but the TcTyVar may come from instantiating
+            --   the type and hence have a different unique.
+            -- No need to keep track of whether they are truly lexically
+            --   scoped because the renamer has named them uniquely
+            --
+            -- For Partial signatures, this list /excludes/ any wildcards
+            --   the named wildcards scope over the binding, and hence
+            --   their Names may appear in renamed type signatures
+            --   in the binding; get them from sig_bndr
+            -- See Note [Binding scoped type variables]
+
+      , sig_theta  :: TcThetaType   -- Instantiated theta.  In the case of a
+                                    -- PartialSig, sig_theta does not include
+                                    -- the extra-constraints wildcard
+
+      , sig_tau    :: TcSigmaType   -- Instantiated tau
+                                    -- See Note [sig_tau may be polymorphic]
+
+      , sig_ctxt   :: UserTypeCtxt  -- In the case of type-class default methods,
+                                    -- the Name in the FunSigCtxt is not the same
+                                    -- as the TcId; the former is 'op', while the
+                                    -- latter is '$dmop' or some such
+
+      , sig_loc    :: SrcSpan       -- Location of the type signature
+    }
+
+data TcIdSigBndr   -- See Note [Complete and partial type signatures]
+  = CompleteSig    -- A complete signature with no wildards,
+                   -- so the complete polymorphic type is known.
+        TcId          -- The polymoprhic Id with that type
+
+  | PartialSig     -- A partial type signature (i.e. includes one or more
+                   -- wildcards). In this case it doesn't make sense to give
+                   -- the polymorphic Id, because we are going to /infer/ its
+                   -- type, so we can't make the polymorphic Id ab-initio
+       { sig_name  :: Name              -- Name of the function; used when report wildcards
+       , sig_hs_ty :: LHsType Name      -- The original partial signature
+       , sig_wcs   :: [(Name,TcTyVar)]  -- Instantiated wildcard variables (named and anonymous)
+                                        -- The Name is what the user wrote, such as '_',
+                                        --   including SrcSpan for the error message;
+                                        -- The TcTyVar is just an ordinary unification variable
+       , sig_cts   :: Maybe SrcSpan     -- Just loc <=> An extra-constraints wildcard was present
+       }                                --              at location loc
+                                        --   e.g.   f :: (Eq a, _) => a -> a
+
+data TcPatSynInfo
+  = TPSI {
+        patsig_name  :: Name,
+        patsig_tau   :: TcSigmaType,
+        patsig_ex    :: [TcTyVar],
+        patsig_prov  :: TcThetaType,
+        patsig_univ  :: [TcTyVar],
+        patsig_req   :: TcThetaType
+    }
+
+findScopedTyVars  -- See Note [Binding scoped type variables]
+  :: TcType             -- The Type: its forall'd variables are a superset
+                        --   of the lexically scoped variables
+  -> [TcTyVar]          -- The instantiated forall variables of the TcType
+  -> [(Name, TcTyVar)]  -- In 1-1 correspondence with the instantiated vars
+findScopedTyVars sig_ty inst_tvs
+  = zipWith find sig_tvs inst_tvs
+  where
+    find sig_tv inst_tv = (tyVarName sig_tv, inst_tv)
+    (sig_tvs,_) = tcSplitForAllTys sig_ty
+
+instance Outputable TcSigInfo where
+  ppr (TcIdSig     idsi) = ppr idsi
+  ppr (TcPatSynSig tpsi) = text "TcPatSynInfo" <+> ppr tpsi
+
+instance Outputable TcIdSigInfo where
+    ppr (TISI { sig_bndr = bndr, sig_skols = tyvars
+              , sig_theta = theta, sig_tau = tau })
+        = ppr (tcIdSigBndrName bndr) <+> dcolon <+>
+          vcat [ pprSigmaType (mkSigmaTy (map snd tyvars) theta tau)
+               , ppr (map fst tyvars) ]
+
+instance Outputable TcIdSigBndr where
+
+instance Outputable TcPatSynInfo where
+    ppr (TPSI{ patsig_name = name}) = ppr name
+
+isPartialSig :: TcIdSigInfo -> Bool
+isPartialSig (TISI { sig_bndr = PartialSig {} }) = True
+isPartialSig _                                   = False
+
+-- | No signature or a partial signature
+noCompleteSig :: Maybe TcSigInfo -> Bool
+noCompleteSig (Just (TcIdSig sig)) = isPartialSig sig
+noCompleteSig _                    = True
+
+tcIdSigBndrName :: TcIdSigBndr -> Name
+tcIdSigBndrName (CompleteSig id)              = idName id
+tcIdSigBndrName (PartialSig { sig_name = n }) = n
+
+tcSigInfoName :: TcSigInfo -> Name
+tcSigInfoName (TcIdSig     idsi) = tcIdSigBndrName (sig_bndr idsi)
+tcSigInfoName (TcPatSynSig tpsi) = patsig_name tpsi
+
+-- Helper for cases when we know for sure we have a complete type
+-- signature, e.g. class methods.
+completeIdSigPolyId :: TcIdSigInfo -> TcId
+completeIdSigPolyId (TISI { sig_bndr = CompleteSig id }) = id
+completeIdSigPolyId _ = panic "completeSigPolyId"
+
+completeIdSigPolyId_maybe :: TcIdSigInfo -> Maybe TcId
+completeIdSigPolyId_maybe (TISI { sig_bndr = CompleteSig id }) = Just id
+completeIdSigPolyId_maybe _                                    = Nothing
+
+completeSigPolyId_maybe :: TcSigInfo -> Maybe TcId
+completeSigPolyId_maybe (TcIdSig sig)    = completeIdSigPolyId_maybe sig
+completeSigPolyId_maybe (TcPatSynSig {}) = Nothing
+
+{-
+Note [Binding scoped type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The type variables *brought into lexical scope* by a type signature may
+be a subset of the *quantified type variables* of the signatures, for two reasons:
+
+* With kind polymorphism a signature like
+    f :: forall f a. f a -> f a
+  may actually give rise to
+    f :: forall k. forall (f::k -> *) (a:k). f a -> f a
+  So the sig_tvs will be [k,f,a], but only f,a are scoped.
+  NB: the scoped ones are not necessarily the *inital* ones!
+
+* Even aside from kind polymorphism, there may be more instantiated
+  type variables than lexically-scoped ones.  For example:
+        type T a = forall b. b -> (a,b)
+        f :: forall c. T c
+  Here, the signature for f will have one scoped type variable, c,
+  but two instantiated type variables, c' and b'.
+
+The function findScopedTyVars takes
+  * hs_ty:    the original HsForAllTy
+  * sig_ty:   the corresponding Type (which is guaranteed to use the same Names
+              as the HsForAllTy)
+  * inst_tvs: the skolems instantiated from the forall's in sig_ty
+It returns a [(Maybe Name, TcTyVar)], in 1-1 correspondence with inst_tvs
+but with a (Just n) for the lexically scoped name of each in-scope tyvar.
+
+Note [sig_tau may be polymorphic]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note that "sig_tau" might actually be a polymorphic type,
+if the original function had a signature like
+   forall a. Eq a => forall b. Ord b => ....
+But that's ok: tcMatchesFun (called by tcRhs) can deal with that
+It happens, too!  See Note [Polymorphic methods] in TcClassDcl.
+
+Note [Existential check]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Lazy patterns can't bind existentials.  They arise in two ways:
+  * Let bindings      let { C a b = e } in b
+  * Twiddle patterns  f ~(C a b) = e
+The pe_lazy field of PatEnv says whether we are inside a lazy
+pattern (perhaps deeply)
+
+If we aren't inside a lazy pattern then we can bind existentials,
+but we need to be careful about "extra" tyvars. Consider
+    (\C x -> d) : pat_ty -> res_ty
+When looking for existential escape we must check that the existential
+bound by C don't unify with the free variables of pat_ty, OR res_ty
+(or of course the environment).   Hence we need to keep track of the
+res_ty free vars.
+
+Note [Complete and partial type signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A type signature is partial when it contains one or more wildcards
+(= type holes).  The wildcard can either be:
+* A (type) wildcard occurring in sig_theta or sig_tau. These are
+  stored in sig_wcs.
+      f :: Bool -> _
+      g :: Eq _a => _a -> _a -> Bool
+* Or an extra-constraints wildcard, stored in sig_cts:
+      h :: (Num a, _) => a -> a
+
+A type signature is a complete type signature when there are no
+wildcards in the type signature, i.e. iff sig_wcs is empty and
+sig_extra_cts is Nothing. -}
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1317,12 +1521,28 @@ isDroppableDerivedLoc :: CtLoc -> Bool
 -- Note [Dropping derived constraints]
 isDroppableDerivedLoc loc
   = case ctLocOrigin loc of
+      HoleOrigin {}    -> False
       KindEqOrigin {}  -> False
       GivenOrigin {}   -> False
       FunDepOrigin1 {} -> False
       FunDepOrigin2 {} -> False
       _                -> True
 
+arisesFromGivens :: Ct -> Bool
+arisesFromGivens ct
+  = case ctEvidence ct of
+      CtGiven {} -> True
+      CtWanted {} -> False
+      CtDerived { ctev_loc = loc } -> from_given loc
+  where
+   from_given :: CtLoc -> Bool
+   from_given loc = from_given_origin (ctLocOrigin loc)
+
+   from_given_origin :: CtOrigin -> Bool
+   from_given_origin (GivenOrigin {})          = True
+   from_given_origin (FunDepOrigin1 _ l1 _ l2) = from_given l1 && from_given l2
+   from_given_origin (FunDepOrigin2 _ o1 _ _)  = from_given_origin o1
+   from_given_origin _                         = False
 
 {- Note [Dropping derived constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1348,6 +1568,9 @@ But (tiresomely) we do keep *some* Derived insolubles:
    - For Givens they reflect unreachable code
    - For Wanteds it is arguably better to get a fundep error than
      a no-instance error (Trac #9612)
+
+ * Type holes are derived constraints because they have no evidence
+   and we want to keep them so we get the error report
 
 Moreover, we keep *all* derived insolubles under some circumstances:
 
@@ -1422,14 +1645,15 @@ isTypeHoleCt (CHoleCan { cc_hole = TypeHole }) = True
 isTypeHoleCt _ = False
 
 instance Outputable Ct where
-  ppr ct = ppr (cc_ev ct) <+> parens (text ct_sort)
-         where ct_sort = case ct of
-                           CTyEqCan {}      -> "CTyEqCan"
-                           CFunEqCan {}     -> "CFunEqCan"
-                           CNonCanonical {} -> "CNonCanonical"
-                           CDictCan {}      -> "CDictCan"
-                           CIrredEvCan {}   -> "CIrredEvCan"
-                           CHoleCan {}      -> "CHoleCan"
+  ppr ct = ppr (cc_ev ct) <+> parens pp_sort
+    where 
+      pp_sort = case ct of
+         CTyEqCan {}      -> text "CTyEqCan"
+         CFunEqCan {}     -> text "CFunEqCan"
+         CNonCanonical {} -> text "CNonCanonical"
+         CDictCan {}      -> text "CDictCan"
+         CIrredEvCan {}   -> text "CIrredEvCan"
+         CHoleCan { cc_occ = occ } -> text "CHoleCan:" <+> ppr occ
 
 singleCt :: Ct -> Cts
 singleCt = unitBag
@@ -2146,8 +2370,8 @@ pprSigSkolInfo :: UserTypeCtxt -> Type -> SDoc
 pprSigSkolInfo ctxt ty
   = case ctxt of
        FunSigCtxt f _ -> pp_sig f
-       _              -> hang (pprUserTypeCtxt ctxt <> colon)
-                            2 (ppr ty)
+       _              -> vcat [ pprUserTypeCtxt ctxt <> colon
+                              , nest 2 (ppr ty) ]
   where
     pp_sig f = vcat [ ptext (sLit "the type signature for:")
                     , nest 2 (pprPrefixOcc f <+> dcolon <+> ppr ty) ]

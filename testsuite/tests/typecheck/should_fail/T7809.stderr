@@ -2,4 +2,4 @@
 T7809.hs:8:8: error:
     Illegal polymorphic or qualified type: PolyId
     GHC doesn't yet support impredicative polymorphism
-    In the type signature for ‘foo’: foo :: F PolyId
+    In the type signature: foo :: F PolyId

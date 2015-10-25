@@ -1345,8 +1345,8 @@ defineMacro overwrite s = do
     let stringTy = nlHsTyVar $ getRdrName stringTyConName
         ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
         body = nlHsVar compose_RDR `mkHsApp` step `mkHsApp` expr
-        tySig = stringTy `nlHsFunTy` ioM
-        new_expr = L (getLoc expr) $ ExprWithTySig body tySig PlaceHolder
+        tySig = mkLHsSigWcType (stringTy `nlHsFunTy` ioM)
+        new_expr = L (getLoc expr) $ ExprWithTySig body tySig
     hv <- GHC.compileParsedExpr new_expr
 
     liftIO (writeIORef macros_ref -- later defined macros have precedence
@@ -1396,8 +1396,8 @@ getGhciStepIO = do
       ghciM = nlHsTyVar (getRdrName ghciTyConName) `nlHsAppTy` stringTy
       ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
       body = nlHsVar (getRdrName ghciStepIoMName)
-      tySig = ghciM `nlHsFunTy` ioM
-  return $ noLoc $ ExprWithTySig body tySig PlaceHolder
+      tySig = mkLHsSigWcType (ghciM `nlHsFunTy` ioM)
+  return $ noLoc $ ExprWithTySig body tySig
 
 -----------------------------------------------------------------------------
 -- :check

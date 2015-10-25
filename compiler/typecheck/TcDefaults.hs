@@ -62,7 +62,7 @@ tcDefaults decls@(L locn (DefaultDecl _) : _)
 
 tc_default_ty :: [Class] -> LHsType Name -> TcM Type
 tc_default_ty deflt_clss hs_ty
- = do   { ty <- tcHsSigType DefaultDeclCtxt hs_ty
+ = do   { ty <- tcHsLiftedType hs_ty
         ; checkTc (isTauTy ty) (polyDefErr hs_ty)
 
         -- Check that the type is an instance of at least one of the deflt_clss

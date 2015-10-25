@@ -2595,20 +2595,8 @@ newFlattenSkolem Derived loc fam_ty
        ; return (ev, fmv) }
 
 newFsk, newFmv :: TcType -> TcS TcTyVar
-newFsk fam_ty
-  = wrapTcS $ do { uniq <- TcM.newUnique
-                 ; let name = TcM.mkTcTyVarName uniq (fsLit "fsk")
-                 ; return (mkTcTyVar name (typeKind fam_ty) (FlatSkol fam_ty)) }
-
-newFmv fam_ty
-  = wrapTcS $ do { uniq <- TcM.newUnique
-                 ; ref  <- TcM.newMutVar Flexi
-                 ; cur_lvl <- TcM.getTcLevel
-                 ; let details = MetaTv { mtv_info  = FlatMetaTv
-                                        , mtv_ref   = ref
-                                        , mtv_tclvl = fmvTcLevel cur_lvl }
-                       name = TcM.mkTcTyVarName uniq (fsLit "s")
-                 ; return (mkTcTyVar name (typeKind fam_ty) details) }
+newFsk fam_ty = wrapTcS (TcM.newFskTyVar fam_ty)
+newFmv fam_ty = wrapTcS (TcM.newFmvTyVar fam_ty)
 
 extendFlatCache :: TyCon -> [Type] -> (TcCoercion, TcType, CtFlavour) -> TcS ()
 extendFlatCache tc xi_args stuff

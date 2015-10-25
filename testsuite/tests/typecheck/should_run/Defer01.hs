@@ -17,6 +17,7 @@ data B = B
 b :: B -> Bool
 b x = x == x
 
+{-
 data C a where
   C1 :: C Int
   C2 :: Bool -> C Bool
@@ -48,6 +49,7 @@ k x = x
 l :: IO ()
 l = putChar >> putChar 'p'
 
-
+-}
 main :: IO ()
 main = print "No errors!"
+

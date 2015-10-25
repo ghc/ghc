@@ -1,10 +1,11 @@
 
-PushedInAsGivens.hs:10:31:
+PushedInAsGivens.hs:10:31: error:
     Couldn't match expected type ‘a1’ with actual type ‘a’
       because type variable ‘a1’ would escape its scope
     This (rigid, skolem) type variable is bound by
-      the type signature for: foo :: (F Int ~ [a1]) => a1 -> Int
-      at PushedInAsGivens.hs:9:20-44
+      the type signature for:
+        foo :: (F Int ~ [a1]) => a1 -> Int
+      at PushedInAsGivens.hs:9:13-44
     Relevant bindings include
       x :: a1 (bound at PushedInAsGivens.hs:10:17)
       foo :: a1 -> Int (bound at PushedInAsGivens.hs:10:13)
@@ -13,7 +14,7 @@ PushedInAsGivens.hs:10:31:
     In the expression: y
     In the first argument of ‘length’, namely ‘[x, y]’
 
-PushedInAsGivens.hs:11:15:
+PushedInAsGivens.hs:11:15: error:
     Couldn't match expected type ‘[a]’ with actual type ‘F Int’
     Relevant bindings include
       y :: a (bound at PushedInAsGivens.hs:9:5)

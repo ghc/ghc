@@ -1,13 +1,16 @@
 
-tcfail068.hs:14:9:
+tcfail068.hs:14:9: error:
     Couldn't match type ‘s1’ with ‘s’
-      ‘s1’ is a rigid type variable bound by
-           a type expected by the context: ST s1 (IndTree s a)
-           at tcfail068.hs:13:9
-      ‘s’ is a rigid type variable bound by
-          the type signature for:
-          itgen :: Constructed a => (Int, Int) -> a -> IndTree s a
-          at tcfail068.hs:11:10
+    ‘s1’ is a rigid type variable bound by
+    a type expected by the context:
+      forall s1. ST s1 (IndTree s a)
+    at tcfail068.hs:13:9
+    ‘s’ is a rigid type variable bound by
+    the type signature for:
+      itgen :: forall a s.
+               Constructed a =>
+               (Int, Int) -> a -> IndTree s a
+    at tcfail068.hs:11:10
     Expected type: ST s1 (IndTree s a)
       Actual type: ST s1 (STArray s1 (Int, Int) a)
     Relevant bindings include
@@ -17,16 +20,18 @@ tcfail068.hs:14:9:
       ‘(newSTArray ((1, 1), n) x)’
     In the expression: runST (newSTArray ((1, 1), n) x)
 
-tcfail068.hs:19:21:
+tcfail068.hs:19:21: error:
     Couldn't match type ‘s’ with ‘s1’
-      ‘s’ is a rigid type variable bound by
-          the type signature for:
-          itiap :: Constructed a =>
-                   (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
-          at tcfail068.hs:16:10
-      ‘s1’ is a rigid type variable bound by
-           a type expected by the context: ST s1 (IndTree s a)
-           at tcfail068.hs:18:9
+    ‘s’ is a rigid type variable bound by
+    the type signature for:
+      itiap :: forall a s.
+               Constructed a =>
+               (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
+    at tcfail068.hs:16:10
+    ‘s1’ is a rigid type variable bound by
+    a type expected by the context:
+      forall s1. ST s1 (IndTree s a)
+    at tcfail068.hs:18:9
     Expected type: STArray s1 (Int, Int) a
       Actual type: IndTree s a
     Relevant bindings include
@@ -36,16 +41,18 @@ tcfail068.hs:19:21:
     In the first argument of ‘readSTArray’, namely ‘arr’
     In the first argument of ‘(>>=)’, namely ‘readSTArray arr i’
 
-tcfail068.hs:24:36:
+tcfail068.hs:24:36: error:
     Couldn't match type ‘s’ with ‘s1’
-      ‘s’ is a rigid type variable bound by
-          the type signature for:
-          itrap :: Constructed a =>
-                   ((Int, Int), (Int, Int)) -> (a -> a) -> IndTree s a -> IndTree s a
-          at tcfail068.hs:23:10
-      ‘s1’ is a rigid type variable bound by
-           a type expected by the context: ST s1 (IndTree s a)
-           at tcfail068.hs:24:29
+    ‘s’ is a rigid type variable bound by
+    the type signature for:
+      itrap :: forall a s.
+               Constructed a =>
+               ((Int, Int), (Int, Int)) -> (a -> a) -> IndTree s a -> IndTree s a
+    at tcfail068.hs:23:10
+    ‘s1’ is a rigid type variable bound by
+    a type expected by the context:
+      forall s1. ST s1 (IndTree s a)
+    at tcfail068.hs:24:29
     Expected type: ST s1 (IndTree s a)
       Actual type: ST s (IndTree s a)
     Relevant bindings include
@@ -60,22 +67,24 @@ tcfail068.hs:24:36:
     In the first argument of ‘runST’, namely ‘(itrap' i k)’
     In the expression: runST (itrap' i k)
 
-tcfail068.hs:36:46:
+tcfail068.hs:36:46: error:
     Couldn't match type ‘s’ with ‘s1’
-      ‘s’ is a rigid type variable bound by
-          the type signature for:
-          itrapstate :: Constructed b =>
-                        ((Int, Int), (Int, Int))
-                        -> (a -> b -> (a, b))
-                        -> ((Int, Int) -> c -> a)
-                        -> (a -> c)
-                        -> c
-                        -> IndTree s b
-                        -> (c, IndTree s b)
-          at tcfail068.hs:34:15
-      ‘s1’ is a rigid type variable bound by
-           a type expected by the context: ST s1 (c, IndTree s b)
-           at tcfail068.hs:36:40
+    ‘s’ is a rigid type variable bound by
+    the type signature for:
+      itrapstate :: forall b a c s.
+                    Constructed b =>
+                    ((Int, Int), (Int, Int))
+                    -> (a -> b -> (a, b))
+                    -> ((Int, Int) -> c -> a)
+                    -> (a -> c)
+                    -> c
+                    -> IndTree s b
+                    -> (c, IndTree s b)
+    at tcfail068.hs:34:15
+    ‘s1’ is a rigid type variable bound by
+    a type expected by the context:
+      forall s1. ST s1 (c, IndTree s b)
+    at tcfail068.hs:36:40
     Expected type: ST s1 (c, IndTree s b)
       Actual type: ST s (c, IndTree s b)
     Relevant bindings include

@@ -14,11 +14,11 @@ instance Foo Bool where
   bar x = [x, not x]
 
 data Record = R {
-     blub :: Foo a => a -> [a]
+     blub :: forall a. Foo a => a -> [a]
     }
 
 main = do { let r = R {blub = bar}
-	  ; print (blub r (3::Int)) 
+	  ; print (blub r (3::Int))
 	  ; print (blub r True)
 	  }
 

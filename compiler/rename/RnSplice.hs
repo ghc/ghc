@@ -34,7 +34,6 @@ import Control.Monad    ( unless, when )
 
 import {-# SOURCE #-} RnExpr   ( rnLExpr )
 
-import PrelNames        ( isUnboundName )
 import TcEnv            ( checkWellStaged )
 import THNames          ( liftName )
 
@@ -45,7 +44,6 @@ import Hooks
 import Var              ( Id )
 import THNames          ( quoteExpName, quotePatName, quoteDecName, quoteTypeName
                         , decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
-import RnTypes          ( collectWildCards )
 import Util
 
 import {-# SOURCE #-} TcExpr   ( tcMonoExpr )
@@ -421,19 +419,18 @@ rnSpliceType splice k
     run_type_splice rn_splice
       = do { hs_ty2 <- runRnSplice UntypedTypeSplice runMetaT ppr rn_splice
            ; (hs_ty3, fvs) <- do { let doc = SpliceTypeCtx hs_ty2
-                                 ; checkValidPartialTypeSplice doc hs_ty2
-                                    -- See Note [Partial Type Splices]
                                  ; checkNoErrs $ rnLHsType doc hs_ty2 }
                                     -- checkNoErrs: see Note [Renamer errors]
            ; return (HsParTy hs_ty3, fvs) }
               -- Wrap the result of the splice in parens so that we don't
               -- lose the outermost location set by runQuasiQuote (#7918)
-{-
-Note [Partial Type Splices]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+{- Note [Partial Type Splices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Partial Type Signatures are partially supported in TH type splices: only
 anonymous wild cards are allowed.
+
+  -- ToDo: SLPJ says: I don't understand all this
 
 Normally, named wild cards are collected before renaming a (partial) type
 signature. However, TH type splices are run during renaming, i.e. after the
@@ -454,7 +451,7 @@ are given names during renaming. These names are collected right after
 renaming. The names generated for anonymous wild cards in TH type splices will
 thus be collected as well.
 
-For more details about renaming wild cards, see rnLHsTypeWithWildCards.
+For more details about renaming wild cards, see RnTypes.rnHsSigWcType
 
 Note that partial type signatures are fully supported in TH declaration
 splices, e.g.:
@@ -463,28 +460,10 @@ splices, e.g.:
          foo x y = x == y |]
 
 This is because in this case, the partial type signature can be treated as a
-whole signature, instead of as an arbitray type.
+whole signature, instead of as an arbitrary type.
 
 -}
 
--- | Check that the type splice doesn't contain an extra-constraint wild card.
--- See Note [Partial Type Splices]. Named wild cards aren't supported in type
--- splices either, but they will be caught during renaming, as they won't be
--- in scope.
---
--- Note that without this check, an error would still be reported, but it
--- would tell the user an unexpected wild card was encountered. This message
--- is confusing, as it doesn't mention the wild card was unexpected because it
--- was an extra-constraints wild card. To avoid confusing, this function
--- provides a specific error message for this case.
-checkValidPartialTypeSplice :: HsDocContext -> LHsType RdrName -> RnM ()
-checkValidPartialTypeSplice doc ty
-  | (L loc _extraWc : _, _) <- collectWildCards ty
-  = failAt loc $ hang (text "Invalid partial type:") 2 (ppr ty) $$
-    text "An extra-constraints wild card is not allowed in a type splice" $$
-    docOfHsDocContext doc
-  | otherwise
-  = return ()
 
 ----------------------
 -- | Rename a splice pattern. See Note [rnSplicePat]

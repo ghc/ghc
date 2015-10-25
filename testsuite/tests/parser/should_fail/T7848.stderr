@@ -24,8 +24,10 @@ T7848.hs:6:57: error:
 T7848.hs:10:9: error:
     Couldn't match expected type ‘t -> t1 -> A -> A -> A -> A -> t2’
                 with actual type ‘a’
-      ‘a’ is a rigid type variable bound by
-          the type signature for: (&) :: a at T7848.hs:10:9
+    ‘a’ is a rigid type variable bound by
+      the type signature for:
+        (&) :: forall a. a
+      at T7848.hs:10:9
     Relevant bindings include
       z :: t1 (bound at T7848.hs:6:12)
       (&) :: t1 (bound at T7848.hs:6:8)

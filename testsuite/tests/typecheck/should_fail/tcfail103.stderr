@@ -1,10 +1,14 @@
 
-tcfail103.hs:15:23:
+tcfail103.hs:15:23: error:
     Couldn't match type ‘t’ with ‘s’
-      ‘t’ is a rigid type variable bound by
-          the type signature for: f :: ST t Int at tcfail103.hs:10:5
-      ‘s’ is a rigid type variable bound by
-          the type signature for: g :: ST s Int at tcfail103.hs:13:14
+    ‘t’ is a rigid type variable bound by
+    the type signature for:
+      f :: forall t. ST t Int
+    at tcfail103.hs:10:5
+    ‘s’ is a rigid type variable bound by
+    the type signature for:
+      g :: forall s. ST s Int
+    at tcfail103.hs:13:14
     Expected type: STRef s Int
       Actual type: STRef t Int
     Relevant bindings include

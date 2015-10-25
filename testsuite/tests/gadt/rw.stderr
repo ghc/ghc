@@ -1,9 +1,10 @@
 
-rw.hs:14:47:
+rw.hs:14:47: error:
     Couldn't match expected type ‘a’ with actual type ‘Int’
-      ‘a’ is a rigid type variable bound by
-          the type signature for: writeInt :: T a -> IORef a -> IO ()
-          at rw.hs:12:12
+    ‘a’ is a rigid type variable bound by
+    the type signature for:
+      writeInt :: forall a. T a -> IORef a -> IO ()
+    at rw.hs:12:12
     Relevant bindings include
       ref :: IORef a (bound at rw.hs:13:12)
       v :: T a (bound at rw.hs:13:10)
@@ -12,11 +13,12 @@ rw.hs:14:47:
     In the expression: writeIORef ref (1 :: Int)
     In a case alternative: ~(Li x) -> writeIORef ref (1 :: Int)
 
-rw.hs:19:51:
+rw.hs:19:51: error:
     Couldn't match type ‘a’ with ‘Bool’
-      ‘a’ is a rigid type variable bound by
-          the type signature for: readBool :: T a -> IORef a -> IO ()
-          at rw.hs:16:12
+    ‘a’ is a rigid type variable bound by
+    the type signature for:
+      readBool :: forall a. T a -> IORef a -> IO ()
+    at rw.hs:16:12
     Expected type: a -> Bool
       Actual type: Bool -> Bool
     Relevant bindings include

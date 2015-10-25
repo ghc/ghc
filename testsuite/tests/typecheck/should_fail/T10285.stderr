@@ -8,12 +8,14 @@ T10285.hs:8:17: error:
                              Coercion a b,
                in an equation for ‘oops’
       at T10285.hs:8:6-13
-      ‘a’ is a rigid type variable bound by
-          the type signature for: oops :: Coercion (N a) (N b) -> a -> b
-          at T10285.hs:7:9
-      ‘b’ is a rigid type variable bound by
-          the type signature for: oops :: Coercion (N a) (N b) -> a -> b
-          at T10285.hs:7:9
+    ‘a’ is a rigid type variable bound by
+    the type signature for:
+      oops :: forall a b. Coercion (N a) (N b) -> a -> b
+    at T10285.hs:7:9
+    ‘b’ is a rigid type variable bound by
+    the type signature for:
+      oops :: forall a b. Coercion (N a) (N b) -> a -> b
+    at T10285.hs:7:9
     Relevant bindings include
       oops :: Coercion (N a) (N b) -> a -> b (bound at T10285.hs:8:1)
     In the expression: coerce

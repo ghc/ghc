@@ -1302,10 +1302,10 @@ gen_Data_binds dflags loc rep_tc
     genDataTyCon :: (LHsBind RdrName, LSig RdrName)
     genDataTyCon        --  $dT
       = (mkHsVarBind loc rdr_name rhs,
-         L loc (TypeSig [L loc rdr_name] sig_ty PlaceHolder))
+         L loc (TypeSig [L loc rdr_name] sig_ty))
       where
         rdr_name = mk_data_type_name rep_tc
-        sig_ty   = nlHsTyVar dataType_RDR
+        sig_ty   = mkLHsSigWcType (nlHsTyVar dataType_RDR)
         constrs  = [nlHsVar (mk_constr_name con) | con <- tyConDataCons rep_tc]
         rhs = nlHsVar mkDataType_RDR
               `nlHsApp` nlHsLit (mkHsString (showSDocOneLine dflags (ppr rep_tc)))
@@ -1314,10 +1314,10 @@ gen_Data_binds dflags loc rep_tc
     genDataDataCon :: DataCon -> (LHsBind RdrName, LSig RdrName)
     genDataDataCon dc       --  $cT1 etc
       = (mkHsVarBind loc rdr_name rhs,
-         L loc (TypeSig [L loc rdr_name] sig_ty PlaceHolder))
+         L loc (TypeSig [L loc rdr_name] sig_ty))
       where
         rdr_name = mk_constr_name dc
-        sig_ty   = nlHsTyVar constr_RDR
+        sig_ty   = mkLHsSigWcType (nlHsTyVar constr_RDR)
         rhs      = nlHsApps mkConstr_RDR constr_args
 
         constr_args
@@ -1938,14 +1938,14 @@ gen_Newtype_binds loc cls inst_tvs cls_tys rhs_ty
         rhs_expr
           = ( nlHsVar coerce_RDR
                 `nlHsApp`
-              (nlHsVar meth_RDR `nlExprWithTySig` toHsType tau_ty'))
-            `nlExprWithTySig` toHsType user_ty
+              (nlHsVar meth_RDR `nlExprWithTySig` toLHsSigWcType tau_ty'))
+            `nlExprWithTySig` toLHsSigWcType user_ty
         -- Open the representation type here, so that it's forall'ed type
         -- variables refer to the ones bound in the user_ty
         (_, _, tau_ty')  = tcSplitSigmaTy tau_ty
 
-    nlExprWithTySig :: LHsExpr RdrName -> LHsType RdrName -> LHsExpr RdrName
-    nlExprWithTySig e s = noLoc (ExprWithTySig e s PlaceHolder)
+    nlExprWithTySig :: LHsExpr RdrName -> LHsSigWcType RdrName -> LHsExpr RdrName
+    nlExprWithTySig e s = noLoc (ExprWithTySig e s)
 
 {-
 ************************************************************************
@@ -1969,11 +1969,11 @@ fiddling around.
 genAuxBindSpec :: SrcSpan -> AuxBindSpec -> (LHsBind RdrName, LSig RdrName)
 genAuxBindSpec loc (DerivCon2Tag tycon)
   = (mk_FunBind loc rdr_name eqns,
-     L loc (TypeSig [L loc rdr_name] (L loc sig_ty) PlaceHolder))
+     L loc (TypeSig [L loc rdr_name] sig_ty))
   where
     rdr_name = con2tag_RDR tycon
 
-    sig_ty = HsCoreTy $
+    sig_ty = mkLHsSigWcType $ L loc $ HsCoreTy $
              mkSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
              mkParentType tycon `mkFunTy` intPrimTy
 
@@ -1995,19 +1995,20 @@ genAuxBindSpec loc (DerivTag2Con tycon)
   = (mk_FunBind loc rdr_name
         [([nlConVarPat intDataCon_RDR [a_RDR]],
            nlHsApp (nlHsVar tagToEnum_RDR) a_Expr)],
-     L loc (TypeSig [L loc rdr_name] (L loc sig_ty) PlaceHolder))
+     L loc (TypeSig [L loc rdr_name] sig_ty))
   where
-    sig_ty = HsCoreTy $ mkForAllTys (tyConTyVars tycon) $
+    sig_ty = mkLHsSigWcType $ L loc $
+             HsCoreTy $ mkForAllTys (tyConTyVars tycon) $
              intTy `mkFunTy` mkParentType tycon
 
     rdr_name = tag2con_RDR tycon
 
 genAuxBindSpec loc (DerivMaxTag tycon)
   = (mkHsVarBind loc rdr_name rhs,
-     L loc (TypeSig [L loc rdr_name] (L loc sig_ty) PlaceHolder))
+     L loc (TypeSig [L loc rdr_name] sig_ty))
   where
     rdr_name = maxtag_RDR tycon
-    sig_ty = HsCoreTy intTy
+    sig_ty = mkLHsSigWcType (L loc (HsCoreTy intTy))
     rhs = nlHsApp (nlHsVar intDataCon_RDR) (nlHsLit (HsIntPrim "" max_tag))
     max_tag =  case (tyConDataCons tycon) of
                  data_cons -> toInteger ((length data_cons) - fIRST_TAG)

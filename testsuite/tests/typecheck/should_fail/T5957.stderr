@@ -1,6 +1,5 @@
 
-T5957.hs:3:9:
+T5957.hs:3:9: error:
     Illegal polymorphic or qualified type: Show a => a -> String
     Perhaps you intended to use RankNTypes or Rank2Types
-    In the type signature for ‘flex’:
-      flex :: Int -> Show a => a -> String
+    In the type signature: flex :: Int -> Show a => a -> String

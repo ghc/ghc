@@ -769,7 +769,8 @@ lookupInstEnv check_overlap_safe
                         , ie_visible = vis_mods })
               cls
               tys
-  = (final_matches, final_unifs, unsafe_overlapped)
+  = -- pprTrace "lookupInstEnv" (ppr cls <+> ppr tys $$ ppr home_ie) $
+    (final_matches, final_unifs, unsafe_overlapped)
   where
     (home_matches, home_unifs) = lookupInstEnv' home_ie vis_mods cls tys
     (pkg_matches,  pkg_unifs)  = lookupInstEnv' pkg_ie  vis_mods cls tys

@@ -67,7 +67,7 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
        ; let (arg_names, is_infix) = case details of
                  PrefixPatSyn names      -> (map unLoc names, False)
                  InfixPatSyn name1 name2 -> (map unLoc [name1, name2], True)
-       ; ((lpat', (args, pat_ty)), tclvl, wanted)
+       ; (tclvl, wanted, (lpat', (args, pat_ty)))
             <- pushLevelAndCaptureConstraints  $
                do { pat_ty <- newFlexiTyVarTy openTypeKind
                   ; tcPat PatSyn lpat pat_ty $

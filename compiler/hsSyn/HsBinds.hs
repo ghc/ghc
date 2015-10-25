@@ -449,7 +449,7 @@ plusHsValBinds _ _
 getTypeSigNames :: HsValBinds a -> NameSet
 -- Get the names that have a user type sig
 getTypeSigNames (ValBindsOut _ sigs)
-  = mkNameSet [unLoc n | L _ (TypeSig names _ _) <- sigs, n <- names]
+  = mkNameSet [unLoc n | L _ (TypeSig names _) <- sigs, n <- names]
 getTypeSigNames _
   = panic "HsBinds.getTypeSigNames"
 
@@ -625,10 +625,9 @@ data Sig name
       --          'ApiAnnotation.AnnComma'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-    TypeSig 
-       [Located name]         -- LHS of the signature; e.g.  f,g,h :: blah
-       (LHsType name)         -- RHS of the signature
-       (PostRn name [Name])   -- Wildcards (both named and anonymous) of the RHS
+    TypeSig
+       [Located name]        -- LHS of the signature; e.g.  f,g,h :: blah
+       (LHsSigWcType name)   -- RHS of the signature; can have wildcards
 
       -- | A pattern synonym type signature
       --
@@ -639,11 +638,8 @@ data Sig name
       --           'ApiAnnotation.AnnDot','ApiAnnotation.AnnDarrow'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-  | PatSynSig (Located name)
-              (HsExplicitFlag, LHsTyVarBndrs name)
-              (LHsContext name) -- Provided context
-              (LHsContext name) -- Required context
-              (LHsType name)
+  | PatSynSig (Located name) (LHsSigType name)
+      -- P :: forall a b. Prov => Req => ty
 
         -- | A type signature for a default method inside a class
         --
@@ -653,7 +649,15 @@ data Sig name
         --           'ApiAnnotation.AnnDcolon'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | GenericSig [Located name] (LHsType name)
+
+      -- | A signature for a class method
+      --   False <=> ordinary class-method signauure
+      --   True  <=> default class method signature
+      -- e.g.   class C a where
+      --          op :: a -> a                   -- Ordinary
+      --          default op :: Eq a => a -> a   -- Generic default
+      -- No wildcards allowed here
+  | ClassOpSig Bool [Located name] (LHsSigType name)
 
         -- | A type signature in generated code, notably the code
         -- generated for record selectors.  We simply record
@@ -699,11 +703,11 @@ data Sig name
         --      'ApiAnnotation.AnnDcolon'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | SpecSig     (Located name)  -- Specialise a function or datatype  ...
-                [LHsType name]  -- ... to these types
-                InlinePragma    -- The pragma on SPECIALISE_INLINE form.
-                                -- If it's just defaultInlinePragma, then we said
-                                --    SPECIALISE, not SPECIALISE_INLINE
+  | SpecSig     (Located name)     -- Specialise a function or datatype  ...
+                [LHsSigType name]  -- ... to these types
+                InlinePragma       -- The pragma on SPECIALISE_INLINE form.
+                                   -- If it's just defaultInlinePragma, then we said
+                                   --    SPECIALISE, not SPECIALISE_INLINE
 
         -- | A specialisation pragma for instance declarations only
         --
@@ -716,7 +720,7 @@ data Sig name
         --      'ApiAnnotation.AnnInstance','ApiAnnotation.AnnClose'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | SpecInstSig SourceText (LHsType name)
+  | SpecInstSig SourceText (LHsSigType name)
                   -- Note [Pragma source text] in BasicTypes
 
         -- | A minimal complete definition pragma
@@ -781,7 +785,7 @@ isVanillaLSig _                 = False
 
 isTypeLSig :: LSig name -> Bool  -- Type signatures
 isTypeLSig (L _(TypeSig {}))    = True
-isTypeLSig (L _(GenericSig {})) = True
+isTypeLSig (L _(ClassOpSig {})) = True
 isTypeLSig (L _(IdSig {}))      = True
 isTypeLSig _                    = False
 
@@ -811,7 +815,9 @@ isMinimalLSig _                    = False
 hsSigDoc :: Sig name -> SDoc
 hsSigDoc (TypeSig {})           = ptext (sLit "type signature")
 hsSigDoc (PatSynSig {})         = ptext (sLit "pattern synonym signature")
-hsSigDoc (GenericSig {})        = ptext (sLit "default type signature")
+hsSigDoc (ClassOpSig is_deflt _ _)
+ | is_deflt                     = ptext (sLit "default type signature")
+ | otherwise                    = ptext (sLit "class method signature")
 hsSigDoc (IdSig {})             = ptext (sLit "id signature")
 hsSigDoc (SpecSig {})           = ptext (sLit "SPECIALISE pragma")
 hsSigDoc (InlineSig _ prag)     = ppr (inlinePragmaSpec prag) <+> ptext (sLit "pragma")
@@ -829,21 +835,26 @@ instance (OutputableBndr name) => Outputable (Sig name) where
     ppr sig = ppr_sig sig
 
 ppr_sig :: OutputableBndr name => Sig name -> SDoc
-ppr_sig (TypeSig vars ty _wcs)    = pprVarSig (map unLoc vars) (ppr ty)
-ppr_sig (GenericSig vars ty)      = ptext (sLit "default") <+> pprVarSig (map unLoc vars) (ppr ty)
-ppr_sig (IdSig id)                = pprVarSig [id] (ppr (varType id))
-ppr_sig (FixSig fix_sig)          = ppr fix_sig
+ppr_sig (TypeSig vars ty)    = pprVarSig (map unLoc vars) (ppr ty)
+ppr_sig (ClassOpSig is_deflt vars ty)
+  | is_deflt                 = ptext (sLit "default") <+> pprVarSig (map unLoc vars) (ppr ty)
+  | otherwise                = pprVarSig (map unLoc vars) (ppr ty)
+ppr_sig (IdSig id)           = pprVarSig [id] (ppr (varType id))
+ppr_sig (FixSig fix_sig)     = ppr fix_sig
 ppr_sig (SpecSig var ty inl)
   = pragBrackets (pprSpec (unLoc var) (interpp'SP ty) inl)
 ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> pprPrefixOcc (unLoc var))
 ppr_sig (SpecInstSig _ ty)
   = pragBrackets (ptext (sLit "SPECIALIZE instance") <+> ppr ty)
 ppr_sig (MinimalSig _ bf)         = pragBrackets (pprMinimalSig bf)
-ppr_sig (PatSynSig name (flag, qtvs) (L _ prov) (L _ req) ty)
+ppr_sig (PatSynSig name sig_ty)
   = pprPatSynSig (unLoc name) False -- TODO: is_bindir
-                 (pprHsForAll flag qtvs (noLoc []))
-                 (pprHsContextMaybe prov) (pprHsContextMaybe req)
+                 (pprHsForAllTvs qtvs)
+                 (pprHsContextMaybe (unLoc prov))
+                 (pprHsContextMaybe (unLoc req))
                  (ppr ty)
+  where
+    (qtvs, prov, req, ty) = splitLHsPatSynTy (hsSigType sig_ty)
 
 pprPatSynSig :: (OutputableBndr name)
              => name -> Bool -> SDoc -> Maybe SDoc -> Maybe SDoc -> SDoc -> SDoc

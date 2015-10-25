@@ -184,15 +184,7 @@ so we can take their type variables into account as part of the
 
 checkAmbiguity :: UserTypeCtxt -> Type -> TcM ()
 checkAmbiguity ctxt ty
-  | GhciCtxt <- ctxt    -- Allow ambiguous types in GHCi's :kind command
-  = return ()           -- E.g.   type family T a :: *  -- T :: forall k. k -> *
-                        -- Then :k T should work in GHCi, not complain that
-                        -- (T k) is ambiguous!
-
-  | InfSigCtxt {} <- ctxt  -- See Note [Validity of inferred types] in TcBinds
-  = return ()
-
-  | otherwise
+  | wantAmbiguityCheck ctxt
   = do { traceTc "Ambiguity check for" (ppr ty)
        ; let free_tkvs = varSetElemsKvsFirst (closeOverKinds (tyVarsOfType ty))
        ; (subst, _tvs) <- tcInstSkolTyVars free_tkvs
@@ -208,20 +200,33 @@ checkAmbiguity ctxt ty
          -- Solve the constraints eagerly because an ambiguous type
          -- can cause a cascade of further errors.  Since the free
          -- tyvars are skolemised, we can safely use tcSimplifyTop
-       ; (_wrap, wanted) <- addErrCtxtM (mk_msg ty') $
+       ; allow_ambiguous <- xoptM Opt_AllowAmbiguousTypes
+       ; (_wrap, wanted) <- addErrCtxt (mk_msg allow_ambiguous) $
                             captureConstraints $
                             tcSubType_NC ctxt ty' ty'
        ; simplifyAmbiguityCheck ty wanted
 
        ; traceTc "Done ambiguity check for" (ppr ty) }
+
+  | otherwise
+  = return ()
  where
-   mk_msg ty tidy_env
-     = do { allow_ambiguous <- xoptM Opt_AllowAmbiguousTypes
-          ; (tidy_env', tidy_ty) <- zonkTidyTcType tidy_env ty
-          ; return (tidy_env', mk_msg tidy_ty $$ ppWhen (not allow_ambiguous) ambig_msg) }
-     where
-       mk_msg ty = pprSigCtxt ctxt (ptext (sLit "the ambiguity check for")) (ppr ty)
-       ambig_msg = ptext (sLit "To defer the ambiguity check to use sites, enable AllowAmbiguousTypes")
+   mk_msg allow_ambiguous
+     = vcat [ ptext (sLit "In the ambiguity check for") <+> what
+            , ppUnless allow_ambiguous ambig_msg ]
+   ambig_msg = ptext (sLit "To defer the ambiguity check to use sites, enable AllowAmbiguousTypes")
+   what | Just n <- isSigMaybe ctxt = quotes (ppr n)
+        | otherwise                 = pprUserTypeCtxt ctxt
+
+wantAmbiguityCheck :: UserTypeCtxt -> Bool
+wantAmbiguityCheck ctxt
+  = case ctxt of
+      GhciCtxt -> False  -- Allow ambiguous types in GHCi's :kind command
+                         -- E.g.   type family T a :: *  -- T :: forall k. k -> *
+                         -- Then :k T should work in GHCi, not complain that
+                         -- (T k) is ambiguous!
+--      InfSigCtxt {} -> False   -- See Note [Validity of inferred types] in TcBinds
+      _ -> True
 
 {-
 ************************************************************************
@@ -260,6 +265,7 @@ This might not necessarily show up in kind checking.
 
 checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Checks that the type is valid for the given context
+-- Assumes arguemt is fully zonked
 -- Not used for instance decls; checkValidInstance instead
 checkValidType ctxt ty
   = do { traceTc "checkValidType" (ppr ty <+> text "::" <+> ppr (typeKind ty))
@@ -286,7 +292,7 @@ checkValidType ctxt ty
                  FunSigCtxt {}   -> rank1
                  InfSigCtxt _    -> ArbitraryRank        -- Inferred type
                  ConArgCtxt _    -> rank1 -- We are given the type of the entire
-                                         -- constructor, hence rank 1
+                                          -- constructor, hence rank 1
 
                  ForSigCtxt _   -> rank1
                  SpecInstCtxt   -> rank1
@@ -311,6 +317,7 @@ checkValidType ctxt ty
        ; traceTc "checkValidType done" (ppr ty <+> text "::" <+> ppr (typeKind ty)) }
 
 checkValidMonoType :: Type -> TcM ()
+-- Assumes arguemt is fully zonked
 checkValidMonoType ty = check_mono_type SigmaCtxt MustBeMonoType ty
 
 
@@ -590,6 +597,7 @@ applying the instance decl would show up two uses of ?x.  Trac #8912.
 -}
 
 checkValidTheta :: UserTypeCtxt -> ThetaType -> TcM ()
+-- Assumes arguemt is fully zonked
 checkValidTheta ctxt theta
   = addErrCtxt (checkThetaCtxt ctxt theta) (check_valid_theta ctxt theta)
 
@@ -956,7 +964,7 @@ validDerivPred tv_set pred
 ************************************************************************
 -}
 
-checkValidInstance :: UserTypeCtxt -> LHsType Name -> Type
+checkValidInstance :: UserTypeCtxt -> LHsSigType Name -> Type
                    -> TcM ([TyVar], ThetaType, Class, [Type])
 checkValidInstance ctxt hs_type ty
   | Just (clas,inst_tys) <- getClassPredTys_maybe tau
@@ -975,6 +983,7 @@ checkValidInstance ctxt hs_type ty
         --   the termination condition, because 'a' appears more often
         --   in the constraint than in the head
         ; undecidable_ok <- xoptM Opt_UndecidableInstances
+        ; traceTc "cvi" (ppr undecidable_ok $$ ppr ty)
         ; if undecidable_ok
           then checkAmbiguity ctxt ty
           else checkInstTermination inst_tys theta
@@ -991,9 +1000,8 @@ checkValidInstance ctxt hs_type ty
     (tvs, theta, tau) = tcSplitSigmaTy ty
 
         -- The location of the "head" of the instance
-    head_loc = case hs_type of
-                 L _ (HsForAllTy _ _ _ _ (L loc _)) -> loc
-                 L loc _                            -> loc
+    head_loc = case splitLHsInstDeclTy hs_type of
+                 (_, _, L loc _) -> loc
 
 {-
 Note [Paterson conditions]

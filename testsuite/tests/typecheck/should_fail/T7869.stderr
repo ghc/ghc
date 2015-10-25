@@ -1,5 +1,5 @@
 
-T7869.hs:3:12:
+T7869.hs:3:12: error:
     Couldn't match type ‘a’ with ‘a1’
       because type variable ‘a1’ would escape its scope
     This (rigid, skolem) type variable is bound by
@@ -14,7 +14,7 @@ T7869.hs:3:12:
     In the expression: (\ x -> f x) :: [a] -> b
     In an equation for ‘f’: f = (\ x -> f x) :: [a] -> b
 
-T7869.hs:3:12:
+T7869.hs:3:12: error:
     Couldn't match type ‘b’ with ‘b1’
       because type variable ‘b1’ would escape its scope
     This (rigid, skolem) type variable is bound by

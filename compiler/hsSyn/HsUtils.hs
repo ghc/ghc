@@ -30,7 +30,7 @@ module HsUtils(
   nlHsTyApp, nlHsTyApps, nlHsVar, nlHsLit, nlHsApp, nlHsApps, nlHsIntLit, nlHsVarApps,
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
   mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
-  toHsType, toHsKind,
+  toLHsSigWcType,
 
   -- Bindings
   mkFunBind, mkVarBind, mkHsVarBind, mk_easy_FunBind, mkTopFunBind, mkPatSynBind,
@@ -45,6 +45,7 @@ module HsUtils(
 
   -- Types
   mkHsAppTy, userHsTyVarBndrs,
+  mkLHsSigType, mkLHsSigWcType, mkClassOpSigs,
   nlHsAppTy, nlHsTyVar, nlHsFunTy, nlHsTyConApp,
 
   -- Stmts
@@ -84,12 +85,13 @@ import HsTypes
 import HsLit
 import PlaceHolder
 
+import TcType( tcSplitForAllTys, tcSplitPhiTy )
 import TcEvidence
 import RdrName
 import Var
+import Type( isPredTy )
+import Kind( isKind )
 import TypeRep
-import TcType
-import Kind
 import DataCon
 import Name
 import NameSet
@@ -425,51 +427,69 @@ nlTuplePat pats box = noLoc (TuplePat pats box [])
 missingTupArg :: HsTupArg RdrName
 missingTupArg = Missing placeHolderType
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-        Converting a Type to an HsType RdrName
+        LHsSigType and LHsSigWcType
 *                                                                      *
-************************************************************************
+********************************************************************* -}
 
-This is needed to implement GeneralizedNewtypeDeriving.
--}
+mkLHsSigType :: LHsType RdrName -> LHsSigType RdrName
+mkLHsSigType ty = mkHsImplicitBndrs ty
 
-toHsType :: Type -> LHsType RdrName
-toHsType ty
-  | [] <- tvs_only
-  , [] <- theta
-  = to_hs_type tau
-  | otherwise
-  = noLoc $
-    mkExplicitHsForAllTy (map mk_hs_tvb tvs_only)
-                         (noLoc $ map toHsType theta)
-                         (to_hs_type tau)
+mkLHsSigWcType :: LHsType RdrName -> LHsSigWcType RdrName
+mkLHsSigWcType ty = mkHsImplicitBndrs (mkHsWildCardBndrs ty)
 
+mkClassOpSigs :: [LSig RdrName] -> [LSig RdrName]
+-- Convert TypeSig to ClassOpSig
+-- The former is what is parsed, but the latter is
+-- what we need in class/instance declarations
+mkClassOpSigs sigs
+  = map fiddle sigs
   where
-    (tvs, theta, tau) = tcSplitSigmaTy ty
-    tvs_only = filter isTypeVar tvs
+    fiddle (L loc (TypeSig nms ty)) = L loc (ClassOpSig False nms (dropWildCards ty))
+    fiddle sig                      = sig
 
-    to_hs_type (TyVarTy tv) = nlHsTyVar (getRdrName tv)
-    to_hs_type (AppTy t1 t2) = nlHsAppTy (toHsType t1) (toHsType t2)
-    to_hs_type (TyConApp tc args) = nlHsTyConApp (getRdrName tc) (map toHsType args')
+toLHsSigWcType :: Type -> LHsSigWcType RdrName
+-- ^ Converting a Type to an HsType RdrName
+-- This is needed to implement GeneralizedNewtypeDeriving.
+--
+-- Note that we use 'getRdrName' extensively, which
+-- generates Exact RdrNames rather than strings.
+toLHsSigWcType ty
+  = mkLHsSigWcType (go ty)
+  where
+    go :: Type -> LHsType RdrName
+    go ty@(ForAllTy {})
+      | (tvs, tau) <- tcSplitForAllTys ty
+      = noLoc (HsForAllTy { hst_bndrs = map go_tv tvs
+                          , hst_body = go tau })
+    go ty@(FunTy arg _)
+      | isPredTy arg
+      , (theta, tau) <- tcSplitPhiTy ty
+      = noLoc (HsQualTy { hst_ctxt = noLoc (map go theta)
+                        , hst_body = go tau })
+    go (FunTy arg res)      = nlHsFunTy (go arg) (go res)
+    go (TyVarTy tv)         = nlHsTyVar (getRdrName tv)
+    go (AppTy t1 t2)        = nlHsAppTy (go t1) (go t2)
+    go (LitTy (NumTyLit n)) = noLoc $ HsTyLit (HsNumTy "" n)
+    go (LitTy (StrTyLit s)) = noLoc $ HsTyLit (HsStrTy "" s)
+    go (TyConApp tc args)   = nlHsTyConApp (getRdrName tc) (map go args')
        where
          args' = filterOut isKind args
          -- Source-language types have _implicit_ kind arguments,
          -- so we must remove them here (Trac #8563)
-    to_hs_type (FunTy arg res) = ASSERT( not (isConstraintKind (typeKind arg)) )
-                                 nlHsFunTy (toHsType arg) (toHsType res)
-    to_hs_type t@(ForAllTy {}) = pprPanic "toHsType" (ppr t)
-    to_hs_type (LitTy (NumTyLit n)) = noLoc $ HsTyLit (HsNumTy "" n)
-    to_hs_type (LitTy (StrTyLit s)) = noLoc $ HsTyLit (HsStrTy "" s)
 
-    mk_hs_tvb tv = noLoc $ KindedTyVar (noLoc (getRdrName tv))
-                                       (toHsKind (tyVarKind tv))
+    go_tv :: TyVar -> LHsTyVarBndr RdrName
+    go_tv tv = noLoc $ KindedTyVar (noLoc (getRdrName tv))
+                                   (go (tyVarKind tv))
 
-toHsKind :: Kind -> LHsKind RdrName
-toHsKind = toHsType
 
---------- HsWrappers: type args, dict args, casts ---------
+{- *********************************************************************
+*                                                                      *
+    --------- HsWrappers: type args, dict args, casts ---------
+*                                                                      *
+********************************************************************* -}
+
 mkLHsWrap :: HsWrapper -> LHsExpr id -> LHsExpr id
 mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
 
@@ -769,7 +789,7 @@ hsLTyClDeclBinders (L loc (ClassDecl   { tcdLName = L _ cls_name
                                        , tcdSigs = sigs, tcdATs = ats }))
   = L loc cls_name :
     [ L fam_loc fam_name | L fam_loc (FamilyDecl { fdLName = L _ fam_name }) <- ats ] ++
-    [ L mem_loc mem_name | L mem_loc (TypeSig ns _ _) <- sigs, L _ mem_name <- ns ]
+    [ L mem_loc mem_name | L mem_loc (ClassOpSig False ns _) <- sigs, L _ mem_name <- ns ]
 hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = L _ name, tcdDataDefn = defn }))
   = L loc name : hsDataDefnBinders defn
 
@@ -778,7 +798,7 @@ hsForeignDeclsBinders :: [LForeignDecl name] -> [Located name]
 -- See Note [SrcSpan for binders]
 hsForeignDeclsBinders foreign_decls
   = [ L decl_loc n
-    | L decl_loc (ForeignImport (L _ n) _ _ _) <- foreign_decls]
+    | L decl_loc (ForeignImport { fd_name = L _ n }) <- foreign_decls]
 
 -------------------
 hsPatSynBinders :: HsValBinds RdrName -> [Located RdrName]

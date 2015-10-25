@@ -380,7 +380,7 @@ Note [Local bindings with Exact Names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 With Template Haskell we can make local bindings that have Exact Names.
 Computing shadowing etc may use elemLocalRdrEnv (at least it certainly
-does so in RnTpes.bindHsTyVars), so for an Exact Name we must consult
+does so in RnTpes.bindHsQTyVars), so for an Exact Name we must consult
 the in-scope-name-set.
 
 

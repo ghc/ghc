@@ -2614,11 +2614,15 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 %************************************************************************
 -}
 
--- |Encapsulated call to addAnnotation, requiring only the SrcSpan of
--- the AST element the annotation belongs to
-type AddAnn = (SrcSpan -> P ())
+-- | Encapsulated call to addAnnotation, requiring only the SrcSpan of
+--   the AST construct the annotation belongs to; together with the
+--   AnnKeywordId, this is is the key of the annotation map
+type AddAnn = SrcSpan -> P ()
 
-addAnnotation :: SrcSpan -> AnnKeywordId -> SrcSpan -> P ()
+addAnnotation :: SrcSpan          -- SrcSpan of enclosing AST construct
+              -> AnnKeywordId     -- The first two parameters are the key
+              -> SrcSpan          -- The location of the keyword itself
+              -> P ()
 addAnnotation l a v = do
   addAnnotationOnly l a v
   allocateComments l

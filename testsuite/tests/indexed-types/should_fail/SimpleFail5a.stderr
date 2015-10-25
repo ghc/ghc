@@ -1,9 +1,10 @@
 
-SimpleFail5a.hs:31:11:
+SimpleFail5a.hs:31:11: error:
     Couldn't match type ‘a’ with ‘Int’
-      ‘a’ is a rigid type variable bound by
-          the type signature for: bar3wrong :: S3 a -> a
-          at SimpleFail5a.hs:30:14
+    ‘a’ is a rigid type variable bound by
+      the type signature for:
+        bar3wrong :: forall a. S3 a -> a
+      at SimpleFail5a.hs:30:14
     Expected type: S3 a
       Actual type: S3 Int
     Relevant bindings include

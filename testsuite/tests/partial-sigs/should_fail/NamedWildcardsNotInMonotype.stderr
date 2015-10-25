@@ -1,6 +1,12 @@
 
-NamedWildcardsNotInMonotype.hs:4:21:
-    Invalid partial type: (Show _a, Eq _c, Eq _b) => _a -> _b -> String
-    The named wild card ‘_c’ is only allowed in the constraints
-    when it also occurs in the rest of the type
-    In the type signature for ‘foo’
+NamedWildcardsNotInMonotype.hs:5:1: error:
+    Could not deduce (Eq t0)
+    from the context: (Show a, Eq t, Eq a)
+      bound by the inferred type for ‘foo’:
+                 (Show a, Eq t, Eq a) => a -> a -> String
+      at NamedWildcardsNotInMonotype.hs:5:1-33
+    The type variable ‘t0’ is ambiguous
+    In the ambiguity check for the inferred type for ‘foo’
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+    When checking that ‘foo’ has the inferred type
+      foo :: forall t a. (Show a, Eq t, Eq a) => a -> a -> String

@@ -5,9 +5,10 @@ T8142.hs:6:18: error:
     The type variable ‘g0’ is ambiguous
     Expected type: Nu ((,) t) -> Nu g
       Actual type: Nu ((,) t0) -> Nu g0
+    In the ambiguity check for the inferred type for ‘h’
+    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
     When checking that ‘h’ has the inferred type
       h :: forall t (g :: * -> *). Nu ((,) t) -> Nu g
-    Probable cause: the inferred type is ambiguous
     In an equation for ‘tracer’:
         tracer
           = h

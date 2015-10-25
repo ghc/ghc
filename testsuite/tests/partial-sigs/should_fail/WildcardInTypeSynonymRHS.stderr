@@ -1,5 +1,4 @@
 
-WildcardInTypeSynonymRHS.hs:4:18:
-    Unexpected wild card: ‘_’
-    In the type ‘Maybe _’
-    In the type declaration for ‘Foo’
+WildcardInTypeSynonymRHS.hs:4:18: error:
+    Wildcard ‘_’ not allowed
+      in the declaration for type synonym ‘Foo’

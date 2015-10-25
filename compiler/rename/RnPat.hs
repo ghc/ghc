@@ -206,10 +206,8 @@ matchNameMaker ctxt = LamMk report_unused
                       ThPatQuote            -> False
                       _                     -> True
 
-rnHsSigCps :: HsWithBndrs RdrName (LHsType RdrName)
-           -> CpsRn (HsWithBndrs Name (LHsType Name))
-rnHsSigCps sig
-  = CpsRn (rnHsBndrSig PatCtx sig)
+rnHsSigCps :: LHsSigWcType RdrName -> CpsRn (LHsSigWcType Name)
+rnHsSigCps sig = CpsRn (rnHsSigWcTypeScoped PatCtx sig)
 
 newPatLName :: NameMaker -> Located RdrName -> CpsRn (Located Name)
 newPatLName name_maker rdr_name@(L loc _)
@@ -562,7 +560,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
     rn_fld pun_ok parent (L l (HsRecField { hsRecFieldId = fld
                                           , hsRecFieldArg = arg
                                           , hsRecPun = pun }))
-      = do { fld'@(L loc fld_nm) <- wrapLocM (lookupSubBndrOcc True parent doc) fld
+      = do { fld'@(L loc fld_nm) <- wrapLocM (lookupRecFieldOcc parent doc) fld
            ; arg' <- if pun
                      then do { checkErr pun_ok (badPun fld)
                              ; return (L loc (mk_arg (mkRdrUnqual (nameOccName fld_nm)))) }

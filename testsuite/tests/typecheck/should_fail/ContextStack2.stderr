@@ -1,5 +1,5 @@
 
-ContextStack2.hs:8:6:
+ContextStack2.hs:8:6: error:
     Reduction stack overflow; size = 11
     When simplifying the following type:
       TF (TF (TF (TF (TF a))))
@@ -8,6 +8,5 @@ ContextStack2.hs:8:6:
     (any upper bound you could choose might fail unpredictably with
      minor updates to GHC, so disabling the check is recommended if
      you're sure that type checking should terminate)
-    In the ambiguity check for the type signature for ‘t’:
-      t :: forall a. (a ~ TF (a, Int)) => Int
-    In the type signature for ‘t’: t :: (a ~ TF (a, Int)) => Int
+    In the ambiguity check for ‘t’
+    In the type signature: t :: (a ~ TF (a, Int)) => Int

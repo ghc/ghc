@@ -1,35 +1,39 @@
 
 T10403.hs:15:7: warning:
-    Found hole ‘_’ with inferred constraints: Functor f
-    In the type signature for:
+    Found constraint wildcard ‘_’ standing for ‘Functor f’
+    In the type signature:
       h1 :: _ => _
 
 T10403.hs:15:12: warning:
     Found type wildcard ‘_’ standing for ‘(a -> b) -> f a -> H f’
     Where: ‘f’ is a rigid type variable bound by
-               the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
-               at T10403.hs:17:1
+             the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
+             at T10403.hs:17:1
            ‘b’ is a rigid type variable bound by
-               the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
-               at T10403.hs:17:1
+             the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
+             at T10403.hs:17:1
            ‘a’ is a rigid type variable bound by
-               the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
-               at T10403.hs:17:1
-    In the type signature for:
+             the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
+             at T10403.hs:17:1
+    Relevant bindings include
+      h1 :: (a -> b) -> f a -> H f (bound at T10403.hs:17:1)
+    In the type signature:
       h1 :: _ => _
 
 T10403.hs:19:7: warning:
     Found type wildcard ‘_’ standing for ‘(a -> b) -> f a -> H f’
     Where: ‘f’ is a rigid type variable bound by
-               the inferred type of h2 :: Functor f => (a -> b) -> f a -> H f
-               at T10403.hs:21:1
+             the inferred type of h2 :: Functor f => (a -> b) -> f a -> H f
+             at T10403.hs:21:1
            ‘b’ is a rigid type variable bound by
-               the inferred type of h2 :: Functor f => (a -> b) -> f a -> H f
-               at T10403.hs:21:1
+             the inferred type of h2 :: Functor f => (a -> b) -> f a -> H f
+             at T10403.hs:21:1
            ‘a’ is a rigid type variable bound by
-               the inferred type of h2 :: Functor f => (a -> b) -> f a -> H f
-               at T10403.hs:21:1
-    In the type signature for:
+             the inferred type of h2 :: Functor f => (a -> b) -> f a -> H f
+             at T10403.hs:21:1
+    Relevant bindings include
+      h2 :: (a -> b) -> f a -> H f (bound at T10403.hs:21:1)
+    In the type signature:
       h2 :: _
 
 T10403.hs:21:1: warning:

@@ -1,4 +1,4 @@
 
 NamedWildcardInTypeFamilyInstanceLHS.hs:5:5: error:
-    Unexpected wild card: ‘_t’
-    In the declaration for type synonym ‘F’
+    Wildcard ‘_t’ not allowed
+      in a type pattern of family instance for ‘F’

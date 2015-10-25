@@ -546,8 +546,8 @@ addTickHsExpr (RecordUpd e rec_binds cons tys1 tys2) =
                 (addTickHsRecordBinds rec_binds)
                 (return cons) (return tys1) (return tys2)
 
-addTickHsExpr (ExprWithTySigOut e ty) =
-        liftM2 ExprWithTySigOut
+addTickHsExpr (ExprWithTySig e ty) =
+        liftM2 ExprWithTySig
                 (addTickLHsExprNever e) -- No need to tick the inner expression
                                     -- for expressions with signatures
                 (return ty)
@@ -595,11 +595,16 @@ addTickHsExpr (HsProc pat cmdtop) =
 addTickHsExpr (HsWrap w e) =
         liftM2 HsWrap
                 (return w)
-                (addTickHsExpr e)       -- explicitly no tick on inside
+                (addTickHsExpr e)       -- Explicitly no tick on inside
+
+addTickHsExpr (ExprWithTySigOut e ty) =
+        liftM2 ExprWithTySigOut
+               (addTickLHsExprNever e) -- No need to tick the inner expression
+               (return ty)             -- for expressions with signatures
 
 addTickHsExpr e@(HsType _) = return e
 
--- Others dhould never happen in expression content.
+-- Others should never happen in expression content.
 addTickHsExpr e  = pprPanic "addTickHsExpr" (ppr e)
 
 addTickTupArg :: LHsTupArg Id -> TM (LHsTupArg Id)

@@ -20,11 +20,12 @@ module RnEnv (
         lookupSigCtxtOccRn,
 
         lookupFixityRn, lookupTyFixityRn,
-        lookupInstDeclBndr, lookupSubBndrOcc, lookupFamInstName,
-        lookupSubBndrGREs, lookupConstructorFields,
+        lookupInstDeclBndr, lookupRecFieldOcc, lookupFamInstName,
+        lookupConstructorFields,
         lookupSyntaxName, lookupSyntaxNames, lookupIfThenElse,
         lookupGreAvailRn,
         getLookupOccRn, addUsedRdrNames,
+        mkUnboundName, mkUnboundNameRdr, isUnboundName,
 
         newLocalBndrRn, newLocalBndrsRn,
         bindLocalNames, bindLocalNamesFV,
@@ -39,7 +40,9 @@ module RnEnv (
         warnUnusedMatches,
         warnUnusedTopBinds, warnUnusedLocalBinds,
         dataTcOccs, kindSigErr, perhapsForallMsg,
-        HsDocContext(..), docOfHsDocContext
+
+        HsDocContext(..), pprHsDocContext,
+        inHsDocContext, withHsDocContext
     ) where
 
 #include "HsVersions.h"
@@ -221,7 +224,7 @@ newTopSrcBinder (L loc rdr_name)
                         -- ToDo: more helpful error messages
                       ; addErr (unknownNameErr (pprNonVarNameSpace
                             (occNameSpace (rdrNameOcc rdr_name))) rdr_name)
-                      ; return (mkUnboundName rdr_name)
+                      ; return (mkUnboundNameRdr rdr_name)
                       }
                 }
             Nothing ->
@@ -409,11 +412,15 @@ lookupInstDeclBndr cls what rdr
                 -- In an instance decl you aren't allowed
                 -- to use a qualified name for the method
                 -- (Although it'd make perfect sense.)
-       ; lookupSubBndrOcc False -- False => we don't give deprecated
+       ; mb_name <- lookupSubBndrOcc
+                          False -- False => we don't give deprecated
                                 -- warnings when a deprecated class
                                 -- method is defined. We only warn
                                 -- when it's used
-                          (ParentIs cls) doc rdr }
+                          cls doc rdr
+       ; case mb_name of
+           Left err -> do { addErr err; return (mkUnboundNameRdr rdr) }
+           Right nm -> return nm }
   where
     doc = what <+> ptext (sLit "of class") <+> quotes (ppr cls)
 
@@ -460,61 +467,77 @@ lookupConstructorFields con_name
 -- unambiguous because there is only one field id 'fld' in scope.
 -- But currently it's rejected.
 
+lookupRecFieldOcc :: Parent  -- NoParent   => just look it up as usual
+                             -- ParentIs p => use p to disambiguate
+                  -> SDoc -> RdrName
+                  -> RnM Name
+lookupRecFieldOcc parent doc rdr_name
+  | ParentIs parent_name <- parent
+  = do { mb_name <- lookupSubBndrOcc True parent_name doc rdr_name
+       ; case mb_name of
+           Left err -> do { addErr err; return (mkUnboundNameRdr rdr_name) }
+           Right n  -> return n }
+
+  | otherwise
+  = lookupGlobalOccRn rdr_name
+
 lookupSubBndrOcc :: Bool
-                 -> Parent  -- NoParent   => just look it up as usual
-                            -- ParentIs p => use p to disambiguate
-                 -> SDoc -> RdrName
-                 -> RnM Name
-lookupSubBndrOcc warnIfDeprec parent doc rdr_name
+                 -> Name     -- Parent
+                 -> SDoc
+                 -> RdrName
+                 -> RnM (Either MsgDoc Name)
+-- Find all the things the rdr-name maps to
+-- and pick the one with the right parent namep
+lookupSubBndrOcc warn_if_deprec the_parent doc rdr_name
   | Just n <- isExact_maybe rdr_name   -- This happens in derived code
-  = lookupExactOcc n
+  = do { n <- lookupExactOcc n
+       ; return (Right n) }
 
   | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
-  = lookupOrig rdr_mod rdr_occ
+  = do { n <- lookupOrig rdr_mod rdr_occ
+       ; return (Right n) }
 
-  | otherwise   -- Find all the things the rdr-name maps to
-  = do  {       -- and pick the one with the right parent namep
-          env <- getGlobalRdrEnv
-        ; case lookupSubBndrGREs env parent rdr_name of
+  | isUnboundName the_parent
+        -- Avoid an error cascade from malformed decls:
+        --   instance Int where { foo = e }
+        -- We have already generated an error in rnLHsInstDecl
+  = return (Right (mkUnboundNameRdr rdr_name))
+
+  | otherwise
+  = do { env <- getGlobalRdrEnv
+       ; let gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
                 -- NB: lookupGlobalRdrEnv, not lookupGRE_RdrName!
                 --     The latter does pickGREs, but we want to allow 'x'
                 --     even if only 'M.x' is in scope
-            [gre] -> do { addUsedRdrName warnIfDeprec gre (used_rdr_name gre)
-                          -- Add a usage; this is an *occurrence* site
-                        ; return (gre_name gre) }
-            []    -> do { ns <- lookupQualifiedNameGHCi rdr_name
-                        ; case ns of {
-                                (n:_) -> return n ;
-                                -- Unlikely to be more than one...?
-                                [] -> do
-                        { addErr (unknownSubordinateErr doc rdr_name)
-                        ; return (mkUnboundName rdr_name) } } }
-            gres  -> do { addNameClashErrRn rdr_name gres
-                        ; return (gre_name (head gres)) } }
+       ; case pick_gres rdr_name gres of
+            (gre:_) -> do { addUsedRdrName warn_if_deprec gre (used_rdr_name gre)
+                            -- Add a usage; this is an *occurrence* site
+                          ; return (Right (gre_name gre)) } 
+                 -- If there is more than one local GRE for the
+                 -- same OccName 'f', that will be reported separately
+                 -- as a duplicate top-level binding for 'f'
+            [] -> do { ns <- lookupQualifiedNameGHCi rdr_name
+                     ; case ns of
+                         (n:_) -> return (Right n)  -- Unlikely to be more than one...?
+                         [] -> return (Left (unknownSubordinateErr doc rdr_name))
+    } }
   where
     -- Note [Usage for sub-bndrs]
     used_rdr_name gre
       | isQual rdr_name = rdr_name
       | otherwise       = greUsedRdrName gre
 
-lookupSubBndrGREs :: GlobalRdrEnv -> Parent -> RdrName -> [GlobalRdrElt]
--- If Parent = NoParent, just do a normal lookup
--- If Parent = Parent p then find all GREs that
---   (a) have parent p
---   (b) for Unqual, are in scope qualified or unqualified
---       for Qual, are in scope with that qualification
-lookupSubBndrGREs env parent rdr_name
-  = case parent of
-      NoParent   -> pickGREs rdr_name gres
-      ParentIs p
-        | isUnqual rdr_name -> filter (parent_is p) gres
-        | otherwise         -> filter (parent_is p) (pickGREs rdr_name gres)
+    -- If Parent = NoParent, just do a normal lookup
+    -- If Parent = Parent p then find all GREs that
+    --   (a) have parent p
+    --   (b) for Unqual, are in scope qualified or unqualified
+    --       for Qual, are in scope with that qualification
+    pick_gres rdr_name gres
+      | isUnqual rdr_name = filter right_parent gres
+      | otherwise         = filter right_parent (pickGREs rdr_name gres)
 
-  where
-    gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
-
-    parent_is p (GRE { gre_par = ParentIs p' }) = p == p'
-    parent_is _ _                               = False
+    right_parent (GRE { gre_par = ParentIs p }) = p == the_parent
+    right_parent _ = False
 
 {-
 Note [Family instance binders]
@@ -656,6 +679,9 @@ getLookupOccRn
   = do local_env <- getLocalRdrEnv
        return (lookupLocalRdrOcc local_env . nameOccName)
 
+mkUnboundNameRdr :: RdrName -> Name
+mkUnboundNameRdr rdr = mkUnboundName (rdrNameOcc rdr)
+
 lookupLocatedOccRn :: Located RdrName -> RnM (Located Name)
 lookupLocatedOccRn = wrapLocM lookupOccRn
 
@@ -765,16 +791,33 @@ lookupOccRn_maybe rdr_name
        ; case lookupLocalRdrEnv local_env rdr_name of {
           Just name -> return (Just name) ;
           Nothing   -> do
-       { mb_name <- lookupGlobalOccRn_maybe rdr_name
-       ; case mb_name of {
-                Just name  -> return (Just name) ;
-                Nothing -> do
-       { ns <- lookupQualifiedNameGHCi rdr_name
+       ; lookupGlobalOccRn_maybe rdr_name } }
+
+lookupGlobalOccRn_maybe :: RdrName -> RnM (Maybe Name)
+-- Looks up a RdrName occurrence in the top-level
+--   environment, including using lookupQualifiedNameGHCi
+--   for the GHCi case
+-- No filter function; does not report an error on failure
+-- Uses addUsedRdrName to record use and deprecations
+lookupGlobalOccRn_maybe rdr_name
+  | Just n <- isExact_maybe rdr_name   -- This happens in derived code
+  = do { n' <- lookupExactOcc n; return (Just n') }
+
+  | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
+  = do { n <- lookupOrig rdr_mod rdr_occ
+       ; return (Just n) }
+
+  | otherwise
+  = do  { mb_gre <- lookupGreRn_maybe rdr_name
+        ; case mb_gre of {
+            Just gre -> return (Just (gre_name gre)) ;
+            Nothing  ->
+     do { ns <- lookupQualifiedNameGHCi rdr_name
                       -- This test is not expensive,
                       -- and only happens for failed lookups
        ; case ns of
            (n:_) -> return (Just n)  -- Unlikely to be more than one...?
-           []    -> return Nothing } } } } }
+           []    -> return Nothing } } }
 
 lookupGlobalOccRn :: RdrName -> RnM Name
 -- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global
@@ -805,24 +848,6 @@ lookupInfoOccRn rdr_name
        ; qual_ns <- lookupQualifiedNameGHCi rdr_name
        ; return (ns ++ (qual_ns `minusList` ns)) }
 
-lookupGlobalOccRn_maybe :: RdrName -> RnM (Maybe Name)
--- No filter function; does not report an error on failure
-
-lookupGlobalOccRn_maybe rdr_name
-  | Just n <- isExact_maybe rdr_name   -- This happens in derived code
-  = do { n' <- lookupExactOcc n; return (Just n') }
-
-  | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
-  = do { n <- lookupOrig rdr_mod rdr_occ
-       ; return (Just n) }
-
-  | otherwise
-  = do  { mb_gre <- lookupGreRn_maybe rdr_name
-        ; case mb_gre of
-                Nothing  -> return Nothing
-                Just gre -> return (Just (gre_name gre)) }
-
-
 --------------------------------------------------
 --      Lookup in the Global RdrEnv of the module
 --------------------------------------------------
@@ -834,6 +859,7 @@ lookupGreRn_maybe :: RdrName -> RnM (Maybe GlobalRdrElt)
 --   Many bindings:       report "ambiguous", return an arbitrary (Just gre)
 -- (This API is a bit strange; lookupGRERn2_maybe is simpler.
 --  But it works and I don't want to fiddle too much.)
+-- Uses addUsedRdrName to record use and deprecations
 lookupGreRn_maybe rdr_name
   = do  { env <- getGlobalRdrEnv
         ; case lookupGRE_RdrName rdr_name env of
@@ -849,6 +875,7 @@ lookupGreRn2_maybe :: RdrName -> RnM (Maybe GlobalRdrElt)
 --   Exactly one binding: record it as "used",   return (Just gre)
 --   No bindings:         report "not in scope", return Nothing
 --   Many bindings:       report "ambiguous",    return Nothing
+-- Uses addUsedRdrName to record use and deprecations
 lookupGreRn2_maybe rdr_name
   = do  { env <- getGlobalRdrEnv
         ; case lookupGRE_RdrName rdr_name env of
@@ -863,13 +890,14 @@ lookupGreRn2_maybe rdr_name
 lookupGreAvailRn :: RdrName -> RnM (Name, AvailInfo)
 -- Used in export lists
 -- If not found or ambiguous, add error message, and fake with UnboundName
+-- Uses addUsedRdrName to record use and deprecations
 lookupGreAvailRn rdr_name
   = do  { mb_gre <- lookupGreRn2_maybe rdr_name
         ; case mb_gre of {
             Just gre -> return (gre_name gre, availFromGRE gre) ;
             Nothing  ->
     do  { traceRn (text "lookupGreRn" <+> ppr rdr_name)
-        ; let name = mkUnboundName rdr_name
+        ; let name = mkUnboundNameRdr rdr_name
         ; return (name, Avail name) } } }
 
 {-
@@ -1016,11 +1044,13 @@ lookupQualifiedNameGHCi rdr_name
       = do { res <- loadSrcInterface_maybe doc mod False Nothing
            ; case res of
                 Succeeded ifaces
-                  -> return [ name
-                            | iface <- ifaces
-                            , avail <- mi_exports iface
-                            , name  <- availNames avail
-                            , nameOccName name == occ ]
+                  -> do { let names = [ name
+                                      | iface <- ifaces
+                                      , avail <- mi_exports iface
+                                      , name  <- availNames avail
+                                      , nameOccName name == occ ]
+                        ; traceRn (text "lookupQualifiedNameGHCi; yes" <+> ppr names)
+                        ; return names }
 
                 _ -> -- Either we couldn't load the interface, or
                      -- we could but we didn't find the name in it
@@ -1028,7 +1058,8 @@ lookupQualifiedNameGHCi rdr_name
                         ; return [] } }
 
       | otherwise
-      = return []
+      = do { traceRn (text "lookupQualifedNameGHCi: off" <+> ppr rdr_name)
+           ; return [] }
 
     doc = ptext (sLit "Need to find") <+> ppr rdr_name
 
@@ -1102,7 +1133,7 @@ lookupSigCtxtOccRn ctxt what
   = wrapLocM $ \ rdr_name ->
     do { mb_name <- lookupBindGroupOcc ctxt what rdr_name
        ; case mb_name of
-           Left err   -> do { addErr err; return (mkUnboundName rdr_name) }
+           Left err   -> do { addErr err; return (mkUnboundNameRdr rdr_name) }
            Right name -> return name }
 
 lookupBindGroupOcc :: HsSigCtxt
@@ -1134,14 +1165,7 @@ lookupBindGroupOcc ctxt what rdr_name
       InstDeclCtxt ns  -> lookup_top (`elemNameSet` ns)
   where
     lookup_cls_op cls
-      = do { env <- getGlobalRdrEnv
-           ; let gres = lookupSubBndrGREs env (ParentIs cls) rdr_name
-           ; case gres of
-               []      -> return (Left (unknownSubordinateErr doc rdr_name))
-               (gre:_) -> return (Right (gre_name gre)) }
-                        -- If there is more than one local GRE for the
-                        -- same OccName 'f', that will be reported separately
-                        -- as a duplicate top-level binding for 'f'
+      = lookupSubBndrOcc True cls doc rdr_name
       where
         doc = ptext (sLit "method of class") <+> quotes (ppr cls)
 
@@ -1586,7 +1610,7 @@ unboundNameX where_look rdr_name extra
                   ; let suggestions = unknownNameSuggestions_ where_look
                                          dflags global_env local_env rdr_name
                   ; addErr (err $$ suggestions) }
-        ; return (mkUnboundName rdr_name) }
+        ; return (mkUnboundNameRdr rdr_name) }
 
 unknownNameErr :: SDoc -> RdrName -> SDoc
 unknownNameErr what rdr_name
@@ -1917,6 +1941,7 @@ data HsDocContext
   | TyDataCtx (Located RdrName)
   | TySynCtx (Located RdrName)
   | TyFamilyCtx (Located RdrName)
+  | FamPatCtx (Located RdrName)    -- The patterns of a type/data family instance
   | ConDeclCtx [Located RdrName]
   | ClassDeclCtx (Located RdrName)
   | ExprWithTySigCtx
@@ -1928,29 +1953,38 @@ data HsDocContext
   | VectDeclCtx (Located RdrName)
   | GenericCtx SDoc   -- Maybe we want to use this more!
 
-docOfHsDocContext :: HsDocContext -> SDoc
-docOfHsDocContext (GenericCtx doc) = doc
-docOfHsDocContext (TypeSigCtx doc) = text "In the type signature for" <+> doc
-docOfHsDocContext PatCtx = text "In a pattern type-signature"
-docOfHsDocContext SpecInstSigCtx = text "In a SPECIALISE instance pragma"
-docOfHsDocContext DefaultDeclCtx = text "In a `default' declaration"
-docOfHsDocContext (ForeignDeclCtx name) = ptext (sLit "In the foreign declaration for") <+> ppr name
-docOfHsDocContext DerivDeclCtx = text "In a deriving declaration"
-docOfHsDocContext (RuleCtx name) = text "In the transformation rule" <+> ftext name
-docOfHsDocContext (TyDataCtx tycon) = text "In the data type declaration for" <+> quotes (ppr tycon)
-docOfHsDocContext (TySynCtx name) = text "In the declaration for type synonym" <+> quotes (ppr name)
-docOfHsDocContext (TyFamilyCtx name) = text "In the declaration for type family" <+> quotes (ppr name)
+withHsDocContext :: HsDocContext -> SDoc -> SDoc
+withHsDocContext ctxt doc = doc $$ inHsDocContext ctxt
 
-docOfHsDocContext (ConDeclCtx [name])
-   = text "In the definition of data constructor" <+> quotes (ppr name)
-docOfHsDocContext (ConDeclCtx names)
-   = text "In the definition of data constructors" <+> interpp'SP names
+inHsDocContext :: HsDocContext -> SDoc
+inHsDocContext ctxt = ptext (sLit "In") <+> pprHsDocContext ctxt
 
-docOfHsDocContext (ClassDeclCtx name) = text "In the declaration for class"     <+> ppr name
-docOfHsDocContext ExprWithTySigCtx = text "In an expression type signature"
-docOfHsDocContext TypBrCtx = ptext (sLit "In a Template-Haskell quoted type")
-docOfHsDocContext HsTypeCtx = text "In a type argument"
-docOfHsDocContext GHCiCtx = ptext (sLit "In GHCi input")
-docOfHsDocContext (SpliceTypeCtx hs_ty) = ptext (sLit "In the spliced type") <+> ppr hs_ty
-docOfHsDocContext ClassInstanceCtx = ptext (sLit "TcSplice.reifyInstances")
-docOfHsDocContext (VectDeclCtx tycon) = ptext (sLit "In the VECTORISE pragma for type constructor") <+> quotes (ppr tycon)
+pprHsDocContext :: HsDocContext -> SDoc
+pprHsDocContext (GenericCtx doc)      = doc
+pprHsDocContext (TypeSigCtx doc)      = text "the type signature for" <+> doc
+pprHsDocContext PatCtx                = text "a pattern type-signature"
+pprHsDocContext SpecInstSigCtx        = text "a SPECIALISE instance pragma"
+pprHsDocContext DefaultDeclCtx        = text "a `default' declaration"
+pprHsDocContext DerivDeclCtx          = text "a deriving declaration"
+pprHsDocContext (RuleCtx name)        = text "the transformation rule" <+> ftext name
+pprHsDocContext (TyDataCtx tycon)     = text "the data type declaration for" <+> quotes (ppr tycon)
+pprHsDocContext (FamPatCtx tycon)     = text "a type pattern of family instance for" <+> quotes (ppr tycon)
+pprHsDocContext (TySynCtx name)       = text "the declaration for type synonym" <+> quotes (ppr name)
+pprHsDocContext (TyFamilyCtx name)    = text "the declaration for type family" <+> quotes (ppr name)
+pprHsDocContext (ClassDeclCtx name)   = text "the declaration for class" <+> quotes (ppr name)
+pprHsDocContext ExprWithTySigCtx      = text "an expression type signature"
+pprHsDocContext TypBrCtx              = text "a Template-Haskell quoted type"
+pprHsDocContext HsTypeCtx             = text "a type argument"
+pprHsDocContext GHCiCtx               = text "GHCi input"
+pprHsDocContext (SpliceTypeCtx hs_ty) = text "the spliced type" <+> quotes (ppr hs_ty)
+pprHsDocContext ClassInstanceCtx      = text "TcSplice.reifyInstances"
+
+pprHsDocContext (ForeignDeclCtx name)
+   = ptext (sLit "the foreign declaration for") <+> quotes (ppr name)
+pprHsDocContext (ConDeclCtx [name])
+   = text "the definition of data constructor" <+> quotes (ppr name)
+pprHsDocContext (ConDeclCtx names)
+   = text "the definition of data constructors" <+> interpp'SP names
+pprHsDocContext (VectDeclCtx tycon)
+   = ptext (sLit "the VECTORISE pragma for type constructor") <+> quotes (ppr tycon)
+

@@ -154,8 +154,8 @@ itName uniq loc = mkInternalName uniq (mkOccNameFS varName (fsLit "it")) loc
 
 -- mkUnboundName makes a place-holder Name; it shouldn't be looked at except possibly
 -- during compiler debugging.
-mkUnboundName :: RdrName -> Name
-mkUnboundName rdr_name = mkInternalName unboundKey (rdrNameOcc rdr_name) noSrcSpan
+mkUnboundName :: OccName -> Name
+mkUnboundName occ = mkInternalName unboundKey occ noSrcSpan
 
 isUnboundName :: Name -> Bool
 isUnboundName name = name `hasKey` unboundKey

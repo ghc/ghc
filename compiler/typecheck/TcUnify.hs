@@ -12,7 +12,7 @@ module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcGen,
   tcSubType, tcSubType_NC, tcSubTypeDS, tcSubTypeDS_NC,
-  checkConstraints,
+  checkConstraints, emitImplicationFor,
 
   -- Various unifications
   unifyType, unifyTypeList, unifyTheta,
@@ -529,8 +529,9 @@ tcGen ctxt expected_ty thing_inside
   = do  { traceTc "tcGen" Outputable.empty
         ; (wrap, tvs', given, rho') <- deeplySkolemise expected_ty
 
+        ; lvl <- getTcLevel
         ; when debugIsOn $
-              traceTc "tcGen" $ vcat [
+              traceTc "tcGen" $ vcat [ ppr lvl, 
                            text "expected_ty" <+> ppr expected_ty,
                            text "inst ty" <+> ppr tvs' <+> ppr rho' ]
 
@@ -566,24 +567,31 @@ checkConstraints :: SkolemInfo
 
 checkConstraints skol_info skol_tvs given thing_inside
   | null skol_tvs && null given
-  = do { res <- thing_inside; return (emptyTcEvBinds, res) }
-      -- Just for efficiency.  We check every function argument with
+  = do { res <- thing_inside
+       ; return (emptyTcEvBinds, res) }
+      -- Fast path.  We check every function argument with
       -- tcPolyExpr, which uses tcGen and hence checkConstraints.
+
+  | otherwise
+  = do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints thing_inside
+       ; ev_binds <- emitImplicationFor tclvl skol_info skol_tvs given wanted
+       ; return (ev_binds, result) }
+
+emitImplicationFor :: TcLevel -> SkolemInfo -> [TcTyVar]
+                   -> [EvVar] -> WantedConstraints
+                   -> TcM TcEvBinds
+emitImplicationFor tclvl skol_info skol_tvs given wanted
+  | isEmptyWC wanted && null given
+             -- Optimisation : if there are no wanteds, and no givens
+             -- don't generate an implication at all.
+             -- Reason for the (null given): we don't want to lose
+             -- the "inaccessible alternative" error check
+  = return emptyTcEvBinds
 
   | otherwise
   = ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
     ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
-    do { (result, tclvl, wanted) <- pushLevelAndCaptureConstraints thing_inside
-
-       ; if isEmptyWC wanted && null given
-            -- Optimisation : if there are no wanteds, and no givens
-            -- don't generate an implication at all.
-            -- Reason for the (null given): we don't want to lose
-            -- the "inaccessible alternative" error check
-         then
-            return (emptyTcEvBinds, result)
-         else do
-       { ev_binds_var <- newTcEvBinds
+    do { ev_binds_var <- newTcEvBinds
        ; env <- getLclEnv
        ; emitImplication $ Implic { ic_tclvl = tclvl
                                   , ic_skols = skol_tvs
@@ -595,7 +603,7 @@ checkConstraints skol_info skol_tvs given thing_inside
                                   , ic_env = env
                                   , ic_info = skol_info }
 
-       ; return (TcEvBinds ev_binds_var, result) } }
+       ; return (TcEvBinds ev_binds_var) }
 
 {-
 ************************************************************************

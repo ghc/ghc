@@ -19,7 +19,7 @@ module RnBinds (
    rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
 
    -- Other bindings
-   rnMethodBinds, renameSigs, mkSigTvFn,
+   rnMethodBinds, renameSigs,
    rnMatchGroup, rnGRHSs, rnGRHS,
    makeMiniFixityEnv, MiniFixityEnv,
    HsSigCtxt(..)
@@ -553,35 +553,23 @@ depAnalBinds binds_w_dus
 
 mkSigTvFn :: [LSig Name] -> (Name -> [Name])
 -- Return a lookup function that maps an Id Name to the names
--- of the type variables that should scope over its body..
+-- of the type variables that should scope over its body.
 mkSigTvFn sigs
   = \n -> lookupNameEnv env n `orElse` []
   where
-    extractScopedTyVars :: LHsType Name -> [Name]
-    extractScopedTyVars (L _ (HsForAllTy Explicit _ ltvs _ _)) = hsLKiTyVarNames ltvs
-    extractScopedTyVars _ = []
-
     env :: NameEnv [Name]
-    env = mkNameEnv [ (name, nwcs ++ extractScopedTyVars ty)  -- Kind variables and type variables
-                      -- nwcs: see Note [Scoping of named wildcards]
-                    | L _ (TypeSig names ty nwcs) <- sigs
-                    , L _ name <- names]
-        -- Note the pattern-match on "Explicit"; we only bind
-        -- type variables from signatures with an explicit top-level for-all
+    env = foldr add_scoped_sig emptyNameEnv sigs
 
+    add_scoped_sig :: LSig Name -> NameEnv [Name] -> NameEnv [Name]
+    add_scoped_sig (L _ (ClassOpSig _ names sig_ty)) env
+      = add_scoped_tvs names (hsScopedTvs sig_ty) env
+    add_scoped_sig (L _ (TypeSig names sig_ty)) env
+      = add_scoped_tvs names (hsWcScopedTvs sig_ty) env
+    add_scoped_sig _ env = env
 
-{- Note [Scoping of named wildcards]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-  f :: _a -> _a
-  f x = let g :: _a -> _a
-            g = ...
-        in ...
-
-Currently, for better or worse, the "_a" variables are all the same. So
-although there is no explicit forall, the "_a" scopes over the definition.
-I don't know if this is a good idea, but there it is.
--}
+    add_scoped_tvs :: [Located Name] -> [Name] -> NameEnv [Name] -> NameEnv [Name]
+    add_scoped_tvs id_names tv_names env
+      = foldr (\(L _ id_n) env -> extendNameEnv env id_n tv_names) env id_names
 
 -- Process the fixity declarations, making a FastString -> (Located Fixity) map
 -- (We keep the location around for reporting duplicate fixity declarations.)
@@ -869,29 +857,26 @@ renameSig :: HsSigCtxt -> Sig RdrName -> RnM (Sig Name, FreeVars)
 renameSig _ (IdSig x)
   = return (IdSig x, emptyFVs)    -- Actually this never occurs
 
-renameSig ctxt sig@(TypeSig vs ty _)
+renameSig ctxt sig@(TypeSig vs ty)
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
-        ; let doc = ppr_sig_bndrs vs
-              wildCardsAllowed = case ctxt of
-                TopSigCtxt _    -> True
-                LocalBindCtxt _ -> True
-                _               -> False
-        ; (new_ty, fvs, wcs)
-            <- if wildCardsAllowed
-               then rnHsSigTypeWithWildCards doc ty
-               else do { (new_ty, fvs) <- rnHsSigType doc ty
-                       ; return (new_ty, fvs, []) }
-        ; return (TypeSig new_vs new_ty wcs, fvs) }
+        ; let doc = TypeSigCtx (ppr_sig_bndrs vs)
+        ; (new_ty, fvs) <- rnHsSigWcType doc ty
+        ; return (TypeSig new_vs new_ty, fvs) }
 
-renameSig ctxt sig@(GenericSig vs ty)
+renameSig ctxt sig@(ClassOpSig is_deflt vs ty)
   = do  { defaultSigs_on <- xoptM Opt_DefaultSignatures
-        ; unless defaultSigs_on (addErr (defaultSigErr sig))
+        ; when (is_deflt && not defaultSigs_on) $
+          addErr (defaultSigErr sig)
         ; new_v <- mapM (lookupSigOccRn ctxt sig) vs
-        ; (new_ty, fvs) <- rnHsSigType (ppr_sig_bndrs vs) ty
-        ; return (GenericSig new_v new_ty, fvs) }
+        ; (new_ty, fvs) <- rnHsSigType ty_ctxt ty
+        ; return (ClassOpSig is_deflt new_v new_ty, fvs) }
+  where
+    (v1:_) = vs
+    ty_ctxt = GenericCtx (ptext (sLit "a class method signature for")
+                          <+> quotes (ppr v1))
 
 renameSig _ (SpecInstSig src ty)
-  = do  { (new_ty, fvs) <- rnLHsType SpecInstSigCtx ty
+  = do  { (new_ty, fvs) <- rnHsSigType SpecInstSigCtx ty
         ; return (SpecInstSig src new_ty,fvs) }
 
 -- {-# SPECIALISE #-} pragmas can refer to imported Ids
@@ -902,12 +887,13 @@ renameSig ctxt sig@(SpecSig v tys inl)
   = do  { new_v <- case ctxt of
                      TopSigCtxt {} -> lookupLocatedOccRn v
                      _             -> lookupSigOccRn ctxt sig v
-        -- ; (new_ty, fvs) <- rnHsSigType (quotes (ppr v)) ty
         ; (new_ty, fvs) <- foldM do_one ([],emptyFVs) tys
         ; return (SpecSig new_v new_ty inl, fvs) }
   where
+    ty_ctxt = GenericCtx (ptext (sLit "a SPECIALISE signature for")
+                          <+> quotes (ppr v))
     do_one (tys,fvs) ty
-      = do { (new_ty, fvs_ty) <- rnHsSigType (quotes (ppr v)) ty
+      = do { (new_ty, fvs_ty) <- rnHsSigType ty_ctxt ty
            ; return ( new_ty:tys, fvs_ty `plusFV` fvs) }
 
 renameSig ctxt sig@(InlineSig v s)
@@ -922,29 +908,13 @@ renameSig ctxt sig@(MinimalSig s bf)
   = do new_bf <- traverse (lookupSigOccRn ctxt sig) bf
        return (MinimalSig s new_bf, emptyFVs)
 
-renameSig ctxt sig@(PatSynSig v (flag, qtvs) prov req ty)
+renameSig ctxt sig@(PatSynSig v ty)
   = do  { v' <- lookupSigOccRn ctxt sig v
-        ; let doc = TypeSigCtx $ quotes (ppr v)
-        ; loc <- getSrcSpanM
-
-        ; let (tv_kvs, mentioned) = extractHsTysRdrTyVars (ty:unLoc prov ++ unLoc req)
-        ; tv_bndrs <- case flag of
-            Implicit ->
-                return $ mkHsQTvs . userHsTyVarBndrs loc $ mentioned
-            Explicit ->
-                do { let heading = ptext (sLit "In the pattern synonym type signature")
-                                   <+> quotes (ppr sig)
-                   ; warnUnusedForAlls (heading $$ docOfHsDocContext doc) qtvs mentioned
-                   ; return qtvs }
-            Qualified -> panic "renameSig: Qualified"
-
-        ; bindHsTyVars doc Nothing tv_kvs tv_bndrs $ \ tyvars -> do
-        { (prov', fvs1) <- rnContext doc prov
-        ; (req', fvs2) <- rnContext doc req
-        ; (ty', fvs3) <- rnLHsType doc ty
-
-        ; let fvs = plusFVs [fvs1, fvs2, fvs3]
-        ; return (PatSynSig v' (flag, tyvars) prov' req' ty', fvs) }}
+        ; (ty', fvs) <- rnHsSigType ty_ctxt ty
+        ; return (PatSynSig v' ty', fvs) }
+  where
+    ty_ctxt = GenericCtx (ptext (sLit "a pattern synonym signature for")
+                          <+> quotes (ppr v))
 
 ppr_sig_bndrs :: [Located RdrName] -> SDoc
 ppr_sig_bndrs bs = quotes (pprWithCommas ppr bs)
@@ -952,10 +922,13 @@ ppr_sig_bndrs bs = quotes (pprWithCommas ppr bs)
 okHsSig :: HsSigCtxt -> LSig a -> Bool
 okHsSig ctxt (L _ sig)
   = case (sig, ctxt) of
-     (GenericSig {}, ClsDeclCtxt {}) -> True
-     (GenericSig {}, _)              -> False
+     (ClassOpSig {}, ClsDeclCtxt {})  -> True
+     (ClassOpSig {}, InstDeclCtxt {}) -> True
+     (ClassOpSig {}, _)               -> False
 
-     (TypeSig {}, _)              -> True
+     (TypeSig {}, ClsDeclCtxt {})  -> False
+     (TypeSig {}, InstDeclCtxt {}) -> False
+     (TypeSig {}, _)               -> True
 
      (PatSynSig {}, TopSigCtxt{}) -> True
      (PatSynSig {}, _)            -> False
@@ -995,16 +968,16 @@ findDupSigs sigs
   = findDupsEq matching_sig (concatMap (expand_sig . unLoc) sigs)
   where
     expand_sig sig@(FixSig (FixitySig ns _)) = zip ns (repeat sig)
-    expand_sig sig@(InlineSig n _)          = [(n,sig)]
-    expand_sig sig@(TypeSig ns _ _)         = [(n,sig) | n <- ns]
-    expand_sig sig@(GenericSig ns _)        = [(n,sig) | n <- ns]
+    expand_sig sig@(InlineSig n _)           = [(n,sig)]
+    expand_sig sig@(TypeSig ns _)            = [(n,sig) | n <- ns]
+    expand_sig sig@(ClassOpSig _ ns _)       = [(n,sig) | n <- ns]
     expand_sig _ = []
 
-    matching_sig (L _ n1,sig1) (L _ n2,sig2) = n1 == n2 && mtch sig1 sig2
-    mtch (FixSig {})     (FixSig {})     = True
-    mtch (InlineSig {})  (InlineSig {})  = True
-    mtch (TypeSig {})    (TypeSig {})    = True
-    mtch (GenericSig {}) (GenericSig {}) = True
+    matching_sig (L _ n1,sig1) (L _ n2,sig2)       = n1 == n2 && mtch sig1 sig2
+    mtch (FixSig {})           (FixSig {})         = True
+    mtch (InlineSig {})        (InlineSig {})      = True
+    mtch (TypeSig {})          (TypeSig {})        = True
+    mtch (ClassOpSig d1 _ _)   (ClassOpSig d2 _ _) = d1 == d2
     mtch _ _ = False
 
 -- Warn about multiple MINIMAL signatures

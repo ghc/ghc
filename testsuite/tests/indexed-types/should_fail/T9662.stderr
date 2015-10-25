@@ -1,16 +1,16 @@
 
 T9662.hs:49:7: error:
     Couldn't match type ‘k’ with ‘n’
-      ‘k’ is a rigid type variable bound by
-          the type signature for:
-          test :: Shape (((sh :. k) :. m) :. n)
-                  -> Shape (((sh :. m) :. n) :. k)
-          at T9662.hs:44:9
-      ‘n’ is a rigid type variable bound by
-          the type signature for:
-          test :: Shape (((sh :. k) :. m) :. n)
-                  -> Shape (((sh :. m) :. n) :. k)
-          at T9662.hs:44:9
+    ‘k’ is a rigid type variable bound by
+      the type signature for:
+        test :: forall sh k m n.
+                Shape (((sh :. k) :. m) :. n) -> Shape (((sh :. m) :. n) :. k)
+      at T9662.hs:44:9
+    ‘n’ is a rigid type variable bound by
+      the type signature for:
+        test :: forall sh k m n.
+                Shape (((sh :. k) :. m) :. n) -> Shape (((sh :. m) :. n) :. k)
+      at T9662.hs:44:9
     Expected type: Exp (((sh :. m) :. n) :. k)
                    -> Exp (((sh :. k) :. m) :. n)
       Actual type: Exp (((sh :. k) :. m) :. n)
@@ -29,16 +29,16 @@ T9662.hs:49:7: error:
 
 T9662.hs:49:7: error:
     Couldn't match type ‘m’ with ‘k’
-      ‘m’ is a rigid type variable bound by
-          the type signature for:
-          test :: Shape (((sh :. k) :. m) :. n)
-                  -> Shape (((sh :. m) :. n) :. k)
-          at T9662.hs:44:9
-      ‘k’ is a rigid type variable bound by
-          the type signature for:
-          test :: Shape (((sh :. k) :. m) :. n)
-                  -> Shape (((sh :. m) :. n) :. k)
-          at T9662.hs:44:9
+    ‘m’ is a rigid type variable bound by
+      the type signature for:
+        test :: forall sh k m n.
+                Shape (((sh :. k) :. m) :. n) -> Shape (((sh :. m) :. n) :. k)
+      at T9662.hs:44:9
+    ‘k’ is a rigid type variable bound by
+      the type signature for:
+        test :: forall sh k m n.
+                Shape (((sh :. k) :. m) :. n) -> Shape (((sh :. m) :. n) :. k)
+      at T9662.hs:44:9
     Expected type: Exp (((sh :. m) :. n) :. k)
                    -> Exp (((sh :. k) :. m) :. n)
       Actual type: Exp (((sh :. k) :. m) :. n)
@@ -57,16 +57,16 @@ T9662.hs:49:7: error:
 
 T9662.hs:49:7: error:
     Couldn't match type ‘n’ with ‘m’
-      ‘n’ is a rigid type variable bound by
-          the type signature for:
-          test :: Shape (((sh :. k) :. m) :. n)
-                  -> Shape (((sh :. m) :. n) :. k)
-          at T9662.hs:44:9
-      ‘m’ is a rigid type variable bound by
-          the type signature for:
-          test :: Shape (((sh :. k) :. m) :. n)
-                  -> Shape (((sh :. m) :. n) :. k)
-          at T9662.hs:44:9
+    ‘n’ is a rigid type variable bound by
+      the type signature for:
+        test :: forall sh k m n.
+                Shape (((sh :. k) :. m) :. n) -> Shape (((sh :. m) :. n) :. k)
+      at T9662.hs:44:9
+    ‘m’ is a rigid type variable bound by
+      the type signature for:
+        test :: forall sh k m n.
+                Shape (((sh :. k) :. m) :. n) -> Shape (((sh :. m) :. n) :. k)
+      at T9662.hs:44:9
     Expected type: Exp (((sh :. m) :. n) :. k)
                    -> Exp (((sh :. k) :. m) :. n)
       Actual type: Exp (((sh :. k) :. m) :. n)

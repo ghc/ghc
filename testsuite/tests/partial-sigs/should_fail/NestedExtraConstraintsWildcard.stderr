@@ -1,6 +1,6 @@
 
-NestedExtraConstraintsWildcard.hs:4:23:
-    Invalid partial type: Bool -> (Eq a, _) => a
-    An extra-constraints wild card is only allowed
-    in the top-level context
-    In the type signature for ‘foo’
+NestedExtraConstraintsWildcard.hs:4:23: error:
+    Wildcard ‘_’ not allowed in a constraint
+      except as the last top-level constraint of a type signature
+        e.g  f :: (Eq a, _) => blah
+      in the type signature for ‘foo’

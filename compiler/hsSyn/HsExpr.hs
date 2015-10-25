@@ -307,16 +307,13 @@ data HsExpr id
   -- For details on above see note [Api annotations] in ApiAnnotation
   | ExprWithTySig
                 (LHsExpr id)
-                (LHsType id)
-                (PostRn id [Name])      -- After renaming, the list of Names
-                                        -- contains the named and unnamed
-                                        -- wildcards brought in scope by the
-                                        -- signature
+                (LHsSigWcType id)
 
-  | ExprWithTySigOut                    -- TRANSLATION
+  | ExprWithTySigOut              -- Post typechecking
                 (LHsExpr id)
-                (LHsType Name)          -- Retain the signature for
-                                        -- round-tripping purposes
+                (LHsSigWcType Name)  -- Retain the signature,
+                                     -- as HsSigType Name, for
+                                     -- round-tripping purposes
 
   -- | Arithmetic sequence
   --
@@ -701,7 +698,7 @@ ppr_expr (RecordCon con_id _ rbinds)
 ppr_expr (RecordUpd aexp rbinds _ _ _)
   = hang (pprLExpr aexp) 2 (ppr rbinds)
 
-ppr_expr (ExprWithTySig expr sig _)
+ppr_expr (ExprWithTySig expr sig)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
          4 (ppr sig)
 ppr_expr (ExprWithTySigOut expr sig)
@@ -1094,6 +1091,7 @@ data Match id body
         m_type :: (Maybe (LHsType id)),
                                  -- A type signature for the result of the match
                                  -- Nothing after typechecking
+                                 -- NB: No longer supported
         m_grhss :: (GRHSs id body)
   } deriving (Typeable)
 deriving instance (Data body,DataId id) => Data (Match id body)

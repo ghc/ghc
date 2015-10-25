@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, PartialTypeSignatures  #-}
 module ExtraConstraintsWildcardInTypeSplice2 where
 
 import Language.Haskell.TH.Lib (wildCardT)

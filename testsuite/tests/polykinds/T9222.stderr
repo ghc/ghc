@@ -6,19 +6,14 @@ T9222.hs:13:3: error:
         bound by the type of the constructor ‘Want’:
                    (a ~ '(b0, c0)) => Proxy b0
         at T9222.hs:13:3
-      ‘b’ is a rigid type variable bound by
-          the type of the constructor ‘Want’:
-            ((a ~ '(b, c)) => Proxy b) -> Want a
-          at T9222.hs:13:3
+    ‘b’ is a rigid type variable bound by
+    the type of the constructor ‘Want’:
+      forall (k :: BOX) (k1 :: BOX) (a :: (,) k k1) (b :: k) (c :: k1).
+      ((a ~ '(b, c)) => Proxy b) -> Want a
+    at T9222.hs:13:3
     Expected type: '(b, c)
       Actual type: a
-    In the ambiguity check for the type of the constructor ‘Want’:
-      Want :: forall (k :: BOX)
-                     (k1 :: BOX)
-                     (a :: (,) k k1)
-                     (b :: k)
-                     (c :: k1).
-              ((a ~ '(b, c)) => Proxy b) -> Want a
+    In the ambiguity check for ‘Want’
     To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
     In the definition of data constructor ‘Want’
     In the data type declaration for ‘Want’

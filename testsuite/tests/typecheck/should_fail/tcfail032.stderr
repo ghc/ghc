@@ -1,5 +1,5 @@
 
-tcfail032.hs:14:8:
+tcfail032.hs:14:8: error:
     Couldn't match expected type ‘a1 -> Int’ with actual type ‘t’
       because type variable ‘a1’ would escape its scope
     This (rigid, skolem) type variable is bound by

@@ -801,7 +801,10 @@ checkHiBootIface'
     local_export_env = availsToNameEnv local_exports
 
     check_inst :: ClsInst -> TcM (Maybe (Id, Id))
-        -- Returns a pair of the boot dfun in terms of the equivalent real dfun
+        -- Returns a pair of the boot dfun in terms of the equivalent
+        -- real dfun. Delicate (like checkBootDecl) because it depends
+        -- on the types lining up precisely even to the ordering of
+        -- the type variables in the foralls.
     check_inst boot_inst
         = case [dfun | inst <- local_insts,
                        let dfun = instanceDFunId inst,
@@ -811,7 +814,8 @@ checkHiBootIface'
                           , text "boot_inst"    <+> ppr boot_inst
                           , text "boot_dfun_ty" <+> ppr boot_dfun_ty
                           ]
-                     ; addErrTc (instMisMatch True boot_inst); return Nothing }
+                     ; addErrTc (instMisMatch True boot_inst)
+                     ; return Nothing }
             (dfun:_) -> return (Just (local_boot_dfun, dfun))
                      where
                         local_boot_dfun = Id.mkExportedLocalId VanillaId boot_dfun_name (idType dfun)
@@ -1745,18 +1749,17 @@ getGhciStepIO = do
     ghciTy <- getGHCiMonad
     fresh_a <- newUnique
     loc     <- getSrcSpanM
-    let a_tv   = mkInternalName fresh_a (mkTyVarOccFS (fsLit "a")) loc
-        ghciM  = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
-        ioM    = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
+    let a_tv    = mkInternalName fresh_a (mkTyVarOccFS (fsLit "a")) loc
+        ghciM   = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
+        ioM     = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
+        step_ty = noLoc $ HsForAllTy { hst_bndrs = [noLoc $ UserTyVar a_tv]
+                                     , hst_body  = nlHsFunTy ghciM ioM }
 
-        stepTy :: LHsType Name    -- Renamed, so needs all binders in place
-        stepTy = noLoc $ HsForAllTy Implicit Nothing
-                            (HsQTvs { hsq_tvs = [noLoc (UserTyVar a_tv)]
-                                    , hsq_kvs = [] })
-                            (noLoc [])
-                            (nlHsFunTy ghciM ioM)
-        step   = noLoc $ ExprWithTySig (nlHsVar ghciStepIoMName) stepTy []
-    return step
+        stepTy :: LHsSigWcType Name  -- Urgh!
+        stepTy = HsIB { hsib_tvs = [], hsib_kvs = []
+                      , hsib_body = HsWC { hswc_wcs = [], hswc_ctx = Nothing
+                                         , hswc_body = step_ty } }
+    return (noLoc $ ExprWithTySig (nlHsVar ghciStepIoMName) stepTy)
 
 isGHCiMonad :: HscEnv -> String -> IO (Messages, Maybe Name)
 isGHCiMonad hsc_env ty
@@ -1792,7 +1795,7 @@ tcRnExpr hsc_env rdr_expr
         -- it might have a rank-2 type (e.g. :t runST)
     uniq <- newUnique ;
     let { fresh_it  = itName uniq (getLoc rdr_expr) } ;
-    ((_tc_expr, res_ty), tclvl, lie) <- pushLevelAndCaptureConstraints $
+    (tclvl, lie, (_tc_expr, res_ty)) <- pushLevelAndCaptureConstraints $
                                         tcInferRho rn_expr ;
     ((qtvs, dicts, _, _), lie_top) <- captureConstraints $
                                       {-# SCC "simplifyInfer" #-}
@@ -1842,12 +1845,17 @@ tcRnType :: HscEnv
 tcRnType hsc_env normalise rdr_type
   = runTcInteractive hsc_env $
     setXOptM Opt_PolyKinds $   -- See Note [Kind-generalise in tcRnType]
-    do { (rn_type, _fvs, wcs) <- rnLHsTypeWithWildCards GHCiCtx rdr_type
+    do { (HsWC { hswc_wcs = wcs, hswc_body = rn_type }, _fvs)
+               <- rnHsWcType GHCiCtx (mkHsWildCardBndrs rdr_type)
+                  -- The type can have wild cards, but no implicit
+                  -- generalisation; e.g.   :kind (T _)
        ; failIfErrsM
 
         -- Now kind-check the type
         -- It can have any rank or kind
-       ; (ty, kind) <- tcWildcardBinders wcs $ \_ ->
+        -- First bring into scope any wildcards
+       ; traceTc "tcRnType" (vcat [ppr wcs, ppr rn_type])
+       ; (ty, kind) <- tcWildCardBinders wcs  $ \ _ ->
                        tcLHsType rn_type
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]

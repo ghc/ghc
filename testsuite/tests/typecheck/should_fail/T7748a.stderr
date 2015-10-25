@@ -1,9 +1,11 @@
 
-T7748a.hs:16:24:
+T7748a.hs:16:24: error:
     Couldn't match expected type ‘a’
                 with actual type ‘Maybe (Maybe (r -> ()))’
-      ‘a’ is a rigid type variable bound by
-          the type signature for: test :: a -> r -> () at T7748a.hs:11:9
+    ‘a’ is a rigid type variable bound by
+    the type signature for:
+      test :: forall a r. a -> r -> ()
+    at T7748a.hs:11:9
     Relevant bindings include
       g :: r -> () (bound at T7748a.hs:13:16)
       f :: r -> () (bound at T7748a.hs:13:8)

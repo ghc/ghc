@@ -1,20 +1,20 @@
 
-T3208b.hs:15:10:
+T3208b.hs:15:10: error:
     Could not deduce: OTerm o0 ~ STerm o0
     from the context: (OTerm a ~ STerm a, OBJECT a, SUBST a)
       bound by the type signature for:
-               fce' :: (OTerm a ~ STerm a, OBJECT a, SUBST a) => a -> c
-      at T3208b.hs:14:9-56
+                 fce' :: (OTerm a ~ STerm a, OBJECT a, SUBST a) => a -> c
+      at T3208b.hs:14:1-56
     The type variable ‘o0’ is ambiguous
     In the expression: fce (apply f)
     In an equation for ‘fce'’: fce' f = fce (apply f)
 
-T3208b.hs:15:15:
+T3208b.hs:15:15: error:
     Could not deduce: OTerm o0 ~ STerm a
     from the context: (OTerm a ~ STerm a, OBJECT a, SUBST a)
       bound by the type signature for:
-               fce' :: (OTerm a ~ STerm a, OBJECT a, SUBST a) => a -> c
-      at T3208b.hs:14:9-56
+                 fce' :: (OTerm a ~ STerm a, OBJECT a, SUBST a) => a -> c
+      at T3208b.hs:14:1-56
     The type variable ‘o0’ is ambiguous
     Relevant bindings include
       f :: a (bound at T3208b.hs:15:6)

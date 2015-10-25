@@ -386,8 +386,7 @@ the let binding.
 
 simplifyInfer :: TcLevel               -- Used when generating the constraints
               -> Bool                  -- Apply monomorphism restriction
-              -> [TcTyVar]             -- The quantified tyvars of any signatures
-                                       --   see Note [Which type variables to quantify]
+              -> [TcIdSigInfo]         -- Any signatures (possibly partial)
               -> [(Name, TcTauType)]   -- Variables to be generalised,
                                        -- and their tau-types
               -> WantedConstraints
@@ -397,16 +396,17 @@ simplifyInfer :: TcLevel               -- Used when generating the constraints
                                     --   so the results type is not as general as
                                     --   it could be
                       TcEvBinds)    -- ... binding these evidence variables
-simplifyInfer rhs_tclvl apply_mr sig_qtvs name_taus wanteds
+simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
   | isEmptyWC wanteds
   = do { gbl_tvs <- tcGetGlobalTyVars
-       ; qtkvs <- quantifyTyVars gbl_tvs (tyVarsOfTypes (map snd name_taus))
+       ; qtkvs <- quantify_tvs sigs gbl_tvs (tyVarsOfTypes (map snd name_taus))
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
        ; return (qtkvs, [], False, emptyTcEvBinds) }
 
   | otherwise
   = do { traceTc "simplifyInfer {"  $ vcat
-             [ ptext (sLit "binds =") <+> ppr name_taus
+             [ ptext (sLit "sigs =") <+> ppr sigs
+             , ptext (sLit "binds =") <+> ppr name_taus
              , ptext (sLit "rhs_tclvl =") <+> ppr rhs_tclvl
              , ptext (sLit "apply_mr =") <+> ppr apply_mr
              , ptext (sLit "(unzonked) wanted =") <+> ppr wanteds
@@ -474,7 +474,7 @@ simplifyInfer rhs_tclvl apply_mr sig_qtvs name_taus wanteds
        ; zonked_taus <- mapM (TcM.zonkTcType . snd) name_taus
        ; let zonked_tau_tvs = tyVarsOfTypes zonked_taus
        ; (qtvs, bound_theta, mr_bites)
-             <- decideQuantification apply_mr sig_qtvs quant_pred_candidates zonked_tau_tvs
+             <- decideQuantification apply_mr sigs quant_pred_candidates zonked_tau_tvs
 
          -- Emit an implication constraint for the
          -- remaining constraints from the RHS
@@ -566,19 +566,19 @@ and the quantified constraints are empty.
 
 decideQuantification
     :: Bool                       -- Apply monomorphism restriction
-    -> [TcTyVar]
+    -> [TcIdSigInfo]
     -> [PredType] -> TcTyVarSet   -- Constraints and type variables from RHS
     -> TcM ( [TcTyVar]       -- Quantify over these tyvars (skolems)
            , [PredType]      -- and this context (fully zonked)
            , Bool )          -- Did the MR bite?
 -- See Note [Deciding quantification]
-decideQuantification apply_mr sig_qtvs constraints zonked_tau_tvs
+decideQuantification apply_mr sigs constraints zonked_tau_tvs
   | apply_mr     -- Apply the Monomorphism restriction
   = do { gbl_tvs <- tcGetGlobalTyVars
        ; let constrained_tvs = tyVarsOfTypes constraints
              mono_tvs = gbl_tvs `unionVarSet` constrained_tvs
              mr_bites = constrained_tvs `intersectsVarSet` zonked_tau_tvs
-       ; qtvs <- quantify_tvs mono_tvs zonked_tau_tvs
+       ; qtvs <- quantify_tvs sigs mono_tvs zonked_tau_tvs
        ; traceTc "decideQuantification 1" (vcat [ppr constraints, ppr gbl_tvs, ppr mono_tvs, ppr qtvs])
        ; return (qtvs, [], mr_bites) }
 
@@ -586,7 +586,7 @@ decideQuantification apply_mr sig_qtvs constraints zonked_tau_tvs
   = do { gbl_tvs <- tcGetGlobalTyVars
        ; let mono_tvs     = growThetaTyVars (filter isEqPred constraints) gbl_tvs
              tau_tvs_plus = growThetaTyVars constraints zonked_tau_tvs
-       ; qtvs        <- quantify_tvs mono_tvs tau_tvs_plus
+       ; qtvs        <- quantify_tvs sigs mono_tvs tau_tvs_plus
        ; constraints <- zonkTcThetaType constraints
               -- quantifyTyVars turned some meta tyvars into
               -- quantified skolems, so we have to zonk again
@@ -598,11 +598,16 @@ decideQuantification apply_mr sig_qtvs constraints zonked_tau_tvs
                                                 , ppr tau_tvs_plus, ppr qtvs, ppr min_theta])
        ; return (qtvs, min_theta, False) }
 
+quantify_tvs :: [TcIdSigInfo] -> TcTyVarSet -> TcTyVarSet -> TcM [TcTyVar]
+-- See Note [Which type variable to quantify]
+quantify_tvs sigs mono_tvs tau_tvs
+  = quantifyTyVars (mono_tvs `delVarSetList`    sig_qtvs)
+                   (tau_tvs  `extendVarSetList` sig_qtvs `extendVarSetList` sig_wcs)
+                   -- NB: quantifyTyVars zonks its arguments
   where
-    quantify_tvs mono_tvs tau_tvs   -- See Note [Which type variable to quantify]
-      | null sig_qtvs = quantifyTyVars mono_tvs tau_tvs
-      | otherwise     = quantifyTyVars (mono_tvs `delVarSetList`    sig_qtvs)
-                                       (tau_tvs  `extendVarSetList` sig_qtvs)
+    sig_qtvs = [ skol | sig <- sigs, (_, skol) <- sig_skols sig ]
+    sig_wcs  = [ wc   | TISI { sig_bndr = PartialSig { sig_wcs = wcs } } <- sigs
+                      , (_, wc) <- wcs ]
 
 ------------------
 pickQuantifiablePreds :: TyVarSet         -- Quantifying over these
@@ -671,20 +676,31 @@ quantify over all type variables that are
 However, for a pattern binding, or with wildards, we might
 be doing inference *in the presence of a type signature*.
 Mostly, if there is a signature we use CheckGen, not InferGen,
-but with pattern bindings or wildcards we might do inference
+but with pattern bindings or wildcards we might do InferGen
 and still have a type signature.  For example:
    f :: _ -> a
    f x = ...
 or
+   g :: (Eq _a) => _b -> _b
+or
    p :: a -> a
    (p,q) = e
-In both cases we use plan InferGen, and hence call simplifyInfer.
+In all these cases we use plan InferGen, and hence call simplifyInfer.
 But those 'a' variables are skolems, and we should be sure to quantify
 over them, regardless of the monomorphism restriction etc.  If we
 don't, when reporting a type error we panic when we find that a
 skolem isn't bound by any enclosing implication.
 
-That's why we pass sig_qtvs to simplifyInfer, and make sure (in
+Moreover we must quantify over all wildcards that are not free in
+the environment.  In the case of 'g' for example, silly though it is,
+we want to get the inferred type
+   g :: forall t. Eq t => Int -> Int
+and then report ambiguity, rather than *not* quantifying over 't'
+and getting some much more mysterious error later.  A similar case
+is
+  h :: F _a -> Int
+
+That's why we pass sigs to simplifyInfer, and make sure (in
 quantify_tvs) that we do quantify over them.  Trac #10615 is
 a case in point.
 

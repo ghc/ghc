@@ -1,6 +1,4 @@
 
-WildcardInForeignExport.hs:6:37:
-    Unexpected wild card: ‘_’
-    In the foreign declaration for ‘foo’: foo :: CInt -> _
-    When checking declaration:
-      foreign export ccall "foo" foo :: CInt -> _
+WildcardInForeignExport.hs:6:37: error:
+    Wildcard ‘_’ not allowed
+      in the foreign declaration for ‘foo’

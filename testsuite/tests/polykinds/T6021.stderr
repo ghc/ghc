@@ -1,4 +1,5 @@
 
-T6021.hs:5:10:
-    Kind variable also used as type variable: ‘b’
-    In an instance declaration
+T6021.hs:5:22: error:
+    Type variable ‘b’ used as a kind
+    In the kind ‘b’
+    In the instance declaration for ‘Panic (a :: b) b’

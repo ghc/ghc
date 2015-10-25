@@ -21,7 +21,8 @@ module TcMType (
   newFlexiTyVarTys,             -- Int -> Kind -> TcM [TcType]
   newReturnTyVar, newReturnTyVarTy,
   newMetaKindVar, newMetaKindVars,
-  mkTcTyVarName, cloneMetaTyVar,
+  cloneMetaTyVar,
+  newFmvTyVar, newFskTyVar,
 
   newMetaTyVar, readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
   newMetaDetails, isFilledMetaTyVar, isUnfilledMetaTyVar,
@@ -253,6 +254,12 @@ instSkolTyVarX mk_tv subst tyvar
     old_name = tyVarName tyvar
     kind     = substTy subst (tyVarKind tyvar)
 
+newFskTyVar :: TcType -> TcM TcTyVar
+newFskTyVar fam_ty
+  = do { uniq <- newUnique
+       ; let name = mkSysTvName uniq (fsLit "fsk")
+       ; return (mkTcTyVar name (typeKind fam_ty) (FlatSkol fam_ty)) }
+
 {-
 Note [Kind substitution when instantiating]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -277,11 +284,17 @@ instead of the buggous
 ************************************************************************
 -}
 
+mkMetaTyVarName :: Unique -> FastString -> Name
+-- Makes a /System/ Name, which is eagerly eliminated by
+-- the unifier; see TcUnify.nicer_to_update_tv1, and
+-- TcCanonical.canEqTyVarTyVar (nicer_to_update_tv2)
+mkMetaTyVarName uniq str = mkSysTvName uniq str
+
 newMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
 -- Make a new meta tyvar out of thin air
 newMetaTyVar meta_info kind
   = do  { uniq <- newUnique
-        ; let name = mkTcTyVarName uniq s
+        ; let name = mkMetaTyVarName uniq s
               s = case meta_info of
                         ReturnTv    -> fsLit "r"
                         TauTv       -> fsLit "t"
@@ -299,11 +312,26 @@ newSigTyVar name kind
        ; details <- newMetaDetails SigTv
        ; return (mkTcTyVar name' kind details) }
 
+newFmvTyVar :: TcType -> TcM TcTyVar
+-- Very like newMetaTyVar, except sets mtv_tclvl to one less
+-- so that the fmv is untouchable.
+newFmvTyVar fam_ty
+  = do { uniq <- newUnique
+       ; ref  <- newMutVar Flexi
+       ; cur_lvl <- getTcLevel
+       ; let details = MetaTv { mtv_info  = FlatMetaTv
+                              , mtv_ref   = ref
+                              , mtv_tclvl = fmvTcLevel cur_lvl }
+             name = mkMetaTyVarName uniq (fsLit "s")
+       ; return (mkTcTyVar name (typeKind fam_ty) details) }
+
 newMetaDetails :: MetaInfo -> TcM TcTyVarDetails
 newMetaDetails info
   = do { ref <- newMutVar Flexi
        ; tclvl <- getTcLevel
-       ; return (MetaTv { mtv_info = info, mtv_ref = ref, mtv_tclvl = tclvl }) }
+       ; return (MetaTv { mtv_info = info
+                        , mtv_ref = ref
+                        , mtv_tclvl = tclvl }) }
 
 cloneMetaTyVar :: TcTyVar -> TcM TcTyVar
 cloneMetaTyVar tv
@@ -315,9 +343,6 @@ cloneMetaTyVar tv
                            details@(MetaTv {}) -> details { mtv_ref = ref }
                            _ -> pprPanic "cloneMetaTyVar" (ppr tv)
         ; return (mkTcTyVar name' (tyVarKind tv) details') }
-
-mkTcTyVarName :: Unique -> FastString -> Name
-mkTcTyVarName uniq str = mkSysTvName uniq str
 
 -- Works for both type and kind variables
 readMetaTyVar :: TyVar -> TcM MetaDetails
@@ -485,7 +510,8 @@ quantifyTyVars :: TcTyVarSet -> TcTyVarSet -> TcM [TcTyVar]
 quantifyTyVars gbl_tvs tkvs
   = do { tkvs    <- zonkTyVarsAndFV tkvs
        ; gbl_tvs <- zonkTyVarsAndFV gbl_tvs
-       ; let (kvs, tvs) = partitionVarSet isKindVar (closeOverKinds tkvs `minusVarSet` gbl_tvs)
+       ; let (kvs, tvs) = partitionVarSet isKindVar $
+                          closeOverKinds tkvs `minusVarSet` gbl_tvs
                               -- NB kinds of tvs are zonked by zonkTyVarsAndFV
              kvs2 = varSetElems kvs
              qtvs = varSetElems tvs

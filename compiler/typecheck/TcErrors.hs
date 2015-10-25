@@ -351,7 +351,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
     -- (see TcRnTypes.trulyInsoluble) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
-    report1 = [ ("insoluble1",   is_given,        True, mkGroupReporter mkEqErr)
+    report1 = [ ("insoluble1",   is_given_eq,     True, mkGroupReporter mkEqErr)
               , ("insoluble2",   utterly_wrong,   True, mkGroupReporter mkEqErr)
               , ("insoluble3",   rigid_nom_tv_eq, True, mkSkolReporter)
               , ("insoluble4",   rigid_nom_eq,    True, mkGroupReporter mkEqErr)
@@ -376,7 +376,10 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
     is_out_of_scope ct _ = isOutOfScopeCt ct
     is_hole         ct _ = isHoleCt ct
 
-    is_given  ct _ = not (isWantedCt ct)  -- The Derived ones are actually all from Givens
+    is_given_eq ct pred
+       | EqPred {} <- pred = arisesFromGivens ct
+       | otherwise         = False
+       -- I think all given residuals are equalities
 
     -- Skolem (i.e. non-meta) type variable on the left
     rigid_nom_eq _ pred = isRigidEqPred tc_lvl pred
@@ -436,6 +439,28 @@ mkHoleReporter ctxt
        ; maybeReportHoleError ctxt ct err
        ; maybeAddDeferredHoleBinding ctxt err ct }
 
+maybeReportHoleError :: ReportErrCtxt -> Ct -> ErrMsg -> TcM ()
+maybeReportHoleError ctxt ct err
+  -- When -XPartialTypeSignatures is on, warnings (instead of errors) are
+  -- generated for holes in partial type signatures.
+  -- Unless -fwarn_partial_type_signatures is not on,
+  -- in which case the messages are discarded.
+  | isTypeHoleCt ct
+  = -- For partial type signatures, generate warnings only, and do that
+    -- only if -fwarn_partial_type_signatures is on
+    case cec_type_holes ctxt of
+       HoleError -> reportError err
+       HoleWarn  -> reportWarning err
+       HoleDefer -> return ()
+
+  -- Otherwise this is a typed hole in an expression
+  | otherwise
+  = -- If deferring, report a warning only if -fwarn-typed-holds is on
+    case cec_expr_holes ctxt of
+       HoleError -> reportError err
+       HoleWarn  -> reportWarning err
+       HoleDefer -> return ()
+
 mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
                              -- Make error message for a group
                 -> Reporter  -- Deal with lots of constraints
@@ -455,39 +480,20 @@ reportGroup mk_err ctxt cts
                -- Add deferred bindings for all
                -- But see Note [Always warn with -fdefer-type-errors]
 
-maybeReportHoleError :: ReportErrCtxt -> Ct -> ErrMsg -> TcM ()
-maybeReportHoleError ctxt ct err
-  -- When -XPartialTypeSignatures is on, warnings (instead of errors) are
-  -- generated for holes in partial type signatures. Unless
-  -- -fwarn_partial_type_signatures is not on, in which case the messages are
-  -- discarded.
-  | isTypeHoleCt ct
-  = -- For partial type signatures, generate warnings only, and do that
-    -- only if -fwarn_partial_type_signatures is on
-    case cec_type_holes ctxt of
-       HoleError -> reportError err
-       HoleWarn  -> reportWarning err
-       HoleDefer -> return ()
-
-  -- Otherwise this is a typed hole in an expression
-  | otherwise
-  = -- If deferring, report a warning only if -fwarn-typed-holds is on
-    case cec_expr_holes ctxt of
-       HoleError -> reportError err
-       HoleWarn  -> reportWarning err
-       HoleDefer -> return ()
-
 maybeReportError :: ReportErrCtxt -> ErrMsg -> TcM ()
 -- Report the error and/or make a deferred binding for it
 maybeReportError ctxt err
+  | cec_suppress ctxt    -- Some worse error has occurred;
+  = return ()            -- so suppress this error/warning
+
   | cec_errors_as_warns ctxt
   = reportWarning err
+
   | otherwise
   = case cec_defer_type_errors ctxt of
-    TypeDefer -> return ()
-    TypeWarn -> reportWarning err
-    -- handle case when suppress is on like in the original code
-    TypeError -> if cec_suppress ctxt then return () else reportError err
+      TypeDefer -> return ()
+      TypeWarn  -> reportWarning err
+      TypeError -> reportError err
 
 addDeferredBinding :: ReportErrCtxt -> ErrMsg -> Ct -> TcM ()
 -- See Note [Deferring coercion errors to runtime]
@@ -748,11 +754,9 @@ mkHoleError ctxt ct@(CHoleCan { cc_occ = occ, cc_hole = hole_sort })
 
     loc_msg tv
        = case tcTyVarDetails tv of
-          SkolemTv {} -> quotes (ppr tv) <+> skol_msg
+          SkolemTv {} -> pprSkol (cec_encl ctxt) tv
           MetaTv {}   -> quotes (ppr tv) <+> ptext (sLit "is an ambiguous type variable")
           det -> pprTcTyVarDetails det
-       where
-          skol_msg = pprSkol (getSkolemInfo (cec_encl ctxt) tv) (getSrcLoc tv)
 
 mkHoleError _ ct = pprPanic "mkHoleError" (ppr ct)
 
@@ -807,9 +811,8 @@ mkEqErr ctxt (ct:_) = mkEqErr1 ctxt ct
 mkEqErr _ [] = panic "mkEqErr"
 
 mkEqErr1 :: ReportErrCtxt -> Ct -> TcM ErrMsg
--- Wanted constraints only!
 mkEqErr1 ctxt ct
-  | isGivenCt ct
+  | arisesFromGivens ct
   = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
        ; let (given_loc, given_msg) = mk_given (ctLoc ct) (cec_encl ctxt)
        ; dflags <- getDynFlags
@@ -1127,7 +1130,7 @@ extraTyVarInfo ctxt tv1 ty2
     tv_extra tv | isTcTyVar tv, isSkolemTyVar tv
                 , let pp_tv = quotes (ppr tv)
                 = case tcTyVarDetails tv of
-                    SkolemTv {}   -> pp_tv <+> pprSkol (getSkolemInfo implics tv) (getSrcLoc tv)
+                    SkolemTv {}   -> pprSkol implics tv
                     FlatSkol {}   -> pp_tv <+> ptext (sLit "is a flattening type variable")
                     RuntimeUnk {} -> pp_tv <+> ptext (sLit "is an interactive-debugger skolem")
                     MetaTv {}     -> empty
@@ -1148,7 +1151,7 @@ suggestAddSig ctxt ty1 ty2
     inferred_bndrs = nub (get_inf ty1 ++ get_inf ty2)
     get_inf ty | Just tv <- tcGetTyVar_maybe ty
                , isTcTyVar tv, isSkolemTyVar tv
-               , InferSkol prs <- getSkolemInfo (cec_encl ctxt) tv
+               , (_, InferSkol prs) <- getSkolemInfo (cec_encl ctxt) tv
                = map fst prs
                | otherwise
                = []
@@ -1772,21 +1775,28 @@ mkAmbigMsg ct
       | gopt Opt_PrintExplicitKinds dflags = empty
       | otherwise = ptext (sLit "Use -fprint-explicit-kinds to see the kind arguments")
 
-pprSkol :: SkolemInfo -> SrcLoc -> SDoc
-pprSkol UnkSkol   _
-  = ptext (sLit "is an unknown type variable")
-pprSkol skol_info tv_loc
-  = sep [ ptext (sLit "is a rigid type variable bound by"),
-          sep [ppr skol_info, ptext (sLit "at") <+> ppr tv_loc]]
+pprSkol :: [Implication] -> TcTyVar -> SDoc
+pprSkol implics tv
+  | (skol_tvs, skol_info) <- getSkolemInfo implics tv
+  = case skol_info of
+      UnkSkol         -> pp_tv <+> ptext (sLit "is an unknown type variable")
+      SigSkol ctxt ty -> ppr_rigid (pprSigSkolInfo ctxt (mkForAllTys skol_tvs ty))
+      _               -> ppr_rigid (pprSkolInfo skol_info)
+  where
+    pp_tv = quotes (ppr tv)
+    ppr_rigid pp_info = hang (pp_tv <+> ptext (sLit "is a rigid type variable bound by"))
+                           2 (sep [ pp_info
+                                  , ptext (sLit "at") <+> ppr (getSrcLoc tv) ])
 
-getSkolemInfo :: [Implication] -> TcTyVar -> SkolemInfo
+getSkolemInfo :: [Implication] -> TcTyVar -> ([TcTyVar], SkolemInfo)
 -- Get the skolem info for a type variable
 -- from the implication constraint that binds it
 getSkolemInfo [] tv
   = pprPanic "No skolem info:" (ppr tv)
 
 getSkolemInfo (implic:implics) tv
-  | tv `elem` ic_skols implic = ic_info implic
+  | let skols = ic_skols implic
+  , tv `elem` ic_skols implic = (skols, ic_info implic)
   | otherwise                 = getSkolemInfo implics tv
 
 -----------------------

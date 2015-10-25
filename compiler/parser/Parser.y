@@ -871,10 +871,11 @@ inst_decl :: { LInstDecl RdrName }
         : 'instance' overlap_pragma inst_type where_inst
        {% do { (binds, sigs, _, ats, adts, _) <- cvBindsAndSigs (snd $ unLoc $4)
              ; let cid = ClsInstDecl { cid_poly_ty = $3, cid_binds = binds
-                                     , cid_sigs = sigs, cid_tyfam_insts = ats
+                                     , cid_sigs = mkClassOpSigs sigs
+                                     , cid_tyfam_insts = ats
                                      , cid_overlap_mode = $2
                                      , cid_datafam_insts = adts }
-             ; ams (L (comb3 $1 $3 $4) (ClsInstD { cid_inst = cid }))
+             ; ams (L (comb3 $1 (hsSigType $3) $4) (ClsInstD { cid_inst = cid }))
                    (mj AnnInstance $1 : (fst $ unLoc $4)) } }
 
            -- type instance declarations
@@ -1053,11 +1054,10 @@ capi_ctype : '{-# CTYPE' STRING STRING '#-}'
 -- Glasgow extension: stand-alone deriving declarations
 stand_alone_deriving :: { LDerivDecl RdrName }
   : 'deriving' 'instance' overlap_pragma inst_type
-                         {% do {
-                                 let err = text "in the stand-alone deriving instance"
-                                            <> colon <+> quotes (ppr $4)
-                               ; ams (sLL $1 $> (DerivDecl $4 $3))
-                                     [mj AnnDeriving $1,mj AnnInstance $2] }}
+                         {% do { let { err = text "in the stand-alone deriving instance"
+                                             <> colon <+> quotes (ppr $4) }
+                               ; ams (sLL $1 (hsSigType $>) (DerivDecl $4 $3))
+                                     [mj AnnDeriving $1, mj AnnInstance $2] } }
 
 -----------------------------------------------------------------------------
 -- Role annotations
@@ -1091,10 +1091,12 @@ pattern_synonym_decl :: { LHsDecl RdrName }
                                                     ImplicitBidirectional)
                [mj AnnPattern $1,mj AnnEqual $3]
          }
+
         | 'pattern' pattern_synonym_lhs '<-' pat
          {%ams (let (name, args) = $2
                 in sLL $1 $> . ValD $ mkPatSynBind name args $4 Unidirectional)
                [mj AnnPattern $1,mj AnnLarrow $3] }
+
         | 'pattern' pattern_synonym_lhs '<-' pat where_decls
             {% do { let (name, args) = $2
                   ; mg <- mkPatSynMatchGroup name (snd $ unLoc $5)
@@ -1117,29 +1119,30 @@ where_decls :: { Located ([AddAnn]
                                            :mcc $4:(fst $ unLoc $3)),sL1 $3 (snd $ unLoc $3)) }
         | 'where' vocurly decls close { L (comb2 $1 $3) ((mj AnnWhere $1:(fst $ unLoc $3))
                                           ,sL1 $3 (snd $ unLoc $3)) }
+
 pattern_synonym_sig :: { LSig RdrName }
         : 'pattern' con '::' ptype
-            {% do { let (flag, qtvs, prov, req, ty) = snd $ unLoc $4
-                  ; let sig = PatSynSig $2 (flag, mkHsQTvs qtvs) prov req ty
-                  ; ams (sLL $1 $> $ sig)
-                        (mj AnnPattern $1:mj AnnDcolon $3:(fst $ unLoc $4)) } }
+                   {% ams (sLL $1 $> $ PatSynSig $2 (mkLHsSigType $4))
+                          [mj AnnPattern $1, mj AnnDcolon $3] }
 
-ptype :: { Located ([AddAnn]
-                  ,( HsExplicitFlag, [LHsTyVarBndr RdrName], LHsContext RdrName
-                   , LHsContext RdrName, LHsType RdrName)) }
+ptype   :: { LHsType RdrName }
         : 'forall' tv_bndrs '.' ptype
-            {% do { hintExplicitForall (getLoc $1)
-                  ; let (_, qtvs', prov, req, ty) = snd $ unLoc $4
-                  ; return $ sLL $1 $>
-                                ((mj AnnForall $1:mj AnnDot $3:(fst $ unLoc $4))
-                                ,(Explicit, $2 ++ qtvs', prov, req ,ty)) }}
+                   {% hintExplicitForall (getLoc $1) >>
+                      ams (sLL $1 $> $
+                           HsForAllTy { hst_bndrs = $2
+                                      , hst_body = $4 })
+                          [mj AnnForall $1, mj AnnDot $3] }
+
         | context '=>' context '=>' type
-            { sLL $1 $> ([mj AnnDarrow $2,mj AnnDarrow $4]
-                        ,(Implicit, [], $1, $3, $5)) }
+                   {% ams (sLL $1 $> $
+                           HsQualTy { hst_ctxt = $1, hst_body = sLL $3 $> $
+                           HsQualTy { hst_ctxt = $3, hst_body = $5 } })
+                           [mj AnnDarrow $2, mj AnnDarrow $4] }
         | context '=>' type
-            { sLL $1 $> ([mj AnnDarrow $2],(Implicit, [], $1, noLoc [], $3)) }
-        | type
-            { sL1 $1 ([],(Implicit, [], noLoc [], noLoc [], $1)) }
+                   {% ams (sLL $1 $> $
+                           HsQualTy { hst_ctxt = $1, hst_body = $3 })
+                           [mj AnnDarrow $2] }
+        | type     { $1 }
 
 -----------------------------------------------------------------------------
 -- Nested declarations
@@ -1152,10 +1155,10 @@ decl_cls  : at_decl_cls                 { $1 }
 
           -- A 'default' signature used with the generic-programming extension
           | 'default' infixexp '::' sigtypedoc
-                    {% do { (TypeSig l ty _) <- checkValSig $2 $4
+                    {% do { v <- checkValSigLhs $2
                           ; let err = text "in default signature" <> colon <+>
-                                      quotes (ppr ty)
-                          ; ams (sLL $1 $> $ SigD (GenericSig l ty))
+                                      quotes (ppr $2)
+                          ; ams (sLL $1 $> $ SigD $ ClassOpSig True [v] $ mkLHsSigType $4)
                                 [mj AnnDefault $1,mj AnnDcolon $3] } }
 
 decls_cls :: { Located ([AddAnn],OrdList (LHsDecl RdrName)) }  -- Reversed
@@ -1324,7 +1327,7 @@ rule_var_list :: { [LRuleBndr RdrName] }
 rule_var :: { LRuleBndr RdrName }
         : varid                         { sLL $1 $> (RuleBndr $1) }
         | '(' varid '::' ctype ')'      {% ams (sLL $1 $> (RuleBndrSig $2
-                                                       (mkHsWithBndrs $4)))
+                                                             (mkLHsSigWcType $4)))
                                                [mop $1,mj AnnDcolon $3,mcp $5] }
 
 -----------------------------------------------------------------------------
@@ -1415,12 +1418,14 @@ safety :: { Located Safety }
         | 'interruptible'               { sLL $1 $> PlayInterruptible }
 
 fspec :: { Located ([AddAnn]
-                    ,(Located StringLiteral, Located RdrName, LHsType RdrName)) }
-       : STRING var '::' sigtypedoc     { sLL $1 $> ([mj AnnDcolon $3]
-                                             ,(L (getLoc $1)
-                                                    (getStringLiteral $1), $2, $4)) }
-       |        var '::' sigtypedoc     { sLL $1 $> ([mj AnnDcolon $2]
-                                             ,(noLoc (StringLiteral "" nilFS), $1, $3)) }
+                    ,(Located StringLiteral, Located RdrName, LHsSigType RdrName)) }
+       : STRING var '::' sigtypedoc     { sLL $1 $>
+                                              ( [mj AnnDcolon $3]
+                                              , (L (getLoc $1)
+                                                   (getStringLiteral $1), $2, mkLHsSigType $4)) }
+       | var '::' sigtypedoc            { sLL $1 $>
+                                              ( [mj AnnDcolon $2]
+                                              , (noLoc (StringLiteral "" nilFS), $1, mkLHsSigType $3)) }
          -- if the entity string is missing, it defaults to the empty string;
          -- the meaning of an empty entity string depends on the calling
          -- convention
@@ -1428,7 +1433,7 @@ fspec :: { Located ([AddAnn]
 -----------------------------------------------------------------------------
 -- Type signatures
 
-opt_sig :: { ([AddAnn],Maybe (LHsType RdrName)) }
+opt_sig :: { ([AddAnn], Maybe (LHsType RdrName)) }
         : {- empty -}                   { ([],Nothing) }
         | '::' sigtype                  { ([mj AnnDcolon $1],Just $2) }
 
@@ -1436,14 +1441,12 @@ opt_asig :: { ([AddAnn],Maybe (LHsType RdrName)) }
         : {- empty -}                   { ([],Nothing) }
         | '::' atype                    { ([mj AnnDcolon $1],Just $2) }
 
-sigtype :: { LHsType RdrName }          -- Always a HsForAllTy,
-                                        -- to tell the renamer where to generalise
-        : ctype                         { sL1 $1 (mkImplicitHsForAllTy $1) }
-        -- Wrap an Implicit forall if there isn't one there already
+sigtype :: { LHsType RdrName }
+        : ctype                            { $1 }
 
-sigtypedoc :: { LHsType RdrName }       -- Always a HsForAllTy
-        : ctypedoc                      { sL1 $1 (mkImplicitHsForAllTy $1) }
-        -- Wrap an Implicit forall if there isn't one there already
+sigtypedoc :: { LHsType RdrName }
+        : ctypedoc                         { $1 }
+
 
 sig_vars :: { Located [Located RdrName] }    -- Returned in reversed order
          : sig_vars ',' var           {% addAnnotation (gl $ head $ unLoc $1)
@@ -1451,10 +1454,10 @@ sig_vars :: { Located [Located RdrName] }    -- Returned in reversed order
                                          >> return (sLL $1 $> ($3 : unLoc $1)) }
          | var                        { sL1 $1 [$1] }
 
-sigtypes1 :: { (OrdList (LHsType RdrName)) }      -- Always HsForAllTys
-        : sigtype                      { unitOL $1 }
-        | sigtype ',' sigtypes1        {% addAnnotation (gl $1) AnnComma (gl $2)
-                                          >> return ((unitOL $1) `appOL` $3) }
+sigtypes1 :: { (OrdList (LHsSigType RdrName)) }
+   : sigtype                 { unitOL (mkLHsSigType $1) }
+   | sigtype ',' sigtypes1   {% addAnnotation (gl $1) AnnComma (gl $2)
+                                >> return (unitOL (mkLHsSigType $1) `appOL` $3) }
 
 -----------------------------------------------------------------------------
 -- Types
@@ -1479,14 +1482,16 @@ unpackedness :: { Located ([AddAnn], Maybe SourceText, SrcUnpackedness) }
 -- A ctype is a for-all type
 ctype   :: { LHsType RdrName }
         : 'forall' tv_bndrs '.' ctype   {% hintExplicitForall (getLoc $1) >>
-                                           ams (sLL $1 $> $ mkExplicitHsForAllTy $2
-                                                                 (noLoc []) $4)
-                                               [mj AnnForall $1,mj AnnDot $3] }
+                                           ams (sLL $1 $> $
+                                                HsForAllTy { hst_bndrs = $2
+                                                           , hst_body = $4 })
+                                               [mj AnnForall $1, mj AnnDot $3] }
         | context '=>' ctype          {% addAnnotation (gl $1) AnnDarrow (gl $2)
                                          >> return (sLL $1 $> $
-                                               mkQualifiedHsForAllTy $1 $3) }
+                                            HsQualTy { hst_ctxt = $1
+                                                     , hst_body = $3 }) }
         | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy (unLoc $1) $3))
-                                             [mj AnnVal $1,mj AnnDcolon $2] }
+                                             [mj AnnVal $1, mj AnnDcolon $2] }
         | type                        { $1 }
 
 ----------------------
@@ -1502,12 +1507,14 @@ ctype   :: { LHsType RdrName }
 
 ctypedoc :: { LHsType RdrName }
         : 'forall' tv_bndrs '.' ctypedoc {% hintExplicitForall (getLoc $1) >>
-                                            ams (sLL $1 $> $ mkExplicitHsForAllTy $2
-                                                                  (noLoc []) $4)
+                                            ams (sLL $1 $> $
+                                                 HsForAllTy { hst_bndrs = $2
+                                                            , hst_body = $4 })
                                                 [mj AnnForall $1,mj AnnDot $3] }
         | context '=>' ctypedoc       {% addAnnotation (gl $1) AnnDarrow (gl $2)
                                          >> return (sLL $1 $> $
-                                                  mkQualifiedHsForAllTy $1 $3) }
+                                            HsQualTy { hst_ctxt = $1
+                                                     , hst_body = $3 }) }
         | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy (unLoc $1) $3))
                                              [mj AnnVal $1,mj AnnDcolon $2] }
         | typedoc                     { $1 }
@@ -1631,16 +1638,15 @@ atype :: { LHsType RdrName }
 
 -- An inst_type is what occurs in the head of an instance decl
 --      e.g.  (Foo a, Gaz b) => Wibble a b
--- It's kept as a single type, with a MonoDictTy at the right
--- hand corner, for convenience.
-inst_type :: { LHsType RdrName }
-        : sigtype                       { $1 }
+-- It's kept as a single type for convenience.
+inst_type :: { LHsSigType RdrName }
+        : sigtype                       { mkLHsSigType $1 }
 
-inst_types1 :: { [LHsType RdrName] }
-        : inst_type                     { [$1] }
+deriv_types :: { [LHsSigType RdrName] }
+        : type                          { [mkLHsSigType $1] }
 
-        | inst_type ',' inst_types1    {% addAnnotation (gl $1) AnnComma (gl $2)
-                                          >> return ($1 : $3) }
+        | type ',' deriv_types          {% addAnnotation (gl $1) AnnComma (gl $2)
+                                           >> return (mkLHsSigType $1 : $3) }
 
 comma_types0  :: { [LHsType RdrName] }  -- Zero or more:  ty,ty,ty
         : comma_types1                  { $1 }
@@ -1798,7 +1804,7 @@ gadt_constr_with_doc
 gadt_constr :: { LConDecl RdrName }
     -- see Note [Difference in parsing GADT and data constructors]
     -- Returns a list because of:   C,D :: ty
-        : con_list '::' sigtype
+        : con_list '::' ctype
                 {% do { (anns,gadtDecl) <- mkGadtDecl (unLoc $1) $3
                       ; ams (sLL $1 $> gadtDecl)
                             (mj AnnDcolon $2:anns) } }
@@ -1839,9 +1845,9 @@ constr :: { LConDecl RdrName }
                             ($1 `mplus` $4))
                        (fst $ unLoc $2) }
 
-forall :: { Located ([AddAnn],[LHsTyVarBndr RdrName]) }
-        : 'forall' tv_bndrs '.'       { sLL $1 $> ([mj AnnForall $1,mj AnnDot $3],$2) }
-        | {- empty -}                 { noLoc ([],[]) }
+forall :: { Located ([AddAnn], Maybe [LHsTyVarBndr RdrName]) }
+        : 'forall' tv_bndrs '.'       { sLL $1 $> ([mj AnnForall $1,mj AnnDot $3], Just $2) }
+        | {- empty -}                 { noLoc ([], Nothing) }
 
 constr_stuff :: { Located (Located RdrName, HsConDeclDetails RdrName) }
     -- see Note [Parsing data constructors is hard]
@@ -1876,21 +1882,23 @@ fielddecl :: { LConDeclField RdrName }
                       (ConDeclField (reverse (unLoc $2)) $4 ($1 `mplus` $5)))
                    [mj AnnDcolon $3] }
 
--- We allow the odd-looking 'inst_type' in a deriving clause, so that
--- we can do deriving( forall a. C [a] ) in a newtype (GHC extension).
--- The 'C [a]' part is converted to an HsPredTy by checkInstType
--- We don't allow a context, but that's sorted out by the type checker.
-deriving :: { Located (Maybe (Located [LHsType RdrName])) }
+-- The outer Located is just to allow the caller to
+-- know the rightmost extremity of the 'deriving' clause
+deriving :: { Located (HsDeriving RdrName) }
         : {- empty -}             { noLoc Nothing }
-        | 'deriving' qtycon       {% aljs ( let { L loc tv = $2 }
-                                            in (sLL $1 $> (Just (sLL $1 $>
-                                                       [L loc (HsTyVar tv)]))))
-                                          [mj AnnDeriving $1] }
-        | 'deriving' '(' ')'      {% aljs (sLL $1 $> (Just (sLL $1 $> [])))
-                                          [mj AnnDeriving $1,mop $2,mcp $3] }
+        | 'deriving' qtycon       {% let { L tv_loc tv = $2
+                                         ; full_loc = comb2 $1 $> }
+                                      in ams (L full_loc $ Just $ L full_loc $
+                                                 [mkLHsSigType (L tv_loc (HsTyVar tv))])
+                                             [mj AnnDeriving $1] }
 
-        | 'deriving' '(' inst_types1 ')'  {% aljs (sLL $1 $> (Just (sLL $1 $> $3)))
-                                                 [mj AnnDeriving $1,mop $2,mcp $4] }
+        | 'deriving' '(' ')'      {% let { full_loc = comb2 $1 $> }
+                                     in ams (L full_loc $ Just $ L full_loc [])
+                                            [mj AnnDeriving $1,mop $2,mcp $3] }
+
+        | 'deriving' '(' deriv_types ')'  {% let { full_loc = comb2 $1 $> }
+                                             in ams (L full_loc $ Just $ L full_loc $3)
+                                                    [mj AnnDeriving $1,mop $2,mcp $4] }
              -- Glasgow extension: allow partial
              -- applications in derivings
 
@@ -1984,12 +1992,14 @@ sigdecl :: { LHsDecl RdrName }
         :
         -- See Note [Declaration/signature overlap] for why we need infixexp here
           infixexp '::' sigtypedoc
-                        {% do s <- checkValSig $1 $3
+                        {% do v <- checkValSigLhs $1
                         ; _ <- ams (sLL $1 $> ()) [mj AnnDcolon $2]
-                        ; return (sLL $1 $> $ SigD s) }
+                        ; return (sLL $1 $> $ SigD $
+                                  TypeSig [v] (mkLHsSigWcType $3)) }
 
         | var ',' sig_vars '::' sigtypedoc
-           {% do { let sig = TypeSig ($1 : reverse (unLoc $3)) $5 PlaceHolder
+           {% do { let sig = TypeSig ($1 : reverse (unLoc $3))
+                                     (mkLHsSigWcType $5)
                  ; addAnnotation (gl $1) AnnComma (gl $2)
                  ; ams ( sLL $1 $> $ SigD sig )
                        [mj AnnDcolon $4] } }
@@ -2057,7 +2067,7 @@ quasiquote :: { Located (HsSplice RdrName) }
                             in sL (getLoc $1) (mkHsQuasiQuote quoterId (RealSrcSpan quoteSpan) quote) }
 
 exp   :: { LHsExpr RdrName }
-        : infixexp '::' sigtype {% ams (sLL $1 $> $ ExprWithTySig $1 $3 PlaceHolder)
+        : infixexp '::' sigtype {% ams (sLL $1 $> $ ExprWithTySig $1 (mkLHsSigWcType $3))
                                        [mj AnnDcolon $2] }
         | infixexp '-<' exp     {% ams (sLL $1 $> $ HsArrApp $1 $3 placeHolderType
                                                         HsFirstOrderApp True)
@@ -2084,7 +2094,10 @@ infixexp :: { LHsExpr RdrName }
 exp10 :: { LHsExpr RdrName }
         : '\\' apat apats opt_asig '->' exp
                    {% ams (sLL $1 $> $ HsLam (mkMatchGroup FromSource
-                            [sLL $1 $> $ Match Nothing ($2:$3) (snd $4) (unguardedGRHSs $6)]))
+                            [sLL $1 $> $ Match { m_fun_id_infix = Nothing
+                                               , m_pats = $2:$3
+                                               , m_type = snd $4
+                                               , m_grhss = unguardedGRHSs $6 }]))
                           (mj AnnLam $1:mj AnnRarrow $5:(fst $4)) }
         | 'let' binds 'in' exp          {% ams (sLL $1 $> $ HsLet (snd $ unLoc $2) $4)
                                                (mj AnnLet $1:mj AnnIn $3
@@ -2513,9 +2526,11 @@ alts1   :: { Located ([AddAnn],[LMatch RdrName (LHsExpr RdrName)]) }
         | alt                   { sL1 $1 ([],[$1]) }
 
 alt     :: { LMatch RdrName (LHsExpr RdrName) }
-        : pat opt_sig alt_rhs      {%ams (sLL $1 $> (Match Nothing [$1] (snd $2)
-                                                              (snd $ unLoc $3)))
-                                         ((fst $2) ++ (fst $ unLoc $3))}
+        : pat opt_asig alt_rhs  {%ams (sLL $1 $> (Match { m_fun_id_infix = Nothing
+                                                        , m_pats = [$1]
+                                                        , m_type = snd $2
+                                                        , m_grhss = snd $ unLoc $3 }))
+                                      (fst $2 ++ (fst $ unLoc $3))}
 
 alt_rhs :: { Located ([AddAnn],GRHSs RdrName (LHsExpr RdrName)) }
         : ralt wherebinds           { sLL $1 $> (fst $ unLoc $2,
@@ -3276,10 +3291,12 @@ in ApiAnnotation.hs
 -}
 
 -- |Construct an AddAnn from the annotation keyword and the location
--- of the keyword
+-- of the keyword itself
 mj :: AnnKeywordId -> Located e -> AddAnn
-mj a l = (\s -> addAnnotation s a (gl l))
+mj a l s = addAnnotation s a (gl l)
 
+addAnnsAt :: SrcSpan -> [AddAnn] -> P ()
+addAnnsAt loc anns = mapM_ (\a -> a loc) anns
 
 gl = getLoc
 
@@ -3297,35 +3314,41 @@ am a (b,s) = do
 
 -- |Add a list of AddAnns to the given AST element
 ams :: Located a -> [AddAnn] -> P (Located a)
-ams a@(L l _) bs = mapM_ (\a -> a l) bs >> return a
+ams a@(L l _) bs = addAnnsAt l bs >> return a
 
+-- |Add all [AddAnn] to an AST element wrapped in a Just
+aljs :: Located (Maybe a) -> [AddAnn] -> P (Located (Maybe a))
+aljs a@(L l _) bs = addAnnsAt l bs >> return a
+
+-- |Add all [AddAnn] to an AST element wrapped in a Just
+ajs a@(Just (L l _)) bs = addAnnsAt l bs >> return a
 
 -- |Add a list of AddAnns to the given AST element, where the AST element is the
 --  result of a monadic action
 amms :: P (Located a) -> [AddAnn] -> P (Located a)
-amms a bs = do
-  av@(L l _) <- a
-  (mapM_ (\a -> a l) bs) >> return av
+amms a bs = do { av@(L l _) <- a
+               ; addAnnsAt l bs
+               ; return av }
 
 -- |Add a list of AddAnns to the AST element, and return the element as a
 --  OrdList
 amsu :: Located a -> [AddAnn] -> P (OrdList (Located a))
-amsu a@(L l _) bs = (mapM_ (\a -> a l) bs) >> return (unitOL a)
+amsu a@(L l _) bs = addAnnsAt l bs >> return (unitOL a)
 
 -- |Synonyms for AddAnn versions of AnnOpen and AnnClose
-mo,mc :: Located Token -> SrcSpan -> P ()
+mo,mc :: Located Token -> AddAnn
 mo ll = mj AnnOpen ll
 mc ll = mj AnnClose ll
 
-moc,mcc :: Located Token -> SrcSpan -> P ()
+moc,mcc :: Located Token -> AddAnn
 moc ll = mj AnnOpenC ll
 mcc ll = mj AnnCloseC ll
 
-mop,mcp :: Located Token -> SrcSpan -> P ()
+mop,mcp :: Located Token -> AddAnn
 mop ll = mj AnnOpenP ll
 mcp ll = mj AnnCloseP ll
 
-mos,mcs :: Located Token -> SrcSpan -> P ()
+mos,mcs :: Located Token -> AddAnn
 mos ll = mj AnnOpenS ll
 mcs ll = mj AnnCloseS ll
 
@@ -3333,19 +3356,6 @@ mcs ll = mj AnnCloseS ll
 --  entry for each SrcSpan
 mcommas :: [SrcSpan] -> [AddAnn]
 mcommas ss = map (\s -> mj AnnCommaTuple (L s ())) ss
-
--- |Add the annotation to an AST element wrapped in a Just
-ajl :: Located (Maybe (Located a)) -> AnnKeywordId -> SrcSpan
- -> P (Located (Maybe (Located a)))
-ajl a@(L _ (Just (L l _))) b s = addAnnotation l b s >> return a
-
--- |Add all [AddAnn] to an AST element wrapped in a Just
-aljs :: Located (Maybe (Located a)) -> [AddAnn]
-  -> P (Located (Maybe (Located a)))
-aljs a@(L _ (Just (L l _))) bs = (mapM_ (\a -> a l) bs) >> return a
-
--- |Add all [AddAnn] to an AST element wrapped in a Just
-ajs a@(Just (L l _)) bs = (mapM_ (\a -> a l) bs) >> return a
 
 -- |Get the location of the last element of a OrdList, or noSrcSpan
 oll :: OrdList (Located a) -> SrcSpan

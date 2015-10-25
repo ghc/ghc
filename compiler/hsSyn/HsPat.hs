@@ -191,9 +191,9 @@ data Pat id
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | SigPatIn        (LPat id)                  -- Pattern with a type signature
-                    (HsWithBndrs id (LHsType id)) -- Signature can bind both
-                                                  -- kind and type vars
+  | SigPatIn        (LPat id)                 -- Pattern with a type signature
+                    (LHsSigWcType id)         -- Signature can bind both
+                                              -- kind and type vars
 
   | SigPatOut       (LPat id)           -- Pattern with a type signature
                     Type

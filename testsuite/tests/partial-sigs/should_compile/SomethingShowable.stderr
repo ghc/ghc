@@ -1,5 +1,5 @@
 TYPE SIGNATURES
-  somethingShowable :: Bool -> String
+  somethingShowable :: Show Bool => Bool -> String
 TYPE CONSTRUCTORS
 COERCION AXIOMS
 Dependent modules: []

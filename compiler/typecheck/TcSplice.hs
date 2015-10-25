@@ -817,7 +817,7 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
         = mapM_ bindName (collectHsBindBinders binds)
       checkTopDecl (SigD _)
         = return ()
-      checkTopDecl (ForD (ForeignImport (L _ name) _ _ _))
+      checkTopDecl (ForD (ForeignImport { fd_name = L _ name }))
         = bindName name
       checkTopDecl _
         = addErr $ text "Only function, value, and foreign import declarations may be added with addTopDecl"
@@ -872,10 +872,10 @@ reifyInstances th_nm th_tys
               hs_tvbs    = mkHsQTvs tv_bndrs
           -- Rename  to HsType Name
         ; ((rn_tvbs, rn_ty), _fvs)
-            <- bindHsTyVars doc Nothing kvs hs_tvbs $ \ rn_tvbs ->
+            <- bindHsQTyVars doc Nothing kvs hs_tvbs $ \ rn_tvbs ->
                do { (rn_ty, fvs) <- rnLHsType doc rdr_ty
                   ; return ((rn_tvbs, rn_ty), fvs) }
-        ; (ty, _kind) <- tcHsTyVarBndrs rn_tvbs $ \ _tvs ->
+        ; (ty, _kind) <- tcHsQTyVars rn_tvbs $ \ _tvs ->
                          tcLHsType rn_ty
         ; ty <- zonkTcTypeToType emptyZonkEnv ty
                 -- Substitute out the meta type variables

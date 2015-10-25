@@ -1,4 +1,5 @@
 
-T9161-1.hs:6:14:
+T9161-1.hs:6:14: error:
     Pattern synonym ‘PATTERN’ used as a type
-    In the type signature for ‘wrongLift’: wrongLift :: PATTERN
+    In the type signature:
+      wrongLift :: PATTERN

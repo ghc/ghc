@@ -669,20 +669,24 @@ as well as explicit user written ones.
 -}
 
 data InstInfo a
-  = InstInfo {
-      iSpec   :: ClsInst,        -- Includes the dfun id.  Its forall'd type
-      iBinds  :: InstBindings a   -- variables scope over the stuff in InstBindings!
-    }
+  = InstInfo
+      { iSpec   :: ClsInst          -- Includes the dfun id
+      , iBinds  :: InstBindings a
+      }
 
 iDFunId :: InstInfo a -> DFunId
 iDFunId info = instanceDFunId (iSpec info)
 
 data InstBindings a
   = InstBindings
-      { ib_tyvars  :: [Name]        -- Names of the tyvars from the instance head
-                                    -- that are lexically in scope in the bindings
+      { ib_tyvars  :: [Name]   -- Names of the tyvars from the instance head
+                               -- that are lexically in scope in the bindings
+                               -- Must correspond 1-1 with the forall'd tyvars
+                               -- of the dfun Id.  When typechecking, we are
+                               -- going to extend the typechecker's envt with
+                               --     ib_tyvars -> dfun_forall_tyvars
 
-      , ib_binds   :: (LHsBinds a)  -- Bindings for the instance methods
+      , ib_binds   :: LHsBinds a    -- Bindings for the instance methods
 
       , ib_pragmas :: [LSig a]      -- User pragmas recorded for generating
                                     -- specialised instances
@@ -827,16 +831,9 @@ pprBinders bndrs  = pprWithCommas ppr bndrs
 notFound :: Name -> TcM TyThing
 notFound name
   = do { lcl_env <- getLclEnv
-       ; namedWildCardsEnabled <- xoptM Opt_NamedWildCards
        ; let stage = tcl_th_ctxt lcl_env
-             isWildCard = case getOccString name of
-               ('_':_:_) | namedWildCardsEnabled -> True
-               "_"                               -> True
-               _                                 -> False
        ; case stage of   -- See Note [Out of scope might be a staging error]
            Splice {} -> stageRestrictionError (quotes (ppr name))
-           _ | isWildCard -> failWithTc $
-                             text "Unexpected wild card:" <+> quotes (ppr name)
            _ -> failWithTc $
                 vcat[ptext (sLit "GHC internal error:") <+> quotes (ppr name) <+>
                      ptext (sLit "is not in scope during type checking, but it passed the renamer"),

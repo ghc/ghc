@@ -24,7 +24,9 @@ import TcRnMonad
 import TcUnify
 import BasicTypes
 import Inst
-import TcBinds
+import TcBinds          ( chooseInferredQuantifiers, tcLocalBinds
+                        , tcUserTypeSig, tcExtendTyVarEnvFromSig )
+import TcSimplify       ( simplifyInfer )
 import FamInst          ( tcGetFamInstEnvs, tcLookupDataFamInst )
 import TcEnv
 import TcArrows
@@ -217,25 +219,14 @@ tcExpr e@(HsLamCase _ matches) res_ty
                   , ptext (sLit "requires")]
         match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
 
-tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
- = tcWildcardBinders wcs $ \ wc_prs ->
-   do { addErrCtxt (pprSigCtxt ExprSigCtxt empty (ppr sig_ty)) $
-        emitWildcardHoleConstraints wc_prs
-      ; sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
-      ; (gen_fn, expr')
-            <- tcGen ExprSigCtxt sig_tc_ty $ \ skol_tvs res_ty ->
-
-                  -- Remember to extend the lexical type-variable environment
-                  -- See Note [More instantiated than scoped] in TcBinds
-               tcExtendTyVarEnv2
-                  [(n,tv) | (Just n, tv) <- findScopedTyVars sig_ty sig_tc_ty skol_tvs] $
-
-               tcMonoExprNC expr res_ty
-
-      ; let inner_expr = ExprWithTySigOut (mkLHsWrap gen_fn expr') sig_ty
-
-      ; (inst_wrap, rho) <- deeplyInstantiate ExprSigOrigin sig_tc_ty
-      ; tcWrapResult (mkHsWrap inst_wrap inner_expr) rho res_ty }
+tcExpr (ExprWithTySig expr sig_ty) res_ty
+  = do { sig_info <- checkNoErrs $  -- Avoid error cascade
+                     tcUserTypeSig sig_ty Nothing
+       ; (expr', poly_ty) <- tcExprSig expr sig_info
+       ; (inst_wrap, rho) <- deeplyInstantiate ExprSigOrigin poly_ty
+       ; let expr'' = mkHsWrap inst_wrap $
+                      ExprWithTySigOut expr' sig_ty
+       ; tcWrapResult expr'' rho res_ty }
 
 tcExpr (HsType ty) _
   = failWithTc (text "Can't handle type argument:" <+> ppr ty)
@@ -1037,10 +1028,73 @@ in the other order, the extra signature in f2 is reqd.
 
 ************************************************************************
 *                                                                      *
+                Expressions with a type signature
+                        expr :: type
+*                                                                      *
+********************************************************************* -}
+
+tcExprSig :: LHsExpr Name -> TcIdSigInfo -> TcM (LHsExpr TcId, TcType)
+tcExprSig expr sig@(TISI { sig_bndr  = s_bndr
+                         , sig_skols = skol_prs
+                         , sig_theta = theta
+                         , sig_tau   = tau })
+  | null skol_prs  -- Fast path when there is no quantification at all
+  , null theta
+  , CompleteSig {} <- s_bndr
+  = do { expr' <- tcPolyExprNC expr tau
+       ; return (expr', tau) }
+
+  | CompleteSig poly_id <- s_bndr
+  = do { given <- newEvVars theta
+       ; (ev_binds, expr') <- checkConstraints skol_info skol_tvs given $
+                              tcExtendTyVarEnvFromSig sig $
+                              tcPolyExprNC expr tau
+
+       ; let poly_wrap = mkWpTyLams   skol_tvs
+                         <.> mkWpLams given
+                         <.> mkWpLet  ev_binds
+       ; return (mkLHsWrap poly_wrap expr', idType poly_id) }
+
+  | PartialSig { sig_name = name } <- s_bndr
+  = do { (tclvl, wanted, expr') <- pushLevelAndCaptureConstraints  $
+                                   tcExtendTyVarEnvFromSig sig $
+                                   tcPolyExprNC expr tau
+       ; (qtvs, givens, _mr_bites, ev_binds)
+                 <- simplifyInfer tclvl False [sig] [(name, tau)] wanted
+       ; tau <- zonkTcType tau
+       ; let inferred_theta = map evVarPred givens
+             tau_tvs        = tyVarsOfType tau
+       ; (_, theta) <- chooseInferredQuantifiers inferred_theta tau_tvs (Just sig)
+       ; let poly_wrap = mkWpTyLams   qtvs
+                         <.> mkWpLams givens   -- Not right
+                         <.> mkWpLet  ev_binds
+       ; return (mkLHsWrap poly_wrap expr', mkSigmaTy qtvs theta tau) }
+
+  | otherwise = panic "tcExprSig"   -- Can't happen
+  where
+    skol_info = SigSkol ExprSigCtxt (mkPhiTy theta tau)
+    skol_tvs = map snd skol_prs
+{-
+       ; ev_binds <- emitImplicationFor tclvl skol_info
+                                        skol_tvs given wanted
+         -- NB: don't use checkConsraints here, because that
+         --     doesn't bump the level if skol_tvs is empty
+         --     But we must also bump the level if there are
+         --     any wildcards.  Easier to do so unconditionally.
+
+
+  = do { (tclvl, wanted, expr') <- pushLevelAndCaptureConstraints $
+                                   tcExtendTyVarEnvFromSig sig $
+                                   tcPolyExprNC expr tau
+       ; (qtvs, givens, _mr_bites, ev_binds)
+                 <- simplifyInfer tclvl False skol_tvs [(name,tau)] wanted
+-}
+
+{- *********************************************************************
+*                                                                      *
                  tcInferId
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 tcCheckId :: Name -> TcRhoType -> TcM (HsExpr TcId)
 tcCheckId name res_ty

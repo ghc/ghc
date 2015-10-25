@@ -180,9 +180,19 @@ repTopDs group@(HsGroup { hs_valds   = valds
 hsSigTvBinders :: HsValBinds Name -> [Name]
 -- See Note [Scoped type variables in bindings]
 hsSigTvBinders binds
-  = [hsLTyVarName tv | L _ (TypeSig _ (L _ (HsForAllTy Explicit _ qtvs _ _)) _) <- sigs
-                     , tv <- hsQTvBndrs qtvs]
+  = concatMap get_scoped_tvs sigs
   where
+    get_scoped_tvs :: LSig Name -> [Name]
+    -- Both implicit and explicit quantified variables
+    -- We need the implicit ones for   f :: forall (a::k). blah
+    --    here 'k' scopes too
+    get_scoped_tvs (L _ (TypeSig _ sig))
+       | HsIB { hsib_kvs = implicit_kvs, hsib_tvs = implicit_tvs
+              , hsib_body = sig1 } <- sig
+       , (explicit_tvs, _) <- splitLHsForAllTy (hswc_body sig1)
+       = implicit_kvs ++ implicit_tvs ++ map hsLTyVarName explicit_tvs
+    get_scoped_tvs _ = []
+
     sigs = case binds of
              ValBindsIn  _ sigs -> sigs
              ValBindsOut _ sigs -> sigs
@@ -342,8 +352,8 @@ repFamilyDecls :: [LFamilyDecl Name] -> DsM [Core TH.DecQ]
 repFamilyDecls fds = liftM de_loc (mapM repFamilyDecl fds)
 
 -------------------------
-mk_extra_tvs :: Located Name -> LHsTyVarBndrs Name
-             -> HsDataDefn Name -> DsM (LHsTyVarBndrs Name)
+mk_extra_tvs :: Located Name -> LHsQTyVars Name
+             -> HsDataDefn Name -> DsM (LHsQTyVars Name)
 -- If there is a kind signature it must be of form
 --    k1 -> .. -> kn -> *
 -- Return type variables [tv1:k1, tv2:k2, .., tvn:kn]
@@ -405,7 +415,7 @@ repClsInstD :: ClsInstDecl Name -> DsM (Core TH.DecQ)
 repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
                          , cid_sigs = prags, cid_tyfam_insts = ats
                          , cid_datafam_insts = adts })
-  = addTyVarBinds tvs $ \_ ->
+  = addSimpleTyVarBinds tvs $
             -- We must bring the type variables into scope, so their
             -- occurrences don't fail, even though the binders don't
             -- appear in the resulting data structure
@@ -415,10 +425,8 @@ repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
             -- For example, the method names should be bound to
             -- the selector Ids, not to fresh names (Trac #5410)
             --
-            do { cxt1 <- repContext cxt
-               ; cls_tcon <- repTy (HsTyVar (unLoc cls))
-               ; cls_tys <- repLTys tys
-               ; inst_ty1 <- repTapps cls_tcon cls_tys
+            do { cxt1 <- repLContext cxt
+               ; inst_ty1 <- repLTy inst_ty
                ; binds1 <- rep_binds binds
                ; prags1 <- rep_sigs prags
                ; ats1 <- mapM (repTyFamInstD . unLoc) ats
@@ -426,19 +434,17 @@ repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
                ; decls <- coreList decQTyConName (ats1 ++ adts1 ++ binds1 ++ prags1)
                ; repInst cxt1 inst_ty1 decls }
  where
-   Just (tvs, cxt, cls, tys) = splitLHsInstDeclTy_maybe ty
+   (tvs, cxt, inst_ty) = splitLHsInstDeclTy ty
 
 repStandaloneDerivD :: LDerivDecl Name -> DsM (SrcSpan, Core TH.DecQ)
 repStandaloneDerivD (L loc (DerivDecl { deriv_type = ty }))
-  = do { dec <- addTyVarBinds tvs $ \_ ->
-                do { cxt' <- repContext cxt
-                   ; cls_tcon <- repTy (HsTyVar (unLoc cls))
-                   ; cls_tys <- repLTys tys
-                   ; inst_ty <- repTapps cls_tcon cls_tys
-                   ; repDeriv cxt' inst_ty }
+  = do { dec <- addSimpleTyVarBinds tvs $
+                do { cxt'     <- repLContext cxt
+                   ; inst_ty' <- repLTy inst_ty
+                   ; repDeriv cxt' inst_ty' }
        ; return (loc, dec) }
   where
-    Just (tvs, cxt, cls, tys) = splitLHsInstDeclTy_maybe ty
+    (tvs, cxt, inst_ty) = splitLHsInstDeclTy ty
 
 repTyFamInstD :: TyFamInstDecl Name -> DsM (Core TH.DecQ)
 repTyFamInstD decl@(TyFamInstDecl { tfid_eqn = eqn })
@@ -448,9 +454,9 @@ repTyFamInstD decl@(TyFamInstDecl { tfid_eqn = eqn })
        ; repTySynInst tc eqn1 }
 
 repTyFamEqn :: LTyFamInstEqn Name -> DsM (Core TH.TySynEqnQ)
-repTyFamEqn (L loc (TyFamEqn { tfe_pats = HsWB { hswb_cts = tys
-                                               , hswb_kvs = kv_names
-                                               , hswb_tvs = tv_names }
+repTyFamEqn (L loc (TyFamEqn { tfe_pats = HsIB { hsib_body = tys
+                                               , hsib_kvs = kv_names
+                                               , hsib_tvs = tv_names }
                                  , tfe_rhs = rhs }))
   = do { let hs_tvs = HsQTvs { hsq_kvs = kv_names
                              , hsq_tvs = userHsTyVarBndrs loc tv_names }   -- Yuk
@@ -462,7 +468,7 @@ repTyFamEqn (L loc (TyFamEqn { tfe_pats = HsWB { hswb_cts = tys
 
 repDataFamInstD :: DataFamInstDecl Name -> DsM (Core TH.DecQ)
 repDataFamInstD (DataFamInstDecl { dfid_tycon = tc_name
-                                 , dfid_pats = HsWB { hswb_cts = tys, hswb_kvs = kv_names, hswb_tvs = tv_names }
+                                 , dfid_pats = HsIB { hsib_body = tys, hsib_kvs = kv_names, hsib_tvs = tv_names }
                                  , dfid_defn = defn })
   = do { tc <- lookupLOcc tc_name               -- See note [Binders and occurrences]
        ; let loc = getLoc tc_name
@@ -472,9 +478,10 @@ repDataFamInstD (DataFamInstDecl { dfid_tycon = tc_name
             ; repDataDefn tc bndrs (Just tys1) tv_names defn } }
 
 repForD :: Located (ForeignDecl Name) -> DsM (SrcSpan, Core TH.DecQ)
-repForD (L loc (ForeignImport name typ _ (CImport (L _ cc) (L _ s) mch cis _)))
+repForD (L loc (ForeignImport { fd_name = name, fd_sig_ty = typ
+                              , fd_fi = CImport (L _ cc) (L _ s) mch cis _ }))
  = do MkC name' <- lookupLOcc name
-      MkC typ' <- repLTy typ
+      MkC typ' <- repHsSigType typ
       MkC cc' <- repCCallConv cc
       MkC s' <- repSafety s
       cis' <- conv_cimportspec cis
@@ -540,16 +547,17 @@ repRuleD (L loc (HsRule n act bndrs lhs _ rhs _))
 
 ruleBndrNames :: LRuleBndr Name -> [Name]
 ruleBndrNames (L _ (RuleBndr n))      = [unLoc n]
-ruleBndrNames (L _ (RuleBndrSig n (HsWB { hswb_kvs = kvs, hswb_tvs = tvs })))
+ruleBndrNames (L _ (RuleBndrSig n sig))
+  | HsIB { hsib_kvs = kvs, hsib_tvs = tvs } <- sig
   = unLoc n : kvs ++ tvs
 
 repRuleBndr :: LRuleBndr Name -> DsM (Core TH.RuleBndrQ)
 repRuleBndr (L _ (RuleBndr n))
   = do { MkC n' <- lookupLBinder n
        ; rep2 ruleVarName [n'] }
-repRuleBndr (L _ (RuleBndrSig n (HsWB { hswb_cts = ty })))
+repRuleBndr (L _ (RuleBndrSig n sig))
   = do { MkC n'  <- lookupLBinder n
-       ; MkC ty' <- repLTy ty
+       ; MkC ty' <- repLTy (hsWcSigType sig)
        ; rep2 typedRuleVarName [n', ty'] }
 
 repAnnD :: LAnnDecl Name -> DsM (SrcSpan, Core TH.DecQ)
@@ -664,15 +672,15 @@ repBangTy ty = do
 --                      Deriving clause
 -------------------------------------------------------
 
-repDerivs :: Maybe (Located [LHsType Name]) -> DsM (Core [TH.Name])
+repDerivs :: HsDeriving Name -> DsM (Core [TH.Name])
 repDerivs Nothing = coreList nameTyConName []
 repDerivs (Just (L _ ctxt))
-  = repList nameTyConName rep_deriv ctxt
+  = repList nameTyConName (rep_deriv . hsSigType) ctxt
   where
     rep_deriv :: LHsType Name -> DsM (Core TH.Name)
         -- Deriving clauses must have the simple H98 form
     rep_deriv ty
-      | Just (cls, []) <- splitHsClassTy_maybe (unLoc ty)
+      | Just (L _ cls, []) <- splitLHsClassTy_maybe ty
       = lookupOcc cls
       | otherwise
       = notHandled "Non-H98 deriving clause" (ppr ty)
@@ -692,9 +700,11 @@ rep_sigs' sigs = do { sigs1 <- mapM rep_sig sigs ;
                      return (concat sigs1) }
 
 rep_sig :: LSig Name -> DsM [(SrcSpan, Core TH.DecQ)]
-rep_sig (L loc (TypeSig nms ty _))    = mapM (rep_ty_sig sigDName loc ty) nms
+rep_sig (L loc (TypeSig nms ty))      = mapM (rep_wc_ty_sig sigDName loc ty) nms
 rep_sig (L _   (PatSynSig {}))        = notHandled "Pattern type signatures" empty
-rep_sig (L loc (GenericSig nms ty))   = mapM (rep_ty_sig defaultSigDName loc ty) nms
+rep_sig (L loc (ClassOpSig is_deflt nms ty))
+  | is_deflt                          = mapM (rep_ty_sig defaultSigDName loc ty) nms
+  | otherwise                         = mapM (rep_ty_sig sigDName loc ty) nms
 rep_sig d@(L _ (IdSig {}))            = pprPanic "rep_sig IdSig" (ppr d)
 rep_sig (L _   (FixSig {}))           = return [] -- fixity sigs at top level
 rep_sig (L loc (InlineSig nm ispec))  = rep_inline nm ispec loc
@@ -703,25 +713,33 @@ rep_sig (L loc (SpecSig nm tys ispec))
 rep_sig (L loc (SpecInstSig _ ty))    = rep_specialiseInst ty loc
 rep_sig (L _   (MinimalSig {}))       = notHandled "MINIMAL pragmas" empty
 
-rep_ty_sig :: Name -> SrcSpan -> LHsType Name -> Located Name
+rep_ty_sig :: Name -> SrcSpan -> LHsSigType Name -> Located Name
            -> DsM (SrcSpan, Core TH.DecQ)
-rep_ty_sig mk_sig loc (L _ ty) nm
+rep_ty_sig mk_sig loc sig_ty nm
   = do { nm1 <- lookupLOcc nm
-       ; ty1 <- rep_ty ty
+       ; ty1 <- repHsSigType sig_ty
        ; sig <- repProto mk_sig nm1 ty1
        ; return (loc, sig) }
-  where
+
+rep_wc_ty_sig :: Name -> SrcSpan -> LHsSigWcType Name -> Located Name
+              -> DsM (SrcSpan, Core TH.DecQ)
     -- We must special-case the top-level explicit for-all of a TypeSig
     -- See Note [Scoped type variables in bindings]
-    rep_ty (HsForAllTy Explicit _ tvs ctxt ty)
-      = do { let rep_in_scope_tv tv = do { name <- lookupBinder (hsLTyVarName tv)
-                                         ; repTyVarBndrWithKind tv name }
-           ; bndrs1 <- repList tyVarBndrTyConName rep_in_scope_tv (hsQTvBndrs tvs)
-           ; ctxt1  <- repLContext ctxt
-           ; ty1    <- repLTy ty
-           ; repTForall bndrs1 ctxt1 ty1 }
-
-    rep_ty ty = repTy ty
+rep_wc_ty_sig mk_sig loc sig_ty nm
+  | HsIB { hsib_tvs  = implicit_tvs, hsib_body = sig1 } <- sig_ty
+  , (explicit_tvs, ctxt, ty) <- splitLHsSigmaTy (hswc_body sig1)
+  = do { nm1 <- lookupLOcc nm
+       ; let rep_in_scope_tv tv = do { name <- lookupBinder (hsLTyVarName tv)
+                                     ; repTyVarBndrWithKind tv name }
+             all_tvs = map (noLoc . UserTyVar) implicit_tvs ++ explicit_tvs
+       ; th_tvs  <- repList tyVarBndrTyConName rep_in_scope_tv all_tvs
+       ; th_ctxt <- repLContext ctxt
+       ; th_ty   <- repLTy ty
+       ; ty1 <- if null all_tvs && null (unLoc ctxt)
+                then return th_ty
+                else repTForall th_tvs th_ctxt th_ty
+       ; sig <- repProto mk_sig nm1 ty1
+       ; return (loc, sig) }
 
 rep_inline :: Located Name
            -> InlinePragma      -- Never defaultInlinePragma
@@ -736,11 +754,11 @@ rep_inline nm ispec loc
        ; return [(loc, pragma)]
        }
 
-rep_specialise :: Located Name -> LHsType Name -> InlinePragma -> SrcSpan
+rep_specialise :: Located Name -> LHsSigType Name -> InlinePragma -> SrcSpan
                -> DsM [(SrcSpan, Core TH.DecQ)]
 rep_specialise nm ty ispec loc
   = do { nm1 <- lookupLOcc nm
-       ; ty1 <- repLTy ty
+       ; ty1 <- repHsSigType ty
        ; phases <- repPhases $ inl_act ispec
        ; let inline = inl_inline ispec
        ; pragma <- if isEmptyInlineSpec inline
@@ -752,9 +770,9 @@ rep_specialise nm ty ispec loc
        ; return [(loc, pragma)]
        }
 
-rep_specialiseInst :: LHsType Name -> SrcSpan -> DsM [(SrcSpan, Core TH.DecQ)]
+rep_specialiseInst :: LHsSigType Name -> SrcSpan -> DsM [(SrcSpan, Core TH.DecQ)]
 rep_specialiseInst ty loc
-  = do { ty1    <- repLTy ty
+  = do { ty1    <- repHsSigType ty
        ; pragma <- repPragSpecInst ty1
        ; return [(loc, pragma)] }
 
@@ -779,7 +797,15 @@ repPhases _                = dataCon allPhasesDataConName
 --                      Types
 -------------------------------------------------------
 
-addTyVarBinds :: LHsTyVarBndrs Name                            -- the binders to be added
+addSimpleTyVarBinds :: [Name]                -- the binders to be added
+                    -> DsM (Core (TH.Q a))   -- action in the ext env
+                    -> DsM (Core (TH.Q a))
+addSimpleTyVarBinds names thing_inside
+  = do { fresh_names <- mkGenSyms names
+       ; term <- addBinds fresh_names thing_inside
+       ; wrapGenSyms fresh_names term }
+
+addTyVarBinds :: LHsQTyVars Name                            -- the binders to be added
               -> (Core [TH.TyVarBndr] -> DsM (Core (TH.Q a)))  -- action in the ext env
               -> DsM (Core (TH.Q a))
 -- gensym a list of type variables and enter them into the meta environment;
@@ -797,7 +823,7 @@ addTyVarBinds (HsQTvs { hsq_kvs = kvs, hsq_tvs = tvs }) m
   where
     mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
 
-addTyClTyVarBinds :: LHsTyVarBndrs Name
+addTyClTyVarBinds :: LHsQTyVars Name
                   -> (Core [TH.TyVarBndr] -> DsM (Core (TH.Q a)))
                   -> DsM (Core (TH.Q a))
 
@@ -840,6 +866,24 @@ repContext :: HsContext Name -> DsM (Core TH.CxtQ)
 repContext ctxt = do preds <- repList typeQTyConName repLTy ctxt
                      repCtxt preds
 
+repHsSigType :: LHsSigType Name -> DsM (Core TH.TypeQ)
+repHsSigType ty = repLTy (hsSigType ty)
+
+repHsSigWcType :: LHsSigWcType Name -> DsM (Core TH.TypeQ)
+repHsSigWcType (HsIB { hsib_kvs  = implicit_kvs
+                     , hsib_tvs  = implicit_tvs
+                     , hsib_body = sig1 })
+  | (explicit_tvs, ctxt, ty) <- splitLHsSigmaTy (hswc_body sig1)
+  = addTyVarBinds (HsQTvs { hsq_kvs = implicit_kvs
+                          , hsq_tvs = map (noLoc . UserTyVar) implicit_tvs
+                                      ++ explicit_tvs })
+                  $ \ th_tvs ->
+    do { th_ctxt <- repLContext ctxt
+       ; th_ty   <- repLTy ty
+       ; if null implicit_tvs && null explicit_tvs && null (unLoc ctxt)
+         then return th_ty
+         else repTForall th_tvs th_ctxt th_ty }
+
 -- yield the representation of a list of types
 --
 repLTys :: [LHsType Name] -> DsM [Core TH.TypeQ]
@@ -850,27 +894,18 @@ repLTys tys = mapM repLTy tys
 repLTy :: LHsType Name -> DsM (Core TH.TypeQ)
 repLTy (L _ ty) = repTy ty
 
+repForall :: HsType Name -> DsM (Core TH.TypeQ)
+-- Arg of repForall is always HsForAllTy or HsQualTy
+repForall ty
+ | (tvs, ctxt, tau) <- splitLHsSigmaTy (noLoc ty)
+ = addTyVarBinds (HsQTvs { hsq_kvs = [], hsq_tvs = tvs}) $ \bndrs ->
+   do { ctxt1  <- repLContext ctxt
+      ; ty1    <- repLTy tau
+      ; repTForall bndrs ctxt1 ty1 }
+
 repTy :: HsType Name -> DsM (Core TH.TypeQ)
-repTy (HsForAllTy _ extra tvs ctxt ty)  =
-  addTyVarBinds tvs $ \bndrs -> do
-    ctxt1  <- repLContext ctxt'
-    ty1    <- repLTy ty
-    repTForall bndrs ctxt1 ty1
-  where
-    -- If extra is not Nothing, an extra-constraints wild card was removed
-    -- (just) before renaming. It must be put back now, otherwise the
-    -- represented type won't include this extra-constraints wild card.
-    ctxt'
-      | Just loc <- extra
-      = let uniq = panic "addExtraCtsWC"
-             -- This unique will be discarded by repLContext, but is required
-             -- to make a Name
-            name = mkInternalName uniq (mkTyVarOcc "_") loc
-        in  (++ [L loc (HsWildCardTy (AnonWildCard name))]) `fmap` ctxt
-      | otherwise
-      = ctxt
-
-
+repTy ty@(HsForAllTy {}) = repForall ty
+repTy ty@(HsQualTy {})   = repForall ty
 
 repTy (HsTyVar n)
   | isTvOcc occ   = do tv1 <- lookupOcc n
@@ -1102,7 +1137,11 @@ repE (RecordUpd e flds _ _ _)
         fs <- repFields flds;
         repRecUpd x fs }
 
-repE (ExprWithTySig e ty _) = do { e1 <- repLE e; t1 <- repLTy ty; repSigExp e1 t1 }
+repE (ExprWithTySig e ty)
+  = do { e1 <- repLE e
+       ; t1 <- repHsSigWcType ty
+       ; repSigExp e1 t1 }
+
 repE (ArithSeq _ _ aseq) =
   case aseq of
     From e              -> do { ds1 <- repLE e; repFrom ds1 }
