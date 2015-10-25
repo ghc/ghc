@@ -1,0 +1,18 @@
+This programme is intended to be used by any GHC developers working on Parser.y
+or RdrHsSyn.hs, and who want to check that their changes do not break the API
+Annotations.
+
+It does a basic test that all annotations do make it to the final AST, and dumps
+a list of the annotations generated for a given file, so that they can be
+checked against the source being parsed for sanity.
+
+This utility is also intended to be used in tests, so that when new features are
+added the expected annotations are also captured.
+
+Usage
+
+In a test Makefile
+
+  $(CHECK_API_ANNOTATIONS) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" FileToParse.hs
+
+See examples in (REPO_HOME)/testsuite/tests/ghc-api/annotations/Makefile

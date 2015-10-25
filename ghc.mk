@@ -538,6 +538,7 @@ ghc/stage2/package-data.mk: compiler/stage2/package-data.mk
 # all the other libraries' package-data.mk files.
 utils/haddock/dist/package-data.mk: compiler/stage2/package-data.mk
 utils/ghctags/dist-install/package-data.mk: compiler/stage2/package-data.mk
+utils/check-api-annotations/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/mkUserGuidePart/dist/package-data.mk: compiler/stage2/package-data.mk
 
 # add the final package.conf dependency: ghc-prim depends on RTS
@@ -652,6 +653,7 @@ BUILD_DIRS += utils/hsc2hs
 BUILD_DIRS += utils/ghc-pkg
 BUILD_DIRS += utils/testremove
 BUILD_DIRS += utils/ghctags
+BUILD_DIRS += utils/check-api-annotations
 BUILD_DIRS += utils/dll-split
 BUILD_DIRS += utils/ghc-pwd
 BUILD_DIRS += utils/ghc-cabal
@@ -705,6 +707,7 @@ ifneq "$(CrossCompiling) $(Stage1Only)" "NO NO"
 BUILD_DIRS := $(filter-out utils/haddock,$(BUILD_DIRS))
 BUILD_DIRS := $(filter-out utils/haddock/doc,$(BUILD_DIRS))
 BUILD_DIRS := $(filter-out utils/ghctags,$(BUILD_DIRS))
+BUILD_DIRS := $(filter-out utils/check-api-annotations,$(BUILD_DIRS))
 BUILD_DIRS := $(filter-out utils/mkUserGuidePart,$(BUILD_DIRS))
 endif
 endif # CLEANING
