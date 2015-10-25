@@ -413,6 +413,9 @@ def compiler_profiled( ):
 def rts_with_libdw( ):
     return config.rts_with_libdw
 
+def libs_have_debug_info( ):
+    return config.libs_have_debug_info
+
 def compiler_debugged( ):
     return config.compiler_debugged
 

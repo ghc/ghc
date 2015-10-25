@@ -77,6 +77,12 @@ RUNTEST_OPTS += -e "ghc_compiler_always_flags='$(TEST_HC_OPTS)'"
 
 RUNTEST_OPTS += -e config.compiler_debugged=$(GhcDebugged)
 
+ifeq "$(filter -g, $(GhcLibHcOps))" "-g"
+RUNTEST_OPTS += -e libs_have_debug_info=1
+else
+RUNTEST_OPTS += -e libs_have_debug_info=0
+endif
+
 ifeq "$(GhcWithNativeCodeGen)" "YES"
 RUNTEST_OPTS += -e ghc_with_native_codegen=1
 else
