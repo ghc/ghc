@@ -6,6 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include "ghcplatform.h"
 #include "RtsSymbols.h"
 
 #include "Rts.h"
@@ -15,6 +16,13 @@
 
 #if !defined(mingw32_HOST_OS)
 #include "posix/Signals.h"
+#endif
+
+#if defined(mingw32_HOST_OS)
+#include <sys/stat.h>
+#include <io.h>
+#include <windows.h>
+#include <shfolder.h> /* SHGetFolderPathW */
 #endif
 
 /* -----------------------------------------------------------------------------
