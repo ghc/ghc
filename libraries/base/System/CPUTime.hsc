@@ -6,7 +6,7 @@
 -- Module      :  System.CPUTime
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
 -- Portability :  portable
@@ -18,7 +18,7 @@
 #include "HsFFI.h"
 #include "HsBaseConfig.h"
 
-module System.CPUTime 
+module System.CPUTime
         (
          getCPUTime,       -- :: IO Integer
          cpuTimePrecision  -- :: Integer
@@ -57,10 +57,10 @@ import Foreign.C
 ##else
 ##endif
 
-#if !defined(mingw32_HOST_OS) && !defined(cygwin32_HOST_OS)
+#if !defined(mingw32_HOST_OS)
 realToInteger :: Real a => a -> Integer
 realToInteger ct = round (realToFrac ct :: Double)
-  -- CTime, CClock, CUShort etc are in Real but not Fractional, 
+  -- CTime, CClock, CUShort etc are in Real but not Fractional,
   -- so we must convert to Double before we can round it
 #endif
 
@@ -72,7 +72,7 @@ realToInteger ct = round (realToFrac ct :: Double)
 getCPUTime :: IO Integer
 getCPUTime = do
 
-#if !defined(mingw32_HOST_OS) && !defined(cygwin32_HOST_OS)
+#if !defined(mingw32_HOST_OS)
 -- getrusage() is right royal pain to deal with when targetting multiple
 -- versions of Solaris, since some versions supply it in libc (2.3 and 2.5),
 -- while 2.4 has got it in libucb (I wouldn't be too surprised if it was back
@@ -90,8 +90,8 @@ getCPUTime = do
     u_usec <- (#peek struct timeval,tv_usec) ru_utime :: IO CSUSeconds
     s_sec  <- (#peek struct timeval,tv_sec)  ru_stime :: IO CTime
     s_usec <- (#peek struct timeval,tv_usec) ru_stime :: IO CSUSeconds
-    return ((realToInteger u_sec * 1000000 + realToInteger u_usec + 
-             realToInteger s_sec * 1000000 + realToInteger s_usec) 
+    return ((realToInteger u_sec * 1000000 + realToInteger u_usec +
+             realToInteger s_sec * 1000000 + realToInteger s_usec)
                 * 1000000)
 
 type CRUsage = ()
@@ -101,13 +101,13 @@ foreign import capi unsafe "HsBase.h getrusage" getrusage :: CInt -> Ptr CRUsage
     _ <- times p_tms
     u_ticks  <- (#peek struct tms,tms_utime) p_tms :: IO CClock
     s_ticks  <- (#peek struct tms,tms_stime) p_tms :: IO CClock
-    return (( (realToInteger u_ticks + realToInteger s_ticks) * 1000000000000) 
+    return (( (realToInteger u_ticks + realToInteger s_ticks) * 1000000000000)
                         `div` fromIntegral clockTicks)
 
 type CTms = ()
 foreign import ccall unsafe times :: Ptr CTms -> IO CClock
 #else
-    ioException (IOError Nothing UnsupportedOperation 
+    ioException (IOError Nothing UnsupportedOperation
                          "getCPUTime"
                          "can't get CPU time"
                          Nothing)
@@ -127,12 +127,12 @@ foreign import ccall unsafe times :: Ptr CTms -> IO CClock
       kt <- ft2psecs p_kernelTime
       return (ut + kt)
      else return 0
-  where 
+  where
         ft2psecs :: Ptr FILETIME -> IO Integer
         ft2psecs ft = do
           high <- (#peek FILETIME,dwHighDateTime) ft :: IO Word32
           low  <- (#peek FILETIME,dwLowDateTime)  ft :: IO Word32
-            -- Convert 100-ns units to picosecs (10^-12) 
+            -- Convert 100-ns units to picosecs (10^-12)
             -- => multiply by 10^5.
           return (((fromIntegral high) * (2^(32::Int)) + (fromIntegral low)) * 100000)
 

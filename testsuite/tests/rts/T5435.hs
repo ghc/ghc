@@ -15,7 +15,7 @@ withPathString = withCString
 #endif
 
 mungeDLL :: FilePath -> FilePath
-#if defined(mingw32_HOST_OS) || defined(cygwin32_HOST_OS)
+#if defined(mingw32_HOST_OS)
 -- Strip extension because addDLL on Windows doesn't want it
 mungeDLL f =
     let (base, ext) = splitExtension f

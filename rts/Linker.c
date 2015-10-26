@@ -58,22 +58,6 @@
 #include <dlfcn.h>
 #endif
 
-#if defined(cygwin32_HOST_OS)
-#ifdef HAVE_DIRENT_H
-#include <dirent.h>
-#endif
-
-#ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
-#endif
-#include <regex.h>
-#include <sys/fcntl.h>
-#include <sys/termios.h>
-#include <sys/utime.h>
-#include <sys/utsname.h>
-#include <sys/wait.h>
-#endif
-
 #if (defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS)) \
  || (!defined(powerpc_HOST_ARCH) && \
     (   defined(linux_HOST_OS)     || defined(freebsd_HOST_OS) || \
@@ -110,7 +94,7 @@
 #  define OBJFORMAT_ELF
 #  include <regex.h>    // regex is already used by dlopen() so this is OK
                         // to use here without requiring an additional lib
-#elif defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
+#elif defined (mingw32_HOST_OS)
 #  define OBJFORMAT_PEi386
 #  include <windows.h>
 #  include <shfolder.h> /* SHGetFolderPathW */

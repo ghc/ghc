@@ -460,7 +460,7 @@ void traceOSProcessInfo_(void) {
                         CAPSET_OSPROCESS_DEFAULT,
                         getpid());
 
-#if !defined(cygwin32_HOST_OS) && !defined (mingw32_HOST_OS)
+#if !defined (mingw32_HOST_OS)
 /* Windows has no strong concept of process hierarchy, so no getppid().
  * In any case, this trace event is mainly useful for tracing programs
  * that use 'forkProcess' which Windows doesn't support anyway.
