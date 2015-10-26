@@ -177,7 +177,7 @@ restrictDecls names = mapMaybe (filterLSigNames (`elem` names))
 restrictATs :: [Name] -> [LFamilyDecl Name] -> [LFamilyDecl Name]
 restrictATs names ats = [ at | at <- ats , unL (fdLName (unL at)) `elem` names ]
 
-emptyHsQTvs :: LHsTyVarBndrs Name
+emptyHsQTvs :: LHsQTyVars Name
 -- This function is here, rather than in HsTypes, because it *renamed*, but
 -- does not necessarily have all the rigt kind variables.  It is used
 -- in Haddock just for printing, so it doesn't matter

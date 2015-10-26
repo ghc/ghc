@@ -96,7 +96,7 @@ tyThingToLHsDecl t = case t of
 
   -- a data-constructor alone just gets rendered as a function:
   AConLike (RealDataCon dc) -> allOK $ SigD (TypeSig [synifyName dc]
-    (synifyType ImplicitizeForAll (dataConUserType dc)) [])
+    (synifyType ImplicitizeForAll (dataConUserType dc)))
 
   AConLike (PatSynCon ps) ->
       let (univ_tvs, ex_tvs, req_theta, prov_theta, arg_tys, res_ty) = patSynSig ps
@@ -118,10 +118,9 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
         hs_rhs     = synifyType WithinType rhs
         (kvs, tvs) = partition isKindVar tkvs
     in TyFamEqn { tfe_tycon = name
-                , tfe_pats  = HsWB { hswb_cts = typats
-                                    , hswb_kvs = map tyVarName kvs
-                                    , hswb_tvs = map tyVarName tvs
-                                    , hswb_wcs = [] }
+                , tfe_pats  = HsIB { hsib_body = typats
+                                   , hsib_kvs = map tyVarName kvs
+                                   , hsib_tvs = map tyVarName tvs }
                 , tfe_rhs   = hs_rhs }
 
 synifyAxiom :: CoAxiom br -> Either ErrMsg (HsDecl Name)
@@ -310,8 +309,14 @@ synifyDataCon use_gadt_syntax dc =
               else ResTyH98
  -- finally we get synifyDataCon's result!
  in hs_arg_tys >>=
-      \hat -> return . noLoc $ ConDecl [name] Implicit -- we don't know nor care
-                qvars ctx hat hs_res_ty Nothing
+      \hat -> return $ noLoc $
+              ConDecl { con_names = [name]
+                      , con_explicit = False    -- we don't know nor care
+                      , con_qvars = qvars
+                      , con_cxt   = ctx
+                      , con_details =  hat
+                      , con_res = hs_res_ty
+                      , con_doc =  Nothing }
                 -- we don't want any "deprecated GADT syntax" warnings!
                 False
 
@@ -327,7 +332,7 @@ synifyCtx :: [PredType] -> LHsContext Name
 synifyCtx = noLoc . map (synifyType WithinType)
 
 
-synifyTyVars :: [TyVar] -> LHsTyVarBndrs Name
+synifyTyVars :: [TyVar] -> LHsQTyVars Name
 synifyTyVars ktvs = HsQTvs { hsq_kvs = map tyVarName kvs
                            , hsq_tvs = map synifyTyVar tvs }
   where
@@ -393,15 +398,13 @@ synifyType _ (FunTy t1 t2) = let
   in noLoc $ HsFunTy s1 s2
 synifyType s forallty@(ForAllTy _tv _ty) =
   let (tvs, ctx, tau) = tcSplitSigmaTy forallty
-      sTvs = synifyTyVars tvs
-      sCtx = synifyCtx ctx
-      sTau = synifyType WithinType tau
-      mkHsForAllTy forallPlicitness =
-        noLoc $ HsForAllTy forallPlicitness Nothing sTvs sCtx sTau
+      sPhi = HsQualTy { hst_ctxt = noLoc (synifyCtx ctx)
+                      , hst_body = noLoc (synify WithinType tau) }
   in case s of
     DeleteTopLevelQuantification -> synifyType ImplicitizeForAll tau
-    WithinType -> mkHsForAllTy Explicit
-    ImplicitizeForAll -> mkHsForAllTy Implicit
+    WithinType        -> noLoc $ HsForAllTy { hst_bndrs = synifyTyVars tvs
+                                            , hst_body  = noLoc sPhi }
+    ImplicitizeForAll -> noLoc sPhi
 
 synifyType _ (LitTy t) = noLoc $ HsTyLit $ synifyTyLit t
 
