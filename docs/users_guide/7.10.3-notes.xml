@@ -3,7 +3,7 @@
   <title>Release notes for version 7.10.3</title>
 
   <para>
-    The 7.10.3 release is a bugfix release, with over 70+ bug fixes
+    The 7.10.3 release is a bugfix release, with over fifty bug fixes
     relative to 7.10.2. The major fixes are listed below. For the full
     list with more detail, see the <ulink
     url="https://ghc.haskell.org/trac/ghc/milestone/7.10.3">GHC 7.10.3
