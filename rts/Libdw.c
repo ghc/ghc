@@ -60,8 +60,6 @@ struct LibDwSession_ {
     Backtrace *cur_bt; // The current backtrace we are collecting (if any)
 };
 
-typedef struct LibDwSession_ LibDwSession;
-
 static const Dwfl_Thread_Callbacks thread_cbs;
 
 void libdw_free(LibDwSession *session) {
