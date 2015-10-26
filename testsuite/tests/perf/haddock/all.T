@@ -28,13 +28,13 @@ test('haddock.base',
             # 2014-04-04:                     3548581572 (x86/Windows, 64bit machine)
             # 2014-12-01:                     4202377432 (x86/Windows, 64bit machine)
 
-          ,(wordsize(32), 3799130400, 1)])
+          ,(wordsize(32), 4714489820, 1)])
             # 2012-08-14: 3046487920 (x86/OSX)
             # 2012-10-30: 2955470952 (x86/Windows)
             # 2013-02-10: 3146596848 (x86/OSX)
             # 2014-02-22: 3554624600 (x86/Linux - new haddock)
             # 2014-06-29: 3799130400 (x86/Linux)
-            # 2014-08-05: XXX TODO UPDATE ME XXX
+            # 2015-10-26: 4714489820 (x86/Linux)
       ],
      stats,
      ['../../../../libraries/base/dist-install/doc/html/base/base.haddock.t'])
@@ -69,11 +69,11 @@ test('haddock.Cabal',
             # 2014-04-24:                     2052220292 (x86/Windows)
             # 2014-12-01:                     3088635556 (x86/Windows)
 
-          ,(wordsize(32), 2127198484, 1)])
+          ,(wordsize(32), 3344425960, 1)])
             # 2012-08-14: 1648610180 (x86/OSX)
             # 2014-01-22: 1986290624 (x86/Linux)
             # 2014-06-29: 2127198484 (x86/Linux)
-            # 2014-08-05: XXX TODO UPDATE ME XXX
+            # 2015-10-26: 3344425960 (x86/Linux)
       ],
      stats,
      ['../../../../libraries/Cabal/Cabal/dist-install/doc/html/Cabal/Cabal.haddock.t'])
@@ -96,10 +96,11 @@ test('haddock.compiler',
             # 2013-11-13:                     14328363592 (x86/Windows, 64bit machine)
             # 2014-12-01:                       104140852 (x86/Windows, sudden shrinkage!)
             # 2014-12-10:                       217933548 increased again
-          ,(wordsize(32), 15110426000, 1)])
+          ,(wordsize(32), 837229548, 1)])
             # 2012-08-14: 13471797488 (x86/OSX)
             # 2014-01-22: 14581475024 (x86/Linux - new haddock)
             # 2014-06-29: 15110426000 (x86/Linux)
+            # 2015-10-26: 837229548   (x86/Linux)
       ],
      stats,
      ['../../../../compiler/stage2/doc/html/ghc/ghc.haddock.t'])

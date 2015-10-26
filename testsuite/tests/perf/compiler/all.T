@@ -50,11 +50,12 @@ test('T1969',
                                  # 2013-02-10 5030080 (x86/Windows)
                                  # 2013-11-13 7295012 (x86/Windows, 64bit machine)
                                  # 2014-04-24 5719436 (x86/Windows, 64bit machine)
-           (wordsize(32), 5949188, 1),
+           (wordsize(32), 5132064, 1),
              #            6707308 (x86/OS X)
              # 2009-12-31 6149572 (x86/Linux)
              # 2014-01-22 6429864 (x86/Linux)
              # 2014-06-29 5949188 (x86/Linux)
+             # 2015-10-26 5132064 (x86/Linux)
            (wordsize(64), 10000000, 15)]),
              # 2014-09-10 10463640, 10  # post-AMP-update (somewhat stabelish)
                # looks like the peak is around ~10M, but we're
@@ -120,13 +121,14 @@ else:
 test('T3294',
      [
       compiler_stats_num_field('max_bytes_used', # Note [residency]
-          [(wordsize(32), 19882188, 15),
+          [(wordsize(32), 23135164, 15),
              #            17725476 (x86/OS X)
              #            14593500 (Windows)
              # 2013-02-10 20651576 (x86/Windows)
              # 2013-02-10 20772984 (x86/OSX)
              # 2013-11-13 24009436 (x86/Windows, 64bit machine)
              # 2014-04-24 19882188 (x86/Windows, 64bit machine)
+             # 2015-10-26 23135164 (x86/Linux, 64bit machine)
            (wordsize(64), 40000000, 15)]),
              # prev:           25753192 (amd64/Linux)
              # 29/08/2012:     37724352 (amd64/Linux)
@@ -612,7 +614,8 @@ test('T9961',
           # 2015-spring   772510192   Got better
           # 2015-05-22    663978160   Fix for #10370 improves it more
           # 2015-07-09    617926624   Fix for #10527 improves it even more
-           (wordsize(32), 375647160, 5)
+           (wordsize(32), 309206936, 5)
+          # 2015-10-26    309206936    (x86_64/Linux)
           ]),
       ],
      compile,

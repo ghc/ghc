@@ -63,7 +63,8 @@ test('T876',
               # 2013-02-14: 1263712 (x86_64/Linux)
               # 2014-02-10:   63216 (x86_64/Linux), call arity analysis
 
-           (wordsize(32), 56796, 5) ]),
+           (wordsize(32), 53240, 5) ]),
+              # 2015-10-26:  53240  (x86_64/Linux)
               # some date:  663712  (Windows, 64-bit machine)
               # 2014-04-04:  56820  (Windows, 64-bit machine)
               # 2014-06-29:  53024  (x86_64/Linux)
@@ -259,11 +260,13 @@ test('T7257',
 
 test('Conversions',
      [stats_num_field('bytes allocated',
-                      [(wordsize(32), 76768, 3),
+                      [(wordsize(32), 79568, 3),
                         # 2012-12-18: 55316 Guessed 64-bit value / 2
                         # 2013-02-10: 77472 (x86/OSX)
                         # 2013-02-10: 79276 (x86/Windows)
                         # 2014-01-13: 76768 (x86/Linux) due to #8647
+                        # 2015-10-26: 79568 (x86_64/Linux)
+
                        (wordsize(64), 107544, 5)]),
                         # 2012-12-18: 109608 (amd64/OS X)
                         # 2014-07-17: 107544 (amd64/Linux)
@@ -383,7 +386,8 @@ test('InlineCloneArrayAlloc',
 
 test('T9203',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(32), 50000000, 5)
+                      [ (wordsize(32), 85561300, 5)
+                      # 2015-10-26     85561300
                       , (wordsize(64), 94547280, 5) ]),
                       # was            95747304
                       # 2019-09-10     94547280 post-AMP cleanup
