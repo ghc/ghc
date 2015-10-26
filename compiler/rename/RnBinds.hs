@@ -197,13 +197,13 @@ rnTopBindsBoot b = pprPanic "rnTopBindsBoot" (ppr b)
 -}
 
 rnLocalBindsAndThen :: HsLocalBinds RdrName
-                    -> (HsLocalBinds Name -> RnM (result, FreeVars))
+                    -> (HsLocalBinds Name -> FreeVars -> RnM (result, FreeVars))
                     -> RnM (result, FreeVars)
 -- This version (a) assumes that the binding vars are *not* already in scope
 --               (b) removes the binders from the free vars of the thing inside
 -- The parser doesn't produce ThenBinds
-rnLocalBindsAndThen EmptyLocalBinds thing_inside
-  = thing_inside EmptyLocalBinds
+rnLocalBindsAndThen EmptyLocalBinds thing_inside =
+  thing_inside EmptyLocalBinds emptyNameSet
 
 rnLocalBindsAndThen (HsValBinds val_binds) thing_inside
   = rnLocalValBindsAndThen val_binds $ \ val_binds' ->
@@ -211,7 +211,7 @@ rnLocalBindsAndThen (HsValBinds val_binds) thing_inside
 
 rnLocalBindsAndThen (HsIPBinds binds) thing_inside = do
     (binds',fv_binds) <- rnIPBinds binds
-    (thing, fvs_thing) <- thing_inside (HsIPBinds binds')
+    (thing, fvs_thing) <- thing_inside (HsIPBinds binds') fv_binds
     return (thing, fvs_thing `plusFV` fv_binds)
 
 rnIPBinds :: HsIPBinds RdrName -> RnM (HsIPBinds Name, FreeVars)
@@ -322,9 +322,10 @@ rnLocalValBindsRHS bound_names binds
 --
 -- here there are no local fixity decls passed in;
 -- the local fixity decls come from the ValBinds sigs
-rnLocalValBindsAndThen :: HsValBinds RdrName
-                       -> (HsValBinds Name -> RnM (result, FreeVars))
-                       -> RnM (result, FreeVars)
+rnLocalValBindsAndThen
+  :: HsValBinds RdrName
+  -> (HsValBinds Name -> FreeVars -> RnM (result, FreeVars))
+  -> RnM (result, FreeVars)
 rnLocalValBindsAndThen binds@(ValBindsIn _ sigs) thing_inside
  = do   {     -- (A) Create the local fixity environment
           new_fixities <- makeMiniFixityEnv [L loc sig
@@ -339,7 +340,7 @@ rnLocalValBindsAndThen binds@(ValBindsIn _ sigs) thing_inside
 
         {      -- (C) Do the RHS and thing inside
           (binds', dus) <- rnLocalValBindsRHS (mkNameSet bound_names) new_lhs
-        ; (result, result_fvs) <- thing_inside binds'
+        ; (result, result_fvs) <- thing_inside binds' (allUses dus)
 
                 -- Report unused bindings based on the (accurate)
                 -- findUses.  E.g.
@@ -1064,7 +1065,7 @@ rnGRHSs :: HsMatchContext Name
         -> GRHSs RdrName (Located (body RdrName))
         -> RnM (GRHSs Name (Located (body Name)), FreeVars)
 rnGRHSs ctxt rnBody (GRHSs grhss binds)
-  = rnLocalBindsAndThen binds   $ \ binds' -> do
+  = rnLocalBindsAndThen binds   $ \ binds' _ -> do
     (grhss', fvGRHSs) <- mapFvRn (rnGRHS ctxt rnBody) grhss
     return (GRHSs grhss' binds', fvGRHSs)
 

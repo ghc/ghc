@@ -9,23 +9,18 @@
 module PackageConfig (
         -- $package_naming
 
-        -- * PackageKey
+        -- * UnitId
         packageConfigId,
-
-        -- * LibraryName
-        LibraryName(..),
 
         -- * The PackageConfig type: information about a package
         PackageConfig,
         InstalledPackageInfo(..),
-        InstalledPackageId(..),
+        ComponentId(..),
         SourcePackageId(..),
         PackageName(..),
-        UnitName(..),
         Version(..),
-        packageUnitName,
         defaultPackageConfig,
-        installedPackageIdString,
+        componentIdString,
         sourcePackageIdString,
         packageNameString,
         pprPackageConfig,
@@ -42,29 +37,27 @@ import Module
 import Unique
 
 -- -----------------------------------------------------------------------------
--- Our PackageConfig type is the InstalledPackageInfo from bin-package-db,
+-- Our PackageConfig type is the InstalledPackageInfo from ghc-boot,
 -- which is similar to a subset of the InstalledPackageInfo type from Cabal.
 
 type PackageConfig = InstalledPackageInfo
-                       InstalledPackageId
+                       ComponentId
                        SourcePackageId
                        PackageName
-                       Module.PackageKey
+                       Module.UnitId
                        Module.ModuleName
 
 -- TODO: there's no need for these to be FastString, as we don't need the uniq
 --       feature, but ghc doesn't currently have convenient support for any
 --       other compact string types, e.g. plain ByteString or Text.
 
-newtype InstalledPackageId = InstalledPackageId FastString deriving (Eq, Ord)
+newtype ComponentId = ComponentId FastString deriving (Eq, Ord)
 newtype SourcePackageId    = SourcePackageId    FastString deriving (Eq, Ord)
 newtype PackageName        = PackageName        FastString deriving (Eq, Ord)
-newtype UnitName           = UnitName           FastString deriving (Eq, Ord)
-newtype LibraryName        = LibraryName        FastString deriving (Eq, Ord)
 
-instance BinaryStringRep InstalledPackageId where
-  fromStringRep = InstalledPackageId . mkFastStringByteString
-  toStringRep (InstalledPackageId s) = fastStringToByteString s
+instance BinaryStringRep ComponentId where
+  fromStringRep = ComponentId . mkFastStringByteString
+  toStringRep (ComponentId s) = fastStringToByteString s
 
 instance BinaryStringRep SourcePackageId where
   fromStringRep = SourcePackageId . mkFastStringByteString
@@ -74,12 +67,8 @@ instance BinaryStringRep PackageName where
   fromStringRep = PackageName . mkFastStringByteString
   toStringRep (PackageName s) = fastStringToByteString s
 
-instance BinaryStringRep LibraryName where
-  fromStringRep = LibraryName . mkFastStringByteString
-  toStringRep (LibraryName s) = fastStringToByteString s
-
-instance Uniquable InstalledPackageId where
-  getUnique (InstalledPackageId n) = getUnique n
+instance Uniquable ComponentId where
+  getUnique (ComponentId n) = getUnique n
 
 instance Uniquable SourcePackageId where
   getUnique (SourcePackageId n) = getUnique n
@@ -87,14 +76,8 @@ instance Uniquable SourcePackageId where
 instance Uniquable PackageName where
   getUnique (PackageName n) = getUnique n
 
-instance Outputable InstalledPackageId where
-  ppr (InstalledPackageId str) = ftext str
-
-instance Outputable UnitName where
-  ppr (UnitName str) = ftext str
-
-instance Outputable LibraryName where
-  ppr (LibraryName str) = ftext str
+instance Outputable ComponentId where
+  ppr (ComponentId str) = ftext str
 
 instance Outputable SourcePackageId where
   ppr (SourcePackageId str) = ftext str
@@ -124,10 +107,10 @@ pprOriginalModule (OriginalModule originalPackageId originalModuleName) =
 defaultPackageConfig :: PackageConfig
 defaultPackageConfig = emptyInstalledPackageInfo
 
-installedPackageIdString :: PackageConfig -> String
-installedPackageIdString pkg = unpackFS str
+componentIdString :: PackageConfig -> String
+componentIdString pkg = unpackFS str
   where
-    InstalledPackageId str = installedPackageId pkg
+    ComponentId str = componentId pkg
 
 sourcePackageIdString :: PackageConfig -> String
 sourcePackageIdString pkg = unpackFS str
@@ -144,8 +127,7 @@ pprPackageConfig InstalledPackageInfo {..} =
     vcat [
       field "name"                 (ppr packageName),
       field "version"              (text (showVersion packageVersion)),
-      field "id"                   (ppr installedPackageId),
-      field "key"                  (ppr packageKey),
+      field "id"                   (ppr componentId),
       field "exposed"              (ppr exposed),
       field "exposed-modules"
         (if all isExposedModule exposedModules
@@ -175,20 +157,16 @@ pprPackageConfig InstalledPackageInfo {..} =
 
 
 -- -----------------------------------------------------------------------------
--- PackageKey (package names, versions and dep hash)
+-- UnitId (package names, versions and dep hash)
 
 -- $package_naming
 -- #package_naming#
--- Mostly the compiler deals in terms of 'PackageKey's, which are md5 hashes
+-- Mostly the compiler deals in terms of 'UnitId's, which are md5 hashes
 -- of a package ID, keys of its dependencies, and Cabal flags. You're expected
--- to pass in the package key in the @-this-package-key@ flag. However, for
+-- to pass in the unit id in the @-this-package-key@ flag. However, for
 -- wired-in packages like @base@ & @rts@, we don't necessarily know what the
 -- version is, so these are handled specially; see #wired_in_packages#.
 
--- | Get the GHC 'PackageKey' right out of a Cabalish 'PackageConfig'
-packageConfigId :: PackageConfig -> PackageKey
-packageConfigId = packageKey
-
-packageUnitName :: PackageConfig -> UnitName
-packageUnitName pkg = let PackageName fs = packageName pkg
-                      in UnitName fs
+-- | Get the GHC 'UnitId' right out of a Cabalish 'PackageConfig'
+packageConfigId :: PackageConfig -> UnitId
+packageConfigId = unitId

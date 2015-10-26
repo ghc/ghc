@@ -18,7 +18,7 @@ test('annfail10', req_interp, compile_fail, [''])
 test('annfail11', normal, compile_fail, [''])
 test('annfail12', req_interp, compile_fail, ['-v0'])
 test('annfail13', normal, compile_fail, [''])
-
+test('T10826', normal, compile_fail, [''])
 """"
 Helpful things to C+P:
 

@@ -1,2 +1,0 @@
-
-B.hs:5:23: Warning: {-# SOURCE #-} unnecessary in import of  ‘A’

@@ -1,5 +1,0 @@
-
-T1476b.hs:7:47:
-    Not in scope: ‘x’
-    In the Template Haskell quotation
-      [| \ $(return $ VarP $ mkName "x") -> x |]

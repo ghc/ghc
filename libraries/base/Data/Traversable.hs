@@ -46,7 +46,9 @@ module Data.Traversable (
     foldMapDefault,
     ) where
 
-import Control.Applicative ( Const(..) )
+-- It is convenient to use 'Const' here but this means we must
+-- define a few instances here which really belong in Control.Applicative
+import Control.Applicative ( Const(..), ZipList(..) )
 import Data.Either ( Either(..) )
 import Data.Foldable ( Foldable )
 import Data.Functor
@@ -194,9 +196,9 @@ instance Traversable Proxy where
     {-# INLINE traverse #-}
     sequenceA _ = pure Proxy
     {-# INLINE sequenceA #-}
-    mapM _ _ = return Proxy
+    mapM _ _ = pure Proxy
     {-# INLINE mapM #-}
-    sequence _ = return Proxy
+    sequence _ = pure Proxy
     {-# INLINE sequence #-}
 
 instance Traversable (Const m) where
@@ -216,6 +218,9 @@ instance Traversable First where
 
 instance Traversable Last where
     traverse f (Last x) = Last <$> traverse f x
+
+instance Traversable ZipList where
+    traverse f (ZipList x) = ZipList <$> traverse f x
 
 -- general functions
 

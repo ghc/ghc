@@ -210,11 +210,17 @@ from testlib import *
 if windows or darwin:
     pkginfo = getStdout([config.ghc_pkg, 'dump'])
     topdir = config.libdir
+    if windows:
+        mingw = os.path.join(topdir, '../mingw/bin')
+        os.environ['PATH'] = os.pathsep.join([os.environ.get("PATH", ""), mingw])
     for line in pkginfo.split('\n'):
         if line.startswith('library-dirs:'):
             path = line.rstrip()
             path = re.sub('^library-dirs: ', '', path)
-            path = re.sub('\\$topdir', topdir, path)
+            # Use string.replace instead of re.sub, because re.sub
+            # interprets backslashes in the replacement string as
+            # escape sequences.
+            path = path.replace('$topdir', topdir)
             if path.startswith('"'):
                 path = re.sub('^"(.*)"$', '\\1', path)
                 path = re.sub('\\\\(.)', '\\1', path)

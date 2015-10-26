@@ -1,0 +1,7 @@
+test('ado001', normal, compile_and_run, [''])
+test('ado002', normal, compile_fail, [''])
+test('ado003', normal, compile_fail, [''])
+test('ado004', normal, compile, [''])
+test('ado005', normal, compile_fail, [''])
+test('ado006', normal, compile, [''])
+test('ado007', normal, compile, [''])

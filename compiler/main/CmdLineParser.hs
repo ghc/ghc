@@ -100,13 +100,13 @@ instance Monad m => Functor (EwM m) where
     fmap = liftM
 
 instance Monad m => Applicative (EwM m) where
-    pure = return
+    pure v = EwM (\_ e w -> return (e, w, v))
     (<*>) = ap
 
 instance Monad m => Monad (EwM m) where
     (EwM f) >>= k = EwM (\l e w -> do (e', w', r) <- f l e w
                                       unEwM (k r) l e' w')
-    return v = EwM (\_ e w -> return (e, w, v))
+    return = pure
 
 runEwM :: EwM m a -> m (Errs, Warns, a)
 runEwM action = unEwM action (panic "processArgs: no arg yet") emptyBag emptyBag
@@ -146,7 +146,7 @@ instance Functor (CmdLineP s) where
     fmap = liftM
 
 instance Applicative (CmdLineP s) where
-    pure = return
+    pure a = CmdLineP $ \s -> (a, s)
     (<*>) = ap
 
 instance Monad (CmdLineP s) where
@@ -154,7 +154,7 @@ instance Monad (CmdLineP s) where
                   let (a, s') = runCmdLine m s
                   in runCmdLine (k a) s'
 
-    return a = CmdLineP $ \s -> (a, s)
+    return = pure
 
 getCmdLineState :: CmdLineP s s
 getCmdLineState   = CmdLineP $ \s -> (s,s)

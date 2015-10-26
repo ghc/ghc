@@ -10,7 +10,7 @@
 -----------------------------------------------------------------------------
 
 module DriverPhases (
-   HscSource(..), isHsBootOrSig, hscSourceString,
+   HscSource(..), isHsBoot, hscSourceString,
    Phase(..),
    happensBefore, eqPhase, anyHsc, isStopLn,
    startPhase,
@@ -22,12 +22,10 @@ module DriverPhases (
    isCishSuffix,
    isDynLibSuffix,
    isHaskellUserSrcSuffix,
-   isHaskellSigSuffix,
    isSourceSuffix,
 
    isHaskellishFilename,
    isHaskellSrcFilename,
-   isHaskellSigFilename,
    isObjectFilename,
    isCishFilename,
    isDynLibFilename,
@@ -60,63 +58,51 @@ import Binary
 
 -- Note [HscSource types]
 -- ~~~~~~~~~~~~~~~~~~~~~~
--- There are three types of source file for Haskell code:
+-- There are two types of source file for user-written Haskell code:
 --
 --      * HsSrcFile is an ordinary hs file which contains code,
 --
---      * HsBootFile is an hs-boot file, which is used to break
---        recursive module imports (there will always be an
---        HsSrcFile associated with it), and
+--      * HsBootFile is an hs-boot file.  Within a unit, it can
+--        be used to break recursive module imports, in which case there's an
+--        HsSrcFile associated with it.  However, externally, it can
+--        also be used to specify the *requirements* of a package,
+--        in which case there is an HsBootMerge associated with it.
 --
---      * HsigFile is an hsig file, which contains only type
---        signatures and is used to specify signatures for
---        modules.
---
--- Syntactically, hs-boot files and hsig files are quite similar: they
--- only include type signatures and must be associated with an
--- actual HsSrcFile.  isHsBootOrSig allows us to abstract over code
--- which is indifferent to which.  However, there are some important
--- differences, mostly owing to the fact that hsigs are proper
--- modules (you `import Sig` directly) whereas HsBootFiles are
--- temporary placeholders (you `import {-# SOURCE #-} Mod).
--- When we finish compiling the true implementation of an hs-boot,
--- we replace the HomeModInfo with the real HsSrcFile.  An HsigFile, on the
--- other hand, is never replaced (in particular, we *cannot* use the
--- HomeModInfo of the original HsSrcFile backing the signature, since it
--- will export too many symbols.)
---
--- Additionally, while HsSrcFile is the only Haskell file
--- which has *code*, we do generate .o files for HsigFile, because
--- this is how the recompilation checker figures out if a file
--- needs to be recompiled.  These are fake object files which
--- should NOT be linked against.
+-- An HsBootMerge is a "fake" source file, which is constructed
+-- by collecting up non-recursive HsBootFiles into a single interface.
+-- HsBootMerges get an hi and o file, and are treated as "non-boot"
+-- sources.
 
 data HscSource
-   = HsSrcFile | HsBootFile | HsigFile
+   = HsSrcFile | HsBootFile | HsBootMerge
      deriving( Eq, Ord, Show )
         -- Ord needed for the finite maps we build in CompManager
+
+instance Outputable HscSource where
+    ppr HsSrcFile = text "HsSrcFile"
+    ppr HsBootFile = text "HsBootFile"
+    ppr HsBootMerge = text "HsBootMerge"
 
 instance Binary HscSource where
     put_ bh HsSrcFile = putByte bh 0
     put_ bh HsBootFile = putByte bh 1
-    put_ bh HsigFile = putByte bh 2
+    put_ bh HsBootMerge = putByte bh 2
     get bh = do
         h <- getByte bh
         case h of
             0 -> return HsSrcFile
             1 -> return HsBootFile
-            _ -> return HsigFile
+            _ -> return HsBootMerge
 
 hscSourceString :: HscSource -> String
 hscSourceString HsSrcFile   = ""
 hscSourceString HsBootFile  = "[boot]"
-hscSourceString HsigFile    = "[sig]"
+hscSourceString HsBootMerge = "[merge]"
 
--- See Note [isHsBootOrSig]
-isHsBootOrSig :: HscSource -> Bool
-isHsBootOrSig HsBootFile = True
-isHsBootOrSig HsigFile   = True
-isHsBootOrSig _          = False
+isHsBoot :: HscSource -> Bool
+isHsBoot HsBootFile  = True
+isHsBoot HsSrcFile   = False
+isHsBoot HsBootMerge = False
 
 data Phase
         = Unlit HscSource
@@ -232,10 +218,8 @@ nextPhase dflags p
 startPhase :: String -> Phase
 startPhase "lhs"      = Unlit HsSrcFile
 startPhase "lhs-boot" = Unlit HsBootFile
-startPhase "lhsig"    = Unlit HsigFile
 startPhase "hs"       = Cpp   HsSrcFile
 startPhase "hs-boot"  = Cpp   HsBootFile
-startPhase "hsig"     = Cpp   HsigFile
 startPhase "hscpp"    = HsPp  HsSrcFile
 startPhase "hspp"     = Hsc   HsSrcFile
 startPhase "hc"       = HCc
@@ -264,7 +248,9 @@ startPhase _          = StopLn     -- all unknown file types
 phaseInputExt :: Phase -> String
 phaseInputExt (Unlit HsSrcFile)   = "lhs"
 phaseInputExt (Unlit HsBootFile)  = "lhs-boot"
-phaseInputExt (Unlit HsigFile)    = "lhsig"
+phaseInputExt (Unlit HsBootMerge) = panic "phaseInputExt: Unlit HsBootMerge"
+        -- You can't Unlit an HsBootMerge, because there's no source
+        -- file to Unlit!
 phaseInputExt (Cpp   _)           = "lpp"       -- intermediate only
 phaseInputExt (HsPp  _)           = "hscpp"     -- intermediate only
 phaseInputExt (Hsc   _)           = "hspp"      -- intermediate only
@@ -289,7 +275,7 @@ phaseInputExt MergeStub           = "o"
 phaseInputExt StopLn              = "o"
 
 haskellish_src_suffixes, haskellish_suffixes, cish_suffixes,
-    haskellish_user_src_suffixes, haskellish_sig_suffixes
+    haskellish_user_src_suffixes
  :: [String]
 -- When a file with an extension in the haskellish_src_suffixes group is
 -- loaded in --make mode, its imports will be loaded too.
@@ -300,9 +286,7 @@ haskellish_suffixes          = haskellish_src_suffixes ++
 cish_suffixes                = [ "c", "cpp", "C", "cc", "cxx", "s", "S", "ll", "bc", "lm_s", "m", "M", "mm" ]
 
 -- Will not be deleted as temp files:
-haskellish_user_src_suffixes =
-  haskellish_sig_suffixes ++ [ "hs", "lhs", "hs-boot", "lhs-boot" ]
-haskellish_sig_suffixes      = [ "hsig", "lhsig" ]
+haskellish_user_src_suffixes = [ "hs", "lhs", "hs-boot", "lhs-boot" ]
 
 objish_suffixes :: Platform -> [String]
 -- Use the appropriate suffix for the system on which
@@ -318,10 +302,9 @@ dynlib_suffixes platform = case platformOS platform of
   _         -> ["so"]
 
 isHaskellishSuffix, isHaskellSrcSuffix, isCishSuffix,
-    isHaskellUserSrcSuffix, isHaskellSigSuffix
+    isHaskellUserSrcSuffix
  :: String -> Bool
 isHaskellishSuffix     s = s `elem` haskellish_suffixes
-isHaskellSigSuffix     s = s `elem` haskellish_sig_suffixes
 isHaskellSrcSuffix     s = s `elem` haskellish_src_suffixes
 isCishSuffix           s = s `elem` cish_suffixes
 isHaskellUserSrcSuffix s = s `elem` haskellish_user_src_suffixes
@@ -334,7 +317,7 @@ isSourceSuffix :: String -> Bool
 isSourceSuffix suff  = isHaskellishSuffix suff || isCishSuffix suff
 
 isHaskellishFilename, isHaskellSrcFilename, isCishFilename,
-    isHaskellUserSrcFilename, isSourceFilename, isHaskellSigFilename
+    isHaskellUserSrcFilename, isSourceFilename
  :: FilePath -> Bool
 -- takeExtension return .foo, so we drop 1 to get rid of the .
 isHaskellishFilename     f = isHaskellishSuffix     (drop 1 $ takeExtension f)
@@ -342,7 +325,6 @@ isHaskellSrcFilename     f = isHaskellSrcSuffix     (drop 1 $ takeExtension f)
 isCishFilename           f = isCishSuffix           (drop 1 $ takeExtension f)
 isHaskellUserSrcFilename f = isHaskellUserSrcSuffix (drop 1 $ takeExtension f)
 isSourceFilename         f = isSourceSuffix         (drop 1 $ takeExtension f)
-isHaskellSigFilename     f = isHaskellSigSuffix     (drop 1 $ takeExtension f)
 
 isObjectFilename, isDynLibFilename :: Platform -> FilePath -> Bool
 isObjectFilename platform f = isObjectSuffix platform (drop 1 $ takeExtension f)

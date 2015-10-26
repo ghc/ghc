@@ -18,9 +18,9 @@ Flags:
                     compiler the test suite covers.
                     2008-07-01: 63% slower than the default.
                     HTML generated here: testsuite/hpc_output/hpc_index.html
-  --fast            Omit dyn way, omit binary distribution
-  --slow            Build stage2 with -DDEBUG. Skips tests that call
-                    compiler_stats_num_field.
+  --fast            Omit binary distribution. Omit certain tests.
+  --slow            Build stage2 with -DDEBUG. Run tests for all WAYS,
+                    but skip those that call compiler_stats_num_field.
                     2008-07-01: 14% slower than the default.
   --dph             Also build libraries/dph and run associated tests.
   --quiet           More pretty build log.
@@ -32,6 +32,11 @@ Flags:
   override this. For a sequential build you would for example use
 
     THREADS=1 ./validate
+
+  You can also use environment variables to pass extra options to the
+  testsuite. For example:
+
+    TEST='read001 read002' ./validate --testsuite-only --fast
 
 EOF
 }
@@ -158,10 +163,6 @@ if [ $no_clean -eq 0 ]; then
     $make maintainer-clean NO_CLEAN_GMP=YES
 
     INSTDIR=`pwd`/inst
-    if [ "$OSTYPE" = "cygwin" ]
-    then
-        INSTDIR=`cygpath -m "$INSTDIR"`
-    fi
 
     if [ $use_dph -eq 1 ]; then
         perl -w boot --validate --required-tag=dph
@@ -173,9 +174,7 @@ fi
 
 thisdir=`utils/ghc-pwd/dist-boot/ghc-pwd`
 
-echo "Validating=YES"       >  mk/are-validating.mk
-echo "ValidateSpeed=$speed" >> mk/are-validating.mk
-echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
+make_settings="Validating=YES ValidateSpeed=$speed ValidateHpc=$hpc"
 
 # Note [Default build system verbosity].
 #
@@ -189,21 +188,14 @@ echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
 # `make -s`, when user explicitly asks for it with `./validate --quiet`.
 if [ $be_quiet -eq 1 ]; then
     # See Note [Default build system verbosity].
-    echo "V=0"                  >> mk/are-validating.mk # Less gunk
-fi
-
-if [ $speed != "FAST" ]; then
-    # Build the "extra" packages (see ./packages), to enable more tests.
-    echo "BUILD_EXTRA_PKGS=YES" >> mk/are-validating.mk
+    make_settings="$make_settings V=0"
 fi
 
 if [ $use_dph -eq 1 ]; then
-    echo "BUILD_DPH=YES"    >> mk/are-validating.mk
-else
-    echo "BUILD_DPH=NO"     >> mk/are-validating.mk
+    make_settings="$make_settings BUILD_DPH=YES"
 fi
 
-$make -j$threads
+$make -j$threads $make_settings
 # For a "debug make", add "--debug=b --debug=m"
 
 check_packages post-build
@@ -213,8 +205,8 @@ check_packages post-build
 
 if [ $speed != "FAST" ]; then
 
-    $make binary-dist-prep
-    $make test_bindist TEST_PREP=YES
+    $make binary-dist-prep $make_settings
+    $make test_bindist TEST_PREP=YES $make_settings
 
     #
     # Install the xhtml package into the bindist.
@@ -225,7 +217,7 @@ if [ $speed != "FAST" ]; then
 
     check_packages post-install
 
-    $make validate_build_xhtml BINDIST_PREFIX="$thisdir/$bindistdir"
+    $make validate_build_xhtml BINDIST_PREFIX="$thisdir/$bindistdir" $make_settings
 
     check_packages post-xhtml
 fi
@@ -247,11 +239,11 @@ fi
 
 case "$speed" in
 SLOW)
-        MAKE_TEST_TARGET=fulltest
+        MAKE_TEST_TARGET=slowtest
         BINDIST="BINDIST=YES"
         ;;
 NORMAL)
-        MAKE_TEST_TARGET=fasttest
+        MAKE_TEST_TARGET=test
         BINDIST="BINDIST=YES"
         ;;
 FAST)
@@ -260,10 +252,8 @@ FAST)
         ;;
 esac
 
-if [ $be_quiet -eq 1 ]; then
+if [ $be_quiet -eq 1 ] && [ -z $VERBOSE ]; then
     TEST_VERBOSITY="VERBOSE=1 NO_PRINT_SUMMARY=YES"
-else
-    TEST_VERBOSITY="VERBOSE=2"
 fi
 
 $make $MAKE_TEST_TARGET stage=2 $BINDIST $TEST_VERBOSITY THREADS=$threads 2>&1 | tee testlog

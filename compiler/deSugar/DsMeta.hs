@@ -56,10 +56,10 @@ import DynFlags
 import FastString
 import ForeignCall
 import Util
+import Maybes
 import MonadUtils
 
 import Data.ByteString ( unpack )
-import Data.Maybe
 import Control.Monad
 import Data.List
 
@@ -261,7 +261,7 @@ repTyClD (L loc (DataDecl { tcdLName = tc, tcdTyVars = tvs, tcdDataDefn = defn }
 repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
                              tcdTyVars = tvs, tcdFDs = fds,
                              tcdSigs = sigs, tcdMeths = meth_binds,
-                             tcdATs = ats, tcdATDefs = [] }))
+                             tcdATs = ats, tcdATDefs = atds }))
   = do { cls1 <- lookupLOcc cls         -- See note [Binders and occurrences]
        ; dec  <- addTyVarBinds tvs $ \bndrs ->
            do { cxt1   <- repLContext cxt
@@ -269,16 +269,12 @@ repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
               ; binds1 <- rep_binds meth_binds
               ; fds1   <- repLFunDeps fds
               ; ats1   <- repFamilyDecls ats
-              ; decls1 <- coreList decQTyConName (ats1 ++ sigs1 ++ binds1)
+              ; atds1  <- repAssocTyFamDefaults atds
+              ; decls1 <- coreList decQTyConName (ats1 ++ atds1 ++ sigs1 ++ binds1)
               ; repClass cxt1 cls1 bndrs fds1 decls1
               }
        ; return $ Just (loc, dec)
        }
-
--- Un-handled cases
-repTyClD (L loc d) = putSrcSpanDs loc $
-                     do { warnDs (hang ds_msg 4 (ppr d))
-                        ; return Nothing }
 
 -------------------------
 repRoleD :: LRoleAnnotDecl Name -> DsM (SrcSpan, Core TH.DecQ)
@@ -320,36 +316,88 @@ repSynDecl tc bndrs ty
        ; repTySyn tc bndrs ty1 }
 
 repFamilyDecl :: LFamilyDecl Name -> DsM (SrcSpan, Core TH.DecQ)
-repFamilyDecl decl@(L loc (FamilyDecl { fdInfo  = info,
-                                        fdLName   = tc,
-                                        fdTyVars  = tvs,
-                                        fdKindSig = opt_kind }))
+repFamilyDecl decl@(L loc (FamilyDecl { fdInfo      = info,
+                                        fdLName     = tc,
+                                        fdTyVars    = tvs,
+                                        fdResultSig = L _ resultSig,
+                                        fdInjectivityAnn = injectivity }))
   = do { tc1 <- lookupLOcc tc           -- See note [Binders and occurrences]
+       ; let mkHsQTvs :: [LHsTyVarBndr Name] -> LHsQTyVars Name
+             mkHsQTvs tvs = HsQTvs { hsq_kvs = [], hsq_tvs = tvs }
+             resTyVar = case resultSig of
+                     TyVarSig bndr -> mkHsQTvs [bndr]
+                     _             -> mkHsQTvs []
        ; dec <- addTyClTyVarBinds tvs $ \bndrs ->
-           case (opt_kind, info) of
-                  (_      , ClosedTypeFamily Nothing) ->
-                    notHandled "abstract closed type family" (ppr decl)
-                  (Nothing, ClosedTypeFamily (Just eqns)) ->
-                    do { eqns1 <- mapM repTyFamEqn eqns
-                       ; eqns2 <- coreList tySynEqnQTyConName eqns1
-                       ; repClosedFamilyNoKind tc1 bndrs eqns2 }
-                  (Just ki, ClosedTypeFamily (Just eqns)) ->
-                    do { eqns1 <- mapM repTyFamEqn eqns
-                       ; eqns2 <- coreList tySynEqnQTyConName eqns1
-                       ; ki1 <- repLKind ki
-                       ; repClosedFamilyKind tc1 bndrs ki1 eqns2 }
-                  (Nothing, _) ->
-                    do { info' <- repFamilyInfo info
-                       ; repFamilyNoKind info' tc1 bndrs }
-                  (Just ki, _) ->
-                    do { info' <- repFamilyInfo info
-                       ; ki1 <- repLKind ki
-                       ; repFamilyKind info' tc1 bndrs ki1 }
+                addTyClTyVarBinds resTyVar $ \_ ->
+           case info of
+             ClosedTypeFamily Nothing ->
+                 notHandled "abstract closed type family" (ppr decl)
+             ClosedTypeFamily (Just eqns) ->
+               do { eqns1  <- mapM repTyFamEqn eqns
+                  ; eqns2  <- coreList tySynEqnQTyConName eqns1
+                  ; result <- repFamilyResultSig resultSig
+                  ; inj    <- repInjectivityAnn injectivity
+                  ; repClosedFamilyD tc1 bndrs result inj eqns2 }
+             OpenTypeFamily ->
+               do { result <- repFamilyResultSig resultSig
+                  ; inj    <- repInjectivityAnn injectivity
+                  ; repOpenFamilyD tc1 bndrs result inj }
+             DataFamily ->
+               do { kind <- repFamilyResultSigToMaybeKind resultSig
+                  ; repDataFamilyD tc1 bndrs kind }
        ; return (loc, dec)
        }
 
+-- | Represent result signature of a type family
+repFamilyResultSig :: FamilyResultSig Name -> DsM (Core TH.FamilyResultSig)
+repFamilyResultSig  NoSig          = repNoSig
+repFamilyResultSig (KindSig ki)    = do { ki' <- repLKind ki
+                                        ; repKindSig ki' }
+repFamilyResultSig (TyVarSig bndr) = do { bndr' <- repTyVarBndr bndr
+                                        ; repTyVarSig bndr' }
+
+-- | Represent result signature using a Maybe Kind. Used with data families,
+-- where the result signature can be either missing or a kind but never a named
+-- result variable.
+repFamilyResultSigToMaybeKind :: FamilyResultSig Name
+                              -> DsM (Core (Maybe TH.Kind))
+repFamilyResultSigToMaybeKind NoSig =
+    do { coreNothing kindTyConName }
+repFamilyResultSigToMaybeKind (KindSig ki) =
+    do { ki' <- repLKind ki
+       ; coreJust kindTyConName ki' }
+repFamilyResultSigToMaybeKind _ = panic "repFamilyResultSigToMaybeKind"
+
+-- | Represent injectivity annotation of a type family
+repInjectivityAnn :: Maybe (LInjectivityAnn Name)
+                  -> DsM (Core (Maybe TH.InjectivityAnn))
+repInjectivityAnn Nothing =
+    do { coreNothing injAnnTyConName }
+repInjectivityAnn (Just (L _ (InjectivityAnn lhs rhs))) =
+    do { lhs'   <- lookupBinder (unLoc lhs)
+       ; rhs1   <- mapM (lookupBinder . unLoc) rhs
+       ; rhs2   <- coreList nameTyConName rhs1
+       ; injAnn <- rep2 injectivityAnnName [unC lhs', unC rhs2]
+       ; coreJust injAnnTyConName injAnn }
+
 repFamilyDecls :: [LFamilyDecl Name] -> DsM [Core TH.DecQ]
 repFamilyDecls fds = liftM de_loc (mapM repFamilyDecl fds)
+
+repAssocTyFamDefaults :: [LTyFamDefltEqn Name] -> DsM [Core TH.DecQ]
+repAssocTyFamDefaults = mapM rep_deflt
+  where
+     -- very like repTyFamEqn, but different in the details
+    rep_deflt :: LTyFamDefltEqn Name -> DsM (Core TH.DecQ)
+    rep_deflt (L _ (TyFamEqn { tfe_tycon = tc
+                             , tfe_pats  = bndrs
+                             , tfe_rhs   = rhs }))
+      = addTyClTyVarBinds bndrs $ \ _ ->
+        do { tc1  <- lookupLOcc tc
+           ; tys1 <- repLTys (hsLTyVarBndrsToTypes bndrs)
+           ; tys2 <- coreList typeQTyConName tys1
+           ; rhs1 <- repLTy rhs
+           ; eqn1 <- repTySynEqn tys2 rhs1
+           ; repTySynInst tc1 eqn1 }
 
 -------------------------
 mk_extra_tvs :: Located Name -> LHsQTyVars Name
@@ -390,13 +438,6 @@ repLFunDep (L _ (xs, ys))
    = do xs' <- repList nameTyConName (lookupBinder . unLoc) xs
         ys' <- repList nameTyConName (lookupBinder . unLoc) ys
         repFunDep xs' ys'
-
--- represent family declaration flavours
---
-repFamilyInfo :: FamilyInfo Name -> DsM (Core TH.FamFlavour)
-repFamilyInfo OpenTypeFamily      = rep2 typeFamName []
-repFamilyInfo DataFamily          = rep2 dataFamName []
-repFamilyInfo ClosedTypeFamily {} = panic "repFamilyInfo"
 
 -- Represent instance declarations
 --
@@ -576,9 +617,6 @@ repAnnProv (TypeAnnProvenance (L _ n))
        ; rep2 typeAnnotationName [ n' ] }
 repAnnProv ModuleAnnProvenance
   = rep2 moduleAnnotationName []
-
-ds_msg :: SDoc
-ds_msg = ptext (sLit "Cannot desugar this Template Haskell declaration:")
 
 -------------------------------------------------------
 --                      Constructors
@@ -857,6 +895,14 @@ repTyVarBndrWithKind (L _ (UserTyVar _)) nm
 repTyVarBndrWithKind (L _ (KindedTyVar _ ki)) nm
   = repLKind ki >>= repKindedTV nm
 
+-- | Represent a type variable binder
+repTyVarBndr :: LHsTyVarBndr Name -> DsM (Core TH.TyVarBndr)
+repTyVarBndr (L _ (UserTyVar nm)) = do { nm' <- lookupBinder nm
+                                       ; repPlainTV nm' }
+repTyVarBndr (L _ (KindedTyVar (L _ nm) ki)) = do { nm' <- lookupBinder nm
+                                                  ; ki' <- repLKind ki
+                                                  ; repKindedTV nm' ki' }
+
 -- represent a type context
 --
 repLContext :: LHsContext Name -> DsM (Core TH.CxtQ)
@@ -1134,7 +1180,7 @@ repE (RecordCon c _ flds)
         repRecCon x fs }
 repE (RecordUpd e flds _ _ _)
  = do { x <- repLE e;
-        fs <- repFields flds;
+        fs <- repUpdFields flds;
         repRecUpd x fs }
 
 repE (ExprWithTySig e ty)
@@ -1161,6 +1207,11 @@ repE (ArithSeq _ _ aseq) =
 
 repE (HsSpliceE splice)    = repSplice splice
 repE (HsStatic e)          = repLE e >>= rep2 staticEName . (:[]) . unC
+repE (HsUnboundVar name)   = do
+                               occ   <- occNameLit name
+                               sname <- repNameS occ
+                               repUnboundVar sname
+
 repE e@(PArrSeq {})        = notHandled "Parallel arrays" (ppr e)
 repE e@(HsCoreAnn {})      = notHandled "Core annotations" (ppr e)
 repE e@(HsSCC {})          = notHandled "Cost centres" (ppr e)
@@ -1217,9 +1268,21 @@ repFields :: HsRecordBinds Name -> DsM (Core [TH.Q TH.FieldExp])
 repFields (HsRecFields { rec_flds = flds })
   = repList fieldExpQTyConName rep_fld flds
   where
-    rep_fld (L _ fld) = do { fn <- lookupLOcc (hsRecFieldId fld)
+    rep_fld :: LHsRecField Name (LHsExpr Name) -> DsM (Core (TH.Q TH.FieldExp))
+    rep_fld (L _ fld) = do { fn <- lookupLOcc (hsRecFieldSel fld)
                            ; e  <- repLE (hsRecFieldArg fld)
                            ; repFieldExp fn e }
+
+repUpdFields :: [LHsRecUpdField Name] -> DsM (Core [TH.Q TH.FieldExp])
+repUpdFields = repList fieldExpQTyConName rep_fld
+  where
+    rep_fld :: LHsRecUpdField Name -> DsM (Core (TH.Q TH.FieldExp))
+    rep_fld (L l fld) = case unLoc (hsRecFieldLbl fld) of
+      Unambiguous _ sel_name -> do { fn <- lookupLOcc (L l sel_name)
+                                   ; e  <- repLE (hsRecFieldArg fld)
+                                   ; repFieldExp fn e }
+      _                      -> notHandled "ambiguous record updates" (ppr fld)
+
 
 
 -----------------------------------------------------------------------------
@@ -1282,7 +1345,7 @@ repSts (ParStmt stmt_blocks _ _ : ss) =
        do { (ss1, zs) <- repSts (map unLoc stmts)
           ; zs1 <- coreList stmtQTyConName zs
           ; return (ss1, zs1) }
-repSts [LastStmt e _]
+repSts [LastStmt e _ _]
   = do { e2 <- repLE e
        ; z <- repNoBindSt e2
        ; return ([], [z]) }
@@ -1446,7 +1509,8 @@ repP (ConPatIn dc details)
                                 repPinfix p1' con_str p2' }
    }
  where
-   rep_fld (L _ fld) = do { MkC v <- lookupLOcc (hsRecFieldId fld)
+   rep_fld :: LHsRecField Name (LPat Name) -> DsM (Core (TH.Name,TH.PatQ))
+   rep_fld (L _ fld) = do { MkC v <- lookupLOcc (hsRecFieldSel fld)
                           ; MkC p <- repLP (hsRecFieldArg fld)
                           ; rep2 fieldPatName [v,p] }
 
@@ -1553,16 +1617,16 @@ globalVar name
   | isExternalName name
   = do  { MkC mod <- coreStringLit name_mod
         ; MkC pkg <- coreStringLit name_pkg
-        ; MkC occ <- occNameLit name
+        ; MkC occ <- nameLit name
         ; rep2 mk_varg [pkg,mod,occ] }
   | otherwise
-  = do  { MkC occ <- occNameLit name
+  = do  { MkC occ <- nameLit name
         ; MkC uni <- coreIntLit (getKey (getUnique name))
         ; rep2 mkNameLName [occ,uni] }
   where
       mod = ASSERT( isExternalName name) nameModule name
       name_mod = moduleNameString (moduleName mod)
-      name_pkg = packageKeyString (modulePackageKey mod)
+      name_pkg = unitIdString (moduleUnitId mod)
       name_occ = nameOccName name
       mk_varg | OccName.isDataOcc name_occ = mkNameG_dName
               | OccName.isVarOcc  name_occ = mkNameG_vName
@@ -1593,13 +1657,16 @@ wrapGenSyms binds body@(MkC b)
     go _ [] = return body
     go var_ty ((name,id) : binds)
       = do { MkC body'  <- go var_ty binds
-           ; lit_str    <- occNameLit name
+           ; lit_str    <- nameLit name
            ; gensym_app <- repGensym lit_str
            ; repBindQ var_ty elt_ty
                       gensym_app (MkC (Lam id body')) }
 
-occNameLit :: Name -> DsM (Core String)
-occNameLit n = coreStringLit (occNameString (nameOccName n))
+nameLit :: Name -> DsM (Core String)
+nameLit n = coreStringLit (occNameString (nameOccName n))
+
+occNameLit :: OccName -> DsM (Core String)
+occNameLit name = coreStringLit (occNameString name)
 
 
 -- %*********************************************************************
@@ -1866,35 +1933,31 @@ repPragRule (MkC nm) (MkC bndrs) (MkC lhs) (MkC rhs) (MkC phases)
 repPragAnn :: Core TH.AnnTarget -> Core TH.ExpQ -> DsM (Core TH.DecQ)
 repPragAnn (MkC targ) (MkC e) = rep2 pragAnnDName [targ, e]
 
-repFamilyNoKind :: Core TH.FamFlavour -> Core TH.Name -> Core [TH.TyVarBndr]
-                -> DsM (Core TH.DecQ)
-repFamilyNoKind (MkC flav) (MkC nm) (MkC tvs)
-    = rep2 familyNoKindDName [flav, nm, tvs]
-
-repFamilyKind :: Core TH.FamFlavour -> Core TH.Name -> Core [TH.TyVarBndr]
-              -> Core TH.Kind
-              -> DsM (Core TH.DecQ)
-repFamilyKind (MkC flav) (MkC nm) (MkC tvs) (MkC ki)
-    = rep2 familyKindDName [flav, nm, tvs, ki]
-
 repTySynInst :: Core TH.Name -> Core TH.TySynEqnQ -> DsM (Core TH.DecQ)
 repTySynInst (MkC nm) (MkC eqn)
     = rep2 tySynInstDName [nm, eqn]
 
-repClosedFamilyNoKind :: Core TH.Name
-                      -> Core [TH.TyVarBndr]
-                      -> Core [TH.TySynEqnQ]
-                      -> DsM (Core TH.DecQ)
-repClosedFamilyNoKind (MkC nm) (MkC tvs) (MkC eqns)
-    = rep2 closedTypeFamilyNoKindDName [nm, tvs, eqns]
+repDataFamilyD :: Core TH.Name -> Core [TH.TyVarBndr]
+               -> Core (Maybe TH.Kind) -> DsM (Core TH.DecQ)
+repDataFamilyD (MkC nm) (MkC tvs) (MkC kind)
+    = rep2 dataFamilyDName [nm, tvs, kind]
 
-repClosedFamilyKind :: Core TH.Name
-                    -> Core [TH.TyVarBndr]
-                    -> Core TH.Kind
-                    -> Core [TH.TySynEqnQ]
-                    -> DsM (Core TH.DecQ)
-repClosedFamilyKind (MkC nm) (MkC tvs) (MkC ki) (MkC eqns)
-    = rep2 closedTypeFamilyKindDName [nm, tvs, ki, eqns]
+repOpenFamilyD :: Core TH.Name
+               -> Core [TH.TyVarBndr]
+               -> Core TH.FamilyResultSig
+               -> Core (Maybe TH.InjectivityAnn)
+               -> DsM (Core TH.DecQ)
+repOpenFamilyD (MkC nm) (MkC tvs) (MkC result) (MkC inj)
+    = rep2 openTypeFamilyDName [nm, tvs, result, inj]
+
+repClosedFamilyD :: Core TH.Name
+                 -> Core [TH.TyVarBndr]
+                 -> Core TH.FamilyResultSig
+                 -> Core (Maybe TH.InjectivityAnn)
+                 -> Core [TH.TySynEqnQ]
+                 -> DsM (Core TH.DecQ)
+repClosedFamilyD (MkC nm) (MkC tvs) (MkC res) (MkC inj) (MkC eqns)
+    = rep2 closedTypeFamilyDName [nm, tvs, res, inj, eqns]
 
 repTySynEqn :: Core [TH.TypeQ] -> Core TH.TypeQ -> DsM (Core TH.TySynEqnQ)
 repTySynEqn (MkC lhs) (MkC rhs)
@@ -1924,7 +1987,9 @@ repConstr con (RecCon (L _ ips))
          ; rep2 recCName [unC con, unC arg_vtys] }
     where
       rep_ip (L _ ip) = mapM (rep_one_ip (cd_fld_type ip)) (cd_fld_names ip)
-      rep_one_ip t n = do { MkC v  <- lookupLOcc n
+
+      rep_one_ip :: LBangType Name -> LFieldOcc Name -> DsM (Core a)
+      rep_one_ip t n = do { MkC v  <- lookupOcc (selectorFieldOcc $ unLoc n)
                           ; MkC ty <- repBangTy  t
                           ; rep2 varStrictTypeName [v,ty] }
 
@@ -2046,6 +2111,18 @@ repKConstraint :: DsM (Core TH.Kind)
 repKConstraint = rep2 constraintKName []
 
 ----------------------------------------------------------
+--       Type family result signature
+
+repNoSig :: DsM (Core TH.FamilyResultSig)
+repNoSig = rep2 noSigName []
+
+repKindSig :: Core TH.Kind -> DsM (Core TH.FamilyResultSig)
+repKindSig (MkC ki) = rep2 kindSigName [ki]
+
+repTyVarSig :: Core TH.TyVarBndr -> DsM (Core TH.FamilyResultSig)
+repTyVarSig (MkC bndr) = rep2 tyVarSigName [bndr]
+
+----------------------------------------------------------
 --              Literals
 
 repLiteral :: HsLit -> DsM (Core TH.Lit)
@@ -2107,6 +2184,9 @@ mk_lit (HsIntegral _ i)   = mk_integer  i
 mk_lit (HsFractional f)   = mk_rational f
 mk_lit (HsIsString _ s)   = mk_string   s
 
+repNameS :: Core String -> DsM (Core TH.Name)
+repNameS (MkC name) = rep2 mkNameSName [name]
+
 --------------- Miscellaneous -------------------
 
 repGensym :: Core String -> DsM (Core (TH.Q TH.Name))
@@ -2121,7 +2201,10 @@ repSequenceQ :: Type -> Core [TH.Q a] -> DsM (Core (TH.Q [a]))
 repSequenceQ ty_a (MkC list)
   = rep2 sequenceQName [Type ty_a, list]
 
------------- Lists and Tuples -------------------
+repUnboundVar :: Core TH.Name -> DsM (Core TH.ExpQ)
+repUnboundVar (MkC name) = rep2 unboundVarEName [name]
+
+------------ Lists -------------------
 -- turn a list of patterns into a single pattern matching a list
 
 repList :: Name -> (a  -> DsM (Core b))
@@ -2147,6 +2230,30 @@ nonEmptyCoreList xs@(MkC x:_) = MkC (mkListExpr (exprType x) (map unC xs))
 
 coreStringLit :: String -> DsM (Core String)
 coreStringLit s = do { z <- mkStringExpr s; return(MkC z) }
+
+------------------- Maybe ------------------
+
+-- | Construct Core expression for Nothing of a given type name
+coreNothing :: Name        -- ^ Name of the TyCon of the element type
+            -> DsM (Core (Maybe a))
+coreNothing tc_name =
+    do { elt_ty <- lookupType tc_name; return (coreNothing' elt_ty) }
+
+-- | Construct Core expression for Nothing of a given type
+coreNothing' :: Type       -- ^ The element type
+             -> Core (Maybe a)
+coreNothing' elt_ty = MkC (mkNothingExpr elt_ty)
+
+-- | Store given Core expression in a Just of a given type name
+coreJust :: Name        -- ^ Name of the TyCon of the element type
+         -> Core a -> DsM (Core (Maybe a))
+coreJust tc_name es
+  = do { elt_ty <- lookupType tc_name; return (coreJust' elt_ty es) }
+
+-- | Store given Core expression in a Just of a given type
+coreJust' :: Type       -- ^ The element type
+          -> Core a -> Core (Maybe a)
+coreJust' elt_ty es = MkC (mkJustExpr elt_ty (unC es))
 
 ------------ Literals & Variables -------------------
 

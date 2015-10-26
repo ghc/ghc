@@ -858,7 +858,7 @@ We may encounter a unification ty1 ~ ty2 that cannot be performed syntactically,
 and yet its consistency is undetermined. Previously, there was no way to still
 make it consistent. So a mismatch error was issued.
 
-Now these unfications are deferred until constraint simplification, where type
+Now these unifications are deferred until constraint simplification, where type
 family instances and given equations may (or may not) establish the consistency.
 Deferred unifications are of the form
                 F ... ~ ...
@@ -868,7 +868,7 @@ E.g.
         id :: x ~ y => x -> y
         id e = e
 
-involves the unfication x = y. It is deferred until we bring into account the
+involves the unification x = y. It is deferred until we bring into account the
 context x ~ y to establish that it holds.
 
 If available, we defer original types (rather than those where closed type

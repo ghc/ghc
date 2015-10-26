@@ -684,7 +684,7 @@ loop:
 
   case ARR_WORDS:
       // just copy the block
-      copy(p,info,q,arr_words_sizeW((StgArrWords *)q),gen_no);
+      copy(p,info,q,arr_words_sizeW((StgArrBytes *)q),gen_no);
       return;
 
   case MUT_ARR_PTRS_CLEAN:

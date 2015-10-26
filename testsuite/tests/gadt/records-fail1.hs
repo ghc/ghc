@@ -10,7 +10,7 @@
 -- It's been removed in August 2015
 -- see Phab D1118
 
--- test should result into parse error
+-- test should result in a parse error
 
 module ShouldFail where
 

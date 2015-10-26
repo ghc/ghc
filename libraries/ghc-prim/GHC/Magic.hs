@@ -69,6 +69,13 @@ lazy x = x
 -- argument will be called at most once, which may (or may not) enable certain
 -- optimizations. It can be useful to improve the performance of code in continuation
 -- passing style.
+--
+-- If 'oneShot' is used wrongly, then it may be that computations whose result
+-- that would otherwise be shared are re-evaluated every time they are used. Otherwise,
+-- the use of `oneShot` is safe.
+--
+-- 'oneShot' is open kinded, i.e. the type variables can refer to unlifted
+-- types as well.
 oneShot :: (a -> b) -> (a -> b)
 oneShot f = f
 -- Implementation note: This is wired in in MkId.lhs, so the code here is

@@ -18,7 +18,7 @@
 # Except! If there's a libraries/foo/ghc-packages then it calls
 #     $(call $1,foo/bar,tag)
 # for each word 'bar' in libraries/foo/ghc-packages.
-# 
+#
 
 # We use an FEL_ prefix for the variable names, to avoid trampling on
 # other variables, as make has no concept of local variables.
@@ -28,7 +28,7 @@
 # repositories of their own:
 #
 #  - base
-#  - bin-package-db
+#  - ghc-boot
 #  - ghc-prim
 #  - integer-gmp
 #  - integer-simple
@@ -37,7 +37,7 @@
 define foreachLibrary
 # $1 = function to call for each library
 # We will give it the package path and the tag as arguments
-$$(foreach hashline,libraries/bin-package-db#-#no-remote-repo#no-vcs        \
+$$(foreach hashline,libraries/ghc-boot#-#no-remote-repo#no-vcs        \
                     libraries/base#-#no-remote-repo#no-vcs                  \
                     libraries/ghc-prim#-#no-remote-repo#no-vcs              \
                     libraries/integer-gmp#-#no-remote-repo#no-vcs           \

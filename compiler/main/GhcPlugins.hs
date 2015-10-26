@@ -19,7 +19,7 @@ module GhcPlugins(
         module VarSet, module VarEnv, module NameSet, module NameEnv, 
         module UniqSet, module UniqFM, module FiniteMap,
         module Util, module Serialized, module SrcLoc, module Outputable, 
-        module UniqSupply, module Unique, module FastString, module FastTypes
+        module UniqSupply, module Unique, module FastString
     ) where
 
 -- Plugin stuff itself
@@ -81,4 +81,3 @@ import Outputable
 import UniqSupply
 import Unique           ( Unique, Uniquable(..) )
 import FastString
-import FastTypes

@@ -4,7 +4,6 @@ module CodeGen.Platform
        where
 
 import CmmExpr
-import FastBool
 import Platform
 import Reg
 
@@ -97,7 +96,7 @@ globalRegMaybe platform
 
     | otherwise -> NoRegs.globalRegMaybe
 
-freeReg :: Platform -> RegNo -> FastBool
+freeReg :: Platform -> RegNo -> Bool
 freeReg platform
  | platformUnregisterised platform = NoRegs.freeReg
  | otherwise

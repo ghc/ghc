@@ -1,10 +1,10 @@
 
-<interactive>:5:1:
+<interactive>:5:1: error:
     No instance for (Show t1) arising from a use of ‘print’
     Cannot resolve unknown runtime type ‘t1’
     Use :print or :force to determine these types
     Relevant bindings include it :: t1 (bound at <interactive>:5:1)
-    Note: there are several potential instances:
+    These potential instances exist:
       instance (Show a, Show b) => Show (Either a b)
         -- Defined in ‘Data.Either’
       instance Show All -- Defined in ‘Data.Monoid’
@@ -13,14 +13,15 @@
                Show (Alt f a)
         -- Defined in ‘Data.Monoid’
       ...plus 33 others
+      (use -fprint-potential-instances to see them all)
     In a stmt of an interactive GHCi command: print it
 
-<interactive>:7:1:
+<interactive>:7:1: error:
     No instance for (Show t1) arising from a use of ‘print’
     Cannot resolve unknown runtime type ‘t1’
     Use :print or :force to determine these types
     Relevant bindings include it :: t1 (bound at <interactive>:7:1)
-    Note: there are several potential instances:
+    These potential instances exist:
       instance (Show a, Show b) => Show (Either a b)
         -- Defined in ‘Data.Either’
       instance Show All -- Defined in ‘Data.Monoid’
@@ -29,4 +30,5 @@
                Show (Alt f a)
         -- Defined in ‘Data.Monoid’
       ...plus 33 others
+      (use -fprint-potential-instances to see them all)
     In a stmt of an interactive GHCi command: print it

@@ -7,6 +7,8 @@
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE PolyKinds              #-}
+{-# LANGUAGE MagicHash              #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -531,6 +533,65 @@ module GHC.Generics  (
 -- @
 -- newtype (':.:') f g p = 'Comp1' { 'unComp1' :: f (g p) }
 -- @
+
+-- *** Representation of unlifted types
+--
+-- |
+--
+-- If one were to attempt to derive a Generic instance for a datatype with an
+-- unlifted argument (for example, 'Int#'), one might expect the occurrence of
+-- the 'Int#' argument to be marked with @'Rec0' 'Int#'@. This won't work,
+-- though, since 'Int#' is of kind @#@ and 'Rec0' expects a type of kind @*@.
+-- In fact, polymorphism over unlifted types is disallowed completely.
+--
+-- One solution would be to represent an occurrence of 'Int#' with 'Rec0 Int'
+-- instead. With this approach, however, the programmer has no way of knowing
+-- whether the 'Int' is actually an 'Int#' in disguise.
+--
+-- Instead of reusing 'Rec0', a separate data family 'URec' is used to mark
+-- occurrences of common unlifted types:
+--
+-- @
+-- data family URec a p
+--
+-- data instance 'URec' ('Ptr' ()) p = 'UAddr'   { 'uAddr#'   :: 'Addr#'   }
+-- data instance 'URec' 'Char'     p = 'UChar'   { 'uChar#'   :: 'Char#'   }
+-- data instance 'URec' 'Double'   p = 'UDouble' { 'uDouble#' :: 'Double#' }
+-- data instance 'URec' 'Int'      p = 'UFloat'  { 'uFloat#'  :: 'Float#'  }
+-- data instance 'URec' 'Float'    p = 'UInt'    { 'uInt#'    :: 'Int#'    }
+-- data instance 'URec' 'Word'     p = 'UWord'   { 'uWord#'   :: 'Word#'   }
+-- @
+--
+-- Several type synonyms are provided for convenience:
+--
+-- @
+-- type 'UAddr'   = 'URec' ('Ptr' ())
+-- type 'UChar'   = 'URec' 'Char'
+-- type 'UDouble' = 'URec' 'Double'
+-- type 'UFloat'  = 'URec' 'Float'
+-- type 'UInt'    = 'URec' 'Int'
+-- type 'UWord'   = 'URec' 'Word'
+-- @
+--
+-- The declaration
+--
+-- @
+-- data IntHash = IntHash Int#
+--   deriving 'Generic'
+-- @
+--
+-- yields
+--
+-- @
+-- instance 'Generic' IntHash where
+--   type 'Rep' IntHash =
+--     'D1' D1IntHash
+--       ('C1' C1_0IntHash
+--         ('S1' 'NoSelector' 'UInt'))
+-- @
+--
+-- Currently, only the six unlifted types listed above are generated, but this
+-- may be extended to encompass more unlifted types in the future.
 #if 0
 -- *** Limitations
 --
@@ -547,6 +608,11 @@ module GHC.Generics  (
     V1, U1(..), Par1(..), Rec1(..), K1(..), M1(..)
   , (:+:)(..), (:*:)(..), (:.:)(..)
 
+  -- ** Unboxed representation types
+  , URec(..)
+  , type UAddr, type UChar, type UDouble
+  , type UFloat, type UInt, type UWord
+
   -- ** Synonyms for convenience
   , Rec0, Par0, R, P
   , D1, C1, S1, D, C, S
@@ -561,6 +627,8 @@ module GHC.Generics  (
   ) where
 
 -- We use some base types
+import GHC.Prim ( Addr#, Char#, Double#, Float#, Int#, Word# )
+import GHC.Ptr ( Ptr )
 import GHC.Types
 import Data.Maybe ( Maybe(..) )
 import Data.Either ( Either(..) )
@@ -576,10 +644,10 @@ import Data.Proxy
 --------------------------------------------------------------------------------
 
 -- | Void: used for datatypes without constructors
-data V1 p
+data V1 (p :: *)
 
 -- | Unit: used for constructors without arguments
-data U1 p = U1
+data U1 (p :: *) = U1
   deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Used for marking occurrences of the parameter
@@ -587,31 +655,71 @@ newtype Par1 p = Par1 { unPar1 :: p }
   deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Recursive calls of kind * -> *
-newtype Rec1 f p = Rec1 { unRec1 :: f p }
+newtype Rec1 f (p :: *) = Rec1 { unRec1 :: f p }
   deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Constants, additional parameters and recursion of kind *
-newtype K1 i c p = K1 { unK1 :: c }
+newtype K1 (i :: *) c (p :: *) = K1 { unK1 :: c }
   deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Meta-information (constructor names, etc.)
-newtype M1 i c f p = M1 { unM1 :: f p }
+newtype M1 (i :: *) (c :: *) f (p :: *) = M1 { unM1 :: f p }
   deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Sums: encode choice between constructors
 infixr 5 :+:
-data (:+:) f g p = L1 (f p) | R1 (g p)
+data (:+:) f g (p :: *) = L1 (f p) | R1 (g p)
   deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Products: encode multiple arguments to constructors
 infixr 6 :*:
-data (:*:) f g p = f p :*: g p
+data (:*:) f g (p :: *) = f p :*: g p
   deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Composition of functors
 infixr 7 :.:
-newtype (:.:) f g p = Comp1 { unComp1 :: f (g p) }
+newtype (:.:) f (g :: * -> *) (p :: *) = Comp1 { unComp1 :: f (g p) }
   deriving (Eq, Ord, Read, Show, Generic)
+
+-- | Constants of kind @#@
+data family URec (a :: *) (p :: *)
+
+-- | Used for marking occurrences of 'Addr#'
+data instance URec (Ptr ()) p = UAddr { uAddr# :: Addr# }
+  deriving (Eq, Ord, Generic)
+
+-- | Used for marking occurrences of 'Char#'
+data instance URec Char p = UChar { uChar# :: Char# }
+  deriving (Eq, Ord, Show, Generic)
+
+-- | Used for marking occurrences of 'Double#'
+data instance URec Double p = UDouble { uDouble# :: Double# }
+  deriving (Eq, Ord, Show, Generic)
+
+-- | Used for marking occurrences of 'Float#'
+data instance URec Float p = UFloat { uFloat# :: Float# }
+  deriving (Eq, Ord, Show, Generic)
+
+-- | Used for marking occurrences of 'Int#'
+data instance URec Int p = UInt { uInt# :: Int# }
+  deriving (Eq, Ord, Show, Generic)
+
+-- | Used for marking occurrences of 'Word#'
+data instance URec Word p = UWord { uWord# :: Word# }
+  deriving (Eq, Ord, Show, Generic)
+
+-- | Type synonym for 'URec': 'Addr#'
+type UAddr   = URec (Ptr ())
+-- | Type synonym for 'URec': 'Char#'
+type UChar   = URec Char
+-- | Type synonym for 'URec': 'Double#'
+type UDouble = URec Double
+-- | Type synonym for 'URec': 'Float#'
+type UFloat  = URec Float
+-- | Type synonym for 'URec': 'Int#'
+type UInt    = URec Int
+-- | Type synonym for 'URec': 'Word#'
+type UWord   = URec Word
 
 -- | Tag for K1: recursion (of kind *)
 data R
@@ -641,24 +749,23 @@ type C1 = M1 C
 -- | Type synonym for encoding meta-information for record selectors
 type S1 = M1 S
 
-
 -- | Class for datatypes that represent datatypes
-class Datatype d where
+class Datatype (d :: *) where
   -- | The name of the datatype (unqualified)
-  datatypeName :: t d (f :: * -> *) a -> [Char]
+  datatypeName :: t d (f :: * -> *) (a :: *) -> [Char]
   -- | The fully-qualified name of the module where the type is declared
-  moduleName   :: t d (f :: * -> *) a -> [Char]
+  moduleName   :: t d (f :: * -> *) (a :: *) -> [Char]
   -- | The package name of the module where the type is declared
-  packageName :: t d (f :: * -> *) a -> [Char]
+  packageName :: t d (f :: * -> *) (a :: *) -> [Char]
   -- | Marks if the datatype is actually a newtype
-  isNewtype    :: t d (f :: * -> *) a -> Bool
+  isNewtype    :: t d (f :: * -> *) (a :: *) -> Bool
   isNewtype _ = False
 
 
 -- | Class for datatypes that represent records
-class Selector s where
+class Selector (s :: *) where
   -- | The name of the selector
-  selName :: t s (f :: * -> *) a -> [Char]
+  selName :: t s (f :: * -> *) (a :: *) -> [Char]
 
 -- | Used for constructor fields without a name
 data NoSelector
@@ -666,16 +773,16 @@ data NoSelector
 instance Selector NoSelector where selName _ = ""
 
 -- | Class for datatypes that represent data constructors
-class Constructor c where
+class Constructor (c :: *) where
   -- | The name of the constructor
-  conName :: t c (f :: * -> *) a -> [Char]
+  conName :: t c (f :: * -> *) (a :: *) -> [Char]
 
   -- | The fixity of the constructor
-  conFixity :: t c (f :: * -> *) a -> Fixity
+  conFixity :: t c (f :: * -> *) (a :: *) -> Fixity
   conFixity _ = Prefix
 
   -- | Marks if this constructor is a record
-  conIsRecord :: t c (f :: * -> *) a -> Bool
+  conIsRecord :: t c (f :: * -> *) (a :: *) -> Bool
   conIsRecord _ = False
 
 

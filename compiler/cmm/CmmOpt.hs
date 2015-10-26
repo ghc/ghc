@@ -21,7 +21,6 @@ import CmmUtils
 import Cmm
 import DynFlags
 
-import FastTypes
 import Outputable
 import Platform
 
@@ -376,30 +375,19 @@ cmmMachOpFoldM _ _ _ = Nothing
 -- This algorithm for determining the $\log_2$ of exact powers of 2 comes
 -- from GCC.  It requires bit manipulation primitives, and we use GHC
 -- extensions.  Tough.
---
--- Used to be in MachInstrs --SDM.
--- ToDo: remove use of unboxery --SDM.
-
--- Unboxery removed in favor of FastInt; but is the function supposed to fail
--- on inputs >= 2147483648, or was that just an implementation artifact?
--- And is this speed-critical, or can we just use Integer operations
--- (including Data.Bits)?
---  --Isaac Dupree
 
 exactLog2 :: Integer -> Maybe Integer
-exactLog2 x_
-  = if (x_ <= 0 || x_ >= 2147483648) then
+exactLog2 x
+  = if (x <= 0 || x >= 2147483648) then
        Nothing
     else
-       case iUnbox (fromInteger x_) of { x ->
-       if (x `bitAndFastInt` negateFastInt x) /=# x then
+       if (x .&. (-x)) /= x then
           Nothing
        else
-          Just (toInteger (iBox (pow2 x)))
-       }
+          Just (pow2 x)
   where
-    pow2 x | x ==# _ILIT(1) = _ILIT(0)
-           | otherwise = _ILIT(1) +# pow2 (x `shiftR_FastInt` _ILIT(1))
+    pow2 x | x == 1 = 0
+           | otherwise = 1 + pow2 (x `shiftR` 1)
 
 -- -----------------------------------------------------------------------------
 -- Utils

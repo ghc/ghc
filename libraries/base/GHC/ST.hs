@@ -58,16 +58,15 @@ instance Functor (ST s) where
       (# new_s, f r #) }
 
 instance Applicative (ST s) where
-    pure = return
+    {-# INLINE pure #-}
+    {-# INLINE (*>)   #-}
+    pure x = ST (\ s -> (# s, x #))
+    m *> k = m >>= \ _ -> k
     (<*>) = ap
 
 instance Monad (ST s) where
-    {-# INLINE return #-}
-    {-# INLINE (>>)   #-}
     {-# INLINE (>>=)  #-}
-    return x = ST (\ s -> (# s, x #))
-    m >> k   = m >>= \ _ -> k
-
+    (>>) = (*>)
     (ST m) >>= k
       = ST (\ s ->
         case (m s) of { (# new_s, r #) ->

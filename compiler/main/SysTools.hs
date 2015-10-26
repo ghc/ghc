@@ -343,13 +343,10 @@ initSysTools mbMinusB
                     sPgm_l   = (ld_prog, ld_args),
                     sPgm_dll = (mkdll_prog,mkdll_args),
                     sPgm_T   = touch_path,
-                    sPgm_sysman  = top_dir ++ "/ghc/rts/parallel/SysMan",
                     sPgm_windres = windres_path,
                     sPgm_libtool = libtool_path,
                     sPgm_lo  = (lo_prog,[]),
                     sPgm_lc  = (lc_prog,[]),
-                    -- Hans: this isn't right in general, but you can
-                    -- elaborate it in the same way as the others
                     sOpt_L       = [],
                     sOpt_P       = [],
                     sOpt_F       = [],
@@ -412,7 +409,7 @@ runCc dflags args =   do
       args1 = map Option (getOpts dflags opt_c)
       args2 = args0 ++ args1 ++ args
   mb_env <- getGccEnv args2
-  runSomethingFiltered dflags cc_filter "C Compiler" p args2 mb_env
+  runSomethingResponseFile dflags cc_filter "C Compiler" p args2 mb_env
  where
   -- discard some harmless warnings from gcc that we can't turn off
   cc_filter = unlines . doFilter . lines
@@ -610,13 +607,13 @@ runClang dflags args = do
     (\(err :: SomeException) -> do
         errorMsg dflags $
             text ("Error running clang! you need clang installed to use the" ++
-                "LLVM backend") $+$
+                  " LLVM backend") $+$
             text "(or GHC tried to execute clang incorrectly)"
         throwIO err
     )
 
 -- | Figure out which version of LLVM we are running this session
-figureLlvmVersion :: DynFlags -> IO (Maybe Int)
+figureLlvmVersion :: DynFlags -> IO (Maybe (Int, Int))
 figureLlvmVersion dflags = do
   let (pgm,opts) = pgm_lc dflags
       args = filter notNull (map showOpt opts)
@@ -629,17 +626,18 @@ figureLlvmVersion dflags = do
              (pin, pout, perr, _) <- runInteractiveProcess pgm args'
                                              Nothing Nothing
              {- > llc -version
-                  Low Level Virtual Machine (http://llvm.org/):
-                    llvm version 2.8 (Ubuntu 2.8-0Ubuntu1)
+                  LLVM (http://llvm.org/):
+                    LLVM version 3.5.2
                     ...
              -}
              hSetBinaryMode pout False
              _     <- hGetLine pout
-             vline <- hGetLine pout
-             v     <- case filter isDigit vline of
-                            []      -> fail "no digits!"
-                            [x]     -> fail $ "only 1 digit! (" ++ show x ++ ")"
-                            (x:y:_) -> return ((read [x,y]) :: Int)
+             vline <- dropWhile (not . isDigit) `fmap` hGetLine pout
+             v     <- case span (/= '.') vline of
+                        ("",_)  -> fail "no digits!"
+                        (x,y) -> return (read x
+                                        , read $ takeWhile isDigit $ drop 1 y)
+
              hClose pin
              hClose pout
              hClose perr
@@ -738,6 +736,30 @@ The flag is only needed on ELF systems. On Windows (PE) and Mac OS X
 
 -}
 
+{- Note [Windows static libGCC]
+
+The GCC versions being upgraded to in #10726 are configured with
+dynamic linking of libgcc supported. This results in libgcc being
+linked dynamically when a shared library is created.
+
+This introduces thus an extra dependency on GCC dll that was not
+needed before by shared libraries created with GHC. This is a particular
+issue on Windows because you get a non-obvious error due to this missing
+dependency. This dependent dll is also not commonly on your path.
+
+For this reason using the static libgcc is preferred as it preserves
+the same behaviour that existed before. There are however some very good
+reasons to have the shared version as well as described on page 181 of
+https://gcc.gnu.org/onlinedocs/gcc-5.2.0/gcc.pdf :
+
+"There are several situations in which an application should use the
+ shared ‘libgcc’ instead of the static version. The most common of these
+ is when the application wishes to throw and catch exceptions across different
+ shared libraries. In that case, each of the libraries as well as the application
+ itself should use the shared ‘libgcc’. "
+
+-}
+
 neededLinkArgs :: LinkerInfo -> [Option]
 neededLinkArgs (GnuLD o)     = o
 neededLinkArgs (GnuGold o)   = o
@@ -815,7 +837,9 @@ getLinkerInfo' dflags = do
                    , "-Wl,--reduce-memory-overheads"
                      -- Increase default stack, see
                      -- Note [Windows stack usage]
-                   , "-Xlinker", "--stack=0x800000,0x800000" ]
+                     -- Force static linking of libGCC
+                     -- Note [Windows static libGCC]
+                   , "-Xlinker", "--stack=0x800000,0x800000", "-static-libgcc" ]
                _ -> do
                  -- In practice, we use the compiler as the linker here. Pass
                  -- -Wl,--version to get linker version info.
@@ -857,10 +881,10 @@ getCompilerInfo' dflags = do
       -- Try to grab the info from the process output.
       parseCompilerInfo _stdo stde _exitc
         -- Regular GCC
-        | any ("gcc version" `isPrefixOf`) stde =
+        | any ("gcc version" `isInfixOf`) stde =
           return GCC
         -- Regular clang
-        | any ("clang version" `isPrefixOf`) stde =
+        | any ("clang version" `isInfixOf`) stde =
           return Clang
         -- XCode 5.1 clang
         | any ("Apple LLVM version 5.1" `isPrefixOf`) stde =
@@ -900,7 +924,7 @@ runLink dflags args = do
       args1     = map Option (getOpts dflags opt_l)
       args2     = args0 ++ linkargs ++ args1 ++ args
   mb_env <- getGccEnv args2
-  runSomethingFiltered dflags ld_filter "Linker" p args2 mb_env
+  runSomethingResponseFile dflags ld_filter "Linker" p args2 mb_env
   where
     ld_filter = case (platformOS (targetPlatform dflags)) of
                   OSSolaris2 -> sunos_ld_filter
@@ -1228,6 +1252,58 @@ runSomething :: DynFlags
 runSomething dflags phase_name pgm args =
   runSomethingFiltered dflags id phase_name pgm args Nothing
 
+-- | Run a command, placing the arguments in an external response file.
+--
+-- This command is used in order to avoid overlong command line arguments on
+-- Windows. The command line arguments are first written to an external,
+-- temporary response file, and then passed to the linker via @filepath.
+-- response files for passing them in. See:
+--
+--     https://gcc.gnu.org/wiki/Response_Files
+--     https://ghc.haskell.org/trac/ghc/ticket/10777
+runSomethingResponseFile
+  :: DynFlags -> (String->String) -> String -> String -> [Option]
+  -> Maybe [(String,String)] -> IO ()
+
+runSomethingResponseFile dflags filter_fn phase_name pgm args mb_env =
+    runSomethingWith dflags phase_name pgm args $ \real_args -> do
+        fp <- getResponseFile real_args
+        let args = ['@':fp]
+        r <- builderMainLoop dflags filter_fn pgm args mb_env
+        return (r,())
+  where
+    getResponseFile args = do
+      fp <- newTempName dflags "rsp"
+      withFile fp WriteMode $ \h -> do
+          hSetEncoding h utf8
+          hPutStr h $ unlines $ map escape args
+      return fp
+
+    -- Note: Response files have backslash-escaping, double quoting, and are
+    -- whitespace separated (some implementations use newline, others any
+    -- whitespace character). Therefore, escape any backslashes, newlines, and
+    -- double quotes in the argument, and surround the content with double
+    -- quotes.
+    --
+    -- Another possibility that could be considered would be to convert
+    -- backslashes in the argument to forward slashes. This would generally do
+    -- the right thing, since backslashes in general only appear in arguments
+    -- as part of file paths on Windows, and the forward slash is accepted for
+    -- those. However, escaping is more reliable, in case somehow a backslash
+    -- appears in a non-file.
+    escape x = concat
+        [ "\""
+        , concatMap
+            (\c ->
+                case c of
+                    '\\' -> "\\\\"
+                    '\n' -> "\\n"
+                    '\"' -> "\\\""
+                    _    -> [c])
+            x
+        , "\""
+        ]
+
 runSomethingFiltered
   :: DynFlags -> (String->String) -> String -> String -> [Option]
   -> Maybe [(String,String)] -> IO ()
@@ -1252,19 +1328,15 @@ handleProc pgm phase_name proc = do
     (rc, r) <- proc `catchIO` handler
     case rc of
       ExitSuccess{} -> return r
-      ExitFailure n
-        -- rawSystem returns (ExitFailure 127) if the exec failed for any
-        -- reason (eg. the program doesn't exist).  This is the only clue
-        -- we have, but we need to report something to the user because in
-        -- the case of a missing program there will otherwise be no output
-        -- at all.
-       | n == 127  -> does_not_exist
-       | otherwise -> throwGhcExceptionIO (PhaseFailed phase_name rc)
+      ExitFailure n -> throwGhcExceptionIO (
+            ProgramError ("`" ++ takeBaseName pgm ++ "'" ++
+                          " failed in phase `" ++ phase_name ++ "'." ++
+                          " (Exit code: " ++ show n ++ ")"))
   where
     handler err =
        if IO.isDoesNotExistError err
           then does_not_exist
-          else IO.ioError err
+          else throwGhcExceptionIO (ProgramError $ show err)
 
     does_not_exist = throwGhcExceptionIO (InstallationError ("could not execute: " ++ pgm))
 
@@ -1398,7 +1470,7 @@ traceCmd dflags phase_name cmd_line action
   where
     handle_exn _verb exn = do { debugTraceMsg dflags 2 (char '\n')
                               ; debugTraceMsg dflags 2 (ptext (sLit "Failed:") <+> text cmd_line <+> text (show exn))
-                              ; throwGhcExceptionIO (PhaseFailed phase_name (ExitFailure 1)) }
+                              ; throwGhcExceptionIO (ProgramError (show exn))}
 
 {-
 ************************************************************************
@@ -1469,7 +1541,7 @@ linesPlatform xs =
 
 #endif
 
-linkDynLib :: DynFlags -> [String] -> [PackageKey] -> IO ()
+linkDynLib :: DynFlags -> [String] -> [UnitId] -> IO ()
 linkDynLib dflags0 o_files dep_packages
  = do
     let -- This is a rather ugly hack to fix dynamically linked
@@ -1515,7 +1587,7 @@ linkDynLib dflags0 o_files dep_packages
                       OSMinGW32 ->
                           pkgs
                       _ ->
-                          filter ((/= rtsPackageKey) . packageConfigId) pkgs
+                          filter ((/= rtsUnitId) . packageConfigId) pkgs
     let pkg_link_opts = let (package_hs_libs, extra_libs, other_flags) = collectLinkOpts dflags pkgs_no_rts
                         in  package_hs_libs ++ extra_libs ++ other_flags
 
@@ -1525,7 +1597,7 @@ linkDynLib dflags0 o_files dep_packages
 
     -- frameworks
     pkg_framework_opts <- getPkgFrameworkOpts dflags platform
-                                              (map packageKey pkgs)
+                                              (map unitId pkgs)
     let framework_opts = getFrameworkOpts dflags platform
 
     case os of
@@ -1646,7 +1718,7 @@ linkDynLib dflags0 o_files dep_packages
                  ++ map Option pkg_link_opts
               )
 
-getPkgFrameworkOpts :: DynFlags -> Platform -> [PackageKey] -> IO [String]
+getPkgFrameworkOpts :: DynFlags -> Platform -> [UnitId] -> IO [String]
 getPkgFrameworkOpts dflags platform dep_packages
   | platformUsesFrameworks platform = do
     pkg_framework_path_opts <- do

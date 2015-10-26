@@ -86,6 +86,7 @@ int main(int argc, char *argv[])
 		switch( *(*argv + 1) ) {
 		  case '-':
 		    iflag = -1;
+		    break;
 		  case '+':
 		  default:
 		    iflag = 1;

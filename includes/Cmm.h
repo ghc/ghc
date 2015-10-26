@@ -540,10 +540,10 @@
    -------------------------------------------------------------------------- */
 
 /* The offset of the payload of an array */
-#define BYTE_ARR_CTS(arr)  ((arr) + SIZEOF_StgArrWords)
+#define BYTE_ARR_CTS(arr)  ((arr) + SIZEOF_StgArrBytes)
 
 /* The number of words allocated in an array payload */
-#define BYTE_ARR_WDS(arr) ROUNDUP_BYTES_TO_WDS(StgArrWords_bytes(arr))
+#define BYTE_ARR_WDS(arr) ROUNDUP_BYTES_TO_WDS(StgArrBytes_bytes(arr))
 
 /* Getting/setting the info pointer of a closure */
 #define SET_INFO(p,info) StgHeader_info(p) = info

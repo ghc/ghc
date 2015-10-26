@@ -101,6 +101,7 @@ test('T5745',
 test('T5892a', normal, compile_fail, ['-package containers'])
 test('T5892b', normal, compile_fail, ['-package containers'])
 test('T5951', normal, compile_fail, [''])
+test('T6018rnfail', normal, compile_fail, [''])
 test('T6060', normal, compile_fail, [''])
 test('T6148', normal, compile_fail, [''])
 test('T7164', normal, compile_fail, [''])
@@ -136,3 +137,4 @@ test('T9032',
 test('T10618', normal, compile_fail, [''])
 test('T10668', normal, compile_fail, [''])
 test('T5001b', normal, compile_fail, [''])
+test('T10781', normal, compile_fail, [''])

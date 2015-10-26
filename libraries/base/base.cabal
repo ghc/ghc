@@ -115,6 +115,7 @@ Library
         Control.Monad
         Control.Monad.Fix
         Control.Monad.Instances
+        Control.Monad.IO.Class
         Control.Monad.ST
         Control.Monad.ST.Lazy
         Control.Monad.ST.Lazy.Safe
@@ -142,11 +143,13 @@ Library
         Data.Int
         Data.Ix
         Data.List
+        Data.List.NonEmpty
         Data.Maybe
         Data.Monoid
         Data.Ord
         Data.Proxy
         Data.Ratio
+        Data.Semigroup
         Data.STRef
         Data.STRef.Lazy
         Data.STRef.Strict
@@ -248,9 +251,9 @@ Library
         GHC.StaticPtr
         GHC.STRef
         GHC.Show
-        GHC.SrcLoc
         GHC.Stable
         GHC.Stack
+        GHC.Stack.Types
         GHC.Stats
         GHC.Storable
         GHC.TopHandler
@@ -340,6 +343,6 @@ Library
             GHC.Event.TimerManager
             GHC.Event.Unique
 
-    -- We need to set the package key to base (without a version number)
+    -- We need to set the unit id to base (without a version number)
     -- as it's magic.
     ghc-options: -this-package-key base

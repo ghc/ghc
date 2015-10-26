@@ -13,7 +13,7 @@ module RnSource (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} RnExpr( rnLExpr )
-import {-# SOURCE #-} RnSplice ( rnSpliceDecl )
+import {-# SOURCE #-} RnSplice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import HsSyn
 import RdrName
@@ -44,8 +44,9 @@ import ListSetOps       ( findDupsEq, removeDups )
 import Digraph          ( SCC, flattenSCC, stronglyConnCompFromEdgedVertices )
 
 import Control.Monad
-import Data.List( sortBy )
+import Data.List ( sortBy )
 import Maybes( orElse, mapMaybe )
+import qualified Data.Set as Set ( difference, fromList, toList, null )
 #if __GLASGOW_HASKELL__ < 709
 import Data.Traversable (traverse)
 #endif
@@ -102,15 +103,10 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    --          Again, they have no value declarations
    --
    (tc_envs, tc_bndrs) <- getLocalNonValBinders local_fix_env group ;
+
    setEnvs tc_envs $ do {
 
    failIfErrsM ; -- No point in continuing if (say) we have duplicate declarations
-
-   -- (C) Extract the mapping from data constructors to field names and
-   --     extend the record field env.
-   --     This depends on the data constructors and field names being in
-   --     scope from (B) above
-   inNewEnv (extendRecordFieldEnv tycl_decls inst_decls) $ \ _ -> do {
 
    -- (D1) Bring pattern synonyms into scope.
    --      Need to do this before (D2) because rnTopBindsLHS
@@ -180,7 +176,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
       -- Haddock docs; no free vars
    rn_docs <- mapM (wrapLocM rnDocDecl) docs ;
 
-    last_tcg_env <- getGblEnv ;
+   last_tcg_env <- getGblEnv ;
    -- (I) Compute the results and return
    let {rn_group = HsGroup { hs_valds   = rn_val_decls,
                              hs_splcds  = rn_splice_decls,
@@ -216,13 +212,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    traceRn (text "finish rnSrc" <+> ppr rn_group) ;
    traceRn (text "finish Dus" <+> ppr src_dus ) ;
    return (final_tcg_env, rn_group)
-                    }}}}}
-
--- some utils because we do this a bunch above
--- compute and install the new env
-inNewEnv :: TcM TcGblEnv -> (TcGblEnv -> TcM a) -> TcM a
-inNewEnv env cont = do e <- env
-                       setGblEnv e $ cont e
+                    }}}}
 
 addTcgDUs :: TcGblEnv -> DefUses -> TcGblEnv
 -- This function could be defined lower down in the module hierarchy,
@@ -360,7 +350,7 @@ rnAnnDecl :: AnnDecl RdrName -> RnM (AnnDecl Name, FreeVars)
 rnAnnDecl ann@(HsAnnotation s provenance expr)
   = addErrCtxt (annCtxt ann) $
     do { (provenance', provenance_fvs) <- rnAnnProvenance provenance
-       ; (expr', expr_fvs) <- setStage (Splice False) $
+       ; (expr', expr_fvs) <- setStage (Splice Untyped) $
                               rnLExpr expr
        ; return (HsAnnotation s provenance' expr',
                  provenance_fvs `plusFV` expr_fvs) }
@@ -400,8 +390,8 @@ rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
        ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) ty
 
         -- Mark any PackageTarget style imports as coming from the current package
-       ; let packageKey = thisPackage $ hsc_dflags topEnv
-             spec'      = patchForeignImport packageKey spec
+       ; let unitId = thisPackage $ hsc_dflags topEnv
+             spec'      = patchForeignImport unitId spec
 
        ; return (ForeignImport { fd_name = name', fd_sig_ty = ty'
                                , fd_co = noForeignImportCoercionYet
@@ -423,21 +413,21 @@ rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
 --      package, so if they get inlined across a package boundry we'll still
 --      know where they're from.
 --
-patchForeignImport :: PackageKey -> ForeignImport -> ForeignImport
-patchForeignImport packageKey (CImport cconv safety fs spec src)
-        = CImport cconv safety fs (patchCImportSpec packageKey spec) src
+patchForeignImport :: UnitId -> ForeignImport -> ForeignImport
+patchForeignImport unitId (CImport cconv safety fs spec src)
+        = CImport cconv safety fs (patchCImportSpec unitId spec) src
 
-patchCImportSpec :: PackageKey -> CImportSpec -> CImportSpec
-patchCImportSpec packageKey spec
+patchCImportSpec :: UnitId -> CImportSpec -> CImportSpec
+patchCImportSpec unitId spec
  = case spec of
-        CFunction callTarget    -> CFunction $ patchCCallTarget packageKey callTarget
+        CFunction callTarget    -> CFunction $ patchCCallTarget unitId callTarget
         _                       -> spec
 
-patchCCallTarget :: PackageKey -> CCallTarget -> CCallTarget
-patchCCallTarget packageKey callTarget =
+patchCCallTarget :: UnitId -> CCallTarget -> CCallTarget
+patchCCallTarget unitId callTarget =
   case callTarget of
   StaticTarget src label Nothing isFun
-                              -> StaticTarget src label (Just packageKey) isFun
+                              -> StaticTarget src label (Just unitId) isFun
   _                           -> callTarget
 
 {-
@@ -1010,10 +1000,10 @@ rnTyClDecl (DataDecl { tcdLName = tycon, tcdTyVars = tyvars, tcdDataDefn = defn 
        ; return (DataDecl { tcdLName = tycon', tcdTyVars = tyvars'
                           , tcdDataDefn = defn', tcdFVs = fvs }, fvs) }
 
-rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = lcls,
-                              tcdTyVars = tyvars, tcdFDs = fds, tcdSigs = sigs,
-                              tcdMeths = mbinds, tcdATs = ats, tcdATDefs = at_defs,
-                              tcdDocs = docs})
+rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
+                        tcdTyVars = tyvars, tcdFDs = fds, tcdSigs = sigs,
+                        tcdMeths = mbinds, tcdATs = ats, tcdATDefs = at_defs,
+                        tcdDocs = docs})
   = do  { lcls' <- lookupLocatedTopBndrRn lcls
         ; let cls' = unLoc lcls'
               kvs = []  -- No scoped kind vars except those in
@@ -1176,27 +1166,31 @@ badGadtStupidTheta _
   = vcat [ptext (sLit "No context is allowed on a GADT-style data declaration"),
           ptext (sLit "(You can put a context on each contructor, though.)")]
 
-rnFamDecl :: Maybe Name
-                    -- Just cls => this FamilyDecl is nested
-                    --             inside an *class decl* for cls
-                    --             used for associated types
+rnFamDecl :: Maybe Name -- Just cls => this FamilyDecl is nested
+                        --             inside an *class decl* for cls
+                        --             used for associated types
           -> FamilyDecl RdrName
           -> RnM (FamilyDecl Name, FreeVars)
 rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
-                             , fdInfo = info, fdKindSig = kind })
-  = do { ((tycon', tyvars', kind'), fv1) <-
-           bindHsQTyVars fmly_doc mb_cls kvs tyvars $ \tyvars' ->
-           do { tycon' <- lookupLocatedTopBndrRn tycon
-              ; (kind', fv_kind) <- rnLHsMaybeKind fmly_doc kind
-              ; return ((tycon', tyvars', kind'), fv_kind) }
+                             , fdInfo = info, fdResultSig = res_sig
+                             , fdInjectivityAnn = injectivity })
+  = do { tycon' <- lookupLocatedTopBndrRn tycon
+       ; ((tyvars', res_sig', injectivity'), fv1) <-
+            bindHsQTyVars doc mb_cls kvs tyvars $ \ tyvars' ->
+            do { (res_sig', fv_kind) <- wrapLocFstM (rnFamResultSig doc) res_sig
+               ; injectivity' <- traverse (rnInjectivityAnn tyvars' res_sig')
+                                          injectivity
+               ; return ( (tyvars', res_sig', injectivity') , fv_kind )  }
        ; (info', fv2) <- rn_info info
        ; return (FamilyDecl { fdLName = tycon', fdTyVars = tyvars'
-                            , fdInfo = info', fdKindSig = kind' }
+                            , fdInfo = info', fdResultSig = res_sig'
+                            , fdInjectivityAnn = injectivity' }
                 , fv1 `plusFV` fv2) }
   where
-     fmly_doc = TyFamilyCtx tycon
-     kvs = extractRdrKindSigVars kind
+     doc = TyFamilyCtx tycon
+     kvs = extractRdrKindSigVars res_sig
 
+     ----------------------
      rn_info (ClosedTypeFamily (Just eqns))
        = do { (eqns', fvs) <- rnList (rnTyFamInstEqn Nothing) eqns
                                                     -- no class context,
@@ -1205,6 +1199,134 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
        = return (ClosedTypeFamily Nothing, emptyFVs)
      rn_info OpenTypeFamily = return (OpenTypeFamily, emptyFVs)
      rn_info DataFamily     = return (DataFamily, emptyFVs)
+
+rnFamResultSig :: HsDocContext -> FamilyResultSig RdrName
+               -> RnM (FamilyResultSig Name, FreeVars)
+rnFamResultSig _ NoSig
+   = return (NoSig, emptyFVs)
+rnFamResultSig doc (KindSig kind)
+   = do { (rndKind, ftvs) <- rnLHsKind doc kind
+        ;  return (KindSig rndKind, ftvs) }
+rnFamResultSig doc (TyVarSig tvbndr)
+   = do { -- `TyVarSig` tells us that user named the result of a type family by
+          -- writing `= tyvar` or `= (tyvar :: kind)`. In such case we want to
+          -- be sure that the supplied result name is not identical to an
+          -- already in-scope type variables:
+          --
+          --  (a) one of already declared type family arguments. Example of
+          --      disallowed declaration:
+          --        type family F a = a
+          --
+          --  (b) already in-scope type variable. This second case might happen
+          --      for associated types, where type class head bounds some type
+          --      variables. Example of disallowed declaration:
+          --         class C a b where
+          --            type F b = a | a -> b
+          -- Both are caught by the "in-scope" check that comes next
+          rdr_env <- getLocalRdrEnv
+       ;  let resName = hsLTyVarName tvbndr
+       ;  when (resName `elemLocalRdrEnv` rdr_env) $
+          addErrAt (getLoc tvbndr) $
+                     (hsep [ text "Type variable", quotes (ppr resName) <> comma
+                           , text "naming a type family result,"
+                           ] $$
+                      text "shadows an already bound type variable")
+
+       ; (tvbndr', fvs) <- rnLHsTyVarBndr doc Nothing rdr_env tvbndr
+       ; return (TyVarSig tvbndr', fvs) }
+
+-- Note [Renaming injectivity annotation]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- During renaming of injectivity annotation we have to make several checks to
+-- make sure that it is well-formed.  At the moment injectivity annotation
+-- consists of a single injectivity condition, so the terms "injectivity
+-- annotation" and "injectivity condition" might be used interchangeably.  See
+-- Note [Injectivity annotation] for a detailed discussion of currently allowed
+-- injectivity annotations.
+--
+-- Checking LHS is simple because the only type variable allowed on the LHS of
+-- injectivity condition is the variable naming the result in type family head.
+-- Example of disallowed annotation:
+--
+--     type family Foo a b = r | b -> a
+--
+-- Verifying RHS of injectivity consists of checking that:
+--
+--  1. only variables defined in type family head appear on the RHS (kind
+--     variables are also allowed).  Example of disallowed annotation:
+--
+--        type family Foo a = r | r -> b
+--
+--  2. for associated types the result variable does not shadow any of type
+--     class variables. Example of disallowed annotation:
+--
+--        class Foo a b where
+--           type F a = b | b -> a
+--
+-- Breaking any of these assumptions results in an error.
+
+-- | Rename injectivity annotation. Note that injectivity annotation is just the
+-- part after the "|".  Everything that appears before it is renamed in
+-- rnFamDecl.
+rnInjectivityAnn :: LHsQTyVars Name            -- ^ Type variables declared in
+                                               --   type family head
+                 -> LFamilyResultSig Name      -- ^ Result signature
+                 -> LInjectivityAnn RdrName    -- ^ Injectivity annotation
+                 -> RnM (LInjectivityAnn Name)
+rnInjectivityAnn tvBndrs (L _ (TyVarSig resTv))
+                 (L srcSpan (InjectivityAnn injFrom injTo))
+ = do
+   { (injDecl'@(L _ (InjectivityAnn injFrom' injTo')), noRnErrors)
+          <- askNoErrs $
+             bindLocalNames [hsLTyVarName resTv] $
+             -- The return type variable scopes over the injectivity annotation
+             -- e.g.   type family F a = (r::*) | r -> a
+             do { injFrom' <- rnLTyVar injFrom
+                ; injTo'   <- mapM rnLTyVar injTo
+                ; return $ L srcSpan (InjectivityAnn injFrom' injTo') }
+
+   ; let tvNames  = Set.fromList $ hsLKiTyVarNames tvBndrs
+         resName  = hsLTyVarName resTv
+         -- See Note [Renaming injectivity annotation]
+         lhsValid = EQ == (stableNameCmp resName (unLoc injFrom'))
+         rhsValid = Set.fromList (map unLoc injTo') `Set.difference` tvNames
+
+   -- if renaming of type variables ended with errors (eg. there were
+   -- not-in-scope variables) don't check the validity of injectivity
+   -- annotation. This gives better error messages.
+   ; when (noRnErrors && not lhsValid) $
+        addErrAt (getLoc injFrom)
+              ( vcat [ text $ "Incorrect type variable on the LHS of "
+                           ++ "injectivity condition"
+              , nest 5
+              ( vcat [ text "Expected :" <+> ppr resName
+                     , text "Actual   :" <+> ppr injFrom ])])
+
+   ; when (noRnErrors && not (Set.null rhsValid)) $
+      do { let errorVars = Set.toList rhsValid
+         ; addErrAt srcSpan $ ( hsep
+                        [ text "Unknown type variable" <> plural errorVars
+                        , text "on the RHS of injectivity condition:"
+                        , interpp'SP errorVars ] ) }
+
+   ; return injDecl' }
+
+-- We can only hit this case when the user writes injectivity annotation without
+-- naming the result:
+--
+--   type family F a | result -> a
+--   type family F a :: * | result -> a
+--
+-- So we rename injectivity annotation like we normally would except that
+-- this time we expect "result" to be reported not in scope by rnLTyVar.
+rnInjectivityAnn _ _ (L srcSpan (InjectivityAnn injFrom injTo)) =
+   setSrcSpan srcSpan $ do
+   (injDecl', _) <- askNoErrs $ do
+     injFrom' <- rnLTyVar injFrom
+     injTo'   <- mapM rnLTyVar injTo
+     return $ L srcSpan (InjectivityAnn injFrom' injTo')
+   return $ injDecl'
 
 {-
 Note [Stupid theta]
@@ -1343,7 +1465,7 @@ rnConDecl decl@(ConDecl { con_names = names, con_qvars = qtvs
 
         ; bindHsQTyVars doc Nothing kvs qtvs' $ \new_tyvars -> do
         { (new_context, fvs1) <- rnContext doc lcxt
-        ; (new_details, fvs2) <- rnConDeclDetails doc details
+        ; (new_details, fvs2) <- rnConDeclDetails (unLoc $ head new_names) doc details
         ; (new_details', new_res_ty, fvs3)
                      <- rnConResult doc (map unLoc new_names) new_details res_ty
         ; traceRn (text "rnConDecl" <+> ppr names <+> vcat
@@ -1403,20 +1525,22 @@ rnConResult doc _con details (ResTyGADT ls ty)
            PrefixCon {} -> return (PrefixCon arg_tys, ResTyGADT ls res_ty, fvs)}
 
 rnConDeclDetails
-   :: HsDocContext
+   :: Name
+   -> HsDocContext
    -> HsConDetails (LHsType RdrName) (Located [LConDeclField RdrName])
    -> RnM (HsConDetails (LHsType Name) (Located [LConDeclField Name]), FreeVars)
-rnConDeclDetails doc (PrefixCon tys)
+rnConDeclDetails _ doc (PrefixCon tys)
   = do { (new_tys, fvs) <- rnLHsTypes doc tys
        ; return (PrefixCon new_tys, fvs) }
 
-rnConDeclDetails doc (InfixCon ty1 ty2)
+rnConDeclDetails _ doc (InfixCon ty1 ty2)
   = do { (new_ty1, fvs1) <- rnLHsType doc ty1
        ; (new_ty2, fvs2) <- rnLHsType doc ty2
        ; return (InfixCon new_ty1 new_ty2, fvs1 `plusFV` fvs2) }
 
-rnConDeclDetails doc (RecCon (L l fields))
-  = do  { (new_fields, fvs) <- rnConDeclFields doc fields
+rnConDeclDetails con doc (RecCon (L l fields))
+  = do  { fls <- lookupConstructorFields con
+        ; (new_fields, fvs) <- rnConDeclFields fls doc fields
                 -- No need to check for duplicate fields
                 -- since that is done by RnNames.extendGlobalRdrEnvRn
         ; return (RecCon (L l new_fields), fvs) }
@@ -1432,51 +1556,6 @@ deprecRecSyntax decl
 badRecResTy :: HsDocContext -> SDoc
 badRecResTy ctxt = withHsDocContext ctxt $
                    ptext (sLit "Malformed constructor signature")
-
-{-
-*********************************************************
-*                                                      *
-\subsection{Support code for type/data declarations}
-*                                                      *
-*********************************************************
-
-Get the mapping from constructors to fields for this module.
-It's convenient to do this after the data type decls have been renamed
--}
-
-extendRecordFieldEnv :: [TyClGroup RdrName] -> [LInstDecl RdrName] -> TcM TcGblEnv
-extendRecordFieldEnv tycl_decls inst_decls
-  = do  { tcg_env <- getGblEnv
-        ; field_env' <- foldrM get_con (tcg_field_env tcg_env) all_data_cons
-        ; return (tcg_env { tcg_field_env = field_env' }) }
-  where
-    -- we want to lookup:
-    --  (a) a datatype constructor
-    --  (b) a record field
-    -- knowing that they're from this module.
-    -- lookupLocatedTopBndrRn does this, because it does a lookupGreLocalRn_maybe,
-    -- which keeps only the local ones.
-    lookup x = do { x' <- lookupLocatedTopBndrRn x
-                    ; return $ unLoc x'}
-
-    all_data_cons :: [ConDecl RdrName]
-    all_data_cons = [con | HsDataDefn { dd_cons = cons } <- all_ty_defs
-                         , L _ con <- cons ]
-    all_ty_defs = [ defn | L _ (DataDecl { tcdDataDefn = defn })
-                                                 <- tyClGroupConcat tycl_decls ]
-               ++ map dfid_defn (instDeclDataFamInsts inst_decls)
-                                              -- Do not forget associated types!
-
-    get_con (ConDecl { con_names = cons, con_details = RecCon flds })
-            (RecFields env fld_set)
-        = do { cons' <- mapM lookup cons
-             ; flds' <- mapM lookup (concatMap (cd_fld_names . unLoc)
-                                               (unLoc flds))
-             ; let env'    = foldl (\e c -> extendNameEnv e c flds') env cons'
-
-                   fld_set' = extendNameSetList fld_set flds'
-             ; return $ (RecFields env' fld_set') }
-    get_con _ env = return env
 
 {-
 *********************************************************
@@ -1529,6 +1608,13 @@ addl gp (L l d : ds) = add gp l d ds
 
 add :: HsGroup RdrName -> SrcSpan -> HsDecl RdrName -> [LHsDecl RdrName]
     -> RnM (HsGroup RdrName, Maybe (SpliceDecl RdrName, [LHsDecl RdrName]))
+
+-- #10047: Declaration QuasiQuoters are expanded immediately, without
+--         causing a group split
+add gp _ (SpliceD (SpliceDecl (L _ qq@HsQuasiQuote{}) _)) ds
+  = do { (ds', _) <- rnTopSpliceDecls qq
+       ; addl gp (ds' ++ ds)
+       }
 
 add gp loc (SpliceD splice@(SpliceDecl _ flag)) ds
   = do { -- We've found a top-level splice.  If it is an *implicit* one

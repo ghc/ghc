@@ -81,19 +81,19 @@ define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way, $4 = stage
 # $1_$2_$3_MOST_HC_OPTS is also passed to C compilations when we use
 # GHC as the C compiler.
 
-ifeq "$(SUPPORTS_PACKAGE_KEY)" "NO"
+ifeq "$(SUPPORTS_COMPONENT_ID)" "NO"
 ifeq "$4" "0"
-$4_USE_PACKAGE_KEY=NO
+$4_USE_COMPONENT_ID=NO
 endif
 endif
 
 $1_$2_$4_DEP_OPTS = \
  $$(foreach pkg,$$($1_$2_DEP_IPIDS),-package-id $$(pkg))
 
-ifeq "$($4_USE_PACKAGE_KEY)" "NO"
-$4_THIS_PACKAGE_KEY = -package-name
+ifeq "$($4_USE_COMPONENT_ID)" "NO"
+$4_THIS_COMPONENT_ID = -package-name
 else
-$4_THIS_PACKAGE_KEY = -this-package-key
+$4_THIS_COMPONENT_ID = -this-package-key
 endif
 
 $1_$2_$3_MOST_HC_OPTS = \
@@ -103,7 +103,7 @@ $1_$2_$3_MOST_HC_OPTS = \
  $$($1_HC_OPTS) \
  $$($1_$2_HC_PKGCONF) \
  $$(if $$($1_$2_PROG),, \
-        $$(if $$($1_PACKAGE),$$($4_THIS_PACKAGE_KEY) $$($1_$2_PACKAGE_KEY))) \
+        $$(if $$($1_PACKAGE),$$($4_THIS_COMPONENT_ID) $$($1_$2_COMPONENT_ID))) \
  $$(if $$($1_PACKAGE),-hide-all-packages) \
  -i $$(if $$($1_$2_HS_SRC_DIRS),$$(foreach dir,$$($1_$2_HS_SRC_DIRS),-i$1/$$(dir)),-i$1) \
  -i$1/$2/build -i$1/$2/build/autogen \
@@ -185,11 +185,11 @@ ifneq "$4" "0"
 ifeq "$$(TargetElf)" "YES"
 $1_$2_$3_GHC_LD_OPTS += \
     -fno-use-rpaths \
-    $$(foreach d,$$($1_$2_TRANSITIVE_DEP_LIB_NAMES),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'$$$$ORIGIN/../$$d') -optl-Wl,-zorigin
+    $$(foreach d,$$($1_$2_TRANSITIVE_DEP_COMPONENT_IDS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'$$$$ORIGIN/../$$d') -optl-Wl,-zorigin
 else ifeq "$$(TargetOS_CPP)" "darwin"
 $1_$2_$3_GHC_LD_OPTS += \
     -fno-use-rpaths \
-    $$(foreach d,$$($1_$2_TRANSITIVE_DEP_LIB_NAMES),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'@loader_path/../$$d')
+    $$(foreach d,$$($1_$2_TRANSITIVE_DEP_COMPONENT_IDS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'@loader_path/../$$d')
 endif
 endif
 endif

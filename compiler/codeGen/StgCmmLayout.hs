@@ -226,9 +226,10 @@ slowCall fun stg_args
                                                   (mkIntExpr dflags n_args)
 
              tscope <- getTickScope
-             emit (mkCbranch (cmmIsTagged dflags funv) is_tagged_lbl slow_lbl
+             emit (mkCbranch (cmmIsTagged dflags funv)
+                             is_tagged_lbl slow_lbl (Just True)
                    <*> mkLabel is_tagged_lbl tscope
-                   <*> mkCbranch correct_arity fast_lbl slow_lbl
+                   <*> mkCbranch correct_arity fast_lbl slow_lbl (Just True)
                    <*> mkLabel fast_lbl tscope
                    <*> fast_code
                    <*> mkBranch end_lbl
@@ -365,10 +366,10 @@ slowArgs dflags args -- careful: reps contains voids (V), but args does not
     (arg_pat, n)            = slowCallPattern (map fst args)
     (call_args, rest_args)  = splitAt n args
 
-    stg_ap_pat = mkCmmRetInfoLabel rtsPackageKey arg_pat
+    stg_ap_pat = mkCmmRetInfoLabel rtsUnitId arg_pat
     this_pat   = (N, Just (mkLblExpr stg_ap_pat)) : call_args
     save_cccs  = [(N, Just (mkLblExpr save_cccs_lbl)), (N, Just curCCS)]
-    save_cccs_lbl = mkCmmRetInfoLabel rtsPackageKey (fsLit "stg_restore_cccs")
+    save_cccs_lbl = mkCmmRetInfoLabel rtsUnitId (fsLit "stg_restore_cccs")
 
 -------------------------------------------------------------------------
 ----        Laying out objects on the heap and stack

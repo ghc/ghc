@@ -13,7 +13,7 @@ lower levels it is preserved with @let@/@letrec@s).
 {-# LANGUAGE CPP #-}
 
 module DsBinds ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, dsSpec,
-                 dsHsWrapper, dsTcEvBinds, dsTcEvBinds_s, dsEvBinds
+                 dsHsWrapper, dsTcEvBinds, dsTcEvBinds_s, dsEvBinds, dsMkUserRule
   ) where
 
 #include "HsVersions.h"
@@ -47,7 +47,7 @@ import Type
 import Kind (returnsConstraintKind)
 import Coercion hiding (substCo)
 import TysWiredIn ( eqBoxDataCon, coercibleDataCon, mkListTy
-                  , mkBoxedTupleTy, stringTy, typeNatKind, typeSymbolKind )
+                  , mkBoxedTupleTy, charTy, typeNatKind, typeSymbolKind )
 import Id
 import MkId(proxyHashId)
 import Class
@@ -69,7 +69,7 @@ import DynFlags
 import FastString
 import Util
 import MonadUtils
-import Control.Monad(liftM)
+import Control.Monad(liftM,when)
 import Fingerprint(Fingerprint(..), fingerprintString)
 
 {-
@@ -450,7 +450,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              spec_id   = mkLocalId spec_name spec_ty
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
-             rule =  mkRule this_mod False {- Not auto -} is_local_id
+       ; rule <- dsMkUserRule this_mod is_local_id
                         (mkFastString ("SPEC " ++ showPpr dflags poly_name))
                         rule_act poly_name
                         rule_bndrs args
@@ -503,6 +503,17 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              | otherwise   = spec_prag_act                   -- Specified by user
 
 
+dsMkUserRule :: Module -> Bool -> RuleName -> Activation
+       -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> DsM CoreRule
+dsMkUserRule this_mod is_local name act fn bndrs args rhs = do
+    let rule = mkRule this_mod False is_local name act fn bndrs args rhs
+    dflags <- getDynFlags
+    when (isOrphan (ru_orphan rule) && wopt Opt_WarnOrphans dflags) $
+        warnDs (ruleOrphWarn rule)
+    return rule
+
+ruleOrphWarn :: CoreRule -> SDoc
+ruleOrphWarn rule = ptext (sLit "Orphan rule:") <+> ppr rule
 
 {- Note [SPECIALISE on INLINE functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -969,10 +980,10 @@ dsEvTypeable ev =
     where
     tycon_name                = tyConName tc
     modl                      = nameModule tycon_name
-    pkg                       = modulePackageKey modl
+    pkg                       = moduleUnitId modl
 
     modl_fs                   = moduleNameFS (moduleName modl)
-    pkg_fs                    = packageKeyFS pkg
+    pkg_fs                    = unitIdFS pkg
     name_fs                   = occNameFS (nameOccName tycon_name)
     hash_name_fs
       | isPromotedTyCon tc    = appendFS (mkFastString "$k") name_fs
@@ -1014,7 +1025,7 @@ dsEvCallStack cs = do
   let srcLocTy     = mkTyConTy srcLocTyCon
   let mkSrcLoc l =
         liftM (mkCoreConApps srcLocDataCon)
-              (sequence [ mkStringExprFS (packageKeyFS $ modulePackageKey m)
+              (sequence [ mkStringExpr (showPpr df $ moduleUnitId m)
                         , mkStringExprFS (moduleNameFS $ moduleName m)
                         , mkStringExprFS (srcSpanFile l)
                         , return $ mkIntExprInt df (srcSpanStartLine l)
@@ -1023,7 +1034,10 @@ dsEvCallStack cs = do
                         , return $ mkIntExprInt df (srcSpanEndCol l)
                         ])
 
-  let callSiteTy = mkBoxedTupleTy [stringTy, srcLocTy]
+  -- Be careful to use [Char] instead of String here to avoid
+  -- unnecessary dependencies on GHC.Base, particularly when
+  -- building GHC.Err.absentError
+  let callSiteTy = mkBoxedTupleTy [mkListTy charTy, srcLocTy]
 
   matchId         <- newSysLocalDs $ mkListTy callSiteTy
 

@@ -12,8 +12,7 @@ module LlvmCodeGen.Base (
         LiveGlobalRegs,
         LlvmUnresData, LlvmData, UnresLabel, UnresStatic,
 
-        LlvmVersion, defaultLlvmVersion, minSupportLlvmVersion,
-        maxSupportLlvmVersion,
+        LlvmVersion, supportedLlvmVersion,
 
         LlvmM,
         runLlvm, liftStream, withClearVars, varLookup, varInsert,
@@ -36,6 +35,7 @@ module LlvmCodeGen.Base (
     ) where
 
 #include "HsVersions.h"
+#include "ghcautoconf.h"
 
 import Llvm
 import LlvmCodeGen.Regs
@@ -111,7 +111,7 @@ widthToLlvmInt w = LMInt $ widthInBits w
 llvmGhcCC :: DynFlags -> LlvmCallConvention
 llvmGhcCC dflags
  | platformUnregisterised (targetPlatform dflags) = CC_Ccc
- | otherwise                                      = CC_Ncc 10
+ | otherwise                                      = CC_Ghc
 
 -- | Llvm Function type for Cmm function
 llvmFunTy :: LiveGlobalRegs -> LlvmM LlvmType
@@ -172,17 +172,11 @@ llvmPtrBits dflags = widthInBits $ typeWidth $ gcWord dflags
 --
 
 -- | LLVM Version Number
-type LlvmVersion = Int
+type LlvmVersion = (Int, Int)
 
--- | The LLVM Version we assume if we don't know
-defaultLlvmVersion :: LlvmVersion
-defaultLlvmVersion = 36
-
-minSupportLlvmVersion :: LlvmVersion
-minSupportLlvmVersion = 36
-
-maxSupportLlvmVersion :: LlvmVersion
-maxSupportLlvmVersion = 36
+-- | The LLVM Version that is currently supported.
+supportedLlvmVersion :: LlvmVersion
+supportedLlvmVersion = sUPPORTED_LLVM_VERSION
 
 -- ----------------------------------------------------------------------------
 -- * Environment Handling
@@ -214,11 +208,11 @@ instance Functor LlvmM where
                                   return (f x, env')
 
 instance Applicative LlvmM where
-    pure = return
+    pure x = LlvmM $ \env -> return (x, env)
     (<*>) = ap
 
 instance Monad LlvmM where
-    return x = LlvmM $ \env -> return (x, env)
+    return = pure
     m >>= f  = LlvmM $ \env -> do (x, env') <- runLlvmM m env
                                   runLlvmM (f x) env'
 

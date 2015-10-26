@@ -258,12 +258,23 @@ targetSupportsSwitch _ = False
 -- | This function creates a SwitchPlan from a SwitchTargets value, breaking it
 -- down into smaller pieces suitable for code generation.
 createSwitchPlan :: SwitchTargets -> SwitchPlan
-createSwitchPlan (SwitchTargets signed mbdef range m) =
+-- Lets do the common case of a singleton map quicky and efficiently (#10677)
+createSwitchPlan (SwitchTargets _signed _range (Just defLabel) m)
+    | [(x, l)] <- M.toList m
+    = IfEqual x l (Unconditionally defLabel)
+-- And another common case, matching booleans
+createSwitchPlan (SwitchTargets _signed (lo,hi) Nothing m)
+    | [(x1, l1), (x2,l2)] <- M.toAscList m
+    , x1 == lo
+    , x2 == hi
+    , x1 + 1 == x2
+    = IfEqual x1 l1 (Unconditionally l2)
+createSwitchPlan (SwitchTargets signed range mbdef m) =
     -- pprTrace "createSwitchPlan" (text (show ids) $$ text (show (range,m)) $$ text (show pieces) $$ text (show flatPlan) $$ text (show plan)) $
     plan
   where
     pieces = concatMap breakTooSmall $ splitAtHoles maxJumpTableHole m
-    flatPlan = findSingleValues $ mkFlatSwitchPlan signed range mbdef pieces
+    flatPlan = findSingleValues $ mkFlatSwitchPlan signed mbdef range pieces
     plan = buildTree signed $ flatPlan
 
 

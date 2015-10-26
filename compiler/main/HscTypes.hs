@@ -10,7 +10,7 @@
 module HscTypes (
         -- * compilation state
         HscEnv(..), hscEPS,
-        FinderCache, FindResult(..), FoundHs(..), FindExactResult(..),
+        FinderCache, FindResult(..),
         Target(..), TargetId(..), pprTarget, pprTargetId,
         ModuleGraph, emptyMG,
         HscStatus(..),
@@ -29,7 +29,7 @@ module HscTypes (
 
         -- * Information about the module being compiled
         -- (re-exported from DriverPhases)
-        HscSource(..), isHsBootOrSig, hscSourceString,
+        HscSource(..), isHsBoot, hscSourceString,
 
 
         -- * State relating to modules in this package
@@ -93,7 +93,7 @@ module HscTypes (
         -- * Information on imports and exports
         WhetherHasOrphans, IsBootInterface, Usage(..),
         Dependencies(..), noDependencies,
-        NameCache(..), OrigNameCache,
+        NameCache(..), OrigNameCache, updNameCacheIO,
         IfaceExport,
 
         -- * Warnings
@@ -162,7 +162,7 @@ import PatSyn
 import PrelNames        ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
 import Packages hiding  ( Version(..) )
 import DynFlags
-import DriverPhases     ( Phase, HscSource(..), isHsBootOrSig, hscSourceString )
+import DriverPhases     ( Phase, HscSource(..), isHsBoot, hscSourceString )
 import BasicTypes
 import IfaceSyn
 import CoreSyn          ( CoreRule, CoreVect )
@@ -202,7 +202,7 @@ data HscStatus
     = HscNotGeneratingCode
     | HscUpToDate
     | HscUpdateBoot
-    | HscUpdateSig
+    | HscUpdateBootMerge
     | HscRecomp CgGuts ModSummary
 
 -- -----------------------------------------------------------------------------
@@ -214,11 +214,11 @@ instance Functor Hsc where
     fmap = liftM
 
 instance Applicative Hsc where
-    pure = return
+    pure a = Hsc $ \_ w -> return (a, w)
     (<*>) = ap
 
 instance Monad Hsc where
-    return a    = Hsc $ \_ w -> return (a, w)
+    return = pure
     Hsc m >>= k = Hsc $ \e w -> do (a, w1) <- m e w
                                    case k a of
                                        Hsc k' -> k' e w1
@@ -451,7 +451,7 @@ instance Outputable TargetId where
 -- | Helps us find information about modules in the home package
 type HomePackageTable  = ModuleNameEnv HomeModInfo
         -- Domain = modules in the home package that have been fully compiled
-        -- "home" package key cached here for convenience
+        -- "home" unit id cached here for convenience
 
 -- | Helps us find information about modules in the imported packages
 type PackageIfaceTable = ModuleEnv ModIface
@@ -674,31 +674,16 @@ prepareAnnotations hsc_env mb_guts = do
 -- modules along the search path. On @:load@, we flush the entire
 -- contents of this cache.
 --
-type FinderCache = ModuleEnv FindExactResult
-
--- | The result of search for an exact 'Module'.
-data FindExactResult
-    = FoundExact ModLocation Module
-        -- ^ The module/signature was found
-    | NoPackageExact PackageKey
-    | NotFoundExact
-        { fer_paths     :: [FilePath]
-        , fer_pkg       :: Maybe PackageKey
-        }
-
--- | A found module or signature; e.g. anything with an interface file
-data FoundHs = FoundHs { fr_loc :: ModLocation
-                       , fr_mod :: Module
-                       -- , fr_origin :: ModuleOrigin
-                       }
+-- Although the @FinderCache@ range is 'FindResult' for convenience,
+-- in fact it will only ever contain 'Found' or 'NotFound' entries.
+--
+type FinderCache = ModuleEnv FindResult
 
 -- | The result of searching for an imported module.
 data FindResult
-  = FoundModule FoundHs
+  = Found ModLocation Module
         -- ^ The module was found
-  | FoundSigs [FoundHs] Module
-        -- ^ Signatures were found, with some backing implementation
-  | NoPackage PackageKey
+  | NoPackage UnitId
         -- ^ The requested package was not found
   | FoundMultiple [(Module, ModuleOrigin)]
         -- ^ _Error_: both in multiple packages
@@ -707,14 +692,14 @@ data FindResult
   | NotFound
       { fr_paths       :: [FilePath]       -- Places where I looked
 
-      , fr_pkg         :: Maybe PackageKey  -- Just p => module is in this package's
+      , fr_pkg         :: Maybe UnitId  -- Just p => module is in this package's
                                            --           manifest, but couldn't find
                                            --           the .hi file
 
-      , fr_mods_hidden :: [PackageKey]      -- Module is in these packages,
+      , fr_mods_hidden :: [UnitId]      -- Module is in these packages,
                                            --   but the *module* is hidden
 
-      , fr_pkgs_hidden :: [PackageKey]      -- Module is in these packages,
+      , fr_pkgs_hidden :: [UnitId]      -- Module is in these packages,
                                            --   but the *package* is hidden
 
       , fr_suggestions :: [ModuleSuggestion] -- Possible mis-spelled modules
@@ -1138,7 +1123,7 @@ data CgGuts
                 -- as part of the code-gen of tycons
 
         cg_foreign   :: !ForeignStubs,   -- ^ Foreign export stubs
-        cg_dep_pkgs  :: ![PackageKey],    -- ^ Dependent packages, used to
+        cg_dep_pkgs  :: ![UnitId],    -- ^ Dependent packages, used to
                                          -- generate #includes for C code gen
         cg_hpc_info  :: !HpcInfo,        -- ^ Program coverage tick box information
         cg_modBreaks :: !ModBreaks       -- ^ Module breakpoints
@@ -1177,7 +1162,7 @@ as if they were defined in modules
    interactive:Ghci2
    ...etc...
 with each bunch of declarations using a new module, all sharing a
-common package 'interactive' (see Module.interactivePackageKey, and
+common package 'interactive' (see Module.interactiveUnitId, and
 PrelNames.mkInteractiveModule).
 
 This scheme deals well with shadowing.  For example:
@@ -1469,7 +1454,7 @@ shadowed_by ids = shadowed
 setInteractivePackage :: HscEnv -> HscEnv
 -- Set the 'thisPackage' DynFlag to 'interactive'
 setInteractivePackage hsc_env
-   = hsc_env { hsc_dflags = (hsc_dflags hsc_env) { thisPackage = interactivePackageKey } }
+   = hsc_env { hsc_dflags = (hsc_dflags hsc_env) { thisPackage = interactiveUnitId } }
 
 setInteractivePrintName :: InteractiveContext -> Name -> InteractiveContext
 setInteractivePrintName ic n = ic{ic_int_print = n}
@@ -1553,20 +1538,13 @@ exposed (say P2), so we use M.T for that, and P1:M.T for the other one.
 This is handled by the qual_mod component of PrintUnqualified, inside
 the (ppr mod) of case (3), in Name.pprModulePrefix
 
-Note [Printing package keys]
+Note [Printing unit ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the old days, original names were tied to PackageIds, which directly
 corresponded to the entities that users wrote in Cabal files, and were perfectly
 suitable for printing when we need to disambiguate packages.  However, with
-PackageKey, the situation is different.  First, the key is not a human readable
-at all, so we need to consult the package database to find the appropriate
-PackageId to display.  Second, there may be multiple copies of a library visible
-with the same PackageId, in which case we need to disambiguate.  For now,
-we just emit the actual package key (which the user can go look up); however,
-another scheme is to (recursively) say which dependencies are different.
-
-NB: When we extend package keys to also have holes, we will have to disambiguate
-those as well.
+UnitId, the situation can be different: if the key is instantiated with
+some holes, we should try to give the user some more useful information.
 -}
 
 -- | Creates some functions that work out the best ways to format
@@ -1578,7 +1556,7 @@ mkPrintUnqualified dflags env = QueryQualify qual_name
   where
   qual_name mod occ
         | [] <- unqual_gres
-        , modulePackageKey mod `elem` [primPackageKey, basePackageKey, thPackageKey]
+        , moduleUnitId mod `elem` [primUnitId, baseUnitId, thUnitId]
         , not (isDerivedOccName occ)
         = NameUnqual   -- For names from ubiquitous packages that come with GHC, if
                        -- there are no entities called unqualified 'occ', then
@@ -1624,10 +1602,10 @@ mkPrintUnqualified dflags env = QueryQualify qual_name
 -- is only one exposed package which exports this module, don't qualify.
 mkQualModule :: DynFlags -> QueryQualifyModule
 mkQualModule dflags mod
-     | modulePackageKey mod == thisPackage dflags = False
+     | moduleUnitId mod == thisPackage dflags = False
 
      | [(_, pkgconfig)] <- lookup,
-       packageConfigId pkgconfig == modulePackageKey mod
+       packageConfigId pkgconfig == moduleUnitId mod
         -- this says: we are given a module P:M, is there just one exposed package
         -- that exposes a module M, and is it package P?
      = False
@@ -1637,10 +1615,10 @@ mkQualModule dflags mod
 
 -- | Creates a function for formatting packages based on two heuristics:
 -- (1) don't qualify if the package in question is "main", and (2) only qualify
--- with a package key if the package ID would be ambiguous.
+-- with a unit id if the package ID would be ambiguous.
 mkQualPackage :: DynFlags -> QueryQualifyPackage
 mkQualPackage dflags pkg_key
-     | pkg_key == mainPackageKey || pkg_key == interactivePackageKey
+     | pkg_key == mainUnitId || pkg_key == interactiveUnitId
         -- Skip the lookup if it's main, since it won't be in the package
         -- database!
      = False
@@ -1811,12 +1789,13 @@ tyThingAvailInfo :: TyThing -> AvailInfo
 tyThingAvailInfo (ATyCon t)
    = case tyConClass_maybe t of
         Just c  -> AvailTC n (n : map getName (classMethods c)
-                  ++ map getName (classATs c))
+                                 ++ map getName (classATs c))
+                             []
              where n = getName c
-        Nothing -> AvailTC n (n : map getName dcs ++
-                                   concatMap dataConFieldLabels dcs)
-             where n = getName t
-                   dcs = tyConDataCons t
+        Nothing -> AvailTC n (n : map getName dcs) flds
+             where n    = getName t
+                   dcs  = tyConDataCons t
+                   flds = tyConFieldLabels t
 tyThingAvailInfo t
    = Avail (getName t)
 
@@ -2093,22 +2072,13 @@ type IsBootInterface = Bool
 -- Invariant: the dependencies of a module @M@ never includes @M@.
 --
 -- Invariant: none of the lists contain duplicates.
---
--- NB: While this contains information about all modules and packages below
--- this one in the the import *hierarchy*, this may not accurately reflect
--- the full runtime dependencies of the module.  This is because this module may
--- have imported a boot module, in which case we'll only have recorded the
--- dependencies from the hs-boot file, not the actual hs file. (This is
--- unavoidable: usually, the actual hs file will have been compiled *after*
--- we wrote this interface file.)  See #936, and also @getLinkDeps@ in
--- @compiler/ghci/Linker.hs@ for code which cares about this distinction.
 data Dependencies
   = Deps { dep_mods   :: [(ModuleName, IsBootInterface)]
                         -- ^ All home-package modules transitively below this one
                         -- I.e. modules that this one imports, or that are in the
                         --      dep_mods of those directly-imported modules
 
-         , dep_pkgs   :: [(PackageKey, Bool)]
+         , dep_pkgs   :: [(UnitId, Bool)]
                         -- ^ All packages transitively below this module
                         -- I.e. packages to which this module's direct imports belong,
                         --      or that are in the dep_pkgs of those modules
@@ -2361,6 +2331,12 @@ data NameCache
                 -- ^ Ensures that one original name gets one unique
    }
 
+updNameCacheIO :: HscEnv
+               -> (NameCache -> (NameCache, c))  -- The updating function
+               -> IO c
+updNameCacheIO hsc_env upd_fn
+  = atomicModifyIORef' (hsc_NC hsc_env) upd_fn
+
 -- | Per-module cache of original 'OccName's given 'Name's
 type OrigNameCache   = ModuleEnv (OccEnv Name)
 
@@ -2424,10 +2400,12 @@ data ModSummary
           -- ^ Timestamp of hi file, if we *only* are typechecking (it is
           -- 'Nothing' otherwise.
           -- See Note [Recompilation checking when typechecking only] and #9243
-        ms_srcimps      :: [Located (ImportDecl RdrName)],
+        ms_srcimps      :: [(Maybe FastString, Located ModuleName)],
           -- ^ Source imports of the module
-        ms_textual_imps :: [Located (ImportDecl RdrName)],
+        ms_textual_imps :: [(Maybe FastString, Located ModuleName)],
           -- ^ Non-source imports of the module from the module *text*
+        ms_merge_imps   :: (Bool, [Module]),
+          -- ^ Non-textual imports computed for HsBootMerge
         ms_hspp_file    :: FilePath,
           -- ^ Filename of preprocessed source file
         ms_hspp_opts    :: DynFlags,
@@ -2440,26 +2418,12 @@ data ModSummary
 ms_mod_name :: ModSummary -> ModuleName
 ms_mod_name = moduleName . ms_mod
 
-ms_imps :: ModSummary -> [Located (ImportDecl RdrName)]
+ms_imps :: ModSummary -> [(Maybe FastString, Located ModuleName)]
 ms_imps ms =
   ms_textual_imps ms ++
   map mk_additional_import (dynFlagDependencies (ms_hspp_opts ms))
   where
-    -- This is a not-entirely-satisfactory means of creating an import
-    -- that corresponds to an import that did not occur in the program
-    -- text, such as those induced by the use of plugins (the -plgFoo
-    -- flag)
-    mk_additional_import mod_nm = noLoc $ ImportDecl {
-      ideclSourceSrc = Nothing,
-      ideclName      = noLoc mod_nm,
-      ideclPkgQual   = Nothing,
-      ideclSource    = False,
-      ideclImplicit  = True, -- Maybe implicit because not "in the program text"
-      ideclQualified = False,
-      ideclAs        = Nothing,
-      ideclHiding    = Nothing,
-      ideclSafe      = False
-    }
+    mk_additional_import mod_nm = (Nothing, noLoc mod_nm)
 
 -- The ModLocation contains both the original source filename and the
 -- filename of the cleaned-up source file after all preprocessing has been
@@ -2471,8 +2435,10 @@ ms_imps ms =
 -- The ModLocation is stable over successive up-sweeps in GHCi, wheres
 -- the ms_hs_date and imports can, of course, change
 
-msHsFilePath, msHiFilePath, msObjFilePath :: ModSummary -> FilePath
-msHsFilePath  ms = expectJust "msHsFilePath" (ml_hs_file  (ms_location ms))
+msHsFilePath :: ModSummary -> Maybe FilePath
+msHsFilePath  ms = ml_hs_file  (ms_location ms)
+
+msHiFilePath, msObjFilePath :: ModSummary -> FilePath
 msHiFilePath  ms = ml_hi_file  (ms_location ms)
 msObjFilePath ms = ml_obj_file (ms_location ms)
 
@@ -2487,7 +2453,10 @@ instance Outputable ModSummary where
                           text "ms_mod =" <+> ppr (ms_mod ms)
                                 <> text (hscSourceString (ms_hsc_src ms)) <> comma,
                           text "ms_textual_imps =" <+> ppr (ms_textual_imps ms),
-                          text "ms_srcimps =" <+> ppr (ms_srcimps ms)]),
+                          text "ms_srcimps =" <+> ppr (ms_srcimps ms),
+                          if not (null (snd (ms_merge_imps ms)))
+                            then text "ms_merge_imps =" <+> ppr (ms_merge_imps ms)
+                            else empty]),
              char '}'
             ]
 
@@ -2495,29 +2464,20 @@ showModMsg :: DynFlags -> HscTarget -> Bool -> ModSummary -> String
 showModMsg dflags target recomp mod_summary
   = showSDoc dflags $
         hsep [text (mod_str ++ replicate (max 0 (16 - length mod_str)) ' '),
-              char '(', text (normalise $ msHsFilePath mod_summary) <> comma,
+              char '(',
+              case msHsFilePath mod_summary of
+                Just path -> text (normalise path) <> comma
+                Nothing -> text "nothing" <> comma,
               case target of
                   HscInterpreted | recomp
                              -> text "interpreted"
                   HscNothing -> text "nothing"
-                  _ | HsigFile == ms_hsc_src mod_summary -> text "nothing"
-                    | otherwise -> text (normalise $ msObjFilePath mod_summary),
+                  _ -> text (normalise $ msObjFilePath mod_summary),
               char ')']
  where
     mod     = moduleName (ms_mod mod_summary)
     mod_str = showPpr dflags mod
-                ++ hscSourceString' dflags mod (ms_hsc_src mod_summary)
-
--- | Variant of hscSourceString which prints more information for signatures.
--- This can't live in DriverPhases because this would cause a module loop.
-hscSourceString' :: DynFlags -> ModuleName -> HscSource -> String
-hscSourceString' _ _ HsSrcFile   = ""
-hscSourceString' _ _ HsBootFile  = "[boot]"
-hscSourceString' dflags mod HsigFile =
-     "[" ++ (maybe "abstract sig"
-               (("sig of "++).showPpr dflags)
-               (getSigOf dflags mod)) ++ "]"
-    -- NB: -sig-of could be missing if we're just typechecking
+                ++ hscSourceString (ms_hsc_src mod_summary)
 
 {-
 ************************************************************************

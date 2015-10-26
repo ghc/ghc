@@ -28,8 +28,8 @@ tc245:
 # presumably because of the .hi file
 T5792:
 	$(RM) -f T5792.o T5792.hi
-	'$(TEST_HC)' -c T5792.hs
-	'$(TEST_HC)' -c T5792.hs -fforce-recomp
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T5792.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T5792.hs -fforce-recomp
 
 T7171:
 	$(RM) -f T7171.hi-boot T7171.o-boot T7171a.hi T7171a.o

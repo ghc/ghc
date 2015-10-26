@@ -121,20 +121,13 @@ if test "$WithGhc" != ""; then
   GhcMinVersion2=`echo "$GhcMinVersion" | sed 's/^\\(.\\)$/0\\1/'`
   GhcCanonVersion="$GhcMajVersion$GhcMinVersion2"
 
-  BOOTSTRAPPING_GHC_INFO_FIELD([OS_STAGE0],[target os])
   BOOTSTRAPPING_GHC_INFO_FIELD([CC_STAGE0],[C compiler command])
   dnl ToDo, once "ld command" is reliably available.
   dnl Then, we can remove the LD_STAGE0 hack in mk/build-package-date.mk
   dnl BOOTSTRAPPING_GHC_INFO_FIELD([LD_STAGE0],[ld command])
-  if test "x$OS_STAGE0" != "xOSDarwin"; then
-    BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
-    BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags])
-    BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file])
-  else
-    AR_STAGE0='$(AR)'
-    AR_OPTS_STAGE0='$(AR_OPTS)'
-    ArSupportsAtFile_STAGE0='$(ArSupportsAtFile)'
-  fi
+  BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
+  BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags])
+  BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file])
 fi
 
 dnl ** Must have GHC to build GHC
@@ -167,9 +160,9 @@ FP_COMPARE_VERSIONS([$GhcVersion],[-gt],[7.7],
 AC_SUBST(CMM_SINK_BOOTSTRAP_IS_NEEDED)
 
 FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.9],
-                    SUPPORTS_PACKAGE_KEY=NO,
-                    SUPPORTS_PACKAGE_KEY=YES)
-AC_SUBST(SUPPORTS_PACKAGE_KEY)
+                    SUPPORTS_COMPONENT_ID=NO,
+                    SUPPORTS_COMPONENT_ID=YES)
+AC_SUBST(SUPPORTS_COMPONENT_ID)
 
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
@@ -286,28 +279,125 @@ fail() {
     exit 1
 }
 
-set_up_tarballs() {
-    local tarball_repo_url="$1"
-    local tarball_dir="$2"
+download_file() {
+    local file_url="$1"
+    local file_md5="$2"
+    local dest_file="$3"
+    local description="$4"
+    local extra_curl_opts="$5"
+    local dest_dir="$(dirname $dest_file)"
 
-    if ! test -d "${tarball_dir}"
+    if ! test -f "${dest_file}"
     then
-        local git_cmd="git clone ${tarball_repo_url} ${tarball_dir}"
+        local curl_cmd="curl -L ${file_url} -o ${dest_file} --create-dirs -# ${extra_curl_opts}"
         if test "$TarballsAutodownload" = "NO"
         then
             echo >&2
-            echo "ERROR: Windows tarball binary distributions not found." >&2
-            echo "Please rerun configure with --enable-tarballs-autodownload, or clone the repository manually:" >&2
-            echo "  $git_cmd" >&2
+            echo "ERROR: ${description} not found." >&2
+            echo "Please rerun configure with --enable-tarballs-autodownload, or perform the download manually:" >&2
+            echo "  $curl_cmd" >&2
             exit 1
         fi
-        AC_MSG_NOTICE([Downloading Windows tarball distributions to ${tarball_dir}...])
-        $git_cmd || {
-            rm -f "${tarball_dir}"
-            fail "ERROR: Git clone failed."
+        AC_MSG_NOTICE([Downloading ${description} to ${dest_dir}...])
+        $curl_cmd || {
+            rm -f "${dest_file}"
+            fail "ERROR: Download failed."
         }
     else
-        AC_MSG_NOTICE([Using Windows tarball distributions found in ${tarball_dir}...])
+        AC_MSG_NOTICE([Using ${description} found in ${dest_dir}...])
+    fi
+
+    echo "${file_md5} *${dest_file}" | md5sum --quiet -c - ||
+        fail "ERROR: ${description} appears to be corrupted, please delete it and try again."
+}
+
+
+if test "$HostOS" = "mingw32"
+then
+    # Find the mingw-w64 7z file to extract.
+    # NB. If you update the tarballs to a new version of gcc, don't
+    # forget to tweak the paths in driver/gcc/gcc.c.
+    if test "$HostArch" = "i386"
+    then
+        mingw_arch="i686"
+        tarball_dest_dir="mingw-w64/x86"
+        tarball_mingw_dir="mingw32"
+    else
+        mingw_arch="x86_64"
+        tarball_dest_dir="mingw-w64/x86_64"
+        tarball_mingw_dir="mingw64"
+    fi
+
+    tarball_dir='ghc-tarballs'
+fi
+
+download_and_extract() {
+    local mingw_url="$1"
+    local file_md5sum_x86="$2"
+    local file_md5sum_x64="$3"
+
+    if test "$HostArch" = "i386"
+    then
+        local file_md5sum="${file_md5sum_x86}"
+    else
+        local file_md5sum="${file_md5sum_x64}"
+    fi
+
+    local mingw_toolchain="$(basename $mingw_url)"
+    local mingw_w64="${tarball_dir}/${tarball_dest_dir}/${mingw_toolchain}"
+
+    download_file "${mingw_url}" "${file_md5sum}" "${mingw_w64}" "${mingw_toolchain}"
+
+    # Mark the tree as needing updates by deleting the folder
+    if test -d inplace/mingw && test inplace/mingw -ot "$mingw_w64"
+    then
+        AC_MSG_NOTICE([In-tree MinGW-w64 tree requires updates...])
+        rm -rf inplace/mingw
+    fi
+}
+
+set_up_tarballs() {
+    local mingw_base_url="https://downloads.haskell.org/~ghc/mingw"
+    local package_prefix="mingw-w64"
+
+    local format_url="${mingw_base_url}/${mingw_arch}/${package_prefix}-${mingw_arch}"
+
+    download_and_extract "${format_url}-crt-git-5.0.0.4531.49c7046-1-any.pkg.tar.xz"           "dd39323140c0c1b3e065e9edb1a66779" "ac22cedd38229bcd57f5999e4734054f"
+    download_and_extract "${format_url}-winpthreads-git-5.0.0.4538.78dca70-1-any.pkg.tar.xz"   "0b14fe27790e94db454fbb3564e79a73" "65cf07b6f42a1a62d1844e08190cab0d"
+    download_and_extract "${format_url}-headers-git-5.0.0.4531.49c7046-1-any.pkg.tar.xz"       "6ee9e3c2f9d3e507f60ee33d19417dc2" "f49a19cdea93998c33ac90ceb9570350"
+    download_and_extract "${format_url}-libwinpthread-git-5.0.0.4538.78dca70-1-any.pkg.tar.xz" "fbb2114aa7fbb5507e21d8a2ea265cfd" "31ed10e2d8891f6251d968f81bfdd274"
+    download_and_extract "${format_url}-zlib-1.2.8-8-any.pkg.tar.xz"                           "7f519cb6defa27a90c5353160cf088d4" "6a2f4a70ccb24acca70a01da331699a6"
+    download_and_extract "${format_url}-isl-0.14.1-2-any.pkg.tar.xz"                           "4cd20fe75ed9ef03e260d529042cb742" "dc0e0a7fd23a8193cccb0bf8d7267685"
+    download_and_extract "${format_url}-mpc-1.0.3-2-any.pkg.tar.xz"                            "719e76fa7a54a8676d2e60af3bb13c45" "df1a7d4050568d83c265ae78c32ef30b"
+    download_and_extract "${format_url}-mpfr-3.1.3.p0-2-any.pkg.tar.xz"                        "e9cbd2402ac1afe6e86c102223b90dcb" "6e3b9ec27edab394aa41536839afdafe"
+    download_and_extract "${format_url}-gmp-6.0.0-3-any.pkg.tar.xz"                            "c02f9759cd0140a6d8ea69ef5a88e167" "2970d4d8b176f8f36ae2d39269b25cce"
+    download_and_extract "${format_url}-gcc-libs-5.2.0-3-any.pkg.tar.xz"                       "a9bd2e65cb350cc8f8a6deb6d3b346a8" "9c2ed24989e14fdf0c548a5215374660"
+    download_and_extract "${format_url}-binutils-2.25.1-1-any.pkg.tar.xz"                      "997e9c2166fb851916cd8ac1bc9c6180" "7cb9f5f50a7103da41f7ec7547c09707"
+    download_and_extract "${format_url}-libiconv-1.14-5-any.pkg.tar.xz"                        "2c99a163689ba8257627bb07274b3f86" "37418c6be92ef20be17cdc9fe844af35"
+    download_and_extract "${format_url}-gcc-5.2.0-3-any.pkg.tar.xz"                            "efe6d6afc18aab89dc01e7ddcd2523a6" "0b697ce61112ba6e5a3c4d565957ea4e"
+
+    # Extract all the tarballs in one go
+    if ! test -d inplace/mingw
+    then
+        AC_MSG_NOTICE([Extracting Windows toolchain from archives (may take a while)...])
+        rm -rf inplace/mingw
+        local base_dir="../${tarball_dir}/${tarball_dest_dir}"
+        ( cd inplace &&
+        find "${base_dir}" -name "*.tar.xz" -exec tar xfJ {} \; &&
+        rm ".MTREE" &&
+        rm ".PKGINFO" &&
+        cd .. ) || fail "Error: Could not extract Windows toolchains."
+
+        mv "inplace/${tarball_mingw_dir}" inplace/mingw &&
+        touch inplace/mingw
+
+        # NB. Now since the GCC is hardcoded to use /mingw32 we need to
+        # make a wrapper around it to give it the proper paths
+        mv inplace/mingw/bin/gcc.exe inplace/mingw/bin/realgcc.exe
+        PATH=`pwd`/inplace/mingw/bin:$PATH
+        inplace/mingw/bin/realgcc.exe driver/gcc/gcc.c driver/utils/cwrapper.c driver/utils/getLocation.c -Idriver/utils -o inplace/mingw/bin/gcc.exe
+
+        AC_MSG_NOTICE([In-tree MingW-w64 tree created])
     fi
 }
 
@@ -315,66 +405,8 @@ if test "$HostOS" = "mingw32"
 then
     test -d inplace || mkdir inplace
 
-    # NB. For now just run git clone on the tarball repo
-    ghc_tarball_repo='git://git.haskell.org/ghc-tarballs.git'
-    ghc_tarball_dir='ghc-tarballs'
-    set_up_tarballs "${ghc_tarball_repo}" "${ghc_tarball_dir}"
-
-    if test "$HostArch" = "i386"
-    then
-
-        # NB. If you update the tarballs to a new version of gcc, don't
-        # forget to tweak the paths in driver/gcc/gcc.c.
-        if ! test -d inplace/mingw ||
-             test inplace/mingw -ot ghc-tarballs/mingw/binutils*.tar.lzma  ||
-             test inplace/mingw -ot ghc-tarballs/mingw/gcc-core*.tar.lzma  ||
-             test inplace/mingw -ot ghc-tarballs/mingw/gcc-c++*.tar.lzma   ||
-             test inplace/mingw -ot ghc-tarballs/mingw/libgcc*.tar.gz      ||
-             test inplace/mingw -ot ghc-tarballs/mingw/libgmp*.tar.gz      ||
-             test inplace/mingw -ot ghc-tarballs/mingw/libmpc*.tar.gz      ||
-             test inplace/mingw -ot ghc-tarballs/mingw/libmpfr*.tar.gz     ||
-             test inplace/mingw -ot ghc-tarballs/mingw/libstdc*.tar.lzma   ||
-             test inplace/mingw -ot ghc-tarballs/mingw/mingwrt*-dev.tar.gz ||
-             test inplace/mingw -ot ghc-tarballs/mingw/mingwrt*-dll.tar.gz ||
-             test inplace/mingw -ot ghc-tarballs/mingw/w32api*.tar.lzma
-        then
-            AC_MSG_NOTICE([Making in-tree mingw tree])
-            rm -rf inplace/mingw
-            mkdir inplace/mingw
-            (
-                cd inplace/mingw &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/binutils*.tar.lzma  &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/gcc-core*.tar.lzma  &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/gcc-c++*.tar.lzma   &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/libgcc*.tar.lzma    &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/libgmp*.tar.lzma    &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/libmpc*.tar.lzma    &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/libmpfr*.tar.lzma   &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/libstdc*.tar.lzma   &&
-                tar -z     -xf ../../ghc-tarballs/mingw/mingwrt*-dev.tar.gz &&
-                tar -z     -xf ../../ghc-tarballs/mingw/mingwrt*-dll.tar.gz &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/w32api*.tar.lzma    &&
-                mv bin/gcc.exe bin/realgcc.exe
-            )
-            PATH=`pwd`/inplace/mingw/bin:$PATH inplace/mingw/bin/realgcc.exe driver/gcc/gcc.c driver/utils/cwrapper.c driver/utils/getLocation.c -Idriver/utils -o inplace/mingw/bin/gcc.exe
-            AC_MSG_NOTICE([In-tree mingw tree created])
-        fi
-    else
-        # NB. If you update the tarballs to a new version of gcc, don't
-        # forget to tweak the paths in driver/gcc/gcc.c.
-        if ! test -d inplace/mingw ||
-             test inplace/mingw -ot ghc-tarballs/mingw64/*.tar.bz2
-        then
-            AC_MSG_NOTICE([Making in-tree mingw tree])
-            rm -rf inplace/mingw
-            mkdir inplace/mingw
-            (
-                cd inplace/mingw &&
-                tar -jxf ../../ghc-tarballs/mingw64/*.tar.bz2
-            )
-            AC_MSG_NOTICE([In-tree mingw tree created])
-        fi
-    fi
+    # NB. Download and extract the MingW-w64 distribution if required
+    set_up_tarballs
 
     mingwbin="$hardtop/inplace/mingw/bin/"
     CC="${mingwbin}gcc.exe"
@@ -383,6 +415,9 @@ then
     RANLIB="${mingwbin}ranlib.exe"
     OBJDUMP="${mingwbin}objdump.exe"
     fp_prog_ar="${mingwbin}ar.exe"
+
+    # NB. Download the perl binaries if required
+    download_file "https://github.com/ghc/ghc-tarballs/blob/master/perl/ghc-perl-1.tar.gz?raw=true" "b21d1681b61cf7a024e854096285b02e" "ghc-tarballs/perl/ghc-perl-1.tar.gz" "Windows Perl binary distributions" "--insecure"
 
     if ! test -d inplace/perl ||
          test inplace/perl -ot ghc-tarballs/perl/ghc-perl*.tar.gz
@@ -518,8 +553,10 @@ esac
 # tools we are looking for. In the past, GHC supported a number of
 # versions of LLVM simultaneously, but that stopped working around
 # 3.5/3.6 release of LLVM.
-LlvmVersion=3.6
+LlvmVersion=3.7
 AC_SUBST([LlvmVersion])
+sUPPORTED_LLVM_VERSION=$(echo \($LlvmVersion\) | sed 's/\./,/')
+AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION], ${sUPPORTED_LLVM_VERSION}, [The supported LLVM version number])
 
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
@@ -733,10 +770,20 @@ then
     HSCOLOUR=`cygpath -m ${HSCOLOUR}`
 fi
 
-dnl ** check for DocBook toolchain
-FP_CHECK_DOCBOOK_DTD
-FP_DOCBOOK_XSL
-FP_PROG_DBLATEX
+dnl ** check for Sphinx toolchain
+AC_PATH_PROG(SPHINXBUILD,sphinx-build)
+AC_CACHE_CHECK([for version of sphinx-build], fp_cv_sphinx_version,
+changequote(, )dnl
+[if test -n "$SPHINXBUILD"; then
+  fp_cv_sphinx_version=`"$SPHINXBUILD" --version 2>&1 | sed 's/Sphinx\( (sphinx-build)\)\? v\?\([0-9]\.[0-9]\.[0-9]\)/\2/' | head -n1`;
+fi;
+changequote([, ])dnl
+])
+FP_COMPARE_VERSIONS([$fp_cv_sphinx_version],-lt,1.0.0,
+    [AC_MSG_WARN([Sphinx version 1.0.0 or later is required to build documentation]); SPHINXBUILD=;])
+
+dnl ** check for xelatex
+AC_PATH_PROG(XELATEX,xelatex)
 
 dnl ** check for ghc-pkg command
 FP_PROG_GHC_PKG
@@ -1024,48 +1071,58 @@ dnl runs out of paging file when we have multiple processes reserving
 dnl 1TB of address space, we get the following error:
 dnl    VirtualAlloc MEM_RESERVE 1099512676352 bytes failed: The paging file is too small for this operation to complete.
 dnl
+
+AC_ARG_ENABLE(large-address-space,
+    [AC_HELP_STRING([--enable-large-address-space],
+        [Use a single large address space on 64 bit systems (enabled by default on 64 bit platforms)])],
+    EnableLargeAddressSpace=$enableval,
+    EnableLargeAddressSpace=yes
+)
+
 use_large_address_space=no
 if test "$ac_cv_sizeof_void_p" -eq 8 ; then
-   if test "$ghc_host_os" = "darwin" ; then
-           use_large_address_space=yes
-   else
-      AC_CHECK_DECLS([MAP_NORESERVE, MADV_FREE, MADV_DONTNEED],[],[],
-[
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/mman.h>
-#include <fcntl.h>
-])
-      if test "$ac_cv_have_decl_MAP_NORESERVE" = "yes" &&
-         test "$ac_cv_have_decl_MADV_FREE" = "yes" ||
-         test "$ac_cv_have_decl_MADV_DONTNEED" = "yes" ; then
-              use_large_address_space=yes
-      fi
-   fi
+    if test "x$EnableLargeAddressSpace" = "xyes" ; then
+        if test "$ghc_host_os" = "darwin" ; then
+            use_large_address_space=yes
+        else
+            AC_CHECK_DECLS([MAP_NORESERVE, MADV_FREE, MADV_DONTNEED],[],[],
+                [
+                #include <unistd.h>
+                #include <sys/types.h>
+                #include <sys/mman.h>
+                #include <fcntl.h>
+            ])
+            if test "$ac_cv_have_decl_MAP_NORESERVE" = "yes" &&
+                test "$ac_cv_have_decl_MADV_FREE" = "yes" ||
+                test "$ac_cv_have_decl_MADV_DONTNEED" = "yes" ; then
+                    use_large_address_space=yes
+            fi
+        fi
+    fi
 fi
 if test "$use_large_address_space" = "yes" ; then
    AC_DEFINE([USE_LARGE_ADDRESS_SPACE], [1], [Enable single heap address space support])
 fi
 
-if test "$HAVE_DOCBOOK_XSL" = "NO" ||
-   test "$XsltprocCmd" = ""
-then
-    BUILD_DOCBOOK_HTML=NO
-else
-    BUILD_DOCBOOK_HTML=YES
-fi
-AC_SUBST(BUILD_DOCBOOK_HTML)
+AC_CHECK_LIB(dw, dwfl_begin, [HaveLibdw=YES], [HaveLibdw=NO])
+AC_SUBST(HaveLibdw)
 
-if test "$DblatexCmd" = ""
-then
-    BUILD_DOCBOOK_PS=NO
-    BUILD_DOCBOOK_PDF=NO
+if test -n "$SPHINXBUILD"; then
+    BUILD_MAN=YES
+    BUILD_SPHINX_HTML=YES
+    if test -n "$XELATEX"; then
+        BUILD_SPHINX_PDF=YES
+    else
+        BUILD_SPHINX_PDF=NO
+    fi
 else
-    BUILD_DOCBOOK_PS=YES
-    BUILD_DOCBOOK_PDF=YES
+    BUILD_MAN=NO
+    BUILD_SPHINX_HTML=NO
+    BUILD_SPHINX_PDF=NO
 fi
-AC_SUBST(BUILD_DOCBOOK_PS)
-AC_SUBST(BUILD_DOCBOOK_PDF)
+AC_SUBST(BUILD_MAN)
+AC_SUBST(BUILD_SPHINX_HTML)
+AC_SUBST(BUILD_SPHINX_PDF)
 
 LIBRARY_VERSION(base)
 LIBRARY_VERSION(Cabal, Cabal/Cabal)
@@ -1077,7 +1134,7 @@ if grep '	' compiler/ghc.cabal.in 2>&1 >/dev/null; then
    AC_MSG_ERROR([compiler/ghc.cabal.in contains tab characters; please remove them])
 fi
 
-AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal settings docs/users_guide/ug-book.xml docs/users_guide/ug-ent.xml docs/index.html libraries/prologue.txt distrib/configure.ac])
+AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal settings docs/users_guide/ghc_config.py docs/index.html libraries/prologue.txt distrib/configure.ac])
 AC_OUTPUT
 
 # We got caught by
@@ -1136,8 +1193,8 @@ echo ["\
    Happy        : $HappyCmd ($HappyVersion)
    Alex         : $AlexCmd ($AlexVersion)
    Perl         : $PerlCmd
-   dblatex      : $DblatexCmd
-   xsltproc     : $XsltprocCmd
+   sphinx-build : $SPHINXBUILD
+   xelatex      : $XELATEX
 
    Using LLVM tools
       llc   : $LlcCmd
@@ -1154,9 +1211,8 @@ echo ["\
 fi
 
 echo ["\
-   Building DocBook HTML documentation : $BUILD_DOCBOOK_HTML
-   Building DocBook PS documentation   : $BUILD_DOCBOOK_PS
-   Building DocBook PDF documentation  : $BUILD_DOCBOOK_PDF"]
+   Tools to build Sphinx HTML documentation available: $BUILD_SPHINX_HTML
+   Tools to build Sphinx PDF documentation available: $BUILD_SPHINX_PDF"]
 
 echo ["----------------------------------------------------------------------
 "]

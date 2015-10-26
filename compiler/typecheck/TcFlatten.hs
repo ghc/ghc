@@ -264,8 +264,9 @@ This is a real dilemma. CURRENT SOLUTION:
    CFunEqCan F fmv ~ fmv, because fmv := F fmv would make an ininite
    type.  Instead we unify fmv:=a, AND record that we have done so.
 
-   If any such "non-CFunEqCan unifications" take place, iterate the
-   entire process.  This is done by the 'go' loop in solveSimpleWanteds.
+   If any such "non-CFunEqCan unifications" take place (in
+   unflatten_eq in TcFlatten.unflatten) iterate the entire process.
+   This is done by the 'go' loop in solveSimpleWanteds.
 
 This story does not feel right but it's the best I can do; and the
 iteration only happens in pretty obscure circumstances.
@@ -527,7 +528,7 @@ newtype FlatM a
   = FlatM { runFlatM :: FlattenEnv -> TcS a }
 
 instance Monad FlatM where
-  return x = FlatM $ const (return x)
+  return = pure
   m >>= k  = FlatM $ \env ->
              do { a  <- runFlatM m env
                 ; runFlatM (k a) env }
@@ -536,7 +537,7 @@ instance Functor FlatM where
   fmap = liftM
 
 instance Applicative FlatM where
-  pure  = return
+  pure x = FlatM $ const (pure x)
   (<*>) = ap
 
 liftTcS :: TcS a -> FlatM a
@@ -1037,7 +1038,9 @@ flatten_fam_app, flatten_exact_fam_app, flatten_exact_fam_app_fully
   --   flatten_exact_fam_app_fully lifts out the application to top level
   -- Postcondition: Coercion :: Xi ~ F tys
 flatten_fam_app tc tys  -- Can be over-saturated
-    = ASSERT( tyConArity tc <= length tys )  -- Type functions are saturated
+    = ASSERT2( tyConArity tc <= length tys
+             , ppr tc $$ ppr (tyConArity tc) $$ ppr tys)
+                 -- Type functions are saturated
                  -- The type function might be *over* saturated
                  -- in which case the remaining arguments should
                  -- be dealt with by AppTys
@@ -1368,7 +1371,7 @@ unflatten tv_eqs funeqs
       ; funeqs <- foldrBagM (unflatten_funeq dflags) emptyCts funeqs
       ; traceTcS "Unflattening 1" $ braces (pprCts funeqs)
 
-          -- Step 2: unify the irreds, if possible
+          -- Step 2: unify the tv_eqs, if possible
       ; tv_eqs  <- foldrBagM (unflatten_eq dflags tclvl) emptyCts tv_eqs
       ; traceTcS "Unflattening 2" $ braces (pprCts tv_eqs)
 
@@ -1376,7 +1379,7 @@ unflatten tv_eqs funeqs
       ; funeqs <- mapBagM finalise_funeq funeqs
       ; traceTcS "Unflattening 3" $ braces (pprCts funeqs)
 
-          -- Step 4: remove any irreds that look like ty ~ ty
+          -- Step 4: remove any tv_eqs that look like ty ~ ty
       ; tv_eqs <- foldrBagM finalise_eq emptyCts tv_eqs
 
       ; let all_flat = tv_eqs `andCts` funeqs

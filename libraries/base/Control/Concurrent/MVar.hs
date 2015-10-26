@@ -270,5 +270,5 @@ addMVarFinalizer = GHC.MVar.addMVarFinalizer
 --
 -- @since 4.6.0.0
 mkWeakMVar :: MVar a -> IO () -> IO (Weak (MVar a))
-mkWeakMVar m@(MVar m#) f = IO $ \s ->
-  case mkWeak# m# m f s of (# s1, w #) -> (# s1, Weak w #)
+mkWeakMVar m@(MVar m#) (IO f) = IO $ \s ->
+    case mkWeak# m# m f s of (# s1, w #) -> (# s1, Weak w #)

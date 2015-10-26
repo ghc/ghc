@@ -83,6 +83,7 @@ module Util (
         doesDirNameExist,
         getModificationUTCTime,
         modificationTimeIfExists,
+        hSetTranslit,
 
         global, consIORef, globalM,
 
@@ -113,15 +114,15 @@ import Data.IORef       ( IORef, newIORef, atomicModifyIORef' )
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.List        hiding (group)
 
-#ifdef DEBUG
-import FastTypes
-#endif
+import GHC.Exts
 
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Applicative)
 #endif
 import Control.Applicative ( liftA2 )
 import Control.Monad    ( liftM )
+import GHC.IO.Encoding (mkTextEncoding, textEncodingName)
+import System.IO (Handle, hGetEncoding, hSetEncoding)
 import System.IO.Error as IO ( isDoesNotExistError )
 import System.Directory ( doesDirectoryExist, getModificationTime )
 import System.FilePath
@@ -462,22 +463,22 @@ isn'tIn _msg x ys = x `notElem` ys
 
 # else /* DEBUG */
 isIn msg x ys
-  = elem100 (_ILIT(0)) x ys
+  = elem100 0 x ys
   where
-    elem100 _ _ []        = False
+    elem100 :: Eq a => Int -> a -> [a] -> Bool
+    elem100 _ _ [] = False
     elem100 i x (y:ys)
-      | i ># _ILIT(100) = trace ("Over-long elem in " ++ msg)
-                                (x `elem` (y:ys))
-      | otherwise       = x == y || elem100 (i +# _ILIT(1)) x ys
+      | i > 100 = trace ("Over-long elem in " ++ msg) (x `elem` (y:ys))
+      | otherwise = x == y || elem100 (i + 1) x ys
 
 isn'tIn msg x ys
-  = notElem100 (_ILIT(0)) x ys
+  = notElem100 0 x ys
   where
+    notElem100 :: Eq a => Int -> a -> [a] -> Bool
     notElem100 _ _ [] =  True
     notElem100 i x (y:ys)
-      | i ># _ILIT(100) = trace ("Over-long notElem in " ++ msg)
-                                (x `notElem` (y:ys))
-      | otherwise      =  x /= y && notElem100 (i +# _ILIT(1)) x ys
+      | i > 100 = trace ("Over-long notElem in " ++ msg) (x `notElem` (y:ys))
+      | otherwise = x /= y && notElem100 (i + 1) x ys
 # endif /* DEBUG */
 
 {-
@@ -487,9 +488,6 @@ isn'tIn msg x ys
 *                                                                      *
 ************************************************************************
 -}
-
-sortWith :: Ord b => (a->b) -> [a] -> [a]
-sortWith get_key xs = sortBy (comparing get_key) xs
 
 minWith :: Ord b => (a -> b) -> [a] -> a
 minWith get_key xs = ASSERT( not (null xs) )
@@ -977,6 +975,19 @@ modificationTimeIfExists f = do
         `catchIO` \e -> if isDoesNotExistError e
                         then return Nothing
                         else ioError e
+
+-- --------------------------------------------------------------
+-- Change the character encoding of the given Handle to transliterate
+-- on unsupported characters instead of throwing an exception
+
+hSetTranslit :: Handle -> IO ()
+hSetTranslit h = do
+    menc <- hGetEncoding h
+    case fmap textEncodingName menc of
+        Just name | '/' `notElem` name -> do
+            enc' <- mkTextEncoding $ name ++ "//TRANSLIT"
+            hSetEncoding h enc'
+        _ -> return ()
 
 -- split a string at the last character where 'pred' is True,
 -- returning a pair of strings. The first component holds the string

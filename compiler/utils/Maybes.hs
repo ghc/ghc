@@ -68,32 +68,42 @@ instance Functor m => Functor (MaybeT m) where
 
 #if __GLASGOW_HASKELL__ < 710
 -- Pre-AMP change
-instance (Monad m, Functor m) => Applicative (MaybeT m) where
+instance (Monad m, Applicative m) => Applicative (MaybeT m) where
 #else
 instance (Monad m) => Applicative (MaybeT m) where
 #endif
-  pure  = return
+  pure = MaybeT . pure . Just
   (<*>) = ap
-
-instance Monad m => Monad (MaybeT m) where
-  return = MaybeT . return . Just
-  x >>= f = MaybeT $ runMaybeT x >>= maybe (return Nothing) (runMaybeT . f)
-  fail _ = MaybeT $ return Nothing
 
 #if __GLASGOW_HASKELL__ < 710
 -- Pre-AMP change
-instance (Monad m, Functor m) => Alternative (MaybeT m) where
+instance (Monad m, Applicative m) => Monad (MaybeT m) where
+#else
+instance (Monad m) => Monad (MaybeT m) where
+#endif
+  return = pure
+  x >>= f = MaybeT $ runMaybeT x >>= maybe (pure Nothing) (runMaybeT . f)
+  fail _ = MaybeT $ pure Nothing
+
+#if __GLASGOW_HASKELL__ < 710
+-- Pre-AMP change
+instance (Monad m, Applicative m) => Alternative (MaybeT m) where
 #else
 instance (Monad m) => Alternative (MaybeT m) where
 #endif
   empty = mzero
   (<|>) = mplus
 
+#if __GLASGOW_HASKELL__ < 710
+-- Pre-AMP change
+instance (Monad m, Applicative m) => MonadPlus (MaybeT m) where
+#else
 instance Monad m => MonadPlus (MaybeT m) where
-  mzero       = MaybeT $ return Nothing
+#endif
+  mzero       = MaybeT $ pure Nothing
   p `mplus` q = MaybeT $ do ma <- runMaybeT p
                             case ma of
-                              Just a  -> return (Just a)
+                              Just a  -> pure (Just a)
                               Nothing -> runMaybeT q
 
 liftMaybeT :: Monad m => m a -> MaybeT m a
@@ -113,11 +123,11 @@ instance Functor (MaybeErr err) where
   fmap = liftM
 
 instance Applicative (MaybeErr err) where
-  pure  = return
+  pure  = Succeeded
   (<*>) = ap
 
 instance Monad (MaybeErr err) where
-  return v = Succeeded v
+  return = pure
   Succeeded v >>= k = k v
   Failed e    >>= _ = Failed e
 

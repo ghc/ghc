@@ -1,6 +1,5 @@
 
 import CmmExpr
-import FastBool
 #if !(MACHREGS_i386 || MACHREGS_x86_64 || MACHREGS_sparc || MACHREGS_powerpc)
 import Panic
 #endif
@@ -823,17 +822,17 @@ globalRegMaybe _ = Nothing
 globalRegMaybe = panic "globalRegMaybe not defined for this platform"
 #endif
 
-freeReg :: RegNo -> FastBool
+freeReg :: RegNo -> Bool
 
 #if MACHREGS_i386 || MACHREGS_x86_64
 
 # if MACHREGS_i386
-freeReg esp = fastBool False -- %esp is the C stack pointer
-freeReg esi = fastBool False -- Note [esi/edi not allocatable]
-freeReg edi = fastBool False
+freeReg esp = False -- %esp is the C stack pointer
+freeReg esi = False -- Note [esi/edi not allocatable]
+freeReg edi = False
 # endif
 # if MACHREGS_x86_64
-freeReg rsp = fastBool False  --        %rsp is the C stack pointer
+freeReg rsp = False  --        %rsp is the C stack pointer
 # endif
 
 {-
@@ -853,158 +852,166 @@ Hence, on x86 esi and edi are treated as not allocatable.
 -- split patterns in two functions to prevent overlaps
 freeReg r         = freeRegBase r
 
-freeRegBase :: RegNo -> FastBool
+freeRegBase :: RegNo -> Bool
 # ifdef REG_Base
-freeRegBase REG_Base = fastBool False
+freeRegBase REG_Base  = False
 # endif
 # ifdef REG_Sp
-freeRegBase REG_Sp   = fastBool False
+freeRegBase REG_Sp    = False
 # endif
 # ifdef REG_SpLim
-freeRegBase REG_SpLim = fastBool False
+freeRegBase REG_SpLim = False
 # endif
 # ifdef REG_Hp
-freeRegBase REG_Hp   = fastBool False
+freeRegBase REG_Hp    = False
 # endif
 # ifdef REG_HpLim
-freeRegBase REG_HpLim = fastBool False
+freeRegBase REG_HpLim = False
 # endif
 -- All other regs are considered to be "free", because we can track
 -- their liveness accurately.
-freeRegBase _ = fastBool True
+freeRegBase _ = True
 
 #elif MACHREGS_powerpc
 
-freeReg 0 = fastBool False -- Hack: r0 can't be used in all insns,
-                           -- but it's actually free
-freeReg 1 = fastBool False -- The Stack Pointer
+freeReg 0 = False -- Used by code setting the back chain pointer
+                  -- in stack reallocations on Linux
+                  -- r0 is not usable in all insns so also reserved
+                  -- on Darwin.
+freeReg 1 = False -- The Stack Pointer
 # if !MACHREGS_darwin
 -- most non-darwin powerpc OSes use r2 as a TOC pointer or something like that
-freeReg 2 = fastBool False
--- TODO: make this conditonal for ppc64 ELF
-freeReg 13 = fastBool False -- reserved for system thread ID
--- TODO: do not reserve r30 in ppc64 ELF
+freeReg 2 = False
+freeReg 13 = False -- reserved for system thread ID on 64 bit
 -- at least linux in -fPIC relies on r30 in PLT stubs
-freeReg 30 = fastBool False
+freeReg 30 = False
+{- TODO: reserve r13 on 64 bit systems only and r30 on 32 bit respectively.
+   For now we use r30 on 64 bit and r13 on 32 bit as a temporary register
+   in stack handling code. See compiler/nativeGen/PPC/Ppr.hs.
+
+   Later we might want to reserve r13 and r30 only where it is required.
+   Then use r12 as temporary register, which is also what the C ABI does.
+-}
+
 # endif
 # ifdef REG_Base
-freeReg REG_Base = fastBool False
+freeReg REG_Base  = False
 # endif
 # ifdef REG_R1
-freeReg REG_R1   = fastBool False
+freeReg REG_R1    = False
 # endif
 # ifdef REG_R2
-freeReg REG_R2   = fastBool False
+freeReg REG_R2    = False
 # endif
 # ifdef REG_R3
-freeReg REG_R3   = fastBool False
+freeReg REG_R3    = False
 # endif
 # ifdef REG_R4
-freeReg REG_R4   = fastBool False
+freeReg REG_R4    = False
 # endif
 # ifdef REG_R5
-freeReg REG_R5   = fastBool False
+freeReg REG_R5    = False
 # endif
 # ifdef REG_R6
-freeReg REG_R6   = fastBool False
+freeReg REG_R6    = False
 # endif
 # ifdef REG_R7
-freeReg REG_R7   = fastBool False
+freeReg REG_R7    = False
 # endif
 # ifdef REG_R8
-freeReg REG_R8   = fastBool False
+freeReg REG_R8    = False
 # endif
 # ifdef REG_R9
-freeReg REG_R9   = fastBool False
+freeReg REG_R9    = False
 # endif
 # ifdef REG_R10
-freeReg REG_R10  = fastBool False
+freeReg REG_R10   = False
 # endif
 # ifdef REG_F1
-freeReg REG_F1 = fastBool False
+freeReg REG_F1    = False
 # endif
 # ifdef REG_F2
-freeReg REG_F2 = fastBool False
+freeReg REG_F2    = False
 # endif
 # ifdef REG_F3
-freeReg REG_F3 = fastBool False
+freeReg REG_F3    = False
 # endif
 # ifdef REG_F4
-freeReg REG_F4 = fastBool False
+freeReg REG_F4    = False
 # endif
 # ifdef REG_F5
-freeReg REG_F5 = fastBool False
+freeReg REG_F5    = False
 # endif
 # ifdef REG_F6
-freeReg REG_F6 = fastBool False
+freeReg REG_F6    = False
 # endif
 # ifdef REG_D1
-freeReg REG_D1 = fastBool False
+freeReg REG_D1    = False
 # endif
 # ifdef REG_D2
-freeReg REG_D2 = fastBool False
+freeReg REG_D2    = False
 # endif
 # ifdef REG_D3
-freeReg REG_D3 = fastBool False
+freeReg REG_D3    = False
 # endif
 # ifdef REG_D4
-freeReg REG_D4 = fastBool False
+freeReg REG_D4    = False
 # endif
 # ifdef REG_D5
-freeReg REG_D5 = fastBool False
+freeReg REG_D5    = False
 # endif
 # ifdef REG_D6
-freeReg REG_D6 = fastBool False
+freeReg REG_D6    = False
 # endif
 # ifdef REG_Sp
-freeReg REG_Sp   = fastBool False
+freeReg REG_Sp    = False
 # endif
 # ifdef REG_Su
-freeReg REG_Su   = fastBool False
+freeReg REG_Su    = False
 # endif
 # ifdef REG_SpLim
-freeReg REG_SpLim = fastBool False
+freeReg REG_SpLim = False
 # endif
 # ifdef REG_Hp
-freeReg REG_Hp   = fastBool False
+freeReg REG_Hp    = False
 # endif
 # ifdef REG_HpLim
-freeReg REG_HpLim = fastBool False
+freeReg REG_HpLim = False
 # endif
-freeReg _               = fastBool True
+freeReg _ = True
 
 #elif MACHREGS_sparc
 
 -- SPARC regs used by the OS / ABI
 -- %g0(r0) is always zero
-freeReg g0  = fastBool False
+freeReg g0  = False
 
 -- %g5(r5) - %g7(r7)
 --  are reserved for the OS
-freeReg g5  = fastBool False
-freeReg g6  = fastBool False
-freeReg g7  = fastBool False
+freeReg g5  = False
+freeReg g6  = False
+freeReg g7  = False
 
 -- %o6(r14)
 --  is the C stack pointer
-freeReg o6  = fastBool False
+freeReg o6  = False
 
 -- %o7(r15)
 --  holds the C return address
-freeReg o7  = fastBool False
+freeReg o7  = False
 
 -- %i6(r30)
 --  is the C frame pointer
-freeReg i6  = fastBool False
+freeReg i6  = False
 
 -- %i7(r31)
 --  is used for C return addresses
-freeReg i7  = fastBool False
+freeReg i7  = False
 
 -- %f0(r32) - %f1(r32)
 --  are C floating point return regs
-freeReg f0  = fastBool False
-freeReg f1  = fastBool False
+freeReg f0  = False
+freeReg f1  = False
 
 {-
 freeReg regNo
@@ -1012,112 +1019,112 @@ freeReg regNo
     | regNo >= f0
     , regNo <  NCG_FirstFloatReg
     , regNo `mod` 2 /= 0
-    = fastBool False
+    = False
 -}
 
 # ifdef REG_Base
-freeReg REG_Base = fastBool False
+freeReg REG_Base  = False
 # endif
 # ifdef REG_R1
-freeReg REG_R1  = fastBool False
+freeReg REG_R1    = False
 # endif
 # ifdef REG_R2
-freeReg REG_R2  = fastBool False
+freeReg REG_R2    = False
 # endif
 # ifdef REG_R3
-freeReg REG_R3  = fastBool False
+freeReg REG_R3    = False
 # endif
 # ifdef REG_R4
-freeReg REG_R4  = fastBool False
+freeReg REG_R4    = False
 # endif
 # ifdef REG_R5
-freeReg REG_R5  = fastBool False
+freeReg REG_R5    = False
 # endif
 # ifdef REG_R6
-freeReg REG_R6  = fastBool False
+freeReg REG_R6    = False
 # endif
 # ifdef REG_R7
-freeReg REG_R7  = fastBool False
+freeReg REG_R7    = False
 # endif
 # ifdef REG_R8
-freeReg REG_R8  = fastBool False
+freeReg REG_R8    = False
 # endif
 # ifdef REG_R9
-freeReg REG_R9  = fastBool False
+freeReg REG_R9    = False
 # endif
 # ifdef REG_R10
-freeReg REG_R10 = fastBool False
+freeReg REG_R10   = False
 # endif
 # ifdef REG_F1
-freeReg REG_F1  = fastBool False
+freeReg REG_F1    = False
 # endif
 # ifdef REG_F2
-freeReg REG_F2  = fastBool False
+freeReg REG_F2    = False
 # endif
 # ifdef REG_F3
-freeReg REG_F3  = fastBool False
+freeReg REG_F3    = False
 # endif
 # ifdef REG_F4
-freeReg REG_F4  = fastBool False
+freeReg REG_F4    = False
 # endif
 # ifdef REG_F5
-freeReg REG_F5  = fastBool False
+freeReg REG_F5    = False
 # endif
 # ifdef REG_F6
-freeReg REG_F6  = fastBool False
+freeReg REG_F6    = False
 # endif
 # ifdef REG_D1
-freeReg REG_D1  = fastBool False
+freeReg REG_D1    = False
 # endif
 # ifdef REG_D1_2
-freeReg REG_D1_2 = fastBool False
+freeReg REG_D1_2  = False
 # endif
 # ifdef REG_D2
-freeReg REG_D2  = fastBool False
+freeReg REG_D2    = False
 # endif
 # ifdef REG_D2_2
-freeReg REG_D2_2 = fastBool False
+freeReg REG_D2_2  = False
 # endif
 # ifdef REG_D3
-freeReg REG_D3  = fastBool False
+freeReg REG_D3    = False
 # endif
 # ifdef REG_D3_2
-freeReg REG_D3_2 = fastBool False
+freeReg REG_D3_2  = False
 # endif
 # ifdef REG_D4
-freeReg REG_D4  = fastBool False
+freeReg REG_D4    = False
 # endif
 # ifdef REG_D4_2
-freeReg REG_D4_2 = fastBool False
+freeReg REG_D4_2  = False
 # endif
 # ifdef REG_D5
-freeReg REG_D5  = fastBool False
+freeReg REG_D5    = False
 # endif
 # ifdef REG_D5_2
-freeReg REG_D5_2 = fastBool False
+freeReg REG_D5_2  = False
 # endif
 # ifdef REG_D6
-freeReg REG_D6  = fastBool False
+freeReg REG_D6    = False
 # endif
 # ifdef REG_D6_2
-freeReg REG_D6_2 = fastBool False
+freeReg REG_D6_2  = False
 # endif
 # ifdef REG_Sp
-freeReg REG_Sp  = fastBool False
+freeReg REG_Sp    = False
 # endif
 # ifdef REG_Su
-freeReg REG_Su  = fastBool False
+freeReg REG_Su    = False
 # endif
 # ifdef REG_SpLim
-freeReg REG_SpLim = fastBool False
+freeReg REG_SpLim = False
 # endif
 # ifdef REG_Hp
-freeReg REG_Hp  = fastBool False
+freeReg REG_Hp    = False
 # endif
 # ifdef REG_HpLim
-freeReg REG_HpLim = fastBool False
+freeReg REG_HpLim = False
 # endif
-freeReg _   = fastBool True
+freeReg _ = True
 
 #else
 

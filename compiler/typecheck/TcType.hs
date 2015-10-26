@@ -65,10 +65,10 @@ module TcType (
   eqType, eqTypes, eqPred, cmpType, cmpTypes, cmpPred, eqTypeX,
   tcEqType, tcEqKind,
   isSigmaTy, isRhoTy, isOverloadedTy,
-  isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
+  isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
-  isPredTy, isTyVarClassPred, isTyVarExposed,
+  isPredTy, isTyVarClassPred, isTyVarExposed, isTyVarUnderDatatype,
   checkValidClsArgs, hasTyVarHead,
   isRigidEqPred, isRigidTy,
 
@@ -82,7 +82,7 @@ module TcType (
 
   ---------------------------------
   -- Predicate types
-  mkMinimalBySCs, transSuperClasses, transSuperClassesPred, 
+  mkMinimalBySCs, transSuperClasses, transSuperClassesPred,
   immSuperClasses,
   isImprovementPred,
 
@@ -433,6 +433,7 @@ data UserTypeCtxt
 
 newtype TcLevel = TcLevel Int deriving( Eq, Ord )
   -- See Note [TcLevel and untouchable type variables] for what this Int is
+  -- See also Note [TcLevel assignment]
 
 {-
 Note [TcLevel and untouchable type variables]
@@ -457,7 +458,6 @@ Note [TcLevel and untouchable type variables]
     (GivenInv)  The free variables of the ic_given of an
                 implication are all untouchable; ie their level
                 numbers are LESS THAN the ic_tclvl of the implication
-
 
 Note [Skolem escape prevention]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -491,16 +491,36 @@ emerges. If we (wrongly) spontaneously solved it to get uf := beta,
 the whole implication disappears but when we pop out again we are left with
 (F Int ~ uf) which will be unified by our final zonking stage and
 uf will get unified *once more* to (F Int).
+
+Note [TcLevel assignment]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+We arrange the TcLevels like this
+
+   1   Top level
+   2     Flatten-meta-vars of level 3
+   3   First-level implication constraints
+   4     Flatten-meta-vars of level 5
+   5   Second-level implication constraints
+   ...etc...
+
+The even-numbered levels are for the flatten-meta-variables assigned
+at the next level in.  Eg for a second-level implication conststraint
+(level 5), the flatten meta-vars are level 4, which makes them untouchable.
+The flatten meta-vars could equally well all have level 0, or just NotALevel
+since they do not live across implications.
 -}
 
 fmvTcLevel :: TcLevel -> TcLevel
+-- See Note [TcLevel assignment]
 fmvTcLevel (TcLevel n) = TcLevel (n-1)
 
 topTcLevel :: TcLevel
+-- See Note [TcLevel assignment]
 topTcLevel = TcLevel 1   -- 1 = outermost level
 
 pushTcLevel :: TcLevel -> TcLevel
-pushTcLevel (TcLevel us) = TcLevel (us + 1)
+-- See Note [TcLevel assignment]
+pushTcLevel (TcLevel us) = TcLevel (us + 2)
 
 strictlyDeeperThan :: TcLevel -> TcLevel -> Bool
 strictlyDeeperThan (TcLevel tv_tclvl) (TcLevel ctxt_tclvl)
@@ -1189,11 +1209,11 @@ instance Functor OccCheckResult where
       fmap = liftM
 
 instance Applicative OccCheckResult where
-      pure = return
+      pure = OC_OK
       (<*>) = ap
 
 instance Monad OccCheckResult where
-  return x = OC_OK x
+  return            = pure
   OC_OK x     >>= k = k x
   OC_Forall   >>= _ = OC_Forall
   OC_NonTyVar >>= _ = OC_NonTyVar
@@ -1265,8 +1285,8 @@ occurCheckExpand dflags tv ty
     -- it and try again.
     go ty@(TyConApp tc tys)
       = case do { tys <- mapM go tys; return (mkTyConApp tc tys) } of
-          OC_OK ty 
-              | impredicative || isTauTyCon tc 
+          OC_OK ty
+              | impredicative || isTauTyCon tc
               -> return ty  -- First try to eliminate the tyvar from the args
               | otherwise
               -> OC_Forall  -- A type synonym with a forall on the RHS
@@ -1316,7 +1336,7 @@ Note [Kind polymorphic type classes]
     class C f where...   -- C :: forall k. k -> Constraint
     g :: forall (f::*). C f => f -> f
 
-Here the (C f) in the signature is really (C * f), and we 
+Here the (C f) in the signature is really (C * f), and we
 don't want to complain that the * isn't a type variable!
 -}
 
@@ -1337,7 +1357,7 @@ checkValidClsArgs flexible_contexts kts
   | otherwise         = all hasTyVarHead tys
   where
     (_, tys) = span isKind kts  -- see Note [Kind polymorphic type classes]
-   
+
 hasTyVarHead :: Type -> Bool
 -- Returns true of (a t1 .. tn), where 'a' is a type variable
 hasTyVarHead ty                 -- Haskell 98 allows predicates of form
@@ -1395,7 +1415,7 @@ immSuperClasses cls tys
 
 isImprovementPred :: PredType -> Bool
 -- Either it's an equality, or has some functional dependency
-isImprovementPred ty 
+isImprovementPred ty
   = case classifyPredType ty of
       EqPred NomEq t1 t2 -> not (t1 `tcEqType` t2)
       EqPred ReprEq _ _  -> False
@@ -1445,6 +1465,11 @@ isUnitTy       = is_tc unitTyConKey
 isCharTy       = is_tc charTyConKey
 isAnyTy        = is_tc anyTyConKey
 
+-- | Does a type represent a floating-point number?
+isFloatingTy :: Type -> Bool
+isFloatingTy ty = isFloatTy ty || isDoubleTy ty
+
+-- | Is a type 'String'?
 isStringTy :: Type -> Bool
 isStringTy ty
   = case tcSplitTyConApp_maybe ty of
@@ -1471,6 +1496,25 @@ isTyVarExposed _  (FunTy {})      = False
 isTyVarExposed tv (AppTy fun arg) = isTyVarExposed tv fun
                                  || isTyVarExposed tv arg
 isTyVarExposed _  (ForAllTy {})   = False
+
+-- | Does the given tyvar appear under a type generative w.r.t.
+-- representational equality? See Note [Occurs check error] in
+-- TcCanonical for the motivation for this function.
+isTyVarUnderDatatype :: TcTyVar -> TcType -> Bool
+isTyVarUnderDatatype tv = go False
+  where
+    go under_dt ty | Just ty' <- tcView ty = go under_dt ty'
+    go under_dt (TyVarTy tv') = under_dt && (tv == tv')
+    go under_dt (TyConApp tc tys) = let under_dt' = under_dt ||
+                                                    isGenerativeTyCon tc
+                                                      Representational
+                                    in any (go under_dt') tys
+    go _        (LitTy {}) = False
+    go _        (FunTy arg res) = go True arg || go True res
+    go under_dt (AppTy fun arg) = go under_dt fun || go under_dt arg
+    go under_dt (ForAllTy tv' inner_ty)
+      | tv' == tv = False
+      | otherwise = go under_dt inner_ty
 
 isRigidTy :: TcType -> Bool
 isRigidTy ty
@@ -1586,8 +1630,9 @@ orphNamesOfCoCon :: CoAxiom br -> NameSet
 orphNamesOfCoCon (CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
   = orphNamesOfTyCon tc `unionNameSet` orphNamesOfCoAxBranches branches
 
-orphNamesOfCoAxBranches :: BranchList CoAxBranch br -> NameSet
-orphNamesOfCoAxBranches = brListFoldr (unionNameSet . orphNamesOfCoAxBranch) emptyNameSet
+orphNamesOfCoAxBranches :: Branches br -> NameSet
+orphNamesOfCoAxBranches
+  = foldr (unionNameSet . orphNamesOfCoAxBranch) emptyNameSet . fromBranches
 
 orphNamesOfCoAxBranch :: CoAxBranch -> NameSet
 orphNamesOfCoAxBranch (CoAxBranch { cab_lhs = lhs, cab_rhs = rhs })
@@ -1885,4 +1930,3 @@ size_type (ForAllTy _ ty)   = size_type ty
 
 sizeTypes :: [Type] -> TypeSize
 sizeTypes tys = sum (map sizeType tys)
-

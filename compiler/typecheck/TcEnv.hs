@@ -1,7 +1,7 @@
 -- (c) The University of Glasgow 2006
-
 {-# LANGUAGE CPP, FlexibleInstances #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an orphan
+{-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an
+                                       -- orphan
 
 module TcEnv(
         TyThing(..), TcTyThing(..), TcId,
@@ -15,10 +15,11 @@ module TcEnv(
         tcExtendGlobalEnv, tcExtendGlobalEnvImplicit, setGlobalTypeEnv,
         tcExtendGlobalValEnv,
         tcLookupLocatedGlobal, tcLookupGlobal,
-        tcLookupField, tcLookupTyCon, tcLookupClass,
+        tcLookupTyCon, tcLookupClass,
         tcLookupDataCon, tcLookupPatSyn, tcLookupConLike,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupAxiom,
+        lookupGlobal,
 
         -- Local environment
         tcExtendKindEnv, tcExtendKindEnv2,
@@ -53,7 +54,8 @@ module TcEnv(
         topIdLvl, isBrackStage,
 
         -- New Ids
-        newLocalName, newDFunName, newFamInstTyConName, newFamInstAxiomName,
+        newLocalName, newDFunName, newDFunName', newFamInstTyConName,
+        newFamInstAxiomName,
         mkStableIdFromString, mkStableIdFromName,
         mkWrapperName
   ) where
@@ -98,6 +100,23 @@ import Maybes( MaybeErr(..) )
 import Data.IORef
 import Data.List
 
+
+{- *********************************************************************
+*                                                                      *
+            An IO interface to looking up globals
+*                                                                      *
+********************************************************************* -}
+
+lookupGlobal :: HscEnv -> Name -> IO TyThing
+-- An IO version, used outside the typechecker
+-- It's more complicated than it looks, because it may
+-- need to suck in an interface file
+lookupGlobal hsc_env name
+  = initTcForLookup hsc_env (tcLookupGlobal name)
+    -- This initTcForLookup stuff is massive overkill
+    -- but that's how it is right now, and at least
+    -- this function localises it
+
 {-
 ************************************************************************
 *                                                                      *
@@ -109,6 +128,7 @@ Using the Located versions (eg. tcLookupLocatedGlobal) is preferred,
 unless you know that the SrcSpan in the monad is already set to the
 span of the Name.
 -}
+
 
 tcLookupLocatedGlobal :: Located Name -> TcM TyThing
 -- c.f. IfaceEnvEnv.tcIfaceGlobal
@@ -137,22 +157,6 @@ tcLookupGlobal name
             Succeeded thing -> return thing
             Failed msg      -> failWithTc msg
         }}}
-
-tcLookupField :: Name -> TcM Id         -- Returns the selector Id
-tcLookupField name
-  = tcLookupId name     -- Note [Record field lookup]
-
-{- Note [Record field lookup]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~
-You might think we should have tcLookupGlobal here, since record fields
-are always top level.  But consider
-        f = e { f = True }
-Then the renamer (which does not keep track of what is a record selector
-and what is not) will rename the definition thus
-        f_7 = e { f_7 = True }
-Now the type checker will find f_7 in the *local* type environment, not
-the global (imported) one. It's wrong, of course, but we want to report a tidy
-error, not in TcEnv.notFound.  -}
 
 tcLookupDataCon :: Name -> TcM DataCon
 tcLookupDataCon name = do
@@ -629,16 +633,18 @@ tcGetDefaultTys
         { integer_ty <- tcMetaTy integerTyConName
         ; checkWiredInTyCon doubleTyCon
         ; string_ty <- tcMetaTy stringTyConName
-        ; let deflt_tys = opt_deflt extended_defaults unitTy  -- Note [Default unitTy]
+        ; list_ty <- tcMetaTy listTyConName
+        ; let deflt_tys = opt_deflt extended_defaults [unitTy, list_ty]
+                          -- Note [Extended defaults]
                           ++ [integer_ty, doubleTy]
-                          ++ opt_deflt ovl_strings string_ty
+                          ++ opt_deflt ovl_strings [string_ty]
         ; return (deflt_tys, flags) } } }
   where
-    opt_deflt True  ty = [ty]
+    opt_deflt True  xs = xs
     opt_deflt False _  = []
 
 {-
-Note [Default unitTy]
+Note [Extended defaults]
 ~~~~~~~~~~~~~~~~~~~~~
 In interative mode (or with -XExtendedDefaultRules) we add () as the first type we
 try when defaulting.  This has very little real impact, except in the following case.
@@ -650,6 +656,9 @@ default the 'a' to (), rather than to Integer (which is what would otherwise hap
 and then GHCi doesn't attempt to print the ().  So in interactive mode, we add
 () to the list of defaulting types.  See Trac #1200.
 
+Additonally, the list type [] is added as a default specialization for
+Traversable and Foldable. As such the default default list now has types of
+varying kinds, e.g. ([] :: * -> *)  and (Integer :: *).
 
 ************************************************************************
 *                                                                      *
@@ -725,11 +734,9 @@ simpleInstInfoTyCon :: InstInfo a -> TyCon
   -- i.e. one of the form       instance (...) => C (T a b c) where ...
 simpleInstInfoTyCon inst = tcTyConAppTyCon (simpleInstInfoTy inst)
 
-{-
-Make a name for the dict fun for an instance decl.  It's an *external*
-name, like otber top-level names, and hence must be made with newGlobalBinder.
--}
-
+-- | Make a name for the dict fun for an instance decl.  It's an *external*
+-- name, like other top-level names, and hence must be made with
+-- newGlobalBinder.
 newDFunName :: Class -> [Type] -> SrcSpan -> TcM Name
 newDFunName clas tys loc
   = do  { is_boot <- tcIsHsBootOrSig
@@ -738,6 +745,15 @@ newDFunName clas tys loc
                             concatMap (occNameString.getDFunTyKey) tys
         ; dfun_occ <- chooseUniqueOccTc (mkDFunOcc info_string is_boot)
         ; newGlobalBinder mod dfun_occ loc }
+
+-- | Special case of 'newDFunName' to generate dict fun name for a single TyCon.
+newDFunName' :: Class -> TyCon -> TcM Name
+newDFunName' clas tycon        -- Just a simple wrapper
+  = do { loc <- getSrcSpanM     -- The location of the instance decl,
+                                -- not of the tycon
+       ; newDFunName clas [mkTyConApp tycon []] loc }
+       -- The type passed to newDFunName is only used to generate
+       -- a suitable string; hence the empty type arg list
 
 {-
 Make a name for the representation tycon of a family instance.  It's an
@@ -791,7 +807,7 @@ mkWrapperName what nameBase
          thisMod <- getModule
          let -- Note [Generating fresh names for ccall wrapper]
              wrapperRef = nextWrapperNum dflags
-             pkg = packageKeyString  (modulePackageKey thisMod)
+             pkg = unitIdString  (moduleUnitId thisMod)
              mod = moduleNameString (moduleName      thisMod)
          wrapperNum <- liftIO $ atomicModifyIORef' wrapperRef $ \mod_env ->
              let num = lookupWithDefaultModuleEnv mod_env 0 thisMod

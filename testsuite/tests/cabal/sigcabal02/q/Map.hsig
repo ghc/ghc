@@ -1,7 +1,0 @@
-{-# LANGUAGE RoleAnnotations #-}
-module Map where
-
-type role Map nominal representational
-data Map k a
-
-member :: Ord k => k -> Map k a -> Bool

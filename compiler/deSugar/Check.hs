@@ -36,7 +36,7 @@ This module performs checks about if one list of equations are:
 \item Overlapped
 \item Non exhaustive
 \end{itemize}
-To discover that we go through the list of equations in a tree-like fashion.
+To discover this we go through the list of equations in a tree-like fashion.
 
 If you like theory, a similar algorithm is described in:
 \begin{quotation}
@@ -55,10 +55,10 @@ The algorithm is based on the first technique, but there are some differences:
 (By the way the second technique is really similar to the one used in
  @Match.hs@ to generate code)
 
-This function takes the equations of a pattern and returns:
+The @check@ function takes the equations of a pattern and returns:
 \begin{itemize}
 \item The patterns that are not recognized
-\item The equations that are not overlapped
+\item The equations that are shadowed or overlapped
 \end{itemize}
 It simplify the patterns and then call @check'@ (the same semantics), and it
 needs to reconstruct the patterns again ....
@@ -74,7 +74,7 @@ then all the constructors are equal:
   f (: x (: y []))   = ....
   f (: x xs)         = .....
 \end{verbatim}
-(more about that in @tidy_eqns@)
+(more about this in @tidy_eqns@)
 
 We would prefer to have a @WarningPat@ of type @String@, but Strings and the
 Pretty Printer are not friends.
@@ -175,25 +175,25 @@ untidy_lit (HsCharPrim src c) = HsChar src c
 untidy_lit lit                = lit
 
 {-
-This equation is the same that check, the only difference is that the
-boring work is done, that work needs to be done only once, this is
-the reason top have two functions, check is the external interface,
-@check'@ is called recursively.
+@check@ is the external interface, boring work (tidy, untidy) is done
+in this as it needs to be done only once.
+@check'@ is called recursively, this is the reason to have two functions.
 
-There are several cases:
+These are the several cases handled in @check'@:
 
 \begin{itemize}
 \item There are no equations: Everything is OK.
-\item There are only one equation, that can fail, and all the patterns are
+
+\item If all the patterns are variables and the match can't fail
+      then this equation is used and it doesn't generate non-exhaustive cases.
+
+\item There is only one equation that can fail, and all the patterns are
       variables. Then that equation is used and the same equation is
       non-exhaustive.
+
 \item All the patterns are variables, and the match can fail, there are
       more equations then the results is the result of the rest of equations
       and this equation is used also.
-
-\item The general case, if all the patterns are variables (here the match
-      can't fail) then the result is that this equation is used and this
-      equation doesn't generate non-exhaustive cases.
 
 \item In the general case, there can exist literals ,constructors or only
       vars in the first column, we actuate in consequence.
@@ -330,7 +330,7 @@ This equation takes a matrix of patterns and split the equations by
 constructor, using all the constructors that appears in the first column
 of the pattern matching.
 
-We can need a default clause or not ...., it depends if we used all the
+Whether we need a default clause or not depends if we used all the
 constructors or not explicitly. The reasoning is similar to @process_literals@,
 the difference is that here the default case is not always needed.
 -}
@@ -363,7 +363,7 @@ construct_matrix con qs =
     (pats,indexs) = (check' (remove_first_column con qs))
 
 {-
-Here remove first column is more difficult that with literals due to the fact
+Here removing the first column is more difficult (than literals) due to the fact
 that constructors can have arguments.
 
 For instance, the matrix
@@ -531,8 +531,8 @@ is_var_lit lit pat
 
 {-
 The difference beteewn @make_con@ and @make_whole_con@ is that
-@make_wole_con@ creates a new constructor with all their arguments, and
-@make_con@ takes a list of argumntes, creates the contructor getting their
+@make_whole_con@ creates a new constructor with all their arguments, and
+@make_con@ takes a list of arguments, creates the constructor getting their
 arguments from the list. See where \fbox{\ ???\ } are used for details.
 
 We need to reconstruct the patterns (make the constructors infix and
@@ -563,7 +563,7 @@ In particular:
 \\      @(x:(...:[])@ & returns to be & @[x,...]@
 \end{tabular}
 
-The difficult case is the third one becouse we need to follow all the
+The difficult case is the third one because we need to follow all the
 contructors until the @[]@ to know that we need to use the second case,
 not the second. \fbox{\ ???\ }
 -}
@@ -648,8 +648,8 @@ tidy_eqn eqn = eqn { eqn_pats = map tidy_pat (eqn_pats eqn),
 
 --------------
 might_fail_pat :: Pat Id -> Bool
--- Returns True of patterns that might fail (i.e. fall through) in a way
--- that is not covered by the checking algorithm.  Specifically:
+-- Returns True for patterns that might fail
+-- (that are not covered by the checking algorithm)  Specifically:
 --         NPlusKPat
 --         ViewPat (if refutable)
 --         ConPatOut of a PatSynCon
@@ -670,7 +670,8 @@ might_fail_pat (BangPat p)                   = might_fail_lpat p
 might_fail_pat (ConPatOut { pat_con = con, pat_args = ps })
   = case unLoc con of
     RealDataCon _dcon -> any might_fail_lpat (hsConPatArgs ps)
-    PatSynCon _psyn -> True
+    PatSynCon _psyn -> True -- This is considered 'might fail', as pattern synonym
+                            -- is not supported by checking algorithm
 
 -- Finally the ones that are sure to succeed, or which are covered by the checking algorithm
 might_fail_pat (LazyPat _)                   = False -- Always succeeds
@@ -696,7 +697,7 @@ tidy_pat (AsPat _ p)      = tidy_pat (unLoc p)
 tidy_pat (SigPatOut p _)  = tidy_pat (unLoc p)
 tidy_pat (CoPat _ pat _)  = tidy_pat pat
 
--- These two are might_fail patterns, so we map them to
+-- These are might_fail patterns, so we map them to
 -- WildPats.  The might_fail_pat stuff arranges that the
 -- guard says "this equation might fall through".
 tidy_pat (NPlusKPat id _ _ _) = WildPat (idType (unLoc id))
@@ -754,16 +755,13 @@ tidy_con con (RecCon (HsRecFields fs _))
                 -- Special case for null patterns; maybe not a record at all
   | otherwise = PrefixCon (map (tidy_lpat.snd) all_pats)
   where
-    arity = case con of
-        RealDataCon dcon -> dataConSourceArity dcon
-        PatSynCon psyn -> patSynArity psyn
+    arity = conLikeArity con
 
      -- pad out all the missing fields with WildPats.
     field_pats = case con of
-        RealDataCon dc -> map (\ f -> (f, nlWildPatId)) (dataConFieldLabels dc)
+        RealDataCon dc -> map (\ f -> (flSelector f, nlWildPatId)) (dataConFieldLabels dc)
         PatSynCon{}    -> panic "Check.tidy_con: pattern synonym with record syntax"
-    all_pats = foldr (\(L _ (HsRecField id p _)) acc
-                                         -> insertNm (getName (unLoc id)) p acc)
+    all_pats = foldr (\ (L _ x) acc -> insertNm (getName (unLoc (hsRecFieldId x))) (hsRecFieldArg x) acc)
                      field_pats fs
 
     insertNm nm p [] = [(nm,p)]

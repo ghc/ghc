@@ -7,6 +7,7 @@ TYPE CONSTRUCTORS
     type family Elem c :: * open
     empty :: c
     insert :: Elem c -> c -> c
+    {-# MINIMAL empty, insert #-}
   data ListColl a = L [a]
     Promotable
 COERCION AXIOMS

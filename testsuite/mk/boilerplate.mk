@@ -176,6 +176,8 @@ ifeq "$(shell $(SHELL) -c 'python2 -c 0' 2> /dev/null && echo exists)" "exists"
 PYTHON = python2
 endif
 
+CHECK_API_ANNOTATIONS := $(abspath $(TOP)/../inplace/bin/check-api-annotations)
+
 # -----------------------------------------------------------------------------
 # configuration of TEST_HC
 

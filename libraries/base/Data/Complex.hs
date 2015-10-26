@@ -2,6 +2,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -35,7 +36,7 @@ module Data.Complex
 
         )  where
 
-import GHC.Generics (Generic)
+import GHC.Generics (Generic, Generic1)
 import Data.Data (Data)
 import Foreign (Storable, castPtr, peek, poke, pokeElemOff, peekElemOff, sizeOf,
                 alignment)
@@ -50,10 +51,13 @@ infix  6  :+
 -- For a complex number @z@, @'abs' z@ is a number with the magnitude of @z@,
 -- but oriented in the positive real direction, whereas @'signum' z@
 -- has the phase of @z@, but unit magnitude.
+--
+-- The 'Foldable' and 'Traversable' instances traverse the real part first.
 data Complex a
   = !a :+ !a    -- ^ forms a complex number from its real and imaginary
                 -- rectangular components.
-        deriving (Eq, Show, Read, Data, Generic)
+        deriving (Eq, Show, Read, Data, Generic, Generic1
+                , Functor, Foldable, Traversable)
 
 -- -----------------------------------------------------------------------------
 -- Functions over Complex
@@ -203,3 +207,10 @@ instance Storable a => Storable (Complex a) where
                         q <-return $  (castPtr p)
                         poke q r
                         pokeElemOff q 1 i
+
+instance Applicative Complex where
+  pure a = a :+ a
+  f :+ g <*> a :+ b = f a :+ g b
+
+instance Monad Complex where
+  a :+ b >>= f = realPart (f a) :+ imagPart (f b)

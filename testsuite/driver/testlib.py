@@ -333,7 +333,7 @@ def ghci_dynamic( ):
     return config.ghc_dynamic
 
 def fast():
-    return config.fast
+    return config.speed == 2
 
 def platform( plat ):
     return config.platform == plat
@@ -591,6 +591,9 @@ def runTest (opts, name, func, args):
 # name  :: String
 # setup :: TestOpts -> IO ()
 def test (name, setup, func, args):
+    if config.only and name not in config.only:
+        return
+
     global aloneTests
     global parallelTests
     global allTestNames
@@ -663,7 +666,6 @@ def test_common_work (name, opts, func, args):
 
         ok_way = lambda way: \
             not getTestOpts().skip \
-            and (config.only == [] or name in config.only) \
             and (getTestOpts().only_ways == None or way in getTestOpts().only_ways) \
             and (config.cmdline_ways == [] or way in config.cmdline_ways) \
             and (not (config.skip_perf_tests and isStatsTest())) \
@@ -672,9 +674,17 @@ def test_common_work (name, opts, func, args):
         # Which ways we are asked to skip
         do_ways = list(filter (ok_way,all_ways))
 
-        # In fast mode, we skip all but one way
-        if config.fast and len(do_ways) > 0:
-            do_ways = [do_ways[0]]
+        # Only run all ways in slow mode.
+        # See Note [validate and testsuite speed] in toplevel Makefile.
+        if config.accept:
+            # Only ever run one way
+            do_ways = do_ways[:1]
+        elif config.speed > 0:
+            # However, if we EXPLICITLY asked for a way (with extra_ways)
+            # please test it!
+            explicit_ways = filter(lambda way: way in opts.extra_ways, do_ways)
+            other_ways = filter(lambda way: way not in opts.extra_ways, do_ways)
+            do_ways = other_ways[:1] + explicit_ways
 
         if not config.clean_only:
             # Run the required tests...
@@ -1026,8 +1036,8 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts, over
     # of whether we expected the compilation to fail or not (successful
     # compilations may generate warnings).
 
-    (platform_specific, expected_stderr_file) = platform_wordsize_qualify(name, 'stderr')
-    actual_stderr_file = qualify(name, 'comp.stderr')
+    (_, expected_stderr_file) = find_expected_file(name, 'stderr')
+    actual_stderr_file = add_suffix(name, 'comp.stderr')
 
     if not compare_outputs(way, 'stderr',
                            join_normalisers(getTestOpts().extra_errmsg_normaliser,
@@ -1051,8 +1061,8 @@ def compile_cmp_asm( name, way, extra_hc_opts ):
     # of whether we expected the compilation to fail or not (successful
     # compilations may generate warnings).
 
-    (platform_specific, expected_asm_file) = platform_wordsize_qualify(name, 'asm')
-    actual_asm_file = qualify(name, 's')
+    (_, expected_asm_file) = find_expected_file(name, 'asm')
+    actual_asm_file = add_suffix(name, 's')
 
     if not compare_outputs(way, 'asm',
                            join_normalisers(normalise_errmsg, normalise_asm),
@@ -1232,10 +1242,10 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
     result = runCmdFor(name, cmd, timeout_multiplier=opts.compile_timeout_multiplier)
 
     if result != 0 and not should_fail:
-        actual_stderr = qualify(name, 'comp.stderr')
         if config.verbose >= 1 and _expect_pass(way):
             print('Compile failed (status ' + repr(result) + ') errors were:')
-            if_verbose_dump(1, actual_stderr)
+            actual_stderr_path = in_testdir(name, 'comp.stderr')
+            if_verbose_dump(1, actual_stderr_path)
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
@@ -1404,10 +1414,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
         stdin_file = qualify(name, 'stdin')
 
     if os.path.exists(stdin_file):
-        stdin = open(stdin_file, 'r')
         os.system('cat ' + stdin_file + ' >>' + qscriptname)
-
-    script.close()
 
     flags = ' '.join(get_compiler_flags(override_flags=None, noforce=False) +
                      config.way_flags(name)[way])
@@ -1435,11 +1442,11 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     # split the stdout into compilation/program output
     split_file(in_testdir(outname), delimiter,
-               qualify(name, 'comp.stdout'),
-               qualify(name, 'run.stdout'))
+               in_testdir(name, 'comp.stdout'),
+               in_testdir(name, 'run.stdout'))
     split_file(in_testdir(errname), delimiter,
-               qualify(name, 'comp.stderr'),
-               qualify(name, 'run.stderr'))
+               in_testdir(name, 'comp.stderr'),
+               in_testdir(name, 'run.stderr'))
 
     # check the exit code
     if exit_code != getTestOpts().exit_code:
@@ -1497,8 +1504,8 @@ def get_compiler_flags(override_flags, noforce):
     return flags
 
 def check_stdout_ok(name, way):
-   actual_stdout_file   = qualify(name, 'run.stdout')
-   (platform_specific, expected_stdout_file) = platform_wordsize_qualify(name, 'stdout')
+   actual_stdout_file = add_suffix(name, 'run.stdout')
+   (platform_specific, expected_stdout_file) = find_expected_file(name, 'stdout')
 
    def norm(str):
       if platform_specific:
@@ -1510,18 +1517,19 @@ def check_stdout_ok(name, way):
 
    check_stdout = getTestOpts().check_stdout
    if check_stdout:
-      return check_stdout(actual_stdout_file, extra_norm)
+      actual_stdout_path = in_testdir(actual_stdout_file)
+      return check_stdout(actual_stdout_path, extra_norm)
 
    return compare_outputs(way, 'stdout', extra_norm,
                           expected_stdout_file, actual_stdout_file)
 
 def dump_stdout( name ):
    print('Stdout:')
-   print(read_no_crs(qualify(name, 'run.stdout')))
+   print(read_no_crs(in_testdir(name, 'run.stdout')))
 
 def check_stderr_ok(name, way):
-   actual_stderr_file   = qualify(name, 'run.stderr')
-   (platform_specific, expected_stderr_file) = platform_wordsize_qualify(name, 'stderr')
+   actual_stderr_file = add_suffix(name, 'run.stderr')
+   (platform_specific, expected_stderr_file) = find_expected_file(name, 'stderr')
 
    def norm(str):
       if platform_specific:
@@ -1535,7 +1543,7 @@ def check_stderr_ok(name, way):
 
 def dump_stderr( name ):
    print("Stderr:")
-   print(read_no_crs(qualify(name, 'run.stderr')))
+   print(read_no_crs(in_testdir(name, 'run.stderr')))
 
 def read_no_crs(file):
     str = ''
@@ -1561,12 +1569,12 @@ def check_hp_ok(name):
 
     hp2psResult = runCmdExitCode(hp2psCmd)
 
-    actual_ps_file = qualify(name, 'ps')
+    actual_ps_path = in_testdir(name, 'ps')
 
     if(hp2psResult == 0):
-        if (os.path.exists(actual_ps_file)):
+        if (os.path.exists(actual_ps_path)):
             if gs_working:
-                gsResult = runCmdExitCode(genGSCmd(actual_ps_file))
+                gsResult = runCmdExitCode(genGSCmd(actual_ps_path))
                 if (gsResult == 0):
                     return (True)
                 else:
@@ -1580,26 +1588,26 @@ def check_hp_ok(name):
         return(False)
 
 def check_prof_ok(name, way):
+    actual_prof_file = add_suffix(name, 'prof')
+    actual_prof_path = in_testdir(actual_prof_file)
 
-    prof_file = qualify(name,'prof')
-
-    if not os.path.exists(prof_file):
-        print(prof_file + " does not exist")
+    if not os.path.exists(actual_prof_path):
+        print(actual_prof_path + " does not exist")
         return(False)
 
-    if os.path.getsize(qualify(name,'prof')) == 0:
-        print(prof_file + " is empty")
+    if os.path.getsize(actual_prof_path) == 0:
+        print(actual_prof_path + " is empty")
         return(False)
 
-    (platform_specific, expected_prof_file) = \
-        platform_wordsize_qualify(name, 'prof.sample')
+    (_, expected_prof_file) = find_expected_file(name, 'prof.sample')
+    expected_prof_path = in_testdir(expected_prof_file)
 
     # sample prof file is not required
-    if not os.path.exists(expected_prof_file):
+    if not os.path.exists(expected_prof_path):
         return True
     else:
         return compare_outputs(way, 'prof', normalise_prof,
-                               expected_prof_file, prof_file,
+                               expected_prof_file, actual_prof_file,
                                whitespace_normaliser=normalise_whitespace)
 
 # Compare expected output to actual output, and optionally accept the
@@ -1609,14 +1617,18 @@ def check_prof_ok(name, way):
 def compare_outputs(way, kind, normaliser, expected_file, actual_file,
                     whitespace_normaliser=lambda x:x):
 
-    if os.path.exists(expected_file):
-        expected_str = normaliser(read_no_crs(expected_file))
-        expected_normalised_file = expected_file + ".normalised"
+    expected_path = in_testdir(expected_file)
+    actual_path = in_testdir(actual_file)
+
+    if os.path.exists(expected_path):
+        expected_str = normaliser(read_no_crs(expected_path))
+        expected_normalised_file = add_suffix(expected_file, 'normalised')
+        expected_normalised_path = in_testdir(expected_normalised_file)
     else:
         expected_str = ''
-        expected_normalised_file = '/dev/null'
+        expected_normalised_path = '/dev/null'
 
-    actual_raw = read_no_crs(actual_file)
+    actual_raw = read_no_crs(actual_path)
     actual_str = normaliser(actual_raw)
 
     # See Note [Output comparison].
@@ -1626,22 +1638,22 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
         if config.verbose >= 1 and _expect_pass(way):
             print('Actual ' + kind + ' output differs from expected:')
 
-        if expected_normalised_file != '/dev/null':
-            write_file(expected_normalised_file, expected_str)
+        if expected_normalised_path != '/dev/null':
+            write_file(expected_normalised_path, expected_str)
 
-        actual_normalised_file = actual_file + ".normalised"
-        write_file(actual_normalised_file, actual_str)
+        actual_normalised_path = add_suffix(actual_path, 'normalised')
+        write_file(actual_normalised_path, actual_str)
 
         if config.verbose >= 1 and _expect_pass(way):
             # See Note [Output comparison].
-            r = os.system('diff -uw ' + expected_normalised_file +
-                                  ' ' + actual_normalised_file)
+            r = os.system('diff -uw {0} {1}'.format(expected_normalised_path,
+                                                    actual_normalised_path))
 
             # If for some reason there were no non-whitespace differences,
             # then do a full diff
             if r == 0:
-                r = os.system( 'diff -u ' + expected_normalised_file + \
-                                      ' ' + actual_normalised_file )
+                r = os.system('diff -u {0} {1}'.format(expected_normalised_path,
+                                                       actual_normalised_path))
 
         if config.accept and (getTestOpts().expect == 'fail' or
                               way in getTestOpts().expect_fail_for):
@@ -1649,7 +1661,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
             return 0
         elif config.accept:
             if_verbose(1, 'Accepting new output.')
-            write_file(expected_file, actual_raw)
+            write_file(expected_path, actual_raw)
             return 1
         else:
             return 0
@@ -1675,11 +1687,20 @@ def normalise_whitespace( str ):
     str = re.sub('[ \t\n]+', ' ', str)
     return str.strip()
 
+def normalise_callstacks(str):
+    def repl(matches):
+        location = matches.group(1)
+        location = normalise_slashes_(location)
+        return ', called at {0}:<line>:<column> in <package-id>:'.format(location)
+    # Ignore line number differences in call stacks (#10834).
+    return re.sub(', called at (.+):[\\d]+:[\\d]+ in [\\w\-\.]+:', repl, str)
+
 def normalise_errmsg( str ):
     # remove " error:" and lower-case " Warning:" to make patch for
     # trac issue #10021 smaller
     str = modify_lines(str, lambda l: re.sub(' error:', '', l))
     str = modify_lines(str, lambda l: re.sub(' Warning:', ' warning:', l))
+    str = normalise_callstacks(str)
 
     # If somefile ends in ".exe" or ".exe:", zap ".exe" (for Windows)
     #    the colon is there because it appears in error messages; this
@@ -1743,6 +1764,7 @@ def normalise_output( str ):
     # Remove a .exe extension (for Windows)
     # This can occur in error messages generated by the program.
     str = re.sub('([^\\s])\\.exe', '\\1', str)
+    str = normalise_callstacks(str)
     return str
 
 def normalise_asm( str ):
@@ -1793,6 +1815,10 @@ def rawSystemWithTimeout(cmd_and_args):
     if r == 98:
         # The python timeout program uses 98 to signal that ^C was pressed
         stopNow()
+    if r == 99 and getTestOpts().exit_code != 99:
+        # Only print a message when timeout killed the process unexpectedly.
+        cmd = cmd_and_args[-1]
+        if_verbose(1, 'Timeout happened...killed process "{0}"...\n'.format(cmd))
     return r
 
 # cmd is a complex command in Bourne-shell syntax
@@ -2095,8 +2121,8 @@ def replace_suffix( name, suffix ):
     base, suf = os.path.splitext(name)
     return base + '.' + suffix
 
-def in_testdir( name ):
-    return (getTestOpts().testdir + '/' + name)
+def in_testdir(name, suffix=''):
+    return getTestOpts().testdir + '/' + add_suffix(name, suffix)
 
 def qualify( name, suff ):
     return in_testdir(add_suffix(name, suff))
@@ -2110,11 +2136,11 @@ def qualify( name, suff ):
 # the major version of the compiler (e.g. 6.8.2 would be "6.8").  For
 # more fine-grained control use compiler_lt().
 #
-def platform_wordsize_qualify( name, suff ):
+def find_expected_file(name, suff):
+    basename = add_suffix(name, suff)
+    basepath = in_testdir(basename)
 
-    basepath = qualify(name, suff)
-
-    paths = [(platformSpecific, basepath + ws + plat)
+    files = [(platformSpecific, basename + ws + plat)
              for (platformSpecific, plat) in [(1, '-' + config.platform),
                                               (1, '-' + config.os),
                                               (0, '')]
@@ -2123,11 +2149,11 @@ def platform_wordsize_qualify( name, suff ):
     dir = glob.glob(basepath + '*')
     dir = [normalise_slashes_(d) for d in dir]
 
-    for (platformSpecific, f) in paths:
-       if f in dir:
+    for (platformSpecific, f) in files:
+       if in_testdir(f) in dir:
             return (platformSpecific,f)
 
-    return (0, basepath)
+    return (0, basename)
 
 # Clean up prior to the test, so that we can't spuriously conclude
 # that it passed on the basis of old run outputs.

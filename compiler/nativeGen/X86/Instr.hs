@@ -29,7 +29,6 @@ import BlockId
 import CodeGen.Platform
 import Cmm
 import FastString
-import FastBool
 import Outputable
 import Platform
 
@@ -531,7 +530,7 @@ x86_regUsageOfInstr platform instr
 -- | Is this register interesting for the register allocator?
 interesting :: Platform -> Reg -> Bool
 interesting _        (RegVirtual _)              = True
-interesting platform (RegReal (RealRegSingle i)) = isFastTrue (freeReg platform i)
+interesting platform (RegReal (RealRegSingle i)) = freeReg platform i
 interesting _        (RegReal (RealRegPair{}))   = panic "X86.interesting: no reg pairs on this arch"
 
 

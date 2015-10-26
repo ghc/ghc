@@ -28,6 +28,7 @@ Thumbs.db
 *.depend*
 *.dyn_o
 *.dyn_hi
+__pycache__
 
 log
 tags
@@ -39,8 +40,6 @@ configure
 
 # Temporarily generated configure files
 confdefs.h
-conftest-book.xml
-conftest.xml
 
 # -----------------------------------------------------------------------------
 # Ignore any overlapped darcs repos and back up files
@@ -88,17 +87,19 @@ _darcs/
 /compiler/ghc.cabal.old
 /distrib/configure.ac
 /distrib/ghc.iss
+/docs/man
 /docs/index.html
-/docs/man/flags.xml
-/docs/man/flags.xsl
-/docs/man/ghc.1
-/docs/users_guide/ug-book.xml
-/docs/users_guide/ug-ent.xml
-/docs/users_guide/users_guide.xml
+/docs/users_guide/users_guide
+/docs/users_guide/ghc.1
+/docs/users_guide/*.xml
+/docs/users_guide/*.gen.rst
+/docs/users_guide/ghc_config.py
+/docs/users_guide/ghc_config.pyc
 /docs/users_guide/users_guide.pdf
-/docs/users_guide/users_guide.ps
-/docs/users_guide/users_guide/
-/docs/users_guide/what_glasgow_exts_does.gen.xml
+/docs/users_guide/build-html
+/docs/users_guide/build-pdf
+/docs/users_guide/.doctrees-html
+/docs/users_guide/.doctrees-pdf
 /driver/ghci/ghc-pkg-inplace
 /driver/ghci/ghci-inplace
 /driver/ghci/ghci.res
@@ -119,12 +120,12 @@ _darcs/
 /libffi/stamp*
 /libffi/package.conf.install
 /libffi/package.conf.install.raw
-/libraries/bin-package-db/GNUmakefile
-/libraries/bin-package-db/ghc.mk
 /libraries/bootstrapping.conf
 /libraries/prologue.txt
 /libraries/doc-index*.html
 /libraries/frames.html
+/libraries/ghc-boot/GNUmakefile
+/libraries/ghc-boot/ghc.mk
 /libraries/haddock-util.js
 /libraries/hslogo-16.png
 /libraries/index-frames.html
@@ -134,7 +135,6 @@ _darcs/
 /libraries/plus.gif
 /libraries/synopsis.png
 /libraries/stamp/
-/mk/are-validating.mk
 /mk/build.mk
 /mk/config.h
 /mk/config.h.in

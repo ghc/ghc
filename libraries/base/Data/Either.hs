@@ -134,7 +134,6 @@ instance Applicative (Either e) where
     Right f <*> r = fmap f r
 
 instance Monad (Either e) where
-    return = Right
     Left  l >>= _ = Left l
     Right r >>= k = k r
 

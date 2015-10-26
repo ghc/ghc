@@ -42,10 +42,6 @@ LIBFFI_NAME = ffi
 endif
 LIBFFI_DLL = lib$(LIBFFI_NAME).dll
 
-ifeq "$(OSTYPE)" "cygwin"
-LIBFFI_PATH_MANGLE = PATH=$$(cygpath "$(TOP)")/libffi:$$PATH; export PATH;
-endif
-
 ifneq "$(BINDIST)" "YES"
 $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
 	$(call removeFiles,$(libffi_STAMP_STATIC_CONFIGURE))
@@ -83,18 +79,12 @@ $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
 	mv libffi/build/Makefile.in libffi/build/Makefile.in.orig
 	sed 's:@toolexeclibdir@:$$(libdir):g' < libffi/build/Makefile.in.orig > libffi/build/Makefile.in
 
-	# Their cmd invocation only works on msys. On cygwin it starts
-	# a cmd interactive shell. The replacement works in both environments.
-	mv libffi/build/ltmain.sh libffi/build/ltmain.sh.orig
-	sed 's#cmd //c echo "\$$1"#cmd /c "echo $$1"#' < libffi/build/ltmain.sh.orig > libffi/build/ltmain.sh
-
 # * Because -Werror may be in SRC_CC_OPTS/SRC_LD_OPTS, we need to turn
 #   warnings off or the compilation of libffi might fail due to warnings;
 #   hence the -w flags.
 # * We specify --libdir, as we need to know the path to libffi.a, but on
 #   some platforms it defaults to .../lib64/ rather than .../lib/.
 	cd libffi && \
-	    $(LIBFFI_PATH_MANGLE) \
 	    cd build && \
 	    CC=$(CC_STAGE1) \
 	    CXX=$(CC_STAGE1) \

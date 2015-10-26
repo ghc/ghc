@@ -1,9 +1,10 @@
 
-T5858.hs:11:7:
-    No instance for (InferOverloaded ([t0], [t1]))
-      arising from a use of ‘infer’
-    The type variables ‘t0’, ‘t1’ are ambiguous
-    Note: there is a potential instance available:
+T5858.hs:11:7: error:
+    Ambiguous type variables ‘t0’, ‘t1’ arising from a use of ‘infer’
+    prevents the constraint ‘(InferOverloaded
+                                ([t0], [t1]))’ from being solved.
+    Probable fix: use a type annotation to specify what ‘t0’, ‘t1’ should be.
+    These potential instance exist:
       instance (t1 ~ String) => InferOverloaded (t1, t1)
         -- Defined at T5858.hs:8:10
     In the expression: infer ([], [])

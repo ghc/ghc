@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 T7861.exe: T7861.hs:10:5: error:
     Couldn't match type ‘a’ with ‘[a]’
     ‘a’ is a rigid type variable bound by
@@ -11,3 +12,18 @@ T7861.exe: T7861.hs:10:5: error:
     In the expression: doA
     In an equation for ‘f’: f = doA
 (deferred type error)
+=======
+T7861: T7861.hs:10:5: error:
+    Couldn't match type ‘a’ with ‘[a]’
+    ‘a’ is a rigid type variable bound by
+        the type signature for:
+          f :: (forall b. a) -> a
+        at T7861.hs:9:6
+    Expected type: (forall b. a) -> a
+      Actual type: (forall b. a) -> [a]
+    Relevant bindings include
+      f :: (forall b. a) -> a (bound at T7861.hs:10:1)
+    In the expression: doA
+    In an equation for ‘f’: f = doA
+(deferred type error)
+>>>>>>> origin/master

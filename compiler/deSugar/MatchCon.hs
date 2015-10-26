@@ -17,8 +17,6 @@ import {-# SOURCE #-} Match     ( match )
 import HsSyn
 import DsBinds
 import ConLike
-import DataCon
-import PatSyn
 import TcType
 import DsMonad
 import DsUtils
@@ -27,6 +25,7 @@ import Util
 import ListSetOps ( runs )
 import Id
 import NameEnv
+import FieldLabel ( flSelector )
 import SrcLoc
 import DynFlags
 import Outputable
@@ -139,21 +138,15 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
     ConPatOut { pat_con = L _ con1, pat_arg_tys = arg_tys, pat_wrap = wrapper1,
                 pat_tvs = tvs1, pat_dicts = dicts1, pat_args = args1 }
               = firstPat eqn1
-    fields1 = case con1 of
-                RealDataCon dcon1 -> dataConFieldLabels dcon1
-                PatSynCon{}       -> []
+    fields1 = map flSelector (conLikeFieldLabels con1)
 
-    val_arg_tys = case con1 of
-                    RealDataCon dcon1 -> dataConInstOrigArgTys dcon1 inst_tys
-                    PatSynCon psyn1   -> patSynInstArgTys      psyn1 inst_tys
+    val_arg_tys = conLikeInstOrigArgTys con1 inst_tys
     inst_tys = ASSERT( tvs1 `equalLength` ex_tvs )
                arg_tys ++ mkTyVarTys tvs1
         -- dataConInstOrigArgTys takes the univ and existential tyvars
         -- and returns the types of the *value* args, which is what we want
 
-    ex_tvs = case con1 of
-               RealDataCon dcon1 -> dataConExTyVars dcon1
-               PatSynCon psyn1   -> patSynExTyVars psyn1
+    ex_tvs = conLikeExTyVars con1
 
     match_group :: [Id] -> [(ConArgPats, EquationInfo)] -> DsM MatchResult
     -- All members of the group have compatible ConArgPats

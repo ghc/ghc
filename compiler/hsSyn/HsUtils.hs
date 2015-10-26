@@ -32,16 +32,22 @@ module HsUtils(
   mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
   toLHsSigWcType,
 
+  -- * Constructing general big tuples
+  -- $big_tuples
+  mkChunkified, chunkify,
+
   -- Bindings
-  mkFunBind, mkVarBind, mkHsVarBind, mk_easy_FunBind, mkTopFunBind, mkPatSynBind,
+  mkFunBind, mkVarBind, mkHsVarBind, mk_easy_FunBind, mkTopFunBind,
+  mkPatSynBind,
 
   -- Literals
   mkHsIntegral, mkHsFractional, mkHsIsString, mkHsString,
 
   -- Patterns
-  mkNPat, mkNPlusKPat, nlVarPat, nlLitPat, nlConVarPat, nlConPat,
+  mkNPat, mkNPlusKPat, nlVarPat, nlLitPat, nlConVarPat, nlConVarPatName, nlConPat,
   nlConPatName, nlInfixConPat, nlNullaryConPat, nlWildConPat, nlWildPat,
   nlWildPatName, nlWildPatId, nlTuplePat, mkParPat,
+  mkBigLHsVarTup, mkBigLHsTup, mkBigLHsVarPatTup, mkBigLHsPatTup,
 
   -- Types
   mkHsAppTy, userHsTyVarBndrs,
@@ -101,10 +107,16 @@ import FastString
 import Util
 import Bag
 import Outputable
+import Constants
 
 import Data.Either
 import Data.Function
 import Data.List
+
+#if __GLASGOW_HASKELL__ < 709
+import Data.Foldable ( foldMap )
+import Data.Monoid ( mempty, mappend )
+#endif
 
 {-
 ************************************************************************
@@ -256,7 +268,7 @@ mkTransformByStmt  ss u b = emptyTransStmt { trS_form = ThenForm,  trS_stmts = s
 mkGroupUsingStmt   ss u   = emptyTransStmt { trS_form = GroupForm, trS_stmts = ss, trS_using = u }
 mkGroupByUsingStmt ss b u = emptyTransStmt { trS_form = GroupForm, trS_stmts = ss, trS_using = u, trS_by = Just b }
 
-mkLastStmt body     = LastStmt body noSyntaxExpr
+mkLastStmt body     = LastStmt body False noSyntaxExpr
 mkBodyStmt body     = BodyStmt body noSyntaxExpr noSyntaxExpr placeHolderType
 mkBindStmt pat body = BindStmt pat body noSyntaxExpr noSyntaxExpr
 
@@ -351,6 +363,9 @@ nlHsVarApps f xs = noLoc (foldl mk (HsVar f) (map HsVar xs))
 nlConVarPat :: RdrName -> [RdrName] -> LPat RdrName
 nlConVarPat con vars = nlConPat con (map nlVarPat vars)
 
+nlConVarPatName :: Name -> [Name] -> LPat Name
+nlConVarPatName con vars = nlConPatName con (map nlVarPat vars)
+
 nlInfixConPat :: id -> LPat id -> LPat id -> LPat id
 nlInfixConPat con l r = noLoc (ConPatIn (noLoc con) (InfixCon l r))
 
@@ -427,7 +442,68 @@ nlTuplePat pats box = noLoc (TuplePat pats box [])
 missingTupArg :: HsTupArg RdrName
 missingTupArg = Missing placeHolderType
 
-{- *********************************************************************
+mkLHsPatTup :: [LPat id] -> LPat id
+mkLHsPatTup []     = noLoc $ TuplePat [] Boxed []
+mkLHsPatTup [lpat] = lpat
+mkLHsPatTup lpats  = L (getLoc (head lpats)) $ TuplePat lpats Boxed []
+
+-- The Big equivalents for the source tuple expressions
+mkBigLHsVarTup :: [id] -> LHsExpr id
+mkBigLHsVarTup ids = mkBigLHsTup (map nlHsVar ids)
+
+mkBigLHsTup :: [LHsExpr id] -> LHsExpr id
+mkBigLHsTup = mkChunkified mkLHsTupleExpr
+
+-- The Big equivalents for the source tuple patterns
+mkBigLHsVarPatTup :: [id] -> LPat id
+mkBigLHsVarPatTup bs = mkBigLHsPatTup (map nlVarPat bs)
+
+mkBigLHsPatTup :: [LPat id] -> LPat id
+mkBigLHsPatTup = mkChunkified mkLHsPatTup
+
+-- $big_tuples
+-- #big_tuples#
+--
+-- GHCs built in tuples can only go up to 'mAX_TUPLE_SIZE' in arity, but
+-- we might concievably want to build such a massive tuple as part of the
+-- output of a desugaring stage (notably that for list comprehensions).
+--
+-- We call tuples above this size \"big tuples\", and emulate them by
+-- creating and pattern matching on >nested< tuples that are expressible
+-- by GHC.
+--
+-- Nesting policy: it's better to have a 2-tuple of 10-tuples (3 objects)
+-- than a 10-tuple of 2-tuples (11 objects), so we want the leaves of any
+-- construction to be big.
+--
+-- If you just use the 'mkBigCoreTup', 'mkBigCoreVarTupTy', 'mkTupleSelector'
+-- and 'mkTupleCase' functions to do all your work with tuples you should be
+-- fine, and not have to worry about the arity limitation at all.
+
+-- | Lifts a \"small\" constructor into a \"big\" constructor by recursive decompositon
+mkChunkified :: ([a] -> a)      -- ^ \"Small\" constructor function, of maximum input arity 'mAX_TUPLE_SIZE'
+             -> [a]             -- ^ Possible \"big\" list of things to construct from
+             -> a               -- ^ Constructed thing made possible by recursive decomposition
+mkChunkified small_tuple as = mk_big_tuple (chunkify as)
+  where
+        -- Each sub-list is short enough to fit in a tuple
+    mk_big_tuple [as] = small_tuple as
+    mk_big_tuple as_s = mk_big_tuple (chunkify (map small_tuple as_s))
+
+chunkify :: [a] -> [[a]]
+-- ^ Split a list into lists that are small enough to have a corresponding
+-- tuple arity. The sub-lists of the result all have length <= 'mAX_TUPLE_SIZE'
+-- But there may be more than 'mAX_TUPLE_SIZE' sub-lists
+chunkify xs
+  | n_xs <= mAX_TUPLE_SIZE = [xs]
+  | otherwise              = split xs
+  where
+    n_xs     = length xs
+    split [] = []
+    split xs = take mAX_TUPLE_SIZE xs : split (drop mAX_TUPLE_SIZE xs)
+
+{-
+************************************************************************
 *                                                                      *
         LHsSigType and LHsSigWcType
 *                                                                      *
@@ -505,7 +581,7 @@ mkHsWrapCoR :: TcCoercionR   -- A Representational coercion  a ~R b
             -> HsExpr id -> HsExpr id
 mkHsWrapCoR co e = mkHsWrap (coToHsWrapperR co) e
 
-mkLHsWrapCo :: TcCoercion -> LHsExpr id -> LHsExpr id
+mkLHsWrapCo :: TcCoercionN -> LHsExpr id -> LHsExpr id
 mkLHsWrapCo co (L loc e) = L loc (mkHsWrapCo co e)
 
 mkHsCmdCast :: TcCoercion -> HsCmd id -> HsCmd id
@@ -690,6 +766,7 @@ collectStmtBinders (ParStmt xs _ _)     = collectLStmtsBinders
                                         $ [s | ParStmtBlock ss _ _ <- xs, s <- ss]
 collectStmtBinders (TransStmt { trS_stmts = stmts }) = collectLStmtsBinders stmts
 collectStmtBinders (RecStmt { recS_stmts = ss })     = collectLStmtsBinders ss
+collectStmtBinders ApplicativeStmt{} = []
 
 
 ----------------- Patterns --------------------------
@@ -767,31 +844,35 @@ hsTyClForeignBinders :: [TyClGroup Name] -> [LInstDecl Name]
 -- We need to look at instance declarations too,
 -- because their associated types may bind data constructors
 hsTyClForeignBinders tycl_decls inst_decls foreign_decls
-  = map unLoc $
-    hsForeignDeclsBinders foreign_decls ++
-    concatMap (concatMap hsLTyClDeclBinders . group_tyclds) tycl_decls ++
-    concatMap hsLInstDeclBinders inst_decls
+  = map unLoc (hsForeignDeclsBinders foreign_decls)
+    ++ getSelectorNames (foldMap (foldMap hsLTyClDeclBinders . group_tyclds) tycl_decls
+                        `mappend` foldMap hsLInstDeclBinders inst_decls)
+  where
+    getSelectorNames :: ([Located Name], [LFieldOcc Name]) -> [Name]
+    getSelectorNames (ns, fs) = map unLoc ns ++ map (selectorFieldOcc.unLoc) fs
 
 -------------------
-hsLTyClDeclBinders :: Eq name => Located (TyClDecl name) -> [Located name]
--- ^ Returns all the /binding/ names of the decl.
--- The first one is guaranteed to be the name of the decl. For record fields
--- mentioned in multiple constructors, the SrcLoc will be from the first
--- occurrence.  We use the equality to filter out duplicate field names.
+hsLTyClDeclBinders :: Located (TyClDecl name) -> ([Located name], [LFieldOcc name])
+-- ^ Returns all the /binding/ names of the decl.  The first one is
+-- guaranteed to be the name of the decl. The first component
+-- represents all binding names except record fields; the second
+-- represents field occurrences. For record fields mentioned in
+-- multiple constructors, the SrcLoc will be from the first occurrence.
 --
 -- Each returned (Located name) has a SrcSpan for the /whole/ declaration.
 -- See Note [SrcSpan for binders]
 
 hsLTyClDeclBinders (L loc (FamDecl { tcdFam = FamilyDecl { fdLName = L _ name } }))
-  = [L loc name]
-hsLTyClDeclBinders (L loc (SynDecl     { tcdLName = L _ name })) = [L loc name]
+  = ([L loc name], [])
+hsLTyClDeclBinders (L loc (SynDecl     { tcdLName = L _ name })) = ([L loc name], [])
 hsLTyClDeclBinders (L loc (ClassDecl   { tcdLName = L _ cls_name
                                        , tcdSigs = sigs, tcdATs = ats }))
-  = L loc cls_name :
-    [ L fam_loc fam_name | L fam_loc (FamilyDecl { fdLName = L _ fam_name }) <- ats ] ++
-    [ L mem_loc mem_name | L mem_loc (ClassOpSig False ns _) <- sigs, L _ mem_name <- ns ]
+  = (L loc cls_name :
+     [ L fam_loc fam_name | L fam_loc (FamilyDecl { fdLName = L _ fam_name }) <- ats ] ++
+     [ L mem_loc mem_name | L mem_loc (ClassOpSig False ns _) <- sigs, L _ mem_name <- ns ]
+    , [])
 hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = L _ name, tcdDataDefn = defn }))
-  = L loc name : hsDataDefnBinders defn
+  = (\ (xs, ys) -> (L loc name : xs, ys)) $ hsDataDefnBinders defn
 
 -------------------
 hsForeignDeclsBinders :: [LForeignDecl name] -> [Located name]
@@ -816,35 +897,36 @@ addPatSynBndr bind pss
   = pss
 
 -------------------
-hsLInstDeclBinders :: Eq name => LInstDecl name -> [Located name]
+hsLInstDeclBinders :: LInstDecl name -> ([Located name], [LFieldOcc name])
 hsLInstDeclBinders (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = dfis } }))
-  = concatMap (hsDataFamInstBinders . unLoc) dfis
+  = foldMap (hsDataFamInstBinders . unLoc) dfis
 hsLInstDeclBinders (L _ (DataFamInstD { dfid_inst = fi }))
   = hsDataFamInstBinders fi
-hsLInstDeclBinders (L _ (TyFamInstD {})) = []
+hsLInstDeclBinders (L _ (TyFamInstD {})) = mempty
 
 -------------------
 -- the SrcLoc returned are for the whole declarations, not just the names
-hsDataFamInstBinders :: Eq name => DataFamInstDecl name -> [Located name]
+hsDataFamInstBinders :: DataFamInstDecl name -> ([Located name], [LFieldOcc name])
 hsDataFamInstBinders (DataFamInstDecl { dfid_defn = defn })
   = hsDataDefnBinders defn
   -- There can't be repeated symbols because only data instances have binders
 
 -------------------
 -- the SrcLoc returned are for the whole declarations, not just the names
-hsDataDefnBinders :: Eq name => HsDataDefn name -> [Located name]
+hsDataDefnBinders :: HsDataDefn name -> ([Located name], [LFieldOcc name])
 hsDataDefnBinders (HsDataDefn { dd_cons = cons })
   = hsConDeclsBinders cons
   -- See Note [Binders in family instances]
 
 -------------------
-hsConDeclsBinders :: forall name. (Eq name) => [LConDecl name] -> [Located name]
+hsConDeclsBinders :: [LConDecl name] -> ([Located name], [LFieldOcc name])
   -- See hsLTyClDeclBinders for what this does
   -- The function is boringly complicated because of the records
   -- And since we only have equality, we have to be a little careful
 hsConDeclsBinders cons = go id cons
-  where go :: ([Located name] -> [Located name]) -> [LConDecl name] -> [Located name]
-        go _ [] = []
+  where go :: ([LFieldOcc name] -> [LFieldOcc name])
+           -> [LConDecl name] -> ([Located name], [LFieldOcc name])
+        go _ [] = ([], [])
         go remSeen (r:rs) =
           -- don't re-mangle the location of field names, because we don't
           -- have a record of the full location of the field declaration anyway
@@ -852,12 +934,14 @@ hsConDeclsBinders cons = go id cons
              -- remove only the first occurrence of any seen field in order to
              -- avoid circumventing detection of duplicate fields (#9156)
              L loc (ConDecl { con_names = names, con_details = RecCon flds }) ->
-               (map (L loc . unLoc) names) ++ r' ++ go remSeen' rs
+               (map (L loc . unLoc) names ++ ns, r' ++ fs)
                   where r' = remSeen (concatMap (cd_fld_names . unLoc)
                                                 (unLoc flds))
-                        remSeen' = foldr (.) remSeen [deleteBy ((==) `on` unLoc) v | v <- r']
+                        remSeen' = foldr (.) remSeen [deleteBy ((==) `on` rdrNameFieldOcc . unLoc) v | v <- r']
+                        (ns, fs) = go remSeen' rs
              L loc (ConDecl { con_names = names }) ->
-                (map (L loc . unLoc) names) ++ go remSeen rs
+                (map (L loc . unLoc) names ++ ns, fs)
+                  where (ns, fs) = go remSeen rs
 
 {-
 
@@ -897,7 +981,11 @@ lStmtsImplicits = hs_lstmts
     hs_lstmts :: [LStmtLR Name idR (Located (body idR))] -> NameSet
     hs_lstmts = foldr (\stmt rest -> unionNameSet (hs_stmt (unLoc stmt)) rest) emptyNameSet
 
+    hs_stmt :: StmtLR Name idR (Located (body idR)) -> NameSet
     hs_stmt (BindStmt pat _ _ _) = lPatImplicits pat
+    hs_stmt (ApplicativeStmt args _ _) = unionNameSets (map do_arg args)
+      where do_arg (_, ApplicativeArgOne pat _) = lPatImplicits pat
+            do_arg (_, ApplicativeArgMany stmts _ _) = hs_lstmts stmts
     hs_stmt (LetStmt binds)      = hs_local_binds binds
     hs_stmt (BodyStmt {})        = emptyNameSet
     hs_stmt (LastStmt {})        = emptyNameSet

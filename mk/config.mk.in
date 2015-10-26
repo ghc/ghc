@@ -165,7 +165,7 @@ GhcWithSMP := $(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised
 # Whether to include GHCi in the compiler.  Depends on whether the RTS linker
 # has support for this OS/ARCH combination.
 
-OsSupportsGHCi=$(strip $(patsubst $(TargetOS_CPP), YES, $(findstring $(TargetOS_CPP), mingw32 cygwin32 linux solaris2 freebsd dragonfly netbsd openbsd darwin kfreebsdgnu)))
+OsSupportsGHCi=$(strip $(patsubst $(TargetOS_CPP), YES, $(findstring $(TargetOS_CPP), mingw32 linux solaris2 freebsd dragonfly netbsd openbsd darwin kfreebsdgnu)))
 ArchSupportsGHCi=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc powerpc64 powerpc64le sparc sparc64 arm aarch64)))
 
 ifeq "$(OsSupportsGHCi)$(ArchSupportsGHCi)" "YESYES"
@@ -288,7 +288,7 @@ StripLibraries=NO
 #		doing object-file splitting
 
 ArchSupportsSplitObjs=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64 powerpc sparc),YES,NO))
-OsSupportsSplitObjs=$(strip $(if $(filter $(TargetOS_CPP),mingw32 cygwin32 linux darwin solaris2 freebsd dragonfly netbsd openbsd),YES,NO))
+OsSupportsSplitObjs=$(strip $(if $(filter $(TargetOS_CPP),mingw32 linux darwin solaris2 freebsd dragonfly netbsd openbsd),YES,NO))
 SplitObjsBroken = @SplitObjsBroken@
 
 SupportsSplitObjs := $(strip \
@@ -300,12 +300,6 @@ SupportsSplitObjs := $(strip \
 
 # By default, enable SplitObjs for the libraries if this build supports it
 SplitObjs=$(SupportsSplitObjs)
-
-# ----------------------------------------------------------------------------
-# Package-related things
-
-# Whether to install the extra packages
-InstallExtraPackages = NO
 
 # ----------------------------------------------------------------------------
 
@@ -347,6 +341,9 @@ FFILibDir=@FFILibDir@
 FFIIncludeDir=@FFIIncludeDir@
 
 
+# Include support for DWARF unwinding
+GhcRtsWithLibdw = @HaveLibdw@
+
 ################################################################################
 #
 #		Paths (see paths.mk)
@@ -364,9 +361,6 @@ FFIIncludeDir=@FFIIncludeDir@
 # setting the TMPDIR env var would have no effect in the build tree.
 
 DEFAULT_TMPDIR		= /tmp
-ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
-DEFAULT_TMPDIR		= /C/TEMP
-endif
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 DEFAULT_TMPDIR		= /C/TEMP
 endif
@@ -470,7 +464,7 @@ GHC_PACKAGE_DB_FLAG = @GHC_PACKAGE_DB_FLAG@
 
 CMM_SINK_BOOTSTRAP_IS_NEEDED = @CMM_SINK_BOOTSTRAP_IS_NEEDED@
 
-SUPPORTS_PACKAGE_KEY = @SUPPORTS_PACKAGE_KEY@
+SUPPORTS_COMPONENT_ID = @SUPPORTS_COMPONENT_ID@
 
 #-----------------------------------------------------------------------------
 # C compiler
@@ -513,16 +507,68 @@ LD_STAGE2       = $(LD)
 LD_STAGE3       = $(LD)
 
 # Cross-compiling options
-#
+# See Note [CrossCompiling vs Stage1Only]
 CrossCompiling        = @CrossCompiling@
 
 # Change this to YES if you're building a cross-compiler and don't
 # want to build stage 2.
+# See Note [CrossCompiling vs Stage1Only]
+# See Note [Stage1Only vs stage=1]
 Stage1Only = NO
 
 # Install stage 2 by default, or stage 1 in the cross compiler
 # case. Can be changed to 3
 INSTALL_GHC_STAGE= $(if $(filter YES,$(Stage1Only)),1,2)
+
+# Note [CrossCompiling vs Stage1Only]
+#
+# There are 4 possible settings:
+#
+# 1 CrossCompiling=NO Stage1Only=NO
+#   The default.
+#
+# 2 CrossCompiling=NO Stage1Only=YES
+#   Don't build ghc-stage2. See Note [Stage1Only vs stage=1].
+#
+# 3 CrossCompiling=YES Stage1Only=YES
+#   Building a cross-compiler (ghc-stage1). See [1] and
+#   Note [Stage1Only vs stage=1].
+#
+# 4 CrossCompiling=YES Stage1Only=NO
+#   Cross-compiling GHC itself. See [1].
+#
+# [1] https://ghc.haskell.org/trac/ghc/wiki/Building/CrossCompiling
+
+# Note [Stage1Only vs stage=1]
+#
+# Stage1Only=YES means:
+#   - don't build ghc-stage2 (the executable)
+#   - don't build utils that rely on ghc-stage2
+#     See Note [No stage2 packages when CrossCompiling or Stage1Only] in
+#     ./ghc.mk.
+#   - install ghc-stage1 instead of ghc-stage2
+#   - install the ghc-pkg that was built with the stage0 compiler
+#   - (*do* still build compiler/stage2 (i.e. the ghc library))
+#   - (*do* still build all other libraries)
+#
+# stage=1 means:
+#   - don't build compiler/stage2 (i.e. the ghc library)
+#   - don't build ghc-stage2 (the executable)
+#   Note: these are the only two things it does. If you want to exclude more
+#   stuff, combine it with Stage1Only=YES, or run make in the ghc or compiler
+#   directory.
+#
+# running make in the ghc or compiler directory means:
+#   - don't build any packages in the libraries/ directory, except the ones
+#     listed in PACKAGES_STAGE0 (i.e. the boot libraries)
+#
+# You may wonder why Stage1Only=YES still builds compiler/stage2. Quoting
+# simonmar in #7639:
+#
+#     "strictly speaking building compiler/stage2 is correct, because it is
+#     the ghc package that can be used with [ghc-stage1]. If you don't
+#     want to build it, then setting stage=1 in your mk/build.mk should
+#     disable it."
 
 # C compiler and linker flags from configure (e.g. -m<blah> to select
 # correct C compiler backend). The stage number is the stage of GHC
@@ -712,21 +758,14 @@ HSCOLOUR_CMD   = @HSCOLOUR@
 TIME_CMD       = @TimeCmd@
 
 #-----------------------------------------------------------------------------
-# DocBook XML stuff
+# Sphinx stuff
 
-BUILD_DOCBOOK_HTML       = @BUILD_DOCBOOK_HTML@
-BUILD_DOCBOOK_PS         = @BUILD_DOCBOOK_PS@
-BUILD_DOCBOOK_PDF        = @BUILD_DOCBOOK_PDF@
-DBLATEX                  = @DblatexCmd@
-# filename.as.url=0 is needed with dblatex 0.3.4 (#7486)
-DBLATEX_OPTS             = -P 'filename.as.url=0' -P 'latex.unicode.use=1'
-XSLTPROC                 = @XsltprocCmd@
-XMLLINT                  = @XmllintCmd@
-HAVE_DOCBOOK_XSL	 = @HAVE_DOCBOOK_XSL@
-XSLTPROC_HTML_STYLESHEET = http://docbook.sourceforge.net/release/xsl/current/html/chunk.xsl
-XSLTPROC_LABEL_OPTS	 = --stringparam toc.section.depth 3 \
-			   --stringparam section.autolabel 1 \
-			   --stringparam section.label.includes.component.label 1
+SPHINXBUILD              = @SPHINXBUILD@
+BUILD_MAN                = @BUILD_MAN@
+BUILD_SPHINX_HTML        = @BUILD_SPHINX_HTML@
+BUILD_SPHINX_PDF         = @BUILD_SPHINX_PDF@
+SPHINXOPTS               = -D latex_paper_size=letter
+XELATEX                  = @XELATEX@
 
 #-----------------------------------------------------------------------------
 # 		FPtools support software
@@ -771,9 +810,9 @@ else
 HSCOLOUR_SRCS = YES
 endif
 
-# Build DPH?
+# Build and install DPH?
 BUILD_DPH = NO
-# Build the "extra" packages (see ./packages)?
+# Build and install the "extra" packages (see ./packages)?
 BUILD_EXTRA_PKGS = NO
 
 ################################################################################

@@ -1,8 +1,7 @@
 
 T9260.hs:12:8: error:
-    Couldn't match type ‘(n0 + 1) + 1’ with ‘1’
-    The type variable ‘n0’ is ambiguous
+    Couldn't match type ‘2’ with ‘1’
     Expected type: Fin 1
-      Actual type: Fin ((n0 + 1) + 1)
+      Actual type: Fin (1 + 1)
     In the expression: Fsucc Fzero
     In an equation for ‘test’: test = Fsucc Fzero

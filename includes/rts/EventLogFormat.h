@@ -113,8 +113,7 @@
 /* 13, 14 deprecated */
 #define EVENT_CREATE_SPARK_THREAD 15 /* (spark_thread)         */
 #define EVENT_LOG_MSG             16 /* (message ...)          */
-/* EVENT_STARTUP should be deprecated at some point */
-#define EVENT_STARTUP             17 /* (num_capabilities)     */
+/* 17 deprecated */
 #define EVENT_BLOCK_MARKER        18 /* (size, end_time, capability) */
 #define EVENT_USER_MSG            19 /* (message ...)          */
 #define EVENT_GC_IDLE             20 /* () */
@@ -190,6 +189,7 @@
 /* ghc changed how it handles sparks so these are no longer applicable */
 #define EVENT_CREATE_SPARK        13 /* (cap, thread) */
 #define EVENT_SPARK_TO_THREAD     14 /* (cap, thread, spark_thread) */
+#define EVENT_STARTUP             17 /* (num_capabilities)     */
 /* these are used by eden but are replaced by new alternatives for ghc */
 #define EVENT_VERSION             23 /* (version_string) */
 #define EVENT_PROGRAM_INVOCATION  24 /* (commandline_string) */

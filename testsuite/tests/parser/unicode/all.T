@@ -22,3 +22,6 @@ test('T2302', only_ways(['normal']), compile_fail, [''])
 test('T4373', normal, compile, [''])
 test('T6016', extra_clean(['T6016-twoBOMs']), compile_and_run, ['-package ghc'])
 test('T7671', normal, compile, [''])
+# TODO: This test ought to be run in a non-UTF8 locale, but this is not yet
+# supported by the test suite (see 10907)
+test('T10907', normal, compile, [''])

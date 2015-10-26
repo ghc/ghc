@@ -20,14 +20,14 @@ cabal03: clean
 	'$(GHC_PKG)' init tmp.d
 	'$(TEST_HC)' -v0 --make Setup
 	cd p && $(SETUP) clean
-	cd p && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --disable-optimisation --ghc-pkg-option=--force
+	cd p && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --disable-optimisation --ghc-pkg-option=--force --ipid p-noopt
 	cd p && $(SETUP) build
 	cd p && $(SETUP) register
 	cd q && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --ghc-pkg-option=--force
 	cd q && $(SETUP) build
 	cd q && $(SETUP) register
 	cd p && $(SETUP) clean
-	cd p && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --ghc-pkg-option=--force
+	cd p && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --ghc-pkg-option=--force --ipid p-withopt
 	cd p && $(SETUP) build
 	cd p && $(SETUP) register
 	cd r && ! ../Setup configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --ghc-pkg-option=--force

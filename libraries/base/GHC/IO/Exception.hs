@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE DeriveGeneric, NoImplicitPrelude, MagicHash,
-             ExistentialQuantification #-}
+             ExistentialQuantification, ImplicitParams #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -98,8 +98,8 @@ instance Show Deadlock where
 -----
 
 -- |This thread has exceeded its allocation limit.  See
--- 'GHC.Conc.setAllocationCounter' and
--- 'GHC.Conc.enableAllocationLimit'.
+-- 'System.Mem.setAllocationCounter' and
+-- 'System.Mem.enableAllocationLimit'.
 --
 -- @since 4.8.0.0
 data AllocationLimitExceeded = AllocationLimitExceeded
@@ -352,10 +352,12 @@ instance Show IOException where
 -- Note the use of "lazy". This means that
 --     assert False (throw e)
 -- will throw the assertion failure rather than e. See trac #5561.
-assertError :: Addr# -> Bool -> a -> a
-assertError str predicate v
+assertError :: (?callStack :: CallStack) => Bool -> a -> a
+assertError predicate v
   | predicate = lazy v
-  | otherwise = throw (AssertionFailed (untangle str "Assertion failed"))
+  | otherwise = throw (AssertionFailed
+                        ("Assertion failed\n"
+                         ++ showCallStack (popCallStack ?callStack)))
 
 unsupportedOperation :: IOError
 unsupportedOperation =

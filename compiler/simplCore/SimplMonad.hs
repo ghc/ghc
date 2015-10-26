@@ -107,9 +107,9 @@ instance Applicative SimplM where
     (*>)  = thenSmpl_
 
 instance Monad SimplM where
-   (>>)   = thenSmpl_
+   (>>)   = (*>)
    (>>=)  = thenSmpl
-   return = returnSmpl
+   return = pure
 
 returnSmpl :: a -> SimplM a
 returnSmpl e = SM (\_st_env us sc -> return (e, us, sc))

@@ -53,6 +53,40 @@ sub sanity_check_tree {
     my $tag;
     my $dir;
 
+    if (-d ".git"  &&
+        system("git config remote.origin.url | grep github.com > /dev/null") == 0 &&
+        system("git config --get-regexp '^url.*github.com/.*/packages-.insteadOf' > /dev/null") != 0) {
+        # If we cloned from github, make sure the url rewrites are set.
+        # Otherwise 'git submodule update --init' prints confusing errors.
+        die <<EOF;
+It seems you cloned this repository from GitHub. But your git config files
+don't contain the url rewrites that are needed to make this work (GitHub
+doesn't support '/' in repository names, so we use a different naming scheme
+for the submodule repositories there).
+
+Please run the following commands first:
+
+  git config --global url."git://github.com/ghc/packages-".insteadOf     git://github.com/ghc/packages/
+  git config --global url."http://github.com/ghc/packages-".insteadOf    http://github.com/ghc/packages/
+  git config --global url."https://github.com/ghc/packages-".insteadOf   https://github.com/ghc/packages/
+  git config --global url."ssh://git\@github.com/ghc/packages-".insteadOf ssh://git\@github.com/ghc/packages/
+  git config --global url."git\@github.com:/ghc/packages-".insteadOf      git\@github.com:/ghc/packages/
+
+And then:
+
+  git submodule update --init
+  ./boot
+
+Or start over, and clone the GHC repository from the haskell server:
+
+  git clone --recursive git://git.haskell.org/ghc.git
+
+For more information, see:
+  * https://ghc.haskell.org/trac/ghc/wiki/Newcomers or
+  * https://ghc.haskell.org/trac/ghc/wiki/Building/GettingTheSources#CloningfromGitHub
+EOF
+    }
+
     # Check that we have all boot packages.
     open PACKAGES, "< packages";
     while (<PACKAGES>) {

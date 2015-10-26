@@ -14,7 +14,7 @@ module SimplUtils (
         preInlineUnconditionally, postInlineUnconditionally,
         activeUnfolding, activeRule,
         getUnfoldingInRuleMatch,
-        simplEnvForGHCi, updModeForStableUnfoldings, updModeForRuleLHS,
+        simplEnvForGHCi, updModeForStableUnfoldings, updModeForRules,
 
         -- The continuation type
         SimplCont(..), DupFlag(..),
@@ -701,20 +701,25 @@ updModeForStableUnfoldings inline_rule_act current_mode
     phaseFromActivation (ActiveAfter n) = Phase n
     phaseFromActivation _               = InitialPhase
 
-updModeForRuleLHS :: SimplifierMode -> SimplifierMode
--- See Note [Simplifying RULE LHSs]
-updModeForRuleLHS current_mode
+updModeForRules :: SimplifierMode -> SimplifierMode
+-- See Note [Simplifying rules]
+updModeForRules current_mode
   = current_mode { sm_phase  = InitialPhase
                  , sm_inline = False
                  , sm_rules  = False
                  , sm_eta_expand = False }
 
-{- Note [Simplifying RULE LHSs]
+{- Note [Simplifying rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When simplifying on the LHS of a rule, refrain from all inlining and
-all RULES.  Doing anything to the LHS is plain confusing, because it
-means that what the rule matches is not what the user wrote.
-c.f. Trac #10595, and #10528.
+When simplifying a rule, refrain from any inlining or applying of other RULES.
+
+Doing anything to the LHS is plain confusing, because it means that what the
+rule matches is not what the user wrote. c.f. Trac #10595, and #10528.
+Moreover, inlining (or applying rules) on rule LHSs risks introducing
+Ticks into the LHS, which makes matching trickier. Trac #10665, #10745.
+
+Doing this to either side confounds tools like HERMIT, which seek to reason
+about and apply the RULES as originally written. See Trac #10829.
 
 Note [Inlining in gentle mode]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -992,14 +997,14 @@ Example
 
    ...fInt...fInt...fInt...
 
-Here f occurs just once, in the RHS of f1. But if we inline it there
+Here f occurs just once, in the RHS of fInt. But if we inline it there
 we'll lose the opportunity to inline at each of fInt's call sites.
 The INLINE pragma will only inline when the application is saturated
 for exactly this reason; and we don't want PreInlineUnconditionally
 to second-guess it.  A live example is Trac #3736.
     c.f. Note [Stable unfoldings and postInlineUnconditionally]
 
-Note [Top-level botomming Ids]
+Note [Top-level bottoming Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Don't inline top-level Ids that are bottoming, even if they are used just
 once, because FloatOut has gone to some trouble to extract them out.
@@ -1518,6 +1523,30 @@ as we would normally do.
 That's why the whole transformation is part of the same process that
 floats let-bindings and constructor arguments out of RHSs.  In particular,
 it is guarded by the doFloatFromRhs call in simplLazyBind.
+
+Note [Which type variables to abstract over]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Abstract only over the type variables free in the rhs wrt which the
+new binding is abstracted.  Note that
+
+  * The naive approach of abstracting wrt the
+    tyvars free in the Id's /type/ fails. Consider:
+        /\ a b -> let t :: (a,b) = (e1, e2)
+                      x :: a     = fst t
+                  in ...
+    Here, b isn't free in x's type, but we must nevertheless
+    abstract wrt b as well, because t's type mentions b.
+    Since t is floated too, we'd end up with the bogus:
+         poly_t = /\ a b -> (e1, e2)
+         poly_x = /\ a   -> fst (poly_t a *b*)
+
+  * We must do closeOverKinds.  Example (Trac #10934):
+       f = /\k (f:k->*) (a:k). let t = AccFailure @ (f a) in ...
+    Here we want to float 't', but we must remember to abstract over
+    'k' as well, even though it is not explicitly mentioned in the RHS,
+    otherwise we get
+       t = /\ (f:k->*) (a:k). AccFailure @ (f a)
+    which is obviously bogus.
 -}
 
 abstractFloats :: [OutTyVar] -> SimplEnv -> OutExpr -> SimplM ([OutBind], OutExpr)
@@ -1538,23 +1567,12 @@ abstractFloats main_tvs body_env body
            ; return (subst', (NonRec poly_id poly_rhs)) }
       where
         rhs' = CoreSubst.substExpr (text "abstract_floats2") subst rhs
-        tvs_here = varSetElemsKvsFirst (main_tv_set `intersectVarSet` exprSomeFreeVars isTyVar rhs')
 
-                -- Abstract only over the type variables free in the rhs
-                -- wrt which the new binding is abstracted.  But the naive
-                -- approach of abstract wrt the tyvars free in the Id's type
-                -- fails. Consider:
-                --      /\ a b -> let t :: (a,b) = (e1, e2)
-                --                    x :: a     = fst t
-                --                in ...
-                -- Here, b isn't free in x's type, but we must nevertheless
-                -- abstract wrt b as well, because t's type mentions b.
-                -- Since t is floated too, we'd end up with the bogus:
-                --      poly_t = /\ a b -> (e1, e2)
-                --      poly_x = /\ a   -> fst (poly_t a *b*)
-                -- So for now we adopt the even more naive approach of
-                -- abstracting wrt *all* the tyvars.  We'll see if that
-                -- gives rise to problems.   SLPJ June 98
+        -- tvs_here: see Note [Which type variables to abstract over]
+        tvs_here = varSetElemsKvsFirst         $
+                   intersectVarSet main_tv_set $
+                   closeOverKinds              $
+                   exprSomeFreeVars isTyVar rhs'
 
     abstract subst (Rec prs)
        = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly tvs_here) ids

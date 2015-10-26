@@ -1,5 +1,5 @@
 name:           template-haskell
-version:        2.10.0.0
+version:        2.11.0.0
 -- NOTE: Don't forget to update ./changelog.md
 license:        BSD3
 license-file:   LICENSE
@@ -48,9 +48,10 @@ Library
 
     build-depends:
         base       >= 4.6 && < 4.9,
+        ghc-boot,
         pretty     == 1.1.*
 
-    -- We need to set the package key to template-haskell (without a
+    -- We need to set the unit ID to template-haskell (without a
     -- version number) as it's magic.
     ghc-options: -Wall
 

@@ -4,7 +4,7 @@ Reading package info from "test.pkg" ... done.
 name: testpkg
 version: 1.2.3.4
 id: testpkg-1.2.3.4-XXX
-key: testpkg-1.2.3.4
+key: testpkg-1.2.3.4-XXX
 license: BSD3
 copyright: (c) The Univsersity of Glasgow 2004
 maintainer: glasgow-haskell-users@haskell.org
@@ -19,17 +19,18 @@ exposed: True
 exposed-modules:
     A
 hidden-modules: B C.D
+abi: 
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
-hs-libraries: testpkg-1.2.3.4
+hs-libraries: testpkg-1.2.3.4-XXX
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 pkgroot: 
 
 name: testpkg
 version: 1.2.3.4
 id: testpkg-1.2.3.4-XXX
-key: testpkg-1.2.3.4
+key: testpkg-1.2.3.4-XXX
 license: BSD3
 copyright: (c) The Univsersity of Glasgow 2004
 maintainer: glasgow-haskell-users@haskell.org
@@ -44,10 +45,11 @@ exposed: True
 exposed-modules:
     A
 hidden-modules: B C.D
+abi: 
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
-hs-libraries: testpkg-1.2.3.4
+hs-libraries: testpkg-1.2.3.4-XXX
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 pkgroot: 
 
@@ -60,7 +62,7 @@ local01.package.conf:
 name: testpkg
 version: 2.0
 id: testpkg-2.0-XXX
-key: testpkg-2.0
+key: testpkg-2.0-XXX
 license: BSD3
 copyright: (c) The Univsersity of Glasgow 2004
 maintainer: glasgow-haskell-users@haskell.org
@@ -75,17 +77,18 @@ exposed: False
 exposed-modules:
     A
 hidden-modules: B C.D C.E
+abi: 
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
-hs-libraries: testpkg-2.0
+hs-libraries: testpkg-2.0-XXX
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 pkgroot: 
 
 name: testpkg
 version: 2.0
 id: testpkg-2.0-XXX
-key: testpkg-2.0
+key: testpkg-2.0-XXX
 license: BSD3
 copyright: (c) The Univsersity of Glasgow 2004
 maintainer: glasgow-haskell-users@haskell.org
@@ -100,17 +103,18 @@ exposed: False
 exposed-modules:
     A
 hidden-modules: B C.D C.E
+abi: 
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
-hs-libraries: testpkg-2.0
+hs-libraries: testpkg-2.0-XXX
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 pkgroot: 
 ---
 name: testpkg
 version: 1.2.3.4
 id: testpkg-1.2.3.4-XXX
-key: testpkg-1.2.3.4
+key: testpkg-1.2.3.4-XXX
 license: BSD3
 copyright: (c) The Univsersity of Glasgow 2004
 maintainer: glasgow-haskell-users@haskell.org
@@ -125,10 +129,11 @@ exposed: True
 exposed-modules:
     A
 hidden-modules: B C.D
+abi: 
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
-hs-libraries: testpkg-1.2.3.4
+hs-libraries: testpkg-1.2.3.4-XXX
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 pkgroot: 
 
@@ -142,7 +147,7 @@ Reading package info from "test3.pkg" ... done.
 name: testpkg
 version: 1.2.3.4
 id: testpkg-1.2.3.4-XXX
-key: testpkg-1.2.3.4
+key: testpkg-1.2.3.4-XXX
 license: BSD3
 copyright: (c) The Univsersity of Glasgow 2004
 maintainer: glasgow-haskell-users@haskell.org
@@ -157,10 +162,11 @@ exposed: False
 exposed-modules:
     A
 hidden-modules: B C.D
+abi: 
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
-hs-libraries: testpkg-1.2.3.4
+hs-libraries: testpkg-1.2.3.4-XXX
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 pkgroot: 
 

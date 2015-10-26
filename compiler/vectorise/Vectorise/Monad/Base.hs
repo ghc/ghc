@@ -51,7 +51,7 @@ newtype VM a
   = VM { runVM :: Builtins -> GlobalEnv -> LocalEnv -> DsM (VResult a) }
 
 instance Monad VM where
-  return x   = VM $ \_  genv lenv -> return (Yes genv lenv x)
+  return = pure
   VM p >>= f = VM $ \bi genv lenv -> do
                                        r <- p bi genv lenv
                                        case r of
@@ -59,7 +59,7 @@ instance Monad VM where
                                          No reason         -> return $ No reason
 
 instance Applicative VM where
-  pure  = return
+  pure x = VM $ \_ genv lenv -> return (Yes genv lenv x)
   (<*>) = ap
   
 instance Functor VM where

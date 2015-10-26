@@ -15,7 +15,8 @@ module TcTypeNats
 import Type
 import Pair
 import TcType     ( TcType, tcEqType )
-import TyCon      ( TyCon, FamTyConFlav(..), mkFamilyTyCon, TyConParent(..)  )
+import TyCon      ( TyCon, FamTyConFlav(..), mkFamilyTyCon
+                  , Injectivity(..), TyConParent(..)  )
 import Coercion   ( Role(..) )
 import TcRnTypes  ( Xi )
 import CoAxiom    ( CoAxiomRule(..), BuiltInSynFamily(..) )
@@ -29,7 +30,7 @@ import TysWiredIn ( typeNatKind, typeSymbolKind
                   , promotedEQDataCon
                   , promotedGTDataCon
                   )
-import TysPrim    ( tyVarList, mkArrowKinds )
+import TysPrim    ( mkArrowKinds, mkTemplateTyVars )
 import PrelNames  ( gHC_TYPELITS
                   , typeNatAddTyFamNameKey
                   , typeNatMulTyFamNameKey
@@ -106,9 +107,11 @@ typeNatLeqTyCon :: TyCon
 typeNatLeqTyCon =
   mkFamilyTyCon name
     (mkArrowKinds [ typeNatKind, typeNatKind ] boolKind)
-    (take 2 $ tyVarList typeNatKind)
+    (mkTemplateTyVars [ typeNatKind, typeNatKind ])
+    Nothing
     (BuiltInSynFamTyCon ops)
     NoParentTyCon
+    NotInjective
 
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "<=?")
@@ -123,9 +126,11 @@ typeNatCmpTyCon :: TyCon
 typeNatCmpTyCon =
   mkFamilyTyCon name
     (mkArrowKinds [ typeNatKind, typeNatKind ] orderingKind)
-    (take 2 $ tyVarList typeNatKind)
+    (mkTemplateTyVars [ typeNatKind, typeNatKind ])
+    Nothing
     (BuiltInSynFamTyCon ops)
     NoParentTyCon
+    NotInjective
 
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "CmpNat")
@@ -140,9 +145,11 @@ typeSymbolCmpTyCon :: TyCon
 typeSymbolCmpTyCon =
   mkFamilyTyCon name
     (mkArrowKinds [ typeSymbolKind, typeSymbolKind ] orderingKind)
-    (take 2 $ tyVarList typeSymbolKind)
+    (mkTemplateTyVars [ typeSymbolKind, typeSymbolKind ])
+    Nothing
     (BuiltInSynFamTyCon ops)
     NoParentTyCon
+    NotInjective
 
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "CmpSymbol")
@@ -162,10 +169,11 @@ mkTypeNatFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
 mkTypeNatFunTyCon2 op tcb =
   mkFamilyTyCon op
     (mkArrowKinds [ typeNatKind, typeNatKind ] typeNatKind)
-    (take 2 $ tyVarList typeNatKind)
+    (mkTemplateTyVars [ typeNatKind, typeNatKind ])
+    Nothing
     (BuiltInSynFamTyCon tcb)
     NoParentTyCon
-
+    NotInjective
 
 
 

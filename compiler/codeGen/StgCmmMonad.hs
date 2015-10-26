@@ -118,12 +118,12 @@ instance Functor FCode where
   fmap f (FCode g) = FCode $ \i s -> case g i s of (# a, s' #) -> (# f a, s' #)
 
 instance A.Applicative FCode where
-      pure = return
+      pure = returnFC
       (<*>) = ap
 
 instance Monad FCode where
         (>>=) = thenFC
-        return = returnFC
+        return = A.pure
 
 {-# INLINE thenC #-}
 {-# INLINE thenFC #-}
@@ -498,7 +498,7 @@ withSelfLoop self_loop code = do
 instance HasDynFlags FCode where
     getDynFlags = liftM cgd_dflags getInfoDown
 
-getThisPackage :: FCode PackageKey
+getThisPackage :: FCode UnitId
 getThisPackage = liftM thisPackage getDynFlags
 
 withInfoDown :: FCode a -> CgInfoDownwards -> FCode a
@@ -831,7 +831,7 @@ mkCmmIfThenElse e tbranch fbranch = do
   endif <- newLabelC
   tid   <- newLabelC
   fid   <- newLabelC
-  return $ catAGraphs [ mkCbranch e tid fid
+  return $ catAGraphs [ mkCbranch e tid fid Nothing
                       , mkLabel tid tscp, tbranch, mkBranch endif
                       , mkLabel fid tscp, fbranch, mkLabel endif tscp ]
 
@@ -839,14 +839,14 @@ mkCmmIfGoto :: CmmExpr -> BlockId -> FCode CmmAGraph
 mkCmmIfGoto e tid = do
   endif <- newLabelC
   tscp  <- getTickScope
-  return $ catAGraphs [ mkCbranch e tid endif, mkLabel endif tscp ]
+  return $ catAGraphs [ mkCbranch e tid endif Nothing, mkLabel endif tscp ]
 
 mkCmmIfThen :: CmmExpr -> CmmAGraph -> FCode CmmAGraph
 mkCmmIfThen e tbranch = do
   endif <- newLabelC
   tid   <- newLabelC
   tscp  <- getTickScope
-  return $ catAGraphs [ mkCbranch e tid endif
+  return $ catAGraphs [ mkCbranch e tid endif Nothing
                       , mkLabel tid tscp, tbranch, mkLabel endif tscp ]
 
 

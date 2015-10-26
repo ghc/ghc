@@ -630,7 +630,7 @@ checkPerms file =
       -- #8248: Improving warning to include a possible fix.
       putStrLn $ "*** WARNING: " ++ file ++
                  " is writable by someone else, IGNORING!" ++
-                 "\nSuggested fix: execute 'chmod 644 " ++ file ++ "'"
+                 "\nSuggested fix: execute 'chmod go-w " ++ file ++ "'"
     return ok
 #endif
 
@@ -1720,8 +1720,8 @@ isSafeModule m = do
     mname = GHC.moduleNameString $ GHC.moduleName m
 
     packageTrusted dflags md
-        | thisPackage dflags == modulePackageKey md = True
-        | otherwise = trusted $ getPackageDetails dflags (modulePackageKey md)
+        | thisPackage dflags == moduleUnitId md = True
+        | otherwise = trusted $ getPackageDetails dflags (moduleUnitId md)
 
     tallyPkgs dflags deps | not (packageTrustOn dflags) = ([], [])
                           | otherwise = partition part deps
@@ -3214,7 +3214,6 @@ showException se =
            -- omit the location for CmdLineError:
            Just (CmdLineError s)    -> putException s
            -- ditto:
-           Just ph@(PhaseFailed {}) -> putException (showGhcException ph "")
            Just other_ghc_ex        -> putException (show other_ghc_ex)
            Nothing                  ->
                case fromException se of
@@ -3256,7 +3255,7 @@ lookupModuleName :: GHC.GhcMonad m => ModuleName -> m Module
 lookupModuleName mName = GHC.lookupModule mName Nothing
 
 isHomeModule :: Module -> Bool
-isHomeModule m = GHC.modulePackageKey m == mainPackageKey
+isHomeModule m = GHC.moduleUnitId m == mainUnitId
 
 -- TODO: won't work if home dir is encoded.
 -- (changeDirectory may not work either in that case.)
@@ -3280,7 +3279,7 @@ wantInterpretedModuleName modname = do
    modl <- lookupModuleName modname
    let str = moduleNameString modname
    dflags <- getDynFlags
-   when (GHC.modulePackageKey modl /= thisPackage dflags) $
+   when (GHC.moduleUnitId modl /= thisPackage dflags) $
       throwGhcException (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))
    is_interpreted <- GHC.moduleIsInterpreted modl
    when (not is_interpreted) $

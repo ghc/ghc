@@ -214,19 +214,20 @@ mkTyFamInstEqn lhs rhs
                  ann) }
 
 mkDataFamInst :: SrcSpan
-         -> NewOrData
-         -> Maybe (Located CType)
-         -> Located (Maybe (LHsContext RdrName), LHsType RdrName)
-         -> Maybe (LHsKind RdrName)
-         -> [LConDecl RdrName]
-         -> HsDeriving RdrName
-         -> P (LInstDecl RdrName)
+              -> NewOrData
+              -> Maybe (Located CType)
+              -> Located (Maybe (LHsContext RdrName), LHsType RdrName)
+              -> Maybe (LHsKind RdrName)
+              -> [LConDecl RdrName]
+              -> HsDeriving RdrName
+              -> P (LInstDecl RdrName)
 mkDataFamInst loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
   = do { (tc, tparams,ann) <- checkTyClHdr False tycl_hdr
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataFamInstD (
-                  DataFamInstDecl { dfid_tycon = tc, dfid_pats = mkHsImplicitBndrs tparams
+                  DataFamInstDecl { dfid_tycon = tc
+                                  , dfid_pats = mkHsImplicitBndrs tparams
                                   , dfid_defn = defn, dfid_fvs = placeHolderNames }))) }
 
 mkTyFamInst :: SrcSpan
@@ -238,15 +239,18 @@ mkTyFamInst loc eqn
 
 mkFamDecl :: SrcSpan
           -> FamilyInfo RdrName
-          -> LHsType RdrName   -- LHS
-          -> Maybe (LHsKind RdrName) -- Optional kind signature
+          -> LHsType RdrName                   -- LHS
+          -> Located (FamilyResultSig RdrName) -- Optional result signature
+          -> Maybe (LInjectivityAnn RdrName)   -- Injectivity annotation
           -> P (LTyClDecl RdrName)
-mkFamDecl loc info lhs ksig
-  = do { (tc, tparams,ann) <- checkTyClHdr False lhs
+mkFamDecl loc info lhs ksig injAnn
+  = do { (tc, tparams, ann) <- checkTyClHdr False lhs
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; tyvars <- checkTyVarsP (ppr info) equals_or_where tc tparams
-       ; return (L loc (FamDecl (FamilyDecl { fdInfo = info, fdLName = tc
-                                            , fdTyVars = tyvars, fdKindSig = ksig }))) }
+       ; return (L loc (FamDecl (FamilyDecl{ fdInfo      = info, fdLName = tc
+                                           , fdTyVars    = tyvars
+                                           , fdResultSig = ksig
+                                           , fdInjectivityAnn = injAnn }))) }
   where
     equals_or_where = case info of
                         DataFamily          -> empty
@@ -260,11 +264,18 @@ mkSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
 -- but if she wrote, say,
 --      f x            then behave as if she'd written $(f x)
 --                     ie a SpliceD
+--
+-- Typed splices are not allowed at the top level, thus we do not represent them
+-- as spliced declaration.  See #10945
 mkSpliceDecl lexpr@(L loc expr)
-  | HsSpliceE splice <- expr = SpliceD (SpliceDecl (L loc splice) ExplicitSplice)
-  | otherwise                = SpliceD (SpliceDecl (L loc splice) ImplicitSplice)
-  where
-    splice = mkUntypedSplice lexpr
+  | HsSpliceE splice@(HsUntypedSplice {}) <- expr
+  = SpliceD (SpliceDecl (L loc splice) ExplicitSplice)
+
+  | HsSpliceE splice@(HsQuasiQuote {}) <- expr
+  = SpliceD (SpliceDecl (L loc splice) ExplicitSplice)
+
+  | otherwise
+  = SpliceD (SpliceDecl (L loc (mkUntypedSplice lexpr)) ImplicitSplice)
 
 mkRoleAnnotDecl :: SrcSpan
                 -> Located RdrName                   -- type being annotated
@@ -938,6 +949,8 @@ checkValSigLhs lhs@(L l _)
          = "Perhaps you meant to use ForeignFunctionInterface?"
          | default_RDR `looks_like` lhs
          = "Perhaps you meant to use DefaultSignatures?"
+         | pattern_RDR `looks_like` lhs
+         = "Perhaps you meant to use PatternSynonyms?"
          | otherwise
          = "Should be of form <variable> :: <type>"
 
@@ -950,6 +963,7 @@ checkValSigLhs lhs@(L l _)
 
     foreign_RDR = mkUnqual varName (fsLit "foreign")
     default_RDR = mkUnqual varName (fsLit "default")
+    pattern_RDR = mkUnqual varName (fsLit "pattern")
 
 
 checkDoAndIfThenElse :: LHsExpr RdrName
@@ -1116,8 +1130,8 @@ checkCmdLStmt :: ExprLStmt RdrName -> P (CmdLStmt RdrName)
 checkCmdLStmt = locMap checkCmdStmt
 
 checkCmdStmt :: SrcSpan -> ExprStmt RdrName -> P (CmdStmt RdrName)
-checkCmdStmt _ (LastStmt e r) =
-    checkCommand e >>= (\c -> return $ LastStmt c r)
+checkCmdStmt _ (LastStmt e s r) =
+    checkCommand e >>= (\c -> return $ LastStmt c s r)
 checkCmdStmt _ (BindStmt pat e b f) =
     checkCommand e >>= (\c -> return $ BindStmt pat c b f)
 checkCmdStmt _ (BodyStmt e t g ty) =
@@ -1174,12 +1188,18 @@ mkRecConstrOrUpdate
 mkRecConstrOrUpdate (L l (HsVar c)) _ (fs,dd)
   | isRdrDataCon c
   = return (RecordCon (L l c) noPostTcExpr (mk_rec_fields fs dd))
-mkRecConstrOrUpdate exp _ (fs,dd)
-  = return (RecordUpd exp (mk_rec_fields fs dd) [] [] [])
+mkRecConstrOrUpdate exp@(L l _) _ (fs,dd)
+  | dd        = parseErrorSDoc l (text "You cannot use `..' in a record update")
+  | otherwise = return (RecordUpd exp (map (fmap mk_rec_upd_field) fs)
+                      PlaceHolder PlaceHolder PlaceHolder)
 
 mk_rec_fields :: [LHsRecField id arg] -> Bool -> HsRecFields id arg
 mk_rec_fields fs False = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
 mk_rec_fields fs True  = HsRecFields { rec_flds = fs, rec_dotdot = Just (length fs) }
+
+mk_rec_upd_field :: HsRecField RdrName (LHsExpr RdrName) -> HsRecUpdField RdrName
+mk_rec_upd_field (HsRecField (L loc (FieldOcc rdr _)) arg pun)
+  = HsRecField (L loc (Unambiguous rdr PlaceHolder)) arg pun
 
 mkInlinePragma :: String -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
                -> InlinePragma
@@ -1324,7 +1344,7 @@ mkModuleImpExp n@(L l name) subs =
       | isVarNameSpace (rdrNameSpace name) -> IEVar       n
       | otherwise                          -> IEThingAbs  (L l name)
     ImpExpAll                              -> IEThingAll  (L l name)
-    ImpExpList xs                          -> IEThingWith (L l name) xs
+    ImpExpList xs                          -> IEThingWith (L l name) xs []
 
 mkTypeImpExp :: Located RdrName   -- TcCls or Var name space
              -> P (Located RdrName)

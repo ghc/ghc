@@ -1,4 +1,4 @@
-[1 of 1] Compiling ShouldFail[sig of Data.STRef] ( tcfail222.hsig, nothing )
+[1 of 1] Compiling ShouldFail[boot] ( tcfail222.hs-boot, tcfail222.o )
 
-<no location info>:
-    ‘newSTRef’ is exported by the hsig file, but not exported by the module
+<no location info>: error:
+    ‘newSTRef’ is exported by the signature file, but not exported by the module

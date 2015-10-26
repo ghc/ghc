@@ -29,11 +29,11 @@ module GHC.Types (
         isTrue#,
         SPEC(..),
         Nat, Symbol,
-        Coercible,
+        Coercible
     ) where
 
 import GHC.Prim
-
+import GHC.Tuple ()
 
 infixr 5 :
 

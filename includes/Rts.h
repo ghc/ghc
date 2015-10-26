@@ -238,6 +238,7 @@ INLINE_HEADER Time fsecondsToTime (double t)
 #include "rts/PrimFloat.h"
 #include "rts/Main.h"
 #include "rts/StaticPtrTable.h"
+#include "rts/Libdw.h"
 
 /* Misc stuff without a home */
 DLL_IMPORT_RTS extern char **prog_argv; /* so we can get at these from Haskell */

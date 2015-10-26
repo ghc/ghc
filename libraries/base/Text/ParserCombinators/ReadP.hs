@@ -103,7 +103,7 @@ data P a
 -- Monad, MonadPlus
 
 instance Applicative P where
-  pure  = return
+  pure x = Result x Fail
   (<*>) = ap
 
 instance MonadPlus P where
@@ -111,8 +111,6 @@ instance MonadPlus P where
   mplus = (<|>)
 
 instance Monad P where
-  return x = Result x Fail
-
   (Get f)      >>= k = Get (\c -> f c >>= k)
   (Look f)     >>= k = Look (\s -> f s >>= k)
   Fail         >>= _ = Fail
@@ -161,11 +159,10 @@ instance Functor ReadP where
   fmap h (R f) = R (\k -> f (k . h))
 
 instance Applicative ReadP where
-    pure = return
+    pure x = R (\k -> k x)
     (<*>) = ap
 
 instance Monad ReadP where
-  return x  = R (\k -> k x)
   fail _    = R (\_ -> Fail)
   R m >>= f = R (\k -> m (\a -> let R m' = f a in m' k))
 

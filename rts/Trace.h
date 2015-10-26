@@ -77,7 +77,7 @@ extern int TRACE_spark_full;
 // the not-taken case to be as efficient as possible, a simple
 // test-and-jump, and with inline functions gcc seemed to move some of
 // the instructions from the branch up before the test.
-// 
+//
 // -----------------------------------------------------------------------------
 
 #ifdef DEBUG
@@ -87,7 +87,7 @@ void traceEnd (void);
 
 #ifdef TRACING
 
-/* 
+/*
  * Record a scheduler event
  */
 #define traceSchedEvent(cap, tag, tso, other)   \
@@ -100,10 +100,10 @@ void traceEnd (void);
         traceSchedEvent_(cap, tag, tso, info1, info2); \
     }
 
-void traceSchedEvent_ (Capability *cap, EventTypeNum tag, 
+void traceSchedEvent_ (Capability *cap, EventTypeNum tag,
                        StgTSO *tso, StgWord info1, StgWord info2);
 
-/* 
+/*
  * Record a GC event
  */
 #define traceGcEvent(cap, tag)    \
@@ -113,7 +113,7 @@ void traceSchedEvent_ (Capability *cap, EventTypeNum tag,
 
 void traceGcEvent_ (Capability *cap, EventTypeNum tag);
 
-/* 
+/*
  * Record a GC event at the explicitly given timestamp
  */
 #define traceGcEventAtT(cap, ts, tag)   \
@@ -123,7 +123,7 @@ void traceGcEvent_ (Capability *cap, EventTypeNum tag);
 
 void traceGcEventAtT_ (Capability *cap, StgWord64 ts, EventTypeNum tag);
 
-/* 
+/*
  * Record a heap event
  */
 #define traceHeapEvent(cap, tag, heap_capset, info1) \
@@ -152,7 +152,7 @@ void traceEventGcStats_  (Capability *cap,
                           W_        par_max_copied,
                           W_        par_tot_copied);
 
-/* 
+/*
  * Record a spark event
  */
 #define traceSparkEvent(cap, tag)         \
@@ -171,7 +171,7 @@ void traceSparkEvent_ (Capability *cap, EventTypeNum tag, StgWord info1);
 // ##__VA_ARGS syntax is a gcc extension, which allows the variable
 // argument list to be empty (see gcc docs for details).
 
-/* 
+/*
  * Emit a trace message on a particular Capability
  */
 #define traceCap(class, cap, msg, ...)          \
@@ -181,7 +181,7 @@ void traceSparkEvent_ (Capability *cap, EventTypeNum tag, StgWord info1);
 
 void traceCap_(Capability *cap, char *msg, ...);
 
-/* 
+/*
  * Emit a trace message
  */
 #define trace(class, msg, ...)                  \
@@ -191,13 +191,13 @@ void traceCap_(Capability *cap, char *msg, ...);
 
 void trace_(char *msg, ...);
 
-/* 
+/*
  * A message or event emitted by the program
  * Used by Debug.Trace.{traceEvent, traceEventIO}
  */
 void traceUserMsg(Capability *cap, char *msg);
 
-/* 
+/*
  * A marker event emitted by the program
  * Used by Debug.Trace.{traceMarker, traceMarkerIO}
  */
@@ -211,7 +211,7 @@ void traceThreadLabel_(Capability *cap,
                        StgTSO     *tso,
                        char       *label);
 
-/* 
+/*
  * Emit a debug message (only when DEBUG is defined)
  */
 #ifdef DEBUG
@@ -232,7 +232,7 @@ void traceThreadLabel_(Capability *cap,
 #define debugTraceCap(class, cap, str, ...) /* nothing */
 #endif
 
-/* 
+/*
  * Emit a message/event describing the state of a thread
  */
 #define traceThreadStatus(class, tso)           \
@@ -241,8 +241,6 @@ void traceThreadLabel_(Capability *cap,
     }
 
 void traceThreadStatus_ (StgTSO *tso);
-
-void traceEventStartup_ (int n_caps);
 
 /*
  * Events for describing capabilities and capability sets in the eventlog
@@ -298,7 +296,6 @@ void traceTaskDelete_ (Task       *task);
 #define debugTraceCap(class, cap, str, ...) /* nothing */
 #define traceThreadStatus(class, tso) /* nothing */
 #define traceThreadLabel_(cap, tso, label) /* nothing */
-INLINE_HEADER void traceEventStartup_ (int n_caps STG_UNUSED) {};
 #define traceCapEvent(cap, tag) /* nothing */
 #define traceCapsetEvent(tag, capset, info) /* nothing */
 #define traceWallClockTime_() /* nothing */
@@ -350,9 +347,6 @@ void dtraceUserMarkerWrapper(Capability *cap, char *msg);
     HASKELLEVENT_CREATE_SPARK_THREAD(cap, spark_tid)
 #define dtraceThreadLabel(cap, tso, label)              \
     HASKELLEVENT_THREAD_LABEL(cap, tso, label)
-INLINE_HEADER void dtraceStartup (int num_caps) {
-    HASKELLEVENT_STARTUP(num_caps);
-}
 #define dtraceCapCreate(cap)                            \
     HASKELLEVENT_CAP_CREATE(cap)
 #define dtraceCapDelete(cap)                            \
@@ -442,7 +436,6 @@ INLINE_HEADER void dtraceStartup (int num_caps) {
 #define dtraceRequestParGc(cap)                         /* nothing */
 #define dtraceCreateSparkThread(cap, spark_tid)         /* nothing */
 #define dtraceThreadLabel(cap, tso, label)              /* nothing */
-INLINE_HEADER void dtraceStartup (int num_caps STG_UNUSED) {};
 #define dtraceUserMsg(cap, msg)                         /* nothing */
 #define dtraceUserMarker(cap, msg)                      /* nothing */
 #define dtraceGcIdle(cap)                               /* nothing */
@@ -492,30 +485,30 @@ INLINE_HEADER void dtraceStartup (int num_caps STG_UNUSED) {};
 //
 // Dtrace - dtrace probes are unconditionally added as probe activation is
 //   handled by the dtrace component of the kernel, and inactive probes are
-//   very cheap — usually, one no-op.  Consequently, dtrace can be used with
+//   very cheap - usually, one no-op.  Consequently, dtrace can be used with
 //   all flavours of the RTS.  In addition, we still support logging events to
 //   a file, even in the presence of dtrace.  This is, eg, useful when tracing
 //   on a server, but browsing trace information with ThreadScope on a local
 //   client.
-// 
+//
 // -----------------------------------------------------------------------------
 
-INLINE_HEADER void traceEventCreateThread(Capability *cap STG_UNUSED, 
+INLINE_HEADER void traceEventCreateThread(Capability *cap STG_UNUSED,
                                           StgTSO     *tso STG_UNUSED)
 {
     traceSchedEvent(cap, EVENT_CREATE_THREAD, tso, tso->stackobj->stack_size);
     dtraceCreateThread((EventCapNo)cap->no, (EventThreadID)tso->id);
 }
 
-INLINE_HEADER void traceEventRunThread(Capability *cap STG_UNUSED, 
+INLINE_HEADER void traceEventRunThread(Capability *cap STG_UNUSED,
                                        StgTSO     *tso STG_UNUSED)
 {
     traceSchedEvent(cap, EVENT_RUN_THREAD, tso, tso->what_next);
     dtraceRunThread((EventCapNo)cap->no, (EventThreadID)tso->id);
 }
 
-INLINE_HEADER void traceEventStopThread(Capability          *cap    STG_UNUSED, 
-                                        StgTSO              *tso    STG_UNUSED, 
+INLINE_HEADER void traceEventStopThread(Capability          *cap    STG_UNUSED,
+                                        StgTSO              *tso    STG_UNUSED,
                                         StgThreadReturnCode  status STG_UNUSED,
                                         StgWord32           info    STG_UNUSED)
 {
@@ -525,17 +518,17 @@ INLINE_HEADER void traceEventStopThread(Capability          *cap    STG_UNUSED,
 }
 
 // needs to be EXTERN_INLINE as it is used in another EXTERN_INLINE function
-EXTERN_INLINE void traceEventThreadRunnable(Capability *cap STG_UNUSED, 
+EXTERN_INLINE void traceEventThreadRunnable(Capability *cap STG_UNUSED,
                                             StgTSO     *tso STG_UNUSED);
 
-EXTERN_INLINE void traceEventThreadRunnable(Capability *cap STG_UNUSED, 
+EXTERN_INLINE void traceEventThreadRunnable(Capability *cap STG_UNUSED,
                                             StgTSO     *tso STG_UNUSED)
 {
     traceSchedEvent(cap, EVENT_THREAD_RUNNABLE, tso, 0);
     dtraceThreadRunnable((EventCapNo)cap->no, (EventThreadID)tso->id);
 }
 
-INLINE_HEADER void traceEventMigrateThread(Capability *cap     STG_UNUSED, 
+INLINE_HEADER void traceEventMigrateThread(Capability *cap     STG_UNUSED,
                                            StgTSO     *tso     STG_UNUSED,
                                            nat         new_cap STG_UNUSED)
 {
@@ -568,7 +561,7 @@ INLINE_HEADER void traceCapDisable(Capability *cap STG_UNUSED)
     dtraceCapDisable((EventCapNo)cap->no);
 }
 
-INLINE_HEADER void traceEventThreadWakeup(Capability *cap       STG_UNUSED, 
+INLINE_HEADER void traceEventThreadWakeup(Capability *cap       STG_UNUSED,
                                           StgTSO     *tso       STG_UNUSED,
                                           nat         other_cap STG_UNUSED)
 {
@@ -710,23 +703,6 @@ INLINE_HEADER void traceEventHeapLive(Capability *cap         STG_UNUSED,
     dtraceEventHeapLive(heap_capset, heap_live);
 }
 
-/* TODO: at some point we should remove this event, it's covered by
- * the cap create/delete events.
- */
-INLINE_HEADER void traceEventStartup(void)
-{
-    int n_caps;
-#ifdef THREADED_RTS
-    // XXX n_capabilities hasn't been initialised yet
-    n_caps = RtsFlags.ParFlags.nNodes;
-#else
-    n_caps = 1;
-#endif
-
-    traceEventStartup_(n_caps);
-    dtraceStartup(n_caps);
-}
-
 INLINE_HEADER void traceCapsetCreate(CapsetID   capset      STG_UNUSED,
                                      CapsetType capset_type STG_UNUSED)
 {
@@ -767,7 +743,7 @@ INLINE_HEADER void traceOSProcessInfo(void)
      * is available to DTrace directly */
 }
 
-INLINE_HEADER void traceEventCreateSparkThread(Capability  *cap      STG_UNUSED, 
+INLINE_HEADER void traceEventCreateSparkThread(Capability  *cap      STG_UNUSED,
                                                StgThreadID spark_tid STG_UNUSED)
 {
     traceSparkEvent2(cap, EVENT_CREATE_SPARK_THREAD, spark_tid);

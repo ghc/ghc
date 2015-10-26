@@ -27,16 +27,31 @@ typedef
           SECTIONKIND_NOINFOAVAIL } 
    SectionKind;
 
-typedef 
+typedef
+   enum { SECTION_NOMEM,
+          SECTION_M32,
+          SECTION_MMAP,
+          SECTION_MALLOC,
+        }
+   SectionAlloc;
+
+typedef
    struct _Section { 
-      void* start; 
-      void* end; 
+      void* start;                /* actual start of section in memory */
+      StgWord size;               /* actual size of section in memory */
       SectionKind kind;
-      struct _Section* next;
-   } 
+      SectionAlloc alloc;
+
+      /*
+       * The following fields are relevant for SECTION_MMAP sections only
+       */
+      StgWord mapped_offset;      /* offset from the image of mapped_start */
+      void* mapped_start;         /* start of mmap() block */
+      StgWord mapped_size;        /* size of mmap() block */
+   }
    Section;
 
-typedef 
+typedef
    struct _ProddableBlock {
       void* start;
       int   size;
@@ -54,6 +69,10 @@ typedef struct ForeignExportStablePtr_ {
     StgStablePtr stable_ptr;
     struct ForeignExportStablePtr_ *next;
 } ForeignExportStablePtr;
+
+#if powerpc_HOST_ARCH || x86_64_HOST_ARCH || arm_HOST_ARCH
+#define NEED_SYMBOL_EXTRAS 1
+#endif
 
 /* Jump Islands are sniplets of machine code required for relative
  * address relocations on the PowerPC, x86_64 and ARM.
@@ -80,7 +99,7 @@ typedef struct {
 typedef struct _ObjectCode {
     OStatus    status;
     pathchar  *fileName;
-    int        fileSize;
+    int        fileSize;     /* also mapped image size when using mmap() */
     char*      formatName;            /* eg "ELF32", "DLL", "COFF", etc. */
 
     /* If this object is a member of an archive, archiveMemberName is
@@ -95,8 +114,10 @@ typedef struct _ObjectCode {
     char**     symbols;
     int        n_symbols;
 
-    /* ptr to malloc'd lump of memory holding the obj file */
+    /* ptr to mem containing the object file image */
     char*      image;
+    /* non-zero if the object file was mmap'd, otherwise malloc'd */
+    int        imageMapped;
 
     /* flag used when deciding whether to unload an object file */
     int        referenced;
@@ -109,6 +130,7 @@ typedef struct _ObjectCode {
 
     /* The section-kind entries for this object module.  Linked
        list. */
+    int n_sections;
     Section* sections;
 
     /* Allow a chain of these things */
@@ -125,7 +147,7 @@ typedef struct _ObjectCode {
     unsigned int pltIndex;
 #endif
 
-#if powerpc_HOST_ARCH || x86_64_HOST_ARCH || arm_HOST_ARCH
+#if NEED_SYMBOL_EXTRAS
     SymbolExtra    *symbol_extras;
     unsigned long   first_symbol_extra;
     unsigned long   n_symbol_extras;

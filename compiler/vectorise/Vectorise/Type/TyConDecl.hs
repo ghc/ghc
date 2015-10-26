@@ -83,13 +83,13 @@ vectTyConDecl tycon name'
            -- return the type constructor of the vectorised class
        ; return tycon'
        }
-                      
+
        -- Regular algebraic type constructor — for now, Haskell 2011-style only
   | isAlgTyCon tycon
   = do { unless (all isVanillaDataCon (tyConDataCons tycon)) $
            do dflags <- getDynFlags
               cantVectorise dflags "Currently only Haskell 2011 datatypes are supported" (ppr tycon)
-  
+
            -- vectorise the data constructor of the class tycon
        ; rhs' <- vectAlgTyConRhs tycon (algTyConRhs tycon)
 
@@ -98,7 +98,7 @@ vectTyConDecl tycon name'
              gadt_flag = isGadtSyntaxTyCon tycon
 
            -- build the vectorised type constructor
-       ; return $ buildAlgTyCon 
+       ; return $ buildAlgTyCon
                     name'                   -- new name
                     (tyConTyVars tycon)     -- keep original type vars
                     (map (const Nominal) (tyConRoles tycon)) -- all roles are N for safety
@@ -108,7 +108,7 @@ vectTyConDecl tycon name'
                     rec_flag                -- whether recursive
                     False                   -- Not promotable
                     gadt_flag               -- whether in GADT syntax
-                    NoParentTyCon           
+                    NoParentTyCon
        }
 
   -- some other crazy thing that we don't handle
@@ -185,6 +185,7 @@ vectDataCon dc
                     name'
                     (dataConIsInfix dc)            -- infix if the original is
                     (dataConSrcBangs dc)           -- strictness as original constructor
+                    (Just $ dataConImplBangs dc)
                     []                             -- no labelled fields for now
                     univ_tvs                       -- universally quantified vars
                     []                             -- no existential tvs for now

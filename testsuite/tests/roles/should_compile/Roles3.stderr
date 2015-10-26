@@ -2,13 +2,17 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
   class C1 a where
     meth1 :: a -> a
+    {-# MINIMAL meth1 #-}
   class C2 a b where
     meth2 :: a ~ b => a -> b
+    {-# MINIMAL meth2 #-}
   class C3 a b where
     type family F3 b :: * open
     meth3 :: a -> F3 b -> F3 b
+    {-# MINIMAL meth3 #-}
   class C4 a b where
     meth4 :: a -> F4 b -> F4 b
+    {-# MINIMAL meth4 #-}
   type family F4 a :: * open
   type Syn1 a = F4 a
   type Syn2 a = [a]

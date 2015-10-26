@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, StandaloneDeriving #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -19,11 +19,13 @@
 -----------------------------------------------------------------------------
 
 module GHC.Unicode (
+        GeneralCategory (..), generalCategory,
         isAscii, isLatin1, isControl,
         isAsciiUpper, isAsciiLower,
         isPrint, isSpace,  isUpper,
         isLower, isAlpha,  isDigit,
         isOctDigit, isHexDigit, isAlphaNum,
+        isPunctuation, isSymbol,
         toUpper, toLower, toTitle,
         wgencat
     ) where
@@ -31,9 +33,130 @@ module GHC.Unicode (
 import GHC.Base
 import GHC.Char        (chr)
 import GHC.Real
+import GHC.Enum ( Enum (..), Bounded (..) )
+import GHC.Arr ( Ix (..) )
 import GHC.Num
 
+-- Data.Char.chr already imports this and we need to define a Show instance
+-- for GeneralCategory
+import GHC.Show ( Show )
+
 #include "HsBaseConfig.h"
+
+-- | Unicode General Categories (column 2 of the UnicodeData table) in
+-- the order they are listed in the Unicode standard (the Unicode
+-- Character Database, in particular).
+--
+-- ==== __Examples__
+--
+-- Basic usage:
+--
+-- >>> :t OtherLetter
+-- OtherLetter :: GeneralCategory
+--
+-- 'Eq' instance:
+--
+-- >>> UppercaseLetter == UppercaseLetter
+-- True
+-- >>> UppercaseLetter == LowercaseLetter
+-- False
+--
+-- 'Ord' instance:
+--
+-- >>> NonSpacingMark <= MathSymbol
+-- True
+--
+-- 'Enum' instance:
+--
+-- >>> enumFromTo ModifierLetter SpacingCombiningMark
+-- [ModifierLetter,OtherLetter,NonSpacingMark,SpacingCombiningMark]
+--
+-- 'Read' instance:
+--
+-- >>> read "DashPunctuation" :: GeneralCategory
+-- DashPunctuation
+-- >>> read "17" :: GeneralCategory
+-- *** Exception: Prelude.read: no parse
+--
+-- 'Show' instance:
+--
+-- >>> show EnclosingMark
+-- "EnclosingMark"
+--
+-- 'Bounded' instance:
+--
+-- >>> minBound :: GeneralCategory
+-- UppercaseLetter
+-- >>> maxBound :: GeneralCategory
+-- NotAssigned
+--
+-- 'Ix' instance:
+--
+--  >>> import Data.Ix ( index )
+--  >>> index (OtherLetter,Control) FinalQuote
+--  12
+--  >>> index (OtherLetter,Control) Format
+--  *** Exception: Error in array index
+--
+data GeneralCategory
+        = UppercaseLetter       -- ^ Lu: Letter, Uppercase
+        | LowercaseLetter       -- ^ Ll: Letter, Lowercase
+        | TitlecaseLetter       -- ^ Lt: Letter, Titlecase
+        | ModifierLetter        -- ^ Lm: Letter, Modifier
+        | OtherLetter           -- ^ Lo: Letter, Other
+        | NonSpacingMark        -- ^ Mn: Mark, Non-Spacing
+        | SpacingCombiningMark  -- ^ Mc: Mark, Spacing Combining
+        | EnclosingMark         -- ^ Me: Mark, Enclosing
+        | DecimalNumber         -- ^ Nd: Number, Decimal
+        | LetterNumber          -- ^ Nl: Number, Letter
+        | OtherNumber           -- ^ No: Number, Other
+        | ConnectorPunctuation  -- ^ Pc: Punctuation, Connector
+        | DashPunctuation       -- ^ Pd: Punctuation, Dash
+        | OpenPunctuation       -- ^ Ps: Punctuation, Open
+        | ClosePunctuation      -- ^ Pe: Punctuation, Close
+        | InitialQuote          -- ^ Pi: Punctuation, Initial quote
+        | FinalQuote            -- ^ Pf: Punctuation, Final quote
+        | OtherPunctuation      -- ^ Po: Punctuation, Other
+        | MathSymbol            -- ^ Sm: Symbol, Math
+        | CurrencySymbol        -- ^ Sc: Symbol, Currency
+        | ModifierSymbol        -- ^ Sk: Symbol, Modifier
+        | OtherSymbol           -- ^ So: Symbol, Other
+        | Space                 -- ^ Zs: Separator, Space
+        | LineSeparator         -- ^ Zl: Separator, Line
+        | ParagraphSeparator    -- ^ Zp: Separator, Paragraph
+        | Control               -- ^ Cc: Other, Control
+        | Format                -- ^ Cf: Other, Format
+        | Surrogate             -- ^ Cs: Other, Surrogate
+        | PrivateUse            -- ^ Co: Other, Private Use
+        | NotAssigned           -- ^ Cn: Other, Not Assigned
+        deriving (Show, Eq, Ord, Enum, Bounded, Ix)
+
+-- | The Unicode general category of the character. This relies on the
+-- 'Enum' instance of 'GeneralCategory', which must remain in the
+-- same order as the categories are presented in the Unicode
+-- standard.
+--
+-- ==== __Examples__
+--
+-- Basic usage:
+--
+-- >>> generalCategory 'a'
+-- LowercaseLetter
+-- >>> generalCategory 'A'
+-- UppercaseLetter
+-- >>> generalCategory '0'
+-- DecimalNumber
+-- >>> generalCategory '%'
+-- OtherPunctuation
+-- >>> generalCategory '♥'
+-- OtherSymbol
+-- >>> generalCategory '\31'
+-- Control
+-- >>> generalCategory ' '
+-- Space
+--
+generalCategory :: Char -> GeneralCategory
+generalCategory c = toEnum $ fromIntegral $ wgencat $ fromIntegral $ ord c
 
 -- | Selects the first 128 characters of the Unicode character set,
 -- corresponding to the ASCII character set.
@@ -117,6 +240,96 @@ isHexDigit              :: Char -> Bool
 isHexDigit c            =  isDigit c ||
                            (fromIntegral (ord c - ord 'A')::Word) <= 5 ||
                            (fromIntegral (ord c - ord 'a')::Word) <= 5
+
+-- | Selects Unicode punctuation characters, including various kinds
+-- of connectors, brackets and quotes.
+--
+-- This function returns 'True' if its argument has one of the
+-- following 'GeneralCategory's, or 'False' otherwise:
+--
+-- * 'ConnectorPunctuation'
+-- * 'DashPunctuation'
+-- * 'OpenPunctuation'
+-- * 'ClosePunctuation'
+-- * 'InitialQuote'
+-- * 'FinalQuote'
+-- * 'OtherPunctuation'
+--
+-- These classes are defined in the
+-- <http://www.unicode.org/reports/tr44/tr44-14.html#GC_Values_Table Unicode Character Database>,
+-- part of the Unicode standard. The same document defines what is
+-- and is not a \"Punctuation\".
+--
+-- ==== __Examples__
+--
+-- Basic usage:
+--
+-- >>> isPunctuation 'a'
+-- False
+-- >>> isPunctuation '7'
+-- False
+-- >>> isPunctuation '♥'
+-- False
+-- >>> isPunctuation '"'
+-- True
+-- >>> isPunctuation '?'
+-- True
+-- >>> isPunctuation '—'
+-- True
+--
+isPunctuation :: Char -> Bool
+isPunctuation c = case generalCategory c of
+        ConnectorPunctuation    -> True
+        DashPunctuation         -> True
+        OpenPunctuation         -> True
+        ClosePunctuation        -> True
+        InitialQuote            -> True
+        FinalQuote              -> True
+        OtherPunctuation        -> True
+        _                       -> False
+
+-- | Selects Unicode symbol characters, including mathematical and
+-- currency symbols.
+--
+-- This function returns 'True' if its argument has one of the
+-- following 'GeneralCategory's, or 'False' otherwise:
+--
+-- * 'MathSymbol'
+-- * 'CurrencySymbol'
+-- * 'ModifierSymbol'
+-- * 'OtherSymbol'
+--
+-- These classes are defined in the
+-- <http://www.unicode.org/reports/tr44/tr44-14.html#GC_Values_Table Unicode Character Database>,
+-- part of the Unicode standard. The same document defines what is
+-- and is not a \"Symbol\".
+--
+-- ==== __Examples__
+--
+-- Basic usage:
+--
+-- >>> isSymbol 'a'
+-- False
+-- >>> isSymbol '6'
+-- False
+-- >>> isSymbol '='
+-- True
+--
+-- The definition of \"math symbol\" may be a little
+-- counter-intuitive depending on one's background:
+--
+-- >>> isSymbol '+'
+-- True
+-- >>> isSymbol '-'
+-- False
+--
+isSymbol :: Char -> Bool
+isSymbol c = case generalCategory c of
+        MathSymbol              -> True
+        CurrencySymbol          -> True
+        ModifierSymbol          -> True
+        OtherSymbol             -> True
+        _                       -> False
 
 -- | Convert a letter to the corresponding upper-case letter, if any.
 -- Any other character is returned unchanged.

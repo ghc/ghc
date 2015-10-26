@@ -87,7 +87,9 @@ data CmmNode e x where
 
   CmmCondBranch :: {                 -- conditional branch
       cml_pred :: CmmExpr,
-      cml_true, cml_false :: ULabel
+      cml_true, cml_false :: ULabel,
+      cml_likely :: Maybe Bool       -- likely result of the conditional,
+                                     -- if known
   } -> CmmNode O C
 
   CmmSwitch
@@ -308,7 +310,7 @@ instance UserOfRegs LocalReg (CmmNode e x) where
     CmmAssign _ expr -> fold f z expr
     CmmStore addr rval -> fold f (fold f z addr) rval
     CmmUnsafeForeignCall t _ args -> fold f (fold f z t) args
-    CmmCondBranch expr _ _ -> fold f z expr
+    CmmCondBranch expr _ _ _ -> fold f z expr
     CmmSwitch expr _ -> fold f z expr
     CmmCall {cml_target=tgt} -> fold f z tgt
     CmmForeignCall {tgt=tgt, args=args} -> fold f (fold f z tgt) args
@@ -323,7 +325,7 @@ instance UserOfRegs GlobalReg (CmmNode e x) where
     CmmAssign _ expr -> fold f z expr
     CmmStore addr rval -> fold f (fold f z addr) rval
     CmmUnsafeForeignCall t _ args -> fold f (fold f z t) args
-    CmmCondBranch expr _ _ -> fold f z expr
+    CmmCondBranch expr _ _ _ -> fold f z expr
     CmmSwitch expr _ -> fold f z expr
     CmmCall {cml_target=tgt, cml_args_regs=args} -> fold f (fold f z args) tgt
     CmmForeignCall {tgt=tgt, args=args} -> fold f (fold f z tgt) args
@@ -463,7 +465,7 @@ mapExp f   (CmmAssign r e)                       = CmmAssign r (f e)
 mapExp f   (CmmStore addr e)                     = CmmStore (f addr) (f e)
 mapExp f   (CmmUnsafeForeignCall tgt fs as)      = CmmUnsafeForeignCall (mapForeignTarget f tgt) fs (map f as)
 mapExp _ l@(CmmBranch _)                         = l
-mapExp f   (CmmCondBranch e ti fi)               = CmmCondBranch (f e) ti fi
+mapExp f   (CmmCondBranch e ti fi l)             = CmmCondBranch (f e) ti fi l
 mapExp f   (CmmSwitch e ids)                     = CmmSwitch (f e) ids
 mapExp f   n@CmmCall {cml_target=tgt}            = n{cml_target = f tgt}
 mapExp f   (CmmForeignCall tgt fs as succ ret_args updfr intrbl) = CmmForeignCall (mapForeignTarget f tgt) fs (map f as) succ ret_args updfr intrbl
@@ -493,7 +495,7 @@ mapExpM f (CmmUnwind r e)           = CmmUnwind r `fmap` f e
 mapExpM f (CmmAssign r e)           = CmmAssign r `fmap` f e
 mapExpM f (CmmStore addr e)         = (\[addr', e'] -> CmmStore addr' e') `fmap` mapListM f [addr, e]
 mapExpM _ (CmmBranch _)             = Nothing
-mapExpM f (CmmCondBranch e ti fi)   = (\x -> CmmCondBranch x ti fi) `fmap` f e
+mapExpM f (CmmCondBranch e ti fi l) = (\x -> CmmCondBranch x ti fi l) `fmap` f e
 mapExpM f (CmmSwitch e tbl)         = (\x -> CmmSwitch x tbl)       `fmap` f e
 mapExpM f (CmmCall tgt mb_id r o i s) = (\x -> CmmCall x mb_id r o i s) `fmap` f tgt
 mapExpM f (CmmUnsafeForeignCall tgt fs as)
@@ -547,7 +549,7 @@ foldExp f (CmmAssign _ e) z                       = f e z
 foldExp f (CmmStore addr e) z                     = f addr $ f e z
 foldExp f (CmmUnsafeForeignCall t _ as) z         = foldr f (foldExpForeignTarget f t z) as
 foldExp _ (CmmBranch _) z                         = z
-foldExp f (CmmCondBranch e _ _) z                 = f e z
+foldExp f (CmmCondBranch e _ _ _) z               = f e z
 foldExp f (CmmSwitch e _) z                       = f e z
 foldExp f (CmmCall {cml_target=tgt}) z            = f tgt z
 foldExp f (CmmForeignCall {tgt=tgt, args=args}) z = foldr f (foldExpForeignTarget f tgt z) args
@@ -558,9 +560,9 @@ foldExpDeep f = foldExp (wrapRecExpf f)
 -- -----------------------------------------------------------------------------
 
 mapSuccessors :: (Label -> Label) -> CmmNode O C -> CmmNode O C
-mapSuccessors f (CmmBranch bid)        = CmmBranch (f bid)
-mapSuccessors f (CmmCondBranch p y n)  = CmmCondBranch p (f y) (f n)
-mapSuccessors f (CmmSwitch e ids)      = CmmSwitch e (mapSwitchTargets f ids)
+mapSuccessors f (CmmBranch bid)         = CmmBranch (f bid)
+mapSuccessors f (CmmCondBranch p y n l) = CmmCondBranch p (f y) (f n) l
+mapSuccessors f (CmmSwitch e ids)       = CmmSwitch e (mapSwitchTargets f ids)
 mapSuccessors _ n = n
 
 -- -----------------------------------------------------------------------------

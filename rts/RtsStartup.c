@@ -176,9 +176,6 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 #ifdef TRACING
     initTracing();
 #endif
-    /* Trace the startup event
-     */
-    traceEventStartup();
 
     /* initialise scheduler data structures (needs to be done before
      * initStorage()).

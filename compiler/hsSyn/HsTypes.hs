@@ -30,11 +30,17 @@ module HsTypes (
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
 
-        LBangType, BangType, HsBang(..), HsSrcBang, HsImplBang,
+        LBangType, BangType,
+        HsSrcBang(..), HsImplBang(..),
         SrcStrictness(..), SrcUnpackedness(..),
         getBangType, getBangStrictness,
 
         ConDeclField(..), LConDeclField, pprConDeclFields,
+
+        FieldOcc(..), LFieldOcc, mkFieldOcc,
+        AmbiguousFieldOcc(..), mkAmbiguousFieldOcc,
+        rdrNameAmbiguousFieldOcc, selectorAmbiguousFieldOcc,
+        unambiguousFieldOcc, ambiguousFieldOcc,
 
         HsWildCardInfo(..), mkAnonWildCardTy, mkNamedWildCardTy,
         wildCardName, sameWildCard, sameNamedWildCard,
@@ -44,7 +50,7 @@ module HsTypes (
         mkHsQTvs, hsQTvBndrs, isHsKindedTyVar, hsTvbAllKinded,
         hsScopedTvs, hsWcScopedTvs, dropWildCards,
         hsTyVarName, hsLKiTyVarNames,
-        hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsLTyVarLocNames,
+        hsLTyVarName, hsLTyVarNames, hsLTyVarLocName,
         splitLHsInstDeclTy, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
         splitLHsForAllTy, splitLHsQualTy, splitLHsSigmaTy,
@@ -52,6 +58,7 @@ module HsTypes (
         splitHsFunType, splitHsAppTys, hsTyGetAppHead_maybe,
         mkHsAppTys, mkHsOpTy,
         ignoreParens, hsSigType, hsWcSigType,
+        hsLTyVarBndrsToTypes,
 
         -- Printing
         pprParendHsType, pprHsForAll, pprHsForAllTvs, pprHsForAllExtra,
@@ -62,9 +69,10 @@ import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
 import PlaceHolder ( PostTc,PostRn,DataId,PlaceHolder(..) )
 
+import Id( Id )
 import Name( Name )
 import RdrName( RdrName )
-import DataCon( HsBang(..), HsSrcBang, HsImplBang,
+import DataCon( HsSrcBang(..), HsImplBang(..),
                 SrcStrictness(..), SrcUnpackedness(..) )
 import TysPrim( funTyConName )
 import Type
@@ -96,7 +104,7 @@ getBangType ty                    = ty
 
 getBangStrictness :: LHsType a -> HsSrcBang
 getBangStrictness (L _ (HsBangTy s _)) = s
-getBangStrictness _ = HsSrcBang Nothing NoSrcUnpack NoSrcStrictness
+getBangStrictness _ = (HsSrcBang Nothing NoSrcUnpack NoSrcStrict)
 
 {-
 ************************************************************************
@@ -243,7 +251,7 @@ mkHsWildCardBndrs x = HsWC { hswc_body = x
 --------------------------------------------------
 -- | These names are used early on to store the names of implicit
 -- parameters.  They completely disappear after type-checking.
-newtype HsIPName = HsIPName FastString-- ?x
+newtype HsIPName = HsIPName FastString
   deriving( Eq, Data, Typeable )
 
 hsIPNameFS :: HsIPName -> FastString
@@ -573,14 +581,94 @@ type LConDeclField name = Located (ConDeclField name)
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 data ConDeclField name  -- Record fields have Haddoc docs on them
-  = ConDeclField { cd_fld_names :: [Located name],
-                   cd_fld_type  :: LBangType name,
-                   cd_fld_doc   :: Maybe LHsDocString }
+  = ConDeclField { cd_fld_names :: [LFieldOcc name],
+                                   -- ^ See Note [ConDeclField names]
+                   cd_fld_type :: LBangType name,
+                   cd_fld_doc  :: Maybe LHsDocString }
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
   deriving (Typeable)
 deriving instance (DataId name) => Data (ConDeclField name)
+
+
+type LFieldOcc name = Located (FieldOcc name)
+
+-- | Represents an *occurrence* of an unambiguous field.  We store
+-- both the 'RdrName' the user originally wrote, and after the
+-- renamer, the selector function.
+data FieldOcc name = FieldOcc { rdrNameFieldOcc  :: RdrName
+                              , selectorFieldOcc :: PostRn name name
+                              }
+  deriving Typeable
+deriving instance Eq (PostRn name name) => Eq (FieldOcc name)
+deriving instance Ord (PostRn name name) => Ord (FieldOcc name)
+deriving instance (Data name, Data (PostRn name name)) => Data (FieldOcc name)
+
+instance Outputable (FieldOcc name) where
+  ppr = ppr . rdrNameFieldOcc
+
+mkFieldOcc :: RdrName -> FieldOcc RdrName
+mkFieldOcc rdr = FieldOcc rdr PlaceHolder
+
+
+-- | Represents an *occurrence* of a field that is potentially
+-- ambiguous after the renamer, with the ambiguity resolved by the
+-- typechecker.  We always store the 'RdrName' that the user
+-- originally wrote, and store the selector function after the renamer
+-- (for unambiguous occurrences) or the typechecker (for ambiguous
+-- occurrences).
+--
+-- See Note [HsRecField and HsRecUpdField] in HsPat
+data AmbiguousFieldOcc name
+  = Unambiguous RdrName (PostRn name name)
+  | Ambiguous   RdrName (PostTc name name)
+  deriving (Typeable)
+deriving instance ( Data name
+                  , Data (PostRn name name)
+                  , Data (PostTc name name))
+                  => Data (AmbiguousFieldOcc name)
+
+instance Outputable (AmbiguousFieldOcc name) where
+  ppr = ppr . rdrNameAmbiguousFieldOcc
+
+mkAmbiguousFieldOcc :: RdrName -> AmbiguousFieldOcc RdrName
+mkAmbiguousFieldOcc rdr = Unambiguous rdr PlaceHolder
+
+rdrNameAmbiguousFieldOcc :: AmbiguousFieldOcc name -> RdrName
+rdrNameAmbiguousFieldOcc (Unambiguous rdr _) = rdr
+rdrNameAmbiguousFieldOcc (Ambiguous   rdr _) = rdr
+
+selectorAmbiguousFieldOcc :: AmbiguousFieldOcc Id -> Id
+selectorAmbiguousFieldOcc (Unambiguous _ sel) = sel
+selectorAmbiguousFieldOcc (Ambiguous   _ sel) = sel
+
+unambiguousFieldOcc :: AmbiguousFieldOcc Id -> FieldOcc Id
+unambiguousFieldOcc (Unambiguous rdr sel) = FieldOcc rdr sel
+unambiguousFieldOcc (Ambiguous   rdr sel) = FieldOcc rdr sel
+
+ambiguousFieldOcc :: FieldOcc Id -> AmbiguousFieldOcc Id
+ambiguousFieldOcc (FieldOcc rdr sel) = Unambiguous rdr sel
+
+{-
+Note [ConDeclField names]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A ConDeclField contains a list of field occurrences: these always
+include the field label as the user wrote it.  After the renamer, it
+will additionally contain the identity of the selector function in the
+second component.
+
+Due to DuplicateRecordFields, the OccName of the selector function
+may have been mangled, which is why we keep the original field label
+separately.  For example, when DuplicateRecordFields is enabled
+
+    data T = MkT { x :: Int }
+
+gives
+
+    ConDeclField { cd_fld_names = [L _ (FieldOcc "x" $sel:x:MkT)], ... }.
+-}
 
 -----------------------
 -- A valid type must have a for-all at the top of the type, or of the fn arg
@@ -639,8 +727,19 @@ hsLKiTyVarNames (HsQTvs { hsq_kvs = kvs, hsq_tvs = tvs })
 hsLTyVarLocName :: LHsTyVarBndr name -> Located name
 hsLTyVarLocName = fmap hsTyVarName
 
-hsLTyVarLocNames :: LHsQTyVars name -> [Located name]
-hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvBndrs qtvs)
+-- | Convert a LHsTyVarBndr to an equivalent LHsType. Used in Template Haskell
+-- quoting for type family equations.
+hsLTyVarBndrToType :: LHsTyVarBndr name -> LHsType name
+hsLTyVarBndrToType = fmap cvt
+  where cvt (UserTyVar n)                     = HsTyVar n
+        cvt (KindedTyVar (L name_loc n) kind) = HsKindSig (L name_loc (HsTyVar n))
+                                                          kind
+
+-- | Convert a LHsTyVarBndrs to a list of types. Used in Template Haskell
+-- quoting for type family equations. Works on *type* variable only, no kind
+-- vars.
+hsLTyVarBndrsToTypes :: LHsQTyVars name -> [LHsType name]
+hsLTyVarBndrsToTypes (HsQTvs { hsq_tvs = tvbs }) = map hsLTyVarBndrToType tvbs
 
 ---------------------
 mkAnonWildCardTy :: HsType RdrName
@@ -797,6 +896,7 @@ splitHsFunType orig_ty@(L _ (HsAppTy t1 t2))
     go _                     _   = ([], orig_ty)  -- Failure to match
 
 splitHsFunType other = ([], other)
+
 
 ignoreParens :: LHsType name -> LHsType name
 ignoreParens (L _ (HsParTy ty)) = ignoreParens ty

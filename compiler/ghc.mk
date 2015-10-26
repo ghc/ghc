@@ -102,6 +102,8 @@ endif
 	@echo 'cGhcWithSMP           = "$(GhcWithSMP)"'                     >> $@
 	@echo 'cGhcRTSWays           :: String'                             >> $@
 	@echo 'cGhcRTSWays           = "$(GhcRTSWays)"'                     >> $@
+	@echo 'cGhcRtsWithLibdw      :: String'                             >> $@
+	@echo 'cGhcRtsWithLibdw      = "$(GhcRtsWithLibdw)"'                >> $@
 	@echo 'cGhcEnableTablesNextToCode :: String'                        >> $@
 	@echo 'cGhcEnableTablesNextToCode = "$(GhcEnableTablesNextToCode)"' >> $@
 	@echo 'cLeadingUnderscore    :: String'                             >> $@
@@ -441,13 +443,13 @@ ifeq "$(compiler_stage1_VERSION_MUNGED)" "YES"
 compiler_stage1_MUNGED_VERSION = $(subst .$(ProjectPatchLevel),,$(ProjectVersion))
 define compiler_PACKAGE_MAGIC
 compiler_stage1_VERSION = $(compiler_stage1_MUNGED_VERSION)
-compiler_stage1_PACKAGE_KEY = $(subst .$(ProjectPatchLevel),,$(compiler_stage1_PACKAGE_KEY))
-compiler_stage1_LIB_NAME = $(subst .$(ProjectPatchLevel),,$(compiler_stage1_LIB_NAME))
+compiler_stage1_COMPONENT_ID = $(subst .$(ProjectPatchLevel),,$(compiler_stage1_COMPONENT_ID))
+compiler_stage1_COMPONENT_ID = $(subst .$(ProjectPatchLevel),,$(compiler_stage1_COMPONENT_ID))
 endef
 
-# NB: the PACKAGE_KEY munging has no effect for new-style package keys
+# NB: the COMPONENT_ID munging has no effect for new-style unit ids
 # (which indeed, have nothing version like in them, but are important for
-# old-style package keys which do.)  The subst operation is idempotent, so
+# old-style unit ids which do.)  The subst operation is idempotent, so
 # as long as we do it at least once we should be good.
 
 # Don't register the non-munged package
@@ -502,12 +504,12 @@ compiler_stage2_dll0_MODULES = \
 	Encoding \
 	ErrUtils \
 	Exception \
-	ExtsCompat46 \
 	FamInstEnv \
 	FastFunctions \
 	FastMutInt \
 	FastString \
-	FastTypes \
+	FastStringEnv \
+	FieldLabel \
 	Fingerprint \
 	FiniteMap \
 	ForeignCall \
@@ -613,7 +615,6 @@ compiler_stage2_dll0_MODULES += \
 	CodeGen.Platform.SPARC \
 	CodeGen.Platform.X86 \
 	CodeGen.Platform.X86_64 \
-	FastBool \
 	Hoopl \
 	Hoopl.Dataflow \
 	InteractiveEvalTypes \
@@ -640,6 +641,7 @@ compiler_stage2_dll0_HS_OBJS = \
     $(patsubst %,compiler/stage2/build/%.$(dyn_osuf),$(subst .,/,$(compiler_stage2_dll0_MODULES)))
 
 # if stage is set to something other than "1" or "", disable stage 1
+# See Note [Stage1Only vs stage=1] in mk/config.mk.in.
 ifneq "$(filter-out 1,$(stage))" ""
 compiler_stage1_NOT_NEEDED = YES
 endif

@@ -18,7 +18,8 @@ module Inst (
 
        newClsInst,
        tcGetInsts, tcGetInstEnvs, getOverlapFlag,
-       tcExtendLocalInstEnv, instCallConstraints, newMethodFromName,
+       tcExtendLocalInstEnv,
+       instCallConstraints, newMethodFromName,
        tcSyntaxName,
 
        -- Simple functions over evidence variables
@@ -407,6 +408,9 @@ syntaxNameCtxt name orig ty tidy_env
 -}
 
 getOverlapFlag :: Maybe OverlapMode -> TcM OverlapFlag
+-- Construct the OverlapFlag from the global module flags,
+-- but if the overlap_mode argument is (Just m),
+--     set the OverlapMode to 'm'
 getOverlapFlag overlap_mode
   = do  { dflags <- getDynFlags
         ; let overlap_ok    = xopt Opt_OverlappingInstances dflags
@@ -438,7 +442,21 @@ newClsInst overlap_mode dfun_name tvs theta clas tys
              -- Not sure if this is really the right place to do so,
              -- but it'll do fine
        ; oflag <- getOverlapFlag overlap_mode
-       ; return (mkLocalInstance dfun oflag tvs' clas tys') }
+       ; let inst = mkLocalInstance dfun oflag tvs' clas tys'
+       ; dflags <- getDynFlags
+       ; warnIf (isOrphan (is_orphan inst) && wopt Opt_WarnOrphans dflags) (instOrphWarn inst)
+       ; return inst }
+
+instOrphWarn :: ClsInst -> SDoc
+instOrphWarn inst
+  = hang (ptext (sLit "Orphan instance:")) 2 (pprInstanceHdr inst)
+    $$ text "To avoid this"
+    $$ nest 4 (vcat possibilities)
+  where
+    possibilities =
+      text "move the instance declaration to the module of the class or of the type, or" :
+      text "wrap the type with a newtype and declare the instance on the new type." :
+      []
 
 tcExtendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
   -- Add new locally-defined instances

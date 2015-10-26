@@ -26,6 +26,7 @@ import Id
 import Var
 import Name
 import NameEnv
+import RdrName
 import TcEnv
 import TcMType
 import TcValidity( arityErr )
@@ -858,16 +859,17 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
   = do  { (rpats', res) <- tcMultiple tc_field rpats penv thing_inside
         ; return (RecCon (HsRecFields rpats' dd), res) }
   where
-    tc_field :: Checker (LHsRecField FieldLabel (LPat Name))
+    tc_field :: Checker (LHsRecField Name (LPat Name))
                         (LHsRecField TcId (LPat TcId))
-    tc_field (L l (HsRecField field_lbl pat pun)) penv thing_inside
-      = do { (sel_id, pat_ty) <- wrapLocFstM find_field_ty field_lbl
+    tc_field (L l (HsRecField (L loc (FieldOcc rdr sel)) pat pun)) penv thing_inside
+      = do { sel'   <- tcLookupId sel
+           ; pat_ty <- setSrcSpan loc $ find_field_ty (occNameFS $ rdrNameOcc rdr)
            ; (pat', res) <- tcConArg (pat, pat_ty) penv thing_inside
-           ; return (L l (HsRecField sel_id pat' pun), res) }
+           ; return (L l (HsRecField (L loc (FieldOcc rdr sel')) pat' pun), res) }
 
-    find_field_ty :: FieldLabel -> TcM (Id, TcType)
-    find_field_ty field_lbl
-        = case [ty | (f,ty) <- field_tys, f == field_lbl] of
+    find_field_ty :: FieldLabelString -> TcM TcType
+    find_field_ty lbl
+        = case [ty | (fl, ty) <- field_tys, flLabel fl == lbl] of
 
                 -- No matching field; chances are this field label comes from some
                 -- other record type (or maybe none).  If this happens, just fail,
@@ -875,25 +877,18 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
                 --      f (R { foo = (a,b) }) = a+b
                 -- If foo isn't one of R's fields, we don't want to crash when
                 -- typechecking the "a+b".
-           [] -> failWith (badFieldCon con_like field_lbl)
+           [] -> failWith (badFieldCon con_like lbl)
 
                 -- The normal case, when the field comes from the right constructor
            (pat_ty : extras) ->
                 ASSERT( null extras )
-                do { sel_id <- tcLookupField field_lbl
-                   ; return (sel_id, pat_ty) }
+                return pat_ty
 
     field_tys :: [(FieldLabel, TcType)]
-    field_tys = case con_like of
-        RealDataCon data_con -> zip (dataConFieldLabels data_con) arg_tys
+    field_tys = zip (conLikeFieldLabels con_like) arg_tys
           -- Don't use zipEqual! If the constructor isn't really a record, then
           -- dataConFieldLabels will be empty (and each field in the pattern
           -- will generate an error below).
-        PatSynCon{} -> []
-
-conLikeArity :: ConLike -> Arity
-conLikeArity (RealDataCon data_con) = dataConSourceArity data_con
-conLikeArity (PatSynCon   pat_syn)  = patSynArity pat_syn
 
 tcConArg :: Checker (LPat Name, TcSigmaType) (LPat Id)
 tcConArg (arg_pat, arg_ty) penv thing_inside
@@ -1045,7 +1040,7 @@ existentialLetPat
           text "I can't handle pattern bindings for existential or GADT data constructors.",
           text "Instead, use a case-expression, or do-notation, to unpack the constructor."]
 
-badFieldCon :: ConLike -> Name -> SDoc
+badFieldCon :: ConLike -> FieldLabelString -> SDoc
 badFieldCon con field
   = hsep [ptext (sLit "Constructor") <+> quotes (ppr con),
           ptext (sLit "does not have field"), quotes (ppr field)]

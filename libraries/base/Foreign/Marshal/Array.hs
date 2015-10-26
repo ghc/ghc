@@ -211,8 +211,7 @@ withArrayLen :: Storable a => [a] -> (Int -> Ptr a -> IO b) -> IO b
 withArrayLen vals f  =
   allocaArray len $ \ptr -> do
       pokeArray ptr vals
-      res <- f len ptr
-      return res
+      f len ptr
   where
     len = length vals
 

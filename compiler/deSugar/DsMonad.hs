@@ -48,6 +48,7 @@ import TcIface
 import LoadIface
 import Finder
 import PrelNames
+import RnNames
 import RdrName
 import HscTypes
 import Bag
@@ -184,7 +185,7 @@ initDs hsc_env mod rdr_env type_env fam_inst_env thing_inside
                  else do {
                ; result <- liftIO $ findImportedModule hsc_env modname Nothing
                ; case result of
-                   FoundModule h -> loadModule err (fr_mod h)
+                   Found _ mod -> loadModule err mod
                    _           -> pprPgmError "Unable to use Data Parallel Haskell (DPH):" err
                } }
 

@@ -1,5 +1,26 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
+## 2.11.0.0  *TBA*
+
+  * Bundled with GHC 7.12.1
+
+  * The compiler can now resolve infix operator fixities in types on its own.
+    The `UInfixT` constructor of `Type` is analoguous to `UInfixE` for expressions
+    and can contain a tree of infix type applications which will be reassociated
+    according to the fixities of the operators. The `ParensT` constructor can be
+    used to explicitly group expressions.
+
+  * Add `namePackage` and `nameSpace`
+
+  * Make `dataToQa` and `dataToExpQ` able to handle `Data` instances whose
+    `toConstr` implementation relies on a function instead of a data
+    constructor (#10796)
+
+  * Add `Show` instances for `NameFlavour` and `NameSpace`
+
+  * TODO: document API changes and important bugfixes
+
+
 ## 2.10.0.0  *Mar 2015*
 
   * Bundled with GHC 7.10.1

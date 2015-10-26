@@ -117,6 +117,7 @@ ppLlvmMeta (MetaNamed n m)
 
 -- | Print out an LLVM metadata value.
 ppLlvmMetaExpr :: MetaExpr -> SDoc
+ppLlvmMetaExpr (MetaVar (LMLitVar (LMNullLit _))) = text "null"
 ppLlvmMetaExpr (MetaStr    s ) = text "!" <> doubleQuotes (ftext s)
 ppLlvmMetaExpr (MetaNode   n ) = text "!" <> int n
 ppLlvmMetaExpr (MetaVar    v ) = ppr v
@@ -245,6 +246,8 @@ ppLlvmExpression expr
         Load       ptr              -> ppLoad ptr
         ALoad      ord st ptr       -> ppALoad ord st ptr
         Malloc     tp amount        -> ppMalloc tp amount
+        AtomicRMW  aop tgt src ordering -> ppAtomicRMW aop tgt src ordering
+        CmpXChg    addr old new s_ord f_ord -> ppCmpXChg addr old new s_ord f_ord
         Phi        tp precessors    -> ppPhi tp precessors
         Asm        asm c ty v se sk -> ppAsm asm c ty v se sk
         MExpr      meta expr        -> ppMetaExpr meta expr
@@ -278,7 +281,7 @@ ppCall ct fptr args attrs = case fptr of
                            (case argTy of
                                VarArgs   -> text ", ..."
                                FixedArgs -> empty)
-                fnty = space <> lparen <> ppArgTy <> rparen <> char '*'
+                fnty = space <> lparen <> ppArgTy <> rparen
                 attrDoc = ppSpaceJoin attrs
             in  tc <> text "call" <+> ppr cc <+> ppr ret
                     <> fnty <+> ppName fptr <> lparen <+> ppValues
@@ -327,6 +330,30 @@ ppSyncOrdering SyncRelease   = text "release"
 ppSyncOrdering SyncAcqRel    = text "acq_rel"
 ppSyncOrdering SyncSeqCst    = text "seq_cst"
 
+ppAtomicOp :: LlvmAtomicOp -> SDoc
+ppAtomicOp LAO_Xchg = text "xchg"
+ppAtomicOp LAO_Add  = text "add"
+ppAtomicOp LAO_Sub  = text "sub"
+ppAtomicOp LAO_And  = text "and"
+ppAtomicOp LAO_Nand = text "nand"
+ppAtomicOp LAO_Or   = text "or"
+ppAtomicOp LAO_Xor  = text "xor"
+ppAtomicOp LAO_Max  = text "max"
+ppAtomicOp LAO_Min  = text "min"
+ppAtomicOp LAO_Umax = text "umax"
+ppAtomicOp LAO_Umin = text "umin"
+
+ppAtomicRMW :: LlvmAtomicOp -> LlvmVar -> LlvmVar -> LlvmSyncOrdering -> SDoc
+ppAtomicRMW aop tgt src ordering =
+  text "atomicrmw" <+> ppAtomicOp aop <+> ppr tgt <> comma
+  <+> ppr src <+> ppSyncOrdering ordering
+
+ppCmpXChg :: LlvmVar -> LlvmVar -> LlvmVar
+          -> LlvmSyncOrdering -> LlvmSyncOrdering -> SDoc
+ppCmpXChg addr old new s_ord f_ord =
+  text "cmpxchg" <+> ppr addr <> comma <+> ppr old <> comma <+> ppr new
+  <+> ppSyncOrdering s_ord <+> ppSyncOrdering f_ord
+
 -- XXX: On x86, vector types need to be 16-byte aligned for aligned access, but
 -- we have no way of guaranteeing that this is true with GHC (we would need to
 -- modify the layout of the stack and closures, change the storage manager,
@@ -336,8 +363,9 @@ ppSyncOrdering SyncSeqCst    = text "seq_cst"
 -- of specifying alignment.
 
 ppLoad :: LlvmVar -> SDoc
-ppLoad var = text "load" <+> ppr var <> align
+ppLoad var = text "load" <+> ppr derefType <> comma <+> ppr var <> align
   where
+    derefType = pLower $ getVarType var
     align | isVector . pLower . getVarType $ var = text ", align 1"
           | otherwise = empty
 
@@ -347,7 +375,9 @@ ppALoad ord st var = sdocWithDynFlags $ \dflags ->
       align     = text ", align" <+> ppr alignment
       sThreaded | st        = text " singlethread"
                 | otherwise = empty
-  in text "load atomic" <+> ppr var <> sThreaded <+> ppSyncOrdering ord <> align
+      derefType = pLower $ getVarType var
+  in text "load atomic" <+> ppr derefType <> comma <+> ppr var <> sThreaded
+            <+> ppSyncOrdering ord <> align
 
 ppStore :: LlvmVar -> LlvmVar -> SDoc
 ppStore val dst
@@ -360,10 +390,10 @@ ppStore val dst
 
 
 ppCast :: LlvmCastOp -> LlvmVar -> LlvmType -> SDoc
-ppCast op from to 
-    =   ppr op 
+ppCast op from to
+    =   ppr op
     <+> ppr (getVarType from) <+> ppName from
-    <+> text "to" 
+    <+> text "to"
     <+> ppr to
 
 
@@ -383,7 +413,9 @@ ppGetElementPtr :: Bool -> LlvmVar -> [LlvmVar] -> SDoc
 ppGetElementPtr inb ptr idx =
   let indexes = comma <+> ppCommaJoin idx
       inbound = if inb then text "inbounds" else empty
-  in text "getelementptr" <+> inbound <+> ppr ptr <> indexes
+      derefType = pLower $ getVarType ptr
+  in text "getelementptr" <+> inbound <+> ppr derefType <> comma <+> ppr ptr
+                            <> indexes
 
 
 ppReturn :: Maybe LlvmVar -> SDoc

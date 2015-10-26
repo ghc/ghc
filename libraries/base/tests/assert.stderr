@@ -1,2 +1,4 @@
-assert: assert.hs:9:11-16: Assertion failed
+assert: Assertion failed
+CallStack:
+  assert, called at assert.hs:9:11 in main:Main
 

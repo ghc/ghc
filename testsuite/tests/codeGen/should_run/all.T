@@ -1,5 +1,5 @@
 # Test +RTS -G1 here (it isn't tested anywhere else)
-setTestOpts(extra_ways(['g1']))
+setTestOpts(unless(fast(), extra_ways(['g1'])))
 
 test('cgrun001', normal, compile_and_run, [''])
 test('cgrun002', normal, compile_and_run, [''])
@@ -138,3 +138,4 @@ test('T10414', [only_ways(['threaded2']), extra_ways(['threaded2'])],
      compile_and_run, ['-feager-blackholing'])
 test('T10521', normal, compile_and_run, [''])
 test('T10521b', normal, compile_and_run, [''])
+test('T10870', normal, compile_and_run, [''])

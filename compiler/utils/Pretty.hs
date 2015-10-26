@@ -205,7 +205,6 @@ module Pretty (
 import BufWrite
 import FastString
 import Panic
-import Numeric (fromRat)
 import System.IO
 import Prelude hiding (error)
 
@@ -499,8 +498,7 @@ int      n = text (show n)
 integer  n = text (show n)
 float    n = text (show n)
 double   n = text (show n)
-rational n = text (show (fromRat n :: Double))
---rational n = text (show (fromRationalX n)) -- _showRational 30 n)
+rational n = text (show n)
 
 parens       :: Doc -> Doc -- ^ Wrap document in @(...)@
 brackets     :: Doc -> Doc -- ^ Wrap document in @[...]@
@@ -531,15 +529,15 @@ reduceDoc p              = p
 
 -- | List version of '<>'.
 hcat :: [Doc] -> Doc
-hcat = foldr (<>)  empty
+hcat = reduceAB . foldr (beside_' False) empty
 
 -- | List version of '<+>'.
 hsep :: [Doc] -> Doc
-hsep = foldr (<+>) empty
+hsep = reduceAB . foldr (beside_' True)  empty
 
 -- | List version of '$$'.
 vcat :: [Doc] -> Doc
-vcat = foldr ($$)  empty
+vcat = reduceAB . foldr (above_' False) empty
 
 -- | Nest (or indent) a document by a given number of positions
 -- (which may also be negative).  'nest' satisfies the laws:
@@ -586,6 +584,19 @@ mkUnion :: Doc -> Doc -> Doc
 mkUnion Empty _ = Empty
 mkUnion p q     = p `union_` q
 
+beside_' :: Bool -> Doc -> Doc -> Doc
+beside_' _ p Empty = p
+beside_' g p q     = Beside p g q
+
+above_' :: Bool -> Doc -> Doc -> Doc
+above_' _ p Empty = p
+above_' g p q     = Above p g q
+
+reduceAB :: Doc -> Doc
+reduceAB (Above  Empty _ q) = q
+reduceAB (Beside Empty _ q) = q
+reduceAB doc                = doc
+
 nilAbove_ :: RDoc -> RDoc
 nilAbove_ = NilAbove
 
@@ -623,12 +634,17 @@ union_ = Union
 -- * @(x '$$' y) '<>' z = x '$$' (y '<>' z)@, if @y@ non-empty.
 --
 ($$) :: Doc -> Doc -> Doc
-p $$  q = Above p False q
+p $$  q = above_ p False q
 
 -- | Above, with no overlapping.
 -- '$+$' is associative, with identity 'empty'.
 ($+$) :: Doc -> Doc -> Doc
-p $+$ q = Above p True q
+p $+$ q = above_ p True q
+
+above_ :: Doc -> Bool -> Doc -> Doc
+above_ p _ Empty = p
+above_ Empty _ q = q
+above_ p g q     = Above p g q
 
 above :: Doc -> Bool -> RDoc -> RDoc
 above (Above p g1 q1)  g2 q2 = above p g1 (above q1 g2 q2)
@@ -679,12 +695,17 @@ nilAboveNest g k q           | not g && k > 0      -- No newline if no overlap
 -- | Beside.
 -- '<>' is associative, with identity 'empty'.
 (<>) :: Doc -> Doc -> Doc
-p <>  q = Beside p False q
+p <>  q = beside_ p False q
 
 -- | Beside, separated by space, unless one of the arguments is 'empty'.
 -- '<+>' is associative, with identity 'empty'.
 (<+>) :: Doc -> Doc -> Doc
-p <+> q = Beside p True  q
+p <+> q = beside_ p True  q
+
+beside_ :: Doc -> Bool -> Doc -> Doc
+beside_ p _ Empty = p
+beside_ Empty _ q = q
+beside_ p g q     = Beside p g q
 
 -- Specification: beside g p q = p <g> q
 beside :: Doc -> Bool -> RDoc -> RDoc
@@ -815,17 +836,21 @@ fillNB _ _           k _  | k `seq` False = undefined
 fillNB g (Nest _ p)  k ys   = fillNB g p k ys
                               -- Never triggered, because of invariant (2)
 fillNB _ Empty _ []         = Empty
+fillNB g Empty k (Empty:ys) = fillNB g Empty k ys
 fillNB g Empty k (y:ys)     = fillNBE g k y ys
 fillNB g p k ys             = fill1 g p k ys
 
 
 fillNBE :: Bool -> Int -> Doc -> [Doc] -> Doc
 fillNBE g k y ys
-  = nilBeside g (fill1 g ((oneLiner . reduceDoc) y) k' ys)
+  = nilBeside g (fill1 g ((elideNest . oneLiner . reduceDoc) y) k' ys)
     -- XXX: TODO: PRETTY: Used to use True here (but GHC used False...)
     `mkUnion` nilAboveNest False k (fill g (y:ys))
   where k' = if g then k - 1 else k
 
+elideNest :: Doc -> Doc
+elideNest (Nest _ d) = d
+elideNest d          = d
 
 -- ---------------------------------------------------------------------------
 -- Selecting the best layout

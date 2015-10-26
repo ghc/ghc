@@ -1,1 +1,3 @@
 ffi008: this is an error
+CallStack:
+  error, called at ffi008.hs:12:12 in main:Main

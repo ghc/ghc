@@ -179,12 +179,11 @@ instance Functor GHCi where
     fmap = liftM
 
 instance Applicative GHCi where
-    pure = return
+    pure a = GHCi $ \_ -> pure a
     (<*>) = ap
 
 instance Monad GHCi where
   (GHCi m) >>= k  =  GHCi $ \s -> m s >>= \a -> unGHCi (k a) s
-  return a  = GHCi $ \_ -> return a
 
 getGHCiState :: GHCi GHCiState
 getGHCiState   = GHCi $ \r -> liftIO $ readIORef r

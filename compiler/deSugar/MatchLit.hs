@@ -228,6 +228,7 @@ warnAboutEmptyEnumerations dflags fromExpr mThnExpr toExpr
     else if tc == word16TyConName then check (undefined :: Word16)
     else if tc == word32TyConName then check (undefined :: Word32)
     else if tc == word64TyConName then check (undefined :: Word64)
+    else if tc == integerTyConName then check (undefined :: Integer)
     else return ()
 
   | otherwise = return ()
@@ -295,10 +296,12 @@ tidyNPat tidy_lit_pat (OverLit val False _ ty) mb_neg _
                             = mk_con_pat intDataCon    (HsIntPrim    "" int_lit)
   | isWordTy ty,   Just int_lit <- mb_int_lit
                             = mk_con_pat wordDataCon   (HsWordPrim   "" int_lit)
-  | isFloatTy ty,  Just rat_lit <- mb_rat_lit = mk_con_pat floatDataCon  (HsFloatPrim  rat_lit)
-  | isDoubleTy ty, Just rat_lit <- mb_rat_lit = mk_con_pat doubleDataCon (HsDoublePrim rat_lit)
   | isStringTy ty, Just str_lit <- mb_str_lit
                             = tidy_lit_pat (HsString "" str_lit)
+     -- NB: do /not/ convert Float or Double literals to F# 3.8 or D# 5.3
+     -- If we do convert to the constructor form, we'll generate a case
+     -- expression on a Float# or Double# and that's not allowed in Core; see
+     -- Trac #9238 and Note [Rules for floating-point comparisons] in PrelRules
   where
     mk_con_pat :: DataCon -> HsLit -> Pat Id
     mk_con_pat con lit = unLoc (mkPrefixConPat con [noLoc $ LitPat lit] [])
@@ -308,15 +311,6 @@ tidyNPat tidy_lit_pat (OverLit val False _ ty) mb_neg _
                    (Nothing, HsIntegral _ i) -> Just i
                    (Just _,  HsIntegral _ i) -> Just (-i)
                    _ -> Nothing
-
-    mb_rat_lit :: Maybe FractionalLit
-    mb_rat_lit = case (mb_neg, val) of
-       (Nothing, HsIntegral _ i) -> Just (integralFractionalLit (fromInteger i))
-       (Just _,  HsIntegral _ i) -> Just (integralFractionalLit
-                                                             (fromInteger (-i)))
-       (Nothing, HsFractional f) -> Just f
-       (Just _, HsFractional f)  -> Just (negateFractionalLit f)
-       _ -> Nothing
 
     mb_str_lit :: Maybe FastString
     mb_str_lit = case (mb_neg, val) of

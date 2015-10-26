@@ -253,7 +253,7 @@ always in scope.
 
   * Note [Rule dependency info]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    The VarSet in a SpecInfo is used for dependency analysis in the
+    The VarSet in a RuleInfo is used for dependency analysis in the
     occurrence analyser.  We must track free vars in *both* lhs and rhs.
     Hence use of idRuleVars, rather than idRuleRhsVars in occAnalBind.
     Why both? Consider

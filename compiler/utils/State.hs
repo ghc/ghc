@@ -19,7 +19,7 @@ instance Applicative (State s) where
                                            (# x, s'' #) -> (# f x, s'' #)
 
 instance Monad (State s) where
-    return x = State $ \s -> (# x, s #)
+    return = pure
     m >>= n  = State $ \s -> case runState' m s of
                              (# r, s' #) -> runState' (n r) s'
 

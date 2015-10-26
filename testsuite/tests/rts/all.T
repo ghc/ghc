@@ -261,7 +261,6 @@ test('T10017', [ when(opsys('mingw32'), skip)
                , only_ways(threaded_ways), extra_run_opts('+RTS -N2 -RTS') ], compile_and_run, [''])
 
 test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
-                 , when(opsys('mingw32'), expect_broken(9381))
                  # this needs runtime infrastructure to do in ghci:
                  #  '-rdynamic' ghc, load modules only via dlopen(RTLD_BLOBAL) and more.
                  , omit_ways(['ghci'])
@@ -330,3 +329,7 @@ test('T9839_06', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_
 # in 'epoll' and 'select' backends on reading from EBADF
 # mingw32 skip as UNIX pipe and close(fd) is used to exercise the problem
 test('T10590', [ignore_output, when(opsys('mingw32'),skip)], compile_and_run, [''])
+
+# 20000 was easily enough to trigger the bug with 7.10
+test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000') ],
+               compile_and_run, ['T10904lib.c'])

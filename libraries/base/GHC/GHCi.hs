@@ -38,11 +38,10 @@ instance Functor NoIO where
   fmap f (NoIO a) = NoIO (fmap f a)
 
 instance Applicative NoIO where
-  pure  = return
+  pure a = NoIO (pure a)
   (<*>) = ap
 
 instance Monad NoIO where
-    return a  = NoIO (return a)
     (>>=) k f = NoIO (noio k >>= noio . f)
 
 instance GHCiSandboxIO NoIO where

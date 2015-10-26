@@ -12,7 +12,8 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
                     findMethodBind, instantiateMethod,
                     tcClassMinimalDef,
                     HsSigFun, mkHsSigFun, lookupHsSig, emptyHsSigs,
-                    tcMkDeclCtxt, tcAddDeclCtxt, badMethodErr
+                    tcMkDeclCtxt, tcAddDeclCtxt, badMethodErr,
+                    tcATDefault
                   ) where
 
 #include "HsVersions.h"
@@ -30,13 +31,21 @@ import TcType
 import TcRnMonad
 import BuildTyCl( TcMethInfo )
 import Class
+import Coercion ( pprCoAxiom )
+import DynFlags
+import FamInst
+import FamInstEnv
 import Id
 import Name
 import NameEnv
 import NameSet
 import Var
+import VarEnv
+import VarSet
 import Outputable
 import SrcLoc
+import TyCon
+import TypeRep
 import Maybes
 import BasicTypes
 import Bag
@@ -45,6 +54,7 @@ import BooleanFormula
 import Util
 
 import Control.Monad
+import Data.List ( mapAccumL )
 
 {-
 Dictionary handling
@@ -418,3 +428,64 @@ warningMinimalDefIncomplete mindef
   = vcat [ ptext (sLit "The MINIMAL pragma does not require:")
          , nest 2 (pprBooleanFormulaNice mindef)
          , ptext (sLit "but there is no default implementation.") ]
+
+tcATDefault :: Bool -- If a warning should be emitted when a default instance
+                    -- definition is not provided by the user
+            -> SrcSpan
+            -> TvSubst
+            -> NameSet
+            -> ClassATItem
+            -> TcM [FamInst]
+-- ^ Construct default instances for any associated types that
+-- aren't given a user definition
+-- Returns [] or singleton
+tcATDefault emit_warn loc inst_subst defined_ats (ATI fam_tc defs)
+  -- User supplied instances ==> everything is OK
+  | tyConName fam_tc `elemNameSet` defined_ats
+  = return []
+
+  -- No user instance, have defaults ==> instatiate them
+   -- Example:   class C a where { type F a b :: *; type F a b = () }
+   --            instance C [x]
+   -- Then we want to generate the decl:   type F [x] b = ()
+  | Just (rhs_ty, _loc) <- defs
+  = do { let (subst', pat_tys') = mapAccumL subst_tv inst_subst
+                                            (tyConTyVars fam_tc)
+             rhs'     = substTy subst' rhs_ty
+             tv_set'  = tyVarsOfTypes pat_tys'
+             tvs'     = varSetElemsKvsFirst tv_set'
+       ; rep_tc_name <- newFamInstTyConName (L loc (tyConName fam_tc)) pat_tys'
+       ; let axiom = mkSingleCoAxiom Nominal rep_tc_name tvs'
+                                     fam_tc pat_tys' rhs'
+           -- NB: no validity check. We check validity of default instances
+           -- in the class definition. Because type instance arguments cannot
+           -- be type family applications and cannot be polytypes, the
+           -- validity check is redundant.
+
+       ; traceTc "mk_deflt_at_instance" (vcat [ ppr fam_tc, ppr rhs_ty
+                                              , pprCoAxiom axiom ])
+       ; fam_inst <- ASSERT( tyVarsOfType rhs' `subVarSet` tv_set' )
+                     newFamInst SynFamilyInst axiom
+       ; return [fam_inst] }
+
+   -- No defaults ==> generate a warning
+  | otherwise  -- defs = Nothing
+  = do { when emit_warn $ warnMissingAT (tyConName fam_tc)
+       ; return [] }
+  where
+    subst_tv subst tc_tv
+      | Just ty <- lookupVarEnv (getTvSubstEnv subst) tc_tv
+      = (subst, ty)
+      | otherwise
+      = (extendTvSubst subst tc_tv ty', ty')
+      where
+        ty' = mkTyVarTy (updateTyVarKind (substTy subst) tc_tv)
+
+warnMissingAT :: Name -> TcM ()
+warnMissingAT name
+  = do { warn <- woptM Opt_WarnMissingMethods
+       ; traceTc "warn" (ppr name <+> ppr warn)
+       ; warnTc warn  -- Warn only if -fwarn-missing-methods
+                (ptext (sLit "No explicit") <+> text "associated type"
+                    <+> ptext (sLit "or default declaration for     ")
+                    <+> quotes (ppr name)) }

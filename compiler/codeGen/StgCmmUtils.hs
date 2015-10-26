@@ -167,10 +167,10 @@ tagToClosure dflags tycon tag
 --
 -------------------------------------------------------------------------
 
-emitRtsCall :: PackageKey -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
+emitRtsCall :: UnitId -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
 emitRtsCall pkg fun args safe = emitRtsCallGen [] (mkCmmCodeLabel pkg fun) args safe
 
-emitRtsCallWithResult :: LocalReg -> ForeignHint -> PackageKey -> FastString
+emitRtsCallWithResult :: LocalReg -> ForeignHint -> UnitId -> FastString
         -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
 emitRtsCallWithResult res hint pkg fun args safe
    = emitRtsCallGen [(res,hint)] (mkCmmCodeLabel pkg fun) args safe
@@ -558,7 +558,7 @@ mk_float_switch :: Width -> CmmExpr -> BlockId
               -> FCode CmmAGraph
 mk_float_switch rep scrut deflt _bounds [(lit,blk)]
   = do dflags <- getDynFlags
-       return $ mkCbranch (cond dflags) deflt blk
+       return $ mkCbranch (cond dflags) deflt blk Nothing
   where
     cond dflags = CmmMachOp ne [scrut, CmmLit cmm_lit]
       where

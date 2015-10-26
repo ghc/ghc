@@ -224,9 +224,9 @@ fileTarget filename = Target (TargetFile filename Nothing) True Nothing
 graphData :: ModuleGraph -> (Maybe Handle, Maybe Handle) -> Ghc ()
 graphData graph handles = do
     mapM_ foundthings graph
-    where foundthings ms =
-              let filename = msHsFilePath ms
-                  modname = moduleName $ ms_mod ms
+    where foundthings ms
+            | Just filename <- msHsFilePath ms =
+              let modname = moduleName $ ms_mod ms
               in handleSourceError (\e -> do
                                        printException e
                                        liftIO $ exitWith (ExitFailure 1)) $
@@ -238,6 +238,7 @@ graphData graph handles = do
                          liftIO (writeTagsData handles =<< fileData filename modname s)
                        _otherwise ->
                          liftIO $ exitWith (ExitFailure 1)
+            | otherwise = return ()
 
 fileData :: FileName -> ModuleName -> RenamedSource -> IO FileData
 fileData filename modname (group, _imports, _lie, _doc) = do
@@ -258,7 +259,7 @@ boundValues mod group =
                        , bind <- bagToList binds
                        , x <- boundThings mod bind ]
                _other -> error "boundValues"
-      tys = [ n | ns <- map hsLTyClDeclBinders (tyClGroupConcat (hs_tyclds group))
+      tys = [ n | ns <- map (fst . hsLTyClDeclBinders) (tyClGroupConcat (hs_tyclds group))
                 , n <- map found ns ]
       fors = concat $ map forBound (hs_fords group)
              where forBound lford = case unLoc lford of

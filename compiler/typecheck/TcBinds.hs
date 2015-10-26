@@ -22,7 +22,7 @@ import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
 import {-# SOURCE #-} TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl, tcPatSynBuilderBind )
 import DynFlags
 import HsSyn
-import HscTypes( isHsBootOrSig )
+import HscTypes( isHsBoot )
 import TcRnMonad
 import TcEnv
 import TcUnify
@@ -38,6 +38,7 @@ import FamInst( tcGetFamInstEnvs )
 import TyCon
 import TcType
 import TysPrim
+import TysWiredIn
 import Id
 import Var
 import VarSet
@@ -57,7 +58,7 @@ import BasicTypes
 import Outputable
 import FastString
 import Type(mkStrLitTy)
-import PrelNames( mkUnboundName, ipClassName, gHC_PRIM )
+import PrelNames( mkUnboundName, gHC_PRIM )
 import TcValidity (checkValidType)
 
 import Control.Monad
@@ -184,7 +185,7 @@ tcRecSelBinds (ValBindsOut binds sigs)
   = tcExtendGlobalValEnv [sel_id | L _ (IdSig sel_id) <- sigs] $
     do { (rec_sel_binds, tcg_env) <- discardWarnings (tcValBinds TopLevel binds sigs getGblEnv)
        ; let tcg_env'
-              | isHsBootOrSig (tcg_src tcg_env) = tcg_env
+              | isHsBoot (tcg_src tcg_env) = tcg_env
               | otherwise = tcg_env { tcg_binds = foldr (unionBags . snd)
                                                         (tcg_binds tcg_env)
                                                         rec_sel_binds }
@@ -226,8 +227,7 @@ tcLocalBinds (HsValBinds (ValBindsOut binds sigs)) thing_inside
 tcLocalBinds (HsValBinds (ValBindsIn {})) _ = panic "tcLocalBinds"
 
 tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
-  = do  { ipClass <- tcLookupClass ipClassName
-        ; (given_ips, ip_binds') <-
+  = do  { (given_ips, ip_binds') <-
             mapAndUnzipM (wrapLocSndM (tc_ip_bind ipClass)) ip_binds
 
         -- If the binding binds ?x = E, we  must now
@@ -653,7 +653,7 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
        ; let name_taus = [(name, idType mono_id) | (name, _, mono_id) <- mono_infos]
              sigs      = [ sig | (_, Just sig, _) <- mono_infos ]
        ; traceTc "simplifyInfer call" (ppr tclvl $$ ppr name_taus $$ ppr wanted)
-       ; (qtvs, givens, _mr_bites, ev_binds)
+       ; (qtvs, givens, ev_binds)
                  <- simplifyInfer tclvl mono sigs name_taus wanted
 
        ; let inferred_theta = map evVarPred givens

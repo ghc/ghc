@@ -81,7 +81,7 @@ dsListComp lquals res_ty = do
 -- and the type of the elements that it outputs (tuples of binders)
 dsInnerListComp :: (ParStmtBlock Id Id) -> DsM (CoreExpr, Type)
 dsInnerListComp (ParStmtBlock stmts bndrs _)
-  = do { expr <- dsListComp (stmts ++ [noLoc $ mkLastStmt (mkBigLHsVarTup bndrs)])
+  = do { expr <- dsListComp (stmts ++ [noLoc $ mkLastStmt (mkBigLHsVarTupId bndrs)])
                             (mkListTy bndrs_tuple_type)
        ; return (expr, bndrs_tuple_type) }
   where
@@ -133,7 +133,7 @@ dsTransStmt (TransStmt { trS_form = form, trS_stmts = stmts, trS_bndrs = binderM
 
     -- Build a pattern that ensures the consumer binds into the NEW binders,
     -- which hold lists rather than single values
-    let pat = mkBigLHsVarPatTup to_bndrs
+    let pat = mkBigLHsVarPatTupId to_bndrs
     return (bound_unzipped_inner_list_expr, pat)
 
 dsTransStmt _ = panic "dsTransStmt: Not given a TransStmt"
@@ -208,7 +208,7 @@ deListComp :: [ExprStmt Id] -> CoreExpr -> DsM CoreExpr
 
 deListComp [] _ = panic "deListComp"
 
-deListComp (LastStmt body _ : quals) list
+deListComp (LastStmt body _ _ : quals) list
   =     -- Figure 7.4, SLPJ, p 135, rule C above
     ASSERT( null quals )
     do { core_body <- dsLExpr body
@@ -246,10 +246,13 @@ deListComp (ParStmt stmtss_w_bndrs _ _ : quals) list
         bndrs_s = [bs | ParStmtBlock _ bs _ <- stmtss_w_bndrs]
 
         -- pat is the pattern ((x1,..,xn), (y1,..,ym)) in the example above
-        pat  = mkBigLHsPatTup pats
-        pats = map mkBigLHsVarPatTup bndrs_s
+        pat  = mkBigLHsPatTupId pats
+        pats = map mkBigLHsVarPatTupId bndrs_s
 
 deListComp (RecStmt {} : _) _ = panic "deListComp RecStmt"
+
+deListComp (ApplicativeStmt {} : _) _ =
+  panic "deListComp ApplicativeStmt"
 
 deBindComp :: OutPat Id
            -> CoreExpr
@@ -312,7 +315,7 @@ dfListComp :: Id -> Id      -- 'c' and 'n'
 
 dfListComp _ _ [] = panic "dfListComp"
 
-dfListComp c_id n_id (LastStmt body _ : quals)
+dfListComp c_id n_id (LastStmt body _ _ : quals)
   = ASSERT( null quals )
     do { core_body <- dsLExpr body
        ; return (mkApps (Var c_id) [core_body, Var n_id]) }
@@ -342,6 +345,8 @@ dfListComp c_id n_id (BindStmt pat list1 _ _ : quals) = do
 
 dfListComp _ _ (ParStmt {} : _) = panic "dfListComp ParStmt"
 dfListComp _ _ (RecStmt {} : _) = panic "dfListComp RecStmt"
+dfListComp _ _ (ApplicativeStmt {} : _) =
+  panic "dfListComp ApplicativeStmt"
 
 dfBindComp :: Id -> Id          -- 'c' and 'n'
            -> (LPat Id, CoreExpr)
@@ -510,7 +515,7 @@ dePArrComp [] _ _ = panic "dePArrComp"
 --
 --  <<[:e' | :]>> pa ea = mapP (\pa -> e') ea
 --
-dePArrComp (LastStmt e' _ : quals) pa cea
+dePArrComp (LastStmt e' _ _ : quals) pa cea
   = ASSERT( null quals )
     do { mapP <- dsDPHBuiltin mapPVar
        ; let ty = parrElemType cea
@@ -589,6 +594,8 @@ dePArrComp (ParStmt {} : _) _ _ =
   panic "DsListComp.dePArrComp: malformed comprehension AST: ParStmt"
 dePArrComp (TransStmt {} : _) _ _ = panic "DsListComp.dePArrComp: TransStmt"
 dePArrComp (RecStmt   {} : _) _ _ = panic "DsListComp.dePArrComp: RecStmt"
+dePArrComp (ApplicativeStmt   {} : _) _ _ =
+  panic "DsListComp.dePArrComp: ApplicativeStmt"
 
 --  <<[:e' | qs | qss:]>> pa ea =
 --    <<[:e' | qss:]>> (pa, (x_1, ..., x_n))
@@ -666,7 +673,7 @@ dsMcStmts (L loc stmt : lstmts) = putSrcSpanDs loc (dsMcStmt stmt lstmts)
 ---------------
 dsMcStmt :: ExprStmt Id -> [ExprLStmt Id] -> DsM CoreExpr
 
-dsMcStmt (LastStmt body ret_op) stmts
+dsMcStmt (LastStmt body _ ret_op) stmts
   = ASSERT( null stmts )
     do { body' <- dsLExpr body
        ; ret_op' <- dsExpr ret_op
@@ -761,7 +768,7 @@ dsMcStmt (ParStmt blocks mzip_op bind_op) stmts_rest
        ; mzip_op'    <- dsExpr mzip_op
 
        ; let -- The pattern variables
-             pats = [ mkBigLHsVarPatTup bs | ParStmtBlock _ bs _ <- blocks]
+             pats = [ mkBigLHsVarPatTupId bs | ParStmtBlock _ bs _ <- blocks]
              -- Pattern with tuples of variables
              -- [v1,v2,v3]  =>  (v1, (v2, v3))
              pat = foldr1 (\p1 p2 -> mkLHsPatTup [p1, p2]) pats
@@ -834,7 +841,7 @@ dsInnerMonadComp :: [ExprLStmt Id]
                  -> HsExpr Id   -- The monomorphic "return" operator
                  -> DsM CoreExpr
 dsInnerMonadComp stmts bndrs ret_op
-  = dsMcStmts (stmts ++ [noLoc (LastStmt (mkBigLHsVarTup bndrs) ret_op)])
+  = dsMcStmts (stmts ++ [noLoc (LastStmt (mkBigLHsVarTupId bndrs) False ret_op)])
 
 -- The `unzip` function for `GroupStmt` in a monad comprehensions
 --

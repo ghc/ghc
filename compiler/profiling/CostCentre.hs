@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 module CostCentre (
         CostCentre(..), CcName, IsCafCC(..),
                 -- All abstract except to friend: ParseIface.y
@@ -26,7 +26,6 @@ import Name
 import Module
 import Unique
 import Outputable
-import FastTypes
 import SrcLoc
 import FastString
 import Util
@@ -87,13 +86,14 @@ cmpCostCentre NormalCC {cc_key = n1, cc_mod =  m1}
 
 cmpCostCentre other_1 other_2
   = let
-        !tag1 = tag_CC other_1
-        !tag2 = tag_CC other_2
+        tag1 = tag_CC other_1
+        tag2 = tag_CC other_2
     in
-    if tag1 <# tag2 then LT else GT
+    if tag1 < tag2 then LT else GT
   where
-    tag_CC (NormalCC   {}) = _ILIT(0)
-    tag_CC (AllCafsCC  {}) = _ILIT(1)
+    tag_CC :: CostCentre -> Int
+    tag_CC (NormalCC   {}) = 0
+    tag_CC (AllCafsCC  {}) = 1
 
 
 -----------------------------------------------------------------------------

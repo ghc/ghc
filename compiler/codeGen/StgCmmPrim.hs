@@ -318,14 +318,19 @@ emitPrimOp dflags [] WriteMutVarOp [mutv,var]
                 [(CmmReg (CmmGlobal BaseReg), AddrHint), (mutv,AddrHint)]
 
 --  #define sizzeofByteArrayzh(r,a) \
---     r = ((StgArrWords *)(a))->bytes
+--     r = ((StgArrBytes *)(a))->bytes
 emitPrimOp dflags [res] SizeofByteArrayOp [arg]
    = emit $ mkAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
 
 --  #define sizzeofMutableByteArrayzh(r,a) \
---      r = ((StgArrWords *)(a))->bytes
+--      r = ((StgArrBytes *)(a))->bytes
 emitPrimOp dflags [res] SizeofMutableByteArrayOp [arg]
    = emitPrimOp dflags [res] SizeofByteArrayOp [arg]
+
+--  #define getSizzeofMutableByteArrayzh(r,a) \
+--      r = ((StgArrBytes *)(a))->bytes
+emitPrimOp dflags [res] GetSizeofMutableByteArrayOp [arg]
+   = emitAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
 
 
 --  #define touchzh(o)                  /* nothing */
@@ -412,7 +417,9 @@ emitPrimOp _      []  WriteSmallArrayOp [obj,ix,v] = doWriteSmallPtrArrayOp obj 
 -- Getting the size of pointer arrays
 
 emitPrimOp dflags [res] SizeofArrayOp [arg]
-   = emit $ mkAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags + oFFSET_StgMutArrPtrs_ptrs dflags) (bWord dflags))
+   = emit $ mkAssign (CmmLocal res) (cmmLoadIndexW dflags arg
+    (fixedHdrSizeW dflags + bytesToWordsRoundUp dflags (oFFSET_StgMutArrPtrs_ptrs dflags))
+        (bWord dflags))
 emitPrimOp dflags [res] SizeofMutableArrayOp [arg]
    = emitPrimOp dflags [res] SizeofArrayOp [arg]
 emitPrimOp dflags [res] SizeofArrayArrayOp [arg]
@@ -423,7 +430,8 @@ emitPrimOp dflags [res] SizeofMutableArrayArrayOp [arg]
 emitPrimOp dflags [res] SizeofSmallArrayOp [arg] =
     emit $ mkAssign (CmmLocal res)
     (cmmLoadIndexW dflags arg
-     (fixedHdrSizeW dflags + oFFSET_StgSmallMutArrPtrs_ptrs dflags) (bWord dflags))
+     (fixedHdrSizeW dflags + bytesToWordsRoundUp dflags (oFFSET_StgSmallMutArrPtrs_ptrs dflags))
+        (bWord dflags))
 emitPrimOp dflags [res] SizeofSmallMutableArrayOp [arg] =
     emitPrimOp dflags [res] SizeofSmallArrayOp [arg]
 
@@ -1632,7 +1640,7 @@ doNewByteArrayOp res_r n = do
 
     base <- allocHeapClosure rep info_ptr curCCS
                      [ (mkIntExpr dflags n,
-                        hdr_size + oFFSET_StgArrWords_bytes dflags)
+                        hdr_size + oFFSET_StgArrBytes_bytes dflags)
                      ]
 
     emit $ mkAssign (CmmLocal res_r) base

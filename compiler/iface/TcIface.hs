@@ -70,6 +70,7 @@ import DynFlags
 import Util
 import FastString
 
+import Data.List
 import Control.Monad
 import qualified Data.Map as Map
 #if __GLASGOW_HASKELL__ < 709
@@ -351,20 +352,23 @@ tc_iface_decl _ _ (IfaceSynonym {ifName = occ_name, ifTyVars = tv_bndrs,
      ; rhs_kind <- tcIfaceKind kind     -- Note [Synonym kind loop]
      ; rhs      <- forkM (mk_doc tc_name) $
                    tcIfaceType rhs_ty
-     ; tycon    <- buildSynonymTyCon tc_name tyvars roles rhs rhs_kind
+     ; let tycon = buildSynonymTyCon tc_name tyvars roles rhs rhs_kind
      ; return (ATyCon tycon) }
    where
      mk_doc n = ptext (sLit "Type synonym") <+> ppr n
 
 tc_iface_decl parent _ (IfaceFamily {ifName = occ_name, ifTyVars = tv_bndrs,
                                      ifFamFlav = fam_flav,
-                                     ifFamKind = kind })
+                                     ifFamKind = kind,
+                                     ifResVar = res, ifFamInj = inj })
    = bindIfaceTyVars_AT tv_bndrs $ \ tyvars -> do
      { tc_name  <- lookupIfaceTop occ_name
      ; rhs_kind <- tcIfaceKind kind     -- Note [Synonym kind loop]
      ; rhs      <- forkM (mk_doc tc_name) $
                    tc_fam_flav fam_flav
-     ; tycon    <- buildFamilyTyCon tc_name tyvars rhs rhs_kind parent
+     ; res_name <- traverse (newIfaceName . mkTyVarOccFS) res
+     ; let tycon = buildFamilyTyCon tc_name tyvars res_name rhs rhs_kind
+                                    parent inj
      ; return (ATyCon tycon) }
    where
      mk_doc n = ptext (sLit "Type synonym") <+> ppr n
@@ -424,7 +428,7 @@ tc_iface_decl _parent ignore_prags
                       Just def -> forkM (mk_at_doc tc)                 $
                                   extendIfaceTyVarEnv (tyConTyVars tc) $
                                   do { tc_def <- tcIfaceType def
-                                     ; return (Just tc_def) }
+                                     ; return (Just (tc_def, noSrcSpan)) }
                   -- Must be done lazily in case the RHS of the defaults mention
                   -- the type constructor being defined here
                   -- e.g.   type AT a; type AT b = AT [b]   Trac #8002
@@ -447,7 +451,7 @@ tc_iface_decl _ _ (IfaceAxiom { ifName = ax_occ, ifTyCon = tc
                              , co_ax_name     = tc_name
                              , co_ax_tc       = tc_tycon
                              , co_ax_role     = role
-                             , co_ax_branches = toBranchList tc_branches
+                             , co_ax_branches = manyBranches tc_branches
                              , co_ax_implicit = False }
        ; return (ACoAxiom axiom) }
 
@@ -506,16 +510,19 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
   = case if_cons of
         IfAbstractTyCon dis -> return (AbstractTyCon dis)
         IfDataFamTyCon  -> return DataFamilyTyCon
-        IfDataTyCon cons -> do  { data_cons <- mapM tc_con_decl cons
-                                ; return (mkDataTyConRhs data_cons) }
-        IfNewTyCon con   -> do  { data_con <- tc_con_decl con
-                                ; mkNewTyConRhs tycon_name tycon data_con }
+        IfDataTyCon cons _ _ -> do  { field_lbls <- mapM (traverse lookupIfaceTop) (ifaceConDeclFields if_cons)
+                                    ; data_cons  <- mapM (tc_con_decl field_lbls) cons
+                                    ; return (mkDataTyConRhs data_cons) }
+        IfNewTyCon  con  _ _ -> do  { field_lbls <- mapM (traverse lookupIfaceTop) (ifaceConDeclFields if_cons)
+                                    ; data_con  <- tc_con_decl field_lbls con
+                                    ; mkNewTyConRhs tycon_name tycon data_con }
   where
-    tc_con_decl (IfCon { ifConInfix = is_infix,
+    tc_con_decl field_lbls (IfCon { ifConInfix = is_infix,
                          ifConExTvs = ex_tvs,
                          ifConOcc = occ, ifConCtxt = ctxt, ifConEqSpec = spec,
-                         ifConArgTys = args, ifConFields = field_lbls,
-                         ifConStricts = if_stricts})
+                         ifConArgTys = args, ifConFields = my_lbls,
+                         ifConStricts = if_stricts,
+                         ifConSrcStricts = if_src_stricts})
      = -- Universally-quantified tyvars are shared with
        -- parent TyCon, and are alrady in scope
        bindIfaceTyVars ex_tvs    $ \ ex_tyvars -> do
@@ -535,31 +542,44 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
                         -- The IfBang field can mention
                         -- the type itself; hence inside forkM
                 ; return (eq_spec, theta, arg_tys, stricts) }
-        ; lbl_names <- mapM lookupIfaceTop field_lbls
+
+        -- Look up the field labels for this constructor; note that
+        -- they should be in the same order as my_lbls!
+        ; let lbl_names = map find_lbl my_lbls
+              find_lbl x = case find (\ fl -> nameOccName (flSelector fl) == x) field_lbls of
+                             Just fl -> fl
+                             Nothing -> error $ "find_lbl missing " ++ occNameString x
 
         -- Remember, tycon is the representation tycon
         ; let orig_res_ty = mkFamilyTyConApp tycon
                                 (substTyVars (mkTopTvSubst eq_spec) tc_tyvars)
 
         ; con <- buildDataCon (pprPanic "tcIfaceDataCons: FamInstEnvs" (ppr name))
-                       name is_infix
-                       stricts -- Pass the HsImplBangs (i.e. final decisions)
-                               -- to buildDataCon; it'll use these to guide
-                               -- the construction of a worker
-                       lbl_names
-                       tc_tyvars ex_tyvars
-                       eq_spec theta
-                       arg_tys orig_res_ty tycon
+                   name is_infix
+                   (map src_strict if_src_stricts)
+                   (Just stricts)
+                     -- Pass the HsImplBangs (i.e. final
+                     -- decisions) to buildDataCon; it'll use
+                     -- these to guide the construction of a
+                     -- worker.
+                     -- See Note [Bangs on imported data constructors] in MkId
+                   lbl_names
+                   tc_tyvars ex_tyvars
+                   eq_spec theta
+                   arg_tys orig_res_ty tycon
         ; traceIf (text "Done interface-file tc_con_decl" <+> ppr name)
         ; return con }
     mk_doc con_name = ptext (sLit "Constructor") <+> ppr con_name
 
     tc_strict :: IfaceBang -> IfL HsImplBang
-    tc_strict IfNoBang = return HsLazy
-    tc_strict IfStrict = return HsStrict
+    tc_strict IfNoBang = return (HsLazy)
+    tc_strict IfStrict = return (HsStrict)
     tc_strict IfUnpack = return (HsUnpack Nothing)
     tc_strict (IfUnpackCo if_co) = do { co <- tcIfaceCo if_co
                                       ; return (HsUnpack (Just co)) }
+
+    src_strict :: IfaceSrcBang -> HsSrcBang
+    src_strict (IfSrcBang unpk bang) = HsSrcBang Nothing unpk bang
 
 tcIfaceEqSpec :: IfaceEqSpec -> IfL [(TyVar, Type)]
 tcIfaceEqSpec spec

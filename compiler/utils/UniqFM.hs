@@ -54,6 +54,7 @@ module UniqFM (
         minusUFM,
         intersectUFM,
         intersectUFM_C,
+        disjointUFM,
         foldUFM, foldUFM_Directly,
         mapUFM, mapUFM_Directly,
         elemUFM, elemUFM_Directly,
@@ -164,6 +165,7 @@ minusUFM        :: UniqFM elt1 -> UniqFM elt2 -> UniqFM elt1
 intersectUFM    :: UniqFM elt -> UniqFM elt -> UniqFM elt
 intersectUFM_C  :: (elt1 -> elt2 -> elt3)
                 -> UniqFM elt1 -> UniqFM elt2 -> UniqFM elt3
+disjointUFM     :: UniqFM elt1 -> UniqFM elt2 -> Bool
 
 foldUFM         :: (elt -> a -> a) -> a -> UniqFM elt -> a
 foldUFM_Directly:: (Unique -> elt -> a -> a) -> a -> UniqFM elt -> a
@@ -262,6 +264,7 @@ plusUFM_CD f (UFM xm) dx (UFM ym) dy
 minusUFM (UFM x) (UFM y) = UFM (M.difference x y)
 intersectUFM (UFM x) (UFM y) = UFM (M.intersection x y)
 intersectUFM_C f (UFM x) (UFM y) = UFM (M.intersectionWith f x y)
+disjointUFM (UFM x) (UFM y) = M.null (M.intersection x y)
 
 foldUFM k z (UFM m) = M.fold k z m
 foldUFM_Directly k z (UFM m) = M.foldWithKey (k . getUnique) z m

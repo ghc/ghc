@@ -117,7 +117,7 @@ data PersistentLinkerState
         -- The currently-loaded packages; always object code
         -- Held, as usual, in dependency order; though I am not sure if
         -- that is really important
-        pkgs_loaded :: ![PackageKey],
+        pkgs_loaded :: ![UnitId],
 
         -- we need to remember the name of previous temporary DLL/.so
         -- libraries so we can link them (see #10322)
@@ -138,10 +138,10 @@ emptyPLS _ = PersistentLinkerState {
   --
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
-  where init_pkgs = [rtsPackageKey]
+  where init_pkgs = [rtsUnitId]
 
 
-extendLoadedPkgs :: [PackageKey] -> IO ()
+extendLoadedPkgs :: [UnitId] -> IO ()
 extendLoadedPkgs pkgs =
   modifyPLS_ $ \s ->
       return s{ pkgs_loaded = pkgs ++ pkgs_loaded s }
@@ -540,7 +540,7 @@ getLinkDeps :: HscEnv -> HomePackageTable
             -> Maybe FilePath                   -- replace object suffices?
             -> SrcSpan                          -- for error messages
             -> [Module]                         -- If you need these
-            -> IO ([Linkable], [PackageKey])     -- ... then link these first
+            -> IO ([Linkable], [UnitId])     -- ... then link these first
 -- Fails with an IO exception if it can't find enough files
 
 getLinkDeps hsc_env hpt pls replace_osuf span mods
@@ -562,30 +562,24 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
         -- 3.  For each dependent module, find its linkable
         --     This will either be in the HPT or (in the case of one-shot
-        --     compilation) we may need to use maybe_getFileLinkable.
-        --     If the module is actually a signature, there won't be a
-        --     linkable (thus catMaybes)
+        --     compilation) we may need to use maybe_getFileLinkable
       ; let { osuf = objectSuf dflags }
-      ; lnks_needed <- fmap Maybes.catMaybes
-                     $ mapM (get_linkable osuf) mods_needed
+      ; lnks_needed <- mapM (get_linkable osuf) mods_needed
 
       ; return (lnks_needed, pkgs_needed) }
   where
     dflags = hsc_dflags hsc_env
     this_pkg = thisPackage dflags
 
-    -- | Given a list of modules @mods@, recursively discover all external
-    -- package and local module (according to @this_pkg@) dependencies.
-    --
-    -- The 'ModIface' contains the transitive closure of the module dependencies
-    -- within the current package, *except* for boot modules: if we encounter
-    -- a boot module, we have to find its real interface and discover the
-    -- dependencies of that.  Hence we need to traverse the dependency
-    -- tree recursively.  See bug #936, testcase ghci/prog007.
-    follow_deps :: [Module]                     -- modules to follow
-                -> UniqSet ModuleName           -- accum. module dependencies
-                -> UniqSet PackageKey           -- accum. package dependencies
-                -> IO ([ModuleName], [PackageKey]) -- result
+        -- The ModIface contains the transitive closure of the module dependencies
+        -- within the current package, *except* for boot modules: if we encounter
+        -- a boot module, we have to find its real interface and discover the
+        -- dependencies of that.  Hence we need to traverse the dependency
+        -- tree recursively.  See bug #936, testcase ghci/prog007.
+    follow_deps :: [Module]             -- modules to follow
+                -> UniqSet ModuleName         -- accum. module dependencies
+                -> UniqSet UnitId          -- accum. package dependencies
+                -> IO ([ModuleName], [UnitId]) -- result
     follow_deps []     acc_mods acc_pkgs
         = return (uniqSetToList acc_mods, uniqSetToList acc_pkgs)
     follow_deps (mod:mods) acc_mods acc_pkgs
@@ -599,7 +593,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
           when (mi_boot iface) $ link_boot_mod_error mod
 
           let
-            pkg = modulePackageKey mod
+            pkg = moduleUnitId mod
             deps  = mi_deps iface
 
             pkg_deps = dep_pkgs deps
@@ -607,7 +601,6 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
                     where is_boot (m,True)  = Left m
                           is_boot (m,False) = Right m
 
-            -- Boot module dependencies which must be processed recursively
             boot_deps' = filter (not . (`elementOfUniqSet` acc_mods)) boot_deps
             acc_mods'  = addListToUniqSet acc_mods (moduleName mod : mod_deps)
             acc_pkgs'  = addListToUniqSet acc_pkgs $ map fst pkg_deps
@@ -638,37 +631,30 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
     get_linkable osuf mod_name      -- A home-package module
         | Just mod_info <- lookupUFM hpt mod_name
-        = adjust_linkable (hm_iface mod_info)
-            (Maybes.expectJust "getLinkDeps" (hm_linkable mod_info))
+        = adjust_linkable (Maybes.expectJust "getLinkDeps" (hm_linkable mod_info))
         | otherwise
         = do    -- It's not in the HPT because we are in one shot mode,
                 -- so use the Finder to get a ModLocation...
-                -- ezyang: I don't actually know how to trigger this codepath,
-                -- seeing as this is GHCi logic. Template Haskell, maybe?
              mb_stuff <- findHomeModule hsc_env mod_name
              case mb_stuff of
-                  FoundExact loc mod -> found loc mod
+                  Found loc mod -> found loc mod
                   _ -> no_obj mod_name
         where
             found loc mod = do {
                 -- ...and then find the linkable for it
                mb_lnk <- findObjectLinkableMaybe mod loc ;
-               iface <- initIfaceCheck hsc_env $
-                            loadUserInterface False (text "getLinkDeps2") mod ;
                case mb_lnk of {
                   Nothing  -> no_obj mod ;
-                  Just lnk -> adjust_linkable iface lnk
+                  Just lnk -> adjust_linkable lnk
               }}
 
-            adjust_linkable iface lnk
-                -- Signatures have no linkables! Don't return one.
-                | mi_hsc_src iface == HsigFile = return Nothing
+            adjust_linkable lnk
                 | Just new_osuf <- replace_osuf = do
                         new_uls <- mapM (adjust_ul new_osuf)
                                         (linkableUnlinked lnk)
-                        return (Just lnk{ linkableUnlinked=new_uls })
+                        return lnk{ linkableUnlinked=new_uls }
                 | otherwise =
-                        return (Just lnk)
+                        return lnk
 
             adjust_ul new_osuf (DotO file) = do
                 MASSERT(osuf `isSuffixOf` file)
@@ -1073,7 +1059,7 @@ showLS (Framework nm) = "(framework) " ++ nm
 -- automatically, and it doesn't matter what order you specify the input
 -- packages.
 --
-linkPackages :: DynFlags -> [PackageKey] -> IO ()
+linkPackages :: DynFlags -> [UnitId] -> IO ()
 -- NOTE: in fact, since each module tracks all the packages it depends on,
 --       we don't really need to use the package-config dependencies.
 --
@@ -1089,13 +1075,13 @@ linkPackages dflags new_pkgs = do
   modifyPLS_ $ \pls -> do
     linkPackages' dflags new_pkgs pls
 
-linkPackages' :: DynFlags -> [PackageKey] -> PersistentLinkerState
+linkPackages' :: DynFlags -> [UnitId] -> PersistentLinkerState
              -> IO PersistentLinkerState
 linkPackages' dflags new_pks pls = do
     pkgs' <- link (pkgs_loaded pls) new_pks
     return $! pls { pkgs_loaded = pkgs' }
   where
-     link :: [PackageKey] -> [PackageKey] -> IO [PackageKey]
+     link :: [UnitId] -> [UnitId] -> IO [UnitId]
      link pkgs new_pkgs =
          foldM link_one pkgs new_pkgs
 
@@ -1105,14 +1091,13 @@ linkPackages' dflags new_pks pls = do
 
         | Just pkg_cfg <- lookupPackage dflags new_pkg
         = do {  -- Link dependents first
-               pkgs' <- link pkgs [ resolveInstalledPackageId dflags ipid
-                                  | ipid <- depends pkg_cfg ]
+               pkgs' <- link pkgs (depends pkg_cfg)
                 -- Now link the package itself
              ; linkPackage dflags pkg_cfg
              ; return (new_pkg : pkgs') }
 
         | otherwise
-        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ packageKeyString new_pkg))
+        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unitIdString new_pkg))
 
 
 linkPackage :: DynFlags -> PackageConfig -> IO ()
@@ -1214,7 +1199,7 @@ locateLib dflags is_hs dirs lib
     --       for a dynamic library (#5289)
     --   otherwise, assume loadDLL can find it
     --
-  = findDll `orElse` findArchive `orElse` tryGcc `orElse` assumeDll
+  = findDll `orElse` findArchive `orElse` tryGcc `orElse` tryGccPrefixed `orElse` assumeDll
 
   | not dynamicGhc
     -- When the GHC package was not compiled as dynamic library
@@ -1235,6 +1220,7 @@ locateLib dflags is_hs dirs lib
      hs_dyn_lib_file = mkHsSOName platform hs_dyn_lib_name
 
      so_name = mkSOName platform lib
+     lib_so_name = "lib" ++ so_name
      dyn_lib_file = case (arch, os) of
                              (ArchX86_64, OSSolaris2) -> "64" </> so_name
                              _ -> so_name
@@ -1244,7 +1230,8 @@ locateLib dflags is_hs dirs lib
      findArchive    = liftM (fmap Archive) $ findFile dirs arch_file
      findHSDll      = liftM (fmap DLLPath) $ findFile dirs hs_dyn_lib_file
      findDll        = liftM (fmap DLLPath) $ findFile dirs dyn_lib_file
-     tryGcc         = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags so_name dirs
+     tryGcc         = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags so_name     dirs
+     tryGccPrefixed = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags lib_so_name dirs
 
      assumeDll   = return (DLL lib)
      infixr `orElse`
@@ -1256,7 +1243,9 @@ locateLib dflags is_hs dirs lib
 
 searchForLibUsingGcc :: DynFlags -> String -> [FilePath] -> IO (Maybe FilePath)
 searchForLibUsingGcc dflags so dirs = do
-   str <- askCc dflags (map (FileOption "-L") dirs
+   -- GCC does not seem to extend the library search path (using -L) when using
+   -- --print-file-name. So instead pass it a new base location.
+   str <- askCc dflags (map (FileOption "-B") dirs
                           ++ [Option "--print-file-name", Option so])
    let file = case lines str of
                 []  -> ""

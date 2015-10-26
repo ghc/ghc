@@ -51,12 +51,12 @@ module IdInfo (
         InsideLam, OneBranch,
         insideLam, notInsideLam, oneBranch, notOneBranch,
 
-        -- ** The SpecInfo type
-        SpecInfo(..),
-        emptySpecInfo,
-        isEmptySpecInfo, specInfoFreeVars,
-        specInfoRules, setSpecInfoHead,
-        specInfo, setSpecInfo,
+        -- ** The RuleInfo type
+        RuleInfo(..),
+        emptyRuleInfo,
+        isEmptyRuleInfo, ruleInfoFreeVars,
+        ruleInfoRules, setRuleInfoHead,
+        ruleInfo, setRuleInfo,
 
         -- ** The CAFInfo type
         CafInfo(..),
@@ -83,7 +83,7 @@ import FastString
 import Demand
 
 -- infixl so you can say (id `set` a `set` b)
-infixl  1 `setSpecInfo`,
+infixl  1 `setRuleInfo`,
           `setArityInfo`,
           `setInlinePragInfo`,
           `setUnfoldingInfo`,
@@ -122,7 +122,8 @@ data IdDetails
                                 --  b) when desugaring a RecordCon we can get
                                 --     from the Id back to the data con]
 
-  | ClassOpId Class             -- ^ The 'Id' is a superclass selector or class operation of a class
+  | ClassOpId Class             -- ^ The 'Id' is a superclass selector,
+                                -- or class operation of a class
 
   | PrimOpId PrimOp             -- ^ The 'Id' is for a primitive operator
   | FCallId ForeignCall         -- ^ The 'Id' is for a foreign call
@@ -133,6 +134,19 @@ data IdDetails
        -- Bool = True <=> the class has only one method, so may be
        --                  implemented with a newtype, so it might be bad
        --                  to be strict on this dictionary
+
+  -- The rest are distinguished only for debugging reasons
+  -- e.g. to suppress them in -ddump-types
+  -- Currently we don't persist these through interface file
+  -- (see MkIface.toIfaceIdDetails), but we easily could if it mattered
+
+  | DefMethId                   -- ^ A default-method Id, either polymorphic or generic
+
+  | ReflectionId                -- ^ A top-level Id to support runtime reflection
+                                -- e.g. $trModule, or $tcT
+
+  | PatSynId                    -- ^ A top-level Id to support pattern synonyms;
+                                -- the builder or matcher for the patern synonym
 
 coVarDetails :: IdDetails
 coVarDetails = VanillaId
@@ -145,6 +159,9 @@ pprIdDetails VanillaId = empty
 pprIdDetails other     = brackets (pp other)
  where
    pp VanillaId         = panic "pprIdDetails"
+   pp DefMethId         = ptext (sLit "DefMethId")
+   pp ReflectionId      = ptext (sLit "ReflectionId")
+   pp PatSynId          = ptext (sLit "PatSynId")
    pp (DataConWorkId _) = ptext (sLit "DataCon")
    pp (DataConWrapId _) = ptext (sLit "DataConWrapper")
    pp (ClassOpId {})    = ptext (sLit "ClassOp")
@@ -178,7 +195,7 @@ pprIdDetails other     = brackets (pp other)
 data IdInfo
   = IdInfo {
         arityInfo       :: !ArityInfo,          -- ^ 'Id' arity
-        specInfo        :: SpecInfo,            -- ^ Specialisations of the 'Id's function which exist
+        ruleInfo        :: RuleInfo,            -- ^ Specialisations of the 'Id's function which exist
                                                 -- See Note [Specialisations and RULES in IdInfo]
         unfoldingInfo   :: Unfolding,           -- ^ The 'Id's unfolding
         cafInfo         :: CafInfo,             -- ^ 'Id' CAF info
@@ -195,8 +212,8 @@ data IdInfo
 
 -- Setters
 
-setSpecInfo :: IdInfo -> SpecInfo -> IdInfo
-setSpecInfo       info sp = sp `seq` info { specInfo = sp }
+setRuleInfo :: IdInfo -> RuleInfo -> IdInfo
+setRuleInfo       info sp = sp `seq` info { ruleInfo = sp }
 setInlinePragInfo :: IdInfo -> InlinePragma -> IdInfo
 setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
 setOccInfo :: IdInfo -> OccInfo -> IdInfo
@@ -238,7 +255,7 @@ vanillaIdInfo
   = IdInfo {
             cafInfo             = vanillaCafInfo,
             arityInfo           = unknownArity,
-            specInfo            = emptySpecInfo,
+            ruleInfo            = emptyRuleInfo,
             unfoldingInfo       = noUnfolding,
             oneShotInfo         = NoOneShotInfo,
             inlinePragInfo      = defaultInlinePragma,
@@ -316,13 +333,13 @@ pprStrictness sig = ppr sig
 {-
 ************************************************************************
 *                                                                      *
-        SpecInfo
+        RuleInfo
 *                                                                      *
 ************************************************************************
 
 Note [Specialisations and RULES in IdInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Generally speaking, a GlobalIdshas an *empty* SpecInfo.  All their
+Generally speaking, a GlobalIdshas an *empty* RuleInfo.  All their
 RULES are contained in the globally-built rule-base.  In principle,
 one could attach the to M.f the RULES for M.f that are defined in M.
 But we don't do that for instance declarations and so we just treat
@@ -331,7 +348,7 @@ them all uniformly.
 The EXCEPTION is PrimOpIds, which do have rules in their IdInfo. That is
 jsut for convenience really.
 
-However, LocalIds may have non-empty SpecInfo.  We treat them
+However, LocalIds may have non-empty RuleInfo.  We treat them
 differently because:
   a) they might be nested, in which case a global table won't work
   b) the RULE might mention free variables, which we use to keep things alive
@@ -342,8 +359,8 @@ and put in the global list.
 
 -- | Records the specializations of this 'Id' that we know about
 -- in the form of rewrite 'CoreRule's that target them
-data SpecInfo
-  = SpecInfo
+data RuleInfo
+  = RuleInfo
         [CoreRule]
         VarSet          -- Locally-defined free vars of *both* LHS and RHS
                         -- of rules.  I don't think it needs to include the
@@ -351,24 +368,24 @@ data SpecInfo
                         -- Note [Rule dependency info] in OccurAnal
 
 -- | Assume that no specilizations exist: always safe
-emptySpecInfo :: SpecInfo
-emptySpecInfo = SpecInfo [] emptyVarSet
+emptyRuleInfo :: RuleInfo
+emptyRuleInfo = RuleInfo [] emptyVarSet
 
-isEmptySpecInfo :: SpecInfo -> Bool
-isEmptySpecInfo (SpecInfo rs _) = null rs
+isEmptyRuleInfo :: RuleInfo -> Bool
+isEmptyRuleInfo (RuleInfo rs _) = null rs
 
 -- | Retrieve the locally-defined free variables of both the left and
 -- right hand sides of the specialization rules
-specInfoFreeVars :: SpecInfo -> VarSet
-specInfoFreeVars (SpecInfo _ fvs) = fvs
+ruleInfoFreeVars :: RuleInfo -> VarSet
+ruleInfoFreeVars (RuleInfo _ fvs) = fvs
 
-specInfoRules :: SpecInfo -> [CoreRule]
-specInfoRules (SpecInfo rules _) = rules
+ruleInfoRules :: RuleInfo -> [CoreRule]
+ruleInfoRules (RuleInfo rules _) = rules
 
 -- | Change the name of the function the rule is keyed on on all of the 'CoreRule's
-setSpecInfoHead :: Name -> SpecInfo -> SpecInfo
-setSpecInfoHead fn (SpecInfo rules fvs)
-  = SpecInfo (map (setRuleIdName fn) rules) fvs
+setRuleInfoHead :: Name -> RuleInfo -> RuleInfo
+setRuleInfoHead fn (RuleInfo rules fvs)
+  = RuleInfo (map (setRuleIdName fn) rules) fvs
 
 {-
 ************************************************************************
@@ -450,7 +467,7 @@ zapUsageInfo info = Just (info {demandInfo = zapUsageDemand (demandInfo info)})
 zapFragileInfo :: IdInfo -> Maybe IdInfo
 -- ^ Zap info that depends on free variables
 zapFragileInfo info
-  = Just (info `setSpecInfo` emptySpecInfo
+  = Just (info `setRuleInfo` emptyRuleInfo
                `setUnfoldingInfo` noUnfolding
                `setOccInfo` zapFragileOcc occ)
   where

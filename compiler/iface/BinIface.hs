@@ -23,9 +23,9 @@ module BinIface (
 import TcRnMonad
 import TyCon
 import ConLike
-import DataCon    (dataConName, dataConWorkId, dataConTyCon)
+import DataCon    ( dataConName, dataConWorkId, dataConTyCon )
 import PrelInfo   ( knownKeyNames )
-import Id         (idName, isDataConWorkId_maybe)
+import Id         ( idName, isDataConWorkId_maybe )
 import TysWiredIn
 import IfaceEnv
 import HscTypes
@@ -260,7 +260,7 @@ getSymbolTable bh ncu = do
                 mapAccumR (fromOnDiskName arr) namecache od_names
         in (namecache', arr)
 
-type OnDiskName = (PackageKey, ModuleName, OccName)
+type OnDiskName = (UnitId, ModuleName, OccName)
 
 fromOnDiskName :: Array Int Name -> NameCache -> OnDiskName -> (NameCache, Name)
 fromOnDiskName _ nc (pid, mod_name, occ) =
@@ -277,7 +277,7 @@ fromOnDiskName _ nc (pid, mod_name, occ) =
 serialiseName :: BinHandle -> Name -> UniqFM (Int,Name) -> IO ()
 serialiseName bh name _ = do
     let mod = ASSERT2( isExternalName name, ppr name ) nameModule name
-    put_ bh (modulePackageKey mod, moduleName mod, nameOccName name)
+    put_ bh (moduleUnitId mod, moduleName mod, nameOccName name)
 
 
 -- Note [Symbol table representation of names]
@@ -303,7 +303,6 @@ serialiseName bh name _ = do
 
 knownKeyNamesMap :: UniqFM Name
 knownKeyNamesMap = listToUFM_Directly [(nameUnique n, n) | n <- knownKeyNames]
-
 
 -- See Note [Symbol table representation of names]
 putName :: BinDictionary -> BinSymbolTable -> BinHandle -> Name -> IO ()

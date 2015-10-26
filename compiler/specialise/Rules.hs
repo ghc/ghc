@@ -16,8 +16,8 @@ module Rules (
         -- ** Checking rule applications
         ruleCheckProgram,
 
-        -- ** Manipulating 'SpecInfo' rules
-        mkSpecInfo, extendSpecInfo, addSpecInfo,
+        -- ** Manipulating 'RuleInfo' rules
+        mkRuleInfo, extendRuleInfo, addRuleInfo,
         addIdSpecialisations,
 
         -- * Misc. CoreRule helpers
@@ -43,7 +43,7 @@ import TysPrim          ( anyTypeOfKind )
 import Coercion
 import CoreTidy         ( tidyRules )
 import Id
-import IdInfo           ( SpecInfo( SpecInfo ) )
+import IdInfo           ( RuleInfo( RuleInfo ) )
 import Var
 import VarEnv
 import VarSet
@@ -180,7 +180,6 @@ mkRule this_mod is_auto is_local name act fn bndrs args rhs
         -- A rule is an orphan only if none of the variables
         -- mentioned on its left-hand side are locally defined
     lhs_names = nameSetElems (extendNameSet (exprsOrphNames args) fn)
-        -- TODO: copied from ruleLhsOrphNames
 
         -- Since rules get eventually attached to one of the free names
         -- from the definition when compiling the ABI hash, we should make
@@ -268,30 +267,30 @@ pprRulesForUser rules
 {-
 ************************************************************************
 *                                                                      *
-                SpecInfo: the rules in an IdInfo
+                RuleInfo: the rules in an IdInfo
 *                                                                      *
 ************************************************************************
 -}
 
--- | Make a 'SpecInfo' containing a number of 'CoreRule's, suitable
+-- | Make a 'RuleInfo' containing a number of 'CoreRule's, suitable
 -- for putting into an 'IdInfo'
-mkSpecInfo :: [CoreRule] -> SpecInfo
-mkSpecInfo rules = SpecInfo rules (rulesFreeVars rules)
+mkRuleInfo :: [CoreRule] -> RuleInfo
+mkRuleInfo rules = RuleInfo rules (rulesFreeVars rules)
 
-extendSpecInfo :: SpecInfo -> [CoreRule] -> SpecInfo
-extendSpecInfo (SpecInfo rs1 fvs1) rs2
-  = SpecInfo (rs2 ++ rs1) (rulesFreeVars rs2 `unionVarSet` fvs1)
+extendRuleInfo :: RuleInfo -> [CoreRule] -> RuleInfo
+extendRuleInfo (RuleInfo rs1 fvs1) rs2
+  = RuleInfo (rs2 ++ rs1) (rulesFreeVars rs2 `unionVarSet` fvs1)
 
-addSpecInfo :: SpecInfo -> SpecInfo -> SpecInfo
-addSpecInfo (SpecInfo rs1 fvs1) (SpecInfo rs2 fvs2)
-  = SpecInfo (rs1 ++ rs2) (fvs1 `unionVarSet` fvs2)
+addRuleInfo :: RuleInfo -> RuleInfo -> RuleInfo
+addRuleInfo (RuleInfo rs1 fvs1) (RuleInfo rs2 fvs2)
+  = RuleInfo (rs1 ++ rs2) (fvs1 `unionVarSet` fvs2)
 
 addIdSpecialisations :: Id -> [CoreRule] -> Id
 addIdSpecialisations id []
   = id
 addIdSpecialisations id rules
   = setIdSpecialisation id $
-    extendSpecInfo (idSpecialisation id) rules
+    extendRuleInfo (idSpecialisation id) rules
 
 -- | Gather all the rules for locally bound identifiers from the supplied bindings
 rulesOfBinds :: [CoreBind] -> [CoreRule]

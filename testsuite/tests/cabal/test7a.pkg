@@ -1,7 +1,7 @@
 name: testpkg7a
 version: 1.0
 id: testpkg7a-1.0-XXX
-key: testpkg7a-1.0
+key: testpkg7a-1.0-XXX
 license: BSD3
 copyright: (c) The Univsersity of Glasgow 2004
 maintainer: glasgow-haskell-users@haskell.org
@@ -13,5 +13,5 @@ category: none
 author: simonmar@microsoft.com
 exposed: True
 exposed-modules: E, A from testpkg-1.2.3.4-XXX:A, A1 from testpkg-1.2.3.4-XXX:A, E2 from testpkg7a-1.0-XXX:E
-hs-libraries: testpkg7a-1.0
+hs-libraries: testpkg7a-1.0-XXX
 depends: testpkg-1.2.3.4-XXX

@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash, ImplicitParams #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -23,22 +23,23 @@
 
 module GHC.Err( absentErr, error, undefined ) where
 import GHC.CString ()
-import GHC.Types
+import GHC.Types (Char)
+import GHC.Stack.Types
 import GHC.Prim
 import GHC.Integer ()   -- Make sure Integer is compiled first
                         -- because GHC depends on it in a wired-in way
                         -- so the build system doesn't see the dependency
-import {-# SOURCE #-} GHC.Exception( errorCallException )
+import {-# SOURCE #-} GHC.Exception( errorCallWithCallStackException )
 
 -- | 'error' stops execution and displays an error message.
-error :: [Char] -> a
-error s = raise# (errorCallException s)
+error :: (?callStack :: CallStack) => [Char] -> a
+error s = raise# (errorCallWithCallStackException s ?callStack)
 
 -- | A special case of 'error'.
 -- It is expected that compilers will recognize this and insert error
 -- messages which are more appropriate to the context in which 'undefined'
 -- appears.
-undefined :: a
+undefined :: (?callStack :: CallStack) => a
 undefined =  error "Prelude.undefined"
 
 -- | Used for compiler-generated error message;

@@ -274,7 +274,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         nto-qnx)
             test -z "[$]2" || eval "[$]2=OSQNXNTO"
             ;;
-        dragonfly|osf1|hpux|linuxaout|freebsd2|cygwin32|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix)
+        dragonfly|osf1|hpux|linuxaout|freebsd2|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix)
             test -z "[$]2" || eval "[$]2=OSUnknown"
             ;;
         linux-android)
@@ -568,10 +568,18 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $3="$$3 -D_HPUX_SOURCE"
         $5="$$5 -D_HPUX_SOURCE"
         ;;
-    arm*linux*       | \
-    aarch64*linux*   )
-        # On arm/linux, aarch64/linux, arm/android and aarch64/android, tell
-        # gcc to link using the gold linker.
+    arm*linux*)
+        # On arm/linux and arm/android, tell gcc to generate Arm
+        # instructions (ie not Thumb) and to link using the gold linker.
+        # Forcing LD to be ld.gold is done in FIND_LD m4 macro.
+        $2="$$2 -marm"
+        $3="$$3 -fuse-ld=gold -Wl,-z,noexecstack"
+        $4="$$4 -z noexecstack"
+        ;;
+
+    aarch64*linux*)
+        # On aarch64/linux and aarch64/android, tell gcc to link using the
+        # gold linker.
         # Forcing LD to be ld.gold is done in FIND_LD m4 macro.
         $3="$$3 -fuse-ld=gold -Wl,-z,noexecstack"
         $4="$$4 -z noexecstack"
@@ -588,21 +596,6 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
 
     rm -f conftest.c conftest.o
     AC_MSG_RESULT([done])
-])
-
-
-AC_DEFUN([FP_PATH_PROG],[
-    AC_PATH_PROG($1,$2,$3,$4,$5,$6)
-    # If we have a cygwin path for something, and we try to run it
-    # from cabal or python, then it'll fail. So we convert to a
-    # native path.
-    if test "$HostOS"     = "mingw32" && \
-       test "${OSTYPE}"  != "msys"    && \
-       test "${$1}" != ""
-    then
-        # Canonicalise to <drive>:/path/to/gcc
-        $1=`cygpath -m "${$1}"`
-    fi
 ])
 
 
@@ -798,9 +791,6 @@ AC_DEFUN([FP_LEADING_UNDERSCORE],
 AC_CACHE_CHECK([leading underscore in symbol names], [fptools_cv_leading_underscore], [
 # Hack!: nlist() under Digital UNIX insist on there being an _,
 # but symbol table listings shows none. What is going on here?!?
-#
-# Another hack: cygwin doesn't come with nlist.h , so we hardwire
-# the underscoredness of that "platform"
 case $HostPlatform in
 *openbsd*) # x86 openbsd is ELF from 3.4 >, meaning no leading uscore
   case $build in
@@ -808,7 +798,6 @@ case $HostPlatform in
     *) fptools_cv_leading_underscore=no ;;
   esac ;;
 alpha-dec-osf*) fptools_cv_leading_underscore=no;;
-*cygwin32) fptools_cv_leading_underscore=yes;;
 i386-unknown-mingw32) fptools_cv_leading_underscore=yes;;
 x86_64-unknown-mingw32) fptools_cv_leading_underscore=no;;
 
@@ -879,7 +868,7 @@ dnl If you increase the minimum version requirement, please also update:
 dnl https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Tools
 dnl
 AC_DEFUN([FPTOOLS_HAPPY],
-[FP_PATH_PROG(HappyCmd,happy,)
+[AC_PATH_PROG(HappyCmd,happy,)
 
 AC_CACHE_CHECK([for version of happy], fptools_cv_happy_version,
 changequote(, )dnl
@@ -907,7 +896,7 @@ dnl https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Tools
 dnl
 AC_DEFUN([FPTOOLS_ALEX],
 [
-FP_PATH_PROG(AlexCmd,alex,)
+AC_PATH_PROG(AlexCmd,alex,)
 
 AC_CACHE_CHECK([for version of alex], fptools_cv_alex_version,
 changequote(, )dnl
@@ -1051,9 +1040,9 @@ AC_SUBST([LdHasFilelist])
 
 # FP_PROG_AR
 # ----------
-# Sets fp_prog_ar to a (non-Cygwin) path to ar. Exits if no ar can be found
+# Sets fp_prog_ar to a path to ar. Exits if no ar can be found
 AC_DEFUN([FP_PROG_AR],
-[FP_PATH_PROG([fp_prog_ar], [ar])
+[AC_PATH_PROG([fp_prog_ar], [ar])
 if test -z "$fp_prog_ar"; then
   AC_MSG_ERROR([cannot find ar in your PATH, no idea how to make a library])
 fi
@@ -1105,7 +1094,7 @@ AC_SUBST([ArSupportsAtFile], [`echo $fp_prog_ar_supports_atfile | tr 'a-z' 'A-Z'
 # FP_PROG_AR_ARGS
 # ---------------
 # Sets fp_prog_ar_args to the arguments for ar and the output variable ArCmd
-# to a non-Cygwin invocation of ar including these arguments.
+# to an invocation of ar including these arguments.
 AC_DEFUN([FP_PROG_AR_ARGS],
 [AC_REQUIRE([FP_PROG_AR_IS_GNU])
 AC_CACHE_CHECK([for ar arguments], [fp_cv_prog_ar_args],
@@ -1281,15 +1270,6 @@ echo foo > conftest.txt
 $fp_prog_find conftest.txt -print > conftest.out 2>&1
 if grep '^conftest.txt$' conftest.out > /dev/null 2>&1 ; then
   # OK, looks like a real "find".
-  case $HostPlatform in
-    *mingw32)
-      if test x${OSTYPE} != xmsys
-      then
-        fp_prog_find="`cygpath --mixed ${fp_prog_find}`"
-        AC_MSG_NOTICE([normalized find command to $fp_prog_find])
-      fi ;;
-    *) ;;
-  esac
   FindCmd="$fp_prog_find"
 else
   # Found a poor WinDoze version of "find", ignore it.
@@ -1401,124 +1381,6 @@ AS_IF([test AS_VAR_GET(fp_func) = yes],
 AS_VAR_POPDEF([fp_func])dnl
 ])# FP_CHECK_FUNC
 
-
-# FP_GEN_DOCBOOK_XML
-# ------------------
-# Generates a DocBook XML V4.5 document in conftest.xml.
-#
-# It took a lot of experimentation to find a document that will cause
-# xsltproc to fail with an error code when the relevant
-# stylesheets/DTDs are not found.  I couldn't make xsltproc fail with
-# a single-file document, it seems a multi-file document is needed.
-# -- SDM 2009-06-03
-#
-AC_DEFUN([FP_GEN_DOCBOOK_XML],
-[rm -f conftest.xml conftest-book.xml
-cat > conftest.xml << EOF
-<?xml version="1.0" encoding="iso-8859-1"?>
-<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
-   "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd" [[
-<!ENTITY conftest-book SYSTEM "conftest-book.xml">
-]]>
-<book id="test">
-&conftest-book;
-</book>
-EOF
-cat >conftest-book.xml << EOF
-<?xml version="1.0" encoding="iso-8859-1"?>
-  <title>A DocBook &ldquo;Test Document&rdquo;</title>
-  <chapter id="id-one">
-    <title>A Chapter Title</title>
-    <para>This is a paragraph, referencing <xref linkend="id-two"/>.</para>
-  </chapter>
-  <chapter id="id-two">
-    <title>Another Chapter Title</title>
-    <para>This is another paragraph, referencing <xref linkend="id-one"/>.</para>
-  </chapter>
-EOF
-]) # FP_GEN_DOCBOOK_XML
-
-
-# FP_PROG_DBLATEX
-# ----------------
-# Sets the output variable DblatexCmd to the full path of dblatex,
-# which we use for building PDF and PS docs.
-# DblatexCmd is empty if dblatex could not be found.
-AC_DEFUN([FP_PROG_DBLATEX],
-[FP_PATH_PROG([DblatexCmd], [dblatex])
-if test -z "$DblatexCmd"; then
-  AC_MSG_WARN([cannot find dblatex in your PATH, you will not be able to build the PDF and PS documentation])
-fi
-])# FP_PROG_DBLATEX
-
-
-# FP_PROG_XSLTPROC
-# ----------------
-# Sets the output variable XsltprocCmd to the full path of the XSLT processor
-# xsltproc. XsltprocCmd is empty if xsltproc could not be found.
-AC_DEFUN([FP_PROG_XSLTPROC],
-[FP_PATH_PROG([XsltprocCmd], [xsltproc])
-if test -z "$XsltprocCmd"; then
-  AC_MSG_WARN([cannot find xsltproc in your PATH, you will not be able to build the HTML documentation])
-fi
-])# FP_PROG_XSLTPROC
-
-
-# FP_DOCBOOK_XSL
-# ----------------------------
-# Check that we can process a DocBook XML document to HTML using xsltproc.
-AC_DEFUN([FP_DOCBOOK_XSL],
-[AC_REQUIRE([FP_PROG_XSLTPROC])dnl
-if test -n "$XsltprocCmd"; then
-  AC_CACHE_CHECK([for DocBook XSL stylesheet], fp_cv_dir_docbook_xsl,
-  [FP_GEN_DOCBOOK_XML
-  fp_cv_dir_docbook_xsl=no
-  if $XsltprocCmd --nonet http://docbook.sourceforge.net/release/xsl/current/html/chunk.xsl conftest.xml > /dev/null 2>&1; then
-     fp_cv_dir_docbook_xsl=yes
-  fi
-  rm -rf conftest*])
-fi
-if test x"$fp_cv_dir_docbook_xsl" = xno; then
-  AC_MSG_WARN([cannot find DocBook XSL stylesheets, you will not be able to build the documentation])
-  HAVE_DOCBOOK_XSL=NO
-else
-  HAVE_DOCBOOK_XSL=YES
-fi
-AC_SUBST([HAVE_DOCBOOK_XSL])
-])# FP_DOCBOOK_XSL
-
-
-# FP_PROG_XMLLINT
-# ----------------
-# Sets the output variable XmllintCmd to the full path of the XSLT processor
-# xmllint. XmllintCmd is empty if xmllint could not be found.
-AC_DEFUN([FP_PROG_XMLLINT],
-[FP_PATH_PROG([XmllintCmd], [xmllint])
-if test -z "$XmllintCmd"; then
-  AC_MSG_WARN([cannot find xmllint in your PATH, you will not be able to validate your documentation])
-fi
-])# FP_PROG_XMLLINT
-
-
-# FP_CHECK_DOCBOOK_DTD
-# --------------------
-AC_DEFUN([FP_CHECK_DOCBOOK_DTD],
-[AC_REQUIRE([FP_PROG_XMLLINT])dnl
-if test -n "$XmllintCmd"; then
-  AC_MSG_CHECKING([for DocBook DTD])
-  FP_GEN_DOCBOOK_XML
-  if $XmllintCmd --nonet --valid --noout conftest.xml ; then
-    AC_MSG_RESULT([ok])
-  else
-    AC_MSG_RESULT([failed])
-    AC_MSG_WARN([cannot find a DTD for DocBook XML V4.5, you will not be able to validate your documentation])
-    AC_MSG_WARN([check your XML_CATALOG_FILES environment variable and/or /etc/xml/catalog])
-  fi
-  rm -rf conftest*
-fi
-])# FP_CHECK_DOCBOOK_DTD
-
-
 # FP_PROG_GHC_PKG
 # ----------------
 # Try to find a ghc-pkg matching the ghc mentioned in the environment variable
@@ -1531,7 +1393,7 @@ AC_DEFUN([FP_PROG_GHC_PKG],
 # so we sed off -stage[0-9]$. However, if we are told to use
 # ghc-6.12.1 then we want to use ghc-pkg-6.12.1, so we keep any
 # other suffix.
-fp_ghc_pkg_guess=`echo $WithGhc | sed -e 's/-stage@<:@0-9@:>@$//' -e 's,ghc\(@<:@^/\\@:>@*\)$,ghc-pkg\1,'`
+fp_ghc_pkg_guess=`echo "$WithGhc" | sed -e 's/-stage@<:@0-9@:>@$//' -e 's,ghc\(@<:@^/\\@:>@*\)$,ghc-pkg\1,'`
 if "$fp_ghc_pkg_guess" list > /dev/null 2>&1; then
   fp_cv_matching_ghc_pkg=$fp_ghc_pkg_guess
 else
@@ -1999,7 +1861,7 @@ case "$1-$2" in
         $3="linux"
         ;;
       # As far as I'm aware, none of these have relevant variants
-      freebsd|netbsd|openbsd|dragonfly|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|cygwin32|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)
+      freebsd|netbsd|openbsd|dragonfly|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)
         $3="$1"
         ;;
       freebsd*) # like i686-gentoo-freebsd7

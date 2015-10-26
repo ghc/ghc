@@ -85,11 +85,11 @@ instance Functor CvtM where
     fmap = liftM
 
 instance Applicative CvtM where
-    pure = return
+    pure x = CvtM $ \loc -> Right (loc,x)
     (<*>) = ap
 
 instance Monad CvtM where
-  return x       = CvtM $ \loc -> Right (loc,x)
+  return = pure
   (CvtM m) >>= k = CvtM $ \loc -> case m loc of
                                   Left err -> Left err
                                   Right (loc',v) -> unCvtM (k v) loc'
@@ -257,14 +257,11 @@ cvtDec (ForeignD ford)
   = do { ford' <- cvtForD ford
        ; returnJustL $ ForD ford' }
 
-cvtDec (FamilyD flav tc tvs kind)
+cvtDec (DataFamilyD tc tvs kind)
   = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
-       ; kind' <- cvtMaybeKind kind
+       ; result <- cvtMaybeKindToFamilyResultSig kind
        ; returnJustL $ TyClD $ FamDecl $
-         FamilyDecl (cvtFamFlavour flav) tc' tvs' kind' }
-  where
-    cvtFamFlavour TypeFam = OpenTypeFamily
-    cvtFamFlavour DataFam = DataFamily
+         FamilyDecl DataFamily tc' tvs' result Nothing }
 
 cvtDec (DataInstD ctxt tc tys constrs derivs)
   = do { (ctxt', tc', typats') <- cvt_tyinst_hdr ctxt tc tys
@@ -300,12 +297,21 @@ cvtDec (TySynInstD tc eqn)
             { tfid_inst = TyFamInstDecl { tfid_eqn = eqn'
                                         , tfid_fvs = placeHolderNames } } }
 
-cvtDec (ClosedTypeFamilyD tc tyvars mkind eqns)
-  = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tyvars
-       ; mkind' <- cvtMaybeKind mkind
-       ; eqns' <- mapM (cvtTySynEqn tc') eqns
+cvtDec (OpenTypeFamilyD tc tvs result injectivity)
+  = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
+       ; result' <- cvtFamilyResultSig result
+       ; injectivity' <- traverse cvtInjectivityAnnotation injectivity
        ; returnJustL $ TyClD $ FamDecl $
-         FamilyDecl (ClosedTypeFamily (Just eqns')) tc' tvs' mkind' }
+         FamilyDecl OpenTypeFamily tc' tvs' result' injectivity' }
+
+cvtDec (ClosedTypeFamilyD tc tyvars result injectivity eqns)
+  = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tyvars
+       ; result' <- cvtFamilyResultSig result
+       ; eqns' <- mapM (cvtTySynEqn tc') eqns
+       ; injectivity' <- traverse cvtInjectivityAnnotation injectivity
+       ; returnJustL $ TyClD $ FamDecl $
+         FamilyDecl (ClosedTypeFamily (Just eqns')) tc' tvs' result'
+                                      injectivity' }
 
 cvtDec (TH.RoleAnnotD tc roles)
   = do { tc' <- tconNameL tc
@@ -452,7 +458,7 @@ cvt_id_arg :: (TH.Name, TH.Strict, TH.Type) -> CvtM (LConDeclField RdrName)
 cvt_id_arg (i, str, ty)
   = do  { i' <- vNameL i
         ; ty' <- cvt_arg (str,ty)
-        ; return $ noLoc (ConDeclField { cd_fld_names = [i']
+        ; return $ noLoc (ConDeclField { cd_fld_names = [fmap (flip FieldOcc PlaceHolder) i']
                                        , cd_fld_type =  ty'
                                        , cd_fld_doc = Nothing}) }
 
@@ -713,12 +719,14 @@ cvtl e = wrapL (cvt e)
     cvt (SigE e t)       = do { e' <- cvtl e; t' <- cvtType t
                               ; return $ ExprWithTySig e' (mkLHsSigWcType t') }
     cvt (RecConE c flds) = do { c' <- cNameL c
-                              ; flds' <- mapM cvtFld flds
+                              ; flds' <- mapM (cvtFld mkFieldOcc) flds
                               ; return $ RecordCon c' noPostTcExpr (HsRecFields flds' Nothing)}
     cvt (RecUpdE e flds) = do { e' <- cvtl e
-                              ; flds' <- mapM cvtFld flds
-                              ; return $ RecordUpd e' (HsRecFields flds' Nothing) [] [] [] }
+                              ; flds' <- mapM (cvtFld mkAmbiguousFieldOcc) flds
+                              ; return $ RecordUpd e' flds'
+                                          PlaceHolder PlaceHolder PlaceHolder }
     cvt (StaticE e)      = fmap HsStatic $ cvtl e
+    cvt (UnboundVarE s)  = do { s' <- vName s; return $ HsVar s' }
 
 {- Note [Dropping constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -736,11 +744,12 @@ and the above expression would be reassociated to
 which we don't want.
 -}
 
-cvtFld :: (TH.Name, TH.Exp) -> CvtM (LHsRecField RdrName (LHsExpr RdrName))
-cvtFld (v,e)
+cvtFld :: (RdrName -> t) -> (TH.Name, TH.Exp) -> CvtM (LHsRecField' t (LHsExpr RdrName))
+cvtFld f (v,e)
   = do  { v' <- vNameL v; e' <- cvtl e
-        ; return (noLoc $ HsRecField { hsRecFieldId = v', hsRecFieldArg = e'
-                                     , hsRecPun = False}) }
+        ; return (noLoc $ HsRecField { hsRecFieldLbl = fmap f v'
+                                     , hsRecFieldArg = e'
+                                     , hsRecPun      = False}) }
 
 cvtDD :: Range -> CvtM (ArithSeqInfo RdrName)
 cvtDD (FromR x)           = do { x' <- cvtl x; return $ From x' }
@@ -958,8 +967,9 @@ cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField RdrName (LPat RdrName))
 cvtPatFld (s,p)
   = do  { s' <- vNameL s; p' <- cvtPat p
-        ; return (noLoc $ HsRecField { hsRecFieldId = s', hsRecFieldArg = p'
-                                     , hsRecPun = False}) }
+        ; return (noLoc $ HsRecField { hsRecFieldLbl = fmap mkFieldOcc s'
+                                     , hsRecFieldArg = p'
+                                     , hsRecPun      = False}) }
 
 {- | @cvtOpAppP x op y@ converts @op@ and @y@ and produces the operator application @x `op` y@.
 The produced tree of infix patterns will be left-biased, provided @x@ is.
@@ -1150,10 +1160,31 @@ cvtOpAppT x op y
 cvtKind :: TH.Kind -> CvtM (LHsKind RdrName)
 cvtKind = cvtTypeKind "kind"
 
-cvtMaybeKind :: Maybe TH.Kind -> CvtM (Maybe (LHsKind RdrName))
-cvtMaybeKind Nothing = return Nothing
-cvtMaybeKind (Just ki) = do { ki' <- cvtKind ki
-                            ; return (Just ki') }
+-- | Convert Maybe Kind to a type family result signature. Used with data
+-- families where naming of the result is not possible (thus only kind or no
+-- signature is possible).
+cvtMaybeKindToFamilyResultSig :: Maybe TH.Kind
+                              -> CvtM (LFamilyResultSig RdrName)
+cvtMaybeKindToFamilyResultSig Nothing   = returnL Hs.NoSig
+cvtMaybeKindToFamilyResultSig (Just ki) = do { ki' <- cvtKind ki
+                                             ; returnL (Hs.KindSig ki') }
+
+-- | Convert type family result signature. Used with both open and closed type
+-- families.
+cvtFamilyResultSig :: TH.FamilyResultSig -> CvtM (Hs.LFamilyResultSig RdrName)
+cvtFamilyResultSig TH.NoSig           = returnL Hs.NoSig
+cvtFamilyResultSig (TH.KindSig ki)    = do { ki' <- cvtKind ki
+                                           ; returnL (Hs.KindSig ki') }
+cvtFamilyResultSig (TH.TyVarSig bndr) = do { tv <- cvt_tv bndr
+                                           ; returnL (Hs.TyVarSig tv) }
+
+-- | Convert injectivity annotation of a type family.
+cvtInjectivityAnnotation :: TH.InjectivityAnn
+                         -> CvtM (Hs.LInjectivityAnn RdrName)
+cvtInjectivityAnnotation (TH.InjectivityAnn annLHS annRHS)
+  = do { annLHS' <- tNameL annLHS
+       ; annRHS' <- mapM tNameL annRHS
+       ; returnL (Hs.InjectivityAnn annLHS' annRHS') }
 
 -----------------------------------------------------------
 cvtFixity :: TH.Fixity -> Hs.Fixity
@@ -1183,7 +1214,7 @@ cvtFractionalLit r = FL { fl_text = show (fromRational r :: Double), fl_value = 
 --------------------------------------------------------------------
 
 -- variable names
-vNameL, cNameL, vcNameL, tconNameL :: TH.Name -> CvtM (Located RdrName)
+vNameL, cNameL, vcNameL, tNameL, tconNameL :: TH.Name -> CvtM (Located RdrName)
 vName,  cName,  vcName,  tName,  tconName  :: TH.Name -> CvtM RdrName
 
 -- Variable names
@@ -1199,6 +1230,7 @@ vcNameL n = wrapL (vcName n)
 vcName n = if isVarName n then vName n else cName n
 
 -- Type variable names
+tNameL n = wrapL (tName n)
 tName n = cvtName OccName.tvName n
 
 -- Type Constructor names
@@ -1292,8 +1324,8 @@ mk_ghc_ns TH.VarName   = OccName.varName
 mk_mod :: TH.ModName -> ModuleName
 mk_mod mod = mkModuleName (TH.modString mod)
 
-mk_pkg :: TH.PkgName -> PackageKey
-mk_pkg pkg = stringToPackageKey (TH.pkgString pkg)
+mk_pkg :: TH.PkgName -> UnitId
+mk_pkg pkg = stringToUnitId (TH.pkgString pkg)
 
 mk_uniq :: Int -> Unique
 mk_uniq u = mkUniqueGrimily u

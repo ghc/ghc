@@ -33,6 +33,7 @@ import Id
 import Var
 import VarSet
 import VarEnv
+import NameSet
 import Bag
 import ErrUtils         ( ErrMsg, pprLocErrMsg )
 import BasicTypes
@@ -965,7 +966,8 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
                             -- be oriented the other way round;
                             -- see TcCanonical.canEqTyVarTyVar
   || isSigTyVar tv1 && not (isTyVarTy ty2)
-  || ctEqRel ct == ReprEq  -- the cases below don't really apply to ReprEq
+  || ctEqRel ct == ReprEq && not (isTyVarUnderDatatype tv1 ty2)
+     -- the cases below don't really apply to ReprEq (except occurs check)
   = mkErrorMsgFromCt ctxt ct (vcat [ misMatchOrCND ctxt ct oriented ty1 ty2
                                    , extraTyVarInfo ctxt tv1 ty2
                                    , extra ])
@@ -977,7 +979,8 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   = mkErrorMsgFromCt ctxt ct $ (kindErrorMsg (mkTyVarTy tv1) ty2 $$ extra)
 
   | OC_Occurs <- occ_check_expand
-  , NomEq <- ctEqRel ct      -- reporting occurs check for Coercible is strange
+  , ctEqRel ct == NomEq || isTyVarUnderDatatype tv1 ty2
+         -- See Note [Occurs check error] in TcCanonical
   = do { let occCheckMsg = addArising (ctOrigin ct) $
                            hang (text "Occurs check: cannot construct the infinite type:")
                               2 (sep [ppr ty1, char '~', ppr ty2])
@@ -1060,7 +1063,7 @@ mkEqInfoMsg ct ty1 ty2
     mb_fun2 = isTyFun_maybe ty2
 
     ambig_msg | isJust mb_fun1 || isJust mb_fun2
-              = snd (mkAmbigMsg ct)
+              = snd (mkAmbigMsg False ct)
               | otherwise = empty
 
     tyfun_msg | Just tc1 <- mb_fun1
@@ -1377,7 +1380,7 @@ sameOccExtra ty1 ty2
   , let n1 = tyConName tc1
         n2 = tyConName tc2
         same_occ = nameOccName n1                   == nameOccName n2
-        same_pkg = modulePackageKey (nameModule n1) == modulePackageKey (nameModule n2)
+        same_pkg = moduleUnitId (nameModule n1) == moduleUnitId (nameModule n2)
   , n1 /= n2   -- Different Names
   , same_occ   -- but same OccName
   = ptext (sLit "NB:") <+> (ppr_from same_pkg n1 $$ ppr_from same_pkg n2)
@@ -1391,10 +1394,10 @@ sameOccExtra ty1 ty2
       | otherwise  -- Imported things have an UnhelpfulSrcSpan
       = hang (quotes (ppr nm))
            2 (sep [ ptext (sLit "is defined in") <+> quotes (ppr (moduleName mod))
-                  , ppUnless (same_pkg || pkg == mainPackageKey) $
+                  , ppUnless (same_pkg || pkg == mainUnitId) $
                     nest 4 $ ptext (sLit "in package") <+> quotes (ppr pkg) ])
        where
-         pkg = modulePackageKey mod
+         pkg = moduleUnitId mod
          mod = nameModule nm
          loc = nameSrcSpan nm
 
@@ -1519,24 +1522,50 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
     givens        = getUserGivens ctxt
     all_tyvars    = all isTyVarTy tys
 
+
     cannot_resolve_msg :: Ct -> SDoc -> SDoc
     cannot_resolve_msg ct binds_msg
-      = vcat [ addArising orig no_inst_msg
+      = vcat [ no_inst_msg
              , nest 2 extra_note
              , vcat (pp_givens givens)
              , ppWhen (has_ambig_tvs && not (null unifiers && null givens))
-               (vcat [ ambig_msg, binds_msg, potential_msg ])
+               (vcat [ ppUnless lead_with_ambig ambig_msg, binds_msg, potential_msg ])
              , show_fixes (add_to_ctxt_fixes has_ambig_tvs ++ drv_fixes) ]
       where
-        (has_ambig_tvs, ambig_msg) = mkAmbigMsg ct
         orig = ctOrigin ct
+        -- See Note [Highlighting ambiguous type variables]
+        lead_with_ambig = has_ambig_tvs && not (any isRuntimeUnkSkol ambig_tvs)
+                        && not (null unifiers) && null givens
 
-    potential_msg
-      = ppWhen (not (null unifiers) && want_potential orig) $
-        hang (if isSingleton unifiers
-              then ptext (sLit "Note: there is a potential instance available:")
-              else ptext (sLit "Note: there are several potential instances:"))
-           2 (ppr_insts (sortBy fuzzyClsInstCmp unifiers))
+        (has_ambig_tvs, ambig_msg) = mkAmbigMsg lead_with_ambig ct
+        ambig_tvs = getAmbigTkvs ct
+
+        no_inst_msg
+          | lead_with_ambig
+          = ambig_msg <+> pprArising orig
+              $$ text "prevents the constraint" <+>  quotes (pprParendType pred)
+              <+> text "from being solved."
+
+          | null givens
+          = addArising orig $ text "No instance for"
+            <+> pprParendType pred
+
+          | otherwise
+          = addArising orig $ text "Could not deduce"
+            <+> pprParendType pred
+
+        potential_msg
+          = ppWhen (not (null unifiers) && want_potential orig) $
+            sdocWithDynFlags $ \dflags ->
+            getPprStyle $ \sty ->
+            pprPotentials dflags sty potential_hdr unifiers
+
+        potential_hdr
+          = vcat [ ppWhen lead_with_ambig $
+                     text "Probable fix: use a type annotation to specify what"
+                     <+> pprQuotedList ambig_tvs <+> text "should be."
+                 , ptext (sLit "These potential instance") <> plural unifiers
+                   <+> text "exist:"]
 
     -- Report "potential instances" only when the constraint arises
     -- directly from the user's use of an overloaded function
@@ -1555,10 +1584,6 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
 
     ppr_skol (PatSkol dc _) = ptext (sLit "the data constructor") <+> quotes (ppr dc)
     ppr_skol skol_info      = ppr skol_info
-
-    no_inst_msg
-      | null givens && null matches = ptext (sLit "No instance for")  <+> pprParendType pred
-      | otherwise                   = ptext (sLit "Could not deduce") <+> pprParendType pred
 
     extra_note | any isFunTy (filterOut isKind tys)
                = ptext (sLit "(maybe you haven't applied a function to enough arguments?)")
@@ -1590,8 +1615,10 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
                   sep [ptext (sLit "Matching givens (or their superclasses):")
                       , nest 2 (vcat matching_givens)]
 
-             ,  sep [ptext (sLit "Matching instances:"),
-                     nest 2 (vcat [pprInstances ispecs, pprInstances unifiers])]
+             ,  sdocWithDynFlags $ \dflags ->
+                getPprStyle $ \sty ->
+                pprPotentials dflags sty (ptext (sLit "Matching instances:")) $
+                ispecs ++ unifiers
 
              ,  ppWhen (null matching_givens && isSingleton matches && null unifiers) $
                 -- Intuitively, some given matched the wanted in their
@@ -1645,6 +1672,24 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
                     ]
              ]
 
+{- Note [Highlighting ambiguous type variables]
+-----------------------------------------------
+When we encounter ambiguous type variables (i.e. type variables
+that remain metavariables after type inference), we need a few more
+conditions before we can reason that *ambiguity* prevents constraints
+from being solved:
+  - We can't have any givens, as encountering a typeclass error
+    with given constraints just means we couldn't deduce
+    a solution satisfying those constraints and as such couldn't
+    bind the type variable to a known type.
+  - If we don't have any unifiers, we don't even have potential
+    instances from which an ambiguity could arise.
+  - Lastly, I don't want to mess with error reporting for
+    unknown runtime types so we just fall back to the old message there.
+Once these conditions are satisfied, we can safely say that ambiguity prevents
+the constraint from being solved. -}
+
+
 usefulContext :: ReportErrCtxt -> TcPredType -> [SkolemInfo]
 usefulContext ctxt pred
   = go (cec_encl ctxt)
@@ -1673,17 +1718,86 @@ show_fixes []     = empty
 show_fixes (f:fs) = sep [ ptext (sLit "Possible fix:")
                         , nest 2 (vcat (f : map (ptext (sLit "or") <+>) fs))]
 
-ppr_insts :: [ClsInst] -> SDoc
-ppr_insts insts
-  = pprInstances (take 3 insts) $$ dot_dot_message
-  where
-    n_extra = length insts - 3
-    dot_dot_message
-       | n_extra <= 0 = empty
-       | otherwise    = ptext (sLit "...plus")
-                        <+> speakNOf n_extra (ptext (sLit "other"))
+pprPotentials :: DynFlags -> PprStyle -> SDoc -> [ClsInst] -> SDoc
+-- See Note [Displaying potential instances]
+pprPotentials dflags sty herald insts
+  | null insts
+  = empty
 
-----------------------
+  | null show_these
+  = hang herald
+       2 (vcat [ not_in_scope_msg empty
+               , flag_hint ])
+
+  | otherwise
+  = hang herald
+       2 (vcat [ pprInstances show_these
+               , ppWhen (n_in_scope_hidden > 0) $
+                 ptext (sLit "...plus")
+                   <+> speakNOf n_in_scope_hidden (ptext (sLit "other"))
+               , not_in_scope_msg (ptext (sLit "...plus"))
+               , flag_hint ])
+  where
+    n_show = 3 :: Int
+    show_potentials = gopt Opt_PrintPotentialInstances dflags
+
+    (in_scope, not_in_scope) = partition inst_in_scope insts
+    sorted = sortBy fuzzyClsInstCmp in_scope
+    show_these | show_potentials = sorted
+               | otherwise       = take n_show sorted
+    n_in_scope_hidden = length sorted - length show_these
+
+       -- "in scope" means that all the type constructors
+       -- are lexically in scope; these instances are likely
+       -- to be more useful
+    inst_in_scope :: ClsInst -> Bool
+    inst_in_scope cls_inst = foldNameSet ((&&) . name_in_scope) True $
+                             orphNamesOfTypes (is_tys cls_inst)
+
+    name_in_scope name
+      | isBuiltInSyntax name
+      = True -- E.g. (->)
+      | Just mod <- nameModule_maybe name
+      = qual_in_scope (qualName sty mod (nameOccName name))
+      | otherwise
+      = True
+
+    qual_in_scope :: QualifyName -> Bool
+    qual_in_scope NameUnqual    = True
+    qual_in_scope (NameQual {}) = True
+    qual_in_scope _             = False
+
+    not_in_scope_msg herald
+      | null not_in_scope
+      = empty
+      | otherwise
+      = hang (herald <+> speakNOf (length not_in_scope)
+                                  (ptext (sLit "instance involving out-of-scope types")))
+           2 (ppWhen show_potentials (pprInstances not_in_scope))
+
+    flag_hint = ppUnless (show_potentials || length show_these == length insts) $
+                ptext (sLit "(use -fprint-potential-instances to see them all)")
+
+{- Note [Displaying potential instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When showing a list of instances for
+  - overlapping instances (show ones that match)
+  - no such instance (show ones that could match)
+we want to give it a bit of structure.  Here's the plan
+
+* Say that an instance is "in scope" if all of the
+  type constructors it mentions are lexically in scope.
+  These are the ones most likely to be useful to the programmer.
+
+* Show at most n_show in-scope instances,
+  and summarise the rest ("plus 3 others")
+
+* Summarise the not-in-scope instances ("plus 4 not in scope")
+
+* Add the flag -fshow-potential-instances which replaces the
+  summary with the full list
+-}
+
 quickFlattenTy :: TcType -> TcM TcType
 -- See Note [Flattening in error message generation]
 quickFlattenTy ty | Just ty' <- tcView ty = quickFlattenTy ty'
@@ -1708,9 +1822,8 @@ quickFlattenTy (TyConApp tc tys)
          ; flat_resttys <- mapM quickFlattenTy resttys
          ; return (foldl AppTy (mkTyVarTy v) flat_resttys) }
 
-{-
-Note [Flattening in error message generation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Flattening in error message generation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider (C (Maybe (F x))), where F is a type function, and we have
 instances
                 C (Maybe Int) and C (Maybe a)
@@ -1743,19 +1856,19 @@ This test suggests -fprint-explicit-kinds when all the ambiguous type
 variables are kind variables.
 -}
 
-mkAmbigMsg :: Ct -> (Bool, SDoc)
-mkAmbigMsg ct
+mkAmbigMsg :: Bool -- True when message has to be at beginning of sentence
+           -> Ct -> (Bool, SDoc)
+mkAmbigMsg prepend_msg ct
   | null ambig_tkvs = (False, empty)
   | otherwise       = (True,  msg)
   where
-    ambig_tkv_set = filterVarSet isAmbiguousTyVar (tyVarsOfCt ct)
-    ambig_tkvs    = varSetElems ambig_tkv_set
+    ambig_tkvs = getAmbigTkvs ct
     (ambig_kvs, ambig_tvs) = partition isKindVar ambig_tkvs
 
     msg | any isRuntimeUnkSkol ambig_tkvs  -- See Note [Runtime skolems]
-        =  vcat [ ptext (sLit "Cannot resolve unknown runtime type") <> plural ambig_tvs
-                     <+> pprQuotedList ambig_tvs
-                , ptext (sLit "Use :print or :force to determine these types")]
+        = vcat [ ptext (sLit "Cannot resolve unknown runtime type")
+                 <> plural ambig_tvs <+> pprQuotedList ambig_tvs
+               , ptext (sLit "Use :print or :force to determine these types")]
 
         | not (null ambig_tvs)
         = pp_ambig (ptext (sLit "type")) ambig_tvs
@@ -1765,6 +1878,11 @@ mkAmbigMsg ct
                , sdocWithDynFlags suggest_explicit_kinds ]
 
     pp_ambig what tkvs
+      | prepend_msg -- "Ambiguous type variable 't0'"
+      = ptext (sLit "Ambiguous") <+> what <+> ptext (sLit "variable")
+        <> plural tkvs <+> pprQuotedList tkvs
+
+      | otherwise -- "The type variable 't0' is ambiguous"
       = ptext (sLit "The") <+> what <+> ptext (sLit "variable") <> plural tkvs
         <+> pprQuotedList tkvs <+> is_or_are tkvs <+> ptext (sLit "ambiguous")
 
@@ -1787,6 +1905,12 @@ pprSkol implics tv
     ppr_rigid pp_info = hang (pp_tv <+> ptext (sLit "is a rigid type variable bound by"))
                            2 (sep [ pp_info
                                   , ptext (sLit "at") <+> ppr (getSrcLoc tv) ])
+
+getAmbigTkvs :: Ct -> [Var]
+getAmbigTkvs ct
+  = varSetElems ambig_tkv_set
+  where
+    ambig_tkv_set = filterVarSet isAmbiguousTyVar (tyVarsOfCt ct)
 
 getSkolemInfo :: [Implication] -> TcTyVar -> ([TcTyVar], SkolemInfo)
 -- Get the skolem info for a type variable

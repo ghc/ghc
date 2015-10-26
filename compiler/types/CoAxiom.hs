@@ -1,16 +1,16 @@
 -- (c) The University of Glasgow 2012
 
-{-# LANGUAGE CPP, DataKinds, DeriveDataTypeable, GADTs, KindSignatures, ScopedTypeVariables, StandaloneDeriving #-}
+{-# LANGUAGE CPP, DataKinds, DeriveDataTypeable, GADTs, KindSignatures,
+             ScopedTypeVariables, StandaloneDeriving, RoleAnnotations #-}
 
 -- | Module for coercion axioms, used to represent type family instances
 -- and newtypes
 
 module CoAxiom (
-       BranchFlag, Branched, Unbranched, BranchIndex, BranchList(..),
-       toBranchList, fromBranchList,
-       toBranchedList, toUnbranchedList,
-       brListLength, brListNth, brListMap, brListFoldr, brListMapM,
-       brListFoldlM_, brListZipWith,
+       BranchFlag, Branched, Unbranched, BranchIndex, Branches,
+       manyBranches, unbranched,
+       fromBranches, numBranches,
+       mapAccumBranches,
 
        CoAxiom(..), CoAxBranch(..),
 
@@ -42,20 +42,22 @@ import BasicTypes
 import Data.Typeable ( Typeable )
 import SrcLoc
 import qualified Data.Data as Data
+import Data.Array
+import Data.List ( mapAccumL )
 
 #include "HsVersions.h"
 
 {-
 Note [Coercion axiom branches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In order to allow type family instance groups, an axiom needs to contain an
+In order to allow closed type families, an axiom needs to contain an
 ordered list of alternatives, called branches. The kind of the coercion built
 from an axiom is determined by which index is used when building the coercion
 from the axiom.
 
 For example, consider the axiom derived from the following declaration:
 
-type instance where
+type family F a where
   F [Int] = Bool
   F [a]   = Double
   F (a b) = Char
@@ -81,7 +83,7 @@ can unify with the supplied arguments. After all, it is possible that some
 of the type arguments are lambda-bound type variables whose instantiation may
 cause an earlier match among the branches. We wish to prohibit this behavior,
 so the type checker rules out the choice of a branch where a previous branch
-can unify. See also [Branched instance checking] in FamInstEnv.hs.
+can unify. See also [Apartness] in FamInstEnv.hs.
 
 For example, the following is malformed, where 'a' is a lambda-bound type
 variable:
@@ -93,24 +95,24 @@ apply, not branch 2. This is a vital consistency check; without it, we could
 derive Int ~ Bool, and that is a Bad Thing.
 
 Note [Branched axioms]
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 Although a CoAxiom has the capacity to store many branches, in certain cases,
 we want only one. These cases are in data/newtype family instances, newtype
-coercions, and type family instances declared with "type instance ...", not
-"type instance where". Furthermore, these unbranched axioms are used in a
+coercions, and type family instances.
+Furthermore, these unbranched axioms are used in a
 variety of places throughout GHC, and it would difficult to generalize all of
 that code to deal with branched axioms, especially when the code can be sure
 of the fact that an axiom is indeed a singleton. At the same time, it seems
 dangerous to assume singlehood in various places through GHC.
 
 The solution to this is to label a CoAxiom with a phantom type variable
-declaring whether it is known to be a singleton or not. The list of branches
-is stored using a special form of list, declared below, that ensures that the
+declaring whether it is known to be a singleton or not. The branches
+are stored using a special datatype, declared below, that ensures that the
 type variable is accurate.
 
 ************************************************************************
 *                                                                      *
-                    Branch lists
+                    Branches
 *                                                                      *
 ************************************************************************
 -}
@@ -128,77 +130,47 @@ deriving instance Typeable 'Unbranched
 -- DataKinds and the promotion quote in client modules. This also means that
 -- we don't need to export the term-level constructors, which should never be used.
 
-data BranchList a (br :: BranchFlag) where
-  FirstBranch :: a -> BranchList a br
-  NextBranch :: a -> BranchList a br -> BranchList a Branched
+newtype Branches (br :: BranchFlag)
+  = MkBranches { unMkBranches :: Array BranchIndex CoAxBranch }
+  deriving Typeable
+type role Branches nominal
 
--- convert to/from lists
-toBranchList :: [a] -> BranchList a Branched
-toBranchList [] = pprPanic "toBranchList" empty
-toBranchList [b] = FirstBranch b
-toBranchList (h:t) = NextBranch h (toBranchList t)
+manyBranches :: [CoAxBranch] -> Branches Branched
+manyBranches brs = ASSERT( snd bnds >= fst bnds )
+                   MkBranches (listArray bnds brs)
+  where
+    bnds = (0, length brs - 1)
 
-fromBranchList :: BranchList a br -> [a]
-fromBranchList (FirstBranch b) = [b]
-fromBranchList (NextBranch h t) = h : (fromBranchList t)
+unbranched :: CoAxBranch -> Branches Unbranched
+unbranched br = MkBranches (listArray (0, 0) [br])
 
--- convert from any BranchList to a Branched BranchList
-toBranchedList :: BranchList a br -> BranchList a Branched
-toBranchedList (FirstBranch b) = FirstBranch b
-toBranchedList (NextBranch h t) = NextBranch h t
+toBranched :: Branches br -> Branches Branched
+toBranched = MkBranches . unMkBranches
 
--- convert from any BranchList to an Unbranched BranchList
-toUnbranchedList :: BranchList a br -> BranchList a Unbranched
-toUnbranchedList (FirstBranch b) = FirstBranch b
-toUnbranchedList _ = pprPanic "toUnbranchedList" empty
+toUnbranched :: Branches br -> Branches Unbranched
+toUnbranched (MkBranches arr) = ASSERT( bounds arr == (0,0) )
+                                MkBranches arr
 
--- length
-brListLength :: BranchList a br -> Int
-brListLength (FirstBranch _) = 1
-brListLength (NextBranch _ t) = 1 + brListLength t
+fromBranches :: Branches br -> [CoAxBranch]
+fromBranches = elems . unMkBranches
 
--- lookup
-brListNth :: BranchList a br -> BranchIndex -> a
-brListNth (FirstBranch b) 0 = b
-brListNth (NextBranch h _) 0 = h
-brListNth (NextBranch _ t) n = brListNth t (n-1)
-brListNth _ _ = pprPanic "brListNth" empty
+branchesNth :: Branches br -> BranchIndex -> CoAxBranch
+branchesNth (MkBranches arr) n = arr ! n
 
--- map, fold
-brListMap :: (a -> b) -> BranchList a br -> [b]
-brListMap f (FirstBranch b) = [f b]
-brListMap f (NextBranch h t) = f h : (brListMap f t)
+numBranches :: Branches br -> Int
+numBranches (MkBranches arr) = snd (bounds arr) + 1
 
-brListFoldr :: (a -> b -> b) -> b -> BranchList a br -> b
-brListFoldr f x (FirstBranch b) = f b x
-brListFoldr f x (NextBranch h t) = f h (brListFoldr f x t)
+-- | The @[CoAxBranch]@ passed into the mapping function is a list of
+-- all previous branches, reversed
+mapAccumBranches :: ([CoAxBranch] -> CoAxBranch -> CoAxBranch)
+                  -> Branches br -> Branches br
+mapAccumBranches f (MkBranches arr)
+  = MkBranches (listArray (bounds arr) (snd $ mapAccumL go [] (elems arr)))
+  where
+    go :: [CoAxBranch] -> CoAxBranch -> ([CoAxBranch], CoAxBranch)
+    go prev_branches cur_branch = ( cur_branch : prev_branches
+                                  , f prev_branches cur_branch )
 
-brListMapM :: Monad m => (a -> m b) -> BranchList a br -> m [b]
-brListMapM f (FirstBranch b) = f b >>= \fb -> return [fb]
-brListMapM f (NextBranch h t) = do { fh <- f h
-                                   ; ft <- brListMapM f t
-                                   ; return (fh : ft) }
-
-brListFoldlM_ :: forall a b m br. Monad m
-              => (a -> b -> m a) -> a -> BranchList b br -> m ()
-brListFoldlM_ f z brs = do { _ <- go z brs
-                           ; return () }
-  where go :: forall br'. a -> BranchList b br' -> m a
-        go acc (FirstBranch b)  = f acc b
-        go acc (NextBranch h t) = do { fh <- f acc h
-                                     ; go fh t }
-
--- zipWith
-brListZipWith :: (a -> b -> c) -> BranchList a br1 -> BranchList b br2 -> [c]
-brListZipWith f (FirstBranch a) (FirstBranch b) = [f a b]
-brListZipWith f (FirstBranch a) (NextBranch b _) = [f a b]
-brListZipWith f (NextBranch a _) (FirstBranch b) = [f a b]
-brListZipWith f (NextBranch a ta) (NextBranch b tb) = f a b : brListZipWith f ta tb
-
--- pretty-printing
-
-instance Outputable a => Outputable (BranchList a br) where
-  ppr = ppr . fromBranchList
 
 {-
 ************************************************************************
@@ -237,8 +209,7 @@ data CoAxiom br
     , co_ax_name     :: Name          -- name for pretty-printing
     , co_ax_role     :: Role          -- role of the axiom's equality
     , co_ax_tc       :: TyCon         -- the head of the LHS patterns
-    , co_ax_branches :: BranchList CoAxBranch br
-                                      -- the branches that form this axiom
+    , co_ax_branches :: Branches br   -- the branches that form this axiom
     , co_ax_implicit :: Bool          -- True <=> the axiom is "implicit"
                                       -- See Note [Implicit axioms]
          -- INVARIANT: co_ax_implicit == True implies length co_ax_branches == 1.
@@ -257,22 +228,22 @@ data CoAxBranch
     , cab_incomps  :: [CoAxBranch]  -- The previous incompatible branches
                                     -- See Note [Storing compatibility]
     }
-  deriving Typeable
+  deriving ( Data.Data, Data.Typeable )
 
 toBranchedAxiom :: CoAxiom br -> CoAxiom Branched
 toBranchedAxiom (CoAxiom unique name role tc branches implicit)
-  = CoAxiom unique name role tc (toBranchedList branches) implicit
+  = CoAxiom unique name role tc (toBranched branches) implicit
 
 toUnbranchedAxiom :: CoAxiom br -> CoAxiom Unbranched
 toUnbranchedAxiom (CoAxiom unique name role tc branches implicit)
-  = CoAxiom unique name role tc (toUnbranchedList branches) implicit
+  = CoAxiom unique name role tc (toUnbranched branches) implicit
 
 coAxiomNumPats :: CoAxiom br -> Int
 coAxiomNumPats = length . coAxBranchLHS . (flip coAxiomNthBranch 0)
 
 coAxiomNthBranch :: CoAxiom br -> BranchIndex -> CoAxBranch
 coAxiomNthBranch (CoAxiom { co_ax_branches = bs }) index
-  = brListNth bs index
+  = branchesNth bs index
 
 coAxiomArity :: CoAxiom br -> BranchIndex -> Arity
 coAxiomArity ax index
@@ -284,18 +255,19 @@ coAxiomName = co_ax_name
 coAxiomRole :: CoAxiom br -> Role
 coAxiomRole = co_ax_role
 
-coAxiomBranches :: CoAxiom br -> BranchList CoAxBranch br
+coAxiomBranches :: CoAxiom br -> Branches br
 coAxiomBranches = co_ax_branches
 
 coAxiomSingleBranch_maybe :: CoAxiom br -> Maybe CoAxBranch
-coAxiomSingleBranch_maybe (CoAxiom { co_ax_branches = branches })
-  | FirstBranch br <- branches
-  = Just br
+coAxiomSingleBranch_maybe (CoAxiom { co_ax_branches = MkBranches arr })
+  | snd (bounds arr) == 0
+  = Just $ arr ! 0
   | otherwise
   = Nothing
 
 coAxiomSingleBranch :: CoAxiom Unbranched -> CoAxBranch
-coAxiomSingleBranch (CoAxiom { co_ax_branches = FirstBranch br }) = br
+coAxiomSingleBranch (CoAxiom { co_ax_branches = MkBranches arr })
+  = arr ! 0
 
 coAxiomTyCon :: CoAxiom br -> TyCon
 coAxiomTyCon = co_ax_tc

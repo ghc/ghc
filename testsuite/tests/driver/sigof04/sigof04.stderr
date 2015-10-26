@@ -1,3 +1,3 @@
 
-<no location info>:
-    ‘insert’ is exported by the hsig file, but not exported by the module
+<no location info>: error:
+    ‘insert’ is exported by the signature file, but not exported by the module

@@ -190,7 +190,10 @@ jump f (info_ptr, field1,..,fieldN) (arg1,..,argN)
 
 where info_ptr and field1..fieldN describe the stack frame, and
 arg1..argN are the arguments passed to f using the NativeNodeCall
-convention.
+convention. Note if a field is longer than a word (e.g. a D_ on
+a 32-bit machine) then the call will push as many words as
+necessary to the stack to accomodate it (e.g. 2).
+
 
 ----------------------------------------------------------------------------- -}
 
@@ -574,7 +577,7 @@ importName
 
         -- A label imported with an explicit packageId.
         | STRING NAME
-        { ($2, mkCmmCodeLabel (fsToPackageKey (mkFastString $1)) $2) }
+        { ($2, mkCmmCodeLabel (fsToUnitId (mkFastString $1)) $2) }
         
         
 names   :: { [FastString] }
@@ -1119,7 +1122,7 @@ profilingInfo dflags desc_str ty_str
     else ProfilingInfo (stringToWord8s desc_str)
                        (stringToWord8s ty_str)
 
-staticClosure :: PackageKey -> FastString -> FastString -> [CmmLit] -> CmmParse ()
+staticClosure :: UnitId -> FastString -> FastString -> [CmmLit] -> CmmParse ()
 staticClosure pkg cl_label info payload
   = do dflags <- getDynFlags
        let lits = mkStaticClosure dflags (mkCmmInfoLabel pkg info) dontCareCCS payload [] [] []
@@ -1268,7 +1271,7 @@ cmmRawIf cond then_id = do
 -- branching to true_id if so, and falling through otherwise.
 emitCond (BoolTest e) then_id = do
   else_id <- newBlockId
-  emit (mkCbranch e then_id else_id)
+  emit (mkCbranch e then_id else_id Nothing)
   emitLabel else_id
 emitCond (BoolNot (BoolTest (CmmMachOp op args))) then_id
   | Just op' <- maybeInvertComparison op

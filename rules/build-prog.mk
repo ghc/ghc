@@ -189,13 +189,8 @@ ifneq "$$(BINDIST)" "YES"
 # The quadrupled $'s here are because the _<way>_LIB variables aren't
 # necessarily set when this part of the makefile is read
 $1/$2/build/tmp/$$($1_$2_PROG) $1/$2/build/tmp/$$($1_$2_PROG).dll : \
-    $$(foreach dep,$$($1_$2_DEP_LIB_NAMES),\
-        $$(if $$(filter ghc%,$$(dep)),\
-            $(if $(filter 0,$3),$$(compiler_stage1_PROGRAM_DEP_LIB),\
-            $(if $(filter 1,$3),$$(compiler_stage2_PROGRAM_DEP_LIB),\
-            $(if $(filter 2,$3),$$(compiler_stage2_PROGRAM_DEP_LIB),\
-            $$(error Bad build stage)))),\
-        $$$$($$(dep)_dist-$(if $(filter 0,$3),boot,install)_PROGRAM_DEP_LIB)))
+    $$(foreach dep,$$($1_$2_DEP_COMPONENT_IDS),\
+        $$$$($$(dep)_dist-$(if $(filter 0,$3),boot,install)_PROGRAM_DEP_LIB))
 
 $1_$2_PROG_NEEDS_C_WRAPPER = NO
 $1_$2_PROG_INPLACE = $$($1_$2_PROG)
@@ -241,7 +236,7 @@ $1/$2/build/tmp/$$($1_$2_PROG)-wrapper.c: driver/utils/dynwrapper.c | $$$$(dir $
 	echo '#include <Windows.h>' >> $$@
 	echo '#include "Rts.h"' >> $$@
 	echo 'LPTSTR path_dirs[] = {' >> $$@
-	$$(foreach p,$$($1_$2_TRANSITIVE_DEP_LIB_NAMES),$$(call make-command,echo '    TEXT("/../lib/$$p")$$(comma)' >> $$@))
+	$$(foreach p,$$($1_$2_TRANSITIVE_DEP_COMPONENT_IDS),$$(call make-command,echo '    TEXT("/../lib/$$p")$$(comma)' >> $$@))
 	echo '    TEXT("/../lib/"),' >> $$@
 	echo '    NULL};' >> $$@
 	echo 'LPTSTR progDll = TEXT("../lib/$$($1_$2_PROG).dll");' >> $$@
@@ -302,7 +297,7 @@ endif
 ifeq "$$($1_$2_WANT_INSTALLED_WRAPPER)" "YES"
 INSTALL_LIBEXECS += $1/$2/build/tmp/$$($1_$2_PROG)
 else ifeq "$$($1_$2_TOPDIR)" "YES"
-INSTALL_TOPDIRS  += $1/$2/build/tmp/$$($1_$2_PROG)
+INSTALL_TOPDIR_BINS += $1/$2/build/tmp/$$($1_$2_PROG)
 else
 INSTALL_BINS     += $1/$2/build/tmp/$$($1_$2_PROG)
 endif

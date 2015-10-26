@@ -50,7 +50,6 @@
 {-# OPTIONS_GHC -fno-warn-tabs #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
-{-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Lexer (
@@ -1495,7 +1494,6 @@ lex_escape = do
 
         'x'   -> readNum is_hexdigit 16 hexDigit
         'o'   -> readNum is_octdigit  8 octDecDigit
-        'b'   -> readNum is_bindigit  2 octDecDigit
         x | is_decdigit x -> readNum2 is_decdigit 10 octDecDigit (octDecDigit x)
 
         c1 ->  do
@@ -1732,11 +1730,11 @@ instance Functor P where
   fmap = liftM
 
 instance Applicative P where
-  pure  = return
+  pure = returnP
   (<*>) = ap
 
 instance Monad P where
-  return = returnP
+  return = pure
   (>>=) = thenP
   fail = failP
 
@@ -1767,7 +1765,7 @@ getPState = P $ \s -> POk s s
 instance HasDynFlags P where
     getDynFlags = P $ \s -> POk s (dflags s)
 
-withThisPackage :: (PackageKey -> a) -> P a
+withThisPackage :: (UnitId -> a) -> P a
 withThisPackage f
  = do pkg <- liftM thisPackage getDynFlags
       return $ f pkg

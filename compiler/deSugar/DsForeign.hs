@@ -223,12 +223,12 @@ dsFCall fn_id co fcall mDeclHeader = do
     dflags <- getDynFlags
     (fcall', cDoc) <-
               case fcall of
-              CCall (CCallSpec (StaticTarget _ cName mPackageKey isFun)
+              CCall (CCallSpec (StaticTarget _ cName mUnitId isFun)
                                CApiConv safety) ->
                do wrapperName <- mkWrapperName "ghc_wrapper" (unpackFS cName)
                   let fcall' = CCall (CCallSpec
                                       (StaticTarget (unpackFS wrapperName)
-                                                    wrapperName mPackageKey
+                                                    wrapperName mUnitId
                                                     True)
                                       CApiConv safety)
                       c = includes

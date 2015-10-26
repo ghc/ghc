@@ -452,8 +452,9 @@ mask_ io = mask $ \_ -> io
 mask io = do
   b <- getMaskingState
   case b of
-    Unmasked -> block $ io unblock
-    _        -> io id
+    Unmasked              -> block $ io unblock
+    MaskedInterruptible   -> io block
+    MaskedUninterruptible -> io blockUninterruptible
 
 uninterruptibleMask_ io = uninterruptibleMask $ \_ -> io
 
@@ -462,7 +463,7 @@ uninterruptibleMask io = do
   case b of
     Unmasked              -> blockUninterruptible $ io unblock
     MaskedInterruptible   -> blockUninterruptible $ io block
-    MaskedUninterruptible -> io id
+    MaskedUninterruptible -> io blockUninterruptible
 
 bracket
         :: IO a         -- ^ computation to run first (\"acquire resource\")

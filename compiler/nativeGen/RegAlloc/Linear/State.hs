@@ -56,12 +56,12 @@ instance Functor (RegM freeRegs) where
       fmap = liftM
 
 instance Applicative (RegM freeRegs) where
-      pure = return
+      pure a  =  RegM $ \s -> (# s, a #)
       (<*>) = ap
 
 instance Monad (RegM freeRegs) where
   m >>= k   =  RegM $ \s -> case unReg m s of { (# s, a #) -> unReg (k a) s }
-  return a  =  RegM $ \s -> (# s, a #)
+  return    =  pure
 
 instance HasDynFlags (RegM a) where
     getDynFlags = RegM $ \s -> (# s, ra_DynFlags s #)

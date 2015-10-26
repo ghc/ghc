@@ -250,12 +250,12 @@ nameToCLabel :: Name -> String -> String
 nameToCLabel n suffix = label where
     encodeZ = zString . zEncodeFS
     (Module pkgKey modName) = ASSERT( isExternalName n ) nameModule n
-    packagePart = encodeZ (packageKeyFS pkgKey)
+    packagePart = encodeZ (unitIdFS pkgKey)
     modulePart  = encodeZ (moduleNameFS modName)
     occPart     = encodeZ (occNameFS (nameOccName n))
 
     label = concat
-        [ if pkgKey == mainPackageKey then "" else packagePart ++ "_"
+        [ if pkgKey == mainUnitId then "" else packagePart ++ "_"
         , modulePart
         , '_':occPart
         , '_':suffix

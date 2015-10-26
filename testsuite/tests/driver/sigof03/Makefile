@@ -11,8 +11,9 @@ sigof03:
 	rm -rf tmp_sigof03
 	mkdir tmp_sigof03
 	'$(TEST_HC)' $(S03_OPTS) -c A.hs
-	'$(TEST_HC)' $(S03_OPTS) -c ASig1.hsig -sig-of "ASig1 is main:A, ASig2 is main:A"
-	'$(TEST_HC)' $(S03_OPTS) -c ASig2.hsig -sig-of "ASig1 is main:A, ASig2 is main:A"
+	'$(TEST_HC)' $(S03_OPTS) -c ASig1.hs-boot -sig-of "ASig1 is main:A, ASig2 is main:A"
+	'$(TEST_HC)' $(S03_OPTS) -c ASig2.hs-boot -sig-of "ASig1 is main:A, ASig2 is main:A"
+	'$(TEST_HC)' $(S03_OPTS) --merge-requirements ASig1 ASig2
 	'$(TEST_HC)' $(S03_OPTS) -c Main.hs
 	'$(TEST_HC)' $(S03_OPTS) tmp_sigof03/A.o tmp_sigof03/Main.o -o tmp_sigof03/Main
 	./tmp_sigof03/Main

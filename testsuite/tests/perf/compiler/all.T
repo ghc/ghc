@@ -416,7 +416,7 @@ test('T783',
             # 2014-09-03: 223377364 (Windows) better specialisation, raft of core-to-core optimisations
             # 2014-12-22: 235002220 (Windows) not sure why
 
-           (wordsize(64), 548288760, 10)]),
+           (wordsize(64), 470738808, 10)]),
             # prev:       349263216 (amd64/Linux)
             # 07/08/2012: 384479856 (amd64/Linux)
             # 29/08/2012: 436927840 (amd64/Linux)
@@ -437,6 +437,8 @@ test('T783',
 	    #    this test seems to be an extreme outlier.)
             # 2015-05-16: 548288760  (amd64/Linux)
 	    #   (improved sequenceBlocks in nativeCodeGen, #10422)
+            # 2015-08-07: 470738808  (amd64/Linux)
+	    #   (simplifying the switch plan code path for simple checks, #10677)
       extra_hc_opts('-static')
       ],
       compile,[''])
@@ -450,7 +452,7 @@ test('T5321Fun',
              #  (increase due to new codegen)
              # 2014-09-03: 299656164     (specialisation and inlining)
              # 10/12/2014: 206406188     #  Improvements in constraint solver
-            (wordsize(64), 429921312, 10)])
+            (wordsize(64), 509921312, 10)])
              # prev:       585521080
              # 29/08/2012: 713385808     #  (increase due to new codegen)
              # 15/05/2013: 628341952     #  (reason for decrease unknown)
@@ -460,6 +462,9 @@ test('T5321Fun',
              # 06/11/2014: 541287000     #  Simon's flat-skol changes to the constraint solver
              # 10/12/2014: 408110888     #  Improvements in constraint solver
              # 16/12/2014: 429921312     #  Flattener parameterized over roles
+             # 10/08/2015: 509921312
+             #  (undefined now takes an implicit parameter and GHC -O0 does
+             #  not recognize that the application is bottom)
       ],
       compile,[''])
 
@@ -472,7 +477,7 @@ test('T5321FD',
             #  (increase due to new codegen)
             # 2014-07-31: 211699816 (Windows) (-11%)
             #  (due to better optCoercion, 5e7406d9, #9233)
-           (wordsize(64), 410895536, 10)])
+           (wordsize(64), 470895536, 10)])
             # prev:       418306336
             # 29/08/2012: 492905640
             #  (increase due to new codegen)
@@ -486,6 +491,9 @@ test('T5321FD',
             #  (due to better optCoercion, 5e7406d9, #9233)
             # 2014-10-08  410895536
             #  (various changes; biggest improvements due to 949ad67 and FastString package ids)
+            # 2015-08-10: 470895536
+            #  (undefined now takes an implicit parameter and GHC -O0 does
+            #  not recognize that the application is bottom)
       ],
       compile,[''])
 
@@ -570,11 +578,12 @@ test('T9020',
           [(wordsize(32), 343005716, 10),
            # Original:    381360728
            # 2014-07-31:  343005716 (Windows) (general round of updates)
-           (wordsize(64), 680162056, 10)])
+           (wordsize(64), 786189008, 10)])
            # prev:        795469104
            # 2014-07-17:  728263536 (general round of updates)
            # 2014-09-10:  785871680 post-AMP-cleanup
            # 2014-11-03:  680162056 Further Applicative and Monad adjustments
+           # 2015-10-21:  786189008 Make stronglyConnCompFromEdgedVertices deterministic
       ],
       compile,[''])
 

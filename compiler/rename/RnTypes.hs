@@ -13,8 +13,10 @@ module RnTypes (
         rnHsKind, rnLHsKind, rnLHsMaybeKind,
         rnHsSigType, rnHsWcType,
         rnHsSigWcType, rnHsSigWcTypeScoped,
-        rnLHsInstType, rnConDeclFields,
+        rnLHsInstType,
         newTyVarNameRn, collectAnonWildCards,
+        rnConDeclFields,
+        rnLTyVar, rnLHsTyVarBndr,
 
         -- Precence related stuff
         mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
@@ -40,6 +42,7 @@ import TysPrim          ( funTyConName )
 import Name
 import SrcLoc
 import NameSet
+import FieldLabel
 
 import Util
 import BasicTypes       ( compareFixity, funTyFixity, negateFixity,
@@ -383,7 +386,7 @@ rnHsTyKi _ doc (HsBangTy b ty)
 rnHsTyKi _ doc ty@(HsRecTy flds)
   = do { addErr (hang (ptext (sLit "Record syntax is illegal here:"))
                     2 (ppr ty))
-       ; (flds', fvs) <- rnConDeclFields doc flds
+       ; (flds', fvs) <- rnConDeclFields [] doc flds
        ; return (HsRecTy flds', fvs) }
 
 rnHsTyKi what doc (HsFunTy ty1 ty2)
@@ -528,6 +531,10 @@ rnTyVar what rdr_name
   | isRnKind what = lookupKindOccRn rdr_name
   | otherwise     = lookupTypeOccRn rdr_name
 
+rnLTyVar :: Located RdrName -> RnM (Located Name)
+rnLTyVar (L loc rdr_name)
+  = do { tyvar <- lookupTypeOccRn rdr_name
+       ; return (L loc tyvar) }
 
 --------------
 rnLHsTypes :: HsDocContext -> [LHsType RdrName]
@@ -666,21 +673,22 @@ bindLHsTyVarBndrs doc mb_assoc tv_bndrs thing_inside
        ; when (isNothing mb_assoc) (checkShadowedRdrNames tv_names_w_loc)
 
        ; rdr_env <- getLocalRdrEnv
-       ; (tv_bndrs', fvs1) <- mapFvRn (rn_tv_bndr rdr_env) tv_bndrs
+       ; (tv_bndrs', fvs1) <- mapFvRn (rnLHsTyVarBndr doc mb_assoc rdr_env) tv_bndrs
        ; (res, fvs2) <- bindLocalNamesFV (map hsLTyVarName tv_bndrs') $
                         thing_inside tv_bndrs'
        ; return (res, fvs1 `plusFV` fvs2) }
-  where
-    rn_tv_bndr :: LocalRdrEnv -> LHsTyVarBndr RdrName -> RnM (LHsTyVarBndr Name, FreeVars)
-    rn_tv_bndr rdr_env (L loc (UserTyVar rdr))
-      = do { nm <- newTyVarNameRn mb_assoc rdr_env loc rdr
-           ; return (L loc (UserTyVar nm), emptyFVs) }
-    rn_tv_bndr rdr_env (L loc (KindedTyVar (L lv rdr) kind))
-      = do { sig_ok <- xoptM Opt_KindSignatures
-           ; unless sig_ok (badKindSigErr doc kind)
-           ; nm <- newTyVarNameRn mb_assoc rdr_env loc rdr
-           ; (kind', fvs) <- rnLHsKind doc kind
-           ; return (L loc (KindedTyVar (L lv nm) kind'), fvs) }
+
+rnLHsTyVarBndr :: HsDocContext -> Maybe a -> LocalRdrEnv
+               -> LHsTyVarBndr RdrName -> RnM (LHsTyVarBndr Name, FreeVars)
+rnLHsTyVarBndr _ mb_assoc rdr_env (L loc (UserTyVar rdr))
+  = do { nm <- newTyVarNameRn mb_assoc rdr_env loc rdr
+       ; return (L loc (UserTyVar nm), emptyFVs) }
+rnLHsTyVarBndr doc mb_assoc rdr_env (L loc (KindedTyVar (L lv rdr) kind))
+  = do { sig_ok <- xoptM Opt_KindSignatures
+       ; unless sig_ok (badKindSigErr doc kind)
+       ; nm <- newTyVarNameRn mb_assoc rdr_env loc rdr
+       ; (kind', fvs) <- rnLHsKind doc kind
+       ; return (L loc (KindedTyVar (L lv nm) kind'), fvs) }
 
 newTyVarNameRn :: Maybe a -> LocalRdrEnv -> SrcSpan -> RdrName -> RnM Name
 newTyVarNameRn mb_assoc rdr_env loc rdr
@@ -732,23 +740,48 @@ collectWildCards lty = go lty
     gos = mconcat . map go
 
 
-{- *****************************************************
-*                                                      *
-          Contexts and predicates
-*                                                      *
-***************************************************** -}
+{-
+*********************************************************
+*                                                       *
+        ConDeclField
+*                                                       *
+*********************************************************
 
-rnConDeclFields :: HsDocContext -> [LConDeclField RdrName]
+When renaming a ConDeclField, we have to find the FieldLabel
+associated with each field.  But we already have all the FieldLabels
+available (since they were brought into scope by
+RnNames.getLocalNonValBinders), so we just take the list as an
+argument, build a map and look them up.
+-}
+
+rnConDeclFields :: [FieldLabel] -> HsDocContext -> [LConDeclField RdrName]
                 -> RnM ([LConDeclField Name], FreeVars)
-rnConDeclFields doc fields = mapFvRn (rnField doc) fields
+rnConDeclFields fls doc fields = mapFvRn (rnField fl_env doc) fields
+  where
+    fl_env = mkFsEnv [ (flLabel fl, fl) | fl <- fls ]
 
-rnField :: HsDocContext -> LConDeclField RdrName
+rnField :: FastStringEnv FieldLabel -> HsDocContext -> LConDeclField RdrName
         -> RnM (LConDeclField Name, FreeVars)
-rnField doc (L l (ConDeclField names ty haddock_doc))
-  = do { new_names <- mapM lookupLocatedTopBndrRn names
+rnField fl_env doc (L l (ConDeclField names ty haddock_doc))
+  = do { let new_names = map (fmap lookupField) names
        ; (new_ty, fvs) <- rnLHsType doc ty
        ; new_haddock_doc <- rnMbLHsDoc haddock_doc
        ; return (L l (ConDeclField new_names new_ty new_haddock_doc), fvs) }
+  where
+    lookupField :: FieldOcc RdrName -> FieldOcc Name
+    lookupField (FieldOcc rdr _) = FieldOcc rdr (flSelector fl)
+      where
+        lbl = occNameFS $ rdrNameOcc rdr
+        fl  = expectJust "rnField" $ lookupFsEnv fl_env lbl
+
+
+{-
+*********************************************************
+*                                                       *
+        Contexts
+*                                                       *
+*********************************************************
+-}
 
 rnContext :: HsDocContext -> LHsContext RdrName -> RnM (LHsContext Name, FreeVars)
 rnContext doc (L loc cxt)
@@ -872,7 +905,7 @@ mkOpAppRn e1 op fix e2                  -- Default case, no rearrangment
 
 ----------------------------
 get_op :: LHsExpr Name -> Name
--- An unbound name could be either HsVar or HsUnboundVra
+-- An unbound name could be either HsVar or HsUnboundVar
 -- See RnExpr.rnUnboundVar
 get_op (L _ (HsVar n))          = n
 get_op (L _ (HsUnboundVar occ)) = mkUnboundName occ
@@ -1167,9 +1200,14 @@ extractHsTysRdrTyVars ty
   = case extract_ltys ty ([],[]) of
      (kvs, tvs) -> (nub kvs, nub tvs)
 
-extractRdrKindSigVars :: Maybe (LHsKind RdrName) -> [RdrName]
-extractRdrKindSigVars Nothing = []
-extractRdrKindSigVars (Just k) = nub (fst (extract_lkind k ([],[])))
+extractRdrKindSigVars :: LFamilyResultSig RdrName -> [RdrName]
+extractRdrKindSigVars (L _ resultSig)
+    | KindSig k                        <- resultSig = kindRdrNameFromSig k
+    | TyVarSig (L _ (KindedTyVar _ k)) <- resultSig = kindRdrNameFromSig k
+    | TyVarSig (L _ (UserTyVar _))     <- resultSig = []
+    | otherwise = [] -- this can only be NoSig but pattern exhasutiveness
+                     -- checker complains about "NoSig <- resultSig"
+    where kindRdrNameFromSig k = nub (fst (extract_lkind k ([],[])))
 
 extractDataDefnKindVars :: HsDataDefn RdrName -> [RdrName]
 -- Get the scoped kind variables mentioned free in the constructor decls

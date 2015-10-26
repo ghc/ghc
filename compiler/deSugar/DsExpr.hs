@@ -33,6 +33,7 @@ import TcType
 import Coercion ( Role(..) )
 import TcEvidence
 import TcRnMonad
+import TcHsSyn
 import Type
 import CoreSyn
 import CoreUtils
@@ -57,6 +58,7 @@ import Bag
 import Outputable
 import FastString
 
+import IfaceEnv
 import IdInfo
 import Data.IORef       ( atomicModifyIORef', modifyIORef )
 
@@ -434,7 +436,7 @@ dsExpr (HsStatic expr@(L loc _)) = do
     info <- mkConApp staticPtrInfoDataCon <$>
             (++[srcLoc]) <$>
             mapM mkStringExprFS
-                 [ packageKeyFS $ modulePackageKey $ nameModule n'
+                 [ unitIdFS $ moduleUnitId $ nameModule n'
                  , moduleNameFS $ moduleName $ nameModule n'
                  , occNameFS    $ nameOccName n'
                  ]
@@ -460,7 +462,7 @@ dsExpr (HsStatic expr@(L loc _)) = do
 
     fingerprintName :: Name -> Fingerprint
     fingerprintName n = fingerprintString $ unpackFS $ concatFS
-        [ packageKeyFS $ modulePackageKey $ nameModule n
+        [ unitIdFS $ moduleUnitId $ nameModule n
         , fsLit ":"
         , moduleNameFS (moduleName $ nameModule n)
         , fsLit "."
@@ -497,11 +499,11 @@ dsExpr (RecordCon (L _ data_con_id) con_expr rbinds) = do
         -- A newtype in the corner should be opaque;
         -- hence TcType.tcSplitFunTys
 
-        mk_arg (arg_ty, lbl)    -- Selector id has the field label as its name
-          = case findField (rec_flds rbinds) lbl of
+        mk_arg (arg_ty, fl)
+          = case findField (rec_flds rbinds) (flSelector fl) of
               (rhs:rhss) -> ASSERT( null rhss )
                             dsLExpr rhs
-              []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (ppr lbl)
+              []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (ppr (flLabel fl))
         unlabelled_bottom arg_ty = mkErrorAppDs rEC_CON_ERROR_ID arg_ty Outputable.empty
 
         labels = dataConFieldLabels (idDataCon data_con_id)
@@ -548,7 +550,7 @@ But if x::T a b, then
 So we need to cast (T a Int) to (T a b).  Sigh.
 -}
 
-dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
+dsExpr expr@(RecordUpd record_expr fields
                        cons_to_upd in_inst_tys out_inst_tys)
   | null fields
   = dsLExpr record_expr
@@ -574,13 +576,13 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
         ; return (add_field_binds field_binds' $
                   bindNonRec discrim_var record_expr' matching_code) }
   where
-    ds_field :: LHsRecField Id (LHsExpr Id) -> DsM (Name, Id, CoreExpr)
+    ds_field :: LHsRecUpdField Id -> DsM (Name, Id, CoreExpr)
       -- Clone the Id in the HsRecField, because its Name is that
-      -- of the record selector, and we must not make that a lcoal binder
+      -- of the record selector, and we must not make that a local binder
       -- else we shadow other uses of the record selector
       -- Hence 'lcl_id'.  Cf Trac #2735
     ds_field (L _ rec_field) = do { rhs <- dsLExpr (hsRecFieldArg rec_field)
-                                  ; let fld_id = unLoc (hsRecFieldId rec_field)
+                                  ; let fld_id = unLoc (hsRecUpdFieldId rec_field)
                                   ; lcl_id <- newSysLocalDs (idType fld_id)
                                   ; return (idName fld_id, lcl_id, rhs) }
 
@@ -604,8 +606,8 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
            ; arg_ids    <- newSysLocalsDs (substTys subst arg_tys)
            ; let val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
                                          (dataConFieldLabels con) arg_ids
-                 mk_val_arg field_name pat_arg_id
-                     = nlHsVar (lookupNameEnv upd_fld_env field_name `orElse` pat_arg_id)
+                 mk_val_arg fl pat_arg_id
+                     = nlHsVar (lookupNameEnv upd_fld_env (flSelector fl) `orElse` pat_arg_id)
                  inst_con = noLoc $ HsWrap wrap (HsVar (dataConWrapId con))
                         -- Reconstruct with the WrapId so that unpacking happens
                  wrap = mkWpEvVarApps theta_vars          <.>
@@ -682,13 +684,13 @@ dsExpr (EViewPat      {})  = panic "dsExpr:EViewPat"
 dsExpr (ELazyPat      {})  = panic "dsExpr:ELazyPat"
 dsExpr (HsType        {})  = panic "dsExpr:HsType"
 dsExpr (HsDo          {})  = panic "dsExpr:HsDo"
-
+dsExpr (HsSingleRecFld{})  = panic "dsExpr: HsSingleRecFld"
 
 
 findField :: [LHsRecField Id arg] -> Name -> [arg]
-findField rbinds lbl
-  = [rhs | L _ (HsRecField { hsRecFieldId = id, hsRecFieldArg = rhs }) <- rbinds
-         , lbl == idName (unLoc id) ]
+findField rbinds sel
+  = [hsRecFieldArg fld | L _ fld <- rbinds
+                       , sel == idName (unLoc $ hsRecFieldId fld) ]
 
 {-
 %--------------------------------------------------------------------
@@ -819,7 +821,7 @@ dsDo stmts
     goL [] = panic "dsDo"
     goL (L loc stmt:lstmts) = putSrcSpanDs loc (go loc stmt lstmts)
 
-    go _ (LastStmt body _) stmts
+    go _ (LastStmt body _ _) stmts
       = ASSERT( null stmts ) dsLExpr body
         -- The 'return' op isn't used for 'do' expressions
 
@@ -846,13 +848,45 @@ dsDo stmts
             ; match_code <- handle_failure pat match fail_op
             ; return (mkApps bind_op' [rhs', Lam var match_code]) }
 
+    go _ (ApplicativeStmt args mb_join body_ty) stmts
+      = do {
+             let
+               (pats, rhss) = unzip (map (do_arg . snd) args)
+
+               do_arg (ApplicativeArgOne pat expr) =
+                 (pat, dsLExpr expr)
+               do_arg (ApplicativeArgMany stmts ret pat) =
+                 (pat, dsDo (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
+
+               arg_tys = map hsLPatType pats
+
+           ; rhss' <- sequence rhss
+           ; ops' <- mapM dsExpr (map fst args)
+
+           ; let body' = noLoc $ HsDo DoExpr stmts body_ty
+
+           ; let fun = L noSrcSpan $ HsLam $
+                   MG { mg_alts = [mkSimpleMatch pats body']
+                      , mg_arg_tys = arg_tys
+                      , mg_res_ty = body_ty
+                      , mg_origin = Generated }
+
+           ; fun' <- dsLExpr fun
+           ; let mk_ap_call l (op,r) = mkApps op [l,r]
+                 expr = foldl mk_ap_call fun' (zip ops' rhss')
+           ; case mb_join of
+               Nothing -> return expr
+               Just join_op ->
+                 do { join_op' <- dsExpr join_op
+                    ; return (App join_op' expr) } }
+
     go loc (RecStmt { recS_stmts = rec_stmts, recS_later_ids = later_ids
                     , recS_rec_ids = rec_ids, recS_ret_fn = return_op
                     , recS_mfix_fn = mfix_op, recS_bind_fn = bind_op
                     , recS_rec_rets = rec_rets, recS_ret_ty = body_ty }) stmts
       = goL (new_bind_stmt : stmts)  -- rec_ids can be empty; eg  rec { print 'x' }
       where
-        new_bind_stmt = L loc $ BindStmt (mkBigLHsPatTup later_pats)
+        new_bind_stmt = L loc $ BindStmt (mkBigLHsPatTupId later_pats)
                                          mfix_app bind_op
                                          noSyntaxExpr  -- Tuple cannot fail
 
@@ -865,9 +899,9 @@ dsDo stmts
         mfix_arg     = noLoc $ HsLam (MG { mg_alts = [mkSimpleMatch [mfix_pat] body]
                                          , mg_arg_tys = [tup_ty], mg_res_ty = body_ty
                                          , mg_origin = Generated })
-        mfix_pat     = noLoc $ LazyPat $ mkBigLHsPatTup rec_tup_pats
+        mfix_pat     = noLoc $ LazyPat $ mkBigLHsPatTupId rec_tup_pats
         body         = noLoc $ HsDo DoExpr (rec_stmts ++ [ret_stmt]) body_ty
-        ret_app      = nlHsApp (noLoc return_op) (mkBigLHsTup rets)
+        ret_app      = nlHsApp (noLoc return_op) (mkBigLHsTupId rets)
         ret_stmt     = noLoc $ mkLastStmt ret_app
                      -- This LastStmt will be desugared with dsDo,
                      -- which ignores the return_op in the LastStmt,
@@ -952,10 +986,9 @@ badMonadBind rhs elt_ty flag_doc
 --
 mkSptEntryName :: SrcSpan -> DsM Name
 mkSptEntryName loc = do
-    uniq <- newUnique
     mod  <- getModule
     occ  <- mkWrapperName "sptEntry"
-    return $ mkExternalName uniq mod occ loc
+    newGlobalBinder mod occ loc
   where
     mkWrapperName what
       = do dflags <- getDynFlags

@@ -317,12 +317,12 @@ minClosureSize dflags = fixedHdrSizeW dflags + mIN_PAYLOAD_SIZE dflags
 
 arrWordsHdrSize :: DynFlags -> ByteOff
 arrWordsHdrSize dflags
- = fixedHdrSize dflags + sIZEOF_StgArrWords_NoHdr dflags
+ = fixedHdrSize dflags + sIZEOF_StgArrBytes_NoHdr dflags
 
 arrWordsHdrSizeW :: DynFlags -> WordOff
 arrWordsHdrSizeW dflags =
     fixedHdrSizeW dflags +
-    (sIZEOF_StgArrWords_NoHdr dflags `quot` wORD_SIZE dflags)
+    (sIZEOF_StgArrBytes_NoHdr dflags `quot` wORD_SIZE dflags)
 
 arrPtrsHdrSize :: DynFlags -> ByteOff
 arrPtrsHdrSize dflags

@@ -19,7 +19,7 @@ module RnNames (
 
 import DynFlags
 import HsSyn
-import TcEnv            ( isBrackStage )
+import TcEnv
 import RnEnv
 import RnHsDoc          ( rnHsDoc )
 import LoadIface        ( loadSrcInterface )
@@ -30,6 +30,7 @@ import Name
 import NameEnv
 import NameSet
 import Avail
+import FieldLabel
 import HscTypes
 import RdrName
 import RdrHsSyn        ( setRdrNameSpace )
@@ -40,12 +41,16 @@ import BasicTypes      ( TopLevelFlag(..), StringLiteral(..) )
 import ErrUtils
 import Util
 import FastString
+import FastStringEnv
 import ListSetOps
 
 import Control.Monad
+import Data.Either      ( partitionEithers, isRight, rights )
+import qualified Data.Foldable as Foldable
 import Data.Map         ( Map )
 import qualified Data.Map as Map
-import Data.List        ( partition, (\\), find )
+import Data.Ord         ( comparing )
+import Data.List        ( partition, (\\), find, sortBy )
 import qualified Data.Set as Set
 import System.FilePath  ((</>))
 import System.IO
@@ -217,7 +222,7 @@ rnImportDecl this_mod
                            -- c.f. GHC.findModule, and Trac #9997
              Nothing         -> True
              Just (StringLiteral _ pkg_fs) -> pkg_fs == fsLit "this" ||
-                            fsToPackageKey pkg_fs == modulePackageKey this_mod))
+                            fsToUnitId pkg_fs == moduleUnitId this_mod))
          (addErr (ptext (sLit "A module cannot import itself:") <+> ppr imp_mod_name))
 
     -- Check for a missing import list (Opt_WarnMissingImportList also
@@ -229,15 +234,11 @@ rnImportDecl this_mod
            | otherwise  -> whenWOptM Opt_WarnMissingImportList $
                            addWarn (missingImportListWarn imp_mod_name)
 
-    ifaces <- loadSrcInterface doc imp_mod_name want_boot (fmap sl_fs mb_pkg)
+    iface <- loadSrcInterface doc imp_mod_name want_boot (fmap sl_fs mb_pkg)
 
     -- Compiler sanity check: if the import didn't say
     -- {-# SOURCE #-} we should not get a hi-boot file
-    WARN( not want_boot && any mi_boot ifaces, ppr imp_mod_name ) do
-
-    -- Another sanity check: we should not get multiple interfaces
-    -- if we're looking for an hi-boot file
-    WARN( want_boot && length ifaces /= 1, ppr imp_mod_name ) do
+    WARN( not want_boot && mi_boot iface, ppr imp_mod_name ) do
 
     -- Issue a user warning for a redundant {- SOURCE -} import
     -- NB that we arrange to read all the ordinary imports before
@@ -248,7 +249,7 @@ rnImportDecl this_mod
     -- the non-boot module depends on the compilation order, which
     -- is not deterministic.  The hs-boot test can show this up.
     dflags <- getDynFlags
-    warnIf (want_boot && any (not.mi_boot) ifaces && isOneShot (ghcMode dflags))
+    warnIf (want_boot && not (mi_boot iface) && isOneShot (ghcMode dflags))
            (warnRedundantSourceImport imp_mod_name)
     when (mod_safe && not (safeImportsOn dflags)) $
         addErr (ptext (sLit "safe import can't be used as Safe Haskell isn't on!")
@@ -261,7 +262,7 @@ rnImportDecl this_mod
                                   is_dloc = loc, is_as = qual_mod_name }
 
     -- filter the imports according to the import declaration
-    (new_imp_details, gres) <- filterImports ifaces imp_spec imp_details
+    (new_imp_details, gres) <- filterImports iface imp_spec imp_details
 
     let gbl_env = mkGlobalRdrEnv gres
 
@@ -276,17 +277,13 @@ rnImportDecl this_mod
                     || (implicit && safeImplicitImpsReq dflags)
 
     let imports
-          = foldr plusImportAvails emptyImportAvails (map
-             (\iface ->
-              (calculateAvails dflags iface mod_safe' want_boot) {
+          = (calculateAvails dflags iface mod_safe' want_boot) {
                 imp_mods = unitModuleEnv (mi_module iface)
-                            [(qual_mod_name, import_all, loc, mod_safe')] })
-             ifaces)
+                            [(qual_mod_name, import_all, loc, mod_safe')] }
 
     -- Complain if we import a deprecated module
     whenWOptM Opt_WarnWarningsDeprecations (
-      forM_ ifaces $ \iface ->
-       case mi_warns iface of
+       case (mi_warns iface) of
           WarnAll txt -> addWarn $ moduleWarn imp_mod_name txt
           _           -> return ()
      )
@@ -294,7 +291,7 @@ rnImportDecl this_mod
     let new_imp_decl = L loc (decl { ideclSafe = mod_safe'
                                    , ideclHiding = new_imp_details })
 
-    return (new_imp_decl, gbl_env, imports, any mi_hpc ifaces)
+    return (new_imp_decl, gbl_env, imports, mi_hpc iface)
 
 -- | Calculate the 'ImportAvails' induced by an import of a particular
 -- interface, but without 'imp_mods'.
@@ -340,7 +337,7 @@ calculateAvails dflags iface mod_safe' want_boot =
                             imp_mod : dep_finsts deps
              | otherwise  = dep_finsts deps
 
-      pkg = modulePackageKey (mi_module iface)
+      pkg = moduleUnitId (mi_module iface)
 
       -- Does this import mean we now require our own pkg
       -- to be trusted? See Note [Trust Own Package]
@@ -517,7 +514,7 @@ extendGlobalRdrEnvRn avails new_fixities
 ********************************************************************* -}
 
 getLocalNonValBinders :: MiniFixityEnv -> HsGroup RdrName
-                      -> RnM ((TcGblEnv, TcLclEnv), NameSet)
+    -> RnM ((TcGblEnv, TcLclEnv), NameSet)
 -- Get all the top-level binders bound the group *except*
 -- for value bindings, which are treated separately
 -- Specifically we return AvailInfo for
@@ -533,7 +530,9 @@ getLocalNonValBinders fixity_env
                 hs_instds = inst_decls,
                 hs_fords  = foreign_decls })
   = do  { -- Process all type/class decls *except* family instances
-        ; tc_avails <- mapM new_tc (tyClGroupConcat tycl_decls)
+        ; overload_ok <- xoptM Opt_DuplicateRecordFields
+        ; (tc_avails, tc_fldss) <- fmap unzip $ mapM (new_tc overload_ok)
+                                                     (tyClGroupConcat tycl_decls)
         ; traceRn (text "getLocalNonValBinders 1" <+> ppr tc_avails)
         ; envs <- extendGlobalRdrEnvRn tc_avails fixity_env
         ; setEnvs envs $ do {
@@ -542,7 +541,8 @@ getLocalNonValBinders fixity_env
 
           -- Process all family instances
           -- to bring new data constructors into scope
-        ; nti_avails <- concatMapM new_assoc inst_decls
+        ; (nti_availss, nti_fldss) <- mapAndUnzipM (new_assoc overload_ok)
+                                                   inst_decls
 
           -- Finish off with value binders:
           --    foreign decls and pattern synonyms for an ordinary module
@@ -552,11 +552,19 @@ getLocalNonValBinders fixity_env
                         | otherwise = for_hs_bndrs
         ; val_avails <- mapM new_simple val_bndrs
 
-        ; let avails    = nti_avails ++ val_avails
+        ; let avails    = concat nti_availss ++ val_avails
               new_bndrs = availsToNameSet avails `unionNameSet`
                           availsToNameSet tc_avails
+              flds      = concat nti_fldss ++ concat tc_fldss
         ; traceRn (text "getLocalNonValBinders 2" <+> ppr avails)
-        ; envs <- extendGlobalRdrEnvRn avails fixity_env
+        ; (tcg_env, tcl_env) <- extendGlobalRdrEnvRn avails fixity_env
+
+        -- Extend tcg_field_env with new fields (this used to be the
+        -- work of extendRecordFieldEnv)
+        ; let field_env = extendNameEnvList (tcg_field_env tcg_env) flds
+              envs      = (tcg_env { tcg_field_env = field_env }, tcl_env)
+
+        ; traceRn (text "getLocalNonValBinders 3" <+> vcat [ppr flds, ppr field_env])
         ; return (envs, new_bndrs) } }
   where
     ValBindsIn _val_binds val_sigs = binds
@@ -575,34 +583,84 @@ getLocalNonValBinders fixity_env
     new_simple rdr_name = do{ nm <- newTopSrcBinder rdr_name
                             ; return (Avail nm) }
 
-    new_tc tc_decl              -- NOT for type/data instances
-        = do { let bndrs = hsLTyClDeclBinders tc_decl
-             ; names@(main_name : _) <- mapM newTopSrcBinder bndrs
-             ; return (AvailTC main_name names) }
+    new_tc :: Bool -> LTyClDecl RdrName
+           -> RnM (AvailInfo, [(Name, [FieldLabel])])
+    new_tc overload_ok tc_decl -- NOT for type/data instances
+        = do { let (bndrs, flds) = hsLTyClDeclBinders tc_decl
+             ; names@(main_name : sub_names) <- mapM newTopSrcBinder bndrs
+             ; flds' <- mapM (new_rec_sel overload_ok sub_names) flds
+             ; let fld_env = case unLoc tc_decl of
+                     DataDecl { tcdDataDefn = d } -> mk_fld_env d names flds'
+                     _                            -> []
+             ; return (AvailTC main_name names flds', fld_env) }
 
-    new_assoc :: LInstDecl RdrName -> RnM [AvailInfo]
-    new_assoc (L _ (TyFamInstD {})) = return []
+    new_rec_sel :: Bool -> [Name] -> LFieldOcc RdrName -> RnM FieldLabel
+    new_rec_sel _ [] _ = error "new_rec_sel: datatype has no constructors!"
+    new_rec_sel overload_ok (dc:_) (L loc (FieldOcc fld _)) =
+      do { sel_name <- newTopSrcBinder $ L loc $ mkRdrUnqual sel_occ
+         ; return $ fl { flSelector = sel_name } }
+      where
+        lbl     = occNameFS $ rdrNameOcc fld
+        fl      = mkFieldLabelOccs lbl (nameOccName dc) overload_ok
+        sel_occ = flSelector fl
+
+    -- Calculate the mapping from constructor names to fields, which
+    -- will go in tcg_field_env. It's convenient to do this here where
+    -- we are working with a single datatype definition.
+    mk_fld_env :: HsDataDefn RdrName -> [Name] -> [FieldLabel] -> [(Name, [FieldLabel])]
+    mk_fld_env d names flds = concatMap find_con_flds (dd_cons d)
+      where
+        find_con_flds (L _ (ConDecl { con_names   = rdrs
+                                    , con_details = RecCon cdflds }))
+            = map (\ (L _ rdr) -> ( find_con_name rdr
+                                  , concatMap find_con_decl_flds (unLoc cdflds)))
+                  rdrs
+        find_con_flds _ = []
+
+        find_con_name rdr
+          = expectJust "getLocalNonValBinders/find_con_name" $
+              find (\ n -> nameOccName n == rdrNameOcc rdr) names
+        find_con_decl_flds (L _ x)
+          = map find_con_decl_fld (cd_fld_names x)
+        find_con_decl_fld  (L _ (FieldOcc rdr _))
+          = expectJust "getLocalNonValBinders/find_con_decl_fld" $
+              find (\ fl -> flLabel fl == lbl) flds
+          where lbl = occNameFS (rdrNameOcc rdr)
+
+    new_assoc :: Bool -> LInstDecl RdrName
+              -> RnM ([AvailInfo], [(Name, [FieldLabel])])
+    new_assoc _ (L _ (TyFamInstD {})) = return ([], [])
       -- type instances don't bind new names
 
-    new_assoc (L _ (DataFamInstD { dfid_inst = d }))
-      = do { avail <- new_di Nothing d
-           ; return [avail] }
-    new_assoc (L _ (ClsInstD { cid_inst = ClsInstDecl
-                             { cid_poly_ty = inst_ty
-                             , cid_datafam_insts = adts } }))
+    new_assoc overload_ok (L _ (DataFamInstD d))
+      = do { (avail, flds) <- new_di overload_ok Nothing d
+           ; return ([avail], flds) }
+    new_assoc overload_ok (L _ (ClsInstD (ClsInstDecl { cid_poly_ty = inst_ty
+                                                      , cid_datafam_insts = adts })))
       | Just (L loc cls_rdr) <- getLHsInstDeclClass_maybe inst_ty
       = do { cls_nm <- setSrcSpan loc $ lookupGlobalOccRn cls_rdr
-           ; mapM (new_di (Just cls_nm) . unLoc) adts }
+           ; (avails, fldss)
+                    <- mapAndUnzipM (new_loc_di overload_ok (Just cls_nm)) adts
+           ; return (avails, concat fldss) }
       | otherwise
-      = return []     -- Do not crash on ill-formed instances
-                      -- Eg   instance !Show Int   Trac #3811c
+      = return ([], [])    -- Do not crash on ill-formed instances
+                           -- Eg   instance !Show Int   Trac #3811c
 
-    new_di :: Maybe Name -> DataFamInstDecl RdrName -> RnM AvailInfo
-    new_di mb_cls ti_decl
+    new_di :: Bool -> Maybe Name -> DataFamInstDecl RdrName
+                   -> RnM (AvailInfo, [(Name, [FieldLabel])])
+    new_di overload_ok mb_cls ti_decl
         = do { main_name <- lookupFamInstName mb_cls (dfid_tycon ti_decl)
-             ; sub_names <- mapM newTopSrcBinder (hsDataFamInstBinders ti_decl)
-             ; return (AvailTC (unLoc main_name) sub_names) }
-                        -- main_name is not bound here!
+             ; let (bndrs, flds) = hsDataFamInstBinders ti_decl
+             ; sub_names <- mapM newTopSrcBinder bndrs
+             ; flds' <- mapM (new_rec_sel overload_ok sub_names) flds
+             ; let avail    = AvailTC (unLoc main_name) sub_names flds'
+                                  -- main_name is not bound here!
+                   fld_env  = mk_fld_env (dfid_defn ti_decl) sub_names flds'
+             ; return (avail, fld_env) }
+
+    new_loc_di :: Bool -> Maybe Name -> LDataFamInstDecl RdrName
+                   -> RnM (AvailInfo, [(Name, [FieldLabel])])
+    new_loc_di overload_ok mb_cls (L _ d) = new_di overload_ok mb_cls d
 
 {-
 Note [Looking up family names in family instances]
@@ -661,18 +719,18 @@ although we never look up data constructors.
 -}
 
 filterImports
-    :: [ModIface]
+    :: ModIface
     -> ImpDeclSpec                     -- The span for the entire import decl
     -> Maybe (Bool, Located [LIE RdrName])    -- Import spec; True => hiding
     -> RnM (Maybe (Bool, Located [LIE Name]), -- Import spec w/ Names
             [GlobalRdrElt])                   -- Same again, but in GRE form
 filterImports iface decl_spec Nothing
-  = return (Nothing, gresFromAvails (Just imp_spec) (concatMap mi_exports iface))
+  = return (Nothing, gresFromAvails (Just imp_spec) (mi_exports iface))
   where
     imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
 
 
-filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
+filterImports iface decl_spec (Just (want_hiding, L l import_items))
   = do  -- check for errors, convert RdrNames to Names
         items1 <- mapM lookup_lie import_items
 
@@ -691,7 +749,7 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
 
         return (Just (want_hiding, L l (map fst items2)), gres)
   where
-    all_avails = concatMap mi_exports ifaces
+    all_avails = mi_exports iface
 
         -- See Note [Dealing with imports]
     imp_occ_env :: OccEnv (Name,        -- the name
@@ -704,8 +762,8 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
         -- 'combine' is only called for associated types which appear twice
         -- in the all_avails. In the example, we combine
         --    T(T,T1,T2,T3) and C(C,T)  to give   (T, T(T,T1,T2,T3), Just C)
-        combine (name1, a1@(AvailTC p1 _), mp1)
-                (name2, a2@(AvailTC p2 _), mp2)
+        combine (name1, a1@(AvailTC p1 _ []), mp1)
+                (name2, a2@(AvailTC p2 _ []), mp2)
           = ASSERT( name1 == name2 && isNothing mp1 && isNothing mp2 )
             if p1 == name1 then (name1, a1, Just p2)
                            else (name1, a2, Just p1)
@@ -740,8 +798,7 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
               Succeeded a -> return (Just a)
 
             lookup_err_msg err = case err of
-              BadImport -> badImportItemErr (any mi_boot ifaces) decl_spec
-                                            ieRdr all_avails
+              BadImport -> badImportItemErr iface decl_spec ieRdr all_avails
               IllegalImport -> illegalImportItemErr
               QualImportError rdr -> qualImportItemErr rdr
 
@@ -768,8 +825,8 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
                           Avail {}                     -- e.g. f(..)
                             -> [DodgyImport tc]
 
-                          AvailTC _ subs
-                            | null (drop 1 subs)       -- e.g. T(..) where T is a synonym
+                          AvailTC _ subs fs
+                            | null (drop 1 subs) && null fs -- e.g. T(..) where T is a synonym
                             -> [DodgyImport tc]
 
                             | not (is_qual decl_spec)  -- e.g. import M( T(..) )
@@ -780,12 +837,12 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
 
                 renamed_ie = IEThingAll (L l name)
                 sub_avails = case avail of
-                               Avail {}           -> []
-                               AvailTC name2 subs -> [(renamed_ie, AvailTC name2 (subs \\ [name]))]
+                               Avail {}              -> []
+                               AvailTC name2 subs fs -> [(renamed_ie, AvailTC name2 (subs \\ [name]) fs)]
             case mb_parent of
               Nothing     -> return ([(renamed_ie, avail)], warns)
                              -- non-associated ty/cls
-              Just parent -> return ((renamed_ie, AvailTC parent [name]) : sub_avails, warns)
+              Just parent -> return ((renamed_ie, AvailTC parent [name] []) : sub_avails, warns)
                              -- associated type
 
         IEThingAbs (L l tc)
@@ -802,8 +859,8 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
             -> do nameAvail <- lookup_name tc
                   return ([mkIEThingAbs l nameAvail], [])
 
-        IEThingWith (L l rdr_tc) rdr_ns -> do
-           (name, AvailTC _ ns, mb_parent) <- lookup_name rdr_tc
+        IEThingWith (L l rdr_tc) rdr_ns rdr_fs -> ASSERT2(null rdr_fs, ppr rdr_fs) do
+           (name, AvailTC _ ns subflds, mb_parent) <- lookup_name rdr_tc
 
            -- Look up the children in the sub-names of the parent
            let subnames = case ns of   -- The tc is first in ns,
@@ -811,23 +868,22 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
                                        -- See the AvailTC Invariant in Avail.hs
                             (n1:ns1) | n1 == name -> ns1
                                      | otherwise  -> ns
-               mb_children = lookupChildren subnames rdr_ns
-
-           children <- if any isNothing mb_children
-                       then failLookupWith BadImport
-                       else return (catMaybes mb_children)
-
-           case mb_parent of
-             -- non-associated ty/cls
-             Nothing     -> return ([(IEThingWith (L l name) children,
-                                      AvailTC name (name:map unLoc children))],
-                                    [])
-             -- associated ty
-             Just parent -> return ([(IEThingWith (L l name) children,
-                                      AvailTC name (map unLoc children)),
-                                     (IEThingWith (L l name) children,
-                                      AvailTC parent [name])],
-                                    [])
+           case lookupChildren (map Left subnames ++ map Right subflds) rdr_ns of
+             Nothing                      -> failLookupWith BadImport
+             Just (childnames, childflds) ->
+               case mb_parent of
+                 -- non-associated ty/cls
+                 Nothing
+                   -> return ([(IEThingWith (L l name) childnames childflds,
+                               AvailTC name (name:map unLoc childnames) (map unLoc childflds))],
+                              [])
+                 -- associated ty
+                 Just parent
+                   -> return ([(IEThingWith (L l name) childnames childflds,
+                                AvailTC name (map unLoc childnames) (map unLoc childflds)),
+                               (IEThingWith (L l name) childnames childflds,
+                                AvailTC parent [name] [])],
+                              [])
 
         _other -> failLookupWith IllegalImport
         -- could be IEModuleContents, IEGroup, IEDoc, IEDocNamed
@@ -837,7 +893,7 @@ filterImports ifaces decl_spec (Just (want_hiding, L l import_items))
         mkIEThingAbs l (n, av, Nothing    ) = (IEThingAbs (L l n),
                                                trimAvail av n)
         mkIEThingAbs l (n, _,  Just parent) = (IEThingAbs (L l n),
-                                               AvailTC parent [n])
+                                               AvailTC parent [n] [])
 
         handle_bad_import m = catchIELookup m $ \err -> case err of
           BadImport | want_hiding -> return ([], [BadImportW])
@@ -879,20 +935,31 @@ plusAvail :: AvailInfo -> AvailInfo -> AvailInfo
 plusAvail a1 a2
   | debugIsOn && availName a1 /= availName a2
   = pprPanic "RnEnv.plusAvail names differ" (hsep [ppr a1,ppr a2])
-plusAvail a1@(Avail {})         (Avail {})      = a1
-plusAvail (AvailTC _ [])        a2@(AvailTC {}) = a2
-plusAvail a1@(AvailTC {})       (AvailTC _ [])  = a1
-plusAvail (AvailTC n1 (s1:ss1)) (AvailTC n2 (s2:ss2))
+plusAvail a1@(Avail {})         (Avail {})        = a1
+plusAvail (AvailTC _ [] [])     a2@(AvailTC {})   = a2
+plusAvail a1@(AvailTC {})       (AvailTC _ [] []) = a1
+plusAvail (AvailTC n1 (s1:ss1) fs1) (AvailTC n2 (s2:ss2) fs2)
   = case (n1==s1, n2==s2) of  -- Maintain invariant the parent is first
        (True,True)   -> AvailTC n1 (s1 : (ss1 `unionLists` ss2))
+                                   (fs1 `unionLists` fs2)
        (True,False)  -> AvailTC n1 (s1 : (ss1 `unionLists` (s2:ss2)))
+                                   (fs1 `unionLists` fs2)
        (False,True)  -> AvailTC n1 (s2 : ((s1:ss1) `unionLists` ss2))
+                                   (fs1 `unionLists` fs2)
        (False,False) -> AvailTC n1 ((s1:ss1) `unionLists` (s2:ss2))
+                                   (fs1 `unionLists` fs2)
+plusAvail (AvailTC n1 ss1 fs1) (AvailTC _ [] fs2)
+  = AvailTC n1 ss1 (fs1 `unionLists` fs2)
+plusAvail (AvailTC n1 [] fs1)  (AvailTC _ ss2 fs2)
+  = AvailTC n1 ss2 (fs1 `unionLists` fs2)
 plusAvail a1 a2 = pprPanic "RnEnv.plusAvail" (hsep [ppr a1,ppr a2])
 
+-- | trims an 'AvailInfo' to keep only a single name
 trimAvail :: AvailInfo -> Name -> AvailInfo
-trimAvail (Avail n)      _ = Avail n
-trimAvail (AvailTC n ns) m = ASSERT( m `elem` ns) AvailTC n [m]
+trimAvail (Avail n)         _ = Avail n
+trimAvail (AvailTC n ns fs) m = case find ((== m) . flSelector) fs of
+    Just x  -> AvailTC n [] [x]
+    Nothing -> ASSERT(m `elem` ns) AvailTC n [m] []
 
 -- | filters 'AvailInfo's by the given predicate
 filterAvails  :: (Name -> Bool) -> [AvailInfo] -> [AvailInfo]
@@ -904,9 +971,10 @@ filterAvail keep ie rest =
   case ie of
     Avail n | keep n    -> ie : rest
             | otherwise -> rest
-    AvailTC tc ns ->
-        let left = filter keep ns in
-        if null left then rest else AvailTC tc left : rest
+    AvailTC tc ns fs ->
+        let ns' = filter keep ns
+            fs' = filter (keep . flSelector) fs in
+        if null ns' && null fs' then rest else AvailTC tc ns' fs' : rest
 
 -- | Given an import\/export spec, construct the appropriate 'GlobalRdrElt's.
 gresFromIE :: ImpDeclSpec -> (LIE Name, AvailInfo) -> [GlobalRdrElt]
@@ -921,16 +989,36 @@ gresFromIE decl_spec (L loc ie, avail)
       where
         item_spec = ImpSome { is_explicit = is_explicit name, is_iloc = loc }
 
-mkChildEnv :: [GlobalRdrElt] -> NameEnv [Name]
-mkChildEnv gres = foldr add emptyNameEnv gres
-    where
-        add (GRE { gre_name = n, gre_par = ParentIs p }) env = extendNameEnv_Acc (:) singleton env p n
-        add _                                            env = env
 
-findChildren :: NameEnv [Name] -> Name -> [Name]
+{-
+Note [Children for duplicate record fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the module
+
+    {-# LANGUAGE DuplicateRecordFields #-}
+    module M (F(foo, MkFInt, MkFBool)) where
+      data family F a
+      data instance F Int = MkFInt { foo :: Int }
+      data instance F Bool = MkFBool { foo :: Bool }
+
+The `foo` in the export list refers to *both* selectors! For this
+reason, lookupChildren builds an environment that maps the FastString
+to a list of items, rather than a single item.
+-}
+
+mkChildEnv :: [GlobalRdrElt] -> NameEnv [GlobalRdrElt]
+mkChildEnv gres = foldr add emptyNameEnv gres
+  where
+    add gre env = case gre_par gre of
+        FldParent p _  -> extendNameEnv_Acc (:) singleton env p gre
+        ParentIs  p    -> extendNameEnv_Acc (:) singleton env p gre
+        NoParent       -> env
+
+findChildren :: NameEnv [a] -> Name -> [a]
 findChildren env n = lookupNameEnv env n `orElse` []
 
-lookupChildren :: [Name] -> [Located RdrName] -> [Maybe (Located Name)]
+lookupChildren :: [Either Name FieldLabel] -> [Located RdrName]
+               -> Maybe ([Located Name], [Located FieldLabel])
 -- (lookupChildren all_kids rdr_items) maps each rdr_item to its
 -- corresponding Name all_kids, if the former exists
 -- The matching is done by FastString, not OccName, so that
@@ -939,14 +1027,30 @@ lookupChildren :: [Name] -> [Located RdrName] -> [Maybe (Located Name)]
 -- the RdrName for AssocTy may have a (bogus) DataName namespace
 -- (Really the rdr_items should be FastStrings in the first place.)
 lookupChildren all_kids rdr_items
-  -- = map (lookupFsEnv kid_env . occNameFS . rdrNameOcc) rdr_items
-  = map doOne rdr_items
+  = do xs <- mapM doOne rdr_items
+       return (fmap concat (partitionEithers xs))
   where
     doOne (L l r) = case (lookupFsEnv kid_env . occNameFS . rdrNameOcc) r of
-      Just n -> Just (L l n)
-      Nothing -> Nothing
+      Just [Left n]            -> Just (Left (L l n))
+      Just rs | all isRight rs -> Just (Right (map (L l) (rights rs)))
+      _                        -> Nothing
 
-    kid_env = mkFsEnv [(occNameFS (nameOccName n), n) | n <- all_kids]
+    -- See Note [Children for duplicate record fields]
+    kid_env = extendFsEnvList_C (++) emptyFsEnv
+                      [(either (occNameFS . nameOccName) flLabel x, [x]) | x <- all_kids]
+
+
+classifyGREs :: [GlobalRdrElt] -> ([Name], [FieldLabel])
+classifyGREs = partitionEithers . map classifyGRE
+
+classifyGRE :: GlobalRdrElt -> Either Name FieldLabel
+classifyGRE gre = case gre_par gre of
+  FldParent _ Nothing -> Right (FieldLabel (occNameFS (nameOccName n)) False n)
+  FldParent _ (Just lbl) -> Right (FieldLabel lbl True n)
+  _                      -> Left  n
+  where
+    n = gre_name gre
+
 
 -- | Combines 'AvailInfo's from the same family
 -- 'avails' may have several items with the same availName
@@ -1056,6 +1160,7 @@ rnExports explicit_mod exports
 
         ; (rn_exports, avails) <- exports_from_avail real_exports rdr_env imports this_mod
         ; let final_avails = nubAvails avails    -- Combine families
+              final_ns     = availsToNameSetWithSelectors final_avails
 
         ; traceRn (text "rnExports: Exports:" <+> ppr final_avails)
 
@@ -1064,7 +1169,7 @@ rnExports explicit_mod exports
                                                 Nothing -> Nothing
                                                 Just _  -> rn_exports,
                             tcg_dus = tcg_dus tcg_env `plusDU`
-                                      usesOnly (availsToNameSet final_avails) }) }
+                                      usesOnly final_ns }) }
 
 exports_from_avail :: Maybe (Located [LIE RdrName])
                          -- Nothing => no explicit export list
@@ -1090,7 +1195,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     do_litem :: ExportAccum -> LIE RdrName -> RnM ExportAccum
     do_litem acc lie = setSrcSpan (getLoc lie) (exports_from_item acc lie)
 
-    kids_env :: NameEnv [Name]  -- Maps a parent to its in-scope children
+    -- Maps a parent to its in-scope children
+    kids_env :: NameEnv [GlobalRdrElt]
     kids_env = mkChildEnv (globalRdrEnvElts rdr_env)
 
     imported_modules = [ qual_name
@@ -1165,31 +1271,33 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     lookup_ie ie@(IEThingAll (L l rdr))
         = do name <- lookupGlobalOccRn rdr
-             let kids = findChildren kids_env name
-             addUsedKids rdr kids
+             let gres = findChildren kids_env name
+                 (non_flds, flds) = classifyGREs gres
+             addUsedKids rdr gres
              warnDodgyExports <- woptM Opt_WarnDodgyExports
-             when (null kids) $
+             when (null gres) $
                   if isTyConName name
                   then when warnDodgyExports $ addWarn (dodgyExportWarn name)
                   else -- This occurs when you export T(..), but
                        -- only import T abstractly, or T is a synonym.
                        addErr (exportItemErr ie)
+             return ( IEThingAll (L l name)
+                    , AvailTC name (name:non_flds) flds )
 
-             return (IEThingAll (L l name), AvailTC name (name:kids))
-
-    lookup_ie ie@(IEThingWith (L l rdr) sub_rdrs)
-        = do name <- lookupGlobalOccRn rdr
+    lookup_ie ie@(IEThingWith (L l rdr) sub_rdrs sub_flds) = ASSERT2(null sub_flds, ppr sub_flds)
+          do name <- lookupGlobalOccRn rdr
+             let gres = findChildren kids_env name
              if isUnboundName name
-                then return (IEThingWith (L l name) [], AvailTC name [name])
-                else do
-             let mb_names = lookupChildren (findChildren kids_env name) sub_rdrs
-             if any isNothing mb_names
-                then do addErr (exportItemErr ie)
-                        return (IEThingWith (L l name) [], AvailTC name [name])
-                else do let names = catMaybes mb_names
-                        addUsedKids rdr (map unLoc names)
-                        return (IEThingWith (L l name) names
-                               , AvailTC name (name:map unLoc names))
+                then return ( IEThingWith (L l name) [] []
+                            , AvailTC name [name] [] )
+                else case lookupChildren (map classifyGRE gres) sub_rdrs of
+                       Nothing -> do addErr (exportItemErr ie)
+                                     return ( IEThingWith (L l name) [] []
+                                            , AvailTC name [name] [] )
+                       Just (non_flds, flds) ->
+                         do addUsedKids rdr gres
+                            return ( IEThingWith (L l name) non_flds flds
+                                   , AvailTC name (name:map unLoc non_flds) (map unLoc flds) )
 
     lookup_ie _ = panic "lookup_ie"    -- Other cases covered earlier
 
@@ -1205,7 +1313,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     -- In an export item M.T(A,B,C), we want to treat the uses of
     -- A,B,C as if they were M.A, M.B, M.C
     addUsedKids parent_rdr kid_names
-       = addUsedRdrNames $ map (mk_kid_rdr . nameOccName) kid_names
+       = addUsedRdrNames $ map (mk_kid_rdr . greOccName) kid_names
        where
          mk_kid_rdr = case isQual_maybe parent_rdr of
                          Nothing           -> mkRdrUnqual
@@ -1216,6 +1324,7 @@ isDoc (IEDoc _)      = True
 isDoc (IEDocNamed _) = True
 isDoc (IEGroup _ _)  = True
 isDoc _ = False
+
 
 -------------------------------
 isModuleExported :: Bool -> ModuleName -> GlobalRdrElt -> Bool
@@ -1315,8 +1424,10 @@ reportUnusedNames :: Maybe (Located [LIE RdrName])  -- Export list
                   -> TcGblEnv -> RnM ()
 reportUnusedNames _export_decls gbl_env
   = do  { traceRn ((text "RUN") <+> (ppr (tcg_dus gbl_env)))
+        ; sel_uses <- readMutVar (tcg_used_selectors gbl_env)
         ; warnUnusedImportDecls gbl_env
-        ; warnUnusedTopBinds   unused_locals }
+        ; warnUnusedTopBinds $ filterOut (used_as_selector sel_uses)
+                                         unused_locals }
   where
     used_names :: NameSet
     used_names = findUses (tcg_dus gbl_env) emptyNameSet
@@ -1340,7 +1451,7 @@ reportUnusedNames _export_decls gbl_env
     gre_is_used :: NameSet -> GlobalRdrElt -> Bool
     gre_is_used used_names (GRE {gre_name = name})
         = name `elemNameSet` used_names
-          || any (`elemNameSet` used_names) (findChildren kids_env name)
+          || any (\ gre -> gre_name gre `elemNameSet` used_names) (findChildren kids_env name)
                 -- A use of C implies a use of T,
                 -- if C was brought into scope by T(..) or T(C)
 
@@ -1352,6 +1463,12 @@ reportUnusedNames _export_decls gbl_env
     unused_locals = filter is_unused_local defined_but_not_used
     is_unused_local :: GlobalRdrElt -> Bool
     is_unused_local gre = isLocalGRE gre && isExternalName (gre_name gre)
+
+    -- Remove uses of record selectors recorded in the typechecker
+    used_as_selector :: Set.Set (FieldOcc Name) -> GlobalRdrElt -> Bool
+    used_as_selector sel_uses gre
+      = isRecFldGRE gre && Foldable.any ((==) (gre_name gre) . selectorFieldOcc) sel_uses
+
 
 {-
 *********************************************************
@@ -1372,20 +1489,23 @@ type ImportDeclUsage
 
 warnUnusedImportDecls :: TcGblEnv -> RnM ()
 warnUnusedImportDecls gbl_env
-  = do { uses <- readMutVar (tcg_used_rdrnames gbl_env)
+  = do { uses <- fmap Set.elems $ readMutVar (tcg_used_rdrnames gbl_env)
+       ; sel_uses <- readMutVar (tcg_used_selectors gbl_env)
        ; let user_imports = filterOut (ideclImplicit . unLoc) (tcg_rn_imports gbl_env)
                             -- This whole function deals only with *user* imports
                             -- both for warning about unnecessary ones, and for
                             -- deciding the minimal ones
              rdr_env = tcg_rdr_env gbl_env
+             fld_env = mkFieldEnv rdr_env
 
        ; let usage :: [ImportDeclUsage]
-             usage = findImportUsage user_imports rdr_env (Set.elems uses)
+             usage = findImportUsage user_imports rdr_env uses sel_uses
 
-       ; traceRn (vcat [ ptext (sLit "Uses:") <+> ppr (Set.elems uses)
+       ; traceRn (vcat [ ptext (sLit "Uses:") <+> ppr uses
+                       , ptext (sLit "Selector uses:") <+> ppr sel_uses
                        , ptext (sLit "Import usage") <+> ppr usage])
        ; whenWOptM Opt_WarnUnusedImports $
-         mapM_ warnUnusedImport usage
+         mapM_ (warnUnusedImport fld_env) usage
 
        ; whenGOptM Opt_D_dump_minimal_imports $
          printMinimalImports usage }
@@ -1417,21 +1537,25 @@ type ImportMap = Map SrcLoc [AvailInfo]  -- See [The ImportMap]
 findImportUsage :: [LImportDecl Name]
                 -> GlobalRdrEnv
                 -> [RdrName]
+                -> Set.Set (FieldOcc Name)
                 -> [ImportDeclUsage]
 
-findImportUsage imports rdr_env rdrs
+findImportUsage imports rdr_env rdrs sel_names
   = map unused_decl imports
   where
     import_usage :: ImportMap
-    import_usage = foldr (extendImportMap rdr_env) Map.empty rdrs
+    import_usage
+      = foldr (extendImportMap_Field rdr_env)
+       (foldr (extendImportMap rdr_env) Map.empty rdrs)
+       (Set.elems sel_names)
 
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
       = (decl, nubAvails used_avails, nameSetElems unused_imps)
       where
         used_avails = Map.lookup (srcSpanEnd loc) import_usage `orElse` []
                       -- srcSpanEnd: see Note [The ImportMap]
-        used_names   = availsToNameSet used_avails
-        used_parents = mkNameSet [n | AvailTC n _ <- used_avails]
+        used_names   = availsToNameSetWithSelectors used_avails
+        used_parents = mkNameSet [n | AvailTC n _ _ <- used_avails]
 
         unused_imps   -- Not trivial; see eg Trac #7454
           = case imps of
@@ -1443,8 +1567,8 @@ findImportUsage imports rdr_env rdrs
         add_unused (IEVar (L _ n))      acc = add_unused_name n acc
         add_unused (IEThingAbs (L _ n)) acc = add_unused_name n acc
         add_unused (IEThingAll (L _ n)) acc = add_unused_all  n acc
-        add_unused (IEThingWith (L _ p) ns) acc
-                                          = add_unused_with p (map unLoc ns) acc
+        add_unused (IEThingWith (L _ p) ns fs) acc = add_unused_with p xs acc
+          where xs = map unLoc ns ++ map (flSelector . unLoc) fs
         add_unused _                    acc = acc
 
         add_unused_name n acc
@@ -1463,19 +1587,30 @@ findImportUsage imports rdr_env rdrs
        -- imported Num(signum).  We don't want to complain that
        -- Num is not itself mentioned.  Hence the two cases in add_unused_with.
 
+extendImportMap :: GlobalRdrEnv
+                -> RdrName
+                -> ImportMap -> ImportMap
+extendImportMap rdr_env rdr =
+  extendImportMap_GRE (lookupGRE_RdrName rdr rdr_env)
 
-extendImportMap :: GlobalRdrEnv -> RdrName -> ImportMap -> ImportMap
--- For a used RdrName, find all the import decls that brought
+extendImportMap_Field :: GlobalRdrEnv
+                      -> FieldOcc Name
+                      -> ImportMap -> ImportMap
+extendImportMap_Field rdr_env (FieldOcc rdr sel) =
+    extendImportMap_GRE (pickGREs rdr (lookupGRE_Field_Name rdr_env sel lbl))
+  where
+    lbl = occNameFS (rdrNameOcc rdr)
+
+-- For each of a list of used GREs, find all the import decls that brought
 -- it into scope; choose one of them (bestImport), and record
 -- the RdrName in that import decl's entry in the ImportMap
-extendImportMap rdr_env rdr imp_map
-  | [gre] <- lookupGRE_RdrName rdr rdr_env
-  , GRE { gre_lcl = lcl, gre_imp = imps } <- gre
-  , not lcl
-  = add_imp gre (bestImport imps) imp_map
-  | otherwise
-  = imp_map
+extendImportMap_GRE :: [GlobalRdrElt] -> ImportMap -> ImportMap
+extendImportMap_GRE gres imp_map
+  = foldr recordRdrName imp_map nonLocalGREs
   where
+    recordRdrName gre m = add_imp gre (bestImport (gre_imp gre)) m
+    nonLocalGREs = filter (not . gre_lcl) gres
+
     add_imp :: GlobalRdrElt -> ImportSpec -> ImportMap -> ImportMap
     add_imp gre (ImpSpec { is_decl = imp_decl_spec }) imp_map
       = Map.insertWith add decl_loc [avail] imp_map
@@ -1500,8 +1635,9 @@ extendImportMap rdr_env rdr imp_map
     isImpAll (ImpSpec { is_item = ImpAll }) = True
     isImpAll _other                         = False
 
-warnUnusedImport :: ImportDeclUsage -> RnM ()
-warnUnusedImport (L loc decl, used, unused)
+warnUnusedImport :: NameEnv (FieldLabelString, Name) -> ImportDeclUsage
+                 -> RnM ()
+warnUnusedImport fld_env (L loc decl, used, unused)
   | Just (False,L _ []) <- ideclHiding decl
                 = return ()            -- Do not warn for 'import M()'
 
@@ -1518,7 +1654,7 @@ warnUnusedImport (L loc decl, used, unused)
                                    <+> quotes pp_mod),
                  ptext (sLit "To import instances alone, use:")
                                    <+> ptext (sLit "import") <+> pp_mod <> parens Outputable.empty ]
-    msg2 = sep [pp_herald <+> quotes (pprWithCommas ppr unused),
+    msg2 = sep [pp_herald <+> quotes sort_unused,
                     text "from module" <+> quotes pp_mod <+> pp_not_used]
     pp_herald  = text "The" <+> pp_qual <+> text "import of"
     pp_qual
@@ -1526,6 +1662,14 @@ warnUnusedImport (L loc decl, used, unused)
       | otherwise           = Outputable.empty
     pp_mod      = ppr (unLoc (ideclName decl))
     pp_not_used = text "is redundant"
+
+    ppr_possible_field n = case lookupNameEnv fld_env n of
+                               Just (fld, p) -> ppr p <> parens (ppr fld)
+                               Nothing  -> ppr n
+
+    -- Print unused names in a deterministic (lexicographic) order
+    sort_unused = pprWithCommas ppr_possible_field $
+                    sortBy (comparing nameOccName) unused
 
 {-
 Note [Do not warn about Prelude hiding]
@@ -1580,33 +1724,42 @@ printMinimalImports imports_w_usage
       = do { let ImportDecl { ideclName    = L _ mod_name
                             , ideclSource  = is_boot
                             , ideclPkgQual = mb_pkg } = decl
-           ; ifaces <- loadSrcInterface doc mod_name is_boot
-                                        (fmap sl_fs mb_pkg)
-           ; let lies = map (L l) (concatMap (to_ie ifaces) used)
+           ; iface <- loadSrcInterface doc mod_name is_boot (fmap sl_fs mb_pkg)
+           ; let lies = map (L l) (concatMap (to_ie iface) used)
            ; return (L l (decl { ideclHiding = Just (False, L l lies) })) }
       where
         doc = text "Compute minimal imports for" <+> ppr decl
 
-    to_ie :: [ModIface] -> AvailInfo -> [IE Name]
+    to_ie :: ModIface -> AvailInfo -> [IE Name]
     -- The main trick here is that if we're importing all the constructors
     -- we want to say "T(..)", but if we're importing only a subset we want
     -- to say "T(A,B,C)".  So we have to find out what the module exports.
     to_ie _ (Avail n)
        = [IEVar (noLoc n)]
-    to_ie _ (AvailTC n [m])
+    to_ie _ (AvailTC n [m] [])
        | n==m = [IEThingAbs (noLoc n)]
-    to_ie ifaces (AvailTC n ns)
-      = case [xs | iface <- ifaces
-                 , AvailTC x xs <- mi_exports iface
+    to_ie iface (AvailTC n ns fs)
+      = case [(xs,gs) |  AvailTC x xs gs <- mi_exports iface
                  , x == n
                  , x `elem` xs    -- Note [Partial export]
                  ] of
            [xs] | all_used xs -> [IEThingAll (noLoc n)]
                 | otherwise   -> [IEThingWith (noLoc n)
-                                              (map noLoc (filter (/= n) ns))]
-           _other             -> map (IEVar . noLoc)  ns
+                                              (map noLoc (filter (/= n) ns))
+                                              (map noLoc fs)]
+                                          -- Note [Overloaded field import]
+           _other | all_non_overloaded fs
+                              -> map (IEVar . noLoc) $ ns ++ map flSelector fs
+                  | otherwise -> [IEThingWith (noLoc n)
+                                              (map noLoc (filter (/= n) ns)) (map noLoc fs)]
         where
-          all_used avail_occs = all (`elem` ns) avail_occs
+          fld_lbls = map flLabel fs
+
+          all_used (avail_occs, avail_flds)
+              = all (`elem` ns) avail_occs
+                    && all (`elem` fld_lbls) (map flLabel avail_flds)
+
+          all_non_overloaded = all (not . flIsOverloaded)
 
 {-
 Note [Partial export]
@@ -1629,6 +1782,24 @@ which we would usually generate if C was exported from B.  Hence
 the (x `elem` xs) test when deciding what to generate.
 
 
+Note [Overloaded field import]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+On the other hand, if we have
+
+    {-# LANGUAGE DuplicateRecordFields #-}
+    module A where
+      data T = MkT { foo :: Int }
+
+    module B where
+      import A
+      f = ...foo...
+
+then the minimal import for module B must be
+    import A ( T(foo) )
+because when DuplicateRecordFields is enabled, field selectors are
+not in scope without their enclosing datatype.
+
+
 ************************************************************************
 *                                                                      *
 \subsection{Errors}
@@ -1641,20 +1812,16 @@ qualImportItemErr rdr
   = hang (ptext (sLit "Illegal qualified name in import item:"))
        2 (ppr rdr)
 
-badImportItemErrStd :: IsBootInterface -> ImpDeclSpec -> IE RdrName -> SDoc
-badImportItemErrStd is_boot decl_spec ie
+badImportItemErrStd :: ModIface -> ImpDeclSpec -> IE RdrName -> SDoc
+badImportItemErrStd iface decl_spec ie
   = sep [ptext (sLit "Module"), quotes (ppr (is_mod decl_spec)), source_import,
          ptext (sLit "does not export"), quotes (ppr ie)]
   where
-    source_import | is_boot       = ptext (sLit "(hi-boot interface)")
+    source_import | mi_boot iface = ptext (sLit "(hi-boot interface)")
                   | otherwise     = Outputable.empty
 
-badImportItemErrDataCon :: OccName
-                        -> IsBootInterface
-                        -> ImpDeclSpec
-                        -> IE RdrName
-                        -> SDoc
-badImportItemErrDataCon dataType_occ is_boot decl_spec ie
+badImportItemErrDataCon :: OccName -> ModIface -> ImpDeclSpec -> IE RdrName -> SDoc
+badImportItemErrDataCon dataType_occ iface decl_spec ie
   = vcat [ ptext (sLit "In module")
              <+> quotes (ppr (is_mod decl_spec))
              <+> source_import <> colon
@@ -1674,21 +1841,17 @@ badImportItemErrDataCon dataType_occ is_boot decl_spec ie
     datacon_occ = rdrNameOcc $ ieName ie
     datacon = parenSymOcc datacon_occ (ppr datacon_occ)
     dataType = parenSymOcc dataType_occ (ppr dataType_occ)
-    source_import | is_boot       = ptext (sLit "(hi-boot interface)")
+    source_import | mi_boot iface = ptext (sLit "(hi-boot interface)")
                   | otherwise     = Outputable.empty
     parens_sp d = parens (space <> d <> space)  -- T( f,g )
 
-badImportItemErr :: IsBootInterface
-                 -> ImpDeclSpec
-                 -> IE RdrName
-                 -> [AvailInfo]
-                 -> SDoc
-badImportItemErr is_boot decl_spec ie avails
+badImportItemErr :: ModIface -> ImpDeclSpec -> IE RdrName -> [AvailInfo] -> SDoc
+badImportItemErr iface decl_spec ie avails
   = case find checkIfDataCon avails of
-     Just con -> badImportItemErrDataCon (availOccName con) is_boot decl_spec ie
-     Nothing  -> badImportItemErrStd is_boot decl_spec ie
+      Just con -> badImportItemErrDataCon (availOccName con) iface decl_spec ie
+      Nothing  -> badImportItemErrStd iface decl_spec ie
   where
-    checkIfDataCon (AvailTC _ ns) =
+    checkIfDataCon (AvailTC _ ns _) =
       case find (\n -> importedFS == nameOccNameFS n) ns of
         Just n  -> isDataConName n
         Nothing -> False

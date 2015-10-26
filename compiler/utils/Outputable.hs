@@ -32,7 +32,7 @@ module Outputable (
         sep, cat,
         fsep, fcat,
         hang, punctuate, ppWhen, ppUnless,
-        speakNth, speakNTimes, speakN, speakNOf, plural, isOrAre,
+        speakNth, speakN, speakNOf, plural, isOrAre, doOrDoes,
 
         coloured, PprColour, colType, colCoerc, colDataCon,
         colBinder, bold, keyword,
@@ -72,9 +72,9 @@ module Outputable (
         mkUserStyle, cmdlineParserStyle, Depth(..),
 
         -- * Error handling and debugging utilities
-        pprPanic, pprSorry, assertPprPanic, pprPanicFastInt, pprPgmError,
+        pprPanic, pprSorry, assertPprPanic, pprPgmError,
         pprTrace, warnPprTrace,
-        trace, pgmError, panic, sorry, panicFastInt, assertPanic,
+        trace, pgmError, panic, sorry, assertPanic,
         pprDebugAndThen,
     ) where
 
@@ -82,12 +82,11 @@ import {-# SOURCE #-}   DynFlags( DynFlags,
                                   targetPlatform, pprUserLength, pprCols,
                                   useUnicode, useUnicodeSyntax,
                                   unsafeGlobalDynFlags )
-import {-# SOURCE #-}   Module( PackageKey, Module, ModuleName, moduleName )
+import {-# SOURCE #-}   Module( UnitId, Module, ModuleName, moduleName )
 import {-# SOURCE #-}   OccName( OccName )
 import {-# SOURCE #-}   StaticFlags( opt_PprStyle_Debug, opt_NoDebugOutput )
 
 import FastString
-import FastTypes
 import qualified Pretty
 import Util
 import Platform
@@ -170,8 +169,8 @@ type QueryQualifyName = Module -> OccName -> QualifyName
 type QueryQualifyModule = Module -> Bool
 
 -- | For a given package, we need to know whether to print it with
--- the package key to disambiguate it.
-type QueryQualifyPackage = PackageKey -> Bool
+-- the unit id to disambiguate it.
+type QueryQualifyPackage = UnitId -> Bool
 
 -- See Note [Printing original names] in HscTypes
 data QualifyName   -- Given P:M.T
@@ -525,8 +524,8 @@ dcolon     = unicodeSyntax (char '∷') (docToSDoc $ Pretty.ptext (sLit "::"))
 arrow      = unicodeSyntax (char '→') (docToSDoc $ Pretty.ptext (sLit "->"))
 larrow     = unicodeSyntax (char '←') (docToSDoc $ Pretty.ptext (sLit "<-"))
 darrow     = unicodeSyntax (char '⇒') (docToSDoc $ Pretty.ptext (sLit "=>"))
-arrowt     = unicodeSyntax (char '↣') (docToSDoc $ Pretty.ptext (sLit ">-"))
-larrowt    = unicodeSyntax (char '↢') (docToSDoc $ Pretty.ptext (sLit "-<"))
+arrowt     = unicodeSyntax (char '⤚') (docToSDoc $ Pretty.ptext (sLit ">-"))
+larrowt    = unicodeSyntax (char '⤙') (docToSDoc $ Pretty.ptext (sLit "-<"))
 arrowtt    = unicodeSyntax (char '⤜') (docToSDoc $ Pretty.ptext (sLit ">>-"))
 larrowtt   = unicodeSyntax (char '⤛') (docToSDoc $ Pretty.ptext (sLit "-<<"))
 semi       = docToSDoc $ Pretty.semi
@@ -976,16 +975,6 @@ speakNOf 0 d = ptext (sLit "no") <+> d <> char 's'
 speakNOf 1 d = ptext (sLit "one") <+> d                 -- E.g. "one argument"
 speakNOf n d = speakN n <+> d <> char 's'               -- E.g. "three arguments"
 
--- | Converts a strictly positive integer into a number of times:
---
--- > speakNTimes 1 = text "once"
--- > speakNTimes 2 = text "twice"
--- > speakNTimes 4 = text "4 times"
-speakNTimes :: Int {- >=1 -} -> SDoc
-speakNTimes t | t == 1     = ptext (sLit "once")
-              | t == 2     = ptext (sLit "twice")
-              | otherwise  = speakN t <+> ptext (sLit "times")
-
 -- | Determines the pluralisation suffix appropriate for the length of a list:
 --
 -- > plural [] = char 's'
@@ -1003,6 +992,15 @@ plural _   = char 's'
 isOrAre :: [a] -> SDoc
 isOrAre [_] = ptext (sLit "is")
 isOrAre _   = ptext (sLit "are")
+
+-- | Determines the form of to do appropriate for the length of a list:
+--
+-- > doOrDoes [] = ptext (sLit "do")
+-- > doOrDoes ["Hello"] = ptext (sLit "does")
+-- > doOrDoes ["Hello", "World"] = ptext (sLit "do")
+doOrDoes :: [a] -> SDoc
+doOrDoes [_] = ptext (sLit "does")
+doOrDoes _   = ptext (sLit "do")
 
 {-
 ************************************************************************
@@ -1031,10 +1029,6 @@ pprTrace :: String -> SDoc -> a -> a
 pprTrace str doc x
    | opt_NoDebugOutput = x
    | otherwise         = pprDebugAndThen unsafeGlobalDynFlags trace (text str) doc x
-
-pprPanicFastInt :: String -> SDoc -> FastInt
--- ^ Specialization of pprPanic that can be safely used with 'FastInt'
-pprPanicFastInt heading pretty_msg = panicDocFastInt heading pretty_msg
 
 warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
 -- ^ Just warn about an assertion failure, recording the given file and line number.

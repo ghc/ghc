@@ -38,7 +38,7 @@ module Id (
 
         -- ** Taking an Id apart
         idName, idType, idUnique, idInfo, idDetails, idRepArity,
-        recordSelectorFieldLabel,
+        recordSelectorTyCon,
 
         -- ** Modifying an Id
         setIdName, setIdUnique, Id.setIdType,
@@ -308,9 +308,8 @@ mkTemplateLocals = mkTemplateLocalsNum 1
 mkTemplateLocalsNum :: Int -> [Type] -> [Id]
 mkTemplateLocalsNum n tys = zipWith mkTemplateLocal [n..] tys
 
-{-
-Note [Exported LocalIds]
-~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Exported LocalIds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We use mkExportedLocalId for things like
  - Dictionary functions (DFunId)
  - Wrapper and matcher Ids for pattern synonyms
@@ -324,7 +323,7 @@ code by the occurrence analyser.  (But "exported" here does not mean
 "brought into lexical scope by an import declaration". Indeed these
 things are always internal Ids that the user never sees.)
 
-It's very important that they are *LocalIds*, not GlobalIs, for lots
+It's very important that they are *LocalIds*, not GlobalIds, for lots
 of reasons:
 
  * We want to treat them as free variables for the purpose of
@@ -354,12 +353,12 @@ That is what is happening in, say tidy_insts in TidyPgm.
 ************************************************************************
 -}
 
--- | If the 'Id' is that for a record selector, extract the 'sel_tycon' and label. Panic otherwise
-recordSelectorFieldLabel :: Id -> (TyCon, FieldLabel)
-recordSelectorFieldLabel id
+-- | If the 'Id' is that for a record selector, extract the 'sel_tycon'. Panic otherwise.
+recordSelectorTyCon :: Id -> TyCon
+recordSelectorTyCon id
   = case Var.idDetails id of
-        RecSelId { sel_tycon = tycon } -> (tycon, idName id)
-        _ -> panic "recordSelectorFieldLabel"
+        RecSelId { sel_tycon = tycon } -> tycon
+        _ -> panic "recordSelectorTyCon"
 
 isRecordSelector        :: Id -> Bool
 isNaughtyRecordSelector :: Id -> Bool
@@ -574,17 +573,17 @@ setIdDemandInfo id dmd = modifyIdInfo (`setDemandInfo` dmd) id
 
 -- See Note [Specialisations and RULES in IdInfo] in IdInfo.hs
 
-idSpecialisation :: Id -> SpecInfo
-idSpecialisation id = specInfo (idInfo id)
+idSpecialisation :: Id -> RuleInfo
+idSpecialisation id = ruleInfo (idInfo id)
 
 idCoreRules :: Id -> [CoreRule]
-idCoreRules id = specInfoRules (idSpecialisation id)
+idCoreRules id = ruleInfoRules (idSpecialisation id)
 
 idHasRules :: Id -> Bool
-idHasRules id = not (isEmptySpecInfo (idSpecialisation id))
+idHasRules id = not (isEmptyRuleInfo (idSpecialisation id))
 
-setIdSpecialisation :: Id -> SpecInfo -> Id
-setIdSpecialisation id spec_info = modifyIdInfo (`setSpecInfo` spec_info) id
+setIdSpecialisation :: Id -> RuleInfo -> Id
+setIdSpecialisation id spec_info = modifyIdInfo (`setRuleInfo` spec_info) id
 
         ---------------------------------
         -- CAF INFO

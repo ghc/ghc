@@ -10,7 +10,8 @@
 -- | This module defines TyCons that can't be expressed in Haskell.
 --   They are all, therefore, wired-in TyCons.  C.f module TysWiredIn
 module TysPrim(
-        tyVarList, alphaTyVars, betaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
+        mkTemplateTyVars,
+        alphaTyVars, betaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
         alphaTy, betaTy, gammaTy, deltaTy,
         openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar, openAlphaTyVars,
         kKiVar,
@@ -205,18 +206,19 @@ alphaTyVars is a list of type variables for use in templates:
         ["a", "b", ..., "z", "t1", "t2", ... ]
 -}
 
-tyVarList :: Kind -> [TyVar]
-tyVarList kind = [ mkTyVar (mkInternalName (mkAlphaTyVarUnique u)
-                                (mkTyVarOccFS (mkFastString name))
-                                noSrcSpan) kind
-                 | u <- [2..],
-                   let name | c <= 'z'  = [c]
-                            | otherwise = 't':show u
-                            where c = chr (u-2 + ord 'a')
-                 ]
+mkTemplateTyVars :: [Kind] -> [TyVar]
+mkTemplateTyVars kinds =
+  [ mkTyVar (mkInternalName (mkAlphaTyVarUnique u)
+                            (mkTyVarOccFS (mkFastString name))
+                            noSrcSpan) k
+  | (k,u) <- zip kinds [2..],
+    let name | c <= 'z'  = [c]
+             | otherwise = 't':show u
+          where c = chr (u-2 + ord 'a')
+  ]
 
 alphaTyVars :: [TyVar]
-alphaTyVars = tyVarList liftedTypeKind
+alphaTyVars = mkTemplateTyVars $ repeat liftedTypeKind
 
 betaTyVars :: [TyVar]
 betaTyVars = tail alphaTyVars
@@ -234,14 +236,15 @@ alphaTy, betaTy, gammaTy, deltaTy :: Type
         -- result type for "error", so that we can have (error Int# "Help")
 openAlphaTyVars :: [TyVar]
 openAlphaTyVar, openBetaTyVar :: TyVar
-openAlphaTyVars@(openAlphaTyVar:openBetaTyVar:_) = tyVarList openTypeKind
+openAlphaTyVars@(openAlphaTyVar:openBetaTyVar:_)
+  = mkTemplateTyVars $ repeat openTypeKind
 
 openAlphaTy, openBetaTy :: Type
 openAlphaTy = mkTyVarTy openAlphaTyVar
 openBetaTy  = mkTyVarTy openBetaTyVar
 
 kKiVar :: KindVar
-kKiVar = (tyVarList superKind) !! 10
+kKiVar = (mkTemplateTyVars $ repeat superKind) !! 10
 
 {-
 ************************************************************************
@@ -771,9 +774,10 @@ anyTy :: Type
 anyTy = mkTyConTy anyTyCon
 
 anyTyCon :: TyCon
-anyTyCon = mkFamilyTyCon anyTyConName kind [kKiVar]
+anyTyCon = mkFamilyTyCon anyTyConName kind [kKiVar] Nothing
                          (ClosedSynFamilyTyCon Nothing)
                          NoParentTyCon
+                         NotInjective
   where
     kind = ForAllTy kKiVar (mkTyVarTy kKiVar)
 

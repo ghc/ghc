@@ -2,6 +2,9 @@
 
 ## 4.8.2.0  *TBA*
 
+  * The restore operation provided by `mask` and `uninterruptibleMask` now
+    restores the previous masking state whatever the current masking state is.
+
   * Bundled with GHC 7.12.1
 
   * `Alt`, `Dual`, `First`, `Last`, `Product`, and `Sum` now have `Data`,
@@ -19,17 +22,22 @@
 
   * `(,) a` now has a `Monad` instance
 
+  * `ZipList` now has `Foldable` and `Traversable` instances
+
+  * `Identity` now has a `Monoid` instance
+
+  * `()` now has a `Storable` instance
+
   * Redundant typeclass constraints have been removed:
      - `Data.Ratio.{denominator,numerator}` have no `Integral` constraint anymore
      - **TODO**
-
-  * New module `GHC.SrcLoc`
 
   * New `GHC.Generics.packageName` operation
 
   * New `GHC.Stack.CallStack` data type
 
-  * `Complex` now has a `Generic` instance
+  * `Complex` now has `Generic`, `Generic1`, `Functor`, `Foldable`, `Traversable`,
+    `Applicative`, and `Monad` instances
 
   * `System.Exit.ExitCode` now has a `Generic` instance
 
@@ -51,11 +59,37 @@
   * Made `PatternMatchFail`, `RecSelError`, `RecConError`, `RecUpdError`,
     `NoMethodError`, and `AssertionFailed` newtypes (#10738)
 
-## 4.8.1.0  *TBA*
+  * New module `Control.Monad.IO.Class` (previously provided by `transformers`
+    package). (#10773)
+
+  * The `Generic` instance for `Proxy` is now poly-kinded (#10775)
+
+  * add `Data.List.NonEmpty` and `Data.Semigroup` (to become
+    super-class of `Monoid` in the future). These modules were
+    provided by the `semigroups` package previously. (#10365)
+
+  * Add `URec`, `UAddr`, `UChar`, `UDouble`, `UFloat`, `UInt`, and `UWord` to
+    `GHC.Generics` as part of making GHC generics capable of handling
+    unlifted types (#10868)
+
+  * Keep `shift{L,R}` on `Integer` with negative shift-arguments from
+    segfaulting (#10571)
+
+  * Add `forkOSWithUnmask` to `Control.Concurrent`, which is like
+    `forkIOWithUnmask`, but the child is run in a bound thread.
+
+  * The `MINIMAL` definition of `Arrow` is now `arr AND (first OR (***))`.
+
+  * The `MINIMAL` definition of `ArrowChoice` is now `left OR (+++)`.
+
+## 4.8.1.0  *Jul 2015*
 
   * Bundled with GHC 7.10.2
 
   * `Lifetime` is now exported from `GHC.Event`
+
+  * Implicit-parameter based source location support exposed in `GHC.SrcLoc`.
+    See GHC User's Manual for more information.
 
 ## 4.8.0.0  *Mar 2015*
 

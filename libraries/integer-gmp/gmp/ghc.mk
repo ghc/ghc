@@ -122,11 +122,6 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	cat libraries/integer-gmp/gmp/tarball/gmp-5.0.4.patch | { cd libraries/integer-gmp/gmp/gmpbuild && $(PATCH_CMD) -p1 ; }
 	chmod +x libraries/integer-gmp/gmp/ln
 
-	# Their cmd invocation only works on msys. On cygwin it starts
-	# a cmd interactive shell. The replacement works in both environments.
-	mv libraries/integer-gmp/gmp/gmpbuild/ltmain.sh libraries/integer-gmp/gmp/gmpbuild/ltmain.sh.orig
-	sed 's#cmd //c echo "\$$1"#cmd /c "echo $$1"#' < libraries/integer-gmp/gmp/gmpbuild/ltmain.sh.orig > libraries/integer-gmp/gmp/gmpbuild/ltmain.sh
-
 	cd libraries/integer-gmp/gmp; (set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
 	    PATH=`pwd`:$$PATH; \
 	    export PATH; \

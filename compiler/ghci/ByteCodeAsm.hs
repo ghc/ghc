@@ -225,11 +225,11 @@ instance Functor Assembler where
     fmap = liftM
 
 instance Applicative Assembler where
-    pure = return
+    pure = NullAsm
     (<*>) = ap
 
 instance Monad Assembler where
-  return = NullAsm
+  return = pure
   NullAsm x >>= f = f x
   AllocPtr p k >>= f = AllocPtr p (k >=> f)
   AllocLit l k >>= f = AllocLit l (k >=> f)

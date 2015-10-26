@@ -40,7 +40,11 @@ ghcilink002 :
 
 .PHONY: ghcilink003
 ghcilink003 :
+ifeq "$(WINDOWS)" "YES"
+	echo ":q" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -lstdc++-6
+else
 	echo ":q" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -lstdc++
+endif
 
 # Test 4: 
 #   package P
@@ -114,7 +118,11 @@ ghcilink006 :
 	echo "version: 1.0" >>$(PKG006)
 	echo "id: test-XXX" >>$(PKG006)
 	echo "key: test-1.0" >>$(PKG006)
+ifeq "$(WINDOWS)" "YES"
+	echo "extra-libraries: stdc++-6" >>$(PKG006)
+else
 	echo "extra-libraries: stdc++" >>$(PKG006)
+endif
 	'$(GHC_PKG)' init $(LOCAL_PKGCONF006)
 	'$(GHC_PKG)' --no-user-package-db -f $(LOCAL_PKGCONF006) register $(PKG006) -v0
 	#

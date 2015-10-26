@@ -2,33 +2,58 @@ module ShouldFail where
 
 -- See Trac #1176
 -- This is really a pretty-printer test, not a typechecker test
--- The more infix ops we have, the worse fsep works
+--
+-- Before ghc-7.2 the error messages looked like this (notice the wrong
+-- indentation):
 
--- Currently the error message looks ok, however
+{-
+tcfail177.hs:9:12:
+    Couldn't match expected type `Bool' with actual type `Int'
+    In the return type of a call of `foo'
+    In the expression:
+      foo
+        ["One........" ~?= "1", "Two" ~?= "2", "Thre........." ~?= "3",
+     "Four" ~?= "4", ....]
+    In an equation for `allTest1':
+        allTest1
+          = foo
+              ["One........" ~?= "1", "Two" ~?= "2", "Thre........." ~?= "3",
+         ....]
 
-allTests :: Bool
-allTests = foo
-           [a ~?= b
-           ,"Three" ~?= "3"
+tcfail177.hs:18:12:
+    Couldn't match expected type `Bool' with actual type `Int'
+    In the return type of a call of `foo'
+    In the expression:
+      foo
+        ["One........" ~?= "1", "Two.................." ~?= "2",
+       "Thre........." ~?= "3", "Four" ~?= "4", ....]
+    In an equation for `allTest2':
+        allTest2
+          = foo
+              ["One........" ~?= "1", "Two.................." ~?= "2",
+             "Thre........." ~?= "3", ....]
+-}
+
+allTest1 :: Bool
+allTest1 = foo
+           ["One........" ~?= "1"
+           ,"Two" ~?= "2"
+           ,"Thre........." ~?= "3"
            ,"Four" ~?= "4"
            ,"Five" ~?= "5"
-           ,"Five" ~?= "5"
-           ,"Five" ~?= "5"
-           ,"Five" ~?= "5"
-           ,"Five" ~?= "5"
-           ,"Five" ~?= "5"
-           ,"Two", "Two", "Two" 
-           ,"Two", "Two", "Two" 
-           ,"Two", "Two", "Two" 
-           ,"Two", "Two", "Two" 
-           ,"Two", "Two", "Two" 
-           ,"Two", "Two", "Two"] 
+           ]
 
-a=""
-b=""
+allTest2 :: Bool
+allTest2 = foo
+           ["One........" ~?= "1"
+           ,"Two.................." ~?= "2"
+           ,"Thre........." ~?= "3"
+           ,"Four" ~?= "4"
+           ,"Five" ~?= "5"
+           ]
 
 (~?=) :: a -> a -> Bool
-(~?=) = error "urk" 
+(~?=) = error "urk"
 
 foo :: a -> Int
 foo x = 0

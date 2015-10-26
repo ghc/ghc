@@ -86,6 +86,7 @@ infixr 1 ^<<, <<^
 -- which may be overridden for efficiency.
 
 class Category a => Arrow a where
+    {-# MINIMAL arr, (first | (***)) #-}
 
     -- | Lift a function to an arrow.
     arr :: (b -> c) -> a b c
@@ -93,16 +94,14 @@ class Category a => Arrow a where
     -- | Send the first component of the input through the argument
     --   arrow, and copy the rest unchanged to the output.
     first :: a b c -> a (b,d) (c,d)
+    first = (*** id)
 
     -- | A mirror image of 'first'.
     --
     --   The default definition may be overridden with a more efficient
     --   version if desired.
     second :: a b c -> a (d,b) (d,c)
-    second f = arr swap >>> first f >>> arr swap
-      where
-        swap :: (x,y) -> (y,x)
-        swap ~(x,y) = (y,x)
+    second = (id ***)
 
     -- | Split the input between the two argument arrows and combine
     --   their output.  Note that this is in general not a functor.
@@ -110,7 +109,8 @@ class Category a => Arrow a where
     --   The default definition may be overridden with a more efficient
     --   version if desired.
     (***) :: a b c -> a b' c' -> a (b,b') (c,c')
-    f *** g = first f >>> second g
+    f *** g = first f >>> arr swap >>> first g >>> arr swap
+      where swap ~(x,y) = (y,x)
 
     -- | Fanout: send the input to both argument arrows and combine
     --   their output.
@@ -141,8 +141,6 @@ class Category a => Arrow a where
 
 instance Arrow (->) where
     arr f = f
-    first f = f *** id
-    second f = id *** f
 --  (f *** g) ~(x,y) = (f x, g y)
 --  sorry, although the above defn is fully H'98, nhc98 can't parse it.
     (***) f g ~(x,y) = (f x, g y)
@@ -218,21 +216,19 @@ instance MonadPlus m => ArrowPlus (Kleisli m) where
 -- be overridden for efficiency.
 
 class Arrow a => ArrowChoice a where
+    {-# MINIMAL (left | (+++)) #-}
 
     -- | Feed marked inputs through the argument arrow, passing the
     --   rest through unchanged to the output.
     left :: a b c -> a (Either b d) (Either c d)
+    left = (+++ id)
 
     -- | A mirror image of 'left'.
     --
     --   The default definition may be overridden with a more efficient
     --   version if desired.
     right :: a b c -> a (Either d b) (Either d c)
-    right f = arr mirror >>> left f >>> arr mirror
-      where
-        mirror :: Either x y -> Either y x
-        mirror (Left x) = Right x
-        mirror (Right y) = Left y
+    right = (id +++)
 
     -- | Split the input between the two argument arrows, retagging
     --   and merging their outputs.
@@ -241,7 +237,11 @@ class Arrow a => ArrowChoice a where
     --   The default definition may be overridden with a more efficient
     --   version if desired.
     (+++) :: a b c -> a b' c' -> a (Either b b') (Either c c')
-    f +++ g = left f >>> right g
+    f +++ g = left f >>> arr mirror >>> left g >>> arr mirror
+      where
+        mirror :: Either x y -> Either y x
+        mirror (Left x) = Right x
+        mirror (Right y) = Left y
 
     -- | Fanin: Split the input between the two argument arrows and
     --   merge their outputs.
@@ -314,7 +314,6 @@ instance Arrow a => Applicative (ArrowMonad a) where
    ArrowMonad f <*> ArrowMonad x = ArrowMonad (f &&& x >>> arr (uncurry id))
 
 instance ArrowApply a => Monad (ArrowMonad a) where
-    return x = ArrowMonad (arr (\_ -> x))
     ArrowMonad m >>= f = ArrowMonad $
         m >>> arr (\x -> let ArrowMonad h = f x in (h, ())) >>> app
 

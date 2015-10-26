@@ -1,0 +1,4 @@
+
+<no location info>: error:
+    output was redirected with -o, but no output will be generated
+because there is no Main module.

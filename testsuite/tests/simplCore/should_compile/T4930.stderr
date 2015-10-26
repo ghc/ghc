@@ -1,39 +1,39 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 23, types: 11, coercions: 0}
+Result size of Tidy Core = {terms: 35, types: 14, coercions: 0}
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
-lvl :: [Char]
-[GblId, Str=DmdType]
-lvl = unpackCString# "Too small"#
+Rec {
+-- RHS size: {terms: 23, types: 6, coercions: 0}
+T4930.$wfoo [InlPrag=[0], Occ=LoopBreaker] :: Int# -> Int#
+[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <L,U>]
+T4930.$wfoo =
+  \ (ww :: Int#) ->
+    case case tagToEnum# @ Bool (<# ww 5#) of _ [Occ=Dead] {
+           False -> I# (+# ww 2#);
+           True -> case T4930.$wfoo ww of ww1 { __DEFAULT -> I# ww1 }
+         }
+    of _ [Occ=Dead] { I# ipv ->
+    +# ww 5#
+    }
+end Rec }
 
--- RHS size: {terms: 2, types: 1, coercions: 0}
-T4930.foo1 :: Int
-[GblId, Str=DmdType b]
-T4930.foo1 = error @ Int lvl
-
--- RHS size: {terms: 16, types: 5, coercions: 0}
-foo :: Int -> Int
+-- RHS size: {terms: 10, types: 4, coercions: 0}
+foo [InlPrag=INLINE[0]] :: Int -> Int
 [GblId,
  Arity=1,
+ Caf=NoCafRefs,
  Str=DmdType <S,1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (n [Occ=Once!] :: Int) ->
-                 case n of _ [Occ=Dead] { I# x ->
-                 case tagToEnum# @ Bool (<# x 5#) of _ [Occ=Dead] {
-                   False -> I# (+# x 5#);
-                   True -> T4930.foo1
-                 }
+         Tmpl= \ (w [Occ=Once!] :: Int) ->
+                 case w of _ [Occ=Dead] { I# ww1 [Occ=Once] ->
+                 case T4930.$wfoo ww1 of ww2 { __DEFAULT -> I# ww2 }
                  }}]
 foo =
-  \ (n :: Int) ->
-    case n of _ [Occ=Dead] { I# x ->
-    case tagToEnum# @ Bool (<# x 5#) of _ [Occ=Dead] {
-      False -> I# (+# x 5#);
-      True -> T4930.foo1
-    }
+  \ (w :: Int) ->
+    case w of _ [Occ=Dead] { I# ww1 ->
+    case T4930.$wfoo ww1 of ww2 { __DEFAULT -> I# ww2 }
     }
 
 
