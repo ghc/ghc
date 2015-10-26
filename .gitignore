@@ -36,6 +36,7 @@ autom4te.cache
 config.log
 config.status
 configure
+missing-win32-tarballs
 
 # -----------------------------------------------------------------------------
 # Ignore any overlapped darcs repos and back up files

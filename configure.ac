@@ -279,38 +279,6 @@ fail() {
     exit 1
 }
 
-download_file() {
-    local file_url="$1"
-    local file_md5="$2"
-    local dest_file="$3"
-    local description="$4"
-    local extra_curl_opts="$5"
-    local dest_dir="$(dirname $dest_file)"
-
-    if ! test -f "${dest_file}"
-    then
-        local curl_cmd="curl -L ${file_url} -o ${dest_file} --create-dirs -# ${extra_curl_opts}"
-        if test "$TarballsAutodownload" = "NO"
-        then
-            echo >&2
-            echo "ERROR: ${description} not found." >&2
-            echo "Please rerun configure with --enable-tarballs-autodownload, or perform the download manually:" >&2
-            echo "  $curl_cmd" >&2
-            exit 1
-        fi
-        AC_MSG_NOTICE([Downloading ${description} to ${dest_dir}...])
-        $curl_cmd || {
-            rm -f "${dest_file}"
-            fail "ERROR: Download failed."
-        }
-    else
-        AC_MSG_NOTICE([Using ${description} found in ${dest_dir}...])
-    fi
-
-    echo "${file_md5} *${dest_file}" | md5sum --quiet -c - ||
-        fail "ERROR: ${description} appears to be corrupted, please delete it and try again."
-}
-
 
 if test "$HostOS" = "mingw32"
 then
@@ -327,61 +295,49 @@ then
         tarball_dest_dir="mingw-w64/x86_64"
         tarball_mingw_dir="mingw64"
     fi
-
-    tarball_dir='ghc-tarballs'
 fi
 
-download_and_extract() {
-    local mingw_url="$1"
-    local file_md5sum_x86="$2"
-    local file_md5sum_x64="$3"
-
-    if test "$HostArch" = "i386"
-    then
-        local file_md5sum="${file_md5sum_x86}"
-    else
-        local file_md5sum="${file_md5sum_x64}"
-    fi
-
-    local mingw_toolchain="$(basename $mingw_url)"
-    local mingw_w64="${tarball_dir}/${tarball_dest_dir}/${mingw_toolchain}"
-
-    download_file "${mingw_url}" "${file_md5sum}" "${mingw_w64}" "${mingw_toolchain}"
-
-    # Mark the tree as needing updates by deleting the folder
-    if test -d inplace/mingw && test inplace/mingw -ot "$mingw_w64"
-    then
-        AC_MSG_NOTICE([In-tree MinGW-w64 tree requires updates...])
-        rm -rf inplace/mingw
-    fi
-}
-
 set_up_tarballs() {
-    local mingw_base_url="https://downloads.haskell.org/~ghc/mingw"
-    local package_prefix="mingw-w64"
-
-    local format_url="${mingw_base_url}/${mingw_arch}/${package_prefix}-${mingw_arch}"
-
-    download_and_extract "${format_url}-crt-git-5.0.0.4531.49c7046-1-any.pkg.tar.xz"           "dd39323140c0c1b3e065e9edb1a66779" "ac22cedd38229bcd57f5999e4734054f"
-    download_and_extract "${format_url}-winpthreads-git-5.0.0.4538.78dca70-1-any.pkg.tar.xz"   "0b14fe27790e94db454fbb3564e79a73" "65cf07b6f42a1a62d1844e08190cab0d"
-    download_and_extract "${format_url}-headers-git-5.0.0.4531.49c7046-1-any.pkg.tar.xz"       "6ee9e3c2f9d3e507f60ee33d19417dc2" "f49a19cdea93998c33ac90ceb9570350"
-    download_and_extract "${format_url}-libwinpthread-git-5.0.0.4538.78dca70-1-any.pkg.tar.xz" "fbb2114aa7fbb5507e21d8a2ea265cfd" "31ed10e2d8891f6251d968f81bfdd274"
-    download_and_extract "${format_url}-zlib-1.2.8-8-any.pkg.tar.xz"                           "7f519cb6defa27a90c5353160cf088d4" "6a2f4a70ccb24acca70a01da331699a6"
-    download_and_extract "${format_url}-isl-0.14.1-2-any.pkg.tar.xz"                           "4cd20fe75ed9ef03e260d529042cb742" "dc0e0a7fd23a8193cccb0bf8d7267685"
-    download_and_extract "${format_url}-mpc-1.0.3-2-any.pkg.tar.xz"                            "719e76fa7a54a8676d2e60af3bb13c45" "df1a7d4050568d83c265ae78c32ef30b"
-    download_and_extract "${format_url}-mpfr-3.1.3.p0-2-any.pkg.tar.xz"                        "e9cbd2402ac1afe6e86c102223b90dcb" "6e3b9ec27edab394aa41536839afdafe"
-    download_and_extract "${format_url}-gmp-6.0.0-3-any.pkg.tar.xz"                            "c02f9759cd0140a6d8ea69ef5a88e167" "2970d4d8b176f8f36ae2d39269b25cce"
-    download_and_extract "${format_url}-gcc-libs-5.2.0-3-any.pkg.tar.xz"                       "a9bd2e65cb350cc8f8a6deb6d3b346a8" "9c2ed24989e14fdf0c548a5215374660"
-    download_and_extract "${format_url}-binutils-2.25.1-1-any.pkg.tar.xz"                      "997e9c2166fb851916cd8ac1bc9c6180" "7cb9f5f50a7103da41f7ec7547c09707"
-    download_and_extract "${format_url}-libiconv-1.14-5-any.pkg.tar.xz"                        "2c99a163689ba8257627bb07274b3f86" "37418c6be92ef20be17cdc9fe844af35"
-    download_and_extract "${format_url}-gcc-5.2.0-3-any.pkg.tar.xz"                            "efe6d6afc18aab89dc01e7ddcd2523a6" "0b697ce61112ba6e5a3c4d565957ea4e"
+    AC_MSG_NOTICE([Checking for Windows toolchain tarballs...])
+    local action
+    if test "$TarballsAutodownload" = "NO"
+    then
+        action="verify"
+    else
+        action="download"
+    fi
+    mk/get-win32-tarballs.sh $action $HostArch > missing-win32-tarballs
+    case $? in
+        0)
+           rm missing-win32-tarballs
+           ;;
+        2)
+           echo
+           echo "Error:"
+           echo "Needed msys2 tarballs are missing. You have a few options to get them,"
+           echo
+           echo "  * run configure with the --enable-tarballs-autodownload option"
+           echo
+           echo "  * run mk/get-win32-tarballs.sh download ${HostArch}"
+           echo
+           echo "  * manually download the files listed in ./missing-win32-tarballs and place"
+           echo "    them in the ghc-tarballs directory."
+           echo
+           exit 1
+           ;;
+        *)
+           echo
+           echo "Error fetching msys2 tarballs; see errors above."
+           exit 1
+           ;;
+    esac
 
     # Extract all the tarballs in one go
     if ! test -d inplace/mingw
     then
         AC_MSG_NOTICE([Extracting Windows toolchain from archives (may take a while)...])
         rm -rf inplace/mingw
-        local base_dir="../${tarball_dir}/${tarball_dest_dir}"
+        local base_dir="../ghc-tarballs/${tarball_dest_dir}"
         ( cd inplace &&
         find "${base_dir}" -name "*.tar.xz" -exec tar xfJ {} \; &&
         rm ".MTREE" &&
@@ -417,8 +373,6 @@ then
     fp_prog_ar="${mingwbin}ar.exe"
 
     # NB. Download the perl binaries if required
-    download_file "https://github.com/ghc/ghc-tarballs/blob/master/perl/ghc-perl-1.tar.gz?raw=true" "b21d1681b61cf7a024e854096285b02e" "ghc-tarballs/perl/ghc-perl-1.tar.gz" "Windows Perl binary distributions" "--insecure"
-
     if ! test -d inplace/perl ||
          test inplace/perl -ot ghc-tarballs/perl/ghc-perl*.tar.gz
     then
