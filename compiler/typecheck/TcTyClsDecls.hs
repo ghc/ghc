@@ -835,7 +835,6 @@ tcDataDefn rec_info tc_name tvs kind
        ; is_boot         <- tcIsHsBootOrSig -- Are we compiling an hs-boot file?
 
              -- Check that we don't use kind signatures without Glasgow extensions
-       ; field_env <- getRecFieldEnv
        ; case mb_ksig of
            Nothing   -> return ()
            Just hs_k -> do { checkTc (kind_signatures) (badSigTyDecl tc_name)
