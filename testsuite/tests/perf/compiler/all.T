@@ -700,3 +700,23 @@ test('T9233',
     ],
     multimod_compile,
     ['T9233', '-v0 -O2 -fno-spec-constr'])
+
+test('T10370',
+     [ only_ways(['optasm']),
+       compiler_stats_num_field('max_bytes_used', # Note [residency]
+          [(wordsize(64), 19548720, 15),
+          # 2015-10-22    19548720
+           (wordsize(32), 11371496, 15),
+          # 2015-10-22    11371496
+          ]),
+       compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
+          [(wordsize(64), 76, 15),
+          # 2015-10-22    76
+           (wordsize(32), 39, 15),
+          # 2015-10-22    39
+          ]),
+       # Use `+RTS -G1` for more stable residency measurements. Note [residency].
+       extra_hc_opts('+RTS -G1 -RTS')
+     ],
+     compile,
+     [''])
