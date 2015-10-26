@@ -10,9 +10,10 @@
 #
 # -----------------------------------------------------------------------------
 
-utils/genprimopcode_dist_MODULES = Lexer Main ParserM Parser Syntax
-utils/genprimopcode_dist_PROGNAME = genprimopcode
-utils/genprimopcode_dist_HC_OPTS = -package array
+utils/genprimopcode_USES_CABAL           = YES
+utils/genprimopcode_PACKAGE              = genprimopcode
+utils/genprimopcode_dist_PROGNAME        = genprimopcode
+utils/genprimopcode_dist_INSTALL         = NO
 utils/genprimopcode_dist_INSTALL_INPLACE = YES
 
 $(eval $(call build-prog,utils/genprimopcode,dist,0))

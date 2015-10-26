@@ -10,10 +10,11 @@
 #
 # -----------------------------------------------------------------------------
 
-utils/deriveConstants_dist_MODULES = DeriveConstants
-utils/deriveConstants_dist_PROGNAME = deriveConstants
+utils/deriveConstants_USES_CABAL           = YES
+utils/deriveConstants_PACKAGE              = deriveConstants
+utils/deriveConstants_dist_PROGNAME        = deriveConstants
+utils/deriveConstants_dist_INSTALL         = NO
 utils/deriveConstants_dist_INSTALL_INPLACE = YES
-utils/deriveConstants_HC_OPTS += -package process -package containers
 
 $(eval $(call build-prog,utils/deriveConstants,dist,0))
 
