@@ -897,7 +897,10 @@ data DynFlags = DynFlags {
 
   -- | Only inline memset if it generates no more than this many
   -- pseudo (roughly: Cmm) instructions.
-  maxInlineMemsetInsns  :: Int
+  maxInlineMemsetInsns  :: Int,
+
+  -- | Reverse the order of error messages in GHC/GHCi
+  reverseErrors :: Bool
 }
 
 class HasDynFlags m where
@@ -1558,7 +1561,9 @@ defaultDynFlags mySettings =
 
         maxInlineAllocSize = 128,
         maxInlineMemcpyInsns = 32,
-        maxInlineMemsetInsns = 32
+        maxInlineMemsetInsns = 32,
+
+        reverseErrors = False
       }
 
 defaultWays :: Settings -> [Way]
@@ -2397,6 +2402,10 @@ dynamic_flags = [
                                      deprecate "Use -fno-force-recomp instead"))
   , defGhcFlag "no-recomp" (NoArg (do setGeneralFlag Opt_ForceRecomp
                                       deprecate "Use -fforce-recomp instead"))
+  , defGhcFlag "freverse-errors"
+      (noArg (\d -> d {reverseErrors = True} ))
+  , defGhcFlag "fno-reverse-errors"
+      (noArg (\d -> d {reverseErrors = False} ))
 
         ------ HsCpp opts ---------------------------------------------------
   , defFlag "D"              (AnySuffix (upd . addOptP))
