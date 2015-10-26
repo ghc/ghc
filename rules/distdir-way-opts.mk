@@ -131,7 +131,7 @@ $1_$2_$3_MOST_DIR_HC_OPTS = \
 # that -O0 is effective (see #5484)
 
 # $1_$2_$3_ALL_HC_OPTS: this is all the options we will pass to GHC
-# for a given ($1,$2,$3).
+# for a given ($1,$2,$3) when we use it for compiling.
 $1_$2_$3_ALL_HC_OPTS = \
  -hisuf $$($3_hisuf) -osuf  $$($3_osuf) -hcsuf $$($3_hcsuf) \
  $$($1_$2_$3_MOST_DIR_HC_OPTS) \
