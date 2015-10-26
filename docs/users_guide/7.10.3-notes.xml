@@ -4,7 +4,7 @@
 
   <para>
     The 7.10.3 release is a bugfix release, with over 70+ bug fixes
-    relative to 7.10.1. The major fixes are listed below. For the full
+    relative to 7.10.2. The major fixes are listed below. For the full
     list with more detail, see the <ulink
     url="https://ghc.haskell.org/trac/ghc/milestone/7.10.3">GHC 7.10.3
     milestone</ulink> on our bug tracker.
@@ -133,16 +133,9 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 4.8.1.0 (was 4.8.0.0)
+                    Version number 4.8.2.0 (was 4.8.1.0)
                </para>
            </listitem>
-            <listitem>
-                <para>
-                    The <literal>Lifetime</literal> datatype (and its
-                    constructors) are now exported from
-                    <literal>GHC.Event</literal>.
-                </para>
-            </listitem>
             <listitem>
                 <para>
                     The <literal>GiveGCStats</literal>,
@@ -152,34 +145,6 @@
                     <literal>GHC.RTS.Flags</literal>.
                 </para>
            </listitem>
-       </itemizedlist>
-    </sect3>
-
-    <sect3>
-        <title>binary</title>
-        <itemizedlist>
-            <listitem>
-                <para>
-                    Version number 0.7.5.0 (was 0.7.3.0)
-               </para>
-           </listitem>
-       </itemizedlist>
-    </sect3>
-
-    <sect3>
-        <title>Cabal</title>
-        <itemizedlist>
-            <listitem>
-                <para>
-                    Version number 1.22.4.0 (was 1.22.2.0).
-               </para>
-           </listitem>
-       </itemizedlist>
-    </sect3>
-
-    <sect3>
-        <title>ghc</title>
-        <itemizedlist>
        </itemizedlist>
     </sect3>
   </sect2>
