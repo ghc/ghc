@@ -7,7 +7,7 @@ module Packages (
         module PackageConfig,
 
         -- * Reading the package config, and processing cmdline args
-        PackageState(preloadPackages),
+        PackageState(preloadPackages, explicitPackages),
         emptyPackageState,
         initPackages,
         readPackageConfigs,
@@ -245,6 +245,10 @@ data PackageState = PackageState {
   -- is always mentioned before the packages it depends on.
   preloadPackages      :: [UnitId],
 
+  -- | Packages which we explicitly depend on (from a command line flag).
+  -- We'll use this to generate version macros.
+  explicitPackages      :: [UnitId],
+
   -- | This is a full map from 'ModuleName' to all modules which may possibly
   -- be providing it.  These providers may be hidden (but we'll still want
   -- to report them in error messages), or it may be an ambiguous import.
@@ -255,6 +259,7 @@ emptyPackageState :: PackageState
 emptyPackageState = PackageState {
     pkgIdMap = emptyUFM,
     preloadPackages = [],
+    explicitPackages = [],
     moduleToPkgConfAll = Map.empty
     }
 
@@ -961,6 +966,10 @@ mkPackageState dflags0 pkgs0 preload0 = do
 
   let pstate = PackageState{
     preloadPackages     = dep_preload,
+    explicitPackages    = foldUFM (\pkg xs ->
+                            if elemUFM (packageConfigId pkg) vis_map
+                                then packageConfigId pkg : xs
+                                else xs) [] pkg_db,
     pkgIdMap            = pkg_db,
     moduleToPkgConfAll  = mkModuleToPkgConfAll dflags pkg_db vis_map
     }

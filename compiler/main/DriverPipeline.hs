@@ -74,6 +74,7 @@ import Data.List        ( isSuffixOf )
 import Data.Maybe
 import Data.Char
 import Data.Time
+import Data.Version
 
 -- ---------------------------------------------------------------------------
 -- Pre-process
@@ -2049,6 +2050,20 @@ doCpp dflags raw input_fn output_fn = do
           , "-include", ghcVersionH
           ]
 
+    -- MIN_VERSION macros
+    let uids = explicitPackages (pkgState dflags)
+        pkgs = catMaybes (map (lookupPackage dflags) uids)
+    mb_macro_include <-
+        -- Only generate if we have (1) we have set -hide-all-packages
+        -- (so we don't generate a HUGE macro file of things we don't
+        -- care about but are exposed) and (2) we actually have packages
+        -- to write macros for!
+        if gopt Opt_HideAllPackages dflags && not (null pkgs)
+            then do macro_stub <- newTempName dflags "h"
+                    writeFile macro_stub (generatePackageVersionMacros pkgs)
+                    return [SysTools.FileOption "-include" macro_stub]
+            else return []
+
     cpp_prog       (   map SysTools.Option verbFlags
                     ++ map SysTools.Option include_paths
                     ++ map SysTools.Option hsSourceCppOpts
@@ -2058,6 +2073,7 @@ doCpp dflags raw input_fn output_fn = do
                     ++ map SysTools.Option hscpp_opts
                     ++ map SysTools.Option sse_defs
                     ++ map SysTools.Option avx_defs
+                    ++ mb_macro_include
         -- Set the language mode to assembler-with-cpp when preprocessing. This
         -- alleviates some of the C99 macro rules relating to whitespace and the hash
         -- operator, which we tend to abuse. Clang in particular is not very happy
@@ -2086,6 +2102,35 @@ getBackendDefs dflags | hscTarget dflags == HscLlvm = do
 
 getBackendDefs _ =
     return []
+
+-- ---------------------------------------------------------------------------
+-- Macros (cribbed from Cabal)
+
+generatePackageVersionMacros :: [PackageConfig] -> String
+generatePackageVersionMacros pkgs = concat
+  [ "/* package " ++ sourcePackageIdString pkg ++ " */\n"
+  ++ generateMacros "" pkgname version
+  | pkg <- pkgs
+  , let version = packageVersion pkg
+        pkgname = map fixchar (packageNameString pkg)
+  ]
+
+fixchar :: Char -> Char
+fixchar '-' = '_'
+fixchar c   = c
+
+generateMacros :: String -> String -> Version -> String
+generateMacros prefix name version =
+  concat
+  ["#define ", prefix, "VERSION_",name," ",show (showVersion version),"\n"
+  ,"#define MIN_", prefix, "VERSION_",name,"(major1,major2,minor) (\\\n"
+  ,"  (major1) <  ",major1," || \\\n"
+  ,"  (major1) == ",major1," && (major2) <  ",major2," || \\\n"
+  ,"  (major1) == ",major1," && (major2) == ",major2," && (minor) <= ",minor,")"
+  ,"\n\n"
+  ]
+  where
+    (major1:major2:minor:_) = map show (versionBranch version ++ repeat 0)
 
 -- ---------------------------------------------------------------------------
 -- join object files into a single relocatable object file, using ld -r
