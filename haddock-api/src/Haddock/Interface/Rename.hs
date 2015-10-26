@@ -170,6 +170,12 @@ renameFnArgsDoc = mapM renameDoc
 renameLType :: LHsType Name -> RnM (LHsType DocName)
 renameLType = mapM renameType
 
+renameLSigType :: LHsWcSigType Name -> RnM (LHsType DocName)
+renameLSigType = renameWc renameLType
+
+renameLWcSigType :: LHsWcSigType Name -> RnM (LHsType DocName)
+renameLWcSigType = renameImplicit renameLSigType
+
 renameLKind :: LHsKind Name -> RnM (LHsKind DocName)
 renameLKind = renameLType
 
@@ -198,11 +204,15 @@ renameMaybeInjectivityAnn = traverse renameInjectivityAnn
 
 renameType :: HsType Name -> RnM (HsType DocName)
 renameType t = case t of
-  HsForAllTy expl extra tyvars lcontext ltype -> do
+  HsForAllTy { hst_bndrs = tyvars, hst_body = ltype } -> do
     tyvars'   <- renameLTyVarBndrs tyvars
+    ltype'    <- renameLType ltype
+    return (HsForAllTy { hst_bndrs = tyvars', hst_body = ltype' })
+
+  HsQualTy { hst_cttx = lcontext , hst_body = ltype } -> do
     lcontext' <- renameLContext lcontext
     ltype'    <- renameLType ltype
-    return (HsForAllTy expl extra tyvars' lcontext' ltype')
+    return (HsQualTy { hst_ctxt = lcontext', hst_body = ltype' })
 
   HsTyVar n -> return . HsTyVar =<< rename n
   HsBangTy b ltype -> return . HsBangTy b =<< renameLType ltype
@@ -252,7 +262,7 @@ renameType t = case t of
   HsSpliceTy _ _          -> error "renameType: HsSpliceTy"
   HsWildCardTy a          -> HsWildCardTy <$> renameWildCardInfo a
 
-renameLTyVarBndrs :: LHsTyVarBndrs Name -> RnM (LHsTyVarBndrs DocName)
+renameLTyVarBndrs :: LHsQTyVars Name -> RnM (LHsQTyVars DocName)
 renameLTyVarBndrs (HsQTvs { hsq_kvs = _, hsq_tvs = tvs })
   = do { tvs' <- mapM renameLTyVarBndr tvs
        ; return (HsQTvs { hsq_kvs = error "haddock:renameLTyVarBndrs", hsq_tvs = tvs' }) }
@@ -441,16 +451,16 @@ renameLFieldOcc (L l (FieldOcc lbl sel)) = do
 
 renameSig :: Sig Name -> RnM (Sig DocName)
 renameSig sig = case sig of
-  TypeSig lnames ltype _ -> do
+  TypeSig lnames ltype -> do
     lnames' <- mapM renameL lnames
-    ltype' <- renameLType ltype
-    return (TypeSig lnames' ltype' PlaceHolder)
+    ltype' <- renameLWcSigType ltype
+    return (TypeSig lnames' ltype')
   PatSynSig lname (flag, qtvs) lreq lprov lty -> do
     lname' <- renameL lname
     qtvs' <- renameLTyVarBndrs qtvs
     lreq' <- renameLContext lreq
     lprov' <- renameLContext lprov
-    lty' <- renameLType lty
+    lty' <- renameLSigType lty
     return $ PatSynSig lname' (flag, qtvs') lreq' lprov' lty'
   FixSig (FixitySig lnames fixity) -> do
     lnames' <- mapM renameL lnames
@@ -463,11 +473,11 @@ renameSig sig = case sig of
 renameForD :: ForeignDecl Name -> RnM (ForeignDecl DocName)
 renameForD (ForeignImport lname ltype co x) = do
   lname' <- renameL lname
-  ltype' <- renameLType ltype
+  ltype' <- renameLSigType ltype
   return (ForeignImport lname' ltype' co x)
 renameForD (ForeignExport lname ltype co x) = do
   lname' <- renameL lname
-  ltype' <- renameLType ltype
+  ltype' <- renameLSigType ltype
   return (ForeignExport lname' ltype' co x)
 
 
@@ -502,32 +512,47 @@ renameTyFamInstD (TyFamInstDecl { tfid_eqn = eqn })
                                , tfid_fvs = placeHolderNames }) }
 
 renameLTyFamInstEqn :: LTyFamInstEqn Name -> RnM (LTyFamInstEqn DocName)
-renameLTyFamInstEqn (L loc (TyFamEqn { tfe_tycon = tc, tfe_pats = pats_w_bndrs, tfe_rhs = rhs }))
+renameLTyFamInstEqn (L loc (TyFamEqn { tfe_tycon = tc, tfe_pats = pats, tfe_rhs = rhs }))
   = do { tc' <- renameL tc
-       ; pats' <- mapM renameLType (hswb_cts pats_w_bndrs)
+       ; pats' <- renameImplicit (mapM renameLType) pats
        ; rhs' <- renameLType rhs
        ; return (L loc (TyFamEqn { tfe_tycon = tc'
-                                 , tfe_pats = HsWB pats' PlaceHolder PlaceHolder PlaceHolder
+                                 , tfe_pats = pats'
                                  , tfe_rhs = rhs' })) }
 
 renameLTyFamDefltEqn :: LTyFamDefltEqn Name -> RnM (LTyFamDefltEqn DocName)
 renameLTyFamDefltEqn (L loc (TyFamEqn { tfe_tycon = tc, tfe_pats = tvs, tfe_rhs = rhs }))
-  = do { tc' <- renameL tc
-       ; tvs'  <- renameLTyVarBndrs tvs
+  = do { tc'  <- renameL tc
+       ; tvs' <- renameLTyVarBndrs tvs
        ; rhs' <- renameLType rhs
        ; return (L loc (TyFamEqn { tfe_tycon = tc'
                                  , tfe_pats = tvs'
                                  , tfe_rhs = rhs' })) }
 
 renameDataFamInstD :: DataFamInstDecl Name -> RnM (DataFamInstDecl DocName)
-renameDataFamInstD (DataFamInstDecl { dfid_tycon = tc, dfid_pats = pats_w_bndrs, dfid_defn = defn })
+renameDataFamInstD (DataFamInstDecl { dfid_tycon = tc, dfid_pats = pats, dfid_defn = defn })
   = do { tc' <- renameL tc
-       ; pats' <- mapM renameLType (hswb_cts pats_w_bndrs)
+       ; pats' <- renameImplicit (mapM renameLType) pats
        ; defn' <- renameDataDefn defn
        ; return (DataFamInstDecl { dfid_tycon = tc'
-                                 , dfid_pats
-                                       = HsWB pats' PlaceHolder PlaceHolder PlaceHolder
+                                 , dfid_pats = pats'
                                  , dfid_defn = defn', dfid_fvs = placeHolderNames }) }
+
+renameImplicit :: (in_thing -> RnM out_thing)
+               -> HsImplicitBndrs Name in_thing
+               -> RnM (HsImplicitBndrs DocName out_thing)
+renameImplicit rn_thing (HsIB { hsib_body = thing })
+  = do { thing' <- rn_thing thing
+       ; return (HsIB { hsib_body = thing'
+                      , hsib_kvs = PlaceHolder, hsib_tvs = PlaceHolder })
+
+renameWc :: (in_thing -> RnM out_thing)
+               -> HsWildcardBndrs Name in_thing
+               -> RnM (HsWildcardBndrs DocName out_thing)
+renameWc rn_thing (HsWC { hswc_body = thing })
+  = do { thing' <- rn_thing thing
+       ; return (HsWC { hswc_body = thing'
+                      , hswc_wcs = PlaceHolder, hswc_ctx = Nothing })
 
 renameExportItem :: ExportItem Name -> RnM (ExportItem DocName)
 renameExportItem item = case item of

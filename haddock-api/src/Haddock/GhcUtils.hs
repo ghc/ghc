@@ -68,7 +68,7 @@ getMainDeclBinder _ = []
 -- to correlate InstDecls with their Instance/CoAxiom Names, via the
 -- instanceMap.
 getInstLoc :: InstDecl name -> SrcSpan
-getInstLoc (ClsInstD (ClsInstDecl { cid_poly_ty = L l _ })) = l
+getInstLoc (ClsInstD (ClsInstDecl { cid_poly_ty = ty })) = getLoc (hsSigType ty)
 getInstLoc (DataFamInstD (DataFamInstDecl { dfid_tycon = L l _ })) = l
 getInstLoc (TyFamInstD (TyFamInstDecl
   -- Since CoAxioms' Names refer to the whole line for type family instances
@@ -91,10 +91,10 @@ filterSigNames p (FixSig (FixitySig ns ty)) =
     []       -> Nothing
     filtered -> Just (FixSig (FixitySig filtered ty))
 filterSigNames _ orig@(MinimalSig _ _)      = Just orig
-filterSigNames p (TypeSig ns ty nwcs) =
+filterSigNames p (TypeSig ns ty) =
   case filter (p . unLoc) ns of
     []       -> Nothing
-    filtered -> Just (TypeSig filtered ty nwcs)
+    filtered -> Just (TypeSig filtered ty)
 filterSigNames _ _                           = Nothing
 
 ifTrueJust :: Bool -> name -> Maybe name
@@ -105,8 +105,8 @@ sigName :: LSig name -> [name]
 sigName (L _ sig) = sigNameNoLoc sig
 
 sigNameNoLoc :: Sig name -> [name]
-sigNameNoLoc (TypeSig   ns _ _)        = map unLoc ns
-sigNameNoLoc (PatSynSig n _ _ _ _)     = [unLoc n]
+sigNameNoLoc (TypeSig   ns _)          = map unLoc ns
+sigNameNoLoc (PatSynSig n _)           = [unLoc n]
 sigNameNoLoc (SpecSig   n _ _)         = [unLoc n]
 sigNameNoLoc (InlineSig n _)           = [unLoc n]
 sigNameNoLoc (FixSig (FixitySig ns _)) = map unLoc ns
@@ -198,7 +198,7 @@ instance Parent (TyClDecl Name) where
                               $ (dd_cons . tcdDataDefn) $ d
     | isClassDecl d =
         map (unL . fdLName . unL) (tcdATs d) ++
-        [ unL n | L _ (TypeSig ns _ _) <- tcdSigs d, n <- ns ]
+        [ unL n | L _ (TypeSig ns _) <- tcdSigs d, n <- ns ]
     | otherwise = []
 
 
