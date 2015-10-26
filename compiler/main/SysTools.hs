@@ -275,6 +275,7 @@ initSysTools mbMinusB
 
        windres_path <- getSetting "windres command"
        libtool_path <- getSetting "libtool command"
+       readelf_path <- getSetting "readelf command"
 
        tmpdir <- getTemporaryDirectory
 
@@ -346,6 +347,7 @@ initSysTools mbMinusB
                     sPgm_sysman  = top_dir ++ "/ghc/rts/parallel/SysMan",
                     sPgm_windres = windres_path,
                     sPgm_libtool = libtool_path,
+                    sPgm_readelf = readelf_path,
                     sPgm_lo  = (lo_prog,[]),
                     sPgm_lc  = (lc_prog,[]),
                     -- Hans: this isn't right in general, but you can
@@ -1048,9 +1050,9 @@ copyWithHeader dflags purpose maybe_header from to = do
 -- | read the contents of the named section in an ELF object as a
 -- String.
 readElfSection :: DynFlags -> String -> FilePath -> IO (Maybe String)
-readElfSection _dflags section exe = do
+readElfSection dflags section exe = do
   let
-     prog = "readelf"
+     prog = pgm_readelf dflags
      args = [Option "-p", Option section, FileOption "" exe]
   --
   r <- readProcessEnvWithExitCode prog (filter notNull (map showOpt args))

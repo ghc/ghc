@@ -148,6 +148,17 @@
           (when using <option>-staticlib</option> only).</para>
         </listitem>
       </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-pgmreadelf</option> <replaceable>cmd</replaceable>
+          <indexterm><primary><option>-pgmreadelf</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Use <replaceable>cmd</replaceable> as the readelf command
+          (part of Unix binutils).</para>
+        </listitem>
+      </varlistentry>
     </variablelist>
   </sect2>
 

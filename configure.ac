@@ -532,6 +532,11 @@ FP_ARG_WITH_PATH_GNU_PROG([RANLIB], [ranlib], [ranlib])
 RanlibCmd="$RANLIB"
 RANLIB="$RanlibCmd"
 
+dnl ** Which readelf to use?
+dnl --------------------------------------------------------------
+FIND_READELF([ReadElfCmd])
+AC_SUBST([ReadElfCmd])
+
 
 # Note: we may not have objdump on OS X, and we only need it on Windows (for DLL checks)
 case $HostOS_CPP in

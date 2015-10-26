@@ -472,6 +472,7 @@ AC_DEFUN([FP_SETTINGS],
         SettingsDllWrapCommand="/bin/false"
         SettingsWindresCommand="/bin/false"
         SettingsLibtoolCommand="libtool"
+        SettingsReadElfCommand="$ReadElfCmd"
         SettingsTouchCommand='touch'
     fi
     if test -z "$LlcCmd"
@@ -501,6 +502,7 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsDllWrapCommand)
     AC_SUBST(SettingsWindresCommand)
     AC_SUBST(SettingsLibtoolCommand)
+    AC_SUBST(SettingsReadElfCommand)
     AC_SUBST(SettingsTouchCommand)
     AC_SUBST(SettingsLlcCommand)
     AC_SUBST(SettingsOptCommand)
@@ -2201,6 +2203,23 @@ AC_DEFUN([FIND_GCC],[
         fi
     fi
     AC_SUBST($1)
+])
+
+# FIND_READELF()
+# --------------------------------
+# Finds which `readelf` to use. This is used in both in the top level
+# `configure.ac` and in `distrib/configure.ac.in`
+#
+# $1 = the variable to set
+#
+AC_DEFUN([FIND_READELF],[
+    if test "$HostOS" != "mingw32"; then
+        FP_ARG_WITH_PATH_GNU_PROG([READELF], [readelf], [readelf])
+        if test -z "$READELF"; then
+            AC_MSG_ERROR([cannot identify readelf tool])
+        fi
+        $1="$READELF"
+    fi
 ])
 
 AC_DEFUN([MAYBE_OVERRIDE_STAGE0],[

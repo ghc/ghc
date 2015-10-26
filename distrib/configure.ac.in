@@ -139,6 +139,11 @@ dnl ** how to invoke `ar' and `ranlib'
 FP_PROG_AR_SUPPORTS_ATFILE
 FP_PROG_AR_NEEDS_RANLIB
 
+dnl ** Which readelf to use?
+dnl --------------------------------------------------------------
+FIND_READELF([ReadElfCmd])
+AC_SUBST([ReadElfCmd])
+
 FP_SETTINGS
 
 #

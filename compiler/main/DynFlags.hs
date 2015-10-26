@@ -71,7 +71,7 @@ module DynFlags (
         versionedAppDir,
         extraGccViaCFlags, systemPackageConfig,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_s, pgm_a, pgm_l, pgm_dll, pgm_T,
-        pgm_sysman, pgm_windres, pgm_libtool, pgm_lo, pgm_lc,
+        pgm_sysman, pgm_windres, pgm_libtool, pgm_readelf, pgm_lo, pgm_lc,
         opt_L, opt_P, opt_F, opt_c, opt_a, opt_l,
         opt_windres, opt_lo, opt_lc,
 
@@ -935,6 +935,7 @@ data Settings = Settings {
   sPgm_sysman            :: String,
   sPgm_windres           :: String,
   sPgm_libtool           :: String,
+  sPgm_readelf           :: String,
   sPgm_lo                :: (String,[Option]), -- LLVM: opt llvm optimiser
   sPgm_lc                :: (String,[Option]), -- LLVM: llc static compiler
   -- options for particular phases
@@ -995,6 +996,8 @@ pgm_windres           :: DynFlags -> String
 pgm_windres dflags = sPgm_windres (settings dflags)
 pgm_libtool           :: DynFlags -> String
 pgm_libtool dflags = sPgm_libtool (settings dflags)
+pgm_readelf           :: DynFlags -> String
+pgm_readelf dflags = sPgm_readelf (settings dflags)
 pgm_lo                :: DynFlags -> (String,[Option])
 pgm_lo dflags = sPgm_lo (settings dflags)
 pgm_lc                :: DynFlags -> (String,[Option])
@@ -2308,6 +2311,8 @@ dynamic_flags = [
       (hasArg (\f -> alterSettings (\s -> s { sPgm_windres = f})))
   , defFlag "pgmlibtool"
       (hasArg (\f -> alterSettings (\s -> s { sPgm_libtool = f})))
+  , defFlag "pgmreadelf"
+      (hasArg (\f -> alterSettings (\s -> s { sPgm_readelf = f})))
 
     -- need to appear before -optl/-opta to be parsed as LLVM flags.
   , defFlag "optlo"
