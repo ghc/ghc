@@ -99,7 +99,7 @@ tyThingToLHsDecl t = case t of
     (synifyType ImplicitizeForAll (dataConUserType dc)) [])
 
   AConLike (PatSynCon ps) ->
-      let (univ_tvs, ex_tvs, req_theta, prov_theta, arg_tys, res_ty) = patSynSig ps
+      let (univ_tvs, req_theta, ex_tvs, prov_theta, arg_tys, res_ty) = patSynSig ps
           qtvs = univ_tvs ++ ex_tvs
           ty = mkFunTys arg_tys res_ty
       in allOK . SigD $ PatSynSig (synifyName ps)
