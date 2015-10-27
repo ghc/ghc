@@ -1,1 +1,14 @@
- 
+
+T10999.hs:5:12: error:
+    Found type wildcard ‘_’ standing for ‘Set.Set a’
+    Where: ‘a’ is a rigid type variable bound by
+               the inferred type of f :: Ord a => () -> Set.Set a at T10999.hs:6:1
+    To use the inferred type, enable PartialTypeSignatures
+    In the type signature for:
+      f :: () -> _
+
+T10999.hs:6:1: error:
+    No instance for (Ord a)
+    When checking that ‘f’ has the inferred type
+      f :: forall a. () -> Set.Set a
+    Probable cause: the inferred type is ambiguous
