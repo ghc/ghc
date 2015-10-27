@@ -791,7 +791,7 @@ data DynFlags = DynFlags {
   -- Package state
   -- NB. do not modify this field, it is calculated by
   -- Packages.initPackages
-  pkgDatabase           :: Maybe [PackageConfig],
+  pkgDatabase           :: Maybe [(FilePath, [PackageConfig])],
   pkgState              :: PackageState,
 
   -- Temporary files

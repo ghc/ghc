@@ -15,5 +15,5 @@ localshadow3.package.conf:
     (shadow-1)
 
 should FAIL:
-should FAIL:
+should SUCCEED:
 should SUCCEED:
