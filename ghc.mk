@@ -1039,7 +1039,7 @@ $(eval $(call bindist-list,.,\
     $(INSTALL_LIBRARY_DOCS) \
     $(addsuffix /*,$(INSTALL_HTML_DOC_DIRS)) \
     docs/index.html \
-    compiler/stage2/doc \
+    $(wildcard compiler/stage2/doc) \
     $(wildcard libraries/*/dist-install/doc/) \
     $(wildcard libraries/*/*/dist-install/doc/) \
     $(filter-out settings,$(INSTALL_LIBS)) \
