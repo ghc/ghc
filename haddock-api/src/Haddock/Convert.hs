@@ -97,17 +97,10 @@ tyThingToLHsDecl t = case t of
 
   -- a data-constructor alone just gets rendered as a function:
   AConLike (RealDataCon dc) -> allOK $ SigD (TypeSig [synifyName dc]
-    (synifyType ImplicitizeForAll (dataConUserType dc)))
+    (synifySigWcType ImplicitizeForAll (dataConUserType dc)))
 
   AConLike (PatSynCon ps) ->
-      let (univ_tvs, ex_tvs, req_theta, prov_theta, arg_tys, res_ty) = patSynSig ps
-          qtvs = univ_tvs ++ ex_tvs
-          ty = mkFunTys arg_tys res_ty
-      in allOK . SigD $ PatSynSig (synifyName ps)
-                          (Implicit, synifyTyVars qtvs)
-                          (synifyCtx req_theta)
-                          (synifyCtx prov_theta)
-                          (synifyType WithinType ty)
+     allOK . SigD $ PatSynSig (synifyName ps) (synifySigType WithinType (patSynType ps))
   where
     withErrs e x = return (e, x)
     allOK x = return (mempty, x)
@@ -317,16 +310,16 @@ synifyDataCon use_gadt_syntax dc =
                       , con_cxt   = ctx
                       , con_details =  hat
                       , con_res = hs_res_ty
-                      , con_doc =  Nothing }
+                      , con_doc =  Nothing
                 -- we don't want any "deprecated GADT syntax" warnings!
-                False
+                      , con_old_rec = False }
 
 synifyName :: NamedThing n => n -> Located Name
 synifyName = noLoc . getName
 
 
 synifyIdSig :: SynifyTypeState -> Id -> Sig Name
-synifyIdSig s i = TypeSig [synifyName i] (synifyType s (varType i)) []
+synifyIdSig s i = TypeSig [synifyName i] (synifySigWcType s (varType i))
 
 
 synifyCtx :: [PredType] -> LHsContext Name
@@ -338,12 +331,14 @@ synifyTyVars ktvs = HsQTvs { hsq_kvs = map tyVarName kvs
                            , hsq_tvs = map synifyTyVar tvs }
   where
     (kvs, tvs) = partition isKindVar ktvs
-    synifyTyVar tv
-      | isLiftedTypeKind kind = noLoc (UserTyVar name)
-      | otherwise             = noLoc (KindedTyVar (noLoc name) (synifyKindSig kind))
-      where
-        kind = tyVarKind tv
-        name = getName tv
+
+synifyTyVar :: TyVar -> LHsTyVarBndr Name
+synifyTyVar tv
+  | isLiftedTypeKind kind = noLoc (UserTyVar name)
+  | otherwise             = noLoc (KindedTyVar (noLoc name) (synifyKindSig kind))
+  where
+    kind = tyVarKind tv
+    name = getName tv
 
 --states of what to do with foralls:
 data SynifyTypeState
@@ -360,6 +355,15 @@ data SynifyTypeState
   --   but we want to restore things to the source-syntax situation where
   --   the defining class gets to quantify all its functions for free!
 
+
+synifySigType :: SynifyTypeState -> Type -> LHsSigType Name
+-- The empty binders is a bit suspicious;
+-- what if the type has free variables?
+synifySigType s ty = mkEmptyImplicitBndrs (synifyType s ty)
+
+synifySigWcType :: SynifyTypeState -> Type -> LHsSigWcType Name
+-- Ditto (see synifySigType)
+synifySigWcType s ty = mkEmptyImplicitBndrs (mkEmptyWildCardBndrs (synifyType s ty))
 
 synifyType :: SynifyTypeState -> Type -> LHsType Name
 synifyType _ (TyVarTy tv) = noLoc $ HsTyVar (getName tv)
@@ -399,11 +403,11 @@ synifyType _ (FunTy t1 t2) = let
   in noLoc $ HsFunTy s1 s2
 synifyType s forallty@(ForAllTy _tv _ty) =
   let (tvs, ctx, tau) = tcSplitSigmaTy forallty
-      sPhi = HsQualTy { hst_ctxt = noLoc (synifyCtx ctx)
-                      , hst_body = noLoc (synify WithinType tau) }
+      sPhi = HsQualTy { hst_ctxt = synifyCtx ctx
+                      , hst_body = synifyType WithinType tau }
   in case s of
     DeleteTopLevelQuantification -> synifyType ImplicitizeForAll tau
-    WithinType        -> noLoc $ HsForAllTy { hst_bndrs = synifyTyVars tvs
+    WithinType        -> noLoc $ HsForAllTy { hst_bndrs = map synifyTyVar tvs
                                             , hst_body  = noLoc sPhi }
     ImplicitizeForAll -> noLoc sPhi
 

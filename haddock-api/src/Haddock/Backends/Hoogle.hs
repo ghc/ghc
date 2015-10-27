@@ -122,8 +122,8 @@ ppExport dflags ExportDecl { expItemDecl    = L _ decl
         f (TyClD d@DataDecl{})  = ppData dflags d subdocs
         f (TyClD d@SynDecl{})   = ppSynonym dflags d
         f (TyClD d@ClassDecl{}) = ppClass dflags d subdocs
-        f (ForD (ForeignImport name typ _ _)) = ppSig dflags $ TypeSig [name] typ
-        f (ForD (ForeignExport name typ _ _)) = ppSig dflags $ TypeSig [name] typ
+        f (ForD (ForeignImport name typ _ _)) = pp_sig dflags [name] (hsSigType typ)
+        f (ForD (ForeignExport name typ _ _)) = pp_sig dflags [name] (hsSigType typ)
         f (SigD sig) = ppSig dflags sig ++ ppFixities
         f _ = []
 
@@ -135,30 +135,32 @@ ppSigWithDoc dflags (TypeSig names sig) subdocs
     = concatMap mkDocSig names
     where
         mkDocSig n = concatMap (ppDocumentation dflags) (getDoc n)
-                     ++ [mkSig n]
-        mkSig n = operator (out dflags n) ++ " :: " ++ outHsType dflags typ
+                     ++ [pp_sig dflags names (hsSigWcType sig)]
 
         getDoc :: Located Name -> [Documentation Name]
         getDoc n = maybe [] (return . fst) (lookup (unL n) subdocs)
 
-        typ = unL (hsSigType sig)
+        typ = unL (hsSigWcType sig)
 ppSigWithDoc _ _ _ = []
 
 ppSig :: DynFlags -> Sig Name -> [String]
 ppSig dflags x  = ppSigWithDoc dflags x []
 
+pp_sig :: DynFlags -> [Located Name] -> LHsType Name -> String
+pp_sig dflags names (L _ typ)  =
+    operator prettyNames ++ " :: " ++ outHsType dflags typ
+    where
+      prettyNames = intercalate ", " $ map (out dflags) names
 
 -- note: does not yet output documentation for class methods
 ppClass :: DynFlags -> TyClDecl Name -> [(Name, DocForDecl Name)] -> [String]
-ppClass dflags decl subdocs = (out dflags decl' ++ ppTyFams) : ppMethods
+ppClass dflags decl subdocs = (out dflags decl{tcdSigs=[]} ++ ppTyFams) :  ppMethods
     where
-        decl' = decl
-            { tcdSigs = [], tcdMeths = emptyBag
-            , tcdATs = [], tcdATDefs = []
-            }
 
-        ppMethods = concat . map (ppSig' . unLoc) $ tcdSigs decl
+        ppMethods = concat . map (ppSig' . unL . add_ctxt) $ tcdSigs decl
         ppSig' = flip (ppSigWithDoc dflags) subdocs . addContext
+
+        add_ctxt = addClassContext (tcdName x) (tyClDeclTyVars x)
 
         ppTyFams
             | null $ tcdATs decl = ""
@@ -172,17 +174,6 @@ ppClass dflags decl subdocs = (out dflags decl' ++ ppTyFams) : ppMethods
             , nest 4 . vcat . map (<> semi) $ elems
             , rbrace
             ]
-
-        addContext (TypeSig name sig) = TypeSig name (mkHsSigType (f (hsSigType sig)))
-        addContext (MinimalSig src sig) = MinimalSig src sig
-        addContext _ = error "expected TypeSig"
-
-        f (L _ (HsForAllTy a ty)) = reL (HsForallTy a (f ty))
-        f (L _ (HsQualTy cxt ty)) = HsQualTy (reL (context : unLoc cxt)) ty
-        f ty = HsQualTy (reL [context]) ty
-
-        context = nlHsTyConApp (tcdName decl)
-            (map (reL . HsTyVar . hsTyVarName . unL) (hsQTvBndrs (tyClDeclTyVars decl)))
 
         tyFamEqnToSyn :: TyFamDefltEqn Name -> TyClDecl Name
         tyFamEqnToSyn tfe = SynDecl

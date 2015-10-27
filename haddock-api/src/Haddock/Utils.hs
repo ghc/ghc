@@ -16,6 +16,7 @@ module Haddock.Utils (
   -- * Misc utilities
   restrictTo, emptyHsQTvs,
   toDescription, toInstalledDescription,
+  mkEmptySigWcType, addClassContext, lHsQTyVarsToTypes,
 
   -- * Filename utilities
   moduleHtmlFile, moduleHtmlFile',
@@ -123,6 +124,34 @@ toInstalledDescription = fmap mkMeta . hmi_description . instInfo
 
 mkMeta :: Doc a -> MDoc a
 mkMeta x = emptyMetaDoc { _doc = x }
+
+mkEmptySigWcType :: LHsType Name -> LHsSigWcType Name
+-- Dubious, because the implicit binders are empty even
+-- though the type might have free varaiables
+mkEmptySigWcType ty = mkEmptyImplicitBndrs (mkEmptyWildCardBndrs ty)
+
+addClassContext :: Name -> LHsQTyVars Name -> LSig Name -> LSig Name
+-- Add the class context to a class-op signature
+addClassContxt cls tvs0 (L pos (ClassOpSig _ lname ltype))
+  = L pos (TypeSig lname (mkEmptySigWcType (go (hsSigType ltype))))
+          -- The mkEmptySigWcType is suspicious
+  where
+    go (L loc (HsForAllTy { hst_bndrs = tvs, hst_body = ty }))
+       = L loc (HsForAllTy { hst_bndrs = tvs, hst_body = go ty })
+    go (L loc (HsQualTy { hst_ctxt = ctxt, hst_body = ty }))
+       = L loc (HsQualTy { hst_ctxt = add_ctxt ctxt, hst_body = ty })
+    go (L loc ty)
+       = L loc (HsQualTy { hst_ctxt = add_ctxt (L loc []), hst_body = L loc ty })
+
+    extra_pred = nlHsTyConApp cls (lHsQTyVarsToTypes tvs0)
+    add_ctxt (L loc preds) = L loc (extra_pred : preds)
+
+addClassContext _ _ sig = sig   -- E.g. a MinimalSig is fine
+
+lHsQTyVarsToTypes :: LHsQTyVars Name -> [LHsType Name]
+lHsQTyVarsToTypes tvs
+  = [ noLoc (HsTyVar (hsLTyVarName tv))
+    | tv <- hsQTvBndrs tvs ]
 
 --------------------------------------------------------------------------------
 -- * Making abstract declarations
