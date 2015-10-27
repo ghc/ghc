@@ -135,6 +135,7 @@ _darcs/
 /libraries/plus.gif
 /libraries/synopsis.png
 /libraries/stamp/
+/mk/are-validating.mk
 /mk/build.mk
 /mk/config.h
 /mk/config.h.in

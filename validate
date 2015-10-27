@@ -174,7 +174,9 @@ fi
 
 thisdir=`utils/ghc-pwd/dist-boot/ghc-pwd`
 
-make_settings="Validating=YES ValidateSpeed=$speed ValidateHpc=$hpc"
+echo "Validating=YES"       >  mk/are-validating.mk
+echo "ValidateSpeed=$speed" >> mk/are-validating.mk
+echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
 
 # Note [Default build system verbosity].
 #
@@ -188,14 +190,16 @@ make_settings="Validating=YES ValidateSpeed=$speed ValidateHpc=$hpc"
 # `make -s`, when user explicitly asks for it with `./validate --quiet`.
 if [ $be_quiet -eq 1 ]; then
     # See Note [Default build system verbosity].
-    make_settings="$make_settings V=0"
+    echo "V=0"                  >> mk/are-validating.mk # Less gunk
 fi
 
 if [ $use_dph -eq 1 ]; then
-    make_settings="$make_settings BUILD_DPH=YES"
+    echo "BUILD_DPH=YES"    >> mk/are-validating.mk
+else
+    echo "BUILD_DPH=NO"     >> mk/are-validating.mk
 fi
 
-$make -j$threads $make_settings
+$make -j$threads
 # For a "debug make", add "--debug=b --debug=m"
 
 check_packages post-build
@@ -205,8 +209,8 @@ check_packages post-build
 
 if [ $speed != "FAST" ]; then
 
-    $make binary-dist-prep $make_settings
-    $make test_bindist TEST_PREP=YES $make_settings
+    $make binary-dist-prep
+    $make test_bindist TEST_PREP=YES
 
     #
     # Install the xhtml package into the bindist.
@@ -217,7 +221,7 @@ if [ $speed != "FAST" ]; then
 
     check_packages post-install
 
-    $make validate_build_xhtml BINDIST_PREFIX="$thisdir/$bindistdir" $make_settings
+    $make validate_build_xhtml BINDIST_PREFIX="$thisdir/$bindistdir"
 
     check_packages post-xhtml
 fi
