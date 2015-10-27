@@ -598,7 +598,7 @@ repRuleBndr (L _ (RuleBndr n))
        ; rep2 ruleVarName [n'] }
 repRuleBndr (L _ (RuleBndrSig n sig))
   = do { MkC n'  <- lookupLBinder n
-       ; MkC ty' <- repLTy (hsWcSigType sig)
+       ; MkC ty' <- repLTy (hsSigWcType sig)
        ; rep2 typedRuleVarName [n', ty'] }
 
 repAnnD :: LAnnDecl Name -> DsM (SrcSpan, Core TH.DecQ)

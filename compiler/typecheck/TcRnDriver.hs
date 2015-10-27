@@ -1751,9 +1751,7 @@ getGhciStepIO = do
                                      , hst_body  = nlHsFunTy ghciM ioM }
 
         stepTy :: LHsSigWcType Name  -- Urgh!
-        stepTy = HsIB { hsib_tvs = [], hsib_kvs = []
-                      , hsib_body = HsWC { hswc_wcs = [], hswc_ctx = Nothing
-                                         , hswc_body = step_ty } }
+        stepTy = mkEmptyImplicitBndrs (mkEmptyWildCardBndrs step_ty)
     return (noLoc $ ExprWithTySig (nlHsVar ghciStepIoMName) stepTy)
 
 isGHCiMonad :: HscEnv -> String -> IO (Messages, Maybe Name)

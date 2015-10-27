@@ -495,7 +495,6 @@ compiler_stage2_dll0_MODULES = \
 	CoreSeq \
 	CoreStats \
 	CostCentre \
-	Ctype \
 	DataCon \
 	Demand \
 	Digraph \
@@ -534,7 +533,6 @@ compiler_stage2_dll0_MODULES = \
 	InstEnv \
 	Kind \
 	Lexeme \
-	Lexer \
 	ListSetOps \
 	Literal \
 	Maybes \

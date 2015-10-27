@@ -46,7 +46,8 @@ module HsTypes (
         wildCardName, sameWildCard, sameNamedWildCard,
         isAnonWildCard, isNamedWildCard,
 
-        mkHsImplicitBndrs, mkHsWildCardBndrs,
+        mkHsImplicitBndrs, mkHsWildCardBndrs, hsImplicitBody,
+        mkEmptyImplicitBndrs, mkEmptyWildCardBndrs,
         mkHsQTvs, hsQTvBndrs, isHsKindedTyVar, hsTvbAllKinded,
         hsScopedTvs, hsWcScopedTvs, dropWildCards,
         hsTyVarName, hsLKiTyVarNames,
@@ -57,7 +58,7 @@ module HsTypes (
         splitLHsClassTy_maybe,
         splitHsFunType, splitHsAppTys, hsTyGetAppHead_maybe,
         mkHsAppTys, mkHsOpTy,
-        ignoreParens, hsSigType, hsWcSigType,
+        ignoreParens, hsSigType, hsSigWcType,
         hsLTyVarBndrsToTypes,
 
         -- Printing
@@ -207,15 +208,18 @@ type LHsSigWcType name = HsImplicitBndrs name (LHsWcType name)  -- Both
 
 -- See Note [Representing type signatures]
 
-hsSigType :: LHsSigType name -> LHsType name
-hsSigType sig_ty = hsib_body sig_ty
+hsImplicitBody :: HsImplicitBndrs name thing -> thing
+hsImplicitBody (HsIB { hsib_body = body }) = body
 
-hsWcSigType :: LHsSigWcType name -> LHsType name
-hsWcSigType sig_ty = hswc_body (hsib_body sig_ty)
+hsSigType :: LHsSigType name -> LHsType name
+hsSigType = hsImplicitBody
+
+hsSigWcType :: LHsSigWcType name -> LHsType name
+hsSigWcType sig_ty = hswc_body (hsib_body sig_ty)
 
 dropWildCards :: LHsSigWcType name -> LHsSigType name
 -- Drop the wildcard part of a LHsSigWcType
-dropWildCards sig_ty = sig_ty { hsib_body = hsWcSigType sig_ty }
+dropWildCards sig_ty = sig_ty { hsib_body = hsSigWcType sig_ty }
 
 {- Note [Representing type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -247,6 +251,19 @@ mkHsWildCardBndrs :: thing -> HsWildCardBndrs RdrName thing
 mkHsWildCardBndrs x = HsWC { hswc_body = x
                            , hswc_wcs  = PlaceHolder
                            , hswc_ctx  = Nothing }
+
+-- Add empty binders.  This is a bit suspicious; what if
+-- the wrapped thing had free type variables?
+mkEmptyImplicitBndrs :: thing -> HsImplicitBndrs Name thing
+mkEmptyImplicitBndrs x = HsIB { hsib_body = x
+                              , hsib_kvs = []
+                              , hsib_tvs = [] }
+
+mkEmptyWildCardBndrs :: thing -> HsWildCardBndrs Name thing
+mkEmptyWildCardBndrs x = HsWC { hswc_body = x
+                              , hswc_wcs  = []
+                              , hswc_ctx  = Nothing }
+
 
 --------------------------------------------------
 -- | These names are used early on to store the names of implicit
