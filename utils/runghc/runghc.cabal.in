@@ -17,7 +17,7 @@ Flag base3
 
 Executable runghc
     Default-Language: Haskell2010
-    Main-Is: runghc.hs
+    Main-Is: Main.hs
 
     if flag(base3)
         Build-Depends: base       >= 3   && < 5,
