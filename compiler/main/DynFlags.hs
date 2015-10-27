@@ -374,6 +374,7 @@ data GeneralFlag
    | Opt_DmdTxDictSel              -- use a special demand transformer for dictionary selectors
    | Opt_Loopification                  -- See Note [Self-recursive tail calls]
    | Opt_CprAnal
+   | Opt_WorkerWrapper
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -3011,7 +3012,8 @@ fFlags = [
   flagSpec "unbox-small-strict-fields"        Opt_UnboxSmallStrictFields,
   flagSpec "unbox-strict-fields"              Opt_UnboxStrictFields,
   flagSpec "vectorisation-avoidance"          Opt_VectorisationAvoidance,
-  flagSpec "vectorise"                        Opt_Vectorise
+  flagSpec "vectorise"                        Opt_Vectorise,
+  flagSpec "worker-wrapper"                   Opt_WorkerWrapper
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
@@ -3251,8 +3253,17 @@ default_PIC platform =
                                          -- information.
     _                      -> []
 
+-- General flags that are switched on/off when other general flags are switched
+-- on
 impliedGFlags :: [(GeneralFlag, TurnOnFlag, GeneralFlag)]
-impliedGFlags = [(Opt_DeferTypeErrors, turnOn, Opt_DeferTypedHoles)]
+impliedGFlags = [(Opt_DeferTypeErrors, turnOn, Opt_DeferTypedHoles)
+                ,(Opt_Strictness, turnOn, Opt_WorkerWrapper)
+                ]
+
+-- General flags that are switched on/off when other general flags are switched
+-- off
+impliedOffGFlags :: [(GeneralFlag, TurnOnFlag, GeneralFlag)]
+impliedOffGFlags = [(Opt_Strictness, turnOff, Opt_WorkerWrapper)]
 
 impliedXFlags :: [(ExtensionFlag, TurnOnFlag, ExtensionFlag)]
 impliedXFlags
@@ -3346,6 +3357,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_Strictness)
     , ([1,2],   Opt_UnboxSmallStrictFields)
     , ([1,2],   Opt_CprAnal)
+    , ([1,2],   Opt_WorkerWrapper)
 
     , ([2],     Opt_LiberateCase)
     , ([2],     Opt_SpecConstr)
@@ -3613,8 +3625,17 @@ setGeneralFlag' f dflags = foldr ($) (gopt_set dflags f) deps
         --     implies further flags
 
 unSetGeneralFlag' :: GeneralFlag -> DynFlags -> DynFlags
-unSetGeneralFlag' f dflags = gopt_unset dflags f
-   -- When you un-set f, however, we don't un-set the things it implies
+unSetGeneralFlag' f dflags = foldr ($) (gopt_unset dflags f) deps
+  where
+    deps = [ if turn_on then setGeneralFlag' d
+                        else unSetGeneralFlag' d
+           | (f', turn_on, d) <- impliedOffGFlags, f' == f ]
+   -- In general, when you un-set f, we don't un-set the things it implies.
+   -- There are however some exceptions, e.g., -fno-strictness implies
+   -- -fno-worker-wrapper.
+   --
+   -- NB: use unSetGeneralFlag' recursively, in case the implied off flags
+   --     imply further flags.
 
 --------------------------
 setWarningFlag, unSetWarningFlag :: WarningFlag -> DynP ()

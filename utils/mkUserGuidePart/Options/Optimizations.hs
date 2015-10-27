@@ -289,7 +289,8 @@ optimizationsOptions =
          , flagReverse = "-fno-static-argument-transformation"
          }
   , flag { flagName = "-fstrictness"
-         , flagDescription = "Turn on strictness analysis. Implied by ``-O``."
+         , flagDescription = "Turn on strictness analysis." ++
+           " Implied by ``-O``. Implies ``-fworker-wrapper``"
          , flagType = DynamicFlag
          , flagReverse = "-fno-strictness"
          }
@@ -340,5 +341,15 @@ optimizationsOptions =
          , flagDescription = "Enable vectorisation of nested data parallelism"
          , flagType = DynamicFlag
          , flagReverse = "-fno-vectorise"
+         }
+  , flag { flagName = "-fworker-wrapper"
+         , flagDescription =
+           "Enable the worker-wrapper transformation after a strictness" ++
+           " analysis pass. Implied by ``-O``, and by ``-fstrictness``." ++
+           " Disabled by ``-fno-strictness``. Enabling ``-fworker-wrapper``" ++
+           " while strictness analysis is disabled (by ``-fno-strictness``)" ++
+           " has no effect."
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-worker-wrapper"
          }
   ]

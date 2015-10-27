@@ -127,6 +127,7 @@ getCoreToDo dflags
     static_args   = gopt Opt_StaticArgumentTransformation dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
+    ww_on         = gopt Opt_WorkerWrapper                dflags
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
@@ -187,12 +188,16 @@ getCoreToDo dflags
                           -- Don't do case-of-case transformations.
                           -- This makes full laziness work better
 
+    strictness_pass = if ww_on
+                       then [CoreDoStrictness,CoreDoWorkerWrapper]
+                       else [CoreDoStrictness]
+
+
     -- New demand analyser
-    demand_analyser = (CoreDoPasses ([
-                           CoreDoStrictness,
-                           CoreDoWorkerWrapper,
-                           simpl_phase 0 ["post-worker-wrapper"] max_iter
-                           ]))
+    demand_analyser = (CoreDoPasses (
+                           strictness_pass ++
+                           [simpl_phase 0 ["post-worker-wrapper"] max_iter]
+                           ))
 
     core_todo =
      if opt_level == 0 then
@@ -309,11 +314,10 @@ getCoreToDo dflags
         -- Final clean-up simplification:
         simpl_phase 0 ["final"] max_iter,
 
-        runWhen late_dmd_anal $ CoreDoPasses [
-            CoreDoStrictness,
-            CoreDoWorkerWrapper,
-            simpl_phase 0 ["post-late-ww"] max_iter
-          ],
+        runWhen late_dmd_anal $ CoreDoPasses (
+            strictness_pass ++
+            [simpl_phase 0 ["post-late-ww"] max_iter]
+          ),
 
         maybe_rule_check (Phase 0)
      ]
