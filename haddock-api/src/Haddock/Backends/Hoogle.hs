@@ -113,38 +113,29 @@ ppExport dflags ExportDecl { expItemDecl    = L _ decl
         f (TyClD d@DataDecl{})  = ppData dflags d subdocs
         f (TyClD d@SynDecl{})   = ppSynonym dflags d
         f (TyClD d@ClassDecl{}) = ppClass dflags d
-        f (ForD (ForeignImport name typ _ _)) = ppSig dflags $ TypeSig [name] typ
-        f (ForD (ForeignExport name typ _ _)) = ppSig dflags $ TypeSig [name] typ
+        f (ForD (ForeignImport name typ _ _)) = pp_sig dflags [name] (hsSigType typ)
+        f (ForD (ForeignExport name typ _ _)) = pp_sig dflags [name] (hsSigType typ)
         f (SigD sig) = ppSig dflags sig
         f _ = []
 ppExport _ _ = []
 
 
 ppSig :: DynFlags -> Sig Name -> [String]
-ppSig dflags (TypeSig names sig)
-    = [operator prettyNames ++ " :: " ++ outHsType dflags typ]
-    where
-        prettyNames = intercalate ", " $ map (out dflags) names
-        typ = unL (hsSigType sig)
+ppSig dflags (TypeSig names sig) = pp_sig dflags names (hsSigWcType sig)
 ppSig _ _ = []
 
+pp_sig :: DynFlags -> [Located Name] -> LHsType Name -> [String]
+pp_sig dflags names (L _ typ)
+  = [operator prettyNames ++ " :: " ++ outHsType dflags typ]
+  where
+    prettyNames = intercalate ", " $ map (out dflags) names
 
 -- note: does not yet output documentation for class methods
 ppClass :: DynFlags -> TyClDecl Name -> [String]
 ppClass dflags x = out dflags x{tcdSigs=[]} :
-            concatMap (ppSig dflags . addContext . unL) (tcdSigs x)
-    where
-        addContext (TypeSig name sig) = TypeSig name (mkHsSigType (f (hsSigType sig)))
-        addContext (MinimalSig src sig) = MinimalSig src sig
-        addContext _ = error "expected TypeSig"
-
-        f (L _ (HsForAllTy a ty)) = reL (HsForallTy a (f ty))
-        f (L _ (HsQualTy cxt ty)) = HsQualTy (reL (context : unLoc cxt)) ty
-        f ty = HsQualTy (reL [context]) ty
-
-        context = nlHsTyConApp (tcdName x)
-            (map (reL . HsTyVar . hsTyVarName . unL) (hsQTvBndrs (tyClDeclTyVars x)))
-
+                   concatMap (ppSig dflags . unL . add_ctxt) (tcdSigs x)
+  where
+    add_ctxt = addClassContext (tcdName x) (tyClDeclTyVars x)
 
 ppInstance :: DynFlags -> ClsInst -> [String]
 ppInstance dflags x = [dropComment $ out dflags x]
