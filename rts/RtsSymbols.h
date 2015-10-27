@@ -9,6 +9,7 @@
 #ifndef RTS_SYMBOLS_H
 #define RTS_SYMBOLS_H
 
+#include "ghcautoconf.h"
 
 #ifdef LEADING_UNDERSCORE
 #define MAYBE_LEADING_UNDERSCORE_STR(s) ("_" s)
