@@ -1,6 +1,8 @@
 {-# LANGUAGE CPP #-}
 main = do
-    putStrLn VERSION_containers
-#if MIN_VERSION_base(3,0,0)
+#ifndef VERSION_containers
+    putStrLn "OK"
+#endif
+#ifndef MIN_VERSION_base
     putStrLn "OK"
 #endif

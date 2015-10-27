@@ -1,6 +1,0 @@
-
-T10970a.hs:4:0: error:
-     error: missing binary operator before token "("
-     #if MIN_VERSION_base(3,0,0)
-     ^
-`gcc' failed in phase `C pre-processor'. (Exit code: 1)
