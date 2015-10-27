@@ -1567,6 +1567,9 @@ defaultDynFlags mySettings =
         maxInlineMemcpyInsns = 32,
         maxInlineMemsetInsns = 32,
 
+        initialUnique = 0,
+        uniqueIncrement = 1,
+
         reverseErrors = False
       }
 
