@@ -479,5 +479,3 @@ test('T10770a', expect_broken(10770), compile, [''])
 test('T10770b', expect_broken(10770), compile, [''])
 test('T10935', normal, compile, [''])
 test('T10971a', normal, compile, [''])
-test('T10997', expect_broken(10997),
-               multi_compile, ['T10997', [('T10997a.hs', '')], '-v0'])

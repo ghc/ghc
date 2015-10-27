@@ -1,5 +1,5 @@
 {-# LANGUAGE PatternSynonyms, ViewPatterns, ConstraintKinds, TypeFamilies, PolyKinds, KindSignatures #-}
-module T10997a where
+module T10997_1a where
 
 import GHC.Exts
 

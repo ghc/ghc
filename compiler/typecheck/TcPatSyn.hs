@@ -84,15 +84,6 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
              prov_theta = map evVarPred prov_dicts
              req_theta  = map evVarPred req_dicts
 
-       ; univ_tvs   <- mapM zonkQuantifiedTyVar univ_tvs
-       ; ex_tvs     <- mapM zonkQuantifiedTyVar ex_tvs
-
-       ; prov_theta <- zonkTcThetaType prov_theta
-       ; req_theta  <- zonkTcThetaType req_theta
-
-       ; pat_ty     <- zonkTcType pat_ty
-       ; args       <- mapM zonkId args
-
        ; traceTc "tcInferPatSynDecl }" $ ppr name
        ; tc_patsyn_finish lname dir is_infix lpat'
                           (univ_tvs, req_theta, ev_binds, req_dicts)
@@ -137,8 +128,8 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
          --  * The arguments, type-coerced to the SigTyVars: wrapped_args
          --  * The instantiation of ex_tvs to pass to the success continuation: ex_tys
          --  * The provided theta substituted with the SigTyVars: prov_theta'
-       ; (req_ev_binds, (lpat', (ex_tys, prov_theta', wrapped_args))) <-
-           checkConstraints skol_info univ_tvs req_dicts $
+       ; (implic1, req_ev_binds, (lpat', (ex_tys, prov_theta', wrapped_args))) <-
+           buildImplication skol_info univ_tvs req_dicts $
            tcPat PatSyn lpat pat_ty $ do
            { ex_sigtvs <- mapM (\tv -> newSigTyVar (getName tv) (tyVarKind tv)) ex_tvs
            ; let subst = mkTvSubst (mkInScopeSet (zipVarEnv ex_sigtvs ex_sigtvs)) $
@@ -156,10 +147,15 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
        ; let ex_tvs_rhs  = varSetElems ex_vars_rhs
 
          -- Check that prov_theta' can be satisfied with the dicts from the pattern
-       ; (prov_ev_binds, prov_dicts) <-
-           checkConstraints skol_info ex_tvs_rhs prov_dicts_rhs $ do
+       ; (implic2, prov_ev_binds, prov_dicts) <-
+           buildImplication skol_info ex_tvs_rhs prov_dicts_rhs $ do
            { let origin = PatOrigin -- TODO
            ; emitWanteds origin prov_theta' }
+
+       -- Solve the constraints now, because we are about to make a PatSyn,
+       -- which should not contain unification variables and the like (Trac #10997)
+       -- Since all the inputs are implications the returned bindings will be empty
+       ; _ <- simplifyTop (emptyWC `addImplics` (implic1 `unionBags` implic2))
 
        ; traceTc "tcCheckPatSynDecl }" $ ppr name
        ; tc_patsyn_finish lname dir is_infix lpat'
@@ -191,20 +187,36 @@ tc_patsyn_finish lname dir is_infix lpat'
                  (ex_tvs, subst, prov_theta, prov_ev_binds, prov_dicts)
                  wrapped_args
                  pat_ty
-  = do { traceTc "tc_patsyn_finish {" $
+  = do { -- Zonk everything.  We are about to build a final PatSyn
+         -- so there had better be no unification variables in there
+         univ_tvs     <- mapM zonkQuantifiedTyVar univ_tvs
+       ; ex_tvs       <- mapM zonkQuantifiedTyVar ex_tvs
+       ; prov_theta   <- zonkTcThetaType prov_theta
+       ; req_theta    <- zonkTcThetaType req_theta
+       ; pat_ty       <- zonkTcType pat_ty
+       ; wrapped_args <- mapM zonk_wrapped_arg wrapped_args
+       ; let qtvs    = univ_tvs ++ ex_tvs
+             theta   = prov_theta ++ req_theta
+             arg_tys = map (varType . fst) wrapped_args
+
+       ; traceTc "tc_patsyn_finish {" $
            ppr (unLoc lname) $$ ppr (unLoc lpat') $$
            ppr (univ_tvs, req_theta, req_ev_binds, req_dicts) $$
            ppr (ex_tvs, subst, prov_theta, prov_ev_binds, prov_dicts) $$
            ppr wrapped_args $$
            ppr pat_ty
+
+       -- Make the 'matcher'
        ; (matcher_id, matcher_bind) <- tcPatSynMatcher lname lpat'
                                          (univ_tvs, req_theta, req_ev_binds, req_dicts)
                                          (ex_tvs, subst, prov_theta, prov_ev_binds, prov_dicts)
-                                         wrapped_args
+                                         wrapped_args  -- Not necessarily zonked
                                          pat_ty
 
+       -- Make the 'builder'
        ; builder_id <- mkPatSynBuilderId dir lname qtvs theta arg_tys pat_ty
 
+       -- Make the PatSyn itself
        ; let patSyn = mkPatSyn (unLoc lname) is_infix
                         (univ_tvs, req_theta)
                         (ex_tvs, prov_theta)
@@ -214,9 +226,10 @@ tc_patsyn_finish lname dir is_infix lpat'
 
        ; return (patSyn, matcher_bind) }
   where
-    qtvs = univ_tvs ++ ex_tvs
-    theta = prov_theta ++ req_theta
-    arg_tys = map (varType . fst) wrapped_args
+    zonk_wrapped_arg :: (Var, HsWrapper) -> TcM (Var, HsWrapper)
+    -- The HsWrapper will get zonked later, as part of the LHsBinds
+    zonk_wrapped_arg (arg_id, wrap) = do { arg_id <- zonkId arg_id
+                                         ; return (arg_id, wrap) }
 
 {-
 ************************************************************************
