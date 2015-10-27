@@ -1700,7 +1700,14 @@ tyConToIfaceDecl env tycon
     ifaceOverloaded flds = case fsEnvElts flds of
                              fl:_ -> flIsOverloaded fl
                              []   -> False
-    ifaceFields flds = map flLabel $ fsEnvElts flds
+    ifaceFields flds = sort $ map flLabel $ fsEnvElts flds
+                       -- We need to sort the labels because they come out
+                       -- of FastStringEnv in arbitrary order, because
+                       -- FastStringEnv is keyed on Uniques.
+                       -- Sorting FastString is ok here, because Uniques
+                       -- are only used for equality checks in the Ord
+                       -- instance for FastString.
+                       -- See Note [Unique Determinism] in Unique.
 
 toIfaceBang :: TidyEnv -> HsImplBang -> IfaceBang
 toIfaceBang _    HsLazy              = IfNoBang
