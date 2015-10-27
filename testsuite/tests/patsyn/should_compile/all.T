@@ -22,3 +22,7 @@ test('ImpExp_Imp', [extra_clean(['ImpExp_Exp.hi', 'ImpExp_Exp.o'])], multimod_co
 test('T9857', normal, compile, [''])
 test('T9889', normal, compile, [''])
 test('T10747', normal, compile, [''])
+test('T10997', [extra_clean(['T10997a.hi', 'T10997a.o'])], multimod_compile, ['T10997', '-v0'])
+test('T10997_1', [extra_clean(['T10997_1a.hi', 'T10997_1a.o'])], multimod_compile, ['T10997_1', '-v0'])
+
+

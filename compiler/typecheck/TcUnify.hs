@@ -12,7 +12,7 @@ module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcGen,
   tcSubType, tcSubType_NC, tcSubTypeDS, tcSubTypeDS_NC,
-  checkConstraints, newImplication,
+  checkConstraints, buildImplication,
 
   -- Various unifications
   unifyType, unifyTypeList, unifyTheta,
@@ -52,6 +52,7 @@ import ErrUtils
 import DynFlags
 import BasicTypes
 import Maybes ( isJust )
+import Bag
 import Util
 import Outputable
 import FastString
@@ -571,17 +572,19 @@ checkConstraints skol_info skol_tvs given thing_inside
       -- tcPolyExpr, which uses tcGen and hence checkConstraints.
 
   | otherwise
-  = newImplication skol_info skol_tvs given thing_inside
+  = do { (implics, ev_binds, result) <- buildImplication skol_info skol_tvs given thing_inside
+       ; emitImplications implics
+       ; return (ev_binds, result) }
 
-newImplication :: SkolemInfo -> [TcTyVar]
-               -> [EvVar] -> TcM result
-               -> TcM (TcEvBinds, result)
-newImplication skol_info skol_tvs given thing_inside
-  = ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
+buildImplication :: SkolemInfo
+                 -> [TcTyVar]           -- Skolems
+                 -> [EvVar]             -- Given
+                 -> TcM result
+                 -> TcM (Bag Implication, TcEvBinds, result)
+buildImplication skol_info skol_tvs given thing_inside
+ =  ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
     ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
-    do { ((result, tclvl), wanted) <- captureConstraints  $
-                                      captureTcLevel $
-                                      thing_inside
+    do { (result, tclvl, wanted) <- pushLevelAndCaptureConstraints thing_inside
 
        ; if isEmptyWC wanted && null given
             -- Optimisation : if there are no wanteds, and no givens
@@ -589,21 +592,21 @@ newImplication skol_info skol_tvs given thing_inside
             -- Reason for the (null given): we don't want to lose
             -- the "inaccessible alternative" error check
          then
-            return (emptyTcEvBinds, result)
+            return (emptyBag, emptyTcEvBinds, result)
          else do
        { ev_binds_var <- newTcEvBinds
        ; env <- getLclEnv
-       ; emitImplication $ Implic { ic_tclvl = tclvl
-                                  , ic_skols = skol_tvs
-                                  , ic_no_eqs = False
-                                  , ic_given = given
-                                  , ic_wanted = wanted
-                                  , ic_insol  = insolubleWC wanted
-                                  , ic_binds = ev_binds_var
-                                  , ic_env = env
-                                  , ic_info = skol_info }
+       ; let implic = Implic { ic_tclvl = tclvl
+                             , ic_skols = skol_tvs
+                             , ic_no_eqs = False
+                             , ic_given = given
+                             , ic_wanted = wanted
+                             , ic_insol = insolubleWC wanted
+                             , ic_binds = ev_binds_var
+                             , ic_env = env
+                             , ic_info = skol_info }
 
-       ; return (TcEvBinds ev_binds_var, result) } }
+       ; return (unitBag implic, TcEvBinds ev_binds_var, result) } }
 
 {-
 ************************************************************************
