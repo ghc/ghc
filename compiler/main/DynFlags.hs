@@ -2402,9 +2402,9 @@ dynamic_flags = [
                                      deprecate "Use -fno-force-recomp instead"))
   , defGhcFlag "no-recomp" (NoArg (do setGeneralFlag Opt_ForceRecomp
                                       deprecate "Use -fforce-recomp instead"))
-  , defGhcFlag "freverse-errors"
+  , defFlag "freverse-errors"
       (noArg (\d -> d {reverseErrors = True} ))
-  , defGhcFlag "fno-reverse-errors"
+  , defFlag "fno-reverse-errors"
       (noArg (\d -> d {reverseErrors = False} ))
 
         ------ HsCpp opts ---------------------------------------------------
