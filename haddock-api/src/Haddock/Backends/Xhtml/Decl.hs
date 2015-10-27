@@ -486,9 +486,9 @@ ppClassDecl summary links instances fixities loc d subdocs
                            -- there are different subdocs for different names in a single
                            -- type signature?
 
-    minimalBit = case [ s | L _ (MinimalSig _ s) <- lsigs ] of
+    minimalBit = case [ s | L _ (MinimalSig _ (L _ s)) <- lsigs ] of
       -- Miminal complete definition = every shown method
-      And xs : _ | sort [getName n | Var (L _ n) <- xs] ==
+      And xs : _ | sort [getName n | L _ (Var (L _ n)) <- xs] ==
                    sort [getName n | L _ (TypeSig ns _ _) <- lsigs, L _ n <- ns]
         -> noHtml
 
@@ -504,9 +504,10 @@ ppClassDecl summary links instances fixities loc d subdocs
       _ -> noHtml
 
     ppMinimal _ (Var (L _ n)) = ppDocName qual Prefix True n
-    ppMinimal _ (And fs) = foldr1 (\a b -> a+++", "+++b) $ map (ppMinimal True) fs
-    ppMinimal p (Or fs) = wrap $ foldr1 (\a b -> a+++" | "+++b) $ map (ppMinimal False) fs
+    ppMinimal _ (And fs) = foldr1 (\a b -> a+++", "+++b) $ map (ppMinimal True . unLoc) fs
+    ppMinimal p (Or fs) = wrap $ foldr1 (\a b -> a+++" | "+++b) $ map (ppMinimal False . unLoc) fs
       where wrap | p = parens | otherwise = id
+    ppMinimal p (Parens x) = ppMinimal p (unLoc x)
 
     instancesBit = ppInstances instances nm unicode qual
 

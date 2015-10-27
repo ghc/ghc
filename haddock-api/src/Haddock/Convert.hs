@@ -78,7 +78,7 @@ tyThingToLHsDecl t = case t of
          , tcdFDs = map (\ (l,r) -> noLoc
                         (map (noLoc . getName) l, map (noLoc . getName) r) ) $
                          snd $ classTvsFds cl
-         , tcdSigs = noLoc (MinimalSig mempty . fmap noLoc $ classMinimalDef cl) :
+         , tcdSigs = noLoc (MinimalSig mempty . noLoc . fmap noLoc $ classMinimalDef cl) :
                       map (noLoc . synifyIdSig DeleteTopLevelQuantification)
                         (classMethods cl)
          , tcdMeths = emptyBag --ignore default method definitions, they don't affect signature
