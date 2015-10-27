@@ -699,10 +699,10 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
 
         ; checkExistentials ex_tvs penv
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX subst ex_tvs
-        ; let ty' = substTy tenv ty
-              arg_tys' = substTys tenv arg_tys
+        ; let ty'         = substTy tenv ty
+              arg_tys'    = substTys tenv arg_tys
               prov_theta' = substTheta tenv prov_theta
-              req_theta' = substTheta tenv req_theta
+              req_theta'  = substTheta tenv req_theta
 
         ; wrap <- coToHsWrapper <$> unifyType ty' pat_ty
         ; traceTc "tcPatSynPat" (ppr pat_syn $$

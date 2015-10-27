@@ -1200,6 +1200,8 @@ instance Outputable TcIdSigInfo where
                , ppr (map fst tyvars) ]
 
 instance Outputable TcIdSigBndr where
+    ppr (CompleteSig f)               = ptext (sLit "CompleteSig") <+> ppr f
+    ppr (PartialSig { sig_name = n }) = ptext (sLit "PartialSig")  <+> ppr n
 
 instance Outputable TcPatSynInfo where
     ppr (TPSI{ patsig_name = name}) = ppr name

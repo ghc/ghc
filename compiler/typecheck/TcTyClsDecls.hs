@@ -1299,7 +1299,9 @@ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl        -- Data types
              -- See Note [Checking GADT return types]
 
        ; fam_envs <- tcGetFamInstEnvs
-       ; traceTc "tcConDecl 2" (ppr names $$ ppr arg_tys $$ ppr univ_tvs $$ ppr ex_tvs $$ ppr field_lbls)
+
+       -- Can't print univ_tvs, arg_tys etc, because we are inside the knot here
+       ; traceTc "tcConDecl 2" (ppr names $$ ppr field_lbls)
        ; let
            buildOneDataCon (L _ name) = do
              { is_infix <- tcConIsInfix name hs_details res_ty

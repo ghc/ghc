@@ -796,9 +796,10 @@ chooseInferredQuantifiers inferred_theta tau_tvs
        ; partial_sigs      <- xoptM Opt_PartialTypeSignatures
        ; warn_partial_sigs <- woptM Opt_WarnPartialTypeSignatures
        ; msg <- mkLongErrAt loc (mk_msg inferred_diff partial_sigs) empty
-       ; traceTc "completeTheta" (vcat
-           [ ppr bndr_info
-           , ppr annotated_theta, ppr inferred_theta, ppr inferred_diff ])
+       ; traceTc "completeTheta" $
+            vcat [ ppr bndr_info
+                 , ppr annotated_theta, ppr inferred_theta
+                 , ppr inferred_diff ]
        ; case partial_sigs of
            True | warn_partial_sigs -> reportWarning msg
                 | otherwise         -> return ()
@@ -1800,7 +1801,10 @@ decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
   | strict_pat_binds                          = NoGen
   | Just (lbind, sig) <- one_funbind_with_sig = if isPartialSig sig
     -- See Note [Partial type signatures and generalisation]
-                                                then infer_plan
+    -- We use InferGen False to say "do inference, but do not apply
+    -- the MR".  It's stupid to apply the MR when we are given a
+    -- signature!  C.f Trac #11016, function f1
+                                                then InferGen False
                                                 else CheckGen lbind sig
   | mono_local_binds                          = NoGen
   | otherwise                                 = infer_plan

@@ -1060,9 +1060,19 @@ tcExprSig expr sig@(TISI { sig_bndr  = s_bndr
        ; tau <- zonkTcType tau
        ; let inferred_theta = map evVarPred givens
              tau_tvs        = tyVarsOfType tau
-       ; (_, theta) <- chooseInferredQuantifiers inferred_theta tau_tvs (Just sig)
-       ; let poly_wrap = mkWpTyLams   qtvs
-                         <.> mkWpLams givens   -- Not right
+       ; (my_tv_set, my_theta) <- chooseInferredQuantifiers inferred_theta tau_tvs (Just sig)
+       ; let my_tvs = filter (`elemVarSet` my_tv_set) qtvs   -- Maintain original order
+             inferred_sigma = mkSigmaTy qtvs   inferred_theta tau
+             my_sigma       = mkSigmaTy my_tvs my_theta       tau
+       ; wrap <- if inferred_sigma `eqType` my_sigma
+                 then return idHsWrapper  -- Fast path; also avoids complaint when we infer
+                                          -- an ambiguouse type and have AllowAmbiguousType
+                                          -- e..g infer  x :: forall a. F a -> Int
+                 else tcSubType_NC ExprSigCtxt inferred_sigma my_sigma
+
+       ; let poly_wrap = wrap
+                         <.> mkWpTyLams qtvs
+                         <.> mkWpLams givens
                          <.> mkWpLet  ev_binds
        ; return (mkLHsWrap poly_wrap expr', mkSigmaTy qtvs theta tau) }
 
@@ -1070,21 +1080,6 @@ tcExprSig expr sig@(TISI { sig_bndr  = s_bndr
   where
     skol_info = SigSkol ExprSigCtxt (mkPhiTy theta tau)
     skol_tvs = map snd skol_prs
-{-
-       ; ev_binds <- emitImplicationFor tclvl skol_info
-                                        skol_tvs given wanted
-         -- NB: don't use checkConsraints here, because that
-         --     doesn't bump the level if skol_tvs is empty
-         --     But we must also bump the level if there are
-         --     any wildcards.  Easier to do so unconditionally.
-
-
-  = do { (tclvl, wanted, expr') <- pushLevelAndCaptureConstraints $
-                                   tcExtendTyVarEnvFromSig sig $
-                                   tcPolyExprNC expr tau
-       ; (qtvs, givens, _mr_bites, ev_binds)
-                 <- simplifyInfer tclvl False skol_tvs [(name,tau)] wanted
--}
 
 {- *********************************************************************
 *                                                                      *
