@@ -1565,7 +1565,9 @@ defaultDynFlags mySettings =
 
         maxInlineAllocSize = 128,
         maxInlineMemcpyInsns = 32,
-        maxInlineMemsetInsns = 32
+        maxInlineMemsetInsns = 32,
+
+        reverseErrors = False
       }
 
 defaultWays :: Settings -> [Way]
