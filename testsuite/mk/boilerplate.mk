@@ -24,7 +24,9 @@ show:
 
 define canonicalise
 # $1 = path variable
-$1_CYGPATH := $$(shell $(SHELL) -c "cygpath -m '$$($1)'" 2> /dev/null)
+# Don't use 'cygpath -m', because it doesn't change drive letters to
+# something 'which' can understand.
+$1_CYGPATH := $$(shell $(SHELL) -c "cygpath '$$($1)'" 2> /dev/null)
 ifneq "$$($1_CYGPATH)" ""
 # We use 'override' in case we are trying to update a value given on
 # the commandline (e.g. TEST_HC)
@@ -121,25 +123,19 @@ else
 IMPLICIT_COMPILER = NO
 endif
 IN_TREE_COMPILER = NO
-# We want to support both "ghc" and "/usr/bin/ghc" as values of TEST_HC
-# passed in by the user, but
-#     which ghc          == /usr/bin/ghc
-#     which /usr/bin/ghc == /usr/bin/ghc
-# so on unix-like platforms we can just always 'which' it.
-# However, on cygwin, we can't just use which:
-#     $ which c:/ghc/ghc-7.4.1/bin/ghc.exe
-#     which: no ghc.exe in (./c:/ghc/ghc-7.4.1/bin)
-# so we start off by using realpath, and if that succeeds then we use
-# that value. Otherwise we fall back on 'which'.
-#
+
+# As values of TEST_HC passed in by the user, we want to support:
+#  * both "ghc" and "/usr/bin/ghc"
+#      We use 'which' to convert the former to the latter.
+#  * both "C:/path/to/ghc.exe" and "/c/path/to/ghc.exe"
+#      We use 'cygpath' to convert the former to the latter, because
+#      'which' can't handle paths starting with a drive letter.
+#  * paths that contain spaces
+#      So we can't use the GNU make function 'realpath'.
 # Note also that we need to use 'override' in order to override a
 # value given on the commandline.
-TEST_HC_REALPATH := $(realpath $(TEST_HC))
-ifeq "$(TEST_HC_REALPATH)" ""
+$(eval $(call canonicaliseExecutable,TEST_HC))
 override TEST_HC := $(shell which '$(TEST_HC)')
-else
-override TEST_HC := $(TEST_HC_REALPATH)
-endif
 endif # "$(TEST_HC)" ""
 
 # We can't use $(dir ...) here as TEST_HC might be in a path
