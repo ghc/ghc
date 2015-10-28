@@ -1548,8 +1548,8 @@ findImportUsage imports rdr_env rdrs sel_names
     import_usage :: ImportMap
     import_usage
       = foldr (extendImportMap_Field rdr_env)
-       (foldr (extendImportMap rdr_env) Map.empty rdrs)
-       (Set.elems sel_names)
+              (foldr (extendImportMap rdr_env) Map.empty rdrs)
+              (Set.elems sel_names)
 
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
       = (decl, nubAvails used_avails, nameSetElems unused_imps)
@@ -1608,11 +1608,12 @@ extendImportMap_Field rdr_env (FieldOcc rdr sel) =
 -- the RdrName in that import decl's entry in the ImportMap
 extendImportMap_GRE :: [GlobalRdrElt] -> ImportMap -> ImportMap
 extendImportMap_GRE gres imp_map
-  = foldr recordRdrName imp_map nonLocalGREs
+  | (gre:_) <- gres
+  , not (isLocalGRE gre)   -- Should always be true, because we only need record
+                           -- uses of imported things, but that's not true yet
+   = add_imp gre (bestImport (gre_imp gre)) imp_map
+  | otherwise       = imp_map
   where
-    recordRdrName gre m = add_imp gre (bestImport (gre_imp gre)) m
-    nonLocalGREs = filter (not . gre_lcl) gres
-
     add_imp :: GlobalRdrElt -> ImportSpec -> ImportMap -> ImportMap
     add_imp gre (ImpSpec { is_decl = imp_decl_spec }) imp_map
       = Map.insertWith add decl_loc [avail] imp_map
@@ -1621,21 +1622,6 @@ extendImportMap_GRE gres imp_map
         decl_loc = srcSpanEnd (is_dloc imp_decl_spec)
                    -- For srcSpanEnd see Note [The ImportMap]
         avail    = availFromGRE gre
-
-    bestImport :: [ImportSpec] -> ImportSpec
-    bestImport iss
-      = case partition isImpAll iss of
-          ([], imp_somes) -> textuallyFirst imp_somes
-          (imp_alls, _)   -> textuallyFirst imp_alls
-
-    textuallyFirst :: [ImportSpec] -> ImportSpec
-    textuallyFirst iss = case sortWith (is_dloc . is_decl) iss of
-                           []     -> pprPanic "textuallyFirst" (ppr iss)
-                           (is:_) -> is
-
-    isImpAll :: ImportSpec -> Bool
-    isImpAll (ImpSpec { is_item = ImpAll }) = True
-    isImpAll _other                         = False
 
 warnUnusedImport :: NameEnv (FieldLabelString, Name) -> ImportDeclUsage
                  -> RnM ()

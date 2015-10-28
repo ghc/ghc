@@ -59,7 +59,7 @@ module RdrName (
         pprNameProvenance,
         Parent(..),
         ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..),
-        importSpecLoc, importSpecModule, isExplicitItem
+        importSpecLoc, importSpecModule, isExplicitItem, bestImport
   ) where
 
 #include "HsVersions.h"
@@ -78,6 +78,7 @@ import Util
 import StaticFlags( opt_PprStyle_Debug )
 
 import Data.Data
+import Data.List( sortBy )
 
 {-
 ************************************************************************
@@ -593,15 +594,14 @@ greQualModName gre@(GRE { gre_name = name, gre_lcl = lcl, gre_imp = iss })
  | otherwise                              = pprPanic "greQualModName" (ppr gre)
 
 greUsedRdrName :: GlobalRdrElt -> RdrName
--- For imported things, return a RdrName to add to the
--- used-RdrName set, which is used to generate
--- unused-import-decl warnings
--- Return an Unqual if possible, otherwise any Qual
+-- For imported things, return a RdrName to add to the used-RdrName
+-- set, which is used to generate unused-import-decl warnings.
+-- Return a Qual RdrName if poss, so that identifies the most
+-- specific ImportSpec.  See Trac #10890 for some good examples.
 greUsedRdrName gre@GRE{ gre_name = name, gre_lcl = lcl, gre_imp = iss }
-  | lcl                               = Unqual occ
-  | not (all (is_qual . is_decl) iss) = Unqual occ
-  | (is:_) <- iss                     = Qual (is_as (is_decl is)) occ
-  | otherwise                         = pprPanic "greRdrName" (ppr name)
+  | lcl, Just mod <- nameModule_maybe name = Qual (moduleName mod)     occ
+  | not (null iss), is <- bestImport iss   = Qual (is_as (is_decl is)) occ
+  | otherwise                              = pprTrace "greUsedRdrName" (ppr gre) (Unqual occ)
   where
     occ = greOccName gre
 
@@ -924,7 +924,7 @@ shadowName env name
 {-
 ************************************************************************
 *                                                                      *
-                        Provenance
+                        ImportSpec
 *                                                                      *
 ************************************************************************
 -}
@@ -981,6 +981,31 @@ instance Eq ImpItemSpec where
 instance Ord ImpItemSpec where
    compare is1 is2 = is_iloc is1 `compare` is_iloc is2
 
+
+bestImport :: [ImportSpec] -> ImportSpec
+-- Given a non-empty bunch of ImportSpecs, return the one that
+-- imported the item most specficially (e.g. by name), using
+-- textually-first as a tie breaker. This is used when reporting
+-- redundant imports
+bestImport iss
+  = case sortBy best iss of
+      (is:_) -> is
+      []     -> pprPanic "bestImport" (ppr iss)
+  where
+    best :: ImportSpec -> ImportSpec -> Ordering
+    -- Less means better
+    best (ImpSpec { is_item = item1, is_decl = d1 })
+         (ImpSpec { is_item = item2, is_decl = d2 })
+      = best_item item1 item2 `thenCmp` (is_dloc d1 `compare` is_dloc d2)
+
+    best_item :: ImpItemSpec -> ImpItemSpec -> Ordering
+    best_item ImpAll ImpAll = EQ
+    best_item ImpAll (ImpSome {}) = GT
+    best_item (ImpSome {}) ImpAll = LT
+    best_item (ImpSome { is_explicit = e1 })
+              (ImpSome { is_explicit = e2 }) = e2 `compare` e1
+     -- False < True, so if e1 is explicit and e2 is not, we get LT
+
 unQualSpecOK :: ImportSpec -> Bool
 -- ^ Is in scope unqualified?
 unQualSpecOK is = not (is_qual (is_decl is))
@@ -999,23 +1024,6 @@ importSpecModule is = is_mod (is_decl is)
 isExplicitItem :: ImpItemSpec -> Bool
 isExplicitItem ImpAll                        = False
 isExplicitItem (ImpSome {is_explicit = exp}) = exp
-
-{-
--- Note [Comparing provenance]
--- Comparison of provenance is just used for grouping
--- error messages (in RnEnv.warnUnusedBinds)
-instance Eq Provenance where
-  p1 == p2 = case p1 `compare` p2 of EQ -> True; _ -> False
-
-instance Ord Provenance where
-   compare (Prov l1 i1) (Prov l2 i2)
-     = (l1 `compare` l2) `thenCmp` (i1 `cmp_is` i2)
-     where  -- See Note [Comparing provenance]
-       []     `cmp_is` []     = EQ
-       []     `cmp_is` _      = LT
-       (_:_)  `cmp_is` []     = GT
-       (i1:_) `cmp_is` (i2:_) = i1 `compare` i2
--}
 
 pprNameProvenance :: GlobalRdrElt -> SDoc
 -- ^ Print out one place where the name was define/imported
