@@ -1168,8 +1168,8 @@ where_decls :: { Located ([AddAnn]
                                           ,sL1 $3 (snd $ unLoc $3)) }
 pattern_synonym_sig :: { LSig RdrName }
         : 'pattern' con '::' ptype
-            {% do { let (flag, qtvs, prov, req, ty) = snd $ unLoc $4
-                  ; let sig = PatSynSig $2 (flag, mkHsQTvs qtvs) prov req ty
+            {% do { let (flag, qtvs, req, prov, ty) = snd $ unLoc $4
+                  ; let sig = PatSynSig $2 (flag, mkHsQTvs qtvs) req prov ty
                   ; ams (sLL $1 $> $ sig)
                         (mj AnnPattern $1:mj AnnDcolon $3:(fst $ unLoc $4)) } }
 
