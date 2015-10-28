@@ -39,7 +39,7 @@ import VarSet
 import MkId
 import VarEnv
 import Inst
-import TcTyClsDecls
+import TcTyDecls
 import ConLike
 import FieldLabel
 #if __GLASGOW_HASKELL__ < 709
