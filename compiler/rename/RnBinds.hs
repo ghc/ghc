@@ -923,7 +923,7 @@ renameSig ctxt sig@(MinimalSig s bf)
   = do new_bf <- traverse (lookupSigOccRn ctxt sig) bf
        return (MinimalSig s new_bf, emptyFVs)
 
-renameSig ctxt sig@(PatSynSig v (flag, qtvs) prov req ty)
+renameSig ctxt sig@(PatSynSig v (flag, qtvs) req prov ty)
   = do  { v' <- lookupSigOccRn ctxt sig v
         ; let doc = TypeSigCtx $ quotes (ppr v)
         ; loc <- getSrcSpanM
@@ -940,12 +940,12 @@ renameSig ctxt sig@(PatSynSig v (flag, qtvs) prov req ty)
             Qualified -> panic "renameSig: Qualified"
 
         ; bindHsTyVars doc Nothing tv_kvs tv_bndrs $ \ tyvars -> do
-        { (prov', fvs1) <- rnContext doc prov
-        ; (req', fvs2) <- rnContext doc req
+        { (req', fvs2) <- rnContext doc req
+        ; (prov', fvs1) <- rnContext doc prov
         ; (ty', fvs3) <- rnLHsType doc ty
 
         ; let fvs = plusFVs [fvs1, fvs2, fvs3]
-        ; return (PatSynSig v' (flag, tyvars) prov' req' ty', fvs) }}
+        ; return (PatSynSig v' (flag, tyvars) req' prov' ty', fvs) }}
 
 ppr_sig_bndrs :: [Located RdrName] -> SDoc
 ppr_sig_bndrs bs = quotes (pprWithCommas ppr bs)

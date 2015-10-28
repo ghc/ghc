@@ -1621,20 +1621,31 @@ tcTySig (L loc (TypeSig names@(L _ name1 : _) hs_ty wcs))
              ; sig <- instTcTySig ctxt hs_ty sigma_ty (extra_cts hs_ty) wc_prs name
              ; return (TcIdSig sig) }
 
-tcTySig (L loc (PatSynSig (L _ name) (_, qtvs) prov req ty))
+tcTySig (L loc (PatSynSig (L _ name) (_, qtvs) req prov ty))
   = setSrcSpan loc $
-    do { traceTc "tcTySig {" $ ppr name $$ ppr qtvs $$ ppr prov $$ ppr req $$ ppr ty
+    do { traceTc "tcTySig {" $ ppr name $$ ppr qtvs $$ ppr req $$ ppr prov $$ ppr ty
        ; let ctxt = PatSynCtxt name
        ; tcHsTyVarBndrs qtvs $ \ qtvs' -> do
        { ty' <- tcHsSigType ctxt ty
        ; req' <- tcHsContext req
        ; prov' <- tcHsContext prov
 
+       -- These are /signatures/ so we zonk to squeeze out any kind
+       -- unification variables. Thta has happened automatically in tcHsSigType
+       ; req'  <- zonkTcThetaType req'
+       ; prov' <- zonkTcThetaType prov'
+
        ; qtvs' <- mapM zonkQuantifiedTyVar qtvs'
 
        ; let (_, pat_ty) = tcSplitFunTys ty'
              univ_set = tyVarsOfType pat_ty
              (univ_tvs, ex_tvs) = partition (`elemVarSet` univ_set) qtvs'
+             bad_tvs = varSetElems (tyVarsOfTypes req' `minusVarSet` univ_set)
+
+       ; unless (null bad_tvs) $ addErr $
+         hang (ptext (sLit "The 'required' context") <+> quotes (pprTheta req'))
+            2 (ptext (sLit "mentions existential type variable") <> plural bad_tvs
+               <+> pprQuotedList bad_tvs)
 
        ; traceTc "tcTySig }" $ ppr (ex_tvs, prov') $$ ppr (univ_tvs, req') $$ ppr ty'
        ; let tpsi = TPSI{ patsig_name = name,

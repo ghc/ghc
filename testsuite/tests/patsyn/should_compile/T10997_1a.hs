@@ -11,7 +11,7 @@ extractJust :: Maybe a -> (Bool, a)
 extractJust (Just a) = (True, a)
 extractJust _        = (False, undefined)
 
-pattern Just' :: () => (Showable a) => a -> (Maybe a)
+pattern Just' :: Showable a => a -> (Maybe a)
 pattern Just' a <- (extractJust -> (True, a)) where
   Just' a = Just a
 

@@ -1524,7 +1524,7 @@ patSynToIfaceDecl ps
                 , ifPatTy         = tidyToIfaceType env2 rhs_ty
                 }
   where
-    (univ_tvs, ex_tvs, prov_theta, req_theta, args, rhs_ty) = patSynSig ps
+    (univ_tvs, req_theta, ex_tvs, prov_theta, args, rhs_ty) = patSynSig ps
     (env1, univ_tvs') = tidyTyVarBndrs emptyTidyEnv univ_tvs
     (env2, ex_tvs')   = tidyTyVarBndrs env1 ex_tvs
     to_if_pr (id, needs_dummy) = (idName id, needs_dummy)

@@ -772,8 +772,8 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name, ifPatBuilder = builder,
                               ifPatTy = pat_ty} )
   = pprPatSynSig name is_bidirectional
                  (pprUserIfaceForAll tvs)
-                 (pprIfaceContextMaybe prov_ctxt)
                  (pprIfaceContextMaybe req_ctxt)
+                 (pprIfaceContextMaybe prov_ctxt)
                  (pprIfaceType ty)
   where
     is_bidirectional = isJust builder

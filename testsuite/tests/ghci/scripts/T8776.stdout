@@ -1,1 +1,2 @@
-pattern P :: (Num t, Eq t1) => A t t1 	-- Defined at T8776.hs:6:1
+pattern P :: () => (Num t, Eq t1) => A t t1
+  	-- Defined at T8776.hs:6:1

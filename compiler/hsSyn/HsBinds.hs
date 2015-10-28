@@ -641,8 +641,8 @@ data Sig name
       -- For details on above see note [Api annotations] in ApiAnnotation
   | PatSynSig (Located name)
               (HsExplicitFlag, LHsTyVarBndrs name)
-              (LHsContext name) -- Provided context
               (LHsContext name) -- Required context
+              (LHsContext name) -- Provided context
               (LHsType name)
 
         -- | A type signature for a default method inside a class
@@ -839,23 +839,23 @@ ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> pprPrefixOcc (unLo
 ppr_sig (SpecInstSig _ ty)
   = pragBrackets (ptext (sLit "SPECIALIZE instance") <+> ppr ty)
 ppr_sig (MinimalSig _ bf)         = pragBrackets (pprMinimalSig bf)
-ppr_sig (PatSynSig name (flag, qtvs) (L _ prov) (L _ req) ty)
+ppr_sig (PatSynSig name (flag, qtvs) (L _ req) (L _ prov) ty)
   = pprPatSynSig (unLoc name) False -- TODO: is_bindir
                  (pprHsForAll flag qtvs (noLoc []))
-                 (pprHsContextMaybe prov) (pprHsContextMaybe req)
+                 (pprHsContextMaybe req) (pprHsContextMaybe prov)
                  (ppr ty)
 
 pprPatSynSig :: (OutputableBndr name)
              => name -> Bool -> SDoc -> Maybe SDoc -> Maybe SDoc -> SDoc -> SDoc
-pprPatSynSig ident _is_bidir tvs prov req ty
+pprPatSynSig ident _is_bidir tvs req prov ty
   = ptext (sLit "pattern") <+> pprPrefixOcc ident <+> dcolon <+>
     tvs <+> context <+> ty
   where
-    context = case (prov, req) of
+    context = case (req, prov) of
         (Nothing, Nothing)    -> empty
-        (Nothing, Just req)   -> parens empty <+> darrow <+> req <+> darrow
-        (Just prov, Nothing)  -> prov <+> darrow
-        (Just prov, Just req) -> prov <+> darrow <+> req <+> darrow
+        (Nothing, Just prov)  -> parens empty <+> darrow <+> prov <+> darrow
+        (Just req, Nothing)   -> req <+> darrow
+        (Just req, Just prov) -> req <+> darrow <+> prov <+> darrow
 
 instance OutputableBndr name => Outputable (FixitySig name) where
   ppr (FixitySig names fixity) = sep [ppr fixity, pprops]
