@@ -11,7 +11,7 @@ def T9579_run_test(binName, expExitCode):
     testCommandTemplate = """
           $MAKE -s --no-print-directory T9579_{binName} \
         && ( ( ./T9579_{binName} 2>&1; echo $?) \
-           | sed -e 's/[0-9]\+ bytes/NUM bytes/g' ) \
+           | sed -e 's/[0-9]* bytes/NUM bytes/g' ) \
     """
 
     test(fmt('T9579_{binName}'),
