@@ -506,9 +506,8 @@ pprInstr (COMMENT _) = empty -- nuke 'em
 pprInstr (COMMENT s) = ptext (sLit "# ") <> ftext s
 -}
 
-pprInstr (LOCATION file line col name)
-   = ptext (sLit "\t.loc ") <> ppr file <+> ppr line <+> ppr col <>
-     ptext (sLit " /* ") <> text name <> ptext (sLit " */")
+pprInstr (LOCATION file line col _name)
+   = ptext (sLit "\t.loc ") <> ppr file <+> ppr line <+> ppr col
 
 pprInstr (DELTA d)
    = pprInstr (COMMENT (mkFastString ("\tdelta = " ++ show d)))
