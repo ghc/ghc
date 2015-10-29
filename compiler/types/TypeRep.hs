@@ -573,7 +573,9 @@ instance Outputable TyLit where
 
 ppr_type :: TyPrec -> Type -> SDoc
 ppr_type _ (TyVarTy tv)       = ppr_tvar tv
-ppr_type p (TyConApp tc tys)  = pprTyTcApp p tc tys
+ppr_type p (TyConApp tc tys)
+  | tyConName tc == errorMessageTypeErrorFamName = text "(type error)"
+  | otherwise = pprTyTcApp p tc tys
 ppr_type p (LitTy l)          = ppr_tylit p l
 ppr_type p ty@(ForAllTy {})   = ppr_forall_type p ty
 

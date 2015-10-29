@@ -28,7 +28,13 @@ import TcEvidence
 import Name
 import RdrName ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual )
 import Class( className )
-import PrelNames( typeableClassName )
+import PrelNames( typeableClassName
+                , typeErrorTextDataConName
+                , typeErrorShowTypeDataConName
+                , typeErrorAppendDataConName
+                , typeErrorVAppendDataConName
+                , errorMessageTypeErrorFamName
+                )
 import Id
 import Var
 import VarSet
@@ -45,7 +51,7 @@ import DynFlags
 import StaticFlags      ( opt_PprStyle_Debug )
 import ListSetOps       ( equivClasses )
 
-import Control.Monad    ( when )
+import Control.Monad    ( when, liftM2, guard )
 import Data.Maybe
 import Data.List        ( partition, mapAccumL, nub, sortBy )
 
@@ -352,7 +358,9 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
     -- (see TcRnTypes.trulyInsoluble) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
-    report1 = [ ("insoluble1",   is_given,        True, mkGroupReporter mkEqErr)
+    report1 = [ ("custom_error", is_user_type_error,
+                                                  True, mkUserTypeErrorReporter)
+              , ("insoluble1",   is_given,        True, mkGroupReporter mkEqErr)
               , ("insoluble2",   utterly_wrong,   True, mkGroupReporter mkEqErr)
               , ("insoluble3",   rigid_nom_tv_eq, True, mkSkolReporter)
               , ("insoluble4",   rigid_nom_eq,    True, mkGroupReporter mkEqErr)
@@ -376,7 +384,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
 
     is_out_of_scope ct _ = isOutOfScopeCt ct
     is_hole         ct _ = isHoleCt ct
-
+    is_user_type_error ct _ = isUserTypeErrorCt ct
     is_given  ct _ = not (isWantedCt ct)  -- The Derived ones are actually all from Givens
 
     -- Skolem (i.e. non-meta) type variable on the left
@@ -436,6 +444,59 @@ mkHoleReporter ctxt
     do { err <- mkHoleError ctxt ct
        ; maybeReportHoleError ctxt ct err
        ; maybeAddDeferredHoleBinding ctxt err ct }
+
+mkUserTypeErrorReporter :: Reporter
+mkUserTypeErrorReporter ctxt
+  = mapM_ $ \ct -> maybeReportError ctxt =<< mkUserTypeError ctxt ct
+
+mkUserTypeError :: ReportErrCtxt -> Ct -> TcM ErrMsg
+mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct =<< render msgT
+  where
+  ctT      = ctPred ct
+  getMsg t = do (tc,[_,msg]) <- splitTyConApp_maybe t
+                guard (tyConName tc == errorMessageTypeErrorFamName)
+                return msg
+
+  msgT  -- TypeError msg ~ Something
+        | Just (_,t1,_) <- getEqPredTys_maybe ctT
+        , Just msg      <- getMsg t1                 = msg
+
+        -- Something ~ TypeError msg
+        | Just (_,_,t2) <- getEqPredTys_maybe ctT
+        , Just msg      <- getMsg t2                 = msg
+
+        -- TypeError msg
+        | Just msg      <- getMsg ctT                = msg
+
+        | otherwise = pprPanic "mkUserTypeError" (ppr ctT)
+
+
+
+  render ty = case splitTyConApp_maybe ty of
+
+                -- Text "Something"
+                Just (tc,[txt])
+                  | tyConName tc == typeErrorTextDataConName
+                  , Just str <- isStrLitTy txt -> return (ftext str)
+
+                -- ShowType t
+                Just (tc,[_k,t])
+                  | tyConName tc == typeErrorShowTypeDataConName ->
+                    return (ppr t)
+
+                -- t1 :<>: t2
+                Just (tc,[t1,t2])
+                  | tyConName tc == typeErrorAppendDataConName ->
+                    liftM2 (<>) (render t1) (render t2)
+
+                -- t1 :$$: t2
+                Just (tc,[t1,t2])
+                  | tyConName tc == typeErrorVAppendDataConName ->
+                    liftM2 ($$) (render t1) (render t2)
+
+                -- An uneavaluated type function
+                _ -> return (ppr ty)
+
 
 mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
                              -- Make error message for a group

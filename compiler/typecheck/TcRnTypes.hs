@@ -61,6 +61,7 @@ module TcRnTypes(
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
         isGivenCt, isHoleCt, isOutOfScopeCt, isExprHoleCt, isTypeHoleCt,
+        isUserTypeErrorCt,
         ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         mkNonCanonical, mkNonCanonicalCt,
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
@@ -114,7 +115,7 @@ import TcEvidence
 import Type
 import CoAxiom  ( Role )
 import Class    ( Class )
-import TyCon    ( TyCon )
+import TyCon    ( TyCon, tyConName )
 import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
 import PatSyn   ( PatSyn, patSynType )
@@ -144,6 +145,7 @@ import Outputable
 import ListSetOps
 import FastString
 import GHC.Fingerprint
+import PrelNames(errorMessageTypeErrorFamName)
 
 import Data.Set (Set)
 import Control.Monad (ap, liftM)
@@ -1440,6 +1442,21 @@ isExprHoleCt _ = False
 isTypeHoleCt :: Ct -> Bool
 isTypeHoleCt (CHoleCan { cc_hole = TypeHole }) = True
 isTypeHoleCt _ = False
+
+-- | The following constraints are considered to be a custom type error:
+--    1. TypeError msg
+--    2. TypeError msg ~ Something
+--    3. Something ~ TypeError msg
+isUserTypeErrorCt :: Ct -> Bool
+isUserTypeErrorCt ct
+  | Just (_,t1,t2) <- getEqPredTys_maybe ctT = isTyErr t1 || isTyErr t2
+  | otherwise                                = isTyErr ctT
+  where
+  ctT       = ctPred ct
+  isTyErr t = case splitTyConApp_maybe t of
+                Just (tc,_) -> tyConName tc == errorMessageTypeErrorFamName
+                _           -> False
+
 
 instance Outputable Ct where
   ppr ct = ppr (cc_ev ct) <+> parens (text ct_sort)
