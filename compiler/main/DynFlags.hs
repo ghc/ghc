@@ -2643,6 +2643,11 @@ dynamic_flags = [
   , defGhcFlag "fmax-inline-memset-insns"
       (intSuffix (\n d -> d{ maxInlineMemsetInsns = n }))
 
+  , defGhcFlag "dinitial-unique"
+      (intSuffix (\n d -> d{ initialUnique = n }))
+  , defGhcFlag "dunique-increment"
+      (intSuffix (\n d -> d{ uniqueIncrement = n }))
+
         ------ Profiling ----------------------------------------------------
 
         -- OLD profiling flags
