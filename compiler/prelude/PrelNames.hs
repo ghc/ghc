@@ -206,13 +206,11 @@ basicKnownKeyNames
         -- Typeable
         typeableClassName,
         typeRepTyConName,
-        trTyConDataConName,
-        trModuleDataConName,
-        trNameSDataConName,
-        typeRepIdName,
+        mkTyConName,
         mkPolyTyConAppName,
         mkAppTyName,
-        typeSymbolTypeRepName, typeNatTypeRepName,
+        typeNatTypeRepName,
+        typeSymbolTypeRepName,
 
         -- Dynamic
         toDynName,
@@ -228,6 +226,7 @@ basicKnownKeyNames
         fromIntegralName, realToFracName,
 
         -- String stuff
+        stringTyConName,
         fromStringName,
 
         -- Enum stuff
@@ -608,8 +607,7 @@ toInteger_RDR           = nameRdrName toIntegerName
 toRational_RDR          = nameRdrName toRationalName
 fromIntegral_RDR        = nameRdrName fromIntegralName
 
-stringTy_RDR, fromString_RDR :: RdrName
-stringTy_RDR            = tcQual_RDR gHC_BASE (fsLit "String")
+fromString_RDR :: RdrName
 fromString_RDR          = nameRdrName fromStringName
 
 fromList_RDR, fromListN_RDR, toList_RDR :: RdrName
@@ -669,6 +667,11 @@ shows_RDR               = varQual_RDR gHC_SHOW (fsLit "shows")
 showString_RDR          = varQual_RDR gHC_SHOW (fsLit "showString")
 showSpace_RDR           = varQual_RDR gHC_SHOW (fsLit "showSpace")
 showParen_RDR           = varQual_RDR gHC_SHOW (fsLit "showParen")
+
+typeRep_RDR, mkTyCon_RDR, mkTyConApp_RDR :: RdrName
+typeRep_RDR       = varQual_RDR tYPEABLE_INTERNAL    (fsLit "typeRep#")
+mkTyCon_RDR       = varQual_RDR tYPEABLE_INTERNAL    (fsLit "mkTyCon")
+mkTyConApp_RDR    = varQual_RDR tYPEABLE_INTERNAL    (fsLit "mkTyConApp")
 
 undefined_RDR :: RdrName
 undefined_RDR = varQual_RDR gHC_ERR (fsLit "undefined")
@@ -779,39 +782,6 @@ and it's convenient to write them all down in one place.
 -- guys as well (perhaps) e.g. see  trueDataConName     below
 -}
 
--- | Build a 'Name' for the 'Typeable' representation of the given special 'TyCon'.
--- Special 'TyCon's include @(->)@, @BOX@, @Constraint@, etc. See 'TysPrim'.
-mkSpecialTyConRepName :: FastString -> Name -> Name
--- See Note [Grand plan for Typeable] in 'TcTypeable' in TcTypeable.
-mkSpecialTyConRepName fs tc_name
-  = mkExternalName (tyConRepNameUnique (nameUnique tc_name))
-                   tYPEABLE_INTERNAL
-                   (mkVarOccFS fs)
-                   wiredInSrcSpan
-
--- | Make a 'Name' for the 'Typeable' representation of the given wired-in type
-mkPrelTyConRepName :: Name -> Name
--- See Note [Grand plan for Typeable] in 'TcTypeable' in TcTypeable.
-mkPrelTyConRepName tc_name  -- Prelude tc_name is always External,
-                            -- so nameModule will work
-  = mkExternalName rep_uniq rep_mod rep_occ (nameSrcSpan tc_name)
-  where
-    name_occ  = nameOccName tc_name
-    name_mod  = nameModule  tc_name
-    name_uniq = nameUnique  tc_name
-    rep_uniq | isTcOcc name_occ = tyConRepNameUnique   name_uniq
-             | otherwise        = dataConRepNameUnique name_uniq
-    (rep_mod, rep_occ) = tyConRepModOcc name_mod name_occ
-
--- | TODO
--- See Note [Grand plan for Typeable] in 'TcTypeable' in TcTypeable.
-tyConRepModOcc :: Module -> OccName -> (Module, OccName)
-tyConRepModOcc tc_module tc_occ
-  | tc_module == gHC_TYPES
-  = (tYPEABLE_INTERNAL, mkTyConRepUserOcc tc_occ)
-  | otherwise
-  = (tc_module,         mkTyConRepSysOcc tc_occ)
-
 wildCardName :: Name
 wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
 
@@ -879,11 +849,12 @@ uWordTyConName     = tcQual gHC_GENERICS (fsLit "UWord") uWordTyConKey
 
 -- Base strings Strings
 unpackCStringName, unpackCStringFoldrName,
-    unpackCStringUtf8Name, eqStringName :: Name
+    unpackCStringUtf8Name, eqStringName, stringTyConName :: Name
 unpackCStringName       = varQual gHC_CSTRING (fsLit "unpackCString#") unpackCStringIdKey
 unpackCStringFoldrName  = varQual gHC_CSTRING (fsLit "unpackFoldrCString#") unpackCStringFoldrIdKey
 unpackCStringUtf8Name   = varQual gHC_CSTRING (fsLit "unpackCStringUtf8#") unpackCStringUtf8IdKey
 eqStringName            = varQual gHC_BASE (fsLit "eqString")  eqStringIdKey
+stringTyConName         = tcQual  gHC_BASE (fsLit "String") stringTyConKey
 
 -- The 'inline' function
 inlineIdName :: Name
@@ -1082,21 +1053,15 @@ ixClassName = clsQual gHC_ARR (fsLit "Ix") ixClassKey
 -- Class Typeable, and functions for constructing `Typeable` dictionaries
 typeableClassName
   , typeRepTyConName
-  , trTyConDataConName
-  , trModuleDataConName
-  , trNameSDataConName
+  , mkTyConName
   , mkPolyTyConAppName
   , mkAppTyName
-  , typeRepIdName
   , typeNatTypeRepName
   , typeSymbolTypeRepName
   :: Name
 typeableClassName     = clsQual tYPEABLE_INTERNAL (fsLit "Typeable")       typeableClassKey
 typeRepTyConName      = tcQual  tYPEABLE_INTERNAL (fsLit "TypeRep")        typeRepTyConKey
-trTyConDataConName    = dcQual  gHC_TYPES         (fsLit "TyCon")          trTyConDataConKey
-trModuleDataConName   = dcQual  gHC_TYPES         (fsLit "Module")         trModuleDataConKey
-trNameSDataConName    = dcQual  gHC_TYPES         (fsLit "TrNameS")        trNameSDataConKey
-typeRepIdName         = varQual tYPEABLE_INTERNAL (fsLit "typeRep#")       typeRepIdKey
+mkTyConName           = varQual tYPEABLE_INTERNAL (fsLit "mkTyCon")        mkTyConKey
 mkPolyTyConAppName    = varQual tYPEABLE_INTERNAL (fsLit "mkPolyTyConApp") mkPolyTyConAppKey
 mkAppTyName           = varQual tYPEABLE_INTERNAL (fsLit "mkAppTy")        mkAppTyKey
 typeNatTypeRepName    = varQual tYPEABLE_INTERNAL (fsLit "typeNatTypeRep") typeNatTypeRepKey
@@ -1377,7 +1342,7 @@ ghciIoClassKey :: Unique
 ghciIoClassKey = mkPreludeClassUnique 44
 
 ---------------- Template Haskell -------------------
---      THNames.hs: USES ClassUniques 200-299
+--      USES ClassUniques 200-299
 -----------------------------------------------------
 
 {-
@@ -1524,6 +1489,9 @@ unknown2TyConKey                        = mkPreludeTyConUnique 131
 unknown3TyConKey                        = mkPreludeTyConUnique 132
 opaqueTyConKey                          = mkPreludeTyConUnique 133
 
+stringTyConKey :: Unique
+stringTyConKey                          = mkPreludeTyConUnique 134
+
 -- Generics (Unique keys)
 v1TyConKey, u1TyConKey, par1TyConKey, rec1TyConKey,
   k1TyConKey, m1TyConKey, sumTyConKey, prodTyConKey,
@@ -1621,7 +1589,7 @@ ipCoNameKey = mkPreludeTyConUnique 185
 
 
 ---------------- Template Haskell -------------------
---      THNames.hs: USES TyConUniques 200-299
+--      USES TyConUniques 200-299
 -----------------------------------------------------
 
 ----------------------- SIMD ------------------------
@@ -1699,16 +1667,6 @@ srcLocDataConKey                        = mkPreludeDataConUnique 37
 
 ipDataConKey :: Unique
 ipDataConKey                            = mkPreludeDataConUnique 38
-
-trTyConDataConKey, trModuleDataConKey, trNameSDataConKey :: Unique
-trTyConDataConKey                       = mkPreludeDataConUnique 40
-trModuleDataConKey                      = mkPreludeDataConUnique 41
-trNameSDataConKey                       = mkPreludeDataConUnique 42
-
----------------- Template Haskell -------------------
---      THNames.hs: USES DataUniques 100-150
------------------------------------------------------
-
 
 {-
 ************************************************************************
@@ -1964,7 +1922,7 @@ proxyHashKey :: Unique
 proxyHashKey = mkPreludeMiscIdUnique 502
 
 ---------------- Template Haskell -------------------
---      THNames.hs: USES IdUniques 200-499
+--      USES IdUniques 200-499
 -----------------------------------------------------
 
 -- Used to make `Typeable` dictionaries
@@ -1973,21 +1931,19 @@ mkTyConKey
   , mkAppTyKey
   , typeNatTypeRepKey
   , typeSymbolTypeRepKey
-  , typeRepIdKey
   :: Unique
 mkTyConKey            = mkPreludeMiscIdUnique 503
 mkPolyTyConAppKey     = mkPreludeMiscIdUnique 504
 mkAppTyKey            = mkPreludeMiscIdUnique 505
 typeNatTypeRepKey     = mkPreludeMiscIdUnique 506
 typeSymbolTypeRepKey  = mkPreludeMiscIdUnique 507
-typeRepIdKey          = mkPreludeMiscIdUnique 508
 
 -- Dynamic
 toDynIdKey :: Unique
-toDynIdKey            = mkPreludeMiscIdUnique 509
+toDynIdKey = mkPreludeMiscIdUnique 508
 
 bitIntegerIdKey :: Unique
-bitIntegerIdKey       = mkPreludeMiscIdUnique 510
+bitIntegerIdKey       = mkPreludeMiscIdUnique 509
 
 {-
 ************************************************************************

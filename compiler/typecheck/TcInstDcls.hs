@@ -434,7 +434,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                          ptext (sLit "Replace the following instance:"))
                      2 (pprInstanceHdr (iSpec i))
 
-    -- Report an error or a warning for a Typeable instances.
+    -- Report an error or a warning for a `Typeable` instances.
     -- If we are working on an .hs-boot file, we just report a warning,
     -- and ignore the instance.  We do this, to give users a chance to fix
     -- their code.
@@ -445,13 +445,10 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
              then
                do warn <- woptM Opt_WarnDerivingTypeable
                   when warn $ addWarnTc $ vcat
-                    [ ppTypeable <+> ptext (sLit "instances in .hs-boot files are ignored")
-                    , ptext (sLit "This warning will become an error in future versions of the compiler")
+                    [ ptext (sLit "`Typeable` instances in .hs-boot files are ignored.")
+                    , ptext (sLit "This warning will become an error in future versions of the compiler.")
                     ]
-             else addErrTc $ ptext (sLit "Class") <+> ppTypeable
-                             <+> ptext (sLit "does not support user-specified instances")
-    ppTypeable :: SDoc
-    ppTypeable = quotes (ppr typeableClassName)
+             else addErrTc $ ptext (sLit "Class `Typeable` does not support user-specified instances.")
 
 addClsInsts :: [InstInfo Name] -> TcM a -> TcM a
 addClsInsts infos thing_inside
@@ -636,7 +633,7 @@ tcDataFamInstDecl mb_clsinfo
 
          -- Check that the family declaration is for the right kind
        ; checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
-       ; checkTc (isDataFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
+       ; checkTc (isAlgTyCon fam_tc) (wrongKindOfFamily fam_tc)
 
          -- Kind check type patterns
        ; tcFamTyPats (famTyConShape fam_tc) mb_clsinfo pats
@@ -662,9 +659,7 @@ tcDataFamInstDecl mb_clsinfo
        ; let orig_res_ty = mkTyConApp fam_tc pats'
 
        ; (rep_tc, fam_inst) <- fixM $ \ ~(rec_rep_tc, _) ->
-           do { data_cons <- tcConDecls new_or_data
-                                        False   -- Not promotable
-                                        rec_rep_tc
+           do { data_cons <- tcConDecls new_or_data rec_rep_tc
                                         (tvs', orig_res_ty) cons
               ; tc_rhs <- case new_or_data of
                      DataType -> return (mkDataTyConRhs data_cons)
@@ -675,7 +670,7 @@ tcDataFamInstDecl mb_clsinfo
                     axiom    = mkSingleCoAxiom Representational
                                                axiom_name eta_tvs fam_tc eta_pats
                                                (mkTyConApp rep_tc (mkTyVarTys eta_tvs))
-                    parent   = DataFamInstTyCon axiom fam_tc pats'
+                    parent   = FamInstTyCon axiom fam_tc pats'
                     roles    = map (const Nominal) tvs'
 
                       -- NB: Use the tvs' from the pats. See bullet toward

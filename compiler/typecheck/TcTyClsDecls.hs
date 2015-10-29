@@ -16,7 +16,7 @@ module TcTyClsDecls (
         kcDataDefn, tcConDecls, dataDeclChecks, checkValidTyCon,
         tcFamTyPats, tcTyFamInstEqn, famTyConShape,
         tcAddTyFamInstCtxt, tcMkDataFamInstCtxt, tcAddDataFamInstCtxt,
-        wrongKindOfFamily, dataConCtxt, badDataConTyCon, mkOneRecordSelector
+        wrongKindOfFamily, dataConCtxt, badDataConTyCon
     ) where
 
 #include "HsVersions.h"
@@ -28,6 +28,7 @@ import TcRnMonad
 import TcEnv
 import TcValidity
 import TcHsSyn
+import TcBinds( tcRecSelBinds )
 import TcTyDecls
 import TcClassDcl
 import TcHsType
@@ -43,7 +44,6 @@ import Class
 import CoAxiom
 import TyCon
 import DataCon
-import ConLike
 import Id
 import IdInfo
 import Var
@@ -53,7 +53,6 @@ import Module
 import Name
 import NameSet
 import NameEnv
-import RdrName
 import RnEnv
 import Outputable
 import Maybes
@@ -64,10 +63,8 @@ import ListSetOps
 import Digraph
 import DynFlags
 import FastString
-import Unique           ( mkBuiltinUnique )
 import BasicTypes
 
-import Bag
 import Control.Monad
 import Data.List
 
@@ -170,7 +167,16 @@ tcTyClGroup tyclds
            -- Step 4: Add the implicit things;
            -- we want them in the environment because
            -- they may be mentioned in interface files
-       ; tcAddImplicits tyclss } }
+       ; tcExtendGlobalValEnv (mkDefaultMethodIds tyclss) $
+         tcAddImplicits tyclss } }
+
+tcAddImplicits :: [TyThing] -> TcM TcGblEnv
+tcAddImplicits tyclss
+ = tcExtendGlobalEnvImplicit implicit_things $
+   tcRecSelBinds rec_sel_binds
+ where
+   implicit_things = concatMap implicitTyThings tyclss
+   rec_sel_binds   = mkRecSelBinds tyclss
 
 zipRecTyClss :: [(Name, Kind)]
              -> [TyThing]           -- Knot-tied

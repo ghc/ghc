@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 36, types: 14, coercions: 0}
+Result size of Tidy Core = {terms: 26, types: 11, coercions: 0}
 
 Rec {
 -- RHS size: {terms: 10, types: 2, coercions: 0}
@@ -25,33 +25,6 @@ foo =
       True -> $wxs y
     }
     }
-
--- RHS size: {terms: 2, types: 0, coercions: 0}
-T3772.$trModule1 :: TrName
-[GblId,
- Caf=NoCafRefs,
- Str=DmdType m1,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T3772.$trModule1 = TrNameS "T3772"#
-
--- RHS size: {terms: 2, types: 0, coercions: 0}
-T3772.$trModule2 :: TrName
-[GblId,
- Caf=NoCafRefs,
- Str=DmdType m1,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
-T3772.$trModule2 = TrNameS "main"#
-
--- RHS size: {terms: 3, types: 0, coercions: 0}
-T3772.$trModule :: Module
-[GblId[ReflectionId],
- Caf=NoCafRefs,
- Str=DmdType m,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
-T3772.$trModule = Module T3772.$trModule2 T3772.$trModule1
 
 
 

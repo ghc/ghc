@@ -6,7 +6,7 @@ T5095.hs:9:11: error:
       instance (Eq a, Eq b) => Eq (Either a b)
         -- Defined in ‘Data.Either’
       instance Eq All -- Defined in ‘Data.Monoid’
-      ...plus 36 others
+      ...plus 35 others
       ...plus one instance involving out-of-scope types
       (use -fprint-potential-instances to see them all)
     (The choice depends on the instantiation of ‘a’

@@ -1,6 +1,5 @@
 
 ==================== Strictness signatures ====================
-HyperStrUse.$trModule: m
 HyperStrUse.f: <S(SL),1*U(1*U(U),A)><S,1*U>m
 
 

@@ -59,7 +59,7 @@ buildDataFamInst name' fam_tc vect_tc rhs
                            rec_flag    -- FIXME: is this ok?
                            False       -- Not promotable
                            False       -- not GADT syntax
-                           (DataFamInstTyCon ax fam_tc pat_tys)
+                           (FamInstTyCon ax fam_tc pat_tys)
       ; liftDs $ newFamInst (DataFamilyInst rep_tc) ax }
  where
     tyvars    = tyConTyVars vect_tc
@@ -79,7 +79,6 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
       fam_envs  <- readGEnv global_fam_inst_env
       liftDs $ buildDataCon fam_envs dc_name
                             False                  -- not infix
-                            NotPromoted            -- not promotable
                             (map (const no_bang) comp_tys)
                             (Just $ map (const HsLazy) comp_tys)
                             []                     -- no field labels
@@ -122,7 +121,6 @@ buildPDatasDataCon orig_name vect_tc repr_tc repr
       fam_envs <- readGEnv global_fam_inst_env
       liftDs $ buildDataCon fam_envs dc_name
                             False                  -- not infix
-                            NotPromoted            -- not promotable
                             (map (const no_bang) comp_tys)
                             (Just $ map (const HsLazy) comp_tys)
                             []                     -- no field labels

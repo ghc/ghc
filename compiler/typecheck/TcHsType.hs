@@ -659,7 +659,7 @@ tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
            AGlobal (ATyCon tc) -> inst_tycon (mkTyConApp tc) (tyConKind tc)
 
            AGlobal (AConLike (RealDataCon dc))
-             | Promoted tc <- promoteDataCon_maybe dc
+             | Just tc <- promoteDataCon_maybe dc
              -> do { data_kinds <- xoptM Opt_DataKinds
                    ; unless data_kinds $ promotionErr name NoDataKinds
                    ; inst_tycon (mkTyConApp tc) (tyConKind tc) }
@@ -1619,10 +1619,10 @@ tc_kind_var_app name arg_kis
              -> do { data_kinds <- xoptM Opt_DataKinds
                    ; unless data_kinds $ addErr (dataKindsErr name)
                    ; case promotableTyCon_maybe tc of
-                       Promoted prom_tc | arg_kis `lengthIs` tyConArity prom_tc
+                       Just prom_tc | arg_kis `lengthIs` tyConArity prom_tc
                                -> return (mkTyConApp prom_tc arg_kis)
-                       Promoted _  -> tycon_err tc "is not fully applied"
-                       NotPromoted -> tycon_err tc "is not promotable" }
+                       Just _  -> tycon_err tc "is not fully applied"
+                       Nothing -> tycon_err tc "is not promotable" }
 
            -- A lexically scoped kind variable
            ATyVar _ kind_var

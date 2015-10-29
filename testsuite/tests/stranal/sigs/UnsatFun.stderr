@@ -1,6 +1,5 @@
 
 ==================== Strictness signatures ====================
-UnsatFun.$trModule: m
 UnsatFun.f: <B,1*U(U)><B,A>b
 UnsatFun.g: <B,1*U(U)>b
 UnsatFun.g': <L,1*U(U)>

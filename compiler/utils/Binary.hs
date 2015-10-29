@@ -76,6 +76,7 @@ import Data.IORef
 import Data.Char                ( ord, chr )
 import Data.Time
 import Data.Typeable
+import Data.Typeable.Internal
 import Control.Monad            ( when )
 import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
@@ -553,14 +554,10 @@ instance Binary (Bin a) where
 -- Instances for Data.Typeable stuff
 
 instance Binary TyCon where
-    put_ bh tc = do
-        put_ bh (tyConPackage tc)
-        put_ bh (tyConModule tc)
-        put_ bh (tyConName tc)
+    put_ bh (TyCon _ p m n) = do
+        put_ bh (p,m,n)
     get bh = do
-        p <- get bh
-        m <- get bh
-        n <- get bh
+        (p,m,n) <- get bh
         return (mkTyCon3 p m n)
 
 instance Binary TypeRep where

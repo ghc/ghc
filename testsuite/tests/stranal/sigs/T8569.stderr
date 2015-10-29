@@ -1,7 +1,5 @@
 
 ==================== Strictness signatures ====================
-T8569.$tcRep: m
-T8569.$trModule: m
 T8569.addUp: <S,1*U><L,U>
 
 

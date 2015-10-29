@@ -323,9 +323,7 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
     addParallelTyConAndCons tycon
       = do
         { addGlobalParallelTyCon tycon
-        ; mapM_ addGlobalParallelVar [ id | dc <- tyConDataCons tycon
-                                          , AnId id <- dataConImplicitTyThings dc ]
-                                          -- Ignoring the promoted tycon; hope that's ok
+        ; mapM_ addGlobalParallelVar . concatMap dataConImplicitIds . tyConDataCons $ tycon
         }
 
     -- Add a mapping from the original to vectorised type constructor to the vectorisation map.  

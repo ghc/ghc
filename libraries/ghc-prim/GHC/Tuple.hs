@@ -16,9 +16,6 @@
 
 module GHC.Tuple where
 
-import GHC.CString ()  -- Make sure we do it first, so that the
-                       -- implicit Typeable stuff can see GHC.Types.TyCon
-                       -- and unpackCString# etc
 
 default () -- Double and Integer aren't available yet
 

@@ -9,12 +9,12 @@ _exception :: e = _
 -2  : main (../Test7.hs:2:8-29)
 <end of history>
 Logged breakpoint at ../Test7.hs:2:18-28
-_result :: a14
+_result :: a12
 Logged breakpoint at ../Test7.hs:2:8-29
-_result :: IO a14
+_result :: IO a12
 no more logged breakpoints
 Logged breakpoint at ../Test7.hs:2:18-28
-_result :: a14
+_result :: a12
 Stopped at <exception thrown>
 _exception :: e
 already at the beginning of the history
@@ -23,7 +23,7 @@ _exception = SomeException
                   "foo"
                   "CallStack:
   error, called at ../Test7.hs:2:18 in main:Main")
-_result :: a14 = _
+_result :: a12 = _
 _exception :: SomeException = SomeException
                                 (ErrorCallWithLocation
                                    "foo"

@@ -72,7 +72,6 @@ module OccName (
         mkPReprTyConOcc,
         mkPADFunOcc,
         mkRecFldSelOcc,
-        mkTyConRepUserOcc, mkTyConRepSysOcc,
 
         -- ** Deconstruction
         occNameFS, occNameString, occNameSpace,
@@ -587,8 +586,7 @@ mkDataConWrapperOcc, mkWorkerOcc,
         mkGenR, mkGen1R, mkGenRCo,
         mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,
         mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
-        mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
-        mkTyConRepUserOcc, mkTyConRepSysOcc
+        mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc
    :: OccName -> OccName
 
 -- These derived variables have a prefix that no Haskell value could have
@@ -611,23 +609,10 @@ mkNewTyCoOcc        = mk_simple_deriv tcName   "NTCo:"  -- Coercion for newtypes
 mkInstTyCoOcc       = mk_simple_deriv tcName   "TFCo:"   -- Coercion for type functions
 mkEqPredCoOcc       = mk_simple_deriv tcName   "$co"
 
--- Used in derived instances
+-- used in derived instances
 mkCon2TagOcc        = mk_simple_deriv varName  "$con2tag_"
 mkTag2ConOcc        = mk_simple_deriv varName  "$tag2con_"
 mkMaxTagOcc         = mk_simple_deriv varName  "$maxtag_"
-
--- TyConRepName stuff; see Note [Grand plan for Typeable] in TcTypeable
--- incluing the wrinkle about mkSpecialTyConRepName
-mkTyConRepSysOcc occ = mk_simple_deriv varName prefix occ
-  where
-    prefix | isDataOcc occ = "$tc'"
-           | otherwise     = "$tc"
-
-mkTyConRepUserOcc occ = mk_simple_deriv varName prefix occ
-  where
-    -- *User-writable* prefix, for types in gHC_TYPES
-    prefix | isDataOcc occ = "tc'"
-           | otherwise     = "tc"
 
 -- Generic deriving mechanism
 

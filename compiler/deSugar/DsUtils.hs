@@ -241,7 +241,7 @@ mkCoLetMatchResult bind = adjustMatchResult (mkCoreLet bind)
 -- let var' = viewExpr var in mr
 mkViewMatchResult :: Id -> CoreExpr -> Id -> MatchResult -> MatchResult
 mkViewMatchResult var' viewExpr var =
-    adjustMatchResult (mkCoreLet (NonRec var' (mkCoreAppDs (text "mkView" <+> ppr var') viewExpr (Var var))))
+    adjustMatchResult (mkCoreLet (NonRec var' (mkCoreAppDs viewExpr (Var var))))
 
 mkEvalMatchResult :: Id -> Type -> MatchResult -> MatchResult
 mkEvalMatchResult var ty
@@ -343,7 +343,7 @@ mkPatSynCase var ty alt fail = do
     matcher <- dsLExpr $ mkLHsWrap wrapper $ nlHsTyApp matcher [ty]
     let MatchResult _ mkCont = match_result
     cont <- mkCoreLams bndrs <$> mkCont fail
-    return $ mkCoreAppsDs (text "patsyn" <+> ppr var) matcher [Var var, ensure_unstrict cont, Lam voidArgId fail]
+    return $ mkCoreAppsDs matcher [Var var, ensure_unstrict cont, Lam voidArgId fail]
   where
     MkCaseAlt{ alt_pat = psyn,
                alt_bndrs = bndrs,
@@ -536,8 +536,8 @@ into
 which stupidly tries to bind the datacon 'True'.
 -}
 
-mkCoreAppDs  :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
-mkCoreAppDs _ (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2
+mkCoreAppDs  :: CoreExpr -> CoreExpr -> CoreExpr
+mkCoreAppDs (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2
   | f `hasKey` seqIdKey            -- Note [Desugaring seq (1), (2)]
   = Case arg1 case_bndr ty2 [(DEFAULT,[],arg2)]
   where
@@ -545,10 +545,10 @@ mkCoreAppDs _ (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2
                    Var v1 | isLocalId v1 -> v1        -- Note [Desugaring seq (2) and (3)]
                    _                     -> mkWildValBinder ty1
 
-mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in MkCore
+mkCoreAppDs fun arg = mkCoreApp fun arg  -- The rest is done in MkCore
 
-mkCoreAppsDs :: SDoc -> CoreExpr -> [CoreExpr] -> CoreExpr
-mkCoreAppsDs s fun args = foldl (mkCoreAppDs s) fun args
+mkCoreAppsDs :: CoreExpr -> [CoreExpr] -> CoreExpr
+mkCoreAppsDs fun args = foldl mkCoreAppDs fun args
 
 mkCastDs :: CoreExpr -> Coercion -> CoreExpr
 -- We define a desugarer-specific verison of CoreUtils.mkCast,

@@ -58,7 +58,7 @@ module Data.Typeable
 
         -- * A canonical proxy type
         Proxy (..),
-
+        
         -- * Type representations
         TypeRep,        -- abstract, instance of: Eq, Show, Typeable
         typeRepFingerprint,
@@ -66,7 +66,6 @@ module Data.Typeable
         showsTypeRep,
 
         TyCon,          -- abstract, instance of: Eq, Show, Typeable
-                        -- For now don't export Module, to avoid name clashes
         tyConFingerprint,
         tyConString,
         tyConPackage,
@@ -88,7 +87,7 @@ module Data.Typeable
         typeRepArgs,    -- :: TypeRep -> [TypeRep]
   ) where
 
-import Data.Typeable.Internal
+import Data.Typeable.Internal hiding (mkTyCon)
 import Data.Type.Equality
 
 import Unsafe.Coerce

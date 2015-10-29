@@ -94,11 +94,9 @@ import BasicTypes       ( HValue )
 import ByteCodeGen      ( byteCodeGen, coreExprToBCOs )
 import Linker
 import CoreTidy         ( tidyExpr )
-import Type             ( Type )
-import {- Kind parts of -} Type         ( Kind )
+import Type             ( Type, Kind )
 import CoreLint         ( lintInteractiveExpr )
 import VarEnv           ( emptyTidyEnv )
-import THNames          ( templateHaskellNames )
 import ConLike
 
 import GHC.Exts
@@ -183,7 +181,7 @@ newHscEnv :: DynFlags -> IO HscEnv
 newHscEnv dflags = do
     eps_var <- newIORef initExternalPackageState
     us      <- mkSplitUniqSupply 'r'
-    nc_var  <- newIORef (initNameCache us allKnownKeyNames)
+    nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyModuleEnv
     return HscEnv {  hsc_dflags       = dflags,
                      hsc_targets      = [],
@@ -195,13 +193,6 @@ newHscEnv dflags = do
                      hsc_FC           = fc_var,
                      hsc_type_env_var = Nothing }
 
-
-allKnownKeyNames :: [Name]      -- Put here to avoid loops involving DsMeta,
-allKnownKeyNames =              -- where templateHaskellNames are defined
-    knownKeyNames
-#ifdef GHCI
-        ++ templateHaskellNames
-#endif
 
 -- -----------------------------------------------------------------------------
 

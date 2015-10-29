@@ -314,7 +314,7 @@ tcPatSynMatcher (L loc name) lpat
 
        ; let matcher_tau   = mkFunTys [pat_ty, cont_ty, fail_ty] res_ty
              matcher_sigma = mkSigmaTy (res_tv:univ_tvs) req_theta matcher_tau
-             matcher_id    = mkExportedLocalId PatSynId matcher_name matcher_sigma
+             matcher_id    = mkExportedLocalId VanillaId matcher_name matcher_sigma
                              -- See Note [Exported LocalIds] in Id
 
              cont_dicts = map nlHsVar prov_dicts

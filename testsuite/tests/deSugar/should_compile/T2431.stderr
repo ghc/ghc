@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 27, types: 24, coercions: 1}
+Result size of Tidy Core = {terms: 8, types: 19, coercions: 1}
 
 -- RHS size: {terms: 2, types: 3, coercions: 1}
 T2431.$WRefl [InlPrag=INLINE] :: forall a. a :~: a
@@ -13,35 +13,10 @@ T2431.$WRefl [InlPrag=INLINE] :: forall a. a :~: a
          Tmpl= \ (@ a) -> T2431.Refl @ a @ a @~ (<a>_N :: a ~# a)}]
 T2431.$WRefl = \ (@ a) -> T2431.Refl @ a @ a @~ (<a>_N :: a ~# a)
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
-a :: TrName
-[GblId, Caf=NoCafRefs, Str=DmdType]
-a = TrNameS "main"#
-
--- RHS size: {terms: 2, types: 0, coercions: 0}
-a1 :: TrName
-[GblId, Caf=NoCafRefs, Str=DmdType]
-a1 = TrNameS "T2431"#
-
--- RHS size: {terms: 3, types: 0, coercions: 0}
-T2431.$trModule :: Module
-[GblId[ReflectionId], Caf=NoCafRefs, Str=DmdType]
-T2431.$trModule = Module a a1
-
--- RHS size: {terms: 2, types: 0, coercions: 0}
-a2 :: TrName
-[GblId, Caf=NoCafRefs, Str=DmdType]
-a2 = TrNameS ":~:"#
-
--- RHS size: {terms: 5, types: 0, coercions: 0}
-T2431.$tc:~: :: TyCon
-[GblId[ReflectionId], Caf=NoCafRefs, Str=DmdType]
-T2431.$tc:~: = TyCon 0## 0## T2431.$trModule a2
-
 -- RHS size: {terms: 4, types: 7, coercions: 0}
 absurd :: forall a. Int :~: Bool -> a
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <L,U>b]
-absurd = \ (@ a3) (x :: Int :~: Bool) -> case x of _ [Occ=Dead] { }
+absurd = \ (@ a) (x :: Int :~: Bool) -> case x of _ [Occ=Dead] { }
 
 
 

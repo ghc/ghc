@@ -1,5 +1,5 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
-             MultiParamTypeClasses, RoleAnnotations, CPP #-}
+             MultiParamTypeClasses, RoleAnnotations #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Types
@@ -29,12 +29,11 @@ module GHC.Types (
         isTrue#,
         SPEC(..),
         Nat, Symbol,
-        Coercible,
-        -- * Runtime type representation
-        Module(..), TrName(..), TyCon(..)
+        Coercible
     ) where
 
 import GHC.Prim
+import GHC.Tuple ()
 
 infixr 5 :
 
@@ -309,56 +308,3 @@ you're reading this in 2023 then things went wrong). See #8326.
 -- Libraries can specify this by using 'SPEC' data type to inform which
 -- loops should be aggressively specialized.
 data SPEC = SPEC | SPEC2
-
-{- *********************************************************************
-*                                                                      *
-             Runtime represntation of TyCon
-*                                                                      *
-********************************************************************* -}
-
-{- Note [Runtime representation of modules and tycons]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We generate a binding for M.$modName and M.$tcT for every module M and
-data type T.  Things to think about
-
-  - We want them to be economical on space; ideally pure data with no thunks.
-
-  - We do this for every module (except this module GHC.Types), so we can't
-    depend on anything else (eg string unpacking code)
-
-That's why we have these terribly low-level repesentations.  The TrName
-type lets us use the TrNameS constructor when allocating static data;
-but we also need TrNameD for the case where we are deserialising a TyCon
-or Module (for example when deserialising a TypeRep), in which case we
-can't conveniently come up with an Addr#.
-
-
-Note [Representations of types defined in GHC.Types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The representations for the types defined in GHC.Types are
-defined in GHC.Typeable.Internal.
-
--}
-
-#include "MachDeps.h"
-
-data Module = Module
-                TrName   -- Package name
-                TrName   -- Module name
-
-data TrName
-  = TrNameS Addr#  -- Static
-  | TrNameD [Char] -- Dynamic
-
-#if WORD_SIZE_IN_BITS < 64
-data TyCon = TyCon
-                Word64#  Word64#   -- Fingerprint
-                Module             -- Module in which this is defined
-                TrName              -- Type constructor name
-#else
-data TyCon = TyCon
-                Word#    Word#
-                Module
-                TrName
-#endif

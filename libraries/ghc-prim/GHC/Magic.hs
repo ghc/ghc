@@ -19,8 +19,6 @@
 
 module GHC.Magic ( inline, lazy, oneShot ) where
 
-import GHC.CString ()
-
 -- | The call @inline f@ arranges that 'f' is inlined, regardless of
 -- its size. More precisely, the call @inline f@ rewrites to the
 -- right-hand side of @f@'s definition. This allows the programmer to

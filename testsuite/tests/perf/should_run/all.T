@@ -409,10 +409,9 @@ test('InlineCloneArrayAlloc',
 test('T9203',
      [stats_num_field('bytes allocated',
                       [ (wordsize(32), 50000000, 5)
-                      , (wordsize(64), 43047088, 5) ]),
+                      , (wordsize(64), 94547280, 5) ]),
                       # was            95747304
                       # 2019-09-10     94547280 post-AMP cleanup
-                      # 2015-10-28     43047088 emit Typeable at definition site
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])

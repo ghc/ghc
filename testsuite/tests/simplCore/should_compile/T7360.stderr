@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 55, types: 34, coercions: 0}
+Result size of Tidy Core = {terms: 36, types: 29, coercions: 0}
 
 -- RHS size: {terms: 6, types: 3, coercions: 0}
 T7360.$WFoo3 [InlPrag=INLINE] :: Int -> Foo
@@ -16,51 +16,6 @@ T7360.$WFoo3 [InlPrag=INLINE] :: Int -> Foo
 T7360.$WFoo3 =
   \ (dt [Occ=Once!] :: Int) ->
     case dt of _ [Occ=Dead] { I# dt [Occ=Once] -> T7360.Foo3 dt }
-
--- RHS size: {terms: 2, types: 0, coercions: 0}
-T7360.$trModule2 :: TrName
-[GblId,
- Caf=NoCafRefs,
- Str=DmdType m1,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
-T7360.$trModule2 = TrNameS "main"#
-
--- RHS size: {terms: 2, types: 0, coercions: 0}
-T7360.$trModule1 :: TrName
-[GblId,
- Caf=NoCafRefs,
- Str=DmdType m1,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T7360.$trModule1 = TrNameS "T7360"#
-
--- RHS size: {terms: 3, types: 0, coercions: 0}
-T7360.$trModule :: Module
-[GblId[ReflectionId],
- Caf=NoCafRefs,
- Str=DmdType m,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
-T7360.$trModule = Module T7360.$trModule2 T7360.$trModule1
-
--- RHS size: {terms: 2, types: 0, coercions: 0}
-T7360.$tcFoo1 :: TrName
-[GblId,
- Caf=NoCafRefs,
- Str=DmdType m1,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
-T7360.$tcFoo1 = TrNameS "Foo"#
-
--- RHS size: {terms: 5, types: 0, coercions: 0}
-T7360.$tcFoo :: TyCon
-[GblId[ReflectionId],
- Caf=NoCafRefs,
- Str=DmdType m,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 50}]
-T7360.$tcFoo = TyCon 0## 0## T7360.$trModule T7360.$tcFoo1
 
 -- RHS size: {terms: 5, types: 2, coercions: 0}
 fun1 [InlPrag=NOINLINE] :: Foo -> ()

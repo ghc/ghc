@@ -297,13 +297,13 @@ What this means is that the implicitTyThings MUST NOT DEPEND on any of
 the forkM stuff.
 -}
 
-tcIfaceDecl :: Bool     -- ^ True <=> discard IdInfo on IfaceId bindings
+tcIfaceDecl :: Bool     -- True <=> discard IdInfo on IfaceId bindings
             -> IfaceDecl
             -> IfL TyThing
-tcIfaceDecl = tc_iface_decl Nothing
+tcIfaceDecl = tc_iface_decl NoParentTyCon
 
-tc_iface_decl :: Maybe Class  -- ^ For associated type/data family declarations
-              -> Bool         -- ^ True <=> discard IdInfo on IfaceId bindings
+tc_iface_decl :: TyConParent    -- For nested declarations
+              -> Bool   -- True <=> discard IdInfo on IfaceId bindings
               -> IfaceDecl
               -> IfL TyThing
 tc_iface_decl _ ignore_prags (IfaceId {ifName = occ_name, ifType = iface_type,
@@ -314,7 +314,7 @@ tc_iface_decl _ ignore_prags (IfaceId {ifName = occ_name, ifType = iface_type,
         ; info <- tcIdInfo ignore_prags name ty info
         ; return (AnId (mkGlobalId details name ty info)) }
 
-tc_iface_decl _ _ (IfaceData {ifName = occ_name,
+tc_iface_decl parent _ (IfaceData {ifName = occ_name,
                           ifCType = cType,
                           ifTyVars = tv_bndrs,
                           ifRoles = roles,
@@ -326,23 +326,22 @@ tc_iface_decl _ _ (IfaceData {ifName = occ_name,
     { tc_name <- lookupIfaceTop occ_name
     ; tycon <- fixM $ \ tycon -> do
             { stupid_theta <- tcIfaceCtxt ctxt
-            ; parent' <- tc_parent tc_name mb_parent
-            ; cons <- tcIfaceDataCons tc_name tycon tyvars rdr_cons is_prom
+            ; parent' <- tc_parent mb_parent
+            ; cons <- tcIfaceDataCons tc_name tycon tyvars rdr_cons
             ; return (buildAlgTyCon tc_name tyvars roles cType stupid_theta
                                     cons is_rec is_prom gadt_syn parent') }
     ; traceIf (text "tcIfaceDecl4" <+> ppr tycon)
     ; return (ATyCon tycon) }
   where
-    tc_parent :: Name -> IfaceTyConParent -> IfL AlgTyConFlav
-    tc_parent tc_name IfNoParent
-      = do { tc_rep_name <- newTyConRepName tc_name
-           ; return (VanillaAlgTyCon tc_rep_name) }
-    tc_parent _ (IfDataInstance ax_name _ arg_tys)
-      = do { ax <- tcIfaceCoAxiom ax_name
+    tc_parent :: IfaceTyConParent -> IfL TyConParent
+    tc_parent IfNoParent = return parent
+    tc_parent (IfDataInstance ax_name _ arg_tys)
+      = ASSERT( isNoParent parent )
+        do { ax <- tcIfaceCoAxiom ax_name
            ; let fam_tc  = coAxiomTyCon ax
                  ax_unbr = toUnbranchedAxiom ax
            ; lhs_tys <- tcIfaceTcArgs arg_tys
-           ; return (DataFamInstTyCon ax_unbr fam_tc lhs_tys) }
+           ; return (FamInstTyCon ax_unbr fam_tc lhs_tys) }
 
 tc_iface_decl _ _ (IfaceSynonym {ifName = occ_name, ifTyVars = tv_bndrs,
                                       ifRoles = roles,
@@ -366,25 +365,20 @@ tc_iface_decl parent _ (IfaceFamily {ifName = occ_name, ifTyVars = tv_bndrs,
      { tc_name  <- lookupIfaceTop occ_name
      ; rhs_kind <- tcIfaceKind kind     -- Note [Synonym kind loop]
      ; rhs      <- forkM (mk_doc tc_name) $
-                   tc_fam_flav tc_name fam_flav
+                   tc_fam_flav fam_flav
      ; res_name <- traverse (newIfaceName . mkTyVarOccFS) res
      ; let tycon = buildFamilyTyCon tc_name tyvars res_name rhs rhs_kind
                                     parent inj
      ; return (ATyCon tycon) }
    where
      mk_doc n = ptext (sLit "Type synonym") <+> ppr n
-
-     tc_fam_flav :: Name -> IfaceFamTyConFlav -> IfL FamTyConFlav
-     tc_fam_flav tc_name IfaceDataFamilyTyCon
-       = do { tc_rep_name <- newTyConRepName tc_name
-            ; return (DataFamilyTyCon tc_rep_name) }
-     tc_fam_flav _ IfaceOpenSynFamilyTyCon= return OpenSynFamilyTyCon
-     tc_fam_flav _ (IfaceClosedSynFamilyTyCon mb_ax_name_branches)
+     tc_fam_flav IfaceOpenSynFamilyTyCon   = return OpenSynFamilyTyCon
+     tc_fam_flav (IfaceClosedSynFamilyTyCon mb_ax_name_branches)
        = do { ax <- traverse (tcIfaceCoAxiom . fst) mb_ax_name_branches
             ; return (ClosedSynFamilyTyCon ax) }
-     tc_fam_flav _ IfaceAbstractClosedSynFamilyTyCon
+     tc_fam_flav IfaceAbstractClosedSynFamilyTyCon
          = return AbstractClosedSynFamilyTyCon
-     tc_fam_flav _ IfaceBuiltInSynFamTyCon
+     tc_fam_flav IfaceBuiltInSynFamTyCon
          = pprPanic "tc_iface_decl"
                     (text "IfaceBuiltInSynFamTyCon in interface file")
 
@@ -428,7 +422,7 @@ tc_iface_decl _parent ignore_prags
           ; return (op_name, dm, op_ty) }
 
    tc_at cls (IfaceAT tc_decl if_def)
-     = do ATyCon tc <- tc_iface_decl (Just cls) ignore_prags tc_decl
+     = do ATyCon tc <- tc_iface_decl (AssocFamilyTyCon cls) ignore_prags tc_decl
           mb_def <- case if_def of
                       Nothing  -> return Nothing
                       Just def -> forkM (mk_at_doc tc)                 $
@@ -512,10 +506,11 @@ tc_ax_branch prev_branches
                           , cab_incomps = map (prev_branches !!) incomps }
     ; return (prev_branches ++ [br]) }
 
-tcIfaceDataCons :: Name -> TyCon -> [TyVar] -> IfaceConDecls -> Bool -> IfL AlgTyConRhs
-tcIfaceDataCons tycon_name tycon tc_tyvars if_cons is_prom
+tcIfaceDataCons :: Name -> TyCon -> [TyVar] -> IfaceConDecls -> IfL AlgTyConRhs
+tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
   = case if_cons of
         IfAbstractTyCon dis -> return (AbstractTyCon dis)
+        IfDataFamTyCon  -> return DataFamilyTyCon
         IfDataTyCon cons _ _ -> do  { field_lbls <- mapM (traverse lookupIfaceTop) (ifaceConDeclFields if_cons)
                                     ; data_cons  <- mapM (tc_con_decl field_lbls) cons
                                     ; return (mkDataTyConRhs data_cons) }
@@ -533,14 +528,14 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons is_prom
        -- parent TyCon, and are alrady in scope
        bindIfaceTyVars ex_tvs    $ \ ex_tyvars -> do
         { traceIf (text "Start interface-file tc_con_decl" <+> ppr occ)
-        ; dc_name  <- lookupIfaceTop occ
+        ; name  <- lookupIfaceTop occ
 
         -- Read the context and argument types, but lazily for two reasons
         -- (a) to avoid looking tugging on a recursive use of
         --     the type itself, which is knot-tied
         -- (b) to avoid faulting in the component types unless
         --     they are really needed
-        ; ~(eq_spec, theta, arg_tys, stricts) <- forkM (mk_doc dc_name) $
+        ; ~(eq_spec, theta, arg_tys, stricts) <- forkM (mk_doc name) $
              do { eq_spec <- tcIfaceEqSpec spec
                 ; theta   <- tcIfaceCtxt ctxt
                 ; arg_tys <- mapM tcIfaceType args
@@ -560,24 +555,20 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons is_prom
         ; let orig_res_ty = mkFamilyTyConApp tycon
                                 (substTyVars (mkTopTvSubst eq_spec) tc_tyvars)
 
-        ; prom_info <- if is_prom then do { n <- newTyConRepName dc_name
-                                          ; return (Promoted n) }
-                                  else return NotPromoted
-
-        ; con <- buildDataCon (pprPanic "tcIfaceDataCons: FamInstEnvs" (ppr dc_name))
-                       dc_name is_infix prom_info
-                       (map src_strict if_src_stricts)
-                       (Just stricts)
-                       -- Pass the HsImplBangs (i.e. final
-                       -- decisions) to buildDataCon; it'll use
-                       -- these to guide the construction of a
-                       -- worker.
-                       -- See Note [Bangs on imported data constructors] in MkId
-                       lbl_names
-                       tc_tyvars ex_tyvars
-                       eq_spec theta
-                       arg_tys orig_res_ty tycon
-        ; traceIf (text "Done interface-file tc_con_decl" <+> ppr dc_name)
+        ; con <- buildDataCon (pprPanic "tcIfaceDataCons: FamInstEnvs" (ppr name))
+                   name is_infix
+                   (map src_strict if_src_stricts)
+                   (Just stricts)
+                     -- Pass the HsImplBangs (i.e. final
+                     -- decisions) to buildDataCon; it'll use
+                     -- these to guide the construction of a
+                     -- worker.
+                     -- See Note [Bangs on imported data constructors] in MkId
+                   lbl_names
+                   tc_tyvars ex_tyvars
+                   eq_spec theta
+                   arg_tys orig_res_ty tycon
+        ; traceIf (text "Done interface-file tc_con_decl" <+> ppr name)
         ; return con }
     mk_doc con_name = ptext (sLit "Constructor") <+> ppr con_name
 
@@ -898,7 +889,7 @@ tcIfaceTupleTy sort info args
             -> return (mkTyConApp base_tc args')
 
           IfacePromotedTyCon
-            | Promoted tc <- promotableTyCon_maybe base_tc
+            | Just tc <- promotableTyCon_maybe base_tc
             -> return (mkTyConApp tc args')
             | otherwise
             -> panic "tcIfaceTupleTy" (ppr base_tc)
@@ -1375,7 +1366,7 @@ tcIfaceTyCon (IfaceTyCon name info)
                                    -- Same Name as its underlying TyCon
   where
     promote_tc tc
-      | Promoted prom_tc <- promotableTyCon_maybe tc = prom_tc
+      | Just prom_tc <- promotableTyCon_maybe tc = prom_tc
       | isSuperKind (tyConKind tc)               = tc
       | otherwise = pprPanic "tcIfaceTyCon" (ppr name $$ ppr tc)
 

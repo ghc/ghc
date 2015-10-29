@@ -1689,8 +1689,8 @@ implicitTyThings (AConLike cl)  = implicitConLikeThings cl
 
 implicitConLikeThings :: ConLike -> [TyThing]
 implicitConLikeThings (RealDataCon dc)
-  = dataConImplicitTyThings dc
-
+  = map AnId (dataConImplicitIds dc)
+    -- For data cons add the worker and (possibly) wrapper
 implicitConLikeThings (PatSynCon {})
   = []  -- Pattern synonyms have no implicit Ids; the wrapper and matcher
         -- are not "implicit"; they are simply new top-level bindings,
@@ -1705,7 +1705,7 @@ implicitClassThings cl
   = -- Does not include default methods, because those Ids may have
     --    their own pragmas, unfoldings etc, not derived from the Class object
     -- associated types
-    --    No recursive call for the classATs, because they
+    --    No extras_plus (recursive call) for the classATs, because they
     --    are only the family decls; they have no implicit things
     map ATyCon (classATs cl) ++
     -- superclass and operation selectors
@@ -1721,14 +1721,17 @@ implicitTyConThings tc
 
       -- for each data constructor in order,
       --   the contructor, worker, and (possibly) wrapper
-    [ thing | dc    <- tyConDataCons tc
-            , thing <- AConLike (RealDataCon dc) : dataConImplicitTyThings dc ]
+    concatMap (extras_plus . AConLike . RealDataCon) (tyConDataCons tc)
       -- NB. record selectors are *not* implicit, they have fully-fledged
       -- bindings that pass through the compilation pipeline as normal.
   where
     class_stuff = case tyConClass_maybe tc of
         Nothing -> []
         Just cl -> implicitClassThings cl
+
+-- add a thing and recursive call
+extras_plus :: TyThing -> [TyThing]
+extras_plus thing = thing : implicitTyThings thing
 
 -- For newtypes and closed type families (only) add the implicit coercion tycon
 implicitCoTyCon :: TyCon -> [TyThing]

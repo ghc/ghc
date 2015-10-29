@@ -414,7 +414,6 @@ Library
         TcErrors
         TcTyClsDecls
         TcTyDecls
-        TcTypeable
         TcType
         TcEvidence
         TcUnify

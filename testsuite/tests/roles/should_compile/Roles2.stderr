@@ -9,17 +9,4 @@ Dependent packages: [base-4.8.2.0, ghc-prim-0.4.0.0,
                      integer-gmp-1.0.0.0]
 
 ==================== Typechecker ====================
-Roles2.$tcT2
-  = TyCon
-      5934726586329293381##
-      1923031187495159753##
-      Roles2.$trModule
-      (TrNameS "T2"#)
-Roles2.$tcT1
-  = TyCon
-      13879106829711353992##
-      15151456821588362072##
-      Roles2.$trModule
-      (TrNameS "T1"#)
-Roles2.$trModule = Module (TrNameS "main"#) (TrNameS "Roles2"#)
 

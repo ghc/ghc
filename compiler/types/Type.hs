@@ -30,7 +30,6 @@ module Type (
         mkTyConApp, mkTyConTy,
         tyConAppTyCon_maybe, tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
         splitTyConApp_maybe, splitTyConApp, tyConAppArgN, nextRole,
-        splitTyConArgs,
 
         mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys,
         mkPiKinds, mkPiType, mkPiTypes,
@@ -595,14 +594,6 @@ nextRole ty
 
   | otherwise
   = Nominal
-
-splitTyConArgs :: TyCon -> [KindOrType] -> ([Kind], [Type])
--- Given a tycon app (T k1 .. kn t1 .. tm), split the kind and type args
--- TyCons always have prenex kinds
-splitTyConArgs tc kts
-  = splitAtList kind_vars kts
-  where
-  (kind_vars, _) = splitForAllTys (tyConKind tc)
 
 newTyConInstRhs :: TyCon -> [Type] -> Type
 -- ^ Unwrap one 'layer' of newtype on a type constructor and its
