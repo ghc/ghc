@@ -1,3 +1,8 @@
+% TODO
+%   - definite typechecker/compiler implies it only looks at the
+%   installed unit database, not TRUE
+
+
 \documentclass{article}
 
 \usepackage{pifont}
@@ -56,46 +61,67 @@
 
 \maketitle
 
-\noindent
-In this document, we look at the compilation of a Backpack unit.
-Here are the steps a unit goes through:
+\noindent Backpack introduces the \emph{Backpack language}, which is
+used to define \emph{Backpack units} that provide some modules given
+implementations for some signatures.  A Backpack unit can be
+immediately typechecked and elaborated into core; at some later point,
+each unit may then be compiled one or more times with different
+instantiations of its requirements.
+
+A unit is typechecked against the indefinite unit database
+(and the installed unit database, for units that have no
+requirements) in three steps:
 
 \begin{enumerate}
-    \item The \textbf{unit renamer} takes the Backpack file consisting
-    of units transforms each unit name to an indefinite unit ID \I{IndefUnitId}.
-    In particular, it associates each unit name with its local binding
-    site (unit declaration), or an external unit declaration from
-    the indefinite unit database.
+    \item The \textbf{dependency solver} computes the module and unit
+    dependency structure of the declarations in a unit.  Specifically,
+    it produces (1) the set of \I{ModuleName}s which are required
+    by the unit, (2) a directed acyclic graph labeled by \I{Module} of
+    the modules and signatures of the unit, and (3) a directed (and acyclic, for now)
+    graph labeled by \I{UnitId} of the includes of the unit.
 
-    \item The \textbf{dependency solver} takes a unit
-    and converts it into a directed acyclic graph representing the
-    dependency structure of the declarations in a unit.
-    It also computes the \I{Module} of each module/signature
-    declaration, the \I{UnitKey} of each include, and the overall
-    requirements of the unit.
+    \item The \textbf{shaper} takes each module/signature in the DAG and
+    computes its \I{Shape}, i.e., the list of \I{AvailInfo}s which are
+    provided/required by each module/signature (respectively).  This
+    step is interleaved with the next step.
 
-    \item The \textbf{shaping pass} takes the DAG
-    and computes its \I{Shape}.  A \I{Shape} describes precisely what
-    a unit provides and requires at the Haskell declaration level (\I{AvailInfo}).
-
-    \item The \textbf{indefinite type checker} takes the DAG and the shape
-    and typechecks each module and signature against the indefinite unit
-    database.  The type checking results are saved in the indefinite
-    unit database under the \I{IndefUnitId}.
-
-    \item The \textbf{definite type checker and compiler} takes the DAG as well as a
-    \emph{hole mapping} specifying how each requirement in the unit
-    is filled, and type-checks and compiles the unit against the
-    installed unit database.  The results are saved to the installed unit database
-    under the \I{InstalledUnitId}.
+    \item The \textbf{type checker} takes each
+    module/signature in the DAG (annotated with its shape) and type
+    checks it.  Cabal will save these type checking results
+    in the indefinite unit database under the \I{ComponentId} associated
+    with this unit.
 \end{enumerate}
+
+At some later point in time, a unit may be compiled against
+the installed unit database, if the user specifies a mapping which
+instantiates the requirements of a unit (a mapping from \I{ModuleName}s to \I{Module}s):
+
+\begin{enumerate}
+    \item The \textbf{dependency solver} operates as before, but it also
+    is responsible for computing the full set of \I{InstalledUnitId}s which
+    must be compiled before this unit can be compiled, and compiling
+    them.
+
+    \item The \textbf{shaper} is not needed. (ToDo: except for recursive
+    module loops.)
+
+    \item The \textbf{type checker and compiler} takes each
+    module/signature in the DAG, and typechecks and compiles the unit.
+    Cabal will save the type checking results and object
+    code to the installed unit database under the \I{InstalledUnitId}
+    associated with this (instantiated) unit.
+\end{enumerate}
+
+\Red{ToDo: Rewrite this for added clarity}
+
+\newpage
 
 \section{Front-end syntax}
 
 \begin{figure}[htpb]
 $$
 \begin{array}{rcll}
-p,q,r && \mbox{Unit names} \\
+p,q,r && \mbox{Component names} \\
 m,n   && \mbox{Module names} \\[1em]
 \multicolumn{3}{l}{\mbox{\bf Units}} \\
   \I{unit} & ::= & \verb|unit|\; p\; [\I{provreq}]\; \verb|where {| d_1 \verb|;| \ldots \verb|;| d_n \verb|}| \\[1em]
@@ -125,22 +151,21 @@ A (slightly simplified) syntax of Backpack is given in Figure~\ref{fig:syntax}.
 $$
 \begin{array}{rcll}
 \multicolumn{3}{l}{\mbox{\bf Identifiers}} \\
-  \I{InstalledPackageId} &  & \mbox{Opaque unique identifier} \\
-  \I{IndefUnitId} & ::= & \I{InstalledPackageId}\, \verb|/|\, p  \\
-  \I{UnitKey} & ::= & \I{IndefUnitId} \verb|(|\, \I{HoleMap}\, \verb|)|  \\
-              & | & \verb|HOLE| \\
+  \I{ComponentId} & ::= & \mbox{Opaque unique identifier}  \\
+  \I{UnitId} & ::= & \I{ComponentId} \verb|(|\, \I{HoleMap}\, \verb|)|  \\
+              & | & \verb|hole| \\
   \I{HoleMap} & ::= & \I{ModuleName}\; \verb|->|\; \I{Module}\; \verb|,|\, \ldots \\
-  \I{Module} & ::= & \I{UnitKey} \verb|:| \I{ModuleName}  \\
-  \I{InstalledUnitId} & ::= & \I{UnitKey} \quad \mbox{(with no occurrence of \texttt{HOLE})} \\[1em]
+  \I{Module} & ::= & \I{UnitId} \verb|:| \I{ModuleName}  \\
+  \I{InstalledUnitId} & ::= & \I{UnitId} \quad \mbox{(with no occurrences of \texttt{hole})} \\[1em]
 \multicolumn{3}{l}{\mbox{\bf Unit databases}} \\
-  \I{IndefUnitDb} & ::= & \I{IndefUnitId} \; \verb|->| \; \I{IndefUnitRecord} \verb|,|\, \ldots \\
+  \I{ComponentDb} & ::= & \I{ComponentId} \; \verb|->| \; \I{ComponentRecord} \verb|,|\, \ldots \\
   \I{InstalledUnitDb} & ::= & \I{InstalledUnitId} \; \verb|->| \; \I{InstalledUnitRecord} \verb|,|\, \ldots \\
 \end{array}
 $$
 \caption{Unit identification} \label{fig:ids}
 \end{figure}
 
-\subsection{The unit databases}
+\subsection{The component and unit database}
 
 To install a package so that it is available when other packages are compiled,
 we must record it in some sort of database (which the compiler will query later).
@@ -152,50 +177,45 @@ However, with Backpack, we have to refine this picture in two ways:
     \item A package is always a unit of distribution: something that has
     single authorship and is uploaded to Hackage.  It would seriously hamper
     modular programming in the small, however, if you always had to create
-    a new package to abstract over some requirements.  Thus, while packages
-    continue to be a unit of distribution, the unit of modularity that the
-    compiler deals with is a unit; a package can contain multiple units.
-    Consequently, the database is a database of \emph{units}, not packages.
-    \item  In Backpack, it may not be possible to \emph{compile} a unit
+    a new package to abstract over some requirements.  So we say that a
+    package can define multiple \emph{components}.  The \emph{component database}
+    records typechecked components.
+    \item  In Backpack, it may not be possible to \emph{compile} a component
     at install time: it may depend on some (as yet) unspecified holes.
-    Thus, we must maintain two databases: the \emph{indefinite unit
-    database}, recording type-checked but uncompiled units, and the
-    \emph{installed unit database}, recording compiled units.  unit
-    database.
+    A component that is compiled to a specific instantiation is called a
+    \emph{unit}.  Thus, we maintain a second \emph{installed unit database}
+    which records compiled units; the \emph{component database} contains
+    typechecked-only components.  (In practice, these two database are
+    stored together, as components with no holes live both in the component
+    database and the installed unit database.)
 \end{enumerate}
 %
 Thus, there are four closely related types of identifier to be aware of:
 
-\begin{description} \item[Installed package IDs]  Although the unit
-databases record compile products per unit, it is still useful to be
-able to assign an identifier to an installed package as a whole.  Thus,
-the \I{InstalledPackageId} is a hash of the source code, as well as
-build info for the package, such as the Cabal and GHC flags, the
-resolution of textual dependencies, etc.  The IPID is opaque to GHC
-and selected by Cabal, which operates at the level of packages (rather
-than units).
+\begin{description}
+\item[Component IDs]  A component ID uniquely represents a component
+in a Cabal package, including the name and version of the containing package,
+the transitive dependencies of the component, and even the build information
+for the component.  This ID is opaque to GHC and selected by Cabal
+(although GHC may take a component ID and suffix it with a unit name to
+derive a new component ID.)  Component IDs identiy entries in the
+\textbf{component database}, which contains the results of typechecking
+a component, but no actual object code.  However, it does contain the
+elaborated source, so that it can be built into actual code when
+the requirement is filled.
 
-\item[Indefinite unit IDs]  A package contains multiple units; so if an
-installed package ID represents a package with all of its dependencies
-resolved, an indefinite unit ID simply singles out a specific unit in
-this installed package.  Indefinite unit IDs identify entries in the
-\textbf{indefinite unit database}, which contain the results of
-type-checking a unit, but no actual object code. Instead, it has enough
-information so that the indefinite unit can be built into actual code
-when a requirement is filled (which means it includes source code and
-build flags as well.)
+\item[Unit ID]  A unit ID is a component ID augmented with a
+\I{HoleMap}, which says how the requirements of the component are
+instantiated.  Every component ID induces a unit ID, where each
+requirement is filled with a fictitious unit \verb|hole|: when we
+typecheck a component for the component database, it is as if we are
+``compiling'' it instantiated with holes.  Units instantiated with holes
+are never installed; they are strictly for type-checking (although we
+could generate code for them, which could be linked if the \verb|hole|
+symbols are rewritten to their true destinations).
 
-\item[Unit keys]  A unit key is an indefinite unit ID, but augmented
-with a \I{HoleMap}, which says how the requirements of the unit are
-instantiated.  Unit keys are assigned when typecheckign both indefinite
-definite units:  a fictitious unit \verb|HOLE| is specified to define
-all unfilled requirements in the unit.  Units instantiated with holes
-are never installed; they are strictly for type-checking (although
-we could generate code for them, which could be linked if the
-\verb|HOLE| symbols are rewritten to their true destinations).
-
-\item[Installed unit IDs]  An installed unit ID is a unit key which has
-no \verb|HOLE|s; it identifies a unit that can be compiled.  The
+\item[Installed unit IDs]  An installed unit ID is a unit ID which has
+no \verb|hole|s; it identifies a unit that can be compiled.  The
 \textbf{installed unit database} caches the compilation results of these
 units, so that if a unit is compiled multiple times with the same
 instantiation, this code can be reused. (This database most closely
@@ -204,28 +224,28 @@ resembles the existing installed package database with GHC today.)
 
 \subsection{The unit renamer}
 
-The unit renamer is responsible for transforming unit names in a
-Backpack file into \I{IndefUnitId}s, so that they can be uniquely
-identified in the indefinite unit database.
-Given the \I{InstalledPackageId} of the package we are compiling (\I{ThisInstalledPackageId})
-and a mapping from $p$ to \I{IndefUnitId} (\I{UnitNameMap}), we rename
+The unit renamer is responsible for transforming component names in a
+Backpack file into \I{ComponentId}s, so that they can be uniquely
+identified in the component database.
+Given a base \I{ComponentId} of the library component we are compiling (\I{ThisComponentId})
+and a mapping from $p$ to \I{ComponentId} (\I{ComponentNameMap}), we rename
 as follows:
 
 \begin{itemize}
-    \item Every unit declaration $\verb|unit|\; p$ is renamed to $\I{ThisInstalledPackageId}\, \verb|-|\, p$
-    \item Every unit include $\verb|include|\; p$ is renamed to $\I{ThisInstalledPackageId}\, \verb|-|\, p$ if $p$ was declared in the Backpack file; otherwise it is renamed according to \I{UnitNameMap}.
+    \item Every unit declaration $\verb|unit|\; p$ is renamed to $\I{ThisComponentId}\, \verb|-|\, p$.
+    \item Every unit include $\verb|include|\; p$ is renamed to $\I{ThisComponentId}\, \verb|-|\, p$ if $p$ was declared in the Backpack file; otherwise it is renamed according to \I{ComponentNameMap}.
 \end{itemize}
 
-The \I{UnitNameMap} is entirely user specified, so there is a great deal
+The \I{ComponentNameMap} is entirely user specified, so there is a great deal
 of flexibility on how it can be created, but the convention we expect to
-be used by Cabal is that a unit name $p$ corresponds to the same-named
+be used by Cabal is that a component name $p$ corresponds to the same-named
 unit in a \emph{package} named $p$.  Packages that don't use Backpack
-only have on unit, which has the same name as package.
+only have one component, the library component, which has the same name as package.
 
 \paragraph{Notational conventions}
 In the rest of this document, when it is unambiguous, we will use $p$, $q$ and $r$
-interchangeably with \I{IndefUnitId}, as after unit renaming, there
-are no occurrences of unit names.
+interchangeably with \I{ComponentId}, as after unit renaming, there
+are no occurrences of component names.
 
 \newpage
 \section{Dependency solver}
@@ -236,19 +256,19 @@ $$
   \tilde{d} & ::= & \verb|module|\;    Module \; [exports]\; \verb|where|\; \I{body} \\
     & |   & \verb|signature|\; \I{Module} \; [exports]\; \verb|where|\; \I{body} \\
     & |   & \verb|merge|\; \I{Module} \\
-    & |   & \verb|include|\; \I{UnitKey} \\
-  \I{IndefUnitRecord}^{\mathsf{dep}} & ::= & \verb|provides:|\; m\; \verb|->|\; \I{Module}\verb|,|\, \ldots\\
+    & |   & \verb|include|\; \I{UnitId} \\
+  \I{ComponentRecord}^{\mathsf{dep}} & ::= & \verb|provides:|\; m\; \verb|->|\; \I{Module}\verb|,|\, \ldots\\
     & & \verb|requires:|\; m\verb|,|\, \ldots
 \end{array}
 $$
 \caption{Resolved declarations} \label{fig:resolved}
 \end{figure}
 
-The dependency solver computes the unfilled requirements of a unit, a
-dependency DAG on the modules/signatures in the unit, and a dependency
-DAG on the includes in the unit.  We assume every referenced $p$ in the
-unit must be recorded in the indefinite unit database, such that we can
-look up $\I{IndefUnitRecord}^{\mathsf{dep}}$.
+The dependency solver computes the unfilled requirements of a component, a
+dependency DAG on the modules/signatures in the component, and a dependency
+DAG on the includes in the component.  We assume every referenced $p$ in the
+component must be recorded in the component database, such that we can
+look up $\I{ComponentRecord}^{\mathsf{dep}}$.
 
 \paragraph{Computing unfilled requirements}  The unfilled requirements are $R-P$, where $R$ and $P$ are sets of module names computed from the declarations in the following manner:
 
@@ -262,12 +282,12 @@ look up $\I{IndefUnitRecord}^{\mathsf{dep}}$.
 We define a graph where the nodes are as described in Figure~\ref{fig:resolved}:
 there is a node per
 for each module and signature, as well as an extra ``merge'' node for
-every unfilled requirement, merges the interfaces of a local signature and
+every unfilled requirement, which merges the interfaces of a local signature and
 any requirements brought in from includes.
 %
 Each node is identified by the tuple $\left(\I{Module}, \I{IsSource?}\right)$, where
-the \I{Module} of a declaration $m$ in unit $p$ is \verb|p(H):m|, where $H$ maps
-each unfilled requirement $n$ to \verb|HOLE:n|, and \I{IsSource?} is true only for signatures.
+the \I{Module} of a declaration $m$ in component $p$ is \verb|p(H):m|, where $H$ maps
+each unfilled requirement $n$ to \verb|hole:n|, and \I{IsSource?} is true only for signatures.
 
 The edges of the directed graph signify a ``depends on'' relation, and are
 defined as follows:
@@ -283,13 +303,13 @@ If the resulting graph has a cycle, this is an error.
 \paragraph{Include dependency graph}  We define an dependency graph
 between includes, where an $\verb|include|\; p$ depends on
 $\verb|include|\; q$ if, for some module name $m$, $p$ requires $m$ and
-$q$ provides $m$.  If there is a cyclic, then there is cross-unit
+$q$ provides $m$.  If there is a cyclic, then there is cross-component
 mutual recursion: for now, this is an error.
 
-Assuming an acyclic graph, we can compute the \I{UnitKey} of each
+Assuming an acyclic graph, we can compute the \I{UnitId} of each
 key as follows.  Initialize $\Gamma$, a substitution from holes to \I{Module},
 to the identity substitution. For each $\verb|include|\; p$ in topological
-order, define its \I{UnitKey} to be $p$ with the mapping $\Gamma$ with its
+order, define its \I{UnitId} to be $p$ with the mapping $\Gamma$ with its
 domain restricted to the requirements of $p$.  Then, for each provision
 $m\; \verb|->|\; \I{Module}$, update $\Gamma$ so that
 $\Gamma(m) = \operatorname{subst} (\Gamma, \I{Module})$
@@ -297,6 +317,11 @@ $\Gamma(m) = \operatorname{subst} (\Gamma, \I{Module})$
 
 During compilation, the include dependency graph is useful for
 determining a compilation order for included units.
+
+\newpage
+\section{Requirement calculation}
+
+\Red{to write}
 
 \newpage
 \section{Shaping pass}
@@ -311,7 +336,7 @@ $$
           & |   & \I{Name} \, \verb|{| \, \I{Name}_0\verb|,| \, \ldots\verb|,| \, \I{Name}_n \, \verb|}| & \mbox{Type constructors} \\
 \I{Name}   & ::= & \I{Module} \verb|.| \I{OccName} \\
 \I{OccName} & & \mbox{Unqualified name in a namespace} \\
-\I{IndefUnitRecord}^{\mathsf{shape}} & ::= & \I{Shape}
+\I{ComponentRecord}^{\mathsf{shape}} & ::= & \I{Shape}
 \end{array}
 $$
 \caption{Shaping} \label{fig:shaping}
@@ -345,7 +370,7 @@ shape a node:
     of all direct dependencies, resulting in the initial shape context.
     \item Rename the module/signature according to the initial shape context,
     getting a \I{ModShape}.  Importantly, when renaming the signature \verb|M|,
-    any declarations defined in the signature are assigned a \I{Name}s with the \I{Module} \verb|HOLE:M| (rather than a \I{Module} based on the current unit $p$).
+    any declarations defined in the signature are assigned a \I{Name}s with the \I{Module} \verb|hole:M| (rather than a \I{Module} based on the current unit $p$).
     \item Merge this \I{ModShape} into the initial shape context
     (modules go in provisions while signatures go in provisions), the
     result defining the shape context of this node.
@@ -367,7 +392,7 @@ in the following way:
           $Y (m)\; \verb|->|\; \ldots$ if $Y (m)$ is defined, and $m$ if it is not.
           (Non-mentioned requirements are always passed through).
     \item For each requirement renaming from \verb|M| to \verb|N| in $Y$, substitute
-          all occurrences of \verb|HOLE:M| to \verb|HOLE:N| in the \I{ModShape}
+          all occurrences of \verb|hole:M| to \verb|hole:N| in the \I{ModShape}
           of all provisions and requirements.
 \end{itemize}
 
@@ -417,7 +442,7 @@ merge the shape of $p$ with the shape of $q$:
 \begin{enumerate}
     \item \emph{Fill every requirement of $q$ with provided modules from
         $p$.} For each requirement $M$ of $q$ that is provided by $p$,
-        substitute each \I{Module} occurrence of \verb|HOLE:M| with the
+        substitute each \I{Module} occurrence of \verb|hole:M| with the
         provided $p\verb|(|M\verb|)|$ (however, do \textbf{NOT} substitute the
         top-level \I{Module} in a \I{Name}s), merge the \I{AvailInfo}s and apply
         the resulting \I{Name} substitution, and
@@ -440,7 +465,7 @@ merge the shape of $p$ with the shape of $q$:
 \begin{figure}[htpb]
 $$
 \begin{array}{rcll}
-\I{IndefUnitRecord} & ::= & \I{ModIface}_0 \verb|;|\, \ldots\verb|;|\, \I{ModIface}_n \\[1em]
+\I{ComponentRecord} & ::= & \I{ModIface}_0 \verb|;|\, \ldots\verb|;|\, \I{ModIface}_n \\[1em]
 \multicolumn{3}{l}{\mbox{\bf Module interface}} \\
 \I{ModIface} & ::= & \verb|module| \; \I{Module} \; \verb|(| \I{mi\_exports} \verb|)| \; \verb|where| \\
 & & \qquad \I{mi\_decls} \\
@@ -488,11 +513,11 @@ For example, given:
 the \I{PkgType} is:
 
 \begin{verbatim}
-    module HOLE:H (HOLE:H.T) where
+    module hole:H (hole:H.T) where
         data T -- abstract type constructor
-    module THIS:A (THIS:A.S, HOLE:H.T) where
-        data S = S HOLE:H.T
-    -- where THIS = p(H -> HOLE:H)
+    module THIS:A (THIS:A.S, hole:H.T) where
+        data S = S hole:H.T
+    -- where THIS = p(H -> hole:H)
 \end{verbatim}
 %
 However, while it is true that the \I{ModIface} is the final result
@@ -631,7 +656,7 @@ visible \I{ModIface}s, and ignoring invisible ones.
 \paragraph{Modules}  For modules, we have a \I{Module} of
 the form $\I{p}\verb|(|m\; \verb|->|\; \I{Module}\verb|,|\, \ldots\verb|)|$,
 and we also have a unique \I{ModIface}, where each hole instantiation
-is $\verb|HOLE:|m$.
+is $\verb|hole:|m$.
 
 To generate the \I{ModDetails} associated with the specific instantiation,
 we have to type-check the \I{ModIface} with the following adjustments:
@@ -639,20 +664,20 @@ we have to type-check the \I{ModIface} with the following adjustments:
 \begin{enumerate}
     \item Perform a \I{Module} substitution according to the instantiation
           of the \I{ModIface}'s \I{Module}. (NB: we \emph{do}
-          substitute \verb|HOLE:A.x| to \verb|HOLE:B.x| if we instantiated
-          \verb|A -> HOLE:B|, \emph{unlike} the disjoint
+          substitute \verb|hole:A.x| to \verb|hole:B.x| if we instantiated
+          \verb|A -> hole:B|, \emph{unlike} the disjoint
           substitutions applied by shaping.)
     \item Perform a \I{Name} substitution as follows: for any name
-          with a unit key that is a $\verb|HOLE|$,
+          with a unit key that is a $\verb|hole|$,
           substitute with the recorded \I{Name} in the requirements of the shape.
           Otherwise, look up the (unique) \I{ModIface} for the \I{Module},
           and subsitute with the corresponding \I{Name} in the \I{mi\_exports}.
 \end{enumerate}
 
 \paragraph{Signatures}  For signatures, we have a \I{Module} of the form
-$\verb|HOLE:|m$.  Unlike modules, there are multiple \I{ModIface}s associated with a hole.
-We distinguish each separate \I{ModIface} by considering the full \I{UnitKey}
-it was defined in, e.g. \verb|p(A -> HOLE:C, B -> q():B)|; call this
+$\verb|hole:|m$.  Unlike modules, there are multiple \I{ModIface}s associated with a hole.
+We distinguish each separate \I{ModIface} by considering the full \I{UnitId}
+it was defined in, e.g. \verb|p(A -> hole:C, B -> q():B)|; call this
 the hole's \emph{defining unit key}; the set of \I{ModIface}s for a hole
 and their defining unit keys can easily be calculated during shaping.
 
@@ -698,18 +723,18 @@ This isn't obviously true, consider:
 When we type check \verb|p|, we get the \I{ModIface}s:
 
 \begin{verbatim}
-    module HOLE:S(HOLE:S.foo) where
+    module hole:S(hole:S.foo) where
         data T
-        foo :: HOLE:S.T
+        foo :: hole:S.T
     module THIS:M(THIS:M.bar) where
-        bar :: HOLE:S.T
+        bar :: hole:S.T
 \end{verbatim}
 %
 Now, when we type check \verb|A|, we pull on the \I{Name} \verb|p(S -> q():S):M.bar|,
 which means we have to type check the \I{ModIface} for \verb|p(S -> q():S):M|.
-The un-substituted type of \verb|bar| has a reference to \verb|HOLE:S.T|;
+The un-substituted type of \verb|bar| has a reference to \verb|hole:S.T|;
 this should be substituted to \verb|q():S.T|.  But how do we discover this?
-We know that \verb|HOLE:S| was instantiated to \verb|q():S|, so we might try
+We know that \verb|hole:S| was instantiated to \verb|q():S|, so we might try
 and look for \verb|q():S.T|.  However, this \I{Name} does not exist because
 the \verb|module S| reexports the selector from \verb|A|!  Nor can we consult
 the (unique) \I{ModIface} for the module, as it doesn't reexport the relevant
@@ -723,7 +748,7 @@ exported by the signature}.
 \newpage
 \section{Installation}
 
-This section defines the syntax for the file-system format of the \I{IndefUnitDb}.
+This section defines the syntax for the file-system format of the \I{ComponentDb}.
 Like entries in the installed unit database, an entry is a sequence of fields
 with values.
 
@@ -731,23 +756,24 @@ Indefinite unit entries share some entries in common with entries in the install
 unit database:
 
 \begin{description}
-    \item[\texttt{id:}] \I{InstalledPackageId} \newline
+    \item[\texttt{component-id:}] \I{ComponentId} \newline
         The unique identifier of an installed package.  This combined
         with \texttt{unit-name} uniquely identifies an entry in the
         installed unit database.
-    \item[\texttt{unit-name:}] \I{UnitName} \newline
-        The unit name of the installed unit.  This is unique per a package.
-        Unlike for the installed unit database, this entry is mandatory for
-        indefinite units.
     \item[\texttt{exposed:}] \verb|True| or \verb|False| \newline
-        Whether or not this package is exposed, i.e. it is available for
+        Whether or not this unit is exposed, i.e. it is available for
         \verb|include| under its \verb|unit-name| (this is used to compute
-        the default \I{UnitNameMap} when GHC is called by itself).
+        the default \I{ComponentNameMap} when GHC is called by itself).
     \item[\texttt{import-dirs:}] \I{FilePath} \newline
-        Where interface files for this unit can be found.
-    \item[\texttt{exposed-modules:}] \I{ModuleName} or \I{ModuleName} \texttt{from} \I{Module} \newline
+        Where interface files for this unit can be found. (NB: these
+        interface files are templates, which contain references to holes
+        which we can substitute.)  (There's exactly one.)
+    \item[\texttt{exposed-modules:}] \I{ModuleName} or \I{ModuleName} \texttt{from} \I{Module} $\ldots$ \newline
         The set of exposed modules from this unit, including reexports from
         other units.
+    \item[\texttt{other-modules:}] \I{ModuleName} $\ldots$ \newline
+        Non-exposed modules; there is an interface for each of these
+        in the import-dirs. (Redundant, but useful for error reporting.)
 \end{description}
 %
 As well as all non-essential, Cabal-specific metadata; e.g. \texttt{name}, \texttt{version}, \ldots (\texttt{data-dir} and \texttt{haddock} probably)
@@ -757,13 +783,15 @@ Here are new entries for indefinite units:
     \item[\texttt{requires:}] \I{ModuleName} \ldots \newline
         The set of module names which are requirements of this unit.
         (Installed units instead record \texttt{instantiated-with}, which
-        specifies how each requirement was instantiated.)
+        specifies how each requirement was instantiated.)  Every
+        requirement has an interface in the import-dirs.
     \item[\texttt{source-dir:}] \I{FilePath} \newline
         The path to the original source of the package.
     \item[\texttt{setup-executable:}] \I{FilePath} \newline
         The path to the \texttt{Setup} executable as described by the Cabal
         specification which is capable of building and installing the package
-        using \texttt{./Setup instantiate} (new),
+        using \texttt{./Setup instantiate} (this is a new command which lets
+        us program how the requirements of the indefinite unit should be filled),
         \texttt{./Setup build}, \texttt{./Setup copy} and
         \texttt{./Setup register}.
     \item[\texttt{package-config:}] \I{FilePath} \newline
@@ -776,17 +804,17 @@ Here are new entries for indefinite units:
 The string representation of \I{Module} is worth remarking upon.  In
 this specification, \I{Module} is a recursive data structure.  For
 installed packages, it is acceptable to flatten \I{Module} into a
-hash representing the \I{UnitKey} and the \I{ModuleName}, as the \I{UnitKey}
+hash representing the \I{UnitId} and the \I{ModuleName}, as the \I{UnitId}
 is an \I{InstalledUnitId} which has an entry in the database.  However,
 this is unacceptable for indefinite units, because we don't have an
-entry per \I{UnitKey}.  So, for \I{UnitKey}s in the indefinite unit database,
+entry per \I{UnitId}.  So, for \I{UnitId}s in the indefinite unit database,
 the full tree is written out, subject to this syntax:
 
 \begin{verbatim}
-Module ::= UnitKey ":" ModuleName
-UnitKey ::= InstalledPackageId
+Module ::= UnitId ":" ModuleName
+UnitId ::= InstalledPackageId
           [ "/" UnitName "(" HoleMap ")" ]
-          | "HOLE"
+          | "hole"
 HoleMap ::= ModuleName "->" Module "," ...
 \end{verbatim}
 
@@ -814,8 +842,8 @@ Presently, however, such an \I{OccName} annotation would be redundant: it can be
 
 \subsection{Holes of a unit are a mapping, not a set.}
 
-Why can't the \I{UnitKey} just record a
-set of \I{Module}s, e.g. $\I{UnitKey}\;::= \; p \; \verb|{| \; \I{Module} \; \verb|}|$?  Consider:
+Why can't the \I{UnitId} just record a
+set of \I{Module}s, e.g. $\I{UnitId}\;::= \; p \; \verb|{| \; \I{Module} \; \verb|}|$?  Consider:
 
 \begin{verbatim}
     unit p (A) requires (H1, H2) where
@@ -842,7 +870,7 @@ a set, both would have the key \verb|p{q():I1, q():I2}| and be
 indistinguishable.
 
 \subsection{Signatures can require a specific entity.}
-With requirements like \verb|A -> { HOLE:A.T, HOLE:A.foo }|,
+With requirements like \verb|A -> { hole:A.T, hole:A.foo }|,
 why not specify it as \verb|A -> { T, foo }|,
 e.g., \verb|required: { ModuleName -> { OccName } }|?  Consider:
 
@@ -857,8 +885,8 @@ The requirements of this unit specify that \verb|A.T| $=$ \verb|B.T|; this
 can be expressed with \I{Name}s as
 
 \begin{verbatim}
-    A -> { HOLE:A.T }
-    B -> { HOLE:A.T }
+    A -> { hole:A.T }
+    B -> { hole:A.T }
 \end{verbatim}
 But, without \I{Name}s, the sharing constraint is impossible:  \verb|A -> { T }; B -> { T }|. (NB: \verb|A| and \verb|B| could be filled with different modules, they just have
 to both export the same \verb|T|.)
@@ -1242,8 +1270,8 @@ of \verb|p|.  Here is each step of the merging process:
           shape 1                       shape 2
           --------------------------------------------------------------------------------
 (initial shapes)
-provides: A -> THIS:A { q():A.T }       M -> p(A -> HOLE:A) { HOLE:A.T, p(A -> HOLE:A).S }
-requires: (nothing)                     A ->                { HOLE:A.T }
+provides: A -> THIS:A { q():A.T }       M -> p(A -> hole:A) { hole:A.T, p(A -> hole:A).S }
+requires: (nothing)                     A ->                { hole:A.T }
 
 (after filling requirements)
 provides: A -> THIS:A { q():A.T }       M -> p(A -> THIS:A) { q():A.T, p(A -> THIS:A).S }
@@ -1255,7 +1283,7 @@ provides: A -> THIS:A         { q():A.T }
 requires: (nothing)
 \end{verbatim}
 
-Notice that we substituted \verb|HOLE:A| with \verb|THIS:A|, but \verb|HOLE:A.T| with \verb|q():A.T|.
+Notice that we substituted \verb|hole:A| with \verb|THIS:A|, but \verb|hole:A.T| with \verb|q():A.T|.
 
 \subsubsection{Requirements merging can affect provisions}
 
@@ -1270,9 +1298,9 @@ requirements and provisions:
     module B(T) where
         data T = T
 
-    -- provides: A -> THIS:A { HOLE:H.T }
+    -- provides: A -> THIS:A { hole:H.T }
     --           B -> THIS:B { THIS:B.T }
-    -- requires: H ->        { HOLE:H.T }
+    -- requires: H ->        { hole:H.T }
 
     signature H(T, f) where
         import B(T)
@@ -1280,7 +1308,7 @@ requirements and provisions:
 
     -- provides: A -> THIS:A { THIS:B.T }           -- UPDATED
     --           B -> THIS:B { THIS:B.T }
-    -- requires: H ->        { THIS:B.T, HOLE:H.f } -- UPDATED
+    -- requires: H ->        { THIS:B.T, hole:H.f } -- UPDATED
 \end{verbatim}
 
 \subsubsection{Sharing constraints}
@@ -1297,18 +1325,18 @@ they are also an instructive example for signature merging.
     signature B(T) where
         data T
 
-    -- requires: A -> { HOLE:A.T }
-                 B -> { HOLE:B.T }
+    -- requires: A -> { hole:A.T }
+                 B -> { hole:B.T }
 
     -- the sharing constraint!
     signature A(T) where
         import B(T)
     -- (shape to merge)
-    -- requires: A -> { HOLE:B.T }
+    -- requires: A -> { hole:B.T }
 
     -- (after merge)
-    -- requires: A -> { HOLE:A.T }
-    --           B -> { HOLE:A.T }
+    -- requires: A -> { hole:A.T }
+    --           B -> { hole:A.T }
 \end{verbatim}
 %
 \Red{I'm pretty sure any choice of \textit{Name} is OK, since the
@@ -1328,16 +1356,16 @@ in the declarations of the unit.
 \section{Cabal}
 
 
-%  \I{InstalledUnitId} & ::= & \I{IndefUnitId} \verb|(| \, m \; \verb|->| \; \I{Module} \verb|,|\, \ldots\, \verb|)| & \mbox{Also known as \I{UnitKey}} \\
+%  \I{InstalledUnitId} & ::= & \I{ComponentId} \verb|(| \, m \; \verb|->| \; \I{Module} \verb|,|\, \ldots\, \verb|)| & \mbox{Also known as \I{UnitId}} \\
 %  \I{Module} & ::= & \I{InstalledUnitId} \verb|:| m \\
 
 \paragraph{Indefinite versus installed units}
-The purpose of an \I{IndefUnitId} is to uniquely identify the results of \textbf{typechecking}
+The purpose of an \I{ComponentId} is to uniquely identify the results of \textbf{typechecking}
 an indefinite unit; whereas an \I{InstalledUnitId} uniquely identifies
 the results of \textbf{compiling} a unit with all its holes
 filled.  Thus, an \I{InstalledUnitId} also records a \emph{hole mapping}
 which specifies how each hole was filled.  If an \I{InstalledUnitId}
-is only partially filled, we may refer to it as a \I{UnitKey} (as these
+is only partially filled, we may refer to it as a \I{UnitId} (as these
 are never installed.)
 
 \paragraph{Units versus packages}
