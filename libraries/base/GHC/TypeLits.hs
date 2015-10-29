@@ -196,10 +196,22 @@ type family (m :: Nat) ^ (n :: Nat) :: Nat
 type family (m :: Nat) - (n :: Nat) :: Nat
 
 
+-- | A description of a custom type error.
 data {-kind-} ErrorMessage = Text Symbol
+                             -- ^ Show the text as is.
+
                            | forall t. ShowType t
+                             -- ^ Pretty print the type.
+                             -- @ShowType :: k -> ErrorMessage@
+
                            | ErrorMessage :<>: ErrorMessage
+                             -- ^ Put two pieces of error message next
+                             -- to each other.
+
                            | ErrorMessage :$$: ErrorMessage
+                             -- ^ Stack two pieces of error message on top
+                             -- of each other.
+
 infixl 5 :$$:
 infixl 6 :<>:
 
