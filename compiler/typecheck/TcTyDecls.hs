@@ -54,10 +54,6 @@ import Data.List
 import Bag
 import FastString ( fastStringToByteString )
 
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative (Applicative(..))
-#endif
-
 import Control.Monad
 
 {-
