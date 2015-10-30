@@ -132,7 +132,7 @@ mkEmptySigWcType ty = mkEmptyImplicitBndrs (mkEmptyWildCardBndrs ty)
 
 addClassContext :: Name -> LHsQTyVars Name -> LSig Name -> LSig Name
 -- Add the class context to a class-op signature
-addClassContxt cls tvs0 (L pos (ClassOpSig _ lname ltype))
+addClassContext cls tvs0 (L pos (ClassOpSig _ lname ltype))
   = L pos (TypeSig lname (mkEmptySigWcType (go (hsSigType ltype))))
           -- The mkEmptySigWcType is suspicious
   where
