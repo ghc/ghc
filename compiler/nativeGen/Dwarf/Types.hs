@@ -231,6 +231,13 @@ pprDwarfFrame DwarfFrame{dwCieLabel=cieLabel,dwCieInit=cieInit,dwCieProcs=procs}
         retReg      = dwarfReturnRegNo plat
         wordSize    = platformWordSize plat
         pprInit (g, uw) = pprSetUnwind plat g (Nothing, uw)
+
+        -- Preserve C stack pointer: This necessary to override that default
+        -- unwinding behavior of setting $sp = CFA.
+        preserveSp = case platformArch plat of
+          ArchX86    -> pprByte dW_CFA_same_value $$ pprLEBWord 4
+          ArchX86_64 -> pprByte dW_CFA_same_value $$ pprLEBWord 7
+          _          -> empty
     in vcat [ ppr cieLabel <> colon
             , pprData4' length -- Length of CIE
             , ppr cieStartLabel <> colon
@@ -250,8 +257,11 @@ pprDwarfFrame DwarfFrame{dwCieLabel=cieLabel,dwCieInit=cieInit,dwCieProcs=procs}
               pprByte (dW_CFA_offset+retReg)
             , pprByte 0
 
+              -- Preserve C stack pointer
+            , preserveSp
+
               -- Sp' = CFA
-              -- (we need to set this manually as our Sp register is
+              -- (we need to set this manually as our (STG) Sp register is
               -- often not the architecture's default stack register)
             , pprByte dW_CFA_val_offset
             , pprLEBWord (fromIntegral spReg)
