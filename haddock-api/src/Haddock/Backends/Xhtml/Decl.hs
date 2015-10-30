@@ -50,8 +50,8 @@ ppDecl summ links (L loc decl) (mbDoc, fnArgsDoc) instances fixities subdocs spl
   TyClD d@(SynDecl {})        -> ppTySyn summ links fixities loc (mbDoc, fnArgsDoc) d splice unicode qual
   TyClD d@(ClassDecl {})      -> ppClassDecl summ links instances fixities loc mbDoc subdocs d splice unicode qual
   SigD (TypeSig lnames lty _) -> ppLFunSig summ links loc (mbDoc, fnArgsDoc) lnames lty fixities splice unicode qual
-  SigD (PatSynSig lname qtvs prov req ty) ->
-      ppLPatSig summ links loc (mbDoc, fnArgsDoc) lname qtvs prov req ty fixities splice unicode qual
+  SigD (PatSynSig lname ty) ->
+      ppLPatSig summ links loc (mbDoc, fnArgsDoc) lname ty fixities splice unicode qual
   ForD d                         -> ppFor summ links loc (mbDoc, fnArgsDoc) d fixities splice unicode qual
   InstD _                        -> noHtml
   _                              -> error "declaration not supported by ppDecl"
@@ -74,23 +74,18 @@ ppFunSig summary links loc doc docnames typ fixities splice unicode qual =
     pp_typ = ppType unicode qual typ
 
 ppLPatSig :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName ->
-             Located DocName ->
-             (HsExplicitFlag, LHsTyVarBndrs DocName) ->
-             LHsContext DocName -> LHsContext DocName ->
-             LHsType DocName ->
+             Located DocName -> LHsSigType DocName
              [(DocName, Fixity)] ->
              Splice -> Unicode -> Qualification -> Html
-ppLPatSig summary links loc (doc, _argDocs) (L _ name) (expl, qtvs) lprov lreq typ fixities splice unicode qual
+ppLPatSig summary links loc (doc, _argDocs) (L _ name) typ fixities splice unicode qual
   | summary = pref1
   | otherwise = topDeclElem links loc splice [name] (pref1 <+> ppFixities fixities qual)
                 +++ docSection Nothing qual doc
   where
     pref1 = hsep [ keyword "pattern"
-                 , ppBinder summary occname
+                 , ppDocBinder name
                  , dcolon unicode
-                 , ppLTyVarBndrs expl qtvs unicode qual
-                 , cxt
-                 , ppLType unicode qual typ
+                 , ppLType unicode (hsSigType ty)
                  ]
 
     cxt = case (ppLContextMaybe lprov unicode qual, ppLContextMaybe lreq unicode qual) of
