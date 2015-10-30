@@ -28,7 +28,7 @@ import BasicTypes
 import Inst
 import TcBinds
 import FamInst          ( tcGetFamInstEnvs, tcLookupDataFamInst )
-import RnEnv            ( addUsedRdrName )
+import RnEnv            ( addUsedGRE )
 import TcEnv
 import TcArrows
 import TcMatches
@@ -1546,8 +1546,7 @@ disambiguateRecordBinds record_expr rbnds res_ty
         -- be recorded again (giving duplicate deprecation warnings).
         f (fld, gre, was_unambiguous)
             = do { unless was_unambiguous $ do
-                     let L loc rdr = hsRecUpdFieldRdr (unLoc fld)
-                     setSrcSpan loc $ addUsedRdrName True gre rdr
+                   setSrcSpan (getLoc fld) $ addUsedGRE True gre
                  ; return (fld, gre_name gre) }
 
         -- Returns Right if fld can have parent p, or Left lbl if not.

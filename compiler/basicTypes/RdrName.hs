@@ -47,7 +47,7 @@ module RdrName (
         lookupGlobalRdrEnv, extendGlobalRdrEnv, greOccName, shadowNames,
         pprGlobalRdrEnv, globalRdrEnvElts,
         lookupGRE_RdrName, lookupGRE_Name, lookupGRE_Field_Name, getGRE_NameQualifier_maybes,
-        transformGREs, pickGREs,
+        transformGREs, pickGREs, pickGREsModExp,
 
         -- * GlobalRdrElts
         gresFromAvails, gresFromAvail, localGREsFromAvail, availFromGRE,
@@ -633,15 +633,13 @@ mkParent n (AvailTC m _ _) | n == m    = NoParent
                            | otherwise = ParentIs m
 
 availFromGRE :: GlobalRdrElt -> AvailInfo
-availFromGRE gre
-  = case gre_par gre of
+availFromGRE (GRE { gre_name = me, gre_par = parent })
+  = case parent of
       ParentIs p                  -> AvailTC p [me] []
       NoParent   | isTyConName me -> AvailTC me [me] []
                  | otherwise      -> Avail   me
       FldParent p Nothing         -> AvailTC p [] [FieldLabel (occNameFS $ nameOccName me) False me]
       FldParent p (Just lbl)      -> AvailTC p [] [FieldLabel lbl True me]
-  where
-    me = gre_name gre
 
 emptyGlobalRdrEnv :: GlobalRdrEnv
 emptyGlobalRdrEnv = emptyOccEnv
@@ -728,57 +726,95 @@ unQualOK (GRE {gre_lcl = lcl, gre_imp = iss })
   | lcl = True
   | otherwise = any unQualSpecOK iss
 
+{- Note [GRE filtering]
+~~~~~~~~~~~~~~~~~~~~~~~
+(pickGREs rdr gres) takes a list of GREs which have the same OccName
+as 'rdr', say "x".  It does two things:
+
+(a) filters the GREs to a subset that are in scope
+    * Qualified,   as 'M.x'  if want_qual    is Qual M _
+    * Unqualified, as 'x'    if want_unqual  is Unqual _
+
+(b) for that subset, filter the provenance field (gre_lcl and gre_imp)
+    to ones that brought it into scope qualifed or unqualified resp.
+
+Example:
+      module A ( f ) where
+      import qualified Foo( f )
+      import Baz( f )
+      f = undefined
+
+Let's suppose that Foo.f and Baz.f are the same entity really, but the local
+'f' is different, so there will be two GREs matching "f":
+   gre1:  gre_lcl = True,  gre_imp = []
+   gre2:  gre_lcl = False, gre_imp = [ imported from Foo, imported from Bar ]
+
+The use of "f" in the export list is ambiguous because it's in scope
+from the local def and the import Baz(f); but *not* the import qualified Foo.
+pickGREs returns two GRE
+   gre1:   gre_lcl = True,  gre_imp = []
+   gre2:   gre_lcl = False, gre_imp = [ imported from Bar ]
+
+Now the the "ambiguous occurrence" message can correctly report how the
+ambiguity arises.
+-}
+
 pickGREs :: RdrName -> [GlobalRdrElt] -> [GlobalRdrElt]
--- ^ Take a list of GREs which have the right OccName
--- Pick those GREs that are suitable for this RdrName
--- And for those, keep only only the Provenances that are suitable
--- Only used for Qual and Unqual, not Orig or Exact
+-- ^ Takes a list of GREs which have the right OccName 'x'
+-- Pick those GREs that are are in scope
+--    * Qualified,   as 'M.x'  if want_qual    is Qual M _
+--    * Unqualified, as 'x'    if want_unqual  is Unqual _
 --
--- Consider:
---
--- @
---       module A ( f ) where
---       import qualified Foo( f )
---       import Baz( f )
---       f = undefined
--- @
---
--- Let's suppose that @Foo.f@ and @Baz.f@ are the same entity really.
--- The export of @f@ is ambiguous because it's in scope from the local def
--- and the import.  The lookup of @Unqual f@ should return a GRE for
--- the locally-defined @f@, and a GRE for the imported @f@, with a /single/
--- provenance, namely the one for @Baz(f)@, so that the "ambiguous occurrence"
--- message mentions the correct candidates
-pickGREs rdr_name gres
-  = ASSERT2( isSrcRdrName rdr_name, ppr rdr_name )
-    mapMaybe pick gres
+-- Return each such GRE, with its ImportSpecs filtered, to reflect
+-- how it is in scope qualifed or unqualified respectively.
+-- See Note [GRE filtering]
+pickGREs (Unqual {})  gres = mapMaybe pickUnqualGRE     gres
+pickGREs (Qual mod _) gres = mapMaybe (pickQualGRE mod) gres
+pickGREs _            _    = []  -- I don't think this actually happens
+
+pickUnqualGRE :: GlobalRdrElt -> Maybe GlobalRdrElt
+pickUnqualGRE gre@(GRE { gre_lcl = lcl, gre_imp = iss })
+  | not lcl, null iss' = Nothing
+  | otherwise          = Just (gre { gre_imp = iss' })
   where
-    rdr_is_unqual = isUnqual rdr_name
-    rdr_is_qual   = isQual_maybe rdr_name
+    iss' = filter unQualSpecOK iss
 
-    pick :: GlobalRdrElt -> Maybe GlobalRdrElt
-    pick gre@(GRE { gre_name = n, gre_lcl = lcl, gre_imp = iss })
-        | not lcl' && null iss'
-        = Nothing
+pickQualGRE :: ModuleName -> GlobalRdrElt -> Maybe GlobalRdrElt
+pickQualGRE mod gre@(GRE { gre_name = n, gre_lcl = lcl, gre_imp = iss })
+  | not lcl', null iss' = Nothing
+  | otherwise           = Just (gre { gre_lcl = lcl', gre_imp = iss' })
+  where
+    iss' = filter (qualSpecOK mod) iss
+    lcl' = lcl && name_is_from mod n
 
-        | otherwise
-        = Just (gre { gre_lcl = lcl', gre_imp = iss' })
+    name_is_from :: ModuleName -> Name -> Bool
+    name_is_from mod name = case nameModule_maybe name of
+                              Just n_mod -> moduleName n_mod == mod
+                              Nothing    -> False
 
-        where
-          lcl' | not lcl       = False
-               | rdr_is_unqual = True
-               | Just (mod,_) <- rdr_is_qual        -- Qualified name
-               , Just n_mod <- nameModule_maybe n   -- Binder is External
-               = mod == moduleName n_mod
-               | otherwise
-               = False
+pickGREsModExp :: ModuleName -> [GlobalRdrElt] -> [(GlobalRdrElt,GlobalRdrElt)]
+-- ^ Pick GREs that are in scope *both* qualified *and* unqualified
+-- Return each GRE that is, as a pair
+--    (qual_gre, unqual_gre)
+-- These two GREs are the original GRE with imports filtered to express how
+-- it is in scope qualified an unqualified respectively
+--
+-- Used only for the 'module M' item in export list;
+--   see RnNames.exports_from_avail
+pickGREsModExp mod gres = mapMaybe (pickBothGRE mod) gres
 
-          iss' | rdr_is_unqual
-               = filter (not . is_qual    . is_decl) iss
-               | Just (mod,_) <- rdr_is_qual
-               = filter ((== mod) . is_as . is_decl) iss
-               | otherwise
-               = []
+pickBothGRE :: ModuleName -> GlobalRdrElt -> Maybe (GlobalRdrElt, GlobalRdrElt)
+pickBothGRE mod gre@(GRE { gre_name = n })
+  | isBuiltInSyntax n                = Nothing
+  | Just gre1 <- pickQualGRE mod gre
+  , Just gre2 <- pickUnqualGRE   gre = Just (gre1, gre2)
+  | otherwise                        = Nothing
+  where
+        -- isBuiltInSyntax filter out names for built-in syntax They
+        -- just clutter up the environment (esp tuples), and the
+        -- parser will generate Exact RdrNames for them, so the
+        -- cluttered envt is no use.  Really, it's only useful for
+        -- GHC.Base and GHC.Tuple.
 
 -- Building GlobalRdrEnvs
 

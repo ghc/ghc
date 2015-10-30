@@ -46,12 +46,12 @@ import ListSetOps
 
 import Control.Monad
 import Data.Either      ( partitionEithers, isRight, rights )
-import qualified Data.Foldable as Foldable
+-- import qualified Data.Foldable as Foldable
 import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Ord         ( comparing )
 import Data.List        ( partition, (\\), find, sortBy )
-import qualified Data.Set as Set
+-- import qualified Data.Set as Set
 import System.FilePath  ((</>))
 import System.IO
 
@@ -1216,23 +1216,21 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                return acc }
 
         | otherwise
-        = do { implicit_prelude <- xoptM Opt_ImplicitPrelude
-             ; warnDodgyExports <- woptM Opt_WarnDodgyExports
+        = do { warnDodgyExports <- woptM Opt_WarnDodgyExports
              ; let { exportValid = (mod `elem` imported_modules)
                                 || (moduleName this_mod == mod)
-                   ; gres = filter (isModuleExported implicit_prelude mod)
-                                   (globalRdrEnvElts rdr_env)
-                   ; new_exports = map availFromGRE gres
-                   ; names       = map gre_name gres }
+                   ; gre_prs     = pickGREsModExp mod (globalRdrEnvElts rdr_env)
+                   ; new_exports = map (availFromGRE . fst) gre_prs
+                   ; names       = map (gre_name     . fst) gre_prs
+                   ; all_gres    = foldr (\(gre1,gre2) gres -> gre1 : gre2 : gres) [] gre_prs
+               }
 
              ; checkErr exportValid (moduleNotImported mod)
-             ; warnIf (warnDodgyExports && exportValid && null names)
+             ; warnIf (warnDodgyExports && exportValid && null gre_prs)
                       (nullModuleExport mod)
 
-             ; addUsedRdrNames (concat [ [mkRdrQual mod occ, mkRdrUnqual occ]
-                                       | occ <- map nameOccName names ])
-                        -- The qualified and unqualified version of all of
-                        -- these names are, in effect, used by this export
+             ; traceRn (text "efa" <+> (ppr mod $$ ppr all_gres))
+             ; addUsedGREs all_gres
 
              ; occs' <- check_occs (IEModuleContents (noLoc mod)) occs names
                       -- This check_occs not only finds conflicts
@@ -1314,12 +1312,9 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     -- In an export item M.T(A,B,C), we want to treat the uses of
     -- A,B,C as if they were M.A, M.B, M.C
-    addUsedKids parent_rdr kid_names
-       = addUsedRdrNames $ map (mk_kid_rdr . greOccName) kid_names
-       where
-         mk_kid_rdr = case isQual_maybe parent_rdr of
-                         Nothing           -> mkRdrUnqual
-                         Just (modName, _) -> mkRdrQual modName
+    -- Happily pickGREs does just the right thing
+    addUsedKids :: RdrName -> [GlobalRdrElt] -> RnM ()
+    addUsedKids parent_rdr kid_gres = addUsedGREs (pickGREs parent_rdr kid_gres)
 
 isDoc :: IE RdrName -> Bool
 isDoc (IEDoc _)      = True
@@ -1327,27 +1322,6 @@ isDoc (IEDocNamed _) = True
 isDoc (IEGroup _ _)  = True
 isDoc _ = False
 
-
--------------------------------
-isModuleExported :: Bool -> ModuleName -> GlobalRdrElt -> Bool
--- True if the thing is in scope *both* unqualified, *and* with qualifier M
-isModuleExported implicit_prelude mod
-                 (GRE { gre_name = name, gre_lcl = lcl, gre_imp = iss })
-  | implicit_prelude && isBuiltInSyntax name = False
-        -- Optimisation: filter out names for built-in syntax
-        -- They just clutter up the environment (esp tuples), and the parser
-        -- will generate Exact RdrNames for them, so the cluttered
-        -- envt is no use.  To avoid doing this filter all the time,
-        -- we use -XNoImplicitPrelude as a clue that the filter is
-        -- worth while.  Really, it's only useful for GHC.Base and GHC.Tuple.
-        --
-        -- It's worth doing because it makes the environment smaller for
-        -- every module that imports the Prelude
-  | otherwise
-  =  (lcl && (case nameModule_maybe name of
-               Just name_mod -> moduleName name_mod == mod
-               Nothing       -> False))
-  || (any unQualSpecOK iss && any (qualSpecOK mod) iss)
 
 -------------------------------
 check_occs :: IE RdrName -> ExportOccMap -> [Name] -> RnM ExportOccMap
@@ -1426,10 +1400,8 @@ reportUnusedNames :: Maybe (Located [LIE RdrName])  -- Export list
                   -> TcGblEnv -> RnM ()
 reportUnusedNames _export_decls gbl_env
   = do  { traceRn ((text "RUN") <+> (ppr (tcg_dus gbl_env)))
-        ; sel_uses <- readMutVar (tcg_used_selectors gbl_env)
         ; warnUnusedImportDecls gbl_env
-        ; warnUnusedTopBinds $ filterOut (used_as_selector sel_uses)
-                                         unused_locals }
+        ; warnUnusedTopBinds unused_locals }
   where
     used_names :: NameSet
     used_names = findUses (tcg_dus gbl_env) emptyNameSet
@@ -1466,12 +1438,6 @@ reportUnusedNames _export_decls gbl_env
     is_unused_local :: GlobalRdrElt -> Bool
     is_unused_local gre = isLocalGRE gre && isExternalName (gre_name gre)
 
-    -- Remove uses of record selectors recorded in the typechecker
-    used_as_selector :: Set.Set (FieldOcc Name) -> GlobalRdrElt -> Bool
-    used_as_selector sel_uses gre
-      = isRecFldGRE gre && Foldable.any ((==) (gre_name gre) . selectorFieldOcc) sel_uses
-
-
 {-
 *********************************************************
 *                                                       *
@@ -1491,8 +1457,7 @@ type ImportDeclUsage
 
 warnUnusedImportDecls :: TcGblEnv -> RnM ()
 warnUnusedImportDecls gbl_env
-  = do { uses <- fmap Set.elems $ readMutVar (tcg_used_rdrnames gbl_env)
-       ; sel_uses <- readMutVar (tcg_used_selectors gbl_env)
+  = do { uses <- readMutVar (tcg_used_gres gbl_env)
        ; let user_imports = filterOut (ideclImplicit . unLoc) (tcg_rn_imports gbl_env)
                             -- This whole function deals only with *user* imports
                             -- both for warning about unnecessary ones, and for
@@ -1501,10 +1466,9 @@ warnUnusedImportDecls gbl_env
              fld_env = mkFieldEnv rdr_env
 
        ; let usage :: [ImportDeclUsage]
-             usage = findImportUsage user_imports rdr_env uses sel_uses
+             usage = findImportUsage user_imports uses
 
        ; traceRn (vcat [ ptext (sLit "Uses:") <+> ppr uses
-                       , ptext (sLit "Selector uses:") <+> ppr sel_uses
                        , ptext (sLit "Import usage") <+> ppr usage])
        ; whenWOptM Opt_WarnUnusedImports $
          mapM_ (warnUnusedImport fld_env) usage
@@ -1537,19 +1501,15 @@ not normalised).
 type ImportMap = Map SrcLoc [AvailInfo]  -- See [The ImportMap]
 
 findImportUsage :: [LImportDecl Name]
-                -> GlobalRdrEnv
-                -> [RdrName]
-                -> Set.Set (FieldOcc Name)
+                -> [GlobalRdrElt]
                 -> [ImportDeclUsage]
 
-findImportUsage imports rdr_env rdrs sel_names
+findImportUsage imports used_gres
   = map unused_decl imports
   where
     import_usage :: ImportMap
     import_usage
-      = foldr (extendImportMap_Field rdr_env)
-              (foldr (extendImportMap rdr_env) Map.empty rdrs)
-              (Set.elems sel_names)
+      = foldr extendImportMap Map.empty used_gres
 
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
       = (decl, nubAvails used_avails, nameSetElems unused_imps)
@@ -1589,30 +1549,12 @@ findImportUsage imports rdr_env rdrs sel_names
        -- imported Num(signum).  We don't want to complain that
        -- Num is not itself mentioned.  Hence the two cases in add_unused_with.
 
-extendImportMap :: GlobalRdrEnv
-                -> RdrName
-                -> ImportMap -> ImportMap
-extendImportMap rdr_env rdr =
-  extendImportMap_GRE (lookupGRE_RdrName rdr rdr_env)
-
-extendImportMap_Field :: GlobalRdrEnv
-                      -> FieldOcc Name
-                      -> ImportMap -> ImportMap
-extendImportMap_Field rdr_env (FieldOcc rdr sel) =
-    extendImportMap_GRE (pickGREs rdr (lookupGRE_Field_Name rdr_env sel lbl))
-  where
-    lbl = occNameFS (rdrNameOcc rdr)
-
+extendImportMap :: GlobalRdrElt -> ImportMap -> ImportMap
 -- For each of a list of used GREs, find all the import decls that brought
 -- it into scope; choose one of them (bestImport), and record
 -- the RdrName in that import decl's entry in the ImportMap
-extendImportMap_GRE :: [GlobalRdrElt] -> ImportMap -> ImportMap
-extendImportMap_GRE gres imp_map
-  | (gre:_) <- gres
-  , not (isLocalGRE gre)   -- Should always be true, because we only need record
-                           -- uses of imported things, but that's not true yet
+extendImportMap gre imp_map
    = add_imp gre (bestImport (gre_imp gre)) imp_map
-  | otherwise       = imp_map
   where
     add_imp :: GlobalRdrElt -> ImportSpec -> ImportMap -> ImportMap
     add_imp gre (ImpSpec { is_decl = imp_decl_spec }) imp_map

@@ -29,7 +29,6 @@ import Outputable
 import DynFlags( DynFlags )
 import VarSet
 import RdrName
-import DataCon ( dataConName )
 
 import Pair
 import Util
@@ -599,7 +598,7 @@ can_eq_newtype_nc rdr_env ev swapped co ty1 ty1' ty2 ps_ty2
          -- check for blowing our stack:
          -- See Note [Newtypes can blow the stack]
        ; checkReductionDepth (ctEvLoc ev) ty1
-       ; markDataConsAsUsed rdr_env (tyConAppTyCon ty1)
+       ; addUsedDataCons rdr_env (tyConAppTyCon ty1)
            -- we have actually used the newtype constructor here, so
            -- make sure we don't warn about importing it!
 
@@ -607,15 +606,6 @@ can_eq_newtype_nc rdr_env ev swapped co ty1 ty1' ty2 ps_ty2
                            (mkTcSymCo co) (mkTcReflCo Representational ps_ty2)
          `andWhenContinue` \ new_ev ->
          can_eq_nc False new_ev ReprEq ty1' ty1' ty2 ps_ty2 }
-
--- | Mark all the datacons of the given 'TyCon' as used in this module,
--- avoiding "redundant import" warnings.
-markDataConsAsUsed :: GlobalRdrEnv -> TyCon -> TcS ()
-markDataConsAsUsed rdr_env tc = addUsedRdrNamesTcS
-  [ greUsedRdrName gre
-  | dc <- tyConDataCons tc
-  , gre : _  <- return $ lookupGRE_Name rdr_env (dataConName dc)
-  , not (isLocalGRE gre) ]
 
 ---------
 -- ^ Decompose a type application.
