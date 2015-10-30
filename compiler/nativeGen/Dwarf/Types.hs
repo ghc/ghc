@@ -43,7 +43,7 @@ import Data.Char
 import CodeGen.Platform
 
 -- | Individual dwarf records. Each one will be encoded as an entry in
--- the .debug_info section.
+-- the @.debug_info@ section.
 data DwarfInfo
   = DwarfCompileUnit { dwChildren :: [DwarfInfo]
                      , dwName :: String
@@ -60,7 +60,7 @@ data DwarfInfo
                , dwMarker :: CLabel }
 
 -- | Abbreviation codes used for encoding above records in the
--- .debug_info section.
+-- @.debug_info@ section.
 data DwarfAbbrev
   = DwAbbrNull          -- ^ Pseudo, used for marking the end of lists
   | DwAbbrCompileUnit
@@ -218,7 +218,7 @@ data DwarfFrameBlock
     , dwFdeUnwind     :: UnwindTable
     }
 
--- | Header for the .debug_frame section. Here we emit the "Common
+-- | Header for the @.debug_frame@ section. Here we emit the "Common
 -- Information Entry" record that etablishes general call frame
 -- parameters and the default stack layout.
 pprDwarfFrame :: DwarfFrame -> SDoc
@@ -315,7 +315,7 @@ pprFrameBlock oldUws (DwarfFrameBlock blockLbl hasInfo uws)
        vcat (map (uncurry $ pprSetUnwind plat) changed) $$
        vcat (map (pprUndefUnwind plat . fst) died)
 
--- [Note: Info Offset]
+-- Note [Info Offset]
 --
 -- GDB was pretty much written with C-like programs in mind, and as a
 -- result they assume that once you have a return address, it is a
@@ -398,7 +398,7 @@ pprUnwindExpr spIsCFA expr
        ptext (sLit "1:")
 
 -- | Generate code for re-setting the unwind information for a
--- register to "undefined"
+-- register to @undefined@
 pprUndefUnwind :: Platform -> GlobalReg -> SDoc
 pprUndefUnwind _    Sp = panic "pprUndefUnwind Sp" -- should never happen
 pprUndefUnwind plat g  = pprByte dW_CFA_undefined $$
