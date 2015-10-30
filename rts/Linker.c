@@ -1217,7 +1217,7 @@ static void m32_allocator_init(m32_allocator m32) {
  * You shouldn't have to use this method. Use `m32_free` instead.
  */
 static void m32_free_internal(void * addr) {
-   uint64_t c = __sync_sub_and_fetch((uint64_t*)addr, 1);
+   uintptr_t c = __sync_sub_and_fetch((uintptr_t*)addr, 1);
    if (c == 0) {
       munmapForLinker(addr, getPageSize());
    }
