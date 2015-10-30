@@ -1,9 +1,10 @@
 ---Problems---------------------
 [
+(AK <no location info> AnnEofPos = [Test10396.hs:8:1])
 ]
 
 ---Problems'--------------------
-[]
+[(AnnEofPos, Test10396.hs:8:1)]
 --------------------------------
 [
 (AK Test10396.hs:1:1 AnnModule = [Test10396.hs:2:1-6])

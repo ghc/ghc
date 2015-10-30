@@ -3,10 +3,12 @@
 (AK Test10354.hs:4:7-15 AnnCloseP = [Test10354.hs:4:15])
 
 (AK Test10354.hs:4:7-15 AnnOpenP = [Test10354.hs:4:7])
+
+(AK <no location info> AnnEofPos = [Test10354.hs:15:1])
 ]
 
 ---Problems'--------------------
-[]
+[(AnnEofPos, Test10354.hs:15:1)]
 --------------------------------
 [
 (AK Test10354.hs:1:1 AnnModule = [Test10354.hs:2:1-6])
