@@ -9,5 +9,9 @@ overloadedrecfldsfail12.hs:10:20: warning:
     In the use of ‘bar’ (imported from OverloadedRecFldsFail12_A):
     "Deprecated bar"
 
+overloadedrecfldsfail12.hs:13:5: warning:
+    In the use of ‘foo’ (imported from OverloadedRecFldsFail12_A):
+    "Deprecated foo"
+
 <no location info>: error: 
 Failing due to -Werror.

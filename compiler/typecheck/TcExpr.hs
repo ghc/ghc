@@ -28,7 +28,9 @@ import BasicTypes
 import Inst
 import TcBinds
 import FamInst          ( tcGetFamInstEnvs, tcLookupDataFamInst )
-import RnEnv            ( addUsedGRE )
+import FamInstEnv       ( FamInstEnvs )
+import RnEnv            ( addUsedGRE, addNameClashErrRn
+                        , unknownSubordinateErr )
 import TcEnv
 import TcArrows
 import TcMatches
@@ -693,7 +695,7 @@ following.
 tcExpr (RecordUpd record_expr rbnds _ _ _ _ ) res_ty
   = ASSERT( notNull rbnds )
     do  {
-        -- STEP -1  See Note [Disambiguating record updates]
+        -- STEP -1  See Note [Disambiguating record fields]
         -- After this we know that rbinds is unambiguous
         rbinds <- disambiguateRecordBinds record_expr rbnds res_ty
         ; let upd_flds = map (unLoc . hsRecFieldLbl . unLoc) rbinds
@@ -826,7 +828,7 @@ tcExpr (RecordUpd record_expr rbnds _ _ _ _ ) res_ty
           RecordUpd (mkLHsWrap scrut_co record_expr') rbinds'
                     relevant_cons scrut_inst_tys result_inst_tys req_wrap }
 
-tcExpr (HsSingleRecFld f) res_ty
+tcExpr (HsRecFld f) res_ty
     = tcCheckRecSelId f res_ty
 
 {-
@@ -973,6 +975,14 @@ tcApp (L loc (HsVar fun)) args res_ty
   , [arg1,arg2] <- args
   = tcSeq loc fun arg1 arg2 res_ty
 
+-- Look for applications of ambiguous record selectors to arguments
+-- with type signatures, see Note [Disambiguating record fields]
+tcApp (L loc (HsRecFld (Ambiguous lbl _))) args@(L _ arg:_) res_ty
+  | Just sig_ty <- obviousSig arg
+  = do { sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
+       ; sel_name <- disambiguateSelector lbl sig_tc_ty
+       ; tcApp (L loc (HsRecFld (Unambiguous lbl sel_name))) args res_ty }
+
 tcApp fun args res_ty
   = do  {   -- Type-check the function
         ; (fun1, fun_tau) <- tcInferFun fun
@@ -1011,7 +1021,7 @@ tcInferFun (L loc (HsVar name))
                -- Don't wrap a context around a plain Id
        ; return (L loc fun, ty) }
 
-tcInferFun (L loc (HsSingleRecFld f))
+tcInferFun (L loc (HsRecFld f))
   = do { (fun, ty) <- setSrcSpan loc (tcInferRecSelId f)
                -- Don't wrap a context around a plain Id
        ; return (L loc fun, ty) }
@@ -1108,19 +1118,27 @@ tcCheckId name res_ty
        ; addErrCtxtM (funResCtxt False (HsVar name) actual_res_ty res_ty) $
          tcWrapResult expr actual_res_ty res_ty }
 
-tcCheckRecSelId :: FieldOcc Name -> TcRhoType -> TcM (HsExpr TcId)
-tcCheckRecSelId f res_ty
+tcCheckRecSelId :: AmbiguousFieldOcc Name -> TcRhoType -> TcM (HsExpr TcId)
+tcCheckRecSelId f@(Unambiguous _ _) res_ty
   = do { (expr, actual_res_ty) <- tcInferRecSelId f
-       ; addErrCtxtM (funResCtxt False (HsSingleRecFld f) actual_res_ty res_ty) $
+       ; addErrCtxtM (funResCtxt False (HsRecFld f) actual_res_ty res_ty) $
          tcWrapResult expr actual_res_ty res_ty }
+tcCheckRecSelId (Ambiguous lbl _) res_ty
+  = case tcSplitFunTy_maybe res_ty of
+      Nothing       -> ambiguousSelector lbl
+      Just (arg, _) -> do { sel_name <- disambiguateSelector lbl arg
+                          ; tcCheckRecSelId (Unambiguous lbl sel_name) res_ty }
 
 ------------------------
 tcInferId :: Name -> TcM (HsExpr TcId, TcRhoType)
 -- Infer type, and deeply instantiate
 tcInferId n = tcInferIdWithOrig (OccurrenceOf n) (nameRdrName n) n
 
-tcInferRecSelId :: FieldOcc Name -> TcM (HsExpr TcId, TcRhoType)
-tcInferRecSelId (FieldOcc lbl sel) = tcInferIdWithOrig (OccurrenceOfRecSel lbl) lbl sel
+tcInferRecSelId :: AmbiguousFieldOcc Name -> TcM (HsExpr TcId, TcRhoType)
+tcInferRecSelId (Unambiguous lbl sel)
+  = tcInferIdWithOrig (OccurrenceOfRecSel lbl) lbl sel
+tcInferRecSelId (Ambiguous lbl _)
+  = ambiguousSelector lbl
 
 ------------------------
 tcInferIdWithOrig :: CtOrigin -> RdrName -> Name ->
@@ -1407,15 +1425,15 @@ getFixedTyVars upd_fld_occs univ_tvs cons
                       , tv `elemVarSet` fixed_tvs ]
 
 {-
-Note [Disambiguating record updates]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Disambiguating record fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When the -XDuplicateRecordFields extension is used, and the renamer
-encounters a record update that it cannot immediately disambiguate
-(because it involves fields that belong to multiple datatypes), it
-will defer resolution of the ambiguity to the typechecker.  In this
-case, the `hsRecUpdFieldSel` field of the `HsRecUpdField` stores a
-list of candidate selectors.
+encounters a record selector or update that it cannot immediately
+disambiguate (because it involves fields that belong to multiple
+datatypes), it will defer resolution of the ambiguity to the
+typechecker.  In this case, the `Ambiguous` constructor of
+`AmbiguousFieldOcc` is used.
 
 Consider the following definitions:
 
@@ -1423,9 +1441,31 @@ Consider the following definitions:
         data T = MkT { foo :: Int, bar :: Int }
         data U = MkU { bar :: Int, baz :: Int }
 
-When the renamer sees an update of `foo`, it will not know which
-parent datatype is in use.  The `disambiguateRecordBinds` function
-tries to determine the parent in three ways:
+When the renamer sees `foo` as a selector or an update, it will not
+know which parent datatype is in use.
+
+For selectors, there are two possible ways to disambiguate:
+
+1. Check if the pushed-in type is a function whose domain is a
+   datatype, for example:
+
+       f s = (foo :: S -> Int) s
+
+       g :: T -> Int
+       g = foo
+
+    This is checked by `tcCheckRecSelId` when checking `HsRecFld foo`.
+
+2. Check if the selector is applied to an argument that has a type
+   signature, for example:
+
+       h = foo (s :: S)
+
+    This is checked by `tcApp`.
+
+
+Updates are slightly more complex.  The `disambiguateRecordBinds`
+function tries to determine the parent datatype in three ways:
 
 1. Check for types that have all the fields being updated. For example:
 
@@ -1450,9 +1490,12 @@ tries to determine the parent in three ways:
 
         h x = (x :: T) { foo = 3 }
 
+
 Note that we do not look up the types of variables being updated, and
 no constraint-solving is performed, so for example the following will
 be rejected as ambiguous:
+
+     let bad (s :: S) = foo s
 
      let r :: T
          r = blah
@@ -1462,107 +1505,162 @@ be rejected as ambiguous:
 
 We could add further tests, of a more heuristic nature. For example,
 rather than looking for an explicit signature, we could try to infer
-the type of the record expression, in case we are lucky enough to get
-a TyConApp straight away. However, it might be hard for programmers to
-predict whether a particular update is sufficiently obvious for the
-signature to be omitted.
+the type of the argument to a selector or the record expression being
+updated, in case we are lucky enough to get a TyConApp straight
+away. However, it might be hard for programmers to predict whether a
+particular update is sufficiently obvious for the signature to be
+omitted. Moreover, this might change the behaviour of typechecker in
+non-obvious ways.
+
+See also Note [HsRecField and HsRecUpdField] in HsPat.
 -}
 
+-- Given a RdrName that refers to multiple record fields, and the type
+-- of its argument, try to determine the name of the selector that is
+-- meant.
+disambiguateSelector :: RdrName -> Type -> RnM Name
+disambiguateSelector rdr parent_type
+ = do { fam_inst_envs <- tcGetFamInstEnvs
+      ; case tyConOf fam_inst_envs parent_type of
+          Nothing -> ambiguousSelector rdr
+          Just p  ->
+            do { xs <- lookupParents rdr
+               ; let parent = RecSelData p
+               ; case lookup parent xs of
+                   Just gre -> do { addUsedGRE True gre
+                                  ; return (gre_name gre) }
+                   Nothing  -> failWithTc (fieldNotInType parent rdr) } }
+
+-- This field name really is ambiguous, so add a suitable "ambiguous
+-- occurrence" error, then give up.
+ambiguousSelector :: RdrName -> RnM a
+ambiguousSelector rdr
+  = do { env <- getGlobalRdrEnv
+       ; let gres = lookupGRE_RdrName rdr env
+       ; setErrCtxt [] $ addNameClashErrRn rdr gres
+       ; failM }
+
+-- Disambiguate the fields in a record update.
+-- See Note [Disambiguating record fields]
 disambiguateRecordBinds :: LHsExpr Name -> [LHsRecUpdField Name] -> Type
                                  -> TcM [LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name)]
 disambiguateRecordBinds record_expr rbnds res_ty
+    -- Are all the fields unambiguous?
   = case mapM isUnambiguous rbnds of
+                     -- If so, just skip to looking up the Ids
                      -- Always the case if DuplicateRecordFields is off
-     Just rbnds' -> lookupSelectors rbnds'
-     Nothing     -> do
-      { fam_inst_envs      <- tcGetFamInstEnvs
-      ; (rbnds_with_parents) <- fmap (zip rbnds) $ mapM getParents rbnds
-      ; (p :: RecSelParent) <- case possibleParents (map snd rbnds_with_parents) of
-               []  -> failWithTc (noPossibleParents rbnds)
-               [p] -> return p
-               _ | Just p <- tyConOf fam_inst_envs res_ty -> return (RecSelData p)
-               _ | Just sig_ty <- obviousSig (unLoc record_expr) ->
-                 do { sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
-                    ; case tyConOf fam_inst_envs sig_tc_ty of
-                        Just p  -> return (RecSelData p)
-                        Nothing -> failWithTc badOverloadedUpdate }
-               _ -> failWithTc badOverloadedUpdate
-      ; assignParent p rbnds_with_parents }
+      Just rbnds' -> mapM lookupSelector rbnds'
+      Nothing     -> -- If not, try to identify a single parent
+        do { fam_inst_envs <- tcGetFamInstEnvs
+             -- Look up the possible parents for each field
+           ; rbnds_with_parents <- getUpdFieldsParents
+           ; let possible_parents = map (map fst . snd) rbnds_with_parents
+             -- Identify a single parent
+           ; p <- identifyParent fam_inst_envs possible_parents
+             -- Pick the right selector with that parent for each field
+           ; checkNoErrs $ mapM (pickParent p) rbnds_with_parents }
   where
+    -- Extract the selector name of a field update if it is unambiguous
     isUnambiguous :: LHsRecUpdField Name -> Maybe (LHsRecUpdField Name, Name)
     isUnambiguous x = case unLoc (hsRecFieldLbl (unLoc x)) of
                         Unambiguous _ sel_name -> Just (x, sel_name)
                         Ambiguous{}            -> Nothing
 
-    lookupSelectors :: [(LHsRecUpdField Name, Name)] -> TcM [LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name)]
-    lookupSelectors = mapM look
-      where
-        look :: (LHsRecUpdField Name, Name) -> TcM (LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name))
-        look (L l x, n) = do i <- tcLookupId n
-                             let L loc af = hsRecFieldLbl x
-                                 lbl      = rdrNameAmbiguousFieldOcc af
-                             return $ L l x { hsRecFieldLbl = L loc (Unambiguous lbl i) }
+    -- Look up the possible parents and selector GREs for each field
+    getUpdFieldsParents :: TcM [(LHsRecUpdField Name
+                                , [(RecSelParent, GlobalRdrElt)])]
+    getUpdFieldsParents
+      = fmap (zip rbnds) $ mapM
+          (lookupParents . unLoc . hsRecUpdFieldRdr . unLoc)
+          rbnds
 
-    -- Extract the outermost TyCon of a type, if there is one; for
-    -- data families this is the representation tycon (because that's
-    -- where the fields live).
-    tyConOf fam_inst_envs ty = case tcSplitTyConApp_maybe ty of
-                                 Just (tc, tys) -> Just (fstOf3 (tcLookupDataFamInst fam_inst_envs tc tys))
-                                 Nothing        -> Nothing
+    -- Given a the lists of possible parents for each field,
+    -- identify a single parent
+    identifyParent :: FamInstEnvs -> [[RecSelParent]] -> TcM RecSelParent
+    identifyParent fam_inst_envs possible_parents
+      = case foldr1 intersect possible_parents of
+        -- No parents for all fields: record update is ill-typed
+        []  -> failWithTc (noPossibleParents rbnds)
+        -- Exactly one datatype with all the fields: use that
+        [p] -> return p
+        -- Multiple possible parents: try harder to disambiguate
+        -- Can we get a parent TyCon from the pushed-in type?
+        _:_ | Just p <- tyConOf fam_inst_envs res_ty -> return (RecSelData p)
+        -- Does the expression being updated have a type signature?
+        -- If so, try to extract a parent TyCon from it
+            | Just sig_ty <- obviousSig (unLoc record_expr)
+            -> do { sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
+                  ; case tyConOf fam_inst_envs sig_tc_ty of
+                      Just p  -> return (RecSelData p)
+                      Nothing -> failWithTc badOverloadedUpdate }
+        -- Nothing else we can try...
+        _ -> failWithTc badOverloadedUpdate
 
-    -- Calculate the list of possible parent tycons, by taking the
-    -- intersection of the possibilities for each field.
-    possibleParents :: [[(RecSelParent, a)]] -> [RecSelParent]
-    possibleParents = foldr1 intersect . map (map fst)
-
-    -- Look up the parent tycon for each candidate record selector.
-    getParents :: LHsRecUpdField Name -> RnM [(RecSelParent, GlobalRdrElt)]
-    getParents (L _ fld) = do
-         { env <- getGlobalRdrEnv
-         ; let gres = lookupGRE_RdrName (unLoc (hsRecUpdFieldRdr fld)) env
-         ; mapM lookupParent gres }
-
-    lookupParent :: GlobalRdrElt -> RnM (RecSelParent, GlobalRdrElt)
-    lookupParent gre = do { id <- tcLookupId (gre_name gre)
-                          ; ASSERT(isRecordSelector id)
-                            return (recordSelectorTyCon id, gre) }
-
-    -- Make all the fields unambiguous by choosing the given parent.
-    -- Fails with an error if any of the ambiguous fields cannot have
-    -- that parent, e.g. if the user writes
+    -- Make a field unambiguous by choosing the given parent.
+    -- Emits an error if the field cannot have that parent,
+    -- e.g. if the user writes
     --     r { x = e } :: T
     -- where T does not have field x.
-    assignParent :: RecSelParent -> [(LHsRecUpdField Name, [(RecSelParent, GlobalRdrElt)])]
-                 -> RnM [LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name)]
-    assignParent p rbnds
-      | null orphans = do rbnds'' <- mapM f rbnds'
-                          lookupSelectors rbnds''
-      | otherwise    = failWithTc (orphanFields p orphans)
-      where
-        (orphans, rbnds') = partitionWith pickParent rbnds
+    pickParent :: RecSelParent
+               -> (LHsRecUpdField Name, [(RecSelParent, GlobalRdrElt)])
+               -> TcM (LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name))
+    pickParent p (upd, xs)
+      = case lookup p xs of
+                      -- Phew! The parent is valid for this field.
+                      -- Previously ambiguous fields must be marked as
+                      -- used now that we know which one is meant, but
+                      -- unambiguous ones shouldn't be recorded again
+                      -- (giving duplicate deprecation warnings).
+          Just gre -> do { unless (null (tail xs)) $ do
+                             let L loc _ = hsRecFieldLbl (unLoc upd)
+                             setSrcSpan loc $ addUsedGRE True gre
+                         ; lookupSelector (upd, gre_name gre) }
+                      -- The field doesn't belong to this parent, so report
+                      -- an error but keep going through all the fields
+          Nothing  -> do { addErrTc (fieldNotInType p
+                                      (unLoc (hsRecUpdFieldRdr (unLoc upd))))
+                         ; lookupSelector (upd, gre_name (snd (head xs))) }
 
-        -- Previously ambiguous fields must be marked as used now that
-        -- we know which one is meant, but unambiguous ones shouldn't
-        -- be recorded again (giving duplicate deprecation warnings).
-        f (fld, gre, was_unambiguous)
-            = do { unless was_unambiguous $ do
-                   setSrcSpan (getLoc fld) $ addUsedGRE True gre
-                 ; return (fld, gre_name gre) }
+    -- Given a (field update, selector name) pair, look up the
+    -- selector to give a field update with an unambiguous Id
+    lookupSelector :: (LHsRecUpdField Name, Name)
+                   -> TcM (LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name))
+    lookupSelector (L l upd, n)
+      = do { i <- tcLookupId n
+           ; let L loc af = hsRecFieldLbl upd
+                 lbl      = rdrNameAmbiguousFieldOcc af
+           ; return $ L l upd { hsRecFieldLbl = L loc (Unambiguous lbl i) } }
 
-        -- Returns Right if fld can have parent p, or Left lbl if not.
-        pickParent :: (LHsRecUpdField Name, [(RecSelParent, GlobalRdrElt)])
-                   -> Either (Located RdrName) (LHsRecUpdField Name, GlobalRdrElt, Bool)
-        pickParent (fld, xs)
-            = case lookup p xs of
-                  Just gre -> Right (fld, gre, null (tail xs))
-                  Nothing  -> Left  (hsRecUpdFieldRdr (unLoc fld))
 
-    -- A type signature on the record expression must be "obvious",
-    -- i.e. the outermost constructor ignoring parentheses.
-    obviousSig :: HsExpr Name -> Maybe (LHsType Name)
-    obviousSig (ExprWithTySig _ ty _) = Just ty
-    obviousSig (HsPar p)              = obviousSig (unLoc p)
-    obviousSig _                      = Nothing
+-- Extract the outermost TyCon of a type, if there is one; for
+-- data families this is the representation tycon (because that's
+-- where the fields live).
+tyConOf :: FamInstEnvs -> Type -> Maybe TyCon
+tyConOf fam_inst_envs ty = case tcSplitTyConApp_maybe ty of
+  Just (tc, tys) -> Just (fstOf3 (tcLookupDataFamInst fam_inst_envs tc tys))
+  Nothing        -> Nothing
+
+-- For an ambiguous record field, find all the candidate record
+-- selectors (as GlobalRdrElts) and their parents.
+lookupParents :: RdrName -> RnM [(RecSelParent, GlobalRdrElt)]
+lookupParents rdr
+  = do { env <- getGlobalRdrEnv
+       ; let gres = lookupGRE_RdrName rdr env
+       ; mapM lookupParent gres }
+  where
+    lookupParent :: GlobalRdrElt -> RnM (RecSelParent, GlobalRdrElt)
+    lookupParent gre = do { id <- tcLookupId (gre_name gre)
+                          ; if isRecordSelector id
+                              then return (recordSelectorTyCon id, gre)
+                              else failWithTc (notSelector (gre_name gre)) }
+
+-- A type signature on the argument of an ambiguous record selector or
+-- the record expression in an update must be "obvious", i.e. the
+-- outermost constructor ignoring parentheses.
+obviousSig :: HsExpr Name -> Maybe (LHsType Name)
+obviousSig (ExprWithTySig _ ty _) = Just ty
+obviousSig (HsPar p)              = obviousSig (unLoc p)
+obviousSig _                      = Nothing
 
 
 {-
@@ -1886,8 +1984,6 @@ noPossibleParents rbinds
 badOverloadedUpdate :: SDoc
 badOverloadedUpdate = ptext (sLit "Record update is ambiguous, and requires a type signature")
 
-orphanFields :: RecSelParent -> [Located RdrName] -> SDoc
-orphanFields p flds
-  = hang (ptext (sLit "Type") <+> ppr p <+>
-             ptext (sLit "does not have field") <> plural flds <> colon)
-       2 (pprQuotedList flds)
+fieldNotInType :: RecSelParent -> RdrName -> SDoc
+fieldNotInType p rdr
+  = unknownSubordinateErr (ptext (sLit "field of type") <+> quotes (ppr p)) rdr

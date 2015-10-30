@@ -94,7 +94,8 @@ rnUnboundVar v
                 ; return (HsVar n, emptyFVs) } }
 
 rnExpr (HsVar v)
-  = do { mb_name <- lookupOccRn_overloaded False v
+  = do { opt_DuplicateRecordFields <- xoptM Opt_DuplicateRecordFields
+       ; mb_name <- lookupOccRn_overloaded opt_DuplicateRecordFields v
        ; case mb_name of {
            Nothing -> rnUnboundVar v ;
            Just (Left name)
@@ -104,9 +105,11 @@ rnExpr (HsVar v)
 
               | otherwise
               -> finishHsVar name ;
-           Just (Right (f:fs)) -> ASSERT( null fs )
-                                  return (HsSingleRecFld f, unitFV (selectorFieldOcc f)) ;
-           Just (Right [])                 -> error "runExpr/HsVar" } }
+           Just (Right [f])        -> return (HsRecFld (ambiguousFieldOcc f)
+                                             , unitFV (selectorFieldOcc f)) ;
+           Just (Right fs@(_:_:_)) -> return (HsRecFld (Ambiguous v PlaceHolder)
+                                             , mkFVs (map selectorFieldOcc fs));
+           Just (Right [])         -> error "runExpr/HsVar" } }
 
 rnExpr (HsIPVar v)
   = return (HsIPVar v, emptyFVs)

@@ -324,6 +324,8 @@ data HsRecField' id arg = HsRecField {
 -- The typechecker will determine the particular selector:
 --
 --     hsRecFieldLbl = Unambiguous "x" $sel:x:MkS  :: AmbiguousFieldOcc Id
+--
+-- See also Note [Disambiguating record fields] in TcExpr.
 
 hsRecFields :: HsRecFields id arg -> [PostRn id id]
 hsRecFields rbinds = map (unLoc . hsRecFieldSel . unLoc) (rec_flds rbinds)

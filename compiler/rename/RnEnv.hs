@@ -16,6 +16,7 @@ module RnEnv (
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
         lookupOccRn_overloaded, lookupGlobalOccRn_overloaded,
         reportUnboundName, unknownNameSuggestions,
+        addNameClashErrRn,
 
         HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn,
         lookupSigCtxtOccRn,

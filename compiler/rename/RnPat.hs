@@ -672,7 +672,7 @@ rnHsRecUpdFields flds
       = do { let lbl = rdrNameAmbiguousFieldOcc f
            ; sel <- setSrcSpan loc $
                       -- Defer renaming of overloaded fields to the typechecker
-                      -- See Note [Disambiguating record updates] in TcExpr
+                      -- See Note [Disambiguating record fields] in TcExpr
                       if overload_ok
                           then do { mb <- lookupGlobalOccRn_overloaded overload_ok lbl
                                   ; case mb of

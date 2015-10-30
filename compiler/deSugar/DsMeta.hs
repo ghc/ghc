@@ -1073,6 +1073,10 @@ repE (HsVar x)            =
                                ; return (MkC e') } }
 repE e@(HsIPVar _) = notHandled "Implicit parameters" (ppr e)
 
+repE e@(HsRecFld f) = case f of
+  Unambiguous _ x -> repE (HsVar x)
+  Ambiguous{}     -> notHandled "Ambiguous record selectors" (ppr e)
+
         -- Remember, we're desugaring renamer output here, so
         -- HsOverlit can definitely occur
 repE (HsOverLit l) = do { a <- repOverloadedLiteral l; repLit a }
@@ -1241,7 +1245,7 @@ repUpdFields = repList fieldExpQTyConName rep_fld
       Unambiguous _ sel_name -> do { fn <- lookupLOcc (L l sel_name)
                                    ; e  <- repLE (hsRecFieldArg fld)
                                    ; repFieldExp fn e }
-      _                      -> notHandled "ambiguous record updates" (ppr fld)
+      _                      -> notHandled "Ambiguous record updates" (ppr fld)
 
 
 

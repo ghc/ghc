@@ -711,7 +711,7 @@ dsExpr (EViewPat      {})  = panic "dsExpr:EViewPat"
 dsExpr (ELazyPat      {})  = panic "dsExpr:ELazyPat"
 dsExpr (HsType        {})  = panic "dsExpr:HsType"
 dsExpr (HsDo          {})  = panic "dsExpr:HsDo"
-dsExpr (HsSingleRecFld{})  = panic "dsExpr: HsSingleRecFld"
+dsExpr (HsRecFld      {})  = panic "dsExpr:HsRecFld"
 
 
 findField :: [LHsRecField Id arg] -> Name -> [arg]

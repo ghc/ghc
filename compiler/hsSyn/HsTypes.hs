@@ -587,7 +587,8 @@ mkFieldOcc rdr = FieldOcc rdr PlaceHolder
 -- (for unambiguous occurrences) or the typechecker (for ambiguous
 -- occurrences).
 --
--- See Note [HsRecField and HsRecUpdField] in HsPat
+-- See Note [HsRecField and HsRecUpdField] in HsPat and
+-- Note [Disambiguating record fields] in TcExpr.
 data AmbiguousFieldOcc name
   = Unambiguous RdrName (PostRn name name)
   | Ambiguous   RdrName (PostTc name name)
@@ -615,7 +616,7 @@ unambiguousFieldOcc :: AmbiguousFieldOcc Id -> FieldOcc Id
 unambiguousFieldOcc (Unambiguous rdr sel) = FieldOcc rdr sel
 unambiguousFieldOcc (Ambiguous   rdr sel) = FieldOcc rdr sel
 
-ambiguousFieldOcc :: FieldOcc Id -> AmbiguousFieldOcc Id
+ambiguousFieldOcc :: FieldOcc name -> AmbiguousFieldOcc name
 ambiguousFieldOcc (FieldOcc rdr sel) = Unambiguous rdr sel
 
 {-

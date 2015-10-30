@@ -10,3 +10,5 @@ x' = I.x
 
 -- But this is okay
 f e = e { I.x = True, I.y = False }
+
+main = return ()

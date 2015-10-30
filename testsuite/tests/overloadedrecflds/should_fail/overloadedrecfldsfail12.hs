@@ -9,4 +9,7 @@ data S = MkS { foo :: Bool }
 f :: T -> T
 f e = e { foo = 3, bar = 3 }
 
+s :: T -> Int
+s = foo
+
 main = return ()
