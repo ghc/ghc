@@ -359,22 +359,34 @@ STATIC_INLINE GNUC_ATTR_HOT void
 scavenge_thunk_srt(const StgInfoTable *info)
 {
     StgThunkInfoTable *thunk_info;
+    nat bitmap;
 
     if (!major_gc) return;
 
     thunk_info = itbl_to_thunk_itbl(info);
-    scavenge_srt((StgClosure **)GET_SRT(thunk_info), thunk_info->i.srt_bitmap);
+    bitmap = thunk_info->i.srt_bitmap;
+    if (bitmap) {
+        // don't read srt_offset if bitmap==0, because it doesn't exist
+        // and so the memory might not be readable.
+        scavenge_srt((StgClosure **)GET_SRT(thunk_info), bitmap);
+    }
 }
 
 STATIC_INLINE GNUC_ATTR_HOT void
 scavenge_fun_srt(const StgInfoTable *info)
 {
     StgFunInfoTable *fun_info;
+    nat bitmap;
 
     if (!major_gc) return;
 
     fun_info = itbl_to_fun_itbl(info);
-    scavenge_srt((StgClosure **)GET_FUN_SRT(fun_info), fun_info->i.srt_bitmap);
+    bitmap = fun_info->i.srt_bitmap;
+    if (bitmap) {
+        // don't read srt_offset if bitmap==0, because it doesn't exist
+        // and so the memory might not be readable.
+        scavenge_srt((StgClosure **)GET_FUN_SRT(fun_info), bitmap);
+    }
 }
 
 /* -----------------------------------------------------------------------------
