@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 
 T5300.hs:11:7: error:
     Could not deduce (C1 a b c0)
@@ -25,22 +24,3 @@ T5300.hs:14:7: error:
     In the type signature:
       f2 :: (Monad m, C1 a1 b1 c1, C2 a2 b2 c2) =>
             a1 -> StateT (T b2) m a2
-=======
-
-T5300.hs:14:7: error:
-    Could not deduce (C2 a2 b2 c20)
-    from the context: (Monad m, C1 a1 b1 c1, C2 a2 b2 c2)
-      bound by the type signature for:
-                 f2 :: (Monad m, C1 a1 b1 c1, C2 a2 b2 c2) =>
-                       a1 -> StateT (T b2) m a2
-      at T5300.hs:14:7-69
-    The type variable ‘c20’ is ambiguous
-    In the ambiguity check for the type signature for ‘f2’:
-      f2 :: forall a1 b2 (m :: * -> *) a2 b1 c1 c2.
-            (Monad m, C1 a1 b1 c1, C2 a2 b2 c2) =>
-            a1 -> StateT (T b2) m a2
-    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
-    In the type signature for ‘f2’:
-      f2 :: (Monad m, C1 a1 b1 c1, C2 a2 b2 c2) =>
-            a1 -> StateT (T b2) m a2
->>>>>>> origin/master
