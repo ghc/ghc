@@ -31,10 +31,10 @@ SRC_CC_WARNING_OPTS += -Wno-unknown-pragmas
 endif
 
 SRC_CC_OPTS     += $(WERROR) -Wall
-SRC_HC_OPTS     += $(WERROR) -Wall
-
+SRC_HC_OPTS     += -Wall
 GhcStage1HcOpts += -fwarn-tabs
-GhcStage2HcOpts += -fwarn-tabs
+GhcStage2HcOpts += -fwarn-tabs $(WERROR)
+GhcLibHcOpts    += $(WERROR)
 
 utils/hpc_dist-install_EXTRA_HC_OPTS += -fwarn-tabs
 
