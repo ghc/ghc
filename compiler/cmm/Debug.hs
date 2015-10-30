@@ -48,6 +48,8 @@ data DebugBlock =
   , dblLabel      :: !Label        -- ^ Hoopl label
   , dblCLabel     :: !CLabel       -- ^ Output label
   , dblHasInfoTbl :: !Bool         -- ^ Has an info table?
+  , dblParent     :: !(Maybe DebugBlock)
+    -- ^ The parent of this proc. See Note [Splitting DebugBlocks]
   , dblTicks      :: ![CmmTickish] -- ^ Ticks defined in this block
   , dblSourceTick
             :: !(Maybe CmmTickish) -- ^ Best source tick covering block
@@ -158,6 +160,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
                                    | g_entry graph == label -> entryLbl
                                    | otherwise              -> blockLbl label
                              , dblHasInfoTbl   = isJust info
+                             , dblParent       = Nothing
                              , dblTicks        = ticks
                              , dblPosition     = Nothing -- see cmmDebugLink
                              , dblUnwind       = unwind

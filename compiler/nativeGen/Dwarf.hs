@@ -122,18 +122,52 @@ compileUnitFooter unitU =
   in ppr cuEndLabel <> colon
 
 -- | Splits the blocks by procedures. In the result all nested blocks
--- will come from the same procedure as the top-level block.
+-- will come from the same procedure as the top-level block. See
+-- Note [Splitting DebugBlocks] for details.
 debugSplitProcs :: [DebugBlock] -> [DebugBlock]
-debugSplitProcs b = concat $ H.mapElems $ mergeMaps $ map split b
+debugSplitProcs b = concat $ H.mapElems $ mergeMaps $ map (split Nothing) b
   where mergeMaps = foldr (H.mapUnionWithKey (const (++))) H.mapEmpty
-        split :: DebugBlock -> H.LabelMap [DebugBlock]
-        split blk = H.mapInsert prc [blk {dblBlocks = own_blks}] nested
+        split :: Maybe DebugBlock -> DebugBlock -> H.LabelMap [DebugBlock]
+        split parent blk = H.mapInsert prc [blk'] nested
           where prc = dblProcedure blk
+                blk' = blk { dblBlocks = own_blks
+                           , dblParent = parent
+                           }
                 own_blks = fromMaybe [] $ H.mapLookup prc nested
-                nested = mergeMaps $ map split $ dblBlocks blk
-        -- Note that we are rebuilding the tree here, so tick scopes
-        -- might change. We could fix that - but we actually only care
-        -- about dblSourceTick in the result, so this is okay.
+                nested = mergeMaps $ map (split parent') $ dblBlocks blk
+                -- Figure out who should be the parent of nested blocks.
+                -- If @blk@ is optimized out then it isn't a good choice
+                -- and we just use its parent.
+                parent'
+                  | Nothing <- dblPosition blk = parent
+                  | otherwise                  = Just blk
+
+{-
+Note [Splitting DebugBlocks]
+
+DWARF requires that we break up the the nested DebugBlocks produced from
+the C-- AST. For instance, we begin with tick trees containing nested procs.
+For example,
+
+    proc A [tick1, tick2]
+      block B [tick3]
+        proc C [tick4]
+
+when producing DWARF we need to procs (which are represented in DWARF as
+TAG_subprogram DIEs) to be top-level DIEs. debugSplitProcs is responsible for
+this transform, pulling out the nested procs into top-level procs.
+
+However, in doing this we need to be careful to preserve the parentage of the
+nested procs. This is the reason DebugBlocks carry the dblParent field, allowing
+us to reorganize the above tree as,
+
+    proc A [tick1, tick2]
+      block B [tick3]
+    proc C [tick4] parent=B
+
+Here we have annotated the new proc C with an attribute giving its original
+parent, B.
+-}
 
 -- | Generate DWARF info for a procedure debug block
 procToDwarf :: DynFlags -> DebugBlock -> DwarfInfo
