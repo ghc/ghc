@@ -184,11 +184,12 @@ test('T5205',
      [stats_num_field('bytes allocated',
                       [(wordsize(32), 47088, 5),
                     # expected value: 47088 (x86/Darwin)
-                       (wordsize(64), 50648, 7)]),
+                       (wordsize(64), 56208, 7)]),
                     # expected value: 51320 (amd64/Linux)
                     # 2014-07-17:     52600 (amd64/Linux) general round of updates
                     # 2015-04-03: Widen 5->7% (amd64/Windows was doing better)
                     # 2015-08-15: 50648 (Windows too good. avg of Windows&Linux)
+                    # 2015-10-30: 56208 (D757: Emit Typeable at definition site)
       only_ways(['normal', 'optasm'])
       ],
      compile_and_run,
@@ -409,9 +410,10 @@ test('InlineCloneArrayAlloc',
 test('T9203',
      [stats_num_field('bytes allocated',
                       [ (wordsize(32), 50000000, 5)
-                      , (wordsize(64), 94547280, 5) ]),
+                      , (wordsize(64), 95451192, 5) ]),
                       # was            95747304
                       # 2019-09-10     94547280 post-AMP cleanup
+                      # 2015-10-28     95451192 emit Typeable at definition site
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])

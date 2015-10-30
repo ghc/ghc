@@ -25,7 +25,7 @@ import CoreUtils        ( exprIsDupable, exprIsExpandable, exprType,
 import CoreFVs          ( CoreExprWithFVs, freeVars, freeVarsOf, idRuleAndUnfoldingVars )
 import Id               ( isOneShotBndr, idType )
 import Var
-import Type             ( Type, isUnLiftedType, splitFunTy, applyTy )
+import Type             ( Type, isUnLiftedType, isFunTy, splitFunTy, applyTy )
 import VarSet
 import Util
 import UniqFM
@@ -168,7 +168,7 @@ fiExpr dflags to_drop ann_expr@(_,AnnApp {})
       = ((applyTy fun_ty ty, extra_fvs), emptyVarSet)
 
     mk_arg_fvs (fun_ty, extra_fvs) (arg_fvs, ann_arg)
-      | noFloatIntoRhs ann_arg arg_ty
+      | ASSERT( isFunTy fun_ty ) noFloatIntoRhs ann_arg arg_ty
       = ((res_ty, extra_fvs `unionVarSet` arg_fvs), emptyVarSet)
       | otherwise
       = ((res_ty, extra_fvs), arg_fvs)

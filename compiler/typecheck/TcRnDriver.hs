@@ -68,6 +68,7 @@ import TcMType
 import MkIface
 import TcSimplify
 import TcTyClsDecls
+import TcTypeable( mkModIdBindings )
 import LoadIface
 import TidyPgm    ( mkBootModDetailsTc )
 import RnNames
@@ -460,8 +461,14 @@ tcRnSrcDecls :: Bool  -- False => no 'module M(..) where' header at all
         -- Returns the variables free in the decls
         -- Reason: solely to report unused imports and bindings
 tcRnSrcDecls explicit_mod_hdr exports decls
- = do {         -- Do all the declarations
-        ((tcg_env, tcl_env), lie) <- captureConstraints $
+ = do { -- Create a binding for $trModule
+        -- Do this before processing any data type declarations,
+        -- which need tcg_tr_module to be initialised
+      ; tcg_env <- mkModIdBindings
+
+                -- Do all the declarations
+      ; ((tcg_env, tcl_env), lie) <- setGblEnv tcg_env  $
+                                     captureConstraints $
               do { (tcg_env, tcl_env) <- tc_rn_src_decls decls ;
                  ; tcg_env <- setEnvs (tcg_env, tcl_env) $
                               checkMain explicit_mod_hdr
@@ -961,12 +968,13 @@ checkBootTyCon tc1 tc2
   | Just fam_flav1 <- famTyConFlav_maybe tc1
   , Just fam_flav2 <- famTyConFlav_maybe tc2
   = ASSERT(tc1 == tc2)
-    let eqFamFlav OpenSynFamilyTyCon OpenSynFamilyTyCon = True
+    let eqFamFlav OpenSynFamilyTyCon   OpenSynFamilyTyCon = True
+        eqFamFlav (DataFamilyTyCon {}) (DataFamilyTyCon {}) = True
         eqFamFlav AbstractClosedSynFamilyTyCon (ClosedSynFamilyTyCon {}) = True
         eqFamFlav (ClosedSynFamilyTyCon {}) AbstractClosedSynFamilyTyCon = True
         eqFamFlav (ClosedSynFamilyTyCon ax1) (ClosedSynFamilyTyCon ax2)
             = eqClosedFamilyAx ax1 ax2
-        eqFamFlav (BuiltInSynFamTyCon _) (BuiltInSynFamTyCon _) = tc1 == tc2
+        eqFamFlav (BuiltInSynFamTyCon {}) (BuiltInSynFamTyCon {}) = tc1 == tc2
         eqFamFlav _ _ = False
         injInfo1 = familyTyConInjectivityInfo tc1
         injInfo2 = familyTyConInjectivityInfo tc2
@@ -998,7 +1006,6 @@ checkBootTyCon tc1 tc2
                           (text "The natures of the declarations for" <+>
                            quotes (ppr tc) <+> text "are different")
       | otherwise = checkSuccess
-    eqAlgRhs _  DataFamilyTyCon{} DataFamilyTyCon{} = checkSuccess
     eqAlgRhs _  tc1@DataTyCon{} tc2@DataTyCon{} =
         checkListBy eqCon (data_cons tc1) (data_cons tc2) (text "constructors")
     eqAlgRhs _  tc1@NewTyCon{} tc2@NewTyCon{} =
@@ -2055,7 +2062,7 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
                         tcg_rules     = rules,
                         tcg_vects     = vects,
                         tcg_imports   = imports })
-  = vcat [ ppr_types insts type_env
+  = vcat [ ppr_types type_env
          , ppr_tycons fam_insts type_env
          , ppr_insts insts
          , ppr_fam_insts fam_insts
@@ -2072,20 +2079,19 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
                   `thenCmp`
           (is_boot1 `compare` is_boot2)
 
-ppr_types :: [ClsInst] -> TypeEnv -> SDoc
-ppr_types insts type_env
+ppr_types :: TypeEnv -> SDoc
+ppr_types type_env
   = text "TYPE SIGNATURES" $$ nest 2 (ppr_sigs ids)
   where
-    dfun_ids = map instanceDFunId insts
     ids = [id | id <- typeEnvIds type_env, want_sig id]
-    want_sig id | opt_PprStyle_Debug = True
-                | otherwise          = isLocalId id &&
-                                       isExternalName (idName id) &&
-                                       not (id `elem` dfun_ids)
-        -- isLocalId ignores data constructors, records selectors etc.
-        -- The isExternalName ignores local dictionary and method bindings
-        -- that the type checker has invented.  Top-level user-defined things
-        -- have External names.
+    want_sig id | opt_PprStyle_Debug
+                = True
+                | otherwise
+                = isExternalName (idName id) &&
+                  (case idDetails id of { VanillaId -> True; _ -> False })
+        -- Looking for VanillaId ignores data constructors, records selectors etc.
+        -- The isExternalName ignores local evidence bindings that the type checker
+        -- has invented.  Top-level user-defined things have External names.
 
 ppr_tycons :: [FamInst] -> TypeEnv -> SDoc
 ppr_tycons fam_insts type_env

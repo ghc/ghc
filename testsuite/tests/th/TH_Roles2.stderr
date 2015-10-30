@@ -9,4 +9,12 @@ Dependent packages: [array-0.5.1.0, base-4.8.2.0, deepseq-1.4.1.1,
                      pretty-1.1.2.0, template-haskell-2.11.0.0]
 
 ==================== Typechecker ====================
+TH_Roles2.$tcT
+  = TyCon
+      6325001754388382679##
+      4656387726417942748##
+      TH_Roles2.$trModule
+      (TrNameS "T"#)
+TH_Roles2.$trModule
+  = Module (TrNameS "main"#) (TrNameS "TH_Roles2"#)
 

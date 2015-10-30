@@ -5,9 +5,9 @@ overloadedlistsfail01.hs:5:8: error:
     Probable fix: use a type annotation to specify what ‘a0’ should be.
     These potential instances exist:
       instance [safe] Show Version -- Defined in ‘Data.Version’
+      instance Show Module -- Defined in ‘GHC.Show’
       instance Show Ordering -- Defined in ‘GHC.Show’
-      instance Show Integer -- Defined in ‘GHC.Show’
-      ...plus 23 others
+      ...plus 26 others
       (use -fprint-potential-instances to see them all)
     In the expression: print [1]
     In an equation for ‘main’: main = print [1]

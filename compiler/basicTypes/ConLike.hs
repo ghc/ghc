@@ -32,7 +32,7 @@ import Unique
 import Util
 import Name
 import BasicTypes
-import {-# SOURCE #-} TypeRep (Type, ThetaType)
+import TypeRep (Type, ThetaType)
 import Var
 import Type (mkTyConApp)
 

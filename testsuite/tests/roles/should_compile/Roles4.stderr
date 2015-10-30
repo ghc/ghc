@@ -15,4 +15,17 @@ Dependent packages: [base-4.8.2.0, ghc-prim-0.4.0.0,
                      integer-gmp-1.0.0.0]
 
 ==================== Typechecker ====================
+Roles4.$tcC3
+  = TyCon
+      16502190608089501863##
+      13971441568961069854##
+      Roles4.$trModule
+      (TrNameS "C3"#)
+Roles4.$tcC1
+  = TyCon
+      11951908835899020229##
+      6518430686554778113##
+      Roles4.$trModule
+      (TrNameS "C1"#)
+Roles4.$trModule = Module (TrNameS "main"#) (TrNameS "Roles4"#)
 
