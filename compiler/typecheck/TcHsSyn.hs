@@ -45,7 +45,6 @@ import TysWiredIn
 import Type
 import ConLike
 import DataCon
-import PatSyn( patSynInstResTy )
 import Name
 import NameSet
 import Var
@@ -99,9 +98,6 @@ hsPatType (NPlusKPat id _ _ _)        = idType (unLoc id)
 hsPatType (CoPat _ _ ty)              = ty
 hsPatType p                           = pprPanic "hsPatType" (ppr p)
 
-conLikeResTy :: ConLike -> [Type] -> Type
-conLikeResTy (RealDataCon con) tys = mkTyConApp (dataConTyCon con) tys
-conLikeResTy (PatSynCon ps)    tys = patSynInstResTy ps tys
 
 hsLitType :: HsLit -> TcType
 hsLitType (HsChar _ _)       = charTy
@@ -302,8 +298,8 @@ zonkTopLExpr :: LHsExpr TcId -> TcM (LHsExpr Id)
 zonkTopLExpr e = zonkLExpr emptyZonkEnv e
 
 zonkTopDecls :: Bag EvBind
-             -> LHsBinds TcId 
-             -> Maybe (Located [LIE RdrName]) 
+             -> LHsBinds TcId
+             -> Maybe (Located [LIE RdrName])
              -> NameSet
              -> [LRuleDecl TcId] -> [LVectDecl TcId] -> [LTcSpecPrag] -> [LForeignDecl TcId]
              -> TcM ([Id],
@@ -713,12 +709,14 @@ zonkExpr env (RecordCon data_con con_expr rbinds)
         ; new_rbinds   <- zonkRecFields env rbinds
         ; return (RecordCon data_con new_con_expr new_rbinds) }
 
-zonkExpr env (RecordUpd expr rbinds cons in_tys out_tys)
+zonkExpr env (RecordUpd expr rbinds cons in_tys out_tys req_wrap)
   = do  { new_expr    <- zonkLExpr env expr
         ; new_in_tys  <- mapM (zonkTcTypeToType env) in_tys
         ; new_out_tys <- mapM (zonkTcTypeToType env) out_tys
         ; new_rbinds  <- zonkRecUpdFields env rbinds
-        ; return (RecordUpd new_expr new_rbinds cons new_in_tys new_out_tys) }
+        ; (_, new_recwrap) <- zonkCoFn env req_wrap
+        ; return (RecordUpd new_expr new_rbinds cons new_in_tys new_out_tys
+                              new_recwrap) }
 
 zonkExpr env (ExprWithTySigOut e ty)
   = do { e' <- zonkLExpr env e
@@ -1509,7 +1507,7 @@ zonkCoToCo env co
                                    do { (env', tv') <- zonkTyBndrX env tv
                                       ; co' <- zonkCoToCo env' co
                                       ; return (mkForAllCo tv' co') }
-                                   
+
 zonkTvCollecting :: TcRef TyVarSet -> UnboundTyVarZonker
 -- This variant collects unbound type variables in a mutable variable
 -- Works on both types and kinds

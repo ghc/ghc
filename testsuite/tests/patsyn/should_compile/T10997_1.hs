@@ -1,6 +1,6 @@
-module T10997 where
+module T10997_1 where
 
-import T10997a
+import T10997_1a
 
 {- With ghc-7.10.2:
 

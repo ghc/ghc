@@ -89,16 +89,17 @@ $$($1_$2_$3_LIB0) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS
 	$$(call build-dll,$1,$2,$3,,$$($1_$2_dll0_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS),$$($1_$2_$3_LIB0))
 endif
 
-else
-
+else # ifneq "$$(HostOS_CPP)" "mingw32"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) $$($1_$2_$3_GHC_LD_OPTS) $$($1_$2_$3_ALL_OBJS) \
          -shared -dynamic -dynload deploy \
 	 $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES)) $$(addprefix -L,$$($1_$2_EXTRA_LIBDIRS)) \
          -no-auto-link-packages \
          -o $$@
-endif
-else
+endif # "$$(HostOS_CPP)" "mingw32"
+
+else # ifneq "$3" "dyn"
+
 # Build the ordinary .a library
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS)
 	$$(call removeFiles,$$@ $$@.contents)
@@ -123,7 +124,7 @@ $$($1_$2_$3_LIB0) :
 endif
 endif
 
-endif
+endif # "$3" "dyn"
 
 $(call all-target,$1_$2,all_$1_$2_$3)
 $(call all-target,$1_$2_$3,$$($1_$2_$3_LIB))
@@ -155,12 +156,12 @@ ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
 ifneq "$4" "0"
 $(call all-target,$1_$2,$$($1_$2_GHCI_LIB))
 endif
-endif
-endif
-endif
+endif # "$$($1_$2_BUILD_GHCI_LIB)" "YES"
+endif # "$3" "v"
+endif # "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
 
 $(call profEnd, build-package-way($1,$2,$3))
-endef
+endef # build-package-way
 
 # $1 = dir
 # $2 = distdir

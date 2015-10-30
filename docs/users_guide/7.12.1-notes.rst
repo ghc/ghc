@@ -102,6 +102,12 @@ Compiler
    ``-fcpr-off`` is now removed, run with ``-fno-cpr-anal`` to get the
    old ``-fcpr-off`` behaviour.
 
+-  Added the option ``-fworker-wrapper``. When enabled, the worker-wrapper
+   transformation is performed after a strictness analysis pass. It is implied
+   by ``-O`` and by ``-fstrictness``. It is disabled by ``-fno-strictness``.
+   Enabling ``-fworker-wrapper`` while strictness analysis is disabled (by
+   ``-fno-strictness``) has no effect.
+
 GHCi
 ~~~~
 

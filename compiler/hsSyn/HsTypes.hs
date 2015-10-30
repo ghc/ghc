@@ -821,16 +821,16 @@ mkHsAppTys fun_ty (arg_ty:arg_tys)
 
 splitLHsPatSynTy :: LHsType name
                  -> ( [LHsTyVarBndr name]
-                    , LHsContext name        -- Provided
                     , LHsContext name        -- Required
-                    , LHsType name)         -- Body
+                    , LHsContext name        -- Provided
+                    , LHsType name)          -- Body
 splitLHsPatSynTy ty
-  | L _ (HsQualTy { hst_ctxt = prov, hst_body = ty2 }) <- ty1
-  , L _ (HsQualTy { hst_ctxt = req,  hst_body = ty3 }) <- ty2
-  = (tvs, prov, req, ty3)
+  | L _ (HsQualTy { hst_ctxt = req, hst_body = ty2 }) <- ty1
+  , L _ (HsQualTy { hst_ctxt = prov,  hst_body = ty3 }) <- ty2
+  = (tvs, req, prov, ty3)
 
-  | L _ (HsQualTy { hst_ctxt = prov, hst_body = ty2 }) <- ty1
-  = (tvs, prov, noLoc [], ty2)
+  | L _ (HsQualTy { hst_ctxt = req, hst_body = ty2 }) <- ty1
+  = (tvs, req, noLoc [], ty2)
 
   | otherwise
   = (tvs, noLoc [], noLoc [], ty1)

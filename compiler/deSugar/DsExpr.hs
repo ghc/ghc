@@ -57,6 +57,7 @@ import Util
 import Bag
 import Outputable
 import FastString
+import PatSyn
 
 import IfaceEnv
 import IdInfo
@@ -492,7 +493,7 @@ We also handle @C{}@ as valid construction syntax for an unlabelled
 constructor @C@, setting all of @C@'s fields to bottom.
 -}
 
-dsExpr (RecordCon (L _ data_con_id) con_expr rbinds) = do
+dsExpr (RecordCon (L _ con_like_id) con_expr rbinds) = do
     con_expr' <- dsExpr con_expr
     let
         (arg_tys, _) = tcSplitFunTys (exprType con_expr')
@@ -506,7 +507,7 @@ dsExpr (RecordCon (L _ data_con_id) con_expr rbinds) = do
               []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (ppr (flLabel fl))
         unlabelled_bottom arg_ty = mkErrorAppDs rEC_CON_ERROR_ID arg_ty Outputable.empty
 
-        labels = dataConFieldLabels (idDataCon data_con_id)
+        labels = conLikeFieldLabels (idConLike con_like_id)
         -- The data_con_id is guaranteed to be the wrapper id of the constructor
 
     con_args <- if null labels
@@ -551,7 +552,7 @@ So we need to cast (T a Int) to (T a b).  Sigh.
 -}
 
 dsExpr expr@(RecordUpd record_expr fields
-                       cons_to_upd in_inst_tys out_inst_tys)
+                        cons_to_upd in_inst_tys out_inst_tys dict_req_wrap )
   | null fields
   = dsLExpr record_expr
   | otherwise
@@ -591,26 +592,37 @@ dsExpr expr@(RecordUpd record_expr fields
 
         -- Awkwardly, for families, the match goes
         -- from instance type to family type
-    tycon     = dataConTyCon (head cons_to_upd)
-    in_ty     = mkTyConApp tycon in_inst_tys
-    out_ty    = mkFamilyTyConApp tycon out_inst_tys
-
+    (in_ty, out_ty) =
+      case (head cons_to_upd) of
+        RealDataCon data_con ->
+          let tycon = dataConTyCon data_con in
+          (mkTyConApp tycon in_inst_tys, mkFamilyTyConApp tycon out_inst_tys)
+        PatSynCon pat_syn ->
+          (patSynInstResTy pat_syn in_inst_tys
+          , patSynInstResTy pat_syn out_inst_tys)
     mk_alt upd_fld_env con
       = do { let (univ_tvs, ex_tvs, eq_spec,
-                  theta, arg_tys, _) = dataConFullSig con
+                  prov_theta, _req_theta, arg_tys, _) = conLikeFullSig con
                  subst = mkTopTvSubst (univ_tvs `zip` in_inst_tys)
 
                 -- I'm not bothering to clone the ex_tvs
            ; eqs_vars   <- mapM newPredVarDs (substTheta subst (eqSpecPreds eq_spec))
-           ; theta_vars <- mapM newPredVarDs (substTheta subst theta)
+           ; theta_vars <- mapM newPredVarDs (substTheta subst prov_theta)
            ; arg_ids    <- newSysLocalsDs (substTys subst arg_tys)
-           ; let val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
-                                         (dataConFieldLabels con) arg_ids
+           ; let field_labels = conLikeFieldLabels con
+                 val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
+                                         field_labels arg_ids
                  mk_val_arg fl pat_arg_id
                      = nlHsVar (lookupNameEnv upd_fld_env (flSelector fl) `orElse` pat_arg_id)
-                 inst_con = noLoc $ HsWrap wrap (HsVar (dataConWrapId con))
+                 -- SAFE: the typechecker will complain if the synonym is
+                 -- not bidirectional
+                 wrap_id = expectJust "dsExpr:mk_alt" (conLikeWrapId_maybe con)
+                 inst_con = noLoc $ HsWrap wrap (HsVar wrap_id)
                         -- Reconstruct with the WrapId so that unpacking happens
-                 wrap = mkWpEvVarApps theta_vars          <.>
+                 -- The order here is because of the order in `TcPatSyn`.
+                 wrap =
+                        dict_req_wrap <.>
+                        mkWpEvVarApps theta_vars          <.>
                         mkWpTyApps    (mkTyVarTys ex_tvs) <.>
                         mkWpTyApps [ty | (tv, ty) <- univ_tvs `zip` out_inst_tys
                                        , not (tv `elemVarEnv` wrap_subst) ]
@@ -618,24 +630,39 @@ dsExpr expr@(RecordUpd record_expr fields
 
                         -- Tediously wrap the application in a cast
                         -- Note [Update for GADTs]
-                 wrap_co = mkTcTyConAppCo Nominal tycon
-                                [ lookup tv ty | (tv,ty) <- univ_tvs `zip` out_inst_tys ]
-                 lookup univ_tv ty = case lookupVarEnv wrap_subst univ_tv of
-                                        Just co' -> co'
-                                        Nothing  -> mkTcReflCo Nominal ty
-                 wrap_subst = mkVarEnv [ (tv, mkTcSymCo (mkTcCoVarCo eq_var))
-                                       | ((tv,_),eq_var) <- eq_spec `zip` eqs_vars ]
+                 wrapped_rhs =
+                  case con of
+                    RealDataCon data_con ->
+                      let
+                        wrap_co =
+                          mkTcTyConAppCo Nominal
+                            (dataConTyCon data_con)
+                            [ lookup tv ty
+                              | (tv,ty) <- univ_tvs `zip` out_inst_tys ]
+                        lookup univ_tv ty =
+                          case lookupVarEnv wrap_subst univ_tv of
+                            Just co' -> co'
+                            Nothing  -> mkTcReflCo Nominal ty
+                        in if null eq_spec
+                             then rhs
+                             else mkLHsWrap (mkWpCast (mkTcSubCo wrap_co)) rhs
+                    -- eq_spec is always null for a PatSynCon
+                    PatSynCon _ -> rhs
 
-                 pat = noLoc $ ConPatOut { pat_con = noLoc (RealDataCon con)
+                 wrap_subst =
+                  mkVarEnv [ (tv, mkTcSymCo (mkTcCoVarCo eq_var))
+                           | ((tv,_),eq_var) <- eq_spec `zip` eqs_vars ]
+
+                 req_wrap = dict_req_wrap <.> mkWpTyApps in_inst_tys
+                 pat = noLoc $ ConPatOut { pat_con = noLoc con
                                          , pat_tvs = ex_tvs
                                          , pat_dicts = eqs_vars ++ theta_vars
                                          , pat_binds = emptyTcEvBinds
                                          , pat_args = PrefixCon $ map nlVarPat arg_ids
                                          , pat_arg_tys = in_inst_tys
-                                         , pat_wrap = idHsWrapper }
-           ; let wrapped_rhs | null eq_spec = rhs
-                             | otherwise    = mkLHsWrap (mkWpCast (mkTcSubCo wrap_co)) rhs
-           ; return (mkSimpleMatch [pat] wrapped_rhs) }
+                                         , pat_wrap = req_wrap }
+
+           ; return (mkSimpleMatch [pat] wrapped_rhs)  }
 
 -- Here is where we desugar the Template Haskell brackets and escapes
 

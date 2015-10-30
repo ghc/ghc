@@ -174,6 +174,22 @@ use `deriving' because we want {\em precise} control of ordering
 (equality on @Uniques@ is v common).
 -}
 
+-- Note [Unique Determinism]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The order of allocated @Uniques@ is not stable across rebuilds.
+-- The main reason for that is that typechecking interface files pulls
+-- @Uniques@ from @UniqSupply@ and the interface file for the module being
+-- currently compiled can, but doesn't have to exist.
+--
+-- It gets more complicated if you take into account that the interface
+-- files are loaded lazily and that building multiple files at once has to
+-- work for any subset of interface files present. When you add parallelism
+-- this makes @Uniques@ hopelessly random.
+--
+-- As such, to get deterministic builds, the order of the allocated
+-- @Uniques@ should not affect the final result.
+-- see also wiki/DeterministicBuilds
+
 eqUnique, ltUnique, leUnique :: Unique -> Unique -> Bool
 eqUnique (MkUnique u1) (MkUnique u2) = u1 == u2
 ltUnique (MkUnique u1) (MkUnique u2) = u1 <  u2

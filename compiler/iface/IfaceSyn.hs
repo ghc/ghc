@@ -154,7 +154,8 @@ data IfaceDecl
                   ifPatProvCtxt   :: IfaceContext,
                   ifPatReqCtxt    :: IfaceContext,
                   ifPatArgs       :: [IfaceType],
-                  ifPatTy         :: IfaceType }
+                  ifPatTy         :: IfaceType,
+                  ifFieldLabels   :: [FieldLabel] }
 
 
 data IfaceTyConParent
@@ -324,7 +325,7 @@ data IfaceUnfolding
 
 data IfaceIdDetails
   = IfVanillaId
-  | IfRecSelId IfaceTyCon Bool
+  | IfRecSelId (Either IfaceTyCon IfaceDecl) Bool
   | IfDFunId
 
 {-
@@ -772,8 +773,8 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name, ifPatBuilder = builder,
                               ifPatTy = pat_ty} )
   = pprPatSynSig name is_bidirectional
                  (pprUserIfaceForAll tvs)
-                 (pprIfaceContextMaybe prov_ctxt)
                  (pprIfaceContextMaybe req_ctxt)
+                 (pprIfaceContextMaybe prov_ctxt)
                  (pprIfaceType ty)
   where
     is_bidirectional = isJust builder
@@ -1156,7 +1157,8 @@ freeNamesIfDecl d@IfacePatSyn{} =
   freeNamesIfContext (ifPatProvCtxt d) &&&
   freeNamesIfContext (ifPatReqCtxt d) &&&
   fnList freeNamesIfType (ifPatArgs d) &&&
-  freeNamesIfType (ifPatTy d)
+  freeNamesIfType (ifPatTy d) &&&
+  mkNameSet (map flSelector (ifFieldLabels d))
 
 freeNamesIfAxBranch :: IfaceAxBranch -> NameSet
 freeNamesIfAxBranch (IfaceAxBranch { ifaxbTyVars = tyvars
@@ -1167,7 +1169,8 @@ freeNamesIfAxBranch (IfaceAxBranch { ifaxbTyVars = tyvars
   freeNamesIfType rhs
 
 freeNamesIfIdDetails :: IfaceIdDetails -> NameSet
-freeNamesIfIdDetails (IfRecSelId tc _) = freeNamesIfTc tc
+freeNamesIfIdDetails (IfRecSelId tc _) =
+  either freeNamesIfTc freeNamesIfDecl tc
 freeNamesIfIdDetails _                 = emptyNameSet
 
 -- All other changes are handled via the version info on the tycon
@@ -1444,7 +1447,7 @@ instance Binary IfaceDecl where
         put_ bh a3
         put_ bh a4
 
-    put_ bh (IfacePatSyn name a2 a3 a4 a5 a6 a7 a8 a9 a10) = do
+    put_ bh (IfacePatSyn name a2 a3 a4 a5 a6 a7 a8 a9 a10 a11) = do
         putByte bh 7
         put_ bh (occNameFS name)
         put_ bh a2
@@ -1456,6 +1459,7 @@ instance Binary IfaceDecl where
         put_ bh a8
         put_ bh a9
         put_ bh a10
+        put_ bh a11
 
     get bh = do
         h <- getByte bh
@@ -1521,8 +1525,9 @@ instance Binary IfaceDecl where
                     a8 <- get bh
                     a9 <- get bh
                     a10 <- get bh
+                    a11 <- get bh
                     occ <- return $! mkDataOccFS a1
-                    return (IfacePatSyn occ a2 a3 a4 a5 a6 a7 a8 a9 a10)
+                    return (IfacePatSyn occ a2 a3 a4 a5 a6 a7 a8 a9 a10 a11)
             _ -> panic (unwords ["Unknown IfaceDecl tag:", show h])
 
 instance Binary IfaceFamTyConFlav where

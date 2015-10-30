@@ -374,6 +374,7 @@ data GeneralFlag
    | Opt_DmdTxDictSel              -- use a special demand transformer for dictionary selectors
    | Opt_Loopification                  -- See Note [Self-recursive tail calls]
    | Opt_CprAnal
+   | Opt_WorkerWrapper
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -897,7 +898,14 @@ data DynFlags = DynFlags {
 
   -- | Only inline memset if it generates no more than this many
   -- pseudo (roughly: Cmm) instructions.
-  maxInlineMemsetInsns  :: Int
+  maxInlineMemsetInsns  :: Int,
+
+  -- | Reverse the order of error messages in GHC/GHCi
+  reverseErrors :: Bool,
+
+  -- | Unique supply configuration for testing build determinism
+  initialUnique         :: Int,
+  uniqueIncrement       :: Int
 }
 
 class HasDynFlags m where
@@ -1558,7 +1566,12 @@ defaultDynFlags mySettings =
 
         maxInlineAllocSize = 128,
         maxInlineMemcpyInsns = 32,
-        maxInlineMemsetInsns = 32
+        maxInlineMemsetInsns = 32,
+
+        initialUnique = 0,
+        uniqueIncrement = 1,
+
+        reverseErrors = False
       }
 
 defaultWays :: Settings -> [Way]
@@ -2397,6 +2410,10 @@ dynamic_flags = [
                                      deprecate "Use -fno-force-recomp instead"))
   , defGhcFlag "no-recomp" (NoArg (do setGeneralFlag Opt_ForceRecomp
                                       deprecate "Use -fforce-recomp instead"))
+  , defGhcFlag "freverse-errors"
+      (noArg (\d -> d {reverseErrors = True} ))
+  , defGhcFlag "fno-reverse-errors"
+      (noArg (\d -> d {reverseErrors = False} ))
 
         ------ HsCpp opts ---------------------------------------------------
   , defFlag "D"              (AnySuffix (upd . addOptP))
@@ -2625,6 +2642,11 @@ dynamic_flags = [
       (intSuffix (\n d -> d{ maxInlineMemcpyInsns = n }))
   , defGhcFlag "fmax-inline-memset-insns"
       (intSuffix (\n d -> d{ maxInlineMemsetInsns = n }))
+
+  , defGhcFlag "dinitial-unique"
+      (intSuffix (\n d -> d{ initialUnique = n }))
+  , defGhcFlag "dunique-increment"
+      (intSuffix (\n d -> d{ uniqueIncrement = n }))
 
         ------ Profiling ----------------------------------------------------
 
@@ -2995,7 +3017,8 @@ fFlags = [
   flagSpec "unbox-small-strict-fields"        Opt_UnboxSmallStrictFields,
   flagSpec "unbox-strict-fields"              Opt_UnboxStrictFields,
   flagSpec "vectorisation-avoidance"          Opt_VectorisationAvoidance,
-  flagSpec "vectorise"                        Opt_Vectorise
+  flagSpec "vectorise"                        Opt_Vectorise,
+  flagSpec "worker-wrapper"                   Opt_WorkerWrapper
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
@@ -3235,8 +3258,17 @@ default_PIC platform =
                                          -- information.
     _                      -> []
 
+-- General flags that are switched on/off when other general flags are switched
+-- on
 impliedGFlags :: [(GeneralFlag, TurnOnFlag, GeneralFlag)]
-impliedGFlags = [(Opt_DeferTypeErrors, turnOn, Opt_DeferTypedHoles)]
+impliedGFlags = [(Opt_DeferTypeErrors, turnOn, Opt_DeferTypedHoles)
+                ,(Opt_Strictness, turnOn, Opt_WorkerWrapper)
+                ]
+
+-- General flags that are switched on/off when other general flags are switched
+-- off
+impliedOffGFlags :: [(GeneralFlag, TurnOnFlag, GeneralFlag)]
+impliedOffGFlags = [(Opt_Strictness, turnOff, Opt_WorkerWrapper)]
 
 impliedXFlags :: [(ExtensionFlag, TurnOnFlag, ExtensionFlag)]
 impliedXFlags
@@ -3330,6 +3362,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_Strictness)
     , ([1,2],   Opt_UnboxSmallStrictFields)
     , ([1,2],   Opt_CprAnal)
+    , ([1,2],   Opt_WorkerWrapper)
 
     , ([2],     Opt_LiberateCase)
     , ([2],     Opt_SpecConstr)
@@ -3597,8 +3630,17 @@ setGeneralFlag' f dflags = foldr ($) (gopt_set dflags f) deps
         --     implies further flags
 
 unSetGeneralFlag' :: GeneralFlag -> DynFlags -> DynFlags
-unSetGeneralFlag' f dflags = gopt_unset dflags f
-   -- When you un-set f, however, we don't un-set the things it implies
+unSetGeneralFlag' f dflags = foldr ($) (gopt_unset dflags f) deps
+  where
+    deps = [ if turn_on then setGeneralFlag' d
+                        else unSetGeneralFlag' d
+           | (f', turn_on, d) <- impliedOffGFlags, f' == f ]
+   -- In general, when you un-set f, we don't un-set the things it implies.
+   -- There are however some exceptions, e.g., -fno-strictness implies
+   -- -fno-worker-wrapper.
+   --
+   -- NB: use unSetGeneralFlag' recursively, in case the implied off flags
+   --     imply further flags.
 
 --------------------------
 setWarningFlag, unSetWarningFlag :: WarningFlag -> DynP ()

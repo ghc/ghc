@@ -1,0 +1,5 @@
+
+records-poly-update.hs:11:14: error:
+    Couldn't match expected type ‘Bool’ with actual type ‘A’
+    In the ‘j’ field of a record
+    In the expression: p1 {j = A}

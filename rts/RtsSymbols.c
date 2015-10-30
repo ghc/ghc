@@ -47,93 +47,8 @@
       SymI_NeedsDataProto(nocldstop)
 #endif
 
-#if defined (cygwin32_HOST_OS)
-#define RTS_MINGW_ONLY_SYMBOLS /**/
-/* Don't have the ability to read import libs / archives, so
- * we have to stupidly list a lot of what libcygwin.a
- * exports; sigh.
- */
-#define RTS_CYGWIN_ONLY_SYMBOLS                          \
-      SymI_HasProto(regfree)                             \
-      SymI_HasProto(regexec)                             \
-      SymI_HasProto(regerror)                            \
-      SymI_HasProto(regcomp)                             \
-      SymI_HasProto(__errno)                             \
-      SymI_HasProto(access)                              \
-      SymI_HasProto(chmod)                               \
-      SymI_HasProto(chdir)                               \
-      SymI_HasProto(close)                               \
-      SymI_HasProto(creat)                               \
-      SymI_HasProto(dup)                                 \
-      SymI_HasProto(dup2)                                \
-      SymI_HasProto(fstat)                               \
-      SymI_HasProto(fcntl)                               \
-      SymI_HasProto(getcwd)                              \
-      SymI_HasProto(getenv)                              \
-      SymI_HasProto(lseek)                               \
-      SymI_HasProto(open)                                \
-      SymI_HasProto(fpathconf)                           \
-      SymI_HasProto(pathconf)                            \
-      SymI_HasProto(stat)                                \
-      SymI_HasProto(pow)                                 \
-      SymI_HasProto(tanh)                                \
-      SymI_HasProto(cosh)                                \
-      SymI_HasProto(sinh)                                \
-      SymI_HasProto(atan)                                \
-      SymI_HasProto(acos)                                \
-      SymI_HasProto(asin)                                \
-      SymI_HasProto(tan)                                 \
-      SymI_HasProto(cos)                                 \
-      SymI_HasProto(sin)                                 \
-      SymI_HasProto(exp)                                 \
-      SymI_HasProto(log)                                 \
-      SymI_HasProto(sqrt)                                \
-      SymI_HasProto(localtime_r)                         \
-      SymI_HasProto(gmtime_r)                            \
-      SymI_HasProto(mktime)                              \
-      SymI_NeedsProto(_imp___tzname)                     \
-      SymI_HasProto(gettimeofday)                        \
-      SymI_HasProto(timezone)                            \
-      SymI_HasProto(tcgetattr)                           \
-      SymI_HasProto(tcsetattr)                           \
-      SymI_HasProto(memcpy)                              \
-      SymI_HasProto(memmove)                             \
-      SymI_HasProto(realloc)                             \
-      SymI_HasProto(malloc)                              \
-      SymI_HasProto(free)                                \
-      SymI_HasProto(fork)                                \
-      SymI_HasProto(lstat)                               \
-      SymI_HasProto(isatty)                              \
-      SymI_HasProto(mkdir)                               \
-      SymI_HasProto(opendir)                             \
-      SymI_HasProto(readdir)                             \
-      SymI_HasProto(rewinddir)                           \
-      SymI_HasProto(closedir)                            \
-      SymI_HasProto(link)                                \
-      SymI_HasProto(mkfifo)                              \
-      SymI_HasProto(pipe)                                \
-      SymI_HasProto(read)                                \
-      SymI_HasProto(rename)                              \
-      SymI_HasProto(rmdir)                               \
-      SymI_HasProto(select)                              \
-      SymI_HasProto(system)                              \
-      SymI_HasProto(write)                               \
-      SymI_HasProto(strcmp)                              \
-      SymI_HasProto(strcpy)                              \
-      SymI_HasProto(strncpy)                             \
-      SymI_HasProto(strerror)                            \
-      SymI_HasProto(sigaddset)                           \
-      SymI_HasProto(sigemptyset)                         \
-      SymI_HasProto(sigprocmask)                         \
-      SymI_HasProto(umask)                               \
-      SymI_HasProto(uname)                               \
-      SymI_HasProto(unlink)                              \
-      SymI_HasProto(utime)                               \
-      SymI_HasProto(waitpid)
-
-#elif defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
 #define RTS_POSIX_ONLY_SYMBOLS  /**/
-#define RTS_CYGWIN_ONLY_SYMBOLS /**/
 
 #if HAVE_GETTIMEOFDAY
 #define RTS_MINGW_GETTIMEOFDAY_SYM SymI_NeedsProto(gettimeofday)
@@ -476,7 +391,6 @@
 
 #else
 #define RTS_MINGW_ONLY_SYMBOLS /**/
-#define RTS_CYGWIN_ONLY_SYMBOLS /**/
 #endif
 
 
@@ -1144,7 +1058,6 @@ RTS_SYMBOLS
 RTS_RET_SYMBOLS
 RTS_POSIX_ONLY_SYMBOLS
 RTS_MINGW_ONLY_SYMBOLS
-RTS_CYGWIN_ONLY_SYMBOLS
 RTS_DARWIN_ONLY_SYMBOLS
 RTS_LIBGCC_SYMBOLS
 RTS_LIBFFI_SYMBOLS
@@ -1182,7 +1095,6 @@ RtsSymbolVal rtsSyms[] = {
       RTS_RET_SYMBOLS
       RTS_POSIX_ONLY_SYMBOLS
       RTS_MINGW_ONLY_SYMBOLS
-      RTS_CYGWIN_ONLY_SYMBOLS
       RTS_DARWIN_ONLY_SYMBOLS
       RTS_LIBGCC_SYMBOLS
       RTS_LIBFFI_SYMBOLS

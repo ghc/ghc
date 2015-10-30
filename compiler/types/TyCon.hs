@@ -17,7 +17,7 @@ module TyCon(
         FamTyConFlav(..), Role(..), Injectivity(..),
 
         -- ** Field labels
-        tyConFieldLabels, tyConFieldLabelEnv, tyConDataConsWithFields,
+        tyConFieldLabels, tyConFieldLabelEnv,
 
         -- ** Constructing TyCons
         mkAlgTyCon,
@@ -1034,11 +1034,6 @@ tyConFieldLabelEnv tc
   | isAlgTyCon tc = algTcFields tc
   | otherwise     = emptyFsEnv
 
--- | The DataCons from this TyCon that have *all* the given fields
-tyConDataConsWithFields :: TyCon -> [FieldLabelString] -> [DataCon]
-tyConDataConsWithFields tc lbls = filter has_flds (tyConDataCons tc)
-  where has_flds dc = all (has_fld dc) lbls
-        has_fld dc lbl = any (\ fl -> flLabel fl == lbl) (dataConFieldLabels dc)
 
 -- | Make a map from strings to FieldLabels from all the data
 -- constructors of this algebraic tycon

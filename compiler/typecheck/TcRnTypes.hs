@@ -152,7 +152,6 @@ import ListSetOps
 import FastString
 import GHC.Fingerprint
 
-import Data.Set (Set)
 import Control.Monad (ap, liftM)
 
 #ifdef GHCI
@@ -407,9 +406,8 @@ data TcGblEnv
           -- things bound in this module. Also store Safe Haskell info
           -- here about transative trusted packaage requirements.
 
-        tcg_dus :: DefUses,   -- ^ What is defined in this module and what is used.
-        tcg_used_rdrnames :: TcRef (Set RdrName),
-        tcg_used_selectors :: TcRef (Set (FieldOcc Name)),
+        tcg_dus       :: DefUses,   -- ^ What is defined in this module and what is used.
+        tcg_used_gres :: TcRef [GlobalRdrElt],  -- ^ Records occurrences of imported entities
           -- See Note [Tracking unused binding and imports]
 
         tcg_keep :: TcRef NameSet,
@@ -592,10 +590,10 @@ data SelfBootInfo
   -- We need this info to compute a safe approximation to
   -- recursive loops, to avoid infinite inlinings
 
-{-
-Note [Tracking unused binding and imports]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We gather three sorts of usage information
+{- Note [Tracking unused binding and imports]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We gather two sorts of usage information
+
  * tcg_dus (defs/uses)
       Records *defined* Names (local, top-level)
           and *used*    Names (local or imported)
@@ -607,19 +605,15 @@ We gather three sorts of usage information
    This usage info is mainly gathered by the renamer's
    gathering of free-variables
 
- * tcg_used_rdrnames
-      Records used *imported* (not locally-defined) RdrNames
+ * tcg_used_gres
       Used only to report unused import declarations
-      Notice that they are RdrNames, not Names, so we can
-      tell whether the reference was qualified or unqualified, which
-      is esssential in deciding whether a particular import decl
-      is unnecessary.  This info isn't present in Names.
 
- * tcg_used_selectors
-      Records the record selectors that are used
-      by the DuplicateRecordFields extension.  These
-      may otherwise be missed from tcg_used_rdrnames as a
-      single RdrName might refer to multiple fields.
+      Records each *occurrence* an *imported* (not locally-defined) entity.
+      The occurrence is recorded by keeping a GlobalRdrElt for it.
+      These is not the GRE that is in the GlobalRdrEnv; rather it
+      is recorded *after* the filtering done by pickGREs.  So it reflect
+      /how that occurrence is in scope/.   See Note [GRE filtering] in
+      RdrName.
 
 
 ************************************************************************

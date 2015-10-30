@@ -106,7 +106,7 @@ on this convention in the User's Guide,
     ~~~~~~~~~~~~~~
 
     Header level 4
-    ^^^^^^^^^^^^^^^
+    ^^^^^^^^^^^^^^
 
 
 Formatting code

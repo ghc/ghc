@@ -429,3 +429,35 @@ Checking for consistency
        single: -dcmm-lint
 
     Ditto for C-- level.
+
+.. _checking-determinism:
+
+Checking for determinism
+------------------------
+
+.. index::
+   single: deterministic builds
+
+``-dinitial-unique=⟨s⟩``
+    .. index::
+       single: -dinitial-unique
+
+    Start ``UniqSupply`` allocation from ⟨s⟩.
+
+``-dunique-increment=⟨i⟩``
+    .. index::
+       single: -dunique-increment
+
+    Set the increment for the generated ``Unique``'s to ⟨i⟩.
+
+    This is useful in combination with ``-dinitial-unique`` to test if the
+    generated files depend on the order of ``Unique``'s.
+
+    Some interesting values:
+
+    * ``-dinitial-unique=0 -dunique-increment=1`` - current sequential
+      ``UniqSupply``
+    * ``-dinitial-unique=16777215 -dunique-increment=-1`` - ``UniqSupply`` that
+      generates in decreasing order
+    * ``-dinitial-unique=1 -dunique-increment=PRIME`` - where PRIME big enough
+      to overflow often - nonsequential order

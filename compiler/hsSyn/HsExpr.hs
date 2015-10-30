@@ -29,7 +29,7 @@ import CoreSyn
 import Var
 import Name
 import BasicTypes
-import DataCon
+import ConLike
 import SrcLoc
 import Util
 import StaticFlags( opt_PprStyle_Debug )
@@ -295,12 +295,15 @@ data HsExpr id
                 [LHsRecUpdField id]
 --              (HsMatchGroup Id)  -- Filled in by the type checker to be
 --                                 -- a match that does the job
-                (PostTc id [DataCon])
+                (PostTc id [ConLike])
                 -- Filled in by the type checker to the
                 -- _non-empty_ list of DataCons that have
                 -- all the upd'd fields
                 (PostTc id [Type])  -- Argument types of *input* record type
                 (PostTc id [Type])  --              and  *output* record type
+                                   -- The original type can be reconstructed
+                                   -- with conLikeResTy
+                (PostTc id HsWrapper) -- See note [Record Update HsWrapper]
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon
 
@@ -555,6 +558,32 @@ whereas that would not be possible using a all to a polymorphic function
 (because you can't call a polymorphic function at an unboxed type).
 
 So we use Nothing to mean "use the old built-in typing rule".
+
+Note [Record Update HsWrapper]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There is a wrapper in RecordUpd which is used for the *required* constraints for
+pattern synonyms. This wrapper is created in the typechecking and is then
+directly used in the desugaring without modification.
+
+For example, if we have the record pattern synonym P,
+
+```
+pattern P :: (Show a) => a -> Maybe a
+pattern P{x} = Just x
+
+foo = (Just True) { x = False }
+```
+
+then `foo` desugars to something like
+
+```
+P x = P False
+```
+
+hence we need to provide the correct dictionaries to P on the RHS so that we can
+build the expression.
+
 -}
 
 instance OutputableBndr id => Outputable (HsExpr id) where
@@ -698,7 +727,7 @@ ppr_expr (ExplicitPArr _ exprs)
 ppr_expr (RecordCon con_id _ rbinds)
   = hang (ppr con_id) 2 (ppr rbinds)
 
-ppr_expr (RecordUpd aexp rbinds _ _ _)
+ppr_expr (RecordUpd aexp rbinds _ _ _ _)
   = hang (pprLExpr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
 
 ppr_expr (ExprWithTySig expr sig)

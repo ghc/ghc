@@ -1,3 +1,6 @@
+
+-include mk/are-validating.mk
+
 ifeq "$(Validating)" "YES"
 include mk/flavours/validate.mk
 -include mk/validate.mk

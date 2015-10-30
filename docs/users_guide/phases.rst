@@ -340,6 +340,22 @@ defined by your local GHC installation, the following trick is useful:
     architecture, where⟨arch⟩ is the name of the current architecture
     (eg. ``i386``, ``x86_64``, ``powerpc``, ``sparc``, etc.).
 
+``VERSION_pkgname``
+    This macro is available starting GHC 8.0.  It is defined for every
+    exposed package, but only if the ``-hide-all-packages`` flag
+    is set.  This macro expands to a string recording the
+    version of ``pkgname`` that is exposed for module import.
+    It is identical in behavior to the ``VERSION_pkgname`` macros
+    that Cabal defines.
+
+``MIN_VERSION_pkgname(x,y,z)``
+    This macro is available starting GHC 8.0.  It is defined for every
+    exposed package, but only if the ``-hide-all-packages`` flag
+    is set. This macro is provided for convenience to write CPP
+    conditionals testing if a package version is ``x.y.z`` or
+    less.  It is identical in behavior to the ``MIN_VERSION_pkgname``
+    macros that Cabal defines.
+
 .. _cpp-string-gaps:
 
 CPP and string gaps

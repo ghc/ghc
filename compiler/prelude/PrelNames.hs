@@ -1849,7 +1849,7 @@ during type checking.
 
         -- Just a place holder for  unbound variables  produced by the renamer:
 unboundKey :: Unique
-unboundKey                    = mkPreludeMiscIdUnique 160
+unboundKey                    = mkPreludeMiscIdUnique 158
 
 fromIntegerClassOpKey, minusClassOpKey, fromRationalClassOpKey,
     enumFromClassOpKey, enumFromThenClassOpKey, enumFromToClassOpKey,

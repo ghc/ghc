@@ -11,7 +11,7 @@ static void ctors2(void)        { printf("ctors2\n");       fflush(stdout); }
 static void modInitFunc1(void)  { printf("modInitFunc1\n"); fflush(stdout); }
 static void modInitFunc2(void)  { printf("modInitFunc2\n"); fflush(stdout); }
 
-#if defined(cygwin32_HOST_OS) || defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
 
 static void (*ctors[2])(void) __attribute__((
             section(".ctors"),

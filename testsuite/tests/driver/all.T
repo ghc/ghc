@@ -456,3 +456,6 @@ test('T365',
 
 test('T9360a', normal, run_command, ['{compiler} --interactive -e ""'])
 test('T9360b', normal, run_command, ['{compiler} -e "" --interactive'])
+
+test('T10970', normal, compile_and_run, ['-hide-all-packages -package base -package containers'])
+test('T10970a', normal, compile_and_run, [''])

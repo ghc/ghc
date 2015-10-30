@@ -693,7 +693,7 @@ tcPatSynPat :: PatEnv -> Located Name -> PatSyn
             -> HsConPatDetails Name -> TcM a
             -> TcM (Pat TcId, a)
 tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
-  = do  { let (univ_tvs, ex_tvs, prov_theta, req_theta, arg_tys, ty) = patSynSig pat_syn
+  = do  { let (univ_tvs, req_theta, ex_tvs, prov_theta, arg_tys, ty) = patSynSig pat_syn
 
         ; (subst, univ_tvs') <- tcInstTyVars univ_tvs
 
@@ -880,9 +880,9 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
            [] -> failWith (badFieldCon con_like lbl)
 
                 -- The normal case, when the field comes from the right constructor
-           (pat_ty : extras) ->
-                ASSERT( null extras )
-                return pat_ty
+           (pat_ty : extras) -> do
+                traceTc "find_field" (ppr pat_ty <+> ppr extras)
+                ASSERT( null extras ) (return pat_ty)
 
     field_tys :: [(FieldLabel, TcType)]
     field_tys = zip (conLikeFieldLabels con_like) arg_tys

@@ -591,8 +591,16 @@ def runTest (opts, name, func, args):
 # name  :: String
 # setup :: TestOpts -> IO ()
 def test (name, setup, func, args):
-    if config.only and name not in config.only:
-        return
+    if config.run_only_some_tests:
+        if name not in config.only:
+            return
+        else:
+            # Note [Mutating config.only]
+            # config.only is initiallly the set of tests requested by
+            # the user (via 'make TEST='). We then remove all tests that
+            # we've already seen (in .T files), so that we can later
+            # report on any tests we couldn't find and error out.
+            config.only.remove(name)
 
     global aloneTests
     global parallelTests

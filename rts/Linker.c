@@ -58,22 +58,6 @@
 #include <dlfcn.h>
 #endif
 
-#if defined(cygwin32_HOST_OS)
-#ifdef HAVE_DIRENT_H
-#include <dirent.h>
-#endif
-
-#ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
-#endif
-#include <regex.h>
-#include <sys/fcntl.h>
-#include <sys/termios.h>
-#include <sys/utime.h>
-#include <sys/utsname.h>
-#include <sys/wait.h>
-#endif
-
 #if (defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS)) \
  || (!defined(powerpc_HOST_ARCH) && \
     (   defined(linux_HOST_OS)     || defined(freebsd_HOST_OS) || \
@@ -110,7 +94,7 @@
 #  define OBJFORMAT_ELF
 #  include <regex.h>    // regex is already used by dlopen() so this is OK
                         // to use here without requiring an additional lib
-#elif defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
+#elif defined (mingw32_HOST_OS)
 #  define OBJFORMAT_PEi386
 #  include <windows.h>
 #  include <shfolder.h> /* SHGetFolderPathW */
@@ -123,9 +107,6 @@
 #  include <mach-o/loader.h>
 #  include <mach-o/nlist.h>
 #  include <mach-o/reloc.h>
-#if !defined(HAVE_DLFCN_H)
-#  include <mach-o/dyld.h>
-#endif
 #if defined(powerpc_HOST_ARCH)
 #  include <mach-o/ppc/reloc.h>
 #endif
@@ -930,11 +911,8 @@ static void* lookupSymbol_ (char *lbl)
 #       if defined(OBJFORMAT_ELF)
         return internal_dlsym(lbl);
 #       elif defined(OBJFORMAT_MACHO)
-#       if HAVE_DLFCN_H
-        /* On OS X 10.3 and later, we use dlsym instead of the old legacy
-           interface.
 
-           HACK: On OS X, all symbols are prefixed with an underscore.
+        /* HACK: On OS X, all symbols are prefixed with an underscore.
                  However, dlsym wants us to omit the leading underscore from the
                  symbol name -- the dlsym routine puts it back on before searching
                  for the symbol. For now, we simply strip it off here (and ONLY
@@ -943,14 +921,6 @@ static void* lookupSymbol_ (char *lbl)
         IF_DEBUG(linker, debugBelch("lookupSymbol: looking up %s with dlsym\n", lbl));
         ASSERT(lbl[0] == '_');
         return internal_dlsym(lbl + 1);
-#       else
-        if (NSIsSymbolNameDefined(lbl)) {
-            NSSymbol symbol = NSLookupAndBindSymbol(lbl);
-            return NSAddressOfSymbol(symbol);
-        } else {
-            return NULL;
-        }
-#       endif /* HAVE_DLFCN_H */
 #       elif defined(OBJFORMAT_PEi386)
         void* sym;
 
@@ -1247,7 +1217,7 @@ static void m32_allocator_init(m32_allocator m32) {
  * You shouldn't have to use this method. Use `m32_free` instead.
  */
 static void m32_free_internal(void * addr) {
-   uint64_t c = __sync_sub_and_fetch((uint64_t*)addr, 1);
+   uintptr_t c = __sync_sub_and_fetch((uintptr_t*)addr, 1);
    if (c == 0) {
       munmapForLinker(addr, getPageSize());
    }

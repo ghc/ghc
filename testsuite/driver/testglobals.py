@@ -23,7 +23,8 @@ class TestConfig:
         self.rootdirs = []
 
         # Run these tests only (run all tests if empty)
-        self.only = []
+        self.run_only_some_tests = False
+        self.only = set()
 
         # Accept new output which differs from the sample?
         self.accept = 0

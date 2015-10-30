@@ -16,7 +16,9 @@ module PatSyn (
         patSynArgs, patSynType,
         patSynMatcher, patSynBuilder,
         patSynExTyVars, patSynSig,
-        patSynInstArgTys, patSynInstResTy,
+        patSynInstArgTys, patSynInstResTy, patSynFieldLabels,
+        patSynFieldType,
+
         tidyPatSynIds
     ) where
 
@@ -31,10 +33,12 @@ import Util
 import BasicTypes
 import FastString
 import Var
+import FieldLabel
 
 import qualified Data.Data as Data
 import qualified Data.Typeable
 import Data.Function
+import Data.List
 
 {-
 ************************************************************************
@@ -46,20 +50,30 @@ import Data.Function
 
 -- | A pattern synonym
 -- See Note [Pattern synonym representation]
+-- See Note [Patten synonym signatures]
 data PatSyn
   = MkPatSyn {
         psName        :: Name,
-        psUnique      :: Unique,      -- Cached from Name
+        psUnique      :: Unique,       -- Cached from Name
 
         psArgs        :: [Type],
-        psArity       :: Arity,       -- == length psArgs
-        psInfix       :: Bool,        -- True <=> declared infix
+        psArity       :: Arity,        -- == length psArgs
+        psInfix       :: Bool,         -- True <=> declared infix
+        psFieldLabels :: [FieldLabel], -- List of fields for a
+                                       -- record pattern synonym
+                                       -- INVARIANT: either empty if no
+                                       -- record pat syn or same length as
+                                       -- psArgs
 
-        psUnivTyVars  :: [TyVar],     -- Universially-quantified type variables
-        psReqTheta    :: ThetaType,   -- Required dictionaries
-        psExTyVars    :: [TyVar],     -- Existentially-quantified type vars
-        psProvTheta   :: ThetaType,   -- Provided dictionaries
-        psOrigResTy   :: Type,        -- Mentions only psUnivTyVars
+        psUnivTyVars  :: [TyVar],      -- Universially-quantified type variables
+        psReqTheta    :: ThetaType,    -- Required dictionaries
+                                       -- these constraints are very much like
+                                       -- stupid thetas (which is a useful
+                                       -- guideline when implementing)
+                                       -- but are actually needed.
+        psExTyVars    :: [TyVar],      -- Existentially-quantified type vars
+        psProvTheta   :: ThetaType,    -- Provided dictionaries
+        psOrigResTy   :: Type,         -- Mentions only psUnivTyVars
 
         -- See Note [Matchers and builders for pattern synonyms]
         psMatcher     :: (Id, Bool),
@@ -89,7 +103,44 @@ data PatSyn
   }
   deriving Data.Typeable.Typeable
 
-{-
+{- Note [Patten synonym signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a pattern synonym signature we write
+   pattern P :: req => prov => t1 -> ... tn -> res_ty
+
+Note that the "required" context comes first, then the "provided"
+context.  Moreover, the "required" context must not mention
+existentially-bound type variables; that is, ones not mentioned in
+res_ty.  See lots of discussion in Trac #10928.
+
+If there is no "provided" context, you can omit it; but you
+can't omit the "required" part (unless you omit both).
+
+Example 1:
+      pattern P1 :: (Num a, Eq a) => b -> Maybe (a,b)
+      pattern P1 x = Just (3,x)
+
+  We require (Num a, Eq a) to match the 3; there is no provided
+  context.
+
+Example 2:
+      data T2 where
+        MkT2 :: (Num a, Eq a) => a -> a -> T2
+
+      patttern P2 :: () => (Num a, Eq a) => a -> T2
+      pattern P2 x = MkT2 3 x
+
+  When we match against P2 we get a Num dictionary provided.
+  We can use that to check the match against 3.
+
+Example 3:
+      pattern P3 :: Eq a => a -> b -> T3 b
+
+   This signature is illegal because the (Eq a) is a required
+   constraint, but it mentions the existentially-bound variable 'a'.
+   You can see it's existential because it doesn't appear in the
+   result type (T3 b).
+
 Note [Pattern synonym representation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following pattern synonym declaration
@@ -244,13 +295,15 @@ mkPatSyn :: Name
          -> Type                 -- ^ Original result type
          -> (Id, Bool)           -- ^ Name of matcher
          -> Maybe (Id, Bool)     -- ^ Name of builder
+         -> [FieldLabel]         -- ^ Names of fields for
+                                 --   a record pattern synonym
          -> PatSyn
 mkPatSyn name declared_infix
          (univ_tvs, req_theta)
          (ex_tvs, prov_theta)
          orig_args
          orig_res_ty
-         matcher builder
+         matcher builder field_labels
     = MkPatSyn {psName = name, psUnique = getUnique name,
                 psUnivTyVars = univ_tvs, psExTyVars = ex_tvs,
                 psProvTheta = prov_theta, psReqTheta = req_theta,
@@ -259,7 +312,9 @@ mkPatSyn name declared_infix
                 psArity = length orig_args,
                 psOrigResTy = orig_res_ty,
                 psMatcher = matcher,
-                psBuilder = builder }
+                psBuilder = builder,
+                psFieldLabels = field_labels
+                }
 
 -- | The 'Name' of the 'PatSyn', giving it a unique, rooted identification
 patSynName :: PatSyn -> Name
@@ -267,6 +322,7 @@ patSynName = psName
 
 patSynType :: PatSyn -> Type
 -- The full pattern type, used only in error messages
+-- See Note [Patten synonym signatures]
 patSynType (MkPatSyn { psUnivTyVars = univ_tvs, psReqTheta = req_theta
                      , psExTyVars   = ex_tvs,   psProvTheta = prov_theta
                      , psArgs = orig_args, psOrigResTy = orig_res_ty })
@@ -285,14 +341,24 @@ patSynArity = psArity
 patSynArgs :: PatSyn -> [Type]
 patSynArgs = psArgs
 
+patSynFieldLabels :: PatSyn -> [FieldLabel]
+patSynFieldLabels = psFieldLabels
+
+-- | Extract the type for any given labelled field of the 'DataCon'
+patSynFieldType :: PatSyn -> FieldLabelString -> Type
+patSynFieldType ps label
+  = case find ((== label) . flLabel . fst) (psFieldLabels ps `zip` psArgs ps) of
+      Just (_, ty) -> ty
+      Nothing -> pprPanic "dataConFieldType" (ppr ps <+> ppr label)
+
 patSynExTyVars :: PatSyn -> [TyVar]
 patSynExTyVars = psExTyVars
 
-patSynSig :: PatSyn -> ([TyVar], [TyVar], ThetaType, ThetaType, [Type], Type)
+patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type)
 patSynSig (MkPatSyn { psUnivTyVars = univ_tvs, psExTyVars = ex_tvs
                     , psProvTheta = prov, psReqTheta = req
                     , psArgs = arg_tys, psOrigResTy = res_ty })
-  = (univ_tvs, ex_tvs, prov, req, arg_tys, res_ty)
+  = (univ_tvs, req, ex_tvs, prov, arg_tys, res_ty)
 
 patSynMatcher :: PatSyn -> (Id,Bool)
 patSynMatcher = psMatcher

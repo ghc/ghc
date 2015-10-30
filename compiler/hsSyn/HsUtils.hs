@@ -881,20 +881,27 @@ hsForeignDeclsBinders foreign_decls
   = [ L decl_loc n
     | L decl_loc (ForeignImport { fd_name = L _ n }) <- foreign_decls]
 
+
+
 -------------------
-hsPatSynBinders :: HsValBinds RdrName -> [Located RdrName]
+hsPatSynBinders :: HsValBinds RdrName
+                -> ([Located RdrName], [Located RdrName])
 -- Collect pattern-synonym binders only, not Ids
 -- See Note [SrcSpan for binders]
-hsPatSynBinders (ValBindsIn binds _) = foldrBag addPatSynBndr [] binds
+hsPatSynBinders (ValBindsIn binds _) = foldrBag addPatSynBndr ([],[]) binds
 hsPatSynBinders _ = panic "hsPatSynBinders"
 
-addPatSynBndr :: LHsBindLR idL idR -> [Located idL] -> [Located idL]
+addPatSynBndr :: LHsBindLR id id -> ([Located id], [Located id])
+                -> ([Located id], [Located id]) -- (selectors, other)
 -- See Note [SrcSpan for binders]
-addPatSynBndr bind pss
-  | L bind_loc (PatSynBind (PSB { psb_id = L _ n })) <- bind
-  = L bind_loc n : pss
+addPatSynBndr bind (sels, pss)
+  | L bind_loc (PatSynBind (PSB { psb_id = L _ n
+                                , psb_args = RecordPatSyn as })) <- bind
+  = (map recordPatSynSelectorId as ++ sels, L bind_loc n : pss)
+  | L bind_loc (PatSynBind (PSB { psb_id = L _ n})) <- bind
+  = (sels, L bind_loc n : pss)
   | otherwise
-  = pss
+  = (sels, pss)
 
 -------------------
 hsLInstDeclBinders :: LInstDecl name -> ([Located name], [LFieldOcc name])

@@ -198,9 +198,12 @@ buildPatSyn :: Name -> Bool
             -> ([TyVar], ThetaType) -- ^ Ex and prov
             -> [Type]               -- ^ Argument types
             -> Type                 -- ^ Result type
+            -> [FieldLabel]         -- ^ Field labels for
+                                    --   a record pattern synonym
             -> PatSyn
 buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
-            (univ_tvs, req_theta) (ex_tvs, prov_theta) arg_tys pat_ty
+            (univ_tvs, req_theta) (ex_tvs, prov_theta) arg_tys
+            pat_ty field_labels
   = ASSERT((and [ univ_tvs == univ_tvs'
                 , ex_tvs == ex_tvs'
                 , pat_ty `eqType` pat_ty'
@@ -211,7 +214,7 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
     mkPatSyn src_name declared_infix
              (univ_tvs, req_theta) (ex_tvs, prov_theta)
              arg_tys pat_ty
-             matcher builder
+             matcher builder field_labels
   where
     ((_:univ_tvs'), req_theta', tau) = tcSplitSigmaTy $ idType matcher_id
     ([pat_ty', cont_sigma, _], _) = tcSplitFunTys tau

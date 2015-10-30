@@ -532,6 +532,7 @@ mk/ghcconfig*_bin_ghc*.exe.mk
 /tests/driver/Hello062a.hs
 /tests/driver/Hello062b.hs
 /tests/driver/Hello062c.hs
+/tests/driver/T10970
 /tests/driver/T1959/E.hs
 /tests/driver/T1959/prog
 /tests/driver/T3007/A/Setup
@@ -631,8 +632,8 @@ mk/ghcconfig*_bin_ghc*.exe.mk
 /tests/driver/recomp013/C.hs
 /tests/driver/recomp014/A.hs
 /tests/driver/recomp014/A1.hs
-/tests/driver/recomp014/B.hsig
 /tests/driver/recomp014/B.hs-boot
+/tests/driver/recomp014/B.hsig
 /tests/driver/recomp014/C.hs
 /tests/driver/recomp014/recomp014
 /tests/driver/retc001/B.hs

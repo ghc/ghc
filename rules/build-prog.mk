@@ -283,7 +283,7 @@ $$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG_INPLACE) | $$$$(dir $$$$@)/.
 	$$(INSTALL) -m 755 $$< $$@
 endif
 
-endif # BINDIST=YES
+endif # BINDIST
 
 ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
 $(call all-target,$1_$2,$$($1_$2_INPLACE))

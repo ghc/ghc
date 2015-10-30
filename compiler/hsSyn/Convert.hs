@@ -7,6 +7,7 @@ This module converts Template Haskell syntax into HsSyn
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
                 convertToHsType,
@@ -34,6 +35,7 @@ import Lexeme
 import Util
 import FastString
 import Outputable
+--import TcEvidence
 
 import qualified Data.ByteString as BS
 import Control.Monad( unless, liftM, ap )
@@ -722,9 +724,11 @@ cvtl e = wrapL (cvt e)
                               ; flds' <- mapM (cvtFld mkFieldOcc) flds
                               ; return $ RecordCon c' noPostTcExpr (HsRecFields flds' Nothing)}
     cvt (RecUpdE e flds) = do { e' <- cvtl e
-                              ; flds' <- mapM (cvtFld mkAmbiguousFieldOcc) flds
-                              ; return $ RecordUpd e' flds'
-                                          PlaceHolder PlaceHolder PlaceHolder }
+                              ; flds'<- mapM (cvtFld mkAmbiguousFieldOcc) flds
+                              ; return $ RecordUpd e'
+                                          flds'
+                                          PlaceHolder PlaceHolder
+                                          PlaceHolder PlaceHolder }
     cvt (StaticE e)      = fmap HsStatic $ cvtl e
     cvt (UnboundVarE s)  = do { s' <- vName s; return $ HsVar s' }
 

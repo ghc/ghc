@@ -260,11 +260,13 @@ rnExpr (RecordCon con_id _ rec_binds@(HsRecFields { rec_dotdot = dd }))
                             ; return (L l (fld { hsRecFieldArg = arg' }), fvs) }
 
 
-rnExpr (RecordUpd expr rbinds _ _ _)
+rnExpr (RecordUpd expr rbinds _ _ _ _)
   = do  { (expr', fvExpr) <- rnLExpr expr
         ; (rbinds', fvRbinds) <- rnHsRecUpdFields rbinds
-        ; return (RecordUpd expr' rbinds' PlaceHolder PlaceHolder PlaceHolder,
-                  fvExpr `plusFV` fvRbinds) }
+        ; return (RecordUpd expr' rbinds'
+                            PlaceHolder PlaceHolder
+                            PlaceHolder PlaceHolder
+                 , fvExpr `plusFV` fvRbinds) }
 
 rnExpr (ExprWithTySig expr pty)
   = do  { (pty', fvTy)    <- rnHsSigWcType ExprWithTySigCtx pty

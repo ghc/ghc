@@ -830,16 +830,16 @@ it is assigned a *pattern type* of the form
 
 ::
 
-      pattern P :: CProv => CReq => t1 -> t2 -> ... -> tN -> t
+      pattern P :: CReq => CProf => t1 -> t2 -> ... -> tN -> t
 
 where ⟨CProv⟩ and ⟨CReq⟩ are type contexts, and ⟨t1⟩, ⟨t2⟩, ..., ⟨tN⟩
 and ⟨t⟩ are types. Notice the unusual form of the type, with two
 contexts ⟨CProv⟩ and ⟨CReq⟩:
 
--  ⟨CReq⟩ are the constraints *required* to match the pattern.
-
 -  ⟨CProv⟩ are the constraints *made available (provided)* by a
    successful pattern match.
+
+-  ⟨CReq⟩ are the constraints *required* to match the pattern.
 
 For example, consider
 
@@ -851,7 +851,7 @@ For example, consider
     f1 :: (Eq a, Num a) => T a -> String
     f1 (MkT 42 x) = show x
 
-    pattern ExNumPat :: (Show b) => (Num a, Eq a) => b -> T a
+    pattern ExNumPat :: (Num a, Eq a) => (Show b) => b -> T a
     pattern ExNumPat x = MkT 42 x
 
     f2 :: (Eq a, Num a) => T a -> String
@@ -871,7 +871,7 @@ Exactly the same reasoning applies to ``ExNumPat``: matching against
 
 Note also the following points
 
--  In the common case where ``CReq`` is empty, ``()``, it can be omitted
+-  In the common case where ``Prov`` is empty, ``()``, it can be omitted
    altogether.
 
 -  You may specify an explicit *pattern signature*, as we did for
@@ -892,14 +892,14 @@ Note also the following points
 
    ::
 
-         (CProv, CReq) => t1 -> t2 -> ... -> tN -> t
+         (CReq, CProv) => t1 -> t2 -> ... -> tN -> t
 
    So in the previous example, when used in an expression, ``ExNumPat``
    has type
 
    ::
 
-         ExNumPat :: (Show b, Num a, Eq a) => b -> T t
+         ExNumPat :: (Num a, Eq a, Show b) => b -> T t
 
    Notice that this is a tiny bit more restrictive than the expression
    ``MkT 42 x`` which would not require ``(Eq a)``.
@@ -911,8 +911,8 @@ Note also the following points
        data S a where
           S1 :: Bool -> S Bool
 
-       pattern P1 b = Just b  -- P1 ::             Bool -> Maybe Bool
-       pattern P2 b = S1 b    -- P2 :: (b~Bool) => Bool -> S b
+       pattern P1 b = Just b  -- P1 ::                   Bool -> Maybe Bool
+       pattern P2 b = S1 b    -- P2 :: () => (b~Bool) => Bool -> S b
 
        f :: Maybe a -> String
        f (P1 x) = "no no no"     -- Type-incorrect

@@ -44,6 +44,7 @@ import Outputable
 import SrcLoc
 import Util
 import Panic
+import UniqSupply
 import MonadUtils       ( liftIO )
 
 -- Imports for --abi-hash
@@ -236,6 +237,7 @@ main' postLoadMode dflags0 args flagWarnings = do
     printInfoForUser (dflags6 { pprCols = 200 })
                      (pkgQual dflags6) (pprModuleMap dflags6)
 
+  liftIO $ initUniqSupply (initialUnique dflags6) (uniqueIncrement dflags6)
         ---------------- Final sanity checking -----------
   liftIO $ checkOptions postLoadMode dflags6 srcs objs
 

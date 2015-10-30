@@ -1129,32 +1129,38 @@ role : VARID             { sL1 $1 $ Just $ getVARID $1 }
 -- Glasgow extension: pattern synonyms
 pattern_synonym_decl :: { LHsDecl RdrName }
         : 'pattern' pattern_synonym_lhs '=' pat
-         {%ams ( let (name, args) = $2
-                 in sLL $1 $> . ValD $ mkPatSynBind name args $4
+         {%      let (name, args,as ) = $2 in
+                 ams (sLL $1 $> . ValD $ mkPatSynBind name args $4
                                                     ImplicitBidirectional)
-               [mj AnnPattern $1,mj AnnEqual $3]
+               (as ++ [mj AnnPattern $1, mj AnnEqual $3])
          }
 
         | 'pattern' pattern_synonym_lhs '<-' pat
-         {%ams (let (name, args) = $2
-                in sLL $1 $> . ValD $ mkPatSynBind name args $4 Unidirectional)
-               [mj AnnPattern $1,mj AnnLarrow $3] }
+         {%    let (name, args, as) = $2 in
+               ams (sLL $1 $> . ValD $ mkPatSynBind name args $4 Unidirectional)
+               (as ++ [mj AnnPattern $1,mj AnnLarrow $3]) }
 
         | 'pattern' pattern_synonym_lhs '<-' pat where_decls
-            {% do { let (name, args) = $2
+            {% do { let (name, args, as) = $2
                   ; mg <- mkPatSynMatchGroup name (snd $ unLoc $5)
                   ; ams (sLL $1 $> . ValD $
                            mkPatSynBind name args $4 (ExplicitBidirectional mg))
-                        (mj AnnPattern $1:mj AnnLarrow $3:(fst $ unLoc $5))
+                       (as ++ ((mj AnnPattern $1:mj AnnLarrow $3:(fst $ unLoc $5))) )
                    }}
 
-pattern_synonym_lhs :: { (Located RdrName, HsPatSynDetails (Located RdrName)) }
-        : con vars0 { ($1, PrefixPatSyn $2) }
-        | varid conop varid { ($2, InfixPatSyn $1 $3) }
+pattern_synonym_lhs :: { (Located RdrName, HsPatSynDetails (Located RdrName), [AddAnn]) }
+        : con vars0 { ($1, PrefixPatSyn $2, []) }
+        | varid conop varid { ($2, InfixPatSyn $1 $3, []) }
+        | con '{' cvars1 '}' { ($1, RecordPatSyn $3, [moc $2, mcc $4] ) }
 
 vars0 :: { [Located RdrName] }
         : {- empty -}                 { [] }
         | varid vars0                 { $1 : $2 }
+
+cvars1 :: { [RecordPatSynField (Located RdrName)] }
+       : varid                        { [RecordPatSynField $1 $1] }
+       | varid ',' cvars1             {% addAnnotation (getLoc $1) AnnComma (getLoc $2) >>
+                                         return ((RecordPatSynField $1 $1) : $3 )}
 
 where_decls :: { Located ([AddAnn]
                          , Located (OrdList (LHsDecl RdrName))) }
@@ -2961,6 +2967,7 @@ qvarid :: { Located RdrName }
 -- Note that 'role' and 'family' get lexed separately regardless of
 -- the use of extensions. However, because they are listed here, this
 -- is OK and they can be used as normal varids.
+-- See Note [Lexing type pseudo-keywords] in Lexer.x
 varid :: { Located RdrName }
         : VARID            { sL1 $1 $! mkUnqual varName (getVARID $1) }
         | special_id       { sL1 $1 $! mkUnqual varName (unLoc $1) }

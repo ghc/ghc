@@ -54,11 +54,19 @@ import GHC.Show
 import GHC.Word
 
 -- | @'Time'@ is defined as a @'StgWord64'@ in @stg/Types.h@
+--
+-- @since 4.8.2.0
 type RtsTime = Word64
 
 -- | @'nat'@ defined in @rts/Types.h@
+--
+-- @since 4.8.2.0
 type RtsNat = #{type unsigned int}
 
+-- | Should we produce a summary of the garbage collector statistics after the
+-- program has exited?
+--
+-- @since 4.8.2.0
 data GiveGCStats
     = NoGCStats
     | CollectGCStats
@@ -81,6 +89,9 @@ instance Enum GiveGCStats where
     toEnum #{const VERBOSE_GC_STATS} = VerboseGCStats
     toEnum e = error ("invalid enum for GiveGCStats: " ++ show e)
 
+-- | Parameters of the garbage collector.
+--
+-- @since 4.8.0.0
 data GCFlags = GCFlags
     { statsFile             :: Maybe FilePath
     , giveStats             :: GiveGCStats
@@ -110,11 +121,17 @@ data GCFlags = GCFlags
     , allocLimitGrace       :: Word
     } deriving (Show)
 
+-- | Parameters concerning context switching
+--
+-- @since 4.8.0.0
 data ConcFlags = ConcFlags
     { ctxtSwitchTime  :: RtsTime
     , ctxtSwitchTicks :: Int
     } deriving (Show)
 
+-- | Miscellaneous parameters
+--
+-- @since 4.8.0.0
 data MiscFlags = MiscFlags
     { tickInterval          :: RtsTime
     , installSignalHandlers :: Bool
@@ -125,6 +142,8 @@ data MiscFlags = MiscFlags
 
 -- | Flags to control debugging output & extra checking in various
 -- subsystems.
+--
+-- @since 4.8.0.0
 data DebugFlags = DebugFlags
     { scheduler   :: Bool -- ^ 's'
     , interpreter :: Bool -- ^ 'i'
@@ -143,6 +162,9 @@ data DebugFlags = DebugFlags
     , sparks      :: Bool -- ^ 'r'
     } deriving (Show)
 
+-- | Should the RTS produce a cost-center summary?
+--
+-- @since 4.8.2.0
 data DoCostCentres
     = CostCentresNone
     | CostCentresSummary
@@ -165,12 +187,18 @@ instance Enum DoCostCentres where
     toEnum #{const COST_CENTRES_XML}     = CostCentresXML
     toEnum e = error ("invalid enum for DoCostCentres: " ++ show e)
 
+-- | Parameters pertaining to the cost-center profiler.
+--
+-- @since 4.8.0.0
 data CCFlags = CCFlags
     { doCostCentres :: DoCostCentres
     , profilerTicks :: Int
     , msecsPerTick  :: Int
     } deriving (Show)
 
+-- | What sort of heap profile are we collecting?
+--
+-- @since 4.8.2.0
 data DoHeapProfile
     = NoHeapProfiling
     | HeapByCCS
@@ -202,6 +230,9 @@ instance Enum DoHeapProfile where
     toEnum #{const HEAP_BY_CLOSURE_TYPE} = HeapByClosureType
     toEnum e = error ("invalid enum for DoHeapProfile: " ++ show e)
 
+-- | Parameters of the cost-center profiler
+--
+-- @since 4.8.0.0
 data ProfFlags = ProfFlags
     { doHeapProfile            :: DoHeapProfile
     , heapProfileInterval      :: RtsTime -- ^ time between samples
@@ -219,10 +250,13 @@ data ProfFlags = ProfFlags
     , bioSelector              :: Maybe String
     } deriving (Show)
 
+-- | Is event tracing enabled?
+--
+-- @since 4.8.2.0
 data DoTrace
-    = TraceNone
-    | TraceEventLog
-    | TraceStderr
+    = TraceNone      -- ^ no tracing
+    | TraceEventLog  -- ^ send tracing events to the event log
+    | TraceStderr    -- ^ send tracing events to @stderr@
     deriving (Show)
 
 instance Enum DoTrace where
@@ -235,6 +269,9 @@ instance Enum DoTrace where
     toEnum #{const TRACE_STDERR}   = TraceStderr
     toEnum e = error ("invalid enum for DoTrace: " ++ show e)
 
+-- | Parameters pertaining to event tracing
+--
+-- @since 4.8.0.0
 data TraceFlags = TraceFlags
     { tracing        :: DoTrace
     , timestamp      :: Bool -- ^ show timestamp in stderr output
@@ -245,11 +282,17 @@ data TraceFlags = TraceFlags
     , user           :: Bool -- ^ trace user events (emitted from Haskell code)
     } deriving (Show)
 
+-- | Parameters pertaining to ticky-ticky profiler
+--
+-- @since 4.8.0.0
 data TickyFlags = TickyFlags
     { showTickyStats :: Bool
     , tickyFile      :: Maybe FilePath
     } deriving (Show)
 
+-- | Parameters of the runtime system
+--
+-- @since 4.8.0.0
 data RTSFlags = RTSFlags
     { gcFlags         :: GCFlags
     , concurrentFlags :: ConcFlags

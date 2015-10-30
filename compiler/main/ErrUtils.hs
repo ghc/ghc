@@ -54,6 +54,7 @@ import System.FilePath  ( takeDirectory, (</>) )
 import Data.List
 import qualified Data.Set as Set
 import Data.IORef
+import Data.Maybe       ( fromMaybe )
 import Data.Ord
 import Data.Time
 import Control.Monad
@@ -198,10 +199,12 @@ printBagOfErrors dflags bag_of_errors
                          errMsgShortDoc  = d,
                          errMsgSeverity  = sev,
                          errMsgExtraInfo = e,
-                         errMsgContext   = unqual } <- sortMsgBag bag_of_errors ]
+                         errMsgContext   = unqual } <- sortMsgBag (Just dflags)
+                                                                  bag_of_errors
+              ]
 
 pprErrMsgBagWithLoc :: Bag ErrMsg -> [SDoc]
-pprErrMsgBagWithLoc bag = [ pprLocErrMsg item | item <- sortMsgBag bag ]
+pprErrMsgBagWithLoc bag = [ pprLocErrMsg item | item <- sortMsgBag Nothing bag ]
 
 pprLocErrMsg :: ErrMsg -> SDoc
 pprLocErrMsg (ErrMsg { errMsgSpan      = s
@@ -213,8 +216,12 @@ pprLocErrMsg (ErrMsg { errMsgSpan      = s
     withPprStyle (mkErrStyle dflags unqual) $
     mkLocMessage sev s (d $$ e)
 
-sortMsgBag :: Bag ErrMsg -> [ErrMsg]
-sortMsgBag bag = sortBy (comparing errMsgSpan) $ bagToList bag
+sortMsgBag :: Maybe DynFlags -> Bag ErrMsg -> [ErrMsg]
+sortMsgBag dflags = sortBy (maybeFlip $ comparing errMsgSpan) . bagToList
+  where maybeFlip :: (a -> a -> b) -> (a -> a -> b)
+        maybeFlip
+          | fromMaybe False (fmap reverseErrors dflags) = flip
+          | otherwise                                  = id
 
 ghcExit :: DynFlags -> Int -> IO ()
 ghcExit dflags val

@@ -500,6 +500,7 @@ tcRnSrcDecls explicit_mod_hdr exports decls
       ; failIfErrsM     -- Don't zonk if there have been errors
                         -- It's a waste of time; and we may get debug warnings
                         -- about strangely-typed TyCons!
+      ; traceTc "Tc10" empty
 
         -- Zonk the final code.  This must be done last.
         -- Even simplifyTop may do some unification.
@@ -518,6 +519,7 @@ tcRnSrcDecls explicit_mod_hdr exports decls
             <- {-# SCC "zonkTopDecls" #-}
                zonkTopDecls all_ev_binds binds exports sig_ns rules vects
                             imp_specs fords ;
+      ; traceTc "Tc11" empty
 
       ; let { final_type_env = extendTypeEnvWithIds type_env bind_ids
             ; tcg_env' = tcg_env { tcg_binds    = binds',
@@ -1106,7 +1108,6 @@ rnTopSrcDecls group
 
                 -- Dump trace of renaming part
         rnDump (ppr rn_decls) ;
-
         return (tcg_env', rn_decls)
    }
 
@@ -1181,8 +1182,6 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
             ; fo_gres = fi_gres `unionBags` foe_gres
             ; fo_fvs = foldrBag (\gre fvs -> fvs `addOneFV` gre_name gre)
                                 emptyFVs fo_gres
-            ; fo_rdr_names :: [RdrName]
-            ; fo_rdr_names = foldrBag gre_to_rdr_name [] fo_gres
 
             ; sig_names = mkNameSet (collectHsValBinders val_binds)
                           `minusNameSet` getTypeSigNames val_binds
@@ -1200,17 +1199,11 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                                  , tcg_dus     = tcg_dus tcg_env `plusDU` usesOnly fo_fvs } } ;
                                  -- tcg_dus: see Note [Newtype constructor usage in foreign declarations]
 
-        addUsedRdrNames fo_rdr_names ;
+        -- See Note [Newtype constructor usage in foreign declarations]
+        addUsedGREs (bagToList fo_gres) ;
+
         return (tcg_env', tcl_env)
     }}}}}}
-  where
-    gre_to_rdr_name :: GlobalRdrElt -> [RdrName] -> [RdrName]
-        -- For *imported* newtype data constructors, we want to
-        -- make sure that at least one of the imports for them is used
-        -- See Note [Newtype constructor usage in foreign declarations]
-    gre_to_rdr_name gre rdrs
-      | isLocalGRE gre = rdrs
-      | otherwise      = greUsedRdrName gre : rdrs
 
 ---------------------------
 tcTyClsInstDecls :: [TyClGroup Name]

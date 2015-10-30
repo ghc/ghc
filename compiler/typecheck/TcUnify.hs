@@ -12,7 +12,7 @@ module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcGen,
   tcSubType, tcSubType_NC, tcSubTypeDS, tcSubTypeDS_NC,
-  checkConstraints, emitImplicationFor,
+  checkConstraints, buildImplication, buildImplicationFor,
 
   -- Various unifications
   unifyType, unifyTypeList, unifyTheta,
@@ -52,6 +52,7 @@ import ErrUtils
 import DynFlags
 import BasicTypes
 import Maybes ( isJust )
+import Bag
 import Util
 import Outputable
 import FastString
@@ -566,44 +567,54 @@ checkConstraints :: SkolemInfo
                  -> TcM (TcEvBinds, result)
 
 checkConstraints skol_info skol_tvs given thing_inside
+  = do { (implics, ev_binds, result) <- buildImplication skol_info skol_tvs given thing_inside
+       ; emitImplications implics
+       ; return (ev_binds, result) }
+
+buildImplication :: SkolemInfo
+                 -> [TcTyVar]           -- Skolems
+                 -> [EvVar]             -- Given
+                 -> TcM result
+                 -> TcM (Bag Implication, TcEvBinds, result)
+buildImplication skol_info skol_tvs given thing_inside
   | null skol_tvs && null given
   = do { res <- thing_inside
-       ; return (emptyTcEvBinds, res) }
+       ; return (emptyBag, emptyTcEvBinds, res) }
       -- Fast path.  We check every function argument with
       -- tcPolyExpr, which uses tcGen and hence checkConstraints.
 
   | otherwise
   = do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints thing_inside
-       ; ev_binds <- emitImplicationFor tclvl skol_info skol_tvs given wanted
-       ; return (ev_binds, result) }
+       ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info skol_tvs given wanted
+       ; return (implics, ev_binds, result) }
 
-emitImplicationFor :: TcLevel -> SkolemInfo -> [TcTyVar]
+buildImplicationFor :: TcLevel -> SkolemInfo -> [TcTyVar]
                    -> [EvVar] -> WantedConstraints
-                   -> TcM TcEvBinds
-emitImplicationFor tclvl skol_info skol_tvs given wanted
+                   -> TcM (Bag Implication, TcEvBinds)
+buildImplicationFor tclvl skol_info skol_tvs given wanted
   | isEmptyWC wanted && null given
              -- Optimisation : if there are no wanteds, and no givens
              -- don't generate an implication at all.
              -- Reason for the (null given): we don't want to lose
              -- the "inaccessible alternative" error check
-  = return emptyTcEvBinds
+  = return (emptyBag, emptyTcEvBinds)
 
   | otherwise
   = ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
     ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
     do { ev_binds_var <- newTcEvBinds
        ; env <- getLclEnv
-       ; emitImplication $ Implic { ic_tclvl = tclvl
-                                  , ic_skols = skol_tvs
-                                  , ic_no_eqs = False
-                                  , ic_given = given
-                                  , ic_wanted = wanted
-                                  , ic_status  = IC_Unsolved
-                                  , ic_binds = ev_binds_var
-                                  , ic_env = env
-                                  , ic_info = skol_info }
+       ; let implic = Implic { ic_tclvl = tclvl
+                             , ic_skols = skol_tvs
+                             , ic_no_eqs = False
+                             , ic_given = given
+                             , ic_wanted = wanted
+                             , ic_status  = IC_Unsolved
+                             , ic_binds = ev_binds_var
+                             , ic_env = env
+                             , ic_info = skol_info }
 
-       ; return (TcEvBinds ev_binds_var) }
+       ; return (unitBag implic, TcEvBinds ev_binds_var) }
 
 {-
 ************************************************************************

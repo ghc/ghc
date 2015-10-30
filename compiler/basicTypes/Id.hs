@@ -54,11 +54,13 @@ module Id (
         isStrictId,
         isExportedId, isLocalId, isGlobalId,
         isRecordSelector, isNaughtyRecordSelector,
+        isPatSynRecordSelector,
+        isDataConRecordSelector,
         isClassOpId_maybe, isDFunId,
         isPrimOpId, isPrimOpId_maybe,
         isFCallId, isFCallId_maybe,
         isDataConWorkId, isDataConWorkId_maybe, isDataConId_maybe, idDataCon,
-        isConLikeId, isBottomingId, idIsFrom,
+        idConLike, isConLikeId, isBottomingId, idIsFrom,
         hasNoBinding,
 
         -- ** Evidence variables
@@ -114,7 +116,6 @@ import Var( Id, DictId,
             isId, isLocalId, isGlobalId, isExportedId )
 import qualified Var
 
-import TyCon
 import Type
 import TysPrim
 import DataCon
@@ -132,6 +133,7 @@ import UniqSupply
 import FastString
 import Util
 import StaticFlags
+import {-# SOURCE #-} ConLike ( ConLike(..) )
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setIdUnfoldingLazily`,
@@ -354,14 +356,17 @@ That is what is happening in, say tidy_insts in TidyPgm.
 -}
 
 -- | If the 'Id' is that for a record selector, extract the 'sel_tycon'. Panic otherwise.
-recordSelectorTyCon :: Id -> TyCon
+recordSelectorTyCon :: Id -> RecSelParent
 recordSelectorTyCon id
   = case Var.idDetails id of
-        RecSelId { sel_tycon = tycon } -> tycon
+        RecSelId { sel_tycon = parent } -> parent
         _ -> panic "recordSelectorTyCon"
+
 
 isRecordSelector        :: Id -> Bool
 isNaughtyRecordSelector :: Id -> Bool
+isPatSynRecordSelector  :: Id -> Bool
+isDataConRecordSelector  :: Id -> Bool
 isPrimOpId              :: Id -> Bool
 isFCallId               :: Id -> Bool
 isDataConWorkId         :: Id -> Bool
@@ -373,7 +378,15 @@ isFCallId_maybe         :: Id -> Maybe ForeignCall
 isDataConWorkId_maybe   :: Id -> Maybe DataCon
 
 isRecordSelector id = case Var.idDetails id of
-                        RecSelId {}  -> True
+                        RecSelId {}     -> True
+                        _               -> False
+
+isDataConRecordSelector id = case Var.idDetails id of
+                        RecSelId {sel_tycon = RecSelData _} -> True
+                        _               -> False
+
+isPatSynRecordSelector id = case Var.idDetails id of
+                        RecSelId {sel_tycon = RecSelPatSyn _} -> True
                         _               -> False
 
 isNaughtyRecordSelector id = case Var.idDetails id of
@@ -423,6 +436,14 @@ idDataCon :: Id -> DataCon
 --
 -- INVARIANT: @idDataCon (dataConWrapId d) = d@: remember, 'dataConWrapId' can return either the wrapper or the worker
 idDataCon id = isDataConId_maybe id `orElse` pprPanic "idDataCon" (ppr id)
+
+idConLike :: Id -> ConLike
+idConLike id =
+  case Var.idDetails id of
+       DataConWorkId con -> RealDataCon con
+       DataConWrapId con -> RealDataCon con
+       PatSynBuilderId ps -> PatSynCon ps
+       _               -> pprPanic "idConLike" (ppr id)
 
 hasNoBinding :: Id -> Bool
 -- ^ Returns @True@ of an 'Id' which may not have a

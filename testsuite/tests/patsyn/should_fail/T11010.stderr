@@ -1,0 +1,8 @@
+
+T11010.hs:8:1: error:
+    The 'required' context ‘a ~ Int’
+      mentions existential type variable ‘a’
+
+T11010.hs:16:1: error:
+    The 'required' context ‘a ~ Int’
+      mentions existential type variable ‘a’
