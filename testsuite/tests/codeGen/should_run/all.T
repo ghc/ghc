@@ -139,3 +139,5 @@ test('T10414', [only_ways(['threaded2']), extra_ways(['threaded2'])],
 test('T10521', normal, compile_and_run, [''])
 test('T10521b', normal, compile_and_run, [''])
 test('T10870', normal, compile_and_run, [''])
+test('PopCnt', omit_ways(['ghci']), multi_compile_and_run,
+                 ['PopCnt', [('PopCnt_cmm.cmm', '')], ''])
