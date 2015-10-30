@@ -17,7 +17,7 @@ dW_LANG_Haskell :: Word
 dW_LANG_Haskell = 0x18
   -- Thanks to Nathan Howell for getting us our very own language ID!
 
--- | Dwarf tags
+-- * Dwarf tags
 dW_TAG_compile_unit, dW_TAG_subroutine_type,
   dW_TAG_file_type, dW_TAG_subprogram, dW_TAG_lexical_block,
   dW_TAG_base_type, dW_TAG_structure_type, dW_TAG_pointer_type,
@@ -38,7 +38,7 @@ dW_TAG_variable        = 52
 dW_TAG_auto_variable   = 256
 dW_TAG_arg_variable    = 257
 
--- | Dwarf attributes
+-- * Dwarf attributes
 dW_AT_name, dW_AT_stmt_list, dW_AT_low_pc, dW_AT_high_pc, dW_AT_language,
   dW_AT_comp_dir, dW_AT_producer, dW_AT_external, dW_AT_frame_base,
   dW_AT_use_UTF8, dW_AT_MIPS_linkage_name :: Word
@@ -54,7 +54,7 @@ dW_AT_frame_base        = 0x40
 dW_AT_use_UTF8          = 0x53
 dW_AT_MIPS_linkage_name = 0x2007
 
--- | Abbrev declaration
+-- * Abbrev declaration
 dW_CHILDREN_no, dW_CHILDREN_yes :: Word8
 dW_CHILDREN_no  = 0
 dW_CHILDREN_yes = 1
@@ -69,7 +69,7 @@ dW_FORM_block1 = 0x0a
 dW_FORM_ref4   = 0x13
 dW_FORM_flag_present = 0x19
 
--- | Dwarf native types
+-- * Dwarf native types
 dW_ATE_address, dW_ATE_boolean, dW_ATE_float, dW_ATE_signed,
   dW_ATE_signed_char, dW_ATE_unsigned, dW_ATE_unsigned_char :: Word
 dW_ATE_address       = 1
@@ -80,7 +80,7 @@ dW_ATE_signed_char   = 6
 dW_ATE_unsigned      = 7
 dW_ATE_unsigned_char = 8
 
--- | Call frame information
+-- * Call frame information
 dW_CFA_set_loc, dW_CFA_undefined, dW_CFA_same_value,
   dW_CFA_def_cfa, dW_CFA_def_cfa_offset, dW_CFA_def_cfa_expression,
   dW_CFA_expression, dW_CFA_offset_extended_sf, dW_CFA_def_cfa_offset_sf,
@@ -100,7 +100,7 @@ dW_CFA_val_offset         = 0x14
 dW_CFA_val_expression     = 0x16
 dW_CFA_offset             = 0x80
 
--- | Operations
+-- * Operations
 dW_OP_deref, dW_OP_consts,
   dW_OP_minus, dW_OP_mul, dW_OP_plus,
   dW_OP_lit0, dW_OP_breg0, dW_OP_call_frame_cfa :: Word8
@@ -113,7 +113,7 @@ dW_OP_lit0           = 0x30
 dW_OP_breg0          = 0x70
 dW_OP_call_frame_cfa = 0x9c
 
--- | Dwarf section declarations
+-- * Dwarf section declarations
 dwarfInfoSection, dwarfAbbrevSection, dwarfLineSection,
   dwarfFrameSection, dwarfGhcSection, dwarfARangesSection :: SDoc
 dwarfInfoSection    = dwarfSection "info"
@@ -133,7 +133,7 @@ dwarfSection name = sdocWithPlatform $ \plat -> ftext $ mkFastString $
        | otherwise
        -> "\t.section .debug_" ++ name ++ ",\"dr\""
 
--- | Dwarf section labels
+-- * Dwarf section labels
 dwarfInfoLabel, dwarfAbbrevLabel, dwarfLineLabel, dwarfFrameLabel :: LitString
 dwarfInfoLabel   = sLit ".Lsection_info"
 dwarfAbbrevLabel = sLit ".Lsection_abbrev"
