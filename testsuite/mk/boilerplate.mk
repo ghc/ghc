@@ -44,15 +44,59 @@ endef
 
 ifeq "$(TEST_HC)" ""
 
-STAGE1_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage1)
-STAGE2_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage2)
-STAGE3_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage3)
+# Note [Spaces in TEST_HC]
+#
+# Tests should be able to handle paths with spaces.
+#
+# One of the things ./validate (without --fast) does is check if binary
+# distributions can succesfully be installed and used in paths containing
+# spaces.
+#
+# It does so in the following way:
+#    * create a binary distribution in 'bindistprep/'.
+#    * install that binary distribution in 'bindisttest/install   dir/'
+#    * run the testsuite with BINDIST=YES
+#
+# BINDIST=YES tells the testsuite driver to use
+# 'bindisttest/install   dir/bin/ghc' instead of 'inplace/bin/ghc-stage2' as
+# TEST_HC.
+#
+# Before, if a GHC developer forgot to quote TEST_HC in their Makefile when
+# adding a new test, the test would fail with a puzzling "command not found:
+# bindisttest/install" error (but only when validating).
+#
+# Therefore, we now:
+#   * make sure 'bindisttest/install' does exist, and show a nice message when
+#     it is executed.
+#   * let the default value of TEST_HC also contain spaces
+#     (i.e. 'inplace/test   spaces/ghc-stage2'), such that the test always
+#     fails, also without BINDIST=YES, and again show a nice message when it
+#     indeed does so, through 'inplace/test'.
 
-ifneq "$(wildcard $(STAGE1_GHC) $(STAGE1_GHC).exe)" ""
+# The `wildcard` function requires spaces to be escaped. Other gnu make
+# functions can't seem to handle spaces at all (e.g. `abspath`).
+STAGE1_TEST_SPACES := $(TOP)/../inplace/test\ \ \ spaces/ghc-stage1
+STAGE1_NORMAL := $(TOP)/../inplace/bin/ghc-stage1
 
+ifneq "$(wildcard $(STAGE1_TEST_SPACES) $(STAGE1_NORMAL))" ""
 IMPLICIT_COMPILER = NO
 IN_TREE_COMPILER = YES
+
+ifneq "$(wildcard $(STAGE1_TEST_SPACES))" ""
+# See Note [Spaces in TEST_HC].
+STAGE1_GHC := $(abspath $(TOP)/../)/inplace/test   spaces/ghc-stage1
+STAGE2_GHC := $(abspath $(TOP)/../)/inplace/test   spaces/ghc-stage2
+STAGE3_GHC := $(abspath $(TOP)/../)/inplace/test   spaces/ghc-stage3
+else
+# Maybe we're on Windows (no symlink support), or in a bindist or sdist, which
+# don't have the 'test   spaces' symlink.
+STAGE1_GHC := $(abspath $(TOP)/../)/inplace/bin/ghc-stage1
+STAGE2_GHC := $(abspath $(TOP)/../)/inplace/bin/ghc-stage2
+STAGE3_GHC := $(abspath $(TOP)/../)/inplace/bin/ghc-stage3
+endif
+
 ifeq "$(BINDIST)" "YES"
+# See Note [Spaces in TEST_HC].
 TEST_HC := $(abspath $(TOP)/../)/bindisttest/install   dir/bin/ghc
 else ifeq "$(stage)" "1"
 TEST_HC := $(STAGE1_GHC)
@@ -69,7 +113,8 @@ IN_TREE_COMPILER = NO
 TEST_HC := $(shell which ghc)
 endif
 
-else
+else # neq "$(TEST_HC)" ""
+
 ifeq "$(TEST_HC)" "ghc"
 IMPLICIT_COMPILER = YES
 else
@@ -95,7 +140,7 @@ override TEST_HC := $(shell which '$(TEST_HC)')
 else
 override TEST_HC := $(TEST_HC_REALPATH)
 endif
-endif
+endif # "$(TEST_HC)" ""
 
 # We can't use $(dir ...) here as TEST_HC might be in a path
 # containing spaces
