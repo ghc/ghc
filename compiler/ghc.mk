@@ -580,6 +580,7 @@ compiler_stage2_dll0_MODULES = \
 	TysWiredIn \
 	Unify \
 	UniqFM \
+	UniqDFM \
 	UniqSet \
 	UniqSupply \
 	Unique \

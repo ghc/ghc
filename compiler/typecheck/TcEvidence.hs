@@ -672,26 +672,44 @@ instance Data.Data TcEvBinds where
 -----------------
 newtype EvBindMap
   = EvBindMap {
-       ev_bind_varenv :: VarEnv EvBind
+       ev_bind_varenv :: DVarEnv EvBind
     }       -- Map from evidence variables to evidence terms
+            -- We use @DVarEnv@ here to get deterministic ordering when we
+            -- turn it into a Bag.
+            -- If we don't do that, when we generate let bindings for
+            -- dictionaries in dsTcEvBinds they will be generated in random
+            -- order.
+            --
+            -- For example:
+            --
+            -- let $dEq = GHC.Classes.$fEqInt in
+            -- let $$dNum = GHC.Num.$fNumInt in ...
+            --
+            -- vs
+            --
+            -- let $dNum = GHC.Num.$fNumInt in
+            -- let $dEq = GHC.Classes.$fEqInt in ...
+            --
+            -- See Note [Deterministic UniqFM] in UniqDFM for explanation why
+            -- @UniqFM@ can lead to nondeterministic order.
 
 emptyEvBindMap :: EvBindMap
-emptyEvBindMap = EvBindMap { ev_bind_varenv = emptyVarEnv }
+emptyEvBindMap = EvBindMap { ev_bind_varenv = emptyDVarEnv }
 
 extendEvBinds :: EvBindMap -> EvBind -> EvBindMap
 extendEvBinds bs ev_bind
-  = EvBindMap { ev_bind_varenv = extendVarEnv (ev_bind_varenv bs)
-                                              (eb_lhs ev_bind)
-                                              ev_bind }
+  = EvBindMap { ev_bind_varenv = extendDVarEnv (ev_bind_varenv bs)
+                                               (eb_lhs ev_bind)
+                                               ev_bind }
 
 lookupEvBind :: EvBindMap -> EvVar -> Maybe EvBind
-lookupEvBind bs = lookupVarEnv (ev_bind_varenv bs)
+lookupEvBind bs = lookupDVarEnv (ev_bind_varenv bs)
 
 evBindMapBinds :: EvBindMap -> Bag EvBind
 evBindMapBinds = foldEvBindMap consBag emptyBag
 
 foldEvBindMap :: (EvBind -> a -> a) -> a -> EvBindMap -> a
-foldEvBindMap k z bs = foldVarEnv k z (ev_bind_varenv bs)
+foldEvBindMap k z bs = foldDVarEnv k z (ev_bind_varenv bs)
 
 -----------------
 -- All evidence is bound by EvBinds; no side effects

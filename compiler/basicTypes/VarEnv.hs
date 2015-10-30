@@ -22,6 +22,15 @@ module VarEnv (
         filterVarEnv, filterVarEnv_Directly, restrictVarEnv,
         partitionVarEnv,
 
+        -- * Deterministic Var environments (maps)
+        DVarEnv,
+
+        -- ** Manipulating these environments
+        emptyDVarEnv,
+        extendDVarEnv,
+        lookupDVarEnv,
+        foldDVarEnv,
+
         -- * The InScopeSet type
         InScopeSet,
 
@@ -52,6 +61,7 @@ import OccName
 import Var
 import VarSet
 import UniqFM
+import UniqDFM
 import Unique
 import Util
 import Maybes
@@ -447,3 +457,21 @@ modifyVarEnv_Directly mangle_fn env key
   = case (lookupUFM_Directly env key) of
       Nothing -> env
       Just xx -> addToUFM_Directly env key (mangle_fn xx)
+
+-- Deterministic VarEnv
+-- See Note [Deterministic UniqFM] in UniqDFM for explanation why we need
+-- DVarEnv.
+
+type DVarEnv elt   = UniqDFM elt
+
+emptyDVarEnv :: DVarEnv a
+emptyDVarEnv = emptyUDFM
+
+extendDVarEnv :: DVarEnv a -> Var -> a -> DVarEnv a
+extendDVarEnv = addToUDFM
+
+lookupDVarEnv :: DVarEnv a -> Var -> Maybe a
+lookupDVarEnv = lookupUDFM
+
+foldDVarEnv :: (a -> b -> b) -> b -> DVarEnv a -> b
+foldDVarEnv = foldUDFM

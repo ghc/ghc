@@ -467,6 +467,7 @@ Library
         Stream
         StringBuffer
         UniqFM
+        UniqDFM
         UniqSet
         Util
         Vectorise.Builtins.Base
