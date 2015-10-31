@@ -33,7 +33,6 @@ import PrelNames( typeableClassName
                 , typeErrorShowTypeDataConName
                 , typeErrorAppendDataConName
                 , typeErrorVAppendDataConName
-                , errorMessageTypeErrorFamName
                 )
 import Id
 import Var
@@ -51,7 +50,7 @@ import DynFlags
 import StaticFlags      ( opt_PprStyle_Debug )
 import ListSetOps       ( equivClasses )
 
-import Control.Monad    ( when, liftM2, guard )
+import Control.Monad    ( when )
 import Data.Maybe
 import Data.List        ( partition, mapAccumL, nub, sortBy )
 
@@ -450,55 +449,38 @@ mkUserTypeErrorReporter ctxt
   = mapM_ $ \ct -> maybeReportError ctxt =<< mkUserTypeError ctxt ct
 
 mkUserTypeError :: ReportErrCtxt -> Ct -> TcM ErrMsg
-mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct =<< render msgT
-  where
-  ctT      = ctPred ct
-  getMsg t = do (tc,[_,msg]) <- splitTyConApp_maybe t
-                guard (tyConName tc == errorMessageTypeErrorFamName)
-                return msg
+mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
+                        $ renderUserTypeError
+                        $ case getUserTypeErrorMsg ct of
+                            Just msg -> msg
+                            Nothing  -> pprPanic "mkUserTypeError" (ppr ct)
 
-  msgT  -- TypeError msg ~ Something
-        | Just (_,t1,_) <- getEqPredTys_maybe ctT
-        , Just msg      <- getMsg t1                 = msg
+-- | Render a type corresponding to a user type error into a SDoc.
+renderUserTypeError :: Type -> SDoc
+renderUserTypeError ty =
+  case splitTyConApp_maybe ty of
 
-        -- Something ~ TypeError msg
-        | Just (_,_,t2) <- getEqPredTys_maybe ctT
-        , Just msg      <- getMsg t2                 = msg
+    -- Text "Something"
+    Just (tc,[txt])
+      | tyConName tc == typeErrorTextDataConName
+      , Just str <- isStrLitTy txt -> ftext str
 
-        | Just (_,ts) <- getClassPredTys_maybe ctT
-        , msg : _ <- mapMaybe getMsg ts              = msg
+    -- ShowType t
+    Just (tc,[_k,t])
+      | tyConName tc == typeErrorShowTypeDataConName -> ppr t
 
-        -- TypeError msg
-        | Just msg      <- getMsg ctT                = msg
+    -- t1 :<>: t2
+    Just (tc,[t1,t2])
+      | tyConName tc == typeErrorAppendDataConName ->
+        renderUserTypeError t1 <> renderUserTypeError t2
 
-        | otherwise = pprPanic "mkUserTypeError" (ppr ctT)
+    -- t1 :$$: t2
+    Just (tc,[t1,t2])
+      | tyConName tc == typeErrorVAppendDataConName ->
+        renderUserTypeError t1 $$ renderUserTypeError t2
 
-
-
-  render ty = case splitTyConApp_maybe ty of
-
-                -- Text "Something"
-                Just (tc,[txt])
-                  | tyConName tc == typeErrorTextDataConName
-                  , Just str <- isStrLitTy txt -> return (ftext str)
-
-                -- ShowType t
-                Just (tc,[_k,t])
-                  | tyConName tc == typeErrorShowTypeDataConName ->
-                    return (ppr t)
-
-                -- t1 :<>: t2
-                Just (tc,[t1,t2])
-                  | tyConName tc == typeErrorAppendDataConName ->
-                    liftM2 (<>) (render t1) (render t2)
-
-                -- t1 :$$: t2
-                Just (tc,[t1,t2])
-                  | tyConName tc == typeErrorVAppendDataConName ->
-                    liftM2 ($$) (render t1) (render t2)
-
-                -- An uneavaluated type function
-                _ -> return (ppr ty)
+    -- An uneavaluated type function
+    _ -> ppr ty
 
 
 mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)

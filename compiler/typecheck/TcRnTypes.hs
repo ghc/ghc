@@ -61,7 +61,7 @@ module TcRnTypes(
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
         isGivenCt, isHoleCt, isOutOfScopeCt, isExprHoleCt, isTypeHoleCt,
-        isUserTypeErrorCt,
+        isUserTypeErrorCt, getUserTypeErrorMsg,
         ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         mkNonCanonical, mkNonCanonicalCt,
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
@@ -148,7 +148,7 @@ import GHC.Fingerprint
 import PrelNames(errorMessageTypeErrorFamName)
 
 import Data.Set (Set)
-import Control.Monad (ap, liftM)
+import Control.Monad (ap, liftM, guard, msum)
 
 #ifdef GHCI
 import Data.Map      ( Map )
@@ -1447,17 +1447,22 @@ isTypeHoleCt _ = False
 --    1. TypeError msg
 --    2. TypeError msg ~ Something  (and the other way around)
 --    3. C (TypeError msg)          (for any parameter of class constraint)
-isUserTypeErrorCt :: Ct -> Bool
-isUserTypeErrorCt ct
-  | Just (_,t1,t2) <- getEqPredTys_maybe ctT    = isTyErr t1 || isTyErr t2
-  | Just (_,ts)    <- getClassPredTys_maybe ctT = any isTyErr ts
+getUserTypeErrorMsg :: Ct -> Maybe Type
+getUserTypeErrorMsg ct
+  | Just (_,t1,t2) <- getEqPredTys_maybe ctT    = oneOf [t1,t2]
+  | Just (_,ts)    <- getClassPredTys_maybe ctT = oneOf ts
   | otherwise                                   = isTyErr ctT
   where
   ctT       = ctPred ct
-  isTyErr t = case splitTyConApp_maybe t of
-                Just (tc,_) -> tyConName tc == errorMessageTypeErrorFamName
-                _           -> False
+  isTyErr t = do (tc,[_,msg]) <- splitTyConApp_maybe t
+                 guard (tyConName tc == errorMessageTypeErrorFamName)
+                 return msg
+  oneOf xs  = msum (map isTyErr xs)
 
+isUserTypeErrorCt :: Ct -> Bool
+isUserTypeErrorCt ct = case getUserTypeErrorMsg ct of
+                         Just _ -> True
+                         _      -> False
 
 instance Outputable Ct where
   ppr ct = ppr (cc_ev ct) <+> parens (text ct_sort)
