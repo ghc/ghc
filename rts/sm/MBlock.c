@@ -96,7 +96,12 @@ typedef struct free_list {
 
 static free_list *free_list_head;
 static W_ mblock_high_watermark;
-W_ mblock_address_space_begin = 0;
+/*
+ * it is quite important that these are in the same cache line as they
+ * are both needed by HEAP_ALLOCED. Moreover, we need to ensure that they
+ * don't share a cache line with anything else to prevent false sharing.
+ */
+struct mblock_address_range mblock_address_space = { 0, 0, {} };
 
 static void *getAllocatedMBlock(free_list **start_iter, W_ startingAt)
 {
@@ -131,7 +136,7 @@ void * getFirstMBlock(void **state STG_UNUSED)
         casted_state = &fake_state;
 
     *casted_state = free_list_head;
-    return getAllocatedMBlock(casted_state, mblock_address_space_begin);
+    return getAllocatedMBlock(casted_state, mblock_address_space.begin);
 }
 
 void * getNextMBlock(void **state STG_UNUSED, void *mblock)
@@ -190,8 +195,7 @@ static void *getFreshMBlocks(nat n)
     W_ size = MBLOCK_SIZE * (W_)n;
     void *addr = (void*)mblock_high_watermark;
 
-    if (mblock_high_watermark + size >
-        mblock_address_space_begin + MBLOCK_SPACE_SIZE)
+    if (mblock_high_watermark + size > mblock_address_space.end)
     {
         // whoa, 1 TB of heap?
         errorBelch("out of memory");
@@ -611,7 +615,8 @@ freeAllMBlocks(void)
 
     osReleaseHeapMemory();
 
-    mblock_address_space_begin = (W_)-1;
+    mblock_address_space.begin = (W_)-1;
+    mblock_address_space.end = (W_)-1;
     mblock_high_watermark = (W_)-1;
 #else
     osFreeAllMBlocks();
@@ -634,9 +639,16 @@ initMBlocks(void)
 
 #ifdef USE_LARGE_ADDRESS_SPACE
     {
-        void *addr = osReserveHeapMemory();
+        W_ size;
+#if aarch64_HOST_ARCH
+        size = (W_)1 << 38; // 1/4 TByte
+#else
+        size = (W_)1 << 40; // 1 TByte
+#endif
+        void *addr = osReserveHeapMemory(size);
 
-        mblock_address_space_begin = (W_)addr;
+        mblock_address_space.begin = (W_)addr;
+        mblock_address_space.end = (W_)addr + size;
         mblock_high_watermark = (W_)addr;
     }
 #elif SIZEOF_VOID_P == 8

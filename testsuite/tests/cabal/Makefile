@@ -156,19 +156,21 @@ shadow:
 	@echo "databases 1 and 3:"
 	$(LOCAL_GHC_PKGSHADOW13) list
 	echo "main = return ()" >shadow.hs
-# 
-# In this test, shadow-1-XXX with ABI hash aaa conflicts with shadow-1-XXX with
-# ABI hash bbb, so GHC errors
+#
+# In this test, the later database defines a new shadow-1-XXX which
+# shadows the old one, making shadowdep unsatisfiable.
 #
 	@echo "should FAIL:"
 	if '$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFSHADOW1) -package-db $(PKGCONFSHADOW2) -package shadowdep -c shadow.hs -fno-code; then false; else true; fi
 #
-# Reversing the orders of the configs does not fix the problem
+# Reversing the orders of the configs fixes the problem, because now
+# the shadow-1-XXX defined in the same DB as shadowdep shadows
+# shadow-1-XXX in localshadow2.package.conf
 #
-	@echo "should FAIL:"
-	if '$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFSHADOW2) -package-db $(PKGCONFSHADOW1) -package shadowdep -c shadow.hs -fno-code; then false; else true; fi
+	@echo "should SUCCEED:"
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFSHADOW2) -package-db $(PKGCONFSHADOW1) -package shadowdep -c shadow.hs -fno-code
 #
-# When the ABIs are the same, there is no problem
+# When the ABIs are the same, dependencies don't break, we just swap it in
 #
 	@echo "should SUCCEED:"
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFSHADOW3) -package-db $(PKGCONFSHADOW1) -package shadowdep -c shadow.hs -fno-code
@@ -240,9 +242,9 @@ ghcpkg02:
 	rm -rf $(PACKAGE_CONF_ghcpkg02)
 	$(GHC_PKG_ghcpkg02) init $(PACKAGE_CONF_ghcpkg02)
 	set -e; \
-	for i in `$(GHC_PKG) list --global --simple-output -v0`; do \
+	for i in `'$(GHC_PKG)' list --global --simple-output -v0`; do \
 		echo Updating $$i; \
-		$(GHC_PKG) describe --global $$i | $(GHC_PKG_ghcpkg02) update --global --force -; \
+		'$(GHC_PKG)' describe --global $$i | $(GHC_PKG_ghcpkg02) update --global --force -; \
 	done
 
 PKGCONF07=local07.package.conf

@@ -65,12 +65,12 @@
         defined(openbsd_HOST_OS  ) || defined(darwin_HOST_OS ) || \
         defined(kfreebsdgnu_HOST_OS) || defined(gnu_HOST_OS  ) || \
         defined(solaris2_HOST_OS)))
-/* Don't use mmap on powerpc_HOST_ARCH as mmap doesn't support
+/* Don't use mmap on powerpc/darwin as the mmap there doesn't support
  * reallocating but we need to allocate jump islands just after each
  * object images. Otherwise relative branches to jump islands can fail
  * due to 24-bits displacement overflow.
  */
-#define USE_MMAP
+#define USE_MMAP 1
 #include <fcntl.h>
 #include <sys/mman.h>
 
@@ -78,13 +78,17 @@
 #include <unistd.h>
 #endif
 
+#else
+
+#define USE_MMAP 0
+
 #endif
 
 
 /* PowerPC has relative branch instructions with only 24 bit displacements
  * and therefore needs jump islands contiguous with each object code module.
  */
-#if (defined(USE_MMAP) && defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS))
+#if (USE_MMAP && defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS))
 #define USE_CONTIGUOUS_MMAP 1
 #else
 #define USE_CONTIGUOUS_MMAP 0
@@ -158,10 +162,8 @@ static HsInt isAlreadyLoaded( pathchar *path );
 static HsInt loadOc( ObjectCode* oc );
 static ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
                          rtsBool mapped, char *archiveMemberName
-#ifndef USE_MMAP
-#ifdef darwin_HOST_OS
+#if (USE_MMAP == 0) && defined (darwin_HOST_OS)
                        , int misalignment
-#endif
 #endif
                        );
 
@@ -234,7 +236,7 @@ static int ocGetNames_MachO       ( ObjectCode* oc );
 static int ocResolve_MachO        ( ObjectCode* oc );
 static int ocRunInit_MachO        ( ObjectCode* oc );
 
-#ifndef USE_MMAP
+#if (USE_MMAP == 0)
 static int machoGetMisalignment( FILE * );
 #endif
 #if NEED_SYMBOL_EXTRAS
@@ -247,7 +249,7 @@ static void machoInitSymbolsWithoutUnderscore( void );
 
 static void freeProddableBlocks (ObjectCode *oc);
 
-#ifdef USE_MMAP
+#if USE_MMAP
 /**
  * An allocated page being filled by the allocator
  */
@@ -559,7 +561,7 @@ initLinker_ (int retain_cafs)
     addDLLHandle(WSTR("*.exe"), GetModuleHandle(NULL));
 #endif
 
-#ifdef USE_MMAP
+#if USE_MMAP
     m32_allocator_init(&allocator);
 #endif
 
@@ -1014,7 +1016,7 @@ void ghci_enquire ( char* addr )
 }
 #endif
 
-#ifdef USE_MMAP
+#if USE_MMAP
 #define ROUND_UP(x,size) ((x + size - 1) & ~(size - 1))
 #define ROUND_DOWN(x,size) (x & ~(size - 1))
 
@@ -1379,7 +1381,7 @@ static void freeOcStablePtrs (ObjectCode *oc)
 static void
 freePreloadObjectFile (ObjectCode *oc)
 {
-#ifdef USE_MMAP
+#if USE_MMAP
 
     if (oc->imageMapped) {
         munmap(oc->image, oc->fileSize);
@@ -1429,7 +1431,7 @@ void freeObjectCode (ObjectCode *oc)
         for (i=0; i < oc->n_sections; i++) {
             if (oc->sections[i].start != NULL) {
                 switch(oc->sections[i].alloc){
-#ifdef USE_MMAP
+#if USE_MMAP
                 case SECTION_MMAP:
                     munmap(oc->sections[i].mapped_start,
                            oc->sections[i].mapped_size);
@@ -1455,7 +1457,7 @@ void freeObjectCode (ObjectCode *oc)
     /* Free symbol_extras.  On x86_64 Windows, symbol_extras are allocated
      * alongside the image, so we don't need to free. */
 #if NEED_SYMBOL_EXTRAS && (!defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS))
-#ifdef USE_MMAP
+#if USE_MMAP
     if (!USE_CONTIGUOUS_MMAP && oc->symbol_extras != NULL)
     {
         m32_free(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);
@@ -1474,10 +1476,8 @@ void freeObjectCode (ObjectCode *oc)
 static ObjectCode*
 mkOc( pathchar *path, char *image, int imageSize,
       rtsBool mapped, char *archiveMemberName
-#ifndef USE_MMAP
-#ifdef darwin_HOST_OS
+#if (USE_MMAP == 0) && defined (darwin_HOST_OS)
     , int misalignment
-#endif
 #endif
     ) {
    ObjectCode* oc;
@@ -1518,10 +1518,8 @@ mkOc( pathchar *path, char *image, int imageSize,
 #endif
    oc->imageMapped       = mapped;
 
-#ifndef USE_MMAP
-#ifdef darwin_HOST_OS
+#if (USE_MMAP == 0) && defined (darwin_HOST_OS)
    oc->misalignment = misalignment;
-#endif
 #endif
 
    /* chain it onto the list of objects */
@@ -1580,7 +1578,7 @@ static HsInt loadArchive_ (pathchar *path)
 #else
 #error Unknown Darwin architecture
 #endif
-#if !defined(USE_MMAP)
+#if (USE_MMAP == 0)
     int misalignment;
 #endif
 #endif
@@ -1864,7 +1862,7 @@ static HsInt loadArchive_ (pathchar *path)
 #endif
                memberSize);
 #elif defined(darwin_HOST_OS)
-#if defined(USE_MMAP)
+#if USE_MMAP
             image = mmapForLinker(memberSize, MAP_ANONYMOUS, -1, 0);
 #else
             /* See loadObj() */
@@ -1931,7 +1929,7 @@ static HsInt loadArchive_ (pathchar *path)
                     path, (int)thisFileNameSize, fileName);
 
             oc = mkOc(path, image, memberSize, rtsFalse, archiveMemberName
-#if !defined(USE_MMAP) && defined(darwin_HOST_OS)
+#if (USE_MMAP == 0) && defined(darwin_HOST_OS)
                      , misalignment
 #endif
                      );
@@ -1952,7 +1950,7 @@ static HsInt loadArchive_ (pathchar *path)
                 barf("loadArchive: GNU-variant index found, but already have an index, while reading filename from `%s'", path);
             }
             IF_DEBUG(linker, debugBelch("loadArchive: Found GNU-variant file index\n"));
-#ifdef USE_MMAP
+#if USE_MMAP
             gnuFileIndex = mmapForLinker(memberSize + 1, MAP_ANONYMOUS, -1, 0);
 #else
             gnuFileIndex = stgMallocBytes(memberSize + 1, "loadArchive(image)");
@@ -1996,14 +1994,14 @@ static HsInt loadArchive_ (pathchar *path)
 
     stgFree(fileName);
     if (gnuFileIndex != NULL) {
-#ifdef USE_MMAP
+#if USE_MMAP
         munmap(gnuFileIndex, gnuFileIndexSize + 1);
 #else
         stgFree(gnuFileIndex);
 #endif
     }
 
-#ifdef USE_MMAP
+#if USE_MMAP
     m32_allocator_flush(&allocator);
 #endif
 
@@ -2032,7 +2030,7 @@ preloadObjectFile (pathchar *path)
    int r;
    void *image;
    ObjectCode *oc;
-#if !defined(USE_MMAP) && defined(darwin_HOST_OS)
+#if (USE_MMAP == 0) && defined(darwin_HOST_OS)
    int misalignment;
 #endif
 
@@ -2044,7 +2042,7 @@ preloadObjectFile (pathchar *path)
 
    fileSize = st.st_size;
 
-#ifdef USE_MMAP
+#if USE_MMAP
    int fd;
 
    /* On many architectures malloc'd memory isn't executable, so we need to use
@@ -2123,7 +2121,7 @@ preloadObjectFile (pathchar *path)
 #endif /* USE_MMAP */
 
    oc = mkOc(path, image, fileSize, rtsTrue, NULL
-#if !defined(USE_MMAP) && defined(darwin_HOST_OS)
+#if (USE_MMAP == 0) && defined(darwin_HOST_OS)
             , misalignment
 #endif
             );
@@ -2468,14 +2466,14 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
 static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
 {
   StgWord n;
-#ifndef USE_MMAP
+#if (USE_MMAP == 0)
   int misalignment = 0;
 #ifdef darwin_HOST_OS
   int aligned;
 #endif
 #endif
 
-#ifdef USE_MMAP
+#if USE_MMAP
   if (USE_CONTIGUOUS_MMAP)
   {
       n = roundUpToPage(oc->fileSize);
@@ -2504,7 +2502,7 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
 
   if( count > 0 )
   {
-#ifdef USE_MMAP
+#if USE_MMAP
     n = roundUpToPage(oc->fileSize);
 
     oc->symbol_extras = m32_alloc(&allocator,
@@ -6291,7 +6289,7 @@ ocGetNames_MachO(ObjectCode* oc)
 
         if((sections[i].flags & SECTION_TYPE) == S_ZEROFILL)
         {
-#ifdef USE_MMAP
+#if USE_MMAP
             char * zeroFillArea = mmapForLinker(sections[i].size, MAP_ANONYMOUS, -1, 0);
             if (zeroFillArea == NULL) return 0;
             memset(zeroFillArea, 0, sections[i].size);
@@ -6594,7 +6592,7 @@ machoInitSymbolsWithoutUnderscore(void)
 }
 #endif
 
-#ifndef USE_MMAP
+#if (USE_MMAP == 0)
 /*
  * Figure out by how much to shift the entire Mach-O file in memory
  * when loading so that its single segment ends up 16-byte-aligned

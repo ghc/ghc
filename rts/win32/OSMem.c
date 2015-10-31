@@ -429,11 +429,11 @@ void setExecutable (void *p, W_ len, rtsBool exec)
 
 static void* heap_base = NULL;
 
-void *osReserveHeapMemory (void)
+void *osReserveHeapMemory (W_ len)
 {
     void *start;
 
-    heap_base = VirtualAlloc(NULL, MBLOCK_SPACE_SIZE + MBLOCK_SIZE,
+    heap_base = VirtualAlloc(NULL, len + MBLOCK_SIZE,
                               MEM_RESERVE, PAGE_READWRITE);
     if (heap_base == NULL) {
         if (GetLastError() == ERROR_NOT_ENOUGH_MEMORY) {
@@ -441,7 +441,7 @@ void *osReserveHeapMemory (void)
         } else {
             sysErrorBelch(
                 "osReserveHeapMemory: VirtualAlloc MEM_RESERVE %llu bytes failed",
-                MBLOCK_SPACE_SIZE + MBLOCK_SIZE);
+                len + MBLOCK_SIZE);
         }
         stg_exit(EXIT_FAILURE);
     }

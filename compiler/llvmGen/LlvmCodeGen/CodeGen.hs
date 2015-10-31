@@ -366,6 +366,9 @@ genCall t@(PrimTarget (MO_SubIntC w)) [dstV, dstO] [lhs, rhs] =
 genCall t@(PrimTarget (MO_Add2 w)) [dstO, dstV] [lhs, rhs] =
     genCallWithOverflow t w [dstV, dstO] [lhs, rhs]
 
+genCall t@(PrimTarget (MO_SubWordC w)) [dstV, dstO] [lhs, rhs] =
+    genCallWithOverflow t w [dstV, dstO] [lhs, rhs]
+
 -- Handle all other foreign calls and prim ops.
 genCall target res args = runStmtsDecls $ do
     dflags <- lift $ getDynFlags
@@ -472,8 +475,12 @@ genCall target res args = runStmtsDecls $ do
 genCallWithOverflow
   :: ForeignTarget -> Width -> [CmmFormal] -> [CmmActual] -> LlvmM StmtData
 genCallWithOverflow t@(PrimTarget op) w [dstV, dstO] [lhs, rhs] = do
-    -- So far this was only tested for the following three CallishMachOps.
-    MASSERT( (op `elem` [MO_Add2 w, MO_AddIntC w, MO_SubIntC w]) )
+    -- So far this was only tested for the following four CallishMachOps.
+    MASSERT( (op `elem` [ MO_Add2 w
+                        , MO_AddIntC w
+                        , MO_SubIntC w
+                        , MO_SubWordC w
+                        ]) )
     let width = widthToLlvmInt w
     -- This will do most of the work of generating the call to the intrinsic and
     -- extracting the values from the struct.
@@ -727,6 +734,8 @@ cmmPrimOpFunctions mop = do
     MO_SubIntC w    -> fsLit $ "llvm.ssub.with.overflow."
                              ++ showSDoc dflags (ppr $ widthToLlvmInt w)
     MO_Add2 w       -> fsLit $ "llvm.uadd.with.overflow."
+                             ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    MO_SubWordC w   -> fsLit $ "llvm.usub.with.overflow."
                              ++ showSDoc dflags (ppr $ widthToLlvmInt w)
 
     MO_S_QuotRem {}  -> unsupported

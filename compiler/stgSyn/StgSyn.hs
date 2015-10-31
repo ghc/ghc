@@ -49,6 +49,7 @@ module StgSyn (
 import Bitmap
 import CoreSyn     ( AltCon, Tickish )
 import CostCentre  ( CostCentreStack )
+import Data.List   ( intersperse )
 import DataCon
 import DynFlags
 import FastString
@@ -646,7 +647,7 @@ pprStgBinding :: StgBinding -> SDoc
 pprStgBinding  bind  = pprGenStgBinding bind
 
 pprStgBindings :: [StgBinding] -> SDoc
-pprStgBindings binds = vcat (map pprGenStgBinding binds)
+pprStgBindings binds = vcat $ intersperse blankLine (map pprGenStgBinding binds)
 
 instance (Outputable bdee) => Outputable (GenStgArg bdee) where
     ppr = pprStgArg

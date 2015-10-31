@@ -3,9 +3,7 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
   data MyKind = A | B
     Promotable
-  type role Sing nominal
   data family Sing (a :: k)
-    RecFlag: Recursive
 COERCION AXIOMS
   axiom DataFamilyInstanceLHS.TFCo:R:SingMyKind_ ::
       Sing = DataFamilyInstanceLHS.R:SingMyKind_

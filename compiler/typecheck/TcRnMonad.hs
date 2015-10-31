@@ -141,7 +141,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_rn_imports     = [],
                 tcg_rn_exports     = maybe_rn_syntax [],
                 tcg_rn_decls       = maybe_rn_syntax emptyRnGroup,
-
+                tcg_tr_module      = Nothing,
                 tcg_binds          = emptyLHsBinds,
                 tcg_imp_specs      = [],
                 tcg_sigs           = emptyNameSet,

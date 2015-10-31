@@ -1380,8 +1380,10 @@ distclean : clean
 # Not sure why this is being cleaned here.
 	$(call removeTrees,includes/dist-derivedconstants)
 
-# Finally, clean the inplace tree.
-	$(call removeTrees,inplace)
+# Also clean Windows-only inplace directories.
+# Don't delete 'inplace' itself, it contains source files.
+	$(call removeTrees,inplace/mingw)
+	$(call removeTrees,inplace/perl)
 
 maintainer-clean : distclean
 	$(call removeFiles,configure mk/config.h.in)

@@ -396,13 +396,6 @@ minusNaturalMaybe (NatJ# x) (NatJ# y)
   where
     res = minusBigNat x y
 
--- | Helper for 'minusNatural' and 'minusNaturalMaybe'
-subWordC# :: Word# -> Word# -> (# Word#, Int# #)
-subWordC# x# y# = (# d#, c# #)
-  where
-    d# = x# `minusWord#` y#
-    c# = d# `gtWord#` x#
-
 -- | Convert 'BigNat' to 'Natural'.
 -- Throws 'Underflow' if passed a 'nullBigNat'.
 bigNatToNatural :: BigNat -> Natural

@@ -30,6 +30,8 @@ import Type
 import TyCon
 import TypeRep
 import Util ( filterByList )
+import Outputable
+import FastString (sLit)
 
 import Control.Monad (liftM, foldM, ap)
 #if __GLASGOW_HASKELL__ < 709
@@ -474,6 +476,11 @@ tcUnifyTysFG :: (TyVar -> BindFlag)
              -> UnifyResult
 tcUnifyTysFG bind_fn tys1 tys2
   = initUM bind_fn (unify_tys tys1 tys2)
+
+instance Outputable a => Outputable (UnifyResultM a) where
+  ppr SurelyApart    = ptext (sLit "SurelyApart")
+  ppr (Unifiable x)  = ptext (sLit "Unifiable") <+> ppr x
+  ppr (MaybeApart x) = ptext (sLit "MaybeApart") <+> ppr x
 
 {-
 ************************************************************************

@@ -7,3 +7,4 @@ test('overloadedrecfldsrun02',
 test('overloadedrecfldsrun03', normal, compile_and_run, [''])
 test('overloadedrecfldsrun04', normal, compile_and_run, [''])
 test('overloadedrecfldsrun05', normal, compile_and_run, [''])
+test('overloadedrecfldsrun06', normal, compile_and_run, [''])

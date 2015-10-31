@@ -23,7 +23,10 @@ module GHC.IntWord64 (
 #endif
     ) where
 
+import GHC.Types () -- Make implicit dependency known to build system
+
 #if WORD_SIZE_IN_BITS < 64
+
 import GHC.Prim
 
 foreign import ccall unsafe "hs_eqWord64"    eqWord64#     :: Word64# -> Word64# -> Int#

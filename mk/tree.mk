@@ -27,6 +27,9 @@ INPLACE_PERL            = $(INPLACE)/perl
 #
 ################################################################################
 
+# See Note [Spaces in TEST_HC].
+# Directory contains multiple spaces, to test that multiple spaces aren't
+# getting collapsed into a single space.
 BIN_DIST_INST_SUBDIR = "install   dir"
 BIN_DIST_INST_DIR = bindisttest/$(BIN_DIST_INST_SUBDIR)
 

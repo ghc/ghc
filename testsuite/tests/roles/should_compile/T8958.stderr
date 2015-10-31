@@ -1,5 +1,5 @@
 
-T8958.hs:1:31: Warning:
+T8958.hs:1:31: warning:
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 TYPE SIGNATURES
 TYPE CONSTRUCTORS
@@ -20,6 +20,13 @@ Dependent packages: [base-4.8.2.0, ghc-prim-0.4.0.0,
                      integer-gmp-1.0.0.0]
 
 ==================== Typechecker ====================
+T8958.$tcMap = TyCon 0## 0## T8958.$trModule (TrNameS "Map"#)
+T8958.$tc'MkMap = TyCon 0## 0## T8958.$trModule (TrNameS "'MkMap"#)
+T8958.$tcRepresentational
+  = TyCon 0## 0## T8958.$trModule (TrNameS "Representational"#)
+T8958.$tcNominal
+  = TyCon 0## 0## T8958.$trModule (TrNameS "Nominal"#)
+T8958.$trModule = Module (TrNameS "main"#) (TrNameS "T8958"#)
 AbsBinds [a] []
   {Exports: [T8958.$fRepresentationala <= $dRepresentational
                <>]

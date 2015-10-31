@@ -29,7 +29,7 @@ import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.List
 import Data.Maybe
 import System.IO
-import System.Directory
+import System.Directory (setCurrentDirectory, getCurrentDirectory, doesFileExist)
 import System.Environment
 import System.Exit      (exitWith, ExitCode(..))
 import System.FilePath

@@ -126,12 +126,12 @@ mkCoreLets binds body = foldr mkCoreLet body binds
 
 -- | Construct an expression which represents the application of one expression
 -- to the other
-mkCoreApp :: CoreExpr -> CoreExpr -> CoreExpr
+mkCoreApp :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
 -- Respects the let/app invariant by building a case expression where necessary
 --   See CoreSyn Note [CoreSyn let/app invariant]
-mkCoreApp fun (Type ty) = App fun (Type ty)
-mkCoreApp fun (Coercion co) = App fun (Coercion co)
-mkCoreApp fun arg       = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg )
+mkCoreApp _ fun (Type ty) = App fun (Type ty)
+mkCoreApp _ fun (Coercion co) = App fun (Coercion co)
+mkCoreApp d fun arg       = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg $$ d )
                           mk_val_app fun arg arg_ty res_ty
                       where
                         fun_ty = exprType fun

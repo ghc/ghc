@@ -27,12 +27,6 @@ define utils/runghc_dist-install_INSTALL_SHELL_WRAPPER_EXTRA
 echo 'ghcprog="$(ghc_stage$(INSTALL_GHC_STAGE)_INSTALL_SHELL_WRAPPER_NAME)"' >> "$(WRAPPER)"
 endef
 
-ifneq "$(BINDIST)" "YES"
-# hack: the build system has trouble with Main modules not called Main.hs
-utils/runghc/dist-install/build/Main.hs : utils/runghc/runghc.hs | $$(dir $$@)/.
-	"$(CP)" $< $@
-endif
-
 $(eval $(call build-prog,utils/runghc,dist-install,1))
 
 install: install_runhaskell
