@@ -789,7 +789,7 @@ chooseInferredQuantifiers inferred_theta tau_tvs
                                         `unionVarSet` tau_tvs)
        ; my_theta <- pickQuantifiablePreds free_tvs inferred_theta
 
-       -- | Report the inferred constraints for an extra-constraints wildcard/hole as
+       -- Report the inferred constraints for an extra-constraints wildcard/hole as
        -- an error message, unless the PartialTypeSignatures flag is enabled. In this
        -- case, the extra inferred constraints are accepted without complaining.
        -- Returns the annotated constraints combined with the inferred constraints.
