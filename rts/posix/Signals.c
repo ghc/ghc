@@ -540,6 +540,7 @@ backtrace_handler(int sig STG_UNUSED)
     Backtrace *bt = libdw_get_backtrace(session);
     libdw_print_backtrace(session, stderr, bt);
     backtrace_free(bt);
+    libdw_free(session);
 #else
     fprintf(stderr, "This build does not support backtraces.\n");
 #endif
