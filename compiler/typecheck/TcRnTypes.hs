@@ -145,7 +145,6 @@ import Outputable
 import ListSetOps
 import FastString
 import GHC.Fingerprint
-import PrelNames(errorMessageTypeErrorFamName)
 
 import Data.Set (Set)
 import Control.Monad (ap, liftM, guard, msum)
@@ -1447,17 +1446,14 @@ isTypeHoleCt _ = False
 --    1. TypeError msg
 --    2. TypeError msg ~ Something  (and the other way around)
 --    3. C (TypeError msg)          (for any parameter of class constraint)
-getUserTypeErrorMsg :: Ct -> Maybe Type
+getUserTypeErrorMsg :: Ct -> Maybe (Kind, Type)
 getUserTypeErrorMsg ct
   | Just (_,t1,t2) <- getEqPredTys_maybe ctT    = oneOf [t1,t2]
   | Just (_,ts)    <- getClassPredTys_maybe ctT = oneOf ts
-  | otherwise                                   = isTyErr ctT
+  | otherwise                                   = isUserErrorTy ctT
   where
   ctT       = ctPred ct
-  isTyErr t = do (tc,[_,msg]) <- splitTyConApp_maybe t
-                 guard (tyConName tc == errorMessageTypeErrorFamName)
-                 return msg
-  oneOf xs  = msum (map isTyErr xs)
+  oneOf xs  = msum (map isUserErrorTy xs)
 
 isUserTypeErrorCt :: Ct -> Bool
 isUserTypeErrorCt ct = case getUserTypeErrorMsg ct of

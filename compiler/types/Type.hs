@@ -38,6 +38,8 @@ module Type (
         mkNumLitTy, isNumLitTy,
         mkStrLitTy, isStrLitTy,
 
+        isUserErrorTy,
+
         coAxNthLHS,
 
         -- (Newtypes)
@@ -164,7 +166,8 @@ import TysPrim
 import {-# SOURCE #-} TysWiredIn ( eqTyCon, coercibleTyCon, typeNatKind, typeSymbolKind )
 import PrelNames ( eqTyConKey, coercibleTyConKey,
                    ipTyConKey, openTypeKindTyConKey,
-                   constraintKindTyConKey, liftedTypeKindTyConKey )
+                   constraintKindTyConKey, liftedTypeKindTyConKey,
+                   errorMessageTypeErrorFamName )
 import CoAxiom
 
 -- others
@@ -446,6 +449,15 @@ isStrLitTy :: Type -> Maybe FastString
 isStrLitTy ty | Just ty1 <- tcView ty = isStrLitTy ty1
 isStrLitTy (LitTy (StrTyLit s)) = Just s
 isStrLitTy _                    = Nothing
+
+
+-- | Is this type a custom user error?
+-- If so, give us the kind and the error message.
+isUserErrorTy :: Type -> Maybe (Kind,Type)
+isUserErrorTy t = do (tc,[k,msg]) <- splitTyConApp_maybe t
+                     guard (tyConName tc == errorMessageTypeErrorFamName)
+                     return (k,msg)
+
 
 {-
 ---------------------------------------------------------------------

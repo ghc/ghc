@@ -452,8 +452,8 @@ mkUserTypeError :: ReportErrCtxt -> Ct -> TcM ErrMsg
 mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
                         $ renderUserTypeError
                         $ case getUserTypeErrorMsg ct of
-                            Just msg -> msg
-                            Nothing  -> pprPanic "mkUserTypeError" (ppr ct)
+                            Just (_,msg) -> msg
+                            Nothing      -> pprPanic "mkUserTypeError" (ppr ct)
 
 -- | Render a type corresponding to a user type error into a SDoc.
 renderUserTypeError :: Type -> SDoc
