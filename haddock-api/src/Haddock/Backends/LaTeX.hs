@@ -385,7 +385,7 @@ ppTypeOrFunSig _ _ typ (doc, argDocs) (pref1, pref2, sep0)
 
      arg_doc n = rDoc . fmap _doc $ Map.lookup n argDocs
 
-     do_args :: Int -> LaTeX -> (HsType DocName) -> LaTeX
+     do_args :: Int -> LaTeX -> HsType DocName -> LaTeX
      do_args _n leader (HsForAllTy tvs ltype)
        = decltt leader
          <-> decltt (hsep (forallSymbol unicode : ppTyVars tvs ++ [dot]))
