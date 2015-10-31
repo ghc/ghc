@@ -725,11 +725,19 @@ then
 fi
 
 dnl ** check for Sphinx toolchain
-AC_PATH_PROG(SPHINXBUILD,sphinx-build)
-AC_CACHE_CHECK([for version of sphinx-build], fp_cv_sphinx_version,
+if test "$HostOS" = "mingw32"
+then
+SphinxBin=sphinx-build2
+else
+SphinxBin=sphinx-build
+fi;
+
+AC_SUBST([SphinxBin])
+AC_PATH_PROG(SPHINXBUILD,${SphinxBin})
+AC_CACHE_CHECK([for version of ${SphinxBin}], fp_cv_sphinx_version,
 changequote(, )dnl
 [if test -n "$SPHINXBUILD"; then
-  fp_cv_sphinx_version=`"$SPHINXBUILD" --version 2>&1 | sed 's/Sphinx\( (sphinx-build)\)\? v\?\([0-9]\.[0-9]\.[0-9]\)/\2/' | head -n1`;
+  fp_cv_sphinx_version=`"$SPHINXBUILD" --version 2>&1 | sed 's/Sphinx\( (sphinx-build[2]\?)\)\? v\?\([0-9]\.[0-9]\.[0-9]\)/\2/' | head -n1`;
 fi;
 changequote([, ])dnl
 ])
