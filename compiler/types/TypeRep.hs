@@ -573,9 +573,7 @@ instance Outputable TyLit where
 
 ppr_type :: TyPrec -> Type -> SDoc
 ppr_type _ (TyVarTy tv)       = ppr_tvar tv
-ppr_type p (TyConApp tc tys)
-  | tyConName tc == errorMessageTypeErrorFamName = text "(type error)"
-  | otherwise = pprTyTcApp p tc tys
+ppr_type p (TyConApp tc tys)  = pprTyTcApp p tc tys
 ppr_type p (LitTy l)          = ppr_tylit p l
 ppr_type p ty@(ForAllTy {})   = ppr_forall_type p ty
 
@@ -715,6 +713,8 @@ pprTyTcApp p tc tys
     if gopt Opt_PrintExplicitKinds dflags then pprTcApp  p ppr_type tc tys
                                    else pprTyList p ty1 ty2
 
+  | tc `hasKey` errorMessageTypeErrorFamKey = text "(type error)"
+
   | otherwise
   = pprTcApp p ppr_type tc tys
 
@@ -723,6 +723,7 @@ pprTcApp :: TyPrec -> (TyPrec -> a -> SDoc) -> TyCon -> [a] -> SDoc
 pprTcApp _ pp tc [ty]
   | tc `hasKey` listTyConKey = pprPromotionQuote tc <> brackets   (pp TopPrec ty)
   | tc `hasKey` parrTyConKey = pprPromotionQuote tc <> paBrackets (pp TopPrec ty)
+
 
 pprTcApp p pp tc tys
   | Just sort <- tyConTuple_maybe tc
