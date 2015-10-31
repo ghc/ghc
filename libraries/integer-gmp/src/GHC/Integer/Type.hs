@@ -1988,13 +1988,6 @@ cmpW# x# y#
   | True                      = GT
 {-# INLINE cmpW# #-}
 
-subWordC# :: Word# -> Word# -> (# Word#, Int# #)
-subWordC# x# y# = (# d#, c# #)
-  where
-    d# = x# `minusWord#` y#
-    c# = d# `gtWord#` x#
-{-# INLINE subWordC# #-}
-
 bitWord# :: Int# -> Word#
 bitWord# = uncheckedShiftL# 1##
 {-# INLINE bitWord# #-}

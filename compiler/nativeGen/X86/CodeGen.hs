@@ -2065,10 +2065,12 @@ genCCall _ is32Bit target dest_regs args = do
                           ADC format (OpImm (ImmInteger 0)) (OpReg reg_h)
                return code
         _ -> panic "genCCall: Wrong number of arguments/results for add2"
+    (PrimTarget (MO_SubWordC width), [res_r, res_c]) ->
+        addSubIntC platform SUB_CC (const Nothing) CARRY width res_r res_c args
     (PrimTarget (MO_AddIntC width), [res_r, res_c]) ->
-        addSubIntC platform ADD_CC (Just . ADD_CC) width res_r res_c args
+        addSubIntC platform ADD_CC (Just . ADD_CC) OFLO width res_r res_c args
     (PrimTarget (MO_SubIntC width), [res_r, res_c]) ->
-        addSubIntC platform SUB_CC (const Nothing) width res_r res_c args
+        addSubIntC platform SUB_CC (const Nothing) OFLO width res_r res_c args
     (PrimTarget (MO_U_Mul2 width), [res_h, res_l]) ->
         case args of
         [arg_x, arg_y] ->
@@ -2122,7 +2124,8 @@ genCCall _ is32Bit target dest_regs args = do
         divOp _ _ _ _ _ _ _
             = panic "genCCall: Wrong number of results for divOp"
 
-        addSubIntC platform instr mrevinstr width res_r res_c [arg_x, arg_y]
+        addSubIntC platform instr mrevinstr cond width
+                   res_r res_c [arg_x, arg_y]
             = do let format = intFormat width
                  rCode <- anyReg =<< trivialCode width (instr format)
                                        (mrevinstr format) arg_x arg_y
@@ -2130,10 +2133,11 @@ genCCall _ is32Bit target dest_regs args = do
                  let reg_c = getRegisterReg platform True (CmmLocal res_c)
                      reg_r = getRegisterReg platform True (CmmLocal res_r)
                      code = rCode reg_r `snocOL`
-                            SETCC OFLO (OpReg reg_tmp) `snocOL`
+                            SETCC cond (OpReg reg_tmp) `snocOL`
                             MOVZxL II8 (OpReg reg_tmp) (OpReg reg_c)
+
                  return code
-        addSubIntC _ _ _ _ _ _ _
+        addSubIntC _ _ _ _ _ _ _ _
             = panic "genCCall: Wrong number of arguments/results for addSubIntC"
 
 genCCall32' :: DynFlags
@@ -2576,6 +2580,7 @@ outOfLineCmmOp mop res args
               MO_Add2 {}       -> unsupported
               MO_AddIntC {}    -> unsupported
               MO_SubIntC {}    -> unsupported
+              MO_SubWordC {}   -> unsupported
               MO_U_Mul2 {}     -> unsupported
               MO_WriteBarrier  -> unsupported
               MO_Touch         -> unsupported
