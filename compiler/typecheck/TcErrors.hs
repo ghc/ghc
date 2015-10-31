@@ -28,12 +28,7 @@ import TcEvidence
 import Name
 import RdrName ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual )
 import Class( className )
-import PrelNames( typeableClassName
-                , typeErrorTextDataConName
-                , typeErrorShowTypeDataConName
-                , typeErrorAppendDataConName
-                , typeErrorVAppendDataConName
-                )
+import PrelNames( typeableClassName )
 import Id
 import Var
 import VarSet
@@ -450,37 +445,10 @@ mkUserTypeErrorReporter ctxt
 
 mkUserTypeError :: ReportErrCtxt -> Ct -> TcM ErrMsg
 mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
-                        $ renderUserTypeError
+                        $ pprUserTypeErrorTy
                         $ case getUserTypeErrorMsg ct of
                             Just (_,msg) -> msg
                             Nothing      -> pprPanic "mkUserTypeError" (ppr ct)
-
--- | Render a type corresponding to a user type error into a SDoc.
-renderUserTypeError :: Type -> SDoc
-renderUserTypeError ty =
-  case splitTyConApp_maybe ty of
-
-    -- Text "Something"
-    Just (tc,[txt])
-      | tyConName tc == typeErrorTextDataConName
-      , Just str <- isStrLitTy txt -> ftext str
-
-    -- ShowType t
-    Just (tc,[_k,t])
-      | tyConName tc == typeErrorShowTypeDataConName -> ppr t
-
-    -- t1 :<>: t2
-    Just (tc,[t1,t2])
-      | tyConName tc == typeErrorAppendDataConName ->
-        renderUserTypeError t1 <> renderUserTypeError t2
-
-    -- t1 :$$: t2
-    Just (tc,[t1,t2])
-      | tyConName tc == typeErrorVAppendDataConName ->
-        renderUserTypeError t1 $$ renderUserTypeError t2
-
-    -- An uneavaluated type function
-    _ -> ppr ty
 
 
 mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)

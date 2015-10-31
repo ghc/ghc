@@ -38,7 +38,7 @@ module Type (
         mkNumLitTy, isNumLitTy,
         mkStrLitTy, isStrLitTy,
 
-        isUserErrorTy,
+        isUserErrorTy, pprUserTypeErrorTy,
 
         coAxNthLHS,
 
@@ -167,7 +167,12 @@ import {-# SOURCE #-} TysWiredIn ( eqTyCon, coercibleTyCon, typeNatKind, typeSym
 import PrelNames ( eqTyConKey, coercibleTyConKey,
                    ipTyConKey, openTypeKindTyConKey,
                    constraintKindTyConKey, liftedTypeKindTyConKey,
-                   errorMessageTypeErrorFamName )
+                   errorMessageTypeErrorFamName,
+                   typeErrorTextDataConName,
+                   typeErrorShowTypeDataConName,
+                   typeErrorAppendDataConName,
+                   typeErrorVAppendDataConName
+                )
 import CoAxiom
 
 -- others
@@ -457,6 +462,35 @@ isUserErrorTy :: Type -> Maybe (Kind,Type)
 isUserErrorTy t = do (tc,[k,msg]) <- splitTyConApp_maybe t
                      guard (tyConName tc == errorMessageTypeErrorFamName)
                      return (k,msg)
+
+-- | Render a type corresponding to a user type error into a SDoc.
+pprUserTypeErrorTy :: Type -> SDoc
+pprUserTypeErrorTy ty =
+  case splitTyConApp_maybe ty of
+
+    -- Text "Something"
+    Just (tc,[txt])
+      | tyConName tc == typeErrorTextDataConName
+      , Just str <- isStrLitTy txt -> ftext str
+
+    -- ShowType t
+    Just (tc,[_k,t])
+      | tyConName tc == typeErrorShowTypeDataConName -> ppr t
+
+    -- t1 :<>: t2
+    Just (tc,[t1,t2])
+      | tyConName tc == typeErrorAppendDataConName ->
+        pprUserTypeErrorTy t1 <> pprUserTypeErrorTy t2
+
+    -- t1 :$$: t2
+    Just (tc,[t1,t2])
+      | tyConName tc == typeErrorVAppendDataConName ->
+        pprUserTypeErrorTy t1 $$ pprUserTypeErrorTy t2
+
+    -- An uneavaluated type function
+    _ -> ppr ty
+
+
 
 
 {-
