@@ -115,7 +115,7 @@ import TcEvidence
 import Type
 import CoAxiom  ( Role )
 import Class    ( Class )
-import TyCon    ( TyCon, tyConName )
+import TyCon    ( TyCon )
 import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
 import PatSyn   ( PatSyn, patSynType )
@@ -147,7 +147,7 @@ import FastString
 import GHC.Fingerprint
 
 import Data.Set (Set)
-import Control.Monad (ap, liftM, guard, msum)
+import Control.Monad (ap, liftM, msum)
 
 #ifdef GHCI
 import Data.Map      ( Map )
