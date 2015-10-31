@@ -820,7 +820,7 @@ dynLinkObjs hsc_env pls objs = do
             unlinkeds                = concatMap linkableUnlinked new_objs
             wanted_objs              = map nameOfObject unlinkeds
 
-        if loadingDynamicHSLibs (hsc_dflags hsc_env)
+        if interpreterDynamic (hsc_dflags hsc_env)
             then do pls2 <- dynLoadObjs hsc_env pls1 wanted_objs
                     return (pls2, Succeeded)
             else do mapM_ (loadObj hsc_env) wanted_objs
@@ -1248,16 +1248,6 @@ loadFrameworks hsc_env platform pkg
                     Just err -> throwGhcExceptionIO (CmdLineError ("can't load framework: "
                                                         ++ fw ++ " (" ++ err ++ ")" ))
 
-loadingDynamicHSLibs :: DynFlags -> Bool
-loadingDynamicHSLibs dflags
-  | gopt Opt_ExternalInterpreter dflags = WayDyn `elem` ways dflags
-  | otherwise = dynamicGhc
-
-loadingProfiledHSLibs :: DynFlags -> Bool
-loadingProfiledHSLibs dflags
-  | gopt Opt_ExternalInterpreter dflags = gopt Opt_SccProfilingOn dflags
-  | otherwise = rtsIsProfiled
-
 -- Try to find an object file for a given library in the given paths.
 -- If it isn't present, we assume that addDLL in the RTS can find it,
 -- which generally means that it should be a dynamic library in the
@@ -1306,8 +1296,8 @@ locateLib hsc_env is_hs dirs lib
      arch_file = "lib" ++ lib ++ lib_tag <.> "a"
      lib_tag = if is_hs && loading_profiled_hs_libs then "_p" else ""
 
-     loading_profiled_hs_libs = loadingProfiledHSLibs dflags
-     loading_dynamic_hs_libs  = loadingDynamicHSLibs dflags
+     loading_profiled_hs_libs = interpreterProfiled dflags
+     loading_dynamic_hs_libs  = interpreterDynamic dflags
 
      hs_dyn_lib_name = lib ++ '-':programName dflags ++ projectVersion dflags
      hs_dyn_lib_file = mkHsSOName platform hs_dyn_lib_name

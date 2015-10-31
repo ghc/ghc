@@ -1,8 +1,7 @@
-Breakpoint 0 activated at A.hs:4:1-9
-Stopped at A.hs:4:1-9
-_result :: a3 = _
-Stopped at A.hs:4:7-9
+Breakpoint 0 activated at A.hs:4:7-9
+Stopped in A.a, A.hs:4:7-9
 _result :: () = _
 x :: () = ()
-Stopped at B.hs:5:1-7
-_result :: r = _
+Stopped in B.b, B.hs:5:7
+_result :: () = _
+x :: () = ()

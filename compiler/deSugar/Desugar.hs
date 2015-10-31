@@ -300,8 +300,8 @@ deSugar hsc_env
 
         ; (binds_cvr, ds_hpc_info, modBreaks)
                          <- if not (isHsBootOrSig hsc_src)
-                              then addTicksToBinds dflags mod mod_loc export_set
-                                          (typeEnvTyCons type_env) binds
+                              then addTicksToBinds hsc_env mod mod_loc
+                                       export_set (typeEnvTyCons type_env) binds
                               else return (binds, hpcInfo, emptyModBreaks)
 
         ; (msgs, mb_res) <- initDs hsc_env mod rdr_env type_env fam_inst_env $

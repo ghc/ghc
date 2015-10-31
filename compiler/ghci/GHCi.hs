@@ -13,6 +13,8 @@ module GHCi
   , evalString
   , evalStringToIOString
   , mallocData
+  , mkCostCentre
+  , costCentreStackInfo
 
   -- * The object-code linker
   , initObjLinker
@@ -207,7 +209,7 @@ handleEvalStatus
   :: HscEnv -> EvalStatus [HValueRef] -> IO (EvalStatus [ForeignHValue])
 handleEvalStatus hsc_env status =
   case status of
-    EvalBreak a b c d -> return (EvalBreak a b c d)
+    EvalBreak a b c d e -> return (EvalBreak a b c d e)
     EvalComplete alloc res ->
       EvalComplete alloc <$> addFinalizer res
  where
@@ -239,6 +241,16 @@ evalStringToIOString hsc_env fhv str = do
 mallocData :: HscEnv -> ByteString -> IO (Ptr ())
 mallocData hsc_env bs = fromRemotePtr <$> iservCmd hsc_env (MallocData bs)
 
+mkCostCentre
+  :: HscEnv -> RemotePtr {- CChar -} -> String -> String
+  -> IO RemotePtr {- CCostCentre -}
+mkCostCentre hsc_env c_module name src =
+  iservCmd hsc_env (MkCostCentre c_module name src)
+
+
+costCentreStackInfo :: HscEnv -> RemotePtr {- CCostCentreStack -} -> IO [String]
+costCentreStackInfo hsc_env ccs =
+  iservCmd hsc_env (CostCentreStackInfo ccs)
 
 -- -----------------------------------------------------------------------------
 -- Interface to the object-code linker

@@ -2558,6 +2558,14 @@ primop  GetCurrentCCSOp "getCurrentCCS#" GenPrimOp
      simplifier, which would result in an uninformative stack
      ("CAF"). }
 
+primop  ClearCCSOp "clearCCS#" GenPrimOp
+   (State# s -> (# State# s, a #)) -> State# s -> (# State# s, a #)
+   { Run the supplied IO action with an empty CCS.  For example, this
+     is used by the interpreter to run an interpreted computation
+     without the call stack showing that it was invoked from GHC. }
+   with
+   out_of_line = True
+
 ------------------------------------------------------------------------
 section "Etc"
         {Miscellaneous built-ins}

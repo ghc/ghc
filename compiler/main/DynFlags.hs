@@ -81,6 +81,7 @@ module DynFlags (
         defaultDynFlags,                -- Settings -> DynFlags
         defaultWays,
         interpWays,
+        interpreterProfiled, interpreterDynamic,
         initDynFlags,                   -- DynFlags -> IO DynFlags
         defaultFatalMessager,
         defaultLogAction,
@@ -1521,6 +1522,16 @@ interpWays
   | dynamicGhc = [WayDyn]
   | rtsIsProfiled = [WayProf]
   | otherwise = []
+
+interpreterProfiled :: DynFlags -> Bool
+interpreterProfiled dflags
+  | gopt Opt_ExternalInterpreter dflags = gopt Opt_SccProfilingOn dflags
+  | otherwise = rtsIsProfiled
+
+interpreterDynamic :: DynFlags -> Bool
+interpreterDynamic dflags
+  | gopt Opt_ExternalInterpreter dflags = WayDyn `elem` ways dflags
+  | otherwise = dynamicGhc
 
 --------------------------------------------------------------------------
 

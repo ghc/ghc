@@ -670,6 +670,7 @@
       SymI_HasProto(stg_restore_cccs_info)      \
       SymI_HasProto(enterFunCCS)                \
       SymI_HasProto(pushCostCentre)             \
+      SymI_HasProto(mkCostCentre)               \
       SymI_HasProto(era)
 #else
 #define RTS_PROF_SYMBOLS /* empty */
@@ -731,6 +732,7 @@
       SymI_HasProto(stg_catchRetryzh)                                   \
       SymI_HasProto(stg_catchSTMzh)                                     \
       SymI_HasProto(stg_checkzh)                                        \
+      SymI_HasProto(stg_clearCCSzh)                                     \
       SymI_HasProto(closure_flags)                                      \
       SymI_HasProto(cmp_thread)                                         \
       SymI_HasProto(createAdjustor)                                     \

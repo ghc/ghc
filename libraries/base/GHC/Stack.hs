@@ -33,6 +33,7 @@ module GHC.Stack (
     CostCentre,
     getCurrentCCS,
     getCCSOf,
+    clearCCS,
     ccsCC,
     ccsParent,
     ccLabel,

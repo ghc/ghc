@@ -5,4 +5,3 @@ i
 f i
 -- RTTI happens implicitly when the bindings at f come into context
 :step
-:step

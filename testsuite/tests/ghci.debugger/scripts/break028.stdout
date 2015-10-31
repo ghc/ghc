@@ -1,5 +1,6 @@
-Stopped at break028.hs:15:1-24
-_result :: Id a4 = _
-Stopped at break028.hs:15:23-24
+Stopped in Main.g, break028.hs:15:23-24
 _result :: Id a4 = _
 x' :: Id a4 = _
+Stopped in Main.g.x', break028.hs:15:16-18
+_result :: Id Bool = _
+x :: Bool = False

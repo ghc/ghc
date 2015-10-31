@@ -1243,7 +1243,6 @@ stg_catchRetryzh (P_ first_code, /* :: STM a */
         (first_code);
 }
 
-
 stg_retryzh /* no arg list: explicit stack layout */
 {
     W_ frame_type;
@@ -1914,7 +1913,7 @@ stg_newBCOzh ( P_ instrs,
     ALLOC_PRIM (bytes);
 
     bco = Hp - bytes + WDS(1);
-    SET_HDR(bco, stg_BCO_info, CCCS);
+    SET_HDR(bco, stg_BCO_info, CCS_MAIN);
 
     StgBCO_instrs(bco)     = instrs;
     StgBCO_literals(bco)   = literals;
@@ -1950,7 +1949,7 @@ stg_mkApUpd0zh ( P_ bco )
     CCCS_ALLOC(SIZEOF_StgAP);
 
     ap = Hp - SIZEOF_StgAP + WDS(1);
-    SET_HDR(ap, stg_AP_info, CCCS);
+    SET_HDR(ap, stg_AP_info, CCS_MAIN);
 
     StgAP_n_args(ap) = HALF_W_(0);
     StgAP_fun(ap) = bco;
@@ -2349,6 +2348,14 @@ stg_getSparkzh ()
         return (0,ghczmprim_GHCziTypes_False_closure);
     }
 #endif
+}
+
+stg_clearCCSzh (P_ arg)
+{
+#ifdef PROFILING
+    CCCS = CCS_MAIN;
+#endif
+    jump stg_ap_v_fast(arg);
 }
 
 stg_numSparkszh ()

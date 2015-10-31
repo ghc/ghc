@@ -58,6 +58,7 @@ import PrelNames
 import RdrName ( RdrName, getGRE_NameQualifier_maybes, getRdrName )
 import SrcLoc
 import qualified Lexer
+import ByteCodeTypes (BreakInfo(..))
 
 import StringBuffer
 import Outputable hiding ( printForUser, printForUserPartWay, bold )
@@ -97,6 +98,7 @@ import qualified Data.Map as M
 
 import Exception hiding (catch)
 import Foreign
+import GHC.Stack hiding (SrcLoc(..))
 
 import System.Directory
 import System.Environment
@@ -197,7 +199,8 @@ ghciCommands = map mkCmd [
   ("type",      keepGoing' typeOfExpr,          completeExpression),
   ("trace",     keepGoing traceCmd,             completeExpression),
   ("undef",     keepGoing undefineMacro,        completeMacro),
-  ("unset",     keepGoing unsetOptions,         completeSetOptions)
+  ("unset",     keepGoing unsetOptions,         completeSetOptions),
+  ("where",     keepGoing whereCmd,             noCompletion)
   ] ++ map mkCmdHidden [ -- hidden commands
   ("all-types", keepGoing' allTypesCmd),
   ("complete",  keepGoing completeCmd),
@@ -1017,8 +1020,7 @@ toBreakIdAndLocation (Just inf) = do
 
 printStoppedAtBreakInfo :: Resume -> [Name] -> GHCi ()
 printStoppedAtBreakInfo res names = do
-  printForUser $ ptext (sLit "Stopped at") <+>
-    ppr (GHC.resumeSpan res)
+  printForUser $ pprStopped res
   --  printTypeOfNames session names
   let namesSorted = sortBy compareNames names
   tythings <- catMaybes `liftM` mapM GHC.lookupName namesSorted
@@ -1117,6 +1119,15 @@ getCurrentBreakSpan = do
                 let hist = GHC.resumeHistory r !! (ix-1)
                 pan <- GHC.getHistorySpan hist
                 return (Just pan)
+
+getCallStackAtCurrentBreakpoint :: GHCi (Maybe [String])
+getCallStackAtCurrentBreakpoint = do
+  resumes <- GHC.getResumeContext
+  case resumes of
+    [] -> return Nothing
+    (r:_) -> do
+       hsc_env <- GHC.getSession
+       Just <$> liftIO (costCentreStackInfo hsc_env (GHC.resumeCCS r))
 
 getCurrentBreakModule :: GHCi (Maybe Module)
 getCurrentBreakModule = do
@@ -2623,7 +2634,18 @@ showContext = do
   where
    pp_resume res =
         ptext (sLit "--> ") <> text (GHC.resumeStmt res)
-        $$ nest 2 (ptext (sLit "Stopped at") <+> ppr (GHC.resumeSpan res))
+        $$ nest 2 (pprStopped res)
+
+pprStopped :: GHC.Resume -> SDoc
+pprStopped res =
+  ptext (sLit "Stopped in")
+    <+> ((case mb_mod_name of
+           Nothing -> empty
+           Just mod_name -> text (moduleNameString mod_name) <> char '.')
+         <> text (GHC.resumeDecl res))
+    <> char ',' <+> ppr (GHC.resumeSpan res)
+ where
+  mb_mod_name = moduleName <$> breakInfo_module <$> GHC.resumeBreakInfo res
 
 showPackages :: GHCi ()
 showPackages = do
@@ -2875,7 +2897,7 @@ stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
         Just loc -> do
            Just md <- getCurrentBreakModule
            current_toplevel_decl <- enclosingTickSpan md loc
-           doContinue (`isSubspanOf` current_toplevel_decl) GHC.SingleStep
+           doContinue (`isSubspanOf` RealSrcSpan current_toplevel_decl) GHC.SingleStep
 
 stepModuleCmd :: String -> GHCi ()
 stepModuleCmd arg = withSandboxOnly ":stepmodule" $ step arg
@@ -2891,17 +2913,22 @@ stepModuleCmd arg = withSandboxOnly ":stepmodule" $ step arg
            doContinue f GHC.SingleStep
 
 -- | Returns the span of the largest tick containing the srcspan given
-enclosingTickSpan :: Module -> SrcSpan -> GHCi SrcSpan
+enclosingTickSpan :: Module -> SrcSpan -> GHCi RealSrcSpan
 enclosingTickSpan _ (UnhelpfulSpan _) = panic "enclosingTickSpan UnhelpfulSpan"
 enclosingTickSpan md (RealSrcSpan src) = do
   ticks <- getTickArray md
   let line = srcSpanStartLine src
   ASSERT(inRange (bounds ticks) line) do
-  let toRealSrcSpan (UnhelpfulSpan _) = panic "enclosingTickSpan UnhelpfulSpan"
-      toRealSrcSpan (RealSrcSpan s) = s
-      enclosing_spans = [ pan | (_,pan) <- ticks ! line
-                               , realSrcSpanEnd (toRealSrcSpan pan) >= realSrcSpanEnd src]
-  return . head . sortBy leftmost_largest $ enclosing_spans
+  let enclosing_spans = [ pan | (_,pan) <- ticks ! line
+                               , realSrcSpanEnd pan >= realSrcSpanEnd src]
+  return . head . sortBy leftmostLargestRealSrcSpan $ enclosing_spans
+ where
+
+leftmostLargestRealSrcSpan :: RealSrcSpan -> RealSrcSpan -> Ordering
+leftmostLargestRealSrcSpan a b =
+  (realSrcSpanStart a `compare` realSrcSpanStart b)
+     `thenCmp`
+  (realSrcSpanEnd b `compare` realSrcSpanEnd a)
 
 traceCmd :: String -> GHCi ()
 traceCmd arg
@@ -2980,7 +3007,7 @@ backCmd arg
   | otherwise       = liftIO $ putStrLn "Syntax:  :back [num]"
   where
   back num = withSandboxOnly ":back" $ do
-      (names, _, pan) <- GHC.back num
+      (names, _, pan, _) <- GHC.back num
       printForUser $ ptext (sLit "Logged breakpoint at") <+> ppr pan
       printTypeOfNames names
        -- run the command set with ":set stop <cmd>"
@@ -2994,7 +3021,7 @@ forwardCmd arg
   | otherwise       = liftIO $ putStrLn "Syntax:  :back [num]"
   where
   forward num = withSandboxOnly ":forward" $ do
-      (names, ix, pan) <- GHC.forward num
+      (names, ix, pan, _) <- GHC.forward num
       printForUser $ (if (ix == 0)
                         then ptext (sLit "Stopped at")
                         else ptext (sLit "Logged breakpoint at")) <+> ppr pan
@@ -3024,16 +3051,13 @@ breakSwitch (arg1:rest)
               liftIO $ putStrLn "No modules are loaded with debugging support."
    | otherwise = do -- try parsing it as an identifier
         wantNameFromInterpretedModule noCanDo arg1 $ \name -> do
-        let loc = GHC.srcSpanStart (GHC.nameSrcSpan name)
-        case loc of
-            RealSrcLoc l ->
+        maybe_info <- GHC.getModuleInfo (GHC.nameModule name)
+        case maybe_info of
+          Nothing -> noCanDo name (ptext (sLit "cannot get module info"))
+          Just minf ->
                ASSERT( isExternalName name )
                     findBreakAndSet (GHC.nameModule name) $
-                         findBreakByCoord (Just (GHC.srcLocFile l))
-                                          (GHC.srcLocLine l,
-                                           GHC.srcLocCol l)
-            UnhelpfulLoc _ ->
-                noCanDo name $ text "can't find its location: " <> ppr loc
+                       findBreakForBind name (GHC.modInfoModBreaks minf)
        where
           noCanDo n why = printForUser $
                 text "cannot set breakpoint on " <> ppr n <> text ": " <> why
@@ -3047,29 +3071,30 @@ breakByModule _ _
 
 breakByModuleLine :: Module -> Int -> [String] -> GHCi ()
 breakByModuleLine md line args
-   | [] <- args = findBreakAndSet md $ findBreakByLine line
+   | [] <- args = findBreakAndSet md $ maybeToList . findBreakByLine line
    | [col] <- args, all isDigit col =
-        findBreakAndSet md $ findBreakByCoord Nothing (line, read col)
+        findBreakAndSet md $ maybeToList . findBreakByCoord Nothing (line, read col)
    | otherwise = breakSyntax
 
 breakSyntax :: a
 breakSyntax = throwGhcException (CmdLineError "Syntax: :break [<mod>] <line> [<column>]")
 
-findBreakAndSet :: Module -> (TickArray -> Maybe (Int, SrcSpan)) -> GHCi ()
+findBreakAndSet :: Module -> (TickArray -> [(Int, RealSrcSpan)]) -> GHCi ()
 findBreakAndSet md lookupTickTree = do
-   dflags <- getDynFlags
    tickArray <- getTickArray md
    (breakArray, _) <- getModBreak md
    case lookupTickTree tickArray of
-      Nothing  -> liftIO $ putStrLn $ "No breakpoints found at that location."
-      Just (tick, pan) -> do
-         success <- liftIO $ setBreakFlag dflags True breakArray tick
+      []  -> liftIO $ putStrLn $ "No breakpoints found at that location."
+      some -> mapM_ (breakAt breakArray) some
+ where
+   breakAt breakArray (tick, pan) = do
+         success <- liftIO $ setBreakFlag True breakArray tick
          if success
             then do
                (alreadySet, nm) <-
                      recordBreak $ BreakLocation
                              { breakModule = md
-                             , breakLoc = pan
+                             , breakLoc = RealSrcSpan pan
                              , breakTick = tick
                              , onBreakCmd = ""
                              }
@@ -3088,49 +3113,61 @@ findBreakAndSet md lookupTickTree = do
 --    - the leftmost subexpression starting on the specified line, or
 --    - the rightmost subexpression enclosing the specified line
 --
-findBreakByLine :: Int -> TickArray -> Maybe (BreakIndex,SrcSpan)
+findBreakByLine :: Int -> TickArray -> Maybe (BreakIndex,RealSrcSpan)
 findBreakByLine line arr
   | not (inRange (bounds arr) line) = Nothing
   | otherwise =
-    listToMaybe (sortBy (leftmost_largest `on` snd)  comp)   `mplus`
-    listToMaybe (sortBy (leftmost_smallest `on` snd) incomp) `mplus`
-    listToMaybe (sortBy (rightmost `on` snd) ticks)
+    listToMaybe (sortBy (leftmostLargestRealSrcSpan `on` snd)  comp)   `mplus`
+    listToMaybe (sortBy (compare `on` snd) incomp) `mplus`
+    listToMaybe (sortBy (flip compare `on` snd) ticks)
   where
         ticks = arr ! line
 
-        starts_here = [ tick | tick@(_,pan) <- ticks,
-                               GHC.srcSpanStartLine (toRealSpan pan) == line ]
+        starts_here = [ (ix,pan) | (ix, pan) <- ticks,
+                        GHC.srcSpanStartLine pan == line ]
 
         (comp, incomp) = partition ends_here starts_here
-            where ends_here (_,pan) = GHC.srcSpanEndLine (toRealSpan pan) == line
-        toRealSpan (RealSrcSpan pan) = pan
-        toRealSpan (UnhelpfulSpan _) = panic "findBreakByLine UnhelpfulSpan"
+            where ends_here (_,pan) = GHC.srcSpanEndLine pan == line
+
+-- The aim is to find the breakpionts for all the RHSs of the
+-- equations corresponding to a binding.  So we find all breakpoints
+-- for
+--   (a) this binder only (not a nested declaration)
+--   (b) that do not have an enclosing breakpoint
+findBreakForBind :: Name -> GHC.ModBreaks -> TickArray
+                 -> [(BreakIndex,RealSrcSpan)]
+findBreakForBind name modbreaks _ = filter (not . enclosed) ticks
+  where
+    ticks = [ (index, span)
+            | (index, [n]) <- assocs (GHC.modBreaks_decls modbreaks),
+              n == occNameString (nameOccName name),
+              RealSrcSpan span <- [GHC.modBreaks_locs modbreaks ! index] ]
+    enclosed (_,sp0) = any subspan ticks
+      where subspan (_,sp) = sp /= sp0 &&
+                         realSrcSpanStart sp <= realSrcSpanStart sp0 &&
+                         realSrcSpanEnd sp0 <= realSrcSpanEnd sp
 
 findBreakByCoord :: Maybe FastString -> (Int,Int) -> TickArray
-                 -> Maybe (BreakIndex,SrcSpan)
+                 -> Maybe (BreakIndex,RealSrcSpan)
 findBreakByCoord mb_file (line, col) arr
   | not (inRange (bounds arr) line) = Nothing
   | otherwise =
-    listToMaybe (sortBy (rightmost `on` snd) contains ++
-                 sortBy (leftmost_smallest `on` snd) after_here)
+    listToMaybe (sortBy (flip compare `on` snd) contains ++
+                 sortBy (compare `on` snd) after_here)
   where
         ticks = arr ! line
 
         -- the ticks that span this coordinate
-        contains = [ tick | tick@(_,pan) <- ticks, pan `spans` (line,col),
+        contains = [ tick | tick@(_,pan) <- ticks, RealSrcSpan pan `spans` (line,col),
                             is_correct_file pan ]
 
         is_correct_file pan
-                 | Just f <- mb_file = GHC.srcSpanFile (toRealSpan pan) == f
+                 | Just f <- mb_file = GHC.srcSpanFile pan == f
                  | otherwise         = True
 
         after_here = [ tick | tick@(_,pan) <- ticks,
-                              let pan' = toRealSpan pan,
-                              GHC.srcSpanStartLine pan' == line,
-                              GHC.srcSpanStartCol pan' >= col ]
-
-        toRealSpan (RealSrcSpan pan) = pan
-        toRealSpan (UnhelpfulSpan _) = panic "findBreakByCoord UnhelpfulSpan"
+                              GHC.srcSpanStartLine pan == line,
+                              GHC.srcSpanStartCol pan >= col ]
 
 -- For now, use ANSI bold on terminals that we know support it.
 -- Otherwise, we add a line of carets under the active expression instead.
@@ -3147,6 +3184,15 @@ start_bold = "\ESC[1m"
 end_bold :: String
 end_bold   = "\ESC[0m"
 
+-----------------------------------------------------------------------------
+-- :where
+
+whereCmd :: String -> GHCi ()
+whereCmd = noArgs $ do
+  mstrs <- getCallStackAtCurrentBreakpoint
+  case mstrs of
+    Nothing -> return ()
+    Just strs -> liftIO $ putStrLn (renderStack strs)
 
 -----------------------------------------------------------------------------
 -- :list
@@ -3199,8 +3245,7 @@ list2 [arg] = do
                                         tickArray
                   case mb_span of
                     Nothing       -> listAround (realSrcLocSpan l) False
-                    Just (_, UnhelpfulSpan _) -> panic "list2 UnhelpfulSpan"
-                    Just (_, RealSrcSpan pan) -> listAround pan False
+                    Just (_, pan) -> listAround pan False
             UnhelpfulLoc _ ->
                   noCanDo name $ text "can't find its location: " <>
                                  ppr loc
@@ -3315,14 +3360,10 @@ discardTickArrays = modifyGHCiState (\st -> st {tickarrays = emptyModuleEnv})
 mkTickArray :: [(BreakIndex,SrcSpan)] -> TickArray
 mkTickArray ticks
   = accumArray (flip (:)) [] (1, max_line)
-        [ (line, (nm,pan)) | (nm,pan) <- ticks,
-                              let pan' = toRealSpan pan,
-                              line <- srcSpanLines pan' ]
+        [ (line, (nm,pan)) | (nm,RealSrcSpan pan) <- ticks, line <- srcSpanLines pan ]
     where
-        max_line = foldr max 0 (map (GHC.srcSpanEndLine . toRealSpan . snd) ticks)
+        max_line = foldr max 0 [ GHC.srcSpanEndLine sp | (_, RealSrcSpan sp) <- ticks ]
         srcSpanLines pan = [ GHC.srcSpanStartLine pan ..  GHC.srcSpanEndLine pan ]
-        toRealSpan (RealSrcSpan pan) = pan
-        toRealSpan (UnhelpfulSpan _) = panic "mkTickArray UnhelpfulSpan"
 
 -- don't reset the counter back to zero?
 discardActiveBreakPoints :: GHCi ()
@@ -3345,9 +3386,8 @@ deleteBreak identity = do
 
 turnOffBreak :: BreakLocation -> GHCi Bool
 turnOffBreak loc = do
-  dflags <- getDynFlags
   (arr, _) <- getModBreak (breakModule loc)
-  liftIO $ setBreakFlag dflags False arr (breakTick loc)
+  liftIO $ setBreakFlag False arr (breakTick loc)
 
 getModBreak :: Module -> GHCi (GHC.BreakArray, Array Int SrcSpan)
 getModBreak m = do
@@ -3357,10 +3397,10 @@ getModBreak m = do
    let ticks      = GHC.modBreaks_locs  modBreaks
    return (arr, ticks)
 
-setBreakFlag :: DynFlags -> Bool -> GHC.BreakArray -> Int -> IO Bool
-setBreakFlag dflags toggle arr i
-   | toggle    = GHC.setBreakOn  dflags arr i
-   | otherwise = GHC.setBreakOff dflags arr i
+setBreakFlag :: Bool -> GHC.BreakArray -> Int -> IO Bool
+setBreakFlag toggle arr i
+   | toggle    = GHC.setBreakOn  arr i
+   | otherwise = GHC.setBreakOff arr i
 
 
 -- ---------------------------------------------------------------------------

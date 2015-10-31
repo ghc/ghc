@@ -1,4 +1,4 @@
-"Stopped at <exception thrown>
+"Stopped in <exception thrown>, <unknown>
 _exception :: e = _
 Logged breakpoint at ../QSort.hs:6:24-38
 _result :: [Char]

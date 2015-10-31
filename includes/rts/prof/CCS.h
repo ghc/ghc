@@ -174,6 +174,7 @@ extern unsigned int RTS_VAR(era);
 
 CostCentreStack * pushCostCentre (CostCentreStack *, CostCentre *);
 void              enterFunCCS    (StgRegTable *reg, CostCentreStack *);
+CostCentre *mkCostCentre (char *label, char *module, char *srcloc);
 
 /* -----------------------------------------------------------------------------
    Registering CCs and CCSs

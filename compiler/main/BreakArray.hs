@@ -2,13 +2,16 @@
 
 -------------------------------------------------------------------------------
 --
--- | Break Arrays in the IO monad
---
--- Entries in the array are Word sized Conceptually, a zero-indexed IOArray of
--- Bools, initially False.  They're represented as Words with 0==False, 1==True.
--- They're used to determine whether GHCI breakpoints are on or off.
---
 -- (c) The University of Glasgow 2007
+--
+-- | Break Arrays
+--
+-- An array of bytes, indexed by a breakpoint number (breakpointId in Tickish)
+-- There is one of these arrays per module.
+--
+-- Each byte is
+--   1 if the corresponding breakpoint is enabled
+--   0 otherwise
 --
 -------------------------------------------------------------------------------
 
@@ -27,10 +30,10 @@ module BreakArray
 #endif
     ) where
 
-import DynFlags
-
 #ifdef GHCI
 import Control.Monad
+import Data.Word
+import GHC.Word
 
 import GHC.Exts
 import GHC.IO ( IO(..) )
@@ -38,43 +41,43 @@ import System.IO.Unsafe ( unsafeDupablePerformIO )
 
 data BreakArray = BA (MutableByteArray# RealWorld)
 
-breakOff, breakOn :: Word
+breakOff, breakOn :: Word8
 breakOn  = 1
 breakOff = 0
 
-showBreakArray :: DynFlags -> BreakArray -> IO ()
-showBreakArray dflags array = do
-    forM_ [0 .. (size dflags array - 1)] $ \i -> do
+showBreakArray :: BreakArray -> IO ()
+showBreakArray array = do
+    forM_ [0 .. (size array - 1)] $ \i -> do
         val <- readBreakArray array i
         putStr $ ' ' : show val
     putStr "\n"
 
-setBreakOn :: DynFlags -> BreakArray -> Int -> IO Bool
-setBreakOn dflags array index
-    | safeIndex dflags array index = do
+setBreakOn :: BreakArray -> Int -> IO Bool
+setBreakOn array index
+    | safeIndex array index = do
           writeBreakArray array index breakOn
           return True
     | otherwise = return False
 
-setBreakOff :: DynFlags -> BreakArray -> Int -> IO Bool
-setBreakOff dflags array index
-    | safeIndex dflags array index = do
+setBreakOff :: BreakArray -> Int -> IO Bool
+setBreakOff array index
+    | safeIndex array index = do
           writeBreakArray array index breakOff
           return True
     | otherwise = return False
 
-getBreak :: DynFlags -> BreakArray -> Int -> IO (Maybe Word)
-getBreak dflags array index
-    | safeIndex dflags array index = do
+getBreak :: BreakArray -> Int -> IO (Maybe Word8)
+getBreak array index
+    | safeIndex array index = do
           val <- readBreakArray array index
           return $ Just val
     | otherwise = return Nothing
 
-safeIndex :: DynFlags -> BreakArray -> Int -> Bool
-safeIndex dflags array index = index < size dflags array && index >= 0
+safeIndex :: BreakArray -> Int -> Bool
+safeIndex array index = index < size array && index >= 0
 
-size :: DynFlags -> BreakArray -> Int
-size dflags (BA array) = size `div` wORD_SIZE dflags
+size :: BreakArray -> Int
+size (BA array) = size
   where
     -- We want to keep this operation pure. The mutable byte array
     -- is never resized so this is safe.
@@ -90,30 +93,28 @@ allocBA (I# sz) = IO $ \s1 ->
     case newByteArray# sz s1 of { (# s2, array #) -> (# s2, BA array #) }
 
 -- create a new break array and initialise elements to zero
-newBreakArray :: DynFlags -> Int -> IO BreakArray
-newBreakArray dflags entries@(I# sz) = do
-    BA array <- allocBA (entries * wORD_SIZE dflags)
+newBreakArray :: Int -> IO BreakArray
+newBreakArray entries@(I# sz) = do
+    BA array <- allocBA entries
     case breakOff of
-        W# off -> do    -- Todo: there must be a better way to write zero as a Word!
-            let loop n | isTrue# (n ==# sz) = return ()
-                       | otherwise = do
-                             writeBA# array n off
-                             loop (n +# 1#)
-            loop 0#
+        W8# off -> do
+           let loop n | isTrue# (n ==# sz) = return ()
+                      | otherwise = do writeBA# array n off; loop (n +# 1#)
+           loop 0#
     return $ BA array
 
 writeBA# :: MutableByteArray# RealWorld -> Int# -> Word# -> IO ()
 writeBA# array i word = IO $ \s ->
-    case writeWordArray# array i word s of { s -> (# s, () #) }
+    case writeWord8Array# array i word s of { s -> (# s, () #) }
 
-writeBreakArray :: BreakArray -> Int -> Word -> IO ()
-writeBreakArray (BA array) (I# i) (W# word) = writeBA# array i word
+writeBreakArray :: BreakArray -> Int -> Word8 -> IO ()
+writeBreakArray (BA array) (I# i) (W8# word) = writeBA# array i word
 
-readBA# :: MutableByteArray# RealWorld -> Int# -> IO Word
+readBA# :: MutableByteArray# RealWorld -> Int# -> IO Word8
 readBA# array i = IO $ \s ->
-    case readWordArray# array i s of { (# s, c #) -> (# s, W# c #) }
+    case readWord8Array# array i s of { (# s, c #) -> (# s, W8# c #) }
 
-readBreakArray :: BreakArray -> Int -> IO Word
+readBreakArray :: BreakArray -> Int -> IO Word8
 readBreakArray (BA array) (I# i) = readBA# array i
 
 #else /* !GHCI */
@@ -124,8 +125,8 @@ readBreakArray (BA array) (I# i) = readBA# array i
 -- presumably have a different representation.
 data BreakArray = Unspecified
 
-newBreakArray :: DynFlags -> Int -> IO BreakArray
-newBreakArray _ _ = return Unspecified
+newBreakArray :: Int -> IO BreakArray
+newBreakArray _ = return Unspecified
 
 #endif /* GHCI */
 

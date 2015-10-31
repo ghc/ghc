@@ -1,6 +1,5 @@
 :l ../Test3.hs
 :st mymap (+1) [1::Integer,2,3]
-:st
 :show bindings
 f x -- should fail, unknown return type
 let y = f x
@@ -11,4 +10,3 @@ y
 -- we know the result is Integer now
 f x
 -- should work now
-

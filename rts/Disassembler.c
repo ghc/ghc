@@ -67,8 +67,9 @@ disInstr ( StgBCO *bco, int pc )
    switch (instr & 0xff) {
       case bci_BRK_FUN:
          debugBelch ("BRK_FUN  " );  printPtr( ptrs[instrs[pc]] );
-         debugBelch (" %d ", instrs[pc+1]); printPtr( ptrs[instrs[pc+2]] ); debugBelch("\n" );
-         pc += 3;
+         debugBelch (" %d ", instrs[pc+1]); printPtr( ptrs[instrs[pc+2]] );
+         debugBelch(" %s\n", ((CostCentre*)(literals[instrs[pc+3]]))->label);
+         pc += 4;
          break;
       case bci_SWIZZLE:
          debugBelch("SWIZZLE stkoff %d by %d\n",

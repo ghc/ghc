@@ -4,6 +4,5 @@ seq test ()
 :print test
 :break f
 f test2
-:step
 :fo x
 :t x

@@ -26,6 +26,7 @@ module GHC.Stack.CCS (
     CostCentre,
     getCurrentCCS,
     getCCSOf,
+    clearCCS,
     ccsCC,
     ccsParent,
     ccLabel,
@@ -59,6 +60,9 @@ getCCSOf :: a -> IO (Ptr CostCentreStack)
 getCCSOf obj = IO $ \s ->
    case getCCSOf## obj s of
      (## s', addr ##) -> (## s', Ptr addr ##)
+
+clearCCS :: IO a -> IO a
+clearCCS (IO m) = IO $ \s -> clearCCS## m s
 
 ccsCC :: Ptr CostCentreStack -> IO (Ptr CostCentre)
 ccsCC p = (# peek CostCentreStack, cc) p

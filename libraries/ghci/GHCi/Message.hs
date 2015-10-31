@@ -114,6 +114,18 @@ data Message a where
    :: HValueRef {- IO a -}
    -> Message (EvalResult ())
 
+  -- | Create a CostCentre
+  MkCostCentre
+   :: RemotePtr    -- module, RemotePtr so it can be shared
+   -> String       -- name
+   -> String       -- SrcSpan
+   -> Message RemotePtr
+
+  -- | Show a 'CostCentreStack' as a @[String]@
+  CostCentreStackInfo
+   :: RemotePtr {- from EvalBreak -}
+   -> Message [String]
+
   -- Template Haskell -------------------------------------------
 
   -- | Start a new TH module, return a state token that should be
@@ -191,6 +203,7 @@ data EvalStatus a
        HValueRef{- AP_STACK -}
        HValueRef{- BreakInfo -}
        HValueRef{- ResumeContext -}
+       RemotePtr -- Cost centre stack
   deriving (Generic, Show)
 
 instance Binary a => Binary (EvalStatus a)
@@ -264,24 +277,26 @@ getMessage = do
       21 -> Msg <$> (EvalString <$> get)
       22 -> Msg <$> (EvalStringToString <$> get <*> get)
       23 -> Msg <$> (EvalIO <$> get)
-      24 -> Msg <$> return StartTH
-      25 -> Msg <$> FinishTH <$> get
-      26 -> Msg <$> (RunTH <$> get <*> get <*> get <*> get)
-      27 -> Msg <$> NewName <$> get
-      28 -> Msg <$> (Report <$> get <*> get)
-      29 -> Msg <$> (LookupName <$> get <*> get)
-      30 -> Msg <$> Reify <$> get
-      31 -> Msg <$> ReifyFixity <$> get
-      32 -> Msg <$> (ReifyInstances <$> get <*> get)
-      33 -> Msg <$> ReifyRoles <$> get
-      34 -> Msg <$> (ReifyAnnotations <$> get <*> get)
-      35 -> Msg <$> ReifyModule <$> get
-      36 -> Msg <$> AddDependentFile <$> get
-      37 -> Msg <$> AddTopDecls <$> get
-      38 -> Msg <$> (IsExtEnabled <$> get)
-      39 -> Msg <$> return ExtsEnabled
-      40 -> Msg <$> return QDone
-      41 -> Msg <$> QException <$> get
+      24 -> Msg <$> (MkCostCentre <$> get <*> get <*> get)
+      25 -> Msg <$> (CostCentreStackInfo <$> get)
+      26 -> Msg <$> return StartTH
+      27 -> Msg <$> FinishTH <$> get
+      28 -> Msg <$> (RunTH <$> get <*> get <*> get <*> get)
+      29 -> Msg <$> NewName <$> get
+      30 -> Msg <$> (Report <$> get <*> get)
+      31 -> Msg <$> (LookupName <$> get <*> get)
+      32 -> Msg <$> Reify <$> get
+      33 -> Msg <$> ReifyFixity <$> get
+      34 -> Msg <$> (ReifyInstances <$> get <*> get)
+      35 -> Msg <$> ReifyRoles <$> get
+      36 -> Msg <$> (ReifyAnnotations <$> get <*> get)
+      37 -> Msg <$> ReifyModule <$> get
+      38 -> Msg <$> AddDependentFile <$> get
+      39 -> Msg <$> AddTopDecls <$> get
+      40 -> Msg <$> (IsExtEnabled <$> get)
+      41 -> Msg <$> return ExtsEnabled
+      42 -> Msg <$> return QDone
+      43 -> Msg <$> QException <$> get
       _  -> Msg <$> QFail <$> get
 
 putMessage :: Message a -> Put
@@ -310,25 +325,27 @@ putMessage m = case m of
   EvalString val              -> putWord8 21 >> put val
   EvalStringToString str val  -> putWord8 22 >> put str >> put val
   EvalIO val                  -> putWord8 23 >> put val
-  StartTH                     -> putWord8 24
-  FinishTH val                -> putWord8 25 >> put val
-  RunTH st q loc ty           -> putWord8 26 >> put st >> put q >> put loc >> put ty
-  NewName a                   -> putWord8 27 >> put a
-  Report a b                  -> putWord8 28 >> put a >> put b
-  LookupName a b              -> putWord8 29 >> put a >> put b
-  Reify a                     -> putWord8 30 >> put a
-  ReifyFixity a               -> putWord8 31 >> put a
-  ReifyInstances a b          -> putWord8 32 >> put a >> put b
-  ReifyRoles a                -> putWord8 33 >> put a
-  ReifyAnnotations a b        -> putWord8 34 >> put a >> put b
-  ReifyModule a               -> putWord8 35 >> put a
-  AddDependentFile a          -> putWord8 36 >> put a
-  AddTopDecls a               -> putWord8 37 >> put a
-  IsExtEnabled a              -> putWord8 38 >> put a
-  ExtsEnabled                 -> putWord8 39
-  QDone                       -> putWord8 40
-  QException a                -> putWord8 41 >> put a
-  QFail a                     -> putWord8 42 >> put a
+  MkCostCentre name mod src   -> putWord8 24 >> put name >> put mod >> put src
+  CostCentreStackInfo ptr     -> putWord8 25 >> put ptr
+  StartTH                     -> putWord8 26
+  FinishTH val                -> putWord8 27 >> put val
+  RunTH st q loc ty           -> putWord8 28 >> put st >> put q >> put loc >> put ty
+  NewName a                   -> putWord8 29 >> put a
+  Report a b                  -> putWord8 30 >> put a >> put b
+  LookupName a b              -> putWord8 31 >> put a >> put b
+  Reify a                     -> putWord8 32 >> put a
+  ReifyFixity a               -> putWord8 33 >> put a
+  ReifyInstances a b          -> putWord8 34 >> put a >> put b
+  ReifyRoles a                -> putWord8 35 >> put a
+  ReifyAnnotations a b        -> putWord8 36 >> put a >> put b
+  ReifyModule a               -> putWord8 37 >> put a
+  AddDependentFile a          -> putWord8 38 >> put a
+  AddTopDecls a               -> putWord8 39 >> put a
+  IsExtEnabled a              -> putWord8 40 >> put a
+  ExtsEnabled                 -> putWord8 41
+  QDone                       -> putWord8 42
+  QException a                -> putWord8 43 >> put a
+  QFail a                     -> putWord8 44 >> put a
 
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages

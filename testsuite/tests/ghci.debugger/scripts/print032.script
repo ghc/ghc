@@ -5,4 +5,3 @@ let b = MkT2 (map Just [2::Int]) -- Want to obtain a thunk
 :break f2
 f2 a b
 :step
-

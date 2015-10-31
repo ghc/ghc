@@ -18,6 +18,7 @@ module ByteCodeAsm (
 import ByteCodeInstr
 import ByteCodeItbls
 import ByteCodeTypes
+import GHCi.RemoteTypes
 
 import HscTypes
 import Name
@@ -359,9 +360,11 @@ assembleI dflags i = case i of
   RETURN_UBX rep           -> emit (return_ubx rep) []
   CCALL off m_addr i       -> do np <- addr m_addr
                                  emit bci_CCALL [SmallOp off, Op np, SmallOp i]
-  BRK_FUN array index info -> do p1 <- ptr (BCOPtrArray array)
-                                 p2 <- ptr (BCOPtrBreakInfo info)
-                                 emit bci_BRK_FUN [Op p1, SmallOp index, Op p2]
+  BRK_FUN array index info cc -> do p1 <- ptr (BCOPtrArray array)
+                                    p2 <- ptr (BCOPtrBreakInfo info)
+                                    np <- addr cc
+                                    emit bci_BRK_FUN [Op p1, SmallOp index,
+                                                      Op p2, Op np]
 
   where
     literal (MachLabel fs (Just sz) _)
@@ -383,7 +386,7 @@ assembleI dflags i = case i of
     literal LitInteger{}       = panic "ByteCodeAsm.literal: LitInteger"
 
     litlabel fs = lit [BCONPtrLbl fs]
-    addr = words . mkLitPtr
+    addr (RemotePtr a) = words [fromIntegral a]
     float = words . mkLitF
     double = words . mkLitD dflags
     int = words . mkLitI
@@ -422,7 +425,6 @@ return_ubx V64 = error "return_ubx: vector"
 mkLitI   ::             Int    -> [Word]
 mkLitF   ::             Float  -> [Word]
 mkLitD   :: DynFlags -> Double -> [Word]
-mkLitPtr ::             Ptr () -> [Word]
 mkLitI64 :: DynFlags -> Int64  -> [Word]
 
 mkLitF f
@@ -482,15 +484,6 @@ mkLitI i
         writeArray arr 0 i
         i_arr <- castSTUArray arr
         w0 <- readArray i_arr 0
-        return [w0 :: Word]
-     )
-
-mkLitPtr a
-   = runST (do
-        arr <- newArray_ ((0::Int),0)
-        writeArray arr 0 a
-        a_arr <- castSTUArray arr
-        w0 <- readArray a_arr 0
         return [w0 :: Word]
      )
 

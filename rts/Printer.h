@@ -24,7 +24,6 @@ char  *            info_update_frame ( StgClosure *closure );
 #ifdef DEBUG
 extern void        prettyPrintClosure (StgClosure *obj);
 extern void        printClosure    ( StgClosure *obj );
-extern StgPtr      printStackObj   ( StgPtr sp );
 extern void        printStackChunk ( StgPtr sp, StgPtr spLim );
 extern void        printTSO        ( StgTSO *tso );
 

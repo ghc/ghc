@@ -277,7 +277,7 @@ emitSetCCC cc tick push
  = do dflags <- getDynFlags
       if not (gopt Opt_SccProfilingOn dflags)
           then return ()
-          else do tmp <- newTemp (ccsType dflags) -- TODO FIXME NOW
+          else do tmp <- newTemp (ccsType dflags)
                   pushCostCentre tmp curCCS cc
                   when tick $ emit (bumpSccCount dflags (CmmReg (CmmLocal tmp)))
                   when push $ emit (storeCurCCS (CmmReg (CmmLocal tmp)))

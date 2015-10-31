@@ -227,6 +227,15 @@ freeProfiling (void)
     arenaFree(prof_arena);
 }
 
+CostCentre *mkCostCentre (char *label, char *module, char *srcloc)
+{
+    CostCentre *cc = stgMallocBytes (sizeof(CostCentre), "mkCostCentre");
+    cc->label = label;
+    cc->module = module;
+    cc->srcloc = srcloc;
+    return cc;
+}
+
 static void
 initProfilingLogFile(void)
 {

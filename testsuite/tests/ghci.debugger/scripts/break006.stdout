@@ -1,6 +1,4 @@
-Stopped at ../Test3.hs:(1,1)-(2,31)
-_result :: [t] = _
-Stopped at ../Test3.hs:2:18-31
+Stopped in Main.mymap, ../Test3.hs:2:18-31
 _result :: [t] = _
 f :: Integer -> t = _
 x :: Integer = 1

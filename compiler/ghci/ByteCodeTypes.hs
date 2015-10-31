@@ -20,6 +20,7 @@ import Outputable
 import PrimOp
 import SizedSeq
 import Type
+import GHCi.RemoteTypes
 
 import Foreign
 import Data.Array.Base  ( UArray(..) )
@@ -33,7 +34,7 @@ data CompiledByteCode
              [FFIInfo]     -- ffi blocks we allocated
                 -- ToDo: we're not tracking strings that we malloc'd
 
-newtype FFIInfo = FFIInfo (Ptr ())
+newtype FFIInfo = FFIInfo RemotePtr
   deriving Show
 
 instance Outputable CompiledByteCode where

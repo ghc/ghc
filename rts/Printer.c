@@ -17,6 +17,10 @@
 #include "Printer.h"
 #include "RtsUtils.h"
 
+#ifdef PROFILING
+#include "Profiling.h"
+#endif
+
 #include <string.h>
 
 #ifdef DEBUG
@@ -422,42 +426,6 @@ void printGraph( StgClosure *obj )
 }
 */
 
-StgPtr
-printStackObj( StgPtr sp )
-{
-    /*debugBelch("Stack[%d] = ", &stgStack[STACK_SIZE] - sp); */
-
-        StgClosure* c = (StgClosure*)(*sp);
-        printPtr((StgPtr)*sp);
-        if (c == (StgClosure*)&stg_ctoi_R1p_info) {
-           debugBelch("\t\t\tstg_ctoi_ret_R1p_info\n" );
-        } else
-        if (c == (StgClosure*)&stg_ctoi_R1n_info) {
-           debugBelch("\t\t\tstg_ctoi_ret_R1n_info\n" );
-        } else
-        if (c == (StgClosure*)&stg_ctoi_F1_info) {
-           debugBelch("\t\t\tstg_ctoi_ret_F1_info\n" );
-        } else
-        if (c == (StgClosure*)&stg_ctoi_D1_info) {
-           debugBelch("\t\t\tstg_ctoi_ret_D1_info\n" );
-        } else
-        if (c == (StgClosure*)&stg_ctoi_V_info) {
-           debugBelch("\t\t\tstg_ctoi_ret_V_info\n" );
-        } else
-        if (get_itbl(c)->type == BCO) {
-           debugBelch("\t\t\t");
-           debugBelch("BCO(...)\n");
-        }
-        else {
-           debugBelch("\t\t\t");
-           printClosure ( (StgClosure*)(*sp));
-        }
-        sp += 1;
-
-    return sp;
-
-}
-
 static void
 printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap, nat size )
 {
@@ -513,15 +481,58 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
         case CATCH_FRAME:
         case UNDERFLOW_FRAME:
         case STOP_FRAME:
-            printObj((StgClosure*)sp);
+            printClosure((StgClosure*)sp);
             continue;
 
-        case RET_SMALL:
-            debugBelch("RET_SMALL (%p)\n", info);
+        case RET_SMALL: {
+            StgWord c = *sp;
+            if (c == (StgWord)&stg_ctoi_R1p_info) {
+                debugBelch("tstg_ctoi_ret_R1p_info\n" );
+            } else if (c == (StgWord)&stg_ctoi_R1n_info) {
+                debugBelch("stg_ctoi_ret_R1n_info\n" );
+            } else if (c == (StgWord)&stg_ctoi_F1_info) {
+                debugBelch("stg_ctoi_ret_F1_info\n" );
+            } else if (c == (StgWord)&stg_ctoi_D1_info) {
+                debugBelch("stg_ctoi_ret_D1_info\n" );
+            } else if (c == (StgWord)&stg_ctoi_V_info) {
+                debugBelch("stg_ctoi_ret_V_info\n" );
+            } else if (c == (StgWord)&stg_ap_v_info) {
+                debugBelch("stg_ap_v_info\n" );
+            } else if (c == (StgWord)&stg_ap_f_info) {
+                debugBelch("stg_ap_f_info\n" );
+            } else if (c == (StgWord)&stg_ap_d_info) {
+                debugBelch("stg_ap_d_info\n" );
+            } else if (c == (StgWord)&stg_ap_l_info) {
+                debugBelch("stg_ap_l_info\n" );
+            } else if (c == (StgWord)&stg_ap_n_info) {
+                debugBelch("stg_ap_n_info\n" );
+            } else if (c == (StgWord)&stg_ap_p_info) {
+                debugBelch("stg_ap_p_info\n" );
+            } else if (c == (StgWord)&stg_ap_pp_info) {
+                debugBelch("stg_ap_pp_info\n" );
+            } else if (c == (StgWord)&stg_ap_ppp_info) {
+                debugBelch("stg_ap_ppp_info\n" );
+            } else if (c == (StgWord)&stg_ap_pppp_info) {
+                debugBelch("stg_ap_pppp_info\n" );
+            } else if (c == (StgWord)&stg_ap_ppppp_info) {
+                debugBelch("stg_ap_ppppp_info\n" );
+            } else if (c == (StgWord)&stg_ap_pppppp_info) {
+                debugBelch("stg_ap_pppppp_info\n" );
+#ifdef PROFILING
+            } else if (c == (StgWord)&stg_restore_cccs_info) {
+                debugBelch("stg_restore_cccs_info\n" );
+                fprintCCS(stderr, (CostCentreStack*)sp[1]);
+                debugBelch("\n" );
+                continue;
+#endif
+            } else {
+                debugBelch("RET_SMALL (%p)\n", info);
+            }
             bitmap = info->layout.bitmap;
             printSmallBitmap(spBottom, sp+1,
                              BITMAP_BITS(bitmap), BITMAP_SIZE(bitmap));
             continue;
+        }
 
         case RET_BCO: {
             StgBCO *bco;
@@ -963,4 +974,3 @@ void
 info_hdr_type(StgClosure *closure, char *res){
   strcpy(res,closure_type_names[get_itbl(closure)->type]);
 }
-

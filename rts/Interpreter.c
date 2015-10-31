@@ -18,6 +18,7 @@
 #include "Prelude.h"
 #include "Stable.h"
 #include "Printer.h"
+#include "Profiling.h"
 #include "Disassembler.h"
 #include "Interpreter.h"
 #include "ThreadPaused.h"
@@ -80,7 +81,25 @@
     SpLim = tso_SpLim(cap->r.rCurrentTSO);
 
 #define SAVE_STACK_POINTERS                     \
-    cap->r.rCurrentTSO->stackobj->sp = Sp
+    cap->r.rCurrentTSO->stackobj->sp = Sp;
+
+#ifdef PROFILING
+#define LOAD_THREAD_STATE()                     \
+    LOAD_STACK_POINTERS                         \
+    cap->r.rCCCS = cap->r.rCurrentTSO->prof.cccs;
+#else
+#define LOAD_THREAD_STATE()                     \
+    LOAD_STACK_POINTERS
+#endif
+
+#ifdef PROFILING
+#define SAVE_THREAD_STATE()                     \
+    SAVE_STACK_POINTERS                         \
+    cap->r.rCurrentTSO->prof.cccs = cap->r.rCCCS;
+#else
+#define SAVE_THREAD_STATE()                     \
+    SAVE_STACK_POINTERS
+#endif
 
 // Note [Not true: ASSERT(Sp > SpLim)]
 //
@@ -90,14 +109,14 @@
 // less than SpLim both when leaving to return to the scheduler.
 
 #define RETURN_TO_SCHEDULER(todo,retcode)       \
-   SAVE_STACK_POINTERS;                         \
+   SAVE_THREAD_STATE();                         \
    cap->r.rCurrentTSO->what_next = (todo);      \
-   threadPaused(cap,cap->r.rCurrentTSO);                \
+   threadPaused(cap,cap->r.rCurrentTSO);        \
    cap->r.rRet = (retcode);                     \
    return cap;
 
 #define RETURN_TO_SCHEDULER_NO_PAUSE(todo,retcode)      \
-   SAVE_STACK_POINTERS;                                 \
+   SAVE_THREAD_STATE();                                 \
    cap->r.rCurrentTSO->what_next = (todo);              \
    cap->r.rRet = (retcode);                             \
    return cap;
@@ -217,10 +236,23 @@ interpretBCO (Capability* cap)
     register StgClosure   *tagged_obj = 0, *obj;
     nat n, m;
 
-    LOAD_STACK_POINTERS;
+    LOAD_THREAD_STATE();
 
     cap->r.rHpLim = (P_)1; // HpLim is the context-switch flag; when it
                            // goes to zero we must return to the scheduler.
+
+    IF_DEBUG(interpreter,
+             debugBelch(
+             "\n---------------------------------------------------------------\n");
+             debugBelch("Entering the interpreter, Sp = %p\n", Sp);
+#ifdef PROFILING
+             fprintCCS(stderr, cap->r.rCCCS);
+             debugBelch("\n");
+#endif
+             debugBelch("\n");
+             printStackChunk(Sp,cap->r.rCurrentTSO->stackobj->stack+cap->r.rCurrentTSO->stackobj->stack_size);
+             debugBelch("\n\n");
+            );
 
     // ------------------------------------------------------------------------
     // Case 1:
@@ -230,6 +262,8 @@ interpretBCO (Capability* cap)
     //          |   XXXX_info   |
     //          +---------------+
     //       Sp |      -------------------> closure
+    //          +---------------+
+    //          |   stg_enter   |
     //          +---------------+
     //
     if (Sp[0] == (W_)&stg_enter_info) {
@@ -280,6 +314,10 @@ eval_obj:
              "\n---------------------------------------------------------------\n");
              debugBelch("Evaluating: "); printObj(obj);
              debugBelch("Sp = %p\n", Sp);
+#ifdef PROFILING
+             fprintCCS(stderr, cap->r.rCCCS);
+             debugBelch("\n");
+#endif
              debugBelch("\n" );
 
              printStackChunk(Sp,cap->r.rCurrentTSO->stackobj->stack+cap->r.rCurrentTSO->stackobj->stack_size);
@@ -333,16 +371,20 @@ eval_obj:
         words = ap->n_args;
 
         // Stack check
-        if (Sp - (words+sizeofW(StgUpdateFrame)) < SpLim) {
+        if (Sp - (words+sizeofW(StgUpdateFrame)+2) < SpLim) {
             Sp -= 2;
             Sp[1] = (W_)tagged_obj;
             Sp[0] = (W_)&stg_enter_info;
             RETURN_TO_SCHEDULER(ThreadInterpret, StackOverflow);
         }
 
-        ENTER_CCS_THUNK(cap,ap);
+#ifdef PROFILING
+        // restore the CCCS after evaluating the AP
+        Sp -= 2;
+        Sp[1] = (W_)cap->r.rCCCS;
+        Sp[0] = (W_)&stg_restore_cccs_info;
+#endif
 
-        /* Ok; we're safe.  Party on.  Push an update frame. */
         Sp -= sizeofW(StgUpdateFrame);
         {
             StgUpdateFrame *__frame;
@@ -350,6 +392,8 @@ eval_obj:
             SET_INFO((StgClosure *)__frame, (StgInfoTable *)&stg_upd_frame_info);
             __frame->updatee = (StgClosure *)(ap);
         }
+
+        ENTER_CCS_THUNK(cap,ap);
 
         /* Reload the stack */
         Sp -= words;
@@ -379,6 +423,12 @@ eval_obj:
                  debugBelch("evaluating unknown closure -- yielding to sched\n");
                  printObj(obj);
             );
+#ifdef PROFILING
+        // restore the CCCS after evaluating the closure
+        Sp -= 2;
+        Sp[1] = (W_)cap->r.rCCCS;
+        Sp[0] = (W_)&stg_restore_cccs_info;
+#endif
         Sp -= 2;
         Sp[1] = (W_)tagged_obj;
         Sp[0] = (W_)&stg_enter_info;
@@ -398,7 +448,11 @@ do_return:
              "\n---------------------------------------------------------------\n");
              debugBelch("Returning: "); printObj(obj);
              debugBelch("Sp = %p\n", Sp);
-             debugBelch("\n" );
+#ifdef PROFILING
+             fprintCCS(stderr, cap->r.rCCCS);
+             debugBelch("\n");
+#endif
+             debugBelch("\n");
              printStackChunk(Sp,cap->r.rCurrentTSO->stackobj->stack+cap->r.rCurrentTSO->stackobj->stack_size);
              debugBelch("\n\n");
             );
@@ -412,6 +466,13 @@ do_return:
 
         // NOTE: not using get_itbl().
         info = ((StgClosure *)Sp)->header.info;
+
+        if (info == (StgInfoTable *)&stg_restore_cccs_info) {
+            cap->r.rCCCS = (CostCentreStack*)Sp[1];
+            Sp += 2;
+            goto do_return;
+        }
+
         if (info == (StgInfoTable *)&stg_ap_v_info) {
             n = 1; m = 0; goto do_apply;
         }
@@ -528,6 +589,20 @@ do_return_unboxed:
                 || Sp[0] == (W_)&stg_ret_l_info
             );
 
+        IF_DEBUG(interpreter,
+             debugBelch(
+             "\n---------------------------------------------------------------\n");
+             debugBelch("Returning: "); printObj(obj);
+             debugBelch("Sp = %p\n", Sp);
+#ifdef PROFILING
+             fprintCCS(stderr, cap->r.rCCCS);
+             debugBelch("\n");
+#endif
+             debugBelch("\n");
+             printStackChunk(Sp,cap->r.rCurrentTSO->stackobj->stack+cap->r.rCurrentTSO->stackobj->stack_size);
+             debugBelch("\n\n");
+            );
+
         // get the offset of the stg_ctoi_ret_XXX itbl
         offset = stack_frame_sizeW((StgClosure *)Sp);
 
@@ -610,6 +685,10 @@ do_apply:
                     Sp[i] = (W_)pap->payload[i];
                 }
                 obj = UNTAG_CLOSURE(pap->fun);
+
+#ifdef PROFILING
+                enterFunCCS(&cap->r, pap->header.prof.ccs);
+#endif
                 goto run_BCO_fun;
             }
             else if (arity == n) {
@@ -618,6 +697,9 @@ do_apply:
                     Sp[i] = (W_)pap->payload[i];
                 }
                 obj = UNTAG_CLOSURE(pap->fun);
+#ifdef PROFILING
+                enterFunCCS(&cap->r, pap->header.prof.ccs);
+#endif
                 goto run_BCO_fun;
             }
             else /* arity > n */ {
@@ -685,6 +767,8 @@ do_apply:
         // No point in us applying machine-code functions
         default:
         defer_apply_to_sched:
+            IF_DEBUG(interpreter,
+                     debugBelch("Cannot apply compiled function; yielding to scheduler\n"));
             Sp -= 2;
             Sp[1] = (W_)tagged_obj;
             Sp[0] = (W_)&stg_enter_info;
@@ -845,22 +929,40 @@ run_BCO:
         case bci_BRK_FUN:
         {
             int arg1_brk_array, arg2_array_index, arg3_freeVars;
+#ifdef PROFILING
+            int arg4_cc;
+#endif
             StgArrBytes *breakPoints;
-            int returning_from_break;     // are we resuming execution from a breakpoint?
-                                          //  if yes, then don't break this time around
-            StgClosure *ioAction;         // the io action to run at a breakpoint
+            int returning_from_break;
 
-            StgAP_STACK *new_aps;         // a closure to save the top stack frame on the heap
+            // the io action to run at a breakpoint
+            StgClosure *ioAction;
+
+            // a closure to save the top stack frame on the heap
+            StgAP_STACK *new_aps;
+
             int i;
             int size_words;
 
-            arg1_brk_array      = BCO_GET_LARGE_ARG;  // 1st arg of break instruction
-            arg2_array_index    = BCO_NEXT;           // 2nd arg of break instruction
-            arg3_freeVars       = BCO_GET_LARGE_ARG;  // 3rd arg of break instruction
+            arg1_brk_array      = BCO_GET_LARGE_ARG;
+            arg2_array_index    = BCO_NEXT;
+            arg3_freeVars       = BCO_GET_LARGE_ARG;
+#ifdef PROFILING
+            arg4_cc             = BCO_GET_LARGE_ARG;
+#else
+            BCO_GET_LARGE_ARG;
+#endif
 
             // check if we are returning from a breakpoint - this info
-            // is stored in the flags field of the current TSO
-            returning_from_break = cap->r.rCurrentTSO->flags & TSO_STOPPED_ON_BREAKPOINT;
+            // is stored in the flags field of the current TSO. If true,
+            // then don't break this time around.
+            returning_from_break =
+                cap->r.rCurrentTSO->flags & TSO_STOPPED_ON_BREAKPOINT;
+
+#ifdef PROFILING
+            cap->r.rCCCS = pushCostCentre(cap->r.rCCCS,
+                                          (CostCentre*)BCO_LIT(arg4_cc));
+#endif
 
             // if we are returning from a break then skip this section
             // and continue executing
@@ -873,7 +975,8 @@ run_BCO:
                // breakpoint flag for this particular expression is
                // true
                if (rts_stop_next_breakpoint == rtsTrue ||
-                   breakPoints->payload[arg2_array_index] == rtsTrue)
+                   ((StgWord8*)breakPoints->payload)[arg2_array_index]
+                     == rtsTrue)
                {
                   // make sure we don't automatically stop at the
                   // next breakpoint
@@ -983,9 +1086,14 @@ run_BCO:
 
         case bci_PUSH_ALTS: {
             int o_bco  = BCO_GET_LARGE_ARG;
-            Sp[-2] = (W_)&stg_ctoi_R1p_info;
-            Sp[-1] = BCO_PTR(o_bco);
             Sp -= 2;
+            Sp[1] = BCO_PTR(o_bco);
+            Sp[0] = (W_)&stg_ctoi_R1p_info;
+#ifdef PROFILING
+            Sp -= 2;
+            Sp[1] = (W_)cap->r.rCCCS;
+            Sp[0] = (W_)&stg_restore_cccs_info;
+#endif
             goto nextInsn;
         }
 
@@ -994,6 +1102,11 @@ run_BCO:
             Sp[-2] = (W_)&stg_ctoi_R1unpt_info;
             Sp[-1] = BCO_PTR(o_bco);
             Sp -= 2;
+#ifdef PROFILING
+            Sp -= 2;
+            Sp[1] = (W_)cap->r.rCCCS;
+            Sp[0] = (W_)&stg_restore_cccs_info;
+#endif
             goto nextInsn;
         }
 
@@ -1002,6 +1115,11 @@ run_BCO:
             Sp[-2] = (W_)&stg_ctoi_R1n_info;
             Sp[-1] = BCO_PTR(o_bco);
             Sp -= 2;
+#ifdef PROFILING
+            Sp -= 2;
+            Sp[1] = (W_)cap->r.rCCCS;
+            Sp[0] = (W_)&stg_restore_cccs_info;
+#endif
             goto nextInsn;
         }
 
@@ -1010,6 +1128,11 @@ run_BCO:
             Sp[-2] = (W_)&stg_ctoi_F1_info;
             Sp[-1] = BCO_PTR(o_bco);
             Sp -= 2;
+#ifdef PROFILING
+            Sp -= 2;
+            Sp[1] = (W_)cap->r.rCCCS;
+            Sp[0] = (W_)&stg_restore_cccs_info;
+#endif
             goto nextInsn;
         }
 
@@ -1018,6 +1141,11 @@ run_BCO:
             Sp[-2] = (W_)&stg_ctoi_D1_info;
             Sp[-1] = BCO_PTR(o_bco);
             Sp -= 2;
+#ifdef PROFILING
+            Sp -= 2;
+            Sp[1] = (W_)cap->r.rCCCS;
+            Sp[0] = (W_)&stg_restore_cccs_info;
+#endif
             goto nextInsn;
         }
 
@@ -1026,6 +1154,11 @@ run_BCO:
             Sp[-2] = (W_)&stg_ctoi_L1_info;
             Sp[-1] = BCO_PTR(o_bco);
             Sp -= 2;
+#ifdef PROFILING
+            Sp -= 2;
+            Sp[1] = (W_)cap->r.rCCCS;
+            Sp[0] = (W_)&stg_restore_cccs_info;
+#endif
             goto nextInsn;
         }
 
@@ -1034,6 +1167,11 @@ run_BCO:
             Sp[-2] = (W_)&stg_ctoi_V_info;
             Sp[-1] = BCO_PTR(o_bco);
             Sp -= 2;
+#ifdef PROFILING
+            Sp -= 2;
+            Sp[1] = (W_)cap->r.rCCCS;
+            Sp[0] = (W_)&stg_restore_cccs_info;
+#endif
             goto nextInsn;
         }
 
@@ -1469,7 +1607,7 @@ run_BCO:
             Sp[1] = (W_)obj;
             Sp[0] = (W_)&stg_ret_p_info;
 
-            SAVE_STACK_POINTERS;
+            SAVE_THREAD_STATE();
             tok = suspendThread(&cap->r, interruptible ? rtsTrue : rtsFalse);
 
             // We already made a copy of the arguments above.
@@ -1477,7 +1615,7 @@ run_BCO:
 
             // And restart the thread again, popping the stg_ret_p frame.
             cap = (Capability *)((void *)((unsigned char*)resumeThread(tok) - STG_FIELD_OFFSET(Capability,r)));
-            LOAD_STACK_POINTERS;
+            LOAD_THREAD_STATE();
 
             if (Sp[0] != (W_)&stg_ret_p_info) {
                 // the stack is not how we left it.  This probably

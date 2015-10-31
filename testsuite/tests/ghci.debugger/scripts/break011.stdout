@@ -1,9 +1,9 @@
 *** Exception: foo
 CallStack (from ImplicitParams):
   error, called at <interactive>:2:1 in interactive:Ghci1
-Stopped at <exception thrown>
+Stopped in <exception thrown>, <unknown>
 _exception :: e = _
-Stopped at <exception thrown>
+Stopped in <exception thrown>, <unknown>
 _exception :: e = _
 -1  : main (../Test7.hs:2:18-28)
 -2  : main (../Test7.hs:2:8-29)
@@ -15,7 +15,7 @@ _result :: IO a3
 no more logged breakpoints
 Logged breakpoint at ../Test7.hs:2:18-28
 _result :: a3
-Stopped at <exception thrown>
+Stopped at <unknown>
 _exception :: e
 already at the beginning of the history
 _exception = SomeException
@@ -32,13 +32,13 @@ _exception :: SomeException = SomeException
 *** Exception: foo
 CallStack (from ImplicitParams):
   error, called at ../Test7.hs:2:18 in main:Main
-Stopped at <exception thrown>
+Stopped in <exception thrown>, <unknown>
 _exception :: e = SomeException
                     (ErrorCallWithLocation
                        "foo"
                        "CallStack (from ImplicitParams):
   error, called at ../Test7.hs:2:18 in main:Main")
-Stopped at <exception thrown>
+Stopped in <exception thrown>, <unknown>
 _exception :: e = SomeException
                     (ErrorCallWithLocation
                        "foo"
