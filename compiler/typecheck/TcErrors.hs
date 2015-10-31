@@ -465,6 +465,9 @@ mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct =<< render msgT
         | Just (_,_,t2) <- getEqPredTys_maybe ctT
         , Just msg      <- getMsg t2                 = msg
 
+        | Just (_,ts) <- getClassPredTys_maybe ctT
+        , msg : _ <- mapMaybe getMsg ts              = msg
+
         -- TypeError msg
         | Just msg      <- getMsg ctT                = msg
 

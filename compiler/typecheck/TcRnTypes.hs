@@ -1445,12 +1445,13 @@ isTypeHoleCt _ = False
 
 -- | The following constraints are considered to be a custom type error:
 --    1. TypeError msg
---    2. TypeError msg ~ Something
---    3. Something ~ TypeError msg
+--    2. TypeError msg ~ Something  (and the other way around)
+--    3. C (TypeError msg)          (for any parameter of class constraint)
 isUserTypeErrorCt :: Ct -> Bool
 isUserTypeErrorCt ct
-  | Just (_,t1,t2) <- getEqPredTys_maybe ctT = isTyErr t1 || isTyErr t2
-  | otherwise                                = isTyErr ctT
+  | Just (_,t1,t2) <- getEqPredTys_maybe ctT    = isTyErr t1 || isTyErr t2
+  | Just (_,ts)    <- getClassPredTys_maybe ctT = any isTyErr ts
+  | otherwise                                   = isTyErr ctT
   where
   ctT       = ctPred ct
   isTyErr t = case splitTyConApp_maybe t of
