@@ -973,7 +973,7 @@ tcApp (L loc (HsVar fun)) args res_ty
 -- with type signatures, see Note [Disambiguating record fields]
 tcApp (L loc (HsRecFld (Ambiguous lbl _))) args@(L _ arg:_) res_ty
   | Just sig_ty <- obviousSig arg
-  = do { sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
+  = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
        ; sel_name <- disambiguateSelector lbl sig_tc_ty
        ; tcApp (L loc (HsRecFld (Unambiguous lbl sel_name))) args res_ty }
 
@@ -1645,7 +1645,7 @@ disambiguateRecordBinds record_expr record_tau rbnds res_ty
         -- If so, try to extract a parent TyCon from it
             | Just {} <- obviousSig (unLoc record_expr)
             , Just tc <- tyConOf fam_inst_envs record_tau
-            -> RecSelData tc
+            -> return (RecSelData tc)
 
         -- Nothing else we can try...
         _ -> failWithTc badOverloadedUpdate
@@ -1711,10 +1711,10 @@ lookupParents rdr
 -- A type signature on the argument of an ambiguous record selector or
 -- the record expression in an update must be "obvious", i.e. the
 -- outermost constructor ignoring parentheses.
-obviousSig :: HsExpr Name -> Maybe (LHsType Name)
-obviousSig (ExprWithTySig _ ty _) = Just ty
-obviousSig (HsPar p)              = obviousSig (unLoc p)
-obviousSig _                      = Nothing
+obviousSig :: HsExpr Name -> Maybe (LHsSigWcType Name)
+obviousSig (ExprWithTySig _ ty) = Just ty
+obviousSig (HsPar p)            = obviousSig (unLoc p)
+obviousSig _                    = Nothing
 
 
 {-
