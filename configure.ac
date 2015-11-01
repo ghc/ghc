@@ -919,6 +919,15 @@ AS_IF([test "$UseSystemLibFFI" = "YES"], [
  CFLAGS="$LIBFFI_CFLAGS $CFLAGS"
  LDFLAGS2="$LDFLAGS"
  LDFLAGS="$LIBFFI_LDFLAGS $LDFLAGS"
+ if test "$HostOS" = "openbsd";
+ then
+   # OpenBSD's libffi is not directly linked to the libpthread but
+   # still requires pthread functionality. This means that any client
+   # binary which links with libffi also needs to link with
+   # libpthread. If it does not, then linking fails with unresolved
+   # symbols.
+   LDFLAGS="$LDFLAGS -lpthread"
+ fi
  AC_CHECK_LIB(ffi, ffi_call,
   [AC_CHECK_HEADERS([ffi.h], [break], [])
    AC_DEFINE([HAVE_LIBFFI], [1], [Define to 1 if you have libffi.])],

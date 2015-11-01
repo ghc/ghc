@@ -45,6 +45,14 @@ extra-libraries:
 #ifdef freebsd_HOST_OS
                               , "pthread" /* for pthread_getthreadid_np() */
 #endif
+#ifdef openbsd_HOST_OS
+/* OpenBSD's libffi is not directly linked to the libpthread but still requires
+pthread functionality. This means that any client binary which links with libffi
+also need to link with libpthread. If it does not, then linking fails with
+unresolved symbols. */
+                              , "pthread"
+
+#endif
 #if defined(DEBUG) && defined(HAVE_LIBBFD)
                               ,"bfd", "iberty"  /* for debugging */
 #endif
