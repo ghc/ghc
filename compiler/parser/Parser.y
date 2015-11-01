@@ -312,6 +312,11 @@ See
   https://ghc.haskell.org/trac/ghc/wiki/GhcAstAnnotations
 for some background.
 
+If you modify the parser and want to ensure that the API annotations are processed
+correctly, see the README in (REPO)/utils/check-api-annotations for details on
+how to set up a test using the check-api-annotations utility, and interpret the
+output it generates.
+
 -- -----------------------------------------------------------------------------
 
 -}
