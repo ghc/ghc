@@ -32,11 +32,7 @@ check title expected got
 expectedGhcOnlyExtensions :: [String]
 expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "AlternativeLayoutRule",
-                             "AlternativeLayoutRuleTransitional",
-                             "DuplicateRecordFields",
-                             "StaticPointers",
-                             "StrictData",
-                             "ApplicativeDo"] -- TODO add this to Cabal
+                             "AlternativeLayoutRuleTransitional"]
 
 expectedCabalOnlyExtensions :: [String]
 expectedCabalOnlyExtensions = ["Generics",
