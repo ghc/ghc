@@ -143,7 +143,8 @@ include mk/warnings.mk
 # (Optional) build-specific configuration
 include mk/custom-settings.mk
 SRC_CC_OPTS     += $(WERROR)
-SRC_HC_OPTS     += $(WERROR)
+GhcStage2HcOpts += $(WERROR)
+GhcLibHcOpts    += $(WERROR)
 
 # -----------------------------------------------------------------------------
 # Check for inconsistent settings, after reading mk/build.mk.
