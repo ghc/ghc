@@ -502,7 +502,7 @@ mkExportItems
     lookupExport (IEVar (L _ x))         = declWith x
     lookupExport (IEThingAbs (L _ t))    = declWith t
     lookupExport (IEThingAll (L _ t))    = declWith t
-    lookupExport (IEThingWith (L _ t) _ _) = declWith t
+    lookupExport (IEThingWith (L _ t) _ _ _) = declWith t
     lookupExport (IEModuleContents (L _ m)) =
       moduleExports thisMod m dflags warnings gre exportedNames decls modMap instIfaceMap maps fixMap splices
     lookupExport (IEGroup lev docStr)  = return $
