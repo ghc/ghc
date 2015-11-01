@@ -4030,7 +4030,6 @@ ocRunInit_PEi386 ( ObjectCode *oc )
 #define Elf_Ehdr    Elf64_Ehdr
 #define Elf_Phdr    Elf64_Phdr
 #define Elf_Shdr    Elf64_Shdr
-#define Elf_Section Elf64_Section
 #define Elf_Sym     Elf64_Sym
 #define Elf_Rel     Elf64_Rel
 #define Elf_Rela    Elf64_Rela
@@ -4055,7 +4054,6 @@ ocRunInit_PEi386 ( ObjectCode *oc )
 #define Elf_Ehdr    Elf32_Ehdr
 #define Elf_Phdr    Elf32_Phdr
 #define Elf_Shdr    Elf32_Shdr
-#define Elf_Section Elf32_Section
 #define Elf_Sym     Elf32_Sym
 #define Elf_Rel     Elf32_Rel
 #define Elf_Rela    Elf32_Rela
@@ -4629,7 +4627,7 @@ ocGetNames_ELF ( ObjectCode* oc )
          HsBool isWeak = HS_BOOL_FALSE;
          char* ad      = NULL;
          char* nm      = strtab + stab[j].st_name;
-         Elf_Section shndx = stab[j].st_shndx;
+         unsigned short shndx = stab[j].st_shndx;
          Elf_Word secno;
 
          /* See Note [Many ELF Sections] */
