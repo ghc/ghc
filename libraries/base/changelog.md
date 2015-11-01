@@ -1,11 +1,11 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## 4.8.2.0  *TBA*
+## 4.9.0.0  *TBA*
+
+  * Bundled with GHC 8.0
 
   * The restore operation provided by `mask` and `uninterruptibleMask` now
     restores the previous masking state whatever the current masking state is.
-
-  * Bundled with GHC 7.12.1
 
   * `Alt`, `Dual`, `First`, `Last`, `Product`, and `Sum` now have `Data`,
     `MonadZip`, and `MonadFix` instances
