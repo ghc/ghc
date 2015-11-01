@@ -31,7 +31,7 @@ hs_ctz32(StgWord x)
 StgWord
 hs_ctz64(StgWord64 x)
 {
-#if defined(__GNUC__) && defined(i386_HOST_ARCH)
+#if defined(__GNUC__) && (defined(i386_HOST_ARCH) || defined(powerpc_HOST_ARCH))
   /* On Linux/i386, the 64bit `__builtin_ctzll()` instrinsic doesn't
      get inlined by GCC but rather a short `__ctzdi2` runtime function
      is inserted when needed into compiled object files.
