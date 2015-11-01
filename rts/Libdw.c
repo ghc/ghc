@@ -16,26 +16,26 @@
 #include "Libdw.h"
 #include "RtsUtils.h"
 
-static BacktraceChunk *backtrace_alloc_chunk(BacktraceChunk *next) {
+static BacktraceChunk *backtraceAllocChunk(BacktraceChunk *next) {
     BacktraceChunk *chunk = stgMallocBytes(sizeof(BacktraceChunk),
-                                           "backtrace_alloc_chunk");
+                                           "backtraceAllocChunk");
     chunk->n_frames = 0;
     chunk->next = next;
     return chunk;
 }
 
 // Allocate a Backtrace
-static Backtrace *backtrace_alloc(void) {
-    Backtrace *bt = stgMallocBytes(sizeof(Backtrace), "backtrace_alloc");
+static Backtrace *backtraceAlloc(void) {
+    Backtrace *bt = stgMallocBytes(sizeof(Backtrace), "backtraceAlloc");
     bt->n_frames = 0;
-    bt->last = backtrace_alloc_chunk(NULL);
+    bt->last = backtraceAllocChunk(NULL);
     return bt;
 }
 
-static void backtrace_push(Backtrace *bt, StgPtr pc) {
+static void backtracePush(Backtrace *bt, StgPtr pc) {
     // Is this chunk full?
     if (bt->last->n_frames == BACKTRACE_CHUNK_SZ)
-        bt->last = backtrace_alloc_chunk(bt->last);
+        bt->last = backtraceAllocChunk(bt->last);
 
     // Push the PC
     bt->last->frames[bt->last->n_frames] = pc;
@@ -43,7 +43,7 @@ static void backtrace_push(Backtrace *bt, StgPtr pc) {
     bt->n_frames++;
 }
 
-void backtrace_free(Backtrace *bt) {
+void backtraceFree(Backtrace *bt) {
     if (bt == NULL)
         return;
     BacktraceChunk *chunk = bt->last;
@@ -55,14 +55,14 @@ void backtrace_free(Backtrace *bt) {
     stgFree(bt);
 }
 
-struct LibDwSession_ {
+struct LibdwSession_ {
     Dwfl *dwfl;
     Backtrace *cur_bt; // The current backtrace we are collecting (if any)
 };
 
 static const Dwfl_Thread_Callbacks thread_cbs;
 
-void libdw_free(LibDwSession *session) {
+void libdwFree(LibdwSession *session) {
     if (session == NULL)
         return;
     dwfl_end(session->dwfl);
@@ -70,9 +70,9 @@ void libdw_free(LibDwSession *session) {
 }
 
 // Create a libdw session with DWARF information for all loaded modules
-LibDwSession *libdw_init() {
-    LibDwSession *session = stgCallocBytes(1, sizeof(LibDwSession),
-                                           "libdw_init");
+LibdwSession *libdwInit() {
+    LibdwSession *session = stgCallocBytes(1, sizeof(LibdwSession),
+                                           "libdwInit");
     // Initialize ELF library
     if (elf_version(EV_CURRENT) == EV_NONE) {
         sysErrorBelch("libelf version too old!");
@@ -121,8 +121,8 @@ LibDwSession *libdw_init() {
     return NULL;
 }
 
-int libdw_lookup_location(LibDwSession *session, Location *frame,
-                           StgPtr pc) {
+int libdwLookupLocation(LibdwSession *session, Location *frame,
+                        StgPtr pc) {
     // Find the module containing PC
     Dwfl_Module *mod = dwfl_addrmodule(session->dwfl, (Dwarf_Addr) pc);
     if (mod == NULL)
@@ -153,9 +153,9 @@ int libdw_lookup_location(LibDwSession *session, Location *frame,
     return 0;
 }
 
-int foreach_frame_outwards(Backtrace *bt,
-                           int (*cb)(StgPtr, void*),
-                           void *user_data)
+int libdwForEachFrameOutwards(Backtrace *bt,
+                              int (*cb)(StgPtr, void*),
+                              void *user_data)
 {
     int n_chunks = bt->n_frames / BACKTRACE_CHUNK_SZ;
     if (bt->n_frames % BACKTRACE_CHUNK_SZ != 0)
@@ -163,7 +163,7 @@ int foreach_frame_outwards(Backtrace *bt,
 
     BacktraceChunk **chunks =
         stgMallocBytes(n_chunks * sizeof(BacktraceChunk *),
-                       "foreach_frame_outwards");
+                       "libdwForEachFrameOutwards");
 
     // First build a list of chunks, ending with the inner-most chunk
     int chunk_idx;
@@ -187,15 +187,15 @@ int foreach_frame_outwards(Backtrace *bt,
 }
 
 struct PrintData {
-    LibDwSession *session;
+    LibdwSession *session;
     FILE *file;
 };
 
-static int print_frame(StgPtr pc, void *cbdata)
+static int printFrame(StgPtr pc, void *cbdata)
 {
     struct PrintData *pd = (struct PrintData *) cbdata;
     Location loc;
-    libdw_lookup_location(pd->session, &loc, pc);
+    libdwLookupLocation(pd->session, &loc, pc);
     fprintf(pd->file, "  %24p    %s ",
             (void*) pc, loc.function);
     if (loc.source_file)
@@ -206,44 +206,45 @@ static int print_frame(StgPtr pc, void *cbdata)
     return 0;
 }
 
-void libdw_print_backtrace(LibDwSession *session, FILE *file, Backtrace *bt) {
+void libdwPrintBacktrace(LibdwSession *session, FILE *file, Backtrace *bt) {
     if (bt == NULL) {
         fprintf(file, "Warning: tried to print failed backtrace\n");
         return;
     }
 
     struct PrintData pd = { session, file };
-    foreach_frame_outwards(bt, print_frame, &pd);
+    libdwForEachFrameOutwards(bt, printFrame, &pd);
 }
 
 // Remember that we are traversing from the inner-most to the outer-most frame
-static int frame_cb(Dwfl_Frame *frame, void *arg) {
-    LibDwSession *session = arg;
+static int getBacktraceFrameCb(Dwfl_Frame *frame, void *arg) {
+    LibdwSession *session = arg;
     Dwarf_Addr pc;
     bool is_activation;
     if (! dwfl_frame_pc(frame, &pc, &is_activation)) {
         // failed to find PC
-        backtrace_push(session->cur_bt, 0x0);
+        backtracePush(session->cur_bt, 0x0);
     } else {
         if (is_activation)
             pc -= 1; // TODO: is this right?
-        backtrace_push(session->cur_bt, (StgPtr) pc);
+        backtracePush(session->cur_bt, (StgPtr) pc);
     }
 
     return DWARF_CB_OK;
 }
 
-Backtrace *libdw_get_backtrace(LibDwSession *session) {
+Backtrace *libdwGetBacktrace(LibdwSession *session) {
     if (session->cur_bt != NULL) {
         sysErrorBelch("Already collecting backtrace. Uh oh.");
         return NULL;
     }
 
-    Backtrace *bt = backtrace_alloc();
+    Backtrace *bt = backtraceAlloc();
     session->cur_bt = bt;
 
     int pid = getpid();
-    int ret = dwfl_getthread_frames(session->dwfl, pid, frame_cb, session);
+    int ret = dwfl_getthread_frames(session->dwfl, pid,
+                                    getBacktraceFrameCb, session);
     if (ret == -1)
         sysErrorBelch("Failed to get stack frames of current process: %s",
                       dwfl_errmsg(dwfl_errno()));

@@ -18,24 +18,24 @@
 
 #ifdef USE_LIBDW
 
-struct LibDwSession_;
-typedef struct LibDwSession_ LibDwSession;
+struct LibdwSession_;
+typedef struct LibdwSession_ LibdwSession;
 
 /* Begin a libdw session. A session is tied to a particular capability */
-LibDwSession *libdw_init(void);
+LibdwSession *libdwInit(void);
 
 /* Free a session */
-void libdw_free(LibDwSession *session);
+void libdwFree(LibdwSession *session);
 
 /* Request a backtrace of the current stack state */
-Backtrace *libdw_get_backtrace(LibDwSession *session);
+Backtrace *libdwGetBacktrace(LibdwSession *session);
 
 /* Lookup Location information for the given address.
  * Returns 0 if successful, 1 if address could not be found. */
-int libdw_lookup_location(LibDwSession *session, Location *loc, StgPtr pc);
+int libdwLookupLocation(LibdwSession *session, Location *loc, StgPtr pc);
 
 /* Pretty-print a backtrace to std*/
-void libdw_print_backtrace(LibDwSession *session, FILE *file, Backtrace *bt);
+void libdwPrintBacktrace(LibdwSession *session, FILE *file, Backtrace *bt);
 
 // Traverse backtrace in order of outer-most to inner-most frame
 #define FOREACH_FRAME_INWARDS(pc, bt)                                 \
@@ -47,9 +47,9 @@ void libdw_print_backtrace(LibDwSession *session, FILE *file, Backtrace *bt);
              _frame_idx++)
 
 // Traverse a backtrace in order of inner-most to outer-most frame
-int foreach_frame_outwards(Backtrace *bt,
-                           int (*cb)(StgPtr, void*),
-                           void *user_data);
+int libdwForEachFrameOutwards(Backtrace *bt,
+                              int (*cb)(StgPtr, void*),
+                              void *user_data);
 
 #endif /* USE_LIBDW */
 

@@ -79,11 +79,11 @@ typedef struct Location_ {
 
 #ifdef USE_LIBDW
 
-void backtrace_free(Backtrace *bt);
+void backtraceFree(Backtrace *bt);
 
 #else
 
-INLINE_HEADER void backtrace_free(Backtrace *bt STG_UNUSED) { }
+INLINE_HEADER void backtraceFree(Backtrace *bt STG_UNUSED) { }
 
 #endif /* USE_LIBDW */
 
