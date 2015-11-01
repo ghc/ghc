@@ -429,11 +429,11 @@ void setExecutable (void *p, W_ len, rtsBool exec)
 
 static void* heap_base = NULL;
 
-void *osReserveHeapMemory (W_ len)
+void *osReserveHeapMemory (W_ *len)
 {
     void *start;
 
-    heap_base = VirtualAlloc(NULL, len + MBLOCK_SIZE,
+    heap_base = VirtualAlloc(NULL, *len + MBLOCK_SIZE,
                               MEM_RESERVE, PAGE_READWRITE);
     if (heap_base == NULL) {
         if (GetLastError() == ERROR_NOT_ENOUGH_MEMORY) {

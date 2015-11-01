@@ -34,8 +34,12 @@ void setExecutable (void *p, W_ len, rtsBool exec);
 // pointed to by the return value, until that memory is committed using
 // osCommitMemory().
 //
+// The value pointed to by len will be filled by the caller with an upper
+// bound on the amount of memory to reserve. On return this will be set
+// to the amount of memory actually reserved.
+//
 // This function is called once when the block allocator is initialized.
-void *osReserveHeapMemory(W_ len);
+void *osReserveHeapMemory(W_ *len);
 
 // Commit (allocate memory for) a piece of address space, which must
 // be within the previously reserved space After this call, it is safe
