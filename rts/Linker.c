@@ -1300,7 +1300,7 @@ m32_alloc(m32_allocator m32, unsigned int size,
             void * addr = (char*)m32->pages[i].base_addr + alsize;
             m32->pages[i].current_size = alsize + size;
             // increment the counter atomically
-            __sync_fetch_and_add((uint64_t*)m32->pages[i].base_addr, 1);
+            __sync_fetch_and_add((uintptr_t*)m32->pages[i].base_addr, 1);
             return addr;
          }
          // most filled?
@@ -1329,7 +1329,7 @@ m32_alloc(m32_allocator m32, unsigned int size,
       m32->pages[empty].current_size = size+ROUND_UP(8,alignment);
       // Initialize the counter:
       // 1 for the allocator + 1 for the returned allocated memory
-      *((uint64_t*)addr)             = 2;
+      *((uintptr_t*)addr)            = 2;
       return (char*)addr + ROUND_UP(8,alignment);
    }
 }
