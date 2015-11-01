@@ -37,7 +37,7 @@ import SrcLoc
 import Var
 import Bag
 import FastString
-import BooleanFormula (BooleanFormula)
+import BooleanFormula (LBooleanFormula)
 
 import Data.Data hiding ( Fixity )
 import Data.List
@@ -731,7 +731,7 @@ data Sig name
         --      'ApiAnnotation.AnnClose'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | MinimalSig SourceText (BooleanFormula (Located name))
+  | MinimalSig SourceText (LBooleanFormula (Located name))
                -- Note [Pragma source text] in BasicTypes
 
   deriving (Typeable)
@@ -886,8 +886,8 @@ pprTcSpecPrags (SpecPrags ps)  = vcat (map (ppr . unLoc) ps)
 instance Outputable TcSpecPrag where
   ppr (SpecPrag var _ inl) = pprSpec var (ptext (sLit "<type>")) inl
 
-pprMinimalSig :: OutputableBndr name => BooleanFormula (Located name) -> SDoc
-pprMinimalSig bf = ptext (sLit "MINIMAL") <+> ppr (fmap unLoc bf)
+pprMinimalSig :: OutputableBndr name => LBooleanFormula (Located name) -> SDoc
+pprMinimalSig (L _ bf) = ptext (sLit "MINIMAL") <+> ppr (fmap unLoc bf)
 
 {-
 ************************************************************************
