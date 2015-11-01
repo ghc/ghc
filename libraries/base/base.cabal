@@ -93,7 +93,7 @@ Library
         UnliftedFFITypes
         Unsafe
 
-    build-depends: rts == 1.0.*, ghc-prim == 0.4.*
+    build-depends: rts == 1.0.*, ghc-prim == 0.5.*
     if flag(integer-simple)
         build-depends: integer-simple >= 0.1.1 && < 0.2
 
