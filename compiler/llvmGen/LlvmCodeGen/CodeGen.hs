@@ -476,11 +476,12 @@ genCallWithOverflow
   :: ForeignTarget -> Width -> [CmmFormal] -> [CmmActual] -> LlvmM StmtData
 genCallWithOverflow t@(PrimTarget op) w [dstV, dstO] [lhs, rhs] = do
     -- So far this was only tested for the following four CallishMachOps.
-    MASSERT((op `elem`  [ MO_Add2 w
-                        , MO_AddIntC w
-                        , MO_SubIntC w
-                        , MO_SubWordC w
-                        ]))
+    let valid = op `elem`   [ MO_Add2 w
+                            , MO_AddIntC w
+                            , MO_SubIntC w
+                            , MO_SubWordC w
+                            ]
+    MASSERT(valid)
     let width = widthToLlvmInt w
     -- This will do most of the work of generating the call to the intrinsic and
     -- extracting the values from the struct.
