@@ -55,18 +55,18 @@ import GHC.Word
 
 -- | @'Time'@ is defined as a @'StgWord64'@ in @stg/Types.h@
 --
--- @since 4.9.0.0
+-- @since 4.8.2.0
 type RtsTime = Word64
 
 -- | @'nat'@ defined in @rts/Types.h@
 --
--- @since 4.9.0.0
+-- @since 4.8.2.0
 type RtsNat = #{type unsigned int}
 
 -- | Should we produce a summary of the garbage collector statistics after the
 -- program has exited?
 --
--- @since 4.9.0.0
+-- @since 4.8.2.0
 data GiveGCStats
     = NoGCStats
     | CollectGCStats
@@ -164,7 +164,7 @@ data DebugFlags = DebugFlags
 
 -- | Should the RTS produce a cost-center summary?
 --
--- @since 4.9.0.0
+-- @since 4.8.2.0
 data DoCostCentres
     = CostCentresNone
     | CostCentresSummary
@@ -198,7 +198,7 @@ data CCFlags = CCFlags
 
 -- | What sort of heap profile are we collecting?
 --
--- @since 4.9.0.0
+-- @since 4.8.2.0
 data DoHeapProfile
     = NoHeapProfiling
     | HeapByCCS
@@ -252,7 +252,7 @@ data ProfFlags = ProfFlags
 
 -- | Is event tracing enabled?
 --
--- @since 4.9.0.0
+-- @since 4.8.2.0
 data DoTrace
     = TraceNone      -- ^ no tracing
     | TraceEventLog  -- ^ send tracing events to the event log
