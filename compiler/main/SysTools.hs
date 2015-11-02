@@ -1329,7 +1329,7 @@ handleProc pgm phase_name proc = do
     case rc of
       ExitSuccess{} -> return r
       ExitFailure n -> throwGhcExceptionIO (
-            ProgramError ("`" ++ takeBaseName pgm ++ "'" ++
+            ProgramError ("`" ++ takeFileName pgm ++ "'" ++
                           " failed in phase `" ++ phase_name ++ "'." ++
                           " (Exit code: " ++ show n ++ ")"))
   where
