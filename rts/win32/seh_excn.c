@@ -1,6 +1,11 @@
 #include "ghcconfig.h"
 #include "seh_excn.h"
 
+// this should be in <excpt.h>, but it's been removed from MinGW distributions
+#ifndef EH_UNWINDING
+#define EH_UNWINDING   0x02
+#endif /* EH_UNWINDING */
+
 /*
  * Exception / signal handlers.
  */
