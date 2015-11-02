@@ -31,7 +31,7 @@
 --
 -- > import Data.Semigroup
 --
--- @since 4.8.2.0
+-- @since 4.9.0.0
 ----------------------------------------------------------------------------
 module Data.Semigroup (
     Semigroup(..)
@@ -86,7 +86,7 @@ infixr 6 <>
 
 -- | The class of semigroups (types with an associative binary operation).
 --
--- @since 4.8.2.0
+-- @since 4.9.0.0
 class Semigroup a where
   -- | An associative operation.
   --

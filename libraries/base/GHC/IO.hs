@@ -348,7 +348,7 @@ unsafeUnmask (IO io) = IO $ unmaskAsyncExceptions# io
 -- When called outside 'mask', or inside 'uninterruptibleMask', this
 -- function has no effect.
 --
--- /Since: 4.8.2.0/
+-- @since 4.9.0.0
 interruptible :: IO a -> IO a
 interruptible act = do
   st <- getMaskingState

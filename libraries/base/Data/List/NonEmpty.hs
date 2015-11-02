@@ -19,7 +19,7 @@
 -- and in terms of API. You will almost certainly want to import this
 -- module @qualified@.
 --
--- @since 4.8.2.0
+-- @since 4.9.0.0
 ----------------------------------------------------------------------------
 
 module Data.List.NonEmpty (
@@ -118,7 +118,7 @@ infixr 5 :|, <|
 
 -- | Non-empty (and non-strict) list type.
 --
--- @since 4.8.2.0
+-- @since 4.9.0.0
 data NonEmpty a = a :| [a]
   deriving ( Eq, Ord, Show, Read, Data, Generic, Generic1 )
 
