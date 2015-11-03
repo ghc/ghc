@@ -23,7 +23,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.IO (
-        IO(..), unIO, failIO, liftIO,
+        IO(..), unIO, failIO, liftIO, mplusIO,
         unsafePerformIO, unsafeInterleaveIO,
         unsafeDupablePerformIO, unsafeDupableInterleaveIO,
         noDuplicate,
@@ -45,7 +45,7 @@ import GHC.ST
 import GHC.Exception
 import GHC.Show
 
-import {-# SOURCE #-} GHC.IO.Exception ( userError )
+import {-# SOURCE #-} GHC.IO.Exception ( userError, IOError )
 
 -- ---------------------------------------------------------------------------
 -- The IO Monad
@@ -291,6 +291,12 @@ catchException (IO io) handler = IO $ catch# io handler'
 catchAny :: IO a -> (forall e . Exception e => e -> IO a) -> IO a
 catchAny (IO io) handler = IO $ catch# io handler'
     where handler' (SomeException e) = unIO (handler e)
+
+
+mplusIO :: IO a -> IO a -> IO a
+mplusIO m n = m `catchIOError` \ _ -> n
+    where catchIOError :: IO a -> (IOError -> IO a) -> IO a
+          catchIOError = catchException
 
 -- | A variant of 'throw' that can only be used within the 'IO' monad.
 --

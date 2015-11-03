@@ -85,6 +85,9 @@
 
   * The `MINIMAL` definition of `ArrowChoice` is now `left OR (+++)`.
 
+  * Add `MonadPlus IO` and `Alternative IO` instances
+    (previously orphans in `transformers`) (#10755)
+
 ## 4.8.2.0  *Oct 2015*
 
   * Bundled with GHC 7.10.3

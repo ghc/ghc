@@ -111,7 +111,7 @@ import GHC.CString
 import GHC.Magic
 import GHC.Prim
 import GHC.Err
-import {-# SOURCE #-} GHC.IO (failIO)
+import {-# SOURCE #-} GHC.IO (failIO,mplusIO)
 
 import GHC.Tuple ()     -- Note [Depend on GHC.Tuple]
 import GHC.Integer ()   -- Note [Depend on GHC.Integer]
@@ -1078,6 +1078,12 @@ instance  Monad IO  where
     (>>)      = (*>)
     (>>=)     = bindIO
     fail s    = failIO s
+
+instance Alternative IO where
+    empty = failIO "mzero"
+    (<|>) = mplusIO
+
+instance MonadPlus IO
 
 returnIO :: a -> IO a
 returnIO x = IO $ \ s -> (# s, x #)
