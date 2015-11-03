@@ -161,10 +161,8 @@ typedef void (*init_t) (int argc, char **argv, char **env);
 static HsInt isAlreadyLoaded( pathchar *path );
 static HsInt loadOc( ObjectCode* oc );
 static ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
-                         rtsBool mapped, char *archiveMemberName
-#if (USE_MMAP == 0) && defined (darwin_HOST_OS)
-                       , int misalignment
-#endif
+                         rtsBool mapped, char *archiveMemberName,
+                         int misalignment
                        );
 
 // Use wchar_t for pathnames on Windows (#5697)
@@ -1475,11 +1473,7 @@ void freeObjectCode (ObjectCode *oc)
 
 static ObjectCode*
 mkOc( pathchar *path, char *image, int imageSize,
-      rtsBool mapped, char *archiveMemberName
-#if (USE_MMAP == 0) && defined (darwin_HOST_OS)
-    , int misalignment
-#endif
-    ) {
+      rtsBool mapped, char *archiveMemberName, int misalignment ) {
    ObjectCode* oc;
 
    IF_DEBUG(linker, debugBelch("mkOc: start\n"));
@@ -1518,9 +1512,7 @@ mkOc( pathchar *path, char *image, int imageSize,
 #endif
    oc->imageMapped       = mapped;
 
-#if (USE_MMAP == 0) && defined (darwin_HOST_OS)
-   oc->misalignment = misalignment;
-#endif
+   oc->misalignment      = misalignment;
 
    /* chain it onto the list of objects */
    oc->next              = NULL;
@@ -1578,10 +1570,8 @@ static HsInt loadArchive_ (pathchar *path)
 #else
 #error Unknown Darwin architecture
 #endif
-#if (USE_MMAP == 0)
-    int misalignment;
 #endif
-#endif
+    int misalignment = 0;
 
     /* TODO: don't call barf() on error, instead return an error code, freeing
      * all resources correctly.  This function is pretty complex, so it needs
@@ -1929,10 +1919,7 @@ static HsInt loadArchive_ (pathchar *path)
                     path, (int)thisFileNameSize, fileName);
 
             oc = mkOc(path, image, memberSize, rtsFalse, archiveMemberName
-#if (USE_MMAP == 0) && defined(darwin_HOST_OS)
-                     , misalignment
-#endif
-                     );
+                     , misalignment);
 
             stgFree(archiveMemberName);
 
@@ -2030,9 +2017,7 @@ preloadObjectFile (pathchar *path)
    int r;
    void *image;
    ObjectCode *oc;
-#if (USE_MMAP == 0) && defined(darwin_HOST_OS)
-   int misalignment;
-#endif
+   int misalignment = 0;
 
    r = pathstat(path, &st);
    if (r == -1) {
@@ -2120,11 +2105,7 @@ preloadObjectFile (pathchar *path)
 
 #endif /* USE_MMAP */
 
-   oc = mkOc(path, image, fileSize, rtsTrue, NULL
-#if (USE_MMAP == 0) && defined(darwin_HOST_OS)
-            , misalignment
-#endif
-            );
+   oc = mkOc(path, image, fileSize, rtsTrue, NULL, misalignment);
 
    return oc;
 }
@@ -2466,12 +2447,6 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
 static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
 {
   StgWord n;
-#if (USE_MMAP == 0)
-  int misalignment = 0;
-#ifdef darwin_HOST_OS
-  int aligned;
-#endif
-#endif
 
 #if USE_MMAP
   if (USE_CONTIGUOUS_MMAP)
@@ -2510,9 +2485,9 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
     if (oc->symbol_extras == NULL) return 0;
 #else
     // round up to the nearest 4
-    aligned = (oc->fileSize + 3) & ~3;
+    int aligned = (oc->fileSize + 3) & ~3;
 
-    misalignment = oc->misalignment;
+    int misalignment = oc->misalignment;
 
     oc->image -= misalignment;
     oc->image = stgReallocBytes( oc->image,
@@ -2696,11 +2671,7 @@ static void
 ocFlushInstructionCache( ObjectCode *oc )
 {
     /* The main object code */
-    ocFlushInstructionCacheFrom(oc->image
-#ifdef darwin_HOST_OS
-            + oc->misalignment
-#endif
-            , oc->fileSize);
+    ocFlushInstructionCacheFrom(oc->image + oc->misalignment, oc->fileSize);
 
     /* Jump Islands */
     ocFlushInstructionCacheFrom(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);
