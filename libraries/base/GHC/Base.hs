@@ -479,6 +479,11 @@ class Applicative m => Monad m where
     -- | Fail with a message.  This operation is not part of the
     -- mathematical definition of a monad, but is invoked on pattern-match
     -- failure in a @do@ expression.
+    --
+    -- As part of the MonadFail proposal (MFP), this function is moved
+    -- to its own class 'MonadFail' (see "Control.Monad.Fail" for more
+    -- details). The definition here will be removed in a future
+    -- release.
     fail        :: String -> m a
     fail s      = error s
 

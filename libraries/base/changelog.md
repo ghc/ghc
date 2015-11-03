@@ -62,6 +62,9 @@
   * New module `Control.Monad.IO.Class` (previously provided by `transformers`
     package). (#10773)
 
+  * New module `Control.Monad.Fail` providing new `MonadFail(fail)`
+    class (#10751)
+
   * The `Generic` instance for `Proxy` is now poly-kinded (#10775)
 
   * add `Data.List.NonEmpty` and `Data.Semigroup` (to become
