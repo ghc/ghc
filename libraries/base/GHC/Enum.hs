@@ -704,7 +704,7 @@ the special case varies more from the general case, due to the issue of overflow
 
 {-# NOINLINE [0] enumDeltaIntegerFB #-}
 enumDeltaIntegerFB :: (Integer -> b -> b) -> Integer -> Integer -> b
-enumDeltaIntegerFB c x d = go x
+enumDeltaIntegerFB c x0 d = go x0
   where go x = x `seq` (x `c` go (x+d))
 
 {-# NOINLINE [1] enumDeltaInteger #-}

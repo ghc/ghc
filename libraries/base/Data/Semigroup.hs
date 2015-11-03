@@ -78,7 +78,6 @@ import           Data.Monoid         (All (..), Any (..), Dual (..), Endo (..),
                                       Product (..), Sum (..))
 import           Data.Monoid         (Alt (..))
 import qualified Data.Monoid         as Monoid
-import           Data.Proxy
 import           Data.Void
 import           GHC.Generics
 
