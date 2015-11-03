@@ -148,7 +148,7 @@ lookupPragEnv prag_fn n = lookupNameEnv prag_fn n `orElse` []
 *                                                                      *
 ********************************************************************* -}
 
-tcPatBndr :: PatEnv -> Name -> TcSigmaType -> TcM (TcCoercion, TcId)
+tcPatBndr :: PatEnv -> Name -> TcSigmaType -> TcM (TcCoercionN, TcId)
 -- (coi, xp) = tcPatBndr penv x pat_ty
 -- Then coi : pat_ty ~ typeof(xp)
 --
@@ -704,7 +704,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
               prov_theta' = substTheta tenv prov_theta
               req_theta'  = substTheta tenv req_theta
 
-        ; wrap <- coToHsWrapper <$> unifyType ty' pat_ty
+        ; wrap <- mkWpCastN <$> unifyType ty' pat_ty
         ; traceTc "tcPatSynPat" (ppr pat_syn $$
                                  ppr pat_ty $$
                                  ppr ty' $$
@@ -751,14 +751,15 @@ matchExpectedTyConAppR tc = downgrade (matchExpectedTyConApp tc)
 
 ----------------------------
 matchExpectedPatTy :: (TcRhoType -> TcM (TcCoercionR, a))
-                    -> TcRhoType -> TcM (HsWrapper, a)
+                    -> TcRhoType            -- Type of the pattern
+                    -> TcM (HsWrapper, a)
 -- See Note [Matching polytyped patterns]
 -- Returns a wrapper : pat_ty ~R inner_ty
 matchExpectedPatTy inner_match pat_ty
   | null tvs && null theta
   = do { (co, res) <- inner_match pat_ty   -- 'co' is Representational
        ; traceTc "matchExpectedPatTy" (ppr pat_ty $$ ppr co $$ ppr (isTcReflCo co))
-       ; return (coToHsWrapperR (mkTcSymCo co), res) }
+       ; return (mkWpCastR (mkTcSymCo co), res) }
          -- The Sym is because the inner_match returns a coercion
          -- that is the other way round to matchExpectedPatTy
 
@@ -773,10 +774,14 @@ matchExpectedPatTy inner_match pat_ty
 ----------------------------
 matchExpectedConTy :: TyCon      -- The TyCon that this data
                                  -- constructor actually returns
-                   -> TcRhoType  -- The type of the pattern
+                                 -- In the case of a data family this is
+                                 -- the /representation/ TyCon
+                   -> TcRhoType  -- The type of the pattern; in the case
+                                 -- of a data family this would mention
+                                 -- the /family/ TyCon
                    -> TcM (TcCoercionR, [TcSigmaType])
 -- See Note [Matching constructor patterns]
--- Returns a coercion : T ty1 ... tyn ~ pat_ty
+-- Returns a coercion : T ty1 ... tyn ~R pat_ty
 -- This is the same way round as matchExpectedListTy etc
 -- but the other way round to matchExpectedPatTy
 matchExpectedConTy data_tc pat_ty
@@ -793,7 +798,7 @@ matchExpectedConTy data_tc pat_ty
              -- co1 : T (ty1,ty2) ~N pat_ty
 
        ; let tys' = mkTyVarTys tvs'
-             co2 = mkTcUnbranchedAxInstCo Representational co_tc tys'
+             co2 = mkTcUnbranchedAxInstCo co_tc tys'
              -- co2 : T (ty1,ty2) ~R T7 ty1 ty2
 
        ; return (mkTcSymCo co2 `mkTcTransCo` mkTcSubCo co1, tys') }

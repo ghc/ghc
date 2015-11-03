@@ -263,7 +263,7 @@ tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
 
     -- Coerces a `t` into a dictionry for `IP "x" t`.
     -- co : t -> IP "x" t
-    toDict ipClass x ty = HsWrap $ mkWpCast $ TcCoercion $
+    toDict ipClass x ty = HsWrap $ mkWpCastN $ TcCoercion $
                           wrapIP $ mkClassPred ipClass [x,ty]
 
 {-
@@ -699,18 +699,18 @@ mkExport :: TcPragEnv
 
 -- Pre-condition: the qtvs and theta are already zonked
 
-mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
+mkExport prag_fn qtvs theta mono_info@(poly_name, mb_sig, mono_id)
   = do  { mono_ty  <- zonkTcType (idType mono_id)
-        ; (poly_id, inferred) <- case mb_sig of
+        ; poly_id <- case mb_sig of
               Just sig | Just poly_id <- completeIdSigPolyId_maybe sig
-                       -> return (poly_id, False)
-              _other   -> do { poly_id <- checkNoErrs $
-                                          mkInferredPolyId qtvs theta
-                                             poly_name mb_sig mono_ty
-                             ; return (poly_id, True) }
+                       -> return poly_id
+              _other   -> checkNoErrs $
+                          mkInferredPolyId qtvs theta
+                                           poly_name mb_sig mono_ty
               -- The checkNoErrors ensures that if the type is ambiguous
               -- we don't carry on to the impedence matching, and generate
-              -- a duplicate ambiguity error
+              -- a duplicate ambiguity error.  There is a similar
+              -- checkNoErrs for complete type signatures too.
 
         -- NB: poly_id has a zonked type
         ; poly_id <- addInlinePrags poly_id prag_sigs
@@ -727,7 +727,7 @@ mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
                   then return idHsWrapper  -- Fast path; also avoids complaint when we infer
                                            -- an ambiguouse type and have AllowAmbiguousType
                                            -- e..g infer  x :: forall a. F a -> Int
-                  else addErrCtxtM (mk_bind_msg inferred True poly_name poly_ty) $
+                  else addErrCtxtM (mk_impedence_match_msg mono_info sel_poly_ty poly_ty) $
                        tcSubType_NC sig_ctxt sel_poly_ty poly_ty
         ; return (ABE { abe_wrap = wrap
                         -- abe_wrap :: idType poly_id ~ (forall qtvs. theta => mono_ty)
@@ -737,8 +737,6 @@ mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
   where
     prag_sigs = lookupPragEnv prag_fn poly_name
     sig_ctxt  = InfSigCtxt poly_name
-
-
 
 mkInferredPolyId :: [TyVar] -> TcThetaType
                  -> Name -> Maybe TcIdSigInfo -> TcType
@@ -760,7 +758,7 @@ mkInferredPolyId qtvs inferred_theta poly_name mb_sig mono_ty
 
        ; let qtvs' = filter (`elemVarSet` my_tvs) qtvs   -- Maintain original order
        ; let inferred_poly_ty = mkSigmaTy qtvs' theta' mono_ty'
-             msg = mk_bind_msg True False poly_name inferred_poly_ty
+             msg = mk_inf_msg poly_name inferred_poly_ty
 
        ; traceTc "mkInferredPolyId" (vcat [ppr poly_name, ppr qtvs, ppr my_tvs, ppr theta', ppr inferred_poly_ty])
        ; addErrCtxtM msg $
@@ -828,18 +826,31 @@ chooseInferredQuantifiers inferred_theta tau_tvs
               , typeSigCtxt ctxt bndr_info ]
 
 
-mk_bind_msg :: Bool -> Bool -> Name -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
-mk_bind_msg inferred want_ambig poly_name poly_ty tidy_env
- = do { (tidy_env', tidy_ty) <- zonkTidyTcType tidy_env poly_ty
-      ; return (tidy_env', mk_msg tidy_ty) }
- where
-   mk_msg ty = vcat [ ptext (sLit "When checking that") <+> quotes (ppr poly_name)
-                      <+> ptext (sLit "has the") <+> what <+> ptext (sLit "type")
-                    , nest 2 (ppr poly_name <+> dcolon <+> ppr ty)
-                    , ppWhen want_ambig $
-                      ptext (sLit "Probable cause: the inferred type is ambiguous") ]
-   what | inferred  = ptext (sLit "inferred")
-        | otherwise = ptext (sLit "specified")
+mk_impedence_match_msg :: MonoBindInfo
+                       -> TcType -> TcType
+                       -> TidyEnv -> TcM (TidyEnv, SDoc)
+-- This is a rare but rather awkward error messages
+mk_impedence_match_msg (name, mb_sig, _) inf_ty sig_ty tidy_env
+ = do { (tidy_env1, inf_ty) <- zonkTidyTcType tidy_env  inf_ty
+      ; (tidy_env2, sig_ty) <- zonkTidyTcType tidy_env1 sig_ty
+      ; let msg = vcat [ ptext (sLit "When checking that the inferred type")
+                       , nest 2 $ ppr name <+> dcolon <+> ppr inf_ty
+                       , ptext (sLit "is as general as its") <+> what <+> ptext (sLit "signature")
+                       , nest 2 $ ppr name <+> dcolon <+> ppr sig_ty ]
+      ; return (tidy_env2, msg) }
+  where
+    what = case mb_sig of
+             Nothing                     -> ptext (sLit "inferred")
+             Just sig | isPartialSig sig -> ptext (sLit "(partial)")
+                      | otherwise        -> empty
+
+
+mk_inf_msg :: Name -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
+mk_inf_msg poly_name poly_ty tidy_env
+ = do { (tidy_env1, poly_ty) <- zonkTidyTcType tidy_env poly_ty
+      ; let msg = vcat [ ptext (sLit "When checking the inferred type")
+                       , nest 2 $ ppr poly_name <+> dcolon <+> ppr poly_ty ]
+      ; return (tidy_env1, msg) }
 
 {-
 Note [Partial type signatures and generalisation]
@@ -1821,20 +1832,28 @@ decideGeneralisationPlan
    :: DynFlags -> TcTypeEnv -> [Name]
    -> [LHsBind Name] -> TcSigFun -> GeneralisationPlan
 decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
-  | strict_pat_binds                          = NoGen
-  | Just (lbind, sig) <- one_funbind_with_sig = if isPartialSig sig
+  | strict_pat_binds                      = NoGen
+  | Just bind_sig <- one_funbind_with_sig = sig_plan bind_sig
+  | mono_local_binds                      = NoGen
+  | otherwise                             = InferGen mono_restriction
+  where
+    bndr_set = mkNameSet bndr_names
+    binds = map unLoc lbinds
+
+    sig_plan :: (LHsBind Name, TcIdSigInfo) -> GeneralisationPlan
     -- See Note [Partial type signatures and generalisation]
     -- We use InferGen False to say "do inference, but do not apply
     -- the MR".  It's stupid to apply the MR when we are given a
-    -- signature!  C.f Trac #11016, function f1
-                                                then InferGen False
-                                                else CheckGen lbind sig
-  | mono_local_binds                          = NoGen
-  | otherwise                                 = infer_plan
-  where
-    infer_plan = InferGen mono_restriction
-    bndr_set = mkNameSet bndr_names
-    binds = map unLoc lbinds
+    -- signature!  C.f Trac #11016, function f2
+    sig_plan (lbind, sig@(TISI { sig_bndr = s_bndr, sig_theta = theta }))
+      = case s_bndr of
+          CompleteSig {} -> CheckGen lbind sig
+          PartialSig { sig_cts = extra_constraints }
+             | Nothing <- extra_constraints
+             , []      <- theta
+             -> InferGen True   -- No signature constraints: apply the MR
+             | otherwise
+             -> InferGen False  -- Don't apply the MR
 
     strict_pat_binds = any isStrictHsBind binds
        -- Strict patterns (top level bang or unboxed tuple) must not

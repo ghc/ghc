@@ -1,6 +1,7 @@
 
-ExtraConstraintsWildcardNotPresent.hs:6:1:
+ExtraConstraintsWildcardNotPresent.hs:6:1: error:
     No instance for (Show a)
-    When checking that ‘show'’ has the inferred type
+    When checking that the inferred type
+      show' :: forall a. Show a => a -> String
+    is as general as its (partial) signature
       show' :: forall a. a -> String
-    Probable cause: the inferred type is ambiguous

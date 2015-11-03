@@ -23,7 +23,7 @@ module HsUtils(
   mkSimpleMatch, unguardedGRHSs, unguardedRHS,
   mkMatchGroup, mkMatchGroupName, mkMatch, mkHsLam, mkHsIf,
   mkHsWrap, mkLHsWrap, mkHsWrapCo, mkHsWrapCoR, mkLHsWrapCo,
-  coToHsWrapper, coToHsWrapperR, mkHsDictLet, mkHsLams,
+  mkHsDictLet, mkHsLams,
   mkHsOpApp, mkHsDo, mkHsComp, mkHsWrapPat, mkHsWrapPatCo,
   mkLHsPar, mkHsCmdCast,
 
@@ -579,11 +579,11 @@ mkHsWrap co_fn e | isIdHsWrapper co_fn = e
 
 mkHsWrapCo :: TcCoercionN   -- A Nominal coercion  a ~N b
            -> HsExpr id -> HsExpr id
-mkHsWrapCo co e = mkHsWrap (coToHsWrapper co) e
+mkHsWrapCo co e = mkHsWrap (mkWpCastN co) e
 
 mkHsWrapCoR :: TcCoercionR   -- A Representational coercion  a ~R b
             -> HsExpr id -> HsExpr id
-mkHsWrapCoR co e = mkHsWrap (coToHsWrapperR co) e
+mkHsWrapCoR co e = mkHsWrap (mkWpCastR co) e
 
 mkLHsWrapCo :: TcCoercionN -> LHsExpr id -> LHsExpr id
 mkLHsWrapCo co (L loc e) = L loc (mkHsWrapCo co e)
@@ -592,22 +592,13 @@ mkHsCmdCast :: TcCoercion -> HsCmd id -> HsCmd id
 mkHsCmdCast co cmd | isTcReflCo co = cmd
                    | otherwise     = HsCmdCast co cmd
 
-coToHsWrapper :: TcCoercion -> HsWrapper   -- A Nominal coercion
-coToHsWrapper co | isTcReflCo co = idHsWrapper
-                 | otherwise     = mkWpCast (mkTcSubCo co)
-
-coToHsWrapperR :: TcCoercion -> HsWrapper   -- A Representational coercion
-coToHsWrapperR co | isTcReflCo co = idHsWrapper
-                  | otherwise     = mkWpCast co
-
 mkHsWrapPat :: HsWrapper -> Pat id -> Type -> Pat id
 mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p
                        | otherwise           = CoPat co_fn p ty
 
--- input coercion is Nominal
-mkHsWrapPatCo :: TcCoercion -> Pat id -> Type -> Pat id
+mkHsWrapPatCo :: TcCoercionN -> Pat id -> Type -> Pat id
 mkHsWrapPatCo co pat ty | isTcReflCo co = pat
-                        | otherwise     = CoPat (mkWpCast (mkTcSubCo co)) pat ty
+                        | otherwise     = CoPat (mkWpCastN co) pat ty
 
 mkHsDictLet :: TcEvBinds -> LHsExpr Id -> LHsExpr Id
 mkHsDictLet ev_binds expr = mkLHsWrap (mkWpLet ev_binds) expr

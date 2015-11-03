@@ -2,5 +2,5 @@
 T10351.hs:6:1: error:
     Non type-variable argument in the constraint: C [t]
     (Use FlexibleContexts to permit this)
-    When checking that ‘f’ has the inferred type
+    When checking the inferred type
       f :: forall t. C [t] => t -> ()

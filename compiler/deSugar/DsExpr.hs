@@ -645,7 +645,7 @@ dsExpr expr@(RecordUpd record_expr fields
                             Nothing  -> mkTcReflCo Nominal ty
                         in if null eq_spec
                              then rhs
-                             else mkLHsWrap (mkWpCast (mkTcSubCo wrap_co)) rhs
+                             else mkLHsWrap (mkWpCastN wrap_co) rhs
                     -- eq_spec is always null for a PatSynCon
                     PatSynCon _ -> rhs
 

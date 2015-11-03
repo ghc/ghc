@@ -155,6 +155,8 @@ data Pat id
         pat_binds :: TcEvBinds,         -- Bindings involving those dictionaries
         pat_args  :: HsConPatDetails id,
         pat_wrap  :: HsWrapper          -- Extra wrapper to pass to the matcher
+                                        -- Only relevant for pattern-synonyms;
+                                        --   ignored for data cons
     }
 
         ------------ View patterns ---------------

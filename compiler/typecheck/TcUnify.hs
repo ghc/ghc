@@ -438,7 +438,7 @@ tc_sub_type :: CtOrigin -> UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsW
 tc_sub_type origin ctxt ty_actual ty_expected
   | isTyVarTy ty_actual  -- See Note [Higher rank types]
   = do { cow <- uType origin ty_actual ty_expected
-       ; return (coToHsWrapper cow) }
+       ; return (mkWpCastN cow) }
 
   | otherwise  -- See Note [Deep skolemisation]
   = do { (sk_wrap, inner_wrap) <- tcGen ctxt ty_expected $ \ _ sk_rho ->
@@ -471,7 +471,7 @@ tc_sub_type_ds origin ctxt ty_actual ty_expected
 
   | otherwise   -- Revert to unification
   = do { cow <- uType origin ty_actual ty_expected
-       ; return (coToHsWrapper cow) }
+       ; return (mkWpCastN cow) }
 
 -----------------
 tcWrapResult :: HsExpr TcId -> TcRhoType -> TcRhoType -> TcM (HsExpr TcId)

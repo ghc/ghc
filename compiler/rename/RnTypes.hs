@@ -296,7 +296,8 @@ rnLHsTyKi what doc (L loc ty)
        ; return (L loc ty', fvs) }
 
 rnLHsType  :: HsDocContext -> LHsType RdrName -> RnM (LHsType Name, FreeVars)
-rnLHsType = rnLHsTyKi RnType
+rnLHsType cxt ty = pprTrace "rnHsType" (pprHsDocContext cxt $$ ppr ty) $
+                   rnLHsTyKi RnType cxt ty
 
 rnLHsPred  :: HsDocContext -> LHsType RdrName -> RnM (LHsType Name, FreeVars)
 rnLHsPred = rnLHsTyKi RnConstraint
@@ -313,7 +314,7 @@ rnLHsMaybeKind doc (Just kind)
        ; return (Just kind', fvs) }
 
 rnHsType  :: HsDocContext -> HsType RdrName -> RnM (HsType Name, FreeVars)
-rnHsType = rnHsTyKi RnType
+rnHsType cxt ty = rnHsTyKi RnType cxt ty
 
 rnHsKind  :: HsDocContext -> HsKind RdrName -> RnM (HsKind Name, FreeVars)
 rnHsKind = rnHsTyKi RnKind

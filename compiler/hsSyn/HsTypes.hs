@@ -126,6 +126,52 @@ renamer can decorate it with the variables bound
 by the pattern ('a' in the first example, 'k' in the second),
 assuming that neither of them is in scope already
 See also Note [Kind and type-variable binders] in RnTypes
+
+Note [HsType binders]
+~~~~~~~~~~~~~~~~~~~~~
+The system fr recording type and kind-variable binders in HsTypes
+is a bit complicated.  Here's how it works.
+
+* In a HsType,
+     HsForAllTy   represents an /explicit, user-written/ 'forall'
+                   e.g.   forall a b. ...
+     HsQualTy     reprsents an /explicit, user-written/ context
+                   e.g.   (Eq a, Show a) => ...
+                  The context can be empty if that's what the user wrote
+  These constructors reprsents what the user wrote, no more
+  and no less.
+
+* HsTyVarBndr describes a quantified type variable written by the
+  user.  For example
+     f :: forall a (b :: *).  blah
+  here 'a' and '(b::*)' are each a HsTyVarBndr.  A HsForAllTy has
+  a list of LHsTyVarBndrs.
+
+* HsImplicitBndrs is a wrapper that gives the implicitly-quantified
+  kind and type variables of the wrapped thing.  It is filled in by
+  the renamer.   For example, if the
+  user writes
+     f :: a -> a
+  the HsImplicitBinders binds the 'a' (not a HsForAllTy!).
+  NB: this implicit quantification is purely lexical: we bind any
+      type or kind variables that are not in scope. The type checker
+      may subsequently quantify over further kind variables.
+
+* HsWildCardBndrs is a wrapper that binds the wildcard variables
+  of the wrapped thing.  It is filled in by the renamer
+     f :: _a -> _
+  The enclosing HsWildCardBndrs binds the wildcards _a and _.
+
+* The explicit presence of these wrappers specifies, in the HsSyn,
+  exactly where implicit quantification is allowed, and where
+  wildcards are allowed.
+
+* LHsQTyVars is used in data/class declarations, where the user gives
+  explicit *type* variable bindings, but we need to implicitly bind
+  *kind* variables.  For example
+      class C (a :: k -> *) where ...
+  The 'k' is implicitly bound in the hsq_tvs field of LHsQTyVars
+
 -}
 
 type LHsContext name = Located (HsContext name)
@@ -151,8 +197,9 @@ type LHsKind name = Located (HsKind name)
 --  The explicitly-quantified binders in a data/type declaration
 
 type LHsTyVarBndr name = Located (HsTyVarBndr name)
+                         -- See Note [HsType binders]
 
-data LHsQTyVars name
+data LHsQTyVars name   -- See Note [HsType binders]
   = HsQTvs { hsq_kvs :: PostRn name [Name]      -- Kind variables
            , hsq_tvs :: [LHsTyVarBndr name]     -- Type variables
              -- See Note [HsForAllTy tyvar binders]
@@ -180,14 +227,14 @@ hsQTvBndrs = hsq_tvs
 --    * Pattern type signatures (SigPatIn)
 -- In the last of these, wildcards can happen, so we must accommodate them
 
-data HsImplicitBndrs name thing
+data HsImplicitBndrs name thing   -- See Note [HsType binders]
   = HsIB { hsib_kvs :: PostRn name [Name] -- Implicitly-bound kind vars
          , hsib_tvs :: PostRn name [Name] -- Implicitly-bound type vars
          , hsib_body :: thing              -- Main payload (type or list of types)
     }
   deriving (Typeable)
 
-data HsWildCardBndrs name thing
+data HsWildCardBndrs name thing   -- See Note [HsType binders]
   = HsWC { hswc_wcs :: PostRn name [Name] -- Wild cards
          , hswc_ctx :: Maybe SrcSpan     -- Indicates whether hswc_body has an
                                          -- extra-constraint wildcard, and if so where
@@ -308,7 +355,7 @@ hsTvbAllKinded :: LHsQTyVars name -> Bool
 hsTvbAllKinded = all (isHsKindedTyVar . unLoc) . hsQTvBndrs
 
 data HsType name
-  = HsForAllTy
+  = HsForAllTy   -- See Note [HsType binders]
       { hst_bndrs :: [LHsTyVarBndr name]   -- Explicit, user-supplied 'forall a b c'
       , hst_body  :: LHsType name          -- body type
       }
@@ -316,7 +363,7 @@ data HsType name
       --         'ApiAnnotation.AnnDot','ApiAnnotation.AnnDarrow'
       -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsQualTy
+  | HsQualTy   -- See Note [HsType binders]
       { hst_ctxt :: LHsContext name       -- Context C => blah
       , hst_body :: LHsType name }
 

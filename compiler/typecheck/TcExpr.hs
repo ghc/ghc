@@ -211,7 +211,7 @@ tcExpr (HsIPVar x) res_ty
        ; tcWrapResult (fromDict ipClass ip_name ip_ty (HsVar ip_var)) ip_ty res_ty }
   where
   -- Coerces a dictionary for `IP "x" t` into `t`.
-  fromDict ipClass x ty = HsWrap $ mkWpCast $ TcCoercion $
+  fromDict ipClass x ty = HsWrap $ mkWpCastN $ TcCoercion $
                           unwrapIP $ mkClassPred ipClass [x,ty]
 
 tcExpr (HsLam match) res_ty
@@ -651,7 +651,6 @@ In the outgoing (HsRecordUpd scrut binds cons in_inst_tys out_inst_tys):
 
 Note [Mixed Record Field Updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Consider the following pattern synonym.
 
   data MyRec = MyRec { foo :: Int, qux :: String }
@@ -716,20 +715,22 @@ tcExpr (RecordUpd record_expr rbnds _ _ _ _) res_ty
         -- Figure out the tycon and data cons from the first field name
         ; let   -- It's OK to use the non-tc splitters here (for a selector)
               sel_id : _  = sel_ids
-              mtycon  =
-                case idDetails sel_id of
-                  RecSelId (RecSelData tycon) _ -> Just tycon
-                  _ -> Nothing
-              con_likes  =
-                case idDetails sel_id of
-                  RecSelId (RecSelData tc) _ ->
-                    map RealDataCon (tyConDataCons tc)
-                  RecSelId (RecSelPatSyn ps) _ ->
-                    [PatSynCon ps]
-                  _ -> panic "tcRecordUpd"
+
+              mtycon :: Maybe TyCon
+              mtycon = case idDetails sel_id of
+                          RecSelId (RecSelData tycon) _ -> Just tycon
+                          _ -> Nothing
+
+              con_likes :: [ConLike]
+              con_likes = case idDetails sel_id of
+                             RecSelId (RecSelData tc) _
+                                -> map RealDataCon (tyConDataCons tc)
+                             RecSelId (RecSelPatSyn ps) _
+                                -> [PatSynCon ps]
+                             _  -> panic "tcRecordUpd"
                 -- NB: for a data type family, the tycon is the instance tycon
 
-              relevant_cons   = conLikesWithFields con_likes upd_fld_occs
+              relevant_cons = conLikesWithFields con_likes upd_fld_occs
                 -- A constructor is only relevant to this process if
                 -- it contains *all* the fields that are being updated
                 -- Other ones will cause a runtime error if they occur
@@ -741,12 +742,13 @@ tcExpr (RecordUpd record_expr rbnds _ _ _ _) res_ty
 
         -- Take apart a representative constructor
         ; let con1 = ASSERT( not (null relevant_cons) ) head relevant_cons
-              (con1_tvs, _, _, _prov_theta, req_theta, con1_arg_tys, _) =
-                conLikeFullSig con1
-              con1_flds = map flLabel $ conLikeFieldLabels con1
-              def_res_ty  = conLikeResTy con1
-              con1_res_ty =
-                (maybe def_res_ty mkFamilyTyConApp mtycon) (mkTyVarTys con1_tvs)
+              (con1_tvs, _, _, _prov_theta, req_theta, con1_arg_tys, _)
+                 = conLikeFullSig con1
+              con1_flds   = map flLabel $ conLikeFieldLabels con1
+              con1_tv_tys = mkTyVarTys con1_tvs
+              con1_res_ty = case mtycon of
+                              Just tc -> mkFamilyTyConApp tc con1_tv_tys
+                              Nothing -> conLikeResTy con1 con1_tv_tys
 
         -- Check that we're not dealing with a unidirectional pattern
         -- synonym
@@ -804,12 +806,14 @@ tcExpr (RecordUpd record_expr rbnds _ _ _ _) res_ty
         ; let theta' = substTheta scrut_subst (conLikeStupidTheta con1)
         ; instStupidTheta RecordUpdOrigin theta'
 
--- Not needed: the co_scrut stuff above will do that
---        -- Step 7: make a cast for the scrutinee, in the case that it's from a type family
---        ; let scrut_co | Just co_con <- tyConFamilyCoercion_maybe tycon =<< mtycon
---                       = mkWpCast (mkTcUnbranchedAxInstCo Representational co_con scrut_inst_tys)
---                       | otherwise
---                       = idHsWrapper
+        -- Step 7: make a cast for the scrutinee, in the
+        --         case that it's from a data family
+        ; let fam_co :: HsWrapper   -- RepT t1 .. tn ~R scrut_ty
+              fam_co | Just tycon <- mtycon
+                     , Just co_con <- tyConFamilyCoercion_maybe tycon
+                     = mkWpCastR (mkTcUnbranchedAxInstCo co_con scrut_inst_tys)
+                     | otherwise
+                     = idHsWrapper
 
         -- Step 8: Check that the req constraints are satisfied
         -- For normal data constructors req_theta is empty but we must do
@@ -819,8 +823,8 @@ tcExpr (RecordUpd record_expr rbnds _ _ _ _) res_ty
 
         -- Phew!
         ; return $ mkHsWrapCo co_res $
-          RecordUpd (mkLHsWrapCo co_scrut record_expr') rbinds'
-                    relevant_cons scrut_inst_tys result_inst_tys req_wrap }
+          RecordUpd (mkLHsWrap fam_co (mkLHsWrapCo co_scrut record_expr'))
+                    rbinds' relevant_cons scrut_inst_tys result_inst_tys req_wrap }
 
 tcExpr (HsRecFld f) res_ty
     = tcCheckRecSelId f res_ty
