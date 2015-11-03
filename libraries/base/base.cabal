@@ -94,6 +94,11 @@ Library
         Unsafe
 
     build-depends: rts == 1.0.*, ghc-prim == 0.5.*
+
+    -- sanity-check to ensure exactly one flag is set
+    if !((flag(integer-gmp) && !flag(integer-simple)) || (!flag(integer-gmp) && flag(integer-simple)))
+        build-depends: invalid-cabal-flag-settings<0
+
     if flag(integer-simple)
         build-depends: integer-simple >= 0.1.1 && < 0.2
 
