@@ -2,5 +2,5 @@ Breakpoint 0 activated at ../Test6.hs:5:8-11
 Stopped at ../Test6.hs:5:8-11
 _result :: a2 = _
 *** Exception: Prelude.head: empty list
-CallStack:
+CallStack (from ImplicitParams):
   error, called at libraries/base/GHC/List.hs:999:3 in base:GHC.List
