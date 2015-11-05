@@ -2213,7 +2213,8 @@ AC_DEFUN([FIND_GCC],[
 # $1 = the variable to set
 #
 AC_DEFUN([FIND_READELF],[
-    if test "$HostOS" != "mingw32"; then
+    if test "$HostOS" != "mingw32" &&
+       test "$HostOS" != "darwin" ; then
         FP_ARG_WITH_PATH_GNU_PROG([READELF], [readelf], [readelf])
         if test -z "$READELF"; then
             AC_MSG_ERROR([cannot identify readelf tool])
