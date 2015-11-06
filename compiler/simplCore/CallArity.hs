@@ -15,7 +15,7 @@ import BasicTypes
 import CoreSyn
 import Id
 import CoreArity ( typeArity )
-import CoreUtils ( exprIsHNF )
+import CoreUtils ( exprIsHNF, exprIsTrivial )
 --import Outputable
 import UnVarGraph
 import Demand
@@ -149,10 +149,15 @@ The interesting cases of the analysis:
  * Case alternatives alt₁,alt₂,...:
    Only one can be execuded, so
    Return (alt₁ ∪ alt₂ ∪...)
- * App e₁ e₂ (and analogously Case scrut alts):
-   We get the results from both sides. Additionally, anything called by e₁ can
-   possibly called with anything from e₂.
+ * App e₁ e₂ (and analogously Case scrut alts), with non-trivial e₂:
+   We get the results from both sides, with the argument evaluted at most once.
+   Additionally, anything called by e₁ can possibly be called with anything
+   from e₂.
    Return: C(e₁) ∪ C(e₂) ∪ (fv e₁) × (fv e₂)
+ * App e₁ x:
+   As this is already in A-normal form, CorePrep will not separately lambda
+   bind (and hence share) x. So we conservatively assume multiple calls to x here
+   Return: C(e₁) ∪ (fv e₁) × {x} ∪ {(x,x)}
  * Let v = rhs in body:
    In addition to the results from the subexpressions, add all co-calls from
    everything that the body calls together with v to everthing that is called
@@ -355,7 +360,7 @@ t1) in the follwing code:
       t2 = if ... then go 1 else ...
   in go 0
 
-Detecting this would reqiure finding out what variables are only ever called
+Detecting this would require finding out what variables are only ever called
 from thunks. While this is certainly possible, we yet have to see this to be
 relevant in the wild.
 
@@ -472,8 +477,12 @@ callArityAnal arity int (App e1 e2)
   where
     (ae1, e1') = callArityAnal (arity + 1) int e1
     (ae2, e2') = callArityAnal 0           int e2
-    -- See Note [Case and App: Which side to take?]
-    final_ae = ae1 `both` ae2
+    -- If the argument is trivial (e.g. a variable), then it will _not_ be
+    -- let-bound in the Core to STG transformation (CorePrep actually),
+    -- so no sharing will happen here, and we have to assume many calls.
+    ae2' | exprIsTrivial e2 = calledMultipleTimes ae2
+         | otherwise        = ae2
+    final_ae = ae1 `both` ae2'
 
 -- Case expression.
 callArityAnal arity int (Case scrut bndr ty alts)
