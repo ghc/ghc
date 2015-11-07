@@ -444,6 +444,13 @@
 #define RTS_DARWIN_ONLY_SYMBOLS
 #endif
 
+#if defined(openbsd_HOST_OS)
+#define RTS_OPENBSD_ONLY_SYMBOLS                            \
+     SymE_NeedsProto(__guard_local)
+#else
+#define RTS_OPENBSD_ONLY_SYMBOLS
+#endif
+
 #ifndef SMP
 # define MAIN_CAP_SYM SymI_HasProto(MainCapability)
 #else
@@ -1076,6 +1083,7 @@ RTS_RET_SYMBOLS
 RTS_POSIX_ONLY_SYMBOLS
 RTS_MINGW_ONLY_SYMBOLS
 RTS_DARWIN_ONLY_SYMBOLS
+RTS_OPENBSD_ONLY_SYMBOLS
 RTS_LIBGCC_SYMBOLS
 RTS_LIBFFI_SYMBOLS
 #undef SymI_NeedsProto
@@ -1113,6 +1121,7 @@ RtsSymbolVal rtsSyms[] = {
       RTS_POSIX_ONLY_SYMBOLS
       RTS_MINGW_ONLY_SYMBOLS
       RTS_DARWIN_ONLY_SYMBOLS
+      RTS_OPENBSD_ONLY_SYMBOLS
       RTS_LIBGCC_SYMBOLS
       RTS_LIBFFI_SYMBOLS
 #if defined(darwin_HOST_OS) && defined(i386_HOST_ARCH)
