@@ -299,39 +299,47 @@ linkCmdLineLibs dflags = do
 linkCmdLineLibs' :: DynFlags -> PersistentLinkerState -> IO PersistentLinkerState
 linkCmdLineLibs' dflags@(DynFlags { ldInputs     = cmdline_ld_inputs
                                   , libraryPaths = lib_paths}) pls =
-  do  {   -- (c) Link libraries from the command-line
-        ; let minus_ls = [ lib | Option ('-':'l':lib) <- cmdline_ld_inputs ]
-        ; libspecs <- mapM (locateLib dflags False lib_paths) minus_ls
+  do  -- (c) Link libraries from the command-line
+      let minus_ls = [ lib | Option ('-':'l':lib) <- cmdline_ld_inputs ]
+      libspecs <- mapM (locateLib dflags False lib_paths) minus_ls
 
-          -- (d) Link .o files from the command-line
-        ; classified_ld_inputs <- mapM (classifyLdInput dflags)
-                                    [ f | FileOption _ f <- cmdline_ld_inputs ]
+      -- (d) Link .o files from the command-line
+      classified_ld_inputs <- mapM (classifyLdInput dflags)
+                                [ f | FileOption _ f <- cmdline_ld_inputs ]
 
-          -- (e) Link any MacOS frameworks
-        ; let platform = targetPlatform dflags
-        ; let (framework_paths, frameworks) =
-                if platformUsesFrameworks platform
-                 then (frameworkPaths dflags, cmdlineFrameworks dflags)
-                  else ([],[])
+      -- (e) Link any MacOS frameworks
+      let platform = targetPlatform dflags
+      let (framework_paths, frameworks) =
+            if platformUsesFrameworks platform
+             then (frameworkPaths dflags, cmdlineFrameworks dflags)
+              else ([],[])
 
-          -- Finally do (c),(d),(e)
-        ; let cmdline_lib_specs = catMaybes classified_ld_inputs
-                               ++ libspecs
-                               ++ map Framework frameworks
-        ; if null cmdline_lib_specs then return pls
-                                    else do
+      -- Finally do (c),(d),(e)
+      let cmdline_lib_specs = catMaybes classified_ld_inputs
+                           ++ libspecs
+                           ++ map Framework frameworks
+      if null cmdline_lib_specs then return pls
+                                else do
 
-        { pls1 <- foldM (preloadLib dflags lib_paths framework_paths) pls
-                        cmdline_lib_specs
-        ; maybePutStr dflags "final link ... "
-        ; ok <- resolveObjs
+      -- Add directories to library search paths
+      let all_paths = let paths = framework_paths
+                               ++ lib_paths
+                               ++ [ takeDirectory dll | DLLPath dll <- libspecs ]
+                      in nub $ map normalise paths
+      pathCache <- mapM addLibrarySearchPath all_paths
 
-        ; if succeeded ok then maybePutStrLn dflags "done"
-          else throwGhcExceptionIO (ProgramError "linking extra libraries/objects failed")
+      pls1 <- foldM (preloadLib dflags lib_paths framework_paths) pls
+                    cmdline_lib_specs
+      maybePutStr dflags "final link ... "
+      ok <- resolveObjs
 
-        ; return pls1
-        }}
+      -- DLLs are loaded, reset the search paths
+      mapM_ removeLibrarySearchPath $ reverse pathCache
 
+      if succeeded ok then maybePutStrLn dflags "done"
+      else throwGhcExceptionIO (ProgramError "linking extra libraries/objects failed")
+
+      return pls1
 
 {- Note [preload packages]
 
@@ -1021,7 +1029,7 @@ data LibrarySpec
 
    | DLL String         -- "Unadorned" name of a .DLL/.so
                         --  e.g.    On unix     "qt"  denotes "libqt.so"
-                        --          On WinDoze  "burble"  denotes "burble.DLL"
+                        --          On Windows  "burble"  denotes "burble.DLL" or "libburble.dll"
                         --  loadDLL is platform-specific and adds the lib/.so/.DLL
                         --  suffixes platform-dependently
 
@@ -1115,7 +1123,7 @@ linkPackage dflags pkg
         -- Because of slight differences between the GHC dynamic linker and
         -- the native system linker some packages have to link with a
         -- different list of libraries when using GHCi. Examples include: libs
-        -- that are actually gnu ld scripts, and the possability that the .a
+        -- that are actually gnu ld scripts, and the possibility that the .a
         -- libs do not exactly match the .so/.dll equivalents. So if the
         -- package file provides an "extra-ghci-libraries" field then we use
         -- that instead of the "extra-libraries" field.
@@ -1135,6 +1143,11 @@ linkPackage dflags pkg
             objs       = [ obj  | Object obj     <- classifieds ]
             archs      = [ arch | Archive arch   <- classifieds ]
 
+        -- Add directories to library search paths
+        let dll_paths  = map takeDirectory known_dlls
+            all_paths  = nub $ map normalise $ dll_paths ++ dirs
+        pathCache <- mapM addLibrarySearchPath all_paths
+
         maybePutStr dflags
             ("Loading package " ++ sourcePackageIdString pkg ++ " ... ")
 
@@ -1142,6 +1155,9 @@ linkPackage dflags pkg
         when (packageName pkg `notElem` partOfGHCi) $ do
             loadFrameworks platform pkg
             mapM_ load_dyn (known_dlls ++ map (mkSOName platform) dlls)
+
+        -- DLLs are loaded, reset the search paths
+        mapM_ removeLibrarySearchPath $ reverse pathCache
 
         -- After loading all the DLLs, we can load the static objects.
         -- Ordering isn't important here, because we do one final link

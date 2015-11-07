@@ -687,10 +687,12 @@
       SymI_HasProto(stg_yield_to_interpreter)                           \
       SymI_HasProto(stg_block_noregs)                                   \
       SymI_HasProto(stg_block_takemvar)                                 \
-      SymI_HasProto(stg_block_readmvar)                           \
+      SymI_HasProto(stg_block_readmvar)                                 \
       SymI_HasProto(stg_block_putmvar)                                  \
       MAIN_CAP_SYM                                                      \
       SymI_HasProto(addDLL)                                             \
+      SymI_HasProto(addLibrarySearchPath)                               \
+      SymI_HasProto(removeLibrarySearchPath)                            \
       SymI_HasProto(__int_encodeDouble)                                 \
       SymI_HasProto(__word_encodeDouble)                                \
       SymI_HasProto(__int_encodeFloat)                                  \

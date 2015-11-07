@@ -104,6 +104,7 @@
 #  include <windows.h>
 #  include <shfolder.h> /* SHGetFolderPathW */
 #  include <math.h>
+#  include <wchar.h>
 #elif defined(darwin_HOST_OS)
 #  define OBJFORMAT_MACHO
 #  include <regex.h>
@@ -244,6 +245,12 @@ static int ocAllocateSymbolExtras_MachO ( ObjectCode* oc );
 #ifdef powerpc_HOST_ARCH
 static void machoInitSymbolsWithoutUnderscore( void );
 #endif
+#endif
+
+#if defined(OBJFORMAT_PEi386)
+// MingW-w64 is missing these from the implementation. So we have to look them up
+typedef DLL_DIRECTORY_COOKIE(*LPAddDLLDirectory)(PCWSTR NewDirectory);
+typedef WINBOOL(*LPRemoveDLLDirectory)(DLL_DIRECTORY_COOKIE Cookie);
 #endif
 
 static void freeProddableBlocks (ObjectCode *oc);
@@ -832,7 +839,7 @@ addDLL( pathchar *dll_name )
    OpenedDLL* o_dll;
    HINSTANCE  instance;
 
-   /* debugBelch("\naddDLL; dll_name = `%s'\n", dll_name); */
+   IF_DEBUG(linker, debugBelch("\naddDLL; dll_name = `%" PATH_FMT "'\n", dll_name));
 
    /* See if we've already got it, and ignore if so. */
    for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
@@ -852,23 +859,46 @@ addDLL( pathchar *dll_name )
 
    size_t bufsize = pathlen(dll_name) + 10;
    buf = stgMallocBytes(bufsize * sizeof(wchar_t), "addDLL");
-   snwprintf(buf, bufsize, L"%s.DLL", dll_name);
-   instance = LoadLibraryW(buf);
-   if (instance == NULL) {
-       if (GetLastError() != ERROR_MOD_NOT_FOUND) goto error;
-       // KAA: allow loading of drivers (like winspool.drv)
-       snwprintf(buf, bufsize, L"%s.DRV", dll_name);
-       instance = LoadLibraryW(buf);
-       if (instance == NULL) {
-           if (GetLastError() != ERROR_MOD_NOT_FOUND) goto error;
-           // #1883: allow loading of unix-style libfoo.dll DLLs
-           snwprintf(buf, bufsize, L"lib%s.DLL", dll_name);
-           instance = LoadLibraryW(buf);
-           if (instance == NULL) {
-               goto error;
+
+   /* These are ordered by probability of success and order we'd like them */
+   const wchar_t *formats[] = { L"%s.DLL", L"%s.DRV", L"lib%s.DLL", L"%s" };
+   const DWORD flags[]      = { LOAD_LIBRARY_SEARCH_USER_DIRS | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS, 0 };
+
+   int cFormat;
+   int cFlag;
+   int flags_start = 1; // Assume we don't support the new API
+
+   /* Detect if newer API are available, if not, skip the first flags entry */
+   if (GetProcAddress((HMODULE)LoadLibraryW(L"Kernel32.DLL"), "AddDllDirectory")) {
+       flags_start = 0;
+   }
+
+   /* Iterate through the possible flags and formats */
+   for (cFlag = flags_start; cFlag < 2; cFlag++)
+   {
+       for (cFormat = 0; cFormat < 4; cFormat++)
+       {
+           snwprintf(buf, bufsize, formats[cFormat], dll_name);
+           instance = LoadLibraryExW(buf, NULL, flags[cFlag]);
+           if (instance == NULL)
+           {
+               if (GetLastError() != ERROR_MOD_NOT_FOUND)
+               {
+                   goto error;
+               }
+           }
+           else
+           {
+               break; // We're done. DLL has been loaded.
            }
        }
    }
+
+   // Check if we managed to load the DLL
+   if (instance == NULL) {
+       goto error;
+   }
+
    stgFree(buf);
 
    addDLLHandle(dll_name, instance);
@@ -877,7 +907,7 @@ addDLL( pathchar *dll_name )
 
 error:
    stgFree(buf);
-   sysErrorBelch("%" PATH_FMT, dll_name);
+   sysErrorBelch("addDLL: %" PATH_FMT " (Win32 error %lu)", dll_name, GetLastError());
 
    /* LoadLibrary failed; return a ptr to the error msg. */
    return "addDLL: could not load DLL";
@@ -885,6 +915,142 @@ error:
 #  else
    barf("addDLL: not implemented on this platform");
 #  endif
+}
+
+
+/* -----------------------------------------------------------------------------
+* Emits a warning determining that the system is missing a required security
+* update that we need to get access to the proper APIs
+*/
+void warnMissingKBLibraryPaths( void )
+{
+    static HsBool missing_update_warn = HS_BOOL_FALSE;
+    if (!missing_update_warn) {
+        debugBelch("Warning: If linking fails, consider installing KB2533623.\n");
+        missing_update_warn = HS_BOOL_TRUE;
+    }
+}
+
+/* -----------------------------------------------------------------------------
+* appends a directory to the process DLL Load path so LoadLibrary can find it
+*
+* Returns: NULL on failure, or pointer to be passed to removeLibrarySearchPath to
+*          restore the search path to what it was before this call.
+*/
+HsPtr addLibrarySearchPath(pathchar* dll_path)
+{
+    IF_DEBUG(linker, debugBelch("\naddLibrarySearchPath: dll_path = `%" PATH_FMT "'\n", dll_path));
+
+#if defined(OBJFORMAT_PEi386)
+    HINSTANCE hDLL = LoadLibraryW(L"Kernel32.DLL");
+    LPAddDLLDirectory AddDllDirectory = (LPAddDLLDirectory)GetProcAddress((HMODULE)hDLL, "AddDllDirectory");
+
+    HsPtr result = NULL;
+
+    const unsigned int init_buf_size = 4096;
+    int bufsize = init_buf_size;
+
+    // Make sure the path is an absolute path
+    WCHAR* abs_path = malloc(sizeof(WCHAR) * init_buf_size);
+    DWORD wResult = GetFullPathNameW(dll_path, bufsize, abs_path, NULL);
+    if (!wResult){
+        sysErrorBelch("addLibrarySearchPath[GetFullPathNameW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError());
+    }
+    else if (wResult > init_buf_size) {
+        abs_path = realloc(abs_path, sizeof(WCHAR) * wResult);
+        if (!GetFullPathNameW(dll_path, bufsize, abs_path, NULL)) {
+            sysErrorBelch("addLibrarySearchPath[GetFullPathNameW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError());
+        }
+    }
+
+    if (AddDllDirectory) {
+        result = AddDllDirectory(abs_path);
+    }
+    else
+    {
+        warnMissingKBLibraryPaths();
+        WCHAR* str = malloc(sizeof(WCHAR) * init_buf_size);
+        wResult = GetEnvironmentVariableW(L"PATH", str, bufsize);
+
+        if (wResult > init_buf_size) {
+            str = realloc(str, sizeof(WCHAR) * wResult);
+            bufsize = wResult;
+            wResult = GetEnvironmentVariableW(L"PATH", str, bufsize);
+            if (!wResult) {
+                sysErrorBelch("addLibrarySearchPath[GetEnvironmentVariableW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError());
+            }
+        }
+
+        bufsize = wResult + 2 + pathlen(abs_path);
+        wchar_t* newPath = malloc(sizeof(wchar_t) * bufsize);
+
+        wcscpy(newPath, abs_path);
+        wcscat(newPath, L";");
+        wcscat(newPath, str);
+        if (!SetEnvironmentVariableW(L"PATH", (LPCWSTR)newPath)) {
+            sysErrorBelch("addLibrarySearchPath[SetEnvironmentVariableW]: %" PATH_FMT " (Win32 error %lu)", abs_path, GetLastError());
+        }
+
+        free(newPath);
+        free(abs_path);
+
+        return str;
+    }
+
+    if (!result) {
+        sysErrorBelch("addLibrarySearchPath: %" PATH_FMT " (Win32 error %lu)", abs_path, GetLastError());
+        free(abs_path);
+        return NULL;
+    }
+
+    free(abs_path);
+    return result;
+#else
+    (void)(dll_path); // Function not implemented for other platforms.
+    return NULL;
+#endif
+}
+
+/* -----------------------------------------------------------------------------
+* removes a directory from the process DLL Load path
+*
+* Returns: HS_BOOL_TRUE on success, otherwise HS_BOOL_FALSE
+*/
+HsBool removeLibrarySearchPath(HsPtr dll_path_index)
+{
+    IF_DEBUG(linker, debugBelch("\nremoveLibrarySearchPath: ptr = `%p'\n", dll_path_index));
+
+#if defined(OBJFORMAT_PEi386)
+    HsBool result = 0;
+
+    if (dll_path_index != NULL) {
+        HINSTANCE hDLL = LoadLibraryW(L"Kernel32.DLL");
+        LPRemoveDLLDirectory RemoveDllDirectory = (LPRemoveDLLDirectory)GetProcAddress((HMODULE)hDLL, "RemoveDllDirectory");
+
+        if (RemoveDllDirectory) {
+            result = RemoveDllDirectory(dll_path_index);
+            // dll_path_index is now invalid, do not use it after this point.
+        }
+        else
+        {
+            warnMissingKBLibraryPaths();
+
+            result = SetEnvironmentVariableW(L"PATH", (LPCWSTR)dll_path_index);
+
+            free(dll_path_index);
+        }
+
+        if (!result) {
+            sysErrorBelch("removeLibrarySearchPath: (Win32 error %lu)", GetLastError());
+            return HS_BOOL_FALSE;
+        }
+    }
+
+    return result == 0 ? HS_BOOL_TRUE : HS_BOOL_FALSE;
+#else
+    (void)(dll_path_index); // Function not implemented for other platforms.
+    return HS_BOOL_FALSE;
+#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -2805,7 +2971,6 @@ typedef
    COFF_reloc;
 
 #define sizeof_COFF_reloc 10
-
 
 /* From PE spec doc, section 3.3.2 */
 /* Note use of MYIMAGE_* since IMAGE_* are already defined in
