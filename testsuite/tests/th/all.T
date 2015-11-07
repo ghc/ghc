@@ -364,3 +364,5 @@ test('T10810', normal, compile, ['-v0'])
 test('T10891', normal, compile, ['-v0'])
 test('T10945', normal, compile_fail, ['-v0'])
 test('T10946', expect_broken(10946), compile, ['-v0'])
+test('T10734', normal, compile_and_run, ['-v0'])
+
