@@ -2191,7 +2191,7 @@ joinObjectFiles dflags o_files output_fn = do
      then do
           script <- newTempName dflags "ldscript"
           cwd <- getCurrentDirectory
-          let o_files_abs = map (cwd </>) o_files
+          let o_files_abs = map (\x -> "\"" ++ (cwd </> x) ++ "\"") o_files
           writeFile script $ "INPUT(" ++ unwords o_files_abs ++ ")"
           ld_r [SysTools.FileOption "" script] ccInfo
      else if sLdSupportsFilelist mySettings
