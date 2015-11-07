@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP, ImplicitParams #-}
 {-
 (c) The University of Glasgow 2006-2012
 (c) The GRASP Project, Glasgow University, 1992-1998
@@ -73,7 +74,7 @@ module Outputable (
 
         -- * Error handling and debugging utilities
         pprPanic, pprSorry, assertPprPanic, pprPgmError,
-        pprTrace, warnPprTrace,
+        pprTrace, warnPprTrace, pprSTrace,
         trace, pgmError, panic, sorry, assertPanic,
         pprDebugAndThen,
     ) where
@@ -109,6 +110,8 @@ import Data.Graph (SCC(..))
 
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
+import GHC.Stack
+import GHC.Exception
 
 {-
 ************************************************************************
@@ -1029,6 +1032,17 @@ pprTrace :: String -> SDoc -> a -> a
 pprTrace str doc x
    | opt_NoDebugOutput = x
    | otherwise         = pprDebugAndThen unsafeGlobalDynFlags trace (text str) doc x
+
+
+-- | If debug output is on, show some 'SDoc' on the screen along
+-- with a call stack when available.
+#if __GLASGOW_HASKELL__ >= 710
+pprSTrace :: (?location :: CallStack) => SDoc -> a -> a
+pprSTrace = pprTrace (showCallStack ?location)
+#else
+pprSTrace :: SDoc -> a -> a
+pprSTrace = pprTrace "no callstack info"
+#endif
 
 warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
 -- ^ Just warn about an assertion failure, recording the given file and line number.
