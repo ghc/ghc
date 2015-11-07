@@ -524,7 +524,6 @@ $(foreach pkg,$(PACKAGES_STAGE1),$(eval $(call fixed_pkg_dep,$(pkg),dist-install
 # eachother, so we can configure them in parallel.
 utils/ghc-pwd/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/ghc-cabal/dist-install/package-data.mk: $(fixed_pkg_prev)
-utils/dll-split/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/hpc/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/ghc-pkg/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/hsc2hs/dist-install/package-data.mk: $(fixed_pkg_prev)
