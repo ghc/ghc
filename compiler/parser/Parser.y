@@ -1422,6 +1422,7 @@ stringlist :: { Located (OrdList (Located StringLiteral)) }
                                return (sLL $1 $> (unLoc $1 `snocOL`
                                                   (L (gl $3) (getStringLiteral $3)))) }
     | STRING                { sLL $1 $> (unitOL (L (gl $1) (getStringLiteral $1))) }
+    | {- empty -}           { noLoc nilOL }
 
 -----------------------------------------------------------------------------
 -- Annotations
