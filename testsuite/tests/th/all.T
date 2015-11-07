@@ -4,10 +4,6 @@
 # and no splices, consider adding it to the quotes/ directory instead
 # of the th/ directory; this way, we can test it on the stage 1 compiler too!
 
-# This test needs to come before the setTestOpts calls below, as we want
-# to run it if compiler_profiled.
-test('T4255', unless(compiler_profiled(), skip), compile_fail, ['-v0'])
-
 def f(name, opts):
     opts.extra_hc_opts = '-XTemplateHaskell -package template-haskell'
     if (ghc_with_interpreter == 0):
@@ -15,7 +11,6 @@ def f(name, opts):
 
 setTestOpts(f)
 setTestOpts(only_ways(['normal','ghci']))
-setTestOpts(when(compiler_profiled(), skip))
 
 test('TH_mkName', normal, compile, ['-v0'])
 test('TH_1tuple', normal, compile_fail, ['-v0'])
@@ -130,7 +125,7 @@ test('TH_linePragma', normal, compile_fail, ['-v0'])
 test('T1830_3',
      extra_clean(['T1830_3a.o','T1830_3a.hi']),
      multimod_compile_and_run,
-     ['T1830_3', '-v0'])
+     ['T1830_3', '-v0 ' + config.ghc_th_way_flags])
 test('T2700', normal, compile, ['-v0'])
 test('T2817', normal, compile, ['-v0'])
 test('T2713', normal, compile_fail, ['-v0'])
@@ -320,7 +315,8 @@ test('TH_StaticPointers02',
      compile_fail, [''])
 test('T8759', normal, compile_fail, ['-v0'])
 test('T7021',
-     extra_clean(['T7021a.hi', 'T7021a.o']), multimod_compile, ['T7021','-v0'])
+     extra_clean(['T7021a.hi', 'T7021a.o']), multimod_compile,
+     ['T7021','-v0 ' + config.ghc_th_way_flags])
 test('T8807', normal, compile, ['-v0'])
 test('T8884', normal, compile, ['-v0'])
 test('T8954', normal, compile, ['-v0'])
@@ -348,7 +344,7 @@ test('T10047', normal, ghci_script, ['T10047.script'])
 test('T10019', normal, ghci_script, ['T10019.script'])
 test('T10267', extra_clean(['T10267a.hi', 'T10267a.o']),
                multimod_compile_fail,
-               ['T10267', '-dsuppress-uniques -v0'])
+               ['T10267', '-dsuppress-uniques -v0 ' + config.ghc_th_way_flags])
 test('T10279', normal, compile_fail, ['-v0'])
 test('T10306', normal, compile, ['-v0'])
 test('T10596', normal, compile, ['-v0'])
@@ -357,7 +353,7 @@ test('T10638', normal, compile_fail, ['-v0'])
 test('T10704',
      extra_clean(['T10704a.o','T10704a.hi']),
      multimod_compile_and_run,
-     ['T10704', '-v0'])
+     ['T10704', '-v0 ' + config.ghc_th_way_flags])
 test('T6018th', normal, compile_fail, ['-v0'])
 test('TH_namePackage', normal, compile_and_run, ['-v0'])
 test('TH_nameSpace', normal, compile_and_run, ['-v0'])

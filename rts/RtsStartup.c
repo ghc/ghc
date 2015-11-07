@@ -230,7 +230,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     initThreadLabelTable();
 #endif
 
-    initProfiling1();
+    initProfiling();
 
     /* start the virtual timer 'subsystem'. */
     initTimer();
@@ -254,10 +254,6 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 #endif
 
     startupHpc();
-
-    // This must be done after module initialisation.
-    // ToDo: make this work in the presence of multiple hs_add_root()s.
-    initProfiling2();
 
     // ditto.
 #if defined(THREADED_RTS)

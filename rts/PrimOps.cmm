@@ -1960,8 +1960,6 @@ stg_mkApUpd0zh ( P_ bco )
 
 stg_unpackClosurezh ( P_ closure )
 {
-// TODO: Consider the absence of ptrs or nonptrs as a special case ?
-
     W_ info, ptrs, nptrs, p, ptrs_arr, nptrs_arr;
     info  = %GET_STD_INFO(UNTAG(closure));
 

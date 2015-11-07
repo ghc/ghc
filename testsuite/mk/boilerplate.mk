@@ -250,6 +250,10 @@ ifeq "$(GhcDynamic)" "YES"
 ghcThWayFlags     = -dynamic
 ghciWayFlags      = -dynamic
 ghcPluginWayFlags = -dynamic
+else ifeq "$(GhcProfiled)" "YES"
+ghcThWayFlags     = -prof
+ghciWayFlags      = -prof
+ghcPluginWayFlags = -prof
 else
 ghcThWayFlags     = -static
 ghciWayFlags      = -static

@@ -31,6 +31,7 @@
 #include "GetEnv.h"
 #include "Stable.h"
 #include "RtsSymbols.h"
+#include "Profiling.h"
 
 #if !defined(mingw32_HOST_OS)
 #include "posix/Signals.h"
@@ -1831,9 +1832,15 @@ static HsInt loadArchive_ (pathchar *path)
         IF_DEBUG(linker,
                  debugBelch("loadArchive: Found member file `%s'\n", fileName));
 
-        isObject = thisFileNameSize >= 2
-                && fileName[thisFileNameSize - 2] == '.'
-                && fileName[thisFileNameSize - 1] == 'o';
+        isObject =
+               (thisFileNameSize >= 2 &&
+                fileName[thisFileNameSize - 2] == '.' &&
+                fileName[thisFileNameSize - 1] == 'o')
+            || (thisFileNameSize >= 4 &&
+                fileName[thisFileNameSize - 4] == '.' &&
+                fileName[thisFileNameSize - 3] == 'p' &&
+                fileName[thisFileNameSize - 2] == '_' &&
+                fileName[thisFileNameSize - 1] == 'o');
 
         IF_DEBUG(linker, debugBelch("loadArchive: \tthisFileNameSize = %d\n", (int)thisFileNameSize));
         IF_DEBUG(linker, debugBelch("loadArchive: \tisObject = %d\n", isObject));
@@ -2260,6 +2267,12 @@ static HsInt resolveObjs_ (void)
             oc->status = OBJECT_RESOLVED;
         }
     }
+
+#ifdef PROFILING
+    // collect any new cost centres & CCSs that were defined during runInit
+    initProfiling2();
+#endif
+
     IF_DEBUG(linker, debugBelch("resolveObjs: done\n"));
     return 1;
 }

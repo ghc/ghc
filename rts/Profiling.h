@@ -20,7 +20,7 @@
 #define PROFILING_ONLY(s) doNothing()
 #endif
 
-void initProfiling1 (void);
+void initProfiling  (void);
 void initProfiling2 (void);
 void endProfiling   (void);
 void freeProfiling  (void);

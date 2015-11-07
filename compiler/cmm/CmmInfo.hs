@@ -26,6 +26,7 @@ module CmmInfo (
   maxStdInfoTableSizeW,
   maxRetInfoTableSizeW,
   stdInfoTableSizeB,
+  conInfoTableSizeB,
   stdSrtBitmapOffset,
   stdClosureTypeOffset,
   stdPtrsOffset, stdNonPtrsOffset,
@@ -551,3 +552,6 @@ stdClosureTypeOffset dflags = stdInfoTableSizeB dflags - wORD_SIZE dflags
 stdPtrsOffset, stdNonPtrsOffset :: DynFlags -> ByteOff
 stdPtrsOffset    dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags
 stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags + hALF_WORD_SIZE dflags
+
+conInfoTableSizeB :: DynFlags -> Int
+conInfoTableSizeB dflags = stdInfoTableSizeB dflags + wORD_SIZE dflags

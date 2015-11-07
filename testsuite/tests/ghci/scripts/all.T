@@ -1,7 +1,5 @@
 # coding=utf8
 
-setTestOpts(when(compiler_profiled(), skip))
-
 test('ghci001', combined_output, ghci_script, ['ghci001.script'])
 test('ghci002', combined_output, ghci_script, ['ghci002.script'])
 test('ghci003', combined_output, ghci_script, ['ghci003.script'])

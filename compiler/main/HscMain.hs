@@ -1787,11 +1787,6 @@ hscCompileCoreExpr hsc_env =
 
 hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO HValue
 hscCompileCoreExpr' hsc_env srcspan ds_expr
-    | rtsIsProfiled
-    = throwIO (InstallationError "You can't call hscCompileCoreExpr in a profiled compiler")
-            -- Otherwise you get a seg-fault when you run it
-
-    | otherwise
     = do { let dflags = hsc_dflags hsc_env
 
            {- Simplify it -}

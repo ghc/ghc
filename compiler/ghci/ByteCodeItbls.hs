@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, MagicHash #-}
+{-# LANGUAGE CPP, MagicHash, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -20,6 +20,7 @@ import DataCon          ( DataCon, dataConRepArgTys, dataConIdentity )
 import TyCon            ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
 import Type             ( flattenRepType, repType, typePrimRep )
 import StgCmmLayout     ( mkVirtHeapOffsets )
+import CmmInfo          ( conInfoTableSizeB, profInfoTableSizeW )
 import Util
 
 import Control.Monad
@@ -42,10 +43,6 @@ itblCode :: DynFlags -> ItblPtr -> Ptr ()
 itblCode dflags (ItblPtr ptr)
  | ghciTablesNextToCode = castPtr ptr `plusPtr` conInfoTableSizeB dflags
  | otherwise            = castPtr ptr
-
--- XXX bogus
-conInfoTableSizeB :: DynFlags -> Int
-conInfoTableSizeB dflags = 3 * wORD_SIZE dflags
 
 type ItblEnv = NameEnv (Name, ItblPtr)
         -- We need the Name in the range so we know which
@@ -258,8 +255,10 @@ foreign import ccall "&stg_interp_constr_entry"
 -- Ultra-minimalist version specially for constructors
 #if SIZEOF_VOID_P == 8
 type HalfWord = Word32
+type FullWord = Word64
 #else
 type HalfWord = Word16
+type FullWord = Word32
 #endif
 
 data StgConInfoTable = StgConInfoTable {
@@ -311,6 +310,8 @@ sizeOfItbl dflags itbl
                                       Right xs -> sizeOf (head xs) * length xs
                                  else 0
         ]
+        + if rtsIsProfiled then profInfoTableSizeW * wORD_SIZE dflags
+                           else 0
 
 pokeItbl :: DynFlags -> Ptr StgInfoTable -> StgInfoTable -> IO ()
 pokeItbl _ a0 itbl
@@ -319,6 +320,9 @@ pokeItbl _ a0 itbl
            case entry itbl of
                Nothing -> return ()
                Just e  -> store e
+           when rtsIsProfiled $ do
+              store (0 :: FullWord)
+              store (0 :: FullWord)
            store (ptrs   itbl)
            store (nptrs  itbl)
            store (tipe   itbl)
@@ -335,6 +339,10 @@ peekItbl dflags a0
            entry'  <- if ghciTablesNextToCode
                       then return Nothing
                       else liftM Just load
+           when rtsIsProfiled $ do
+              (_ :: Ptr FullWord) <- advance
+              (_ :: Ptr FullWord) <- advance
+              return ()
            ptrs'   <- load
            nptrs'  <- load
            tipe'   <- load
