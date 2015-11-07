@@ -493,7 +493,7 @@ We also handle @C{}@ as valid construction syntax for an unlabelled
 constructor @C@, setting all of @C@'s fields to bottom.
 -}
 
-dsExpr (RecordCon (L _ con_like_id) con_expr rbinds) = do
+dsExpr (RecordCon _ con_expr rbinds labels) = do
     con_expr' <- dsExpr con_expr
     let
         (arg_tys, _) = tcSplitFunTys (exprType con_expr')
@@ -507,8 +507,6 @@ dsExpr (RecordCon (L _ con_like_id) con_expr rbinds) = do
               []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (ppr (flLabel fl))
         unlabelled_bottom arg_ty = mkErrorAppDs rEC_CON_ERROR_ID arg_ty Outputable.empty
 
-        labels = conLikeFieldLabels (idConLike con_like_id)
-        -- The data_con_id is guaranteed to be the wrapper id of the constructor
 
     con_args <- if null labels
                 then mapM unlabelled_bottom arg_tys

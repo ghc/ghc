@@ -36,6 +36,7 @@ import StaticFlags( opt_PprStyle_Debug )
 import Outputable
 import FastString
 import Type
+import FieldLabel
 
 -- libraries:
 import Data.Data hiding (Fixity)
@@ -284,6 +285,7 @@ data HsExpr id
                                    -- it's the dataConWrapId of the constructor
                 PostTcExpr         -- Data con Id applied to type args
                 (HsRecordBinds id)
+                (PostTc id [FieldLabel])
 
   -- | Record update
   --
@@ -727,7 +729,7 @@ ppr_expr (ExplicitList _ _ exprs)
 ppr_expr (ExplicitPArr _ exprs)
   = paBrackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
 
-ppr_expr (RecordCon con_id _ rbinds)
+ppr_expr (RecordCon con_id _ rbinds _)
   = hang (ppr con_id) 2 (ppr rbinds)
 
 ppr_expr (RecordUpd aexp rbinds _ _ _ _)

@@ -251,11 +251,11 @@ rnExpr (ExplicitTuple tup_args boxity)
     rnTupArg (L l (Missing _)) = return (L l (Missing placeHolderType)
                                         , emptyFVs)
 
-rnExpr (RecordCon con_id _ rbinds)
+rnExpr (RecordCon con_id _ rbinds _)
   = do  { conname <- lookupLocatedOccRn con_id
         ; (rbinds', fvRbinds) <- rnHsRecBinds (HsRecFieldCon (unLoc conname)) rbinds
-        ; return (RecordCon conname noPostTcExpr rbinds',
-                  fvRbinds `addOneFV` unLoc conname) }
+        ; return (RecordCon conname noPostTcExpr rbinds' PlaceHolder ,
+                  fvRbinds `addOneFV` unLoc conname ) }
 
 rnExpr (RecordUpd expr rbinds _ _ _ _)
   = do  { (expr', fvExpr) <- rnLExpr expr

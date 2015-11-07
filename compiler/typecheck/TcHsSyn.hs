@@ -704,10 +704,10 @@ zonkExpr env (ExplicitPArr ty exprs)
        new_exprs <- zonkLExprs env exprs
        return (ExplicitPArr new_ty new_exprs)
 
-zonkExpr env (RecordCon data_con con_expr rbinds)
+zonkExpr env (RecordCon data_con con_expr rbinds labels)
   = do  { new_con_expr <- zonkExpr env con_expr
         ; new_rbinds   <- zonkRecFields env rbinds
-        ; return (RecordCon data_con new_con_expr new_rbinds) }
+        ; return (RecordCon data_con new_con_expr new_rbinds labels) }
 
 zonkExpr env (RecordUpd expr rbinds cons in_tys out_tys req_wrap)
   = do  { new_expr    <- zonkLExpr env expr

@@ -122,8 +122,6 @@ data IdDetails
                                 --  a) to support isImplicitId
                                 --  b) when desugaring a RecordCon we can get
                                 --     from the Id back to the data con]
-  | PatSynBuilderId PatSyn         -- ^ As for DataConWrapId
-
   | ClassOpId Class             -- ^ The 'Id' is a superclass selector,
                                 -- or class operation of a class
 
@@ -188,7 +186,6 @@ pprIdDetails other     = brackets (pp other)
    pp (RecSelId { sel_naughty = is_naughty })
                          = brackets $ ptext (sLit "RecSel")
                             <> ppWhen is_naughty (ptext (sLit "(naughty)"))
-   pp (PatSynBuilderId _)   = ptext (sLit "PatSynBuilder")
 
 {-
 ************************************************************************

@@ -711,7 +711,9 @@ cvtl e = wrapL (cvt e)
                               ; return $ ExprWithTySig e' t' PlaceHolder }
     cvt (RecConE c flds) = do { c' <- cNameL c
                               ; flds' <- mapM (cvtFld mkFieldOcc) flds
-                              ; return $ RecordCon c' noPostTcExpr (HsRecFields flds' Nothing)}
+                              ; return $ RecordCon c' noPostTcExpr
+                                          (HsRecFields flds' Nothing)
+                                          PlaceHolder }
     cvt (RecUpdE e flds) = do { e' <- cvtl e
                               ; flds'<- mapM (cvtFld mkAmbiguousFieldOcc) flds
                               ; return $ RecordUpd e'

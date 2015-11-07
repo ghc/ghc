@@ -535,11 +535,12 @@ addTickHsExpr (ExplicitPArr ty es) =
 
 addTickHsExpr (HsStatic e) = HsStatic <$> addTickLHsExpr e
 
-addTickHsExpr (RecordCon id ty rec_binds) =
-        liftM3 RecordCon
+addTickHsExpr (RecordCon id ty rec_binds labels) =
+        liftM4 RecordCon
                 (return id)
                 (return ty)
                 (addTickHsRecordBinds rec_binds)
+                (return labels)
 addTickHsExpr (RecordUpd e rec_binds cons tys1 tys2 req_wrap) =
         return RecordUpd `ap`
                 (addTickLHsExpr e) `ap`

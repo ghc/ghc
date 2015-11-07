@@ -219,7 +219,7 @@ tc_patsyn_finish lname dir is_infix lpat'
              theta   = prov_theta ++ req_theta
              arg_tys = map (varType . fst) wrapped_args
 
-       ; (patSyn, matcher_bind) <- fixM $ \ ~(patSyn,_) -> do {
+       ;
 
         traceTc "tc_patsyn_finish {" $
            ppr (unLoc lname) $$ ppr (unLoc lpat') $$
@@ -238,7 +238,7 @@ tc_patsyn_finish lname dir is_infix lpat'
 
        -- Make the 'builder'
        ; builder_id <- mkPatSynBuilderId dir lname qtvs theta
-                                         arg_tys pat_ty patSyn
+                                         arg_tys pat_ty
 
          -- TODO: Make this have the proper information
        ; let mkFieldLabel name = FieldLabel (occNameFS (nameOccName name)) False name
@@ -246,14 +246,13 @@ tc_patsyn_finish lname dir is_infix lpat'
 
 
        -- Make the PatSyn itself
-       ; let patSyn' = mkPatSyn (unLoc lname) is_infix
+       ; let patSyn = mkPatSyn (unLoc lname) is_infix
                         (univ_tvs, req_theta)
                         (ex_tvs, prov_theta)
                         arg_tys
                         pat_ty
                         matcher_id builder_id
                         field_labels'
-       ; return (patSyn', matcher_bind) }
 
        -- Selectors
        ; let (sigs, selector_binds) =
@@ -388,9 +387,9 @@ isUnidirectional ExplicitBidirectional{} = False
 -}
 
 mkPatSynBuilderId :: HsPatSynDir a -> Located Name
-                  -> [TyVar] -> ThetaType -> [Type] -> Type -> PatSyn
+                  -> [TyVar] -> ThetaType -> [Type] -> Type
                   -> TcM (Maybe (Id, Bool))
-mkPatSynBuilderId dir  (L _ name) qtvs theta arg_tys pat_ty pat_syn
+mkPatSynBuilderId dir  (L _ name) qtvs theta arg_tys pat_ty
   | isUnidirectional dir
   = return Nothing
   | otherwise
@@ -398,8 +397,7 @@ mkPatSynBuilderId dir  (L _ name) qtvs theta arg_tys pat_ty pat_syn
        ; let builder_sigma = mkSigmaTy qtvs theta (mkFunTys builder_arg_tys pat_ty)
              builder_id    =
               -- See Note [Exported LocalIds] in Id
-              mkExportedLocalId (PatSynBuilderId pat_syn)
-                                builder_name builder_sigma
+              mkExportedLocalId VanillaId builder_name builder_sigma
        ; return (Just (builder_id, need_dummy_arg)) }
   where
     builder_arg_tys | need_dummy_arg = [voidPrimTy]

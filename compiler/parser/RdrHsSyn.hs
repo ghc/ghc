@@ -847,7 +847,7 @@ checkAPat msg loc e0 = do
                                    return (TuplePat ps b [])
      | otherwise -> parseErrorSDoc loc (text "Illegal tuple section in pattern:" $$ ppr e0)
 
-   RecordCon c _ (HsRecFields fs dd)
+   RecordCon c _ (HsRecFields fs dd) _
                         -> do fs <- mapM (checkPatField msg) fs
                               return (ConPatIn c (RecCon (HsRecFields fs dd)))
    HsSpliceE s | not (isTypedSplice s)
@@ -1188,7 +1188,7 @@ mkRecConstrOrUpdate
 
 mkRecConstrOrUpdate (L l (HsVar c)) _ (fs,dd)
   | isRdrDataCon c
-  = return (RecordCon (L l c) noPostTcExpr (mk_rec_fields fs dd))
+  = return (RecordCon (L l c) noPostTcExpr (mk_rec_fields fs dd) PlaceHolder)
 mkRecConstrOrUpdate exp@(L l _) _ (fs,dd)
   | dd        = parseErrorSDoc l (text "You cannot use `..' in a record update")
   | otherwise = return (RecordUpd exp (map (fmap mk_rec_upd_field) fs)
