@@ -637,6 +637,8 @@ pprInstr (SLW reg1 reg2 (RIImm (ImmInt i))) | i < 0  || i > 31 =
     -- Fixes ticket http://ghc.haskell.org/trac/ghc/ticket/10870
     pprInstr (XOR reg1 reg2 (RIReg reg2))
 
+pprInstr (SRAW reg1 reg2 (RIImm (ImmInt i))) | i > 31 =
+    pprInstr (SRAW reg1 reg2 (RIImm (ImmInt 31)))
 
 pprInstr (SLW reg1 reg2 ri) = pprLogic (sLit "slw") reg1 reg2 (limitShiftRI ri)
 
