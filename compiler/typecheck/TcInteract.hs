@@ -602,12 +602,13 @@ we keep?  More subtle than you might think!
          See Note [Solving superclass constraints] in TcInstDcls
 
        - Keep the one that has a non-trivial evidence binding.
-         Note [Tracking redundant constraints] again.
             Example:  f :: (Eq a, Ord a) => blah
-            then we may find [G] sc_sel (d1::Ord a) :: Eq a
+            then we may find [G] d3 :: Eq a
                              [G] d2 :: Eq a
+              with bindings  d3 = sc_sel (d1::Ord a)
             We want to discard d2 in favour of the superclass selection from
             the Ord dictionary.
+         Why? See Note [Tracking redundant constraints] in TcSimplify again.
 
   * Finally, when there is still a choice, use IRKeep rather than
     IRReplace, to avoid unnecessary munging of the inert set.
