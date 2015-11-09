@@ -699,10 +699,9 @@ tcFamDecl1 parent
          -- If Nothing, this is an abstract family in a hs-boot file;
          -- but eqns might be empty in the Just case as well
        ; case mb_eqns of
-           Nothing   ->
-               return [ATyCon $ buildFamilyTyCon tc_name tvs' Nothing
-                                     AbstractClosedSynFamilyTyCon kind parent
-                                     NotInjective ]
+           Nothing   -> return
+               [ ATyCon $ buildFamilyTyCon tc_name tvs' (resultVariableName sig)
+                                 AbstractClosedSynFamilyTyCon kind parent inj' ]
            Just eqns -> do {
 
          -- Process the equations, creating CoAxBranches
