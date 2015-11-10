@@ -978,12 +978,12 @@ checkSafeImports dflags tcg_env
 
     condense :: (Module, [ImportedModsVal]) -> Hsc (Module, SrcSpan, IsSafeImport)
     condense (_, [])   = panic "HscMain.condense: Pattern match failure!"
-    condense (m, x:xs) = do (_,_,l,s) <- foldlM cond' x xs
+    condense (m, x:xs) = do (_,_,l,s,_,_) <- foldlM cond' x xs
                             return (m, l, s)
 
     -- ImportedModsVal = (ModuleName, Bool, SrcSpan, IsSafeImport)
     cond' :: ImportedModsVal -> ImportedModsVal -> Hsc ImportedModsVal
-    cond' v1@(m1,_,l1,s1) (_,_,_,s2)
+    cond' v1@(m1,_,l1,s1,_,_) (_,_,_,s2,_,_)
         | s1 /= s2
         = throwErrors $ unitBag $ mkPlainErrMsg dflags l1
               (text "Module" <+> ppr m1 <+>

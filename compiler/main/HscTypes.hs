@@ -1029,7 +1029,7 @@ emptyModDetails
 
 -- | Records the modules directly imported by a module for extracting e.g. usage information
 type ImportedMods = ModuleEnv [ImportedModsVal]
-type ImportedModsVal = (ModuleName, Bool, SrcSpan, IsSafeImport)
+type ImportedModsVal = (ModuleName, Bool, SrcSpan, IsSafeImport, Bool, GlobalRdrEnv)
 
 -- | A ModGuts is carried through the compiler, accumulating stuff as it goes
 -- There is only one ModGuts at any time, the one for the module

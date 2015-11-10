@@ -264,12 +264,16 @@ rnImportDecl this_mod
     -- filter the imports according to the import declaration
     (new_imp_details, gres) <- filterImports iface imp_spec imp_details
 
+    -- for certain error messages, we’d like to know what could be imported
+    -- here, if everything were imported
+    potential_gres <- mkGlobalRdrEnv . snd <$> filterImports iface imp_spec Nothing
+
     let gbl_env = mkGlobalRdrEnv gres
 
-        -- True <=> import M ()
-        import_all = case imp_details of
-                        Just (is_hiding, L _ ls) -> not is_hiding && null ls
-                        _                    -> False
+        -- import_all == True <=> import M ()
+        (is_hiding, import_all) = case imp_details of
+                        Just (is_hiding, L _ ls) -> (is_hiding, not is_hiding && null ls)
+                        _                        -> (False, False)
 
         -- should the import be safe?
         mod_safe' = mod_safe
@@ -279,7 +283,7 @@ rnImportDecl this_mod
     let imports
           = (calculateAvails dflags iface mod_safe' want_boot) {
                 imp_mods = unitModuleEnv (mi_module iface)
-                            [(qual_mod_name, import_all, loc, mod_safe')] }
+                            [(qual_mod_name, import_all, loc, mod_safe', is_hiding, potential_gres)] }
 
     -- Complain if we import a deprecated module
     whenWOptM Opt_WarnWarningsDeprecations (
@@ -1217,7 +1221,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     imported_modules = [ qual_name
                        | xs <- moduleEnvElts $ imp_mods imports,
-                         (qual_name, _, _, _) <- xs ]
+                         (qual_name, _, _, _, _, _) <- xs ]
 
     exports_from_item :: ExportAccum -> LIE RdrName -> RnM ExportAccum
     exports_from_item acc@(ie_names, occs, exports)

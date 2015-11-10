@@ -974,7 +974,7 @@ data ImportAvails
           -- @
           -- it is @Bar@.
           --
-          -- The 'Bool' means:
+          -- The first 'Bool' means:
           --
           --  - @True@ => import was @import Foo ()@
           --
@@ -987,6 +987,8 @@ data ImportAvails
           --       export version changes
           --
           --   (b) to specify what child modules to initialise
+          --
+          -- The second 'Bool' means that the module is safe (see rnImportDecl)
           --
           -- We need a full ModuleEnv rather than a ModuleNameEnv here,
           -- because we might be importing modules of the same name from

@@ -17,7 +17,8 @@ module Outputable (
         -- * Pretty printing combinators
         SDoc, runSDoc, initSDocContext,
         docToSDoc,
-        interppSP, interpp'SP, pprQuotedList, pprWithCommas, quotedListWithOr,
+        interppSP, interpp'SP,
+        pprQuotedList, pprWithCommas, quotedListWithOr, quotedListWithNor,
         empty, nest,
         char,
         text, ftext, ptext, ztext,
@@ -909,6 +910,11 @@ quotedListWithOr :: [SDoc] -> SDoc
 -- [x,y,z]  ==>  `x', `y' or `z'
 quotedListWithOr xs@(_:_:_) = quotedList (init xs) <+> ptext (sLit "or") <+> quotes (last xs)
 quotedListWithOr xs = quotedList xs
+
+quotedListWithNor :: [SDoc] -> SDoc
+-- [x,y,z]  ==>  `x', `y' nor `z'
+quotedListWithNor xs@(_:_:_) = quotedList (init xs) <+> ptext (sLit "nor") <+> quotes (last xs)
+quotedListWithNor xs = quotedList xs
 
 {-
 ************************************************************************
