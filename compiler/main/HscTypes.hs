@@ -1033,7 +1033,6 @@ type ImportedMods = ModuleEnv [ImportedModsVal]
 data ImportedModsVal
  = ImportedModsVal {
         imv_name :: ModuleName,         -- ^ The name the module is imported with
-        imv_empty :: Bool,              -- ^ whether it is an "import Foo ()" import
         imv_span :: SrcSpan,            -- ^ the source span of the whole import
         imv_is_safe :: IsSafeImport,    -- ^ whether this is a safe import
         imv_is_hiding :: Bool,          -- ^ whether this is an "hiding" import

@@ -270,10 +270,8 @@ rnImportDecl this_mod
 
     let gbl_env = mkGlobalRdrEnv gres
 
-        -- import_all == True <=> import M ()
-        (is_hiding, import_all) = case imp_details of
-                        Just (is_hiding, L _ ls) -> (is_hiding, not is_hiding && null ls)
-                        _                        -> (False, False)
+        is_hiding | Just (True,_) <- imp_details = True
+                  | otherwise                    = False
 
         -- should the import be safe?
         mod_safe' = mod_safe
@@ -282,7 +280,6 @@ rnImportDecl this_mod
 
     let imv = ImportedModsVal
             { imv_name        = qual_mod_name
-            , imv_empty       = import_all
             , imv_span        = loc
             , imv_is_safe     = mod_safe'
             , imv_is_hiding   = is_hiding

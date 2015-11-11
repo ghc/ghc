@@ -969,27 +969,8 @@ data ImportAvails
           --      = ModuleEnv [ImportedModsVal],
           -- ^ Domain is all directly-imported modules
           --
-          -- 'imv_name' is what the module was imported as, e.g. in
-          -- @
-          --     import Foo as Bar
-          -- @
-          -- it is @Bar@.
-          --
-          -- The first 'Bool' means:
-          --
-          --  - @True@ => import was @import Foo ()@
-          --
-          --  - @False@ => import was some other form
-          --
-          -- Used
-          --
-          --   (a) to help construct the usage information in the interface
-          --       file; if we import something we need to recompile if the
-          --       export version changes
-          --
-          --   (b) to specify what child modules to initialise
-          --
-          -- The second 'Bool' means that the module is safe (see rnImportDecl)
+          -- See the documentaion on ImportedModsVal in HscTypes for the
+          -- meaning of the fields.
           --
           -- We need a full ModuleEnv rather than a ModuleNameEnv here,
           -- because we might be importing modules of the same name from
