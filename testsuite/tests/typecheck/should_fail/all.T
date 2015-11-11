@@ -390,3 +390,8 @@ test('T10715', normal, compile_fail, [''])
 test('T10715b', normal, compile_fail, [''])
 test('T10971b', normal, compile_fail, [''])
 test('T10971d', extra_clean(['T10971c.hi', 'T10971c.o']), multimod_compile_fail, ['T10971d','-v0'])
+test('CustomTypeErrors01', normal, compile_fail, [''])
+test('CustomTypeErrors02', normal, compile_fail, [''])
+test('CustomTypeErrors03', normal, compile_fail, [''])
+
+
