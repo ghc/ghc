@@ -351,7 +351,6 @@ tcPatSynMatcher (L loc name) lpat
                     }
 
        ; let bind = FunBind{ fun_id = L loc matcher_id
-                           , fun_infix = False
                            , fun_matches = mg
                            , fun_co_fn = idHsWrapper
                            , bind_fvs = emptyNameSet
@@ -426,7 +425,6 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
                           | otherwise      = match_group
 
              bind = FunBind { fun_id      = L loc (idName builder_id)
-                            , fun_infix   = False
                             , fun_matches = match_group'
                             , fun_co_fn   = idHsWrapper
                             , bind_fvs    = placeHolderNamesTc
@@ -458,8 +456,8 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
               RecordPatSyn args     -> map recordPatSynPatVar args
 
     add_dummy_arg :: MatchGroup Name (LHsExpr Name) -> MatchGroup Name (LHsExpr Name)
-    add_dummy_arg mg@(MG { mg_alts = [L loc (Match Nothing [] ty grhss)] })
-      = mg { mg_alts = [L loc (Match Nothing [nlWildPatName] ty grhss)] }
+    add_dummy_arg mg@(MG {mg_alts = [L l (Match NonFunBindMatch [] ty grhss)] })
+      = mg { mg_alts = [L l (Match NonFunBindMatch [nlWildPatName] ty grhss)] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches (PatSyn :: HsMatchContext Name) other_mg
 

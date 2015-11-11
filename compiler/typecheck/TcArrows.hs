@@ -246,7 +246,7 @@ tc_cmd env
                              tcPats LambdaExpr pats arg_tys     $
                              tc_grhss grhss cmd_stk' res_ty
 
-        ; let match' = L mtch_loc (Match Nothing pats' Nothing grhss')
+        ; let match' = L mtch_loc (Match NonFunBindMatch pats' Nothing grhss')
               arg_tys = map hsLPatType pats'
               cmd' = HsCmdLam (MG { mg_alts = [match'], mg_arg_tys = arg_tys
                                   , mg_res_ty = res_ty, mg_origin = origin })

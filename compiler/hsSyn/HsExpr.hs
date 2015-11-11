@@ -1123,9 +1123,8 @@ type LMatch id body = Located (Match id body)
 -- For details on above see note [Api annotations] in ApiAnnotation
 data Match id body
   = Match {
-        m_fun_id_infix :: (Maybe (Located id,Bool)),
-          -- fun_id and fun_infix for functions with multiple equations
-          -- only present for a RdrName. See note [fun_id in Match]
+        m_fixity :: MatchFixity id,
+          -- See note [m_fixity in Match]
         m_pats :: [LPat id], -- The patterns
         m_type :: (Maybe (LHsType id)),
                                  -- A type signature for the result of the match
@@ -1135,7 +1134,7 @@ data Match id body
 deriving instance (Data body,DataId id) => Data (Match id body)
 
 {-
-Note [fun_id in Match]
+Note [m_fixity in Match]
 ~~~~~~~~~~~~~~~~~~~~~~
 
 The parser initially creates a FunBind with a single Match in it for
@@ -1159,6 +1158,20 @@ Example infix function definition requiring individual API Annotations
 
 
 -}
+
+-- |When a Match is part of a FunBind, it captures one complete equation for the
+-- function. As such it has the function name, and its fixity.
+data MatchFixity id
+  = NonFunBindMatch
+  | FunBindMatch (Located id) -- of the Id
+                 Bool         -- is infix
+  deriving (Typeable)
+deriving instance (DataId id) => Data (MatchFixity id)
+
+isInfixMatch :: Match id body -> Bool
+isInfixMatch match = case m_fixity match of
+  FunBindMatch _ True -> True
+  _                   -> False
 
 isEmptyMatchGroup :: MatchGroup id body -> Bool
 isEmptyMatchGroup (MG { mg_alts = ms }) = null ms
@@ -1206,8 +1219,8 @@ pprMatches ctxt (MG { mg_alts = matches })
 
 -- Exported to HsBinds, which can't see the defn of HsMatchContext
 pprFunBind :: (OutputableBndr idL, OutputableBndr idR, Outputable body)
-           => idL -> Bool -> MatchGroup idR body -> SDoc
-pprFunBind fun inf matches = pprMatches (FunRhs fun inf) matches
+           => idL -> MatchGroup idR body -> SDoc
+pprFunBind fun matches = pprMatches (FunRhs fun) matches
 
 -- Exported to HsBinds, which can't see the defn of HsMatchContext
 pprPatBind :: forall bndr id body. (OutputableBndr bndr, OutputableBndr id, Outputable body)
@@ -1217,15 +1230,16 @@ pprPatBind pat (grhss)
 
 pprMatch :: (OutputableBndr idL, OutputableBndr idR, Outputable body)
          => HsMatchContext idL -> Match idR body -> SDoc
-pprMatch ctxt (Match _ pats maybe_ty grhss)
+pprMatch ctxt match
   = sep [ sep (herald : map (nest 2 . pprParendLPat) other_pats)
         , nest 2 ppr_maybe_ty
-        , nest 2 (pprGRHSs ctxt grhss) ]
+        , nest 2 (pprGRHSs ctxt (m_grhss match)) ]
   where
+    is_infix = isInfixMatch match
     (herald, other_pats)
         = case ctxt of
-            FunRhs fun is_infix
-                | not is_infix -> (pprPrefixOcc fun, pats)
+            FunRhs fun
+                | not is_infix -> (pprPrefixOcc fun, m_pats match)
                         -- f x y z = e
                         -- Not pprBndr; the AbsBinds will
                         -- have printed the signature
@@ -1238,14 +1252,14 @@ pprMatch ctxt (Match _ pats maybe_ty grhss)
                 where
                   pp_infix = pprParendLPat pat1 <+> pprInfixOcc fun <+> pprParendLPat pat2
 
-            LambdaExpr -> (char '\\', pats)
+            LambdaExpr -> (char '\\', m_pats match)
 
             _  -> ASSERT( null pats1 )
                   (ppr pat1, [])        -- No parens around the single pat
 
-    (pat1:pats1) = pats
+    (pat1:pats1) = m_pats match
     (pat2:pats2) = pats1
-    ppr_maybe_ty = case maybe_ty of
+    ppr_maybe_ty = case m_type match of
                         Just ty -> dcolon <+> ppr ty
                         Nothing -> empty
 
@@ -1918,7 +1932,7 @@ pp_dotdot = ptext (sLit " .. ")
 -}
 
 data HsMatchContext id  -- Context of a Match
-  = FunRhs id Bool              -- Function binding for f; True <=> written infix
+  = FunRhs id                   -- Function binding for f
   | LambdaExpr                  -- Patterns of a lambda
   | CaseAlt                     -- Patterns and guards on a case alternative
   | IfAlt                       -- Guards of a multi-way if alternative
@@ -1990,7 +2004,7 @@ pprMatchContext ctxt
     want_an _           = False
 
 pprMatchContextNoun :: Outputable id => HsMatchContext id -> SDoc
-pprMatchContextNoun (FunRhs fun _)  = ptext (sLit "equation for")
+pprMatchContextNoun (FunRhs fun)    = ptext (sLit "equation for")
                                       <+> quotes (ppr fun)
 pprMatchContextNoun CaseAlt         = ptext (sLit "case alternative")
 pprMatchContextNoun IfAlt           = ptext (sLit "multi-way if alternative")
@@ -2042,13 +2056,13 @@ pprStmtContext (TransStmtCtxt c)
 
 -- Used to generate the string for a *runtime* error message
 matchContextErrString :: Outputable id => HsMatchContext id -> SDoc
-matchContextErrString (FunRhs fun _)             = ptext (sLit "function") <+> ppr fun
-matchContextErrString CaseAlt                    = ptext (sLit "case")
-matchContextErrString IfAlt                      = ptext (sLit "multi-way if")
-matchContextErrString PatBindRhs                 = ptext (sLit "pattern binding")
-matchContextErrString RecUpd                     = ptext (sLit "record update")
-matchContextErrString LambdaExpr                 = ptext (sLit "lambda")
-matchContextErrString ProcExpr                   = ptext (sLit "proc")
+matchContextErrString (FunRhs fun)         = ptext (sLit "function") <+> ppr fun
+matchContextErrString CaseAlt              = ptext (sLit "case")
+matchContextErrString IfAlt                = ptext (sLit "multi-way if")
+matchContextErrString PatBindRhs           = ptext (sLit "pattern binding")
+matchContextErrString RecUpd               = ptext (sLit "record update")
+matchContextErrString LambdaExpr           = ptext (sLit "lambda")
+matchContextErrString ProcExpr             = ptext (sLit "proc")
 matchContextErrString ThPatSplice                = panic "matchContextErrString"  -- Not used at runtime
 matchContextErrString ThPatQuote                 = panic "matchContextErrString"  -- Not used at runtime
 matchContextErrString PatSyn                     = panic "matchContextErrString"  -- Not used at runtime

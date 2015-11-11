@@ -387,21 +387,22 @@ getMonoBind :: LHsBind RdrName -> [LHsDecl RdrName]
 --
 -- No AndMonoBinds or EmptyMonoBinds here; just single equations
 
-getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1), fun_infix = is_infix1,
+getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1),
                                fun_matches = MG { mg_alts = mtchs1 } })) binds
   | has_args mtchs1
-  = go is_infix1 mtchs1 loc1 binds []
+  = go mtchs1 loc1 binds []
   where
-    go is_infix mtchs loc
-       (L loc2 (ValD (FunBind { fun_id = L _ f2, fun_infix = is_infix2,
+    go mtchs loc
+       (L loc2 (ValD (FunBind { fun_id = L _ f2,
                                 fun_matches = MG { mg_alts = mtchs2 } })) : binds) _
-        | f1 == f2 = go (is_infix || is_infix2) (mtchs2 ++ mtchs)
+        | f1 == f2 = go (mtchs2 ++ mtchs)
                         (combineSrcSpans loc loc2) binds []
-    go is_infix mtchs loc (doc_decl@(L loc2 (DocD _)) : binds) doc_decls
+    go mtchs loc (doc_decl@(L loc2 (DocD _)) : binds) doc_decls
         = let doc_decls' = doc_decl : doc_decls
-          in go is_infix mtchs (combineSrcSpans loc loc2) binds doc_decls'
-    go is_infix mtchs loc binds doc_decls
-        = (L loc (makeFunBind fun_id1 is_infix (reverse mtchs)), (reverse doc_decls) ++ binds)
+          in go mtchs (combineSrcSpans loc loc2) binds doc_decls'
+    go mtchs loc binds doc_decls
+        = ( L loc (makeFunBind fun_id1 (reverse mtchs))
+          , (reverse doc_decls) ++ binds)
         -- Reverse the final matches, to get it back in the right order
         -- Do the same thing with the trailing doc comments
 
@@ -465,9 +466,9 @@ mkPatSynMatchGroup (L _ patsyn_name) (L _ decls) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr loc decl
            ; match <- case details of
-               PrefixCon pats -> return $ Match Nothing pats Nothing rhs
+               PrefixCon pats -> return $ Match NonFunBindMatch pats Nothing rhs
                InfixCon pat1 pat2 ->
-                         return $ Match Nothing [pat1, pat2] Nothing rhs
+                         return $ Match NonFunBindMatch [pat1, pat2] Nothing rhs
                RecCon{} -> recordPatSynErr loc pat
            ; return $ L loc match }
     fromDecl (L loc decl) = extraDeclErr loc decl
@@ -912,16 +913,17 @@ checkFunBind msg ann lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
         let match_span = combineSrcSpans lhs_loc rhs_span
         -- Add back the annotations stripped from any HsPar values in the lhs
         -- mapM_ (\a -> a match_span) ann
-        return (ann,makeFunBind fun is_infix
-                  [L match_span (Match (Just (fun,is_infix)) ps opt_sig grhss)])
+        return (ann,makeFunBind fun
+                  [L match_span (Match (FunBindMatch fun is_infix)
+                                 ps opt_sig grhss)])
         -- The span of the match covers the entire equation.
         -- That isn't quite right, but it'll do for now.
 
-makeFunBind :: Located RdrName -> Bool -> [LMatch RdrName (LHsExpr RdrName)]
+makeFunBind :: Located RdrName -> [LMatch RdrName (LHsExpr RdrName)]
             -> HsBind RdrName
 -- Like HsUtils.mkFunBind, but we need to be able to set the fixity too
-makeFunBind fn is_infix ms
-  = FunBind { fun_id = fn, fun_infix = is_infix,
+makeFunBind fn ms
+  = FunBind { fun_id = fn,
               fun_matches = mkMatchGroup FromSource ms,
               fun_co_fn = idHsWrapper,
               bind_fvs = placeHolderNames,

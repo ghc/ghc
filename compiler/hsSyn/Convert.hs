@@ -630,7 +630,7 @@ cvtClause (Clause ps body wheres)
   = do  { ps' <- cvtPats ps
         ; g'  <- cvtGuard body
         ; ds' <- cvtLocalDecs (ptext (sLit "a where clause")) wheres
-        ; returnL $ Hs.Match Nothing ps' Nothing (GRHSs g' ds') }
+        ; returnL $ Hs.Match NonFunBindMatch ps' Nothing (GRHSs g' ds') }
 
 
 -------------------------------------------------------------------
@@ -851,7 +851,7 @@ cvtMatch (TH.Match p body decs)
   = do  { p' <- cvtPat p
         ; g' <- cvtGuard body
         ; decs' <- cvtLocalDecs (ptext (sLit "a where clause")) decs
-        ; returnL $ Hs.Match Nothing [p'] Nothing (GRHSs g' decs') }
+        ; returnL $ Hs.Match NonFunBindMatch [p'] Nothing (GRHSs g' decs') }
 
 cvtGuard :: TH.Body -> CvtM [LGRHS RdrName (LHsExpr RdrName)]
 cvtGuard (GuardedB pairs) = mapM cvtpair pairs

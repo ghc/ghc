@@ -144,10 +144,10 @@ dsStrictBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
        ; return (mkCoreLets ds_binds body2) }
 
 dsStrictBind (FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn
-                      , fun_tick = tick, fun_infix = inf }) body
+                      , fun_tick = tick }) body
                 -- Can't be a bang pattern (that looks like a PatBind)
                 -- so must be simply unboxed
-  = do { (args, rhs) <- matchWrapper (FunRhs (idName fun ) inf) matches
+  = do { (args, rhs) <- matchWrapper (FunRhs (idName fun )) matches
        ; MASSERT( null args ) -- Functions aren't lifted
        ; MASSERT( isIdHsWrapper co_fn )
        ; let rhs' = mkOptTickBox tick rhs

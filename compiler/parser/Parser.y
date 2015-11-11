@@ -2021,7 +2021,7 @@ decl_no_th :: { LHsDecl RdrName }
         | infixexp opt_sig rhs  {% do { (ann,r) <- checkValDef empty $1 (snd $2) $3;
                                         let { l = comb2 $1 $> };
                                         case r of {
-                                          (FunBind n _ _ _ _ _) ->
+                                          (FunBind n _ _ _ _) ->
                                                 ams (L l ()) (mj AnnFunId n:(fst $2)) >> return () ;
                                           (PatBind (L lh _lhs) _rhs _ _ _) ->
                                                 ams (L lh ()) (fst $2) >> return () } ;
@@ -2158,7 +2158,7 @@ infixexp :: { LHsExpr RdrName }
 exp10 :: { LHsExpr RdrName }
         : '\\' apat apats opt_asig '->' exp
                    {% ams (sLL $1 $> $ HsLam (mkMatchGroup FromSource
-                            [sLL $1 $> $ Match Nothing ($2:$3) (snd $4) (unguardedGRHSs $6)]))
+                            [sLL $1 $> $ Match NonFunBindMatch ($2:$3) (snd $4) (unguardedGRHSs $6)]))
                           (mj AnnLam $1:mj AnnRarrow $5:(fst $4)) }
         | 'let' binds 'in' exp          {% ams (sLL $1 $> $ HsLet (snd $ unLoc $2) $4)
                                                (mj AnnLet $1:mj AnnIn $3
@@ -2556,7 +2556,7 @@ alts1   :: { Located ([AddAnn],[LMatch RdrName (LHsExpr RdrName)]) }
         | alt                   { sL1 $1 ([],[$1]) }
 
 alt     :: { LMatch RdrName (LHsExpr RdrName) }
-        : pat opt_sig alt_rhs      {%ams (sLL $1 $> (Match Nothing [$1] (snd $2)
+        : pat opt_sig alt_rhs      {%ams (sLL $1 $> (Match NonFunBindMatch [$1] (snd $2)
                                                               (snd $ unLoc $3)))
                                          ((fst $2) ++ (fst $ unLoc $3))}
 

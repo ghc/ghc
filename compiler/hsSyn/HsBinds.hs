@@ -140,8 +140,6 @@ data HsBindLR idL idR
 
         fun_id :: Located idL, -- Note [fun_id in Match] in HsExpr
 
-        fun_infix :: Bool,      -- ^ True => infix declaration
-
         fun_matches :: MatchGroup idR (LHsExpr idR),  -- ^ The payload
 
         fun_co_fn :: HsWrapper, -- ^ Coercion from the type of the MatchGroup to the type of
@@ -488,14 +486,14 @@ ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })
   = pprPatBind pat grhss
 ppr_monobind (VarBind { var_id = var, var_rhs = rhs })
   = sep [pprBndr CaseBind var, nest 2 $ equals <+> pprExpr (unLoc rhs)]
-ppr_monobind (FunBind { fun_id = fun, fun_infix = inf,
+ppr_monobind (FunBind { fun_id = fun,
                         fun_co_fn = wrap,
                         fun_matches = matches,
                         fun_tick = ticks })
   = pprTicks empty (if null ticks then empty
                     else text "-- ticks = " <> ppr ticks)
     $$  ifPprDebug (pprBndr LetBind (unLoc fun))
-    $$  pprFunBind (unLoc fun) inf matches
+    $$  pprFunBind (unLoc fun) matches
     $$  ifPprDebug (ppr wrap)
 ppr_monobind (PatSynBind psb) = ppr psb
 ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
@@ -522,18 +520,18 @@ instance (OutputableBndr idL, OutputableBndr idR) => Outputable (PatSynBind idL 
       ppr_lhs = ptext (sLit "pattern") <+> ppr_details
       ppr_simple syntax = syntax <+> ppr pat
 
-      (is_infix, ppr_details) = case details of
-          InfixPatSyn v1 v2 -> (True, hsep [ppr v1, pprInfixOcc psyn, ppr v2])
-          PrefixPatSyn vs   -> (False, hsep (pprPrefixOcc psyn : map ppr vs))
+      ppr_details = case details of
+          InfixPatSyn v1 v2 -> hsep [ppr v1, pprInfixOcc psyn, ppr v2]
+          PrefixPatSyn vs   -> hsep (pprPrefixOcc psyn : map ppr vs)
           RecordPatSyn vs   ->
-            (False, pprPrefixOcc psyn
-                      <> braces (sep (punctuate comma (map ppr vs))))
+            pprPrefixOcc psyn
+                      <> braces (sep (punctuate comma (map ppr vs)))
 
       ppr_rhs = case dir of
           Unidirectional           -> ppr_simple (ptext (sLit "<-"))
           ImplicitBidirectional    -> ppr_simple equals
           ExplicitBidirectional mg -> ppr_simple (ptext (sLit "<-")) <+> ptext (sLit "where") $$
-                                      (nest 2 $ pprFunBind psyn is_infix mg)
+                                      (nest 2 $ pprFunBind psyn mg)
 
 pprTicks :: SDoc -> SDoc -> SDoc
 -- Print stuff about ticks only when -dppr-debug is on, to avoid

@@ -39,6 +39,7 @@ module HsUtils(
   -- Bindings
   mkFunBind, mkVarBind, mkHsVarBind, mk_easy_FunBind, mkTopFunBind,
   mkPatSynBind,
+  isInfixFunBind,
 
   -- Literals
   mkHsIntegral, mkHsFractional, mkHsIsString, mkHsString, mkHsStringPrimLit,
@@ -134,7 +135,7 @@ mkHsPar e = L (getLoc e) (HsPar e)
 mkSimpleMatch :: [LPat id] -> Located (body id) -> LMatch id (Located (body id))
 mkSimpleMatch pats rhs
   = L loc $
-    Match Nothing pats Nothing (unguardedGRHSs rhs)
+    Match NonFunBindMatch pats Nothing (unguardedGRHSs rhs)
   where
     loc = case pats of
                 []      -> getLoc rhs
@@ -603,7 +604,7 @@ l
 mkFunBind :: Located RdrName -> [LMatch RdrName (LHsExpr RdrName)]
           -> HsBind RdrName
 -- Not infix, with place holders for coercion and free vars
-mkFunBind fn ms = FunBind { fun_id = fn, fun_infix = False
+mkFunBind fn ms = FunBind { fun_id = fn
                           , fun_matches = mkMatchGroup Generated ms
                           , fun_co_fn = idHsWrapper
                           , bind_fvs = placeHolderNames
@@ -612,7 +613,7 @@ mkFunBind fn ms = FunBind { fun_id = fn, fun_infix = False
 mkTopFunBind :: Origin -> Located Name -> [LMatch Name (LHsExpr Name)]
              -> HsBind Name
 -- In Name-land, with empty bind_fvs
-mkTopFunBind origin fn ms = FunBind { fun_id = fn, fun_infix = False
+mkTopFunBind origin fn ms = FunBind { fun_id = fn
                                     , fun_matches = mkMatchGroupName origin ms
                                     , fun_co_fn = idHsWrapper
                                     , bind_fvs = emptyNameSet -- NB: closed
@@ -636,6 +637,16 @@ mkPatSynBind name details lpat dir = PatSynBind psb
              , psb_dir = dir
              , psb_fvs = placeHolderNames }
 
+-- |If any of the matches in the 'FunBind' are infix, the 'FunBind' is
+-- considered infix.
+isInfixFunBind :: HsBindLR id1 id2 -> Bool
+isInfixFunBind (FunBind _ (MG matches _ _ _) _ _ _)
+  = any isInfix matches
+  where
+    isInfix (L _ match) = isInfixMatch match
+isInfixFunBind _ = False
+
+
 ------------
 mk_easy_FunBind :: SrcSpan -> RdrName -> [LPat RdrName]
                 -> LHsExpr RdrName -> LHsBind RdrName
@@ -645,7 +656,7 @@ mk_easy_FunBind loc fun pats expr
 ------------
 mkMatch :: [LPat id] -> LHsExpr id -> HsLocalBinds id -> LMatch id (LHsExpr id)
 mkMatch pats expr binds
-  = noLoc (Match Nothing (map paren pats) Nothing
+  = noLoc (Match NonFunBindMatch (map paren pats) Nothing
                  (GRHSs (unguardedRHS noSrcSpan expr) binds))
   where
     paren lp@(L l p) | hsPatNeedsParens p = L l (ParPat lp)
