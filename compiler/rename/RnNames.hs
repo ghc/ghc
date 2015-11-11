@@ -280,10 +280,17 @@ rnImportDecl this_mod
                     || (not implicit && safeDirectImpsReq dflags)
                     || (implicit && safeImplicitImpsReq dflags)
 
+    let imv = ImportedModsVal
+            { imv_name        = qual_mod_name
+            , imv_empty       = import_all
+            , imv_span        = loc
+            , imv_is_safe     = mod_safe'
+            , imv_is_hiding   = is_hiding
+            , imv_all_exports = potential_gres
+            }
     let imports
-          = (calculateAvails dflags iface mod_safe' want_boot) {
-                imp_mods = unitModuleEnv (mi_module iface)
-                            [(qual_mod_name, import_all, loc, mod_safe', is_hiding, potential_gres)] }
+          = (calculateAvails dflags iface mod_safe' want_boot)
+                { imp_mods = unitModuleEnv (mi_module iface) [imv] }
 
     -- Complain if we import a deprecated module
     whenWOptM Opt_WarnWarningsDeprecations (
@@ -1218,10 +1225,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     pat_syns :: [GlobalRdrElt]
     pat_syns = findPatSyns (globalRdrEnvElts rdr_env)
 
-
-    imported_modules = [ qual_name
-                       | xs <- moduleEnvElts $ imp_mods imports,
-                         (qual_name, _, _, _, _, _) <- xs ]
+    imported_modules = [ imv_name imv
+                       | xs <- moduleEnvElts $ imp_mods imports, imv <- xs ]
 
     exports_from_item :: ExportAccum -> LIE RdrName -> RnM ExportAccum
     exports_from_item acc@(ie_names, occs, exports)

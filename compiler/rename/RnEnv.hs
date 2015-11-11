@@ -1682,14 +1682,14 @@ importSuggestions _dflags imports rdr_name
       , ptext (sLit "exports")
       , quotes (ppr occ_name) <> dot
       ]
-  | [(mod,(_,_,loc,_,_,_))] <- helpful_imports_non_hiding
+  | [(mod,imv)] <- helpful_imports_non_hiding
   = fsep
       [ ptext (sLit "Perhaps you want to add")
       , quotes (ppr occ_name)
       , ptext (sLit "to the import list")
       , ptext (sLit "in the import of")
       , quotes (ppr mod)
-      , parens (ppr loc) <> dot
+      , parens (ppr (imv_span imv)) <> dot
       ]
   | not (null helpful_imports_non_hiding)
   = fsep
@@ -1699,17 +1699,17 @@ importSuggestions _dflags imports rdr_name
       ]
     $$
     nest 2 (vcat
-        [ quotes (ppr mod) <+> parens (ppr loc)
-        | (mod,(_,_,loc,_,_,_)) <- helpful_imports_non_hiding
+        [ quotes (ppr mod) <+> parens (ppr (imv_span imv))
+        | (mod,imv) <- helpful_imports_non_hiding
         ])
-  | [(mod,(_,_,loc,_,_,_))] <- helpful_imports_hiding
+  | [(mod,imv)] <- helpful_imports_hiding
   = fsep
       [ ptext (sLit "Perhaps you want to remove")
       , quotes (ppr occ_name)
       , ptext (sLit "from the explicit hiding list")
       , ptext (sLit "in the import of")
       , quotes (ppr mod)
-      , parens (ppr loc) <> dot
+      , parens (ppr (imv_span imv)) <> dot
       ]
   | not (null helpful_imports_hiding)
   = fsep
@@ -1720,8 +1720,8 @@ importSuggestions _dflags imports rdr_name
       ]
     $$
     nest 2 (vcat
-        [ quotes (ppr mod) <+> parens (ppr loc)
-        | (mod,(_,_,loc,_,_,_)) <- helpful_imports_hiding
+        [ quotes (ppr mod) <+> parens (ppr (imv_span imv))
+        | (mod,imv) <- helpful_imports_hiding
         ])
   | otherwise
   = Outputable.empty
@@ -1738,26 +1738,20 @@ importSuggestions _dflags imports rdr_name
   -- explicit import list (for no particularly good reason)
   pick :: [ImportedModsVal] -> Maybe ImportedModsVal
   pick = listToMaybe . sortBy (compare `on` prefer) . filter select
-    where select (name, _,_,_,_,_) = name == mod_name
-          prefer (_, _, loc, _, hiding, _) = (hiding, loc)
+    where select imv = imv_name imv == mod_name
+          prefer imv = (imv_is_hiding imv, imv_span imv)
 
   -- Which of these would export a 'foo'
   -- (all of these are restricted imports, because if they were not, we
   -- wouldn't have an out-of-scope error in the first place)
-  helpful_imports = [ (mod, imp)
-    | (mod, imp@(_, _, _, _, _, all_exports)) <- interesting_imports
-    , not . null $ lookupGlobalRdrEnv all_exports occ_name
-    ]
+  helpful_imports = filter helpful interesting_imports
+    where helpful (_,imv)
+            = not . null $ lookupGlobalRdrEnv (imv_all_exports imv) occ_name
 
-  -- Which of these do that because of an explicit import list
-  helpful_imports_non_hiding = [ (mod, imp)
-    | (mod, imp@(_, _ , _, _, False, _)) <- helpful_imports
-    ]
-
-  -- Which of these do that because of an explicit hiding list
-  helpful_imports_hiding = [ (mod, imp)
-    | (mod, imp@(_, _ , _, _, True, _)) <- helpful_imports
-    ]
+  -- Which of these do that because of an explicit hiding list resp. an
+  -- explicit import list
+  (helpful_imports_hiding, helpful_imports_non_hiding)
+    = partition (imv_is_hiding . snd) helpful_imports
 
 -- | Called from the typechecker (TcErrors) when we find an unbound variable
 unknownNameSuggestions :: DynFlags

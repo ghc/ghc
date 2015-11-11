@@ -21,7 +21,7 @@ module HscTypes (
         -- * Information about modules
         ModDetails(..), emptyModDetails,
         ModGuts(..), CgGuts(..), ForeignStubs(..), appendStubC,
-        ImportedMods, ImportedModsVal,
+        ImportedMods, ImportedModsVal(..),
 
         ModSummary(..), ms_imps, ms_mod_name, showModMsg, isBootSummary,
         msHsFilePath, msHiFilePath, msObjFilePath,
@@ -1027,9 +1027,18 @@ emptyModDetails
                  md_anns      = [],
                  md_vect_info = noVectInfo }
 
--- | Records the modules directly imported by a module for extracting e.g. usage information
+-- | Records the modules directly imported by a module for extracting e.g.
+-- usage information, and also to give better error message
 type ImportedMods = ModuleEnv [ImportedModsVal]
-type ImportedModsVal = (ModuleName, Bool, SrcSpan, IsSafeImport, Bool, GlobalRdrEnv)
+data ImportedModsVal
+ = ImportedModsVal {
+        imv_name :: ModuleName,         -- ^ The name the module is imported with
+        imv_empty :: Bool,              -- ^ whether it is an "import Foo ()" import
+        imv_span :: SrcSpan,            -- ^ the source span of the whole import
+        imv_is_safe :: IsSafeImport,    -- ^ whether this is a safe import
+        imv_is_hiding :: Bool,          -- ^ whether this is an "hiding" import
+        imv_all_exports :: GlobalRdrEnv -- ^ all the things the module could provide
+        }
 
 -- | A ModGuts is carried through the compiler, accumulating stuff as it goes
 -- There is only one ModGuts at any time, the one for the module

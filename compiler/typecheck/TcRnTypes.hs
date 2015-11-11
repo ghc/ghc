@@ -966,9 +966,10 @@ type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
 data ImportAvails
    = ImportAvails {
         imp_mods :: ImportedMods,
-          --      = ModuleEnv [(ModuleName, Bool, SrcSpan, Bool)],
+          --      = ModuleEnv [ImportedModsVal],
           -- ^ Domain is all directly-imported modules
-          -- The 'ModuleName' is what the module was imported as, e.g. in
+          --
+          -- 'imv_name' is what the module was imported as, e.g. in
           -- @
           --     import Foo as Bar
           -- @
