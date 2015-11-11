@@ -1799,7 +1799,7 @@ tyThingAvailInfo (ATyCon t)
                    dcs  = tyConDataCons t
                    flds = tyConFieldLabels t
 tyThingAvailInfo t
-   = Avail (getName t)
+   = avail (getName t)
 
 {-
 ************************************************************************

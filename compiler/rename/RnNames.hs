@@ -580,7 +580,7 @@ getLocalNonValBinders fixity_env
       -- declaration, not just the name
     new_simple :: Located RdrName -> RnM AvailInfo
     new_simple rdr_name = do{ nm <- newTopSrcBinder rdr_name
-                            ; return (Avail nm) }
+                            ; return (avail nm) }
 
     new_tc :: Bool -> LTyClDecl RdrName
            -> RnM (AvailInfo, [(Name, [FieldLabel])])
@@ -860,7 +860,8 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
             -> do nameAvail <- lookup_name tc
                   return ([mkIEThingAbs l nameAvail], [])
 
-        IEThingWith (L l rdr_tc) rdr_ns rdr_fs -> ASSERT2(null rdr_fs, ppr rdr_fs) do
+        IEThingWith (L l rdr_tc) wc rdr_ns rdr_fs ->
+          ASSERT2(null rdr_fs, ppr rdr_fs) do
            (name, AvailTC _ ns subflds, mb_parent) <- lookup_name rdr_tc
 
            -- Look up the children in the sub-names of the parent
@@ -875,14 +876,14 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                case mb_parent of
                  -- non-associated ty/cls
                  Nothing
-                   -> return ([(IEThingWith (L l name) childnames childflds,
+                   -> return ([(IEThingWith (L l name) wc childnames childflds,
                                AvailTC name (name:map unLoc childnames) (map unLoc childflds))],
                               [])
                  -- associated ty
                  Just parent
-                   -> return ([(IEThingWith (L l name) childnames childflds,
+                   -> return ([(IEThingWith (L l name) wc childnames childflds,
                                 AvailTC name (map unLoc childnames) (map unLoc childflds)),
-                               (IEThingWith (L l name) childnames childflds,
+                               (IEThingWith (L l name) wc childnames childflds,
                                 AvailTC parent [name] [])],
                               [])
 
@@ -957,7 +958,7 @@ plusAvail a1 a2 = pprPanic "RnEnv.plusAvail" (hsep [ppr a1,ppr a2])
 
 -- | trims an 'AvailInfo' to keep only a single name
 trimAvail :: AvailInfo -> Name -> AvailInfo
-trimAvail (Avail n)         _ = Avail n
+trimAvail (Avail b n)         _ = Avail b n
 trimAvail (AvailTC n ns fs) m = case find ((== m) . flSelector) fs of
     Just x  -> AvailTC n [] [x]
     Nothing -> ASSERT( m `elem` ns ) AvailTC n [m] []
@@ -970,7 +971,7 @@ filterAvails keep avails = foldr (filterAvail keep) [] avails
 filterAvail :: (Name -> Bool) -> AvailInfo -> [AvailInfo] -> [AvailInfo]
 filterAvail keep ie rest =
   case ie of
-    Avail n | keep n    -> ie : rest
+    Avail _ n | keep n    -> ie : rest
             | otherwise -> rest
     AvailTC tc ns fs ->
         let ns' = filter keep ns
@@ -1014,6 +1015,14 @@ mkChildEnv gres = foldr add emptyNameEnv gres
         FldParent p _  -> extendNameEnv_Acc (:) singleton env p gre
         ParentIs  p    -> extendNameEnv_Acc (:) singleton env p gre
         NoParent       -> env
+        PatternSynonym -> env
+
+findPatSyns :: [GlobalRdrElt] -> [GlobalRdrElt]
+findPatSyns gres = foldr add [] gres
+  where
+    add g@(GRE { gre_par = PatternSynonym }) ps =
+      g:ps
+    add _ ps = ps
 
 findChildren :: NameEnv [a] -> Name -> [a]
 findChildren env n = lookupNameEnv env n `orElse` []
@@ -1051,7 +1060,6 @@ classifyGRE gre = case gre_par gre of
   _                      -> Left  n
   where
     n = gre_name gre
-
 
 -- | Combines 'AvailInfo's from the same family
 -- 'avails' may have several items with the same availName
@@ -1129,7 +1137,7 @@ type ExportOccMap = OccEnv (Name, IE RdrName)
 rnExports :: Bool       -- False => no 'module M(..) where' header at all
           -> Maybe (Located [LIE RdrName]) -- Nothing => no explicit export list
           -> TcGblEnv
-          -> RnM TcGblEnv
+          -> RnM (Maybe [LIE Name], TcGblEnv)
 
         -- Complains if two distinct exports have same OccName
         -- Warns about identical exports.
@@ -1166,12 +1174,14 @@ rnExports explicit_mod exports
 
         ; traceRn (text "rnExports: Exports:" <+> ppr final_avails)
 
-        ; return (tcg_env { tcg_exports    = final_avails,
-                            tcg_rn_exports = case tcg_rn_exports tcg_env of
+        ; let new_tcg_env =
+                  (tcg_env { tcg_exports    = final_avails,
+                             tcg_rn_exports = case tcg_rn_exports tcg_env of
                                                 Nothing -> Nothing
                                                 Just _  -> rn_exports,
                             tcg_dus = tcg_dus tcg_env `plusDU`
-                                      usesOnly final_ns }) }
+                                      usesOnly final_ns })
+        ; return (rn_exports, new_tcg_env) }
 
 exports_from_avail :: Maybe (Located [LIE RdrName])
                          -- Nothing => no explicit export list
@@ -1200,6 +1210,10 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     -- Maps a parent to its in-scope children
     kids_env :: NameEnv [GlobalRdrElt]
     kids_env = mkChildEnv (globalRdrEnvElts rdr_env)
+
+    pat_syns :: [GlobalRdrElt]
+    pat_syns = findPatSyns (globalRdrEnvElts rdr_env)
+
 
     imported_modules = [ qual_name
                        | xs <- moduleEnvElts $ imp_mods imports,
@@ -1269,8 +1283,54 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
         = do (name, avail) <- lookupGreAvailRn rdr
              return (IEThingAbs (L l name), avail)
 
-    lookup_ie ie@(IEThingAll (L l rdr))
+    lookup_ie ie@(IEThingAll n)
+        = do
+            (n, avail, flds) <- lookup_ie_all ie n
+            let name = unLoc n
+            return (IEThingAll n, AvailTC name (name:avail) flds)
+
+
+    lookup_ie ie@(IEThingWith l wc sub_rdrs _)
+        = do
+            (lname, subs, avails, flds) <- lookup_ie_with ie l sub_rdrs
+            (_, all_avail, all_flds) <-
+              case wc of
+                NoIEWildcard -> return (lname, [], [])
+                IEWildcard _ -> lookup_ie_all ie l
+            let name = unLoc lname
+            return (IEThingWith lname wc subs [],
+                    AvailTC name (name : avails ++ all_avail)
+                                 (flds ++ all_flds))
+
+
+
+
+    lookup_ie _ = panic "lookup_ie"    -- Other cases covered earlier
+
+    lookup_ie_with :: IE RdrName -> Located RdrName -> [Located RdrName]
+                   -> RnM (Located Name, [Located Name], [Name], [FieldLabel])
+    lookup_ie_with ie (L l rdr) sub_rdrs
         = do name <- lookupGlobalOccRn rdr
+             let gres = findChildren kids_env name
+                 mchildren =
+                  lookupChildren (map classifyGRE (gres ++ pat_syns)) sub_rdrs
+             addUsedKids rdr gres
+             if isUnboundName name
+                then return (L l name, [], [name], [])
+                else
+                  case mchildren of
+                    Nothing -> do
+                          addErr (exportItemErr ie)
+                          return (L l name, [], [name], [])
+                    Just (non_flds, flds) -> do
+                          addUsedKids rdr gres
+                          return (L l name, non_flds
+                                 , map unLoc non_flds
+                                 , map unLoc flds)
+    lookup_ie_all :: IE RdrName -> Located RdrName
+                  -> RnM (Located Name, [Name], [FieldLabel])
+    lookup_ie_all ie (L l rdr) =
+          do name <- lookupGlobalOccRn rdr
              let gres = findChildren kids_env name
                  (non_flds, flds) = classifyGREs gres
              addUsedKids rdr gres
@@ -1281,25 +1341,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                   else -- This occurs when you export T(..), but
                        -- only import T abstractly, or T is a synonym.
                        addErr (exportItemErr ie)
-             return ( IEThingAll (L l name)
-                    , AvailTC name (name:non_flds) flds )
-
-    lookup_ie ie@(IEThingWith (L l rdr) sub_rdrs sub_flds) = ASSERT2(null sub_flds, ppr sub_flds)
-          do name <- lookupGlobalOccRn rdr
-             let gres = findChildren kids_env name
-             if isUnboundName name
-                then return ( IEThingWith (L l name) [] []
-                            , AvailTC name [name] [] )
-                else case lookupChildren (map classifyGRE gres) sub_rdrs of
-                       Nothing -> do addErr (exportItemErr ie)
-                                     return ( IEThingWith (L l name) [] []
-                                            , AvailTC name [name] [] )
-                       Just (non_flds, flds) ->
-                         do addUsedKids rdr gres
-                            return ( IEThingWith (L l name) non_flds flds
-                                   , AvailTC name (name:map unLoc non_flds) (map unLoc flds) )
-
-    lookup_ie _ = panic "lookup_ie"    -- Other cases covered earlier
+             return (L l name, non_flds, flds)
 
     -------------
     lookup_doc_ie :: IE RdrName -> RnM (IE Name)
@@ -1529,9 +1571,13 @@ findImportUsage imports used_gres
         add_unused (IEVar (L _ n))      acc = add_unused_name n acc
         add_unused (IEThingAbs (L _ n)) acc = add_unused_name n acc
         add_unused (IEThingAll (L _ n)) acc = add_unused_all  n acc
-        add_unused (IEThingWith (L _ p) ns fs) acc = add_unused_with p xs acc
+        add_unused (IEThingWith (L _ p) wc ns fs) acc =
+          add_wc_all (add_unused_with p xs acc)
           where xs = map unLoc ns ++ map (flSelector . unLoc) fs
-        add_unused _                    acc = acc
+                add_wc_all = case wc of
+                            NoIEWildcard -> id
+                            IEWildcard _ -> add_unused_all p
+        add_unused _ acc = acc
 
         add_unused_name n acc
           | n `elemNameSet` used_names = acc
@@ -1664,7 +1710,7 @@ printMinimalImports imports_w_usage
     -- The main trick here is that if we're importing all the constructors
     -- we want to say "T(..)", but if we're importing only a subset we want
     -- to say "T(A,B,C)".  So we have to find out what the module exports.
-    to_ie _ (Avail n)
+    to_ie _ (Avail _ n)
        = [IEVar (noLoc n)]
     to_ie _ (AvailTC n [m] [])
        | n==m = [IEThingAbs (noLoc n)]
@@ -1674,13 +1720,13 @@ printMinimalImports imports_w_usage
                  , x `elem` xs    -- Note [Partial export]
                  ] of
            [xs] | all_used xs -> [IEThingAll (noLoc n)]
-                | otherwise   -> [IEThingWith (noLoc n)
+                | otherwise   -> [IEThingWith (noLoc n) NoIEWildcard
                                               (map noLoc (filter (/= n) ns))
                                               (map noLoc fs)]
                                           -- Note [Overloaded field import]
            _other | all_non_overloaded fs
                               -> map (IEVar . noLoc) $ ns ++ map flSelector fs
-                  | otherwise -> [IEThingWith (noLoc n)
+                  | otherwise -> [IEThingWith (noLoc n) NoIEWildcard
                                               (map noLoc (filter (/= n) ns)) (map noLoc fs)]
         where
           fld_lbls = map flLabel fs

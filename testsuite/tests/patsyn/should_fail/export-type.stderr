@@ -1,0 +1,18 @@
+
+export-type.hs:3:16: error:
+    Pattern synonyms can only be bundled with matching type constructors
+    Couldn't match expected type of ‘A’ with actual type of ‘B’
+    In the pattern synonym: MyB
+    In the export: A(.., MyB)
+
+export-type.hs:3:27: error:
+    Pattern synonyms can only be bundled with matching type constructors
+    Couldn't match expected type of ‘B’ with actual type of ‘A’
+    In the pattern synonym: MyA
+    In the export: B(MyA)
+
+export-type.hs:3:35: error:
+    Pattern synonyms can only be bundled with matching type constructors
+    Couldn't match expected type of ‘C a’ with actual type of ‘B’
+    In the pattern synonym: MyC
+    In the export: C(MyC)

@@ -445,6 +445,8 @@ data TcGblEnv
 
         tcg_rn_exports :: Maybe [Located (IE Name)],
                 -- Nothing <=> no explicit export list
+                -- Is always Nothing if we don't want to retain renamed
+                -- exports
 
         tcg_rn_imports :: [LImportDecl Name],
                 -- Keep the renamed imports regardless.  They are not

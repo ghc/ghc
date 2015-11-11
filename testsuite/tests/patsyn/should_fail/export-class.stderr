@@ -1,0 +1,4 @@
+
+export-class.hs:3:13: error:
+    Pattern synonyms can be bundled only with datatypes.
+    In the export: MyClass(.., P)

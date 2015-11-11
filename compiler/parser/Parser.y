@@ -33,6 +33,7 @@ import Control.Monad    ( unless, liftM )
 import GHC.Exts
 import Data.Char
 import Control.Monad    ( mplus )
+import Control.Applicative ((<$))
 
 -- compiler/hsSyn
 import HsSyn
@@ -79,6 +80,7 @@ import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilD
 
 -- compiler/utils
 import Util             ( looksLikePackageName )
+import Prelude
 
 }
 
@@ -632,9 +634,8 @@ exp_doc :: { OrdList (LIE RdrName) }
    -- No longer allow things like [] and (,,,) to be exported
    -- They are built in syntax, always available
 export  :: { OrdList (LIE RdrName) }
-        : qcname_ext export_subspec  {% amsu (sLL $1 $> (mkModuleImpExp $1
-                                                    (snd $ unLoc $2)))
-                                             (fst $ unLoc $2) }
+        : qcname_ext export_subspec  {% mkModuleImpExp $1 (snd $ unLoc $2)
+                                          >>= \ie -> amsu (sLL $1 $> ie) (fst $ unLoc $2) }
         |  'module' modid            {% amsu (sLL $1 $> (IEModuleContents $2))
                                              [mj AnnModule $1] }
         |  'pattern' qcon            {% amsu (sLL $1 $> (IEVar $2))
@@ -642,18 +643,34 @@ export  :: { OrdList (LIE RdrName) }
 
 export_subspec :: { Located ([AddAnn],ImpExpSubSpec) }
         : {- empty -}             { sL0 ([],ImpExpAbs) }
-        | '(' '..' ')'            { sLL $1 $> ([mop $1,mcp $3,mj AnnDotdot $2]
-                                       , ImpExpAll) }
-        | '(' ')'                 { sLL $1 $> ([mop $1,mcp $2],ImpExpList []) }
-        | '(' qcnames ')'         { sLL $1 $> ([mop $1,mcp $3],ImpExpList (reverse $2)) }
+        | '(' qcnames ')'         {% mkImpExpSubSpec (reverse (snd $2))
+                                      >>= \(as,ie) -> return $ sLL $1 $>
+                                            (as ++ [mop $1,mcp $3] ++ fst $2, ie) }
 
-qcnames :: { [Located RdrName] }     -- A reversed list
-        :  qcnames ',' qcname_ext       {% (aa (head $1) (AnnComma, $2)) >>
-                                           return ($3  : $1) }
-        |  qcname_ext                   { [$1]  }
 
-qcname_ext :: { Located RdrName }       -- Variable or data constructor
-                                        -- or tagged type constructor
+qcnames :: { ([AddAnn], [Located (Maybe RdrName)]) }
+  : {- empty -}                   { ([],[]) }
+  | qcnames1                      { $1 }
+
+qcnames1 :: { ([AddAnn], [Located (Maybe RdrName)]) }     -- A reversed list
+        :  qcnames1 ',' qcname_ext_w_wildcard  {% case (last (snd $1)) of
+                                                    l@(L _ Nothing) ->
+                                                      return ([mj AnnComma $2, mj AnnDotdot l]
+                                                              ,($3  : snd $1))
+                                                    l -> (aa l (AnnComma, $2) >>
+                                                          return (fst $1, $3 : snd $1)) }
+
+
+        -- Annotations readded in mkImpExpSubSpec
+        |  qcname_ext_w_wildcard                   { ([],[$1])  }
+
+-- Variable, data constructor or wildcard
+-- or tagged type constructor
+qcname_ext_w_wildcard :: { Located (Maybe RdrName) }
+        :  qcname_ext               { Just `fmap` $1 }
+        |  '..'                     { Nothing <$ $1 }
+
+qcname_ext :: { Located RdrName }
         :  qcname                   { $1 }
         |  'type' oqtycon           {% amms (mkTypeImpExp (sLL $1 $> (unLoc $2)))
                                             [mj AnnType $1,mj AnnVal $2] }
@@ -726,7 +743,10 @@ maybeas :: { ([AddAnn],Located (Maybe ModuleName)) }
         | {- empty -}                          { ([],noLoc Nothing) }
 
 maybeimpspec :: { Located (Maybe (Bool, Located [LIE RdrName])) }
-        : impspec                  { L (gl $1) (Just (unLoc $1)) }
+        : impspec                  {% let (b, ie) = unLoc $1 in
+                                       checkImportSpec ie
+                                        >>= \checkedIe ->
+                                          return (L (gl $1) (Just (b, checkedIe)))  }
         | {- empty -}              { noLoc Nothing }
 
 impspec :: { Located (Bool, Located [LIE RdrName]) }

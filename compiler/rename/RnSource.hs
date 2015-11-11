@@ -127,7 +127,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    let { id_bndrs = collectHsIdBinders new_lhs } ;  -- Excludes pattern-synonym binders
                                                     -- They are already in scope
    traceRn (text "rnSrcDecls" <+> ppr id_bndrs) ;
-   tc_envs <- extendGlobalRdrEnvRn (map Avail id_bndrs) local_fix_env ;
+   tc_envs <- extendGlobalRdrEnvRn (map avail id_bndrs) local_fix_env ;
    traceRn (text "D2" <+> ppr (tcg_rdr_env (fst tc_envs)));
    setEnvs tc_envs $ do {
 
@@ -1548,7 +1548,7 @@ extendPatSynEnv val_decls local_fix_env thing = do {
      names_with_fls <- new_ps val_decls
    ; let pat_syn_bndrs =
           concat [name: map flSelector fields | (name, fields) <- names_with_fls]
-   ; let avails = map Avail pat_syn_bndrs
+   ; let avails = map patSynAvail pat_syn_bndrs
    ; (gbl_env, lcl_env) <-
         extendGlobalRdrEnvRn avails local_fix_env
 

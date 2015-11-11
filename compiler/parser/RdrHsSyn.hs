@@ -56,7 +56,9 @@ module RdrHsSyn (
         -- Help with processing exports
         ImpExpSubSpec(..),
         mkModuleImpExp,
-        mkTypeImpExp
+        mkTypeImpExp,
+        mkImpExpSubSpec,
+        checkImportSpec
 
     ) where
 
@@ -87,6 +89,7 @@ import FastString
 import Maybes
 import Util
 import ApiAnnotation
+import Data.List
 
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative ((<$>))
@@ -1328,16 +1331,31 @@ mkExtName rdrNm = mkFastString (occNameString (rdrNameOcc rdrNm))
 --------------------------------------------------------------------------------
 -- Help with module system imports/exports
 
-data ImpExpSubSpec = ImpExpAbs | ImpExpAll | ImpExpList [Located RdrName]
+data ImpExpSubSpec = ImpExpAbs
+                   | ImpExpAll
+                   | ImpExpList [Located RdrName]
+                   | ImpExpAllWith [Located (Maybe RdrName)]
 
-mkModuleImpExp :: Located RdrName -> ImpExpSubSpec -> IE RdrName
+mkModuleImpExp :: Located RdrName -> ImpExpSubSpec -> P (IE RdrName)
 mkModuleImpExp n@(L l name) subs =
   case subs of
     ImpExpAbs
-      | isVarNameSpace (rdrNameSpace name) -> IEVar       n
-      | otherwise                          -> IEThingAbs  (L l name)
-    ImpExpAll                              -> IEThingAll  (L l name)
-    ImpExpList xs                          -> IEThingWith (L l name) xs []
+      | isVarNameSpace (rdrNameSpace name) -> return $ IEVar  n
+      | otherwise                          -> return $ IEThingAbs  (L l name)
+    ImpExpAll                              -> return $ IEThingAll  (L l name)
+    ImpExpList xs                          ->
+      return $ IEThingWith (L l name) NoIEWildcard xs []
+    ImpExpAllWith xs                       ->
+      do allowed <- extension patternSynonymsEnabled
+         if allowed
+          then
+            let withs = map unLoc xs
+                pos   = maybe NoIEWildcard IEWildcard
+                          (findIndex isNothing withs)
+                ies   = [L l n | L l (Just n) <- xs]
+            in return (IEThingWith (L l name) pos ies [])
+          else parseErrorSDoc l
+            (text "Illegal export form (use PatternSynonyms to enable)")
 
 mkTypeImpExp :: Located RdrName   -- TcCls or Var name space
              -> P (Located RdrName)
@@ -1347,6 +1365,28 @@ mkTypeImpExp name =
        then return (fmap (`setRdrNameSpace` tcClsName) name)
        else parseErrorSDoc (getLoc name)
               (text "Illegal keyword 'type' (use ExplicitNamespaces to enable)")
+
+checkImportSpec :: Located [LIE RdrName] -> P (Located [LIE RdrName])
+checkImportSpec ie@(L _ specs) =
+    case [l | (L l (IEThingWith _ (IEWildcard _) _ _)) <- specs] of
+      [] -> return ie
+      (l:_) -> importSpecError l
+  where
+    importSpecError l =
+      parseErrorSDoc l
+        (text "Illegal import form, this syntax can only be used to bundle"
+        $+$ text "pattern synonyms with types in module exports.")
+
+-- In the correct order
+mkImpExpSubSpec :: [Located (Maybe RdrName)] -> P ([AddAnn], ImpExpSubSpec)
+mkImpExpSubSpec [] = return ([], ImpExpList [])
+mkImpExpSubSpec [L l Nothing] =
+  return ([\s -> addAnnotation l AnnDotdot s], ImpExpAll)
+mkImpExpSubSpec xs =
+  if (any (isNothing . unLoc) xs)
+    then return $ ([], ImpExpAllWith xs)
+    else return $ ([], ImpExpList ([L l x | L l (Just x) <- xs]))
+
 
 -----------------------------------------------------------------------------
 -- Misc utils
