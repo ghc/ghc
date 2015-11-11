@@ -307,14 +307,12 @@ synifyDataCon use_gadt_syntax dc =
  in hs_arg_tys >>=
       \hat -> return $ noLoc $
               ConDecl { con_names = [name]
-                      , con_explicit = False    -- we don't know nor care
+                      , con_explicit = Implicit   -- we don't know nor care
                       , con_qvars = qvars
                       , con_cxt   = ctx
                       , con_details =  hat
                       , con_res = hs_res_ty
-                      , con_doc =  Nothing
-                -- we don't want any "deprecated GADT syntax" warnings!
-                      , con_old_rec = False }
+                      , con_doc =  Nothing }
 
 synifyName :: NamedThing n => n -> Located Name
 synifyName = noLoc . getName
