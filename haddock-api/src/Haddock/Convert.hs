@@ -307,8 +307,6 @@ synifyDataCon use_gadt_syntax dc =
  in hs_arg_tys >>=
       \hat -> return . noLoc $ ConDecl [name] Implicit -- we don't know nor care
                 qvars ctx hat hs_res_ty Nothing
-                -- we don't want any "deprecated GADT syntax" warnings!
-                False
 
 synifyName :: NamedThing n => n -> Located Name
 synifyName = noLoc . getName
