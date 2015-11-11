@@ -1425,9 +1425,9 @@ lex_stringgap s = do
 
 lex_char_tok :: Action
 -- Here we are basically parsing character literals, such as 'x' or '\n'
--- but, when Template Haskell is on, we additionally spot
--- 'x and ''T, returning ITsimpleQuote and ITtyQuote respectively,
--- but WITHOUT CONSUMING the x or T part  (the parser does that).
+-- but we additionally spot 'x and ''T, returning ITsimpleQuote and
+-- ITtyQuote respectively, but WITHOUT CONSUMING the x or T part
+-- (the parser does that).
 -- So we have to do two characters of lookahead: when we see 'x we need to
 -- see if there's a trailing quote
 lex_char_tok span buf _len = do        -- We've seen '
@@ -1460,7 +1460,7 @@ lex_char_tok span buf _len = do        -- We've seen '
                         finish_char_tok buf loc c
                 _other -> do            -- We've seen 'x not followed by quote
                                         -- (including the possibility of EOF)
-                                        -- If TH is on, just parse the quote only
+                                        -- Just parse the quote only
                         let (AI end _) = i1
                         return (L (mkRealSrcSpan loc end) ITsimpleQuote)
 
