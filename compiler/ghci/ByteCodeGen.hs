@@ -598,7 +598,10 @@ schemeT d s p app
 
    -- Case 1
    | Just (CCall ccall_spec) <- isFCallId_maybe fn
-   = generateCCall d s p ccall_spec fn args_r_to_l
+   = if isSupportedCConv ccall_spec
+      then generateCCall d s p ccall_spec fn args_r_to_l
+      else unsupportedCConvException
+
 
    -- Case 2: Constructor application
    | Just con <- maybe_saturated_dcon,
@@ -1508,13 +1511,25 @@ bcIdUnaryType x = case repType (idType x) of
 
 -- See bug #1257
 unboxedTupleException :: a
-unboxedTupleException
-   = throwGhcException
-        (ProgramError
-           ("Error: bytecode compiler can't handle unboxed tuples.\n"++
-            "  Possibly due to foreign import/export decls in source.\n"++
-            "  Workaround: use -fobject-code, or compile this module to .o separately."))
+unboxedTupleException = throwGhcException (ProgramError
+  ("Error: bytecode compiler can't handle unboxed tuples.\n"++
+   "  Possibly due to foreign import/export decls in source.\n"++
+   "  Workaround: use -fobject-code, or compile this module to .o separately."))
 
+-- | Indicate if the calling convention is supported
+isSupportedCConv :: CCallSpec -> Bool
+isSupportedCConv (CCallSpec _ cconv _) = case cconv of
+   CCallConv            -> True     -- we explicitly pattern match on every
+   StdCallConv          -> True     -- convention to ensure that a warning
+   PrimCallConv         -> False    -- is triggered when a new one is added
+   JavaScriptCallConv   -> False
+   CApiConv             -> False
+
+-- See bug #10462
+unsupportedCConvException :: a
+unsupportedCConvException = throwGhcException (ProgramError
+  ("Error: bytecode compiler can't handle some foreign calling conventions\n"++
+   "  Workaround: use -fobject-code, or compile this module to .o separately."))
 
 mkSLIDE :: Word16 -> Word -> OrdList BCInstr
 mkSLIDE n d
