@@ -1,6 +1,6 @@
 module TransAssociated(A(..)) where
 
-import Associated (A(..))
+import Bundle (A(..))
 
 foo = MkA 5
 baz = NoA

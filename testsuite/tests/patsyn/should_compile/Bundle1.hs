@@ -1,6 +1,6 @@
 module Associated1(A(..)) where
 
-import AssociatedInternal1 (A(..))
+import BundleInternal1 (A(..))
 
 foo = MkA 5
 baz = NoA
