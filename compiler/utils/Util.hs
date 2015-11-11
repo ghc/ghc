@@ -872,22 +872,35 @@ toArgs str
                        Left ("Couldn't read " ++ show str ++ "as [String]")
       s -> toArgs' s
  where
+  toArgs' :: String -> Either String [String]
+  -- Remove outer quotes:
+  -- > toArgs' "\"foo\" \"bar baz\""
+  -- Right ["foo", "bar baz"]
+  --
+  -- Keep inner quotes:
+  -- > toArgs' "-DFOO=\"bar baz\""
+  -- Right ["-DFOO=\"bar baz\""]
   toArgs' s = case dropWhile isSpace s of
               [] -> Right []
-              ('"' : _) -> case reads s of
-                           [(arg, rest)]
-                              -- rest must either be [] or start with a space
-                            | all isSpace (take 1 rest) ->
-                               case toArgs' rest of
-                               Left err -> Left err
-                               Right args -> Right (arg : args)
-                           _ ->
-                               Left ("Couldn't read " ++ show s ++ "as String")
-              s' -> case break isSpace s' of
-                    (arg, s'') -> case toArgs' s'' of
-                                  Left err -> Left err
-                                  Right args -> Right (arg : args)
+              ('"' : _) -> do
+                    -- readAsString removes outer quotes
+                    (arg, rest) <- readAsString s
+                    (arg:) `fmap` toArgs' rest
+              s' -> case break (isSpace <||> (== '"')) s' of
+                    (argPart1, s''@('"':_)) -> do
+                        (argPart2, rest) <- readAsString s''
+                        -- show argPart2 to keep inner quotes
+                        ((argPart1 ++ show argPart2):) `fmap` toArgs' rest
+                    (arg, s'') -> (arg:) `fmap` toArgs' s''
 
+  readAsString :: String -> Either String (String, String)
+  readAsString s = case reads s of
+                [(arg, rest)]
+                    -- rest must either be [] or start with a space
+                    | all isSpace (take 1 rest) ->
+                    Right (arg, rest)
+                _ ->
+                    Left ("Couldn't read " ++ show s ++ "as String")
 {-
 -- -----------------------------------------------------------------------------
 -- Floats

@@ -236,8 +236,9 @@ getOptions' dflags toks
           parseToks (open:close:xs)
               | IToptions_prag str <- getToken open
               , ITclose_prag       <- getToken close
-              = map (L (getLoc open)) (words str) ++
-                parseToks xs
+              = case toArgs str of
+                  Left err -> panic ("getOptions'.parseToks: " ++ err)
+                  Right args -> map (L (getLoc open)) args ++ parseToks xs
           parseToks (open:close:xs)
               | ITinclude_prag str <- getToken open
               , ITclose_prag       <- getToken close
