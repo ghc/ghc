@@ -5668,10 +5668,8 @@ defaults to ``*`` if omitted. An example is
     data family Array e
 
 Named arguments can also be given explicit kind signatures if needed.
-Just as with
-[http://www.haskell.org/ghc/docs/latest/html/users\_guide/gadt.html GADT
-declarations] named arguments are entirely optional, so that we can
-declare ``Array`` alternatively with
+Just as with :ref:`GADT declarations <gadt>` named arguments are
+entirely optional, so that we can declare ``Array`` alternatively with
 
 ::
 
