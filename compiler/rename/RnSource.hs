@@ -1444,9 +1444,8 @@ rnConDecl :: ConDecl RdrName -> RnM (ConDecl Name, FreeVars)
 rnConDecl decl@(ConDecl { con_names = names, con_qvars = tvs
                         , con_cxt = lcxt@(L loc cxt), con_details = details
                         , con_res = res_ty, con_doc = mb_doc
-                        , con_old_rec = old_rec, con_explicit = expl })
+                        , con_explicit = expl })
   = do  { mapM_ (addLocM checkConName) names
-        ; when old_rec (addWarn (deprecRecSyntax decl))
         ; new_names <- mapM lookupLocatedTopBndrRn names
 
            -- For H98 syntax, the tvs are the existential ones
@@ -1530,13 +1529,6 @@ rnConDeclDetails con doc (RecCon (L l fields))
         ; return (RecCon (L l new_fields), fvs) }
 
 -------------------------------------------------
-deprecRecSyntax :: ConDecl RdrName -> SDoc
-deprecRecSyntax decl
-  = vcat [ ptext (sLit "Declaration of") <+> quotes (ppr (con_names decl))
-                 <+> ptext (sLit "uses deprecated syntax")
-         , ptext (sLit "Instead, use the form")
-         , nest 2 (ppr decl) ]   -- Pretty printer uses new form
-
 badRecResTy :: SDoc -> SDoc
 badRecResTy doc = ptext (sLit "Malformed constructor signature") $$ doc
 

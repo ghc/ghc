@@ -1045,12 +1045,6 @@ data ConDecl name
 
     , con_doc       :: Maybe LHsDocString
         -- ^ A possible Haddock comment.
-
-    , con_old_rec :: Bool
-        -- ^ TEMPORARY field; True <=> user has employed now-deprecated syntax for
-        --                             GADT-style record decl   C { blah } :: T a b
-        -- Remove this when we no longer parse this stuff, and hence do not
-        -- need to report decprecated use
     } deriving (Typeable)
 deriving instance (DataId name) => Data (ConDecl name)
 

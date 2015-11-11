@@ -487,8 +487,7 @@ mkSimpleConDecl :: Located RdrName -> [LHsTyVarBndr RdrName]
                 -> ConDecl RdrName
 
 mkSimpleConDecl name qvars cxt details
-  = ConDecl { con_old_rec  = False
-            , con_names    = [name]
+  = ConDecl { con_names    = [name]
             , con_explicit = Explicit
             , con_qvars    = mkHsQTvs qvars
             , con_cxt      = cxt
@@ -523,8 +522,7 @@ mkGadtDecl' names (L ls (HsForAllTy imp _ qvars cxt tau))
           _other                                    -> (PrefixCon [], tau)
 
     mk_gadt_con names
-       = ConDecl { con_old_rec  = False
-                 , con_names    = names
+       = ConDecl { con_names    = names
                  , con_explicit = imp
                  , con_qvars    = qvars
                  , con_cxt      = cxt
