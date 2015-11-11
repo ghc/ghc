@@ -498,29 +498,27 @@ mkSimpleConDecl name qvars cxt details
 
 mkGadtDecl :: [Located RdrName]
            -> LHsType RdrName     -- Always a HsForAllTy
-           -> P ([AddAnn], ConDecl RdrName)
-mkGadtDecl names (L l ty) = do
-  let
-    (anns,ty') = flattenHsForAllTyKeepAnns ty
-  gadt <- mkGadtDecl' names (L l ty')
-  return (anns,gadt)
+           -> ([AddAnn], ConDecl RdrName)
+mkGadtDecl names (L l ty) =
+  let (anns, ty') = flattenHsForAllTyKeepAnns ty
+      gadt        = mkGadtDecl' names (L l ty')
+  in (anns, gadt)
 
 mkGadtDecl' :: [Located RdrName]
-           -> LHsType RdrName     -- Always a HsForAllTy
-           -> P (ConDecl RdrName)
-
+            ->  LHsType RdrName     -- Always a HsForAllTy
+            -> (ConDecl RdrName)
 -- We allow C,D :: ty
 -- and expand it as if it had been
 --    C :: ty; D :: ty
 -- (Just like type signatures in general.)
 mkGadtDecl' names (L ls (HsForAllTy imp _ qvars cxt tau))
-  = return $ mk_gadt_con names
+  = mk_gadt_con names
   where
     (details, res_ty)           -- See Note [Sorting out the result type]
       = case tau of
           L _ (HsFunTy (L l (HsRecTy flds)) res_ty)
                                             -> (RecCon (L l flds), res_ty)
-          _other                                    -> (PrefixCon [], tau)
+          _other                            -> (PrefixCon [], tau)
 
     mk_gadt_con names
        = ConDecl { con_names    = names
