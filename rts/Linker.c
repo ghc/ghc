@@ -4350,9 +4350,16 @@ static Elf_Word elf_shstrndx(Elf_Ehdr* ehdr)
 {
    Elf_Shdr* shdr = (Elf_Shdr*) ((char*)ehdr + ehdr->e_shoff);
    Elf_Half shstrndx = ehdr->e_shstrndx;
+#if defined(SHN_XINDEX)
    return shstrndx != SHN_XINDEX ? shstrndx : shdr[0].sh_link;
+#else
+   // some OSes do not support SHN_XINDEX yet, let's revert to
+   // old way
+   return shstrndx;
+#endif
 }
 
+#if defined(SHN_XINDEX)
 static Elf_Word*
 get_shndx_table(Elf_Ehdr* ehdr)
 {
@@ -4368,7 +4375,7 @@ get_shndx_table(Elf_Ehdr* ehdr)
    }
    return NULL;
 }
-
+#endif
 
 /*
  * Generic ELF functions
@@ -4542,8 +4549,9 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    if (nstrtab == 0) {
       IF_DEBUG(linker,debugBelch("   no normal string tables (potentially, but not necessarily a problem)\n"));
    }
-
+#if defined(SHN_XINDEX)
    Elf_Word* shndxTable = get_shndx_table(ehdr);
+#endif
    nsymtabs = 0;
    IF_DEBUG(linker,debugBelch( "Symbol tables\n" ));
    for (i = 0; i < shnum; i++) {
@@ -4562,11 +4570,13 @@ ocVerifyImage_ELF ( ObjectCode* oc )
       }
       for (j = 0; j < nent; j++) {
          Elf_Word secno = stab[j].st_shndx;
+#if defined(SHN_XINDEX)
          /* See Note [Many ELF Sections] */
          if (secno == SHN_XINDEX) {
             ASSERT(shndxTable);
             secno = shndxTable[j];
          }
+#endif
          IF_DEBUG(linker,debugBelch("   %2d  ", j ));
          IF_DEBUG(linker,debugBelch("  sec=%-5d  size=%-3d  val=%5p  ",
                              (int)secno,
@@ -4681,7 +4691,9 @@ ocGetNames_ELF ( ObjectCode* oc )
    char*     strtab;
    Elf_Shdr* shdr     = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
    Section * sections;
+#if defined(SHN_XINDEX)
    Elf_Word* shndxTable = get_shndx_table(ehdr);
+#endif
    const Elf_Word shnum = elf_shnum(ehdr);
 
    ASSERT(symhash != NULL);
@@ -4784,13 +4796,13 @@ ocGetNames_ELF ( ObjectCode* oc )
           * shndx variable, not the section number in secno. Sections with the
           * real number in the SHN_LORESERVE..HIRESERVE range will have shndx
           * SHN_XINDEX and a secno with one of the reserved values. */
+         secno = shndx;
+#if defined(SHN_XINDEX)
          if (shndx == SHN_XINDEX) {
             ASSERT(shndxTable);
             secno = shndxTable[j];
-         } else {
-            secno = shndx;
          }
-
+#endif
          /* Figure out if we want to add it; if so, set ad to its
             address.  Otherwise leave ad == NULL. */
 
@@ -4812,7 +4824,11 @@ ocGetNames_ELF ( ObjectCode* oc )
               /* and not an undefined symbol */
               && shndx != SHN_UNDEF
               /* and not in a "special section" */
-              && (shndx < SHN_LORESERVE || shndx == SHN_XINDEX)
+              && (shndx < SHN_LORESERVE
+#if defined(SHN_XINDEX)
+                  || shndx == SHN_XINDEX
+#endif
+                 )
               &&
               /* and it's a not a section or string table or anything silly */
               ( ELF_ST_TYPE(stab[j].st_info)==STT_FUNC ||
@@ -4909,7 +4925,9 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
    int target_shndx = shdr[shnum].sh_info;
    int symtab_shndx = shdr[shnum].sh_link;
    int strtab_shndx = shdr[symtab_shndx].sh_link;
+#if defined(SHN_XINDEX)
    Elf_Word* shndx_table = get_shndx_table((Elf_Ehdr*)ehdrC);
+#endif
 
    stab  = (Elf_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
    strtab= (char*)    (ehdrC + shdr[ strtab_shndx ].sh_offset);
@@ -4955,10 +4973,12 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
             symbol = sym.st_name==0 ? "(noname)" : strtab+sym.st_name;
             /* See Note [Many ELF Sections] */
             Elf_Word secno = sym.st_shndx;
+#if defined(SHN_XINDEX)
             if (secno == SHN_XINDEX) {
                ASSERT(shndx_table);
                secno = shndx_table[ELF_R_SYM(info)];
             }
+#endif
             S = (Elf_Addr)oc->sections[ secno ].start +
                 stab[ELF_R_SYM(info)].st_value;
          } else {
@@ -5219,7 +5239,9 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
    int symtab_shndx = shdr[shnum].sh_link;
    int strtab_shndx = shdr[symtab_shndx].sh_link;
    int target_shndx = shdr[shnum].sh_info;
+#if defined(SHN_XINDEX)
    Elf_Word* shndx_table = get_shndx_table((Elf_Ehdr*)ehdrC);
+#endif
 #if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(ia64_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
    /* This #ifdef only serves to avoid unused-var warnings. */
    Elf_Addr targ = (Elf_Addr) oc->sections[target_shndx].start;
@@ -5272,9 +5294,11 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
             symbol = sym.st_name==0 ? "(noname)" : strtab+sym.st_name;
             /* See Note [Many ELF Sections] */
             Elf_Word secno = sym.st_shndx;
+#if defined(SHN_XINDEX)
             if (secno == SHN_XINDEX) {
               secno = shndx_table[ELF_R_SYM(info)];
             }
+#endif
             S = (Elf_Addr)oc->sections[secno].start
                 + stab[ELF_R_SYM(info)].st_value;
 #ifdef ELF_FUNCTION_DESC
