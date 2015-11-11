@@ -718,12 +718,17 @@ pprInstr (SR II32 reg1 reg2 (RIImm (ImmInt i))) | i < 0  || i > 31 =
     pprInstr (XOR reg1 reg2 (RIReg reg2))
 
 pprInstr (SL II32 reg1 reg2 (RIImm (ImmInt i))) | i < 0  || i > 31 =
-    -- As aboce for SR, but for left shifts.
+    -- As above for SR, but for left shifts.
     -- Fixes ticket http://ghc.haskell.org/trac/ghc/ticket/10870
     pprInstr (XOR reg1 reg2 (RIReg reg2))
 
-pprInstr (SRA II32 reg1 reg2 (RIImm (ImmInt i))) | i < 0  || i > 31 =
-    pprInstr (XOR reg1 reg2 (RIReg reg2))
+pprInstr (SRA II32 reg1 reg2 (RIImm (ImmInt i))) | i > 31 =
+    -- PT: I don't know what to do for negative shift amounts:
+    -- For now just panic.
+    --
+    -- For shift amounts greater than 31 set all bit to the
+    -- value of the sign bit, this also what sraw does.
+    pprInstr (SRA II32 reg1 reg2 (RIImm (ImmInt 31)))
 
 pprInstr (SL fmt reg1 reg2 ri) =
          let op = case fmt of
