@@ -21,10 +21,10 @@ module Language.Haskell.TH.PprLib (
         parens, brackets, braces, quotes, doubleQuotes,
 
         -- * Combining documents
-        (<>), (<+>), hcat, hsep, 
-        ($$), ($+$), vcat, 
-        sep, cat, 
-        fsep, fcat, 
+        (<>), (<+>), hcat, hsep,
+        ($$), ($+$), vcat,
+        sep, cat,
+        fsep, fcat,
         nest,
         hang, punctuate,
 
@@ -98,8 +98,8 @@ hcat   :: [Doc] -> Doc;          -- ^List version of '<>'
 hsep   :: [Doc] -> Doc;          -- ^List version of '<+>'
 
 ($$)   :: Doc -> Doc -> Doc;     -- ^Above; if there is no
-                                -- overlap it \"dovetails\" the two
-($+$)   :: Doc -> Doc -> Doc;    -- ^Above, without dovetailing.
+                                 -- overlap it \"dovetails\" the two
+($+$)  :: Doc -> Doc -> Doc;     -- ^Above, without dovetailing.
 vcat   :: [Doc] -> Doc;          -- ^List version of '$$'
 
 cat    :: [Doc] -> Doc;          -- ^ Either hcat or vcat
@@ -112,9 +112,9 @@ nest   :: Int -> Doc -> Doc;     -- ^ Nested
 
 -- GHC-specific ones.
 
-hang :: Doc -> Int -> Doc -> Doc;       -- ^ @hang d1 n d2 = sep [d1, nest n d2]@
-punctuate :: Doc -> [Doc] -> [Doc];      -- ^ @punctuate p [d1, ... dn] = [d1 \<> p, d2 \<> p, ... dn-1 \<> p, dn]@
-
+hang :: Doc -> Int -> Doc -> Doc;      -- ^ @hang d1 n d2 = sep [d1, nest n d2]@
+punctuate :: Doc -> [Doc] -> [Doc]
+   -- ^ @punctuate p [d1, ... dn] = [d1 \<> p, d2 \<> p, ... dn-1 \<> p, dn]@
 
 -- ---------------------------------------------------------------------------
 -- The "implementation"
@@ -227,4 +227,3 @@ punctuate p (d:ds) = go d ds
                    where
                      go d' [] = [d']
                      go d' (e:es) = (d' <> p) : go e es
-

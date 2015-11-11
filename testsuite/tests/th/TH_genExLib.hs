@@ -12,7 +12,7 @@ genAny decl = do { d <- decl
 
 genAnyClass :: Name -> [Dec] -> Dec
 genAnyClass name decls
-  = DataD [] anyName [] [constructor] []
+  = DataD [] anyName [] Nothing [constructor] []
   where
     anyName = mkName ("Any" ++ nameBase name ++ "1111")
     constructor = ForallC [PlainTV var_a] [AppT (ConT name) (VarT var_a)] $

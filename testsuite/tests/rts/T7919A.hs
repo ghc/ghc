@@ -19,6 +19,7 @@ largeData =
     (cxt [])
     (dataName)
     []
+    Nothing
     [normalC dataName (replicate size (((,) <$> notStrict) `ap` [t| Int |]))]
     (cxt [])
 

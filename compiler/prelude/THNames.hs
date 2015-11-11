@@ -76,7 +76,7 @@ templateHaskellNames = [
     -- Strict
     isStrictName, notStrictName, unpackedName,
     -- Con
-    normalCName, recCName, infixCName, forallCName,
+    normalCName, recCName, infixCName, forallCName, gadtCName, recGadtCName,
     -- StrictType
     strictTypeName,
     -- VarStrictType
@@ -356,11 +356,13 @@ notStrictName     = libFun  (fsLit "notStrict")     notStrictKey
 unpackedName      = libFun  (fsLit "unpacked")      unpackedKey
 
 -- data Con = ...
-normalCName, recCName, infixCName, forallCName :: Name
-normalCName = libFun (fsLit "normalC") normalCIdKey
-recCName    = libFun (fsLit "recC")    recCIdKey
-infixCName  = libFun (fsLit "infixC")  infixCIdKey
-forallCName  = libFun (fsLit "forallC")  forallCIdKey
+normalCName, recCName, infixCName, forallCName, gadtCName, recGadtCName :: Name
+normalCName  = libFun (fsLit "normalC" ) normalCIdKey
+recCName     = libFun (fsLit "recC"    ) recCIdKey
+infixCName   = libFun (fsLit "infixC"  ) infixCIdKey
+forallCName  = libFun (fsLit "forallC" ) forallCIdKey
+gadtCName    = libFun (fsLit "gadtC"   ) gadtCIdKey
+recGadtCName = libFun (fsLit "recGadtC") recGadtCIdKey
 
 -- type StrictType = ...
 strictTypeName :: Name
@@ -801,19 +803,22 @@ notStrictKey        = mkPreludeMiscIdUnique 364
 unpackedKey         = mkPreludeMiscIdUnique 365
 
 -- data Con = ...
-normalCIdKey, recCIdKey, infixCIdKey, forallCIdKey :: Unique
+normalCIdKey, recCIdKey, infixCIdKey, forallCIdKey, gadtCIdKey,
+  recGadtCIdKey :: Unique
 normalCIdKey      = mkPreludeMiscIdUnique 370
 recCIdKey         = mkPreludeMiscIdUnique 371
 infixCIdKey       = mkPreludeMiscIdUnique 372
 forallCIdKey      = mkPreludeMiscIdUnique 373
+gadtCIdKey        = mkPreludeMiscIdUnique 374
+recGadtCIdKey     = mkPreludeMiscIdUnique 375
 
 -- type StrictType = ...
 strictTKey :: Unique
-strictTKey        = mkPreludeMiscIdUnique 374
+strictTKey        = mkPreludeMiscIdUnique 376
 
 -- type VarStrictType = ...
 varStrictTKey :: Unique
-varStrictTKey     = mkPreludeMiscIdUnique 375
+varStrictTKey     = mkPreludeMiscIdUnique 377
 
 -- data Type = ...
 forallTIdKey, varTIdKey, conTIdKey, tupleTIdKey, unboxedTupleTIdKey, arrowTIdKey,

@@ -7,4 +7,4 @@ import Language.Haskell.TH
 
 
 -- splice a simple data declaration
-$(return [DataD [] (mkName "T") [] [NormalC (mkName "C") []] []])
+$(return [DataD [] (mkName "T") [] Nothing [NormalC (mkName "C") []] []])

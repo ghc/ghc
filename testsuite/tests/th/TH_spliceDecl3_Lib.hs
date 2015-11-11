@@ -4,8 +4,9 @@ where
 import Language.Haskell.TH
 
 rename' :: Dec -> Q [Dec]
-rename' (DataD ctxt tyName tyvars cons derivs) =
-  return [DataD ctxt (stripMod tyName) tyvars (map renameCons cons) derivs]
+rename' (DataD ctxt tyName tyvars ksig cons derivs) =
+  return [DataD ctxt (stripMod tyName) tyvars ksig
+          (map renameCons cons) derivs]
   where
     renameCons (NormalC conName tys) = NormalC (stripMod conName) tys
     --

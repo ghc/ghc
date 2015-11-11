@@ -615,11 +615,10 @@ getLocalNonValBinders fixity_env
     mk_fld_env :: HsDataDefn RdrName -> [Name] -> [FieldLabel] -> [(Name, [FieldLabel])]
     mk_fld_env d names flds = concatMap find_con_flds (dd_cons d)
       where
-        find_con_flds (L _ (ConDeclH98 { con_name   = rdrs
-                                    , con_details = RecCon cdflds }))
-            = map (\ (L _ rdr) -> ( find_con_name rdr
-                                  , concatMap find_con_decl_flds (unLoc cdflds)))
-                  [rdrs] -- AZ:TODO remove map
+        find_con_flds (L _ (ConDeclH98 { con_name    = L _ rdr
+                                       , con_details = RecCon cdflds }))
+            = [( find_con_name rdr
+               , concatMap find_con_decl_flds (unLoc cdflds) )]
         find_con_flds (L _ (ConDeclGADT
                               { con_names = rdrs
                               , con_type = (HsIB { hsib_body = res_ty})}))
@@ -630,6 +629,7 @@ getLocalNonValBinders fixity_env
               (_tvs, _cxt, tau) = splitLHsSigmaTy res_ty
               cdflds = case tau of
                  L _ (HsFunTy (L _ (HsAppsTy [HsAppPrefix (L _ (HsRecTy flds))])) _) -> flds
+                 L _ (HsFunTy (L _ (HsRecTy flds)) _) -> flds
                  _                                    -> []
         find_con_flds _ = []
 

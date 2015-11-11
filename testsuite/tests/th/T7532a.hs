@@ -11,5 +11,5 @@ class C a where
 bang :: DecsQ
 bang = return [
      InstanceD [] (AppT (ConT ''C) (ConT ''Int)) [
-         DataInstD [] ''D [ConT ''Int] [
-             NormalC (mkName "T") []] []]] 
+         DataInstD [] ''D [ConT ''Int] Nothing [
+             NormalC (mkName "T") []] []]]

@@ -9,7 +9,7 @@ class Class a where
 
 mkSimpleClass :: Name -> Q [Dec]
 mkSimpleClass name = do
-	TyConI (DataD [] dname [] cs _) <- reify name
+	TyConI (DataD [] dname [] Nothing cs _) <- reify name
 	((NormalC conname []):_) <- return cs
 	ClassI (ClassD [] cname [_] [] [SigD mname _]) _ <- reify ''Class
 	return [InstanceD [] (AppT (ConT cname) (ConT dname)) [FunD mname

@@ -128,8 +128,8 @@ pprExp i (LamE ps e) = parensIf (i > noPrec) $ char '\\' <> hsep (map (pprPat ap
                                            <+> text "->" <+> ppr e
 pprExp i (LamCaseE ms) = parensIf (i > noPrec)
                        $ text "\\case" $$ nest nestDepth (ppr ms)
-pprExp _ (TupE es) = parens $ sep $ punctuate comma $ map ppr es
-pprExp _ (UnboxedTupE es) = hashParens $ sep $ punctuate comma $ map ppr es
+pprExp _ (TupE es) = parens (commaSep es)
+pprExp _ (UnboxedTupE es) = hashParens (commaSep es)
 -- Nesting in Cond is to avoid potential problems in do statments
 pprExp i (CondE guard true false)
  = parensIf (i > noPrec) $ sep [text "if"   <+> ppr guard,
@@ -146,7 +146,7 @@ pprExp i (LetE ds_ e) = parensIf (i > noPrec) $ text "let" <+> pprDecs ds_
   where
     pprDecs []  = empty
     pprDecs [d] = ppr d
-    pprDecs ds  = braces $ sep $ punctuate semi $ map ppr ds
+    pprDecs ds  = braces (semiSep ds)
 
 pprExp i (CaseE e ms)
  = parensIf (i > noPrec) $ text "case" <+> ppr e <+> text "of"
@@ -155,18 +155,18 @@ pprExp i (DoE ss_) = parensIf (i > noPrec) $ text "do" <+> pprStms ss_
   where
     pprStms []  = empty
     pprStms [s] = ppr s
-    pprStms ss  = braces $ sep $ punctuate semi $ map ppr ss
+    pprStms ss  = braces (semiSep ss)
 
 pprExp _ (CompE []) = text "<<Empty CompExp>>"
 -- This will probably break with fixity declarations - would need a ';'
 pprExp _ (CompE ss) = text "[" <> ppr s
                   <+> text "|"
-                  <+> (sep $ punctuate comma $ map ppr ss')
+                  <+> commaSep ss'
                    <> text "]"
     where s = last ss
           ss' = init ss
 pprExp _ (ArithSeqE d) = ppr d
-pprExp _ (ListE es) = brackets $ sep $ punctuate comma $ map ppr es
+pprExp _ (ListE es) = brackets (commaSep es)
 pprExp i (SigE e t) = parensIf (i > noPrec) $ ppr e <+> dcolon <+> ppr t
 pprExp _ (RecConE nm fs) = ppr nm <> braces (pprFields fs)
 pprExp _ (RecUpdE e fs) = pprExp appPrec e <> braces (pprFields fs)
@@ -184,10 +184,10 @@ pprMaybeExp i (Just e) = pprExp i e
 ------------------------------
 instance Ppr Stmt where
     ppr (BindS p e) = ppr p <+> text "<-" <+> ppr e
-    ppr (LetS ds) = text "let" <+> (braces $ sep $ punctuate semi $ map ppr ds)
+    ppr (LetS ds) = text "let" <+> (braces (semiSep ds))
     ppr (NoBindS e) = ppr e
     ppr (ParS sss) = sep $ punctuate (text "|")
-                         $ map (sep . punctuate comma . map ppr) sss
+                         $ map commaSep sss
 
 ------------------------------
 instance Ppr Match where
@@ -245,8 +245,8 @@ instance Ppr Pat where
 pprPat :: Precedence -> Pat -> Doc
 pprPat i (LitP l)     = pprLit i l
 pprPat _ (VarP v)     = pprName' Applied v
-pprPat _ (TupP ps)    = parens $ sep $ punctuate comma $ map ppr ps
-pprPat _ (UnboxedTupP ps) = hashParens $ sep $ punctuate comma $ map ppr ps
+pprPat _ (TupP ps)    = parens (commaSep ps)
+pprPat _ (UnboxedTupP ps) = hashParens (commaSep ps)
 pprPat i (ConP s ps)  = parensIf (i >= appPrec) $ pprName' Applied s
                                               <+> sep (map (pprPat appPrec) ps)
 pprPat _ (ParensP p)  = parens $ pprPat noPrec p
@@ -267,7 +267,7 @@ pprPat _ (RecP nm fs)
  = parens $     ppr nm
             <+> braces (sep $ punctuate comma $
                         map (\(s,p) -> ppr s <+> equals <+> ppr p) fs)
-pprPat _ (ListP ps) = brackets $ sep $ punctuate comma $ map ppr ps
+pprPat _ (ListP ps) = brackets (commaSep ps)
 pprPat i (SigP p t) = parensIf (i > noPrec) $ ppr p <+> dcolon <+> ppr t
 pprPat _ (ViewP e p) = parens $ pprExp noPrec e <+> text "->" <+> pprPat noPrec p
 
@@ -283,10 +283,10 @@ ppr_dec _ (ValD p r ds) = ppr p <+> pprBody True r
                           $$ where_clause ds
 ppr_dec _ (TySynD t xs rhs)
   = ppr_tySyn empty t (hsep (map ppr xs)) rhs
-ppr_dec _ (DataD ctxt t xs cs decs)
-  = ppr_data empty ctxt t (hsep (map ppr xs)) cs decs
-ppr_dec _ (NewtypeD ctxt t xs c decs)
-  = ppr_newtype empty ctxt t (sep (map ppr xs)) c decs
+ppr_dec _ (DataD ctxt t xs ksig cs decs)
+  = ppr_data empty ctxt t (hsep (map ppr xs)) ksig cs decs
+ppr_dec _ (NewtypeD ctxt t xs ksig c decs)
+  = ppr_newtype empty ctxt t (sep (map ppr xs)) ksig c decs
 ppr_dec _  (ClassD ctxt c xs fds ds)
   = text "class" <+> pprCxt ctxt <+> ppr c <+> hsep (map ppr xs) <+> ppr fds
     $$ where_clause ds
@@ -303,13 +303,13 @@ ppr_dec isTop (DataFamilyD tc tvs kind)
                 | otherwise = empty
     maybeKind | (Just k') <- kind = dcolon <+> ppr k'
               | otherwise = empty
-ppr_dec isTop (DataInstD ctxt tc tys cs decs)
-  = ppr_data maybeInst ctxt tc (sep (map pprParendType tys)) cs decs
+ppr_dec isTop (DataInstD ctxt tc tys ksig cs decs)
+  = ppr_data maybeInst ctxt tc (sep (map pprParendType tys)) ksig cs decs
   where
     maybeInst | isTop     = text "instance"
               | otherwise = empty
-ppr_dec isTop (NewtypeInstD ctxt tc tys c decs)
-  = ppr_newtype maybeInst ctxt tc (sep (map pprParendType tys)) c decs
+ppr_dec isTop (NewtypeInstD ctxt tc tys ksig c decs)
+  = ppr_newtype maybeInst ctxt tc (sep (map pprParendType tys)) ksig c decs
   where
     maybeInst | isTop     = text "instance"
               | otherwise = empty
@@ -339,11 +339,11 @@ ppr_dec _ (StandaloneDerivD cxt ty)
 ppr_dec _ (DefaultSigD n ty)
   = hsep [ text "default", pprPrefixOcc n, dcolon, ppr ty ]
 
-ppr_data :: Doc -> Cxt -> Name -> Doc -> [Con] -> Cxt -> Doc
-ppr_data maybeInst ctxt t argsDoc cs decs
+ppr_data :: Doc -> Cxt -> Name -> Doc -> Maybe Kind -> [Con] -> Cxt -> Doc
+ppr_data maybeInst ctxt t argsDoc ksig cs decs
   = sep [text "data" <+> maybeInst
             <+> pprCxt ctxt
-            <+> ppr t <+> argsDoc,
+            <+> ppr t <+> argsDoc <+> ksigDoc <+> maybeWhere,
          nest nestDepth (sep (pref $ map ppr cs)),
          if null decs
            then empty
@@ -351,19 +351,39 @@ ppr_data maybeInst ctxt t argsDoc cs decs
               $ text "deriving" <+> ppr_cxt_preds decs]
   where
     pref :: [Doc] -> [Doc]
-    pref []     = []      -- No constructors; can't happen in H98
-    pref (d:ds) = (char '=' <+> d):map (char '|' <+>) ds
+    pref xs | isGadtDecl = xs
+    pref []              = []      -- No constructors; can't happen in H98
+    pref (d:ds)          = (char '=' <+> d):map (char '|' <+>) ds
 
-ppr_newtype :: Doc -> Cxt -> Name -> Doc -> Con -> Cxt -> Doc
-ppr_newtype maybeInst ctxt t argsDoc c decs
+    maybeWhere :: Doc
+    maybeWhere | isGadtDecl = text "where"
+               | otherwise  = empty
+
+    isGadtDecl :: Bool
+    isGadtDecl = not (null cs) && all isGadtCon cs
+        where isGadtCon (GadtC _ _ _ _   ) = True
+              isGadtCon (RecGadtC _ _ _ _) = True
+              isGadtCon (ForallC _ _ x   ) = isGadtCon x
+              isGadtCon  _                 = False
+
+    ksigDoc = case ksig of
+                Nothing -> empty
+                Just k  -> dcolon <+> ppr k
+
+ppr_newtype :: Doc -> Cxt -> Name -> Doc -> Maybe Kind -> Con -> Cxt -> Doc
+ppr_newtype maybeInst ctxt t argsDoc ksig c decs
   = sep [text "newtype" <+> maybeInst
             <+> pprCxt ctxt
-            <+> ppr t <+> argsDoc,
+            <+> ppr t <+> argsDoc <+> ksigDoc,
          nest 2 (char '=' <+> ppr c),
          if null decs
            then empty
            else nest nestDepth
                 $ text "deriving" <+> ppr_cxt_preds decs]
+  where
+    ksigDoc = case ksig of
+                Nothing -> empty
+                Just k  -> dcolon <+> ppr k
 
 ppr_tySyn :: Doc -> Name -> Doc -> Type -> Doc
 ppr_tySyn maybeInst t argsDoc rhs
@@ -380,7 +400,7 @@ ppr_tf_head (TypeFamilyHead tc tvs res inj)
 instance Ppr FunDep where
     ppr (FunDep xs ys) = hsep (map ppr xs) <+> text "->" <+> hsep (map ppr ys)
     ppr_list [] = empty
-    ppr_list xs = char '|' <+> sep (punctuate (text ", ") (map ppr xs))
+    ppr_list xs = char '|' <+> commaSep xs
 
 ------------------------------
 instance Ppr FamFlavour where
@@ -478,13 +498,46 @@ instance Ppr Clause where
 ------------------------------
 instance Ppr Con where
     ppr (NormalC c sts) = ppr c <+> sep (map pprStrictType sts)
+
     ppr (RecC c vsts)
         = ppr c <+> braces (sep (punctuate comma $ map pprVarStrictType vsts))
+
     ppr (InfixC st1 c st2) = pprStrictType st1
                          <+> pprName' Infix c
                          <+> pprStrictType st2
-    ppr (ForallC ns ctxt con) = text "forall" <+> hsep (map ppr ns)
-                            <+> char '.' <+> sep [pprCxt ctxt, ppr con]
+
+    ppr (ForallC ns ctxt (GadtC c sts ty idx))
+        = commaSep c <+> dcolon <+> pprForall ns ctxt <+> pprGadtRHS sts ty idx
+
+    ppr (ForallC ns ctxt (RecGadtC c vsts ty idx))
+        = commaSep c <+> dcolon <+> pprForall ns ctxt
+      <+> pprRecFields vsts ty idx
+
+    ppr (ForallC ns ctxt con)
+        = pprForall ns ctxt <+> ppr con
+
+    ppr (GadtC c sts ty idx)
+        = commaSep c <+> dcolon <+> pprGadtRHS sts ty idx
+
+    ppr (RecGadtC c vsts ty idx)
+        = commaSep c <+> dcolon <+> pprRecFields vsts ty idx
+
+pprForall :: [TyVarBndr] -> Cxt -> Doc
+pprForall ns ctxt
+    = text "forall" <+> hsep (map ppr ns)
+  <+> char '.' <+> pprCxt ctxt
+
+pprRecFields :: [(Name, Strict, Type)] -> Name -> [Type] -> Doc
+pprRecFields vsts ty idx
+    = braces (sep (punctuate comma $ map pprVarStrictType vsts))
+  <+> arrow <+> ppr ty <+> sep (map ppr idx)
+
+pprGadtRHS :: [(Strict, Type)] -> Name -> [Type] -> Doc
+pprGadtRHS [] ty idx
+    = ppr ty <+> sep (map ppr idx)
+pprGadtRHS sts ty idx
+    = sep (punctuate (space <> arrow) (map pprStrictType sts))
+  <+> arrow <+> ppr ty <+> sep (map ppr idx)
 
 ------------------------------
 pprVarStrictType :: (Name, Strict, Type) -> Doc
@@ -548,9 +601,9 @@ pprTyApp (EqualityT, [arg1, arg2]) =
     sep [pprFunArgType arg1 <+> text "~", ppr arg2]
 pprTyApp (ListT, [arg]) = brackets (ppr arg)
 pprTyApp (TupleT n, args)
- | length args == n = parens (sep (punctuate comma (map ppr args)))
+ | length args == n = parens (commaSep args)
 pprTyApp (PromotedTupleT n, args)
- | length args == n = quoteParens (sep (punctuate comma (map ppr args)))
+ | length args == n = quoteParens (commaSep args)
 pprTyApp (fun, args) = pprParendType fun <+> sep (map pprParendType args)
 
 pprFunArgType :: Type -> Doc    -- Should really use a precedence argument
@@ -591,7 +644,7 @@ pprCxt ts = ppr_cxt_preds ts <+> text "=>"
 ppr_cxt_preds :: Cxt -> Doc
 ppr_cxt_preds [] = empty
 ppr_cxt_preds [t] = ppr t
-ppr_cxt_preds ts = parens (sep $ punctuate comma $ map ppr ts)
+ppr_cxt_preds ts = parens (commaSep ts)
 
 ------------------------------
 instance Ppr Range where
@@ -629,3 +682,13 @@ instance Ppr Loc where
            , parens $ int start_ln <> comma <> int start_col
            , text "-"
            , parens $ int end_ln <> comma <> int end_col ]
+
+-- Takes a list of printable things and prints them separated by commas followed
+-- by space.
+commaSep :: Ppr a => [a] -> Doc
+commaSep = sep . punctuate comma . map ppr
+
+-- Takes a list of printable things and prints them separated by semicolons
+-- followed by space.
+semiSep :: Ppr a => [a] -> Doc
+semiSep = sep . punctuate semi . map ppr

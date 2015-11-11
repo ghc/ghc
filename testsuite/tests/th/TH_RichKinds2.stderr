@@ -1,8 +1,9 @@
 
 TH_RichKinds2.hs:24:4: Warning:
-    data SMaybe_0 (t_1 :: k_0 -> *) (t_3 :: GHC.Base.Maybe k_0)
-    = forall . t_3 ~ 'GHC.Base.Nothing => SNothing_4
-    | forall a_5 . t_3 ~ 'GHC.Base.Just a_5 => SJust_6 (t_1 a_5)
+    data SMaybe_0 :: (k_0 -> *) -> GHC.Base.Maybe k_0 -> * where
+    SNothing_2 :: forall s_3 . SMaybe_0 s_3 'GHC.Base.Nothing
+    SJust_4 :: forall s_5 a_6 . (s_5 a_6) -> SMaybe_0 s_5
+                                                      'GHC.Base.Just a_6
 type instance TH_RichKinds2.Map f_7 '[] = '[]
 type instance TH_RichKinds2.Map f_8
                                 ('GHC.Types.: h_9 t_10) = 'GHC.Types.: (f_8 h_9)

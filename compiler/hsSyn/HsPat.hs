@@ -17,7 +17,6 @@
 module HsPat (
         Pat(..), InPat, OutPat, LPat,
 
-        HsConDetails(..),
         HsConPatDetails, hsConPatArgs,
         HsRecFields(..), HsRecField'(..), LHsRecField',
         HsRecField, LHsRecField,
@@ -224,14 +223,6 @@ data Pat id
   deriving (Typeable)
 deriving instance (DataId id) => Data (Pat id)
 
--- HsConDetails is use for patterns/expressions *and* for data type declarations
-
-data HsConDetails arg rec
-  = PrefixCon [arg]             -- C p1 p2 p3
-  | RecCon    rec               -- C { x = p1, y = p2 }
-  | InfixCon  arg arg           -- p1 `C` p2
-  deriving (Data, Typeable)
-
 type HsConPatDetails id = HsConDetails (LPat id) (HsRecFields id (LPat id))
 
 hsConPatArgs :: HsConPatDetails id -> [LPat id]
@@ -239,16 +230,8 @@ hsConPatArgs (PrefixCon ps)   = ps
 hsConPatArgs (RecCon fs)      = map (hsRecFieldArg . unLoc) (rec_flds fs)
 hsConPatArgs (InfixCon p1 p2) = [p1,p2]
 
-instance (Outputable arg, Outputable rec)
-         => Outputable (HsConDetails arg rec) where
-  ppr (PrefixCon args) = text "PrefixCon" <+> ppr args
-  ppr (RecCon rec)     = text "RecCon:" <+> ppr rec
-  ppr (InfixCon l r)   = text "InfixCon:" <+> ppr [l, r]
-
-{-
-However HsRecFields is used only for patterns and expressions
-(not data type declarations)
--}
+-- HsRecFields is used only for patterns and expressions (not data type
+-- declarations)
 
 data HsRecFields id arg         -- A bunch of record fields
                                 --      { x = 3, y = True }

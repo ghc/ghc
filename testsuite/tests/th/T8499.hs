@@ -5,7 +5,7 @@ module T8499 where
 
 import Language.Haskell.TH
 
-$( do TyConI (DataD _ _ [KindedTV tvb_a _] _ _) <- reify ''Maybe
+$( do TyConI (DataD _ _ [KindedTV tvb_a _] _ _ _) <- reify ''Maybe
       my_a <- newName "a"
       return [TySynD (mkName "SMaybe")
                      [KindedTV my_a (AppT (ConT ''Maybe) (VarT tvb_a))]

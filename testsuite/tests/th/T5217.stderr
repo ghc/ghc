@@ -7,7 +7,8 @@ T5217.hs:(6,3)-(9,53): Splicing declarations
             T4 :: a -> b -> T b [a] |]
   ======>
     data T a b
-      = (b ~ Char, a ~ Int) => T1 Int |
-        b ~ a => T2 a |
-        a ~ [b] => T3 b |
-        forall a. b ~ [a] => T4 a a
+      where
+        T1 :: Int -> T Int Char
+        T2 :: forall a. a -> T a a
+        T3 :: forall a. a -> T [a] a
+        T4 :: forall a b. a -> b -> T b [a]

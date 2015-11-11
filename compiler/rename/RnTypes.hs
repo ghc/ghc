@@ -469,10 +469,7 @@ rnHsTyKi _ doc (HsBangTy b ty)
        ; return (HsBangTy b ty', fvs) }
 
 rnHsTyKi _ doc@(ConDeclCtx names) (HsRecTy flds)
-  = do {
-       -- AZ:reviewers: is there a monadic version of concatMap?
-         flss <- mapM (lookupConstructorFields . unLoc) names
-       ; let fls = concat flss
+  = do { fls <- concatMapM (lookupConstructorFields . unLoc) names
        ; (flds', fvs) <- rnConDeclFields fls doc flds
        ; return (HsRecTy flds', fvs) }
 

@@ -1312,43 +1312,87 @@ reifyTyCon tc
 
   | otherwise
   = do  { cxt <- reifyCxt (tyConStupidTheta tc)
-        ; let tvs = tyConTyVars tc
-        ; cons <- mapM (reifyDataCon (mkTyVarTys tvs)) (tyConDataCons tc)
+        ; let tvs      = tyConTyVars tc
+              dataCons = tyConDataCons tc
+              -- see Note [Reifying GADT data constructors]
+              isGadt   = any (not . null . dataConEqSpec) dataCons
+        ; cons <- mapM (reifyDataCon isGadt (mkTyVarTys tvs)) dataCons
         ; r_tvs <- reifyTyVars tvs (Just tc)
         ; let name = reifyName tc
               deriv = []        -- Don't know about deriving
-              decl | isNewTyCon tc = TH.NewtypeD cxt name r_tvs (head cons) deriv
-                   | otherwise     = TH.DataD    cxt name r_tvs cons        deriv
+              decl | isNewTyCon tc =
+                       TH.NewtypeD cxt name r_tvs Nothing (head cons) deriv
+                   | otherwise     =
+                       TH.DataD    cxt name r_tvs Nothing       cons  deriv
         ; return (TH.TyConI decl) }
 
-reifyDataCon :: [Type] -> DataCon -> TcM TH.Con
--- For GADTs etc, see Note [Reifying data constructors]
-reifyDataCon tys dc
-  = do { let (ex_tvs, theta, arg_tys) = dataConInstSig dc tys
-             stricts  = map reifyStrict (dataConSrcBangs dc)
-             fields   = dataConFieldLabels dc
-             name     = reifyName dc
+reifyDataCon :: Bool -> [Type] -> DataCon -> TcM TH.Con
+-- For GADTs etc, see Note [Reifying GADT data constructors]
+reifyDataCon isGadtDataCon tys dc
+  = do { let -- used for H98 data constructors
+             (ex_tvs, theta, arg_tys)
+                 = dataConInstSig dc tys
+             -- used for GADTs data constructors
+             (g_univ_tvs, g_ex_tvs, g_eq_spec, g_theta, g_arg_tys, _)
+                 = dataConFullSig dc
+             stricts   = map reifyStrict (dataConSrcBangs dc)
+             fields    = dataConFieldLabels dc
+             name      = reifyName dc
+             r_ty_name = reifyName (dataConTyCon dc) -- return type for GADTs
+             -- return type indices
+             subst     = mkTopTCvSubst (map eqSpecPair g_eq_spec)
+             idx       = substTyVars subst g_univ_tvs
+             -- universal tvs that were not substituted
+             g_unsbst_univ_tvs = filter (`notElemTCvSubst` subst) g_univ_tvs
 
-       ; r_arg_tys <- reifyTypes arg_tys
+       ; r_arg_tys <- reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)
+       ; idx_tys   <- reifyTypes idx
 
-       ; let main_con | not (null fields)
-                      = TH.RecC name
-                          (zip3 (map reifyFieldLabel fields) stricts r_arg_tys)
+       ; let main_con | not (null fields) && not isGadtDataCon
+                      = TH.RecC name (zip3 (map reifyFieldLabel fields)
+                                      stricts r_arg_tys)
+                      | not (null fields)
+                      = TH.RecGadtC [name]
+                                   (zip3 (map (reifyName . flSelector) fields)
+                                    stricts r_arg_tys) r_ty_name idx_tys
                       | dataConIsInfix dc
                       = ASSERT( length arg_tys == 2 )
                         TH.InfixC (s1,r_a1) name (s2,r_a2)
+                      | isGadtDataCon
+                      = TH.GadtC [name] (stricts `zip` r_arg_tys) r_ty_name
+                                 idx_tys
                       | otherwise
                       = TH.NormalC name (stricts `zip` r_arg_tys)
              [r_a1, r_a2] = r_arg_tys
              [s1,   s2]   = stricts
-
+             (ex_tvs', theta') | isGadtDataCon = ( g_unsbst_univ_tvs ++ g_ex_tvs
+                                                 , g_theta )
+                               | otherwise     = ( ex_tvs, theta )
+             ret_con | null ex_tvs' && null theta' = return main_con
+                     | otherwise                   = do
+                         { cxt <- reifyCxt theta'
+                         ; ex_tvs'' <- reifyTyVars ex_tvs' Nothing
+                         ; return (TH.ForallC ex_tvs'' cxt main_con) }
        ; ASSERT( length arg_tys == length stricts )
-         if null ex_tvs && null theta then
-             return main_con
-         else do
-         { cxt <- reifyCxt theta
-         ; ex_tvs' <- reifyTyVars ex_tvs Nothing
-         ; return (TH.ForallC ex_tvs' cxt main_con) } }
+         ret_con }
+
+-- Note [Reifying GADT data constructors]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- At this point in the compilation pipeline we have no way of telling whether a
+-- data type was declared as a H98 data type or as a GADT.  We have to rely on
+-- heuristics here.  We look at dcEqSpec field of all data constructors in a
+-- data type declaration.  If at least one data constructor has non-empty
+-- dcEqSpec this means that the data type must have been declared as a GADT.
+-- Consider these declarations:
+--
+--   data T a where
+--      MkT :: forall a. (a ~ Int) => T a
+--
+--   data T a where
+--      MkT :: T Int
+--
+-- First declaration will be reified as a GADT.  Second declaration will be
+-- reified as a normal H98 data type declaration.
 
 ------------------------------
 reifyClass :: Class -> TcM TH.Info
@@ -1483,13 +1527,18 @@ reifyFamilyInstance is_poly_tvs inst@(FamInst { fi_flavor = flavor
                  (_rep_tc, rep_tc_args) = splitTyConApp rhs
                  etad_tyvars            = dropList rep_tc_args tvs
                  eta_expanded_lhs = lhs `chkAppend` mkTyVarTys etad_tyvars
-           ; cons <- mapM (reifyDataCon (mkTyVarTys tvs)) (tyConDataCons rep_tc)
+                 dataCons               = tyConDataCons rep_tc
+                 -- see Note [Reifying GADT data constructors]
+                 isGadt   = any (not . null . dataConEqSpec) dataCons
+           ; cons <- mapM (reifyDataCon isGadt (mkTyVarTys tvs)) dataCons
            ; let types_only = filterOutInvisibleTypes fam_tc eta_expanded_lhs
            ; th_tys <- reifyTypes types_only
            ; annot_th_tys <- zipWith3M annotThType is_poly_tvs types_only th_tys
-           ; return (if isNewTyCon rep_tc
-                     then TH.NewtypeInstD [] fam' annot_th_tys (head cons) []
-                     else TH.DataInstD    [] fam' annot_th_tys cons        []) }
+           ; return $
+               if isNewTyCon rep_tc
+               then TH.NewtypeInstD [] fam' annot_th_tys Nothing (head cons) []
+               else TH.DataInstD    [] fam' annot_th_tys Nothing       cons  []
+           }
   where
     fam_tc = famInstTyCon inst
 
@@ -1772,21 +1821,6 @@ ppr_th :: TH.Ppr a => a -> SDoc
 ppr_th x = text (TH.pprint x)
 
 {-
-Note [Reifying data constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Template Haskell syntax is rich enough to express even GADTs,
-provided we do so in the equality-predicate form.  So a GADT
-like
-
-  data T a where
-     MkT1 :: a -> T [a]
-     MkT2 :: T Int
-
-will appear in TH syntax like this
-
-  data T a = forall b. (a ~ [b]) => MkT1 b
-           | (a ~ Int) => MkT2
-
 Note [Reifying field labels]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When reifying a datatype declared with DuplicateRecordFields enabled, we want

@@ -1473,10 +1473,13 @@ data Dec
   = FunD Name [Clause]            -- ^ @{ f p1 p2 = b where decs }@
   | ValD Pat Body [Dec]           -- ^ @{ p = b where decs }@
   | DataD Cxt Name [TyVarBndr]
-         [Con] Cxt                -- ^ @{ data Cxt x => T x = A x | B (T x)
-                                  --       deriving (Z,W Q)}@
+          (Maybe Kind)            -- Kind signature (allowed only for GADTs)
+          [Con] Cxt
+                                  -- ^ @{ data Cxt x => T x = A x | B (T x)
+                                  --       deriving (Z,W)}@
   | NewtypeD Cxt Name [TyVarBndr]
-         Con Cxt                  -- ^ @{ newtype Cxt x => T x = A (B x)
+             (Maybe Kind)         -- Kind signature
+             Con Cxt              -- ^ @{ newtype Cxt x => T x = A (B x)
                                   --       deriving (Z,W Q)}@
   | TySynD Name [TyVarBndr] Type  -- ^ @{ type T x = (x,x) }@
   | ClassD Cxt Name [TyVarBndr]
@@ -1498,12 +1501,14 @@ data Dec
          -- ^ @{ data family T a b c :: * }@
 
   | DataInstD Cxt Name [Type]
-         [Con] Cxt                -- ^ @{ data instance Cxt x => T [x] = A x
-                                  --                                | B (T x)
-                                  --       deriving (Z,W Q)}@
+             (Maybe Kind)         -- Kind signature
+             [Con] Cxt            -- ^ @{ data instance Cxt x => T [x]
+                                  --       = A x | B (T x) deriving (Z,W)}@
+
   | NewtypeInstD Cxt Name [Type]
-         Con Cxt                  -- ^ @{ newtype instance Cxt x => T [x] = A (B x)
-                                  --       deriving (Z,W)}@
+                 (Maybe Kind)     -- Kind signature
+                 Con Cxt          -- ^ @{ newtype instance Cxt x => T [x]
+                                  --        = A (B x) deriving (Z,W)}@
   | TySynInstD Name TySynEqn      -- ^ @{ type instance ... }@
 
   -- | open type families (may also appear in [Dec] of 'ClassD' and 'InstanceD')
@@ -1591,11 +1596,30 @@ type Pred = Type
 data Strict = IsStrict | NotStrict | Unpacked
          deriving( Show, Eq, Ord, Data, Typeable, Generic )
 
-data Con = NormalC Name [StrictType]          -- ^ @C Int a@
-         | RecC Name [VarStrictType]          -- ^ @C { v :: Int, w :: a }@
-         | InfixC StrictType Name StrictType  -- ^ @Int :+ a@
-         | ForallC [TyVarBndr] Cxt Con        -- ^ @forall a. Eq a => C [a]@
+data Con = NormalC Name [StrictType]         -- ^ @C Int a@
+         | RecC Name [VarStrictType]         -- ^ @C { v :: Int, w :: a }@
+         | InfixC StrictType Name StrictType -- ^ @Int :+ a@
+         | ForallC [TyVarBndr] Cxt Con       -- ^ @forall a. Eq a => C [a]@
+         | GadtC [Name] [StrictType]
+                 Name                        -- See Note [GADT return type]
+                 [Type]                      -- Indices of the type constructor
+                                             -- ^ @C :: a -> b -> T b Int@
+         | RecGadtC [Name] [VarStrictType]
+                    Name                     -- See Note [GADT return type]
+                    [Type]                   -- Indices of the type constructor
+                                             -- ^ @C :: { v :: Int } -> T b Int@
          deriving( Show, Eq, Ord, Data, Typeable, Generic )
+
+-- Note [GADT return type]
+-- ~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- The name of the return type stored by a GADT constructor does not necessarily
+-- match the name of the data type:
+--
+-- type S = T
+--
+-- data T a where
+--     MkT :: S Int
 
 type StrictType = (Strict, Type)
 type VarStrictType = (Name, Strict, Type)

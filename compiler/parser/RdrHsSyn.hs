@@ -614,7 +614,7 @@ really doesn't matter!
 -}
 
 -- | Note [Sorting out the result type]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- In a GADT declaration which is not a record, we put the whole constr type
 -- into the res_ty for a ConDeclGADT for now; the renamer will unravel it once
 -- it has sorted out operator fixities. Consider for example
@@ -623,7 +623,7 @@ really doesn't matter!
 --       a :*: (b -> (a :*: (b -> (a :+: b))))
 --
 -- so it's hard to split up the arguments until we've done the precedence
--- resolution (in the renamer) On the other hand, for a record
+-- resolution (in the renamer). On the other hand, for a record
 --         { x,y :: Int } -> a :*: b
 -- there is no doubt.  AND we need to sort records out so that
 -- we can bring x,y into scope.  So:

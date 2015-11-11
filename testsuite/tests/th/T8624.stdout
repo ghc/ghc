@@ -1,2 +1,2 @@
--- T8624.hs:7:3-72: Splicing declarations
+-- T8624.hs:(7,3)-(8,43): Splicing declarations
 data THDec = THDec

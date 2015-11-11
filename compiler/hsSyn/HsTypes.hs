@@ -34,7 +34,9 @@ module HsTypes (
         SrcStrictness(..), SrcUnpackedness(..),
         getBangType, getBangStrictness,
 
-        ConDeclField(..), LConDeclField, pprConDeclFields,
+        ConDeclField(..), LConDeclField, pprConDeclFields, updateGadtResult,
+
+        HsConDetails(..),
 
         FieldOcc(..), LFieldOcc, mkFieldOcc,
         AmbiguousFieldOcc(..), mkAmbiguousFieldOcc,
@@ -47,7 +49,8 @@ module HsTypes (
 
         mkHsImplicitBndrs, mkHsWildCardBndrs, hsImplicitBody,
         mkEmptyImplicitBndrs, mkEmptyWildCardBndrs,
-        mkHsQTvs, hsQTvExplicit, isHsKindedTyVar, hsTvbAllKinded,
+        mkHsQTvs, hsQTvExplicit, emptyLHsQTvs, isEmptyLHsQTvs,
+        isHsKindedTyVar, hsTvbAllKinded,
         hsScopedTvs, hsWcScopedTvs, dropWildCards,
         hsTyVarName, hsAllLTyVarNames, hsLTyVarLocNames,
         hsLTyVarName, hsLTyVarLocName, hsExplicitLTyVarNames,
@@ -85,6 +88,7 @@ import Maybes( isJust )
 
 import Data.Data hiding ( Fixity )
 import Data.Maybe ( fromMaybe )
+import Control.Monad ( unless )
 #if __GLASGOW_HASKELL > 710
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
@@ -215,6 +219,13 @@ mkHsQTvs tvs = HsQTvs { hsq_implicit = PlaceHolder, hsq_explicit = tvs }
 
 hsQTvExplicit :: LHsQTyVars name -> [LHsTyVarBndr name]
 hsQTvExplicit = hsq_explicit
+
+emptyLHsQTvs :: LHsQTyVars Name
+emptyLHsQTvs = HsQTvs [] []
+
+isEmptyLHsQTvs :: LHsQTyVars Name -> Bool
+isEmptyLHsQTvs (HsQTvs [] []) = True
+isEmptyLHsQTvs _              = False
 
 ------------------------------------------------
 --            HsImplicitBndrs
@@ -669,6 +680,22 @@ data ConDeclField name  -- Record fields have Haddoc docs on them
   deriving (Typeable)
 deriving instance (DataId name) => Data (ConDeclField name)
 
+instance (OutputableBndr name) => Outputable (ConDeclField name) where
+  ppr (ConDeclField fld_n fld_ty _) = ppr fld_n <+> dcolon <+> ppr fld_ty
+
+-- HsConDetails is used for patterns/expressions *and* for data type
+-- declarations
+data HsConDetails arg rec
+  = PrefixCon [arg]             -- C p1 p2 p3
+  | RecCon    rec               -- C { x = p1, y = p2 }
+  | InfixCon  arg arg           -- p1 `C` p2
+  deriving (Data, Typeable)
+
+instance (Outputable arg, Outputable rec)
+         => Outputable (HsConDetails arg rec) where
+  ppr (PrefixCon args) = text "PrefixCon" <+> ppr args
+  ppr (RecCon rec)     = text "RecCon:" <+> ppr rec
+  ppr (InfixCon l r)   = text "InfixCon:" <+> ppr [l, r]
 
 type LFieldOcc name = Located (FieldOcc name)
 
@@ -734,6 +761,30 @@ unambiguousFieldOcc (Ambiguous   rdr sel) = FieldOcc rdr sel
 
 ambiguousFieldOcc :: FieldOcc name -> AmbiguousFieldOcc name
 ambiguousFieldOcc (FieldOcc rdr sel) = Unambiguous rdr sel
+
+-- Takes details and result type of a GADT data constructor as created by the
+-- parser and rejigs them using information about fixities from the renamer.
+-- See Note [Sorting out the result type] in RdrHsSyn
+updateGadtResult
+  :: (Monad m)
+     => (SDoc -> m ())
+     -> SDoc
+     -> HsConDetails (LHsType Name) (Located [LConDeclField Name])
+                     -- ^ Original details
+     -> LHsType Name -- ^ Original result type
+     -> m (HsConDetails (LHsType Name) (Located [LConDeclField Name]),
+           LHsType Name)
+updateGadtResult failWith doc details ty
+  = do { let (arg_tys, res_ty) = splitHsFunType ty
+             badConSig         = text "Malformed constructor signature"
+       ; case details of
+           InfixCon {}  -> pprPanic "updateGadtResult" (ppr ty)
+
+           RecCon {}    -> do { unless (null arg_tys)
+                                       (failWith (doc <+> badConSig))
+                              ; return (details, res_ty) }
+
+           PrefixCon {} -> return (PrefixCon arg_tys, res_ty)}
 
 {-
 Note [ConDeclField names]

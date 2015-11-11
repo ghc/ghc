@@ -89,7 +89,6 @@ import {-# SOURCE #-}   HsExpr( LHsExpr, HsExpr, HsSplice, pprExpr, pprSplice )
         -- Because Expr imports Decls via HsBracket
 
 import HsBinds
-import HsPat
 import HsTypes
 import HsDoc
 import TyCon
@@ -1078,8 +1077,8 @@ gadtDeclDetails HsIB {hsib_body = lbody_ty} = (details,res_ty,cxt,tvs)
     (tvs, cxt, tau) = splitLHsSigmaTy lbody_ty
     (details, res_ty)           -- See Note [Sorting out the result type]
       = case tau of
-          L _ (HsFunTy (L l (HsRecTy flds)) res_ty)
-                  -> (RecCon (L l flds), res_ty)
+          L _ (HsFunTy (L l (HsRecTy flds)) res_ty')
+                  -> (RecCon (L l flds), res_ty')
           _other  -> (PrefixCon [], tau)
 
 hsConDeclArgTys :: HsConDeclDetails name -> [LBangType name]
