@@ -34,12 +34,12 @@
 
    On 64-bit machines, we have two possibilities. One is to request
    a single chunk of address space that we deem "large enough"
-   (currently 1TB, could easily be extended to, say 16TB or more).
-   Memory from that chunk is GC memory, everything else is not. This
-   case is tricky in that it requires support from the OS to allocate
-   address space without allocating memory (in practice, all modern
-   OSes do this). It's also tricky in that it is the only case where
-   a successful HEAP_ALLOCED(p) check can trigger a segfault when
+   (currently 1TB or the ulimit size, whichever is smaller, although this could
+   easily be extended to, say 16TB or more). Memory from that chunk is GC
+   memory, everything else is not. This case is tricky in that it requires
+   support from the OS to allocate address space without allocating memory (in
+   practice, all modern OSes do this). It's also tricky in that it is the only
+   case where a successful HEAP_ALLOCED(p) check can trigger a segfault when
    accessing p (and for debugging purposes, it will).
 
    Alternatively, the older implementation caches one 12-bit block map
@@ -51,16 +51,14 @@
 
 #ifdef USE_LARGE_ADDRESS_SPACE
 
-extern W_ mblock_address_space_begin;
-#if aarch64_HOST_ARCH
-# define MBLOCK_SPACE_SIZE      ((StgWord)1 << 38) /* 1/4 TB */
-#else
-# define MBLOCK_SPACE_SIZE      ((StgWord)1 << 40) /* 1 TB */
-#endif
+struct mblock_address_range {
+    W_ begin, end;
+    W_ padding[6];  // ensure nothing else inhabits this cache line
+} ATTRIBUTE_ALIGNED(64);
+extern struct mblock_address_range mblock_address_space;
 
-# define HEAP_ALLOCED(p)        ((W_)(p) >= mblock_address_space_begin && \
-                                 (W_)(p) < (mblock_address_space_begin +  \
-                                            MBLOCK_SPACE_SIZE))
+# define HEAP_ALLOCED(p)        ((W_)(p) >= mblock_address_space.begin && \
+                                 (W_)(p) < (mblock_address_space.end))
 # define HEAP_ALLOCED_GC(p)     HEAP_ALLOCED(p)
 
 #elif SIZEOF_VOID_P == 4

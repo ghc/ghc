@@ -644,22 +644,16 @@ data Sig name
   | PatSynSig (Located name) (LHsSigType name)
       -- P :: forall a b. Prov => Req => ty
 
-        -- | A type signature for a default method inside a class
-        --
-        -- > default eq :: (Representable0 a, GEq (Rep0 a)) => a -> a -> Bool
-        --
-        --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDefault',
-        --           'ApiAnnotation.AnnDcolon'
-
-        -- For details on above see note [Api annotations] in ApiAnnotation
-
       -- | A signature for a class method
-      --   False <=> ordinary class-method signauure
-      --   True  <=> default class method signature
+      --   False: ordinary class-method signauure
+      --   True:  default class method signature
       -- e.g.   class C a where
       --          op :: a -> a                   -- Ordinary
       --          default op :: Eq a => a -> a   -- Generic default
       -- No wildcards allowed here
+      --
+      --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDefault',
+      --           'ApiAnnotation.AnnDcolon'
   | ClassOpSig Bool [Located name] (LHsSigType name)
 
         -- | A type signature in generated code, notably the code

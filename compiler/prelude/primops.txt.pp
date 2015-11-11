@@ -316,6 +316,11 @@ primtype Word#
 primop   WordAddOp   "plusWord#"   Dyadic   Word# -> Word# -> Word#
    with commutable = True
 
+primop   WordSubCOp   "subWordC#"   GenPrimOp   Word# -> Word# -> (# Word#, Int# #)
+         {Subtract unsigned integers reporting overflow.
+          The first element of the pair is the result.  The second element is
+          the carry flag, which is nonzero on overflow.}
+
 -- Returns (# high, low #) (or equivalently, (# carry, low #))
 primop   WordAdd2Op  "plusWord2#"  GenPrimOp
    Word# -> Word# -> (# Word#, Word# #)

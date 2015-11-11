@@ -456,6 +456,7 @@ platformSupportsSavingLinkOpts os
   | os == OSSolaris2 = False -- see #5382
   | otherwise        = osElfTarget os
 
+-- See Note [LinkInfo section]
 ghcLinkInfoSectionName :: String
 ghcLinkInfoSectionName = ".debug-ghc-link-info"
    -- if we use the ".debug" prefix, then strip will strip it by default
@@ -1659,9 +1660,11 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
 
   where
     link_opts info = hcat [
+          -- LinkInfo section must be of type "progbits"
+          -- See Note [LinkInfo section]
           text "\t.section ", text ghcLinkInfoSectionName,
                                    text ",\"\",",
-                                   text elfSectionNote,
+                                   text elfSectionProgBits,
                                    text "\n",
 
           text "\t.ascii \"", info', text "\"\n",
@@ -1681,15 +1684,14 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
             escape :: String -> String
             escape = concatMap (charToC.fromIntegral.ord)
 
-            elfSectionNote :: String
-            elfSectionNote = case platformArch (targetPlatform dflags) of
-                               ArchARM _ _ _ -> "%note"
-                               _             -> "@note"
+            elfSectionProgBits :: String
+            elfSectionProgBits = case platformArch (targetPlatform dflags) of
+                                     ArchARM _ _ _ -> "%progbits"
+                                     _             -> "@progbits"
 
--- The "link info" is a string representing the parameters of the
--- link.  We save this information in the binary, and the next time we
--- link, if nothing else has changed, we use the link info stored in
--- the existing binary to decide whether to re-link or not.
+-- | Return the "link info" string
+--
+-- See Note [LinkInfo section]
 getLinkInfo :: DynFlags -> [UnitId] -> IO String
 getLinkInfo dflags dep_packages = do
    package_link_opts <- getPackageLinkOpts dflags dep_packages
@@ -1707,6 +1709,22 @@ getLinkInfo dflags dep_packages = do
                    getOpts dflags opt_l)
    --
    return (show link_info)
+
+
+{- Note [LinkInfo section]
+   ~~~~~~~~~~~~~~~~~~~~~~~
+
+The "link info" is a string representing the parameters of the link. We save
+this information in the binary, and the next time we link, if nothing else has
+changed, we use the link info stored in the existing binary to decide whether
+to re-link or not.
+
+The "link info" string is stored in a ELF section called ".debug-ghc-link-info"
+(see ghcLinkInfoSectionName) with the SHT_PROGBITS type. It used to be of type
+SHT_NOTE without following their specified record-based format (see #11022).
+
+-}
+
 
 -----------------------------------------------------------------------------
 -- Look for the /* GHC_PACKAGES ... */ comment at the top of a .hc file

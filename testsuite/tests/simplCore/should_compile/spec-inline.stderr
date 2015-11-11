@@ -1,6 +1,33 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 162, types: 61, coercions: 0}
+Result size of Tidy Core = {terms: 172, types: 64, coercions: 0}
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+Roman.$trModule2 :: TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=DmdType m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
+Roman.$trModule2 = TrNameS "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+Roman.$trModule1 :: TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=DmdType m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
+Roman.$trModule1 = TrNameS "Roman"#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0}
+Roman.$trModule :: Module
+[GblId[ReflectionId],
+ Caf=NoCafRefs,
+ Str=DmdType m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+Roman.$trModule = Module Roman.$trModule2 Roman.$trModule1
 
 -- RHS size: {terms: 2, types: 1, coercions: 0}
 Roman.foo3 :: Int

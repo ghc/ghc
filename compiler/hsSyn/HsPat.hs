@@ -155,6 +155,8 @@ data Pat id
         pat_binds :: TcEvBinds,         -- Bindings involving those dictionaries
         pat_args  :: HsConPatDetails id,
         pat_wrap  :: HsWrapper          -- Extra wrapper to pass to the matcher
+                                        -- Only relevant for pattern-synonyms;
+                                        --   ignored for data cons
     }
 
         ------------ View patterns ---------------
@@ -324,6 +326,8 @@ data HsRecField' id arg = HsRecField {
 -- The typechecker will determine the particular selector:
 --
 --     hsRecFieldLbl = Unambiguous "x" $sel:x:MkS  :: AmbiguousFieldOcc Id
+--
+-- See also Note [Disambiguating record fields] in TcExpr.
 
 hsRecFields :: HsRecFields id arg -> [PostRn id id]
 hsRecFields rbinds = map (unLoc . hsRecFieldSel . unLoc) (rec_flds rbinds)

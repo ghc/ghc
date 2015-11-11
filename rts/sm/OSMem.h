@@ -29,13 +29,13 @@ void setExecutable (void *p, W_ len, rtsBool exec);
   we will ever need, which keeps everything nice and consecutive.
 */
 
-// Reserve the large address space blob, and return the address that
-// the OS has chosen for it.  It is not safe to access the memory
-// pointed to by the return value, until that memory is committed
-// using osCommitMemory().
+// Reserve the large address space blob of the given size, and return the
+// address that the OS has chosen for it. It is not safe to access the memory
+// pointed to by the return value, until that memory is committed using
+// osCommitMemory().
 //
 // This function is called once when the block allocator is initialized.
-void *osReserveHeapMemory(void);
+void *osReserveHeapMemory(W_ len);
 
 // Commit (allocate memory for) a piece of address space, which must
 // be within the previously reserved space After this call, it is safe

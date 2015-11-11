@@ -135,7 +135,7 @@ data HsExpr id
                              -- Turned into HsVar by type checker, to support deferred
                              --   type errors.  (The HsUnboundVar only has an OccName.)
 
-  | HsSingleRecFld (FieldOcc id) -- ^ Variable that corresponds to a record selector
+  | HsRecFld (AmbiguousFieldOcc id) -- ^ Variable pointing to record selector
 
   | HsIPVar   HsIPName       -- ^ Implicit parameter
   | HsOverLit (HsOverLit id) -- ^ Overloaded literals
@@ -561,29 +561,21 @@ So we use Nothing to mean "use the old built-in typing rule".
 
 Note [Record Update HsWrapper]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-There is a wrapper in RecordUpd which is used for the *required* constraints for
-pattern synonyms. This wrapper is created in the typechecking and is then
-directly used in the desugaring without modification.
+There is a wrapper in RecordUpd which is used for the *required*
+constraints for pattern synonyms. This wrapper is created in the
+typechecking and is then directly used in the desugaring without
+modification.
 
 For example, if we have the record pattern synonym P,
+  pattern P :: (Show a) => a -> Maybe a
+  pattern P{x} = Just x
 
-```
-pattern P :: (Show a) => a -> Maybe a
-pattern P{x} = Just x
-
-foo = (Just True) { x = False }
-```
-
+  foo = (Just True) { x = False }
 then `foo` desugars to something like
-
-```
-P x = P False
-```
-
-hence we need to provide the correct dictionaries to P on the RHS so that we can
-build the expression.
-
+  foo = case Just True of
+          P x -> P False
+hence we need to provide the correct dictionaries to P's matcher on
+the RHS so that we can build the expression.
 -}
 
 instance OutputableBndr id => Outputable (HsExpr id) where
@@ -798,7 +790,7 @@ ppr_expr (HsArrForm (L _ (HsVar v)) (Just _) [arg1, arg2])
 ppr_expr (HsArrForm op _ args)
   = hang (ptext (sLit "(|") <+> ppr_lexpr op)
          4 (sep (map (pprCmdArg.unLoc) args) <+> ptext (sLit "|)"))
-ppr_expr (HsSingleRecFld f) = ppr f
+ppr_expr (HsRecFld f) = ppr f
 
 pprExternalSrcLoc :: (StringLiteral,(Int,Int),(Int,Int)) -> SDoc
 pprExternalSrcLoc (StringLiteral _ src,(n1,n2),(n3,n4))
@@ -850,7 +842,7 @@ hsExprNeedsParens (HsRnBracketOut {}) = False
 hsExprNeedsParens (HsTcBracketOut {}) = False
 hsExprNeedsParens (HsDo sc _ _)
        | isListCompExpr sc            = False
-hsExprNeedsParens (HsSingleRecFld{})  = False
+hsExprNeedsParens (HsRecFld{})        = False
 hsExprNeedsParens _ = True
 
 
@@ -863,7 +855,7 @@ isAtomicHsExpr (HsIPVar {})      = True
 isAtomicHsExpr (HsUnboundVar {}) = True
 isAtomicHsExpr (HsWrap _ e)      = isAtomicHsExpr e
 isAtomicHsExpr (HsPar e)         = isAtomicHsExpr (unLoc e)
-isAtomicHsExpr (HsSingleRecFld{}) = True
+isAtomicHsExpr (HsRecFld{})      = True
 isAtomicHsExpr _                 = False
 
 {-
@@ -956,7 +948,7 @@ data HsCmd id
 
     -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsCmdCast   TcCoercion     -- A simpler version of HsWrap in HsExpr
+  | HsCmdCast   TcCoercionN    -- A simpler version of HsWrap in HsExpr
                 (HsCmd id)     -- If   cmd :: arg1 --> res
                                --       co :: arg1 ~ arg2
                                -- Then (HsCmdCast co cmd) :: arg2 --> res

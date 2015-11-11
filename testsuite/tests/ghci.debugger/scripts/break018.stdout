@@ -1,5 +1,5 @@
 Stopped at ../mdo.hs:(30,1)-(32,27)
-_result :: IO (N a) = _
+_result :: IO (N a6) = _
 Stopped at ../mdo.hs:(30,16)-(32,27)
 _result :: IO (N Char) = _
 x :: Char = 'h'
@@ -10,4 +10,4 @@ f :: N Char = _
 l :: N Char = _
 x :: Char = 'h'
 Stopped at ../mdo.hs:(8,1)-(9,42)
-_result :: IO (N a) = _
+_result :: IO (N a6) = _

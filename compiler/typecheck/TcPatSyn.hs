@@ -141,7 +141,7 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
                { arg <- tcLookupId arg_name
                ; let arg_ty' = substTy subst arg_ty
                ; coi <- unifyType (varType arg) arg_ty'
-               ; return (setVarType arg arg_ty, coToHsWrapper coi) }
+               ; return (setVarType arg arg_ty, mkWpCastN coi) }
            ; return (ex_tys, prov_theta', wrapped_args) }
 
        ; (ex_vars_rhs, prov_dicts_rhs) <- tcCollectEx lpat'
@@ -313,7 +313,7 @@ tcPatSynMatcher (L loc name) lpat
 
        ; let matcher_tau   = mkFunTys [pat_ty, cont_ty, fail_ty] res_ty
              matcher_sigma = mkSigmaTy (res_tv:univ_tvs) req_theta matcher_tau
-             matcher_id    = mkExportedLocalId VanillaId matcher_name matcher_sigma
+             matcher_id    = mkExportedLocalId PatSynId matcher_name matcher_sigma
                              -- See Note [Exported LocalIds] in Id
 
              cont_dicts = map nlHsVar prov_dicts
@@ -367,8 +367,11 @@ mkPatSynRecSelBinds :: PatSyn
                     -> [FieldLabel]
                     -- ^ Visible field labels
                     -> [(LSig Name, LHsBinds Name)]
-mkPatSynRecSelBinds ps fields =
-    map (mkOneRecordSelector [PatSynCon ps] (RecSelPatSyn ps)) fields
+mkPatSynRecSelBinds ps fields = map mkRecSel fields
+  where
+    mkRecSel fld_lbl =
+      case mkOneRecordSelector [PatSynCon ps] (RecSelPatSyn ps) fld_lbl of
+        (name, (_rec_flag, binds)) -> (name, binds)
 
 isUnidirectional :: HsPatSynDir a -> Bool
 isUnidirectional Unidirectional          = True

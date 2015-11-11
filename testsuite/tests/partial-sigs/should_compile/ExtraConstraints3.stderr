@@ -14,7 +14,7 @@ TYPE SIGNATURES
   < :: forall a. Ord a => a -> a -> Bool
   <= :: forall a. Ord a => a -> a -> Bool
   =<< ::
-    forall a (m :: * -> *) b. Monad m => (a -> m b) -> m a -> m b
+    forall (m :: * -> *) a b. Monad m => (a -> m b) -> m a -> m b
   == :: forall a. Eq a => a -> a -> Bool
   > :: forall a. Ord a => a -> a -> Bool
   >= :: forall a. Ord a => a -> a -> Bool
@@ -27,10 +27,10 @@ TYPE SIGNATURES
   acos :: forall a. Floating a => a -> a
   acosh :: forall a. Floating a => a -> a
   all ::
-    forall a (t :: * -> *). Foldable t => (a -> Bool) -> t a -> Bool
+    forall (t :: * -> *) a. Foldable t => (a -> Bool) -> t a -> Bool
   and :: forall (t :: * -> *). Foldable t => t Bool -> Bool
   any ::
-    forall a (t :: * -> *). Foldable t => (a -> Bool) -> t a -> Bool
+    forall (t :: * -> *) a. Foldable t => (a -> Bool) -> t a -> Bool
   appendFile :: FilePath -> String -> IO ()
   asTypeOf :: forall a. a -> a -> a
   asin :: forall a. Floating a => a -> a
@@ -43,7 +43,7 @@ TYPE SIGNATURES
   compare :: forall a. Ord a => a -> a -> Ordering
   concat :: forall (t :: * -> *) a. Foldable t => t [a] -> [a]
   concatMap ::
-    forall a b (t :: * -> *). Foldable t => (a -> [b]) -> t a -> [b]
+    forall (t :: * -> *) a b. Foldable t => (a -> [b]) -> t a -> [b]
   const :: forall a b. a -> b -> a
   cos :: forall a. Floating a => a -> a
   cosh :: forall a. Floating a => a -> a
@@ -117,11 +117,11 @@ TYPE SIGNATURES
   lookup :: forall a b. Eq a => a -> [(a, b)] -> Maybe b
   map :: forall a b. (a -> b) -> [a] -> [b]
   mapM ::
-    forall (t :: * -> *) a (m :: * -> *) b.
+    forall (t :: * -> *) (m :: * -> *) a b.
     (Monad m, Traversable t) =>
     (a -> m b) -> t a -> m (t b)
   mapM_ ::
-    forall a (m :: * -> *) b (t :: * -> *).
+    forall (t :: * -> *) (m :: * -> *) a b.
     (Monad m, Foldable t) =>
     (a -> m b) -> t a -> m ()
   max :: forall a. Ord a => a -> a -> a
@@ -135,7 +135,7 @@ TYPE SIGNATURES
   negate :: forall a. Num a => a -> a
   not :: Bool -> Bool
   notElem ::
-    forall a (t :: * -> *). (Eq a, Foldable t) => a -> t a -> Bool
+    forall (t :: * -> *) a. (Eq a, Foldable t) => a -> t a -> Bool
   null :: forall (t :: * -> *) a. Foldable t => t a -> Bool
   odd :: forall a. Integral a => a -> Bool
   or :: forall (t :: * -> *). Foldable t => t Bool -> Bool

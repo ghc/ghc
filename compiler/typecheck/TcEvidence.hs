@@ -6,7 +6,8 @@ module TcEvidence (
 
   -- HsWrapper
   HsWrapper(..),
-  (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams, mkWpLams, mkWpLet, mkWpCast,
+  (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams, 
+  mkWpLams, mkWpLet, mkWpCastN, mkWpCastR,
   mkWpFun, idHsWrapper, isIdHsWrapper, pprHsWrapper,
 
   -- Evidence bindings
@@ -203,7 +204,7 @@ mkTcTyConAppCo role tc cos -- No need to expand type synonyms
 -- Input coercion is Nominal
 -- mkSubCo will do some normalisation. We do not do it for TcCoercions, but
 -- defer that to desugaring; just to reduce the code duplication a little bit
-mkTcSubCo :: TcCoercion -> TcCoercion
+mkTcSubCo :: TcCoercionN -> TcCoercionR
 mkTcSubCo (TcRefl _ ty)
   = TcRefl Representational ty
 mkTcSubCo co
@@ -258,12 +259,11 @@ mkTcAxInstCo role ax index tys
     arg_roles = coAxBranchRoles branch
     rtys      = zipWith mkTcReflCo (arg_roles ++ repeat Nominal) tys
 
-mkTcAxiomRuleCo :: CoAxiomRule -> [TcType] -> [TcCoercion] -> TcCoercion
+mkTcAxiomRuleCo :: CoAxiomRule -> [TcType] -> [TcCoercion] -> TcCoercionR
 mkTcAxiomRuleCo = TcAxiomRuleCo
 
-mkTcUnbranchedAxInstCo :: Role -> CoAxiom Unbranched -> [TcType] -> TcCoercion
-mkTcUnbranchedAxInstCo role ax tys
-  = mkTcAxInstCo role ax 0 tys
+mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType] -> TcCoercionR
+mkTcUnbranchedAxInstCo ax tys = mkTcAxInstCo Representational ax 0 tys
 
 mkTcAppCo :: TcCoercion -> TcCoercion -> TcCoercion
 -- No need to deal with TyConApp on the left; see Note [TcCoercions]
@@ -570,7 +570,7 @@ data HsWrapper
        -- This isn't the same as for mkTcFunCo, but it has to be this way
        -- because we can't use 'sym' to flip around these HsWrappers
 
-  | WpCast TcCoercion         -- A cast:  [] `cast` co
+  | WpCast TcCoercionR        -- A cast:  [] `cast` co
                               -- Guaranteed not the identity coercion
                               -- At role Representational
 
@@ -601,11 +601,18 @@ mkWpFun (WpCast co1) WpHole       _  t2 = WpCast (mkTcFunCo Representational (mk
 mkWpFun (WpCast co1) (WpCast co2) _  _  = WpCast (mkTcFunCo Representational (mkTcSymCo co1) co2)
 mkWpFun co1          co2          t1 t2 = WpFun co1 co2 t1 t2
 
-mkWpCast :: TcCoercion -> HsWrapper
-mkWpCast co
+mkWpCastR :: TcCoercionR -> HsWrapper
+mkWpCastR co
   | isTcReflCo co = WpHole
   | otherwise     = ASSERT2(tcCoercionRole co == Representational, ppr co)
                     WpCast co
+
+mkWpCastN :: TcCoercionN -> HsWrapper
+mkWpCastN co
+  | isTcReflCo co = WpHole
+  | otherwise     = ASSERT2(tcCoercionRole co == Nominal, ppr co)
+                    WpCast (mkTcSubCo co)
+    -- The mkTcSubCo converts Nominal to Representational
 
 mkWpTyApps :: [Type] -> HsWrapper
 mkWpTyApps tys = mk_co_app_fn WpTyApp tys
@@ -672,26 +679,44 @@ instance Data.Data TcEvBinds where
 -----------------
 newtype EvBindMap
   = EvBindMap {
-       ev_bind_varenv :: VarEnv EvBind
+       ev_bind_varenv :: DVarEnv EvBind
     }       -- Map from evidence variables to evidence terms
+            -- We use @DVarEnv@ here to get deterministic ordering when we
+            -- turn it into a Bag.
+            -- If we don't do that, when we generate let bindings for
+            -- dictionaries in dsTcEvBinds they will be generated in random
+            -- order.
+            --
+            -- For example:
+            --
+            -- let $dEq = GHC.Classes.$fEqInt in
+            -- let $$dNum = GHC.Num.$fNumInt in ...
+            --
+            -- vs
+            --
+            -- let $dNum = GHC.Num.$fNumInt in
+            -- let $dEq = GHC.Classes.$fEqInt in ...
+            --
+            -- See Note [Deterministic UniqFM] in UniqDFM for explanation why
+            -- @UniqFM@ can lead to nondeterministic order.
 
 emptyEvBindMap :: EvBindMap
-emptyEvBindMap = EvBindMap { ev_bind_varenv = emptyVarEnv }
+emptyEvBindMap = EvBindMap { ev_bind_varenv = emptyDVarEnv }
 
 extendEvBinds :: EvBindMap -> EvBind -> EvBindMap
 extendEvBinds bs ev_bind
-  = EvBindMap { ev_bind_varenv = extendVarEnv (ev_bind_varenv bs)
-                                              (eb_lhs ev_bind)
-                                              ev_bind }
+  = EvBindMap { ev_bind_varenv = extendDVarEnv (ev_bind_varenv bs)
+                                               (eb_lhs ev_bind)
+                                               ev_bind }
 
 lookupEvBind :: EvBindMap -> EvVar -> Maybe EvBind
-lookupEvBind bs = lookupVarEnv (ev_bind_varenv bs)
+lookupEvBind bs = lookupDVarEnv (ev_bind_varenv bs)
 
 evBindMapBinds :: EvBindMap -> Bag EvBind
 evBindMapBinds = foldEvBindMap consBag emptyBag
 
 foldEvBindMap :: (EvBind -> a -> a) -> a -> EvBindMap -> a
-foldEvBindMap k z bs = foldVarEnv k z (ev_bind_varenv bs)
+foldEvBindMap k z bs = foldDVarEnv k z (ev_bind_varenv bs)
 
 -----------------
 -- All evidence is bound by EvBinds; no side effects
@@ -730,24 +755,27 @@ data EvTerm
   | EvLit EvLit       -- Dictionary for KnownNat and KnownSymbol classes.
                       -- Note [KnownNat & KnownSymbol and EvLit]
 
-  | EvCallStack EvCallStack -- Dictionary for CallStack implicit parameters
+  | EvCallStack EvCallStack      -- Dictionary for CallStack implicit parameters
 
-  | EvTypeable EvTypeable   -- Dictionary for `Typeable`
+  | EvTypeable Type EvTypeable   -- Dictionary for (Typeable ty)
 
   deriving( Data.Data, Data.Typeable )
 
 
 -- | Instructions on how to make a 'Typeable' dictionary.
+-- See Note [Typeable evidence terms]
 data EvTypeable
-  = EvTypeableTyCon TyCon [Kind]
-    -- ^ Dictionary for concrete type constructors.
+  = EvTypeableTyCon -- ^ Dictionary for @Typeable (T k1..kn)@
 
-  | EvTypeableTyApp (EvTerm,Type) (EvTerm,Type)
-    -- ^ Dictionary for type applications;  this is used when we have
-    -- a type expression starting with a type variable (e.g., @Typeable (f a)@)
+  | EvTypeableTyApp EvTerm EvTerm
+    -- ^ Dictionary for @Typeable (s t)@,
+    -- given a dictionaries for @s@ and @t@
 
-  | EvTypeableTyLit (EvTerm,Type)
-    -- ^ Dictionary for a type literal.
+  | EvTypeableTyLit EvTerm
+    -- ^ Dictionary for a type literal,
+    -- e.g. @Typeable "foo"@ or @Typeable 3@
+    -- The 'EvTerm' is evidence of, e.g., @KnownNat 3@
+    -- (see Trac #10348)
 
   deriving ( Data.Data, Data.Typeable )
 
@@ -769,6 +797,20 @@ data EvCallStack
   deriving( Data.Data, Data.Typeable )
 
 {-
+Note [Typeable evidence terms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The EvTypeable data type looks isomorphic to Type, but the EvTerms
+inside can be EvIds.  Eg
+    f :: forall a. Typeable a => a -> TypeRep
+    f x = typeRep (undefined :: Proxy [a])
+Here for the (Typeable [a]) dictionary passed to typeRep we make
+evidence
+    dl :: Typeable [a] = EvTypeable [a]
+                            (EvTypeableTyApp EvTypeableTyCon (EvId d))
+where
+    d :: Typable a
+is the lambda-bound dictionary passed into f.
+
 Note [Coercion evidence terms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A "coercion evidence term" takes one of these forms
@@ -1009,7 +1051,7 @@ evVarsOfTerm (EvCast tm co)       = evVarsOfTerm tm `unionVarSet` coVarsOfTcCo c
 evVarsOfTerm (EvDelayedError _ _) = emptyVarSet
 evVarsOfTerm (EvLit _)            = emptyVarSet
 evVarsOfTerm (EvCallStack cs)     = evVarsOfCallStack cs
-evVarsOfTerm (EvTypeable ev)      = evVarsOfTypeable ev
+evVarsOfTerm (EvTypeable _ ev)    = evVarsOfTypeable ev
 
 evVarsOfTerms :: [EvTerm] -> VarSet
 evVarsOfTerms = mapUnionVarSet evVarsOfTerm
@@ -1023,9 +1065,9 @@ evVarsOfCallStack cs = case cs of
 evVarsOfTypeable :: EvTypeable -> VarSet
 evVarsOfTypeable ev =
   case ev of
-    EvTypeableTyCon _ _    -> emptyVarSet
-    EvTypeableTyApp e1 e2  -> evVarsOfTerms (map fst [e1,e2])
-    EvTypeableTyLit e      -> evVarsOfTerm (fst e)
+    EvTypeableTyCon       -> emptyVarSet
+    EvTypeableTyApp e1 e2 -> evVarsOfTerms [e1,e2]
+    EvTypeableTyLit e     -> evVarsOfTerm e
 
 {-
 ************************************************************************
@@ -1082,16 +1124,16 @@ instance Outputable EvBind where
    -- We cheat a bit and pretend EqVars are CoVars for the purposes of pretty printing
 
 instance Outputable EvTerm where
-  ppr (EvId v)              = ppr v
-  ppr (EvCast v co)         = ppr v <+> (ptext (sLit "`cast`")) <+> pprParendTcCo co
-  ppr (EvCoercion co)       = ptext (sLit "CO") <+> ppr co
-  ppr (EvSuperClass d n)    = ptext (sLit "sc") <> parens (ppr (d,n))
-  ppr (EvDFunApp df tys ts) = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
-  ppr (EvLit l)             = ppr l
-  ppr (EvCallStack cs)      = ppr cs
-  ppr (EvDelayedError ty msg) =     ptext (sLit "error")
+  ppr (EvId v)                = ppr v
+  ppr (EvCast v co)           = ppr v <+> (ptext (sLit "`cast`")) <+> pprParendTcCo co
+  ppr (EvCoercion co)         = ptext (sLit "CO") <+> ppr co
+  ppr (EvSuperClass d n)      = ptext (sLit "sc") <> parens (ppr (d,n))
+  ppr (EvDFunApp df tys ts)   = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
+  ppr (EvLit l)               = ppr l
+  ppr (EvCallStack cs)        = ppr cs
+  ppr (EvDelayedError ty msg) = ptext (sLit "error")
                                 <+> sep [ char '@' <> ppr ty, ppr msg ]
-  ppr (EvTypeable ev)    = ppr ev
+  ppr (EvTypeable ty ev)      = ppr ev <+> dcolon <+> ptext (sLit "Typeable") <+> ppr ty
 
 instance Outputable EvLit where
   ppr (EvNum n) = integer n
@@ -1106,11 +1148,9 @@ instance Outputable EvCallStack where
     = angleBrackets (ppr (name,loc)) <+> ptext (sLit ":") <+> ppr tm
 
 instance Outputable EvTypeable where
-  ppr ev =
-    case ev of
-      EvTypeableTyCon tc ks    -> parens (ppr tc <+> sep (map ppr ks))
-      EvTypeableTyApp t1 t2    -> parens (ppr (fst t1) <+> ppr (fst t2))
-      EvTypeableTyLit x        -> ppr (fst x)
+  ppr EvTypeableTyCon         = ptext (sLit "TC")
+  ppr (EvTypeableTyApp t1 t2) = parens (ppr t1 <+> ppr t2)
+  ppr (EvTypeableTyLit t1)    = ptext (sLit "TyLit") <> ppr t1
 
 
 ----------------------------------------------------------------------

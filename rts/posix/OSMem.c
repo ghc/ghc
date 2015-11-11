@@ -377,22 +377,22 @@ void setExecutable (void *p, W_ len, rtsBool exec)
 #ifdef USE_LARGE_ADDRESS_SPACE
 
 static void *
-osTryReserveHeapMemory (void *hint)
+osTryReserveHeapMemory (W_ len, void *hint)
 {
     void *base, *top;
     void *start, *end;
 
-    /* We try to allocate MBLOCK_SPACE_SIZE + MBLOCK_SIZE,
+    /* We try to allocate len + MBLOCK_SIZE,
        because we need memory which is MBLOCK_SIZE aligned,
        and then we discard what we don't need */
 
-    base = my_mmap(hint, MBLOCK_SPACE_SIZE + MBLOCK_SIZE, MEM_RESERVE);
-    top = (void*)((W_)base + MBLOCK_SPACE_SIZE + MBLOCK_SIZE);
+    base = my_mmap(hint, len + MBLOCK_SIZE, MEM_RESERVE);
+    top = (void*)((W_)base + len + MBLOCK_SIZE);
 
     if (((W_)base & MBLOCK_MASK) != 0) {
         start = MBLOCK_ROUND_UP(base);
         end = MBLOCK_ROUND_DOWN(top);
-        ASSERT(((W_)end - (W_)start) == MBLOCK_SPACE_SIZE);
+        ASSERT(((W_)end - (W_)start) == len);
 
         if (munmap(base, (W_)start-(W_)base) < 0) {
             sysErrorBelch("unable to release slop before heap");
@@ -407,7 +407,7 @@ osTryReserveHeapMemory (void *hint)
     return start;
 }
 
-void *osReserveHeapMemory(void)
+void *osReserveHeapMemory(W_ len)
 {
     int attempt;
     void *at;
@@ -425,8 +425,8 @@ void *osReserveHeapMemory(void)
 
     attempt = 0;
     do {
-        at = osTryReserveHeapMemory((void*)((W_)8 * (1 << 30) +
-                                            attempt * BLOCK_SIZE));
+        void *hint = (void*)((W_)8 * (1 << 30) + attempt * BLOCK_SIZE);
+        at = osTryReserveHeapMemory(len, hint);
     } while ((W_)at < ((W_)8 * (1 << 30)));
 
     return at;
@@ -467,7 +467,8 @@ void osReleaseHeapMemory(void)
 {
     int r;
 
-    r = munmap((void*)mblock_address_space_begin, MBLOCK_SPACE_SIZE);
+    r = munmap((void*)mblock_address_space.begin,
+               mblock_address_space.end - mblock_address_space.begin);
     if(r < 0)
         sysErrorBelch("unable to release address space");
 }

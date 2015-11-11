@@ -13,7 +13,7 @@ cabal-version: >=1.10
 
 Executable ghc-cabal
     Default-Language: Haskell2010
-    Main-Is: ghc-cabal.hs
+    Main-Is: Main.hs
 
     Build-Depends: base       >= 3   && < 5,
                    bytestring >= 0.10 && < 0.11,

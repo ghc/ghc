@@ -31,9 +31,10 @@ Trac10045.hs:6:17: error:
 
 Trac10045.hs:7:9: error:
     No instance for (Num a)
-    When checking that ‘copy’ has the inferred type
+    When checking that the inferred type
+      copy :: forall t t1 a. Num a => t -> a -> t1
+    is as general as its (partial) signature
       copy :: forall t t1 a. t -> a -> t1
-    Probable cause: the inferred type is ambiguous
     In the expression:
       let
         copy :: _

@@ -8,5 +8,5 @@ tcfail080.hs:27:1: error:
     The type variable ‘c0’ is ambiguous
     In the ambiguity check for the inferred type for ‘q’
     To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
-    When checking that ‘q’ has the inferred type
+    When checking the inferred type
       q :: forall (c :: * -> *) a. Collection c a => a -> Bool

@@ -317,7 +317,7 @@ tc_cmd _ cmd _
                       ptext (sLit "was found where an arrow command was expected")])
 
 
-matchExpectedCmdArgs :: Arity -> TcType -> TcM (TcCoercion, [TcType], TcType)
+matchExpectedCmdArgs :: Arity -> TcType -> TcM (TcCoercionN, [TcType], TcType)
 matchExpectedCmdArgs 0 ty
   = return (mkTcNomReflCo ty, [], ty)
 matchExpectedCmdArgs n ty
