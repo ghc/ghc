@@ -1044,6 +1044,20 @@ unfoldr f b0 = build (\c n ->
 
 -- | 'lines' breaks a string up into a list of strings at newline
 -- characters.  The resulting strings do not contain newlines.
+--
+-- Note that after splitting the string at newline characters, the
+-- last part of the string is considered a line even if it doesn't end
+-- with a newline. For example,
+--
+-- > lines "" == []
+-- > lines "\n" == [""]
+-- > lines "one" == ["one"]
+-- > lines "one\n" == ["one"]
+-- > lines "one\n\n" == ["one",""]
+-- > lines "one\ntwo" == ["one","two"]
+-- > lines "one\ntwo\n" == ["one","two"]
+--
+-- Thus @'lines' s@ contains at least as many elements as newlines in @s@.
 lines                   :: String -> [String]
 lines ""                =  []
 -- Somehow GHC doesn't detect the selector thunks in the below code,
