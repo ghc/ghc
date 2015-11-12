@@ -256,6 +256,9 @@ getOptions' dflags toks
           parseToks (open:xs)
               | ITlanguage_prag <- getToken open
               = parseLanguage xs
+          parseToks (comment:xs) -- Skip over comments
+              | isComment (getToken comment)
+              = parseToks xs
           parseToks _ = []
           parseLanguage (L loc (ITconid fs):rest)
               = checkExtension dflags (L loc fs) :
@@ -268,6 +271,17 @@ getOptions' dflags toks
               = languagePragParseError dflags (getLoc tok)
           parseLanguage []
               = panic "getOptions'.parseLanguage(2) went past eof token"
+
+          isComment :: Token -> Bool
+          isComment c =
+            case c of
+              (ITlineComment {})     -> True
+              (ITblockComment {})    -> True
+              (ITdocCommentNext {})  -> True
+              (ITdocCommentPrev {})  -> True
+              (ITdocCommentNamed {}) -> True
+              (ITdocSection {})      -> True
+              _                      -> False
 
 -----------------------------------------------------------------------------
 
