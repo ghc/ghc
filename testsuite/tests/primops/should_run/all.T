@@ -5,7 +5,7 @@ test('T9430', omit_ways(['ghci']), compile_and_run, [''])
 test('T10481', exit_code(1), compile_and_run, [''])
 test('T10678',
      [stats_num_field('bytes allocated',
-                      [(wordsize(64), 88041768, 5)
+                      [(wordsize(64), 64004171, 5)
                        # 2015-11-04: 88041768 +/- 5%  (before runRW#)
                        # 2015-11-04: 64004171         (after runRW#)
                       ]),
