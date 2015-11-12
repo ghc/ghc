@@ -10,6 +10,11 @@
 #
 # -----------------------------------------------------------------------------
 
+HADDOCK_VER := $(shell grep "^version:" utils/haddock/haddock.cabal | sed "s/^version: \+//")
+HADDOCK_MAJOR_VER := $(shell echo $(HADDOCK_VER) | sed 's/\([0-9]\+\).\([0-9]\+\).\([0-9]\+\)/\1/')
+HADDOCK_MINOR_VER := $(shell echo $(HADDOCK_VER) | sed 's/\([0-9]\+\).\([0-9]\+\).\([0-9]\+\)/\2/')
+HADDOCK_PATCH_VER := $(shell echo $(HADDOCK_VER) | sed 's/\([0-9]\+\).\([0-9]\+\).\([0-9]\+\)/\3/')
+HADDOCK_VERSION_STRING := $(shell echo $$(($(HADDOCK_MAJOR_VER) * 1000 + $(HADDOCK_MINOR_VER) * 10 + $(HADDOCK_PATCH_VER))))
 
 define haddock  # args: $1 = dir,  $2 = distdir
 $(call trace, haddock($1,$2))
@@ -40,6 +45,7 @@ $1_$2_HADDOCK_FLAGS += --source-module=src/%{MODULE/./-}.html --source-entity=sr
 endif
 
 ifneq "$$(BINDIST)" "YES"
+
 # We need the quadruple dollars for the dependencies, as it isn't
 # guaranteed that we are processing the packages in dependency order,
 # so we don't want to expand it yet.
@@ -56,6 +62,7 @@ endif
 	  --hoogle \
 	  --title="$$($1_PACKAGE)-$$($1_$2_VERSION)$$(if $$(strip $$($1_$2_SYNOPSIS)),: $$(strip $$($1_$2_SYNOPSIS)),)" \
 	  --prologue="$1/$2/haddock-prologue.txt" \
+    --optghc="-D__HADDOCK_VERSION__=$$(HADDOCK_VERSION_STRING)" \
 	  $$(foreach mod,$$($1_$2_HIDDEN_MODULES),--hide=$$(mod)) \
 	  $$(foreach pkg,$$($1_$2_DEPS),$$(if $$($$(pkg)_HADDOCK_FILE),--read-interface=../$$(pkg)$$(comma)../$$(pkg)/src/%{MODULE/./-}.html\#%{NAME}$$(comma)$$($$(pkg)_HADDOCK_FILE))) \
 	  $$(foreach opt,$$($1_$2_$$(HADDOCK_WAY)_ALL_HC_OPTS),--optghc=$$(opt)) \
