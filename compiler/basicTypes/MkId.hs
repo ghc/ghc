@@ -990,8 +990,11 @@ mkFCallId dflags uniq fcall ty
     (_, tau)        = tcSplitForAllTys ty
     (arg_tys, _)    = tcSplitFunTys tau
     arity           = length arg_tys
-    strict_sig      = mkClosedStrictSig (replicate arity evalDmd) topRes
 
+    strict_sig      = mkClosedStrictSig (replicate arity topDmd) topRes
+    -- the call does not claim to be strict in its arguments, since they
+    -- may be lifted (foreign import prim) and the called code doen't
+    -- necessarily force them. See Trac #11076.
 {-
 ************************************************************************
 *                                                                      *
