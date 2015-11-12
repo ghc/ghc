@@ -154,14 +154,20 @@ pprStatic s = case s of
 -- data sections
 --
 pprSection :: Section -> SDoc
-pprSection s = case s of
-    Text              -> section <+> doubleQuotes (text "text")
-    Data              -> section <+> doubleQuotes (text "data")
-    ReadOnlyData      -> section <+> doubleQuotes (text "readonly")
-    ReadOnlyData16    -> section <+> doubleQuotes (text "readonly16")
-    RelocatableReadOnlyData
-                      -> section <+> doubleQuotes (text "relreadonly")
-    UninitialisedData -> section <+> doubleQuotes (text "uninitialised")
-    OtherSection s'   -> section <+> doubleQuotes (text s')
- where
+pprSection (Section t suffix) =
+  section <+> doubleQuotes (pprSectionType t <+> char '.' <+> ppr suffix)
+  where
     section = ptext (sLit "section")
+
+pprSectionType :: SectionType -> SDoc
+pprSectionType s = doubleQuotes (ptext t)
+ where
+  t = case s of
+    Text              -> sLit "text"
+    Data              -> sLit "data"
+    ReadOnlyData      -> sLit "readonly"
+    ReadOnlyData16    -> sLit "readonly16"
+    RelocatableReadOnlyData
+                      -> sLit "relreadonly"
+    UninitialisedData -> sLit "uninitialised"
+    OtherSection s'   -> sLit s' -- Not actually a literal though.

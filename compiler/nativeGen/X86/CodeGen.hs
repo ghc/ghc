@@ -1224,6 +1224,7 @@ isOperand _ _            = False
 memConstant :: Int -> CmmLit -> NatM Amode
 memConstant align lit = do
   lbl <- getNewLabelNat
+  let rosection = Section ReadOnlyData lbl
   dflags <- getDynFlags
   (addr, addr_code) <- if target32Bit (targetPlatform dflags)
                        then do dynRef <- cmmMakeDynamicReference
@@ -1234,7 +1235,7 @@ memConstant align lit = do
                                return (addr, addr_code)
                        else return (ripRel (ImmCLbl lbl), nilOL)
   let code =
-        LDATA ReadOnlyData (align, Statics lbl [CmmStaticLit lit])
+        LDATA rosection (align, Statics lbl [CmmStaticLit lit])
         `consOL` addr_code
   return (Amode addr code)
 
@@ -2599,50 +2600,48 @@ genSwitch dflags expr targets
         (reg,e_code) <- getSomeReg (cmmOffset dflags expr offset)
         lbl <- getNewLabelNat
         dflags <- getDynFlags
+        let is32bit = target32Bit (targetPlatform dflags)
+            os = platformOS (targetPlatform dflags)
+            -- Might want to use .rodata.<function we're in> instead, but as
+            -- long as it's something unique it'll work out since the
+            -- references to the jump table are in the appropriate section.
+            rosection = case os of
+              -- on Mac OS X/x86_64, put the jump table in the text section to
+              -- work around a limitation of the linker.
+              -- ld64 is unable to handle the relocations for
+              --     .quad L1 - L0
+              -- if L0 is not preceded by a non-anonymous label in its section.
+              OSDarwin | not is32bit -> Section Text lbl
+              _ -> Section ReadOnlyData lbl
         dynRef <- cmmMakeDynamicReference dflags DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let op = OpAddr (AddrBaseIndex (EABaseReg tableReg)
                                        (EAIndex reg (wORD_SIZE dflags)) (ImmInt 0))
 
-        return $ if target32Bit (targetPlatform dflags)
+        return $ if is32bit || os == OSDarwin
                  then e_code `appOL` t_code `appOL` toOL [
                                 ADD (intFormat (wordWidth dflags)) op (OpReg tableReg),
-                                JMP_TBL (OpReg tableReg) ids ReadOnlyData lbl
+                                JMP_TBL (OpReg tableReg) ids rosection lbl
                        ]
-                 else case platformOS (targetPlatform dflags) of
-                      OSDarwin ->
-                          -- on Mac OS X/x86_64, put the jump table
-                          -- in the text section to work around a
-                          -- limitation of the linker.
-                          -- ld64 is unable to handle the relocations for
-                          --     .quad L1 - L0
-                          -- if L0 is not preceded by a non-anonymous
-                          -- label in its section.
-                          e_code `appOL` t_code `appOL` toOL [
-                                   ADD (intFormat (wordWidth dflags)) op (OpReg tableReg),
-                                   JMP_TBL (OpReg tableReg) ids Text lbl
-                           ]
-                      _ ->
-                          -- HACK: On x86_64 binutils<2.17 is only able
-                          -- to generate PC32 relocations, hence we only
-                          -- get 32-bit offsets in the jump table. As
-                          -- these offsets are always negative we need
-                          -- to properly sign extend them to 64-bit.
-                          -- This hack should be removed in conjunction
-                          -- with the hack in PprMach.hs/pprDataItem
-                          -- once binutils 2.17 is standard.
-                          e_code `appOL` t_code `appOL` toOL [
-                                   MOVSxL II32 op (OpReg reg),
-                                   ADD (intFormat (wordWidth dflags)) (OpReg reg) (OpReg tableReg),
-                                   JMP_TBL (OpReg tableReg) ids ReadOnlyData lbl
-                           ]
+                 else -- HACK: On x86_64 binutils<2.17 is only able to generate
+                      -- PC32 relocations, hence we only get 32-bit offsets in
+                      -- the jump table. As these offsets are always negative
+                      -- we need to properly sign extend them to 64-bit. This
+                      -- hack should be removed in conjunction with the hack in
+                      -- PprMach.hs/pprDataItem once binutils 2.17 is standard.
+                      e_code `appOL` t_code `appOL` toOL [
+                               MOVSxL II32 op (OpReg reg),
+                               ADD (intFormat (wordWidth dflags)) (OpReg reg)
+                                   (OpReg tableReg),
+                               JMP_TBL (OpReg tableReg) ids rosection lbl
+                       ]
   | otherwise
   = do
         (reg,e_code) <- getSomeReg (cmmOffset dflags expr offset)
         lbl <- getNewLabelNat
         let op = OpAddr (AddrBaseIndex EABaseNone (EAIndex reg (wORD_SIZE dflags)) (ImmCLbl lbl))
             code = e_code `appOL` toOL [
-                    JMP_TBL op ids ReadOnlyData lbl
+                    JMP_TBL op ids (Section ReadOnlyData lbl) lbl
                  ]
         return code
   where (offset, ids) = switchTargetsToTable targets

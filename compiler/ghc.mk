@@ -462,6 +462,9 @@ endif
 compiler_stage1_SplitObjs = NO
 compiler_stage2_SplitObjs = NO
 compiler_stage3_SplitObjs = NO
+compiler_stage1_SplitSections = NO
+compiler_stage2_SplitSections = NO
+compiler_stage3_SplitSections = NO
 
 # There are too many symbols in the ghc package for a Windows DLL.
 # We therefore need to split some of the modules off into a separate

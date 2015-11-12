@@ -1908,6 +1908,10 @@ linkBinary' staticLink dflags o_files dep_packages = do
                           then ["-Wl,-read_only_relocs,suppress"]
                           else [])
 
+                      ++ (if sLdIsGnuLd mySettings
+                          then ["-Wl,--gc-sections"]
+                          else [])
+
                       ++ o_files
                       ++ lib_path_opts)
                       ++ extra_ld_inputs

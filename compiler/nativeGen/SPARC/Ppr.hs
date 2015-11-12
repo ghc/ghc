@@ -13,7 +13,6 @@
 module SPARC.Ppr (
         pprNatCmmDecl,
         pprBasicBlock,
-        pprSectionHeader,
         pprData,
         pprInstr,
         pprFormat,
@@ -53,7 +52,7 @@ import Data.Word
 
 pprNatCmmDecl :: NatCmmDecl CmmStatics Instr -> SDoc
 pprNatCmmDecl (CmmData section dats) =
-  pprSectionHeader section $$ pprDatas dats
+  pprSectionAlign section $$ pprDatas dats
 
 pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   case topInfoTable proc of
@@ -62,28 +61,31 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
          []     -> -- special case for split markers:
            pprLabel lbl
          blocks -> -- special case for code without info table:
-           pprSectionHeader Text $$
+           pprSectionAlign (Section Text lbl) $$
            pprLabel lbl $$ -- blocks guaranteed not null, so label needed
            vcat (map (pprBasicBlock top_info) blocks)
 
     Just (Statics info_lbl _) ->
       sdocWithPlatform $ \platform ->
       (if platformHasSubsectionsViaSymbols platform
-          then pprSectionHeader Text $$
+          then pprSectionAlign dspSection $$
                ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
       vcat (map (pprBasicBlock top_info) blocks) $$
-         -- above: Even the first block gets a label, because with branch-chain
-         -- elimination, it might be the target of a goto.
-            (if platformHasSubsectionsViaSymbols platform
-             then
-             -- See Note [Subsections Via Symbols]
-                      text "\t.long "
-                  <+> ppr info_lbl
-                  <+> char '-'
-                  <+> ppr (mkDeadStripPreventer info_lbl)
-             else empty)
+      -- above: Even the first block gets a label, because with branch-chain
+      -- elimination, it might be the target of a goto.
+      (if platformHasSubsectionsViaSymbols platform
+       then
+       -- See Note [Subsections Via Symbols]
+                text "\t.long "
+            <+> ppr info_lbl
+            <+> char '-'
+            <+> ppr (mkDeadStripPreventer info_lbl)
+       else empty)
 
+dspSection :: Section
+dspSection = Section Text $
+    panic "subsections-via-symbols doesn't combine with split-sections"
 
 pprBasicBlock :: BlockEnv CmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlock info_env (BasicBlock blockid instrs)
@@ -94,7 +96,7 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
        Just (Statics info_lbl info) ->
-           pprSectionHeader Text $$
+           pprSectionAlign (Section Text info_lbl) $$
            vcat (map pprData info) $$
            pprLabel info_lbl
 
@@ -320,17 +322,19 @@ pprImm imm
 --      On SPARC all the data sections must be at least 8 byte aligned
 --      incase we store doubles in them.
 --
-pprSectionHeader :: Section -> SDoc
-pprSectionHeader seg = case seg of
-  Text              -> text ".text\n\t.align 4"
-  Data              -> text ".data\n\t.align 8"
-  ReadOnlyData      -> text ".text\n\t.align 8"
-  RelocatableReadOnlyData
-                    -> text ".text\n\t.align 8"
-  UninitialisedData -> text ".bss\n\t.align 8"
-  ReadOnlyData16    -> text ".data\n\t.align 16"
-  OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section"
-
+pprSectionAlign :: Section -> SDoc
+pprSectionAlign sec@(Section seg _) =
+  sdocWithPlatform $ \platform ->
+    pprSectionHeader platform sec $$
+    ptext (case seg of
+      Text              -> sLit ".align 4"
+      Data              -> sLit ".align 8"
+      ReadOnlyData      -> sLit ".align 8"
+      RelocatableReadOnlyData
+                        -> sLit ".align 8"
+      UninitialisedData -> sLit ".align 8"
+      ReadOnlyData16    -> sLit ".align 16"
+      OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section")
 
 -- | Pretty print a data item.
 pprDataItem :: CmmLit -> SDoc

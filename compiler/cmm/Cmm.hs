@@ -8,7 +8,7 @@ module Cmm (
      CmmGraph, GenCmmGraph(..),
      CmmBlock,
      RawCmmDecl, RawCmmGroup,
-     Section(..), CmmStatics(..), CmmStatic(..),
+     Section(..), SectionType(..), CmmStatics(..), CmmStatic(..),
 
      -- ** Blocks containing lists
      GenBasicBlock(..), blockId,
@@ -48,8 +48,10 @@ import Data.Word        ( Word8 )
 -- A CmmProgram is a list of CmmGroups  
 -- A CmmGroup is a list of top-level declarations  
 
--- When object-splitting is on,each group is compiled into a separate
+-- When object-splitting is on, each group is compiled into a separate
 -- .o file. So typically we put closely related stuff in a CmmGroup.
+-- Section-splitting follows suit and makes one .text subsection for each
+-- CmmGroup.
 
 type CmmProgram = [CmmGroup]
 
@@ -163,7 +165,7 @@ needsSRT (C_SRT _ _ _) = True
 --              Static Data
 -----------------------------------------------------------------------------
 
-data Section
+data SectionType
   = Text
   | Data
   | ReadOnlyData
@@ -171,6 +173,9 @@ data Section
   | UninitialisedData
   | ReadOnlyData16      -- .rodata.cst16 on x86_64, 16-byte aligned
   | OtherSection String
+  deriving (Show)
+
+data Section = Section SectionType CLabel
 
 data CmmStatic
   = CmmStaticLit CmmLit

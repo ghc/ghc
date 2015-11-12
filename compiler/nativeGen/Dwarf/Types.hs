@@ -5,7 +5,7 @@ module Dwarf.Types
   , pprAbbrevDecls
     -- * Dwarf address range table
   , DwarfARange(..)
-  , pprDwarfARange
+  , pprDwarfARanges
     -- * Dwarf frame
   , DwarfFrame(..), DwarfFrameProc(..), DwarfFrameBlock(..)
   , pprDwarfFrame
@@ -159,14 +159,12 @@ data DwarfARange
   = DwarfARange
     { dwArngStartLabel :: CLabel
     , dwArngEndLabel   :: CLabel
-    , dwArngUnitUnique :: Unique
-      -- ^ from which the corresponding label in @.debug_info@ is derived
     }
 
 -- | Print assembler directives corresponding to a DWARF @.debug_aranges@
 -- address table entry.
-pprDwarfARange :: DwarfARange -> SDoc
-pprDwarfARange arng = sdocWithPlatform $ \plat ->
+pprDwarfARanges :: [DwarfARange] -> Unique -> SDoc
+pprDwarfARanges arngs unitU = sdocWithPlatform $ \plat ->
   let wordSize = platformWordSize plat
       paddingSize = 4 :: Int
       -- header is 12 bytes long.
@@ -174,21 +172,24 @@ pprDwarfARange arng = sdocWithPlatform $ \plat ->
       -- pad such that first entry begins at multiple of entry size.
       pad n = vcat $ replicate n $ pprByte 0
       initialLength = 8 + paddingSize + 2*2*wordSize
-      length = ppr (dwArngEndLabel arng)
-               <> char '-' <> ppr (dwArngStartLabel arng)
   in pprDwWord (ppr initialLength)
      $$ pprHalf 2
-     $$ sectionOffset (ppr $ mkAsmTempLabel $ dwArngUnitUnique arng)
+     $$ sectionOffset (ppr $ mkAsmTempLabel $ unitU)
                       (ptext dwarfInfoLabel)
      $$ pprByte (fromIntegral wordSize)
      $$ pprByte 0
      $$ pad paddingSize
-     -- beginning of body
-     $$ pprWord (ppr $ dwArngStartLabel arng)
-     $$ pprWord length
+     -- body
+     $$ vcat (map pprDwarfARange arngs)
      -- terminus
      $$ pprWord (char '0')
      $$ pprWord (char '0')
+
+pprDwarfARange :: DwarfARange -> SDoc
+pprDwarfARange arng = pprWord (ppr $ dwArngStartLabel arng) $$ pprWord length
+  where
+    length = ppr (dwArngEndLabel arng)
+             <> char '-' <> ppr (dwArngStartLabel arng)
 
 -- | Information about unwind instructions for a procedure. This
 -- corresponds to a "Common Information Entry" (CIE) in DWARF.

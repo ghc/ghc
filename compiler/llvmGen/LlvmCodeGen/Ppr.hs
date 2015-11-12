@@ -114,6 +114,7 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
        dflags <- getDynFlags
        let buildArg = fsLit . showSDoc dflags . ppPlainName
            funArgs = map buildArg (llvmFunArgs dflags live)
+           funSect = llvmFunSection dflags (decName funDec)
 
        -- generate the info table
        prefix <- case mb_info of
@@ -123,7 +124,8 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
                        let infoTy = LMStruct $ map getStatType infoStatics
                        return $ Just $ LMStaticStruc infoStatics infoTy
 
-       let fun = LlvmFunction funDec funArgs llvmStdFunAttrs Nothing
+
+       let fun = LlvmFunction funDec funArgs llvmStdFunAttrs funSect
                               prefix lmblocks
            name = decName $ funcDecl fun
            defName = name `appendFS` fsLit "$def"

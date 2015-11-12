@@ -342,8 +342,8 @@ genSwitch dflags expr targets
 generateJumpTableForInstr :: DynFlags -> Instr
                           -> Maybe (NatCmmDecl CmmStatics Instr)
 generateJumpTableForInstr dflags (JMP_TBL _ ids label) =
-        let jumpTable = map (jumpTableEntry dflags) ids
-        in Just (CmmData ReadOnlyData (Statics label jumpTable))
+  let jumpTable = map (jumpTableEntry dflags) ids
+  in Just (CmmData (Section ReadOnlyData label) (Statics label jumpTable))
 generateJumpTableForInstr _ _ = Nothing
 
 

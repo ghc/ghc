@@ -385,7 +385,7 @@ cmmdata :: { CmmParse () }
         : 'section' STRING '{' data_label statics '}' 
                 { do lbl <- $4;
                      ss <- sequence $5;
-                     code (emitDecl (CmmData (section $2) (Statics lbl $ concat ss))) }
+                     code (emitDecl (CmmData (Section (section $2) lbl) (Statics lbl $ concat ss))) }
 
 data_label :: { CmmParse CLabel }
     : NAME ':'  
@@ -834,7 +834,7 @@ typenot8 :: { CmmType }
         | 'gcptr'               {% do dflags <- getDynFlags; return $ gcWord dflags }
 
 {
-section :: String -> Section
+section :: String -> SectionType
 section "text"      = Text
 section "data"      = Data
 section "rodata"    = ReadOnlyData

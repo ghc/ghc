@@ -144,7 +144,9 @@ getInstrinct2 fname fty@(LMFunction funSig) = do
         return []
       Nothing -> do
         funInsert fname fty
-        return [CmmData Data [([],[fty])]]
+        un <- runUs getUniqueM
+        let lbl = mkAsmTempLabel un
+        return [CmmData (Section Data lbl) [([],[fty])]]
 
     return (fv, nilOL, tops)
 

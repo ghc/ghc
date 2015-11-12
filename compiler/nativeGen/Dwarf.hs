@@ -83,10 +83,21 @@ dwarfGen df modLoc us blocks = do
                  pprDwarfFrame (debugFrame framesU procs)
 
   -- .aranges section: Information about the bounds of compilation units
-  let aranges = dwarfARangesSection $$
-                pprDwarfARange (DwarfARange lowLabel highLabel unitU)
+  let aranges' | gopt Opt_SplitSections df = map mkDwarfARange procs
+               | otherwise                 = [DwarfARange lowLabel highLabel]
+  let aranges = dwarfARangesSection $$ pprDwarfARanges aranges' unitU
 
   return (infoSct $$ abbrevSct $$ lineSct $$ frameSct $$ aranges, us'')
+
+-- | Build an address range entry for one proc.
+-- With split sections, each proc needs its own entry, since they may get
+-- scattered in the final binary. Without split sections, we could make a
+-- single arange based on the first/last proc.
+mkDwarfARange :: DebugBlock -> DwarfARange
+mkDwarfARange proc = DwarfARange start end
+  where
+    start = dblCLabel proc
+    end = mkAsmTempEndLabel start
 
 -- | Header for a compilation unit, establishing global format
 -- parameters

@@ -791,6 +791,7 @@ getLinkerInfo' dflags = do
           -- GNU ld specifically needs to use less memory. This especially
           -- hurts on small object files. Trac #5240.
           -- Set DT_NEEDED for all shared libraries. Trac #10110.
+          -- TODO: Investigate if these help or hurt when using split sections.
           return (GnuLD $ map Option ["-Wl,--hash-size=31",
                                       "-Wl,--reduce-memory-overheads",
                                       -- ELF specific flag

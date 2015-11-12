@@ -162,9 +162,10 @@ mkByteStringCLit :: Unique -> [Word8] -> (CmmLit, GenCmmDecl CmmStatics info stm
 -- We have to make a top-level decl for the string,
 -- and return a literal pointing to it
 mkByteStringCLit uniq bytes
-  = (CmmLabel lbl, CmmData ReadOnlyData $ Statics lbl [CmmString bytes])
+  = (CmmLabel lbl, CmmData sec $ Statics lbl [CmmString bytes])
   where
     lbl = mkStringLitLabel uniq
+    sec = Section ReadOnlyData lbl
 mkDataLits :: Section -> CLabel -> [CmmLit] -> GenCmmDecl CmmStatics info stmt
 -- Build a data-segment data block
 mkDataLits section lbl lits
@@ -175,8 +176,8 @@ mkRODataLits :: CLabel -> [CmmLit] -> GenCmmDecl CmmStatics info stmt
 mkRODataLits lbl lits
   = mkDataLits section lbl lits
   where
-    section | any needsRelocation lits = RelocatableReadOnlyData
-            | otherwise                = ReadOnlyData
+    section | any needsRelocation lits = Section RelocatableReadOnlyData lbl
+            | otherwise                = Section ReadOnlyData lbl
     needsRelocation (CmmLabel _)      = True
     needsRelocation (CmmLabelOff _ _) = True
     needsRelocation _                 = False

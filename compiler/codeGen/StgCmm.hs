@@ -194,7 +194,8 @@ mkModuleInit cost_centre_info this_mod hpc_info
         ; initCostCentres cost_centre_info
             -- For backwards compatibility: user code may refer to this
             -- label for calling hs_add_root().
-        ; emitDecl (CmmData Data (Statics (mkPlainModuleInitLabel this_mod) []))
+        ; let lbl = mkPlainModuleInitLabel this_mod
+        ; emitDecl (CmmData (Section Data lbl) (Statics lbl []))
         }
 
 

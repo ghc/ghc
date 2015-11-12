@@ -306,7 +306,7 @@ baseRegOffset _      reg            = pprPanic "baseRegOffset:" (ppr reg)
 
 emitDataLits :: CLabel -> [CmmLit] -> FCode ()
 -- Emit a data-segment data block
-emitDataLits lbl lits = emitDecl (mkDataLits Data lbl lits)
+emitDataLits lbl lits = emitDecl (mkDataLits (Section Data lbl) lbl lits)
 
 emitRODataLits :: CLabel -> [CmmLit] -> FCode ()
 -- Emit a read-only data block
