@@ -1204,11 +1204,3 @@ a `iShiftRL#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
 --      unpackFoldr "foo" c (unpackFoldr "baz" c n)  =  unpackFoldr "foobaz" c n
 
   #-}
-
-
-#ifdef __HADDOCK__
--- | A special argument for the 'Control.Monad.ST.ST' type constructor,
--- indexing a state embedded in the 'Prelude.IO' monad by
--- 'Control.Monad.ST.stToIO'.
-data RealWorld
-#endif

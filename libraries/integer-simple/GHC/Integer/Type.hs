@@ -34,8 +34,6 @@ import GHC.Tuple ()
 import GHC.IntWord64
 #endif
 
-#if !defined(__HADDOCK__)
-
 data Integer = Positive !Positive | Negative !Positive | Naught
 
 -------------------------------------------------------------------
@@ -867,8 +865,6 @@ floatFromPositive (Some w ds)
        `plusFloat#` (int2Float# (word2Int# h) `timesFloat#`
              (2.0# `powerFloat#` int2Float# (highHalfShift ())))
        `plusFloat#` int2Float# (word2Int# l)
-
-#endif
 
 {-
 Note [Avoid patError]
