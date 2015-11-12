@@ -27,6 +27,7 @@
 
         getSizeofMutableByteArray# :: MutableByteArray# d -> State# d -> (# State# d, Int# #)
         subWordC# :: Word# -> Word# -> (# Word#, Int# #)
+        runRW# :: (State# RealWorld -> (# State# RealWorld, o #)) -> (# State# RealWorld, o #)
 
 - Added to `GHC.Types`:
 

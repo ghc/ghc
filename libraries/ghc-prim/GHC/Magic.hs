@@ -1,5 +1,9 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE UnboxedTuples #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Magic
@@ -17,8 +21,9 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Magic ( inline, lazy, oneShot ) where
+module GHC.Magic ( inline, lazy, oneShot, runRW# ) where
 
+import GHC.Prim
 import GHC.CString ()
 
 -- | The call @inline f@ arranges that 'f' is inlined, regardless of
@@ -82,3 +87,15 @@ oneShot :: (a -> b) -> (a -> b)
 oneShot f = f
 -- Implementation note: This is wired in in MkId.lhs, so the code here is
 -- mostly there to have a place for the documentation.
+
+-- | Apply a function to a 'RealWorld' token.
+runRW# :: (State# RealWorld -> (# State# RealWorld, o #))
+       -> (# State# RealWorld, o #)
+-- See Note [runRW magic] in MkId
+#if !defined(__HADDOCK_VERSION__)
+runRW# m = m realWorld#
+#else
+runRW# = runRW#   -- The realWorld# is too much for haddock
+#endif
+{-# NOINLINE runRW# #-}
+-- This is inlined manually in CorePrep

@@ -1934,8 +1934,7 @@ liftIO (IO m) = m
 
 -- NB: equivalent of GHC.IO.unsafeDupablePerformIO, see notes there
 runS :: S RealWorld a -> a
-runS m = lazy (case m realWorld# of (# _, r #) -> r)
-{-# NOINLINE runS #-}
+runS m = case runRW# m of (# _, a #) -> a
 
 -- stupid hack
 fail :: [Char] -> S s a

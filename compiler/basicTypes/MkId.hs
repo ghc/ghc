@@ -30,7 +30,7 @@ module MkId (
         wiredInIds, ghcPrimIds,
         unsafeCoerceName, unsafeCoerceId, realWorldPrimId,
         voidPrimId, voidArgId,
-        nullAddrId, seqId, lazyId, lazyIdKey,
+        nullAddrId, seqId, lazyId, lazyIdKey, runRWId,
         coercionTokenId, magicDictId, coerceId,
         proxyHashId,
 
@@ -120,7 +120,7 @@ is right here.
 
 wiredInIds :: [Id]
 wiredInIds
-  =  [lazyId, dollarId, oneShotId]
+  =  [lazyId, dollarId, oneShotId, runRWId]
   ++ errorIds           -- Defined in MkCore
   ++ ghcPrimIds
 
@@ -1057,7 +1057,8 @@ another gun with which to shoot yourself in the foot.
 
 lazyIdName, unsafeCoerceName, nullAddrName, seqName,
    realWorldName, voidPrimIdName, coercionTokenName,
-   magicDictName, coerceName, proxyName, dollarName, oneShotName :: Name
+   magicDictName, coerceName, proxyName, dollarName, oneShotName,
+   runRWName :: Name
 unsafeCoerceName  = mkWiredInIdName gHC_PRIM  (fsLit "unsafeCoerce#")  unsafeCoerceIdKey  unsafeCoerceId
 nullAddrName      = mkWiredInIdName gHC_PRIM  (fsLit "nullAddr#")      nullAddrIdKey      nullAddrId
 seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey           seqId
@@ -1070,6 +1071,7 @@ coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
 dollarName        = mkWiredInIdName gHC_BASE  (fsLit "$")              dollarIdKey        dollarId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
+runRWName         = mkWiredInIdName gHC_MAGIC (fsLit "runRW#")         runRWKey           runRWId
 
 dollarId :: Id  -- Note [dollarId magic]
 dollarId = pcMiscPrelId dollarName ty
@@ -1182,6 +1184,19 @@ oneShotId = pcMiscPrelId oneShotName ty info
     x' = setOneShotLambda x
     rhs = mkLams [openAlphaTyVar, openBetaTyVar, body, x'] $ Var body `App` Var x
 
+runRWId :: Id -- See Note [runRW magic] in this module
+runRWId = pcMiscPrelId runRWName ty info
+  where
+    info    = noCafIdInfo `setInlinePragInfo` neverInlinePragma
+    -- State# RealWorld
+    stateRW = mkTyConApp statePrimTyCon [realWorldTy]
+    -- (# State# RealWorld, o #)
+    ret_ty  = mkTyConApp unboxedPairTyCon [stateRW, openAlphaTy]
+    -- State# RealWorld -> (# State# RealWorld, o #)
+    arg_ty  = stateRW `mkFunTy` ret_ty
+    -- (State# RealWorld -> (# State# RealWorld, o #))
+    --   -> (# State# RealWorld, o #)
+    ty      = mkForAllTys [openAlphaTyVar] (arg_ty `mkFunTy` ret_ty)
 
 --------------------------------------------------------------------------------
 magicDictId :: Id  -- See Note [magicDictId magic]
@@ -1321,6 +1336,44 @@ See Trac #3259 for a real world example.
 
 lazyId is defined in GHC.Base, so we don't *have* to inline it.  If it
 appears un-applied, we'll end up just calling it.
+
+Note [runRW magic]
+~~~~~~~~~~~~~~~~~~
+Some definitions, for instance @runST@, must have careful control over float out
+of the bindings in their body. Consider this use of @runST@,
+
+    f x = runST ( \ s -> let (a, s')  = newArray# 100 [] s
+                             (_, s'') = fill_in_array_or_something a x s'
+                         in freezeArray# a s'' )
+
+If we inline @runST@, we'll get:
+
+    f x = let (a, s')  = newArray# 100 [] realWorld#{-NB-}
+              (_, s'') = fill_in_array_or_something a x s'
+          in freezeArray# a s''
+
+And now if we allow the @newArray#@ binding to float out to become a CAF,
+we end up with a result that is totally and utterly wrong:
+
+    f = let (a, s')  = newArray# 100 [] realWorld#{-NB-} -- YIKES!!!
+        in \ x ->
+            let (_, s'') = fill_in_array_or_something a x s'
+            in freezeArray# a s''
+
+All calls to @f@ will share a {\em single} array! Clearly this is nonsense and
+must be prevented.
+
+This is what @runRW#@ gives us: by being inlined extremely late in the
+optimization (right before lowering to STG, in CorePrep), we can ensure that
+no further floating will occur. This allows us to safely inline things like
+@runST@, which are otherwise needlessly expensive (see #10678 and #5916).
+
+While the definition of @GHC.Magic.runRW#@, we override its type in @MkId@
+to be open-kinded,
+
+    runRW# :: (o :: OpenKind) => (State# RealWorld -> (# State# RealWorld, o #))
+                              -> (# State# RealWorld, o #)
+
 
 Note [The oneShot function]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

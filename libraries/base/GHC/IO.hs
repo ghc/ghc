@@ -176,11 +176,8 @@ like 'bracket' cannot be used safely within 'unsafeDupablePerformIO'.
 
 @since 4.4.0.0
 -}
-{-# NOINLINE unsafeDupablePerformIO #-}
-    -- See Note [unsafeDupablePerformIO is NOINLINE]
 unsafeDupablePerformIO  :: IO a -> a
-unsafeDupablePerformIO (IO m) = lazy (case m realWorld# of (# _, r #) -> r)
-     -- See Note [unsafeDupablePerformIO has a lazy RHS]
+unsafeDupablePerformIO (IO m) = case runRW# m of (# _, a #) -> a
 
 -- Note [unsafeDupablePerformIO is NOINLINE]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
