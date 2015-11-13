@@ -251,7 +251,7 @@ rnExpr (ExplicitTuple tup_args boxity)
     rnTupArg (L l (Missing _)) = return (L l (Missing placeHolderType)
                                         , emptyFVs)
 
-rnExpr (RecordCon con_id _ rec_binds@(HsRecFields { rec_dotdot = dd } _))
+rnExpr (RecordCon con_id _ rec_binds@(HsRecFields { rec_dotdot = dd }) _)
   = do { con_lname@(L _ con_name) <- lookupLocatedOccRn con_id
        ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon con_name) HsVar rec_binds
        ; (flds', fvss) <- mapAndUnzipM rn_field flds

@@ -913,7 +913,7 @@ checkFunBind msg ann lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
         let match_span = combineSrcSpans lhs_loc rhs_span
         -- Add back the annotations stripped from any HsPar values in the lhs
         -- mapM_ (\a -> a match_span) ann
-        return (ann,makeFunBind fun is_infix
+        return (ann, makeFunBind fun
                   [L match_span (Match { m_fixity = FunBindMatch fun is_infix
                                        , m_pats = ps
                                        , m_type = opt_sig

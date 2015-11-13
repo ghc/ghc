@@ -1880,7 +1880,7 @@ gadt_constr :: { LConDecl RdrName }
     -- see Note [Difference in parsing GADT and data constructors]
     -- Returns a list because of:   C,D :: ty
         : con_list '::' ctype
-                     {% let { (anns,gadtDecl) = mkGadtDecl (unLoc $1) $3 }
+                {% do { let { (anns,gadtDecl) = mkGadtDecl (unLoc $1) $3 }
                       ; ams (sLL $1 $> gadtDecl)
                             (mj AnnDcolon $2:anns) } }
 
