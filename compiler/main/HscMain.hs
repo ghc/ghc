@@ -141,7 +141,6 @@ import CmmPipeline
 import CmmInfo
 import CodeOutput
 import NameEnv          ( emptyNameEnv )
-import NameSet          ( emptyNameSet )
 import InstEnv
 import FamInstEnv
 import Fingerprint      ( Fingerprint )
@@ -1747,9 +1746,8 @@ mkModGuts mod safe binds =
         mg_loc          = mkGeneralSrcSpan (moduleNameFS (moduleName mod)),
                                   -- A bit crude
         mg_exports      = [],
+        mg_usages       = [],
         mg_deps         = noDependencies,
-        mg_dir_imps     = emptyModuleEnv,
-        mg_used_names   = emptyNameSet,
         mg_used_th      = False,
         mg_rdr_env      = emptyGlobalRdrEnv,
         mg_fix_env      = emptyFixityEnv,
@@ -1769,8 +1767,7 @@ mkModGuts mod safe binds =
         mg_inst_env     = emptyInstEnv,
         mg_fam_inst_env = emptyFamInstEnv,
         mg_safe_haskell = safe,
-        mg_trust_pkg    = False,
-        mg_dependent_files = []
+        mg_trust_pkg    = False
     }
 
 

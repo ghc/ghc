@@ -1051,9 +1051,7 @@ data ModGuts
         mg_exports   :: ![AvailInfo],    -- ^ What it exports
         mg_deps      :: !Dependencies,   -- ^ What it depends on, directly or
                                          -- otherwise
-        mg_dir_imps  :: !ImportedMods,   -- ^ Directly-imported modules; used to
-                                         -- generate initialisation code
-        mg_used_names:: !NameSet,        -- ^ What the module needed (used in 'MkIface.mkIface')
+        mg_usages    :: ![Usage],        -- ^ What was used?  Used for interfaces.
 
         mg_used_th   :: !Bool,           -- ^ Did we run a TH splice?
         mg_rdr_env   :: !GlobalRdrEnv,   -- ^ Top-level lexical environment
@@ -1092,11 +1090,9 @@ data ModGuts
                                                 -- one); c.f. 'tcg_fam_inst_env'
 
         mg_safe_haskell :: SafeHaskellMode,     -- ^ Safe Haskell mode
-        mg_trust_pkg    :: Bool,                -- ^ Do we need to trust our
+        mg_trust_pkg    :: Bool                 -- ^ Do we need to trust our
                                                 -- own package for Safe Haskell?
                                                 -- See Note [RnNames . Trust Own Package]
-
-        mg_dependent_files :: [FilePath]        -- ^ Dependencies from addDependentFile
     }
 
 -- The ModGuts takes on several slightly different forms:
