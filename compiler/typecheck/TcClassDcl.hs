@@ -282,7 +282,7 @@ tcClassMinimalDef _clas sigs op_info
     -- By default require all methods without a default
     -- implementation whose names don't start with '_'
     defMindef :: ClassMinimalDef
-    defMindef = mkAnd [ mkVar name
+    defMindef = mkAnd [ noLoc (mkVar name)
                       | (name, NoDM, _) <- op_info
                       , not (startsWithUnderscore (getOccName name)) ]
 
@@ -342,8 +342,8 @@ findMinimalDef :: [LSig Name] -> Maybe ClassMinimalDef
 findMinimalDef = firstJusts . map toMinimalDef
   where
     toMinimalDef :: LSig Name -> Maybe ClassMinimalDef
-    toMinimalDef (L _ (MinimalSig _ bf)) = Just (fmap unLoc bf)
-    toMinimalDef _                       = Nothing
+    toMinimalDef (L _ (MinimalSig _ (L _ bf))) = Just (fmap unLoc bf)
+    toMinimalDef _                             = Nothing
 
 {-
 Note [Polymorphic methods]

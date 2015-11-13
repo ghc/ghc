@@ -1376,7 +1376,7 @@ tcMonoBinds :: RecFlag  -- Whether the binding is recursive for typechecking pur
             -> TcM (LHsBinds TcId, [MonoBindInfo])
 
 tcMonoBinds is_rec sig_fn no_gen
-           [ L b_loc (FunBind { fun_id = L nm_loc name, fun_infix = inf,
+           [ L b_loc (FunBind { fun_id = L nm_loc name,
                                 fun_matches = matches, bind_fvs = fvs })]
                              -- Single function binding,
   | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
@@ -1393,12 +1393,10 @@ tcMonoBinds is_rec sig_fn no_gen
                                  -- We extend the error context even for a non-recursive
                                  -- function so that in type error messages we show the
                                  -- type of the thing whose rhs we are type checking
-                               do { lvl <- getTcLevel
-                                  ; traceTc "tcMonoBinds 1" (ppr name <+> ppr lvl)
-                                  ; tcMatchesFun name inf matches rhs_ty }
+                               tcMatchesFun name matches rhs_ty
 
         ; return (unitBag $ L b_loc $
-                     FunBind { fun_id = L nm_loc mono_id, fun_infix = inf,
+                     FunBind { fun_id = L nm_loc mono_id,
                                fun_matches = matches', bind_fvs = fvs,
                                fun_co_fn = co_fn, fun_tick = [] },
                   [(name, Nothing, mono_id)]) }
@@ -1438,7 +1436,7 @@ tcMonoBinds _ sig_fn no_gen binds
 -- it; hence the TcMonoBind data type in which the LHS is done but the RHS isn't
 
 data TcMonoBind         -- Half completed; LHS done, RHS not done
-  = TcFunBind  MonoBindInfo  SrcSpan Bool (MatchGroup Name (LHsExpr Name))
+  = TcFunBind  MonoBindInfo  SrcSpan (MatchGroup Name (LHsExpr Name))
   | TcPatBind [MonoBindInfo] (LPat TcId) (GRHSs Name (LHsExpr Name)) TcSigmaType
 
 type MonoBindInfo = (Name, Maybe TcIdSigInfo, TcId)
@@ -1446,7 +1444,7 @@ type MonoBindInfo = (Name, Maybe TcIdSigInfo, TcId)
         -- the monomorphic bound things
 
 tcLhs :: TcSigFun -> LetBndrSpec -> HsBind Name -> TcM TcMonoBind
-tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_infix = inf, fun_matches = matches })
+tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_matches = matches })
   | Just (TcIdSig sig) <- sig_fn name
   , TISI { sig_tau = tau } <- sig
   = ASSERT2( case no_gen of { LetLclBndr -> True; LetGblBndr {} -> False }
@@ -1457,12 +1455,12 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_infix = inf, fun_matc
        -- Both InferGen and CheckGen gives rise to LetLclBndr
     do  { mono_name <- newLocalName name
         ; let mono_id = mkLocalId mono_name tau
-        ; return (TcFunBind (name, Just sig, mono_id) nm_loc inf matches) }
+        ; return (TcFunBind (name, Just sig, mono_id) nm_loc matches) }
 
   | otherwise
   = do  { mono_ty <- newFlexiTyVarTy openTypeKind
         ; mono_id <- newNoSigLetBndr no_gen name mono_ty
-        ; return (TcFunBind (name, Nothing, mono_id) nm_loc inf matches) }
+        ; return (TcFunBind (name, Nothing, mono_id) nm_loc matches) }
 
 tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
   = do  { let tc_pat exp_ty = tcLetPat sig_fn no_gen pat exp_ty $
@@ -1488,13 +1486,13 @@ tcLhs _ _ other_bind = pprPanic "tcLhs" (ppr other_bind)
 
 -------------------
 tcRhs :: TcMonoBind -> TcM (HsBind TcId)
-tcRhs (TcFunBind info@(_, mb_sig, mono_id) loc inf matches)
+tcRhs (TcFunBind info@(_, mb_sig, mono_id) loc matches)
   = tcExtendIdBinderStackForRhs [info]  $
     tcExtendTyVarEnvForRhs mb_sig       $
     do  { traceTc "tcRhs: fun bind" (ppr mono_id $$ ppr (idType mono_id))
-        ; (co_fn, matches') <- tcMatchesFun (idName mono_id) inf
+        ; (co_fn, matches') <- tcMatchesFun (idName mono_id)
                                             matches (idType mono_id)
-        ; return (FunBind { fun_id = L loc mono_id, fun_infix = inf
+        ; return (FunBind { fun_id = L loc mono_id
                           , fun_matches = matches'
                           , fun_co_fn = co_fn
                           , bind_fvs = placeHolderNamesTc
@@ -1553,7 +1551,7 @@ getMonoBindInfo :: [Located TcMonoBind] -> [MonoBindInfo]
 getMonoBindInfo tc_binds
   = foldr (get_info . unLoc) [] tc_binds
   where
-    get_info (TcFunBind info _ _ _)  rest = info : rest
+    get_info (TcFunBind info _ _)  rest = info : rest
     get_info (TcPatBind infos _ _ _) rest = infos ++ rest
 
 {-
@@ -1909,8 +1907,8 @@ decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
     restricted (PatSynBind {}) = panic "isRestrictedGroup/unrestricted PatSynBind"
     restricted (AbsBinds {}) = panic "isRestrictedGroup/unrestricted AbsBinds"
 
-    restricted_match (MG { mg_alts = L _ (Match _ [] _ _) : _ }) = True
-    restricted_match _                                           = False
+    restricted_match (MG { mg_alts = L _ (L _ (Match _ [] _ _) : _ )}) = True
+    restricted_match _                                                 = False
         -- No args => like a pattern binding
         -- Some args => a function binding
 

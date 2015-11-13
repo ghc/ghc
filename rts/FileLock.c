@@ -41,7 +41,7 @@ static int cmpLocks(StgWord w1, StgWord w2)
     return (l1->device == l2->device && l1->inode == l2->inode);
 }
 
-static int hashLock(HashTable *table, StgWord w)
+static int hashLock(const HashTable *table, StgWord w)
 {
     Lock *l = (Lock *)w;
     StgWord key = l->inode ^ (l->inode >> 32) ^ l->device ^ (l->device >> 32);

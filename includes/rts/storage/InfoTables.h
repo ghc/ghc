@@ -49,28 +49,6 @@ typedef struct {
 } StgProfInfo;
 
 /* -----------------------------------------------------------------------------
-   Ticky info
-
-   There is no ticky-specific stuff in an info table at this time.
-   -------------------------------------------------------------------------- */
-
-/* -----------------------------------------------------------------------------
-   Debugging info
-   -------------------------------------------------------------------------- */
-
-#ifdef DEBUG_CLOSURE
-
-typedef struct {
-        ... whatever ...
-} StgDebugInfo;
-
-#else /* !DEBUG_CLOSURE */
-
-/* There is no DEBUG-specific stuff in an info table at this time. */
-
-#endif /* DEBUG_CLOSURE */
-
-/* -----------------------------------------------------------------------------
    Closure flags
    -------------------------------------------------------------------------- */
 
@@ -215,12 +193,6 @@ typedef struct StgInfoTable_ {
 
 #ifdef PROFILING
     StgProfInfo     prof;
-#endif
-#ifdef TICKY
-  /* Ticky-specific stuff would go here. */
-#endif
-#ifdef DEBUG_CLOSURE
-  /* Debug-specific stuff would go here. */
 #endif
 
     StgClosureInfo  layout;     /* closure layout info (one word) */

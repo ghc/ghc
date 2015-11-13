@@ -26,6 +26,7 @@ module CmmInfo (
   maxStdInfoTableSizeW,
   maxRetInfoTableSizeW,
   stdInfoTableSizeB,
+  conInfoTableSizeB,
   stdSrtBitmapOffset,
   stdClosureTypeOffset,
   stdPtrsOffset, stdNonPtrsOffset,
@@ -132,7 +133,7 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
         --
         return (top_decls ++
                 [CmmProc mapEmpty entry_lbl live blocks,
-                 mkDataLits Data info_lbl
+                 mkDataLits (Section Data info_lbl) info_lbl
                     (CmmLabel entry_lbl : rel_std_info ++ rel_extra_bits)])
 
   --
@@ -551,3 +552,6 @@ stdClosureTypeOffset dflags = stdInfoTableSizeB dflags - wORD_SIZE dflags
 stdPtrsOffset, stdNonPtrsOffset :: DynFlags -> ByteOff
 stdPtrsOffset    dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags
 stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags + hALF_WORD_SIZE dflags
+
+conInfoTableSizeB :: DynFlags -> Int
+conInfoTableSizeB dflags = stdInfoTableSizeB dflags + wORD_SIZE dflags

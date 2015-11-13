@@ -1,0 +1,6 @@
+
+export-type-synonym.hs:3:14: error:
+    Pattern synonyms can only be bundled with matching type constructors
+    Couldn't match expected type of ‘A’ with actual type of ‘C’
+    In the pattern synonym: P
+    In the export: A(P)

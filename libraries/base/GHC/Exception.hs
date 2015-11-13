@@ -186,7 +186,7 @@ errorCallWithCallStackException s stk
 
 -- | Pretty print 'SrcLoc'
 --
--- @since 4.8.2.0
+-- @since 4.9.0.0
 showSrcLoc :: SrcLoc -> String
 showSrcLoc SrcLoc {..}
   = foldr (++) ""
@@ -198,7 +198,7 @@ showSrcLoc SrcLoc {..}
 
 -- | Pretty print 'CallStack'
 --
--- @since 4.8.2.0
+-- @since 4.9.0.0
 showCallStack :: CallStack -> String
 showCallStack (CallStack stk@(_:_))
   = unlines ("CallStack:" : map (indent . showCallSite) stk)
@@ -214,7 +214,7 @@ showCallStack _ = error "CallStack cannot be empty!"
 
 -- | Remove the most recent callsite from the 'CallStack'
 --
--- @since 4.8.2.0
+-- @since 4.9.0.0
 popCallStack :: CallStack -> CallStack
 popCallStack (CallStack (_:rest)) = CallStack rest
 popCallStack _ = error "CallStack cannot be empty!"

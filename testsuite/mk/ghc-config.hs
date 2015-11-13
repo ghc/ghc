@@ -25,6 +25,7 @@ main = do
   getGhcFieldOrFail fields "GhcRTSWays" "RTS ways"
   getGhcFieldOrDefault fields "GhcDynamicByDefault" "Dynamic by default" "NO"
   getGhcFieldOrDefault fields "GhcDynamic" "GHC Dynamic" "NO"
+  getGhcFieldOrDefault fields "GhcProfiled" "GHC Profiled" "NO"
   getGhcFieldProgWithDefault fields "AR" "ar command" "ar"
   getGhcFieldProgWithDefault fields "LLC" "LLVM llc command" "llc"
 

@@ -47,7 +47,7 @@ import Util
 import FastString
 import Outputable
 
-import Control.Monad (when,void)
+import Control.Monad (unless,void)
 import Control.Arrow (first)
 
 #if __GLASGOW_HASKELL__ >= 709
@@ -295,7 +295,7 @@ cgCase (StgOpApp (StgPrimOp op) args _) bndr (AlgAlt tycon) alts
 
        -- If the binder is not dead, convert the tag to a constructor
        -- and assign it.
-       ; when (not (isDeadBinder bndr)) $ do
+       ; unless (isDeadBinder bndr) $ do
             { dflags <- getDynFlags
             ; tmp_reg <- bindArgToReg (NonVoid bndr)
             ; emitAssign (CmmLocal tmp_reg)
@@ -401,7 +401,7 @@ cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
   || reps_compatible
   = -- assignment suffices for unlifted types
     do { dflags <- getDynFlags
-       ; when (not reps_compatible) $
+       ; unless reps_compatible $
            panic "cgCase: reps do not match, perhaps a dodgy unsafeCoerce?"
        ; v_info <- getCgIdInfo v
        ; emitAssign (CmmLocal (idToReg dflags (NonVoid bndr)))

@@ -142,8 +142,17 @@ include mk/warnings.mk
 
 # (Optional) build-specific configuration
 include mk/custom-settings.mk
+SRC_CC_OPTS     += -Wall
+SRC_HC_OPTS     += -Wall
+# Don't add -Werror to GhcStage1HcOpts, because otherwise validate may
+# unnecessarily fail during the stage1 build when booting with an older
+# compiler.
+# It would be better to only exclude certain warnings from becoming errors
+# (e.g. '-Werror -Wno-error=unused-imports -Wno-error=...'), but -Wno-error
+# isn't supported yet (https://ghc.haskell.org/trac/ghc/wiki/Design/Warnings).
 SRC_CC_OPTS     += $(WERROR)
-SRC_HC_OPTS     += $(WERROR)
+GhcStage2HcOpts += $(WERROR)
+GhcLibHcOpts    += $(WERROR)
 
 # -----------------------------------------------------------------------------
 # Check for inconsistent settings, after reading mk/build.mk.
@@ -515,7 +524,6 @@ $(foreach pkg,$(PACKAGES_STAGE1),$(eval $(call fixed_pkg_dep,$(pkg),dist-install
 # eachother, so we can configure them in parallel.
 utils/ghc-pwd/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/ghc-cabal/dist-install/package-data.mk: $(fixed_pkg_prev)
-utils/dll-split/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/hpc/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/ghc-pkg/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/hsc2hs/dist-install/package-data.mk: $(fixed_pkg_prev)

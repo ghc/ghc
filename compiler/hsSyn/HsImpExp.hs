@@ -154,7 +154,10 @@ data IE name
 
         -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | IEThingWith (Located name) [Located name] [Located (FieldLbl name)]
+  | IEThingWith (Located name)
+                IEWildcard
+                [Located name]
+                [Located (FieldLbl name)]
                  -- ^ Class/Type plus some methods/constructors
                  -- and record fields; see Note [IEThingWith]
         -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen',
@@ -172,6 +175,8 @@ data IE name
   | IEDoc               HsDocString      -- ^ Some documentation
   | IEDocNamed          String           -- ^ Reference to named doc
   deriving (Eq, Data, Typeable)
+
+data IEWildcard = NoIEWildcard | IEWildcard Int deriving (Eq, Data, Typeable)
 
 {-
 Note [IEThingWith]
@@ -191,11 +196,21 @@ See Note [Representing fields in AvailInfo] in Avail for more details.
 -}
 
 ieName :: IE name -> name
-ieName (IEVar (L _ n))           = n
-ieName (IEThingAbs  (L _ n))     = n
-ieName (IEThingWith (L _ n) _ _) = n
-ieName (IEThingAll  (L _ n))     = n
+ieName (IEVar (L _ n))              = n
+ieName (IEThingAbs  (L _ n))        = n
+ieName (IEThingWith (L _ n) _ _ _)  = n
+ieName (IEThingAll  (L _ n))        = n
 ieName _ = panic "ieName failed pattern match!"
+
+ieNames :: IE a -> [a]
+ieNames (IEVar       (L _ n)   )     = [n]
+ieNames (IEThingAbs  (L _ n)   )     = [n]
+ieNames (IEThingAll  (L _ n)   )     = [n]
+ieNames (IEThingWith (L _ n) _ ns _) = n : map unLoc ns
+ieNames (IEModuleContents _    )     = []
+ieNames (IEGroup          _ _  )     = []
+ieNames (IEDoc            _    )     = []
+ieNames (IEDocNamed       _    )     = []
 
 pprImpExp :: (HasOccName name, OutputableBndr name) => name -> SDoc
 pprImpExp name = type_pref <+> pprPrefixOcc name
@@ -208,12 +223,20 @@ instance (HasOccName name, OutputableBndr name) => Outputable (IE name) where
     ppr (IEVar          var)    = pprPrefixOcc (unLoc var)
     ppr (IEThingAbs     thing)  = pprImpExp (unLoc thing)
     ppr (IEThingAll      thing) = hcat [pprImpExp (unLoc thing), text "(..)"]
-    ppr (IEThingWith thing withs flds)
+    ppr (IEThingWith thing wc withs flds)
         = pprImpExp (unLoc thing) <> parens (fsep (punctuate comma
-                                            (map pprImpExp (map unLoc withs) ++
-                                                map (ppr . flLabel . unLoc) flds)))
+                                              ppWiths ++
+                                              map (ppr . flLabel . unLoc) flds))
+      where
+        ppWiths =
+          case wc of
+              NoIEWildcard ->
+                map (pprImpExp . unLoc) withs
+              IEWildcard pos ->
+                let (bs, as) = splitAt pos (map (pprImpExp . unLoc) withs)
+                in bs ++ [text ".."] ++ as
     ppr (IEModuleContents mod')
         = ptext (sLit "module") <+> ppr mod'
-    ppr (IEGroup n _)           = text ("<IEGroup: " ++ (show n) ++ ">")
+    ppr (IEGroup n _)           = text ("<IEGroup: " ++ show n ++ ">")
     ppr (IEDoc doc)             = ppr doc
     ppr (IEDocNamed string)     = text ("<IEDocNamed: " ++ string ++ ">")

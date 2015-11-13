@@ -11,6 +11,10 @@
 
 #include "eventlog/EventLog.h"
 
+#if USE_LIBDW
+#include <Libdw.h>
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -157,6 +161,14 @@ rtsFatalInternalErrorFn(const char *s, va_list ap)
        fprintf(stderr, "internal error: ");
      }
      vfprintf(stderr, s, ap);
+#if USE_LIBDW
+     fprintf(stderr, "\n");
+     fprintf(stderr, "Stack trace:");
+     LibdwSession *session = libdwInit();
+     Backtrace *bt = libdwGetBacktrace(session);
+     libdwPrintBacktrace(session, stderr, bt);
+     libdwFree(session);
+#endif
      fprintf(stderr, "\n");
      fprintf(stderr, "    (GHC version %s for %s)\n", ProjectVersion, xstr(HostPlatform_TYPE));
      fprintf(stderr, "    Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug\n");

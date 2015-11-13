@@ -78,6 +78,7 @@ import DynFlags
 import FastString
 import Control.Monad
 import Data.List
+import Data.Function    ( on )
 import ListSetOps       ( minusList )
 import Constants        ( mAX_TUPLE_SIZE )
 
@@ -953,7 +954,7 @@ lookupGreAvailRn rdr_name
             Nothing  ->
     do  { traceRn (text "lookupGreRn" <+> ppr rdr_name)
         ; let name = mkUnboundNameRdr rdr_name
-        ; return (name, Avail name) } } }
+        ; return (name, avail name) } } }
 
 {-
 *********************************************************
@@ -1046,6 +1047,7 @@ lookupImpDeprec iface gre
        ParentIs  p              -> mi_warn_fn iface p
        FldParent { par_is = p } -> mi_warn_fn iface p
        NoParent                 -> Nothing
+       PatternSynonym           -> Nothing
 
 {-
 Note [Used names with interface not loaded]
@@ -1659,9 +1661,11 @@ unboundNameX where_look rdr_name extra
           then addErr err
           else do { local_env  <- getLocalRdrEnv
                   ; global_env <- getGlobalRdrEnv
-                  ; let suggestions = unknownNameSuggestions_ where_look
+                  ; impInfo <- getImports
+                  ; let suggestions1 = unknownNameSuggestions_ where_look
                                          dflags global_env local_env rdr_name
-                  ; addErr (err $$ suggestions) }
+                  ; let suggestions2 = importSuggestions dflags impInfo rdr_name
+                  ; addErr (err $$ suggestions1 $$ suggestions2) }
         ; return (mkUnboundNameRdr rdr_name) }
 
 unknownNameErr :: SDoc -> RdrName -> SDoc
@@ -1677,11 +1681,107 @@ type HowInScope = Either SrcSpan ImpDeclSpec
      -- Left loc    =>  locally bound at loc
      -- Right ispec =>  imported as specified by ispec
 
+-- | Generate helpful suggestions if a qualified name Mod.foo is not in scope.
+importSuggestions :: DynFlags -> ImportAvails -> RdrName -> SDoc
+importSuggestions _dflags imports rdr_name
+  | not (isQual rdr_name) = Outputable.empty
+  | null interesting_imports
+  = hsep
+      [ ptext (sLit "No module named")
+      , quotes (ppr mod_name)
+      , ptext (sLit "is imported.")
+      ]
+  | null helpful_imports
+  , [(mod,_)] <- interesting_imports
+  = hsep
+      [ ptext (sLit "Module")
+      , quotes (ppr mod)
+      , ptext (sLit "does not export")
+      , quotes (ppr occ_name) <> dot
+      ]
+  | null helpful_imports
+  , mods <- map fst interesting_imports
+  = hsep
+      [ ptext (sLit "Neither")
+      , quotedListWithNor (map ppr mods)
+      , ptext (sLit "exports")
+      , quotes (ppr occ_name) <> dot
+      ]
+  | [(mod,imv)] <- helpful_imports_non_hiding
+  = fsep
+      [ ptext (sLit "Perhaps you want to add")
+      , quotes (ppr occ_name)
+      , ptext (sLit "to the import list")
+      , ptext (sLit "in the import of")
+      , quotes (ppr mod)
+      , parens (ppr (imv_span imv)) <> dot
+      ]
+  | not (null helpful_imports_non_hiding)
+  = fsep
+      [ ptext (sLit "Perhaps you want to add")
+      , quotes (ppr occ_name)
+      , ptext (sLit "to one of these import lists:")
+      ]
+    $$
+    nest 2 (vcat
+        [ quotes (ppr mod) <+> parens (ppr (imv_span imv))
+        | (mod,imv) <- helpful_imports_non_hiding
+        ])
+  | [(mod,imv)] <- helpful_imports_hiding
+  = fsep
+      [ ptext (sLit "Perhaps you want to remove")
+      , quotes (ppr occ_name)
+      , ptext (sLit "from the explicit hiding list")
+      , ptext (sLit "in the import of")
+      , quotes (ppr mod)
+      , parens (ppr (imv_span imv)) <> dot
+      ]
+  | not (null helpful_imports_hiding)
+  = fsep
+      [ ptext (sLit "Perhaps you want to remove")
+      , quotes (ppr occ_name)
+      , ptext (sLit "from the hiding clauses")
+      , ptext (sLit "in one of these imports:")
+      ]
+    $$
+    nest 2 (vcat
+        [ quotes (ppr mod) <+> parens (ppr (imv_span imv))
+        | (mod,imv) <- helpful_imports_hiding
+        ])
+  | otherwise
+  = Outputable.empty
+ where
+  Just (mod_name, occ_name) = isQual_maybe rdr_name
+
+  -- What import statements provide "Mod" at all
+  interesting_imports = [ (mod, imp)
+    | (mod, mod_imports) <- moduleEnvToList (imp_mods imports)
+    , Just imp <- return $ pick mod_imports
+    ]
+
+  -- We want to keep only one for each original module; preferably one with an
+  -- explicit import list (for no particularly good reason)
+  pick :: [ImportedModsVal] -> Maybe ImportedModsVal
+  pick = listToMaybe . sortBy (compare `on` prefer) . filter select
+    where select imv = imv_name imv == mod_name
+          prefer imv = (imv_is_hiding imv, imv_span imv)
+
+  -- Which of these would export a 'foo'
+  -- (all of these are restricted imports, because if they were not, we
+  -- wouldn't have an out-of-scope error in the first place)
+  helpful_imports = filter helpful interesting_imports
+    where helpful (_,imv)
+            = not . null $ lookupGlobalRdrEnv (imv_all_exports imv) occ_name
+
+  -- Which of these do that because of an explicit hiding list resp. an
+  -- explicit import list
+  (helpful_imports_hiding, helpful_imports_non_hiding)
+    = partition (imv_is_hiding . snd) helpful_imports
+
+-- | Called from the typechecker (TcErrors) when we find an unbound variable
 unknownNameSuggestions :: DynFlags
                        -> GlobalRdrEnv -> LocalRdrEnv
                        -> RdrName -> SDoc
--- Called from the typechecker (TcErrors)
--- when we find an unbound variable
 unknownNameSuggestions = unknownNameSuggestions_ WL_Any
 
 unknownNameSuggestions_ :: WhereLooking -> DynFlags
@@ -1849,6 +1949,7 @@ warnUnusedTopBinds gres
          let isBoot = tcg_src env == HsBootFile
          let noParent gre = case gre_par gre of
                             NoParent -> True
+                            PatternSynonym -> True
                             _        -> False
              -- Don't warn about unused bindings with parents in
              -- .hs-boot files, as you are sometimes required to give

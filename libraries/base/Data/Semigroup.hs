@@ -31,7 +31,7 @@
 --
 -- > import Data.Semigroup
 --
--- @since 4.8.2.0
+-- @since 4.9.0.0
 ----------------------------------------------------------------------------
 module Data.Semigroup (
     Semigroup(..)
@@ -78,7 +78,6 @@ import           Data.Monoid         (All (..), Any (..), Dual (..), Endo (..),
                                       Product (..), Sum (..))
 import           Data.Monoid         (Alt (..))
 import qualified Data.Monoid         as Monoid
-import           Data.Proxy
 import           Data.Void
 import           GHC.Generics
 
@@ -86,7 +85,7 @@ infixr 6 <>
 
 -- | The class of semigroups (types with an associative binary operation).
 --
--- @since 4.8.2.0
+-- @since 4.9.0.0
 class Semigroup a where
   -- | An associative operation.
   --

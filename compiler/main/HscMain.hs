@@ -978,15 +978,15 @@ checkSafeImports dflags tcg_env
 
     condense :: (Module, [ImportedModsVal]) -> Hsc (Module, SrcSpan, IsSafeImport)
     condense (_, [])   = panic "HscMain.condense: Pattern match failure!"
-    condense (m, x:xs) = do (_,_,l,s) <- foldlM cond' x xs
-                            return (m, l, s)
+    condense (m, x:xs) = do imv <- foldlM cond' x xs
+                            return (m, imv_span imv, imv_is_safe imv)
 
     -- ImportedModsVal = (ModuleName, Bool, SrcSpan, IsSafeImport)
     cond' :: ImportedModsVal -> ImportedModsVal -> Hsc ImportedModsVal
-    cond' v1@(m1,_,l1,s1) (_,_,_,s2)
-        | s1 /= s2
-        = throwErrors $ unitBag $ mkPlainErrMsg dflags l1
-              (text "Module" <+> ppr m1 <+>
+    cond' v1 v2
+        | imv_is_safe v1 /= imv_is_safe v2
+        = throwErrors $ unitBag $ mkPlainErrMsg dflags (imv_span v1)
+              (text "Module" <+> ppr (imv_name v1) <+>
               (text $ "is imported both as a safe and unsafe import!"))
         | otherwise
         = return v1
@@ -1434,7 +1434,7 @@ doCodeGen hsc_env this_mod data_tycons
     -- we generate one SRT for the whole module.
     let
      pipeline_stream
-      | gopt Opt_SplitObjs dflags
+      | gopt Opt_SplitObjs dflags || gopt Opt_SplitSections dflags
         = {-# SCC "cmmPipeline" #-}
           let run_pipeline us cmmgroup = do
                 let (topSRT', us') = initUs us emptySRT
@@ -1787,11 +1787,6 @@ hscCompileCoreExpr hsc_env =
 
 hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO HValue
 hscCompileCoreExpr' hsc_env srcspan ds_expr
-    | rtsIsProfiled
-    = throwIO (InstallationError "You can't call hscCompileCoreExpr in a profiled compiler")
-            -- Otherwise you get a seg-fault when you run it
-
-    | otherwise
     = do { let dflags = hsc_dflags hsc_env
 
            {- Simplify it -}

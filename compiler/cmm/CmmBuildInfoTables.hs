@@ -148,8 +148,9 @@ addCAF caf srt =
     where last  = next_elt srt
 
 srtToData :: TopSRT -> CmmGroup
-srtToData srt = [CmmData RelocatableReadOnlyData (Statics (lbl srt) tbl)]
+srtToData srt = [CmmData sec (Statics (lbl srt) tbl)]
     where tbl = map (CmmStaticLit . CmmLabel) (reverse (rev_elts srt))
+          sec = Section RelocatableReadOnlyData (lbl srt)
 
 -- Once we have found the CAFs, we need to do two things:
 -- 1. Build a table of all the CAFs used in the procedure.
@@ -223,7 +224,8 @@ to_SRT dflags top_srt off len bmp
   | len > maxBmpSize dflags || bmp == [toStgWord dflags (fromStgHalfWord (srtEscape dflags))]
   = do id <- getUniqueM
        let srt_desc_lbl = mkLargeSRTLabel id
-           tbl = CmmData RelocatableReadOnlyData $
+           section = Section RelocatableReadOnlyData srt_desc_lbl
+           tbl = CmmData section $
                    Statics srt_desc_lbl $ map CmmStaticLit
                      ( cmmLabelOffW dflags top_srt off
                      : mkWordCLit dflags (fromIntegral len)

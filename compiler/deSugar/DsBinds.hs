@@ -108,10 +108,9 @@ dsHsBind (VarBind { var_id = var, var_rhs = expr, var_inline = inline_regardless
         ; return (unitOL (makeCorePair dflags var' False 0 core_expr)) }
 
 dsHsBind (FunBind { fun_id = L _ fun, fun_matches = matches
-                  , fun_co_fn = co_fn, fun_tick = tick
-                  , fun_infix = inf })
+                  , fun_co_fn = co_fn, fun_tick = tick })
  = do   { dflags <- getDynFlags
-        ; (args, body) <- matchWrapper (FunRhs (idName fun) inf) matches
+        ; (args, body) <- matchWrapper (FunRhs (idName fun)) matches
         ; let body' = mkOptTickBox tick body
         ; rhs <- dsHsWrapper co_fn (mkLams args body')
         ; {- pprTrace "dsHsBind" (ppr fun <+> ppr (idInlinePragma fun)) $ -}

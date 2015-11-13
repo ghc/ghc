@@ -302,6 +302,17 @@ SupportsSplitObjs := $(strip \
 SplitObjs=$(SupportsSplitObjs)
 
 # ----------------------------------------------------------------------------
+# Section splitting
+#
+# Similar to -ffunction-sections -fdata-sections in GCC. Provides space saving
+# like SplitObjs, but doesn't require post-processing and splitting of object
+# files.
+#
+# Set SplitSections=YES in your build.mk to enable.
+
+SplitSections=NO
+
+# ----------------------------------------------------------------------------
 
 # There are a number of things which technically depend on GHC (e.g. if
 # ghc changes then Haskell files may be compiled differently, or Cabal

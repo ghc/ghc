@@ -613,6 +613,20 @@ for example).
     the library itself (the ``.a`` file) can be a factor of 2 to 2.5
     larger. We use this feature for building GHC's libraries.
 
+``-split-sections``
+    .. index::
+       single: -split-sections
+
+    Place each generated function or data item into its own section in the
+    output file if the target supports arbitrary sections. The name of the
+    function or the name of the data item determines the section's name in the
+    output file.
+
+    When linking, the linker can automatically remove all unreferenced sections
+    and thus produce smaller executables. The effect is similar to
+    ``-split-objs``, but somewhat more efficient - the generated library files
+    are about 30% smaller than with ``-split-objs``.
+
 ``-static``
     .. index::
        single: -static

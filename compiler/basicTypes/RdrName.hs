@@ -428,6 +428,7 @@ data Parent = NoParent
             | ParentIs  { par_is :: Name }
             | FldParent { par_is :: Name, par_lbl :: Maybe FieldLabelString }
               -- ^ See Note [Parents for record fields]
+            | PatternSynonym
             deriving (Eq)
 
 instance Outputable Parent where
@@ -435,6 +436,7 @@ instance Outputable Parent where
    ppr (ParentIs n)    = ptext (sLit "parent:") <> ppr n
    ppr (FldParent n f) = ptext (sLit "fldparent:")
                              <> ppr n <> colon <> ppr f
+   ppr (PatternSynonym) = ptext (sLit "pattern synonym")
 
 plusParent :: Parent -> Parent -> Parent
 -- See Note [Combining parents]
@@ -442,7 +444,8 @@ plusParent p1@(ParentIs _)    p2 = hasParent p1 p2
 plusParent p1@(FldParent _ _) p2 = hasParent p1 p2
 plusParent p1 p2@(ParentIs _)    = hasParent p2 p1
 plusParent p1 p2@(FldParent _ _) = hasParent p2 p1
-plusParent NoParent NoParent     = NoParent
+plusParent PatternSynonym PatternSynonym = PatternSynonym
+plusParent _ _                   = NoParent
 
 hasParent :: Parent -> Parent -> Parent
 #ifdef DEBUG
@@ -491,6 +494,23 @@ Note [Parents]
 
   class C          Class operations
                    Associated type constructors
+
+The `PatternSynonym` constructor is so called as pattern synonyms can be
+bundled with any type constructor (during renaming). In other words, they can
+have any parent.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~
+ Constructor      Meaning
+ ~~~~~~~~~~~~~~~~~~~~~~~~
+  NoParent        Can not be bundled with a type constructor.
+  ParentIs n      Can be bundled with the type constructor corresponding to
+                  n.
+  PatternSynonym  Can be bundled with any type constructor. It is so called
+                  because only pattern synonyms can be bundled with any type
+                  constructor.
+  FldParent       See Note [Parents for record fields]
+
+
 
 
 Note [Parents for record fields]
@@ -627,18 +647,20 @@ greSrcSpan gre@(GRE { gre_name = name, gre_lcl = lcl, gre_imp = iss } )
   | otherwise     = pprPanic "greSrcSpan" (ppr gre)
 
 mkParent :: Name -> AvailInfo -> Parent
-mkParent _ (Avail _)                   = NoParent
+mkParent _ (Avail NotPatSyn _)           = NoParent
+mkParent _ (Avail IsPatSyn  _)           = PatternSynonym
 mkParent n (AvailTC m _ _) | n == m    = NoParent
-                           | otherwise = ParentIs m
+                         | otherwise = ParentIs m
 
 availFromGRE :: GlobalRdrElt -> AvailInfo
 availFromGRE (GRE { gre_name = me, gre_par = parent })
   = case parent of
       ParentIs p                  -> AvailTC p [me] []
       NoParent   | isTyConName me -> AvailTC me [me] []
-                 | otherwise      -> Avail   me
+                 | otherwise      -> avail   me
       FldParent p Nothing         -> AvailTC p [] [FieldLabel (occNameFS $ nameOccName me) False me]
       FldParent p (Just lbl)      -> AvailTC p [] [FieldLabel lbl True me]
+      PatternSynonym              -> patSynAvail me
 
 emptyGlobalRdrEnv :: GlobalRdrEnv
 emptyGlobalRdrEnv = emptyOccEnv

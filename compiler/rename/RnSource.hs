@@ -126,7 +126,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    let { id_bndrs = collectHsIdBinders new_lhs } ;  -- Excludes pattern-synonym binders
                                                     -- They are already in scope
    traceRn (text "rnSrcDecls" <+> ppr id_bndrs) ;
-   tc_envs <- extendGlobalRdrEnvRn (map Avail id_bndrs) local_fix_env ;
+   tc_envs <- extendGlobalRdrEnvRn (map avail id_bndrs) local_fix_env ;
    traceRn (text "D2" <+> ppr (tcg_rdr_env (fst tc_envs)));
    setEnvs tc_envs $ do {
 
@@ -1458,9 +1458,8 @@ rnConDecl :: ConDecl RdrName -> RnM (ConDecl Name, FreeVars)
 rnConDecl decl@(ConDecl { con_names = names, con_qvars = qtvs
                         , con_cxt = lcxt@(L loc cxt), con_details = details
                         , con_res = res_ty, con_doc = mb_doc
-                        , con_old_rec = old_rec, con_explicit = explicit })
+                        , con_explicit = explicit })
   = do  { mapM_ (addLocM checkConName) names
-        ; when old_rec (addWarn (deprecRecSyntax decl))
         ; new_names    <- mapM lookupLocatedTopBndrRn names
         ; mb_doc'      <- rnMbLHsDoc mb_doc
         ; let (kvs, qtvs') = get_con_qtvs qtvs (hsConDeclArgTys details) res_ty
@@ -1548,13 +1547,6 @@ rnConDeclDetails con doc (RecCon (L l fields))
         ; return (RecCon (L l new_fields), fvs) }
 
 -------------------------------------------------
-deprecRecSyntax :: ConDecl RdrName -> SDoc
-deprecRecSyntax decl
-  = vcat [ ptext (sLit "Declaration of") <+> quotes (ppr (con_names decl))
-                 <+> ptext (sLit "uses deprecated syntax")
-         , ptext (sLit "Instead, use the form")
-         , nest 2 (ppr decl) ]   -- Pretty printer uses new form
-
 badRecResTy :: HsDocContext -> SDoc
 badRecResTy ctxt = withHsDocContext ctxt $
                    ptext (sLit "Malformed constructor signature")
@@ -1567,7 +1559,7 @@ extendPatSynEnv val_decls local_fix_env thing = do {
      names_with_fls <- new_ps val_decls
    ; let pat_syn_bndrs =
           concat [name: map flSelector fields | (name, fields) <- names_with_fls]
-   ; let avails = map Avail pat_syn_bndrs
+   ; let avails = map patSynAvail pat_syn_bndrs
    ; (gbl_env, lcl_env) <-
         extendGlobalRdrEnvRn avails local_fix_env
 

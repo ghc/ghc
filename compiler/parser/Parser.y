@@ -33,6 +33,7 @@ import Control.Monad    ( unless, liftM )
 import GHC.Exts
 import Data.Char
 import Control.Monad    ( mplus )
+import Control.Applicative ((<$))
 
 -- compiler/hsSyn
 import HsSyn
@@ -43,7 +44,7 @@ import DynFlags
 
 -- compiler/utils
 import OrdList
-import BooleanFormula   ( BooleanFormula(..), mkTrue )
+import BooleanFormula   ( BooleanFormula(..), LBooleanFormula(..), mkTrue )
 import FastString
 import Maybes           ( orElse )
 import Outputable
@@ -79,6 +80,7 @@ import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilD
 
 -- compiler/utils
 import Util             ( looksLikePackageName )
+import Prelude
 
 }
 
@@ -311,6 +313,11 @@ See
   https://ghc.haskell.org/trac/ghc/wiki/ApiAnnotations and
   https://ghc.haskell.org/trac/ghc/wiki/GhcAstAnnotations
 for some background.
+
+If you modify the parser and want to ensure that the API annotations are processed
+correctly, see the README in (REPO)/utils/check-api-annotations for details on
+how to set up a test using the check-api-annotations utility, and interpret the
+output it generates.
 
 -- -----------------------------------------------------------------------------
 
@@ -627,9 +634,8 @@ exp_doc :: { OrdList (LIE RdrName) }
    -- No longer allow things like [] and (,,,) to be exported
    -- They are built in syntax, always available
 export  :: { OrdList (LIE RdrName) }
-        : qcname_ext export_subspec  {% amsu (sLL $1 $> (mkModuleImpExp $1
-                                                    (snd $ unLoc $2)))
-                                             (fst $ unLoc $2) }
+        : qcname_ext export_subspec  {% mkModuleImpExp $1 (snd $ unLoc $2)
+                                          >>= \ie -> amsu (sLL $1 $> ie) (fst $ unLoc $2) }
         |  'module' modid            {% amsu (sLL $1 $> (IEModuleContents $2))
                                              [mj AnnModule $1] }
         |  'pattern' qcon            {% amsu (sLL $1 $> (IEVar $2))
@@ -637,18 +643,34 @@ export  :: { OrdList (LIE RdrName) }
 
 export_subspec :: { Located ([AddAnn],ImpExpSubSpec) }
         : {- empty -}             { sL0 ([],ImpExpAbs) }
-        | '(' '..' ')'            { sLL $1 $> ([mop $1,mcp $3,mj AnnDotdot $2]
-                                       , ImpExpAll) }
-        | '(' ')'                 { sLL $1 $> ([mop $1,mcp $2],ImpExpList []) }
-        | '(' qcnames ')'         { sLL $1 $> ([mop $1,mcp $3],ImpExpList (reverse $2)) }
+        | '(' qcnames ')'         {% mkImpExpSubSpec (reverse (snd $2))
+                                      >>= \(as,ie) -> return $ sLL $1 $>
+                                            (as ++ [mop $1,mcp $3] ++ fst $2, ie) }
 
-qcnames :: { [Located RdrName] }     -- A reversed list
-        :  qcnames ',' qcname_ext       {% (aa (head $1) (AnnComma, $2)) >>
-                                           return ($3  : $1) }
-        |  qcname_ext                   { [$1]  }
 
-qcname_ext :: { Located RdrName }       -- Variable or data constructor
-                                        -- or tagged type constructor
+qcnames :: { ([AddAnn], [Located (Maybe RdrName)]) }
+  : {- empty -}                   { ([],[]) }
+  | qcnames1                      { $1 }
+
+qcnames1 :: { ([AddAnn], [Located (Maybe RdrName)]) }     -- A reversed list
+        :  qcnames1 ',' qcname_ext_w_wildcard  {% case (last (snd $1)) of
+                                                    l@(L _ Nothing) ->
+                                                      return ([mj AnnComma $2, mj AnnDotdot l]
+                                                              ,($3  : snd $1))
+                                                    l -> (aa l (AnnComma, $2) >>
+                                                          return (fst $1, $3 : snd $1)) }
+
+
+        -- Annotations readded in mkImpExpSubSpec
+        |  qcname_ext_w_wildcard                   { ([],[$1])  }
+
+-- Variable, data constructor or wildcard
+-- or tagged type constructor
+qcname_ext_w_wildcard :: { Located (Maybe RdrName) }
+        :  qcname_ext               { Just `fmap` $1 }
+        |  '..'                     { Nothing <$ $1 }
+
+qcname_ext :: { Located RdrName }
         :  qcname                   { $1 }
         |  'type' oqtycon           {% amms (mkTypeImpExp (sLL $1 $> (unLoc $2)))
                                             [mj AnnType $1,mj AnnVal $2] }
@@ -721,7 +743,10 @@ maybeas :: { ([AddAnn],Located (Maybe ModuleName)) }
         | {- empty -}                          { ([],noLoc Nothing) }
 
 maybeimpspec :: { Located (Maybe (Bool, Located [LIE RdrName])) }
-        : impspec                  { L (gl $1) (Just (unLoc $1)) }
+        : impspec                  {% let (b, ie) = unLoc $1 in
+                                       checkImportSpec ie
+                                        >>= \checkedIe ->
+                                          return (L (gl $1) (Just (b, checkedIe)))  }
         | {- empty -}              { noLoc Nothing }
 
 impspec :: { Located (Bool, Located [LIE RdrName]) }
@@ -1301,35 +1326,35 @@ decls   :: { Located ([AddAnn],OrdList (LHsDecl RdrName)) }
         | decl                          { sL1 $1 ([], unitOL $1) }
         | {- empty -}                   { noLoc ([],nilOL) }
 
-decllist :: { Located ([AddAnn],OrdList (LHsDecl RdrName)) }
+decllist :: { Located ([AddAnn],Located (OrdList (LHsDecl RdrName))) }
         : '{'            decls '}'     { sLL $1 $> (moc $1:mcc $3:(fst $ unLoc $2)
-                                                   ,snd $ unLoc $2) }
-        |     vocurly    decls close   { L (gl $2) (fst $ unLoc $2,snd $ unLoc $2) }
+                                                   ,sL1 $2 $ snd $ unLoc $2) }
+        |     vocurly    decls close   { L (gl $2) (fst $ unLoc $2,sL1 $2 $ snd $ unLoc $2) }
 
 -- Binding groups other than those of class and instance declarations
 --
-binds   ::  { Located ([AddAnn],HsLocalBinds RdrName) }
+binds   ::  { Located ([AddAnn],Located (HsLocalBinds RdrName)) }
                                          -- May have implicit parameters
                                                 -- No type declarations
-        : decllist          {% do { val_binds <- cvBindGroup (snd $ unLoc $1)
+        : decllist          {% do { val_binds <- cvBindGroup (unLoc $ snd $ unLoc $1)
                                   ; return (sL1 $1 (fst $ unLoc $1
-                                                    ,HsValBinds val_binds)) } }
+                                                    ,sL1 $1 $ HsValBinds val_binds)) } }
 
         | '{'            dbinds '}'     { sLL $1 $> ([moc $1,mcc $3]
-                                             ,HsIPBinds (IPBinds (unLoc $2)
+                                             ,sL1 $2 $ HsIPBinds (IPBinds (unLoc $2)
                                                          emptyTcEvBinds)) }
 
         |     vocurly    dbinds close   { L (getLoc $2) ([]
-                                            ,HsIPBinds (IPBinds (unLoc $2)
+                                            ,sL1 $2 $ HsIPBinds (IPBinds (unLoc $2)
                                                         emptyTcEvBinds)) }
 
 
-wherebinds :: { Located ([AddAnn],HsLocalBinds RdrName) }
+wherebinds :: { Located ([AddAnn],Located (HsLocalBinds RdrName)) }
                                                 -- May have implicit parameters
                                                 -- No type declarations
         : 'where' binds                 { sLL $1 $> (mj AnnWhere $1 : (fst $ unLoc $2)
                                              ,snd $ unLoc $2) }
-        | {- empty -}                   { noLoc ([],emptyLocalBinds) }
+        | {- empty -}                   { noLoc ([],noLoc emptyLocalBinds) }
 
 
 -----------------------------------------------------------------------------
@@ -1420,6 +1445,7 @@ stringlist :: { Located (OrdList (Located StringLiteral)) }
                                return (sLL $1 $> (unLoc $1 `snocOL`
                                                   (L (gl $3) (getStringLiteral $3)))) }
     | STRING                { sLL $1 $> (unitOL (L (gl $1) (getStringLiteral $1))) }
+    | {- empty -}           { noLoc nilOL }
 
 -----------------------------------------------------------------------------
 -- Annotations
@@ -1854,7 +1880,7 @@ gadt_constr :: { LConDecl RdrName }
     -- see Note [Difference in parsing GADT and data constructors]
     -- Returns a list because of:   C,D :: ty
         : con_list '::' ctype
-                {% do { (anns,gadtDecl) <- mkGadtDecl (unLoc $1) $3
+                     {% let { (anns,gadtDecl) = mkGadtDecl (unLoc $1) $3 }
                       ; ams (sLL $1 $> gadtDecl)
                             (mj AnnDcolon $2:anns) } }
 
@@ -2003,7 +2029,7 @@ decl_no_th :: { LHsDecl RdrName }
         | infixexp opt_sig rhs  {% do { (ann,r) <- checkValDef empty $1 (snd $2) $3;
                                         let { l = comb2 $1 $> };
                                         case r of {
-                                          (FunBind n _ _ _ _ _) ->
+                                          (FunBind n _ _ _ _) ->
                                                 ams (L l ()) (mj AnnFunId n:(fst $2)) >> return () ;
                                           (PatBind (L lh _lhs) _rhs _ _ _) ->
                                                 ams (L lh ()) (fst $2) >> return () } ;
@@ -2085,11 +2111,10 @@ sigdecl :: { LHsDecl RdrName }
                                   $ SigD (SpecInstSig (getSPEC_PRAGs $1) $3))
                        [mo $1,mj AnnInstance $2,mc $4] }
 
-        -- AZ TODO: Do we need locations in the name_formula_opt?
         -- A minimal complete definition
         | '{-# MINIMAL' name_boolformula_opt '#-}'
-            {% ams (sLL $1 $> $ SigD (MinimalSig (getMINIMAL_PRAGs $1) (snd $2)))
-                   (mo $1:mc $3:fst $2) }
+            {% ams (sLL $1 $> $ SigD (MinimalSig (getMINIMAL_PRAGs $1) $2))
+                   [mo $1,mc $3] }
 
 activation :: { ([AddAnn],Maybe Activation) }
         : {- empty -}                           { ([],Nothing) }
@@ -2143,7 +2168,7 @@ infixexp :: { LHsExpr RdrName }
 exp10 :: { LHsExpr RdrName }
         : '\\' apat apats opt_asig '->' exp
                    {% ams (sLL $1 $> $ HsLam (mkMatchGroup FromSource
-                            [sLL $1 $> $ Match { m_fun_id_infix = Nothing
+                            [sLL $1 $> $ Match { m_fixity = NonFunBindMatch
                                                , m_pats = $2:$3
                                                , m_type = snd $4
                                                , m_grhss = unguardedGRHSs $6 }]))
@@ -2544,7 +2569,7 @@ alts1   :: { Located ([AddAnn],[LMatch RdrName (LHsExpr RdrName)]) }
         | alt                   { sL1 $1 ([],[$1]) }
 
 alt     :: { LMatch RdrName (LHsExpr RdrName) }
-        : pat opt_asig alt_rhs  {%ams (sLL $1 $> (Match { m_fun_id_infix = Nothing
+        : pat opt_asig alt_rhs  {%ams (sLL $1 $> (Match { m_fixity = NonFunBindMatch
                                                         , m_pats = [$1]
                                                         , m_type = snd $2
                                                         , m_grhss = snd $ unLoc $3 }))
@@ -2712,24 +2737,24 @@ ipvar   :: { Located HsIPName }
 -----------------------------------------------------------------------------
 -- Warnings and deprecations
 
-name_boolformula_opt :: { ([AddAnn],BooleanFormula (Located RdrName)) }
+name_boolformula_opt :: { LBooleanFormula (Located RdrName) }
         : name_boolformula          { $1 }
-        | {- empty -}               { ([],mkTrue) }
+        | {- empty -}               { noLoc mkTrue }
 
-name_boolformula :: { ([AddAnn],BooleanFormula (Located RdrName)) }
+name_boolformula :: { LBooleanFormula (Located RdrName) }
         : name_boolformula_and                      { $1 }
         | name_boolformula_and '|' name_boolformula
-                                             { ((mj AnnVbar $2:fst $1)++(fst $3)
-                                                ,Or [snd $1,snd $3]) }
+                           {% aa $1 (AnnVbar, $2)
+                              >> return (sLL $1 $> (Or [$1,$3])) }
 
-name_boolformula_and :: { ([AddAnn],BooleanFormula (Located RdrName)) }
+name_boolformula_and :: { LBooleanFormula (Located RdrName) }
         : name_boolformula_atom                             { $1 }
         | name_boolformula_atom ',' name_boolformula_and
-                  { ((mj AnnComma $2:fst $1)++(fst $3), And [snd $1,snd $3]) }
+                  {% aa $1 (AnnComma,$2) >> return (sLL $1 $> (And [$1,$3])) }
 
-name_boolformula_atom :: { ([AddAnn],BooleanFormula (Located RdrName)) }
-        : '(' name_boolformula ')'  { ((mop $1:mcp $3:(fst $2)),snd $2) }
-        | name_var                  { ([],Var $1) }
+name_boolformula_atom :: { LBooleanFormula (Located RdrName) }
+        : '(' name_boolformula ')'  {% ams (sLL $1 $> (Parens $2)) [mop $1,mcp $3] }
+        | name_var                  { sL1 $1 (Var $1) }
 
 namelist :: { Located [Located RdrName] }
 namelist : name_var              { sL1 $1 [$1] }

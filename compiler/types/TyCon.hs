@@ -57,6 +57,7 @@ module TyCon(
         isTyConAssoc, tyConAssoc_maybe,
         isRecursiveTyCon,
         isImplicitTyCon,
+        isTyConWithSrcDataCons,
 
         -- ** Extracting information out of TyCons
         tyConName,
@@ -1688,6 +1689,21 @@ expandSynTyCon_maybe tc tys
    = Nothing
 
 ----------------
+
+-- | Check if the tycon actually refers to a proper `data` or `newtype`
+--  with user defined constructors rather than one from a class or other
+--  construction.
+isTyConWithSrcDataCons :: TyCon -> Bool
+isTyConWithSrcDataCons (AlgTyCon { algTcRhs = rhs, algTcParent = parent }) =
+  case rhs of
+    DataTyCon {}  -> isSrcParent
+    NewTyCon {}   -> isSrcParent
+    TupleTyCon {} -> isSrcParent
+    _ -> False
+  where
+    isSrcParent = isNoParent parent
+isTyConWithSrcDataCons _ = False
+
 
 -- | As 'tyConDataCons_maybe', but returns the empty list of constructors if no
 -- constructors could be found

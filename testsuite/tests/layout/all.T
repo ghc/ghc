@@ -31,8 +31,7 @@ test('layout006',
 
 test('layout007',
      [req_interp,
-      extra_clean(['layout007.hi', 'layout007.o']),
-      when(compiler_profiled(), skip)],
+      extra_clean(['layout007.hi', 'layout007.o'])],
      run_command,
      ['$MAKE -s --no-print-directory layout007'])
 

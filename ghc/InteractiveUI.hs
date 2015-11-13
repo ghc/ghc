@@ -83,7 +83,6 @@ import Data.Maybe
 
 import Exception hiding (catch)
 
-import Foreign.C
 #if __GLASGOW_HASKELL__ >= 709
 import Foreign
 #else
@@ -346,8 +345,6 @@ findEditor = do
         return ""
 #endif
 
-foreign import ccall unsafe "rts_isProfiled" isProfiled :: IO CInt
-
 default_progname, default_prompt, default_prompt2, default_stop :: String
 default_progname = "<interactive>"
 default_prompt = "%s> "
@@ -360,13 +357,6 @@ default_args = []
 interactiveUI :: GhciSettings -> [(FilePath, Maybe Phase)] -> Maybe [String]
               -> Ghc ()
 interactiveUI config srcs maybe_exprs = do
-   -- although GHCi compiles with -prof, it is not usable: the byte-code
-   -- compiler and interpreter don't work with profiling.  So we check for
-   -- this up front and emit a helpful error message (#2197)
-   i <- liftIO $ isProfiled
-   when (i /= 0) $
-     throwGhcException (InstallationError "GHCi cannot be used when compiled with -prof")
-
    -- HACK! If we happen to get into an infinite loop (eg the user
    -- types 'let x=x in x' at the prompt), then the thread will block
    -- on a blackhole, and become unreachable during GC.  The GC will

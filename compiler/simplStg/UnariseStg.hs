@@ -114,10 +114,10 @@ unariseExpr us rho (StgLam xs e)
 unariseExpr us rho (StgCase e case_lives alts_lives bndr srt alt_ty alts)
   = StgCase (unariseExpr us1 rho e) (unariseLives rho case_lives)
             (unariseLives rho alts_lives) bndr (unariseSRT rho srt)
-            alt_ty' alts'
+            alt_ty alts'
  where
     (us1, us2) = splitUniqSupply us
-    (alt_ty', alts') = unariseAlts us2 rho alt_ty bndr (repType (idType bndr)) alts
+    alts'      = unariseAlts us2 rho alt_ty bndr alts
 
 unariseExpr us rho (StgLet bind e)
   = StgLet (unariseBinding us1 rho bind) (unariseExpr us2 rho e)
@@ -134,26 +134,24 @@ unariseExpr us rho (StgTick tick e)
   = StgTick tick (unariseExpr us rho e)
 
 ------------------------
-unariseAlts :: UniqSupply -> UnariseEnv -> AltType -> Id -> RepType -> [StgAlt] -> (AltType, [StgAlt])
-unariseAlts us rho alt_ty _ (UnaryRep _) alts
-  = (alt_ty, zipWith (\us alt -> unariseAlt us rho alt) (listSplitUniqSupply us) alts)
-
-unariseAlts us rho _ bndr (UbxTupleRep tys) ((DEFAULT, [], [], e) : _)
-  = (UbxTupAlt n, [(DataAlt (tupleDataCon Unboxed n), ys, uses, unariseExpr us2' rho' e)])
+unariseAlts :: UniqSupply -> UnariseEnv -> AltType -> Id -> [StgAlt] -> [StgAlt]
+unariseAlts us rho (UbxTupAlt n) bndr [(DEFAULT, [], [], e)]
+  = [(DataAlt (tupleDataCon Unboxed n), ys, uses, unariseExpr us2' rho' e)]
   where
     (us2', rho', ys) = unariseIdBinder us rho bndr
     uses = replicate (length ys) (not (isDeadBinder bndr))
-    n = length tys
 
-unariseAlts us rho _ bndr (UbxTupleRep _) [(DataAlt _, ys, uses, e)]
-  = (UbxTupAlt n, [(DataAlt (tupleDataCon Unboxed n), ys', uses', unariseExpr us2' rho'' e)])
+unariseAlts us rho (UbxTupAlt n) bndr [(DataAlt _, ys, uses, e)]
+  = [(DataAlt (tupleDataCon Unboxed n), ys', uses', unariseExpr us2' rho'' e)]
   where
     (us2', rho', ys', uses') = unariseUsedIdBinders us rho ys uses
     rho'' = extendVarEnv rho' bndr ys'
-    n = length ys'
 
-unariseAlts _ _ _ _ (UbxTupleRep _) alts
+unariseAlts _ _ (UbxTupAlt _) _ alts
   = pprPanic "unariseExpr: strange unboxed tuple alts" (ppr alts)
+
+unariseAlts us rho _ _ alts
+  = zipWith (\us alt -> unariseAlt us rho alt) (listSplitUniqSupply us) alts
 
 --------------------------
 unariseAlt :: UniqSupply -> UnariseEnv -> StgAlt -> StgAlt

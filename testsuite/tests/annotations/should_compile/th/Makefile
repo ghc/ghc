@@ -5,7 +5,7 @@ include $(TOP)/mk/test.mk
 annth_make:
 	$(MAKE) clean_annth_make
 	mkdir build_make
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make \
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 --make \
 	   -odir build_make -hidir build_make -o build_make/annth annth.hs
 
 clean_annth_make:
@@ -14,16 +14,16 @@ clean_annth_make:
 annth_compunits:
 	$(MAKE) clean_annth_compunits
 	mkdir build_compunits
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic-too \
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 \
 	  -odir build_compunits -hidir build_compunits \
 	  -c AnnHelper.hs
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic-too \
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 \
 	  -odir build_compunits -hidir build_compunits \
 	  -c TestModule.hs
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic-too \
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 \
 	  -odir build_compunits -hidir build_compunits \
 	  -c TestModuleTH.hs
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -ibuild_compunits \
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 -ibuild_compunits \
 	  -odir build_compunits -hidir build_compunits \
 	  -c annth.hs
 

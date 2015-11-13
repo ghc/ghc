@@ -595,6 +595,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                     , case gre_par gre of
                                         ParentIs p               -> p /= parent_tc
                                         FldParent { par_is = p } -> p /= parent_tc
+                                        PatternSynonym           -> True
                                         NoParent                 -> True ]
                    where
                      rdr = mkVarUnqual lbl

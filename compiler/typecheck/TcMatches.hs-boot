@@ -10,7 +10,7 @@ tcGRHSsPat    :: GRHSs Name (LHsExpr Name)
               -> TcRhoType
               -> TcM (GRHSs TcId (LHsExpr TcId))
 
-tcMatchesFun :: Name -> Bool
+tcMatchesFun :: Name
              -> MatchGroup Name (LHsExpr Name)
              -> TcRhoType
              -> TcM (HsWrapper, MatchGroup TcId (LHsExpr TcId))

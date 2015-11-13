@@ -144,10 +144,10 @@ dsStrictBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
        ; return (mkCoreLets ds_binds body2) }
 
 dsStrictBind (FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn
-                      , fun_tick = tick, fun_infix = inf }) body
+                      , fun_tick = tick }) body
                 -- Can't be a bang pattern (that looks like a PatBind)
                 -- so must be simply unboxed
-  = do { (args, rhs) <- matchWrapper (FunRhs (idName fun ) inf) matches
+  = do { (args, rhs) <- matchWrapper (FunRhs (idName fun )) matches
        ; MASSERT( null args ) -- Functions aren't lifted
        ; MASSERT( isIdHsWrapper co_fn )
        ; let rhs' = mkOptTickBox tick rhs
@@ -319,19 +319,19 @@ dsExpr (HsCase discrim matches)
 
 -- Pepe: The binds are in scope in the body but NOT in the binding group
 --       This is to avoid silliness in breakpoints
-dsExpr (HsLet binds body) = do
+dsExpr (HsLet (L _ binds) body) = do
     body' <- dsLExpr body
     dsLocalBinds binds body'
 
 -- We need the `ListComp' form to use `deListComp' (rather than the "do" form)
 -- because the interpretation of `stmts' depends on what sort of thing it is.
 --
-dsExpr (HsDo ListComp     stmts res_ty) = dsListComp stmts res_ty
-dsExpr (HsDo PArrComp     stmts _)      = dsPArrComp (map unLoc stmts)
-dsExpr (HsDo DoExpr       stmts _)      = dsDo stmts
-dsExpr (HsDo GhciStmtCtxt stmts _)      = dsDo stmts
-dsExpr (HsDo MDoExpr      stmts _)      = dsDo stmts
-dsExpr (HsDo MonadComp    stmts _)      = dsMonadComp stmts
+dsExpr (HsDo ListComp     (L _ stmts) res_ty) = dsListComp stmts res_ty
+dsExpr (HsDo PArrComp     (L _ stmts) _)      = dsPArrComp (map unLoc stmts)
+dsExpr (HsDo DoExpr       (L _ stmts) _)      = dsDo stmts
+dsExpr (HsDo GhciStmtCtxt (L _ stmts) _)      = dsDo stmts
+dsExpr (HsDo MDoExpr      (L _ stmts) _)      = dsDo stmts
+dsExpr (HsDo MonadComp    (L _ stmts) _)      = dsMonadComp stmts
 
 dsExpr (HsIf mb_fun guard_expr then_expr else_expr)
   = do { pred <- dsLExpr guard_expr
@@ -493,7 +493,7 @@ We also handle @C{}@ as valid construction syntax for an unlabelled
 constructor @C@, setting all of @C@'s fields to bottom.
 -}
 
-dsExpr (RecordCon (L _ con_like_id) con_expr rbinds) = do
+dsExpr (RecordCon _ con_expr rbinds labels) = do
     con_expr' <- dsExpr con_expr
     let
         (arg_tys, _) = tcSplitFunTys (exprType con_expr')
@@ -507,8 +507,6 @@ dsExpr (RecordCon (L _ con_like_id) con_expr rbinds) = do
               []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (ppr (flLabel fl))
         unlabelled_bottom arg_ty = mkErrorAppDs rEC_CON_ERROR_ID arg_ty Outputable.empty
 
-        labels = conLikeFieldLabels (idConLike con_like_id)
-        -- The data_con_id is guaranteed to be the wrapper id of the constructor
 
     con_args <- if null labels
                 then mapM unlabelled_bottom arg_tys
@@ -569,7 +567,8 @@ dsExpr expr@(RecordUpd record_expr fields
         -- constructor aguments.
         ; alts <- mapM (mk_alt upd_fld_env) cons_to_upd
         ; ([discrim_var], matching_code)
-                <- matchWrapper RecUpd (MG { mg_alts = alts, mg_arg_tys = [in_ty]
+                <- matchWrapper RecUpd (MG { mg_alts = noLoc alts
+                                           , mg_arg_tys = [in_ty]
                                            , mg_res_ty = out_ty, mg_origin = FromSource })
                                            -- FromSource is not strictly right, but we
                                            -- want incomplete pattern-match warnings
@@ -859,7 +858,7 @@ dsDo stmts
            ; rest <- goL stmts
            ; return (mkApps then_expr2 [rhs2, rest]) }
 
-    go _ (LetStmt binds) stmts
+    go _ (LetStmt (L _ binds)) stmts
       = do { rest <- goL stmts
            ; dsLocalBinds binds rest }
 
@@ -890,10 +889,10 @@ dsDo stmts
            ; rhss' <- sequence rhss
            ; ops' <- mapM dsExpr (map fst args)
 
-           ; let body' = noLoc $ HsDo DoExpr stmts body_ty
+           ; let body' = noLoc $ HsDo DoExpr (noLoc stmts) body_ty
 
            ; let fun = L noSrcSpan $ HsLam $
-                   MG { mg_alts = [mkSimpleMatch pats body']
+                   MG { mg_alts = noLoc [mkSimpleMatch pats body']
                       , mg_arg_tys = arg_tys
                       , mg_res_ty = body_ty
                       , mg_origin = Generated }
@@ -923,11 +922,13 @@ dsDo stmts
         later_pats   = rec_tup_pats
         rets         = map noLoc rec_rets
         mfix_app     = nlHsApp (noLoc mfix_op) mfix_arg
-        mfix_arg     = noLoc $ HsLam (MG { mg_alts = [mkSimpleMatch [mfix_pat] body]
-                                         , mg_arg_tys = [tup_ty], mg_res_ty = body_ty
-                                         , mg_origin = Generated })
+        mfix_arg     = noLoc $ HsLam
+                           (MG { mg_alts = noLoc [mkSimpleMatch [mfix_pat] body]
+                               , mg_arg_tys = [tup_ty], mg_res_ty = body_ty
+                               , mg_origin = Generated })
         mfix_pat     = noLoc $ LazyPat $ mkBigLHsPatTupId rec_tup_pats
-        body         = noLoc $ HsDo DoExpr (rec_stmts ++ [ret_stmt]) body_ty
+        body         = noLoc $ HsDo
+                                DoExpr (noLoc (rec_stmts ++ [ret_stmt])) body_ty
         ret_app      = nlHsApp (noLoc return_op) (mkBigLHsTupId rets)
         ret_stmt     = noLoc $ mkLastStmt ret_app
                      -- This LastStmt will be desugared with dsDo,

@@ -23,7 +23,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.IO (
-        IO(..), unIO, failIO, liftIO,
+        IO(..), unIO, failIO, liftIO, mplusIO,
         unsafePerformIO, unsafeInterleaveIO,
         unsafeDupablePerformIO, unsafeDupableInterleaveIO,
         noDuplicate,
@@ -45,7 +45,7 @@ import GHC.ST
 import GHC.Exception
 import GHC.Show
 
-import {-# SOURCE #-} GHC.IO.Exception ( userError )
+import {-# SOURCE #-} GHC.IO.Exception ( userError, IOError )
 
 -- ---------------------------------------------------------------------------
 -- The IO Monad
@@ -176,11 +176,8 @@ like 'bracket' cannot be used safely within 'unsafeDupablePerformIO'.
 
 @since 4.4.0.0
 -}
-{-# NOINLINE unsafeDupablePerformIO #-}
-    -- See Note [unsafeDupablePerformIO is NOINLINE]
 unsafeDupablePerformIO  :: IO a -> a
-unsafeDupablePerformIO (IO m) = lazy (case m realWorld# of (# _, r #) -> r)
-     -- See Note [unsafeDupablePerformIO has a lazy RHS]
+unsafeDupablePerformIO (IO m) = case runRW# m of (# _, a #) -> a
 
 -- Note [unsafeDupablePerformIO is NOINLINE]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -292,6 +289,12 @@ catchAny :: IO a -> (forall e . Exception e => e -> IO a) -> IO a
 catchAny (IO io) handler = IO $ catch# io handler'
     where handler' (SomeException e) = unIO (handler e)
 
+
+mplusIO :: IO a -> IO a -> IO a
+mplusIO m n = m `catchIOError` \ _ -> n
+    where catchIOError :: IO a -> (IOError -> IO a) -> IO a
+          catchIOError = catchException
+
 -- | A variant of 'throw' that can only be used within the 'IO' monad.
 --
 -- Although 'throwIO' has a type that is an instance of the type of 'throw', the
@@ -348,7 +351,7 @@ unsafeUnmask (IO io) = IO $ unmaskAsyncExceptions# io
 -- When called outside 'mask', or inside 'uninterruptibleMask', this
 -- function has no effect.
 --
--- /Since: 4.8.2.0/
+-- @since 4.9.0.0
 interruptible :: IO a -> IO a
 interruptible act = do
   st <- getMaskingState

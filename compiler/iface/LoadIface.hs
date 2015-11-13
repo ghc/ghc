@@ -908,7 +908,7 @@ When printing export lists, we print like this:
 -}
 
 pprExport :: IfaceExport -> SDoc
-pprExport (Avail n)         = ppr n
+pprExport (Avail _ n)         = ppr n
 pprExport (AvailTC _ [] []) = Outputable.empty
 pprExport (AvailTC n ns0 fs) = case ns0 of
                                  (n':ns) | n==n' -> ppr n <> pp_export ns fs

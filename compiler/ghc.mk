@@ -462,6 +462,9 @@ endif
 compiler_stage1_SplitObjs = NO
 compiler_stage2_SplitObjs = NO
 compiler_stage3_SplitObjs = NO
+compiler_stage1_SplitSections = NO
+compiler_stage2_SplitSections = NO
+compiler_stage3_SplitSections = NO
 
 # There are too many symbols in the ghc package for a Windows DLL.
 # We therefore need to split some of the modules off into a separate
@@ -662,8 +665,8 @@ $(eval $(call build-package,compiler,stage3,2))
 define keepCAFsForGHCiDynOnly
 # $1 = stage
 # $2 = way
-ifeq "$$(findstring dyn, $1)" ""
-compiler_stage$1_$2_C_OBJS := $$(filter-out %/keepCAFsForGHCi.o,$$(compiler_stage$1_$2_C_OBJS))
+ifeq "$$(findstring dyn, $2)" ""
+compiler_stage$1_$2_C_OBJS := $$(filter-out %/keepCAFsForGHCi.$$($2_osuf),$$(compiler_stage$1_$2_C_OBJS))
 endif
 endef
 $(foreach w,$(compiler_stage1_WAYS),$(eval $(call keepCAFsForGHCiDynOnly,1,$w)))

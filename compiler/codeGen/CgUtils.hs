@@ -86,6 +86,8 @@ baseRegOffset dflags GCEnter1            = oFFSET_stgGCEnter1 dflags
 baseRegOffset dflags GCFun               = oFFSET_stgGCFun dflags
 baseRegOffset _      BaseReg             = panic "baseRegOffset:BaseReg"
 baseRegOffset _      PicBaseReg          = panic "baseRegOffset:PicBaseReg"
+baseRegOffset _      MachSp              = panic "baseRegOffset:MachSp"
+baseRegOffset _      UnwindReturnReg     = panic "baseRegOffset:UnwindReturnReg"
 
 
 -- -----------------------------------------------------------------------------

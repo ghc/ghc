@@ -271,8 +271,9 @@ test('T7257',
      [stats_num_field('bytes allocated',
                       [(wordsize(32), 1150000000, 10),
                     # expected value: 1246287228 (i386/Linux)
-                       (wordsize(64), 1774893760, 5)]),
+                       (wordsize(64), 1654893248, 5)]),
                         # 2012-09-21: 1774893760 (amd64/Linux)
+                        # 2015-11-03: 1654893248 (amd64/Linux)
       stats_num_field('peak_megabytes_allocated',
                       [(wordsize(32), 217, 5),
                         # 2012-10-08: 217 (x86/Linux)

@@ -7,6 +7,7 @@ import DynFlags
 import Outputable
 import ApiAnnotation
 import System.Environment( getArgs )
+import System.Exit
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -19,7 +20,7 @@ main = do
 
 testOneFile :: FilePath -> String -> IO ()
 testOneFile libdir fileName = do
-       ((anns,cs),p) <- runGhc (Just libdir) $ do
+       ((anns,_cs),p) <- runGhc (Just libdir) $ do
                         dflags <- getSessionDynFlags
                         _ <- setSessionDynFlags dflags
                         let mn =mkModuleName fileName
@@ -33,9 +34,6 @@ testOneFile libdir fileName = do
 
        let sspans = Set.fromList $ getAllSrcSpans (pm_parsed_source p)
 
-           problems = filter (\(s,_a) -> not (Set.member s sspans))
-                             $ getAnnSrcSpans (anns,cs)
-
            exploded = [((kw,ss),[anchor])
                       | ((anchor,kw),sss) <- Map.toList anns,ss <- sss]
 
@@ -45,17 +43,20 @@ testOneFile libdir fileName = do
                                -> not (any (\a -> Set.member a sspans) anchors))
                               exploded'
 
-       putStrLn "---Problems---------------------"
-       putStrLn (intercalate "\n" [showAnns $ Map.fromList $ map snd problems])
-       putStrLn "---Problems'--------------------"
-       putStrLn (intercalate "\n" [pp $ Map.fromList $ map fst problems'])
-       putStrLn "--------------------------------"
-       putStrLn (intercalate "\n" [showAnns anns])
+           problems'' = filter (\((a,_),_) -> a /= AnnEofPos) problems'
+
+       putStrLn "---Problems (should be empty list)---"
+       putStrLn (intercalate "\n" [pp $ Map.fromList $ map fst problems''])
+       putStrLn "---Annotations-----------------------"
+       putStrLn "-- SrcSpan the annotation is attached to, AnnKeywordId,"
+       putStrLn "--    list of locations the keyword item appears in"
+       -- putStrLn (intercalate "\n" [showAnns anns])
+       putStrLn (showAnns anns)
+       if null problems''
+          then exitSuccess
+          else exitFailure
 
     where
-      getAnnSrcSpans :: ApiAnns -> [(SrcSpan,(ApiAnnKey,[SrcSpan]))]
-      getAnnSrcSpans (anns,_) = map (\a@((ss,_),_) -> (ss,a)) $ Map.toList anns
-
       getAllSrcSpans :: (Data t) => t -> [SrcSpan]
       getAllSrcSpans ast = everything (++) ([] `mkQ` getSrcSpan) ast
         where
@@ -64,11 +65,12 @@ testOneFile libdir fileName = do
 
 
 showAnns :: Map.Map ApiAnnKey [SrcSpan] -> String
-showAnns anns = "[\n" ++ (intercalate "\n"
+showAnns anns = "[\n" ++ (intercalate ",\n"
    $ map (\((s,k),v)
-              -> ("(AK " ++ pp s ++ " " ++ show k ++" = " ++ pp v ++ ")\n"))
+              -- -> ("(AK " ++ pp s ++ " " ++ show k ++" = " ++ pp v ++ ")\n"))
+              -> ("((" ++ pp s ++ "," ++ show k ++"), " ++ pp v ++ ")"))
    $ Map.toList anns)
-    ++ "]\n"
+    ++ "\n]\n"
 
 pp :: (Outputable a) => a -> String
 pp a = showPpr unsafeGlobalDynFlags a

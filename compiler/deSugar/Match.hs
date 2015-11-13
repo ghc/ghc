@@ -148,8 +148,8 @@ pp_context (DsMatchContext kind _loc) msg rest_of_msg_fun
   where
     (ppr_match, pref)
         = case kind of
-             FunRhs fun _ -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
-             _            -> (pprMatchContext kind, \ pp -> pp)
+             FunRhs fun -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
+             _          -> (pprMatchContext kind, \ pp -> pp)
 
 ppr_pats :: Outputable a => [a] -> SDoc
 ppr_pats pats = sep (map ppr pats)
@@ -791,7 +791,7 @@ one pattern, and match simply only accepts one pattern.
 JJQC 30-Nov-1997
 -}
 
-matchWrapper ctxt (MG { mg_alts = matches
+matchWrapper ctxt (MG { mg_alts = L _ matches
                       , mg_arg_tys = arg_tys
                       , mg_res_ty = rhs_ty
                       , mg_origin = origin })

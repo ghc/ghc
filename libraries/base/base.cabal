@@ -1,5 +1,5 @@
 name:           base
-version:        4.8.2.0
+version:        4.9.0.0
 -- NOTE: Don't forget to update ./changelog.md
 license:        BSD3
 license-file:   LICENSE
@@ -93,7 +93,12 @@ Library
         UnliftedFFITypes
         Unsafe
 
-    build-depends: rts == 1.0.*, ghc-prim == 0.4.*
+    build-depends: rts == 1.0.*, ghc-prim == 0.5.*
+
+    -- sanity-check to ensure exactly one flag is set
+    if !((flag(integer-gmp) && !flag(integer-simple)) || (!flag(integer-gmp) && flag(integer-simple)))
+        build-depends: invalid-cabal-flag-settings<0
+
     if flag(integer-simple)
         build-depends: integer-simple >= 0.1.1 && < 0.2
 
@@ -113,6 +118,7 @@ Library
         Control.Exception
         Control.Exception.Base
         Control.Monad
+        Control.Monad.Fail
         Control.Monad.Fix
         Control.Monad.Instances
         Control.Monad.IO.Class

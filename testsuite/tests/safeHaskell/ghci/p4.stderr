@@ -1,6 +1,7 @@
 
 <interactive>:5:9: error:
     Not in scope: ‘System.IO.Unsafe.unsafePerformIO’
+    No module named ‘System.IO.Unsafe’ is imported.
 
 <interactive>:6:9: error:
     Variable not in scope: x :: IO Integer -> t

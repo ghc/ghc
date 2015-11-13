@@ -459,6 +459,15 @@ data GlobalReg
   -- (where necessary) in the native code generator.
   | BaseReg
 
+  -- The register used by the platform for the C stack pointer. This is
+  -- a break in the STG abstraction used exclusively to setup stack unwinding
+  -- information.
+  | MachSp
+
+  -- The is a dummy register used to indicate to the stack unwinder where
+  -- a routine would return to.
+  | UnwindReturnReg
+
   -- Base Register for PIC (position-independent code) calculations
   -- Only used inside the native code generator. It's exact meaning differs
   -- from platform to platform (see module PositionIndependentCode).
@@ -486,6 +495,8 @@ instance Eq GlobalReg where
    GCEnter1 == GCEnter1 = True
    GCFun == GCFun = True
    BaseReg == BaseReg = True
+   MachSp == MachSp = True
+   UnwindReturnReg == UnwindReturnReg = True
    PicBaseReg == PicBaseReg = True
    _r1 == _r2 = False
 
@@ -510,6 +521,8 @@ instance Ord GlobalReg where
    compare GCEnter1 GCEnter1 = EQ
    compare GCFun GCFun = EQ
    compare BaseReg BaseReg = EQ
+   compare MachSp MachSp = EQ
+   compare UnwindReturnReg UnwindReturnReg = EQ
    compare PicBaseReg PicBaseReg = EQ
    compare (VanillaReg _ _) _ = LT
    compare _ (VanillaReg _ _) = GT
@@ -547,6 +560,10 @@ instance Ord GlobalReg where
    compare _ GCFun = GT
    compare BaseReg _ = LT
    compare _ BaseReg = GT
+   compare MachSp _ = LT
+   compare _ MachSp = GT
+   compare UnwindReturnReg _ = LT
+   compare _ UnwindReturnReg = GT
    compare EagerBlackholeInfo _ = LT
    compare _ EagerBlackholeInfo = GT
 

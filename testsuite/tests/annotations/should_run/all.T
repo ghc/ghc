@@ -1,4 +1,3 @@
-setTestOpts(when(compiler_profiled(), skip))
 # These tests are very slow due to their use of package GHC
 setTestOpts(when(fast(), skip))
 

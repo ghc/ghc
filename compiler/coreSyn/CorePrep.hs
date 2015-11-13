@@ -18,6 +18,7 @@ import OccurAnal
 
 import HscTypes
 import PrelNames
+import MkId             ( realWorldPrimId )
 import CoreUtils
 import CoreArity
 import CoreFVs
@@ -511,9 +512,19 @@ cpeRhsE env (Lit (LitInteger i _))
 cpeRhsE _env expr@(Lit {}) = return (emptyFloats, expr)
 cpeRhsE env expr@(Var {})  = cpeApp env expr
 
-cpeRhsE env (Var f `App` _ `App` arg)
+cpeRhsE env (Var f `App` _{-type-} `App` arg)
   | f `hasKey` lazyIdKey          -- Replace (lazy a) by a
   = cpeRhsE env arg               -- See Note [lazyId magic] in MkId
+
+    -- See Note [runRW magic] in MkId
+  | f `hasKey` runRWKey           -- Replace (runRW# f) by (f realWorld#),
+  = case arg of                   -- beta reducing if possible
+      Lam s body -> cpeRhsE env (substExpr (text "runRW#") subst body)
+        where subst = extendIdSubst emptySubst s (Var realWorldPrimId)
+                      -- XXX I think we can use emptySubst here
+                      -- because realWorldPrimId is a global variable
+                      -- and so cannot be bound by a lambda in body
+      _          -> cpeRhsE env (arg `App` Var realWorldPrimId)
 
 cpeRhsE env expr@(App {}) = cpeApp env expr
 

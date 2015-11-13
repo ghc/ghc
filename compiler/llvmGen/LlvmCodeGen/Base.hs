@@ -26,7 +26,7 @@ module LlvmCodeGen.Base (
 
         cmmToLlvmType, widthToLlvmFloat, widthToLlvmInt, llvmFunTy,
         llvmFunSig, llvmFunArgs, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
-        llvmPtrBits, tysToParams,
+        llvmPtrBits, tysToParams, llvmFunSection,
 
         strCLabel_llvm, strDisplayName_llvm, strProcedureName_llvm,
         getGlobalPtr, generateExternDecls,
@@ -139,6 +139,12 @@ llvmFunAlign dflags = Just (wORD_SIZE dflags)
 -- | Alignment to use for into tables
 llvmInfAlign :: DynFlags -> LMAlign
 llvmInfAlign dflags = Just (wORD_SIZE dflags)
+
+-- | Section to use for a function
+llvmFunSection :: DynFlags -> LMString -> LMSection
+llvmFunSection dflags lbl
+    | gopt Opt_SplitSections dflags = Just (concatFS [fsLit ".text.", lbl])
+    | otherwise                     = Nothing
 
 -- | A Function's arguments
 llvmFunArgs :: DynFlags -> LiveGlobalRegs -> [LlvmVar]

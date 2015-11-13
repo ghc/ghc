@@ -725,19 +725,11 @@ then
 fi
 
 dnl ** check for Sphinx toolchain
-if test "$HostOS" = "mingw32"
-then
-SphinxBin=sphinx-build2
-else
-SphinxBin=sphinx-build
-fi;
-
-AC_SUBST([SphinxBin])
-AC_PATH_PROG(SPHINXBUILD,${SphinxBin})
-AC_CACHE_CHECK([for version of ${SphinxBin}], fp_cv_sphinx_version,
+AC_PATH_PROG(SPHINXBUILD,sphinx-build)
+AC_CACHE_CHECK([for version of sphinx-build], fp_cv_sphinx_version,
 changequote(, )dnl
 [if test -n "$SPHINXBUILD"; then
-  fp_cv_sphinx_version=`"$SPHINXBUILD" --version 2>&1 | sed 's/Sphinx\( (sphinx-build[2]\?)\)\? v\?\([0-9]\.[0-9]\.[0-9]\)/\2/' | head -n1`;
+  fp_cv_sphinx_version=`"$SPHINXBUILD" --version 2>&1 | sed 's/Sphinx\( (sphinx-build)\)\? v\?\([0-9]\.[0-9]\.[0-9]\)/\2/' | head -n1`;
 fi;
 changequote([, ])dnl
 ])
@@ -919,6 +911,15 @@ AS_IF([test "$UseSystemLibFFI" = "YES"], [
  CFLAGS="$LIBFFI_CFLAGS $CFLAGS"
  LDFLAGS2="$LDFLAGS"
  LDFLAGS="$LIBFFI_LDFLAGS $LDFLAGS"
+ if test "$HostOS" = "openbsd";
+ then
+   # OpenBSD's libffi is not directly linked to the libpthread but
+   # still requires pthread functionality. This means that any client
+   # binary which links with libffi also needs to link with
+   # libpthread. If it does not, then linking fails with unresolved
+   # symbols.
+   LDFLAGS="$LDFLAGS -lpthread"
+ fi
  AC_CHECK_LIB(ffi, ffi_call,
   [AC_CHECK_HEADERS([ffi.h], [break], [])
    AC_DEFINE([HAVE_LIBFFI], [1], [Define to 1 if you have libffi.])],
@@ -1046,6 +1047,11 @@ if test "$ac_cv_sizeof_void_p" -eq 8 ; then
     if test "x$EnableLargeAddressSpace" = "xyes" ; then
         if test "$ghc_host_os" = "darwin" ; then
             use_large_address_space=yes
+	elif test "$ghc_host_os" = "openbsd" ; then
+	    # as of OpenBSD 5.8 (2015), OpenBSD does not support mmap with MAP_NORESERVE.
+	    # The flag MAP_NORESERVE is supported for source compatibility reasons,
+	    # but is completely ignored by OS mmap
+            use_large_address_space=no
         else
             AC_CHECK_DECLS([MAP_NORESERVE, MADV_FREE, MADV_DONTNEED],[],[],
                 [

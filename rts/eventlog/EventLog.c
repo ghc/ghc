@@ -1100,20 +1100,22 @@ void postBlockMarker (EventsBuf *eb)
 
 void printAndClearEventBuf (EventsBuf *ebuf)
 {
-    StgWord64 numBytes = 0, written = 0;
-
     closeBlockMarker(ebuf);
 
     if (ebuf->begin != NULL && ebuf->pos != ebuf->begin)
     {
-        numBytes = ebuf->pos - ebuf->begin;
-
-        written = fwrite(ebuf->begin, 1, numBytes, event_log_file);
-        if (written != numBytes) {
-            debugBelch(
-                "printAndClearEventLog: fwrite() failed, written=%" FMT_Word64
-                " doesn't match numBytes=%" FMT_Word64, written, numBytes);
-            return;
+        StgInt8 *begin = ebuf->begin;
+        while (begin < ebuf->pos) {
+            StgWord64 remain = ebuf->pos - begin;
+            StgWord64 written = fwrite(begin, 1, remain, event_log_file);
+            if (written == 0) {
+                debugBelch(
+                    "printAndClearEventLog: fwrite() failed to write anything;"
+                    " tried to write numBytes=%" FMT_Word64, remain);
+                resetEventsBuf(ebuf);
+                return;
+            }
+            begin += written;
         }
 
         resetEventsBuf(ebuf);

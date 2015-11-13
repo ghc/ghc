@@ -8,3 +8,8 @@ module T3303A where
 foo :: Int
 foo = 4
 
+-- Empty list should work too (#11044).
+{-# DEPRECATED foo2 [] #-}
+
+foo2 :: Int
+foo2 = 4

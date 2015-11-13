@@ -10,7 +10,7 @@
              DeriveTraversable #-}
 
 module BooleanFormula (
-        BooleanFormula(..),
+        BooleanFormula(..), LBooleanFormula,
         mkFalse, mkTrue, mkAnd, mkOr, mkVar,
         isFalse, isTrue,
         eval, simplify, isUnsatisfied,
@@ -28,12 +28,16 @@ import Data.Traversable ( Traversable )
 import MonadUtils
 import Outputable
 import Binary
+import SrcLoc
 
 ----------------------------------------------------------------------
 -- Boolean formula type and smart constructors
 ----------------------------------------------------------------------
 
-data BooleanFormula a = Var a | And [BooleanFormula a] | Or [BooleanFormula a]
+type LBooleanFormula a = Located (BooleanFormula a)
+
+data BooleanFormula a = Var a | And [LBooleanFormula a] | Or [LBooleanFormula a]
+                      | Parens (LBooleanFormula a)
   deriving (Eq, Data, Typeable, Functor, Foldable, Traversable)
 
 mkVar :: a -> BooleanFormula a
@@ -49,27 +53,28 @@ mkBool False = mkFalse
 mkBool True  = mkTrue
 
 -- Make a conjunction, and try to simplify
-mkAnd :: Eq a => [BooleanFormula a] -> BooleanFormula a
+mkAnd :: Eq a => [LBooleanFormula a] -> BooleanFormula a
 mkAnd = maybe mkFalse (mkAnd' . nub) . concatMapM fromAnd
   where
   -- See Note [Simplification of BooleanFormulas]
-  fromAnd :: BooleanFormula a -> Maybe [BooleanFormula a]
-  fromAnd (And xs) = Just xs
+  fromAnd :: LBooleanFormula a -> Maybe [LBooleanFormula a]
+  fromAnd (L _ (And xs)) = Just xs
      -- assume that xs are already simplified
      -- otherwise we would need: fromAnd (And xs) = concat <$> traverse fromAnd xs
-  fromAnd (Or []) = Nothing -- in case of False we bail out, And [..,mkFalse,..] == mkFalse
+  fromAnd (L _ (Or [])) = Nothing
+     -- in case of False we bail out, And [..,mkFalse,..] == mkFalse
   fromAnd x = Just [x]
-  mkAnd' [x] = x
+  mkAnd' [x] = unLoc x
   mkAnd' xs = And xs
 
-mkOr :: Eq a => [BooleanFormula a] -> BooleanFormula a
+mkOr :: Eq a => [LBooleanFormula a] -> BooleanFormula a
 mkOr = maybe mkTrue (mkOr' . nub) . concatMapM fromOr
   where
   -- See Note [Simplification of BooleanFormulas]
-  fromOr (Or xs) = Just xs
-  fromOr (And []) = Nothing
+  fromOr (L _ (Or xs)) = Just xs
+  fromOr (L _ (And [])) = Nothing
   fromOr x = Just [x]
-  mkOr' [x] = x
+  mkOr' [x] = unLoc x
   mkOr' xs = Or xs
 
 
@@ -121,8 +126,9 @@ isTrue _ = False
 
 eval :: (a -> Bool) -> BooleanFormula a -> Bool
 eval f (Var x)  = f x
-eval f (And xs) = all (eval f) xs
-eval f (Or xs)  = any (eval f) xs
+eval f (And xs) = all (eval f . unLoc) xs
+eval f (Or xs)  = any (eval f . unLoc) xs
+eval f (Parens x) = eval f (unLoc x)
 
 -- Simplify a boolean formula.
 -- The argument function should give the truth of the atoms, or Nothing if undecided.
@@ -130,8 +136,9 @@ simplify :: Eq a => (a -> Maybe Bool) -> BooleanFormula a -> BooleanFormula a
 simplify f (Var a) = case f a of
   Nothing -> Var a
   Just b  -> mkBool b
-simplify f (And xs) = mkAnd (map (simplify f) xs)
-simplify f (Or xs) = mkOr (map (simplify f) xs)
+simplify f (And xs) = mkAnd (map (\(L l x) -> L l (simplify f x)) xs)
+simplify f (Or xs) = mkOr (map (\(L l x) -> L l (simplify f x)) xs)
+simplify f (Parens x) = simplify f (unLoc x)
 
 -- Test if a boolean formula is satisfied when the given values are assigned to the atoms
 -- if it is, returns Nothing
@@ -151,13 +158,16 @@ isUnsatisfied f bf
 -- If the boolean formula holds, does that mean that the given atom is always true?
 impliesAtom :: Eq a => BooleanFormula a -> a -> Bool
 Var x  `impliesAtom` y = x == y
-And xs `impliesAtom` y = any (`impliesAtom` y) xs -- we have all of xs, so one of them implying y is enough
-Or  xs `impliesAtom` y = all (`impliesAtom` y) xs
+And xs `impliesAtom` y = any (\x -> (unLoc x) `impliesAtom` y) xs
+           -- we have all of xs, so one of them implying y is enough
+Or  xs `impliesAtom` y = all (\x -> (unLoc x) `impliesAtom` y) xs
+Parens x `impliesAtom` y = (unLoc x) `impliesAtom` y
 
 implies :: Eq a => BooleanFormula a -> BooleanFormula a -> Bool
 x `implies` Var y  = x `impliesAtom` y
-x `implies` And ys = all (x `implies`) ys
-x `implies` Or ys  = any (x `implies`) ys
+x `implies` And ys = all (implies x . unLoc) ys
+x `implies` Or ys  = any (implies x . unLoc) ys
+x `implies` Parens y  = x `implies` (unLoc y)
 
 ----------------------------------------------------------------------
 -- Pretty printing
@@ -173,9 +183,10 @@ pprBooleanFormula' pprVar pprAnd pprOr = go
   where
   go p (Var x)  = pprVar p x
   go p (And []) = cparen (p > 0) $ empty
-  go p (And xs) = pprAnd p (map (go 3) xs)
+  go p (And xs) = pprAnd p (map (go 3 . unLoc) xs)
   go _ (Or  []) = keyword $ text "FALSE"
-  go p (Or  xs) = pprOr p (map (go 2) xs)
+  go p (Or  xs) = pprOr p (map (go 2 . unLoc) xs)
+  go p (Parens x) = go p (unLoc x)
 
 -- Pretty print in source syntax, "a | b | c,d,e"
 pprBooleanFormula :: (Rational -> a -> SDoc) -> Rational -> BooleanFormula a -> SDoc
@@ -203,13 +214,15 @@ instance Outputable a => Outputable (BooleanFormula a) where
 ----------------------------------------------------------------------
 
 instance Binary a => Binary (BooleanFormula a) where
-  put_ bh (Var x)  = putByte bh 0 >> put_ bh x
-  put_ bh (And xs) = putByte bh 1 >> put_ bh xs
-  put_ bh (Or  xs) = putByte bh 2 >> put_ bh xs
+  put_ bh (Var x)    = putByte bh 0 >> put_ bh x
+  put_ bh (And xs)   = putByte bh 1 >> put_ bh xs
+  put_ bh (Or  xs)   = putByte bh 2 >> put_ bh xs
+  put_ bh (Parens x) = putByte bh 3 >> put_ bh x
 
   get bh = do
     h <- getByte bh
     case h of
-      0 -> Var <$> get bh
-      1 -> And <$> get bh
-      _ -> Or  <$> get bh
+      0 -> Var    <$> get bh
+      1 -> And    <$> get bh
+      2 -> Or     <$> get bh
+      _ -> Parens <$> get bh

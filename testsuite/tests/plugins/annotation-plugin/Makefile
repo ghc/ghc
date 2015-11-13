@@ -13,6 +13,6 @@ package.%:
 	mkdir pkg.$*
 	"$(TEST_HC)" -outputdir pkg.$* --make -v0 -o pkg.$*/setup Setup.hs
 	"$(GHC_PKG)" init pkg.$*/local.package.conf
-	pkg.$*/setup configure --distdir pkg.$*/dist -v0 $(CABAL_PLUGIN_BUILD) --prefix="$(HERE)/pkg.$*/install" --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=pkg.$*/local.package.conf
+	pkg.$*/setup configure --distdir pkg.$*/dist -v0 $(CABAL_PLUGIN_BUILD) --prefix="$(HERE)/pkg.$*/install" --with-compiler="$(TEST_HC)" $(if $(findstring _p,$(GhcRTSWays)), --enable-library-profiling) --with-hc-pkg="$(GHC_PKG)" --package-db=pkg.$*/local.package.conf
 	pkg.$*/setup build     --distdir pkg.$*/dist -v0
 	pkg.$*/setup install   --distdir pkg.$*/dist -v0

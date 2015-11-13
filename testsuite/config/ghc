@@ -179,7 +179,6 @@ def get_compiler_info():
 
     if re.match(".*_p(_.*|$)", rtsInfoDict["RTS way"]):
         config.compiler_profiled = True
-        config.run_ways = [x for x in config.run_ways if x != 'ghci']
     else:
         config.compiler_profiled = False
 
@@ -204,6 +203,11 @@ def get_compiler_info():
         config.ghci_way_flags   = "-dynamic"
         config.ghc_th_way       = "dyn"
         config.ghc_plugin_way   = "dyn"
+    elif config.compiler_profiled:
+        config.ghc_th_way_flags = "-prof"
+        config.ghci_way_flags   = "-prof"
+        config.ghc_th_way       = "prof"
+        config.ghc_plugin_way   = "prof"
     else:
         config.ghc_th_way_flags = "-static"
         config.ghci_way_flags   = "-static"

@@ -1029,7 +1029,7 @@ compileParsedExpr expr@(L loc _) = withSession $ \hsc_env -> do
   -- create a new binding.
   let expr_fs = fsLit "_compileParsedExpr"
       expr_name = mkInternalName (getUnique expr_fs) (mkTyVarOccFS expr_fs) loc
-      let_stmt = L loc . LetStmt . HsValBinds $
+      let_stmt = L loc . LetStmt . L loc . HsValBinds $
         ValBindsIn (unitBag $ mkHsVarBind loc (getRdrName expr_name) expr) []
 
   Just (ids, hvals_io, fix_env) <- liftIO $ hscParsedStmt hsc_env let_stmt

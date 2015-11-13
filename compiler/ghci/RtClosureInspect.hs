@@ -175,17 +175,17 @@ getClosureData :: DynFlags -> a -> IO Closure
 getClosureData dflags a =
    case unpackClosure# a of
      (# iptr, ptrs, nptrs #) -> do
-           let iptr'
-                | ghciTablesNextToCode =
-                   Ptr iptr
+           let iptr0 = Ptr iptr
+           let iptr1
+                | ghciTablesNextToCode = iptr0
                 | otherwise =
                    -- the info pointer we get back from unpackClosure#
                    -- is to the beginning of the standard info table,
                    -- but the Storable instance for info tables takes
                    -- into account the extra entry pointer when
                    -- !ghciTablesNextToCode, so we must adjust here:
-                   Ptr iptr `plusPtr` negate (wORD_SIZE dflags)
-           itbl <- peekItbl dflags iptr'
+                   iptr0 `plusPtr` negate (wORD_SIZE dflags)
+           itbl <- peekItbl dflags iptr1
            let tipe = readCType (BCI.tipe itbl)
                elems = fromIntegral (BCI.ptrs itbl)
                ptrsList = Array 0 (elems - 1) elems ptrs
@@ -193,7 +193,7 @@ getClosureData dflags a =
                               | I# i <- [0.. fromIntegral (BCI.nptrs itbl)-1] ]
            ASSERT(elems >= 0) return ()
            ptrsList `seq`
-            return (Closure tipe (Ptr iptr) itbl ptrsList nptrs_data)
+            return (Closure tipe iptr0 itbl ptrsList nptrs_data)
 
 readCType :: Integral a => a -> ClosureType
 readCType i
@@ -774,7 +774,8 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
             return (Term my_ty (Right dc) a subTerms)
 
 -- The otherwise case: can be a Thunk,AP,PAP,etc.
-      tipe_clos ->
+      tipe_clos -> do
+         traceTR (text "Unknown closure:" <+> ppr tipe_clos)
          return (Suspension tipe_clos my_ty a Nothing)
 
   -- insert NewtypeWraps around newtypes

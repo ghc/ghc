@@ -151,8 +151,8 @@ wired-in Ids.
 
 ghcPrimExports :: [IfaceExport]
 ghcPrimExports
- = map (Avail . idName) ghcPrimIds ++
-   map (Avail . idName . primOpId) allThePrimOps ++
+ = map (avail . idName) ghcPrimIds ++
+   map (avail . idName . primOpId) allThePrimOps ++
    [ AvailTC n [n] []
    | tc <- funTyCon : primTyCons, let n = tyConName tc  ]
 

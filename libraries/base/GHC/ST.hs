@@ -18,7 +18,7 @@
 
 module GHC.ST (
         ST(..), STret(..), STRep,
-        fixST, runST, runSTRep,
+        fixST, runST,
 
         -- * Unsafe functions
         liftST, unsafeInterleaveST
@@ -103,62 +103,10 @@ instance  Show (ST s a)  where
     showsPrec _ _  = showString "<<ST action>>"
     showList       = showList__ (showsPrec 0)
 
-{-
-Definition of runST
-~~~~~~~~~~~~~~~~~~~
-
-SLPJ 95/04: Why @runST@ must not have an unfolding; consider:
-\begin{verbatim}
-f x =
-  runST ( \ s -> let
-                    (a, s')  = newArray# 100 [] s
-                    (_, s'') = fill_in_array_or_something a x s'
-                  in
-                  freezeArray# a s'' )
-\end{verbatim}
-If we inline @runST@, we'll get:
-\begin{verbatim}
-f x = let
-        (a, s')  = newArray# 100 [] realWorld#{-NB-}
-        (_, s'') = fill_in_array_or_something a x s'
-      in
-      freezeArray# a s''
-\end{verbatim}
-And now the @newArray#@ binding can be floated to become a CAF, which
-is totally and utterly wrong:
-\begin{verbatim}
-f = let
-    (a, s')  = newArray# 100 [] realWorld#{-NB-} -- YIKES!!!
-    in
-    \ x ->
-        let (_, s'') = fill_in_array_or_something a x s' in
-        freezeArray# a s''
-\end{verbatim}
-All calls to @f@ will share a {\em single} array!  End SLPJ 95/04.
--}
-
 {-# INLINE runST #-}
--- The INLINE prevents runSTRep getting inlined in *this* module
--- so that it is still visible when runST is inlined in an importing
--- module.  Regrettably delicate.  runST is behaving like a wrapper.
-
 -- | Return the value computed by a state transformer computation.
 -- The @forall@ ensures that the internal state used by the 'ST'
 -- computation is inaccessible to the rest of the program.
 runST :: (forall s. ST s a) -> a
-runST st = runSTRep (case st of { ST st_rep -> st_rep })
-
--- I'm only letting runSTRep be inlined right at the end, in particular *after* full laziness
--- That's what the "INLINE [0]" says.
---              SLPJ Apr 99
--- {-# INLINE [0] runSTRep #-}
-
--- SDM: further to the above, inline phase 0 is run *before*
--- full-laziness at the moment, which means that the above comment is
--- invalid.  Inlining runSTRep doesn't make a huge amount of
--- difference, anyway.  Hence:
-
-{-# NOINLINE runSTRep #-}
-runSTRep :: (forall s. STRep s a) -> a
-runSTRep st_rep = case st_rep realWorld# of
-                        (# _, r #) -> r
+runST (ST st_rep) = case runRW# st_rep of (# _, a #) -> a
+-- See Note [Definition of runRW#] in GHC.Magic

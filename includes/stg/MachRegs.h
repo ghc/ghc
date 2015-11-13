@@ -102,6 +102,7 @@
 #if STOLEN_X86_REGS >= 4
 # define REG_Hp     edi
 #endif
+#define REG_MachSp  esp
 
 #define REG_XMM1    xmm0
 #define REG_XMM2    xmm1
@@ -169,6 +170,7 @@
 #define REG_R5    r8
 #define REG_R6    r9
 #define REG_SpLim r15
+#define REG_MachSp  rsp
 
 /*
 Map both Fn and Dn to register xmmn so that we can pass a function any

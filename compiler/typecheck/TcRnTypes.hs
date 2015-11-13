@@ -452,6 +452,8 @@ data TcGblEnv
 
         tcg_rn_exports :: Maybe [Located (IE Name)],
                 -- Nothing <=> no explicit export list
+                -- Is always Nothing if we don't want to retain renamed
+                -- exports
 
         tcg_rn_imports :: [LImportDecl Name],
                 -- Keep the renamed imports regardless.  They are not
@@ -971,27 +973,11 @@ type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
 data ImportAvails
    = ImportAvails {
         imp_mods :: ImportedMods,
-          --      = ModuleEnv [(ModuleName, Bool, SrcSpan, Bool)],
+          --      = ModuleEnv [ImportedModsVal],
           -- ^ Domain is all directly-imported modules
-          -- The 'ModuleName' is what the module was imported as, e.g. in
-          -- @
-          --     import Foo as Bar
-          -- @
-          -- it is @Bar@.
           --
-          -- The 'Bool' means:
-          --
-          --  - @True@ => import was @import Foo ()@
-          --
-          --  - @False@ => import was some other form
-          --
-          -- Used
-          --
-          --   (a) to help construct the usage information in the interface
-          --       file; if we import something we need to recompile if the
-          --       export version changes
-          --
-          --   (b) to specify what child modules to initialise
+          -- See the documentaion on ImportedModsVal in HscTypes for the
+          -- meaning of the fields.
           --
           -- We need a full ModuleEnv rather than a ModuleNameEnv here,
           -- because we might be importing modules of the same name from

@@ -111,7 +111,7 @@ import GHC.CString
 import GHC.Magic
 import GHC.Prim
 import GHC.Err
-import {-# SOURCE #-} GHC.IO (failIO)
+import {-# SOURCE #-} GHC.IO (failIO,mplusIO)
 
 import GHC.Tuple ()     -- Note [Depend on GHC.Tuple]
 import GHC.Integer ()   -- Note [Depend on GHC.Integer]
@@ -479,6 +479,11 @@ class Applicative m => Monad m where
     -- | Fail with a message.  This operation is not part of the
     -- mathematical definition of a monad, but is invoked on pattern-match
     -- failure in a @do@ expression.
+    --
+    -- As part of the MonadFail proposal (MFP), this function is moved
+    -- to its own class 'MonadFail' (see "Control.Monad.Fail" for more
+    -- details). The definition here will be removed in a future
+    -- release.
     fail        :: String -> m a
     fail s      = error s
 
@@ -1073,6 +1078,12 @@ instance  Monad IO  where
     (>>)      = (*>)
     (>>=)     = bindIO
     fail s    = failIO s
+
+instance Alternative IO where
+    empty = failIO "mzero"
+    (<|>) = mplusIO
+
+instance MonadPlus IO
 
 returnIO :: a -> IO a
 returnIO x = IO $ \ s -> (# s, x #)

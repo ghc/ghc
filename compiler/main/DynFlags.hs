@@ -172,10 +172,8 @@ import SrcLoc
 import BasicTypes       ( IntWithInf, treatZeroAsInf )
 import FastString
 import Outputable
-#ifdef GHCI
 import Foreign.C        ( CInt(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
-#endif
 import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessage )
 
 import System.IO.Unsafe ( unsafePerformIO )
@@ -393,6 +391,7 @@ data GeneralFlag
    | Opt_EagerBlackHoling
    | Opt_NoHsMain
    | Opt_SplitObjs
+   | Opt_SplitSections
    | Opt_StgStats
    | Opt_HideAllPackages
    | Opt_PrintBindResult
@@ -1285,7 +1284,10 @@ wayUnsetGeneralFlags _ WayDyn      = [-- There's no point splitting objects
                                       -- when we're going to be dynamically
                                       -- linking. Plus it breaks compilation
                                       -- on OSX x86.
-                                      Opt_SplitObjs]
+                                      Opt_SplitObjs,
+                                      -- If splitobjs wasn't useful for this,
+                                      -- assume sections aren't either.
+                                      Opt_SplitSections]
 wayUnsetGeneralFlags _ WayProf     = []
 wayUnsetGeneralFlags _ WayEventLog = []
 
@@ -1580,9 +1582,10 @@ defaultWays settings = if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
                        else []
 
 interpWays :: [Way]
-interpWays = if dynamicGhc
-             then [WayDyn]
-             else []
+interpWays
+  | dynamicGhc = [WayDyn]
+  | rtsIsProfiled = [WayProf]
+  | otherwise = []
 
 --------------------------------------------------------------------------
 
@@ -2327,6 +2330,15 @@ dynamic_flags = [
                 then setGeneralFlag Opt_SplitObjs
                 else addWarn "ignoring -fsplit-objs"))
 
+  , defGhcFlag "split-sections"
+      (noArgM (\dflags -> do
+        if platformHasSubsectionsViaSymbols (targetPlatform dflags)
+          then do addErr $
+                    "-split-sections is not useful on this platform " ++
+                    "since it always uses subsections via symbols."
+                  return dflags
+          else return (gopt_set dflags Opt_SplitSections)))
+
         -------- ghc -M -----------------------------------------------------
   , defGhcFlag "dep-suffix"               (hasArg addDepSuffix)
   , defGhcFlag "dep-makefile"             (hasArg setDepMakefile)
@@ -2410,9 +2422,9 @@ dynamic_flags = [
                                      deprecate "Use -fno-force-recomp instead"))
   , defGhcFlag "no-recomp" (NoArg (do setGeneralFlag Opt_ForceRecomp
                                       deprecate "Use -fforce-recomp instead"))
-  , defGhcFlag "freverse-errors"
+  , defFlag "freverse-errors"
       (noArg (\d -> d {reverseErrors = True} ))
-  , defGhcFlag "fno-reverse-errors"
+  , defFlag "fno-reverse-errors"
       (noArg (\d -> d {reverseErrors = False} ))
 
         ------ HsCpp opts ---------------------------------------------------
@@ -3493,14 +3505,12 @@ glasgowExtsFlags = [
            , Opt_UnicodeSyntax
            , Opt_UnliftedFFITypes ]
 
-#ifdef GHCI
 -- Consult the RTS to find whether GHC itself has been built profiled
 -- If so, you can't use Template Haskell
 foreign import ccall unsafe "rts_isProfiled" rtsIsProfiledIO :: IO CInt
 
 rtsIsProfiled :: Bool
 rtsIsProfiled = unsafeDupablePerformIO rtsIsProfiledIO /= 0
-#endif
 
 #ifdef GHCI
 -- Consult the RTS to find whether GHC itself has been built with
@@ -4126,6 +4136,8 @@ compilerInfo dflags
                                        then "YES" else "NO"),
        ("GHC Dynamic",                 if dynamicGhc
                                        then "YES" else "NO"),
+       ("GHC Profiled",                if rtsIsProfiled
+                                       then "YES" else "NO"),
        ("Leading underscore",          cLeadingUnderscore),
        ("Debug on",                    show debugIsOn),
        ("LibDir",                      topDir dflags),
@@ -4217,6 +4229,14 @@ makeDynFlagsConsistent dflags
            "Enabling -fPIC as it is always on for this platform"
  | Left err <- checkOptLevel (optLevel dflags) dflags
     = loop (updOptLevel 0 dflags) err
+
+ | LinkInMemory <- ghcLink dflags
+ , rtsIsProfiled
+ , isObjectTarget (hscTarget dflags)
+ , WayProf `notElem` ways dflags
+    = loop dflags{ways = WayProf : ways dflags}
+         "Enabling -prof, because -fobject-code is enabled and GHCi is profiled"
+
  | otherwise = (dflags, [])
     where loc = mkGeneralSrcSpan (fsLit "when making flags consistent")
           loop updated_dflags warning

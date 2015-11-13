@@ -6,6 +6,7 @@ import Language.Haskell.TH.Syntax
 import AnnHelper
 import TestModule
 import TestModuleTH
+import System.IO
 
 main = do
   $(do
@@ -24,3 +25,4 @@ main = do
     anns <- reifyAnnotations (AnnLookupName 'TestTypeTH)
     runIO $ print (anns :: [String])
     [| return () |] )
+  hFlush stdout

@@ -1,1 +1,3 @@
 ioprof: a
+CallStack:
+  error, called at ioprof.hs:23:22 in main:Main

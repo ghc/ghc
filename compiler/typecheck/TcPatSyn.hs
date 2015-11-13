@@ -218,7 +218,7 @@ tc_patsyn_finish lname dir is_infix lpat'
              theta   = prov_theta ++ req_theta
              arg_tys = map (varType . fst) wrapped_args
 
-       ; (patSyn, matcher_bind) <- fixM $ \ ~(patSyn,_) -> do {
+       ;
 
         traceTc "tc_patsyn_finish {" $
            ppr (unLoc lname) $$ ppr (unLoc lpat') $$
@@ -237,7 +237,7 @@ tc_patsyn_finish lname dir is_infix lpat'
 
        -- Make the 'builder'
        ; builder_id <- mkPatSynBuilderId dir lname qtvs theta
-                                         arg_tys pat_ty patSyn
+                                         arg_tys pat_ty
 
          -- TODO: Make this have the proper information
        ; let mkFieldLabel name = FieldLabel (occNameFS (nameOccName name)) False name
@@ -245,14 +245,13 @@ tc_patsyn_finish lname dir is_infix lpat'
 
 
        -- Make the PatSyn itself
-       ; let patSyn' = mkPatSyn (unLoc lname) is_infix
+       ; let patSyn = mkPatSyn (unLoc lname) is_infix
                         (univ_tvs, req_theta)
                         (ex_tvs, prov_theta)
                         arg_tys
                         pat_ty
                         matcher_id builder_id
                         field_labels'
-       ; return (patSyn', matcher_bind) }
 
        -- Selectors
        ; let (sigs, selector_binds) =
@@ -331,27 +330,27 @@ tcPatSynMatcher (L loc name) lpat
              body = mkLHsWrap (mkWpLet req_ev_binds) $
                     L (getLoc lpat) $
                     HsCase (nlHsVar scrutinee) $
-                    MG{ mg_alts = cases
+                    MG{ mg_alts = L (getLoc lpat) cases
                       , mg_arg_tys = [pat_ty]
                       , mg_res_ty = res_ty
                       , mg_origin = Generated
                       }
              body' = noLoc $
                      HsLam $
-                     MG{ mg_alts = [mkSimpleMatch args body]
+                     MG{ mg_alts = noLoc [mkSimpleMatch args body]
                        , mg_arg_tys = [pat_ty, cont_ty, res_ty]
                        , mg_res_ty = res_ty
                        , mg_origin = Generated
                        }
-             match = mkMatch [] (mkHsLams (res_tv:univ_tvs) req_dicts body') EmptyLocalBinds
-             mg = MG{ mg_alts = [match]
+             match = mkMatch [] (mkHsLams (res_tv:univ_tvs) req_dicts body')
+                             (noLoc EmptyLocalBinds)
+             mg = MG{ mg_alts = L (getLoc match) [match]
                     , mg_arg_tys = []
                     , mg_res_ty = res_ty
                     , mg_origin = Generated
                     }
 
        ; let bind = FunBind{ fun_id = L loc matcher_id
-                           , fun_infix = False
                            , fun_matches = mg
                            , fun_co_fn = idHsWrapper
                            , bind_fvs = emptyNameSet
@@ -387,9 +386,9 @@ isUnidirectional ExplicitBidirectional{} = False
 -}
 
 mkPatSynBuilderId :: HsPatSynDir a -> Located Name
-                  -> [TyVar] -> ThetaType -> [Type] -> Type -> PatSyn
+                  -> [TyVar] -> ThetaType -> [Type] -> Type
                   -> TcM (Maybe (Id, Bool))
-mkPatSynBuilderId dir  (L _ name) qtvs theta arg_tys pat_ty pat_syn
+mkPatSynBuilderId dir  (L _ name) qtvs theta arg_tys pat_ty
   | isUnidirectional dir
   = return Nothing
   | otherwise
@@ -397,8 +396,7 @@ mkPatSynBuilderId dir  (L _ name) qtvs theta arg_tys pat_ty pat_syn
        ; let builder_sigma = mkSigmaTy qtvs theta (mkFunTys builder_arg_tys pat_ty)
              builder_id    =
               -- See Note [Exported LocalIds] in Id
-              mkExportedLocalId (PatSynBuilderId pat_syn)
-                                builder_name builder_sigma
+              mkExportedLocalId VanillaId builder_name builder_sigma
        ; return (Just (builder_id, need_dummy_arg)) }
   where
     builder_arg_tys | need_dummy_arg = [voidPrimTy]
@@ -427,7 +425,6 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
                           | otherwise      = match_group
 
              bind = FunBind { fun_id      = L loc (idName builder_id)
-                            , fun_infix   = False
                             , fun_matches = match_group'
                             , fun_co_fn   = idHsWrapper
                             , bind_fvs    = placeHolderNamesTc
@@ -449,9 +446,9 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
 
     mk_mg :: LHsExpr Name -> MatchGroup Name (LHsExpr Name)
     mk_mg body = mkMatchGroupName Generated [builder_match]
-               where
-                 builder_args  = [L loc (VarPat n) | L loc n <- args]
-                 builder_match = mkMatch builder_args body EmptyLocalBinds
+             where
+               builder_args  = [L loc (VarPat n) | L loc n <- args]
+               builder_match = mkMatch builder_args body (noLoc EmptyLocalBinds)
 
     args = case details of
               PrefixPatSyn args     -> args
@@ -459,8 +456,10 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
               RecordPatSyn args     -> map recordPatSynPatVar args
 
     add_dummy_arg :: MatchGroup Name (LHsExpr Name) -> MatchGroup Name (LHsExpr Name)
-    add_dummy_arg mg@(MG { mg_alts = [L loc (Match Nothing [] ty grhss)] })
-      = mg { mg_alts = [L loc (Match Nothing [nlWildPatName] ty grhss)] }
+    add_dummy_arg mg@(MG { mg_alts
+                            = L l [L loc (Match NonFunBindMatch [] ty grhss)] })
+      = mg { mg_alts
+                = L l [L loc (Match NonFunBindMatch [nlWildPatName] ty grhss)] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches (PatSyn :: HsMatchContext Name) other_mg
 

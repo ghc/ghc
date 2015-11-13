@@ -102,6 +102,7 @@ enum
     MEM_RESERVE_AND_COMMIT = MEM_RESERVE | MEM_COMMIT
 };
 
+/* Returns NULL on failure; errno set */
 static void *
 my_mmap (void *addr, W_ size, int operation)
 {
@@ -196,6 +197,19 @@ my_mmap (void *addr, W_ size, int operation)
 #endif
 
     if (ret == (void *)-1) {
+        return NULL;
+    }
+
+    return ret;
+}
+
+/* Variant of my_mmap which aborts in the case of an error */
+static void *
+my_mmap_or_barf (void *addr, W_ size, int operation)
+{
+    void *ret = my_mmap(addr, size, operation);
+
+    if (ret == NULL) {
         if (errno == ENOMEM ||
             (errno == EINVAL && sizeof(void*)==4 && size >= 0xc0000000)) {
             // If we request more than 3Gig, then we get EINVAL
@@ -222,7 +236,7 @@ gen_map_mblocks (W_ size)
     // Try to map a larger block, and take the aligned portion from
     // it (unmap the rest).
     size += MBLOCK_SIZE;
-    ret = my_mmap(0, size, MEM_RESERVE_AND_COMMIT);
+    ret = my_mmap_or_barf(0, size, MEM_RESERVE_AND_COMMIT);
 
     // unmap the slop bits around the chunk we allocated
     slop = (W_)ret & MBLOCK_MASK;
@@ -261,7 +275,7 @@ osGetMBlocks(nat n)
       // use gen_map_mblocks the first time.
       ret = gen_map_mblocks(size);
   } else {
-      ret = my_mmap(next_request, size, MEM_RESERVE_AND_COMMIT);
+      ret = my_mmap_or_barf(next_request, size, MEM_RESERVE_AND_COMMIT);
 
       if (((W_)ret & MBLOCK_MASK) != 0) {
           // misaligned block!
@@ -387,6 +401,9 @@ osTryReserveHeapMemory (W_ len, void *hint)
        and then we discard what we don't need */
 
     base = my_mmap(hint, len + MBLOCK_SIZE, MEM_RESERVE);
+    if (base == NULL)
+        return NULL;
+
     top = (void*)((W_)base + len + MBLOCK_SIZE);
 
     if (((W_)base & MBLOCK_MASK) != 0) {
@@ -407,7 +424,7 @@ osTryReserveHeapMemory (W_ len, void *hint)
     return start;
 }
 
-void *osReserveHeapMemory(W_ len)
+void *osReserveHeapMemory(W_ *len)
 {
     int attempt;
     void *at;
@@ -419,15 +436,43 @@ void *osReserveHeapMemory(W_ len)
        libraries are position independent but cannot be loaded about 4GB.
 
        We do so with a hint to the mmap, and we verify the OS satisfied our
-       hint. We loop a few times in case there is already something allocated
-       there, but we bail if we cannot allocate at all.
+       hint. We loop, shifting our hint by 1 BLOCK_SIZE every time, in case
+       there is already something allocated there.
+
+       Some systems impose resource limits restricting the amount of memory we
+       can request (see, e.g. #10877). If mmap fails we halve our allocation
+       request and try again. If our request size gets absurdly small we simply
+       give up.
+
     */
 
     attempt = 0;
-    do {
+    while (1) {
+        if (*len < MBLOCK_SIZE) {
+            // Give up if the system won't even give us 16 blocks worth of heap
+            barf("osReserveHeapMemory: Failed to allocate heap storage");
+        }
+
         void *hint = (void*)((W_)8 * (1 << 30) + attempt * BLOCK_SIZE);
-        at = osTryReserveHeapMemory(len, hint);
-    } while ((W_)at < ((W_)8 * (1 << 30)));
+        at = osTryReserveHeapMemory(*len, hint);
+        if (at == NULL) {
+            // This means that mmap failed which we take to mean that we asked
+            // for too much memory. This can happen due to POSIX resource
+            // limits. In this case we reduce our allocation request by a factor
+            // of two and try again.
+            *len /= 2;
+        } else if ((W_)at >= ((W_)8 * (1 << 30))) {
+            // Success! We were given a block of memory starting above the 8 GB
+            // mark, which is what we were looking for.
+            break;
+        } else {
+            // We got addressing space but it wasn't above the 8GB mark.
+            // Try again.
+            if (munmap(at, *len) < 0) {
+                sysErrorBelch("unable to release reserved heap");
+            }
+        }
+    }
 
     return at;
 }

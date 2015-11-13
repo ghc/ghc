@@ -48,9 +48,9 @@ test('TypeFamilyInstanceLHS', normal, compile, ['-ddump-types -fno-warn-partial-
 test('Uncurry', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('UncurryNamed', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('WarningWildcardInstantiations', normal, compile, ['-ddump-types'])
-test('SplicesUsed', [req_interp, only_compiler_types(['ghc']), when(compiler_profiled(), skip),
+test('SplicesUsed', [req_interp, only_compiler_types(['ghc']),
                      extra_clean(['Splices.o', 'Splices.hi'])],
-     multimod_compile, ['SplicesUsed', ''])
+     multimod_compile, ['SplicesUsed', config.ghc_th_way_flags])
 test('TypedSplice', [req_interp, normal], compile, [''])
 test('T10403', normal, compile, [''])
 test('T10438', normal, compile, [''])

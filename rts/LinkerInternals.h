@@ -19,12 +19,12 @@ typedef enum {
    the GC for deciding whether or not a pointer on the stack
    is a code pointer.
 */
-typedef 
+typedef
    enum { SECTIONKIND_CODE_OR_RODATA,
           SECTIONKIND_RWDATA,
           SECTIONKIND_INIT_ARRAY,
           SECTIONKIND_OTHER,
-          SECTIONKIND_NOINFOAVAIL } 
+          SECTIONKIND_NOINFOAVAIL }
    SectionKind;
 
 typedef
@@ -36,7 +36,7 @@ typedef
    SectionAlloc;
 
 typedef
-   struct _Section { 
+   struct _Section {
       void* start;                /* actual start of section in memory */
       StgWord size;               /* actual size of section in memory */
       SectionKind kind;
@@ -122,11 +122,9 @@ typedef struct _ObjectCode {
     /* flag used when deciding whether to unload an object file */
     int        referenced;
 
-#ifdef darwin_HOST_OS
     /* record by how much image has been deliberately misaligned
        after allocation, so that we can use realloc */
     int        misalignment;
-#endif
 
     /* The section-kind entries for this object module.  Linked
        list. */

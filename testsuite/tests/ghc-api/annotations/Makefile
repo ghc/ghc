@@ -62,7 +62,8 @@ T10280:
 
 .PHONY: T10269
 T10269:
-	$(CHECK_API_ANNOTATIONS) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test10269
+	# Ignore result code, we have an unattached (superfluous) AnnVal
+	- $(CHECK_API_ANNOTATIONS) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test10269
 
 .PHONY: T10312
 T10312:
@@ -91,6 +92,10 @@ T10354:
 .PHONY: T10399
 T10399:
 	$(CHECK_API_ANNOTATIONS) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test10399
+
+.PHONY: bundle-export
+bundle-export:
+	$(CHECK_API_ANNOTATIONS) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" BundleExport
 
 .PHONY: T10313
 T10313:

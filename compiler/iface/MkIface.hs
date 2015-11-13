@@ -1031,9 +1031,9 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
 
         (is_direct_import, imp_safe)
             = case lookupModuleEnv direct_imports mod of
-                Just ((_,_,_,safe):_xs) -> (True, safe)
-                Just _                  -> pprPanic "mkUsage: empty direct import" Outputable.empty
-                Nothing                 -> (False, safeImplicitImpsReq dflags)
+                Just (imv : _xs) -> (True, imv_is_safe imv)
+                Just _           -> pprPanic "mkUsage: empty direct import" Outputable.empty
+                Nothing          -> (False, safeImplicitImpsReq dflags)
                 -- Nothing case is for implicit imports like 'System.IO' when 'putStrLn'
                 -- is used in the source code. We require them to be safe in Safe Haskell
 
@@ -1080,7 +1080,7 @@ mkIfaceExports exports
   = sortBy stableAvailCmp (map sort_subs exports)
   where
     sort_subs :: AvailInfo -> AvailInfo
-    sort_subs (Avail n) = Avail n
+    sort_subs (Avail b n) = Avail b n
     sort_subs (AvailTC n [] fs) = AvailTC n [] (sort_flds fs)
     sort_subs (AvailTC n (m:ms) fs)
        | n==m      = AvailTC n (m:sortBy stableNameCmp ms) (sort_flds fs)

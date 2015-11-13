@@ -184,7 +184,7 @@ pprMaybeExp i (Just e) = pprExp i e
 ------------------------------
 instance Ppr Stmt where
     ppr (BindS p e) = ppr p <+> text "<-" <+> ppr e
-    ppr (LetS ds) = text "let" <+> ppr ds
+    ppr (LetS ds) = text "let" <+> (braces $ sep $ punctuate semi $ map ppr ds)
     ppr (NoBindS e) = ppr e
     ppr (ParS sss) = sep $ punctuate (text "|")
                          $ map (sep . punctuate comma . map ppr) sss

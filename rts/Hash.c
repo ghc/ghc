@@ -58,7 +58,7 @@ struct hashtable {
  * -------------------------------------------------------------------------- */
 
 int
-hashWord(HashTable *table, StgWord key)
+hashWord(const HashTable *table, StgWord key)
 {
     int bucket;
 
@@ -76,7 +76,7 @@ hashWord(HashTable *table, StgWord key)
 }
 
 int
-hashStr(HashTable *table, char *key)
+hashStr(const HashTable *table, char *key)
 {
     int h, bucket;
     char *s;
@@ -187,7 +187,7 @@ expand(HashTable *table)
 }
 
 void *
-lookupHashTable(HashTable *table, StgWord key)
+lookupHashTable(const HashTable *table, StgWord key)
 {
     int bucket;
     int segment;

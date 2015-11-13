@@ -340,6 +340,8 @@ eval_obj:
             RETURN_TO_SCHEDULER(ThreadInterpret, StackOverflow);
         }
 
+        ENTER_CCS_THUNK(cap,ap);
+
         /* Ok; we're safe.  Party on.  Push an update frame. */
         Sp -= sizeofW(StgUpdateFrame);
         {
@@ -529,7 +531,7 @@ do_return_unboxed:
         // get the offset of the stg_ctoi_ret_XXX itbl
         offset = stack_frame_sizeW((StgClosure *)Sp);
 
-        switch (get_itbl((StgClosure *)Sp+offset)->type) {
+        switch (get_itbl((StgClosure*)((StgPtr)Sp+offset))->type) {
 
         case RET_BCO:
             // Returning to an interpreted continuation: put the object on
@@ -883,7 +885,7 @@ run_BCO:
                   // the BCO
                   size_words = BCO_BITMAP_SIZE(obj) + 2;
                   new_aps = (StgAP_STACK *) allocate(cap, AP_STACK_sizeW(size_words));
-                  SET_HDR(new_aps,&stg_AP_STACK_info,CCS_SYSTEM);
+                  SET_HDR(new_aps,&stg_AP_STACK_info,cap->r.rCCCS);
                   new_aps->size = size_words;
                   new_aps->fun = &stg_dummy_ret_closure;
 
@@ -1098,7 +1100,7 @@ run_BCO:
             ap = (StgAP*)allocate(cap, AP_sizeW(n_payload));
             Sp[-1] = (W_)ap;
             ap->n_args = n_payload;
-            SET_HDR(ap, &stg_AP_info, CCS_SYSTEM/*ToDo*/)
+            SET_HDR(ap, &stg_AP_info, cap->r.rCCCS)
             Sp --;
             goto nextInsn;
         }
@@ -1109,7 +1111,7 @@ run_BCO:
             ap = (StgAP*)allocate(cap, AP_sizeW(n_payload));
             Sp[-1] = (W_)ap;
             ap->n_args = n_payload;
-            SET_HDR(ap, &stg_AP_NOUPD_info, CCS_SYSTEM/*ToDo*/)
+            SET_HDR(ap, &stg_AP_NOUPD_info, cap->r.rCCCS)
             Sp --;
             goto nextInsn;
         }
@@ -1122,7 +1124,7 @@ run_BCO:
             Sp[-1] = (W_)pap;
             pap->n_args = n_payload;
             pap->arity = arity;
-            SET_HDR(pap, &stg_PAP_info, CCS_SYSTEM/*ToDo*/)
+            SET_HDR(pap, &stg_PAP_info, cap->r.rCCCS)
             Sp --;
             goto nextInsn;
         }
@@ -1192,7 +1194,7 @@ run_BCO:
                                                itbl->layout.payload.nptrs );
             StgClosure* con = (StgClosure*)allocate_NONUPD(cap,request);
             ASSERT( itbl->layout.payload.ptrs + itbl->layout.payload.nptrs > 0);
-            SET_HDR(con, (StgInfoTable*)BCO_LIT(o_itbl), CCS_SYSTEM/*ToDo*/);
+            SET_HDR(con, (StgInfoTable*)BCO_LIT(o_itbl), cap->r.rCCCS);
             for (i = 0; i < n_words; i++) {
                 con->payload[i] = (StgClosure*)Sp[i];
             }

@@ -7,6 +7,9 @@
 module Avail (
     Avails,
     AvailInfo(..),
+    IsPatSyn(..),
+    avail,
+    patSynAvail,
     availsToNameSet,
     availsToNameSetWithSelectors,
     availsToNameEnv,
@@ -31,7 +34,7 @@ import Data.Function
 -- The AvailInfo type
 
 -- | Records what things are "available", i.e. in scope
-data AvailInfo = Avail Name      -- ^ An ordinary identifier in scope
+data AvailInfo = Avail IsPatSyn Name      -- ^ An ordinary identifier in scope
                | AvailTC Name
                          [Name]
                          [FieldLabel]
@@ -51,6 +54,8 @@ data AvailInfo = Avail Name      -- ^ An ordinary identifier in scope
                 deriving( Eq )
                         -- Equality used when deciding if the
                         -- interface has changed
+
+data IsPatSyn = NotPatSyn | IsPatSyn deriving Eq
 
 -- | A collection of 'AvailInfo' - several things that are \"available\"
 type Avails = [AvailInfo]
@@ -105,13 +110,19 @@ modules.
 
 -- | Compare lexicographically
 stableAvailCmp :: AvailInfo -> AvailInfo -> Ordering
-stableAvailCmp (Avail n1)         (Avail n2)     = n1 `stableNameCmp` n2
+stableAvailCmp (Avail _ n1)       (Avail _ n2)   = n1 `stableNameCmp` n2
 stableAvailCmp (Avail {})         (AvailTC {})   = LT
 stableAvailCmp (AvailTC n ns nfs) (AvailTC m ms mfs) =
     (n `stableNameCmp` m) `thenCmp`
     (cmpList stableNameCmp ns ms) `thenCmp`
     (cmpList (stableNameCmp `on` flSelector) nfs mfs)
 stableAvailCmp (AvailTC {})       (Avail {})     = GT
+
+patSynAvail :: Name -> AvailInfo
+patSynAvail n = Avail IsPatSyn n
+
+avail :: Name -> AvailInfo
+avail n = Avail NotPatSyn n
 
 -- -----------------------------------------------------------------------------
 -- Operations on AvailInfo
@@ -132,29 +143,28 @@ availsToNameEnv avails = foldr add emptyNameEnv avails
 -- | Just the main name made available, i.e. not the available pieces
 -- of type or class brought into scope by the 'GenAvailInfo'
 availName :: AvailInfo -> Name
-availName (Avail n)       = n
+availName (Avail _ n)     = n
 availName (AvailTC n _ _) = n
 
 -- | All names made available by the availability information (excluding overloaded selectors)
 availNames :: AvailInfo -> [Name]
-availNames (Avail n)         = [n]
+availNames (Avail _ n)         = [n]
 availNames (AvailTC _ ns fs) = ns ++ [ flSelector f | f <- fs, not (flIsOverloaded f) ]
 
 -- | All names made available by the availability information (including overloaded selectors)
 availNamesWithSelectors :: AvailInfo -> [Name]
-availNamesWithSelectors (Avail n)         = [n]
+availNamesWithSelectors (Avail _ n)         = [n]
 availNamesWithSelectors (AvailTC _ ns fs) = ns ++ map flSelector fs
 
 -- | Names for non-fields made available by the availability information
 availNonFldNames :: AvailInfo -> [Name]
-availNonFldNames (Avail n)        = [n]
+availNonFldNames (Avail _ n)        = [n]
 availNonFldNames (AvailTC _ ns _) = ns
 
 -- | Fields made available by the availability information
 availFlds :: AvailInfo -> [FieldLabel]
 availFlds (AvailTC _ _ fs) = fs
 availFlds _                = []
-
 
 -- -----------------------------------------------------------------------------
 -- Printing
@@ -163,13 +173,14 @@ instance Outputable AvailInfo where
    ppr = pprAvail
 
 pprAvail :: AvailInfo -> SDoc
-pprAvail (Avail n)         = ppr n
+pprAvail (Avail _ n)         = ppr n
 pprAvail (AvailTC n ns fs) = ppr n <> braces (hsep (punctuate comma (map ppr ns ++ map (ppr . flLabel) fs)))
 
 instance Binary AvailInfo where
-    put_ bh (Avail aa) = do
+    put_ bh (Avail b aa) = do
             putByte bh 0
             put_ bh aa
+            put_ bh b
     put_ bh (AvailTC ab ac ad) = do
             putByte bh 1
             put_ bh ab
@@ -179,8 +190,18 @@ instance Binary AvailInfo where
             h <- getByte bh
             case h of
               0 -> do aa <- get bh
-                      return (Avail aa)
+                      b  <- get bh
+                      return (Avail b aa)
               _ -> do ab <- get bh
                       ac <- get bh
                       ad <- get bh
                       return (AvailTC ab ac ad)
+
+instance Binary IsPatSyn where
+  put_ bh IsPatSyn = putByte bh 0
+  put_ bh NotPatSyn = putByte bh 1
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return IsPatSyn
+      _ -> return NotPatSyn

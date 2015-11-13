@@ -43,6 +43,7 @@ import Packages
 import HeaderInfo
 import DriverPhases
 import SysTools
+import Elf
 import HscMain
 import Finder
 import HscTypes hiding ( Hsc )
@@ -72,7 +73,6 @@ import System.IO
 import Control.Monad
 import Data.List        ( isSuffixOf )
 import Data.Maybe
-import Data.Char
 import Data.Time
 import Data.Version
 
@@ -447,9 +447,15 @@ checkLinkInfo dflags pkg_deps exe_file
  = do
    link_info <- getLinkInfo dflags pkg_deps
    debugTraceMsg dflags 3 $ text ("Link info: " ++ link_info)
-   m_exe_link_info <- readElfSection dflags ghcLinkInfoSectionName exe_file
-   debugTraceMsg dflags 3 $ text ("Exe link info: " ++ show m_exe_link_info)
-   return (Just link_info /= m_exe_link_info)
+   m_exe_link_info <- readElfNoteAsString dflags exe_file
+                          ghcLinkInfoSectionName ghcLinkInfoNoteName
+   let sameLinkInfo = (Just link_info == m_exe_link_info)
+   debugTraceMsg dflags 3 $ case m_exe_link_info of
+     Nothing -> text "Exe link info: Not found"
+     Just s
+       | sameLinkInfo -> text ("Exe link info is the same")
+       | otherwise    -> text ("Exe link info is different: " ++ s)
+   return (not sameLinkInfo)
 
 platformSupportsSavingLinkOpts :: OS -> Bool
 platformSupportsSavingLinkOpts os
@@ -460,6 +466,10 @@ platformSupportsSavingLinkOpts os
 ghcLinkInfoSectionName :: String
 ghcLinkInfoSectionName = ".debug-ghc-link-info"
    -- if we use the ".debug" prefix, then strip will strip it by default
+
+-- Identifier for the note (see Note [LinkInfo section])
+ghcLinkInfoNoteName :: String
+ghcLinkInfoNoteName = "GHC link info"
 
 findHSLib :: DynFlags -> [String] -> String -> IO (Maybe FilePath)
 findHSLib dflags dirs lib = do
@@ -1660,34 +1670,17 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
 
   where
     link_opts info = hcat [
-          -- LinkInfo section must be of type "progbits"
-          -- See Note [LinkInfo section]
-          text "\t.section ", text ghcLinkInfoSectionName,
-                                   text ",\"\",",
-                                   text elfSectionProgBits,
-                                   text "\n",
+      -- "link info" section (see Note [LinkInfo section])
+      makeElfNote dflags ghcLinkInfoSectionName ghcLinkInfoNoteName 0 info,
 
-          text "\t.ascii \"", info', text "\"\n",
-
-          -- ALL generated assembly must have this section to disable
-          -- executable stacks.  See also
-          -- compiler/nativeGen/AsmCodeGen.hs for another instance
-          -- where we need to do this.
-          (if platformHasGnuNonexecStack (targetPlatform dflags)
-           then text ".section .note.GNU-stack,\"\",@progbits\n"
-           else Outputable.empty)
-
-           ]
-          where
-            info' = text $ escape info
-
-            escape :: String -> String
-            escape = concatMap (charToC.fromIntegral.ord)
-
-            elfSectionProgBits :: String
-            elfSectionProgBits = case platformArch (targetPlatform dflags) of
-                                     ArchARM _ _ _ -> "%progbits"
-                                     _             -> "@progbits"
+      -- ALL generated assembly must have this section to disable
+      -- executable stacks.  See also
+      -- compiler/nativeGen/AsmCodeGen.hs for another instance
+      -- where we need to do this.
+      if platformHasGnuNonexecStack (targetPlatform dflags)
+        then text ".section .note.GNU-stack,\"\",@progbits\n"
+        else Outputable.empty
+      ]
 
 -- | Return the "link info" string
 --
@@ -1720,8 +1713,8 @@ changed, we use the link info stored in the existing binary to decide whether
 to re-link or not.
 
 The "link info" string is stored in a ELF section called ".debug-ghc-link-info"
-(see ghcLinkInfoSectionName) with the SHT_PROGBITS type. It used to be of type
-SHT_NOTE without following their specified record-based format (see #11022).
+(see ghcLinkInfoSectionName) with the SHT_NOTE type.  For some time, it used to
+not follow the specified record-based format (see #11022).
 
 -}
 
@@ -1913,6 +1906,10 @@ linkBinary' staticLink dflags o_files dep_packages = do
                              platformArch platform == ArchX86 &&
                              not staticLink
                           then ["-Wl,-read_only_relocs,suppress"]
+                          else [])
+
+                      ++ (if sLdIsGnuLd mySettings
+                          then ["-Wl,--gc-sections"]
                           else [])
 
                       ++ o_files
@@ -2191,7 +2188,7 @@ joinObjectFiles dflags o_files output_fn = do
      then do
           script <- newTempName dflags "ldscript"
           cwd <- getCurrentDirectory
-          let o_files_abs = map (cwd </>) o_files
+          let o_files_abs = map (\x -> "\"" ++ (cwd </> x) ++ "\"") o_files
           writeFile script $ "INPUT(" ++ unwords o_files_abs ++ ")"
           ld_r [SysTools.FileOption "" script] ccInfo
      else if sLdSupportsFilelist mySettings

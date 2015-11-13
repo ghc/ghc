@@ -11,8 +11,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module X86.Ppr (
         pprNatCmmDecl,
-        pprBasicBlock,
-        pprSectionHeader,
         pprData,
         pprInstr,
         pprFormat,
@@ -53,7 +51,7 @@ import Data.Bits
 
 pprNatCmmDecl :: NatCmmDecl (Alignment, CmmStatics) Instr -> SDoc
 pprNatCmmDecl (CmmData section dats) =
-  pprSectionHeader section $$ pprDatas dats
+  pprSectionAlign section $$ pprDatas dats
 
 pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   sdocWithDynFlags $ \dflags ->
@@ -63,7 +61,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
          []     -> -- special case for split markers:
            pprLabel lbl
          blocks -> -- special case for code without info table:
-           pprSectionHeader Text $$
+           pprSectionAlign (Section Text lbl) $$
            pprLabel lbl $$ -- blocks guaranteed not null, so label needed
            vcat (map (pprBasicBlock top_info) blocks) $$
            (if gopt Opt_Debug dflags
@@ -72,21 +70,20 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
 
     Just (Statics info_lbl _) ->
       sdocWithPlatform $ \platform ->
+      pprSectionAlign (Section Text info_lbl) $$
       (if platformHasSubsectionsViaSymbols platform
-          then pprSectionHeader Text $$
-               ppr (mkDeadStripPreventer info_lbl) <> char ':'
+          then ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
       vcat (map (pprBasicBlock top_info) blocks) $$
-         -- above: Even the first block gets a label, because with branch-chain
-         -- elimination, it might be the target of a goto.
-            (if platformHasSubsectionsViaSymbols platform
-             then
-             -- See Note [Subsections Via Symbols]
-                      text "\t.long "
-                  <+> ppr info_lbl
-                  <+> char '-'
-                  <+> ppr (mkDeadStripPreventer info_lbl)
-             else empty) $$
+      -- above: Even the first block gets a label, because with branch-chain
+      -- elimination, it might be the target of a goto.
+      (if platformHasSubsectionsViaSymbols platform
+       then -- See Note [Subsections Via Symbols]
+                text "\t.long "
+            <+> ppr info_lbl
+            <+> char '-'
+            <+> ppr (mkDeadStripPreventer info_lbl)
+       else empty) $$
       (if gopt Opt_Debug dflags
        then ppr (mkAsmTempEndLabel info_lbl) <> char ':' else empty) $$
       pprSizeDecl info_lbl
@@ -96,8 +93,7 @@ pprSizeDecl :: CLabel -> SDoc
 pprSizeDecl lbl
  = sdocWithPlatform $ \platform ->
    if osElfTarget (platformOS platform)
-   then ptext (sLit "\t.size") <+> ppr lbl
-     <> ptext (sLit ", .-") <> ppr lbl
+   then ptext (sLit "\t.size") <+> ppr lbl <> ptext (sLit ", .-") <> ppr lbl
    else empty
 
 pprBasicBlock :: BlockEnv CmmStatics -> NatBasicBlock Instr -> SDoc
@@ -113,7 +109,6 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
        Just (Statics info_lbl info) ->
-           pprSectionHeader Text $$
            infoTableLoc $$
            vcat (map pprData info) $$
            pprLabel info_lbl
@@ -384,56 +379,34 @@ pprAddr (AddrBaseIndex base index displacement)
     ppr_disp (ImmInt 0) = empty
     ppr_disp imm        = pprImm imm
 
-
-pprSectionHeader :: Section -> SDoc
-pprSectionHeader seg =
- sdocWithPlatform $ \platform ->
- case platformOS platform of
- OSDarwin
-  | target32Bit platform ->
-     case seg of
-      Text              -> text ".text\n\t.align 2"
-      Data              -> text ".data\n\t.align 2"
-      ReadOnlyData      -> text ".const\n\t.align 2"
-      RelocatableReadOnlyData
-                        -> text ".const_data\n\t.align 2"
-      UninitialisedData -> text ".data\n\t.align 2"
-      ReadOnlyData16    -> text ".const\n\t.align 4"
-      OtherSection _    -> panic "X86.Ppr.pprSectionHeader: unknown section"
-  | otherwise ->
-     case seg of
-      Text              -> text ".text\n\t.align 3"
-      Data              -> text ".data\n\t.align 3"
-      ReadOnlyData      -> text ".const\n\t.align 3"
-      RelocatableReadOnlyData
-                        -> text ".const_data\n\t.align 3"
-      UninitialisedData -> text ".data\n\t.align 3"
-      ReadOnlyData16    -> text ".const\n\t.align 4"
-      OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section"
- _
-  | target32Bit platform ->
-     case seg of
-      Text              -> text ".text\n\t.align 4,0x90"
-      Data              -> text ".data\n\t.align 4"
-      ReadOnlyData      -> text ".section .rodata\n\t.align 4"
-      RelocatableReadOnlyData
-                        -> text ".section .data\n\t.align 4"
-      UninitialisedData -> text ".section .bss\n\t.align 4"
-      ReadOnlyData16    -> text ".section .rodata\n\t.align 16"
-      OtherSection _    -> panic "X86.Ppr.pprSectionHeader: unknown section"
-  | otherwise ->
-     case seg of
-      Text              -> text ".text\n\t.align 8"
-      Data              -> text ".data\n\t.align 8"
-      ReadOnlyData      -> text ".section .rodata\n\t.align 8"
-      RelocatableReadOnlyData
-                        -> text ".section .data\n\t.align 8"
-      UninitialisedData -> text ".section .bss\n\t.align 8"
-      ReadOnlyData16    -> text ".section .rodata.cst16\n\t.align 16"
-      OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section"
-
-
-
+-- | Print section header and appropriate alignment for that section.
+pprSectionAlign :: Section -> SDoc
+pprSectionAlign (Section (OtherSection _) _) =
+     panic "X86.Ppr.pprSectionAlign: unknown section"
+pprSectionAlign sec@(Section seg _) =
+  sdocWithPlatform $ \platform ->
+    pprSectionHeader platform sec $$
+    ptext (sLit ".align ") <>
+    case platformOS platform of
+      OSDarwin
+       | target32Bit platform ->
+          case seg of
+           ReadOnlyData16    -> int 4
+           _                 -> int 2
+       | otherwise ->
+          case seg of
+           ReadOnlyData16    -> int 4
+           _                 -> int 3
+      _
+       | target32Bit platform ->
+          case seg of
+           Text              -> ptext (sLit "4,0x90")
+           ReadOnlyData16    -> int 16
+           _                 -> int 4
+       | otherwise ->
+          case seg of
+           ReadOnlyData16    -> int 16
+           _                 -> int 8
 
 pprDataItem :: CmmLit -> SDoc
 pprDataItem lit = sdocWithDynFlags $ \dflags -> pprDataItem' dflags lit

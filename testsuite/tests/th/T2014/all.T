@@ -1,5 +1,3 @@
-setTestOpts(when(compiler_profiled(), skip))
-
 test('T2014',
      [req_interp,
       extra_clean(['A.hi-boot','A.hi','A.o','A.o-boot',

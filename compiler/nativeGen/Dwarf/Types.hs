@@ -5,7 +5,7 @@ module Dwarf.Types
   , pprAbbrevDecls
     -- * Dwarf address range table
   , DwarfARange(..)
-  , pprDwarfARange
+  , pprDwarfARanges
     -- * Dwarf frame
   , DwarfFrame(..), DwarfFrameProc(..), DwarfFrameBlock(..)
   , pprDwarfFrame
@@ -43,7 +43,7 @@ import Data.Char
 import CodeGen.Platform
 
 -- | Individual dwarf records. Each one will be encoded as an entry in
--- the .debug_info section.
+-- the @.debug_info@ section.
 data DwarfInfo
   = DwarfCompileUnit { dwChildren :: [DwarfInfo]
                      , dwName :: String
@@ -60,7 +60,7 @@ data DwarfInfo
                , dwMarker :: CLabel }
 
 -- | Abbreviation codes used for encoding above records in the
--- .debug_info section.
+-- @.debug_info@ section.
 data DwarfAbbrev
   = DwAbbrNull          -- ^ Pseudo, used for marking the end of lists
   | DwAbbrCompileUnit
@@ -159,14 +159,12 @@ data DwarfARange
   = DwarfARange
     { dwArngStartLabel :: CLabel
     , dwArngEndLabel   :: CLabel
-    , dwArngUnitUnique :: Unique
-      -- ^ from which the corresponding label in @.debug_info@ is derived
     }
 
 -- | Print assembler directives corresponding to a DWARF @.debug_aranges@
 -- address table entry.
-pprDwarfARange :: DwarfARange -> SDoc
-pprDwarfARange arng = sdocWithPlatform $ \plat ->
+pprDwarfARanges :: [DwarfARange] -> Unique -> SDoc
+pprDwarfARanges arngs unitU = sdocWithPlatform $ \plat ->
   let wordSize = platformWordSize plat
       paddingSize = 4 :: Int
       -- header is 12 bytes long.
@@ -174,21 +172,24 @@ pprDwarfARange arng = sdocWithPlatform $ \plat ->
       -- pad such that first entry begins at multiple of entry size.
       pad n = vcat $ replicate n $ pprByte 0
       initialLength = 8 + paddingSize + 2*2*wordSize
-      length = ppr (dwArngEndLabel arng)
-               <> char '-' <> ppr (dwArngStartLabel arng)
   in pprDwWord (ppr initialLength)
      $$ pprHalf 2
-     $$ sectionOffset (ppr $ mkAsmTempLabel $ dwArngUnitUnique arng)
+     $$ sectionOffset (ppr $ mkAsmTempLabel $ unitU)
                       (ptext dwarfInfoLabel)
      $$ pprByte (fromIntegral wordSize)
      $$ pprByte 0
      $$ pad paddingSize
-     -- beginning of body
-     $$ pprWord (ppr $ dwArngStartLabel arng)
-     $$ pprWord length
+     -- body
+     $$ vcat (map pprDwarfARange arngs)
      -- terminus
      $$ pprWord (char '0')
      $$ pprWord (char '0')
+
+pprDwarfARange :: DwarfARange -> SDoc
+pprDwarfARange arng = pprWord (ppr $ dwArngStartLabel arng) $$ pprWord length
+  where
+    length = ppr (dwArngEndLabel arng)
+             <> char '-' <> ppr (dwArngStartLabel arng)
 
 -- | Information about unwind instructions for a procedure. This
 -- corresponds to a "Common Information Entry" (CIE) in DWARF.
@@ -218,7 +219,7 @@ data DwarfFrameBlock
     , dwFdeUnwind     :: UnwindTable
     }
 
--- | Header for the .debug_frame section. Here we emit the "Common
+-- | Header for the @.debug_frame@ section. Here we emit the "Common
 -- Information Entry" record that etablishes general call frame
 -- parameters and the default stack layout.
 pprDwarfFrame :: DwarfFrame -> SDoc
@@ -231,6 +232,13 @@ pprDwarfFrame DwarfFrame{dwCieLabel=cieLabel,dwCieInit=cieInit,dwCieProcs=procs}
         retReg      = dwarfReturnRegNo plat
         wordSize    = platformWordSize plat
         pprInit (g, uw) = pprSetUnwind plat g (Nothing, uw)
+
+        -- Preserve C stack pointer: This necessary to override that default
+        -- unwinding behavior of setting $sp = CFA.
+        preserveSp = case platformArch plat of
+          ArchX86    -> pprByte dW_CFA_same_value $$ pprLEBWord 4
+          ArchX86_64 -> pprByte dW_CFA_same_value $$ pprLEBWord 7
+          _          -> empty
     in vcat [ ppr cieLabel <> colon
             , pprData4' length -- Length of CIE
             , ppr cieStartLabel <> colon
@@ -250,8 +258,11 @@ pprDwarfFrame DwarfFrame{dwCieLabel=cieLabel,dwCieInit=cieInit,dwCieProcs=procs}
               pprByte (dW_CFA_offset+retReg)
             , pprByte 0
 
+              -- Preserve C stack pointer
+            , preserveSp
+
               -- Sp' = CFA
-              -- (we need to set this manually as our Sp register is
+              -- (we need to set this manually as our (STG) Sp register is
               -- often not the architecture's default stack register)
             , pprByte dW_CFA_val_offset
             , pprLEBWord (fromIntegral spReg)
@@ -305,7 +316,7 @@ pprFrameBlock oldUws (DwarfFrameBlock blockLbl hasInfo uws)
        vcat (map (uncurry $ pprSetUnwind plat) changed) $$
        vcat (map (pprUndefUnwind plat . fst) died)
 
--- [Note: Info Offset]
+-- Note [Info Offset]
 --
 -- GDB was pretty much written with C-like programs in mind, and as a
 -- result they assume that once you have a return address, it is a
@@ -327,7 +338,8 @@ pprFrameBlock oldUws (DwarfFrameBlock blockLbl hasInfo uws)
 
 -- | Get DWARF register ID for a given GlobalReg
 dwarfGlobalRegNo :: Platform -> GlobalReg -> Word8
-dwarfGlobalRegNo p = maybe 0 (dwarfRegNo p . RegReal) . globalRegMaybe p
+dwarfGlobalRegNo p UnwindReturnReg = dwarfReturnRegNo p
+dwarfGlobalRegNo p reg = maybe 0 (dwarfRegNo p . RegReal) $ globalRegMaybe p reg
 
 -- | Generate code for setting the unwind information for a register,
 -- optimized using its known old value in the table. Note that "Sp" is
@@ -388,7 +400,7 @@ pprUnwindExpr spIsCFA expr
        ptext (sLit "1:")
 
 -- | Generate code for re-setting the unwind information for a
--- register to "undefined"
+-- register to @undefined@
 pprUndefUnwind :: Platform -> GlobalReg -> SDoc
 pprUndefUnwind _    Sp = panic "pprUndefUnwind Sp" -- should never happen
 pprUndefUnwind plat g  = pprByte dW_CFA_undefined $$

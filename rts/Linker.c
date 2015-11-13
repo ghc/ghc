@@ -31,6 +31,7 @@
 #include "GetEnv.h"
 #include "Stable.h"
 #include "RtsSymbols.h"
+#include "Profiling.h"
 
 #if !defined(mingw32_HOST_OS)
 #include "posix/Signals.h"
@@ -103,6 +104,7 @@
 #  include <windows.h>
 #  include <shfolder.h> /* SHGetFolderPathW */
 #  include <math.h>
+#  include <wchar.h>
 #elif defined(darwin_HOST_OS)
 #  define OBJFORMAT_MACHO
 #  include <regex.h>
@@ -161,10 +163,8 @@ typedef void (*init_t) (int argc, char **argv, char **env);
 static HsInt isAlreadyLoaded( pathchar *path );
 static HsInt loadOc( ObjectCode* oc );
 static ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
-                         rtsBool mapped, char *archiveMemberName
-#if (USE_MMAP == 0) && defined (darwin_HOST_OS)
-                       , int misalignment
-#endif
+                         rtsBool mapped, char *archiveMemberName,
+                         int misalignment
                        );
 
 // Use wchar_t for pathnames on Windows (#5697)
@@ -245,6 +245,12 @@ static int ocAllocateSymbolExtras_MachO ( ObjectCode* oc );
 #ifdef powerpc_HOST_ARCH
 static void machoInitSymbolsWithoutUnderscore( void );
 #endif
+#endif
+
+#if defined(OBJFORMAT_PEi386)
+// MingW-w64 is missing these from the implementation. So we have to look them up
+typedef DLL_DIRECTORY_COOKIE(*LPAddDLLDirectory)(PCWSTR NewDirectory);
+typedef WINBOOL(*LPRemoveDLLDirectory)(DLL_DIRECTORY_COOKIE Cookie);
 #endif
 
 static void freeProddableBlocks (ObjectCode *oc);
@@ -833,7 +839,7 @@ addDLL( pathchar *dll_name )
    OpenedDLL* o_dll;
    HINSTANCE  instance;
 
-   /* debugBelch("\naddDLL; dll_name = `%s'\n", dll_name); */
+   IF_DEBUG(linker, debugBelch("\naddDLL; dll_name = `%" PATH_FMT "'\n", dll_name));
 
    /* See if we've already got it, and ignore if so. */
    for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
@@ -853,23 +859,46 @@ addDLL( pathchar *dll_name )
 
    size_t bufsize = pathlen(dll_name) + 10;
    buf = stgMallocBytes(bufsize * sizeof(wchar_t), "addDLL");
-   snwprintf(buf, bufsize, L"%s.DLL", dll_name);
-   instance = LoadLibraryW(buf);
-   if (instance == NULL) {
-       if (GetLastError() != ERROR_MOD_NOT_FOUND) goto error;
-       // KAA: allow loading of drivers (like winspool.drv)
-       snwprintf(buf, bufsize, L"%s.DRV", dll_name);
-       instance = LoadLibraryW(buf);
-       if (instance == NULL) {
-           if (GetLastError() != ERROR_MOD_NOT_FOUND) goto error;
-           // #1883: allow loading of unix-style libfoo.dll DLLs
-           snwprintf(buf, bufsize, L"lib%s.DLL", dll_name);
-           instance = LoadLibraryW(buf);
-           if (instance == NULL) {
-               goto error;
+
+   /* These are ordered by probability of success and order we'd like them */
+   const wchar_t *formats[] = { L"%s.DLL", L"%s.DRV", L"lib%s.DLL", L"%s" };
+   const DWORD flags[]      = { LOAD_LIBRARY_SEARCH_USER_DIRS | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS, 0 };
+
+   int cFormat;
+   int cFlag;
+   int flags_start = 1; // Assume we don't support the new API
+
+   /* Detect if newer API are available, if not, skip the first flags entry */
+   if (GetProcAddress((HMODULE)LoadLibraryW(L"Kernel32.DLL"), "AddDllDirectory")) {
+       flags_start = 0;
+   }
+
+   /* Iterate through the possible flags and formats */
+   for (cFlag = flags_start; cFlag < 2; cFlag++)
+   {
+       for (cFormat = 0; cFormat < 4; cFormat++)
+       {
+           snwprintf(buf, bufsize, formats[cFormat], dll_name);
+           instance = LoadLibraryExW(buf, NULL, flags[cFlag]);
+           if (instance == NULL)
+           {
+               if (GetLastError() != ERROR_MOD_NOT_FOUND)
+               {
+                   goto error;
+               }
+           }
+           else
+           {
+               break; // We're done. DLL has been loaded.
            }
        }
    }
+
+   // Check if we managed to load the DLL
+   if (instance == NULL) {
+       goto error;
+   }
+
    stgFree(buf);
 
    addDLLHandle(dll_name, instance);
@@ -878,7 +907,7 @@ addDLL( pathchar *dll_name )
 
 error:
    stgFree(buf);
-   sysErrorBelch("%" PATH_FMT, dll_name);
+   sysErrorBelch("addDLL: %" PATH_FMT " (Win32 error %lu)", dll_name, GetLastError());
 
    /* LoadLibrary failed; return a ptr to the error msg. */
    return "addDLL: could not load DLL";
@@ -886,6 +915,142 @@ error:
 #  else
    barf("addDLL: not implemented on this platform");
 #  endif
+}
+
+
+/* -----------------------------------------------------------------------------
+* Emits a warning determining that the system is missing a required security
+* update that we need to get access to the proper APIs
+*/
+void warnMissingKBLibraryPaths( void )
+{
+    static HsBool missing_update_warn = HS_BOOL_FALSE;
+    if (!missing_update_warn) {
+        debugBelch("Warning: If linking fails, consider installing KB2533623.\n");
+        missing_update_warn = HS_BOOL_TRUE;
+    }
+}
+
+/* -----------------------------------------------------------------------------
+* appends a directory to the process DLL Load path so LoadLibrary can find it
+*
+* Returns: NULL on failure, or pointer to be passed to removeLibrarySearchPath to
+*          restore the search path to what it was before this call.
+*/
+HsPtr addLibrarySearchPath(pathchar* dll_path)
+{
+    IF_DEBUG(linker, debugBelch("\naddLibrarySearchPath: dll_path = `%" PATH_FMT "'\n", dll_path));
+
+#if defined(OBJFORMAT_PEi386)
+    HINSTANCE hDLL = LoadLibraryW(L"Kernel32.DLL");
+    LPAddDLLDirectory AddDllDirectory = (LPAddDLLDirectory)GetProcAddress((HMODULE)hDLL, "AddDllDirectory");
+
+    HsPtr result = NULL;
+
+    const unsigned int init_buf_size = 4096;
+    int bufsize = init_buf_size;
+
+    // Make sure the path is an absolute path
+    WCHAR* abs_path = malloc(sizeof(WCHAR) * init_buf_size);
+    DWORD wResult = GetFullPathNameW(dll_path, bufsize, abs_path, NULL);
+    if (!wResult){
+        sysErrorBelch("addLibrarySearchPath[GetFullPathNameW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError());
+    }
+    else if (wResult > init_buf_size) {
+        abs_path = realloc(abs_path, sizeof(WCHAR) * wResult);
+        if (!GetFullPathNameW(dll_path, bufsize, abs_path, NULL)) {
+            sysErrorBelch("addLibrarySearchPath[GetFullPathNameW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError());
+        }
+    }
+
+    if (AddDllDirectory) {
+        result = AddDllDirectory(abs_path);
+    }
+    else
+    {
+        warnMissingKBLibraryPaths();
+        WCHAR* str = malloc(sizeof(WCHAR) * init_buf_size);
+        wResult = GetEnvironmentVariableW(L"PATH", str, bufsize);
+
+        if (wResult > init_buf_size) {
+            str = realloc(str, sizeof(WCHAR) * wResult);
+            bufsize = wResult;
+            wResult = GetEnvironmentVariableW(L"PATH", str, bufsize);
+            if (!wResult) {
+                sysErrorBelch("addLibrarySearchPath[GetEnvironmentVariableW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError());
+            }
+        }
+
+        bufsize = wResult + 2 + pathlen(abs_path);
+        wchar_t* newPath = malloc(sizeof(wchar_t) * bufsize);
+
+        wcscpy(newPath, abs_path);
+        wcscat(newPath, L";");
+        wcscat(newPath, str);
+        if (!SetEnvironmentVariableW(L"PATH", (LPCWSTR)newPath)) {
+            sysErrorBelch("addLibrarySearchPath[SetEnvironmentVariableW]: %" PATH_FMT " (Win32 error %lu)", abs_path, GetLastError());
+        }
+
+        free(newPath);
+        free(abs_path);
+
+        return str;
+    }
+
+    if (!result) {
+        sysErrorBelch("addLibrarySearchPath: %" PATH_FMT " (Win32 error %lu)", abs_path, GetLastError());
+        free(abs_path);
+        return NULL;
+    }
+
+    free(abs_path);
+    return result;
+#else
+    (void)(dll_path); // Function not implemented for other platforms.
+    return NULL;
+#endif
+}
+
+/* -----------------------------------------------------------------------------
+* removes a directory from the process DLL Load path
+*
+* Returns: HS_BOOL_TRUE on success, otherwise HS_BOOL_FALSE
+*/
+HsBool removeLibrarySearchPath(HsPtr dll_path_index)
+{
+    IF_DEBUG(linker, debugBelch("\nremoveLibrarySearchPath: ptr = `%p'\n", dll_path_index));
+
+#if defined(OBJFORMAT_PEi386)
+    HsBool result = 0;
+
+    if (dll_path_index != NULL) {
+        HINSTANCE hDLL = LoadLibraryW(L"Kernel32.DLL");
+        LPRemoveDLLDirectory RemoveDllDirectory = (LPRemoveDLLDirectory)GetProcAddress((HMODULE)hDLL, "RemoveDllDirectory");
+
+        if (RemoveDllDirectory) {
+            result = RemoveDllDirectory(dll_path_index);
+            // dll_path_index is now invalid, do not use it after this point.
+        }
+        else
+        {
+            warnMissingKBLibraryPaths();
+
+            result = SetEnvironmentVariableW(L"PATH", (LPCWSTR)dll_path_index);
+
+            free(dll_path_index);
+        }
+
+        if (!result) {
+            sysErrorBelch("removeLibrarySearchPath: (Win32 error %lu)", GetLastError());
+            return HS_BOOL_FALSE;
+        }
+    }
+
+    return result == 0 ? HS_BOOL_TRUE : HS_BOOL_FALSE;
+#else
+    (void)(dll_path_index); // Function not implemented for other platforms.
+    return HS_BOOL_FALSE;
+#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -1300,7 +1465,7 @@ m32_alloc(m32_allocator m32, unsigned int size,
             void * addr = (char*)m32->pages[i].base_addr + alsize;
             m32->pages[i].current_size = alsize + size;
             // increment the counter atomically
-            __sync_fetch_and_add((uint64_t*)m32->pages[i].base_addr, 1);
+            __sync_fetch_and_add((uintptr_t*)m32->pages[i].base_addr, 1);
             return addr;
          }
          // most filled?
@@ -1329,7 +1494,7 @@ m32_alloc(m32_allocator m32, unsigned int size,
       m32->pages[empty].current_size = size+ROUND_UP(8,alignment);
       // Initialize the counter:
       // 1 for the allocator + 1 for the returned allocated memory
-      *((uint64_t*)addr)             = 2;
+      *((uintptr_t*)addr)            = 2;
       return (char*)addr + ROUND_UP(8,alignment);
    }
 }
@@ -1475,11 +1640,7 @@ void freeObjectCode (ObjectCode *oc)
 
 static ObjectCode*
 mkOc( pathchar *path, char *image, int imageSize,
-      rtsBool mapped, char *archiveMemberName
-#if (USE_MMAP == 0) && defined (darwin_HOST_OS)
-    , int misalignment
-#endif
-    ) {
+      rtsBool mapped, char *archiveMemberName, int misalignment ) {
    ObjectCode* oc;
 
    IF_DEBUG(linker, debugBelch("mkOc: start\n"));
@@ -1518,9 +1679,7 @@ mkOc( pathchar *path, char *image, int imageSize,
 #endif
    oc->imageMapped       = mapped;
 
-#if (USE_MMAP == 0) && defined (darwin_HOST_OS)
-   oc->misalignment = misalignment;
-#endif
+   oc->misalignment      = misalignment;
 
    /* chain it onto the list of objects */
    oc->next              = NULL;
@@ -1578,10 +1737,8 @@ static HsInt loadArchive_ (pathchar *path)
 #else
 #error Unknown Darwin architecture
 #endif
-#if (USE_MMAP == 0)
-    int misalignment;
 #endif
-#endif
+    int misalignment = 0;
 
     /* TODO: don't call barf() on error, instead return an error code, freeing
      * all resources correctly.  This function is pretty complex, so it needs
@@ -1841,9 +1998,15 @@ static HsInt loadArchive_ (pathchar *path)
         IF_DEBUG(linker,
                  debugBelch("loadArchive: Found member file `%s'\n", fileName));
 
-        isObject = thisFileNameSize >= 2
-                && fileName[thisFileNameSize - 2] == '.'
-                && fileName[thisFileNameSize - 1] == 'o';
+        isObject =
+               (thisFileNameSize >= 2 &&
+                fileName[thisFileNameSize - 2] == '.' &&
+                fileName[thisFileNameSize - 1] == 'o')
+            || (thisFileNameSize >= 4 &&
+                fileName[thisFileNameSize - 4] == '.' &&
+                fileName[thisFileNameSize - 3] == 'p' &&
+                fileName[thisFileNameSize - 2] == '_' &&
+                fileName[thisFileNameSize - 1] == 'o');
 
         IF_DEBUG(linker, debugBelch("loadArchive: \tthisFileNameSize = %d\n", (int)thisFileNameSize));
         IF_DEBUG(linker, debugBelch("loadArchive: \tisObject = %d\n", isObject));
@@ -1929,10 +2092,7 @@ static HsInt loadArchive_ (pathchar *path)
                     path, (int)thisFileNameSize, fileName);
 
             oc = mkOc(path, image, memberSize, rtsFalse, archiveMemberName
-#if (USE_MMAP == 0) && defined(darwin_HOST_OS)
-                     , misalignment
-#endif
-                     );
+                     , misalignment);
 
             stgFree(archiveMemberName);
 
@@ -2030,9 +2190,7 @@ preloadObjectFile (pathchar *path)
    int r;
    void *image;
    ObjectCode *oc;
-#if (USE_MMAP == 0) && defined(darwin_HOST_OS)
-   int misalignment;
-#endif
+   int misalignment = 0;
 
    r = pathstat(path, &st);
    if (r == -1) {
@@ -2120,11 +2278,7 @@ preloadObjectFile (pathchar *path)
 
 #endif /* USE_MMAP */
 
-   oc = mkOc(path, image, fileSize, rtsTrue, NULL
-#if (USE_MMAP == 0) && defined(darwin_HOST_OS)
-            , misalignment
-#endif
-            );
+   oc = mkOc(path, image, fileSize, rtsTrue, NULL, misalignment);
 
    return oc;
 }
@@ -2279,6 +2433,12 @@ static HsInt resolveObjs_ (void)
             oc->status = OBJECT_RESOLVED;
         }
     }
+
+#ifdef PROFILING
+    // collect any new cost centres & CCSs that were defined during runInit
+    initProfiling2();
+#endif
+
     IF_DEBUG(linker, debugBelch("resolveObjs: done\n"));
     return 1;
 }
@@ -2466,12 +2626,6 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
 static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
 {
   StgWord n;
-#if (USE_MMAP == 0)
-  int misalignment = 0;
-#ifdef darwin_HOST_OS
-  int aligned;
-#endif
-#endif
 
 #if USE_MMAP
   if (USE_CONTIGUOUS_MMAP)
@@ -2510,9 +2664,9 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
     if (oc->symbol_extras == NULL) return 0;
 #else
     // round up to the nearest 4
-    aligned = (oc->fileSize + 3) & ~3;
+    int aligned = (oc->fileSize + 3) & ~3;
 
-    misalignment = oc->misalignment;
+    int misalignment = oc->misalignment;
 
     oc->image -= misalignment;
     oc->image = stgReallocBytes( oc->image,
@@ -2696,11 +2850,7 @@ static void
 ocFlushInstructionCache( ObjectCode *oc )
 {
     /* The main object code */
-    ocFlushInstructionCacheFrom(oc->image
-#ifdef darwin_HOST_OS
-            + oc->misalignment
-#endif
-            , oc->fileSize);
+    ocFlushInstructionCacheFrom(oc->image + oc->misalignment, oc->fileSize);
 
     /* Jump Islands */
     ocFlushInstructionCacheFrom(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);
@@ -2821,7 +2971,6 @@ typedef
    COFF_reloc;
 
 #define sizeof_COFF_reloc 10
-
 
 /* From PE spec doc, section 3.3.2 */
 /* Note use of MYIMAGE_* since IMAGE_* are already defined in
@@ -4026,6 +4175,7 @@ ocRunInit_PEi386 ( ObjectCode *oc )
 #define Elf_Addr    Elf64_Addr
 #define Elf_Word    Elf64_Word
 #define Elf_Sword   Elf64_Sword
+#define Elf_Half    Elf64_Half
 #define Elf_Ehdr    Elf64_Ehdr
 #define Elf_Phdr    Elf64_Phdr
 #define Elf_Shdr    Elf64_Shdr
@@ -4049,6 +4199,7 @@ ocRunInit_PEi386 ( ObjectCode *oc )
 #define Elf_Addr    Elf32_Addr
 #define Elf_Word    Elf32_Word
 #define Elf_Sword   Elf32_Sword
+#define Elf_Half    Elf32_Half
 #define Elf_Ehdr    Elf32_Ehdr
 #define Elf_Phdr    Elf32_Phdr
 #define Elf_Shdr    Elf32_Shdr
@@ -4165,6 +4316,68 @@ PLTSize(void)
 #endif
 
 /*
+
+   Note [Many ELF Sections]
+
+   The normal section number fields in ELF are limited to 16 bits, which runs
+   out of bits when you try to cram in more sections than that.
+
+   To solve this, the fields e_shnum and e_shstrndx in the ELF header have an
+   escape value (different for each case), and the actual section number is
+   stashed into unused fields in the first section header.
+
+   For symbols, there seems to have been no place in the actual symbol table
+   for the extra bits, so the indexes have been moved into an auxilliary
+   section instead.
+   For symbols in sections beyond 0xff00, the symbol's st_shndx will be an
+   escape value (SHN_XINDEX), and the actual 32-bit section number for symbol N
+   is stored at index N in the SHT_SYMTAB_SHNDX table.
+
+   These extensions seem to be undocumented in version 4.1 of the ABI and only
+   appear in the drafts for the "next" version:
+      https://refspecs.linuxfoundation.org/elf/gabi4+/contents.html
+
+*/
+
+static Elf_Word elf_shnum(Elf_Ehdr* ehdr)
+{
+   Elf_Shdr* shdr = (Elf_Shdr*) ((char*)ehdr + ehdr->e_shoff);
+   Elf_Half shnum = ehdr->e_shnum;
+   return shnum != SHN_UNDEF ? shnum : shdr[0].sh_size;
+}
+
+static Elf_Word elf_shstrndx(Elf_Ehdr* ehdr)
+{
+   Elf_Shdr* shdr = (Elf_Shdr*) ((char*)ehdr + ehdr->e_shoff);
+   Elf_Half shstrndx = ehdr->e_shstrndx;
+#if defined(SHN_XINDEX)
+   return shstrndx != SHN_XINDEX ? shstrndx : shdr[0].sh_link;
+#else
+   // some OSes do not support SHN_XINDEX yet, let's revert to
+   // old way
+   return shstrndx;
+#endif
+}
+
+#if defined(SHN_XINDEX)
+static Elf_Word*
+get_shndx_table(Elf_Ehdr* ehdr)
+{
+   Elf_Word  i;
+   char*     ehdrC    = (char*)ehdr;
+   Elf_Shdr* shdr     = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
+   const Elf_Word shnum = elf_shnum(ehdr);
+
+   for (i = 0; i < shnum; i++) {
+     if (shdr[i].sh_type == SHT_SYMTAB_SHNDX) {
+       return (Elf32_Word*)(ehdrC + shdr[i].sh_offset);
+     }
+   }
+   return NULL;
+}
+#endif
+
+/*
  * Generic ELF functions
  */
 
@@ -4173,7 +4386,8 @@ ocVerifyImage_ELF ( ObjectCode* oc )
 {
    Elf_Shdr* shdr;
    Elf_Sym*  stab;
-   int i, j, nent, nstrtab, nsymtabs;
+   int j, nent, nstrtab, nsymtabs;
+   Elf_Word i, shnum, shstrndx;
    char* sh_strtab;
 
    char*     ehdrC = (char*)(oc->image);
@@ -4233,24 +4447,26 @@ ocVerifyImage_ELF ( ObjectCode* oc )
                      return 0;
    }
 
+   shnum = elf_shnum(ehdr);
    IF_DEBUG(linker,debugBelch(
              "\nSection header table: start %ld, n_entries %d, ent_size %d\n",
-             (long)ehdr->e_shoff, ehdr->e_shnum, ehdr->e_shentsize  ));
+             (long)ehdr->e_shoff, shnum, ehdr->e_shentsize  ));
 
    ASSERT (ehdr->e_shentsize == sizeof(Elf_Shdr));
 
    shdr = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
 
-   if (ehdr->e_shstrndx == SHN_UNDEF) {
+   shstrndx = elf_shstrndx(ehdr);
+   if (shstrndx == SHN_UNDEF) {
       errorBelch("%s: no section header string table", oc->fileName);
       return 0;
    } else {
       IF_DEBUG(linker,debugBelch( "Section header string table is section %d\n",
-                          ehdr->e_shstrndx));
-      sh_strtab = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
+                          shstrndx));
+      sh_strtab = ehdrC + shdr[shstrndx].sh_offset;
    }
 
-   for (i = 0; i < ehdr->e_shnum; i++) {
+   for (i = 0; i < shnum; i++) {
       IF_DEBUG(linker,debugBelch("%2d:  ", i ));
       IF_DEBUG(linker,debugBelch("type=%2d  ", (int)shdr[i].sh_type ));
       IF_DEBUG(linker,debugBelch("size=%4d  ", (int)shdr[i].sh_size ));
@@ -4259,7 +4475,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
                ehdrC + shdr[i].sh_offset,
                       ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1));
 
-#define SECTION_INDEX_VALID(ndx) (ndx > SHN_UNDEF && ndx < ehdr->e_shnum)
+#define SECTION_INDEX_VALID(ndx) (ndx > SHN_UNDEF && ndx < shnum)
 
       switch (shdr[i].sh_type) {
 
@@ -4318,10 +4534,10 @@ ocVerifyImage_ELF ( ObjectCode* oc )
 
    IF_DEBUG(linker,debugBelch( "\nString tables\n" ));
    nstrtab = 0;
-   for (i = 0; i < ehdr->e_shnum; i++) {
+   for (i = 0; i < shnum; i++) {
       if (shdr[i].sh_type == SHT_STRTAB
           /* Ignore the section header's string table. */
-          && i != ehdr->e_shstrndx
+          && i != shstrndx
           /* Ignore string tables named .stabstr, as they contain
              debugging info. */
           && 0 != memcmp(".stabstr", sh_strtab + shdr[i].sh_name, 8)
@@ -4333,10 +4549,12 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    if (nstrtab == 0) {
       IF_DEBUG(linker,debugBelch("   no normal string tables (potentially, but not necessarily a problem)\n"));
    }
-
+#if defined(SHN_XINDEX)
+   Elf_Word* shndxTable = get_shndx_table(ehdr);
+#endif
    nsymtabs = 0;
    IF_DEBUG(linker,debugBelch( "Symbol tables\n" ));
-   for (i = 0; i < ehdr->e_shnum; i++) {
+   for (i = 0; i < shnum; i++) {
       if (shdr[i].sh_type != SHT_SYMTAB) continue;
       IF_DEBUG(linker,debugBelch( "section %d is a symbol table\n", i ));
       nsymtabs++;
@@ -4351,9 +4569,17 @@ ocVerifyImage_ELF ( ObjectCode* oc )
          return 0;
       }
       for (j = 0; j < nent; j++) {
+         Elf_Word secno = stab[j].st_shndx;
+#if defined(SHN_XINDEX)
+         /* See Note [Many ELF Sections] */
+         if (secno == SHN_XINDEX) {
+            ASSERT(shndxTable);
+            secno = shndxTable[j];
+         }
+#endif
          IF_DEBUG(linker,debugBelch("   %2d  ", j ));
          IF_DEBUG(linker,debugBelch("  sec=%-5d  size=%-3d  val=%5p  ",
-                             (int)stab[j].st_shndx,
+                             (int)secno,
                              (int)stab[j].st_size,
                              (char*)stab[j].st_value ));
 
@@ -4377,9 +4603,10 @@ ocVerifyImage_ELF ( ObjectCode* oc )
          }
          IF_DEBUG(linker,debugBelch("  " ));
 
-         IF_DEBUG(linker,debugBelch("name=%s\n",
+         IF_DEBUG(linker,debugBelch("other=%2x ", stab[j].st_other ));
+         IF_DEBUG(linker,debugBelch("name=%s [%x]\n",
                         ehdrC + shdr[shdr[i].sh_link].sh_offset
-                              + stab[j].st_name ));
+                              + stab[j].st_name, stab[j].st_name ));
       }
    }
 
@@ -4455,7 +4682,8 @@ mapObjectFileSection (int fd, Elf_Word offset, Elf_Word size,
 static int
 ocGetNames_ELF ( ObjectCode* oc )
 {
-   int i, j, nent, result, fd = -1;
+   Elf_Word i;
+   int j, nent, result, fd = -1;
    Elf_Sym* stab;
 
    char*     ehdrC    = (char*)(oc->image);
@@ -4463,13 +4691,17 @@ ocGetNames_ELF ( ObjectCode* oc )
    char*     strtab;
    Elf_Shdr* shdr     = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
    Section * sections;
+#if defined(SHN_XINDEX)
+   Elf_Word* shndxTable = get_shndx_table(ehdr);
+#endif
+   const Elf_Word shnum = elf_shnum(ehdr);
 
    ASSERT(symhash != NULL);
 
-   sections = (Section*)stgCallocBytes(sizeof(Section), ehdr->e_shnum,
+   sections = (Section*)stgCallocBytes(sizeof(Section), shnum,
                                        "ocGetNames_ELF(sections)");
    oc->sections = sections;
-   oc->n_sections = ehdr->e_shnum;
+   oc->n_sections = shnum;
 
 
    if (oc->imageMapped) {
@@ -4484,7 +4716,7 @@ ocGetNames_ELF ( ObjectCode* oc )
        }
    }
 
-   for (i = 0; i < ehdr->e_shnum; i++) {
+   for (i = 0; i < shnum; i++) {
       int         is_bss = FALSE;
       SectionKind kind   = getSectionKind_ELF(&shdr[i], &is_bss);
       SectionAlloc alloc = SECTION_NOMEM;
@@ -4556,12 +4788,25 @@ ocGetNames_ELF ( ObjectCode* oc )
          HsBool isWeak = HS_BOOL_FALSE;
          char* ad      = NULL;
          char* nm      = strtab + stab[j].st_name;
-         int   secno   = stab[j].st_shndx;
+         unsigned short shndx = stab[j].st_shndx;
+         Elf_Word secno;
 
+         /* See Note [Many ELF Sections] */
+         /* Note that future checks for special SHN_* numbers should check the
+          * shndx variable, not the section number in secno. Sections with the
+          * real number in the SHN_LORESERVE..HIRESERVE range will have shndx
+          * SHN_XINDEX and a secno with one of the reserved values. */
+         secno = shndx;
+#if defined(SHN_XINDEX)
+         if (shndx == SHN_XINDEX) {
+            ASSERT(shndxTable);
+            secno = shndxTable[j];
+         }
+#endif
          /* Figure out if we want to add it; if so, set ad to its
             address.  Otherwise leave ad == NULL. */
 
-         if (secno == SHN_COMMON) {
+         if (shndx == SHN_COMMON) {
             isLocal = FALSE;
             ad = stgCallocBytes(1, stab[j].st_size, "ocGetNames_ELF(COMMON)");
             /*
@@ -4577,9 +4822,13 @@ ocGetNames_ELF ( ObjectCode* oc )
                 || ELF_ST_BIND(stab[j].st_info)==STB_WEAK
               )
               /* and not an undefined symbol */
-              && stab[j].st_shndx != SHN_UNDEF
+              && shndx != SHN_UNDEF
               /* and not in a "special section" */
-              && stab[j].st_shndx < SHN_LORESERVE
+              && (shndx < SHN_LORESERVE
+#if defined(SHN_XINDEX)
+                  || shndx == SHN_XINDEX
+#endif
+                 )
               &&
               /* and it's a not a section or string table or anything silly */
               ( ELF_ST_TYPE(stab[j].st_info)==STT_FUNC ||
@@ -4588,7 +4837,7 @@ ocGetNames_ELF ( ObjectCode* oc )
               )
             ) {
             /* Section 0 is the undefined section, hence > and not >=. */
-            ASSERT(secno > 0 && secno < ehdr->e_shnum);
+            ASSERT(secno > 0 && secno < shnum);
             /*
             if (shdr[secno].sh_type == SHT_NOBITS) {
                debugBelch("   BSS symbol, size %d off %d name %s\n",
@@ -4635,10 +4884,10 @@ ocGetNames_ELF ( ObjectCode* oc )
                                    strtab + stab[j].st_name ));
             /*
             debugBelch(
-                    "skipping   bind = %d,  type = %d,  shndx = %d   `%s'\n",
+                    "skipping   bind = %d,  type = %d,  secno = %d   `%s'\n",
                     (int)ELF_ST_BIND(stab[j].st_info),
                     (int)ELF_ST_TYPE(stab[j].st_info),
-                    (int)stab[j].st_shndx,
+                    (int)secno,
                     strtab + stab[j].st_name
                    );
             */
@@ -4676,6 +4925,9 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
    int target_shndx = shdr[shnum].sh_info;
    int symtab_shndx = shdr[shnum].sh_link;
    int strtab_shndx = shdr[symtab_shndx].sh_link;
+#if defined(SHN_XINDEX)
+   Elf_Word* shndx_table = get_shndx_table((Elf_Ehdr*)ehdrC);
+#endif
 
    stab  = (Elf_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
    strtab= (char*)    (ehdrC + shdr[ strtab_shndx ].sh_offset);
@@ -4719,9 +4971,16 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
             /* Yes, so we can get the address directly from the ELF symbol
                table. */
             symbol = sym.st_name==0 ? "(noname)" : strtab+sym.st_name;
-            S = (Elf_Addr)oc->sections[sym.st_shndx].start +
+            /* See Note [Many ELF Sections] */
+            Elf_Word secno = sym.st_shndx;
+#if defined(SHN_XINDEX)
+            if (secno == SHN_XINDEX) {
+               ASSERT(shndx_table);
+               secno = shndx_table[ELF_R_SYM(info)];
+            }
+#endif
+            S = (Elf_Addr)oc->sections[ secno ].start +
                 stab[ELF_R_SYM(info)].st_value;
-
          } else {
             symbol = strtab + sym.st_name;
             S_tmp = lookupSymbol_( symbol );
@@ -4980,6 +5239,9 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
    int symtab_shndx = shdr[shnum].sh_link;
    int strtab_shndx = shdr[symtab_shndx].sh_link;
    int target_shndx = shdr[shnum].sh_info;
+#if defined(SHN_XINDEX)
+   Elf_Word* shndx_table = get_shndx_table((Elf_Ehdr*)ehdrC);
+#endif
 #if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(ia64_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
    /* This #ifdef only serves to avoid unused-var warnings. */
    Elf_Addr targ = (Elf_Addr) oc->sections[target_shndx].start;
@@ -5030,7 +5292,14 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
             /* Yes, so we can get the address directly from the ELF symbol
                table. */
             symbol = sym.st_name==0 ? "(noname)" : strtab+sym.st_name;
-            S = (Elf_Addr)oc->sections[sym.st_shndx].start
+            /* See Note [Many ELF Sections] */
+            Elf_Word secno = sym.st_shndx;
+#if defined(SHN_XINDEX)
+            if (secno == SHN_XINDEX) {
+              secno = shndx_table[ELF_R_SYM(info)];
+            }
+#endif
+            S = (Elf_Addr)oc->sections[secno].start
                 + stab[ELF_R_SYM(info)].st_value;
 #ifdef ELF_FUNCTION_DESC
             /* Make a function descriptor for this function */
@@ -5309,20 +5578,22 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 static int
 ocResolve_ELF ( ObjectCode* oc )
 {
-   int   shnum, ok;
+   int       ok;
+   Elf_Word  i;
    char*     ehdrC = (char*)(oc->image);
    Elf_Ehdr* ehdr  = (Elf_Ehdr*) ehdrC;
    Elf_Shdr* shdr  = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
+   const Elf_Word shnum = elf_shnum(ehdr);
 
    /* Process the relocation sections. */
-   for (shnum = 0; shnum < ehdr->e_shnum; shnum++) {
-      if (shdr[shnum].sh_type == SHT_REL) {
-         ok = do_Elf_Rel_relocations ( oc, ehdrC, shdr, shnum );
+   for (i = 0; i < shnum; i++) {
+      if (shdr[i].sh_type == SHT_REL) {
+         ok = do_Elf_Rel_relocations ( oc, ehdrC, shdr, i );
          if (!ok) return ok;
       }
       else
-      if (shdr[shnum].sh_type == SHT_RELA) {
-         ok = do_Elf_Rela_relocations ( oc, ehdrC, shdr, shnum );
+      if (shdr[i].sh_type == SHT_RELA) {
+         ok = do_Elf_Rela_relocations ( oc, ehdrC, shdr, i );
          if (!ok) return ok;
       }
    }
@@ -5336,11 +5607,11 @@ ocResolve_ELF ( ObjectCode* oc )
 
 static int ocRunInit_ELF( ObjectCode *oc )
 {
-   int   i;
+   Elf_Word i;
    char*     ehdrC = (char*)(oc->image);
    Elf_Ehdr* ehdr  = (Elf_Ehdr*) ehdrC;
    Elf_Shdr* shdr  = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
-   char* sh_strtab = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
+   char* sh_strtab = ehdrC + shdr[elf_shstrndx(ehdr)].sh_offset;
    int argc, envc;
    char **argv, **envv;
 
@@ -5351,7 +5622,7 @@ static int ocRunInit_ELF( ObjectCode *oc )
    // special!  See DL_DT_INIT_ADDRESS macro in glibc
    // as well as ELF_FUNCTION_PTR_IS_SPECIAL.  We've not handled
    // it here, please file a bug report if it affects you.
-   for (i = 0; i < ehdr->e_shnum; i++) {
+   for (i = 0; i < elf_shnum(ehdr); i++) {
       init_t *init_start, *init_end, *init;
       int is_bss = FALSE;
       SectionKind kind = getSectionKind_ELF(&shdr[i], &is_bss);
@@ -5398,16 +5669,18 @@ static int ocAllocateSymbolExtras_ELF( ObjectCode *oc )
 {
   Elf_Ehdr *ehdr;
   Elf_Shdr* shdr;
-  int i;
+  Elf_Word i, shnum;
 
   ehdr = (Elf_Ehdr *) oc->image;
   shdr = (Elf_Shdr *) ( ((char *)oc->image) + ehdr->e_shoff );
 
-  for( i = 0; i < ehdr->e_shnum; i++ )
+  shnum = elf_shnum(ehdr);
+
+  for( i = 0; i < shnum; i++ )
     if( shdr[i].sh_type == SHT_SYMTAB )
       break;
 
-  if( i == ehdr->e_shnum )
+  if( i == shnum )
   {
     // Not having a symbol table is not in principle a problem.
     // When an object file has no symbols then the 'strip' program

@@ -25,7 +25,6 @@ module SysTools (
         runLlvmLlc,
         runClang,
         figureLlvmVersion,
-        readElfSection,
 
         getLinkerInfo,
         getCompilerInfo,
@@ -78,8 +77,6 @@ import System.Directory
 import Data.Char
 import Data.List
 import qualified Data.Map as Map
-import Text.ParserCombinators.ReadP hiding (char)
-import qualified Text.ParserCombinators.ReadP as R
 
 #ifndef mingw32_HOST_OS
 import qualified System.Posix.Internals
@@ -794,6 +791,7 @@ getLinkerInfo' dflags = do
           -- GNU ld specifically needs to use less memory. This especially
           -- hurts on small object files. Trac #5240.
           -- Set DT_NEEDED for all shared libraries. Trac #10110.
+          -- TODO: Investigate if these help or hurt when using split sections.
           return (GnuLD $ map Option ["-Wl,--hash-size=31",
                                       "-Wl,--reduce-memory-overheads",
                                       -- ELF specific flag
@@ -1043,31 +1041,7 @@ copyWithHeader dflags purpose maybe_header from to = do
    hPutStr h str
    hSetBinaryMode h True
 
--- | read the contents of the named section in an ELF object as a
--- String.
-readElfSection :: DynFlags -> String -> FilePath -> IO (Maybe String)
-readElfSection _dflags section exe = do
-  let
-     prog = "readelf"
-     args = [Option "-p", Option section, FileOption "" exe]
-  --
-  r <- readProcessEnvWithExitCode prog (filter notNull (map showOpt args))
-                                  en_locale_env
-  case r of
-    (ExitSuccess, out, _err) -> return (doFilter (lines out))
-    _ -> return Nothing
- where
-  doFilter [] = Nothing
-  doFilter (s:r) = case readP_to_S parse s of
-                    [(p,"")] -> Just p
-                    _r       -> doFilter r
-   where parse = do
-           skipSpaces
-           _ <- R.char '['
-           skipSpaces
-           _ <- string "0]"
-           skipSpaces
-           munch (const True)
+
 
 {-
 ************************************************************************
@@ -1329,7 +1303,7 @@ handleProc pgm phase_name proc = do
     case rc of
       ExitSuccess{} -> return r
       ExitFailure n -> throwGhcExceptionIO (
-            ProgramError ("`" ++ takeBaseName pgm ++ "'" ++
+            ProgramError ("`" ++ takeFileName pgm ++ "'" ++
                           " failed in phase `" ++ phase_name ++ "'." ++
                           " (Exit code: " ++ show n ++ ")"))
   where

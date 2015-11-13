@@ -471,15 +471,15 @@ rnBind _ bind@(PatBind { pat_lhs = pat
           return (bind', bndrs, all_fvs) }
 
 rnBind sig_fn bind@(FunBind { fun_id = name
-                            , fun_infix = is_infix
                             , fun_matches = matches })
        -- invariant: no free vars here when it's a FunBind
   = do  { let plain_name = unLoc name
 
         ; (matches', rhs_fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
                                 -- bindSigTyVars tests for Opt_ScopedTyVars
-                                 rnMatchGroup (FunRhs plain_name is_infix)
+                                 rnMatchGroup (FunRhs plain_name)
                                               rnLExpr matches
+        ; let is_infix = isInfixFunBind bind
         ; when is_infix $ checkPrecMatch plain_name matches'
 
         ; mod <- getModule
@@ -921,9 +921,9 @@ renameSig ctxt sig@(FixSig (FixitySig vs f))
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
         ; return (FixSig (FixitySig new_vs f), emptyFVs) }
 
-renameSig ctxt sig@(MinimalSig s bf)
+renameSig ctxt sig@(MinimalSig s (L l bf))
   = do new_bf <- traverse (lookupSigOccRn ctxt sig) bf
-       return (MinimalSig s new_bf, emptyFVs)
+       return (MinimalSig s (L l new_bf), emptyFVs)
 
 renameSig ctxt sig@(PatSynSig v ty)
   = do  { v' <- lookupSigOccRn ctxt sig v
@@ -1016,7 +1016,7 @@ rnMatchGroup :: Outputable (body RdrName) => HsMatchContext Name
              -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
              -> MatchGroup RdrName (Located (body RdrName))
              -> RnM (MatchGroup Name (Located (body Name)), FreeVars)
-rnMatchGroup ctxt rnBody (MG { mg_alts = ms, mg_origin = origin })
+rnMatchGroup ctxt rnBody (MG { mg_alts = L _ ms, mg_origin = origin })
   = do { empty_case_ok <- xoptM Opt_EmptyCase
        ; when (null ms && not empty_case_ok) (addErr (emptyCaseErr ctxt))
        ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
@@ -1032,22 +1032,23 @@ rnMatch' :: Outputable (body RdrName) => HsMatchContext Name
          -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
          -> Match RdrName (Located (body RdrName))
          -> RnM (Match Name (Located (body Name)), FreeVars)
-rnMatch' ctxt rnBody match@(Match { m_fun_id_infix = mf, m_pats = pats
+rnMatch' ctxt rnBody match@(Match { m_fixity = mf, m_pats = pats
                                   , m_type = maybe_rhs_sig, m_grhss = grhss })
   = do  {       -- Result type signatures are no longer supported
           case maybe_rhs_sig of
                 Nothing -> return ()
                 Just (L loc ty) -> addErrAt loc (resSigErr ctxt match ty)
 
+        ; let isinfix = isInfixMatch match
                -- Now the main event
                -- Note that there are no local fixity decls for matches
         ; rnPats ctxt pats      $ \ pats' -> do
         { (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
         ; let mf' = case (ctxt,mf) of
-                      (FunRhs funid isinfix,Just (L lf _,_))
-                                                    -> Just (L lf funid,isinfix)
-                      _                             -> Nothing
-        ; return (Match { m_fun_id_infix = mf', m_pats = pats'
+                      (FunRhs funid,FunBindMatch (L lf _) _)
+                                            -> FunBindMatch (L lf funid) isinfix
+                      _                     -> NonFunBindMatch
+        ; return (Match { m_fixity = mf', m_pats = pats'
                         , m_type = Nothing, m_grhss = grhss'}, grhss_fvs ) }}
 
 emptyCaseErr :: HsMatchContext Name -> SDoc
@@ -1080,10 +1081,10 @@ rnGRHSs :: HsMatchContext Name
         -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
         -> GRHSs RdrName (Located (body RdrName))
         -> RnM (GRHSs Name (Located (body Name)), FreeVars)
-rnGRHSs ctxt rnBody (GRHSs grhss binds)
+rnGRHSs ctxt rnBody (GRHSs grhss (L l binds))
   = rnLocalBindsAndThen binds   $ \ binds' _ -> do
     (grhss', fvGRHSs) <- mapFvRn (rnGRHS ctxt rnBody) grhss
-    return (GRHSs grhss' binds', fvGRHSs)
+    return (GRHSs grhss' (L l binds'), fvGRHSs)
 
 rnGRHS :: HsMatchContext Name
        -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))

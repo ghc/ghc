@@ -391,7 +391,7 @@ fiExpr dflags to_drop (_, AnnCase scrut case_bndr _ [(con,alt_bndrs,rhs)])
                     (FloatCase scrut' case_bndr con alt_bndrs)
     scrut' = fiExpr dflags scrut_binds scrut
     [shared_binds, scrut_binds, rhs_binds]
-       = sepBindsByDropPoint dflags False [freeVarsOf scrut, rhs_fvs] to_drop
+       = sepBindsByDropPoint dflags False [scrut_fvs, rhs_fvs] to_drop
     rhs_fvs   = freeVarsOf rhs `delVarSetList` (case_bndr : alt_bndrs)
     scrut_fvs = freeVarsOf scrut
 

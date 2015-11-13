@@ -19,7 +19,7 @@
 -- and in terms of API. You will almost certainly want to import this
 -- module @qualified@.
 --
--- @since 4.8.2.0
+-- @since 4.9.0.0
 ----------------------------------------------------------------------------
 
 module Data.List.NonEmpty (
@@ -85,11 +85,6 @@ module Data.List.NonEmpty (
    , zip         -- :: NonEmpty a -> NonEmpty b -> NonEmpty (a,b)
    , zipWith     -- :: (a -> b -> c) -> NonEmpty a -> NonEmpty b -> NonEmpty c
    , unzip       -- :: NonEmpty (a, b) -> (NonEmpty a, NonEmpty b)
-   -- * Functions on streams of characters
-   , words       -- :: NonEmpty Char -> NonEmpty String
-   , unwords     -- :: NonEmpty String -> NonEmpty Char
-   , lines       -- :: NonEmpty Char -> NonEmpty String
-   , unlines     -- :: NonEmpty String -> NonEmpty Char
    -- * Converting to and from a list
    , fromList    -- :: [a] -> NonEmpty a
    , toList      -- :: NonEmpty a -> [a]
@@ -100,10 +95,10 @@ module Data.List.NonEmpty (
 
 import           Prelude             hiding (break, cycle, drop, dropWhile,
                                       filter, foldl, foldr, head, init, iterate,
-                                      last, length, lines, map, repeat, reverse,
+                                      last, length, map, repeat, reverse,
                                       scanl, scanl1, scanr, scanr1, span,
-                                      splitAt, tail, take, takeWhile, unlines,
-                                      unwords, unzip, words, zip, zipWith, (!!))
+                                      splitAt, tail, take, takeWhile,
+                                      unzip, zip, zipWith, (!!))
 import qualified Prelude
 
 import           Control.Applicative (Alternative, many)
@@ -123,7 +118,7 @@ infixr 5 :|, <|
 
 -- | Non-empty (and non-strict) list type.
 --
--- @since 4.8.2.0
+-- @since 4.9.0.0
 data NonEmpty a = a :| [a]
   deriving ( Eq, Ord, Show, Read, Data, Generic, Generic1 )
 
@@ -461,32 +456,6 @@ zipWith f ~(x :| xs) ~(y :| ys) = f x y :| List.zipWith f xs ys
 -- | The 'unzip' function is the inverse of the 'zip' function.
 unzip :: Functor f => f (a,b) -> (f a, f b)
 unzip xs = (fst <$> xs, snd <$> xs)
-
--- | The 'words' function breaks a stream of characters into a
--- stream of words, which were delimited by white space.
---
--- /Beware/: if the input contains no words (i.e. is entirely
--- whitespace), this will cause an error.
-words :: NonEmpty Char -> NonEmpty String
-words = lift List.words
-
--- | The 'unwords' function is an inverse operation to 'words'. It
--- joins words with separating spaces.
---
--- /Beware/: the input @(\"\" :| [])@ will cause an error.
-unwords :: NonEmpty String -> NonEmpty Char
-unwords = lift List.unwords
-
--- | The 'lines' function breaks a stream of characters into a stream
--- of strings at newline characters. The resulting strings do not
--- contain newlines.
-lines :: NonEmpty Char -> NonEmpty String
-lines = lift List.lines
-
--- | The 'unlines' function is an inverse operation to 'lines'. It
--- joins lines, after appending a terminating newline to each.
-unlines :: NonEmpty String -> NonEmpty Char
-unlines = lift List.unlines
 
 -- | The 'nub' function removes duplicate elements from a list. In
 -- particular, it keeps only the first occurence of each element.

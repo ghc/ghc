@@ -15,7 +15,7 @@ typedef struct hashtable HashTable; /* abstract */
 
 /* Hash table access where the keys are StgWords */
 HashTable * allocHashTable    ( void );
-void *      lookupHashTable ( HashTable *table, StgWord key );
+void *      lookupHashTable ( const HashTable *table, StgWord key );
 void        insertHashTable ( HashTable *table, StgWord key, void *data );
 void *      removeHashTable ( HashTable *table, StgWord key, void *data );
 
@@ -44,11 +44,11 @@ HashTable * allocStrHashTable ( void );
    (removeHashTable(table, (StgWord)key, data))
 
 /* Hash tables for arbitrary keys */
-typedef int HashFunction(HashTable *table, StgWord key);
+typedef int HashFunction(const HashTable *table, StgWord key);
 typedef int CompareFunction(StgWord key1, StgWord key2);
 HashTable * allocHashTable_(HashFunction *hash, CompareFunction *compare);
-int hashWord(HashTable *table, StgWord key);
-int hashStr(HashTable *table, char *key);
+int hashWord(const HashTable *table, StgWord key);
+int hashStr(const HashTable *table, char *key);
 
 /* Freeing hash tables
  */

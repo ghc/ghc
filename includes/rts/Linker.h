@@ -66,6 +66,17 @@ HsInt resolveObjs( void );
 /* load a dynamic library */
 const char *addDLL( pathchar* dll_name );
 
+/* add a path to the library search path */
+HsPtr addLibrarySearchPath(pathchar* dll_path);
+
+/* removes a directory from the search path,
+   path must have been added using addLibrarySearchPath */
+HsBool removeLibrarySearchPath(HsPtr dll_path_index);
+
+/* give a warning about missing Windows patches that would make
+   the linker work better */
+void warnMissingKBLibraryPaths( void );
+
 /* called by the initialization code for a module, not a user API */
 StgStablePtr foreignExportStablePtr (StgPtr p);
 

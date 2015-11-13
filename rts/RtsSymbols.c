@@ -444,6 +444,13 @@
 #define RTS_DARWIN_ONLY_SYMBOLS
 #endif
 
+#if defined(openbsd_HOST_OS)
+#define RTS_OPENBSD_ONLY_SYMBOLS                            \
+     SymE_NeedsProto(__guard_local)
+#else
+#define RTS_OPENBSD_ONLY_SYMBOLS
+#endif
+
 #ifndef SMP
 # define MAIN_CAP_SYM SymI_HasProto(MainCapability)
 #else
@@ -641,10 +648,25 @@
       SymI_HasProto(stg_INTLIKE_closure)
 #endif
 
+#if defined(PROFILING)
+#define RTS_PROF_SYMBOLS                        \
+      SymI_HasProto(CCS_DONT_CARE)              \
+      SymI_HasProto(CC_LIST)                    \
+      SymI_HasProto(CC_ID)                      \
+      SymI_HasProto(CCS_LIST)                   \
+      SymI_HasProto(CCS_ID)                     \
+      SymI_HasProto(stg_restore_cccs_info)      \
+      SymI_HasProto(enterFunCCS)                \
+      SymI_HasProto(pushCostCentre)             \
+      SymI_HasProto(era)
+#else
+#define RTS_PROF_SYMBOLS /* empty */
+#endif
 
 #define RTS_SYMBOLS                                                     \
       Maybe_Stable_Names                                                \
       RTS_TICKY_SYMBOLS                                                 \
+      RTS_PROF_SYMBOLS                                                  \
       SymI_HasProto(StgReturn)                                          \
       SymI_HasProto(stg_gc_noregs)                                      \
       SymI_HasProto(stg_ret_v_info)                                     \
@@ -672,10 +694,12 @@
       SymI_HasProto(stg_yield_to_interpreter)                           \
       SymI_HasProto(stg_block_noregs)                                   \
       SymI_HasProto(stg_block_takemvar)                                 \
-      SymI_HasProto(stg_block_readmvar)                           \
+      SymI_HasProto(stg_block_readmvar)                                 \
       SymI_HasProto(stg_block_putmvar)                                  \
       MAIN_CAP_SYM                                                      \
       SymI_HasProto(addDLL)                                             \
+      SymI_HasProto(addLibrarySearchPath)                               \
+      SymI_HasProto(removeLibrarySearchPath)                            \
       SymI_HasProto(__int_encodeDouble)                                 \
       SymI_HasProto(__word_encodeDouble)                                \
       SymI_HasProto(__int_encodeFloat)                                  \
@@ -1059,6 +1083,7 @@ RTS_RET_SYMBOLS
 RTS_POSIX_ONLY_SYMBOLS
 RTS_MINGW_ONLY_SYMBOLS
 RTS_DARWIN_ONLY_SYMBOLS
+RTS_OPENBSD_ONLY_SYMBOLS
 RTS_LIBGCC_SYMBOLS
 RTS_LIBFFI_SYMBOLS
 #undef SymI_NeedsProto
@@ -1096,6 +1121,7 @@ RtsSymbolVal rtsSyms[] = {
       RTS_POSIX_ONLY_SYMBOLS
       RTS_MINGW_ONLY_SYMBOLS
       RTS_DARWIN_ONLY_SYMBOLS
+      RTS_OPENBSD_ONLY_SYMBOLS
       RTS_LIBGCC_SYMBOLS
       RTS_LIBFFI_SYMBOLS
 #if defined(darwin_HOST_OS) && defined(i386_HOST_ARCH)
