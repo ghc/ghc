@@ -1720,7 +1720,7 @@ mkSimpleConMatch fold extra_pats con insides = do
     let vars_needed = takeList insides as_RDRs
     let pat = nlConVarPat con_name vars_needed
     rhs <- fold con_name (zipWith nlHsApp insides (map nlHsVar vars_needed))
-    return $ mkMatch (extra_pats ++ [pat]) rhs emptyLocalBinds
+    return $ mkMatch (extra_pats ++ [pat]) rhs (noLoc emptyLocalBinds)
 
 -- "case x of (a1,a2,a3) -> fold [x1 a1, x2 a2, x3 a3]"
 mkSimpleTupleCase :: Monad m => ([LPat RdrName] -> DataCon -> [a]
@@ -1919,7 +1919,8 @@ makeG_d.
 gen_Lift_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
 gen_Lift_binds loc tycon
   | null data_cons = (unitBag (L loc $ mkFunBind (L loc lift_RDR)
-                       [mkMatch [nlWildPat] errorMsg_Expr emptyLocalBinds])
+                       [mkMatch [nlWildPat] errorMsg_Expr
+                                            (noLoc emptyLocalBinds)])
                      , emptyBag)
   | otherwise = (unitBag lift_bind, emptyBag)
   where
@@ -2157,7 +2158,7 @@ mk_FunBind :: SrcSpan -> RdrName
 mk_FunBind loc fun pats_and_exprs
   = mkRdrFunBind (L loc fun) matches
   where
-    matches = [mkMatch p e emptyLocalBinds | (p,e) <-pats_and_exprs]
+    matches = [mkMatch p e (noLoc emptyLocalBinds) | (p,e) <-pats_and_exprs]
 
 mkRdrFunBind :: Located RdrName -> [LMatch RdrName (LHsExpr RdrName)] -> LHsBind RdrName
 mkRdrFunBind fun@(L loc fun_rdr) matches = L loc (mkFunBind fun matches')
@@ -2168,7 +2169,7 @@ mkRdrFunBind fun@(L loc fun_rdr) matches = L loc (mkFunBind fun matches')
    -- which can happen with -XEmptyDataDecls
    -- See Trac #4302
    matches' = if null matches
-              then [mkMatch [] (error_Expr str) emptyLocalBinds]
+              then [mkMatch [] (error_Expr str) (noLoc emptyLocalBinds)]
               else matches
    str = "Void " ++ occNameString (rdrNameOcc fun_rdr)
 
