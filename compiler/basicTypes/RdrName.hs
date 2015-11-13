@@ -495,6 +495,23 @@ Note [Parents]
   class C          Class operations
                    Associated type constructors
 
+The `PatternSynonym` constructor is so called as pattern synonyms can be
+bundled with any type constructor (during renaming). In other words, they can
+have any parent.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~
+ Constructor      Meaning
+ ~~~~~~~~~~~~~~~~~~~~~~~~
+  NoParent        Can not be bundled with a type constructor.
+  ParentIs n      Can be bundled with the type constructor corresponding to
+                  n.
+  PatternSynonym  Can be bundled with any type constructor. It is so called
+                  because only pattern synonyms can be bundled with any type
+                  constructor.
+  FldParent       See Note [Parents for record fields]
+
+
+
 
 Note [Parents for record fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
