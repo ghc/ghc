@@ -78,7 +78,7 @@ tyThingToLHsDecl t = case t of
          , tcdFDs = map (\ (l,r) -> noLoc
                         (map (noLoc . getName) l, map (noLoc . getName) r) ) $
                          snd $ classTvsFds cl
-         , tcdSigs = noLoc (MinimalSig mempty . fmap noLoc $ classMinimalDef cl) :
+         , tcdSigs = noLoc (MinimalSig mempty . noLoc . fmap noLoc $ classMinimalDef cl) :
                       map (noLoc . synifyIdSig DeleteTopLevelQuantification)
                         (classMethods cl)
          , tcdMeths = emptyBag --ignore default method definitions, they don't affect signature
@@ -304,9 +304,7 @@ synifyDataCon use_gadt_syntax dc =
                       , con_cxt   = ctx
                       , con_details =  hat
                       , con_res = hs_res_ty
-                      , con_doc =  Nothing
-                -- we don't want any "deprecated GADT syntax" warnings!
-                      , con_old_rec = False }
+                      , con_doc =  Nothing }
 
 synifyName :: NamedThing n => n -> Located Name
 synifyName = noLoc . getName

@@ -501,7 +501,7 @@ mkExportItems
     lookupExport (IEVar (L _ x))         = declWith x
     lookupExport (IEThingAbs (L _ t))    = declWith t
     lookupExport (IEThingAll (L _ t))    = declWith t
-    lookupExport (IEThingWith (L _ t) _ _) = declWith t
+    lookupExport (IEThingWith (L _ t) _ _ _) = declWith t
     lookupExport (IEModuleContents (L _ m)) =
       moduleExports thisMod m dflags warnings gre exportedNames decls modMap instIfaceMap maps fixMap splices
     lookupExport (IEGroup lev docStr)  = return $
@@ -556,7 +556,7 @@ mkExportItems
 
                   L loc (TyClD cl@ClassDecl{}) -> do
                     mdef <- liftGhcToErrMsgGhc $ minimalDef t
-                    let sig = maybeToList $ fmap (noLoc . MinimalSig mempty . fmap noLoc) mdef
+                    let sig = maybeToList $ fmap (noLoc . MinimalSig mempty . noLoc . fmap noLoc) mdef
                     return [ mkExportDecl t
                       (L loc $ TyClD cl { tcdSigs = sig ++ tcdSigs cl }) docs_ ]
 
@@ -748,7 +748,7 @@ fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap, instMap
         return $ Just (ExportDecl decl doc subs [] (fixities name subs) (l `elem` splices))
     mkExportItem (L l (TyClD cl@ClassDecl{ tcdLName = L _ name, tcdSigs = sigs })) = do
       mdef <- liftGhcToErrMsgGhc $ minimalDef name
-      let sig = maybeToList $ fmap (noLoc . MinimalSig mempty . fmap noLoc) mdef
+      let sig = maybeToList $ fmap (noLoc . MinimalSig mempty . noLoc . fmap noLoc) mdef
       expDecl (L l (TyClD cl { tcdSigs = sig ++ sigs })) l name
     mkExportItem decl@(L l d)
       | name:_ <- getMainDeclBinder d = expDecl decl l name
