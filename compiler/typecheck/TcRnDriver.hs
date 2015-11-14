@@ -164,12 +164,8 @@ tcRnSignature dflags hsc_src
  = do { tcg_env <- getGblEnv ;
         case tcg_sig_of tcg_env of {
           Just sof
-           | hsc_src /= HsBootFile -> do
-                { modname <- fmap moduleName getModule
-                ; addErr (text "Found -sig-of entry for" <+> ppr modname
-                                <+> text "which is not hs-boot." $$
-                          text "Try removing" <+> ppr modname <+>
-                          text "from -sig-of")
+           | hsc_src /= HsigFile -> do
+                { addErr (ptext (sLit "Illegal -sig-of specified for non hsig"))
                 ; return tcg_env
                 }
            | otherwise -> do
@@ -183,7 +179,15 @@ tcRnSignature dflags hsc_src
                 , tcg_imports = tcg_imports tcg_env `plusImportAvails` avails
                 })
             } ;
-          Nothing -> return tcg_env
+          Nothing
+             | HsigFile <- hsc_src
+             , HscNothing <- hscTarget dflags -> do
+                { return tcg_env
+                }
+             | HsigFile <- hsc_src -> do
+                { addErr (ptext (sLit "Missing -sig-of for hsig"))
+                ; failM }
+             | otherwise -> return tcg_env
         }
       }
 
@@ -319,7 +323,7 @@ tcRnModuleTcRnM hsc_env hsc_src
 
                 -- Rename and type check the declarations
         traceRn (text "rn1a") ;
-        tcg_env <- if isHsBoot hsc_src then
+        tcg_env <- if isHsBootOrSig hsc_src then
                         tcRnHsBootDecls hsc_src local_decls
                    else
                         {-# SCC "tcRnSrcDecls" #-}
@@ -675,9 +679,9 @@ tcRnHsBootDecls hsc_src decls
                 -- are written into the interface file.
         ; let { type_env0 = tcg_type_env gbl_env
               ; type_env1 = extendTypeEnvWithIds type_env0 val_ids
-              -- Don't add the dictionaries for non-recursive case, we don't
-              -- actually want to /define/ the instance, just an export list
-              ; type_env2 | Just _ <- tcg_impl_rdr_env gbl_env = type_env1
+              -- Don't add the dictionaries for hsig, we don't actually want
+              -- to /define/ the instance
+              ; type_env2 | HsigFile <- hsc_src = type_env1
                           | otherwise = extendTypeEnvWithIds type_env1 dfun_ids
               ; dfun_ids = map iDFunId inst_infos
               }
@@ -687,9 +691,14 @@ tcRnHsBootDecls hsc_src decls
    ; traceTc "boot" (ppr lie); return gbl_env }
 
 badBootDecl :: HscSource -> String -> Located decl -> TcM ()
-badBootDecl _hsc_src what (L loc _)
+badBootDecl hsc_src what (L loc _)
   = addErrAt loc (char 'A' <+> text what
-      <+> text "declaration is not (currently) allowed in a hs-boot file")
+      <+> ptext (sLit "declaration is not (currently) allowed in a")
+      <+> (case hsc_src of
+            HsBootFile -> ptext (sLit "hs-boot")
+            HsigFile -> ptext (sLit "hsig")
+            _ -> panic "badBootDecl: should be an hsig or hs-boot file")
+      <+> ptext (sLit "file"))
 
 {-
 Once we've typechecked the body of the module, we want to compare what
@@ -1064,7 +1073,7 @@ emptyRnEnv2 = mkRnEnv2 emptyInScopeSet
 missingBootThing :: Bool -> Name -> String -> SDoc
 missingBootThing is_boot name what
   = quotes (ppr name) <+> ptext (sLit "is exported by the")
-    <+> (if is_boot then ptext (sLit "hs-boot") else ptext (sLit "signature"))
+    <+> (if is_boot then ptext (sLit "hs-boot") else ptext (sLit "hsig"))
     <+> ptext (sLit "file, but not")
     <+> text what <+> ptext (sLit "the module")
 
@@ -1074,11 +1083,11 @@ bootMisMatch is_boot extra_info real_thing boot_thing
           ptext (sLit "has conflicting definitions in the module"),
           ptext (sLit "and its") <+>
             (if is_boot then ptext (sLit "hs-boot file")
-                       else ptext (sLit "signature file")),
+                       else ptext (sLit "hsig file")),
           ptext (sLit "Main module:") <+> PprTyThing.pprTyThing real_thing,
           (if is_boot
             then ptext (sLit "Boot file:  ")
-            else ptext (sLit "Signature file: "))
+            else ptext (sLit "Hsig file: "))
             <+> PprTyThing.pprTyThing boot_thing,
           extra_info]
 
@@ -1086,7 +1095,7 @@ instMisMatch :: Bool -> ClsInst -> SDoc
 instMisMatch is_boot inst
   = hang (ppr inst)
        2 (ptext (sLit "is defined in the") <+>
-        (if is_boot then ptext (sLit "hs-boot") else ptext (sLit "signature"))
+        (if is_boot then ptext (sLit "hs-boot") else ptext (sLit "hsig"))
        <+> ptext (sLit "file, but not in the module itself"))
 
 {-

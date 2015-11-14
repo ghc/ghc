@@ -21,7 +21,7 @@ import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
 import {-# SOURCE #-} TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl, tcPatSynBuilderBind )
 import DynFlags
 import HsSyn
-import HscTypes( isHsBoot )
+import HscTypes( isHsBootOrSig )
 import TcRnMonad
 import TcEnv
 import TcUnify
@@ -74,7 +74,7 @@ import Data.List (partition)
 
 addTypecheckedBinds :: TcGblEnv -> [LHsBinds Id] -> TcGblEnv
 addTypecheckedBinds tcg_env binds
-  | isHsBoot (tcg_src tcg_env) = tcg_env
+  | isHsBootOrSig (tcg_src tcg_env) = tcg_env
     -- Do not add the code for record-selector bindings
     -- when compiling hs-boot files
   | otherwise = tcg_env { tcg_binds = foldr unionBags

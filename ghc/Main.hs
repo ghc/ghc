@@ -22,7 +22,7 @@ import CmdLineParser
 -- Implementations of the various modes (--show-iface, mkdependHS. etc.)
 import LoadIface        ( showIface )
 import HscMain          ( newHscEnv )
-import DriverPipeline   ( oneShot, compileFile, mergeRequirement )
+import DriverPipeline   ( oneShot, compileFile )
 import DriverMkDepend   ( doMkDependHS )
 #ifdef GHCI
 import InteractiveUI    ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
@@ -157,7 +157,6 @@ main' postLoadMode dflags0 args flagWarnings = do
                DoMake          -> (CompManager, dflt_target,    LinkBinary)
                DoMkDependHS    -> (MkDepend,    dflt_target,    LinkBinary)
                DoAbiHash       -> (OneShot,     dflt_target,    LinkBinary)
-               DoMergeRequirements -> (OneShot, dflt_target,    LinkBinary)
                _               -> (OneShot,     dflt_target,    LinkBinary)
 
   let dflags1 = case lang of
@@ -253,7 +252,6 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoInteractive          -> ghciUI srcs Nothing
        DoEval exprs           -> ghciUI srcs $ Just $ reverse exprs
        DoAbiHash              -> abiHash (map fst srcs)
-       DoMergeRequirements           -> doMergeRequirements (map fst srcs)
        ShowPackages           -> liftIO $ showPackages dflags6
 
   liftIO $ dumpFinalStats dflags6
@@ -459,16 +457,14 @@ data PostLoadMode
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
   | DoAbiHash               -- ghc --abi-hash
   | ShowPackages            -- ghc --show-packages
-  | DoMergeRequirements            -- ghc --merge-requirements
 
 doMkDependHSMode, doMakeMode, doInteractiveMode,
-  doAbiHashMode, showPackagesMode, doMergeRequirementsMode :: Mode
+  doAbiHashMode, showPackagesMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
 doInteractiveMode = mkPostLoadMode DoInteractive
 doAbiHashMode = mkPostLoadMode DoAbiHash
 showPackagesMode = mkPostLoadMode ShowPackages
-doMergeRequirementsMode = mkPostLoadMode DoMergeRequirements
 
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
@@ -608,7 +604,6 @@ mode_flags =
   , defFlag "C"            (PassFlag (setMode (stopBeforeMode HCc)))
   , defFlag "S"            (PassFlag (setMode (stopBeforeMode (As False))))
   , defFlag "-make"        (PassFlag (setMode doMakeMode))
-  , defFlag "-merge-requirements" (PassFlag (setMode doMergeRequirementsMode))
   , defFlag "-interactive" (PassFlag (setMode doInteractiveMode))
   , defFlag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
   , defFlag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
@@ -718,16 +713,6 @@ doMake srcs  = do
     when (failed ok_flag) (liftIO $ exitWith (ExitFailure 1))
     return ()
 
--- ----------------------------------------------------------------------------
--- Run --merge-requirements mode
-
-doMergeRequirements :: [String] -> Ghc ()
-doMergeRequirements srcs = mapM_ doMergeRequirement srcs
-
-doMergeRequirement :: String -> Ghc ()
-doMergeRequirement src = do
-    hsc_env <- getSession
-    liftIO $ mergeRequirement hsc_env (mkModuleName src)
 
 -- ---------------------------------------------------------------------------
 -- --show-iface mode

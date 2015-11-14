@@ -49,7 +49,7 @@ import BasicTypes
 import DynFlags
 import ErrUtils
 import FastString
-import HscTypes ( isHsBoot )
+import HscTypes ( isHsBootOrSig )
 import Id
 import MkId
 import Name
@@ -441,7 +441,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
     typeable_err i =
       setSrcSpan (getSrcSpan (iSpec i)) $
         do env <- getGblEnv
-           if isHsBoot (tcg_src env)
+           if isHsBootOrSig (tcg_src env)
              then
                do warn <- woptM Opt_WarnDerivingTypeable
                   when warn $ addWarnTc $ vcat

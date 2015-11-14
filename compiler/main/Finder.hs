@@ -228,11 +228,8 @@ findHomeModule hsc_env mod_name =
      source_exts =
       [ ("hs",   mkHomeModLocationSearched dflags mod_name "hs")
       , ("lhs",  mkHomeModLocationSearched dflags mod_name "lhs")
-      -- TODO: This is a giant hack!  If we find an hs-boot file,
-      -- pretend that there's an hs file here too, even if there isn't.
-      -- GhcMake will know what to do next.
-      , ("hs-boot",   mkHomeModLocationSearched dflags mod_name "hs")
-      , ("lhs-boot",  mkHomeModLocationSearched dflags mod_name "lhs")
+      , ("hsig",  mkHomeModLocationSearched dflags mod_name "hsig")
+      , ("lhsig",  mkHomeModLocationSearched dflags mod_name "lhsig")
       ]
 
      hi_exts = [ (hisuf,                mkHiOnlyModLocation dflags hisuf)
@@ -252,6 +249,7 @@ findHomeModule hsc_env mod_name =
   if mod == gHC_PRIM
         then return (Found (error "GHC.Prim ModLocation") mod)
         else searchPathExts home_path mod exts
+
 
 -- | Search for a module in external packages only.
 findPackageModule :: HscEnv -> Module -> IO FindResult
