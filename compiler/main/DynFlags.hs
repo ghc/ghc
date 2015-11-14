@@ -653,6 +653,7 @@ data ExtensionFlag
    | Opt_PartialTypeSignatures
    | Opt_NamedWildCards
    | Opt_StaticPointers
+   | Opt_Strict
    | Opt_StrictData
    deriving (Eq, Enum, Show)
 
@@ -3212,6 +3213,7 @@ xFlags = [
   flagSpec "ScopedTypeVariables"              Opt_ScopedTypeVariables,
   flagSpec "StandaloneDeriving"               Opt_StandaloneDeriving,
   flagSpec "StaticPointers"                   Opt_StaticPointers,
+  flagSpec "Strict"                           Opt_Strict,
   flagSpec "StrictData"                       Opt_StrictData,
   flagSpec' "TemplateHaskell"                 Opt_TemplateHaskell
                                               setTemplateHaskellLoc,

@@ -27,8 +27,9 @@ module HsPat (
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
-        isStrictHsBind, looksLazyPatBind,
-        isStrictLPat, hsPatNeedsParens,
+        isUnliftedHsBind, looksLazyPatBind,
+        isUnliftedLPat, isBangedLPat, isBangedPatBind,
+        hsPatNeedsParens,
         isIrrefutableHsPat,
 
         pprParendLPat, pprConArgs
@@ -493,17 +494,25 @@ patterns are treated specially, of course.
 The 1.3 report defines what ``irrefutable'' and ``failure-free'' patterns are.
 -}
 
-isStrictLPat :: LPat id -> Bool
-isStrictLPat (L _ (ParPat p))             = isStrictLPat p
-isStrictLPat (L _ (BangPat {}))           = True
-isStrictLPat (L _ (TuplePat _ Unboxed _)) = True
-isStrictLPat _                            = False
+isUnliftedLPat :: LPat id -> Bool
+isUnliftedLPat (L _ (ParPat p))             = isUnliftedLPat p
+isUnliftedLPat (L _ (TuplePat _ Unboxed _)) = True
+isUnliftedLPat _                            = False
 
-isStrictHsBind :: HsBind id -> Bool
+isUnliftedHsBind :: HsBind id -> Bool
 -- A pattern binding with an outermost bang or unboxed tuple must be matched strictly
 -- Defined in this module because HsPat is above HsBinds in the import graph
-isStrictHsBind (PatBind { pat_lhs = p }) = isStrictLPat p
-isStrictHsBind _                         = False
+isUnliftedHsBind (PatBind { pat_lhs = p }) = isUnliftedLPat p
+isUnliftedHsBind _                         = False
+
+isBangedPatBind :: HsBind id -> Bool
+isBangedPatBind (PatBind {pat_lhs = pat}) = isBangedLPat pat
+isBangedPatBind _ = False
+
+isBangedLPat :: LPat id -> Bool
+isBangedLPat (L _ (ParPat p))   = isBangedLPat p
+isBangedLPat (L _ (BangPat {})) = True
+isBangedLPat _                  = False
 
 looksLazyPatBind :: HsBind id -> Bool
 -- Returns True of anything *except*

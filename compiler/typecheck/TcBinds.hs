@@ -1731,7 +1731,7 @@ decideGeneralisationPlan
    :: DynFlags -> TcTypeEnv -> [Name]
    -> [LHsBind Name] -> TcSigFun -> GeneralisationPlan
 decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
-  | strict_pat_binds                          = NoGen
+  | unlifted_pat_binds                          = NoGen
   | Just (lbind, sig) <- one_funbind_with_sig = if isPartialSig sig
     -- See Note [Partial type signatures and generalisation]
                                                 then infer_plan
@@ -1743,8 +1743,8 @@ decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
     bndr_set = mkNameSet bndr_names
     binds = map unLoc lbinds
 
-    strict_pat_binds = any isStrictHsBind binds
-       -- Strict patterns (top level bang or unboxed tuple) must not
+    unlifted_pat_binds = any isUnliftedHsBind binds
+       -- Unlifted patterns (unboxed tuple) must not
        -- be polymorphic, because we are going to force them
        -- See Trac #4498, #8762
 
@@ -1843,7 +1843,7 @@ checkStrictBinds top_lvl rec_group orig_binds tc_binds poly_ids
     return ()
   where
     any_unlifted_bndr  = any is_unlifted poly_ids
-    any_strict_pat     = any (isStrictHsBind   . unLoc) orig_binds
+    any_strict_pat     = any (isUnliftedHsBind . unLoc) orig_binds
     any_pat_looks_lazy = any (looksLazyPatBind . unLoc) orig_binds
 
     is_unlifted id = case tcSplitSigmaTy (idType id) of
@@ -1873,7 +1873,7 @@ polyBindErr :: [LHsBind Name] -> SDoc
 polyBindErr binds
   = hang (ptext (sLit "You can't mix polymorphic and unlifted bindings"))
        2 (vcat [vcat (map ppr binds),
-                ptext (sLit "Probable fix: use a bang pattern")])
+                ptext (sLit "Probable fix: add a type signature")])
 
 strictBindErr :: String -> Bool -> [LHsBind Name] -> SDoc
 strictBindErr flavour any_unlifted_bndr binds
