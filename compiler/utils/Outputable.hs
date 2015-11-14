@@ -111,8 +111,10 @@ import Data.Graph (SCC(..))
 
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
+#if __GLASGOW_HASKELL__ > 710
 import GHC.Stack
 import GHC.Exception
+#endif
 
 {-
 ************************************************************************
@@ -1042,7 +1044,7 @@ pprTrace str doc x
 
 -- | If debug output is on, show some 'SDoc' on the screen along
 -- with a call stack when available.
-#if __GLASGOW_HASKELL__ >= 710
+#if __GLASGOW_HASKELL__ > 710
 pprSTrace :: (?location :: CallStack) => SDoc -> a -> a
 pprSTrace = pprTrace (showCallStack ?location)
 #else
