@@ -130,9 +130,7 @@ createInterface tm flags modMap instIfaceMap = do
 
   return $! Interface {
     ifaceMod             = mdl
-  , ifaceOrigFilename    = case msHsFilePath ms of
-                            Just path -> path
-                            Nothing -> "(none)"
+  , ifaceOrigFilename    = msHsFilePath ms
   , ifaceInfo            = info
   , ifaceDoc             = Documentation mbDoc modWarn
   , ifaceRnDoc           = Documentation Nothing Nothing
