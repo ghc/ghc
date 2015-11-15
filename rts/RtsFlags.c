@@ -298,8 +298,6 @@ usage_text[] = {
 "  -p       Time/allocation profile        (output file <program>.prof)",
 "  -P       More detailed Time/Allocation profile",
 "  -Pa      Give information about *all* cost centres",
-
-# if defined(PROFILING)
 "",
 "  -h<break-down> Heap residency profile (hp2ps) (output file <program>.hp)",
 "     break-down: c = cost centre stack (default)",
@@ -325,8 +323,7 @@ usage_text[] = {
 "  -xt            Include threads (TSOs) in a heap profile",
 "",
 "  -xc      Show current cost centre stack on raising an exception",
-# endif
-#endif /* PROFILING or PAR */
+#endif /* PROFILING */
 
 #ifdef TRACING
 "",
