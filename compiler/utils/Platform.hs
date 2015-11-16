@@ -83,6 +83,7 @@ data OS
         | OSOsf3
         | OSQNXNTO
         | OSAndroid
+        | OSAIX
         deriving (Read, Show, Eq)
 
 -- | ARM Instruction Set Architecture, Extensions and ABI
@@ -127,6 +128,7 @@ osElfTarget OSOsf3      = False -- I don't know if this is right, but as
                                 -- per comment below it's safe
 osElfTarget OSQNXNTO    = False
 osElfTarget OSAndroid   = True
+osElfTarget OSAIX       = False
 osElfTarget OSUnknown   = False
  -- Defaulting to False is safe; it means don't rely on any
  -- ELF-specific functionality.  It is important to have a default for

@@ -4277,6 +4277,7 @@ data LinkerInfo
   | GnuGold  [Option]
   | DarwinLD [Option]
   | SolarisLD [Option]
+  | AixLD    [Option]
   | UnknownLD
   deriving Eq
 

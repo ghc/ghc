@@ -769,6 +769,7 @@ neededLinkArgs (GnuLD o)     = o
 neededLinkArgs (GnuGold o)   = o
 neededLinkArgs (DarwinLD o)  = o
 neededLinkArgs (SolarisLD o) = o
+neededLinkArgs (AixLD o)     = o
 neededLinkArgs UnknownLD     = []
 
 -- Grab linker info and cache it in DynFlags.
@@ -823,6 +824,9 @@ getLinkerInfo' dflags = do
                  -- precisely so we assume here, the Solaris linker is
                  -- used.
                  return $ SolarisLD []
+               OSAIX ->
+                 -- IBM AIX uses its own non-binutils linker as well
+                 return $ AixLD []
                OSDarwin ->
                  -- Darwin has neither GNU Gold or GNU LD, but a strange linker
                  -- that doesn't support --version. We can just assume that's
