@@ -219,8 +219,9 @@ import Data.OldList hiding ( all, and, any, concat, concatMap, elem, find,
 
 import GHC.Base ( Bool(..), Eq((==)), otherwise )
 
--- | The 'isSubsequenceOf' function takes two lists and returns 'True' if the
--- first list is a subsequence of the second list.
+-- | The 'isSubsequenceOf' function takes two lists and returns 'True' if all
+-- the elements of the first list occur, in order, in the second. The
+-- elements do not have to occur consecutively.
 --
 -- @'isSubsequenceOf' x y@ is equivalent to @'elem' x ('subsequences' y)@.
 --
