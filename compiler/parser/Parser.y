@@ -468,12 +468,12 @@ output it generates.
  DOCSECTION     { L _ (ITdocSection _ _) }
 
 -- Template Haskell
-'[|'            { L _ ITopenExpQuote  }
+'[|'            { L _ (ITopenExpQuote _) }
 '[p|'           { L _ ITopenPatQuote  }
 '[t|'           { L _ ITopenTypQuote  }
 '[d|'           { L _ ITopenDecQuote  }
 '|]'            { L _ ITcloseQuote    }
-'[||'           { L _ ITopenTExpQuote   }
+'[||'           { L _ (ITopenTExpQuote _) }
 '||]'           { L _ ITcloseTExpQuote  }
 TH_ID_SPLICE    { L _ (ITidEscape _)  }     -- $x
 '$('            { L _ ITparenEscape   }     -- $( exp )
@@ -2302,8 +2302,10 @@ aexp2   :: { LHsExpr RdrName }
         | SIMPLEQUOTE  qcon     {% ams (sLL $1 $> $ HsBracket (VarBr True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
         | TH_TY_QUOTE tyvar     {% ams (sLL $1 $> $ HsBracket (VarBr False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
         | TH_TY_QUOTE gtycon    {% ams (sLL $1 $> $ HsBracket (VarBr False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
-        | '[|' exp '|]'       {% ams (sLL $1 $> $ HsBracket (ExpBr $2)) [mo $1,mc $3] }
-        | '[||' exp '||]'     {% ams (sLL $1 $> $ HsBracket (TExpBr $2)) [mo $1,mc $3]}
+        | '[|' exp '|]'       {% ams (sLL $1 $> $ HsBracket (ExpBr $2))
+                                      (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) }
+        | '[||' exp '||]'     {% ams (sLL $1 $> $ HsBracket (TExpBr $2))
+                                      (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) }
         | '[t|' ctype '|]'    {% ams (sLL $1 $> $ HsBracket (TypBr $2)) [mo $1,mc $3] }
         | '[p|' infixexp '|]' {% checkPattern empty $2 >>= \p ->
                                       ams (sLL $1 $> $ HsBracket (PatBr p))
@@ -3207,6 +3209,11 @@ isUnicode (L _ (ITrarrowtail iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITLarrowtail iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITRarrowtail iu)) = iu == UnicodeSyntax
 isUnicode _                       = False
+
+hasE :: Located Token -> Bool
+hasE (L _ (ITopenExpQuote HasE))  = True
+hasE (L _ (ITopenTExpQuote HasE)) = True
+hasE _                            = False
 
 getSCC :: Located Token -> P FastString
 getSCC lt = do let s = getSTRING lt

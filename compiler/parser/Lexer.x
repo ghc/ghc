@@ -365,10 +365,10 @@ $tab          { warnTab }
 }
 
 <0> {
-  "[|"        / { ifExtension thEnabled } { token ITopenExpQuote }
-  "[||"       / { ifExtension thEnabled } { token ITopenTExpQuote }
-  "[e|"       / { ifExtension thEnabled } { token ITopenExpQuote }
-  "[e||"      / { ifExtension thEnabled } { token ITopenTExpQuote }
+  "[|"        / { ifExtension thEnabled } { token (ITopenExpQuote NoE) }
+  "[||"       / { ifExtension thEnabled } { token (ITopenTExpQuote NoE) }
+  "[e|"       / { ifExtension thEnabled } { token (ITopenExpQuote HasE) }
+  "[e||"      / { ifExtension thEnabled } { token (ITopenTExpQuote HasE) }
   "[p|"       / { ifExtension thEnabled } { token ITopenPatQuote }
   "[d|"       / { ifExtension thEnabled } { layout_token ITopenDecQuote }
   "[t|"       / { ifExtension thEnabled } { token ITopenTypQuote }
@@ -647,12 +647,12 @@ data Token
   | ITprimdouble FractionalLit
 
   -- Template Haskell extension tokens
-  | ITopenExpQuote              --  [| or [e|
+  | ITopenExpQuote HasE         --  [| or [e|
   | ITopenPatQuote              --  [p|
   | ITopenDecQuote              --  [d|
   | ITopenTypQuote              --  [t|
   | ITcloseQuote                --  |]
-  | ITopenTExpQuote             --  [||
+  | ITopenTExpQuote HasE        --  [|| or [e||
   | ITcloseTExpQuote            --  ||]
   | ITidEscape   FastString     --  $x
   | ITparenEscape               --  $(

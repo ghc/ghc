@@ -9,6 +9,7 @@ module ApiAnnotation (
   AnnotationComment(..),
   IsUnicodeSyntax(..),
   unicodeAnn,
+  HasE(..),
   LRdrName -- Exists for haddocks only
   ) where
 
@@ -238,6 +239,7 @@ data AnnKeywordId
     | AnnOf
     | AnnOpen   -- ^ '(\#' or '{-\# LANGUAGE' etc
     | AnnOpenC   -- ^ '{'
+    | AnnOpenE   -- ^ '[e|' or '[e||'
     | AnnOpenP   -- ^ '('
     | AnnOpenPE   -- ^ '$('
     | AnnOpenPTE   -- ^ '$$('
@@ -331,3 +333,14 @@ unicodeAnn AnnRarrowtail = AnnRarrowtailU
 unicodeAnn AnnStar       = AnnStarU
 unicodeAnn ann           = ann
 -- What about '*'?
+
+
+-- | Some template haskell tokens have two variants, one with an `e` the other
+-- not:
+--
+-- >  [| or [e|
+-- >  [|| or [e||
+--
+-- This type indicates whether the 'e' is present or not.
+data HasE = HasE | NoE
+     deriving (Eq, Ord, Data, Typeable, Show)
