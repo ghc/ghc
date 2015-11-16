@@ -360,6 +360,13 @@ basicKnownKeyNames
         -- Fingerprint
         , fingerprintDataConName
 
+        -- Custom type errors
+        , errorMessageTypeErrorFamName
+        , typeErrorTextDataConName
+        , typeErrorAppendDataConName
+        , typeErrorVAppendDataConName
+        , typeErrorShowTypeDataConName
+
     ] ++ case cIntegerLibraryType of
            IntegerGMP    -> [integerSDataConName]
            IntegerSimple -> []
@@ -1102,6 +1109,30 @@ mkAppTyName           = varQual tYPEABLE_INTERNAL (fsLit "mkAppTy")        mkApp
 typeNatTypeRepName    = varQual tYPEABLE_INTERNAL (fsLit "typeNatTypeRep") typeNatTypeRepKey
 typeSymbolTypeRepName = varQual tYPEABLE_INTERNAL (fsLit "typeSymbolTypeRep") typeSymbolTypeRepKey
 
+-- Custom type errors
+errorMessageTypeErrorFamName
+  , typeErrorTextDataConName
+  , typeErrorAppendDataConName
+  , typeErrorVAppendDataConName
+  , typeErrorShowTypeDataConName
+  :: Name
+
+errorMessageTypeErrorFamName =
+  tcQual gHC_TYPELITS (fsLit "TypeError") errorMessageTypeErrorFamKey
+
+typeErrorTextDataConName =
+  dcQual gHC_TYPELITS (fsLit "Text") typeErrorTextDataConKey
+
+typeErrorAppendDataConName =
+  dcQual gHC_TYPELITS (fsLit ":<>:") typeErrorAppendDataConKey
+
+typeErrorVAppendDataConName =
+  dcQual gHC_TYPELITS (fsLit ":$$:") typeErrorVAppendDataConKey
+
+typeErrorShowTypeDataConName =
+  dcQual gHC_TYPELITS (fsLit "ShowType") typeErrorShowTypeDataConKey
+
+
 
 -- Dynamic
 toDynName :: Name
@@ -1585,6 +1616,12 @@ typeNatSubTyFamNameKey    = mkPreludeTyConUnique 170
 typeSymbolCmpTyFamNameKey = mkPreludeTyConUnique 171
 typeNatCmpTyFamNameKey    = mkPreludeTyConUnique 172
 
+-- Custom user type-errors
+errorMessageTypeErrorFamKey :: Unique
+errorMessageTypeErrorFamKey =  mkPreludeTyConUnique 173
+
+
+
 ntTyConKey:: Unique
 ntTyConKey = mkPreludeTyConUnique 174
 coercibleTyConKey :: Unique
@@ -1704,6 +1741,16 @@ trTyConDataConKey, trModuleDataConKey, trNameSDataConKey :: Unique
 trTyConDataConKey                       = mkPreludeDataConUnique 40
 trModuleDataConKey                      = mkPreludeDataConUnique 41
 trNameSDataConKey                       = mkPreludeDataConUnique 42
+
+typeErrorTextDataConKey,
+  typeErrorAppendDataConKey,
+  typeErrorVAppendDataConKey,
+  typeErrorShowTypeDataConKey
+  :: Unique
+typeErrorTextDataConKey                 = mkPreludeDataConUnique 50
+typeErrorAppendDataConKey               = mkPreludeDataConUnique 51
+typeErrorVAppendDataConKey              = mkPreludeDataConUnique 52
+typeErrorShowTypeDataConKey             = mkPreludeDataConUnique 53
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES DataUniques 100-150

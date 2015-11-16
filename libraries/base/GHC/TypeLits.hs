@@ -12,6 +12,7 @@
 {-# LANGUAGE UndecidableInstances #-}  -- for compiling instances of (==)
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE PolyKinds #-}
 
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
@@ -35,6 +36,10 @@ module GHC.TypeLits
     -- * Functions on type literals
   , type (<=), type (<=?), type (+), type (*), type (^), type (-)
   , CmpNat, CmpSymbol
+
+  -- * User-defined type errors
+  , TypeError
+  , ErrorMessage(..)
 
   ) where
 
@@ -189,6 +194,28 @@ type family (m :: Nat) ^ (n :: Nat) :: Nat
 --
 -- @since 4.7.0.0
 type family (m :: Nat) - (n :: Nat) :: Nat
+
+
+-- | A description of a custom type error.
+data {-kind-} ErrorMessage = Text Symbol
+                             -- ^ Show the text as is.
+
+                           | forall t. ShowType t
+                             -- ^ Pretty print the type.
+                             -- @ShowType :: k -> ErrorMessage@
+
+                           | ErrorMessage :<>: ErrorMessage
+                             -- ^ Put two pieces of error message next
+                             -- to each other.
+
+                           | ErrorMessage :$$: ErrorMessage
+                             -- ^ Stack two pieces of error message on top
+                             -- of each other.
+
+infixl 5 :$$:
+infixl 6 :<>:
+
+type family TypeError (a :: ErrorMessage) :: b where
 
 
 --------------------------------------------------------------------------------

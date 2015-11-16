@@ -61,6 +61,7 @@ module TcRnTypes(
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
         isGivenCt, isHoleCt, isOutOfScopeCt, isExprHoleCt, isTypeHoleCt,
+        isUserTypeErrorCt, getUserTypeErrorMsg,
         ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         mkNonCanonical, mkNonCanonicalCt,
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
@@ -145,7 +146,7 @@ import ListSetOps
 import FastString
 import GHC.Fingerprint
 
-import Control.Monad (ap, liftM)
+import Control.Monad (ap, liftM, msum)
 
 #ifdef GHCI
 import Data.Map      ( Map )
@@ -1425,6 +1426,24 @@ isExprHoleCt _ = False
 isTypeHoleCt :: Ct -> Bool
 isTypeHoleCt (CHoleCan { cc_hole = TypeHole }) = True
 isTypeHoleCt _ = False
+
+-- | The following constraints are considered to be a custom type error:
+--    1. TypeError msg
+--    2. TypeError msg ~ Something  (and the other way around)
+--    3. C (TypeError msg)          (for any parameter of class constraint)
+getUserTypeErrorMsg :: Ct -> Maybe (Kind, Type)
+getUserTypeErrorMsg ct
+  | Just (_,t1,t2) <- getEqPredTys_maybe ctT    = oneOf [t1,t2]
+  | Just (_,ts)    <- getClassPredTys_maybe ctT = oneOf ts
+  | otherwise                                   = isUserErrorTy ctT
+  where
+  ctT       = ctPred ct
+  oneOf xs  = msum (map isUserErrorTy xs)
+
+isUserTypeErrorCt :: Ct -> Bool
+isUserTypeErrorCt ct = case getUserTypeErrorMsg ct of
+                         Just _ -> True
+                         _      -> False
 
 instance Outputable Ct where
   ppr ct = ppr (cc_ev ct) <+> parens (text ct_sort)

@@ -713,6 +713,8 @@ pprTyTcApp p tc tys
     if gopt Opt_PrintExplicitKinds dflags then pprTcApp  p ppr_type tc tys
                                    else pprTyList p ty1 ty2
 
+  | tc `hasKey` errorMessageTypeErrorFamKey = text "(TypeError ...)"
+
   | otherwise
   = pprTcApp p ppr_type tc tys
 
@@ -721,6 +723,7 @@ pprTcApp :: TyPrec -> (TyPrec -> a -> SDoc) -> TyCon -> [a] -> SDoc
 pprTcApp _ pp tc [ty]
   | tc `hasKey` listTyConKey = pprPromotionQuote tc <> brackets   (pp TopPrec ty)
   | tc `hasKey` parrTyConKey = pprPromotionQuote tc <> paBrackets (pp TopPrec ty)
+
 
 pprTcApp p pp tc tys
   | Just sort <- tyConTuple_maybe tc

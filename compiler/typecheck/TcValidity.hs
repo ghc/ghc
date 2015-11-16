@@ -232,6 +232,16 @@ checkAmbiguity ctxt ty
        mk_msg ty = pprSigCtxt ctxt (ptext (sLit "the ambiguity check for")) (ppr ty)
        ambig_msg = ptext (sLit "To defer the ambiguity check to use sites, enable AllowAmbiguousTypes")
 
+
+checkUserTypeError :: Type -> TcM ()
+checkUserTypeError = check
+  where
+  check ty
+    | Just (_,msg) <- isUserErrorTy ty = failWithTc (pprUserTypeErrorTy msg)
+    | Just (_,ts)  <- splitTyConApp_maybe ty  = mapM_ check ts
+    | Just (t1,t2) <- splitAppTy_maybe ty     = check t1 >> check t2
+    | otherwise                               = return ()
+
 {-
 ************************************************************************
 *                                                                      *
@@ -311,6 +321,8 @@ checkValidType ctxt ty
         -- Do this *after* check_type, because we can't usefully take
         -- the kind of an ill-formed type such as (a~Int)
        ; check_kind ctxt ty
+
+       ; checkUserTypeError ty
 
        -- Check for ambiguous types.  See Note [When to call checkAmbiguity]
        -- NB: this will happen even for monotypes, but that should be cheap;

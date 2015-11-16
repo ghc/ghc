@@ -352,7 +352,9 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
     -- (see TcRnTypes.trulyInsoluble) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
-    report1 = [ ("insoluble1",   is_given,        True, mkGroupReporter mkEqErr)
+    report1 = [ ("custom_error", is_user_type_error,
+                                                  True, mkUserTypeErrorReporter)
+              , ("insoluble1",   is_given,        True, mkGroupReporter mkEqErr)
               , ("insoluble2",   utterly_wrong,   True, mkGroupReporter mkEqErr)
               , ("insoluble3",   rigid_nom_tv_eq, True, mkSkolReporter)
               , ("insoluble4",   rigid_nom_eq,    True, mkGroupReporter mkEqErr)
@@ -376,7 +378,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
 
     is_out_of_scope ct _ = isOutOfScopeCt ct
     is_hole         ct _ = isHoleCt ct
-
+    is_user_type_error ct _ = isUserTypeErrorCt ct
     is_given  ct _ = not (isWantedCt ct)  -- The Derived ones are actually all from Givens
 
     -- Skolem (i.e. non-meta) type variable on the left
@@ -436,6 +438,18 @@ mkHoleReporter ctxt
     do { err <- mkHoleError ctxt ct
        ; maybeReportHoleError ctxt ct err
        ; maybeAddDeferredHoleBinding ctxt err ct }
+
+mkUserTypeErrorReporter :: Reporter
+mkUserTypeErrorReporter ctxt
+  = mapM_ $ \ct -> maybeReportError ctxt =<< mkUserTypeError ctxt ct
+
+mkUserTypeError :: ReportErrCtxt -> Ct -> TcM ErrMsg
+mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
+                        $ pprUserTypeErrorTy
+                        $ case getUserTypeErrorMsg ct of
+                            Just (_,msg) -> msg
+                            Nothing      -> pprPanic "mkUserTypeError" (ppr ct)
+
 
 mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
                              -- Make error message for a group
