@@ -237,6 +237,8 @@ mkTextEncoding e = case mb_coding_failure_mode of
 mkTextEncoding' :: CodingFailureMode -> String -> IO TextEncoding
 mkTextEncoding' cfm enc =
   case [toUpper c | c <- enc, c /= '-'] of
+  -- ISO8859-1 we can handle ourself
+    "ISO88591" -> return $ Latin1.mkLatin1 cfm
   -- UTF-8 and friends we can handle ourselves
     "UTF8"    -> return $ UTF8.mkUTF8 cfm
     "UTF16"   -> return $ UTF16.mkUTF16 cfm
