@@ -586,6 +586,12 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $3="$$3 -fuse-ld=gold -Wl,-z,noexecstack"
         $4="$$4 -z noexecstack"
         ;;
+
+    powerpc-ibm-aix*)
+        $2="$$2 -mminimal-toc"
+        $3="$$3 -mminimal-toc"
+        ;;
+
     esac
 
     # If gcc knows about the stack protector, turn it off.

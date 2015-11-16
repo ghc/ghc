@@ -381,6 +381,14 @@ endif
 compiler/stage2/build/Parser_HC_OPTS += -O0 -fno-ignore-interface-pragmas -fcmm-sink
 compiler/stage3/build/Parser_HC_OPTS += -O0 -fno-ignore-interface-pragmas -fcmm-sink
 
+# Parser.hc has so many symbols it overflows when using -mminimal-toc
+ifeq "$(HostOS_CPP)" "aix"
+compiler/stage1/build/Parser_HC_OPTS += -optc-mfull-toc
+endif
+ifeq "$(TargetOS_CPP)" "aix"
+compiler/stage2/build/Parser_HC_OPTS += -optc-mfull-toc
+compiler/stage3/build/Parser_HC_OPTS += -optc-mfull-toc
+endif
 
 ifeq "$(GhcProfiled)" "YES"
 # If we're profiling GHC then we want SCCs.  However, adding -auto-all
