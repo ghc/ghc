@@ -556,6 +556,11 @@ endif
 BOOT_LIBS = $(foreach lib,$(PACKAGES_STAGE0),$(libraries/$(lib)_dist-boot_v_LIB))
 
 # ----------------------------------------
+# magic / HVR HACK XXX
+libraries/base_CONFIGURE_OPTS += --configure-option=--disable-largefile
+libraries/unix_CONFIGURE_OPTS += --configure-option=--disable-largefile
+
+# ----------------------------------------
 # Special magic for the ghc-prim package
 
 # We want the ghc-prim package to include the GHC.Prim module when it

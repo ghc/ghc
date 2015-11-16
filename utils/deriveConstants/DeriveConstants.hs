@@ -662,7 +662,7 @@ getWanted verbose tmpdir gccProgram gccFlags nmProgram
          execute verbose gccProgram (gccFlags ++ ["-c", cFile, "-o", oFile])
          xs <- case os of
                  "openbsd" -> readProcess "/usr/bin/objdump" ["--syms", oFile] ""
-                 _         -> readProcess nmProgram ["-P", oFile] ""
+                 _         -> readProcess (nmProgram ++ "2") ["-P", oFile] ""
 
          let ls = lines xs
              ms = map parseNmLine ls

@@ -1,0 +1,32 @@
+GhcLibWays = v
+
+GhcUnregisterised    = YES
+GhcWithNativeCodeGen = NO
+GhcThreaded          = NO
+
+INTEGER_LIBRARY    = integer-simple
+Stage1Only         = YES
+#stage=1
+
+DYNAMIC_BY_DEFAULT   = NO
+DYNAMIC_GHC_PROGRAMS = NO
+
+SRC_HC_OPTS          = -O -H64m
+GhcStage1HcOpts      = -O
+GhcStage2HcOpts      = -O
+GhcHcOpts            = -Rghc-timing
+GhcLibHcOpts         = -O
+
+SplitObjs            = NO
+HADDOCK_DOCS         = NO
+BUILD_DOCBOOK_HTML   = NO
+BUILD_DOCBOOK_PS     = NO
+BUILD_DOCBOOK_PDF    = NO
+#GhcLibWays     += p
+
+# NoFib settings
+NoFibWays =
+STRIP_CMD = :
+
+#
+#compiler/stage2/build/Parser_HC_OPTS += -optc-mfull-toc
