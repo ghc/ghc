@@ -7,6 +7,8 @@ module ApiAnnotation (
   ApiAnnKey,
   AnnKeywordId(..),
   AnnotationComment(..),
+  IsUnicodeSyntax(..),
+  unicodeAnn,
   LRdrName -- Exists for haddocks only
   ) where
 
@@ -198,8 +200,10 @@ data AnnKeywordId
     | AnnComma -- ^ as a list separator
     | AnnCommaTuple -- ^ in a RdrName for a tuple
     | AnnDarrow -- ^ '=>'
+    | AnnDarrowU -- ^ '=>', unicode variant
     | AnnData
     | AnnDcolon -- ^ '::'
+    | AnnDcolonU -- ^ '::', unicode variant
     | AnnDefault
     | AnnDeriving
     | AnnDo
@@ -210,6 +214,7 @@ data AnnKeywordId
     | AnnExport
     | AnnFamily
     | AnnForall
+    | AnnForallU -- ^ Unicode variant
     | AnnForeign
     | AnnFunId -- ^ for function name in matches where there are
                -- multiple equations for the function.
@@ -223,6 +228,7 @@ data AnnKeywordId
     | AnnInstance
     | AnnLam
     | AnnLarrow     -- ^ '<-'
+    | AnnLarrowU    -- ^ '<-', unicode variant
     | AnnLet
     | AnnMdo
     | AnnMinus -- ^ '-'
@@ -241,9 +247,12 @@ data AnnKeywordId
     | AnnProc
     | AnnQualified
     | AnnRarrow -- ^ '->'
+    | AnnRarrowU -- ^ '->', unicode variant
     | AnnRec
     | AnnRole
     | AnnSafe
+    | AnnStar -- ^ '*'
+    | AnnStarU -- ^ '*', unicode variant.
     | AnnSemi -- ^ ';'
     | AnnSimpleQuote -- ^ '''
     | AnnStatic -- ^ 'static'
@@ -261,11 +270,15 @@ data AnnKeywordId
     | AnnVbar -- ^ '|'
     | AnnWhere
     | Annlarrowtail -- ^ '-<'
+    | AnnlarrowtailU -- ^ '-<', unicode variant
     | Annrarrowtail -- ^ '->'
+    | AnnrarrowtailU -- ^ '->', unicode variant
     | AnnLarrowtail -- ^ '-<<'
+    | AnnLarrowtailU -- ^ '-<<', unicode variant
     | AnnRarrowtail -- ^ '>>-'
+    | AnnRarrowtailU -- ^ '>>-', unicode variant
     | AnnEofPos
-    deriving (Eq,Ord,Data,Typeable,Show)
+    deriving (Eq, Ord, Data, Typeable, Show)
 
 instance Outputable AnnKeywordId where
   ppr x = text (show x)
@@ -282,7 +295,7 @@ data AnnotationComment =
   | AnnDocOptionsOld   String     -- ^ doc options declared "-- # ..."-style
   | AnnLineComment     String     -- ^ comment starting by "--"
   | AnnBlockComment    String     -- ^ comment in {- -}
-    deriving (Eq,Ord,Data,Typeable,Show)
+    deriving (Eq, Ord, Data, Typeable, Show)
 -- Note: these are based on the Token versions, but the Token type is
 -- defined in Lexer.x and bringing it in here would create a loop
 
@@ -295,3 +308,26 @@ instance Outputable AnnotationComment where
 --             'ApiAnnotation.AnnTilde'
 --   - May have 'ApiAnnotation.AnnComma' when in a list
 type LRdrName = Located RdrName
+
+
+-- | Certain tokens can have alternate representations when unicode syntax is
+-- enabled. This flag is attached to those tokens in the lexer so that the
+-- original source representation can be reproduced in the corresponding
+-- 'ApiAnnotation'
+data IsUnicodeSyntax = UnicodeSyntax | NormalSyntax
+    deriving (Eq, Ord, Data, Typeable, Show)
+
+-- | Convert a normal annotation into its unicode equivalent one
+unicodeAnn :: AnnKeywordId -> AnnKeywordId
+unicodeAnn AnnForall     = AnnForallU
+unicodeAnn AnnDcolon     = AnnDcolonU
+unicodeAnn AnnLarrow     = AnnLarrowU
+unicodeAnn AnnRarrow     = AnnRarrowU
+unicodeAnn AnnDarrow     = AnnDarrowU
+unicodeAnn Annlarrowtail = AnnLarrowtailU
+unicodeAnn Annrarrowtail = AnnrarrowtailU
+unicodeAnn AnnLarrowtail = AnnLarrowtailU
+unicodeAnn AnnRarrowtail = AnnRarrowtailU
+unicodeAnn AnnStar       = AnnStarU
+unicodeAnn ann           = ann
+-- What about '*'?

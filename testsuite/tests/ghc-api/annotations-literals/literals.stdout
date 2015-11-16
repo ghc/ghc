@@ -14,7 +14,7 @@
 
 (LiteralsTest.hs:4:3,ITvarid "y",[y]),
 
-(LiteralsTest.hs:4:5-6,ITdcolon,[::]),
+(LiteralsTest.hs:4:5-6,ITdcolon NormalSyntax,[::]),
 
 (LiteralsTest.hs:4:8-10,ITconid "Int",[Int]),
 
@@ -38,7 +38,7 @@
 
 (LiteralsTest.hs:8:1,ITvarid "s",[s]),
 
-(LiteralsTest.hs:8:3-4,ITdcolon,[::]),
+(LiteralsTest.hs:8:3-4,ITdcolon NormalSyntax,[::]),
 
 (LiteralsTest.hs:8:6-11,ITconid "String",[String]),
 
@@ -54,7 +54,7 @@
 
 (LiteralsTest.hs:11:1,ITvarid "c",[c]),
 
-(LiteralsTest.hs:11:3-4,ITdcolon,[::]),
+(LiteralsTest.hs:11:3-4,ITdcolon NormalSyntax,[::]),
 
 (LiteralsTest.hs:11:6-9,ITconid "Char",[Char]),
 
@@ -70,7 +70,7 @@
 
 (LiteralsTest.hs:14:1,ITvarid "d",[d]),
 
-(LiteralsTest.hs:14:3-4,ITdcolon,[::]),
+(LiteralsTest.hs:14:3-4,ITdcolon NormalSyntax,[::]),
 
 (LiteralsTest.hs:14:6-11,ITconid "Double",[Double]),
 

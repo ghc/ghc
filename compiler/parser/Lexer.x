@@ -535,7 +535,7 @@ data Token
   | ITtype
   | ITwhere
 
-  | ITforall                    -- GHC extension keywords
+  | ITforall            IsUnicodeSyntax -- GHC extension keywords
   | ITexport
   | ITlabel
   | ITdynamic
@@ -587,20 +587,20 @@ data Token
 
   | ITdotdot                    -- reserved symbols
   | ITcolon
-  | ITdcolon
+  | ITdcolon            IsUnicodeSyntax
   | ITequal
   | ITlam
   | ITlcase
   | ITvbar
-  | ITlarrow
-  | ITrarrow
+  | ITlarrow            IsUnicodeSyntax
+  | ITrarrow            IsUnicodeSyntax
   | ITat
   | ITtilde
   | ITtildehsh
-  | ITdarrow
+  | ITdarrow            IsUnicodeSyntax
   | ITminus
   | ITbang
-  | ITstar
+  | ITstar              IsUnicodeSyntax
   | ITdot
 
   | ITbiglam                    -- GHC-extension symbols
@@ -671,15 +671,15 @@ data Token
   -- Arrow notation extension
   | ITproc
   | ITrec
-  | IToparenbar                 --  (|
-  | ITcparenbar                 --  |)
-  | ITlarrowtail                --  -<
-  | ITrarrowtail                --  >-
-  | ITLarrowtail                --  -<<
-  | ITRarrowtail                --  >>-
+  | IToparenbar                  --  (|
+  | ITcparenbar                  --  |)
+  | ITlarrowtail IsUnicodeSyntax --  -<
+  | ITrarrowtail IsUnicodeSyntax --  >-
+  | ITLarrowtail IsUnicodeSyntax --  -<<
+  | ITRarrowtail IsUnicodeSyntax --  >>-
 
-  | ITunknown String            -- Used when the lexer can't make sense of it
-  | ITeof                       -- end of file token
+  | ITunknown String             -- Used when the lexer can't make sense of it
+  | ITeof                        -- end of file token
 
   -- Documentation annotations
   | ITdocCommentNext  String     -- something beginning '-- |'
@@ -733,7 +733,8 @@ reservedWordsFM = listToUFM $
          ( "type",           ITtype,          0 ),
          ( "where",          ITwhere,         0 ),
 
-         ( "forall",         ITforall,        xbit ExplicitForallBit .|.
+         ( "forall",         ITforall NormalSyntax,
+                                              xbit ExplicitForallBit .|.
                                               xbit InRulePragBit),
          ( "mdo",            ITmdo,           xbit RecursiveDoBit),
              -- See Note [Lexing type pseudo-keywords]
@@ -784,44 +785,49 @@ a key detail to make all this work.
 reservedSymsFM :: UniqFM (Token, ExtsBitmap -> Bool)
 reservedSymsFM = listToUFM $
     map (\ (x,y,z) -> (mkFastString x,(y,z)))
-      [ ("..",  ITdotdot,   always)
+      [ ("..",  ITdotdot,              always)
         -- (:) is a reserved op, meaning only list cons
-       ,(":",   ITcolon,    always)
-       ,("::",  ITdcolon,   always)
-       ,("=",   ITequal,    always)
-       ,("\\",  ITlam,      always)
-       ,("|",   ITvbar,     always)
-       ,("<-",  ITlarrow,   always)
-       ,("->",  ITrarrow,   always)
-       ,("@",   ITat,       always)
-       ,("~",   ITtilde,    always)
-       ,("~#",  ITtildehsh, magicHashEnabled)
-       ,("=>",  ITdarrow,   always)
-       ,("-",   ITminus,    always)
-       ,("!",   ITbang,     always)
+       ,(":",   ITcolon,               always)
+       ,("::",  ITdcolon NormalSyntax, always)
+       ,("=",   ITequal,               always)
+       ,("\\",  ITlam,                 always)
+       ,("|",   ITvbar,                always)
+       ,("<-",  ITlarrow NormalSyntax, always)
+       ,("->",  ITrarrow NormalSyntax, always)
+       ,("@",   ITat,                  always)
+       ,("~",   ITtilde,               always)
+       ,("~#",  ITtildehsh,            magicHashEnabled)
+       ,("=>",  ITdarrow NormalSyntax, always)
+       ,("-",   ITminus,               always)
+       ,("!",   ITbang,                always)
 
         -- For data T (a::*) = MkT
-       ,("*", ITstar, always) -- \i -> kindSigsEnabled i || tyFamEnabled i)
+       ,("*", ITstar NormalSyntax, always)
+                                  -- \i -> kindSigsEnabled i || tyFamEnabled i)
         -- For 'forall a . t'
        ,(".", ITdot,  always) -- \i -> explicitForallEnabled i || inRulePrag i)
 
-       ,("-<",  ITlarrowtail, arrowsEnabled)
-       ,(">-",  ITrarrowtail, arrowsEnabled)
-       ,("-<<", ITLarrowtail, arrowsEnabled)
-       ,(">>-", ITRarrowtail, arrowsEnabled)
+       ,("-<",  ITlarrowtail NormalSyntax, arrowsEnabled)
+       ,(">-",  ITrarrowtail NormalSyntax, arrowsEnabled)
+       ,("-<<", ITLarrowtail NormalSyntax, arrowsEnabled)
+       ,(">>-", ITRarrowtail NormalSyntax, arrowsEnabled)
 
-       ,("∷",   ITdcolon, unicodeSyntaxEnabled)
-       ,("⇒",   ITdarrow, unicodeSyntaxEnabled)
-       ,("∀",   ITforall, unicodeSyntaxEnabled)
-       ,("→",   ITrarrow, unicodeSyntaxEnabled)
-       ,("←",   ITlarrow, unicodeSyntaxEnabled)
+       ,("∷",   ITdcolon UnicodeSyntax, unicodeSyntaxEnabled)
+       ,("⇒",   ITdarrow UnicodeSyntax, unicodeSyntaxEnabled)
+       ,("∀",   ITforall UnicodeSyntax, unicodeSyntaxEnabled)
+       ,("→",   ITrarrow UnicodeSyntax, unicodeSyntaxEnabled)
+       ,("←",   ITlarrow UnicodeSyntax, unicodeSyntaxEnabled)
 
-       ,("⤙",   ITlarrowtail, \i -> unicodeSyntaxEnabled i && arrowsEnabled i)
-       ,("⤚",   ITrarrowtail, \i -> unicodeSyntaxEnabled i && arrowsEnabled i)
-       ,("⤛",   ITLarrowtail, \i -> unicodeSyntaxEnabled i && arrowsEnabled i)
-       ,("⤜",   ITRarrowtail, \i -> unicodeSyntaxEnabled i && arrowsEnabled i)
+       ,("⤙",   ITlarrowtail UnicodeSyntax,
+                                \i -> unicodeSyntaxEnabled i && arrowsEnabled i)
+       ,("⤚",   ITrarrowtail UnicodeSyntax,
+                                \i -> unicodeSyntaxEnabled i && arrowsEnabled i)
+       ,("⤛",   ITLarrowtail UnicodeSyntax,
+                                \i -> unicodeSyntaxEnabled i && arrowsEnabled i)
+       ,("⤜",   ITRarrowtail UnicodeSyntax,
+                                \i -> unicodeSyntaxEnabled i && arrowsEnabled i)
 
-       ,("★", ITstar, unicodeSyntaxEnabled)
+       ,("★", ITstar UnicodeSyntax, unicodeSyntaxEnabled)
 
         -- ToDo: ideally, → and ∷ should be "specials", so that they cannot
         -- form part of a large operator.  This would let us have a better
