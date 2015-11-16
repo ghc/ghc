@@ -215,6 +215,11 @@ base
    ``disableAllocationLimit`` are now available from ``System.Mem``. Previously
    this functionality was only available from ``GHC.Conc``.
 
+- ``forever``, ``filterM``, ``mapAndUnzipM``, ``zipWithM``, ``zipWithM_``,
+  ``replicateM``, and ``replicateM`` were generalized from ``Monad`` to
+  ``Applicative``. If this causes performance regressions, try to make the
+  implementation of ``(*>)`` match that of ``(>>)``.
+
 
 binary
 ~~~~~~

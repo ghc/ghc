@@ -50,6 +50,9 @@
 
   * Generalise `forever` from `Monad` to `Applicative`
 
+  * Generalize `filterM`, `mapAndUnzipM`, `zipWithM`, `zipWithM_`, `replicateM`,
+    `replicateM` from `Monad` to `Applicative` (#10168)
+
   * Exported `GiveGCStats`, `DoCostCentres`, `DoHeapProfile`, `DoTrace`,
     `RtsTime`, and `RtsNat` from `GHC.RTS.Flags`
 
