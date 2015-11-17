@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -76,6 +77,10 @@ import GHC.Unicode ( isSpace )
 import GHC.List ( replicate, null )
 import GHC.Base hiding ( many )
 
+#if __GLASGOW_HASKELL__ > 710
+import Control.Monad.Fail
+#endif
+
 infixr 5 +++, <++
 
 ------------------------------------------------------------------------
@@ -118,6 +123,11 @@ instance Monad P where
   (Final r)    >>= k = final [ys' | (x,s) <- r, ys' <- run (k x) s]
 
   fail _ = Fail
+
+#if __GLASGOW_HASKELL__ > 710
+instance MonadFail P where
+  fail _ = Fail
+#endif
 
 instance Alternative P where
   empty = Fail
@@ -165,6 +175,11 @@ instance Applicative ReadP where
 instance Monad ReadP where
   fail _    = R (\_ -> Fail)
   R m >>= f = R (\k -> m (\a -> let R m' = f a in m' k))
+
+#if __GLASGOW_HASKELL__ > 710
+instance MonadFail ReadP where
+  fail _    = R (\_ -> Fail)
+#endif
 
 instance Alternative ReadP where
     empty = mzero

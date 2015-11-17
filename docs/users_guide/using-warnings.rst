@@ -188,12 +188,22 @@ command line.
        single: AMP
        single: Applicative-Monad Proposal
 
-    Causes a warning to be emitted when a definition is in conflict with
-    the AMP (Applicative-Monad proosal), namely: 1. Instance of Monad
-    without Applicative; 2. Instance of MonadPlus without Alternative;
-    3. Custom definitions of join/pure/<\*>
+    This option is deprecated.
 
-    This option is on by default.
+    Caused a warning to be emitted when a definition was in conflict with
+    the AMP (Applicative-Monad proosal).
+
+``-fwarn-missing-monadfail-instance``
+    .. index::
+       single: -fwarn-missing-monadfail-instance
+       single: MFP
+       single: MonadFail Proposal
+
+    Warn when a failable pattern is used in a do-block that does not have a
+    ``MonadFail`` instance.
+
+    This option is off by default, but will be switched on in a future GHC
+    release, as part of the MFP (MonadFail Proposal).
 
 ``-fwarn-deprecated-flags``
     .. index::

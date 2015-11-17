@@ -1,15 +1,18 @@
-{-# LANGUAGE RebindableSyntax, NPlusKPatterns, RankNTypes,
-             ScopedTypeVariables, FlexibleInstances #-}
+{-# LANGUAGE RebindableSyntax #-}
+{-# LANGUAGE NPlusKPatterns #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 module Main where
 	{
---	import Prelude;
 	import qualified Prelude;
 	import Prelude(String,undefined,Maybe(..),IO,putStrLn,
 		Integer,(++),Rational, (==), (>=) );
 
 	debugFunc :: String -> IO a -> IO a;
 	debugFunc s ioa = (putStrLn ("++ " ++ s)) Prelude.>>
-		(ioa Prelude.>>= (\a -> 
+		(ioa Prelude.>>= (\a ->
 			(putStrLn ("-- " ++ s)) Prelude.>> (Prelude.return a)
 		));
 
@@ -18,7 +21,7 @@ module Main where
 
 	returnIO :: a -> IO a;
         returnIO = Prelude.return;
-	
+
 	class HasReturn a where
 		{
 		return :: a;
@@ -107,10 +110,10 @@ module Main where
 		Just (b::b) <- g;	-- >>= (and fail if g returns Nothing)
 		return b;		-- return
 		};
-	
+
 	test_fromInteger :: Integer;
 	test_fromInteger = 27;
-	
+
 	test_fromRational :: Rational;
 	test_fromRational = 31.5;
 
@@ -129,7 +132,7 @@ module Main where
 
 
 	doTest :: String -> IO a -> IO ();
-	doTest s ioa = 
+	doTest s ioa =
 		(putStrLn ("start test " ++ s))
 			Prelude.>>
 		ioa
@@ -137,7 +140,7 @@ module Main where
 		(putStrLn ("end test " ++ s));
 
 	main :: IO ();
-	main = 
+	main =
 		(doTest "test_do failure"
 			(test_do (Prelude.return ()) (Prelude.return Nothing))
 		)

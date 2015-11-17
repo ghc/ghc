@@ -10,7 +10,8 @@ general, all of these functions return a renamed thing, and a set of
 free variables.
 -}
 
-{-# LANGUAGE CPP, ScopedTypeVariables, RecordWildCards #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module RnExpr (
         rnLExpr, rnExpr, rnStmts
@@ -787,7 +788,12 @@ rnStmt ctxt rnBody (L loc (BindStmt pat body _ _)) thing_inside
   = do  { (body', fv_expr) <- rnBody body
                 -- The binders do not scope over the expression
         ; (bind_op, fvs1) <- lookupStmtName ctxt bindMName
-        ; (fail_op, fvs2) <- lookupStmtName ctxt failMName
+
+        ; xMonadFailEnabled <- fmap (xopt Opt_MonadFailDesugaring) getDynFlags
+        ; let failFunction | xMonadFailEnabled = failMName
+                           | otherwise         = failMName_preMFP
+        ; (fail_op, fvs2) <- lookupSyntaxName failFunction
+
         ; rnPat (StmtCtxt ctxt) pat $ \ pat' -> do
         { (thing, fvs3) <- thing_inside (collectPatBinders pat')
         ; return (( [(L loc (BindStmt pat' body' bind_op fail_op), fv_expr)]
@@ -1091,7 +1097,12 @@ rn_rec_stmt rnBody _ (L loc (BodyStmt body _ _ _), _)
 rn_rec_stmt rnBody _ (L loc (BindStmt pat' body _ _), fv_pat)
   = do { (body', fv_expr) <- rnBody body
        ; (bind_op, fvs1) <- lookupSyntaxName bindMName
-       ; (fail_op, fvs2) <- lookupSyntaxName failMName
+
+       ; xMonadFailEnabled <- fmap (xopt Opt_MonadFailDesugaring) getDynFlags
+       ; let failFunction | xMonadFailEnabled = failMName
+                          | otherwise         = failMName_preMFP
+       ; (fail_op, fvs2) <- lookupSyntaxName failFunction
+
        ; let bndrs = mkNameSet (collectPatBinders pat')
              fvs   = fv_expr `plusFV` fv_pat `plusFV` fvs1 `plusFV` fvs2
        ; return [(bndrs, fvs, bndrs `intersectNameSet` fvs,

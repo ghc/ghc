@@ -147,6 +147,9 @@ import FastString
 import GHC.Fingerprint
 
 import Control.Monad (ap, liftM, msum)
+#if __GLASGOW_HASKELL__ > 710
+import qualified Control.Monad.Fail as MonadFail
+#endif
 
 #ifdef GHCI
 import Data.Map      ( Map )
@@ -2263,6 +2266,8 @@ data CtOrigin
   | UnboundOccurrenceOf RdrName
   | ListOrigin          -- An overloaded list
   | StaticOrigin        -- A static form
+  | FailablePattern (LPat TcId) -- A failable pattern in do-notation for the
+                                -- MonadFail Proposal (MFP)
 
 ctoHerald :: SDoc
 ctoHerald = ptext (sLit "arising from")
@@ -2352,6 +2357,8 @@ pprCtO AnnOrigin             = ptext (sLit "an annotation")
 pprCtO HoleOrigin            = ptext (sLit "a use of") <+> quotes (ptext $ sLit "_")
 pprCtO ListOrigin            = ptext (sLit "an overloaded list")
 pprCtO StaticOrigin          = ptext (sLit "a static form")
+pprCtO (FailablePattern pat) = text "the failable pattern" <+> quotes (ppr pat)
+                               $$ text "(this will become an error a future GHC release)"
 pprCtO _                     = panic "pprCtOrigin"
 
 {-
@@ -2379,6 +2386,11 @@ instance Monad TcPluginM where
   TcPluginM m >>= k =
     TcPluginM (\ ev -> do a <- m ev
                           runTcPluginM (k a) ev)
+
+#if __GLASGOW_HASKELL__ > 710
+instance MonadFail.MonadFail TcPluginM where
+  fail x   = TcPluginM (const $ fail x)
+#endif
 
 runTcPluginM :: TcPluginM a -> Maybe EvBindsVar -> TcM a
 runTcPluginM (TcPluginM m) = m

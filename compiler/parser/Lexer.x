@@ -78,6 +78,9 @@ module Lexer (
 import Control.Applicative
 #endif
 import Control.Monad
+#if __GLASGOW_HASKELL__ > 710
+import Control.Monad.Fail
+#endif
 import Data.Bits
 import Data.Char
 import Data.List
@@ -1754,6 +1757,11 @@ instance Monad P where
   return = pure
   (>>=) = thenP
   fail = failP
+
+#if __GLASGOW_HASKELL__ > 710
+instance MonadFail P where
+  fail = failP
+#endif
 
 returnP :: a -> P a
 returnP a = a `seq` (P $ \s -> POk s a)

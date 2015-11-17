@@ -505,6 +505,7 @@ data WarningFlag =
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
    | Opt_WarnAMP
+   | Opt_WarnMissingMonadFailInstance
    | Opt_WarnDodgyExports
    | Opt_WarnDodgyImports
    | Opt_WarnOrphans
@@ -656,6 +657,7 @@ data ExtensionFlag
    | Opt_StaticPointers
    | Opt_Strict
    | Opt_StrictData
+   | Opt_MonadFailDesugaring
    deriving (Eq, Enum, Show)
 
 type SigOf = Map ModuleName Module
@@ -2898,6 +2900,7 @@ fWarningFlags = [
   flagSpec "warn-missing-import-lists"        Opt_WarnMissingImportList,
   flagSpec "warn-missing-local-sigs"          Opt_WarnMissingLocalSigs,
   flagSpec "warn-missing-methods"             Opt_WarnMissingMethods,
+  flagSpec "warn-missing-monadfail-instance"  Opt_WarnMissingMonadFailInstance,
   flagSpec "warn-missing-signatures"          Opt_WarnMissingSigs,
   flagSpec "warn-missing-exported-sigs"       Opt_WarnMissingExportedSigs,
   flagSpec "warn-monomorphism-restriction"    Opt_WarnMonomorphism,
@@ -3168,6 +3171,7 @@ xFlags = [
   flagSpec "LiberalTypeSynonyms"              Opt_LiberalTypeSynonyms,
   flagSpec "MagicHash"                        Opt_MagicHash,
   flagSpec "MonadComprehensions"              Opt_MonadComprehensions,
+  flagSpec "MonadFailDesugaring"              Opt_MonadFailDesugaring,
   flagSpec "MonoLocalBinds"                   Opt_MonoLocalBinds,
   flagSpec' "MonoPatBinds"                    Opt_MonoPatBinds
     (\ turn_on -> when turn_on $

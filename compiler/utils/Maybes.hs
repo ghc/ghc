@@ -20,6 +20,9 @@ module Maybes (
 
 import Control.Applicative
 import Control.Monad
+#if __GLASGOW_HASKELL__ > 710
+import Control.Monad.Fail
+#endif
 import Data.Maybe
 
 infixr 4 `orElse`
@@ -84,6 +87,12 @@ instance (Monad m) => Monad (MaybeT m) where
   return = pure
   x >>= f = MaybeT $ runMaybeT x >>= maybe (pure Nothing) (runMaybeT . f)
   fail _ = MaybeT $ pure Nothing
+
+
+#if __GLASGOW_HASKELL__ > 710
+instance Monad m => MonadFail (MaybeT m) where
+  fail _ = MaybeT $ return Nothing
+#endif
 
 #if __GLASGOW_HASKELL__ < 710
 -- Pre-AMP change

@@ -1336,7 +1336,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
   -- For details on above see note [Api annotations] in ApiAnnotation
   | BindStmt (LPat idL)
              body
-             (SyntaxExpr idR) -- The (>>=) operator; see Note [The type of bind]
+             (SyntaxExpr idR) -- The (>>=) operator; see Note [The type of bind in Stmts]
              (SyntaxExpr idR) -- The fail operator
              -- The fail operator is noSyntaxExpr
              -- if the pattern match can't fail

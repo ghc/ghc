@@ -75,8 +75,8 @@ module Control.Monad
     , (<$!>)
     ) where
 
-import Data.Functor ( void, (<$>) )
 import Data.Foldable ( Foldable, sequence_, sequenceA_, msum, mapM_, foldlM, forM_ )
+import Data.Functor ( void, (<$>) )
 import Data.Traversable ( forM, mapM, traverse, sequence, sequenceA )
 
 import GHC.Base hiding ( mapM, sequence )

@@ -76,7 +76,7 @@ import RnEnv
 import RnSource
 import ErrUtils
 import Id
-import IdInfo( IdDetails( VanillaId ) )
+import IdInfo
 import VarEnv
 import Module
 import UniqFM
@@ -103,7 +103,6 @@ import FastString
 import Maybes
 import Util
 import Bag
-import IdInfo
 
 import Control.Monad
 

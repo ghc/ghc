@@ -1681,6 +1681,22 @@ In the case of transform comprehensions, notice that the groups are
 parameterised over some arbitrary type ``n`` (provided it has an
 ``fmap``, as well as the comprehension being over an arbitrary monad.
 
+.. _monadfail-desugaring
+
+New monadic failure desugaring mechanism
+----------------------------------------
+
+.. index::
+    single: -XMonadFailDesugaring option
+
+Switch desugaring of ``do``-blocks to use ``MonadFail.fail`` instead of
+``Monad.fail``. This will be the default behaviour in a future GHC release,
+under the MonadFail Proposal (MFP).
+
+This extension is temporary, and will be deprecated in a future release. It is
+included so that library authors have a hard check for whether their code
+will work with future GHC versions.
+
 .. _rebindable-syntax:
 
 Rebindable syntax and the implicit Prelude import

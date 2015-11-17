@@ -1,0 +1,74 @@
+
+MonadFailErrors.hs:16:5: error:
+    Could not deduce (MonadFail m) arising from a do statement
+    from the context: Monad m
+      bound by the type signature for:
+                 general :: Monad m => m a
+      at MonadFailErrors.hs:14:12-25
+    Possible fix:
+      add (MonadFail m) to the context of
+        the type signature for:
+          general :: Monad m => m a
+    In a stmt of a 'do' block: Just x <- undefined
+    In the expression:
+      do { Just x <- undefined;
+           undefined }
+    In an equation for ‘general’:
+        general
+          = do { Just x <- undefined;
+                 undefined }
+
+MonadFailErrors.hs:30:5: error:
+    No instance for (MonadFail Identity) arising from a do statement
+    In a stmt of a 'do' block: Just x <- undefined
+    In the expression:
+      do { Just x <- undefined;
+           undefined }
+    In an equation for ‘identity’:
+        identity
+          = do { Just x <- undefined;
+                 undefined }
+
+MonadFailErrors.hs:44:5: error:
+    No instance for (MonadFail (ST s)) arising from a do statement
+    In a stmt of a 'do' block: Just x <- undefined
+    In the expression:
+      do { Just x <- undefined;
+           undefined }
+    In an equation for ‘st’:
+        st
+          = do { Just x <- undefined;
+                 undefined }
+
+MonadFailErrors.hs:51:5: error:
+    No instance for (MonadFail ((->) r)) arising from a do statement
+    In a stmt of a 'do' block: Just x <- undefined
+    In the expression:
+      do { Just x <- undefined;
+           undefined }
+    In an equation for ‘reader’:
+        reader
+          = do { Just x <- undefined;
+                 undefined }
+
+MonadFailErrors.hs:59:5: error:
+    No instance for (MonadFail Identity) arising from a do statement
+    In a stmt of a 'do' block: Newtype x <- undefined
+    In the expression:
+      do { Newtype x <- undefined;
+           undefined }
+    In an equation for ‘newtypeMatch’:
+        newtypeMatch
+          = do { Newtype x <- undefined;
+                 undefined }
+
+MonadFailErrors.hs:67:5: error:
+    No instance for (MonadFail Identity) arising from a do statement
+    In a stmt of a 'do' block: Data x <- undefined
+    In the expression:
+      do { Data x <- undefined;
+           undefined }
+    In an equation for ‘singleConMatch’:
+        singleConMatch
+          = do { Data x <- undefined;
+                 undefined }

@@ -463,12 +463,23 @@ mkGroupReporter mk_err ctxt cts
 
 reportGroup :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg) -> ReportErrCtxt
             -> [Ct] -> TcM ()
-reportGroup mk_err ctxt cts
-  = do { err <- mk_err ctxt cts
-       ; maybeReportError ctxt err
-       ; mapM_ (maybeAddDeferredBinding ctxt err) cts }
-               -- Add deferred bindings for all
-               -- But see Note [Always warn with -fdefer-type-errors]
+reportGroup mk_err ctxt cts =
+  case partition isMonadFailInstanceMissing cts of
+        -- Only warn about missing MonadFail constraint when
+        -- there are no other missing contstraints!
+        (monadFailCts, []) -> do { err <- mk_err ctxt monadFailCts
+                                 ; reportWarning err }
+
+        (_, cts') -> do { err <- mk_err ctxt cts'
+                        ; maybeReportError ctxt err
+                        ; mapM_ (maybeAddDeferredBinding ctxt err) cts' }
+                                -- Add deferred bindings for all
+                                -- But see Note [Always warn with -fdefer-type-errors]
+  where
+    isMonadFailInstanceMissing ct =
+        case ctLocOrigin (ctLoc ct) of
+            FailablePattern _pat -> True
+            _otherwise           -> False
 
 maybeReportHoleError :: ReportErrCtxt -> Ct -> ErrMsg -> TcM ()
 maybeReportHoleError ctxt ct err

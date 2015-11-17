@@ -40,6 +40,9 @@ import State
 import Control.Applicative (Applicative(..))
 #endif
 import Control.Monad
+#if __GLASGOW_HASKELL__ > 710
+import qualified Control.Monad.Fail as MonadFail
+#endif
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified FiniteMap as Map
@@ -2087,6 +2090,11 @@ instance Monad SpecM where
                                        z
     return = pure
     fail str = SpecM $ fail str
+
+#if __GLASGOW_HASKELL__ > 710
+instance MonadFail.MonadFail SpecM where
+    fail str = SpecM $ fail str
+#endif
 
 instance MonadUnique SpecM where
     getUniqueSupplyM

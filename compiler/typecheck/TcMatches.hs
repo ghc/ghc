@@ -6,7 +6,9 @@
 TcMatches: Typecheck some @Matches@
 -}
 
-{-# LANGUAGE CPP, RankNTypes #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
                    TcMatchCtxt(..), TcStmtChecker, TcExprStmtChecker, TcCmdStmtChecker,
@@ -36,6 +38,10 @@ import Outputable
 import Util
 import SrcLoc
 import FastString
+import DynFlags
+import PrelNames (monadFailClassName)
+import Type
+import Inst
 
 -- Create chunkified tuple tybes for monad comprehensions
 import MkCore
@@ -517,14 +523,17 @@ tcMcStmt ctxt (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
         ; bind_op'   <- tcSyntaxOp MCompOrigin bind_op
                              (mkFunTys [rhs_ty, mkFunTy pat_ty new_res_ty] res_ty)
 
-           -- If (but only if) the pattern can fail, typecheck the 'fail' operator
+        -- If (but only if) the pattern can fail, typecheck the 'fail' operator
         ; fail_op' <- if isIrrefutableHsPat pat
-                      then return noSyntaxExpr
-                      else tcSyntaxOp MCompOrigin fail_op (mkFunTy stringTy new_res_ty)
+            then return noSyntaxExpr
+            else tcSyntaxOp MCompOrigin fail_op (mkFunTy stringTy new_res_ty)
 
         ; rhs' <- tcMonoExprNC rhs rhs_ty
+
         ; (pat', thing) <- tcPat (StmtCtxt ctxt) pat pat_ty $
                            thing_inside new_res_ty
+
+        ; monadFailWarnings pat' new_res_ty
 
         ; return (BindStmt pat' rhs' bind_op' fail_op', thing) }
 
@@ -764,15 +773,17 @@ tcDoStmt ctxt (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
         ; bind_op'   <- tcSyntaxOp DoOrigin bind_op
                              (mkFunTys [rhs_ty, mkFunTy pat_ty new_res_ty] res_ty)
 
-                -- If (but only if) the pattern can fail,
-                -- typecheck the 'fail' operator
+        -- If (but only if) the pattern can fail, typecheck the 'fail' operator
         ; fail_op' <- if isIrrefutableHsPat pat
-                      then return noSyntaxExpr
-                      else tcSyntaxOp DoOrigin fail_op (mkFunTy stringTy new_res_ty)
+            then return noSyntaxExpr
+            else tcSyntaxOp DoOrigin fail_op (mkFunTy stringTy new_res_ty)
 
         ; rhs' <- tcMonoExprNC rhs rhs_ty
+
         ; (pat', thing) <- tcPat (StmtCtxt ctxt) pat pat_ty $
                            thing_inside new_res_ty
+
+        ; monadFailWarnings pat' new_res_ty
 
         ; return (BindStmt pat' rhs' bind_op' fail_op', thing) }
 
@@ -847,6 +858,8 @@ tcDoStmt ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
 tcDoStmt _ stmt _ _
   = pprPanic "tcDoStmt: unexpected Stmt" (ppr stmt)
 
+
+
 {-
 Note [Treat rebindable syntax first]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -858,6 +871,64 @@ rebindable syntax first, and push that information into (tcMonoExprNC rhs).
 Otherwise the error shows up when cheking the rebindable syntax, and
 the expected/inferred stuff is back to front (see Trac #3613).
 -}
+
+
+
+---------------------------------------------------
+-- MonadFail Proposal warnings
+---------------------------------------------------
+
+-- The idea behind issuing MonadFail warnings is that we add them whenever a
+-- failable pattern is encountered. However, instead of throwing a type error
+-- when the constraint cannot be satisfied, we only issue a warning in
+-- TcErrors.hs.
+
+monadFailWarnings :: LPat TcId -> TcType -> TcRn ()
+monadFailWarnings pat doExprType = unless (isIrrefutableHsPat pat) $ do
+    rebindableSyntax <- xoptM Opt_RebindableSyntax
+    desugarFlag      <- xoptM Opt_MonadFailDesugaring
+    missingWarning   <- woptM Opt_WarnMissingMonadFailInstance
+    if | rebindableSyntax && (desugarFlag || missingWarning)
+           -> warnRebindableClash pat
+       | not desugarFlag && missingWarning
+           -> addMonadFailConstraint pat doExprType
+       | otherwise        -> pure ()
+
+addMonadFailConstraint :: LPat TcId -> TcType -> TcRn ()
+addMonadFailConstraint pat doExprType = do
+    doExprTypeHead <- tyHead <$> zonkType doExprType
+    monadFailClass <- tcLookupClass monadFailClassName
+    let predType = mkClassPred monadFailClass [doExprTypeHead]
+    _ <- emitWanted (FailablePattern pat) predType
+    pure ()
+
+warnRebindableClash :: LPat TcId -> TcRn ()
+warnRebindableClash pattern = addWarnAt (getLoc pattern)
+    (text "The failable pattern" <+> quotes (ppr pattern)
+     $$
+     nest 2 (text "is used together with -XRebindableSyntax."
+             <+> text "If this is intentional,"
+             $$
+             text "compile with -fno-warn-missing-monadfail-instance."))
+
+zonkType :: TcType -> TcRn TcType
+zonkType ty = do
+    tidyEnv <- tcInitTidyEnv
+    (_, zonkedType) <- zonkTidyTcType tidyEnv ty
+    pure zonkedType
+
+
+tyHead :: TcType -> TcType
+tyHead ty
+    | Just (con, _) <- splitAppTy_maybe ty = con
+    | Just _ <- splitFunTy_maybe ty        = panicFor "FunTy"
+    | Just _ <- splitTyConApp_maybe ty     = panicFor "TyConApp"
+    | Just _ <- splitForAllTy_maybe ty     = panicFor "ForAllTy"
+    | otherwise                            = panicFor "<some other>"
+
+    where panicFor x = panic ("MonadFail check applied to " ++ x ++ " type")
+
+
 
 {-
 Note [typechecking ApplicativeStmt]

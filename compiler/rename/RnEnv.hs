@@ -1441,8 +1441,8 @@ lookupIfThenElse :: RnM (Maybe (SyntaxExpr Name), FreeVars)
 -- case we desugar directly rather than calling an existing function
 -- Hence the (Maybe (SyntaxExpr Name)) return type
 lookupIfThenElse
-  = do { rebind <- xoptM Opt_RebindableSyntax
-       ; if not rebind
+  = do { rebindable_on <- xoptM Opt_RebindableSyntax
+       ; if not rebindable_on
          then return (Nothing, emptyFVs)
          else do { ite <- lookupOccRn (mkVarUnqual (fsLit "ifThenElse"))
                  ; return (Just (HsVar ite), unitFV ite) } }

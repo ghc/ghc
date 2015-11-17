@@ -64,6 +64,9 @@ import Demand ( splitStrictSig, isBotRes )
 import HscTypes
 import DynFlags
 import Control.Monad
+#if __GLASGOW_HASKELL__ > 710
+import qualified Control.Monad.Fail as MonadFail
+#endif
 import MonadUtils
 import Data.Maybe
 import Pair
@@ -1502,6 +1505,11 @@ instance Monad LintM where
                          case res of
                            Just r -> unLintM (k r) env errs'
                            Nothing -> (Nothing, errs'))
+
+#if __GLASGOW_HASKELL__ > 710
+instance MonadFail.MonadFail LintM where
+    fail err = failWithL (text err)
+#endif
 
 instance HasDynFlags LintM where
   getDynFlags = LintM (\ e errs -> (Just (le_dynflags e), errs))
