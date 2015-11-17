@@ -588,8 +588,9 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         ;;
 
     powerpc-ibm-aix*)
-        $2="$$2 -mminimal-toc"
-        $3="$$3 -mminimal-toc"
+        $2="$$2 -mminimal-toc -D_THREAD_SAFE"
+        $3="$$3 -mminimal-toc -D_THREAD_SAFE"
+        $5="$$5 -D_THREAD_SAFE"
         ;;
 
     esac
