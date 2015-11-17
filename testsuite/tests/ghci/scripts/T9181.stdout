@@ -5,6 +5,11 @@ type (<=) (x :: Nat) (y :: Nat) = (x <=? y) ~ 'True
 type family (<=?) (a :: Nat) (b :: Nat) :: Bool
 type family CmpNat (a :: Nat) (b :: Nat) :: Ordering
 type family CmpSymbol (a :: Symbol) (b :: Symbol) :: Ordering
+data ErrorMessage where
+  Text :: Symbol -> ErrorMessage
+  ShowType :: t -> ErrorMessage
+  (:<>:) :: ErrorMessage -> ErrorMessage -> ErrorMessage
+  (:$$:) :: ErrorMessage -> ErrorMessage -> ErrorMessage
 class KnownNat (n :: Nat) where
   natSing :: SNat n
   {-# MINIMAL natSing #-}
@@ -15,6 +20,7 @@ data SomeNat where
   SomeNat :: KnownNat n => (Proxy n) -> SomeNat
 data SomeSymbol where
   SomeSymbol :: KnownSymbol n => (Proxy n) -> SomeSymbol
+type family TypeError (a :: ErrorMessage) :: b where
 type family (^) (a :: Nat) (b :: Nat) :: Nat
 natVal :: KnownNat n => proxy n -> Integer
 natVal' :: KnownNat n => Proxy# n -> Integer
