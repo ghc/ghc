@@ -55,6 +55,7 @@ import SysTools
 
 -- Standard libraries
 import Control.Monad
+import Control.Applicative((<|>))
 
 import Data.IORef
 import Data.List
@@ -1209,20 +1210,25 @@ locateLib dflags is_hs dirs lib
     -- For non-Haskell libraries (e.g. gmp, iconv):
     --   first look in library-dirs for a dynamic library (libfoo.so)
     --   then  look in library-dirs for a static library (libfoo.a)
+    --   first look in library-dirs and inplace GCC for a dynamic library (libfoo.so)
+    --   then  check for system dynamic libraries (e.g. kernel32.dll on windows)
     --   then  try "gcc --print-file-name" to search gcc's search path
+    --   then  look in library-dirs and inplace GCC for a static library (libfoo.a)
     --       for a dynamic library (#5289)
     --   otherwise, assume loadDLL can find it
     --
-  = findDll `orElse`
+  = findDll     `orElse`
+    findSysDll  `orElse`
+    tryGcc      `orElse`
     findArchive `orElse`
-    tryGcc `orElse`
-    tryGccPrefixed `orElse`
     assumeDll
 
   | dynamicGhc
     -- When the GHC package was compiled as dynamic library (=DYNAMIC set),
     -- we search for .so libraries first.
-  = findHSDll `orElse` findDynObject `orElse` assumeDll
+  = findHSDll     `orElse`
+    findDynObject `orElse`
+    assumeDll
 
   | rtsIsProfiled
     -- When the GHC package is profiled, only a libHSfoo_p.a archive will do.
@@ -1232,7 +1238,7 @@ locateLib dflags is_hs dirs lib
   | otherwise
     -- HSfoo.o is the best, but only works for the normal way
     -- libHSfoo.a is the backup option.
-  = findObject `orElse`
+  = findObject  `orElse`
     findArchive `orElse`
     assumeDll
 
@@ -1253,11 +1259,15 @@ locateLib dflags is_hs dirs lib
 
      findObject     = liftM (fmap Object)  $ findFile dirs obj_file
      findDynObject  = liftM (fmap Object)  $ findFile dirs dyn_obj_file
-     findArchive    = liftM (fmap Archive) $ findFile dirs arch_file
+     findArchive    = let local  = liftM (fmap Archive) $ findFile dirs arch_file
+                          linked = liftM (fmap Archive) $ searchForLibUsingGcc dflags arch_file dirs
+                      in liftM2 (<|>) local linked
      findHSDll      = liftM (fmap DLLPath) $ findFile dirs hs_dyn_lib_file
      findDll        = liftM (fmap DLLPath) $ findFile dirs dyn_lib_file
-     tryGcc         = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags so_name     dirs
-     tryGccPrefixed = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags lib_so_name dirs
+     findSysDll     = fmap (fmap $ DLL . takeFileName) $ findSystemLibrary so_name
+     tryGcc         = let short = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags so_name     dirs
+                          full  = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags lib_so_name dirs
+                      in liftM2 (<|>) short full
 
      assumeDll   = return (DLL lib)
      infixr `orElse`

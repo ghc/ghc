@@ -77,6 +77,13 @@ HsBool removeLibrarySearchPath(HsPtr dll_path_index);
    the linker work better */
 void warnMissingKBLibraryPaths( void );
 
+/* -----------------------------------------------------------------------------
+* Searches the system directories to determine if there is a system DLL that
+* satisfies the given name. This prevent GHCi from linking against a static
+* library if a DLL is available.
+*/
+pathchar* findSystemLibrary(pathchar* dll_name);
+
 /* called by the initialization code for a module, not a user API */
 StgStablePtr foreignExportStablePtr (StgPtr p);
 

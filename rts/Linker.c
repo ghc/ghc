@@ -917,6 +917,43 @@ error:
 #  endif
 }
 
+/* -----------------------------------------------------------------------------
+* Searches the system directories to determine if there is a system DLL that
+* satisfies the given name. This prevent GHCi from linking against a static
+* library if a DLL is available.
+*
+* Returns: NULL on failure or no DLL found, else the full path to the DLL
+*          that can be loaded.
+*/
+pathchar* findSystemLibrary(pathchar* dll_name)
+{
+
+    IF_DEBUG(linker, debugBelch("\nfindSystemLibrary: dll_name = `%" PATH_FMT "'\n", dll_name));
+
+#if defined(OBJFORMAT_PEi386)
+    const unsigned int init_buf_size = 1024;
+    unsigned int bufsize     = init_buf_size;
+    wchar_t* result = malloc(sizeof(wchar_t) * bufsize);
+    DWORD wResult   = SearchPathW(NULL, dll_name, NULL, bufsize, result, NULL);
+
+    if (wResult > bufsize) {
+        result  = realloc(result, sizeof(wchar_t) * wResult);
+        wResult = SearchPathW(NULL, dll_name, NULL, wResult, result, NULL);
+    }
+
+
+    if (!wResult) {
+        free(result);
+        return NULL;
+    }
+
+    return result;
+
+#else
+    (void)(dll_name); // Function not implemented for other platforms.
+    return NULL;
+#endif
+}
 
 /* -----------------------------------------------------------------------------
 * Emits a warning determining that the system is missing a required security

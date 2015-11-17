@@ -11,6 +11,11 @@ test('T1407',
      extra_hc_opts('-L.')],
      run_command, ['$MAKE --no-print-directory -s T1407'])
 
+test('T3242',
+     [unless(doing_ghci, skip), unless(opsys('mingw32'), skip)],
+     run_command,
+     ['$MAKE -s --no-print-directory T3242'])
+
 test('T10955',
      [unless(doing_ghci, skip),unless(opsys('mingw32'), skip),
      extra_clean(['bin_dep/*', 'bin_dep']),
