@@ -198,7 +198,7 @@ array
 base
 ~~~~
 
--  Version number XXXXX (was 4.7.0.0)
+-  Version number 4.9.0.0 (was 4.7.0.0)
 
 -  A new module ``GHC.SrcLoc`` was added, exporting a new type
    ``SrcLoc``. A ``SrcLoc`` contains package, module, and file names, as
