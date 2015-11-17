@@ -1303,12 +1303,20 @@ isAbstractTyCon :: TyCon -> Bool
 isAbstractTyCon (AlgTyCon { algTcRhs = AbstractTyCon {} }) = True
 isAbstractTyCon _ = False
 
--- | Make an algebraic 'TyCon' abstract. Panics if the supplied 'TyCon' is not
--- algebraic
+-- | Make an fake, abstract 'TyCon' from an existing one.
+-- Used when recovering from errors
 makeTyConAbstract :: TyCon -> TyCon
-makeTyConAbstract tc@(AlgTyCon { algTcRhs = rhs })
-  = tc { algTcRhs = AbstractTyCon (isGenInjAlgRhs rhs) }
-makeTyConAbstract tc = pprPanic "makeTyConAbstract" (ppr tc)
+makeTyConAbstract tc
+  = PrimTyCon { tyConName        = name,
+                tyConUnique      = nameUnique name,
+                tyConKind        = tyConKind tc,
+                tyConArity       = tyConArity tc,
+                tcRoles          = tyConRoles tc,
+                primTyConRep     = PtrRep,
+                isUnLifted       = False,
+                primRepName      = Nothing }
+  where
+    name = tyConName tc
 
 -- | Does this 'TyCon' represent something that cannot be defined in Haskell?
 isPrimTyCon :: TyCon -> Bool

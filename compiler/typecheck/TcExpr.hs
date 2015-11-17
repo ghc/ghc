@@ -211,7 +211,7 @@ tcExpr (HsIPVar x) res_ty
        ; tcWrapResult (fromDict ipClass ip_name ip_ty (HsVar ip_var)) ip_ty res_ty }
   where
   -- Coerces a dictionary for `IP "x" t` into `t`.
-  fromDict ipClass x ty = HsWrap $ mkWpCastN $ TcCoercion $
+  fromDict ipClass x ty = HsWrap $ mkWpCastR $ TcCoercion $
                           unwrapIP $ mkClassPred ipClass [x,ty]
 
 tcExpr (HsLam match) res_ty

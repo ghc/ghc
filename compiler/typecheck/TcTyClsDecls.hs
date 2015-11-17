@@ -157,17 +157,17 @@ tcTyClGroup tyclds
            -- We can do this now because we are done with the recursive knot
            -- Do it before Step 4 (adding implicit things) because the latter
            -- expects well-formed TyCons
-       ; tcExtendGlobalEnv tyclss $ do
-       { traceTc "Starting validity check" (ppr tyclss)
-       ; mapM_ (recoverM (return ()) . checkValidTyCl) tyclss
-           -- We recover, which allows us to report multiple validity errors
+       ; traceTc "Starting validity check" (ppr tyclss)
+       ; tyclss <- mapM checkValidTyCl tyclss
+       ; traceTc "Done validity check" (ppr tyclss)
        ; mapM_ (recoverM (return ()) . checkValidRoleAnnots role_annots) tyclss
            -- See Note [Check role annotations in a second pass]
 
            -- Step 4: Add the implicit things;
            -- we want them in the environment because
            -- they may be mentioned in interface files
-       ; tcAddImplicits tyclss } }
+       ; tcExtendGlobalEnv tyclss $
+         tcAddImplicits tyclss }
 
 zipRecTyClss :: [(Name, Kind)]
              -> [TyThing]           -- Knot-tied
@@ -648,8 +648,6 @@ tcTyClDecl1 _parent rec_info
              ; class_ats = map ATyCon (classATs clas) }
 
        ; return (ATyCon (classTyCon clas) : gen_dm_ids ++ class_ats ) }
-         -- NB: Order is important due to the call to `mkGlobalThings' when
-         --     tying the the type and class declaration type checking knot.
   where
     tc_fundep (tvs1, tvs2) = do { tvs1' <- mapM tcFdTyVar tvs1
                                 ; tvs2' <- mapM tcFdTyVar tvs2
@@ -1528,17 +1526,32 @@ tied, so we can look at things freely.
 checkClassCycleErrs :: Class -> TcM ()
 checkClassCycleErrs cls = mapM_ recClsErr (calcClassCycles cls)
 
-checkValidTyCl :: TyThing -> TcM ()
+checkValidTyCl :: TyThing -> TcM TyThing
+checkValidTyCl (ATyCon tc)
+  = setSrcSpan (getSrcSpan tc) $
+    addTyConCtxt tc $
+    recoverM (do { traceTc "Aborted validity for tycon" (ppr tc)
+                 ; return (ATyCon (makeTyConAbstract tc)) })
+             (do { traceTc "Starting validity for tycon" (ppr tc)
+                 ; checkValidTyCon tc
+                 ; traceTc "Done validity for tycon" (ppr tc)
+                 ; return (ATyCon tc) })
+    -- We recover, which allows us to report multiple validity errors
+    -- In the failure case we return a TyCon of the right kind, but
+    -- with no interesting behaviour (makeTyConAbstract). Why?
+    -- Suppose we have
+    --    type T a = Fun
+    -- where Fun is a type family of arity 1.  The RHS is invalid, but we
+    -- want to go on checking validity of subsequent type declarations.
+    -- So we replace T with an abstract TyCon which will do no harm.
+    -- See indexed-types/should_fail/BadSock ande Trac #10896
+
 checkValidTyCl thing
-  = setSrcSpan (getSrcSpan thing) $
-    addTyThingCtxt thing $
-    case thing of
-      ATyCon tc -> checkValidTyCon tc
-      AnId _    -> return ()  -- Generic default methods are checked
-                              -- with their parent class
-      ACoAxiom _ -> return () -- Axioms checked with their parent
-                              -- closed family tycon
-      _         -> pprTrace "checkValidTyCl" (ppr thing) $ return ()
+  = return thing
+      -- AnId: Generic default methods are checked
+      --       with their parent class
+      -- ACoAxiom:  Axioms checked with their parent
+      --            closed family tycon
 
 -------------------------
 -- For data types declared with record syntax, we require
@@ -2203,16 +2216,12 @@ incoherentRoles = (text "Roles other than" <+> quotes (text "nominal") <+>
                    text "for class parameters can lead to incoherence.") $$
                   (text "Use IncoherentInstances to allow this; bad role found")
 
-addTyThingCtxt :: TyThing -> TcM a -> TcM a
-addTyThingCtxt thing
+addTyConCtxt :: TyCon -> TcM a -> TcM a
+addTyConCtxt tc
   = addErrCtxt ctxt
   where
-    name = getName thing
-    flav = case thing of
-             ATyCon tc -> text (tyConFlavour tc)
-             _ -> pprTrace "addTyThingCtxt strange" (ppr thing)
-                  Outputable.empty
-
+    name = getName tc
+    flav = text (tyConFlavour tc)
     ctxt = hsep [ ptext (sLit "In the"), flav
                 , ptext (sLit "declaration for"), quotes (ppr name) ]
 

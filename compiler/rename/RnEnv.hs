@@ -891,7 +891,8 @@ lookupGlobalOccRn_overloaded overload_ok rdr_name
                 []    -> return Nothing
                 [gre] | isRecFldGRE gre
                          -> do { addUsedGRE True gre
-                               ; let fld_occ = FieldOcc rdr_name (gre_name gre)
+                               ; let fld_occ :: FieldOcc Name
+                                     fld_occ = FieldOcc rdr_name (gre_name gre)
                                ; return (Just (Right [fld_occ])) }
                       | otherwise
                          -> do { addUsedGRE True gre

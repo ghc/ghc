@@ -576,24 +576,25 @@ decideQuantification apply_mr sigs name_taus constraints zonked_tau_tvs
   = do { gbl_tvs <- tcGetGlobalTyVars
        ; let constrained_tvs = tyVarsOfTypes constraints
              mono_tvs = gbl_tvs `unionVarSet` constrained_tvs
-             mr_bites = constrained_tvs `intersectsVarSet` zonked_tau_tvs
        ; qtvs <- quantify_tvs sigs mono_tvs zonked_tau_tvs
-       ; traceTc "decideQuantification 1" (vcat [ppr constraints, ppr gbl_tvs, ppr mono_tvs
-                                                , ppr qtvs, ppr mr_bites])
 
        -- Warn about the monomorphism restriction
        ; warn_mono <- woptM Opt_WarnMonomorphism
+       ; let mr_bites = constrained_tvs `intersectsVarSet` zonked_tau_tvs
        ; warnTc (warn_mono && mr_bites) $
          hang (ptext (sLit "The Monomorphism Restriction applies to the binding")
                <> plural bndrs <+> ptext (sLit "for") <+> pp_bndrs)
              2 (ptext (sLit "Consider giving a type signature for")
                 <+> if isSingleton bndrs then pp_bndrs else ptext (sLit "these binders"))
 
+       -- All done
+       ; traceTc "decideQuantification 1" (vcat [ppr constraints, ppr gbl_tvs, ppr mono_tvs
+                                                , ppr qtvs, ppr mr_bites])
        ; return (qtvs, []) }
 
   | otherwise
   = do { gbl_tvs <- tcGetGlobalTyVars
-       ; let mono_tvs     = growThetaTyVars (filter isEqPred constraints) gbl_tvs
+       ; let mono_tvs     = growThetaTyVars equality_constraints gbl_tvs
              tau_tvs_plus = growThetaTyVars constraints zonked_tau_tvs
        ; qtvs        <- quantify_tvs sigs mono_tvs tau_tvs_plus
        ; constraints <- zonkTcThetaType constraints
@@ -609,6 +610,7 @@ decideQuantification apply_mr sigs name_taus constraints zonked_tau_tvs
   where
     bndrs    = map fst name_taus
     pp_bndrs = pprWithCommas (quotes . ppr) bndrs
+    equality_constraints = filter isEqPred constraints
 
 quantify_tvs :: [TcIdSigInfo] -> TcTyVarSet -> TcTyVarSet -> TcM [TcTyVar]
 -- See Note [Which type variable to quantify]

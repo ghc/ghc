@@ -121,7 +121,8 @@ rn_hs_wc_type ctxt (HsWC { hswc_body = hs_ty }) thing_inside
                  -- nwcs :: [Name]   Named wildcards
        ; bindLocalNamesFV nwcs $
     do { (wc_ty, fvs1) <- rnWcSigTy ctxt hs_ty
-       ; let wc_ty' = wc_ty { hswc_wcs = nwcs ++ hswc_wcs wc_ty }
+       ; let wc_ty' :: HsWildCardBndrs Name (LHsType Name)
+             wc_ty' = wc_ty { hswc_wcs = nwcs ++ hswc_wcs wc_ty }
        ; (res, fvs2) <- thing_inside wc_ty'
        ; return (res, fvs1 `plusFV` fvs2) } }
 
@@ -296,7 +297,7 @@ rnLHsTyKi what doc (L loc ty)
        ; return (L loc ty', fvs) }
 
 rnLHsType  :: HsDocContext -> LHsType RdrName -> RnM (LHsType Name, FreeVars)
-rnLHsType cxt ty = pprTrace "rnHsType" (pprHsDocContext cxt $$ ppr ty) $
+rnLHsType cxt ty = -- pprTrace "rnHsType" (pprHsDocContext cxt $$ ppr ty) $
                    rnLHsTyKi RnType cxt ty
 
 rnLHsPred  :: HsDocContext -> LHsType RdrName -> RnM (LHsType Name, FreeVars)

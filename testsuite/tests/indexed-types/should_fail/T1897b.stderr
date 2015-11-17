@@ -7,7 +7,7 @@ T1897b.hs:16:1: error:
       Actual type: t (Depend a0) -> Bool
     In the ambiguity check for the inferred type for ‘isValid’
     To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
-    When checking that ‘isValid’ has the inferred type
+    When checking the inferred type
       isValid :: forall a (t :: * -> *).
                  (Foldable t, Bug a) =>
                  t (Depend a) -> Bool

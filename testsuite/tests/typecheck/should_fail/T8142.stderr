@@ -7,7 +7,7 @@ T8142.hs:6:18: error:
       Actual type: Nu ((,) t0) -> Nu g0
     In the ambiguity check for the inferred type for ‘h’
     To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
-    When checking that ‘h’ has the inferred type
+    When checking the inferred type
       h :: forall t (g :: * -> *). Nu ((,) t) -> Nu g
     In an equation for ‘tracer’:
         tracer

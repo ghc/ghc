@@ -1160,7 +1160,7 @@ instance Outputable EvTypeable where
 -- | Create a 'Coercion' that unwraps an implicit-parameter dictionary
 -- to expose the underlying value. We expect the 'Type' to have the form
 -- `IP sym ty`, return a 'Coercion' `co :: IP sym ty ~ ty`.
-unwrapIP :: Type -> Coercion
+unwrapIP :: Type -> CoercionR
 unwrapIP ty =
   case unwrapNewTyCon_maybe tc of
     Just (_,_,ax) -> mkUnbranchedAxInstCo Representational ax tys
@@ -1172,5 +1172,5 @@ unwrapIP ty =
 
 -- | Create a 'Coercion' that wraps a value in an implicit-parameter
 -- dictionary. See 'unwrapIP'.
-wrapIP :: Type -> Coercion
+wrapIP :: Type -> CoercionR
 wrapIP ty = mkSymCo (unwrapIP ty)
