@@ -1,8 +1,7 @@
 -- (c) The University of Glasgow 2006
 
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
--- For Functor SCC. ToDo: Remove me when 7.10 is released
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Digraph(
         Graph, graphFromEdgedVertices,
 
@@ -328,14 +327,6 @@ graphEmpty g = lo > hi
 -}
 
 type IntGraph = G.Graph
-
--- Functor instance was added in 7.8, in containers 0.5.3.2 release
--- ToDo: Drop me when 7.10 is released.
-#if __GLASGOW_HASKELL__ < 708
-instance Functor SCC where
-    fmap f (AcyclicSCC v) = AcyclicSCC (f v)
-    fmap f (CyclicSCC vs) = CyclicSCC (fmap f vs)
-#endif
 
 {-
 ------------------------------------------------------------
