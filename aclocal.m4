@@ -1772,17 +1772,18 @@ out:
         exit(2);
     }
 
+    tock = 0;
+
     it.it_value.tv_sec = 0;
-    it.it_value.tv_nsec = 1000000;
+    it.it_value.tv_nsec = 1000000; // 1ms
     it.it_interval = it.it_value;
     if (timer_settime(timer, 0, &it, NULL) != 0) {
         fprintf(stderr,"settime problem\n");
         exit(4);
     }
 
-    tock = 0;
-
-    usleep(3000);
+    // some environments have coarse scheduler/timer granularity of ~10ms and worse
+    usleep(100000); // 100ms
 
     if (!tock) {
         fprintf(stderr,"no CLOCK_REALTIME signal\n");
