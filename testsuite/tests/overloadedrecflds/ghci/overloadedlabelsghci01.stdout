@@ -1,0 +1,4 @@
+#x :: IsLabel "x" t => t
+"hello"
+"hello world"
+"goodbye world"

@@ -648,6 +648,7 @@ data ExtensionFlag
    | Opt_BinaryLiterals
    | Opt_NegativeLiterals
    | Opt_DuplicateRecordFields
+   | Opt_OverloadedLabels
    | Opt_EmptyCase
    | Opt_PatternSynonyms
    | Opt_PartialTypeSignatures
@@ -3184,6 +3185,7 @@ xFlags = [
   flagSpec "NumDecimals"                      Opt_NumDecimals,
   flagSpec' "OverlappingInstances"            Opt_OverlappingInstances
                                               setOverlappingInsts,
+  flagSpec "OverloadedLabels"                 Opt_OverloadedLabels,
   flagSpec "OverloadedLists"                  Opt_OverloadedLists,
   flagSpec "OverloadedStrings"                Opt_OverloadedStrings,
   flagSpec "PackageImports"                   Opt_PackageImports,

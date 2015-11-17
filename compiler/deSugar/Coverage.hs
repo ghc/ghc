@@ -465,6 +465,7 @@ addTickHsExpr e@(HsVar id)       = do freeVar id; return e
 addTickHsExpr (HsUnboundVar {})  = panic "addTickHsExpr.HsUnboundVar"
 addTickHsExpr e@(HsIPVar _)      = return e
 addTickHsExpr e@(HsOverLit _)    = return e
+addTickHsExpr e@(HsOverLabel _)  = return e
 addTickHsExpr e@(HsLit _)        = return e
 addTickHsExpr (HsLam matchgroup) = liftM HsLam (addTickMatchGroup True matchgroup)
 addTickHsExpr (HsLamCase ty mgs) = liftM (HsLamCase ty) (addTickMatchGroup True mgs)

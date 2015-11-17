@@ -2215,6 +2215,7 @@ data CtOrigin
       CtOrigin                  -- originally arising from this
 
   | IPOccOrigin  HsIPName       -- Occurrence of an implicit parameter
+  | OverLabelOrigin FastString  -- Occurrence of an overloaded label
 
   | LiteralOrigin (HsOverLit Name)      -- Occurrence of a literal
   | NegateOrigin                        -- Occurrence of syntactic negation
@@ -2324,6 +2325,8 @@ pprCtO (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
 pprCtO (OccurrenceOfRecSel name) = hsep [ptext (sLit "a use of"), quotes (ppr name)]
 pprCtO AppOrigin             = ptext (sLit "an application")
 pprCtO (IPOccOrigin name)    = hsep [ptext (sLit "a use of implicit parameter"), quotes (ppr name)]
+pprCtO (OverLabelOrigin l)   = hsep [ptext (sLit "the overloaded label")
+                                    ,quotes (char '#' <> ppr l)]
 pprCtO RecordUpdOrigin       = ptext (sLit "a record update")
 pprCtO ExprSigOrigin         = ptext (sLit "an expression type signature")
 pprCtO PatSigOrigin          = ptext (sLit "a pattern type signature")

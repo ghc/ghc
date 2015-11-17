@@ -589,6 +589,9 @@ zonkExpr env (HsVar id)
 zonkExpr _ (HsIPVar id)
   = return (HsIPVar id)
 
+zonkExpr _ (HsOverLabel l)
+  = return (HsOverLabel l)
+
 zonkExpr env (HsLit (HsRat f ty))
   = do new_ty <- zonkTcTypeToType env ty
        return (HsLit (HsRat f new_ty))

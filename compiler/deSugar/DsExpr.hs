@@ -199,6 +199,7 @@ dsExpr (ExprWithTySigOut e _) = dsLExpr e
 dsExpr (HsVar var)            = return (varToCoreExpr var)   -- See Note [Desugaring vars]
 dsExpr (HsUnboundVar {})      = panic "dsExpr: HsUnboundVar" -- Typechecker eliminates them
 dsExpr (HsIPVar _)            = panic "dsExpr: HsIPVar"
+dsExpr (HsOverLabel _)        = panic "dsExpr: HsOverLabel"
 dsExpr (HsLit lit)            = dsLit lit
 dsExpr (HsOverLit lit)        = dsOverLit lit
 

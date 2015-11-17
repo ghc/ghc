@@ -321,6 +321,9 @@ basicKnownKeyNames
         -- Type-level naturals
         knownNatClassName, knownSymbolClassName,
 
+        -- Overloaded labels
+        isLabelClassName,
+
         -- Source locations
         callStackDataConName, callStackTyConName,
         srcLocDataConName,
@@ -477,6 +480,9 @@ gHC_STATICPTR = mkBaseModule (fsLit "GHC.StaticPtr")
 
 gHC_FINGERPRINT_TYPE :: Module
 gHC_FINGERPRINT_TYPE = mkBaseModule (fsLit "GHC.Fingerprint.Type")
+
+gHC_OVER_LABELS :: Module
+gHC_OVER_LABELS = mkBaseModule (fsLit "GHC.OverloadedLabels")
 
 mAIN, rOOT_MAIN :: Module
 mAIN            = mkMainModule_ mAIN_NAME
@@ -1271,6 +1277,11 @@ knownNatClassName     = clsQual gHC_TYPELITS (fsLit "KnownNat") knownNatClassNam
 knownSymbolClassName :: Name
 knownSymbolClassName  = clsQual gHC_TYPELITS (fsLit "KnownSymbol") knownSymbolClassNameKey
 
+-- Overloaded labels
+isLabelClassName :: Name
+isLabelClassName
+ = clsQual gHC_OVER_LABELS (fsLit "IsLabel") isLabelClassNameKey
+
 -- Source Locations
 callStackDataConName, callStackTyConName, srcLocDataConName :: Name
 callStackDataConName
@@ -1406,6 +1417,9 @@ knownSymbolClassNameKey = mkPreludeClassUnique 43
 
 ghciIoClassKey :: Unique
 ghciIoClassKey = mkPreludeClassUnique 44
+
+isLabelClassNameKey :: Unique
+isLabelClassNameKey = mkPreludeClassUnique 45
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES ClassUniques 200-299
@@ -2036,6 +2050,7 @@ toDynIdKey            = mkPreludeMiscIdUnique 509
 
 bitIntegerIdKey :: Unique
 bitIntegerIdKey       = mkPreludeMiscIdUnique 510
+
 
 {-
 ************************************************************************

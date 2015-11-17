@@ -260,7 +260,8 @@ $tab          { warnTab }
 -- with {-#, then we'll assume it's a pragma we know about and go for do_bol.
 <bol> {
   \n                                    ;
-  ^\# (line)?                           { begin line_prag1 }
+  ^\# line                              { begin line_prag1 }
+  ^\# / { followedByDigit }             { begin line_prag1 }
   ^\# pragma .* \n                      ; -- GCC 3.3 CPP generated, apparently
   ^\# \! .* \n                          ; -- #!, for scripts
   ()                                    { do_bol }
@@ -399,6 +400,11 @@ $tab          { warnTab }
 
 <0> {
   \? @varid / { ifExtension ipEnabled } { skip_one_varid ITdupipvarid }
+}
+
+<0> {
+  "#" @varid / { ifExtension overloadedLabelsEnabled }
+               { skip_one_varid ITlabelvarid }
 }
 
 <0> {
@@ -633,6 +639,7 @@ data Token
   | ITqconsym (FastString,FastString)
 
   | ITdupipvarid   FastString   -- GHC extension: implicit param: ?x
+  | ITlabelvarid   FastString   -- Overloaded label: #x
 
   | ITchar     SourceText Char       -- Note [Literal source text] in BasicTypes
   | ITstring   SourceText FastString -- Note [Literal source text] in BasicTypes
@@ -905,6 +912,10 @@ notFollowedBy char _ _ _ (AI _ buf)
 notFollowedBySymbol :: AlexAccPred ExtsBitmap
 notFollowedBySymbol _ _ _ (AI _ buf)
   = nextCharIsNot buf (`elem` "!#$%&*+./<=>?@\\^|-~")
+
+followedByDigit :: AlexAccPred ExtsBitmap
+followedByDigit _ _ _ (AI _ buf)
+  = afterOptionalSpace buf (\b -> nextCharIs b (`elem` ['0'..'9']))
 
 -- We must reject doc comments as being ordinary comments everywhere.
 -- In some cases the doc comment will be selected as the lexeme due to
@@ -1984,6 +1995,7 @@ data ExtBits
   | ArrowsBit
   | ThBit
   | IpBit
+  | OverloadedLabelsBit -- #x overloaded labels
   | ExplicitForallBit -- the 'forall' keyword and '.' symbol
   | BangPatBit -- Tells the parser to understand bang-patterns
                -- (doesn't affect the lexer)
@@ -2023,6 +2035,8 @@ thEnabled :: ExtsBitmap -> Bool
 thEnabled = xtest ThBit
 ipEnabled :: ExtsBitmap -> Bool
 ipEnabled = xtest IpBit
+overloadedLabelsEnabled :: ExtsBitmap -> Bool
+overloadedLabelsEnabled = xtest OverloadedLabelsBit
 explicitForallEnabled :: ExtsBitmap -> Bool
 explicitForallEnabled = xtest ExplicitForallBit
 bangPatEnabled :: ExtsBitmap -> Bool
@@ -2113,6 +2127,7 @@ mkPState flags buf loc =
                .|. ThBit                       `setBitIf` xopt Opt_TemplateHaskell          flags
                .|. QqBit                       `setBitIf` xopt Opt_QuasiQuotes              flags
                .|. IpBit                       `setBitIf` xopt Opt_ImplicitParams           flags
+               .|. OverloadedLabelsBit         `setBitIf` xopt Opt_OverloadedLabels         flags
                .|. ExplicitForallBit           `setBitIf` xopt Opt_ExplicitForAll           flags
                .|. BangPatBit                  `setBitIf` xopt Opt_BangPatterns             flags
                .|. HaddockBit                  `setBitIf` gopt Opt_Haddock                  flags

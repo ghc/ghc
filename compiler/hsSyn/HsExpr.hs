@@ -138,6 +138,8 @@ data HsExpr id
 
   | HsRecFld (AmbiguousFieldOcc id) -- ^ Variable pointing to record selector
 
+  | HsOverLabel FastString   -- ^ Overloaded label (See Note [Overloaded labels]
+                             --   in GHC.OverloadedLabels)
   | HsIPVar   HsIPName       -- ^ Implicit parameter
   | HsOverLit (HsOverLit id) -- ^ Overloaded literals
 
@@ -626,6 +628,7 @@ ppr_expr :: forall id. OutputableBndr id => HsExpr id -> SDoc
 ppr_expr (HsVar v)        = pprPrefixOcc v
 ppr_expr (HsUnboundVar v) = pprPrefixOcc v
 ppr_expr (HsIPVar v)      = ppr v
+ppr_expr (HsOverLabel l)  = char '#' <> ppr l
 ppr_expr (HsLit lit)      = ppr lit
 ppr_expr (HsOverLit lit)  = ppr lit
 ppr_expr (HsPar e)        = parens (ppr_lexpr e)
@@ -844,6 +847,7 @@ hsExprNeedsParens (HsOverLit {})      = False
 hsExprNeedsParens (HsVar {})          = False
 hsExprNeedsParens (HsUnboundVar {})   = False
 hsExprNeedsParens (HsIPVar {})        = False
+hsExprNeedsParens (HsOverLabel {})    = False
 hsExprNeedsParens (ExplicitTuple {})  = False
 hsExprNeedsParens (ExplicitList {})   = False
 hsExprNeedsParens (ExplicitPArr {})   = False
@@ -865,6 +869,7 @@ isAtomicHsExpr (HsVar {})        = True
 isAtomicHsExpr (HsLit {})        = True
 isAtomicHsExpr (HsOverLit {})    = True
 isAtomicHsExpr (HsIPVar {})      = True
+isAtomicHsExpr (HsOverLabel {})  = True
 isAtomicHsExpr (HsUnboundVar {}) = True
 isAtomicHsExpr (HsWrap _ e)      = isAtomicHsExpr e
 isAtomicHsExpr (HsPar e)         = isAtomicHsExpr (unLoc e)
