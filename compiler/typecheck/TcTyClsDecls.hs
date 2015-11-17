@@ -158,7 +158,12 @@ tcTyClGroup tyclds
            -- Do it before Step 4 (adding implicit things) because the latter
            -- expects well-formed TyCons
        ; traceTc "Starting validity check" (ppr tyclss)
-       ; tyclss <- mapM checkValidTyCl tyclss
+       ; tyclss <- tcExtendGlobalEnv tyclss $
+                       -- Hack alert: bring the generic default methods into
+                       -- scope so that we can look them up to check their
+                       -- validity.  This is really wrong.  We should store
+                       -- their type in the Class.  Trac #11105.
+                   mapM checkValidTyCl tyclss
        ; traceTc "Done validity check" (ppr tyclss)
        ; mapM_ (recoverM (return ()) . checkValidRoleAnnots role_annots) tyclss
            -- See Note [Check role annotations in a second pass]
@@ -172,19 +177,31 @@ tcTyClGroup tyclds
 zipRecTyClss :: [(Name, Kind)]
              -> [TyThing]           -- Knot-tied
              -> [(Name,TyThing)]
--- Build a name-TyThing mapping for the things bound by decls
--- being careful not to look at the [TyThing]
+-- Build a name-TyThing mapping for the TyCons bound by decls
+-- being careful not to look at the knot-tied [TyThing]
 -- The TyThings in the result list must have a visible ATyCon,
--- because typechecking types (in, say, tcTyClDecl) looks at this outer constructor
+-- because typechecking types (in, say, tcTyClDecl) looks at
+-- this outer constructor
 zipRecTyClss kind_pairs rec_things
   = [ (name, ATyCon (get name)) | (name, _kind) <- kind_pairs ]
   where
-    rec_type_env :: TypeEnv
-    rec_type_env = mkTypeEnv rec_things
+    rec_tc_env :: NameEnv TyCon
+    rec_tc_env = foldr add_tc emptyNameEnv rec_things
 
-    get name = case lookupTypeEnv rec_type_env name of
-                 Just (ATyCon tc) -> tc
-                 other            -> pprPanic "zipRecTyClss" (ppr name <+> ppr other)
+    add_tc :: TyThing -> NameEnv TyCon -> NameEnv TyCon
+    add_tc (ATyCon tc) env
+      | Just cls <- tyConClass_maybe tc
+      = foldr add_one_tc (add_one_tc tc env) (classATs cls)
+      | otherwise
+      = add_one_tc tc env
+    add_tc _ env = env
+
+    add_one_tc :: TyCon -> NameEnv TyCon -> NameEnv TyCon
+    add_one_tc tc env = extendNameEnv env (tyConName tc) tc
+
+    get name = case lookupNameEnv rec_tc_env name of
+                 Just tc -> tc
+                 other   -> pprPanic "zipRecTyClss" (ppr name <+> ppr other)
 
 {-
 ************************************************************************
@@ -644,10 +661,9 @@ tcTyClDecl1 _parent rec_info
                             , let gen_dm_ty = mkSigmaTy tvs'
                                                       [mkClassPred clas (mkTyVarTys tvs')]
                                                       gen_dm_tau
-                            ]
-             ; class_ats = map ATyCon (classATs clas) }
+                            ] }
 
-       ; return (ATyCon (classTyCon clas) : gen_dm_ids ++ class_ats ) }
+       ; return (ATyCon (classTyCon clas) : gen_dm_ids ) }
   where
     tc_fundep (tvs1, tvs2) = do { tvs1' <- mapM tcFdTyVar tvs1
                                 ; tvs2' <- mapM tcFdTyVar tvs2
