@@ -62,7 +62,7 @@ htmlhelp_basename = 'GHCUsersGuide'
 # -- Options for LaTeX output ---------------------------------------------
 
 latex_elements = {
-    'inputenv': '',
+    'inputenc': '',
     'utf8extra': '',
     'preamble': '''
 \usepackage{fontspec}
