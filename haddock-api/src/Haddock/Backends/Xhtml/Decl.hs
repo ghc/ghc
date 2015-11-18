@@ -482,8 +482,8 @@ ppClassDecl summary links instances fixities loc d subdocs
 
     minimalBit = case [ s | L _ (MinimalSig _ (L _ s)) <- lsigs ] of
       -- Miminal complete definition = every shown method
-      And xs : _ | sort [getName n | Var (L _ n) <- xs] ==
-                   sort [getName n | L _ (TypeSig ns _ _) <- lsigs, L _ n <- ns]
+      And xs : _ | sort [getName n | L _ (Var (L _ n)) <- xs] ==
+                   sort [getName n | L _ (TypeSig ns _) <- lsigs, L _ n <- ns]
         -> noHtml
 
       -- Minimal complete definition = the only shown method
