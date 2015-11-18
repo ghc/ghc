@@ -91,6 +91,9 @@
   * Add `MonadPlus IO` and `Alternative IO` instances
     (previously orphans in `transformers`) (#10755)
 
+  * Add `GHC.TypeLits.TypeError` and `ErrorMessage` to allow users
+    to define custom compile-time error messages.
+
 ## 4.8.2.0  *Oct 2015*
 
   * Bundled with GHC 7.10.3
