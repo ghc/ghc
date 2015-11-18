@@ -3085,8 +3085,19 @@ supportedLanguageOverlays :: [String]
 supportedLanguageOverlays = map flagSpecName safeHaskellFlags
 
 supportedExtensions :: [String]
-supportedExtensions
-    = concatMap (\name -> [name, "No" ++ name]) (map flagSpecName xFlags)
+supportedExtensions = concatMap toFlagSpecNamePair xFlags
+  where
+    toFlagSpecNamePair flg
+#ifndef GHCI
+      -- make sure that `ghc --supported-extensions` omits
+      -- "TemplateHaskell" when it's known to be unsupported. See also
+      -- GHC #11102 for rationale
+      | flagSpecFlag flg == Opt_TemplateHaskell  = [noName]
+#endif
+      | otherwise = [name, noName]
+      where
+        noName = "No" ++ name
+        name = flagSpecName flg
 
 supportedLanguagesAndExtensions :: [String]
 supportedLanguagesAndExtensions =
