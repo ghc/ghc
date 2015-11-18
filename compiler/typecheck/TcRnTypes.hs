@@ -1879,7 +1879,8 @@ ctFlavourRole = ctEvFlavourRole . cc_ev
 ~~~~~~~~~~~~~~~~~~~
 (eqCanRewrite ct1 ct2) holds if the constraint ct1 (a CTyEqCan of form
 tv ~ ty) can be used to rewrite ct2.  It must satisfy the properties of
-a can-rewrite relation, see Definition [Can-rewrite relation]
+a can-rewrite relation, see Definition [Can-rewrite relation] in
+TcSMonad.
 
 With the solver handling Coercible constraints like equality constraints,
 the rewrite conditions must take role into account, never allowing
@@ -1905,7 +1906,8 @@ improvement works; see Note [The improvement story] in TcInteract.
 However, for now at least I'm only letting (Derived,NomEq) rewrite
 (Derived,NomEq) and not doing anything for ReprEq.  If we have
     eqCanRewriteFR (Derived, NomEq) (Derived, _)  = True
-then we lose the property of Note [Can-rewrite relation]
+then we lose property R2 of Definition [Can-rewrite relation]
+in TcSMonad
   R2.  If f1 >= f, and f2 >= f,
        then either f1 >= f2 or f2 >= f1
 Consider f1 = (Given, ReprEq)
@@ -1917,12 +1919,27 @@ we can; straight from the Wanteds during improvment. And from a Derived
 ReprEq we could conceivably get a Derived NomEq improvment (by decomposing
 a type constructor with Nomninal role), and hence unify.
 
-Note [canRewriteOrSame]
-~~~~~~~~~~~~~~~~~~~~~~~
-canRewriteOrSame is similar but
- * returns True for Wanted/Wanted.
- * works for all kinds of constraints, not just CTyEqCans
-See the call sites for explanations.
+Note [canDischarge]
+~~~~~~~~~~~~~~~~~~~
+(x1:c1 `canDischarge` x2:c2) returns True if we can use c1 to
+/discharge/ c2; that is, if we can simply drop (x2:c2) altogether,
+perhaps adding a binding for x2 in terms of x1.  We only ask this
+question in two cases:
+
+* Identical equality constraints:
+      (x1:s~t) `canDischarge` (xs:s~t)
+  In this case we can just drop x2 in favour of x1.
+
+* Function calls with the same LHS:
+    (x1:F ts ~ f1) `canDischarge` (x2:F ts ~ f2)
+  Here we can drop x2 in favour of x1, either unifying
+  f2 (if it's a flatten meta-var) or adding a new Given
+  (f1 ~ f2), if x2 is a Given.
+
+This is different from eqCanRewrite; for exammple, a Wanted
+can certainly discharge an identical Wanted.  So canDicharge
+does /not/ define a can-rewrite relation in the sense of
+Definition [Can-rewrite relation] in TcSMonad.
 -}
 
 eqCanRewrite :: CtEvidence -> CtEvidence -> Bool
@@ -1939,7 +1956,7 @@ eqCanRewriteFR (Derived, NomEq)   (Derived, NomEq)  = True
 eqCanRewriteFR _                 _                  = False
 
 canDischarge :: CtEvidence -> CtEvidence -> Bool
--- See Note [canRewriteOrSame]
+-- See Note [canDischarge]
 canDischarge ev1 ev2 = ctEvFlavourRole ev1 `canDischargeFR` ctEvFlavourRole ev2
 
 canDischargeFR :: CtFlavourRole -> CtFlavourRole -> Bool
