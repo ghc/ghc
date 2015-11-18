@@ -26,6 +26,7 @@ rebindable6.hs:109:17: error:
 
 rebindable6.hs:110:17: error:
     Ambiguous type variable ‘t1’ arising from a do statement
+                                 with the failable pattern ‘Just (b :: b)’
     prevents the constraint ‘(HasFail
                                 ([Char] -> t1))’ from being solved.
       (maybe you haven't applied a function to enough arguments?)

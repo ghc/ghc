@@ -526,7 +526,9 @@ tcMcStmt ctxt (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
         ; fail_op' <- if isIrrefutableHsPat pat
             then return noSyntaxExpr
-            else tcSyntaxOp MCompOrigin fail_op (mkFunTy stringTy new_res_ty)
+            else tcSyntaxOp (MCompPatOrigin pat)
+                            fail_op
+                            (mkFunTy stringTy new_res_ty)
 
         ; rhs' <- tcMonoExprNC rhs rhs_ty
 
@@ -776,7 +778,9 @@ tcDoStmt ctxt (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
         ; fail_op' <- if isIrrefutableHsPat pat
             then return noSyntaxExpr
-            else tcSyntaxOp DoOrigin fail_op (mkFunTy stringTy new_res_ty)
+            else tcSyntaxOp (DoPatOrigin pat)
+                            fail_op
+                            (mkFunTy stringTy new_res_ty)
 
         ; rhs' <- tcMonoExprNC rhs rhs_ty
 

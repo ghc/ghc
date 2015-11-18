@@ -2247,7 +2247,11 @@ data CtOrigin
   | StandAloneDerivOrigin -- Typechecking stand-alone deriving
   | DefaultOrigin       -- Typechecking a default decl
   | DoOrigin            -- Arising from a do expression
+  | DoPatOrigin (LPat Name) -- Arising from a failable pattern in
+                            -- a do expression
   | MCompOrigin         -- Arising from a monad comprehension
+  | MCompPatOrigin (LPat Name) -- Arising from a failable pattern in a
+                               -- monad comprehension
   | IfOrigin            -- Arising from an if statement
   | ProcOrigin          -- Arising from a proc expression
   | AnnOrigin           -- An annotation
@@ -2267,7 +2271,8 @@ data CtOrigin
   | ListOrigin          -- An overloaded list
   | StaticOrigin        -- A static form
   | FailablePattern (LPat TcId) -- A failable pattern in do-notation for the
-                                -- MonadFail Proposal (MFP)
+                                -- MonadFail Proposal (MFP). Obsolete when
+                                -- actual desugaring to MonadFail.fail is live.
 
 ctoHerald :: SDoc
 ctoHerald = ptext (sLit "arising from")
@@ -2321,11 +2326,25 @@ pprCtOrigin (DerivOriginCoerce meth ty1 ty2)
        2 (sep [ text "from type" <+> quotes (ppr ty1)
               , nest 2 $ text "to type" <+> quotes (ppr ty2) ])
 
+pprCtOrigin (DoPatOrigin pat)
+    = ctoHerald <+> text "a do statement"
+      $$
+      text "with the failable pattern" <+> quotes (ppr pat)
+
+pprCtOrigin (MCompPatOrigin pat)
+    = ctoHerald <+> hsep [ text "the failable pattern"
+           , quotes (ppr pat)
+           , text "in a statement in a monad comprehension" ]
+pprCtOrigin (FailablePattern pat)
+    = ctoHerald <+> text "the failable pattern" <+> quotes (ppr pat)
+      $$
+      text "(this will become an error a future GHC release)"
+
 pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin
 
-----------------
-pprCtO :: CtOrigin -> SDoc  -- Ones that are short one-liners
+-- | Short one-liners
+pprCtO :: CtOrigin -> SDoc
 pprCtO (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
 pprCtO (OccurrenceOfRecSel name) = hsep [ptext (sLit "a use of"), quotes (ppr name)]
 pprCtO AppOrigin             = ptext (sLit "an application")
@@ -2350,15 +2369,13 @@ pprCtO DerivOrigin           = ptext (sLit "the 'deriving' clause of a data type
 pprCtO StandAloneDerivOrigin = ptext (sLit "a 'deriving' declaration")
 pprCtO DefaultOrigin         = ptext (sLit "a 'default' declaration")
 pprCtO DoOrigin              = ptext (sLit "a do statement")
-pprCtO MCompOrigin           = ptext (sLit "a statement in a monad comprehension")
+pprCtO MCompOrigin           = text "a statement in a monad comprehension"
 pprCtO ProcOrigin            = ptext (sLit "a proc expression")
 pprCtO (TypeEqOrigin t1 t2)  = ptext (sLit "a type equality") <+> sep [ppr t1, char '~', ppr t2]
 pprCtO AnnOrigin             = ptext (sLit "an annotation")
 pprCtO HoleOrigin            = ptext (sLit "a use of") <+> quotes (ptext $ sLit "_")
 pprCtO ListOrigin            = ptext (sLit "an overloaded list")
 pprCtO StaticOrigin          = ptext (sLit "a static form")
-pprCtO (FailablePattern pat) = text "the failable pattern" <+> quotes (ppr pat)
-                               $$ text "(this will become an error a future GHC release)"
 pprCtO _                     = panic "pprCtOrigin"
 
 {-
