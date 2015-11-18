@@ -709,19 +709,23 @@ zonkExpr env (ExplicitPArr ty exprs)
        new_exprs <- zonkLExprs env exprs
        return (ExplicitPArr new_ty new_exprs)
 
-zonkExpr env (RecordCon data_con con_expr rbinds labels)
+zonkExpr env expr@(RecordCon { rcon_con_expr = con_expr, rcon_flds = rbinds })
   = do  { new_con_expr <- zonkExpr env con_expr
         ; new_rbinds   <- zonkRecFields env rbinds
-        ; return (RecordCon data_con new_con_expr new_rbinds labels) }
+        ; return (expr { rcon_con_expr = new_con_expr
+                       , rcon_flds = new_rbinds }) }
 
-zonkExpr env (RecordUpd expr rbinds cons in_tys out_tys req_wrap)
+zonkExpr env (RecordUpd { rupd_expr = expr, rupd_flds = rbinds
+                        , rupd_cons = cons, rupd_in_tys = in_tys
+                        , rupd_out_tys = out_tys, rupd_wrap = req_wrap })
   = do  { new_expr    <- zonkLExpr env expr
         ; new_in_tys  <- mapM (zonkTcTypeToType env) in_tys
         ; new_out_tys <- mapM (zonkTcTypeToType env) out_tys
         ; new_rbinds  <- zonkRecUpdFields env rbinds
         ; (_, new_recwrap) <- zonkCoFn env req_wrap
-        ; return (RecordUpd new_expr new_rbinds cons new_in_tys new_out_tys
-                              new_recwrap) }
+        ; return (RecordUpd { rupd_expr = new_expr, rupd_flds =  new_rbinds
+                            , rupd_cons = cons, rupd_in_tys = new_in_tys
+                            , rupd_out_tys = new_out_tys, rupd_wrap = new_recwrap }) }
 
 zonkExpr env (ExprWithTySigOut e ty)
   = do { e' <- zonkLExpr env e

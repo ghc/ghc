@@ -497,26 +497,28 @@ We also handle @C{}@ as valid construction syntax for an unlabelled
 constructor @C@, setting all of @C@'s fields to bottom.
 -}
 
-dsExpr (RecordCon _ con_expr rbinds labels) = do
-    con_expr' <- dsExpr con_expr
-    let
-        (arg_tys, _) = tcSplitFunTys (exprType con_expr')
-        -- A newtype in the corner should be opaque;
-        -- hence TcType.tcSplitFunTys
+dsExpr (RecordCon { rcon_con_expr = con_expr, rcon_flds = rbinds
+                  , rcon_con_like = con_like })
+  = do { con_expr' <- dsExpr con_expr
+       ; let
+             (arg_tys, _) = tcSplitFunTys (exprType con_expr')
+             -- A newtype in the corner should be opaque;
+             -- hence TcType.tcSplitFunTys
 
-        mk_arg (arg_ty, fl)
-          = case findField (rec_flds rbinds) (flSelector fl) of
-              (rhs:rhss) -> ASSERT( null rhss )
-                            dsLExpr rhs
-              []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (ppr (flLabel fl))
-        unlabelled_bottom arg_ty = mkErrorAppDs rEC_CON_ERROR_ID arg_ty Outputable.empty
+             mk_arg (arg_ty, fl)
+               = case findField (rec_flds rbinds) (flSelector fl) of
+                   (rhs:rhss) -> ASSERT( null rhss )
+                                 dsLExpr rhs
+                   []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (ppr (flLabel fl))
+             unlabelled_bottom arg_ty = mkErrorAppDs rEC_CON_ERROR_ID arg_ty Outputable.empty
 
+             labels = conLikeFieldLabels con_like
 
-    con_args <- if null labels
-                then mapM unlabelled_bottom arg_tys
-                else mapM mk_arg (zipEqual "dsExpr:RecordCon" arg_tys labels)
+       ; con_args <- if null labels
+                     then mapM unlabelled_bottom arg_tys
+                     else mapM mk_arg (zipEqual "dsExpr:RecordCon" arg_tys labels)
 
-    return (mkCoreApps con_expr' con_args)
+       ; return (mkCoreApps con_expr' con_args) }
 
 {-
 Record update is a little harder. Suppose we have the decl:
@@ -553,8 +555,10 @@ But if x::T a b, then
 So we need to cast (T a Int) to (T a b).  Sigh.
 -}
 
-dsExpr expr@(RecordUpd record_expr fields
-                        cons_to_upd in_inst_tys out_inst_tys dict_req_wrap )
+dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
+                       , rupd_cons = cons_to_upd
+                       , rupd_in_tys = in_inst_tys, rupd_out_tys = out_inst_tys
+                       , rupd_wrap = dict_req_wrap } )
   | null fields
   = dsLExpr record_expr
   | otherwise

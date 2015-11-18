@@ -21,6 +21,7 @@ module RdrHsSyn (
         mkPatSynMatchGroup,
         mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
         mkTyClD, mkInstD,
+        mkRdrRecordCon, mkRdrRecordUpd,
         setRdrNameSpace,
 
         cvBindGroup,
@@ -849,7 +850,7 @@ checkAPat msg loc e0 = do
                                    return (TuplePat ps b [])
      | otherwise -> parseErrorSDoc loc (text "Illegal tuple section in pattern:" $$ ppr e0)
 
-   RecordCon c _ (HsRecFields fs dd) _
+   RecordCon { rcon_con_name = c, rcon_flds = HsRecFields fs dd }
                         -> do fs <- mapM (checkPatField msg) fs
                               return (ConPatIn c (RecCon (HsRecFields fs dd)))
    HsSpliceE s | not (isTypedSplice s)
@@ -1191,11 +1192,22 @@ mkRecConstrOrUpdate
 
 mkRecConstrOrUpdate (L l (HsVar c)) _ (fs,dd)
   | isRdrDataCon c
-  = return (RecordCon (L l c) noPostTcExpr (mk_rec_fields fs dd) PlaceHolder)
+  = return (mkRdrRecordCon (L l c) (mk_rec_fields fs dd))
 mkRecConstrOrUpdate exp@(L l _) _ (fs,dd)
   | dd        = parseErrorSDoc l (text "You cannot use `..' in a record update")
-  | otherwise = return (RecordUpd exp (map (fmap mk_rec_upd_field) fs)
-                      PlaceHolder PlaceHolder PlaceHolder PlaceHolder)
+  | otherwise = return (mkRdrRecordUpd exp (map (fmap mk_rec_upd_field) fs))
+
+mkRdrRecordUpd :: LHsExpr RdrName -> [LHsRecUpdField RdrName] -> HsExpr RdrName
+mkRdrRecordUpd exp flds
+  = RecordUpd { rupd_expr = exp
+              , rupd_flds = flds
+              , rupd_cons    = PlaceHolder, rupd_in_tys  = PlaceHolder
+              , rupd_out_tys = PlaceHolder, rupd_wrap    = PlaceHolder }
+
+mkRdrRecordCon :: Located RdrName -> HsRecordBinds RdrName -> HsExpr RdrName
+mkRdrRecordCon con flds
+  = RecordCon { rcon_con_name = con, rcon_flds = flds
+              , rcon_con_expr = noPostTcExpr, rcon_con_like = PlaceHolder }
 
 mk_rec_fields :: [LHsRecField id arg] -> Bool -> HsRecFields id arg
 mk_rec_fields fs False = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }

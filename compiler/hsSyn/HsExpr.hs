@@ -36,7 +36,6 @@ import StaticFlags( opt_PprStyle_Debug )
 import Outputable
 import FastString
 import Type
-import FieldLabel
 
 -- libraries:
 import Data.Data hiding (Fixity)
@@ -283,11 +282,12 @@ data HsExpr id
   --         'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose' @'}'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | RecordCon   (Located id)       -- The constructor.  After type checking
-                                   -- it's the dataConWrapId of the constructor
-                PostTcExpr         -- Data con Id applied to type args
-                (HsRecordBinds id)
-                (PostTc id [FieldLabel])
+  | RecordCon
+      { rcon_con_name :: Located id         -- The constructor name;
+                                            --  not used after type checking
+      , rcon_con_like :: PostTc id ConLike  -- The data constructor or pattern synonym
+      , rcon_con_expr :: PostTcExpr         -- Instantiated constructor function
+      , rcon_flds     :: HsRecordBinds id } -- The fields
 
   -- | Record update
   --
@@ -295,19 +295,20 @@ data HsExpr id
   --         'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose' @'}'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | RecordUpd   (LHsExpr id)
-                [LHsRecUpdField id]
---              (HsMatchGroup Id)  -- Filled in by the type checker to be
---                                 -- a match that does the job
-                (PostTc id [ConLike])
+  | RecordUpd
+      { rupd_expr :: LHsExpr id
+      , rupd_flds :: [LHsRecUpdField id]
+      , rupd_cons :: PostTc id [ConLike]
                 -- Filled in by the type checker to the
                 -- _non-empty_ list of DataCons that have
                 -- all the upd'd fields
-                (PostTc id [Type])  -- Argument types of *input* record type
-                (PostTc id [Type])  --              and  *output* record type
-                                   -- The original type can be reconstructed
-                                   -- with conLikeResTy
-                (PostTc id HsWrapper) -- See note [Record Update HsWrapper]
+
+      , rupd_in_tys  :: PostTc id [Type]  -- Argument types of *input* record type
+      , rupd_out_tys :: PostTc id [Type]  --              and  *output* record type
+                                          -- The original type can be reconstructed
+                                          -- with conLikeResTy
+      , rupd_wrap :: PostTc id HsWrapper  -- See note [Record Update HsWrapper]
+      }
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon
 
@@ -732,10 +733,10 @@ ppr_expr (ExplicitList _ _ exprs)
 ppr_expr (ExplicitPArr _ exprs)
   = paBrackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
 
-ppr_expr (RecordCon con_id _ rbinds _)
+ppr_expr (RecordCon { rcon_con_name = con_id, rcon_flds = rbinds })
   = hang (ppr con_id) 2 (ppr rbinds)
 
-ppr_expr (RecordUpd aexp rbinds _ _ _ _)
+ppr_expr (RecordUpd { rupd_expr = aexp, rupd_flds = rbinds })
   = hang (pprLExpr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
 
 ppr_expr (ExprWithTySig expr sig _)

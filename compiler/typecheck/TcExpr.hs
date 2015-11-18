@@ -576,7 +576,7 @@ to support expressions like this:
 ************************************************************************
 -}
 
-tcExpr (RecordCon (L loc con_name) _ rbinds _) res_ty
+tcExpr (RecordCon { rcon_con_name = L loc con_name, rcon_flds = rbinds }) res_ty
   = do  { con_like <- tcLookupConLike con_name
 
         -- Check for missing fields
@@ -585,14 +585,16 @@ tcExpr (RecordCon (L loc con_name) _ rbinds _) res_ty
         ; (con_expr, con_tau) <- tcInferId con_name
         ; let arity = conLikeArity con_like
               (arg_tys, actual_res_ty) = tcSplitFunTysN con_tau arity
-              labels = conLikeFieldLabels con_like
         ; case conLikeWrapId_maybe con_like of
                Nothing -> nonBidirectionalErr (conLikeName con_like)
                Just con_id -> do {
                   co_res <- unifyType actual_res_ty res_ty
                 ; rbinds' <- tcRecordBinds con_like arg_tys rbinds
                 ; return $ mkHsWrapCo co_res $
-                    RecordCon (L loc con_id) con_expr rbinds' labels } }
+                    RecordCon { rcon_con_name = L loc con_id
+                              , rcon_con_expr = con_expr
+                              , rcon_con_like = con_like
+                              , rcon_flds = rbinds' } } }
 
 {-
 Note [Type of a record update]
@@ -730,7 +732,7 @@ following.
 
 -}
 
-tcExpr (RecordUpd record_expr rbnds _ _ _ _ ) res_ty
+tcExpr (RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
   = ASSERT( notNull rbnds )
     do  {
         -- STEP -1  See Note [Disambiguating record fields]
@@ -863,8 +865,10 @@ tcExpr (RecordUpd record_expr rbnds _ _ _ _ ) res_ty
 
         -- Phew!
         ; return $ mkHsWrapCo co_res $
-          RecordUpd (mkLHsWrap scrut_co record_expr') rbinds'
-                    relevant_cons scrut_inst_tys result_inst_tys req_wrap }
+          RecordUpd { rupd_expr = mkLHsWrap scrut_co record_expr'
+                    , rupd_flds = rbinds'
+                    , rupd_cons = relevant_cons, rupd_in_tys = scrut_inst_tys
+                    , rupd_out_tys = result_inst_tys, rupd_wrap = req_wrap } }
 
 tcExpr (HsRecFld f) res_ty
     = tcCheckRecSelId f res_ty
