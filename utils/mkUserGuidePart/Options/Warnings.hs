@@ -145,6 +145,13 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-fno-warn-missing-local-sigs"
          }
+  , flag { flagName = "-fwarn-missing-monadfail-instance"
+         , flagDescription =
+           "warn when a failable pattern is used in a do-block that does not  "++
+           "have a ``MonadFail`` instance."
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-warn-missing-monadfail-instance"
+         }
   , flag { flagName = "-fwarn-missed-specialisations"
          , flagDescription =
            "warn when specialisation of an imported, overloaded function fails."
