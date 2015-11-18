@@ -1689,9 +1689,10 @@ New monadic failure desugaring mechanism
 .. index::
     single: -XMonadFailDesugaring option
 
-Switch desugaring of ``do``-blocks to use ``MonadFail.fail`` instead of
-``Monad.fail``. This will be the default behaviour in a future GHC release,
-under the MonadFail Proposal (MFP).
+The ``-XMonadFailDesugaring`` extension switches the desugaring of
+``do``-blocks to use ``MonadFail.fail`` instead of ``Monad.fail``. This will
+eventually be the default behaviour in a future GHC release, under the
+MonadFail Proposal (MFP).
 
 This extension is temporary, and will be deprecated in a future release. It is
 included so that library authors have a hard check for whether their code

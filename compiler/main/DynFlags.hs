@@ -504,7 +504,7 @@ data WarningFlag =
    | Opt_WarnContextQuantification
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
-   | Opt_WarnAMP
+   | Opt_WarnAMP -- Introduced in GHC 7.8, obsolete since 7.10
    | Opt_WarnMissingMonadFailInstance
    | Opt_WarnDodgyExports
    | Opt_WarnDodgyImports
@@ -2873,7 +2873,7 @@ fWarningFlags = [
   flagSpec "warn-alternative-layout-rule-transitional"
                                       Opt_WarnAlternativeLayoutRuleTransitional,
   flagSpec' "warn-amp"                        Opt_WarnAMP
-    (\_ -> deprecate "it has no effect, and will be removed in GHC 7.12"),
+    (\_ -> deprecate "it has no effect"),
   flagSpec' "warn-auto-orphans"               Opt_WarnAutoOrphans
     (\_ -> deprecate "it has no effect"),
   flagSpec "warn-deferred-type-errors"        Opt_WarnDeferredTypeErrors,
