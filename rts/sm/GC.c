@@ -45,7 +45,6 @@
 #include "RetainerProfile.h"
 #include "LdvProfile.h"
 #include "RaiseAsync.h"
-#include "Papi.h"
 #include "Stable.h"
 #include "CheckUnload.h"
 
@@ -792,10 +791,6 @@ new_gc_thread (nat n, gc_thread *t)
 
     init_gc_thread(t);
 
-#ifdef USE_PAPI
-    t->papi_events = -1;
-#endif
-
     for (g = 0; g < RtsFlags.GcFlags.generations; g++)
     {
         ws = &t->gens[g];
@@ -1028,14 +1023,6 @@ gcWorkerThread (Capability *cap)
     debugTrace(DEBUG_gc, "GC thread %d standing by...", gct->thread_index);
     ACQUIRE_SPIN_LOCK(&gct->gc_spin);
 
-#ifdef USE_PAPI
-    // start performance counters in this thread...
-    if (gct->papi_events == -1) {
-        papi_init_eventset(&gct->papi_events);
-    }
-    papi_thread_start_gc1_count(gct->papi_events);
-#endif
-
     init_gc_thread(gct);
 
     traceEventGcWork(gct->cap);
@@ -1055,11 +1042,6 @@ gcWorkerThread (Capability *cap)
     // only reachable via weak pointers.  To fix this problem would
     // require another GC barrier, which is too high a price.
     pruneSparkQueue(cap);
-#endif
-
-#ifdef USE_PAPI
-    // count events in this thread towards the GC totals
-    papi_thread_stop_gc1_count(gct->papi_events);
 #endif
 
     // Wait until we're told to continue

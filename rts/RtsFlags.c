@@ -103,10 +103,6 @@ static void read_debug_flags(const char *arg);
 static rtsBool read_heap_profiling_flag(const char *arg);
 #endif
 
-#ifdef USE_PAPI
-static void read_papi_flag(const char *arg);
-#endif
-
 #ifdef TRACING
 static void read_trace_flags(const char *arg);
 #endif
@@ -250,12 +246,6 @@ void initRtsFlagsDefaults(void)
 #ifdef TICKY_TICKY
     RtsFlags.TickyFlags.showTickyStats   = rtsFalse;
     RtsFlags.TickyFlags.tickyFile        = NULL;
-#endif
-
-#ifdef USE_PAPI
-    /* By default no special measurements taken */
-    RtsFlags.PapiFlags.eventType        = 0;
-    RtsFlags.PapiFlags.numUserEvents    = 0;
 #endif
 }
 
@@ -421,19 +411,6 @@ usage_text[] = {
 #if defined(x86_64_HOST_ARCH)
 "  -xm       Base address to mmap memory in the GHCi linker",
 "            (hex; must be <80000000)",
-#endif
-#if defined(USE_PAPI)
-"  -aX       CPU performance counter measurements using PAPI",
-"            (use with the -s<file> option).  X is one of:",
-"",
-/* "            y - cycles", */
-"            1 - level 1 cache misses",
-"            2 - level 2 cache misses",
-"            b - branch mispredictions",
-"            s - stalled cycles",
-"            e - cache miss and branch misprediction events",
-"            +PAPI_EVENT   - collect papi preset event PAPI_EVENT",
-"            #NATIVE_EVENT - collect native event NATIVE_EVENT (in hex)",
 #endif
 "  -xq       The allocation limit given to a thread after it receives",
 "            an AllocationLimitExceeded exception. (default: 100k)",
@@ -789,13 +766,6 @@ error = rtsTrue;
                       = decodeSize(rts_argv[arg], 2, 2*BLOCK_SIZE, HS_INT_MAX)
                            / BLOCK_SIZE;
                   break;
-
-#ifdef USE_PAPI
-              case 'a':
-                OPTION_UNSAFE;
-                read_papi_flag(&rts_argv[arg])
-                break;
-#endif
 
               case 'B':
                 OPTION_UNSAFE;
@@ -1556,47 +1526,6 @@ static void read_debug_flags(const char* arg)
     // -Dx also turns on -v.  Use -l to direct trace
     // events to the .eventlog file instead.
     RtsFlags.TraceFlags.tracing = TRACE_STDERR;
-}
-#endif
-
-#ifdef USE_PAPI
-static void read_papi_flags(const char *arg)
-{
-    // Already parsed "-a"
-    switch(arg[2]) {
-    case '1':
-        RtsFlags.PapiFlags.eventType = PAPI_FLAG_CACHE_L1;
-        break;
-    case '2':
-        RtsFlags.PapiFlags.eventType = PAPI_FLAG_CACHE_L2;
-        break;
-    case 'b':
-        RtsFlags.PapiFlags.eventType = PAPI_FLAG_BRANCH;
-        break;
-    case 's':
-        RtsFlags.PapiFlags.eventType = PAPI_FLAG_STALLS;
-        break;
-    case 'e':
-        RtsFlags.PapiFlags.eventType = PAPI_FLAG_CB_EVENTS;
-        break;
-    case '+':
-    case '#':
-        if (RtsFlags.PapiFlags.numUserEvents >= MAX_PAPI_USER_EVENTS) {
-            errorBelch("maximum number of PAPI events reached");
-            stg_exit(EXIT_FAILURE);
-        }
-        nat eventNum  = RtsFlags.PapiFlags.numUserEvents++;
-        char kind     = arg[2];
-        nat eventKind =
-            kind == '+' ? PAPI_PRESET_EVENT_KIND : PAPI_NATIVE_EVENT_KIND;
-
-        RtsFlags.PapiFlags.userEvents[eventNum] = arg + 3;
-        RtsFlags.PapiFlags.eventType = PAPI_USER_EVENTS;
-        RtsFlags.PapiFlags.userEventsKind[eventNum] = eventKind;
-        break;
-    default:
-        bad_option( arg );
-    }
 }
 #endif
 

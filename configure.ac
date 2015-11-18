@@ -1006,12 +1006,6 @@ AC_COMPILE_IFELSE(
   ])
 
 
-dnl ** checking for PAPI
-AC_CHECK_LIB(papi, PAPI_library_init, HavePapiLib=YES, HavePapiLib=NO)
-AC_CHECK_HEADER([papi.h], [HavePapiHeader=YES], [HavePapiHeader=NO])
-AC_SUBST(HavePapiLib)
-AC_SUBST(HavePapiHeader)
-
 AC_CHECK_FUNCS(__mingw_vfprintf)
 
 if test "$HavePapiLib" = "YES" -a "$HavePapiHeader" = "YES"; then

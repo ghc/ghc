@@ -129,7 +129,7 @@ typedef struct gc_thread_ {
 
     bdescr * free_blocks;          // a buffer of free blocks for this thread
                                    //  during GC without accessing the block
-                                   //   allocators spin lock. 
+                                   //   allocators spin lock.
 
     // These two lists are chained through the STATIC_LINK() fields of static
     // objects.  Pointers are tagged with the current static_flag, so before
@@ -161,20 +161,16 @@ typedef struct gc_thread_ {
                                    // optimise it into a per-thread
                                    // variable).
 
-    rtsBool failed_to_evac;        // failure to evacuate an object typically 
-                                   // Causes it to be recorded in the mutable 
+    rtsBool failed_to_evac;        // failure to evacuate an object typically
+                                   // Causes it to be recorded in the mutable
                                    // object list
 
     rtsBool eager_promotion;       // forces promotion to the evac gen
                                    // instead of the to-space
                                    // corresponding to the object
 
-    W_ thunk_selector_depth;     // used to avoid unbounded recursion in 
+    W_ thunk_selector_depth;       // used to avoid unbounded recursion in
                                    // evacuate() for THUNK_SELECTOR
-
-#ifdef USE_PAPI
-    int papi_events;
-#endif
 
     // -------------------
     // stats

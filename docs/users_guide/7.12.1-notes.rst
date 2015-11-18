@@ -175,7 +175,7 @@ Template Haskell
 Runtime system
 ~~~~~~~~~~~~~~
 
--  TODO FIXME.
+-  Support for performance monitoring with PAPI has been dropped.
 
 Build system
 ~~~~~~~~~~~~

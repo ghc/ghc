@@ -66,12 +66,8 @@ double    mut_user_time_during_heap_census(void);
 
 void      statDescribeGens( void );
 
-Time stat_getElapsedGCTime(void);
-Time stat_getElapsedTime(void);
-
-/* Only exported for Papi.c */
-void statsPrintf( char *s, ... ) 
-    GNUC3_ATTRIBUTE(format (PRINTF, 1, 2));
+Time      stat_getElapsedGCTime(void);
+Time      stat_getElapsedTime(void);
 
 #include "EndPrivate.h"
 

@@ -21,10 +21,6 @@
 # include <sys/times.h>
 #endif
 
-#ifdef USE_PAPI
-# include <papi.h>
-#endif
-
 #if ! ((defined(HAVE_GETRUSAGE) && !irix_HOST_OS) || defined(HAVE_TIMES))
 #error No implementation for getProcessCPUTime() available.
 #endif
@@ -130,17 +126,9 @@ void getProcessTimes(Time *user, Time *elapsed)
 
 Time getProcessCPUTime(void)
 {
-#if !defined(THREADED_RTS) && USE_PAPI
-    long long usec;
-    if ((usec = PAPI_get_virt_usec()) < 0) {
-        barf("PAPI_get_virt_usec: %lld", usec);
-    }
-    return USToTime(usec);
-#else
     Time user, elapsed;
     getProcessTimes(&user,&elapsed);
     return user;
-#endif
 }
 
 Time getProcessElapsedTime(void)
@@ -185,18 +173,11 @@ void getProcessTimes(Time *user, Time *elapsed)
 
 Time getThreadCPUTime(void)
 {
-#if USE_PAPI
-    long long usec;
-    if ((usec = PAPI_get_virt_usec()) < 0) {
-        barf("PAPI_get_virt_usec: %lld", usec);
-    }
-    return USToTime(usec);
-
-#elif !defined(BE_CONSERVATIVE)            &&  \
-       defined(HAVE_CLOCK_GETTIME)       &&  \
-       defined(_SC_CPUTIME)             &&  \
-       defined(CLOCK_PROCESS_CPUTIME_ID) &&  \
-       defined(HAVE_SYSCONF)
+#if !defined(BE_CONSERVATIVE)            &&  \
+     defined(HAVE_CLOCK_GETTIME)       &&  \
+     defined(_SC_CPUTIME)             &&  \
+     defined(CLOCK_PROCESS_CPUTIME_ID) &&  \
+     defined(HAVE_SYSCONF)
     {
         static int checked_sysconf = 0;
         static int sysconf_result = 0;
