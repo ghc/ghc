@@ -115,6 +115,9 @@ Compiler
    is intended to alert users to cases where they apply ``INLINEABLE`` but
    may not get the speed-up they expect.
 
+-  When printing an out-of-scope error message, GHC will give helpful advice if
+   the error might be caused by too restrictive imports.
+
 GHCi
 ~~~~
 
