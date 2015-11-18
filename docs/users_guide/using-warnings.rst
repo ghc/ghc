@@ -158,17 +158,16 @@ command line.
        single: warnings
        single: pragmas
 
-    Emits a warning if GHC cannot specialise a function that is imported
-    and overloaded, usually because the function needs an ``INLINEABLE``
-    pragma.. The "all" form reports all such situations. The "non-all"
-    form only reports when the situation arises during specialisation of
-    an imported function; presumably teh latter was marked
-    ``INLINEABLE`` so that it would specialise but if it, in turn, calls
-    other functions that are not specialised you won't get the
-    performance boost you expect.
+    Emits a warning if GHC cannot specialise an overloaded function, usually
+    because the function needs an ``INLINEABLE`` pragma. The "all" form reports
+    all such situations whereas the "non-all" form only reports when the
+    situation arises during specialisation of an imported function.
 
-    ``-fwarn-missed-specialisations`` is on by default;
-    ``-fwarn-all-missed-specialisations`` is implied by ``-Wall``.
+    The "non-all" form is intended to catch cases where an imported function
+    that is marked as ``INLINEABLE`` (presumably to enable specialisation) cannot
+    be specialised as it calls other functions that are themselves not specialised.
+
+    These options are both off by default.
 
 ``-fwarn-warnings-deprecations``
     .. index::

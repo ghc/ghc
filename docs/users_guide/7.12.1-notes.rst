@@ -108,6 +108,13 @@ Compiler
    Enabling ``-fworker-wrapper`` while strictness analysis is disabled (by
    ``-fno-strictness``) has no effect.
 
+-  Added the options ``-fwarn-missed-specialisations`` and
+   ``-fwarn-all-missed-specialisations``. When enabled, the simplifier will
+   produce a warning when a overloaded imported function cannot be
+   specialised (typically due to a missing ``INLINEABLE`` pragma). This
+   is intended to alert users to cases where they apply ``INLINEABLE`` but
+   may not get the speed-up they expect.
+
 GHCi
 ~~~~
 

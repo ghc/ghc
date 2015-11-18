@@ -145,6 +145,18 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-fno-warn-missing-local-sigs"
          }
+  , flag { flagName = "-fwarn-missed-specialisations"
+         , flagDescription =
+           "warn when specialisation of an imported, overloaded function fails."
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-warn-missed-specialisations"
+         }
+  , flag { flagName = "-fwarn-all-missed-specialisations"
+         , flagDescription =
+           "warn when specialisation of any overloaded function fails."
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-warn-all-missed-specialisations"
+         }
   , flag { flagName = "-fwarn-monomorphism-restriction"
          , flagDescription = "warn when the Monomorphism Restriction is applied"
          , flagType = DynamicFlag

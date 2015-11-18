@@ -3436,8 +3436,7 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnAlternativeLayoutRuleTransitional,
         Opt_WarnUnsupportedLlvmVersion,
         Opt_WarnContextQuantification,
-        Opt_WarnTabs,
-        Opt_WarnMissedSpecs
+        Opt_WarnTabs
       ]
 
 minusWOpts :: [WarningFlag]
@@ -3465,8 +3464,7 @@ minusWallOpts
         Opt_WarnOrphans,
         Opt_WarnUnusedDoBind,
         Opt_WarnTrustworthySafe,
-        Opt_WarnUntickedPromotedConstructors,
-        Opt_WarnAllMissedSpecs
+        Opt_WarnUntickedPromotedConstructors
       ]
 
 enableUnusedBinds :: DynP ()
