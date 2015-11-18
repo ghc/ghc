@@ -1637,10 +1637,9 @@ unboundNameX where_look rdr_name extra
           else do { local_env  <- getLocalRdrEnv
                   ; global_env <- getGlobalRdrEnv
                   ; impInfo <- getImports
-                  ; let suggestions1 = unknownNameSuggestions_ where_look
-                                         dflags global_env local_env rdr_name
-                  ; let suggestions2 = importSuggestions dflags impInfo rdr_name
-                  ; addErr (err $$ suggestions1 $$ suggestions2) }
+                  ; let suggestions = unknownNameSuggestions_ where_look
+                                        dflags global_env local_env impInfo rdr_name
+                  ; addErr (err $$ suggestions) }
         ; return (mkUnboundName rdr_name) }
 
 unknownNameErr :: SDoc -> RdrName -> SDoc
@@ -1656,113 +1655,25 @@ type HowInScope = Either SrcSpan ImpDeclSpec
      -- Left loc    =>  locally bound at loc
      -- Right ispec =>  imported as specified by ispec
 
--- | Generate helpful suggestions if a qualified name Mod.foo is not in scope.
-importSuggestions :: DynFlags -> ImportAvails -> RdrName -> SDoc
-importSuggestions _dflags imports rdr_name
-  | not (isQual rdr_name) = Outputable.empty
-  | null interesting_imports
-  = hsep
-      [ ptext (sLit "No module named")
-      , quotes (ppr mod_name)
-      , ptext (sLit "is imported.")
-      ]
-  | null helpful_imports
-  , [(mod,_)] <- interesting_imports
-  = hsep
-      [ ptext (sLit "Module")
-      , quotes (ppr mod)
-      , ptext (sLit "does not export")
-      , quotes (ppr occ_name) <> dot
-      ]
-  | null helpful_imports
-  , mods <- map fst interesting_imports
-  = hsep
-      [ ptext (sLit "Neither")
-      , quotedListWithNor (map ppr mods)
-      , ptext (sLit "exports")
-      , quotes (ppr occ_name) <> dot
-      ]
-  | [(mod,imv)] <- helpful_imports_non_hiding
-  = fsep
-      [ ptext (sLit "Perhaps you want to add")
-      , quotes (ppr occ_name)
-      , ptext (sLit "to the import list")
-      , ptext (sLit "in the import of")
-      , quotes (ppr mod)
-      , parens (ppr (imv_span imv)) <> dot
-      ]
-  | not (null helpful_imports_non_hiding)
-  = fsep
-      [ ptext (sLit "Perhaps you want to add")
-      , quotes (ppr occ_name)
-      , ptext (sLit "to one of these import lists:")
-      ]
-    $$
-    nest 2 (vcat
-        [ quotes (ppr mod) <+> parens (ppr (imv_span imv))
-        | (mod,imv) <- helpful_imports_non_hiding
-        ])
-  | [(mod,imv)] <- helpful_imports_hiding
-  = fsep
-      [ ptext (sLit "Perhaps you want to remove")
-      , quotes (ppr occ_name)
-      , ptext (sLit "from the explicit hiding list")
-      , ptext (sLit "in the import of")
-      , quotes (ppr mod)
-      , parens (ppr (imv_span imv)) <> dot
-      ]
-  | not (null helpful_imports_hiding)
-  = fsep
-      [ ptext (sLit "Perhaps you want to remove")
-      , quotes (ppr occ_name)
-      , ptext (sLit "from the hiding clauses")
-      , ptext (sLit "in one of these imports:")
-      ]
-    $$
-    nest 2 (vcat
-        [ quotes (ppr mod) <+> parens (ppr (imv_span imv))
-        | (mod,imv) <- helpful_imports_hiding
-        ])
-  | otherwise
-  = Outputable.empty
- where
-  Just (mod_name, occ_name) = isQual_maybe rdr_name
-
-  -- What import statements provide "Mod" at all
-  interesting_imports = [ (mod, imp)
-    | (mod, mod_imports) <- moduleEnvToList (imp_mods imports)
-    , Just imp <- return $ pick mod_imports
-    ]
-
-  -- We want to keep only one for each original module; preferably one with an
-  -- explicit import list (for no particularly good reason)
-  pick :: [ImportedModsVal] -> Maybe ImportedModsVal
-  pick = listToMaybe . sortBy (compare `on` prefer) . filter select
-    where select imv = imv_name imv == mod_name
-          prefer imv = (imv_is_hiding imv, imv_span imv)
-
-  -- Which of these would export a 'foo'
-  -- (all of these are restricted imports, because if they were not, we
-  -- wouldn't have an out-of-scope error in the first place)
-  helpful_imports = filter helpful interesting_imports
-    where helpful (_,imv)
-            = not . null $ lookupGlobalRdrEnv (imv_all_exports imv) occ_name
-
-  -- Which of these do that because of an explicit hiding list resp. an
-  -- explicit import list
-  (helpful_imports_hiding, helpful_imports_non_hiding)
-    = partition (imv_is_hiding . snd) helpful_imports
 
 -- | Called from the typechecker (TcErrors) when we find an unbound variable
 unknownNameSuggestions :: DynFlags
-                       -> GlobalRdrEnv -> LocalRdrEnv
+                       -> GlobalRdrEnv -> LocalRdrEnv -> ImportAvails
                        -> RdrName -> SDoc
 unknownNameSuggestions = unknownNameSuggestions_ WL_Any
 
 unknownNameSuggestions_ :: WhereLooking -> DynFlags
+                       -> GlobalRdrEnv -> LocalRdrEnv -> ImportAvails
+                       -> RdrName -> SDoc
+unknownNameSuggestions_ where_look dflags global_env local_env imports tried_rdr_name =
+    similarNameSuggestions where_look dflags global_env local_env tried_rdr_name $$
+    importSuggestions dflags imports tried_rdr_name
+
+
+similarNameSuggestions :: WhereLooking -> DynFlags
                         -> GlobalRdrEnv -> LocalRdrEnv
                         -> RdrName -> SDoc
-unknownNameSuggestions_ where_look dflags global_env
+similarNameSuggestions where_look dflags global_env
                         local_env tried_rdr_name
   = case suggest of
       []  -> Outputable.empty
@@ -1875,6 +1786,113 @@ unknownNameSuggestions_ where_look dflags global_env
     quals_only (GRE { gre_name = n, gre_imp = is })
       = [ (mkRdrQual (is_as ispec) (nameOccName n), Right ispec)
         | i <- is, let ispec = is_decl i, is_qual ispec ]
+
+-- | Generate helpful suggestions if a qualified name Mod.foo is not in scope.
+importSuggestions :: DynFlags -> ImportAvails -> RdrName -> SDoc
+importSuggestions _dflags imports rdr_name
+  | not (isQual rdr_name || isUnqual rdr_name) = Outputable.empty
+  | null interesting_imports
+  , Just name <- mod_name
+  = hsep
+      [ ptext (sLit "No module named")
+      , quotes (ppr name)
+      , ptext (sLit "is imported.")
+      ]
+  | is_qualified
+  , null helpful_imports
+  , [(mod,_)] <- interesting_imports
+  = hsep
+      [ ptext (sLit "Module")
+      , quotes (ppr mod)
+      , ptext (sLit "does not export")
+      , quotes (ppr occ_name) <> dot
+      ]
+  | is_qualified
+  , null helpful_imports
+  , mods <- map fst interesting_imports
+  = hsep
+      [ ptext (sLit "Neither")
+      , quotedListWithNor (map ppr mods)
+      , ptext (sLit "exports")
+      , quotes (ppr occ_name) <> dot
+      ]
+  | [(mod,imv)] <- helpful_imports_non_hiding
+  = fsep
+      [ ptext (sLit "Perhaps you want to add")
+      , quotes (ppr occ_name)
+      , ptext (sLit "to the import list")
+      , ptext (sLit "in the import of")
+      , quotes (ppr mod)
+      , parens (ppr (imv_span imv)) <> dot
+      ]
+  | not (null helpful_imports_non_hiding)
+  = fsep
+      [ ptext (sLit "Perhaps you want to add")
+      , quotes (ppr occ_name)
+      , ptext (sLit "to one of these import lists:")
+      ]
+    $$
+    nest 2 (vcat
+        [ quotes (ppr mod) <+> parens (ppr (imv_span imv))
+        | (mod,imv) <- helpful_imports_non_hiding
+        ])
+  | [(mod,imv)] <- helpful_imports_hiding
+  = fsep
+      [ ptext (sLit "Perhaps you want to remove")
+      , quotes (ppr occ_name)
+      , ptext (sLit "from the explicit hiding list")
+      , ptext (sLit "in the import of")
+      , quotes (ppr mod)
+      , parens (ppr (imv_span imv)) <> dot
+      ]
+  | not (null helpful_imports_hiding)
+  = fsep
+      [ ptext (sLit "Perhaps you want to remove")
+      , quotes (ppr occ_name)
+      , ptext (sLit "from the hiding clauses")
+      , ptext (sLit "in one of these imports:")
+      ]
+    $$
+    nest 2 (vcat
+        [ quotes (ppr mod) <+> parens (ppr (imv_span imv))
+        | (mod,imv) <- helpful_imports_hiding
+        ])
+  | otherwise
+  = Outputable.empty
+ where
+  is_qualified = isQual rdr_name
+  (mod_name, occ_name) = case rdr_name of
+    Unqual occ_name        -> (Nothing, occ_name)
+    Qual mod_name occ_name -> (Just mod_name, occ_name)
+    _                      -> error "importSuggestions: dead code"
+
+
+  -- What import statements provide "Mod" at all
+  -- or, if this is an unqualified name, are not qualified imports
+  interesting_imports = [ (mod, imp)
+    | (mod, mod_imports) <- moduleEnvToList (imp_mods imports)
+    , Just imp <- return $ pick mod_imports
+    ]
+
+  -- We want to keep only one for each original module; preferably one with an
+  -- explicit import list (for no particularly good reason)
+  pick :: [ImportedModsVal] -> Maybe ImportedModsVal
+  pick = listToMaybe . sortBy (compare `on` prefer) . filter select
+    where select imv = case mod_name of Just name -> imv_name imv == name
+                                        Nothing   -> not (imv_qualified imv)
+          prefer imv = (imv_is_hiding imv, imv_span imv)
+
+  -- Which of these would export a 'foo'
+  -- (all of these are restricted imports, because if they were not, we
+  -- wouldn't have an out-of-scope error in the first place)
+  helpful_imports = filter helpful interesting_imports
+    where helpful (_,imv)
+            = not . null $ lookupGlobalRdrEnv (imv_all_exports imv) occ_name
+
+  -- Which of these do that because of an explicit hiding list resp. an
+  -- explicit import list
+  (helpful_imports_hiding, helpful_imports_non_hiding)
+    = partition (imv_is_hiding . snd) helpful_imports
 
 {-
 ************************************************************************

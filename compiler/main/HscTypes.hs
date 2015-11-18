@@ -1032,11 +1032,12 @@ emptyModDetails
 type ImportedMods = ModuleEnv [ImportedModsVal]
 data ImportedModsVal
  = ImportedModsVal {
-        imv_name :: ModuleName,         -- ^ The name the module is imported with
-        imv_span :: SrcSpan,            -- ^ the source span of the whole import
-        imv_is_safe :: IsSafeImport,    -- ^ whether this is a safe import
-        imv_is_hiding :: Bool,          -- ^ whether this is an "hiding" import
-        imv_all_exports :: GlobalRdrEnv -- ^ all the things the module could provide
+        imv_name :: ModuleName,          -- ^ The name the module is imported with
+        imv_span :: SrcSpan,             -- ^ the source span of the whole import
+        imv_is_safe :: IsSafeImport,     -- ^ whether this is a safe import
+        imv_is_hiding :: Bool,           -- ^ whether this is an "hiding" import
+        imv_all_exports :: GlobalRdrEnv, -- ^ all the things the module could provide
+        imv_qualified :: Bool            -- ^ whether this is a qualified import
         }
 
 -- | A ModGuts is carried through the compiler, accumulating stuff as it goes

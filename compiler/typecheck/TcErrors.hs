@@ -724,9 +724,10 @@ mkHoleError ctxt ct@(CHoleCan { cc_occ = occ, cc_hole = hole_sort })
                        -- Suggest possible in-scope variables in the message
   = do { dflags  <- getDynFlags
        ; rdr_env <- getGlobalRdrEnv
+       ; impInfo <- getImports
        ; mkLongErrAt (RealSrcSpan (tcl_loc lcl_env)) out_of_scope_msg
                      (unknownNameSuggestions dflags rdr_env
-                               (tcl_rdr lcl_env) (mkRdrUnqual occ)) }
+                               (tcl_rdr lcl_env) impInfo (mkRdrUnqual occ)) }
 
   | otherwise  -- Explicit holes, like "_" or "_f"
   = do { (ctxt, binds_doc, ct) <- relevantBindings False ctxt ct
