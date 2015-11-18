@@ -3801,10 +3801,10 @@ There are some other differences regarding what data types can have derived
    this data type::
 
        data E a where
-           E1 :: (a ~ Int) =&gt; a   -> E a
+           E1 :: (a ~ Int) => a   -> E a
            E2 ::              Int -> E Int
-           E3 :: (a ~ Int) =&gt; a   -> E Int
-           E4 :: (a ~ Int) =&gt; Int -> E a
+           E3 :: (a ~ Int) => a   -> E Int
+           E4 :: (a ~ Int) => Int -> E a
 
        deriving instance Foldable E
 
