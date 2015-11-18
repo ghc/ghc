@@ -161,7 +161,7 @@ pprReg reg
 
                 RealRegPair r1 r2
                  -> text "(" <> pprReg_ofRegNo r1
-                 <> text "|" <> pprReg_ofRegNo r2
+                 <> vbar     <> pprReg_ofRegNo r2
                  <> text ")"
 
 

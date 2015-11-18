@@ -3,8 +3,10 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
   type family F a b :: * open
 COERCION AXIOMS
-  axiom TypeFamilyInstanceLHS.TFCo:R:FBool_ :: F Bool _ = Bool
-  axiom TypeFamilyInstanceLHS.TFCo:R:FInt_ :: F Int _ = Int
+  axiom TypeFamilyInstanceLHS.TFCo:R:FBool_ ::
+    F Bool _ = Bool -- Defined at TypeFamilyInstanceLHS.hs:6:15
+  axiom TypeFamilyInstanceLHS.TFCo:R:FInt_ ::
+    F Int _ = Int -- Defined at TypeFamilyInstanceLHS.hs:5:15
 FAMILY INSTANCES
   type instance F Int _
   type instance F Bool _

@@ -754,29 +754,39 @@ ppr_forall_co p ty
     split1 tvs ty               = (reverse tvs, ty)
 
 pprCoAxiom :: CoAxiom br -> SDoc
-pprCoAxiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
-  = hang (ptext (sLit "axiom") <+> ppr ax <+> dcolon)
-       2 (vcat (map (pprCoAxBranch tc) $ fromBranches branches))
+pprCoAxiom ax@(CoAxiom { co_ax_branches = branches })
+  = hang (text "axiom" <+> ppr ax <+> dcolon)
+       2 (vcat (map (ppr_co_ax_branch (const ppr) ax) $ fromBranches branches))
 
-pprCoAxBranch :: TyCon -> CoAxBranch -> SDoc
-pprCoAxBranch fam_tc (CoAxBranch { cab_tvs = tvs
-                                 , cab_lhs = lhs
-                                 , cab_rhs = rhs })
-  = hang (pprUserForAll tvs)
-       2 (hang (pprTypeApp fam_tc lhs) 2 (equals <+> (ppr rhs)))
+pprCoAxBranch :: CoAxiom br -> CoAxBranch -> SDoc
+pprCoAxBranch = ppr_co_ax_branch pprRhs
+  where
+    pprRhs fam_tc (TyConApp tycon _)
+      | isDataFamilyTyCon fam_tc
+      = pprDataCons tycon
+    pprRhs _ rhs = ppr rhs
 
 pprCoAxBranchHdr :: CoAxiom br -> BranchIndex -> SDoc
-pprCoAxBranchHdr ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_name = name }) index
-  | CoAxBranch { cab_lhs = tys, cab_loc = loc } <- coAxiomNthBranch ax index
-  = hang (pprTypeApp fam_tc tys)
-       2 (ptext (sLit "-- Defined") <+> ppr_loc loc)
+pprCoAxBranchHdr ax index = pprCoAxBranch ax (coAxiomNthBranch ax index)
+
+ppr_co_ax_branch :: (TyCon -> Type -> SDoc) -> CoAxiom br -> CoAxBranch -> SDoc
+ppr_co_ax_branch ppr_rhs
+              (CoAxiom { co_ax_tc = fam_tc, co_ax_name = name })
+              (CoAxBranch { cab_tvs = tvs
+                          , cab_lhs = lhs
+                          , cab_rhs = rhs
+                          , cab_loc = loc })
+  = foldr1 (flip hangNotEmpty 2)
+        [ pprUserForAll tvs
+        , pprTypeApp fam_tc lhs <+> equals <+> ppr_rhs fam_tc rhs
+        , text "-- Defined" <+> pprLoc loc ]
   where
-        ppr_loc loc
+        pprLoc loc
           | isGoodSrcSpan loc
-          = ptext (sLit "at") <+> ppr (srcSpanStart loc)
+          = text "at" <+> ppr (srcSpanStart loc)
 
           | otherwise
-          = ptext (sLit "in") <+>
+          = text "in" <+>
               quotes (ppr (nameModule name))
 
 {-

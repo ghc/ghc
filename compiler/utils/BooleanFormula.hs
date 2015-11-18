@@ -193,7 +193,7 @@ pprBooleanFormula :: (Rational -> a -> SDoc) -> Rational -> BooleanFormula a -> 
 pprBooleanFormula pprVar = pprBooleanFormula' pprVar pprAnd pprOr
   where
   pprAnd p = cparen (p > 3) . fsep . punctuate comma
-  pprOr  p = cparen (p > 2) . fsep . intersperse (text "|")
+  pprOr  p = cparen (p > 2) . fsep . intersperse vbar
 
 -- Pretty print human in readable format, "either `a' or `b' or (`c', `d' and `e')"?
 pprBooleanFormulaNice :: Outputable a => BooleanFormula a -> SDoc

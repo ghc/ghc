@@ -10,7 +10,8 @@ TYPE CONSTRUCTORS
   type role Representational representational
   class Representational a
 COERCION AXIOMS
-  axiom T8958.NTCo:Map :: Map k v = [(k, v)]
+  axiom T8958.NTCo:Map ::
+    Map k v = [(k, v)] -- Defined at T8958.hs:13:1
 INSTANCES
   instance [incoherent] Nominal a -- Defined at T8958.hs:7:10
   instance [incoherent] Representational a

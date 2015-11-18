@@ -713,7 +713,7 @@ ppr_expr (HsIf _ e1 e2 e3)
 ppr_expr (HsMultiIf _ alts)
   = sep $ ptext (sLit "if") : map ppr_alt alts
   where ppr_alt (L _ (GRHS guards expr)) =
-          sep [ char '|' <+> interpp'SP guards
+          sep [ vbar <+> interpp'SP guards
               , ptext (sLit "->") <+> pprDeeper (ppr expr) ]
 
 -- special case: let ... in let ...
@@ -1283,7 +1283,7 @@ pprGRHS ctxt (GRHS [] body)
  =  pp_rhs ctxt body
 
 pprGRHS ctxt (GRHS guards body)
- = sep [char '|' <+> interpp'SP guards, pp_rhs ctxt body]
+ = sep [vbar <+> interpp'SP guards, pp_rhs ctxt body]
 
 pp_rhs :: Outputable body => HsMatchContext idL -> body -> SDoc
 pp_rhs ctxt rhs = matchSeparator ctxt <+> pprDeeper (ppr rhs)
@@ -1707,7 +1707,7 @@ pprComp :: (OutputableBndr id, Outputable body)
 pprComp quals     -- Prints:  body | qual1, ..., qualn
   | not (null quals)
   , L _ (LastStmt body _ _) <- last quals
-  = hang (ppr body <+> char '|') 2 (pprQuals (dropTail 1 quals))
+  = hang (ppr body <+> vbar) 2 (pprQuals (dropTail 1 quals))
   | otherwise
   = pprPanic "pprComp" (pprQuals quals)
 
@@ -1842,7 +1842,7 @@ pprSplice (HsQuasiQuote n q _ s) = ppr_quasi n q s
 
 ppr_quasi :: OutputableBndr id => id -> id -> FastString -> SDoc
 ppr_quasi n quoter quote = ifPprDebug (brackets (ppr n)) <>
-                           char '[' <> ppr quoter <> ptext (sLit "|") <>
+                           char '[' <> ppr quoter <> vbar <>
                            ppr quote <> ptext (sLit "|]")
 
 ppr_splice :: OutputableBndr id => SDoc -> id -> LHsExpr id -> SDoc
@@ -1888,7 +1888,7 @@ pprHsBracket (VarBr False n) = ptext (sLit "''") <> ppr n
 pprHsBracket (TExpBr e)  = thTyBrackets (ppr e)
 
 thBrackets :: SDoc -> SDoc -> SDoc
-thBrackets pp_kind pp_body = char '[' <> pp_kind <> char '|' <+>
+thBrackets pp_kind pp_body = char '[' <> pp_kind <> vbar <+>
                              pp_body <+> ptext (sLit "|]")
 
 thTyBrackets :: SDoc -> SDoc

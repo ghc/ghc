@@ -17,10 +17,13 @@ TYPE CONSTRUCTORS
   type Syn1 a = F4 a
   type Syn2 a = [a]
 COERCION AXIOMS
-  axiom Roles3.NTCo:C1 :: C1 a = a -> a
-  axiom Roles3.NTCo:C2 :: C2 a b = (a ~ b) => a -> b
-  axiom Roles3.NTCo:C3 :: C3 a b = a -> F3 b -> F3 b
-  axiom Roles3.NTCo:C4 :: C4 a b = a -> F4 b -> F4 b
+  axiom Roles3.NTCo:C1 :: C1 a = a -> a -- Defined at Roles3.hs:6:1
+  axiom Roles3.NTCo:C2 ::
+    C2 a b = (a ~ b) => a -> b -- Defined at Roles3.hs:9:1
+  axiom Roles3.NTCo:C3 ::
+    C3 a b = a -> F3 b -> F3 b -- Defined at Roles3.hs:12:1
+  axiom Roles3.NTCo:C4 ::
+    C4 a b = a -> F4 b -> F4 b -- Defined at Roles3.hs:18:1
 Dependent modules: []
 Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
                      integer-gmp-1.0.0.0]

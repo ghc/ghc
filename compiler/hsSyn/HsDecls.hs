@@ -906,7 +906,7 @@ pprFamilyDecl top_level (FamilyDecl { fdInfo = info, fdLName = ltycon
                 TyVarSig tv_bndr -> text "=" <+> ppr tv_bndr
     pp_inj = case mb_inj of
                Just (L _ (InjectivityAnn lhs rhs)) ->
-                 hsep [ text "|", ppr lhs, text "->", hsep (map ppr rhs) ]
+                 hsep [ vbar, ppr lhs, text "->", hsep (map ppr rhs) ]
                Nothing -> empty
     (pp_where, pp_eqns) = case info of
       ClosedTypeFamily mb_eqns ->

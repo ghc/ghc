@@ -17,6 +17,8 @@ dataConSourceArity  :: DataCon -> Arity
 dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConInstOrigArgTys  :: DataCon -> [Type] -> [Type]
 dataConStupidTheta :: DataCon -> ThetaType
+dataConFullSig :: DataCon
+               -> ([TyVar], [TyVar], [(TyVar,Type)], ThetaType, [Type], Type)
 
 instance Eq DataCon
 instance Ord DataCon

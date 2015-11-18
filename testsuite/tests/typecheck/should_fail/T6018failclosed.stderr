@@ -2,7 +2,7 @@
 T6018failclosed.hs:11:5: error:
     Type family equation violates injectivity annotation.
     RHS of injective type family equation cannot be a type family:
-      IdProxyClosed a = IdClosed a
+      IdProxyClosed a = IdClosed a -- Defined at T6018failclosed.hs:11:5
     In the equations for closed type family ‘IdProxyClosed’
     In the type family declaration for ‘IdProxyClosed’
 
@@ -10,14 +10,15 @@ T6018failclosed.hs:19:5: error:
     Type family equation violates injectivity annotation.
     RHS of injective type family equation is a bare type variable
     but these LHS type and kind patterns are not bare variables: ‘'Z’
-      PClosed 'Z m = m
+      PClosed 'Z m = m -- Defined at T6018failclosed.hs:19:5
     In the equations for closed type family ‘PClosed’
     In the type family declaration for ‘PClosed’
 
 T6018failclosed.hs:19:5: error:
     Type family equations violate injectivity annotation:
-      PClosed 'Z m = m
+      PClosed 'Z m = m -- Defined at T6018failclosed.hs:19:5
       PClosed ('S n) m = 'S (PClosed n m)
+        -- Defined at T6018failclosed.hs:20:5
     In the equations for closed type family ‘PClosed’
     In the type family declaration for ‘PClosed’
 
@@ -27,8 +28,8 @@ T6018failclosed.hs:25:5: error:
     cannot be inferred from the right-hand side.
     (enabling -fprint-explicit-kinds might help)
     In the type family equation:
-    forall (k :: BOX) (k1 :: BOX) (b :: k) (c :: k1).
-      JClosed Int b c = Char
+      forall (k :: BOX) (k1 :: BOX) (b :: k) (c :: k1).
+        JClosed Int b c = Char -- Defined at T6018failclosed.hs:25:5
     In the equations for closed type family ‘JClosed’
     In the type family declaration for ‘JClosed’
 
@@ -36,28 +37,29 @@ T6018failclosed.hs:30:5: error:
     Type family equation violates injectivity annotation.
     Type variable ‘n’ cannot be inferred from the right-hand side.
     In the type family equation:
-      KClosed ('S n) m = 'S m
+      KClosed ('S n) m = 'S m -- Defined at T6018failclosed.hs:30:5
     In the equations for closed type family ‘KClosed’
     In the type family declaration for ‘KClosed’
 
 T6018failclosed.hs:35:5: error:
     Type family equation violates injectivity annotation.
     RHS of injective type family equation cannot be a type family:
-    forall (k :: BOX) (a :: k). LClosed a = MaybeSynClosed a
+      forall (k :: BOX) (a :: k).
+        LClosed a = MaybeSynClosed a -- Defined at T6018failclosed.hs:35:5
     In the equations for closed type family ‘LClosed’
     In the type family declaration for ‘LClosed’
 
 T6018failclosed.hs:39:5: error:
     Type family equations violate injectivity annotation:
-      FClosed Char Bool Int = Int
-      FClosed Bool Int Char = Int
+      FClosed Char Bool Int = Int -- Defined at T6018failclosed.hs:39:5
+      FClosed Bool Int Char = Int -- Defined at T6018failclosed.hs:40:5
     In the equations for closed type family ‘FClosed’
     In the type family declaration for ‘FClosed’
 
 T6018failclosed.hs:43:5: error:
     Type family equations violate injectivity annotation:
-      IClosed Int Char Bool = Bool
-      IClosed Int Int Int = Bool
+      IClosed Int Char Bool = Bool -- Defined at T6018failclosed.hs:43:5
+      IClosed Int Int Int = Bool -- Defined at T6018failclosed.hs:44:5
     In the equations for closed type family ‘IClosed’
     In the type family declaration for ‘IClosed’
 
@@ -65,14 +67,14 @@ T6018failclosed.hs:50:3: error:
     Type family equation violates injectivity annotation.
     Type variable ‘a’ cannot be inferred from the right-hand side.
     In the type family equation:
-      E2 a = 'False
+      E2 a = 'False -- Defined at T6018failclosed.hs:50:3
     In the equations for closed type family ‘E2’
     In the type family declaration for ‘E2’
 
 T6018failclosed.hs:61:3: error:
     Type family equations violate injectivity annotation:
-      F a IO = IO a
-      F Char b = b Int
+      F a IO = IO a -- Defined at T6018failclosed.hs:61:3
+      F Char b = b Int -- Defined at T6018failclosed.hs:62:3
     In the equations for closed type family ‘F’
     In the type family declaration for ‘F’
 
@@ -81,6 +83,7 @@ T6018failclosed.hs:66:5: error:
     Kind variable ‘k’ cannot be inferred from the right-hand side.
     (enabling -fprint-explicit-kinds might help)
     In the type family equation:
-    forall (k :: BOX) (a :: k) (b :: k). Gc a b = Int
+      forall (k :: BOX) (a :: k) (b :: k).
+        Gc a b = Int -- Defined at T6018failclosed.hs:66:5
     In the equations for closed type family ‘Gc’
     In the type family declaration for ‘Gc’

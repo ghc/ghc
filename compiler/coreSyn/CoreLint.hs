@@ -1350,13 +1350,13 @@ lintCoercion (InstCo co arg_ty)
 
 lintCoercion co@(AxiomInstCo con ind cos)
   = do { unless (0 <= ind && ind < numBranches (coAxiomBranches con))
-                (bad_ax (ptext (sLit "index out of range")))
+                (bad_ax (text "index out of range"))
          -- See Note [Kind instantiation in coercions]
        ; let CoAxBranch { cab_tvs   = ktvs
                         , cab_roles = roles
                         , cab_lhs   = lhs
                         , cab_rhs   = rhs } = coAxiomNthBranch con ind
-       ; unless (equalLength ktvs cos) (bad_ax (ptext (sLit "lengths")))
+       ; unless (equalLength ktvs cos) (bad_ax (text "lengths"))
        ; in_scope <- getInScope
        ; let empty_subst = mkTvSubst in_scope emptyTvSubstEnv
        ; (subst_l, subst_r) <- foldlM check_ki
@@ -1365,11 +1365,12 @@ lintCoercion co@(AxiomInstCo con ind cos)
        ; let lhs' = Type.substTys subst_l lhs
              rhs' = Type.substTy subst_r rhs
        ; case checkAxInstCo co of
-           Just bad_branch -> bad_ax $ ptext (sLit "inconsistent with") <+> (pprCoAxBranch (coAxiomTyCon con) bad_branch)
+           Just bad_branch -> bad_ax $ text "inconsistent with" <+>
+                                       pprCoAxBranch con bad_branch
            Nothing -> return ()
        ; return (typeKind rhs', mkTyConApp (coAxiomTyCon con) lhs', rhs', coAxiomRole con) }
   where
-    bad_ax what = addErrL (hang (ptext (sLit "Bad axiom application") <+> parens what)
+    bad_ax what = addErrL (hang (text  "Bad axiom application" <+> parens what)
                         2 (ppr co))
 
     check_ki (subst_l, subst_r) (ktv, role, co)
@@ -1379,7 +1380,8 @@ lintCoercion co@(AxiomInstCo con ind cos)
                   -- Using subst_l is ok, because subst_l and subst_r
                   -- must agree on kind equalities
            ; unless (k `isSubKind` ktv_kind)
-                    (bad_ax (ptext (sLit "check_ki2") <+> vcat [ ppr co, ppr k, ppr ktv, ppr ktv_kind ] ))
+                    (bad_ax (text "check_ki2" <+>
+                             vcat [ ppr co, ppr k, ppr ktv, ppr ktv_kind ] ))
            ; return (Type.extendTvSubst subst_l ktv t1,
                      Type.extendTvSubst subst_r ktv t2) }
 

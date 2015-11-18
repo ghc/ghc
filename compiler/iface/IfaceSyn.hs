@@ -643,7 +643,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
             -- See discussion on Trac #8672.
 
     add_bars []     = Outputable.empty
-    add_bars (c:cs) = sep ((equals <+> c) : map (char '|' <+>) cs)
+    add_bars (c:cs) = sep ((equals <+> c) : map (vbar <+>) cs)
 
     ok_con dc = showSub ss dc || any (showSub ss) (ifConFields dc)
 
@@ -741,7 +741,7 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon, ifTyVars = tyvars
 
     pp_inj_cond res inj = case filterByList inj tyvars of
        []  -> empty
-       tvs -> hsep [text "|", ppr res, text "->", interppSP (map fst tvs)]
+       tvs -> hsep [vbar, ppr res, text "->", interppSP (map fst tvs)]
 
     pp_rhs IfaceDataFamilyTyCon
       = ppShowIface ss (ptext (sLit "data"))

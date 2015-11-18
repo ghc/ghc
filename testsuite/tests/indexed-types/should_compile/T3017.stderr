@@ -11,7 +11,8 @@ TYPE CONSTRUCTORS
   data ListColl a = L [a]
     Promotable
 COERCION AXIOMS
-  axiom Foo.TFCo:R:ElemListColl :: Elem (ListColl a) = a
+  axiom Foo.TFCo:R:ElemListColl ::
+    Elem (ListColl a) = a -- Defined at T3017.hs:13:9
 INSTANCES
   instance Coll (ListColl a) -- Defined at T3017.hs:12:11
 FAMILY INSTANCES

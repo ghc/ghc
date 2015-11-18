@@ -463,7 +463,7 @@ mkErrorAppDs err_id ty msg = do
     src_loc <- getSrcSpanDs
     dflags <- getDynFlags
     let
-        full_msg = showSDoc dflags (hcat [ppr src_loc, text "|", msg])
+        full_msg = showSDoc dflags (hcat [ppr src_loc, vbar, msg])
         core_msg = Lit (mkMachString full_msg)
         -- mkMachString returns a result of type String#
     return (mkApps (Var err_id) [Type ty, core_msg])

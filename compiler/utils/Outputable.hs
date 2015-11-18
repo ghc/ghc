@@ -25,7 +25,7 @@ module Outputable (
         int, intWithCommas, integer, float, double, rational,
         parens, cparen, brackets, braces, quotes, quote,
         doubleQuotes, angleBrackets, paBrackets,
-        semi, comma, colon, dcolon, space, equals, dot,
+        semi, comma, colon, dcolon, space, equals, dot, vbar,
         arrow, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
         blankLine, forAllLit,
@@ -33,7 +33,7 @@ module Outputable (
         ($$), ($+$), vcat,
         sep, cat,
         fsep, fcat,
-        hang, punctuate, ppWhen, ppUnless,
+        hang, hangNotEmpty, punctuate, ppWhen, ppUnless,
         speakNth, speakN, speakNOf, plural, isOrAre, doOrDoes,
 
         coloured, PprColour, colType, colCoerc, colDataCon,
@@ -521,7 +521,7 @@ quotes d =
              ('\'' : _, _)       -> pp_d
              _other              -> Pretty.quotes pp_d
 
-semi, comma, colon, equals, space, dcolon, underscore, dot :: SDoc
+semi, comma, colon, equals, space, dcolon, underscore, dot, vbar :: SDoc
 arrow, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt :: SDoc
 lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
 
@@ -541,6 +541,7 @@ equals     = docToSDoc $ Pretty.equals
 space      = docToSDoc $ Pretty.space
 underscore = char '_'
 dot        = char '.'
+vbar       = char '|'
 lparen     = docToSDoc $ Pretty.lparen
 rparen     = docToSDoc $ Pretty.rparen
 lbrack     = docToSDoc $ Pretty.lbrack
@@ -605,6 +606,12 @@ hang :: SDoc  -- ^ The header
       -> SDoc -- ^ The hung body, indented and placed below the header
       -> SDoc
 hang d1 n d2   = SDoc $ \sty -> Pretty.hang (runSDoc d1 sty) n (runSDoc d2 sty)
+
+-- | This behaves like 'hang', but does not indent the second document
+-- when the header is empty.
+hangNotEmpty :: SDoc -> Int -> SDoc -> SDoc
+hangNotEmpty d1 n d2 =
+    SDoc $ \sty -> Pretty.hangNotEmpty (runSDoc d1 sty) n (runSDoc d2 sty)
 
 punctuate :: SDoc   -- ^ The punctuation
           -> [SDoc] -- ^ The list that will have punctuation added between every adjacent pair of elements

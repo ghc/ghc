@@ -402,10 +402,10 @@ checkForInjectivityConflicts instEnvs famInst
     | isTypeFamilyTyCon tycon
     -- type family is injective in at least one argument
     , Injective inj <- familyTyConInjectivityInfo tycon = do
-    { let axiom = coAxiomSingleBranch (fi_axiom famInst)
+    { let axiom = coAxiomSingleBranch fi_ax
           conflicts = lookupFamInstEnvInjectivityConflicts inj instEnvs famInst
           -- see Note [Verifying injectivity annotation] in FamInstEnv
-          errs = makeInjectivityErrors tycon axiom inj conflicts
+          errs = makeInjectivityErrors fi_ax axiom inj conflicts
     ; mapM_ (\(err, span) -> setSrcSpan span $ addErr err) errs
     ; return (null errs)
     }
@@ -414,15 +414,16 @@ checkForInjectivityConflicts instEnvs famInst
     -- type family we report no conflicts
     | otherwise = return True
     where tycon = famInstTyCon famInst
+          fi_ax = fi_axiom famInst
 
 -- | Build a list of injectivity errors together with their source locations.
 makeInjectivityErrors
-   :: TyCon        -- ^ Type family tycon for which we generate errors
+   :: CoAxiom br   -- ^ Type family for which we generate errors
    -> CoAxBranch   -- ^ Currently checked equation (represented by axiom)
    -> [Bool]       -- ^ Injectivity annotation
    -> [CoAxBranch] -- ^ List of injectivity conflicts
    -> [(SDoc, SrcSpan)]
-makeInjectivityErrors tycon axiom inj conflicts
+makeInjectivityErrors fi_ax axiom inj conflicts
   = ASSERT2( any id inj, text "No injective type variables" )
     let lhs             = coAxBranchLHS axiom
         rhs             = coAxBranchRHS axiom
@@ -435,7 +436,8 @@ makeInjectivityErrors tycon axiom inj conflicts
         wrong_bare_rhs  = not $ null bare_variables
 
         err_builder herald eqns
-                        = ( herald $$ vcat (map (pprCoAxBranch tycon) eqns)
+                        = ( hang herald
+                               2 (vcat (map (pprCoAxBranch fi_ax) eqns))
                           , coAxBranchSpan (head eqns) )
         errorIf p f     = if p then [f err_builder axiom] else []
      in    errorIf are_conflicts  (conflictInjInstErr     conflicts     )

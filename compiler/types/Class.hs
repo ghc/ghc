@@ -290,7 +290,7 @@ instance Outputable DefMeth where
 
 pprFundeps :: Outputable a => [FunDep a] -> SDoc
 pprFundeps []  = empty
-pprFundeps fds = hsep (ptext (sLit "|") : punctuate comma (map pprFunDep fds))
+pprFundeps fds = hsep (vbar : punctuate comma (map pprFunDep fds))
 
 pprFunDep :: Outputable a => FunDep a -> SDoc
 pprFunDep (us, vs) = hsep [interppSP us, ptext (sLit "->"), interppSP vs]

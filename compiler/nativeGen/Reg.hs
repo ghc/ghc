@@ -135,8 +135,9 @@ instance Uniquable RealReg where
 instance Outputable RealReg where
         ppr reg
          = case reg of
-                RealRegSingle i         -> text "%r"    <> int i
-                RealRegPair r1 r2       -> text "%r(" <> int r1 <> text "|" <> int r2 <> text ")"
+                RealRegSingle i         -> text "%r"  <> int i
+                RealRegPair r1 r2       -> text "%r(" <> int r1
+                                           <> vbar <> int r2 <> text ")"
 
 regNosOfRealReg :: RealReg -> [RegNo]
 regNosOfRealReg rr

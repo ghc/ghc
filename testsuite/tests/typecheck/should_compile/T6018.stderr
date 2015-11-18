@@ -4,8 +4,8 @@
 
 T6018.hs:75:5: Warning:
     Type family instance equation is overlapped:
-       Foo Bool = Bool
+      Foo Bool = Bool -- Defined at T6018.hs:75:5
 
 T6018.hs:82:5: Warning:
     Type family instance equation is overlapped:
-       Bar Bool = Char
+      Bar Bool = Char -- Defined at T6018.hs:82:5
