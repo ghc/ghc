@@ -27,7 +27,7 @@ MAN_PAGES := docs/users_guide/ghc.1
 
 ifneq "$(BINDIST)" "YES"
 $(MAN_PAGES): $(docs/users_guide_MAN_RST_SOURCES) $(utils/mkUserGuidePart_GENERATED_RST_SOURCES)
-	$(SPHINXBUILD) -b man docs/users_guide docs/users_guide
+	$(SPHINXBUILD) -b man -d docs/users_guide/.doctrees-man docs/users_guide docs/users_guide
 endif
 
 man : $(MAN_PAGES)
