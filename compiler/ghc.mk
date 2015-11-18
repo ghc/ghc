@@ -580,7 +580,6 @@ compiler_stage2_dll0_MODULES = \
 	PrimOp \
 	RdrName \
 	Rules \
-	Serialized \
 	SrcLoc \
 	StaticFlags \
 	StringBuffer \
@@ -609,49 +608,8 @@ ifeq "$(GhcWithInterpreter)" "YES"
 # These files are reacheable from DynFlags
 # only by GHCi-enabled code (see #9552)
 compiler_stage2_dll0_MODULES += \
-	Bitmap \
-	BlockId \
-	ByteCodeAsm \
-	ByteCodeInstr \
-	ByteCodeItbls \
-	CLabel \
-	Cmm \
-	CmmCallConv \
-	CmmExpr \
-	CmmInfo \
-	CmmMachOp \
-	CmmNode \
-	CmmSwitch \
-	CmmUtils \
-	CodeGen.Platform \
-	CodeGen.Platform.ARM \
-	CodeGen.Platform.ARM64 \
-	CodeGen.Platform.NoRegs \
-	CodeGen.Platform.PPC \
-	CodeGen.Platform.PPC_Darwin \
-	CodeGen.Platform.SPARC \
-	CodeGen.Platform.X86 \
-	CodeGen.Platform.X86_64 \
-	Hoopl \
-	Hoopl.Dataflow \
-	InteractiveEvalTypes \
-	MkGraph \
-	PprCmm \
-	PprCmmDecl \
-	PprCmmExpr \
-	Reg \
-	RegClass \
-	SMRep \
-	StgCmmArgRep \
-	StgCmmClosure \
-	StgCmmEnv \
-	StgCmmLayout \
-	StgCmmMonad \
-	StgCmmProf \
-	StgCmmTicky \
-	StgCmmUtils \
-	StgSyn \
-	Stream
+	ByteCodeTypes \
+	InteractiveEvalTypes
 endif
 
 compiler_stage2_dll0_HS_OBJS = \
@@ -769,4 +727,3 @@ ghc/stage1/package-data.mk : compiler/stage1/inplace-pkg-config-munged
 endif
 
 endif
-

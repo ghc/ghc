@@ -1,4 +1,4 @@
-import ObjLink
+import GHCi.ObjLink
 
 library_name = "libfoo_script_T2615.so" -- this is really a linker script
 

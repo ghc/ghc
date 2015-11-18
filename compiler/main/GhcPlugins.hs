@@ -18,7 +18,7 @@ module GhcPlugins(
         module TysWiredIn, module HscTypes, module BasicTypes,
         module VarSet, module VarEnv, module NameSet, module NameEnv,
         module UniqSet, module UniqFM, module FiniteMap,
-        module Util, module Serialized, module SrcLoc, module Outputable,
+        module Util, module GHC.Serialized, module SrcLoc, module Outputable,
         module UniqSupply, module Unique, module FastString
     ) where
 
@@ -75,7 +75,7 @@ import FiniteMap
 
 -- Common utilities
 import Util
-import Serialized
+import GHC.Serialized
 import SrcLoc
 import Outputable
 import UniqSupply

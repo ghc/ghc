@@ -20,5 +20,5 @@ else:
 
 test('cabal04',
      normal,
-     run_command, 
+     run_command,
      ['$MAKE -s --no-print-directory cabal04 VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn + ' ' + cleanup])

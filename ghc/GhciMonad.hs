@@ -22,7 +22,10 @@ module GhciMonad (
         runStmt, runDecls, resume, timeIt, recordBreak, revertCAFs,
 
         printForUser, printForUserPartWay, prettyLocations,
-        initInterpBuffering, turnOffBuffering, flushInterpBuffers,
+        initInterpBuffering,
+        turnOffBuffering, turnOffBuffering_,
+        flushInterpBuffers,
+        mkEvalWrapper
     ) where
 
 #include "HsVersions.h"
@@ -31,14 +34,13 @@ import qualified GHC
 import GhcMonad         hiding (liftIO)
 import Outputable       hiding (printForUser, printForUserPartWay)
 import qualified Outputable
-import Util
 import DynFlags
 import FastString
 import HscTypes
 import SrcLoc
 import Module
-import ObjLink
-import Linker
+import GHCi
+import GHCi.RemoteTypes
 
 import Exception
 import Numeric
@@ -48,7 +50,6 @@ import System.CPUTime
 import System.Environment
 import System.IO
 import Control.Monad
-import GHC.Exts
 
 import System.Console.Haskeline (CompletionFunc, InputT)
 import qualified System.Console.Haskeline as Haskeline
@@ -62,6 +63,7 @@ data GHCiState = GHCiState
      {
         progname       :: String,
         args           :: [String],
+        evalWrapper    :: ForeignHValue, -- IO a -> IO a
         prompt         :: String,
         prompt2        :: String,
         editor         :: String,
@@ -103,7 +105,12 @@ data GHCiState = GHCiState
         -- help text to display to a user
         short_help :: String,
         long_help  :: String,
-        lastErrorLocations :: IORef [(FastString, Int)]
+        lastErrorLocations :: IORef [(FastString, Int)],
+
+        -- hFlush stdout; hFlush stderr in the interpreter
+        flushStdHandles :: ForeignHValue,
+        -- hSetBuffering NoBuffering for stdin/stdout/stderr
+        noBuffering :: ForeignHValue
      }
 
 type TickArray = Array Int [(BreakIndex,SrcSpan)]
@@ -282,18 +289,14 @@ printForUserPartWay doc = do
 runStmt :: String -> GHC.SingleStep -> GHCi (Maybe GHC.ExecResult)
 runStmt expr step = do
   st <- getGHCiState
-  reifyGHCi $ \x ->
-    withProgName (progname st) $
-    withArgs (args st) $
-      reflectGHCi x $ do
-        GHC.handleSourceError (\e -> do GHC.printException e;
-                                        return Nothing) $ do
-          let opts = GHC.execOptions
-                { GHC.execSourceFile = progname st
-                , GHC.execLineNumber = line_number st
-                , GHC.execSingleStep = step }
-          r <- GHC.execStmt expr opts
-          return (Just r)
+  GHC.handleSourceError (\e -> do GHC.printException e; return Nothing) $ do
+    let opts = GHC.execOptions
+                  { GHC.execSourceFile = progname st
+                  , GHC.execLineNumber = line_number st
+                  , GHC.execSingleStep = step
+                  , GHC.execWrap = \fhv -> EvalApp (EvalThis (evalWrapper st))
+                                                   (EvalThis fhv) }
+    Just <$> GHC.execStmt expr opts
 
 runDecls :: String -> GHCi (Maybe [GHC.Name])
 runDecls decls = do
@@ -355,9 +358,9 @@ revertCAFs :: GHCi ()
 revertCAFs = do
   liftIO rts_revertCAFs
   s <- getGHCiState
-  when (not (ghc_e s)) $ liftIO turnOffBuffering
-        -- Have to turn off buffering again, because we just
-        -- reverted stdout, stderr & stdin to their defaults.
+  when (not (ghc_e s)) turnOffBuffering
+     -- Have to turn off buffering again, because we just
+     -- reverted stdout, stderr & stdin to their defaults.
 
 foreign import ccall "revertCAFs" rts_revertCAFs  :: IO ()
         -- Make it "safe", just in case
@@ -366,54 +369,38 @@ foreign import ccall "revertCAFs" rts_revertCAFs  :: IO ()
 -- To flush buffers for the *interpreted* computation we need
 -- to refer to *its* stdout/stderr handles
 
-GLOBAL_VAR(stdin_ptr,  error "no stdin_ptr",  Ptr ())
-GLOBAL_VAR(stdout_ptr, error "no stdout_ptr", Ptr ())
-GLOBAL_VAR(stderr_ptr, error "no stderr_ptr", Ptr ())
+-- | Compile "hFlush stdout; hFlush stderr" once, so we can use it repeatedly
+initInterpBuffering :: Ghc (ForeignHValue, ForeignHValue)
+initInterpBuffering = do
+  nobuf <- GHC.compileExprRemote $
+   "do { System.IO.hSetBuffering System.IO.stdin System.IO.NoBuffering; " ++
+       " System.IO.hSetBuffering System.IO.stdout System.IO.NoBuffering; " ++
+       " System.IO.hSetBuffering System.IO.stderr System.IO.NoBuffering }"
+  flush <- GHC.compileExprRemote $
+   "do { System.IO.hFlush System.IO.stdout; " ++
+       " System.IO.hFlush System.IO.stderr }"
+  return (nobuf, flush)
 
--- After various attempts, I believe this is the least bad way to do
--- what we want.  We know look up the address of the static stdin,
--- stdout, and stderr closures in the loaded base package, and each
--- time we need to refer to them we cast the pointer to a Handle.
--- This avoids any problems with the CAF having been reverted, because
--- we'll always get the current value.
---
--- The previous attempt that didn't work was to compile an expression
--- like "hSetBuffering stdout NoBuffering" into an expression of type
--- IO () and run this expression each time we needed it, but the
--- problem is that evaluating the expression might cache the contents
--- of the Handle rather than referring to it from its static address
--- each time.  There's no safe workaround for this.
-
-initInterpBuffering :: Ghc ()
-initInterpBuffering = do -- make sure these are linked
-    dflags <- GHC.getSessionDynFlags
-    liftIO $ do
-      initDynLinker dflags
-
-        -- ToDo: we should really look up these names properly, but
-        -- it's a fiddle and not all the bits are exposed via the GHC
-        -- interface.
-      mb_stdin_ptr  <- ObjLink.lookupSymbol "base_GHCziIOziHandleziFD_stdin_closure"
-      mb_stdout_ptr <- ObjLink.lookupSymbol "base_GHCziIOziHandleziFD_stdout_closure"
-      mb_stderr_ptr <- ObjLink.lookupSymbol "base_GHCziIOziHandleziFD_stderr_closure"
-
-      let f ref (Just ptr) = writeIORef ref ptr
-          f _   Nothing    = panic "interactiveUI:setBuffering2"
-      zipWithM_ f [stdin_ptr,stdout_ptr,stderr_ptr]
-                  [mb_stdin_ptr,mb_stdout_ptr,mb_stderr_ptr]
-
+-- | Invoke "hFlush stdout; hFlush stderr" in the interpreter
 flushInterpBuffers :: GHCi ()
-flushInterpBuffers
- = liftIO $ do getHandle stdout_ptr >>= hFlush
-               getHandle stderr_ptr >>= hFlush
+flushInterpBuffers = do
+  st <- getGHCiState
+  hsc_env <- GHC.getSession
+  liftIO $ evalIO hsc_env (flushStdHandles st)
 
-turnOffBuffering :: IO ()
-turnOffBuffering
- = do hdls <- mapM getHandle [stdin_ptr,stdout_ptr,stderr_ptr]
-      mapM_ (\h -> hSetBuffering h NoBuffering) hdls
+-- | Turn off buffering for stdin, stdout, and stderr in the interpreter
+turnOffBuffering :: GHCi ()
+turnOffBuffering = do
+  st <- getGHCiState
+  turnOffBuffering_ (noBuffering st)
 
-getHandle :: IORef (Ptr ()) -> IO Handle
-getHandle ref = do
-  (Ptr addr) <- readIORef ref
-  case addrToAny# addr of (# hval #) -> return (unsafeCoerce# hval)
+turnOffBuffering_ :: GhcMonad m => ForeignHValue -> m ()
+turnOffBuffering_ fhv = do
+  hsc_env <- getSession
+  liftIO $ evalIO hsc_env fhv
 
+mkEvalWrapper :: GhcMonad m => String -> [String] ->  m ForeignHValue
+mkEvalWrapper progname args =
+  GHC.compileExprRemote $
+    "\\m -> System.Environment.withProgName " ++ show progname ++
+    "(System.Environment.withArgs " ++ show args ++ " m)"

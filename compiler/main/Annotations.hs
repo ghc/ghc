@@ -12,7 +12,8 @@ module Annotations (
 
         -- * AnnEnv for collecting and querying Annotations
         AnnEnv,
-        mkAnnEnv, extendAnnEnvList, plusAnnEnv, emptyAnnEnv, findAnns,
+        mkAnnEnv, extendAnnEnvList, plusAnnEnv, emptyAnnEnv,
+        findAnns, findAnnsByTypeRep,
         deserializeAnns
     ) where
 
@@ -20,7 +21,7 @@ import Binary
 import Module           ( Module )
 import Name
 import Outputable
-import Serialized
+import GHC.Serialized
 import UniqFM
 import Unique
 
@@ -115,10 +116,17 @@ findAnns deserialize (MkAnnEnv ann_env)
   = (mapMaybe (fromSerialized deserialize))
     . (lookupWithDefaultUFM ann_env [])
 
+-- | Find the annotations attached to the given target as 'Typeable'
+--   values of your choice. If no deserializer is specified,
+--   only transient annotations will be returned.
+findAnnsByTypeRep :: AnnEnv -> CoreAnnTarget -> TypeRep -> [[Word8]]
+findAnnsByTypeRep (MkAnnEnv ann_env) target tyrep
+  = [ ws | Serialized tyrep' ws <- lookupWithDefaultUFM ann_env [] target
+    , tyrep' == tyrep ]
+
 -- | Deserialize all annotations of a given type. This happens lazily, that is
 --   no deserialization will take place until the [a] is actually demanded and
 --   the [a] can also be empty (the UniqFM is not filtered).
 deserializeAnns :: Typeable a => ([Word8] -> a) -> AnnEnv -> UniqFM [a]
 deserializeAnns deserialize (MkAnnEnv ann_env)
   = mapUFM (mapMaybe (fromSerialized deserialize)) ann_env
-

@@ -11,6 +11,8 @@ TcSplice: Template Haskell splices
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module TcSplice(
@@ -26,7 +28,8 @@ module TcSplice(
      -- called only in stage2 (ie GHCI is on)
      runMetaE, runMetaP, runMetaT, runMetaD, runQuasi,
      tcTopSpliceExpr, lookupThName_maybe,
-     defaultRunMeta, runMeta'
+     defaultRunMeta, runMeta',
+     finishTH
 #endif
       ) where
 
@@ -47,6 +50,9 @@ import TcUnify
 import TcEnv
 
 #ifdef GHCI
+import GHCi.Message
+import GHCi.RemoteTypes
+import GHCi
 import HscMain
         -- These imports are the reason that TcSplice
         -- is very high up the module hierarchy
@@ -89,7 +95,7 @@ import Id
 import IdInfo
 import DsExpr
 import DsMonad
-import Serialized
+import GHC.Serialized
 import ErrUtils
 import Util
 import Unique
@@ -109,9 +115,14 @@ import qualified Language.Haskell.TH.Syntax as TH
 import GHC.Desugar      ( AnnotationWrapper(..) )
 
 import qualified Data.IntSet as IntSet
-import qualified Data.Map as Map
+import Control.Exception
+import Data.Binary
+import Data.Binary.Get
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as LB
 import Data.Dynamic  ( fromDynamic, toDyn )
-import Data.Typeable ( typeOf, Typeable, typeRep )
+import qualified Data.Map as Map
+import Data.Typeable ( typeOf, Typeable, TypeRep, typeRep )
 import Data.Data (Data)
 import Data.Proxy    ( Proxy (..) )
 import GHC.Exts         ( unsafeCoerce# )
@@ -558,18 +569,28 @@ runAnnotation target expr = do
                ann_value = serialized
            }
 
-convertAnnotationWrapper :: AnnotationWrapper -> Either MsgDoc Serialized
-convertAnnotationWrapper  annotation_wrapper = Right $
-        case annotation_wrapper of
-            AnnotationWrapper value | let serialized = toSerialized serializeWithData value ->
-                -- Got the value and dictionaries: build the serialized value and
-                -- call it a day. We ensure that we seq the entire serialized value
-                -- in order that any errors in the user-written code for the
-                -- annotation are exposed at this point.  This is also why we are
-                -- doing all this stuff inside the context of runMeta: it has the
-                -- facilities to deal with user error in a meta-level expression
-                seqSerialized serialized `seq` serialized
+convertAnnotationWrapper :: ForeignHValue -> TcM (Either MsgDoc Serialized)
+convertAnnotationWrapper fhv = do
+  dflags <- getDynFlags
+  if gopt Opt_ExternalInterpreter dflags
+    then do
+      Right <$> runTH THAnnWrapper fhv
+    else do
+      annotation_wrapper <- liftIO $ wormhole dflags fhv
+      return $ Right $
+        case unsafeCoerce# annotation_wrapper of
+           AnnotationWrapper value | let serialized = toSerialized serializeWithData value ->
+               -- Got the value and dictionaries: build the serialized value and
+               -- call it a day. We ensure that we seq the entire serialized value
+               -- in order that any errors in the user-written code for the
+               -- annotation are exposed at this point.  This is also why we are
+               -- doing all this stuff inside the context of runMeta: it has the
+               -- facilities to deal with user error in a meta-level expression
+               seqSerialized serialized `seq` serialized
 
+-- | Force the contents of the Serialized value so weknow it doesn't contain any bottoms
+seqSerialized :: Serialized -> ()
+seqSerialized (Serialized the_type bytes) = the_type `seq` bytes `seqList` ()
 
 
 {-
@@ -583,11 +604,18 @@ convertAnnotationWrapper  annotation_wrapper = Right $
 runQuasi :: TH.Q a -> TcM a
 runQuasi act = TH.runQ act
 
-runQResult :: (a -> String) -> (SrcSpan -> a -> b) -> SrcSpan -> TH.Q a -> TcM b
-runQResult show_th f expr_span hval
-  = do { th_result <- TH.runQ hval
+runQResult
+  :: (a -> String)
+  -> (SrcSpan -> a -> b)
+  -> (ForeignHValue -> TcM a)
+  -> SrcSpan
+  -> ForeignHValue {- TH.Q a -}
+  -> TcM b
+runQResult show_th f runQ expr_span hval
+  = do { th_result <- runQ hval
        ; traceTc "Got TH result:" (text (show_th th_result))
        ; return (f expr_span th_result) }
+
 
 -----------------
 runMeta :: (MetaHook TcM -> LHsExpr Id -> TcM hs_syn)
@@ -599,15 +627,15 @@ runMeta unwrap e
 
 defaultRunMeta :: MetaHook TcM
 defaultRunMeta (MetaE r)
-  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsExpr)
+  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsExpr runTHExp)
 defaultRunMeta (MetaP r)
-  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToPat)
+  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToPat runTHPat)
 defaultRunMeta (MetaT r)
-  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsType)
+  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsType runTHType)
 defaultRunMeta (MetaD r)
-  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsDecls)
+  = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsDecls runTHDec)
 defaultRunMeta (MetaAW r)
-  = fmap r . runMeta' False (const empty) (const (return . convertAnnotationWrapper))
+  = fmap r . runMeta' False (const empty) (const convertAnnotationWrapper)
     -- We turn off showing the code in meta-level exceptions because doing so exposes
     -- the toAnnotationWrapper function that we slap around the users code
 
@@ -635,7 +663,7 @@ runMetaD = runMeta metaRequestD
 ---------------
 runMeta' :: Bool                 -- Whether code should be printed in the exception message
          -> (hs_syn -> SDoc)                                    -- how to print the code
-         -> (SrcSpan -> x -> TcM (Either MsgDoc hs_syn))        -- How to run x
+         -> (SrcSpan -> ForeignHValue -> TcM (Either MsgDoc hs_syn))        -- How to run x
          -> LHsExpr Id           -- Of type x; typically x = Q TH.Exp, or something like that
          -> TcM hs_syn           -- Of type t
 runMeta' show_code ppr_hs run_and_convert expr
@@ -680,7 +708,7 @@ runMeta' show_code ppr_hs run_and_convert expr
         ; either_tval <- tryAllM $
                          setSrcSpan expr_span $ -- Set the span so that qLocation can
                                                 -- see where this splice is
-             do { mb_result <- run_and_convert expr_span (unsafeCoerce# hval)
+             do { mb_result <- run_and_convert expr_span hval
                 ; case mb_result of
                     Left err     -> failWithTc err
                     Right result -> do { traceTc "Got HsSyn result:" (ppr_hs result)
@@ -694,6 +722,7 @@ runMeta' show_code ppr_hs run_and_convert expr
         }}}
   where
     -- see Note [Concealed TH exceptions]
+    fail_with_exn :: Exception e => String -> e -> TcM a
     fail_with_exn phase exn = do
         exn_msg <- liftIO $ Panic.safeShowException exn
         let msg = vcat [text "Exception when trying to" <+> text phase <+> text "compile-time code:",
@@ -856,6 +885,125 @@ instance TH.Quasi TcM where
   qExtsEnabled = do
     dflags <- hsc_dflags <$> getTopEnv
     return $ map toEnum $ IntSet.elems $ extensionFlags dflags
+
+
+-- | Run all module finalizers
+finishTH :: TcM ()
+finishTH = do
+  hsc_env <- env_top <$> getEnv
+  dflags <- getDynFlags
+  if not (gopt Opt_ExternalInterpreter dflags)
+    then do
+      tcg <- getGblEnv
+      let th_modfinalizers_var = tcg_th_modfinalizers tcg
+      modfinalizers <- readTcRef th_modfinalizers_var
+      writeTcRef th_modfinalizers_var []
+      mapM_ runQuasi modfinalizers
+    else withIServ hsc_env $ \i -> do
+      tcg <- getGblEnv
+      th_state <- readTcRef (tcg_th_remote_state tcg)
+      case th_state of
+        Nothing -> return () -- TH was not started, nothing to do
+        Just fhv -> do
+          liftIO $ withForeignHValue fhv $ \rhv ->
+            writeIServ i (putMessage (FinishTH rhv))
+          () <- runRemoteTH i
+          writeTcRef (tcg_th_remote_state tcg) Nothing
+
+runTHExp :: ForeignHValue -> TcM TH.Exp
+runTHExp = runTH THExp
+
+runTHPat :: ForeignHValue -> TcM TH.Pat
+runTHPat = runTH THPat
+
+runTHType :: ForeignHValue -> TcM TH.Type
+runTHType = runTH THType
+
+runTHDec :: ForeignHValue -> TcM [TH.Dec]
+runTHDec = runTH THDec
+
+runTH :: Binary a => THResultType -> ForeignHValue -> TcM a
+runTH ty fhv = do
+  hsc_env <- env_top <$> getEnv
+  dflags <- getDynFlags
+  if not (gopt Opt_ExternalInterpreter dflags)
+    then do
+       -- just run it in the local TcM
+      hv <- liftIO $ wormhole dflags fhv
+      r <- runQuasi (unsafeCoerce# hv :: TH.Q a)
+      return r
+    else
+      -- run it on the server
+      withIServ hsc_env $ \i -> do
+        rstate <- getTHState i
+        loc <- TH.qLocation
+        liftIO $
+          withForeignHValue rstate $ \state_hv ->
+          withForeignHValue fhv $ \q_hv ->
+            writeIServ i (putMessage (RunTH state_hv q_hv ty (Just loc)))
+        bs <- runRemoteTH i
+        return $! runGet get (LB.fromStrict bs)
+
+-- | communicate with a remotely-running TH computation until it
+-- finishes and returns a result.
+runRemoteTH :: Binary a => IServ -> TcM a
+runRemoteTH iserv = do
+  Msg msg <- liftIO $ readIServ iserv getMessage
+  case msg of
+    QDone -> liftIO $ readIServ iserv get
+    QException str -> liftIO $ throwIO (ErrorCall str)
+    QFail str -> fail str
+    _other -> do
+      r <- handleTHMessage msg
+      liftIO $ writeIServ iserv (put r)
+      runRemoteTH iserv
+
+getTHState :: IServ -> TcM ForeignHValue
+getTHState i = do
+  tcg <- getGblEnv
+  th_state <- readTcRef (tcg_th_remote_state tcg)
+  case th_state of
+    Just rhv -> return rhv
+    Nothing -> do
+      hsc_env <- env_top <$> getEnv
+      fhv <- liftIO $ mkFinalizedHValue hsc_env =<< iservCall i StartTH
+      writeTcRef (tcg_th_remote_state tcg) (Just fhv)
+      return fhv
+
+wrapTHResult :: TcM a -> TcM (THResult a)
+wrapTHResult tcm = do
+  e <- tryM tcm   -- only catch 'fail', treat everything else as catastrophic
+  case e of
+    Left e -> return (THException (show e))
+    Right a -> return (THComplete a)
+
+handleTHMessage :: Message a -> TcM a
+handleTHMessage msg = case msg of
+  NewName a -> wrapTHResult $ TH.qNewName a
+  Report b str -> wrapTHResult $ TH.qReport b str
+  LookupName b str -> wrapTHResult $ TH.qLookupName b str
+  Reify n -> wrapTHResult $ TH.qReify n
+  ReifyFixity n -> wrapTHResult $ TH.qReifyFixity n
+  ReifyInstances n ts -> wrapTHResult $ TH.qReifyInstances n ts
+  ReifyRoles n -> wrapTHResult $ TH.qReifyRoles n
+  ReifyAnnotations lookup tyrep ->
+    wrapTHResult $ (map B.pack <$> getAnnotationsByTypeRep lookup tyrep)
+  ReifyModule m -> wrapTHResult $ TH.qReifyModule m
+  AddDependentFile f -> wrapTHResult $ TH.qAddDependentFile f
+  AddTopDecls decs -> wrapTHResult $ TH.qAddTopDecls decs
+  IsExtEnabled ext -> wrapTHResult $ TH.qIsExtEnabled ext
+  ExtsEnabled -> wrapTHResult $ TH.qExtsEnabled
+  _ -> panic ("handleTHMessage: unexpected message " ++ show msg)
+
+getAnnotationsByTypeRep :: TH.AnnLookup -> TypeRep -> TcM [[Word8]]
+getAnnotationsByTypeRep th_name tyrep
+  = do { name <- lookupThAnnLookup th_name
+       ; topEnv <- getTopEnv
+       ; epsHptAnns <- liftIO $ prepareAnnotations topEnv Nothing
+       ; tcg <- getGblEnv
+       ; let selectedEpsHptAnns = findAnnsByTypeRep epsHptAnns name tyrep
+       ; let selectedTcgAnns = findAnnsByTypeRep (tcg_ann_env tcg) name tyrep
+       ; return (selectedEpsHptAnns ++ selectedTcgAnns) }
 
 {-
 ************************************************************************

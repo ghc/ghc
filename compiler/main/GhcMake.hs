@@ -532,7 +532,7 @@ unload :: HscEnv -> [Linkable] -> IO ()
 unload hsc_env stable_linkables -- Unload everthing *except* 'stable_linkables'
   = case ghcLink (hsc_dflags hsc_env) of
 #ifdef GHCI
-        LinkInMemory -> Linker.unload (hsc_dflags hsc_env) stable_linkables
+        LinkInMemory -> Linker.unload hsc_env stable_linkables
 #else
         LinkInMemory -> panic "unload: no interpreter"
                                 -- urgh.  avoid warnings:

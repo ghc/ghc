@@ -166,20 +166,7 @@ main' postLoadMode dflags0 args flagWarnings = do
                DoAbiHash       -> (OneShot,     dflt_target,    LinkBinary)
                _               -> (OneShot,     dflt_target,    LinkBinary)
 
-  let dflags1 = case lang of
-                HscInterpreted ->
-                    let platform = targetPlatform dflags0
-                        dflags0a = updateWays $ dflags0 { ways = interpWays }
-                        dflags0b = foldl gopt_set dflags0a
-                                 $ concatMap (wayGeneralFlags platform)
-                                             interpWays
-                        dflags0c = foldl gopt_unset dflags0b
-                                 $ concatMap (wayUnsetGeneralFlags platform)
-                                             interpWays
-                    in dflags0c
-                _ ->
-                    dflags0
-      dflags2 = dflags1{ ghcMode   = mode,
+  let dflags1 = dflags0{ ghcMode   = mode,
                          hscTarget = lang,
                          ghcLink   = link,
                          verbosity = case postLoadMode of
@@ -191,14 +178,29 @@ main' postLoadMode dflags0 args flagWarnings = do
       -- can be overriden from the command-line
       -- XXX: this should really be in the interactive DynFlags, but
       -- we don't set that until later in interactiveUI
-      dflags3  | DoInteractive <- postLoadMode = imp_qual_enabled
+      dflags2  | DoInteractive <- postLoadMode = imp_qual_enabled
                | DoEval _      <- postLoadMode = imp_qual_enabled
-               | otherwise                     = dflags2
-        where imp_qual_enabled = dflags2 `gopt_set` Opt_ImplicitImportQualified
+               | otherwise                     = dflags1
+        where imp_qual_enabled = dflags1 `gopt_set` Opt_ImplicitImportQualified
 
         -- The rest of the arguments are "dynamic"
         -- Leftover ones are presumably files
-  (dflags4, fileish_args, dynamicFlagWarnings) <- GHC.parseDynamicFlags dflags3 args
+  (dflags3, fileish_args, dynamicFlagWarnings) <-
+      GHC.parseDynamicFlags dflags2 args
+
+  let dflags4 = case lang of
+                HscInterpreted | not (gopt Opt_ExternalInterpreter dflags3) ->
+                    let platform = targetPlatform dflags3
+                        dflags3a = updateWays $ dflags3 { ways = interpWays }
+                        dflags3b = foldl gopt_set dflags3a
+                                 $ concatMap (wayGeneralFlags platform)
+                                             interpWays
+                        dflags3c = foldl gopt_unset dflags3b
+                                 $ concatMap (wayUnsetGeneralFlags platform)
+                                             interpWays
+                    in dflags3c
+                _ ->
+                    dflags3
 
   GHC.prettyPrintGhcErrors dflags4 $ do
 
@@ -208,9 +210,6 @@ main' postLoadMode dflags0 args flagWarnings = do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
          liftIO $ handleFlagWarnings dflags4 flagWarnings'
-
-        -- make sure we clean up after ourselves
-  GHC.defaultCleanupHandler dflags4 $ do
 
   liftIO $ showBanner postLoadMode dflags4
 
@@ -336,9 +335,10 @@ checkOptions mode dflags srcs objs = do
 
         -- -prof and --interactive are not a good combination
    when ((filter (not . wayRTSOnly) (ways dflags) /= interpWays)
-         && isInterpretiveMode mode) $
+         && isInterpretiveMode mode
+         && not (gopt Opt_ExternalInterpreter dflags)) $
       do throwGhcException (UsageError
-                   "--interactive can't be used with -prof or -static.")
+              "-fexternal-interpreter is required when using --interactive with a non-standard way (-prof, -static, or -dynamic).")
         -- -ohi sanity check
    if (isJust (outputHi dflags) &&
       (isCompManagerMode mode || srcs `lengthExceeds` 1))

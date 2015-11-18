@@ -38,7 +38,7 @@ import qualified Data.Map as M
 --import UniqFM
 --import Debug.Trace
 
--- search for definitions of things 
+-- search for definitions of things
 -- we do this by parsing the source and grabbing top-level definitions
 
 -- We generate both CTAGS and ETAGS format tags files
@@ -118,10 +118,8 @@ main = do
       _ <- setSessionDynFlags dflags2
       --liftIO $ print (length pkgs)
 
-      GHC.defaultCleanupHandler dflags2 $ do
-
-        targetsAtOneGo hsfiles (ctags_hdl,etags_hdl)
-        mapM_ (mapM (liftIO . hClose)) [ctags_hdl, etags_hdl]
+      targetsAtOneGo hsfiles (ctags_hdl,etags_hdl)
+      mapM_ (mapM (liftIO . hClose)) [ctags_hdl, etags_hdl]
 
 ----------------------------------------------
 ----------  ARGUMENT PROCESSING --------------

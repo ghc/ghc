@@ -27,9 +27,9 @@ module RtClosureInspect(
 #include "HsVersions.h"
 
 import DebuggerUtils
-import ByteCodeItbls    ( StgInfoTable, peekItbl )
-import qualified ByteCodeItbls as BCI( StgInfoTable(..) )
-import BasicTypes       ( HValue )
+import GHCi.RemoteTypes ( HValue )
+import qualified GHCi.InfoTable as InfoTable
+import GHCi.InfoTable (StgInfoTable, peekItbl)
 import HscTypes
 
 import DataCon
@@ -185,12 +185,12 @@ getClosureData dflags a =
                    -- into account the extra entry pointer when
                    -- !ghciTablesNextToCode, so we must adjust here:
                    iptr0 `plusPtr` negate (wORD_SIZE dflags)
-           itbl <- peekItbl dflags iptr1
-           let tipe = readCType (BCI.tipe itbl)
-               elems = fromIntegral (BCI.ptrs itbl)
+           itbl <- peekItbl iptr1
+           let tipe = readCType (InfoTable.tipe itbl)
+               elems = fromIntegral (InfoTable.ptrs itbl)
                ptrsList = Array 0 (elems - 1) elems ptrs
                nptrs_data = [W# (indexWordArray# nptrs i)
-                              | I# i <- [0.. fromIntegral (BCI.nptrs itbl)-1] ]
+                            | I# i <- [0.. fromIntegral (InfoTable.nptrs itbl)-1] ]
            ASSERT(elems >= 0) return ()
            ptrsList `seq`
             return (Closure tipe iptr0 itbl ptrsList nptrs_data)

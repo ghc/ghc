@@ -10,7 +10,9 @@ _exception :: e = _
 _exception = SomeException
                (GHC.IO.Exception.IOError
                   Nothing GHC.IO.Exception.UserError [] "error" Nothing Nothing)
-*** Exception: user error (error)
+Stopped at <exception thrown>
+_exception :: e = SomeException
+                    (GHC.IO.Exception.IOError Nothing GHC.IO.Exception.UserError ....)
 Stopped at <exception thrown>
 _exception :: e = _
 _exception = SomeException

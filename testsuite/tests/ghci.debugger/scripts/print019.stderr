@@ -9,6 +9,6 @@
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show TyCon -- Defined in ‘GHC.Show’
         ...plus 30 others
-        ...plus two instance involving out-of-scope typess
+        ...plus 8 instance involving out-of-scope typess
         (use -fprint-potential-instances to see them all)
     • In a stmt of an interactive GHCi command: print it

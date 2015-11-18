@@ -86,8 +86,6 @@ module BasicTypes(
 
         FractionalLit(..), negateFractionalLit, integralFractionalLit,
 
-        HValue(..),
-
         SourceText,
 
         IntWithInf, infinity, treatZeroAsInf, mkIntWithInf, intGtLimit
@@ -99,7 +97,6 @@ import SrcLoc ( Located,unLoc )
 import StaticFlags( opt_PprStyle_Debug )
 import Data.Data hiding (Fixity)
 import Data.Function (on)
-import GHC.Exts (Any)
 
 {-
 ************************************************************************
@@ -1164,8 +1161,6 @@ instance Ord FractionalLit where
 
 instance Outputable FractionalLit where
   ppr = text . fl_text
-
-newtype HValue = HValue Any
 
 {-
 ************************************************************************

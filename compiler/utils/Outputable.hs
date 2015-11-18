@@ -94,6 +94,7 @@ import Util
 import Platform
 import Pretty           ( Doc, Mode(..) )
 import Panic
+import GHC.Serialized
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -810,6 +811,9 @@ instance Outputable Fingerprint where
 instance Outputable a => Outputable (SCC a) where
    ppr (AcyclicSCC v) = text "NONREC" $$ (nest 3 (ppr v))
    ppr (CyclicSCC vs) = text "REC" $$ (nest 3 (vcat (map ppr vs)))
+
+instance Outputable Serialized where
+    ppr (Serialized the_type bytes) = int (length bytes) <+> ptext (sLit "of type") <+> text (show the_type)
 
 {-
 ************************************************************************

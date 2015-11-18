@@ -15,4 +15,7 @@ error "foo"
 :force _exception
 :show bindings
 :force _result
+-- the exception is caught by the withProg/withArgs wrappers, hence 3 :continues
+:continue
+:continue
 :continue

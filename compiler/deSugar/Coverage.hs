@@ -981,7 +981,9 @@ data TickishType = ProfNotes | HpcTicks | Breakpoints | SourceNotes
 
 coveragePasses :: DynFlags -> [TickishType]
 coveragePasses dflags =
-    ifa (hscTarget dflags == HscInterpreted) Breakpoints $
+    ifa (hscTarget dflags == HscInterpreted &&
+         not (gopt Opt_ExternalInterpreter dflags)) Breakpoints $
+         -- TODO: breakpoints don't work with -fexternal-interpreter yet
     ifa (gopt Opt_Hpc dflags)                HpcTicks $
     ifa (gopt Opt_SccProfilingOn dflags &&
          profAuto dflags /= NoProfAuto)      ProfNotes $

@@ -187,6 +187,8 @@ initSysTools mbMinusB
            platformConstantsFile = top_dir </> "platformConstants"
            installed :: FilePath -> FilePath
            installed file = top_dir </> file
+           libexec :: FilePath -> FilePath
+           libexec file = top_dir </> "bin" </> file
 
        settingsStr <- readFile settingsFile
        platformConstantsStr <- readFile platformConstantsFile
@@ -265,10 +267,10 @@ initSysTools mbMinusB
 
              -- For all systems, unlit, split, mangle are GHC utilities
              -- architecture-specific stuff is done when building Config.hs
-           unlit_path = installed cGHC_UNLIT_PGM
+           unlit_path = libexec cGHC_UNLIT_PGM
 
              -- split is a Perl script
-           split_script  = installed cGHC_SPLIT_PGM
+           split_script  = libexec cGHC_SPLIT_PGM
 
        windres_path <- getSetting "windres command"
        libtool_path <- getSetting "libtool command"
@@ -304,6 +306,8 @@ initSysTools mbMinusB
        -- We just assume on command line
        lc_prog <- getSetting "LLVM llc command"
        lo_prog <- getSetting "LLVM opt command"
+
+       let iserv_prog = libexec "ghc-iserv"
 
        let platform = Platform {
                           platformArch = targetArch,
@@ -344,6 +348,7 @@ initSysTools mbMinusB
                     sPgm_libtool = libtool_path,
                     sPgm_lo  = (lo_prog,[]),
                     sPgm_lc  = (lc_prog,[]),
+                    sPgm_i   = iserv_prog,
                     sOpt_L       = [],
                     sOpt_P       = [],
                     sOpt_F       = [],
@@ -353,6 +358,7 @@ initSysTools mbMinusB
                     sOpt_windres = [],
                     sOpt_lo      = [],
                     sOpt_lc      = [],
+                    sOpt_i       = [],
                     sPlatformConstants = platformConstants
              }
 

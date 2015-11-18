@@ -1,14 +1,14 @@
 {-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 --
 -- (c) The University of Glasgow 2002-2006
 --
 -- Serialized values
 
-module Serialized (
+module GHC.Serialized (
     -- * Main Serialized data type
-    Serialized,
-    seqSerialized,
+    Serialized(..),
 
     -- * Going into and out of 'Serialized'
     toSerialized, fromSerialized,
@@ -17,31 +17,13 @@ module Serialized (
     serializeWithData, deserializeWithData,
   ) where
 
-import Binary
-import Outputable
-import FastString
-import Util
-
 import Data.Bits
 import Data.Word        ( Word8 )
-
 import Data.Data
 
 
 -- | Represents a serialized value of a particular type. Attempts can be made to deserialize it at certain types
 data Serialized = Serialized TypeRep [Word8]
-
-instance Outputable Serialized where
-    ppr (Serialized the_type bytes) = int (length bytes) <+> ptext (sLit "of type") <+> text (show the_type)
-
-instance Binary Serialized where
-    put_ bh (Serialized the_type bytes) = do
-        put_ bh the_type
-        put_ bh bytes
-    get bh = do
-        the_type <- get bh
-        bytes <- get bh
-        return (Serialized the_type bytes)
 
 -- | Put a Typeable value that we are able to actually turn into bytes into a 'Serialized' value ready for deserialization later
 toSerialized :: Typeable a => (a -> [Word8]) -> a -> Serialized
@@ -53,11 +35,6 @@ fromSerialized :: forall a. Typeable a => ([Word8] -> a) -> Serialized -> Maybe 
 fromSerialized deserialize (Serialized the_type bytes)
   | the_type == typeOf (undefined :: a) = Just (deserialize bytes)
   | otherwise                           = Nothing
-
--- | Force the contents of the Serialized value so weknow it doesn't contain any bottoms
-seqSerialized :: Serialized -> ()
-seqSerialized (Serialized the_type bytes) = the_type `seq` bytes `seqList` ()
-
 
 -- | Use a 'Data' instance to implement a serialization scheme dual to that of 'deserializeWithData'
 serializeWithData :: Data a => a -> [Word8]
@@ -176,4 +153,3 @@ deserializeList deserialize_element bytes k = deserializeInt bytes $ \len bytes 
     go len bytes k
       | len <= 0  = k [] bytes
       | otherwise = deserialize_element bytes (\elt bytes -> go (len - 1) bytes (k . (elt:)))
-

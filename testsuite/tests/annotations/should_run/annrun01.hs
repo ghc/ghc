@@ -6,7 +6,7 @@ import GHC
 import MonadUtils  ( liftIO )
 import DynFlags    ( defaultFatalMessager, defaultFlushOut )
 import Annotations ( AnnTarget(..), CoreAnnTarget )
-import Serialized  ( deserializeWithData )
+import GHC.Serialized  ( deserializeWithData )
 import Panic
 
 import Config

@@ -8,8 +8,7 @@
 module ByteCodeAsm (
         assembleBCOs, assembleBCO,
 
-        CompiledByteCode(..),
-        UnlinkedBCO(..), BCOPtr(..), BCONPtr(..), bcoFreeNames,
+        bcoFreeNames,
         SizedSeq, sizeSS, ssElts,
         iNTERP_STACK_CHECK_THRESH
   ) where
@@ -18,12 +17,13 @@ module ByteCodeAsm (
 
 import ByteCodeInstr
 import ByteCodeItbls
+import ByteCodeTypes
 
+import HscTypes
 import Name
 import NameSet
 import Literal
 import TyCon
-import PrimOp
 import FastString
 import StgCmmLayout     ( ArgRep(..) )
 import SMRep
@@ -31,6 +31,9 @@ import DynFlags
 import Outputable
 import Platform
 import Util
+
+-- From iserv
+import SizedSeq
 
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Applicative(..))
@@ -47,6 +50,7 @@ import Data.Array.Base  ( UArray(..) )
 
 import Data.Array.Unsafe( castSTUArray )
 
+import qualified Data.ByteString as B
 import Foreign
 import Data.Char        ( ord )
 import Data.List
@@ -54,43 +58,11 @@ import Data.Map (Map)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as Map
 
-import GHC.Base         ( ByteArray#, MutableByteArray#, RealWorld )
-
 -- -----------------------------------------------------------------------------
 -- Unlinked BCOs
 
 -- CompiledByteCode represents the result of byte-code
 -- compiling a bunch of functions and data types
-
-data CompiledByteCode
-  = ByteCode [UnlinkedBCO] -- Bunch of interpretable bindings
-             ItblEnv       -- A mapping from DataCons to their itbls
-
-instance Outputable CompiledByteCode where
-  ppr (ByteCode bcos _) = ppr bcos
-
-
-data UnlinkedBCO
-   = UnlinkedBCO {
-        unlinkedBCOName   :: Name,
-        unlinkedBCOArity  :: Int,
-        unlinkedBCOInstrs :: ByteArray#,                 -- insns
-        unlinkedBCOBitmap :: ByteArray#,                 -- bitmap
-        unlinkedBCOLits   :: (SizedSeq BCONPtr),        -- non-ptrs
-        unlinkedBCOPtrs   :: (SizedSeq BCOPtr)          -- ptrs
-   }
-
-data BCOPtr
-  = BCOPtrName   Name
-  | BCOPtrPrimOp PrimOp
-  | BCOPtrBCO    UnlinkedBCO
-  | BCOPtrBreakInfo  BreakInfo
-  | BCOPtrArray (MutableByteArray# RealWorld)
-
-data BCONPtr
-  = BCONPtrWord  Word
-  | BCONPtrLbl   FastString
-  | BCONPtrItbl  Name
 
 -- | Finds external references.  Remember to remove the names
 -- defined by this group of BCOs themselves
@@ -105,12 +77,6 @@ bcoFreeNames bco
              map bco_refs [ bco | BCOPtrBCO bco <- ssElts ptrs ]
           )
 
-instance Outputable UnlinkedBCO where
-   ppr (UnlinkedBCO nm _arity _insns _bitmap lits ptrs)
-      = sep [text "BCO", ppr nm, text "with",
-             ppr (sizeSS lits), text "lits",
-             ppr (sizeSS ptrs), text "ptrs" ]
-
 -- -----------------------------------------------------------------------------
 -- The bytecode assembler
 
@@ -122,11 +88,11 @@ instance Outputable UnlinkedBCO where
 -- bytecode address in this BCO.
 
 -- Top level assembler fn.
-assembleBCOs :: DynFlags -> [ProtoBCO Name] -> [TyCon] -> IO CompiledByteCode
-assembleBCOs dflags proto_bcos tycons
-  = do  itblenv <- mkITbls dflags tycons
-        bcos    <- mapM (assembleBCO dflags) proto_bcos
-        return (ByteCode bcos itblenv)
+assembleBCOs :: HscEnv -> [ProtoBCO Name] -> [TyCon] -> IO CompiledByteCode
+assembleBCOs hsc_env proto_bcos tycons = do
+  itblenv <- mkITbls hsc_env tycons
+  bcos    <- mapM (assembleBCO (hsc_dflags hsc_env)) proto_bcos
+  return (ByteCode bcos itblenv (concat (map protoBCOFFIs proto_bcos)))
 
 assembleBCO :: DynFlags -> ProtoBCO Name -> IO UnlinkedBCO
 assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = do
@@ -161,15 +127,9 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
   ASSERT(n_insns == sizeSS final_insns) return ()
 
   let asm_insns = ssElts final_insns
-      barr a = case a of UArray _lo _hi _n b -> b
-
-      insns_arr = Array.listArray (0, n_insns - 1) asm_insns
-      !insns_barr = barr insns_arr
-
+      insns_arr = Array.listArray (0, fromIntegral n_insns - 1) asm_insns
       bitmap_arr = mkBitmapArray bsize bitmap
-      !bitmap_barr = barr bitmap_arr
-
-      ul_bco = UnlinkedBCO nm arity insns_barr bitmap_barr final_lits final_ptrs
+      ul_bco = UnlinkedBCO nm arity insns_arr bitmap_arr final_lits final_ptrs
 
   -- 8 Aug 01: Finalisers aren't safe when attached to non-primitive
   -- objects, since they might get run too early.  Disable this until
@@ -190,23 +150,6 @@ mkBitmapArray bsize bitmap
 type AsmState = (SizedSeq Word16,
                  SizedSeq BCONPtr,
                  SizedSeq BCOPtr)
-
-data SizedSeq a = SizedSeq !Word [a]
-emptySS :: SizedSeq a
-emptySS = SizedSeq 0 []
-
-addToSS :: SizedSeq a -> a -> SizedSeq a
-addToSS (SizedSeq n r_xs) x = SizedSeq (n+1) (x:r_xs)
-
-addListToSS :: SizedSeq a -> [a] -> SizedSeq a
-addListToSS (SizedSeq n r_xs) xs
-  = SizedSeq (n + genericLength xs) (reverse xs ++ r_xs)
-
-ssElts :: SizedSeq a -> [a]
-ssElts (SizedSeq _ r_xs) = reverse r_xs
-
-sizeSS :: SizedSeq a -> Word
-sizeSS (SizedSeq n _) = n
 
 data Operand
   = Op Word
@@ -365,9 +308,7 @@ assembleI dflags i = case i of
                            -> do let ul_bco = assembleBCO dflags proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  emit (push_alts pk) [Op p]
-  PUSH_UBX (Left lit) nws  -> do np <- literal lit
-                                 emit bci_PUSH_UBX [Op np, SmallOp nws]
-  PUSH_UBX (Right aa) nws  -> do np <- addr aa
+  PUSH_UBX lit nws         -> do np <- literal lit
                                  emit bci_PUSH_UBX [Op np, SmallOp nws]
 
   PUSH_APPLY_N             -> emit bci_PUSH_APPLY_N []
@@ -437,7 +378,9 @@ assembleI dflags i = case i of
     literal (MachChar c)       = int (ord c)
     literal (MachInt64 ii)     = int64 (fromIntegral ii)
     literal (MachWord64 ii)    = int64 (fromIntegral ii)
-    literal other              = pprPanic "ByteCodeAsm.literal" (ppr other)
+    literal (MachStr bs)       = lit [BCONPtrStr (bs `B.snoc` 0)]
+       -- MachStr requires a zero-terminator when emitted
+    literal LitInteger{}       = panic "ByteCodeAsm.literal: LitInteger"
 
     litlabel fs = lit [BCONPtrLbl fs]
     addr = words . mkLitPtr

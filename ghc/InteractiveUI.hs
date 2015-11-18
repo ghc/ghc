@@ -28,6 +28,7 @@ import GhciTags
 import Debugger
 
 -- The GHC interface
+import GHCi
 import DynFlags
 import ErrUtils
 import GhcMonad ( modifySession )
@@ -38,7 +39,7 @@ import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
 import HsImpExp
 import HsSyn
 import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
-                  setInteractivePrintName )
+                  setInteractivePrintName, hsc_dflags )
 import Module
 import Name
 import Packages ( trusted, getPackageDetails, listVisibleModuleNames, pprFlag )
@@ -102,7 +103,6 @@ import System.Posix hiding ( getEnv )
 import qualified System.Win32
 #endif
 
-import GHC.Exts ( unsafeCoerce# )
 import GHC.IO.Exception ( IOErrorType(InvalidArgument) )
 import GHC.IO.Handle ( hFlushAll )
 import GHC.TopHandler ( topHandler )
@@ -375,7 +375,7 @@ interactiveUI config srcs maybe_exprs = do
    _ <- liftIO $ newStablePtr stderr
 
     -- Initialise buffering for the *interpreted* I/O system
-   initInterpBuffering
+   (nobuffering, flush) <- initInterpBuffering
 
    -- The initial set of DynFlags used for interactive evaluation is the same
    -- as the global DynFlags, plus -XExtendedDefaultRules and
@@ -391,29 +391,31 @@ interactiveUI config srcs maybe_exprs = do
    _ <- GHC.setProgramDynFlags $
       progDynFlags { log_action = ghciLogAction lastErrLocationsRef }
 
-   liftIO $ when (isNothing maybe_exprs) $ do
+   when (isNothing maybe_exprs) $ do
         -- Only for GHCi (not runghc and ghc -e):
 
         -- Turn buffering off for the compiled program's stdout/stderr
-        turnOffBuffering
+        turnOffBuffering_ nobuffering
         -- Turn buffering off for GHCi's stdout
-        hFlush stdout
-        hSetBuffering stdout NoBuffering
+        liftIO $ hFlush stdout
+        liftIO $ hSetBuffering stdout NoBuffering
         -- We don't want the cmd line to buffer any input that might be
         -- intended for the program, so unbuffer stdin.
-        hSetBuffering stdin NoBuffering
-        hSetBuffering stderr NoBuffering
+        liftIO $ hSetBuffering stdin NoBuffering
+        liftIO $ hSetBuffering stderr NoBuffering
 #if defined(mingw32_HOST_OS)
         -- On Unix, stdin will use the locale encoding.  The IO library
         -- doesn't do this on Windows (yet), so for now we use UTF-8,
         -- for consistency with GHC 6.10 and to make the tests work.
-        hSetEncoding stdin utf8
+        liftIO $ hSetEncoding stdin utf8
 #endif
 
    default_editor <- liftIO $ findEditor
+   eval_wrapper <- mkEvalWrapper default_progname default_args
    startGHCi (runGHCi srcs maybe_exprs)
         GHCiState{ progname           = default_progname,
                    GhciMonad.args     = default_args,
+                   evalWrapper        = eval_wrapper,
                    prompt             = defPrompt config,
                    prompt2            = defPrompt2 config,
                    stop               = default_stop,
@@ -434,7 +436,9 @@ interactiveUI config srcs maybe_exprs = do
                    ghc_e              = isJust maybe_exprs,
                    short_help         = shortHelpText config,
                    long_help          = fullHelpText config,
-                   lastErrorLocations = lastErrLocationsRef
+                   lastErrorLocations = lastErrLocationsRef,
+                   flushStdHandles    = flush,
+                   noBuffering        = nobuffering
                  }
 
    return ()
@@ -948,7 +952,7 @@ afterRunStmt step_here run_result = do
           Right names -> do
             show_types <- isOptionSet ShowType
             when show_types $ printTypeOfNames names
-     GHC.ExecBreak _ names mb_info
+     GHC.ExecBreak names mb_info
          | isNothing  mb_info ||
            step_here (GHC.resumeSpan $ head resumes) -> do
                mb_id_loc <- toBreakIdAndLocation mb_info
@@ -1319,7 +1323,7 @@ defineMacro overwrite s = do
         body = nlHsVar compose_RDR `mkHsApp` step `mkHsApp` expr
         tySig = mkLHsSigWcType (stringTy `nlHsFunTy` ioM)
         new_expr = L (getLoc expr) $ ExprWithTySig body tySig
-    hv <- GHC.compileParsedExpr new_expr
+    hv <- GHC.compileParsedExprRemote new_expr
 
     let newCmd = Command { cmdName = macro_name
                          , cmdAction = lift . runMacro hv
@@ -1330,9 +1334,10 @@ defineMacro overwrite s = do
     -- later defined macros have precedence
     liftIO $ writeIORef macros_ref (newCmd : filtered)
 
-runMacro :: GHC.HValue{-String -> IO String-} -> String -> GHCi Bool
+runMacro :: GHC.ForeignHValue{-String -> IO String-} -> String -> GHCi Bool
 runMacro fun s = do
-  str <- liftIO ((unsafeCoerce# fun :: String -> IO String) s)
+  hsc_env <- GHC.getSession
+  str <- liftIO $ evalStringToIOString hsc_env fun s
   enqueueCommands (lines str)
   return False
 
@@ -1360,9 +1365,10 @@ cmdCmd str = handleSourceError GHC.printException $ do
     expr <- GHC.parseExpr str
     -- > ghciStepIO str :: IO String
     let new_expr = step `mkHsApp` expr
-    hv <- GHC.compileParsedExpr new_expr
+    hv <- GHC.compileParsedExprRemote new_expr
 
-    cmds <- liftIO $ (unsafeCoerce# hv :: IO String)
+    hsc_env <- GHC.getSession
+    cmds <- liftIO $ evalString hsc_env hv
     enqueueCommands (lines cmds)
 
 -- | Generate a typed ghciStepIO expression
@@ -2126,8 +2132,16 @@ showDynFlags show_all dflags = do
 setArgs, setOptions :: [String] -> GHCi ()
 setProg, setEditor, setStop :: String -> GHCi ()
 
-setArgs args = modifyGHCiState (\st -> st { GhciMonad.args = args })
-setProg prog = modifyGHCiState (\st -> st { progname = prog })
+setArgs args = do
+  st <- getGHCiState
+  wrapper <- mkEvalWrapper (progname st) args
+  setGHCiState st { GhciMonad.args = args, evalWrapper = wrapper }
+
+setProg prog = do
+  st <- getGHCiState
+  wrapper <- mkEvalWrapper prog (GhciMonad.args st)
+  setGHCiState st { progname = prog, evalWrapper = wrapper }
+
 setEditor cmd = modifyGHCiState (\st -> st { editor = cmd })
 
 setStop str@(c:_) | isDigit c
@@ -2203,14 +2217,15 @@ newDynFlags interactive_only minus_opts = do
 
         -- if the package flags changed, reset the context and link
         -- the new packages.
-        dflags2 <- getDynFlags
+        hsc_env <- GHC.getSession
+        let dflags2 = hsc_dflags hsc_env
         when (packageFlags dflags2 /= packageFlags dflags0) $ do
           when (verbosity dflags2 > 0) $
             liftIO . putStrLn $
               "package flags have changed, resetting and loading new packages..."
           GHC.setTargets []
           _ <- GHC.load LoadAllTargets
-          liftIO $ linkPackages dflags2 new_pkgs
+          liftIO $ linkPackages hsc_env new_pkgs
           -- package flags changed, we can't re-use any of the old context
           setContextAfterLoad False []
           -- and copy the package state to the interactive DynFlags
@@ -2226,10 +2241,12 @@ newDynFlags interactive_only minus_opts = do
             newLdInputs     = drop ld0length (ldInputs dflags2)
             newCLFrameworks = drop fmrk0length (cmdlineFrameworks dflags2)
 
+            hsc_env' = hsc_env { hsc_dflags =
+                         dflags2 { ldInputs = newLdInputs
+                                 , cmdlineFrameworks = newCLFrameworks } }
+
         when (not (null newLdInputs && null newCLFrameworks)) $
-          liftIO $ linkCmdLineLibs $
-            dflags2 { ldInputs = newLdInputs
-                    , cmdlineFrameworks = newCLFrameworks }
+          liftIO $ linkCmdLineLibs hsc_env'
 
       return ()
 

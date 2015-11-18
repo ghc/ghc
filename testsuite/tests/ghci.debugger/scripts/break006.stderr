@@ -10,7 +10,7 @@
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
         ...plus 23 others
-        ...plus 13 instance involving out-of-scope typess
+        ...plus 19 instance involving out-of-scope typess
         (use -fprint-potential-instances to see them all)
     • In a stmt of an interactive GHCi command: print it
 
@@ -25,6 +25,6 @@
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
         ...plus 23 others
-        ...plus 13 instance involving out-of-scope typess
+        ...plus 19 instance involving out-of-scope typess
         (use -fprint-potential-instances to see them all)
     • In a stmt of an interactive GHCi command: print it

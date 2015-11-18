@@ -20,6 +20,13 @@ TH_spliceE5_prof::
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(HC_OPTS) --make -v0 TH_spliceE5_prof.hs -prof -auto-all -osuf p.o -o $@
 	./$@
 
+# With -fexternal-interpreter, we don't have to build the non-profiled
+# objects first.
+TH_spliceE5_prof_ext::
+	$(RM) TH_spliceE5_prof_ext*.o TH_spliceE5_prof_ext*.hi TH_spliceE5_prof_ext*.p.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(HC_OPTS) --make -v0 TH_spliceE5_prof_ext.hs -prof -auto-all -fexternal-interpreter -o $@
+	./$@
+
 .PHONY: TH_Depends
 TH_Depends:
 	$(RM) TH_Depends_external.txt

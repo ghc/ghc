@@ -28,7 +28,7 @@ module TcRnDriver (
     ) where
 
 #ifdef GHCI
-import {-# SOURCE #-} TcSplice ( runQuasi )
+import {-# SOURCE #-} TcSplice ( finishTH )
 import RnSplice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
 import IfaceEnv( externaliseName )
 import TcHsType
@@ -485,11 +485,7 @@ tcRnSrcDecls explicit_mod_hdr decls
       ; setEnvs (tcg_env, tcl_env) $ do {
 
 #ifdef GHCI
-        -- Run all module finalizers
-        let th_modfinalizers_var = tcg_th_modfinalizers tcg_env
-      ; modfinalizers <- readTcRef th_modfinalizers_var
-      ; writeTcRef th_modfinalizers_var []
-      ; mapM_ runQuasi modfinalizers
+      ; finishTH
 #endif /* GHCI */
 
         -- wanted constraints from static forms

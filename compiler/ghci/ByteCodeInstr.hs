@@ -6,17 +6,15 @@
 
 -- | ByteCodeInstrs: Bytecode instruction definitions
 module ByteCodeInstr (
-        BCInstr(..), ProtoBCO(..), bciStackUse, BreakInfo (..)
+        BCInstr(..), ProtoBCO(..), bciStackUse,
   ) where
 
 #include "HsVersions.h"
 #include "../includes/MachDeps.h"
 
-import ByteCodeItbls    ( ItblPtr )
-
+import ByteCodeTypes
 import StgCmmLayout     ( ArgRep(..) )
 import PprCore
-import Type
 import Outputable
 import FastString
 import Name
@@ -28,7 +26,6 @@ import VarSet
 import PrimOp
 import SMRep
 
-import Module (Module)
 import GHC.Exts
 import Data.Word
 
@@ -46,7 +43,7 @@ data ProtoBCO a
         -- what the BCO came from
         protoBCOExpr       :: Either  [AnnAlt Id DVarSet] (AnnExpr Id DVarSet),
         -- malloc'd pointers
-        protoBCOPtrs       :: [Either ItblPtr (Ptr ())]
+        protoBCOFFIs       :: [FFIInfo]
    }
 
 type LocalLabel = Word16
@@ -70,7 +67,7 @@ data BCInstr
    | PUSH_ALTS_UNLIFTED (ProtoBCO Name) ArgRep
 
    -- Pushing literals
-   | PUSH_UBX  (Either Literal (Ptr ())) Word16
+   | PUSH_UBX  Literal Word16
         -- push this int/float/double/addr, on the stack. Word16
         -- is # of words to copy from literal pool.  Eitherness reflects
         -- the difficulty of dealing with MachAddr here, mostly due to
@@ -144,28 +141,13 @@ data BCInstr
    -- Breakpoints
    | BRK_FUN          (MutableByteArray# RealWorld) Word16 BreakInfo
 
-data BreakInfo
-   = BreakInfo
-   { breakInfo_module :: Module
-   , breakInfo_number :: {-# UNPACK #-} !Int
-   , breakInfo_vars   :: [(Id,Word16)]
-   , breakInfo_resty  :: Type
-   }
-
-instance Outputable BreakInfo where
-   ppr info = text "BreakInfo" <+>
-              parens (ppr (breakInfo_module info) <+>
-                      ppr (breakInfo_number info) <+>
-                      ppr (breakInfo_vars info) <+>
-                      ppr (breakInfo_resty info))
-
 -- -----------------------------------------------------------------------------
 -- Printing bytecode instructions
 
 instance Outputable a => Outputable (ProtoBCO a) where
-   ppr (ProtoBCO name instrs bitmap bsize arity origin malloced)
+   ppr (ProtoBCO name instrs bitmap bsize arity origin ffis)
       = (text "ProtoBCO" <+> ppr name <> char '#' <> int arity
-                <+> text (show malloced) <> colon)
+                <+> text (show ffis) <> colon)
         $$ nest 3 (case origin of
                       Left alts -> vcat (zipWith (<+>) (char '{' : repeat (char ';'))
                                                        (map (pprCoreAltShort.deAnnAlt) alts)) <+> char '}'
@@ -210,19 +192,18 @@ instance Outputable BCInstr where
    ppr (PUSH_ALTS bco)       = hang (text "PUSH_ALTS") 2 (ppr bco)
    ppr (PUSH_ALTS_UNLIFTED bco pk) = hang (text "PUSH_ALTS_UNLIFTED" <+> ppr pk) 2 (ppr bco)
 
-   ppr (PUSH_UBX (Left lit) nw) = text "PUSH_UBX" <+> parens (ppr nw) <+> ppr lit
-   ppr (PUSH_UBX (Right aa) nw) = text "PUSH_UBX" <+> parens (ppr nw) <+> text (show aa)
-   ppr PUSH_APPLY_N             = text "PUSH_APPLY_N"
-   ppr PUSH_APPLY_V             = text "PUSH_APPLY_V"
-   ppr PUSH_APPLY_F             = text "PUSH_APPLY_F"
-   ppr PUSH_APPLY_D             = text "PUSH_APPLY_D"
-   ppr PUSH_APPLY_L             = text "PUSH_APPLY_L"
-   ppr PUSH_APPLY_P             = text "PUSH_APPLY_P"
-   ppr PUSH_APPLY_PP            = text "PUSH_APPLY_PP"
-   ppr PUSH_APPLY_PPP           = text "PUSH_APPLY_PPP"
-   ppr PUSH_APPLY_PPPP          = text "PUSH_APPLY_PPPP"
-   ppr PUSH_APPLY_PPPPP         = text "PUSH_APPLY_PPPPP"
-   ppr PUSH_APPLY_PPPPPP        = text "PUSH_APPLY_PPPPPP"
+   ppr (PUSH_UBX lit nw)     = text "PUSH_UBX" <+> parens (ppr nw) <+> ppr lit
+   ppr PUSH_APPLY_N          = text "PUSH_APPLY_N"
+   ppr PUSH_APPLY_V          = text "PUSH_APPLY_V"
+   ppr PUSH_APPLY_F          = text "PUSH_APPLY_F"
+   ppr PUSH_APPLY_D          = text "PUSH_APPLY_D"
+   ppr PUSH_APPLY_L          = text "PUSH_APPLY_L"
+   ppr PUSH_APPLY_P          = text "PUSH_APPLY_P"
+   ppr PUSH_APPLY_PP         = text "PUSH_APPLY_PP"
+   ppr PUSH_APPLY_PPP        = text "PUSH_APPLY_PPP"
+   ppr PUSH_APPLY_PPPP       = text "PUSH_APPLY_PPPP"
+   ppr PUSH_APPLY_PPPPP      = text "PUSH_APPLY_PPPPP"
+   ppr PUSH_APPLY_PPPPPP     = text "PUSH_APPLY_PPPPPP"
 
    ppr (SLIDE n d)           = text "SLIDE   " <+> ppr n <+> ppr d
    ppr (ALLOC_AP sz)         = text "ALLOC_AP   " <+> ppr sz

@@ -106,13 +106,13 @@ data Literal
                 (Maybe Int)
         FunctionOrData
                 -- ^ A label literal. Parameters:
-                        --
-                        -- 1) The name of the symbol mentioned in the declaration
-                        --
-                        -- 2) The size (in bytes) of the arguments
-                                --    the label expects. Only applicable with
-                                --    @stdcall@ labels. @Just x@ => @\<x\>@ will
-                                --    be appended to label name when emitting assembly.
+                --
+                -- 1) The name of the symbol mentioned in the declaration
+                --
+                -- 2) The size (in bytes) of the arguments
+                --    the label expects. Only applicable with
+                --    @stdcall@ labels. @Just x@ => @\<x\>@ will
+                --    be appended to label name when emitting assembly.
 
   | LitInteger Integer Type --  ^ Integer literals
                             -- See Note [Integer literals]

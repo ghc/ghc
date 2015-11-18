@@ -3,9 +3,13 @@
 test('ghci001', combined_output, ghci_script, ['ghci001.script'])
 test('ghci002', combined_output, ghci_script, ['ghci002.script'])
 test('ghci003', combined_output, ghci_script, ['ghci003.script'])
-test('ghci004', combined_output, ghci_script, ['ghci004.script'])
+test('ghci004', [ combined_output,
+                  unless(opsys('mingw32'),extra_ways(['ghci-ext'])) ],
+                ghci_script, ['ghci004.script'])
 test('ghci005', combined_output, ghci_script, ['ghci005.script'])
-test('ghci006', combined_output, ghci_script, ['ghci006.script'])
+test('ghci006', [ combined_output,
+                  unless(opsys('mingw32'),extra_ways(['ghci-ext'])) ],
+                ghci_script, ['ghci006.script'])
 test('ghci007', combined_output, ghci_script, ['ghci007.script'])
 test('ghci008', combined_output, ghci_script, ['ghci008.script'])
 test('ghci009', combined_output, ghci_script, ['ghci009.script'])
@@ -84,7 +88,7 @@ test('ghci056',
      ],
      ghci_script, ['ghci056.script'])
 
-test('ghci057', normal, ghci_script_without_flag('-fno-warn-tabs'), ['ghci057.script'])
+test('ghci057', extra_hc_opts('-fwarn-tabs'), ghci_script, ['ghci057.script'])
 
 test('T2452', normal, ghci_script, ['T2452.script'])
 test('T2766', normal, ghci_script, ['T2766.script'])
@@ -192,7 +196,7 @@ test('T9181', normal, ghci_script, ['T9181.script'])
 test('T9086b', normal, ghci_script, ['T9086b.script'])
 test('T9140', combined_output, ghci_script, ['T9140.script'])
 test('T9658', normal, ghci_script, ['T9658.script'])
-test('T9293', normal, ghci_script_without_flag('-fno-warn-tabs'), ['T9293.script'])
+test('T9293', extra_hc_opts('-fwarn-tabs'), ghci_script, ['T9293.script'])
 test('T9762',
  [ unless(have_dynamic(),skip)
  , pre_cmd('$MAKE -s --no-print-directory T9762_prep')

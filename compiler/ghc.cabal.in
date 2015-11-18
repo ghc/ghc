@@ -64,6 +64,9 @@ Library
     else
         Build-Depends: unix
 
+    if flag(ghci)
+        Build-Depends: ghci
+
     GHC-Options: -Wall -fno-warn-name-shadowing
 
     if flag(ghci)
@@ -467,7 +470,6 @@ Library
         Pair
         Panic
         Pretty
-        Serialized
         State
         Stream
         StringBuffer
@@ -578,6 +580,7 @@ Library
     if flag(ghci)
         Exposed-Modules:
             Convert
+            ByteCodeTypes
             ByteCodeAsm
             ByteCodeGen
             ByteCodeInstr
@@ -586,6 +589,6 @@ Library
             Debugger
             LibFFI
             Linker
-            ObjLink
             RtClosureInspect
             DebuggerUtils
+            GHCi

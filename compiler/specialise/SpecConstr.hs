@@ -47,7 +47,7 @@ import DynFlags         ( DynFlags(..) )
 import StaticFlags      ( opt_PprStyle_Debug )
 import Maybes           ( orElse, catMaybes, isJust, isNothing )
 import Demand
-import Serialized       ( deserializeWithData )
+import GHC.Serialized   ( deserializeWithData )
 import Util
 import Pair
 import UniqSupply

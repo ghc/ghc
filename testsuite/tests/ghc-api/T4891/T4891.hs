@@ -35,17 +35,16 @@ doit = do
   dflags' <- getSessionDynFlags
   primPackages <- setSessionDynFlags dflags'
   dflags <- getSessionDynFlags
-  defaultCleanupHandler dflags $ do
-    target <- guessTarget "X.hs" Nothing
-    setTargets [target]
-    load LoadAllTargets
+  target <- guessTarget "X.hs" Nothing
+  setTargets [target]
+  load LoadAllTargets
 
-    () <- chaseConstructor (unsafeCoerce False)
-    () <- chaseConstructor (unsafeCoerce [1,2,3])
-    () <- chaseConstructor (unsafeCoerce (3 :-> 2))
-    () <- chaseConstructor (unsafeCoerce (4 :->. 4))
-    () <- chaseConstructor (unsafeCoerce (4 :->.+ 4))
-    return ()
+  () <- chaseConstructor (unsafeCoerce False)
+  () <- chaseConstructor (unsafeCoerce [1,2,3])
+  () <- chaseConstructor (unsafeCoerce (3 :-> 2))
+  () <- chaseConstructor (unsafeCoerce (4 :->. 4))
+  () <- chaseConstructor (unsafeCoerce (4 :->.+ 4))
+  return ()
 
 chaseConstructor :: (GhcMonad m) => HValue -> m ()
 chaseConstructor !hv = do

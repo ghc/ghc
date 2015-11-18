@@ -29,7 +29,8 @@ config.other_ways         = ['prof',
                              'threaded1_ls', 'threaded2_hT',
                              'llvm', 'debugllvm',
                              'profllvm', 'profoptllvm', 'profthreadedllvm',
-                             'debug']
+                             'debug',
+                             'ghci-ext']
 
 if (ghc_with_native_codegen == 1):
     config.compile_ways.append('optasm')
@@ -110,6 +111,7 @@ config.way_flags = lambda name : {
     'profllvm'         : ['-prof', '-static', '-auto-all', '-fllvm'],
     'profoptllvm'      : ['-O', '-prof', '-static', '-auto-all', '-fllvm'],
     'profthreadedllvm' : ['-O', '-prof', '-static', '-auto-all', '-threaded', '-fllvm'],
+    'ghci-ext'         : ['--interactive', '-v0', '-ignore-dot-ghci', '-fexternal-interpreter', '+RTS', '-I0.1', '-RTS'],
    }
 
 config.way_rts_flags = { 
@@ -140,6 +142,7 @@ config.way_rts_flags = {
     'profllvm'         : ['-p'],
     'profoptllvm'      : ['-hc', '-p'],
     'profthreadedllvm' : ['-p'],
+    'ghci-ext'         : [],
    }
 
 # Useful classes of ways that can be used with only_ways() and

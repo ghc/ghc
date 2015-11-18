@@ -32,6 +32,18 @@ _exception :: SomeException = SomeException
 *** Exception: foo
 CallStack (from ImplicitParams):
   error, called at ../Test7.hs:2:18 in main:Main
+Stopped at <exception thrown>
+_exception :: e = SomeException
+                    (ErrorCallWithLocation
+                       "foo"
+                       "CallStack (from ImplicitParams):
+  error, called at ../Test7.hs:2:18 in main:Main")
+Stopped at <exception thrown>
+_exception :: e = SomeException
+                    (ErrorCallWithLocation
+                       "foo"
+                       "CallStack (from ImplicitParams):
+  error, called at ../Test7.hs:2:18 in main:Main")
 *** Exception: foo
 CallStack (from ImplicitParams):
   error, called at ../Test7.hs:2:18 in main:Main

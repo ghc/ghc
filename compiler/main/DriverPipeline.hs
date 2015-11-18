@@ -237,7 +237,7 @@ compileOne' m_tc_result mHscMessage
        needsLinker = needsTH || needsQQ
        isDynWay    = any (== WayDyn) (ways dflags0)
        isProfWay   = any (== WayProf) (ways dflags0)
-
+       internalInterpreter = not (gopt Opt_ExternalInterpreter dflags0)
 
        src_flavour = ms_hsc_src summary
        mod_name = ms_mod_name summary
@@ -245,9 +245,10 @@ compileOne' m_tc_result mHscMessage
        object_filename = ml_obj_file location
 
        -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
-       -- the linker can correctly load the object files.
-
-       dflags1 = if needsLinker && dynamicGhc && not isDynWay && not isProfWay
+       -- the linker can correctly load the object files.  This isn't necessary
+       -- when using -fexternal-interpreter.
+       dflags1 = if needsLinker && dynamicGhc && internalInterpreter &&
+                    not isDynWay && not isProfWay
                   then gopt_set dflags0 Opt_BuildDynamicToo
                   else dflags0
 

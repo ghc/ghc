@@ -72,8 +72,8 @@ module DynFlags (
         versionedAppDir,
         extraGccViaCFlags, systemPackageConfig,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_s, pgm_a, pgm_l, pgm_dll, pgm_T,
-        pgm_windres, pgm_libtool, pgm_lo, pgm_lc,
-        opt_L, opt_P, opt_F, opt_c, opt_a, opt_l,
+        pgm_windres, pgm_libtool, pgm_lo, pgm_lc, pgm_i,
+        opt_L, opt_P, opt_F, opt_c, opt_a, opt_l, opt_i,
         opt_windres, opt_lo, opt_lc,
 
 
@@ -428,6 +428,7 @@ data GeneralFlag
    | Opt_RelativeDynlibPaths
    | Opt_Hpc
    | Opt_FlatCache
+   | Opt_ExternalInterpreter
 
    -- PreInlining is on by default. The option is there just to see how
    -- bad things get if you turn it off!
@@ -884,6 +885,7 @@ data Settings = Settings {
   sPgm_libtool           :: String,
   sPgm_lo                :: (String,[Option]), -- LLVM: opt llvm optimiser
   sPgm_lc                :: (String,[Option]), -- LLVM: llc static compiler
+  sPgm_i                 :: String,
   -- options for particular phases
   sOpt_L                 :: [String],
   sOpt_P                 :: [String],
@@ -894,6 +896,7 @@ data Settings = Settings {
   sOpt_windres           :: [String],
   sOpt_lo                :: [String], -- LLVM: llvm optimiser
   sOpt_lc                :: [String], -- LLVM: llc static compiler
+  sOpt_i                 :: [String], -- iserv options
 
   sPlatformConstants     :: PlatformConstants
  }
@@ -944,6 +947,8 @@ pgm_lo                :: DynFlags -> (String,[Option])
 pgm_lo dflags = sPgm_lo (settings dflags)
 pgm_lc                :: DynFlags -> (String,[Option])
 pgm_lc dflags = sPgm_lc (settings dflags)
+pgm_i                 :: DynFlags -> String
+pgm_i dflags = sPgm_i (settings dflags)
 opt_L                 :: DynFlags -> [String]
 opt_L dflags = sOpt_L (settings dflags)
 opt_P                 :: DynFlags -> [String]
@@ -965,6 +970,8 @@ opt_lo                :: DynFlags -> [String]
 opt_lo dflags = sOpt_lo (settings dflags)
 opt_lc                :: DynFlags -> [String]
 opt_lc dflags = sOpt_lc (settings dflags)
+opt_i                 :: DynFlags -> [String]
+opt_i dflags = sOpt_i (settings dflags)
 
 -- | The directory for this version of ghc in the user's app directory
 -- (typically something like @~/.ghc/x86_64-linux-7.6.3@)
@@ -2188,6 +2195,8 @@ dynamic_flags = [
       (hasArg (\f -> alterSettings (\s -> s { sPgm_lo  = (f,[])})))
   , defFlag "pgmlc"
       (hasArg (\f -> alterSettings (\s -> s { sPgm_lc  = (f,[])})))
+  , defFlag "pgmi"
+      (hasArg (\f -> alterSettings (\s -> s { sPgm_i  =  f})))
   , defFlag "pgmL"
       (hasArg (\f -> alterSettings (\s -> s { sPgm_L   = f})))
   , defFlag "pgmP"
@@ -2214,6 +2223,8 @@ dynamic_flags = [
       (hasArg (\f -> alterSettings (\s -> s { sOpt_lo  = f : sOpt_lo s})))
   , defFlag "optlc"
       (hasArg (\f -> alterSettings (\s -> s { sOpt_lc  = f : sOpt_lc s})))
+  , defFlag "opti"
+      (hasArg (\f -> alterSettings (\s -> s { sOpt_i   = f : sOpt_i s})))
   , defFlag "optL"
       (hasArg (\f -> alterSettings (\s -> s { sOpt_L   = f : sOpt_L s})))
   , defFlag "optP"
@@ -2904,6 +2915,7 @@ fFlags = [
   flagSpec "error-spans"                      Opt_ErrorSpans,
   flagSpec "excess-precision"                 Opt_ExcessPrecision,
   flagSpec "expose-all-unfoldings"            Opt_ExposeAllUnfoldings,
+  flagSpec "external-interpreter"             Opt_ExternalInterpreter,
   flagSpec "flat-cache"                       Opt_FlatCache,
   flagSpec "float-in"                         Opt_FloatIn,
   flagSpec "force-recomp"                     Opt_ForceRecomp,
@@ -4158,6 +4170,33 @@ tARGET_MAX_WORD dflags
       8 -> toInteger (maxBound :: Word64)
       w -> panic ("tARGET_MAX_WORD: Unknown platformWordSize: " ++ show w)
 
+
+{- -----------------------------------------------------------------------------
+Note [DynFlags consistency]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are a number of number of DynFlags configurations which either
+do not make sense or lead to unimplemented or buggy codepaths in the
+compiler. makeDynFlagsConsistent is responsible for verifying the validity
+of a set of DynFlags, fixing any issues, and reporting them back to the
+caller.
+
+GHCi and -O
+---------------
+
+When using optimization, the compiler can introduce several things
+(such as unboxed tuples) into the intermediate code, which GHCi later
+chokes on since the bytecode interpreter can't handle this (and while
+this is arguably a bug these aren't handled, there are no plans to fix
+it.)
+
+While the driver pipeline always checks for this particular erroneous
+combination when parsing flags, we also need to check when we update
+the flags; this is because API clients may parse flags but update the
+DynFlags afterwords, before finally running code inside a session (see
+T10052 and #10052).
+-}
+
 -- | Resolve any internal inconsistencies in a set of 'DynFlags'.
 -- Returns the consistent 'DynFlags' as well as a list of warnings
 -- to report to the user.
@@ -4170,6 +4209,13 @@ makeDynFlagsConsistent dflags
  | os == OSMinGW32 && gopt Opt_BuildDynamicToo dflags
     = let dflags' = gopt_unset dflags Opt_BuildDynamicToo
           warn    = "-dynamic-too is not supported on Windows"
+      in loop dflags' warn
+ -- Disalbe -fexternal-interpreter on Windows.  This is a temporary measure;
+ -- all that is missing is the implementation of the interprocess communication
+ -- which uses pipes on POSIX systems. (#11100)
+ | os == OSMinGW32 && gopt Opt_ExternalInterpreter dflags
+    = let dflags' = gopt_unset dflags Opt_ExternalInterpreter
+          warn    = "-fexternal-interpreter is currently not supported on Windows"
       in loop dflags' warn
  | hscTarget dflags == HscC &&
    not (platformUnregisterised (targetPlatform dflags))
@@ -4211,6 +4257,7 @@ makeDynFlagsConsistent dflags
     = loop (updOptLevel 0 dflags) err
 
  | LinkInMemory <- ghcLink dflags
+ , not (gopt Opt_ExternalInterpreter dflags)
  , rtsIsProfiled
  , isObjectTarget (hscTarget dflags)
  , WayProf `notElem` ways dflags
@@ -4226,32 +4273,6 @@ makeDynFlagsConsistent dflags
           arch = platformArch platform
           os   = platformOS   platform
 
-{-
-Note [DynFlags consistency]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-There are a number of number of DynFlags configurations which either
-do not make sense or lead to unimplemented or buggy codepaths in the
-compiler. makeDynFlagsConsistent is responsible for verifying the validity
-of a set of DynFlags, fixing any issues, and reporting them back to the
-caller.
-
-GHCi and -O
----------------
-
-When using optimization, the compiler can introduce several things
-(such as unboxed tuples) into the intermediate code, which GHCi later
-chokes on since the bytecode interpreter can't handle this (and while
-this is arguably a bug these aren't handled, there are no plans to fix
-it.)
-
-While the driver pipeline always checks for this particular erroneous
-combination when parsing flags, we also need to check when we update
-the flags; this is because API clients may parse flags but update the
-DynFlags afterwords, before finally running code inside a session (see
-T10052 and #10052).
-
--}
 
 --------------------------------------------------------------------------
 -- Do not use unsafeGlobalDynFlags!

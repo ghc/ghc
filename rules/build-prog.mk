@@ -48,7 +48,6 @@ endef
 
 
 
-
 define build-prog-vars
 # $1 = dir
 # $2 = distdir
@@ -92,16 +91,25 @@ else
 ifneq "$$($$($1_$2_PROGNAME)_INPLACE)" ""
 $$(error $$($1_$2_PROGNAME)_INPLACE defined twice)
 endif
+#
+# Where do we install the wrapper and the binary?
+#   $$($1_$2_PROGNAME)_INPLACE  The thing we run (script or binary)
+#   $1_$2_INPLACE               The binary
+#
 ifeq "$$($1_$2_TOPDIR)" "YES"
-$$($1_$2_PROGNAME)_INPLACE = $$(INPLACE_TOPDIR)/$$($1_$2_PROG)
+$$($1_$2_PROGNAME)_INPLACE = $$(INPLACE_LIB)/bin/$$($1_$2_PROG)
+ifeq "$$($1_$2_WANT_INPLACE_WRAPPER)" "YES"
+$1_$2_INPLACE = $$(INPLACE_LIB)/bin/$$($1_$2_PROG).bin
+else
+$1_$2_INPLACE = $$(INPLACE_LIB)/bin/$$($1_$2_PROG)
+endif
 else
 $$($1_$2_PROGNAME)_INPLACE = $$(INPLACE_BIN)/$$($1_$2_PROG)
-endif
-# Where do we install the inplace version?
 ifeq "$$($1_$2_WANT_INPLACE_WRAPPER)" "YES"
 $1_$2_INPLACE = $$(INPLACE_LIB)/bin/$$($1_$2_PROG)
 else
 $1_$2_INPLACE = $$($$($1_$2_PROGNAME)_INPLACE)
+endif
 endif
 endif
 
@@ -297,7 +305,7 @@ endif
 ifeq "$$($1_$2_WANT_INSTALLED_WRAPPER)" "YES"
 INSTALL_LIBEXECS += $1/$2/build/tmp/$$($1_$2_PROG)
 else ifeq "$$($1_$2_TOPDIR)" "YES"
-INSTALL_TOPDIR_BINS += $1/$2/build/tmp/$$($1_$2_PROG)
+INSTALL_LIBEXECS += $1/$2/build/tmp/$$($1_$2_PROG)
 else
 INSTALL_BINS     += $1/$2/build/tmp/$$($1_$2_PROG)
 endif

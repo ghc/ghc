@@ -20,10 +20,10 @@ module Panic (
      panic, sorry, assertPanic, trace,
      panicDoc, sorryDoc, pgmErrorDoc,
 
-     Exception.Exception(..), showException, safeShowException, try, tryMost, throwTo,
+     Exception.Exception(..), showException, safeShowException,
+     try, tryMost, throwTo,
 
      installSignalHandlers,
-     pushInterruptTargetThread, popInterruptTargetThread
 ) where
 #include "HsVersions.h"
 
@@ -47,7 +47,7 @@ import GHC.ConsoleHandler
 #endif
 
 import GHC.Stack
-import System.Mem.Weak  ( Weak, deRefWeak )
+import System.Mem.Weak  ( deRefWeak )
 
 -- | GHC's own exception type
 --   error messages all take the form:
@@ -220,18 +220,15 @@ tryMost action = do r <- try action
 installSignalHandlers :: IO ()
 installSignalHandlers = do
   main_thread <- myThreadId
-  pushInterruptTargetThread main_thread
+  wtid <- mkWeakThreadId main_thread
 
   let
-      interrupt_exn = (toException UserInterrupt)
-
       interrupt = do
-        mt <- peekInterruptTargetThread
-        case mt of
+        r <- deRefWeak wtid
+        case r of
           Nothing -> return ()
-          Just t  -> throwTo t interrupt_exn
+          Just t  -> throwTo t UserInterrupt
 
-  --
 #if !defined(mingw32_HOST_OS)
   _ <- installHandler sigQUIT  (Catch interrupt) Nothing
   _ <- installHandler sigINT   (Catch interrupt) Nothing
@@ -254,29 +251,3 @@ installSignalHandlers = do
   _ <- installHandler (Catch sig_handler)
   return ()
 #endif
-
-{-# NOINLINE interruptTargetThread #-}
-interruptTargetThread :: MVar [Weak ThreadId]
-interruptTargetThread = unsafePerformIO (newMVar [])
-
-pushInterruptTargetThread :: ThreadId -> IO ()
-pushInterruptTargetThread tid = do
- wtid <- mkWeakThreadId tid
- modifyMVar_ interruptTargetThread $ return . (wtid :)
-
-peekInterruptTargetThread :: IO (Maybe ThreadId)
-peekInterruptTargetThread =
-  withMVar interruptTargetThread $ loop
- where
-   loop [] = return Nothing
-   loop (t:ts) = do
-     r <- deRefWeak t
-     case r of
-       Nothing -> loop ts
-       Just t  -> return (Just t)
-
-popInterruptTargetThread :: IO ()
-popInterruptTargetThread =
-  modifyMVar_ interruptTargetThread $
-   \tids -> return $! case tids of []     -> []
-                                   (_:ts) -> ts

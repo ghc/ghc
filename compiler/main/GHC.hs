@@ -127,6 +127,8 @@ module GHC (
         -- ** Compiling expressions
         HValue, parseExpr, compileParsedExpr,
         InteractiveEval.compileExpr, dynCompileExpr,
+        ForeignHValue,
+        compileExprRemote, compileParsedExprRemote,
 
         -- ** Other
         runTcInteractive,   -- Desired by some clients (Trac #8878)
@@ -134,7 +136,7 @@ module GHC (
 
         -- ** The debugger
         SingleStep(..),
-        Resume(resumeStmt, resumeThreadId, resumeBreakInfo, resumeSpan,
+        Resume(resumeStmt, resumeBreakInfo, resumeSpan,
                resumeHistory, resumeHistoryIx),
         History(historyBreakInfo, historyEnclosingDecls),
         GHC.getHistorySpan, getHistoryModule,
@@ -287,10 +289,12 @@ module GHC (
 #include "HsVersions.h"
 
 #ifdef GHCI
-import ByteCodeInstr
+import ByteCodeTypes
 import BreakArray
 import InteractiveEval
 import TcRnDriver       ( runTcInteractive )
+import GHCi
+import GHCi.RemoteTypes
 #endif
 
 import PprTyThing       ( pprFamInst )
@@ -405,22 +409,12 @@ defaultErrorHandler fm (FlushOut flushOut) inner =
             ) $
   inner
 
--- | Install a default cleanup handler to remove temporary files deposited by
--- a GHC run.  This is separate from 'defaultErrorHandler', because you might
--- want to override the error handling, but still get the ordinary cleanup
--- behaviour.
-defaultCleanupHandler :: (ExceptionMonad m) =>
-                         DynFlags -> m a -> m a
-defaultCleanupHandler dflags inner =
-    -- make sure we clean up after ourselves
-    inner `gfinally`
-          (liftIO $ do
-              cleanTempFiles dflags
-              cleanTempDirs dflags
-          )
-          --  exceptions will be blocked while we clean the temporary files,
-          -- so there shouldn't be any difficulty if we receive further
-          -- signals.
+-- | This function is no longer necessary, cleanup is now done by
+-- runGhc/runGhcT.
+{-# DEPRECATED defaultCleanupHandler "Cleanup is now done by runGhc/runGhcT" #-}
+defaultCleanupHandler :: (ExceptionMonad m) => DynFlags -> m a -> m a
+defaultCleanupHandler _ m = m
+ where _warning_suppression = m `gonException` undefined
 
 
 -- %************************************************************************
@@ -446,7 +440,8 @@ runGhc mb_top_dir ghc = do
   let session = Session ref
   flip unGhc session $ do
     initGhcMonad mb_top_dir
-    ghc
+    withCleanupSession ghc
+
   -- XXX: unregister interrupt handlers here?
 
 -- | Run function for 'GhcT' monad transformer.
@@ -469,7 +464,23 @@ runGhcT mb_top_dir ghct = do
   let session = Session ref
   flip unGhcT session $ do
     initGhcMonad mb_top_dir
-    ghct
+    withCleanupSession ghct
+
+withCleanupSession :: GhcMonad m => m a -> m a
+withCleanupSession ghc = ghc `gfinally` cleanup
+  where
+   cleanup = do
+      hsc_env <- getSession
+      let dflags = hsc_dflags hsc_env
+      liftIO $ do
+          cleanTempFiles dflags
+          cleanTempDirs dflags
+#ifdef GHCI
+          stopIServ hsc_env -- shut down the IServ
+#endif
+          --  exceptions will be blocked while we clean the temporary files,
+          -- so there shouldn't be any difficulty if we receive further
+          -- signals.
 
 -- | Initialise a GHC session.
 --

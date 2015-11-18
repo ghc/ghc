@@ -457,6 +457,7 @@ PACKAGES_STAGE1 += terminfo
 endif
 endif
 PACKAGES_STAGE1 += haskeline
+PACKAGES_STAGE1 += ghci
 
 # See Note [No stage2 packages when CrossCompiling or Stage1Only].
 # See Note [Stage1Only vs stage=1] in mk/config.mk.in.
@@ -522,6 +523,9 @@ utils/ghc-pkg/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/hsc2hs/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/compare_sizes/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/runghc/dist-install/package-data.mk: $(fixed_pkg_prev)
+iserv/stage2/package-data.mk: $(fixed_pkg_prev)
+iserv/stage2_p/package-data.mk: $(fixed_pkg_prev)
+iserv/stage2_dyn/package-data.mk: $(fixed_pkg_prev)
 
 # the GHC package doesn't live in libraries/, so we add its dependency manually:
 compiler/stage2/package-data.mk: $(fixed_pkg_prev)
@@ -665,6 +669,9 @@ BUILD_DIRS += utils/mkUserGuidePart
 BUILD_DIRS += docs/users_guide
 BUILD_DIRS += utils/count_lines
 BUILD_DIRS += utils/compare_sizes
+ifeq "$(Windows_Host)" "NO"
+BUILD_DIRS += iserv
+endif
 
 # ----------------------------------------------
 # Actually include the sub-ghc.mk's
@@ -892,7 +899,9 @@ ifneq "$(INSTALL_LIBEXECS)" ""
 	done
 # We rename ghc-stage2, so that the right program name is used in error
 # messages etc.
+ifeq "$(Windows_Host)" "NO"
 	"$(MV)" "$(DESTDIR)$(ghclibexecdir)/bin/ghc-stage$(INSTALL_GHC_STAGE)" "$(DESTDIR)$(ghclibexecdir)/bin/ghc"
+endif
 endif
 
 install_topdirs: $(INSTALL_TOPDIR_BINS) $(INSTALL_TOPDIR_SCRIPTS)
@@ -1054,7 +1063,7 @@ BIN_DIST_MK = $(BIN_DIST_PREP_DIR)/bindist.mk
 unix-binary-dist-prep:
 	$(call removeTrees,bindistprep/)
 	"$(MKDIRHIER)" $(BIN_DIST_PREP_DIR)
-	set -e; for i in packages LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh settings.in ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
+	set -e; for i in packages LICENSE compiler ghc iserv rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh settings.in ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
 	echo "HADDOCK_DOCS       = $(HADDOCK_DOCS)"       >> $(BIN_DIST_MK)
 	echo "BUILD_SPHINX_HTML  = $(BUILD_SPHINX_HTML)"  >> $(BIN_DIST_MK)
 	echo "BUILD_SPHINX_PDF   = $(BUILD_SPHINX_PDF)"   >> $(BIN_DIST_MK)
@@ -1507,4 +1516,3 @@ phase_0_builds: $(utils/deriveConstants_dist_depfile_c_asm)
 
 .PHONY: phase_1_builds
 phase_1_builds: $(PACKAGE_DATA_MKS)
-

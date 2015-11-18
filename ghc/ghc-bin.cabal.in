@@ -44,7 +44,8 @@ Executable ghc
 
     GHC-Options: -Wall
     if flag(ghci)
-        Build-depends: deepseq >= 1.4 && < 1.5
+        Build-depends: deepseq >= 1.4 && < 1.5,
+                       ghci
         CPP-Options: -DGHCI
         GHC-Options: -fno-warn-name-shadowing
         Other-Modules:

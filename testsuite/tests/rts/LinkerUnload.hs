@@ -16,5 +16,5 @@ loadPackages = do
     let dflags' = dflags { hscTarget = HscNothing
                          , ghcLink  = LinkInMemory }
     pkgs <- setSessionDynFlags dflags'
-    dflags <- getSessionDynFlags
-    liftIO $ Linker.linkPackages dflags pkgs
+    hsc_env <- getSession
+    liftIO $ Linker.linkPackages hsc_env pkgs

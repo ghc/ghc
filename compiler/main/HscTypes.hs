@@ -14,6 +14,9 @@ module HscTypes (
         Target(..), TargetId(..), pprTarget, pprTargetId,
         ModuleGraph, emptyMG,
         HscStatus(..),
+#ifdef GHCI
+        IServ(..),
+#endif
 
         -- * Hsc monad
         Hsc(..), runHsc, runInteractiveHsc,
@@ -130,8 +133,10 @@ module HscTypes (
 #include "HsVersions.h"
 
 #ifdef GHCI
-import ByteCodeAsm      ( CompiledByteCode )
+import ByteCodeTypes        ( CompiledByteCode )
 import InteractiveEvalTypes ( Resume )
+import GHCi.Message         ( Pipe )
+import GHCi.RemoteTypes     ( HValueRef )
 #endif
 
 import HsSyn
@@ -184,16 +189,19 @@ import Binary
 import ErrUtils
 import Platform
 import Util
-import Serialized       ( Serialized )
+import GHC.Serialized   ( Serialized )
 
 import Control.Monad    ( guard, liftM, when, ap )
+import Control.Concurrent
 import Data.Array       ( Array, array )
 import Data.IORef
 import Data.Time
 import Data.Word
 import Data.Typeable    ( Typeable )
 import Exception
+import Foreign
 import System.FilePath
+import System.Process   ( ProcessHandle )
 
 -- -----------------------------------------------------------------------------
 -- Compilation state
@@ -333,7 +341,7 @@ handleFlagWarnings dflags warns
 ************************************************************************
 -}
 
--- | Hscenv is like 'Session', except that some of the fields are immutable.
+-- | HscEnv is like 'Session', except that some of the fields are immutable.
 -- An HscEnv is used to compile a single module from plain Haskell source
 -- code (after preprocessing) to either C, assembly or C--.  Things like
 -- the module graph don't change during a single compilation.
@@ -394,11 +402,26 @@ data HscEnv
                 -- ^ Used for one-shot compilation only, to initialise
                 -- the 'IfGblEnv'. See 'TcRnTypes.tcg_type_env_var' for
                 -- 'TcRunTypes.TcGblEnv'
+
+#ifdef GHCI
+        , hsc_iserv :: MVar (Maybe IServ)
+                -- ^ interactive server process.  Created the first
+                -- time it is needed.
+#endif
  }
 
 instance ContainsDynFlags HscEnv where
     extractDynFlags env = hsc_dflags env
     replaceDynFlags env dflags = env {hsc_dflags = dflags}
+
+#ifdef GHCI
+data IServ = IServ
+  { iservPipe :: Pipe
+  , iservProcess :: ProcessHandle
+  , iservLookupSymbolCache :: IORef (UniqFM (Ptr ()))
+  , iservPendingFrees :: [HValueRef]
+  }
+#endif
 
 -- | Retrieve the ExternalPackageState cache.
 hscEPS :: HscEnv -> IO ExternalPackageState

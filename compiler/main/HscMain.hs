@@ -90,7 +90,7 @@ module HscMain
 
 #ifdef GHCI
 import Id
-import BasicTypes       ( HValue )
+import GHCi.RemoteTypes ( ForeignHValue )
 import ByteCodeGen      ( byteCodeGen, coreExprToBCOs )
 import Linker
 import CoreTidy         ( tidyExpr )
@@ -101,8 +101,6 @@ import VarEnv           ( emptyTidyEnv )
 import THNames          ( templateHaskellNames )
 import Panic
 import ConLike
-
-import GHC.Exts
 #endif
 
 import Module
@@ -162,6 +160,7 @@ import Stream (Stream)
 import Util
 
 import Data.List
+import Control.Concurrent
 import Control.Monad
 import Data.IORef
 import System.FilePath as FilePath
@@ -183,15 +182,20 @@ newHscEnv dflags = do
     us      <- mkSplitUniqSupply 'r'
     nc_var  <- newIORef (initNameCache us allKnownKeyNames)
     fc_var  <- newIORef emptyModuleEnv
-    return HscEnv {  hsc_dflags       = dflags,
-                     hsc_targets      = [],
-                     hsc_mod_graph    = [],
-                     hsc_IC           = emptyInteractiveContext dflags,
-                     hsc_HPT          = emptyHomePackageTable,
-                     hsc_EPS          = eps_var,
-                     hsc_NC           = nc_var,
-                     hsc_FC           = fc_var,
-                     hsc_type_env_var = Nothing }
+    iserv_mvar <- newMVar Nothing
+    return HscEnv {  hsc_dflags       = dflags
+                  ,  hsc_targets      = []
+                  ,  hsc_mod_graph    = []
+                  ,  hsc_IC           = emptyInteractiveContext dflags
+                  ,  hsc_HPT          = emptyHomePackageTable
+                  ,  hsc_EPS          = eps_var
+                  ,  hsc_NC           = nc_var
+                  ,  hsc_FC           = fc_var
+                  ,  hsc_type_env_var = Nothing
+#ifdef GHCI
+                  , hsc_iserv        = iserv_mvar
+#endif
+                  }
 
 
 allKnownKeyNames :: [Name]      -- Put here to avoid loops involving DsMeta,
@@ -1303,7 +1307,7 @@ hscInteractive hsc_env cgguts mod_summary = do
     prepd_binds <- {-# SCC "CorePrep" #-}
                    corePrepPgm hsc_env location core_binds data_tycons
     -----------------  Generate byte code ------------------
-    comp_bc <- byteCodeGen dflags this_mod prepd_binds data_tycons mod_breaks
+    comp_bc <- byteCodeGen hsc_env this_mod prepd_binds data_tycons mod_breaks
     ------------------ Create f-x-dynamic C-side stuff ---
     (_istub_h_exists, istub_c_exists)
         <- outputForeignStubs dflags this_mod location foreign_stubs
@@ -1434,7 +1438,7 @@ IO monad as explained in Note [Interactively-bound Ids in GHCi] in HscTypes
 --
 -- We return Nothing to indicate an empty statement (or comment only), not a
 -- parse error.
-hscStmt :: HscEnv -> String -> IO (Maybe ([Id], IO [HValue], FixityEnv))
+hscStmt :: HscEnv -> String -> IO (Maybe ([Id], ForeignHValue, FixityEnv))
 hscStmt hsc_env stmt = hscStmtWithLocation hsc_env stmt "<interactive>" 1
 
 -- | Compile a stmt all the way to an HValue, but don't run it
@@ -1445,7 +1449,9 @@ hscStmtWithLocation :: HscEnv
                     -> String -- ^ The statement
                     -> String -- ^ The source
                     -> Int    -- ^ Starting line
-                    -> IO (Maybe ([Id], IO [HValue], FixityEnv))
+                    -> IO ( Maybe ([Id]
+                          , ForeignHValue {- IO [HValue] -}
+                          , FixityEnv))
 hscStmtWithLocation hsc_env0 stmt source linenumber =
   runInteractiveHsc hsc_env0 $ do
     maybe_stmt <- hscParseStmtWithLocation source linenumber stmt
@@ -1458,7 +1464,9 @@ hscStmtWithLocation hsc_env0 stmt source linenumber =
 
 hscParsedStmt :: HscEnv
               -> GhciLStmt RdrName  -- ^ The parsed statement
-              -> IO (Maybe ([Id], IO [HValue], FixityEnv))
+              -> IO ( Maybe ([Id]
+                    , ForeignHValue {- IO [HValue] -}
+                    , FixityEnv))
 hscParsedStmt hsc_env stmt = runInteractiveHsc hsc_env $ do
   -- Rename and typecheck it
   (ids, tc_expr, fix_env) <- ioMsgMaybe $ tcRnStmt hsc_env stmt
@@ -1474,9 +1482,8 @@ hscParsedStmt hsc_env stmt = runInteractiveHsc hsc_env $ do
   -- Whereas the linker already knows to ignore 'interactive'
   let src_span = srcLocSpan interactiveSrcLoc
   hval <- liftIO $ hscCompileCoreExpr hsc_env src_span ds_expr
-  let hvals_io = unsafeCoerce# hval :: IO [HValue]
 
-  return $ Just (ids, hvals_io, fix_env)
+  return $ Just (ids, hval, fix_env)
 
 -- | Compile a decls
 hscDecls :: HscEnv
@@ -1518,8 +1525,7 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
     {- Tidy -}
     (tidy_cg, mod_details) <- liftIO $ tidyProgram hsc_env simpl_mg
 
-    let dflags = hsc_dflags hsc_env
-        !CgGuts{ cg_module    = this_mod,
+    let !CgGuts{ cg_module    = this_mod,
                  cg_binds     = core_binds,
                  cg_tycons    = tycons,
                  cg_modBreaks = mod_breaks } = tidy_cg
@@ -1536,7 +1542,7 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
       liftIO $ corePrepPgm hsc_env iNTERACTIVELoc core_binds data_tycons
 
     {- Generate byte code -}
-    cbc <- liftIO $ byteCodeGen dflags this_mod
+    cbc <- liftIO $ byteCodeGen hsc_env this_mod
                                 prepd_binds data_tycons mod_breaks
 
     let src_span = srcLocSpan interactiveSrcLoc
@@ -1715,11 +1721,11 @@ mkModGuts mod safe binds =
 %********************************************************************* -}
 
 #ifdef GHCI
-hscCompileCoreExpr :: HscEnv -> SrcSpan -> CoreExpr -> IO HValue
+hscCompileCoreExpr :: HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue
 hscCompileCoreExpr hsc_env =
   lookupHook hscCompileCoreExprHook hscCompileCoreExpr' (hsc_dflags hsc_env) hsc_env
 
-hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO HValue
+hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue
 hscCompileCoreExpr' hsc_env srcspan ds_expr
     = do { let dflags = hsc_dflags hsc_env
 
@@ -1736,7 +1742,8 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
          ; lintInteractiveExpr "hscCompileExpr" hsc_env prepd_expr
 
            {- Convert to BCOs -}
-         ; bcos <- coreExprToBCOs dflags (icInteractiveModule (hsc_IC hsc_env)) prepd_expr
+         ; bcos <- coreExprToBCOs hsc_env
+                     (icInteractiveModule (hsc_IC hsc_env)) prepd_expr
 
            {- link it -}
          ; hval <- linkExpr hsc_env srcspan bcos

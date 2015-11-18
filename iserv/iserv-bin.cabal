@@ -1,0 +1,26 @@
+Name: iserv-bin
+Version: 0.0
+Copyright: XXX
+License: BSD3
+-- XXX License-File: LICENSE
+Author: XXX
+Maintainer: XXX
+Synopsis: XXX
+Description:
+        XXX
+Category: Development
+build-type: Simple
+cabal-version: >=1.10
+
+Executable iserv
+    Default-Language: Haskell2010
+    Main-Is: Main.hs
+    C-Sources: iservmain.c
+    Build-Depends: array      >= 0.5 && < 0.6,
+                   base       >= 4   && < 5,
+                   unix       >= 2.7 && < 2.8,
+                   binary     >= 0.7 && < 0.9,
+                   bytestring >= 0.10 && < 0.11,
+                   containers >= 0.5 && < 0.6,
+                   deepseq    >= 1.4 && < 1.5,
+                   ghci

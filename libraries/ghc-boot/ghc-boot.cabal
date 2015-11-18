@@ -37,6 +37,7 @@ Library
             GHC.Lexeme
             GHC.PackageDb
             GHC.LanguageExtensions
+            GHC.Serialized
 
     build-depends: base       >= 4   && < 5,
                    binary     == 0.8.*,

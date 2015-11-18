@@ -1,27 +1,35 @@
-	Thu Apr  2 19:44 2015 Time and Allocation Profiling Report  (Final)
+	Tue Dec  8 08:29 2015 Time and Allocation Profiling Report  (Final)
 
-	   scc003 +RTS -p -RTS
+	   scc003 +RTS -hc -p -RTS
 
-	total time  =        0.13 secs   (132 ticks @ 1000 us, 1 processor)
-	total alloc = 195,487,784 bytes  (excludes profiling overheads)
+	total time  =        0.04 secs   (40 ticks @ 1000 us, 1 processor)
+	total alloc =      48,912 bytes  (excludes profiling overheads)
 
-COST CENTRE MODULE  %time %alloc
+COST CENTRE MODULE            %time %alloc
 
-fib         Main    100.0  100.0
+fib         Main              100.0    0.0
+MAIN        MAIN                0.0    1.8
+main        Main                0.0   19.6
+CAF         GHC.Conc.Signal     0.0    1.3
+CAF         GHC.IO.Encoding     0.0    5.9
+CAF         GHC.IO.Handle.FD    0.0   70.6
 
 
-                                                     individual      inherited
-COST CENTRE MODULE                no.     entries  %time %alloc   %time %alloc
+                                                      individual      inherited
+COST CENTRE  MODULE                no.     entries  %time %alloc   %time %alloc
 
-MAIN        MAIN                   99           0    0.0    0.0   100.0  100.0
- CAF        Main                  197           0    0.0    0.0   100.0  100.0
-  main      Main                  198           1    0.0    0.0   100.0  100.0
-   f        Main                  199           1    0.0    0.0   100.0  100.0
-    f.\     Main                  201           1    0.0    0.0    99.2   99.2
-     fib    Main                  202     2692537   99.2   99.2    99.2   99.2
-    fib     Main                  200       21891    0.8    0.8     0.8    0.8
- CAF        GHC.Conc.Signal       179           0    0.0    0.0     0.0    0.0
- CAF        GHC.IO.Encoding       163           0    0.0    0.0     0.0    0.0
- CAF        GHC.IO.Encoding.Iconv 161           0    0.0    0.0     0.0    0.0
- CAF        GHC.IO.Handle.FD      152           0    0.0    0.0     0.0    0.0
- CAF        GHC.IO.Handle.Text    150           0    0.0    0.0     0.0    0.0
+MAIN         MAIN                  105           0    0.0    1.8   100.0  100.0
+ main        Main                  211           0    0.0   18.9     0.0   18.9
+ CAF         GHC.IO.Handle.Text    140           0    0.0    0.2     0.0    0.2
+ CAF         GHC.IO.Handle.FD      138           0    0.0   70.6     0.0   70.6
+ CAF         GHC.IO.Encoding.Iconv 130           0    0.0    0.5     0.0    0.5
+ CAF         GHC.IO.Encoding       128           0    0.0    5.9     0.0    5.9
+ CAF         GHC.Conc.Signal       118           0    0.0    1.3     0.0    1.3
+ CAF         Main                  112           0    0.0    0.0   100.0    0.8
+  main       Main                  210           1    0.0    0.7   100.0    0.8
+   f         Main                  212           1    0.0    0.0   100.0    0.1
+    f.\      Main                  216           1    0.0    0.0   100.0    0.0
+     fib     Main                  217     2692537  100.0    0.0   100.0    0.0
+    f.x'     Main                  213           1    0.0    0.0     0.0    0.0
+     f.(...) Main                  214           1    0.0    0.0     0.0    0.0
+      fib    Main                  215       21891    0.0    0.0     0.0    0.0

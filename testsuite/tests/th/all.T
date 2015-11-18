@@ -51,6 +51,14 @@ test('TH_spliceE5_prof',
      run_command,
      ['$MAKE -s --no-print-directory TH_spliceE5_prof'])
 
+test('TH_spliceE5_prof_ext',
+     [req_profiling,
+      omit_ways(['ghci']),
+      extra_clean(['TH_spliceE5_prof_ext_Lib.hi',
+                   'TH_spliceE5_prof_ext_Lib.o'])],
+     run_command,
+     ['$MAKE -s --no-print-directory TH_spliceE5_prof_ext'])
+
 test('TH_spliceD1',
      extra_clean(['TH_spliceD1_Lib.hi', 'TH_spliceD1_Lib.o']),
      multimod_compile_fail,
@@ -370,3 +378,5 @@ test('T10819',
      multimod_compile,
      ['T10819.hs', '-v0 ' + config.ghc_th_way_flags])
 test('T10820', normal, compile_and_run, ['-v0'])
+
+test('TH_finalizer', normal, compile, ['-v0'])

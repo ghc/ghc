@@ -24,6 +24,7 @@ module DynamicLoading (
 
 #ifdef GHCI
 import Linker           ( linkModule, getHValue )
+import GHCi             ( wormhole )
 import SrcLoc           ( noSrcSpan )
 import Finder           ( findImportedModule, cannotFindModule )
 import TcRnMonad        ( initTcInteractive, initIfaceTcRn )
@@ -38,7 +39,7 @@ import Plugins          ( Plugin, FrontendPlugin, CommandLineOption )
 import PrelNames        ( pluginTyConName, frontendPluginTyConName )
 
 import HscTypes
-import BasicTypes       ( HValue )
+import GHCi.RemoteTypes ( HValue )
 import Type             ( Type, eqType, mkTyConTy, pprTyThingCategory )
 import TyCon            ( TyCon )
 import Name             ( Name, nameModule_maybe )
@@ -170,7 +171,7 @@ getHValueSafely hsc_env val_name expected_type = do
                                    return ()
                     Nothing ->  return ()
                 -- Find the value that we just linked in and cast it given that we have proved it's type
-                hval <- getHValue hsc_env val_name
+                hval <- getHValue hsc_env val_name >>= wormhole dflags
                 return (Just hval)
              else return Nothing
         Just val_thing -> throwCmdLineErrorS dflags $ wrongTyThingError val_name val_thing

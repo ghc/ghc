@@ -1161,7 +1161,12 @@ run_BCO:
             pap->fun = (StgClosure*)Sp[0];
 
             // The function should be a BCO
-            ASSERT(get_itbl(pap->fun)->type == BCO);
+            if (get_itbl(pap->fun)->type != BCO) {
+#ifdef DEBUG
+                printClosure(pap->fun);
+#endif
+                barf("bci_MKPAP");
+            }
 
             for (i = 0; i < n_payload; i++)
                 pap->payload[i] = (StgClosure*)Sp[i+1];

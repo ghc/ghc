@@ -1,0 +1,41 @@
+Name: ghci
+Version: 0.0
+Copyright: XXX
+License: BSD3
+-- XXX License-File: LICENSE
+Author: XXX
+Maintainer: XXX
+Synopsis: XXX
+Description:
+        XXX
+Category: Development
+build-type: Simple
+cabal-version: >=1.10
+
+Library
+    Default-Language: Haskell2010
+    Exposed-Modules: GHCi.Message,
+                     GHCi.ResolvedBCO,
+                     GHCi.RemoteTypes,
+                     GHCi.ObjLink,
+                     GHCi.CreateBCO,
+                     GHCi.FFI,
+                     GHCi.InfoTable,
+                     GHCi.Run,
+                     GHCi.Signals,
+                     GHCi.TH,
+                     GHCi.TH.Binary,
+                     SizedSeq
+    Build-Depends: base       >= 4   && < 5,
+                   binary     >= 0.7 && < 0.9,
+                   bytestring >= 0.10 && < 0.11,
+                   containers >= 0.5 && < 0.6,
+                   deepseq    >= 1.4 && < 1.5,
+                   filepath   >= 1.4 && < 1.5,
+                   ghc-boot,
+                   array      >= 0.5 && < 0.6,
+                   template-haskell >= 2.11 && < 2.12,
+                   transformers >= 0.4 && < 0.6
+
+    if !os(windows)
+       Build-Depends: unix >= 2.7 && < 2.8

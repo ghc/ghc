@@ -467,7 +467,7 @@ AC_DEFUN([FP_SETTINGS],
         SettingsPerlCommand='$topdir/../perl/perl.exe'
         SettingsDllWrapCommand="\$topdir/../${mingw_bin_prefix}dllwrap.exe"
         SettingsWindresCommand="\$topdir/../${mingw_bin_prefix}windres.exe"
-        SettingsTouchCommand='$topdir/touchy.exe'
+        SettingsTouchCommand='$topdir/bin/touchy.exe'
     else
         SettingsCCompilerCommand="$WhatGccIsCalled"
         SettingsHaskellCPPCommand="$HaskellCPPCmd"
