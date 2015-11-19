@@ -675,11 +675,13 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
          execute verbose gccProgram (gccFlags ++ ["-c", cFile, "-o", oFile])
          xs <- case os of
                  "openbsd" -> readProcess objdumpProgam ["--syms", oFile] ""
+                 "aix"     -> readProcess objdumpProgam ["--syms", oFile] ""
                  _         -> readProcess nmProgram ["-P", oFile] ""
 
          let ls = lines xs
-             ms = map parseNmLine ls
-             m = Map.fromList $ catMaybes ms
+             m = Map.fromList $ case os of
+                 "aix" -> parseAixObjdump ls
+                 _     -> catMaybes $ map parseNmLine ls
          rs <- mapM (lookupResult m) (wanteds os)
          return rs
     where headers = ["#define IN_STG_CODE 0",
@@ -763,6 +765,28 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
               where mkP r s = case (stripPrefix prefix r, readHex s) of
                         (Just name, [(size, "")]) -> Just (name, size)
                         _ -> Nothing
+
+          -- On AIX, `nm` isn't able to tell us the symbol size, so we
+          -- need to use `objdump --syms`. However, unlike on OpenBSD,
+          -- `objdump --syms` outputs entries spanning two lines, e.g.
+          --
+          -- [ 50](sec  3)(fl 0x00)(ty   0)(scl   2) (nx 1) 0x00000318 derivedConstantBLOCK_SIZE
+          -- AUX val  4097 prmhsh 0 snhsh 0 typ 3 algn 3 clss 5 stb 0 snstb 0
+          --
+          parseAixObjdump :: [String] -> [(String,Integer)]
+          parseAixObjdump = catMaybes . goAix
+            where
+              goAix (l1@('[':_):l2@('A':'U':'X':_):ls')
+                  = parseObjDumpEntry l1 l2 : goAix ls'
+              goAix (_:ls') = goAix ls'
+              goAix [] = []
+
+              parseObjDumpEntry l1 l2
+                  | ["val",n] <- take 2 (tail $ words l2)
+                  , Just sym <- stripPrefix prefix sym0 = Just (sym, read n)
+                  | otherwise = Nothing
+                where
+                  [sym0, adr] = take 2 (reverse $ words l1)
 
           -- If an Int value is larger than 2^28 or smaller
           -- than -2^28, then fail.
