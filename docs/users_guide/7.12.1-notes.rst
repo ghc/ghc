@@ -81,6 +81,36 @@ Language
 -  The ``-XDeriveAnyClass`` extension now fills in associated type family
    default instances when deriving a class that contains them.
 
+-  Users can now define record pattern synonyms. This allows pattern synonyms
+   to behave more like normal data constructors. For example, ::
+
+      pattern P :: a -> b -> (a, b)
+      pattern P{x,y} = (x,y)
+
+   will allow `P` to be used like a record data constructor and also defines
+   selector functions `x :: (a, b) -> a` and `y :: (a, b) -> b`.
+
+-  Pattern synonyms can now be bundled with type constructors. For a pattern
+   synonym `P` and a type constructor `T`, `P` can be bundled with `T` so that
+   when `T` is imported `P` is also imported. With this change
+   a library author can provide either real data constructors or pattern
+   synonyms in an opaque manner. See :ref:`pattern-synonyms` for details. ::
+
+      -- Foo.hs
+      module Foo ( T(P) ) where
+
+      data T = T
+
+      pattern P = T
+
+      -- Baz.hs
+      module Baz where
+
+      -- P is imported
+      import Foo (T(..))
+
+
+
 Compiler
 ~~~~~~~~
 

@@ -729,24 +729,97 @@ Which enables us to rewrite our functions in a much cleaner style:
       isIntEndo (Arrow Int Int) = True
       isIntEndo _               = False
 
-Note that in this example, the pattern synonyms ``Int`` and ``Arrow``
-can also be used as expressions (they are *bidirectional*). This is not
-necessarily the case: *unidirectional* pattern synonyms can also be
-declared with the following syntax:
+In general there are three kinds of pattern synonyms. Unidirectional,
+bidirectional and explicitly bidirectional. The examples given so far are
+examples of bidirectional pattern synonyms. A bidirectional synonym
+behaves the same as an ordinary data constructor. We can use it in a pattern
+context to deconstruct values and in an expression context to construct values.
+For example, we can construct the value `intEndo` using the pattern synonyms
+`Arrow` and `Int` as defined previously.
+
+::
+
+      intEndo :: Type
+      intEndo = Arrow Int Int
+
+This example is equivalent to the much more complicated construction if we had
+directly used the `Type` constructors.
+
+::
+
+      intEndo :: Type
+      intEndo = App "->" [App "Int" [], App "Int" []]
+
+
+Unidirectional synonyms can only be used in a pattern context and are
+defined as follows:
+
 
 ::
 
       pattern Head x <- x:xs
 
 In this case, ``Head`` ⟨x⟩ cannot be used in expressions, only patterns,
-since it wouldn't specify a value for the ⟨xs⟩ on the right-hand side.
-We can give an explicit inversion of a pattern synonym using the
-following syntax:
+since it wouldn't specify a value for the ⟨xs⟩ on the right-hand side. However,
+we can define an explicitly bidirectional pattern synonym by separately
+specifying how to construct and deconstruct a type. The syntax for
+doing this is as follows:
 
 ::
 
-      pattern Head x <- x:xs where
-        Head x = [x]
+      pattern HeadC x <- x:xs where
+        HeadC x = [x]
+
+We can then use ``HeadC`` in both expression and pattern contexts. In a pattern
+context it will match the head of any list with length at least one. In an
+expression context it will construct a singleton list.
+
+The table below summarises where each kind of pattern synonym can be used.
+
++---------------+----------------+---------------+---------------------------+
+| Context       | Unidirectional | Bidirectional | Explicitly Bidirectional  |
++===============+================+===============+===========================+
+| Pattern       | Yes            | Yes           | Yes                       |
++---------------+----------------+---------------+---------------------------+
+| Expression    | No             | Yes (Inferred)| Yes (Explicit)            |
++---------------+----------------+---------------+---------------------------+
+
+Record Pattern Synonyms
+~~~~~~~~~~~~~~~~~~~~~~~
+
+It is also possible to define pattern synonyms which behave just like record
+constructors. The syntax for doing this is as follows:
+
+::
+
+      pattern Point :: (Int, Int)
+      pattern Point{x, y} = (x, y)
+
+The idea is that we can then use ``Point`` just as if we had defined a new
+datatype ``MyPoint`` with two fields ``x`` and ``y``.
+
+::
+
+    data MyPoint = Point { x :: Int, y :: Int }
+
+Whilst a normal pattern synonym can be used in two ways, there are then seven
+ways in which to use ``Point``. Precisely the ways in which a normal record
+constructor can be used.
+
+=======================================   ==================================
+Usage                                     Example
+=======================================   ==================================
+As a constructor                          ``zero = Point 0 0``
+As a constructor with record syntax       ``zero = Point { x = 0, y = 0}``
+In a pattern context                      ``isZero (Point 0 0) = True``
+In a pattern context with record syntax   ``isZero (Point { x = 0, y = 0 }``
+In a pattern context with field puns      ``getX (Point {x}) = x``
+In a record update                        ``(0, 0) { x = 1 } == (1,0)``
+Using record selectors                    ``x (0,0) == 0``
+=======================================   ==================================
+
+For a unidirectional record pattern synonym we define record selectors but do
+not allow record updates or construction.
 
 The syntax and semantics of pattern synonyms are elaborated in the
 following subsections. See the :ghc-wiki:`Wiki page <PatternSynonyms>` for more
@@ -755,36 +828,48 @@ details.
 Syntax and scoping of pattern synonyms
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A pattern synonym declaration can be either unidirectional or
-bidirectional. The syntax for unidirectional pattern synonyms is:
+A pattern synonym declaration can be either unidirectional,
+bidirectional or explicitly bidirectional.
+The syntax for unidirectional pattern synonyms is:
 
 ::
 
-      pattern Name args <- pat
+      pattern pat_lhs <- pat
 
-and the syntax for bidirectional pattern synonyms is:
-
-::
-
-      pattern Name args = pat
-
-or
+the syntax for bidirectional pattern synonyms is:
 
 ::
 
-      pattern Name args <- pat where
-        Name args = expr
+      pattern pat_lhs = pat
 
-Either prefix or infix syntax can be used.
+and the syntax for explicitly bidirectional pattern synonyms is:
+
+::
+
+      pattern pat_lhs <- pat where
+        pat_lhs = expr
+
+We can define either prefix, infix or record pattern synonyms by modifying
+the form of `pat_lhs`. The syntax for these is as follows:
+
+======= ============================
+Prefix  ``Name args``
+------- ----------------------------
+Infix   ``arg1 `Name` arg2``
+        or ``arg1 op arg2``
+------- ----------------------------
+Record  ``Name{arg1,arg2,...,argn}``
+======= ============================
+
 
 Pattern synonym declarations can only occur in the top level of a
 module. In particular, they are not allowed as local definitions.
 
 The variables in the left-hand side of the definition are bound by the
-pattern on the right-hand side. For implicitly bidirectional pattern
+pattern on the right-hand side. For bidirectional pattern
 synonyms, all the variables of the right-hand side must also occur on
 the left-hand side; also, wildcard patterns and view patterns are not
-allowed. For unidirectional and explicitly-bidirectional pattern
+allowed. For unidirectional and explicitly bidirectional pattern
 synonyms, there is no restriction on the right-hand side pattern.
 
 Pattern synonyms cannot be defined recursively.
@@ -794,16 +879,23 @@ Pattern synonyms cannot be defined recursively.
 Import and export of pattern synonyms
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The name of the pattern synonym itself is in the same namespace as
-proper data constructors. In an export or import specification, you must
+The name of the pattern synonym is in the same namespace as proper data
+constructors. Like normal data constructors, pattern synonyms can be imported
+and exported through association with a type constructor or independently.
+
+To export them on their own, in an export or import specification, you must
 prefix pattern names with the ``pattern`` keyword, e.g.:
 
 ::
 
-      module Example (pattern Single) where
-      pattern Single x = [x]
+      module Example (pattern Zero) where
 
-Without the ``pattern`` prefix, ``Single`` would be interpreted as a
+      data MyNum = MkNum Int
+
+      pattern Zero :: MyNum
+      pattern Zero = MkNum 0
+
+Without the ``pattern`` prefix, ``Zero`` would be interpreted as a
 type constructor in the export list.
 
 You may also use the ``pattern`` keyword in an import/export
@@ -816,6 +908,37 @@ example:
 
 would bring into scope the data constructor ``Just`` from the ``Maybe``
 type, without also bringing the type constructor ``Maybe`` into scope.
+
+To bundle a pattern synonym with a type constructor, we list the pattern
+synonym in the export list of a module which exports the type constructor.
+For example, to bundle ``Zero`` with ``MyNum`` we could write the following:
+
+::
+
+      module Example ( MyNum(Zero) ) where
+
+If a module was then to import ``MyNum`` from ``Example``, it would also import
+the pattern synonym ``Zero``.
+
+It is also possible to use the special token ``..`` in an export list to mean
+all currently bundled constructors. For example, we could write:
+
+::
+
+      module Example ( MyNum(.., Zero) ) where
+
+in which case, ``Example`` would export the type constructor ``MyNum`` with
+the data constructor ``MkNum`` and also the pattern synonym ``Zero``.
+
+Bundled patterns synoyms are type checked to ensure that they are of the same
+type as the type constructor which they are bundled with. A pattern synonym
+`P` can not be bundled with a type constructor `T` if `P`'s type is visibly
+incompatible with `T`.
+
+A module which imports ``MyNum(..)`` from ``Example`` and then re-exports
+``MyNum(..)`` will also export any pattern synonyms bundled with ``MyNum`` in
+``Example``. A more complete specification can be found on the
+:ghc-wiki:`wiki. <PatternSynonyms/AssociatingSynonyms>`
 
 Typing of pattern synonyms
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -911,8 +1034,11 @@ Note also the following points
        data S a where
           S1 :: Bool -> S Bool
 
-       pattern P1 b = Just b  -- P1 ::                   Bool -> Maybe Bool
-       pattern P2 b = S1 b    -- P2 :: () => (b~Bool) => Bool -> S b
+       pattern P1 :: Bool -> Maybe Bool
+       pattern P1 b = Just b
+
+       pattern P2 :: () => (b ~ Bool) => Bool -> S b
+       pattern P2 b = S1 b
 
        f :: Maybe a -> String
        f (P1 x) = "no no no"     -- Type-incorrect
