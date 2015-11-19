@@ -15,7 +15,7 @@
 -- @since 4.5.0.0
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE UnboxedTuples, MagicHash, NoImplicitPrelude #-}
+{-# LANGUAGE MagicHash, NoImplicitPrelude #-}
 module GHC.Stack (
     -- * Call stacks
     currentCallStack,
