@@ -478,6 +478,12 @@ FP_ARG_WITH_PATH_GNU_PROG([NM], [nm], [nm])
 NmCmd="$NM"
 AC_SUBST([NmCmd])
 
+dnl ** Which objdump to use?
+dnl --------------------------------------------------------------
+FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([OBJDUMP], [objdump], [objdump])
+ObjdumpCmd="$OBJDUMP"
+AC_SUBST([ObjdumpCmd])
+
 dnl ** Which ar to use?
 dnl --------------------------------------------------------------
 FP_ARG_WITH_PATH_GNU_PROG([AR], [ar], [ar])
@@ -1152,6 +1158,8 @@ echo ["\
    hs-cpp       : $HaskellCPPCmd
    hs-cpp-flags : $HaskellCPPArgs
    ld           : $LdCmd
+   nm           : $NmCmd
+   objdump      : $ObjdumpCmd
    Happy        : $HappyCmd ($HappyVersion)
    Alex         : $AlexCmd ($AlexVersion)
    Perl         : $PerlCmd

@@ -37,7 +37,6 @@ import System.Environment (getArgs)
 import System.Exit (ExitCode(ExitSuccess), exitFailure)
 import System.FilePath ((</>))
 import System.IO (stderr, hPutStrLn)
-import System.Info (os)
 import System.Process (showCommandForUser, readProcess, rawSystem)
 
 main :: IO ()
@@ -47,6 +46,11 @@ main = do opts <- parseArgs
                                     Nothing -> die ("No " ++ descr ++ " given")
           mode <- getOption "mode" o_mode
           fn <- getOption "output filename" o_outputFilename
+          os <- getOption "target os"   o_targetOS
+
+          let haskellWanteds = [ what | (wh, what) <- wanteds os
+                                      , wh `elem` [Haskell, Both] ]
+
           case mode of
               Gen_Haskell_Type     -> writeHaskellType     fn haskellWanteds
               Gen_Haskell_Wrappers -> writeHaskellWrappers fn haskellWanteds
@@ -57,7 +61,8 @@ main = do opts <- parseArgs
                      nmProg  <- getOption "nm program"  o_nmProg
                      let verbose = o_verbose opts
                          gccFlags = o_gccFlags opts
-                     rs <- getWanted verbose tmpdir gccProg gccFlags nmProg
+                     rs <- getWanted verbose os tmpdir gccProg gccFlags nmProg
+                                     (o_objdumpProg opts)
                      let haskellRs = [ what
                                      | (wh, what) <- rs
                                      , wh `elem` [Haskell, Both] ]
@@ -67,8 +72,6 @@ main = do opts <- parseArgs
                      case cm of
                          ComputeHaskell -> writeHaskellValue fn haskellRs
                          ComputeHeader  -> writeHeader       fn cRs
-    where haskellWanteds = [ what | (wh, what) <- wanteds,
-                                    wh `elem` [Haskell, Both] ]
 
 data Options = Options {
                    o_verbose :: Bool,
@@ -77,7 +80,9 @@ data Options = Options {
                    o_outputFilename :: Maybe FilePath,
                    o_gccProg :: Maybe FilePath,
                    o_gccFlags :: [String],
-                   o_nmProg :: Maybe FilePath
+                   o_nmProg :: Maybe FilePath,
+                   o_objdumpProg :: Maybe FilePath,
+                   o_targetOS :: Maybe String
                }
 
 parseArgs :: IO Options
@@ -91,7 +96,9 @@ parseArgs = do args <- getArgs
                              o_outputFilename = Nothing,
                              o_gccProg = Nothing,
                              o_gccFlags = [],
-                             o_nmProg = Nothing
+                             o_nmProg = Nothing,
+                             o_objdumpProg = Nothing,
+                             o_targetOS = Nothing
                          }
           f opts [] = return opts
           f opts ("-v" : args')
@@ -116,6 +123,10 @@ parseArgs = do args <- getArgs
               = f (opts {o_gccFlags = flag : o_gccFlags opts}) args'
           f opts ("--nm-program" : prog : args')
               = f (opts {o_nmProg = Just prog}) args'
+          f opts ("--objdump-program" : prog : args')
+              = f (opts {o_objdumpProg = Just prog}) args'
+          f opts ("--target-os" : os : args')
+              = f (opts {o_targetOS = Just os}) args'
           f _ (flag : _) = die ("Unrecognised flag: " ++ show flag)
 
 data Mode = Gen_Haskell_Type
@@ -283,8 +294,8 @@ haskellise :: Name -> Name
 haskellise (c : cs) = toLower c : cs
 haskellise "" = ""
 
-wanteds :: Wanteds
-wanteds = concat
+wanteds :: String -> Wanteds
+wanteds os = concat
           [-- Closure header sizes.
            constantWord Both "STD_HDR_SIZE"
                              -- grrr.. PROFILING is on so we need to
@@ -654,21 +665,22 @@ wanteds = concat
           ,constantNatural Haskell "ILDV_STATE_USE"    "LDV_STATE_USE"
           ]
 
-getWanted :: Bool -> FilePath -> FilePath -> [String] -> FilePath -> IO Results
-getWanted verbose tmpdir gccProgram gccFlags nmProgram
-    = do let cStuff = unlines (headers ++ concatMap (doWanted . snd) wanteds)
+getWanted :: Bool -> String -> FilePath -> FilePath -> [String] -> FilePath -> Maybe FilePath
+             -> IO Results
+getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
+    = do let cStuff = unlines (headers ++ concatMap (doWanted . snd) (wanteds os))
              cFile = tmpdir </> "tmp.c"
              oFile = tmpdir </> "tmp.o"
          writeFile cFile cStuff
          execute verbose gccProgram (gccFlags ++ ["-c", cFile, "-o", oFile])
          xs <- case os of
-                 "openbsd" -> readProcess "/usr/bin/objdump" ["--syms", oFile] ""
+                 "openbsd" -> readProcess objdumpProgam ["--syms", oFile] ""
                  _         -> readProcess nmProgram ["-P", oFile] ""
 
          let ls = lines xs
              ms = map parseNmLine ls
              m = Map.fromList $ catMaybes ms
-         rs <- mapM (lookupResult m) wanteds
+         rs <- mapM (lookupResult m) (wanteds os)
          return rs
     where headers = ["#define IN_STG_CODE 0",
                      "",
@@ -697,6 +709,8 @@ getWanted verbose tmpdir gccProgram gccFlags nmProgram
                      "",
                      "#pragma GCC poison sizeof"
                      ]
+
+          objdumpProgam = maybe (error "no objdump program given") id mobjdumpProgram
 
           prefix = "derivedConstant"
           mkFullName name = prefix ++ name
