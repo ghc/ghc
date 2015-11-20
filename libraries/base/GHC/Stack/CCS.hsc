@@ -2,7 +2,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  GHC.Stack
+-- Module      :  GHC.Stack.CCS
 -- Copyright   :  (c) The University of Glasgow 2011
 -- License     :  see libraries/base/LICENSE
 --
@@ -16,14 +16,10 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE UnboxedTuples, MagicHash, NoImplicitPrelude #-}
-module GHC.Stack (
+module GHC.Stack.CCS (
     -- * Call stacks
     currentCallStack,
     whoCreated,
-    errorWithStackTrace,
-
-    -- * Implicit parameter call stacks
-    SrcLoc(..), CallStack(..),
 
     -- * Internals
     CostCentreStack,
@@ -42,13 +38,11 @@ module GHC.Stack (
 import Foreign
 import Foreign.C
 
-import GHC.IO
 import GHC.Base
 import GHC.Ptr
 import GHC.Foreign as GHC
 import GHC.IO.Encoding
-import GHC.Exception
-import GHC.List ( concatMap, null, reverse )
+import GHC.List ( concatMap, reverse )
 
 #define PROFILING
 #include "Rts.h"
@@ -120,14 +114,3 @@ whoCreated obj = do
 
 renderStack :: [String] -> String
 renderStack strs = "Stack trace:" ++ concatMap ("\n  "++) (reverse strs)
-
--- | Like the function 'error', but appends a stack trace to the error
--- message if one is available.
---
--- @since 4.7.0.0
-errorWithStackTrace :: String -> a
-errorWithStackTrace x = unsafeDupablePerformIO $ do
-   stack <- ccsToStrings =<< getCurrentCCS x
-   if null stack
-      then throwIO (ErrorCall x)
-      else throwIO (ErrorCallWithLocation x (renderStack stack))

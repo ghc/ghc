@@ -59,4 +59,7 @@ compile_libAB_dyn:
 
 .PHONY: T1407
 T1407:
-	cat T1407.script | LD_LIBRARY_PATH=. "$(TEST_HC)" -ignore-dot-ghci -v0 --interactive -L.
+	cat T1407.script | LD_LIBRARY_PATH=. "$(TEST_HC)" $(TEST_HC_OPTS) -ignore-dot-ghci -v0 --interactive -L.
+
+.PHONY: T3242
+	echo ":q" | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -ignore-dot-ghci -v0 -lm

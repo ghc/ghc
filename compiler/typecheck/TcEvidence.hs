@@ -1157,9 +1157,12 @@ instance Outputable EvTypeable where
 -- Helper functions for dealing with IP newtype-dictionaries
 ----------------------------------------------------------------------
 
--- | Create a 'Coercion' that unwraps an implicit-parameter dictionary
--- to expose the underlying value. We expect the 'Type' to have the form
--- `IP sym ty`, return a 'Coercion' `co :: IP sym ty ~ ty`.
+-- | Create a 'Coercion' that unwraps an implicit-parameter or
+-- overloaded-label dictionary to expose the underlying value. We
+-- expect the 'Type' to have the form `IP sym ty` or `IsLabel sym ty`,
+-- and return a 'Coercion' `co :: IP sym ty ~ ty` or
+-- `co :: IsLabel sym ty ~ Proxy# sym -> ty`.  See also
+-- Note [Type-checking overloaded labels] in TcExpr.
 unwrapIP :: Type -> CoercionR
 unwrapIP ty =
   case unwrapNewTyCon_maybe tc of

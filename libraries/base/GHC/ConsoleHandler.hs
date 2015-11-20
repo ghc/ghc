@@ -19,7 +19,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.ConsoleHandler
-#if !defined(mingw32_HOST_OS) && !defined(__HADDOCK__)
+#if !defined(mingw32_HOST_OS)
         where
 
 import GHC.Base ()  -- dummy dependency

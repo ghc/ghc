@@ -1,5 +1,5 @@
 *** Exception: foo
-CallStack:
+CallStack (from ImplicitParams):
   error, called at <interactive>:2:1 in interactive:Ghci1
 Stopped at <exception thrown>
 _exception :: e = _
@@ -21,17 +21,17 @@ already at the beginning of the history
 _exception = SomeException
                (ErrorCallWithLocation
                   "foo"
-                  "CallStack:
+                  "CallStack (from ImplicitParams):
   error, called at ../Test7.hs:2:18 in main:Main")
 _result :: a14 = _
 _exception :: SomeException = SomeException
                                 (ErrorCallWithLocation
                                    "foo"
-                                   "CallStack:
+                                   "CallStack (from ImplicitParams):
   error, called at ../Test7.hs:2:18 in main:Main")
 *** Exception: foo
-CallStack:
+CallStack (from ImplicitParams):
   error, called at ../Test7.hs:2:18 in main:Main
 *** Exception: foo
-CallStack:
+CallStack (from ImplicitParams):
   error, called at ../Test7.hs:2:18 in main:Main

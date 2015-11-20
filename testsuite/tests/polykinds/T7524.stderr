@@ -1,5 +1,6 @@
 
 T7524.hs:5:15:
     Conflicting family instance declarations:
-      F a a -- Defined at T7524.hs:5:15
-      F a b -- Defined at T7524.hs:6:15
+      forall (k :: BOX) (a :: k). F a a = Int -- Defined at T7524.hs:5:15
+      forall (k :: BOX) (k1 :: BOX) (a :: k) (b :: k1).
+        F a b = Bool -- Defined at T7524.hs:6:15

@@ -12,6 +12,7 @@
 {-# LANGUAGE UndecidableInstances #-}  -- for compiling instances of (==)
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE PolyKinds #-}
 
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
@@ -35,6 +36,10 @@ module GHC.TypeLits
     -- * Functions on type literals
   , type (<=), type (<=?), type (+), type (*), type (^), type (-)
   , CmpNat, CmpSymbol
+
+  -- * User-defined type errors
+  , TypeError
+  , ErrorMessage(..)
 
   ) where
 
@@ -189,6 +194,54 @@ type family (m :: Nat) ^ (n :: Nat) :: Nat
 --
 -- @since 4.7.0.0
 type family (m :: Nat) - (n :: Nat) :: Nat
+
+
+-- | A description of a custom type error.
+data {-kind-} ErrorMessage = Text Symbol
+                             -- ^ Show the text as is.
+
+                           | forall t. ShowType t
+                             -- ^ Pretty print the type.
+                             -- @ShowType :: k -> ErrorMessage@
+
+                           | ErrorMessage :<>: ErrorMessage
+                             -- ^ Put two pieces of error message next
+                             -- to each other.
+
+                           | ErrorMessage :$$: ErrorMessage
+                             -- ^ Stack two pieces of error message on top
+                             -- of each other.
+
+infixl 5 :$$:
+infixl 6 :<>:
+
+-- | The type-level equivalent of 'error'.
+--
+-- The polymorphic kind of this type allows it to be used in several settings.
+-- For instance, it can be used as a constraint, e.g. to provide a better error
+-- message for a non-existant instance,
+--
+-- @@
+-- -- in a context
+-- instance TypeError (Text "Cannot 'Show' functions." :$$:
+--                     Text "Perhaps there is a missing argument?")
+--       => Show (a -> b) where
+--     showsPrec = error "unreachable"
+-- @@
+--
+-- It can also be placed on the right-hand side of a type-level function
+-- to provide an error for an invalid case,
+--
+-- @@
+-- type family ByteSize x where
+--    ByteSize Word16   = 2
+--    ByteSize Word8    = 1
+--    ByteSize a        = TypeError (Text "The type " :<>: ShowType a :<>:
+--                                   Text " is not exportable.")
+-- @@
+--
+-- @since 4.9.0.0
+type family TypeError (a :: ErrorMessage) :: b where
 
 
 --------------------------------------------------------------------------------

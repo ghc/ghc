@@ -463,33 +463,6 @@ rts/dist/build/sm/Evac_thr_CC_OPTS += -DPARALLEL_GC -Irts/sm
 rts/dist/build/sm/Scav_thr_CC_OPTS += -DPARALLEL_GC -Irts/sm
 
 #-----------------------------------------------------------------------------
-# Add PAPI library if needed
-
-ifeq "$(GhcRtsWithPapi)" "YES"
-
-rts_CC_OPTS		+= -DUSE_PAPI
-
-rts_PACKAGE_CPP_OPTS	+= -DUSE_PAPI
-rts_PACKAGE_CPP_OPTS    += -DPAPI_INCLUDE_DIR=$(PapiIncludeDir)
-rts_PACKAGE_CPP_OPTS    += -DPAPI_LIB_DIR=$(PapiLibDir)
-
-ifneq "$(PapiIncludeDir)" ""
-rts_HC_OPTS     += -I$(PapiIncludeDir)
-rts_CC_OPTS     += -I$(PapiIncludeDir)
-rts_HSC2HS_OPTS += -I$(PapiIncludeDir)
-endif
-ifneq "$(PapiLibDirs)" ""
-rts_LD_OPTS     += -L$(PapiLibDirs)
-endif
-
-else # GhcRtsWithPapi==YES
-
-rts_PACKAGE_CPP_OPTS += -DPAPI_INCLUDE_DIR=""
-rts_PACKAGE_CPP_OPTS += -DPAPI_LIB_DIR=""
-
-endif
-
-#-----------------------------------------------------------------------------
 # Use system provided libffi
 
 ifeq "$(UseSystemLibFFI)" "YES"

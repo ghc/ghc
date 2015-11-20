@@ -244,13 +244,13 @@ defFullHelpText =
   "   :cd <dir>                   change directory to <dir>\n" ++
   "   :cmd <expr>                 run the commands returned by <expr>::IO String\n" ++
   "   :complete <dom> [<rng>] <s> list completions for partial input string\n" ++
-  "   :ctags[!] [<file>]          create tags file for Vi (default: \"tags\")\n" ++
+  "   :ctags[!] [<file>]          create tags file <file> for Vi (default: \"tags\")\n" ++
   "                               (!: use regex instead of line number)\n" ++
   "   :def <cmd> <expr>           define command :<cmd> (later defined command has\n" ++
   "                               precedence, ::<cmd> is always a builtin command)\n" ++
   "   :edit <file>                edit file\n" ++
   "   :edit                       edit last module\n" ++
-  "   :etags [<file>]             create tags file for Emacs (default: \"TAGS\")\n" ++
+  "   :etags [<file>]             create tags file <file> for Emacs (default: \"TAGS\")\n" ++
   "   :help, :?                   display this list of commands\n" ++
   "   :info[!] [<name> ...]       display information about the given names\n" ++
   "                               (!: do not filter instances)\n" ++
@@ -265,7 +265,7 @@ defFullHelpText =
   "   :reload[!]                  reload the current module set\n" ++
   "                               (!: defer type errors)\n" ++
   "   :run function [<arguments> ...] run the function with the given arguments\n" ++
-  "   :script <filename>          run the script <filename>\n" ++
+  "   :script <file>              run the script <file>\n" ++
   "   :type <expr>                show the type of <expr>\n" ++
   "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
   "   :!<command>                 run the shell command <command>\n" ++

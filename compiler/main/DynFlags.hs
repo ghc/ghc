@@ -504,7 +504,8 @@ data WarningFlag =
    | Opt_WarnContextQuantification
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
-   | Opt_WarnAMP
+   | Opt_WarnAMP -- Introduced in GHC 7.8, obsolete since 7.10
+   | Opt_WarnMissingMonadFailInstance
    | Opt_WarnDodgyExports
    | Opt_WarnDodgyImports
    | Opt_WarnOrphans
@@ -648,12 +649,15 @@ data ExtensionFlag
    | Opt_BinaryLiterals
    | Opt_NegativeLiterals
    | Opt_DuplicateRecordFields
+   | Opt_OverloadedLabels
    | Opt_EmptyCase
    | Opt_PatternSynonyms
    | Opt_PartialTypeSignatures
    | Opt_NamedWildCards
    | Opt_StaticPointers
+   | Opt_Strict
    | Opt_StrictData
+   | Opt_MonadFailDesugaring
    deriving (Eq, Enum, Show)
 
 type SigOf = Map ModuleName Module
@@ -2869,7 +2873,7 @@ fWarningFlags = [
   flagSpec "warn-alternative-layout-rule-transitional"
                                       Opt_WarnAlternativeLayoutRuleTransitional,
   flagSpec' "warn-amp"                        Opt_WarnAMP
-    (\_ -> deprecate "it has no effect, and will be removed in GHC 7.12"),
+    (\_ -> deprecate "it has no effect"),
   flagSpec' "warn-auto-orphans"               Opt_WarnAutoOrphans
     (\_ -> deprecate "it has no effect"),
   flagSpec "warn-deferred-type-errors"        Opt_WarnDeferredTypeErrors,
@@ -2896,6 +2900,7 @@ fWarningFlags = [
   flagSpec "warn-missing-import-lists"        Opt_WarnMissingImportList,
   flagSpec "warn-missing-local-sigs"          Opt_WarnMissingLocalSigs,
   flagSpec "warn-missing-methods"             Opt_WarnMissingMethods,
+  flagSpec "warn-missing-monadfail-instance"  Opt_WarnMissingMonadFailInstance,
   flagSpec "warn-missing-signatures"          Opt_WarnMissingSigs,
   flagSpec "warn-missing-exported-sigs"       Opt_WarnMissingExportedSigs,
   flagSpec "warn-monomorphism-restriction"    Opt_WarnMonomorphism,
@@ -3080,8 +3085,19 @@ supportedLanguageOverlays :: [String]
 supportedLanguageOverlays = map flagSpecName safeHaskellFlags
 
 supportedExtensions :: [String]
-supportedExtensions
-    = concatMap (\name -> [name, "No" ++ name]) (map flagSpecName xFlags)
+supportedExtensions = concatMap toFlagSpecNamePair xFlags
+  where
+    toFlagSpecNamePair flg
+#ifndef GHCI
+      -- make sure that `ghc --supported-extensions` omits
+      -- "TemplateHaskell" when it's known to be unsupported. See also
+      -- GHC #11102 for rationale
+      | flagSpecFlag flg == Opt_TemplateHaskell  = [noName]
+#endif
+      | otherwise = [name, noName]
+      where
+        noName = "No" ++ name
+        name = flagSpecName flg
 
 supportedLanguagesAndExtensions :: [String]
 supportedLanguagesAndExtensions =
@@ -3166,6 +3182,7 @@ xFlags = [
   flagSpec "LiberalTypeSynonyms"              Opt_LiberalTypeSynonyms,
   flagSpec "MagicHash"                        Opt_MagicHash,
   flagSpec "MonadComprehensions"              Opt_MonadComprehensions,
+  flagSpec "MonadFailDesugaring"              Opt_MonadFailDesugaring,
   flagSpec "MonoLocalBinds"                   Opt_MonoLocalBinds,
   flagSpec' "MonoPatBinds"                    Opt_MonoPatBinds
     (\ turn_on -> when turn_on $
@@ -3183,6 +3200,7 @@ xFlags = [
   flagSpec "NumDecimals"                      Opt_NumDecimals,
   flagSpec' "OverlappingInstances"            Opt_OverlappingInstances
                                               setOverlappingInsts,
+  flagSpec "OverloadedLabels"                 Opt_OverloadedLabels,
   flagSpec "OverloadedLists"                  Opt_OverloadedLists,
   flagSpec "OverloadedStrings"                Opt_OverloadedStrings,
   flagSpec "PackageImports"                   Opt_PackageImports,
@@ -3212,6 +3230,7 @@ xFlags = [
   flagSpec "ScopedTypeVariables"              Opt_ScopedTypeVariables,
   flagSpec "StandaloneDeriving"               Opt_StandaloneDeriving,
   flagSpec "StaticPointers"                   Opt_StaticPointers,
+  flagSpec "Strict"                           Opt_Strict,
   flagSpec "StrictData"                       Opt_StrictData,
   flagSpec' "TemplateHaskell"                 Opt_TemplateHaskell
                                               setTemplateHaskellLoc,
@@ -3417,8 +3436,7 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnAlternativeLayoutRuleTransitional,
         Opt_WarnUnsupportedLlvmVersion,
         Opt_WarnContextQuantification,
-        Opt_WarnTabs,
-        Opt_WarnMissedSpecs
+        Opt_WarnTabs
       ]
 
 minusWOpts :: [WarningFlag]
@@ -3446,8 +3464,7 @@ minusWallOpts
         Opt_WarnOrphans,
         Opt_WarnUnusedDoBind,
         Opt_WarnTrustworthySafe,
-        Opt_WarnUntickedPromotedConstructors,
-        Opt_WarnAllMissedSpecs
+        Opt_WarnUntickedPromotedConstructors
       ]
 
 enableUnusedBinds :: DynP ()
@@ -4352,6 +4369,7 @@ data LinkerInfo
   | GnuGold  [Option]
   | DarwinLD [Option]
   | SolarisLD [Option]
+  | AixLD    [Option]
   | UnknownLD
   deriving Eq
 

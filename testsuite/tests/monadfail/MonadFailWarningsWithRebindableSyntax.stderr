@@ -1,0 +1,5 @@
+
+MonadFailWarningsWithRebindableSyntax.hs:13:5: warning:
+    The failable pattern ‘Just x’
+      is used together with -XRebindableSyntax. If this is intentional,
+      compile with -fno-warn-missing-monadfail-instance.

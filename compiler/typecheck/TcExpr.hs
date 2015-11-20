@@ -59,6 +59,7 @@ import TysWiredIn
 import TysPrim( intPrimTy )
 import PrimOp( tagToEnumKey )
 import PrelNames
+import MkId ( proxyHashId )
 import DynFlags
 import SrcLoc
 import Util
@@ -214,6 +215,22 @@ tcExpr (HsIPVar x) res_ty
   fromDict ipClass x ty = HsWrap $ mkWpCastR $ TcCoercion $
                           unwrapIP $ mkClassPred ipClass [x,ty]
 
+tcExpr (HsOverLabel l) res_ty  -- See Note [Type-checking overloaded labels]
+  = do { let origin = OverLabelOrigin l
+       ; isLabelClass <- tcLookupClass isLabelClassName
+       ; alpha <- newFlexiTyVarTy openTypeKind
+       ; let lbl = mkStrLitTy l
+             pred = mkClassPred isLabelClass [lbl, alpha]
+       ; loc <- getSrcSpanM
+       ; var <- emitWanted origin pred
+       ; let proxy_arg = L loc (mkHsWrap (mkWpTyApps [typeSymbolKind, lbl])
+                                         (HsVar proxyHashId))
+             tm = L loc (fromDict pred (HsVar var)) `HsApp` proxy_arg
+       ; tcWrapResult tm alpha res_ty }
+  where
+  -- Coerces a dictionary for `IsLabel "x" t` into `Proxy# x -> t`.
+  fromDict pred = HsWrap $ mkWpCastR $ TcCoercion $ unwrapIP pred
+
 tcExpr (HsLam match) res_ty
   = do  { (co_fn, match') <- tcMatchLambda match res_ty
         ; return (mkHsWrap co_fn (HsLam match')) }
@@ -242,6 +259,26 @@ tcExpr (HsType ty) _
         -- so it's not enabled yet.
         -- Can't eliminate it altogether from the parser, because the
         -- same parser parses *patterns*.
+
+
+{-
+Note [Type-checking overloaded labels]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Recall that (in GHC.OverloadedLabels) we have
+
+    class IsLabel (x :: Symbol) a where
+      fromLabel :: Proxy# x -> a
+
+When we see an overloaded label like `#foo`, we generate a fresh
+variable `alpha` for the type and emit an `IsLabel "foo" alpha`
+constraint.  Because the `IsLabel` class has a single method, it is
+represented by a newtype, so we can coerce `IsLabel "foo" alpha` to
+`Proxy# "foo" -> alpha` (just like for implicit parameters).  We then
+apply it to `proxy#` of type `Proxy# "foo"`.
+
+That is, we translate `#foo` to `fromLabel (proxy# :: Proxy# "foo")`.
+-}
+
 
 {-
 ************************************************************************
@@ -530,7 +567,7 @@ to support expressions like this:
 ************************************************************************
 -}
 
-tcExpr (RecordCon (L loc con_name) _ rbinds _) res_ty
+tcExpr (RecordCon { rcon_con_name = L loc con_name, rcon_flds = rbinds }) res_ty
   = do  { con_like <- tcLookupConLike con_name
 
         -- Check for missing fields
@@ -539,14 +576,16 @@ tcExpr (RecordCon (L loc con_name) _ rbinds _) res_ty
         ; (con_expr, con_tau) <- tcInferId con_name
         ; let arity = conLikeArity con_like
               (arg_tys, actual_res_ty) = tcSplitFunTysN con_tau arity
-              labels = conLikeFieldLabels con_like
         ; case conLikeWrapId_maybe con_like of
                Nothing -> nonBidirectionalErr (conLikeName con_like)
                Just con_id -> do {
                   co_res <- unifyType actual_res_ty res_ty
                 ; rbinds' <- tcRecordBinds con_like arg_tys rbinds
                 ; return $ mkHsWrapCo co_res $
-                    RecordCon (L loc con_id) con_expr rbinds' labels } }
+                    RecordCon { rcon_con_name = L loc con_id
+                              , rcon_con_expr = con_expr
+                              , rcon_con_like = con_like
+                              , rcon_flds = rbinds' } } }
 
 {-
 Note [Type of a record update]
@@ -683,7 +722,7 @@ following.
 
 -}
 
-tcExpr (RecordUpd record_expr rbnds _ _ _ _) res_ty
+tcExpr (RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
   = ASSERT( notNull rbnds )
     do  { -- STEP -2: typecheck the record_expr, the record to bd updated
           (record_expr', record_tau) <- tcInferFun record_expr
@@ -824,8 +863,10 @@ tcExpr (RecordUpd record_expr rbnds _ _ _ _) res_ty
 
         -- Phew!
         ; return $ mkHsWrapCo co_res $
-          RecordUpd (mkLHsWrap fam_co (mkLHsWrapCo co_scrut record_expr'))
-                    rbinds' relevant_cons scrut_inst_tys result_inst_tys req_wrap }
+          RecordUpd { rupd_expr = mkLHsWrap fam_co (mkLHsWrapCo co_scrut record_expr')
+                    , rupd_flds = rbinds'
+                    , rupd_cons = relevant_cons, rupd_in_tys = scrut_inst_tys
+                    , rupd_out_tys = result_inst_tys, rupd_wrap = req_wrap } }
 
 tcExpr (HsRecFld f) res_ty
     = tcCheckRecSelId f res_ty

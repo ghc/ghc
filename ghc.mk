@@ -929,14 +929,14 @@ ifneq "$(INSTALL_LIBRARY_DOCS)" ""
 	$(INSTALL_SCRIPT) $(INSTALL_OPTS) libraries/gen_contents_index "$(DESTDIR)$(docdir)/html/libraries/"
 endif
 ifneq "$(INSTALL_HTML_DOC_DIRS)" ""
+	# We need to filter out the directories so install doesn't choke on them
 	for i in $(INSTALL_HTML_DOC_DIRS); do \
 		$(INSTALL_DIR) "$(DESTDIR)$(docdir)/html/`basename $$i`"; \
-    for f in $$i/*; do \
-# We filter out the directories so install doesn't choke on them \
-      if test -f $$f; then \
-		    $(INSTALL_DOC) $(INSTALL_OPTS) "$$f" "$(DESTDIR)$(docdir)/html/`basename $$i`"; \
-      fi \
-    done \
+		for f in $$i/*; do \
+			if test -f $$f; then \
+				$(INSTALL_DOC) $(INSTALL_OPTS) "$$f" "$(DESTDIR)$(docdir)/html/`basename $$i`"; \
+			fi \
+		done \
 	done
 endif
 

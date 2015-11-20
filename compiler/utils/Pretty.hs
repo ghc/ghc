@@ -180,7 +180,7 @@ module Pretty (
         sep, cat,
         fsep, fcat,
         nest,
-        hang, punctuate,
+        hang, hangNotEmpty, punctuate,
 
         -- * Predicates on documents
         isEmpty,
@@ -562,6 +562,12 @@ nest k p = mkNest k (reduceDoc p)
 -- | @hang d1 n d2 = sep [d1, nest n d2]@
 hang :: Doc -> Int -> Doc -> Doc
 hang d1 n d2 = sep [d1, nest n d2]
+
+-- | Apply 'hang' to the arguments if the first 'Doc' is not empty.
+hangNotEmpty :: Doc -> Int -> Doc -> Doc
+hangNotEmpty d1 n d2 = if isEmpty d1
+                       then d2
+                       else hang d1 n d2
 
 -- | @punctuate p [d1, ... dn] = [d1 \<> p, d2 \<> p, ... dn-1 \<> p, dn]@
 punctuate :: Doc -> [Doc] -> [Doc]

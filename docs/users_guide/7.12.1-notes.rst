@@ -81,6 +81,36 @@ Language
 -  The ``-XDeriveAnyClass`` extension now fills in associated type family
    default instances when deriving a class that contains them.
 
+-  Users can now define record pattern synonyms. This allows pattern synonyms
+   to behave more like normal data constructors. For example, ::
+
+      pattern P :: a -> b -> (a, b)
+      pattern P{x,y} = (x,y)
+
+   will allow `P` to be used like a record data constructor and also defines
+   selector functions `x :: (a, b) -> a` and `y :: (a, b) -> b`.
+
+-  Pattern synonyms can now be bundled with type constructors. For a pattern
+   synonym `P` and a type constructor `T`, `P` can be bundled with `T` so that
+   when `T` is imported `P` is also imported. With this change
+   a library author can provide either real data constructors or pattern
+   synonyms in an opaque manner. See :ref:`pattern-synonyms` for details. ::
+
+      -- Foo.hs
+      module Foo ( T(P) ) where
+
+      data T = T
+
+      pattern P = T
+
+      -- Baz.hs
+      module Baz where
+
+      -- P is imported
+      import Foo (T(..))
+
+
+
 Compiler
 ~~~~~~~~
 
@@ -107,6 +137,16 @@ Compiler
    by ``-O`` and by ``-fstrictness``. It is disabled by ``-fno-strictness``.
    Enabling ``-fworker-wrapper`` while strictness analysis is disabled (by
    ``-fno-strictness``) has no effect.
+
+-  Added the options ``-fwarn-missed-specialisations`` and
+   ``-fwarn-all-missed-specialisations``. When enabled, the simplifier will
+   produce a warning when a overloaded imported function cannot be
+   specialised (typically due to a missing ``INLINEABLE`` pragma). This
+   is intended to alert users to cases where they apply ``INLINEABLE`` but
+   may not get the speed-up they expect.
+
+-  When printing an out-of-scope error message, GHC will give helpful advice if
+   the error might be caused by too restrictive imports.
 
 GHCi
 ~~~~
@@ -168,7 +208,7 @@ Template Haskell
 Runtime system
 ~~~~~~~~~~~~~~
 
--  TODO FIXME.
+-  Support for performance monitoring with PAPI has been dropped.
 
 Build system
 ~~~~~~~~~~~~
@@ -191,7 +231,7 @@ array
 base
 ~~~~
 
--  Version number XXXXX (was 4.7.0.0)
+-  Version number 4.9.0.0 (was 4.7.0.0)
 
 -  A new module ``GHC.SrcLoc`` was added, exporting a new type
    ``SrcLoc``. A ``SrcLoc`` contains package, module, and file names, as
@@ -215,6 +255,13 @@ base
    ``disableAllocationLimit`` are now available from ``System.Mem``. Previously
    this functionality was only available from ``GHC.Conc``.
 
+- ``forever``, ``filterM``, ``mapAndUnzipM``, ``zipWithM``, ``zipWithM_``,
+  ``replicateM``, and ``replicateM`` were generalized from ``Monad`` to
+  ``Applicative``. If this causes performance regressions, try to make the
+  implementation of ``(*>)`` match that of ``(>>)``.
+
+- Add ``GHC.TypeLits.TypeError`` and ``ErrorMessage`` to allow users
+  to define custom compile-time error messages.
 
 binary
 ~~~~~~

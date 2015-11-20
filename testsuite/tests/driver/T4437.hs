@@ -32,7 +32,9 @@ check title expected got
 expectedGhcOnlyExtensions :: [String]
 expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "AlternativeLayoutRule",
-                             "AlternativeLayoutRuleTransitional"]
+                             "AlternativeLayoutRuleTransitional",
+                             "OverloadedLabels",
+                             "MonadFailDesugaring"]
 
 expectedCabalOnlyExtensions :: [String]
 expectedCabalOnlyExtensions = ["Generics",

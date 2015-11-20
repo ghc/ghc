@@ -27,7 +27,7 @@ release = version  # The full version, including alpha/beta/rc tags.
 
 # Syntax highlighting
 highlight_language = 'haskell'
-pygments_style = 'colorful'
+pygments_style = 'tango'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -62,7 +62,7 @@ htmlhelp_basename = 'GHCUsersGuide'
 # -- Options for LaTeX output ---------------------------------------------
 
 latex_elements = {
-    'inputenv': '',
+    'inputenc': '',
     'utf8extra': '',
     'preamble': '''
 \usepackage{fontspec}

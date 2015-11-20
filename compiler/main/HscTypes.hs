@@ -29,7 +29,7 @@ module HscTypes (
 
         -- * Information about the module being compiled
         -- (re-exported from DriverPhases)
-        HscSource(..), isHsBoot, hscSourceString,
+        HscSource(..), isHsBootOrSig, hscSourceString,
 
 
         -- * State relating to modules in this package
@@ -162,7 +162,7 @@ import PatSyn
 import PrelNames        ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
 import Packages hiding  ( Version(..) )
 import DynFlags
-import DriverPhases     ( Phase, HscSource(..), isHsBoot, hscSourceString )
+import DriverPhases     ( Phase, HscSource(..), isHsBootOrSig, hscSourceString )
 import BasicTypes
 import IfaceSyn
 import CoreSyn          ( CoreRule, CoreVect )
@@ -202,7 +202,7 @@ data HscStatus
     = HscNotGeneratingCode
     | HscUpToDate
     | HscUpdateBoot
-    | HscUpdateBootMerge
+    | HscUpdateSig
     | HscRecomp CgGuts ModSummary
 
 -- -----------------------------------------------------------------------------
@@ -1032,11 +1032,12 @@ emptyModDetails
 type ImportedMods = ModuleEnv [ImportedModsVal]
 data ImportedModsVal
  = ImportedModsVal {
-        imv_name :: ModuleName,         -- ^ The name the module is imported with
-        imv_span :: SrcSpan,            -- ^ the source span of the whole import
-        imv_is_safe :: IsSafeImport,    -- ^ whether this is a safe import
-        imv_is_hiding :: Bool,          -- ^ whether this is an "hiding" import
-        imv_all_exports :: GlobalRdrEnv -- ^ all the things the module could provide
+        imv_name :: ModuleName,          -- ^ The name the module is imported with
+        imv_span :: SrcSpan,             -- ^ the source span of the whole import
+        imv_is_safe :: IsSafeImport,     -- ^ whether this is a safe import
+        imv_is_hiding :: Bool,           -- ^ whether this is an "hiding" import
+        imv_all_exports :: GlobalRdrEnv, -- ^ all the things the module could provide
+        imv_qualified :: Bool            -- ^ whether this is a qualified import
         }
 
 -- | A ModGuts is carried through the compiler, accumulating stuff as it goes
@@ -1051,9 +1052,7 @@ data ModGuts
         mg_exports   :: ![AvailInfo],    -- ^ What it exports
         mg_deps      :: !Dependencies,   -- ^ What it depends on, directly or
                                          -- otherwise
-        mg_dir_imps  :: !ImportedMods,   -- ^ Directly-imported modules; used to
-                                         -- generate initialisation code
-        mg_used_names:: !NameSet,        -- ^ What the module needed (used in 'MkIface.mkIface')
+        mg_usages    :: ![Usage],        -- ^ What was used?  Used for interfaces.
 
         mg_used_th   :: !Bool,           -- ^ Did we run a TH splice?
         mg_rdr_env   :: !GlobalRdrEnv,   -- ^ Top-level lexical environment
@@ -1092,11 +1091,9 @@ data ModGuts
                                                 -- one); c.f. 'tcg_fam_inst_env'
 
         mg_safe_haskell :: SafeHaskellMode,     -- ^ Safe Haskell mode
-        mg_trust_pkg    :: Bool,                -- ^ Do we need to trust our
+        mg_trust_pkg    :: Bool                 -- ^ Do we need to trust our
                                                 -- own package for Safe Haskell?
                                                 -- See Note [RnNames . Trust Own Package]
-
-        mg_dependent_files :: [FilePath]        -- ^ Dependencies from addDependentFile
     }
 
 -- The ModGuts takes on several slightly different forms:
@@ -2416,8 +2413,6 @@ data ModSummary
           -- ^ Source imports of the module
         ms_textual_imps :: [(Maybe FastString, Located ModuleName)],
           -- ^ Non-source imports of the module from the module *text*
-        ms_merge_imps   :: (Bool, [Module]),
-          -- ^ Non-textual imports computed for HsBootMerge
         ms_hspp_file    :: FilePath,
           -- ^ Filename of preprocessed source file
         ms_hspp_opts    :: DynFlags,
@@ -2447,10 +2442,8 @@ ms_imps ms =
 -- The ModLocation is stable over successive up-sweeps in GHCi, wheres
 -- the ms_hs_date and imports can, of course, change
 
-msHsFilePath :: ModSummary -> Maybe FilePath
-msHsFilePath  ms = ml_hs_file  (ms_location ms)
-
-msHiFilePath, msObjFilePath :: ModSummary -> FilePath
+msHsFilePath, msHiFilePath, msObjFilePath :: ModSummary -> FilePath
+msHsFilePath  ms = expectJust "msHsFilePath" (ml_hs_file  (ms_location ms))
 msHiFilePath  ms = ml_hi_file  (ms_location ms)
 msObjFilePath ms = ml_obj_file (ms_location ms)
 
@@ -2465,10 +2458,7 @@ instance Outputable ModSummary where
                           text "ms_mod =" <+> ppr (ms_mod ms)
                                 <> text (hscSourceString (ms_hsc_src ms)) <> comma,
                           text "ms_textual_imps =" <+> ppr (ms_textual_imps ms),
-                          text "ms_srcimps =" <+> ppr (ms_srcimps ms),
-                          if not (null (snd (ms_merge_imps ms)))
-                            then text "ms_merge_imps =" <+> ppr (ms_merge_imps ms)
-                            else empty]),
+                          text "ms_srcimps =" <+> ppr (ms_srcimps ms)]),
              char '}'
             ]
 
@@ -2476,20 +2466,29 @@ showModMsg :: DynFlags -> HscTarget -> Bool -> ModSummary -> String
 showModMsg dflags target recomp mod_summary
   = showSDoc dflags $
         hsep [text (mod_str ++ replicate (max 0 (16 - length mod_str)) ' '),
-              char '(',
-              case msHsFilePath mod_summary of
-                Just path -> text (normalise path) <> comma
-                Nothing -> text "nothing" <> comma,
+              char '(', text (normalise $ msHsFilePath mod_summary) <> comma,
               case target of
                   HscInterpreted | recomp
                              -> text "interpreted"
                   HscNothing -> text "nothing"
-                  _ -> text (normalise $ msObjFilePath mod_summary),
+                  _ | HsigFile == ms_hsc_src mod_summary -> text "nothing"
+                    | otherwise -> text (normalise $ msObjFilePath mod_summary),
               char ')']
  where
     mod     = moduleName (ms_mod mod_summary)
     mod_str = showPpr dflags mod
-                ++ hscSourceString (ms_hsc_src mod_summary)
+                ++ hscSourceString' dflags mod (ms_hsc_src mod_summary)
+
+-- | Variant of hscSourceString which prints more information for signatures.
+-- This can't live in DriverPhases because this would cause a module loop.
+hscSourceString' :: DynFlags -> ModuleName -> HscSource -> String
+hscSourceString' _ _ HsSrcFile   = ""
+hscSourceString' _ _ HsBootFile  = "[boot]"
+hscSourceString' dflags mod HsigFile =
+     "[" ++ (maybe "abstract sig"
+               (("sig of "++).showPpr dflags)
+               (getSigOf dflags mod)) ++ "]"
+    -- NB: -sig-of could be missing if we're just typechecking
 
 {-
 ************************************************************************

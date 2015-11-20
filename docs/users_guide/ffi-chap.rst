@@ -10,7 +10,7 @@ Foreign function interface (FFI)
 
 GHC (mostly) conforms to the Haskell Foreign Function Interface, whose
 definition is part of the Haskell Report on
-```http://www.haskell.org/`` <http://www.haskell.org/>`__.
+``http://www.haskell.org/`` <http://www.haskell.org/>`__.
 
 FFI support is enabled by default, but can be enabled or disabled
 explicitly with the ``-XForeignFunctionInterface`` flag.

@@ -700,6 +700,7 @@
       SymI_HasProto(addDLL)                                             \
       SymI_HasProto(addLibrarySearchPath)                               \
       SymI_HasProto(removeLibrarySearchPath)                            \
+      SymI_HasProto(findSystemLibrary)                                  \
       SymI_HasProto(__int_encodeDouble)                                 \
       SymI_HasProto(__word_encodeDouble)                                \
       SymI_HasProto(__int_encodeFloat)                                  \

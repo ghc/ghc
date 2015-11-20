@@ -353,7 +353,7 @@ pprStrictness sig = ppr sig
 
 Note [Specialisations and RULES in IdInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Generally speaking, a GlobalIdshas an *empty* RuleInfo.  All their
+Generally speaking, a GlobalId has an *empty* RuleInfo.  All their
 RULES are contained in the globally-built rule-base.  In principle,
 one could attach the to M.f the RULES for M.f that are defined in M.
 But we don't do that for instance declarations and so we just treat

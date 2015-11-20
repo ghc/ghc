@@ -274,8 +274,11 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         nto-qnx)
             test -z "[$]2" || eval "[$]2=OSQNXNTO"
             ;;
-        dragonfly|osf1|hpux|linuxaout|freebsd2|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix)
+        dragonfly|osf1|hpux|linuxaout|freebsd2|gnu|nextstep2|nextstep3|sunos4|ultrix|irix)
             test -z "[$]2" || eval "[$]2=OSUnknown"
+            ;;
+        aix)
+            test -z "[$]2" || eval "[$]2=OSAIX"
             ;;
         linux-android)
             test -z "[$]2" || eval "[$]2=OSAndroid"
@@ -584,6 +587,20 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $3="$$3 -fuse-ld=gold -Wl,-z,noexecstack"
         $4="$$4 -z noexecstack"
         ;;
+
+    powerpc-ibm-aix*)
+        # On IBM AIX, we need to workaround XCOFF's limitations. Specifically,
+        # there's a TOC which only supports at most 16k entries (see
+        # http://www.ibm.com/developerworks/rational/library/overview-toc-aix/
+        # for more details), and by using `-mminimal-toc` we use up only one TOC
+        # entry per translation unit, at the cost of an additional pointer
+        # indirection. However, see note in `compiler/ghc.mk` about `Parser.hs`.
+        # Finally, we need `-D_THREAD_SAFE` to unlock a thread-local `errno`.
+        $2="$$2 -mminimal-toc -D_THREAD_SAFE"
+        $3="$$3 -mminimal-toc -D_THREAD_SAFE"
+        $5="$$5 -D_THREAD_SAFE"
+        ;;
+
     esac
 
     # If gcc knows about the stack protector, turn it off.
@@ -1591,17 +1608,18 @@ int main(int argc, char *argv[])
         exit(2);
     }
 
+    tock = 0;
+
     it.it_value.tv_sec = 0;
-    it.it_value.tv_nsec = 1000000;
+    it.it_value.tv_nsec = 1000000; // 1ms
     it.it_interval = it.it_value;
     if (timer_settime(timer, 0, &it, NULL) != 0) {
         fprintf(stderr,"settime problem\n");
         exit(4);
     }
 
-    tock = 0;
-
-    usleep(3000);
+    // some environments have coarse scheduler/timer granularity of ~10ms and worse
+    usleep(100000); // 100ms
 
     if (!tock) {
         fprintf(stderr,"no CLOCK_REALTIME signal\n");
@@ -1861,8 +1879,11 @@ case "$1-$2" in
         $3="linux"
         ;;
       # As far as I'm aware, none of these have relevant variants
-      freebsd|netbsd|openbsd|dragonfly|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)
+      freebsd|netbsd|openbsd|dragonfly|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|haiku)
         $3="$1"
+        ;;
+      aix*) # e.g. powerpc-ibm-aix7.1.3.0
+        $3="aix"
         ;;
       freebsd*) # like i686-gentoo-freebsd7
                 #      i686-gentoo-freebsd8

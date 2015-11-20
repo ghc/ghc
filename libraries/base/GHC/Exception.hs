@@ -38,6 +38,9 @@ import Data.Typeable (Typeable, cast)
 import GHC.Base
 import GHC.Show
 import GHC.Stack.Types
+import GHC.OldList
+import GHC.IO.Unsafe
+import {-# SOURCE #-} GHC.Stack.CCS
 
 {- |
 The @SomeException@ type is the root of the exception type hierarchy.
@@ -180,9 +183,17 @@ errorCallException :: String -> SomeException
 errorCallException s = toException (ErrorCall s)
 
 errorCallWithCallStackException :: String -> CallStack -> SomeException
-errorCallWithCallStackException s stk
-  = toException (ErrorCallWithLocation s (showCallStack (popCallStack stk)))
+errorCallWithCallStackException s stk = unsafeDupablePerformIO $ do
+  ccsStack <- currentCallStack
+  let
+    implicitParamCallStack = showCallStackLines (popCallStack stk)
+    ccsCallStack = showCCSStack ccsStack
+    stack = intercalate "\n" $ implicitParamCallStack ++ ccsCallStack
+  return $ toException (ErrorCallWithLocation s stack)
 
+showCCSStack :: [String] -> [String]
+showCCSStack [] = []
+showCCSStack stk = "CallStack (from -prof):" : map ("  " ++) (reverse stk)
 
 -- | Pretty print 'SrcLoc'
 --
@@ -200,17 +211,13 @@ showSrcLoc SrcLoc {..}
 --
 -- @since 4.9.0.0
 showCallStack :: CallStack -> String
-showCallStack (CallStack stk@(_:_))
-  = unlines ("CallStack:" : map (indent . showCallSite) stk)
-  where
-  -- Data.OldList isn't available yet, so we repeat the definition here
-  unlines [] = []
-  unlines [l] = l
-  unlines (l:ls) = l ++ '\n' : unlines ls
-  indent l = "  " ++ l
-  showCallSite (f, loc) = f ++ ", called at " ++ showSrcLoc loc
-showCallStack _ = error "CallStack cannot be empty!"
+showCallStack = intercalate "\n" . showCallStackLines
 
+showCallStackLines :: CallStack -> [String]
+showCallStackLines (CallStack stk) =
+    "CallStack (from ImplicitParams):" : map (("  " ++) . showCallSite) stk
+  where
+    showCallSite (f, loc) = f ++ ", called at " ++ showSrcLoc loc
 
 -- | Remove the most recent callsite from the 'CallStack'
 --

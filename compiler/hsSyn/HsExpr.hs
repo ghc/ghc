@@ -36,7 +36,6 @@ import StaticFlags( opt_PprStyle_Debug )
 import Outputable
 import FastString
 import Type
-import FieldLabel
 
 -- libraries:
 import Data.Data hiding (Fixity)
@@ -138,6 +137,8 @@ data HsExpr id
 
   | HsRecFld (AmbiguousFieldOcc id) -- ^ Variable pointing to record selector
 
+  | HsOverLabel FastString   -- ^ Overloaded label (See Note [Overloaded labels]
+                             --   in GHC.OverloadedLabels)
   | HsIPVar   HsIPName       -- ^ Implicit parameter
   | HsOverLit (HsOverLit id) -- ^ Overloaded literals
 
@@ -281,11 +282,12 @@ data HsExpr id
   --         'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose' @'}'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | RecordCon   (Located id)       -- The constructor.  After type checking
-                                   -- it's the dataConWrapId of the constructor
-                PostTcExpr         -- Data con Id applied to type args
-                (HsRecordBinds id)
-                (PostTc id [FieldLabel])
+  | RecordCon
+      { rcon_con_name :: Located id         -- The constructor name;
+                                            --  not used after type checking
+      , rcon_con_like :: PostTc id ConLike  -- The data constructor or pattern synonym
+      , rcon_con_expr :: PostTcExpr         -- Instantiated constructor function
+      , rcon_flds     :: HsRecordBinds id } -- The fields
 
   -- | Record update
   --
@@ -293,19 +295,20 @@ data HsExpr id
   --         'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose' @'}'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | RecordUpd   (LHsExpr id)
-                [LHsRecUpdField id]
---              (HsMatchGroup Id)  -- Filled in by the type checker to be
---                                 -- a match that does the job
-                (PostTc id [ConLike])
+  | RecordUpd
+      { rupd_expr :: LHsExpr id
+      , rupd_flds :: [LHsRecUpdField id]
+      , rupd_cons :: PostTc id [ConLike]
                 -- Filled in by the type checker to the
                 -- _non-empty_ list of DataCons that have
                 -- all the upd'd fields
-                (PostTc id [Type])  -- Argument types of *input* record type
-                (PostTc id [Type])  --              and  *output* record type
-                                   -- The original type can be reconstructed
-                                   -- with conLikeResTy
-                (PostTc id HsWrapper) -- See note [Record Update HsWrapper]
+
+      , rupd_in_tys  :: PostTc id [Type]  -- Argument types of *input* record type
+      , rupd_out_tys :: PostTc id [Type]  --              and  *output* record type
+                                          -- The original type can be reconstructed
+                                          -- with conLikeResTy
+      , rupd_wrap :: PostTc id HsWrapper  -- See note [Record Update HsWrapper]
+      }
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon
 
@@ -615,6 +618,7 @@ ppr_expr :: forall id. OutputableBndr id => HsExpr id -> SDoc
 ppr_expr (HsVar v)        = pprPrefixOcc v
 ppr_expr (HsUnboundVar v) = pprPrefixOcc v
 ppr_expr (HsIPVar v)      = ppr v
+ppr_expr (HsOverLabel l)  = char '#' <> ppr l
 ppr_expr (HsLit lit)      = ppr lit
 ppr_expr (HsOverLit lit)  = ppr lit
 ppr_expr (HsPar e)        = parens (ppr_lexpr e)
@@ -698,7 +702,7 @@ ppr_expr (HsIf _ e1 e2 e3)
 ppr_expr (HsMultiIf _ alts)
   = sep $ ptext (sLit "if") : map ppr_alt alts
   where ppr_alt (L _ (GRHS guards expr)) =
-          sep [ char '|' <+> interpp'SP guards
+          sep [ vbar <+> interpp'SP guards
               , ptext (sLit "->") <+> pprDeeper (ppr expr) ]
 
 -- special case: let ... in let ...
@@ -718,10 +722,10 @@ ppr_expr (ExplicitList _ _ exprs)
 ppr_expr (ExplicitPArr _ exprs)
   = paBrackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
 
-ppr_expr (RecordCon con_id _ rbinds _)
+ppr_expr (RecordCon { rcon_con_name = con_id, rcon_flds = rbinds })
   = hang (ppr con_id) 2 (ppr rbinds)
 
-ppr_expr (RecordUpd aexp rbinds _ _ _ _)
+ppr_expr (RecordUpd { rupd_expr = aexp, rupd_flds = rbinds })
   = hang (pprLExpr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
 
 ppr_expr (ExprWithTySig expr sig)
@@ -833,6 +837,7 @@ hsExprNeedsParens (HsOverLit {})      = False
 hsExprNeedsParens (HsVar {})          = False
 hsExprNeedsParens (HsUnboundVar {})   = False
 hsExprNeedsParens (HsIPVar {})        = False
+hsExprNeedsParens (HsOverLabel {})    = False
 hsExprNeedsParens (ExplicitTuple {})  = False
 hsExprNeedsParens (ExplicitList {})   = False
 hsExprNeedsParens (ExplicitPArr {})   = False
@@ -854,6 +859,7 @@ isAtomicHsExpr (HsVar {})        = True
 isAtomicHsExpr (HsLit {})        = True
 isAtomicHsExpr (HsOverLit {})    = True
 isAtomicHsExpr (HsIPVar {})      = True
+isAtomicHsExpr (HsOverLabel {})  = True
 isAtomicHsExpr (HsUnboundVar {}) = True
 isAtomicHsExpr (HsWrap _ e)      = isAtomicHsExpr e
 isAtomicHsExpr (HsPar e)         = isAtomicHsExpr (unLoc e)
@@ -1267,7 +1273,7 @@ pprGRHS ctxt (GRHS [] body)
  =  pp_rhs ctxt body
 
 pprGRHS ctxt (GRHS guards body)
- = sep [char '|' <+> interpp'SP guards, pp_rhs ctxt body]
+ = sep [vbar <+> interpp'SP guards, pp_rhs ctxt body]
 
 pp_rhs :: Outputable body => HsMatchContext idL -> body -> SDoc
 pp_rhs ctxt rhs = matchSeparator ctxt <+> pprDeeper (ppr rhs)
@@ -1321,7 +1327,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
   -- For details on above see note [Api annotations] in ApiAnnotation
   | BindStmt (LPat idL)
              body
-             (SyntaxExpr idR) -- The (>>=) operator; see Note [The type of bind]
+             (SyntaxExpr idR) -- The (>>=) operator; see Note [The type of bind in Stmts]
              (SyntaxExpr idR) -- The fail operator
              -- The fail operator is noSyntaxExpr
              -- if the pattern match can't fail
@@ -1691,7 +1697,7 @@ pprComp :: (OutputableBndr id, Outputable body)
 pprComp quals     -- Prints:  body | qual1, ..., qualn
   | not (null quals)
   , L _ (LastStmt body _ _) <- last quals
-  = hang (ppr body <+> char '|') 2 (pprQuals (dropTail 1 quals))
+  = hang (ppr body <+> vbar) 2 (pprQuals (dropTail 1 quals))
   | otherwise
   = pprPanic "pprComp" (pprQuals quals)
 
@@ -1826,7 +1832,7 @@ pprSplice (HsQuasiQuote n q _ s) = ppr_quasi n q s
 
 ppr_quasi :: OutputableBndr id => id -> id -> FastString -> SDoc
 ppr_quasi n quoter quote = ifPprDebug (brackets (ppr n)) <>
-                           char '[' <> ppr quoter <> ptext (sLit "|") <>
+                           char '[' <> ppr quoter <> vbar <>
                            ppr quote <> ptext (sLit "|]")
 
 ppr_splice :: OutputableBndr id => SDoc -> id -> LHsExpr id -> SDoc
@@ -1872,7 +1878,7 @@ pprHsBracket (VarBr False n) = ptext (sLit "''") <> ppr n
 pprHsBracket (TExpBr e)  = thTyBrackets (ppr e)
 
 thBrackets :: SDoc -> SDoc -> SDoc
-thBrackets pp_kind pp_body = char '[' <> pp_kind <> char '|' <+>
+thBrackets pp_kind pp_body = char '[' <> pp_kind <> vbar <+>
                              pp_body <+> ptext (sLit "|]")
 
 thTyBrackets :: SDoc -> SDoc

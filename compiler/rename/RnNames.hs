@@ -284,6 +284,7 @@ rnImportDecl this_mod
             , imv_is_safe     = mod_safe'
             , imv_is_hiding   = is_hiding
             , imv_all_exports = potential_gres
+            , imv_qualified   = qual_only
             }
     let imports
           = (calculateAvails dflags iface mod_safe' want_boot)

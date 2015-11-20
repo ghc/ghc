@@ -213,29 +213,6 @@ typedef struct _TICKY_FLAGS {
     FILE   *tickyFile;
 } TICKY_FLAGS;
 
-#ifdef USE_PAPI
-#define MAX_PAPI_USER_EVENTS 8
-
-/* See Note [Synchronization of flags and base APIs] */
-typedef struct _PAPI_FLAGS {
-    nat     eventType;          /* The type of events to count */
-    nat     numUserEvents;
-    char *  userEvents[MAX_PAPI_USER_EVENTS];
-    /* Allow user to enter either PAPI preset or native events */
-    nat     userEventsKind[MAX_PAPI_USER_EVENTS];
-} PAPI_FLAGS;
-
-#define PAPI_FLAG_CACHE_L1 1
-#define PAPI_FLAG_CACHE_L2 2
-#define PAPI_FLAG_BRANCH 3
-#define PAPI_FLAG_STALLS 4
-#define PAPI_FLAG_CB_EVENTS 5
-#define PAPI_USER_EVENTS 6
-#define PAPI_PRESET_EVENT_KIND 0
-#define PAPI_NATIVE_EVENT_KIND 1
-
-#endif
-
 /* Put them together: */
 
 /* See Note [Synchronization of flags and base APIs] */
@@ -252,9 +229,6 @@ typedef struct _RTS_FLAGS {
 
 #if defined(THREADED_RTS)
     PAR_FLAGS	      ParFlags;
-#endif
-#ifdef USE_PAPI
-    PAPI_FLAGS        PapiFlags;
 #endif
 } RTS_FLAGS;
 

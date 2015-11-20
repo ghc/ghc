@@ -66,6 +66,7 @@ module TcRnTypes(
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
         isGivenCt, isHoleCt, isOutOfScopeCt, isExprHoleCt, isTypeHoleCt,
+        isUserTypeErrorCt, getUserTypeErrorMsg,
         ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         mkNonCanonical, mkNonCanonicalCt,
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
@@ -152,7 +153,10 @@ import ListSetOps
 import FastString
 import GHC.Fingerprint
 
-import Control.Monad (ap, liftM)
+import Control.Monad (ap, liftM, msum)
+#if __GLASGOW_HASKELL__ > 710
+import qualified Control.Monad.Fail as MonadFail
+#endif
 
 #ifdef GHCI
 import Data.Map      ( Map )
@@ -347,7 +351,6 @@ data DsMetaVal
 -- to have a TcGblEnv which is only defined here.
 data FrontendResult
         = FrontendTypecheck TcGblEnv
-        | FrontendMerge     ModIface
 
 -- | 'TcGblEnv' describes the top-level of the module at the
 -- point at which the typechecker is finished work.
@@ -1651,6 +1654,24 @@ isTypeHoleCt :: Ct -> Bool
 isTypeHoleCt (CHoleCan { cc_hole = TypeHole }) = True
 isTypeHoleCt _ = False
 
+-- | The following constraints are considered to be a custom type error:
+--    1. TypeError msg
+--    2. TypeError msg ~ Something  (and the other way around)
+--    3. C (TypeError msg)          (for any parameter of class constraint)
+getUserTypeErrorMsg :: Ct -> Maybe (Kind, Type)
+getUserTypeErrorMsg ct
+  | Just (_,t1,t2) <- getEqPredTys_maybe ctT    = oneOf [t1,t2]
+  | Just (_,ts)    <- getClassPredTys_maybe ctT = oneOf ts
+  | otherwise                                   = isUserErrorTy ctT
+  where
+  ctT       = ctPred ct
+  oneOf xs  = msum (map isUserErrorTy xs)
+
+isUserTypeErrorCt :: Ct -> Bool
+isUserTypeErrorCt ct = case getUserTypeErrorMsg ct of
+                         Just _ -> True
+                         _      -> False
+
 instance Outputable Ct where
   ppr ct = ppr (cc_ev ct) <+> parens pp_sort
     where 
@@ -2084,7 +2105,8 @@ ctFlavourRole = ctEvFlavourRole . cc_ev
 ~~~~~~~~~~~~~~~~~~~
 (eqCanRewrite ct1 ct2) holds if the constraint ct1 (a CTyEqCan of form
 tv ~ ty) can be used to rewrite ct2.  It must satisfy the properties of
-a can-rewrite relation, see Definition [Can-rewrite relation]
+a can-rewrite relation, see Definition [Can-rewrite relation] in
+TcSMonad.
 
 With the solver handling Coercible constraints like equality constraints,
 the rewrite conditions must take role into account, never allowing
@@ -2110,7 +2132,8 @@ improvement works; see Note [The improvement story] in TcInteract.
 However, for now at least I'm only letting (Derived,NomEq) rewrite
 (Derived,NomEq) and not doing anything for ReprEq.  If we have
     eqCanRewriteFR (Derived, NomEq) (Derived, _)  = True
-then we lose the property of Note [Can-rewrite relation]
+then we lose property R2 of Definition [Can-rewrite relation]
+in TcSMonad
   R2.  If f1 >= f, and f2 >= f,
        then either f1 >= f2 or f2 >= f1
 Consider f1 = (Given, ReprEq)
@@ -2122,12 +2145,27 @@ we can; straight from the Wanteds during improvment. And from a Derived
 ReprEq we could conceivably get a Derived NomEq improvment (by decomposing
 a type constructor with Nomninal role), and hence unify.
 
-Note [canRewriteOrSame]
-~~~~~~~~~~~~~~~~~~~~~~~
-canRewriteOrSame is similar but
- * returns True for Wanted/Wanted.
- * works for all kinds of constraints, not just CTyEqCans
-See the call sites for explanations.
+Note [canDischarge]
+~~~~~~~~~~~~~~~~~~~
+(x1:c1 `canDischarge` x2:c2) returns True if we can use c1 to
+/discharge/ c2; that is, if we can simply drop (x2:c2) altogether,
+perhaps adding a binding for x2 in terms of x1.  We only ask this
+question in two cases:
+
+* Identical equality constraints:
+      (x1:s~t) `canDischarge` (xs:s~t)
+  In this case we can just drop x2 in favour of x1.
+
+* Function calls with the same LHS:
+    (x1:F ts ~ f1) `canDischarge` (x2:F ts ~ f2)
+  Here we can drop x2 in favour of x1, either unifying
+  f2 (if it's a flatten meta-var) or adding a new Given
+  (f1 ~ f2), if x2 is a Given.
+
+This is different from eqCanRewrite; for exammple, a Wanted
+can certainly discharge an identical Wanted.  So canDicharge
+does /not/ define a can-rewrite relation in the sense of
+Definition [Can-rewrite relation] in TcSMonad.
 -}
 
 eqCanRewrite :: CtEvidence -> CtEvidence -> Bool
@@ -2144,7 +2182,7 @@ eqCanRewriteFR (Derived, NomEq)   (Derived, NomEq)  = True
 eqCanRewriteFR _                 _                  = False
 
 canDischarge :: CtEvidence -> CtEvidence -> Bool
--- See Note [canRewriteOrSame]
+-- See Note [canDischarge]
 canDischarge ev1 ev2 = ctEvFlavourRole ev1 `canDischargeFR` ctEvFlavourRole ev2
 
 canDischargeFR :: CtFlavourRole -> CtFlavourRole -> Bool
@@ -2423,6 +2461,7 @@ data CtOrigin
       CtOrigin                  -- originally arising from this
 
   | IPOccOrigin  HsIPName       -- Occurrence of an implicit parameter
+  | OverLabelOrigin FastString  -- Occurrence of an overloaded label
 
   | LiteralOrigin (HsOverLit Name)      -- Occurrence of a literal
   | NegateOrigin                        -- Occurrence of syntactic negation
@@ -2451,7 +2490,11 @@ data CtOrigin
   | StandAloneDerivOrigin -- Typechecking stand-alone deriving
   | DefaultOrigin       -- Typechecking a default decl
   | DoOrigin            -- Arising from a do expression
+  | DoPatOrigin (LPat Name) -- Arising from a failable pattern in
+                            -- a do expression
   | MCompOrigin         -- Arising from a monad comprehension
+  | MCompPatOrigin (LPat Name) -- Arising from a failable pattern in a
+                               -- monad comprehension
   | IfOrigin            -- Arising from an if statement
   | ProcOrigin          -- Arising from a proc expression
   | AnnOrigin           -- An annotation
@@ -2470,6 +2513,9 @@ data CtOrigin
   | UnboundOccurrenceOf RdrName
   | ListOrigin          -- An overloaded list
   | StaticOrigin        -- A static form
+  | FailablePattern (LPat TcId) -- A failable pattern in do-notation for the
+                                -- MonadFail Proposal (MFP). Obsolete when
+                                -- actual desugaring to MonadFail.fail is live.
 
 ctoHerald :: SDoc
 ctoHerald = ptext (sLit "arising from")
@@ -2523,15 +2569,31 @@ pprCtOrigin (DerivOriginCoerce meth ty1 ty2)
        2 (sep [ text "from type" <+> quotes (ppr ty1)
               , nest 2 $ text "to type" <+> quotes (ppr ty2) ])
 
+pprCtOrigin (DoPatOrigin pat)
+    = ctoHerald <+> text "a do statement"
+      $$
+      text "with the failable pattern" <+> quotes (ppr pat)
+
+pprCtOrigin (MCompPatOrigin pat)
+    = ctoHerald <+> hsep [ text "the failable pattern"
+           , quotes (ppr pat)
+           , text "in a statement in a monad comprehension" ]
+pprCtOrigin (FailablePattern pat)
+    = ctoHerald <+> text "the failable pattern" <+> quotes (ppr pat)
+      $$
+      text "(this will become an error a future GHC release)"
+
 pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin
 
-----------------
-pprCtO :: CtOrigin -> SDoc  -- Ones that are short one-liners
+-- | Short one-liners
+pprCtO :: CtOrigin -> SDoc
 pprCtO (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
 pprCtO (OccurrenceOfRecSel name) = hsep [ptext (sLit "a use of"), quotes (ppr name)]
 pprCtO AppOrigin             = ptext (sLit "an application")
 pprCtO (IPOccOrigin name)    = hsep [ptext (sLit "a use of implicit parameter"), quotes (ppr name)]
+pprCtO (OverLabelOrigin l)   = hsep [ptext (sLit "the overloaded label")
+                                    ,quotes (char '#' <> ppr l)]
 pprCtO RecordUpdOrigin       = ptext (sLit "a record update")
 pprCtO ExprSigOrigin         = ptext (sLit "an expression type signature")
 pprCtO PatSigOrigin          = ptext (sLit "a pattern type signature")
@@ -2550,7 +2612,7 @@ pprCtO DerivOrigin           = ptext (sLit "the 'deriving' clause of a data type
 pprCtO StandAloneDerivOrigin = ptext (sLit "a 'deriving' declaration")
 pprCtO DefaultOrigin         = ptext (sLit "a 'default' declaration")
 pprCtO DoOrigin              = ptext (sLit "a do statement")
-pprCtO MCompOrigin           = ptext (sLit "a statement in a monad comprehension")
+pprCtO MCompOrigin           = text "a statement in a monad comprehension"
 pprCtO ProcOrigin            = ptext (sLit "a proc expression")
 pprCtO (TypeEqOrigin t1 t2)  = ptext (sLit "a type equality") <+> sep [ppr t1, char '~', ppr t2]
 pprCtO AnnOrigin             = ptext (sLit "an annotation")
@@ -2584,6 +2646,11 @@ instance Monad TcPluginM where
   TcPluginM m >>= k =
     TcPluginM (\ ev -> do a <- m ev
                           runTcPluginM (k a) ev)
+
+#if __GLASGOW_HASKELL__ > 710
+instance MonadFail.MonadFail TcPluginM where
+  fail x   = TcPluginM (const $ fail x)
+#endif
 
 runTcPluginM :: TcPluginM a -> Maybe EvBindsVar -> TcM a
 runTcPluginM (TcPluginM m) = m

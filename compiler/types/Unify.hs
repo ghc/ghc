@@ -34,6 +34,9 @@ import Outputable
 import FastString (sLit)
 
 import Control.Monad (liftM, foldM, ap)
+#if __GLASGOW_HASKELL__ > 710
+import qualified Control.Monad.Fail as MonadFail
+#endif
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Applicative(..))
 #endif
@@ -728,6 +731,11 @@ instance Monad UM where
                                Unifiable (v', subst'') -> MaybeApart (v', subst'')
                                other                   -> other
                            SurelyApart -> SurelyApart)
+
+#if __GLASGOW_HASKELL__ > 710
+instance MonadFail.MonadFail UM where
+    fail _   = UM (\_tvs _subst -> SurelyApart) -- failed pattern match
+#endif
 
 -- returns an idempotent substitution
 initUM :: (TyVar -> BindFlag) -> UM () -> UnifyResult

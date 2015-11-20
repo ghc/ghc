@@ -32,7 +32,6 @@ Library
         PolymorphicComponents
         RankNTypes
         ScopedTypeVariables
-        TemplateHaskell
         UnboxedTuples
 
     exposed-modules:

@@ -1108,6 +1108,7 @@ repE (HsVar x)            =
         Just (DsSplice e)  -> do { e' <- dsExpr e
                                ; return (MkC e') } }
 repE e@(HsIPVar _) = notHandled "Implicit parameters" (ppr e)
+repE e@(HsOverLabel _) = notHandled "Overloaded labels" (ppr e)
 
 repE e@(HsRecFld f) = case f of
   Unambiguous _ x -> repE (HsVar x)
@@ -1178,11 +1179,11 @@ repE e@(ExplicitTuple es boxed)
   | otherwise      = do { xs <- repLEs [e | L _ (Present e) <- es]
                         ; repUnboxedTup xs }
 
-repE (RecordCon c _ flds _)
+repE (RecordCon { rcon_con_name = c, rcon_flds = flds })
  = do { x <- lookupLOcc c;
         fs <- repFields flds;
         repRecCon x fs }
-repE (RecordUpd e flds _ _ _ _)
+repE (RecordUpd { rupd_expr = e, rupd_flds = flds })
  = do { x <- repLE e;
         fs <- repUpdFields flds;
         repRecUpd x fs }

@@ -75,12 +75,13 @@ module Control.Monad
     , (<$!>)
     ) where
 
-import Data.Foldable ( Foldable, sequence_, msum, mapM_, foldlM, forM_ )
-import Data.Functor ( void )
-import Data.Traversable ( forM, mapM, sequence )
+import Data.Foldable ( Foldable, sequence_, sequenceA_, msum, mapM_, foldlM, forM_ )
+import Data.Functor ( void, (<$>) )
+import Data.Traversable ( forM, mapM, traverse, sequence, sequenceA )
 
 import GHC.Base hiding ( mapM, sequence )
-import GHC.List ( zipWith, unzip, replicate )
+import GHC.Enum ( pred )
+import GHC.List ( zipWith, unzip )
 
 -- -----------------------------------------------------------------------------
 -- Functions mandated by the Prelude
@@ -94,13 +95,8 @@ guard False     =  empty
 -- | This generalizes the list-based 'filter' function.
 
 {-# INLINE filterM #-}
-filterM          :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
-filterM p        = foldr go (return [])
-  where
-    go x r = do
-      flg <- p x
-      ys <- r
-      return (if flg then x:ys else ys)
+filterM          :: (Applicative m) => (a -> m Bool) -> [a] -> m [a]
+filterM p        = foldr (\ x -> liftA2 (\ flg -> if flg then (x:) else id) (p x)) (pure [])
 
 infixr 1 <=<, >=>
 
@@ -125,19 +121,19 @@ forever a   = let a' = a *> a' in a'
 -- | The 'mapAndUnzipM' function maps its first argument over a list, returning
 -- the result as a pair of lists. This function is mainly used with complicated
 -- data structures or a state-transforming monad.
-mapAndUnzipM      :: (Monad m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
+mapAndUnzipM      :: (Applicative m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
 {-# INLINE mapAndUnzipM #-}
-mapAndUnzipM f xs =  sequence (map f xs) >>= return . unzip
+mapAndUnzipM f xs =  unzip <$> traverse f xs
 
--- | The 'zipWithM' function generalizes 'zipWith' to arbitrary monads.
-zipWithM          :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
+-- | The 'zipWithM' function generalizes 'zipWith' to arbitrary applicative functors.
+zipWithM          :: (Applicative m) => (a -> b -> m c) -> [a] -> [b] -> m [c]
 {-# INLINE zipWithM #-}
-zipWithM f xs ys  =  sequence (zipWith f xs ys)
+zipWithM f xs ys  =  sequenceA (zipWith f xs ys)
 
 -- | 'zipWithM_' is the extension of 'zipWithM' which ignores the final result.
-zipWithM_         :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m ()
+zipWithM_         :: (Applicative m) => (a -> b -> m c) -> [a] -> [b] -> m ()
 {-# INLINE zipWithM_ #-}
-zipWithM_ f xs ys =  sequence_ (zipWith f xs ys)
+zipWithM_ f xs ys =  sequenceA_ (zipWith f xs ys)
 
 {- | The 'foldM' function is analogous to 'foldl', except that its result is
 encapsulated in a monad. Note that 'foldM' works from left-to-right over
@@ -175,18 +171,20 @@ foldM_ f a xs  = foldlM f a xs >> return ()
 
 -- | @'replicateM' n act@ performs the action @n@ times,
 -- gathering the results.
-replicateM        :: (Monad m) => Int -> m a -> m [a]
+replicateM        :: (Applicative m) => Int -> m a -> m [a]
 {-# INLINEABLE replicateM #-}
 {-# SPECIALISE replicateM :: Int -> IO a -> IO [a] #-}
 {-# SPECIALISE replicateM :: Int -> Maybe a -> Maybe [a] #-}
-replicateM n x    = sequence (replicate n x)
+replicateM 0 _    = pure []
+replicateM n x    = liftA2 (:) x (replicateM (pred n) x)
 
 -- | Like 'replicateM', but discards the result.
-replicateM_       :: (Monad m) => Int -> m a -> m ()
+replicateM_       :: (Applicative m) => Int -> m a -> m ()
 {-# INLINEABLE replicateM_ #-}
 {-# SPECIALISE replicateM_ :: Int -> IO a -> IO () #-}
 {-# SPECIALISE replicateM_ :: Int -> Maybe a -> Maybe () #-}
-replicateM_ n x   = sequence_ (replicate n x)
+replicateM_ 0 _   = pure ()
+replicateM_ n x   = x *> replicateM_ (pred n) x
 
 -- | The reverse of 'when'.
 unless            :: (Applicative f) => Bool -> f () -> f ()

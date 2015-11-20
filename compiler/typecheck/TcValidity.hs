@@ -35,6 +35,7 @@ import Class
 import TyCon
 
 -- others:
+import Coercion    ( pprCoAxBranch )
 import HsSyn            -- HsType
 import TcRnMonad        -- TcType, amongst others
 import FunDeps
@@ -237,6 +238,16 @@ wantAmbiguityCheck ctxt
 --      InfSigCtxt {} -> False   -- See Note [Validity of inferred types] in TcBinds
       _ -> True
 
+
+checkUserTypeError :: Type -> TcM ()
+checkUserTypeError = check
+  where
+  check ty
+    | Just (_,msg) <- isUserErrorTy ty = failWithTc (pprUserTypeErrorTy msg)
+    | Just (_,ts)  <- splitTyConApp_maybe ty  = mapM_ check ts
+    | Just (t1,t2) <- splitAppTy_maybe ty     = check t1 >> check t2
+    | otherwise                               = return ()
+
 {-
 ************************************************************************
 *                                                                      *
@@ -317,6 +328,8 @@ checkValidType ctxt ty
         -- Do this *after* check_type, because we can't usefully take
         -- the kind of an ill-formed type such as (a~Int)
        ; check_kind ctxt ty
+
+       ; checkUserTypeError ty
 
        -- Check for ambiguous types.  See Note [When to call checkAmbiguity]
        -- NB: this will happen even for monotypes, but that should be cheap;
@@ -1234,7 +1247,7 @@ wrongATArgErr ty instTy =
 -}
 
 checkValidCoAxiom :: CoAxiom Branched -> TcM ()
-checkValidCoAxiom (CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
+checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
   = do { mapM_ (checkValidCoAxBranch Nothing fam_tc) branch_list
        ; foldlM_ check_branch_compat [] branch_list }
   where
@@ -1250,7 +1263,7 @@ checkValidCoAxiom (CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
     check_branch_compat prev_branches cur_branch
       | cur_branch `isDominatedBy` prev_branches
       = do { addWarnAt (coAxBranchSpan cur_branch) $
-             inaccessibleCoAxBranch fam_tc cur_branch
+             inaccessibleCoAxBranch ax cur_branch
            ; return prev_branches }
       | otherwise
       = do { check_injectivity prev_branches cur_branch
@@ -1266,7 +1279,7 @@ checkValidCoAxiom (CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
                      fst $ foldl (gather_conflicts inj prev_branches cur_branch)
                                  ([], 0) prev_branches
            ; mapM_ (\(err, span) -> setSrcSpan span $ addErr err)
-                   (makeInjectivityErrors fam_tc cur_branch inj conflicts) }
+                   (makeInjectivityErrors ax cur_branch inj conflicts) }
       | otherwise
       = return ()
 
@@ -1384,13 +1397,10 @@ isTyFamFree = null . tcTyFamInsts
 
 -- Error messages
 
-inaccessibleCoAxBranch :: TyCon -> CoAxBranch -> SDoc
-inaccessibleCoAxBranch fam_tc (CoAxBranch { cab_tvs = tvs
-                                          , cab_lhs = lhs
-                                          , cab_rhs = rhs })
+inaccessibleCoAxBranch :: CoAxiom br -> CoAxBranch -> SDoc
+inaccessibleCoAxBranch fi_ax cur_branch
   = ptext (sLit "Type family instance equation is overlapped:") $$
-    hang (pprUserForAll tvs)
-       2 (hang (pprTypeApp fam_tc lhs) 2 (equals <+> (ppr rhs)))
+    nest 2 (pprCoAxBranch fi_ax cur_branch)
 
 tyFamInstIllegalErr :: Type -> SDoc
 tyFamInstIllegalErr ty

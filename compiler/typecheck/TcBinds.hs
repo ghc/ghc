@@ -22,7 +22,7 @@ import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
 import {-# SOURCE #-} TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl, tcPatSynBuilderBind )
 import DynFlags
 import HsSyn
-import HscTypes( isHsBoot )
+import HscTypes( isHsBootOrSig )
 import TcRnMonad
 import TcEnv
 import TcUnify
@@ -75,7 +75,7 @@ import Data.List (partition)
 
 addTypecheckedBinds :: TcGblEnv -> [LHsBinds Id] -> TcGblEnv
 addTypecheckedBinds tcg_env binds
-  | isHsBoot (tcg_src tcg_env) = tcg_env
+  | isHsBootOrSig (tcg_src tcg_env) = tcg_env
     -- Do not add the code for record-selector bindings
     -- when compiling hs-boot files
   | otherwise = tcg_env { tcg_binds = foldr unionBags
@@ -1830,7 +1830,7 @@ decideGeneralisationPlan
    :: DynFlags -> TcTypeEnv -> [Name]
    -> [LHsBind Name] -> TcSigFun -> GeneralisationPlan
 decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
-  | strict_pat_binds                      = NoGen
+  | unlifted_pat_binds                    = NoGen
   | Just bind_sig <- one_funbind_with_sig = sig_plan bind_sig
   | mono_local_binds                      = NoGen
   | otherwise                             = InferGen mono_restriction
@@ -1853,8 +1853,8 @@ decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
              | otherwise
              -> InferGen False  -- Don't apply the MR
 
-    strict_pat_binds = any isStrictHsBind binds
-       -- Strict patterns (top level bang or unboxed tuple) must not
+    unlifted_pat_binds = any isUnliftedHsBind binds
+       -- Unlifted patterns (unboxed tuple) must not
        -- be polymorphic, because we are going to force them
        -- See Trac #4498, #8762
 
@@ -1953,7 +1953,7 @@ checkStrictBinds top_lvl rec_group orig_binds tc_binds poly_ids
     return ()
   where
     any_unlifted_bndr  = any is_unlifted poly_ids
-    any_strict_pat     = any (isStrictHsBind   . unLoc) orig_binds
+    any_strict_pat     = any (isUnliftedHsBind . unLoc) orig_binds
     any_pat_looks_lazy = any (looksLazyPatBind . unLoc) orig_binds
 
     is_unlifted id = case tcSplitSigmaTy (idType id) of
@@ -1983,7 +1983,7 @@ polyBindErr :: [LHsBind Name] -> SDoc
 polyBindErr binds
   = hang (ptext (sLit "You can't mix polymorphic and unlifted bindings"))
        2 (vcat [vcat (map ppr binds),
-                ptext (sLit "Probable fix: use a bang pattern")])
+                ptext (sLit "Probable fix: add a type signature")])
 
 strictBindErr :: String -> Bool -> [LHsBind Name] -> SDoc
 strictBindErr flavour any_unlifted_bndr binds

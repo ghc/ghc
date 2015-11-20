@@ -10,7 +10,8 @@ general, all of these functions return a renamed thing, and a set of
 free variables.
 -}
 
-{-# LANGUAGE CPP, ScopedTypeVariables, RecordWildCards #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module RnExpr (
         rnLExpr, rnExpr, rnStmts
@@ -113,6 +114,9 @@ rnExpr (HsVar v)
 
 rnExpr (HsIPVar v)
   = return (HsIPVar v, emptyFVs)
+
+rnExpr (HsOverLabel v)
+  = return (HsOverLabel v, emptyFVs)
 
 rnExpr (HsLit lit@(HsString src s))
   = do { opt_OverloadedStrings <- xoptM Opt_OverloadedStrings
@@ -251,23 +255,25 @@ rnExpr (ExplicitTuple tup_args boxity)
     rnTupArg (L l (Missing _)) = return (L l (Missing placeHolderType)
                                         , emptyFVs)
 
-rnExpr (RecordCon con_id _ rec_binds@(HsRecFields { rec_dotdot = dd }) _)
+rnExpr (RecordCon { rcon_con_name = con_id
+                  , rcon_flds = rec_binds@(HsRecFields { rec_dotdot = dd }) })
   = do { con_lname@(L _ con_name) <- lookupLocatedOccRn con_id
        ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon con_name) HsVar rec_binds
        ; (flds', fvss) <- mapAndUnzipM rn_field flds
        ; let rec_binds' = HsRecFields { rec_flds = flds', rec_dotdot = dd }
-       ; return ( RecordCon con_lname noPostTcExpr rec_binds' PlaceHolder
+       ; return (RecordCon { rcon_con_name = con_lname, rcon_flds = rec_binds'
+                           , rcon_con_expr = noPostTcExpr, rcon_con_like = PlaceHolder }
                 , fvs `plusFV` plusFVs fvss `addOneFV` con_name) }
   where
     rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hsRecFieldArg fld)
                             ; return (L l (fld { hsRecFieldArg = arg' }), fvs) }
 
-rnExpr (RecordUpd expr rbinds _ _ _ _)
+rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
   = do  { (expr', fvExpr) <- rnLExpr expr
         ; (rbinds', fvRbinds) <- rnHsRecUpdFields rbinds
-        ; return (RecordUpd expr' rbinds'
-                            PlaceHolder PlaceHolder
-                            PlaceHolder PlaceHolder
+        ; return (RecordUpd { rupd_expr = expr', rupd_flds = rbinds'
+                            , rupd_cons    = PlaceHolder, rupd_in_tys = PlaceHolder
+                            , rupd_out_tys = PlaceHolder, rupd_wrap   = PlaceHolder }
                  , fvExpr `plusFV` fvRbinds) }
 
 rnExpr (ExprWithTySig expr pty)
@@ -771,7 +777,12 @@ rnStmt ctxt rnBody (L loc (BindStmt pat body _ _)) thing_inside
   = do  { (body', fv_expr) <- rnBody body
                 -- The binders do not scope over the expression
         ; (bind_op, fvs1) <- lookupStmtName ctxt bindMName
-        ; (fail_op, fvs2) <- lookupStmtName ctxt failMName
+
+        ; xMonadFailEnabled <- fmap (xopt Opt_MonadFailDesugaring) getDynFlags
+        ; let failFunction | xMonadFailEnabled = failMName
+                           | otherwise         = failMName_preMFP
+        ; (fail_op, fvs2) <- lookupSyntaxName failFunction
+
         ; rnPat (StmtCtxt ctxt) pat $ \ pat' -> do
         { (thing, fvs3) <- thing_inside (collectPatBinders pat')
         ; return (( [(L loc (BindStmt pat' body' bind_op fail_op), fv_expr)]
@@ -1075,7 +1086,12 @@ rn_rec_stmt rnBody _ (L loc (BodyStmt body _ _ _), _)
 rn_rec_stmt rnBody _ (L loc (BindStmt pat' body _ _), fv_pat)
   = do { (body', fv_expr) <- rnBody body
        ; (bind_op, fvs1) <- lookupSyntaxName bindMName
-       ; (fail_op, fvs2) <- lookupSyntaxName failMName
+
+       ; xMonadFailEnabled <- fmap (xopt Opt_MonadFailDesugaring) getDynFlags
+       ; let failFunction | xMonadFailEnabled = failMName
+                          | otherwise         = failMName_preMFP
+       ; (fail_op, fvs2) <- lookupSyntaxName failFunction
+
        ; let bndrs = mkNameSet (collectPatBinders pat')
              fvs   = fv_expr `plusFV` fv_pat `plusFV` fvs1 `plusFV` fvs2
        ; return [(bndrs, fvs, bndrs `intersectNameSet` fvs,

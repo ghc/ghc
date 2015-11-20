@@ -545,7 +545,7 @@ tidy1 v (AsPat (L _ var) pat)
 -}
 
 tidy1 v (LazyPat pat)
-  = do  { sel_prs <- mkSelectorBinds [] pat (Var v)
+  = do  { (_,sel_prs) <- mkSelectorBinds False [] pat (Var v)
         ; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
         ; return (mkCoreLets sel_binds, WildPat (idType v)) }
 
@@ -804,9 +804,14 @@ matchWrapper ctxt (MG { mg_alts = L _ matches
         ; return (new_vars, result_expr) }
   where
     mk_eqn_info (L _ (Match _ pats _ grhss))
-      = do { let upats = map unLoc pats
+      = do { dflags <- getDynFlags
+           ; let upats = map (strictify dflags) pats
            ; match_result <- dsGRHSs ctxt upats grhss rhs_ty
            ; return (EqnInfo { eqn_pats = upats, eqn_rhs  = match_result}) }
+
+    strictify dflags pat =
+      let (is_strict, pat') = getUnBangedLPat dflags pat
+      in if is_strict then BangPat pat' else unLoc pat'
 
     handleWarnings = if isGenerated origin
                      then discardWarningsDs
@@ -981,6 +986,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     -- the instance for IPName derives using the id, so this works if the
     -- above does
     exp (HsIPVar i) (HsIPVar i') = i == i'
+    exp (HsOverLabel l) (HsOverLabel l') = l == l'
     exp (HsOverLit l) (HsOverLit l') =
         -- Overloaded lits are equal if they have the same type
         -- and the data is the same.

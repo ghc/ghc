@@ -478,6 +478,12 @@ FP_ARG_WITH_PATH_GNU_PROG([NM], [nm], [nm])
 NmCmd="$NM"
 AC_SUBST([NmCmd])
 
+dnl ** Which objdump to use?
+dnl --------------------------------------------------------------
+FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([OBJDUMP], [objdump], [objdump])
+ObjdumpCmd="$OBJDUMP"
+AC_SUBST([ObjdumpCmd])
+
 dnl ** Which ar to use?
 dnl --------------------------------------------------------------
 FP_ARG_WITH_PATH_GNU_PROG([AR], [ar], [ar])
@@ -1006,12 +1012,6 @@ AC_COMPILE_IFELSE(
   ])
 
 
-dnl ** checking for PAPI
-AC_CHECK_LIB(papi, PAPI_library_init, HavePapiLib=YES, HavePapiLib=NO)
-AC_CHECK_HEADER([papi.h], [HavePapiHeader=YES], [HavePapiHeader=NO])
-AC_SUBST(HavePapiLib)
-AC_SUBST(HavePapiHeader)
-
 AC_CHECK_FUNCS(__mingw_vfprintf)
 
 if test "$HavePapiLib" = "YES" -a "$HavePapiHeader" = "YES"; then
@@ -1158,6 +1158,8 @@ echo ["\
    hs-cpp       : $HaskellCPPCmd
    hs-cpp-flags : $HaskellCPPArgs
    ld           : $LdCmd
+   nm           : $NmCmd
+   objdump      : $ObjdumpCmd
    Happy        : $HappyCmd ($HappyVersion)
    Alex         : $AlexCmd ($AlexVersion)
    Perl         : $PerlCmd

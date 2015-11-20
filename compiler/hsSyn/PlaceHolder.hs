@@ -110,6 +110,7 @@ type DataId id =
   , Data (PostTc id Coercion)
   , Data (PostTc id id)
   , Data (PostTc id [Type])
+  , Data (PostTc id ConLike)
   , Data (PostTc id [ConLike])
   , Data (PostTc id HsWrapper)
   , Data (PostTc id [FieldLabel])

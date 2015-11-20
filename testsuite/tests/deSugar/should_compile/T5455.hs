@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fwarn-incomplete-uni-patterns #-}
 module T5455 where
 
--- No error message for this one: 
+-- No error message for this one:
 -- the pattern will never be demanded
 
 w :: String -> String

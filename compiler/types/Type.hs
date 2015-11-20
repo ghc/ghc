@@ -39,6 +39,8 @@ module Type (
         mkNumLitTy, isNumLitTy,
         mkStrLitTy, isStrLitTy,
 
+        isUserErrorTy, pprUserTypeErrorTy,
+
         coAxNthLHS,
 
         -- (Newtypes)
@@ -165,7 +167,13 @@ import TysPrim
 import {-# SOURCE #-} TysWiredIn ( eqTyCon, coercibleTyCon, typeNatKind, typeSymbolKind )
 import PrelNames ( eqTyConKey, coercibleTyConKey,
                    ipTyConKey, openTypeKindTyConKey,
-                   constraintKindTyConKey, liftedTypeKindTyConKey )
+                   constraintKindTyConKey, liftedTypeKindTyConKey,
+                   errorMessageTypeErrorFamName,
+                   typeErrorTextDataConName,
+                   typeErrorShowTypeDataConName,
+                   typeErrorAppendDataConName,
+                   typeErrorVAppendDataConName
+                )
 import CoAxiom
 
 -- others
@@ -447,6 +455,44 @@ isStrLitTy :: Type -> Maybe FastString
 isStrLitTy ty | Just ty1 <- tcView ty = isStrLitTy ty1
 isStrLitTy (LitTy (StrTyLit s)) = Just s
 isStrLitTy _                    = Nothing
+
+
+-- | Is this type a custom user error?
+-- If so, give us the kind and the error message.
+isUserErrorTy :: Type -> Maybe (Kind,Type)
+isUserErrorTy t = do (tc,[k,msg]) <- splitTyConApp_maybe t
+                     guard (tyConName tc == errorMessageTypeErrorFamName)
+                     return (k,msg)
+
+-- | Render a type corresponding to a user type error into a SDoc.
+pprUserTypeErrorTy :: Type -> SDoc
+pprUserTypeErrorTy ty =
+  case splitTyConApp_maybe ty of
+
+    -- Text "Something"
+    Just (tc,[txt])
+      | tyConName tc == typeErrorTextDataConName
+      , Just str <- isStrLitTy txt -> ftext str
+
+    -- ShowType t
+    Just (tc,[_k,t])
+      | tyConName tc == typeErrorShowTypeDataConName -> ppr t
+
+    -- t1 :<>: t2
+    Just (tc,[t1,t2])
+      | tyConName tc == typeErrorAppendDataConName ->
+        pprUserTypeErrorTy t1 <> pprUserTypeErrorTy t2
+
+    -- t1 :$$: t2
+    Just (tc,[t1,t2])
+      | tyConName tc == typeErrorVAppendDataConName ->
+        pprUserTypeErrorTy t1 $$ pprUserTypeErrorTy t2
+
+    -- An uneavaluated type function
+    _ -> ppr ty
+
+
+
 
 {-
 ---------------------------------------------------------------------

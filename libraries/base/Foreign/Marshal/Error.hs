@@ -30,10 +30,6 @@ module Foreign.Marshal.Error (
 
 import Foreign.Ptr
 
-#ifdef __HADDOCK__
-import Data.Bool
-import System.IO.Error
-#endif
 import GHC.Base
 import GHC.Num
 import GHC.IO.Exception

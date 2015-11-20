@@ -39,6 +39,7 @@ module TypeRep (
         pprKind, pprParendKind, pprTyLit, suppressKinds,
         TyPrec(..), maybeParen, pprTcApp,
         pprPrefixApp, pprArrowChain, ppr_type,
+        pprDataCons,
 
         -- Free variables
         tyVarsOfType, tyVarsOfTypes, closeOverKinds, varSetElemsKvsFirst,
@@ -59,7 +60,7 @@ module TypeRep (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DataCon( dataConTyCon )
+import {-# SOURCE #-} DataCon( DataCon, dataConTyCon, dataConFullSig )
 import {-# SOURCE #-} ConLike ( ConLike(..) )
 import {-# SOURCE #-} Type( isPredTy ) -- Transitively pulls in a LOT of stuff, better to break the loop
 
@@ -77,6 +78,7 @@ import CoAxiom
 import PrelNames
 import Outputable
 import FastString
+import ListSetOps
 import Util
 import DynFlags
 import StaticFlags( opt_PprStyle_Debug )
@@ -693,6 +695,20 @@ remember to parenthesise the operator, thus
 See Trac #2766.
 -}
 
+pprDataCons :: TyCon -> SDoc
+pprDataCons = sepWithVBars . fmap pprDataConWithArgs . tyConDataCons
+  where
+    sepWithVBars [] = empty
+    sepWithVBars docs = sep (punctuate (space <> vbar) docs)
+
+pprDataConWithArgs :: DataCon -> SDoc
+pprDataConWithArgs dc = sep [forAllDoc, thetaDoc, ppr dc <+> argsDoc]
+  where
+    (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty) = dataConFullSig dc
+    forAllDoc = pprUserForAll ((univ_tvs `minusList` map fst eq_spec) ++ ex_tvs)
+    thetaDoc  = pprThetaArrowTy theta
+    argsDoc   = hsep (fmap pprParendType arg_tys)
+
 pprTypeApp :: TyCon -> [Type] -> SDoc
 pprTypeApp tc tys = pprTyTcApp TopPrec tc tys
         -- We have to use ppr on the TyCon (not its name)
@@ -713,6 +729,8 @@ pprTyTcApp p tc tys
     if gopt Opt_PrintExplicitKinds dflags then pprTcApp  p ppr_type tc tys
                                    else pprTyList p ty1 ty2
 
+  | tc `hasKey` errorMessageTypeErrorFamKey = text "(TypeError ...)"
+
   | otherwise
   = pprTcApp p ppr_type tc tys
 
@@ -721,6 +739,7 @@ pprTcApp :: TyPrec -> (TyPrec -> a -> SDoc) -> TyCon -> [a] -> SDoc
 pprTcApp _ pp tc [ty]
   | tc `hasKey` listTyConKey = pprPromotionQuote tc <> brackets   (pp TopPrec ty)
   | tc `hasKey` parrTyConKey = pprPromotionQuote tc <> paBrackets (pp TopPrec ty)
+
 
 pprTcApp p pp tc tys
   | Just sort <- tyConTuple_maybe tc

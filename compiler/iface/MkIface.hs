@@ -9,13 +9,10 @@
 -- writing them to disk and comparing two versions to see if
 -- recompilation is required.
 module MkIface (
-        mkUsedNames,
-        mkDependencies,
         mkIface,        -- Build a ModIface from a ModGuts,
                         -- including computing version information
 
         mkIfaceTc,
-        mkIfaceDirect,
 
         writeIfaceFile, -- Write the interface file
 
@@ -64,6 +61,7 @@ import IfaceSyn
 import LoadIface
 import FlagChecker
 
+import Desugar ( mkUsageInfo, mkUsedNames, mkDependencies )
 import Id
 import IdInfo
 import Demand
@@ -102,13 +100,11 @@ import Digraph
 import SrcLoc
 import Outputable
 import BasicTypes       hiding ( SuccessFlag(..) )
-import UniqFM
 import Unique
 import Util             hiding ( eqListBy )
 import FastString
 import FastStringEnv
 import Maybes
-import ListSetOps
 import Binary
 import Fingerprint
 import Exception
@@ -116,7 +112,6 @@ import Exception
 import Control.Monad
 import Data.Function
 import Data.List
-import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Ord
 import Data.IORef
@@ -143,51 +138,20 @@ mkIface :: HscEnv
 mkIface hsc_env maybe_old_fingerprint mod_details
          ModGuts{     mg_module       = this_mod,
                       mg_hsc_src      = hsc_src,
-                      mg_used_names   = used_names,
+                      mg_usages       = usages,
                       mg_used_th      = used_th,
                       mg_deps         = deps,
-                      mg_dir_imps     = dir_imp_mods,
                       mg_rdr_env      = rdr_env,
                       mg_fix_env      = fix_env,
                       mg_warns        = warns,
                       mg_hpc_info     = hpc_info,
                       mg_safe_haskell = safe_mode,
-                      mg_trust_pkg    = self_trust,
-                      mg_dependent_files = dependent_files
+                      mg_trust_pkg    = self_trust
                     }
         = mkIface_ hsc_env maybe_old_fingerprint
-                   this_mod hsc_src used_names used_th deps rdr_env fix_env
-                   warns hpc_info dir_imp_mods self_trust dependent_files
-                   safe_mode mod_details
-
--- | Make an interface from a manually constructed 'ModIface'.  We use
--- this when we are merging 'ModIface's.  We assume that the 'ModIface'
--- has accurate entries but not accurate fingerprint information (so,
--- like @intermediate_iface@ in 'mkIface_'.)
-mkIfaceDirect :: HscEnv
-              -> Maybe Fingerprint
-              -> ModIface
-              -> IO (ModIface, Bool)
-mkIfaceDirect hsc_env maybe_old_fingerprint iface0 = do
-    -- Sort some things to make sure we're deterministic
-    let intermediate_iface = iface0 {
-            mi_exports   = mkIfaceExports (mi_exports iface0),
-            mi_insts     = sortBy cmp_inst     (mi_insts iface0),
-            mi_fam_insts = sortBy cmp_fam_inst (mi_fam_insts iface0),
-            mi_rules     = sortBy cmp_rule     (mi_rules iface0)
-        }
-        dflags = hsc_dflags hsc_env
-    (final_iface, no_change_at_all)
-          <- {-# SCC "versioninfo" #-}
-                   addFingerprints hsc_env maybe_old_fingerprint
-                                   intermediate_iface
-                                   (map snd (mi_decls iface0))
-
-    -- Debug printing
-    dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE"
-                  (pprModIface final_iface)
-
-    return (final_iface, no_change_at_all)
+                   this_mod hsc_src used_th deps rdr_env fix_env
+                   warns hpc_info self_trust
+                   safe_mode usages mod_details
 
 -- | make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
@@ -215,62 +179,25 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
           let hpc_info = emptyHpcInfo other_hpc_info
           used_th <- readIORef tc_splice_used
           dep_files <- (readIORef dependent_files)
+          usages <- mkUsageInfo hsc_env this_mod (imp_mods imports) used_names dep_files
           mkIface_ hsc_env maybe_old_fingerprint
-                   this_mod hsc_src used_names
+                   this_mod hsc_src
                    used_th deps rdr_env
-                   fix_env warns hpc_info (imp_mods imports)
-                   (imp_trust_own_pkg imports) dep_files safe_mode mod_details
+                   fix_env warns hpc_info
+                   (imp_trust_own_pkg imports) safe_mode usages mod_details
 
-
-mkUsedNames :: TcGblEnv -> NameSet
-mkUsedNames TcGblEnv{ tcg_dus = dus } = allUses dus
-
--- | Extract information from the rename and typecheck phases to produce
--- a dependencies information for the module being compiled.
-mkDependencies :: TcGblEnv -> IO Dependencies
-mkDependencies
-          TcGblEnv{ tcg_mod = mod,
-                    tcg_imports = imports,
-                    tcg_th_used = th_var
-                  }
- = do
-      -- Template Haskell used?
-      th_used <- readIORef th_var
-      let dep_mods = eltsUFM (delFromUFM (imp_dep_mods imports) (moduleName mod))
-                -- M.hi-boot can be in the imp_dep_mods, but we must remove
-                -- it before recording the modules on which this one depends!
-                -- (We want to retain M.hi-boot in imp_dep_mods so that
-                --  loadHiBootInterface can see if M's direct imports depend
-                --  on M.hi-boot, and hence that we should do the hi-boot consistency
-                --  check.)
-
-          pkgs | th_used   = insertList thUnitId (imp_dep_pkgs imports)
-               | otherwise = imp_dep_pkgs imports
-
-          -- Set the packages required to be Safe according to Safe Haskell.
-          -- See Note [RnNames . Tracking Trust Transitively]
-          sorted_pkgs = sortBy stableUnitIdCmp pkgs
-          trust_pkgs  = imp_trust_pkgs imports
-          dep_pkgs'   = map (\x -> (x, x `elem` trust_pkgs)) sorted_pkgs
-
-      return Deps { dep_mods   = sortBy (stableModuleNameCmp `on` fst) dep_mods,
-                    dep_pkgs   = dep_pkgs',
-                    dep_orphs  = sortBy stableModuleCmp (imp_orphs  imports),
-                    dep_finsts = sortBy stableModuleCmp (imp_finsts imports) }
-                    -- sort to get into canonical order
-                    -- NB. remember to use lexicographic ordering
 
 mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> HscSource
-         -> NameSet -> Bool -> Dependencies -> GlobalRdrEnv
+         -> Bool -> Dependencies -> GlobalRdrEnv
          -> NameEnv FixItem -> Warnings -> HpcInfo
-         -> ImportedMods -> Bool
-         -> [FilePath]
+         -> Bool
          -> SafeHaskellMode
+         -> [Usage]
          -> ModDetails
          -> IO (ModIface, Bool)
 mkIface_ hsc_env maybe_old_fingerprint
-         this_mod hsc_src used_names used_th deps rdr_env fix_env src_warns
-         hpc_info dir_imp_mods pkg_trust_req dependent_files safe_mode
+         this_mod hsc_src used_th deps rdr_env fix_env src_warns
+         hpc_info pkg_trust_req safe_mode usages
          ModDetails{  md_insts     = insts,
                       md_fam_insts = fam_insts,
                       md_rules     = rules,
@@ -284,8 +211,6 @@ mkIface_ hsc_env maybe_old_fingerprint
 --      to expose in the interface
 
   = do
-    usages  <- mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files
-
     let entities = typeEnvElts type_env
         decls  = [ tyThingToIfaceDecl entity
                  | entity <- entities,
@@ -365,6 +290,11 @@ mkIface_ hsc_env maybe_old_fingerprint
 
     return (final_iface, no_change_at_all)
   where
+     cmp_rule     = comparing ifRuleName
+     -- Compare these lexicographically by OccName, *not* by unique,
+     -- because the latter is not stable across compilations:
+     cmp_inst     = comparing (nameOccName . ifDFun)
+     cmp_fam_inst = comparing (nameOccName . ifFamInstTcName)
 
      dflags = hsc_dflags hsc_env
 
@@ -382,6 +312,8 @@ mkIface_ hsc_env maybe_old_fingerprint
      deliberatelyOmitted :: String -> a
      deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
 
+     ifFamInstTcName = ifFamInstFam
+
      flattenVectInfo (VectInfo { vectInfoVar            = vVar
                                , vectInfoTyCon          = vTyCon
                                , vectInfoParallelVars     = vParallelVars
@@ -394,16 +326,6 @@ mkIface_ hsc_env maybe_old_fingerprint
        , ifaceVectInfoParallelVars   = [Var.varName v | v <- varSetElems vParallelVars]
        , ifaceVectInfoParallelTyCons = nameSetElems vParallelTyCons
        }
-
-cmp_rule :: IfaceRule -> IfaceRule -> Ordering
-cmp_rule     = comparing ifRuleName
--- Compare these lexicographically by OccName, *not* by unique,
--- because the latter is not stable across compilations:
-cmp_inst :: IfaceClsInst -> IfaceClsInst -> Ordering
-cmp_inst     = comparing (nameOccName . ifDFun)
-
-cmp_fam_inst :: IfaceFamInst -> IfaceFamInst -> Ordering
-cmp_fam_inst = comparing (nameOccName . ifFamInstFam)
 
 -----------------------------
 writeIfaceFile :: DynFlags -> FilePath -> ModIface -> IO ()
@@ -930,143 +852,6 @@ mkOrphMap get_key decls
 ************************************************************************
 -}
 
-mkUsageInfo :: HscEnv -> Module -> ImportedMods -> NameSet -> [FilePath] -> IO [Usage]
-mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files
-  = do
-    eps <- hscEPS hsc_env
-    hashes <- mapM getFileHash dependent_files
-    let mod_usages = mk_mod_usage_info (eps_PIT eps) hsc_env this_mod
-                                       dir_imp_mods used_names
-    let usages = mod_usages ++ [ UsageFile { usg_file_path = f
-                                           , usg_file_hash = hash }
-                               | (f, hash) <- zip dependent_files hashes ]
-    usages `seqList` return usages
-    -- seq the list of Usages returned: occasionally these
-    -- don't get evaluated for a while and we can end up hanging on to
-    -- the entire collection of Ifaces.
-
-mk_mod_usage_info :: PackageIfaceTable
-              -> HscEnv
-              -> Module
-              -> ImportedMods
-              -> NameSet
-              -> [Usage]
-mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
-  = mapMaybe mkUsage usage_mods
-  where
-    hpt = hsc_HPT hsc_env
-    dflags = hsc_dflags hsc_env
-    this_pkg = thisPackage dflags
-
-    used_mods    = moduleEnvKeys ent_map
-    dir_imp_mods = moduleEnvKeys direct_imports
-    all_mods     = used_mods ++ filter (`notElem` used_mods) dir_imp_mods
-    usage_mods   = sortBy stableModuleCmp all_mods
-                        -- canonical order is imported, to avoid interface-file
-                        -- wobblage.
-
-    -- ent_map groups together all the things imported and used
-    -- from a particular module
-    ent_map :: ModuleEnv [OccName]
-    ent_map  = foldNameSet add_mv emptyModuleEnv used_names
-     where
-      add_mv name mv_map
-        | isWiredInName name = mv_map  -- ignore wired-in names
-        | otherwise
-        = case nameModule_maybe name of
-             Nothing  -> ASSERT2( isSystemName name, ppr name ) mv_map
-                -- See Note [Internal used_names]
-
-             Just mod -> -- This lambda function is really just a
-                         -- specialised (++); originally came about to
-                         -- avoid quadratic behaviour (trac #2680)
-                         extendModuleEnvWith (\_ xs -> occ:xs) mv_map mod [occ]
-                where occ = nameOccName name
-
-    -- We want to create a Usage for a home module if
-    --  a) we used something from it; has something in used_names
-    --  b) we imported it, even if we used nothing from it
-    --     (need to recompile if its export list changes: export_fprint)
-    mkUsage :: Module -> Maybe Usage
-    mkUsage mod
-      | isNothing maybe_iface           -- We can't depend on it if we didn't
-                                        -- load its interface.
-      || mod == this_mod                -- We don't care about usages of
-                                        -- things in *this* module
-      = Nothing
-
-      | moduleUnitId mod /= this_pkg
-      = Just UsagePackageModule{ usg_mod      = mod,
-                                 usg_mod_hash = mod_hash,
-                                 usg_safe     = imp_safe }
-        -- for package modules, we record the module hash only
-
-      | (null used_occs
-          && isNothing export_hash
-          && not is_direct_import
-          && not finsts_mod)
-      = Nothing                 -- Record no usage info
-        -- for directly-imported modules, we always want to record a usage
-        -- on the orphan hash.  This is what triggers a recompilation if
-        -- an orphan is added or removed somewhere below us in the future.
-
-      | otherwise
-      = Just UsageHomeModule {
-                      usg_mod_name = moduleName mod,
-                      usg_mod_hash = mod_hash,
-                      usg_exports  = export_hash,
-                      usg_entities = Map.toList ent_hashs,
-                      usg_safe     = imp_safe }
-      where
-        maybe_iface  = lookupIfaceByModule dflags hpt pit mod
-                -- In one-shot mode, the interfaces for home-package
-                -- modules accumulate in the PIT not HPT.  Sigh.
-
-        Just iface   = maybe_iface
-        finsts_mod   = mi_finsts    iface
-        hash_env     = mi_hash_fn   iface
-        mod_hash     = mi_mod_hash  iface
-        export_hash | depend_on_exports = Just (mi_exp_hash iface)
-                    | otherwise         = Nothing
-
-        (is_direct_import, imp_safe)
-            = case lookupModuleEnv direct_imports mod of
-                Just (imv : _xs) -> (True, imv_is_safe imv)
-                Just _           -> pprPanic "mkUsage: empty direct import" Outputable.empty
-                Nothing          -> (False, safeImplicitImpsReq dflags)
-                -- Nothing case is for implicit imports like 'System.IO' when 'putStrLn'
-                -- is used in the source code. We require them to be safe in Safe Haskell
-
-        used_occs = lookupModuleEnv ent_map mod `orElse` []
-
-        -- Making a Map here ensures that (a) we remove duplicates
-        -- when we have usages on several subordinates of a single parent,
-        -- and (b) that the usages emerge in a canonical order, which
-        -- is why we use Map rather than OccEnv: Map works
-        -- using Ord on the OccNames, which is a lexicographic ordering.
-        ent_hashs :: Map OccName Fingerprint
-        ent_hashs = Map.fromList (map lookup_occ used_occs)
-
-        lookup_occ occ =
-            case hash_env occ of
-                Nothing -> pprPanic "mkUsage" (ppr mod <+> ppr occ <+> ppr used_names)
-                Just r  -> r
-
-        depend_on_exports = is_direct_import
-        {- True
-              Even if we used 'import M ()', we have to register a
-              usage on the export list because we are sensitive to
-              changes in orphan instances/rules.
-           False
-              In GHC 6.8.x we always returned true, and in
-              fact it recorded a dependency on *all* the
-              modules underneath in the dependency tree.  This
-              happens to make orphans work right, but is too
-              expensive: it'll read too many interface files.
-              The 'isNothing maybe_iface' check above saved us
-              from generating many of these usages (at least in
-              one-shot mode), but that's even more bogus!
-        -}
 
 mkIfaceAnnotation :: Annotation -> IfaceAnnotation
 mkIfaceAnnotation (Annotation { ann_target = target, ann_value = payload })

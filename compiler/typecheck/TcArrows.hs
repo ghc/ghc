@@ -354,7 +354,7 @@ tcArrDoStmt env ctxt (BindStmt pat rhs _ _) res_ty thing_inside
   = do  { (rhs', pat_ty) <- tc_arr_rhs env rhs
         ; (pat', thing)  <- tcPat (StmtCtxt ctxt) pat pat_ty $
                             thing_inside res_ty
-        ; return (BindStmt pat' rhs' noSyntaxExpr noSyntaxExpr, thing) }
+        ; return (mkBindStmt pat' rhs', thing) }
 
 tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
                             , recS_rec_ids = rec_names }) res_ty thing_inside

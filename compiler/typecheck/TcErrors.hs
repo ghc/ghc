@@ -352,7 +352,9 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
     -- (see TcRnTypes.trulyInsoluble) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
-    report1 = [ ("insoluble1",   is_given_eq,     True, mkGroupReporter mkEqErr)
+    report1 = [ ("custom_error", is_user_type_error,
+                                                  True, mkUserTypeErrorReporter)
+              , ("insoluble1",   is_given_eq,     True, mkGroupReporter mkEqErr)
               , ("insoluble2",   utterly_wrong,   True, mkGroupReporter mkEqErr)
               , ("insoluble3",   rigid_nom_tv_eq, True, mkSkolReporter)
               , ("insoluble4",   rigid_nom_eq,    True, mkGroupReporter mkEqErr)
@@ -381,6 +383,8 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
        | EqPred {} <- pred = arisesFromGivens ct
        | otherwise         = False
        -- I think all given residuals are equalities
+
+    is_user_type_error ct _ = isUserTypeErrorCt ct
 
     -- Skolem (i.e. non-meta) type variable on the left
     rigid_nom_eq _ pred = isRigidEqPred tc_lvl pred
@@ -440,6 +444,48 @@ mkHoleReporter ctxt
        ; maybeReportHoleError ctxt ct err
        ; maybeAddDeferredHoleBinding ctxt err ct }
 
+mkUserTypeErrorReporter :: Reporter
+mkUserTypeErrorReporter ctxt
+  = mapM_ $ \ct -> maybeReportError ctxt =<< mkUserTypeError ctxt ct
+
+mkUserTypeError :: ReportErrCtxt -> Ct -> TcM ErrMsg
+mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
+                        $ pprUserTypeErrorTy
+                        $ case getUserTypeErrorMsg ct of
+                            Just (_,msg) -> msg
+                            Nothing      -> pprPanic "mkUserTypeError" (ppr ct)
+
+
+mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
+                             -- Make error message for a group
+                -> Reporter  -- Deal with lots of constraints
+-- Group together errors from same location,
+-- and report only the first (to avoid a cascade)
+mkGroupReporter mk_err ctxt cts
+  = mapM_ (reportGroup mk_err ctxt) (equivClasses cmp_loc cts)
+  where
+    cmp_loc ct1 ct2 = ctLocSpan (ctLoc ct1) `compare` ctLocSpan (ctLoc ct2)
+
+reportGroup :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg) -> ReportErrCtxt
+            -> [Ct] -> TcM ()
+reportGroup mk_err ctxt cts =
+  case partition isMonadFailInstanceMissing cts of
+        -- Only warn about missing MonadFail constraint when
+        -- there are no other missing contstraints!
+        (monadFailCts, []) -> do { err <- mk_err ctxt monadFailCts
+                                 ; reportWarning err }
+
+        (_, cts') -> do { err <- mk_err ctxt cts'
+                        ; maybeReportError ctxt err
+                        ; mapM_ (maybeAddDeferredBinding ctxt err) cts' }
+                                -- Add deferred bindings for all
+                                -- But see Note [Always warn with -fdefer-type-errors]
+  where
+    isMonadFailInstanceMissing ct =
+        case ctLocOrigin (ctLoc ct) of
+            FailablePattern _pat -> True
+            _otherwise           -> False
+
 maybeReportHoleError :: ReportErrCtxt -> Ct -> ErrMsg -> TcM ()
 maybeReportHoleError ctxt ct err
   -- When -XPartialTypeSignatures is on, warnings (instead of errors) are
@@ -461,25 +507,6 @@ maybeReportHoleError ctxt ct err
        HoleError -> reportError err
        HoleWarn  -> reportWarning err
        HoleDefer -> return ()
-
-mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
-                             -- Make error message for a group
-                -> Reporter  -- Deal with lots of constraints
--- Group together errors from same location,
--- and report only the first (to avoid a cascade)
-mkGroupReporter mk_err ctxt cts
-  = mapM_ (reportGroup mk_err ctxt) (equivClasses cmp_loc cts)
-  where
-    cmp_loc ct1 ct2 = ctLocSpan (ctLoc ct1) `compare` ctLocSpan (ctLoc ct2)
-
-reportGroup :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg) -> ReportErrCtxt
-            -> [Ct] -> TcM ()
-reportGroup mk_err ctxt cts
-  = do { err <- mk_err ctxt cts
-       ; maybeReportError ctxt err
-       ; mapM_ (maybeAddDeferredBinding ctxt err) cts }
-               -- Add deferred bindings for all
-               -- But see Note [Always warn with -fdefer-type-errors]
 
 maybeReportError :: ReportErrCtxt -> ErrMsg -> TcM ()
 -- Report the error and/or make a deferred binding for it
@@ -705,9 +732,10 @@ mkHoleError ctxt ct@(CHoleCan { cc_occ = occ, cc_hole = hole_sort })
                        -- Suggest possible in-scope variables in the message
   = do { dflags  <- getDynFlags
        ; rdr_env <- getGlobalRdrEnv
+       ; impInfo <- getImports
        ; mkLongErrAt (RealSrcSpan (tcl_loc lcl_env)) out_of_scope_msg
                      (unknownNameSuggestions dflags rdr_env
-                               (tcl_rdr lcl_env) (mkRdrUnqual occ)) }
+                               (tcl_rdr lcl_env) impInfo (mkRdrUnqual occ)) }
 
   | otherwise  -- Explicit holes, like "_" or "_f"
   = do { (ctxt, binds_doc, ct) <- relevantBindings False ctxt ct

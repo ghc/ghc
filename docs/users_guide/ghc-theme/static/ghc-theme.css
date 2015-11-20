@@ -25,8 +25,9 @@ body {
     padding: 0;
     border: 1px solid #aaa;
 
-    margin: 0px 80px 0px 80px;
+    margin: auto;
     min-width: 740px;
+    max-width: 1200px;
 }
 
 div.logo {
@@ -139,7 +140,7 @@ p {
 }
 
 a {
-    color: #428BCA;
+    color: #2b628c;
     text-decoration: none;
 }
 

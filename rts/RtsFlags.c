@@ -95,8 +95,16 @@ static StgWord64 decodeSize (
 
 static void bad_option (const char *s);
 
+#ifdef DEBUG
+static void read_debug_flags(const char *arg);
+#endif
+
+#ifdef PROFILING
+static rtsBool read_heap_profiling_flag(const char *arg);
+#endif
+
 #ifdef TRACING
-static void read_trace_flags(char *arg);
+static void read_trace_flags(const char *arg);
 #endif
 
 static void errorUsage (void) GNU_ATTRIBUTE(__noreturn__);
@@ -239,12 +247,6 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TickyFlags.showTickyStats   = rtsFalse;
     RtsFlags.TickyFlags.tickyFile        = NULL;
 #endif
-
-#ifdef USE_PAPI
-    /* By default no special measurements taken */
-    RtsFlags.PapiFlags.eventType        = 0;
-    RtsFlags.PapiFlags.numUserEvents    = 0;
-#endif
 }
 
 static const char *
@@ -298,8 +300,6 @@ usage_text[] = {
 "  -p       Time/allocation profile        (output file <program>.prof)",
 "  -P       More detailed Time/Allocation profile",
 "  -Pa      Give information about *all* cost centres",
-
-# if defined(PROFILING)
 "",
 "  -h<break-down> Heap residency profile (hp2ps) (output file <program>.hp)",
 "     break-down: c = cost centre stack (default)",
@@ -325,8 +325,7 @@ usage_text[] = {
 "  -xt            Include threads (TSOs) in a heap profile",
 "",
 "  -xc      Show current cost centre stack on raising an exception",
-# endif
-#endif /* PROFILING or PAR */
+#endif /* PROFILING */
 
 #ifdef TRACING
 "",
@@ -412,19 +411,6 @@ usage_text[] = {
 #if defined(x86_64_HOST_ARCH)
 "  -xm       Base address to mmap memory in the GHCi linker",
 "            (hex; must be <80000000)",
-#endif
-#if defined(USE_PAPI)
-"  -aX       CPU performance counter measurements using PAPI",
-"            (use with the -s<file> option).  X is one of:",
-"",
-/* "            y - cycles", */
-"            1 - level 1 cache misses",
-"            2 - level 2 cache misses",
-"            b - branch mispredictions",
-"            s - stalled cycles",
-"            e - cache miss and branch misprediction events",
-"            +PAPI_EVENT   - collect papi preset event PAPI_EVENT",
-"            #NATIVE_EVENT - collect native event NATIVE_EVENT (in hex)",
 #endif
 "  -xq       The allocation limit given to a thread after it receives",
 "            an AllocationLimitExceeded exception. (default: 100k)",
@@ -774,51 +760,12 @@ error = rtsTrue;
                       = decodeSize(rts_argv[arg], 2, 2*BLOCK_SIZE, HS_INT_MAX)
                            / BLOCK_SIZE;
                   break;
-            case 'n':
+              case 'n':
                   OPTION_UNSAFE;
                   RtsFlags.GcFlags.nurseryChunkSize
                       = decodeSize(rts_argv[arg], 2, 2*BLOCK_SIZE, HS_INT_MAX)
                            / BLOCK_SIZE;
                   break;
-
-#ifdef USE_PAPI
-              case 'a':
-                OPTION_UNSAFE;
-                switch(rts_argv[arg][2]) {
-                case '1':
-                  RtsFlags.PapiFlags.eventType = PAPI_FLAG_CACHE_L1;
-                  break;
-                case '2':
-                  RtsFlags.PapiFlags.eventType = PAPI_FLAG_CACHE_L2;
-                  break;
-                case 'b':
-                  RtsFlags.PapiFlags.eventType = PAPI_FLAG_BRANCH;
-                  break;
-                case 's':
-                  RtsFlags.PapiFlags.eventType = PAPI_FLAG_STALLS;
-                  break;
-                case 'e':
-                  RtsFlags.PapiFlags.eventType = PAPI_FLAG_CB_EVENTS;
-                  break;
-                case '+':
-                case '#':
-                  if (RtsFlags.PapiFlags.numUserEvents >= MAX_PAPI_USER_EVENTS) {
-                      errorBelch("maximum number of PAPI events reached");
-                      stg_exit(EXIT_FAILURE);
-                  }
-                  nat eventNum  = RtsFlags.PapiFlags.numUserEvents++;
-                  char kind     = rts_argv[arg][2];
-                  nat eventKind = kind == '+' ? PAPI_PRESET_EVENT_KIND : PAPI_NATIVE_EVENT_KIND;
-
-                  RtsFlags.PapiFlags.userEvents[eventNum] = rts_argv[arg] + 3;
-                  RtsFlags.PapiFlags.eventType = PAPI_USER_EVENTS;
-                  RtsFlags.PapiFlags.userEventsKind[eventNum] = eventKind;
-                  break;
-                default:
-                  bad_option( rts_argv[arg] );
-                }
-                break;
-#endif
 
               case 'B':
                 OPTION_UNSAFE;
@@ -852,65 +799,7 @@ error = rtsTrue;
 
               case 'D':
               OPTION_SAFE;
-              DEBUG_BUILD_ONLY(
-              {
-                  char *c;
-
-                  for (c  = rts_argv[arg] + 2; *c != '\0'; c++) {
-                      switch (*c) {
-                      case 's':
-                          RtsFlags.DebugFlags.scheduler = rtsTrue;
-                          break;
-                      case 'i':
-                          RtsFlags.DebugFlags.interpreter = rtsTrue;
-                          break;
-                      case 'w':
-                          RtsFlags.DebugFlags.weak = rtsTrue;
-                          break;
-                      case 'G':
-                          RtsFlags.DebugFlags.gccafs = rtsTrue;
-                          break;
-                      case 'g':
-                          RtsFlags.DebugFlags.gc = rtsTrue;
-                          break;
-                      case 'b':
-                          RtsFlags.DebugFlags.block_alloc = rtsTrue;
-                          break;
-                      case 'S':
-                          RtsFlags.DebugFlags.sanity = rtsTrue;
-                          break;
-                      case 't':
-                          RtsFlags.DebugFlags.stable = rtsTrue;
-                          break;
-                      case 'p':
-                          RtsFlags.DebugFlags.prof = rtsTrue;
-                          break;
-                      case 'l':
-                          RtsFlags.DebugFlags.linker = rtsTrue;
-                          break;
-                      case 'a':
-                          RtsFlags.DebugFlags.apply = rtsTrue;
-                          break;
-                      case 'm':
-                          RtsFlags.DebugFlags.stm = rtsTrue;
-                          break;
-                      case 'z':
-                          RtsFlags.DebugFlags.squeeze = rtsTrue;
-                          break;
-                      case 'c':
-                          RtsFlags.DebugFlags.hpc = rtsTrue;
-                          break;
-                      case 'r':
-                          RtsFlags.DebugFlags.sparks = rtsTrue;
-                          break;
-                      default:
-                          bad_option( rts_argv[arg] );
-                      }
-                  }
-                  // -Dx also turns on -v.  Use -l to direct trace
-                  // events to the .eventlog file instead.
-                  RtsFlags.TraceFlags.tracing = TRACE_STDERR;
-              })
+              DEBUG_BUILD_ONLY(read_debug_flags(rts_argv[arg]);)
               break;
 
               case 'K':
@@ -1102,109 +991,8 @@ error = rtsTrue;
 #else
                 OPTION_SAFE;
                 PROFILING_BUILD_ONLY(
-                switch (rts_argv[arg][2]) {
-                case '\0':
-                case 'C':
-                case 'c':
-                case 'M':
-                case 'm':
-                case 'D':
-                case 'd':
-                case 'Y':
-                case 'y':
-                case 'R':
-                case 'r':
-                case 'B':
-                case 'b':
-                    if (rts_argv[arg][2] != '\0' && rts_argv[arg][3] != '\0') {
-                        {
-                            char *left  = strchr(rts_argv[arg], '{');
-                            char *right = strrchr(rts_argv[arg], '}');
-
-                            // curly braces are optional, for
-                            // backwards compat.
-                            if (left)
-                                left = left+1;
-                            else
-                                left = rts_argv[arg] + 3;
-
-                            if (!right)
-                                right = rts_argv[arg] + strlen(rts_argv[arg]);
-
-                            *right = '\0';
-
-                            switch (rts_argv[arg][2]) {
-                            case 'c': // cost centre label select
-                                RtsFlags.ProfFlags.ccSelector = left;
-                                break;
-                            case 'C':
-                                RtsFlags.ProfFlags.ccsSelector = left;
-                                break;
-                            case 'M':
-                            case 'm': // cost centre module select
-                                RtsFlags.ProfFlags.modSelector = left;
-                                break;
-                            case 'D':
-                            case 'd': // closure descr select
-                                RtsFlags.ProfFlags.descrSelector = left;
-                                break;
-                            case 'Y':
-                            case 'y': // closure type select
-                                RtsFlags.ProfFlags.typeSelector = left;
-                                break;
-                            case 'R':
-                            case 'r': // retainer select
-                                RtsFlags.ProfFlags.retainerSelector = left;
-                                break;
-                            case 'B':
-                            case 'b': // biography select
-                                RtsFlags.ProfFlags.bioSelector = left;
-                                break;
-                            }
-                        }
-                        break;
-                    }
-
-                    if (RtsFlags.ProfFlags.doHeapProfile != 0) {
-                        errorBelch("multiple heap profile options");
-                        error = rtsTrue;
-                        break;
-                    }
-
-                    switch (rts_argv[arg][2]) {
-                    case '\0':
-                    case 'C':
-                    case 'c':
-                        RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CCS;
-                        break;
-                    case 'M':
-                    case 'm':
-                          RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_MOD;
-                          break;
-                    case 'D':
-                    case 'd':
-                          RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_DESCR;
-                          break;
-                    case 'Y':
-                    case 'y':
-                          RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_TYPE;
-                          break;
-                    case 'R':
-                    case 'r':
-                          RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_RETAINER;
-                          break;
-                    case 'B':
-                    case 'b':
-                          RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_LDV;
-                          break;
-                    }
-                    break;
-
-                default:
-                    errorBelch("invalid heap profile option: %s",rts_argv[arg]);
-                    error = rtsTrue;
-                }
-                )
+                    error = read_heap_profiling_flag(rts_argv[arg]);
+                );
 #endif /* PROFILING */
                 break;
 
@@ -1679,10 +1467,185 @@ decodeSize(const char *flag, nat offset, StgWord64 min, StgWord64 max)
     return val;
 }
 
-#if defined(TRACING)
-static void read_trace_flags(char *arg)
+#ifdef DEBUG
+static void read_debug_flags(const char* arg)
 {
-    char *c;
+    // Already parsed "-D"
+    const char *c;
+    for (c  = arg + 2; *c != '\0'; c++) {
+        switch (*c) {
+        case 's':
+            RtsFlags.DebugFlags.scheduler = rtsTrue;
+            break;
+        case 'i':
+            RtsFlags.DebugFlags.interpreter = rtsTrue;
+            break;
+        case 'w':
+            RtsFlags.DebugFlags.weak = rtsTrue;
+            break;
+        case 'G':
+            RtsFlags.DebugFlags.gccafs = rtsTrue;
+            break;
+        case 'g':
+            RtsFlags.DebugFlags.gc = rtsTrue;
+            break;
+        case 'b':
+            RtsFlags.DebugFlags.block_alloc = rtsTrue;
+            break;
+        case 'S':
+            RtsFlags.DebugFlags.sanity = rtsTrue;
+            break;
+        case 't':
+            RtsFlags.DebugFlags.stable = rtsTrue;
+            break;
+        case 'p':
+            RtsFlags.DebugFlags.prof = rtsTrue;
+            break;
+        case 'l':
+            RtsFlags.DebugFlags.linker = rtsTrue;
+            break;
+        case 'a':
+            RtsFlags.DebugFlags.apply = rtsTrue;
+            break;
+        case 'm':
+            RtsFlags.DebugFlags.stm = rtsTrue;
+            break;
+        case 'z':
+            RtsFlags.DebugFlags.squeeze = rtsTrue;
+            break;
+        case 'c':
+            RtsFlags.DebugFlags.hpc = rtsTrue;
+            break;
+        case 'r':
+            RtsFlags.DebugFlags.sparks = rtsTrue;
+            break;
+        default:
+            bad_option( arg );
+        }
+    }
+    // -Dx also turns on -v.  Use -l to direct trace
+    // events to the .eventlog file instead.
+    RtsFlags.TraceFlags.tracing = TRACE_STDERR;
+}
+#endif
+
+#ifdef PROFILING
+// Parse a "-h" flag, returning whether the parse resulted in an error.
+static rtsBool read_heap_profiling_flag(const char *arg)
+{
+    // Already parsed "-h"
+    rtsBool error = rtsFalse;
+    switch (arg[2]) {
+    case '\0':
+    case 'C':
+    case 'c':
+    case 'M':
+    case 'm':
+    case 'D':
+    case 'd':
+    case 'Y':
+    case 'y':
+    case 'R':
+    case 'r':
+    case 'B':
+    case 'b':
+        if (arg[2] != '\0' && arg[3] != '\0') {
+            {
+                char *left  = strchr(arg, '{');
+                char *right = strrchr(arg, '}');
+
+                // curly braces are optional, for
+                // backwards compat.
+                if (left)
+                    left = left+1;
+                else
+                    left = arg + 3;
+
+                if (!right)
+                    right = arg + strlen(arg);
+
+                *right = '\0';
+
+                switch (arg[2]) {
+                case 'c': // cost centre label select
+                    RtsFlags.ProfFlags.ccSelector = left;
+                    break;
+                case 'C':
+                    RtsFlags.ProfFlags.ccsSelector = left;
+                    break;
+                case 'M':
+                case 'm': // cost centre module select
+                    RtsFlags.ProfFlags.modSelector = left;
+                    break;
+                case 'D':
+                case 'd': // closure descr select
+                    RtsFlags.ProfFlags.descrSelector = left;
+                    break;
+                case 'Y':
+                case 'y': // closure type select
+                    RtsFlags.ProfFlags.typeSelector = left;
+                    break;
+                case 'R':
+                case 'r': // retainer select
+                    RtsFlags.ProfFlags.retainerSelector = left;
+                    break;
+                case 'B':
+                case 'b': // biography select
+                    RtsFlags.ProfFlags.bioSelector = left;
+                    break;
+                }
+            }
+            break;
+        }
+
+        if (RtsFlags.ProfFlags.doHeapProfile != 0) {
+            errorBelch("multiple heap profile options");
+            error = rtsTrue;
+            break;
+        }
+
+        switch (arg[2]) {
+        case '\0':
+        case 'C':
+        case 'c':
+            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CCS;
+            break;
+        case 'M':
+        case 'm':
+            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_MOD;
+            break;
+        case 'D':
+        case 'd':
+            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_DESCR;
+            break;
+        case 'Y':
+        case 'y':
+            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_TYPE;
+            break;
+        case 'R':
+        case 'r':
+            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_RETAINER;
+            break;
+        case 'B':
+        case 'b':
+            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_LDV;
+            break;
+        }
+        break;
+
+    default:
+        errorBelch("invalid heap profile option: %s", arg);
+        error = rtsTrue;
+    }
+
+    return error;
+}
+#endif
+
+#if defined(TRACING)
+static void read_trace_flags(const char *arg)
+{
+    const char *c;
     rtsBool enabled = rtsTrue;
     /* Syntax for tracing flags currently looks like:
      *

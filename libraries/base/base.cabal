@@ -238,6 +238,7 @@ Library
         GHC.IO.Handle.Text
         GHC.IO.Handle.Types
         GHC.IO.IOMode
+        GHC.IO.Unsafe
         GHC.IOArray
         GHC.IORef
         GHC.Int
@@ -246,6 +247,7 @@ Library
         GHC.Natural
         GHC.Num
         GHC.OldList
+        GHC.OverloadedLabels
         GHC.PArr
         GHC.Pack
         GHC.Profiling
@@ -259,6 +261,7 @@ Library
         GHC.Show
         GHC.Stable
         GHC.Stack
+        GHC.Stack.CCS
         GHC.Stack.Types
         GHC.Stats
         GHC.Storable

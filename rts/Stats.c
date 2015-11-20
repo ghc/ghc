@@ -20,10 +20,6 @@
 #include "sm/GCThread.h"
 #include "sm/BlockAlloc.h"
 
-#if USE_PAPI
-#include "Papi.h"
-#endif
-
 /* huh? */
 #define BIG_STRING_LEN              512
 
@@ -71,6 +67,7 @@ static Time *GC_coll_cpu = NULL;
 static Time *GC_coll_elapsed = NULL;
 static Time *GC_coll_max_pause = NULL;
 
+static void statsPrintf( char *s, ... ) GNUC3_ATTRIBUTE(format (PRINTF, 1, 2));
 static void statsFlush( void );
 static void statsClose( void );
 
@@ -210,17 +207,6 @@ void
 stat_endInit(void)
 {
     getProcessTimes(&end_init_cpu, &end_init_elapsed);
-
-#if USE_PAPI
-    /* We start counting events for the mutator
-     * when garbage collection starts
-     * we switch to the GC event set. */
-    papi_start_mutator_count();
-
-    /* This flag is needed to avoid counting the last GC */
-    papi_is_reporting = 1;
-
-#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -233,15 +219,6 @@ void
 stat_startExit(void)
 {
     getProcessTimes(&start_exit_cpu, &start_exit_elapsed);
-
-#if USE_PAPI
-    /* We stop counting mutator events
-     * GC events are not being counted at this point */
-    papi_stop_mutator_count();
-
-    /* This flag is needed, because GC is run once more after this function */
-    papi_is_reporting = 0;
-#endif
 }
 
 void
@@ -275,14 +252,6 @@ stat_startGC (Capability *cap, gc_thread *gct)
             debugBelch("\007");
         }
     }
-
-#if USE_PAPI
-    if(papi_is_reporting) {
-      /* Switch to counting GC events */
-      papi_stop_mutator_count();
-      papi_start_gc_count();
-    }
-#endif
 
     getProcessTimes(&gct->gc_start_cpu, &gct->gc_start_elapsed);
 
@@ -432,18 +401,6 @@ stat_endGC (Capability *cap, gc_thread *gct,
         debugBelch("\b\b\b  \b\b\b");
         rub_bell = 0;
     }
-
-#if USE_PAPI
-    if(papi_is_reporting) {
-      /* Switch to counting mutator events */
-      if (gen == 0) {
-          papi_stop_gc0_count();
-      } else {
-          papi_stop_gc1_count();
-      }
-      papi_start_mutator_count();
-    }
-#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -759,9 +716,6 @@ stat_exit (void)
             TICK_PRINT_TOT(2);
             */
 
-#if USE_PAPI
-            papi_stats_report();
-#endif
 #if defined(THREADED_RTS) && defined(PROF_SPIN)
             {
                 nat g;

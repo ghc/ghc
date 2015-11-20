@@ -49,7 +49,7 @@ import BasicTypes
 import DynFlags
 import ErrUtils
 import FastString
-import HscTypes ( isHsBoot )
+import HscTypes ( isHsBootOrSig )
 import Id
 import MkId
 import Name
@@ -443,7 +443,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
     typeable_err i =
       setSrcSpan (getSrcSpan (iSpec i)) $
         do env <- getGblEnv
-           if isHsBoot (tcg_src env)
+           if isHsBootOrSig (tcg_src env)
              then
                do warn <- woptM Opt_WarnDerivingTypeable
                   when warn $ addWarnTc $ vcat
@@ -1286,7 +1286,8 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
         error_msg dflags = L inst_loc (HsLit (HsStringPrim ""
                                     (unsafeMkByteString (error_string dflags))))
         meth_tau     = funResultTy (applyTys (idType sel_id) inst_tys)
-        error_string dflags = showSDoc dflags (hcat [ppr inst_loc, text "|", ppr sel_id ])
+        error_string dflags = showSDoc dflags
+                              (hcat [ppr inst_loc, vbar, ppr sel_id ])
         lam_wrapper  = mkWpTyLams tyvars <.> mkWpLams dfun_ev_vars
 
     tc_default sel_id (DefMeth dm_name) -- A polymorphic default method

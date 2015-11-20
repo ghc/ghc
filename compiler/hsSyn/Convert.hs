@@ -723,15 +723,10 @@ cvtl e = wrapL (cvt e)
                               ; return $ ExprWithTySig e' (mkLHsSigWcType t') }
     cvt (RecConE c flds) = do { c' <- cNameL c
                               ; flds' <- mapM (cvtFld mkFieldOcc) flds
-                              ; return $ RecordCon c' noPostTcExpr
-                                          (HsRecFields flds' Nothing)
-                                          PlaceHolder }
+                              ; return $ mkRdrRecordCon c' (HsRecFields flds' Nothing) }
     cvt (RecUpdE e flds) = do { e' <- cvtl e
                               ; flds'<- mapM (cvtFld mkAmbiguousFieldOcc) flds
-                              ; return $ RecordUpd e'
-                                          flds'
-                                          PlaceHolder PlaceHolder
-                                          PlaceHolder PlaceHolder }
+                              ; return $ mkRdrRecordUpd e' flds' }
     cvt (StaticE e)      = fmap HsStatic $ cvtl e
     cvt (UnboundVarE s)  = do { s' <- vName s; return $ HsVar s' }
 

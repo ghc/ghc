@@ -28,9 +28,11 @@ import MonadUtils
 import Data.Function
 import Data.Maybe
 import Data.Ord
+import DriverPhases
 import Panic
 import Data.List
 import Control.Monad
+import System.Directory
 import System.IO
 import System.IO.Error
 
@@ -131,23 +133,31 @@ tagInfo dflags unqual exported kind name loc
         (showSDocForUser dflags unqual $ ftext (srcLocFile loc))
         (srcLocLine loc) (srcLocCol loc) Nothing
 
+-- throw an exception when someone tries to overwrite existing source file (fix for #10989)
+writeTagsSafely :: FilePath -> String -> IO ()
+writeTagsSafely file str = do
+    dfe <- doesFileExist file
+    if dfe && isSourceFilename file
+        then throwGhcException (CmdLineError (file ++ " is existing source file. " ++
+             "Please specify another file name to store tags data"))
+        else writeFile file str
 
 collateAndWriteTags :: TagsKind -> FilePath -> [TagInfo] -> IO (Either IOError ())
 -- ctags style with the Ex exresion being just the line number, Vim et al
 collateAndWriteTags CTagsWithLineNumbers file tagInfos = do
   let tags = unlines $ sort $ map showCTag tagInfos
-  tryIO (writeFile file tags)
+  tryIO (writeTagsSafely file tags)
 
 -- ctags style with the Ex exresion being a regex searching the line, Vim et al
 collateAndWriteTags CTagsWithRegExes file tagInfos = do -- ctags style, Vim et al
   tagInfoGroups <- makeTagGroupsWithSrcInfo tagInfos
   let tags = unlines $ sort $ map showCTag $concat tagInfoGroups
-  tryIO (writeFile file tags)
+  tryIO (writeTagsSafely file tags)
 
 collateAndWriteTags ETags file tagInfos = do -- etags style, Emacs/XEmacs
   tagInfoGroups <- makeTagGroupsWithSrcInfo $filter tagExported tagInfos
   let tagGroups = map processGroup tagInfoGroups
-  tryIO (writeFile file $ concat tagGroups)
+  tryIO (writeTagsSafely file $ concat tagGroups)
 
   where
     processGroup [] = throwGhcException (CmdLineError "empty tag file group??")

@@ -1077,7 +1077,7 @@ off with ``-fno-warn-orphans``, and ``-Werror`` will make the
 compilation fail if the warning is issued.
 
 You can identify an orphan module by looking in its interface file,
-``M.hi``, using the ```--show-iface`` :ref:`mode <modes>`. If there is a
+``M.hi``, using the ``--show-iface`` :ref:`mode <modes>`. If there is a
 ``[orphan module]`` on the first line, GHC considers it an orphan
 module.
 

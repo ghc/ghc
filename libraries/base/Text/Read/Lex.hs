@@ -39,7 +39,8 @@ import GHC.Base
 import GHC.Char
 import GHC.Num( Num(..), Integer )
 import GHC.Show( Show(..) )
-import GHC.Unicode( isSpace, isAlpha, isAlphaNum )
+import GHC.Unicode
+  ( GeneralCategory(..), generalCategory, isSpace, isAlpha, isAlphaNum )
 import GHC.Real( Rational, (%), fromIntegral, Integral,
                  toInteger, (^), quot, even )
 import GHC.List
@@ -198,8 +199,10 @@ lexPunc :: ReadP Lexeme
 lexPunc =
   do c <- satisfy isPuncChar
      return (Punc [c])
- where
-  isPuncChar c = c `elem` ",;()[]{}`"
+
+-- | The @special@ character class as defined in the Haskell Report.
+isPuncChar :: Char -> Bool
+isPuncChar c = c `elem` ",;()[]{}`"
 
 -- ----------------------------------------------------------------------
 -- Symbols
@@ -212,7 +215,15 @@ lexSymbol =
       else
         return (Symbol s)
  where
-  isSymbolChar c = c `elem` "!@#$%&*+./<=>?\\^|:-~"
+  isSymbolChar c = not (isPuncChar c) && case generalCategory c of
+      MathSymbol              -> True
+      CurrencySymbol          -> True
+      ModifierSymbol          -> True
+      OtherSymbol             -> True
+      DashPunctuation         -> True
+      OtherPunctuation        -> not (c `elem` "'\"")
+      ConnectorPunctuation    -> c /= '_'
+      _                       -> False
   reserved_ops   = ["..", "::", "=", "\\", "|", "<-", "->", "@", "~", "=>"]
 
 -- ----------------------------------------------------------------------

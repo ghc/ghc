@@ -6,11 +6,6 @@
  *
  * ---------------------------------------------------------------------------*/
 
-// PAPI uses caddr_t, which is not POSIX
-#ifndef USE_PAPI
-#include "PosixSource.h"
-#endif
-
 #include "Rts.h"
 #include "RtsAPI.h"
 #include "HsFFI.h"
@@ -58,10 +53,6 @@
 #endif
 #ifdef HAVE_LOCALE_H
 #include <locale.h>
-#endif
-
-#if USE_PAPI
-#include "Papi.h"
 #endif
 
 // Count of how many outstanding hs_init()s there have been.
@@ -167,10 +158,6 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 
     /* Initialise the stats department, phase 1 */
     initStats1();
-
-#ifdef USE_PAPI
-    papi_init();
-#endif
 
     /* initTracing must be after setupRtsFlags() */
 #ifdef TRACING

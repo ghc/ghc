@@ -187,6 +187,10 @@ INSTALL_LIBS += $(includes_GHCCONSTANTS_HASKELL_VALUE)
 DERIVE_CONSTANTS_FLAGS += --gcc-program "$(WhatGccIsCalled)"
 DERIVE_CONSTANTS_FLAGS += $(addprefix --gcc-flag$(space),$(includes_CC_OPTS) -fcommon)
 DERIVE_CONSTANTS_FLAGS += --nm-program "$(NM)"
+ifneq "$(OBJDUMP)" ""
+DERIVE_CONSTANTS_FLAGS += --objdump-program "$(OBJDUMP)"
+endif
+DERIVE_CONSTANTS_FLAGS += --target-os "$(TargetOS_CPP)"
 
 ifneq "$(BINDIST)" "YES"
 $(includes_DERIVEDCONSTANTS):           $$(includes_H_CONFIG) $$(includes_H_PLATFORM) $$(includes_H_VERSION) $$(includes_H_FILES) $$(rts_H_FILES)

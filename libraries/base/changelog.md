@@ -50,6 +50,9 @@
 
   * Generalise `forever` from `Monad` to `Applicative`
 
+  * Generalize `filterM`, `mapAndUnzipM`, `zipWithM`, `zipWithM_`, `replicateM`,
+    `replicateM` from `Monad` to `Applicative` (#10168)
+
   * Exported `GiveGCStats`, `DoCostCentres`, `DoHeapProfile`, `DoTrace`,
     `RtsTime`, and `RtsNat` from `GHC.RTS.Flags`
 
@@ -87,6 +90,9 @@
 
   * Add `MonadPlus IO` and `Alternative IO` instances
     (previously orphans in `transformers`) (#10755)
+
+  * Add `GHC.TypeLits.TypeError` and `ErrorMessage` to allow users
+    to define custom compile-time error messages.
 
 ## 4.8.2.0  *Oct 2015*
 

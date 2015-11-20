@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-missing-monadfail-instance #-}
 {-# LANGUAGE RebindableSyntax, NPlusKPatterns #-}
 
 module RebindableCase1 where
@@ -11,7 +12,7 @@ module RebindableCase1 where
 	infixl 1 >>=;
 	(>>=) :: a;
 	(>>=) = undefined;
-	
+
 	infixl 1 >>;
 	(>>) :: a;
 	(>>) = undefined;
@@ -38,9 +39,9 @@ module RebindableCase1 where
 		Just a <- g;
 		return a;
 		};
-	
+
 	test_fromInteger = 1;
-	
+
 	test_fromRational = 0.5;
 
 	test_negate a = - a;
