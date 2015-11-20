@@ -30,7 +30,7 @@ module TcTyDecls(
 import TcRnMonad
 import TcEnv
 import TcTypeable( mkTypeableBinds )
-import TcBinds( tcRecSelBinds, addTypecheckedBinds )
+import TcBinds( tcRecSelBinds )
 import TypeRep( Type(..) )
 import TcType
 import TysWiredIn( unitTy )
@@ -812,26 +812,22 @@ updateRoleEnv name n role
 ********************************************************************* -}
 
 tcAddImplicits :: [TyThing] -> TcM TcGblEnv
+-- Given a [TyThing], add to the TcGblEnv
+--   * the implicitTyThings of the TyThings
+--   * bindings for record selectors
+--   * bindings for type representations for the TyThings
 tcAddImplicits tyclss
   = discardWarnings $
     tcExtendGlobalEnvImplicit implicit_things  $
     tcExtendGlobalValEnv def_meth_ids          $
-    do { (typeable_ids, typeable_binds) <- mkTypeableBinds tycons
-       ; gbl_env <- tcExtendGlobalValEnv typeable_ids
-                    $ tcRecSelBinds $ mkRecSelBinds tycons
-       ; return (gbl_env `addTypecheckedBinds` typeable_binds) }
+    do { gbl_env <- mkTypeableBinds tycons
+       ; gbl_env <- setGblEnv gbl_env $
+                    tcRecSelBinds (mkRecSelBinds tycons)
+       ; return gbl_env }
  where
    implicit_things = concatMap implicitTyThings tyclss
    tycons          = [tc | ATyCon tc <- tyclss]
    def_meth_ids    = mkDefaultMethodIds tyclss
-
-{-
-************************************************************************
-*                                                                      *
-                Building record selectors
-*                                                                      *
-************************************************************************
--}
 
 mkDefaultMethodIds :: [TyThing] -> [Id]
 -- See Note [Default method Ids and Template Haskell]
@@ -857,6 +853,14 @@ When we typecheck 'ast' we have done the first pass over the class decl
 declarations (because they can mention value declarations).  So we
 must bring the default method Ids into scope first (so they can be seen
 when typechecking the [d| .. |] quote, and typecheck them later.
+-}
+
+{-
+************************************************************************
+*                                                                      *
+                Building record selectors
+*                                                                      *
+************************************************************************
 -}
 
 mkRecSelBinds :: [TyCon] -> HsValBinds Name

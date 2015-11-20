@@ -131,25 +131,29 @@ mkModIdBindings
 *                                                                      *
 ********************************************************************* -}
 
-mkTypeableBinds :: [TyCon] -> TcM ([Id], [LHsBinds Id])
+mkTypeableBinds :: [TyCon] -> TcM TcGblEnv
 mkTypeableBinds tycons
   = do { dflags  <- getDynFlags
        ; gbl_env <- getGblEnv
        ; mod <- getModule
        ; if mod == gHC_TYPES
-         then return ([], [])  -- Do not generate bindings for modules in GHC.Types
+         then return gbl_env  -- Do not generate bindings for modules in GHC.Types
          else
     do { tr_datacon  <- tcLookupDataCon trTyConDataConName
        ; trn_datacon <- tcLookupDataCon trNameSDataConName
-       ; let pkg_str  = unitIdString (moduleUnitId mod)
-             mod_str  = moduleNameString (moduleName mod)
-             mod_expr = case tcg_tr_module gbl_env of  -- Should be set by now
-                           Just mod_id -> nlHsVar mod_id
-                           Nothing     -> pprPanic "tcMkTypeableBinds" (ppr tycons)
-             stuff    = (dflags, mod_expr, pkg_str, mod_str, tr_datacon, trn_datacon)
-             tc_binds = map (mk_typeable_binds stuff) tycons
+       ; let pkg_str    = unitIdString (moduleUnitId mod)
+             mod_str    = moduleNameString (moduleName mod)
+             mod_expr   = case tcg_tr_module gbl_env of  -- Should be set by now
+                             Just mod_id -> nlHsVar mod_id
+                             Nothing     -> pprPanic "tcMkTypeableBinds" (ppr tycons)
+             stuff      = (dflags, mod_expr, pkg_str, mod_str, tr_datacon, trn_datacon)
+             tc_binds   = map (mk_typeable_binds stuff) all_tycons
+             all_tycons = [ tc' | tc <- tycons, tc' <- tc : tyConATs tc ]
+                             -- We need type representations for any associated types
              tycon_rep_ids = foldr ((++) . collectHsBindsBinders) [] tc_binds
-       ; return (tycon_rep_ids, tc_binds) } }
+
+       ; gbl_env <- tcExtendGlobalValEnv tycon_rep_ids getGblEnv
+       ; return (gbl_env `addTypecheckedBinds` tc_binds) } }
 
 trNameLit :: DataCon -> FastString -> LHsExpr Id
 trNameLit tr_name_dc fs

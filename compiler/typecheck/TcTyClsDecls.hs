@@ -189,12 +189,8 @@ zipRecTyClss kind_pairs rec_things
     rec_tc_env = foldr add_tc emptyNameEnv rec_things
 
     add_tc :: TyThing -> NameEnv TyCon -> NameEnv TyCon
-    add_tc (ATyCon tc) env
-      | Just cls <- tyConClass_maybe tc
-      = foldr add_one_tc (add_one_tc tc env) (classATs cls)
-      | otherwise
-      = add_one_tc tc env
-    add_tc _ env = env
+    add_tc (ATyCon tc) env = foldr add_one_tc env (tc : tyConATs tc)
+    add_tc _           env = env
 
     add_one_tc :: TyCon -> NameEnv TyCon -> NameEnv TyCon
     add_one_tc tc env = extendNameEnv env (tyConName tc) tc

@@ -73,7 +73,7 @@ module TyCon(
         tyConArity,
         tyConRoles,
         tyConFlavour,
-        tyConTuple_maybe, tyConClass_maybe,
+        tyConTuple_maybe, tyConClass_maybe, tyConATs,
         tyConFamInst_maybe, tyConFamInstSig_maybe, tyConFamilyCoercion_maybe,
         tyConFamilyResVar_maybe,
         synTyConDefn_maybe, synTyConRhs_maybe,
@@ -1874,6 +1874,11 @@ isClassTyCon _                                        = False
 tyConClass_maybe :: TyCon -> Maybe Class
 tyConClass_maybe (AlgTyCon {algTcParent = ClassTyCon clas _}) = Just clas
 tyConClass_maybe _                                            = Nothing
+
+-- | Return the associated types of the 'TyCon', if any
+tyConATs :: TyCon -> [TyCon]
+tyConATs (AlgTyCon {algTcParent = ClassTyCon clas _}) = classATs clas
+tyConATs _                                            = []
 
 ----------------------------------------------------------------------------
 -- | Is this 'TyCon' that for a data family instance?

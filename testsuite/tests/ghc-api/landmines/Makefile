@@ -6,7 +6,7 @@ clean:
 	rm -f *.o *.hi
 
 landmines: clean
-	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v4 -package ghc landmines
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc landmines
 	./landmines "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
 
