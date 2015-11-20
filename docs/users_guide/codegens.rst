@@ -81,7 +81,7 @@ output to facilitate porting GHC itself to a new platform. This mode
 produces much slower code though so it's unlikely your version of GHC
 was built this way. If it has then the native code generator probably
 won't be available. You can check this information by calling
-```ghc --info`` (see :ref:`ghc-info`).
+``ghc --info`` (see :ref:`ghc-info`).
 
 .. _unreg:
 
@@ -112,4 +112,4 @@ to build GHC with the appropriate options set. Consult the GHC Building
 Guide for details.
 
 You can check if your GHC is unregisterised by calling
-```ghc --info`` (see :ref:`ghc-info`).
+``ghc --info`` (see :ref:`ghc-info`).

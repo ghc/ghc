@@ -9985,7 +9985,7 @@ more details, see
    source code).
 
 -  The arrows web page at
-   ```http://www.haskell.org/arrows/`` <http://www.haskell.org/arrows/>`__.
+   ``http://www.haskell.org/arrows/`` <http://www.haskell.org/arrows/>`__.
 
 With the ``-XArrows`` flag, GHC supports the arrow notation described in
 the second of these papers, translating it using combinators from the
