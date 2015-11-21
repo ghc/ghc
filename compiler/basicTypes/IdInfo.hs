@@ -376,21 +376,21 @@ and put in the global list.
 data RuleInfo
   = RuleInfo
         [CoreRule]
-        VarSet          -- Locally-defined free vars of *both* LHS and RHS
+        DVarSet         -- Locally-defined free vars of *both* LHS and RHS
                         -- of rules.  I don't think it needs to include the
                         -- ru_fn though.
                         -- Note [Rule dependency info] in OccurAnal
 
 -- | Assume that no specilizations exist: always safe
 emptyRuleInfo :: RuleInfo
-emptyRuleInfo = RuleInfo [] emptyVarSet
+emptyRuleInfo = RuleInfo [] emptyDVarSet
 
 isEmptyRuleInfo :: RuleInfo -> Bool
 isEmptyRuleInfo (RuleInfo rs _) = null rs
 
 -- | Retrieve the locally-defined free variables of both the left and
 -- right hand sides of the specialization rules
-ruleInfoFreeVars :: RuleInfo -> VarSet
+ruleInfoFreeVars :: RuleInfo -> DVarSet
 ruleInfoFreeVars (RuleInfo _ fvs) = fvs
 
 ruleInfoRules :: RuleInfo -> [CoreRule]

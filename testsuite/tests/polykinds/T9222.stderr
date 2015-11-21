@@ -6,10 +6,10 @@ T9222.hs:13:3: error:
         bound by the type of the constructor ‘Want’:
                    (a ~ '(b0, c0)) => Proxy b0
         at T9222.hs:13:3
-      ‘b’ is a rigid type variable bound by
-          the type of the constructor ‘Want’:
-            ((a ~ '(b, c)) => Proxy b) -> Want a
-          at T9222.hs:13:3
+    ‘b’ is a rigid type variable bound by
+        the type of the constructor ‘Want’:
+          ((a ~ '(b, c)) => Proxy b) -> Want a
+        at T9222.hs:13:3
     Expected type: '(b, c)
       Actual type: a
     In the ambiguity check for the type of the constructor ‘Want’:

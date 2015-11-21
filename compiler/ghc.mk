@@ -529,6 +529,7 @@ compiler_stage2_dll0_MODULES = \
 	Fingerprint \
 	FiniteMap \
 	ForeignCall \
+	FV \
 	Hooks \
 	HsBinds \
 	HsDecls \

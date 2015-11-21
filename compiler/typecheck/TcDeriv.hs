@@ -691,7 +691,7 @@ deriveTyData tvs tc tc_args (L loc deriv_pred)
               final_cls_tys       = substTys subst' cls_tys
 
         ; traceTc "derivTyData1" (vcat [ pprTvBndrs tvs, ppr tc, ppr tc_args, ppr deriv_pred
-                                       , pprTvBndrs (varSetElems $ tyVarsOfTypes tc_args)
+                                       , pprTvBndrs (tyVarsOfTypesList tc_args)
                                        , ppr n_args_to_keep, ppr n_args_to_drop
                                        , ppr inst_ty_kind, ppr cls_arg_kind, ppr mb_match
                                        , ppr final_tc_args, ppr final_cls_tys ])

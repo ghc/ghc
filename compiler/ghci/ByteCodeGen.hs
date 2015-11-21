@@ -152,7 +152,7 @@ mkProtoBCO
    :: DynFlags
    -> name
    -> BCInstrList
-   -> Either  [AnnAlt Id VarSet] (AnnExpr Id VarSet)
+   -> Either  [AnnAlt Id DVarSet] (AnnExpr Id DVarSet)
    -> Int
    -> Word16
    -> [StgWord]
@@ -215,7 +215,7 @@ argBits dflags (rep : args)
 
 -- Compile code for the right-hand side of a top-level binding
 
-schemeTopBind :: (Id, AnnExpr Id VarSet) -> BcM (ProtoBCO Name)
+schemeTopBind :: (Id, AnnExpr Id DVarSet) -> BcM (ProtoBCO Name)
 
 
 schemeTopBind (id, rhs)
@@ -252,7 +252,7 @@ schemeTopBind (id, rhs)
 schemeR :: [Id]                 -- Free vars of the RHS, ordered as they
                                 -- will appear in the thunk.  Empty for
                                 -- top-level things, which have no free vars.
-        -> (Id, AnnExpr Id VarSet)
+        -> (Id, AnnExpr Id DVarSet)
         -> BcM (ProtoBCO Name)
 schemeR fvs (nm, rhs)
 {-
@@ -267,7 +267,7 @@ schemeR fvs (nm, rhs)
 -}
    = schemeR_wrk fvs nm rhs (collect rhs)
 
-collect :: AnnExpr Id VarSet -> ([Var], AnnExpr' Id VarSet)
+collect :: AnnExpr Id DVarSet -> ([Var], AnnExpr' Id DVarSet)
 collect (_, e) = go [] e
   where
     go xs e | Just e' <- bcView e = go xs e'
@@ -278,7 +278,7 @@ collect (_, e) = go [] e
       = go (x:xs) e
     go xs not_lambda = (reverse xs, not_lambda)
 
-schemeR_wrk :: [Id] -> Id -> AnnExpr Id VarSet -> ([Var], AnnExpr' Var VarSet) -> BcM (ProtoBCO Name)
+schemeR_wrk :: [Id] -> Id -> AnnExpr Id DVarSet -> ([Var], AnnExpr' Var DVarSet) -> BcM (ProtoBCO Name)
 schemeR_wrk fvs nm original_body (args, body)
    = do
      dflags <- getDynFlags
@@ -303,7 +303,7 @@ schemeR_wrk fvs nm original_body (args, body)
                  arity bitmap_size bitmap False{-not alts-})
 
 -- introduce break instructions for ticked expressions
-schemeER_wrk :: Word -> BCEnv -> AnnExpr' Id VarSet -> BcM BCInstrList
+schemeER_wrk :: Word -> BCEnv -> AnnExpr' Id DVarSet -> BcM BCInstrList
 schemeER_wrk d p rhs
   | AnnTick (Breakpoint tick_no fvs) (_annot, newRhs) <- rhs
   = do  code <- schemeE (fromIntegral d) 0 p newRhs
@@ -338,7 +338,7 @@ trunc16 w
     | otherwise
     = fromIntegral w
 
-fvsToEnv :: BCEnv -> VarSet -> [Id]
+fvsToEnv :: BCEnv -> DVarSet -> [Id]
 -- Takes the free variables of a right-hand side, and
 -- delivers an ordered list of the local variables that will
 -- be captured in the thunk for the RHS
@@ -347,7 +347,7 @@ fvsToEnv :: BCEnv -> VarSet -> [Id]
 --
 -- The code that constructs the thunk, and the code that executes
 -- it, have to agree about this layout
-fvsToEnv p fvs = [v | v <- varSetElems fvs,
+fvsToEnv p fvs = [v | v <- dVarSetElems fvs,
                       isId v,           -- Could be a type variable
                       v `Map.member` p]
 
@@ -355,7 +355,7 @@ fvsToEnv p fvs = [v | v <- varSetElems fvs,
 -- schemeE
 
 returnUnboxedAtom :: Word -> Sequel -> BCEnv
-                 -> AnnExpr' Id VarSet -> ArgRep
+                 -> AnnExpr' Id DVarSet -> ArgRep
                  -> BcM BCInstrList
 -- Returning an unlifted value.
 -- Heave it on the stack, SLIDE, and RETURN.
@@ -367,7 +367,7 @@ returnUnboxedAtom d s p e e_rep
 
 -- Compile code to apply the given expression to the remaining args
 -- on the stack, returning a HNF.
-schemeE :: Word -> Sequel -> BCEnv -> AnnExpr' Id VarSet -> BcM BCInstrList
+schemeE :: Word -> Sequel -> BCEnv -> AnnExpr' Id DVarSet -> BcM BCInstrList
 
 schemeE d s p e
    | Just e' <- bcView e
@@ -469,17 +469,17 @@ schemeE d s p exp@(AnnTick (Breakpoint _id _fvs) _rhs)
           -- breakpoint will otherwise work fine.
           id <- newId (mkFunTy realWorldStatePrimTy ty)
           st <- newId realWorldStatePrimTy
-          let letExp = AnnLet (AnnNonRec id (fvs, AnnLam st (emptyVarSet, exp)))
-                              (emptyVarSet, (AnnApp (emptyVarSet, AnnVar id)
-                                                    (emptyVarSet, AnnVar realWorldPrimId)))
+          let letExp = AnnLet (AnnNonRec id (fvs, AnnLam st (emptyDVarSet, exp)))
+                              (emptyDVarSet, (AnnApp (emptyDVarSet, AnnVar id)
+                                                    (emptyDVarSet, AnnVar realWorldPrimId)))
           schemeE d s p letExp
         else do
           id <- newId ty
           -- Todo: is emptyVarSet correct on the next line?
-          let letExp = AnnLet (AnnNonRec id (fvs, exp)) (emptyVarSet, AnnVar id)
+          let letExp = AnnLet (AnnNonRec id (fvs, exp)) (emptyDVarSet, AnnVar id)
           schemeE d s p letExp
    where exp' = deAnnotate' exp
-         fvs  = exprFreeVars exp'
+         fvs  = exprFreeDVars exp'
          ty   = exprType exp'
 
 -- ignore other kinds of tick
@@ -581,7 +581,7 @@ schemeE _ _ _ expr
 schemeT :: Word         -- Stack depth
         -> Sequel       -- Sequel depth
         -> BCEnv        -- stack env
-        -> AnnExpr' Id VarSet
+        -> AnnExpr' Id DVarSet
         -> BcM BCInstrList
 
 schemeT d s p app
@@ -644,7 +644,7 @@ schemeT d s p app
 
 mkConAppCode :: Word -> Sequel -> BCEnv
              -> DataCon                 -- The data constructor
-             -> [AnnExpr' Id VarSet]    -- Args, in *reverse* order
+             -> [AnnExpr' Id DVarSet]    -- Args, in *reverse* order
              -> BcM BCInstrList
 
 mkConAppCode _ _ _ con []       -- Nullary constructor
@@ -680,7 +680,7 @@ mkConAppCode orig_d _ p con args_r_to_l
 
 unboxedTupleReturn
         :: Word -> Sequel -> BCEnv
-        -> AnnExpr' Id VarSet -> BcM BCInstrList
+        -> AnnExpr' Id DVarSet -> BcM BCInstrList
 unboxedTupleReturn d s p arg = returnUnboxedAtom d s p arg (atomRep arg)
 
 -- -----------------------------------------------------------------------------
@@ -688,7 +688,7 @@ unboxedTupleReturn d s p arg = returnUnboxedAtom d s p arg (atomRep arg)
 
 doTailCall
         :: Word -> Sequel -> BCEnv
-        -> Id -> [AnnExpr' Id VarSet]
+        -> Id -> [AnnExpr' Id DVarSet]
         -> BcM BCInstrList
 doTailCall init_d s p fn args
   = do_pushes init_d args (map atomRep args)
@@ -745,7 +745,7 @@ findPushSeq _
 -- Case expressions
 
 doCase  :: Word -> Sequel -> BCEnv
-        -> AnnExpr Id VarSet -> Id -> [AnnAlt Id VarSet]
+        -> AnnExpr Id DVarSet -> Id -> [AnnAlt Id DVarSet]
         -> Maybe Id  -- Just x <=> is an unboxed tuple case with scrut binder, don't enter the result
         -> BcM BCInstrList
 doCase d s p (_,scrut) bndr alts is_unboxed_tuple
@@ -900,7 +900,7 @@ generateCCall :: Word -> Sequel         -- stack and sequel depths
               -> BCEnv
               -> CCallSpec              -- where to call
               -> Id                     -- of target, for type info
-              -> [AnnExpr' Id VarSet]   -- args (atoms)
+              -> [AnnExpr' Id DVarSet]   -- args (atoms)
               -> BcM BCInstrList
 
 generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
@@ -949,7 +949,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
          -- Do magic for Ptr/Byte arrays.  Push a ptr to the array on
          -- the stack but then advance it over the headers, so as to
          -- point to the payload.
-         parg_ArrayishRep :: Word16 -> Word -> BCEnv -> AnnExpr' Id VarSet
+         parg_ArrayishRep :: Word16 -> Word -> BCEnv -> AnnExpr' Id DVarSet
                           -> BcM BCInstrList
          parg_ArrayishRep hdrSize d p a
             = do (push_fo, _) <- pushAtom d p a
@@ -1142,7 +1142,7 @@ maybe_getCCallReturnRep fn_ty
      --trace (showSDoc (ppr (a_reps, r_reps))) $
      if ok then maybe_r_rep_to_go else blargh
 
-maybe_is_tagToEnum_call :: AnnExpr' Id VarSet -> Maybe (AnnExpr' Id VarSet, [Name])
+maybe_is_tagToEnum_call :: AnnExpr' Id DVarSet -> Maybe (AnnExpr' Id DVarSet, [Name])
 -- Detect and extract relevant info for the tagToEnum kludge.
 maybe_is_tagToEnum_call app
   | AnnApp (_, AnnApp (_, AnnVar v) (_, AnnType t)) arg <- app
@@ -1200,7 +1200,7 @@ a 1-word null. See Trac #8383.
 
 
 implement_tagToId :: Word -> Sequel -> BCEnv
-                  -> AnnExpr' Id VarSet -> [Name] -> BcM BCInstrList
+                  -> AnnExpr' Id DVarSet -> [Name] -> BcM BCInstrList
 -- See Note [Implementing tagToEnum#]
 implement_tagToId d s p arg names
   = ASSERT( notNull names )
@@ -1243,7 +1243,7 @@ implement_tagToId d s p arg names
 -- to 5 and not to 4.  Stack locations are numbered from zero, so a
 -- depth 6 stack has valid words 0 .. 5.
 
-pushAtom :: Word -> BCEnv -> AnnExpr' Id VarSet -> BcM (BCInstrList, Word16)
+pushAtom :: Word -> BCEnv -> AnnExpr' Id DVarSet -> BcM (BCInstrList, Word16)
 
 pushAtom d p e
    | Just e' <- bcView e

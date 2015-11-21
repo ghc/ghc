@@ -451,6 +451,7 @@ Library
         FastStringEnv
         Fingerprint
         FiniteMap
+        FV
         GraphBase
         GraphColor
         GraphOps

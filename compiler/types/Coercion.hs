@@ -47,6 +47,7 @@ module Coercion (
 
         -- ** Free variables
         tyCoVarsOfCo, tyCoVarsOfCos, coVarsOfCo, coercionSize,
+        tyCoVarsOfCoAcc, tyCoVarsOfCosAcc,
 
         -- ** Substitution
         CvSubstEnv, emptyCvSubstEnv,
@@ -107,6 +108,7 @@ import Data.Traversable (traverse, sequenceA)
 #endif
 import FastString
 import ListSetOps
+import FV
 
 import qualified Data.Data as Data hiding ( TyCon )
 import Control.Arrow ( first )
@@ -554,24 +556,45 @@ isCoVarType ty      -- Tests for t1 ~# t2, the unboxed equality
       Nothing       -> False
 
 tyCoVarsOfCo :: Coercion -> VarSet
+tyCoVarsOfCo co = runFVSet $ tyCoVarsOfCoAcc co
 -- Extracts type and coercion variables from a coercion
-tyCoVarsOfCo (Refl _ ty)           = tyVarsOfType ty
-tyCoVarsOfCo (TyConAppCo _ _ cos)  = tyCoVarsOfCos cos
-tyCoVarsOfCo (AppCo co1 co2)       = tyCoVarsOfCo co1 `unionVarSet` tyCoVarsOfCo co2
-tyCoVarsOfCo (ForAllCo tv co)      = tyCoVarsOfCo co `delVarSet` tv
-tyCoVarsOfCo (CoVarCo v)           = unitVarSet v
-tyCoVarsOfCo (AxiomInstCo _ _ cos) = tyCoVarsOfCos cos
-tyCoVarsOfCo (UnivCo _ _ ty1 ty2)  = tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2
-tyCoVarsOfCo (SymCo co)            = tyCoVarsOfCo co
-tyCoVarsOfCo (TransCo co1 co2)     = tyCoVarsOfCo co1 `unionVarSet` tyCoVarsOfCo co2
-tyCoVarsOfCo (NthCo _ co)          = tyCoVarsOfCo co
-tyCoVarsOfCo (LRCo _ co)           = tyCoVarsOfCo co
-tyCoVarsOfCo (InstCo co ty)        = tyCoVarsOfCo co `unionVarSet` tyVarsOfType ty
-tyCoVarsOfCo (SubCo co)            = tyCoVarsOfCo co
-tyCoVarsOfCo (AxiomRuleCo _ ts cs) = tyVarsOfTypes ts `unionVarSet` tyCoVarsOfCos cs
 
 tyCoVarsOfCos :: [Coercion] -> VarSet
-tyCoVarsOfCos = mapUnionVarSet tyCoVarsOfCo
+tyCoVarsOfCos cos = runFVSet $ tyCoVarsOfCosAcc cos
+
+tyCoVarsOfCoAcc :: Coercion -> FV
+tyCoVarsOfCoAcc (Refl _ ty) fv_cand in_scope acc =
+  tyVarsOfTypeAcc ty fv_cand in_scope acc
+tyCoVarsOfCoAcc (TyConAppCo _ _ cos) fv_cand in_scope acc =
+  tyCoVarsOfCosAcc cos fv_cand in_scope acc
+tyCoVarsOfCoAcc (AppCo co1 co2) fv_cand in_scope acc =
+  (tyCoVarsOfCoAcc co1 `unionFV` tyCoVarsOfCoAcc co2) fv_cand in_scope acc
+tyCoVarsOfCoAcc (ForAllCo tv co) fv_cand in_scope acc =
+  delFV tv (tyCoVarsOfCoAcc co) fv_cand in_scope acc
+tyCoVarsOfCoAcc (CoVarCo v) fv_cand in_scope acc = oneVar v fv_cand in_scope acc
+tyCoVarsOfCoAcc (AxiomInstCo _ _ cos) fv_cand in_scope acc =
+  tyCoVarsOfCosAcc cos fv_cand in_scope acc
+tyCoVarsOfCoAcc (UnivCo _ _ ty1 ty2) fv_cand in_scope acc =
+  (tyVarsOfTypeAcc ty1 `unionFV` tyVarsOfTypeAcc ty2) fv_cand in_scope acc
+tyCoVarsOfCoAcc (SymCo co) fv_cand in_scope acc =
+  tyCoVarsOfCoAcc co fv_cand in_scope acc
+tyCoVarsOfCoAcc (TransCo co1 co2) fv_cand in_scope acc =
+  (tyCoVarsOfCoAcc co1 `unionFV` tyCoVarsOfCoAcc co2) fv_cand in_scope acc
+tyCoVarsOfCoAcc (NthCo _ co) fv_cand in_scope acc =
+  tyCoVarsOfCoAcc co fv_cand in_scope acc
+tyCoVarsOfCoAcc (LRCo _ co) fv_cand in_scope acc =
+  tyCoVarsOfCoAcc co fv_cand in_scope acc
+tyCoVarsOfCoAcc (InstCo co ty) fv_cand in_scope acc =
+  (tyCoVarsOfCoAcc co `unionFV` tyVarsOfTypeAcc ty) fv_cand in_scope acc
+tyCoVarsOfCoAcc (SubCo co) fv_cand in_scope acc =
+  tyCoVarsOfCoAcc co fv_cand in_scope acc
+tyCoVarsOfCoAcc (AxiomRuleCo _ ts cs) fv_cand in_scope acc =
+  (tyVarsOfTypesAcc ts `unionFV` tyCoVarsOfCosAcc cs) fv_cand in_scope acc
+
+tyCoVarsOfCosAcc :: [Coercion] -> FV
+tyCoVarsOfCosAcc (co:cos) fv_cand in_scope acc =
+  (tyCoVarsOfCoAcc co `unionFV` tyCoVarsOfCosAcc cos) fv_cand in_scope acc
+tyCoVarsOfCosAcc [] fv_cand in_scope acc = noVars fv_cand in_scope acc
 
 coVarsOfCo :: Coercion -> VarSet
 -- Extract *coerction* variables only.  Tiresome to repeat the code, but easy.

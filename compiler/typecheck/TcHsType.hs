@@ -972,7 +972,7 @@ kcHsTyVarBndrs cusk (HsQTvs { hsq_kvs = kv_ns, hsq_tvs = hs_tvs }) thing_inside
        ; (res_kind, stuff) <- tcExtendKindEnv nks thing_inside
        ; let full_kind = mkArrowKinds (map snd nks) res_kind
              kvs       = filter (not . isMetaTyVar) $
-                         varSetElems $ tyVarsOfType full_kind
+                         tyVarsOfTypeList full_kind
              gen_kind  = if cusk
                          then mkForAllTys kvs full_kind
                          else full_kind

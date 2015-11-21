@@ -33,7 +33,7 @@ import Module           ( Module, ModuleSet, elemModuleSet )
 import CoreSubst
 import OccurAnal        ( occurAnalyseExpr )
 import CoreFVs          ( exprFreeVars, exprsFreeVars, bindFreeVars
-                        , rulesFreeVars, exprsOrphNames )
+                        , rulesFreeDVars, exprsOrphNames )
 import CoreUtils        ( exprType, eqExpr, mkTick, mkTicks,
                           stripTicksTopT, stripTicksTopE )
 import PprCore          ( pprRules )
@@ -275,15 +275,15 @@ pprRulesForUser rules
 -- | Make a 'RuleInfo' containing a number of 'CoreRule's, suitable
 -- for putting into an 'IdInfo'
 mkRuleInfo :: [CoreRule] -> RuleInfo
-mkRuleInfo rules = RuleInfo rules (rulesFreeVars rules)
+mkRuleInfo rules = RuleInfo rules (rulesFreeDVars rules)
 
 extendRuleInfo :: RuleInfo -> [CoreRule] -> RuleInfo
 extendRuleInfo (RuleInfo rs1 fvs1) rs2
-  = RuleInfo (rs2 ++ rs1) (rulesFreeVars rs2 `unionVarSet` fvs1)
+  = RuleInfo (rs2 ++ rs1) (rulesFreeDVars rs2 `unionDVarSet` fvs1)
 
 addRuleInfo :: RuleInfo -> RuleInfo -> RuleInfo
 addRuleInfo (RuleInfo rs1 fvs1) (RuleInfo rs2 fvs2)
-  = RuleInfo (rs1 ++ rs2) (fvs1 `unionVarSet` fvs2)
+  = RuleInfo (rs1 ++ rs2) (fvs1 `unionDVarSet` fvs2)
 
 addIdSpecialisations :: Id -> [CoreRule] -> Id
 addIdSpecialisations id []

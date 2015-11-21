@@ -143,6 +143,7 @@ module TcType (
   isPrimitiveType,
 
   tyVarsOfType, tyVarsOfTypes, closeOverKinds,
+  tyVarsOfTypeList, tyVarsOfTypesList,
   tcTyVarsOfType, tcTyVarsOfTypes,
 
   pprKind, pprParendKind, pprSigmaType,
