@@ -1,0 +1,7 @@
+
+<interactive>:19:1: warning: Unrecognised pragma
+
+<interactive>:62:1:
+    Role mismatch on variable b:
+      Annotation says phantom but role representational is required
+    while checking a role annotation for ‘T1’

@@ -462,12 +462,11 @@ with the ``let`` form, the expression isn't evaluated immediately:
 Note that ``let`` bindings do not automatically print the value bound,
 unlike monadic bindings.
 
-You can also use ``let``-statements to define functions at the
-prompt:
+You can also define functions at the prompt:
 
 ::
 
-    Prelude> let add a b = a + b
+    Prelude> add a b = a + b
     Prelude> add 1 2
     3
     Prelude>
@@ -479,7 +478,7 @@ instead of layout:
 
 ::
 
-    Prelude> let f op n [] = n ; f op n (h:t) = h `op` f op n t
+    Prelude> f op n [] = n ; f op n (h:t) = h `op` f op n t
     Prelude> f (+) 0 [1..3]
     6
     Prelude>
@@ -491,8 +490,8 @@ own):
 ::
 
     Prelude> :{
-    Prelude| let g op n [] = n
-    Prelude|     g op n (h:t) = h `op` g op n t
+    Prelude| g op n [] = n
+    Prelude| g op n (h:t) = h `op` g op n t
     Prelude| :}
     Prelude> g (*) 1 [1..3]
     6
@@ -877,7 +876,7 @@ arguments, e.g.:
 
 ::
 
-    Prelude> let main = System.Environment.getArgs >>= print
+    Prelude> main = System.Environment.getArgs >>= print
     Prelude> :main foo bar
     ["foo","bar"]
 
@@ -897,8 +896,8 @@ flag or the ``:run`` command:
 
 ::
 
-    Prelude> let foo = putStrLn "foo" >> System.Environment.getArgs >>= print
-    Prelude> let bar = putStrLn "bar" >> System.Environment.getArgs >>= print
+    Prelude> foo = putStrLn "foo" >> System.Environment.getArgs >>= print
+    Prelude> bar = putStrLn "bar" >> System.Environment.getArgs >>= print
     Prelude> :set -main-is foo
     Prelude> :main foo "bar baz"
     foo
@@ -2318,7 +2317,7 @@ commonly used commands.
 
     ::
 
-        Prelude> let main = System.Environment.getArgs >>= print
+        Prelude> main = System.Environment.getArgs >>= print
         Prelude> :main foo bar
         ["foo","bar"]
 
@@ -2338,8 +2337,8 @@ commonly used commands.
 
     ::
 
-        Prelude> let foo = putStrLn "foo" >> System.Environment.getArgs >>= print
-        Prelude> let bar = putStrLn "bar" >> System.Environment.getArgs >>= print
+        Prelude> foo = putStrLn "foo" >> System.Environment.getArgs >>= print
+        Prelude> bar = putStrLn "bar" >> System.Environment.getArgs >>= print
         Prelude> :set -main-is foo
         Prelude> :main foo "bar baz"
         foo

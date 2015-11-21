@@ -164,6 +164,8 @@ GHCi
 
 -  ``ghci -e`` now behaves like ``ghc -e`` (#9360).
 
+-  Added support for top-level function declarations (#7253).
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
