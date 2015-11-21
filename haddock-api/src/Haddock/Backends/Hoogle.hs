@@ -152,7 +152,7 @@ ppClass dflags x = out dflags x{tcdSigs=[]} :
         f t = HsForAllTy Implicit Nothing emptyHsQTvs (reL [context]) (reL t)
 
         context = nlHsTyConApp (tcdName x)
-            (map (reL . HsTyVar . hsTyVarName . unL) (hsQTvBndrs (tyClDeclTyVars x)))
+            (map (reL . HsTyVar . reL . hsTyVarName . unL) (hsQTvBndrs (tyClDeclTyVars x)))
 
 
 ppInstance :: DynFlags -> ClsInst -> [String]
@@ -201,7 +201,7 @@ ppCtor dflags dat subdocs con
         name = out dflags $ map unL $ con_names con
 
         resType = case con_res con of
-            ResTyH98 -> apps $ map (reL . HsTyVar) $
+            ResTyH98 -> apps $ map (reL . HsTyVar . reL) $
                         (tcdName dat) : [hsTyVarName v | L _ v@(UserTyVar _) <- hsQTvBndrs $ tyClDeclTyVars dat]
             ResTyGADT _ x -> x
 

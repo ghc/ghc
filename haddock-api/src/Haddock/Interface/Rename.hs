@@ -204,7 +204,7 @@ renameType t = case t of
     ltype'    <- renameLType ltype
     return (HsForAllTy expl extra tyvars' lcontext' ltype')
 
-  HsTyVar n -> return . HsTyVar =<< rename n
+  HsTyVar (L l n) -> return . HsTyVar . L l =<< rename n
   HsBangTy b ltype -> return . HsBangTy b =<< renameLType ltype
 
   HsAppTy a b -> do
@@ -259,9 +259,9 @@ renameLTyVarBndrs (HsQTvs { hsq_kvs = _, hsq_tvs = tvs })
                 -- This is rather bogus, but I'm not sure what else to do
 
 renameLTyVarBndr :: LHsTyVarBndr Name -> RnM (LHsTyVarBndr DocName)
-renameLTyVarBndr (L loc (UserTyVar n))
+renameLTyVarBndr (L loc (UserTyVar (L l n)))
   = do { n' <- rename n
-       ; return (L loc (UserTyVar n')) }
+       ; return (L loc (UserTyVar (L l n'))) }
 renameLTyVarBndr (L loc (KindedTyVar (L lv n) kind))
   = do { n' <- rename n
        ; kind' <- renameLKind kind
@@ -273,8 +273,8 @@ renameLContext (L loc context) = do
   return (L loc context')
 
 renameWildCardInfo :: HsWildCardInfo Name -> RnM (HsWildCardInfo DocName)
-renameWildCardInfo (AnonWildCard  name) = AnonWildCard  <$> rename name
-renameWildCardInfo (NamedWildCard name) = NamedWildCard <$> rename name
+renameWildCardInfo (AnonWildCard  (L l name)) = AnonWildCard . L l <$> rename name
+renameWildCardInfo (NamedWildCard (L l name)) = NamedWildCard . L l <$> rename name
 
 renameInstHead :: InstHead Name -> RnM (InstHead DocName)
 renameInstHead (className, k, types, rest) = do

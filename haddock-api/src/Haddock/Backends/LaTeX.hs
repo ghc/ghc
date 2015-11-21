@@ -902,14 +902,14 @@ ppr_mono_ty ctxt_prec (HsForAllTy expl extra tvs ctxt ty) unicode
     hsep [ppForAll expl tvs ctxt' unicode, ppr_mono_lty pREC_TOP ty unicode]
  where
    anonWC :: HsType DocName
-   anonWC = HsWildCardTy (AnonWildCard (Undocumented underscore))
+   anonWC = HsWildCardTy (AnonWildCard (noLoc (Undocumented underscore)))
    underscore = mkUnboundName (mkRdrUnqual (mkTyVarOcc "_"))
    ctxt'
      | Just loc <- extra = (++ [L loc anonWC]) `fmap` ctxt
      | otherwise         = ctxt
 
 ppr_mono_ty _         (HsBangTy b ty)     u = ppBang b <> ppLParendType u ty
-ppr_mono_ty _         (HsTyVar name)      _ = ppDocName name
+ppr_mono_ty _         (HsTyVar (L _ name)) _ = ppDocName name
 ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   u = ppr_fun_ty ctxt_prec ty1 ty2 u
 ppr_mono_ty _         (HsTupleTy con tys) u = tupleParens con (map (ppLType u) tys)
 ppr_mono_ty _         (HsKindSig ty kind) u = parens (ppr_mono_lty pREC_TOP ty u <+> dcolon u <+> ppLKind u kind)
@@ -947,7 +947,7 @@ ppr_mono_ty ctxt_prec (HsDocTy ty _) unicode
 
 ppr_mono_ty _ (HsWildCardTy (AnonWildCard _)) _ = char '_'
 
-ppr_mono_ty _ (HsWildCardTy (NamedWildCard name)) _ = ppDocName name
+ppr_mono_ty _ (HsWildCardTy (NamedWildCard (L _ name))) _ = ppDocName name
 
 ppr_mono_ty _ (HsTyLit t) u = ppr_tylit t u
 

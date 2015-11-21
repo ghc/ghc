@@ -835,7 +835,7 @@ ppParendType unicode qual ty = ppr_mono_ty pREC_CON ty unicode qual
 ppFunLhType  unicode qual ty = ppr_mono_ty pREC_FUN ty unicode qual
 
 ppHsTyVarBndr :: Unicode -> Qualification -> HsTyVarBndr DocName -> Html
-ppHsTyVarBndr _       qual (UserTyVar   name     ) =
+ppHsTyVarBndr _       qual (UserTyVar (L _ name)) =
     ppDocName qual Raw False name
 ppHsTyVarBndr unicode qual (KindedTyVar name kind) =
     parens (ppDocName qual Raw False (unLoc name) <+> dcolon unicode <+>
@@ -877,19 +877,19 @@ ppr_mono_ty ctxt_prec (HsForAllTy expl extra tvs ctxt ty) unicode qual
   = maybeParen ctxt_prec pREC_FUN $ ppForAllCon expl tvs ctxt' unicode qual
                                     <+> ppr_mono_lty pREC_TOP ty unicode qual
  where
-   anonWC = HsWildCardTy (AnonWildCard (Undocumented underscore))
+   anonWC = HsWildCardTy (AnonWildCard (noLoc (Undocumented underscore)))
    underscore = mkUnboundName (mkRdrUnqual (mkTyVarOcc "_"))
    ctxt'
      | Just loc <- extra = (++ [L loc anonWC]) `fmap` ctxt
      | otherwise         = ctxt
 
 -- UnicodeSyntax alternatives
-ppr_mono_ty _ (HsTyVar name) True _
+ppr_mono_ty _ (HsTyVar (L _ name)) True _
   | getOccString (getName name) == "*"    = toHtml "★"
   | getOccString (getName name) == "(->)" = toHtml "(→)"
 
 ppr_mono_ty _         (HsBangTy b ty)     u q = ppBang b +++ ppLParendType u q ty
-ppr_mono_ty _         (HsTyVar name)      _ q = ppDocName q Prefix True name
+ppr_mono_ty _         (HsTyVar (L _ name)) _ q = ppDocName q Prefix True name
 ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   u q = ppr_fun_ty ctxt_prec ty1 ty2 u q
 ppr_mono_ty _         (HsTupleTy con tys) u q = tupleParens con (map (ppLType u q) tys)
 ppr_mono_ty _         (HsKindSig ty kind) u q =
@@ -928,7 +928,7 @@ ppr_mono_ty ctxt_prec (HsDocTy ty _) unicode qual
 
 ppr_mono_ty _ (HsWildCardTy (AnonWildCard _)) _ _ = char '_'
 
-ppr_mono_ty _ (HsWildCardTy (NamedWildCard name)) _ q = ppDocName q Prefix True name
+ppr_mono_ty _ (HsWildCardTy (NamedWildCard (L _ name))) _ q = ppDocName q Prefix True name
 
 ppr_mono_ty _ (HsTyLit n) _ _ = ppr_tylit n
 
