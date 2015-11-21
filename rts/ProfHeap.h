@@ -14,7 +14,7 @@
 void    heapCensus         (Time t);
 nat     initHeapProfiling  (void);
 void    endHeapProfiling   (void);
-rtsBool strMatchesSelector (char* str, char* sel);
+rtsBool strMatchesSelector (const char* str, const char* sel);
 
 #include "EndPrivate.h"
 
