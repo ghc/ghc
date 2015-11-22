@@ -32,9 +32,11 @@ Thumbs.db
 *.stdout.normalised
 *.stdout-mingw32.normalised
 *.stdout-ghc.normalised
+*.stdout-ws-32.normalised
 *.stderr.normalised
 *.stderr-mingw32.normalised
 *.stderr-ghc.normalised
+*.stderr-ws-32.normalised
 *.interp.stdout
 *.interp.stderr
 *.run.stdout

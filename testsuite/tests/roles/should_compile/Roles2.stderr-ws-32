@@ -1,0 +1,25 @@
+TYPE SIGNATURES
+TYPE CONSTRUCTORS
+  data T1 a = K1 (IO a)
+  type role T2 phantom
+  data T2 a = K2 (FunPtr a)
+COERCION AXIOMS
+Dependent modules: []
+Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
+                     integer-gmp-1.0.0.0]
+
+==================== Typechecker ====================
+Roles2.$tcT2
+  = TyCon
+      5934726586329293381L##
+      1923031187495159753L##
+      Roles2.$trModule
+      (TrNameS "T2"#)
+Roles2.$tcT1
+  = TyCon
+      13879106829711353992L##
+      15151456821588362072L##
+      Roles2.$trModule
+      (TrNameS "T1"#)
+Roles2.$trModule = Module (TrNameS "main"#) (TrNameS "Roles2"#)
+
