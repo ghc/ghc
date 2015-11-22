@@ -998,19 +998,24 @@ abstractVars :: Level -> LevelEnv -> DVarSet -> [OutVar]
         -- Find the variables in fvs, free vars of the target expresion,
         -- whose level is greater than the destination level
         -- These are the ones we are going to abstract out
+        --
+        -- Note that to get reproducible builds, the variables need to be
+        -- abstracted in deterministic order, not dependent on the values of
+        -- Uniques. This is achieved by using DVarSets, deterministic free
+        -- variable computation and deterministic sort.
+        -- See Note [Unique Determinism] in Unique for explanation of why
+        -- Uniques are not deterministic.
 abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
-  = map zap $ uniq $ sortQuantVars
+  = map zap $ sortQuantVars $ uniq
     [out_var | out_fv  <- dVarSetElems (substDVarSet subst in_fvs)
-             , out_var <- varSetElems (close out_fv)
+             , out_var <- dVarSetElems (close out_fv)
              , abstract_me out_var ]
         -- NB: it's important to call abstract_me only on the OutIds the
         -- come from substDVarSet (not on fv, which is an InId)
   where
     uniq :: [Var] -> [Var]
-        -- Remove adjacent duplicates; the sort will have brought them together
-    uniq (v1:v2:vs) | v1 == v2  = uniq (v2:vs)
-                    | otherwise = v1 : uniq (v2:vs)
-    uniq vs = vs
+        -- Remove duplicates, preserving order
+    uniq = dVarSetElems . mkDVarSet
 
     abstract_me v = case lookupVarEnv lvl_env v of
                         Just lvl -> dest_lvl `ltLvl` lvl
@@ -1024,11 +1029,11 @@ abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
                      setIdInfo v vanillaIdInfo
           | otherwise = v
 
-    close :: Var -> VarSet  -- Close over variables free in the type
-                            -- Result includes the input variable itself
-    close v = foldVarSet (unionVarSet . close)
-                         (unitVarSet v)
-                         (varTypeTyVars v)
+    close :: Var -> DVarSet  -- Close over variables free in the type
+                             -- Result includes the input variable itself
+    close v = foldDVarSet (unionDVarSet . close)
+                          (unitDVarSet v)
+                          (runFVDSet $ varTypeTyVarsAcc v)
 
 type LvlM result = UniqSM result
 
