@@ -1607,12 +1607,28 @@ context :: { LHsContext RdrName }
                                                    else return ()
                                                 ; ams ctx anns
                                                 } }
+{- Note [GADT decl discards annotations]
+~~~~~~~~~~~~~~~~~~~~~
+The type production for
+
+    btype `->` btype
+
+adds the AnnRarrow annotation twice, in different places.
+
+This is because if the type is processed as usual, it belongs on the annotations
+for the type as a whole.
+
+But if the type is passed to mkGadtDecl, it discards the top level SrcSpan, and
+the top-level annotation will be disconnected. Hence for this specific case it
+is connected to the first type too.
+-}
+
 -- See Note [Parsing ~]
 type :: { LHsType RdrName }
         : btype                         { splitTilde $1 }
         | btype qtyconop type           { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
         | btype tyvarop  type           { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
-        | btype '->'     ctype          {% ams $1 [mu AnnRarrow $2]
+        | btype '->'     ctype          {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
                                         >> ams (sLL $1 $> $ HsFunTy (splitTilde $1) $3)
                                                [mu AnnRarrow $2] }
         | btype SIMPLEQUOTE qconop type  {% ams (sLL $1 $> $ mkHsOpTy $1 $3 $4)
