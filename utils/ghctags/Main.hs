@@ -289,7 +289,7 @@ boundThings modname lbinding =
               lid id = FoundThing modname (getOccString id) loc
           in case unLoc lpat of
                WildPat _ -> tl
-               VarPat name -> lid name : tl
+               VarPat (L _ name) -> lid name : tl
                LazyPat p -> patThings p tl
                AsPat id p -> patThings p (thing id : tl)
                ParPat p -> patThings p tl

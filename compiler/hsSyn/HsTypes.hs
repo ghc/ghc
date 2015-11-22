@@ -225,7 +225,7 @@ instance OutputableBndr HsIPName where
 --------------------------------------------------
 data HsTyVarBndr name
   = UserTyVar        -- no explicit kinding
-         name
+         (Located name)
 
   | KindedTyVar
          (Located name)
@@ -265,8 +265,9 @@ data HsType name
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsTyVar             name            -- Type variable, type constructor, or data constructor
-                                        -- see Note [Promotions (HsTyVar)]
+  | HsTyVar    (Located name)
+                  -- Type variable, type constructor, or data constructor
+                  -- see Note [Promotions (HsTyVar)]
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in ApiAnnotation
@@ -426,9 +427,9 @@ mkHsOpTy :: LHsType name -> Located name -> LHsType name -> HsType name
 mkHsOpTy ty1 op ty2 = HsOpTy ty1 (WpKiApps [], op) ty2
 
 data HsWildCardInfo name
-    = AnonWildCard (PostRn name Name)
+    = AnonWildCard (PostRn name (Located Name))
       -- A anonymous wild card ('_'). A name is generated during renaming.
-    | NamedWildCard name
+    | NamedWildCard (Located name)
       -- A named wild card ('_a').
     deriving (Typeable)
 deriving instance (DataId name) => Data (HsWildCardInfo name)
@@ -726,7 +727,7 @@ hsExplicitTvs _                                     = []
 
 ---------------------
 hsTyVarName :: HsTyVarBndr name -> name
-hsTyVarName (UserTyVar n)           = n
+hsTyVarName (UserTyVar (L _ n))     = n
 hsTyVarName (KindedTyVar (L _ n) _) = n
 
 hsLTyVarName :: LHsTyVarBndr name -> name
@@ -752,8 +753,8 @@ hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvBndrs qtvs)
 hsLTyVarBndrToType :: LHsTyVarBndr name -> LHsType name
 hsLTyVarBndrToType = fmap cvt
   where cvt (UserTyVar n)                     = HsTyVar n
-        cvt (KindedTyVar (L name_loc n) kind) = HsKindSig (L name_loc (HsTyVar n))
-                                                          kind
+        cvt (KindedTyVar (L name_loc n) kind)
+                   = HsKindSig (L name_loc (HsTyVar (L name_loc n))) kind
 
 -- | Convert a LHsTyVarBndrs to a list of types. Used in Template Haskell
 -- quoting for type family equations. Works on *type* variable only, no kind
@@ -765,7 +766,7 @@ hsLTyVarBndrsToTypes (HsQTvs { hsq_tvs = tvbs }) = map hsLTyVarBndrToType tvbs
 mkAnonWildCardTy :: HsType RdrName
 mkAnonWildCardTy = HsWildCardTy (AnonWildCard PlaceHolder)
 
-mkNamedWildCardTy :: n -> HsType n
+mkNamedWildCardTy :: Located n -> HsType n
 mkNamedWildCardTy = HsWildCardTy . NamedWildCard
 
 isAnonWildCard :: HsWildCardInfo name -> Bool
@@ -776,8 +777,8 @@ isNamedWildCard :: HsWildCardInfo name -> Bool
 isNamedWildCard = not . isAnonWildCard
 
 wildCardName :: HsWildCardInfo Name -> Name
-wildCardName (NamedWildCard n) = n
-wildCardName (AnonWildCard  n) = n
+wildCardName (NamedWildCard (L _ n)) = n
+wildCardName (AnonWildCard  (L _ n)) = n
 
 -- Two wild cards are the same when: they're both named and have the same
 -- name, or they're both anonymous and have the same location.
@@ -785,13 +786,15 @@ sameWildCard :: Eq name
              => Located (HsWildCardInfo name)
              -> Located (HsWildCardInfo name) -> Bool
 sameWildCard (L l1 (AnonWildCard _))   (L l2 (AnonWildCard _))   = l1 == l2
-sameWildCard (L _  (NamedWildCard n1)) (L _  (NamedWildCard n2)) = n1 == n2
+sameWildCard (L _  (NamedWildCard (L _ n1)))
+             (L _  (NamedWildCard (L _ n2))) = n1 == n2
 sameWildCard _ _ = False
 
 sameNamedWildCard :: Eq name
                   => Located (HsWildCardInfo name)
                   -> Located (HsWildCardInfo name) -> Bool
-sameNamedWildCard (L _  (NamedWildCard n1)) (L _  (NamedWildCard n2)) = n1 == n2
+sameNamedWildCard (L _  (NamedWildCard (L _ n1)))
+                  (L _  (NamedWildCard (L _ n2))) = n1 == n2
 sameNamedWildCard _ _ = False
 
 splitHsAppTys :: LHsType n -> [LHsType n] -> (LHsType n, [LHsType n])
@@ -806,7 +809,7 @@ splitHsAppTys f                   as = (f,as)
 hsTyGetAppHead_maybe :: LHsType n -> Maybe (n, [LHsType n])
 hsTyGetAppHead_maybe = go []
   where
-    go tys (L _ (HsTyVar n))             = Just (n, tys)
+    go tys (L _ (HsTyVar (L _ n)))       = Just (n, tys)
     go tys (L _ (HsAppTy l r))           = go (r : tys) l
     go tys (L _ (HsOpTy l (_, L _ n) r)) = Just (n, l : r : tys)
     go tys (L _ (HsParTy t))             = go tys t
@@ -854,13 +857,13 @@ splitLHsClassTy_maybe :: LHsType name -> Maybe (Located name, [LHsType name])
 splitLHsClassTy_maybe ty
   = checkl ty []
   where
-    checkl (L l ty) args = case ty of
-        HsTyVar t          -> Just (L l t, args)
-        HsAppTy l r        -> checkl l (r:args)
-        HsOpTy l (_, tc) r -> checkl (fmap HsTyVar tc) (l:r:args)
-        HsParTy t          -> checkl t args
-        HsKindSig ty _     -> checkl ty args
-        _                  -> Nothing
+    checkl (L _ ty) args = case ty of
+        HsTyVar (L lt t)       -> Just (L lt t, args)
+        HsAppTy l r            -> checkl l (r:args)
+        HsOpTy l (_,L lt tc) r -> checkl (L lt (HsTyVar (L lt tc))) (l:r:args)
+        HsParTy t              -> checkl t args
+        HsKindSig ty _         -> checkl ty args
+        _                      -> Nothing
 
 -- splitHsFunType decomposes a type (t1 -> t2 ... -> tn)
 -- Breaks up any parens in the result type:
@@ -878,7 +881,7 @@ splitHsFunType (L _ (HsFunTy x y))
 splitHsFunType orig_ty@(L _ (HsAppTy t1 t2))
   = go t1 [t2]
   where  -- Look for (->) t1 t2, possibly with parenthesisation
-    go (L _ (HsTyVar fn))    tys | fn == funTyConName
+    go (L _ (HsTyVar (L _ fn))) tys | fn == funTyConName
                                  , [t1,t2] <- tys
                                  , (args, res) <- splitHsFunType t2
                                  = (t1:args, res)
@@ -1010,7 +1013,7 @@ ppr_mono_ty ctxt_prec (HsForAllTy exp extra tvs ctxt ty)
 
 ppr_mono_ty _    (HsBangTy b ty)     = ppr b <> ppr_mono_lty TyConPrec ty
 ppr_mono_ty _    (HsRecTy flds)      = pprConDeclFields flds
-ppr_mono_ty _    (HsTyVar name)      = pprPrefixOcc name
+ppr_mono_ty _    (HsTyVar (L _ name))= pprPrefixOcc name
 ppr_mono_ty prec (HsFunTy ty1 ty2)   = ppr_fun_ty prec ty1 ty2
 ppr_mono_ty _    (HsTupleTy con tys) = tupleParens std_con (pprWithCommas ppr tys)
   where std_con = case con of

@@ -338,10 +338,11 @@ mkQuasiQuoteExpr :: UntypedSpliceFlavour -> Name -> SrcSpan -> FastString -> LHs
 -- which is what we must run in a quasi-quote
 mkQuasiQuoteExpr flavour quoter q_span quote
   = L q_span $ HsApp (L q_span $
-                      HsApp (L q_span (HsVar quote_selector)) quoterExpr)
+                      HsApp (L q_span (HsVar (L q_span quote_selector)))
+                            quoterExpr)
                      quoteExpr
   where
-    quoterExpr = L q_span $! HsVar $! quoter
+    quoterExpr = L q_span $! HsVar $! (L q_span quoter)
     quoteExpr  = L q_span $! HsLit $! HsString "" quote
     quote_selector = case flavour of
                        UntypedExpSplice  -> quoteExpName

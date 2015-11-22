@@ -29,19 +29,19 @@ traverse a =
       gmapM traverse a
   where
     showVar :: Maybe (HsExpr Id) -> Traverse ()
-    showVar (Just (HsVar v)) =
+    showVar (Just (HsVar (L _ v))) =
       modify $ \(loc, ids) -> (loc, (varName v, loc) : ids)
     showVar _ =
       return ()
 
     showTyVar :: Maybe (HsType Name) -> Traverse ()
-    showTyVar (Just (HsTyVar v)) =
+    showTyVar (Just (HsTyVar (L _ v))) =
       modify $ \(loc, ids) -> (loc, (v, loc) : ids)
     showTyVar _ =
       return ()
 
     showPatVar :: Maybe (Pat Id) -> Traverse ()
-    showPatVar (Just (VarPat v)) =
+    showPatVar (Just (VarPat (L _ v))) =
       modify $ \(loc, ids) -> (loc, (varName v, loc) : ids)
     showPatVar _
       = return ()

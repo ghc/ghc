@@ -1206,9 +1206,9 @@ tcVect :: VectDecl Name -> TcM (VectDecl TcId)
 tcVect (HsVect s name rhs)
   = addErrCtxt (vectCtxt name) $
     do { var <- wrapLocM tcLookupId name
-       ; let L rhs_loc (HsVar rhs_var_name) = rhs
+       ; let L rhs_loc (HsVar (L lv rhs_var_name)) = rhs
        ; rhs_id <- tcLookupId rhs_var_name
-       ; return $ HsVect s var (L rhs_loc (HsVar rhs_id))
+       ; return $ HsVect s var (L rhs_loc (HsVar (L lv rhs_id)))
        }
 
 {- OLD CODE:

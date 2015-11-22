@@ -1658,9 +1658,9 @@ btype :: { LHsType RdrName }
         | atype                         { $1 }
 
 atype :: { LHsType RdrName }
-        : ntgtycon                       { sL1 $1 (HsTyVar (unLoc $1)) }      -- Not including unit tuples
+        : ntgtycon                       { sL1 $1 (HsTyVar $1) }      -- Not including unit tuples
         | tyvar                          {% do { nwc <- namedWildCardsEnabled -- (See Note [Unit tuples])
-                                               ; let tv@(Unqual name) = unLoc $1
+                                               ; let tv@(L _ (Unqual name)) = $1
                                                ; return $ if (startsWithUnderscore name && nwc)
                                                           then (sL1 $1 (mkNamedWildCardTy tv))
                                                           else (sL1 $1 (HsTyVar tv)) } }
@@ -1692,10 +1692,10 @@ atype :: { LHsType RdrName }
         | '$(' exp ')'                {% ams (sLL $1 $> $ mkHsSpliceTy $2)
                                              [mj AnnOpenPE $1,mj AnnCloseP $3] }
         | TH_ID_SPLICE                {%ams (sLL $1 $> $ mkHsSpliceTy $ sL1 $1 $ HsVar $
-                                             mkUnqual varName (getTH_ID_SPLICE $1))
+                                             (sL1 $1 (mkUnqual varName (getTH_ID_SPLICE $1))))
                                              [mj AnnThIdSplice $1] }
                                       -- see Note [Promotion] for the followings
-        | SIMPLEQUOTE qcon_nowiredlist {% ams (sLL $1 $> $ HsTyVar $ unLoc $2) [mj AnnSimpleQuote $1,mj AnnName $2] }
+        | SIMPLEQUOTE qcon_nowiredlist {% ams (sLL $1 $> $ HsTyVar $2) [mj AnnSimpleQuote $1,mj AnnName $2] }
         | SIMPLEQUOTE  '(' ctype ',' comma_types1 ')'
                              {% addAnnotation (gl $3) AnnComma (gl $4) >>
                                 ams (sLL $1 $> $ HsExplicitTupleTy [] ($3 : $5))
@@ -1703,7 +1703,7 @@ atype :: { LHsType RdrName }
         | SIMPLEQUOTE  '[' comma_types0 ']'     {% ams (sLL $1 $> $ HsExplicitListTy
                                                             placeHolderKind $3)
                                                        [mj AnnSimpleQuote $1,mos $2,mcs $4] }
-        | SIMPLEQUOTE var                       {% ams (sLL $1 $> $ HsTyVar $ unLoc $2)
+        | SIMPLEQUOTE var                       {% ams (sLL $1 $> $ HsTyVar $2)
                                                        [mj AnnSimpleQuote $1,mj AnnName $2] }
 
         -- Two or more [ty, ty, ty] must be a promoted list type, just as
@@ -1748,7 +1748,7 @@ tv_bndrs :: { [LHsTyVarBndr RdrName] }
          | {- empty -}                  { [] }
 
 tv_bndr :: { LHsTyVarBndr RdrName }
-        : tyvar                         { sL1 $1 (UserTyVar (unLoc $1)) }
+        : tyvar                         { sL1 $1 (UserTyVar $1) }
         | '(' tyvar '::' kind ')'       {% ams (sLL $1 $>  (KindedTyVar $2 $4))
                                                [mop $1,mu AnnDcolon $3
                                                ,mcp $5] }
@@ -1802,16 +1802,16 @@ bkind :: { LHsKind RdrName }
         | bkind akind            { sLL $1 $> $ HsAppTy $1 $2 }
 
 akind :: { LHsKind RdrName }
-        : '*'                    {% ams (sL1 $1 $ HsTyVar (nameRdrName liftedTypeKindTyConName))
+        : '*'                    {% ams (sL1 $1 $ HsTyVar (sL1 $1 (nameRdrName liftedTypeKindTyConName)))
                                         [mu AnnStar $1] }
         | '(' kind ')'           {% ams (sLL $1 $>  $ HsParTy $2)
                                         [mop $1,mcp $3] }
         | pkind                  { $1 }
-        | tyvar                  { sL1 $1 $ HsTyVar (unLoc $1) }
+        | tyvar                  { sL1 $1 $ HsTyVar $1 }
 
 pkind :: { LHsKind RdrName }  -- promoted type, see Note [Promotion]
-        : qtycon                          { sL1 $1 $ HsTyVar $ unLoc $1 }
-        | '(' ')'                   {% ams (sLL $1 $> $ HsTyVar $ getRdrName unitTyCon)
+        : qtycon                          { sL1 $1 $ HsTyVar $1 }
+        | '(' ')'                   {% ams (sLL $1 $> $ HsTyVar $ (sLL $1 $> $ getRdrName unitTyCon))
                                            [mop $1,mcp $2] }
         | '(' kind ',' comma_kinds1 ')'
                           {% addAnnotation (gl $2) AnnComma (gl $3) >>
@@ -1977,7 +1977,7 @@ deriving :: { Located (Maybe (Located [LHsType RdrName])) }
         : {- empty -}             { noLoc Nothing }
         | 'deriving' qtycon       {% aljs ( let { L loc tv = $2 }
                                             in (sLL $1 $> (Just (sLL $1 $>
-                                                       [L loc (HsTyVar tv)]))))
+                                                       [L loc (HsTyVar $2)]))))
                                           [mj AnnDeriving $1] }
         | 'deriving' '(' ')'      {% aljs (sLL $1 $> (Just (sLL $1 $> [])))
                                           [mj AnnDeriving $1,mop $2,mcp $3] }
@@ -2024,7 +2024,7 @@ docdecld :: { LDocDecl }
 decl_no_th :: { LHsDecl RdrName }
         : sigdecl               { $1 }
 
-        | '!' aexp rhs          {% do { let { e = sLL $1 $2 (SectionR (sL1 $1 (HsVar bang_RDR)) $2) };
+        | '!' aexp rhs          {% do { let { e = sLL $1 $2 (SectionR (sL1 $1 (HsVar (sL1 $1 bang_RDR))) $2) };
                                         pat <- checkPattern empty e;
                                         _ <- ams (sLL $1 $> ())
                                                (fst $ unLoc $3);
@@ -2281,8 +2281,8 @@ aexp1   :: { LHsExpr RdrName }
         | aexp2                { $1 }
 
 aexp2   :: { LHsExpr RdrName }
-        : qvar                          { sL1 $1 (HsVar   $! unLoc $1) }
-        | qcon                          { sL1 $1 (HsVar   $! unLoc $1) }
+        : qvar                          { sL1 $1 (HsVar   $! $1) }
+        | qcon                          { sL1 $1 (HsVar   $! $1) }
         | ipvar                         { sL1 $1 (HsIPVar $! unLoc $1) }
         | overloaded_label              { sL1 $1 (HsOverLabel $! unLoc $1) }
         | literal                       { sL1 $1 (HsLit   $! unLoc $1) }
@@ -2339,14 +2339,14 @@ aexp2   :: { LHsExpr RdrName }
 
 splice_exp :: { LHsExpr RdrName }
         : TH_ID_SPLICE          {% ams (sL1 $1 $ mkHsSpliceE
-                                        (sL1 $1 $ HsVar (mkUnqual varName
-                                                        (getTH_ID_SPLICE $1))))
+                                        (sL1 $1 $ HsVar (sL1 $1 (mkUnqual varName
+                                                           (getTH_ID_SPLICE $1)))))
                                        [mj AnnThIdSplice $1] }
         | '$(' exp ')'          {% ams (sLL $1 $> $ mkHsSpliceE $2)
                                        [mj AnnOpenPE $1,mj AnnCloseP $3] }
         | TH_ID_TY_SPLICE       {% ams (sL1 $1 $ mkHsSpliceTE
-                                        (sL1 $1 $ HsVar (mkUnqual varName
-                                                     (getTH_ID_TY_SPLICE $1))))
+                                        (sL1 $1 $ HsVar (sL1 $1 (mkUnqual varName
+                                                        (getTH_ID_TY_SPLICE $1)))))
                                        [mj AnnThIdTySplice $1] }
         | '$$(' exp ')'         {% ams (sLL $1 $> $ mkHsSpliceTE $2)
                                        [mj AnnOpenPTE $1,mj AnnCloseP $3] }
@@ -2621,7 +2621,7 @@ gdpat   :: { LGRHS RdrName (LHsExpr RdrName) }
 pat     :: { LPat RdrName }
 pat     :  exp          {% checkPattern empty $1 }
         | '!' aexp      {% amms (checkPattern empty (sLL $1 $> (SectionR
-                                                     (sL1 $1 (HsVar bang_RDR)) $2)))
+                                                     (sL1 $1 (HsVar (sL1 $1 bang_RDR))) $2)))
                                 [mj AnnBang $1] }
 
 bindpat :: { LPat RdrName }
@@ -2629,14 +2629,14 @@ bindpat :  exp            {% checkPattern
                                 (text "Possibly caused by a missing 'do'?") $1 }
         | '!' aexp        {% amms (checkPattern
                                      (text "Possibly caused by a missing 'do'?")
-                                     (sLL $1 $> (SectionR (sL1 $1 (HsVar bang_RDR)) $2)))
+                                     (sLL $1 $> (SectionR (sL1 $1 (HsVar (sL1 $1 bang_RDR))) $2)))
                                   [mj AnnBang $1] }
 
 apat   :: { LPat RdrName }
 apat    : aexp                  {% checkPattern empty $1 }
         | '!' aexp              {% amms (checkPattern empty
                                             (sLL $1 $> (SectionR
-                                                (sL1 $1 (HsVar bang_RDR)) $2)))
+                                                (sL1 $1 (HsVar (sL1 $1 bang_RDR))) $2)))
                                         [mj AnnBang $1] }
 
 apats  :: { [LPat RdrName] }
@@ -2938,12 +2938,12 @@ varop   :: { Located RdrName }
                                        ,mj AnnBackquote $3] }
 
 qop     :: { LHsExpr RdrName }   -- used in sections
-        : qvarop                { sL1 $1 $ HsVar (unLoc $1) }
-        | qconop                { sL1 $1 $ HsVar (unLoc $1) }
+        : qvarop                { sL1 $1 $ HsVar $1 }
+        | qconop                { sL1 $1 $ HsVar $1 }
 
 qopm    :: { LHsExpr RdrName }   -- used in sections
-        : qvaropm               { sL1 $1 $ HsVar (unLoc $1) }
-        | qconop                { sL1 $1 $ HsVar (unLoc $1) }
+        : qvaropm               { sL1 $1 $ HsVar $1 }
+        | qconop                { sL1 $1 $ HsVar $1 }
 
 qvarop :: { Located RdrName }
         : qvarsym               { $1 }

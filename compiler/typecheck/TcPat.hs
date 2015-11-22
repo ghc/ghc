@@ -504,10 +504,10 @@ tc_pat  :: PatEnv
         -> TcM (Pat TcId,       -- Translated pattern
                 a)              -- Result of thing inside
 
-tc_pat penv (VarPat name) pat_ty thing_inside
+tc_pat penv (VarPat (L l name)) pat_ty thing_inside
   = do  { (co, id) <- tcPatBndr penv name pat_ty
         ; res <- tcExtendIdEnv1 name id thing_inside
-        ; return (mkHsWrapPatCo co (VarPat id) pat_ty, res) }
+        ; return (mkHsWrapPatCo co (VarPat (L l id)) pat_ty, res) }
 
 tc_pat penv (ParPat pat) pat_ty thing_inside
   = do  { (pat', res) <- tc_lpat pat pat_ty penv thing_inside

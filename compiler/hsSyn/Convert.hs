@@ -465,7 +465,7 @@ cvtDerivs cs = do { cs' <- mapM cvt_one cs
                   ; return (Just (noLoc cs')) }
         where
           cvt_one c = do { c' <- tconName c
-                         ; returnL $ HsTyVar c' }
+                         ; returnL $ HsTyVar (noLoc c') }
 
 cvt_fundep :: FunDep -> CvtM (Located (Class.FunDep (Located RdrName)))
 cvt_fundep (FunDep xs ys) = do { xs' <- mapM tName xs
@@ -641,8 +641,8 @@ cvtClause (Clause ps body wheres)
 cvtl :: TH.Exp -> CvtM (LHsExpr RdrName)
 cvtl e = wrapL (cvt e)
   where
-    cvt (VarE s)        = do { s' <- vName s; return $ HsVar s' }
-    cvt (ConE s)        = do { s' <- cName s; return $ HsVar s' }
+    cvt (VarE s)        = do { s' <- vName s; return $ HsVar (noLoc s') }
+    cvt (ConE s)        = do { s' <- cName s; return $ HsVar (noLoc s') }
     cvt (LitE l)
       | overloadedLit l = do { l' <- cvtOverLit l; return $ HsOverLit l' }
       | otherwise       = do { l' <- cvtLit l;     return $ HsLit l' }
@@ -717,7 +717,7 @@ cvtl e = wrapL (cvt e)
                               ; flds'<- mapM (cvtFld mkAmbiguousFieldOcc) flds
                               ; return $ mkRdrRecordUpd e' flds' }
     cvt (StaticE e)      = fmap HsStatic $ cvtl e
-    cvt (UnboundVarE s)  = do { s' <- vName s; return $ HsVar s' }
+    cvt (UnboundVarE s)  = do { s' <- vName s; return $ HsVar (noLoc s') }
 
 {- Note [Dropping constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -930,7 +930,7 @@ cvtp (TH.LitP l)
                                   -- Not right for negative patterns;
                                   -- need to think about that!
   | otherwise          = do { l' <- cvtLit l; return $ Hs.LitPat l' }
-cvtp (TH.VarP s)       = do { s' <- vName s; return $ Hs.VarPat s' }
+cvtp (TH.VarP s)       = do { s' <- vName s; return $ Hs.VarPat (noLoc s') }
 cvtp (TupP [p])        = do { p' <- cvtPat p; return $ ParPat p' } -- Note [Dropping constructors]
 cvtp (TupP ps)         = do { ps' <- cvtPats ps; return $ TuplePat ps' Boxed   [] }
 cvtp (UnboxedTupP ps)  = do { ps' <- cvtPats ps; return $ TuplePat ps' Unboxed [] }
@@ -986,7 +986,7 @@ cvtTvs tvs = do { tvs' <- mapM cvt_tv tvs; return (mkHsQTvs tvs') }
 cvt_tv :: TH.TyVarBndr -> CvtM (LHsTyVarBndr RdrName)
 cvt_tv (TH.PlainTV nm)
   = do { nm' <- tName nm
-       ; returnL $ UserTyVar nm' }
+       ; returnL $ UserTyVar (noLoc nm') }
 cvt_tv (TH.KindedTV nm ki)
   = do { nm' <- tName nm
        ; ki' <- cvtKind ki
@@ -1019,22 +1019,26 @@ cvtTypeKind ty_str ty
              | n == 1
              -> failWith (ptext (sLit ("Illegal 1-tuple " ++ ty_str ++ " constructor")))
              | otherwise
-             -> mk_apps (HsTyVar (getRdrName (tupleTyCon Boxed n))) tys'
+             -> mk_apps (HsTyVar (noLoc (getRdrName (tupleTyCon Boxed n)))) tys'
            UnboxedTupleT n
              | length tys' == n         -- Saturated
              -> if n==1 then return (head tys') -- Singleton tuples treated
                                                 -- like nothing (ie just parens)
                         else returnL (HsTupleTy HsUnboxedTuple tys')
              | otherwise
-             -> mk_apps (HsTyVar (getRdrName (tupleTyCon Unboxed n))) tys'
+             -> mk_apps (HsTyVar (noLoc (getRdrName (tupleTyCon Unboxed n))))
+                        tys'
            ArrowT
              | [x',y'] <- tys' -> returnL (HsFunTy x' y')
-             | otherwise       -> mk_apps (HsTyVar (getRdrName funTyCon)) tys'
+             | otherwise -> mk_apps (HsTyVar (noLoc (getRdrName funTyCon))) tys'
            ListT
              | [x']    <- tys' -> returnL (HsListTy x')
-             | otherwise       -> mk_apps (HsTyVar (getRdrName listTyCon)) tys'
-           VarT nm -> do { nm' <- tName nm;    mk_apps (HsTyVar nm') tys' }
-           ConT nm -> do { nm' <- tconName nm; mk_apps (HsTyVar nm') tys' }
+             | otherwise
+                        -> mk_apps (HsTyVar (noLoc (getRdrName listTyCon))) tys'
+           VarT nm -> do { nm' <- tName nm
+                         ; mk_apps (HsTyVar (noLoc nm')) tys' }
+           ConT nm -> do { nm' <- tconName nm
+                         ; mk_apps (HsTyVar (noLoc nm')) tys' }
 
            ForallT tvs cxt ty
              | null tys'
@@ -1057,13 +1061,14 @@ cvtTypeKind ty_str ty
              -> mk_apps mkAnonWildCardTy tys'
 
            WildCardT (Just nm)
-             -> do { nm' <- tName nm; mk_apps (mkNamedWildCardTy nm') tys' }
+             -> do { nm' <- tName nm
+                   ; mk_apps (mkNamedWildCardTy (noLoc nm')) tys' }
 
            InfixT t1 s t2
              -> do { s'  <- tconName s
                    ; t1' <- cvtType t1
                    ; t2' <- cvtType t2
-                   ; mk_apps (HsTyVar s') [t1', t2']
+                   ; mk_apps (HsTyVar (noLoc s')) [t1', t2']
                    }
 
            UInfixT t1 s t2
@@ -1076,7 +1081,8 @@ cvtTypeKind ty_str ty
                    ; returnL $ HsParTy t'
                    }
 
-           PromotedT nm -> do { nm' <- cName nm; mk_apps (HsTyVar nm') tys' }
+           PromotedT nm -> do { nm' <- cName nm
+                              ; mk_apps (HsTyVar (noLoc nm')) tys' }
                  -- Promoted data constructor; hence cName
 
            PromotedTupleT n
@@ -1097,17 +1103,18 @@ cvtTypeKind ty_str ty
              | [ty1, L _ (HsExplicitListTy _ tys2)] <- tys'
              -> returnL (HsExplicitListTy placeHolderKind (ty1:tys2))
              | otherwise
-             -> mk_apps (HsTyVar (getRdrName consDataCon)) tys'
+             -> mk_apps (HsTyVar (noLoc (getRdrName consDataCon))) tys'
 
            StarT
-             -> returnL (HsTyVar (getRdrName liftedTypeKindTyCon))
+             -> returnL (HsTyVar (noLoc (getRdrName liftedTypeKindTyCon)))
 
            ConstraintT
-             -> returnL (HsTyVar (getRdrName constraintKindTyCon))
+             -> returnL (HsTyVar (noLoc (getRdrName constraintKindTyCon)))
 
            EqualityT
              | [x',y'] <- tys' -> returnL (HsEqTy x' y')
-             | otherwise       -> mk_apps (HsTyVar (getRdrName eqPrimTyCon)) tys'
+             | otherwise
+                      -> mk_apps (HsTyVar (noLoc (getRdrName eqPrimTyCon))) tys'
 
            _ -> failWith (ptext (sLit ("Malformed " ++ ty_str)) <+> text (show ty))
     }

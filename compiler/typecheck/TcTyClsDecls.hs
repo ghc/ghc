@@ -1084,7 +1084,8 @@ tc_fam_ty_pats (name, arity, kind) mb_clsinfo
                    substKiWith fam_kvs fam_arg_kinds fam_body
              -- Treat (anonymous) wild cards as type variables without a name.
              -- See Note [Wild cards in family instances]
-             anon_tvs = [L (nameSrcSpan wc) (UserTyVar wc) | wc <- wcs]
+             anon_tvs = [L (nameSrcSpan wc)
+                         (UserTyVar (L (nameSrcSpan wc) wc)) | wc <- wcs]
              hs_tvs = HsQTvs { hsq_kvs = kvars
                              , hsq_tvs = anon_tvs ++ userHsTyVarBndrs loc tvars }
 

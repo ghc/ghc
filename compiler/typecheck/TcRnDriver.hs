@@ -1304,7 +1304,8 @@ check_main dflags tcg_env explicit_mod_hdr
         ; res_ty <- newFlexiTyVarTy liftedTypeKind
         ; main_expr
                 <- addErrCtxt mainCtxt    $
-                   tcMonoExpr (L loc (HsVar main_name)) (mkTyConApp ioTyCon [res_ty])
+                   tcMonoExpr (L loc (HsVar (L loc main_name)))
+                                            (mkTyConApp ioTyCon [res_ty])
 
                 -- See Note [Root-main Id]
                 -- Construct the binding
@@ -1617,13 +1618,15 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
                           ValBindsOut [(NonRecursive,unitBag the_bind)] []
 
               -- [it <- e]
-              bind_stmt = L loc $ BindStmt (L loc (VarPat fresh_it))
+              bind_stmt = L loc $ BindStmt (L loc (VarPat (L loc fresh_it)))
                                            (nlHsApp ghciStep rn_expr)
-                                           (HsVar bindIOName) noSyntaxExpr
+                                           (HsVar (L loc bindIOName))
+                                           noSyntaxExpr
 
               -- [; print it]
               print_it  = L loc $ BodyStmt (nlHsApp (nlHsVar interPrintName) (nlHsVar fresh_it))
-                                           (HsVar thenIOName) noSyntaxExpr placeHolderType
+                                           (HsVar (L loc thenIOName))
+                                                  noSyntaxExpr placeHolderType
 
         -- The plans are:
         --   A. [it <- e; print it]     but not if it::()
@@ -1691,7 +1694,7 @@ tcUserStmt rdr_stmt@(L loc _)
            ; return stuff }
       where
         print_v  = L loc $ BodyStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
-                                    (HsVar thenIOName) noSyntaxExpr
+                                    (HsVar (L loc thenIOName)) noSyntaxExpr
                                     placeHolderType
 
 -- | Typecheck the statements given and then return the results of the
@@ -1757,7 +1760,7 @@ getGhciStepIO = do
 
         stepTy :: LHsType Name    -- Renamed, so needs all binders in place
         stepTy = noLoc $ HsForAllTy Implicit Nothing
-                            (HsQTvs { hsq_tvs = [noLoc (UserTyVar a_tv)]
+                            (HsQTvs { hsq_tvs = [noLoc (UserTyVar (noLoc a_tv))]
                                     , hsq_kvs = [] })
                             (noLoc [])
                             (nlHsFunTy ghciM ioM)

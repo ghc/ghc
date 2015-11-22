@@ -442,9 +442,9 @@ splitCon :: LHsType RdrName
 splitCon ty
  = split ty []
  where
-   split (L _ (HsAppTy t u)) ts    = split t (u : ts)
-   split (L l (HsTyVar tc))  ts    = do data_con <- tyConToDataCon l tc
-                                        return (data_con, mk_rest ts)
+   split (L _ (HsAppTy t u)) ts      = split t (u : ts)
+   split (L l (HsTyVar (L _ tc))) ts = do data_con <- tyConToDataCon l tc
+                                          return (data_con, mk_rest ts)
    split (L l (HsTupleTy HsBoxedOrConstraintTuple ts)) []
       = return (L l (getRdrName (tupleDataCon Boxed (length ts))), PrefixCon ts)
    split (L l _) _ = parseErrorSDoc l (text "Cannot parse data constructor in a data/newtype declaration:" <+> ppr ty)
@@ -668,10 +668,10 @@ checkTyVars pp_what equals_or_where tc tparms
   where
 
         -- Check that the name space is correct!
-    chk (L l (HsKindSig (L lv (HsTyVar tv)) k))
+    chk (L l (HsKindSig (L lv (HsTyVar (L _ tv))) k))
         | isRdrTyVar tv    = return (L l (KindedTyVar (L lv tv) k))
-    chk (L l (HsTyVar tv))
-        | isRdrTyVar tv    = return (L l (UserTyVar tv))
+    chk (L l (HsTyVar (L ltv tv)))
+        | isRdrTyVar tv    = return (L l (UserTyVar (L ltv tv)))
     chk t@(L loc _)
         = Left (loc,
                 vcat [ ptext (sLit "Unexpected type") <+> quotes (ppr t)
@@ -719,7 +719,7 @@ checkTyClHdr is_cls ty
   where
     goL (L l ty) acc ann = go l ty acc ann
 
-    go l (HsTyVar tc) acc ann
+    go l (HsTyVar (L _ tc)) acc ann
       | isRdrTc tc               = return (L l tc, acc, ann)
     go _ (HsOpTy t1 (_, ltc@(L _ tc)) t2) acc ann
       | isRdrTc tc               = return (ltc, t1:t2:acc, ann)
@@ -769,7 +769,7 @@ checkLPat msg e@(L l _) = checkPat msg l e []
 
 checkPat :: SDoc -> SrcSpan -> LHsExpr RdrName -> [LPat RdrName]
          -> P (LPat RdrName)
-checkPat _ loc (L l (HsVar c)) args
+checkPat _ loc (L l (HsVar (L _ c))) args
   | isRdrDataCon c = return (L loc (ConPatIn (L l c) (PrefixCon args)))
 checkPat msg loc e args     -- OK to let this happen even if bang-patterns
                         -- are not enabled, because there is no valid
@@ -802,7 +802,7 @@ checkAPat msg loc e0 = do
    NegApp (L l (HsOverLit pos_lit)) _
                         -> return (mkNPat (L l pos_lit) (Just noSyntaxExpr))
 
-   SectionR (L lb (HsVar bang)) e        -- (! x)
+   SectionR (L lb (HsVar (L _ bang))) e    -- (! x)
         | bang == bang_RDR
         -> do { bang_on <- extension bangPatEnabled
               ; if bang_on then do { e' <- checkLPat msg e
@@ -826,7 +826,7 @@ checkAPat msg loc e0 = do
                              return (SigPatIn e (mkHsWithBndrs t'))
 
    -- n+k patterns
-   OpApp (L nloc (HsVar n)) (L _ (HsVar plus)) _
+   OpApp (L nloc (HsVar (L _ n))) (L _ (HsVar (L _ plus))) _
          (L lloc (HsOverLit lit@(OverLit {ol_val = HsIntegral {}})))
                       | xopt Opt_NPlusKPatterns dynflags && (plus == plus_RDR)
                       -> return (mkNPlusKPat (L nloc n) (L lloc lit))
@@ -834,7 +834,7 @@ checkAPat msg loc e0 = do
    OpApp l op _fix r  -> do l <- checkLPat msg l
                             r <- checkLPat msg r
                             case op of
-                               L cl (HsVar c) | isDataOcc (rdrNameOcc c)
+                               L cl (HsVar (L _ c)) | isDataOcc (rdrNameOcc c)
                                       -> return (ConPatIn (L cl c) (InfixCon l r))
                                _ -> patFail msg loc e0
 
@@ -860,7 +860,7 @@ checkAPat msg loc e0 = do
 placeHolderPunRhs :: LHsExpr RdrName
 -- The RHS of a punned record field will be filled in by the renamer
 -- It's better not to make it an error, in case we want to print it when debugging
-placeHolderPunRhs = noLoc (HsVar pun_RDR)
+placeHolderPunRhs = noLoc (HsVar (noLoc pun_RDR))
 
 plus_RDR, bang_RDR, pun_RDR :: RdrName
 plus_RDR = mkUnqual varName (fsLit "+") -- Hack
@@ -943,7 +943,7 @@ checkValSig
         :: LHsExpr RdrName
         -> LHsType RdrName
         -> P (Sig RdrName)
-checkValSig (L l (HsVar v)) ty
+checkValSig (L l (HsVar (L _ v))) ty
   | isUnqual v && not (isDataOcc (rdrNameOcc v))
   = return (TypeSig [L l v] ty PlaceHolder)
 checkValSig lhs@(L l _) ty
@@ -962,9 +962,9 @@ checkValSig lhs@(L l _) ty
     -- A common error is to forget the ForeignFunctionInterface flag
     -- so check for that, and suggest.  cf Trac #3805
     -- Sadly 'foreign import' still barfs 'parse error' because 'import' is a keyword
-    looks_like s (L _ (HsVar v))     = v == s
-    looks_like s (L _ (HsApp lhs _)) = looks_like s lhs
-    looks_like _ _                   = False
+    looks_like s (L _ (HsVar (L _ v))) = v == s
+    looks_like s (L _ (HsApp lhs _))   = looks_like s lhs
+    looks_like _ _                     = False
 
     foreign_RDR = mkUnqual varName (fsLit "foreign")
     default_RDR = mkUnqual varName (fsLit "default")
@@ -997,7 +997,7 @@ checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
         -- not be any OpApps inside the e's
 splitBang :: LHsExpr RdrName -> Maybe (LHsExpr RdrName, [LHsExpr RdrName])
 -- Splits (f ! g a b) into (f, [(! g), a, b])
-splitBang (L _ (OpApp l_arg bang@(L _ (HsVar op)) _ r_arg))
+splitBang (L _ (OpApp l_arg bang@(L _ (HsVar (L _ op))) _ r_arg))
   | op == bang_RDR = Just (l_arg, L l' (SectionR bang arg1) : argns)
   where
     l' = combineLocs bang arg1
@@ -1022,7 +1022,7 @@ isFunLhs :: LHsExpr RdrName
 
 isFunLhs e = go e [] []
  where
-   go (L loc (HsVar f)) es ann
+   go (L loc (HsVar (L _ f))) es ann
         | not (isRdrDataCon f)       = return (Just (L loc f, False, es, ann))
    go (L _ (HsApp f e)) es       ann = go f (e:es) ann
    go (L l (HsPar e))   es@(_:_) ann = go e es (ann ++ mkParensApiAnn l)
@@ -1040,7 +1040,7 @@ isFunLhs e = go e [] []
         -- ToDo: what about this?
         --              x + 1 `op` y = ...
 
-   go e@(L loc (OpApp l (L loc' (HsVar op)) fix r)) es ann
+   go e@(L loc (OpApp l (L loc' (HsVar (L _ op))) fix r)) es ann
         | Just (e',es') <- splitBang e
         = do { bang_on <- extension bangPatEnabled
              ; if bang_on then go e' (es' ++ es) ann
@@ -1052,9 +1052,9 @@ isFunLhs e = go e [] []
         = do { mb_l <- go l es ann
              ; case mb_l of
                  Just (op', True, j : k : es', ann')
-                    -> return (Just (op', True, j : op_app : es', ann'))
-                    where
-                      op_app = L loc (OpApp k (L loc' (HsVar op)) fix r)
+                   -> return (Just (op', True, j : op_app : es', ann'))
+                   where
+                     op_app = L loc (OpApp k (L loc' (HsVar (L loc' op))) fix r)
                  _ -> return Nothing }
    go _ _ _ = return Nothing
 
@@ -1190,7 +1190,7 @@ mkRecConstrOrUpdate
         -> ([LHsRecField RdrName (LHsExpr RdrName)], Bool)
         -> P (HsExpr RdrName)
 
-mkRecConstrOrUpdate (L l (HsVar c)) _ (fs,dd)
+mkRecConstrOrUpdate (L l (HsVar (L _ c))) _ (fs,dd)
   | isRdrDataCon c
   = return (mkRdrRecordCon (L l c) (mk_rec_fields fs dd))
 mkRecConstrOrUpdate exp@(L l _) _ (fs,dd)

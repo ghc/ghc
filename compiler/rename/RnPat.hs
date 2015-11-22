@@ -356,9 +356,9 @@ rnPatAndThen _  (WildPat _)   = return (WildPat placeHolderType)
 rnPatAndThen mk (ParPat pat)  = do { pat' <- rnLPatAndThen mk pat; return (ParPat pat') }
 rnPatAndThen mk (LazyPat pat) = do { pat' <- rnLPatAndThen mk pat; return (LazyPat pat') }
 rnPatAndThen mk (BangPat pat) = do { pat' <- rnLPatAndThen mk pat; return (BangPat pat') }
-rnPatAndThen mk (VarPat rdr)  = do { loc <- liftCps getSrcSpanM
-                                   ; name <- newPatName mk (L loc rdr)
-                                   ; return (VarPat name) }
+rnPatAndThen mk (VarPat (L l rdr)) = do { loc <- liftCps getSrcSpanM
+                                        ; name <- newPatName mk (L loc rdr)
+                                        ; return (VarPat (L l name)) }
      -- we need to bind pattern variables for view pattern expressions
      -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
 
@@ -487,10 +487,12 @@ rnHsRecPatsAndThen :: NameMaker
                    -> HsRecFields RdrName (LPat RdrName)
                    -> CpsRn (HsRecFields Name (LPat Name))
 rnHsRecPatsAndThen mk (L _ con) hs_rec_fields@(HsRecFields { rec_dotdot = dd })
-  = do { flds <- liftCpsFV $ rnHsRecFields (HsRecFieldPat con) VarPat hs_rec_fields
+  = do { flds <- liftCpsFV $ rnHsRecFields (HsRecFieldPat con) mkVarPat
+                                            hs_rec_fields
        ; flds' <- mapM rn_field (flds `zip` [1..])
        ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
   where
+    mkVarPat l n = VarPat (L l n)
     rn_field (L l fld, n') = do { arg' <- rnLPatAndThen (nested_mk dd mk n')
                                                         (hsRecFieldArg fld)
                                 ; return (L l (fld { hsRecFieldArg = arg' })) }
@@ -516,7 +518,8 @@ data HsRecFieldContext
 rnHsRecFields
     :: forall arg.
        HsRecFieldContext
-    -> (RdrName -> arg) -- When punning, use this to build a new field
+    -> (SrcSpan -> RdrName -> arg)
+         -- When punning, use this to build a new field
     -> HsRecFields RdrName (Located arg)
     -> RnM ([LHsRecField Name (Located arg)], FreeVars)
 
@@ -560,7 +563,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
       = do { sel <- setSrcSpan loc $ lookupSubBndrOcc True parent doc lbl
            ; arg' <- if pun
                      then do { checkErr pun_ok (badPun (L loc lbl))
-                             ; return (L loc (mk_arg lbl)) }
+                             ; return (L loc (mk_arg loc lbl)) }
                      else return arg
            ; return (L l (HsRecField { hsRecFieldLbl = L loc (FieldOcc lbl sel)
                                      , hsRecFieldArg = arg'
@@ -616,7 +619,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
            ; addUsedGREs (map thirdOf3 dot_dot_gres)
            ; return [ L loc (HsRecField
                         { hsRecFieldLbl = L loc (FieldOcc arg_rdr sel)
-                        , hsRecFieldArg = L loc (mk_arg arg_rdr)
+                        , hsRecFieldArg = L loc (mk_arg loc arg_rdr)
                         , hsRecPun      = False })
                     | (lbl, sel, _) <- dot_dot_gres
                     , let arg_rdr = mkVarUnqual lbl ] }
@@ -683,7 +686,7 @@ rnHsRecUpdFields flds
                           else fmap Left $ lookupSubBndrOcc True Nothing doc lbl
            ; arg' <- if pun
                      then do { checkErr pun_ok (badPun (L loc lbl))
-                             ; return (L loc (HsVar lbl)) }
+                             ; return (L loc (HsVar (L loc lbl))) }
                      else return arg
            ; (arg'', fvs) <- rnLExpr arg'
 
@@ -777,8 +780,8 @@ rnOverLit origLit
         ; let std_name = hsOverLitName val
         ; (from_thing_name, fvs) <- lookupSyntaxName std_name
         ; let rebindable = case from_thing_name of
-                                HsVar v -> v /= std_name
-                                _       -> panic "rnOverLit"
+                                HsVar (L _ v) -> v /= std_name
+                                _             -> panic "rnOverLit"
         ; return (lit { ol_witness = from_thing_name
                       , ol_rebindable = rebindable
                       , ol_type = placeHolderType }, fvs) }

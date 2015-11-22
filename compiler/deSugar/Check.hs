@@ -688,7 +688,7 @@ tidy_lpat p = fmap tidy_pat p
 --------------
 tidy_pat :: Pat Id -> Pat Id
 tidy_pat pat@(WildPat _)  = pat
-tidy_pat (VarPat id)      = WildPat (idType id)
+tidy_pat (VarPat id)      = WildPat (idType (unLoc id))
 tidy_pat (ParPat p)       = tidy_pat (unLoc p)
 tidy_pat (LazyPat p)      = WildPat (hsLPatType p)      -- For overlap and exhaustiveness checking
                                                         -- purposes, a ~pat is like a wildcard

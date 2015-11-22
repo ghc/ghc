@@ -74,7 +74,7 @@ data Pat id
         -- The sole reason for a type on a WildPat is to
         -- support hsPatType :: Pat Id -> Type
 
-  | VarPat      id                      -- Variable
+  | VarPat      (Located id)            -- Variable
   | LazyPat     (LPat id)               -- Lazy pattern
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
 
@@ -384,7 +384,7 @@ pprParendPat p = getPprStyle $ \ sty ->
                          -- is the pattern inside that matters.  Sigh.
 
 pprPat :: (OutputableBndr name) => Pat name -> SDoc
-pprPat (VarPat var)           = pprPatBndr var
+pprPat (VarPat (L _ var))     = pprPatBndr var
 pprPat (WildPat _)            = char '_'
 pprPat (LazyPat pat)          = char '~' <> pprParendLPat pat
 pprPat (BangPat pat)          = char '!' <> pprParendLPat pat

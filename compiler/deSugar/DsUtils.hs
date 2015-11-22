@@ -116,7 +116,8 @@ selectMatchVar :: Pat Id -> DsM Id
 selectMatchVar (BangPat pat) = selectMatchVar (unLoc pat)
 selectMatchVar (LazyPat pat) = selectMatchVar (unLoc pat)
 selectMatchVar (ParPat pat)  = selectMatchVar (unLoc pat)
-selectMatchVar (VarPat var)  = return (localiseId var)  -- Note [Localise pattern binders]
+selectMatchVar (VarPat var)  = return (localiseId (unLoc var))
+                                  -- Note [Localise pattern binders]
 selectMatchVar (AsPat var _) = return (unLoc var)
 selectMatchVar other_pat     = newSysLocalDs (hsPatType other_pat)
                                   -- OK, better make up one...
@@ -621,7 +622,7 @@ mkSelectorBinds :: Bool           -- ^ is strict
                 -- binds (see Note [Desugar Strict binds] in DsBinds)
                 -- and all the desugared binds
 
-mkSelectorBinds _ ticks (L _ (VarPat v)) val_expr
+mkSelectorBinds _ ticks (L _ (VarPat (L _ v))) val_expr
   = return (Just v
            ,[(v, case ticks of
                     [t] -> mkOptTickBox t val_expr

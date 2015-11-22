@@ -1445,28 +1445,28 @@ lookupIfThenElse
        ; if not rebindable_on
          then return (Nothing, emptyFVs)
          else do { ite <- lookupOccRn (mkVarUnqual (fsLit "ifThenElse"))
-                 ; return (Just (HsVar ite), unitFV ite) } }
+                 ; return (Just (HsVar (noLoc ite)), unitFV ite) } }
 
 lookupSyntaxName :: Name                                -- The standard name
                  -> RnM (SyntaxExpr Name, FreeVars)     -- Possibly a non-standard name
 lookupSyntaxName std_name
   = do { rebindable_on <- xoptM Opt_RebindableSyntax
        ; if not rebindable_on then
-           return (HsVar std_name, emptyFVs)
+           return (HsVar (noLoc std_name), emptyFVs)
          else
             -- Get the similarly named thing from the local environment
            do { usr_name <- lookupOccRn (mkRdrUnqual (nameOccName std_name))
-              ; return (HsVar usr_name, unitFV usr_name) } }
+              ; return (HsVar (noLoc usr_name), unitFV usr_name) } }
 
 lookupSyntaxNames :: [Name]                          -- Standard names
                   -> RnM ([HsExpr Name], FreeVars)   -- See comments with HsExpr.ReboundNames
 lookupSyntaxNames std_names
   = do { rebindable_on <- xoptM Opt_RebindableSyntax
        ; if not rebindable_on then
-             return (map HsVar std_names, emptyFVs)
+             return (map (HsVar . noLoc) std_names, emptyFVs)
         else
           do { usr_names <- mapM (lookupOccRn . mkRdrUnqual . nameOccName) std_names
-             ; return (map HsVar usr_names, mkFVs usr_names) } }
+             ; return (map (HsVar . noLoc) usr_names, mkFVs usr_names) } }
 
 {-
 *********************************************************

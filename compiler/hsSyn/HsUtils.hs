@@ -194,7 +194,7 @@ mkSimpleHsAlt pat expr
   = mkSimpleMatch [pat] expr
 
 nlHsTyApp :: name -> [Type] -> LHsExpr name
-nlHsTyApp fun_id tys = noLoc (HsWrap (mkWpTyApps tys) (HsVar fun_id))
+nlHsTyApp fun_id tys = noLoc (HsWrap (mkWpTyApps tys) (HsVar (noLoc fun_id)))
 
 nlHsTyApps :: name -> [Type] -> [LHsExpr name] -> LHsExpr name
 nlHsTyApps fun_id tys xs = foldl nlHsApp (nlHsTyApp fun_id tys) xs
@@ -299,7 +299,8 @@ mkRecStmt stmts  = emptyRecStmt { recS_stmts = stmts }
 --- A useful function for building @OpApps@.  The operator is always a
 -- variable, and we don't know the fixity yet.
 mkHsOpApp :: LHsExpr id -> id -> LHsExpr id -> HsExpr id
-mkHsOpApp e1 op e2 = OpApp e1 (noLoc (HsVar op)) (error "mkOpApp:fixity") e2
+mkHsOpApp e1 op e2 = OpApp e1 (noLoc (HsVar (noLoc op)))
+                           (error "mkOpApp:fixity") e2
 
 unqualSplice :: RdrName
 unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
@@ -334,7 +335,7 @@ mkHsStringPrimLit fs
 -------------
 userHsTyVarBndrs :: SrcSpan -> [name] -> [Located (HsTyVarBndr name)]
 -- Caller sets location
-userHsTyVarBndrs loc bndrs = [ L loc (UserTyVar v) | v <- bndrs ]
+userHsTyVarBndrs loc bndrs = [ L loc (UserTyVar (L loc v)) | v <- bndrs ]
 
 {-
 ************************************************************************
@@ -345,13 +346,13 @@ userHsTyVarBndrs loc bndrs = [ L loc (UserTyVar v) | v <- bndrs ]
 -}
 
 nlHsVar :: id -> LHsExpr id
-nlHsVar n = noLoc (HsVar n)
+nlHsVar n = noLoc (HsVar (noLoc n))
 
 nlHsLit :: HsLit -> LHsExpr id
 nlHsLit n = noLoc (HsLit n)
 
 nlVarPat :: id -> LPat id
-nlVarPat n = noLoc (VarPat n)
+nlVarPat n = noLoc (VarPat (noLoc n))
 
 nlLitPat :: HsLit -> LPat id
 nlLitPat l = noLoc (LitPat l)
@@ -366,7 +367,7 @@ nlHsApps :: id -> [LHsExpr id] -> LHsExpr id
 nlHsApps f xs = foldl nlHsApp (nlHsVar f) xs
 
 nlHsVarApps :: id -> [id] -> LHsExpr id
-nlHsVarApps f xs = noLoc (foldl mk (HsVar f) (map HsVar xs))
+nlHsVarApps f xs = noLoc (foldl mk (HsVar (noLoc f)) (map (HsVar . noLoc) xs))
                  where
                    mk f a = HsApp (noLoc f) (noLoc a)
 
@@ -427,7 +428,7 @@ nlHsTyVar :: name                         -> LHsType name
 nlHsFunTy :: LHsType name -> LHsType name -> LHsType name
 
 nlHsAppTy f t           = noLoc (HsAppTy f t)
-nlHsTyVar x             = noLoc (HsTyVar x)
+nlHsTyVar x             = noLoc (HsTyVar (noLoc x))
 nlHsFunTy a b           = noLoc (HsFunTy a b)
 
 nlHsTyConApp :: name -> [LHsType name] -> LHsType name
@@ -781,7 +782,7 @@ collect_lpat :: LPat name -> [name] -> [name]
 collect_lpat (L _ pat) bndrs
   = go pat
   where
-    go (VarPat var)               = var : bndrs
+    go (VarPat (L _ var))         = var : bndrs
     go (WildPat _)                = bndrs
     go (LazyPat pat)              = collect_lpat pat bndrs
     go (BangPat pat)              = collect_lpat pat bndrs

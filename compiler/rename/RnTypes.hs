@@ -144,9 +144,9 @@ rnHsTyKi :: Bool -> HsDocContext -> HsType RdrName -> RnM (HsType Name, FreeVars
 rnHsTyKi isType doc ty@HsForAllTy{}
   = rnHsTyKiForAll isType doc (flattenTopLevelHsForAllTy ty)
 
-rnHsTyKi isType _ (HsTyVar rdr_name)
+rnHsTyKi isType _ (HsTyVar (L l rdr_name))
   = do { name <- rnTyVar isType rdr_name
-       ; return (HsTyVar name, unitFV name) }
+       ; return (HsTyVar (L l name), unitFV name) }
 
 -- If we see (forall a . ty), without foralls on, the forall will give
 -- a sensible error message, but we don't want to complain about the dot too
@@ -286,11 +286,11 @@ rnHsTyKi isType _doc (HsWildCardTy (AnonWildCard PlaceHolder))
     do { loc <- getSrcSpanM
        ; uniq <- newUnique
        ; let name = mkInternalName uniq (mkTyVarOcc "_") loc
-       ; return (HsWildCardTy (AnonWildCard name), emptyFVs) }
+       ; return (HsWildCardTy (AnonWildCard (L loc name)), emptyFVs) }
          -- emptyFVs: this occurrence does not refer to a
          --           binding, so don't treat it as a free variable
 
-rnHsTyKi isType doc (HsWildCardTy (NamedWildCard rdr_name))
+rnHsTyKi isType doc (HsWildCardTy (NamedWildCard (L l rdr_name)))
   = ASSERT( isType )
     do { not_in_scope <- isNothing `fmap` lookupOccRn_maybe rdr_name
        ; when not_in_scope $
@@ -300,7 +300,7 @@ rnHsTyKi isType doc (HsWildCardTy (NamedWildCard rdr_name))
          failWith $ text "Unexpected wild card:" <+> quotes (ppr rdr_name) $$
                     docOfHsDocContext doc
        ; name <- rnTyVar isType rdr_name
-       ; return (HsWildCardTy (NamedWildCard name), emptyFVs) }
+       ; return (HsWildCardTy (NamedWildCard (L l name)), emptyFVs) }
          -- emptyFVs: this occurrence does not refer to a
          --           binding, so don't treat it as a free variable
 
@@ -469,9 +469,9 @@ bindHsTyVars doc mb_assoc kv_bndrs tv_bndrs thing_inside
 
 rnLHsTyVarBndr :: HsDocContext -> Maybe a -> LocalRdrEnv
                -> LHsTyVarBndr RdrName -> RnM (LHsTyVarBndr Name, FreeVars)
-rnLHsTyVarBndr _ mb_assoc rdr_env (L loc (UserTyVar rdr))
+rnLHsTyVarBndr _ mb_assoc rdr_env (L loc (UserTyVar (L l rdr)))
   = do { nm <- newTyVarNameRn mb_assoc rdr_env loc rdr
-       ; return (L loc (UserTyVar nm), emptyFVs) }
+       ; return (L loc (UserTyVar (L l nm)), emptyFVs) }
 rnLHsTyVarBndr doc mb_assoc rdr_env (L loc (KindedTyVar (L lv rdr) kind))
   = do { sig_ok <- xoptM Opt_KindSignatures
        ; unless sig_ok (badSigErr False doc kind)
@@ -572,7 +572,7 @@ rnLHsTypeWithWildCards doc ty
        ; rdr_env <- getLocalRdrEnv
        -- Filter out named wildcards that are already in scope
        ; let (_, wcs) = collectWildCards ty
-             nwcs = [L loc n | L loc (NamedWildCard n) <- wcs
+             nwcs = [L loc n | L _ (NamedWildCard (L loc n)) <- wcs
                              , not (elemLocalRdrEnv n rdr_env) ]
        ; bindLocatedLocalsRn nwcs $ \nwcs' -> do {
          (ty', fvs) <- rnLHsType doc ty
@@ -870,7 +870,7 @@ mkOpAppRn e1 op fix e2                  -- Default case, no rearrangment
 get_op :: LHsExpr Name -> Name
 -- An unbound name could be either HsVar or HsUnboundVar
 -- See RnExpr.rnUnboundVar
-get_op (L _ (HsVar n))          = n
+get_op (L _ (HsVar (L _ n)))    = n
 get_op (L _ (HsUnboundVar occ)) = mkUnboundName (mkRdrUnqual occ)
 get_op other                    = pprPanic "get_op" (ppr other)
 
@@ -1081,9 +1081,9 @@ opTyErr op ty@(HsOpTy ty1 _ _)
           | otherwise
           = ptext (sLit "Use TypeOperators to allow operators in types")
 
-    forall_head (L _ (HsTyVar tv))   = tv == forall_tv_RDR
-    forall_head (L _ (HsAppTy ty _)) = forall_head ty
-    forall_head _other               = False
+    forall_head (L _ (HsTyVar (L _ tv))) = tv == forall_tv_RDR
+    forall_head (L _ (HsAppTy ty _))     = forall_head ty
+    forall_head _other                   = False
 opTyErr _ ty = pprPanic "opTyErr: Not an op" (ppr ty)
 
 {-
@@ -1192,7 +1192,7 @@ extract_lkind kind (acc_kvs, acc_tvs) = case extract_lty kind ([], acc_kvs) of
 extract_lty :: LHsType RdrName -> FreeKiTyVars -> FreeKiTyVars
 extract_lty (L _ ty) acc
   = case ty of
-      HsTyVar tv                -> extract_tv tv acc
+      HsTyVar (L _ tv)          -> extract_tv tv acc
       HsBangTy _ ty             -> extract_lty ty acc
       HsRecTy flds              -> foldr (extract_lty . cd_fld_type . unLoc) acc
                                          flds
