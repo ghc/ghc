@@ -1014,13 +1014,6 @@ AC_COMPILE_IFELSE(
 
 AC_CHECK_FUNCS(__mingw_vfprintf)
 
-if test "$HavePapiLib" = "YES" -a "$HavePapiHeader" = "YES"; then
-   HavePapi=YES
-else
-   HavePapi=NO
-fi
-AC_SUBST(HavePapi)
-
 dnl large address space support (see includes/rts/storage/MBlock.h)
 dnl
 dnl Darwin has vm_allocate/vm_protect
