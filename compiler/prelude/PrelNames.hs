@@ -234,9 +234,8 @@ basicKnownKeyNames
         enumFromName, enumFromThenName,
         enumFromThenToName, enumFromToName,
 
-        -- Applicative/Alternative stuff
-        pureAName,
-        apAName,
+        -- Applicative stuff
+        pureAName, apAName, thenAName,
 
         -- Monad stuff
         thenIOName, bindIOName, returnIOName, failIOName, bindMName, thenMName,
@@ -927,9 +926,15 @@ monadFailClassName, failMName :: Name
 monadFailClassName = clsQual mONAD_FAIL (fsLit "MonadFail") monadFailClassKey
 failMName          = varQual mONAD_FAIL (fsLit "fail")      failMClassOpKey
 
--- Classes (Applicative, Foldable, Traversable)
-applicativeClassName, foldableClassName, traversableClassName :: Name
-applicativeClassName  = clsQual  gHC_BASE            (fsLit "Applicative") applicativeClassKey
+-- Class Applicative
+applicativeClassName, pureAName, apAName, thenAName :: Name
+applicativeClassName = clsQual gHC_BASE (fsLit "Applicative") applicativeClassKey
+apAName              = varQual gHC_BASE (fsLit "<*>")         apAClassOpKey
+pureAName            = varQual gHC_BASE (fsLit "pure")        pureAClassOpKey
+thenAName            = varQual gHC_BASE (fsLit "*>")          thenAClassOpKey
+
+-- Classes (Foldable, Traversable)
+foldableClassName, traversableClassName :: Name
 foldableClassName     = clsQual  dATA_FOLDABLE       (fsLit "Foldable")    foldableClassKey
 traversableClassName  = clsQual  dATA_TRAVERSABLE    (fsLit "Traversable") traversableClassKey
 
@@ -937,17 +942,18 @@ traversableClassName  = clsQual  dATA_TRAVERSABLE    (fsLit "Traversable") trave
 
 -- AMP additions
 
-joinMName,  apAName, pureAName, alternativeClassName :: Name
+joinMName, alternativeClassName :: Name
 joinMName            = varQual gHC_BASE (fsLit "join")        joinMIdKey
-apAName              = varQual gHC_BASE (fsLit "<*>")         apAClassOpKey
-pureAName            = varQual gHC_BASE (fsLit "pure")        pureAClassOpKey
 alternativeClassName = clsQual mONAD (fsLit "Alternative") alternativeClassKey
 
-joinMIdKey, apAClassOpKey, pureAClassOpKey, alternativeClassKey :: Unique
+--
+joinMIdKey, apAClassOpKey, pureAClassOpKey, thenAClassOpKey,
+    alternativeClassKey :: Unique
 joinMIdKey          = mkPreludeMiscIdUnique 750
 apAClassOpKey       = mkPreludeMiscIdUnique 751 -- <*>
 pureAClassOpKey     = mkPreludeMiscIdUnique 752
-alternativeClassKey = mkPreludeMiscIdUnique 753
+thenAClassOpKey     = mkPreludeMiscIdUnique 753
+alternativeClassKey = mkPreludeMiscIdUnique 754
 
 
 -- Functions for GHC extensions

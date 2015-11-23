@@ -1,6 +1,6 @@
 
 CustomTypeErrors02.hs:17:1: error:
-    The type 'a_aES -> a_aES' cannot be represented as an integer.
+    The type 'a_aER -> a_aER' cannot be represented as an integer.
     When checking that ‘err’ has the inferred type
       err :: (TypeError ...)
 
