@@ -326,7 +326,7 @@ synifyTyVars ktvs = HsQTvs { hsq_kvs = map tyVarName kvs
 
 synifyTyVar :: TyVar -> LHsTyVarBndr Name
 synifyTyVar tv
-  | isLiftedTypeKind kind = noLoc (UserTyVar name)
+  | isLiftedTypeKind kind = noLoc (UserTyVar (noLoc name))
   | otherwise             = noLoc (KindedTyVar (noLoc name) (synifyKindSig kind))
   where
     kind = tyVarKind tv
@@ -358,7 +358,7 @@ synifySigWcType :: SynifyTypeState -> Type -> LHsSigWcType Name
 synifySigWcType s ty = mkEmptyImplicitBndrs (mkEmptyWildCardBndrs (synifyType s ty))
 
 synifyType :: SynifyTypeState -> Type -> LHsType Name
-synifyType _ (TyVarTy tv) = noLoc $ HsTyVar (getName tv)
+synifyType _ (TyVarTy tv) = noLoc $ HsTyVar $ noLoc (getName tv)
 synifyType _ (TyConApp tc tys)
   -- Use non-prefix tuple syntax where possible, because it looks nicer.
   | Just sort <- tyConTuple_maybe tc
@@ -383,7 +383,7 @@ synifyType _ (TyConApp tc tys)
   -- Most TyCons:
   | otherwise =
     foldl (\t1 t2 -> noLoc (HsAppTy t1 t2))
-      (noLoc $ HsTyVar (getName tc))
+      (noLoc $ HsTyVar $ noLoc (getName tc))
       (map (synifyType WithinType) tys)
 synifyType _ (AppTy t1 t2) = let
   s1 = synifyType WithinType t1
