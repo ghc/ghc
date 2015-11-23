@@ -137,7 +137,7 @@ See also Note [Kind and type-variable binders] in RnTypes
 
 Note [HsType binders]
 ~~~~~~~~~~~~~~~~~~~~~
-The system fr recording type and kind-variable binders in HsTypes
+The system for recording type and kind-variable binders in HsTypes
 is a bit complicated.  Here's how it works.
 
 * In a HsType,
@@ -146,7 +146,7 @@ is a bit complicated.  Here's how it works.
      HsQualTy     reprsents an /explicit, user-written/ context
                    e.g.   (Eq a, Show a) => ...
                   The context can be empty if that's what the user wrote
-  These constructors reprsents what the user wrote, no more
+  These constructors represent what the user wrote, no more
   and no less.
 
 * HsTyVarBndr describes a quantified type variable written by the

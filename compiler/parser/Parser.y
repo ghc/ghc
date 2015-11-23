@@ -1895,10 +1895,9 @@ gadt_constr_with_doc
 gadt_constr :: { LConDecl RdrName }
     -- see Note [Difference in parsing GADT and data constructors]
     -- Returns a list because of:   C,D :: ty
-        : con_list '::' ctype
-                {% do { let { (anns,gadtDecl) = mkGadtDecl (unLoc $1) $3 }
-                      ; ams (sLL $1 $> gadtDecl)
-                            (mu AnnDcolon $2:anns) } }
+        : con_list '::' sigtype
+                {% ams (sLL $1 $> (mkGadtDecl (unLoc $1) (mkLHsSigType $3)))
+                       [mu AnnDcolon $2] }
 
 {- Note [Difference in parsing GADT and data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1925,13 +1924,13 @@ constrs1 :: { Located [LConDecl RdrName] }
 constr :: { LConDecl RdrName }
         : maybe_docnext forall context '=>' constr_stuff maybe_docprev
                 {% ams (let (con,details) = unLoc $5 in
-                  addConDoc (L (comb4 $2 $3 $4 $5) (mkSimpleConDecl con
+                  addConDoc (L (comb4 $2 $3 $4 $5) (mkConDeclH98 con
                                                    (snd $ unLoc $2) $3 details))
                             ($1 `mplus` $6))
                         (mu AnnDarrow $4:(fst $ unLoc $2)) }
         | maybe_docnext forall constr_stuff maybe_docprev
                 {% ams ( let (con,details) = unLoc $3 in
-                  addConDoc (L (comb2 $2 $3) (mkSimpleConDecl con
+                  addConDoc (L (comb2 $2 $3) (mkConDeclH98 con
                                            (snd $ unLoc $2) (noLoc []) details))
                             ($1 `mplus` $4))
                        (fst $ unLoc $2) }
@@ -2671,7 +2670,6 @@ stmtlist :: { Located ([AddAnn],[LStmt RdrName (LHsExpr RdrName)]) }
 -- here, because we need too much lookahead if we see do { e ; }
 -- So we use BodyStmts throughout, and switch the last one over
 -- in ParseUtils.checkDo instead
--- AZ: TODO check that we can retrieve multiple semis.
 
 stmts :: { Located ([AddAnn],[LStmt RdrName (LHsExpr RdrName)]) }
         : stmts ';' stmt  {% if null (snd $ unLoc $1)

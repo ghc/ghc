@@ -60,8 +60,9 @@ module HsDecls (
   noForeignImportCoercionYet, noForeignExportCoercionYet,
   CImportSpec(..),
   -- ** Data-constructor declarations
-  ConDecl(..), LConDecl, ResType(..),
+  ConDecl(..), LConDecl,
   HsConDeclDetails, hsConDeclArgTys,
+  getConNames,
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
   -- ** Deprecations
@@ -106,6 +107,7 @@ import SrcLoc
 import FastString
 
 import Bag
+import Data.Maybe ( fromMaybe )
 import Data.Data        hiding (TyCon,Fixity)
 #if __GLASGOW_HASKELL__ < 709
 import Data.Foldable ( Foldable )
@@ -956,9 +958,9 @@ data HsDataDefn name   -- The payload of a data type defn
                      -- ^ Data constructors
                      --
                      -- For @data T a = T1 | T2 a@
-                     --   the 'LConDecl's all have 'ResTyH98'.
+                     --   the 'LConDecl's all have 'ConDeclH98'.
                      -- For @data T a where { T1 :: T a }@
-                     --   the 'LConDecls' all have 'ResTyGADT'.
+                     --   the 'LConDecls' all have 'ConDeclGADT'.
 
                  dd_derivs :: HsDeriving name  -- ^ Optional 'deriving' claues
 
@@ -1020,70 +1022,46 @@ type LConDecl name = Located (ConDecl name)
 
 -- For details on above see note [Api annotations] in ApiAnnotation
 data ConDecl name
-  = ConDecl
-    { con_names     :: [Located name]
-        -- ^ Constructor names.  This is used for the DataCon itself, and for
-        -- the user-callable wrapper Id.
-        -- It is a list to deal with GADT constructors of the form
-        --   T1, T2, T3 :: <payload>
+  = ConDeclGADT
+      { con_names   :: [Located name]
+      , con_type    :: LHsSigType name
+        -- ^ The type after the ‘::’
+      , con_doc     :: Maybe LHsDocString
+          -- ^ A possible Haddock comment.
+      }
 
-    , con_explicit  :: Bool
-        -- ^ Is there an user-written forall?
-        -- For ResTyH98, "explicit" means something like:
-        --     data T = forall a. MkT { x :: a -> a }
-        -- For ResTyGADT, "explicit" means something like
-        --     data T where { MkT :: forall a. <blah> }
+  | ConDeclH98
+      { con_name    :: Located name
 
-    , con_qvars     :: LHsQTyVars name
-        -- ^ Type variables.  Depending on 'con_res' this describes the
-        -- following entities
-        --
-        --  - ResTyH98:  the constructor's *existential* type variables
+      , con_qvars     :: Maybe (LHsQTyVars name)
+        -- User-written forall (if any), and its implicit
+        -- kind variables
+        -- Non-Nothing needs -XExistentialQuantification
         --               e.g. data T a = forall b. MkT b (b->a)
         --               con_qvars = {b}
-        --
-        --  - ResTyGADT: *all* the constructor's quantified type variables
-        --               e.g.  data T a where
-        --                       MkT :: forall a b. b -> (b->a) -> T a
-        --               con_qvars = {a,b}
-        --
-        -- If con_explicit is False, then con_qvars is irrelevant
-        -- until after renaming.
 
-    , con_cxt       :: LHsContext name
-        -- ^ The context.  This /does not/ include the \"stupid theta\" which
-        -- lives only in the 'TyData' decl.
+      , con_cxt       :: Maybe (LHsContext name)
+        -- ^ User-written context (if any)
 
-    , con_details   :: HsConDeclDetails name
-        -- ^ The main payload
+      , con_details   :: HsConDeclDetails name
+          -- ^ Arguments
 
-    , con_res       :: ResType (LHsType name)
-        -- ^ Result type of the constructor
-
-    , con_doc       :: Maybe LHsDocString
-        -- ^ A possible Haddock comment.
-    } deriving (Typeable)
+      , con_doc       :: Maybe LHsDocString
+          -- ^ A possible Haddock comment.
+      } deriving (Typeable)
 deriving instance (DataId name) => Data (ConDecl name)
 
 type HsConDeclDetails name
    = HsConDetails (LBangType name) (Located [LConDeclField name])
 
+getConNames :: ConDecl name -> [Located name]
+getConNames (ConDeclH98  {con_name  = name})  = [name]
+getConNames (ConDeclGADT {con_names = names}) = names
+
 hsConDeclArgTys :: HsConDeclDetails name -> [LBangType name]
 hsConDeclArgTys (PrefixCon tys)    = tys
 hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
 hsConDeclArgTys (RecCon flds)      = map (cd_fld_type . unLoc) (unLoc flds)
-
-data ResType ty
-   = ResTyH98             -- Constructor was declared using Haskell 98 syntax
-   | ResTyGADT SrcSpan ty -- Constructor was declared using GADT-style syntax,
-                          --      and here is its result type, and the SrcSpan
-                          --      of the original sigtype, for API Annotations
-   deriving (Data, Typeable)
-
-instance Outputable ty => Outputable (ResType ty) where
-         -- Debugging only
-   ppr ResTyH98         = ptext (sLit "ResTyH98")
-   ppr (ResTyGADT _ ty) = ptext (sLit "ResTyGADT") <+> ppr ty
 
 pp_data_defn :: OutputableBndr name
                   => (HsContext name -> SDoc)   -- Printing the header
@@ -1115,7 +1093,7 @@ instance Outputable NewOrData where
   ppr DataType = ptext (sLit "data")
 
 pp_condecls :: OutputableBndr name => [LConDecl name] -> SDoc
-pp_condecls cs@(L _ ConDecl{ con_res = ResTyGADT _ _ } : _) -- In GADT syntax
+pp_condecls cs@(L _ ConDeclGADT{} : _) -- In GADT syntax
   = hang (ptext (sLit "where")) 2 (vcat (map ppr cs))
 pp_condecls cs                    -- In H98 syntax
   = equals <+> sep (punctuate (ptext (sLit " |")) (map ppr cs))
@@ -1124,50 +1102,27 @@ instance (OutputableBndr name) => Outputable (ConDecl name) where
     ppr = pprConDecl
 
 pprConDecl :: OutputableBndr name => ConDecl name -> SDoc
-pprConDecl (ConDecl { con_names = [L _ con]  -- NB: non-GADT means 1 con
-                    , con_explicit = expl, con_qvars = tvs
-                    , con_cxt = cxt, con_details = details
-                    , con_res = ResTyH98, con_doc = doc })
-  = sep [ppr_mbDoc doc, ppr_con_forall expl tvs cxt, ppr_details details]
+pprConDecl (ConDeclH98 { con_name = L _ con
+                       , con_qvars = mtvs
+                       , con_cxt = mcxt
+                       , con_details = details
+                       , con_doc = doc })
+  = sep [ppr_mbDoc doc, pprHsForAll tvs cxt,         ppr_details details]
   where
     ppr_details (InfixCon t1 t2) = hsep [ppr t1, pprInfixOcc con, ppr t2]
     ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc con
                                    : map (pprParendHsType . unLoc) tys)
     ppr_details (RecCon fields)  = pprPrefixOcc con
                                  <+> pprConDeclFields (unLoc fields)
+    tvs = case mtvs of
+      Nothing -> []
+      Just (HsQTvs _ tvs) -> tvs
 
-pprConDecl (ConDecl { con_names = cons, con_explicit = expl, con_qvars = tvs
-                    , con_cxt = cxt, con_details = PrefixCon arg_tys
-                    , con_res = ResTyGADT _ res_ty, con_doc = doc })
-  = ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon <+>
-    sep [ppr_con_forall expl tvs cxt, ppr (foldr mk_fun_ty res_ty arg_tys)]
-  where
-    mk_fun_ty a b = noLoc (HsFunTy a b)
+    cxt = fromMaybe (noLoc []) mcxt
 
-pprConDecl (ConDecl { con_names = cons, con_explicit = expl, con_qvars = tvs
-                    , con_cxt = cxt, con_details = RecCon fields
-                    , con_res = ResTyGADT _ res_ty, con_doc = doc })
+pprConDecl (ConDeclGADT { con_names = cons, con_type = res_ty, con_doc = doc })
   = sep [ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon
-         <+> ppr_con_forall expl tvs cxt,
-         pprConDeclFields (unLoc fields) <+> arrow <+> ppr res_ty]
-
-pprConDecl decl@(ConDecl { con_details = InfixCon ty1 ty2, con_res = ResTyGADT {} })
-  = pprConDecl (decl { con_details = PrefixCon [ty1,ty2] })
-        -- In GADT syntax we don't allow infix constructors
-        -- so if we ever trip over one (albeit I can't see how that
-        -- can happen) print it like a prefix one
-
--- this fallthrough would happen with a non-GADT-syntax ConDecl with more
--- than one constructor, which should indeed be impossible
-pprConDecl (ConDecl { con_names = cons }) = pprPanic "pprConDecl" (ppr cons)
-
-ppr_con_forall :: OutputableBndr name => Bool -> LHsQTyVars name
-                                      -> LHsContext name -> SDoc
-ppr_con_forall explicit_forall qtvs (L _ ctxt)
-  | explicit_forall
-  = pprHsForAllTvs (hsQTvBndrs qtvs) <+> pprHsContext ctxt
-  | otherwise
-  = pprHsContext ctxt
+         <+> ppr res_ty]
 
 ppr_con_names :: (OutputableBndr name) => [Located name] -> SDoc
 ppr_con_names = pprWithCommas (pprPrefixOcc . unLoc)

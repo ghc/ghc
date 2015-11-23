@@ -58,6 +58,7 @@ import ForeignCall
 import Util
 import Maybes
 import MonadUtils
+import RdrHsSyn ( gadtDeclDetails )
 
 import Data.ByteString ( unpack )
 import Control.Monad
@@ -302,7 +303,7 @@ repDataDefn tc bndrs opt_tys tv_names
                              _cs -> failWithDs (ptext
                                      (sLit "Multiple constructors for newtype:")
                                       <+> pprQuotedList
-                                                (con_names $ unLoc $ head cons))
+                                                (getConNames $ unLoc $ head cons))
                           }
            DataType -> do { consL <- concatMapM (repC tv_names) cons
                           ; cons1 <- coreList conQTyConName consL
@@ -623,26 +624,48 @@ repAnnProv ModuleAnnProvenance
 -------------------------------------------------------
 
 repC :: [Name] -> LConDecl Name -> DsM [Core TH.ConQ]
-repC _ (L _ (ConDecl { con_names = con, con_qvars = con_tvs, con_cxt = L _ []
-                     , con_details = details, con_res = ResTyH98 }))
-  | null (hsQTvBndrs con_tvs)
-  = do { con1 <- mapM lookupLOcc con       -- See Note [Binders and occurrences]
+repC _ (L _ (ConDeclH98 { con_name = con
+                        , con_qvars = Nothing, con_cxt = Nothing
+                        , con_details = details }))
+  = do { con1 <- mapM lookupLOcc [con]       -- See Note [Binders and occurrences]
        ; mapM (\c -> repConstr c details) con1  }
 
-repC tvs (L _ (ConDecl { con_names = cons
-                       , con_qvars = con_tvs, con_cxt = L _ ctxt
-                       , con_details = details
-                       , con_res = res_ty }))
-  = do { (eq_ctxt, con_tv_subst) <- mkGadtCtxt tvs res_ty
+repC _ (L _ (ConDeclH98 { con_name = con
+                        , con_qvars = mcon_tvs, con_cxt = mcxt
+                        , con_details = details }))
+  = do { let (eq_ctxt, con_tv_subst) = ([], [])
+       ; let con_tvs = fromMaybe (HsQTvs [] []) mcon_tvs
+       ; let ctxt = unLoc $ fromMaybe (noLoc []) mcxt
        ; let ex_tvs = HsQTvs { hsq_kvs = filterOut (in_subst con_tv_subst) (hsq_kvs con_tvs)
                              , hsq_tvs = filterOut (in_subst con_tv_subst . hsLTyVarName) (hsq_tvs con_tvs) }
+
+       ; let binds = []
+       ; b <- dsExtendMetaEnv (mkNameEnv binds) $ -- Binds some of the con_tvs
+         addTyVarBinds ex_tvs $ \ ex_bndrs ->   -- Binds the remaining con_tvs
+    do { con1     <- lookupLOcc con -- See Note [Binders and occurrences]
+       ; c'        <- repConstr con1 details
+       ; ctxt'     <- repContext (eq_ctxt ++ ctxt)
+       ; if (null (hsq_kvs ex_tvs) && null (hsq_tvs ex_tvs) && null (eq_ctxt ++ ctxt))
+            then return c'
+            else rep2 forallCName ([unC ex_bndrs, unC ctxt'] ++ [unC c']) }
+    ; return [b]
+    }
+repC tvs (L _ (ConDeclGADT { con_names = cons
+                           , con_type = res_ty@(HsIB { hsib_kvs = con_kvs, hsib_tvs = con_tvns }) }))
+  = do { (eq_ctxt, con_tv_subst) <- mkGadtCtxt tvs res_ty
+       ; let con_tvs = map (noLoc . UserTyVar . noLoc) con_tvns
+       ; let ex_tvs = HsQTvs { hsq_kvs = filterOut (in_subst con_tv_subst) con_kvs
+                             , hsq_tvs = filterOut (in_subst con_tv_subst . hsLTyVarName) con_tvs }
 
        ; binds <- mapM dupBinder con_tv_subst
        ; b <- dsExtendMetaEnv (mkNameEnv binds) $ -- Binds some of the con_tvs
          addTyVarBinds ex_tvs $ \ ex_bndrs ->   -- Binds the remaining con_tvs
-    do { cons1     <- mapM lookupLOcc cons -- See Note [Binders and occurrences]
-       ; c'        <- mapM (\c -> repConstr c details) cons1
-       ; ctxt'     <- repContext (eq_ctxt ++ ctxt)
+    do { cons1 <- mapM lookupLOcc cons -- See Note [Binders and occurrences]
+       ; let (details,res_ty',_,_) = gadtDeclDetails res_ty
+       ; let doc = ptext (sLit "In the constructor for ") <+> ppr (head cons)
+       ; (hs_details,_res_ty) <- update_con_result doc details res_ty'
+       ; c'        <- mapM (\c -> repConstr c hs_details) cons1
+       ; ctxt'     <- repContext eq_ctxt
        ; rep2 forallCName ([unC ex_bndrs, unC ctxt'] ++ (map unC c')) }
     ; return [b]
     }
@@ -651,8 +674,37 @@ in_subst :: [(Name,Name)] -> Name -> Bool
 in_subst []          _ = False
 in_subst ((n',_):ns) n = n==n' || in_subst ns n
 
+update_con_result :: SDoc
+            -> HsConDetails (LHsType Name) (Located [LConDeclField Name])
+                    -- Original details
+            -> LHsType Name -- The original result type
+            -> DsM (HsConDetails (LHsType Name) (Located [LConDeclField Name]),
+                    LHsType Name)
+update_con_result doc details ty
+  = do {  let (arg_tys, res_ty) = splitHsFunType ty
+                -- We can finally split it up,
+                -- now the renamer has dealt with fixities
+                -- See Note [Sorting out the result type] in RdrHsSyn
+
+       ; case details of
+           InfixCon {}  -> pprPanic "update_con_result" (ppr ty)
+           -- See Note [Sorting out the result type] in RdrHsSyn
+
+           RecCon {}    -> do { unless (null arg_tys)
+                                       (failWithDs (badRecResTy doc))
+                                -- AZ: This error used to be reported during
+                                --     renaming, will now be reported in type
+                                --     checking. Is this a problem?
+                              ; return (details, res_ty) }
+
+           PrefixCon {} -> return (PrefixCon arg_tys, res_ty)}
+    where
+        badRecResTy :: SDoc -> SDoc
+        badRecResTy ctxt = ctxt <+>
+                        ptext (sLit "Malformed constructor signature")
+
 mkGadtCtxt :: [Name]            -- Tyvars of the data type
-           -> ResType (LHsType Name)
+           -> LHsSigType Name
            -> DsM (HsContext Name, [(Name,Name)])
 -- Given a data type in GADT syntax, figure out the equality
 -- context, so that we can represent it with an explicit
@@ -666,16 +718,16 @@ mkGadtCtxt :: [Name]            -- Tyvars of the data type
 --     (b~[e], c~e), [d->a]
 --
 -- This function is fiddly, but not really hard
-mkGadtCtxt _ ResTyH98
-  = return ([], [])
-mkGadtCtxt data_tvs (ResTyGADT _ res_ty)
-  | Just (_, tys) <- hsTyGetAppHead_maybe res_ty
+mkGadtCtxt data_tvs res_ty
+  | Just (_, tys) <- hsTyGetAppHead_maybe ty
   , data_tvs `equalLength` tys
   = return (go [] [] (data_tvs `zip` tys))
 
   | otherwise
   = failWithDs (ptext (sLit "Malformed constructor result type:") <+> ppr res_ty)
   where
+    (_,ty',_,_) = gadtDeclDetails res_ty
+    (_arg_tys,ty) = splitHsFunType ty'
     go cxt subst [] = (cxt, subst)
     go cxt subst ((data_tv, ty) : rest)
        | Just con_tv <- is_hs_tyvar ty
@@ -691,7 +743,6 @@ mkGadtCtxt data_tvs (ResTyGADT _ res_ty)
     is_hs_tyvar (L _ (HsTyVar (L _ n))) = Just n  -- Type variables *and* tycons
     is_hs_tyvar (L _ (HsParTy ty))      = is_hs_tyvar ty
     is_hs_tyvar _                       = Nothing
-
 
 repBangTy :: LBangType Name -> DsM (Core (TH.StrictTypeQ))
 repBangTy ty = do

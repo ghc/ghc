@@ -9,7 +9,7 @@
 
 module TcHsType (
         -- Type signatures
-        kcClassSigType, tcClassSigType,
+        kcHsSigType, tcClassSigType,
         tcHsSigType, tcHsSigWcType,
         zonkSigType, zonkAndCheckValidity,
         funsSigCtxt, addSigCtxt,
@@ -183,8 +183,8 @@ tcHsSigWcType :: UserTypeCtxt -> LHsSigWcType Name -> TcM Type
 -- alrady checked this, so we can simply ignore it.
 tcHsSigWcType ctxt sig_ty = tcHsSigType ctxt (dropWildCards sig_ty)
 
-kcClassSigType :: [Located Name] -> LHsSigType Name -> TcM ()
-kcClassSigType names (HsIB { hsib_body = hs_ty
+kcHsSigType :: [Located Name] -> LHsSigType Name -> TcM ()
+kcHsSigType names (HsIB { hsib_body = hs_ty
                            , hsib_kvs  = sig_kvs
                            , hsib_tvs  = sig_tvs })
   = addSigCtxt (funsSigCtxt names) hs_ty $
@@ -387,9 +387,10 @@ tc_hs_type ty@(HsBangTy {})    _
     -- other kinds of bangs are not (eg ((!Maybe) Int)). These kinds of
     -- bangs are invalid, so fail. (#7210)
     = failWithTc (ptext (sLit "Unexpected strictness annotation:") <+> ppr ty)
-tc_hs_type (HsRecTy _)         _ = panic "tc_hs_type: record" -- Unwrapped by con decls
+tc_hs_type ty@(HsRecTy _)      _
       -- Record types (which only show up temporarily in constructor
       -- signatures) should have been removed by now
+    = failWithTc (ptext (sLit "Record syntax is illegal here:") <+> ppr ty)
 
 ---------- Functions and applications
 tc_hs_type hs_ty@(HsTyVar (L _ name)) exp_kind
