@@ -1559,7 +1559,7 @@ ctype   :: { LHsType RdrName }
                                            ams (sLL $1 $> $
                                                 HsForAllTy { hst_bndrs = $2
                                                            , hst_body = $4 })
-                                               [mj AnnForall $1, mj AnnDot $3] }
+                                               [mu AnnForall $1, mj AnnDot $3] }
         | context '=>' ctype          {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1
@@ -1584,7 +1584,7 @@ ctypedoc :: { LHsType RdrName }
                                             ams (sLL $1 $> $
                                                  HsForAllTy { hst_bndrs = $2
                                                             , hst_body = $4 })
-                                                [mj AnnForall $1,mj AnnDot $3] }
+                                                [mu AnnForall $1,mj AnnDot $3] }
         | context '=>' ctypedoc       {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1
