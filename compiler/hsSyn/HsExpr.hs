@@ -129,6 +129,8 @@ is Less Cool because
 data HsExpr id
   = HsVar     (Located id)   -- ^ Variable
 
+                             -- See Note [Located RdrNames]
+
   | HsUnboundVar OccName     -- ^ Unbound variable; also used for "holes" _, or _x.
                              -- Turned from HsVar to HsUnboundVar by the renamer, when
                              --   it finds an out-of-scope variable
@@ -592,6 +594,16 @@ P x = P False
 hence we need to provide the correct dictionaries to P on the RHS so that we can
 build the expression.
 
+Note [Located RdrNames]
+~~~~~~~~~~~~~~~~~~~~~~~
+A number of syntax elements have seemingly redundant locations attached to them.
+This is deliberate, to allow transformations making use of the API Annotations
+to easily correlate a Located Name in the RenamedSource with a Located RdrName
+in the ParsedSource.
+
+There are unfortunately enough differences between the ParsedSource and the
+RenamedSource that the API Annotations cannot be used directly with
+RenamedSource, so this allows a simple mapping to be used based on the location.
 -}
 
 instance OutputableBndr id => Outputable (HsExpr id) where

@@ -226,7 +226,7 @@ instance OutputableBndr HsIPName where
 data HsTyVarBndr name
   = UserTyVar        -- no explicit kinding
          (Located name)
-
+        -- See Note [Located RdrNames] in HsExpr
   | KindedTyVar
          (Located name)
          (LHsKind name)  -- The user-supplied kind signature
@@ -268,6 +268,7 @@ data HsType name
   | HsTyVar    (Located name)
                   -- Type variable, type constructor, or data constructor
                   -- see Note [Promotions (HsTyVar)]
+                  -- See Note [Located RdrNames] in HsExpr
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in ApiAnnotation
