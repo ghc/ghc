@@ -1242,8 +1242,8 @@ rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
         }
   where
     h98_style = case condecls of  -- Note [Stupid theta]
-                     L _ (ConDecl { con_res = ResTyGADT {} }) : _  -> False
-                     _                                             -> True
+                     L _ (ConDeclGADT {}) : _  -> False
+                     _                         -> True
 
     rn_derivs Nothing
       = return (Nothing, emptyFVs)
@@ -1454,7 +1454,7 @@ depAnalTyClDecls ds_w_fvs
         DataDecl { tcdLName = L _ data_name
                  , tcdDataDefn = HsDataDefn { dd_cons = cons } }
           -> do L _ dc <- cons
-                return $ zip (map unLoc $ con_names dc) (repeat data_name)
+                return $ zip (map unLoc $ getConNames dc) (repeat data_name)
         _ -> []
 
 {-
@@ -1506,29 +1506,6 @@ modules), we get better error messages, too.
 \subsection{Support code for type/data declarations}
 *                                                      *
 *********************************************************
-
-Note [Quantification in data constructor declarations]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Four cases, afer renaming
-  * ResTyH98
-     - data T a = forall b. MkT { x :: b -> a }
-       The 'b' is explicitly declared;
-       con_qvars = [b]
-
-     - data T a = MkT { x :: a -> b }
-       Do *not* implicitly quantify over 'b'; it is
-       simply out of scope.  con_qvars = []
-
-  * ResTyGADT
-     - data T a where { MkT :: forall b. (b -> a) -> T a }
-       con_qvars = [a,b]
-
-     - data T a where { MkT :: (b -> a) -> T a }
-       con_qvars = [a,b], by implicit quantification
-                          of the type signature
-       It is uncomfortable that we add implicitly-bound
-       type variables to the HsQTyVars, which usually
-       only has explicitly-bound type variables
 -}
 
 ---------------
@@ -1543,75 +1520,61 @@ rnConDecls :: [LConDecl RdrName] -> RnM ([LConDecl Name], FreeVars)
 rnConDecls = mapFvRn (wrapLocFstM rnConDecl)
 
 rnConDecl :: ConDecl RdrName -> RnM (ConDecl Name, FreeVars)
-rnConDecl decl@(ConDecl { con_names = names, con_qvars = qtvs
-                        , con_cxt = lcxt@(L loc cxt), con_details = details
-                        , con_res = res_ty, con_doc = mb_doc
-                        , con_explicit = explicit })
-  = do  { mapM_ (addLocM checkConName) names
-        ; new_names    <- mapM lookupLocatedTopBndrRn names
+rnConDecl decl@(ConDeclH98 { con_name = name, con_qvars = qtvs
+                           , con_cxt = mcxt, con_details = details
+                           , con_doc = mb_doc })
+  = do  { _ <- addLocM checkConName name
+        ; new_name     <- lookupLocatedTopBndrRn name
+        ; let doc = ConDeclCtx [new_name]
         ; mb_doc'      <- rnMbLHsDoc mb_doc
-        ; let (kvs, qtvs') = get_con_qtvs qtvs (hsConDeclArgTys details) res_ty
+        ; let (kvs, qtvs') = get_con_qtvs qtvs (hsConDeclArgTys details)
 
         ; bindHsQTyVars doc Nothing kvs qtvs' $ \new_tyvars -> do
-        { (new_context, fvs1) <- rnContext doc lcxt
-        ; (new_details, fvs2) <- rnConDeclDetails (unLoc $ head new_names) doc details
-        ; (new_details', new_res_ty, fvs3)
-                     <- rnConResult doc (map unLoc new_names) new_details res_ty
-        ; traceRn (text "rnConDecl" <+> ppr names <+> vcat
+        { (new_context, fvs1) <- case mcxt of
+                             Nothing   -> return (Nothing,emptyFVs)
+                             Just lcxt -> do { (lctx',fvs) <- rnContext doc lcxt
+                                             ; return (Just lctx',fvs) }
+        ; (new_details, fvs2) <- rnConDeclDetails (unLoc new_name) doc details
+        ; let (new_details',fvs3) = (new_details,emptyFVs)
+        ; traceRn (text "rnConDecl" <+> ppr name <+> vcat
              [ text "free_kvs:" <+> ppr kvs
              , text "qtvs:" <+> ppr qtvs
              , text "qtvs':" <+> ppr qtvs' ])
         ; let all_fvs = fvs1 `plusFV` fvs2 `plusFV` fvs3
         ; warnUnusedForAlls (inHsDocContext doc) (hsQTvBndrs new_tyvars) all_fvs
-        ; return (decl { con_names = new_names, con_qvars = new_tyvars
+        ; let new_tyvars' = case qtvs of
+                Nothing -> Nothing
+                Just _ -> Just new_tyvars
+        ; return (decl { con_name = new_name, con_qvars = new_tyvars'
                        , con_cxt = new_context, con_details = new_details'
-                       , con_res = new_res_ty, con_doc = mb_doc' },
+                       , con_doc = mb_doc' },
                   all_fvs) }}
  where
-    doc = ConDeclCtx names
+    cxt = maybe [] unLoc mcxt
     get_rdr_tvs tys = extractHsTysRdrTyVars (cxt ++ tys)
 
-    get_con_qtvs :: LHsQTyVars RdrName -> [LHsType RdrName]
-                 -> ResType (LHsType RdrName)
+    get_con_qtvs :: Maybe (LHsQTyVars RdrName) -> [LHsType RdrName]
                  -> ([RdrName], LHsQTyVars RdrName)
-    get_con_qtvs qtvs arg_tys ResTyH98
-      | explicit   -- data T = forall a. MkT (a -> a)
-      = (free_kvs, qtvs)
-      | otherwise  -- data T = MkT (a -> a)
+    get_con_qtvs Nothing _arg_tys
       = ([], mkHsQTvs [])
+    get_con_qtvs (Just qtvs) arg_tys
+      = (free_kvs, qtvs)
       where
         (free_kvs, _) = get_rdr_tvs arg_tys
 
-    get_con_qtvs qtvs arg_tys (ResTyGADT _ ty)
-      | explicit  -- data T x where { MkT :: forall a. a -> T a }
-      = (free_kvs, qtvs)
-      | otherwise -- data T x where { MkT :: a -> T a }
-      = (free_kvs, mkHsQTvs (userHsTyVarBndrs loc free_tvs))
-      where
-        (free_kvs, free_tvs) = get_rdr_tvs (ty : arg_tys)
+rnConDecl decl@(ConDeclGADT { con_names = names, con_type = ty
+                            , con_doc = mb_doc })
+  = do  { mapM_ (addLocM checkConName) names
+        ; new_names    <- mapM lookupLocatedTopBndrRn names
+        ; let doc = ConDeclCtx new_names
+        ; mb_doc'      <- rnMbLHsDoc mb_doc
 
-rnConResult :: HsDocContext -> [Name]
-            -> HsConDetails (LHsType Name) (Located [LConDeclField Name])
-            -> ResType (LHsType RdrName)
-            -> RnM (HsConDetails (LHsType Name) (Located [LConDeclField Name]),
-                    ResType (LHsType Name), FreeVars)
-rnConResult _   _   details ResTyH98 = return (details, ResTyH98, emptyFVs)
-rnConResult doc _con details (ResTyGADT ls ty)
-  = do { (ty', fvs) <- rnLHsType doc ty
-       ; let (arg_tys, res_ty) = splitHsFunType ty'
-                -- We can finally split it up,
-                -- now the renamer has dealt with fixities
-                -- See Note [Sorting out the result type] in RdrHsSyn
-
-       ; case details of
-           InfixCon {}  -> pprPanic "rnConResult" (ppr ty)
-           -- See Note [Sorting out the result type] in RdrHsSyn
-
-           RecCon {}    -> do { unless (null arg_tys)
-                                       (addErr (badRecResTy doc))
-                              ; return (details, ResTyGADT ls res_ty, fvs) }
-
-           PrefixCon {} -> return (PrefixCon arg_tys, ResTyGADT ls res_ty, fvs)}
+        ; (ty', fvs) <- rnHsSigType doc ty
+        ; traceRn (text "rnConDecl" <+> ppr names <+> vcat
+             [ text "fvs:" <+> ppr fvs ])
+        ; return (decl { con_names = new_names, con_type = ty'
+                       , con_doc = mb_doc' },
+                  fvs) }
 
 rnConDeclDetails
    :: Name
@@ -1635,9 +1598,6 @@ rnConDeclDetails con doc (RecCon (L l fields))
         ; return (RecCon (L l new_fields), fvs) }
 
 -------------------------------------------------
-badRecResTy :: HsDocContext -> SDoc
-badRecResTy ctxt = withHsDocContext ctxt $
-                   ptext (sLit "Malformed constructor signature")
 
 -- | Brings pattern synonym names and also pattern synonym selectors
 -- from record pattern synonyms into scope.

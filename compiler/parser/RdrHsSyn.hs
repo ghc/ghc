@@ -35,7 +35,7 @@ module RdrHsSyn (
         mkExport,
         mkExtName,           -- RdrName -> CLabelString
         mkGadtDecl,          -- [Located RdrName] -> LHsType RdrName -> ConDecl RdrName
-        mkSimpleConDecl,
+        mkConDeclH98,
         mkATDefault,
 
         -- Bunch of functions in the parser monad for
@@ -487,58 +487,25 @@ mkPatSynMatchGroup (L _ patsyn_name) (L _ decls) =
         text "pattern synonym 'where' clause must bind the pattern synonym's name" <+>
         quotes (ppr patsyn_name) $$ ppr decl
 
-mkSimpleConDecl :: Located RdrName -> Maybe [LHsTyVarBndr RdrName]
+mkConDeclH98 :: Located RdrName -> Maybe [LHsTyVarBndr RdrName]
                 -> LHsContext RdrName -> HsConDeclDetails RdrName
                 -> ConDecl RdrName
 
-mkSimpleConDecl name mb_forall cxt details
-  = ConDecl { con_names    = [name]
-            , con_explicit = explicit
-            , con_qvars    = qvars
-            , con_cxt      = cxt
-            , con_details  = details
-            , con_res      = ResTyH98
-            , con_doc      = Nothing }
-  where
-    (explicit, qvars) = case mb_forall of
-                          Nothing  -> (False, mkHsQTvs [])
-                          Just tvs -> (True,  mkHsQTvs tvs)
+mkConDeclH98 name mb_forall cxt details
+  = ConDeclH98 { con_name     = name
+               , con_qvars    = fmap mkHsQTvs mb_forall
+               , con_cxt      = Just cxt
+                             -- AZ:TODO: when can cxt be Nothing?
+                             --          remembering that () is a valid context.
+               , con_details  = details
+               , con_doc      = Nothing }
 
 mkGadtDecl :: [Located RdrName]
-           -> LHsType RdrName     -- Always a HsForAllTy
-           -> ([AddAnn], ConDecl RdrName)
-mkGadtDecl names ty = ([], mkGadtDecl' names ty)
-
-mkGadtDecl' :: [Located RdrName]
-            -> LHsType RdrName
-            -> ConDecl RdrName
--- We allow C,D :: ty
--- and expand it as if it had been
---    C :: ty; D :: ty
--- (Just like type signatures in general.)
-
-mkGadtDecl' names lbody_ty@(L loc body_ty)
-  = mk_gadt_con names
-  where
-    (tvs, cxt, tau) = splitLHsSigmaTy lbody_ty
-    (details, res_ty)           -- See Note [Sorting out the result type]
-      = case tau of
-          L _ (HsFunTy (L l (HsRecTy flds)) res_ty)
-                  -> (RecCon (L l flds), res_ty)
-          _other  -> (PrefixCon [], tau)
-
-    explicit = case body_ty of
-                 HsForAllTy {} -> True
-                 _             -> False
-
-    mk_gadt_con names
-       = ConDecl { con_names    = names
-                 , con_explicit = explicit
-                 , con_qvars    = mkHsQTvs tvs
-                 , con_cxt      = cxt
-                 , con_details  = details
-                 , con_res      = ResTyGADT loc res_ty
-                 , con_doc      = Nothing }
+           -> LHsSigType RdrName     -- Always a HsForAllTy
+           -> ConDecl RdrName
+mkGadtDecl names ty = ConDeclGADT { con_names = names
+                                  , con_type  = ty
+                                  , con_doc   = Nothing }
 
 tyConToDataCon :: SrcSpan -> RdrName -> P (Located RdrName)
 tyConToDataCon loc tc
@@ -639,19 +606,19 @@ really doesn't matter!
 
 -- | Note [Sorting out the result type]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- In a GADT declaration which is not a record, we put the whole constr
--- type into the ResTyGADT for now; the renamer will unravel it once it
--- has sorted out operator fixities. Consider for example
+-- In a GADT declaration which is not a record, we put the whole constr type
+-- into the res_ty for a ConDeclGADT for now; the renamer will unravel it once
+-- it has sorted out operator fixities. Consider for example
 --      C :: a :*: b -> a :*: b -> a :+: b
 -- Initially this type will parse as
 --       a :*: (b -> (a :*: (b -> (a :+: b))))
-
+--
 -- so it's hard to split up the arguments until we've done the precedence
 -- resolution (in the renamer) On the other hand, for a record
 --         { x,y :: Int } -> a :*: b
 -- there is no doubt.  AND we need to sort records out so that
 -- we can bring x,y into scope.  So:
---    * For PrefixCon we keep all the args in the ResTyGADT
+--    * For PrefixCon we keep all the args in the res_ty
 --    * For RecCon we do not
 
 checkTyVarsP :: SDoc -> SDoc -> Located RdrName -> [LHsType RdrName] -> P (LHsQTyVars RdrName)
