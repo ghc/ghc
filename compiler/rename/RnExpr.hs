@@ -73,14 +73,14 @@ rnLExpr = wrapLocFstM rnExpr
 
 rnExpr :: HsExpr RdrName -> RnM (HsExpr Name, FreeVars)
 
-finishHsVar :: Name -> RnM (HsExpr Name, FreeVars)
+finishHsVar :: Located Name -> RnM (HsExpr Name, FreeVars)
 -- Separated from rnExpr because it's also used
 -- when renaming infix expressions
-finishHsVar name
+finishHsVar (L l name)
  = do { this_mod <- getModule
       ; when (nameIsLocalOrFrom this_mod name) $
         checkThLocalName name
-      ; return (HsVar name, unitFV name) }
+      ; return (HsVar (L l name), unitFV name) }
 
 rnUnboundVar :: RdrName -> RnM (HsExpr Name, FreeVars)
 rnUnboundVar v
@@ -92,9 +92,9 @@ rnUnboundVar v
 
         else -- Fail immediately (qualified name)
              do { n <- reportUnboundName v
-                ; return (HsVar n, emptyFVs) } }
+                ; return (HsVar (noLoc n), emptyFVs) } }
 
-rnExpr (HsVar v)
+rnExpr (HsVar (L l v))
   = do { opt_DuplicateRecordFields <- xoptM Opt_DuplicateRecordFields
        ; mb_name <- lookupOccRn_overloaded opt_DuplicateRecordFields v
        ; case mb_name of {
@@ -105,7 +105,7 @@ rnExpr (HsVar v)
               -> rnExpr (ExplicitList placeHolderType Nothing [])
 
               | otherwise
-              -> finishHsVar name ;
+              -> finishHsVar (L l name) ;
            Just (Right [f])        -> return (HsRecFld (ambiguousFieldOcc f)
                                              , unitFV (selectorFieldOcc f)) ;
            Just (Right fs@(_:_:_)) -> return (HsRecFld (Ambiguous v PlaceHolder)
@@ -150,8 +150,8 @@ rnExpr (OpApp e1 op  _ e2)
         -- more, so I've removed the test.  Adding HsPars in TcGenDeriv
         -- should prevent bad things happening.
         ; fixity <- case op' of
-                      L _ (HsVar n) -> lookupFixityRn n
-                      _             -> return (Fixity minPrecedence InfixL)
+                     L _ (HsVar (L _ n)) -> lookupFixityRn n
+                     _                   -> return (Fixity minPrecedence InfixL)
                                        -- c.f. lookupFixity for unbound
 
         ; final_e <- mkOpAppRn e1' op' fixity e2'
@@ -258,13 +258,14 @@ rnExpr (ExplicitTuple tup_args boxity)
 rnExpr (RecordCon { rcon_con_name = con_id
                   , rcon_flds = rec_binds@(HsRecFields { rec_dotdot = dd }) })
   = do { con_lname@(L _ con_name) <- lookupLocatedOccRn con_id
-       ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon con_name) HsVar rec_binds
+       ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon con_name) mk_hs_var rec_binds
        ; (flds', fvss) <- mapAndUnzipM rn_field flds
        ; let rec_binds' = HsRecFields { rec_flds = flds', rec_dotdot = dd }
        ; return (RecordCon { rcon_con_name = con_lname, rcon_flds = rec_binds'
                            , rcon_con_expr = noPostTcExpr, rcon_con_like = PlaceHolder }
                 , fvs `plusFV` plusFVs fvss `addOneFV` con_name) }
   where
+    mk_hs_var l n = HsVar (L l n)
     rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hsRecFieldArg fld)
                             ; return (L l (fld { hsRecFieldArg = arg' }), fvs) }
 
@@ -420,7 +421,6 @@ rnSection section@(SectionL expr op)
 
 rnSection other = pprPanic "rnSection" (ppr other)
 
-
 {-
 ************************************************************************
 *                                                                      *
@@ -473,7 +473,7 @@ rnCmd (HsCmdArrApp arrow arg _ ho rtl)
 -- infix form
 rnCmd (HsCmdArrForm op (Just _) [arg1, arg2])
   = do { (op',fv_op) <- escapeArrowScope (rnLExpr op)
-       ; let L _ (HsVar op_name) = op'
+       ; let L _ (HsVar (L _ op_name)) = op'
        ; (arg1',fv_arg1) <- rnCmdTop arg1
        ; (arg2',fv_arg2) <- rnCmdTop arg2
         -- Deal with fixity
@@ -922,7 +922,7 @@ lookupStmtName ctxt n
       TransStmtCtxt c -> lookupStmtName c n     -- the parent context
   where
     rebindable     = lookupSyntaxName n
-    not_rebindable = return (HsVar n, emptyFVs)
+    not_rebindable = return (HsVar (noLoc n), emptyFVs)
 
 {-
 Note [Renaming parallel Stmts]
@@ -1633,7 +1633,7 @@ isReturnApp (L _ (HsApp f arg))
   | otherwise = Nothing
  where
   is_return (L _ (HsPar e)) = is_return e
-  is_return (L _ (HsVar r)) = r == returnMName
+  is_return (L _ (HsVar (L _ r))) = r == returnMName
        -- TODO: I don't know how to get this right for rebindable syntax
   is_return _ = False
 isReturnApp _ = Nothing

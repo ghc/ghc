@@ -528,6 +528,7 @@ compiler_stage2_dll0_MODULES = \
 	Fingerprint \
 	FiniteMap \
 	ForeignCall \
+	FV \
 	Hooks \
 	HsBinds \
 	HsDecls \
@@ -593,8 +594,9 @@ compiler_stage2_dll0_MODULES = \
 	TysPrim \
 	TysWiredIn \
 	Unify \
-	UniqFM \
 	UniqDFM \
+	UniqDSet \
+	UniqFM \
 	UniqSet \
 	UniqSupply \
 	Unique \

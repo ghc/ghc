@@ -14,7 +14,7 @@ import CoreSyn
 import IdInfo
 import Demand( seqDemand, seqStrictSig )
 import BasicTypes( seqOccInfo )
-import VarSet( seqVarSet )
+import VarSet( seqDVarSet )
 import Var( varType, tyVarKind )
 import Type( seqType, isTyVar )
 import Coercion( seqCo )
@@ -40,7 +40,7 @@ seqOneShot :: OneShotInfo -> ()
 seqOneShot l = l `seq` ()
 
 seqRuleInfo :: RuleInfo -> ()
-seqRuleInfo (RuleInfo rules fvs) = seqRules rules `seq` seqVarSet fvs
+seqRuleInfo (RuleInfo rules fvs) = seqRules rules `seq` seqDVarSet fvs
 
 seqCaf :: CafInfo -> ()
 seqCaf c = c `seq` ()

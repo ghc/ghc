@@ -32,9 +32,11 @@ Thumbs.db
 *.stdout.normalised
 *.stdout-mingw32.normalised
 *.stdout-ghc.normalised
+*.stdout-ws-32.normalised
 *.stderr.normalised
 *.stderr-mingw32.normalised
 *.stderr-ghc.normalised
+*.stderr-ws-32.normalised
 *.interp.stdout
 *.interp.stderr
 *.run.stdout
@@ -1219,6 +1221,7 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /tests/perf/should_run/T876
 /tests/perf/should_run/T9203
 /tests/perf/should_run/T9339
+/tests/perf/should_run/T10359
 /tests/perf/should_run/lazy-bs-alloc
 /tests/perf/should_run/lazy-bs-alloc.stats
 /tests/perf/should_run/speed.f32

@@ -757,7 +757,7 @@ validRuleLhs foralls lhs
 
     check (OpApp e1 op _ e2)              = checkl op `mplus` checkl_e e1 `mplus` checkl_e e2
     check (HsApp e1 e2)                   = checkl e1 `mplus` checkl_e e2
-    check (HsVar v) | v `notElem` foralls = Nothing
+    check (HsVar (L _ v)) | v `notElem` foralls = Nothing
     check other                           = Just other  -- Failure
 
         -- Check an argument

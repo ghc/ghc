@@ -44,7 +44,7 @@ data ProtoBCO a
         protoBCOBitmapSize :: Word16,
         protoBCOArity      :: Int,
         -- what the BCO came from
-        protoBCOExpr       :: Either  [AnnAlt Id VarSet] (AnnExpr Id VarSet),
+        protoBCOExpr       :: Either  [AnnAlt Id DVarSet] (AnnExpr Id DVarSet),
         -- malloc'd pointers
         protoBCOPtrs       :: [Either ItblPtr (Ptr ())]
    }

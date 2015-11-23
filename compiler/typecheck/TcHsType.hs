@@ -392,7 +392,7 @@ tc_hs_type (HsRecTy _)         _ = panic "tc_hs_type: record" -- Unwrapped by co
       -- signatures) should have been removed by now
 
 ---------- Functions and applications
-tc_hs_type hs_ty@(HsTyVar name) exp_kind
+tc_hs_type hs_ty@(HsTyVar (L _ name)) exp_kind
   = do { (ty, k) <- tcTyVar name
        ; checkExpectedKind hs_ty k exp_kind
        ; return ty }
@@ -1021,14 +1021,14 @@ kcHsTyVarBndrs cusk (HsQTvs { hsq_kvs = kv_ns, hsq_tvs = hs_tvs }) thing_inside
        ; (res_kind, stuff) <- tcExtendKindEnv nks thing_inside
        ; let full_kind = mkArrowKinds (map snd nks) res_kind
              kvs       = filter (not . isMetaTyVar) $
-                         varSetElems $ tyVarsOfType full_kind
+                         tyVarsOfTypeList full_kind
              gen_kind  = if cusk
                          then mkForAllTys kvs full_kind
                          else full_kind
        ; return (gen_kind, stuff) } }
   where
     kc_hs_tv :: HsTyVarBndr Name -> TcM (Name, TcKind)
-    kc_hs_tv (UserTyVar n)
+    kc_hs_tv (UserTyVar (L _ n))
       = do { mb_thing <- tcLookupLcl_maybe n
            ; kind <- case mb_thing of
                        Just (AThing k) -> return k
@@ -1199,7 +1199,7 @@ kcTyClTyVars name (HsQTvs { hsq_kvs = kvs, hsq_tvs = hs_tvs }) thing_inside
     -- to match the kind variables they mention against the ones
     -- we've freshly brought into scope
     kc_tv :: LHsTyVarBndr Name -> Kind -> TcM (Name, Kind)
-    kc_tv (L _ (UserTyVar n)) exp_k
+    kc_tv (L _ (UserTyVar (L _ n))) exp_k
       = return (n, exp_k)
     kc_tv (L _ (KindedTyVar (L _ n) hs_k)) exp_k
       = do { k <- tcLHsKind hs_k
@@ -1242,7 +1242,7 @@ tcTyClTyVars tycon (HsQTvs { hsq_kvs = hs_kvs, hsq_tvs = hs_tvs }) thing_inside
     -- e.g.   class C a_29 where
     --           type T b_30 a_29 :: *
     -- Here the a_29 is shared
-    tc_hs_tv (L _ (UserTyVar n)) kind
+    tc_hs_tv (L _ (UserTyVar (L _ n))) kind
        = return (mkTyVar n kind)
     tc_hs_tv (L _ (KindedTyVar (L _ n) hs_k)) kind
        = do { tc_kind <- tcLHsKind hs_k
@@ -1638,8 +1638,8 @@ tc_lhs_kind (L span ki) = setSrcSpan span (tc_hs_kind ki)
 
 -- The main worker
 tc_hs_kind :: HsKind Name -> TcM Kind
-tc_hs_kind (HsTyVar tc)    = tc_kind_var_app tc []
-tc_hs_kind k@(HsAppTy _ _) = tc_kind_app k []
+tc_hs_kind (HsTyVar (L _ tc)) = tc_kind_var_app tc []
+tc_hs_kind k@(HsAppTy _ _)    = tc_kind_app k []
 
 tc_hs_kind (HsParTy ki) = tc_lhs_kind ki
 
@@ -1665,11 +1665,11 @@ tc_hs_kind k = pprPanic "tc_hs_kind" (ppr k)
 
 -- Special case for kind application
 tc_kind_app :: HsKind Name -> [LHsKind Name] -> TcM Kind
-tc_kind_app (HsAppTy ki1 ki2) kis = tc_kind_app (unLoc ki1) (ki2:kis)
-tc_kind_app (HsTyVar tc)      kis = do { arg_kis <- mapM tc_lhs_kind kis
+tc_kind_app (HsAppTy ki1 ki2)  kis = tc_kind_app (unLoc ki1) (ki2:kis)
+tc_kind_app (HsTyVar (L _ tc)) kis = do { arg_kis <- mapM tc_lhs_kind kis
                                        ; tc_kind_var_app tc arg_kis }
-tc_kind_app ki                _   = failWithTc (quotes (ppr ki) <+>
-                                    ptext (sLit "is not a kind constructor"))
+tc_kind_app ki                 _   = failWithTc (quotes (ppr ki) <+>
+                                     ptext (sLit "is not a kind constructor"))
 
 tc_kind_var_app :: Name -> [Kind] -> TcM Kind
 -- Special case for * and Constraint kinds

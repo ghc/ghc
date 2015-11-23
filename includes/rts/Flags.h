@@ -131,13 +131,13 @@ typedef struct _PROFILING_FLAGS {
 
     nat                 ccsLength;
 
-    char*               modSelector;
-    char*               descrSelector;
-    char*               typeSelector;
-    char*               ccSelector;
-    char*               ccsSelector;
-    char*               retainerSelector;
-    char*               bioSelector;
+    const char*         modSelector;
+    const char*         descrSelector;
+    const char*         typeSelector;
+    const char*         ccSelector;
+    const char*         ccsSelector;
+    const char*         retainerSelector;
+    const char*         bioSelector;
 
 } PROFILING_FLAGS;
 

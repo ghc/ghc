@@ -1436,6 +1436,9 @@ AC_CACHE_CHECK([for extra options to pass gcc when compiling via C], [fp_cv_gcc_
  FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [3.4],
   [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fwrapv"],
   [])
+ FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [4.0],
+  [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fno-builtin"],
+  [])
 ])
 AC_SUBST([GccExtraViaCOpts],$fp_cv_gcc_extra_opts)
 ])

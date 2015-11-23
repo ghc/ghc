@@ -421,7 +421,7 @@ mk_extra_tvs tc tvs defn
            ; hs_tvs <- go rest
            ; return (hs_tv : hs_tvs) }
 
-    go (L _ (HsTyVar n))
+    go (L _ (HsTyVar (L _ n)))
       | n == liftedTypeKindTyConName
       = return []
 
@@ -686,11 +686,11 @@ mkGadtCtxt data_tvs (ResTyGADT _ res_ty)
        = go (eq_pred : cxt) subst rest
        where
          loc = getLoc ty
-         eq_pred = L loc (HsEqTy (L loc (HsTyVar data_tv)) ty)
+         eq_pred = L loc (HsEqTy (L loc (HsTyVar (L loc data_tv))) ty)
 
-    is_hs_tyvar (L _ (HsTyVar n))  = Just n   -- Type variables *and* tycons
-    is_hs_tyvar (L _ (HsParTy ty)) = is_hs_tyvar ty
-    is_hs_tyvar _                  = Nothing
+    is_hs_tyvar (L _ (HsTyVar (L _ n))) = Just n  -- Type variables *and* tycons
+    is_hs_tyvar (L _ (HsParTy ty))      = is_hs_tyvar ty
+    is_hs_tyvar _                       = Nothing
 
 
 repBangTy :: LBangType Name -> DsM (Core (TH.StrictTypeQ))
@@ -897,8 +897,8 @@ repTyVarBndrWithKind (L _ (KindedTyVar _ ki)) nm
 
 -- | Represent a type variable binder
 repTyVarBndr :: LHsTyVarBndr Name -> DsM (Core TH.TyVarBndr)
-repTyVarBndr (L _ (UserTyVar nm)) = do { nm' <- lookupBinder nm
-                                       ; repPlainTV nm' }
+repTyVarBndr (L _ (UserTyVar (L _ nm)) )= do { nm' <- lookupBinder nm
+                                             ; repPlainTV nm' }
 repTyVarBndr (L _ (KindedTyVar (L _ nm) ki)) = do { nm' <- lookupBinder nm
                                                   ; ki' <- repLKind ki
                                                   ; repKindedTV nm' ki' }
@@ -953,7 +953,7 @@ repTy :: HsType Name -> DsM (Core TH.TypeQ)
 repTy ty@(HsForAllTy {}) = repForall ty
 repTy ty@(HsQualTy {})   = repForall ty
 
-repTy (HsTyVar n)
+repTy (HsTyVar (L _ n))
   | isTvOcc occ   = do tv1 <- lookupOcc n
                        repTvar tv1
   | isDataOcc occ = do tc1 <- lookupOcc n
@@ -976,10 +976,10 @@ repTy (HsListTy t)          = do
                                 t1   <- repLTy t
                                 tcon <- repListTyCon
                                 repTapp tcon t1
-repTy (HsPArrTy t)          = do
-                                t1   <- repLTy t
-                                tcon <- repTy (HsTyVar (tyConName parrTyCon))
-                                repTapp tcon t1
+repTy (HsPArrTy t)     = do
+                           t1   <- repLTy t
+                           tcon <- repTy (HsTyVar (noLoc (tyConName parrTyCon)))
+                           repTapp tcon t1
 repTy (HsTupleTy HsUnboxedTuple tys) = do
                                 tys1 <- repLTys tys
                                 tcon <- repUnboxedTupleTyCon (length tys)
@@ -1011,7 +1011,7 @@ repTy (HsTyLit lit) = do
                         lit' <- repTyLit lit
                         repTLit lit'
 repTy (HsWildCardTy (AnonWildCard _)) = repTWildCard
-repTy (HsWildCardTy (NamedWildCard n)) = do
+repTy (HsWildCardTy (NamedWildCard (L _ n))) = do
                                            nwc <- lookupOcc n
                                            repTNamedWildCard nwc
 
@@ -1040,7 +1040,7 @@ repNonArrowLKind :: LHsKind Name -> DsM (Core TH.Kind)
 repNonArrowLKind (L _ ki) = repNonArrowKind ki
 
 repNonArrowKind :: HsKind Name -> DsM (Core TH.Kind)
-repNonArrowKind (HsTyVar name)
+repNonArrowKind (HsTyVar (L _ name))
   | name == liftedTypeKindTyConName = repKStar
   | name == constraintKindTyConName = repKConstraint
   | isTvOcc (nameOccName name)      = lookupOcc name >>= repKVar
@@ -1099,7 +1099,7 @@ repLE :: LHsExpr Name -> DsM (Core TH.ExpQ)
 repLE (L loc e) = putSrcSpanDs loc (repE e)
 
 repE :: HsExpr Name -> DsM (Core TH.ExpQ)
-repE (HsVar x)            =
+repE (HsVar (L _ x))            =
   do { mb_val <- dsLookupMetaEnv x
      ; case mb_val of
         Nothing          -> do { str <- globalVar x
@@ -1111,7 +1111,7 @@ repE e@(HsIPVar _) = notHandled "Implicit parameters" (ppr e)
 repE e@(HsOverLabel _) = notHandled "Overloaded labels" (ppr e)
 
 repE e@(HsRecFld f) = case f of
-  Unambiguous _ x -> repE (HsVar x)
+  Unambiguous _ x -> repE (HsVar (noLoc x))
   Ambiguous{}     -> notHandled "Ambiguous record selectors" (ppr e)
 
         -- Remember, we're desugaring renamer output here, so
@@ -1496,7 +1496,7 @@ repLP (L _ p) = repP p
 repP :: Pat Name -> DsM (Core TH.PatQ)
 repP (WildPat _)       = repPwild
 repP (LitPat l)        = do { l2 <- repLiteral l; repPlit l2 }
-repP (VarPat x)        = do { x' <- lookupBinder x; repPvar x' }
+repP (VarPat (L _ x))  = do { x' <- lookupBinder x; repPvar x' }
 repP (LazyPat p)       = do { p1 <- repLP p; repPtilde p1 }
 repP (BangPat p)       = do { p1 <- repLP p; repPbang p1 }
 repP (AsPat x p)       = do { x' <- lookupLBinder x; p1 <- repLP p; repPaspat x' p1 }

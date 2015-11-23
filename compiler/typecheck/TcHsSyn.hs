@@ -80,7 +80,7 @@ hsLPatType (L _ pat) = hsPatType pat
 hsPatType :: Pat Id -> Type
 hsPatType (ParPat pat)                = hsLPatType pat
 hsPatType (WildPat ty)                = ty
-hsPatType (VarPat var)                = idType var
+hsPatType (VarPat (L _ var))          = idType var
 hsPatType (BangPat pat)               = hsLPatType pat
 hsPatType (LazyPat pat)               = hsLPatType pat
 hsPatType (LitPat lit)                = hsLitType lit
@@ -583,8 +583,8 @@ zonkExpr   :: ZonkEnv -> HsExpr TcId    -> TcM (HsExpr Id)
 zonkLExprs env exprs = mapM (zonkLExpr env) exprs
 zonkLExpr  env expr  = wrapLocM (zonkExpr env) expr
 
-zonkExpr env (HsVar id)
-  = return (HsVar (zonkIdOcc env id))
+zonkExpr env (HsVar (L l id))
+  = return (HsVar (L l (zonkIdOcc env id)))
 
 zonkExpr _ (HsIPVar id)
   = return (HsIPVar id)
@@ -1071,9 +1071,9 @@ zonk_pat env (WildPat ty)
   = do  { ty' <- zonkTcTypeToType env ty
         ; return (env, WildPat ty') }
 
-zonk_pat env (VarPat v)
+zonk_pat env (VarPat (L l v))
   = do  { v' <- zonkIdBndr env v
-        ; return (extendIdZonkEnv1 env v', VarPat v') }
+        ; return (extendIdZonkEnv1 env v', VarPat (L l v')) }
 
 zonk_pat env (LazyPat pat)
   = do  { (env', pat') <- zonkPat env pat

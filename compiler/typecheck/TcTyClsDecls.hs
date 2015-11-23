@@ -1095,7 +1095,9 @@ tc_fam_ty_pats (name, arity, kind) mb_clsinfo
              -- Treat (anonymous) wild cards as type variables without a name.
              -- See Note [Wild cards in family instances]
              wcs = concatMap collectAnonWildCards arg_pats
-             anon_tvs = [L (nameSrcSpan wc) (UserTyVar wc) | wc <- wcs]
+             anon_tvs = [L loc (UserTyVar (L loc wc))
+                        | wc <- wcs
+                        , let loc = nameSrcSpan wc ]
              hs_tvs = HsQTvs { hsq_kvs = kvars
                              , hsq_tvs = anon_tvs ++ userHsTyVarBndrs loc tvars }
 

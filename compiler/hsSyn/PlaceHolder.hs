@@ -17,6 +17,7 @@ import Coercion
 import {-# SOURCE #-} ConLike (ConLike)
 import TcEvidence (HsWrapper)
 import FieldLabel
+import SrcLoc (Located)
 
 import Data.Data hiding ( Fixity )
 import BasicTypes       (Fixity)
@@ -103,6 +104,7 @@ type DataId id =
   , Data (PostRn id Fixity)
   , Data (PostRn id Bool)
   , Data (PostRn id Name)
+  , Data (PostRn id (Located Name))
   , Data (PostRn id [Name])
 --  , Data (PostRn id [id])
   , Data (PostRn id id)

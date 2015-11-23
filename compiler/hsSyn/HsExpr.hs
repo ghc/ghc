@@ -127,7 +127,7 @@ is Less Cool because
 
 -- | A Haskell expression.
 data HsExpr id
-  = HsVar     id             -- ^ Variable
+  = HsVar     (Located id)   -- ^ Variable
 
   | HsUnboundVar OccName     -- ^ Unbound variable; also used for "holes" _, or _x.
                              -- Turned from HsVar to HsUnboundVar by the renamer, when
@@ -615,7 +615,7 @@ ppr_lexpr :: OutputableBndr id => LHsExpr id -> SDoc
 ppr_lexpr e = ppr_expr (unLoc e)
 
 ppr_expr :: forall id. OutputableBndr id => HsExpr id -> SDoc
-ppr_expr (HsVar v)        = pprPrefixOcc v
+ppr_expr (HsVar (L _ v))  = pprPrefixOcc v
 ppr_expr (HsUnboundVar v) = pprPrefixOcc v
 ppr_expr (HsIPVar v)      = ppr v
 ppr_expr (HsOverLabel l)  = char '#' <> ppr l
@@ -635,8 +635,8 @@ ppr_expr (HsApp e1 e2)
 
 ppr_expr (OpApp e1 op _ e2)
   = case unLoc op of
-      HsVar v -> pp_infixly v
-      _       -> pp_prefixly
+      HsVar (L _ v) -> pp_infixly v
+      _             -> pp_prefixly
   where
     pp_e1 = pprDebugParendExpr e1   -- In debug mode, add parens
     pp_e2 = pprDebugParendExpr e2   -- to make precedence clear
@@ -651,8 +651,8 @@ ppr_expr (NegApp e _) = char '-' <+> pprDebugParendExpr e
 
 ppr_expr (SectionL expr op)
   = case unLoc op of
-      HsVar v -> pp_infixly v
-      _       -> pp_prefixly
+      HsVar (L _ v) -> pp_infixly v
+      _             -> pp_prefixly
   where
     pp_expr = pprDebugParendExpr expr
 
@@ -662,8 +662,8 @@ ppr_expr (SectionL expr op)
 
 ppr_expr (SectionR op expr)
   = case unLoc op of
-      HsVar v -> pp_infixly v
-      _       -> pp_prefixly
+      HsVar (L _ v) -> pp_infixly v
+      _             -> pp_prefixly
   where
     pp_expr = pprDebugParendExpr expr
 
@@ -791,7 +791,7 @@ ppr_expr (HsArrApp arrow arg _ HsHigherOrderApp True)
 ppr_expr (HsArrApp arrow arg _ HsHigherOrderApp False)
   = hsep [ppr_lexpr arg, arrowtt, ppr_lexpr arrow]
 
-ppr_expr (HsArrForm (L _ (HsVar v)) (Just _) [arg1, arg2])
+ppr_expr (HsArrForm (L _ (HsVar (L _ v))) (Just _) [arg1, arg2])
   = sep [pprCmdArg (unLoc arg1), hsep [pprInfixOcc v, pprCmdArg (unLoc arg2)]]
 ppr_expr (HsArrForm op _ args)
   = hang (ptext (sLit "(|") <+> ppr_lexpr op)
@@ -1053,7 +1053,7 @@ ppr_cmd (HsCmdArrApp arrow arg _ HsHigherOrderApp True)
 ppr_cmd (HsCmdArrApp arrow arg _ HsHigherOrderApp False)
   = hsep [ppr_lexpr arg, arrowtt, ppr_lexpr arrow]
 
-ppr_cmd (HsCmdArrForm (L _ (HsVar v)) (Just _) [arg1, arg2])
+ppr_cmd (HsCmdArrForm (L _ (HsVar (L _ v))) (Just _) [arg1, arg2])
   = sep [pprCmdArg (unLoc arg1), hsep [pprInfixOcc v, pprCmdArg (unLoc arg2)]]
 ppr_cmd (HsCmdArrForm op _ args)
   = hang (ptext (sLit "(|") <> ppr_lexpr op)

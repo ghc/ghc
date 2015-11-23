@@ -176,7 +176,7 @@ match menv subst (TyVarTy tv1) ty2
     else Nothing        -- ty2 doesn't match
 
   | tv1' `elemVarSet` me_tmpls menv
-  = if any (inRnEnvR rn_env) (varSetElems (tyVarsOfType ty2))
+  = if any (inRnEnvR rn_env) (tyVarsOfTypeList ty2)
     then Nothing        -- Occurs check
                         -- ezyang: Is this really an occurs check?  It seems
                         -- to just reject matching \x. A against \x. x (maintaining

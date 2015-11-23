@@ -63,7 +63,8 @@ endif
 # Please use V=1 (the default) when reporting GHC bugs.
 #V=0
 
-# Should all enabled warnings (see mk/warnings.mk) be turned into errors?
+# Should all enabled warnings (see mk/warnings.mk) be turned into errors while
+# building stage 2?
 #WERROR=-Werror
 
 # After stage 1 and the libraries have been built, you can uncomment this line:

@@ -897,22 +897,6 @@ enqueueCommands cmds = do
   cmds `deepseq` return ()
   modifyGHCiState $ \st -> st{ cmdqueue = cmds ++ cmdqueue st }
 
--- | If we one of these strings prefixes a command, then we treat it as a decl
--- rather than a stmt. NB that the appropriate decl prefixes depends on the
--- flag settings (Trac #9915)
-declPrefixes :: DynFlags -> [String]
-declPrefixes dflags = keywords ++ concat opt_keywords
-  where
-    keywords = [ "class ", "instance "
-               , "data ", "newtype ", "type "
-               , "default ", "default("
-               ]
-
-    opt_keywords = [ ["foreign "  | xopt Opt_ForeignFunctionInterface dflags]
-                   , ["deriving " | xopt Opt_StandaloneDeriving dflags]
-                   , ["pattern "  | xopt Opt_PatternSynonyms dflags]
-                   ]
-
 -- | Entry point to execute some haskell code from user.
 -- The return value True indicates success, as in `runOneCommand`.
 runStmt :: String -> SingleStep -> GHCi (Maybe GHC.ExecResult)
@@ -927,10 +911,11 @@ runStmt stmt step
  = do addImportToContext stmt; return (Just (GHC.ExecComplete (Right []) 0))
 
  | otherwise
- = do dflags <- getDynFlags
-      if any (stmt `looks_like`) (declPrefixes dflags)
-        then run_decl
-        else run_stmt
+ = do
+     parse_res <- GhciMonad.isStmt stmt
+     if parse_res
+       then run_stmt
+       else run_decl
   where
     run_decl =
         do _ <- liftIO $ tryIO $ hFlushAll stdin

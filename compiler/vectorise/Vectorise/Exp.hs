@@ -8,7 +8,7 @@ module Vectorise.Exp
   , vectTopExprs
   , vectScalarFun
   , vectScalarDFun
-  ) 
+  )
 where
 
 #include "HsVersions.h"
@@ -44,6 +44,7 @@ import Outputable
 import FastString
 import DynFlags
 import Util
+import UniqDFM (udfmToUfm)
 #if __GLASGOW_HASKELL__ < 709
 import MonadUtils
 #endif
@@ -118,9 +119,9 @@ vectTopExprs binds
     }
   where
     (vars, exprs) = unzip binds
-    
+
     vectAvoidAndEncapsulate pvs = encapsulateScalars <=< vectAvoidInfo pvs . freeVars
-    
+
     vect var exprVI
       = do
         { vExpr  <- closedV $
@@ -180,17 +181,17 @@ encapsulateScalars ((fvs, vi), AnnTick tck expr)
     { encExpr <- encapsulateScalars expr
     ; return ((fvs, vi), AnnTick tck encExpr)
     }
-encapsulateScalars ce@((fvs, vi), AnnLam bndr expr) 
-  = do 
+encapsulateScalars ce@((fvs, vi), AnnLam bndr expr)
+  = do
     { vectAvoid <- isVectAvoidanceAggressive
-    ; varsS     <- allScalarVarTypeSet fvs 
+    ; varsS     <- allScalarVarTypeSet fvs
         -- NB: diverts from the paper: we need to check the scalarness of bound variables as well,
         --     as 'vectScalarFun' will handle them just the same as those introduced for the 'fvs'
         --     by encapsulation.
     ; bndrsS    <- allScalarVarType bndrs
     ; case (vi, vectAvoid && varsS && bndrsS) of
         (VISimple, True) -> liftSimpleAndCase ce
-        _                -> do 
+        _                -> do
                             { encExpr <- encapsulateScalars expr
                             ; return ((fvs, vi), AnnLam bndr encExpr)
                             }
@@ -203,7 +204,7 @@ encapsulateScalars ce@((fvs, vi), AnnApp ce1 ce2)
     ; varsS     <- allScalarVarTypeSet fvs
     ; case (vi, (vectAvoid || isSimpleApplication ce) && varsS) of
         (VISimple, True) -> liftSimpleAndCase ce
-        _                -> do 
+        _                -> do
                             { encCe1 <- encapsulateScalars ce1
                             ; encCe2 <- encapsulateScalars ce2
                             ; return ((fvs, vi), AnnApp encCe1 encCe2)
@@ -224,13 +225,13 @@ encapsulateScalars ce@((fvs, vi), AnnApp ce1 ce2)
     isSimple (_, AnnTick _ ce) = isSimple ce
     isSimple (_, AnnCast ce _) = isSimple ce
     isSimple _                 = False
-encapsulateScalars ce@((fvs, vi), AnnCase scrut bndr ty alts) 
-  = do 
+encapsulateScalars ce@((fvs, vi), AnnCase scrut bndr ty alts)
+  = do
     { vectAvoid <- isVectAvoidanceAggressive
-    ; varsS     <- allScalarVarTypeSet fvs 
+    ; varsS     <- allScalarVarTypeSet fvs
     ; case (vi, vectAvoid && varsS) of
         (VISimple, True) -> liftSimpleAndCase ce
-        _                -> do 
+        _                -> do
                             { encScrut <- encapsulateScalars scrut
                             ; encAlts  <- mapM encAlt alts
                             ; return ((fvs, vi), AnnCase encScrut bndr ty encAlts)
@@ -238,34 +239,34 @@ encapsulateScalars ce@((fvs, vi), AnnCase scrut bndr ty alts)
     }
   where
     encAlt (con, bndrs, expr) = (con, bndrs,) <$> encapsulateScalars expr
-encapsulateScalars ce@((fvs, vi), AnnLet (AnnNonRec bndr expr1) expr2) 
-  = do 
+encapsulateScalars ce@((fvs, vi), AnnLet (AnnNonRec bndr expr1) expr2)
+  = do
     { vectAvoid <- isVectAvoidanceAggressive
-    ; varsS     <- allScalarVarTypeSet fvs 
+    ; varsS     <- allScalarVarTypeSet fvs
     ; case (vi, vectAvoid && varsS) of
         (VISimple, True) -> liftSimpleAndCase ce
-        _                -> do 
+        _                -> do
                             { encExpr1 <- encapsulateScalars expr1
                             ; encExpr2 <- encapsulateScalars expr2
                             ; return ((fvs, vi), AnnLet (AnnNonRec bndr encExpr1) encExpr2)
                             }
     }
-encapsulateScalars ce@((fvs, vi), AnnLet (AnnRec binds) expr) 
-  = do 
+encapsulateScalars ce@((fvs, vi), AnnLet (AnnRec binds) expr)
+  = do
     { vectAvoid <- isVectAvoidanceAggressive
-    ; varsS     <- allScalarVarTypeSet fvs 
-    ; case (vi, vectAvoid && varsS) of 
+    ; varsS     <- allScalarVarTypeSet fvs
+    ; case (vi, vectAvoid && varsS) of
         (VISimple, True) -> liftSimpleAndCase ce
-        _                -> do 
+        _                -> do
                             { encBinds <- mapM encBind binds
                             ; encExpr  <- encapsulateScalars expr
                             ; return ((fvs, vi), AnnLet (AnnRec encBinds) encExpr)
                             }
-    }                            
+    }
  where
    encBind (bndr, expr) = (bndr,) <$> encapsulateScalars expr
 encapsulateScalars ((fvs, vi), AnnCast expr coercion)
-  = do 
+  = do
     { encExpr <- encapsulateScalars expr
     ; return ((fvs, vi), AnnCast encExpr coercion)
     }
@@ -296,8 +297,8 @@ liftSimple ((fvs, vi), AnnVar v)
   | v `elemVarSet` fvs                -- special case to avoid producing: (\v -> v) v
   && not (isToplevel v)               --   NB: if 'v' not free or is toplevel, we must get the 'VIEncaps'
   = return $ ((fvs, vi), AnnVar v)
-liftSimple aexpr@((fvs_orig, VISimple), expr) 
-  = do 
+liftSimple aexpr@((fvs_orig, VISimple), expr)
+  = do
     { let liftedExpr = mkAnnApps (mkAnnLams (reverse vars) fvs expr) vars
 
     ; traceVt "encapsulate:" $ ppr (deAnnotate aexpr) $$ text "==>" $$ ppr (deAnnotate liftedExpr)
@@ -307,18 +308,18 @@ liftSimple aexpr@((fvs_orig, VISimple), expr)
   where
     vars = varSetElems fvs
     fvs  = filterVarSet (not . isToplevel) fvs_orig -- only include 'Id's that are not toplevel
-    
+
     mkAnnLams :: [Var] -> VarSet -> AnnExpr' Var (VarSet, VectAvoidInfo) -> CoreExprWithVectInfo
     mkAnnLams []     fvs expr = ASSERT(isEmptyVarSet fvs)
                                 ((emptyVarSet, VIEncaps), expr)
     mkAnnLams (v:vs) fvs expr = mkAnnLams vs (fvs `delVarSet` v) (AnnLam v ((fvs, VIEncaps), expr))
-      
+
     mkAnnApps :: CoreExprWithVectInfo -> [Var] -> CoreExprWithVectInfo
     mkAnnApps aexpr []     = aexpr
     mkAnnApps aexpr (v:vs) = mkAnnApps (mkAnnApp aexpr v) vs
 
     mkAnnApp :: CoreExprWithVectInfo -> Var -> CoreExprWithVectInfo
-    mkAnnApp aexpr@((fvs, _vi), _expr) v 
+    mkAnnApp aexpr@((fvs, _vi), _expr) v
       = ((fvs `extendVarSet` v, VISimple), AnnApp aexpr ((unitVarSet v, VISimple), AnnVar v))
 liftSimple aexpr
   = pprPanic "Vectorise.Exp.liftSimple: not simple" $ ppr (deAnnotate aexpr)
@@ -327,8 +328,8 @@ isToplevel :: Var -> Bool
 isToplevel v | isId v    = case realIdUnfolding v of
                              NoUnfolding                     -> False
                              OtherCon      {}                -> True
-                             DFunUnfolding {}                -> True 
-                             CoreUnfolding {uf_is_top = top} -> top 
+                             DFunUnfolding {}                -> True
+                             CoreUnfolding {uf_is_top = top} -> top
              | otherwise = False
 
 -- |Vectorise an expression.
@@ -341,7 +342,7 @@ vectExpr aexpr
   = vectFnExpr True False aexpr
     -- encapsulated constant => vectorise as a scalar constant
   | isVIEncaps aexpr
-  = traceVt "vectExpr (encapsulated constant):" (ppr . deAnnotate $ aexpr) >> 
+  = traceVt "vectExpr (encapsulated constant):" (ppr . deAnnotate $ aexpr) >>
     vectConst (deAnnotate aexpr)
 
 vectExpr (_, AnnVar v)
@@ -351,7 +352,7 @@ vectExpr (_, AnnLit lit)
   = vectConst $ Lit lit
 
 vectExpr aexpr@(_, AnnLam _ _)
-  = traceVt "vectExpr [AnnLam]:" (ppr . deAnnotate $ aexpr) >> 
+  = traceVt "vectExpr [AnnLam]:" (ppr . deAnnotate $ aexpr) >>
     vectFnExpr True False aexpr
 
   -- SPECIAL CASE: Vectorise/lift 'patError @ ty err' by only vectorising/lifting the type 'ty';
@@ -360,7 +361,7 @@ vectExpr aexpr@(_, AnnLam _ _)
 -- FIXME: can't be do this with a VECTORISE pragma on 'pAT_ERROR_ID' now?
 vectExpr (_, AnnApp (_, AnnApp (_, AnnVar v) (_, AnnType ty)) err)
   | v == pAT_ERROR_ID
-  = do 
+  = do
     { (vty, lty) <- vectAndLiftType ty
     ; return (mkCoreApps (Var v) [Type vty, err'], mkCoreApps (Var v) [Type lty, err'])
     }
@@ -387,9 +388,9 @@ vectExpr e@(_, AnnApp fn arg)
   | isPredTy arg_ty   -- dictionary application (whose result is not a dictionary)
   = vectPolyApp e
   | otherwise         -- user value
-  = do 
+  = do
     {   -- vectorise the types
-    ; varg_ty <- vectType arg_ty 
+    ; varg_ty <- vectType arg_ty
     ; vres_ty <- vectType res_ty
 
         -- vectorise the function and argument expression
@@ -406,10 +407,10 @@ vectExpr (_, AnnCase scrut bndr ty alts)
   | Just (tycon, ty_args) <- splitTyConApp_maybe scrut_ty
   , isAlgTyCon tycon
   = vectAlgCase tycon ty_args scrut bndr ty alts
-  | otherwise 
-  = do 
+  | otherwise
+  = do
     { dflags <- getDynFlags
-    ; cantVectorise dflags "Can't vectorise expression (no algebraic type constructor)" $ 
+    ; cantVectorise dflags "Can't vectorise expression (no algebraic type constructor)" $
         ppr scrut_ty
     }
   where
@@ -418,8 +419,8 @@ vectExpr (_, AnnCase scrut bndr ty alts)
 vectExpr (_, AnnLet (AnnNonRec bndr rhs) body)
   = do
     { traceVt "let binding (non-recursive)" Outputable.empty
-    ; vrhs <- localV $ 
-                inBind bndr $ 
+    ; vrhs <- localV $
+                inBind bndr $
                   vectAnnPolyExpr False rhs
     ; traceVt "let body (non-recursive)" Outputable.empty
     ; (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
@@ -433,7 +434,7 @@ vectExpr (_, AnnLet (AnnRec bs) body)
                                   ; vrhss <- zipWithM vect_rhs bndrs rhss
                                   ; traceVt "let body (recursive)" Outputable.empty
                                   ; vbody <- vectExpr body
-                                  ; return (vrhss, vbody) 
+                                  ; return (vrhss, vbody)
                                   }
     ; return $ vLet (vRec vbndrs vrhss) vbody
     }
@@ -451,7 +452,7 @@ vectExpr (_, AnnType ty)
   = vType <$> vectType ty
 
 vectExpr e
-  = do 
+  = do
     { dflags <- getDynFlags
     ; cantVectorise dflags "Can't vectorise expression (vectExpr)" $ ppr (deAnnotate e)
     }
@@ -473,7 +474,7 @@ vectFnExpr inline loop_breaker aexpr@(_ann, AnnLam bndr body)
     -- predicate abstraction: leave as a normal abstraction, but vectorise the predicate type
   | isId bndr
     && isPredTy (idType bndr)
-  = do 
+  = do
     { vBndr <- vectBndr bndr
     ; vbody <- vectFnExpr inline loop_breaker body
     ; return $ mapVect (mkLams [vectorised vBndr]) vbody
@@ -484,10 +485,10 @@ vectFnExpr inline loop_breaker aexpr@(_ann, AnnLam bndr body)
     -- non-predicate abstraction: vectorise as a non-scalar computation
   | isId bndr
   = vectLam inline loop_breaker aexpr
-  | otherwise 
-  = do 
+  | otherwise
+  = do
     { dflags <- getDynFlags
-    ; cantVectorise dflags "Vectorise.Exp.vectFnExpr: Unexpected type lambda" $ 
+    ; cantVectorise dflags "Vectorise.Exp.vectFnExpr: Unexpected type lambda" $
         ppr (deAnnotate aexpr)
     }
 vectFnExpr _ _ aexpr
@@ -522,7 +523,7 @@ vectPolyApp e0
               ; vDictsInner <- mapM vectDictExpr (map deAnnotate dictsInner)
               ; vTysOuter   <- mapM vectType     tysOuter
               ; vTysInner   <- mapM vectType     tysInner
-              
+
               ; let reconstructOuter v = (`mkApps` vDictsOuter) <$> polyApply v vTysOuter
 
               ; case vVar of
@@ -537,10 +538,10 @@ vectPolyApp e0
                               -- arguments are non-vectorised arguments, where no 'PA'dictionaries
                               -- are needed for the type variables
                           ; ve <- if null dictsInner
-                                  then 
+                                  then
                                     return $ Var vv `mkTyApps` vTysOuter `mkApps` vDictsOuter
-                                  else 
-                                    reconstructOuter 
+                                  else
+                                    reconstructOuter
                                       (Var vv `mkTyApps` vTysInner `mkApps` vDictsInner)
                           ; traceVt "  GLOBAL (dict):" (ppr ve)
                           ; vectConst ve
@@ -561,8 +562,8 @@ vectPolyApp e0
     (e4, tysInner)   = collectAnnTypeArgs e3
     --
     isDictComp var = (isJust . isClassOpId_maybe $ var) || isDFunId var
-    
--- |Vectorise the body of a dfun.  
+
+-- |Vectorise the body of a dfun.
 --
 -- Dictionary computations are special for the following reasons.  The application of dictionary
 -- functions are always saturated, so there is no need to create closures.  Dictionary computations
@@ -622,16 +623,16 @@ vectDictExpr (Coercion coe)
 -- "Note [Scalar dfuns]" in 'Vectorise'.
 --
 vectScalarFun :: CoreExpr -> VM VExpr
-vectScalarFun expr 
-  = do 
-    { traceVt "vectScalarFun:" (ppr expr) 
+vectScalarFun expr
+  = do
+    { traceVt "vectScalarFun:" (ppr expr)
     ; let (arg_tys, res_ty) = splitFunTys (exprType expr)
     ; mkScalarFun arg_tys res_ty expr
     }
 
 -- Generate code for a scalar function by generating a scalar closure.  If the function is a
 -- dictionary function, vectorise it as dictionary code.
--- 
+--
 mkScalarFun :: [Type] -> Type -> CoreExpr -> VM VExpr
 mkScalarFun arg_tys res_ty expr
   | isPredTy res_ty
@@ -652,7 +653,7 @@ mkScalarFun arg_tys res_ty expr
     unused = error "Vectorise.Exp.mkScalarFun: we don't lift dictionary expressions"
 
 -- |Vectorise a dictionary function that has a 'VECTORISE SCALAR instance' pragma.
--- 
+--
 -- In other words, all methods in that dictionary are scalar functions — to be vectorised with
 -- 'vectScalarFun'.  The dictionary "function" itself may be a constant, though.
 --
@@ -675,7 +676,7 @@ mkScalarFun arg_tys res_ty expr
 --
 -- > $v$dEqPair :: forall a b. V:Eq a -> V:Eq b -> V:Eq (a, b)
 -- > $v$dEqPair = /\a b -> \dEqa :: V:Eq a -> \dEqb :: V:Eq b ->
--- >                D:V:Eq $(vectScalarFun True recFns 
+-- >                D:V:Eq $(vectScalarFun True recFns
 -- >                         [| (==) @(a, b) ($dEqPair @a @b $(unVect dEqa) $(unVect dEqb)) |])
 --
 -- NB:
@@ -693,7 +694,7 @@ vectScalarDFun var
        ; vTheta     <- mapM vectType theta
        ; vThetaBndr <- mapM (newLocalVar (fsLit "vd")) vTheta
        ; let vThetaVars = varsToCoreExprs vThetaBndr
-       
+
            -- vectorise superclass dictionaries and methods as scalar expressions
        ; thetaVars  <- mapM (newLocalVar (fsLit "d")) theta
        ; thetaExprs <- zipWithM unVectDict theta vThetaVars
@@ -730,7 +731,7 @@ vectScalarDFun var
 -- where 'opTyi' is the type of the i-th superclass or op of the unvectorised dictionary.
 --
 unVectDict :: Type -> CoreExpr -> VM CoreExpr
-unVectDict ty e 
+unVectDict ty e
   = do { vTys <- mapM vectType tys
        ; let meths = map (\sel -> Var sel `mkTyApps` vTys `mkApps` [e]) selIds
        ; scOps <- zipWithM fromVect methTys meths
@@ -755,7 +756,7 @@ vectLam :: Bool                 -- ^ Should the RHS of a binding be inlined?
         -> VM VExpr
 vectLam inline loop_breaker expr@((fvs, _vi), AnnLam _ _)
  = do { traceVt "fully vectorise a lambda expression" (ppr . deAnnotate $ expr)
- 
+
       ; let (bndrs, body) = collectAnnValBinders expr
 
           -- grab the in-scope type variables
@@ -763,7 +764,7 @@ vectLam inline loop_breaker expr@((fvs, _vi), AnnLam _ _)
 
           -- collect and vectorise all /local/ free variables
       ; vfvs <- readLEnv $ \env ->
-                  [ (var, fromJust mb_vv) 
+                  [ (var, fromJust mb_vv)
                   | var <- varSetElems fvs
                   , let mb_vv = lookupVarEnv (local_vars env) var
                   , isJust mb_vv         -- its local == is in local var env
@@ -827,7 +828,7 @@ vectLam _ _ _ = panic "Vectorise.Exp.vectLam: not a lambda"
 --
 
 -- FIXME: this is too lazy...is it?
-vectAlgCase :: TyCon -> [Type] -> CoreExprWithVectInfo -> Var -> Type  
+vectAlgCase :: TyCon -> [Type] -> CoreExprWithVectInfo -> Var -> Type
             -> [(AltCon, [Var], CoreExprWithVectInfo)]
             -> VM VExpr
 vectAlgCase _tycon _ty_args scrut bndr ty [(DEFAULT, [], body)]
@@ -873,7 +874,7 @@ vectAlgCase _tycon _ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
 
     mk_wild_case expr ty dc bndrs body
       = mkWildCase expr (exprType expr) ty [(DataAlt dc, bndrs, body)]
-      
+
     dataConErr = (text "vectAlgCase: data constructor not vectorised" <+> ppr dc)
 
 vectAlgCase tycon _ty_args scrut bndr ty alts
@@ -977,7 +978,7 @@ vectAlgCase tycon _ty_args scrut bndr ty alts
               }
             _ -> return []
         }
-   
+
 
 -- Support to compute information for vectorisation avoidance ------------------
 
@@ -1039,7 +1040,7 @@ unlessVIParrExpr e1 e2 = e1 `unlessVIParr` vectAvoidInfoOf e2
 --
 vectAvoidInfo :: VarSet -> CoreExprWithFVs -> VM CoreExprWithVectInfo
 vectAvoidInfo pvs ce@(fvs, AnnVar v)
-  = do 
+  = do
     { gpvs <- globalParallelVars
     ; vi <- if v `elemVarSet` pvs || v `elemVarSet` gpvs
             then return VIParr
@@ -1049,37 +1050,37 @@ vectAvoidInfo pvs ce@(fvs, AnnVar v)
         traceVt "  reason:" $ if v `elemVarSet` pvs  then text "local"  else
                               if v `elemVarSet` gpvs then text "global" else text "parallel type"
 
-    ; return ((fvs, vi), AnnVar v)
+    ; return ((udfmToUfm fvs, vi), AnnVar v)
     }
 
 vectAvoidInfo _pvs ce@(fvs, AnnLit lit)
-  = do 
-    { vi <- vectAvoidInfoTypeOf ce  
-    ; viTrace ce vi [] 
-    ; return ((fvs, vi), AnnLit lit)
+  = do
+    { vi <- vectAvoidInfoTypeOf ce
+    ; viTrace ce vi []
+    ; return ((udfmToUfm fvs, vi), AnnLit lit)
     }
 
 vectAvoidInfo pvs ce@(fvs, AnnApp e1 e2)
-  = do 
+  = do
     { ceVI <- vectAvoidInfoTypeOf ce
-    ; eVI1 <- vectAvoidInfo pvs e1  
+    ; eVI1 <- vectAvoidInfo pvs e1
     ; eVI2 <- vectAvoidInfo pvs e2
     ; let vi = ceVI `unlessVIParrExpr` eVI1 `unlessVIParrExpr` eVI2
-    -- ; viTrace ce vi [eVI1, eVI2]                     
-    ; return ((fvs, vi), AnnApp eVI1 eVI2)
+    -- ; viTrace ce vi [eVI1, eVI2]
+    ; return ((udfmToUfm fvs, vi), AnnApp eVI1 eVI2)
     }
 
 vectAvoidInfo pvs (fvs, AnnLam var body)
-  = do 
-    { bodyVI <- vectAvoidInfo pvs body 
+  = do
+    { bodyVI <- vectAvoidInfo pvs body
     ; varVI  <- vectAvoidInfoType $ varType var
     ; let vi = vectAvoidInfoOf bodyVI `unlessVIParr` varVI
     -- ; viTrace ce vi [bodyVI]
-    ; return ((fvs, vi), AnnLam var bodyVI)
+    ; return ((udfmToUfm fvs, vi), AnnLam var bodyVI)
     }
 
-vectAvoidInfo pvs ce@(fvs, AnnLet (AnnNonRec var e) body)  
-  = do 
+vectAvoidInfo pvs ce@(fvs, AnnLet (AnnNonRec var e) body)
+  = do
     { ceVI       <- vectAvoidInfoTypeOf ce
     ; eVI        <- vectAvoidInfo pvs e
     ; isScalarTy <- isScalar $ varType var
@@ -1093,11 +1094,11 @@ vectAvoidInfo pvs ce@(fvs, AnnLet (AnnNonRec var e) body)
         ; return (bodyVI, ceVI `unlessVIParrExpr` bodyVI)
         }
     -- ; viTrace ce vi [eVI, bodyVI]
-    ; return ((fvs, vi), AnnLet (AnnNonRec var eVI) bodyVI)
+    ; return ((udfmToUfm fvs, vi), AnnLet (AnnNonRec var eVI) bodyVI)
     }
 
-vectAvoidInfo pvs ce@(fvs, AnnLet (AnnRec bnds) body)  
-  = do 
+vectAvoidInfo pvs ce@(fvs, AnnLet (AnnRec bnds) body)
+  = do
     { ceVI         <- vectAvoidInfoTypeOf ce
     ; bndsVI       <- mapM (vectAvoidInfoBnd pvs) bnds
     ; parrBndrs    <- map fst <$> filterM isVIParrBnd bndsVI
@@ -1108,36 +1109,36 @@ vectAvoidInfo pvs ce@(fvs, AnnLet (AnnRec bnds) body)
         ; bndsVI <- mapM (vectAvoidInfoBnd extendedPvs) bnds
         ; bodyVI <- vectAvoidInfo extendedPvs body
         -- ; viTrace ce VIParr (map snd bndsVI ++ [bodyVI])
-        ; return ((fvs, VIParr), AnnLet (AnnRec bndsVI) bodyVI)
+        ; return ((udfmToUfm fvs, VIParr), AnnLet (AnnRec bndsVI) bodyVI)
         }
       else do         -- demanded bindings cannot trigger parallelism
         { bodyVI <- vectAvoidInfo pvs body
         ; let vi = ceVI `unlessVIParrExpr` bodyVI
         -- ; viTrace ce vi (map snd bndsVI ++ [bodyVI])
-        ; return ((fvs, vi), AnnLet (AnnRec bndsVI) bodyVI)          
+        ; return ((udfmToUfm fvs, vi), AnnLet (AnnRec bndsVI) bodyVI)
         }
     }
   where
     vectAvoidInfoBnd pvs (var, e) = (var,) <$> vectAvoidInfo pvs e
 
-    isVIParrBnd (var, eVI) 
-      = do 
+    isVIParrBnd (var, eVI)
+      = do
         { isScalarTy <- isScalar (varType var)
         ; return $ isVIParr eVI && not isScalarTy
         }
 
-vectAvoidInfo pvs ce@(fvs, AnnCase e var ty alts) 
-  = do 
+vectAvoidInfo pvs ce@(fvs, AnnCase e var ty alts)
+  = do
     { ceVI           <- vectAvoidInfoTypeOf ce
     ; eVI            <- vectAvoidInfo pvs e
     ; altsVI         <- mapM (vectAvoidInfoAlt (isVIParr eVI)) alts
     ; let alteVIs = [eVI | (_, _, eVI) <- altsVI]
           vi      =  foldl unlessVIParrExpr ceVI (eVI:alteVIs)  -- NB: same effect as in the paper
     -- ; viTrace ce vi (eVI : alteVIs)
-    ; return ((fvs, vi), AnnCase eVI var ty altsVI)
+    ; return ((udfmToUfm fvs, vi), AnnCase eVI var ty altsVI)
     }
   where
-    vectAvoidInfoAlt scrutIsPar (con, bndrs, e) 
+    vectAvoidInfoAlt scrutIsPar (con, bndrs, e)
       = do
         { allScalar <- allScalarVarType bndrs
         ; let altPvs | scrutIsPar && not allScalar = pvs `extendVarSetList` bndrs
@@ -1146,26 +1147,27 @@ vectAvoidInfo pvs ce@(fvs, AnnCase e var ty alts)
         }
 
 vectAvoidInfo pvs (fvs, AnnCast e (fvs_ann, ann))
-  = do 
+  = do
     { eVI <- vectAvoidInfo pvs e
-    ; return ((fvs, vectAvoidInfoOf eVI), AnnCast eVI ((fvs_ann, VISimple), ann))
+    ; return ((udfmToUfm fvs, vectAvoidInfoOf eVI)
+             , AnnCast eVI ((udfmToUfm fvs_ann, VISimple), ann))
     }
 
 vectAvoidInfo pvs (fvs, AnnTick tick e)
-  = do 
+  = do
     { eVI <- vectAvoidInfo pvs e
-    ; return ((fvs, vectAvoidInfoOf eVI), AnnTick tick eVI)
+    ; return ((udfmToUfm fvs, vectAvoidInfoOf eVI), AnnTick tick eVI)
     }
 
 vectAvoidInfo _pvs (fvs, AnnType ty)
-  = return ((fvs, VISimple), AnnType ty)
+  = return ((udfmToUfm fvs, VISimple), AnnType ty)
 
-vectAvoidInfo _pvs (fvs, AnnCoercion coe) 
-  = return ((fvs, VISimple), AnnCoercion coe)
+vectAvoidInfo _pvs (fvs, AnnCoercion coe)
+  = return ((udfmToUfm fvs, VISimple), AnnCoercion coe)
 
 -- Compute vectorisation avoidance information for a type.
 --
-vectAvoidInfoType :: Type -> VM VectAvoidInfo   
+vectAvoidInfoType :: Type -> VM VectAvoidInfo
 vectAvoidInfoType ty
   | isPredTy ty
   = return VIDict
@@ -1183,9 +1185,9 @@ vectAvoidInfoType ty
     { parr <- maybeParrTy ty
     ; if parr
       then return VIParr
-      else do 
+      else do
     { scalar <- isScalar ty
-    ; if scalar 
+    ; if scalar
       then return VISimple
       else return VIComplex
     } }
@@ -1198,16 +1200,16 @@ vectAvoidInfoTypeOf = vectAvoidInfoType . annExprType
 -- Checks whether the type might be a parallel array type.
 --
 maybeParrTy :: Type -> VM Bool
-maybeParrTy ty 
+maybeParrTy ty
     -- looking through newtypes
   | Just ty'      <- coreView ty
   = (== VIParr) <$> vectAvoidInfoType ty'
     -- decompose constructor applications
-  | Just (tc, ts) <- splitTyConApp_maybe ty 
+  | Just (tc, ts) <- splitTyConApp_maybe ty
   = do
     { isParallel <- (tyConName tc `elemNameSet`) <$> globalParallelTyCons
     ; if isParallel
-      then return True 
+      then return True
       else or <$> mapM maybeParrTy ts
     }
 maybeParrTy (ForAllTy _ ty) = maybeParrTy ty
@@ -1232,6 +1234,6 @@ allScalarVarTypeSet = allScalarVarType . varSetElems
 --
 viTrace :: CoreExprWithFVs -> VectAvoidInfo -> [CoreExprWithVectInfo] -> VM ()
 viTrace ce vi vTs
-  = traceVt ("vect info: " ++ show vi ++ "[" ++ 
+  = traceVt ("vect info: " ++ show vi ++ "[" ++
              (concat $ map ((++ " ") . show . vectAvoidInfoOf) vTs) ++ "]")
             (ppr $ deAnnotate ce)

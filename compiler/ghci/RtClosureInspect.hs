@@ -1268,7 +1268,7 @@ quantifyType :: Type -> QuantifiedType
 -- Thus (quantifyType (forall a. a->[b]))
 -- returns ([a,b], a -> [b])
 
-quantifyType ty = (varSetElems (tyVarsOfType rho), rho)
+quantifyType ty = (tyVarsOfTypeList rho, rho)
   where
     (_tvs, rho) = tcSplitForAllTys ty
 

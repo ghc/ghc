@@ -451,6 +451,7 @@ Library
         FastStringEnv
         Fingerprint
         FiniteMap
+        FV
         GraphBase
         GraphColor
         GraphOps
@@ -468,8 +469,9 @@ Library
         State
         Stream
         StringBuffer
-        UniqFM
         UniqDFM
+        UniqDSet
+        UniqFM
         UniqSet
         Util
         Vectorise.Builtins.Base

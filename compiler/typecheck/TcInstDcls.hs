@@ -897,7 +897,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
    loc     = getSrcSpan dfun_id
 
 wrapId :: HsWrapper -> id -> HsExpr id
-wrapId wrapper id = mkHsWrap wrapper (HsVar id)
+wrapId wrapper id = mkHsWrap wrapper (HsVar (noLoc id))
 
 {- Note [Typechecking plan for instance declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1308,7 +1308,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
            ; dm_id <- tcLookupId dm_name
            ; let dm_inline_prag = idInlinePragma dm_id
                  rhs = HsWrap (mkWpEvVarApps [self_dict] <.> mkWpTyApps inst_tys) $
-                       HsVar dm_id
+                       HsVar (noLoc dm_id)
 
                  -- A method always has a complete type signature,
                  -- hence it is safe to call completeIdSigPolyId

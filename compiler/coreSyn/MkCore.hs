@@ -80,10 +80,10 @@ import BasicTypes
 import Util
 import Pair
 import DynFlags
-
-import Data.Char        ( ord )
 import Data.List
 import Data.Ord
+
+import Data.Char        ( ord )
 #if __GLASGOW_HASKELL__ < 709
 import Data.Word        ( Word )
 #endif
@@ -97,13 +97,14 @@ infixl 4 `mkCoreApp`, `mkCoreApps`
 *                                                                      *
 ************************************************************************
 -}
-
 sortQuantVars :: [Var] -> [Var]
 -- Sort the variables (KindVars, TypeVars, and Ids)
 -- into order: Kind, then Type, then Id
-sortQuantVars = sortBy (comparing withCategory)
+-- It is a deterministic sort, meaining it doesn't look at the values of
+-- Uniques. For explanation why it's important See Note [Unique Determinism]
+-- in Unique.
+sortQuantVars = sortBy (comparing category)
   where
-    withCategory v = (category v, v)
     category :: Var -> Int
     category v
      | isKindVar v = 1

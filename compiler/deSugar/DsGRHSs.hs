@@ -134,9 +134,9 @@ isTrueLHsExpr :: LHsExpr Id -> Maybe (CoreExpr -> DsM CoreExpr)
 --        * Trivial wappings of these
 -- The arguments to Just are any HsTicks that we have found,
 -- because we still want to tick then, even it they are aways evaluted.
-isTrueLHsExpr (L _ (HsVar v)) |  v `hasKey` otherwiseIdKey
-                              || v `hasKey` getUnique trueDataConId
-                                      = Just return
+isTrueLHsExpr (L _ (HsVar (L _ v))) |  v `hasKey` otherwiseIdKey
+                                    || v `hasKey` getUnique trueDataConId
+                                            = Just return
         -- trueDataConId doesn't have the same unique as trueDataCon
 isTrueLHsExpr (L _ (HsTick tickish e))
     | Just ticks <- isTrueLHsExpr e

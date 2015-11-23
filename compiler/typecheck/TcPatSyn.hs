@@ -447,7 +447,7 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
     mk_mg :: LHsExpr Name -> MatchGroup Name (LHsExpr Name)
     mk_mg body = mkMatchGroupName Generated [builder_match]
              where
-               builder_args  = [L loc (VarPat n) | L loc n <- args]
+               builder_args  = [L loc (VarPat (L loc n)) | L loc n <- args]
                builder_match = mkMatch builder_args body (noLoc EmptyLocalBinds)
 
     args = case details of
@@ -468,7 +468,7 @@ tcPatSynBuilderOcc :: CtOrigin -> PatSyn -> TcM (HsExpr TcId, TcRhoType)
 tcPatSynBuilderOcc orig ps
   | Just (builder_id, add_void_arg) <- builder
   = do { (wrap, rho) <- deeplyInstantiate orig (idType builder_id)
-       ; let inst_fun = mkHsWrap wrap (HsVar builder_id)
+       ; let inst_fun = mkHsWrap wrap (HsVar (noLoc builder_id))
        ; if add_void_arg
          then return ( HsApp (noLoc inst_fun) (nlHsVar voidPrimId)
                      , tcFunResultTy rho )
@@ -600,7 +600,7 @@ tcPatToExpr args = go
     go (L loc (ConPatIn (L _ con) info))
       = do { exprs <- mapM go (hsConPatArgs info)
            ; return $ L loc $
-             foldl (\x y -> HsApp (L loc x) y) (HsVar con) exprs }
+             foldl (\x y -> HsApp (L loc x) y) (HsVar (L loc con)) exprs }
 
     go (L _ (SigPatIn pat _)) = go pat
         -- See Note [Type signatures and the builder expression]
@@ -608,8 +608,8 @@ tcPatToExpr args = go
     go (L loc p) = fmap (L loc) $ go1 p
 
     go1 :: Pat Name -> Maybe (HsExpr Name)
-    go1   (VarPat var)
-      | var `elemNameSet` lhsVars     = return $ HsVar var
+    go1   (VarPat (L l var))
+      | var `elemNameSet` lhsVars     = return $ HsVar (L l var)
       | otherwise                     = Nothing
     go1   (LazyPat pat)               = fmap HsPar $ go pat
     go1   (ParPat pat)                = fmap HsPar $ go pat

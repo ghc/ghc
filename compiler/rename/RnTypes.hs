@@ -355,9 +355,9 @@ rnHsTyKi _ doc (HsQualTy { hst_ctxt = lctxt
        ; return (HsQualTy { hst_ctxt = ctxt', hst_body =  tau' }
                 , fvs1 `plusFV` fvs2) }
 
-rnHsTyKi what _ (HsTyVar rdr_name)
+rnHsTyKi what _ (HsTyVar (L loc rdr_name))
   = do { name <- rnTyVar what rdr_name
-       ; return (HsTyVar name, unitFV name) }
+       ; return (HsTyVar (L loc name), unitFV name) }
 
 -- If we see (forall a . ty), without foralls on, the forall will give
 -- a sensible error message, but we don't want to complain about the dot too
@@ -593,7 +593,7 @@ rnWildCard _ (AnonWildCard _)
        ; let name = mkInternalName uniq (mkTyVarOcc "_") loc
        ; return (AnonWildCard name) }
 
-rnWildCard ctxt wc@(NamedWildCard rdr_name)
+rnWildCard ctxt wc@(NamedWildCard (L loc rdr_name))
   -- NB: The parser only generates NamedWildCard if -XNamedWildCards
   --     is on, so we don't need to check for that here
   = do { mb_name <- lookupOccRn_maybe rdr_name
@@ -601,7 +601,7 @@ rnWildCard ctxt wc@(NamedWildCard rdr_name)
        ; case mb_name of
            Just n  -> return (NamedWildCard n)
            Nothing -> do { addErr msg  -- I'm not sure how this can happen
-                         ; return (NamedWildCard (mkUnboundNameRdr rdr_name)) } }
+                         ; return (NamedWildCard (L loc (mkUnboundNameRdr rdr_name))) } }
   where
     msg = wildCardMsg ctxt (notAllowed wc)
 
@@ -682,9 +682,9 @@ bindLHsTyVarBndrs doc mb_assoc tv_bndrs thing_inside
 
 rnLHsTyVarBndr :: HsDocContext -> Maybe a -> LocalRdrEnv
                -> LHsTyVarBndr RdrName -> RnM (LHsTyVarBndr Name, FreeVars)
-rnLHsTyVarBndr _ mb_assoc rdr_env (L loc (UserTyVar rdr))
+rnLHsTyVarBndr _ mb_assoc rdr_env (L loc (UserTyVar (L l rdr)))
   = do { nm <- newTyVarNameRn mb_assoc rdr_env loc rdr
-       ; return (L loc (UserTyVar nm), emptyFVs) }
+       ; return (L loc (UserTyVar (L l nm)), emptyFVs) }
 rnLHsTyVarBndr doc mb_assoc rdr_env (L loc (KindedTyVar (L lv rdr) kind))
   = do { sig_ok <- xoptM Opt_KindSignatures
        ; unless sig_ok (badKindSigErr doc kind)
@@ -909,7 +909,7 @@ mkOpAppRn e1 op fix e2                  -- Default case, no rearrangment
 get_op :: LHsExpr Name -> Name
 -- An unbound name could be either HsVar or HsUnboundVar
 -- See RnExpr.rnUnboundVar
-get_op (L _ (HsVar n))          = n
+get_op (L _ (HsVar (L _ n)))    = n
 get_op (L _ (HsUnboundVar occ)) = mkUnboundName occ
 get_op other                    = pprPanic "get_op" (ppr other)
 
@@ -1135,9 +1135,9 @@ opTyErr op ty@(HsOpTy ty1 _ _)
           | otherwise
           = ptext (sLit "Use TypeOperators to allow operators in types")
 
-    forall_head (L _ (HsTyVar tv))   = tv == forall_tv_RDR
-    forall_head (L _ (HsAppTy ty _)) = forall_head ty
-    forall_head _other               = False
+    forall_head (L _ (HsTyVar (L _ tv))) = tv == forall_tv_RDR
+    forall_head (L _ (HsAppTy ty _))     = forall_head ty
+    forall_head _other                   = False
 opTyErr _ ty = pprPanic "opTyErr: Not an op" (ppr ty)
 
 {-
@@ -1253,7 +1253,7 @@ extract_lkind kind (acc_kvs, acc_tvs) = case extract_lty kind ([], acc_kvs) of
 extract_lty :: LHsType RdrName -> FreeKiTyVars -> FreeKiTyVars
 extract_lty (L _ ty) acc
   = case ty of
-      HsTyVar tv                -> extract_tv tv acc
+      HsTyVar (L _ tv)          -> extract_tv tv acc
       HsBangTy _ ty             -> extract_lty ty acc
       HsRecTy flds              -> foldr (extract_lty . cd_fld_type . unLoc) acc
                                          flds

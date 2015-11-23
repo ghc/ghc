@@ -1,11 +1,17 @@
 
 T10403.hs:15:7: warning:
+<<<<<<< HEAD
     Found constraint wildcard ‘_’ standing for ‘Functor f’
     In the type signature:
+=======
+    Found hole ‘_’ with inferred constraints: Functor f
+    In the type signature for:
+>>>>>>> origin/master
       h1 :: _ => _
 
 T10403.hs:15:12: warning:
     Found type wildcard ‘_’ standing for ‘(a -> b) -> f a -> H f’
+<<<<<<< HEAD
     Where: ‘f’ is a rigid type variable bound by
              the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
              at T10403.hs:17:1
@@ -76,3 +82,36 @@ T10403.hs:28:20: warning:
     Relevant bindings include app2 :: H (B t) (bound at T10403.hs:28:1)
     In the second argument of ‘h2’, namely ‘(B ())’
     In the expression: h2 (H . I) (B ())
+=======
+    Where: ‘b’ is a rigid type variable bound by
+               the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
+               at T10403.hs:17:1
+           ‘a’ is a rigid type variable bound by
+               the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
+               at T10403.hs:17:1
+           ‘f’ is a rigid type variable bound by
+               the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
+               at T10403.hs:17:1
+    In the type signature for:
+      h1 :: _ => _
+
+T10403.hs:19:7: warning:
+    Found type wildcard ‘_’ standing for ‘(a -> b) -> f a -> H f’
+    Where: ‘b’ is a rigid type variable bound by
+               the inferred type of h2 :: Functor f => (a -> b) -> f a -> H f
+               at T10403.hs:21:1
+           ‘a’ is a rigid type variable bound by
+               the inferred type of h2 :: Functor f => (a -> b) -> f a -> H f
+               at T10403.hs:21:1
+           ‘f’ is a rigid type variable bound by
+               the inferred type of h2 :: Functor f => (a -> b) -> f a -> H f
+               at T10403.hs:21:1
+    In the type signature for:
+      h2 :: _
+
+T10403.hs:21:1: warning:
+    No instance for (Functor f)
+    When checking that ‘h2’ has the inferred type
+      h2 :: forall (f :: * -> *) b a. (a -> b) -> f a -> H f
+    Probable cause: the inferred type is ambiguous
+>>>>>>> origin/master

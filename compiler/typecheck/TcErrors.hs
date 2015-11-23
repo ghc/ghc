@@ -746,7 +746,7 @@ mkHoleError ctxt ct@(CHoleCan { cc_occ = occ, cc_hole = hole_sort })
     ct_loc      = ctLoc ct
     lcl_env     = ctLocEnv ct_loc
     hole_ty     = ctEvPred (ctEvidence ct)
-    tyvars      = varSetElems (tyVarsOfType hole_ty)
+    tyvars      = tyVarsOfTypeList hole_ty
     boring_type = isTyVarTy hole_ty
 
     out_of_scope_msg -- Print v :: ty only if the type has structure
@@ -1660,7 +1660,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
 
              ,  ppWhen (isSingleton matches) $
                 parens (vcat [ ptext (sLit "The choice depends on the instantiation of") <+>
-                                  quotes (pprWithCommas ppr (varSetElems (tyVarsOfTypes tys)))
+                                  quotes (pprWithCommas ppr (tyVarsOfTypesList tys))
                              , ppWhen (null (matching_givens)) $
                                vcat [ ptext (sLit "To pick the first instance above, use IncoherentInstances")
                                     , ptext (sLit "when compiling the other instance declarations")]
