@@ -153,6 +153,7 @@ data IE name
         --                                 'ApiAnnotation.AnnType'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
+        -- See Note [Located RdrNames] in HsExpr
 
   | IEThingWith (Located name)
                 IEWildcard
