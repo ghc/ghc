@@ -1,0 +1,4 @@
+
+T11112.hs:3:9: error:
+    Constraint ‘Ord s’ used as a type
+    In the type signature for ‘sort’: sort :: Ord s -> [s] -> [s]
