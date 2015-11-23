@@ -35,7 +35,6 @@
                                 SymI_HasProto(stg_makeStableNamezh)           \
                                 SymI_HasProto(stg_finalizzeWeakzh)
 
-#if defined(USE_LIBDW)
 #define RTS_LIBDW_SYMBOLS                       \
       SymE_HasProto(backtraceFree)              \
       SymE_HasProto(libdwGetBacktrace)          \
@@ -43,9 +42,6 @@
       SymE_HasProto(libdwPoolTake)              \
       SymE_HasProto(libdwPoolRelease)           \
       SymE_HasProto(libdwPoolClear)
-#else
-#define RTS_LIBDW_SYMBOLS
-#endif /* USE_LIBDW */
 
 #if !defined (mingw32_HOST_OS)
 #define RTS_POSIX_ONLY_SYMBOLS                  \
