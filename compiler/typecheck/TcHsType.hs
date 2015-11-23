@@ -1098,7 +1098,7 @@ tcHsTyVarBndr :: HsTyVarBndr Name -> TcM TcTyVar
 -- with a mutable kind in it.
 --
 -- Returned TcTyVar has the same name; no cloning
-tcHsTyVarBndr (UserTyVar name)
+tcHsTyVarBndr (UserTyVar (L _ name))
   = do { kind <- newMetaKindVar
        ; return (mkTcTyVar name kind (SkolemTv False)) }
 tcHsTyVarBndr (KindedTyVar (L _ name) kind)

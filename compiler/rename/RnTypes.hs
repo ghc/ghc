@@ -591,7 +591,7 @@ rnWildCard _ (AnonWildCard _)
   = do { loc <- getSrcSpanM
        ; uniq <- newUnique
        ; let name = mkInternalName uniq (mkTyVarOcc "_") loc
-       ; return (AnonWildCard name) }
+       ; return (AnonWildCard (L loc name)) }
 
 rnWildCard ctxt wc@(NamedWildCard (L loc rdr_name))
   -- NB: The parser only generates NamedWildCard if -XNamedWildCards
@@ -599,7 +599,7 @@ rnWildCard ctxt wc@(NamedWildCard (L loc rdr_name))
   = do { mb_name <- lookupOccRn_maybe rdr_name
        ; traceRn (text "rnWildCard named" <+> (ppr rdr_name $$ ppr mb_name))
        ; case mb_name of
-           Just n  -> return (NamedWildCard n)
+           Just n  -> return (NamedWildCard (L loc n))
            Nothing -> do { addErr msg  -- I'm not sure how this can happen
                          ; return (NamedWildCard (L loc (mkUnboundNameRdr rdr_name))) } }
   where
@@ -704,11 +704,11 @@ newTyVarNameRn mb_assoc rdr_env loc rdr
 collectNamedWildCards :: LHsType RdrName -> [Located RdrName]
 collectNamedWildCards hs_ty
   = nubBy eqLocated $
-    [L l n | L l (NamedWildCard n) <- collectWildCards hs_ty ]
+    [n | L _ (NamedWildCard n) <- collectWildCards hs_ty ]
 
 collectAnonWildCards :: LHsType Name -> [Name]
 collectAnonWildCards hs_ty
-  = [n | L _ (AnonWildCard n) <- collectWildCards hs_ty ]
+  = [n | L _ (AnonWildCard (L _ n)) <- collectWildCards hs_ty ]
 
 collectWildCards :: LHsType name -> [Located (HsWildCardInfo name)]
 -- | Extract all wild cards from a type.

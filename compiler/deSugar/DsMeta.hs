@@ -769,7 +769,7 @@ rep_wc_ty_sig mk_sig loc sig_ty nm
   = do { nm1 <- lookupLOcc nm
        ; let rep_in_scope_tv tv = do { name <- lookupBinder (hsLTyVarName tv)
                                      ; repTyVarBndrWithKind tv name }
-             all_tvs = map (noLoc . UserTyVar) implicit_tvs ++ explicit_tvs
+             all_tvs = map (noLoc . UserTyVar . noLoc) implicit_tvs ++ explicit_tvs
        ; th_tvs  <- repList tyVarBndrTyConName rep_in_scope_tv all_tvs
        ; th_ctxt <- repLContext ctxt
        ; th_ty   <- repLTy ty
@@ -921,7 +921,7 @@ repHsSigWcType (HsIB { hsib_kvs  = implicit_kvs
                      , hsib_body = sig1 })
   | (explicit_tvs, ctxt, ty) <- splitLHsSigmaTy (hswc_body sig1)
   = addTyVarBinds (HsQTvs { hsq_kvs = implicit_kvs
-                          , hsq_tvs = map (noLoc . UserTyVar) implicit_tvs
+                          , hsq_tvs = map (noLoc . UserTyVar . noLoc) implicit_tvs
                                       ++ explicit_tvs })
                   $ \ th_tvs ->
     do { th_ctxt <- repLContext ctxt

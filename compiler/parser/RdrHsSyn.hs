@@ -942,7 +942,7 @@ checkPatBind msg lhs (L _ (_,grhss))
                     ([],[])) }
 
 checkValSigLhs :: LHsExpr RdrName -> P (Located RdrName)
-checkValSigLhs (L _ (HsVar lrdr@(L l v)))
+checkValSigLhs (L _ (HsVar lrdr@(L _ v)))
   | isUnqual v
   , not (isDataOcc (rdrNameOcc v))
   = return lrdr
