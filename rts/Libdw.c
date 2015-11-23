@@ -312,7 +312,8 @@ static bool set_initial_registers(Dwfl_Thread *thread,
              "movl %%ebp, 0x14(%0)\n\t"
              "movl %%esp, 0x18(%0)\n\t"
              "movl %%edi, 0x1c(%0)\n\t"
-             "lea 0(%%eip), %%eax\n\t"
+             "here:\n\t"
+             "movl here,  %%eax\n\t"
              "movl %%eax, 0x20(%0)\n\t"
              :                            /* no output */
              :"r" (&regs[0])              /* input */
