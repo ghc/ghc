@@ -209,10 +209,6 @@ data LHsQTyVars name   -- See Note [HsType binders]
 deriving instance (DataId name) => Data (LHsQTyVars name)
 
 mkHsQTvs :: [LHsTyVarBndr RdrName] -> LHsQTyVars RdrName
--- Just at RdrName because in the Name variant we should know just
--- what the kind-variable binders are; and we don't
--- We put an empty list (rather than a panic) for the kind vars so
--- that the pretty printer works ok on them.
 mkHsQTvs tvs = HsQTvs { hsq_kvs = PlaceHolder, hsq_tvs = tvs }
 
 hsQTvBndrs :: LHsQTyVars name -> [LHsTyVarBndr name]
