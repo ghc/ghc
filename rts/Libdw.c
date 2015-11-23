@@ -123,18 +123,19 @@ LibdwSession *libdwInit() {
 
 int libdwLookupLocation(LibdwSession *session, Location *frame,
                         StgPtr pc) {
+    Dwarf_Addr addr = (Dwarf_Addr) (uintptr_t) pc;
     // Find the module containing PC
-    Dwfl_Module *mod = dwfl_addrmodule(session->dwfl, (Dwarf_Addr) pc);
+    Dwfl_Module *mod = dwfl_addrmodule(session->dwfl, addr);
     if (mod == NULL)
         return 1;
     dwfl_module_info(mod, NULL, NULL, NULL, NULL, NULL,
                      &frame->object_file, NULL);
 
     // Find function name
-    frame->function = dwfl_module_addrname(mod, (Dwarf_Addr) pc);
+    frame->function = dwfl_module_addrname(mod, addr);
 
     // Try looking up source location
-    Dwfl_Line *line = dwfl_module_getsrc(mod, (Dwarf_Addr) pc);
+    Dwfl_Line *line = dwfl_module_getsrc(mod, addr);
     if (line != NULL) {
         Dwarf_Addr addr;
         int lineno, colno;
@@ -227,7 +228,7 @@ static int getBacktraceFrameCb(Dwfl_Frame *frame, void *arg) {
     } else {
         if (is_activation)
             pc -= 1; // TODO: is this right?
-        backtracePush(session->cur_bt, (StgPtr) pc);
+        backtracePush(session->cur_bt, (StgPtr) (uintptr_t) pc);
     }
 
     return DWARF_CB_OK;
@@ -264,7 +265,7 @@ static pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
 
 static bool memory_read(Dwfl *dwfl STG_UNUSED, Dwarf_Addr addr,
                         Dwarf_Word *result, void *arg STG_UNUSED) {
-    *result = *(Dwarf_Word *) addr;
+    *result = *(Dwarf_Word *) (uintptr_t) addr;
     return true;
 }
 
