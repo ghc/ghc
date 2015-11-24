@@ -31,6 +31,7 @@ import Outputable
 import Platform
 import Unique
 import Reg
+import SrcLoc
 
 import Dwarf.Constants
 
@@ -54,10 +55,16 @@ data DwarfInfo
                      , dwLineLabel :: LitString }
   | DwarfSubprogram { dwChildren :: [DwarfInfo]
                     , dwName :: String
-                    , dwLabel :: CLabel }
+                    , dwLabel :: CLabel
+                    , dwParent :: Maybe CLabel
+                      -- ^ label of DIE belonging to the parent tick
+                    }
   | DwarfBlock { dwChildren :: [DwarfInfo]
                , dwLabel :: CLabel
-               , dwMarker :: CLabel }
+               , dwMarker :: Maybe CLabel
+               }
+  | DwarfSrcNote { dwSrcSpan :: RealSrcSpan
+                 }
 
 -- | Abbreviation codes used for encoding above records in the
 -- @.debug_info@ section.
@@ -65,7 +72,10 @@ data DwarfAbbrev
   = DwAbbrNull          -- ^ Pseudo, used for marking the end of lists
   | DwAbbrCompileUnit
   | DwAbbrSubprogram
+  | DwAbbrSubprogramWithParent
+  | DwAbbrBlockWithoutCode
   | DwAbbrBlock
+  | DwAbbrGhcSrcNote
   deriving (Eq, Enum)
 
 -- | Generate assembly for the given abbreviation code
@@ -81,6 +91,16 @@ pprAbbrevDecls haveDebugLine =
         let fld (tag, form) = pprLEBWord tag $$ pprLEBWord form
         in pprAbbrev abbr $$ pprLEBWord tag $$ pprByte chld $$
            vcat (map fld flds) $$ pprByte 0 $$ pprByte 0
+      -- These are shared between DwAbbrSubprogram and
+      -- DwAbbrSubprogramWithParent
+      subprogramAttrs =
+           [ (dW_AT_name, dW_FORM_string)
+           , (dW_AT_MIPS_linkage_name, dW_FORM_string)
+           , (dW_AT_external, dW_FORM_flag)
+           , (dW_AT_low_pc, dW_FORM_addr)
+           , (dW_AT_high_pc, dW_FORM_addr)
+           , (dW_AT_frame_base, dW_FORM_block1)
+           ]
   in dwarfAbbrevSection $$
      ptext dwarfAbbrevLabel <> colon $$
      mkAbbrev DwAbbrCompileUnit dW_TAG_compile_unit dW_CHILDREN_yes
@@ -96,26 +116,40 @@ pprAbbrevDecls haveDebugLine =
         then [ (dW_AT_stmt_list, dW_FORM_data4) ]
         else [])) $$
      mkAbbrev DwAbbrSubprogram dW_TAG_subprogram dW_CHILDREN_yes
+       subprogramAttrs $$
+     mkAbbrev DwAbbrSubprogramWithParent dW_TAG_subprogram dW_CHILDREN_yes
+       (subprogramAttrs ++ [(dW_AT_ghc_tick_parent, dW_FORM_ref_addr)]) $$
+     mkAbbrev DwAbbrBlockWithoutCode dW_TAG_lexical_block dW_CHILDREN_yes
        [ (dW_AT_name, dW_FORM_string)
-       , (dW_AT_MIPS_linkage_name, dW_FORM_string)
-       , (dW_AT_external, dW_FORM_flag)
-       , (dW_AT_low_pc, dW_FORM_addr)
-       , (dW_AT_high_pc, dW_FORM_addr)
-       , (dW_AT_frame_base, dW_FORM_block1)
        ] $$
      mkAbbrev DwAbbrBlock dW_TAG_lexical_block dW_CHILDREN_yes
        [ (dW_AT_name, dW_FORM_string)
        , (dW_AT_low_pc, dW_FORM_addr)
        , (dW_AT_high_pc, dW_FORM_addr)
        ] $$
+     mkAbbrev DwAbbrGhcSrcNote dW_TAG_ghc_src_note dW_CHILDREN_no
+       [ (dW_AT_ghc_span_file, dW_FORM_string)
+       , (dW_AT_ghc_span_start_line, dW_FORM_data4)
+       , (dW_AT_ghc_span_start_col, dW_FORM_data2)
+       , (dW_AT_ghc_span_end_line, dW_FORM_data4)
+       , (dW_AT_ghc_span_end_col, dW_FORM_data2)
+       ] $$
      pprByte 0
 
 -- | Generate assembly for DWARF data
 pprDwarfInfo :: Bool -> DwarfInfo -> SDoc
 pprDwarfInfo haveSrc d
-  = pprDwarfInfoOpen haveSrc d $$
-    vcat (map (pprDwarfInfo haveSrc) (dwChildren d)) $$
-    pprDwarfInfoClose
+  = case d of
+      DwarfCompileUnit {}  -> hasChildren
+      DwarfSubprogram {}   -> hasChildren
+      DwarfBlock {}        -> hasChildren
+      DwarfSrcNote {}      -> noChildren
+  where
+    hasChildren =
+        pprDwarfInfoOpen haveSrc d $$
+        vcat (map (pprDwarfInfo haveSrc) (dwChildren d)) $$
+        pprDwarfInfoClose
+    noChildren = pprDwarfInfoOpen haveSrc d
 
 -- | Prints assembler data corresponding to DWARF info records. Note
 -- that the binary format of this is paramterized in @abbrevDecls@ and
@@ -133,8 +167,10 @@ pprDwarfInfoOpen haveSrc (DwarfCompileUnit _ name producer compDir lowLabel
   $$ if haveSrc
      then sectionOffset (ptext lineLbl) (ptext dwarfLineLabel)
      else empty
-pprDwarfInfoOpen _ (DwarfSubprogram _ name label) = sdocWithDynFlags $ \df ->
-  pprAbbrev DwAbbrSubprogram
+pprDwarfInfoOpen _ (DwarfSubprogram _ name label
+                                    parent) = sdocWithDynFlags $ \df ->
+  ppr (mkAsmTempDieLabel label) <> colon
+  $$ pprAbbrev abbrev
   $$ pprString name
   $$ pprString (renderWithStyle df (ppr label) (mkCodeStyle CStyle))
   $$ pprFlag (externallyVisibleCLabel label)
@@ -142,11 +178,29 @@ pprDwarfInfoOpen _ (DwarfSubprogram _ name label) = sdocWithDynFlags $ \df ->
   $$ pprWord (ppr $ mkAsmTempEndLabel label)
   $$ pprByte 1
   $$ pprByte dW_OP_call_frame_cfa
-pprDwarfInfoOpen _ (DwarfBlock _ label marker) = sdocWithDynFlags $ \df ->
-  pprAbbrev DwAbbrBlock
+  $$ parentValue
+  where
+    abbrev = case parent of Nothing -> DwAbbrSubprogram
+                            Just _  -> DwAbbrSubprogramWithParent
+    parentValue = maybe empty pprParentDie parent
+    pprParentDie sym = sectionOffset (ppr sym) (ptext dwarfInfoLabel)
+pprDwarfInfoOpen _ (DwarfBlock _ label Nothing) = sdocWithDynFlags $ \df ->
+  ppr (mkAsmTempDieLabel label) <> colon
+  $$ pprAbbrev DwAbbrBlockWithoutCode
+  $$ pprString (renderWithStyle df (ppr label) (mkCodeStyle CStyle))
+pprDwarfInfoOpen _ (DwarfBlock _ label (Just marker)) = sdocWithDynFlags $ \df ->
+  ppr (mkAsmTempDieLabel label) <> colon
+  $$ pprAbbrev DwAbbrBlock
   $$ pprString (renderWithStyle df (ppr label) (mkCodeStyle CStyle))
   $$ pprWord (ppr marker)
   $$ pprWord (ppr $ mkAsmTempEndLabel marker)
+pprDwarfInfoOpen _ (DwarfSrcNote ss) =
+  pprAbbrev DwAbbrGhcSrcNote
+  $$ pprString' (ftext $ srcSpanFile ss)
+  $$ pprData4 (fromIntegral $ srcSpanStartLine ss)
+  $$ pprHalf (fromIntegral $ srcSpanStartCol ss)
+  $$ pprData4 (fromIntegral $ srcSpanEndLine ss)
+  $$ pprHalf (fromIntegral $ srcSpanEndCol ss)
 
 -- | Close a DWARF info record with children
 pprDwarfInfoClose :: SDoc

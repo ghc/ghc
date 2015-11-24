@@ -985,7 +985,7 @@ coveragePasses dflags =
     ifa (gopt Opt_Hpc dflags)                HpcTicks $
     ifa (gopt Opt_SccProfilingOn dflags &&
          profAuto dflags /= NoProfAuto)      ProfNotes $
-    ifa (gopt Opt_Debug dflags)              SourceNotes []
+    ifa (debugLevel dflags > 0)              SourceNotes []
   where ifa f x xs | f         = x:xs
                    | otherwise = xs
 

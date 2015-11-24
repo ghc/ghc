@@ -19,6 +19,13 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-w"
          }
+  , flag { flagName = "-Wcompat"
+         , flagDescription =
+           "enable future compatibility warnings " ++
+           "(details in :ref:`options-sanity`)"
+         , flagType = DynamicFlag
+         , flagReverse = "-Wno-compat"
+         }
   , flag { flagName = "-Werror"
          , flagDescription = "make warnings fatal"
          , flagType = DynamicFlag
@@ -173,6 +180,15 @@ warningsOptions =
          , flagDescription = "warn when names are shadowed"
          , flagType = DynamicFlag
          , flagReverse = "-fno-warn-name-shadowing"
+         }
+  , flag { flagName = "-fwarn-noncanonical-monad-instance"
+         , flagDescription =
+           "warn when ``Applicative`` or ``Monad`` instances have "++
+           "noncanonical definitions of ``return``, ``pure``, ``(>>)``, "++
+           "or ``(*>)``. "++
+           "See flag description in :ref:`options-sanity` for more details."
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-warn-noncanonical-monad-instance"
          }
   , flag { flagName = "-fwarn-orphans"
          , flagDescription =

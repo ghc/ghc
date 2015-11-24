@@ -141,11 +141,13 @@ data IE name
         --             'ApiAnnotation.AnnType'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
+        -- See Note [Located RdrNames] in HsExpr
   | IEThingAbs  (Located name)     -- ^ Class/Type (can't tell)
         --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnPattern',
         --             'ApiAnnotation.AnnType','ApiAnnotation.AnnVal'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
+        -- See Note [Located RdrNames] in HsExpr
   | IEThingAll  (Located name)     -- ^ Class/Type plus all methods/constructors
         --
         -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen',
@@ -153,6 +155,7 @@ data IE name
         --                                 'ApiAnnotation.AnnType'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
+        -- See Note [Located RdrNames] in HsExpr
 
   | IEThingWith (Located name)
                 IEWildcard

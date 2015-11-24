@@ -19,7 +19,7 @@ module Outputable (
         docToSDoc,
         interppSP, interpp'SP,
         pprQuotedList, pprWithCommas, quotedListWithOr, quotedListWithNor,
-        empty, nest,
+        empty, isEmpty, nest,
         char,
         text, ftext, ptext, ztext,
         int, intWithCommas, integer, float, double, rational,
@@ -301,8 +301,8 @@ pprDeeper d = SDoc $ \ctx -> case ctx of
     runSDoc d ctx{sdocStyle = PprUser q (PartWay (n-1))}
   _ -> runSDoc d ctx
 
+-- | Truncate a list that is longer than the current depth.
 pprDeeperList :: ([SDoc] -> SDoc) -> [SDoc] -> SDoc
--- Truncate a list that list that is longer than the current depth
 pprDeeperList f ds
   | null ds   = f []
   | otherwise = SDoc work
@@ -461,6 +461,10 @@ showSDocDumpOneLine dflags d
 irrelevantNCols :: Int
 -- Used for OneLineMode and LeftMode when number of cols isn't used
 irrelevantNCols = 1
+
+isEmpty :: DynFlags -> SDoc -> Bool
+isEmpty dflags sdoc = Pretty.isEmpty $ runSDoc sdoc dummySDocContext
+   where dummySDocContext = initSDocContext dflags PprDebug
 
 docToSDoc :: Doc -> SDoc
 docToSDoc d = SDoc (\_ -> d)

@@ -753,6 +753,12 @@ mkLongErrAt loc msg extra
          printer <- getPrintUnqualified dflags ;
          return $ mkLongErrMsg dflags loc printer msg extra }
 
+mkErrDocAt :: SrcSpan -> ErrDoc -> TcRn ErrMsg
+mkErrDocAt loc errDoc
+  = do { dflags <- getDynFlags ;
+         printer <- getPrintUnqualified dflags ;
+         return $ mkErrDoc dflags loc printer errDoc }
+
 addLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
 addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportError
 
@@ -769,7 +775,7 @@ reportError err
 reportWarning :: ErrMsg -> TcRn ()
 reportWarning err
   = do { let warn = makeIntoWarning err
-                    -- 'err' was build by mkLongErrMsg or something like that,
+                    -- 'err' was built by mkLongErrMsg or something like that,
                     -- so it's of error severity.  For a warning we downgrade
                     -- its severity to SevWarning
 
@@ -1107,7 +1113,7 @@ mkErrInfo env ctxts
  = go 0 env ctxts
  where
    go :: Int -> TidyEnv -> [ErrCtxt] -> TcM SDoc
-   go _ _   [] = return Outputable.empty
+   go _ _   [] = return empty
    go n env ((is_landmark, ctxt) : ctxts)
      | is_landmark || n < mAX_CONTEXTS -- Too verbose || opt_PprStyle_Debug
      = do { (env', msg) <- ctxt env

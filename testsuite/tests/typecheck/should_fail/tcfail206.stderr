@@ -21,10 +21,10 @@ tcfail206.hs:11:5: error:
     at tcfail206.hs:10:6
     Expected type: a -> (a, Bool)
       Actual type: a -> (a, a)
-    Relevant bindings include
-      c :: a -> (a, Bool) (bound at tcfail206.hs:11:1)
     In the expression: (True || False,)
     In an equation for ‘c’: c = (True || False,)
+    Relevant bindings include
+      c :: a -> (a, Bool) (bound at tcfail206.hs:11:1)
 
 tcfail206.hs:14:5: error:
     Couldn't match type ‘Bool’ with ‘Int’
@@ -49,7 +49,7 @@ tcfail206.hs:20:5: error:
     at tcfail206.hs:19:6
     Expected type: a -> (# a, Bool #)
       Actual type: a -> (# a, a #)
-    Relevant bindings include
-      f :: a -> (# a, Bool #) (bound at tcfail206.hs:20:1)
     In the expression: (# True || False, #)
     In an equation for ‘f’: f = (# True || False, #)
+    Relevant bindings include
+      f :: a -> (# a, Bool #) (bound at tcfail206.hs:20:1)

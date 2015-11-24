@@ -25,7 +25,7 @@ import Util
 
 import DynFlags
 import FastString
-import Outputable
+import Outputable hiding ( isEmpty )
 import qualified Data.Set as Set
 import Control.Monad.Fix
 import Data.Array as Array
@@ -796,7 +796,7 @@ manifestSp dflags stackmaps stack0 sp0 sp_high
 
     -- Add unwind pseudo-instructions to document Sp level for debugging
     add_unwind_info block
-      | gopt Opt_Debug dflags = CmmUnwind Sp sp_unwind : block
+      | debugLevel dflags > 0 = CmmUnwind Sp sp_unwind : block
       | otherwise             = block
     sp_unwind = CmmRegOff (CmmGlobal Sp) (sp0 - wORD_SIZE dflags)
 

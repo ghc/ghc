@@ -2,6 +2,6 @@
 T9497a.hs:2:8: warning:
     Found hole: _main :: IO ()
     Or perhaps ‘_main’ is mis-spelled, or not in scope
-    Relevant bindings include main :: IO () (bound at T9497a.hs:2:1)
     In the expression: _main
     In an equation for ‘main’: main = _main
+    Relevant bindings include main :: IO () (bound at T9497a.hs:2:1)

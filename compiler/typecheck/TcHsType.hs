@@ -487,7 +487,7 @@ tc_hs_type hs_ty@(HsTupleTy HsBoxedOrConstraintTuple hs_tys) exp_kind@(EK exp_k 
        ; sequence_ [ setSrcSpan loc $
                      checkExpectedKind ty kind
                         (expArgKind (ptext (sLit "a tuple")) arg_kind n)
-                   | (ty@(L loc _),kind,n) <- zip3 hs_tys kinds [1..] ]
+                   | (L loc ty, kind, n) <- zip3 hs_tys kinds [1..] ]
 
        ; finish_tuple hs_ty tup_sort tys exp_kind }
 
@@ -503,10 +503,9 @@ tc_hs_type hs_ty@(HsTupleTy hs_tup_sort tys) exp_kind
 
 
 --------- Promoted lists and tuples
-tc_hs_type hs_ty@(HsExplicitListTy _k tys) exp_kind
-  = do { tks <- mapM tc_infer_lhs_type tys
-       ; let taus = map fst tks
-       ; kind <- unifyKinds (ptext (sLit "In a promoted list")) tks
+tc_hs_type hs_ty@(HsExplicitListTy _k hs_tys) exp_kind
+  = do { (taus, kinds) <- mapAndUnzipM tc_infer_lhs_type hs_tys
+       ; kind <- unifyKinds (ptext (sLit "In a promoted list")) hs_tys kinds
        ; checkExpectedKind hs_ty (mkPromotedListTy kind) exp_kind
        ; return (foldr (mk_cons kind) (mk_nil kind) taus) }
   where
@@ -534,7 +533,7 @@ tc_hs_type ipTy@(HsIParamTy n ty) exp_kind
 tc_hs_type ty@(HsEqTy ty1 ty2) exp_kind
   = do { (ty1', kind1) <- tc_infer_lhs_type ty1
        ; (ty2', kind2) <- tc_infer_lhs_type ty2
-       ; checkExpectedKind ty2 kind2
+       ; checkExpectedKind (unLoc ty2) kind2
               (EK kind1 msg_fn)
        ; checkExpectedKind ty constraintKind exp_kind
        ; return (mkNakedTyConApp eqTyCon [kind1, ty1', ty2']) }
@@ -545,14 +544,14 @@ tc_hs_type ty@(HsEqTy ty1 ty2) exp_kind
 --------- Misc
 tc_hs_type (HsKindSig ty sig_k) exp_kind
   = do { sig_k' <- tcLHsKind sig_k
-       ; checkExpectedKind ty sig_k' exp_kind
+       ; checkExpectedKind (unLoc ty) sig_k' exp_kind
        ; tc_lhs_type ty (EK sig_k' msg_fn) }
   where
     msg_fn pkind = ptext (sLit "The signature specified kind")
                    <+> quotes (pprKind pkind)
 
-tc_hs_type (HsCoreTy ty) exp_kind
-  = do { checkExpectedKind ty (typeKind ty) exp_kind
+tc_hs_type hs_ty@(HsCoreTy ty) exp_kind
+  = do { checkExpectedKind hs_ty (typeKind ty) exp_kind
        ; return ty }
 
 
@@ -1527,12 +1526,12 @@ expArgKind exp kind arg_no = EK kind msg_fn
             , nest 2 $ ptext (sLit "should have kind")
               <+> quotes (pprKind pkind) ]
 
-unifyKinds :: SDoc -> [(TcType, TcKind)] -> TcM TcKind
-unifyKinds fun act_kinds
+unifyKinds :: SDoc -> [LHsType Name] -> [TcKind] -> TcM TcKind
+unifyKinds fun hs_tys act_kinds
   = do { kind <- newMetaKindVar
-       ; let check (arg_no, (ty, act_kind))
-               = checkExpectedKind ty act_kind (expArgKind (quotes fun) kind arg_no)
-       ; mapM_ check (zip [1..] act_kinds)
+       ; let check (arg_no, L _ hs_ty, act_kind)
+               = checkExpectedKind hs_ty act_kind (expArgKind (quotes fun) kind arg_no)
+       ; mapM_ check (zip3 [1..] hs_tys act_kinds)
        ; return kind }
 
 checkKind :: TcKind -> TcKind -> TcM ()
@@ -1542,7 +1541,7 @@ checkKind act_kind exp_kind
            Just EQ -> return ()
            _       -> unifyKindMisMatch act_kind exp_kind }
 
-checkExpectedKind :: Outputable a => a -> TcKind -> ExpKind -> TcM ()
+checkExpectedKind :: HsType Name -> TcKind -> ExpKind -> TcM ()
 -- A fancy wrapper for 'unifyKindX', which tries
 -- to give decent error messages.
 --      (checkExpectedKind ty act_kind exp_kind)
@@ -1586,15 +1585,7 @@ checkExpectedKind ty act_kind (EK exp_kind ek_ctxt)
                                 OC_Occurs -> True
                                 _bad      -> False
 
-            err | isLiftedTypeKind exp_kind && isUnliftedTypeKind act_kind
-                = ptext (sLit "Expecting a lifted type, but") <+> quotes (ppr ty)
-                    <+> ptext (sLit "is unlifted")
-
-                | isUnliftedTypeKind exp_kind && isLiftedTypeKind act_kind
-                = ptext (sLit "Expecting an unlifted type, but") <+> quotes (ppr ty)
-                    <+> ptext (sLit "is lifted")
-
-                | occurs_check   -- Must precede the "more args expected" check
+            err | occurs_check   -- Must precede the "more args expected" check
                 = ptext (sLit "Kind occurs check") $$ more_info
 
                 | n_exp_as < n_act_as     -- E.g. [Maybe]
@@ -1609,9 +1600,24 @@ checkExpectedKind ty act_kind (EK exp_kind ek_ctxt)
                 | otherwise               -- E.g. Monad [Int]
                 = more_info
 
-            more_info = sep [ ek_ctxt tidy_exp_kind <> comma
-                            , nest 2 $ ptext (sLit "but") <+> quotes (ppr ty)
-                              <+> ptext (sLit "has kind") <+> quotes (pprKind tidy_act_kind)]
+            more_info
+                | isLiftedTypeKind exp_kind && isUnliftedTypeKind act_kind
+                = ptext (sLit "Expecting a lifted type, but") <+> quotes (ppr ty)
+                    <+> ptext (sLit "is unlifted")
+
+                | isUnliftedTypeKind exp_kind && isLiftedTypeKind act_kind
+                = ptext (sLit "Expecting an unlifted type, but") <+> quotes (ppr ty)
+                    <+> ptext (sLit "is lifted")
+
+                | isSubOpenTypeKind exp_kind
+                , isConstraintKind act_kind
+                = ptext (sLit "Constraint") <+> quotes (ppr ty)
+                    <+> ptext (sLit "used as a type")
+
+                | otherwise
+                = sep [ ek_ctxt tidy_exp_kind <> comma
+                      , nest 2 $ ptext (sLit "but") <+> quotes (ppr ty)
+                        <+> ptext (sLit "has kind") <+> quotes (pprKind tidy_act_kind) ]
 
       ; traceTc "checkExpectedKind 1" (ppr ty $$ ppr tidy_act_kind $$ ppr tidy_exp_kind $$ ppr env1 $$ ppr env2)
       ; failWithTcM (env2, err) } } }

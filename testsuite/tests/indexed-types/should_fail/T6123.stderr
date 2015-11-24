@@ -2,6 +2,6 @@
 T6123.hs:10:14: error:
     Occurs check: cannot construct the infinite type: t0 ~ Id t0
     The type variable ‘t0’ is ambiguous
-    Relevant bindings include cundefined :: t0 (bound at T6123.hs:10:1)
     In the expression: cid undefined
     In an equation for ‘cundefined’: cundefined = cid undefined
+    Relevant bindings include cundefined :: t0 (bound at T6123.hs:10:1)

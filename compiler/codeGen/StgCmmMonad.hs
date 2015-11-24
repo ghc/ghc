@@ -576,7 +576,7 @@ getTickScope = do
 tickScope :: FCode a -> FCode a
 tickScope code = do
         info <- getInfoDown
-        if not (gopt Opt_Debug (cgd_dflags info)) then code else do
+        if debugLevel (cgd_dflags info) == 0 then code else do
           u <- newUnique
           let scope' = SubScope u (cgd_tick_scope info)
           withInfoDown code info{ cgd_tick_scope = scope' }
@@ -729,7 +729,7 @@ emitTick = emitCgStmt . CgStmt . CmmTick
 emitUnwind :: GlobalReg -> CmmExpr -> FCode ()
 emitUnwind g e = do
   dflags <- getDynFlags
-  when (gopt Opt_Debug dflags) $
+  when (debugLevel dflags > 0) $
      emitCgStmt $ CgStmt $ CmmUnwind g e
 
 emitAssign :: CmmReg  -> CmmExpr -> FCode ()

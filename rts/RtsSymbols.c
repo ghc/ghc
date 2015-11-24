@@ -35,6 +35,14 @@
                                 SymI_HasProto(stg_makeStableNamezh)           \
                                 SymI_HasProto(stg_finalizzeWeakzh)
 
+#define RTS_LIBDW_SYMBOLS                       \
+      SymE_HasProto(backtraceFree)              \
+      SymE_HasProto(libdwGetBacktrace)          \
+      SymE_HasProto(libdwLookupLocation)        \
+      SymE_HasProto(libdwPoolTake)              \
+      SymE_HasProto(libdwPoolRelease)           \
+      SymE_HasProto(libdwPoolClear)
+
 #if !defined (mingw32_HOST_OS)
 #define RTS_POSIX_ONLY_SYMBOLS                  \
       SymI_HasProto(__hscore_get_saved_termios) \
@@ -667,6 +675,7 @@
       Maybe_Stable_Names                                                \
       RTS_TICKY_SYMBOLS                                                 \
       RTS_PROF_SYMBOLS                                                  \
+      RTS_LIBDW_SYMBOLS                                                 \
       SymI_HasProto(StgReturn)                                          \
       SymI_HasProto(stg_gc_noregs)                                      \
       SymI_HasProto(stg_ret_v_info)                                     \

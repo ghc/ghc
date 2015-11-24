@@ -8,7 +8,7 @@ FDsFromGivens2.hs:14:15: error:
                        KCC :: C Char Char => () -> KCC,
                      in an equation for ‘bar’
         at FDsFromGivens2.hs:14:6-10
-    Relevant bindings include
-      bar :: KCC -> a -> a (bound at FDsFromGivens2.hs:14:1)
     In the expression: f
     In an equation for ‘bar’: bar (KCC _) = f
+    Relevant bindings include
+      bar :: KCC -> a -> a (bound at FDsFromGivens2.hs:14:1)

@@ -45,6 +45,23 @@ standard “packages” of warnings:
     ``-fwarn-missing-exported-sigs``, ``-fwarn-missing-import-lists``
     and ``-fwarn-identities``.
 
+``-Wcompat``
+    .. index::
+       single: -Wcompat
+
+    Turns on warnings that will be enabled by default in the future, but remain
+    off in normal compilations for the time being. This allows library authors
+    eager to make their code future compatible to adapt to new features before
+    they even generate warnings.
+
+    This currently enables only ``-fwarn-missing-monadfail-instance``.
+
+``-Wno-compat``
+    .. index::
+       single: -Wno-compat
+
+    Disables all warnings enabled by ``-Wcompat``.
+
 ``-w``
     .. index::
        single: -w
@@ -192,6 +209,28 @@ command line.
     Caused a warning to be emitted when a definition was in conflict with
     the AMP (Applicative-Monad proosal).
 
+``-fwarn-noncanonical-monad-instances``
+    .. index::
+       single: -fwarn-noncanonical-monad-instances
+
+    Warn if noncanonical ``Applicative`` or ``Monad`` instances
+    declarations are detected.
+
+    When this warning is enabled, the following conditions are verified:
+
+    In ``Monad`` instances declarations warn if any of the following
+    conditions does not hold:
+
+     * If ``return`` is defined it must be canonical (i.e. ``return = pure``).
+     * If ``(>>)`` is defined it must be canonical (i.e. ``(>>) = (*>)``).
+
+    Moreover, in 'Applicative' instance declarations:
+
+     * Warn if ``pure`` is defined backwards (i.e. ``pure = return``).
+     * Warn if ``(*>)`` is defined backwards (i.e. ``(*>) = (>>)``).
+
+    This option is off by default.
+
 ``-fwarn-missing-monadfail-instance``
     .. index::
        single: -fwarn-missing-monadfail-instance
@@ -201,8 +240,9 @@ command line.
     Warn when a failable pattern is used in a do-block that does not have a
     ``MonadFail`` instance.
 
-    This option is off by default, but will be switched on in a future GHC
-    release, as part of the MFP (MonadFail Proposal).
+    Being part of the ``-Wcompat`` option group, this warning is off by
+    default, but will be switched on in a future GHC release, as part of
+    the MFP (MonadFail Proposal).
 
 ``-fwarn-deprecated-flags``
     .. index::

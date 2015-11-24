@@ -33,7 +33,6 @@ test('ScopedNamedWildcardsBad', normal, compile_fail, [''])
 test('TidyClash', normal, compile_fail, [''])
 # Bug
 test('TidyClash2', expect_broken(9478), compile_fail, [''])
-test('Trac10045', normal, compile_fail, [''])
 test('UnnamedConstraintWildcard1', normal, compile_fail, [''])
 test('UnnamedConstraintWildcard2', normal, compile_fail, [''])
 test('WildcardInADT1', normal, compile_fail, [''])

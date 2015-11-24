@@ -221,7 +221,7 @@ mkDataConWorkers dflags mod_loc data_tycons
    -- If we want to generate debug info, we put a source note on the
    -- worker. This is useful, especially for heap profiling.
    tick_it name
-     | not (gopt Opt_Debug dflags)           = id
+     | debugLevel dflags == 0                = id
      | RealSrcSpan span <- nameSrcSpan name  = tick span
      | Just file <- ml_hs_file mod_loc       = tick (span1 file)
      | otherwise                             = tick (span1 "???")

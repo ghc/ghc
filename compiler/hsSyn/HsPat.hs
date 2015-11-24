@@ -74,7 +74,8 @@ data Pat id
         -- The sole reason for a type on a WildPat is to
         -- support hsPatType :: Pat Id -> Type
 
-  | VarPat      (Located id)            -- Variable
+  | VarPat      (Located id) -- Variable
+                             -- See Note [Located RdrNames] in HsExpr
   | LazyPat     (LPat id)               -- Lazy pattern
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
 

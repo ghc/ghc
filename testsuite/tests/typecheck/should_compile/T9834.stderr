@@ -11,14 +11,14 @@ T9834.hs:23:10: warning:
                     Applicative q =>
                     Nat (Comp p q) (Comp p q))
                    -> p a0 -> p a0
+    In the expression: wrapIdComp
+    In an equation for ‘afix’: afix = wrapIdComp
     Relevant bindings include
       afix :: (forall (q :: * -> *).
                Applicative q =>
                Comp p q a -> Comp p q a)
               -> p a
         (bound at T9834.hs:23:3)
-    In the expression: wrapIdComp
-    In an equation for ‘afix’: afix = wrapIdComp
 
 T9834.hs:23:10: warning:
     Couldn't match type ‘a’ with ‘p a0’
@@ -36,14 +36,14 @@ T9834.hs:23:10: warning:
                     Applicative q =>
                     Nat (Comp p q) (Comp p q))
                    -> p a0 -> p a0
+    In the expression: wrapIdComp
+    In an equation for ‘afix’: afix = wrapIdComp
     Relevant bindings include
       afix :: (forall (q :: * -> *).
                Applicative q =>
                Comp p q a -> Comp p q a)
               -> p a
         (bound at T9834.hs:23:3)
-    In the expression: wrapIdComp
-    In an equation for ‘afix’: afix = wrapIdComp
 
 T9834.hs:23:10: warning:
     Couldn't match type ‘a’ with ‘a1’
@@ -61,11 +61,11 @@ T9834.hs:23:10: warning:
       at T9834.hs:23:10
     Expected type: Comp p q a1 -> Comp p q a1
       Actual type: Comp p q a -> Comp p q a
+    In the expression: wrapIdComp
+    In an equation for ‘afix’: afix = wrapIdComp
     Relevant bindings include
       afix :: (forall (q :: * -> *).
                Applicative q =>
                Comp p q a -> Comp p q a)
               -> p a
         (bound at T9834.hs:23:3)
-    In the expression: wrapIdComp
-    In an equation for ‘afix’: afix = wrapIdComp

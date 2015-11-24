@@ -10,6 +10,6 @@ T7594.hs:33:12:
     Possible fix: add a type signature for ‘bar2’
     Expected type: a -> b
       Actual type: a -> IO ()
-    Relevant bindings include bar2 :: b (bound at T7594.hs:33:1)
     In the first argument of ‘app’, namely ‘print’
     In the expression: app print q2
+    Relevant bindings include bar2 :: b (bound at T7594.hs:33:1)

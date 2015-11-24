@@ -3,34 +3,34 @@ holes3.hs:3:5: error:
     Found hole: _ :: t
     Where: ‘t’ is a rigid type variable bound by
                the inferred type of f :: t at holes3.hs:3:1
-    Relevant bindings include f :: t (bound at holes3.hs:3:1)
     In the expression: _
     In an equation for ‘f’: f = _
+    Relevant bindings include f :: t (bound at holes3.hs:3:1)
 
 holes3.hs:6:7: error:
     Found hole: _gr :: Char
     Or perhaps ‘_gr’ is mis-spelled, or not in scope
+    In the expression: _gr
+    In an equation for ‘g’: g x = _gr
     Relevant bindings include
       x :: Int (bound at holes3.hs:6:3)
       g :: Int -> Char (bound at holes3.hs:6:1)
-    In the expression: _gr
-    In an equation for ‘g’: g x = _gr
 
 holes3.hs:8:5: error:
     Found hole: _aa :: [Char]
     Or perhaps ‘_aa’ is mis-spelled, or not in scope
-    Relevant bindings include h :: [Char] (bound at holes3.hs:8:1)
     In the first argument of ‘(++)’, namely ‘_aa’
     In the expression: _aa ++ "a"
     In an equation for ‘h’: h = _aa ++ "a"
+    Relevant bindings include h :: [Char] (bound at holes3.hs:8:1)
 
 holes3.hs:11:15: error:
     Found hole: _x :: b0
     Where: ‘b0’ is an ambiguous type variable
     Or perhaps ‘_x’ is mis-spelled, or not in scope
-    Relevant bindings include
-      y :: [a] (bound at holes3.hs:11:3)
-      z :: [a] -> [a] (bound at holes3.hs:11:1)
     In the second argument of ‘const’, namely ‘_x’
     In the expression: const y _x
     In an equation for ‘z’: z y = const y _x
+    Relevant bindings include
+      y :: [a] (bound at holes3.hs:11:3)
+      z :: [a] -> [a] (bound at holes3.hs:11:1)

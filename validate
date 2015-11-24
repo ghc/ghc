@@ -157,6 +157,8 @@ if [ $be_quiet -eq 1 ]; then
     make="$make -s"
 fi
 
+$make -C utils/checkUniques
+
 if [ $testsuite_only -eq 0 ]; then
 
 if [ $no_clean -eq 0 ]; then

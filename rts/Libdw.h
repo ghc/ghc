@@ -18,21 +18,11 @@
 
 #ifdef USE_LIBDW
 
-struct LibdwSession_;
-typedef struct LibdwSession_ LibdwSession;
-
 /* Begin a libdw session. A session is tied to a particular capability */
 LibdwSession *libdwInit(void);
 
 /* Free a session */
 void libdwFree(LibdwSession *session);
-
-/* Request a backtrace of the current stack state */
-Backtrace *libdwGetBacktrace(LibdwSession *session);
-
-/* Lookup Location information for the given address.
- * Returns 0 if successful, 1 if address could not be found. */
-int libdwLookupLocation(LibdwSession *session, Location *loc, StgPtr pc);
 
 /* Pretty-print a backtrace to std*/
 void libdwPrintBacktrace(LibdwSession *session, FILE *file, Backtrace *bt);
