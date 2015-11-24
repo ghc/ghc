@@ -30,7 +30,9 @@ import ForeignCall      ( CCallTarget(..) )
 import Module
 import HscTypes         ( Warnings(..), plusWarns )
 import Class            ( FunDep )
-import PrelNames        ( isUnboundName )
+import PrelNames        ( applicativeClassName, pureAName, thenAName
+                        , monadClassName, returnMName, thenMName
+                        , isUnboundName )
 import Name
 import NameSet
 import NameEnv
@@ -449,6 +451,90 @@ rnSrcInstDecl (ClsInstD { cid_inst = cid })
   = do { (cid', fvs) <- rnClsInstDecl cid
        ; return (ClsInstD { cid_inst = cid' }, fvs) }
 
+-- | Warn about unsound/non-canonical 'Applicative'/'Monad' instance
+-- declarations. Specifically, the following conditions are verified:
+--
+-- In 'Monad' instances declarations:
+--
+--  * If 'return' is overridden it must be canonical (i.e. @return = pure@).
+--  * If '(>>)' is overridden it must be canonical (i.e. @(>>) = (*>)@).
+--
+-- In 'Applicative' instance declarations:
+--
+--  * Warn if 'pure' is defined backwards (i.e. @pure = return@).
+--  * Warn if '(*>)' is defined backwards (i.e. @(*>) = (>>)@).
+--
+checkCanonicalMonadInstances :: Name -> LHsType Name -> LHsBinds Name -> RnM ()
+checkCanonicalMonadInstances cls poly_ty mbinds
+  | cls == applicativeClassName  = do
+      forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $ do
+          case mbind of
+              FunBind { fun_id = L _ name, fun_matches = mg }
+                  | name == pureAName, isAliasMG mg == Just returnMName
+                  -> addWarnNonCanMeth1 "pure" "return"
+
+                  | name == thenAName, isAliasMG mg == Just thenMName
+                  -> addWarnNonCanMeth1 "(*>)" "(>>)"
+
+              _ -> return ()
+
+  | cls == monadClassName  = do
+      forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $ do
+          case mbind of
+              FunBind { fun_id = L _ name, fun_matches = mg }
+                  | name == returnMName, isAliasMG mg /= Just pureAName
+                  -> addWarnNonCanMeth2 "return" "pure"
+
+                  | name == thenMName, isAliasMG mg /= Just thenAName
+                  -> addWarnNonCanMeth2 "(>>)" "(*>)"
+
+              _ -> return ()
+
+  | otherwise = return ()
+  where
+    -- | test whether MatchGroup represents a trivial \"lhsName = rhsName\"
+    -- binding, and return @Just rhsName@ if this is the case
+    isAliasMG :: MatchGroup Name (LHsExpr Name) -> Maybe Name
+    isAliasMG MG {mg_alts = L _ [L _ (Match { m_pats = [], m_grhss = grhss })]}
+        | GRHSs [L _ (GRHS [] body)] lbinds <- grhss
+        , L _ EmptyLocalBinds <- lbinds
+        , L _ (HsVar (L _ rhsName)) <- body  = Just rhsName
+    isAliasMG _ = Nothing
+
+    -- got "lhs = rhs" but expected something different
+    addWarnNonCanMeth1 lhs rhs = do
+        addWarn $ vcat [ text "Noncanonical" <+>
+                         quotes (text (lhs ++ " = " ++ rhs)) <+>
+                         text "definition detected"
+                       , instDeclCtxt1 poly_ty
+                       , text "Move definition from" <+>
+                         quotes (text rhs) <+>
+                         text "to" <+> quotes (text lhs)
+                       ]
+
+    -- expected "lhs = rhs" but got something else
+    addWarnNonCanMeth2 lhs rhs = do
+        addWarn $ vcat [ text "Noncanonical" <+>
+                         quotes (text lhs) <+>
+                         text "definition detected"
+                       , instDeclCtxt1 poly_ty
+                       , text "Either remove definition for" <+>
+                         quotes (text lhs) <+> text "or define as" <+>
+                         quotes (text (lhs ++ " = " ++ rhs))
+                       ]
+
+    -- stolen from TcInstDcls
+    instDeclCtxt1 :: LHsType Name -> SDoc
+    instDeclCtxt1 hs_inst_ty
+      = inst_decl_ctxt (case unLoc hs_inst_ty of
+                        HsForAllTy _ _ _ _ (L _ ty') -> ppr ty'
+                        _                            -> ppr hs_inst_ty)
+
+    inst_decl_ctxt :: SDoc -> SDoc
+    inst_decl_ctxt doc = hang (ptext (sLit "in the instance declaration for"))
+                         2 (quotes doc <> text ".")
+
+
 rnClsInstDecl :: ClsInstDecl RdrName -> RnM (ClsInstDecl Name, FreeVars)
 rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                            , cid_sigs = uprags, cid_tyfam_insts = ats
@@ -472,6 +558,9 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
         -- (Slightly strangely) when scoped type variables are on, the
         -- forall-d tyvars scope over the method bindings too
        ; (mbinds', uprags', meth_fvs) <- rnMethodBinds False cls ktv_names mbinds uprags
+
+       ; whenWOptM Opt_WarnNonCanonicalMonadInstances $
+         checkCanonicalMonadInstances cls inst_ty' mbinds'
 
        -- Rename the associated types, and type signatures
        -- Both need to have the instance type variables in scope

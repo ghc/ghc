@@ -174,6 +174,15 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-fno-warn-name-shadowing"
          }
+  , flag { flagName = "-fwarn-noncanonical-monad-instance"
+         , flagDescription =
+           "warn when ``Applicative`` or ``Monad`` instances have "++
+           "noncanonical definitions of ``return``, ``pure``, ``(>>)``, "++
+           "or ``(*>)``. "++
+           "See flag description in :ref:`options-sanity` for more details."
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-warn-noncanonical-monad-instance"
+         }
   , flag { flagName = "-fwarn-orphans"
          , flagDescription =
            "warn when the module contains :ref:`orphan instance declarations "++

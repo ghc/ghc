@@ -192,6 +192,28 @@ command line.
     Caused a warning to be emitted when a definition was in conflict with
     the AMP (Applicative-Monad proosal).
 
+``-fwarn-noncanonical-monad-instances``
+    .. index::
+       single: -fwarn-noncanonical-monad-instances
+
+    Warn if noncanonical ``Applicative`` or ``Monad`` instances
+    declarations are detected.
+
+    When this warning is enabled, the following conditions are verified:
+
+    In ``Monad`` instances declarations warn if any of the following
+    conditions does not hold:
+
+     * If ``return`` is defined it must be canonical (i.e. ``return = pure``).
+     * If ``(>>)`` is defined it must be canonical (i.e. ``(>>) = (*>)``).
+
+    Moreover, in 'Applicative' instance declarations:
+
+     * Warn if ``pure`` is defined backwards (i.e. ``pure = return``).
+     * Warn if ``(*>)`` is defined backwards (i.e. ``(*>) = (>>)``).
+
+    This option is off by default.
+
 ``-fwarn-missing-monadfail-instance``
     .. index::
        single: -fwarn-missing-monadfail-instance

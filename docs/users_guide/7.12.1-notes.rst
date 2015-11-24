@@ -145,6 +145,10 @@ Compiler
    is intended to alert users to cases where they apply ``INLINEABLE`` but
    may not get the speed-up they expect.
 
+-  Added the option ``-fwarn-noncanonical-monad-instances`` which helps
+   detect noncanonical ``Applicative``/``Monad`` instance definitions.
+   See flag description in :ref:`options-sanity` for more details.
+
 -  When printing an out-of-scope error message, GHC will give helpful advice if
    the error might be caused by too restrictive imports.
 

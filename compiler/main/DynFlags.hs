@@ -528,6 +528,7 @@ data WarningFlag =
    | Opt_WarnUntickedPromotedConstructors
    | Opt_WarnDerivingTypeable
    | Opt_WarnDeferredTypeErrors
+   | Opt_WarnNonCanonicalMonadInstances
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -2904,6 +2905,8 @@ fWarningFlags = [
   flagSpec "warn-missing-exported-sigs"       Opt_WarnMissingExportedSigs,
   flagSpec "warn-monomorphism-restriction"    Opt_WarnMonomorphism,
   flagSpec "warn-name-shadowing"              Opt_WarnNameShadowing,
+  flagSpec "warn-noncanonical-monad-instances"
+                                         Opt_WarnNonCanonicalMonadInstances,
   flagSpec "warn-orphans"                     Opt_WarnOrphans,
   flagSpec "warn-overflowed-literals"         Opt_WarnOverflowedLiterals,
   flagSpec "warn-overlapping-patterns"        Opt_WarnOverlappingPatterns,
