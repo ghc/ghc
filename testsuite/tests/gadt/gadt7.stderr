@@ -11,9 +11,9 @@ gadt7.hs:16:38:
       ‘t’ is a rigid type variable bound by
           the inferred type of i1b :: T t1 -> r -> t at gadt7.hs:16:1
     Possible fix: add a type signature for ‘i1b’
+    In the expression: y1
+    In a case alternative: K -> y1
     Relevant bindings include
       y1 :: r (bound at gadt7.hs:16:16)
       y :: r (bound at gadt7.hs:16:7)
       i1b :: T t1 -> r -> t (bound at gadt7.hs:16:1)
-    In the expression: y1
-    In a case alternative: K -> y1

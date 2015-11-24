@@ -10,9 +10,9 @@ T5853.hs:15:52: error:
       bound by the RULE "map/map" at T5853.hs:15:2-57
       ‘t2’ is a rigid type variable bound by
            the RULE "map/map" at T5853.hs:15:2
+    In the expression: (f . g) <$> xs
+    When checking the transformation rule "map/map"
     Relevant bindings include
       f :: Elem t -> Elem t2 (bound at T5853.hs:15:19)
       g :: Elem t1 -> Elem t (bound at T5853.hs:15:21)
       xs :: t1 (bound at T5853.hs:15:23)
-    In the expression: (f . g) <$> xs
-    When checking the transformation rule "map/map"

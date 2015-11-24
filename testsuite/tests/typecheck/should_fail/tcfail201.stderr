@@ -6,10 +6,10 @@ tcfail201.hs:17:58: error:
           gfoldl' :: (forall a1 b. c (a1 -> b) -> a1 -> c b)
                      -> (forall g. g -> c g) -> a -> c a
           at tcfail201.hs:15:12
+    In the first argument of ‘z’, namely ‘DocEmpty’
+    In the expression: z DocEmpty
     Relevant bindings include
       hsDoc :: a (bound at tcfail201.hs:16:13)
       gfoldl' :: (forall a1 b. c (a1 -> b) -> a1 -> c b)
                  -> (forall g. g -> c g) -> a -> c a
         (bound at tcfail201.hs:16:1)
-    In the first argument of ‘z’, namely ‘DocEmpty’
-    In the expression: z DocEmpty

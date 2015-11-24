@@ -4,8 +4,8 @@ tcrun035.hs:13:7:
                   with ‘forall (m :: * -> *). Monad m => m a’
     Expected type: (forall (m :: * -> *). Monad m => m a) -> IO a
       Actual type: IO a -> IO a
+    In the expression: id . id
+    In an equation for ‘foo’: foo = id . id
     Relevant bindings include
       foo :: (forall (m :: * -> *). Monad m => m a) -> IO a
         (bound at tcrun035.hs:13:1)
-    In the expression: id . id
-    In an equation for ‘foo’: foo = id . id

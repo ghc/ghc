@@ -5,9 +5,9 @@ T7194.hs:18:35:
     This (rigid, skolem) type variable is bound by
       the type signature for: g :: C (F a) => a -> Int
       at T7194.hs:17:23-41
+    In the expression: foo y
+    In the first argument of ‘length’, namely ‘[x, foo y]’
     Relevant bindings include
       y :: a (bound at T7194.hs:18:20)
       g :: a -> Int (bound at T7194.hs:18:18)
       x :: b0 (bound at T7194.hs:17:9)
-    In the expression: foo y
-    In the first argument of ‘length’, namely ‘[x, foo y]’

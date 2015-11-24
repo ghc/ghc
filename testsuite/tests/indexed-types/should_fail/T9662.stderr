@@ -15,10 +15,6 @@ T9662.hs:49:7: error:
                    -> Exp (((sh :. k) :. m) :. n)
       Actual type: Exp (((sh :. k) :. m) :. n)
                    -> Exp (((sh :. k) :. m) :. n)
-    Relevant bindings include
-      test :: Shape (((sh :. k) :. m) :. n)
-              -> Shape (((sh :. m) :. n) :. k)
-        (bound at T9662.hs:45:1)
     In the second argument of ‘backpermute’, namely ‘id’
     In the expression:
       backpermute
@@ -26,6 +22,10 @@ T9662.hs:49:7: error:
            (atom :. atom :. atom :. atom)
            (\ (sh :. k :. m :. n) -> (sh :. m :. n :. k)))
         id
+    Relevant bindings include
+      test :: Shape (((sh :. k) :. m) :. n)
+              -> Shape (((sh :. m) :. n) :. k)
+        (bound at T9662.hs:45:1)
 
 T9662.hs:49:7: error:
     Couldn't match type ‘m’ with ‘k’
@@ -43,10 +43,6 @@ T9662.hs:49:7: error:
                    -> Exp (((sh :. k) :. m) :. n)
       Actual type: Exp (((sh :. k) :. m) :. n)
                    -> Exp (((sh :. k) :. m) :. n)
-    Relevant bindings include
-      test :: Shape (((sh :. k) :. m) :. n)
-              -> Shape (((sh :. m) :. n) :. k)
-        (bound at T9662.hs:45:1)
     In the second argument of ‘backpermute’, namely ‘id’
     In the expression:
       backpermute
@@ -54,6 +50,10 @@ T9662.hs:49:7: error:
            (atom :. atom :. atom :. atom)
            (\ (sh :. k :. m :. n) -> (sh :. m :. n :. k)))
         id
+    Relevant bindings include
+      test :: Shape (((sh :. k) :. m) :. n)
+              -> Shape (((sh :. m) :. n) :. k)
+        (bound at T9662.hs:45:1)
 
 T9662.hs:49:7: error:
     Couldn't match type ‘n’ with ‘m’
@@ -71,10 +71,6 @@ T9662.hs:49:7: error:
                    -> Exp (((sh :. k) :. m) :. n)
       Actual type: Exp (((sh :. k) :. m) :. n)
                    -> Exp (((sh :. k) :. m) :. n)
-    Relevant bindings include
-      test :: Shape (((sh :. k) :. m) :. n)
-              -> Shape (((sh :. m) :. n) :. k)
-        (bound at T9662.hs:45:1)
     In the second argument of ‘backpermute’, namely ‘id’
     In the expression:
       backpermute
@@ -82,3 +78,7 @@ T9662.hs:49:7: error:
            (atom :. atom :. atom :. atom)
            (\ (sh :. k :. m :. n) -> (sh :. m :. n :. k)))
         id
+    Relevant bindings include
+      test :: Shape (((sh :. k) :. m) :. n)
+              -> Shape (((sh :. m) :. n) :. k)
+        (bound at T9662.hs:45:1)

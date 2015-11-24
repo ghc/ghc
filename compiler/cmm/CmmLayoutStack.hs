@@ -25,7 +25,7 @@ import Util
 
 import DynFlags
 import FastString
-import Outputable
+import Outputable hiding ( isEmpty )
 import qualified Data.Set as Set
 import Control.Monad.Fix
 import Data.Array as Array

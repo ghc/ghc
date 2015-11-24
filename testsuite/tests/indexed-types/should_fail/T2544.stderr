@@ -5,10 +5,10 @@ T2544.hs:17:18: error:
     The type variable ‘i0’ is ambiguous
     Expected type: IxMap l [Int]
       Actual type: IxMap i0 [Int]
-    Relevant bindings include
-      empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:17:4)
     In the first argument of ‘BiApp’, namely ‘empty’
     In the expression: BiApp empty empty
+    Relevant bindings include
+      empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:17:4)
 
 T2544.hs:17:24: error:
     Couldn't match type ‘IxMap i1’ with ‘IxMap r’
@@ -16,7 +16,7 @@ T2544.hs:17:24: error:
     The type variable ‘i1’ is ambiguous
     Expected type: IxMap r [Int]
       Actual type: IxMap i1 [Int]
-    Relevant bindings include
-      empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:17:4)
     In the second argument of ‘BiApp’, namely ‘empty’
     In the expression: BiApp empty empty
+    Relevant bindings include
+      empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:17:4)

@@ -4,6 +4,8 @@ T5439.hs:82:28:
                    with ‘Attempt (HHead (HDrop n0 l0)) -> Attempt (HElemOf l0)’
     Expected type: f (Attempt (HNth n0 l0) -> Attempt (HElemOf l0))
       Actual type: f (Attempt (WaitOpResult (WaitOps rs)))
+    In the first argument of ‘complete’, namely ‘ev’
+    In the expression: complete ev
     Relevant bindings include
       register :: Bool -> Peano n -> WaitOps (HDrop n rs) -> IO Bool
         (bound at T5439.hs:64:9)
@@ -13,8 +15,6 @@ T5439.hs:82:28:
       registerWaitOp :: WaitOps rs
                         -> f (Attempt (WaitOpResult (WaitOps rs))) -> IO Bool
         (bound at T5439.hs:61:3)
-    In the first argument of ‘complete’, namely ‘ev’
-    In the expression: complete ev
 
 T5439.hs:82:39:
     Couldn't match expected type ‘Peano n0’

@@ -33,12 +33,12 @@
 
 ../../typecheck/should_run/Defer01.hs:31:5: warning:
     Couldn't match expected type ‘Char -> t’ with actual type ‘Char’
-    Relevant bindings include
-      f :: t (bound at ../../typecheck/should_run/Defer01.hs:31:1)
     The function ‘e’ is applied to one argument,
     but its type ‘Char’ has none
     In the expression: e 'q'
     In an equation for ‘f’: f = e 'q'
+    Relevant bindings include
+      f :: t (bound at ../../typecheck/should_run/Defer01.hs:31:1)
 
 ../../typecheck/should_run/Defer01.hs:34:8: warning:
     Couldn't match expected type ‘Char’ with actual type ‘a’
@@ -46,20 +46,20 @@
         the type signature for:
           h :: a -> (Char, Char)
         at ../../typecheck/should_run/Defer01.hs:33:6
+    In the expression: x
+    In the expression: (x, 'c')
     Relevant bindings include
       x :: a (bound at ../../typecheck/should_run/Defer01.hs:34:3)
       h :: a -> (Char, Char)
         (bound at ../../typecheck/should_run/Defer01.hs:34:1)
-    In the expression: x
-    In the expression: (x, 'c')
 
 ../../typecheck/should_run/Defer01.hs:39:17: warning:
     Couldn't match expected type ‘Bool’ with actual type ‘T a’
+    In the first argument of ‘not’, namely ‘(K a)’
+    In the expression: (not (K a))
     Relevant bindings include
       a :: a (bound at ../../typecheck/should_run/Defer01.hs:39:3)
       i :: a -> () (bound at ../../typecheck/should_run/Defer01.hs:39:1)
-    In the first argument of ‘not’, namely ‘(K a)’
-    In the expression: (not (K a))
 
 ../../typecheck/should_run/Defer01.hs:43:5: warning:
     No instance for (MyClass a1) arising from a use of ‘myOp’
@@ -147,12 +147,12 @@
 (deferred type error)
 *** Exception: ../../typecheck/should_run/Defer01.hs:31:5: error:
     Couldn't match expected type ‘Char -> t’ with actual type ‘Char’
-    Relevant bindings include
-      f :: t (bound at ../../typecheck/should_run/Defer01.hs:31:1)
     The function ‘e’ is applied to one argument,
     but its type ‘Char’ has none
     In the expression: e 'q'
     In an equation for ‘f’: f = e 'q'
+    Relevant bindings include
+      f :: t (bound at ../../typecheck/should_run/Defer01.hs:31:1)
 (deferred type error)
 *** Exception: ../../typecheck/should_run/Defer01.hs:34:8: error:
     Couldn't match expected type ‘Char’ with actual type ‘a’
@@ -160,20 +160,20 @@
         the type signature for:
           h :: a -> (Char, Char)
         at ../../typecheck/should_run/Defer01.hs:33:6
+    In the expression: x
+    In the expression: (x, 'c')
     Relevant bindings include
       x :: a (bound at ../../typecheck/should_run/Defer01.hs:34:3)
       h :: a -> (Char, Char)
         (bound at ../../typecheck/should_run/Defer01.hs:34:1)
-    In the expression: x
-    In the expression: (x, 'c')
 (deferred type error)
 *** Exception: ../../typecheck/should_run/Defer01.hs:39:17: error:
     Couldn't match expected type ‘Bool’ with actual type ‘T a’
+    In the first argument of ‘not’, namely ‘(K a)’
+    In the expression: (not (K a))
     Relevant bindings include
       a :: a (bound at ../../typecheck/should_run/Defer01.hs:39:3)
       i :: a -> () (bound at ../../typecheck/should_run/Defer01.hs:39:1)
-    In the first argument of ‘not’, namely ‘(K a)’
-    In the expression: (not (K a))
 (deferred type error)
 *** Exception: ../../typecheck/should_run/Defer01.hs:43:5: error:
     No instance for (MyClass a1) arising from a use of ‘myOp’

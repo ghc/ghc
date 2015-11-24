@@ -15,7 +15,7 @@ holes2.hs:3:5: warning:
 holes2.hs:3:10: warning:
     Found hole: _ :: a0
     Where: ‘a0’ is an ambiguous type variable
-    Relevant bindings include f :: String (bound at holes2.hs:3:1)
     In the first argument of ‘show’, namely ‘_’
     In the expression: show _
     In an equation for ‘f’: f = show _
+    Relevant bindings include f :: String (bound at holes2.hs:3:1)

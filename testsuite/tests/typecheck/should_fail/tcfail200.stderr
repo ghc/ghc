@@ -4,8 +4,8 @@ tcfail200.hs:5:15: error:
     When matching types
       t1 :: *
       Int# :: #
-    Relevant bindings include
-      x :: (t1, Char) (bound at tcfail200.hs:5:9)
     In the expression: 1#
     In the expression: (1#, 'c')
     In an equation for ‘x’: x = (1#, 'c')
+    Relevant bindings include
+      x :: (t1, Char) (bound at tcfail200.hs:5:9)

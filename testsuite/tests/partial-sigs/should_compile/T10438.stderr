@@ -3,11 +3,6 @@ T10438.hs:7:22: warning:
     Found type wildcard ‘_’ standing for ‘t2’
     Where: ‘t2’ is a rigid type variable bound by
                 the inferred type of g :: t2 -> t2 at T10438.hs:6:9
-    Relevant bindings include
-      r :: t2 (bound at T10438.hs:6:11)
-      g :: t2 -> t2 (bound at T10438.hs:6:9)
-      f :: t (bound at T10438.hs:5:5)
-      foo :: t -> t1 -> t1 (bound at T10438.hs:5:1)
     In the type signature for:
       x :: _
     In an equation for ‘g’:
@@ -25,3 +20,8 @@ T10438.hs:7:22: warning:
                 where
                     x :: _
                     x = r
+    Relevant bindings include
+      r :: t2 (bound at T10438.hs:6:11)
+      g :: t2 -> t2 (bound at T10438.hs:6:9)
+      f :: t (bound at T10438.hs:5:5)
+      foo :: t -> t1 -> t1 (bound at T10438.hs:5:1)

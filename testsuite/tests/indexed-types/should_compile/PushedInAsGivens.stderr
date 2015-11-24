@@ -5,19 +5,16 @@ PushedInAsGivens.hs:10:31:
     This (rigid, skolem) type variable is bound by
       the type signature for: foo :: (F Int ~ [a1]) => a1 -> Int
       at PushedInAsGivens.hs:9:20-44
+    In the expression: y
+    In the first argument of ‘length’, namely ‘[x, y]’
     Relevant bindings include
       x :: a1 (bound at PushedInAsGivens.hs:10:17)
       foo :: a1 -> Int (bound at PushedInAsGivens.hs:10:13)
       y :: a (bound at PushedInAsGivens.hs:9:5)
       bar :: a -> (a, Int) (bound at PushedInAsGivens.hs:9:1)
-    In the expression: y
-    In the first argument of ‘length’, namely ‘[x, y]’
 
 PushedInAsGivens.hs:11:15:
     Couldn't match expected type ‘[a]’ with actual type ‘F Int’
-    Relevant bindings include
-      y :: a (bound at PushedInAsGivens.hs:9:5)
-      bar :: a -> (a, Int) (bound at PushedInAsGivens.hs:9:1)
     In the expression: foo y
     In the expression: (y, foo y)
     In the expression:
@@ -25,3 +22,6 @@ PushedInAsGivens.hs:11:15:
         foo :: (F Int ~ [a]) => a -> Int
         foo x = length [...]
       in (y, foo y)
+    Relevant bindings include
+      y :: a (bound at PushedInAsGivens.hs:9:5)
+      bar :: a -> (a, Int) (bound at PushedInAsGivens.hs:9:1)

@@ -4,10 +4,10 @@
                 with actual type ‘a’
     ‘a’ is a rigid type variable bound by
         the instance declaration at <interactive>:5:10
+    In the expression: a
+    In the expression: [a, b]
     Relevant bindings include
       b :: a (bound at <interactive>:5:43)
       a :: a (bound at <interactive>:5:41)
       asList :: (a, a) -> [ListableElem (a, a)]
         (bound at <interactive>:5:33)
-    In the expression: a
-    In the expression: [a, b]

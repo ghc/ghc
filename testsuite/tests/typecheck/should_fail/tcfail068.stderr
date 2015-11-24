@@ -10,12 +10,12 @@ tcfail068.hs:14:9:
           at tcfail068.hs:11:10
     Expected type: ST s1 (IndTree s a)
       Actual type: ST s1 (STArray s1 (Int, Int) a)
-    Relevant bindings include
-      itgen :: (Int, Int) -> a -> IndTree s a
-        (bound at tcfail068.hs:12:1)
     In the first argument of ‘runST’, namely
       ‘(newSTArray ((1, 1), n) x)’
     In the expression: runST (newSTArray ((1, 1), n) x)
+    Relevant bindings include
+      itgen :: (Int, Int) -> a -> IndTree s a
+        (bound at tcfail068.hs:12:1)
 
 tcfail068.hs:19:21:
     Couldn't match type ‘s’ with ‘s1’
@@ -29,12 +29,12 @@ tcfail068.hs:19:21:
            at tcfail068.hs:18:9
     Expected type: STArray s1 (Int, Int) a
       Actual type: IndTree s a
+    In the first argument of ‘readSTArray’, namely ‘arr’
+    In the first argument of ‘(>>=)’, namely ‘readSTArray arr i’
     Relevant bindings include
       arr :: IndTree s a (bound at tcfail068.hs:17:11)
       itiap :: (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
         (bound at tcfail068.hs:17:1)
-    In the first argument of ‘readSTArray’, namely ‘arr’
-    In the first argument of ‘(>>=)’, namely ‘readSTArray arr i’
 
 tcfail068.hs:24:36:
     Couldn't match type ‘s’ with ‘s1’
@@ -48,6 +48,8 @@ tcfail068.hs:24:36:
            at tcfail068.hs:24:29
     Expected type: ST s1 (IndTree s a)
       Actual type: ST s (IndTree s a)
+    In the first argument of ‘runST’, namely ‘(itrap' i k)’
+    In the expression: runST (itrap' i k)
     Relevant bindings include
       itrap' :: Int -> Int -> ST s (IndTree s a)
         (bound at tcfail068.hs:26:9)
@@ -57,8 +59,6 @@ tcfail068.hs:24:36:
       itrap :: ((Int, Int), (Int, Int))
                -> (a -> a) -> IndTree s a -> IndTree s a
         (bound at tcfail068.hs:24:1)
-    In the first argument of ‘runST’, namely ‘(itrap' i k)’
-    In the expression: runST (itrap' i k)
 
 tcfail068.hs:36:46:
     Couldn't match type ‘s’ with ‘s1’
@@ -78,6 +78,8 @@ tcfail068.hs:36:46:
            at tcfail068.hs:36:40
     Expected type: ST s1 (c, IndTree s b)
       Actual type: ST s (c, IndTree s b)
+    In the first argument of ‘runST’, namely ‘(itrapstate' i k s)’
+    In the expression: runST (itrapstate' i k s)
     Relevant bindings include
       itrapstate' :: Int -> Int -> c -> ST s (c, IndTree s b)
         (bound at tcfail068.hs:38:9)
@@ -92,5 +94,3 @@ tcfail068.hs:36:46:
                     -> IndTree s b
                     -> (c, IndTree s b)
         (bound at tcfail068.hs:36:1)
-    In the first argument of ‘runST’, namely ‘(itrapstate' i k s)’
-    In the expression: runST (itrapstate' i k s)

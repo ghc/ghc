@@ -8,20 +8,20 @@ SplicesUsed.hs:7:16: warning:
 
 SplicesUsed.hs:8:15: warning:
     Found type wildcard ‘_a’ standing for ‘Maybe Bool’
-    Relevant bindings include
-      maybeBool :: Maybe Bool (bound at SplicesUsed.hs:8:1)
     In an expression type signature: _a -> _a
     In the expression: id :: _a -> _a
     In the expression: (id :: _a -> _a) (Just True :: Maybe _)
+    Relevant bindings include
+      maybeBool :: Maybe Bool (bound at SplicesUsed.hs:8:1)
 
 SplicesUsed.hs:8:27: warning:
     Found type wildcard ‘_’ standing for ‘Bool’
-    Relevant bindings include
-      maybeBool :: Maybe Bool (bound at SplicesUsed.hs:8:1)
     In an expression type signature: Maybe _
     In the first argument of ‘id :: _a -> _a’, namely
       ‘(Just True :: Maybe _)’
     In the expression: (id :: _a -> _a) (Just True :: Maybe _)
+    Relevant bindings include
+      maybeBool :: Maybe Bool (bound at SplicesUsed.hs:8:1)
 
 SplicesUsed.hs:10:17: warning:
     Found type wildcard ‘_’ standing for ‘(Char, a)’

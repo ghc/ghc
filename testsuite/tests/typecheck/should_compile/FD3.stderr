@@ -7,8 +7,8 @@ FD3.hs:15:15: error:
     ‘a’ is a rigid type variable bound by
         the type signature for: translate :: (String, a) -> A a
         at FD3.hs:14:14
+    In the expression: mkA a
+    In an equation for ‘translate’: translate a = mkA a
     Relevant bindings include
       a :: (String, a) (bound at FD3.hs:15:11)
       translate :: (String, a) -> A a (bound at FD3.hs:15:1)
-    In the expression: mkA a
-    In an equation for ‘translate’: translate a = mkA a

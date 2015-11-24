@@ -16,9 +16,9 @@ T3208b.hs:15:15:
                fce' :: (OTerm a ~ STerm a, OBJECT a, SUBST a) => a -> c
       at T3208b.hs:14:9-56
     The type variable ‘o0’ is ambiguous
-    Relevant bindings include
-      f :: a (bound at T3208b.hs:15:6)
-      fce' :: a -> c (bound at T3208b.hs:15:1)
     In the first argument of ‘fce’, namely ‘(apply f)’
     In the expression: fce (apply f)
     In an equation for ‘fce'’: fce' f = fce (apply f)
+    Relevant bindings include
+      f :: a (bound at T3208b.hs:15:6)
+      fce' :: a -> c (bound at T3208b.hs:15:1)

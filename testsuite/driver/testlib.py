@@ -1,3 +1,4 @@
+# coding=utf8
 #
 # (c) Simon Marlow 2002
 #
@@ -1547,7 +1548,8 @@ def check_stderr_ok(name, way):
 
    return compare_outputs(way, 'stderr',
                           join_normalisers(norm, getTestOpts().extra_errmsg_normaliser), \
-                          expected_stderr_file, actual_stderr_file)
+                          expected_stderr_file, actual_stderr_file,
+                          whitespace_normaliser=normalise_whitespace)
 
 def dump_stderr( name ):
    print("Stderr:")
@@ -1692,8 +1694,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
 
 def normalise_whitespace( str ):
     # Merge contiguous whitespace characters into a single space.
-    str = re.sub('[ \t\n]+', ' ', str)
-    return str.strip()
+    return ' '.join(w for w in str.split())
 
 def normalise_callstacks(str):
     def repl(matches):
@@ -1722,6 +1723,11 @@ def normalise_errmsg( str ):
     str = re.sub('ghc-stage[123]', 'ghc', str)
     # Error messages simetimes contain integer implementation package
     str = re.sub('integer-(gmp|simple)-[0-9.]+', 'integer-<IMPL>-<VERSION>', str)
+    # Also filter out bullet characters.  This is because bullets are used to
+    # separate error sections, and tests shouldn't be sensitive to how the
+    # the division happens.
+    bullet = u'•'.encode('utf8')
+    str = str.replace(bullet, '')
     return str
 
 # normalise a .prof file, so that we can reasonably compare it against

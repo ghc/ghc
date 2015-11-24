@@ -6,9 +6,6 @@ T10045.hs:6:18: error:
            ‘t2’ is a rigid type variable bound by
                 the inferred type of copy :: t1 -> Bool -> t2 at T10045.hs:7:10
     To use the inferred type, enable PartialTypeSignatures
-    Relevant bindings include
-      ws1 :: () (bound at T10045.hs:5:11)
-      foo :: Meta -> t (bound at T10045.hs:5:1)
     In the type signature for:
       copy :: _
     In the expression:
@@ -22,3 +19,6 @@ T10045.hs:6:18: error:
               copy :: _
               copy w from = copy w True
             in copy ws1 False
+    Relevant bindings include
+      ws1 :: () (bound at T10045.hs:5:11)
+      foo :: Meta -> t (bound at T10045.hs:5:1)

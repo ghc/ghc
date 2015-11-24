@@ -14,7 +14,7 @@ T10285.hs:8:17: error:
       ‘b’ is a rigid type variable bound by
           the type signature for: oops :: Coercion (N a) (N b) -> a -> b
           at T10285.hs:7:9
-    Relevant bindings include
-      oops :: Coercion (N a) (N b) -> a -> b (bound at T10285.hs:8:1)
     In the expression: coerce
     In an equation for ‘oops’: oops Coercion = coerce
+    Relevant bindings include
+      oops :: Coercion (N a) (N b) -> a -> b (bound at T10285.hs:8:1)
