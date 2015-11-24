@@ -40,7 +40,6 @@ import SrcLoc
 import FastString
 import DynFlags
 import PrelNames (monadFailClassName)
-import Type
 import Inst
 
 -- Create chunkified tuple tybes for monad comprehensions
@@ -523,19 +522,13 @@ tcMcStmt ctxt (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
         ; bind_op'   <- tcSyntaxOp MCompOrigin bind_op
                              (mkFunTys [rhs_ty, mkFunTy pat_ty new_res_ty] res_ty)
 
-        -- If (but only if) the pattern can fail, typecheck the 'fail' operator
-        ; fail_op' <- if isIrrefutableHsPat pat
-            then return noSyntaxExpr
-            else tcSyntaxOp (MCompPatOrigin pat)
-                            fail_op
-                            (mkFunTy stringTy new_res_ty)
-
         ; rhs' <- tcMonoExprNC rhs rhs_ty
 
         ; (pat', thing) <- tcPat (StmtCtxt ctxt) pat pat_ty $
                            thing_inside new_res_ty
 
-        ; monadFailWarnings pat' new_res_ty
+        -- If (but only if) the pattern can fail, typecheck the 'fail' operator
+        ; fail_op' <- tcMonadFailOp (MCompPatOrigin pat) pat' fail_op new_res_ty
 
         ; return (BindStmt pat' rhs' bind_op' fail_op', thing) }
 
@@ -775,19 +768,13 @@ tcDoStmt ctxt (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
         ; bind_op'   <- tcSyntaxOp DoOrigin bind_op
                              (mkFunTys [rhs_ty, mkFunTy pat_ty new_res_ty] res_ty)
 
-        -- If (but only if) the pattern can fail, typecheck the 'fail' operator
-        ; fail_op' <- if isIrrefutableHsPat pat
-            then return noSyntaxExpr
-            else tcSyntaxOp (DoPatOrigin pat)
-                            fail_op
-                            (mkFunTy stringTy new_res_ty)
-
         ; rhs' <- tcMonoExprNC rhs rhs_ty
 
         ; (pat', thing) <- tcPat (StmtCtxt ctxt) pat pat_ty $
                            thing_inside new_res_ty
 
-        ; monadFailWarnings pat' new_res_ty
+        -- If (but only if) the pattern can fail, typecheck the 'fail' operator
+        ; fail_op' <- tcMonadFailOp (DoPatOrigin pat) pat' fail_op new_res_ty
 
         ; return (BindStmt pat' rhs' bind_op' fail_op', thing) }
 
@@ -887,24 +874,44 @@ the expected/inferred stuff is back to front (see Trac #3613).
 -- when the constraint cannot be satisfied, we only issue a warning in
 -- TcErrors.hs.
 
-monadFailWarnings :: LPat TcId -> TcType -> TcRn ()
-monadFailWarnings pat doExprType = unless (isIrrefutableHsPat pat) $ do
-    rebindableSyntax <- xoptM Opt_RebindableSyntax
-    desugarFlag      <- xoptM Opt_MonadFailDesugaring
-    missingWarning   <- woptM Opt_WarnMissingMonadFailInstance
-    if | rebindableSyntax && (desugarFlag || missingWarning)
-           -> warnRebindableClash pat
-       | not desugarFlag && missingWarning
-           -> addMonadFailConstraint pat doExprType
-       | otherwise        -> pure ()
+tcMonadFailOp :: CtOrigin
+              -> LPat TcId
+              -> HsExpr Name         -- The fail op
+              -> TcType              -- Type of the whole do-expression
+              -> TcRn (HsExpr TcId)  -- Typechecked fail op
+-- Get a 'fail' operator expression, to use if the pattern
+-- match fails. If the pattern is irrefutatable, just return
+-- noSyntaxExpr; it won't be used
+tcMonadFailOp orig pat fail_op res_ty
+  | isIrrefutableHsPat pat
+  = return noSyntaxExpr
 
-addMonadFailConstraint :: LPat TcId -> TcType -> TcRn ()
-addMonadFailConstraint pat doExprType = do
-    doExprTypeHead <- tyHead <$> zonkType doExprType
-    monadFailClass <- tcLookupClass monadFailClassName
-    let predType = mkClassPred monadFailClass [doExprTypeHead]
-    _ <- emitWanted (FailablePattern pat) predType
-    pure ()
+  | otherwise
+  = do { -- Issue MonadFail warnings
+         rebindableSyntax <- xoptM Opt_RebindableSyntax
+       ; desugarFlag      <- xoptM Opt_MonadFailDesugaring
+       ; missingWarning   <- woptM Opt_WarnMissingMonadFailInstance
+       ; if | rebindableSyntax && (desugarFlag || missingWarning)
+              -> warnRebindableClash pat
+            | not desugarFlag && missingWarning
+              -> emitMonadFailConstraint pat res_ty
+            | otherwise
+              -> return ()
+
+        -- Get the fail op itself
+        ; tcSyntaxOp orig fail_op (mkFunTy stringTy res_ty) }
+
+emitMonadFailConstraint :: LPat TcId -> TcType -> TcRn ()
+emitMonadFailConstraint pat res_ty
+  = do { -- We expect res_ty to be of form (monad_ty arg_ty)
+         (_co, (monad_ty, _arg_ty)) <- matchExpectedAppTy res_ty
+
+         -- Emit (MonadFail m), but ignore the evidence; it's
+         -- just there to generate a warning
+       ; monadFailClass <- tcLookupClass monadFailClassName
+       ; _ <- emitWanted (FailablePattern pat)
+                         (mkClassPred monadFailClass [monad_ty])
+       ; return () }
 
 warnRebindableClash :: LPat TcId -> TcRn ()
 warnRebindableClash pattern = addWarnAt (getLoc pattern)
@@ -914,25 +921,6 @@ warnRebindableClash pattern = addWarnAt (getLoc pattern)
              <+> text "If this is intentional,"
              $$
              text "compile with -fno-warn-missing-monadfail-instance."))
-
-zonkType :: TcType -> TcRn TcType
-zonkType ty = do
-    tidyEnv <- tcInitTidyEnv
-    (_, zonkedType) <- zonkTidyTcType tidyEnv ty
-    pure zonkedType
-
-
-tyHead :: TcType -> TcType
-tyHead ty
-    | Just (con, _) <- splitAppTy_maybe ty = con
-    | Just _ <- splitFunTy_maybe ty        = panicFor "FunTy"
-    | Just _ <- splitTyConApp_maybe ty     = panicFor "TyConApp"
-    | Just _ <- splitForAllTy_maybe ty     = panicFor "ForAllTy"
-    | otherwise                            = panicFor "<some other>"
-
-    where panicFor x = panic ("MonadFail check applied to " ++ x ++ " type")
-
-
 
 {-
 Note [typechecking ApplicativeStmt]
