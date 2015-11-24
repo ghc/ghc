@@ -152,6 +152,17 @@ Compiler
 -  When printing an out-of-scope error message, GHC will give helpful advice if
    the error might be caused by too restrictive imports.
 
+-  Added the ``-Wcompat`` warning group, along with its opposite
+   ``-Wno-compat``. Turns on warnings that will be enabled by default in the
+   future, but remain off in normal compilations for the time being. This
+   allows library authors eager to make their code future compatible to adapt
+   to new features before they even generate warnings.
+
+-  Added the ``-fwarn-missing-monadfail-instance`` flag. When enabled, this
+   will issue a warning if a failable pattern is used in a context that does
+   not have a ``MonadFail`` constraint. This flag represents phase 1 of the
+   MonadFail proposal (MFP).
+
 GHCi
 ~~~~
 

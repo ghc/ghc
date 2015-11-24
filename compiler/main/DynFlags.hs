@@ -2570,13 +2570,15 @@ dynamic_flags = [
   , defGhcFlag "mavx512pf"    (noArg (\d -> d{ avx512pf = True }))
 
      ------ Warning opts -------------------------------------------------
-  , defFlag "W"      (NoArg (mapM_ setWarningFlag minusWOpts))
-  , defFlag "Werror" (NoArg (setGeneralFlag           Opt_WarnIsError))
-  , defFlag "Wwarn"  (NoArg (unSetGeneralFlag         Opt_WarnIsError))
-  , defFlag "Wall"   (NoArg (mapM_ setWarningFlag minusWallOpts))
-  , defFlag "Wnot"   (NoArg (do upd (\dfs -> dfs {warningFlags = IntSet.empty})
-                                deprecate "Use -w instead"))
-  , defFlag "w"      (NoArg (upd (\dfs -> dfs {warningFlags = IntSet.empty})))
+  , defFlag "W"       (NoArg (mapM_ setWarningFlag minusWOpts))
+  , defFlag "Werror"  (NoArg (setGeneralFlag           Opt_WarnIsError))
+  , defFlag "Wwarn"   (NoArg (unSetGeneralFlag         Opt_WarnIsError))
+  , defFlag "Wcompat" (NoArg (mapM_ setWarningFlag minusWcompatOpts))
+  , defFlag "Wno-compat" (NoArg (mapM_ unSetWarningFlag minusWcompatOpts))
+  , defFlag "Wall"    (NoArg (mapM_ setWarningFlag minusWallOpts))
+  , defFlag "Wnot"    (NoArg (do upd (\dfs -> dfs {warningFlags = IntSet.empty})
+                                 deprecate "Use -w instead"))
+  , defFlag "w"       (NoArg (upd (\dfs -> dfs {warningFlags = IntSet.empty})))
 
         ------ Plugin flags ------------------------------------------------
   , defGhcFlag "fplugin-opt" (hasArg addPluginModuleNameOption)
@@ -3416,6 +3418,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
 --
 --  * docs/users_guide/using.xml
 
+-- | Warnings enabled unless specified otherwise
 standardWarnings :: [WarningFlag]
 standardWarnings -- see Note [Documenting warning flags]
     = [ Opt_WarnOverlappingPatterns,
@@ -3441,8 +3444,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnTabs
       ]
 
+-- | Things you get with -W
 minusWOpts :: [WarningFlag]
--- Things you get with -W
 minusWOpts
     = standardWarnings ++
       [ Opt_WarnUnusedTopBinds,
@@ -3455,8 +3458,8 @@ minusWOpts
         Opt_WarnDodgyImports
       ]
 
+-- | Things you get with -Wall
 minusWallOpts :: [WarningFlag]
--- Things you get with -Wall
 minusWallOpts
     = minusWOpts ++
       [ Opt_WarnTypeDefaults,
@@ -3467,6 +3470,16 @@ minusWallOpts
         Opt_WarnUnusedDoBind,
         Opt_WarnTrustworthySafe,
         Opt_WarnUntickedPromotedConstructors
+      ]
+
+-- | Things you get with -Wcompat.
+--
+-- This is intended to group together warnings that will be enabled by default
+-- at some point in the future, so that library authors eager to make their
+-- code future compatible to fix issues before they even generate warnings.
+minusWcompatOpts :: [WarningFlag]
+minusWcompatOpts
+    = [ Opt_WarnMissingMonadFailInstance
       ]
 
 enableUnusedBinds :: DynP ()

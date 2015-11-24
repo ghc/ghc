@@ -19,6 +19,13 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-w"
          }
+  , flag { flagName = "-Wcompat"
+         , flagDescription =
+           "enable future compatibility warnings " ++
+           "(details in :ref:`options-sanity`)"
+         , flagType = DynamicFlag
+         , flagReverse = "-Wno-compat"
+         }
   , flag { flagName = "-Werror"
          , flagDescription = "make warnings fatal"
          , flagType = DynamicFlag
