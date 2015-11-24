@@ -211,10 +211,10 @@ import GHC.Foreign (withCString, peekCString)
 -- described in the User's Guide. Usually at least two sections need to be
 -- updated:
 --
---  * Flag Reference section in docs/users-guide/flags.xml lists all available
---    flags together with a short description
+--  * Flag Reference section generated from the modules in
+--    utils/mkUserGuidePart/Options
 --
---  * Flag description in docs/users_guide/using.xml provides a detailed
+--  * Flag description in docs/users_guide/using.rst provides a detailed
 --    explanation of flags' usage.
 
 -- Note [Supporting CLI completion]
@@ -3358,8 +3358,8 @@ impliedXFlags
 -- If you change the list of flags enabled for particular optimisation levels
 -- please remember to update the User's Guide. The relevant files are:
 --
---  * docs/users_guide/flags.xml
---  * docs/users_guide/using.xml
+--  * utils/mkUserGuidePart/Options/
+--  * docs/users_guide/using.rst
 --
 -- The first contains the Flag Refrence section, which breifly lists all
 -- available flags. The second contains a detailed description of the
@@ -3416,7 +3416,8 @@ optLevelFlags -- see Note [Documenting optimisation flags]
 -- If you change the list of warning enabled by default
 -- please remember to update the User's Guide. The relevant file is:
 --
---  * docs/users_guide/using.xml
+--  * utils/mkUserGuidePart/
+--  * docs/users_guide/using.rst
 
 -- | Warnings enabled unless specified otherwise
 standardWarnings :: [WarningFlag]
