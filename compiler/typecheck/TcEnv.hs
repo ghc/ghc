@@ -12,7 +12,8 @@ module TcEnv(
         InstBindings(..),
 
         -- Global environment
-        tcExtendGlobalEnv, tcExtendGlobalEnvImplicit, setGlobalTypeEnv,
+        tcExtendGlobalEnv, tcExtendTyConEnv,
+        tcExtendGlobalEnvImplicit, setGlobalTypeEnv,
         tcExtendGlobalValEnv,
         tcLookupLocatedGlobal, tcLookupGlobal,
         tcLookupTyCon, tcLookupClass,
@@ -260,10 +261,8 @@ setGlobalTypeEnv tcg_env new_type_env
 
 
 tcExtendGlobalEnvImplicit :: [TyThing] -> TcM r -> TcM r
-  -- Extend the global environment with some TyThings that can be obtained
-  -- via implicitTyThings from other entities in the environment.  Examples
-  -- are dfuns, famInstTyCons, data cons, etc.
-  -- These TyThings are not added to tcg_tcs.
+  -- Just extend the global environment with some TyThings
+  -- Do not extend tcg_tcs etc
 tcExtendGlobalEnvImplicit things thing_inside
    = do { tcg_env <- getGblEnv
         ; let ge'  = extendTypeEnvList (tcg_type_env tcg_env) things
@@ -279,6 +278,16 @@ tcExtendGlobalEnv things thing_inside
                           tcg_patsyns = [ps | AConLike (PatSynCon ps) <- things] ++ tcg_patsyns env }
        ; setGblEnv env' $
             tcExtendGlobalEnvImplicit things thing_inside
+       }
+
+tcExtendTyConEnv :: [TyCon] -> TcM r -> TcM r
+  -- Given a mixture of Ids, TyCons, Classes, all defined in the
+  -- module being compiled, extend the global environment
+tcExtendTyConEnv tycons thing_inside
+  = do { env <- getGblEnv
+       ; let env' = env { tcg_tcs = tycons ++ tcg_tcs env }
+       ; setGblEnv env' $
+         tcExtendGlobalEnvImplicit (map ATyCon tycons) thing_inside
        }
 
 tcExtendGlobalValEnv :: [Id] -> TcM a -> TcM a

@@ -147,7 +147,9 @@ mkTypeableBinds tycons
                            Just mod_id -> nlHsVar mod_id
                            Nothing     -> pprPanic "tcMkTypeableBinds" (ppr tycons)
              stuff    = (dflags, mod_expr, pkg_str, mod_str, tr_datacon, trn_datacon)
-             tc_binds = map (mk_typeable_binds stuff) tycons
+             all_tycons = [ tc' | tc <- tycons, tc' <- tc : tyConATs tc ]
+                             -- We need type representations for any associated types
+             tc_binds = map (mk_typeable_binds stuff) all_tycons
              tycon_rep_ids = foldr ((++) . collectHsBindsBinders) [] tc_binds
        ; return (tycon_rep_ids, tc_binds) } }
 

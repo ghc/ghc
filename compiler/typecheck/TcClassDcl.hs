@@ -97,16 +97,16 @@ Death to "ExpandingDicts".
 ************************************************************************
 -}
 
-tcClassSigs :: Name                  -- Name of the class
+tcClassSigs :: Name                -- Name of the class
             -> [LSig Name]
             -> LHsBinds Name
-            -> TcM ([TcMethInfo],    -- Exactly one for each method
-                    NameEnv Type)    -- Types of the generic-default methods
+            -> TcM [TcMethInfo]    -- Exactly one for each method
 tcClassSigs clas sigs def_methods
   = do { traceTc "tcClassSigs 1" (ppr clas)
 
        ; gen_dm_prs <- concat <$> mapM (addLocM tc_gen_sig) gen_sigs
-       ; let gen_dm_env = mkNameEnv gen_dm_prs
+       ; let gen_dm_env :: NameEnv Type
+             gen_dm_env = mkNameEnv gen_dm_prs
 
        ; op_info <- concat <$> mapM (addLocM (tc_sig gen_dm_env)) vanilla_sigs
 
@@ -120,22 +120,22 @@ tcClassSigs clas sigs def_methods
                    -- Generic signature without value binding
 
        ; traceTc "tcClassSigs 2" (ppr clas)
-       ; return (op_info, gen_dm_env) }
+       ; return op_info }
   where
     vanilla_sigs = [L loc (nm,ty) | L loc (TypeSig    nm ty _) <- sigs]
     gen_sigs     = [L loc (nm,ty) | L loc (GenericSig nm ty) <- sigs]
     dm_bind_names :: [Name]     -- These ones have a value binding in the class decl
     dm_bind_names = [op | L _ (FunBind {fun_id = L _ op}) <- bagToList def_methods]
 
-    tc_sig genop_env (op_names, op_hs_ty)
+    tc_sig gen_dm_env (op_names, op_hs_ty)
       = do { traceTc "ClsSig 1" (ppr op_names)
            ; op_ty <- tcClassSigType op_hs_ty   -- Class tyvars already in scope
            ; traceTc "ClsSig 2" (ppr op_names)
-           ; return [ (op_name, f op_name, op_ty) | L _ op_name <- op_names ] }
+           ; return [ (op_name, op_ty, f op_name) | L _ op_name <- op_names ] }
            where
-             f nm | nm `elemNameEnv` genop_env = GenericDM
-                  | nm `elem` dm_bind_names    = VanillaDM
-                  | otherwise                  = NoDM
+             f nm | Just ty <- lookupNameEnv gen_dm_env nm = Just (GenericDM ty)
+                  | nm `elem` dm_bind_names                = Just VanillaDM
+                  | otherwise                              = Nothing
 
     tc_gen_sig (op_names, gen_hs_ty)
       = do { gen_op_ty <- tcClassSigType gen_hs_ty
@@ -173,19 +173,8 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
               pred        = mkClassPred clas (mkTyVarTys clas_tyvars)
         ; this_dict <- newEvVar pred
 
-        ; let tc_item (sel_id, dm_info)
-                = case dm_info of
-                    DefMeth dm_name    -> tc_dm sel_id dm_name False
-                    GenDefMeth dm_name -> tc_dm sel_id dm_name True
-                       -- For GenDefMeth, warn if the user specifies a signature
-                       -- with redundant constraints; but not for DefMeth, where
-                       -- the default method may well be 'error' or something
-                    NoDefMeth          -> do { mapM_ (addLocM (badDmPrag sel_id))
-                                                     (lookupPragEnv prag_fn (idName sel_id))
-                                             ; return emptyBag }
-              tc_dm = tcDefMeth clas clas_tyvars this_dict
-                                default_binds sig_fn prag_fn
-
+        ; let tc_item = tcDefMeth clas clas_tyvars this_dict
+                                  default_binds sig_fn prag_fn
         ; dm_binds <- tcExtendTyVarEnv clas_tyvars $
                       mapM tc_item op_items
 
@@ -194,19 +183,25 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 tcClassDecl2 d = pprPanic "tcClassDecl2" (ppr d)
 
 tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds Name
-          -> HsSigFun -> TcPragEnv -> Id -> Name -> Bool
+          -> HsSigFun -> TcPragEnv -> ClassOpItem
           -> TcM (LHsBinds TcId)
--- Generate code for polymorphic default methods only (hence DefMeth)
--- (Generic default methods have turned into instance decls by now.)
+-- Generate code for default methods
 -- This is incompatible with Hugs, which expects a polymorphic
 -- default method for every class op, regardless of whether or not
 -- the programmer supplied an explicit default decl for the class.
 -- (If necessary we can fix that, but we don't have a convenient Id to hand.)
-tcDefMeth clas tyvars this_dict binds_in
-          hs_sig_fn prag_fn sel_id dm_name warn_redundant
+
+tcDefMeth _ _ _ _ _ prag_fn (sel_id, Nothing)
+  = do { -- No default method
+         mapM_ (addLocM (badDmPrag sel_id))
+               (lookupPragEnv prag_fn (idName sel_id))
+       ; return emptyBag }
+
+tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
+          (sel_id, Just (dm_name, dm_spec))
   | Just (L bind_loc dm_bind, bndr_loc) <- findMethodBind sel_name binds_in
-    -- First look up the default method -- it should be there!
-  = do { global_dm_id  <- tcLookupId dm_name
+  = do { -- First look up the default method -- It should be there!
+         global_dm_id  <- tcLookupId dm_name
        ; global_dm_id  <- addInlinePrags global_dm_id prags
        ; local_dm_name <- setSrcSpan bndr_loc (newLocalName sel_name)
             -- Base the local_dm_name on the selector name, because
@@ -234,6 +229,13 @@ tcDefMeth clas tyvars this_dict binds_in
              lm_bind     = dm_bind { fun_id = L bind_loc local_dm_name }
                              -- Substitute the local_meth_name for the binder
                              -- NB: the binding is always a FunBind
+
+             warn_redundant = case dm_spec of
+                                GenericDM {} -> True
+                                VanillaDM    -> False
+                -- For GenericDM, warn if the user specifies a signature
+                -- with redundant constraints; but not for VanillaDM, where
+                -- the default method may well be 'error' or something
 
              ctxt = FunSigCtxt sel_name warn_redundant
 
@@ -283,7 +285,7 @@ tcClassMinimalDef _clas sigs op_info
     -- implementation whose names don't start with '_'
     defMindef :: ClassMinimalDef
     defMindef = mkAnd [ noLoc (mkVar name)
-                      | (name, NoDM, _) <- op_info
+                      | (name, _, Nothing) <- op_info
                       , not (startsWithUnderscore (getOccName name)) ]
 
 instantiateMethod :: Class -> Id -> [TcType] -> TcType

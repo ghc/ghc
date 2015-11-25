@@ -1721,7 +1721,8 @@ implicitTyConThings tc
   = class_stuff ++
       -- fields (names of selectors)
 
-      -- (possibly) implicit newtype coercion
+      -- (possibly) implicit newtype axioms
+      -- or type family axioms
     implicitCoTyCon tc ++
 
       -- for each data constructor in order,

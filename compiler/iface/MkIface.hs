@@ -1529,8 +1529,9 @@ classToIfaceDecl env clas
 
     toIfaceClassOp (sel_id, def_meth)
         = ASSERT(sel_tyvars == clas_tyvars)
-          IfaceClassOp (getOccName sel_id) (toDmSpec def_meth)
+          IfaceClassOp (getOccName sel_id)
                        (tidyToIfaceType env1 op_ty)
+                       (fmap toDmSpec def_meth)
         where
                 -- Be careful when splitting the type, because of things
                 -- like         class Foo a where
@@ -1540,9 +1541,9 @@ classToIfaceDecl env clas
           (sel_tyvars, rho_ty) = splitForAllTys (idType sel_id)
           op_ty                = funResultTy rho_ty
 
-    toDmSpec NoDefMeth      = NoDM
-    toDmSpec (GenDefMeth _) = GenericDM
-    toDmSpec (DefMeth _)    = VanillaDM
+    toDmSpec :: (Name, DefMethSpec Type) -> DefMethSpec IfaceType
+    toDmSpec (_, VanillaDM)       = VanillaDM
+    toDmSpec (_, GenericDM dm_ty) = GenericDM (tidyToIfaceType env1 dm_ty)
 
     toIfaceFD (tvs1, tvs2) = (map (getFS . tidyTyVar env1) tvs1,
                               map (getFS . tidyTyVar env1) tvs2)

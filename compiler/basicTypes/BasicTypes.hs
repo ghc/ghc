@@ -765,19 +765,17 @@ instance Outputable OccInfo where
 
 The DefMethSpec enumeration just indicates what sort of default method
 is used for a class. It is generated from source code, and present in
-interface files; it is converted to Class.DefMeth before begin put in a
+interface files; it is converted to Class.DefMethInfo before begin put in a
 Class object.
 -}
 
-data DefMethSpec = NoDM        -- No default method
-                 | VanillaDM   -- Default method given with polymorphic code
-                 | GenericDM   -- Default method given with generic code
-  deriving Eq
+data DefMethSpec ty
+  = VanillaDM     -- Default method given with polymorphic code
+  | GenericDM ty  -- Default method given with code of this type
 
-instance Outputable DefMethSpec where
-  ppr NoDM      = empty
-  ppr VanillaDM = ptext (sLit "{- Has default method -}")
-  ppr GenericDM = ptext (sLit "{- Has generic default method -}")
+instance Outputable (DefMethSpec ty) where
+  ppr VanillaDM      = ptext (sLit "{- Has default method -}")
+  ppr (GenericDM {}) = ptext (sLit "{- Has generic default method -}")
 
 {-
 ************************************************************************

@@ -807,17 +807,6 @@ instance Binary InlineSpec where
                   2 -> return Inlinable
                   _ -> return NoInline
 
-instance Binary DefMethSpec where
-    put_ bh NoDM      = putByte bh 0
-    put_ bh VanillaDM = putByte bh 1
-    put_ bh GenericDM = putByte bh 2
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> return NoDM
-              1 -> return VanillaDM
-              _ -> return GenericDM
-
 instance Binary RecFlag where
     put_ bh Recursive = do
             putByte bh 0

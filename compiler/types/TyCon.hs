@@ -73,7 +73,7 @@ module TyCon(
         tyConArity,
         tyConRoles,
         tyConFlavour,
-        tyConTuple_maybe, tyConClass_maybe,
+        tyConTuple_maybe, tyConClass_maybe, tyConATs,
         tyConFamInst_maybe, tyConFamInstSig_maybe, tyConFamilyCoercion_maybe,
         tyConFamilyResVar_maybe,
         synTyConDefn_maybe, synTyConRhs_maybe,
@@ -1303,12 +1303,20 @@ isAbstractTyCon :: TyCon -> Bool
 isAbstractTyCon (AlgTyCon { algTcRhs = AbstractTyCon {} }) = True
 isAbstractTyCon _ = False
 
--- | Make an algebraic 'TyCon' abstract. Panics if the supplied 'TyCon' is not
--- algebraic
+-- | Make an fake, abstract 'TyCon' from an existing one.
+-- Used when recovering from errors
 makeTyConAbstract :: TyCon -> TyCon
-makeTyConAbstract tc@(AlgTyCon { algTcRhs = rhs })
-  = tc { algTcRhs = AbstractTyCon (isGenInjAlgRhs rhs) }
-makeTyConAbstract tc = pprPanic "makeTyConAbstract" (ppr tc)
+makeTyConAbstract tc
+  = PrimTyCon { tyConName        = name,
+                tyConUnique      = nameUnique name,
+                tyConKind        = tyConKind tc,
+                tyConArity       = tyConArity tc,
+                tcRoles          = tyConRoles tc,
+                primTyConRep     = PtrRep,
+                isUnLifted       = False,
+                primRepName      = Nothing }
+  where
+    name = tyConName tc
 
 -- | Does this 'TyCon' represent something that cannot be defined in Haskell?
 isPrimTyCon :: TyCon -> Bool
@@ -1866,6 +1874,11 @@ isClassTyCon _                                        = False
 tyConClass_maybe :: TyCon -> Maybe Class
 tyConClass_maybe (AlgTyCon {algTcParent = ClassTyCon clas _}) = Just clas
 tyConClass_maybe _                                            = Nothing
+
+-- | Return the associated types of the 'TyCon', if any
+tyConATs :: TyCon -> [TyCon]
+tyConATs (AlgTyCon {algTcParent = ClassTyCon clas _}) = classATs clas
+tyConATs _                                            = []
 
 ----------------------------------------------------------------------------
 -- | Is this 'TyCon' that for a data family instance?

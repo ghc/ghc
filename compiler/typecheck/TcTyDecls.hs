@@ -375,18 +375,17 @@ data RecTyInfo = RTI { rti_promotable :: Bool
                      , rti_is_rec     :: Name -> RecFlag }
 
 calcRecFlags :: SelfBootInfo -> Bool  -- hs-boot file?
-             -> RoleAnnots -> [TyThing] -> RecTyInfo
+             -> RoleAnnots -> [TyCon] -> RecTyInfo
 -- The 'boot_names' are the things declared in M.hi-boot, if M is the current module.
 -- Any type constructors in boot_names are automatically considered loop breakers
-calcRecFlags boot_details is_boot mrole_env tyclss
+-- Recursion of newtypes/data types can happen via
+-- the class TyCon, so all_tycons includes the class tycons
+calcRecFlags boot_details is_boot mrole_env all_tycons
   = RTI { rti_promotable = is_promotable
         , rti_roles      = roles
         , rti_is_rec     = is_rec }
   where
     rec_tycon_names = mkNameSet (map tyConName all_tycons)
-    all_tycons = mapMaybe getTyCon tyclss
-                   -- Recursion of newtypes/data types can happen via
-                   -- the class TyCon, so tyclss includes the class tycons
 
     is_promotable = all (computeTyConPromotability rec_tycon_names) all_tycons
 
@@ -465,10 +464,6 @@ calcRecFlags boot_details is_boot mrole_env tyclss
 
 new_tc_rhs :: TyCon -> Type
 new_tc_rhs tc = snd (newTyConRhs tc)    -- Ignore the type variables
-
-getTyCon :: TyThing -> Maybe TyCon
-getTyCon (ATyCon tc) = Just tc
-getTyCon _           = Nothing
 
 findLoopBreakers :: [(TyCon, [TyCon])] -> [Name]
 -- Finds a set of tycons that cut all loops
@@ -811,19 +806,39 @@ updateRoleEnv name n role
 *                                                                      *
 ********************************************************************* -}
 
-tcAddImplicits :: [TyThing] -> TcM TcGblEnv
-tcAddImplicits tyclss
+tcAddImplicits :: [TyCon] -> TcM TcGblEnv
+tcAddImplicits tycons
   = discardWarnings $
     tcExtendGlobalEnvImplicit implicit_things  $
     tcExtendGlobalValEnv def_meth_ids          $
-    do { (typeable_ids, typeable_binds) <- mkTypeableBinds tycons
+    do { traceTc "tcAddImplicits" $ vcat
+            [ text "tycons" <+> ppr tycons
+            , text "implicits" <+> ppr implicit_things ]
+       ; (typeable_ids, typeable_binds) <- mkTypeableBinds tycons
        ; gbl_env <- tcExtendGlobalValEnv typeable_ids
                     $ tcRecSelBinds $ mkRecSelBinds tycons
        ; return (gbl_env `addTypecheckedBinds` typeable_binds) }
  where
-   implicit_things = concatMap implicitTyThings tyclss
-   tycons          = [tc | ATyCon tc <- tyclss]
-   def_meth_ids    = mkDefaultMethodIds tyclss
+   implicit_things = concatMap implicitTyConThings tycons
+   def_meth_ids    = mkDefaultMethodIds tycons
+
+mkDefaultMethodIds :: [TyCon] -> [Id]
+-- We want to put the default-method Ids (both vanilla and generic)
+-- into the type environment so that they are found when we typecheck
+-- the filled-in default methods of each instance declaration
+-- See Note [Default method Ids and Template Haskell]
+mkDefaultMethodIds tycons
+  = [ mkExportedLocalId VanillaId dm_name (mk_dm_ty cls sel_id dm_spec)
+    | tc <- tycons
+    , Just cls <- [tyConClass_maybe tc]
+    , (sel_id, Just (dm_name, dm_spec)) <- classOpItems cls ]
+  where
+    mk_dm_ty :: Class -> Id -> DefMethSpec Type -> Type
+    mk_dm_ty _ sel_id VanillaDM        = idType sel_id
+    mk_dm_ty cls _   (GenericDM dm_ty) = mkSigmaTy cls_tvs [pred] dm_ty
+       where
+         cls_tvs = classTyVars cls
+         pred    = mkClassPred cls (mkTyVarTys cls_tvs)
 
 {-
 ************************************************************************
@@ -833,14 +848,8 @@ tcAddImplicits tyclss
 ************************************************************************
 -}
 
-mkDefaultMethodIds :: [TyThing] -> [Id]
--- See Note [Default method Ids and Template Haskell]
-mkDefaultMethodIds things
-  = [ mkExportedLocalId VanillaId dm_name (idType sel_id)
-    | ATyCon tc <- things
-    , Just cls <- [tyConClass_maybe tc]
-    , (sel_id, DefMeth dm_name) <- classOpItems cls ]
-
+{-
+-}
 {-
 Note [Default method Ids and Template Haskell]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

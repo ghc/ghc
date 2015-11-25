@@ -173,10 +173,13 @@ data IfaceFamTyConFlav
   | IfaceAbstractClosedSynFamilyTyCon
   | IfaceBuiltInSynFamTyCon -- for pretty printing purposes only
 
-data IfaceClassOp = IfaceClassOp IfaceTopBndr DefMethSpec IfaceType
-        -- Nothing    => no default method
-        -- Just False => ordinary polymorphic default method
-        -- Just True  => generic default method
+data IfaceClassOp
+  = IfaceClassOp IfaceTopBndr
+                 IfaceType                         -- Class op type
+                 (Maybe (DefMethSpec IfaceType))   -- Default method
+                 -- The types of both the class op itself,
+                 -- and the default method, are *not* quantifed
+                 -- over the class variables
 
 data IfaceAT = IfaceAT  -- See Class.ClassATItem
                   IfaceDecl          -- The associated type declaration
@@ -814,9 +817,14 @@ instance Outputable IfaceClassOp where
    ppr = pprIfaceClassOp showAll
 
 pprIfaceClassOp :: ShowSub -> IfaceClassOp -> SDoc
-pprIfaceClassOp ss (IfaceClassOp n dm ty) = hang opHdr 2 (pprIfaceSigmaType ty)
-  where opHdr = pprPrefixIfDeclBndr ss n
-                <+> ppShowIface ss (ppr dm) <+> dcolon
+pprIfaceClassOp ss (IfaceClassOp n ty dm)
+  = pp_sig n ty $$ generic_dm
+  where
+   generic_dm | Just (GenericDM dm_ty) <- dm
+              =  ptext (sLit "default") <+> pp_sig n dm_ty
+              | otherwise
+              = empty
+   pp_sig n ty = pprPrefixIfDeclBndr ss n <+> dcolon <+> pprIfaceSigmaType ty
 
 instance Outputable IfaceAT where
    ppr = pprIfaceAT showAll
@@ -1182,7 +1190,11 @@ freeNamesIfAT (IfaceAT decl mb_def)
       Just rhs -> freeNamesIfType rhs
 
 freeNamesIfClsSig :: IfaceClassOp -> NameSet
-freeNamesIfClsSig (IfaceClassOp _n _dm ty) = freeNamesIfType ty
+freeNamesIfClsSig (IfaceClassOp _n ty dm) = freeNamesIfType ty &&& freeNamesDM dm
+
+freeNamesDM :: Maybe (DefMethSpec IfaceType) -> NameSet
+freeNamesDM (Just (GenericDM ty)) = freeNamesIfType ty
+freeNamesDM _                     = emptyNameSet
 
 freeNamesIfConDecls :: IfaceConDecls -> NameSet
 freeNamesIfConDecls (IfDataTyCon c _ _) = fnList freeNamesIfConDecl c
@@ -1538,16 +1550,16 @@ instance Binary IfaceFamTyConFlav where
                                   (ppr (fromIntegral h :: Int)) }
 
 instance Binary IfaceClassOp where
-    put_ bh (IfaceClassOp n def ty) = do
+    put_ bh (IfaceClassOp n ty def) = do
         put_ bh (occNameFS n)
-        put_ bh def
         put_ bh ty
+        put_ bh def
     get bh = do
         n   <- get bh
-        def <- get bh
         ty  <- get bh
+        def <- get bh
         occ <- return $! mkVarOccFS n
-        return (IfaceClassOp occ def ty)
+        return (IfaceClassOp occ ty def)
 
 instance Binary IfaceAT where
     put_ bh (IfaceAT dec defs) = do

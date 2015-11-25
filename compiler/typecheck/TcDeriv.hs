@@ -410,9 +410,9 @@ tcDeriving deriv_infos deriv_decls
              liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
                         (ddump_deriving inst_info rn_binds newTyCons famInsts))
 
-        ; let all_tycons = map ATyCon (bagToList newTyCons)
-        ; gbl_env <- tcExtendGlobalEnv all_tycons $
-                     tcExtendGlobalEnvImplicit (concatMap implicitTyThings all_tycons) $
+        ; let all_tycons = bagToList newTyCons
+        ; gbl_env <- tcExtendTyConEnv all_tycons $
+                     tcExtendGlobalEnvImplicit (concatMap implicitTyConThings all_tycons) $
                      tcExtendLocalFamInstEnv (bagToList famInsts) $
                      tcExtendLocalInstEnv (map iSpec (bagToList inst_info)) getGblEnv
         ; let all_dus = rn_dus `plusDU` usesOnly (mkFVs $ catMaybes maybe_fvs)

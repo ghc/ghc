@@ -6,7 +6,7 @@ module Vectorise.Type.TyConDecl (
 import Vectorise.Type.Type
 import Vectorise.Monad
 import Vectorise.Env( GlobalEnv( global_fam_inst_env ) )
-import BuildTyCl( buildClass, buildDataCon )
+import BuildTyCl( TcMethInfo, buildClass, buildDataCon )
 import OccName
 import Class
 import Type
@@ -120,7 +120,7 @@ vectTyConDecl tycon name'
 
 -- |Vectorise a class method.  (Don't enter it into the vectorisation map yet.)
 --
-vectMethod :: Id -> DefMeth -> Type -> VM (Name, DefMethSpec, Type)
+vectMethod :: Id -> DefMethInfo -> Type -> VM TcMethInfo
 vectMethod id defMeth ty
  = do {   -- Vectorise the method type.
       ; ty' <- vectType ty
@@ -128,7 +128,7 @@ vectMethod id defMeth ty
           -- Create a name for the vectorised method.
       ; id' <- mkVectId id ty'
 
-      ; return  (Var.varName id', defMethSpecOfDefMeth defMeth, ty')
+      ; return  (Var.varName id', ty', defMethSpecOfDefMeth defMeth)
       }
 
 -- |Vectorise the RHS of an algebraic type.

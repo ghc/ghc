@@ -36,14 +36,13 @@ import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
 import Type
 import TcEvidence
 import TyCon
-import CoAxiom
+import CoAxiom( toBranchedAxiom )
 import DataCon
 import Class
 import Var
 import VarEnv
 import VarSet
 import PrelNames  ( typeableClassName, genericClassNames )
---                   , knownNatClassName, knownSymbolClassName )
 import Bag
 import BasicTypes
 import DynFlags
@@ -462,14 +461,17 @@ addFamInsts :: [FamInst] -> TcM a -> TcM a
 --        (b) the type envt with stuff from data type decls
 addFamInsts fam_insts thing_inside
   = tcExtendLocalFamInstEnv fam_insts $
-    tcExtendGlobalEnv things  $
+    tcExtendGlobalEnv axioms $
+    tcExtendTyConEnv data_rep_tycons  $
     do { traceTc "addFamInsts" (pprFamInsts fam_insts)
-       ; tcg_env <- tcAddImplicits things
+       ; tcg_env <- tcAddImplicits data_rep_tycons
+                    -- Does not add its axiom; that comes from
+                    -- adding the 'axioms' above
        ; setGblEnv tcg_env thing_inside }
   where
-    axioms = map (toBranchedAxiom . famInstAxiom) fam_insts
-    tycons = famInstsRepTyCons fam_insts
-    things = map ATyCon tycons ++ map ACoAxiom axioms
+    axioms = map (ACoAxiom . toBranchedAxiom . famInstAxiom) fam_insts
+    data_rep_tycons = famInstsRepTyCons fam_insts
+      -- The representation tycons for 'data instances' declarations
 
 {-
 Note [Deriving inside TH brackets]
@@ -1228,7 +1230,7 @@ tcMethods :: DFunId -> Class
           -> [TcType]
           -> TcEvBinds
           -> ([Located TcSpecPrag], TcPragEnv)
-          -> [(Id, DefMeth)]
+          -> [ClassOpItem]
           -> InstBindings Name
           -> TcM ([Id], LHsBinds Id, Bag Implication)
         -- The returned inst_meth_ids all have types starting
@@ -1255,7 +1257,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
     inst_loc  = getSrcSpan dfun_id
 
     ----------------------
-    tc_item :: (Id, DefMeth) -> TcM (Id, LHsBind Id, Maybe Implication)
+    tc_item :: ClassOpItem -> TcM (Id, LHsBind Id, Maybe Implication)
     tc_item (sel_id, dm_info)
       | Just (user_bind, bndr_loc) <- findMethodBind (idName sel_id) binds
       = tcMethodBody clas tyvars dfun_ev_vars inst_tys
@@ -1266,15 +1268,15 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
            ; tc_default sel_id dm_info }
 
     ----------------------
-    tc_default :: Id -> DefMeth -> TcM (TcId, LHsBind Id, Maybe Implication)
+    tc_default :: Id -> DefMethInfo -> TcM (TcId, LHsBind Id, Maybe Implication)
 
-    tc_default sel_id (GenDefMeth dm_name)
+    tc_default sel_id (Just (dm_name, GenericDM {}))
       = do { meth_bind <- mkGenericDefMethBind clas inst_tys sel_id dm_name
            ; tcMethodBody clas tyvars dfun_ev_vars inst_tys
                                   dfun_ev_binds is_derived hs_sig_fn prags
                                   sel_id meth_bind inst_loc }
 
-    tc_default sel_id NoDefMeth     -- No default method at all
+    tc_default sel_id Nothing     -- No default method at all
       = do { traceTc "tc_def: warn" (ppr sel_id)
            ; (meth_id, _, _) <- mkMethIds hs_sig_fn clas tyvars dfun_ev_vars
                                           inst_tys sel_id
@@ -1292,7 +1294,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                               (hcat [ppr inst_loc, vbar, ppr sel_id ])
         lam_wrapper  = mkWpTyLams tyvars <.> mkWpLams dfun_ev_vars
 
-    tc_default sel_id (DefMeth dm_name) -- A polymorphic default method
+    tc_default sel_id (Just (dm_name, VanillaDM)) -- A polymorphic default method
       = do {     -- Build the typechecked version directly,
                  -- without calling typecheck_method;
                  -- see Note [Default methods in instances]
