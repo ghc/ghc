@@ -525,6 +525,11 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(isalnum)                             \
       SymI_HasProto(isascii)                             \
       RTS___MINGW_VFPRINTF_SYM                           \
+      SymI_HasProto(__mingw_vsscanf)                     \
+      SymI_HasProto(__mingw_vprintf)                     \
+      SymI_HasProto(__mingw_vsprintf)                    \
+      SymI_HasProto(__ms_vsnprintf)                      \
+      SymI_HasProto(strdup)                              \
       SymI_HasProto(strcmp)                              \
       SymI_HasProto(memmove)                             \
       SymI_HasProto(realloc)                             \
