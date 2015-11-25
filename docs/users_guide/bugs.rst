@@ -463,6 +463,11 @@ Bugs in GHC
    libraries that come with GHC are probably built without this option,
    unless you built GHC yourself.
 
+-  There is known to be maleficent interactions between weak references and
+   laziness. Particularly, it has been observed that placing a thunk containing
+   a reference to a weak reference inside of another weak reference may cause
+   runtime crashes. See :ghc-ticket:`11108` for details.
+
 .. _bugs-ghci:
 
 Bugs in GHCi (the interactive GHC)
