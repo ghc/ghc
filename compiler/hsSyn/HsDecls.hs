@@ -369,8 +369,8 @@ Default methods
    E.g. $dmmax
 
  - If there is a default method name at all, it's recorded in
-   the ClassOpSig (in HsBinds), in the DefMeth field.
-   (DefMeth is defined in Class.hs)
+   the ClassOpSig (in HsBinds), in the DefMethInfo field.
+   (DefMethInfo is defined in Class.hs)
 
 Source-code class decls and interface-code class decls are treated subtly
 differently, which has given me a great deal of confusion over the years.
@@ -391,7 +391,8 @@ In *source-code* class declarations:
           op2 :: <type>
           op1 = ...
    We generate a binding for $dmop1 but not for $dmop2.
-   The Class for Foo has a NoDefMeth for op2 and a DefMeth for op1.
+   The Class for Foo has a Nothing for op2 and
+                         a Just ($dm_op1, VanillaDM) for op1.
    The Name for $dmop2 is simply discarded.
 
 In *interface-file* class declarations:

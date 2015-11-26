@@ -141,15 +141,15 @@ mkTypeableBinds tycons
          else
     do { tr_datacon  <- tcLookupDataCon trTyConDataConName
        ; trn_datacon <- tcLookupDataCon trNameSDataConName
-       ; let pkg_str    = unitIdString (moduleUnitId mod)
-             mod_str    = moduleNameString (moduleName mod)
-             mod_expr   = case tcg_tr_module gbl_env of  -- Should be set by now
-                             Just mod_id -> nlHsVar mod_id
-                             Nothing     -> pprPanic "tcMkTypeableBinds" (ppr tycons)
-             stuff      = (dflags, mod_expr, pkg_str, mod_str, tr_datacon, trn_datacon)
-             tc_binds   = map (mk_typeable_binds stuff) all_tycons
+       ; let pkg_str  = unitIdString (moduleUnitId mod)
+             mod_str  = moduleNameString (moduleName mod)
+             mod_expr = case tcg_tr_module gbl_env of  -- Should be set by now
+                           Just mod_id -> nlHsVar mod_id
+                           Nothing     -> pprPanic "tcMkTypeableBinds" (ppr tycons)
+             stuff    = (dflags, mod_expr, pkg_str, mod_str, tr_datacon, trn_datacon)
              all_tycons = [ tc' | tc <- tycons, tc' <- tc : tyConATs tc ]
                              -- We need type representations for any associated types
+             tc_binds = map (mk_typeable_binds stuff) all_tycons
              tycon_rep_ids = foldr ((++) . collectHsBindsBinders) [] tc_binds
 
        ; gbl_env <- tcExtendGlobalValEnv tycon_rep_ids getGblEnv

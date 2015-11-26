@@ -230,7 +230,7 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
 
 -- ------------------------------------------------------
 
-type TcMethInfo = (Name, DefMethSpec, Type)
+type TcMethInfo = (Name, Type, Maybe (DefMethSpec Type))
         -- A temporary intermediate, to communicate between
         -- tcClassSigs and buildClass.
 
@@ -279,7 +279,7 @@ buildClass tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc_isrec
                 --     class C a => D a
                 -- we don't get a newtype with no arguments!
               args      = sc_sel_names ++ op_names
-              op_tys    = [ty | (_,_,ty) <- sig_stuff]
+              op_tys    = [ty | (_,ty,_) <- sig_stuff]
               op_names  = [op | (op,_,_) <- sig_stuff]
               arg_tys   = sc_theta ++ op_tys
               rec_tycon = classTyCon rec_clas
@@ -327,13 +327,11 @@ buildClass tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc_isrec
     no_bang = HsSrcBang Nothing NoSrcUnpack NoSrcStrict
 
     mk_op_item :: Class -> TcMethInfo -> TcRnIf n m ClassOpItem
-    mk_op_item rec_clas (op_name, dm_spec, _)
+    mk_op_item rec_clas (op_name, _, dm_spec)
       = do { dm_info <- case dm_spec of
-                          NoDM      -> return NoDefMeth
-                          GenericDM -> do { dm_name <- newImplicitBinder op_name mkGenDefMethodOcc
-                                          ; return (GenDefMeth dm_name) }
-                          VanillaDM -> do { dm_name <- newImplicitBinder op_name mkDefaultMethodOcc
-                                          ; return (DefMeth dm_name) }
+                          Nothing   -> return Nothing
+                          Just spec -> do { dm_name <- newImplicitBinder op_name mkDefaultMethodOcc
+                                          ; return (Just (dm_name, spec)) }
            ; return (mkDictSelId op_name rec_clas, dm_info) }
 
 {-

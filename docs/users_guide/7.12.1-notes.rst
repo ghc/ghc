@@ -161,7 +161,8 @@ Compiler
 -  Added the ``-fwarn-missing-monadfail-instance`` flag. When enabled, this
    will issue a warning if a failable pattern is used in a context that does
    not have a ``MonadFail`` constraint. This flag represents phase 1 of the
-   MonadFail proposal (MFP).
+   `MonadFail Proposal (MFP)
+   <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
 
 GHCi
 ~~~~

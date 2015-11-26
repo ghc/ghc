@@ -1107,17 +1107,6 @@ n+k patterns
 ``n+k`` pattern support is disabled by default. To enable it, you can
 use the ``-XNPlusKPatterns`` flag.
 
-.. _traditional-record-syntax:
-
-Traditional record syntax
--------------------------
-
-.. index::
-   single: -XNoTraditionalRecordSyntax
-
-Traditional record syntax, such as ``C {f = x}``, is enabled by default.
-To disable it, you can use the ``-XNoTraditionalRecordSyntax`` flag.
-
 .. _recursive-do-notation:
 
 The recursive do-notation
@@ -1818,7 +1807,8 @@ New monadic failure desugaring mechanism
 The ``-XMonadFailDesugaring`` extension switches the desugaring of
 ``do``-blocks to use ``MonadFail.fail`` instead of ``Monad.fail``. This will
 eventually be the default behaviour in a future GHC release, under the
-MonadFail Proposal (MFP).
+`MonadFail Proposal (MFP)
+<https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
 
 This extension is temporary, and will be deprecated in a future release. It is
 included so that library authors have a hard check for whether their code
@@ -2099,250 +2089,6 @@ except that the semi-colons between guards in a multi-way if are
 optional. So it is not necessary to line up all the guards at the same
 column; this is consistent with the way guards work in function
 definitions and case expressions.
-
-.. _disambiguate-fields:
-
-Record field disambiguation
----------------------------
-
-In record construction and record pattern matching it is entirely
-unambiguous which field is referred to, even if there are two different
-data types in scope with a common field name. For example:
-
-::
-
-    module M where
-      data S = MkS { x :: Int, y :: Bool }
-
-    module Foo where
-      import M
-
-      data T = MkT { x :: Int }
-
-      ok1 (MkS { x = n }) = n+1   -- Unambiguous
-      ok2 n = MkT { x = n+1 }     -- Unambiguous
-
-      bad1 k = k { x = 3 }  -- Ambiguous
-      bad2 k = x k          -- Ambiguous
-
-Even though there are two ``x``'s in scope, it is clear that the ``x``
-in the pattern in the definition of ``ok1`` can only mean the field
-``x`` from type ``S``. Similarly for the function ``ok2``. However, in
-the record update in ``bad1`` and the record selection in ``bad2`` it is
-not clear which of the two types is intended.
-
-Haskell 98 regards all four as ambiguous, but with the
-``-XDisambiguateRecordFields`` flag, GHC will accept the former two. The
-rules are precisely the same as those for instance declarations in
-Haskell 98, where the method names on the left-hand side of the method
-bindings in an instance declaration refer unambiguously to the method of
-that class (provided they are in scope at all), even if there are other
-variables in scope with the same name. This reduces the clutter of
-qualified names when you import two records from different modules that
-use the same field name.
-
-Some details:
-
--  Field disambiguation can be combined with punning (see
-   :ref:`record-puns`). For example:
-
-   ::
-
-       module Foo where
-         import M
-         x=True
-         ok3 (MkS { x }) = x+1   -- Uses both disambiguation and punning
-
--  With ``-XDisambiguateRecordFields`` you can use *unqualified* field
-   names even if the corresponding selector is only in scope *qualified*
-   For example, assuming the same module ``M`` as in our earlier
-   example, this is legal:
-
-   ::
-
-       module Foo where
-         import qualified M    -- Note qualified
-
-         ok4 (M.MkS { x = n }) = n+1   -- Unambiguous
-
-   Since the constructor ``MkS`` is only in scope qualified, you must
-   name it ``M.MkS``, but the field ``x`` does not need to be qualified
-   even though ``M.x`` is in scope but ``x`` is not (In effect, it is
-   qualified by the constructor).
-
-.. _record-puns:
-
-Record puns
------------
-
-Record puns are enabled by the flag ``-XNamedFieldPuns``.
-
-When using records, it is common to write a pattern that binds a
-variable with the same name as a record field, such as:
-
-::
-
-    data C = C {a :: Int}
-    f (C {a = a}) = a
-
-Record punning permits the variable name to be elided, so one can simply
-write
-
-::
-
-    f (C {a}) = a
-
-to mean the same pattern as above. That is, in a record pattern, the
-pattern ``a`` expands into the pattern ``a = a`` for the same name
-``a``.
-
-Note that:
-
--  Record punning can also be used in an expression, writing, for
-   example,
-
-   ::
-
-       let a = 1 in C {a}
-
-   instead of
-
-   ::
-
-       let a = 1 in C {a = a}
-
-   The expansion is purely syntactic, so the expanded right-hand side
-   expression refers to the nearest enclosing variable that is spelled
-   the same as the field name.
-
--  Puns and other patterns can be mixed in the same record:
-
-   ::
-
-       data C = C {a :: Int, b :: Int}
-       f (C {a, b = 4}) = a
-
--  Puns can be used wherever record patterns occur (e.g. in ``let``
-   bindings or at the top-level).
-
--  A pun on a qualified field name is expanded by stripping off the
-   module qualifier. For example:
-
-   ::
-
-       f (C {M.a}) = a
-
-   means
-
-   ::
-
-       f (M.C {M.a = a}) = a
-
-   (This is useful if the field selector ``a`` for constructor ``M.C``
-   is only in scope in qualified form.)
-
-.. _record-wildcards:
-
-Record wildcards
-----------------
-
-Record wildcards are enabled by the flag ``-XRecordWildCards``. This
-flag implies ``-XDisambiguateRecordFields``.
-
-For records with many fields, it can be tiresome to write out each field
-individually in a record pattern, as in
-
-::
-
-    data C = C {a :: Int, b :: Int, c :: Int, d :: Int}
-    f (C {a = 1, b = b, c = c, d = d}) = b + c + d
-
-Record wildcard syntax permits a "``..``" in a record pattern, where
-each elided field ``f`` is replaced by the pattern ``f = f``. For
-example, the above pattern can be written as
-
-::
-
-    f (C {a = 1, ..}) = b + c + d
-
-More details:
-
--  Record wildcards in patterns can be mixed with other patterns,
-   including puns (:ref:`record-puns`); for example, in a pattern
-   ``(C {a = 1, b, ..})``. Additionally, record wildcards can be used
-   wherever record patterns occur, including in ``let`` bindings and at
-   the top-level. For example, the top-level binding
-
-   ::
-
-       C {a = 1, ..} = e
-
-   defines ``b``, ``c``, and ``d``.
-
--  Record wildcards can also be used in an expression, when constructing
-   a record. For example,
-
-   ::
-
-       let {a = 1; b = 2; c = 3; d = 4} in C {..}
-
-   in place of
-
-   ::
-
-       let {a = 1; b = 2; c = 3; d = 4} in C {a=a, b=b, c=c, d=d}
-
-   The expansion is purely syntactic, so the record wildcard expression
-   refers to the nearest enclosing variables that are spelled the same
-   as the omitted field names.
-
--  Record wildcards may *not* be used in record *updates*. For example
-   this is illegal:
-
-   ::
-
-       f r = r { x = 3, .. }
-
--  For both pattern and expression wildcards, the "``..``" expands to
-   the missing *in-scope* record fields. Specifically the expansion of
-   "``C {..}``" includes ``f`` if and only if:
-
-   -  ``f`` is a record field of constructor ``C``.
-
-   -  The record field ``f`` is in scope somehow (either qualified or
-      unqualified).
-
-   -  In the case of expressions (but not patterns), the variable ``f``
-      is in scope unqualified, apart from the binding of the record
-      selector itself.
-
-   These rules restrict record wildcards to the situations in which the
-   user could have written the expanded version. For example
-
-   ::
-
-       module M where
-         data R = R { a,b,c :: Int }
-       module X where
-         import M( R(a,c) )
-         f b = R { .. }
-
-   The ``R{..}`` expands to ``R{M.a=a}``, omitting ``b`` since the
-   record field is not in scope, and omitting ``c`` since the variable
-   ``c`` is not in scope (apart from the binding of the record selector
-   ``c``, of course).
-
--  Record wildcards cannot be used (a) in a record update construct, and
-   (b) for data constructors that are not declared with record fields.
-   For example:
-
-   ::
-
-       f x = x { v=True, .. }   -- Illegal (a)
-
-       data T = MkT Int Bool
-       g = MkT { .. }           -- Illegal (b)
-       h (MkT { .. }) = True    -- Illegal (b)
 
 .. _local-fixity-declarations:
 
@@ -3531,6 +3277,419 @@ also sets ``-XGADTSyntax`` and ``-XMonoLocalBinds``.
    unification-based type inference for
    GADTs <http://research.microsoft.com/%7Esimonpj/papers/gadt>`__. The
    criteria implemented by GHC are given in the Appendix.
+
+.. _record-system-extensions:
+
+Extensions to the record system
+===============================
+
+.. _traditional-record-syntax:
+
+Traditional record syntax
+-------------------------
+
+.. index::
+   single: -XNoTraditionalRecordSyntax
+
+Traditional record syntax, such as ``C {f = x}``, is enabled by default.
+To disable it, you can use the ``-XNoTraditionalRecordSyntax`` flag.
+
+.. _disambiguate-fields:
+
+Record field disambiguation
+---------------------------
+
+In record construction and record pattern matching it is entirely
+unambiguous which field is referred to, even if there are two different
+data types in scope with a common field name. For example:
+
+::
+
+    module M where
+      data S = MkS { x :: Int, y :: Bool }
+
+    module Foo where
+      import M
+
+      data T = MkT { x :: Int }
+
+      ok1 (MkS { x = n }) = n+1   -- Unambiguous
+      ok2 n = MkT { x = n+1 }     -- Unambiguous
+
+      bad1 k = k { x = 3 }  -- Ambiguous
+      bad2 k = x k          -- Ambiguous
+
+Even though there are two ``x``'s in scope, it is clear that the ``x``
+in the pattern in the definition of ``ok1`` can only mean the field
+``x`` from type ``S``. Similarly for the function ``ok2``. However, in
+the record update in ``bad1`` and the record selection in ``bad2`` it is
+not clear which of the two types is intended.
+
+Haskell 98 regards all four as ambiguous, but with the
+``-XDisambiguateRecordFields`` flag, GHC will accept the former two. The
+rules are precisely the same as those for instance declarations in
+Haskell 98, where the method names on the left-hand side of the method
+bindings in an instance declaration refer unambiguously to the method of
+that class (provided they are in scope at all), even if there are other
+variables in scope with the same name. This reduces the clutter of
+qualified names when you import two records from different modules that
+use the same field name.
+
+Some details:
+
+-  Field disambiguation can be combined with punning (see
+   :ref:`record-puns`). For example:
+
+   ::
+
+       module Foo where
+         import M
+         x=True
+         ok3 (MkS { x }) = x+1   -- Uses both disambiguation and punning
+
+-  With ``-XDisambiguateRecordFields`` you can use *unqualified* field
+   names even if the corresponding selector is only in scope *qualified*
+   For example, assuming the same module ``M`` as in our earlier
+   example, this is legal:
+
+   ::
+
+       module Foo where
+         import qualified M    -- Note qualified
+
+         ok4 (M.MkS { x = n }) = n+1   -- Unambiguous
+
+   Since the constructor ``MkS`` is only in scope qualified, you must
+   name it ``M.MkS``, but the field ``x`` does not need to be qualified
+   even though ``M.x`` is in scope but ``x`` is not (In effect, it is
+   qualified by the constructor).
+
+.. _duplicate-record-fields:
+
+Duplicate record fields
+-----------------------
+
+Going beyond ``-XDisambiguateRecordFields`` (see :ref:`disambiguate-fields`),
+the ``-XDuplicateRecordFields`` extension allows multiple datatypes to be
+declared using the same field names in a single module. For example, it allows
+this:
+
+::
+
+    module M where
+      data S = MkS { x :: Int }
+      data T = MkT { x :: Bool }
+
+Uses of fields that are always unambiguous because they mention the constructor,
+including construction and pattern-matching, may freely use duplicated field
+names. For example, the following are permitted (just as with
+``-XDisambiguateRecordFields``):
+
+::
+
+    s = MkS { x = 3 }
+
+    f (MkT { x = b }) = b
+
+Field names used as selector functions or in record updates must be unambiguous,
+either because there is only one such field in scope, or because a type
+signature is supplied, as described in the following sections.
+
+Selector functions
+~~~~~~~~~~~~~~~~~~
+
+Fields may be used as selector functions only if they are unambiguous, so this
+is still not allowed if both ``S(x)`` and ``T(x)`` are in scope:
+
+::
+
+    bad r = x r
+
+An ambiguous selector may be disambiguated by the type being "pushed down" to
+the occurrence of the selector (see :ref:`higher-rank-type-inference` for more
+details on what "pushed down" means). For example, the following are permitted:
+
+::
+
+    ok1 = x :: S -> Int
+
+    ok2 :: S -> Int
+    ok2 = x
+
+    ok3 = k x -- assuming we already have k :: (S -> Int) -> _
+
+In addition, the datatype that is meant may be given as a type signature on the
+argument to the selector:
+
+::
+
+    ok4 s = x (s :: S)
+
+However, we do not infer the type of the argument to determine the datatype, or
+have any way of deferring the choice to the constraint solver. Thus the
+following is ambiguous:
+
+::
+
+    bad :: S -> Int
+    bad s = x s
+
+Even though a field label is duplicated in its defining module, it may be
+possible to use the selector unambiguously elsewhere. For example, another
+module could import ``S(x)`` but not ``T(x)``, and then use ``x`` unambiguously.
+
+Record updates
+~~~~~~~~~~~~~~
+
+In a record update such as ``e { x = 1 }``, if there are multiple ``x`` fields
+in scope, then the type of the context must fix which record datatype is
+intended, or a type annotation must be supplied. Consider the following
+definitions:
+
+::
+
+    data S = MkS { foo :: Int }
+    data T = MkT { foo :: Int, bar :: Int }
+    data U = MkU { bar :: Int, baz :: Int }
+
+Without ``-XDuplicateRecordFields``, an update mentioning ``foo`` will always be
+ambiguous if all these definitions were in scope. When the extension is enabled,
+there are several options for disambiguating updates:
+
+- Check for types that have all the fields being updated. For example:
+
+  ::
+
+      f x = x { foo = 3, bar = 2 }
+
+  Here ``f`` must be updating ``T`` because neither ``S`` nor ``U`` have both
+  fields.
+
+- Use the type being pushed in to the record update, as in the following:
+
+  ::
+
+      g1 :: T -> T
+      g1 x = x { foo = 3 }
+
+      g2 x = x { foo = 3 } :: T
+
+      g3 = k (x { foo = 3 }) -- assuming we already have k :: T -> _
+
+- Use an explicit type signature on the record expression, as in:
+
+  ::
+
+      h x = (x :: T) { foo = 3 }
+
+The type of the expression being updated will not be inferred, and no
+constraint-solving will be performed, so the following will be rejected as
+ambiguous:
+
+::
+
+    let x :: T
+        x = blah
+    in x { foo = 3 }
+
+    \x -> [x { foo = 3 },  blah :: T ]
+
+    \ (x :: T) -> x { foo = 3 }
+
+Import and export of record fields
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When ``-XDuplicateRecordFields`` is enabled, an ambiguous field must be exported
+as part of its datatype, rather than at the top level. For example, the
+following is legal:
+
+::
+
+    module M (S(x), T(..)) where
+      data S = MkS { x :: Int }
+      data T = MkT { x :: Bool }
+
+However, this would not be permitted, because ``x`` is ambiguous:
+
+::
+
+    module M (x) where ...
+
+Similar restrictions apply on import.
+
+.. _record-puns:
+
+Record puns
+-----------
+
+Record puns are enabled by the flag ``-XNamedFieldPuns``.
+
+When using records, it is common to write a pattern that binds a
+variable with the same name as a record field, such as:
+
+::
+
+    data C = C {a :: Int}
+    f (C {a = a}) = a
+
+Record punning permits the variable name to be elided, so one can simply
+write
+
+::
+
+    f (C {a}) = a
+
+to mean the same pattern as above. That is, in a record pattern, the
+pattern ``a`` expands into the pattern ``a = a`` for the same name
+``a``.
+
+Note that:
+
+-  Record punning can also be used in an expression, writing, for
+   example,
+
+   ::
+
+       let a = 1 in C {a}
+
+   instead of
+
+   ::
+
+       let a = 1 in C {a = a}
+
+   The expansion is purely syntactic, so the expanded right-hand side
+   expression refers to the nearest enclosing variable that is spelled
+   the same as the field name.
+
+-  Puns and other patterns can be mixed in the same record:
+
+   ::
+
+       data C = C {a :: Int, b :: Int}
+       f (C {a, b = 4}) = a
+
+-  Puns can be used wherever record patterns occur (e.g. in ``let``
+   bindings or at the top-level).
+
+-  A pun on a qualified field name is expanded by stripping off the
+   module qualifier. For example:
+
+   ::
+
+       f (C {M.a}) = a
+
+   means
+
+   ::
+
+       f (M.C {M.a = a}) = a
+
+   (This is useful if the field selector ``a`` for constructor ``M.C``
+   is only in scope in qualified form.)
+
+.. _record-wildcards:
+
+Record wildcards
+----------------
+
+Record wildcards are enabled by the flag ``-XRecordWildCards``. This
+flag implies ``-XDisambiguateRecordFields``.
+
+For records with many fields, it can be tiresome to write out each field
+individually in a record pattern, as in
+
+::
+
+    data C = C {a :: Int, b :: Int, c :: Int, d :: Int}
+    f (C {a = 1, b = b, c = c, d = d}) = b + c + d
+
+Record wildcard syntax permits a "``..``" in a record pattern, where
+each elided field ``f`` is replaced by the pattern ``f = f``. For
+example, the above pattern can be written as
+
+::
+
+    f (C {a = 1, ..}) = b + c + d
+
+More details:
+
+-  Record wildcards in patterns can be mixed with other patterns,
+   including puns (:ref:`record-puns`); for example, in a pattern
+   ``(C {a = 1, b, ..})``. Additionally, record wildcards can be used
+   wherever record patterns occur, including in ``let`` bindings and at
+   the top-level. For example, the top-level binding
+
+   ::
+
+       C {a = 1, ..} = e
+
+   defines ``b``, ``c``, and ``d``.
+
+-  Record wildcards can also be used in an expression, when constructing
+   a record. For example,
+
+   ::
+
+       let {a = 1; b = 2; c = 3; d = 4} in C {..}
+
+   in place of
+
+   ::
+
+       let {a = 1; b = 2; c = 3; d = 4} in C {a=a, b=b, c=c, d=d}
+
+   The expansion is purely syntactic, so the record wildcard expression
+   refers to the nearest enclosing variables that are spelled the same
+   as the omitted field names.
+
+-  Record wildcards may *not* be used in record *updates*. For example
+   this is illegal:
+
+   ::
+
+       f r = r { x = 3, .. }
+
+-  For both pattern and expression wildcards, the "``..``" expands to
+   the missing *in-scope* record fields. Specifically the expansion of
+   "``C {..}``" includes ``f`` if and only if:
+
+   -  ``f`` is a record field of constructor ``C``.
+
+   -  The record field ``f`` is in scope somehow (either qualified or
+      unqualified).
+
+   -  In the case of expressions (but not patterns), the variable ``f``
+      is in scope unqualified, apart from the binding of the record
+      selector itself.
+
+   These rules restrict record wildcards to the situations in which the
+   user could have written the expanded version. For example
+
+   ::
+
+       module M where
+         data R = R { a,b,c :: Int }
+       module X where
+         import M( R(a,c) )
+         f b = R { .. }
+
+   The ``R{..}`` expands to ``R{M.a=a}``, omitting ``b`` since the
+   record field is not in scope, and omitting ``c`` since the variable
+   ``c`` is not in scope (apart from the binding of the record selector
+   ``c``, of course).
+
+-  Record wildcards cannot be used (a) in a record update construct, and
+   (b) for data constructors that are not declared with record fields.
+   For example:
+
+   ::
+
+       f x = x { v=True, .. }   -- Illegal (a)
+
+       data T = MkT Int Bool
+       g = MkT { .. }           -- Illegal (b)
+       h (MkT { .. }) = True    -- Illegal (b)
 
 .. _deriving:
 
@@ -8242,6 +8401,8 @@ polymorphic types. For example:
 In the function ``h`` we use the record selectors ``return`` and
 ``bind`` to extract the polymorphic bind and return functions from the
 ``MonadT`` data structure, rather than using pattern matching.
+
+.. _higher-rank-type-inference:
 
 Type inference
 ~~~~~~~~~~~~~~

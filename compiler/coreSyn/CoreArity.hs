@@ -826,7 +826,6 @@ So the costs of evaluating 'e' (not 'e y') are attributed to "foo"
 
 Note [Eta expansion and source notes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 CorePrep puts floatable ticks outside of value applications, but not
 type applications. As a result we might be trying to eta-expand an
 expression like

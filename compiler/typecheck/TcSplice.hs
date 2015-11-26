@@ -1214,10 +1214,9 @@ reifyClass cls
       = do { ty <- reifyType (idType op)
            ; let nm' = reifyName op
            ; case def_meth of
-                GenDefMeth gdm_nm ->
-                  do { gdm_id <- tcLookupId gdm_nm
-                     ; gdm_ty <- reifyType (idType gdm_id)
-                     ; return [TH.SigD nm' ty, TH.DefaultSigD nm' gdm_ty] }
+                Just (_, GenericDM gdm_ty) ->
+                  do { gdm_ty' <- reifyType gdm_ty
+                     ; return [TH.SigD nm' ty, TH.DefaultSigD nm' gdm_ty'] }
                 _ -> return [TH.SigD nm' ty] }
 
     reifyAT :: ClassATItem -> TcM [TH.Dec]

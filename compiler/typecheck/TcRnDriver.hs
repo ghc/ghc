@@ -935,7 +935,7 @@ checkBootTyCon tc1 tc2
            check (eqTypeX env op_ty1 op_ty2)
                  (text "The types of" <+> pname1 <+>
                   text "are different") `andThenCheck`
-           check (def_meth1 == def_meth2)
+           check (eqMaybeBy eqDM def_meth1 def_meth2)
                  (text "The default methods associated with" <+> pname1 <+>
                   text "are different")
          where
@@ -952,6 +952,10 @@ checkBootTyCon tc1 tc2
          = checkBootTyCon tc1 tc2 `andThenCheck`
            check (eqATDef def_ats1 def_ats2)
                  (text "The associated type defaults differ")
+
+       eqDM (_, VanillaDM)    (_, VanillaDM)    = True
+       eqDM (_, GenericDM t1) (_, GenericDM t2) = eqTypeX env t1 t2
+       eqDM _ _ = False
 
        -- Ignore the location of the defaults
        eqATDef Nothing             Nothing             = True

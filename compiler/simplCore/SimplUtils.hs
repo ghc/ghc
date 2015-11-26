@@ -1302,7 +1302,10 @@ mkLam bndrs body cont
       , let body_arity = exprEtaExpandArity dflags body
       , body_arity > 0
       = do { tick (EtaExpansion (head bndrs))
-           ; return (mkLams bndrs (etaExpand body_arity body)) }
+           ; let res = mkLams bndrs (etaExpand body_arity body)
+           ; traceSmpl "eta expand" (vcat [text "before" <+> ppr (mkLams bndrs body)
+                                          , text "after" <+> ppr res])
+           ; return res }
 
       | otherwise
       = return (mkLams bndrs body)

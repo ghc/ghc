@@ -242,7 +242,8 @@ command line.
 
     Being part of the ``-Wcompat`` option group, this warning is off by
     default, but will be switched on in a future GHC release, as part of
-    the MFP (MonadFail Proposal).
+    the `MonadFail Proposal (MFP)
+    <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
 
 ``-fwarn-deprecated-flags``
     .. index::
