@@ -45,7 +45,7 @@ module TcSMonad (
     emptyInert, getTcSInerts, setTcSInerts, takeGivenInsolubles,
     matchableGivens, prohibitedSuperClassSolve,
     getUnsolvedInerts,
-    removeInertCts,
+    removeInertCts, getPendingScDicts, isPendingScDict,
     addInertCan, addInertEq, insertFunEq,
     emitInsoluble, emitWorkNC, emitWorkCt,
 
@@ -548,9 +548,7 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
               --   (b) emitDerivedShadows
 
        , inert_dicts :: DictMap Ct
-              -- Dictionaries only, index is the class
-              -- NB: index is /not/ the whole type because FD reactions
-              -- need to match the class but not necessarily the whole type.
+              -- Dictionaries only
 
        , inert_safehask :: DictMap Ct
               -- Failed dictionary resolution due to Safe Haskell overlapping
@@ -1637,6 +1635,35 @@ getInertGivens
                      $ foldFunEqs (:) (inert_funeqs inerts)
                      $ concat (varEnvElts (inert_eqs inerts))
        ; return (filter isGivenCt all_cts) }
+
+getPendingScDicts :: TcS [Ct]
+-- Find all inert Given dictionaries whose cc_pend_sc flag is True
+-- Set the flag to False in the inert set, and return that Ct
+getPendingScDicts = updRetInertCans get_sc_dicts
+  where
+    get_sc_dicts ic@(IC { inert_dicts = dicts })
+      = (sc_pend_dicts, ic')
+      where
+        ic' = ic { inert_dicts = foldr add dicts sc_pend_dicts }
+
+        sc_pend_dicts :: [Ct]
+        sc_pend_dicts = foldDicts get_pending dicts []
+
+    get_pending :: Ct -> [Ct] -> [Ct]  -- Get dicts with cc_pend_sc = True
+                                       -- but flipping the flag
+    get_pending dict dicts
+        | Just dict' <- isPendingScDict dict = dict' : dicts
+        | otherwise                          = dicts
+
+    add :: Ct -> DictMap Ct -> DictMap Ct
+    add ct@(CDictCan { cc_class = cls, cc_tyargs = tys }) dicts
+        = addDict dicts cls tys ct
+    add ct _ = pprPanic "getPendingScDicts" (ppr ct)
+
+isPendingScDict :: Ct -> Maybe Ct
+isPendingScDict ct@(CDictCan { cc_pend_sc = True })
+                  = Just (ct { cc_pend_sc = False })
+isPendingScDict _ = Nothing
 
 getUnsolvedInerts :: TcS ( Bag Implication
                          , Cts     -- Tyvar eqs: a ~ ty

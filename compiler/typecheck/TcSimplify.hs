@@ -32,6 +32,7 @@ import PrelNames
 import TcErrors
 import TcEvidence
 import TcInteract
+import TcCanonical   ( makeSuperClasses )
 import TcMType   as TcM
 import TcRnMonad as TcRn
 import TcSMonad  as TcS
@@ -909,12 +910,13 @@ solveWanteds wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics 
          -- of adding Derived insolubles twice; see
          -- TcSMonad Note [Do not add duplicate derived insolubles]
        ; wc1 <- solveSimpleWanteds simples
+       ; (no_new_scs, wc1) <- expandSuperClasses wc1
        ; let WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 } = wc1
 
        ; (floated_eqs, implics2) <- solveNestedImplications (implics `unionBags` implics1)
 
        ; dflags <- getDynFlags
-       ; final_wc <- simpl_loop 0 (solverIterations dflags) floated_eqs
+       ; final_wc <- simpl_loop 0 (solverIterations dflags) floated_eqs no_new_scs
                                 (WC { wc_simple = simples1, wc_impl = implics2
                                     , wc_insol  = insols `unionBags` insols1 })
 
@@ -925,10 +927,10 @@ solveWanteds wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics 
 
        ; return final_wc }
 
-simpl_loop :: Int -> IntWithInf -> Cts
+simpl_loop :: Int -> IntWithInf -> Cts -> Bool
            -> WantedConstraints
            -> TcS WantedConstraints
-simpl_loop n limit floated_eqs
+simpl_loop n limit floated_eqs no_new_given_scs
            wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
   | n `intGtLimit` limit
   = failTcS (hang (ptext (sLit "solveWanteds: too many iterations")
@@ -936,7 +938,7 @@ simpl_loop n limit floated_eqs
                 2 (vcat [ ptext (sLit "Set limit with -fsolver-iterations=n; n=0 for no limit")
                         , ppr wc ] ))
 
-  | no_floated_eqs
+  | isEmptyBag floated_eqs && no_new_given_scs
   = return wc  -- Done!
 
   | otherwise
@@ -949,19 +951,43 @@ simpl_loop n limit floated_eqs
                                -- NB: the floated_eqs may include /derived/ equalities
                                --     arising from fundeps inside an implication
 
+       ; (no_new_scs, wc1) <- expandSuperClasses wc1
+
        ; let WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 } = wc1
 
-       -- solveImplications may make progress only if unifs2 holds
+       -- We have already tried to solve the nested implications once
+       -- Try again only if we have unified some meta-variables
+       -- (which is a bit like adding more givens
+       -- See Note [Cutting off simpl_loop]
        ; (floated_eqs2, implics2) <- if unifs1 == 0 && isEmptyBag implics1
                                      then return (emptyBag, implics)
                                      else solveNestedImplications (implics `unionBags` implics1)
 
-       ; simpl_loop (n+1) limit floated_eqs2
+       ; simpl_loop (n+1) limit floated_eqs2 no_new_scs
                     (WC { wc_simple = simples1, wc_impl = implics2
                         , wc_insol  = insols `unionBags` insols1 }) }
 
-  where
-    no_floated_eqs = isEmptyBag floated_eqs
+expandSuperClasses :: WantedConstraints -> TcS (Bool, WantedConstraints)
+-- If there are any unsolved wanteds, expand one step of superclasses for
+-- unsolved wanteds or givens
+expandSuperClasses wc@(WC { wc_simple = unsolved, wc_insol = insols })
+  | isEmptyBag unsolved  -- No unsolved simple wanteds, so do not add suerpclasses
+  = return (True, wc)
+  | otherwise
+  = do { let (pending_wanted, unsolved') = mapAccumBagL get [] unsolved
+             get acc ct = case isPendingScDict ct of
+                            Just ct' -> (ct':acc, ct')
+                            Nothing  -> (acc,     ct)
+       ; pending_given <- getPendingScDicts
+       ; if null pending_given && null pending_wanted
+         then return (True, wc)
+         else
+    do { new_given  <- concatMapM makeSuperClasses pending_given
+       ; new_insols <- solveSimpleGivens new_given
+       ; new_wanted <- concatMapM makeSuperClasses pending_wanted
+       ; return (False, wc { wc_simple = unsolved' `unionBags`
+                                         listToBag (map mkNonCanonical new_wanted)
+                           , wc_insol = insols `unionBags` new_insols }) } }
 
 solveNestedImplications :: Bag Implication
                         -> TcS (Cts, Bag Implication)
@@ -1010,7 +1036,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
          -- Solve the nested constraints
        ; (no_given_eqs, given_insols, residual_wanted)
              <- nestImplicTcS ev_binds tclvl $
-               do { given_insols <- solveSimpleGivens (mkGivenLoc tclvl info env) givens
+               do { given_insols <- solveSimpleGivenEvVars (mkGivenLoc tclvl info env) givens
                   ; no_eqs <- getNoGivenEqs tclvl skols
 
                   ; residual_wanted <- solveWanteds wanteds
@@ -1289,27 +1315,17 @@ of progress.  Trac #8474 is a classic example:
 
   * So there is no point in attempting to re-solve
        ?yn:betan => [W] ?x:Int
-    because we'll just get the same [D] again
+    via solveNestedImplications, because we'll just get the
+    same [D] again
 
   * If we *do* re-solve, we'll get an ininite loop. It is cut off by
     the fixed bound of 10, but solving the next takes 10*10*...*10 (ie
     exponentially many) iterations!
 
-Conclusion: we should iterate simpl_loop iff we will get more 'givens'
-in the inert set when solving the nested implications.  That is the
-result of prepareInertsForImplications is larger.  How can we tell
-this?
-
-Consider floated_eqs (all wanted or derived):
-
-(a) [W/D] CTyEqCan (a ~ ty).  This can give rise to a new given only by causing
-    a unification. So we count those unifications.
-
-(b) [W] CFunEqCan (F tys ~ xi).  Even though these are wanted, they
-    are pushed in as givens by prepareInertsForImplications.  See Note
-    [Preparing inert set for implications] in TcSMonad.  But because
-    of that very fact, we won't generate another copy if we iterate
-    simpl_loop.  So we iterate if there any of these
+Conclusion: we should call solveNestedImplications only if we did
+some unifiction in solveSimpleWanteds; because that's the only way
+we'll get more Givens (a unificaiton is like adding a Given) to
+allow the implication to make progress.
 -}
 
 promoteTyVar :: TcLevel -> TcTyVar  -> TcS TcTyVar

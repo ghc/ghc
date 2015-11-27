@@ -82,7 +82,7 @@ module TcType (
 
   ---------------------------------
   -- Predicate types
-  mkMinimalBySCs, transSuperClasses, transSuperClassesPred,
+  mkMinimalBySCs, boundedSuperClasses,
   immSuperClasses,
   isImprovementPred,
 
@@ -1377,30 +1377,44 @@ evVarPred var
 
 -- Superclasses
 
+type PredWithSCs = (PredType, [PredType])
+
 mkMinimalBySCs :: [PredType] -> [PredType]
 -- Remove predicates that can be deduced from others by superclasses
-mkMinimalBySCs ptys = [ ploc |  ploc <- ptys
-                             ,  ploc `not_in_preds` rec_scs ]
+-- Result is a subset of the input
+mkMinimalBySCs ptys = go preds_with_scs []
  where
-   rec_scs = concatMap trans_super_classes ptys
-   not_in_preds p ps = not (any (eqPred p) ps)
+   preds_with_scs :: [PredWithSCs]
+   preds_with_scs = [ (pred, boundedSuperClasses pred)
+                    | pred <- ptys ]
 
-   trans_super_classes pred   -- Superclasses of pred, excluding pred itself
-     = case classifyPredType pred of
-         ClassPred cls tys -> transSuperClasses cls tys
-         _                 -> []
+   go :: [PredWithSCs]   -- Work list
+      -> [PredWithSCs]   -- Accumulating result
+      -> [PredType]
+   go [] min_preds = map fst min_preds
+   go (work_item@(p,_) : work_list) min_preds
+     | p `in_cloud` work_list || p `in_cloud` min_preds
+     = go work_list min_preds
+     | otherwise
+     = go work_list (work_item : min_preds)
 
-transSuperClasses :: Class -> [Type] -> [PredType]
-transSuperClasses cls tys    -- Superclasses of (cls tys),
-                             -- excluding (cls tys) itself
-  = concatMap transSuperClassesPred (immSuperClasses cls tys)
+   in_cloud :: PredType -> [PredWithSCs] -> Bool
+   in_cloud p ps = or [ p `eqPred` p' | (_, scs) <- ps, p' <- scs ]
 
-transSuperClassesPred :: PredType -> [PredType]
--- (transSuperClassesPred p) returns (p : p's superclasses)
-transSuperClassesPred p
-  = case classifyPredType p of
-      ClassPred cls tys -> p : transSuperClasses cls tys
-      _                 -> [p]
+boundedSuperClasses :: PredType -> [PredType]
+-- (boundedSuperClasses p) returns (p's superclasses)
+-- not including p (unless there's a loop)
+boundedSuperClasses p
+  = go 10 p   -- Set a hard limit here; it's always sound
+              -- to return fewer superclasses
+  where
+    go :: Int -> PredType -> [PredType]
+    go n p | n > 0
+           , ClassPred cls tys <- classifyPredType p
+           = [ p' | sc <- immSuperClasses cls tys
+                  , p'  <- sc : go (n-1) sc ]
+           | otherwise
+           = []
 
 immSuperClasses :: Class -> [Type] -> [PredType]
 immSuperClasses cls tys

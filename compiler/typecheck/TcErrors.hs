@@ -332,7 +332,7 @@ warnRedundantConstraints ctxt env info ev_vars
                      _        -> ev_vars
 
    improving ev_var = any isImprovementPred $
-                      transSuperClassesPred (idType ev_var)
+                      boundedSuperClasses (idType ev_var)
 
 {- Note [Redundant constraints in instance decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

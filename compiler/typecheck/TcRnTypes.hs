@@ -1114,7 +1114,13 @@ data Ct
   = CDictCan {  -- e.g.  Num xi
       cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
       cc_class  :: Class,
-      cc_tyargs :: [Xi]        -- cc_tyargs are function-free, hence Xi
+      cc_tyargs :: [Xi],       -- cc_tyargs are function-free, hence Xi
+      cc_pend_sc :: Bool       -- True <=> (a) cc_class has superclasses
+                               --          (b) we have not yet added those
+                               --              superclasses as Givens
+           -- NB: cc_pend_sc is used for G/W/D.  For W/D the reason
+           --     we need superclasses is to expose possible improvement
+           --     via fundeps
     }
 
   | CIrredEvCan {  -- These stand for yet-unusable predicates

@@ -3,7 +3,7 @@
 module TcCanonical(
      canonicalize,
      unifyDerived,
-
+     makeSuperClasses,
      StopOrContinue(..), stopWith, continueWith
   ) where
 
@@ -139,11 +139,11 @@ canonicalize ct@(CNonCanonical { cc_ev = ev })
        ; {-# SCC "canEvVar" #-}
          canEvNC ev }
 
-canonicalize (CDictCan { cc_ev = ev
-                       , cc_class  = cls
-                       , cc_tyargs = xis })
+canonicalize (CDictCan { cc_ev = ev, cc_class  = cls
+                       , cc_tyargs = xis, cc_pend_sc = pend_sc })
   = {-# SCC "canClass" #-}
-    canClass ev cls xis -- Do not add any superclasses
+    canClass ev cls xis pend_sc
+
 canonicalize (CTyEqCan { cc_ev = ev
                        , cc_tyvar  = tv
                        , cc_rhs    = xi
@@ -183,43 +183,28 @@ canEvNC ev
 ************************************************************************
 -}
 
-canClass, canClassNC
-   :: CtEvidence
-   -> Class -> [Type] -> TcS (StopOrContinue Ct)
+canClassNC :: CtEvidence -> Class -> [Type] -> TcS (StopOrContinue Ct)
+canClassNC ev cls tys = canClass ev cls tys (has_scs cls)
+  where
+    has_scs cls = not (null (classSCTheta cls))
+
+canClass :: CtEvidence -> Class -> [Type] -> Bool -> TcS (StopOrContinue Ct)
 -- Precondition: EvVar is class evidence
 
--- The canClassNC version is used on non-canonical constraints
--- and adds superclasses.  The plain canClass version is used
--- for already-canonical class constraints (but which might have
--- been subsituted or somthing), and hence do not need superclasses
-
-canClassNC ev cls tys
-  = canClass ev cls tys
-    `andWhenContinue` emitSuperclasses
-
-canClass ev cls tys
+canClass ev cls tys pend_sc
   =   -- all classes do *nominal* matching
     ASSERT2( ctEvRole ev == Nominal, ppr ev $$ ppr cls $$ ppr tys )
     do { (xis, cos) <- flattenManyNom ev tys
        ; let co = mkTcTyConAppCo Nominal (classTyCon cls) cos
              xi = mkClassPred cls xis
              mk_ct new_ev = CDictCan { cc_ev = new_ev
-                                     , cc_tyargs = xis, cc_class = cls }
+                                     , cc_tyargs = xis
+                                     , cc_class = cls
+                                     , cc_pend_sc = pend_sc }
        ; mb <- rewriteEvidence ev xi co
        ; traceTcS "canClass" (vcat [ ppr ev <+> ppr cls <+> ppr tys
                                    , ppr xi, ppr mb ])
        ; return (fmap mk_ct mb) }
-
-emitSuperclasses :: Ct -> TcS (StopOrContinue Ct)
-emitSuperclasses ct@(CDictCan { cc_ev = ev , cc_tyargs = xis_new, cc_class = cls })
-            -- Add superclasses of this one here, See Note [Adding superclasses].
-            -- But only if we are not simplifying the LHS of a rule.
- = do { newSCWorkFromFlavored ev cls xis_new
-      -- Arguably we should "seq" the coercions if they are derived,
-      -- as we do below for emit_kind_constraint, to allow errors in
-      -- superclasses to be executed if deferred to runtime!
-      ; continueWith ct }
-emitSuperclasses _ = panic "emit_superclasses of non-class!"
 
 {- Note [Adding superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -326,25 +311,24 @@ Mind you, now that Wanteds cannot rewrite Derived, I think this particular
 situation can't happen.
   -}
 
-newSCWorkFromFlavored :: CtEvidence -> Class -> [Xi] -> TcS ()
+makeSuperClasses :: Ct -> TcS [CtEvidence]
 -- Returns superclasses, see Note [Adding superclasses]
-newSCWorkFromFlavored flavor cls xis
-  | CtGiven { ctev_evar = evar, ctev_loc = loc } <- flavor
-  = do { given_evs <- newGivenEvVars (mk_given_loc loc)
-                                     (mkEvScSelectors (EvId evar) cls xis)
-       ; emitWorkNC given_evs }
+makeSuperClasses (CDictCan { cc_ev = ev, cc_tyargs = xis, cc_class = cls })
+            -- Add superclasses of this one here, See Note [Adding superclasses].
+            -- But only if we are not simplifying the LHS of a rule.
+  | CtGiven { ctev_evar = evar, ctev_loc = loc } <- ev
+  =  newGivenEvVars (mk_given_loc loc)
+                    (mkEvScSelectors (EvId evar) cls xis)
 
   | isEmptyVarSet (tyVarsOfTypes xis)
-  = return () -- Wanteds with no variables yield no deriveds.
+  = return [] -- Wanteds with no variables yield no deriveds.
               -- See Note [Improvement from Ground Wanteds]
 
   | otherwise -- Wanted/Derived case, just add those SC that can lead to improvement.
-  = do { let sc_rec_theta = transSuperClasses cls xis
-             impr_theta   = filter isImprovementPred sc_rec_theta
-             loc          = ctEvLoc flavor
-       ; traceTcS "newSCWork/Derived" $ text "impr_theta =" <+> ppr impr_theta
-       ; emitNewDeriveds loc impr_theta }
-
+  = do { let sc_theta = immSuperClasses cls xis
+             loc      = ctEvLoc ev
+       ; traceTcS "newSCWork/Derived" $ text "sc_theta =" <+> ppr sc_theta
+       ; mapM (newDerivedNC loc) sc_theta }
   where
     size = sizeTypes xis
     mk_given_loc loc
@@ -364,6 +348,8 @@ newSCWorkFromFlavored flavor cls xis
 
        | otherwise  -- Probably doesn't happen, since this function
        = loc        -- is only used for Givens, but does no harm
+
+makeSuperClasses ct = pprPanic "makeSuperClasses" (ppr ct)
 
 {-
 ************************************************************************

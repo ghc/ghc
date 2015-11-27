@@ -56,12 +56,11 @@ import BasicTypes
 import SrcLoc
 import Unique ( mkBuiltinUnique )
 import Outputable
-import UniqSet
 import Util
 import Maybes
 import Data.List
 import Bag
-import FastString ( fastStringToByteString )
+import FastString
 
 import Control.Monad
 
@@ -198,6 +197,42 @@ when the context is a (constraint) tuple, such as (Eq a, Show a).
 Furthermore, expand always looks through type synonyms.
 -}
 
+calcClassCycles :: Class -> Maybe SDoc
+-- Nothing  <=> ok
+-- Just err <=> possible cycle error
+calcClassCycles cls
+  = case go (unitNameSet (getName cls)) cls of
+     Nothing  -> Nothing
+     Just err -> Just (vcat [ ptext (sLit "Possible superclass cycle for") <+> quotes (ppr cls)
+                            , nest 2 err ])
+  where
+    go :: NameSet -> Class -> Maybe SDoc
+    -- Nothing => ok
+    go so_far cls
+       | cls_name  `elemNameSet` so_far
+       = Just (ptext (sLit "whose superclasses include") <+> quotes (ppr cls))
+       | otherwise
+       = do { err <- firstJusts (map (go_pred (so_far `extendNameSet` cls_name))
+                                     (classSCTheta cls))
+          ; return (ptext (sLit "whose superclasses include") <+> quotes (ppr cls)
+                    $$ err) }
+       where
+         cls_name = getName cls
+
+    go_pred :: NameSet -> PredType -> Maybe SDoc
+    go_pred so_far pred
+       = case classifyPredType pred of
+          ClassPred cls _ -> go so_far cls
+          EqPred {}       -> Nothing
+          IrredPred p     -> Just (ptext (sLit "whose superclass predicates include")
+                                   <+> quotes (ppr p))
+
+-- If we started with C, we might get a call
+--   go F {C,D,E} [ whose superclasses include D
+--               , whose superclasses include E ]
+
+
+{-
 calcClassCycles :: Class -> [[TyCon]]
 calcClassCycles cls
   = nubBy eqAsCycle $
@@ -255,6 +290,7 @@ calcClassCycles cls
     papp tvs      []       = ([], Left tvs)
     papp (tv:tvs) (ty:tys) = ((tv, ty):env, remainder)
       where (env, remainder) = papp tvs tys
+-}
 
 {-
 ************************************************************************
