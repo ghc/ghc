@@ -63,12 +63,13 @@ import {-# SOURCE #-} TcSplice ( runMetaD, runMetaE, runMetaP, runMetaT, tcTopSp
 rnBracket :: HsExpr RdrName -> HsBracket RdrName -> RnM (HsExpr Name, FreeVars)
 rnBracket e br_body
   = addErrCtxt (quotationCtxtDoc br_body) $
-    do { -- Check that Template Haskell is enabled and available
-         thEnabled <- xoptM Opt_TemplateHaskell
-       ; unless thEnabled $
+    do { -- Check that -XTemplateHaskellQuotes is enabled and available
+         thQuotesEnabled <- xoptM Opt_TemplateHaskellQuotes
+       ; unless thQuotesEnabled $
            failWith ( vcat
                       [ text "Syntax error on" <+> ppr e
-                      , text "Perhaps you intended to use TemplateHaskell" ] )
+                      , text ("Perhaps you intended to use TemplateHaskell"
+                              ++ " or TemplateHaskellQuotes") ] )
 
          -- Check for nested brackets
        ; cur_stage <- getStage

@@ -571,6 +571,7 @@ data ExtensionFlag
    | Opt_ParallelArrays           -- Syntactic support for parallel arrays
    | Opt_Arrows                   -- Arrow-notation syntax
    | Opt_TemplateHaskell
+   | Opt_TemplateHaskellQuotes    -- subset of TH supported by stage1, no splice
    | Opt_QuasiQuotes
    | Opt_ImplicitParams
    | Opt_ImplicitPrelude
@@ -3049,7 +3050,7 @@ fLangFlags = [
 -- See Note [Supporting CLI completion]
   flagSpec' "th"                              Opt_TemplateHaskell
     (\on -> deprecatedForExtension "TemplateHaskell" on
-         >> setTemplateHaskellLoc on),
+         >> checkTemplateHaskellOk on),
   flagSpec' "fi"                              Opt_ForeignFunctionInterface
     (deprecatedForExtension "ForeignFunctionInterface"),
   flagSpec' "ffi"                             Opt_ForeignFunctionInterface
@@ -3237,7 +3238,8 @@ xFlags = [
   flagSpec "Strict"                           Opt_Strict,
   flagSpec "StrictData"                       Opt_StrictData,
   flagSpec' "TemplateHaskell"                 Opt_TemplateHaskell
-                                              setTemplateHaskellLoc,
+                                              checkTemplateHaskellOk,
+  flagSpec "TemplateHaskellQuotes"            Opt_TemplateHaskellQuotes,
   flagSpec "TraditionalRecordSyntax"          Opt_TraditionalRecordSyntax,
   flagSpec "TransformListComp"                Opt_TransformListComp,
   flagSpec "TupleSections"                    Opt_TupleSections,
@@ -3350,6 +3352,8 @@ impliedXFlags
 
     -- Duplicate record fields require field disambiguation
     , (Opt_DuplicateRecordFields, turnOn, Opt_DisambiguateRecordFields)
+
+    , (Opt_TemplateHaskell, turnOn, Opt_TemplateHaskellQuotes)
   ]
 
 -- Note [Documenting optimisation flags]
@@ -3589,9 +3593,25 @@ setIncoherentInsts True = do
   l <- getCurLoc
   upd (\d -> d { incoherentOnLoc = l })
 
-setTemplateHaskellLoc :: TurnOnFlag -> DynP ()
-setTemplateHaskellLoc _
+checkTemplateHaskellOk :: TurnOnFlag -> DynP ()
+#ifdef GHCI
+checkTemplateHaskellOk _turn_on
   = getCurLoc >>= \l -> upd (\d -> d { thOnLoc = l })
+#else
+-- In stage 1, Template Haskell is simply illegal, except with -M
+-- We don't bleat with -M because there's no problem with TH there,
+-- and in fact GHC's build system does ghc -M of the DPH libraries
+-- with a stage1 compiler
+checkTemplateHaskellOk turn_on
+  | turn_on = do dfs <- liftEwM getCmdLineState
+                 case ghcMode dfs of
+                    MkDepend -> return ()
+                    _        -> addErr msg
+  | otherwise = return ()
+  where
+    msg = "Template Haskell requires GHC with interpreter support\n    " ++
+          "Perhaps you are using a stage-1 compiler?"
+#endif
 
 {- **********************************************************************
 %*                                                                      *

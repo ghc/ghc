@@ -34,6 +34,7 @@ expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "AlternativeLayoutRule",
                              "AlternativeLayoutRuleTransitional",
                              "OverloadedLabels",
+                             "TemplateHaskellQuotes",
                              "MonadFailDesugaring"]
 
 expectedCabalOnlyExtensions :: [String]

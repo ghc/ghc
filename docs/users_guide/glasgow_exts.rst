@@ -9489,10 +9489,15 @@ Syntax
 
 .. index::
    single: -XTemplateHaskell
+   single: -XTemplateHaskellQuotes
 
-Template Haskell has the following new syntactic constructions. You need
-to use the flag ``-XTemplateHaskell`` to switch these syntactic extensions
-on.
+Template Haskell has the following new syntactic constructions. You
+need to use the flag ``-XTemplateHaskell`` to switch these syntactic
+extensions on. Alternatively, the ``-XTemplateHaskellQuotes`` flag can
+be used to enable the quotation subset of Template Haskell
+(i.e. without splice syntax). The ``-XTemplateHaskellQuotes``
+extension is considered safe under :ref:`safe-haskell` while
+``-XTemplateHaskell`` is not.
 
 -  A splice is written ``$x``, where ``x`` is an identifier, or
    ``$(...)``, where the "..." is an arbitrary expression. There must be

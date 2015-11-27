@@ -369,15 +369,15 @@ $tab          { warnTab }
 }
 
 <0> {
-  "[|"        / { ifExtension thEnabled } { token (ITopenExpQuote NoE) }
-  "[||"       / { ifExtension thEnabled } { token (ITopenTExpQuote NoE) }
-  "[e|"       / { ifExtension thEnabled } { token (ITopenExpQuote HasE) }
-  "[e||"      / { ifExtension thEnabled } { token (ITopenTExpQuote HasE) }
-  "[p|"       / { ifExtension thEnabled } { token ITopenPatQuote }
-  "[d|"       / { ifExtension thEnabled } { layout_token ITopenDecQuote }
-  "[t|"       / { ifExtension thEnabled } { token ITopenTypQuote }
-  "|]"        / { ifExtension thEnabled } { token ITcloseQuote }
-  "||]"       / { ifExtension thEnabled } { token ITcloseTExpQuote }
+  "[|"        / { ifExtension thQuotesEnabled } { token (ITopenExpQuote NoE) }
+  "[||"       / { ifExtension thQuotesEnabled } { token (ITopenTExpQuote NoE) }
+  "[e|"       / { ifExtension thQuotesEnabled } { token (ITopenExpQuote HasE) }
+  "[e||"      / { ifExtension thQuotesEnabled } { token (ITopenTExpQuote HasE) }
+  "[p|"       / { ifExtension thQuotesEnabled } { token ITopenPatQuote }
+  "[d|"       / { ifExtension thQuotesEnabled } { layout_token ITopenDecQuote }
+  "[t|"       / { ifExtension thQuotesEnabled } { token ITopenTypQuote }
+  "|]"        / { ifExtension thQuotesEnabled } { token ITcloseQuote }
+  "||]"       / { ifExtension thQuotesEnabled } { token ITcloseTExpQuote }
   \$ @varid   / { ifExtension thEnabled } { skip_one_varid ITidEscape }
   "$$" @varid / { ifExtension thEnabled } { skip_two_varid ITidTyEscape }
   "$("        / { ifExtension thEnabled } { token ITparenEscape }
@@ -2002,6 +2002,7 @@ data ExtBits
   | ParrBit
   | ArrowsBit
   | ThBit
+  | ThQuotesBit
   | IpBit
   | OverloadedLabelsBit -- #x overloaded labels
   | ExplicitForallBit -- the 'forall' keyword and '.' symbol
@@ -2041,6 +2042,8 @@ arrowsEnabled :: ExtsBitmap -> Bool
 arrowsEnabled = xtest ArrowsBit
 thEnabled :: ExtsBitmap -> Bool
 thEnabled = xtest ThBit
+thQuotesEnabled :: ExtsBitmap -> Bool
+thQuotesEnabled = xtest ThQuotesBit
 ipEnabled :: ExtsBitmap -> Bool
 ipEnabled = xtest IpBit
 overloadedLabelsEnabled :: ExtsBitmap -> Bool
@@ -2133,6 +2136,7 @@ mkPState flags buf loc =
                .|. ParrBit                     `setBitIf` xopt Opt_ParallelArrays           flags
                .|. ArrowsBit                   `setBitIf` xopt Opt_Arrows                   flags
                .|. ThBit                       `setBitIf` xopt Opt_TemplateHaskell          flags
+               .|. ThQuotesBit                 `setBitIf` xopt Opt_TemplateHaskellQuotes    flags
                .|. QqBit                       `setBitIf` xopt Opt_QuasiQuotes              flags
                .|. IpBit                       `setBitIf` xopt Opt_ImplicitParams           flags
                .|. OverloadedLabelsBit         `setBitIf` xopt Opt_OverloadedLabels         flags

@@ -642,6 +642,13 @@ languageOptions =
          , flagReverse = "-XNoTemplateHaskell"
          , flagSince = "6.8.1"
          }
+  , flag { flagName = "-XTemplateHaskellQuotes"
+         , flagDescription = "Enable quotation subset of "++
+                             ":ref:`Template Haskell <template-haskell>`."
+         , flagType = DynamicFlag
+         , flagReverse = "-XNoTemplateHaskellQuotes"
+         , flagSince = "8.0.1"
+         }
   , flag { flagName = "-XNoTraditionalRecordSyntax"
          , flagDescription =
            "Disable support for traditional record syntax "++
