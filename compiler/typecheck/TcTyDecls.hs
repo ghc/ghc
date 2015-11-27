@@ -165,48 +165,30 @@ exmaple, is fine
 even though C's full definition uses C.
 
 Making the check static also makes it conservative.  Eg
+  type family F a
+  class F a => C a
+Here an instance of (F a) might mention C:
+  type instance F [a] = C a
+and now we'd have a loop.
+
+The static check works like this, starting with C
+  * Look at C's superclass predicates
+  * If any is a type-function application, fail
+  * If any has C at the head, fail
+  * If any has a type class D at the head,
+    make the same test with D
+
+A tricky point is: what if there is a type variable at the head:
   class f a => C f a
-  class C a => D a
-Here if we produced a constraint (C D a), then its
-superclass would be (D a)
+Can this loop with some instantation of C? Well, no. You might try
+  C C a
+to instantiate 'f' with 'C', but that's ill kinded.  So what about
+  C (C ?) a
+To make it loop you'd need an infinte thing
+  C (C (C ... )) a
 
-
-We want definitions such as:
-
-  class C cls a where cls a => a -> a
-  class C D a => D a where
-
-to be accepted, even though a naive acyclicity check would reject the
-program as having a cycle between D and its superclass.  Why? Because
-when we instantiate
-     D ty1
-we get the superclas
-     C D ty1
-and C has no superclasses, so we have terminated with a finite set.
-
-More precisely, the rule is this: the superclasses sup_C of a class C
-are rejected iff:
-
-  C \elem expand(sup_C)
-
-Where expand is defined as follows:
-
-(1)  expand(a ty1 ... tyN) = expand(ty1) \union ... \union expand(tyN)
-
-(2)  expand(D ty1 ... tyN) = {D}
-                             \union sup_D[ty1/x1, ..., tyP/xP]
-                             \union expand(ty(P+1)) ... \union expand(tyN)
-           where (D x1 ... xM) is a class, P = min(M,N)
-
-(3)  expand(T ty1 ... tyN) = expand(ty1) \union ... \union expand(tyN)
-        where T is not a class
-
-Eqn (1) is conservative; when there's a type variable at the head,
-look in all the argument types.  Eqn (2) expands superclasses; the
-third component of the union is like Eqn (1).  Eqn (3) happens mainly
-when the context is a (constraint) tuple, such as (Eq a, Show a).
-
-Furthermore, expand always looks through type synonyms.
+So I don't think we can make a loop through a type variable in
+the head.
 -}
 
 checkClassCycles :: Class -> Maybe SDoc
