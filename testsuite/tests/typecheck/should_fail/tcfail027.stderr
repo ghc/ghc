@@ -1,8 +1,12 @@
 
-tcfail027.hs:4:1:
-    Cycle in class declaration (via superclasses): A -> B -> A
-    In the class declaration for ‘A’
+tcfail027.hs:4:1: error:
+    • Superclass cycle for ‘A’
+        whose superclasses include ‘B’
+        whose superclasses include ‘A’
+    • In the class declaration for ‘A’
 
-tcfail027.hs:7:1:
-    Cycle in class declaration (via superclasses): B -> A -> B
-    In the class declaration for ‘B’
+tcfail027.hs:7:1: error:
+    • Superclass cycle for ‘B’
+        whose superclasses include ‘A’
+        whose superclasses include ‘B’
+    • In the class declaration for ‘B’

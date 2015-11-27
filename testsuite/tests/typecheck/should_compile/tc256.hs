@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ConstraintKinds, UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies, ConstraintKinds, UndecidableInstances, UndecidableSuperClasses #-}
 module Ctx where
 
 import GHC.Prim( Constraint )

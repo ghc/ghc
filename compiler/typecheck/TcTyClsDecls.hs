@@ -1769,9 +1769,10 @@ checkNewDataCon con
 checkValidClass :: Class -> TcM ()
 checkValidClass cls
   = do  { constrained_class_methods <- xoptM Opt_ConstrainedClassMethods
-        ; multi_param_type_classes <- xoptM Opt_MultiParamTypeClasses
-        ; nullary_type_classes <- xoptM Opt_NullaryTypeClasses
-        ; fundep_classes <- xoptM Opt_FunctionalDependencies
+        ; multi_param_type_classes  <- xoptM Opt_MultiParamTypeClasses
+        ; nullary_type_classes      <- xoptM Opt_NullaryTypeClasses
+        ; fundep_classes            <- xoptM Opt_FunctionalDependencies
+        ; undecidable_super_classes <- xoptM Opt_UndecidableSuperClasses
 
         -- Check that the class is unary, unless multiparameter type classes
         -- are enabled; also recognize deprecated nullary type classes
@@ -1786,8 +1787,10 @@ checkValidClass cls
 
           -- Now check for cyclic superclasses
           -- If there are superclass cycles, checkClassCycleErrs bails.
-        ; case calcClassCycles cls of
-             Just err -> addErrTc err
+        ; unless undecidable_super_classes $
+          case checkClassCycles cls of
+             Just err -> setSrcSpan (getSrcSpan cls) $
+                         addErrTc err
              Nothing  -> return ()
 
         -- Check the class operations.

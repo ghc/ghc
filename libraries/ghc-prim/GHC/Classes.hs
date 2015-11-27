@@ -1,7 +1,8 @@
 {-# LANGUAGE CPP, Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, StandaloneDeriving, BangPatterns,
              KindSignatures, DataKinds, ConstraintKinds,
-              MultiParamTypeClasses, FunctionalDependencies #-}
+             MultiParamTypeClasses, FunctionalDependencies
+   #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
   -- ip :: IP x a => a  is strictly speaking ambiguous, but IP is magic
 

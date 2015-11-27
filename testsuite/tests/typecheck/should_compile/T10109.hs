@@ -1,5 +1,6 @@
 {-# LANGUAGE PolyKinds, MultiParamTypeClasses, FunctionalDependencies,
              UndecidableInstances, FlexibleInstances #-}
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
 module T10109 where
 

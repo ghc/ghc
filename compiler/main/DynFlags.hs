@@ -557,6 +557,7 @@ data ExtensionFlag
    | Opt_OverlappingInstances
    | Opt_UndecidableInstances
    | Opt_IncoherentInstances
+   | Opt_UndecidableSuperClasses
    | Opt_MonomorphismRestriction
    | Opt_MonoPatBinds
    | Opt_MonoLocalBinds
@@ -3246,6 +3247,7 @@ xFlags = [
   flagSpec "TypeSynonymInstances"             Opt_TypeSynonymInstances,
   flagSpec "UnboxedTuples"                    Opt_UnboxedTuples,
   flagSpec "UndecidableInstances"             Opt_UndecidableInstances,
+  flagSpec "UndecidableSuperClasses"          Opt_UndecidableSuperClasses,
   flagSpec "UnicodeSyntax"                    Opt_UnicodeSyntax,
   flagSpec "UnliftedFFITypes"                 Opt_UnliftedFFITypes,
   flagSpec "ViewPatterns"                     Opt_ViewPatterns

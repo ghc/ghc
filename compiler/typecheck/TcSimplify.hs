@@ -1037,12 +1037,16 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
        ; (no_given_eqs, given_insols, residual_wanted)
              <- nestImplicTcS ev_binds tclvl $
                do { given_insols <- solveSimpleGivenEvVars (mkGivenLoc tclvl info env) givens
-                  ; no_eqs <- getNoGivenEqs tclvl skols
 
                   ; residual_wanted <- solveWanteds wanteds
                         -- solveWanteds, *not* solveWantedsAndDrop, because
                         -- we want to retain derived equalities so we can float
                         -- them out in floatEqualities
+
+                  ; no_eqs <- getNoGivenEqs tclvl skols
+                        -- Call getNoGivenEqs /after/ solveWanteds, because
+                        -- solveWanteds can augment the givens in expandSuperClasses
+                        -- to reveal given superclass equalities
 
                   ; return (no_eqs, given_insols, residual_wanted) }
 

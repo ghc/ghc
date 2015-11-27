@@ -1,4 +1,5 @@
 
-tcfail217.hs:7:1:
-    Cycle in class declaration (via superclasses): A -> Aish -> A
-    In the class declaration for ‘A’
+tcfail217.hs:7:1: error:
+    • Potential superclass cycle for ‘A’
+        whose superclass predicates include ‘cls (Aish cls)’
+    • In the class declaration for ‘A’
