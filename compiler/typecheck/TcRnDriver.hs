@@ -1641,7 +1641,8 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
         -- naked expression. Deferring type errors here is unhelpful because the
         -- expression gets evaluated right away anyway. It also would potentially
         -- emit two redundant type-error warnings, one from each plan.
-        ; plan <- unsetGOptM Opt_DeferTypeErrors $ runPlans [
+        ; plan <- unsetGOptM Opt_DeferTypeErrors $
+                  unsetGOptM Opt_DeferTypedHoles $ runPlans [
                     -- Plan A
                     do { stuff@([it_id], _) <- tcGhciStmts [bind_stmt, print_it]
                        ; it_ty <- zonkTcType (idType it_id)
