@@ -15,6 +15,7 @@ module GhciMonad (
         GHCiState(..), setGHCiState, getGHCiState, modifyGHCiState,
         GHCiOption(..), isOptionSet, setOption, unsetOption,
         Command,
+        PromptFunction,
         BreakLocation(..),
         TickArray,
         getDynFlags,
@@ -66,15 +67,22 @@ import Control.Applicative (Applicative(..))
 -----------------------------------------------------------------------------
 -- GHCi monad
 
--- the Bool means: True = we should exit GHCi (:quit)
+-- | A GHCi command
+--
+-- the @Bool@ means: @True@ = we should exit GHCi (@:quit@)
 type Command = (String, String -> InputT GHCi Bool, CompletionFunc GHCi)
+
+-- | A function to generate the GHCi prompt.
+type PromptFunction = [String]  -- ^ names of modules in scope
+                   -> Int       -- ^ current line number
+                   -> IO String -- ^ an action returning a prompt string
 
 data GHCiState = GHCiState
      {
         progname       :: String,
         args           :: [String],
-        prompt         :: String,
-        prompt2        :: String,
+        prompt         :: PromptFunction,
+        prompt2        :: PromptFunction,
         editor         :: String,
         stop           :: String,
         options        :: [GHCiOption],
