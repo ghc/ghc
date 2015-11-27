@@ -383,10 +383,6 @@ $tab          { warnTab }
   "$("        / { ifExtension thEnabled } { token ITparenEscape }
   "$$("       / { ifExtension thEnabled } { token ITparenTyEscape }
 
--- For backward compatibility, accept the old dollar syntax
-  "[$" @varid "|"  / { ifExtension qqEnabled }
-                     { lex_quasiquote_tok }
-
   "[" @varid "|"  / { ifExtension qqEnabled }
                      { lex_quasiquote_tok }
 

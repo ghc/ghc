@@ -46,7 +46,6 @@ import Var              ( Id )
 import THNames          ( quoteExpName, quotePatName, quoteDecName, quoteTypeName
                         , decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
 import RnTypes          ( collectWildCards )
-import Util
 
 import {-# SOURCE #-} TcExpr   ( tcMonoExpr )
 import {-# SOURCE #-} TcSplice ( runMetaD, runMetaE, runMetaP, runMetaT, tcTopSpliceExpr )
@@ -373,17 +372,6 @@ rnSplice (HsQuasiQuote splice_name quoter q_loc quote)
         ; loc  <- getSrcSpanM
         ; splice_name' <- newLocalBndrRn (L loc splice_name)
 
-          -- Drop the leading "$" from the quoter name, if present
-          -- This is old-style syntax, now deprecated
-          -- NB: when removing this backward-compat, remove
-          --     the matching code in Lexer.x (around line 310)
-        ; let occ_str = occNameString (rdrNameOcc quoter)
-        ; quoter <- if ASSERT( not (null occ_str) )  -- Lexer ensures this
-                       head occ_str /= '$'
-                    then return quoter
-                    else do { addWarn (deprecatedDollar quoter)
-                            ; return (mkRdrUnqual (mkVarOcc (tail occ_str))) }
-
           -- Rename the quoter; akin to the HsVar case of rnExpr
         ; quoter' <- lookupOccRn quoter
         ; this_mod <- getModule
@@ -391,13 +379,6 @@ rnSplice (HsQuasiQuote splice_name quoter q_loc quote)
           checkThLocalName quoter'
 
         ; return (HsQuasiQuote splice_name' quoter' q_loc quote, unitFV quoter') }
-
-deprecatedDollar :: RdrName -> SDoc
-deprecatedDollar quoter
-  = hang (ptext (sLit "Deprecated syntax:"))
-       2 (ptext (sLit "quasiquotes no longer need a dollar sign:")
-          <+> ppr quoter)
-
 
 ---------------------
 rnSpliceExpr :: HsSplice RdrName -> RnM (HsExpr Name, FreeVars)
