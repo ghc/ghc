@@ -52,6 +52,10 @@ import Data.List        ( partition, mapAccumL, nub, sortBy )
 #if __GLASGOW_HASKELL__ < 709
 import Data.Monoid      ( Monoid, mempty, mappend, mconcat )
 #endif
+#if __GLASGOW_HASKELL__ > 710
+import Data.Semigroup   ( Semigroup )
+import qualified Data.Semigroup as Semigroup
+#endif
 
 
 {-
@@ -203,6 +207,11 @@ The context is added when the the Report is passed off to 'mkErrorReport'.
 Unfortunately, unlike the context, the relevant bindings are added in
 multiple places so they have to be in the Report.
 -}
+
+#if __GLASGOW_HASKELL__ > 710
+instance Semigroup Report where
+    Report a1 b1 <> Report a2 b2 = Report (a1 ++ a2) (b1 ++ b2)
+#endif
 
 instance Monoid Report where
     mempty = Report [] []

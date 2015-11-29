@@ -502,7 +502,8 @@ data WarningFlag =
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
    | Opt_WarnAMP -- Introduced in GHC 7.8, obsolete since 7.10
-   | Opt_WarnMissingMonadFailInstance
+   | Opt_WarnMissingMonadFailInstance -- since 8.0
+   | Opt_WarnSemigroup -- since 8.0
    | Opt_WarnDodgyExports
    | Opt_WarnDodgyImports
    | Opt_WarnOrphans
@@ -2904,6 +2905,7 @@ fWarningFlags = [
   flagSpec "warn-missing-local-sigs"          Opt_WarnMissingLocalSigs,
   flagSpec "warn-missing-methods"             Opt_WarnMissingMethods,
   flagSpec "warn-missing-monadfail-instance"  Opt_WarnMissingMonadFailInstance,
+  flagSpec "warn-semigroup"                   Opt_WarnSemigroup,
   flagSpec "warn-missing-signatures"          Opt_WarnMissingSigs,
   flagSpec "warn-missing-exported-sigs"       Opt_WarnMissingExportedSigs,
   flagSpec "warn-monomorphism-restriction"    Opt_WarnMonomorphism,
@@ -3485,6 +3487,7 @@ minusWallOpts
 minusWcompatOpts :: [WarningFlag]
 minusWcompatOpts
     = [ Opt_WarnMissingMonadFailInstance
+      , Opt_WarnSemigroup
       ]
 
 enableUnusedBinds :: DynP ()

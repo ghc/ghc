@@ -89,6 +89,10 @@ import Data.Maybe ( fromMaybe )
 #if __GLASGOW_HASKELL__ < 709
 import Data.Monoid hiding ((<>))
 #endif
+#if __GLASGOW_HASKELL__ > 710
+import Data.Semigroup   ( Semigroup )
+import qualified Data.Semigroup as Semigroup
+#endif
 
 {-
 ************************************************************************
@@ -174,6 +178,12 @@ emptyHsQTvs =  HsQTvs { hsq_kvs = [], hsq_tvs = [] }
 
 hsQTvBndrs :: LHsTyVarBndrs name -> [LHsTyVarBndr name]
 hsQTvBndrs = hsq_tvs
+
+#if __GLASGOW_HASKELL__ > 710
+instance Semigroup (LHsTyVarBndrs name) where
+  HsQTvs kvs1 tvs1 <> HsQTvs kvs2 tvs2
+    = HsQTvs (kvs1 ++ kvs2) (tvs1 ++ tvs2)
+#endif
 
 instance Monoid (LHsTyVarBndrs name) where
   mempty = emptyHsQTvs

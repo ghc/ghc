@@ -154,10 +154,17 @@ warningsOptions =
          }
   , flag { flagName = "-fwarn-missing-monadfail-instance"
          , flagDescription =
-           "warn when a failable pattern is used in a do-block that does not  "++
-           "have a ``MonadFail`` instance."
+           "warn when a failable pattern is used in a do-block that does " ++
+           "not have a ``MonadFail`` instance."
          , flagType = DynamicFlag
          , flagReverse = "-fno-warn-missing-monadfail-instance"
+         }
+  , flag { flagName = "-fwarn-semigroup"
+         , flagDescription =
+           "warn when a ``Monoid`` is not ``Semigroup``, and on non-" ++
+           "``Semigroup`` definitions of ``(<>)``?"
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-warn-semigroup"
          }
   , flag { flagName = "-fwarn-missed-specialisations"
          , flagDescription =

@@ -164,6 +164,12 @@ Compiler
    `MonadFail Proposal (MFP)
    <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
 
+-  Added the ``-fwarn-semigroup`` flag. When enabled, this
+   will issue a warning if a type is an instance of ``Monoid`` but not
+   ``Semigroup``, and when a custom definition ``(<>)`` is made. Fixing these
+   warnings makes sure the definition of ``Semigroup`` as a superclass of
+   ``Monoid`` does not break any code.
+
 GHCi
 ~~~~
 

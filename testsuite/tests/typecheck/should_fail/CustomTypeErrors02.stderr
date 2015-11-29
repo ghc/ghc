@@ -1,10 +1,10 @@
 
 CustomTypeErrors02.hs:17:1: error:
-    The type 'a_aER -> a_aER' cannot be represented as an integer.
-    When checking that ‘err’ has the inferred type
-      err :: (TypeError ...)
+    • The type 'a_aEN -> a_aEN' cannot be represented as an integer.
+    • When checking that ‘err’ has the inferred type
+        err :: (TypeError ...)
 
 CustomTypeErrors02.hs:17:7: error:
-    The type 'a0 -> a0' cannot be represented as an integer.
-    In the expression: convert id
-    In an equation for ‘err’: err = convert id
+    • The type 'a0 -> a0' cannot be represented as an integer.
+    • In the expression: convert id
+      In an equation for ‘err’: err = convert id

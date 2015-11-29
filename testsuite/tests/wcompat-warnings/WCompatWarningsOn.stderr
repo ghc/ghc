@@ -1,21 +1,25 @@
 
 WCompatWarningsOn.hs:11:5: warning:
-    Could not deduce (MonadFail m)
-      arising from the failable pattern ‘Just _’
-      (this will become an error a future GHC release)
-    from the context: Monad m
-      bound by the type signature for:
-                 monadFail :: Monad m => m a
-      at WCompatWarningsOn.hs:9:14-27
-    Possible fix:
-      add (MonadFail m) to the context of
-        the type signature for:
-          monadFail :: Monad m => m a
-    In a stmt of a 'do' block: Just _ <- undefined
-    In the expression:
-      do { Just _ <- undefined;
-           undefined }
-    In an equation for ‘monadFail’:
-        monadFail
-          = do { Just _ <- undefined;
-                 undefined }
+    • Could not deduce (MonadFail m)
+        arising from the failable pattern ‘Just _’
+        (this will become an error a future GHC release)
+      from the context: Monad m
+        bound by the type signature for:
+                   monadFail :: Monad m => m a
+        at WCompatWarningsOn.hs:9:14-27
+      Possible fix:
+        add (MonadFail m) to the context of
+          the type signature for:
+            monadFail :: Monad m => m a
+    • In a stmt of a 'do' block: Just _ <- undefined
+      In the expression:
+        do { Just _ <- undefined;
+             undefined }
+      In an equation for ‘monadFail’:
+          monadFail
+            = do { Just _ <- undefined;
+                   undefined }
+
+WCompatWarningsOn.hs:14:1: warning:
+    Local definition of ‘<>’ clashes with a future Prelude name.
+    This will become an error in a future release.
