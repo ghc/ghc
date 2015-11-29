@@ -2333,27 +2333,45 @@ showCmd :: String -> GHCi ()
 showCmd ""   = showOptions False
 showCmd "-a" = showOptions True
 showCmd str = do
-  st <- getGHCiState
-  case words str of
-        ["args"]     -> liftIO $ putStrLn (show (GhciMonad.args st))
-        ["prog"]     -> liftIO $ putStrLn (show (progname st))
-        ["editor"]   -> liftIO $ putStrLn (show (editor st))
-        ["stop"]     -> liftIO $ putStrLn (show (stop st))
-        ["imports"]  -> showImports
-        ["modules" ] -> showModules
-        ["bindings"] -> showBindings
-        ["linker"]   ->
-            do dflags <- getDynFlags
-               liftIO $ showLinkerState dflags
-        ["breaks"]   -> showBkptTable
-        ["context"]  -> showContext
-        ["packages"]  -> showPackages
-        ["paths"]     -> showPaths
-        ["languages"] -> showLanguages -- backwards compat
-        ["language"]  -> showLanguages
-        ["lang"]      -> showLanguages -- useful abbreviation
-        _ -> throwGhcException (CmdLineError ("syntax:  :show [ args | prog | editor | stop | modules\n" ++
-                                              "               | bindings | breaks | context | packages | language ]"))
+    st <- getGHCiState
+    dflags <- getDynFlags
+
+    let lookupCmd :: String -> Maybe (GHCi ())
+        lookupCmd name = lookup name $ map (\(_,b,c) -> (b,c)) cmds
+
+        -- (show in help?, command name, action)
+        action :: String -> GHCi () -> (Bool, String, GHCi ())
+        action name m = (True, name, m)
+
+        hidden :: String -> GHCi () -> (Bool, String, GHCi ())
+        hidden name m = (False, name, m)
+
+        cmds =
+            [ action "args"       $ liftIO $ putStrLn (show (GhciMonad.args st))
+            , action "prog"       $ liftIO $ putStrLn (show (progname st))
+            , action "editor"     $ liftIO $ putStrLn (show (editor st))
+            , action "stop"       $ liftIO $ putStrLn (show (stop st))
+            , action "imports"    $ showImports
+            , action "modules"    $ showModules
+            , action "bindings"   $ showBindings
+            , action "linker"     $ getDynFlags >>= liftIO . showLinkerState
+            , action "breaks"     $ showBkptTable
+            , action "context"    $ showContext
+            , action "packages"   $ showPackages
+            , action "paths"      $ showPaths
+            , action "language"   $ showLanguages
+            , hidden "languages"  $ showLanguages -- backwards compat
+            , hidden "lang"       $ showLanguages -- useful abbreviation
+            ]
+
+    case words str of
+      [w] | Just action <- lookupCmd w -> action
+
+      _ -> let helpCmds = [ text name | (True, name, _) <- cmds ]
+           in throwGhcException $ CmdLineError $ showSDoc dflags
+              $ hang (text "syntax:") 4
+              $ hang (text ":show") 6
+              $ brackets (fsep $ punctuate (text " |") helpCmds)
 
 showiCmd :: String -> GHCi ()
 showiCmd str = do
