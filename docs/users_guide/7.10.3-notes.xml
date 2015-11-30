@@ -156,13 +156,6 @@
     <itemizedlist>
       <listitem>
         <para>
-            The <literal>Cabal</literal> release shipped with this GHC release lacks
-            support for response files, a mechanism used on Windows to workaround the
-            low command-line length limit on that platform. For this reason you
-            may experience line length issues when building Haddock documentation with Cabal
-            on Windows.
-        </para>
-        <para>
           At the time of release there is a <ulink
           href="https://github.com/haskell/cabal/commit/1c1228a808b55331ac1db6d71fd2f8533f5fc57e">fix</ulink>
           in the <literal>Cabal</literal> upstream respository, although it is not yet
