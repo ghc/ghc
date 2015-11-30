@@ -21,6 +21,10 @@ import Outputable
 #if __GLASGOW_HASKELL__ < 709
 import Data.Monoid ( Monoid(..) )
 #endif
+#if __GLASGOW_HASKELL__ > 710
+import Data.Semigroup   ( Semigroup )
+import qualified Data.Semigroup as Semigroup
+#endif
 
 infixl 5  `appOL`
 infixl 5  `snocOL`
@@ -37,6 +41,11 @@ data OrdList a
 
 instance Outputable a => Outputable (OrdList a) where
   ppr ol = ppr (fromOL ol)  -- Convert to list and print that
+
+#if __GLASGOW_HASKELL__ > 710
+instance Semigroup (OrdList a) where
+  (<>) = appOL
+#endif
 
 instance Monoid (OrdList a) where
   mempty = nilOL

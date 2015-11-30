@@ -164,6 +164,12 @@ Compiler
    `MonadFail Proposal (MFP)
    <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
 
+-  Added the ``-fwarn-semigroup`` flag. When enabled, this
+   will issue a warning if a type is an instance of ``Monoid`` but not
+   ``Semigroup``, and when a custom definition ``(<>)`` is made. Fixing these
+   warnings makes sure the definition of ``Semigroup`` as a superclass of
+   ``Monoid`` does not break any code.
+
 GHCi
 ~~~~
 
@@ -185,11 +191,11 @@ GHCi
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
--  The ``TemplateHaskell`` now no longer automatically errors when used
-   with a stage 1 compiler (i.e. GHC without interpreter support); in
-   particular, plain Haskell quotes (not quasi-quotes) can now be
-   compiled without erroring. Splices and quasi-quotes continue to only
-   be supported by a stage 2 compiler.
+-  The new ``-XTemplateHaskellQuotes`` flag allows to use the
+   quotes (not quasi-quotes) subset of ``TemplateHaskell``.  This is
+   particularly useful for use with a stage 1 compiler (i.e. GHC
+   without interpreter support). Also, ``-XTemplateHaskellQuotes`` is
+   considered safe under Safe Haskell.
 
 -  Partial type signatures can now be used in splices, see
    :ref:`pts-where`.

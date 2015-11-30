@@ -10,3 +10,5 @@ monadFail :: Monad m => m a
 monadFail = do
     Just _ <- undefined
     undefined
+
+(<>) = undefined -- Semigroup warnings

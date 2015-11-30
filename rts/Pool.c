@@ -111,19 +111,40 @@ nat poolGetDesiredSize(Pool *pool) {
     return pool->desired_size;
 }
 
+// Try taking a PoolEntry with an item from a pool,
+// returning NULL if no items are available.
+static PoolEntry *poolTryTake_(Pool *pool) {
+    PoolEntry *ent = NULL;
+    if (pool->available != NULL) {
+        ent = pool->available;
+        pool->available = ent->next;
+    } else if (pool->current_size < pool->max_size) {
+        ent = stgMallocBytes(sizeof(PoolEntry), "pool_take");
+        ent->flags = 0;
+        ent->thing = pool->alloc_fn();
+        pool->current_size++;
+    } else {
+        return NULL;
+    }
+
+    ent->next = pool->taken;
+    pool->taken = ent;
+    return ent;
+}
+
+void *poolTryTake(Pool *pool) {
+    ACQUIRE_LOCK(&pool->mutex);
+    PoolEntry *ent = poolTryTake_(pool);
+    RELEASE_LOCK(&pool->mutex);
+    return ent ? ent->thing : NULL;
+}
+
 void *poolTake(Pool *pool) {
     PoolEntry *ent = NULL;
     ACQUIRE_LOCK(&pool->mutex);
     while (ent == NULL) {
-        if (pool->available != NULL) {
-            ent = pool->available;
-            pool->available = ent->next;
-        } else if (pool->current_size < pool->max_size) {
-            ent = stgMallocBytes(sizeof(PoolEntry), "pool_take");
-            ent->flags = 0;
-            ent->thing = pool->alloc_fn();
-            pool->current_size++;
-        } else {
+        ent = poolTryTake_(pool);
+        if (!ent) {
 #ifdef THREADED_RTS
             waitCondition(&pool->cond, &pool->mutex);
 #else
@@ -132,8 +153,6 @@ void *poolTake(Pool *pool) {
         }
     }
 
-    ent->next = pool->taken;
-    pool->taken = ent;
     RELEASE_LOCK(&pool->mutex);
     return ent->thing;
 }

@@ -84,6 +84,10 @@ import Data.Data
 #if __GLASGOW_HASKELL__ < 709
 import Data.Monoid
 #endif
+#if __GLASGOW_HASKELL__ > 710
+import Data.Semigroup   ( Semigroup )
+import qualified Data.Semigroup as Semigroup
+#endif
 
 {-
 ************************************************************************
@@ -201,6 +205,11 @@ ufmToList       :: UniqFM elt -> [(Unique, elt)]
 *                                                                      *
 ************************************************************************
 -}
+
+#if __GLASGOW_HASKELL__ > 710
+instance Semigroup (UniqFM a) where
+  (<>) = plusUFM
+#endif
 
 instance Monoid (UniqFM a) where
     mempty = emptyUFM

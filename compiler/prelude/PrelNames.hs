@@ -197,6 +197,8 @@ basicKnownKeyNames
         alternativeClassName,
         foldableClassName,
         traversableClassName,
+        semigroupClassName, sappendName,
+        monoidClassName, memptyName, mappendName, mconcatName,
 
         -- The IO type
         -- See Note [TyConRepNames for non-wired-in TyCons]
@@ -403,7 +405,8 @@ pRELUDE         = mkBaseModule_ pRELUDE_NAME
 gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     gHC_CLASSES, gHC_BASE, gHC_ENUM, gHC_GHCI, gHC_CSTRING,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER_TYPE, gHC_LIST,
-    gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING, dATA_FOLDABLE, dATA_TRAVERSABLE, dATA_MONOID,
+    gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING,
+    dATA_FOLDABLE, dATA_TRAVERSABLE, dATA_MONOID, dATA_SEMIGROUP,
     gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC,
@@ -432,6 +435,7 @@ dATA_EITHER     = mkBaseModule (fsLit "Data.Either")
 dATA_STRING     = mkBaseModule (fsLit "Data.String")
 dATA_FOLDABLE   = mkBaseModule (fsLit "Data.Foldable")
 dATA_TRAVERSABLE= mkBaseModule (fsLit "Data.Traversable")
+dATA_SEMIGROUP  = mkBaseModule (fsLit "Data.Semigroup")
 dATA_MONOID     = mkBaseModule (fsLit "Data.Monoid")
 gHC_CONC        = mkBaseModule (fsLit "GHC.Conc")
 gHC_IO          = mkBaseModule (fsLit "GHC.IO")
@@ -938,6 +942,16 @@ foldableClassName, traversableClassName :: Name
 foldableClassName     = clsQual  dATA_FOLDABLE       (fsLit "Foldable")    foldableClassKey
 traversableClassName  = clsQual  dATA_TRAVERSABLE    (fsLit "Traversable") traversableClassKey
 
+-- Classes (Semigroup, Monoid)
+semigroupClassName, sappendName :: Name
+semigroupClassName = clsQual dATA_SEMIGROUP (fsLit "Semigroup") semigroupClassKey
+sappendName        = varQual dATA_SEMIGROUP (fsLit "<>")        sappendClassOpKey
+monoidClassName, memptyName, mappendName, mconcatName :: Name
+monoidClassName    = clsQual gHC_BASE       (fsLit "Monoid")    monoidClassKey
+memptyName         = varQual gHC_BASE       (fsLit "mempty")    memptyClassOpKey
+mappendName        = varQual gHC_BASE       (fsLit "mappend")   mappendClassOpKey
+mconcatName        = varQual gHC_BASE       (fsLit "mconcat")   mconcatClassOpKey
+
 
 
 -- AMP additions
@@ -1437,6 +1451,10 @@ ghciIoClassKey = mkPreludeClassUnique 44
 
 isLabelClassNameKey :: Unique
 isLabelClassNameKey = mkPreludeClassUnique 45
+
+semigroupClassKey, monoidClassKey :: Unique
+semigroupClassKey = mkPreludeClassUnique 46
+monoidClassKey    = mkPreludeClassUnique 47
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES ClassUniques 200-299
@@ -2072,6 +2090,14 @@ toDynIdKey            = mkPreludeMiscIdUnique 509
 bitIntegerIdKey :: Unique
 bitIntegerIdKey       = mkPreludeMiscIdUnique 510
 
+sappendClassOpKey :: Unique
+sappendClassOpKey = mkPreludeMiscIdUnique 511
+
+memptyClassOpKey, mappendClassOpKey, mconcatClassOpKey :: Unique
+memptyClassOpKey  = mkPreludeMiscIdUnique 512
+mappendClassOpKey = mkPreludeMiscIdUnique 513
+mconcatClassOpKey = mkPreludeMiscIdUnique 514
+
 
 {-
 ************************************************************************
@@ -2108,6 +2134,7 @@ standardClassKeys = derivableClassKeys ++ numericClassKeys
                   ++ [randomClassKey, randomGenClassKey,
                       functorClassKey,
                       monadClassKey, monadPlusClassKey, monadFailClassKey,
+                      semigroupClassKey, monoidClassKey,
                       isStringClassKey,
                       applicativeClassKey, foldableClassKey,
                       traversableClassKey, alternativeClassKey

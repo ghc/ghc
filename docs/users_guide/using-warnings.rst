@@ -54,7 +54,8 @@ standard “packages” of warnings:
     eager to make their code future compatible to adapt to new features before
     they even generate warnings.
 
-    This currently enables only ``-fwarn-missing-monadfail-instance``.
+    This currently enables ``-fwarn-missing-monadfail-instance`` and
+    ``-fwarn-semigroup``.
 
 ``-Wno-compat``
     .. index::
@@ -244,6 +245,21 @@ command line.
     default, but will be switched on in a future GHC release, as part of
     the `MonadFail Proposal (MFP)
     <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
+
+``-fwarn-semigroup``
+    .. index::
+       single: -fwarn-semigroup
+       single: semigroup
+
+    Warn when definitions are in conflict with the future inclusion of
+    ``Semigroup`` into the standard typeclasses.
+
+        1. Instances of ``Monoid`` should also be instances of ``Semigroup``
+        2. The ``Semigroup`` operator ``(<>)`` will be in ``Prelude``, which
+           clashes with custom local definitions of such an operator
+
+    Being part of the ``-Wcompat`` option group, this warning is off by
+    default, but will be switched on in a future GHC release.
 
 ``-fwarn-deprecated-flags``
     .. index::

@@ -16,6 +16,23 @@
 
 #include "Pool.h"
 
+/*
+ * Note [libdw session pool]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * Building a libdw session requires a number of rather expensive steps,
+ *
+ *   - Examine the object files mapped into the address space
+ *   - Find them on disk
+ *   - Open them and map their debugging information
+ *   - Build various index structures necessary for quick lookup
+ *
+ * The time to setup a session can be several milliseconds. In order to avoid
+ * incurring this cost too often, we keep a pool of warm sessions around which
+ * can be shared between capabilities.
+ *
+ */
+
 static Pool *pool = NULL;
 static nat pool_size = 10; // TODO
 
@@ -26,7 +43,7 @@ void libdwPoolInit(void) {
 }
 
 LibdwSession *libdwPoolTake(void) {
-    return poolTake(pool);
+    return poolTryTake(pool);
 }
 
 void libdwPoolRelease(LibdwSession *sess) {

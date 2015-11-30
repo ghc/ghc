@@ -87,6 +87,13 @@ import Maybes( isJust )
 
 import Data.Data hiding ( Fixity )
 import Data.Maybe ( fromMaybe )
+#if __GLASGOW_HASKELL__ < 709
+import Data.Monoid hiding((<>))
+#endif
+#if __GLASGOW_HASKELL > 710
+import Data.Semigroup   ( Semigroup )
+import qualified Data.Semigroup as Semigroup
+#endif
 
 {-
 ************************************************************************
@@ -213,6 +220,15 @@ mkHsQTvs tvs = HsQTvs { hsq_kvs = PlaceHolder, hsq_tvs = tvs }
 
 hsQTvBndrs :: LHsQTyVars name -> [LHsTyVarBndr name]
 hsQTvBndrs = hsq_tvs
+
+instance Semigroup (LHsTyVarBndrs name) where
+  HsQTvs kvs1 tvs1 <> HsQTvs kvs2 tvs2
+    = HsQTvs (kvs1 ++ kvs2) (tvs1 ++ tvs2)
+
+instance Monoid (LHsTyVarBndrs name) where
+  mempty = emptyHsQTvs
+  mappend (HsQTvs kvs1 tvs1) (HsQTvs kvs2 tvs2)
+    = HsQTvs (kvs1 ++ kvs2) (tvs1 ++ tvs2)
 
 ------------------------------------------------
 --            HsImplicitBndrs

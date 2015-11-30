@@ -337,6 +337,8 @@ data PackageArg
 runit :: Verbosity -> [Flag] -> [String] -> IO ()
 runit verbosity cli nonopts = do
   installSignalHandlers -- catch ^C and clean up
+  when (verbosity >= Verbose)
+    (putStr ourCopyright)
   prog <- getProgramName
   let
         force
@@ -351,7 +353,7 @@ runit verbosity cli nonopts = do
           where accumExpandPkgroot _ FlagExpandPkgroot   = Just True
                 accumExpandPkgroot _ FlagNoExpandPkgroot = Just False
                 accumExpandPkgroot x _                   = x
-                
+
         splitFields fields = unfoldr splitComma (',':fields)
           where splitComma "" = Nothing
                 splitComma fs = Just $ break (==',') (tail fs)
@@ -456,7 +458,7 @@ runit verbosity cli nonopts = do
           Nothing -> readPackageArg as_arg pkgid_str
           Just m  -> return (Substring pkgid_str m)
         describePackage verbosity cli pkgarg (fromMaybe False mexpand_pkgroot)
-        
+
     ["field", pkgid_str, fields] -> do
         pkgarg <- case substringCheck pkgid_str of
           Nothing -> readPackageArg as_arg pkgid_str
@@ -516,7 +518,7 @@ globVersion = Version [] ["*"]
 -- Some commands operate  on multiple databases, with overlapping semantics:
 --      list, describe, field
 
-data PackageDB 
+data PackageDB
   = PackageDB {
       location, locationAbsolute :: !FilePath,
       -- We need both possibly-relative and definately-absolute package
@@ -524,7 +526,7 @@ data PackageDB
       -- an identifier for the db, so it is important we do not modify it.
       -- On the other hand we need the absolute path in a few places
       -- particularly in relation to the ${pkgroot} stuff.
-      
+
       packages :: [InstalledPackageInfo]
     }
 
@@ -541,8 +543,8 @@ getPkgDatabases :: Verbosity
                 -> Bool    -- read caches, if available
                 -> Bool    -- expand vars, like ${pkgroot} and $topdir
                 -> [Flag]
-                -> IO (PackageDBStack, 
-                          -- the real package DB stack: [global,user] ++ 
+                -> IO (PackageDBStack,
+                          -- the real package DB stack: [global,user] ++
                           -- DBs specified on the command line with -f.
                        Maybe FilePath,
                           -- which one to modify, if any
@@ -620,7 +622,7 @@ getPkgDatabases verbosity modify use_user use_cache expand_vars my_flags = do
 
   let db_flags = [ f | Just f <- map is_db_flag my_flags ]
          where is_db_flag FlagUser
-                      | Just (user_conf, _user_exists) <- mb_user_conf 
+                      | Just (user_conf, _user_exists) <- mb_user_conf
                       = Just user_conf
                is_db_flag FlagGlobal     = Just virt_global_conf
                is_db_flag (FlagConfig f) = Just f
@@ -788,7 +790,7 @@ mungePackageDBPaths :: FilePath -> PackageDB -> PackageDB
 mungePackageDBPaths top_dir db@PackageDB { packages = pkgs } =
     db { packages = map (mungePackagePaths top_dir pkgroot) pkgs }
   where
-    pkgroot = takeDirectory (locationAbsolute db)    
+    pkgroot = takeDirectory (locationAbsolute db)
     -- It so happens that for both styles of package db ("package.conf"
     -- files and "package.conf.d" dirs) the pkgroot is the parent directory
     -- ${pkgroot}/package.conf  or  ${pkgroot}/package.conf.d/
@@ -935,7 +937,7 @@ registerPackage :: FilePath
                 -> IO ()
 registerPackage input verbosity my_flags multi_instance
                 expand_env_vars update force = do
-  (db_stack, Just to_modify, _flag_dbs) <- 
+  (db_stack, Just to_modify, _flag_dbs) <-
       getPkgDatabases verbosity True{-modify-} True{-use user-}
                                 True{-use cache-} False{-expand vars-} my_flags
 
@@ -977,7 +979,7 @@ registerPackage input verbosity my_flags multi_instance
   validatePackageConfig pkg_expanded verbosity truncated_stack
                         multi_instance update force
 
-  let 
+  let
      -- In the normal mode, we only allow one version of each package, so we
      -- remove all instances with the same source package id as the one we're
      -- adding. In the multi instance mode we don't do that, thus allowing
@@ -1022,12 +1024,12 @@ changeDB verbosity cmds db = do
 updateInternalDB :: PackageDB -> [DBOp] -> PackageDB
 updateInternalDB db cmds = db{ packages = foldl do_cmd (packages db) cmds }
  where
-  do_cmd pkgs (RemovePackage p) = 
+  do_cmd pkgs (RemovePackage p) =
     filter ((/= installedComponentId p) . installedComponentId) pkgs
   do_cmd pkgs (AddPackage p) = p : pkgs
-  do_cmd pkgs (ModifyPackage p) = 
+  do_cmd pkgs (ModifyPackage p) =
     do_cmd (do_cmd pkgs (RemovePackage p)) (AddPackage p)
-    
+
 
 changeDBDir :: Verbosity -> [DBOp] -> PackageDB -> IO ()
 changeDBDir verbosity cmds db = do
@@ -1042,7 +1044,7 @@ changeDBDir verbosity cmds db = do
     let file = location db </> display (installedComponentId p) <.> "conf"
     when (verbosity > Normal) $ infoLn ("writing " ++ file)
     writeUTF8File file (showInstalledPackageInfo p)
-  do_cmd (ModifyPackage p) = 
+  do_cmd (ModifyPackage p) =
     do_cmd (AddPackage p)
 
 updateDBCache :: Verbosity -> PackageDB -> IO ()
@@ -1157,7 +1159,7 @@ modifyPackage fn pkgarg verbosity my_flags force = do
 
   -- Do the search for the package respecting flags...
   (db, ps) <- fmap head $ findPackagesByDB flag_dbs pkgarg
-  let 
+  let
       db_name = location db
       pkgs    = packages db
 
@@ -1188,7 +1190,7 @@ modifyPackage fn pkgarg verbosity my_flags force = do
 
 recache :: Verbosity -> [Flag] -> IO ()
 recache verbosity my_flags = do
-  (db_stack, Just to_modify, _flag_dbs) <- 
+  (db_stack, Just to_modify, _flag_dbs) <-
      getPkgDatabases verbosity True{-modify-} True{-use user-} False{-no cache-}
                                False{-expand vars-} my_flags
   let
@@ -1205,7 +1207,7 @@ listPackages ::  Verbosity -> [Flag] -> Maybe PackageArg
              -> IO ()
 listPackages verbosity my_flags mPackageName mModuleName = do
   let simple_output = FlagSimpleOutput `elem` my_flags
-  (db_stack, _, flag_db_stack) <- 
+  (db_stack, _, flag_db_stack) <-
      getPkgDatabases verbosity False{-modify-} False{-use user-}
                                True{-use cache-} False{-expand vars-} my_flags
 
@@ -1307,7 +1309,7 @@ simplePackageList my_flags pkgs = do
 
 showPackageDot :: Verbosity -> [Flag] -> IO ()
 showPackageDot verbosity myflags = do
-  (_, _, flag_db_stack) <- 
+  (_, _, flag_db_stack) <-
       getPkgDatabases verbosity False{-modify-} False{-use user-}
                                 True{-use cache-} False{-expand vars-} myflags
 
@@ -1332,7 +1334,7 @@ showPackageDot verbosity myflags = do
 -- dependencies may be varying versions
 latestPackage ::  Verbosity -> [Flag] -> PackageIdentifier -> IO ()
 latestPackage verbosity my_flags pkgid = do
-  (_, _, flag_db_stack) <- 
+  (_, _, flag_db_stack) <-
      getPkgDatabases verbosity False{-modify-} False{-use user-}
                                True{-use cache-} False{-expand vars-} my_flags
 
@@ -1348,7 +1350,7 @@ latestPackage verbosity my_flags pkgid = do
 
 describePackage :: Verbosity -> [Flag] -> PackageArg -> Bool -> IO ()
 describePackage verbosity my_flags pkgarg expand_pkgroot = do
-  (_, _, flag_db_stack) <- 
+  (_, _, flag_db_stack) <-
       getPkgDatabases verbosity False{-modify-} False{-use user-}
                                 True{-use cache-} expand_pkgroot my_flags
   dbs <- findPackagesByDB flag_db_stack pkgarg
@@ -1357,7 +1359,7 @@ describePackage verbosity my_flags pkgarg expand_pkgroot = do
 
 dumpPackages :: Verbosity -> [Flag] -> Bool -> IO ()
 dumpPackages verbosity my_flags expand_pkgroot = do
-  (_, _, flag_db_stack) <- 
+  (_, _, flag_db_stack) <-
      getPkgDatabases verbosity False{-modify-} False{-use user-}
                                True{-use cache-} expand_pkgroot my_flags
   doDump expand_pkgroot [ (pkg, locationAbsolute db)
@@ -1414,7 +1416,7 @@ matchesPkg :: PackageArg -> InstalledPackageInfo -> Bool
 
 describeField :: Verbosity -> [Flag] -> PackageArg -> [String] -> Bool -> IO ()
 describeField verbosity my_flags pkgarg fields expand_pkgroot = do
-  (_, _, flag_db_stack) <- 
+  (_, _, flag_db_stack) <-
       getPkgDatabases verbosity False{-modify-} False{-use user-}
                                 True{-use cache-} expand_pkgroot my_flags
   fns <- mapM toField fields
@@ -1434,7 +1436,7 @@ describeField verbosity my_flags pkgarg fields expand_pkgroot = do
 
 checkConsistency :: Verbosity -> [Flag] -> IO ()
 checkConsistency verbosity my_flags = do
-  (db_stack, _, _) <- 
+  (db_stack, _, _) <-
          getPkgDatabases verbosity False{-modify-} True{-use user-}
                                    True{-use cache-} True{-expand vars-}
                                    my_flags
@@ -1678,7 +1680,7 @@ checkPath url_ok is_dir warn_only thisfield d
        let msg = thisfield ++ ": " ++ d ++ " doesn't exist or isn't a "
                                         ++ if is_dir then "directory" else "file"
        in
-       if warn_only 
+       if warn_only
           then vwarn msg
           else verror ForceFiles msg
 

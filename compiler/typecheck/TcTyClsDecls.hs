@@ -923,19 +923,28 @@ tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = L _ tc_name
                                            , tfe_rhs = rhs })]
   = setSrcSpan loc $
     tcAddFamInstCtxt (ptext (sLit "default type instance")) tc_name $
-    tcTyClTyVars tc_name hs_tvs $ \ tvs rhs_kind ->
     do { traceTc "tcDefaultAssocDecl" (ppr tc_name)
-       ; checkTc (isTypeFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
        ; let (fam_name, fam_pat_arity, _) = famTyConShape fam_tc
+             fam_tc_tvs                   = tyConTyVars fam_tc
+
+       -- Kind of family check
+       ; checkTc (isTypeFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
+
+       -- Arity check
        ; ASSERT( fam_name == tc_name )
          checkTc (length (hsQTvBndrs hs_tvs) == fam_pat_arity)
                  (wrongNumberOfParmsErr fam_pat_arity)
-       ; rhs_ty <- tcCheckLHsType rhs rhs_kind
+
+       -- Typecheck RHS
+       -- NB: the tcTyClTYVars call is here, /after/ the arity check
+       -- If the arity isn't right, tcTyClTyVars crashes (Trac #11136)
+       ; (tvs, rhs_ty) <- tcTyClTyVars tc_name hs_tvs $ \ tvs rhs_kind ->
+                          do { rhs_ty <- tcCheckLHsType rhs rhs_kind
+                             ; return (tvs, rhs_ty) }
        ; rhs_ty <- zonkTcTypeToType emptyZonkEnv rhs_ty
-       ; let fam_tc_tvs = tyConTyVars fam_tc
-             subst = zipTopTvSubst tvs (mkTyVarTys fam_tc_tvs)
-       ; return ( ASSERT( equalLength fam_tc_tvs tvs )
-                  Just (substTy subst rhs_ty, loc) ) }
+       ; let subst = ASSERT( equalLength tvs fam_tc_tvs )
+                     zipTopTvSubst tvs (mkTyVarTys fam_tc_tvs)
+       ; return ( Just (substTy subst rhs_ty, loc) ) }
     -- We check for well-formedness and validity later, in checkValidClass
 
 -------------------------

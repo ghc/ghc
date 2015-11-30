@@ -109,7 +109,7 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
 
 getCoreToDo :: DynFlags -> [CoreToDo]
 getCoreToDo dflags
-  = core_todo
+  = flatten_todos core_todo
   where
     opt_level     = optLevel           dflags
     phases        = simplPhases        dflags
@@ -321,6 +321,13 @@ getCoreToDo dflags
 
         maybe_rule_check (Phase 0)
      ]
+
+    -- Remove 'CoreDoNothing' and flatten 'CoreDoPasses' for clarity.
+    flatten_todos [] = []
+    flatten_todos (CoreDoNothing : rest) = flatten_todos rest
+    flatten_todos (CoreDoPasses passes : rest) =
+      flatten_todos passes ++ flatten_todos rest
+    flatten_todos (todo : rest) = todo : flatten_todos rest
 
 -- Loading plugins
 
