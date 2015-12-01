@@ -203,7 +203,7 @@ type LHsKind name = Located (HsKind name)
 --------------------------------------------------
 --             LHsQTyVars
 --  The explicitly-quantified binders in a data/type declaration
-SQua
+
 type LHsTyVarBndr name = Located (HsTyVarBndr name)
                          -- See Note [HsType binders]
 

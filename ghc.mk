@@ -138,21 +138,14 @@ endif
 endif
 
 include mk/ways.mk
-include mk/warnings.mk
 
 # (Optional) build-specific configuration
 include mk/custom-settings.mk
-SRC_CC_OPTS     += -Wall
-SRC_HC_OPTS     += -Wall
-# Don't add -Werror to GhcStage1HcOpts, because otherwise validate may
-# unnecessarily fail during the stage1 build when booting with an older
-# compiler.
-# It would be better to only exclude certain warnings from becoming errors
-# (e.g. '-Werror -Wno-error=unused-imports -Wno-error=...'), but -Wno-error
-# isn't supported yet (https://ghc.haskell.org/trac/ghc/wiki/Design/Warnings).
-SRC_CC_OPTS     += $(WERROR)
-GhcStage2HcOpts += $(WERROR)
-GhcLibHcOpts    += $(WERROR)
+
+# The user can reset SRC_HC_OPTS from mk/build.mk. Since we try to append
+# '-Wall' to it in mk/warnings.mk, we have to include mk/warnings.mk after
+# mk/custom-settings.mk.
+include mk/warnings.mk
 
 # -----------------------------------------------------------------------------
 # Check for inconsistent settings, after reading mk/build.mk.

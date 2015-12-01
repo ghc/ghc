@@ -19,7 +19,9 @@ define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way, $4 = stage
 #   $1 is the directory we're building in
 #   $2 is the distdir (e.g. "dist", "dist-install" etc.)
 #   $3 is the way (e.g. "v", "p", etc.)
-#   $4 is the stage ("1", "2", "3")
+#   $4 is the stage ("0", "1", "2") that the options are passed to
+#                                   See Note [Stage number in build variables]
+#                                   in mk/config.mk.in.
 # 
 # -----------------------------
 # The variables affecting Haskell compilations are as follows, including
@@ -40,10 +42,22 @@ define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way, $4 = stage
 #  SRC_HC_OPTS           source-tree-wide GHC options      mk/config.mk.in
 #                                                          mk/build.mk
 #                                                          mk/validate.mk
-#   
+#                                                          mk/warnings.mk
+#
+#  SRC_HC_OPTS_STAGE$4   source-tree-wide GHC options,     mk/config.mk.in
+#                        supplied to the stage $4          mk/build.mk
+#                        compiler only                     mk/validate.mk
+#                                                          mk/warnings.mk
+#
 #  SRC_HC_WARNING_OPTS   source-tree-wide GHC warning      mk/config.mk.in
 #                        options                           mk/build.mk
 #                                                          mk/validate.mk
+#                                                          mk/warnings.mk
+#
+#  SRC_HC_WARNING_OPTS_STAGE$4                             mk/config.mk.in
+#                        source-tree-wide GHC warning      mk/build.mk
+#                        options, supplied to the          mk/validate.mk
+#                        stage $4 compiler only            mk/warnings.mk
 #   
 #  EXTRA_HC_OPTS         for supplying extra options on    make EXTRA_HC_OPTS=...
 #                        the command line   
@@ -60,6 +74,7 @@ define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way, $4 = stage
 #  $1_$2_MORE_HC_OPTS    GHC options for this dir/distdir  ???
 #   
 #  $1_$2_EXTRA_HC_OPTS   GHC options for this dir/distdir  mk/build.mk
+#                                                          mk/warnings.mk
 #   
 #  $1_$2_HC_PKGCONF      -package-db flag if necessary   rules/package-config.mk
 #   
@@ -100,6 +115,7 @@ $1_$2_$3_MOST_HC_OPTS = \
  $$(WAY_$3_HC_OPTS) \
  $$(CONF_HC_OPTS) \
  $$(SRC_HC_OPTS) \
+ $$(SRC_HC_OPTS_STAGE$4) \
  $$($1_HC_OPTS) \
  $$($1_$2_HC_PKGCONF) \
  $$(if $$($1_$2_PROG),, \
@@ -121,6 +137,7 @@ $1_$2_$3_MOST_HC_OPTS = \
  $$($1_$2_$3_HC_OPTS) \
  $$($$(basename $$(subst ./,,$$<))_HC_OPTS) \
  $$(SRC_HC_WARNING_OPTS) \
+ $$(SRC_HC_WARNING_OPTS_STAGE$4) \
  $$(EXTRA_HC_OPTS)
 
 $1_$2_$3_MOST_DIR_HC_OPTS = \
