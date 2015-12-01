@@ -1,7 +1,7 @@
 
 CustomTypeErrors02.hs:17:1: error:
     • The type 'a_aEN -> a_aEN' cannot be represented as an integer.
-    • When checking that ‘err’ has the inferred type
+    • When checking the inferred type
         err :: (TypeError ...)
 
 CustomTypeErrors02.hs:17:7: error:

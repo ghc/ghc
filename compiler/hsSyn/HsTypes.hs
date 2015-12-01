@@ -88,7 +88,8 @@ import Maybes( isJust )
 import Data.Data hiding ( Fixity )
 import Data.Maybe ( fromMaybe )
 #if __GLASGOW_HASKELL__ < 709
-import Data.Monoid hiding((<>))
+-- SPJ temp
+-- import Data.Monoid hiding((<>))
 #endif
 #if __GLASGOW_HASKELL > 710
 import Data.Semigroup   ( Semigroup )
@@ -202,7 +203,7 @@ type LHsKind name = Located (HsKind name)
 --------------------------------------------------
 --             LHsQTyVars
 --  The explicitly-quantified binders in a data/type declaration
-
+SQua
 type LHsTyVarBndr name = Located (HsTyVarBndr name)
                          -- See Note [HsType binders]
 
@@ -221,14 +222,18 @@ mkHsQTvs tvs = HsQTvs { hsq_kvs = PlaceHolder, hsq_tvs = tvs }
 hsQTvBndrs :: LHsQTyVars name -> [LHsTyVarBndr name]
 hsQTvBndrs = hsq_tvs
 
+{-
+#if __GLASGOW_HASKELL__ > 710
 instance Semigroup (LHsTyVarBndrs name) where
   HsQTvs kvs1 tvs1 <> HsQTvs kvs2 tvs2
     = HsQTvs (kvs1 ++ kvs2) (tvs1 ++ tvs2)
+#endif
 
-instance Monoid (LHsTyVarBndrs name) where
-  mempty = emptyHsQTvs
+instance Monoid (LHsQTyVars name) where
+  mempty = mkHsQTvs []
   mappend (HsQTvs kvs1 tvs1) (HsQTvs kvs2 tvs2)
     = HsQTvs (kvs1 ++ kvs2) (tvs1 ++ tvs2)
+-}
 
 ------------------------------------------------
 --            HsImplicitBndrs
@@ -247,12 +252,19 @@ data HsImplicitBndrs name thing   -- See Note [HsType binders]
   deriving (Typeable)
 
 data HsWildCardBndrs name thing   -- See Note [HsType binders]
-  = HsWC { hswc_wcs :: PostRn name [Name] -- Wild cards
-         , hswc_ctx :: Maybe SrcSpan     -- Indicates whether hswc_body has an
-                                         -- extra-constraint wildcard, and if so where
-                                         --    e.g.  (Eq a, _) => a -> a
-                                         -- NB: the wildcard stays in the type
-         , hswc_body :: thing }  -- Main payload (type or list of types)
+  = HsWC { hswc_wcs :: PostRn name [Name]
+                -- Wild cards, both named and anonymous
+
+         , hswc_ctx :: Maybe SrcSpan
+                -- Indicates whether hswc_body has an
+                -- extra-constraint wildcard, and if so where
+                --    e.g.  (Eq a, _) => a -> a
+                -- NB: the wildcard stays in HsQualTy inside the type!
+                -- So for pretty printing purposes you can ignore
+                -- hswc_ctx
+
+         , hswc_body :: thing  -- Main payload (type or list of types)
+    }
   deriving( Typeable )
 
 deriving instance (Data name, Data thing, Data (PostRn name [Name]))

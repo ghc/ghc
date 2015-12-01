@@ -178,28 +178,6 @@ rnWcSigContext ctxt (L loc hs_ctxt)
                       , hswc_ctx = Nothing
                       , hswc_body = L loc hs_ctxt' }, fvs) }
 
-{- Note [Error checkingp for wildcards]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Here is how various wildcard-related errors are reported
-
-* Named extra-constraints wild cards aren't allowed,
-  e.g. invalid: @(Show a, _x) => a -> String@.
-
-* There is only one extra-constraints wild card in the context and it must
-  come last, e.g. invalid: @(_, Show a) => a -> String@
-  or @(_, Show a, _) => a -> String@.
-
-* There should be no unnamed wild cards in the context.
-
-* An extra-constraints wild card can only occur in the top-level context.
-  This would be invalid: @(Eq a, _) => a -> (Num a, _) => a -> Bool@.
-
-* Named wild cards occurring in the context must also occur in the monotype.
-
-When an invalid wild card is found, we fail with an error.
-
-????? What about f :: (forall a. (Eq _) => a -> a -> Bool) -> Int
--}
 
 {- ******************************************************
 *                                                       *
