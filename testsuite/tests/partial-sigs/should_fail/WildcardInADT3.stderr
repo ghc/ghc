@@ -1,6 +1,4 @@
 
-WildcardInADT3.hs:4:27:
-    Unexpected wild card: ‘_’
-    In the type ‘_ => a’
-    In the definition of data constructor ‘Foo’
-    In the data declaration for ‘Foo’
+WildcardInADT3.hs:4:27: error:
+    Wildcard ‘_’ not allowed
+      in the definition of data constructor ‘Foo’

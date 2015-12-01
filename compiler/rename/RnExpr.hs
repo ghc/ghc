@@ -255,12 +255,19 @@ rnExpr (ExplicitTuple tup_args boxity)
     rnTupArg (L l (Missing _)) = return (L l (Missing placeHolderType)
                                         , emptyFVs)
 
-rnExpr (RecordCon { rcon_con_name = con_id, rcon_flds = rbinds })
-  = do  { conname <- lookupLocatedOccRn con_id
-        ; (rbinds', fvRbinds) <- rnHsRecBinds (HsRecFieldCon (unLoc conname)) rbinds
-        ; return (RecordCon { rcon_con_name = conname, rcon_flds = rbinds'
-                            , rcon_con_expr = noPostTcExpr, rcon_con_like = PlaceHolder },
-                  fvRbinds `addOneFV` unLoc conname ) }
+rnExpr (RecordCon { rcon_con_name = con_id
+                  , rcon_flds = rec_binds@(HsRecFields { rec_dotdot = dd }) })
+  = do { con_lname@(L _ con_name) <- lookupLocatedOccRn con_id
+       ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon con_name) mk_hs_var rec_binds
+       ; (flds', fvss) <- mapAndUnzipM rn_field flds
+       ; let rec_binds' = HsRecFields { rec_flds = flds', rec_dotdot = dd }
+       ; return (RecordCon { rcon_con_name = con_lname, rcon_flds = rec_binds'
+                           , rcon_con_expr = noPostTcExpr, rcon_con_like = PlaceHolder }
+                , fvs `plusFV` plusFVs fvss `addOneFV` con_name) }
+  where
+    mk_hs_var l n = HsVar (L l n)
+    rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hsRecFieldArg fld)
+                            ; return (L l (fld { hsRecFieldArg = arg' }), fvs) }
 
 rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
   = do  { (expr', fvExpr) <- rnLExpr expr
@@ -270,11 +277,11 @@ rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
                             , rupd_out_tys = PlaceHolder, rupd_wrap   = PlaceHolder }
                  , fvExpr `plusFV` fvRbinds) }
 
-rnExpr (ExprWithTySig expr pty PlaceHolder)
-  = do  { (pty', fvTy, wcs) <- rnLHsTypeWithWildCards ExprWithTySigCtx pty
-        ; (expr', fvExpr)   <- bindSigTyVarsFV (hsExplicitTvs pty') $
-                               rnLExpr expr
-        ; return (ExprWithTySig expr' pty' wcs, fvExpr `plusFV` fvTy) }
+rnExpr (ExprWithTySig expr pty)
+  = do  { (pty', fvTy)    <- rnHsSigWcType ExprWithTySigCtx pty
+        ; (expr', fvExpr) <- bindSigTyVarsFV (hsWcScopedTvs pty') $
+                             rnLExpr expr
+        ; return (ExprWithTySig expr' pty', fvExpr `plusFV` fvTy) }
 
 rnExpr (HsIf _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p
@@ -413,26 +420,6 @@ rnSection section@(SectionL expr op)
         ; return (SectionL expr' op', fvs_op `plusFV` fvs_expr) }
 
 rnSection other = pprPanic "rnSection" (ppr other)
-
-{-
-************************************************************************
-*                                                                      *
-        Records
-*                                                                      *
-************************************************************************
--}
-
-rnHsRecBinds :: HsRecFieldContext -> HsRecordBinds RdrName
-             -> RnM (HsRecordBinds Name, FreeVars)
-rnHsRecBinds ctxt rec_binds@(HsRecFields { rec_dotdot = dd })
-  = do { (flds, fvs) <- rnHsRecFields ctxt mkHsVar rec_binds
-       ; (flds', fvss) <- mapAndUnzipM rn_field flds
-       ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd },
-                 fvs `plusFV` plusFVs fvss) }
-  where
-    mkHsVar l n = HsVar (L l n)
-    rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hsRecFieldArg fld)
-                            ; return (L l (fld { hsRecFieldArg = arg' }), fvs) }
 
 {-
 ************************************************************************

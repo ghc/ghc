@@ -6,7 +6,7 @@ MonadFailErrors.hs:16:5: error:
       from the context: Monad m
         bound by the type signature for:
                    general :: Monad m => m a
-        at MonadFailErrors.hs:14:12-25
+        at MonadFailErrors.hs:14:1-25
       Possible fix:
         add (MonadFail m) to the context of
           the type signature for:

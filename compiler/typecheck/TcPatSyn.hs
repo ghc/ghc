@@ -69,8 +69,7 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
        ; tcCheckPatSynPat lpat
 
        ; let (arg_names, rec_fields, is_infix) = collectPatSynArgInfo details
-
-       ; ((lpat', (args, pat_ty)), tclvl, wanted)
+       ; (tclvl, wanted, (lpat', (args, pat_ty)))
             <- pushLevelAndCaptureConstraints  $
                do { pat_ty <- newFlexiTyVarTy openTypeKind
                   ; tcPat PatSyn lpat pat_ty $
@@ -142,7 +141,7 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
                { arg <- tcLookupId arg_name
                ; let arg_ty' = substTy subst arg_ty
                ; coi <- unifyType (varType arg) arg_ty'
-               ; return (setVarType arg arg_ty, coToHsWrapper coi) }
+               ; return (setVarType arg arg_ty, mkWpCastN coi) }
            ; return (ex_tys, prov_theta', wrapped_args) }
 
        ; (ex_vars_rhs, prov_dicts_rhs) <- tcCollectEx lpat'

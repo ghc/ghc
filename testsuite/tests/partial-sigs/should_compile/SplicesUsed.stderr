@@ -2,81 +2,99 @@
 [2 of 2] Compiling SplicesUsed      ( SplicesUsed.hs, SplicesUsed.o )
 
 SplicesUsed.hs:7:16: warning:
-    Found type wildcard ‘_’ standing for ‘Maybe Bool’
-    In the type signature for:
-      maybeBool :: _
+    • Found type wildcard ‘_’ standing for ‘Maybe Bool’
+    • In the type signature:
+        maybeBool :: _
+    • Relevant bindings include
+        maybeBool :: Maybe Bool (bound at SplicesUsed.hs:8:1)
 
 SplicesUsed.hs:8:15: warning:
-    Found type wildcard ‘_a’ standing for ‘Maybe Bool’
-    In an expression type signature: _a -> _a
-    In the expression: id :: _a -> _a
-    In the expression: (id :: _a -> _a) (Just True :: Maybe _)
-    Relevant bindings include
-      maybeBool :: Maybe Bool (bound at SplicesUsed.hs:8:1)
+    • Found type wildcard ‘_a’ standing for ‘t’
+      Where: ‘t’ is a rigid type variable bound by
+               the inferred type of <expression> :: t -> t at SplicesUsed.hs:8:15
+    • In an expression type signature: _a -> _a
+      In the expression: id :: _a -> _a
+      In the expression: (id :: _a -> _a) (Just True :: Maybe _)
+    • Relevant bindings include
+        maybeBool :: Maybe Bool (bound at SplicesUsed.hs:8:1)
 
 SplicesUsed.hs:8:27: warning:
-    Found type wildcard ‘_’ standing for ‘Bool’
-    In an expression type signature: Maybe _
-    In the first argument of ‘id :: _a -> _a’, namely
-      ‘(Just True :: Maybe _)’
-    In the expression: (id :: _a -> _a) (Just True :: Maybe _)
-    Relevant bindings include
-      maybeBool :: Maybe Bool (bound at SplicesUsed.hs:8:1)
+    • Found type wildcard ‘_’ standing for ‘Bool’
+    • In an expression type signature: Maybe _
+      In the first argument of ‘id :: _a -> _a’, namely
+        ‘(Just True :: Maybe _)’
+      In the expression: (id :: _a -> _a) (Just True :: Maybe _)
+    • Relevant bindings include
+        maybeBool :: Maybe Bool (bound at SplicesUsed.hs:8:1)
 
 SplicesUsed.hs:10:17: warning:
-    Found type wildcard ‘_’ standing for ‘(Char, a)’
-    Where: ‘a’ is a rigid type variable bound by
+    • Found type wildcard ‘_’ standing for ‘(Char, a)’
+      Where: ‘a’ is a rigid type variable bound by
                the inferred type of charA :: a -> (Char, a)
                at SplicesUsed.hs:10:10
-    In the type signature for:
-      charA :: a -> (_)
+    • In the type signature:
+        charA :: a -> (_)
+    • Relevant bindings include
+        charA :: a -> (Char, a) (bound at SplicesUsed.hs:11:1)
 
 SplicesUsed.hs:13:14: warning:
-    Found type wildcard ‘_’ standing for ‘a -> Bool’
-    Where: ‘a’ is a rigid type variable bound by
+    • Found type wildcard ‘_’ standing for ‘a -> Bool’
+      Where: ‘a’ is a rigid type variable bound by
                the inferred type of filter' :: (a -> Bool) -> [a] -> [a]
                at SplicesUsed.hs:14:1
-    In the type signature for:
-      filter' :: _ -> _ -> _
+    • In the type signature:
+        filter' :: _ -> _ -> _
+    • Relevant bindings include
+        filter' :: (a -> Bool) -> [a] -> [a] (bound at SplicesUsed.hs:14:1)
 
 SplicesUsed.hs:13:14: warning:
-    Found type wildcard ‘_’ standing for ‘[a]’
-    Where: ‘a’ is a rigid type variable bound by
+    • Found type wildcard ‘_’ standing for ‘[a]’
+      Where: ‘a’ is a rigid type variable bound by
                the inferred type of filter' :: (a -> Bool) -> [a] -> [a]
                at SplicesUsed.hs:14:1
-    In the type signature for:
-      filter' :: _ -> _ -> _
+    • In the type signature:
+        filter' :: _ -> _ -> _
+    • Relevant bindings include
+        filter' :: (a -> Bool) -> [a] -> [a] (bound at SplicesUsed.hs:14:1)
 
 SplicesUsed.hs:13:14: warning:
-    Found type wildcard ‘_’ standing for ‘[a]’
-    Where: ‘a’ is a rigid type variable bound by
+    • Found type wildcard ‘_’ standing for ‘[a]’
+      Where: ‘a’ is a rigid type variable bound by
                the inferred type of filter' :: (a -> Bool) -> [a] -> [a]
                at SplicesUsed.hs:14:1
-    In the type signature for:
-      filter' :: _ -> _ -> _
+    • In the type signature:
+        filter' :: _ -> _ -> _
+    • Relevant bindings include
+        filter' :: (a -> Bool) -> [a] -> [a] (bound at SplicesUsed.hs:14:1)
 
 SplicesUsed.hs:16:3: warning:
-    Found hole ‘_’ with inferred constraints: Eq a
-    In the type signature for:
+    Found constraint wildcard ‘_’ standing for ‘Eq a’
+    In the type signature:
       foo :: _ => _
 
 SplicesUsed.hs:16:3: warning:
-    Found type wildcard ‘_’ standing for ‘a -> a -> Bool’
-    Where: ‘a’ is a rigid type variable bound by
+    • Found type wildcard ‘_’ standing for ‘a -> a -> Bool’
+      Where: ‘a’ is a rigid type variable bound by
                the inferred type of foo :: Eq a => a -> a -> Bool
                at SplicesUsed.hs:16:3
-    In the type signature for:
-      foo :: _ => _
+    • In the type signature:
+        foo :: _ => _
+    • Relevant bindings include
+        foo :: a -> a -> Bool (bound at SplicesUsed.hs:16:3)
 
 SplicesUsed.hs:18:3: warning:
-    Found type wildcard ‘_a’ standing for ‘Bool’
-    In the type signature for:
-      bar :: _a -> _b -> (_a, _b)
+    • Found type wildcard ‘_a’ standing for ‘Bool’
+    • In the type signature:
+        bar :: _a -> _b -> (_a, _b)
+    • Relevant bindings include
+        bar :: Bool -> t -> (Bool, t) (bound at SplicesUsed.hs:18:3)
 
 SplicesUsed.hs:18:3: warning:
-    Found type wildcard ‘_b’ standing for ‘t’
-    Where: ‘t’ is a rigid type variable bound by
+    • Found type wildcard ‘_b’ standing for ‘t’
+      Where: ‘t’ is a rigid type variable bound by
                the inferred type of bar :: Bool -> t -> (Bool, t)
                at SplicesUsed.hs:18:3
-    In the type signature for:
-      bar :: _a -> _b -> (_a, _b)
+    • In the type signature:
+        bar :: _a -> _b -> (_a, _b)
+    • Relevant bindings include
+        bar :: Bool -> t -> (Bool, t) (bound at SplicesUsed.hs:18:3)

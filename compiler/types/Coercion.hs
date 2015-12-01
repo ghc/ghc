@@ -8,7 +8,8 @@
 --
 module Coercion (
         -- * Main data type
-        Coercion(..), Var, CoVar,
+        Coercion(..), CoercionN, CoercionR,
+        Var, CoVar,
         LeftOrRight(..), pickLR,
         Role(..), ltRole,
 
@@ -120,6 +121,9 @@ import Control.Arrow ( first )
 *                                                                      *
 ************************************************************************
 -}
+
+type CoercionR = Coercion   -- A coercion at Representation role   ~R
+type CoercionN = Coercion   -- A coercion at Nominal        role   ~N
 
 -- | A 'Coercion' is concrete evidence of the equality/convertibility
 -- of two types.

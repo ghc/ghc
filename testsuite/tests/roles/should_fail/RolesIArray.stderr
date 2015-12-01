@@ -2,11 +2,11 @@
 RolesIArray.hs:10:13: error:
     Couldn't match type ‘Word64’ with ‘N’
       arising from the coercion of the method ‘Data.Array.Base.unsafeAccumArray’
-        from type ‘forall e' i.
+        from type ‘forall i e'.
                    Ix i =>
                    (Word64 -> e' -> Word64)
                    -> Word64 -> (i, i) -> [(Int, e')] -> UArray i Word64’
-          to type ‘forall e' i.
+          to type ‘forall i e'.
                    Ix i =>
                    (N -> e' -> N) -> N -> (i, i) -> [(Int, e')] -> UArray i N’
     When deriving the instance for (IArray UArray N)
@@ -14,11 +14,11 @@ RolesIArray.hs:10:13: error:
 RolesIArray.hs:10:13: error:
     Couldn't match type ‘Word64’ with ‘N’
       arising from the coercion of the method ‘Data.Array.Base.unsafeAccum’
-        from type ‘forall e' i.
+        from type ‘forall i e'.
                    Ix i =>
                    (Word64 -> e' -> Word64)
                    -> UArray i Word64 -> [(Int, e')] -> UArray i Word64’
-          to type ‘forall e' i.
+          to type ‘forall i e'.
                    Ix i =>
                    (N -> e' -> N) -> UArray i N -> [(Int, e')] -> UArray i N’
     When deriving the instance for (IArray UArray N)

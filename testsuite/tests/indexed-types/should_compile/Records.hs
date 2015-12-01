@@ -26,7 +26,7 @@ f r = r { moo = 3 }
 class D c where
   data D1 c
   works :: Int -> D1 c -> D1 c
-  buggy :: Int -> D1 c -> D1 c 
+  buggy :: Int -> D1 c -> D1 c
   buggy2 :: Int -> D1 c -> D1 c
 
 instance D FooC where
@@ -34,7 +34,7 @@ instance D FooC where
 
   works x d = d  -- d unchanged, so OK
 
-  buggy x d@(D1F { noo = k }) = 
+  buggy x d@(D1F { noo = k }) =
     d { noo = k + x }
 
   buggy2 x d@(D1F { noo = k }) =

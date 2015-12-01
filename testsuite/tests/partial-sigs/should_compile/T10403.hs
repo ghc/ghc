@@ -17,6 +17,7 @@ h1 :: _ => _
 h1 f b = (H . fmap (const ())) (fmap f b)
 
 h2 :: _
+-- MR applies
 -- h2 :: Functor m => (a -> b) -> m a -> H m
 h2 f b = (H . fmap (const ())) (fmap f b)
 

@@ -29,7 +29,7 @@ module TcType (
 
   --------------------------------
   -- MetaDetails
-  UserTypeCtxt(..), pprUserTypeCtxt, pprSigCtxt,
+  UserTypeCtxt(..), pprUserTypeCtxt, pprSigCtxt, isSigMaybe,
   TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTv, superSkolemTv,
   MetaDetails(Flexi, Indirect), MetaInfo(..),
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
@@ -423,14 +423,14 @@ data UserTypeCtxt
 -- will become  type T = forall a. a->a
 --
 -- With gla-exts that's right, but for H98 we should complain.
+-}
 
 
-************************************************************************
+{- *********************************************************************
 *                                                                      *
                 Untoucable type variables
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 newtype TcLevel = TcLevel Int deriving( Eq, Ord )
   -- See Note [TcLevel and untouchable type variables] for what this Int is
@@ -590,16 +590,22 @@ pprSigCtxt :: UserTypeCtxt -> SDoc -> SDoc -> SDoc
 --              f :: <type>
 -- The <extra> is either empty or "the ambiguity check for"
 pprSigCtxt ctxt extra pp_ty
-  = sep [ ptext (sLit "In") <+> extra <+> pprUserTypeCtxt ctxt <> colon
-        , nest 2 (pp_sig ctxt) ]
-  where
-    pp_sig (FunSigCtxt n _) = pp_n_colon n
-    pp_sig (ConArgCtxt n)   = pp_n_colon n
-    pp_sig (ForSigCtxt n)   = pp_n_colon n
-    pp_sig (PatSynCtxt n)   = pp_n_colon n
-    pp_sig _                = pp_ty
+  | Just n <- isSigMaybe ctxt
+  = vcat [ ptext (sLit "In") <+> extra <+> ptext (sLit "the type signature:")
+         , nest 2 (pprPrefixOcc n <+> dcolon <+> pp_ty) ]
 
-    pp_n_colon n = pprPrefixOcc n <+> dcolon <+> pp_ty
+  | otherwise
+  = hang (ptext (sLit "In") <+> extra <+> pprUserTypeCtxt ctxt <> colon)
+       2 pp_ty
+
+  where
+
+isSigMaybe :: UserTypeCtxt -> Maybe Name
+isSigMaybe (FunSigCtxt n _) = Just n
+isSigMaybe (ConArgCtxt n)   = Just n
+isSigMaybe (ForSigCtxt n)   = Just n
+isSigMaybe (PatSynCtxt n)   = Just n
+isSigMaybe _                = Nothing
 
 {-
 ************************************************************************

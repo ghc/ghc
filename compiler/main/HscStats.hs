@@ -45,7 +45,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
              ("InstType         ", inst_type_ds),
              ("InstData         ", inst_data_ds),
              ("TypeSigs         ", bind_tys),
-             ("GenericSigs      ", generic_sigs),
+             ("ClassOpSigs      ", generic_sigs),
              ("ValBinds         ", val_bind_ds),
              ("FunBinds         ", fn_bind_ds),
              ("PatSynBinds      ", patsyn_ds),
@@ -105,12 +105,12 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
 
     count_sigs sigs = sum5 (map sig_info sigs)
 
-    sig_info (FixSig _)       = (1,0,0,0,0)
-    sig_info (TypeSig _ _ _)  = (0,1,0,0,0)
-    sig_info (SpecSig _ _ _)  = (0,0,1,0,0)
-    sig_info (InlineSig _ _)  = (0,0,0,1,0)
-    sig_info (GenericSig _ _) = (0,0,0,0,1)
-    sig_info _                = (0,0,0,0,0)
+    sig_info (FixSig {})     = (1,0,0,0,0)
+    sig_info (TypeSig {})    = (0,1,0,0,0)
+    sig_info (SpecSig {})    = (0,0,1,0,0)
+    sig_info (InlineSig {})  = (0,0,0,1,0)
+    sig_info (ClassOpSig {}) = (0,0,0,0,1)
+    sig_info _               = (0,0,0,0,0)
 
     import_info (L _ (ImportDecl { ideclSafe = safe, ideclQualified = qual
                                  , ideclAs = as, ideclHiding = spec }))
@@ -126,7 +126,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
 
     data_info (DataDecl { tcdDataDefn = HsDataDefn { dd_cons = cs
                                                    , dd_derivs = derivs}})
-        = (length cs, case derivs of Nothing       -> 0
+        = (length cs, case derivs of Nothing -> 0
                                      Just (L _ ds) -> length ds)
     data_info _ = (0,0)
 

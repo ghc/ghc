@@ -1,5 +1,5 @@
 
-T7278.hs:8:43:
+T7278.hs:8:43: error:
     ‘t’ is applied to too many type arguments
-    In the type signature for ‘f’:
+    In the type signature:
       f :: (C (t :: k) (TF t)) => TF t p1 p0 -> t p1 p0

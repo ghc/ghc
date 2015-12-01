@@ -1,16 +1,16 @@
 
-T3169.hs:13:22:
-    Couldn't match type ‘elt’ with ‘Map b elt’
+T3169.hs:13:22: error:
+    • Couldn't match type ‘elt’ with ‘Map b elt’
       ‘elt’ is a rigid type variable bound by
-            the type signature for:
-            lookup :: (a, b) -> Map (a, b) elt -> Maybe elt
-            at T3169.hs:12:3
-    Expected type: Map a (Map b elt)
-      Actual type: Map (a, b) elt
-    In the second argument of ‘lookup’, namely ‘m’
-    In the expression: lookup a m :: Maybe (Map b elt)
-    Relevant bindings include
-      m :: Map (a, b) elt (bound at T3169.hs:12:17)
-      b :: b (bound at T3169.hs:12:13)
-      lookup :: (a, b) -> Map (a, b) elt -> Maybe elt
-        (bound at T3169.hs:12:3)
+        the type signature for:
+          lookup :: forall elt. (a, b) -> Map (a, b) elt -> Maybe elt
+        at T3169.hs:12:3
+      Expected type: Map a (Map b elt)
+        Actual type: Map (a, b) elt
+    • In the second argument of ‘lookup’, namely ‘m’
+      In the expression: lookup a m :: Maybe (Map b elt)
+    • Relevant bindings include
+        m :: Map (a, b) elt (bound at T3169.hs:12:17)
+        b :: b (bound at T3169.hs:12:13)
+        lookup :: (a, b) -> Map (a, b) elt -> Maybe elt
+          (bound at T3169.hs:12:3)

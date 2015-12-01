@@ -1,18 +1,20 @@
 
-T9939.hs:5:7: Warning:
+T9939.hs:5:1: warning:
     Redundant constraint: Eq a
-    In the type signature for: f1 :: (Eq a, Ord a) => a -> a -> Bool
+    In the type signature for:
+         f1 :: (Eq a, Ord a) => a -> a -> Bool
 
-T9939.hs:9:7: Warning:
+T9939.hs:9:1: warning:
     Redundant constraint: Eq a
-    In the type signature for: f2 :: (Eq a, Ord a) => a -> a -> Bool
+    In the type signature for:
+         f2 :: (Eq a, Ord a) => a -> a -> Bool
 
-T9939.hs:13:7: Warning:
+T9939.hs:13:1: warning:
     Redundant constraint: Eq b
     In the type signature for:
-       f3 :: (Eq a, a ~ b, Eq b) => a -> b -> Bool
+         f3 :: (Eq a, a ~ b, Eq b) => a -> b -> Bool
 
-T9939.hs:20:7: Warning:
+T9939.hs:20:1: warning:
     Redundant constraint: Eq b
     In the type signature for:
-       f4 :: (Eq a, Eq b) => a -> b -> Equal a b -> Bool
+         f4 :: (Eq a, Eq b) => a -> b -> Equal a b -> Bool

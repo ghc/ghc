@@ -6,7 +6,8 @@ module TcEvidence (
 
   -- HsWrapper
   HsWrapper(..),
-  (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams, mkWpLams, mkWpLet, mkWpCast,
+  (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
+  mkWpLams, mkWpLet, mkWpCastN, mkWpCastR,
   mkWpFun, idHsWrapper, isIdHsWrapper, pprHsWrapper,
 
   -- Evidence bindings
@@ -203,7 +204,7 @@ mkTcTyConAppCo role tc cos -- No need to expand type synonyms
 -- Input coercion is Nominal
 -- mkSubCo will do some normalisation. We do not do it for TcCoercions, but
 -- defer that to desugaring; just to reduce the code duplication a little bit
-mkTcSubCo :: TcCoercion -> TcCoercion
+mkTcSubCo :: TcCoercionN -> TcCoercionR
 mkTcSubCo (TcRefl _ ty)
   = TcRefl Representational ty
 mkTcSubCo co
@@ -258,12 +259,11 @@ mkTcAxInstCo role ax index tys
     arg_roles = coAxBranchRoles branch
     rtys      = zipWith mkTcReflCo (arg_roles ++ repeat Nominal) tys
 
-mkTcAxiomRuleCo :: CoAxiomRule -> [TcType] -> [TcCoercion] -> TcCoercion
+mkTcAxiomRuleCo :: CoAxiomRule -> [TcType] -> [TcCoercion] -> TcCoercionR
 mkTcAxiomRuleCo = TcAxiomRuleCo
 
-mkTcUnbranchedAxInstCo :: Role -> CoAxiom Unbranched -> [TcType] -> TcCoercion
-mkTcUnbranchedAxInstCo role ax tys
-  = mkTcAxInstCo role ax 0 tys
+mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType] -> TcCoercionR
+mkTcUnbranchedAxInstCo ax tys = mkTcAxInstCo Representational ax 0 tys
 
 mkTcAppCo :: TcCoercion -> TcCoercion -> TcCoercion
 -- No need to deal with TyConApp on the left; see Note [TcCoercions]
@@ -570,7 +570,7 @@ data HsWrapper
        -- This isn't the same as for mkTcFunCo, but it has to be this way
        -- because we can't use 'sym' to flip around these HsWrappers
 
-  | WpCast TcCoercion         -- A cast:  [] `cast` co
+  | WpCast TcCoercionR        -- A cast:  [] `cast` co
                               -- Guaranteed not the identity coercion
                               -- At role Representational
 
@@ -601,11 +601,18 @@ mkWpFun (WpCast co1) WpHole       _  t2 = WpCast (mkTcFunCo Representational (mk
 mkWpFun (WpCast co1) (WpCast co2) _  _  = WpCast (mkTcFunCo Representational (mkTcSymCo co1) co2)
 mkWpFun co1          co2          t1 t2 = WpFun co1 co2 t1 t2
 
-mkWpCast :: TcCoercion -> HsWrapper
-mkWpCast co
+mkWpCastR :: TcCoercionR -> HsWrapper
+mkWpCastR co
   | isTcReflCo co = WpHole
   | otherwise     = ASSERT2(tcCoercionRole co == Representational, ppr co)
                     WpCast co
+
+mkWpCastN :: TcCoercionN -> HsWrapper
+mkWpCastN co
+  | isTcReflCo co = WpHole
+  | otherwise     = ASSERT2(tcCoercionRole co == Nominal, ppr co)
+                    WpCast (mkTcSubCo co)
+    -- The mkTcSubCo converts Nominal to Representational
 
 mkWpTyApps :: [Type] -> HsWrapper
 mkWpTyApps tys = mk_co_app_fn WpTyApp tys
@@ -1156,7 +1163,7 @@ instance Outputable EvTypeable where
 -- and return a 'Coercion' `co :: IP sym ty ~ ty` or
 -- `co :: IsLabel sym ty ~ Proxy# sym -> ty`.  See also
 -- Note [Type-checking overloaded labels] in TcExpr.
-unwrapIP :: Type -> Coercion
+unwrapIP :: Type -> CoercionR
 unwrapIP ty =
   case unwrapNewTyCon_maybe tc of
     Just (_,_,ax) -> mkUnbranchedAxInstCo Representational ax tys
@@ -1168,5 +1175,5 @@ unwrapIP ty =
 
 -- | Create a 'Coercion' that wraps a value in an implicit-parameter
 -- dictionary. See 'unwrapIP'.
-wrapIP :: Type -> Coercion
+wrapIP :: Type -> CoercionR
 wrapIP ty = mkSymCo (unwrapIP ty)

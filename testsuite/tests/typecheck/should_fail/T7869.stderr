@@ -26,3 +26,4 @@ T7869.hs:3:12:
     In the expression: (\ x -> f x) :: [a] -> b
     In an equation for ‘f’: f = (\ x -> f x) :: [a] -> b
     Relevant bindings include f :: [a] -> b (bound at T7869.hs:3:1)
+

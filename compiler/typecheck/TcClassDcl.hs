@@ -20,7 +20,7 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 
 import HsSyn
 import TcEnv
-import TcPat( addInlinePrags, completeIdSigPolyId, lookupPragEnv, emptyPragEnv )
+import TcPat( addInlinePrags, lookupPragEnv, emptyPragEnv )
 import TcEvidence( idHsWrapper )
 import TcBinds
 import TcUnify
@@ -122,14 +122,16 @@ tcClassSigs clas sigs def_methods
        ; traceTc "tcClassSigs 2" (ppr clas)
        ; return op_info }
   where
-    vanilla_sigs = [L loc (nm,ty) | L loc (TypeSig    nm ty _) <- sigs]
-    gen_sigs     = [L loc (nm,ty) | L loc (GenericSig nm ty) <- sigs]
+    vanilla_sigs = [L loc (nm,ty) | L loc (ClassOpSig False nm ty) <- sigs]
+    gen_sigs     = [L loc (nm,ty) | L loc (ClassOpSig True  nm ty) <- sigs]
     dm_bind_names :: [Name]     -- These ones have a value binding in the class decl
     dm_bind_names = [op | L _ (FunBind {fun_id = L _ op}) <- bagToList def_methods]
 
+    tc_sig :: NameEnv Type -> ([Located Name], LHsSigType Name)
+           -> TcM [TcMethInfo]
     tc_sig gen_dm_env (op_names, op_hs_ty)
       = do { traceTc "ClsSig 1" (ppr op_names)
-           ; op_ty <- tcClassSigType op_hs_ty   -- Class tyvars already in scope
+           ; op_ty <- tcClassSigType op_names op_hs_ty   -- Class tyvars already in scope
            ; traceTc "ClsSig 2" (ppr op_names)
            ; return [ (op_name, op_ty, f op_name) | L _ op_name <- op_names ] }
            where
@@ -138,7 +140,7 @@ tcClassSigs clas sigs def_methods
                   | otherwise                              = Nothing
 
     tc_gen_sig (op_names, gen_hs_ty)
-      = do { gen_op_ty <- tcClassSigType gen_hs_ty
+      = do { gen_op_ty <- tcClassSigType op_names gen_hs_ty
            ; return [ (op_name, gen_op_ty) | L _ op_name <- op_names ] }
 
 {-
@@ -239,7 +241,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
 
              ctxt = FunSigCtxt sel_name warn_redundant
 
-       ; local_dm_sig <- instTcTySig ctxt hs_ty local_dm_ty Nothing [] local_dm_name
+       ; local_dm_sig <- instTcTySig ctxt hs_ty local_dm_ty local_dm_name
         ; (ev_binds, (tc_bind, _))
                <- checkConstraints (ClsSkol clas) tyvars [this_dict] $
                   tcPolyCheck NonRecursive no_prag_fn local_dm_sig
@@ -312,17 +314,17 @@ instantiateMethod clas sel_id inst_tys
 
 
 ---------------------------
-type HsSigFun = NameEnv (LHsType Name)
+type HsSigFun = NameEnv (LHsSigType Name)
 
 emptyHsSigs :: HsSigFun
 emptyHsSigs = emptyNameEnv
 
 mkHsSigFun :: [LSig Name] -> HsSigFun
 mkHsSigFun sigs = mkNameEnv [(n, hs_ty)
-                            | L _ (TypeSig ns hs_ty _) <- sigs
+                            | L _ (ClassOpSig False ns hs_ty) <- sigs
                             , L _ n <- ns ]
 
-lookupHsSig :: HsSigFun -> Name -> Maybe (LHsType Name)
+lookupHsSig :: HsSigFun -> Name -> Maybe (LHsSigType Name)
 lookupHsSig = lookupNameEnv
 
 ---------------------------

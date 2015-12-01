@@ -383,7 +383,7 @@ Note [Local bindings with Exact Names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 With Template Haskell we can make local bindings that have Exact Names.
 Computing shadowing etc may use elemLocalRdrEnv (at least it certainly
-does so in RnTpes.bindHsTyVars), so for an Exact Name we must consult
+does so in RnTpes.bindHsQTyVars), so for an Exact Name we must consult
 the in-scope-name-set.
 
 
@@ -515,7 +515,6 @@ have any parent.
 
 Note [Parents for record fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 For record fields, in addition to the Name of the type constructor
 (stored in par_is), we use FldParent to store the field label.  This
 extra information is used for identifying overloaded record fields

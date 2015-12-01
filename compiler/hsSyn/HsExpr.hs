@@ -321,16 +321,13 @@ data HsExpr id
   -- For details on above see note [Api annotations] in ApiAnnotation
   | ExprWithTySig
                 (LHsExpr id)
-                (LHsType id)
-                (PostRn id [Name])      -- After renaming, the list of Names
-                                        -- contains the named and unnamed
-                                        -- wildcards brought in scope by the
-                                        -- signature
+                (LHsSigWcType id)
 
-  | ExprWithTySigOut                    -- TRANSLATION
+  | ExprWithTySigOut              -- Post typechecking
                 (LHsExpr id)
-                (LHsType Name)          -- Retain the signature for
-                                        -- round-tripping purposes
+                (LHsSigWcType Name)  -- Retain the signature,
+                                     -- as HsSigType Name, for
+                                     -- round-tripping purposes
 
   -- | Arithmetic sequence
   --
@@ -571,28 +568,21 @@ So we use Nothing to mean "use the old built-in typing rule".
 
 Note [Record Update HsWrapper]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-There is a wrapper in RecordUpd which is used for the *required* constraints for
-pattern synonyms. This wrapper is created in the typechecking and is then
-directly used in the desugaring without modification.
+There is a wrapper in RecordUpd which is used for the *required*
+constraints for pattern synonyms. This wrapper is created in the
+typechecking and is then directly used in the desugaring without
+modification.
 
 For example, if we have the record pattern synonym P,
+  pattern P :: (Show a) => a -> Maybe a
+  pattern P{x} = Just x
 
-```
-pattern P :: (Show a) => a -> Maybe a
-pattern P{x} = Just x
-
-foo = (Just True) { x = False }
-```
-
+  foo = (Just True) { x = False }
 then `foo` desugars to something like
-
-```
-P x = P False
-```
-
-hence we need to provide the correct dictionaries to P on the RHS so that we can
-build the expression.
+  foo = case Just True of
+          P x -> P False
+hence we need to provide the correct dictionaries to P's matcher on
+the RHS so that we can build the expression.
 
 Note [Located RdrNames]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -604,6 +594,7 @@ in the ParsedSource.
 There are unfortunately enough differences between the ParsedSource and the
 RenamedSource that the API Annotations cannot be used directly with
 RenamedSource, so this allows a simple mapping to be used based on the location.
+>>>>>>> origin/master
 -}
 
 instance OutputableBndr id => Outputable (HsExpr id) where
@@ -751,7 +742,7 @@ ppr_expr (RecordCon { rcon_con_name = con_id, rcon_flds = rbinds })
 ppr_expr (RecordUpd { rupd_expr = aexp, rupd_flds = rbinds })
   = hang (pprLExpr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
 
-ppr_expr (ExprWithTySig expr sig _)
+ppr_expr (ExprWithTySig expr sig)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
          4 (ppr sig)
 ppr_expr (ExprWithTySigOut expr sig)
@@ -979,7 +970,7 @@ data HsCmd id
 
     -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsCmdCast   TcCoercion     -- A simpler version of HsWrap in HsExpr
+  | HsCmdCast   TcCoercionN    -- A simpler version of HsWrap in HsExpr
                 (HsCmd id)     -- If   cmd :: arg1 --> res
                                --       co :: arg1 ~ arg2
                                -- Then (HsCmdCast co cmd) :: arg2 --> res
@@ -1147,6 +1138,7 @@ data Match id body
         m_type :: (Maybe (LHsType id)),
                                  -- A type signature for the result of the match
                                  -- Nothing after typechecking
+                                 -- NB: No longer supported
         m_grhss :: (GRHSs id body)
   } deriving (Typeable)
 deriving instance (Data body,DataId id) => Data (Match id body)
