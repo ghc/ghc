@@ -21,7 +21,7 @@ module TcType (
   --------------------------------
   -- Types
   TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType,
-  TcTyVar, TcTyVarSet, TcKind, TcCoVar,
+  TcTyVar, TcTyVarSet, TcDTyVarSet, TcKind, TcCoVar,
 
   -- TcLevel
   TcLevel(..), topTcLevel, pushTcLevel,
@@ -144,6 +144,8 @@ module TcType (
 
   tyVarsOfType, tyVarsOfTypes, closeOverKinds,
   tyVarsOfTypeList, tyVarsOfTypesList,
+  tyVarsOfTypeAcc, tyVarsOfTypesAcc,
+  tyVarsOfTypeDSet, tyVarsOfTypesDSet, closeOverKindsDSet,
   tcTyVarsOfType, tcTyVarsOfTypes,
 
   pprKind, pprParendKind, pprSigmaType,
@@ -244,6 +246,7 @@ type TcRhoType      = TcType  -- Note [TcRhoType]
 type TcTauType      = TcType
 type TcKind         = Kind
 type TcTyVarSet     = TyVarSet
+type TcDTyVarSet    = DTyVarSet
 
 {-
 Note [TcRhoType]

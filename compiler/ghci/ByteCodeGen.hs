@@ -479,7 +479,7 @@ schemeE d s p exp@(AnnTick (Breakpoint _id _fvs) _rhs)
           let letExp = AnnLet (AnnNonRec id (fvs, exp)) (emptyDVarSet, AnnVar id)
           schemeE d s p letExp
    where exp' = deAnnotate' exp
-         fvs  = exprFreeDVars exp'
+         fvs  = exprFreeVarsDSet exp'
          ty   = exprType exp'
 
 -- ignore other kinds of tick

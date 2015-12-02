@@ -28,6 +28,10 @@ module UniqDFM (
         unitUDFM,
         addToUDFM,
         delFromUDFM,
+        delListFromUDFM,
+        adjustUDFM,
+        alterUDFM,
+        mapUDFM,
         plusUDFM,
         lookupUDFM,
         elemUDFM,
@@ -37,7 +41,9 @@ module UniqDFM (
         isNullUDFM,
         sizeUDFM,
         intersectUDFM,
+        disjointUDFM,
         minusUDFM,
+        partitionUDFM,
 
         udfmToList,
         udfmToUfm,
@@ -222,10 +228,23 @@ intersectUDFM (UDFM x i) (UDFM y _j) = UDFM (M.intersection x y) i
   -- M.intersection is left biased, that means the result will only have
   -- a subset of elements from the left set, so `i` is a good upper bound.
 
+disjointUDFM :: UniqDFM elt -> UniqDFM elt -> Bool
+disjointUDFM (UDFM x _i) (UDFM y _j) = M.null (M.intersection x y)
+
 minusUDFM :: UniqDFM elt1 -> UniqDFM elt2 -> UniqDFM elt1
 minusUDFM (UDFM x i) (UDFM y _j) = UDFM (M.difference x y) i
   -- M.difference returns a subset of a left set, so `i` is a good upper
   -- bound.
+
+-- | Partition UniqDFM into two UniqDFMs according to the predicate
+partitionUDFM :: (elt -> Bool) -> UniqDFM elt -> (UniqDFM elt, UniqDFM elt)
+partitionUDFM p (UDFM m i) =
+  case M.partition (p . taggedFst) m of
+    (left, right) -> (UDFM left i, UDFM right i)
+
+-- | Delete a list of elements from a UniqDFM
+delListFromUDFM  :: Uniquable key => UniqDFM elt -> [key] -> UniqDFM elt
+delListFromUDFM = foldl delFromUDFM
 
 -- | This allows for lossy conversion from UniqDFM to UniqFM
 udfmToUfm :: UniqDFM elt -> UniqFM elt
@@ -234,6 +253,32 @@ udfmToUfm (UDFM m _i) =
 
 listToUDFM_Directly :: [(Unique, elt)] -> UniqDFM elt
 listToUDFM_Directly = foldl (\m (u, v) -> addToUDFM_Directly m u v) emptyUDFM
+
+-- | Apply a function to a particular element
+adjustUDFM :: Uniquable key => (elt -> elt) -> UniqDFM elt -> key -> UniqDFM elt
+adjustUDFM f (UDFM m i) k = UDFM (M.adjust (fmap f) (getKey $ getUnique k) m) i
+
+-- | The expression (alterUDFM f k map) alters value x at k, or absence
+-- thereof. alterUDFM can be used to insert, delete, or update a value in
+-- UniqDFM. Use addToUDFM, delFromUDFM or adjustUDFM when possible, they are
+-- more efficient.
+alterUDFM
+  :: Uniquable key
+  => (Maybe elt -> Maybe elt)  -- How to adjust
+  -> UniqDFM elt               -- old
+  -> key                       -- new
+  -> UniqDFM elt               -- result
+alterUDFM f (UDFM m i) k =
+  UDFM (M.alter alterf (getKey $ getUnique k) m) (i + 1)
+  where
+  alterf Nothing = inject $ f Nothing
+  alterf (Just (TaggedVal v _)) = inject $ f (Just v)
+  inject Nothing = Nothing
+  inject (Just v) = Just $ TaggedVal v i
+
+-- | Map a function over every value in a UniqDFM
+mapUDFM :: (elt1 -> elt2) -> UniqDFM elt1 -> UniqDFM elt2
+mapUDFM f (UDFM m i) = UDFM (M.map (fmap f) m) i
 
 -- This should not be used in commited code, provided for convenience to
 -- make ad-hoc conversions when developing

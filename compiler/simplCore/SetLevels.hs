@@ -771,10 +771,10 @@ lvlBind env (AnnRec pairs)
         -- Finding the free vars of the binding group is annoying
     bind_fvs = ((unionDVarSets [ rhs_fvs | (_, (rhs_fvs,_)) <- pairs])
                 `unionDVarSet`
-                (runFVDSet $ foldr unionFV noVars [ idFreeVarsAcc bndr
-                                                  | (bndr, (_,_)) <- pairs]))
-               `minusDVarSet`
-                mkDVarSet bndrs -- XXX: it's a waste to create a set here
+                (runFVDSet $ unionsFV [ idFreeVarsAcc bndr
+                                      | (bndr, (_,_)) <- pairs]))
+               `delDVarSetList`
+                bndrs
 
     dest_lvl = destLevel env bind_fvs (all isFunction rhss) False
     abs_vars = abstractVars dest_lvl env bind_fvs
