@@ -317,7 +317,7 @@ zonkTopDecls ev_binds binds export_ies sig_ns rules vects imp_specs fords
         ; warn_missing_sigs <- woptM Opt_WarnMissingSigs
         ; warn_only_exported <- woptM Opt_WarnMissingExportedSigs
         ; let export_occs  = maybe emptyBag
-                                   (listToBag . map (rdrNameOcc . ieName . unLoc) . unLoc)
+                                   (listToBag . concatMap (map rdrNameOcc . ieNames . unLoc) . unLoc)
                                    export_ies
               sig_warn
                 | warn_only_exported = topSigWarnIfExported export_occs sig_ns
