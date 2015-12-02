@@ -44,16 +44,16 @@ Roman.foo_$s$wgo =
     let {
       a :: Int#
       [LclId, Str=DmdType]
-      a = +# (+# (+# (+# (+# (+# sc1 sc1) sc1) sc1) sc1) sc1) sc1 } in
-    case tagToEnum# @ Bool (<=# sc 0#) of _ [Occ=Dead] {
+      a = +# (+# (+# (+# (+# (+# sc sc) sc) sc) sc) sc) sc } in
+    case tagToEnum# @ Bool (<=# sc1 0#) of _ [Occ=Dead] {
       False ->
-        case tagToEnum# @ Bool (<# sc 100#) of _ [Occ=Dead] {
+        case tagToEnum# @ Bool (<# sc1 100#) of _ [Occ=Dead] {
           False ->
-            case tagToEnum# @ Bool (<# sc 500#) of _ [Occ=Dead] {
-              False -> Roman.foo_$s$wgo (-# sc 1#) (+# a a);
-              True -> Roman.foo_$s$wgo (-# sc 3#) a
+            case tagToEnum# @ Bool (<# sc1 500#) of _ [Occ=Dead] {
+              False -> Roman.foo_$s$wgo (+# a a) (-# sc1 1#);
+              True -> Roman.foo_$s$wgo a (-# sc1 3#)
             };
-          True -> Roman.foo_$s$wgo (-# sc 2#) sc1
+          True -> Roman.foo_$s$wgo sc (-# sc1 2#)
         };
       True -> 0#
     }
@@ -77,7 +77,7 @@ Roman.$wgo =
           [LclId, Str=DmdType]
           a = +# (+# (+# (+# (+# (+# ipv ipv) ipv) ipv) ipv) ipv) ipv } in
         case w of _ [Occ=Dead] {
-          Nothing -> Roman.foo_$s$wgo 10# a;
+          Nothing -> Roman.foo_$s$wgo a 10#;
           Just n ->
             case n of _ [Occ=Dead] { I# x2 ->
             case tagToEnum# @ Bool (<=# x2 0#) of _ [Occ=Dead] {
@@ -85,10 +85,10 @@ Roman.$wgo =
                 case tagToEnum# @ Bool (<# x2 100#) of _ [Occ=Dead] {
                   False ->
                     case tagToEnum# @ Bool (<# x2 500#) of _ [Occ=Dead] {
-                      False -> Roman.foo_$s$wgo (-# x2 1#) (+# a a);
-                      True -> Roman.foo_$s$wgo (-# x2 3#) a
+                      False -> Roman.foo_$s$wgo (+# a a) (-# x2 1#);
+                      True -> Roman.foo_$s$wgo a (-# x2 3#)
                     };
-                  True -> Roman.foo_$s$wgo (-# x2 2#) ipv
+                  True -> Roman.foo_$s$wgo ipv (-# x2 2#)
                 };
               True -> 0#
             }
@@ -145,14 +145,14 @@ foo :: Int -> Int
 foo =
   \ (n :: Int) ->
     case n of _ [Occ=Dead] { I# ipv ->
-    case Roman.foo_$s$wgo ipv 6# of ww { __DEFAULT -> I# ww }
+    case Roman.foo_$s$wgo 6# ipv of ww { __DEFAULT -> I# ww }
     }
 
 
 ------ Local rules for imported ids --------
 "SC:$wgo0" [0]
     forall (sc :: Int#) (sc1 :: Int#).
-      Roman.$wgo (Just @ Int (I# sc)) (Just @ Int (I# sc1))
+      Roman.$wgo (Just @ Int (I# sc1)) (Just @ Int (I# sc))
       = Roman.foo_$s$wgo sc sc1
 
 
