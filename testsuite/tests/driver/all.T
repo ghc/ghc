@@ -460,3 +460,13 @@ test('T9360b', normal, run_command, ['{compiler} -e "" --interactive'])
 test('T10970', normal, compile_and_run, ['-hide-all-packages -package base -package containers'])
 test('T10970a', normal, compile_and_run, [''])
 test('T4931', normal, compile_and_run, [''])
+test('T10320',
+    [
+        extra_clean([
+                        'T10320dump/T10320.dump-rule-firings',
+                        'T10320dump/T10320.dump-rule-rewrites',
+                        'T10320dump',
+                        'T10320.hs'
+                    ]),
+    ],
+    run_command, ['$MAKE -s --no-print-directory T10320'])

@@ -649,8 +649,13 @@ runPipeline' start_phase hsc_env env input_fn
   = do
   -- Execute the pipeline...
   let state = PipeState{ hsc_env, maybe_loc, maybe_stub_o = maybe_stub_o }
+      dflags = extractDynFlags hsc_env
 
-  evalP (pipeLoop start_phase input_fn) env state
+  -- #10320: Open dump files for writing. Any existing dump specified
+  -- in 'dflags' will be truncated.
+  bracket_ (openDumpFiles dflags)
+           (closeDumpFiles dflags)
+           (evalP (pipeLoop start_phase input_fn) env state)
 
 -- ---------------------------------------------------------------------------
 -- outer pipeline loop

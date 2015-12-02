@@ -27,6 +27,8 @@ module ErrUtils (
         dumpIfSet, dumpIfSet_dyn, dumpIfSet_dyn_printer,
         mkDumpDoc, dumpSDoc,
 
+        openDumpFiles, closeDumpFiles,
+
         --  * Messages during compilation
         putMsg, printInfoForUser, printOutputForUser,
         logInfo, logOutput,
@@ -53,7 +55,7 @@ import System.Directory
 import System.Exit      ( ExitCode(..), exitWith )
 import System.FilePath  ( takeDirectory, (</>) )
 import Data.List
-import qualified Data.Set as Set
+import qualified Data.Map as Map
 import Data.IORef
 import Data.Maybe       ( fromMaybe )
 import Data.Ord
@@ -291,6 +293,15 @@ dumpIfSet_dyn_printer :: PrintUnqualified
 dumpIfSet_dyn_printer printer dflags flag doc
   = when (dopt flag dflags) $ dumpSDoc dflags printer flag "" doc
 
+-- | a wrapper around 'dumpSDoc'.
+-- First check whether the dump flag is set
+-- Do nothing if it is unset
+--
+-- Makes a dummy write operation into the dump
+dumpIfSet_dyn_empty :: DynFlags -> DumpFlag -> IO ()
+dumpIfSet_dyn_empty dflags flag
+  = when (dopt flag dflags) $ dumpSDoc dflags neverQualify flag "" empty
+
 mkDumpDoc :: String -> SDoc -> SDoc
 mkDumpDoc hdr doc
    = vcat [blankLine,
@@ -300,6 +311,23 @@ mkDumpDoc hdr doc
      where
         line = text (replicate 20 '=')
 
+-- | Open dump files from DynFlags for writing
+--
+-- #10320: This function should be called once before the pipe line
+-- is started. It writes empty data into all requested dumps to initiate
+-- their creation.
+openDumpFiles :: DynFlags -> IO ()
+openDumpFiles dflags
+  = let flags = enumFrom (toEnum 0 :: DumpFlag)
+    in mapM_ (dumpIfSet_dyn_empty dflags) flags
+
+
+-- | Close all opened dump files
+--
+closeDumpFiles :: DynFlags -> IO ()
+closeDumpFiles dflags
+  = do gd <- readIORef $ generatedDumps dflags
+       mapM_ hClose $ Map.elems gd
 
 -- | Write out a dump.
 --      If --dump-to-file is set then this goes to a file.
@@ -315,32 +343,16 @@ dumpSDoc dflags print_unqual flag hdr doc
  = do let mFile = chooseDumpFile dflags flag
           dump_style = mkDumpStyle print_unqual
       case mFile of
-            Just fileName
-                 -> do
-                        let gdref = generatedDumps dflags
-                        gd <- readIORef gdref
-                        let append = Set.member fileName gd
-                            mode = if append then AppendMode else WriteMode
-                        when (not append) $
-                            writeIORef gdref (Set.insert fileName gd)
-                        createDirectoryIfMissing True (takeDirectory fileName)
-                        handle <- openFile fileName mode
-
-                        -- We do not want the dump file to be affected by
-                        -- environment variables, but instead to always use
-                        -- UTF8. See:
-                        -- https://ghc.haskell.org/trac/ghc/ticket/10762
-                        hSetEncoding handle utf8
-
-                        doc' <- if null hdr
-                                then return doc
-                                else do t <- getCurrentTime
-                                        let d = text (show t)
-                                             $$ blankLine
-                                             $$ doc
-                                        return $ mkDumpDoc hdr d
-                        defaultLogActionHPrintDoc dflags handle doc' dump_style
-                        hClose handle
+            Just fileName -> do
+              handle <- getDumpFileHandle dflags fileName
+              doc' <- if null hdr
+                      then return doc
+                      else do t <- getCurrentTime
+                              let d = text (show t)
+                                   $$ blankLine
+                                   $$ doc
+                              return $ mkDumpDoc hdr d
+              defaultLogActionHPrintDoc dflags handle doc' dump_style
 
             -- write the dump to stdout
             Nothing -> do
@@ -349,10 +361,35 @@ dumpSDoc dflags print_unqual flag hdr doc
                     | otherwise = (mkDumpDoc hdr doc, SevDump)
               log_action dflags dflags severity noSrcSpan dump_style doc'
 
+-- | Return a handle assigned to the 'fileName'
+--
+-- If the requested file doesn't exist the new one will be created
+getDumpFileHandle :: DynFlags -> FilePath -> IO Handle
+getDumpFileHandle dflags fileName
+  = do
+      let gdref = generatedDumps dflags
+      gd <- readIORef gdref
+
+      let mHandle = Map.lookup fileName gd
+      case mHandle of
+        Just handle -> return handle
+
+        Nothing -> do
+          createDirectoryIfMissing True (takeDirectory fileName)
+          handle <- openFile fileName WriteMode
+
+          -- We do not want the dump file to be affected by
+          -- environment variables, but instead to always use
+          -- UTF8. See:
+          -- https://ghc.haskell.org/trac/ghc/ticket/10762
+          hSetEncoding handle utf8
+          writeIORef gdref (Map.insert fileName handle gd)
+
+          return handle
 
 -- | Choose where to put a dump file based on DynFlags
 --
-chooseDumpFile :: DynFlags -> DumpFlag -> Maybe String
+chooseDumpFile :: DynFlags -> DumpFlag -> Maybe FilePath
 chooseDumpFile dflags flag
 
         | gopt Opt_DumpToFile dflags || flag == Opt_D_th_dec_file
