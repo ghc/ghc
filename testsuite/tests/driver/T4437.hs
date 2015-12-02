@@ -30,13 +30,17 @@ check title expected got
          showProblems "Missing flags" missing
 
 expectedGhcOnlyExtensions :: [String]
+-- In GHC but not yet added to Cabal
 expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "AlternativeLayoutRule",
                              "AlternativeLayoutRuleTransitional",
+                             "UndecidableSuperclasses",    -- Experimental SLPJ 30 Nov 15
+                                                           -- not yet added to Cabal
                              "OverloadedLabels",
                              "MonadFailDesugaring"]
 
 expectedCabalOnlyExtensions :: [String]
+-- In Cabal but not in GHC; flags for other compilers
 expectedCabalOnlyExtensions = ["Generics",
                                "ExtensibleRecords",
                                "RestrictedTypeSynonyms",

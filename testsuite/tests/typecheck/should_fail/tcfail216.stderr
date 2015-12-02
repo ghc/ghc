@@ -1,5 +1,0 @@
-
-tcfail216.hs:5:1: error:
-    • Potential superclass cycle for ‘A’
-        whose superclass predicates include ‘cls (A cls)’
-    • In the class declaration for ‘A’

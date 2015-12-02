@@ -31,22 +31,39 @@ instance (Build dc r, a ~ dc) => Build dc (a->r) where
 
 
 -- The type is inferred
--- tspan :: (Monoid d, Build (DC d) r, BuildR r ~ DC d) => r
-tspan :: (Build (DC d) r, BuildR r ~ DC d) => r
+tspan :: (Monoid d, Build (DC d) r, BuildR r ~ DC d) => r
 tspan = build (id :: DC d -> DC d) mempty
 
-{- Wanted:
+{- Solving 'tspan'
+
+Given:    Build (DC d) r, BuildR r ~ DC d
+ (by sc)  Monoid (DC d)
+
+   Wanted:
        Build acc0 r0
        Monid acc0
        acc0 ~ DC d0
        DC d0 ~ BuildR r0
+       r ~ r0
 ==>
-       Build (DC d0) r0
+       Build (DC d0) r
        Monoid (DC d0)  -->  Monoid d0
-       DC d- ~ BuildR r0
+       DC d0 ~ BuildR r
 
-In fact Monoid (DC d0) is a superclass of (Build (DC do) r0)
-But during inference we do not take upserclasses of wanteds
+From Given: BuildR r = DC d, hence
+       DC d0 ~ DC d
+hence
+       d0 ~ d
+
+===>
+       Build (DC d) r
+       Monoid (DC d)
+
+Now things are delicate.  Either the instance Monoid (DC d) will fire or,
+if we are lucky, we might spot that (Monoid (DC d)) is a superclass of
+a given.  But now (Decl 15) we add superclasses lazily, so that is less
+likely to happen, and was always fragile.  So include (MOnoid d) in the
+signature, as was the case in the orignal ticket.
 -}
 
 
