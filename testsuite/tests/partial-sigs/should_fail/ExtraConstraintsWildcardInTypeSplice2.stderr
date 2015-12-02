@@ -1,4 +1,5 @@
 
 ExtraConstraintsWildcardInTypeSplice2.hs:6:12: error:
-    Unexpected wild card: ‘_’
-    In the type signature for ‘show'’: show' :: (_) => a -> String
+    Wildcard ‘_’ not allowed
+      in the spliced type ‘_’
+    In the untyped splice: $wildCardT

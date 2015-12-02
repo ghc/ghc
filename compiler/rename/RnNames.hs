@@ -541,7 +541,7 @@ getLocalNonValBinders fixity_env
   = do  { -- Process all type/class decls *except* family instances
         ; overload_ok <- xoptM Opt_DuplicateRecordFields
         ; (tc_avails, tc_fldss) <- fmap unzip $ mapM (new_tc overload_ok)
-                                                    (tyClGroupConcat tycl_decls)
+                                                     (tyClGroupConcat tycl_decls)
         ; traceRn (text "getLocalNonValBinders 1" <+> ppr tc_avails)
         ; envs <- extendGlobalRdrEnvRn tc_avails fixity_env
         ; setEnvs envs $ do {
@@ -573,6 +573,7 @@ getLocalNonValBinders fixity_env
         ; let field_env = extendNameEnvList (tcg_field_env tcg_env) flds
               envs      = (tcg_env { tcg_field_env = field_env }, tcl_env)
 
+        ; traceRn (text "getLocalNonValBinders 3" <+> vcat [ppr flds, ppr field_env])
         ; return (envs, new_bndrs) } }
   where
     ValBindsIn _val_binds val_sigs = binds
@@ -583,7 +584,7 @@ getLocalNonValBinders fixity_env
     -- In a hs-boot file, the value binders come from the
     --  *signatures*, and there should be no foreign binders
     hs_boot_sig_bndrs = [ L decl_loc (unLoc n)
-                        | L decl_loc (TypeSig ns _ _) <- val_sigs, n <- ns]
+                        | L decl_loc (TypeSig ns _) <- val_sigs, n <- ns]
 
       -- the SrcSpan attached to the input should be the span of the
       -- declaration, not just the name
@@ -636,8 +637,7 @@ getLocalNonValBinders fixity_env
            ; return ([avail], flds) }
     new_assoc overload_ok (L _ (ClsInstD (ClsInstDecl { cid_poly_ty = inst_ty
                                                       , cid_datafam_insts = adts })))
-      | Just (_, _, L loc cls_rdr, _) <-
-                   splitLHsInstDeclTy_maybe (flattenTopLevelLHsForAllTy inst_ty)
+      | Just (L loc cls_rdr) <- getLHsInstDeclClass_maybe inst_ty
       = do { cls_nm <- setSrcSpan loc $ lookupGlobalOccRn cls_rdr
            ; (avails, fldss)
                     <- mapAndUnzipM (new_loc_di overload_ok (Just cls_nm)) adts

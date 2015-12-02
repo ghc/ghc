@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies, GADTs #-}
 
--- Tests record update in the presence of 
+-- Tests record update in the presence of
 -- existentials, GADTs, type families
 
 module Rec where
@@ -12,6 +12,7 @@ data S a where
 
 updS s x = s { fs1=x }
 
+{-
 ------------------ GADT
 data T a b where
    T1 :: { ft1 :: a, ft2 :: c, ft3 :: d } -> T a Int
@@ -28,3 +29,4 @@ data instance R (a,b) where
    R2 :: { fr1 :: a, fr3 :: c } -> R (a,b)
 
 updR r x = r { fr1=x }
+-}

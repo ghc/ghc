@@ -32,6 +32,7 @@ import TcTyDecls
 import TcClassDcl
 import TcHsType
 import TcMType
+import RnTypes( collectAnonWildCards )
 import TcType
 import FamInst
 import FamInstEnv
@@ -171,10 +172,11 @@ tcTyClGroup tyclds
 zipRecTyClss :: [(Name, Kind)]
              -> [TyCon]           -- Knot-tied
              -> [(Name,TyThing)]
--- Build a name-TyThing mapping for the things bound by decls
--- being careful not to look at the [TyThing]
+-- Build a name-TyThing mapping for the TyCons bound by decls
+-- being careful not to look at the knot-tied [TyThing]
 -- The TyThings in the result list must have a visible ATyCon,
--- because typechecking types (in, say, tcTyClDecl) looks at this outer constructor
+-- because typechecking types (in, say, tcTyClDecl) looks at
+-- this outer constructor
 zipRecTyClss kind_pairs rec_tycons
   = [ (name, ATyCon (get name)) | (name, _kind) <- kind_pairs ]
   where
@@ -476,11 +478,10 @@ kcTyClDecl (ClassDecl { tcdLName = L _ name, tcdTyVars = hs_tvs
                        , tcdCtxt = ctxt, tcdSigs = sigs })
   = kcTyClTyVars name hs_tvs $
     do  { _ <- tcHsContext ctxt
-        ; mapM_ (wrapLocM kc_sig)     sigs }
+        ; mapM_ (wrapLocM kc_sig) sigs }
   where
-    kc_sig (TypeSig _ op_ty _)  = discardResult (tcHsLiftedType op_ty)
-    kc_sig (GenericSig _ op_ty) = discardResult (tcHsLiftedType op_ty)
-    kc_sig _                    = return ()
+    kc_sig (ClassOpSig _ nms op_ty) = kcClassSigType nms op_ty
+    kc_sig _                        = return ()
 
 -- closed type families look at their equations, but other families don't
 -- do anything here
@@ -922,19 +923,28 @@ tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = L _ tc_name
                                            , tfe_rhs = rhs })]
   = setSrcSpan loc $
     tcAddFamInstCtxt (ptext (sLit "default type instance")) tc_name $
-    tcTyClTyVars tc_name hs_tvs $ \ tvs rhs_kind ->
     do { traceTc "tcDefaultAssocDecl" (ppr tc_name)
-       ; checkTc (isTypeFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
        ; let (fam_name, fam_pat_arity, _) = famTyConShape fam_tc
+             fam_tc_tvs                   = tyConTyVars fam_tc
+
+       -- Kind of family check
+       ; checkTc (isTypeFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
+
+       -- Arity check
        ; ASSERT( fam_name == tc_name )
          checkTc (length (hsQTvBndrs hs_tvs) == fam_pat_arity)
                  (wrongNumberOfParmsErr fam_pat_arity)
-       ; rhs_ty <- tcCheckLHsType rhs rhs_kind
+
+       -- Typecheck RHS
+       -- NB: the tcTyClTYVars call is here, /after/ the arity check
+       -- If the arity isn't right, tcTyClTyVars crashes (Trac #11136)
+       ; (tvs, rhs_ty) <- tcTyClTyVars tc_name hs_tvs $ \ tvs rhs_kind ->
+                          do { rhs_ty <- tcCheckLHsType rhs rhs_kind
+                             ; return (tvs, rhs_ty) }
        ; rhs_ty <- zonkTcTypeToType emptyZonkEnv rhs_ty
-       ; let fam_tc_tvs = tyConTyVars fam_tc
-             subst = zipTopTvSubst tvs (mkTyVarTys fam_tc_tvs)
-       ; return ( ASSERT( equalLength fam_tc_tvs tvs )
-                  Just (substTy subst rhs_ty, loc) ) }
+       ; let subst = ASSERT( equalLength tvs fam_tc_tvs )
+                     zipTopTvSubst tvs (mkTyVarTys fam_tc_tvs)
+       ; return ( Just (substTy subst rhs_ty, loc) ) }
     -- We check for well-formedness and validity later, in checkValidClass
 
 -------------------------
@@ -1037,9 +1047,9 @@ famTyConShape fam_tc
 
 tc_fam_ty_pats :: FamTyConShape
                -> Maybe ClsInfo
-               -> HsWithBndrs Name [LHsType Name] -- Patterns
-               -> (TcKind -> TcM ())              -- Kind checker for RHS
-                                                  -- result is ignored
+               -> HsTyPats Name       -- Patterns
+               -> (TcKind -> TcM ())  -- Kind checker for RHS
+                                      -- result is ignored
                -> TcM ([Kind], [Type], Kind)
 -- Check the type patterns of a type or data family instance
 --     type instance F <pat1> <pat2> = <type>
@@ -1053,8 +1063,8 @@ tc_fam_ty_pats :: FamTyConShape
 -- (and, if C is poly-kinded, so will its kind parameter).
 
 tc_fam_ty_pats (name, arity, kind) mb_clsinfo
-               (HsWB { hswb_cts = arg_pats, hswb_kvs = kvars
-                     , hswb_tvs = tvars, hswb_wcs = wcs })
+               (HsIB { hsib_body = arg_pats, hsib_kvs = kvars
+                     , hsib_tvs = tvars })
                kind_checker
   = do { let (fam_kvs, fam_body) = splitForAllTys kind
 
@@ -1080,14 +1090,16 @@ tc_fam_ty_pats (name, arity, kind) mb_clsinfo
                    substKiWith fam_kvs fam_arg_kinds fam_body
              -- Treat (anonymous) wild cards as type variables without a name.
              -- See Note [Wild cards in family instances]
-             anon_tvs = [L (nameSrcSpan wc)
-                         (UserTyVar (L (nameSrcSpan wc) wc)) | wc <- wcs]
+             wcs = concatMap collectAnonWildCards arg_pats
+             anon_tvs = [L loc (UserTyVar (L loc wc))
+                        | wc <- wcs
+                        , let loc = nameSrcSpan wc ]
              hs_tvs = HsQTvs { hsq_kvs = kvars
                              , hsq_tvs = anon_tvs ++ userHsTyVarBndrs loc tvars }
 
          -- Kind-check and quantify
          -- See Note [Quantifying over family patterns]
-       ; typats <- tcHsTyVarBndrs hs_tvs $ \ _ ->
+       ; typats <- tcHsQTyVars hs_tvs $ \ _ ->
                    do { kind_checker res_kind
                       ; tcHsArgTys (quotes (ppr name)) arg_pats arg_kinds }
 
@@ -1096,8 +1108,8 @@ tc_fam_ty_pats (name, arity, kind) mb_clsinfo
 -- See Note [tc_fam_ty_pats vs tcFamTyPats]
 tcFamTyPats :: FamTyConShape
             -> Maybe ClsInfo
-            -> HsWithBndrs Name [LHsType Name] -- patterns
-            -> (TcKind -> TcM ())              -- kind-checker for RHS
+            -> HsTyPats Name         -- patterns
+            -> (TcKind -> TcM ())    -- kind-checker for RHS
             -> ([TKVar]              -- Kind and type variables
                 -> [TcType]          -- Kind and type arguments
                 -> Kind -> TcM a)
@@ -1255,9 +1267,10 @@ tcConDecl new_or_data is_prom rep_tycon tmpl_tvs res_tmpl
   = addErrCtxt (dataConCtxtName names) $
     do { traceTc "tcConDecl 1" (ppr names)
        ; (ctxt, arg_tys, res_ty, field_lbls, stricts)
-           <- tcHsTyVarBndrs hs_tvs $ \ _ ->
-              do { ctxt    <- tcHsContext hs_ctxt
-                 ; btys    <- tcConArgs new_or_data hs_details
+           <- tcHsQTyVars hs_tvs $ \ _ ->
+              do { traceTc "tcConDecl" (ppr names <+> text "tvs:" <+> ppr hs_tvs)
+                 ; ctxt <- tcHsContext hs_ctxt
+                 ; btys <- tcConArgs new_or_data hs_details
                  ; res_ty  <- tcConRes hs_res_ty
                  ; field_lbls <- lookupConstructorFields (unLoc $ head names)
                  ; let (arg_tys, stricts) = unzip btys
@@ -1290,6 +1303,9 @@ tcConDecl new_or_data is_prom rep_tycon tmpl_tvs res_tmpl
              -- See Note [Checking GADT return types]
 
        ; fam_envs <- tcGetFamInstEnvs
+
+       -- Can't print univ_tvs, arg_tys etc, because we are inside the knot here
+       ; traceTc "tcConDecl 2" (ppr names $$ ppr field_lbls)
        ; let
            buildOneDataCon (L _ name) = do
              { is_infix <- tcConIsInfix name hs_details res_ty

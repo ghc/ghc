@@ -1,5 +1,10 @@
 
 NamedWildcardInTypeSplice.hs:8:16: error:
-    Unexpected wild card: ‘_a’
-    In a Template-Haskell quoted type
+    Wildcard ‘_a’ not allowed
+      in a Template-Haskell quoted type
+    In the Template Haskell quotation [t| _a -> _a |]
+
+NamedWildcardInTypeSplice.hs:8:22: error:
+    Wildcard ‘_a’ not allowed
+      in a Template-Haskell quoted type
     In the Template Haskell quotation [t| _a -> _a |]

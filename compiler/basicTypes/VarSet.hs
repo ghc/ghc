@@ -26,13 +26,15 @@ module VarSet (
 
         -- ** Manipulating these sets
         emptyDVarSet, unitDVarSet, mkDVarSet,
-        extendDVarSet,
+        extendDVarSet, extendDVarSetList,
         elemDVarSet, dVarSetElems, subDVarSet,
         unionDVarSet, unionDVarSets, mapUnionDVarSet,
-        intersectDVarSet,
-        isEmptyDVarSet, delDVarSet,
+        intersectDVarSet, intersectsDVarSet, disjointDVarSet,
+        isEmptyDVarSet, delDVarSet, delDVarSetList,
         minusDVarSet, foldDVarSet, filterDVarSet,
+        transCloDVarSet,
         sizeDVarSet, seqDVarSet,
+        partitionDVarSet,
     ) where
 
 #include "HsVersions.h"
@@ -42,15 +44,13 @@ import Unique
 import UniqSet
 import UniqDSet
 import UniqFM( disjointUFM )
+import UniqDFM( disjointUDFM )
 
-{-
-************************************************************************
-*                                                                      *
-\subsection{@VarSet@s}
-*                                                                      *
-************************************************************************
--}
-
+-- | A non-deterministic set of variables.
+-- See Note [Deterministic UniqFM] in UniqDFM for explanation why it's not
+-- deterministic and why it matters. Use DVarSet if the set eventually
+-- gets converted into a list or folded over in a way where the order
+-- changes the generated code, for example when abstracting variables.
 type VarSet       = UniqSet Var
 type IdSet        = UniqSet Id
 type TyVarSet     = UniqSet TyVar
@@ -206,6 +206,14 @@ mapUnionDVarSet get_set xs = foldr (unionDVarSet . get_set) emptyDVarSet xs
 intersectDVarSet :: DVarSet -> DVarSet -> DVarSet
 intersectDVarSet = intersectUniqDSets
 
+-- | True if empty intersection
+disjointDVarSet :: DVarSet -> DVarSet -> Bool
+disjointDVarSet s1 s2 = disjointUDFM s1 s2
+
+-- | True if non-empty intersection
+intersectsDVarSet :: DVarSet -> DVarSet -> Bool
+intersectsDVarSet s1 s2 = not (s1 `disjointDVarSet` s2)
+
 isEmptyDVarSet :: DVarSet -> Bool
 isEmptyDVarSet = isEmptyUniqDSet
 
@@ -224,5 +232,43 @@ filterDVarSet = filterUniqDSet
 sizeDVarSet :: DVarSet -> Int
 sizeDVarSet = sizeUniqDSet
 
+-- | Partition DVarSet according to the predicate given
+partitionDVarSet :: (Var -> Bool) -> DVarSet -> (DVarSet, DVarSet)
+partitionDVarSet = partitionUniqDSet
+
+-- | Delete a list of variables from DVarSet
+delDVarSetList :: DVarSet -> [Var] -> DVarSet
+delDVarSetList = delListFromUniqDSet
+
 seqDVarSet :: DVarSet -> ()
 seqDVarSet s = sizeDVarSet s `seq` ()
+
+-- | Add a list of variables to DVarSet
+extendDVarSetList :: DVarSet -> [Var] -> DVarSet
+extendDVarSetList = addListToUniqDSet
+
+-- | transCloVarSet for DVarSet
+transCloDVarSet :: (DVarSet -> DVarSet)
+                  -- Map some variables in the set to
+                  -- extra variables that should be in it
+                -> DVarSet -> DVarSet
+-- (transCloDVarSet f s) repeatedly applies f to new candidates, adding any
+-- new variables to s that it finds thereby, until it reaches a fixed point.
+--
+-- The function fn could be (Var -> DVarSet), but we use (DVarSet -> DVarSet)
+-- for efficiency, so that the test can be batched up.
+-- It's essential that fn will work fine if given new candidates
+-- one at at time; ie  fn {v1,v2} = fn v1 `union` fn v2
+transCloDVarSet fn seeds
+  = go seeds seeds
+  where
+    go :: DVarSet  -- Accumulating result
+       -> DVarSet  -- Work-list; un-processed subset of accumulating result
+       -> DVarSet
+    -- Specification: go acc vs = acc `union` transClo fn vs
+
+    go acc candidates
+       | isEmptyDVarSet new_vs = acc
+       | otherwise            = go (acc `unionDVarSet` new_vs) new_vs
+       where
+         new_vs = fn candidates `minusDVarSet` acc

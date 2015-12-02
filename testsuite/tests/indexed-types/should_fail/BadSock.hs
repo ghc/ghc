@@ -27,8 +27,8 @@ data Socket :: SocketType -> * where
            -> Socket sock
 
 type family Foo (op :: SocketOperation) :: SocketType -> Constraint where
-    Foo 'Read = Readable 
-    Foo Write = Writable 
+    Foo 'Read = Readable
+    Foo Write = Writable
 
 type family Operation (op :: SocketOperation) :: * where
     Operation 'Read = IO Message

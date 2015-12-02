@@ -372,12 +372,14 @@ Bugs in GHC
 -  GHC's runtime system implements cooperative multitasking, with
    context switching potentially occurring only when a program
    allocates. This means that programs that do not allocate may never
-   context switch. See :ghc-ticket:`367` for further discussion.
+   context switch. This is especially true of programs using STM, which
+   may deadlock after observing inconsistent state. See :ghc-ticket:`367`
+   for further discussion.
 
    If you are hit by this, you may want to compile the affected module
-   with ``-fno-omit-yields``. This flag ensures that yield points are
-   inserted at every function entrypoint (at the expense of a bit of
-   performance).
+   with ``-fno-omit-yields`` (see :ref:`options-f`). This flag ensures that
+   yield points are inserted at every function entrypoint (at the expense of a
+   bit of performance).
 
 -  GHC can warn about non-exhaustive or overlapping patterns (see
    :ref:`options-sanity`), and usually does so correctly. But not
@@ -460,6 +462,11 @@ Bugs in GHC
    later), which is why the option is not enabled by default. The
    libraries that come with GHC are probably built without this option,
    unless you built GHC yourself.
+
+-  There is known to be maleficent interactions between weak references and
+   laziness. Particularly, it has been observed that placing a thunk containing
+   a reference to a weak reference inside of another weak reference may cause
+   runtime crashes. See :ghc-ticket:`11108` for details.
 
 .. _bugs-ghci:
 

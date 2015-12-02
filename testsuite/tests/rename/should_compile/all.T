@@ -224,5 +224,5 @@ test('T7969',
      run_command,
      ['$MAKE -s --no-print-directory T7969'])
 test('T9127', normal, compile, [''])
-test('T4426', normal, compile, [''])
+test('T4426', normal, compile_fail, [''])
 test('T9778', normal, compile, ['-fwarn-unticked-promoted-constructors'])

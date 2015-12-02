@@ -19,7 +19,8 @@
 -- @InstDecl@, @DefaultDecl@ and @ForeignDecl@.
 module HsDecls (
   -- * Toplevel declarations
-  HsDecl(..), LHsDecl, HsDataDefn(..),
+  HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving,
+
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl,
   TyClGroup(..), tyClGroupConcat, mkTyClGroup,
@@ -481,10 +482,10 @@ data TyClDecl name
     --             'ApiAnnotation.AnnEqual',
 
     -- For details on above see note [Api annotations] in ApiAnnotation
-    SynDecl { tcdLName  :: Located name            -- ^ Type constructor
-            , tcdTyVars :: LHsTyVarBndrs name      -- ^ Type variables; for an associated type
+    SynDecl { tcdLName  :: Located name           -- ^ Type constructor
+            , tcdTyVars :: LHsQTyVars name        -- ^ Type variables; for an associated type
                                                   --   these include outer binders
-            , tcdRhs    :: LHsType name            -- ^ RHS of type declaration
+            , tcdRhs    :: LHsType name           -- ^ RHS of type declaration
             , tcdFVs    :: PostRn name NameSet }
 
   | -- | @data@ declaration
@@ -497,7 +498,7 @@ data TyClDecl name
 
     -- For details on above see note [Api annotations] in ApiAnnotation
     DataDecl { tcdLName    :: Located name        -- ^ Type constructor
-             , tcdTyVars   :: LHsTyVarBndrs name  -- ^ Type variables; for an associated type
+             , tcdTyVars   :: LHsQTyVars name  -- ^ Type variables; for an associated type
                                                   --   these include outer binders
                                                   -- Eg  class T a where
                                                   --       type F a :: *
@@ -509,7 +510,7 @@ data TyClDecl name
 
   | ClassDecl { tcdCtxt    :: LHsContext name,          -- ^ Context...
                 tcdLName   :: Located name,             -- ^ Name of the class
-                tcdTyVars  :: LHsTyVarBndrs name,       -- ^ Class type variables
+                tcdTyVars  :: LHsQTyVars name,          -- ^ Class type variables
                 tcdFDs     :: [Located (FunDep (Located name))],
                                                         -- ^ Functional deps
                 tcdSigs    :: [LSig name],              -- ^ Methods' signatures
@@ -547,7 +548,6 @@ tyClGroupConcat = concatMap group_tyclds
 
 mkTyClGroup :: [LTyClDecl name] -> TyClGroup name
 mkTyClGroup decls = TyClGroup { group_tyclds = decls, group_roles = [] }
-
 
 -- Simple classifiers for TyClDecl
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -613,7 +613,7 @@ tyClDeclLName decl = tcdLName decl
 tcdName :: TyClDecl name -> name
 tcdName = unLoc . tyClDeclLName
 
-tyClDeclTyVars :: TyClDecl name -> LHsTyVarBndrs name
+tyClDeclTyVars :: TyClDecl name -> LHsQTyVars name
 tyClDeclTyVars (FamDecl { tcdFam = FamilyDecl { fdTyVars = tvs } }) = tvs
 tyClDeclTyVars d = tcdTyVars d
 
@@ -685,7 +685,7 @@ instance OutputableBndr name => Outputable (TyClGroup name) where
 
 pp_vanilla_decl_head :: OutputableBndr name
    => Located name
-   -> LHsTyVarBndrs name
+   -> LHsQTyVars name
    -> HsContext name
    -> SDoc
 pp_vanilla_decl_head thing tyvars context
@@ -796,7 +796,7 @@ type LFamilyDecl name = Located (FamilyDecl name)
 data FamilyDecl name = FamilyDecl
   { fdInfo           :: FamilyInfo name              -- type/data, closed/open
   , fdLName          :: Located name                 -- type constructor
-  , fdTyVars         :: LHsTyVarBndrs name           -- type variables
+  , fdTyVars         :: LHsQTyVars name              -- type variables
   , fdResultSig      :: LFamilyResultSig name        -- result signature
   , fdInjectivityAnn :: Maybe (LInjectivityAnn name) -- optional injectivity ann
   }
@@ -960,25 +960,30 @@ data HsDataDefn name   -- The payload of a data type defn
                      -- For @data T a where { T1 :: T a }@
                      --   the 'LConDecls' all have 'ResTyGADT'.
 
-                 dd_derivs :: Maybe (Located [LHsType name])
-                     -- ^ Derivings; @Nothing@ => not specified,
-                     --              @Just []@ => derive exactly what is asked
-                     --
-                     -- These "types" must be of form
-                     -- @
-                     --      forall ab. C ty1 ty2
-                     -- @
-                     -- Typically the foralls and ty args are empty, but they
-                     -- are non-empty for the newtype-deriving case
-                     --
-                     --  - 'ApiAnnotation.AnnKeywordId' :
-                     --       'ApiAnnotation.AnnDeriving',
-                     --       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
+                 dd_derivs :: HsDeriving name  -- ^ Optional 'deriving' claues
 
              -- For details on above see note [Api annotations] in ApiAnnotation
    }
     deriving( Typeable )
 deriving instance (DataId id) => Data (HsDataDefn id)
+
+type HsDeriving name = Maybe (Located [LHsSigType name])
+  -- ^ The optional 'deriving' clause of a data declaration
+  --
+  --   @Nothing@ => not specified,
+  --   @Just []@ => derive exactly what is asked
+  --
+  -- It's a 'LHsSigType' because, with Generalised Newtype
+  -- Deriving, we can mention type variables that aren't
+  -- bound by the date type.   e.g.
+  --     data T b = ... deriving( C [a] )
+  -- should producd a derived instance for (C [a] (T b))
+  --
+  -- The payload of the Maybe is Located so that we have a
+  -- place to hang the API annotations:
+  --  - 'ApiAnnotation.AnnKeywordId' :
+  --       'ApiAnnotation.AnnDeriving',
+  --       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
 
 data NewOrData
   = NewType                     -- ^ @newtype Blah ...@
@@ -1021,17 +1026,28 @@ data ConDecl name
         -- the user-callable wrapper Id.
         -- It is a list to deal with GADT constructors of the form
         --   T1, T2, T3 :: <payload>
-    , con_explicit  :: HsExplicitFlag
-        -- ^ Is there an user-written forall? (cf. 'HsTypes.HsForAllTy')
 
-    , con_qvars     :: LHsTyVarBndrs name
+    , con_explicit  :: Bool
+        -- ^ Is there an user-written forall?
+        -- For ResTyH98, "explicit" means something like:
+        --     data T = forall a. MkT { x :: a -> a }
+        -- For ResTyGADT, "explicit" means something like
+        --     data T where { MkT :: forall a. <blah> }
+
+    , con_qvars     :: LHsQTyVars name
         -- ^ Type variables.  Depending on 'con_res' this describes the
         -- following entities
         --
         --  - ResTyH98:  the constructor's *existential* type variables
-        --  - ResTyGADT: *all* the constructor's quantified type variables
+        --               e.g. data T a = forall b. MkT b (b->a)
+        --               con_qvars = {b}
         --
-        -- If con_explicit is Implicit, then con_qvars is irrelevant
+        --  - ResTyGADT: *all* the constructor's quantified type variables
+        --               e.g.  data T a where
+        --                       MkT :: forall a b. b -> (b->a) -> T a
+        --               con_qvars = {a,b}
+        --
+        -- If con_explicit is False, then con_qvars is irrelevant
         -- until after renaming.
 
     , con_cxt       :: LHsContext name
@@ -1087,9 +1103,9 @@ pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data, dd_ctxt = L _ context
                Nothing   -> empty
                Just kind -> dcolon <+> ppr kind
     pp_derivings = case derivings of
-                     Nothing       -> empty
-                     Just (L _ ds) -> hsep [ptext (sLit "deriving"),
-                                            parens (interpp'SP ds)]
+                     Nothing -> empty
+                     Just (L _ ds) -> hsep [ ptext (sLit "deriving")
+                                           , parens (interpp'SP ds)]
 
 instance OutputableBndr name => Outputable (HsDataDefn name) where
    ppr d = pp_data_defn (\_ -> ptext (sLit "Naked HsDataDefn")) d
@@ -1112,7 +1128,7 @@ pprConDecl (ConDecl { con_names = [L _ con]  -- NB: non-GADT means 1 con
                     , con_explicit = expl, con_qvars = tvs
                     , con_cxt = cxt, con_details = details
                     , con_res = ResTyH98, con_doc = doc })
-  = sep [ppr_mbDoc doc, pprHsForAll expl tvs cxt, ppr_details details]
+  = sep [ppr_mbDoc doc, ppr_con_forall expl tvs cxt, ppr_details details]
   where
     ppr_details (InfixCon t1 t2) = hsep [ppr t1, pprInfixOcc con, ppr t2]
     ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc con
@@ -1124,7 +1140,7 @@ pprConDecl (ConDecl { con_names = cons, con_explicit = expl, con_qvars = tvs
                     , con_cxt = cxt, con_details = PrefixCon arg_tys
                     , con_res = ResTyGADT _ res_ty, con_doc = doc })
   = ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon <+>
-    sep [pprHsForAll expl tvs cxt, ppr (foldr mk_fun_ty res_ty arg_tys)]
+    sep [ppr_con_forall expl tvs cxt, ppr (foldr mk_fun_ty res_ty arg_tys)]
   where
     mk_fun_ty a b = noLoc (HsFunTy a b)
 
@@ -1132,7 +1148,7 @@ pprConDecl (ConDecl { con_names = cons, con_explicit = expl, con_qvars = tvs
                     , con_cxt = cxt, con_details = RecCon fields
                     , con_res = ResTyGADT _ res_ty, con_doc = doc })
   = sep [ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon
-         <+> pprHsForAll expl tvs cxt,
+         <+> ppr_con_forall expl tvs cxt,
          pprConDeclFields (unLoc fields) <+> arrow <+> ppr res_ty]
 
 pprConDecl decl@(ConDecl { con_details = InfixCon ty1 ty2, con_res = ResTyGADT {} })
@@ -1144,6 +1160,14 @@ pprConDecl decl@(ConDecl { con_details = InfixCon ty1 ty2, con_res = ResTyGADT {
 -- this fallthrough would happen with a non-GADT-syntax ConDecl with more
 -- than one constructor, which should indeed be impossible
 pprConDecl (ConDecl { con_names = cons }) = pprPanic "pprConDecl" (ppr cons)
+
+ppr_con_forall :: OutputableBndr name => Bool -> LHsQTyVars name
+                                      -> LHsContext name -> SDoc
+ppr_con_forall explicit_forall qtvs (L _ ctxt)
+  | explicit_forall
+  = pprHsForAllTvs (hsQTvBndrs qtvs) <+> pprHsContext ctxt
+  | otherwise
+  = pprHsContext ctxt
 
 ppr_con_names :: (OutputableBndr name) => [Located name] -> SDoc
 ppr_con_names = pprWithCommas (pprPrefixOcc . unLoc)
@@ -1183,12 +1207,12 @@ type LTyFamInstEqn  name = Located (TyFamInstEqn  name)
 
 type LTyFamDefltEqn name = Located (TyFamDefltEqn name)
 
-type HsTyPats name = HsWithBndrs name [LHsType name]
+type HsTyPats name = HsImplicitBndrs name [LHsType name]
             -- ^ Type patterns (with kind and type bndrs)
             -- See Note [Family instance declaration binders]
 
 type TyFamInstEqn  name = TyFamEqn name (HsTyPats name)
-type TyFamDefltEqn name = TyFamEqn name (LHsTyVarBndrs name)
+type TyFamDefltEqn name = TyFamEqn name (LHsQTyVars name)
   -- See Note [Type family instance declarations in HsSyn]
 
 -- | One equation in a type family instance declaration
@@ -1244,9 +1268,9 @@ deriving instance (DataId name) => Data (DataFamInstDecl name)
 type LClsInstDecl name = Located (ClsInstDecl name)
 data ClsInstDecl name
   = ClsInstDecl
-      { cid_poly_ty :: LHsType name    -- Context => Class Instance-type
-                                       -- Using a polytype means that the renamer conveniently
-                                       -- figures out the quantified type variables for us.
+      { cid_poly_ty :: LHsSigType name    -- Context => Class Instance-type
+                                          -- Using a polytype means that the renamer conveniently
+                                          -- figures out the quantified type variables for us.
       , cid_binds         :: LHsBinds name           -- Class methods
       , cid_sigs          :: [LSig name]             -- User-supplied pragmatic info
       , cid_tyfam_insts   :: [LTyFamInstDecl name]   -- Type family instances
@@ -1344,7 +1368,7 @@ pp_fam_inst_lhs :: OutputableBndr name
    -> HsTyPats name
    -> HsContext name
    -> SDoc
-pp_fam_inst_lhs thing (HsWB { hswb_cts = typats }) context -- explicit type patterns
+pp_fam_inst_lhs thing (HsIB { hsib_body = typats }) context -- explicit type patterns
    = hsep [ pprHsContext context, pprPrefixOcc (unLoc thing)
           , hsep (map (pprParendHsType.unLoc) typats)]
 
@@ -1404,7 +1428,7 @@ instDeclDataFamInsts inst_decls
 type LDerivDecl name = Located (DerivDecl name)
 
 data DerivDecl name = DerivDecl
-        { deriv_type :: LHsType name
+        { deriv_type         :: LHsSigType name
         , deriv_overlap_mode :: Maybe (Located OverlapMode)
          -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
          --                                    'ApiAnnotation.AnnClose',
@@ -1466,14 +1490,17 @@ instance (OutputableBndr name)
 type LForeignDecl name = Located (ForeignDecl name)
 
 data ForeignDecl name
-  = ForeignImport (Located name) -- defines this name
-                  (LHsType name) -- sig_ty
-                  (PostTc name Coercion) -- rep_ty ~ sig_ty
-                  ForeignImport
-  | ForeignExport (Located name) -- uses this name
-                  (LHsType name) -- sig_ty
-                  (PostTc name Coercion)  -- sig_ty ~ rep_ty
-                  ForeignExport
+  = ForeignImport
+      { fd_name   :: Located name          -- defines this name
+      , fd_sig_ty :: LHsSigType name       -- sig_ty
+      , fd_co     :: PostTc name Coercion  -- rep_ty ~ sig_ty
+      , fd_fi     :: ForeignImport }
+
+  | ForeignExport
+      { fd_name   :: Located name          -- uses this name
+      , fd_sig_ty :: LHsSigType name       -- sig_ty
+      , fd_co     :: PostTc name Coercion  -- rep_ty ~ sig_ty
+      , fd_fe     :: ForeignExport }
         -- ^
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnForeign',
         --           'ApiAnnotation.AnnImport','ApiAnnotation.AnnExport',
@@ -1481,6 +1508,7 @@ data ForeignDecl name
 
         -- For details on above see note [Api annotations] in ApiAnnotation
   deriving (Typeable)
+
 deriving instance (DataId name) => Data (ForeignDecl name)
 {-
     In both ForeignImport and ForeignExport:
@@ -1543,10 +1571,10 @@ data ForeignExport = CExport  (Located CExportSpec) -- contains the calling
 --
 
 instance OutputableBndr name => Outputable (ForeignDecl name) where
-  ppr (ForeignImport n ty _ fimport) =
-    hang (ptext (sLit "foreign import") <+> ppr fimport <+> ppr n)
-       2 (dcolon <+> ppr ty)
-  ppr (ForeignExport n ty _ fexport) =
+  ppr (ForeignImport { fd_name = n, fd_sig_ty = ty, fd_fi = fimport })
+    = hang (ptext (sLit "foreign import") <+> ppr fimport <+> ppr n)
+         2 (dcolon <+> ppr ty)
+  ppr (ForeignExport { fd_name = n, fd_sig_ty = ty, fd_fe = fexport }) =
     hang (ptext (sLit "foreign export") <+> ppr fexport <+> ppr n)
        2 (dcolon <+> ppr ty)
 
@@ -1621,7 +1649,7 @@ flattenRuleDecls decls = concatMap (rds_rules . unLoc) decls
 type LRuleBndr name = Located (RuleBndr name)
 data RuleBndr name
   = RuleBndr (Located name)
-  | RuleBndrSig (Located name) (HsWithBndrs name (LHsType name))
+  | RuleBndrSig (Located name) (LHsSigWcType name)
         -- ^
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
         --     'ApiAnnotation.AnnDcolon','ApiAnnotation.AnnClose'
@@ -1630,7 +1658,7 @@ data RuleBndr name
   deriving (Typeable)
 deriving instance (DataId name) => Data (RuleBndr name)
 
-collectRuleBndrSigTys :: [RuleBndr name] -> [HsWithBndrs name (LHsType name)]
+collectRuleBndrSigTys :: [RuleBndr name] -> [LHsSigWcType name]
 collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ ty <- bndrs]
 
 instance OutputableBndr name => Outputable (RuleDecls name) where
@@ -1709,7 +1737,7 @@ data VectDecl name
   | HsVectClassOut              -- post type-checking
       Class
   | HsVectInstIn                -- pre type-checking (always SCALAR)  !!!FIXME: should be superfluous now
-      (LHsType name)
+      (LHsSigType name)
   | HsVectInstOut               -- post type-checking (always SCALAR) !!!FIXME: should be superfluous now
       ClsInst
   deriving (Typeable)

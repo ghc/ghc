@@ -7,7 +7,9 @@
 https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/TypeChecker
 -}
 
-{-# LANGUAGE CPP, NondecreasingIndentation #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NondecreasingIndentation #-}
 
 module TcRnDriver (
 #ifdef GHCI
@@ -103,6 +105,7 @@ import FastString
 import Maybes
 import Util
 import Bag
+import Inst (tcGetInsts)
 
 import Control.Monad
 
@@ -812,7 +815,10 @@ checkHiBootIface'
     local_export_env = availsToNameEnv local_exports
 
     check_inst :: ClsInst -> TcM (Maybe (Id, Id))
-        -- Returns a pair of the boot dfun in terms of the equivalent real dfun
+        -- Returns a pair of the boot dfun in terms of the equivalent
+        -- real dfun. Delicate (like checkBootDecl) because it depends
+        -- on the types lining up precisely even to the ordering of
+        -- the type variables in the foralls.
     check_inst boot_inst
         = case [dfun | inst <- local_insts,
                        let dfun = instanceDFunId inst,
@@ -822,7 +828,8 @@ checkHiBootIface'
                           , text "boot_inst"    <+> ppr boot_inst
                           , text "boot_dfun_ty" <+> ppr boot_dfun_ty
                           ]
-                     ; addErrTc (instMisMatch True boot_inst); return Nothing }
+                     ; addErrTc (instMisMatch True boot_inst)
+                     ; return Nothing }
             (dfun:_) -> return (Just (local_boot_dfun, dfun))
                      where
                         local_boot_dfun = Id.mkExportedLocalId VanillaId boot_dfun_name (idType dfun)
@@ -1153,6 +1160,10 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- Generate Applicative/Monad proposal (AMP) warnings
         traceTc "Tc3b" empty ;
 
+                -- Generate Semigroup/Monoid warnings
+        traceTc "Tc3c" empty ;
+        tcSemigroupWarnings ;
+
                 -- Foreign import declarations next.
         traceTc "Tc4" empty ;
         (fi_ids, fi_decls, fi_gres) <- tcForeignImports foreign_decls ;
@@ -1222,6 +1233,190 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
 
         return (tcg_env', tcl_env)
     }}}}}}
+
+
+tcSemigroupWarnings :: TcM ()
+tcSemigroupWarnings = do
+    traceTc "tcSemigroupWarnings" empty
+    let warnFlag = Opt_WarnSemigroup
+    tcPreludeClashWarn warnFlag sappendName
+    tcMissingParentClassWarn warnFlag monoidClassName semigroupClassName
+
+
+-- | Warn on local definitions of names that would clash with future Prelude
+-- elements.
+--
+--   A name clashes if the following criteria are met:
+--       1. It would is imported (unqualified) from Prelude
+--       2. It is locally defined in the current module
+--       3. It has the same literal name as the reference function
+--       4. It is not identical to the reference function
+tcPreludeClashWarn :: WarningFlag
+                   -> Name
+                   -> TcM ()
+tcPreludeClashWarn warnFlag name = do
+    { warn <- woptM warnFlag
+    ; when warn $ do
+    { traceTc "tcPreludeClashWarn/wouldBeImported" empty
+    -- Is the name imported (unqualified) from Prelude? (Point 4 above)
+    ; rnImports <- fmap (map unLoc . tcg_rn_imports) getGblEnv
+    -- (Note that this automatically handles -XNoImplicitPrelude, as Prelude
+    -- will not appear in rnImports automatically if it is set.)
+
+    -- Continue only the name is imported from Prelude
+    ; when (importedViaPrelude name rnImports) $ do
+      -- Handle 2.-4.
+    { rdrElts <- fmap (concat . occEnvElts . tcg_rdr_env) getGblEnv
+
+    ; let clashes :: GlobalRdrElt -> Bool
+          clashes x = isLocalDef && nameClashes && isNotInProperModule
+            where
+              isLocalDef = gre_lcl x == True
+              -- Names are identical ...
+              nameClashes = nameOccName (gre_name x) == nameOccName name
+              -- ... but not the actual definitions, because we don't want to
+              -- warn about a bad definition of e.g. <> in Data.Semigroup, which
+              -- is the (only) proper place where this should be defined
+              isNotInProperModule = gre_name x /= name
+
+          -- List of all offending definitions
+          clashingElts :: [GlobalRdrElt]
+          clashingElts = filter clashes rdrElts
+
+    ; traceTc "tcPreludeClashWarn/prelude_functions"
+                (hang (ppr name) 4 (sep [ppr clashingElts]))
+
+    ; let warn_msg x = addWarnAt (nameSrcSpan (gre_name x)) (hsep
+              [ text "Local definition of"
+              , (quotes . ppr . nameOccName . gre_name) x
+              , text "clashes with a future Prelude name." ]
+              $$
+              text "This will become an error in a future release." )
+    ; mapM_ warn_msg clashingElts
+    }}}
+
+  where
+
+    -- Is the given name imported via Prelude?
+    --
+    -- Possible scenarios:
+    --   a) Prelude is imported implicitly, issue warnings.
+    --   b) Prelude is imported explicitly, but without mentioning the name in
+    --      question. Issue no warnings.
+    --   c) Prelude is imported hiding the name in question. Issue no warnings.
+    --   d) Qualified import of Prelude, no warnings.
+    importedViaPrelude :: Name
+                       -> [ImportDecl Name]
+                       -> Bool
+    importedViaPrelude name = any importViaPrelude
+      where
+        isPrelude :: ImportDecl Name -> Bool
+        isPrelude imp = unLoc (ideclName imp) == pRELUDE_NAME
+
+        -- Implicit (Prelude) import?
+        isImplicit :: ImportDecl Name -> Bool
+        isImplicit = ideclImplicit
+
+        -- Unqualified import?
+        isUnqualified :: ImportDecl Name -> Bool
+        isUnqualified = not . ideclQualified
+
+        -- List of explicitly imported (or hidden) Names from a single import.
+        --   Nothing -> No explicit imports
+        --   Just (False, <names>) -> Explicit import list of <names>
+        --   Just (True , <names>) -> Explicit hiding of <names>
+        importListOf :: ImportDecl Name -> Maybe (Bool, [Name])
+        importListOf = fmap toImportList . ideclHiding
+          where
+            toImportList (h, loc) = (h, map (ieName . unLoc) (unLoc loc))
+
+        isExplicit :: ImportDecl Name -> Bool
+        isExplicit x = case importListOf x of
+            Nothing -> False
+            Just (False, explicit)
+                -> nameOccName name `elem`    map nameOccName explicit
+            Just (True, hidden)
+                -> nameOccName name `notElem` map nameOccName hidden
+
+        -- Check whether the given name would be imported (unqualified) from
+        -- an import declaration.
+        importViaPrelude :: ImportDecl Name -> Bool
+        importViaPrelude x = isPrelude x
+                          && isUnqualified x
+                          && (isImplicit x || isExplicit x)
+
+
+-- Notation: is* is for classes the type is an instance of, should* for those
+--           that it should also be an instance of based on the corresponding
+--           is*.
+tcMissingParentClassWarn :: WarningFlag
+                         -> Name -- ^ Instances of this ...
+                         -> Name -- ^ should also be instances of this
+                         -> TcM ()
+tcMissingParentClassWarn warnFlag isName shouldName
+  = do { warn <- woptM warnFlag
+       ; when warn $ do
+       { traceTc "tcMissingParentClassWarn" empty
+       ; isClass'     <- tcLookupClass_maybe isName
+       ; shouldClass' <- tcLookupClass_maybe shouldName
+       ; case (isClass', shouldClass') of
+              (Just isClass, Just shouldClass) -> do
+                  { localInstances <- tcGetInsts
+                  ; let isInstance m = is_cls m == isClass
+                        isInsts = filter isInstance localInstances
+                  ; traceTc "tcMissingParentClassWarn/isInsts" (ppr isInsts)
+                  ; forM_ isInsts (checkShouldInst isClass shouldClass)
+                  }
+              (is',should') ->
+                  traceTc "tcMissingParentClassWarn/notIsShould"
+                          (hang (ppr isName <> text "/" <> ppr shouldName) 2 (
+                            (hsep [ quotes (text "Is"), text "lookup for"
+                                  , ppr isName
+                                  , text "resulted in", ppr is' ])
+                            $$
+                            (hsep [ quotes (text "Should"), text "lookup for"
+                                  , ppr shouldName
+                                  , text "resulted in", ppr should' ])))
+       }}
+  where
+    -- Check whether the desired superclass exists in a given environment.
+    checkShouldInst :: Class   -- ^ Class of existing instance
+                    -> Class   -- ^ Class there should be an instance of
+                    -> ClsInst -- ^ Existing instance
+                    -> TcM ()
+    checkShouldInst isClass shouldClass isInst
+      = do { instEnv <- tcGetInstEnvs
+           ; let (instanceMatches, shouldInsts, _)
+                    = lookupInstEnv False instEnv shouldClass (is_tys isInst)
+
+           ; traceTc "tcMissingParentClassWarn/checkShouldInst"
+                     (hang (ppr isInst) 4
+                         (sep [ppr instanceMatches, ppr shouldInsts]))
+
+           -- "<location>: Warning: <type> is an instance of <is> but not
+           -- <should>" e.g. "Foo is an instance of Monad but not Applicative"
+           ; let instLoc = srcLocSpan . nameSrcLoc $ getName isInst
+                 warnMsg (Just name:_) =
+                      addWarnAt instLoc $
+                           hsep [ (quotes . ppr . nameOccName) name
+                                , text "is an instance of"
+                                , (ppr . nameOccName . className) isClass
+                                , text "but not"
+                                , (ppr . nameOccName . className) shouldClass ]
+                                <> text "."
+                           $$
+                           hsep [ text "This will become an error in"
+                                , text "a future release." ]
+                 warnMsg _ = pure ()
+           ; when (null shouldInsts && null instanceMatches) $
+                  warnMsg (is_tcs isInst)
+           }
+
+    tcLookupClass_maybe :: Name -> TcM (Maybe Class)
+    tcLookupClass_maybe name = tcLookupImported_maybe name >>= \case
+        Succeeded (ATyCon tc) | cls@(Just _) <- tyConClass_maybe tc -> pure cls
+        _else -> pure Nothing
+
 
 ---------------------------
 tcTyClsInstDecls :: [TyClGroup Name]
@@ -1641,7 +1836,8 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
         -- naked expression. Deferring type errors here is unhelpful because the
         -- expression gets evaluated right away anyway. It also would potentially
         -- emit two redundant type-error warnings, one from each plan.
-        ; plan <- unsetGOptM Opt_DeferTypeErrors $ runPlans [
+        ; plan <- unsetGOptM Opt_DeferTypeErrors $
+                  unsetGOptM Opt_DeferTypedHoles $ runPlans [
                     -- Plan A
                     do { stuff@([it_id], _) <- tcGhciStmts [bind_stmt, print_it]
                        ; it_ty <- zonkTcType (idType it_id)
@@ -1758,18 +1954,17 @@ getGhciStepIO = do
     ghciTy <- getGHCiMonad
     fresh_a <- newUnique
     loc     <- getSrcSpanM
-    let a_tv   = mkInternalName fresh_a (mkTyVarOccFS (fsLit "a")) loc
-        ghciM  = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
-        ioM    = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
+    let a_tv    = mkInternalName fresh_a (mkTyVarOccFS (fsLit "a")) loc
+        ghciM   = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
+        ioM     = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
 
-        stepTy :: LHsType Name    -- Renamed, so needs all binders in place
-        stepTy = noLoc $ HsForAllTy Implicit Nothing
-                            (HsQTvs { hsq_tvs = [noLoc (UserTyVar (noLoc a_tv))]
-                                    , hsq_kvs = [] })
-                            (noLoc [])
-                            (nlHsFunTy ghciM ioM)
-        step   = noLoc $ ExprWithTySig (nlHsVar ghciStepIoMName) stepTy []
-    return step
+        step_ty = noLoc $ HsForAllTy { hst_bndrs = [noLoc $ UserTyVar (noLoc a_tv)]
+                                     , hst_body  = nlHsFunTy ghciM ioM }
+
+        stepTy :: LHsSigWcType Name
+        stepTy = mkEmptyImplicitBndrs (mkEmptyWildCardBndrs step_ty)
+
+    return (noLoc $ ExprWithTySig (nlHsVar ghciStepIoMName) stepTy)
 
 isGHCiMonad :: HscEnv -> String -> IO (Messages, Maybe Name)
 isGHCiMonad hsc_env ty
@@ -1805,7 +2000,7 @@ tcRnExpr hsc_env rdr_expr
         -- it might have a rank-2 type (e.g. :t runST)
     uniq <- newUnique ;
     let { fresh_it  = itName uniq (getLoc rdr_expr) } ;
-    ((_tc_expr, res_ty), tclvl, lie) <- pushLevelAndCaptureConstraints $
+    (tclvl, lie, (_tc_expr, res_ty)) <- pushLevelAndCaptureConstraints $
                                         tcInferRho rn_expr ;
     ((qtvs, dicts, _), lie_top) <- captureConstraints $
                                    {-# SCC "simplifyInfer" #-}
@@ -1855,12 +2050,17 @@ tcRnType :: HscEnv
 tcRnType hsc_env normalise rdr_type
   = runTcInteractive hsc_env $
     setXOptM Opt_PolyKinds $   -- See Note [Kind-generalise in tcRnType]
-    do { (rn_type, _fvs, wcs) <- rnLHsTypeWithWildCards GHCiCtx rdr_type
+    do { (HsWC { hswc_wcs = wcs, hswc_body = rn_type }, _fvs)
+               <- rnHsWcType GHCiCtx (mkHsWildCardBndrs rdr_type)
+                  -- The type can have wild cards, but no implicit
+                  -- generalisation; e.g.   :kind (T _)
        ; failIfErrsM
 
         -- Now kind-check the type
         -- It can have any rank or kind
-       ; (ty, kind) <- tcWildcardBinders wcs $ \_ ->
+        -- First bring into scope any wildcards
+       ; traceTc "tcRnType" (vcat [ppr wcs, ppr rn_type])
+       ; (ty, kind) <- tcWildCardBinders wcs  $ \ _ ->
                        tcLHsType rn_type
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]

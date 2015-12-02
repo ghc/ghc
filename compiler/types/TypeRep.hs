@@ -44,6 +44,8 @@ module TypeRep (
         -- Free variables
         tyVarsOfType, tyVarsOfTypes, closeOverKinds, varSetElemsKvsFirst,
         tyVarsOfTypeAcc, tyVarsOfTypeList, tyVarsOfTypesAcc, tyVarsOfTypesList,
+        tyVarsOfTypeDSet, tyVarsOfTypesDSet,
+        closeOverKindsDSet, closeOverKindsAcc,
 
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
@@ -308,22 +310,41 @@ isKindVar v = isTKVar v && isSuperKind (varType v)
 ************************************************************************
 -}
 
+-- | Returns free variables of a type, including kind variables as
+-- a non-deterministic set. For type synonyms it does /not/ expand the
+-- synonym.
 tyVarsOfType :: Type -> VarSet
--- ^ NB: for type synonyms tyVarsOfType does /not/ expand the synonym
--- tyVarsOfType returns free variables of a type, including kind variables.
 tyVarsOfType ty = runFVSet $ tyVarsOfTypeAcc ty
 
 -- | `tyVarsOfType` that returns free variables of a type in deterministic
 -- order. For explanation of why using `VarSet` is not deterministic see
--- Note [Deterministic UniqFM] in UniqDFM.
-tyVarsOfTypeList :: Type -> [Var]
+-- Note [Deterministic FV] in FV.
+tyVarsOfTypeList :: Type -> [TyVar]
 tyVarsOfTypeList ty = runFVList $ tyVarsOfTypeAcc ty
 
+-- | `tyVarsOfType` that returns free variables of a type in a deterministic
+-- set. For explanation of why using `VarSet` is not deterministic see
+-- Note [Deterministic FV] in FV.
+tyVarsOfTypeDSet :: Type -> DTyVarSet
+tyVarsOfTypeDSet ty = runFVDSet $ tyVarsOfTypeAcc ty
+
+-- | Returns free variables of types, including kind variables as
+-- a non-deterministic set. For type synonyms it does /not/ expand the
+-- synonym.
 tyVarsOfTypes :: [Type] -> TyVarSet
 tyVarsOfTypes tys = runFVSet $ tyVarsOfTypesAcc tys
 
-tyVarsOfTypesList :: [Type] -> [Var]
+-- | Returns free variables of types, including kind variables as
+-- a deterministically ordered list. For type synonyms it does /not/ expand the
+-- synonym.
+tyVarsOfTypesList :: [Type] -> [TyVar]
 tyVarsOfTypesList tys = runFVList $ tyVarsOfTypesAcc tys
+
+-- | Returns free variables of types, including kind variables as
+-- a deterministic set. For type synonyms it does /not/ expand the
+-- synonym.
+tyVarsOfTypesDSet :: [Type] -> DTyVarSet
+tyVarsOfTypesDSet tys = runFVDSet $ tyVarsOfTypesAcc tys
 
 
 -- | The worker for `tyVarsOfType` and `tyVarsOfTypeList`.
@@ -331,6 +352,7 @@ tyVarsOfTypesList tys = runFVList $ tyVarsOfTypesAcc tys
 -- make the function quadratic.
 -- It's exported, so that it can be composed with other functions that compute
 -- free variables.
+-- See Note [FV naming conventions] in FV.
 tyVarsOfTypeAcc :: Type -> FV
 tyVarsOfTypeAcc (TyVarTy v) fv_cand in_scope acc = oneVar v fv_cand in_scope acc
 tyVarsOfTypeAcc (TyConApp _ tys) fv_cand in_scope acc =
@@ -349,12 +371,22 @@ tyVarsOfTypesAcc (ty:tys) fv_cand in_scope acc =
   (tyVarsOfTypeAcc ty `unionFV` tyVarsOfTypesAcc tys) fv_cand in_scope acc
 tyVarsOfTypesAcc [] fv_cand in_scope acc = noVars fv_cand in_scope acc
 
+-- | Add the kind variables free in the kinds of the tyvars in the given set.
+-- Returns a non-deterministic set.
 closeOverKinds :: TyVarSet -> TyVarSet
--- Add the kind variables free in the kinds
--- of the tyvars in the given set
-closeOverKinds tvs
-  = foldVarSet (\tv ktvs -> tyVarsOfType (tyVarKind tv) `unionVarSet` ktvs)
-               tvs tvs
+closeOverKinds = runFVSet . closeOverKindsAcc . varSetElems
+
+-- | Given a list of tyvars returns a deterministic FV computation that
+-- returns the given tyvars with the kind variables free in the kinds of the
+-- given tyvars.
+closeOverKindsAcc :: [TyVar] -> FV
+closeOverKindsAcc tvs =
+  mapUnionFV (tyVarsOfTypeAcc . tyVarKind) tvs `unionFV` someVars tvs
+
+-- | Add the kind variables free in the kinds of the tyvars in the given set.
+-- Returns a deterministic set.
+closeOverKindsDSet :: DTyVarSet -> DTyVarSet
+closeOverKindsDSet = runFVDSet . closeOverKindsAcc . dVarSetElems
 
 varSetElemsKvsFirst :: VarSet -> [TyVar]
 -- {k1,a,k2,b} --> [k1,k2,a,b]

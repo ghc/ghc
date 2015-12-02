@@ -5,8 +5,7 @@ T8034.hs:6:3: error:
     The type variable ‘a0’ is ambiguous
     Expected type: F a -> F a
       Actual type: F a0 -> F a0
-    In the ambiguity check for the type signature for ‘foo’:
-      foo :: forall a. C a => F a -> F a
+    In the ambiguity check for ‘foo’
     To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
     When checking the class method: foo :: forall a. C a => F a -> F a
     In the class declaration for ‘C’

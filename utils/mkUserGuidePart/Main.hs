@@ -76,11 +76,6 @@ flagsTable theFlags =
 inlineCode :: String -> ReST
 inlineCode s = "``" ++ s ++ "``"
 
--- | Generate a ReST substitution definition.
-substitution :: String -> ReST -> ReST
-substitution substName content =
-    unlines [".. |" ++ substName ++ "| ", content]
-
 heading :: Char -> String -> ReST
 heading chr title = unlines
     [ title

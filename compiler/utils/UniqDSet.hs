@@ -28,6 +28,8 @@ module UniqDSet (
         isEmptyUniqDSet,
         lookupUniqDSet,
         uniqDSetToList,
+        partitionUniqDSet,
+        delListFromUniqDSet,
     ) where
 
 import UniqDFM
@@ -86,3 +88,9 @@ lookupUniqDSet = lookupUDFM
 
 uniqDSetToList :: UniqDSet a -> [a]
 uniqDSetToList = eltsUDFM
+
+partitionUniqDSet :: (a -> Bool) -> UniqDSet a -> (UniqDSet a, UniqDSet a)
+partitionUniqDSet = partitionUDFM
+
+delListFromUniqDSet :: Uniquable a => UniqDSet a -> [a] -> UniqDSet a
+delListFromUniqDSet = delListFromUDFM

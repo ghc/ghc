@@ -9,5 +9,3 @@ data (Show a) => Obs a = forall b. LiftObs a b
 
 f :: Show a => Obs a -> String
 f (LiftObs _ _) = "yes"
-                 
-

@@ -33,7 +33,6 @@ import Control.Monad    ( unless, when )
 
 import {-# SOURCE #-} RnExpr   ( rnLExpr )
 
-import PrelNames        ( isUnboundName )
 import TcEnv            ( checkWellStaged )
 import THNames          ( liftName )
 
@@ -45,8 +44,6 @@ import Hooks
 import Var              ( Id )
 import THNames          ( quoteExpName, quotePatName, quoteDecName, quoteTypeName
                         , decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
-import RnTypes          ( collectWildCards )
-import Util
 
 import {-# SOURCE #-} TcExpr   ( tcMonoExpr )
 import {-# SOURCE #-} TcSplice ( runMetaD, runMetaE, runMetaP, runMetaT, tcTopSpliceExpr )
@@ -63,12 +60,13 @@ import {-# SOURCE #-} TcSplice ( runMetaD, runMetaE, runMetaP, runMetaT, tcTopSp
 rnBracket :: HsExpr RdrName -> HsBracket RdrName -> RnM (HsExpr Name, FreeVars)
 rnBracket e br_body
   = addErrCtxt (quotationCtxtDoc br_body) $
-    do { -- Check that Template Haskell is enabled and available
-         thEnabled <- xoptM Opt_TemplateHaskell
-       ; unless thEnabled $
+    do { -- Check that -XTemplateHaskellQuotes is enabled and available
+         thQuotesEnabled <- xoptM Opt_TemplateHaskellQuotes
+       ; unless thQuotesEnabled $
            failWith ( vcat
                       [ text "Syntax error on" <+> ppr e
-                      , text "Perhaps you intended to use TemplateHaskell" ] )
+                      , text ("Perhaps you intended to use TemplateHaskell"
+                              ++ " or TemplateHaskellQuotes") ] )
 
          -- Check for nested brackets
        ; cur_stage <- getStage
@@ -372,17 +370,6 @@ rnSplice (HsQuasiQuote splice_name quoter q_loc quote)
         ; loc  <- getSrcSpanM
         ; splice_name' <- newLocalBndrRn (L loc splice_name)
 
-          -- Drop the leading "$" from the quoter name, if present
-          -- This is old-style syntax, now deprecated
-          -- NB: when removing this backward-compat, remove
-          --     the matching code in Lexer.x (around line 310)
-        ; let occ_str = occNameString (rdrNameOcc quoter)
-        ; quoter <- if ASSERT( not (null occ_str) )  -- Lexer ensures this
-                       head occ_str /= '$'
-                    then return quoter
-                    else do { addWarn (deprecatedDollar quoter)
-                            ; return (mkRdrUnqual (mkVarOcc (tail occ_str))) }
-
           -- Rename the quoter; akin to the HsVar case of rnExpr
         ; quoter' <- lookupOccRn quoter
         ; this_mod <- getModule
@@ -390,13 +377,6 @@ rnSplice (HsQuasiQuote splice_name quoter q_loc quote)
           checkThLocalName quoter'
 
         ; return (HsQuasiQuote splice_name' quoter' q_loc quote, unitFV quoter') }
-
-deprecatedDollar :: RdrName -> SDoc
-deprecatedDollar quoter
-  = hang (ptext (sLit "Deprecated syntax:"))
-       2 (ptext (sLit "quasiquotes no longer need a dollar sign:")
-          <+> ppr quoter)
-
 
 ---------------------
 rnSpliceExpr :: HsSplice RdrName -> RnM (HsExpr Name, FreeVars)
@@ -439,19 +419,18 @@ rnSpliceType splice k
       = do { traceRn (text "rnSpliceType: untyped type splice")
            ; hs_ty2 <- runRnSplice UntypedTypeSplice runMetaT ppr rn_splice
            ; (hs_ty3, fvs) <- do { let doc = SpliceTypeCtx hs_ty2
-                                 ; checkValidPartialTypeSplice doc hs_ty2
-                                    -- See Note [Partial Type Splices]
                                  ; checkNoErrs $ rnLHsType doc hs_ty2 }
                                     -- checkNoErrs: see Note [Renamer errors]
            ; return (HsParTy hs_ty3, fvs) }
               -- Wrap the result of the splice in parens so that we don't
               -- lose the outermost location set by runQuasiQuote (#7918)
-{-
-Note [Partial Type Splices]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+{- Note [Partial Type Splices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Partial Type Signatures are partially supported in TH type splices: only
 anonymous wild cards are allowed.
+
+  -- ToDo: SLPJ says: I don't understand all this
 
 Normally, named wild cards are collected before renaming a (partial) type
 signature. However, TH type splices are run during renaming, i.e. after the
@@ -472,7 +451,7 @@ are given names during renaming. These names are collected right after
 renaming. The names generated for anonymous wild cards in TH type splices will
 thus be collected as well.
 
-For more details about renaming wild cards, see rnLHsTypeWithWildCards.
+For more details about renaming wild cards, see RnTypes.rnHsSigWcType
 
 Note that partial type signatures are fully supported in TH declaration
 splices, e.g.:
@@ -481,28 +460,10 @@ splices, e.g.:
          foo x y = x == y |]
 
 This is because in this case, the partial type signature can be treated as a
-whole signature, instead of as an arbitray type.
+whole signature, instead of as an arbitrary type.
 
 -}
 
--- | Check that the type splice doesn't contain an extra-constraint wild card.
--- See Note [Partial Type Splices]. Named wild cards aren't supported in type
--- splices either, but they will be caught during renaming, as they won't be
--- in scope.
---
--- Note that without this check, an error would still be reported, but it
--- would tell the user an unexpected wild card was encountered. This message
--- is confusing, as it doesn't mention the wild card was unexpected because it
--- was an extra-constraints wild card. To avoid confusing, this function
--- provides a specific error message for this case.
-checkValidPartialTypeSplice :: HsDocContext -> LHsType RdrName -> RnM ()
-checkValidPartialTypeSplice doc ty
-  | (L loc _extraWc : _, _) <- collectWildCards ty
-  = failAt loc $ hang (text "Invalid partial type:") 2 (ppr ty) $$
-    text "An extra-constraints wild card is not allowed in a type splice" $$
-    docOfHsDocContext doc
-  | otherwise
-  = return ()
 
 ----------------------
 -- | Rename a splice pattern. See Note [rnSplicePat]

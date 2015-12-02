@@ -169,7 +169,7 @@ instance Outputable CoreToDo where
   ppr CoreDoPrintCore          = ptext (sLit "Print core")
   ppr (CoreDoRuleCheck {})     = ptext (sLit "Rule check")
   ppr CoreDoNothing            = ptext (sLit "CoreDoNothing")
-  ppr (CoreDoPasses {})        = ptext (sLit "CoreDoPasses")
+  ppr (CoreDoPasses passes)    = ptext (sLit "CoreDoPasses") <+> ppr passes
 
 pprPassDetails :: CoreToDo -> SDoc
 pprPassDetails (CoreDoSimplify n md) = vcat [ ptext (sLit "Max iterations =") <+> int n

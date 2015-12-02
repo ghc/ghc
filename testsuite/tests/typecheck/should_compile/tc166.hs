@@ -14,9 +14,9 @@ module ShouldCompile where
     instance C Char a Bool
 
     data P t a = forall b. (C t a b) => MkP b
-    
+
     data Q t = MkQ (forall a. P t a)
-    
+
     f1 :: Q Char
     f1 = MkQ (MkP True)
 

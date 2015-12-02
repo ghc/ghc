@@ -1,6 +1,7 @@
 
-Defaulting1MROff.hs:6:1: error:
-    No instance for (Num t)
-    When checking that ‘alpha’ has the inferred type
-      alpha :: forall t. t
-    Probable cause: the inferred type is ambiguous
+Defaulting1MROff.hs:7:10: warning:
+    • Found type wildcard ‘_’ standing for ‘Integer’
+    • In the type signature:
+        alpha :: _
+    • Relevant bindings include
+        alpha :: Integer (bound at Defaulting1MROff.hs:8:1)

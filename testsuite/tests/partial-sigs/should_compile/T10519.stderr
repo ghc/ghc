@@ -1,5 +1,5 @@
 
 T10519.hs:5:18: warning:
-    Found hole ‘_’ with inferred constraints: Eq a
-    In the type signature for:
+    Found constraint wildcard ‘_’ standing for ‘Eq a’
+    In the type signature:
       foo :: forall a. _ => a -> a -> Bool

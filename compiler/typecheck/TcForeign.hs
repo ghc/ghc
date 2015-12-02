@@ -65,13 +65,13 @@ import Control.Monad
 
 -- Defines a binding
 isForeignImport :: LForeignDecl name -> Bool
-isForeignImport (L _ (ForeignImport _ _ _ _)) = True
-isForeignImport _                             = False
+isForeignImport (L _ (ForeignImport {})) = True
+isForeignImport _                        = False
 
 -- Exports a binding
 isForeignExport :: LForeignDecl name -> Bool
-isForeignExport (L _ (ForeignExport _ _ _ _)) = True
-isForeignExport _                             = False
+isForeignExport (L _ (ForeignExport {})) = True
+isForeignExport _                        = False
 
 {-
 Note [Don't recur in normaliseFfiType']
@@ -234,7 +234,8 @@ tcForeignImports' decls
        ; return (ids, decls, unionManyBags gres) }
 
 tcFImport :: LForeignDecl Name -> TcM (Id, LForeignDecl Id, Bag GlobalRdrElt)
-tcFImport (L dloc fo@(ForeignImport (L nloc nm) hs_ty _ imp_decl))
+tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
+                                    , fd_fi = imp_decl }))
   = setSrcSpan dloc $ addErrCtxt (foreignDeclCtxt fo)  $
     do { sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
        ; (norm_co, norm_sig_ty, gres) <- normaliseFfiType sig_ty
@@ -251,7 +252,10 @@ tcFImport (L dloc fo@(ForeignImport (L nloc nm) hs_ty _ imp_decl))
        ; imp_decl' <- tcCheckFIType arg_tys res_ty imp_decl
           -- Can't use sig_ty here because sig_ty :: Type and
           -- we need HsType Id hence the undefined
-       ; let fi_decl = ForeignImport (L nloc id) undefined (mkSymCo norm_co) imp_decl'
+       ; let fi_decl = ForeignImport { fd_name = L nloc id
+                                     , fd_sig_ty = undefined
+                                     , fd_co = mkSymCo norm_co
+                                     , fd_fi = imp_decl' }
        ; return (id, L dloc fi_decl, gres) }
 tcFImport d = pprPanic "tcFImport" (ppr d)
 
@@ -371,7 +375,7 @@ tcForeignExports' decls
        return (b `consBag` binds, L loc f : fs, gres1 `unionBags` gres2)
 
 tcFExport :: ForeignDecl Name -> TcM (LHsBind Id, ForeignDecl Id, Bag GlobalRdrElt)
-tcFExport fo@(ForeignExport (L loc nm) hs_ty _ spec)
+tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spec })
   = addErrCtxt (foreignDeclCtxt fo) $ do
 
     sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
@@ -391,7 +395,11 @@ tcFExport fo@(ForeignExport (L loc nm) hs_ty _ spec)
     -- is *stable* (i.e. the compiler won't change it later),
     -- because this name will be referred to by the C code stub.
     id  <- mkStableIdFromName nm sig_ty loc mkForeignExportOcc
-    return (mkVarBind id rhs, ForeignExport (L loc id) undefined norm_co spec', gres)
+    return ( mkVarBind id rhs
+           , ForeignExport { fd_name = L loc id
+                           , fd_sig_ty = undefined
+                           , fd_co = norm_co, fd_fe = spec' }
+           , gres)
 tcFExport d = pprPanic "tcFExport" (ppr d)
 
 -- ------------ Checking argument types for foreign export ----------------------

@@ -43,7 +43,15 @@ void poolSetDesiredSize(Pool *pool, nat size);
 /* Get the desired size of a pool */
 nat poolGetDesiredSize(Pool *pool);
 
-/* Grab an available thing from a pool */
+/* Try to grab an available thing from a pool, returning NULL if no things
+ * are available.
+ */
+void *poolTryTake(Pool *pool);
+
+/* Grab an available thing from a pool. This will block if no elements are
+ * available in the case of a threaded runtime or abort in a single-threaded
+ * environment.
+ */
 void *poolTake(Pool *pool);
 
 /* Release a thing back to the pool from which it was taken */

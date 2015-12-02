@@ -31,7 +31,7 @@ module TcTyDecls(
 import TcRnMonad
 import TcEnv
 import TcTypeable( mkTypeableBinds )
-import TcBinds( tcRecSelBinds, addTypecheckedBinds )
+import TcBinds( tcRecSelBinds )
 import TypeRep( Type(..) )
 import TcType
 import TysWiredIn( unitTy )
@@ -779,6 +779,11 @@ updateRoleEnv name n role
 ********************************************************************* -}
 
 tcAddImplicits :: [TyCon] -> TcM TcGblEnv
+-- Given a [TyCon], add to the TcGblEnv
+--   * extend the TypeEnv with their implicitTyThings
+--   * extend the TypeEnv with any default method Ids
+--   * add bindings for record selectors
+--   * add bindings for type representations for the TyThings
 tcAddImplicits tycons
   = discardWarnings $
     tcExtendGlobalEnvImplicit implicit_things  $
@@ -786,10 +791,10 @@ tcAddImplicits tycons
     do { traceTc "tcAddImplicits" $ vcat
             [ text "tycons" <+> ppr tycons
             , text "implicits" <+> ppr implicit_things ]
-       ; (typeable_ids, typeable_binds) <- mkTypeableBinds tycons
-       ; gbl_env <- tcExtendGlobalValEnv typeable_ids
-                    $ tcRecSelBinds $ mkRecSelBinds tycons
-       ; return (gbl_env `addTypecheckedBinds` typeable_binds) }
+       ; gbl_env <- mkTypeableBinds tycons
+       ; gbl_env <- setGblEnv gbl_env $
+                    tcRecSelBinds (mkRecSelBinds tycons)
+       ; return gbl_env }
  where
    implicit_things = concatMap implicitTyConThings tycons
    def_meth_ids    = mkDefaultMethodIds tycons
@@ -821,8 +826,6 @@ mkDefaultMethodIds tycons
 -}
 
 {-
--}
-{-
 Note [Default method Ids and Template Haskell]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this (Trac #4169):
@@ -838,6 +841,14 @@ When we typecheck 'ast' we have done the first pass over the class decl
 declarations (because they can mention value declarations).  So we
 must bring the default method Ids into scope first (so they can be seen
 when typechecking the [d| .. |] quote, and typecheck them later.
+-}
+
+{-
+************************************************************************
+*                                                                      *
+                Building record selectors
+*                                                                      *
+************************************************************************
 -}
 
 mkRecSelBinds :: [TyCon] -> HsValBinds Name
@@ -968,9 +979,9 @@ like     sel :: T [a] -> a
 
 For naughty selectors we make a dummy binding
    sel = ()
-for naughty selectors, so that the later type-check will add them to the
-environment, and they'll be exported.  The function is never called, because
-the tyepchecker spots the sel_naughty field.
+so that the later type-check will add them to the environment, and they'll be
+exported.  The function is never called, because the typechecker spots the
+sel_naughty field.
 
 Note [GADT record selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

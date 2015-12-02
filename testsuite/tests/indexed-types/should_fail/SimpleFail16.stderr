@@ -1,5 +1,5 @@
 
-SimpleFail16.hs:10:12:
+SimpleFail16.hs:10:12: error:
     Couldn't match expected type ‘p0 a0’ with actual type ‘F ()’
     The type variables ‘p0’, ‘a0’ are ambiguous
     In the first argument of ‘foo’, namely ‘(undefined :: F ())’

@@ -12,7 +12,7 @@ module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcGen,
   tcSubType, tcSubType_NC, tcSubTypeDS, tcSubTypeDS_NC,
-  checkConstraints, buildImplication,
+  checkConstraints, buildImplication, buildImplicationFor,
 
   -- Various unifications
   unifyType, unifyTypeList, unifyTheta,
@@ -438,7 +438,7 @@ tc_sub_type :: CtOrigin -> UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsW
 tc_sub_type origin ctxt ty_actual ty_expected
   | isTyVarTy ty_actual  -- See Note [Higher rank types]
   = do { cow <- uType origin ty_actual ty_expected
-       ; return (coToHsWrapper cow) }
+       ; return (mkWpCastN cow) }
 
   | otherwise  -- See Note [Deep skolemisation]
   = do { (sk_wrap, inner_wrap) <- tcGen ctxt ty_expected $ \ _ sk_rho ->
@@ -471,7 +471,7 @@ tc_sub_type_ds origin ctxt ty_actual ty_expected
 
   | otherwise   -- Revert to unification
   = do { cow <- uType origin ty_actual ty_expected
-       ; return (coToHsWrapper cow) }
+       ; return (mkWpCastN cow) }
 
 -----------------
 tcWrapResult :: HsExpr TcId -> TcRhoType -> TcRhoType -> TcM (HsExpr TcId)
@@ -530,8 +530,9 @@ tcGen ctxt expected_ty thing_inside
   = do  { traceTc "tcGen" Outputable.empty
         ; (wrap, tvs', given, rho') <- deeplySkolemise expected_ty
 
+        ; lvl <- getTcLevel
         ; when debugIsOn $
-              traceTc "tcGen" $ vcat [
+              traceTc "tcGen" $ vcat [ ppr lvl,
                            text "expected_ty" <+> ppr expected_ty,
                            text "inst ty" <+> ppr tvs' <+> ppr rho' ]
 
@@ -566,12 +567,6 @@ checkConstraints :: SkolemInfo
                  -> TcM (TcEvBinds, result)
 
 checkConstraints skol_info skol_tvs given thing_inside
-  | null skol_tvs && null given
-  = do { res <- thing_inside; return (emptyTcEvBinds, res) }
-      -- Just for efficiency.  We check every function argument with
-      -- tcPolyExpr, which uses tcGen and hence checkConstraints.
-
-  | otherwise
   = do { (implics, ev_binds, result) <- buildImplication skol_info skol_tvs given thing_inside
        ; emitImplications implics
        ; return (ev_binds, result) }
@@ -582,19 +577,32 @@ buildImplication :: SkolemInfo
                  -> TcM result
                  -> TcM (Bag Implication, TcEvBinds, result)
 buildImplication skol_info skol_tvs given thing_inside
- =  ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
-    ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
-    do { (result, tclvl, wanted) <- pushLevelAndCaptureConstraints thing_inside
+  | null skol_tvs && null given
+  = do { res <- thing_inside
+       ; return (emptyBag, emptyTcEvBinds, res) }
+      -- Fast path.  We check every function argument with
+      -- tcPolyExpr, which uses tcGen and hence checkConstraints.
 
-       ; if isEmptyWC wanted && null given
-            -- Optimisation : if there are no wanteds, and no givens
-            -- don't generate an implication at all.
-            -- Reason for the (null given): we don't want to lose
-            -- the "inaccessible alternative" error check
-         then
-            return (emptyBag, emptyTcEvBinds, result)
-         else do
-       { ev_binds_var <- newTcEvBinds
+  | otherwise
+  = do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints thing_inside
+       ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info skol_tvs given wanted
+       ; return (implics, ev_binds, result) }
+
+buildImplicationFor :: TcLevel -> SkolemInfo -> [TcTyVar]
+                   -> [EvVar] -> WantedConstraints
+                   -> TcM (Bag Implication, TcEvBinds)
+buildImplicationFor tclvl skol_info skol_tvs given wanted
+  | isEmptyWC wanted && null given
+             -- Optimisation : if there are no wanteds, and no givens
+             -- don't generate an implication at all.
+             -- Reason for the (null given): we don't want to lose
+             -- the "inaccessible alternative" error check
+  = return (emptyBag, emptyTcEvBinds)
+
+  | otherwise
+  = ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
+    ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
+    do { ev_binds_var <- newTcEvBinds
        ; env <- getLclEnv
        ; let implic = Implic { ic_tclvl = tclvl
                              , ic_skols = skol_tvs
@@ -606,7 +614,7 @@ buildImplication skol_info skol_tvs given thing_inside
                              , ic_env = env
                              , ic_info = skol_info }
 
-       ; return (unitBag implic, TcEvBinds ev_binds_var, result) } }
+       ; return (unitBag implic, TcEvBinds ev_binds_var) }
 
 {-
 ************************************************************************

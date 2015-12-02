@@ -1,9 +1,16 @@
-SRC_CC_WARNING_OPTS =
-SRC_HC_WARNING_OPTS =
+# See Note [Order of warning flags].
+SRC_CC_OPTS     += -Wall $(WERROR)
+SRC_HC_OPTS     += -Wall
+# Don't add -Werror to SRC_HC_OPTS_STAGE0 (or SRC_HC_OPTS), because otherwise
+# validate may unnecessarily fail when booting with an older compiler.
+# It would be better to only exclude certain warnings from becoming errors
+# (e.g. '-Werror -Wno-error=unused-imports -Wno-error=...'), but -Wno-error
+# isn't supported yet (https://ghc.haskell.org/trac/ghc/wiki/Design/Warnings).
+#
+# See Note [Stage number in build variables] in mk/config.mk.in.
+SRC_HC_OPTS_STAGE1 += $(WERROR)
+SRC_HC_OPTS_STAGE2 += $(WERROR)
 
-
-#####################
-# Warnings
 
 ifneq "$(GccIsClang)" "YES"
 
@@ -25,10 +32,6 @@ SRC_CC_WARNING_OPTS += -Wno-unknown-pragmas
 
 endif
 
-GhcStage1HcOpts += -fwarn-tabs
-GhcStage2HcOpts += -fwarn-tabs
-
-utils/hpc_dist-install_EXTRA_HC_OPTS += -fwarn-tabs
 
 
 ######################################################################
@@ -113,3 +116,26 @@ GhcBootLibExtraHcOpts += -fno-warn-deprecated-flags
 #
 GhcLibExtraHcOpts += -fno-warn-tabs
 GhcBootLibExtraHcOpts += -fno-warn-tabs
+
+
+# Note [Order of warning flags]
+#
+# In distdir-way-opts, build flags are added in the following order (this
+# list is not exhaustive):
+#
+#   * SRC_HC_OPTS(_STAGE$4)
+#   * ghc-options from .cabal files ($1_$2_HC_OPTS)
+#   * SRC_HC_WARNING_OPTS(_STAGE$4)
+#
+# Considerations:
+#
+#   * Most .cabal files specify -Wall. But not all, and not all building we
+#   do relies on .cabal files. So we have to add -Wall ourselves somewhere.
+#
+#   * Some .cabal also specify warning supression flags. Because -Wall
+#   overrides any warning supression flags that come before it, we have to
+#   make sure -Wall comes before any warning supression flags. So we add it
+#   to SRC_HC_OPTS.
+#
+#   * Similarly, our own warning supression should come after the -Wall from
+#   the .cabal files, so we do *not* add them to SRC_HC_OPTS.

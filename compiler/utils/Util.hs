@@ -375,42 +375,41 @@ nOfThem n thing = replicate n thing
 --
 -- @
 --  atLength atLenPred atEndPred ls n
---   | n < 0         = atLenPred n
+--   | n < 0         = atLenPred ls
 --   | length ls < n = atEndPred (n - length ls)
 --   | otherwise     = atLenPred (drop n ls)
 -- @
-atLength :: ([a] -> b)
-         -> (Int -> b)
+atLength :: ([a] -> b)   -- Called when length ls >= n, passed (drop n ls)
+                         --    NB: arg passed to this function may be []
+         -> b            -- Called when length ls <  n
          -> [a]
          -> Int
          -> b
-atLength atLenPred atEndPred ls n
-  | n < 0     = atEndPred n
+atLength atLenPred atEnd ls n
+  | n < 0     = atLenPred ls
   | otherwise = go n ls
   where
-    go n [] = atEndPred n
-    go 0 ls = atLenPred ls
+    -- go's first arg n >= 0
+    go 0 ls     = atLenPred ls
+    go _ []     = atEnd           -- n > 0 here
     go n (_:xs) = go (n-1) xs
 
 -- Some special cases of atLength:
 
 lengthExceeds :: [a] -> Int -> Bool
 -- ^ > (lengthExceeds xs n) = (length xs > n)
-lengthExceeds = atLength notNull (const False)
+lengthExceeds = atLength notNull False
 
 lengthAtLeast :: [a] -> Int -> Bool
-lengthAtLeast = atLength notNull (== 0)
+lengthAtLeast = atLength (const True) False
 
 lengthIs :: [a] -> Int -> Bool
-lengthIs = atLength null (==0)
+lengthIs = atLength null False
 
 listLengthCmp :: [a] -> Int -> Ordering
 listLengthCmp = atLength atLen atEnd
  where
-  atEnd 0      = EQ
-  atEnd x
-   | x > 0     = LT -- not yet seen 'n' elts, so list length is < n.
-   | otherwise = GT
+  atEnd = LT    -- Not yet seen 'n' elts, so list length is < n.
 
   atLen []     = EQ
   atLen _      = GT

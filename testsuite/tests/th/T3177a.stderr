@@ -1,8 +1,10 @@
 
-T3177a.hs:8:8:
+T3177a.hs:8:8: error:
     ‘Int’ is applied to too many type arguments
-    In the type signature for ‘f’: f :: Int Int
+    In the type signature:
+      f :: Int Int
 
-T3177a.hs:11:6:
+T3177a.hs:11:6: error:
     ‘Int’ is applied to too many type arguments
-    In the type signature for ‘g’: g :: Int Int
+    In the type signature:
+      g :: Int Int

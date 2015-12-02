@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE PolyKinds, DataKinds, TypeFamilies, GADTs, MultiParamTypeClasses,
+{-# LANGUAGE PolyKinds, DataKinds, TypeFamilies, GADTs, MultiParamTypeClasses, KindSignatures,
              FunctionalDependencies, FlexibleInstances, UndecidableInstances, ExistentialQuantification #-}
 
 module T6068 where
@@ -23,7 +23,7 @@ class HasSingleton a (kp :: KProxy k) | a -> kp where
 
 class Floop a b | a -> b
 
-instance forall a (mp :: KProxy (Maybe ak)). Floop a mp => HasSingleton (Maybe a) mp where
+instance Floop a (mp :: KProxy (Maybe ak)) => HasSingleton (Maybe a) mp where
   exists Nothing = Exists SNothing
 
 -- instance forall (a ::*) (mp :: KProxy (Maybe ak)). HasSingleton (Maybe ak) (Maybe a) mp where

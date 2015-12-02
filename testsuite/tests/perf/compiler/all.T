@@ -293,7 +293,7 @@ test('T3064',
             # 2014-12-01: 162457940 (Windows)
             # 2014-12-22: 122836340 (Windows) Death to silent superclasses
 
-           (wordsize(64), 243670824, 5)]),
+           (wordsize(64), 264952256, 5)]),
             # (amd64/Linux) (28/06/2011):  73259544
             # (amd64/Linux) (07/02/2013): 224798696
             # (amd64/Linux) (02/08/2013): 236404384, increase from roles
@@ -310,6 +310,8 @@ test('T3064',
             # (Mac)         (18/12/2014): 350418600, improvements to flattener
             # (amd64/Linux) (22/12/2014): 243670824, Ha! Death to superclass constraints, makes
             #                                        much less code for Monad instances
+            # (amd64/Linux) (01/12/2015): 264952256, Regression due to Simon's wildcard refactor
+            #                                        Tracked as #11151.
 
 ###################################
 # deactivated for now, as this metric became too volatile recently

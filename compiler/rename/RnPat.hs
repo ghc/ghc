@@ -206,10 +206,8 @@ matchNameMaker ctxt = LamMk report_unused
                       ThPatQuote            -> False
                       _                     -> True
 
-rnHsSigCps :: HsWithBndrs RdrName (LHsType RdrName)
-           -> CpsRn (HsWithBndrs Name (LHsType Name))
-rnHsSigCps sig
-  = CpsRn (rnHsBndrSig PatCtx sig)
+rnHsSigCps :: LHsSigWcType RdrName -> CpsRn (LHsSigWcType Name)
+rnHsSigCps sig = CpsRn (rnHsSigWcTypeScoped PatCtx sig)
 
 newPatLName :: NameMaker -> Located RdrName -> CpsRn (Located Name)
 newPatLName name_maker rdr_name@(L loc _)
@@ -560,7 +558,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
     rn_fld pun_ok parent (L l (HsRecField { hsRecFieldLbl = L loc (FieldOcc lbl _)
                                           , hsRecFieldArg = arg
                                           , hsRecPun      = pun }))
-      = do { sel <- setSrcSpan loc $ lookupSubBndrOcc True parent doc lbl
+      = do { sel <- setSrcSpan loc $ lookupRecFieldOcc parent doc lbl
            ; arg' <- if pun
                      then do { checkErr pun_ok (badPun (L loc lbl))
                              ; return (L loc (mk_arg loc lbl)) }
@@ -683,7 +681,7 @@ rnHsRecUpdFields flds
                                       Nothing -> do { addErr (unknownSubordinateErr doc lbl)
                                                     ; return (Right []) }
                                       Just r  -> return r }
-                          else fmap Left $ lookupSubBndrOcc True Nothing doc lbl
+                          else fmap Left $ lookupGlobalOccRn lbl
            ; arg' <- if pun
                      then do { checkErr pun_ok (badPun (L loc lbl))
                              ; return (L loc (HsVar (L loc lbl))) }

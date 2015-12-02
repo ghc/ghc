@@ -1,8 +1,8 @@
 
-T9196.hs:4:7:
+T9196.hs:4:7: error:
     Illegal constraint: forall a. Eq a
-    In the type signature for ‘f’: f :: (forall a. Eq a) => a -> a
+    In the type signature: f :: (forall a. Eq a) => a -> a
 
-T9196.hs:7:7:
-    Illegal constraint: Eq a => Ord a
-    In the type signature for ‘g’: g :: (Eq a => Ord a) => a -> a
+T9196.hs:7:7: error:
+    Expected a constraint, but ‘Eq a => Ord a’ has kind ‘*’
+    In the type signature: g :: (Eq a => Ord a) => a -> a

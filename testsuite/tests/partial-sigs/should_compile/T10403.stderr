@@ -1,39 +1,80 @@
 
 T10403.hs:15:7: warning:
-    Found hole ‘_’ with inferred constraints: Functor f
-    In the type signature for:
+    Found constraint wildcard ‘_’ standing for ‘Functor f’
+    In the type signature:
       h1 :: _ => _
 
 T10403.hs:15:12: warning:
-    Found type wildcard ‘_’ standing for ‘(a -> b) -> f a -> H f’
-    Where: ‘b’ is a rigid type variable bound by
+    • Found type wildcard ‘_’ standing for ‘(a -> b) -> f a -> H f’
+      Where: ‘b’ is a rigid type variable bound by
                the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
                at T10403.hs:17:1
-           ‘a’ is a rigid type variable bound by
+             ‘a’ is a rigid type variable bound by
                the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
                at T10403.hs:17:1
-           ‘f’ is a rigid type variable bound by
+             ‘f’ is a rigid type variable bound by
                the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
                at T10403.hs:17:1
-    In the type signature for:
-      h1 :: _ => _
+    • In the type signature:
+        h1 :: _ => _
+    • Relevant bindings include
+        h1 :: (a -> b) -> f a -> H f (bound at T10403.hs:17:1)
 
 T10403.hs:19:7: warning:
-    Found type wildcard ‘_’ standing for ‘(a -> b) -> f a -> H f’
-    Where: ‘b’ is a rigid type variable bound by
-               the inferred type of h2 :: Functor f => (a -> b) -> f a -> H f
-               at T10403.hs:21:1
-           ‘a’ is a rigid type variable bound by
-               the inferred type of h2 :: Functor f => (a -> b) -> f a -> H f
-               at T10403.hs:21:1
-           ‘f’ is a rigid type variable bound by
-               the inferred type of h2 :: Functor f => (a -> b) -> f a -> H f
-               at T10403.hs:21:1
-    In the type signature for:
-      h2 :: _
+    • Found type wildcard ‘_’ standing for ‘(a -> b) -> f0 a -> H f0’
+      Where: ‘b’ is a rigid type variable bound by
+               the inferred type of h2 :: (a -> b) -> f0 a -> H f0
+               at T10403.hs:22:1
+             ‘a’ is a rigid type variable bound by
+               the inferred type of h2 :: (a -> b) -> f0 a -> H f0
+               at T10403.hs:22:1
+             ‘f0’ is an ambiguous type variable
+    • In the type signature:
+        h2 :: _
+    • Relevant bindings include
+        h2 :: (a -> b) -> f0 a -> H f0 (bound at T10403.hs:22:1)
 
-T10403.hs:21:1: warning:
-    No instance for (Functor f)
-    When checking that ‘h2’ has the inferred type
-      h2 :: forall (f :: * -> *) b a. (a -> b) -> f a -> H f
-    Probable cause: the inferred type is ambiguous
+T10403.hs:22:15: warning:
+    • Ambiguous type variable ‘f0’ arising from a use of ‘fmap’
+      prevents the constraint ‘(Functor f0)’ from being solved.
+      Relevant bindings include
+        b :: f0 a (bound at T10403.hs:22:6)
+        h2 :: (a -> b) -> f0 a -> H f0 (bound at T10403.hs:22:1)
+      Probable fix: use a type annotation to specify what ‘f0’ should be.
+      These potential instances exist:
+        instance Functor IO -- Defined in ‘GHC.Base’
+        instance Functor (B t) -- Defined at T10403.hs:10:10
+        instance Functor I -- Defined at T10403.hs:6:10
+        ...plus four others
+        (use -fprint-potential-instances to see them all)
+    • In the second argument of ‘(.)’, namely ‘fmap (const ())’
+      In the expression: H . fmap (const ())
+      In the expression: (H . fmap (const ())) (fmap f b)
+
+T10403.hs:28:8: warning:
+    • Couldn't match type ‘f0’ with ‘B t’
+        because type variable ‘t’ would escape its scope
+      This (rigid, skolem) type variable is bound by
+        the type signature for:
+          app2 :: H (B t)
+        at T10403.hs:27:1-15
+      Expected type: H (B t)
+        Actual type: H f0
+    • In the expression: h2 (H . I) (B ())
+      In an equation for ‘app2’: app2 = h2 (H . I) (B ())
+    • Relevant bindings include
+        app2 :: H (B t) (bound at T10403.hs:28:1)
+
+T10403.hs:28:20: warning:
+    • Couldn't match type ‘f0’ with ‘B t’
+        because type variable ‘t’ would escape its scope
+      This (rigid, skolem) type variable is bound by
+        the type signature for:
+          app2 :: H (B t)
+        at T10403.hs:27:1-15
+      Expected type: f0 ()
+        Actual type: B t ()
+    • In the second argument of ‘h2’, namely ‘(B ())’
+      In the expression: h2 (H . I) (B ())
+    • Relevant bindings include
+        app2 :: H (B t) (bound at T10403.hs:28:1)

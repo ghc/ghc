@@ -37,6 +37,7 @@ expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "UndecidableSuperclasses",    -- Experimental SLPJ 30 Nov 15
                                                            -- not yet added to Cabal
                              "OverloadedLabels",
+                             "TemplateHaskellQuotes",
                              "MonadFailDesugaring"]
 
 expectedCabalOnlyExtensions :: [String]

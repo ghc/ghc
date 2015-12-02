@@ -1,5 +1,6 @@
 
-T7224.hs:6:19:
+T7224.hs:6:19: error:
     Kind variable ‘i’ used as a type
-    In the type ‘a -> m i i a’
+    In the type signature:
+      ret' :: a -> m i i a
     In the class declaration for ‘PMonad'’

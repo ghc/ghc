@@ -26,7 +26,9 @@ import TcRnMonad
 import TcUnify
 import BasicTypes
 import Inst
-import TcBinds
+import TcBinds          ( chooseInferredQuantifiers, tcLocalBinds
+                        , tcUserTypeSig, tcExtendTyVarEnvFromSig )
+import TcSimplify       ( simplifyInfer )
 import FamInst          ( tcGetFamInstEnvs, tcLookupDataFamInst )
 import FamInstEnv       ( FamInstEnvs )
 import RnEnv            ( addUsedGRE, addNameClashErrRn
@@ -211,7 +213,7 @@ tcExpr (HsIPVar x) res_ty
                       ip_ty res_ty }
   where
   -- Coerces a dictionary for `IP "x" t` into `t`.
-  fromDict ipClass x ty = HsWrap $ mkWpCast $ TcCoercion $
+  fromDict ipClass x ty = HsWrap $ mkWpCastR $ TcCoercion $
                           unwrapIP $ mkClassPred ipClass [x,ty]
 
 tcExpr (HsOverLabel l) res_ty  -- See Note [Type-checking overloaded labels]
@@ -228,7 +230,7 @@ tcExpr (HsOverLabel l) res_ty  -- See Note [Type-checking overloaded labels]
        ; tcWrapResult tm alpha res_ty }
   where
   -- Coerces a dictionary for `IsLabel "x" t` into `Proxy# x -> t`.
-  fromDict pred = HsWrap $ mkWpCast $ TcCoercion $ unwrapIP pred
+  fromDict pred = HsWrap $ mkWpCastR $ TcCoercion $ unwrapIP pred
 
 tcExpr (HsLam match) res_ty
   = do  { (co_fn, match') <- tcMatchLambda match res_ty
@@ -242,25 +244,14 @@ tcExpr e@(HsLamCase _ matches) res_ty
                   , ptext (sLit "requires")]
         match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
 
-tcExpr (ExprWithTySig expr sig_ty wcs) res_ty
- = tcWildcardBinders wcs $ \ wc_prs ->
-   do { addErrCtxt (pprSigCtxt ExprSigCtxt empty (ppr sig_ty)) $
-        emitWildcardHoleConstraints wc_prs
-      ; sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
-      ; (gen_fn, expr')
-            <- tcGen ExprSigCtxt sig_tc_ty $ \ skol_tvs res_ty ->
-
-                  -- Remember to extend the lexical type-variable environment
-                  -- See Note [More instantiated than scoped] in TcBinds
-               tcExtendTyVarEnv2
-                  [(n,tv) | (Just n, tv) <- findScopedTyVars sig_ty sig_tc_ty skol_tvs] $
-
-               tcMonoExprNC expr res_ty
-
-      ; let inner_expr = ExprWithTySigOut (mkLHsWrap gen_fn expr') sig_ty
-
-      ; (inst_wrap, rho) <- deeplyInstantiate ExprSigOrigin sig_tc_ty
-      ; tcWrapResult (mkHsWrap inst_wrap inner_expr) rho res_ty }
+tcExpr (ExprWithTySig expr sig_ty) res_ty
+  = do { sig_info <- checkNoErrs $  -- Avoid error cascade
+                     tcUserTypeSig sig_ty Nothing
+       ; (expr', poly_ty) <- tcExprSig expr sig_info
+       ; (inst_wrap, rho) <- deeplyInstantiate ExprSigOrigin poly_ty
+       ; let expr'' = mkHsWrap inst_wrap $
+                      ExprWithTySigOut expr' sig_ty
+       ; tcWrapResult expr'' rho res_ty }
 
 tcExpr (HsType ty) _
   = failWithTc (text "Can't handle type argument:" <+> ppr ty)
@@ -703,7 +694,6 @@ In the outgoing (HsRecordUpd scrut binds cons in_inst_tys out_inst_tys):
 
 Note [Mixed Record Field Updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Consider the following pattern synonym.
 
   data MyRec = MyRec { foo :: Int, qux :: String }
@@ -737,10 +727,12 @@ following.
 
 tcExpr (RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
   = ASSERT( notNull rbnds )
-    do  {
+    do  { -- STEP -2: typecheck the record_expr, the record to bd updated
+          (record_expr', record_tau) <- tcInferFun record_expr
+
         -- STEP -1  See Note [Disambiguating record fields]
         -- After this we know that rbinds is unambiguous
-        rbinds <- disambiguateRecordBinds record_expr rbnds res_ty
+        ; rbinds <- disambiguateRecordBinds record_expr record_tau rbnds res_ty
         ; let upd_flds = map (unLoc . hsRecFieldLbl . unLoc) rbinds
               upd_fld_occs = map (occNameFS . rdrNameOcc . rdrNameAmbiguousFieldOcc) upd_flds
               sel_ids      = map selectorAmbiguousFieldOcc upd_flds
@@ -766,20 +758,22 @@ tcExpr (RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
         -- Figure out the tycon and data cons from the first field name
         ; let   -- It's OK to use the non-tc splitters here (for a selector)
               sel_id : _  = sel_ids
-              mtycon  =
-                case idDetails sel_id of
-                  RecSelId (RecSelData tycon) _ -> Just tycon
-                  _ -> Nothing
-              con_likes  =
-                case idDetails sel_id of
-                  RecSelId (RecSelData tc) _ ->
-                    map RealDataCon (tyConDataCons tc)
-                  RecSelId (RecSelPatSyn ps) _ ->
-                    [PatSynCon ps]
-                  _ -> panic "tcRecordUpd"
+
+              mtycon :: Maybe TyCon
+              mtycon = case idDetails sel_id of
+                          RecSelId (RecSelData tycon) _ -> Just tycon
+                          _ -> Nothing
+
+              con_likes :: [ConLike]
+              con_likes = case idDetails sel_id of
+                             RecSelId (RecSelData tc) _
+                                -> map RealDataCon (tyConDataCons tc)
+                             RecSelId (RecSelPatSyn ps) _
+                                -> [PatSynCon ps]
+                             _  -> panic "tcRecordUpd"
                 -- NB: for a data type family, the tycon is the instance tycon
 
-              relevant_cons   = conLikesWithFields con_likes upd_fld_occs
+              relevant_cons = conLikesWithFields con_likes upd_fld_occs
                 -- A constructor is only relevant to this process if
                 -- it contains *all* the fields that are being updated
                 -- Other ones will cause a runtime error if they occur
@@ -791,12 +785,13 @@ tcExpr (RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
 
         -- Take apart a representative constructor
         ; let con1 = ASSERT( not (null relevant_cons) ) head relevant_cons
-              (con1_tvs, _, _, _prov_theta, req_theta, con1_arg_tys, _) =
-                conLikeFullSig con1
-              con1_flds = map flLabel $ conLikeFieldLabels con1
-              def_res_ty  = conLikeResTy con1
-              con1_res_ty =
-                (maybe def_res_ty mkFamilyTyConApp mtycon) (mkTyVarTys con1_tvs)
+              (con1_tvs, _, _, _prov_theta, req_theta, con1_arg_tys, _)
+                 = conLikeFullSig con1
+              con1_flds   = map flLabel $ conLikeFieldLabels con1
+              con1_tv_tys = mkTyVarTys con1_tvs
+              con1_res_ty = case mtycon of
+                              Just tc -> mkFamilyTyConApp tc con1_tv_tys
+                              Nothing -> conLikeResTy con1 con1_tv_tys
 
         -- Check that we're not dealing with a unidirectional pattern
         -- synonym
@@ -843,22 +838,25 @@ tcExpr (RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
               scrut_ty      = TcType.substTy scrut_subst  con1_res_ty
               con1_arg_tys' = map (TcType.substTy result_subst) con1_arg_tys
 
-        ; co_res <- unifyType rec_res_ty res_ty
+        ; co_res   <- unifyType rec_res_ty res_ty
+        ; co_scrut <- unifyType record_tau scrut_ty
 
         -- STEP 5
-        -- Typecheck the thing to be updated, and the bindings
-        ; record_expr' <- tcMonoExpr record_expr scrut_ty
+        -- Typecheck the bindings
         ; rbinds'      <- tcRecordUpd con1 con1_arg_tys' rbinds
 
         -- STEP 6: Deal with the stupid theta
         ; let theta' = substTheta scrut_subst (conLikeStupidTheta con1)
         ; instStupidTheta RecordUpdOrigin theta'
 
-        -- Step 7: make a cast for the scrutinee, in the case that it's from a type family
-        ; let scrut_co | Just co_con <- tyConFamilyCoercion_maybe =<< mtycon
-                       = mkWpCast (mkTcUnbranchedAxInstCo Representational co_con scrut_inst_tys)
-                       | otherwise
-                       = idHsWrapper
+        -- Step 7: make a cast for the scrutinee, in the
+        --         case that it's from a data family
+        ; let fam_co :: HsWrapper   -- RepT t1 .. tn ~R scrut_ty
+              fam_co | Just tycon <- mtycon
+                     , Just co_con <- tyConFamilyCoercion_maybe tycon
+                     = mkWpCastR (mkTcUnbranchedAxInstCo co_con scrut_inst_tys)
+                     | otherwise
+                     = idHsWrapper
 
         -- Step 8: Check that the req constraints are satisfied
         -- For normal data constructors req_theta is empty but we must do
@@ -868,7 +866,7 @@ tcExpr (RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
 
         -- Phew!
         ; return $ mkHsWrapCo co_res $
-          RecordUpd { rupd_expr = mkLHsWrap scrut_co record_expr'
+          RecordUpd { rupd_expr = mkLHsWrap fam_co (mkLHsWrapCo co_scrut record_expr')
                     , rupd_flds = rbinds'
                     , rupd_cons = relevant_cons, rupd_in_tys = scrut_inst_tys
                     , rupd_out_tys = result_inst_tys, rupd_wrap = req_wrap } }
@@ -1024,7 +1022,7 @@ tcApp (L loc (HsVar (L _ fun))) args res_ty
 -- with type signatures, see Note [Disambiguating record fields]
 tcApp (L loc (HsRecFld (Ambiguous lbl _))) args@(L _ arg:_) res_ty
   | Just sig_ty <- obviousSig arg
-  = do { sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
+  = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
        ; sel_name <- disambiguateSelector lbl sig_tc_ty
        ; tcApp (L loc (HsRecFld (Unambiguous lbl sel_name))) args res_ty }
 
@@ -1152,10 +1150,68 @@ in the other order, the extra signature in f2 is reqd.
 
 ************************************************************************
 *                                                                      *
+                Expressions with a type signature
+                        expr :: type
+*                                                                      *
+********************************************************************* -}
+
+tcExprSig :: LHsExpr Name -> TcIdSigInfo -> TcM (LHsExpr TcId, TcType)
+tcExprSig expr sig@(TISI { sig_bndr  = s_bndr
+                         , sig_skols = skol_prs
+                         , sig_theta = theta
+                         , sig_tau   = tau })
+  | null skol_prs  -- Fast path when there is no quantification at all
+  , null theta
+  , CompleteSig {} <- s_bndr
+  = do { expr' <- tcPolyExprNC expr tau
+       ; return (expr', tau) }
+
+  | CompleteSig poly_id <- s_bndr
+  = do { given <- newEvVars theta
+       ; (ev_binds, expr') <- checkConstraints skol_info skol_tvs given $
+                              tcExtendTyVarEnvFromSig sig $
+                              tcPolyExprNC expr tau
+
+       ; let poly_wrap = mkWpTyLams   skol_tvs
+                         <.> mkWpLams given
+                         <.> mkWpLet  ev_binds
+       ; return (mkLHsWrap poly_wrap expr', idType poly_id) }
+
+  | PartialSig { sig_name = name } <- s_bndr
+  = do { (tclvl, wanted, expr') <- pushLevelAndCaptureConstraints  $
+                                   tcExtendTyVarEnvFromSig sig $
+                                   tcPolyExprNC expr tau
+       ; (qtvs, givens, ev_binds)
+                 <- simplifyInfer tclvl False [sig] [(name, tau)] wanted
+       ; tau <- zonkTcType tau
+       ; let inferred_theta = map evVarPred givens
+             tau_tvs        = tyVarsOfType tau
+       ; (my_tv_set, my_theta) <- chooseInferredQuantifiers inferred_theta tau_tvs (Just sig)
+       ; let my_tvs = filter (`elemVarSet` my_tv_set) qtvs   -- Maintain original order
+             inferred_sigma = mkSigmaTy qtvs   inferred_theta tau
+             my_sigma       = mkSigmaTy my_tvs my_theta       tau
+       ; wrap <- if inferred_sigma `eqType` my_sigma
+                 then return idHsWrapper  -- Fast path; also avoids complaint when we infer
+                                          -- an ambiguouse type and have AllowAmbiguousType
+                                          -- e..g infer  x :: forall a. F a -> Int
+                 else tcSubType_NC ExprSigCtxt inferred_sigma my_sigma
+
+       ; let poly_wrap = wrap
+                         <.> mkWpTyLams qtvs
+                         <.> mkWpLams givens
+                         <.> mkWpLet  ev_binds
+       ; return (mkLHsWrap poly_wrap expr', mkSigmaTy qtvs theta tau) }
+
+  | otherwise = panic "tcExprSig"   -- Can't happen
+  where
+    skol_info = SigSkol ExprSigCtxt (mkPhiTy theta tau)
+    skol_tvs = map snd skol_prs
+
+{- *********************************************************************
+*                                                                      *
                  tcInferId
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 tcCheckId :: Name -> TcRhoType -> TcM (HsExpr TcId)
 tcCheckId name res_ty
@@ -1474,7 +1530,6 @@ getFixedTyVars upd_fld_occs univ_tvs cons
 {-
 Note [Disambiguating record fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 When the -XDuplicateRecordFields extension is used, and the renamer
 encounters a record selector or update that it cannot immediately
 disambiguate (because it involves fields that belong to multiple
@@ -1589,9 +1644,10 @@ ambiguousSelector rdr
 
 -- Disambiguate the fields in a record update.
 -- See Note [Disambiguating record fields]
-disambiguateRecordBinds :: LHsExpr Name -> [LHsRecUpdField Name] -> Type
-                                 -> TcM [LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name)]
-disambiguateRecordBinds record_expr rbnds res_ty
+disambiguateRecordBinds :: LHsExpr Name -> TcType
+                        -> [LHsRecUpdField Name] -> Type
+                        -> TcM [LHsRecField' (AmbiguousFieldOcc Id) (LHsExpr Name)]
+disambiguateRecordBinds record_expr record_tau rbnds res_ty
     -- Are all the fields unambiguous?
   = case mapM isUnambiguous rbnds of
                      -- If so, just skip to looking up the Ids
@@ -1628,18 +1684,20 @@ disambiguateRecordBinds record_expr rbnds res_ty
       = case foldr1 intersect possible_parents of
         -- No parents for all fields: record update is ill-typed
         []  -> failWithTc (noPossibleParents rbnds)
+
         -- Exactly one datatype with all the fields: use that
         [p] -> return p
+
         -- Multiple possible parents: try harder to disambiguate
         -- Can we get a parent TyCon from the pushed-in type?
         _:_ | Just p <- tyConOf fam_inst_envs res_ty -> return (RecSelData p)
+
         -- Does the expression being updated have a type signature?
         -- If so, try to extract a parent TyCon from it
-            | Just sig_ty <- obviousSig (unLoc record_expr)
-            -> do { sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
-                  ; case tyConOf fam_inst_envs sig_tc_ty of
-                      Just p  -> return (RecSelData p)
-                      Nothing -> failWithTc badOverloadedUpdate }
+            | Just {} <- obviousSig (unLoc record_expr)
+            , Just tc <- tyConOf fam_inst_envs record_tau
+            -> return (RecSelData tc)
+
         -- Nothing else we can try...
         _ -> failWithTc badOverloadedUpdate
 
@@ -1704,10 +1762,10 @@ lookupParents rdr
 -- A type signature on the argument of an ambiguous record selector or
 -- the record expression in an update must be "obvious", i.e. the
 -- outermost constructor ignoring parentheses.
-obviousSig :: HsExpr Name -> Maybe (LHsType Name)
-obviousSig (ExprWithTySig _ ty _) = Just ty
-obviousSig (HsPar p)              = obviousSig (unLoc p)
-obviousSig _                      = Nothing
+obviousSig :: HsExpr Name -> Maybe (LHsSigWcType Name)
+obviousSig (ExprWithTySig _ ty) = Just ty
+obviousSig (HsPar p)            = obviousSig (unLoc p)
+obviousSig _                    = Nothing
 
 
 {-

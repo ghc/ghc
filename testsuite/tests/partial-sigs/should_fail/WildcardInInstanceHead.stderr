@@ -1,4 +1,4 @@
 
-WildcardInInstanceHead.hs:7:14:
-    Unexpected wild card: ‘_’
-    In the instance declaration for ‘Foo _’
+WildcardInInstanceHead.hs:7:14: error:
+    Wildcard ‘_’ not allowed
+      in an instance declaration for ‘Foo’

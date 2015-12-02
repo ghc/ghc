@@ -1709,10 +1709,12 @@ implicitClassThings :: Class -> [TyThing]
 implicitClassThings cl
   = -- Does not include default methods, because those Ids may have
     --    their own pragmas, unfoldings etc, not derived from the Class object
+
     -- associated types
     --    No recursive call for the classATs, because they
     --    are only the family decls; they have no implicit things
     map ATyCon (classATs cl) ++
+
     -- superclass and operation selectors
     map AnId (classAllSelIds cl)
 

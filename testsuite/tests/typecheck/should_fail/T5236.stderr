@@ -1,11 +1,14 @@
 
-T5236.hs:13:9:
+T5236.hs:13:9: error:
     Couldn't match type ‘B’ with ‘A’
-    arising from a functional dependency between:
-      constraint ‘Id A B’
-        arising from the type signature for: loop :: Id A B => Bool
-      instance ‘Id B B’ at T5236.hs:11:10-15
-    In the ambiguity check for the type signature for ‘loop’:
-      loop :: Id A B => Bool
+      arising from a functional dependency between:
+        constraint ‘Id A B’
+          arising from the type signature for:
+                         loop :: Id A B => Bool
+        instance ‘Id B B’ at T5236.hs:11:10-15
+    Inaccessible code in
+      the type signature for:
+        loop :: Id A B => Bool
+    In the ambiguity check for ‘loop’
     To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
-    In the type signature for ‘loop’: loop :: Id A B => Bool
+    In the type signature: loop :: Id A B => Bool

@@ -339,7 +339,7 @@ both of them.  So we gather defs/uses from deriving just like anything else.
 data DerivInfo = DerivInfo { di_rep_tc :: TyCon
                              -- ^ The data tycon for normal datatypes,
                              -- or the *representation* tycon for data families
-                           , di_preds  :: [LHsType Name]
+                           , di_preds  :: [LHsSigType Name]
                            , di_ctxt   :: SDoc -- ^ error context
                            }
 
@@ -483,6 +483,7 @@ renameDeriv is_boot inst_infos bagBinds
     do  {
         -- Bring the extra deriving stuff into scope
         -- before renaming the instances themselves
+        ; traceTc "rnd" (vcat (map (\i -> pprInstInfoDetails i $$ text "") inst_infos))
         ; (aux_binds, aux_sigs) <- mapAndUnzipBagM return bagBinds
         ; let aux_val_binds = ValBindsIn aux_binds (bagToList aux_sigs)
         ; rn_aux_lhs <- rnTopBindsLHS emptyFsEnv aux_val_binds
@@ -602,7 +603,7 @@ deriveStandalone (L loc (DerivDecl deriv_ty overlap_mode))
   = setSrcSpan loc                   $
     addErrCtxt (standaloneCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
-       ; (tvs, theta, cls, inst_tys) <- tcHsInstHead TcType.InstDeclCtxt deriv_ty
+       ; (tvs, theta, cls, inst_tys) <- tcHsClsInstType TcType.InstDeclCtxt deriv_ty
        ; traceTc "Standalone deriving;" $ vcat
               [ text "tvs:" <+> ppr tvs
               , text "theta:" <+> ppr theta
@@ -645,12 +646,12 @@ warnUselessTypeable
 ------------------------------------------------------------------
 deriveTyData :: [TyVar] -> TyCon -> [Type]   -- LHS of data or data instance
                                              --   Can be a data instance, hence [Type] args
-             -> LHsType Name                 -- The deriving predicate
+             -> LHsSigType Name              -- The deriving predicate
              -> TcM [EarlyDerivSpec]
 -- The deriving clause of a data or newtype declaration
 -- I.e. not standalone deriving
-deriveTyData tvs tc tc_args (L loc deriv_pred)
-  = setSrcSpan loc     $        -- Use the location of the 'deriving' item
+deriveTyData tvs tc tc_args deriv_pred
+  = setSrcSpan (getLoc (hsSigType deriv_pred)) $  -- Use loc of the 'deriving' item
     do  { (deriv_tvs, cls, cls_tys, cls_arg_kind)
                 <- tcExtendTyVarEnv tvs $
                    tcHsDeriv deriv_pred
@@ -1967,12 +1968,12 @@ genInst comauxs
        ; return ( InstInfo
                     { iSpec   = inst_spec
                     , iBinds  = InstBindings
-                        { ib_binds = gen_Newtype_binds loc clas tvs tys rhs_ty
-                        , ib_tyvars = map Var.varName tvs   -- Scope over bindings
-                        , ib_pragmas = []
+                        { ib_binds      = gen_Newtype_binds loc clas tvs tys rhs_ty
+                        , ib_tyvars     = map Var.varName tvs   -- Scope over bindings
+                        , ib_pragmas    = []
                         , ib_extensions = [ Opt_ImpredicativeTypes
                                           , Opt_RankNTypes ]
-                        , ib_derived = True } }
+                        , ib_derived    = True } }
                 , emptyBag
                 , Just $ getName $ head $ tyConDataCons rep_tycon ) }
               -- See Note [Newtype deriving and unused constructors]
@@ -2145,7 +2146,7 @@ derivingHiddenErr tc
   = hang (ptext (sLit "The data constructors of") <+> quotes (ppr tc) <+> ptext (sLit "are not all in scope"))
        2 (ptext (sLit "so you cannot derive an instance for it"))
 
-standaloneCtxt :: LHsType Name -> SDoc
+standaloneCtxt :: LHsSigType Name -> SDoc
 standaloneCtxt ty = hang (ptext (sLit "In the stand-alone deriving instance for"))
                        2 (quotes (ppr ty))
 

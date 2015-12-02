@@ -173,10 +173,10 @@ dsHsBind dflags
         ; let core_bind = Rec bind_prs
         ; ds_binds <- dsTcEvBinds_s ev_binds
         ; rhs <- dsHsWrapper wrap $  -- Usually the identity
-                            mkLams tyvars $ mkLams dicts $
-                            mkCoreLets ds_binds $
-                            Let core_bind $
-                            Var local
+                 mkLams tyvars $ mkLams dicts $
+                 mkCoreLets ds_binds $
+                 Let core_bind $
+                 Var local
 
         ; (spec_binds, rules) <- dsSpecs rhs prags
 

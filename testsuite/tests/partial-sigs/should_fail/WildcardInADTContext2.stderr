@@ -1,7 +1,7 @@
 
-WildcardInADTContext2.hs:1:53: Warning:
+WildcardInADTContext2.hs:1:53: warning:
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
-WildcardInADTContext2.hs:4:10:
-    Unexpected wild card: ‘_a’
-    In the data type declaration for ‘Foo’
+WildcardInADTContext2.hs:4:10: error:
+    Wildcard ‘_a’ not allowed
+      in the data type declaration for ‘Foo’

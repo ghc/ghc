@@ -1,5 +1,5 @@
 def f(name, opts):
-    opts.extra_hc_opts = '-XTemplateHaskell -package template-haskell'
+    opts.extra_hc_opts = '-XTemplateHaskellQuotes -package template-haskell'
 
 setTestOpts(f)
 

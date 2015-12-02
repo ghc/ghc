@@ -31,6 +31,7 @@ module GHC.ExecutionStack.Internal (
   , invalidateDebugCache
   ) where
 
+import Control.Monad (join)
 import Data.Word
 import Foreign.C.Types
 import Foreign.C.String (peekCString, CString)
@@ -66,11 +67,14 @@ newtype StackTrace = StackTrace (ForeignPtr StackTrace)
 -- | An address
 type Addr = Ptr ()
 
-withSession :: (ForeignPtr Session -> IO a) -> IO a
+withSession :: (ForeignPtr Session -> IO a) -> IO (Maybe a)
 withSession action = do
     ptr <- libdw_pool_take
-    fptr <- newForeignPtr libdw_pool_release ptr
-    action fptr
+    if | nullPtr == ptr -> return Nothing
+       | otherwise      -> do
+           fptr <- newForeignPtr libdw_pool_release ptr
+           ret <- action fptr
+           return $ Just ret
 
 -- | How many stack frames in the given 'StackTrace'
 stackDepth :: StackTrace -> Int
@@ -126,7 +130,7 @@ locationSize :: Int
 locationSize = (#const sizeof(Location))
 
 -- | List the frames of a stack trace.
-stackFrames :: StackTrace -> [Location]
+stackFrames :: StackTrace -> Maybe [Location]
 stackFrames st@(StackTrace fptr) = unsafePerformIO $ withSession $ \sess -> do
     chunks <- chunksList st
     go sess (reverse chunks)
@@ -197,7 +201,7 @@ foreign import ccall unsafe "&backtraceFree"
 
 -- | Get an execution stack.
 collectStackTrace :: IO (Maybe StackTrace)
-collectStackTrace = withSession $ \sess -> do
+collectStackTrace = fmap join $ withSession $ \sess -> do
     st <- withForeignPtr sess libdw_get_backtrace
     if | st == nullPtr -> return Nothing
        | otherwise     -> Just . StackTrace <$> newForeignPtr backtrace_free st

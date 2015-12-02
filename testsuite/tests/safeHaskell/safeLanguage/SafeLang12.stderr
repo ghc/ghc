@@ -1,12 +1,11 @@
 
-SafeLang12.hs:2:14: Warning:
+SafeLang12.hs:2:14: warning:
     -XTemplateHaskell is not allowed in Safe Haskell; ignoring -XTemplateHaskell
 
-SafeLang12_B.hs:2:14: Warning:
+SafeLang12_B.hs:2:14: warning:
     -XTemplateHaskell is not allowed in Safe Haskell; ignoring -XTemplateHaskell
 [1 of 3] Compiling SafeLang12_B     ( SafeLang12_B.hs, SafeLang12_B.o )
 
-SafeLang12_B.hs:14:67:
-    Syntax error on ''Class
-    Perhaps you intended to use TemplateHaskell
-    In the Template Haskell quotation ''Class
+SafeLang12_B.hs:5:1: error:
+    Language.Haskell.TH: Can't be safely imported!
+    The module itself isn't safe.

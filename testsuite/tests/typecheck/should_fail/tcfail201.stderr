@@ -1,15 +1,16 @@
 
 tcfail201.hs:17:58: error:
-    Couldn't match expected type ‘a’ with actual type ‘HsDoc id0’
+    • Couldn't match expected type ‘a’ with actual type ‘HsDoc id0’
       ‘a’ is a rigid type variable bound by
-          the type signature for:
-          gfoldl' :: (forall a1 b. c (a1 -> b) -> a1 -> c b)
+        the type signature for:
+          gfoldl' :: forall a (c :: * -> *).
+                     (forall a1 b. c (a1 -> b) -> a1 -> c b)
                      -> (forall g. g -> c g) -> a -> c a
-          at tcfail201.hs:15:12
-    In the first argument of ‘z’, namely ‘DocEmpty’
-    In the expression: z DocEmpty
-    Relevant bindings include
-      hsDoc :: a (bound at tcfail201.hs:16:13)
-      gfoldl' :: (forall a1 b. c (a1 -> b) -> a1 -> c b)
-                 -> (forall g. g -> c g) -> a -> c a
-        (bound at tcfail201.hs:16:1)
+        at tcfail201.hs:15:12
+    • In the first argument of ‘z’, namely ‘DocEmpty’
+      In the expression: z DocEmpty
+    • Relevant bindings include
+        hsDoc :: a (bound at tcfail201.hs:16:13)
+        gfoldl' :: (forall a1 b. c (a1 -> b) -> a1 -> c b)
+                   -> (forall g. g -> c g) -> a -> c a
+          (bound at tcfail201.hs:16:1)

@@ -9,7 +9,7 @@ The @Inst@ type: dictionaries or method instances
 {-# LANGUAGE CPP #-}
 
 module Inst (
-       deeplySkolemise, deeplyInstantiate, 
+       deeplySkolemise, deeplyInstantiate,
        instCall, instDFunType, instStupidTheta,
        newWanted, newWanteds,
        emitWanted, emitWanteds,
@@ -25,6 +25,7 @@ module Inst (
        -- Simple functions over evidence variables
        tyVarsOfWC, tyVarsOfBag,
        tyVarsOfCt, tyVarsOfCts,
+       tyVarsOfCtList, tyVarsOfCtsList,
     ) where
 
 #include "HsVersions.h"
@@ -60,6 +61,7 @@ import Util
 import Outputable
 import Control.Monad( unless )
 import Data.Maybe( isJust )
+import FV
 
 {-
 ************************************************************************
@@ -623,16 +625,43 @@ addClsInstsErr herald ispecs
 -}
 
 ---------------- Getting free tyvars -------------------------
-tyVarsOfCt :: Ct -> TcTyVarSet
-tyVarsOfCt (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })     = extendVarSet (tyVarsOfType xi) tv
-tyVarsOfCt (CFunEqCan { cc_tyargs = tys, cc_fsk = fsk }) = extendVarSet (tyVarsOfTypes tys) fsk
-tyVarsOfCt (CDictCan { cc_tyargs = tys })                = tyVarsOfTypes tys
-tyVarsOfCt (CIrredEvCan { cc_ev = ev })                  = tyVarsOfType (ctEvPred ev)
-tyVarsOfCt (CHoleCan { cc_ev = ev })                     = tyVarsOfType (ctEvPred ev)
-tyVarsOfCt (CNonCanonical { cc_ev = ev })                = tyVarsOfType (ctEvPred ev)
 
+-- | Returns free variables of constraints as a non-deterministic set
+tyVarsOfCt :: Ct -> TcTyVarSet
+tyVarsOfCt = runFVSet . tyVarsOfCtAcc
+
+-- | Returns free variables of constraints as a deterministically ordered.
+-- list. See Note [Deterministic FV] in FV.
+tyVarsOfCtList :: Ct -> [TcTyVar]
+tyVarsOfCtList = runFVList . tyVarsOfCtAcc
+
+-- | Returns free variables of constraints as a composable FV computation.
+-- See Note [Deterministic FV] in FV.
+tyVarsOfCtAcc :: Ct -> FV
+tyVarsOfCtAcc (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })
+  = tyVarsOfTypeAcc xi `unionFV` oneVar tv
+tyVarsOfCtAcc (CFunEqCan { cc_tyargs = tys, cc_fsk = fsk })
+  = tyVarsOfTypesAcc tys `unionFV` oneVar fsk
+tyVarsOfCtAcc (CDictCan { cc_tyargs = tys }) = tyVarsOfTypesAcc tys
+tyVarsOfCtAcc (CIrredEvCan { cc_ev = ev }) = tyVarsOfTypeAcc (ctEvPred ev)
+tyVarsOfCtAcc (CHoleCan { cc_ev = ev }) = tyVarsOfTypeAcc (ctEvPred ev)
+tyVarsOfCtAcc (CNonCanonical { cc_ev = ev }) = tyVarsOfTypeAcc (ctEvPred ev)
+
+-- | Returns free variables of a bag of constraints as a non-deterministic
+-- set. See Note [Deterministic FV] in FV.
 tyVarsOfCts :: Cts -> TcTyVarSet
-tyVarsOfCts = foldrBag (unionVarSet . tyVarsOfCt) emptyVarSet
+tyVarsOfCts = runFVSet . tyVarsOfCtsAcc
+
+-- | Returns free variables of a bag of constraints as a deterministically
+-- odered list. See Note [Deterministic FV] in FV.
+tyVarsOfCtsList :: Cts -> [TcTyVar]
+tyVarsOfCtsList = runFVList . tyVarsOfCtsAcc
+
+-- | Returns free variables of a bag of constraints as a composable FV
+-- computation. See Note [Deterministic FV] in FV.
+tyVarsOfCtsAcc :: Cts -> FV
+tyVarsOfCtsAcc = foldrBag (unionFV . tyVarsOfCtAcc) noVars
+
 
 tyVarsOfWC :: WantedConstraints -> TyVarSet
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems

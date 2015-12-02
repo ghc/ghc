@@ -36,14 +36,15 @@ module GHC.ExecutionStack (
   , showStackTrace
   ) where
 
+import Control.Monad (join)
 import GHC.ExecutionStack.Internal
 
 -- | Get a trace of the current execution stack state.
 --
 -- Returns @Nothing@ if stack trace support isn't available on host machine.
 getStackTrace :: IO (Maybe [Location])
-getStackTrace = fmap stackFrames `fmap` collectStackTrace
+getStackTrace = (join . fmap stackFrames) `fmap` collectStackTrace
 
 -- | Get a string representation of the current execution stack state.
 showStackTrace :: IO (Maybe String)
-showStackTrace = fmap (flip showStackFrames "") `fmap` getStackTrace
+showStackTrace = fmap (\st -> showStackFrames st "") `fmap` getStackTrace

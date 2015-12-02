@@ -211,7 +211,7 @@ newtype Alt f a = Alt {getAlt :: f a}
   deriving (Generic, Generic1, Read, Show, Eq, Ord, Num, Enum,
             Monad, MonadPlus, Applicative, Alternative, Functor)
 
-instance forall f a . Alternative f => Monoid (Alt f a) where
+instance Alternative f => Monoid (Alt f a) where
         mempty = Alt empty
         mappend = coerce ((<|>) :: f a -> f a -> f a)
 
