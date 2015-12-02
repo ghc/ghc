@@ -222,7 +222,11 @@ mkIface_ hsc_env maybe_old_fingerprint
                    nameIsLocalOrFrom this_mod name  ]
                       -- Sigh: see Note [Root-main Id] in TcRnDriver
 
-        fixities    = [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
+        fixities    = sortBy (comparing fst)
+          [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
+          -- The order of fixities returned from nameEnvElts is not
+          -- deterministic, so we sort by OccName to canonicalize it.
+          -- See Note [Deterministic UniqFM] in UniqDFM for more details.
         warns       = src_warns
         iface_rules = map coreRuleToIfaceRule rules
         iface_insts = map instanceToIfaceInst $ fixSafeInstances safe_mode insts
