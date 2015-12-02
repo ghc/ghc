@@ -540,8 +540,12 @@ isIrrefutableHsPat :: OutputableBndr id => LPat id -> Bool
 --      (NB: this is not quite the same as the (silly) defn
 --      in 3.17.2 of the Haskell 98 report.)
 --
--- isIrrefutableHsPat returns False if it's in doubt; specifically
--- on a ConPatIn it doesn't know the size of the constructor family
+-- WARNING: isIrrefutableHsPat returns False if it's in doubt.
+-- Specifically on a ConPatIn, which is what it sees for a
+-- (LPat Name) in the renamer, it doesn't know the size of the
+-- constructor family, so it returns False.  Result: only
+-- tuple patterns are considered irrefuable at the renamer stage.
+--
 -- But if it returns True, the pattern is definitely irrefutable
 isIrrefutableHsPat pat
   = go pat

@@ -1437,6 +1437,11 @@ ado _ctxt []        tail _ = return (tail, emptyNameSet)
 -- the bind form, which would give rise to a Monad constraint.
 ado ctxt [(L _ (BindStmt pat rhs _ _),_)] tail _
   | isIrrefutableHsPat pat, (False,tail') <- needJoin tail
+    -- WARNING: isIrrefutableHsPat on (HsPat Name) doesn't have enough info
+    --          to know which types have only one constructor.  So only
+    --          tuples come out as irrefutable; other single-constructor
+    --          types, and newtypes, will not.  See the code for
+    --          isIrrefuatableHsPat
   = mkApplicativeStmt ctxt [ApplicativeArgOne pat rhs] False tail'
 
 ado _ctxt [(one,_)] tail _ = return (one:tail, emptyNameSet)
