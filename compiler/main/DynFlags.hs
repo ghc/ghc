@@ -113,10 +113,6 @@ module DynFlags (
         -- ** DynFlags C compiler options
         picCCOpts, picPOpts,
 
-        -- * Configuration of the stg-to-stg passes
-        StgToDo(..),
-        getStgToDo,
-
         -- * Compiler configuration suitable for display to the user
         compilerInfo,
 
@@ -2027,28 +2023,6 @@ updOptLevel n dfs
 
    extra_gopts  = [ f | (ns,f) <- optLevelFlags, final_n `elem` ns ]
    remove_gopts = [ f | (ns,f) <- optLevelFlags, final_n `notElem` ns ]
-
--- -----------------------------------------------------------------------------
--- StgToDo:  abstraction of stg-to-stg passes to run.
-
-data StgToDo
-  = StgDoMassageForProfiling  -- should be (next to) last
-  -- There's also setStgVarInfo, but its absolute "lastness"
-  -- is so critical that it is hardwired in (no flag).
-  | D_stg_stats
-
-getStgToDo :: DynFlags -> [StgToDo]
-getStgToDo dflags
-  = todo2
-  where
-        stg_stats = gopt Opt_StgStats dflags
-
-        todo1 = if stg_stats then [D_stg_stats] else []
-
-        todo2 | WayProf `elem` ways dflags
-              = StgDoMassageForProfiling : todo1
-              | otherwise
-              = todo1
 
 {- **********************************************************************
 %*                                                                      *

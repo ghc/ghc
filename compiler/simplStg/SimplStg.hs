@@ -87,3 +87,25 @@ stg2stg dflags module_name binds
             --         UniqueSupply for the next guy to use
             --         cost-centres to be declared/registered (specialised)
             --         add to description of what's happened (reverse order)
+
+-- -----------------------------------------------------------------------------
+-- StgToDo:  abstraction of stg-to-stg passes to run.
+
+-- | Optional Stg-to-Stg passes.
+data StgToDo
+  = StgDoMassageForProfiling  -- should be (next to) last
+  | D_stg_stats
+
+-- | Which optional Stg-to-Stg passes to run. Depends on flags, ways etc.
+getStgToDo :: DynFlags -> [StgToDo]
+getStgToDo dflags
+  = todo2
+  where
+        stg_stats = gopt Opt_StgStats dflags
+
+        todo1 = if stg_stats then [D_stg_stats] else []
+
+        todo2 | WayProf `elem` ways dflags
+              = StgDoMassageForProfiling : todo1
+              | otherwise
+              = todo1
