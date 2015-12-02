@@ -164,7 +164,6 @@ unariseAlt us rho (con, xs, uses, e)
 unariseSRT :: UnariseEnv -> SRT -> SRT
 unariseSRT _   NoSRT            = NoSRT
 unariseSRT rho (SRTEntries ids) = SRTEntries (concatMapVarSet (unariseId rho) ids)
-unariseSRT _   (SRT {})         = panic "unariseSRT"
 
 unariseLives :: UnariseEnv -> StgLiveVars -> StgLiveVars
 unariseLives rho ids = concatMapVarSet (unariseId rho) ids
