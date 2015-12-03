@@ -1,0 +1,11 @@
+
+T11016.hs:5:19: warning:
+    Found constraint wildcard ‘_’ standing for ‘()’
+    In the type signature:
+      f1 :: (?x :: Int, _) => Int
+
+T11016.hs:8:22: warning:
+    • Found type wildcard ‘_’ standing for ‘Int’
+    • In the type signature:
+        f2 :: (?x :: Int) => _
+    • Relevant bindings include f2 :: Int (bound at T11016.hs:9:1)
