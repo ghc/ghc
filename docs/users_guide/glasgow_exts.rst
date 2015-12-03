@@ -9772,6 +9772,8 @@ The syntax for a declaration splice uses "``$``" not "``splice``". The type of
 the enclosed expression must be ``Q [Dec]``, not ``[Q Dec]``. Typed expression
 splices and quotations are supported.)
 
+.. _th-usage:
+
 Using Template Haskell
 ----------------------
 
