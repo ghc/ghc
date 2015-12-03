@@ -806,7 +806,7 @@ data DynFlags = DynFlags {
   -- Names of files which were generated from -ddump-to-file; used to
   -- track which ones we need to truncate because it's our first run
   -- through
-  generatedDumps        :: IORef (Map FilePath Handle),
+  generatedDumps        :: IORef (Set FilePath),
 
   -- hsc dynamic flags
   dumpFlags             :: IntSet,
@@ -1386,7 +1386,7 @@ initDynFlags dflags = do
  refFilesToClean <- newIORef []
  refDirsToClean <- newIORef Map.empty
  refFilesToNotIntermediateClean <- newIORef []
- refGeneratedDumps <- newIORef Map.empty
+ refGeneratedDumps <- newIORef Set.empty
  refRtldInfo <- newIORef Nothing
  refRtccInfo <- newIORef Nothing
  wrapperNum <- newIORef emptyModuleEnv
