@@ -150,7 +150,7 @@ dsUnliftedBind (FunBind { fun_id = L _ fun
                         , fun_tick = tick }) body
                -- Can't be a bang pattern (that looks like a PatBind)
                -- so must be simply unboxed
-  = do { (args, rhs) <- matchWrapper (FunRhs (idName fun)) matches
+  = do { (args, rhs) <- matchWrapper (FunRhs (idName fun)) Nothing matches
        ; MASSERT( null args ) -- Functions aren't lifted
        ; MASSERT( isIdHsWrapper co_fn )
        ; let rhs' = mkOptTickBox tick rhs
@@ -215,11 +215,11 @@ dsExpr (NegApp expr neg_expr)
   = App <$> dsExpr neg_expr <*> dsLExpr expr
 
 dsExpr (HsLam a_Match)
-  = uncurry mkLams <$> matchWrapper LambdaExpr a_Match
+  = uncurry mkLams <$> matchWrapper LambdaExpr Nothing a_Match
 
 dsExpr (HsLamCase arg matches)
   = do { arg_var <- newSysLocalDs arg
-       ; ([discrim_var], matching_code) <- matchWrapper CaseAlt matches
+       ; ([discrim_var], matching_code) <- matchWrapper CaseAlt Nothing matches
        ; return $ Lam arg_var $ bindNonRec discrim_var (Var arg_var) matching_code }
 
 dsExpr e@(HsApp fun arg)
@@ -319,7 +319,7 @@ dsExpr (HsCoreAnn _ _ expr)
 
 dsExpr (HsCase discrim matches)
   = do { core_discrim <- dsLExpr discrim
-       ; ([discrim_var], matching_code) <- matchWrapper CaseAlt matches
+       ; ([discrim_var], matching_code) <- matchWrapper CaseAlt (Just discrim) matches
        ; return (bindNonRec discrim_var core_discrim matching_code) }
 
 -- Pepe: The binds are in scope in the body but NOT in the binding group
@@ -576,11 +576,11 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
         -- constructor aguments.
         ; alts <- mapM (mk_alt upd_fld_env) cons_to_upd
         ; ([discrim_var], matching_code)
-                <- matchWrapper RecUpd (MG { mg_alts = noLoc alts
-                                           , mg_arg_tys = [in_ty]
-                                           , mg_res_ty = out_ty, mg_origin = FromSource })
-                                           -- FromSource is not strictly right, but we
-                                           -- want incomplete pattern-match warnings
+                <- matchWrapper RecUpd Nothing (MG { mg_alts = noLoc alts
+                                                   , mg_arg_tys = [in_ty]
+                                                   , mg_res_ty = out_ty, mg_origin = FromSource })
+                                                   -- FromSource is not strictly right, but we
+                                                   -- want incomplete pattern-match warnings
 
         ; return (add_field_binds field_binds' $
                   bindNonRec discrim_var record_expr' matching_code) }

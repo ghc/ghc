@@ -1,4 +1,8 @@
 
+T7294.hs:23:1: warning:
+    Pattern match(es) are redundant
+    In an equation for ‘nth’: nth Nil _ = ...
+
 T7294.hs:25:5: Warning:
     Couldn't match type ‘'True’ with ‘'False’
     Inaccessible code in

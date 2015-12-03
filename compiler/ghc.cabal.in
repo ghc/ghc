@@ -266,6 +266,8 @@ Library
         CoreStats
         MkCore
         PprCore
+        PmExpr
+        TmOracle
         Check
         Coverage
         Desugar

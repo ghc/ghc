@@ -22,7 +22,7 @@ module HsPat (
         HsRecFields(..), HsRecField'(..), LHsRecField',
         HsRecField, LHsRecField,
         HsRecUpdField, LHsRecUpdField,
-        hsRecFields, hsRecFieldSel, hsRecFieldId,
+        hsRecFields, hsRecFieldSel, hsRecFieldId, hsRecFieldsArgs,
         hsRecUpdFieldId, hsRecUpdFieldOcc, hsRecUpdFieldRdr,
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
@@ -31,6 +31,8 @@ module HsPat (
         isUnliftedLPat, isBangedLPat, isBangedPatBind,
         hsPatNeedsParens,
         isIrrefutableHsPat,
+
+        collectEvVarsPats,
 
         pprParendLPat, pprConArgs
     ) where
@@ -56,6 +58,7 @@ import Outputable
 import Type
 import SrcLoc
 import FastString
+import Bag -- collect ev vars from pats
 import Maybes
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
@@ -334,6 +337,10 @@ data HsRecField' id arg = HsRecField {
 hsRecFields :: HsRecFields id arg -> [PostRn id id]
 hsRecFields rbinds = map (unLoc . hsRecFieldSel . unLoc) (rec_flds rbinds)
 
+-- Probably won't typecheck at once, things have changed :/
+hsRecFieldsArgs :: HsRecFields id arg -> [arg]
+hsRecFieldsArgs rbinds = map (hsRecFieldArg . unLoc) (rec_flds rbinds)
+
 hsRecFieldSel :: HsRecField name arg -> Located (PostRn name name)
 hsRecFieldSel = fmap selectorFieldOcc . hsRecFieldLbl
 
@@ -610,3 +617,35 @@ conPatNeedsParens :: HsConDetails a b -> Bool
 conPatNeedsParens (PrefixCon args) = not (null args)
 conPatNeedsParens (InfixCon {})    = True
 conPatNeedsParens (RecCon {})      = True
+
+{-
+% Collect all EvVars from all constructor patterns
+-}
+
+-- May need to add more cases
+collectEvVarsPats :: [Pat id] -> Bag EvVar
+collectEvVarsPats = unionManyBags . map collectEvVarsPat
+
+collectEvVarsLPat :: LPat id -> Bag EvVar
+collectEvVarsLPat (L _ pat) = collectEvVarsPat pat
+
+collectEvVarsPat :: Pat id -> Bag EvVar
+collectEvVarsPat pat =
+  case pat of
+    LazyPat  p        -> collectEvVarsLPat p
+    AsPat _  p        -> collectEvVarsLPat p
+    ParPat   p        -> collectEvVarsLPat p
+    BangPat  p        -> collectEvVarsLPat p
+    ListPat  ps _ _   -> unionManyBags $ map collectEvVarsLPat ps
+    TuplePat ps _ _   -> unionManyBags $ map collectEvVarsLPat ps
+    PArrPat  ps _     -> unionManyBags $ map collectEvVarsLPat ps
+    ConPatOut {pat_dicts = dicts, pat_args  = args}
+                      -> unionBags (listToBag dicts)
+                                   $ unionManyBags
+                                   $ map collectEvVarsLPat
+                                   $ hsConPatArgs args
+    SigPatOut p _     -> collectEvVarsLPat p
+    CoPat _ p _       -> collectEvVarsPat  p
+    ConPatIn _  _     -> panic "foldMapPatBag: ConPatIn"
+    SigPatIn _ _      -> panic "foldMapPatBag: SigPatIn"
+    _other_pat        -> emptyBag

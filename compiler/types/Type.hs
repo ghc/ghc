@@ -30,7 +30,7 @@ module Type (
         mkTyConApp, mkTyConTy,
         tyConAppTyCon_maybe, tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
         splitTyConApp_maybe, splitTyConApp, tyConAppArgN, nextRole,
-        splitTyConArgs,
+        splitTyConArgs, splitListTyConApp_maybe,
 
         mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys,
         mkPiKinds, mkPiType, mkPiTypes,
@@ -126,7 +126,7 @@ module Type (
         -- ** Performing substitution on types and kinds
         substTy, substTys, substTyWith, substTysWith, substTheta,
         substTyVar, substTyVars, substTyVarBndr,
-        cloneTyVarBndr, deShadowTy, lookupTyVar,
+        cloneTyVarBndr, cloneTyVarBndrs, deShadowTy, lookupTyVar,
         substKiWith, substKisWith,
 
         -- * Pretty-printing
@@ -164,7 +164,7 @@ import NameEnv
 import Class
 import TyCon
 import TysPrim
-import {-# SOURCE #-} TysWiredIn ( eqTyCon, coercibleTyCon, typeNatKind, typeSymbolKind )
+import {-# SOURCE #-} TysWiredIn ( eqTyCon, listTyCon, coercibleTyCon, typeNatKind, typeSymbolKind )
 import PrelNames ( eqTyConKey, coercibleTyConKey,
                    ipTyConKey, openTypeKindTyConKey,
                    constraintKindTyConKey, liftedTypeKindTyConKey,
@@ -178,6 +178,7 @@ import CoAxiom
 
 -- others
 import Unique           ( Unique, hasKey )
+import UniqSupply       ( UniqSupply, takeUniqFromSupply )
 import BasicTypes       ( Arity, RepArity )
 import Util
 import ListSetOps       ( getNth )
@@ -627,6 +628,13 @@ splitTyConApp_maybe ty | Just ty' <- coreView ty = splitTyConApp_maybe ty'
 splitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 splitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
 splitTyConApp_maybe _                 = Nothing
+
+-- | Attempts to tease a list type apart and gives the type of the elements if
+-- successful (looks through type synonyms)
+splitListTyConApp_maybe :: Type -> Maybe Type
+splitListTyConApp_maybe ty = case splitTyConApp_maybe ty of
+  Just (tc,[e]) | tc == listTyCon -> Just e
+  _other                          -> Nothing
 
 -- | What is the role assigned to the next parameter of this type? Usually,
 -- this will be 'Nominal', but if the type is a 'TyConApp', we may be able to
@@ -1715,6 +1723,14 @@ cloneTyVarBndr (TvSubst in_scope tv_env) tv uniq
   where
     tv' = setVarUnique tv uniq  -- Simply set the unique; the kind
                                 -- has no type variables to worry about
+
+cloneTyVarBndrs :: TvSubst -> [TyVar] -> UniqSupply -> (TvSubst, [TyVar])
+cloneTyVarBndrs subst []     _usupply = (subst, [])
+cloneTyVarBndrs subst (t:ts)  usupply = (subst'', tv:tvs)
+  where
+    (uniq, usupply') = takeUniqFromSupply usupply
+    (subst' , tv )   = cloneTyVarBndr subst t uniq
+    (subst'', tvs)   = cloneTyVarBndrs subst' ts usupply'
 
 {-
 ----------------------------------------------------

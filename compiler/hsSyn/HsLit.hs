@@ -174,3 +174,25 @@ instance Outputable OverLitVal where
   ppr (HsIntegral _ i)   = integer i
   ppr (HsFractional f)   = ppr f
   ppr (HsIsString _ s)   = pprHsString s
+
+-- | pmPprHsLit pretty prints literals and is used when pretty printing pattern
+-- match warnings. All are printed the same (i.e., without hashes if they are
+-- primitive and not wrapped in constructors if they are boxed). This happens
+-- mainly for too reasons:
+--  * We do not want to expose their internal representation
+--  * The warnings become too messy
+pmPprHsLit :: HsLit -> SDoc
+pmPprHsLit (HsChar _ c)       = pprHsChar c
+pmPprHsLit (HsCharPrim _ c)   = pprHsChar c
+pmPprHsLit (HsString _ s)     = pprHsString s
+pmPprHsLit (HsStringPrim _ s) = pprHsBytes s
+pmPprHsLit (HsInt _ i)        = integer i
+pmPprHsLit (HsIntPrim _ i)    = integer i
+pmPprHsLit (HsWordPrim _ w)   = integer w
+pmPprHsLit (HsInt64Prim _ i)  = integer i
+pmPprHsLit (HsWord64Prim _ w) = integer w
+pmPprHsLit (HsInteger _ i _)  = integer i
+pmPprHsLit (HsRat f _)        = ppr f
+pmPprHsLit (HsFloatPrim f)    = ppr f
+pmPprHsLit (HsDoublePrim d)   = ppr d
+

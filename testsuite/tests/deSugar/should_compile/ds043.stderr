@@ -1,4 +1,4 @@
 
-ds043.hs:8:2:
-    Warning: Pattern match(es) are overlapped
-	     In a case alternative: B {e = True, f = False} -> ...
+ds043.hs:8:2: warning:
+    Pattern match(es) are redundant
+    In a case alternative: B {e = True, f = False} -> ...

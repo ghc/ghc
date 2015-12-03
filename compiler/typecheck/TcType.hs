@@ -148,6 +148,12 @@ module TcType (
   tyVarsOfTypeDSet, tyVarsOfTypesDSet, closeOverKindsDSet,
   tcTyVarsOfType, tcTyVarsOfTypes,
 
+  --------------------------------
+  -- Transforming Types to TcTypes
+  toTcType,    -- :: Type -> TcType
+  toTcTyVar,   -- :: TyVar -> TcTyVar
+  toTcTypeBag, -- :: Bag EvVar -> Bag EvVar
+
   pprKind, pprParendKind, pprSigmaType,
   pprType, pprParendType, pprTypeApp, pprTyThingCategory,
   pprTheta, pprThetaArrowTy, pprClassPred,
@@ -181,6 +187,7 @@ import PrelNames
 import TysWiredIn
 import BasicTypes
 import Util
+import Bag
 import Maybes
 import ListSetOps
 import Outputable
@@ -1541,6 +1548,41 @@ isRigidEqPred tc_lvl (EqPred NomEq ty1 _)
   = True
 
 isRigidEqPred _ _ = False  -- Not an equality
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Transformation of Types to TcTypes}
+*                                                                      *
+************************************************************************
+-}
+
+toTcType :: Type -> TcType
+toTcType ty = to_tc_type emptyVarSet ty
+   where
+    to_tc_type :: VarSet -> Type -> TcType
+    -- The constraint solver expects EvVars to have TcType, in which the
+    -- free type variables are TcTyVars. So we convert from Type to TcType here
+    -- A bit tiresome; but one day I expect the two types to be entirely separate
+    -- in which case we'll definitely need to do this
+    to_tc_type forall_tvs (TyVarTy tv)
+      | Just var <- lookupVarSet forall_tvs tv = TyVarTy var
+      | otherwise = TyVarTy (toTcTyVar tv)
+    to_tc_type  ftvs (FunTy t1 t2)     = FunTy (to_tc_type ftvs t1) (to_tc_type ftvs t2)
+    to_tc_type  ftvs (AppTy t1 t2)     = AppTy (to_tc_type ftvs t1) (to_tc_type ftvs t2)
+    to_tc_type  ftvs (TyConApp tc tys) = TyConApp tc (map (to_tc_type ftvs) tys)
+    to_tc_type  ftvs (ForAllTy tv ty)  = let tv' = toTcTyVar tv
+                                         in ForAllTy tv' (to_tc_type (ftvs `extendVarSet` tv') ty)
+    to_tc_type _ftvs (LitTy l)         = LitTy l
+
+toTcTyVar :: TyVar -> TcTyVar
+toTcTyVar tv
+  | isTcTyVar tv = setVarType tv (toTcType (tyVarKind tv))
+  | isId tv      = pprPanic "toTcTyVar: Id:" (ppr tv)
+  | otherwise    = mkTcTyVar (tyVarName tv) (toTcType (tyVarKind tv)) vanillaSkolemTv
+
+toTcTypeBag :: Bag EvVar -> Bag EvVar -- All TyVars are transformed to TcTyVars
+toTcTypeBag evvars = mapBag (\tv -> setTyVarKind tv (toTcType (tyVarKind tv))) evvars
 
 {-
 ************************************************************************

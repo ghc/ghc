@@ -1,0 +1,8 @@
+
+T5490.hs:245:15: warning:
+    Pattern match(es) are redundant
+    In a case alternative: HDropZero -> ...
+
+T5490.hs:288:3: warning:
+    Pattern match(es) are redundant
+    In a case alternative: _ -> ...

@@ -16,7 +16,6 @@ instance (Eq a) => Eq (TypeWitness a) where
   (==) TWBool    TWBool    = True
   (==) TWFloat   TWFloat   = True
   (==) TWDouble  TWDouble  = True
-  (==) _         _         = False
 
 data TernOp a b c d where
   OpIf       ::                   TypeWitness a                    ->    TernOp Bool   a      a      a

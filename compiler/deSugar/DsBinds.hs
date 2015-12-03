@@ -130,7 +130,7 @@ dsHsBind dflags
 dsHsBind dflags
          (FunBind { fun_id = L _ fun, fun_matches = matches
                   , fun_co_fn = co_fn, fun_tick = tick })
- = do   { (args, body) <- matchWrapper (FunRhs (idName fun)) matches
+ = do   { (args, body) <- matchWrapper (FunRhs (idName fun)) Nothing matches
         ; let body' = mkOptTickBox tick body
         ; rhs <- dsHsWrapper co_fn (mkLams args body')
         ; let core_binds@(id,_) = makeCorePair dflags fun False 0 rhs
@@ -169,7 +169,9 @@ dsHsBind dflags
         , abe_mono = local, abe_prags = prags } <- export
   , not (xopt Opt_Strict dflags)                 -- handle strict binds
   , not (anyBag (isBangedPatBind . unLoc) binds) -- in the next case
-  = do  { (_, bind_prs) <- ds_lhs_binds binds
+  = -- push type constraints deeper for pattern match check
+    addDictsDs (toTcTypeBag (listToBag dicts)) $
+     do { (_, bind_prs) <- ds_lhs_binds binds
         ; let core_bind = Rec bind_prs
         ; ds_binds <- dsTcEvBinds_s ev_binds
         ; rhs <- dsHsWrapper wrap $  -- Usually the identity
@@ -191,7 +193,9 @@ dsHsBind dflags
                    , abs_exports = exports, abs_ev_binds = ev_binds
                    , abs_binds = binds })
          -- See Note [Desugaring AbsBinds]
-  = do  { (local_force_vars, bind_prs) <- ds_lhs_binds binds
+  = -- push type constraints deeper for pattern match check
+    addDictsDs (toTcTypeBag (listToBag dicts)) $
+     do { (local_force_vars, bind_prs) <- ds_lhs_binds binds
         ; let core_bind = Rec [ makeCorePair dflags (add_inline lcl_id) False 0 rhs
                               | (lcl_id, rhs) <- bind_prs ]
                 -- Monomorphic recursion possible, hence Rec

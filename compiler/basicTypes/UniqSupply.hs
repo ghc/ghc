@@ -15,13 +15,15 @@ module UniqSupply (
 
         mkSplitUniqSupply,
         splitUniqSupply, listSplitUniqSupply,
+        splitUniqSupply3, splitUniqSupply4,
 
         -- * Unique supply monad and its abstraction
-        UniqSM, MonadUnique(..),
+        UniqSM, MonadUnique(..), liftUs,
 
         -- ** Operations on the monad
         initUs, initUs_,
         lazyThenUs, lazyMapUs,
+        getUniqueSupplyM3,
 
         -- * Set supply strategy
         initUniqSupply
@@ -96,6 +98,22 @@ listSplitUniqSupply  (MkSplitUniqSupply _ s1 s2) = s1 : listSplitUniqSupply s2
 uniqFromSupply  (MkSplitUniqSupply n _ _)  = mkUniqueGrimily n
 uniqsFromSupply (MkSplitUniqSupply n _ s2) = mkUniqueGrimily n : uniqsFromSupply s2
 takeUniqFromSupply (MkSplitUniqSupply n s1 _) = (mkUniqueGrimily n, s1)
+
+-- | Build three 'UniqSupply' from a single one,
+-- each of which can supply its own unique
+splitUniqSupply3 :: UniqSupply -> (UniqSupply, UniqSupply, UniqSupply)
+splitUniqSupply3 us = (us1, us2, us3)
+  where
+    (us1, us') = splitUniqSupply us
+    (us2, us3) = splitUniqSupply us'
+
+-- | Build four 'UniqSupply' from a single one,
+-- each of which can supply its own unique
+splitUniqSupply4 :: UniqSupply -> (UniqSupply, UniqSupply, UniqSupply, UniqSupply)
+splitUniqSupply4 us = (us1, us2, us3, us4)
+  where
+    (us1, us2, us') = splitUniqSupply3 us
+    (us3, us4)      = splitUniqSupply us'
 
 {-
 ************************************************************************
@@ -184,6 +202,12 @@ instance MonadUnique UniqSM where
     getUniqueSupplyM = getUs
     getUniqueM  = getUniqueUs
     getUniquesM = getUniquesUs
+
+getUniqueSupplyM3 :: MonadUnique m => m (UniqSupply, UniqSupply, UniqSupply)
+getUniqueSupplyM3 = liftM3 (,,) getUniqueSupplyM getUniqueSupplyM getUniqueSupplyM
+
+liftUs :: MonadUnique m => UniqSM a -> m a
+liftUs m = getUniqueSupplyM >>= return . flip initUs_ m
 
 getUniqueUs :: UniqSM Unique
 getUniqueUs = USM (\us -> case takeUniqFromSupply us of

@@ -1917,7 +1917,6 @@ lookupSolvedDict (IS { inert_solved_dicts = solved }) cls tys
       Just ev -> Just ev
       _       -> Nothing
 
-
 {- *********************************************************************
 *                                                                      *
                    Irreds

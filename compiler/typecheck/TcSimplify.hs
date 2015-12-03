@@ -7,6 +7,7 @@ module TcSimplify(
        simplifyDefault,
        simplifyTop, simplifyInteractive,
        solveWantedsTcM,
+       tcCheckSatisfiability,
 
        -- For Rules we need these two
        solveWanteds, runTcS
@@ -359,6 +360,19 @@ simplifyDefault theta
        ; traceTc "reportUnsolved }" empty
 
        ; return () }
+
+------------------
+tcCheckSatisfiability :: Bag EvVar -> TcM Bool
+-- Return True if satisfiable, False if definitely contradictory
+tcCheckSatisfiability givens
+  = do { lcl_env <- TcRn.getLclEnv
+       ; let given_loc = mkGivenLoc topTcLevel UnkSkol lcl_env
+       ; traceTc "checkSatisfiabilty {" (ppr givens)
+       ; (res, _ev_binds) <- runTcS $
+             do { cts <- solveSimpleGivens given_loc (bagToList givens)
+                ; return (not (isEmptyBag cts)) }
+       ; traceTc "checkSatisfiabilty }" (ppr res)
+       ; return (not res) }
 
 {-
 *********************************************************************************

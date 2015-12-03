@@ -63,7 +63,6 @@ test('ds056', normal, compile, ['-Wall -fno-warn-tabs'])
 test('ds057', normal, compile, [''])
 test('ds058', normal, compile, ['-W -fno-warn-tabs'])
 test('ds059', normal, compile, ['-W'])
-test('ds060', expect_broken(322), compile, [''])
 test('ds062', normal, compile, [''])
 test('ds063', normal, compile, [''])
 

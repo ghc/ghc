@@ -1,0 +1,3 @@
+pmc003.hs:6:1: warning:
+    Pattern match(es) have inaccessible right hand side
+    In an equation for ‘f’: f True False = ...

@@ -1,4 +1,4 @@
 
-T2395.hs:12:1: Warning:
-    Pattern match(es) are overlapped
+T2395.hs:12:1: warning:
+    Pattern match(es) are redundant
     In an equation for ‘bar’: bar _ = ...
