@@ -909,8 +909,6 @@ livenessForward platform rsLiveEntry (li@(LiveInstr instr mLive) : lis)
         in LiveInstr instr (Just live { liveBorn = rsBorn })
                 : livenessForward platform rsLiveNext lis
 
-livenessForward _ _ _             = panic "RegLiveness.livenessForward: no match"
-
 
 -- | Calculate liveness going backwards,
 --   filling in when regs die, and what regs are live across each instruction

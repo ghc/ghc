@@ -163,7 +163,6 @@ arfGraph pass@FwdPass { fp_lattice = lattice,
                 -> Fact e f -> UniqSM (DG f n e C, Fact C f)
              c NothingC (JustO entry)   f = (block entry `cat` body (successors entry) bdy) f
              c (JustC entries) NothingO f = body entries bdy f
-             c _ _ _ = error "bogus GADT pattern match failure"
 
     -- Lift from nodes to blocks
     block BNil            f = return (dgnil, f)
@@ -253,7 +252,6 @@ analyzeFwd FwdPass { fp_lattice = lattice,
       = case (entries, entry) of
          (NothingC, JustO entry)   -> block entry `cat` body (successors entry)
          (JustC entries, NothingO) -> body entries
-         _ -> error "bogus GADT pattern match failure"
      where
        body  :: [Label] -> Fact C f -> Fact C f
        body entries f
@@ -296,7 +294,6 @@ analyzeFwdBlocks FwdPass { fp_lattice = lattice,
       = case (entries, entry) of
          (NothingC, JustO entry)   -> block entry `cat` body (successors entry)
          (JustC entries, NothingO) -> body entries
-         _ -> error "bogus GADT pattern match failure"
      where
        body  :: [Label] -> Fact C f -> Fact C f
        body entries f
@@ -339,7 +336,6 @@ analyzeBwd BwdPass { bp_lattice = lattice,
       = case (entries, entry) of
          (NothingC, JustO entry)   -> body (successors entry)
          (JustC entries, NothingO) -> body entries
-         _ -> error "bogus GADT pattern match failure"
      where
        body  :: [Label] -> Fact C f -> Fact C f
        body entries f
@@ -429,7 +425,6 @@ arbGraph pass@BwdPass { bp_lattice  = lattice,
                 -> Fact C f -> UniqSM (DG f n e C, Fact e f)
              c NothingC (JustO entry)   f = (block entry `cat` body (successors entry) bdy) f
              c (JustC entries) NothingO f = body entries bdy f
-             c _ _ _ = error "bogus GADT pattern match failure"
 
     -- Lift from nodes to blocks
     block BNil            f = return (dgnil, f)
