@@ -3,3 +3,7 @@ case (# 'b', GHC.Types.False #) of
     (# 'a', GHC.Types.True #) -> (# "One", 1 #)
     (# 'b', GHC.Types.False #) -> (# "Two", 2 #)
     (# _, _ #) -> (# "Three", 3 #)
+
+TH_repUnboxedTuples.hs:18:13: warning:
+    Pattern match(es) are redundant
+    In a case alternative: (# 'a', True #) -> ...
