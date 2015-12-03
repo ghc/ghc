@@ -117,9 +117,14 @@ data ValSetAbs   -- Reprsents a set of value vector abstractions
   | Constraint [PmConstraint] ValSetAbs -- ^ Extend Delta
   | Cons ValAbs ValSetAbs               -- ^ map (ucon u) vs
 
-type PmResult = ( [[LPat Id]] -- ^ redundant clauses
-                , [[LPat Id]] -- ^ clauses with inaccessible rhs
-                , [([PmExpr], [ComplexEq])] ) -- ^ missing
+-- | Pattern check result
+--
+-- * redundant clauses
+-- * clauses with inaccessible RHS
+-- * missing
+type PmResult = ( [[LPat Id]]
+                , [[LPat Id]]
+                , [([PmExpr], [ComplexEq])] )
 
 {-
 %************************************************************************
