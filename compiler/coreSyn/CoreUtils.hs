@@ -733,11 +733,28 @@ saturating them.
 
 Note [Tick trivial]
 ~~~~~~~~~~~~~~~~~~~
-
 Ticks are only trivial if they are pure annotations. If we treat
 "tick<n> x" as trivial, it will be inlined inside lambdas and the
 entry count will be skewed, for example.  Furthermore "scc<n> x" will
 turn into just "x" in mkTick.
+
+Note [Empty case is trivial]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The expression (case (x::Int) Bool of {}) is just a type-changing
+case used when we are sure that 'x' will not return.  See
+Note [Empty case alternatives] in CoreSyn.
+
+If the scrutinee is trivial, then so is the whole expression; and the
+CoreToSTG pass in fact drops the case expression leaving only the
+scrutinee.
+
+Having more trivial expressions is good.  Moreover, if we don't treat
+it as trivial we may land up with let-bindings like
+   let v = case x of {} in ...
+and after CoreToSTG that gives
+   let v = x in ...
+and that confuses the code generator (Trac #11155). So best to kill
+it off at source.
 -}
 
 exprIsTrivial :: CoreExpr -> Bool
@@ -750,6 +767,7 @@ exprIsTrivial (Tick t e)       = not (tickishIsCode t) && exprIsTrivial e
                                  -- See Note [Tick trivial]
 exprIsTrivial (Cast e _)       = exprIsTrivial e
 exprIsTrivial (Lam b body)     = not (isRuntimeVar b) && exprIsTrivial body
+exprIsTrivial (Case e _ _ [])  = exprIsTrivial e  -- See Note [Empty case is trivial]
 exprIsTrivial _                = False
 
 {-

@@ -224,4 +224,7 @@ test('T10083',
      run_command,
      ['$MAKE -s --no-print-directory T10083'])
 test('T10689', normal, compile, [''])
-test('T10689a', normal, compile, [''])
+test('T11155',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T11155'])
