@@ -299,8 +299,7 @@ static bool set_initial_registers(Dwfl_Thread *thread,
         );
     return dwfl_thread_state_registers(thread, 0, 17, regs);
 }
-#endif
-#ifdef i386_HOST_ARCH
+#elif defined(i386_HOST_ARCH)
 static bool set_initial_registers(Dwfl_Thread *thread,
                                   void *arg STG_UNUSED) {
     Dwarf_Word regs[9];
@@ -321,6 +320,8 @@ static bool set_initial_registers(Dwfl_Thread *thread,
         );
     return dwfl_thread_state_registers(thread, 0, 9, regs);
 }
+#else
+#    error "Please implement set_initial_registers() for your arch"
 #endif
 
 static const Dwfl_Thread_Callbacks thread_cbs = {
