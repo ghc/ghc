@@ -42,7 +42,7 @@ utils/mkUserGuidePart_GENERATED_FLAGS_SETS := \
 utils/mkUserGuidePart_GENERATED_RST_SOURCES := \
 		$(addprefix docs/users_guide/flags-,$(addsuffix .gen.rst,$(utils/mkUserGuidePart_GENERATED_FLAGS_SETS))) \
 		docs/users_guide/what_glasgow_exts_does.gen.rst \
-    docs/man/all-flags.gen.rst
+		docs/man/all-flags.gen.rst
 
 utils/mkUserGuidePart_USES_CABAL           = YES
 utils/mkUserGuidePart_PACKAGE              = mkUserGuidePart
