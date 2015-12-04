@@ -39,7 +39,7 @@ module Type (
         mkNumLitTy, isNumLitTy,
         mkStrLitTy, isStrLitTy,
 
-        isUserErrorTy, pprUserTypeErrorTy,
+        userTypeError_maybe, pprUserTypeErrorTy,
 
         coAxNthLHS,
 
@@ -460,10 +460,11 @@ isStrLitTy _                    = Nothing
 
 -- | Is this type a custom user error?
 -- If so, give us the kind and the error message.
-isUserErrorTy :: Type -> Maybe (Kind,Type)
-isUserErrorTy t = do (tc,[k,msg]) <- splitTyConApp_maybe t
-                     guard (tyConName tc == errorMessageTypeErrorFamName)
-                     return (k,msg)
+userTypeError_maybe :: Type -> Maybe Type
+userTypeError_maybe t
+  = do { (tc, [_kind, msg]) <- splitTyConApp_maybe t
+       ; guard (tyConName tc == errorMessageTypeErrorFamName)
+       ; return msg }
 
 -- | Render a type corresponding to a user type error into a SDoc.
 pprUserTypeErrorTy :: Type -> SDoc
