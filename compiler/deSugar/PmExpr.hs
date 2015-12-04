@@ -357,7 +357,7 @@ pprPmExprCon con args
     list = list_elements args
 
     list_elements [x,y]
-      | PmExprCon c es <- y,  nilDataCon == c = ASSERT (null es) [x,y]
+      | PmExprCon c es <- y,  nilDataCon == c = ASSERT(null es) [x,y]
       | PmExprCon c es <- y, consDataCon == c = x : list_elements es
       | otherwise = [x,y]
     list_elements list  = pprPanic "list_elements:" (ppr list)
