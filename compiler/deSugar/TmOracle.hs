@@ -32,7 +32,6 @@ import TcHsSyn
 import MonadUtils
 import Util
 
-import Data.Maybe (isJust)
 import qualified Data.Map as Map
 
 {-
