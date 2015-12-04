@@ -370,12 +370,12 @@ translateConPatVec  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
     -- The data constructor was not defined using record syntax. For the
     -- pattern to be in record syntax it should be empty (e.g. Just {}).
     -- So just like the previous case.
-  | null orig_lbls = ASSERT (null matched_lbls) mkPatternVarsSM arg_tys
+  | null orig_lbls = ASSERT(null matched_lbls) mkPatternVarsSM arg_tys
     -- Some of the fields appear, in the original order (there may be holes).
     -- Generate a simple constructor pattern and make up fresh variables for
     -- the rest of the fields
   | matched_lbls `subsetOf` orig_lbls
-  = ASSERT (length orig_lbls == length arg_tys)
+  = ASSERT(length orig_lbls == length arg_tys)
       let translateOne (lbl, ty) = case lookup lbl matched_pats of
             Just p  -> translatePat p
             Nothing -> mkPatternVarsSM [ty]
@@ -616,7 +616,7 @@ process_guards us  gs
 -- * Basic utilities
 
 patternType :: Pattern -> Type
-patternType (PmGuard pv _) = ASSERT (patVecArity pv == 1) (patternType p)
+patternType (PmGuard pv _) = ASSERT(patVecArity pv == 1) (patternType p)
   where Just p = find ((==1) . patternArity) pv
 patternType (NonGuard pat) = pmPatType pat
 
@@ -826,8 +826,8 @@ splitConstraints (c : rest)
   = case c of
       TyConstraint cs    -> (cs ++ ty_cs, tm_cs, bot_cs)
       TmConstraint e1 e2 -> (ty_cs, (e1,e2):tm_cs, bot_cs)
-      BtConstraint cs    -> ASSERT (isNothing bot_cs) -- NB: Only one x ~ _|_
-                                   (ty_cs, tm_cs, Just cs)
+      BtConstraint cs    -> ASSERT(isNothing bot_cs) -- NB: Only one x ~ _|_
+                                  (ty_cs, tm_cs, Just cs)
   where
     (ty_cs, tm_cs, bot_cs) = splitConstraints rest
 
