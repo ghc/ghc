@@ -757,11 +757,11 @@ mkInferredPolyId qtvs inferred_theta poly_name mb_sig mono_ty
                                 inferred_theta (tyVarsOfType mono_ty') mb_sig
 
        ; let qtvs' = filter (`elemVarSet` my_tvs) qtvs   -- Maintain original order
-       ; let inferred_poly_ty = mkSigmaTy qtvs' theta' mono_ty'
-             msg = mk_inf_msg poly_name inferred_poly_ty
+             inferred_poly_ty = mkSigmaTy qtvs' theta' mono_ty'
 
-       ; traceTc "mkInferredPolyId" (vcat [ppr poly_name, ppr qtvs, ppr my_tvs, ppr theta', ppr inferred_poly_ty])
-       ; addErrCtxtM msg $
+       ; traceTc "mkInferredPolyId" (vcat [ppr poly_name, ppr qtvs, ppr my_tvs, ppr theta'
+                                          , ppr inferred_poly_ty])
+       ; addErrCtxtM (mk_inf_msg poly_name inferred_poly_ty) $
          checkValidType (InfSigCtxt poly_name) inferred_poly_ty
 
        ; return (mkLocalId poly_name inferred_poly_ty) }
