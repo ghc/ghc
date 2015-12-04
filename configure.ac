@@ -58,6 +58,9 @@ dnl  #define SIZEOF_CHAR 0
 dnl recently.
 AC_PREREQ([2.60])
 
+dnl make extensions visible to allow feature-tests to detect them lateron
+AC_USE_SYSTEM_EXTENSIONS
+
 # -------------------------------------------------------------------------
 # Prepare to generate the following header files
 #

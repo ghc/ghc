@@ -7,12 +7,6 @@
  *
  * --------------------------------------------------------------------------*/
 
-#if defined(__linux__) || defined(__GLIBC__)
-/* We want GNU extensions in DEBUG mode for mutex error checking */
-/* We also want the affinity API, which requires _GNU_SOURCE */
-#define _GNU_SOURCE
-#endif
-
 #include "PosixSource.h"
 
 #if defined(freebsd_HOST_OS)

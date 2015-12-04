@@ -10,13 +10,6 @@
 #include "PosixSource.h"
 #endif
 
-/* Linux needs _GNU_SOURCE to get RTLD_DEFAULT from <dlfcn.h> and
-   MREMAP_MAYMOVE from <sys/mman.h>.
- */
-#if defined(__linux__)  || defined(__GLIBC__)
-#define _GNU_SOURCE 1
-#endif
-
 #include "Rts.h"
 #include "HsFFI.h"
 
