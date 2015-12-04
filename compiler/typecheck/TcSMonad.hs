@@ -662,8 +662,8 @@ Definition [Can-rewrite relation]
 A "can-rewrite" relation between flavours, written f1 >= f2, is a
 binary relation with the following properties
 
-  R1.  >= is transitive
-  R2.  If f1 >= f, and f2 >= f,
+  (R1) >= is transitive
+  (R2) If f1 >= f, and f2 >= f,
        then either f1 >= f2 or f2 >= f1
 
 Lemma.  If f1 >= f then f1 >= f1
@@ -690,7 +690,7 @@ See Note [Flavours with roles].
 Theorem: S(f,a) is well defined as a function.
 Proof: Suppose (a -f1-> t1) and (a -f2-> t2) are both in S,
                and  f1 >= f and f2 >= f
-       Then by (R2) f1 >= f2 or f2 >= f1, which contradicts (WF)
+       Then by (R2) f1 >= f2 or f2 >= f1, which contradicts (WF1)
 
 Notation: repeated application.
   S^0(f,t)     = t
@@ -701,9 +701,6 @@ A generalised substitution S is "inert" iff
 
   (IG1) there is an n such that
         for every f,t, S^n(f,t) = S^(n+1)(f,t)
-
-  (IG2) if (b -f-> t) in S, and f >= f, then S(f,t) = t
-        that is, each individual binding is "self-stable"
 
 By (IG1) we define S*(f,t) to be the result of exahaustively
 applying S(f,_) to t.
@@ -719,8 +716,8 @@ guarantee that this recursive use will terminate.
 
 Note [Extending the inert equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This is the main theorem!
-
+Theorem [Stability under extension]
+   This is the main theorem!
    Suppose we have a "work item"
        a -fw-> t
    and an inert generalised substitution S,
