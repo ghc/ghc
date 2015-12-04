@@ -245,6 +245,8 @@ mkTextEncoding' cfm enc =
     "UTF32"   -> return $ UTF32.mkUTF32 cfm
     "UTF32LE" -> return $ UTF32.mkUTF32le cfm
     "UTF32BE" -> return $ UTF32.mkUTF32be cfm
+  -- ISO8859-1 we can handle ourselves as well
+    "ISO88591" -> return $ Latin1.mkLatin1 cfm
 #if defined(mingw32_HOST_OS)
     'C':'P':n | [(cp,"")] <- reads n -> return $ CodePage.mkCodePageEncoding cfm cp
     _ -> unknownEncodingErr (enc ++ codingFailureModeSuffix cfm)
