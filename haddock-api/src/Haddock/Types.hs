@@ -492,11 +492,11 @@ instance Functor ErrMsgM where
         fmap f (Writer (a, msgs)) = Writer (f a, msgs)
 
 instance Applicative ErrMsgM where
-    pure = return
-    (<*>) = ap
+    pure a = Writer (a, [])
+    (<*>)  = ap
 
 instance Monad ErrMsgM where
-        return a = Writer (a, [])
+        return   = pure
         m >>= k  = Writer $ let
                 (a, w)  = runWriter m
                 (b, w') = runWriter (k a)
@@ -545,11 +545,11 @@ instance Functor ErrMsgGhc where
   fmap f (WriterGhc x) = WriterGhc (fmap (first f) x)
 
 instance Applicative ErrMsgGhc where
-    pure = return
+    pure a = WriterGhc (return (a, []))
     (<*>) = ap
 
 instance Monad ErrMsgGhc where
-  return a = WriterGhc (return (a, []))
+  return = pure
   m >>= k = WriterGhc $ runWriterGhc m >>= \ (a, msgs1) ->
                fmap (second (msgs1 ++)) (runWriterGhc (k a))
 
