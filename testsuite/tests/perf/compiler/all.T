@@ -513,7 +513,7 @@ test('T5321FD',
 
 test('T5642',
      [ only_ways(['normal']),
-       expect_broken(11163),
+       skip(), # See Trac #11163
        compiler_stats_num_field('bytes allocated',
            [(wordsize(32), 641085256, 10),
                      # sample from x86/Linux
