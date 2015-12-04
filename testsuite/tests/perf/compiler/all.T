@@ -617,13 +617,14 @@ test('T9675',
  	  # 2015-07-11    15341228   (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
        compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
-          [(wordsize(64), 105, 15),
+          [(wordsize(64), 88, 15),
           # 2014-10-13    66
           # 2014-10-13    58         seq the DmdEnv in seqDmdType as well
           # 2014-10-13    49         different machines giving different results...
           # 2014-10-13    53         use the mean
           # 2015-06-15    44         reduced for some reason
           # 2015-06-21    105        switch to `+RTS -G1`
+          # 2015-12-04    88         new pattern checker (D1535)
             (wordsize(32), 56, 15)
  	  # 2015-07-11    56         (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
