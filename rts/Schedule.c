@@ -1293,19 +1293,19 @@ scheduleHandleThreadFinished (Capability *cap STG_UNUSED, Task *task, StgTSO *t)
                   // NOTE: return val is stack->sp[1] (see StgStartup.hc)
                   *(task->incall->ret) = (StgClosure *)task->incall->tso->stackobj->sp[1];
               }
-              task->incall->stat = Success;
+              task->incall->rstat = Success;
           } else {
               if (task->incall->ret) {
                   *(task->incall->ret) = NULL;
               }
               if (sched_state >= SCHED_INTERRUPTING) {
                   if (heap_overflow) {
-                      task->incall->stat = HeapExhausted;
+                      task->incall->rstat = HeapExhausted;
                   } else {
-                      task->incall->stat = Interrupted;
+                      task->incall->rstat = Interrupted;
                   }
               } else {
-                  task->incall->stat = Killed;
+                  task->incall->rstat = Killed;
               }
           }
 #ifdef DEBUG
@@ -2351,7 +2351,7 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability **pcap)
 
     task->incall->tso = tso;
     task->incall->ret = ret;
-    task->incall->stat = NoStatus;
+    task->incall->rstat = NoStatus;
 
     appendToRunQueue(cap,tso);
 
@@ -2360,7 +2360,7 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability **pcap)
 
     cap = schedule(cap,task);
 
-    ASSERT(task->incall->stat != NoStatus);
+    ASSERT(task->incall->rstat != NoStatus);
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
     debugTrace(DEBUG_sched, "bound thread (%lu) finished", (unsigned long)id);
