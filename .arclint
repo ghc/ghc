@@ -52,6 +52,10 @@
       "severity": {
         "2": "disabled"
       }
+    },
+    "check-binaries": {
+      "type": "external-json",
+      "external-json.script": "python .arc-linters/check-binaries.py"
     }
   },
 
