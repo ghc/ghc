@@ -48,6 +48,11 @@
 // on Linux
 # define _BSD_SOURCE
 
+// On AIX we need _BSD defined, otherwise <math.h> includes <stdlib.h>
+# if defined(_AIX)
+#  define _BSD 1
+# endif
+
 // '_BSD_SOURCE' is deprecated since glibc-2.20
 // in favour of '_DEFAULT_SOURCE'
 # define _DEFAULT_SOURCE
