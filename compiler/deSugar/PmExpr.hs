@@ -27,7 +27,7 @@ import VarSet
 
 import Data.Functor ((<$>))
 import Data.Maybe (mapMaybe)
-import Data.List (groupBy, sortBy)
+import Data.List (groupBy, sortBy, nubBy)
 import Control.Monad.Trans.State.Lazy
 
 {-
@@ -66,21 +66,16 @@ data PmLit = PmSLit HsLit                                    -- simple
 -- inconclusive. Since an overloaded PmLit represents a function application
 -- (e.g.  fromInteger 5), if two literals look the same they are the same but
 -- if they don't, whether they are depends on the implementation of the
--- from-function.
-eqPmLit :: PmLit -> PmLit -> Maybe Bool
-eqPmLit (PmSLit    l1) (PmSLit l2   ) = Just (l1 == l2)
-eqPmLit (PmOLit b1 l1) (PmOLit b2 l2) = if res then Just True else Nothing
-  where res = b1 == b2 && l1 == l2
-eqPmLit _ _ = Just False -- this should not even happen I think
+-- from-function. Yet, for the purposes of the check, we check syntactically
+-- only (it is safe anyway, since literals always need a catch-all to be
+-- considered to be exhaustive).
+eqPmLit :: PmLit -> PmLit -> Bool
+eqPmLit (PmSLit    l1) (PmSLit    l2) = l1 == l2
+eqPmLit (PmOLit b1 l1) (PmOLit b2 l2) = b1 == b2 && l1 == l2
+eqPmLit _              _              = False
 
 nubPmLit :: [PmLit] -> [PmLit]
-nubPmLit []     = []
-nubPmLit [x]    = [x]
-nubPmLit (x:xs) = x : nubPmLit (filter (neqPmLit x) xs)
-  where neqPmLit l1 l2 = case eqPmLit l1 l2 of
-          Just True  -> False
-          Just False -> True
-          Nothing    -> True
+nubPmLit = nubBy eqPmLit
 
 -- | Term equalities
 type SimpleEq  = (Id, PmExpr) -- We always use this orientation
@@ -374,4 +369,3 @@ instance Outputable PmLit where
 -- not really useful for pmexprs per se
 instance Outputable PmExpr where
   ppr e = fst $ runPmPprM (pprPmExpr e) []
-

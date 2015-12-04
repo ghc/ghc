@@ -71,7 +71,7 @@ The algorithm used is described in the paper:
 
 type PmM a = DsM a
 
-data PmConstraint = TmConstraint Id PmExpr -- ^ Term equalities: x ~ e
+data PmConstraint = TmConstraint PmExpr PmExpr -- ^ Term equalities: e ~ e
                   | TyConstraint [EvVar]   -- ^ Type equalities
                   | BtConstraint Id        -- ^ Strictness constraints: x ~ _|_
 
@@ -174,10 +174,12 @@ checkMatches vars matches
 initial_uncovered :: [Id] -> DsM ValSetAbs
 initial_uncovered vars = do
   ty_cs <- TyConstraint . bagToList <$> getDictsDs
-  tm_cs <- map (uncurry TmConstraint) . bagToList <$> getTmCsDs
+  tm_cs <- map simpleToTmCs . bagToList <$> getTmCsDs
   let vsa = map (VA . PmVar) vars
   return $ mkConstraint (ty_cs:tm_cs) (foldr Cons Singleton vsa)
-
+  where
+    simpleToTmCs :: (Id, PmExpr) -> PmConstraint
+    simpleToTmCs (x,e) = TmConstraint (PmExprVar x) e
 {-
 %************************************************************************
 %*                                                                      *
@@ -670,8 +672,8 @@ mkOneConFull x usupply con = (con_abs, constraints)
                        , pm_con_args    = arguments }
 
     constraints -- term and type constraints
-      | null evvars = [ TmConstraint x (pmPatToPmExpr con_abs) ]
-      | otherwise   = [ TmConstraint x (pmPatToPmExpr con_abs)
+      | null evvars = [ TmConstraint (PmExprVar x) (pmPatToPmExpr con_abs) ]
+      | otherwise   = [ TmConstraint (PmExprVar x) (pmPatToPmExpr con_abs)
                       , TyConstraint evvars ]
 
 mkConVars :: UniqSupply -> [Type] -> [ValAbs] -- ys, fresh with the given type
@@ -818,14 +820,14 @@ nameType name usupply ty = newEvVar idname ty
     idname  = mkInternalName unique occname noSrcSpan
 
 -- | Partition the constraints to type cs, term cs and forced variables
-splitConstraints :: [PmConstraint] -> ([EvVar], [(Id, PmExpr)], Maybe Id)
+splitConstraints :: [PmConstraint] -> ([EvVar], [(PmExpr, PmExpr)], Maybe Id)
 splitConstraints [] = ([],[],Nothing)
 splitConstraints (c : rest)
   = case c of
-      TyConstraint cs  -> (cs ++ ty_cs, tm_cs, bot_cs)
-      TmConstraint x e -> (ty_cs, (x,e):tm_cs, bot_cs)
-      BtConstraint cs  -> ASSERT (isNothing bot_cs) -- NB: Only one x ~ _|_
-                                 (ty_cs, tm_cs, Just cs)
+      TyConstraint cs    -> (cs ++ ty_cs, tm_cs, bot_cs)
+      TmConstraint e1 e2 -> (ty_cs, (e1,e2):tm_cs, bot_cs)
+      BtConstraint cs    -> ASSERT (isNothing bot_cs) -- NB: Only one x ~ _|_
+                                   (ty_cs, tm_cs, Just cs)
   where
     (ty_cs, tm_cs, bot_cs) = splitConstraints rest
 
@@ -883,20 +885,14 @@ pruneVSABound n v = go n init_cs emptylist v
             vecs1 <- go n                  all_cs vec vsa1
             vecs2 <- go (n - length vecs1) all_cs vec vsa2
             return (vecs1 ++ vecs2)
-          Singleton ->
-            -- Have another go at the term oracle state, for strange
-            -- equalities between overloaded literals. See
-            -- Note [Undecidable Equality on Overloaded Literals] in TmOracle
-            if containsEqLits tm_env
-              then return [] -- not on the safe side
-              else do
-                -- TODO: Provide an incremental interface for the type oracle
-                sat <- tyOracle (listToBag ty_cs)
-                return $ case sat of
-                  True  -> let (residual_eqs, subst) = wrapUpTmState tm_env
-                               vector = substInValVecAbs subst (toList vec)
-                           in  [(vector, residual_eqs)]
-                  False -> []
+          Singleton -> do
+            -- TODO: Provide an incremental interface for the type oracle
+            sat <- tyOracle (listToBag ty_cs)
+            return $ case sat of
+              True  -> let (residual_eqs, subst) = wrapUpTmState tm_env
+                           vector = substInValVecAbs subst (toList vec)
+                       in  [(vector, residual_eqs)]
+              False -> []
 
           Constraint cs vsa -> case splitConstraints cs of
             (new_ty_cs, new_tm_cs, new_bot_ct) ->
@@ -1000,7 +996,7 @@ pmTraverse us gvsa rec (p:ps) vsa =
     PmGuard pv e ->
       let (us1, us2) = splitUniqSupply us
           y  = mkPmId us1 (patternType p)
-          cs = [TmConstraint y e]
+          cs = [TmConstraint (PmExprVar y) e]
       in  mkConstraint cs $ tailVSA $
             pmTraverse us2 gvsa rec (pv++ps) (VA (PmVar y) `mkCons` vsa)
 
@@ -1023,16 +1019,12 @@ cMatcher, uMatcher, dMatcher :: PmMatcher
 -- CVar
 cMatcher us gvsa (PmVar x) ps va vsa
   = VA va `mkCons` (cs `mkConstraint` covered us gvsa ps vsa)
-  where cs = [TmConstraint x (pmPatToPmExpr va)]
+  where cs = [TmConstraint (PmExprVar x) (pmPatToPmExpr va)]
 
 -- CLitCon
 cMatcher us gvsa (PmLit l) ps (va@(PmCon {})) vsa
-  = VA va `mkCons` (cs `mkConstraint` covered us2 gvsa ps vsa)
-  where
-    (us1, us2) = splitUniqSupply us
-    y  = mkPmId us1 (pmPatType va)
-    cs = [ TmConstraint y (PmExprLit l)
-         , TmConstraint y (pmPatToPmExpr va) ]
+  = VA va `mkCons` (cs `mkConstraint` covered us gvsa ps vsa)
+  where cs = [ TmConstraint (PmExprLit l) (pmPatToPmExpr va) ]
 
 -- CConLit
 cMatcher us gvsa (p@(PmCon {})) ps (PmLit l) vsa
@@ -1041,7 +1033,7 @@ cMatcher us gvsa (p@(PmCon {})) ps (PmLit l) vsa
     (us1, us2, us3)   = splitUniqSupply3 us
     y                 = mkPmId us1 (pmPatType p)
     (con_abs, all_cs) = mkOneConFull y us2 (pm_con_con p)
-    cs = TmConstraint y (PmExprLit l) : all_cs
+    cs = TmConstraint (PmExprVar y) (PmExprLit l) : all_cs
 
 -- CConCon
 cMatcher us gvsa (p@(PmCon { pm_con_con = c1, pm_con_args = args1 })) ps
@@ -1055,15 +1047,8 @@ cMatcher us gvsa (p@(PmCon { pm_con_con = c1, pm_con_args = args1 })) ps
 
 -- CLitLit
 cMatcher us gvsa (PmLit l1) ps (va@(PmLit l2)) vsa = case eqPmLit l1 l2 of
-  Just True  -> VA va `mkCons` covered us gvsa ps vsa -- match
-  Just False -> Empty                                 -- mismatch
-  Nothing    -> VA va `mkCons` (cs `mkConstraint` covered us2 gvsa ps vsa)
-  -- See Note [Undecidable Equality on Overloaded Literals] in TmOracle
-  where
-    (us1, us2) = splitUniqSupply us
-    y          = mkPmId us1 (pmPatType va)
-    cs         = [ TmConstraint y (PmExprLit l1)
-                 , TmConstraint y (PmExprLit l2) ]
+  True  -> VA va `mkCons` covered us gvsa ps vsa -- match
+  False -> Empty                                 -- mismatch
 
 -- CConVar
 cMatcher us gvsa (p@(PmCon { pm_con_con = con })) ps (PmVar x) vsa
@@ -1077,7 +1062,7 @@ cMatcher us gvsa (p@(PmLit l)) ps (PmVar x) vsa
   = cMatcher us gvsa p ps lit_abs (mkConstraint cs vsa)
   where
     lit_abs = PmLit l
-    cs      = [TmConstraint x (PmExprLit l)]
+    cs      = [TmConstraint (PmExprVar x) (PmExprLit l)]
 
 -- uMatcher
 -- ----------------------------------------------------------------------------
@@ -1085,7 +1070,7 @@ cMatcher us gvsa (p@(PmLit l)) ps (PmVar x) vsa
 -- UVar
 uMatcher us gvsa (PmVar x) ps va vsa
   = VA va `mkCons` (cs `mkConstraint` uncovered us gvsa ps vsa)
-  where cs = [TmConstraint x (pmPatToPmExpr va)]
+  where cs = [TmConstraint (PmExprVar x) (pmPatToPmExpr va)]
 
 -- ULitCon
 uMatcher us gvsa (PmLit l) ps (va@(PmCon {})) vsa
@@ -1093,7 +1078,7 @@ uMatcher us gvsa (PmLit l) ps (va@(PmCon {})) vsa
   where
     (us1, us2) = splitUniqSupply us
     y  = mkPmId us1 (pmPatType va)
-    cs = [TmConstraint y (PmExprLit l)]
+    cs = [TmConstraint (PmExprVar y) (PmExprLit l)]
 
 -- UConLit
 uMatcher us gvsa (p@(PmCon {})) ps (PmLit l) vsa
@@ -1101,7 +1086,7 @@ uMatcher us gvsa (p@(PmCon {})) ps (PmLit l) vsa
   where
     (us1, us2) = splitUniqSupply us
     y  = mkPmId us1 (pmPatType p)
-    cs = [TmConstraint y (PmExprLit l)]
+    cs = [TmConstraint (PmExprVar y) (PmExprLit l)]
 
 -- UConCon
 uMatcher us gvsa ( p@(PmCon { pm_con_con = c1, pm_con_args = args1 })) ps
@@ -1115,20 +1100,8 @@ uMatcher us gvsa ( p@(PmCon { pm_con_con = c1, pm_con_args = args1 })) ps
 
 -- ULitLit
 uMatcher us gvsa (PmLit l1) ps (va@(PmLit l2)) vsa = case eqPmLit l1 l2 of
-  Just True  -> VA va `mkCons` uncovered us gvsa ps vsa -- match
-  Just False -> VA va `mkCons` vsa                      -- mismatch
-  Nothing    -> mkUnion (VA va `mkCons`
-                            (match_cs `mkConstraint` uncovered us3 gvsa ps vsa))
-                        (non_match_cs `mkConstraint` (VA va `mkCons` vsa))
-  -- See Note [Undecidable Equality on Overloaded Literals] in TmOracle
-  where
-    (us1, us2, us3) = splitUniqSupply3 us
-    y               = mkPmId us1 (pmPatType va)
-    z               = mkPmId us2 boolTy
-    match_cs        = [ TmConstraint y (PmExprLit l1)
-                      , TmConstraint y (PmExprLit l2) ]
-    non_match_cs    = [ TmConstraint z falsePmExpr
-                      , TmConstraint z (PmExprEq (PmExprLit l1) (PmExprLit l2))]
+  True  -> VA va `mkCons` uncovered us gvsa ps vsa -- match
+  False -> VA va `mkCons` vsa                      -- mismatch
 
 -- UConVar
 uMatcher us gvsa (p@(PmCon { pm_con_con = con })) ps (PmVar x) vsa
@@ -1145,14 +1118,12 @@ uMatcher us gvsa (p@(PmCon { pm_con_con = con })) ps (PmVar x) vsa
 
 -- ULitVar
 uMatcher us gvsa (p@(PmLit l)) ps (PmVar x) vsa
-  = mkUnion (uMatcher us2 gvsa p ps (PmLit l) (mkConstraint match_cs vsa))
+  = mkUnion (uMatcher us gvsa p ps (PmLit l) (mkConstraint match_cs vsa))
             (non_match_cs `mkConstraint` (VA (PmVar x) `mkCons` vsa))
   where
-    (us1, us2) = splitUniqSupply us
-    y  = mkPmId us1 (pmPatType p)
-    match_cs     = [ TmConstraint x (PmExprLit l)]
-    non_match_cs = [ TmConstraint y falsePmExpr
-                   , TmConstraint y (PmExprEq (PmExprVar x) (PmExprLit l)) ]
+    match_cs     = [ TmConstraint (PmExprVar x) (PmExprLit l)]
+    non_match_cs = [ TmConstraint falsePmExpr
+                                  (PmExprEq (PmExprVar x) (PmExprLit l)) ]
 
 -- dMatcher
 -- ----------------------------------------------------------------------------
@@ -1160,16 +1131,12 @@ uMatcher us gvsa (p@(PmLit l)) ps (PmVar x) vsa
 -- DVar
 dMatcher us gvsa (PmVar x) ps va vsa
   = VA va `mkCons` (cs `mkConstraint` divergent us gvsa ps vsa)
-  where cs = [TmConstraint x (pmPatToPmExpr va)]
+  where cs = [TmConstraint (PmExprVar x) (pmPatToPmExpr va)]
 
 -- DLitCon
 dMatcher us gvsa (PmLit l) ps (va@(PmCon {})) vsa
-  = VA va  `mkCons` (cs `mkConstraint` divergent us2 gvsa ps vsa)
-  where
-    (us1, us2) = splitUniqSupply us
-    y  = mkPmId us1 (pmPatType va)
-    cs = [ TmConstraint y (PmExprLit l)
-         , TmConstraint y (pmPatToPmExpr va) ]
+  = VA va `mkCons` (cs `mkConstraint` divergent us gvsa ps vsa)
+  where cs = [ TmConstraint (PmExprLit l) (pmPatToPmExpr va) ]
 
 -- DConLit
 dMatcher us gvsa (p@(PmCon { pm_con_con = con })) ps (PmLit l) vsa
@@ -1178,7 +1145,7 @@ dMatcher us gvsa (p@(PmCon { pm_con_con = con })) ps (PmLit l) vsa
     (us1, us2, us3)   = splitUniqSupply3 us
     y                 = mkPmId us1 (pmPatType p)
     (con_abs, all_cs) = mkOneConFull y us2 con
-    cs = TmConstraint y (PmExprLit l) : all_cs
+    cs = TmConstraint (PmExprVar y) (PmExprLit l) : all_cs
 
 -- DConCon
 dMatcher us gvsa (p@(PmCon { pm_con_con = c1, pm_con_args = args1 })) ps
@@ -1192,15 +1159,8 @@ dMatcher us gvsa (p@(PmCon { pm_con_con = c1, pm_con_args = args1 })) ps
 
 -- DLitLit
 dMatcher us gvsa (PmLit l1) ps (va@(PmLit l2)) vsa = case eqPmLit l1 l2 of
-  Just True  -> VA va `mkCons` divergent us gvsa ps vsa -- we know: match
-  Just False -> Empty                                   -- we know: no match
-  Nothing    -> VA va `mkCons` (cs `mkConstraint` divergent us2 gvsa ps vsa)
-  -- See Note [Undecidable Equality on Overloaded Literals] in TmOracle
-  where
-    (us1, us2) = splitUniqSupply us
-    y          = mkPmId us1 (pmPatType va)
-    cs         = [ TmConstraint y (PmExprLit l1)
-                 , TmConstraint y (PmExprLit l2) ]
+  True  -> VA va `mkCons` divergent us gvsa ps vsa -- match
+  False -> Empty                                   -- mismatch
 
 -- DConVar
 dMatcher us gvsa (p@(PmCon { pm_con_con = con })) ps (PmVar x) vsa
@@ -1215,7 +1175,7 @@ dMatcher us gvsa (PmLit l) ps (PmVar x) vsa
   = mkUnion (VA (PmVar x) `mkCons` mkConstraint [BtConstraint x] vsa)
             (dMatcher us gvsa (PmLit l) ps (PmLit l) (mkConstraint cs vsa))
   where
-    cs = [TmConstraint x (PmExprLit l)]
+    cs = [TmConstraint (PmExprVar x) (PmExprLit l)]
 
 -- ----------------------------------------------------------------------------
 -- * Propagation of term constraints inwards when checking nested matches
