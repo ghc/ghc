@@ -18,7 +18,7 @@ test('T3927b',only_compiler_types(['ghc']), compile, ['-fwarn-incomplete-pattern
 test('T3927', only_compiler_types(['ghc']), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T4139', only_compiler_types(['ghc']), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T6124', only_compiler_types(['ghc']), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T7669', only_compiler_types(['ghc']), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T7669a', only_compiler_types(['ghc']), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T8970', only_compiler_types(['ghc']), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T9951b',only_compiler_types(['ghc']), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T9951', only_compiler_types(['ghc']), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
