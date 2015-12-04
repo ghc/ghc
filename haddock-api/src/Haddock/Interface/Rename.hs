@@ -91,13 +91,13 @@ newtype RnM a =
 
 instance Monad RnM where
   (>>=) = thenRn
-  return = returnRn
+  return = pure
 
 instance Functor RnM where
   fmap f x = do a <- x; return (f a)
 
 instance Applicative RnM where
-  pure = return
+  pure = returnRn
   (<*>) = ap
 
 returnRn :: a -> RnM a

@@ -126,7 +126,7 @@ instance Monad (Parser i) where
       where msg = "Failed reading: " ++ err
     {-# INLINE fail #-}
 
-    return v = Parser $ \t pos more _lose succ -> succ t pos more v
+    return = pure
     {-# INLINE return #-}
 
     m >>= k = Parser $ \t !pos more lose succ ->
@@ -158,7 +158,7 @@ apP d e = do
 {-# INLINE apP #-}
 
 instance Applicative (Parser i) where
-    pure   = return
+    pure v = Parser $ \t pos more _lose succ -> succ t pos more v
     {-# INLINE pure #-}
     (<*>)  = apP
     {-# INLINE (<*>) #-}
@@ -166,7 +166,7 @@ instance Applicative (Parser i) where
     -- These definitions are equal to the defaults, but this
     -- way the optimizer doesn't have to work so hard to figure
     -- that out.
-    (*>)   = (>>)
+    m *> k = m >>= \_ -> k
     {-# INLINE (*>) #-}
     x <* y = x >>= \a -> y >> return a
     {-# INLINE (<*) #-}
