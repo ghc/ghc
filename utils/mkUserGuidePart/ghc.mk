@@ -32,7 +32,6 @@ utils/mkUserGuidePart_GENERATED_FLAGS_SETS := \
   plugin                      \
   profiling                   \
   program-coverage            \
-  recompilating-checking      \
   recompilation-checking      \
   redirecting-output          \
   temporary-files             \
@@ -45,7 +44,7 @@ utils/mkUserGuidePart_GENERATED_RST_SOURCES_BLESSED_FILE := \
 
 utils/mkUserGuidePart_GENERATED_RST_SOURCES_OTHER_FILES := \
 		$(addprefix docs/users_guide/flags-,$(addsuffix .gen.rst,$(utils/mkUserGuidePart_GENERATED_FLAGS_SETS))) \
-		docs/man/all-flags.gen.rst
+		docs/users_guide/all-flags.gen.rst
 
 utils/mkUserGuidePart_GENERATED_RST_SOURCES := \
 		$(utils/mkUserGuidePart_GENERATED_RST_SOURCES_BLESSED_FILE) \
