@@ -105,6 +105,7 @@ solveComplexEq solver_state@(standby, (unhandled, env)) eq@(e1, e2) = case eq of
   (_,PmExprOther _)            -> Just (standby, (True, env))
 
   (PmExprLit l1, PmExprLit l2) -> case eqPmLit l1 l2 of
+    -- See Note [Undecidable Equality for Overloaded Literals]
     True  -> Just solver_state
     False -> Nothing
 
@@ -165,6 +166,7 @@ simplifyEqExpr e1 e2 = case (e1, e2) of
 
   -- Literals
   (PmExprLit l1, PmExprLit l2) -> case eqPmLit l1 l2 of
+    -- See Note [Undecidable Equality for Overloaded Literals]
     True  -> (truePmExpr,  True)
     False -> (falsePmExpr, True)
 

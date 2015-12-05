@@ -1048,6 +1048,7 @@ cMatcher us gvsa (p@(PmCon { pm_con_con = c1, pm_con_args = args1 })) ps
 
 -- CLitLit
 cMatcher us gvsa (PmLit l1) ps (va@(PmLit l2)) vsa = case eqPmLit l1 l2 of
+  -- See Note [Undecidable Equality for Overloaded Literals]
   True  -> VA va `mkCons` covered us gvsa ps vsa -- match
   False -> Empty                                 -- mismatch
 
@@ -1101,6 +1102,7 @@ uMatcher us gvsa ( p@(PmCon { pm_con_con = c1, pm_con_args = args1 })) ps
 
 -- ULitLit
 uMatcher us gvsa (PmLit l1) ps (va@(PmLit l2)) vsa = case eqPmLit l1 l2 of
+  -- See Note [Undecidable Equality for Overloaded Literals]
   True  -> VA va `mkCons` uncovered us gvsa ps vsa -- match
   False -> VA va `mkCons` vsa                      -- mismatch
 
@@ -1161,6 +1163,7 @@ dMatcher us gvsa (p@(PmCon { pm_con_con = c1, pm_con_args = args1 })) ps
 
 -- DLitLit
 dMatcher us gvsa (PmLit l1) ps (va@(PmLit l2)) vsa = case eqPmLit l1 l2 of
+  -- See Note [Undecidable Equality for Overloaded Literals]
   True  -> VA va `mkCons` divergent us gvsa ps vsa -- match
   False -> Empty                                   -- mismatch
 
