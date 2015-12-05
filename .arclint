@@ -52,15 +52,6 @@
       "severity": {
         "2": "disabled"
       }
-    },
-    "check-binaries": {
-      "type": "external-json",
-      "external-json.script": "python .arc-linters/check-binaries.py"
-    },
-    "bad-assert-clang-cpp": {
-      "type": "external-json",
-      "include": ["(\\.(l?hs|x|y\\.pp)(\\.in)?$)"],
-      "external-json.script": "python .arc-linters/check-cpp.py"
     }
   },
 
