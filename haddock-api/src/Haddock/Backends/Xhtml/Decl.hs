@@ -801,6 +801,7 @@ ppSideBySideConstr subdocs fixities unicode qual (L _ con)
 
     doGADTCon :: Located (HsType DocName) -> Html
     doGADTCon ty = ppOcc <+> dcolon unicode
+        -- ++AZ++ make this prepend "{..}" when it is a record style GADT
         <+> ppLType unicode qual ty
         <+> fixity
 
@@ -963,9 +964,10 @@ ppr_mono_ty _         (HsPArrTy ty)       u q = pabrackets (ppr_mono_lty pREC_TO
 ppr_mono_ty ctxt_prec (HsIParamTy n ty)   u q =
     maybeParen ctxt_prec pREC_CTX $ ppIPName n <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u q
 ppr_mono_ty _         (HsSpliceTy {})     _ _ = error "ppr_mono_ty HsSpliceTy"
-ppr_mono_ty _         (HsRecTy {})        _ _ = mempty -- Can now legally occur
-                                                       -- un ConDeclGADT, but is
-                                                       -- output elsewhere
+ppr_mono_ty _         (HsRecTy {})        _ _ = toHtml "{..}"
+       -- Can now legally occur in ConDeclGADT, the output here is to provide a
+       -- placeholder in the signature, which is followed by the field
+       -- declarations.
 ppr_mono_ty _         (HsCoreTy {})       _ _ = error "ppr_mono_ty HsCoreTy"
 ppr_mono_ty _         (HsExplicitListTy _ tys) u q =
     promoQuote $ brackets $ hsep $ punctuate comma $ map (ppLType u q) tys
