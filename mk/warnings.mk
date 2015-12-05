@@ -32,6 +32,8 @@ SRC_CC_WARNING_OPTS += -Wno-unknown-pragmas
 
 endif
 
+SRC_HC_WARNING_OPTS_STAGE1 += -fwarn-noncanonical-monad-instances
+SRC_HC_WARNING_OPTS_STAGE2 += -fwarn-noncanonical-monad-instances
 
 
 ######################################################################
