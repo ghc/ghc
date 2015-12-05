@@ -34,4 +34,4 @@ if os.path.isfile(path):
                 warnings.append(warning)
 
 logger.debug(warnings)
-print json.dumps(warnings)
+print(json.dumps(warnings))

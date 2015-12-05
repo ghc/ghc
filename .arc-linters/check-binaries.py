@@ -17,4 +17,4 @@ if os.path.isfile(path):
             }
             warnings.append(warning)
 
-print json.dumps(warnings)
+print(json.dumps(warnings))
