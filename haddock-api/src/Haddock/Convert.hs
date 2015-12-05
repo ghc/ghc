@@ -300,19 +300,21 @@ synifyDataCon use_gadt_syntax dc =
           (False,True) -> case linear_tys of
                            [a,b] -> return $ InfixCon a b
                            _ -> Left "synifyDataCon: infix with non-2 args?"
-  hs_res_ty = if use_gadt_syntax
-              then ResTyGADT noSrcSpan (synifyType WithinType res_ty)
-              else ResTyH98
+  gadt_ty = HsIB [] [] (synifyType WithinType res_ty)
  -- finally we get synifyDataCon's result!
  in hs_arg_tys >>=
-      \hat -> return $ noLoc $
-              ConDecl { con_names = [name]
-                      , con_explicit = Implicit   -- we don't know nor care
-                      , con_qvars = qvars
-                      , con_cxt   = ctx
-                      , con_details =  hat
-                      , con_res = hs_res_ty
-                      , con_doc =  Nothing }
+      \hat ->
+        if use_gadt_syntax
+           then return $ noLoc $
+              ConDeclGADT { con_names = [name]
+                          , con_type = gadt_ty
+                          , con_doc =  Nothing }
+           else return $ noLoc $
+              ConDeclH98 { con_name = name
+                         , con_qvars = Just qvars
+                         , con_cxt   = Just ctx
+                         , con_details =  hat
+                         , con_doc =  Nothing }
 
 synifyName :: NamedThing n => n -> Located Name
 synifyName = noLoc . getName

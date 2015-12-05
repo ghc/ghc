@@ -50,6 +50,7 @@ import TcRnTypes
 import FastString (concatFS)
 import BasicTypes ( StringLiteral(..) )
 import qualified Outputable as O
+import HsDecls ( gadtDeclDetails,getConDetails )
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
 -- To do this, we need access to already processed modules in the topological
@@ -340,9 +341,9 @@ subordinates instMap decl = case decl of
       where
         cons = map unL $ (dd_cons dd)
         constrs = [ (unL cname, maybeToList $ fmap unL $ con_doc c, M.empty)
-                  | c <- cons, cname <- con_names c ]
+                  | c <- cons, cname <- getConNames c ]
         fields  = [ (selectorFieldOcc n, maybeToList $ fmap unL doc, M.empty)
-                  | RecCon flds <- map con_details cons
+                  | RecCon flds <- map getConDetails cons
                   , L _ (ConDeclField ns _ doc) <- (unLoc flds)
                   , L _ n <- ns ]
 
@@ -797,7 +798,8 @@ extractDecl name mdl decl
         SigD <$> extractRecSel name mdl n tys (dd_cons defn)
       InstD (ClsInstD ClsInstDecl { cid_datafam_insts = insts }) ->
         let matches = [ d | L _ d <- insts
-                          , L _ ConDecl { con_details = RecCon rec } <- dd_cons (dfid_defn d)
+                          -- , L _ ConDecl { con_details = RecCon rec } <- dd_cons (dfid_defn d)
+                          , RecCon rec <- map (getConDetails . unLoc) (dd_cons (dfid_defn d))
                           , ConDeclField { cd_fld_names = ns } <- map unLoc (unLoc rec)
                           , L _ n <- ns
                           , selectorFieldOcc n == name
@@ -812,7 +814,7 @@ extractRecSel :: Name -> Module -> Name -> [LHsType Name] -> [LConDecl Name]
 extractRecSel _ _ _ _ [] = error "extractRecSel: selector not found"
 
 extractRecSel nm mdl t tvs (L _ con : rest) =
-  case con_details con of
+  case getConDetails con of
     RecCon (L _ fields) | ((l,L _ (ConDeclField _nn ty _)) : _) <- matching_fields fields ->
       L l (TypeSig [noLoc nm] (mkEmptySigWcType (noLoc (HsFunTy data_ty (getBangType ty)))))
     _ -> extractRecSel nm mdl t tvs rest
@@ -821,7 +823,8 @@ extractRecSel nm mdl t tvs (L _ con : rest) =
   matching_fields flds = [ (l,f) | f@(L _ (ConDeclField ns _ _)) <- flds
                                  , L l n <- ns, selectorFieldOcc n == nm ]
   data_ty
-    | ResTyGADT _ ty <- con_res con = ty
+    -- | ResTyGADT _ ty <- con_res con = ty
+    | ConDeclGADT{} <- con = hsib_body $ con_type con
     | otherwise = foldl' (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar (noLoc t))) tvs
 
 -- | Keep export items with docs.

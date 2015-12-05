@@ -411,17 +411,16 @@ renameDataDefn (HsDataDefn { dd_ND = nd, dd_ctxt = lcontext, dd_cType = cType
                        , dd_kindSig = k', dd_cons = cons', dd_derivs = Nothing })
 
 renameCon :: ConDecl Name -> RnM (ConDecl DocName)
-renameCon decl@(ConDecl { con_names = lnames, con_qvars = ltyvars
-                        , con_cxt = lcontext, con_details = details
-                        , con_res = restype, con_doc = mbldoc }) = do
-      lnames'   <- mapM renameL lnames
-      ltyvars'  <- renameLHsQTyVars ltyvars
-      lcontext' <- renameLContext lcontext
+renameCon decl@(ConDeclH98 { con_name = lname, con_qvars = ltyvars
+                           , con_cxt = lcontext, con_details = details
+                           , con_doc = mbldoc }) = do
+      lname'    <- renameL lname
+      ltyvars'  <- traverse renameLHsQTyVars ltyvars
+      lcontext' <- traverse renameLContext lcontext
       details'  <- renameDetails details
-      restype'  <- renameResType restype
       mbldoc'   <- mapM renameLDocHsSyn mbldoc
-      return (decl { con_names = lnames', con_qvars = ltyvars', con_cxt = lcontext'
-                   , con_details = details', con_res = restype', con_doc = mbldoc' })
+      return (decl { con_name = lname', con_qvars = ltyvars', con_cxt = lcontext'
+                   , con_details = details', con_doc = mbldoc' })
 
   where
     renameDetails (RecCon (L l fields)) = do
@@ -433,9 +432,14 @@ renameCon decl@(ConDecl { con_names = lnames, con_qvars = ltyvars
       b' <- renameLType b
       return (InfixCon a' b')
 
-    renameResType (ResTyH98) = return ResTyH98
-    renameResType (ResTyGADT l t) = return . ResTyGADT l =<< renameLType t
-
+renameCon decl@(ConDeclGADT { con_names = lnames
+                            , con_type = lty
+                            , con_doc = mbldoc }) = do
+      lnames'   <- mapM renameL lnames
+      lty'      <- renameLSigType lty
+      mbldoc'   <- mapM renameLDocHsSyn mbldoc
+      return (decl { con_names = lnames'
+                   , con_type = lty', con_doc = mbldoc' })
 
 renameConDeclFieldField :: LConDeclField Name -> RnM (LConDeclField DocName)
 renameConDeclFieldField (L l (ConDeclField names t doc)) = do
