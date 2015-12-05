@@ -151,7 +151,14 @@ my_mmap (void *addr, W_ size, int operation)
     else
         prot = PROT_NONE;
     if (operation == MEM_RESERVE)
+# if defined(MAP_NORESERVE)
         flags = MAP_NORESERVE;
+# else
+#  ifdef USE_LARGE_ADDRESS_SPACE
+#   error USE_LARGE_ADDRESS_SPACE needs MAP_NORESERVE
+#  endif
+        errorBelch("my_mmap(,,MEM_RESERVE) not supported on this platform");
+# endif
     else if (operation == MEM_COMMIT)
         flags = MAP_FIXED;
     else
