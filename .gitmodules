@@ -117,4 +117,4 @@
 	ignore = none
 [submodule ".arc-linters/arcanist-external-json-linter"]
 	path = .arc-linters/arcanist-external-json-linter
-	url = https://github.com/bgamari/arcanist-external-json-linter.git
+	url = ../arcanist-external-json-linter.git
