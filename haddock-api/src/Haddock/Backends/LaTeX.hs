@@ -575,14 +575,14 @@ ppDataDecl instances subdocs _loc doc dataDecl unicode
 
   where
     cons      = dd_cons (tcdDataDefn dataDecl)
-    resTy     = (con_res . unLoc . head) cons
+    resTy     = (unLoc . head) cons
 
     body = catMaybes [constrBit, doc >>= documentationToLaTeX]
 
     (whereBit, leaders)
       | null cons = (empty,[])
       | otherwise = case resTy of
-        ResTyGADT _ _ -> (decltt (keyword "where"), repeat empty)
+        ConDeclGADT{} -> (decltt (keyword "where"), repeat empty)
         _             -> (empty, (decltt (text "=") : repeat (decltt (text "|"))))
 
     constrBit
@@ -606,6 +606,71 @@ ppConstrHdr forall tvs ctxt unicode
       True  -> forallSymbol unicode <+> hsep (map ppName tvs) <+> text ". "
       False -> empty
 
+
+ppSideBySideConstr :: [(DocName, DocForDecl DocName)] -> Bool -> LaTeX
+                   -> LConDecl DocName -> LaTeX
+ppSideBySideConstr subdocs unicode leader (L _ con@(ConDeclH98 {})) =
+  leader <->
+  case con_details con of
+
+    PrefixCon args ->
+      decltt (hsep ((header_ unicode <+> ppOcc) :
+                 map (ppLParendType unicode) args))
+      <-> rDoc mbDoc <+> nl
+
+    RecCon (L _ fields) ->
+      (decltt (header_ unicode <+> ppOcc)
+        <-> rDoc mbDoc <+> nl)
+      $$
+      doRecordFields fields
+
+    InfixCon arg1 arg2 ->
+      decltt (hsep [ header_ unicode <+> ppLParendType unicode arg1,
+                 ppOcc,
+                 ppLParendType unicode arg2 ])
+      <-> rDoc mbDoc <+> nl
+
+ where
+    doRecordFields fields =
+        vcat (map (ppSideBySideField subdocs unicode) (map unLoc fields))
+
+
+    header_ = ppConstrHdr False tyVars context
+    occ     = map (nameOccName . getName . unLoc) $ getConNames con
+    ppOcc   = case occ of
+      [one] -> ppBinder one
+      _     -> cat (punctuate comma (map ppBinder occ))
+    tyVars  = tyvarNames (fromMaybe (HsQTvs PlaceHolder []) (con_qvars con))
+    context = unLoc (fromMaybe (noLoc []) (con_cxt con))
+
+    -- don't use "con_doc con", in case it's reconstructed from a .hi file,
+    -- or also because we want Haddock to do the doc-parsing, not GHC.
+    mbDoc = case getConNames con of
+              [] -> panic "empty con_names"
+              (cn:_) -> lookup (unLoc cn) subdocs >>=
+                        fmap _doc . combineDocumentation . fst
+
+ppSideBySideConstr subdocs unicode leader (L _ con@(ConDeclGADT {})) =
+  leader <->
+  doGADTCon (hsib_body $ con_type con)
+
+ where
+    doGADTCon resTy = decltt (ppOcc <+> dcolon unicode <+>
+                               ppLType unicode resTy
+                            ) <-> rDoc mbDoc
+
+    occ     = map (nameOccName . getName . unLoc) $ getConNames con
+    ppOcc   = case occ of
+      [one] -> ppBinder one
+      _     -> cat (punctuate comma (map ppBinder occ))
+
+    -- don't use "con_doc con", in case it's reconstructed from a .hi file,
+    -- or also because we want Haddock to do the doc-parsing, not GHC.
+    mbDoc = case getConNames con of
+              [] -> panic "empty con_names"
+              (cn:_) -> lookup (unLoc cn) subdocs >>=
+                        fmap _doc . combineDocumentation . fst
+{- old
 
 ppSideBySideConstr :: [(DocName, DocForDecl DocName)] -> Bool -> LaTeX
                    -> LConDecl DocName -> LaTeX
@@ -670,7 +735,7 @@ ppSideBySideConstr subdocs unicode leader (L loc con) =
               (cn:_) -> lookup (unLoc cn) subdocs >>=
                         fmap _doc . combineDocumentation . fst
     mkFunTy a b = noLoc (HsFunTy a b)
-
+-}
 
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField DocName ->  LaTeX
 ppSideBySideField subdocs unicode (ConDeclField names ltype _) =

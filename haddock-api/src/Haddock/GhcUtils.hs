@@ -188,14 +188,14 @@ class Parent a where
 
 instance Parent (ConDecl Name) where
   children con =
-    case con_details con of
+    case getConDetails con of
       RecCon fields -> map (selectorFieldOcc . unL) $
                          concatMap (cd_fld_names . unL) (unL fields)
       _             -> []
 
 instance Parent (TyClDecl Name) where
   children d
-    | isDataDecl  d = map unL $ concatMap (con_names . unL)
+    | isDataDecl  d = map unL $ concatMap (getConNames . unL)
                               $ (dd_cons . tcdDataDefn) $ d
     | isClassDecl d =
         map (unL . fdLName . unL) (tcdATs d) ++
@@ -209,7 +209,7 @@ family = getName &&& children
 
 
 familyConDecl :: ConDecl Name -> [(Name, [Name])]
-familyConDecl d = zip (map unL (con_names d)) (repeat $ children d)
+familyConDecl d = zip (map unL (getConNames d)) (repeat $ children d)
 
 -- | A mapping from the parent (main-binder) to its children and from each
 -- child to its grand-children, recursively.
