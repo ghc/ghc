@@ -136,7 +136,8 @@ extendSubstAndSolve x e (standby, (unhandled, env))
   where
     -- Apply the substitution to the worklist and partition them to the ones
     -- that had some progress and the rest. Then, recurse over the ones that
-    -- had some progress.
+    -- had some progress. Careful about performance:
+    -- See Note [Representation of Term Equalities] in deSugar/Check.hs
     (changed, unchanged) = partitionWith (substComplexEq x e) standby
     new_incr_state       = (unchanged, (unhandled, Map.insert x e env))
 

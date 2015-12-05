@@ -72,6 +72,7 @@ The algorithm used is described in the paper:
 type PmM a = DsM a
 
 data PmConstraint = TmConstraint PmExpr PmExpr -- ^ Term equalities: e ~ e
+                    -- See Note [Representation of Term Equalities]
                   | TyConstraint [EvVar]   -- ^ Type equalities
                   | BtConstraint Id        -- ^ Strictness constraints: x ~ _|_
 
@@ -1122,6 +1123,7 @@ uMatcher us gvsa (p@(PmLit l)) ps (PmVar x) vsa
             (non_match_cs `mkConstraint` (VA (PmVar x) `mkCons` vsa))
   where
     match_cs     = [ TmConstraint (PmExprVar x) (PmExprLit l)]
+   -- See Note [Representation of Term Equalities]
     non_match_cs = [ TmConstraint falsePmExpr
                                   (PmExprEq (PmExprVar x) (PmExprLit l)) ]
 
@@ -1362,3 +1364,64 @@ ppr_uncovered (expr_vec, complex)
   where
     sdoc_vec = mapM pprPmExprWithParens expr_vec
     (vec,cs) = runPmPprM sdoc_vec (filterComplex complex)
+
+{- Note [Representation of Term Equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the paper, term constraints always take the form (x ~ e). Of course, a more
+general constraint of the form (e1 ~ e1) can always be transformed to an
+equivalent set of the former constraints, by introducing a fresh, intermediate
+variable: { y ~ e1, y ~ e1 }. Yet, implementing this representation gave rise
+to #11160 (incredibly bad performance for literal pattern matching). Two are
+the main sources of this problem (the actual problem is how these two interact
+with each other):
+
+1. Pattern matching on literals generates twice as many constraints as needed.
+   Consider the following (tests/ghci/should_run/ghcirun004):
+
+    foo :: Int -> Int
+    foo 1    = 0
+    ...
+    foo 5000 = 4999
+
+   The covered and uncovered set *should* look like:
+     U0 = { x |> {} }
+
+     C1  = { 1  |> { x ~ 1 } }
+     U1  = { x  |> { False ~ (x ~ 1) } }
+     ...
+     C10 = { 10 |> { False ~ (x ~ 1), .., False ~ (x ~ 9), x ~ 10 } }
+     U10 = { x  |> { False ~ (x ~ 1), .., False ~ (x ~ 9), False ~ (x ~ 10) } }
+     ...
+
+     If replace { False ~ (x ~ 1) }, with { y ~ False, y ~ (x ~ 1) }
+     we get twice as many constraints. Also note that half of them are just the
+     substitution [x |-> False].
+
+2. The term oracle (`tmOracle` in deSugar/TmOracle) uses equalities of the form
+   (x ~ e) as substitutions [x |-> e]. More specifically, function
+   `extendSubstAndSolve` applies such substitutions in the residual constraints
+   and partitions them in the affected and non-affected ones, which are the new
+   worklist. Essentially, this gives quadradic behaviour on the number of the
+   residual constraints. (This would not be the case if the term oracle used
+   mutable variables but, since we use it to handle disjunctions on value set
+   abstractions (`Union` case), we chose a pure, incremental interface).
+
+Now the problem becomes apparent (e.g. for clause 300):
+  * Set U300 contains 300 substituting constraints [y_i |-> False] and 300
+    constraints that we know that will not reduce (stay in the worklist).
+  * To check for consistency, we apply the substituting constraints ONE BY ONE
+    (since `tmOracle` is called incrementally, it does not have all of them
+    available at once). Hence, we go through the (non-progressing) constraints
+    over and over, achieving over-quadradic behaviour.
+
+If instead we allow constraints of the form (e ~ e),
+  * All uncovered sets Ui contain no substituting constraints and i
+    non-progressing constraints of the form (False ~ (x ~ lit)) so the oracle
+    behaves linearly.
+  * All covered sets Ci contain exactly (i-1) non-progressing constraints and
+    a single substituting constraint. So the term oracle goes through the
+    constraints only once.
+
+The performance improvement becomes even more important when more arguments are
+involved.
+-}
