@@ -197,6 +197,14 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-fno-warn-noncanonical-monad-instance"
          }
+  , flag { flagName = "-fwarn-noncanonical-monoid-instance"
+         , flagDescription =
+           "warn when ``Semigroup`` or ``Monoid`` instances have "++
+           "noncanonical definitions of ``(<>)`` or ``mappend``. "++
+           "See flag description in :ref:`options-sanity` for more details."
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-warn-noncanonical-monoid-instance"
+         }
   , flag { flagName = "-fwarn-orphans"
          , flagDescription =
            "warn when the module contains :ref:`orphan instance declarations "++

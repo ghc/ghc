@@ -31,7 +31,10 @@ import Module
 import HscTypes         ( Warnings(..), plusWarns )
 import Class            ( FunDep )
 import PrelNames        ( applicativeClassName, pureAName, thenAName
-                        , monadClassName, returnMName, thenMName )
+                        , monadClassName, returnMName, thenMName
+                        , semigroupClassName, sappendName
+                        , monoidClassName, mappendName
+                        )
 import Name
 import NameSet
 import NameEnv
@@ -455,47 +458,101 @@ rnSrcInstDecl (ClsInstD { cid_inst = cid })
   = do { (cid', fvs) <- rnClsInstDecl cid
        ; return (ClsInstD { cid_inst = cid' }, fvs) }
 
--- | Warn about unsound/non-canonical 'Applicative'/'Monad' instance
--- declarations. Specifically, the following conditions are verified:
+-- | Warn about non-canonical typeclass instance declarations
 --
--- In 'Monad' instances declarations:
+-- A "non-canonical" instance definition can occur for instances of a
+-- class which redundantly defines an operation its superclass
+-- provides as well (c.f. `return`/`pure`). In such cases, a canonical
+-- instance is one where the subclass inherits its method
+-- implementation from its superclass instance (usually the subclass
+-- has a default method implementation to that effect). Consequently,
+-- a non-canonical instance occurs when this is not the case.
 --
---  * If 'return' is overridden it must be canonical (i.e. @return = pure@).
---  * If '(>>)' is overridden it must be canonical (i.e. @(>>) = (*>)@).
---
--- In 'Applicative' instance declarations:
---
---  * Warn if 'pure' is defined backwards (i.e. @pure = return@).
---  * Warn if '(*>)' is defined backwards (i.e. @(*>) = (>>)@).
---
-checkCanonicalMonadInstances :: Name -> LHsSigType Name -> LHsBinds Name -> RnM ()
-checkCanonicalMonadInstances cls poly_ty mbinds
-  | cls == applicativeClassName  = do
-      forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $ do
-          case mbind of
-              FunBind { fun_id = L _ name, fun_matches = mg }
-                  | name == pureAName, isAliasMG mg == Just returnMName
-                  -> addWarnNonCanMeth1 "pure" "return"
+-- See also descriptions of 'checkCanonicalMonadInstances' and
+-- 'checkCanonicalMonoidInstances'
+checkCanonicalInstances :: Name -> LHsSigType Name -> LHsBinds Name -> RnM ()
+checkCanonicalInstances cls poly_ty mbinds = do
+    whenWOptM Opt_WarnNonCanonicalMonadInstances
+        checkCanonicalMonadInstances
 
-                  | name == thenAName, isAliasMG mg == Just thenMName
-                  -> addWarnNonCanMeth1 "(*>)" "(>>)"
+    whenWOptM Opt_WarnNonCanonicalMonoidInstances
+        checkCanonicalMonoidInstances
 
-              _ -> return ()
-
-  | cls == monadClassName  = do
-      forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $ do
-          case mbind of
-              FunBind { fun_id = L _ name, fun_matches = mg }
-                  | name == returnMName, isAliasMG mg /= Just pureAName
-                  -> addWarnNonCanMeth2 "return" "pure"
-
-                  | name == thenMName, isAliasMG mg /= Just thenAName
-                  -> addWarnNonCanMeth2 "(>>)" "(*>)"
-
-              _ -> return ()
-
-  | otherwise = return ()
   where
+    -- | Warn about unsound/non-canonical 'Applicative'/'Monad' instance
+    -- declarations. Specifically, the following conditions are verified:
+    --
+    -- In 'Monad' instances declarations:
+    --
+    --  * If 'return' is overridden it must be canonical (i.e. @return = pure@)
+    --  * If '(>>)' is overridden it must be canonical (i.e. @(>>) = (*>)@)
+    --
+    -- In 'Applicative' instance declarations:
+    --
+    --  * Warn if 'pure' is defined backwards (i.e. @pure = return@).
+    --  * Warn if '(*>)' is defined backwards (i.e. @(*>) = (>>)@).
+    --
+    checkCanonicalMonadInstances
+      | cls == applicativeClassName  = do
+          forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $ do
+              case mbind of
+                  FunBind { fun_id = L _ name, fun_matches = mg }
+                      | name == pureAName, isAliasMG mg == Just returnMName
+                      -> addWarnNonCanonicalMethod1 "pure" "return"
+
+                      | name == thenAName, isAliasMG mg == Just thenMName
+                      -> addWarnNonCanonicalMethod1 "(*>)" "(>>)"
+
+                  _ -> return ()
+
+      | cls == monadClassName  = do
+          forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $ do
+              case mbind of
+                  FunBind { fun_id = L _ name, fun_matches = mg }
+                      | name == returnMName, isAliasMG mg /= Just pureAName
+                      -> addWarnNonCanonicalMethod2 "return" "pure"
+
+                      | name == thenMName, isAliasMG mg /= Just thenAName
+                      -> addWarnNonCanonicalMethod2 "(>>)" "(*>)"
+
+                  _ -> return ()
+
+      | otherwise = return ()
+
+    -- | Check whether Monoid(mappend) is defined in terms of
+    -- Semigroup((<>)) (and not the other way round). Specifically,
+    -- the following conditions are verified:
+    --
+    -- In 'Monoid' instances declarations:
+    --
+    --  * If 'mappend' is overridden it must be canonical
+    --    (i.e. @mappend = (<>)@)
+    --
+    -- In 'Semigroup' instance declarations:
+    --
+    --  * Warn if '(<>)' is defined backwards (i.e. @(<>) = mappend@).
+    --
+    checkCanonicalMonoidInstances
+      | cls == semigroupClassName  = do
+          forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $ do
+              case mbind of
+                  FunBind { fun_id = L _ name, fun_matches = mg }
+                      | name == sappendName, isAliasMG mg == Just mappendName
+                      -> addWarnNonCanonicalMethod1 "(<>)" "mappend"
+
+                  _ -> return ()
+
+      | cls == monoidClassName  = do
+          forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpan loc $ do
+              case mbind of
+                  FunBind { fun_id = L _ name, fun_matches = mg }
+                      | name == mappendName, isAliasMG mg /= Just sappendName
+                      -> addWarnNonCanonicalMethod2NoDefault "mappend" "(<>)"
+
+                  _ -> return ()
+
+      | otherwise = return ()
+
     -- | test whether MatchGroup represents a trivial \"lhsName = rhsName\"
     -- binding, and return @Just rhsName@ if this is the case
     isAliasMG :: MatchGroup Name (LHsExpr Name) -> Maybe Name
@@ -506,7 +563,7 @@ checkCanonicalMonadInstances cls poly_ty mbinds
     isAliasMG _ = Nothing
 
     -- got "lhs = rhs" but expected something different
-    addWarnNonCanMeth1 lhs rhs = do
+    addWarnNonCanonicalMethod1 lhs rhs = do
         addWarn $ vcat [ text "Noncanonical" <+>
                          quotes (text (lhs ++ " = " ++ rhs)) <+>
                          text "definition detected"
@@ -517,13 +574,23 @@ checkCanonicalMonadInstances cls poly_ty mbinds
                        ]
 
     -- expected "lhs = rhs" but got something else
-    addWarnNonCanMeth2 lhs rhs = do
+    addWarnNonCanonicalMethod2 lhs rhs = do
         addWarn $ vcat [ text "Noncanonical" <+>
                          quotes (text lhs) <+>
                          text "definition detected"
                        , instDeclCtxt1 poly_ty
                        , text "Either remove definition for" <+>
                          quotes (text lhs) <+> text "or define as" <+>
+                         quotes (text (lhs ++ " = " ++ rhs))
+                       ]
+
+    -- like above, but method has no default impl
+    addWarnNonCanonicalMethod2NoDefault lhs rhs = do
+        addWarn $ vcat [ text "Noncanonical" <+>
+                         quotes (text lhs) <+>
+                         text "definition detected"
+                       , instDeclCtxt1 poly_ty
+                       , text "Define as" <+>
                          quotes (text (lhs ++ " = " ++ rhs))
                        ]
 
@@ -558,8 +625,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
           -- forall-d tyvars scope over the method bindings too
        ; (mbinds', uprags', meth_fvs) <- rnMethodBinds False cls ktv_names mbinds uprags
 
-       ; whenWOptM Opt_WarnNonCanonicalMonadInstances $
-         checkCanonicalMonadInstances cls inst_ty' mbinds'
+       ; checkCanonicalInstances cls inst_ty' mbinds'
 
        -- Rename the associated types, and type signatures
        -- Both need to have the instance type variables in scope
