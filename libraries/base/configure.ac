@@ -1,12 +1,8 @@
+AC_PREREQ([2.60])
 AC_INIT([Haskell base package], [1.0], [libraries@haskell.org], [base])
 
 # Safety check: Ensure that we are in the correct source directory.
 AC_CONFIG_SRCDIR([include/HsBase.h])
-
-AC_PREREQ([2.60])
-
-dnl make extensions visible to allow feature-tests to detect them lateron
-AC_USE_SYSTEM_EXTENSIONS
 
 AC_CONFIG_HEADERS([include/HsBaseConfig.h include/EventConfig.h])
 
@@ -18,6 +14,8 @@ AC_ARG_WITH([cc],
             [C compiler],
             [CC=$withval])
 AC_PROG_CC()
+dnl make extensions visible to allow feature-tests to detect them lateron
+AC_USE_SYSTEM_EXTENSIONS
 
 AC_MSG_CHECKING(for WINDOWS platform)
 case $host in
