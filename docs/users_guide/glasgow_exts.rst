@@ -1721,11 +1721,12 @@ comprehensions are explained in the previous chapters
 the type ``[a]`` with the type ``Monad m => m a`` for monad
 comprehensions.
 
-Note: Even though most of these examples are using the list monad, monad
-comprehensions work for any monad. The ``base`` package offers all
-necessary instances for lists, which make ``MonadComprehensions``
-backward compatible to built-in, transform and parallel list
-comprehensions.
+.. note::
+    Even though most of these examples are using the list monad, monad
+    comprehensions work for any monad. The ``base`` package offers all
+    necessary instances for lists, which make ``MonadComprehensions``
+    backward compatible to built-in, transform and parallel list
+    comprehensions.
 
 More formally, the desugaring is as follows. We write ``D[ e | Q]`` to
 mean the desugaring of the monad comprehension ``[ e | Q]``:
@@ -6690,9 +6691,7 @@ Two things to watch out for:
    specifications cannot be nested. To specify ``GMap``\ 's data
    constructors, you have to list it separately.
 
--  Consider this example:
-
-   ::
+-  Consider this example: ::
 
          module X where
            data family D
@@ -6701,13 +6700,11 @@ Two things to watch out for:
            import X
            data instance D Int = D1 | D2
 
-   Module Y exports all the entities defined in Y, namely the data
+   Module ``Y`` exports all the entities defined in ``Y``, namely the data
    constructors ``D1`` and ``D2``, and *implicitly* the data family ``D``,
-   even though it's defined in X. 
-   This means you can write "``import Y( D(D1,D2) )``" *without* 
-   giving an explicit export list like this: 
-
-   ::
+   even though it's defined in ``X``.
+   This means you can write ``import Y( D(D1,D2) )`` *without*
+   giving an explicit export list like this: ::
 
             module Y( D(..) ) where ...
        or   module Y( module Y, D ) where ...
