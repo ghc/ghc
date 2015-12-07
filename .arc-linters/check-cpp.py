@@ -9,16 +9,19 @@ import os
 import json
 import re
 
-
-def setup_logging():
-    logger = logging.getLogger()
+def setup_logging(logger):
+    """
+    ``arc lint`` makes it quite tricky to catch debug output from linters.
+    Log to a file to work around this.
+    """
     hdlr = logging.FileHandler('linter.log', 'w')
     logger.addHandler(hdlr)
     logger.setLevel(logging.DEBUG)
     return logger
 
-logger = setup_logging()
-#logger.debug(sys.argv)
+logger = logging.getLogger()
+#setup_logging(logger)
+logger.debug(sys.argv)
 
 path = sys.argv[1]
 warnings = []
