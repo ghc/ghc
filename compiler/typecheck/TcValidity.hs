@@ -494,7 +494,7 @@ check_syn_tc_app ctxt rank ty tc tys
                 mapM_ check_arg tys
 
           else  -- In the liberal case (only for closed syns), expand then check
-          case tcView ty of
+          case coreView ty of
              Just ty' -> check_type ctxt rank ty'
              Nothing  -> pprPanic "check_tau_type" (ppr ty)  }
 
@@ -1447,7 +1447,7 @@ fvType, fv_type :: Type -> [TyVar]
 fvType ty | isKind ty = []
           | otherwise = fv_type ty
 
-fv_type ty | Just exp_ty <- tcView ty = fv_type exp_ty
+fv_type ty | Just exp_ty <- coreView ty = fv_type exp_ty
 fv_type (TyVarTy tv)        = [tv]
 fv_type (TyConApp _ tys)    = fvTypes tys
 fv_type (LitTy {})          = []

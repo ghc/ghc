@@ -207,7 +207,7 @@ match menv subst (FunTy ty1a ty1b) (FunTy ty2a ty2b)
        ; match menv subst' ty1b ty2b }
 match menv subst (AppTy ty1a ty1b) ty2
   | Just (ty2a, ty2b) <- repSplitAppTy_maybe ty2
-        -- 'repSplit' used because the tcView stuff is done above
+        -- 'repSplit' used because the coreView stuff is done above
   = do { subst' <- match menv subst ty1a ty2a
        ; match menv subst' ty1b ty2b }
 
@@ -406,8 +406,8 @@ tcUnifyTyWithTFs twoWay t1 t2 = niFixTvSubst `fmap` go t1 t2 emptyTvSubstEnv
     where
       go :: Type -> Type -> TvSubstEnv -> Maybe TvSubstEnv
       -- look through type synonyms
-      go t1 t2 theta | Just t1' <- tcView t1 = go t1' t2  theta
-      go t1 t2 theta | Just t2' <- tcView t2 = go t1  t2' theta
+      go t1 t2 theta | Just t1' <- coreView t1 = go t1' t2  theta
+      go t1 t2 theta | Just t2' <- coreView t2 = go t1  t2' theta
       -- proper unification
       go (TyVarTy tv) t2 theta
           -- Equation (1)
@@ -571,8 +571,8 @@ unify :: Type -> Type -> UM ()
 unify (TyVarTy tv1) ty2  = uVar tv1 ty2
 unify ty1 (TyVarTy tv2)  = uVar tv2 ty1
 
-unify ty1 ty2 | Just ty1' <- tcView ty1 = unify ty1' ty2
-unify ty1 ty2 | Just ty2' <- tcView ty2 = unify ty1 ty2'
+unify ty1 ty2 | Just ty1' <- coreView ty1 = unify ty1' ty2
+unify ty1 ty2 | Just ty2' <- coreView ty2 = unify ty1 ty2'
 
 unify ty1 ty2
   | Just (tc1, tys1) <- splitTyConApp_maybe ty1
@@ -636,7 +636,7 @@ uUnrefined :: TvSubstEnv          -- environment to extend (from the UM monad)
 -- We know that tv1 isn't refined
 
 uUnrefined subst tv1 ty2 ty2'
-  | Just ty2'' <- tcView ty2'
+  | Just ty2'' <- coreView ty2'
   = uUnrefined subst tv1 ty2 ty2''      -- Unwrap synonyms
                 -- This is essential, in case we have
                 --      type Foo a = a

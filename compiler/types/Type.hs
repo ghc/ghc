@@ -100,7 +100,7 @@ module Type (
         seqType, seqTypes,
 
         -- * Other views onto Types
-        coreView, tcView,
+        coreView,
 
         UnaryType, RepType(..), flattenRepType, repType,
         tyConsOfType,
@@ -270,16 +270,6 @@ coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc t
 coreView _ = Nothing
 
 -----------------------------------------------
-{-# INLINE tcView #-}
-tcView :: Type -> Maybe Type
--- ^ Historical only; 'tcView' and 'coreView' used to differ, but don't any more
-tcView = coreView
-  -- ToDo: get rid of tcView altogether
-  -- You might think that tcView belows in TcType rather than Type, but unfortunately
-  -- it is needed by Unify, which is turn imported by Coercion (for MatchEnv and matchList).
-  -- So we will leave it here to avoid module loops.
-
------------------------------------------------
 expandTypeSynonyms :: Type -> Type
 -- ^ Expand out all type synonyms.  Actually, it'd suffice to expand out
 -- just the ones that discard type variables (e.g.  type Funny a = Int)
@@ -444,7 +434,7 @@ mkNumLitTy n = LitTy (NumTyLit n)
 
 -- | Is this a numeric literal. We also look through type synonyms.
 isNumLitTy :: Type -> Maybe Integer
-isNumLitTy ty | Just ty1 <- tcView ty = isNumLitTy ty1
+isNumLitTy ty | Just ty1 <- coreView ty = isNumLitTy ty1
 isNumLitTy (LitTy (NumTyLit n)) = Just n
 isNumLitTy _                    = Nothing
 
@@ -453,7 +443,7 @@ mkStrLitTy s = LitTy (StrTyLit s)
 
 -- | Is this a symbol literal. We also look through type synonyms.
 isStrLitTy :: Type -> Maybe FastString
-isStrLitTy ty | Just ty1 <- tcView ty = isStrLitTy ty1
+isStrLitTy ty | Just ty1 <- coreView ty = isStrLitTy ty1
 isStrLitTy (LitTy (StrTyLit s)) = Just s
 isStrLitTy _                    = Nothing
 
@@ -755,7 +745,7 @@ tyConsOfType ty
   = go ty
   where
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
-     go ty | Just ty' <- tcView ty = go ty'
+     go ty | Just ty' <- coreView ty = go ty'
      go (TyVarTy {})               = emptyNameEnv
      go (LitTy {})                 = emptyNameEnv
      go (TyConApp tc tys)          = go_tc tc tys

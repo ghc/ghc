@@ -130,7 +130,7 @@ matchExpectedFunTys herald arity orig_ty
       | n_req == 0 = return (mkTcNomReflCo ty, [], ty)
 
     go n_req ty
-      | Just ty' <- tcView ty = go n_req ty'
+      | Just ty' <- coreView ty = go n_req ty'
 
     go n_req (FunTy arg_ty res_ty)
       | not (isPredTy arg_ty)
@@ -234,7 +234,7 @@ matchExpectedTyConApp tc orig_ty
   = go orig_ty
   where
     go ty
-       | Just ty' <- tcView ty
+       | Just ty' <- coreView ty
        = go ty'
 
     go ty@(TyConApp tycon args)
@@ -281,7 +281,7 @@ matchExpectedAppTy orig_ty
   = go orig_ty
   where
     go ty
-      | Just ty' <- tcView ty = go ty'
+      | Just ty' <- coreView ty = go ty'
 
       | Just (fun_ty, arg_ty) <- tcSplitAppTy_maybe ty
       = return (mkTcNomReflCo orig_ty, (fun_ty, arg_ty))
@@ -745,8 +745,8 @@ uType origin orig_ty1 orig_ty2
         -- we'll end up saying "can't match Foo with Bool"
         -- rather than "can't match "Int with Bool".  See Trac #4535.
     go ty1 ty2
-      | Just ty1' <- tcView ty1 = go ty1' ty2
-      | Just ty2' <- tcView ty2 = go ty1  ty2'
+      | Just ty1' <- coreView ty1 = go ty1' ty2
+      | Just ty2' <- coreView ty2 = go ty1  ty2'
 
         -- Functions (or predicate functions) just check the two parts
     go (FunTy fun1 arg1) (FunTy fun2 arg2)
@@ -1263,8 +1263,8 @@ unifyKindX (TyVarTy kv1) k2 = uKVar NotSwapped unifyKindX kv1 k2
 unifyKindX k1 (TyVarTy kv2) = uKVar IsSwapped  unifyKindX kv2 k1
 
 unifyKindX k1 k2       -- See Note [Expanding synonyms during unification]
-  | Just k1' <- tcView k1 = unifyKindX k1' k2
-  | Just k2' <- tcView k2 = unifyKindX k1  k2'
+  | Just k1' <- coreView k1 = unifyKindX k1' k2
+  | Just k2' <- coreView k2 = unifyKindX k1  k2'
 
 unifyKindX (TyConApp kc1 []) (TyConApp kc2 [])
   | kc1 == kc2               = return (Just EQ)
