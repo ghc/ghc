@@ -195,4 +195,3 @@ pmPprHsLit (HsInteger _ i _)  = integer i
 pmPprHsLit (HsRat f _)        = ppr f
 pmPprHsLit (HsFloatPrim f)    = ppr f
 pmPprHsLit (HsDoublePrim d)   = ppr d
-

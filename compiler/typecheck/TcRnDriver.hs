@@ -1444,7 +1444,7 @@ tcTyClsInstDecls tycl_decls inst_decls deriv_decls
 
     get_fi_cons :: DataFamInstDecl Name -> [Name]
     get_fi_cons (DataFamInstDecl { dfid_defn = HsDataDefn { dd_cons = cons } })
-      = map unLoc $ concatMap (con_names . unLoc) cons
+      = map unLoc $ concatMap (getConNames . unLoc) cons
 
 {-
 Note [AFamDataCon: not promoting data family constructors]
