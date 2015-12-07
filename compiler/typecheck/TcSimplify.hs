@@ -32,7 +32,7 @@ import PrelNames
 import TcErrors
 import TcEvidence
 import TcInteract
-import TcCanonical   ( makeSuperClasses )
+import TcCanonical   ( makeSuperClasses, addSuperClasses )
 import TcMType   as TcM
 import TcRnMonad as TcRn
 import TcSMonad  as TcS
@@ -1005,7 +1005,7 @@ expandSuperClasses wc@(WC { wc_simple = unsolved, wc_insol = insols })
        ; new_insols <- solveSimpleGivens new_given
        ; new_wanted <- concatMapM makeSuperClasses pending_wanted
        ; return (False, wc { wc_simple = unsolved' `unionBags`
-                                         listToBag (map mkNonCanonical new_wanted)
+                                         listToBag new_wanted
                            , wc_insol = insols `unionBags` new_insols }) } }
 
 solveNestedImplications :: Bag Implication
@@ -1055,7 +1055,8 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
          -- Solve the nested constraints
        ; (no_given_eqs, given_insols, residual_wanted)
              <- nestImplicTcS ev_binds tclvl $
-               do { given_insols <- solveSimpleGivenEvVars (mkGivenLoc tclvl info env) givens
+               do { givens_w_scs <- concatMapM (addSuperClasses . mk_given_ev) givens
+                  ; given_insols <- solveSimpleGivens givens_w_scs
 
                   ; residual_wanted <- solveWanteds wanteds
                         -- solveWanteds, *not* solveWantedsAndDrop, because
@@ -1064,7 +1065,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
 
                   ; no_eqs <- getNoGivenEqs tclvl skols
                         -- Call getNoGivenEqs /after/ solveWanteds, because
-                        -- solveWanteds can augment the givens in expandSuperClasses
+                        -- solveWanteds can augment the givens, via expandSuperClasses,
                         -- to reveal given superclass equalities
 
                   ; return (no_eqs, given_insols, residual_wanted) }
@@ -1086,6 +1087,11 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
              , text "implication evbinds = " <+> ppr (evBindMapBinds evbinds) ]
 
        ; return (floated_eqs, res_implic) }
+  where
+    given_loc = mkGivenLoc tclvl info env
+    mk_given_ev ev_id = CtGiven { ctev_evar = ev_id
+                                , ctev_pred = evVarPred ev_id
+                                , ctev_loc  = given_loc }
 
 ----------------------
 setImplicationStatus :: Implication -> TcS (Maybe Implication)

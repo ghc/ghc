@@ -82,7 +82,7 @@ module TcType (
 
   ---------------------------------
   -- Predicate types
-  mkMinimalBySCs, boundedSuperClasses,
+  mkMinimalBySCs, transSuperClasses,
   immSuperClasses,
   isImprovementPred,
 
@@ -1394,7 +1394,7 @@ mkMinimalBySCs :: [PredType] -> [PredType]
 mkMinimalBySCs ptys = go preds_with_scs []
  where
    preds_with_scs :: [PredWithSCs]
-   preds_with_scs = [ (pred, boundedSuperClasses pred)
+   preds_with_scs = [ (pred, transSuperClasses pred)
                     | pred <- ptys ]
 
    go :: [PredWithSCs]   -- Work list
@@ -1410,20 +1410,23 @@ mkMinimalBySCs ptys = go preds_with_scs []
    in_cloud :: PredType -> [PredWithSCs] -> Bool
    in_cloud p ps = or [ p `eqPred` p' | (_, scs) <- ps, p' <- scs ]
 
-boundedSuperClasses :: PredType -> [PredType]
--- (boundedSuperClasses p) returns (p's superclasses)
--- not including p (unless there's a loop)
-boundedSuperClasses p
-  = go 10 p   -- Set a hard limit here; it's always sound
-              -- to return fewer superclasses
+transSuperClasses :: PredType -> [PredType]
+-- (transSuperClasses p) returns (p's superclasses)
+-- not including p
+transSuperClasses p
+  = go emptyNameSet p
   where
-    go :: Int -> PredType -> [PredType]
-    go n p | n > 0
-           , ClassPred cls tys <- classifyPredType p
-           = [ p' | sc <- immSuperClasses cls tys
-                  , p'  <- sc : go (n-1) sc ]
-           | otherwise
-           = []
+    go :: NameSet -> PredType -> [PredType]
+    go rec_clss p
+       | ClassPred cls tys <- classifyPredType p
+       , let cls_nm = className cls
+       , not (cls_nm `elemNameSet` rec_clss)
+       , let rec_clss' | isCTupleClass cls = rec_clss
+                       | otherwise         = rec_clss `extendNameSet` cls_nm
+       = [ p' | sc <- immSuperClasses cls tys
+              , p'  <- sc : go rec_clss' sc ]
+       | otherwise
+       = []
 
 immSuperClasses :: Class -> [Type] -> [PredType]
 immSuperClasses cls tys

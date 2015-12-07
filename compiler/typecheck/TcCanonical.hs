@@ -3,7 +3,7 @@
 module TcCanonical(
      canonicalize,
      unifyDerived,
-     makeSuperClasses,
+     makeSuperClasses, addSuperClasses,
      StopOrContinue(..), stopWith, continueWith
   ) where
 
@@ -28,12 +28,13 @@ import OccName( OccName )
 import Outputable
 import DynFlags( DynFlags )
 import VarSet
+import NameSet
 import RdrName
 
 import Pair
 import Util
 import Bag
-import MonadUtils ( zipWith3M, zipWith3M_ )
+import MonadUtils ( concatMapM, zipWith3M, zipWith3M_ )
 import Data.List  ( zip4 )
 import BasicTypes
 import FastString
@@ -206,8 +207,56 @@ canClass ev cls tys pend_sc
                                    , ppr xi, ppr mb ])
        ; return (fmap mk_ct mb) }
 
-{- Note [Adding superclasses]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [The superclass story]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We need to add superclass constraints for two reasons:
+
+* For givens, they give us a route to to proof.  E.g.
+    f :: Ord a => a -> Bool
+    f x = x == x
+  We get a Wanted (Eq a), which can only be solved from the superclass
+  of the Given (Ord a).
+
+* For wanteds, they may give useful functional dependencies.  E.g.
+     class C a b | a -> b where ...
+     class C a b => D a b where ...
+  Now a Wanted constraint (D Int beta) has (C Int beta) as a superclass
+  and that might tell us about beta, via C's fundeps.  We can get this
+  by generateing a Derived (C Int beta) constraint.  It's derived because
+  we don't actually have to cough up any evidence for it; it's only there
+  to generate fundep equalities.
+
+For these reasons we want to generate superclass constraints for both
+Givens and Wanteds. But:
+
+* (Minor) they are often not needed, so generating them aggressively
+  is a waste of time.
+
+* (Major) if we want recursive superclasses, there would be an infinite
+  number of them.  Here is a real-life example (Trac #10318);
+
+     class (Frac (Frac a) ~ Frac a,
+            Fractional (Frac a),
+            IntegralDomain (Frac a))
+         => IntegralDomain a where
+      type Frac a :: *
+
+  Notice that IntegralDomain has an associated type Frac, and one
+  of IntegralDomain's superclasses is another IntegralDomain constraint.
+
+So here's the plan:
+
+1. Generate superclasses for given (but not wanted) constraints, but
+   stop if you encounter the same class twice.  That is, expand eagerly,
+   but have a conservative termination condition. Notice that with normal
+   Haskell-98 classes, the loop-detector will never bite, so we'll get
+   all the superclasses.
+
+2. Solve the wanteds as usual.
+
+3. If we have any remaining unsolved wanteds, 
+
+
 Since dictionaries are canonicalized only once in their lifetime, the
 place to add their superclasses is canonicalisation.  See Note [Add
 superclasses only during canonicalisation].  Here is what we do:
@@ -311,26 +360,61 @@ Mind you, now that Wanteds cannot rewrite Derived, I think this particular
 situation can't happen.
   -}
 
-makeSuperClasses :: Ct -> TcS [CtEvidence]
--- Returns superclasses, see Note [Adding superclasses]
-makeSuperClasses (CDictCan { cc_ev = ev, cc_tyargs = xis, cc_class = cls })
-            -- Add superclasses of this one here, See Note [Adding superclasses].
-            -- But only if we are not simplifying the LHS of a rule.
-  | CtGiven { ctev_evar = evar, ctev_loc = loc } <- ev
-  =  newGivenEvVars (mk_given_loc loc)
-                    (mkEvScSelectors (EvId evar) cls xis)
+addSuperClasses :: CtEvidence -> TcS [Ct]
+-- Make a Ct from this CtEvidence, but add its superclasses
+-- if it's a class constraint
+addSuperClasses ev = mk_superclasses emptyNameSet ev
 
-  | isEmptyVarSet (tyVarsOfTypes xis)
+makeSuperClasses :: Ct -> TcS [Ct]
+-- Returns superclasses, transitively, see Note [The superclasses story]
+makeSuperClasses (CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys })
+  = mk_strict_superclasses emptyNameSet ev cls tys
+makeSuperClasses ct
+  = pprPanic "makeSuperClasses" (ppr ct)
+
+mk_superclasses :: NameSet -> CtEvidence -> TcS [Ct]
+-- Return this constraint, plus its superclasses, if any
+mk_superclasses rec_clss ev
+  | ClassPred cls tys <- classifyPredType (ctEvPred ev)
+  = mk_superclasses_of rec_clss ev cls tys
+
+  | otherwise   -- Superclass is not a class predicate
+  = return [mkNonCanonical ev]
+
+mk_superclasses_of :: NameSet -> CtEvidence -> Class -> [Type] -> TcS [Ct]
+-- Return this class constraint, plus its superclasses
+mk_superclasses_of rec_clss ev cls tys
+  | loop_found
+  = return [this_ct]
+  | otherwise
+  = do { sc_cts <- mk_strict_superclasses rec_clss' ev cls tys
+       ; return (this_ct : sc_cts) }
+  where
+    cls_nm     = className cls
+    loop_found = cls_nm `elemNameSet` rec_clss
+    rec_clss'  | isCTupleClass cls = rec_clss  -- Never contribute to recursion
+               | otherwise         = rec_clss `extendNameSet` cls_nm
+    this_ct    = CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys
+                          , cc_pend_sc = loop_found }
+
+mk_strict_superclasses :: NameSet -> CtEvidence -> Class -> [Type] -> TcS [Ct]
+mk_strict_superclasses rec_clss ev cls tys
+  | CtGiven { ctev_evar = evar, ctev_loc = loc } <- ev
+  = do { sc_evs <- newGivenEvVars (mk_given_loc loc)
+                                  (mkEvScSelectors (EvId evar) cls tys)
+       ; concatMapM (mk_superclasses rec_clss) sc_evs }
+
+
+  | isEmptyVarSet (tyVarsOfTypes tys)
   = return [] -- Wanteds with no variables yield no deriveds.
               -- See Note [Improvement from Ground Wanteds]
 
   | otherwise -- Wanted/Derived case, just add those SC that can lead to improvement.
-  = do { let sc_theta = immSuperClasses cls xis
-             loc      = ctEvLoc ev
-       ; traceTcS "newSCWork/Derived" $ text "sc_theta =" <+> ppr sc_theta
-       ; mapM (newDerivedNC loc) sc_theta }
+  = do { let loc = ctEvLoc ev
+       ; sc_evs <- mapM (newDerivedNC loc) (immSuperClasses cls tys)
+       ; concatMapM (mk_superclasses rec_clss) sc_evs }
   where
-    size = sizeTypes xis
+    size = sizeTypes tys
     mk_given_loc loc
        | isCTupleClass cls
        = loc   -- For tuple predicates, just take them apart, without
@@ -349,7 +433,6 @@ makeSuperClasses (CDictCan { cc_ev = ev, cc_tyargs = xis, cc_class = cls })
        | otherwise  -- Probably doesn't happen, since this function
        = loc        -- is only used for Givens, but does no harm
 
-makeSuperClasses ct = pprPanic "makeSuperClasses" (ppr ct)
 
 {-
 ************************************************************************
