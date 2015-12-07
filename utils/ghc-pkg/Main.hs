@@ -1271,10 +1271,13 @@ listPackages verbosity my_flags mPackageName mModuleName = do
     mapM_ show_normal stack
 #else
     let
-       show_colour withF db =
-           mconcat $ map (<#> termText "\n") $
-               (termText (location db) :
-                  map (termText "   " <#>) (map pp_pkg (packages db)))
+       show_colour withF db@PackageDB{ packages = pkg_confs } =
+           if null pkg_confs
+           then termText (location db) <#> termText "\n    (no packages)\n"
+           else
+               mconcat $ map (<#> termText "\n") $
+                           (termText (location db) :
+                                     map (termText "   " <#>) (map pp_pkg pkg_confs))
           where
                    pp_pkg p
                      | installedComponentId p `elem` broken = withF Red  doc
