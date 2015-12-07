@@ -2,24 +2,32 @@ module Settings.Builders.Ghc (ghcArgs, ghcMArgs, commonGhcArgs) where
 
 import Expression
 import Oracles
-import Predicates (stagedBuilder, splitObjects, stage0, notStage0)
+import GHC
+import Predicates (package, stagedBuilder, splitObjects, stage0, notStage0)
 import Settings
 
 -- TODO: add support for -dyno
+-- TODO: consider adding a new builder for programs (e.g. GhcLink?)
 -- $1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.hs-boot
 --     $$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
 --     $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno
 --     $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@)))
 ghcArgs :: Args
-ghcArgs = stagedBuilder Ghc ? mconcat [ commonGhcArgs
-                                      , arg "-H32m"
-                                      , stage0    ? arg "-O"
-                                      , notStage0 ? arg "-O2"
-                                      , arg "-Wall"
-                                      , arg "-fwarn-tabs"
-                                      , splitObjects ? arg "-split-objs"
-                                      , arg "-c", append =<< getInputs
-                                      , arg "-o", arg =<< getOutput ]
+ghcArgs = stagedBuilder Ghc ? do
+    output <- getOutput
+    way    <- getWay
+    let buildObj = ("//*." ++ osuf way) ?== output || ("//*." ++ obootsuf way) ?== output
+    mconcat [ commonGhcArgs
+            , arg "-H32m"
+            , stage0    ? arg "-O"
+            , notStage0 ? arg "-O2"
+            , arg "-Wall"
+            , arg "-fwarn-tabs"
+            , buildObj ? splitObjects ? arg "-split-objs"
+            , package ghc ? arg "-no-hs-main"
+            , buildObj ? arg "-c"
+            , append =<< getInputs
+            , arg "-o", arg =<< getOutput ]
 
 ghcMArgs :: Args
 ghcMArgs = stagedBuilder GhcM ? do
@@ -71,6 +79,7 @@ wayGhcArgs = do
 packageGhcArgs :: Args
 packageGhcArgs = do
     stage              <- getStage
+    pkg                <- getPackage
     supportsPackageKey <- getFlag SupportsPackageKey
     pkgKey             <- getPkgData PackageKey
     pkgDepIds          <- getPkgDataList DepIds
@@ -78,7 +87,8 @@ packageGhcArgs = do
         [ arg "-hide-all-packages"
         , arg "-no-user-package-db"
         , stage0 ? arg "-package-db libraries/bootstrapping.conf"
-        , if supportsPackageKey || stage /= Stage0
+        , isLibrary pkg ?
+          if supportsPackageKey || stage /= Stage0
           then arg $ "-this-package-key " ++ pkgKey
           else arg $ "-package-name "     ++ pkgKey
         , append $ map ("-package-id " ++) pkgDepIds ]
