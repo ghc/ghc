@@ -521,7 +521,7 @@ test('T5642',
             # 2014-09-03:  753045568
             # 2014-12-10:  641085256 Improvements in constraints solver
 
-            (wordsize(64), 1412808976, 10)])
+            (wordsize(64), 1071915072, 10)])
             # prev:        1300000000
             # 2014-07-17:  1358833928 (general round of updates)
             # 2014-08-07:  1402242360 (caused by 1fc60ea)
@@ -533,6 +533,7 @@ test('T5642',
             # 2014-09-10:  1536924976 post-AMP-cleanup
             # 2014-12-10:  1282916024 Improvements in constraints solver
             # 2015-10-28:  1412808976 Emit Typeable at definition site
+            # 2015-11-22:  1071915072 Use TypeLits in the metadata encoding
       ],
       compile,['-O'])
 

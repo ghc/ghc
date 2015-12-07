@@ -11,7 +11,6 @@ The deriving code for the Generic class
 
 module TcGenGenerics (canDoGenerics, canDoGenerics1,
                       GenericKind(..),
-                      MetaTyCons, genGenericMetaTyCons,
                       gen_Generic_binds, get_gen1_constrained_tys) where
 
 import HsSyn
@@ -23,10 +22,11 @@ import DataCon
 import TyCon
 import FamInstEnv       ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import FamInst
-import Module           ( Module, moduleName, moduleNameString
-                        , moduleUnitId, unitIdString, getModule )
+import Module           ( Module, moduleName, moduleNameFS
+                        , moduleUnitId, unitIdFS )
 import IfaceEnv         ( newGlobalBinder )
 import Name      hiding ( varName )
+import NameEnv ( lookupNameEnv )
 import RdrName
 import BasicTypes
 import TysPrim
@@ -36,16 +36,14 @@ import TcEnv
 import TcRnMonad
 import HscTypes
 import ErrUtils( Validity(..), andValid )
-import BuildTyCl
 import SrcLoc
 import Bag
-import Inst
 import VarSet (elemVarSet)
 import Outputable
 import FastString
 import Util
 
-import Control.Monad (mplus,forM)
+import Control.Monad (mplus)
 import Data.Maybe (isJust)
 
 #include "HsVersions.h"
@@ -65,117 +63,11 @@ For the generic representation we need to generate:
 \end{itemize}
 -}
 
-gen_Generic_binds :: GenericKind -> TyCon -> MetaTyCons -> Module
+gen_Generic_binds :: GenericKind -> TyCon -> Module
                  -> TcM (LHsBinds RdrName, FamInst)
-gen_Generic_binds gk tc metaTyCons mod = do
-  repTyInsts <- tc_mkRepFamInsts gk tc metaTyCons mod
+gen_Generic_binds gk tc mod = do
+  repTyInsts <- tc_mkRepFamInsts gk tc mod
   return (mkBindsRep gk tc, repTyInsts)
-
-genGenericMetaTyCons :: TyCon -> TcM (MetaTyCons, BagDerivStuff)
-genGenericMetaTyCons tc =
-  do  let tc_name   = tyConName tc
-      ty_rep_name <- newTyConRepName tc_name
-      let mod       = nameModule tc_name
-          tc_cons   = tyConDataCons tc
-          tc_arits  = map dataConSourceArity tc_cons
-
-          tc_occ    = nameOccName tc_name
-          d_occ     = mkGenD mod tc_occ
-          c_occ m   = mkGenC mod tc_occ m
-          s_occ m n = mkGenS mod tc_occ m n
-
-          mkTyCon name = ASSERT( isExternalName name )
-                         buildAlgTyCon name [] [] Nothing [] distinctAbstractTyConRhs
-                                            NonRecursive
-                                            False          -- Not promotable
-                                            False          -- Not GADT syntax
-                                            (VanillaAlgTyCon ty_rep_name)
-
-      loc <- getSrcSpanM
-      -- we generate new names in current module
-      currentMod <- getModule
-      d_name  <- newGlobalBinder currentMod d_occ loc
-      c_names <- forM (zip [0..] tc_cons) $ \(m,_) ->
-                    newGlobalBinder currentMod (c_occ m) loc
-      s_names <- forM (zip [0..] tc_arits) $ \(m,a) -> forM [0..a-1] $ \n ->
-                    newGlobalBinder currentMod (s_occ m n) loc
-
-      let metaDTyCon  = mkTyCon d_name
-          metaCTyCons = map mkTyCon c_names
-          metaSTyCons = map (map mkTyCon) s_names
-
-          metaDts = MetaTyCons metaDTyCon metaCTyCons metaSTyCons
-
-      (,) metaDts `fmap` metaTyConsToDerivStuff tc metaDts
-
--- both the tycon declarations and related instances
-metaTyConsToDerivStuff :: TyCon -> MetaTyCons -> TcM BagDerivStuff
-metaTyConsToDerivStuff tc metaDts =
-  do  dClas <- tcLookupClass datatypeClassName
-      d_dfun_name <- newDFunName' dClas tc
-      cClas <- tcLookupClass constructorClassName
-      c_dfun_names <- sequence [ (conTy,) <$> newDFunName' cClas tc
-                               | conTy <- metaC metaDts ]
-      sClas <- tcLookupClass selectorClassName
-      s_dfun_names <-
-        sequence (map sequence [ [ (selector,) <$> newDFunName' sClas tc
-                                 | selector <- selectors ]
-                               | selectors <- metaS metaDts ])
-      fix_env <- getFixityEnv
-
-      let
-        (dBinds,cBinds,sBinds) = mkBindsMetaD fix_env tc
-        mk_inst clas tc dfun_name
-          = newClsInst (Just (NoOverlap "")) dfun_name [] [] clas tys
-          where
-            tys = [mkTyConTy tc]
-
-
-      let d_metaTycon = metaD metaDts
-      d_inst <- mk_inst dClas d_metaTycon d_dfun_name
-      c_insts <- sequence [ mk_inst cClas c ds | (c, ds) <- c_dfun_names ]
-      s_insts <- mapM (mapM (\(s,ds) -> mk_inst sClas s ds)) s_dfun_names
-
-      let
-        -- Datatype
-        d_binds  = InstBindings { ib_binds = dBinds
-                                , ib_tyvars = []
-                                , ib_pragmas = []
-                                , ib_extensions = []
-                                , ib_derived = True }
-        d_mkInst = DerivInst (InstInfo { iSpec = d_inst, iBinds = d_binds })
-
-        -- Constructor
-        c_binds = [ InstBindings { ib_binds = c
-                                 , ib_tyvars = []
-                                 , ib_pragmas = []
-                                 , ib_extensions = []
-                                 , ib_derived = True }
-                  | c <- cBinds ]
-        c_mkInst = [ DerivInst (InstInfo { iSpec = is, iBinds = bs })
-                   | (is,bs) <- myZip1 c_insts c_binds ]
-
-        -- Selector
-        s_binds = [ [ InstBindings { ib_binds = s
-                                   , ib_tyvars = []
-                                   , ib_pragmas = []
-                                   , ib_extensions = []
-                                   , ib_derived = True }
-                    | s <- ss ] | ss <- sBinds ]
-        s_mkInst = map (map (\(is,bs) -> DerivInst (InstInfo { iSpec  = is
-                                                             , iBinds = bs})))
-                       (myZip2 s_insts s_binds)
-
-        myZip1 :: [a] -> [b] -> [(a,b)]
-        myZip1 l1 l2 = ASSERT(length l1 == length l2) zip l1 l2
-
-        myZip2 :: [[a]] -> [[b]] -> [[(a,b)]]
-        myZip2 l1 l2 =
-          ASSERT(and (zipWith (>=) (map length l1) (map length l2)))
-            [ zip x1 x2 | (x1,x2) <- zip l1 l2 ]
-
-      return $ mapBag DerivTyCon (metaTyCons2TyCons metaDts)
-               `unionBags` listToBag (d_mkInst : c_mkInst ++ concat s_mkInst)
 
 {-
 ************************************************************************
@@ -430,7 +322,6 @@ gk2gkDC Gen0_   _ = Gen0_DC
 gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
 
 
-
 -- Bindings for the Generic instance
 mkBindsRep :: GenericKind -> TyCon -> LHsBinds RdrName
 mkBindsRep gk tycon =
@@ -464,10 +355,9 @@ mkBindsRep gk tycon =
 
 tc_mkRepFamInsts :: GenericKind     -- Gen0 or Gen1
                -> TyCon           -- The type to generate representation for
-               -> MetaTyCons      -- Metadata datatypes to refer to
                -> Module          -- Used as the location of the new RepTy
                -> TcM (FamInst)   -- Generated representation0 coercion
-tc_mkRepFamInsts gk tycon metaDts mod =
+tc_mkRepFamInsts gk tycon mod =
        -- Consider the example input tycon `D`, where data D a b = D_ a
        -- Also consider `R:DInt`, where { data family D x y :: * -> *
        --                               ; data instance D Int a b = D_ a }
@@ -500,7 +390,7 @@ tc_mkRepFamInsts gk tycon metaDts mod =
                      Nothing -> [mkTyConApp tycon tyvar_args]
 
        -- `repTy` = D1 ... (C1 ... (S1 ... (Rec0 a))) :: * -> *
-     ; repTy <- tc_mkRepTy gk_ tycon metaDts
+     ; repTy <- tc_mkRepTy gk_ tycon
 
        -- `rep_name` is a name we generate for the synonym
      ; rep_name <- let mkGen = case gk of Gen0 -> mkGenR; Gen1 -> mkGen1R
@@ -583,16 +473,13 @@ tc_mkRepTy ::  -- Gen0_ or Gen1_, for Rep or Rep1
                GenericKind_
               -- The type to generate representation for
             -> TyCon
-               -- Metadata datatypes to refer to
-            -> MetaTyCons
                -- Generated representation0 type
             -> TcM Type
-tc_mkRepTy gk_ tycon metaDts =
+tc_mkRepTy gk_ tycon =
   do
     d1      <- tcLookupTyCon d1TyConName
     c1      <- tcLookupTyCon c1TyConName
     s1      <- tcLookupTyCon s1TyConName
-    nS1     <- tcLookupTyCon noSelTyConName
     rec0    <- tcLookupTyCon rec0TyConName
     rec1    <- tcLookupTyCon rec1TyConName
     par1    <- tcLookupTyCon par1TyConName
@@ -608,37 +495,46 @@ tc_mkRepTy gk_ tycon metaDts =
     uInt    <- tcLookupTyCon uIntTyConName
     uWord   <- tcLookupTyCon uWordTyConName
 
+    let tcLookupPromDataCon = fmap promoteDataCon . tcLookupDataCon
+
+    md      <- tcLookupPromDataCon metaDataDataConName
+    mc      <- tcLookupPromDataCon metaConsDataConName
+    ms      <- tcLookupPromDataCon metaSelDataConName
+    mns     <- tcLookupPromDataCon metaNoSelDataConName
+    pPrefix <- tcLookupPromDataCon prefixIDataConName
+    pInfix  <- tcLookupPromDataCon infixIDataConName
+    pLA     <- tcLookupPromDataCon leftAssociativeDataConName
+    pRA     <- tcLookupPromDataCon rightAssociativeDataConName
+    pNA     <- tcLookupPromDataCon notAssociativeDataConName
+
+    fix_env <- getFixityEnv
+
     let mkSum' a b = mkTyConApp plus  [a,b]
         mkProd a b = mkTyConApp times [a,b]
         mkComp a b = mkTyConApp comp  [a,b]
         mkRec0 a   = mkBoxTy uAddr uChar uDouble uFloat uInt uWord rec0 a
         mkRec1 a   = mkTyConApp rec1  [a]
         mkPar1     = mkTyConTy  par1
-        mkD    a   = mkTyConApp d1    [metaDTyCon, sumP (tyConDataCons a)]
-        mkC  i d a = mkTyConApp c1    [d, prod i (dataConInstOrigArgTys a $ mkTyVarTys $ tyConTyVars tycon)
-                                                 (null (dataConFieldLabels a))]
-        -- This field has no label
-        mkS True  _ a = mkTyConApp s1 [mkTyConTy nS1, a]
-        -- This field has a  label
-        mkS False d a = mkTyConApp s1 [d, a]
+        mkD    a   = mkTyConApp d1 [ metaDataTy, sumP (tyConDataCons a) ]
+        mkC      a = mkTyConApp c1 [ metaConsTy a
+                                   , prod (dataConInstOrigArgTys a
+                                            . mkTyVarTys . tyConTyVars $ tycon)
+                                          (dataConFieldLabels a)]
+        mkS mlbl a = mkTyConApp s1 [metaSelTy mlbl, a]
 
         -- Sums and products are done in the same way for both Rep and Rep1
         sumP [] = mkTyConTy v1
-        sumP l  = ASSERT(length metaCTyCons == length l)
-                    foldBal mkSum' [ mkC i d a
-                                   | (d,(a,i)) <- zip metaCTyCons (zip l [0..])]
+        sumP l  = foldBal mkSum' . map mkC  $ l
         -- The Bool is True if this constructor has labelled fields
-        prod :: Int -> [Type] -> Bool -> Type
-        prod i [] _ = ASSERT(length metaSTyCons > i)
-                        ASSERT(length (metaSTyCons !! i) == 0)
-                          mkTyConTy u1
-        prod i l b  = ASSERT(length metaSTyCons > i)
-                        ASSERT(length l == length (metaSTyCons !! i))
-                          foldBal mkProd [ arg d t b
-                                         | (d,t) <- zip (metaSTyCons !! i) l ]
+        prod :: [Type] -> [FieldLabel] -> Type
+        prod [] _ = mkTyConTy u1
+        prod l fl = foldBal mkProd [ ASSERT(null fl || length fl > j)
+                                     arg t (if null fl then Nothing
+                                                       else Just (fl !! j))
+                                   | (t,j) <- zip l [0..] ]
 
-        arg :: Type -> Type -> Bool -> Type
-        arg d t b = mkS b d $ case gk_ of
+        arg :: Type -> Maybe FieldLabel -> Type
+        arg t fl = mkS fl $ case gk_ of
             -- Here we previously used Par0 if t was a type variable, but we
             -- realized that we can't always guarantee that we are wrapping-up
             -- all type variables in Par0. So we decided to stop using Par0
@@ -646,16 +542,49 @@ tc_mkRepTy gk_ tycon metaDts =
                       Gen0_        -> mkRec0 t
                       Gen1_ argVar -> argPar argVar t
           where
-            -- Builds argument represention for Rep1 (more complicated due to
+            -- Builds argument representation for Rep1 (more complicated due to
             -- the presence of composition).
             argPar argVar = argTyFold argVar $ ArgTyAlg
               {ata_rec0 = mkRec0, ata_par1 = mkPar1,
                ata_rec1 = mkRec1, ata_comp = mkComp}
 
+        tyConName_user = case tyConFamInst_maybe tycon of
+                           Just (ptycon, _) -> tyConName ptycon
+                           Nothing          -> tyConName tycon
 
-        metaDTyCon  = mkTyConTy (metaD metaDts)
-        metaCTyCons = map mkTyConTy (metaC metaDts)
-        metaSTyCons = map (map mkTyConTy) (metaS metaDts)
+        dtName  = mkStrLitTy . occNameFS . nameOccName $ tyConName_user
+        mdName  = mkStrLitTy . moduleNameFS . moduleName
+                . nameModule . tyConName $ tycon
+        pkgName = mkStrLitTy . unitIdFS . moduleUnitId
+                . nameModule . tyConName $ tycon
+        isNT    = mkTyConTy $ if isNewTyCon tycon
+                              then promotedTrueDataCon
+                              else promotedFalseDataCon
+
+        ctName = mkStrLitTy . occNameFS . nameOccName . dataConName
+        ctFix c = case myLookupFixity fix_env (dataConName c) of
+                    Just (Fixity n InfixL) -> buildFix n pLA
+                    Just (Fixity n InfixR) -> buildFix n pRA
+                    Just (Fixity n InfixN) -> buildFix n pNA
+                    Nothing                -> mkTyConTy pPrefix
+        buildFix n assoc = mkTyConApp pInfix [ mkTyConTy assoc
+                                             , mkNumLitTy (fromIntegral n)]
+
+        myLookupFixity :: FixityEnv -> Name -> Maybe Fixity
+        myLookupFixity env n = case lookupNameEnv env n of
+                                 Just (FixItem _ fix) -> Just fix
+                                 Nothing              -> Nothing
+
+        isRec c = mkTyConTy $ if length (dataConFieldLabels c) > 0
+                              then promotedTrueDataCon
+                              else promotedFalseDataCon
+
+        selName = mkStrLitTy . flLabel
+
+        metaDataTy   = mkTyConApp md [dtName, mdName, pkgName, isNT]
+        metaConsTy c = mkTyConApp mc [ctName c, ctFix c, isRec c]
+        metaSelTy Nothing  = mkTyConTy mns
+        metaSelTy (Just s) = mkTyConApp ms [selName s]
 
     return (mkD tycon)
 
@@ -680,84 +609,6 @@ mkBoxTy uAddr uChar uDouble uFloat uInt uWord rec0 ty
   | ty == intPrimTy    = mkTyConTy uInt
   | ty == wordPrimTy   = mkTyConTy uWord
   | otherwise          = mkTyConApp rec0 [ty]
-
---------------------------------------------------------------------------------
--- Meta-information
---------------------------------------------------------------------------------
-
-data MetaTyCons = MetaTyCons { -- One meta datatype per datatype
-                               metaD :: TyCon
-                               -- One meta datatype per constructor
-                             , metaC :: [TyCon]
-                               -- One meta datatype per selector per constructor
-                             , metaS :: [[TyCon]] }
-
-instance Outputable MetaTyCons where
-  ppr (MetaTyCons d c s) = ppr d $$ vcat (map ppr c) $$ vcat (map ppr (concat s))
-
-metaTyCons2TyCons :: MetaTyCons -> Bag TyCon
-metaTyCons2TyCons (MetaTyCons d c s) = listToBag (d : c ++ concat s)
-
-
--- Bindings for Datatype, Constructor, and Selector instances
-mkBindsMetaD :: FixityEnv -> TyCon
-             -> ( LHsBinds RdrName      -- Datatype instance
-                , [LHsBinds RdrName]    -- Constructor instances
-                , [[LHsBinds RdrName]]) -- Selector instances
-mkBindsMetaD fix_env tycon = (dtBinds, allConBinds, allSelBinds)
-      where
-        mkBag l = foldr1 unionBags
-                    [ unitBag (mkRdrFunBind (L loc name) matches)
-                        | (name, matches) <- l ]
-        dtBinds       = mkBag ( [ (datatypeName_RDR, dtName_matches)
-                                , (moduleName_RDR, moduleName_matches)
-                                , (packageName_RDR, pkgName_matches)]
-                              ++ ifElseEmpty (isNewTyCon tycon)
-                                [ (isNewtypeName_RDR, isNewtype_matches) ] )
-
-        allConBinds   = map conBinds datacons
-        conBinds c    = mkBag ( [ (conName_RDR, conName_matches c)]
-                              ++ ifElseEmpty (dataConIsInfix c)
-                                   [ (conFixity_RDR, conFixity_matches c) ]
-                              ++ ifElseEmpty (length (dataConFieldLabels c) > 0)
-                                   [ (conIsRecord_RDR, conIsRecord_matches c) ]
-                              )
-
-        ifElseEmpty p x = if p then x else []
-        fixity c      = case lookupFixity fix_env (dataConName c) of
-                          Fixity n InfixL -> buildFix n leftAssocDataCon_RDR
-                          Fixity n InfixR -> buildFix n rightAssocDataCon_RDR
-                          Fixity n InfixN -> buildFix n notAssocDataCon_RDR
-        buildFix n assoc = nlHsApps infixDataCon_RDR [nlHsVar assoc
-                                                     , nlHsIntLit (toInteger n)]
-
-        allSelBinds   = map (map selBinds) datasels
-        selBinds s    = mkBag [(selName_RDR, selName_matches s)]
-
-        loc           = srcLocSpan (getSrcLoc tycon)
-        mkStringLHS s = [mkSimpleHsAlt nlWildPat (nlHsLit (mkHsString s))]
-        datacons      = tyConDataCons tycon
-        datasels      = map dataConFieldLabels datacons
-
-        tyConName_user = case tyConFamInst_maybe tycon of
-                           Just (ptycon, _) -> tyConName ptycon
-                           Nothing          -> tyConName tycon
-
-        dtName_matches     = mkStringLHS . occNameString . nameOccName
-                           $ tyConName_user
-        moduleName_matches = mkStringLHS . moduleNameString . moduleName
-                           . nameModule . tyConName $ tycon
-        pkgName_matches    = mkStringLHS . unitIdString . moduleUnitId
-                           . nameModule . tyConName $ tycon
-        isNewtype_matches  = [mkSimpleHsAlt nlWildPat (nlHsVar true_RDR)]
-
-        conName_matches     c = mkStringLHS . occNameString . nameOccName
-                              . dataConName $ c
-        conFixity_matches   c = [mkSimpleHsAlt nlWildPat (fixity c)]
-        conIsRecord_matches _ = [mkSimpleHsAlt nlWildPat (nlHsVar true_RDR)]
-
-        selName_matches    fl = mkStringLHS (unpackFS (flLabel fl))
-
 
 --------------------------------------------------------------------------------
 -- Dealing with sums
@@ -851,10 +702,10 @@ genLR_E i n e
 --------------------------------------------------------------------------------
 
 -- Build a product expression
-mkProd_E :: GenericKind_DC      -- Generic or Generic1?
-         -> US              -- Base for unique names
+mkProd_E :: GenericKind_DC    -- Generic or Generic1?
+         -> US                -- Base for unique names
          -> [(RdrName, Type)] -- List of variables matched on the lhs and their types
-         -> LHsExpr RdrName -- Resulting product expression
+         -> LHsExpr RdrName   -- Resulting product expression
 mkProd_E _   _ []     = mkM1_E (nlHsVar u1DataCon_RDR)
 mkProd_E gk_ _ varTys = mkM1_E (foldBal prod appVars)
                      -- These M1s are meta-information for the constructor

@@ -7,6 +7,7 @@
 
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -17,14 +18,14 @@ import GHC.Generics
 import Data.Data
 import Data.Proxy
 
-type family FirstSelector (f :: * -> *) :: *
+type family FirstSelector (f :: * -> *) :: Meta
 type instance FirstSelector (M1 D x f) = FirstSelector f
 type instance FirstSelector (M1 C x f) = FirstSelector f
 type instance FirstSelector (a :*: b)  = FirstSelector a
 type instance FirstSelector (M1 S s f) = s
 
-data SelectorProxy s (f :: * -> *) a = SelectorProxy
-type SelectorProxy' s = SelectorProxy s Proxy ()
+data SelectorProxy (s :: Meta) (f :: * -> *) a = SelectorProxy
+type SelectorProxy' (s :: Meta) = SelectorProxy s Proxy ()
 
 -- Extract the first selector name using GHC.Generics
 firstSelectorName :: forall a. Selector (FirstSelector (Rep a))

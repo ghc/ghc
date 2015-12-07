@@ -12326,41 +12326,26 @@ For example, a user-defined datatype of trees
 ::
     data UserTree a = Node a (UserTree a) (UserTree a) | Leaf
 
-will get the following representation:
+in a ``Main`` module in a package named ``foo`` will get the following
+representation:
 
 ::
 
     instance Generic (UserTree a) where
       -- Representation type
       type Rep (UserTree a) =
-        M1 D D1UserTree (
-              M1 C C1_0UserTree (
-                    M1 S NoSelector (K1 R a)
-                :*: M1 S NoSelector (K1 R (UserTree a))
-                :*: M1 S NoSelector (K1 R (UserTree a)))
-          :+: M1 C C1_1UserTree U1)
+        M1 D ('MetaData "UserTree" "Main" "package-name" "foo" 'False) (
+              M1 C ('MetaCons "Node" 'PrefixI 'False) (
+                    M1 S 'MetaNoSel (K1 R a)
+                :*: M1 S 'MetaNoSel (K1 R (UserTree a))
+                :*: M1 S 'MetaNoSel (K1 R (UserTree a)))
+          :+: M1 C ('MetaCons "Leaf" 'PrefixI 'False) U1)
 
       -- Conversion functions
       from (Node x l r) = M1 (L1 (M1 (M1 (K1 x) :*: M1 (K1 l) :*: M1 (K1 r))))
       from Leaf         = M1 (R1 (M1 U1))
       to (M1 (L1 (M1 (M1 (K1 x) :*: M1 (K1 l) :*: M1 (K1 r))))) = Node x l r
       to (M1 (R1 (M1 U1)))                                      = Leaf
-
-    -- Meta-information
-    data D1UserTree
-    data C1_0UserTree
-    data C1_1UserTree
-
-    instance Datatype D1UserTree where
-      datatypeName _ = "UserTree"
-      moduleName _   = "Main"
-      packageName _  = "main"
-
-    instance Constructor C1_0UserTree where
-      conName _ = "Node"
-
-    instance Constructor C1_1UserTree where
-      conName _ = "Leaf"
 
 This representation is generated automatically if a ``deriving Generic``
 clause is attached to the datatype. `Standalone
