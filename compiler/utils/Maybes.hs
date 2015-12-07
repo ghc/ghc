@@ -3,7 +3,6 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# LANGUAGE CPP #-}
 module Maybes (
         module Data.Maybe,
 
@@ -18,11 +17,9 @@ module Maybes (
         MaybeT(..), liftMaybeT
     ) where
 
-import Control.Applicative
+import Control.Applicative as A
 import Control.Monad
-#if __GLASGOW_HASKELL__ > 710
-import Control.Monad.Fail
-#endif
+import Control.Monad.Trans.Maybe
 import Data.Maybe
 
 infixr 4 `orElse`
@@ -64,56 +61,7 @@ orElse = flip fromMaybe
 ************************************************************************
 -}
 
-newtype MaybeT m a = MaybeT {runMaybeT :: m (Maybe a)}
-
-instance Functor m => Functor (MaybeT m) where
-  fmap f x = MaybeT $ fmap (fmap f) $ runMaybeT x
-
-#if __GLASGOW_HASKELL__ < 710
--- Pre-AMP change
-instance (Monad m, Applicative m) => Applicative (MaybeT m) where
-#else
-instance (Monad m) => Applicative (MaybeT m) where
-#endif
-  pure = MaybeT . pure . Just
-  (<*>) = ap
-
-#if __GLASGOW_HASKELL__ < 710
--- Pre-AMP change
-instance (Monad m, Applicative m) => Monad (MaybeT m) where
-#else
-instance (Monad m) => Monad (MaybeT m) where
-#endif
-  return = pure
-  x >>= f = MaybeT $ runMaybeT x >>= maybe (pure Nothing) (runMaybeT . f)
-  fail _ = MaybeT $ pure Nothing
-
-
-#if __GLASGOW_HASKELL__ > 710
-instance Monad m => MonadFail (MaybeT m) where
-  fail _ = MaybeT $ return Nothing
-#endif
-
-#if __GLASGOW_HASKELL__ < 710
--- Pre-AMP change
-instance (Monad m, Applicative m) => Alternative (MaybeT m) where
-#else
-instance (Monad m) => Alternative (MaybeT m) where
-#endif
-  empty = mzero
-  (<|>) = mplus
-
-#if __GLASGOW_HASKELL__ < 710
--- Pre-AMP change
-instance (Monad m, Applicative m) => MonadPlus (MaybeT m) where
-#else
-instance Monad m => MonadPlus (MaybeT m) where
-#endif
-  mzero       = MaybeT $ pure Nothing
-  p `mplus` q = MaybeT $ do ma <- runMaybeT p
-                            case ma of
-                              Just a  -> pure (Just a)
-                              Nothing -> runMaybeT q
+-- We had our own MaybeT in the past. Now we reuse transformer's MaybeT
 
 liftMaybeT :: Monad m => m a -> MaybeT m a
 liftMaybeT act = MaybeT $ Just `liftM` act
@@ -136,7 +84,7 @@ instance Applicative (MaybeErr err) where
   (<*>) = ap
 
 instance Monad (MaybeErr err) where
-  return = pure
+  return = A.pure
   Succeeded v >>= k = k v
   Failed e    >>= _ = Failed e
 
