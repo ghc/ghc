@@ -181,11 +181,31 @@ data IdScope    -- See Note [GlobalId/LocalId]
   = GlobalId
   | LocalId ExportFlag
 
-data ExportFlag
-  = NotExported -- ^ Not exported: may be discarded as dead code.
-  | Exported    -- ^ Exported: kept alive
+data ExportFlag   -- See Note [ExportFlag on binders]
+  = NotExported   -- ^ Not exported: may be discarded as dead code.
+  | Exported      -- ^ Exported: kept alive
 
-{-
+{- Note [ExportFlag on binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An ExportFlag of "Exported" on a top-level binder says "keep this
+binding alive; do not drop it as dead code".  This transitively
+keeps alive all the other top-level bindings that this binding refers
+to.  This property is persisted all the way down the pipeline, so that
+the binding will be compiled all the way to object code, and its
+symbols will appear in the linker symbol table.
+
+However, note that this use of "exported" is quite different to the
+export list on a Haskell module.  Setting the ExportFlag on an Id does
+/not/ mean that if you import the module (in Haskell source code you
+will see this Id.  Of course, things that appear in the export list
+of the source Haskell module do indeed have their ExportFlag set.
+But many other things, such as dictionary functions, are kept alive
+by having their ExportFlag set, even though they are not exported
+in the source-code sense.
+
+We should probably use a different term for ExportFlag, like
+KeepAlive.
+
 Note [GlobalId/LocalId]
 ~~~~~~~~~~~~~~~~~~~~~~~
 A GlobalId is
