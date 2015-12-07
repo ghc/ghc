@@ -835,9 +835,9 @@ checkFreeListSanity(void)
         // make sure we're fully coalesced
         if (bd->link != NULL)
         {
-            ASSERT (MBLOCK_ROUND_DOWN(bd->link) !=
-                    (StgWord8*)MBLOCK_ROUND_DOWN(bd) +
-                    BLOCKS_TO_MBLOCKS(bd->blocks) * MBLOCK_SIZE);
+            ASSERT(MBLOCK_ROUND_DOWN(bd->link) !=
+                   (StgWord8*)MBLOCK_ROUND_DOWN(bd) +
+                   BLOCKS_TO_MBLOCKS(bd->blocks) * MBLOCK_SIZE);
         }
     }
 }
