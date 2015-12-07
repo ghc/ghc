@@ -1,4 +1,4 @@
-module Rules.Library (buildPackageLibrary) where
+module Rules.Library (buildPackageLibrary, cSources, hSources) where
 
 import Expression hiding (splitPath)
 import Oracles
@@ -19,7 +19,7 @@ buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
         cSrcs <- cSources target
         hSrcs <- hSources target
 
-        let way   = detectWay a
+        let way   = detectWay a -- TODO: eliminate differences below
             cObjs = [ buildPath -/- src -<.> osuf way | src <- cSrcs ]
             hObjs = [ buildPath -/- src  <.> osuf way | src <- hSrcs ]
 
@@ -28,14 +28,14 @@ buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
         need $ cObjs ++ hObjs
 
         split <- interpretPartial target splitObjects
-        splitObjs <- if not split then return [] else
+        splitObjs <- if not split then return hObjs else -- TODO: make clearer!
             fmap concat $ forM hSrcs $ \src -> do
                 let splitPath = buildPath -/- src ++ "_" ++ osuf way ++ "_split"
                 contents <- liftIO $ IO.getDirectoryContents splitPath
                 return . map (splitPath -/-)
                        . filter (not . all (== '.')) $ contents
 
-        build $ fullTarget target Ar (cObjs ++ hObjs ++ splitObjs) [a]
+        build $ fullTarget target Ar (cObjs ++ splitObjs) [a]
 
         synopsis <- interpretPartial target $ getPkgData Synopsis
         putSuccess $ "/--------\n| Successfully built package library '"
