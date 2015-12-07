@@ -4,7 +4,7 @@ module Settings.Builders.GhcCabal (
     ) where
 
 import Expression
-import Predicates
+import Predicates hiding (stage)
 import Settings
 
 cabalArgs :: Args
@@ -14,7 +14,7 @@ cabalArgs = builder GhcCabal ? do
     mconcat [ arg "configure"
             , arg path
             , arg dir
-            , dllArgs
+            , dll0Args
             , withStaged Ghc
             , withStaged GhcPkg
             , stage0 ? bootPackageDbArgs
@@ -40,12 +40,12 @@ ghcCabalHsColourArgs = builder GhcCabalHsColour ? do
 -- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?
 libraryArgs :: Args
 libraryArgs = do
-    ways   <- getWays
-    ghcInt <- lift $ ghcWithInterpreter
+    ways <- getWays
+    ghci <- lift ghcWithInterpreter
     append [ if vanilla `elem` ways
              then  "--enable-library-vanilla"
              else "--disable-library-vanilla"
-           , if vanilla `elem` ways && ghcInt && not dynamicGhcPrograms
+           , if vanilla `elem` ways && ghci && not dynamicGhcPrograms
              then  "--enable-library-for-ghci"
              else "--disable-library-for-ghci"
            , if profiling `elem` ways
@@ -80,13 +80,6 @@ bootPackageDbArgs :: Args
 bootPackageDbArgs = do
     path <- getSetting GhcSourcePath
     arg $ "--package-db=" ++ path -/- "libraries/bootstrapping.conf"
-
--- This is a positional argument, hence:
--- * if it is empty, we need to emit one empty string argument;
--- * otherwise, we must collapse it into one space-separated string.
--- TODO: should be non-empty for compiler
-dllArgs :: Args
-dllArgs = arg ""
 
 packageConstraints :: Args
 packageConstraints = stage0 ? do
@@ -219,3 +212,179 @@ appendCcArgs xs = do
             , builder GhcCabal   ? appendSub "--configure-option=CFLAGS" xs
             , builder GhcCabal   ? appendSub "--gcc-options" xs ]
 
+-- This is a positional argument, hence:
+-- * if it is empty, we need to emit one empty string argument;
+-- * otherwise, we must collapse it into one space-separated string.
+dll0Args :: Args
+dll0Args = do
+    windows <- lift windowsHost
+    pkg     <- getPackage
+    stage   <- getStage
+    let needDll0Args = windows && pkg == compiler && stage == Stage1
+    ghci    <- lift ghcWithInterpreter
+    arg . unwords . concat $ [ modules     | needDll0Args         ]
+                          ++ [ ghciModules | needDll0Args && ghci ] -- see #9552
+  where
+    modules = [ "Annotations"
+              , "ApiAnnotation"
+              , "Avail"
+              , "Bag"
+              , "BasicTypes"
+              , "Binary"
+              , "BooleanFormula"
+              , "BreakArray"
+              , "BufWrite"
+              , "Class"
+              , "CmdLineParser"
+              , "CmmType"
+              , "CoAxiom"
+              , "ConLike"
+              , "Coercion"
+              , "Config"
+              , "Constants"
+              , "CoreArity"
+              , "CoreFVs"
+              , "CoreSubst"
+              , "CoreSyn"
+              , "CoreTidy"
+              , "CoreUnfold"
+              , "CoreUtils"
+              , "CoreSeq"
+              , "CoreStats"
+              , "CostCentre"
+              , "Ctype"
+              , "DataCon"
+              , "Demand"
+              , "Digraph"
+              , "DriverPhases"
+              , "DynFlags"
+              , "Encoding"
+              , "ErrUtils"
+              , "Exception"
+              , "ExtsCompat46"
+              , "FamInstEnv"
+              , "FastFunctions"
+              , "FastMutInt"
+              , "FastString"
+              , "FastTypes"
+              , "Fingerprint"
+              , "FiniteMap"
+              , "ForeignCall"
+              , "Hooks"
+              , "HsBinds"
+              , "HsDecls"
+              , "HsDoc"
+              , "HsExpr"
+              , "HsImpExp"
+              , "HsLit"
+              , "PlaceHolder"
+              , "HsPat"
+              , "HsSyn"
+              , "HsTypes"
+              , "HsUtils"
+              , "HscTypes"
+              , "IOEnv"
+              , "Id"
+              , "IdInfo"
+              , "IfaceSyn"
+              , "IfaceType"
+              , "InstEnv"
+              , "Kind"
+              , "Lexeme"
+              , "Lexer"
+              , "ListSetOps"
+              , "Literal"
+              , "Maybes"
+              , "MkCore"
+              , "MkId"
+              , "Module"
+              , "MonadUtils"
+              , "Name"
+              , "NameEnv"
+              , "NameSet"
+              , "OccName"
+              , "OccurAnal"
+              , "OptCoercion"
+              , "OrdList"
+              , "Outputable"
+              , "PackageConfig"
+              , "Packages"
+              , "Pair"
+              , "Panic"
+              , "PatSyn"
+              , "PipelineMonad"
+              , "Platform"
+              , "PlatformConstants"
+              , "PprCore"
+              , "PrelNames"
+              , "PrelRules"
+              , "Pretty"
+              , "PrimOp"
+              , "RdrName"
+              , "Rules"
+              , "Serialized"
+              , "SrcLoc"
+              , "StaticFlags"
+              , "StringBuffer"
+              , "TcEvidence"
+              , "TcRnTypes"
+              , "TcType"
+              , "TrieMap"
+              , "TyCon"
+              , "Type"
+              , "TypeRep"
+              , "TysPrim"
+              , "TysWiredIn"
+              , "Unify"
+              , "UniqFM"
+              , "UniqSet"
+              , "UniqSupply"
+              , "Unique"
+              , "Util"
+              , "Var"
+              , "VarEnv"
+              , "VarSet" ]
+    ghciModules = [ "Bitmap"
+                  , "BlockId"
+                  , "ByteCodeAsm"
+                  , "ByteCodeInstr"
+                  , "ByteCodeItbls"
+                  , "CLabel"
+                  , "Cmm"
+                  , "CmmCallConv"
+                  , "CmmExpr"
+                  , "CmmInfo"
+                  , "CmmMachOp"
+                  , "CmmNode"
+                  , "CmmSwitch"
+                  , "CmmUtils"
+                  , "CodeGen.Platform"
+                  , "CodeGen.Platform.ARM"
+                  , "CodeGen.Platform.ARM64"
+                  , "CodeGen.Platform.NoRegs"
+                  , "CodeGen.Platform.PPC"
+                  , "CodeGen.Platform.PPC_Darwin"
+                  , "CodeGen.Platform.SPARC"
+                  , "CodeGen.Platform.X86"
+                  , "CodeGen.Platform.X86_64"
+                  , "FastBool"
+                  , "Hoopl"
+                  , "Hoopl.Dataflow"
+                  , "InteractiveEvalTypes"
+                  , "MkGraph"
+                  , "PprCmm"
+                  , "PprCmmDecl"
+                  , "PprCmmExpr"
+                  , "Reg"
+                  , "RegClass"
+                  , "SMRep"
+                  , "StgCmmArgRep"
+                  , "StgCmmClosure"
+                  , "StgCmmEnv"
+                  , "StgCmmLayout"
+                  , "StgCmmMonad"
+                  , "StgCmmProf"
+                  , "StgCmmTicky"
+                  , "StgCmmUtils"
+                  , "StgSyn"
+                  , "Stream" ]
