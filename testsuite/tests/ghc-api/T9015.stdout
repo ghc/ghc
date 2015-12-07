@@ -1,0 +1,86 @@
+Is import:
+import Data.Maybe: True
+import qualified Data.Maybe: True
+import Data.Maybe (isJust): True
+add a b = a+b: False
+data Foo = Foo String: False
+deriving instance Show Foo: False
+{-# NOVECTORISE foo #-}: False
+{-# WARNING Foo "Just a warning" #-}: False
+{-# ANN foo (Just "Hello") #-}: False
+{-# RULES "map/map" forall f g xs. map f (map g xs) = map (f.g) xs #-}: False
+class HasString a where
+  update :: a -> (String -> String) -> a
+  upcase :: a -> a
+  upcase x = update x (fmap toUpper)
+  content :: a -> String
+  default content :: Show a => a -> String
+  content = show: False
+instance HasString Foo where
+  update (Foo s) f = Foo (f s)
+  content (Foo s) = s: False
+add a b: False
+let foo = add a b: False
+x <- foo y: False
+5 + 8: False
+a <-: False
+2 +: False
+@#: False
+
+Is declaration:
+import Data.Maybe: False
+import qualified Data.Maybe: False
+import Data.Maybe (isJust): False
+add a b = a+b: True
+data Foo = Foo String: True
+deriving instance Show Foo: True
+{-# NOVECTORISE foo #-}: True
+{-# WARNING Foo "Just a warning" #-}: True
+{-# ANN foo (Just "Hello") #-}: True
+{-# RULES "map/map" forall f g xs. map f (map g xs) = map (f.g) xs #-}: True
+class HasString a where
+  update :: a -> (String -> String) -> a
+  upcase :: a -> a
+  upcase x = update x (fmap toUpper)
+  content :: a -> String
+  default content :: Show a => a -> String
+  content = show: True
+instance HasString Foo where
+  update (Foo s) f = Foo (f s)
+  content (Foo s) = s: True
+add a b: False
+let foo = add a b: False
+x <- foo y: False
+5 + 8: False
+a <-: False
+2 +: False
+@#: False
+
+Is statement:
+import Data.Maybe: False
+import qualified Data.Maybe: False
+import Data.Maybe (isJust): False
+add a b = a+b: False
+data Foo = Foo String: False
+deriving instance Show Foo: False
+{-# NOVECTORISE foo #-}: False
+{-# WARNING Foo "Just a warning" #-}: False
+{-# ANN foo (Just "Hello") #-}: False
+{-# RULES "map/map" forall f g xs. map f (map g xs) = map (f.g) xs #-}: False
+class HasString a where
+  update :: a -> (String -> String) -> a
+  upcase :: a -> a
+  upcase x = update x (fmap toUpper)
+  content :: a -> String
+  default content :: Show a => a -> String
+  content = show: False
+instance HasString Foo where
+  update (Foo s) f = Foo (f s)
+  content (Foo s) = s: False
+add a b: True
+let foo = add a b: True
+x <- foo y: True
+5 + 8: True
+a <-: False
+2 +: False
+@#: False

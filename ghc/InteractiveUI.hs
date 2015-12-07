@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, MagicHash, NondecreasingIndentation, TupleSections,
-             RecordWildCards #-}
+             RecordWildCards, MultiWayIf #-}
 {-# OPTIONS -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
@@ -900,23 +900,17 @@ enqueueCommands cmds = do
 -- | Entry point to execute some haskell code from user.
 -- The return value True indicates success, as in `runOneCommand`.
 runStmt :: String -> SingleStep -> GHCi (Maybe GHC.ExecResult)
-runStmt stmt step
- -- empty; this should be impossible anyways since we filtered out
- -- whitespace-only input in runOneCommand's noSpace
- | null (filter (not.isSpace) stmt)
- = return Nothing
+runStmt stmt step = do
+  dflags <- GHC.getInteractiveDynFlags
+  if | GHC.isStmt dflags stmt   -> run_stmt
+     | GHC.isImport dflags stmt -> run_imports
+     | otherwise                -> run_decl
 
- -- import
- | stmt `looks_like` "import "
- = do addImportToContext stmt; return (Just (GHC.ExecComplete (Right []) 0))
-
- | otherwise
- = do
-     parse_res <- GhciMonad.isStmt stmt
-     if parse_res
-       then run_stmt
-       else run_decl
   where
+    run_imports = do
+      addImportToContext stmt
+      return (Just (GHC.ExecComplete (Right []) 0))
+
     run_decl =
         do _ <- liftIO $ tryIO $ hFlushAll stdin
            m_result <- GhciMonad.runDecls stmt
@@ -937,11 +931,6 @@ runStmt stmt step
            case m_result of
                Nothing     -> return Nothing
                Just result -> Just <$> afterRunStmt (const True) result
-
-    s `looks_like` prefix = prefix `isPrefixOf` dropWhile isSpace s
-       -- Ignore leading spaces (see Trac #9914), so that
-       --    ghci>   data T = T
-       -- (note leading spaces) works properly
 
 -- | Clean up the GHCi environment after a statement has run
 afterRunStmt :: (SrcSpan -> Bool) -> GHC.ExecResult -> GHCi GHC.ExecResult

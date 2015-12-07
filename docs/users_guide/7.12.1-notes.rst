@@ -359,6 +359,8 @@ ghc
    `startsVarSymASCII`, and `isVarSymChar` from `Lexeme` to the `GHC.Lemexe`
    module of the `ghc-boot` library.
 
+- Add `isImport`, `isDecl`, and `isStmt` functions.
+
 ghc-boot
 ~~~~~~~~
 

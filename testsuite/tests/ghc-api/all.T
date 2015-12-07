@@ -17,3 +17,6 @@ test('T10508_api', extra_run_opts('"' + config.libdir + '"'),
 test('T10942', extra_run_opts('"' + config.libdir + '"'),
                    compile_and_run,
                    ['-package ghc'])
+test('T9015', extra_run_opts('"' + config.libdir + '"'),
+              compile_and_run,
+              ['-package ghc'])

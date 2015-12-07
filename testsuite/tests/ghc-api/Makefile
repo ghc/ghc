@@ -20,6 +20,11 @@ T8628:
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc T8628
 	./T8628 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
-.PHONY: clean T6145 T8639_api T8628
+T9015:
+	rm -f T9015.o T9015.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc T9015
+	./T9015 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
+
+.PHONY: clean T6145 T8639_api T8628 T9015
 
 
