@@ -55,10 +55,6 @@ import qualified System.Console.Haskeline as Haskeline
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative (Applicative(..))
-#endif
-
 -----------------------------------------------------------------------------
 -- GHCi monad
 
