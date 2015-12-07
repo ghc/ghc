@@ -6702,10 +6702,10 @@ Two things to watch out for:
            data instance D Int = D1 | D2
 
    Module Y exports all the entities defined in Y, namely the data
-   constructors ``D1`` and ``D2``, *but not the data family* ``D``. That
-   (annoyingly) means that you cannot selectively import Y selectively,
-   thus "``import Y( D(D1,D2) )``", because Y does not export ``D``.
-   Instead you should list the exports explicitly, thus:
+   constructors ``D1`` and ``D2``, and *implicitly* the data family ``D``,
+   even though it's defined in X. 
+   This means you can write "``import Y( D(D1,D2) )``" *without* 
+   giving an explicit export list like this: 
 
    ::
 

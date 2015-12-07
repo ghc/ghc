@@ -1200,14 +1200,24 @@ exports_from_avail :: Maybe (Located [LIE RdrName])
                    -> RnM (Maybe [LIE Name], [AvailInfo])
 
 exports_from_avail Nothing rdr_env _imports _this_mod
- = -- The same as (module M) where M is the current module name,
-   -- so that's how we handle it.
-   let
-       avails = [ availFromGRE gre
-                | gre <- globalRdrEnvElts rdr_env
-                , isLocalGRE gre ]
-   in
-    return (Nothing, avails)
+   -- The same as (module M) where M is the current module name,
+   -- so that's how we handle it, except we also export the data family
+   -- when a data instance is exported.
+  = let avails = [ fix_faminst $ availFromGRE gre
+                 | gre <- globalRdrEnvElts rdr_env
+                 , isLocalGRE gre ]
+    in return (Nothing, avails)
+  where
+    -- #11164: when we define a data instance
+    -- but not data family, re-export the family
+    -- Generally, whenever we export a part of a declaration,
+    -- export the declaration, too.
+    fix_faminst (AvailTC n ns flds)
+      | not (n `elem` ns)
+      = AvailTC n (n:ns) flds
+
+    fix_faminst avail = avail
+
 
 exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
   = do (ie_names, _, exports) <- foldlM do_litem emptyExportAccum rdr_items

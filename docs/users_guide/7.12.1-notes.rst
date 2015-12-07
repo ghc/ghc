@@ -109,6 +109,29 @@ Language
       -- P is imported
       import Foo (T(..))
 
+-  Whenever a data instance is exported, the corresponding data family
+   is exported, too. This allows one to write ::
+
+     -- Foo.hs
+     module Foo where
+     
+     data family T a
+
+     -- Bar.hs
+     module Bar where
+     
+     import Foo
+     
+     data instance T Int = MkT
+
+     -- Baz.hs
+     module Baz where
+     
+     import Bar (T(MkT))
+
+   In previous versions of GHC, this required a workaround via an
+   explicit export list in Bar. 
+
 
 
 Compiler
