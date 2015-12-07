@@ -36,7 +36,6 @@ import qualified Control.Exception as Exception
 import Data.Maybe
 
 import Data.Char ( isSpace, toLower )
-import Data.Ord (comparing)
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative (Applicative(..))
 #endif
@@ -1243,12 +1242,10 @@ listPackages verbosity my_flags mPackageName mModuleName = do
 
       show_normal PackageDB{ location = db_name, packages = pkg_confs } =
           do hPutStrLn stdout (db_name ++ ":")
-             if null pp_pkgs
+             if null pkg_confs
                  then hPutStrLn stdout "    (no packages)"
-                 else hPutStrLn stdout $ unlines (map ("    " ++) pp_pkgs)
+                 else hPutStrLn stdout $ unlines (map ("    " ++) (map pp_pkg pkg_confs))
            where
-                 -- Sort using instance Ord PackageId
-                 pp_pkgs = map pp_pkg . sortBy (comparing installedComponentId) $ pkg_confs
                  pp_pkg p
                    | installedComponentId p `elem` broken = printf "{%s}" doc
                    | exposed p = doc
@@ -1305,8 +1302,7 @@ simplePackageList :: [Flag] -> [InstalledPackageInfo] -> IO ()
 simplePackageList my_flags pkgs = do
    let showPkg = if FlagNamesOnly `elem` my_flags then display . pkgName
                                                   else display
-       -- Sort using instance Ord PackageId
-       strs = map showPkg $ sort $ map sourcePackageId pkgs
+       strs = map showPkg $ map sourcePackageId pkgs
    when (not (null pkgs)) $
       hPutStrLn stdout $ concat $ intersperse " " strs
 
