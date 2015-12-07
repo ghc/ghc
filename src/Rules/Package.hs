@@ -7,6 +7,7 @@ import Rules.Dependencies
 import Rules.Documentation
 import Rules.Generate
 import Rules.Library
+import Rules.Program
 import Rules.Resources
 import Target
 
@@ -17,4 +18,5 @@ buildPackage = mconcat
     , generatePackageCode
     , compilePackage
     , buildPackageLibrary
-    , buildPackageDocumentation ]
+    , buildPackageDocumentation
+    , buildProgram ]
