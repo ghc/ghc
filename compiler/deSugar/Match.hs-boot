@@ -13,6 +13,7 @@ match   :: [Id]
 
 matchWrapper
         :: HsMatchContext Name
+        -> Maybe (LHsExpr Id)
         -> MatchGroup Id (LHsExpr Id)
         -> DsM ([Id], CoreExpr)
 

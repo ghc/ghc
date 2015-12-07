@@ -7,27 +7,34 @@
 {-# LANGUAGE CPP #-}
 
 module ErrUtils (
-        MsgDoc,
+        -- * Basic types
         Validity(..), andValid, allValid, isValid, getInvalids,
+        Severity(..),
 
-        ErrMsg, ErrDoc, errDoc, WarnMsg, Severity(..),
+        -- * Messages
+        MsgDoc, ErrMsg, ErrDoc, errDoc, WarnMsg,
         Messages, ErrorMessages, WarningMessages,
         errMsgSpan, errMsgContext,
-        mkLocMessage, pprMessageBag, pprErrMsgBagWithLoc,
-        pprLocErrMsg, makeIntoWarning,
+        errorsFound, isEmptyMessages,
 
-        errorsFound, emptyMessages, isEmptyMessages,
+        -- ** Formatting
+        pprMessageBag, pprErrMsgBagWithLoc,
+        pprLocErrMsg, printBagOfErrors,
+
+        -- ** Construction
+        emptyMessages, mkLocMessage, makeIntoWarning,
         mkErrMsg, mkPlainErrMsg, mkErrDoc, mkLongErrMsg, mkWarnMsg,
         mkPlainWarnMsg,
-        printBagOfErrors,
         warnIsErrorMsg, mkLongWarnMsg,
 
-        ghcExit,
+        -- * Utilities
         doIfSet, doIfSet_dyn,
+
+        -- * Dump files
         dumpIfSet, dumpIfSet_dyn, dumpIfSet_dyn_printer,
         mkDumpDoc, dumpSDoc,
 
-        --  * Messages during compilation
+        -- * Issuing messages during compilation
         putMsg, printInfoForUser, printOutputForUser,
         logInfo, logOutput,
         errorMsg, warningMsg,
@@ -35,7 +42,7 @@ module ErrUtils (
         compilationProgressMsg,
         showPass,
         debugTraceMsg,
-
+        ghcExit,
         prettyPrintGhcErrors,
     ) where
 
@@ -67,8 +74,8 @@ type MsgDoc  = SDoc
 
 -------------------------
 data Validity
-  = IsValid            -- Everything is fine
-  | NotValid MsgDoc    -- A problem, and some indication of why
+  = IsValid            -- ^ Everything is fine
+  | NotValid MsgDoc    -- ^ A problem, and some indication of why
 
 isValid :: Validity -> Bool
 isValid IsValid       = True
@@ -78,7 +85,8 @@ andValid :: Validity -> Validity -> Validity
 andValid IsValid v = v
 andValid v _       = v
 
-allValid :: [Validity] -> Validity   -- If they aren't all valid, return the first
+-- | If they aren't all valid, return the first
+allValid :: [Validity] -> Validity
 allValid []       = IsValid
 allValid (v : vs) = v `andValid` allValid vs
 
@@ -125,16 +133,16 @@ data Severity
   | SevInteractive
 
   | SevDump
-    -- Log messagse intended for compiler developers
+    -- ^ Log messagse intended for compiler developers
     -- No file/line/column stuff
 
   | SevInfo
-    -- Log messages intended for end users.
+    -- ^ Log messages intended for end users.
     -- No file/line/column stuff.
 
   | SevWarning
   | SevError
-    -- SevWarning and SevError are used for warnings and errors
+    -- ^ SevWarning and SevError are used for warnings and errors
     --   o The message has a file/line/column heading,
     --     plus "warning:" or "error:",
     --     added by mkLocMessags
@@ -184,11 +192,11 @@ mkErrDoc :: DynFlags -> SrcSpan -> PrintUnqualified -> ErrDoc -> ErrMsg
 mkErrDoc dflags = mk_err_msg dflags SevError
 
 mkLongErrMsg, mkLongWarnMsg   :: DynFlags -> SrcSpan -> PrintUnqualified -> MsgDoc -> MsgDoc -> ErrMsg
--- A long (multi-line) error message
+-- ^ A long (multi-line) error message
 mkErrMsg, mkWarnMsg           :: DynFlags -> SrcSpan -> PrintUnqualified -> MsgDoc            -> ErrMsg
--- A short (one-line) error message
+-- ^ A short (one-line) error message
 mkPlainErrMsg, mkPlainWarnMsg :: DynFlags -> SrcSpan ->                     MsgDoc            -> ErrMsg
--- Variant that doesn't care about qualified/unqualified names
+-- ^ Variant that doesn't care about qualified/unqualified names
 
 mkLongErrMsg   dflags locn unqual msg extra = mk_err_msg dflags SevError   locn unqual        (ErrDoc [msg] [] [extra])
 mkErrMsg       dflags locn unqual msg       = mk_err_msg dflags SevError   locn unqual        (ErrDoc [msg] [] [])
@@ -302,14 +310,14 @@ mkDumpDoc hdr doc
 
 
 -- | Write out a dump.
---      If --dump-to-file is set then this goes to a file.
---      otherwise emit to stdout.
+-- If --dump-to-file is set then this goes to a file.
+-- otherwise emit to stdout.
 --
--- When hdr is empty, we print in a more compact format (no separators and
+-- When @hdr@ is empty, we print in a more compact format (no separators and
 -- blank lines)
 --
--- The DumpFlag is used only to choose the filename to use if --dump-to-file is
--- used; it is not used to decide whether to dump the output
+-- The 'DumpFlag' is used only to choose the filename to use if @--dump-to-file@
+-- is used; it is not used to decide whether to dump the output
 dumpSDoc :: DynFlags -> PrintUnqualified -> DumpFlag -> String -> SDoc -> IO ()
 dumpSDoc dflags print_unqual flag hdr doc
  = do let mFile = chooseDumpFile dflags flag
@@ -352,7 +360,7 @@ dumpSDoc dflags print_unqual flag hdr doc
 
 -- | Choose where to put a dump file based on DynFlags
 --
-chooseDumpFile :: DynFlags -> DumpFlag -> Maybe String
+chooseDumpFile :: DynFlags -> DumpFlag -> Maybe FilePath
 chooseDumpFile dflags flag
 
         | gopt Opt_DumpToFile dflags || flag == Opt_D_th_dec_file
@@ -449,7 +457,7 @@ logInfo :: DynFlags -> PprStyle -> MsgDoc -> IO ()
 logInfo dflags sty msg = log_action dflags dflags SevInfo noSrcSpan sty msg
 
 logOutput :: DynFlags -> PprStyle -> MsgDoc -> IO ()
--- Like logInfo but with SevOutput rather then SevInfo
+-- ^ Like 'logInfo' but with 'SevOutput' rather then 'SevInfo'
 logOutput dflags sty msg = log_action dflags dflags SevOutput noSrcSpan sty msg
 
 prettyPrintGhcErrors :: ExceptionMonad m => DynFlags -> m a -> m a

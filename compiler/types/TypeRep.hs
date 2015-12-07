@@ -790,7 +790,9 @@ pprTyTcApp p tc tys
     if gopt Opt_PrintExplicitKinds dflags then pprTcApp  p ppr_type tc tys
                                    else pprTyList p ty1 ty2
 
-  | tc `hasKey` errorMessageTypeErrorFamKey = text "(TypeError ...)"
+  | not opt_PprStyle_Debug
+  , tc `hasKey` errorMessageTypeErrorFamKey
+  = text "(TypeError ...)"   -- Suppress detail unles you _really_ want to see it
 
   | otherwise
   = pprTcApp p ppr_type tc tys

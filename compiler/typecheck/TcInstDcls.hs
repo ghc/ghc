@@ -663,33 +663,39 @@ tcDataFamInstDecl mb_clsinfo
          -- Construct representation tycon
        ; rep_tc_name <- newFamInstTyConName fam_tc_name pats'
        ; axiom_name  <- newImplicitBinder rep_tc_name mkInstTyCoOcc
-       ; let orig_res_ty = mkTyConApp fam_tc pats'
+       ; let (eta_pats, etad_tvs) = eta_reduce pats'
+             eta_tvs              = filterOut (`elem` etad_tvs) tvs'
+             full_tvs             = eta_tvs ++ etad_tvs
+                 -- Put the eta-removed tyvars at the end
+                 -- Remember, tvs' is in arbitrary order (except kind vars are
+                 -- first, so there is no reason to suppose that the etad_tvs
+                 -- (obtained from the pats) are at the end (Trac #11148)
+             orig_res_ty          = mkTyConApp fam_tc pats'
 
        ; (rep_tc, fam_inst) <- fixM $ \ ~(rec_rep_tc, _) ->
            do { data_cons <- tcConDecls new_or_data
                                         False   -- Not promotable
                                         rec_rep_tc
-                                        (tvs', orig_res_ty) cons
+                                        (full_tvs, orig_res_ty) cons
               ; tc_rhs <- case new_or_data of
                      DataType -> return (mkDataTyConRhs data_cons)
                      NewType  -> ASSERT( not (null data_cons) )
                                  mkNewTyConRhs rep_tc_name rec_rep_tc (head data_cons)
               -- freshen tyvars
-              ; let (eta_tvs, eta_pats) = eta_reduce tvs' pats'
-                    axiom    = mkSingleCoAxiom Representational
-                                               axiom_name eta_tvs fam_tc eta_pats
-                                               (mkTyConApp rep_tc (mkTyVarTys eta_tvs))
-                    parent   = DataFamInstTyCon axiom fam_tc pats'
-                    roles    = map (const Nominal) tvs'
+              ; let axiom  = mkSingleCoAxiom Representational
+                                             axiom_name eta_tvs fam_tc eta_pats
+                                             (mkTyConApp rep_tc (mkTyVarTys eta_tvs))
+                    parent = DataFamInstTyCon axiom fam_tc pats'
 
-                      -- NB: Use the tvs' from the pats. See bullet toward
+                      -- NB: Use the full_tvs from the pats. See bullet toward
                       -- the end of Note [Data type families] in TyCon
-                    rep_tc   = buildAlgTyCon rep_tc_name tvs' roles
-                                             (fmap unLoc cType) stupid_theta
-                                             tc_rhs
-                                             Recursive
-                                             False      -- No promotable to the kind level
-                                             gadt_syntax parent
+                    rep_tc = buildAlgTyCon rep_tc_name full_tvs
+                                           (map (const Nominal) full_tvs)
+                                           (fmap unLoc cType) stupid_theta
+                                           tc_rhs
+                                           Recursive
+                                           False      -- No promotable to the kind level
+                                           gadt_syntax parent
                  -- We always assume that indexed types are recursive.  Why?
                  -- (1) Due to their open nature, we can never be sure that a
                  -- further instance might not introduce a new recursive
@@ -710,51 +716,27 @@ tcDataFamInstDecl mb_clsinfo
 
        ; return (fam_inst, m_deriv_info) } }
   where
-    -- See Note [Eta reduction for data family axioms]
-    --  [a,b,c,d].T [a] c Int c d  ==>  [a,b,c]. T [a] c Int c
-    eta_reduce tvs pats = go (reverse tvs) (reverse pats)
-    go (tv:tvs) (pat:pats)
-      | Just tv' <- getTyVar_maybe pat
-      , tv == tv'
+    eta_reduce :: [Type] -> ([Type], [TyVar])
+    -- See Note [Eta reduction for data families] in FamInstEnv
+    -- Splits the incoming patterns into two: the [TyVar]
+    -- are the patterns that can be eta-reduced away.
+    -- e.g.     T [a] Int a d c   ==>  (T [a] Int a, [d,c])
+    --
+    -- NB: quadratic algorithm, but types are small here
+    eta_reduce pats
+      = go (reverse pats) []
+    go (pat:pats) etad_tvs
+      | Just tv <- getTyVar_maybe pat
       , not (tv `elemVarSet` tyVarsOfTypes pats)
-      = go tvs pats
-    go tvs pats = (reverse tvs, reverse pats)
-
-{-
-Note [Eta reduction for data family axioms]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this
-   data family T a b :: *
-   newtype instance T Int a = MkT (IO a) deriving( Monad )
-We'd like this to work.  From the 'newtype instance' you might
-think we'd get:
-   newtype TInt a = MkT (IO a)
-   axiom ax1 a :: T Int a ~ TInt a   -- The type-instance part
-   axiom ax2 a :: TInt a ~ IO a      -- The newtype part
-
-But now what can we do?  We have this problem
-   Given:   d  :: Monad IO
-   Wanted:  d' :: Monad (T Int) = d |> ????
-What coercion can we use for the ???
-
-Solution: eta-reduce both axioms, thus:
-   axiom ax1 :: T Int ~ TInt
-   axiom ax2 :: TInt ~ IO
-Now
-   d' = d |> Monad (sym (ax2 ; ax1))
-
-This eta reduction happens both for data instances and newtype instances.
-
-See Note [Newtype eta] in TyCon.
+      = go pats (tv : etad_tvs)
+    go pats etad_tvs = (reverse pats, etad_tvs)
 
 
-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
       Type-checking instance declarations, pass 2
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 tcInstDecls2 :: [LTyClDecl Name] -> [InstInfo Name]
              -> TcM (LHsBinds Id)

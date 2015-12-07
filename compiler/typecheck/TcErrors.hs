@@ -499,8 +499,8 @@ mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
                         $ important
                         $ pprUserTypeErrorTy
                         $ case getUserTypeErrorMsg ct of
-                            Just (_,msg) -> msg
-                            Nothing      -> pprPanic "mkUserTypeError" (ppr ct)
+                            Just msg -> msg
+                            Nothing  -> pprPanic "mkUserTypeError" (ppr ct)
 
 
 mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)

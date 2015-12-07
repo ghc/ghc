@@ -227,6 +227,10 @@ data Sequel
                         -- may allocate (e.g. it's a foreign call or
                         -- allocating primOp)
 
+instance Outputable Sequel where
+    ppr (Return b) = ptext (sLit "Return") <+> ppr b
+    ppr (AssignTo regs b) = ptext (sLit "AssignTo") <+> ppr regs <+> ppr b
+
 -- See Note [sharing continuations] below
 data ReturnKind
   = AssignedDirectly

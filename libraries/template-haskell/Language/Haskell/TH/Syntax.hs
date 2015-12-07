@@ -908,7 +908,7 @@ nameBase (Name occ _) = occString occ
 --
 -- ==== __Examples__
 --
--- >>> nameModule ''Data.Either.Either"
+-- >>> nameModule ''Data.Either.Either
 -- Just "Data.Either"
 -- >>> nameModule (mkName "foo")
 -- Nothing
@@ -923,7 +923,7 @@ nameModule _                      = Nothing
 --
 -- ==== __Examples__
 --
--- >>> namePackage ''Data.Either.Either"
+-- >>> namePackage ''Data.Either.Either
 -- Just "base"
 -- >>> namePackage (mkName "foo")
 -- Nothing
@@ -1343,10 +1343,10 @@ data Lit = CharL Char
 
 -- | Pattern in Haskell given in @{}@
 data Pat
-  = LitP Lit                      -- ^ @{ 5 or 'c' }@
+  = LitP Lit                      -- ^ @{ 5 or \'c\' }@
   | VarP Name                     -- ^ @{ x }@
   | TupP [Pat]                    -- ^ @{ (p1,p2) }@
-  | UnboxedTupP [Pat]             -- ^ @{ (# p1,p2 #) }@
+  | UnboxedTupP [Pat]             -- ^ @{ (\# p1,p2 \#) }@
   | ConP Name [Pat]               -- ^ @data T1 = C1 t1 t2; {C1 p1 p1} = e@
   | InfixP Pat Name Pat           -- ^ @foo ({x :+ y}) = e@
   | UInfixP Pat Name Pat          -- ^ @foo ({x :+ y}) = e@
@@ -1376,7 +1376,7 @@ data Clause = Clause [Pat] Body [Dec]
 data Exp
   = VarE Name                          -- ^ @{ x }@
   | ConE Name                          -- ^ @data T1 = C1 t1 t2; p = {C1} e1 e2  @
-  | LitE Lit                           -- ^ @{ 5 or 'c'}@
+  | LitE Lit                           -- ^ @{ 5 or \'c\'}@
   | AppE Exp Exp                       -- ^ @{ f x }@
 
   | InfixE (Maybe Exp) Exp (Maybe Exp) -- ^ @{x + y} or {(x+)} or {(+ x)} or {(+)}@
@@ -1393,10 +1393,10 @@ data Exp
   | ParensE Exp                        -- ^ @{ (e) }@
                                        --
                                        -- See "Language.Haskell.TH.Syntax#infix"
-  | LamE [Pat] Exp                     -- ^ @{ \ p1 p2 -> e }@
-  | LamCaseE [Match]                   -- ^ @{ \case m1; m2 }@
+  | LamE [Pat] Exp                     -- ^ @{ \\ p1 p2 -> e }@
+  | LamCaseE [Match]                   -- ^ @{ \\case m1; m2 }@
   | TupE [Exp]                         -- ^ @{ (e1,e2) }  @
-  | UnboxedTupE [Exp]                  -- ^ @{ (# e1,e2 #) }  @
+  | UnboxedTupE [Exp]                  -- ^ @{ (\# e1,e2 \#) }  @
   | CondE Exp Exp Exp                  -- ^ @{ if e1 then e2 else e3 }@
   | MultiIfE [(Guard, Exp)]            -- ^ @{ if | g1 -> e1 | g2 -> e2 }@
   | LetE [Dec] Exp                     -- ^ @{ let x=e1;   y=e2 in e3 }@
@@ -1470,7 +1470,7 @@ data Dec
   | InfixD Fixity Name            -- ^ @{ infix 3 foo }@
 
   -- | pragmas
-  | PragmaD Pragma                -- ^ @{ {\-# INLINE [1] foo #-\} }@
+  | PragmaD Pragma                -- ^ @{ {\-\# INLINE [1] foo \#-\} }@
 
   -- | data families (may also appear in [Dec] of 'ClassD' and 'InstanceD')
   | DataFamilyD Name [TyVarBndr]
@@ -1590,7 +1590,7 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> -> \<t
 
           -- See Note [Representing concrete syntax in types]
           | TupleT Int                    -- ^ @(,), (,,), etc.@
-          | UnboxedTupleT Int             -- ^ @(#,#), (#,,#), etc.@
+          | UnboxedTupleT Int             -- ^ @(\#,\#), (\#,,\#), etc.@
           | ArrowT                        -- ^ @->@
           | EqualityT                     -- ^ @~@
           | ListT                         -- ^ @[]@

@@ -847,15 +847,17 @@ of the scope of a `seq`, or dropped the `seq` altogether.
 
 cpe_ExprIsTrivial :: CoreExpr -> Bool
 -- Version that doesn't consider an scc annotation to be trivial.
-cpe_ExprIsTrivial (Var _)        = True
-cpe_ExprIsTrivial (Type _)       = True
-cpe_ExprIsTrivial (Coercion _)   = True
-cpe_ExprIsTrivial (Lit _)        = True
-cpe_ExprIsTrivial (App e arg)    = isTypeArg arg && cpe_ExprIsTrivial e
-cpe_ExprIsTrivial (Tick t e)     = not (tickishIsCode t) && cpe_ExprIsTrivial e
-cpe_ExprIsTrivial (Cast e _)     = cpe_ExprIsTrivial e
-cpe_ExprIsTrivial (Lam b body) | isTyVar b = cpe_ExprIsTrivial body
-cpe_ExprIsTrivial _              = False
+cpe_ExprIsTrivial (Var _)         = True
+cpe_ExprIsTrivial (Type _)        = True
+cpe_ExprIsTrivial (Coercion _)    = True
+cpe_ExprIsTrivial (Lit _)         = True
+cpe_ExprIsTrivial (App e arg)     = not (isRuntimeArg arg) && cpe_ExprIsTrivial e
+cpe_ExprIsTrivial (Lam b e)       = not (isRuntimeVar b) && cpe_ExprIsTrivial e
+cpe_ExprIsTrivial (Tick t e)      = not (tickishIsCode t) && cpe_ExprIsTrivial e
+cpe_ExprIsTrivial (Cast e _)      = cpe_ExprIsTrivial e
+cpe_ExprIsTrivial (Case e _ _ []) = cpe_ExprIsTrivial e
+                                    -- See Note [Empty case is trivial] in CoreUtils
+cpe_ExprIsTrivial _               = False
 
 {-
 -- -----------------------------------------------------------------------------

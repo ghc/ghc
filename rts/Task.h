@@ -94,7 +94,7 @@ typedef struct InCall_ {
                                 // without owning a Capability in the
                                 // first place.
 
-    SchedulerStatus  stat;      // return status
+    SchedulerStatus  rstat;     // return status
     StgClosure **    ret;       // return value
 
     struct Task_ *task;

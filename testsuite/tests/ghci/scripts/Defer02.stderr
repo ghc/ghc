@@ -12,6 +12,10 @@
     • In the expression: 'p'
       In an equation for ‘a’: a = 'p'
 
+../../typecheck/should_run/Defer01.hs:25:1: warning:
+    Pattern match(es) have inaccessible right hand side
+    In an equation for ‘c’: c (C2 x) = ...
+
 ../../typecheck/should_run/Defer01.hs:25:4: warning:
     • Couldn't match type ‘Int’ with ‘Bool’
       Inaccessible code in
@@ -90,6 +94,10 @@
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the type signature:
         k :: (Int ~ Bool) => Int -> Bool
+
+../../typecheck/should_run/Defer01.hs:46:1: warning:
+    Pattern match(es) are redundant
+    In an equation for ‘k’: k x = ...
 
 ../../typecheck/should_run/Defer01.hs:49:5: warning:
     • Couldn't match expected type ‘IO a0’

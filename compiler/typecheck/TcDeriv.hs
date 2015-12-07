@@ -47,7 +47,6 @@ import DataCon
 import Maybes
 import RdrName
 import Name
-import NameEnv
 import NameSet
 import TyCon
 import TcType
@@ -146,10 +145,6 @@ data EarlyDerivSpec = InferTheta (DerivSpec ThetaOrigin)
         --
         -- GivenTheta ds => the exact context for the instance is supplied
         --                  by the programmer; it is ds_theta
-
-forgetTheta :: EarlyDerivSpec -> DerivSpec ()
-forgetTheta (InferTheta spec) = spec { ds_theta = () }
-forgetTheta (GivenTheta spec) = spec { ds_theta = () }
 
 earlyDSLoc :: EarlyDerivSpec -> SrcSpan
 earlyDSLoc (InferTheta spec) = ds_loc spec
@@ -381,25 +376,20 @@ tcDeriving deriv_infos deriv_decls
         ; early_specs <- makeDerivSpecs is_boot deriv_infos deriv_decls
         ; traceTc "tcDeriving 1" (ppr early_specs)
 
-        -- for each type, determine the auxliary declarations that are common
-        -- to multiple derivations involving that type (e.g. Generic and
-        -- Generic1 should use the same TcGenGenerics.MetaTyCons)
-        ; (commonAuxs, auxDerivStuff) <- commonAuxiliaries $ map forgetTheta early_specs
-
         ; let (infer_specs, given_specs) = splitEarlyDerivSpec early_specs
-        ; insts1 <- mapM (genInst commonAuxs) given_specs
+        ; insts1 <- mapM genInst given_specs
 
         -- the stand-alone derived instances (@insts1@) are used when inferring
         -- the contexts for "deriving" clauses' instances (@infer_specs@)
         ; final_specs <- extendLocalInstEnv (map (iSpec . fstOf3) insts1) $
                          inferInstanceContexts infer_specs
 
-        ; insts2 <- mapM (genInst commonAuxs) final_specs
+        ; insts2 <- mapM genInst final_specs
 
         ; let (inst_infos, deriv_stuff, maybe_fvs) = unzip3 (insts1 ++ insts2)
         ; loc <- getSrcSpanM
-        ; let (binds, newTyCons, famInsts, extraInstances) =
-                genAuxBinds loc (unionManyBags (auxDerivStuff : deriv_stuff))
+        ; let (binds, famInsts, extraInstances) =
+                genAuxBinds loc (unionManyBags deriv_stuff)
 
         ; dflags <- getDynFlags
 
@@ -408,29 +398,22 @@ tcDeriving deriv_infos deriv_decls
 
         ; unless (isEmptyBag inst_info) $
              liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
-                        (ddump_deriving inst_info rn_binds newTyCons famInsts))
+                        (ddump_deriving inst_info rn_binds famInsts))
 
-        ; let all_tycons = bagToList newTyCons
-        ; gbl_env <- tcExtendTyConEnv all_tycons $
-                     tcExtendGlobalEnvImplicit (concatMap implicitTyConThings all_tycons) $
-                     tcExtendLocalFamInstEnv (bagToList famInsts) $
+        ; gbl_env <- tcExtendLocalFamInstEnv (bagToList famInsts) $
                      tcExtendLocalInstEnv (map iSpec (bagToList inst_info)) getGblEnv
         ; let all_dus = rn_dus `plusDU` usesOnly (mkFVs $ catMaybes maybe_fvs)
         ; return (addTcgDUs gbl_env all_dus, inst_info, rn_binds) }
   where
     ddump_deriving :: Bag (InstInfo Name) -> HsValBinds Name
-                   -> Bag TyCon               -- ^ Empty data constructors
                    -> Bag FamInst             -- ^ Rep type family instances
                    -> SDoc
-    ddump_deriving inst_infos extra_binds repMetaTys repFamInsts
+    ddump_deriving inst_infos extra_binds repFamInsts
       =    hang (ptext (sLit "Derived instances:"))
               2 (vcat (map (\i -> pprInstInfoDetails i $$ text "") (bagToList inst_infos))
                  $$ ppr extra_binds)
-        $$ hangP "Generic representation:" (
-              hangP "Generated datatypes for meta-information:"
-               (vcat (map ppr (bagToList repMetaTys)))
-           $$ hangP "Representation types:"
-                (vcat (map pprRepTy (bagToList repFamInsts))))
+        $$ hangP "GHC.Generics representation types:"
+             (vcat (map pprRepTy (bagToList repFamInsts)))
 
     hangP s x = text "" $$ hang (ptext (sLit s)) 2 x
 
@@ -440,27 +423,6 @@ pprRepTy fi@(FamInst { fi_tys = lhs })
   = ptext (sLit "type") <+> ppr (mkTyConApp (famInstTyCon fi) lhs) <+>
       equals <+> ppr rhs
   where rhs = famInstRHS fi
-
--- As of 24 April 2012, this only shares MetaTyCons between derivations of
--- Generic and Generic1; thus the types and logic are quite simple.
-type CommonAuxiliary = MetaTyCons
-type CommonAuxiliaries = NameEnv CommonAuxiliary
-
-commonAuxiliaries :: [DerivSpec ()] -> TcM (CommonAuxiliaries, BagDerivStuff)
-commonAuxiliaries = foldM snoc (emptyNameEnv, emptyBag) where
-  snoc :: (CommonAuxiliaries, BagDerivStuff)
-       -> DerivSpec () -> TcM (CommonAuxiliaries, BagDerivStuff)
-  snoc acc@(cas, stuff) (DS {ds_cls = cls, ds_tc = rep_tycon})
-    | getUnique cls `elem` [genClassKey, gen1ClassKey] =
-      extendComAux $ genGenericMetaTyCons rep_tycon
-    | otherwise = return acc
-   where extendComAux :: TcM (MetaTyCons, BagDerivStuff)
-                      -> TcM (CommonAuxiliaries, BagDerivStuff)
-         extendComAux m -- don't run m if its already in the accumulator
-           | elemNameEnv (tyConName rep_tycon) cas = return acc
-           | otherwise = do (ca, new_stuff) <- m
-                            return ( extendNameEnv cas (tyConName rep_tycon) ca
-                                   , stuff `unionBags` new_stuff)
 
 renameDeriv :: Bool
             -> [InstInfo RdrName]
@@ -1955,11 +1917,9 @@ the renamer.  What a great hack!
 -- Representation tycons differ from the tycon in the instance signature in
 -- case of instances for indexed families.
 --
-genInst :: CommonAuxiliaries
-        -> DerivSpec ThetaType
+genInst :: DerivSpec ThetaType
         -> TcM (InstInfo RdrName, BagDerivStuff, Maybe Name)
-genInst comauxs
-        spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon, ds_tc_args = rep_tc_args
+genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon, ds_tc_args = rep_tc_args
                  , ds_theta = theta, ds_newtype = is_newtype, ds_tys = tys
                  , ds_name = dfun_name, ds_cls = clas, ds_loc = loc })
   | is_newtype   -- See Note [Bindings for Generalised Newtype Deriving]
@@ -1982,8 +1942,6 @@ genInst comauxs
   = do { (meth_binds, deriv_stuff) <- genDerivStuff loc clas
                                         dfun_name rep_tycon
                                         tys tvs
-                                        (lookupNameEnv comauxs
-                                                       (tyConName rep_tycon))
        ; inst_spec <- newDerivClsInst theta spec
        ; traceTc "newder" (ppr inst_spec)
        ; let inst_info = InstInfo { iSpec   = inst_spec
@@ -2000,17 +1958,15 @@ genInst comauxs
 -- Generate the bindings needed for a derived class that isn't handled by
 -- -XGeneralizedNewtypeDeriving.
 genDerivStuff :: SrcSpan -> Class -> Name -> TyCon -> [Type] -> [TyVar]
-              -> Maybe CommonAuxiliary
               -> TcM (LHsBinds RdrName, BagDerivStuff)
-genDerivStuff loc clas dfun_name tycon inst_tys tyvars comaux_maybe
+genDerivStuff loc clas dfun_name tycon inst_tys tyvars
   -- Special case for DeriveGeneric
   | let ck = classKey clas
-  ,
-    Just gk <- lookup ck [(genClassKey, Gen0), (gen1ClassKey, Gen1)]
-  = let -- TODO NSF: correctly identify when we're building Both instead of One
-        Just metaTyCons = comaux_maybe -- well-guarded by commonAuxiliaries and genInst
+  , ck `elem` [genClassKey, gen1ClassKey]
+  = let gk = if ck == genClassKey then Gen0 else Gen1
+        -- TODO NSF: correctly identify when we're building Both instead of One
     in do
-      (binds, faminst) <- gen_Generic_binds gk tycon metaTyCons (nameModule dfun_name)
+      (binds, faminst) <- gen_Generic_binds gk tycon (nameModule dfun_name)
       return (binds, unitBag (DerivFamInst faminst))
 
   -- Not deriving Generic(1), so we first check if the compiler has built-in

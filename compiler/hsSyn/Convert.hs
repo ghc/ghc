@@ -45,7 +45,7 @@ import Control.Applicative (Applicative(..))
 
 import Data.Char ( chr )
 import Data.Word ( Word8 )
-import Data.Maybe( catMaybes )
+import Data.Maybe( catMaybes, fromMaybe )
 import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
 
@@ -423,13 +423,13 @@ cvtConstr (NormalC c strtys)
   = do  { c'   <- cNameL c
         ; cxt' <- returnL []
         ; tys' <- mapM cvt_arg strtys
-        ; returnL $ mkSimpleConDecl c' Nothing cxt' (PrefixCon tys') }
+        ; returnL $ mkConDeclH98 c' Nothing cxt' (PrefixCon tys') }
 
 cvtConstr (RecC c varstrtys)
   = do  { c'    <- cNameL c
         ; cxt'  <- returnL []
         ; args' <- mapM cvt_id_arg varstrtys
-        ; returnL $ mkSimpleConDecl c' Nothing cxt'
+        ; returnL $ mkConDeclH98 c' Nothing cxt'
                                    (RecCon (noLoc args')) }
 
 cvtConstr (InfixC st1 c st2)
@@ -437,15 +437,23 @@ cvtConstr (InfixC st1 c st2)
         ; cxt' <- returnL []
         ; st1' <- cvt_arg st1
         ; st2' <- cvt_arg st2
-        ; returnL $ mkSimpleConDecl c' Nothing cxt' (InfixCon st1' st2') }
+        ; returnL $ mkConDeclH98 c' Nothing cxt' (InfixCon st1' st2') }
 
 cvtConstr (ForallC tvs ctxt con)
   = do  { tvs'  <- cvtTvs tvs
         ; L loc ctxt' <- cvtContext ctxt
         ; L _ con' <- cvtConstr con
-        ; returnL $ con' { con_qvars = mkHsQTvs (hsQTvBndrs tvs' ++ hsQTvBndrs (con_qvars con'))
-                         , con_explicit = True
-                         , con_cxt = L loc (ctxt' ++ (unLoc $ con_cxt con')) } }
+        ; let qvars = case (tvs,con_qvars con') of
+                ([],Nothing) -> Nothing
+                _  ->
+                  Just $ mkHsQTvs (hsQTvBndrs tvs' ++
+                                   hsQTvBndrs (fromMaybe (HsQTvs PlaceHolder [])
+                                              (con_qvars con')))
+        ; returnL $ con' { con_qvars = qvars
+                         , con_cxt = Just $
+                                     L loc (ctxt' ++
+                                            unLoc (fromMaybe (noLoc [])
+                                                   (con_cxt con'))) } }
 
 cvt_arg :: (TH.Strict, TH.Type) -> CvtM (LHsType RdrName)
 cvt_arg (NotStrict, ty) = cvtType ty

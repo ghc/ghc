@@ -18,7 +18,7 @@ module MonadUtils
         , concatMapM
         , mapMaybeM
         , fmapMaybeM, fmapEitherM
-        , anyM, allM
+        , anyM, allM, orM
         , foldlM, foldlM_, foldrM
         , maybeMapM
         , whenM
@@ -148,6 +148,10 @@ anyM f (x:xs) = do b <- f x
 allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
 allM _ []     = return True
 allM f (b:bs) = (f b) >>= (\bv -> if bv then allM f bs else return False)
+
+-- | Monadic version of or
+orM :: Monad m => m Bool -> m Bool -> m Bool
+orM m1 m2 = m1 >>= \x -> if x then return True else m2
 
 -- | Monadic version of foldl
 foldlM :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a

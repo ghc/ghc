@@ -1,12 +1,12 @@
 
-WCompatWarningsOn.hs:11:5: warning:
+WCompatWarningsOn.hs:13:5: warning:
     • Could not deduce (MonadFail m)
         arising from the failable pattern ‘Just _’
         (this will become an error a future GHC release)
       from the context: Monad m
         bound by the type signature for:
                    monadFail :: Monad m => m a
-        at WCompatWarningsOn.hs:9:1-27
+        at WCompatWarningsOn.hs:11:1-27
       Possible fix:
         add (MonadFail m) to the context of
           the type signature for:
@@ -20,6 +20,16 @@ WCompatWarningsOn.hs:11:5: warning:
             = do { Just _ <- undefined;
                    undefined }
 
-WCompatWarningsOn.hs:14:1: warning:
+WCompatWarningsOn.hs:16:1: warning:
     Local definition of ‘<>’ clashes with a future Prelude name.
     This will become an error in a future release.
+
+WCompatWarningsOn.hs:22:3: warning:
+    Noncanonical ‘(<>) = mappend’ definition detected
+    in the instance declaration for ‘Semigroup S’.
+    Move definition from ‘mappend’ to ‘(<>)’
+
+WCompatWarningsOn.hs:25:3: warning:
+    Noncanonical ‘mappend’ definition detected
+    in the instance declaration for ‘Monoid S’.
+    Define as ‘mappend = (<>)’

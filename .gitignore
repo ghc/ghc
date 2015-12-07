@@ -91,7 +91,6 @@ _darcs/
 /docs/index.html
 /docs/users_guide/users_guide
 /docs/users_guide/ghc.1
-/docs/users_guide/*.xml
 /docs/users_guide/*.gen.rst
 /docs/users_guide/ghc_config.py
 /docs/users_guide/ghc_config.pyc
@@ -134,6 +133,7 @@ _darcs/
 /libraries/plus.gif
 /libraries/synopsis.png
 /libraries/stamp/
+/linter.log
 /mk/are-validating.mk
 /mk/build.mk
 /mk/config.h

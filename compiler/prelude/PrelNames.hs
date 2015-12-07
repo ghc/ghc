@@ -380,12 +380,16 @@ genericTyConNames :: [Name]
 genericTyConNames = [
     v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
     k1TyConName, m1TyConName, sumTyConName, prodTyConName,
-    compTyConName, rTyConName, pTyConName, dTyConName,
-    cTyConName, sTyConName, rec0TyConName, par0TyConName,
+    compTyConName, rTyConName, dTyConName,
+    cTyConName, sTyConName, rec0TyConName,
     d1TyConName, c1TyConName, s1TyConName, noSelTyConName,
     repTyConName, rep1TyConName, uRecTyConName,
     uAddrTyConName, uCharTyConName, uDoubleTyConName,
-    uFloatTyConName, uIntTyConName, uWordTyConName
+    uFloatTyConName, uIntTyConName, uWordTyConName,
+    prefixIDataConName, infixIDataConName, leftAssociativeDataConName,
+    rightAssociativeDataConName, notAssociativeDataConName,
+    metaDataDataConName, metaConsDataConName,
+    metaSelDataConName, metaNoSelDataConName
   ]
 
 {-
@@ -702,8 +706,7 @@ u1DataCon_RDR, par1DataCon_RDR, rec1DataCon_RDR,
   unPar1_RDR, unRec1_RDR, unK1_RDR, unComp1_RDR,
   from_RDR, from1_RDR, to_RDR, to1_RDR,
   datatypeName_RDR, moduleName_RDR, packageName_RDR, isNewtypeName_RDR,
-  conName_RDR, conFixity_RDR, conIsRecord_RDR,
-  noArityDataCon_RDR, arityDataCon_RDR, selName_RDR,
+  conName_RDR, conFixity_RDR, conIsRecord_RDR, selName_RDR,
   prefixDataCon_RDR, infixDataCon_RDR, leftAssocDataCon_RDR,
   rightAssocDataCon_RDR, notAssocDataCon_RDR,
   uAddrDataCon_RDR, uCharDataCon_RDR, uDoubleDataCon_RDR,
@@ -742,8 +745,6 @@ conName_RDR       = varQual_RDR gHC_GENERICS (fsLit "conName")
 conFixity_RDR     = varQual_RDR gHC_GENERICS (fsLit "conFixity")
 conIsRecord_RDR   = varQual_RDR gHC_GENERICS (fsLit "conIsRecord")
 
-noArityDataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "NoArity")
-arityDataCon_RDR      = dataQual_RDR gHC_GENERICS (fsLit "Arity")
 prefixDataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "Prefix")
 infixDataCon_RDR      = dataQual_RDR gHC_GENERICS (fsLit "Infix")
 leftAssocDataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "LeftAssociative")
@@ -854,12 +855,16 @@ rightDataConName  = dcQual dATA_EITHER (fsLit "Right")  rightDataConKey
 -- Generics (types)
 v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
   k1TyConName, m1TyConName, sumTyConName, prodTyConName,
-  compTyConName, rTyConName, pTyConName, dTyConName,
-  cTyConName, sTyConName, rec0TyConName, par0TyConName,
+  compTyConName, rTyConName, dTyConName,
+  cTyConName, sTyConName, rec0TyConName,
   d1TyConName, c1TyConName, s1TyConName, noSelTyConName,
   repTyConName, rep1TyConName, uRecTyConName,
   uAddrTyConName, uCharTyConName, uDoubleTyConName,
-  uFloatTyConName, uIntTyConName, uWordTyConName :: Name
+  uFloatTyConName, uIntTyConName, uWordTyConName,
+  prefixIDataConName, infixIDataConName, leftAssociativeDataConName,
+  rightAssociativeDataConName, notAssociativeDataConName,
+  metaDataDataConName, metaConsDataConName,
+  metaSelDataConName, metaNoSelDataConName :: Name
 
 v1TyConName  = tcQual gHC_GENERICS (fsLit "V1") v1TyConKey
 u1TyConName  = tcQual gHC_GENERICS (fsLit "U1") u1TyConKey
@@ -873,13 +878,11 @@ prodTyConName   = tcQual gHC_GENERICS (fsLit ":*:") prodTyConKey
 compTyConName   = tcQual gHC_GENERICS (fsLit ":.:") compTyConKey
 
 rTyConName  = tcQual gHC_GENERICS (fsLit "R") rTyConKey
-pTyConName  = tcQual gHC_GENERICS (fsLit "P") pTyConKey
 dTyConName  = tcQual gHC_GENERICS (fsLit "D") dTyConKey
 cTyConName  = tcQual gHC_GENERICS (fsLit "C") cTyConKey
 sTyConName  = tcQual gHC_GENERICS (fsLit "S") sTyConKey
 
 rec0TyConName  = tcQual gHC_GENERICS (fsLit "Rec0") rec0TyConKey
-par0TyConName  = tcQual gHC_GENERICS (fsLit "Par0") par0TyConKey
 d1TyConName  = tcQual gHC_GENERICS (fsLit "D1") d1TyConKey
 c1TyConName  = tcQual gHC_GENERICS (fsLit "C1") c1TyConKey
 s1TyConName  = tcQual gHC_GENERICS (fsLit "S1") s1TyConKey
@@ -895,6 +898,17 @@ uDoubleTyConName   = tcQual gHC_GENERICS (fsLit "UDouble") uDoubleTyConKey
 uFloatTyConName    = tcQual gHC_GENERICS (fsLit "UFloat") uFloatTyConKey
 uIntTyConName      = tcQual gHC_GENERICS (fsLit "UInt") uIntTyConKey
 uWordTyConName     = tcQual gHC_GENERICS (fsLit "UWord") uWordTyConKey
+
+prefixIDataConName = dcQual gHC_GENERICS (fsLit "PrefixI")  prefixIDataConKey
+infixIDataConName  = dcQual gHC_GENERICS (fsLit "InfixI")   infixIDataConKey
+leftAssociativeDataConName  = dcQual gHC_GENERICS (fsLit "LeftAssociative")   leftAssociativeDataConKey
+rightAssociativeDataConName = dcQual gHC_GENERICS (fsLit "RightAssociative")  rightAssociativeDataConKey
+notAssociativeDataConName   = dcQual gHC_GENERICS (fsLit "NotAssociative")    notAssociativeDataConKey
+
+metaDataDataConName  = dcQual gHC_GENERICS (fsLit "MetaData")  metaDataDataConKey
+metaConsDataConName  = dcQual gHC_GENERICS (fsLit "MetaCons")  metaConsDataConKey
+metaSelDataConName   = dcQual gHC_GENERICS (fsLit "MetaSel")   metaSelDataConKey
+metaNoSelDataConName = dcQual gHC_GENERICS (fsLit "MetaNoSel") metaNoSelDataConKey
 
 -- Base strings Strings
 unpackCStringName, unpackCStringFoldrName,
@@ -1607,8 +1621,8 @@ opaqueTyConKey                          = mkPreludeTyConUnique 133
 -- Generics (Unique keys)
 v1TyConKey, u1TyConKey, par1TyConKey, rec1TyConKey,
   k1TyConKey, m1TyConKey, sumTyConKey, prodTyConKey,
-  compTyConKey, rTyConKey, pTyConKey, dTyConKey,
-  cTyConKey, sTyConKey, rec0TyConKey, par0TyConKey,
+  compTyConKey, rTyConKey, dTyConKey,
+  cTyConKey, sTyConKey, rec0TyConKey,
   d1TyConKey, c1TyConKey, s1TyConKey, noSelTyConKey,
   repTyConKey, rep1TyConKey, uRecTyConKey,
   uAddrTyConKey, uCharTyConKey, uDoubleTyConKey,
@@ -1626,13 +1640,11 @@ prodTyConKey  = mkPreludeTyConUnique 142
 compTyConKey  = mkPreludeTyConUnique 143
 
 rTyConKey = mkPreludeTyConUnique 144
-pTyConKey = mkPreludeTyConUnique 145
 dTyConKey = mkPreludeTyConUnique 146
 cTyConKey = mkPreludeTyConUnique 147
 sTyConKey = mkPreludeTyConUnique 148
 
 rec0TyConKey  = mkPreludeTyConUnique 149
-par0TyConKey  = mkPreludeTyConUnique 150
 d1TyConKey    = mkPreludeTyConUnique 151
 c1TyConKey    = mkPreludeTyConUnique 152
 s1TyConKey    = mkPreludeTyConUnique 153
@@ -1729,6 +1741,7 @@ charDataConKey, consDataConKey, doubleDataConKey, falseDataConKey,
     ratioDataConKey, stableNameDataConKey, trueDataConKey, wordDataConKey,
     word8DataConKey, ioDataConKey, integerDataConKey, eqBoxDataConKey,
     coercibleDataConKey, nothingDataConKey, justDataConKey :: Unique
+
 charDataConKey                          = mkPreludeDataConUnique  1
 consDataConKey                          = mkPreludeDataConUnique  2
 doubleDataConKey                        = mkPreludeDataConUnique  3
@@ -1800,6 +1813,20 @@ typeErrorTextDataConKey                 = mkPreludeDataConUnique 50
 typeErrorAppendDataConKey               = mkPreludeDataConUnique 51
 typeErrorVAppendDataConKey              = mkPreludeDataConUnique 52
 typeErrorShowTypeDataConKey             = mkPreludeDataConUnique 53
+
+prefixIDataConKey, infixIDataConKey, leftAssociativeDataConKey,
+    rightAssociativeDataConKey, notAssociativeDataConKey,
+    metaDataDataConKey, metaConsDataConKey,
+    metaSelDataConKey, metaNoSelDataConKey :: Unique
+prefixIDataConKey                       = mkPreludeDataConUnique 54
+infixIDataConKey                        = mkPreludeDataConUnique 55
+leftAssociativeDataConKey               = mkPreludeDataConUnique 56
+rightAssociativeDataConKey              = mkPreludeDataConUnique 57
+notAssociativeDataConKey                = mkPreludeDataConUnique 58
+metaDataDataConKey                      = mkPreludeDataConUnique 59
+metaConsDataConKey                      = mkPreludeDataConUnique 60
+metaSelDataConKey                       = mkPreludeDataConUnique 61
+metaNoSelDataConKey                     = mkPreludeDataConUnique 62
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES DataUniques 100-150

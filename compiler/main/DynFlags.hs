@@ -113,10 +113,6 @@ module DynFlags (
         -- ** DynFlags C compiler options
         picCCOpts, picPOpts,
 
-        -- * Configuration of the stg-to-stg passes
-        StgToDo(..),
-        getStgToDo,
-
         -- * Compiler configuration suitable for display to the user
         compilerInfo,
 
@@ -529,7 +525,8 @@ data WarningFlag =
    | Opt_WarnUntickedPromotedConstructors
    | Opt_WarnDerivingTypeable
    | Opt_WarnDeferredTypeErrors
-   | Opt_WarnNonCanonicalMonadInstances
+   | Opt_WarnNonCanonicalMonadInstances   -- since 8.0
+   | Opt_WarnNonCanonicalMonoidInstances  -- since 8.0
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -2029,28 +2026,6 @@ updOptLevel n dfs
    extra_gopts  = [ f | (ns,f) <- optLevelFlags, final_n `elem` ns ]
    remove_gopts = [ f | (ns,f) <- optLevelFlags, final_n `notElem` ns ]
 
--- -----------------------------------------------------------------------------
--- StgToDo:  abstraction of stg-to-stg passes to run.
-
-data StgToDo
-  = StgDoMassageForProfiling  -- should be (next to) last
-  -- There's also setStgVarInfo, but its absolute "lastness"
-  -- is so critical that it is hardwired in (no flag).
-  | D_stg_stats
-
-getStgToDo :: DynFlags -> [StgToDo]
-getStgToDo dflags
-  = todo2
-  where
-        stg_stats = gopt Opt_StgStats dflags
-
-        todo1 = if stg_stats then [D_stg_stats] else []
-
-        todo2 | WayProf `elem` ways dflags
-              = StgDoMassageForProfiling : todo1
-              | otherwise
-              = todo1
-
 {- **********************************************************************
 %*                                                                      *
                 DynFlags parser
@@ -2913,6 +2888,8 @@ fWarningFlags = [
   flagSpec "warn-name-shadowing"              Opt_WarnNameShadowing,
   flagSpec "warn-noncanonical-monad-instances"
                                          Opt_WarnNonCanonicalMonadInstances,
+  flagSpec "warn-noncanonical-monoid-instances"
+                                         Opt_WarnNonCanonicalMonoidInstances,
   flagSpec "warn-orphans"                     Opt_WarnOrphans,
   flagSpec "warn-overflowed-literals"         Opt_WarnOverflowedLiterals,
   flagSpec "warn-overlapping-patterns"        Opt_WarnOverlappingPatterns,
@@ -3490,6 +3467,7 @@ minusWcompatOpts :: [WarningFlag]
 minusWcompatOpts
     = [ Opt_WarnMissingMonadFailInstance
       , Opt_WarnSemigroup
+      , Opt_WarnNonCanonicalMonoidInstances
       ]
 
 enableUnusedBinds :: DynP ()

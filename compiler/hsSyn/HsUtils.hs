@@ -953,14 +953,32 @@ hsConDeclsBinders cons = go id cons
           case r of
              -- remove only the first occurrence of any seen field in order to
              -- avoid circumventing detection of duplicate fields (#9156)
-             L loc (ConDecl { con_names = names, con_details = RecCon flds }) ->
-               (map (L loc . unLoc) names ++ ns, r' ++ fs)
+             L loc (ConDeclGADT { con_names = names
+                                , con_type = HsIB { hsib_body = res_ty}}) ->
+               case tau of
+                 L _ (HsFunTy (L _ (HsRecTy flds)) _res_ty)
+                         -> (map (L loc . unLoc) names ++ ns, r' ++ fs)
+                            where r' = remSeen (concatMap (cd_fld_names . unLoc)
+                                                          flds)
+                                  remSeen'
+                                    = foldr (.) remSeen
+                                        [deleteBy ((==) `on`
+                                                  rdrNameFieldOcc . unLoc) v
+                                        | v <- r']
+                                  (ns, fs) = go remSeen' rs
+                 _other  -> (map (L loc . unLoc) names ++ ns, fs)
+                            where (ns, fs) = go remSeen rs
+                 where
+                   (_tvs, _cxt, tau) = splitLHsSigmaTy res_ty
+             L loc (ConDeclH98 { con_name = name
+                               , con_details = RecCon flds }) ->
+               ([L loc (unLoc name)] ++ ns, r' ++ fs)
                   where r' = remSeen (concatMap (cd_fld_names . unLoc)
                                                 (unLoc flds))
                         remSeen' = foldr (.) remSeen [deleteBy ((==) `on` rdrNameFieldOcc . unLoc) v | v <- r']
                         (ns, fs) = go remSeen' rs
-             L loc (ConDecl { con_names = names }) ->
-                (map (L loc . unLoc) names ++ ns, fs)
+             L loc (ConDeclH98 { con_name = name }) ->
+                ([L loc (unLoc name)] ++ ns, fs)
                   where (ns, fs) = go remSeen rs
 
 {-

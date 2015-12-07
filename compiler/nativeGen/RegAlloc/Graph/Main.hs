@@ -355,9 +355,6 @@ graphAddCoalesce (r1, r2) graph
         , RegReal _             <- r2
         = graph
 
-graphAddCoalesce _ _
-        = panic "graphAddCoalesce: bogus"
-
 
 -- | Patch registers in code using the reg -> reg mapping in this graph.
 patchRegsFromGraph

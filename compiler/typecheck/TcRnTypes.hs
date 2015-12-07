@@ -131,6 +131,7 @@ import TcType
 import Annotations
 import InstEnv
 import FamInstEnv
+import PmExpr
 import IOEnv
 import RdrName
 import Name
@@ -317,7 +318,9 @@ instance ContainsModule DsGblEnv where
 
 data DsLclEnv = DsLclEnv {
         dsl_meta    :: DsMetaEnv,        -- Template Haskell bindings
-        dsl_loc     :: SrcSpan           -- to put in pattern-matching error msgs
+        dsl_loc     :: RealSrcSpan,      -- To put in pattern-matching error msgs
+        dsl_dicts   :: Bag EvVar,        -- Constraints from GADT pattern-matching
+        dsl_tm_cs   :: Bag SimpleEq
      }
 
 -- Inside [| |] brackets, the desugarer looks
@@ -1664,14 +1667,14 @@ isTypeHoleCt _ = False
 --    1. TypeError msg
 --    2. TypeError msg ~ Something  (and the other way around)
 --    3. C (TypeError msg)          (for any parameter of class constraint)
-getUserTypeErrorMsg :: Ct -> Maybe (Kind, Type)
+getUserTypeErrorMsg :: Ct -> Maybe Type
 getUserTypeErrorMsg ct
   | Just (_,t1,t2) <- getEqPredTys_maybe ctT    = oneOf [t1,t2]
   | Just (_,ts)    <- getClassPredTys_maybe ctT = oneOf ts
-  | otherwise                                   = isUserErrorTy ctT
+  | otherwise                                   = userTypeError_maybe ctT
   where
   ctT       = ctPred ct
-  oneOf xs  = msum (map isUserErrorTy xs)
+  oneOf xs  = msum (map userTypeError_maybe xs)
 
 isUserTypeErrorCt :: Ct -> Bool
 isUserTypeErrorCt ct = case getUserTypeErrorMsg ct of

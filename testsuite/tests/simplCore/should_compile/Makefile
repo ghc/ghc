@@ -6,6 +6,12 @@ T8832:
 	$(RM) -f T8832.o T8832.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(T8832_WORDSIZE_OPTS) -O -c -ddump-simpl T8832.hs | grep '^[a-zA-Z0-9]\+ ='
 
+T11155:
+	$(RM) -f T11155.o T11155.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T11155.hs
+	-nm T11155.o  | grep 'stg_ap_0_upd'
+	# Expecting no output from the grep
+
 T8274:
 	$(RM) -f T8274.o T8274.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T8274.hs | grep '#'

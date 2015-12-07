@@ -54,8 +54,8 @@ standard “packages” of warnings:
     eager to make their code future compatible to adapt to new features before
     they even generate warnings.
 
-    This currently enables ``-fwarn-missing-monadfail-instance`` and
-    ``-fwarn-semigroup``.
+    This currently enables ``-fwarn-missing-monadfail-instance``,
+    ``-fwarn-semigroup``, and ``-fwarn-noncanonical-monoid-instances``.
 
 ``-Wno-compat``
     .. index::
@@ -231,6 +231,28 @@ command line.
      * Warn if ``(*>)`` is defined backwards (i.e. ``(*>) = (>>)``).
 
     This option is off by default.
+
+``-fwarn-noncanonical-monoid-instances``
+    .. index::
+       single: -fwarn-noncanonical-monoid-instances
+
+    Warn if noncanonical ``Semigroup`` or ``Monoid`` instances
+    declarations are detected.
+
+    When this warning is enabled, the following conditions are verified:
+
+    In ``Monoid`` instances declarations warn if any of the following
+    conditions does not hold:
+
+     * If ``mappend`` is defined it must be canonical
+       (i.e. ``mappend = (Data.Semigroup.<>)``).
+
+    Moreover, in 'Semigroup' instance declarations:
+
+     * Warn if ``(<>)`` is defined backwards (i.e. ``(<>) = mappend``).
+
+    This warning is off by default. However, it is part of the
+    ``-Wcompat`` option group.
 
 ``-fwarn-missing-monadfail-instance``
     .. index::

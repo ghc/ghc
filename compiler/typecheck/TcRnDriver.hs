@@ -329,7 +329,7 @@ tcRnModuleTcRnM hsc_env hsc_src
                         tcRnHsBootDecls hsc_src local_decls
                    else
                         {-# SCC "tcRnSrcDecls" #-}
-                        tcRnSrcDecls explicit_mod_hdr export_ies local_decls ;
+                        tcRnSrcDecls explicit_mod_hdr local_decls ;
         setGblEnv tcg_env               $ do {
 
                 -- Process the export list
@@ -464,12 +464,11 @@ tcRnImports hsc_env import_decls
 -}
 
 tcRnSrcDecls :: Bool  -- False => no 'module M(..) where' header at all
-             -> Maybe (Located [LIE RdrName])   -- Exports
              -> [LHsDecl RdrName]               -- Declarations
              -> TcM TcGblEnv
         -- Returns the variables free in the decls
         -- Reason: solely to report unused imports and bindings
-tcRnSrcDecls explicit_mod_hdr exports decls
+tcRnSrcDecls explicit_mod_hdr decls
  = do { -- Create a binding for $trModule
         -- Do this before processing any data type declarations,
         -- which need tcg_tr_module to be initialised
@@ -523,7 +522,6 @@ tcRnSrcDecls explicit_mod_hdr exports decls
         -- This pass also warns about missing type signatures
       ; let { TcGblEnv { tcg_type_env  = type_env,
                          tcg_binds     = binds,
-                         tcg_sigs      = sig_ns,
                          tcg_ev_binds  = cur_ev_binds,
                          tcg_imp_specs = imp_specs,
                          tcg_rules     = rules,
@@ -533,7 +531,7 @@ tcRnSrcDecls explicit_mod_hdr exports decls
 
       ; (bind_ids, ev_binds', binds', fords', imp_specs', rules', vects')
             <- {-# SCC "zonkTopDecls" #-}
-               zonkTopDecls all_ev_binds binds exports sig_ns rules vects
+               zonkTopDecls all_ev_binds binds rules vects
                             imp_specs fords ;
       ; traceTc "Tc11" empty
 
@@ -1444,7 +1442,7 @@ tcTyClsInstDecls tycl_decls inst_decls deriv_decls
 
     get_fi_cons :: DataFamInstDecl Name -> [Name]
     get_fi_cons (DataFamInstDecl { dfid_defn = HsDataDefn { dd_cons = cons } })
-      = map unLoc $ concatMap (con_names . unLoc) cons
+      = map unLoc $ concatMap (getConNames . unLoc) cons
 
 {-
 Note [AFamDataCon: not promoting data family constructors]
@@ -2115,7 +2113,7 @@ tcRnDeclsi :: HscEnv
            -> IO (Messages, Maybe TcGblEnv)
 tcRnDeclsi hsc_env local_decls
   = runTcInteractive hsc_env $
-    tcRnSrcDecls False Nothing local_decls
+    tcRnSrcDecls False local_decls
 
 externaliseAndTidyId :: Module -> Id -> TcM Id
 externaliseAndTidyId this_mod id

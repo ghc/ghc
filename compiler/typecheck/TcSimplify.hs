@@ -7,6 +7,7 @@ module TcSimplify(
        simplifyDefault,
        simplifyTop, simplifyInteractive,
        solveWantedsTcM,
+       tcCheckSatisfiability,
 
        -- For Rules we need these two
        solveWanteds, runTcS
@@ -361,6 +362,19 @@ simplifyDefault theta
 
        ; return () }
 
+------------------
+tcCheckSatisfiability :: Bag EvVar -> TcM Bool
+-- Return True if satisfiable, False if definitely contradictory
+tcCheckSatisfiability givens
+  = do { lcl_env <- TcRn.getLclEnv
+       ; let given_loc = mkGivenLoc topTcLevel UnkSkol lcl_env
+       ; traceTc "checkSatisfiabilty {" (ppr givens)
+       ; (res, _ev_binds) <- runTcS $
+             do { cts <- solveSimpleGivens given_loc (bagToList givens)
+                ; return (not (isEmptyBag cts)) }
+       ; traceTc "checkSatisfiabilty }" (ppr res)
+       ; return (not res) }
+
 {-
 *********************************************************************************
 *                                                                                 *
@@ -413,30 +427,25 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
              , ptext (sLit "(unzonked) wanted =") <+> ppr wanteds
              ]
 
-              -- Historical note: Before step 2 we used to have a
-              -- HORRIBLE HACK described in Note [Avoid unnecessary
-              -- constraint simplification] but, as described in Trac
-              -- #4361, we have taken in out now.  That's why we start
-              -- with step 2!
-
-              -- Step 2) First try full-blown solving
-
-              -- NB: we must gather up all the bindings from doing
-              -- this solving; hence (runTcSWithEvBinds ev_binds_var).
-              -- And note that since there are nested implications,
-              -- calling solveWanteds will side-effect their evidence
-              -- bindings, so we can't just revert to the input
-              -- constraint.
+       -- First do full-blown solving
+       -- NB: we must gather up all the bindings from doing
+       -- this solving; hence (runTcSWithEvBinds ev_binds_var).
+       -- And note that since there are nested implications,
+       -- calling solveWanteds will side-effect their evidence
+       -- bindings, so we can't just revert to the input
+       -- constraint.
 
        ; ev_binds_var <- TcM.newTcEvBinds
        ; wanted_transformed_incl_derivs <- setTcLevel rhs_tclvl $
-                                           runTcSWithEvBinds ev_binds_var (solveWanteds wanteds)
+           do { sig_derived <- concatMapM mkSigDerivedWanteds sigs
+              ; runTcSWithEvBinds ev_binds_var $
+                solveWanteds (wanteds `addSimples` listToBag sig_derived) }
        ; wanted_transformed_incl_derivs <- TcM.zonkWC wanted_transformed_incl_derivs
 
-              -- Step 4) Candidates for quantification are an approximation of wanted_transformed
-              -- NB: Already the fixpoint of any unifications that may have happened
-              -- NB: We do not do any defaulting when inferring a type, this can lead
-              -- to less polymorphic types, see Note [Default while Inferring]
+       -- Find quant_pred_candidates, the predicates that
+       -- we'll consider quantifying over
+       -- NB: We do not do any defaulting when inferring a type, this can lead
+       -- to less polymorphic types, see Note [Default while Inferring]
 
        ; tc_lcl_env <- TcRn.getLclEnv
        ; null_ev_binds_var <- TcM.newTcEvBinds
@@ -471,14 +480,14 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
 
        -- NB: quant_pred_candidates is already fully zonked
 
-         -- Decide what type variables and constraints to quantify
+       -- Decide what type variables and constraints to quantify
        ; zonked_taus <- mapM (TcM.zonkTcType . snd) name_taus
        ; let zonked_tau_tvs = tyVarsOfTypes zonked_taus
        ; (qtvs, bound_theta) <- decideQuantification apply_mr sigs name_taus
                                         quant_pred_candidates zonked_tau_tvs
 
-         -- Emit an implication constraint for the
-         -- remaining constraints from the RHS
+       -- Emit an implication constraint for the
+       -- remaining constraints from the RHS
        ; bound_ev_vars <- mapM TcM.newEvVar bound_theta
        ; let skol_info = InferSkol [ (name, mkSigmaTy [] bound_theta ty)
                                    | (name, ty) <- name_taus ]
@@ -497,18 +506,18 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
                              , ic_env      = tc_lcl_env }
        ; emitImplication implic
 
-         -- Promote any type variables that are free in the inferred type
-         -- of the function:
-         --    f :: forall qtvs. bound_theta => zonked_tau
-         -- These variables now become free in the envt, and hence will show
-         -- up whenever 'f' is called.  They may currently at rhs_tclvl, but
-         -- they had better be unifiable at the outer_tclvl!
-         -- Example:   envt mentions alpha[1]
-         --            tau_ty = beta[2] -> beta[2]
-         --            consraints = alpha ~ [beta]
-         -- we don't quantify over beta (since it is fixed by envt)
-         -- so we must promote it!  The inferred type is just
-         --   f :: beta -> beta
+       -- Promote any type variables that are free in the inferred type
+       -- of the function:
+       --    f :: forall qtvs. bound_theta => zonked_tau
+       -- These variables now become free in the envt, and hence will show
+       -- up whenever 'f' is called.  They may currently at rhs_tclvl, but
+       -- they had better be unifiable at the outer_tclvl!
+       -- Example:   envt mentions alpha[1]
+       --            tau_ty = beta[2] -> beta[2]
+       --            consraints = alpha ~ [beta]
+       -- we don't quantify over beta (since it is fixed by envt)
+       -- so we must promote it!  The inferred type is just
+       --   f :: beta -> beta
        ; outer_tclvl    <- TcRn.getTcLevel
        ; zonked_tau_tvs <- TcM.zonkTyVarsAndFV zonked_tau_tvs
               -- decideQuantification turned some meta tyvars into
@@ -531,7 +540,32 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
 
        ; return ( qtvs, bound_ev_vars, TcEvBinds ev_binds_var) }
 
-{-
+mkSigDerivedWanteds :: TcIdSigInfo -> TcM [Ct]
+-- See Note [Add deriveds for signature contexts]
+mkSigDerivedWanteds (TISI { sig_bndr = PartialSig { sig_name = name }
+                          , sig_theta = theta, sig_tau = tau })
+ = do { let skol_info = InferSkol [(name, mkSigmaTy [] theta tau)]
+      ; loc <- getCtLocM (GivenOrigin skol_info)
+      ; return [ mkNonCanonical (CtDerived { ctev_pred = pred
+                                           , ctev_loc = loc })
+               | pred <- theta ] }
+mkSigDerivedWanteds _ = return []
+
+{- Note [Add deriveds for signature contexts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this (Trac #11016):
+  f2 :: (?x :: Int) => _
+  f2 = ?x
+We'll use plan InferGen because there are holes in the type.  But we want
+to have the (?x :: Int) constraint floating around so that the functional
+dependencies kick in.  Otherwise the occurrence of ?x on the RHS produces
+constraint (?x :: alpha), and we wont unify alpha:=Int.
+
+Solution: in simplifyInfer, just before simplifying the constraints
+gathered from the RHS, add Derived constraints for the context of any
+type signatures.  This is rare; if there is a type signature we'll usually
+be doing CheckGen.  But it happens for signatures with holes.
+
 ************************************************************************
 *                                                                      *
                 Quantification

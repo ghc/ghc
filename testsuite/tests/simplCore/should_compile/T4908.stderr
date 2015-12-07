@@ -31,14 +31,14 @@ T4908.$trModule = Module T4908.$trModule2 T4908.$trModule1
 
 Rec {
 -- RHS size: {terms: 19, types: 5, coercions: 0}
-T4908.f_$s$wf [Occ=LoopBreaker] :: Int# -> Int -> Int# -> Bool
-[GblId, Arity=3, Caf=NoCafRefs, Str=DmdType <S,1*U><L,A><L,U>]
+T4908.f_$s$wf [Occ=LoopBreaker] :: Int -> Int# -> Int# -> Bool
+[GblId, Arity=3, Caf=NoCafRefs, Str=DmdType <L,A><L,U><S,1*U>]
 T4908.f_$s$wf =
-  \ (sc :: Int#) (sc1 :: Int) (sc2 :: Int#) ->
-    case sc of ds {
+  \ (sc :: Int) (sc1 :: Int#) (sc2 :: Int#) ->
+    case sc2 of ds {
       __DEFAULT ->
-        case sc2 of ds1 {
-          __DEFAULT -> T4908.f_$s$wf (-# ds 1#) sc1 ds1;
+        case sc1 of ds1 {
+          __DEFAULT -> T4908.f_$s$wf sc ds1 (-# ds 1#);
           0# -> True
         };
       0# -> True
@@ -60,7 +60,7 @@ T4908.$wf =
         case w of _ [Occ=Dead] { (a, b) ->
         case b of _ [Occ=Dead] { I# ds1 ->
         case ds1 of ds2 {
-          __DEFAULT -> T4908.f_$s$wf (-# ds 1#) a ds2;
+          __DEFAULT -> T4908.f_$s$wf a ds2 (-# ds 1#);
           0# -> True
         }
         }
@@ -86,8 +86,8 @@ f =
 
 ------ Local rules for imported ids --------
 "SC:$wf0" [0]
-    forall (sc :: Int#) (sc1 :: Int) (sc2 :: Int#).
-      T4908.$wf sc (sc1, I# sc2)
+    forall (sc :: Int) (sc1 :: Int#) (sc2 :: Int#).
+      T4908.$wf sc2 (sc, I# sc1)
       = T4908.f_$s$wf sc sc1 sc2
 
 

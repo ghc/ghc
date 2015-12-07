@@ -25,7 +25,7 @@ import CoreSyn
 import CoreSubst
 import CoreUtils
 import CoreUnfold       ( couldBeSmallEnoughToInline )
-import CoreFVs          ( exprsFreeVars )
+import CoreFVs          ( exprsFreeVarsList )
 import CoreMonad
 import Literal          ( litIsLifted )
 import HscTypes         ( ModGuts(..) )
@@ -1835,7 +1835,13 @@ callToPats env bndr_occs (Call _ args con_env)
   | otherwise
   = do  { let in_scope      = substInScope (sc_subst env)
         ; (interesting, pats) <- argsToPats env in_scope con_env args bndr_occs
-        ; let pat_fvs       = varSetElems (exprsFreeVars pats)
+        ; let pat_fvs       = exprsFreeVarsList pats
+                -- To get determinism we need the list of free variables in
+                -- deterministic order. Otherwise we end up creating
+                -- lambdas with different argument orders. See
+                -- determinism/simplCore/should_compile/spec-inline-determ.hs
+                -- for an example. For explanation of determinism
+                -- considerations See Note [Unique Determinism] in Unique.
               in_scope_vars = getInScopeVars in_scope
               qvars         = filterOut (`elemVarSet` in_scope_vars) pat_fvs
                 -- Quantify over variables that are not in scope

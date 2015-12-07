@@ -459,6 +459,9 @@ export CC
 MAYBE_OVERRIDE_STAGE0([gcc],[CC_STAGE0])
 MAYBE_OVERRIDE_STAGE0([ar],[AR_STAGE0])
 
+dnl make extensions visible to allow feature-tests to detect them lateron
+AC_USE_SYSTEM_EXTENSIONS
+
 dnl ** figure out how to invoke the C preprocessor (i.e. `gcc -E`)
 AC_PROG_CPP
 

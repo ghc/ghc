@@ -1,5 +1,7 @@
 -- !!! ds022 -- literal patterns (wimp version)
 --
+{-# OPTIONS_GHC -fwarn-overlapping-patterns #-}
+
 module ShouldCompile where
 
 f 1 1.1 = []

@@ -58,7 +58,7 @@ A number of restrictions apply to use of annotations:
 -  The expression you are annotating with must have a type with
    ``Typeable`` and ``Data`` instances
 
--  The `Template Haskell staging restrictions <>`__ apply to the
+-  The :ref:`Template Haskell staging restrictions <th-usage>` apply to the
    expression being annotated with, so for example you cannot run a
    function from the module being compiled.
 

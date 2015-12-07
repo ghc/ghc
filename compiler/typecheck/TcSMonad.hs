@@ -660,8 +660,8 @@ Definition [Can-rewrite relation]
 A "can-rewrite" relation between flavours, written f1 >= f2, is a
 binary relation with the following properties
 
-  R1.  >= is transitive
-  R2.  If f1 >= f, and f2 >= f,
+  (R1) >= is transitive
+  (R2) If f1 >= f, and f2 >= f,
        then either f1 >= f2 or f2 >= f1
 
 Lemma.  If f1 >= f then f1 >= f1
@@ -688,7 +688,7 @@ See Note [Flavours with roles].
 Theorem: S(f,a) is well defined as a function.
 Proof: Suppose (a -f1-> t1) and (a -f2-> t2) are both in S,
                and  f1 >= f and f2 >= f
-       Then by (R2) f1 >= f2 or f2 >= f1, which contradicts (WF)
+       Then by (R2) f1 >= f2 or f2 >= f1, which contradicts (WF1)
 
 Notation: repeated application.
   S^0(f,t)     = t
@@ -700,8 +700,8 @@ A generalised substitution S is "inert" iff
   (IG1) there is an n such that
         for every f,t, S^n(f,t) = S^(n+1)(f,t)
 
-  (IG2) if (b -f-> t) in S, and f >= f, then S(f,t) = t
-        that is, each individual binding is "self-stable"
+By (IG1) we define S*(f,t) to be the result of exahaustively
+applying S(f,_) to t.
 
 ----------------------------------------------------------------
 Our main invariant:
@@ -714,8 +714,8 @@ guarantee that this recursive use will terminate.
 
 Note [Extending the inert equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This is the main theorem!
-
+Theorem [Stability under extension]
+   This is the main theorem!
    Suppose we have a "work item"
        a -fw-> t
    and an inert generalised substitution S,
@@ -735,7 +735,8 @@ This is the main theorem!
            or (K2c) not (fw >= fs)
            or (K2d) a not in s
 
-      (K3) If (b -fs-> s) is in S with (fw >= fs), then
+      (K3) See Note [K3: completeness of solving]
+           If (b -fs-> s) is in S with (fw >= fs), then
         (K3a) If the role of fs is nominal: s /= a
         (K3b) If the role of fs is representational: EITHER
                 a not in s, OR
@@ -816,9 +817,9 @@ Key lemma to make it watertight.
 
 Also, consider roles more carefully. See Note [Flavours with roles].
 
-Completeness
-~~~~~~~~~~~~~
-K3: completeness.  (K3) is not necessary for the extended substitution
+Note [K3: completeness of solving]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(K3) is not necessary for the extended substitution
 to be inert.  In fact K1 could be made stronger by saying
    ... then (not (fw >= fs) or not (fs >= fs))
 But it's not enough for S to be inert; we also want completeness.
@@ -1939,7 +1940,6 @@ lookupSolvedDict (IS { inert_solved_dicts = solved }) cls tys
   = case findDict solved cls tys of
       Just ev -> Just ev
       _       -> Nothing
-
 
 {- *********************************************************************
 *                                                                      *

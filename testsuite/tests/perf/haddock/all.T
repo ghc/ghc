@@ -89,7 +89,7 @@ test('haddock.Cabal',
 test('haddock.compiler',
      [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 40624322224, 10)
+          [(wordsize(64), 44721228752, 10)
             # 2012P-08-14: 26070600504 (amd64/Linux)
             # 2012-08-29: 26353100288 (amd64/Linux, new CG)
             # 2012-09-18: 26882813032 (amd64/Linux)
@@ -100,6 +100,7 @@ test('haddock.compiler',
             # 2014-11-22: 33562468736 (amd64/Linux)
             # 2015-06-02: 36740649320 (amd64/Linux) unknown cause
             # 2015-06-29: 40624322224 (amd64/Linux) due to #10482, not yet investigated
+            # 2015-12-03: 44721228752 (amd64/Linux) slow creep upwards
 
           ,(platform('i386-unknown-mingw32'),   902576468, 10)
             # 2012-10-30:                     13773051312 (x86/Windows)

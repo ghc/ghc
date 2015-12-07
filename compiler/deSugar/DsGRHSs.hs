@@ -8,7 +8,7 @@ Matching guarded right-hand-sides (GRHSs)
 
 {-# LANGUAGE CPP #-}
 
-module DsGRHSs ( dsGuarded, dsGRHSs, dsGRHS ) where
+module DsGRHSs ( dsGuarded, dsGRHSs, dsGRHS, isTrueLHsExpr ) where
 
 #include "HsVersions.h"
 

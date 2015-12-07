@@ -424,7 +424,7 @@ test('T783',
             # 2014-09-03: 223377364 (Windows) better specialisation, raft of core-to-core optimisations
             # 2014-12-22: 235002220 (Windows) not sure why
 
-           (wordsize(64), 526230456, 10)]),
+           (wordsize(64), 1134085384, 10)]),
             # prev:       349263216 (amd64/Linux)
             # 07/08/2012: 384479856 (amd64/Linux)
             # 29/08/2012: 436927840 (amd64/Linux)
@@ -449,6 +449,8 @@ test('T783',
             #   (simplifying the switch plan code path for simple checks, #10677)
             # 2015-08-28: 526230456 (amd64/Linux)
             #    (D757: Emit Typeable instances at site of type definition)
+            # 2015-12-04: 1134085384 (amd64/Linux)
+            #    (D1535: Major overhaul of pattern match checker, #11162)
       extra_hc_opts('-static')
       ],
       compile,[''])
@@ -511,6 +513,7 @@ test('T5321FD',
 
 test('T5642',
      [ only_ways(['normal']),
+       skip, # See Trac #11163
        compiler_stats_num_field('bytes allocated',
            [(wordsize(32), 641085256, 10),
                      # sample from x86/Linux
@@ -518,7 +521,7 @@ test('T5642',
             # 2014-09-03:  753045568
             # 2014-12-10:  641085256 Improvements in constraints solver
 
-            (wordsize(64), 1412808976, 10)])
+            (wordsize(64), 1071915072, 10)])
             # prev:        1300000000
             # 2014-07-17:  1358833928 (general round of updates)
             # 2014-08-07:  1402242360 (caused by 1fc60ea)
@@ -530,6 +533,7 @@ test('T5642',
             # 2014-09-10:  1536924976 post-AMP-cleanup
             # 2014-12-10:  1282916024 Improvements in constraints solver
             # 2015-10-28:  1412808976 Emit Typeable at definition site
+            # 2015-11-22:  1071915072 Use TypeLits in the metadata encoding
       ],
       compile,['-O'])
 
@@ -614,13 +618,14 @@ test('T9675',
  	  # 2015-07-11    15341228   (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
        compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
-          [(wordsize(64), 105, 15),
+          [(wordsize(64), 88, 15),
           # 2014-10-13    66
           # 2014-10-13    58         seq the DmdEnv in seqDmdType as well
           # 2014-10-13    49         different machines giving different results...
           # 2014-10-13    53         use the mean
           # 2015-06-15    44         reduced for some reason
           # 2015-06-21    105        switch to `+RTS -G1`
+          # 2015-12-04    88         new pattern checker (D1535)
             (wordsize(32), 56, 15)
  	  # 2015-07-11    56         (x86/Linux, 64-bit machine) use +RTS -G1
           ]),

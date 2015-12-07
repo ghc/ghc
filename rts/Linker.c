@@ -10,13 +10,6 @@
 #include "PosixSource.h"
 #endif
 
-/* Linux needs _GNU_SOURCE to get RTLD_DEFAULT from <dlfcn.h> and
-   MREMAP_MAYMOVE from <sys/mman.h>.
- */
-#if defined(__linux__)  || defined(__GLIBC__)
-#define _GNU_SOURCE 1
-#endif
-
 #include "Rts.h"
 #include "HsFFI.h"
 
@@ -4489,7 +4482,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
              "\nSection header table: start %ld, n_entries %d, ent_size %d\n",
              (long)ehdr->e_shoff, shnum, ehdr->e_shentsize  ));
 
-   ASSERT (ehdr->e_shentsize == sizeof(Elf_Shdr));
+   ASSERT(ehdr->e_shentsize == sizeof(Elf_Shdr));
 
    shdr = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
 

@@ -1,0 +1,7 @@
+pmc005.hs:11:1: warning:
+    Pattern match(es) have inaccessible right hand side
+    In an equation for ‘foo’: foo _ TList = ...
+
+pmc005.hs:11:1: warning:
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘foo’: Patterns not matched: TBool TBool

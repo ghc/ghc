@@ -231,18 +231,31 @@ wantAmbiguityCheck ctxt
                          -- E.g.   type family T a :: *  -- T :: forall k. k -> *
                          -- Then :k T should work in GHCi, not complain that
                          -- (T k) is ambiguous!
---      InfSigCtxt {} -> False   -- See Note [Validity of inferred types] in TcBinds
       _ -> True
 
 
 checkUserTypeError :: Type -> TcM ()
+-- Check to see if the type signature mentions "TypeError blah"
+-- anywhere in it, and fail if so.
+--
+-- Very unsatisfactorily (Trac #11144) we need to tidy the type
+-- because it may have come from an /inferred/ signature, not a
+-- user-supplied one.  This is really only a half-baked fix;
+-- the other errors in checkValidType don't do tidying, and so
+-- may give bad error messages when given an inferred type.
 checkUserTypeError = check
   where
   check ty
-    | Just (_,msg) <- isUserErrorTy ty = failWithTc (pprUserTypeErrorTy msg)
+    | Just msg     <- userTypeError_maybe ty  = fail_with msg
     | Just (_,ts)  <- splitTyConApp_maybe ty  = mapM_ check ts
     | Just (t1,t2) <- splitAppTy_maybe ty     = check t1 >> check t2
+    | Just (_,t1)  <- splitForAllTy_maybe ty  = check t1
     | otherwise                               = return ()
+
+  fail_with msg = do { env0 <- tcInitTidyEnv
+                     ; let (env1, tidy_msg) = tidyOpenType env0 msg
+                     ; failWithTcM (env1, pprUserTypeErrorTy tidy_msg) }
+
 
 {-
 ************************************************************************
@@ -280,7 +293,7 @@ This might not necessarily show up in kind checking.
 -}
 
 checkValidType :: UserTypeCtxt -> Type -> TcM ()
--- Checks that the type is valid for the given context
+-- Checks that a user-written type is valid for the given context
 -- Assumes arguemt is fully zonked
 -- Not used for instance decls; checkValidInstance instead
 checkValidType ctxt ty

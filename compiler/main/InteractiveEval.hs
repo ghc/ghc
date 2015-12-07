@@ -14,6 +14,7 @@ module InteractiveEval (
         Status(..), Resume(..), History(..),
         execStmt, ExecOptions(..), execOptions, ExecResult(..), resumeExec,
         runDecls, runDeclsWithLocation,
+        isStmt, isImport, isDecl,
         parseImportDecl, SingleStep(..),
         resume,
         abandon, abandonAll,
@@ -84,12 +85,15 @@ import RtClosureInspect
 import Outputable
 import FastString
 import Bag
+import qualified Lexer (P (..), ParseResult(..), unP, mkPState)
+import qualified Parser (parseStmt, parseModule, parseDeclaration)
 
 import System.Mem.Weak
 import System.Directory
 import Data.Dynamic
 import Data.Either
 import Data.List (find)
+import StringBuffer (stringToStringBuffer)
 import Control.Monad
 #if __GLASGOW_HASKELL__ >= 709
 import Foreign
@@ -985,6 +989,39 @@ parseName :: GhcMonad m => String -> m [Name]
 parseName str = withSession $ \hsc_env -> liftIO $
    do { lrdr_name <- hscParseIdentifier hsc_env str
       ; hscTcRnLookupRdrName hsc_env lrdr_name }
+
+-- | Returns @True@ if passed string is a statement.
+isStmt :: DynFlags -> String -> Bool
+isStmt dflags stmt =
+  case parseThing Parser.parseStmt dflags stmt of
+    Lexer.POk _ _ -> True
+    Lexer.PFailed _ _ -> False
+
+-- | Returns @True@ if passed string is an import declaration.
+isImport :: DynFlags -> String -> Bool
+isImport dflags stmt =
+  case parseThing Parser.parseModule dflags stmt of
+    Lexer.POk _ thing -> hasImports thing
+    Lexer.PFailed _ _ -> False
+  where
+    hasImports = not . null . hsmodImports . unLoc
+
+-- | Returns @True@ if passed string is a declaration but __/not a splice/__.
+isDecl :: DynFlags -> String -> Bool
+isDecl dflags stmt = do
+  case parseThing Parser.parseDeclaration dflags stmt of
+    Lexer.POk _ thing ->
+      case unLoc thing of
+        SpliceD _ -> False
+        _ -> True
+    Lexer.PFailed _ _ -> False
+
+parseThing :: Lexer.P thing -> DynFlags -> String -> Lexer.ParseResult thing
+parseThing parser dflags stmt = do
+  let buf = stringToStringBuffer stmt
+      loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
+
+  Lexer.unP parser (Lexer.mkPState dflags buf loc)
 
 -- -----------------------------------------------------------------------------
 -- Getting the type of an expression

@@ -102,20 +102,58 @@ data FamInst  -- See Note [FamInsts and CoAxioms]
                 -- INVARIANT: fi_tcs = roughMatchTcs fi_tys
 
             -- Used for "proper matching"; ditto
-            , fi_tvs    :: [TyVar]      -- Template tyvars for full match
-                                 -- Like ClsInsts, these variables are always
-                                 -- fresh. See Note [Template tyvars are fresh]
-                                 -- in InstEnv
-                                 -- INVARIANT: fi_tvs = coAxiomTyVars fi_axiom
+            , fi_tvs :: [TyVar]      -- Template tyvars for full match
+                 -- Like ClsInsts, these variables are always fresh
+                 -- See Note [Template tyvars are fresh] in InstEnv
+                 -- INVARIANT: fi_tvs = coAxiomTyVars fi_axiom
 
-            , fi_tys    :: [Type]       --   and its arg types
+            , fi_tys :: [Type]       --   The LHS type patterns
+                 -- May be eta-reduced; see Note [Eta reduction for data families]
 
-            , fi_rhs    :: Type         --   the RHS, with its freshened vars
+            , fi_rhs :: Type         --   the RHS, with its freshened vars
             }
 
 data FamFlavor
   = SynFamilyInst         -- A synonym family
   | DataFamilyInst TyCon  -- A data family, with its representation TyCon
+
+{- Note [Eta reduction for data families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this
+   data family T a b :: *
+   newtype instance T Int a = MkT (IO a) deriving( Monad )
+We'd like this to work.
+
+From the 'newtype instance' you might think we'd get:
+   newtype TInt a = MkT (IO a)
+   axiom ax1 a :: T Int a ~ TInt a   -- The newtype-instance part
+   axiom ax2 a :: TInt a ~ IO a      -- The newtype part
+
+But now what can we do?  We have this problem
+   Given:   d  :: Monad IO
+   Wanted:  d' :: Monad (T Int) = d |> ????
+What coercion can we use for the ???
+
+Solution: eta-reduce both axioms, thus:
+   axiom ax1 :: T Int ~ TInt
+   axiom ax2 :: TInt ~ IO
+Now
+   d' = d |> Monad (sym (ax2 ; ax1))
+
+This eta reduction happens for data instances as well as newtype
+instances. Here we want to eta-reduce the data family axiom.
+All this is done in TcInstDcls.tcDataFamInstDecl.
+
+See also Note [Newtype eta] in TyCon.
+
+Bottom line:
+  For a FamInst with fi_flavour = DataFamilyInst rep_tc,
+  - fi_tvs may be shorter than tyConTyVars of rep_tc
+  - fi_tys may be shorter than tyConArity of the family tycon
+       i.e. LHS is unsaturated
+  - fi_rhs will be (rep_tc fi_tvs)
+       i.e. RHS is un-saturated
+-}
 
 -- Obtain the axiom of a family instance
 famInstAxiom :: FamInst -> CoAxiom Unbranched
@@ -170,11 +208,13 @@ instance Outputable FamInst where
 --     See pprTyThing.pprFamInst for printing for the user
 pprFamInst :: FamInst -> SDoc
 pprFamInst famInst
-  = hang (pprFamInstHdr famInst)
-       2 (vcat [ ifPprDebug (ptext (sLit "Coercion axiom:") <+> ppr ax)
-               , ifPprDebug (ptext (sLit "RHS:") <+> ppr (famInstRHS famInst)) ])
+  = hang (pprFamInstHdr famInst) 2 (ifPprDebug debug_stuff)
   where
     ax = fi_axiom famInst
+    debug_stuff = vcat [ ptext (sLit "Coercion axiom:") <+> ppr ax
+                       , ptext (sLit "Tvs:") <+> ppr (fi_tvs famInst)
+                       , ptext (sLit "LHS:") <+> ppr (fi_tys famInst)
+                       , ptext (sLit "RHS:") <+> ppr (fi_rhs famInst) ]
 
 pprFamInstHdr :: FamInst -> SDoc
 pprFamInstHdr fi@(FamInst {fi_flavor = flavor})

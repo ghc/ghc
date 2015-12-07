@@ -130,6 +130,7 @@ module GHC (
 
         -- ** Other
         runTcInteractive,   -- Desired by some clients (Trac #8878)
+        isStmt, isImport, isDecl,
 
         -- ** The debugger
         SingleStep(..),

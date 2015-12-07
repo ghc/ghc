@@ -1,0 +1,39 @@
+T3927b.hs:58:5: warning:
+    • Redundant constraint: Restrict op (Implements 'Dealer)
+    • In the type signature for:
+           f :: Restrict op (Implements 'Dealer) =>
+                SockOp 'Dealer op -> Operation op
+      In an equation for ‘dealer’:
+          dealer
+            = Socket (Proxy :: Proxy Dealer) f
+            where
+                f ::
+                  Restrict op (Implements Dealer) => SockOp Dealer op -> Operation op
+                f SRead = undefined
+                f SWrite = undefined
+
+T3927b.hs:65:5: warning:
+    • Redundant constraint: Restrict op (Implements 'Push)
+    • In the type signature for:
+           f :: Restrict op (Implements 'Push) =>
+                SockOp 'Push op -> Operation op
+      In an equation for ‘push’:
+          push
+            = Socket (Proxy :: Proxy Push) f
+            where
+                f ::
+                  Restrict op (Implements Push) => SockOp Push op -> Operation op
+                f SWrite = undefined
+
+T3927b.hs:71:5: warning:
+    • Redundant constraint: Restrict op (Implements 'Pull)
+    • In the type signature for:
+           f :: Restrict op (Implements 'Pull) =>
+                SockOp 'Pull op -> Operation op
+      In an equation for ‘pull’:
+          pull
+            = Socket (Proxy :: Proxy Pull) f
+            where
+                f ::
+                  Restrict op (Implements Pull) => SockOp Pull op -> Operation op
+                f SRead = undefined

@@ -94,6 +94,9 @@
   * Add `GHC.TypeLits.TypeError` and `ErrorMessage` to allow users
     to define custom compile-time error messages.
 
+  * Redesign `GHC.Generics` to use type-level literals to represent the
+    metadata of generic representation types (#9766)
+
 ## 4.8.2.0  *Oct 2015*
 
   * Bundled with GHC 7.10.3

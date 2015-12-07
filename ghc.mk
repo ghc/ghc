@@ -875,17 +875,17 @@ install_bins: $(INSTALL_BINS) $(INSTALL_SCRIPTS)
 	for i in $(INSTALL_BINS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i "$(DESTDIR)$(bindir)" ;  \
 	done
+ifneq "$(INSTALL_SCRIPTS)" ""
 	for i in $(INSTALL_SCRIPTS); do \
 		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i "$(DESTDIR)$(bindir)" ;  \
 	done
+endif
 
 install_libs: $(INSTALL_LIBS)
 	$(call installLibsTo, $(INSTALL_LIBS), "$(DESTDIR)$(ghclibdir)")
 
 install_libexecs:  $(INSTALL_LIBEXECS)
-ifeq "$(INSTALL_LIBEXECS)" ""
-	@:
-else
+ifneq "$(INSTALL_LIBEXECS)" ""
 	$(INSTALL_DIR) "$(DESTDIR)$(ghclibexecdir)/bin"
 	for i in $(INSTALL_LIBEXECS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i "$(DESTDIR)$(ghclibexecdir)/bin"; \
@@ -900,9 +900,11 @@ install_topdirs: $(INSTALL_TOPDIR_BINS) $(INSTALL_TOPDIR_SCRIPTS)
 	for i in $(INSTALL_TOPDIR_BINS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i "$(DESTDIR)$(topdir)"; \
 	done
+ifneq "$(INSTALL_TOPDIR_SCRIPTS)" ""
 	for i in $(INSTALL_TOPDIR_SCRIPTS); do \
 		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i "$(DESTDIR)$(topdir)"; \
 	done
+endif
 
 install_docs: $(INSTALL_DOCS)
 	$(INSTALL_DIR) "$(DESTDIR)$(docdir)"
@@ -922,7 +924,7 @@ ifneq "$(INSTALL_LIBRARY_DOCS)" ""
 	$(INSTALL_SCRIPT) $(INSTALL_OPTS) libraries/gen_contents_index "$(DESTDIR)$(docdir)/html/libraries/"
 endif
 ifneq "$(INSTALL_HTML_DOC_DIRS)" ""
-	# We need to filter out the directories so install doesn't choke on them
+# We need to filter out the directories so install doesn't choke on them
 	for i in $(INSTALL_HTML_DOC_DIRS); do \
 		$(INSTALL_DIR) "$(DESTDIR)$(docdir)/html/`basename $$i`"; \
 		for f in $$i/*; do \

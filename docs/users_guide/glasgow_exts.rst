@@ -1721,11 +1721,12 @@ comprehensions are explained in the previous chapters
 the type ``[a]`` with the type ``Monad m => m a`` for monad
 comprehensions.
 
-Note: Even though most of these examples are using the list monad, monad
-comprehensions work for any monad. The ``base`` package offers all
-necessary instances for lists, which make ``MonadComprehensions``
-backward compatible to built-in, transform and parallel list
-comprehensions.
+.. note::
+    Even though most of these examples are using the list monad, monad
+    comprehensions work for any monad. The ``base`` package offers all
+    necessary instances for lists, which make ``MonadComprehensions``
+    backward compatible to built-in, transform and parallel list
+    comprehensions.
 
 More formally, the desugaring is as follows. We write ``D[ e | Q]`` to
 mean the desugaring of the monad comprehension ``[ e | Q]``:
@@ -1796,7 +1797,7 @@ In the case of transform comprehensions, notice that the groups are
 parameterised over some arbitrary type ``n`` (provided it has an
 ``fmap``, as well as the comprehension being over an arbitrary monad.
 
-.. _monadfail-desugaring
+.. _monadfail-desugaring:
 
 New monadic failure desugaring mechanism
 ----------------------------------------
@@ -6690,9 +6691,7 @@ Two things to watch out for:
    specifications cannot be nested. To specify ``GMap``\ 's data
    constructors, you have to list it separately.
 
--  Consider this example:
-
-   ::
+-  Consider this example: ::
 
          module X where
            data family D
@@ -6701,13 +6700,11 @@ Two things to watch out for:
            import X
            data instance D Int = D1 | D2
 
-   Module Y exports all the entities defined in Y, namely the data
-   constructors ``D1`` and ``D2``, *but not the data family* ``D``. That
-   (annoyingly) means that you cannot selectively import Y selectively,
-   thus "``import Y( D(D1,D2) )``", because Y does not export ``D``.
-   Instead you should list the exports explicitly, thus:
-
-   ::
+   Module ``Y`` exports all the entities defined in ``Y``, namely the data
+   constructors ``D1`` and ``D2``, and *implicitly* the data family ``D``,
+   even though it's defined in ``X``.
+   This means you can write ``import Y( D(D1,D2) )`` *without*
+   giving an explicit export list like this: ::
 
             module Y( D(..) ) where ...
        or   module Y( module Y, D ) where ...
@@ -9772,6 +9769,8 @@ The syntax for a declaration splice uses "``$``" not "``splice``". The type of
 the enclosed expression must be ``Q [Dec]``, not ``[Q Dec]``. Typed expression
 splices and quotations are supported.)
 
+.. _th-usage:
+
 Using Template Haskell
 ----------------------
 
@@ -10642,7 +10641,7 @@ strict, regardless of the pattern. (We say "apparent" exception because
 the Right Way to think of it is that the bang at the top of a binding is
 not part of the *pattern*; rather it is part of the syntax of the
 *binding*, creating a "bang-pattern binding".) See :ref:`Strict recursive and
-polymorphic let bindings <recursive-and-polymorphic-let-bindings> for
+polymorphic let bindings <recursive-and-polymorphic-let-bindings>` for
 how bang-pattern bindings are compiled.
 
 However, *nested* bangs in a pattern binding behave uniformly with all
@@ -12327,41 +12326,26 @@ For example, a user-defined datatype of trees
 ::
     data UserTree a = Node a (UserTree a) (UserTree a) | Leaf
 
-will get the following representation:
+in a ``Main`` module in a package named ``foo`` will get the following
+representation:
 
 ::
 
     instance Generic (UserTree a) where
       -- Representation type
       type Rep (UserTree a) =
-        M1 D D1UserTree (
-              M1 C C1_0UserTree (
-                    M1 S NoSelector (K1 R a)
-                :*: M1 S NoSelector (K1 R (UserTree a))
-                :*: M1 S NoSelector (K1 R (UserTree a)))
-          :+: M1 C C1_1UserTree U1)
+        M1 D ('MetaData "UserTree" "Main" "package-name" "foo" 'False) (
+              M1 C ('MetaCons "Node" 'PrefixI 'False) (
+                    M1 S 'MetaNoSel (K1 R a)
+                :*: M1 S 'MetaNoSel (K1 R (UserTree a))
+                :*: M1 S 'MetaNoSel (K1 R (UserTree a)))
+          :+: M1 C ('MetaCons "Leaf" 'PrefixI 'False) U1)
 
       -- Conversion functions
       from (Node x l r) = M1 (L1 (M1 (M1 (K1 x) :*: M1 (K1 l) :*: M1 (K1 r))))
       from Leaf         = M1 (R1 (M1 U1))
       to (M1 (L1 (M1 (M1 (K1 x) :*: M1 (K1 l) :*: M1 (K1 r))))) = Node x l r
       to (M1 (R1 (M1 U1)))                                      = Leaf
-
-    -- Meta-information
-    data D1UserTree
-    data C1_0UserTree
-    data C1_1UserTree
-
-    instance Datatype D1UserTree where
-      datatypeName _ = "UserTree"
-      moduleName _   = "Main"
-      packageName _  = "main"
-
-    instance Constructor C1_0UserTree where
-      conName _ = "Node"
-
-    instance Constructor C1_1UserTree where
-      conName _ = "Leaf"
 
 This representation is generated automatically if a ``deriving Generic``
 clause is attached to the datatype. `Standalone
