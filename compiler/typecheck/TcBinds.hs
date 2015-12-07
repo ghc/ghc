@@ -58,7 +58,7 @@ import Util
 import BasicTypes
 import Outputable
 import FastString
-import Type(mkStrLitTy)
+import Type(mkStrLitTy, tidyOpenType)
 import PrelNames( mkUnboundName, gHC_PRIM )
 import TcValidity (checkValidType)
 
@@ -728,6 +728,10 @@ mkExport prag_fn qtvs theta mono_info@(poly_name, mb_sig, mono_id)
                                            -- e..g infer  x :: forall a. F a -> Int
                   else addErrCtxtM (mk_impedence_match_msg mono_info sel_poly_ty poly_ty) $
                        tcSubType_NC sig_ctxt sel_poly_ty poly_ty
+
+        ; warn_missing_sigs <- woptM Opt_WarnMissingLocalSigs
+        ; when warn_missing_sigs $ localSigWarn poly_id mb_sig
+
         ; return (ABE { abe_wrap = wrap
                         -- abe_wrap :: idType poly_id ~ (forall qtvs. theta => mono_ty)
                       , abe_poly = poly_id
@@ -851,6 +855,24 @@ mk_inf_msg poly_name poly_ty tidy_env
       ; let msg = vcat [ ptext (sLit "When checking the inferred type")
                        , nest 2 $ ppr poly_name <+> dcolon <+> ppr poly_ty ]
       ; return (tidy_env1, msg) }
+
+
+-- | Warn the user about polymorphic local binders that lack type signatures.
+localSigWarn :: Id -> Maybe TcIdSigInfo -> TcM ()
+localSigWarn id mb_sig
+  | Just _ <- mb_sig               = return ()
+  | not (isSigmaTy (idType id))    = return ()
+  | otherwise                      = warnMissingSig msg id
+  where
+    msg = ptext (sLit "Polymorphic local binding with no type signature:")
+
+warnMissingSig :: SDoc -> Id -> TcM ()
+warnMissingSig msg id
+  = do  { env0 <- tcInitTidyEnv
+        ; let (env1, tidy_ty) = tidyOpenType env0 (idType id)
+        ; addWarnTcM (env1, mk_msg tidy_ty) }
+  where
+    mk_msg ty = sep [ msg, nest 2 $ pprPrefixName (idName id) <+> dcolon <+> ppr ty ]
 
 {-
 Note [Partial type signatures and generalisation]
