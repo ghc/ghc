@@ -4482,7 +4482,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
              "\nSection header table: start %ld, n_entries %d, ent_size %d\n",
              (long)ehdr->e_shoff, shnum, ehdr->e_shentsize  ));
 
-   ASSERT (ehdr->e_shentsize == sizeof(Elf_Shdr));
+   ASSERT(ehdr->e_shentsize == sizeof(Elf_Shdr));
 
    shdr = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
 
