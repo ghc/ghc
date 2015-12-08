@@ -65,7 +65,7 @@ languageOptions =
            "Enable :ref:`Applicative do-notation desugaring <applicative-do>`"
          , flagType = DynamicFlag
          , flagReverse = "-XNoApplicativeDo"
-         , flagSince = "7.12.1"
+         , flagSince = "8.0.1"
          }
   , flag { flagName = "-XAutoDeriveTypeable"
          , flagDescription =

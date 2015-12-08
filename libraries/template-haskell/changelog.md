@@ -2,7 +2,7 @@
 
 ## 2.11.0.0  *TBA*
 
-  * Bundled with GHC 7.12.1
+  * Bundled with GHC 8.0.1
 
   * The compiler can now resolve infix operator fixities in types on its own.
     The `UInfixT` constructor of `Type` is analoguous to `UInfixE` for expressions
