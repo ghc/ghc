@@ -130,13 +130,10 @@ ghciWelcomeMsg :: String
 ghciWelcomeMsg = "GHCi, version " ++ cProjectVersion ++
                  ": http://www.haskell.org/ghc/  :? for help"
 
-cmdName :: Command -> String
-cmdName (n,_,_) = n
-
 GLOBAL_VAR(macros_ref, [], [Command])
 
 ghciCommands :: [Command]
-ghciCommands = [
+ghciCommands = map mkCmd [
   -- Hugs users are accustomed to :e, so make sure it doesn't overlap
   ("?",         keepGoing help,                 noCompletion),
   ("add",       keepGoingPaths addModule,       completeFilename),
@@ -148,7 +145,6 @@ ghciCommands = [
   ("cd",        keepGoing' changeDirectory,     completeFilename),
   ("check",     keepGoing' checkModule,         completeHomeModule),
   ("continue",  keepGoing continueCmd,          noCompletion),
-  ("complete",  keepGoing completeCmd,          noCompletion),
   ("cmd",       keepGoing cmdCmd,               completeExpression),
   ("ctags",     keepGoing createCTagsWithLineNumbersCmd, completeFilename),
   ("ctags!",    keepGoing createCTagsWithRegExesCmd, completeFilename),
@@ -189,8 +185,21 @@ ghciCommands = [
   ("trace",     keepGoing traceCmd,             completeExpression),
   ("undef",     keepGoing undefineMacro,        completeMacro),
   ("unset",     keepGoing unsetOptions,         completeSetOptions)
+  ] ++ map mkCmdHidden [ -- hidden commands
+  ("complete",  keepGoing completeCmd)
   ]
+ where
+  mkCmd (n,a,c) = Command { cmdName = n
+                          , cmdAction = a
+                          , cmdHidden = False
+                          , cmdCompletionFunc = c
+                          }
 
+  mkCmdHidden (n,a) = Command { cmdName = n
+                              , cmdAction = a
+                              , cmdHidden = True
+                              , cmdCompletionFunc = noCompletion
+                              }
 
 -- We initialize readline (in the interactiveUI function) to use
 -- word_break_chars as the default set of completion word break characters.
@@ -1019,7 +1028,7 @@ specialCommand str = do
   maybe_cmd <- lift $ lookupCommand cmd
   htxt <- short_help <$> getGHCiState
   case maybe_cmd of
-    GotCommand (_,f,_) -> f (dropWhile isSpace rest)
+    GotCommand cmd -> (cmdAction cmd) (dropWhile isSpace rest)
     BadCommand ->
       do liftIO $ hPutStr stdout ("unknown command ':" ++ cmd ++ "'\n"
                            ++ htxt)
@@ -1049,7 +1058,10 @@ lookupCommand' :: String -> GHCi (Maybe Command)
 lookupCommand' ":" = return Nothing
 lookupCommand' str' = do
   macros    <- liftIO $ readIORef macros_ref
-  ghci_cmds <- ghci_commands `fmap` getGHCiState
+  ghci_cmds <- ghci_commands <$> getGHCiState
+
+  let ghci_cmds_nohide = filter (not . cmdHidden) ghci_cmds
+
   let (str, xcmds) = case str' of
           ':' : rest -> (rest, [])     -- "::" selects a builtin command
           _          -> (str', macros) -- otherwise include macros in lookup
@@ -1057,7 +1069,8 @@ lookupCommand' str' = do
       lookupExact  s = find $ (s ==)           . cmdName
       lookupPrefix s = find $ (s `isPrefixOf`) . cmdName
 
-      builtinPfxMatch = lookupPrefix str ghci_cmds
+      -- hidden commands can only be matched exact
+      builtinPfxMatch = lookupPrefix str ghci_cmds_nohide
 
   -- first, look for exact match (while preferring macros); then, look
   -- for first prefix match (preferring builtins), *unless* a macro
@@ -1307,8 +1320,14 @@ defineMacro overwrite s = do
         new_expr = L (getLoc expr) $ ExprWithTySig body tySig
     hv <- GHC.compileParsedExpr new_expr
 
-    liftIO (writeIORef macros_ref -- later defined macros have precedence
-            ((macro_name, lift . runMacro hv, noCompletion) : filtered))
+    let newCmd = Command { cmdName = macro_name
+                         , cmdAction = lift . runMacro hv
+                         , cmdHidden = False
+                         , cmdCompletionFunc = noCompletion
+                         }
+
+    -- later defined macros have precedence
+    liftIO $ writeIORef macros_ref (newCmd : filtered)
 
 runMacro :: GHC.HValue{-String -> IO String-} -> String -> GHCi Bool
 runMacro fun s = do
@@ -2533,14 +2552,14 @@ ghciCompleteWord line@(left,_) = case firstWord of
     lookupCompletion c = do
         maybe_cmd <- lookupCommand' c
         case maybe_cmd of
-            Just (_,_,f) -> return f
-            Nothing -> return completeFilename
+            Just cmd -> return (cmdCompletionFunc cmd)
+            Nothing  -> return completeFilename
 
 completeGhciCommand = wrapCompleter " " $ \w -> do
   macros <- liftIO $ readIORef macros_ref
   cmds   <- ghci_commands `fmap` getGHCiState
   let macro_names = map (':':) . map cmdName $ macros
-  let command_names = map (':':) . map cmdName $ cmds
+  let command_names = map (':':) . map cmdName $ filter (not . cmdHidden) cmds
   let{ candidates = case w of
       ':' : ':' : _ -> map (':':) command_names
       _ -> nub $ macro_names ++ command_names }

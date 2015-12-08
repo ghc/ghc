@@ -14,7 +14,7 @@ module GhciMonad (
         GHCi(..), startGHCi,
         GHCiState(..), setGHCiState, getGHCiState, modifyGHCiState,
         GHCiOption(..), isOptionSet, setOption, unsetOption,
-        Command,
+        Command(..),
         BreakLocation(..),
         TickArray,
         getDynFlags,
@@ -57,9 +57,6 @@ import Control.Monad.IO.Class
 
 -----------------------------------------------------------------------------
 -- GHCi monad
-
--- the Bool means: True = we should exit GHCi (:quit)
-type Command = (String, String -> InputT GHCi Bool, CompletionFunc GHCi)
 
 data GHCiState = GHCiState
      {
@@ -110,6 +107,21 @@ data GHCiState = GHCiState
      }
 
 type TickArray = Array Int [(BreakIndex,SrcSpan)]
+
+-- | A GHCi command
+data Command
+   = Command
+   { cmdName           :: String
+     -- ^ Name of GHCi command (e.g. "exit")
+   , cmdAction         :: String -> InputT GHCi Bool
+     -- ^ The 'Bool' value denotes whether to exit GHCi
+   , cmdHidden         :: Bool
+     -- ^ Commands which are excluded from default completion
+     -- and @:help@ summary. This is usually set for commands not
+     -- useful for interactive use but rather for IDEs.
+   , cmdCompletionFunc :: CompletionFunc GHCi
+     -- ^ 'CompletionFunc' for arguments
+   }
 
 data GHCiOption
         = ShowTiming            -- show time/allocs after evaluation
