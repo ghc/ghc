@@ -1,6 +1,6 @@
 
    ==============================================================
-    The (Interactive) Glasgow Haskell Compiler -- version 7.10.2
+    The (Interactive) Glasgow Haskell Compiler -- version 7.10.3
    ==============================================================
 
 The GHC Team is pleased to announce a new minor release of GHC. This is a
@@ -29,7 +29,7 @@ bug-fix release and contains a number of important fixes,
 A more thorough list of the changes in the release can be found in the release
 notes,
 
-  http://haskell.org/ghc/docs/7.10.2/html/users_guide/release-7-10-2.html
+  http://haskell.org/ghc/docs/7.10.3/html/users_guide/release-7-10-3.html
 
 
 How to get it
