@@ -24,7 +24,7 @@
 module GHC.Exception
        ( Exception(..)    -- Class
        , throw
-       , SomeException(..), ErrorCall(..), pattern ErrorCall, ArithException(..)
+       , SomeException(..), ErrorCall(..,ErrorCall), ArithException(..)
        , divZeroException, overflowException, ratioZeroDenomException
        , errorCallException, errorCallWithCallStackException
        , showCallStack, popCallStack, showSrcLoc

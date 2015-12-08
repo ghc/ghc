@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, ExistentialQuantification, PatternSynonyms #-}
+{-# LANGUAGE NoImplicitPrelude, ExistentialQuantification #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -56,7 +56,6 @@ module Control.Exception (
         RecSelError(..),
         RecUpdError(..),
         ErrorCall(..),
-        pattern ErrorCall,
         TypeError(..),
 
         -- * Throwing exceptions
