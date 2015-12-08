@@ -63,9 +63,6 @@ $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
 # will use cygwin symbolic links which cannot be read by mingw gcc.
 	chmod +x libffi/ln
 
-	# don't report nonselinux systems as selinux
-	( cd libffi/build && "$(PATCH_CMD)" -p0 < ../libffi.x86-execstack.patch; )
-
 	# We need to use -MMD rather than -MD, as otherwise we get paths
 	# like c:/... in the dependency files on Windows, and the extra
 	# colons break make
