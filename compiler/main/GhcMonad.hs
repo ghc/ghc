@@ -29,6 +29,7 @@ import DynFlags
 import Exception
 import ErrUtils
 
+import Control.Monad
 import Data.IORef
 
 -- -----------------------------------------------------------------------------
@@ -184,13 +185,8 @@ instance ExceptionMonad m => ExceptionMonad (GhcT m) where
                            in
                               unGhcT (f g_restore) s
 
-#if __GLASGOW_HASKELL__ < 710
--- Pre-AMP change
-instance (ExceptionMonad m, Functor m) => HasDynFlags (GhcT m) where
-#else
-instance (ExceptionMonad m) => HasDynFlags (GhcT m) where
-#endif
-  getDynFlags = getSessionDynFlags
+instance MonadIO m => HasDynFlags (GhcT m) where
+  getDynFlags = GhcT $ \(Session r) -> liftM hsc_dflags (liftIO $ readIORef r)
 
 #if __GLASGOW_HASKELL__ < 710
 -- Pre-AMP change

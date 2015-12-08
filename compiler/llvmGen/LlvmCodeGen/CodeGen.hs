@@ -275,7 +275,7 @@ genCall (PrimTarget (MO_AtomicWrite _width)) [] [addr, val] = runStmtsDecls $ do
 -- some extra parameters.
 genCall t@(PrimTarget op) [] args
  | Just align <- machOpMemcpyishAlign op = runStmtsDecls $ do
-    dflags <- lift $ getDynFlags
+    dflags <- getDynFlags
     let isVolTy = [i1]
         isVolVal = [mkIntLit i1 0]
         argTy | MO_Memset _ <- op = [i8Ptr, i8,    llvmWord dflags, i32] ++ isVolTy
@@ -377,7 +377,7 @@ genCall t@(PrimTarget (MO_SubWordC w)) [dstV, dstO] [lhs, rhs] =
 
 -- Handle all other foreign calls and prim ops.
 genCall target res args = runStmtsDecls $ do
-    dflags <- lift $ getDynFlags
+    dflags <- getDynFlags
 
     -- parameter types
     let arg_type (_, AddrHint) = i8Ptr
@@ -1378,7 +1378,7 @@ genMachOp_slow opt op [x, y] = case op of
 
                 else do
                     -- Error. Continue anyway so we can debug the generated ll file.
-                    dflags <- lift getDynFlags
+                    dflags <- getDynFlags
                     let style = mkCodeStyle CStyle
                         toString doc = renderWithStyle dflags doc style
                         cmmToStr = (lines . toString . PprCmm.pprExpr)
@@ -1422,7 +1422,7 @@ genMachOp_slow opt op [x, y] = case op of
             vx <- exprToVarW x
             vy <- exprToVarW y
 
-            dflags <- lift getDynFlags
+            dflags <- getDynFlags
             let word  = getVarType vx
             let word2 = LMInt $ 2 * (llvmWidthInBits dflags $ getVarType vx)
             let shift = llvmWidthInBits dflags word
@@ -1522,7 +1522,7 @@ genLoad_fast atomic e r n ty = do
 genLoad_slow :: Atomic -> CmmExpr -> CmmType -> [MetaAnnot] -> LlvmM ExprData
 genLoad_slow atomic e ty meta = runExprData $ do
     iptr <- exprToVarW e
-    dflags <- lift getDynFlags
+    dflags <- getDynFlags
     case getVarType iptr of
          LMPointer _ -> do
                     doExprW (cmmToLlvmType ty) (MExpr meta $ loadInstr iptr)

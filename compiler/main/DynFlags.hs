@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 -------------------------------------------------------------------------------
 --
@@ -176,6 +177,13 @@ import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
 import Control.Arrow ((&&&))
 import Control.Monad
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Writer
+import Control.Monad.Trans.Reader
+import qualified Control.Monad.Trans.Maybe as CMT
+#if MIN_VERSION_transformers(4,0,0)
+import Control.Monad.Trans.Except
+#endif
 import Control.Exception (throwIO)
 
 import Data.Bits
@@ -186,6 +194,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Monoid (Monoid)
 import Data.Word
 import System.FilePath
 import System.Directory
@@ -911,6 +920,32 @@ data DynFlags = DynFlags {
 
 class HasDynFlags m where
     getDynFlags :: m DynFlags
+
+{- It would be desirable to have the more generalised
+
+  instance (MonadTrans t, Monad m, HasDynFlags m) => HasDynFlags (t m) where
+      getDynFlags = lift getDynFlags
+
+instance definition. However, that definition would overlap with the
+`HasDynFlags (GhcT m)` instance. Instead we define instances for a
+couple of common Monad transformers explicitly. -}
+
+instance (Monoid a, Monad m, HasDynFlags m) => HasDynFlags (WriterT a m) where
+    getDynFlags = lift getDynFlags
+
+instance (Monad m, HasDynFlags m) => HasDynFlags (ReaderT a m) where
+    getDynFlags = lift getDynFlags
+
+instance (Monad m, HasDynFlags m) => HasDynFlags (MaybeT m) where
+    getDynFlags = liftMaybeT getDynFlags
+
+instance (Monad m, HasDynFlags m) => HasDynFlags (CMT.MaybeT m) where
+    getDynFlags = lift getDynFlags
+
+#if MIN_VERSION_transformers(4,0,0)
+instance (Monad m, HasDynFlags m) => HasDynFlags (ExceptT e m) where
+    getDynFlags = lift getDynFlags
+#endif
 
 class ContainsDynFlags t where
     extractDynFlags :: t -> DynFlags

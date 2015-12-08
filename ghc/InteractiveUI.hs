@@ -849,7 +849,7 @@ runOneCommand eh gCmd = do
 checkInputForLayout :: String -> InputT GHCi (Maybe String)
                     -> InputT GHCi (Maybe String)
 checkInputForLayout stmt getStmt = do
-   dflags' <- lift $ getDynFlags
+   dflags' <- getDynFlags
    let dflags = xopt_set dflags' Opt_AlternativeLayoutRule
    st0 <- getGHCiState
    let buf'   =  stringToStringBuffer stmt
