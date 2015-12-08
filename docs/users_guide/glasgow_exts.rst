@@ -11542,8 +11542,8 @@ You can add explicit phase control (:ref:`phase-control`) to
 do so, the same phase is used for the rewrite rule and the INLINE
 control of the specialised function.
 
-Warning: you can make GHC diverge by using ``SPECIALISE INLINE`` on an
-ordinarily-recursive function.
+.. warning:: You can make GHC diverge by using ``SPECIALISE INLINE`` on an
+             ordinarily-recursive function.
 
 ``SPECIALIZE`` for imported functions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
