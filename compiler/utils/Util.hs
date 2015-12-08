@@ -868,7 +868,7 @@ toArgs str
                     | all isSpace spaces ->
                        Right args
                    _ ->
-                       Left ("Couldn't read " ++ show str ++ "as [String]")
+                       Left ("Couldn't read " ++ show str ++ " as [String]")
       s -> toArgs' s
  where
   toArgs' :: String -> Either String [String]
@@ -899,7 +899,7 @@ toArgs str
                     | all isSpace (take 1 rest) ->
                     Right (arg, rest)
                 _ ->
-                    Left ("Couldn't read " ++ show s ++ "as String")
+                    Left ("Couldn't read " ++ show s ++ " as String")
 {-
 -- -----------------------------------------------------------------------------
 -- Floats
