@@ -180,7 +180,7 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 import Control.Monad.Trans.Reader
-#if MIN_VERSION_transformers(4,0,0)
+#if MIN_VERSION_transformers(0,4,0)
 import Control.Monad.Trans.Except
 #endif
 import Control.Exception (throwIO)
@@ -938,7 +938,7 @@ instance (Monad m, HasDynFlags m) => HasDynFlags (ReaderT a m) where
 instance (Monad m, HasDynFlags m) => HasDynFlags (MaybeT m) where
     getDynFlags = lift getDynFlags
 
-#if MIN_VERSION_transformers(4,0,0)
+#if MIN_VERSION_transformers(0,4,0)
 instance (Monad m, HasDynFlags m) => HasDynFlags (ExceptT e m) where
     getDynFlags = lift getDynFlags
 #endif
