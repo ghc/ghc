@@ -305,7 +305,7 @@ you were defining) appears in the abe_poly field of the
 abs_exports. The bindings in abs_binds are for fresh, local, Ids with
 a *monomorphic* Id.
 
-If there is a group of mutually recursive (see Note [Polymoprhic
+If there is a group of mutually recursive (see Note [Polymorphic
 recursion]) functions without type signatures, we get one AbsBinds
 with the monomorphic versions of the bindings in abs_binds, and one
 element of abe_exports for each variable bound in the mutually
@@ -319,7 +319,7 @@ After type checking we get
                                   , abe_mono = g :: a -> a }]
             , abs_binds = { (f,g) = (\x -> x, f) }
 
-Note [Polymoprhic recursion]
+Note [Polymorphic recursion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
    Rec { f x = ...(g ef)...
@@ -348,7 +348,7 @@ up with
        ; AbsBinds { ...for g ... } }
 
 This approach allows both f and to call each other
-polymoprhically, even though only g has a signature.
+polymorphically, even though only g has a signature.
 
 We get an AbsBinds that encompasses multiple source-program
 bindings only when

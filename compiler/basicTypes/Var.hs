@@ -196,7 +196,7 @@ symbols will appear in the linker symbol table.
 
 However, note that this use of "exported" is quite different to the
 export list on a Haskell module.  Setting the ExportFlag on an Id does
-/not/ mean that if you import the module (in Haskell source code you
+/not/ mean that if you import the module (in Haskell source code) you
 will see this Id.  Of course, things that appear in the export list
 of the source Haskell module do indeed have their ExportFlag set.
 But many other things, such as dictionary functions, are kept alive

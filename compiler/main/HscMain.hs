@@ -798,7 +798,7 @@ hscFileFrontEnd mod_summary = do
 -- Note [Safe Haskell Inference]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Safe Haskell does Safe inference on modules that don't have any specific
--- safe haskell mode flag. The basic aproach to this is:
+-- safe haskell mode flag. The basic approach to this is:
 --   * When deciding if we need to do a Safe language check, treat
 --     an unmarked module as having -XSafe mode specified.
 --   * For checks, don't throw errors but return them to the caller.

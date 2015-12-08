@@ -299,7 +299,7 @@ putEnv keyvalue = do
   -- IMPORTANT: Do not free `s` after calling putenv!
   --
   -- According to SUSv2, the string passed to putenv becomes part of the
-  -- enviroment.
+  -- environment.
   throwErrnoIf_ (/= 0) "putenv" (c_putenv s)
 
 foreign import ccall unsafe "putenv" c_putenv :: CString -> IO CInt

@@ -1142,7 +1142,7 @@ data TcIdSigInfo
 data TcIdSigBndr   -- See Note [Complete and partial type signatures]
   = CompleteSig    -- A complete signature with no wildards,
                    -- so the complete polymorphic type is known.
-        TcId          -- The polymoprhic Id with that type
+        TcId          -- The polymorphic Id with that type
 
   | PartialSig     -- A partial type signature (i.e. includes one or more
                    -- wildcards). In this case it doesn't make sense to give

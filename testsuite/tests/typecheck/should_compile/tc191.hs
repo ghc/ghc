@@ -19,7 +19,7 @@ geq :: Data a => a -> a -> Bool
 geq x y = geq' x y
   where
 --    This type signature no longer works, because it is
---    insufficiently polymoprhic.
+--    insufficiently polymorphic.
 --    geq' :: forall a b. (Data a, Data b) => a -> b -> Bool
     geq' :: GenericQ (GenericQ Bool)
     geq' x y =     (toConstr x == toConstr y)

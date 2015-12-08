@@ -521,7 +521,7 @@ Here `tm` is the monomorphic binding for `rhs`.
 With `Strict`, we want to force `tm`, but NOT `fm` or `gm`.
 Alas, `tm` isn't in scope in the `in <body>` part.
 
-The simplest thing is to return it in the polymoprhic
+The simplest thing is to return it in the polymorphic
 tuple `t`, thus:
 
   let t = /\a. letrec tm = rhs[fm,gm]
