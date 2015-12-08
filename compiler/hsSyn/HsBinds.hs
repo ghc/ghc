@@ -263,7 +263,7 @@ Note [AbsBinds]
 ~~~~~~~~~~~~~~~
 The AbsBinds constructor is used in the output of the type checker, to record
 *typechecked* and *generalised* bindings.  Consider a module M, with this
-top-level binding
+top-level binding, where there is no type signature for M.reverse,
     M.reverse []     = []
     M.reverse (x:xs) = M.reverse xs ++ [x]
 
@@ -282,8 +282,8 @@ Notice that 'M.reverse' is polymorphic as expected, but there is a local
 definition for plain 'reverse' which is *monomorphic*.  The type variable
 'a' scopes over the entire letrec.
 
-That's after desugaring.  What about after type checking but before desugaring?
-That's where AbsBinds comes in.  It looks like this:
+That's after desugaring.  What about after type checking but before
+desugaring?  That's where AbsBinds comes in.  It looks like this:
 
    AbsBinds { abs_tvs     = [a]
             , abs_exports = [ABE { abe_poly = M.reverse :: forall a. [a] -> [a],
@@ -305,11 +305,11 @@ you were defining) appears in the abe_poly field of the
 abs_exports. The bindings in abs_binds are for fresh, local, Ids with
 a *monomorphic* Id.
 
-If there is a group of mutually recursive functions without type
-signatures, we get one AbsBinds with the monomorphic versions of the
-bindings in abs_binds, and one element of abe_exports for each
-variable bound in the mutually recursive group.  This is true even for
-pattern bindings.  Example:
+If there is a group of mutually recursive (see Note [Polymoprhic
+recursion]) functions without type signatures, we get one AbsBinds
+with the monomorphic versions of the bindings in abs_binds, and one
+element of abe_exports for each variable bound in the mutually
+recursive group.  This is true even for pattern bindings.  Example:
         (f,g) = (\x -> x, f)
 After type checking we get
    AbsBinds { abs_tvs     = [a]
@@ -318,6 +318,44 @@ After type checking we get
                             , ABE { abe_poly = M.g :: forall a. a -> a
                                   , abe_mono = g :: a -> a }]
             , abs_binds = { (f,g) = (\x -> x, f) }
+
+Note [Polymoprhic recursion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   Rec { f x = ...(g ef)...
+
+       ; g :: forall a. [a] -> [a]
+       ; g y = ...(f eg)...  }
+
+These bindings /are/ mutually recursive (f calls g, and g calls f).
+But we can use the type signature for g to break the recursion,
+like this:
+
+  1. Add g :: forall a. [a] -> [a] to the type environment
+
+  2. Typecheck the definition of f, all by itself,
+     including generalising it to find its most general
+     type, say f :: forall b. b -> b -> [b]
+
+  3. Extend the type environment with that type for f
+
+  4. Typecheck the definition of g, all by itself,
+     checking that it has the type claimed by its signature
+
+Steps 2 and 4 each generate a separate AbsBinds, so we end
+up with
+   Rec { AbsBinds { ...for f ... }
+       ; AbsBinds { ...for g ... } }
+
+This approach allows both f and to call each other
+polymoprhically, even though only g has a signature.
+
+We get an AbsBinds that encompasses multiple source-program
+bindings only when
+ * Each binding in the group has at least one binder that
+   lacks a user type signature
+ * The group forms a strongly connected component
+
 
 Note [AbsBinds wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~
