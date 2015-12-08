@@ -181,12 +181,20 @@ instance Applicative GHCi where
 instance Monad GHCi where
   (GHCi m) >>= k  =  GHCi $ \s -> m s >>= \a -> unGHCi (k a) s
 
-getGHCiState :: GHCi GHCiState
-getGHCiState   = GHCi $ \r -> liftIO $ readIORef r
-setGHCiState :: GHCiState -> GHCi ()
-setGHCiState s = GHCi $ \r -> liftIO $ writeIORef r s
-modifyGHCiState :: (GHCiState -> GHCiState) -> GHCi ()
-modifyGHCiState f = GHCi $ \r -> liftIO $ readIORef r >>= writeIORef r . f
+class HasGhciState m where
+    getGHCiState    :: m GHCiState
+    setGHCiState    :: GHCiState -> m ()
+    modifyGHCiState :: (GHCiState -> GHCiState) -> m ()
+
+instance HasGhciState GHCi where
+    getGHCiState      = GHCi $ \r -> liftIO $ readIORef r
+    setGHCiState s    = GHCi $ \r -> liftIO $ writeIORef r s
+    modifyGHCiState f = GHCi $ \r -> liftIO $ modifyIORef r f
+
+instance (MonadTrans t, Monad m, HasGhciState m) => HasGhciState (t m) where
+    getGHCiState    = lift getGHCiState
+    setGHCiState    = lift . setGHCiState
+    modifyGHCiState = lift . modifyGHCiState
 
 liftGhc :: Ghc a -> GHCi a
 liftGhc m = GHCi $ \_ -> m
