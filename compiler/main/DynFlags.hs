@@ -180,7 +180,6 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 import Control.Monad.Trans.Reader
-import qualified Control.Monad.Trans.Maybe as CMT
 #if MIN_VERSION_transformers(4,0,0)
 import Control.Monad.Trans.Except
 #endif
@@ -937,9 +936,6 @@ instance (Monad m, HasDynFlags m) => HasDynFlags (ReaderT a m) where
     getDynFlags = lift getDynFlags
 
 instance (Monad m, HasDynFlags m) => HasDynFlags (MaybeT m) where
-    getDynFlags = liftMaybeT getDynFlags
-
-instance (Monad m, HasDynFlags m) => HasDynFlags (CMT.MaybeT m) where
     getDynFlags = lift getDynFlags
 
 #if MIN_VERSION_transformers(4,0,0)
