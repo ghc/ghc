@@ -33,7 +33,7 @@ import PrelNames
 import TcErrors
 import TcEvidence
 import TcInteract
-import TcCanonical   ( makeSuperClasses, addSuperClasses )
+import TcCanonical   ( makeSuperClasses, mkGivenWithSuperClasses )
 import TcMType   as TcM
 import TcRnMonad as TcRn
 import TcSMonad  as TcS
@@ -368,10 +368,14 @@ tcCheckSatisfiability :: Bag EvVar -> TcM Bool
 tcCheckSatisfiability givens
   = do { lcl_env <- TcRn.getLclEnv
        ; let given_loc = mkGivenLoc topTcLevel UnkSkol lcl_env
+             given_cts = [ mkNonCanonical (CtGiven { ctev_evar = ev_id
+                                                   , ctev_pred = evVarPred ev_id
+                                                   , ctev_loc  = given_loc })
+                         | ev_id <- bagToList givens ]
        ; traceTc "checkSatisfiabilty {" (ppr givens)
        ; (res, _ev_binds) <- runTcS $
-             do { cts <- solveSimpleGivens given_loc (bagToList givens)
-                ; return (not (isEmptyBag cts)) }
+             do { insols <- solveSimpleGivens given_cts
+                ; return (not (isEmptyBag insols)) }
        ; traceTc "checkSatisfiabilty }" (ppr res)
        ; return (not res) }
 
@@ -1071,7 +1075,7 @@ solveImplication :: Implication    -- Wanted
 solveImplication imp@(Implic { ic_tclvl  = tclvl
                              , ic_binds  = ev_binds
                              , ic_skols  = skols
-                             , ic_given  = givens
+                             , ic_given  = given_ids
                              , ic_wanted = wanteds
                              , ic_info   = info
                              , ic_status = status
@@ -1088,8 +1092,9 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
 
          -- Solve the nested constraints
        ; (no_given_eqs, given_insols, residual_wanted)
-             <- nestImplicTcS ev_binds tclvl $
-               do { givens_w_scs <- concatMapM (addSuperClasses . mk_given_ev) givens
+            <- nestImplicTcS ev_binds tclvl $
+               do { let loc = mkGivenLoc tclvl info env
+                  ; givens_w_scs <- concatMapM (mkGivenWithSuperClasses loc) given_ids
                   ; given_insols <- solveSimpleGivens givens_w_scs
 
                   ; residual_wanted <- solveWanteds wanteds
@@ -1121,11 +1126,6 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
              , text "implication evbinds = " <+> ppr (evBindMapBinds evbinds) ]
 
        ; return (floated_eqs, res_implic) }
-  where
-    given_loc = mkGivenLoc tclvl info env
-    mk_given_ev ev_id = CtGiven { ctev_evar = ev_id
-                                , ctev_pred = evVarPred ev_id
-                                , ctev_loc  = given_loc }
 
 ----------------------
 setImplicationStatus :: Implication -> TcS (Maybe Implication)

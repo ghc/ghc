@@ -3,7 +3,7 @@
 module TcCanonical(
      canonicalize,
      unifyDerived,
-     makeSuperClasses, addSuperClasses,
+     makeSuperClasses, mkGivenWithSuperClasses,
      StopOrContinue(..), stopWith, continueWith
   ) where
 
@@ -360,10 +360,12 @@ Mind you, now that Wanteds cannot rewrite Derived, I think this particular
 situation can't happen.
   -}
 
-addSuperClasses :: CtEvidence -> TcS [Ct]
--- Make a Ct from this CtEvidence, but add its superclasses
--- if it's a class constraint
-addSuperClasses ev = mk_superclasses emptyNameSet ev
+mkGivenWithSuperClasses :: CtLoc -> EvId -> TcS [Ct]
+-- From a given EvId, make its Ct, plus the Ct's of its superclasses
+mkGivenWithSuperClasses loc ev_id
+  = mk_superclasses emptyNameSet (CtGiven { ctev_evar = ev_id
+                                          , ctev_pred = evVarPred ev_id
+                                          , ctev_loc  = loc })
 
 makeSuperClasses :: Ct -> TcS [Ct]
 -- Returns superclasses, transitively, see Note [The superclasses story]
