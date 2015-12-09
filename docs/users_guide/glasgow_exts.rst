@@ -5873,6 +5873,43 @@ to subsume the ``OverloadedStrings`` extension (currently, as a special
 case, string literals benefit from statically allocated compact
 representation).
 
+Recursive superclasses
+----------------------
+
+A class cannot generally have itself as a superclass. So this is illegal ::
+
+    class C a => D a where ...
+    class D a => C a where ...
+
+GHC implements this test conservatively when type functions are involved.
+For example ::
+
+    type family F a :: Constraint
+    class F a => C a where ...
+
+GHC will complain about this, because you might later add ::
+
+    type instance F Int = C Int
+
+and now we'd be in a superclass loop.
+
+However recursive superclasses are sometimes useful. Here's a real-life
+example (Trac #10318) ::
+
+     class (Frac (Frac a) ~ Frac a,
+            Fractional (Frac a),
+            IntegralDomain (Frac a))
+         => IntegralDomain a where
+      type Frac a :: *
+
+Here the superclass cycle does terminate but it's not entirely straightforward
+to see that it does.
+
+With the language extension ``-XRecursiveSuperClasses`` GHC will allow these
+class declarations.  If there really *is* a loop, GHC will only
+expand it to finite depth.
+
+
 .. _type-families:
 
 Type families
