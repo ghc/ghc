@@ -234,11 +234,11 @@ renameType t = case t of
 
   HsTupleTy b ts -> return . HsTupleTy b =<< mapM renameLType ts
 
-  HsOpTy a (w, L loc op) b -> do
+  HsOpTy a (L loc op) b -> do
     op' <- rename op
     a'  <- renameLType a
     b'  <- renameLType b
-    return (HsOpTy a' (w, L loc op') b')
+    return (HsOpTy a' (L loc op') b')
 
   HsParTy ty -> return . HsParTy =<< renameLType ty
 
@@ -254,18 +254,18 @@ renameType t = case t of
 
   HsTyLit x -> return (HsTyLit x)
 
-  HsWrapTy a b            -> HsWrapTy a <$> renameType b
   HsRecTy a               -> HsRecTy <$> mapM renameConDeclFieldField a
   HsCoreTy a              -> pure (HsCoreTy a)
   HsExplicitListTy  a b   -> HsExplicitListTy  a <$> mapM renameLType b
   HsExplicitTupleTy a b   -> HsExplicitTupleTy a <$> mapM renameLType b
   HsSpliceTy _ _          -> error "renameType: HsSpliceTy"
   HsWildCardTy a          -> HsWildCardTy <$> renameWildCardInfo a
+  HsAppsTy _              -> error "renameType: HsAppsTy"
 
 renameLHsQTyVars :: LHsQTyVars Name -> RnM (LHsQTyVars DocName)
-renameLHsQTyVars (HsQTvs { hsq_kvs = _, hsq_tvs = tvs })
+renameLHsQTyVars (HsQTvs { hsq_implicit = _, hsq_explicit = tvs })
   = do { tvs' <- mapM renameLTyVarBndr tvs
-       ; return (HsQTvs { hsq_kvs = error "haddock:renameLHsQTyVars", hsq_tvs = tvs' }) }
+       ; return (HsQTvs { hsq_implicit = error "haddock:renameLHsQTyVars", hsq_explicit = tvs' }) }
                 -- This is rather bogus, but I'm not sure what else to do
 
 renameLTyVarBndr :: LHsTyVarBndr Name -> RnM (LHsTyVarBndr DocName)
@@ -547,7 +547,7 @@ renameImplicit :: (in_thing -> RnM out_thing)
 renameImplicit rn_thing (HsIB { hsib_body = thing })
   = do { thing' <- rn_thing thing
        ; return (HsIB { hsib_body = thing'
-                      , hsib_kvs = PlaceHolder, hsib_tvs = PlaceHolder }) }
+                      , hsib_vars = PlaceHolder }) }
 
 renameWc :: (in_thing -> RnM out_thing)
          -> HsWildCardBndrs Name in_thing

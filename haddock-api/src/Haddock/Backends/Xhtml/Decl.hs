@@ -176,7 +176,7 @@ ppTyVars :: [LHsTyVarBndr DocName] -> [Html]
 ppTyVars tvs = map (ppTyName . getName . hsLTyVarName) tvs
 
 tyvarNames :: LHsQTyVars DocName -> [Name]
-tyvarNames = map (getName . hsLTyVarName) . hsQTvBndrs
+tyvarNames = map (getName . hsLTyVarName) . hsQTvExplicit
 
 
 ppFor :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName
@@ -200,7 +200,7 @@ ppTySyn summary links fixities loc doc (SynDecl { tcdLName = L _ name, tcdTyVars
                    splice unicode qual
   where
     hdr  = hsep ([keyword "type", ppBinder summary occ]
-                 ++ ppTyVars (hsQTvBndrs ltyvars))
+                 ++ ppTyVars (hsQTvExplicit ltyvars))
     full = hdr <+> equals <+> ppLType unicode qual ltype
     occ  = nameOccName . getName $ name
     fixs
@@ -969,11 +969,9 @@ ppr_mono_ty _         (HsRecTy {})        _ _ = toHtml "{..}"
        -- placeholder in the signature, which is followed by the field
        -- declarations.
 ppr_mono_ty _         (HsCoreTy {})       _ _ = error "ppr_mono_ty HsCoreTy"
-ppr_mono_ty _         (HsExplicitListTy _ tys) u q =
-    promoQuote $ brackets $ hsep $ punctuate comma $ map (ppLType u q) tys
-ppr_mono_ty _         (HsExplicitTupleTy _ tys) u q =
-    promoQuote $ parenList $ map (ppLType u q) tys
-ppr_mono_ty _         (HsWrapTy {})       _ _ = error "ppr_mono_ty HsWrapTy"
+ppr_mono_ty _         (HsExplicitListTy _ tys) u q = promoQuote $ brackets $ hsep $ punctuate comma $ map (ppLType u q) tys
+ppr_mono_ty _         (HsExplicitTupleTy _ tys) u q = promoQuote $ parenList $ map (ppLType u q) tys
+ppr_mono_ty _         (HsAppsTy {})       _ _ = error "ppr_mono_ty HsAppsTy"
 
 ppr_mono_ty ctxt_prec (HsEqTy ty1 ty2) unicode qual
   = maybeParen ctxt_prec pREC_CTX $
@@ -983,7 +981,7 @@ ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty) unicode qual
   = maybeParen ctxt_prec pREC_CON $
     hsep [ppr_mono_lty pREC_FUN fun_ty unicode qual, ppr_mono_lty pREC_CON arg_ty unicode qual]
 
-ppr_mono_ty ctxt_prec (HsOpTy ty1 (_, op) ty2) unicode qual
+ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2) unicode qual
   = maybeParen ctxt_prec pREC_FUN $
     ppr_mono_lty pREC_OP ty1 unicode qual <+> ppr_op <+> ppr_mono_lty pREC_OP ty2 unicode qual
   where

@@ -26,19 +26,19 @@ import Data.List( partition )
 import DataCon
 import FamInstEnv
 import HsSyn
-import Kind ( splitKindFunTys, tyConResKind, isKind )
 import Name
 import RdrName ( mkVarUnqual )
 import PatSyn
 import SrcLoc ( Located, noLoc, unLoc, noSrcSpan )
 import TcType ( tcSplitSigmaTy )
 import TyCon
-import Type (isStrLitTy, mkFunTys)
-import TypeRep
+import Type
+import TyCoRep
 import TysPrim ( alphaTyVars )
-import TysWiredIn ( listTyConName, eqTyCon, ipTyCon )
+import TysWiredIn ( listTyConName, ipTyCon )
+import PrelNames ( hasKey, eqTyConKey )
 import Unique ( getUnique )
-import Util ( filterByList )
+import Util ( filterByList, filterOut )
 import Var
 
 import Haddock.Types
@@ -117,11 +117,9 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
   = let name       = synifyName tc
         typats     = map (synifyType WithinType) args
         hs_rhs     = synifyType WithinType rhs
-        (kvs, tvs) = partition isKindVar tkvs
     in TyFamEqn { tfe_tycon = name
                 , tfe_pats  = HsIB { hsib_body = typats
-                                   , hsib_kvs = map tyVarName kvs
-                                   , hsib_tvs = map tyVarName tvs }
+                                   , hsib_vars = map tyVarName tkvs }
                 , tfe_rhs   = hs_rhs }
 
 synifyAxiom :: CoAxiom br -> Either ErrMsg (HsDecl Name)
@@ -149,8 +147,8 @@ synifyTyCon _coax tc
                          let mk_hs_tv realKind fakeTyVar
                                 = noLoc $ KindedTyVar (noLoc (getName fakeTyVar))
                                                       (synifyKindSig realKind)
-                         in HsQTvs { hsq_kvs = []   -- No kind polymorphism
-                                   , hsq_tvs = zipWith mk_hs_tv (fst (splitKindFunTys (tyConKind tc)))
+                         in HsQTvs { hsq_implicit = []   -- No kind polymorphism
+                                   , hsq_explicit = zipWith mk_hs_tv (fst (splitFunTys (tyConKind tc)))
                                                                 alphaTyVars --a, b, c... which are unfortunately all kind *
                                    }
 
@@ -188,11 +186,12 @@ synifyTyCon _coax tc
                  , fdLName = synifyName tc
                  , fdTyVars = synifyTyVars (tyConTyVars tc)
                  , fdResultSig =
-                       synifyFamilyResultSig resultVar (tyConResKind tc)
+                       synifyFamilyResultSig resultVar tyConResKind
                  , fdInjectivityAnn =
                        synifyInjectivityAnn  resultVar (tyConTyVars tc)
                                        (familyTyConInjectivityInfo tc)
                  }
+    tyConResKind = piResultTys (tyConKind tc) (mkTyVarTys (tyConTyVars tc))
 
 synifyTyCon coax tc
   | Just ty <- synTyConRhs_maybe tc
@@ -300,7 +299,7 @@ synifyDataCon use_gadt_syntax dc =
           (False,True) -> case linear_tys of
                            [a,b] -> return $ InfixCon a b
                            _ -> Left "synifyDataCon: infix with non-2 args?"
-  gadt_ty = HsIB [] [] (synifyType WithinType res_ty)
+  gadt_ty = HsIB [] (synifyType WithinType res_ty)
  -- finally we get synifyDataCon's result!
  in hs_arg_tys >>=
       \hat ->
@@ -329,10 +328,8 @@ synifyCtx = noLoc . map (synifyType WithinType)
 
 
 synifyTyVars :: [TyVar] -> LHsQTyVars Name
-synifyTyVars ktvs = HsQTvs { hsq_kvs = map tyVarName kvs
-                           , hsq_tvs = map synifyTyVar tvs }
-  where
-    (kvs, tvs) = partition isKindVar ktvs
+synifyTyVars ktvs = HsQTvs { hsq_implicit = []
+                           , hsq_explicit = map synifyTyVar ktvs }
 
 synifyTyVar :: TyVar -> LHsTyVarBndr Name
 synifyTyVar tv
@@ -387,19 +384,21 @@ synifyType _ (TyConApp tc tys)
   , Just x <- isStrLitTy name
   = noLoc $ HsIParamTy (HsIPName x) (synifyType WithinType ty)
   -- and equalities
-  | tc == eqTyCon
+  | tc `hasKey` eqTyConKey
   , [ty1, ty2] <- tys
   = noLoc $ HsEqTy (synifyType WithinType ty1) (synifyType WithinType ty2)
   -- Most TyCons:
   | otherwise =
     foldl (\t1 t2 -> noLoc (HsAppTy t1 t2))
       (noLoc $ HsTyVar $ noLoc (getName tc))
-      (map (synifyType WithinType) tys)
+      (map (synifyType WithinType) $
+       filterOut isCoercionTy tys)
+synifyType s (AppTy t1 (CoercionTy {})) = synifyType s t1
 synifyType _ (AppTy t1 t2) = let
   s1 = synifyType WithinType t1
   s2 = synifyType WithinType t2
   in noLoc $ HsAppTy s1 s2
-synifyType _ (FunTy t1 t2) = let
+synifyType _ (ForAllTy (Anon t1) t2) = let
   s1 = synifyType WithinType t1
   s2 = synifyType WithinType t2
   in noLoc $ HsFunTy s1 s2
@@ -414,6 +413,8 @@ synifyType s forallty@(ForAllTy _tv _ty) =
     ImplicitizeForAll -> noLoc sPhi
 
 synifyType _ (LitTy t) = noLoc $ HsTyLit $ synifyTyLit t
+synifyType s (CastTy t _) = synifyType s t
+synifyType _ (CoercionTy {}) = error "synifyType:Coercion"
 
 synifyTyLit :: TyLit -> HsTyLit
 synifyTyLit (NumTyLit n) = HsNumTy mempty n
@@ -437,7 +438,7 @@ synifyInstHead (_, preds, cls, types) = specializeInstHead $ InstHead
         }
     }
   where
-    (ks,ts) = break (not . isKind) types
+    (ks,ts) = partitionInvisibles (classTyCon cls) id types
     synifyClsIdSig = synifyIdSig DeleteTopLevelQuantification
 
 -- Convert a family instance, this could be a type family or data family
@@ -456,5 +457,5 @@ synifyFamInst fi opaque = do
         return . TypeInst . Just . unLoc . synifyType WithinType $ fi_rhs fi
     ityp (DataFamilyInst c) =
         DataInst <$> synifyTyCon (Just $ famInstAxiom fi) c
-    (ks,ts) = break (not . isKind) $ fi_tys fi
+    (ks,ts) = partitionInvisibles (classTyCon cls) id $ fi_tys fi
     synifyTypes = map (unLoc. synifyType WithinType)

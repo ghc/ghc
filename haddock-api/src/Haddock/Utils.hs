@@ -151,7 +151,7 @@ addClassContext _ _ sig = sig   -- E.g. a MinimalSig is fine
 lHsQTyVarsToTypes :: LHsQTyVars Name -> [LHsType Name]
 lHsQTyVarsToTypes tvs
   = [ noLoc (HsTyVar (noLoc (hsLTyVarName tv)))
-    | tv <- hsQTvBndrs tvs ]
+    | tv <- hsQTvExplicit tvs ]
 
 --------------------------------------------------------------------------------
 -- * Making abstract declarations
@@ -200,7 +200,8 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
             c' :: ConDecl Name
             c' = ConDeclH98
                    { con_name = head (con_names c)
-                   , con_qvars = Just $ HsQTvs { hsq_kvs = mempty, hsq_tvs = tvs }
+                   , con_qvars = Just $ HsQTvs { hsq_implicit = mempty
+                                               , hsq_explicit = tvs }
                    , con_cxt = Just cxt
                    , con_details = details
                    , con_doc = con_doc c
@@ -224,7 +225,8 @@ emptyHsQTvs :: LHsQTyVars Name
 -- This function is here, rather than in HsTypes, because it *renamed*, but
 -- does not necessarily have all the rigt kind variables.  It is used
 -- in Haddock just for printing, so it doesn't matter
-emptyHsQTvs = HsQTvs { hsq_kvs = error "haddock:emptyHsQTvs", hsq_tvs = [] }
+emptyHsQTvs = HsQTvs { hsq_implicit = error "haddock:emptyHsQTvs"
+                     , hsq_explicit = [] }
 
 
 --------------------------------------------------------------------------------
