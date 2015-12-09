@@ -4489,13 +4489,12 @@ Deriving any other class
 ------------------------
 
 With ``-XDeriveAnyClass`` you can derive any other class. The compiler
-will simply generate an empty instance. The instance context will be
-generated according to the same rules used when deriving ``Eq``. This is
+will simply generate an instance declaration with no explicitly-defined
+mathods.
+This is
 mostly useful in classes whose `minimal set <#minimal-pragma>`__ is
 empty, and especially when writing
-`generic functions <#generic-programming>`__. In case you try to derive some
-class on a newtype, and ``-XGeneralizedNewtypeDeriving`` is also on,
-``-XDeriveAnyClass`` takes precedence.
+`generic functions <#generic-programming>`__. 
 
 As an example, consider a simple pretty-printer class ``SPretty``, which outputs
 pretty strings: ::
@@ -4522,8 +4521,47 @@ That is, an ``SPretty Foo`` instance will be created with empty implementations
 for all methods. Since we are using ``-XDefaultSignatures`` in this example, a
 default implementation of ``sPpr`` is filled in automatically.
 
-Similarly, ``-XDeriveAnyClass`` can be used to fill in default instances for
-associated type families: ::
+Note the following details
+
+- In case you try to derive some
+  class on a newtype, and ``-XGeneralizedNewtypeDeriving`` is also on,
+  ``-XDeriveAnyClass`` takes precedence.
+
+- ``-XDeriveAnyClass`` is allowed only when the last argument of the class
+  has kind ``*`` or ``(* -> *)``.  So this is not allowed: ::
+
+    data T a b = MkT a b deriving( Bifunctor )
+
+  because the last argument of ``Bifunctor :: (* -> * -> *) -> Constraint``
+  has the wrong kind.
+
+- The instance context will be generated according to the same rules
+  used when deriving ``Eq`` (if the kind of the type is ``*``), or
+  the rules for ``Functor`` (if the kind of the type is ``(* -> *)``).
+  For example ::
+
+    instance C a => C (a,b) where ...
+
+    data T a b = MkT a (a,b) deriving( C )
+
+  The ``deriving`` clause will generate ::
+
+    instance C a => C (T a b) where {}
+
+  The constraints `C a` and `C (a,b)` are generated from the data
+  constructor arguments, but the latter simplifies to `C a`.
+
+- ``-XDeriveAnyClass`` can be used with partially applied classes,
+  such as ::
+
+    data T a = MKT a deriving( D Int )
+
+  which generates ::
+
+    instance D Int a => D Int (T a) where {}
+
+- ``-XDeriveAnyClass`` can be used to fill in default instances for
+  associated type families: ::
 
     {-# LANGUAGE DeriveAnyClass, TypeFamilies #-}
 
@@ -4536,8 +4574,12 @@ associated type families: ::
     doubleBarSize :: Size Bar -> Size Bar
     doubleBarSize s = 2*s
 
-Since ``-XDeriveAnyClass`` does not generate an instance definition for ``Size
-Bar``, it will default to ``Int``.
+  The ``deriving( Sizable )`` is equivalent to saying ::
+
+    instance Sizeable Bar where {}
+
+  and then the normal rules for filling in associated types from the
+  default will apply, making ``Size Bar`` equal to ``Int``.
 
 .. _type-class-extensions:
 
