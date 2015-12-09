@@ -22,7 +22,7 @@ t = undefined
 *     fsk ~ (TF a, TF Int)
         (flatten lhs)
          a ~ (TF a, TF Int)
-        (flaten rhs)
+        (flatten rhs)
         a ~ (fsk1, TF Int)
 (wk)  TF a ~ fsk1   
 

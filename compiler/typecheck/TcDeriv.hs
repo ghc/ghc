@@ -1135,7 +1135,7 @@ canDeriveAnyClass dflags _tycon clas
   where
     -- We are making an instance  (C t1 .. tn (T s1 .. sm))
     -- and we can only do so if the kind of C's last argument
-    -- is * or (* -> *).  Becuase only then can we make a resonable
+    -- is * or (* -> *).  Because only then can we make a reasonable
     -- guess at the instance context
     target_kind = tyVarKind (last (classTyVars clas))
 

@@ -18,13 +18,13 @@ test('Check01', normal, multi_compile_fail, ['Check01 -distrust base', [
                                             ('Check01_B.hs', '-trust base')
                                             ], '-fpackage-trust'])
 
-# suceed this time since we trust base when we compile AND use CheckB
+# succeed this time since we trust base when we compile AND use CheckB
 test('Check02', normal, multi_compile, ['Check02', [
                                        ('Check02_A.hs', ''),
                                        ('Check02_B.hs', '')
                                        ], '-trust base -fpackage-trust'])
 
-# suceed as while like Check01_fail we don't import CheckB as a safe
+# succeed as while like Check01_fail we don't import CheckB as a safe
 # import this time, so don't require base trusted when used.
 test('Check03', normal, multi_compile, ['Check03', [
                                        ('Check03_A.hs', ''),

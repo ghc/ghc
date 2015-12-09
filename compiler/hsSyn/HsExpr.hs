@@ -1642,7 +1642,7 @@ pprStmt (ApplicativeStmt args mb_join _)
   -- of statements.
    pp_for_user = vcat $ punctuate semi $ concatMap flattenArg args
 
-   -- ppr directly rather than transforming here, becuase we need to
+   -- ppr directly rather than transforming here, because we need to
    -- inject a "return" which is hard when we're polymorphic in the id
    -- type.
    flattenStmt :: ExprLStmt idL -> [SDoc]

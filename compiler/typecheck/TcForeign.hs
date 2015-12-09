@@ -466,7 +466,7 @@ checkForeignRes non_io_result_ok check_safe pred_res_ty ty
            _ | check_safe && safeLanguageOn dflags
                -> addErrTc (illegalForeignTyErr result safeHsErr)
 
-           -- sucess! non-IO return is fine
+           -- success! non-IO return is fine
            _ -> return () }
   where
     safeHsErr = ptext $ sLit "Safe Haskell is on, all FFI imports must be in the IO monad"

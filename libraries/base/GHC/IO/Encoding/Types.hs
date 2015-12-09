@@ -123,7 +123,7 @@ instance Show TextEncoding where
 
 -- | @since 4.4.0.0
 data CodingProgress = InputUnderflow  -- ^ Stopped because the input contains insufficient available elements,
-                                      -- or all of the input sequence has been sucessfully translated.
+                                      -- or all of the input sequence has been successfully translated.
                     | OutputUnderflow -- ^ Stopped because the output contains insufficient free elements
                     | InvalidSequence -- ^ Stopped because there are sufficient free elements in the output
                                       -- to output at least one encoded ASCII character, but the input contains

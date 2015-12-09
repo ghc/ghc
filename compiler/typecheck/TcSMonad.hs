@@ -2618,7 +2618,7 @@ sites.  Not only do we want an error message for each, but with
 *derived* insolubles, we only want to report each one once.  Why?
 
 (a) A constraint (C r s t) where r -> s, say, may generate the same fundep
-    equality many times, as the original constraint is sucessively rewritten.
+    equality many times, as the original constraint is successively rewritten.
 
 (b) Ditto the successive iterations of the main solver itself, as it traverses
     the constraint tree. See example below.

@@ -293,7 +293,7 @@ Consider this (Trac #9161)
 Here, the type signature for b mentions A.  But A is a pattern
 synonym, which is typechecked (for very good reasons; a view pattern
 in the RHS may mention a value binding) as part of a group of
-bindings.  It is entirely resonable to reject this, but to do so
+bindings.  It is entirely reasonable to reject this, but to do so
 we need A to be in the kind environment when kind-checking the signature for B.
 
 Hence the tcExtendKindEnv2 patsyn_placeholder_kinds, which adds a binding
@@ -754,7 +754,7 @@ mkInferredPolyId qtvs inferred_theta poly_name mb_sig mono_ty
                -- Example: f :: [F Int] -> Bool
                -- should be rewritten to f :: [Char] -> Bool, if possible
                --
-               -- We can discard the coercion _co, becuase we'll reconstruct
+               -- We can discard the coercion _co, because we'll reconstruct
                -- it in the call to tcSubType below
 
        ; (my_tvs, theta') <- chooseInferredQuantifiers
@@ -1770,7 +1770,7 @@ tcUserTypeSig hs_sig_ty mb_name
 
          -- Check for validity (eg rankN etc)
          -- The ambiguity check will happen (from checkValidType),
-         -- but unnecessarily; it will always succeed becuase there
+         -- but unnecessarily; it will always succeed because there
          -- is no quantification
        ; _ <- zonkAndCheckValidity ctxt_F (mkPhiTy theta tau)
 

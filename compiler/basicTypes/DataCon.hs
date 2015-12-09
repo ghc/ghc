@@ -1079,7 +1079,7 @@ dataConCannotMatch tys con
 *                                                                      *
                  Promotion
 
-   These functions are here becuase
+   These functions are here because
    - isPromotableTyCon calls dataConFullSig
    - mkDataCon calls promoteType
    - It's nice to keep the promotion stuff together

@@ -739,7 +739,7 @@ parUpsweep n_jobs old_hpt stable_mods cleanup sccs = do
     hsc_env_var <- liftIO $ newMVar hsc_env
 
     -- The old HPT is used for recompilation checking in upsweep_mod. When a
-    -- module sucessfully gets compiled, its HMI is pruned from the old HPT.
+    -- module successfully gets compiled, its HMI is pruned from the old HPT.
     old_hpt_var <- liftIO $ newIORef old_hpt
 
     -- What we use to limit parallelism with.

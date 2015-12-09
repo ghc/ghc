@@ -838,7 +838,7 @@ splitForAllTy_maybe ty = splitFAT_m ty
     splitFAT_m _                            = Nothing
 
 -- | Attempts to take a forall type apart, returning all the immediate such bound
--- type variables and the remainder of the type. Always suceeds, even if that means
+-- type variables and the remainder of the type. Always succeeds, even if that means
 -- returning an empty list of 'TyVar's
 splitForAllTys :: Type -> ([TyVar], Type)
 splitForAllTys ty = split ty ty []

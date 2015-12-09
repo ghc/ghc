@@ -4490,7 +4490,7 @@ Deriving any other class
 
 With ``-XDeriveAnyClass`` you can derive any other class. The compiler
 will simply generate an instance declaration with no explicitly-defined
-mathods.
+methods.
 This is
 mostly useful in classes whose `minimal set <#minimal-pragma>`__ is
 empty, and especially when writing
