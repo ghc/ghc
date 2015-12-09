@@ -1,4 +1,5 @@
-T3927b.hs:58:5: warning:
+
+T3927b.hs:59:5: warning:
     • Redundant constraint: Restrict op (Implements 'Dealer)
     • In the type signature for:
            f :: Restrict op (Implements 'Dealer) =>
@@ -12,7 +13,7 @@ T3927b.hs:58:5: warning:
                 f SRead = undefined
                 f SWrite = undefined
 
-T3927b.hs:65:5: warning:
+T3927b.hs:66:5: warning:
     • Redundant constraint: Restrict op (Implements 'Push)
     • In the type signature for:
            f :: Restrict op (Implements 'Push) =>
@@ -25,7 +26,7 @@ T3927b.hs:65:5: warning:
                   Restrict op (Implements Push) => SockOp Push op -> Operation op
                 f SWrite = undefined
 
-T3927b.hs:71:5: warning:
+T3927b.hs:72:5: warning:
     • Redundant constraint: Restrict op (Implements 'Pull)
     • In the type signature for:
            f :: Restrict op (Implements 'Pull) =>

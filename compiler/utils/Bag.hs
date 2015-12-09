@@ -20,7 +20,6 @@ module Bag (
         listToBag, bagToList, mapAccumBagL,
         foldrBagM, foldlBagM, mapBagM, mapBagM_,
         flatMapBagM, flatMapBagPairM,
-        mapAndUnzipBagM, mapAccumBagL, mapAccumBagLM,
         mapAndUnzipBagM, mapAccumBagLM,
         anyBagM, filterBagM
     ) where

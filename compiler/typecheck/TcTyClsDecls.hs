@@ -1612,11 +1612,6 @@ Validity checking is done once the mutually-recursive knot has been
 tied, so we can look at things freely.
 -}
 
-{-
-checkClassCycleErrs :: Class -> TcM ()
-checkClassCycleErrs cls = mapM_ recClsErr (calcClassCycles cls)
--}
-
 checkValidTyCl :: TyCon -> TcM TyCon
 checkValidTyCl tc
   = setSrcSpan (getSrcSpan tc) $
@@ -2190,13 +2185,6 @@ recSynErr syn_decls
   where
     sorted_decls = sortLocated syn_decls
     ppr_decl (L loc decl) = ppr loc <> colon <+> ppr decl
-
-{-
-recClsErr :: [TyCon] -> TcRn ()
-recClsErr cycles
-  = addErr (sep [ptext (sLit "Cycle in class declaration (via superclasses):"),
-                 nest 2 (hsep (intersperse (text "->") (map ppr cycles)))])
--}
 
 badDataConTyCon :: DataCon -> Type -> Type -> SDoc
 badDataConTyCon data_con res_ty_tmpl actual_res_ty

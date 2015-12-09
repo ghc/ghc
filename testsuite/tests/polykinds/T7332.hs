@@ -31,7 +31,8 @@ instance (Build dc r, a ~ dc) => Build dc (a->r) where
 
 
 -- The type is inferred
-tspan :: (Monoid d, Build (DC d) r, BuildR r ~ DC d) => r
+-- tspan :: (Monoid d, Build (DC d) r, BuildR r ~ DC d) => r
+tspan :: (Build (DC d) r, BuildR r ~ DC d) => r
 tspan = build (id :: DC d -> DC d) mempty
 
 {- Solving 'tspan'

@@ -199,8 +199,10 @@ checkClassCycles cls
        ; let herald | definite_cycle = ptext (sLit "Superclass cycle for")
                     | otherwise      = ptext (sLit "Potential superclass cycle for")
        ; return (vcat [ herald <+> quotes (ppr cls)
-                      , nest 2 err ]) }
+                      , nest 2 err, hint]) }
   where
+    hint = ptext (sLit "Use UndecidableSuperClasses to accept this")
+
     go :: NameSet -> Class -> Maybe (Bool, SDoc)
     go so_far cls = firstJusts $
                     map (go_pred (so_far `extendNameSet` getName cls)) $
@@ -209,14 +211,18 @@ checkClassCycles cls
     go_pred :: NameSet -> PredType -> Maybe (Bool, SDoc)
     go_pred so_far pred  -- NB: tcSplitTyConApp looks through synonyms
        = case tcSplitTyConApp_maybe pred of
-           Nothing -> Nothing
-           Just (tc, _) | isFamilyTyCon tc
-                        -> Just (False, ptext (sLit "whose superclass predicates include type family")
-                                        <+> quotes (ppr pred))
-                        | Just cls <- tyConClass_maybe tc
-                        -> go_cls so_far cls
-                        | otherwise   -- Equality predicate, for example
-                        -> Nothing
+           Nothing      -> Nothing
+           Just (tc, _) -> go_tc so_far pred tc
+
+    go_tc :: NameSet -> PredType -> TyCon -> Maybe (Bool, SDoc)
+    go_tc so_far pred tc
+      | isFamilyTyCon tc
+      = Just (False, hang (ptext (sLit "whose superclass predicates include type family"))
+                        2 (quotes (ppr pred)))
+      | Just cls <- tyConClass_maybe tc
+      = go_cls so_far cls
+      | otherwise   -- Equality predicate, for example
+      = Nothing
 
     go_cls :: NameSet -> Class -> Maybe (Bool, SDoc)
     go_cls so_far cls

@@ -34,7 +34,7 @@ expectedGhcOnlyExtensions :: [String]
 expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "AlternativeLayoutRule",
                              "AlternativeLayoutRuleTransitional",
-                             "UndecidableSuperclasses",    -- Experimental SLPJ 30 Nov 15
+                             "UndecidableSuperClasses",    -- Experimental SLPJ 30 Nov 15
                                                            -- not yet added to Cabal
                              "OverloadedLabels",
                              "TemplateHaskellQuotes",

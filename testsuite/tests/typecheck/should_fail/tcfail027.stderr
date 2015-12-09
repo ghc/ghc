@@ -3,10 +3,12 @@ tcfail027.hs:4:1: error:
     • Superclass cycle for ‘A’
         whose superclasses include ‘B’
         whose superclasses include ‘A’
+      Use UndecidableSuperClasses to accept this
     • In the class declaration for ‘A’
 
 tcfail027.hs:7:1: error:
     • Superclass cycle for ‘B’
         whose superclasses include ‘A’
         whose superclasses include ‘B’
+      Use UndecidableSuperClasses to accept this
     • In the class declaration for ‘B’

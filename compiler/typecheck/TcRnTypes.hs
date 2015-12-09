@@ -75,7 +75,7 @@ module TcRnTypes(
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, unionsWC, addSimples, addImplics, mkSimpleWC, addInsols,
         dropDerivedWC, dropDerivedSimples, dropDerivedInsols,
-        isDroppableDerivedLoc, insolubleImplic, trulyInsoluble,
+        isDroppableDerivedLoc, insolubleImplic,
         arisesFromGivens,
 
         Implication(..), ImplicStatus(..), isInsolubleStatus,
@@ -1798,11 +1798,11 @@ trulyInsoluble :: TcLevel -> Ct -> Bool
 -- The constraint is in the wc_insol set,
 -- but we do not treat as truly isoluble
 --  a) type-holes, arising from PartialTypeSignatures,
---  b) an out-of-scope variable
+--     (except out-of-scope variables masquerading as type-holes)
 -- Yuk!
-trulyInsoluble tc_lvl insol
-  =  isOutOfScopeCt insol
-  || isRigidEqPred tc_lvl (classifyPredType (ctPred insol))
+trulyInsoluble _tc_lvl insol
+  | CHoleCan {} <- insol = isOutOfScopeCt insol
+  | otherwise            = True
 
 instance Outputable WantedConstraints where
   ppr (WC {wc_simple = s, wc_impl = i, wc_insol = n})

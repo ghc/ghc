@@ -1009,7 +1009,6 @@ simpl_loop n limit floated_eqs no_new_given_scs
                                --     arising from fundeps inside an implication
 
        ; (no_new_scs, wc1) <- expandSuperClasses wc1
-
        ; let WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 } = wc1
 
        -- We have already tried to solve the nested implications once
@@ -1027,6 +1026,7 @@ simpl_loop n limit floated_eqs no_new_given_scs
 expandSuperClasses :: WantedConstraints -> TcS (Bool, WantedConstraints)
 -- If there are any unsolved wanteds, expand one step of superclasses for
 -- unsolved wanteds or givens
+-- See Note [The superclass story] in TcCanonical
 expandSuperClasses wc@(WC { wc_simple = unsolved, wc_insol = insols })
   | isEmptyBag unsolved  -- No unsolved simple wanteds, so do not add suerpclasses
   = return (True, wc)
@@ -1042,8 +1042,7 @@ expandSuperClasses wc@(WC { wc_simple = unsolved, wc_insol = insols })
     do { new_given  <- concatMapM makeSuperClasses pending_given
        ; new_insols <- solveSimpleGivens new_given
        ; new_wanted <- concatMapM makeSuperClasses pending_wanted
-       ; return (False, wc { wc_simple = unsolved' `unionBags`
-                                         listToBag new_wanted
+       ; return (False, wc { wc_simple = unsolved' `unionBags` listToBag new_wanted
                            , wc_insol = insols `unionBags` new_insols }) } }
 
 solveNestedImplications :: Bag Implication
