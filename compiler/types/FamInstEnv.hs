@@ -345,9 +345,8 @@ Then we get a data type for each instance, and an axiom:
    axiom ax7   :: T Int ~ TInt   -- Eta-reduced
    axiom ax8 a :: T Bool [a] ~ TBoolList a
 
-These two axioms for T, one with one pattern, one with two.  The reason
-for this eta-reduction is decribed in TcInstDcls
-   Note [Eta reduction for data family axioms]
+These two axioms for T, one with one pattern, one with two;
+see Note [Eta reduction for data families]
 -}
 
 type FamInstEnv = UniqFM FamilyInstEnv  -- Maps a family to its instances
@@ -967,8 +966,8 @@ We handle data families and type families separately here:
 
  * For data family instances, though, we need to re-split for each
    instance, because the breakdown might be different for each
-   instance.  Why?  Because of eta reduction; see Note [Eta reduction
-   for data family axioms] in TcInstDcls.
+   instance.  Why?  Because of eta reduction; see
+   Note [Eta reduction for data families].
 -}
 
 -- checks if one LHS is dominated by a list of other branches
