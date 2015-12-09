@@ -18,7 +18,7 @@ This is where we do all the grimy bindings' generation.
 module TcGenDeriv (
         BagDerivStuff, DerivStuff(..),
 
-        hasBuiltinDeriving, canDeriveAnyClass,
+        hasBuiltinDeriving,
         FFoldType(..), functorLikeTraverse,
         deepSubtypesContaining, foldDataConArgs,
         mkCoerceClassMethEqn,
@@ -132,19 +132,6 @@ hasBuiltinDeriving dflags fix_env clas = assocMaybe gen_list (getUnique clas)
                , (foldableClassKey,    gen_Foldable_binds)
                , (traversableClassKey, gen_Traversable_binds)
                , (liftClassKey,        gen_Lift_binds) ]
-
--- Nothing: we can (try to) derive it via Generics
--- Just s:  we can't, reason s
-canDeriveAnyClass :: DynFlags -> TyCon -> Class -> Maybe SDoc
-canDeriveAnyClass dflags _tycon clas =
-  let b `orElse` s = if b then Nothing else Just (ptext (sLit s))
-      Just m  <> _ = Just m
-      Nothing <> n = n
-  -- We can derive a given class for a given tycon via Generics iff
-  in  -- 1) The class is not a "standard" class (like Show, Functor, etc.)
-        (not (getUnique clas `elem` standardClassKeys) `orElse` "")
-      -- 2) Opt_DeriveAnyClass is on
-     <> (xopt Opt_DeriveAnyClass dflags `orElse` "Try enabling DeriveAnyClass")
 
 {-
 ************************************************************************
