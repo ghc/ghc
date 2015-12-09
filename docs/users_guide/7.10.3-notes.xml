@@ -117,7 +117,7 @@
 
       <listitem>
         <para>
-          The template Haskell <literal>getQ</literal> and
+          The Template Haskell <literal>getQ</literal> and
           <literal>putQ</literal> functions are fixed (having been broken since GHC
           7.10.1, (<ulink href="https://ghc.haskell.org/trac/ghc/ticket/10596">Trac
           #10596</ulink>).
@@ -154,14 +154,6 @@
   <sect2>
     <title>Known bugs</title>
     <itemizedlist>
-      <listitem>
-        <para>
-          At the time of release there is a <ulink
-          href="https://github.com/haskell/cabal/commit/1c1228a808b55331ac1db6d71fd2f8533f5fc57e">fix</ulink>
-          in the <literal>Cabal</literal> upstream respository, although it is not yet
-          present in a release.
-        </para>
-      </listitem>
       <listitem>
         <para>
           Unfortunately the fix for
