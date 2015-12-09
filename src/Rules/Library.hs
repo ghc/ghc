@@ -15,6 +15,7 @@ buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
 
     -- TODO: handle dynamic libraries
     matchBuildResult buildPath "a" ?> \a -> do
+
         removeFileIfExists a
         cSrcs <- cSources target
         hSrcs <- hSources target
@@ -35,7 +36,9 @@ buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
                 return . map (splitPath -/-)
                        . filter (not . all (== '.')) $ contents
 
-        build $ fullTarget target Ar (cObjs ++ splitObjs) [a]
+        if "//*-0.*" ?== a
+        then build $ fullTarget target Ar [] [a]
+        else build $ fullTarget target Ar (cObjs ++ splitObjs) [a]
 
         synopsis <- interpretPartial target $ getPkgData Synopsis
         putSuccess $ "/--------\n| Successfully built package library '"

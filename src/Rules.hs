@@ -5,6 +5,7 @@ import Oracles
 import Rules.Package
 import Rules.Resources
 import Settings
+import Settings.Builders.GhcCabal
 
 -- generateTargets needs top-level build targets
 generateTargets :: Rules ()
@@ -21,9 +22,12 @@ generateTargets = action $ do
             ways        <- interpretPartial target getWays
             let ghciLib = buildPath -/- "HS" ++ libName <.> "o"
                 haddock = pkgHaddockFile pkg
-            libs <- forM ways $ \way -> do
+            libs <- fmap concat . forM ways $ \way -> do
                 extension <- libsuf way
-                return $ buildPath -/- "libHS" ++ libName <.> extension
+                let name = buildPath -/- "libHS" ++ libName
+                dll0 <- needDll0 stage pkg
+                return $ [ name <.> extension ]
+                      ++ [ name ++ "-0" <.> extension | dll0 ]
 
             return $  [ ghciLib | needGhciLib == "YES" && stage == Stage1 ]
                    ++ [ haddock | needHaddock          && stage == Stage1 ]
