@@ -412,7 +412,7 @@ ppTyVars = map (ppSymName . getName . hsLTyVarName)
 
 
 tyvarNames :: LHsQTyVars DocName -> [Name]
-tyvarNames = map (getName . hsLTyVarName) . hsQTvBndrs
+tyvarNames = map (getName . hsLTyVarName) . hsQTvExplicit
 
 
 declWithDoc :: LaTeX -> Maybe LaTeX -> LaTeX
@@ -723,7 +723,7 @@ ppSideBySideConstr subdocs unicode leader (L loc con) =
     tyVars  = tyvarNames (con_qvars con)
     context = unLoc (con_cxt con)
 
-    mk_forall ty | con_explicit con = L loc (HsForAllTy (hsQTvBndrs ltvs) ty)
+    mk_forall ty | con_explicit con = L loc (HsForAllTy (hsQTvExplicit ltvs) ty)
                  | otherwise        = ty
     mk_phi ty | null context = ty
               | otherwise    = L loc (HsQualTy (con_cxt con) ty)
@@ -955,7 +955,6 @@ ppr_mono_ty _         (HsRecTy {})        _ = error "ppr_mono_ty HsRecTy"
 ppr_mono_ty _         (HsCoreTy {})       _ = error "ppr_mono_ty HsCoreTy"
 ppr_mono_ty _         (HsExplicitListTy _ tys) u = Pretty.quote $ brackets $ hsep $ punctuate comma $ map (ppLType u) tys
 ppr_mono_ty _         (HsExplicitTupleTy _ tys) u = Pretty.quote $ parenList $ map (ppLType u) tys
-ppr_mono_ty _         (HsWrapTy {})       _ = error "ppr_mono_ty HsWrapTy"
 
 ppr_mono_ty ctxt_prec (HsEqTy ty1 ty2) unicode
   = maybeParen ctxt_prec pREC_OP $
@@ -965,7 +964,7 @@ ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty) unicode
   = maybeParen ctxt_prec pREC_CON $
     hsep [ppr_mono_lty pREC_FUN fun_ty unicode, ppr_mono_lty pREC_CON arg_ty unicode]
 
-ppr_mono_ty ctxt_prec (HsOpTy ty1 (_, op) ty2) unicode
+ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2) unicode
   = maybeParen ctxt_prec pREC_FUN $
     ppr_mono_lty pREC_OP ty1 unicode <+> ppr_op <+> ppr_mono_lty pREC_OP ty2 unicode
   where
@@ -984,6 +983,8 @@ ppr_mono_ty _ (HsWildCardTy (AnonWildCard _)) _ = char '_'
 ppr_mono_ty _ (HsWildCardTy (NamedWildCard (L _ name))) _ = ppDocName name
 
 ppr_mono_ty _ (HsTyLit t) u = ppr_tylit t u
+
+ppr_mono_ty _ (HsAppsTy {}) _ = panic "ppr_mono_ty:HsAppsTy"
 
 
 ppr_tylit :: HsTyLit -> Bool -> LaTeX

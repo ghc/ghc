@@ -184,7 +184,7 @@ ppCtor dflags dat subdocs con@ConDeclH98 {}
         name = out dflags $ map unL $ getConNames con
 
         resType = apps $ map (reL . HsTyVar . reL) $
-                        (tcdName dat) : [hsTyVarName v | L _ v@(UserTyVar _) <- hsQTvBndrs $ tyClDeclTyVars dat]
+                        (tcdName dat) : [hsTyVarName v | L _ v@(UserTyVar _) <- hsQTvExplicit $ tyClDeclTyVars dat]
 
 ppCtor dflags _dat subdocs con@ConDeclGADT {}
    = concatMap (lookupCon dflags subdocs) (getConNames con) ++ f

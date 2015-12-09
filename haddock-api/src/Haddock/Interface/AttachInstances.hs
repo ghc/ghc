@@ -22,6 +22,7 @@ import Control.Arrow hiding ((<+>))
 import Data.List
 import Data.Ord (comparing)
 import Data.Function (on)
+import Data.Maybe ( maybeToList, mapMaybe )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -41,7 +42,7 @@ import PrelNames
 import TcRnDriver (tcRnGetInfo)
 import TcType (tcSplitSigmaTy)
 import TyCon
-import TypeRep
+import TyCoRep
 import TysPrim( funTyCon )
 import Var hiding (varName)
 #define FSLIT(x) (mkFastString# (x#))
@@ -146,18 +147,26 @@ instHead (_, _, cls, args)
 argCount :: Type -> Int
 argCount (AppTy t _) = argCount t + 1
 argCount (TyConApp _ ts) = length ts
-argCount (FunTy _ _ ) = 2
+argCount (ForAllTy (Anon _) _ ) = 2
 argCount (ForAllTy _ t) = argCount t
+argCount (CastTy t _) = argCount t
 argCount _ = 0
 
 simplify :: Type -> SimpleType
+simplify (ForAllTy (Anon t1) t2) = SimpleType funTyConName [simplify t1, simplify t2]
 simplify (ForAllTy _ t) = simplify t
-simplify (FunTy t1 t2) = SimpleType funTyConName [simplify t1, simplify t2]
-simplify (AppTy t1 t2) = SimpleType s (ts ++ [simplify t2])
+simplify (AppTy t1 t2) = SimpleType s (ts ++ maybeToList (simplify_maybe t2))
   where (SimpleType s ts) = simplify t1
 simplify (TyVarTy v) = SimpleType (tyVarName v) []
-simplify (TyConApp tc ts) = SimpleType (tyConName tc) (map simplify ts)
+simplify (TyConApp tc ts) = SimpleType (tyConName tc)
+                                       (mapMaybe simplify_maybe ts)
 simplify (LitTy l) = SimpleTyLit l
+simplify (CastTy ty _) = simplify ty
+simplify (CoercionTy _) = error "simplify:Coercion"
+
+simplify_maybe :: Type -> Maybe SimpleType
+simplify_maybe (CoercionTy {}) = Nothing
+simplify_maybe ty              = Just (simplify ty)
 
 -- Used for sorting
 instFam :: FamInst -> ([Int], Name, [SimpleType], Int, SimpleType)
@@ -207,9 +216,10 @@ isTypeHidden expInfo = typeHidden
         TyVarTy {} -> False
         AppTy t1 t2 -> typeHidden t1 || typeHidden t2
         TyConApp tcon args -> nameHidden (getName tcon) || any typeHidden args
-        FunTy t1 t2 -> typeHidden t1 || typeHidden t2
-        ForAllTy _ ty -> typeHidden ty
+        ForAllTy bndr ty -> typeHidden (binderType bndr) || typeHidden ty
         LitTy _ -> False
+        CastTy ty _ -> typeHidden ty
+        CoercionTy {} -> False
 
     nameHidden :: Name -> Bool
     nameHidden = isNameHidden expInfo
