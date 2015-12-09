@@ -25,6 +25,7 @@ data Builder = Alex
              | Ghc Stage
              | GhcCabal
              | GhcCabalHsColour
+             | GhcLink Stage
              | GhcM Stage
              | GhcPkg Stage
              | GhcSplit
@@ -50,6 +51,7 @@ builderKey builder = case builder of
     Ghc Stage1       -> "ghc-stage1"
     Ghc Stage2       -> "ghc-stage2"
     Ghc Stage3       -> "ghc-stage3"
+    GhcLink stage    -> builderKey $ Ghc stage -- using Ghc as linker
     GhcM stage       -> builderKey $ Ghc stage -- synonym for 'Ghc -M'
     GhcCabal         -> "ghc-cabal"
     GhcCabalHsColour -> builderKey $ GhcCabal -- synonym for 'GhcCabal hscolour'
