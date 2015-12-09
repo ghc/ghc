@@ -1,6 +1,6 @@
 module Settings.Builders.GhcCabal (
     cabalArgs, ghcCabalHsColourArgs, bootPackageDbArgs, customPackageArgs,
-    ccArgs, cppArgs, ccWarnings, argStagedSettingList
+    ccArgs, cppArgs, ccWarnings, argStagedSettingList, needDll0
     ) where
 
 import Expression
@@ -212,18 +212,22 @@ appendCcArgs xs = do
             , builder GhcCabal   ? appendSub "--configure-option=CFLAGS" xs
             , builder GhcCabal   ? appendSub "--gcc-options" xs ]
 
+needDll0 :: Stage -> Package -> Action Bool
+needDll0 stage pkg = do
+    windows <- windowsHost
+    return $ windows && pkg == compiler && stage == Stage1
+
 -- This is a positional argument, hence:
 -- * if it is empty, we need to emit one empty string argument;
 -- * otherwise, we must collapse it into one space-separated string.
 dll0Args :: Args
 dll0Args = do
-    windows <- lift windowsHost
-    pkg     <- getPackage
-    stage   <- getStage
-    let needDll0Args = windows && pkg == compiler && stage == Stage1
-    ghci    <- lift ghcWithInterpreter
-    arg . unwords . concat $ [ modules     | needDll0Args         ]
-                          ++ [ ghciModules | needDll0Args && ghci ] -- see #9552
+    stage <- getStage
+    pkg   <- getPackage
+    dll0  <- lift $ needDll0 stage pkg
+    ghci  <- lift ghcWithInterpreter
+    arg . unwords . concat $ [ modules     | dll0         ]
+                          ++ [ ghciModules | dll0 && ghci ] -- see #9552
   where
     modules = [ "Annotations"
               , "ApiAnnotation"
