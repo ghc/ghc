@@ -1,0 +1,44 @@
+
+T11192.hs:7:14: warning:
+    • Found type wildcard ‘_’ standing for ‘Int -> t -> t’
+      Where: ‘t’ is a rigid type variable bound by
+               the inferred type of go :: Int -> t -> t at T11192.hs:8:8
+    • In the type signature:
+        go :: _
+      In the expression:
+        let
+          go :: _
+          go 0 a = a
+        in go (0 :: Int) undefined
+      In an equation for ‘fails’:
+          fails
+            = let
+                go :: _
+                go 0 a = a
+              in go (0 :: Int) undefined
+    • Relevant bindings include
+        go :: Int -> t -> t (bound at T11192.hs:8:8)
+        fails :: a (bound at T11192.hs:6:1)
+
+T11192.hs:13:14: warning:
+    • Found type wildcard ‘_’ standing for ‘t -> t1 -> t1’
+      Where: ‘t’ is a rigid type variable bound by
+               the inferred type of go :: t -> t1 -> t1 at T11192.hs:14:8
+             ‘t1’ is a rigid type variable bound by
+               the inferred type of go :: t -> t1 -> t1 at T11192.hs:14:8
+    • In the type signature:
+        go :: _
+      In the expression:
+        let
+          go :: _
+          go _ a = a
+        in go (0 :: Int) undefined
+      In an equation for ‘succeeds’:
+          succeeds
+            = let
+                go :: _
+                go _ a = a
+              in go (0 :: Int) undefined
+    • Relevant bindings include
+        go :: t -> t1 -> t1 (bound at T11192.hs:14:8)
+        succeeds :: a (bound at T11192.hs:12:1)
