@@ -20,10 +20,10 @@
           Starting with 7.10.2 GHC would simplify both the left- and
           right-hand-sides of rewrite rules, causing a variety of unexpected behavior.
           Simplification of the LHS resulted in various rules to fail to fire (<ulink
-          href="https://ghc.haskell.org/trac/ghc/ticket/10528">Trac #10528</ulink>, in
+          url="https://ghc.haskell.org/trac/ghc/ticket/10528">Trac #10528</ulink>, in
           particular affecting the widely used <literal>text</literal> library)
           whereas rewrites of the RHS broke some of the more exotic uses of rewrite rules
-          (e.g. HERMIT, <ulink href="https://ghc.haskell.org/trac/ghc/ticket/10829">Trac
+          (e.g. HERMIT, <ulink url="https://ghc.haskell.org/trac/ghc/ticket/10829">Trac
           #10829).</ulink>
         </para>
       </listitem>
@@ -32,7 +32,7 @@
         <para>
           A bug in the simplifier's treatment of phantom type variables in rules
           resulting in a compiler-crash has been fixed. (<ulink
-          href="https://ghc.haskell.org/trac/ghc/ticket/10689">Trac #10689</ulink>).
+          url="https://ghc.haskell.org/trac/ghc/ticket/10689">Trac #10689</ulink>).
         </para>
       </listitem>
 
@@ -40,7 +40,7 @@
         <para>
           A simplifier bug resulting in incorrect results when comparing against
           -0.0 has been fixed (<ulink
-          href="https://ghc.haskell.org/trac/ghc/ticket/9238">Trac #9238</ulink>).
+          url="https://ghc.haskell.org/trac/ghc/ticket/9238">Trac #9238</ulink>).
         </para>
       </listitem>
 
@@ -48,9 +48,9 @@
         <para>
           The compiler is now better able to work around platform limits on
           command-line length on Windows thanks to support for response files
-          (<ulink href="https://ghc.haskell.org/trac/ghc/ticket/10375">Trac
+          (<ulink url="https://ghc.haskell.org/trac/ghc/ticket/10375">Trac
           #10375</ulink>) and an upgrade to the GCC toolchain (<ulink
-          href="https://ghc.haskell.org/trac/ghc/ticket/10726">Trac
+          url="https://ghc.haskell.org/trac/ghc/ticket/10726">Trac
           #10726</ulink>)
         </para>
       </listitem>
@@ -58,7 +58,7 @@
       <listitem>
         <para>
           The linker is now far less verbose when faced with certain warning conditions on Windows.
-          (<ulink href="https://ghc.haskell.org/trac/ghc/ticket/9297">Trac
+          (<ulink url="https://ghc.haskell.org/trac/ghc/ticket/9297">Trac
           #9297</ulink>).
         </para>
       </listitem>
@@ -66,7 +66,7 @@
       <listitem>
         <para>
           Framework flags are now included in the linker command line on Mac OS X
-          (<ulink href="https://ghc.haskell.org/trac/ghc/ticket/10568">Trac
+          (<ulink url="https://ghc.haskell.org/trac/ghc/ticket/10568">Trac
           #10568</ulink>).
         </para>
       </listitem>
@@ -75,7 +75,7 @@
         <para>
           Compiler error messages containing Unicode characters no longer crash
           the compiler on platforms without Unicode support.
-          (<ulink href="https://ghc.haskell.org/trac/ghc/ticket/6037">Trac
+          (<ulink url="https://ghc.haskell.org/trac/ghc/ticket/6037">Trac
           #6037</ulink>).
         </para>
       </listitem>
@@ -84,7 +84,7 @@
         <para>
           ARM support should be substantially more reliable as the compiler now
           takes precautions to avoid linking against Thumb code (<ulink
-          href="https://ghc.haskell.org/trac/ghc/ticket/10375">Trac #10375</ulink>).
+          url="https://ghc.haskell.org/trac/ghc/ticket/10375">Trac #10375</ulink>).
           Unfortunately the fix involved breaking some configurations. See the
           entry in the "Known Bugs" section below.
         </para>
@@ -95,20 +95,20 @@
           A bug in the typechecker's treatment of
           <literal>PartialTypeSignatures</literal> which previously resulted in
           a compile-time crash has been fixed. (<ulink
-          href="https://ghc.haskell.org/trac/ghc/ticket/10438">Trac #10438</ulink>).
+          url="https://ghc.haskell.org/trac/ghc/ticket/10438">Trac #10438</ulink>).
         </para>
       </listitem>
       <listitem>
         <para>
           A typechecker bug leading to the compiler crashing has been resolved
-          (<ulink href="https://ghc.haskell.org/trac/ghc/ticket/10489">Trac
+          (<ulink url="https://ghc.haskell.org/trac/ghc/ticket/10489">Trac
           #10489</ulink>).
         </para>
       </listitem>
 
       <listitem>
         <para>
-          Due to a <ulink href="https://ghc.haskell.org/trac/ghc/ticket/10826">
+          Due to a <ulink url="https://ghc.haskell.org/trac/ghc/ticket/10826">
           security issue
           </ulink>, Safe Haskell now forbids annotations in programs marked as
           <literal>-XSafe</literal>
@@ -119,7 +119,7 @@
         <para>
           The Template Haskell <literal>getQ</literal> and
           <literal>putQ</literal> functions are fixed (having been broken since GHC
-          7.10.1, (<ulink href="https://ghc.haskell.org/trac/ghc/ticket/10596">Trac
+          7.10.1, (<ulink url="https://ghc.haskell.org/trac/ghc/ticket/10596">Trac
           #10596</ulink>).
         </para>
       </listitem>
@@ -157,9 +157,9 @@
       <listitem>
         <para>
           Unfortunately the fix for
-          <ulink href="https://ghc.haskell.org/trac/ghc/ticket/10375">Trac #10375</ulink>
+          <ulink url="https://ghc.haskell.org/trac/ghc/ticket/10375">Trac #10375</ulink>
           required that support for the ARM Thumb instruction set be disabled.
-          See <ulink href="https://ghc.haskell.org/trac/ghc/ticket/11058">Trac
+          See <ulink url="https://ghc.haskell.org/trac/ghc/ticket/11058">Trac
           #11058</ulink> for details.
         </para>
       </listitem>
