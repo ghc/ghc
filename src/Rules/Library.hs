@@ -1,6 +1,7 @@
 module Rules.Library (buildPackageLibrary, cSources, hSources) where
 
 import Expression hiding (splitPath)
+import GHC
 import Oracles
 import Predicates (splitObjects)
 import Rules.Actions
@@ -36,9 +37,12 @@ buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
                 return . map (splitPath -/-)
                        . filter (not . all (== '.')) $ contents
 
+        eObjs <- extraObjects target
+        let objs = cObjs ++ splitObjs ++ eObjs
+
         if "//*-0.*" ?== a
-        then build $ fullTarget target Ar [] [a]
-        else build $ fullTarget target Ar (cObjs ++ splitObjs) [a]
+        then build $ fullTarget target Ar [] [a] -- TODO: scan for dlls
+        else build $ fullTarget target Ar objs [a]
 
         synopsis <- interpretPartial target $ getPkgData Synopsis
         putSuccess $ "/--------\n| Successfully built package library '"
@@ -65,3 +69,10 @@ hSources target = do
     modules <- interpretPartial target $ getPkgDataList Modules
     -- GHC.Prim is special: we do not build it
     return . map (replaceEq '.' '/') . filter (/= "GHC.Prim") $ modules
+
+extraObjects :: PartialTarget -> Action [FilePath]
+extraObjects (PartialTarget _ pkg) = do
+    gmpObjs <- getDirectoryFiles "" [pkgPath pkg -/- "gmp/objs/*.o"]
+    if pkg == integerGmp
+    then return gmpObjs
+    else return []
