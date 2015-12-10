@@ -7,7 +7,6 @@ import Oracles
 import GHC
 import Predicates (package, stagedBuilder, splitObjects, stage0, notStage0)
 import Settings
-import Settings.Builders.GhcCabal
 
 -- TODO: add support for -dyno
 -- TODO: consider adding a new builder for programs (e.g. GhcLink?)
@@ -30,7 +29,7 @@ ghcArgs = stagedBuilder Ghc ? do
             , arg "-fwarn-tabs"
             , buildObj ? splitObjects ? arg "-split-objs"
             , package ghc ? arg "-no-hs-main"
-            , not buildObj ? arg "-no-auto-link-packages"
+            -- , not buildObj ? arg "-no-auto-link-packages"
             , not buildObj ? append [ "-optl-l" ++ lib | lib <- libs    ]
             , not buildObj ? append [ "-optl-L" ++ dir | dir <- libDirs ]
             , buildObj ? arg "-c"

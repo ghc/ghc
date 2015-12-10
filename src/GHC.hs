@@ -1,6 +1,6 @@
 module GHC (
     array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
-    deepseq, directory, filepath, ghc, ghcPrim, haskeline, hoopl, hpc,
+    deepseq, directory, filepath, ghc, ghcCabal, ghcPrim, haskeline, hoopl, hpc,
     integerGmp, integerSimple, parallel, pretty, primitive, process, stm,
     templateHaskell, terminfo, time, transformers, unix, win32, xhtml,
 
@@ -19,13 +19,14 @@ import Stage
 defaultKnownPackages :: [Package]
 defaultKnownPackages =
     [ array, base, binPackageDb, binary, bytestring, cabal, compiler
-    , containers, deepseq, directory, filepath, ghc, ghcPrim, haskeline, hoopl
-    , hpc, integerGmp, integerSimple, parallel, pretty, primitive, process, stm
-    , templateHaskell, terminfo, time, transformers, unix, win32, xhtml ]
+    , containers, deepseq, directory, filepath, ghc, ghcCabal, ghcPrim
+    , haskeline, hoopl, hpc, integerGmp, integerSimple, parallel, pretty
+    , primitive, process, stm, templateHaskell, terminfo, time, transformers
+    , unix, win32, xhtml ]
 
 -- Package definitions
 array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
-    deepseq, directory, filepath, ghc, ghcPrim, haskeline, hoopl, hpc,
+    deepseq, directory, filepath, ghc, ghcCabal, ghcPrim, haskeline, hoopl, hpc,
     integerGmp, integerSimple, parallel, pretty, primitive, process, stm,
     templateHaskell, terminfo, time, transformers, unix, win32, xhtml :: Package
 
@@ -41,6 +42,7 @@ deepseq         = library  "deepseq"
 directory       = library  "directory"
 filepath        = library  "filepath"
 ghc             = topLevel "ghc-bin"        `setPath` "ghc"
+ghcCabal        = utility  "ghc-cabal"
 ghcPrim         = library  "ghc-prim"
 haskeline       = library  "haskeline"
 hoopl           = library  "hoopl"
@@ -60,6 +62,7 @@ unix            = library  "unix"
 win32           = library  "Win32"
 xhtml           = library  "xhtml"
 
+
 -- GHC build results will be placed into target directories with the following
 -- typical structure:
 -- * build/          : contains compiled object code
@@ -75,8 +78,9 @@ defaultTargetDirectory stage pkg
 
 defaultProgramPath :: Stage -> Package -> Maybe FilePath
 defaultProgramPath stage pkg
-    | pkg == ghc = program $ "ghc-stage" ++ show (fromEnum stage + 1)
-    | otherwise  = Nothing
+    | pkg == ghc      = program $ "ghc-stage" ++ show (fromEnum stage + 1)
+    | pkg == ghcCabal = program $ pkgName pkg
+    | otherwise       = Nothing
   where
     program name = Just $ pkgPath pkg -/- defaultTargetDirectory stage pkg
                                       -/- "build/tmp" -/- name <.> exe

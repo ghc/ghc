@@ -25,7 +25,8 @@ packagesStage1 :: Packages
 packagesStage1 = mconcat
     [ packagesStage0
     , append [ array, base, bytestring, containers, deepseq, directory, filepath
-             , ghcPrim, haskeline, integerLibrary, pretty, process, time ]
+             , ghcCabal, ghcPrim, haskeline, integerLibrary, pretty, process
+             , time ]
     , windowsHost      ? append [win32]
     , notM windowsHost ? append [unix]
     , buildHaddock     ? append [xhtml] ]

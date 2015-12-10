@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Package (
-    Package (..), PackageName, pkgCabalFile, setPath, library, topLevel
+    Package (..), PackageName, pkgCabalFile, setPath, topLevel, library, utility
     ) where
 
 import Base
@@ -21,11 +21,14 @@ data Package = Package
 pkgCabalFile :: Package -> FilePath
 pkgCabalFile pkg = pkgPath pkg -/- pkgName pkg <.> "cabal"
 
+topLevel :: PackageName -> Package
+topLevel name = Package name name
+
 library :: PackageName -> Package
 library name = Package name ("libraries" -/- name)
 
-topLevel :: PackageName -> Package
-topLevel name = Package name name
+utility :: PackageName -> Package
+utility name = Package name ("utils" -/- name)
 
 setPath :: Package -> FilePath -> Package
 setPath pkg path = pkg { pkgPath = path }

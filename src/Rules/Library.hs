@@ -71,8 +71,6 @@ hSources target = do
     return . map (replaceEq '.' '/') . filter (/= "GHC.Prim") $ modules
 
 extraObjects :: PartialTarget -> Action [FilePath]
-extraObjects (PartialTarget _ pkg) = do
-    gmpObjs <- getDirectoryFiles "" [pkgPath pkg -/- "gmp/objs/*.o"]
-    if pkg == integerGmp
-    then return gmpObjs
-    else return []
+extraObjects (PartialTarget _ pkg)
+    | pkg == integerGmp = getDirectoryFiles "" [pkgPath pkg -/- "gmp/objs/*.o"]
+    | otherwise         = return []
