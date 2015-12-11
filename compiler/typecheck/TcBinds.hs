@@ -49,7 +49,6 @@ import NameSet
 import NameEnv
 import SrcLoc
 import Bag
-import PatSyn
 import ListSetOps
 import ErrUtils
 import Digraph
@@ -483,13 +482,12 @@ tc_single :: forall thing.
           -> LHsBind Name -> TcM thing
           -> TcM (LHsBinds TcId, thing)
 tc_single _top_lvl sig_fn _prag_fn (L _ (PatSynBind psb@PSB{ psb_id = L _ name })) thing_inside
-  = do { (pat_syn, aux_binds, tcg_env) <- tc_pat_syn_decl
-       ; let tything = AConLike (PatSynCon pat_syn)
-       ; thing <- setGblEnv tcg_env  $ tcExtendGlobalEnv [tything] thing_inside
+  = do { (aux_binds, tcg_env) <- tc_pat_syn_decl
+       ; thing <- setGblEnv tcg_env thing_inside
        ; return (aux_binds, thing)
        }
   where
-    tc_pat_syn_decl :: TcM (PatSyn, LHsBinds TcId, TcGblEnv)
+    tc_pat_syn_decl :: TcM (LHsBinds TcId, TcGblEnv)
     tc_pat_syn_decl = case sig_fn name of
         Nothing                 -> tcInferPatSynDecl psb
         Just (TcPatSynSig tpsi) -> tcCheckPatSynDecl psb tpsi

@@ -61,7 +61,7 @@ import Control.Monad (forM)
 -}
 
 tcInferPatSynDecl :: PatSynBind Name Name
-                  -> TcM (PatSyn, LHsBinds Id, TcGblEnv)
+                  -> TcM (LHsBinds Id, TcGblEnv)
 tcInferPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
                        psb_def = lpat, psb_dir = dir }
   = setSrcSpan loc $
@@ -96,7 +96,7 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
 
 tcCheckPatSynDecl :: PatSynBind Name Name
                   -> TcPatSynInfo
-                  -> TcM (PatSyn, LHsBinds Id, TcGblEnv)
+                  -> TcM (LHsBinds Id, TcGblEnv)
 tcCheckPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
                        psb_def = lpat, psb_dir = dir }
                   TPSI{ patsig_tau = tau,
@@ -163,7 +163,7 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
                           (univ_tvs, req_theta, req_ev_binds, req_dicts)
                           (ex_tvs, ex_tys, prov_theta, prov_ev_binds, prov_dicts)
                           wrapped_args
-                          pat_ty rec_fields  }
+                          pat_ty rec_fields }
   where
     (arg_tys, pat_ty) = tcSplitFunTys tau
 
@@ -199,7 +199,7 @@ tc_patsyn_finish :: Located Name  -- ^ PatSyn Name
                  -> TcType              -- ^ Pattern type
                  -> [Name]              -- ^ Selector names
                  -- ^ Whether fields, empty if not record PatSyn
-                 -> TcM (PatSyn, LHsBinds Id, TcGblEnv)
+                 -> TcM (LHsBinds Id, TcGblEnv)
 tc_patsyn_finish lname dir is_infix lpat'
                  (univ_tvs, req_theta, req_ev_binds, req_dicts)
                  (ex_tvs, subst, prov_theta, prov_ev_binds, prov_dicts)
@@ -262,7 +262,7 @@ tc_patsyn_finish lname dir is_infix lpat'
             tcRecSelBinds
               (ValBindsOut (zip (repeat NonRecursive) selector_binds) sigs)
 
-       ; return (patSyn, matcher_bind, tcg_env) }
+       ; return (matcher_bind, tcg_env) }
 
   where
     zonk_wrapped_arg :: (Var, HsWrapper) -> TcM (Var, HsWrapper)
