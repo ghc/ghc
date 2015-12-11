@@ -1223,8 +1223,9 @@ exports_from_avail Nothing rdr_env _imports _this_mod
   where
     -- #11164: when we define a data instance
     -- but not data family, re-export the family
-    -- Generally, whenever we export a part of a declaration,
-    -- export the declaration, too.
+    -- Even though we don't check whether this is actually a data family
+    -- only data families can locally define subordinate things (`ns` here)
+    -- without locally defining (and instead importing) the parent (`n`)
     fix_faminst (AvailTC n ns flds)
       | not (n `elem` ns)
       = AvailTC n (n:ns) flds

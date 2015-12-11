@@ -6666,6 +6666,11 @@ adjustment for type families:
    associated types ``Tj``. The types need a keyword "``type``" to
    distinguish them from data constructors.
 
+-  Whenever there is no export list and a data instance is defined, the
+   corresponding data family type constructor is exported along with
+   the new data constructors, regardless of whether the data family
+   is defined locally or in another module.
+
 .. _data-family-impexp-examples:
 
 Examples
