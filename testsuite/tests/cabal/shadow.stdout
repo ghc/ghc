@@ -1,17 +1,17 @@
 databases 1 and 2:
-localshadow1.package.conf:
+localshadow1.package.conf
     (shadow-1)
     (shadowdep-1)
 
-localshadow2.package.conf:
+localshadow2.package.conf
     (shadow-1)
 
 databases 1 and 3:
-localshadow1.package.conf:
+localshadow1.package.conf
     (shadow-1)
     (shadowdep-1)
 
-localshadow3.package.conf:
+localshadow3.package.conf
     (shadow-1)
 
 should FAIL:

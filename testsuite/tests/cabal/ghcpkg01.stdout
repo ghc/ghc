@@ -1,4 +1,4 @@
-local01.package.conf:
+local01.package.conf
     (no packages)
 Reading package info from "test.pkg" ... done.
 name: testpkg
@@ -55,7 +55,7 @@ pkgroot:
 
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 Reading package info from "test2.pkg" ... done.
-local01.package.conf:
+local01.package.conf
     testpkg-1.2.3.4
     (testpkg-2.0)
 
@@ -170,6 +170,6 @@ hs-libraries: testpkg-1.2.3.4-XXX
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 pkgroot: 
 
-local01.package.conf:
+local01.package.conf
     (no packages)
 Reading package info from "test3.pkg" ... done.

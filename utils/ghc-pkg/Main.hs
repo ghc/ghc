@@ -1241,7 +1241,7 @@ listPackages verbosity my_flags mPackageName mModuleName = do
       broken = map installedComponentId (brokenPackages pkg_map)
 
       show_normal PackageDB{ location = db_name, packages = pkg_confs } =
-          do hPutStrLn stdout (db_name ++ ":")
+          do hPutStrLn stdout db_name
              if null pkg_confs
                  then hPutStrLn stdout "    (no packages)"
                  else hPutStrLn stdout $ unlines (map ("    " ++) (map pp_pkg pkg_confs))
@@ -1273,8 +1273,8 @@ listPackages verbosity my_flags mPackageName mModuleName = do
            then termText (location db) <#> termText "\n    (no packages)\n"
            else
                mconcat $ map (<#> termText "\n") $
-                           (termText (location db) :
-                                     map (termText "   " <#>) (map pp_pkg pkg_confs))
+                           (termText (location db)
+                            : map (termText "    " <#>) (map pp_pkg pkg_confs))
           where
                    pp_pkg p
                      | installedComponentId p `elem` broken = withF Red  doc
