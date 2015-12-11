@@ -62,3 +62,6 @@ test('T10294a',
       clean_cmd('$MAKE -s --no-print-directory -C annotation-plugin clean.T10294a')],
      run_command,
      ['$MAKE -s --no-print-directory T10294a'])
+
+test('frontend01', [ extra_clean(['FrontendPlugin.hi', 'FrontendPlugin.o', 'frontend01', 'frontend01.o', 'frontend01.hi']) ],
+     run_command, ['$MAKE -s --no-print-directory frontend01'])

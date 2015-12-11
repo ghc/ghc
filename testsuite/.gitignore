@@ -1237,6 +1237,7 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /tests/plugins/T10420
 /tests/plugins/annotation-plugin/pkg.T10294/
 /tests/plugins/annotation-plugin/pkg.T10294a/
+/tests/plugins/frontend01
 /tests/plugins/plugins01
 /tests/plugins/plugins05
 /tests/plugins/plugins06

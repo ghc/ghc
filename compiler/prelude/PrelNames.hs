@@ -345,6 +345,7 @@ basicKnownKeyNames
 
         -- Plugins
         , pluginTyConName
+        , frontendPluginTyConName
 
         -- Generics
         , genClassName, gen1ClassName
@@ -1347,6 +1348,8 @@ pLUGINS :: Module
 pLUGINS = mkThisGhcModule (fsLit "Plugins")
 pluginTyConName :: Name
 pluginTyConName = tcQual pLUGINS (fsLit "Plugin") pluginTyConKey
+frontendPluginTyConName :: Name
+frontendPluginTyConName = tcQual pLUGINS (fsLit "FrontendPlugin") frontendPluginTyConKey
 
 -- Static pointers
 staticPtrInfoTyConName :: Name
@@ -1606,8 +1609,9 @@ constraintKindTyConKey                  = mkPreludeTyConUnique 92
 starKindTyConKey                        = mkPreludeTyConUnique 93
 unicodeStarKindTyConKey                 = mkPreludeTyConUnique 94
 
-pluginTyConKey :: Unique
+pluginTyConKey, frontendPluginTyConKey :: Unique
 pluginTyConKey                          = mkPreludeTyConUnique 102
+frontendPluginTyConKey                  = mkPreludeTyConUnique 103
 
 unknownTyConKey, unknown1TyConKey, unknown2TyConKey, unknown3TyConKey,
     opaqueTyConKey :: Unique

@@ -5,6 +5,7 @@ module DynamicLoading (
 #ifdef GHCI
         -- * Loading plugins
         loadPlugins,
+        loadFrontendPlugin,
 
         -- * Force loading information
         forceLoadModuleInterfaces,
@@ -30,11 +31,11 @@ import LoadIface        ( loadPluginInterface )
 import RdrName          ( RdrName, ImportSpec(..), ImpDeclSpec(..)
                         , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName
                         , gre_name, mkRdrQual )
-import OccName          ( mkVarOcc )
+import OccName          ( OccName, mkVarOcc )
 import RnNames          ( gresFromAvails )
 import DynFlags
-import Plugins          ( Plugin, CommandLineOption )
-import PrelNames        ( pluginTyConName )
+import Plugins          ( Plugin, FrontendPlugin, CommandLineOption )
+import PrelNames        ( pluginTyConName, frontendPluginTyConName )
 
 import HscTypes
 import BasicTypes       ( HValue )
@@ -68,8 +69,14 @@ loadPlugins hsc_env
                             , opt_mod_nm == mod_nm ]
 
 loadPlugin :: HscEnv -> ModuleName -> IO Plugin
-loadPlugin hsc_env mod_name
-  = do { let plugin_rdr_name = mkRdrQual mod_name (mkVarOcc "plugin")
+loadPlugin = loadPlugin' (mkVarOcc "plugin") pluginTyConName
+
+loadFrontendPlugin :: HscEnv -> ModuleName -> IO FrontendPlugin
+loadFrontendPlugin = loadPlugin' (mkVarOcc "frontendPlugin") frontendPluginTyConName
+
+loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO a
+loadPlugin' occ_name plugin_name hsc_env mod_name
+  = do { let plugin_rdr_name = mkRdrQual mod_name occ_name
              dflags = hsc_dflags hsc_env
        ; mb_name <- lookupRdrNameInModuleForPlugins hsc_env mod_name
                         plugin_rdr_name
@@ -81,7 +88,7 @@ loadPlugin hsc_env mod_name
                           , ppr plugin_rdr_name ]) ;
             Just name ->
 
-     do { plugin_tycon <- forceLoadTyCon hsc_env pluginTyConName
+     do { plugin_tycon <- forceLoadTyCon hsc_env plugin_name
         ; mb_plugin <- getValueSafely hsc_env name (mkTyConTy plugin_tycon)
         ; case mb_plugin of
             Nothing ->

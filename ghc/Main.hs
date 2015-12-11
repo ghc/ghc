@@ -28,6 +28,13 @@ import DriverMkDepend   ( doMkDependHS )
 import InteractiveUI    ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
 
+-- Frontend plugins
+#ifdef GHCI
+import DynamicLoading
+import Plugins
+#endif
+import Module           ( ModuleName )
+
 
 -- Various other random stuff that we need
 import Config
@@ -253,6 +260,7 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoEval exprs           -> ghciUI srcs $ Just $ reverse exprs
        DoAbiHash              -> abiHash (map fst srcs)
        ShowPackages           -> liftIO $ showPackages dflags6
+       DoFrontend f           -> doFrontend f srcs
 
   liftIO $ dumpFinalStats dflags6
 
@@ -457,6 +465,7 @@ data PostLoadMode
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
   | DoAbiHash               -- ghc --abi-hash
   | ShowPackages            -- ghc --show-packages
+  | DoFrontend ModuleName   -- ghc --frontend Plugin.Module
 
 doMkDependHSMode, doMakeMode, doInteractiveMode,
   doAbiHashMode, showPackagesMode :: Mode
@@ -474,6 +483,9 @@ stopBeforeMode phase = mkPostLoadMode (StopBefore phase)
 
 doEvalMode :: String -> Mode
 doEvalMode str = mkPostLoadMode (DoEval [str])
+
+doFrontendMode :: String -> Mode
+doFrontendMode str = mkPostLoadMode (DoFrontend (mkModuleName str))
 
 mkPostLoadMode :: PostLoadMode -> Mode
 mkPostLoadMode = Right . Right
@@ -607,6 +619,7 @@ mode_flags =
   , defFlag "-interactive" (PassFlag (setMode doInteractiveMode))
   , defFlag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
   , defFlag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
+  , defFlag "-frontend"    (SepArg   (\s -> setMode (doFrontendMode s) "-frontend"))
   ]
 
 setMode :: Mode -> String -> EwM ModeM ()
@@ -828,6 +841,20 @@ showPackages, dumpPackages, dumpPackagesSimple :: DynFlags -> IO ()
 showPackages       dflags = putStrLn (showSDoc dflags (pprPackages dflags))
 dumpPackages       dflags = putMsg dflags (pprPackages dflags)
 dumpPackagesSimple dflags = putMsg dflags (pprPackagesSimple dflags)
+
+-- -----------------------------------------------------------------------------
+-- Frontend plugin support
+
+doFrontend :: ModuleName -> [(String, Maybe Phase)] -> Ghc ()
+#ifndef GHCI
+doFrontend _ _ =
+    throwGhcException (CmdLineError "not built for interactive use")
+#else
+doFrontend modname srcs = do
+    hsc_env <- getSession
+    frontend_plugin <- liftIO $ loadFrontendPlugin hsc_env modname
+    frontend frontend_plugin (frontendPluginOpts (hsc_dflags hsc_env)) srcs
+#endif
 
 -- -----------------------------------------------------------------------------
 -- ABI hash support

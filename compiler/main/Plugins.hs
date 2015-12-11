@@ -1,10 +1,13 @@
 module Plugins (
+    FrontendPlugin(..), defaultFrontendPlugin,
     Plugin(..), CommandLineOption,
     defaultPlugin
     ) where
 
 import CoreMonad ( CoreToDo, CoreM )
 import TcRnTypes ( TcPlugin )
+import GhcMonad
+import DriverPhases
 
 
 -- | Command line options gathered from the -PModule.Name:stuff syntax
@@ -36,3 +39,10 @@ defaultPlugin = Plugin {
         installCoreToDos = const return
       , tcPlugin         = const Nothing
     }
+
+type FrontendPluginAction = [String] -> [(String, Maybe Phase)] -> Ghc ()
+data FrontendPlugin = FrontendPlugin {
+      frontend :: FrontendPluginAction
+    }
+defaultFrontendPlugin :: FrontendPlugin
+defaultFrontendPlugin = FrontendPlugin { frontend = \_ _ -> return () }

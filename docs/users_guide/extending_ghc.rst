@@ -533,3 +533,53 @@ typechecking, and can be checked by ``-dcore-lint``. It is possible for
 the plugin to create equality axioms for use in evidence terms, but GHC
 does not check their consistency, and inconsistent axiom sets may lead
 to segfaults or other runtime misbehaviour.
+
+.. _frontend_plugins:
+
+Frontend plugins
+~~~~~~~~~~~~~~~~
+
+A frontend plugin allows you to add new major modes to GHC.  You may prefer
+this over a traditional program which calls the GHC API, as GHC manages a lot
+of parsing flags and administrative nonsense which can be difficult to
+manage manually.  To load a frontend plugin exported by ``Foo.FrontendPlugin``,
+we just invoke GHC as follows:
+
+::
+
+    $ ghc --frontend Foo.FrontendPlugin ...other options...
+
+Frontend plugins, like compiler plugins, are exported by registered plugins.
+However, unlike compiler modules, frontend plugins are modules that export
+at least a single identifier ``frontendPlugin`` of type
+``GhcPlugins.FrontendPlugin``.
+
+``FrontendPlugin`` exports a field ``frontend``, which is a function
+``[String] -> [(String, Maybe Phase)] -> Ghc ()``.  The first argument
+is a list of extra flags passed to the frontend with ``-ffrontend-opt``;
+the second argument is the list of arguments, usually source files
+and module names to be compiled (the ``Phase`` indicates if an ``-x``
+flag was set), and a frontend simply executes some operation in the
+``Ghc`` monad (which, among other things, has a ``Session``).
+
+As a quick example, here is a frontend plugin that prints the arguments that
+were passed to it, and then exits.
+
+::
+
+    module DoNothing.FrontendPlugin (frontendPlugin) where
+    import GhcPlugins
+
+    frontendPlugin :: FrontendPlugin
+    frontendPlugin = defaultFrontendPlugin {
+      frontend = doNothing
+      }
+
+    doNothing :: [String] -> [(String, Maybe Phase)] -> Ghc ()
+    doNothing flags args = do
+        liftIO $ print flags
+        liftIO $ print args
+
+Provided you have compiled this plugin and registered it in a package,
+you can just use it by specifying ``--frontend DoNothing.FrontendPlugin``
+on the command line to GHC.
