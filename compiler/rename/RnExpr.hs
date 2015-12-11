@@ -150,9 +150,10 @@ rnExpr (OpApp e1 op  _ e2)
         -- more, so I've removed the test.  Adding HsPars in TcGenDeriv
         -- should prevent bad things happening.
         ; fixity <- case op' of
-                     L _ (HsVar (L _ n)) -> lookupFixityRn n
-                     _                   -> return (Fixity minPrecedence InfixL)
-                                       -- c.f. lookupFixity for unbound
+                      L _ (HsVar (L _ n)) -> lookupFixityRn n
+                      L _ (HsRecFld f)    -> lookupFieldFixityRn f
+                      _ -> return (Fixity minPrecedence InfixL)
+                           -- c.f. lookupFixity for unbound
 
         ; final_e <- mkOpAppRn e1' op' fixity e2'
         ; return (final_e, fv_e1 `plusFV` fv_op `plusFV` fv_e2) }

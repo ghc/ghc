@@ -379,6 +379,15 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
                op' fix
                (mkLHsWrapCo co_a arg2') }
 
+  | (L loc (HsRecFld (Ambiguous lbl _))) <- op
+  , Just sig_ty <- obviousSig (unLoc arg1)
+    -- See Note [Disambiguating record fields]
+  = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
+       ; sel_name <- disambiguateSelector lbl sig_tc_ty
+       ; let op' = L loc (HsRecFld (Unambiguous lbl sel_name))
+       ; tcExpr (OpApp arg1 op' fix arg2) res_ty
+       }
+
   | otherwise
   = do { traceTc "Non Application rule" (ppr op)
        ; (op', op_ty) <- tcInferFun op
@@ -1739,11 +1748,14 @@ disambiguateRecordBinds record_expr record_tau rbnds res_ty
 
 -- Extract the outermost TyCon of a type, if there is one; for
 -- data families this is the representation tycon (because that's
--- where the fields live).
+-- where the fields live).  Look inside sigma-types, so that
+--   tyConOf _ (forall a. Q => T a) = T
 tyConOf :: FamInstEnvs -> Type -> Maybe TyCon
-tyConOf fam_inst_envs ty = case tcSplitTyConApp_maybe ty of
+tyConOf fam_inst_envs ty0 = case tcSplitTyConApp_maybe ty of
   Just (tc, tys) -> Just (fstOf3 (tcLookupDataFamInst fam_inst_envs tc tys))
   Nothing        -> Nothing
+  where
+    (_, _, ty) = tcSplitSigmaTy ty0
 
 -- For an ambiguous record field, find all the candidate record
 -- selectors (as GlobalRdrElts) and their parents.

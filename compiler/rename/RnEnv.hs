@@ -21,7 +21,7 @@ module RnEnv (
         HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn,
         lookupSigCtxtOccRn,
 
-        lookupFixityRn, lookupTyFixityRn,
+        lookupFixityRn, lookupFieldFixityRn, lookupTyFixityRn,
         lookupInstDeclBndr, lookupRecFieldOcc, lookupFamInstName,
         lookupConstructorFields,
         lookupSyntaxName, lookupSyntaxNames, lookupIfThenElse,
@@ -1043,10 +1043,10 @@ warnIfDeprecated gre@(GRE { gre_name = name, gre_imp = iss })
 
 lookupImpDeprec :: ModIface -> GlobalRdrElt -> Maybe WarningTxt
 lookupImpDeprec iface gre
-  = mi_warn_fn iface (gre_name gre) `mplus`  -- Bleat if the thing,
+  = mi_warn_fn iface (greOccName gre) `mplus`  -- Bleat if the thing,
     case gre_par gre of                      -- or its parent, is warn'd
-       ParentIs  p              -> mi_warn_fn iface p
-       FldParent { par_is = p } -> mi_warn_fn iface p
+       ParentIs  p              -> mi_warn_fn iface (nameOccName p)
+       FldParent { par_is = p } -> mi_warn_fn iface (nameOccName p)
        NoParent                 -> Nothing
        PatternSynonym           -> Nothing
 
@@ -1259,7 +1259,7 @@ lookupBindGroupOcc ctxt what rdr_name
 
 
 ---------------
-lookupLocalTcNames :: HsSigCtxt -> SDoc -> RdrName -> RnM [Name]
+lookupLocalTcNames :: HsSigCtxt -> SDoc -> RdrName -> RnM [(RdrName, Name)]
 -- GHC extension: look up both the tycon and data con or variable.
 -- Used for top-level fixity signatures and deprecations.
 -- Complain if neither is in scope.
@@ -1270,7 +1270,8 @@ lookupLocalTcNames ctxt what rdr_name
        ; when (null names) $ addErr (head errs) -- Bleat about one only
        ; return names }
   where
-    lookup = lookupBindGroupOcc ctxt what
+    lookup rdr = do { name <- lookupBindGroupOcc ctxt what rdr
+                    ; return (fmap ((,) rdr) name) }
 
 dataTcOccs :: RdrName -> [RdrName]
 -- Return both the given name and the same name promoted to the TcClsName
@@ -1373,7 +1374,10 @@ lookupFixity is a bit strange.
 -}
 
 lookupFixityRn :: Name -> RnM Fixity
-lookupFixityRn name
+lookupFixityRn name = lookupFixityRn' name (nameOccName name)
+
+lookupFixityRn' :: Name -> OccName -> RnM Fixity
+lookupFixityRn' name occ
   | isUnboundName name
   = return (Fixity minPrecedence InfixL)
     -- Minimise errors from ubound names; eg
@@ -1412,14 +1416,51 @@ lookupFixityRn name
       -- and that's what we want.
       = do { iface <- loadInterfaceForName doc name
            ; traceRn (text "lookupFixityRn: looking up name in iface cache and found:" <+>
-                      vcat [ppr name, ppr $ mi_fix_fn iface (nameOccName name)])
-           ; return (mi_fix_fn iface (nameOccName name)) }
+                      vcat [ppr name, ppr $ mi_fix_fn iface occ])
+           ; return (mi_fix_fn iface occ) }
 
     doc = ptext (sLit "Checking fixity for") <+> ppr name
 
 ---------------
 lookupTyFixityRn :: Located Name -> RnM Fixity
 lookupTyFixityRn (L _ n) = lookupFixityRn n
+
+-- | Look up the fixity of a (possibly ambiguous) occurrence of a record field
+-- selector.  We use 'lookupFixityRn'' so that we can specifiy the 'OccName' as
+-- the field label, which might be different to the 'OccName' of the selector
+-- 'Name' if @DuplicateRecordFields@ is in use (Trac #1173). If there are
+-- multiple possible selectors with different fixities, generate an error.
+lookupFieldFixityRn :: AmbiguousFieldOcc Name -> RnM Fixity
+lookupFieldFixityRn (Unambiguous rdr n) = lookupFixityRn' n (rdrNameOcc rdr)
+lookupFieldFixityRn (Ambiguous   rdr _) = get_ambiguous_fixity rdr
+  where
+    get_ambiguous_fixity :: RdrName -> RnM Fixity
+    get_ambiguous_fixity rdr_name = do
+      traceRn $ text "get_ambiguous_fixity" <+> ppr rdr_name
+      rdr_env <- getGlobalRdrEnv
+      let elts =  lookupGRE_RdrName rdr_name rdr_env
+
+      fixities <- groupBy ((==) `on` snd) . zip elts
+                  <$> mapM lookup_gre_fixity elts
+
+      case fixities of
+        -- There should always be at least one fixity.
+        -- Something's very wrong if there are no fixity candidates, so panic
+        [] -> panic "get_ambiguous_fixity: no candidates for a given RdrName"
+        [ (_, fix):_ ] -> return fix
+        ambigs -> addErr (ambiguous_fixity_err rdr_name ambigs)
+                  >> return (Fixity minPrecedence InfixL)
+
+    lookup_gre_fixity gre = lookupFixityRn' (gre_name gre) (greOccName gre)
+
+    ambiguous_fixity_err rn ambigs
+      = vcat [ text "Ambiguous fixity for record field" <+> quotes (ppr rn)
+             , hang (text "Conflicts: ") 2 . vcat .
+               map format_ambig $ concat ambigs ]
+
+    format_ambig (elt, fix) = hang (ppr fix)
+                                 2 (pprNameProvenance elt)
+
 
 {-
 ************************************************************************

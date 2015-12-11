@@ -723,6 +723,10 @@ deriving instance ( Data name
 instance Outputable (AmbiguousFieldOcc name) where
   ppr = ppr . rdrNameAmbiguousFieldOcc
 
+instance OutputableBndr (AmbiguousFieldOcc name) where
+  pprInfixOcc  = pprInfixOcc . rdrNameAmbiguousFieldOcc
+  pprPrefixOcc = pprPrefixOcc . rdrNameAmbiguousFieldOcc
+
 mkAmbiguousFieldOcc :: RdrName -> AmbiguousFieldOcc RdrName
 mkAmbiguousFieldOcc rdr = Unambiguous rdr PlaceHolder
 

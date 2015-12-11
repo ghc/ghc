@@ -807,8 +807,10 @@ data ModIface
                 -- Cached environments for easy lookup
                 -- These are computed (lazily) from other fields
                 -- and are not put into the interface file
-        mi_warn_fn   :: Name -> Maybe WarningTxt,        -- ^ Cached lookup for 'mi_warns'
-        mi_fix_fn    :: OccName -> Fixity,               -- ^ Cached lookup for 'mi_fixities'
+        mi_warn_fn   :: OccName -> Maybe WarningTxt,
+                -- ^ Cached lookup for 'mi_warns'
+        mi_fix_fn    :: OccName -> Fixity,
+                -- ^ Cached lookup for 'mi_fixities'
         mi_hash_fn   :: OccName -> Maybe (OccName, Fingerprint),
                 -- ^ Cached lookup for 'mi_decls'.
                 -- The @Nothing@ in 'mi_hash_fn' means that the thing
@@ -2008,12 +2010,12 @@ instance Binary Warnings where
                       return (WarnSome aa)
 
 -- | Constructs the cache for the 'mi_warn_fn' field of a 'ModIface'
-mkIfaceWarnCache :: Warnings -> Name -> Maybe WarningTxt
+mkIfaceWarnCache :: Warnings -> OccName -> Maybe WarningTxt
 mkIfaceWarnCache NoWarnings  = \_ -> Nothing
 mkIfaceWarnCache (WarnAll t) = \_ -> Just t
-mkIfaceWarnCache (WarnSome pairs) = lookupOccEnv (mkOccEnv pairs) . nameOccName
+mkIfaceWarnCache (WarnSome pairs) = lookupOccEnv (mkOccEnv pairs)
 
-emptyIfaceWarnCache :: Name -> Maybe WarningTxt
+emptyIfaceWarnCache :: OccName -> Maybe WarningTxt
 emptyIfaceWarnCache _ = Nothing
 
 plusWarns :: Warnings -> Warnings -> Warnings

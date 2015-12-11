@@ -287,7 +287,7 @@ rnSrcFixityDecls bndr_set fix_decls
       = setSrcSpan name_loc $
                     -- this lookup will fail if the definition isn't local
         do names <- lookupLocalTcNames sig_ctxt what rdr_name
-           return [ L name_loc name | name <- names ]
+           return [ L name_loc name | (_, name) <- names ]
     what = ptext (sLit "fixity signature")
 
 {-
@@ -325,7 +325,7 @@ rnSrcWarnDecls bndr_set decls'
        -- ensures that the names are defined locally
      = do { names <- concatMapM (lookupLocalTcNames sig_ctxt what . unLoc)
                                 rdr_names
-          ; return [(nameOccName name, txt) | name <- names] }
+          ; return [(rdrNameOcc rdr, txt) | (rdr, _) <- names] }
 
    what = ptext (sLit "deprecation")
 

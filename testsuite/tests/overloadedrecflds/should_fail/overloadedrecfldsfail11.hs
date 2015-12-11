@@ -1,5 +1,5 @@
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# OPTIONS_GHC -Werror #-}
+import OverloadedRecFldsFail11_A
 
-{-# WARNING foo "No warnings for DRFs" #-}
-data S = MkS { foo :: Bool }
-data T = MkT { foo :: Int }
+main = print (foo (MkS True :: S))

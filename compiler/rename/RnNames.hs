@@ -477,7 +477,7 @@ extendGlobalRdrEnvRn avails new_fixities
 
         ; rdr_env2 <- foldlM add_gre rdr_env1 new_gres
 
-        ; let fix_env' = foldl extend_fix_env fix_env new_names
+        ; let fix_env' = foldl extend_fix_env fix_env new_gres
               gbl_env' = gbl_env { tcg_rdr_env = rdr_env2, tcg_fix_env = fix_env' }
 
         ; traceRn (text "extendGlobalRdrEnvRn 2" <+> (pprGlobalRdrEnv True rdr_env2))
@@ -487,13 +487,14 @@ extendGlobalRdrEnvRn avails new_fixities
     new_occs  = map nameOccName new_names
 
     -- If there is a fixity decl for the gre, add it to the fixity env
-    extend_fix_env fix_env name
+    extend_fix_env fix_env gre
       | Just (L _ fi) <- lookupFsEnv new_fixities (occNameFS occ)
       = extendNameEnv fix_env name (FixItem occ fi)
       | otherwise
       = fix_env
       where
-        occ  = nameOccName name
+        name = gre_name gre
+        occ  = greOccName gre
 
     new_gres :: [GlobalRdrElt]  -- New LocalDef GREs, derived from avails
     new_gres = concatMap localGREsFromAvail avails
@@ -564,8 +565,8 @@ getLocalNonValBinders fixity_env
         ; val_avails <- mapM new_simple val_bndrs
 
         ; let avails    = concat nti_availss ++ val_avails
-              new_bndrs = availsToNameSet avails `unionNameSet`
-                          availsToNameSet tc_avails
+              new_bndrs = availsToNameSetWithSelectors avails `unionNameSet`
+                          availsToNameSetWithSelectors tc_avails
               flds      = concat nti_fldss ++ concat tc_fldss
         ; traceRn (text "getLocalNonValBinders 2" <+> ppr avails)
         ; (tcg_env, tcl_env) <- extendGlobalRdrEnvRn avails fixity_env
