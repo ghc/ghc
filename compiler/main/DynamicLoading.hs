@@ -38,8 +38,7 @@ import PrelNames        ( pluginTyConName )
 
 import HscTypes
 import BasicTypes       ( HValue )
-import TypeRep          ( mkTyConTy, pprTyThingCategory )
-import Type             ( Type, eqType )
+import Type             ( Type, eqType, mkTyConTy, pprTyThingCategory )
 import TyCon            ( TyCon )
 import Name             ( Name, nameModule_maybe )
 import Id               ( idType )
@@ -99,7 +98,7 @@ forceLoadModuleInterfaces :: HscEnv -> SDoc -> [Module] -> IO ()
 forceLoadModuleInterfaces hsc_env doc modules
     = (initTcInteractive hsc_env $
        initIfaceTcRn $
-       mapM_ (loadPluginInterface doc) modules) 
+       mapM_ (loadPluginInterface doc) modules)
       >> return ()
 
 -- | Force the interface for the module containing the name to be loaded. The 'SDoc' parameter is used
@@ -117,7 +116,7 @@ forceLoadNameModuleInterface hsc_env reason name = do
 forceLoadTyCon :: HscEnv -> Name -> IO TyCon
 forceLoadTyCon hsc_env con_name = do
     forceLoadNameModuleInterface hsc_env (ptext (sLit "contains a name used in an invocation of loadTyConTy")) con_name
-    
+
     mb_con_thing <- lookupTypeHscEnv hsc_env con_name
     case mb_con_thing of
         Nothing -> throwCmdLineErrorS dflags $ missingTyThingError con_name

@@ -3,7 +3,7 @@
 
 module TcShouldTerminate where
 
-import GHC.Prim (Constraint)
+import Data.Kind (Constraint)
 
 class C (p :: Constraint)
 class D (p :: Constraint)

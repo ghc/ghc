@@ -6,13 +6,13 @@ T10403.hs:15:7: warning:
 
 T10403.hs:15:12: warning:
     • Found type wildcard ‘_’ standing for ‘(a -> b) -> f a -> H f’
-      Where: ‘b’ is a rigid type variable bound by
+      Where: ‘f’ is a rigid type variable bound by
+               the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
+               at T10403.hs:17:1
+             ‘b’ is a rigid type variable bound by
                the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
                at T10403.hs:17:1
              ‘a’ is a rigid type variable bound by
-               the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
-               at T10403.hs:17:1
-             ‘f’ is a rigid type variable bound by
                the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
                at T10403.hs:17:1
     • In the type signature:
@@ -22,13 +22,13 @@ T10403.hs:15:12: warning:
 
 T10403.hs:19:7: warning:
     • Found type wildcard ‘_’ standing for ‘(a -> b) -> f0 a -> H f0’
-      Where: ‘b’ is a rigid type variable bound by
+      Where: ‘f0’ is an ambiguous type variable
+             ‘b’ is a rigid type variable bound by
                the inferred type of h2 :: (a -> b) -> f0 a -> H f0
                at T10403.hs:22:1
              ‘a’ is a rigid type variable bound by
                the inferred type of h2 :: (a -> b) -> f0 a -> H f0
                at T10403.hs:22:1
-             ‘f0’ is an ambiguous type variable
     • In the type signature:
         h2 :: _
     • Relevant bindings include
@@ -59,7 +59,7 @@ T10403.hs:28:8: warning:
           app2 :: H (B t)
         at T10403.hs:27:1-15
       Expected type: H (B t)
-        Actual type: H f0
+      Actual type: H f0
     • In the expression: h2 (H . I) (B ())
       In an equation for ‘app2’: app2 = h2 (H . I) (B ())
     • Relevant bindings include
@@ -73,7 +73,7 @@ T10403.hs:28:20: warning:
           app2 :: H (B t)
         at T10403.hs:27:1-15
       Expected type: f0 ()
-        Actual type: B t ()
+      Actual type: B t ()
     • In the second argument of ‘h2’, namely ‘(B ())’
       In the expression: h2 (H . I) (B ())
     • Relevant bindings include

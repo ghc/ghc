@@ -16,7 +16,7 @@ werror.hs:10:1: Warning: Defined but not used: ‘f’
 
 werror.hs:10:1: Warning:
     Top-level binding with no type signature:
-      f :: forall t t1. [t] -> [t1]
+      f :: forall r r1. [r] -> [r1]
 
 werror.hs:10:1: Warning:
     Pattern match(es) are redundant

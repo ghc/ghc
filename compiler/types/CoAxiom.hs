@@ -18,7 +18,8 @@ module CoAxiom (
        coAxiomName, coAxiomArity, coAxiomBranches,
        coAxiomTyCon, isImplicitCoAxiom, coAxiomNumPats,
        coAxiomNthBranch, coAxiomSingleBranch_maybe, coAxiomRole,
-       coAxiomSingleBranch, coAxBranchTyVars, coAxBranchRoles,
+       coAxiomSingleBranch, coAxBranchTyVars, coAxBranchCoVars,
+       coAxBranchRoles,
        coAxBranchLHS, coAxBranchRHS, coAxBranchSpan, coAxBranchIncomps,
        placeHolderIncomps,
 
@@ -28,7 +29,7 @@ module CoAxiom (
        BuiltInSynFamily(..), trivialBuiltInFamily
        ) where
 
-import {-# SOURCE #-} TypeRep ( Type )
+import {-# SOURCE #-} TyCoRep ( Type )
 import {-# SOURCE #-} TyCon ( TyCon )
 import Outputable
 import FastString
@@ -64,9 +65,9 @@ type family F a where
 
 This will give rise to this axiom:
 
-axF :: {                                           F [Int] ~ Bool
-       ; forall (a :: *).                          F [a]   ~ Double
-       ; forall (k :: BOX) (a :: k -> *) (b :: k). F (a b) ~ Char
+axF :: {                                         F [Int] ~ Bool
+       ; forall (a :: *).                        F [a]   ~ Double
+       ; forall (k :: *) (a :: k -> *) (b :: k). F (a b) ~ Char
        }
 
 The axiom is used with the AxiomInstCo constructor of Coercion. If we wish
@@ -222,6 +223,10 @@ data CoAxBranch
                                     -- See Note [CoAxiom locations]
     , cab_tvs      :: [TyVar]       -- Bound type variables; not necessarily fresh
                                     -- See Note [CoAxBranch type variables]
+    , cab_cvs      :: [CoVar]       -- Bound coercion variables
+                                    -- Always empty, for now.
+                                    -- See Note [Constraints in patterns]
+                                    -- in TcTyClsDecls
     , cab_roles    :: [Role]        -- See Note [CoAxBranch roles]
     , cab_lhs      :: [Type]        -- Type patterns to match against
     , cab_rhs      :: Type          -- Right-hand side of the equality
@@ -247,7 +252,9 @@ coAxiomNthBranch (CoAxiom { co_ax_branches = bs }) index
 
 coAxiomArity :: CoAxiom br -> BranchIndex -> Arity
 coAxiomArity ax index
-  = length $ cab_tvs $ coAxiomNthBranch ax index
+  = length tvs + length cvs
+  where
+    CoAxBranch { cab_tvs = tvs, cab_cvs = cvs } = coAxiomNthBranch ax index
 
 coAxiomName :: CoAxiom br -> Name
 coAxiomName = co_ax_name
@@ -274,6 +281,9 @@ coAxiomTyCon = co_ax_tc
 
 coAxBranchTyVars :: CoAxBranch -> [TyVar]
 coAxBranchTyVars = cab_tvs
+
+coAxBranchCoVars :: CoAxBranch -> [CoVar]
+coAxBranchCoVars = cab_cvs
 
 coAxBranchLHS :: CoAxBranch -> [Type]
 coAxBranchLHS = cab_lhs
@@ -395,6 +405,13 @@ instance Typeable br => Data.Data (CoAxiom br) where
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "CoAxiom"
 
+instance Outputable CoAxBranch where
+  ppr (CoAxBranch { cab_loc = loc
+                  , cab_lhs = lhs
+                  , cab_rhs = rhs }) =
+    text "CoAxBranch" <+> parens (ppr loc) <> colon <+> ppr lhs <+>
+    text "=>" <+> ppr rhs
+
 {-
 ************************************************************************
 *                                                                      *
@@ -408,7 +425,7 @@ Roles are defined here to avoid circular dependencies.
 -- See Note [Roles] in Coercion
 -- defined here to avoid cyclic dependency with Coercion
 data Role = Nominal | Representational | Phantom
-  deriving (Eq, Data.Data, Data.Typeable)
+  deriving (Eq, Ord, Data.Data, Data.Typeable)
 
 -- These names are slurped into the parser code. Changing these strings
 -- will change the **surface syntax** that GHC accepts! If you want to
@@ -457,10 +474,9 @@ type Eqn = Pair Type
 -- | For now, we work only with nominal equality.
 data CoAxiomRule = CoAxiomRule
   { coaxrName      :: FastString
-  , coaxrTypeArity :: Int       -- number of type argumentInts
   , coaxrAsmpRoles :: [Role]    -- roles of parameter equations
   , coaxrRole      :: Role      -- role of resulting equation
-  , coaxrProves    :: [Type] -> [Eqn] -> Maybe Eqn
+  , coaxrProves    :: [Eqn] -> Maybe Eqn
         -- ^ coaxrProves returns @Nothing@ when it doesn't like
         -- the supplied arguments.  When this happens in a coercion
         -- that means that the coercion is ill-formed, and Core Lint

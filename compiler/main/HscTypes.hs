@@ -75,7 +75,7 @@ module HscTypes (
         -- * TyThings and type environments
         TyThing(..),  tyThingAvailInfo,
         tyThingTyCon, tyThingDataCon,
-        tyThingId, tyThingCoAxiom, tyThingParent_maybe, tyThingsTyVars,
+        tyThingId, tyThingCoAxiom, tyThingParent_maybe, tyThingsTyCoVars,
         implicitTyThings, implicitTyConThings, implicitClassThings,
         isImplicitTyThing,
 
@@ -1496,10 +1496,10 @@ icExtendGblRdrEnv env tythings
                              _            -> False
     is_sub_bndr _ = False
 
-substInteractiveContext :: InteractiveContext -> TvSubst -> InteractiveContext
+substInteractiveContext :: InteractiveContext -> TCvSubst -> InteractiveContext
 substInteractiveContext ictxt@InteractiveContext{ ic_tythings = tts } subst
-  | isEmptyTvSubst subst = ictxt
-  | otherwise            = ictxt { ic_tythings = map subst_ty tts }
+  | isEmptyTCvSubst subst = ictxt
+  | otherwise             = ictxt { ic_tythings = map subst_ty tts }
   where
     subst_ty (AnId id) = AnId $ id `setIdType` substTy subst (idType id)
     subst_ty tt        = tt
@@ -1781,19 +1781,19 @@ tyThingParent_maybe (AnId id)     = case idDetails id of
                                       _other                      -> Nothing
 tyThingParent_maybe _other = Nothing
 
-tyThingsTyVars :: [TyThing] -> TyVarSet
-tyThingsTyVars tts =
+tyThingsTyCoVars :: [TyThing] -> TyCoVarSet
+tyThingsTyCoVars tts =
     unionVarSets $ map ttToVarSet tts
     where
-        ttToVarSet (AnId id)     = tyVarsOfType $ idType id
+        ttToVarSet (AnId id)     = tyCoVarsOfType $ idType id
         ttToVarSet (AConLike cl) = case cl of
-            RealDataCon dc  -> tyVarsOfType $ dataConRepType dc
+            RealDataCon dc  -> tyCoVarsOfType $ dataConRepType dc
             PatSynCon{}     -> emptyVarSet
         ttToVarSet (ATyCon tc)
           = case tyConClass_maybe tc of
               Just cls -> (mkVarSet . fst . classTvsFds) cls
-              Nothing  -> tyVarsOfType $ tyConKind tc
-        ttToVarSet _             = emptyVarSet
+              Nothing  -> tyCoVarsOfType $ tyConKind tc
+        ttToVarSet (ACoAxiom _)  = emptyVarSet
 
 -- | The Names that a TyThing should bring into scope.  Used to build
 -- the GlobalRdrEnv for the InteractiveContext.

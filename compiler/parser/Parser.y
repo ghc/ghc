@@ -59,7 +59,7 @@ import BasicTypes
 
 -- compiler/types
 import Type             ( funTyCon )
-import Kind             ( Kind, liftedTypeKind, unliftedTypeKind, mkArrowKind )
+import Kind             ( Kind )
 import Class            ( FunDep )
 
 -- compiler/parser
@@ -73,10 +73,11 @@ import TcEvidence       ( emptyTcEvBinds )
 
 -- compiler/prelude
 import ForeignCall
-import TysPrim          ( liftedTypeKindTyConName, eqPrimTyCon )
+import TysPrim          ( eqPrimTyCon )
+import PrelNames        ( eqTyCon_RDR )
 import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilDataCon,
                           unboxedUnitTyCon, unboxedUnitDataCon,
-                          listTyCon_RDR, parrTyCon_RDR, consDataCon_RDR, eqTyCon_RDR )
+                          listTyCon_RDR, parrTyCon_RDR, consDataCon_RDR )
 
 -- compiler/utils
 import Util             ( looksLikePackageName )
@@ -84,9 +85,9 @@ import Prelude
 
 }
 
-{- Last updated: 31 Jul 2015
+{- Last updated: 18 Nov 2015
 
-Conflicts: 47 shift/reduce
+Conflicts: 36 shift/reduce
 
 If you modify this parser and add a conflict, please update this comment.
 You can learn more about the conflicts by passing 'happy' the -i flag:
@@ -127,35 +128,26 @@ state 46 contains 2 shift/reduce conflicts.
 
 -------------------------------------------------------------------------------
 
-state 50 contains 11 shift/reduce conflicts.
+state 50 contains 1 shift/reduce conflict.
 
-        context -> btype .                                  (rule 282)
-    *** type -> btype .                                     (rule 283)
-        type -> btype . qtyconop type                       (rule 284)
-        type -> btype . tyvarop type                        (rule 285)
-        type -> btype . '->' ctype                          (rule 286)
-        type -> btype . SIMPLEQUOTE qconop type             (rule 287)
-        type -> btype . SIMPLEQUOTE varop type              (rule 288)
-        btype -> btype . atype                              (rule 299)
+        context -> btype .                                  (rule 295)
+    *** type -> btype .                                     (rule 297)
+        type -> btype . '->' ctype                          (rule 298)
 
-    Conflicts: ':' '->' '-' '!' '*' '.' '`' VARSYM CONSYM QVARSYM QCONSYM
-
-Example of ambiguity: 'e :: a `b` c';  does this mean
-    (e::a) `b` c, or
-    (e :: (a `b` c))
-
-The case for '->' involves view patterns rather than type operators:
-    'case v of { x :: T -> T ... } '
-    Which of these two is intended?
-          case v of
-            (x::T) -> T         -- Rhs is T
-    or
-          case v of
-            (x::T -> T) -> ..   -- Rhs is ...
+    Conflicts: '->'
 
 -------------------------------------------------------------------------------
 
-state 119 contains 15 shift/reduce conflicts.
+state 51 contains 9 shift/reduce conflicts.
+
+    *** btype -> tyapps .                                   (rule 303)
+        tyapps -> tyapps . tyapp                            (rule 307)
+
+    Conflicts: ':' '-' '!' '.' '`' VARSYM CONSYM QVARSYM QCONSYM
+
+-------------------------------------------------------------------------------
+
+state 132 contains 14 shift/reduce conflicts.
 
         exp -> infixexp . '::' sigtype                      (rule 416)
         exp -> infixexp . '-<' exp                          (rule 417)
@@ -165,7 +157,7 @@ state 119 contains 15 shift/reduce conflicts.
     *** exp -> infixexp .                                   (rule 421)
         infixexp -> infixexp . qop exp10                    (rule 423)
 
-    Conflicts: ':' '::' '-' '!' '*' '-<' '>-' '-<<' '>>-'
+    Conflicts: ':' '::' '-' '!' '-<' '>-' '-<<' '>>-'
                '.' '`' VARSYM CONSYM QVARSYM QCONSYM
 
 Examples of ambiguity:
@@ -180,7 +172,7 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
-state 279 contains 1 shift/reduce conflicts.
+state 292 contains 1 shift/reduce conflicts.
 
         rule -> STRING . rule_activation rule_forall infixexp '=' exp    (rule 215)
 
@@ -198,23 +190,18 @@ a rule instructing how to rewrite the expression '[0] f'.
 
 -------------------------------------------------------------------------------
 
-state 288 contains 11 shift/reduce conflicts.
+state 301 contains 1 shift/reduce conflict.
 
-    *** type -> btype .                                     (rule 283)
-        type -> btype . qtyconop type                       (rule 284)
-        type -> btype . tyvarop type                        (rule 285)
-        type -> btype . '->' ctype                          (rule 286)
-        type -> btype . SIMPLEQUOTE qconop type             (rule 287)
-        type -> btype . SIMPLEQUOTE varop type              (rule 288)
-        btype -> btype . atype                              (rule 299)
+    *** type -> btype .                                     (rule 297)
+        type -> btype . '->' ctype                          (rule 298)
 
-    Conflicts: ':' '->' '-' '!' '*' '.' '`' VARSYM CONSYM QVARSYM QCONSYM
+    Conflict: '->'
 
-Same as State 50, but minus the context productions.
+Same as state 50 but without contexts.
 
 -------------------------------------------------------------------------------
 
-state 324 contains 1 shift/reduce conflicts.
+state 337 contains 1 shift/reduce conflicts.
 
         tup_exprs -> commas . tup_tail                      (rule 505)
         sysdcon_nolist -> '(' commas . ')'                  (rule 616)
@@ -229,7 +216,7 @@ if -XTupleSections is not specified.
 
 -------------------------------------------------------------------------------
 
-state 376 contains 1 shift/reduce conflicts.
+state 388 contains 1 shift/reduce conflicts.
 
         tup_exprs -> commas . tup_tail                      (rule 505)
         sysdcon_nolist -> '(#' commas . '#)'                (rule 618)
@@ -241,20 +228,18 @@ Same as State 324 for unboxed tuples.
 
 -------------------------------------------------------------------------------
 
-state 404 contains 1 shift/reduce conflicts.
+state 460 contains 1 shift/reduce conflict.
 
-        exp10 -> 'let' binds . 'in' exp                     (rule 425)
-        exp10 -> 'let' binds . 'in' error                   (rule 440)
-        exp10 -> 'let' binds . error                        (rule 441)
-    *** qual -> 'let' binds .                               (rule 579)
+        oqtycon -> '(' qtyconsym . ')'                      (rule 621)
+    *** qtyconop -> qtyconsym .                             (rule 628)
 
-    Conflict: error
+    Conflict: ')'
 
 TODO: Why?
 
 -------------------------------------------------------------------------------
 
-state 633 contains 1 shift/reduce conflicts.
+state 635 contains 1 shift/reduce conflicts.
 
     *** aexp2 -> ipvar .                                    (rule 466)
         dbind -> ipvar . '=' exp                            (rule 590)
@@ -269,7 +254,7 @@ sensible meaning, namely the lhs of an implicit binding.
 
 -------------------------------------------------------------------------------
 
-state 699 contains 1 shift/reduce conflicts.
+state 702 contains 1 shift/reduce conflicts.
 
         rule -> STRING rule_activation . rule_forall infixexp '=' exp    (rule 215)
 
@@ -286,7 +271,7 @@ doesn't include 'forall'.
 
 -------------------------------------------------------------------------------
 
-state 950 contains 1 shift/reduce conflicts.
+state 930 contains 1 shift/reduce conflicts.
 
         transformqual -> 'then' 'group' . 'using' exp       (rule 528)
         transformqual -> 'then' 'group' . 'by' exp 'using' exp    (rule 529)
@@ -294,6 +279,16 @@ state 950 contains 1 shift/reduce conflicts.
 
     Conflict: 'by'
 
+-------------------------------------------------------------------------------
+
+state 1270 contains 1 shift/reduce conflict.
+
+    *** atype -> tyvar .                                    (rule 314)
+        tv_bndr -> '(' tyvar . '::' kind ')'                (rule 346)
+
+    Conflict: '::'
+
+TODO: Why?
 
 -------------------------------------------------------------------------------
 -- API Annotations
@@ -413,7 +408,6 @@ output it generates.
  '=>'           { L _ (ITdarrow _) }
  '-'            { L _ ITminus }
  '!'            { L _ ITbang }
- '*'            { L _ (ITstar _) }
  '-<'           { L _ (ITlarrowtail _) }            -- for arrow notation
  '>-'           { L _ (ITrarrowtail _) }            -- for arrow notation
  '-<<'          { L _ (ITLarrowtail _) }            -- for arrow notation
@@ -1606,12 +1600,22 @@ ctypedoc :: { LHsType RdrName }
 -- but not                          f :: ?x::Int => blah
 -- See Note [Parsing ~]
 context :: { LHsContext RdrName }
-        :  btype                        {% do { (anns,ctx) <- checkContext (splitTilde $1)
+        :  btype                        {% do { (anns,ctx) <- checkContext $1
                                                 ; if null (unLoc ctx)
                                                    then addAnnotation (gl $1) AnnUnit (gl $1)
                                                    else return ()
                                                 ; ams ctx anns
                                                 } }
+
+context_no_ops :: { LHsContext RdrName }
+        : btype_no_ops                 {% do { let { ty = splitTilde $1 }
+                                             ; (anns,ctx) <- checkContext ty
+                                             ; if null (unLoc ctx)
+                                                   then addAnnotation (gl ty) AnnUnit (gl ty)
+                                                   else return ()
+                                             ; ams ctx anns
+                                             } }
+
 {- Note [GADT decl discards annotations]
 ~~~~~~~~~~~~~~~~~~~~~
 The type production for
@@ -1628,39 +1632,48 @@ the top-level annotation will be disconnected. Hence for this specific case it
 is connected to the first type too.
 -}
 
--- See Note [Parsing ~]
 type :: { LHsType RdrName }
-        : btype                         { splitTilde $1 }
-        | btype qtyconop type           { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
-        | btype tyvarop  type           { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
-        | btype '->'     ctype          {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
-                                        >> ams (sLL $1 $> $ HsFunTy (splitTilde $1) $3)
-                                               [mu AnnRarrow $2] }
-        | btype SIMPLEQUOTE qconop type  {% ams (sLL $1 $> $ mkHsOpTy $1 $3 $4)
-                                                [mj AnnSimpleQuote $2] }
-        | btype SIMPLEQUOTE varop  type  {% ams (sLL $1 $> $ mkHsOpTy $1 $3 $4)
-                                                [mj AnnSimpleQuote $2] }
--- See Note [Parsing ~]
-typedoc :: { LHsType RdrName }
-        : btype                          { splitTilde $1 }
-        | btype docprev                  { sLL $1 $> $ HsDocTy (splitTilde $1) $2 }
-        | btype qtyconop type            { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
-        | btype qtyconop type docprev    { sLL $1 $> $ HsDocTy (L (comb3 $1 $2 $3) (mkHsOpTy $1 $2 $3)) $4 }
-        | btype tyvarop  type            { sLL $1 $> $ mkHsOpTy $1 $2 $3 }
-        | btype tyvarop  type docprev    { sLL $1 $> $ HsDocTy (L (comb3 $1 $2 $3) (mkHsOpTy $1 $2 $3)) $4 }
-        | btype '->'     ctypedoc        {% ams (sLL $1 $> $ HsFunTy (splitTilde $1) $3)
-                                                [mu AnnRarrow $2] }
-        | btype docprev '->' ctypedoc    {% ams (sLL $1 $> $ HsFunTy (L (comb2 (splitTilde $1) $2)
-                                                            (HsDocTy $1 $2)) $4)
-                                                [mu AnnRarrow $3] }
-        | btype SIMPLEQUOTE qconop type  {% ams (sLL $1 $> $ mkHsOpTy $1 $3 $4)
-                                                [mj AnnSimpleQuote $2] }
-        | btype SIMPLEQUOTE varop  type  {% ams (sLL $1 $> $ mkHsOpTy $1 $3 $4)
-                                                [mj AnnSimpleQuote $2] }
+        : btype                        { $1 }
+        | btype '->' ctype             {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
+                                       >> ams (sLL $1 $> $ HsFunTy $1 $3)
+                                              [mu AnnRarrow $2] }
 
+
+typedoc :: { LHsType RdrName }
+        : btype                          { $1 }
+        | btype docprev                  { sLL $1 $> $ HsDocTy $1 $2 }
+        | btype '->'     ctypedoc        {% ams (sLL $1 $> $ HsFunTy $1 $3)
+                                                [mu AnnRarrow $2] }
+        | btype docprev '->' ctypedoc    {% ams (sLL $1 $> $
+                                                 HsFunTy (L (comb2 $1 $2) (HsDocTy $1 $2))
+                                                         $4)
+                                                [mu AnnRarrow $3] }
+
+-- See Note [Parsing ~]
 btype :: { LHsType RdrName }
-        : btype atype                   { sLL $1 $> $ HsAppTy $1 $2 }
+        : tyapps                      { sL1 $1 $ HsAppsTy (splitTildeApps (reverse (unLoc $1))) }
+
+-- Used for parsing Haskell98-style data constructors,
+-- in order to forbid the blasphemous
+-- > data Foo = Int :+ Char :* Bool
+-- See also Note [Parsing data constructors is hard].
+btype_no_ops :: { LHsType RdrName }
+        : btype_no_ops atype            { sLL $1 $> $ HsAppTy $1 $2 }
         | atype                         { $1 }
+
+tyapps :: { Located [HsAppType RdrName] }   -- NB: This list is reversed
+        : tyapp                         { sL1 $1 [unLoc $1] }
+        | tyapps tyapp                  { sLL $1 $> $ (unLoc $2) : (unLoc $1) }
+
+-- See Note [HsAppsTy] in HsTypes
+tyapp :: { Located (HsAppType RdrName) }
+        : atype                         { sL1 $1 $ HsAppPrefix $1 }
+        | qtyconop                      { sL1 $1 $ HsAppInfix $1 }
+        | tyvarop                       { sL1 $1 $ HsAppInfix $1 }
+        | SIMPLEQUOTE qconop            {% ams (sLL $1 $> $ HsAppInfix $2)
+                                               [mj AnnSimpleQuote $1] }
+        | SIMPLEQUOTE varop             {% ams (sLL $1 $> $ HsAppInfix $2)
+                                               [mj AnnSimpleQuote $1] }
 
 atype :: { LHsType RdrName }
         : ntgtycon                       { sL1 $1 (HsTyVar $1) }      -- Not including unit tuples
@@ -1797,37 +1810,7 @@ turn them into HsEqTy's.
 -- Kinds
 
 kind :: { LHsKind RdrName }
-        : bkind                  { $1 }
-        | bkind '->' kind        {% ams (sLL $1 $> $ HsFunTy $1 $3)
-                                        [mu AnnRarrow $2] }
-
-bkind :: { LHsKind RdrName }
-        : akind                  { $1 }
-        | bkind akind            { sLL $1 $> $ HsAppTy $1 $2 }
-
-akind :: { LHsKind RdrName }
-        : '*'                    {% ams (sL1 $1 $ HsTyVar (sL1 $1 (nameRdrName liftedTypeKindTyConName)))
-                                        [mu AnnStar $1] }
-        | '(' kind ')'           {% ams (sLL $1 $>  $ HsParTy $2)
-                                        [mop $1,mcp $3] }
-        | pkind                  { $1 }
-        | tyvar                  { sL1 $1 $ HsTyVar $1 }
-
-pkind :: { LHsKind RdrName }  -- promoted type, see Note [Promotion]
-        : qtycon                          { sL1 $1 $ HsTyVar $1 }
-        | '(' ')'                   {% ams (sLL $1 $> $ HsTyVar $ (sLL $1 $> $ getRdrName unitTyCon))
-                                           [mop $1,mcp $2] }
-        | '(' kind ',' comma_kinds1 ')'
-                          {% addAnnotation (gl $2) AnnComma (gl $3) >>
-                             ams (sLL $1 $> $ HsTupleTy HsBoxedTuple ( $2 : $4))
-                                 [mop $1,mcp $5] }
-        | '[' kind ']'                    {% ams (sLL $1 $> $ HsListTy $2)
-                                                 [mos $1,mcs $3] }
-
-comma_kinds1 :: { [LHsKind RdrName] }
-        : kind                         { [$1] }
-        | kind  ',' comma_kinds1       {% addAnnotation (gl $1) AnnComma (gl $2)
-                                          >> return ($1 : $3) }
+        : ctype                  { $1 }
 
 {- Note [Promotion]
    ~~~~~~~~~~~~~~~~
@@ -1839,12 +1822,6 @@ few reasons:
   1. we don't need quotes since we cannot define names in kinds
   2. if one day we merge types and kinds, tick would mean look in DataName
   3. we don't have a kind namespace anyway
-
-- Syntax of explicit kind polymorphism  (IA0_TODO: not yet implemented)
-Kind abstraction is implicit. We write
-> data SList (s :: k -> *) (as :: [k]) where ...
-because it looks like what we do in terms
-> id (x :: a) = x
 
 - Name resolution
 When the user write Zero instead of 'Zero in types, we parse it a
@@ -1922,7 +1899,7 @@ constrs1 :: { Located [LConDecl RdrName] }
         | constr                                          { sL1 $1 [$1] }
 
 constr :: { LConDecl RdrName }
-        : maybe_docnext forall context '=>' constr_stuff maybe_docprev
+        : maybe_docnext forall context_no_ops '=>' constr_stuff maybe_docprev
                 {% ams (let (con,details) = unLoc $5 in
                   addConDoc (L (comb4 $2 $3 $4 $5) (mkConDeclH98 con
                                                    (snd $ unLoc $2) $3 details))
@@ -1941,16 +1918,17 @@ forall :: { Located ([AddAnn], Maybe [LHsTyVarBndr RdrName]) }
 
 constr_stuff :: { Located (Located RdrName, HsConDeclDetails RdrName) }
     -- see Note [Parsing data constructors is hard]
-        : btype                         {% splitCon $1 >>= return.sLL $1 $> }
-        | btype conop btype             {  sLL $1 $> ($2, InfixCon $1 $3) }
+        : btype_no_ops                         {% do { c <- splitCon $1
+                                                     ; return $ sLL $1 $> c } }
+        | btype_no_ops conop btype_no_ops      {  sLL $1 $> ($2, InfixCon (splitTilde $1) $3) }
 
 {- Note [Parsing data constructors is hard]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We parse the constructor declaration
      C t1 t2
-as a btype (treating C as a type constructor) and then convert C to be
+as a btype_no_ops (treating C as a type constructor) and then convert C to be
 a data constructor.  Reason: it might continue like this:
-     C t1 t2 %: D Int
+     C t1 t2 :% D Int
 in which case C really would be a type constructor.  We can't resolve this
 ambiguity till we come across the constructor oprerator :% (or not, more usually)
 -}
@@ -2931,8 +2909,6 @@ tyconsym :: { Located RdrName }
         : CONSYM                { sL1 $1 $! mkUnqual tcClsName (getCONSYM $1) }
         | VARSYM                { sL1 $1 $! mkUnqual tcClsName (getVARSYM $1) }
         | ':'                   { sL1 $1 $! consDataCon_RDR }
-        | '*'                   {% ams (sL1 $1 $! mkUnqual tcClsName (fsLit "*"))
-                                       [mu AnnStar $1] }
         | '-'                   { sL1 $1 $! mkUnqual tcClsName (fsLit "-") }
 
 
@@ -3070,7 +3046,6 @@ special_id
 special_sym :: { Located FastString }
 special_sym : '!'       {% ams (sL1 $1 (fsLit "!")) [mj AnnBang $1] }
             | '.'       { sL1 $1 (fsLit ".") }
-            | '*'       {% ams (sL1 $1 (fsLit "*")) [mu AnnStar $1] }
 
 -----------------------------------------------------------------------------
 -- Data constructors
@@ -3240,7 +3215,6 @@ isUnicode (L _ (ITdcolon     iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITlarrow     iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITrarrow     iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITrarrow     iu)) = iu == UnicodeSyntax
-isUnicode (L _ (ITstar       iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITlarrowtail iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITrarrowtail iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITLarrowtail iu)) = iu == UnicodeSyntax

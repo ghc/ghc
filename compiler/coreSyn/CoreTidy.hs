@@ -18,7 +18,7 @@ import CoreSyn
 import CoreArity
 import Id
 import IdInfo
-import Type( tidyType, tidyTyVarBndr )
+import Type( tidyType, tidyTyCoVarBndr )
 import Coercion( tidyCo )
 import Var
 import VarEnv
@@ -126,13 +126,13 @@ tidyVarOcc (_, var_env) v = lookupVarEnv var_env v `orElse` v
 -- tidyBndr is used for lambda and case binders
 tidyBndr :: TidyEnv -> Var -> (TidyEnv, Var)
 tidyBndr env var
-  | isTyVar var = tidyTyVarBndr env var
-  | otherwise   = tidyIdBndr env var
+  | isTyCoVar var = tidyTyCoVarBndr env var
+  | otherwise     = tidyIdBndr env var
 
 tidyBndrs :: TidyEnv -> [Var] -> (TidyEnv, [Var])
 tidyBndrs env vars = mapAccumL tidyBndr env vars
 
--- Non-top-level variables
+-- Non-top-level variables, not covars
 tidyIdBndr :: TidyEnv -> Id -> (TidyEnv, Id)
 tidyIdBndr env@(tidy_env, var_env) id
   = -- Do this pattern match strictly, otherwise we end up holding on to
@@ -172,7 +172,8 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) (id,rhs)
     let
         ty'      = tidyType env (idType id)
         name'    = mkInternalName (idUnique id) occ' noSrcSpan
-        id'      = mkLocalIdWithInfo name' ty' new_info
+        details  = idDetails id
+        id'      = mkLocalVar details name' ty' new_info
         var_env' = extendVarEnv var_env id id'
 
         -- Note [Tidy IdInfo]

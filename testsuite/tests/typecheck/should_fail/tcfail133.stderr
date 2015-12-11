@@ -3,9 +3,9 @@ tcfail133.hs:2:61: warning:
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 tcfail133.hs:68:7: error:
-    Ambiguous type variable ‘r0’ arising from a use of ‘show’
-    prevents the constraint ‘(Show r0)’ from being solved.
-    Probable fix: use a type annotation to specify what ‘r0’ should be.
+    Ambiguous type variable ‘a0’ arising from a use of ‘show’
+    prevents the constraint ‘(Show a0)’ from being solved.
+    Probable fix: use a type annotation to specify what ‘a0’ should be.
     These potential instances exist:
       instance Show Module -- Defined in ‘GHC.Show’
       instance Show Ordering -- Defined in ‘GHC.Show’
@@ -18,7 +18,7 @@ tcfail133.hs:68:7: error:
         foo = show $ add (One :@ Zero) (One :@ One)
 
 tcfail133.hs:68:14: error:
-    No instance for (AddDigit (Zero :@ (One :@ One)) One r0)
+    No instance for (AddDigit (Zero :@ (One :@ One)) One a0)
       arising from a use of ‘add’
     In the second argument of ‘($)’, namely
       ‘add (One :@ Zero) (One :@ One)’

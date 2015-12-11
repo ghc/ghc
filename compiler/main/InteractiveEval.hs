@@ -74,7 +74,7 @@ import Unique
 import UniqSupply
 import MonadUtils
 import Module
-import PrelNames  ( toDynName )
+import PrelNames  ( toDynName, pretendNameIsInScope )
 import Panic
 import UniqFM
 import Maybes
@@ -675,8 +675,8 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
 
        (ids, offsets) = unzip pointers
 
-       free_tvs = mapUnionVarSet (tyVarsOfType . idType) ids
-                  `unionVarSet` tyVarsOfType result_ty
+       free_tvs = mapUnionVarSet (tyCoVarsOfType . idType) ids
+                  `unionVarSet` tyCoVarsOfType result_ty
 
    -- It might be that getIdValFromApStack fails, because the AP_STACK
    -- has been accidentally evaluated, or something else has gone wrong.
@@ -720,13 +720,13 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
      = do { name <- newInteractiveBinder hsc_env occ (getSrcSpan old_id)
           ; return (Id.mkVanillaGlobalWithInfo name ty (idInfo old_id)) }
 
-   newTyVars :: UniqSupply -> TcTyVarSet -> TvSubst
+   newTyVars :: UniqSupply -> TcTyVarSet -> TCvSubst
      -- Similarly, clone the type variables mentioned in the types
      -- we have here, *and* make them all RuntimeUnk tyars
    newTyVars us tvs
-     = mkTopTvSubst [ (tv, mkTyVarTy (mkRuntimeUnkTyVar name (tyVarKind tv)))
-                    | (tv, uniq) <- varSetElems tvs `zip` uniqsFromSupply us
-                    , let name = setNameUnique (tyVarName tv) uniq ]
+     = mkTopTCvSubst [ (tv, mkTyVarTy (mkRuntimeUnkTyVar name (tyVarKind tv)))
+                     | (tv, uniq) <- varSetElems tvs `zip` uniqsFromSupply us
+                     , let name = setNameUnique (tyVarName tv) uniq ]
 
 rttiEnvironment :: HscEnv -> IO HscEnv
 rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
@@ -738,7 +738,7 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
    hsc_env' <- foldM improveTypes hsc_env (map idName incompletelyTypedIds)
    return hsc_env'
     where
-     noSkolems = isEmptyVarSet . tyVarsOfType . idType
+     noSkolems = isEmptyVarSet . tyCoVarsOfType . idType
      improveTypes hsc_env@HscEnv{hsc_IC=ic} name = do
       let tmp_ids = [id | AnId id <- ic_tythings ic]
           Just id = find (\i -> idName i == name) tmp_ids
@@ -963,11 +963,13 @@ getInfo allInfo name
        || all ok (nameSetElems names)
         where   -- A name is ok if it's in the rdr_env,
                 -- whether qualified or not
-          ok n | n == name         = True       -- The one we looked for in the first place!
-               | isBuiltInSyntax n = True
-               | isExternalName n  = any ((== n) . gre_name)
-                                         (lookupGRE_Name rdr_env n)
-               | otherwise         = True
+          ok n | n == name              = True
+                       -- The one we looked for in the first place!
+               | pretendNameIsInScope n = True
+               | isBuiltInSyntax n      = True
+               | isExternalName n       = any ((== n) . gre_name)
+                                              (lookupGRE_Name rdr_env n)
+               | otherwise              = True
 
 -- | Returns all names in scope in the current interactive context
 getNamesInScope :: GhcMonad m => m [Name]

@@ -5,7 +5,7 @@ module Vectorise.Utils.Poly
   , polyApply
   , polyVApply
   , polyArity
-  ) 
+  )
 where
 
 import Vectorise.Vect
@@ -36,7 +36,7 @@ polyAbstract tvs p
        ; p (mk_args mdicts)
        }
   where
-    mk_dict_var tv 
+    mk_dict_var tv
       = do { r <- paDictArgType tv
            ; case r of
                Just ty -> liftM Just (newLocalVar (fsLit "dPA") ty)
@@ -49,7 +49,7 @@ polyAbstract tvs p
 -- on their kinds).
 --
 polyArity :: [TyVar] -> VM Int
-polyArity tvs 
+polyArity tvs
   = do { tys <- mapM paDictArgType tvs
        ; return $ length [() | Just _ <- tys]
        }
@@ -62,7 +62,7 @@ polyApply expr tys
       ; return $ expr `mkTyApps` tys `mkApps` dicts
       }
 
--- |Apply a vectorised expression to a set of type arguments together with 'PA' dictionaries for 
+-- |Apply a vectorised expression to a set of type arguments together with 'PA' dictionaries for
 -- these type arguments.
 --
 polyVApply :: VExpr -> [Type] -> VM VExpr

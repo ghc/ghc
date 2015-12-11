@@ -14,7 +14,7 @@ module Util (
         zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
         zipLazy, stretchZipWith, zipWithAndUnzip,
 
-        filterByList,
+        filterByList, partitionByList,
 
         unzipWith,
 
@@ -22,7 +22,7 @@ module Util (
         mapAndUnzip, mapAndUnzip3, mapAccumL2,
         nOfThem, filterOut, partitionWith, splitEithers,
 
-        dropWhileEndLE,
+        dropWhileEndLE, spanEnd,
 
         foldl1', foldl2, count, all2,
 
@@ -36,10 +36,11 @@ module Util (
         isIn, isn'tIn,
 
         -- * Tuples
-        fstOf3, sndOf3, thirdOf3,
+        fstOf3, sndOf3, thdOf3,
         firstM, first3M,
-        third3,
+        fst3, snd3, third3,
         uncurry3,
+        liftFst, liftSnd,
 
         -- * List operations controlled by another list
         takeList, dropList, splitAtList, split,
@@ -215,16 +216,28 @@ nTimes n f = f . nTimes (n-1) f
 
 fstOf3   :: (a,b,c) -> a
 sndOf3   :: (a,b,c) -> b
-thirdOf3 :: (a,b,c) -> c
+thdOf3   :: (a,b,c) -> c
 fstOf3      (a,_,_) =  a
 sndOf3      (_,b,_) =  b
-thirdOf3    (_,_,c) =  c
+thdOf3      (_,_,c) =  c
+
+fst3 :: (a -> d) -> (a, b, c) -> (d, b, c)
+fst3 f (a, b, c) = (f a, b, c)
+
+snd3 :: (b -> d) -> (a, b, c) -> (a, d, c)
+snd3 f (a, b, c) = (a, f b, c)
 
 third3 :: (c -> d) -> (a, b, c) -> (a, b, d)
 third3 f (a, b, c) = (a, b, f c)
 
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (a, b, c) = f a b c
+
+liftFst :: (a -> b) -> (a, c) -> (b, c)
+liftFst f (a,c) = (f a, c)
+
+liftSnd :: (a -> b) -> (c, a) -> (c, b)
+liftSnd f (c,a) = (c, f a)
 
 firstM :: Monad m => (a -> m c) -> (a, b) -> m (c, b)
 firstM f (x, y) = liftM (\x' -> (x', y)) (f x)
@@ -318,6 +331,19 @@ filterByList :: [Bool] -> [a] -> [a]
 filterByList (True:bs)  (x:xs) = x : filterByList bs xs
 filterByList (False:bs) (_:xs) =     filterByList bs xs
 filterByList _          _      = []
+
+-- | 'partitionByList' takes a list of Bools and a list of some elements and
+-- partitions the list according to the list of Bools. Elements corresponding
+-- to 'True' go to the left; elements corresponding to 'False' go to the right.
+-- For example, @partitionByList [True, False, True] [1,2,3] == ([1,3], [2])@
+-- This function does not check whether the lists have equal
+-- length.
+partitionByList :: [Bool] -> [a] -> ([a], [a])
+partitionByList = go [] []
+  where
+    go trues falses (True  : bs) (x : xs) = go (x:trues) falses bs xs
+    go trues falses (False : bs) (x : xs) = go trues (x:falses) bs xs
+    go trues falses _ _ = (reverse trues, reverse falses)
 
 stretchZipWith :: (a -> Bool) -> b -> (a->b->c) -> [a] -> [b] -> [c]
 -- ^ @stretchZipWith p z f xs ys@ stretches @ys@ by inserting @z@ in
@@ -600,6 +626,17 @@ dropTail n xs
 -- difference between dropWhileEnd and dropWhileEndLE.
 dropWhileEndLE :: (a -> Bool) -> [a] -> [a]
 dropWhileEndLE p = foldr (\x r -> if null r && p x then [] else x:r) []
+
+-- | @spanEnd p l == reverse (span p (reverse l))@. The first list
+-- returns actually comes after the second list (when you look at the
+-- input list).
+spanEnd :: (a -> Bool) -> [a] -> ([a], [a])
+spanEnd p l = go l [] [] l
+  where go yes _rev_yes rev_no [] = (yes, reverse rev_no)
+        go yes rev_yes  rev_no (x:xs)
+          | p x       = go yes (x : rev_yes) rev_no                  xs
+          | otherwise = go xs  []            (x : rev_yes ++ rev_no) xs
+
 
 snocView :: [a] -> Maybe ([a],a)
         -- Split off the last element

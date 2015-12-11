@@ -9,7 +9,8 @@ module IfaceEnv (
         lookupOrig, lookupOrigNameCache, extendNameCache,
         newIfaceName, newIfaceNames,
         extendIfaceIdEnv, extendIfaceTyVarEnv,
-        tcIfaceLclId, tcIfaceTyVar, lookupIfaceTyVar,
+        tcIfaceLclId, tcIfaceTyVar, lookupIfaceVar,
+        lookupIfaceTyVar, extendIfaceEnvs,
 
         ifaceExportNames,
 
@@ -31,11 +32,13 @@ import Avail
 import Module
 import UniqFM
 import FastString
+import IfaceType
 import UniqSupply
 import SrcLoc
 import Util
 
 import Outputable
+import Data.List     ( partition )
 
 {-
 *********************************************************
@@ -277,8 +280,16 @@ tcIfaceTyVar occ
             Nothing     -> failIfM (text "Iface type variable out of scope: " <+> ppr occ)
         }
 
-lookupIfaceTyVar :: FastString -> IfL (Maybe TyVar)
-lookupIfaceTyVar occ
+lookupIfaceTyVar :: IfaceTvBndr -> IfL (Maybe TyVar)
+lookupIfaceTyVar (occ, _)
+  = do  { lcl <- getLclEnv
+        ; return (lookupUFM (if_tv_env lcl) occ) }
+
+lookupIfaceVar :: IfaceBndr -> IfL (Maybe TyCoVar)
+lookupIfaceVar (IfaceIdBndr (occ, _))
+  = do  { lcl <- getLclEnv
+        ; return (lookupUFM (if_id_env lcl) occ) }
+lookupIfaceVar (IfaceTvBndr (occ, _))
   = do  { lcl <- getLclEnv
         ; return (lookupUFM (if_tv_env lcl) occ) }
 
@@ -288,6 +299,14 @@ extendIfaceTyVarEnv tyvars thing_inside
         ; let { tv_env' = addListToUFM (if_tv_env env) pairs
               ; pairs   = [(occNameFS (getOccName tv), tv) | tv <- tyvars] }
         ; setLclEnv (env { if_tv_env = tv_env' }) thing_inside }
+
+extendIfaceEnvs :: [TyCoVar] -> IfL a -> IfL a
+extendIfaceEnvs tcvs thing_inside
+  = extendIfaceTyVarEnv tvs $
+    extendIfaceIdEnv    cvs $
+    thing_inside
+  where
+    (tvs, cvs) = partition isTyVar tcvs
 
 {-
 ************************************************************************

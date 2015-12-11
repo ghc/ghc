@@ -26,7 +26,6 @@ import Id
 import Name
 import Type
 import FamInstEnv
-import Coercion
 import InstEnv
 import Class
 import Avail
@@ -38,16 +37,20 @@ import DsMonad
 import DsExpr
 import DsBinds
 import DsForeign
+import PrelNames   ( coercibleTyConKey )
+import TysPrim     ( eqReprPrimTyCon )
+import Unique      ( hasKey )
+import Coercion    ( mkCoVarCo )
+import TysWiredIn  ( coercibleDataCon )
+import DataCon     ( dataConWrapId )
+import MkCore      ( mkCoreLet )
 import Module
 import NameSet
 import NameEnv
 import Rules
-import TysPrim (eqReprPrimTyCon)
-import TysWiredIn (coercibleTyCon )
 import BasicTypes       ( Activation(.. ), competesWith, pprRuleName )
 import CoreMonad        ( CoreToDo(..) )
 import CoreLint         ( endPassIO )
-import MkCore
 import VarSet
 import FastString
 import ErrUtils
@@ -325,7 +328,7 @@ deSugar hsc_env
 
         ; case mb_res of {
            Nothing -> return (msgs, Nothing) ;
-           Just (ds_ev_binds, all_prs, all_rules, vects0, ds_fords) -> do
+           Just (ds_ev_binds, all_prs, all_rules, vects0, ds_fords) ->
 
      do {       -- Add export flags to bindings
           keep_alive <- readIORef keep_var
@@ -629,13 +632,19 @@ unfold_coerce bndrs lhs rhs = do
     go :: [Id] -> DsM ([Id], CoreExpr -> CoreExpr)
     go []     = return ([], id)
     go (v:vs)
-        | Just (tc, args) <- splitTyConApp_maybe (idType v)
-        , tc == coercibleTyCon = do
-            let ty' = mkTyConApp eqReprPrimTyCon args
-            v' <- mkDerivedLocalM mkRepEqOcc v ty'
+        | Just (tc, [k, t1, t2]) <- splitTyConApp_maybe (idType v)
+        , tc `hasKey` coercibleTyConKey = do
+            u <- newUnique
+
+            let ty' = mkTyConApp eqReprPrimTyCon [k, k, t1, t2]
+                v'  = mkLocalCoVar
+                        (mkDerivedInternalName mkRepEqOcc u (getName v)) ty'
+                box = Var (dataConWrapId coercibleDataCon) `mkTyApps`
+                      [k, t1, t2] `App`
+                      Coercion (mkCoVarCo v')
 
             (bndrs, wrap) <- go vs
-            return (v':bndrs, mkCoreLet (NonRec v (mkEqBox (mkCoVarCo v'))) . wrap)
+            return (v':bndrs, mkCoreLet (NonRec v box) . wrap)
         | otherwise = do
             (bndrs,wrap) <- go vs
             return (v:bndrs, wrap)
@@ -649,8 +658,6 @@ of cons's. We can achieve that slightly indirectly by
 switching off EnableRewriteRules.  See DsExpr.dsExplicitList.
 
 That keeps the desugaring of list comprehensions simple too.
-
-
 
 Nor do we want to warn of conversion identities on the LHS;
 the rule is precisly to optimise them:
@@ -669,6 +676,7 @@ For that we replace any forall'ed `c :: Coercible a b` value in a RULE by
 corresponding `co :: a ~#R b` and wrap the LHS and the RHS in
 `let c = MkCoercible co in ...`. This is later simplified to the desired form
 by simpleOptExpr (for the LHS) resp. the simplifiers (for the RHS).
+See also Note [Getting the map/coerce RULE to work] in CoreSubst.
 
 Note [Rules and inlining/other rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

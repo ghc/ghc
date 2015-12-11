@@ -15,23 +15,18 @@
 ((Test10358.hs:5:7-16,AnnEqual), [Test10358.hs:5:12]),
 ((Test10358.hs:5:7-16,AnnSemi), [Test10358.hs:5:17]),
 ((Test10358.hs:5:14-16,AnnVal), [Test10358.hs:5:15]),
-((Test10358.hs:5:15,AnnStar), [Test10358.hs:5:15]),
 ((Test10358.hs:5:19-22,AnnBang), [Test10358.hs:5:19]),
 ((Test10358.hs:5:19-32,AnnEqual), [Test10358.hs:5:24]),
 ((Test10358.hs:5:19-32,AnnSemi), [Test10358.hs:6:7]),
 ((Test10358.hs:5:26-32,AnnVal), [Test10358.hs:5:29]),
-((Test10358.hs:5:29,AnnStar), [Test10358.hs:5:29]),
 ((Test10358.hs:6:7-16,AnnEqual), [Test10358.hs:6:10]),
 ((Test10358.hs:6:7-16,AnnFunId), [Test10358.hs:6:7-8]),
 ((Test10358.hs:6:7-16,AnnSemi), [Test10358.hs:7:7]),
 ((Test10358.hs:6:12-14,AnnVal), [Test10358.hs:6:13]),
 ((Test10358.hs:6:12-16,AnnVal), [Test10358.hs:6:15]),
-((Test10358.hs:6:13,AnnStar), [Test10358.hs:6:13]),
-((Test10358.hs:6:15,AnnStar), [Test10358.hs:6:15]),
 ((Test10358.hs:7:7-17,AnnEqual), [Test10358.hs:7:10]),
 ((Test10358.hs:7:7-17,AnnFunId), [Test10358.hs:7:7-8]),
 ((Test10358.hs:7:12-17,AnnVal), [Test10358.hs:7:14]),
-((Test10358.hs:7:14,AnnStar), [Test10358.hs:7:14]),
 ((<no location info>,AnnEofPos), [Test10358.hs:9:1])
 ]
 

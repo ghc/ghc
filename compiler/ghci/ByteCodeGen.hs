@@ -57,6 +57,7 @@ import UniqSupply
 import BreakArray
 import Data.Maybe
 import Module
+import Control.Arrow ( second )
 
 import qualified Data.ByteString        as BS
 import qualified Data.ByteString.Unsafe as BS
@@ -77,7 +78,7 @@ byteCodeGen :: DynFlags
 byteCodeGen dflags this_mod binds tycs modBreaks
    = do showPass dflags "ByteCodeGen"
 
-        let flatBinds = [ (bndr, freeVars rhs)
+        let flatBinds = [ (bndr, simpleFreeVars rhs)
                         | (bndr, rhs) <- flattenBinds binds]
 
         us <- mkSplitUniqSupply 'y'
@@ -91,6 +92,7 @@ byteCodeGen dflags this_mod binds tycs modBreaks
            "Proto-BCOs" (vcat (intersperse (char ' ') (map ppr proto_bcos)))
 
         assembleBCOs dflags proto_bcos tycs
+  where
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for an expression
@@ -114,7 +116,7 @@ coreExprToBCOs dflags this_mod expr
       us <- mkSplitUniqSupply 'y'
       (BcM_State _dflags _us _this_mod _final_ctr mallocd _ , proto_bco)
          <- runBc dflags us this_mod emptyModBreaks $
-              schemeTopBind (invented_id, freeVars expr)
+              schemeTopBind (invented_id, simpleFreeVars expr)
 
       when (notNull mallocd)
            (panic "ByteCodeGen.coreExprToBCOs: missing final emitBc?")
@@ -123,6 +125,31 @@ coreExprToBCOs dflags this_mod expr
 
       assembleBCO dflags proto_bco
 
+
+-- The regular freeVars function gives more information than is useful to
+-- us here. simpleFreeVars does the impedence matching.
+simpleFreeVars :: CoreExpr -> AnnExpr Id DVarSet
+simpleFreeVars = go . freeVars
+  where
+    go :: AnnExpr Id FVAnn -> AnnExpr Id DVarSet
+    go (ann, e) = (freeVarsOfAnn ann, go' e)
+
+    go' :: AnnExpr' Id FVAnn -> AnnExpr' Id DVarSet
+    go' (AnnVar id)                  = AnnVar id
+    go' (AnnLit lit)                 = AnnLit lit
+    go' (AnnLam bndr body)           = AnnLam bndr (go body)
+    go' (AnnApp fun arg)             = AnnApp (go fun) (go arg)
+    go' (AnnCase scrut bndr ty alts) = AnnCase (go scrut) bndr ty (map go_alt alts)
+    go' (AnnLet bind body)           = AnnLet (go_bind bind) (go body)
+    go' (AnnCast expr (ann, co))     = AnnCast (go expr) (freeVarsOfAnn ann, co)
+    go' (AnnTick tick body)          = AnnTick tick (go body)
+    go' (AnnType ty)                 = AnnType ty
+    go' (AnnCoercion co)             = AnnCoercion co
+
+    go_alt (con, args, expr) = (con, args, go expr)
+
+    go_bind (AnnNonRec bndr rhs) = AnnNonRec bndr (go rhs)
+    go_bind (AnnRec pairs)       = AnnRec (map (second go) pairs)
 
 -- -----------------------------------------------------------------------------
 -- Compilation schema for the bytecode generator

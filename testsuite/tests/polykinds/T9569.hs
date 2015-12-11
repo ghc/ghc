@@ -2,7 +2,7 @@
 {-# LANGUAGE RankNTypes, ConstraintKinds, KindSignatures, DataKinds, TypeFamilies #-}
 module T9569 where
 
-import GHC.Prim
+import GHC.Exts
 
 data Proxy (c :: Constraint)
 

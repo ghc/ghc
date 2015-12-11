@@ -22,9 +22,9 @@ T11192.hs:7:14: warning:
 
 T11192.hs:13:14: warning:
     • Found type wildcard ‘_’ standing for ‘t -> t1 -> t1’
-      Where: ‘t’ is a rigid type variable bound by
+      Where: ‘t1’ is a rigid type variable bound by
                the inferred type of go :: t -> t1 -> t1 at T11192.hs:14:8
-             ‘t1’ is a rigid type variable bound by
+             ‘t’ is a rigid type variable bound by
                the inferred type of go :: t -> t1 -> t1 at T11192.hs:14:8
     • In the type signature:
         go :: _

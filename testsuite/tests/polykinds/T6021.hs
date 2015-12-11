@@ -1,4 +1,4 @@
-{-# LANGUAGE KindSignatures, PolyKinds, MultiParamTypeClasses #-}
+{-# LANGUAGE KindSignatures, PolyKinds, MultiParamTypeClasses, FlexibleInstances #-}
 module T6021 where
 
 class Panic a b

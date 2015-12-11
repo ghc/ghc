@@ -35,7 +35,6 @@ import CoreUtils
 import CoreArity ( etaExpand )
 import CoreUnfold
 import CoreFVs
-import UniqSupply
 import Digraph
 
 import PrelNames
@@ -44,10 +43,8 @@ import TyCon
 import TcEvidence
 import TcType
 import Type
-import Kind( isKind )
-import Coercion hiding (substCo)
-import TysWiredIn ( eqBoxDataCon, coercibleDataCon, mkListTy
-                  , mkBoxedTupleTy, charTy
+import Coercion
+import TysWiredIn ( mkListTy, mkBoxedTupleTy, charTy
                   , typeNatKind, typeSymbolKind )
 import Id
 import MkId(proxyHashId)
@@ -55,7 +52,6 @@ import Class
 import DataCon  ( dataConTyCon )
 import Name
 import IdInfo   ( IdDetails(..) )
-import Var
 import VarSet
 import Rules
 import VarEnv
@@ -70,7 +66,7 @@ import DynFlags
 import FastString
 import Util
 import MonadUtils
-import Control.Monad(liftM,when,foldM)
+import Control.Monad
 
 {-**********************************************************************
 *                                                                      *
@@ -182,7 +178,7 @@ dsHsBind dflags
 
         ; (spec_binds, rules) <- dsSpecs rhs prags
 
-        ; let   global'   = addIdSpecialisations global rules
+        ; let   global'  = addIdSpecialisations global rules
                 main_bind = makeCorePair dflags global' (isDefaultMethod prags)
                                          (dictArity dicts) rhs
 
@@ -243,12 +239,14 @@ dsHsBind dflags
                              -- the inline pragma from the source
                              -- The type checker put the inline pragma
                              -- on the *global* Id, so we need to transfer it
-    inline_env = mkVarEnv [ (lcl_id, setInlinePragma lcl_id prag)
-                          | ABE { abe_mono = lcl_id, abe_poly = gbl_id } <- exports
-                          , let prag = idInlinePragma gbl_id ]
+    inline_env
+      = mkVarEnv [ (lcl_id, setInlinePragma lcl_id prag)
+                 | ABE { abe_mono = lcl_id, abe_poly = gbl_id } <- exports
+                 , let prag = idInlinePragma gbl_id ]
 
     add_inline :: Id -> Id    -- tran
-    add_inline lcl_id = lookupVarEnv inline_env lcl_id `orElse` lcl_id
+    add_inline lcl_id = lookupVarEnv inline_env lcl_id
+                        `orElse` lcl_id
 
     global_env :: IdEnv Id -- Maps local Id to its global exported Id
     global_env =
@@ -797,18 +795,23 @@ decomposeRuleLhs orig_bndrs orig_lhs
            -- which in turn makes wrap_lets work right
 
    split_lets :: CoreExpr -> ([(DictId,CoreExpr)], CoreExpr)
-   split_lets e
-     | Let (NonRec d r) body <- e
-     , isDictId d
-     , (bs, body') <- split_lets body
+   split_lets (Let (NonRec d r) body)
+     | isDictId d
      = ((d,r):bs, body')
-     | otherwise
-     = ([], e)
+     where (bs, body') = split_lets body
+
+    -- handle "unlifted lets" too, needed for "map/coerce"
+   split_lets (Case r d _ [(DEFAULT, _, body)])
+     | isCoVar d
+     = ((d,r):bs, body')
+     where (bs, body') = split_lets body
+
+   split_lets e = ([], e)
 
    wrap_lets :: VarSet -> [(DictId,CoreExpr)] -> CoreExpr -> CoreExpr
    wrap_lets _ [] body = body
    wrap_lets needed ((d, r) : bs) body
-     | rhs_fvs `intersectsVarSet` needed = Let (NonRec d r) (wrap_lets needed' bs body)
+     | rhs_fvs `intersectsVarSet` needed = mkCoreLet (NonRec d r) (wrap_lets needed' bs body)
      | otherwise                         = wrap_lets needed bs body
      where
        rhs_fvs = exprFreeVars r
@@ -946,7 +949,6 @@ confused.   Likewise it might have an InlineRule or something, which would be
 utterly bogus. So we really make a fresh Id, with the same unique and type
 as the old one, but with an Internal name and no IdInfo.
 
-
 ************************************************************************
 *                                                                      *
                 Desugaring evidence
@@ -966,8 +968,8 @@ dsHsWrapper (WpFun c1 c2 t1 _) e = do { x <- newSysLocalDs t1
                                       ; e1 <- dsHsWrapper c1 (Var x)
                                       ; e2 <- dsHsWrapper c2 (mkCoreAppDs (text "dsHsWrapper") e e1)
                                       ; return (Lam x e2) }
-dsHsWrapper (WpCast co)       e = ASSERT(tcCoercionRole co == Representational)
-                                  dsTcCoercion co (mkCastDs e)
+dsHsWrapper (WpCast co)       e = ASSERT(coercionRole co == Representational)
+                                  return $ mkCastDs e co
 dsHsWrapper (WpEvLam ev)      e = return $ Lam ev e
 dsHsWrapper (WpTyLam tv)      e = return $ Lam tv e
 dsHsWrapper (WpEvApp    tm)   e = liftM (App e) (dsEvTerm tm)
@@ -985,22 +987,12 @@ dsTcEvBinds (EvBinds bs)   = dsEvBinds bs
 dsEvBinds :: Bag EvBind -> DsM [CoreBind]
 dsEvBinds bs = mapM ds_scc (sccEvBinds bs)
   where
-    ds_scc (AcyclicSCC (EvBind { eb_lhs = v, eb_rhs = r }))
+    ds_scc (AcyclicSCC (EvBind { eb_lhs = v, eb_rhs = r}))
                           = liftM (NonRec v) (dsEvTerm r)
-    ds_scc (CyclicSCC bs) = liftM Rec (mapM ds_pair bs)
+    ds_scc (CyclicSCC bs) = liftM Rec (mapM dsEvBind bs)
 
-    ds_pair (EvBind { eb_lhs = v, eb_rhs = r }) = liftM ((,) v) (dsEvTerm r)
-
-sccEvBinds :: Bag EvBind -> [SCC EvBind]
-sccEvBinds bs = stronglyConnCompFromEdgedVertices edges
-  where
-    edges :: [(EvBind, EvVar, [EvVar])]
-    edges = foldrBag ((:) . mk_node) [] bs
-
-    mk_node :: EvBind -> (EvBind, EvVar, [EvVar])
-    mk_node b@(EvBind { eb_lhs = var, eb_rhs = term })
-       = (b, var, varSetElems (evVarsOfTerm term))
-
+dsEvBind :: EvBind -> DsM (Id, CoreExpr)
+dsEvBind (EvBind { eb_lhs = v, eb_rhs = r}) = liftM ((,) v) (dsEvTerm r)
 
 {-**********************************************************************
 *                                                                      *
@@ -1017,24 +1009,24 @@ dsEvTerm (EvLit (EvStr s))  = mkStringExprFS s
 
 dsEvTerm (EvCast tm co)
   = do { tm' <- dsEvTerm tm
-       ; dsTcCoercion co $ mkCastDs tm' }
-         -- 'v' is always a lifted evidence variable so it is
-         -- unnecessary to call varToCoreExpr v here.
+       ; return $ mkCastDs tm' co }
 
 dsEvTerm (EvDFunApp df tys tms)
-  = return (Var df `mkTyApps` tys `mkApps` (map Var tms))
+  = do { tms' <- mapM dsEvTerm tms
+       ; return $ Var df `mkTyApps` tys `mkApps` tms' }
 
-dsEvTerm (EvCoercion (TcCoVarCo v)) = return (Var v)  -- See Note [Simple coercions]
-dsEvTerm (EvCoercion co)            = dsTcCoercion co mkEqBox
-
+dsEvTerm (EvCoercion co) = return (Coercion co)
 dsEvTerm (EvSuperClass d n)
   = do { d' <- dsEvTerm d
        ; let (cls, tys) = getClassPredTys (exprType d')
              sc_sel_id  = classSCSelId cls n    -- Zero-indexed
        ; return $ Var sc_sel_id `mkTyApps` tys `App` d' }
 
-dsEvTerm (EvDelayedError ty msg)
-  = return $ Var errorId `mkTyApps` [ty] `mkApps` [litMsg]
+dsEvTerm (EvDelayedError ty msg) = return $ dsEvDelayedError ty msg
+
+dsEvDelayedError :: Type -> FastString -> CoreExpr
+dsEvDelayedError ty msg
+  = Var errorId `mkTyApps` [getLevity "dsEvTerm" ty, ty] `mkApps` [litMsg]
   where
     errorId = tYPE_ERROR_ID
     litMsg  = Lit (MachStr (fastStringToByteString msg))
@@ -1071,10 +1063,9 @@ dsEvTypeable ty ev
 
 ds_ev_typeable :: Type -> EvTypeable -> DsM CoreExpr
 -- Returns a CoreExpr :: TypeRep ty
-ds_ev_typeable ty EvTypeableTyCon
+ds_ev_typeable ty (EvTypeableTyCon evs)
   | Just (tc, ks) <- splitTyConApp_maybe ty
-  = ASSERT( all isKind ks )
-    do { ctr <- dsLookupGlobalId mkPolyTyConAppName
+  = do { ctr <- dsLookupGlobalId mkPolyTyConAppName
                     -- mkPolyTyConApp :: TyCon -> [KindRep] -> [TypeRep] -> TypeRep
        ; tyRepTc <- dsLookupTyCon typeRepTyConName  -- TypeRep (the TyCon)
        ; let tyRepType = mkTyConApp tyRepTc []      -- TypeRep (the Type)
@@ -1083,15 +1074,9 @@ ds_ev_typeable ty EvTypeableTyCon
                                   , mkListExpr tyRepType kReps
                                   , mkListExpr tyRepType tReps ]
 
-             kindRep k  -- Returns CoreExpr :: TypeRep for that kind k
-               = case splitTyConApp_maybe k of
-                   Nothing -> panic "dsEvTypeable: not a kind constructor"
-                   Just (kc,ks) -> do { kcRep <- tyConRep kc
-                                      ; reps  <- mapM kindRep ks
-                                      ; return (mkRep kcRep [] reps) }
 
        ; tcRep <- tyConRep tc
-       ; kReps <- mapM kindRep ks
+       ; kReps <- zipWithM getRep evs ks
        ; return (mkRep tcRep kReps []) }
 
 ds_ev_typeable ty (EvTypeableTyApp ev1 ev2)
@@ -1213,119 +1198,3 @@ dsEvCallStack cs = do
     EvCsTop name loc tm -> mkPush name loc tm
     EvCsPushCall name loc tm -> mkPush (occNameFS $ getOccName name) loc tm
     EvCsEmpty -> panic "Cannot have an empty CallStack"
-
-{-**********************************************************************
-*                                                                      *
-           Desugaring Coercions
-*                                                                      *
-**********************************************************************-}
-
-dsTcCoercion :: TcCoercion -> (Coercion -> CoreExpr) -> DsM CoreExpr
--- This is the crucial function that moves
--- from TcCoercions to Coercions; see Note [TcCoercions] in Coercion
--- e.g.  dsTcCoercion (trans g1 g2) k
---       = case g1 of EqBox g1# ->
---         case g2 of EqBox g2# ->
---         k (trans g1# g2#)
--- thing_inside will get a coercion at the role requested
-dsTcCoercion co thing_inside
-  = do { us <- newUniqueSupply
-       ; let eqvs_covs :: [(EqVar,CoVar)]
-             eqvs_covs = zipWith mk_co_var (varSetElems (coVarsOfTcCo co))
-                                           (uniqsFromSupply us)
-
-             subst = mkCvSubst emptyInScopeSet [(eqv, mkCoVarCo cov) | (eqv, cov) <- eqvs_covs]
-             result_expr = thing_inside (ds_tc_coercion subst co)
-             result_ty   = exprType result_expr
-
-       ; return (foldr (wrap_in_case result_ty) result_expr eqvs_covs) }
-  where
-    mk_co_var :: Id -> Unique -> (Id, Id)
-    mk_co_var eqv uniq = (eqv, mkUserLocal occ uniq ty loc)
-       where
-         eq_nm = idName eqv
-         occ = nameOccName eq_nm
-         loc = nameSrcSpan eq_nm
-         ty  = mkCoercionType (getEqPredRole (evVarPred eqv)) ty1 ty2
-         (ty1, ty2) = getEqPredTys (evVarPred eqv)
-
-    wrap_in_case result_ty (eqv, cov) body
-      = case getEqPredRole (evVarPred eqv) of
-         Nominal          -> Case (Var eqv) eqv result_ty [(DataAlt eqBoxDataCon, [cov], body)]
-         Representational -> Case (Var eqv) eqv result_ty [(DataAlt coercibleDataCon, [cov], body)]
-         Phantom          -> panic "wrap_in_case/phantom"
-
-ds_tc_coercion :: CvSubst -> TcCoercion -> Coercion
--- If the incoming TcCoercion if of type (a ~ b)   (resp.  Coercible a b)
---                 the result is of type (a ~# b)  (reps.  a ~# b)
--- The VarEnv maps EqVars of type (a ~ b) to Coercions of type (a ~# b) (resp. and so on)
--- No need for InScope set etc because the
-ds_tc_coercion subst tc_co
-  = go tc_co
-  where
-    go (TcRefl r ty)            = Refl r (Coercion.substTy subst ty)
-    go (TcTyConAppCo r tc cos)  = mkTyConAppCo r tc (map go cos)
-    go (TcAppCo co1 co2)        = mkAppCo (go co1) (go co2)
-    go (TcForAllCo tv co)       = mkForAllCo tv' (ds_tc_coercion subst' co)
-                              where
-                                (subst', tv') = Coercion.substTyVarBndr subst tv
-    go (TcAxiomInstCo ax ind cos)
-                                = AxiomInstCo ax ind (map go cos)
-    go (TcPhantomCo ty1 ty2)    = UnivCo (fsLit "ds_tc_coercion") Phantom ty1 ty2
-    go (TcSymCo co)             = mkSymCo (go co)
-    go (TcTransCo co1 co2)      = mkTransCo (go co1) (go co2)
-    go (TcNthCo n co)           = mkNthCo n (go co)
-    go (TcLRCo lr co)           = mkLRCo lr (go co)
-    go (TcSubCo co)             = mkSubCo (go co)
-    go (TcLetCo bs co)          = ds_tc_coercion (ds_co_binds bs) co
-    go (TcCastCo co1 co2)       = mkCoCast (go co1) (go co2)
-    go (TcCoVarCo v)            = ds_ev_id subst v
-    go (TcAxiomRuleCo co ts cs) = AxiomRuleCo co (map (Coercion.substTy subst) ts) (map go cs)
-    go (TcCoercion co)          = co
-
-    ds_co_binds :: TcEvBinds -> CvSubst
-    ds_co_binds (EvBinds bs)      = foldl ds_scc subst (sccEvBinds bs)
-    ds_co_binds eb@(TcEvBinds {}) = pprPanic "ds_co_binds" (ppr eb)
-
-    ds_scc :: CvSubst -> SCC EvBind -> CvSubst
-    ds_scc subst (AcyclicSCC (EvBind { eb_lhs = v, eb_rhs = ev_term }))
-      = extendCvSubstAndInScope subst v (ds_co_term subst ev_term)
-    ds_scc _ (CyclicSCC other) = pprPanic "ds_scc:cyclic" (ppr other $$ ppr tc_co)
-
-    ds_co_term :: CvSubst -> EvTerm -> Coercion
-    ds_co_term subst (EvCoercion tc_co) = ds_tc_coercion subst tc_co
-    ds_co_term subst (EvId v)           = ds_ev_id subst v
-    ds_co_term subst (EvCast tm co)     = mkCoCast (ds_co_term subst tm) (ds_tc_coercion subst co)
-    ds_co_term _ other = pprPanic "ds_co_term" (ppr other $$ ppr tc_co)
-
-    ds_ev_id :: CvSubst -> EqVar -> Coercion
-    ds_ev_id subst v
-     | Just co <- Coercion.lookupCoVar subst v = co
-     | otherwise  = pprPanic "ds_tc_coercion" (ppr v $$ ppr tc_co)
-
-{-
-Note [Simple coercions]
-~~~~~~~~~~~~~~~~~~~~~~~
-We have a special case for coercions that are simple variables.
-Suppose   cv :: a ~ b   is in scope
-Lacking the special case, if we see
-        f a b cv
-we'd desguar to
-        f a b (case cv of EqBox (cv# :: a ~# b) -> EqBox cv#)
-which is a bit stupid.  The special case does the obvious thing.
-
-This turns out to be important when desugaring the LHS of a RULE
-(see Trac #7837).  Suppose we have
-    normalise        :: (a ~ Scalar a) => a -> a
-    normalise_Double :: Double -> Double
-    {-# RULES "normalise" normalise = normalise_Double #-}
-
-Then the RULE we want looks like
-     forall a, (cv:a~Scalar a).
-       normalise a cv = normalise_Double
-But without the special case we generate the redundant box/unbox,
-which simpleOpt (currently) doesn't remove. So the rule never matches.
-
-Maybe simpleOpt should be smarter.  But it seems like a good plan
-to simply never generate the redundant box/unbox in the first place.
--}

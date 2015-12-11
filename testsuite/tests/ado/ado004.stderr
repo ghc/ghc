@@ -18,9 +18,9 @@ TYPE SIGNATURES
     (Monad m, Num a2) =>
     (a2 -> m a1) -> (a1 -> a1 -> m a) -> m a
   test6 ::
-    forall t (m :: * -> *) a.
+    forall r (m :: * -> *) a.
     (Monad m, Num (m a)) =>
-    (m a -> m (m a)) -> t -> m a
+    (m a -> m (m a)) -> r -> m a
 TYPE CONSTRUCTORS
 COERCION AXIOMS
 Dependent modules: []

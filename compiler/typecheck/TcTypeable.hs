@@ -189,7 +189,6 @@ mkTyConRepBinds (dflags, mod_expr, pkg_str, mod_str, tr_datacon, trn_datacon) ty
 
     tycon_str = add_tick (occNameString (getOccName tycon))
     add_tick s | isPromotedDataCon tycon = '\'' : s
-               | isPromotedTyCon   tycon = '\'' : s
                | otherwise               = s
 
     hashThis :: String
@@ -205,6 +204,4 @@ mkTyConRepBinds (dflags, mod_expr, pkg_str, mod_str, tr_datacon, trn_datacon) ty
 
 mkTypeableDataConBinds :: TypeableStuff -> DataCon -> LHsBinds Id
 mkTypeableDataConBinds stuff dc
-  = case promoteDataCon_maybe dc of
-      Promoted tc -> mkTyConRepBinds stuff tc
-      NotPromoted -> emptyBag
+  = mkTyConRepBinds stuff (promoteDataCon dc)

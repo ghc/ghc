@@ -8,10 +8,10 @@ module Vectorise.Builtins.Base (
   mAX_DPH_COMBINE,
   mAX_DPH_SCALAR_ARGS,
   aLL_DPH_PRIM_TYCONS,
-  
+
   -- * Builtins
   Builtins(..),
-  
+
   -- * Projections
   selTy, selsTy,
   selReplicate,
@@ -68,8 +68,8 @@ aLL_DPH_PRIM_TYCONS = map tyConName [intPrimTyCon, {- floatPrimTyCon, -} doubleP
 -- |Holds the names of the types and functions from 'Data.Array.Parallel.Prim' that are used by the
 -- vectoriser.
 --
-data Builtins 
-        = Builtins 
+data Builtins
+        = Builtins
         { parrayTyCon          :: TyCon                     -- ^ PArray
         , pdataTyCon           :: TyCon                     -- ^ PData
         , pdatasTyCon          :: TyCon                     -- ^ PDatas
@@ -100,7 +100,7 @@ data Builtins
         , closureTyCon         :: TyCon                     -- ^ :->
         , closureVar           :: Var                       -- ^ closure
         , liftedClosureVar     :: Var                       -- ^ liftedClosure
-        , applyVar             :: Var                       -- ^ $: 
+        , applyVar             :: Var                       -- ^ $:
         , liftedApplyVar       :: Var                       -- ^ liftedApply
         , closureCtrFuns       :: Array Int Var             -- ^ closure1 .. closure3
         , selTys               :: Array Int Type            -- ^ Sel2
@@ -127,7 +127,7 @@ selsLength :: Int -> Builtins -> CoreExpr
 selsLength      = indexBuiltin "selLength" selsLengths
 
 selReplicate :: Int -> Builtins -> CoreExpr
-selReplicate    = indexBuiltin "selReplicate" selReplicates 
+selReplicate    = indexBuiltin "selReplicate" selReplicates
 
 selTags :: Int -> Builtins -> CoreExpr
 selTags         = indexBuiltin "selTags" selTagss
@@ -140,13 +140,13 @@ sumTyCon        = indexBuiltin "sumTyCon" sumTyCons
 
 prodTyCon :: Int -> Builtins -> TyCon
 prodTyCon n _
-  | n >= 2 && n <= mAX_DPH_PROD 
+  | n >= 2 && n <= mAX_DPH_PROD
   = tupleTyCon Boxed n
   | otherwise
   = pprPanic "prodTyCon" (ppr n)
 
 prodDataCon :: Int -> Builtins -> DataCon
-prodDataCon n bi 
+prodDataCon n bi
  = case tyConDataCons (prodTyCon n bi) of
     [con] -> con
     _ -> pprPanic "prodDataCon" (ppr n)
@@ -168,7 +168,7 @@ combinePDVar = indexBuiltin "combinePDVar" combinePDVars
 
 combinePD_PrimVar :: Int -> TyCon -> Builtins -> Var
 combinePD_PrimVar i tc bi
-  = lookupEnvBuiltin "combinePD_PrimVar" 
+  = lookupEnvBuiltin "combinePD_PrimVar"
       (indexBuiltin "combinePD_PrimVar" combinePD_PrimVarss i bi) (tyConName tc)
 
 scalarZip :: Int -> Builtins -> Var
@@ -179,18 +179,18 @@ closureCtrFun = indexBuiltin "closureCtrFun" closureCtrFuns
 
 -- | Get an element from one of the arrays of `Builtins`.
 --   Panic if the indexed thing is not in the array.
-indexBuiltin :: (Ix i, Outputable i) 
+indexBuiltin :: (Ix i, Outputable i)
              => String                   -- ^ Name of the selector we've used, for panic messages.
              -> (Builtins -> Array i a)  -- ^ Field selector for the `Builtins`.
              -> i                        -- ^ Index into the array.
-             -> Builtins 
+             -> Builtins
              -> a
 indexBuiltin fn f i bi
   | inRange (bounds xs) i = xs ! i
-  | otherwise       
-  = pprSorry "Vectorise.Builtins.indexBuiltin" 
+  | otherwise
+  = pprSorry "Vectorise.Builtins.indexBuiltin"
     (vcat [ text ""
-    , text "DPH builtin function '" <> text fn <> text "' of size '" <> ppr i <> 
+    , text "DPH builtin function '" <> text fn <> text "' of size '" <> ppr i <>
       text "' is not yet implemented."
     , text "This function does not appear in your source program, but it is needed"
     , text "to compile your code in the backend. This is a known, current limitation"
@@ -206,10 +206,10 @@ lookupEnvBuiltin :: String                    -- Function name for error message
                  -> a
 lookupEnvBuiltin fn env n
   | Just r <- lookupNameEnv env n = r
-  | otherwise 
-  = pprSorry "Vectorise.Builtins.lookupEnvBuiltin" 
+  | otherwise
+  = pprSorry "Vectorise.Builtins.lookupEnvBuiltin"
     (vcat [ text ""
-    , text "DPH builtin function '" <> text fn <> text "_" <> ppr n <> 
+    , text "DPH builtin function '" <> text fn <> text "_" <> ppr n <>
       text "' is not yet implemented."
     , text "This function does not appear in your source program, but it is needed"
     , text "to compile your code in the backend. This is a known, current limitation"

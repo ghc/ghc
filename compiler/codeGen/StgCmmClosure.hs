@@ -77,7 +77,7 @@ import DataCon
 import FastString
 import Name
 import Type
-import TypeRep
+import TyCoRep
 import TcType
 import TyCon
 import BasicTypes
@@ -957,16 +957,18 @@ getTyDescription :: Type -> String
 getTyDescription ty
   = case (tcSplitSigmaTy ty) of { (_, _, tau_ty) ->
     case tau_ty of
-      TyVarTy _                            -> "*"
-      AppTy fun _                   -> getTyDescription fun
-      FunTy _ res                   -> '-' : '>' : fun_result res
-      TyConApp tycon _              -> getOccString tycon
-      ForAllTy _ ty          -> getTyDescription ty
+      TyVarTy _              -> "*"
+      AppTy fun _            -> getTyDescription fun
+      TyConApp tycon _       -> getOccString tycon
+      ForAllTy (Anon _) res  -> '-' : '>' : fun_result res
+      ForAllTy (Named {}) ty -> getTyDescription ty
       LitTy n                -> getTyLitDescription n
+      CastTy ty _            -> getTyDescription ty
+      CoercionTy co          -> pprPanic "getTyDescription" (ppr co)
     }
   where
-    fun_result (FunTy _ res) = '>' : fun_result res
-    fun_result other             = getTyDescription other
+    fun_result (ForAllTy (Anon _) res) = '>' : fun_result res
+    fun_result other                   = getTyDescription other
 
 getTyLitDescription :: TyLit -> String
 getTyLitDescription l =

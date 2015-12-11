@@ -40,7 +40,6 @@ import SrcLoc
 import FastString
 import DynFlags
 import PrelNames (monadFailClassName)
-import Inst
 
 -- Create chunkified tuple tybes for monad comprehensions
 import MkCore
@@ -462,7 +461,8 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
              tup_ty        = mkBigCoreVarTupTy bndr_ids
              poly_arg_ty   = m_app alphaTy
              poly_res_ty   = m_app (n_app alphaTy)
-             using_poly_ty = mkForAllTy alphaTyVar $ by_arrow $
+             using_poly_ty = mkNamedForAllTy alphaTyVar Invisible $
+                             by_arrow $
                              poly_arg_ty `mkFunTy` poly_res_ty
 
        ; using' <- tcPolyExpr using using_poly_ty
@@ -472,7 +472,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
              -- typically something like [(Int,Bool,Int)]
              -- We don't know what tuple_ty is yet, so we use a variable
        ; let mk_n_bndr :: Name -> TcId -> TcId
-             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name (n_app (idType bndr_id))
+             mk_n_bndr n_bndr_name bndr_id = mkLocalIdOrCoVar n_bndr_name (n_app (idType bndr_id))
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
@@ -573,7 +573,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
                          , trS_by = by, trS_using = using, trS_form = form
                          , trS_ret = return_op, trS_bind = bind_op
                          , trS_fmap = fmap_op }) res_ty thing_inside
-  = do { let star_star_kind = liftedTypeKind `mkArrowKind` liftedTypeKind
+  = do { let star_star_kind = liftedTypeKind `mkFunTy` liftedTypeKind
        ; m1_ty   <- newFlexiTyVarTy star_star_kind
        ; m2_ty   <- newFlexiTyVarTy star_star_kind
        ; tup_ty  <- newFlexiTyVarTy liftedTypeKind
@@ -595,7 +595,8 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
              using_arg_ty = m1_ty `mkAppTy` tup_ty
              poly_res_ty  = m2_ty `mkAppTy` n_app alphaTy
              using_res_ty = m2_ty `mkAppTy` n_app tup_ty
-             using_poly_ty = mkForAllTy alphaTyVar $ by_arrow $
+             using_poly_ty = mkNamedForAllTy alphaTyVar Invisible $
+                             by_arrow $
                              poly_arg_ty `mkFunTy` poly_res_ty
 
              -- 'stmts' returns a result of type (m1_ty tuple_ty),
@@ -629,7 +630,8 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
        ; fmap_op' <- case form of
                        ThenForm -> return noSyntaxExpr
                        _ -> fmap unLoc . tcPolyExpr (noLoc fmap_op) $
-                            mkForAllTy alphaTyVar $ mkForAllTy betaTyVar $
+                            mkNamedForAllTy alphaTyVar Invisible $
+                            mkNamedForAllTy betaTyVar  Invisible $
                             (alphaTy `mkFunTy` betaTy)
                             `mkFunTy` (n_app alphaTy)
                             `mkFunTy` (n_app betaTy)
@@ -642,7 +644,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
 
        --------------- Bulding the bindersMap ----------------
        ; let mk_n_bndr :: Name -> TcId -> TcId
-             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name (n_app (idType bndr_id))
+             mk_n_bndr n_bndr_name bndr_id = mkLocalIdOrCoVar n_bndr_name (n_app (idType bndr_id))
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
@@ -689,10 +691,10 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
 --        -> m (st1, (st2, st3))
 --
 tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op) res_ty thing_inside
-  = do { let star_star_kind = liftedTypeKind `mkArrowKind` liftedTypeKind
+  = do { let star_star_kind = liftedTypeKind `mkFunTy` liftedTypeKind
        ; m_ty   <- newFlexiTyVarTy star_star_kind
 
-       ; let mzip_ty  = mkForAllTys [alphaTyVar, betaTyVar] $
+       ; let mzip_ty  = mkInvForAllTys [alphaTyVar, betaTyVar] $
                         (m_ty `mkAppTy` alphaTy)
                         `mkFunTy`
                         (m_ty `mkAppTy` betaTy)

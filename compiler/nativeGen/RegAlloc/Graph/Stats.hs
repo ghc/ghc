@@ -41,13 +41,13 @@ data RegAllocStats statics instr
         -- Information about the initial conflict graph.
         = RegAllocStatsStart
         { -- | Initial code, with liveness.
-          raLiveCmm     :: [LiveCmmDecl statics instr]                  
+          raLiveCmm     :: [LiveCmmDecl statics instr]
 
           -- | The initial, uncolored graph.
-        , raGraph       :: Color.Graph VirtualReg RegClass RealReg      
+        , raGraph       :: Color.Graph VirtualReg RegClass RealReg
 
           -- | Information to help choose which regs to spill.
-        , raSpillCosts  :: SpillCostInfo }                              
+        , raSpillCosts  :: SpillCostInfo }
 
 
         -- Information about an intermediate graph.
@@ -55,22 +55,22 @@ data RegAllocStats statics instr
         -- instruction stream.
         | RegAllocStatsSpill
         { -- | Code we tried to allocate registers for.
-          raCode        :: [LiveCmmDecl statics instr]                  
+          raCode        :: [LiveCmmDecl statics instr]
 
           -- | Partially colored graph.
         , raGraph       :: Color.Graph VirtualReg RegClass RealReg
 
           -- | The regs that were coaleced.
-        , raCoalesced   :: UniqFM VirtualReg                            
+        , raCoalesced   :: UniqFM VirtualReg
 
           -- | Spiller stats.
-        , raSpillStats  :: SpillStats                                   
+        , raSpillStats  :: SpillStats
 
           -- | Number of instructions each reg lives for.
-        , raSpillCosts  :: SpillCostInfo                                
+        , raSpillCosts  :: SpillCostInfo
 
           -- | Code with spill instructions added.
-        , raSpilled     :: [LiveCmmDecl statics instr] }                
+        , raSpilled     :: [LiveCmmDecl statics instr] }
 
 
         -- a successful coloring
@@ -103,7 +103,7 @@ data RegAllocStats statics instr
         , raSRMs          :: (Int, Int, Int) }
 
 
-instance (Outputable statics, Outputable instr) 
+instance (Outputable statics, Outputable instr)
        => Outputable (RegAllocStats statics instr) where
 
  ppr (s@RegAllocStatsStart{}) = sdocWithPlatform $ \platform ->
@@ -141,7 +141,7 @@ instance (Outputable statics, Outputable instr)
         $$ ppr (raSpilled s)
 
 
- ppr (s@RegAllocStatsColored { raSRMs = (spills, reloads, moves) }) 
+ ppr (s@RegAllocStatsColored { raSRMs = (spills, reloads, moves) })
     = sdocWithPlatform $ \platform ->
            text "#  Colored"
 
@@ -304,7 +304,7 @@ countSRMs cmm
         = execState (mapBlockTopM countSRM_block cmm) (0, 0, 0)
 
 
-countSRM_block 
+countSRM_block
         :: Instruction instr
         => GenBasicBlock (LiveInstr instr)
         -> State (Int, Int, Int) (GenBasicBlock (LiveInstr instr))

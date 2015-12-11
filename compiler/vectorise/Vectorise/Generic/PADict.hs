@@ -38,9 +38,9 @@ import FastString
 --
 -- Example:
 --    df :: forall a. PR (PRepr a) -> PA a -> PA (T a)
---    df = /\a. \(c:PR (PRepr a)) (d:PA a). MkPA c ($PR_df a d) ($toPRepr a d) ... 
+--    df = /\a. \(c:PR (PRepr a)) (d:PA a). MkPA c ($PR_df a d) ($toPRepr a d) ...
 --    $dPR_df :: forall a. PA a -> PR (PRepr (T a))
---    $dPR_df = ....   
+--    $dPR_df = ....
 --    $toRepr :: forall a. PA a -> T a -> PRepr (T a)
 --    $toPRepr = ...
 -- The "..." stuff is filled in by buildPAScAndMethods
@@ -49,7 +49,7 @@ import FastString
 buildPADict
         :: TyCon        -- ^ tycon of the type being vectorised.
         -> CoAxiom Unbranched
-                        -- ^ Coercion between the type and 
+                        -- ^ Coercion between the type and
                         --     its vectorised representation.
         -> TyCon        -- ^ PData  instance tycon
         -> TyCon        -- ^ PDatas instance tycon
@@ -62,7 +62,7 @@ buildPADict vect_tc prepr_ax pdata_tc pdatas_tc repr
                                   -- the envt; they don't include the silent superclass args yet
    do { mod <- liftDs getModule
       ; let dfun_name = mkLocalisedOccName mod mkPADFunOcc vect_tc_name
-   
+
           -- The superclass dictionary is a (silent) argument if the tycon is polymorphic...
       ; let mk_super_ty = do { r <- mkPReprType inst_ty
                              ; pr_cls <- builtin prClass
@@ -72,7 +72,7 @@ buildPADict vect_tc prepr_ax pdata_tc pdatas_tc repr
       ; super_args <- mapM (newLocalVar (fsLit "pr")) super_tys
       ; let val_args = super_args ++ args
             all_args = tvs ++ val_args
-     
+
           -- ...it is constant otherwise
       ; super_consts <- sequence [prDictOfPReprInstTyCon inst_ty prepr_ax [] | null tvs]
 
@@ -84,13 +84,13 @@ buildPADict vect_tc prepr_ax pdata_tc pdatas_tc repr
       ; pa_dc  <- builtin paDataCon
       ; let dict = mkLams all_args (mkConApp pa_dc con_args)
             con_args = Type inst_ty
-                     : map Var super_args  -- the superclass dictionary is either 
+                     : map Var super_args  -- the superclass dictionary is either
                     ++ super_consts        -- lambda-bound or constant
                     ++ map (method_call val_args) method_ids
 
           -- Build the type of the dictionary function.
       ; pa_cls <- builtin paClass
-      ; let dfun_ty = mkForAllTys tvs
+      ; let dfun_ty = mkInvForAllTys tvs
                     $ mkFunTys (map varType val_args)
                                (mkClassPred pa_cls [inst_ty])
 

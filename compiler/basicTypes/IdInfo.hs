@@ -10,7 +10,7 @@ Haskell. [WDP 94/11])
 
 module IdInfo (
         -- * The IdDetails type
-        IdDetails(..), pprIdDetails, coVarDetails,
+        IdDetails(..), pprIdDetails, coVarDetails, isCoVarDetails,
         RecSelParent(..),
 
         -- * The IdInfo type
@@ -135,19 +135,18 @@ data IdDetails
        --                  implemented with a newtype, so it might be bad
        --                  to be strict on this dictionary
 
+  | CoVarId                    -- ^ A coercion variable
+
   -- The rest are distinguished only for debugging reasons
   -- e.g. to suppress them in -ddump-types
   -- Currently we don't persist these through interface file
   -- (see MkIface.toIfaceIdDetails), but we easily could if it mattered
-
-  | DefMethId                   -- ^ A default-method Id, either polymorphic or generic
 
   | ReflectionId                -- ^ A top-level Id to support runtime reflection
                                 -- e.g. $trModule, or $tcT
 
   | PatSynId                    -- ^ A top-level Id to support pattern synonyms;
                                 -- the builder or matcher for the patern synonym
-
 
 data RecSelParent = RecSelData TyCon | RecSelPatSyn PatSyn deriving Eq
   -- Either `TyCon` or `PatSyn` depending
@@ -160,10 +159,15 @@ instance Outputable RecSelParent where
             RecSelData ty_con -> ppr ty_con
             RecSelPatSyn ps   -> ppr ps
 
-
-
+-- | Just a synonym for 'CoVarId'. Written separately so it can be
+-- exported in the hs-boot file.
 coVarDetails :: IdDetails
-coVarDetails = VanillaId
+coVarDetails = CoVarId
+
+-- | Check if an 'IdDetails' says 'CoVarId'.
+isCoVarDetails :: IdDetails -> Bool
+isCoVarDetails CoVarId = True
+isCoVarDetails _       = False
 
 instance Outputable IdDetails where
     ppr = pprIdDetails
@@ -173,7 +177,6 @@ pprIdDetails VanillaId = empty
 pprIdDetails other     = brackets (pp other)
  where
    pp VanillaId         = panic "pprIdDetails"
-   pp DefMethId         = ptext (sLit "DefMethId")
    pp ReflectionId      = ptext (sLit "ReflectionId")
    pp PatSynId          = ptext (sLit "PatSynId")
    pp (DataConWorkId _) = ptext (sLit "DataCon")
@@ -186,6 +189,7 @@ pprIdDetails other     = brackets (pp other)
    pp (RecSelId { sel_naughty = is_naughty })
                          = brackets $ ptext (sLit "RecSel")
                             <> ppWhen is_naughty (ptext (sLit "(naughty)"))
+   pp CoVarId           = ptext (sLit "CoVarId")
 
 {-
 ************************************************************************

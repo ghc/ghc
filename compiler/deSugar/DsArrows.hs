@@ -275,7 +275,7 @@ dsProcExpr pat (L _ (HsCmdTop cmd _unitTy cmd_ty ids)) = do
     var <- selectSimpleMatchVarL pat
     match_code <- matchSimply (Var var) ProcExpr pat env_stk_expr fail_expr
     let pat_ty = hsLPatType pat
-        proc_code = do_premap meth_ids pat_ty env_stk_ty cmd_ty
+    let proc_code = do_premap meth_ids pat_ty env_stk_ty cmd_ty
                     (Lam var match_code)
                     core_cmd
     return (mkLets meth_binds proc_code)
@@ -403,8 +403,8 @@ dsCmd ids local_vars stack_ty res_ty
         (HsCmdLam (MG { mg_alts = L _ [L _ (Match _ pats _
                                            (GRHSs [L _ (GRHS [] body)] _ ))] }))
         env_ids = do
+    let pat_vars = mkVarSet (collectPatsBinders pats)
     let
-        pat_vars = mkVarSet (collectPatsBinders pats)
         local_vars' = pat_vars `unionVarSet` local_vars
         (pat_tys, stack_ty') = splitTypeAt (length pats) stack_ty
     (core_body, free_vars, env_ids') <- dsfixCmd ids local_vars' stack_ty' res_ty body
@@ -711,9 +711,8 @@ dsCmdDo ids local_vars res_ty [L _ (LastStmt body _ _)] env_ids = do
         env_ids')
 
 dsCmdDo ids local_vars res_ty (stmt:stmts) env_ids = do
-    let
-        bound_vars = mkVarSet (collectLStmtBinders stmt)
-        local_vars' = bound_vars `unionVarSet` local_vars
+    let bound_vars  = mkVarSet (collectLStmtBinders stmt)
+    let local_vars' = bound_vars `unionVarSet` local_vars
     (core_stmts, _, env_ids') <- trimInput (dsCmdDo ids local_vars' res_ty stmts)
     (core_stmt, fv_stmt) <- dsCmdLStmt ids local_vars env_ids' stmt env_ids
     return (do_compose ids
@@ -785,10 +784,10 @@ dsCmdStmt ids local_vars out_ids (BodyStmt cmd _ _ c_ty) env_ids = do
 -- but that's likely to be defined in terms of first.
 
 dsCmdStmt ids local_vars out_ids (BindStmt pat cmd _ _) env_ids = do
-    (core_cmd, fv_cmd, env_ids1) <- dsfixCmd ids local_vars unitTy (hsLPatType pat) cmd
+    let pat_ty = hsLPatType pat
+    (core_cmd, fv_cmd, env_ids1) <- dsfixCmd ids local_vars unitTy pat_ty cmd
+    let pat_vars = mkVarSet (collectPatBinders pat)
     let
-        pat_ty = hsLPatType pat
-        pat_vars = mkVarSet (collectPatBinders pat)
         env_ids2 = varSetElems (mkVarSet out_ids `minusVarSet` pat_vars)
         env_ty2 = mkBigCoreVarTupTy env_ids2
 
@@ -1018,9 +1017,8 @@ dsCmdStmts ids local_vars out_ids [stmt] env_ids
   = dsCmdLStmt ids local_vars out_ids stmt env_ids
 
 dsCmdStmts ids local_vars out_ids (stmt:stmts) env_ids = do
-    let
-        bound_vars = mkVarSet (collectLStmtBinders stmt)
-        local_vars' = bound_vars `unionVarSet` local_vars
+    let bound_vars  = mkVarSet (collectLStmtBinders stmt)
+    let local_vars' = bound_vars `unionVarSet` local_vars
     (core_stmts, _fv_stmts, env_ids') <- dsfixCmdStmts ids local_vars' out_ids stmts
     (core_stmt, fv_stmt) <- dsCmdLStmt ids local_vars env_ids' stmt env_ids
     return (do_compose ids

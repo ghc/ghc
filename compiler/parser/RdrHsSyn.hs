@@ -52,7 +52,7 @@ module RdrHsSyn (
         checkDoAndIfThenElse,
         checkRecordSyntax,
         parseErrorSDoc,
-        splitTilde,
+        splitTilde, splitTildeApps,
 
         -- Help with processing exports
         ImpExpSubSpec(..),
@@ -77,9 +77,10 @@ import Lexer
 import Type             ( TyThing(..) )
 import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
-                          listTyConName, listTyConKey )
+                          listTyConName, listTyConKey,
+                          starKindTyConName, unicodeStarKindTyConName )
 import ForeignCall
-import PrelNames        ( forall_tv_RDR, allNameStrings )
+import PrelNames        ( forall_tv_RDR, eqTyCon_RDR, allNameStrings )
 import DynFlags
 import SrcLoc
 import Unique           ( hasKey )
@@ -443,9 +444,10 @@ splitCon :: LHsType RdrName
 splitCon ty
  = split ty []
  where
-   split (L _ (HsAppTy t u)) ts      = split t (u : ts)
-   split (L l (HsTyVar (L _ tc))) ts = do data_con <- tyConToDataCon l tc
-                                          return (data_con, mk_rest ts)
+   -- This is used somewhere where HsAppsTy is not used
+   split (L _ (HsAppTy t u)) ts       = split t (u : ts)
+   split (L l (HsTyVar (L _ tc)))  ts = do data_con <- tyConToDataCon l tc
+                                           return (data_con, mk_rest ts)
    split (L l (HsTupleTy HsBoxedOrConstraintTuple ts)) []
       = return (L l (getRdrName (tupleDataCon Boxed (length ts))), PrefixCon ts)
    split (L l _) _ = parseErrorSDoc l (text "Cannot parse data constructor in a data/newtype declaration:" <+> ppr ty)
@@ -641,8 +643,11 @@ checkTyVars pp_what equals_or_where tc tparms
        ; return (mkHsQTvs tvs) }
   where
 
+    chk (L _ (HsParTy ty)) = chk ty
+    chk (L _ (HsAppsTy [HsAppPrefix ty])) = chk ty
+
         -- Check that the name space is correct!
-    chk (L l (HsKindSig (L lv (HsTyVar (L _ tv))) k))
+    chk (L l (HsKindSig (L _ (HsAppsTy [HsAppPrefix (L lv (HsTyVar (L _ tv)))])) k))
         | isRdrTyVar tv    = return (L l (KindedTyVar (L lv tv) k))
     chk (L l (HsTyVar (L ltv tv)))
         | isRdrTyVar tv    = return (L l (UserTyVar (L ltv tv)))
@@ -695,10 +700,18 @@ checkTyClHdr is_cls ty
 
     go l (HsTyVar (L _ tc)) acc ann
       | isRdrTc tc               = return (L l tc, acc, ann)
-    go _ (HsOpTy t1 (_, ltc@(L _ tc)) t2) acc ann
+    go _ (HsOpTy t1 ltc@(L _ tc) t2) acc ann
       | isRdrTc tc               = return (ltc, t1:t2:acc, ann)
     go l (HsParTy ty)    acc ann = goL ty acc (ann ++ mkParensApiAnn l)
     go _ (HsAppTy t1 t2) acc ann = goL t1 (t2:acc) ann
+    go _ (HsAppsTy ts)   acc ann
+      | Just (head, args) <- getAppsTyHead_maybe ts = goL head (args ++ acc) ann
+
+    go _ (HsAppsTy [HsAppInfix (L loc star)]) [] ann
+      | occNameFS (rdrNameOcc star) == fsLit "*"
+      = return (L loc (nameRdrName starKindTyConName), [], ann)
+      | occNameFS (rdrNameOcc star) == fsLit "★"
+      = return (L loc (nameRdrName unicodeStarKindTyConName), [], ann)
 
     go l (HsTupleTy HsBoxedOrConstraintTuple ts) [] ann
       = return (L l (nameRdrName tup_name), ts, ann)
@@ -717,6 +730,10 @@ checkContext (L l orig_t)
  where
   check anns (L lp (HsTupleTy _ ts))   -- (Eq a, Ord b) shows up as a tuple type
     = return (anns ++ mkParensApiAnn lp,L l ts)                -- Ditto ()
+
+    -- don't let HsAppsTy get in the way
+  check anns (L _ (HsAppsTy [HsAppPrefix ty]))
+    = check anns ty
 
   check anns (L lp1 (HsParTy ty))-- to be sure HsParTy doesn't get into the way
        = check anns' ty
@@ -1028,7 +1045,7 @@ isFunLhs e = go e [] []
    go _ _ _ = return Nothing
 
 
--- | Transform btype with strict_mark's into HsEqTy's
+-- | Transform btype_no_ops with strict_mark's into HsEqTy's
 -- (((~a) ~b) c) ~d ==> ((~a) ~ (b c)) ~ d
 splitTilde :: LHsType RdrName -> LHsType RdrName
 splitTilde t = go t
@@ -1042,6 +1059,23 @@ splitTilde t = go t
               t -> L loc (HsAppTy t t2)
 
         go t = t
+
+-- | Transform tyapps with strict_marks into uses of twiddle
+-- [~a, ~b, c, ~d] ==> (~a) ~ b c ~ d
+splitTildeApps :: [HsAppType RdrName] -> [HsAppType RdrName]
+splitTildeApps []         = []
+splitTildeApps (t : rest) = t : concatMap go rest
+  where go (HsAppPrefix
+            (L loc (HsBangTy
+                    (HsSrcBang Nothing NoSrcUnpack SrcLazy)
+                    ty)))
+          = [HsAppInfix (L tilde_loc eqTyCon_RDR), HsAppPrefix ty]
+          where
+            tilde_loc = srcSpanFirstCharacter loc
+
+        go t = [t]
+
+
 
 ---------------------------------------------------------------------------
 -- Check for monad comprehensions

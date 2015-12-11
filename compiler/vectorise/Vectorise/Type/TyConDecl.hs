@@ -6,7 +6,7 @@ module Vectorise.Type.TyConDecl (
 import Vectorise.Type.Type
 import Vectorise.Monad
 import Vectorise.Env( GlobalEnv( global_fam_inst_env ) )
-import BuildTyCl( TcMethInfo, buildClass, buildDataCon )
+import BuildTyCl( TcMethInfo, buildClass, buildDataCon, newTyConRepName )
 import OccName
 import Class
 import Type
@@ -64,6 +64,7 @@ vectTyConDecl tycon name'
                      (tyConTyVars tycon)        -- keep original type vars
                      (map (const Nominal) (tyConRoles tycon)) -- all role are N for safety
                      theta'                     -- superclasses
+                     (tyConKind tycon)          -- keep original kind
                      (snd . classTvsFds $ cls)  -- keep the original functional dependencies
                      []                         -- no associated types (for the moment)
                      methods'                   -- method info
@@ -100,17 +101,17 @@ vectTyConDecl tycon name'
 
            -- build the vectorised type constructor
        ; tc_rep_name <- mkDerivedName mkTyConRepUserOcc name'
-       ; return $ buildAlgTyCon
+       ; return $ mkAlgTyCon
                     name'                   -- new name
+                    (tyConKind tycon)       -- keep original kind
                     (tyConTyVars tycon)     -- keep original type vars
                     (map (const Nominal) (tyConRoles tycon)) -- all roles are N for safety
                     Nothing
                     []                      -- no stupid theta
                     rhs'                    -- new constructor defs
-                    rec_flag                -- whether recursive
-                    False                   -- Not promotable
-                    gadt_flag               -- whether in GADT syntax
                     (VanillaAlgTyCon tc_rep_name)
+                    rec_flag                -- whether recursive
+                    gadt_flag               -- whether in GADT syntax
        }
 
   -- some other crazy thing that we don't handle
@@ -181,10 +182,11 @@ vectDataCon dc
        ; arg_tys <- mapM vectType rep_arg_tys
        ; let ret_ty = mkFamilyTyConApp tycon' (mkTyVarTys univ_tvs)
        ; fam_envs  <- readGEnv global_fam_inst_env
+       ; rep_nm    <- liftDs $ newTyConRepName name'
        ; liftDs $ buildDataCon fam_envs
                     name'
                     (dataConIsInfix dc)            -- infix if the original is
-                    NotPromoted                    -- Vectorised type is not promotable
+                    rep_nm
                     (dataConSrcBangs dc)           -- strictness as original constructor
                     (Just $ dataConImplBangs dc)
                     []                             -- no labelled fields for now

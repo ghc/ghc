@@ -1,7 +1,7 @@
 module TcIface where
 
 import IfaceSyn    ( IfaceDecl, IfaceClsInst, IfaceFamInst, IfaceRule, IfaceAnnotation )
-import TypeRep     ( TyThing )
+import TyCoRep     ( TyThing )
 import TcRnTypes   ( IfL )
 import InstEnv     ( ClsInst )
 import FamInstEnv  ( FamInst )

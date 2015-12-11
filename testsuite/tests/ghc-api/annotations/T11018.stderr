@@ -20,7 +20,7 @@ Test11018.hs:26:7: error:
     Not in scope: type constructor or class ‘ArrowApply’
 
 Test11018.hs:37:27: error:
-    Illegal kind signature: ‘* -> *’
+    Illegal kind signature: ‘★ -> ★’
       Perhaps you intended to use KindSignatures
     In the data type declaration for ‘RecorderU’
 

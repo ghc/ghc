@@ -1,6 +1,6 @@
 {-# OPTIONS -XRecursiveDo #-}
 
--- This test, from Iavor Diatchki, made GHC 6.2 loop (testLoop) 
+-- This test, from Iavor Diatchki, made GHC 6.2 loop (testLoop)
 -- or panic (testPanic); there was a Lint error.
 -- The reason was a missing bindInstsOfLocalFuns in tcStmtAndThen
 

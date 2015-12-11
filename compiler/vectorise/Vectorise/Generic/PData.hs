@@ -46,20 +46,20 @@ buildDataFamInst name' fam_tc vect_tc rhs
  = do { axiom_name <- mkDerivedName mkInstTyCoOcc name'
 
       ; (_, tyvars') <- liftDs $ tcInstSigTyVarsLoc (getSrcSpan name') tyvars
-      ; let ax       = mkSingleCoAxiom Representational axiom_name tyvars' fam_tc pat_tys rep_ty
+      ; let ax       = mkSingleCoAxiom Representational axiom_name tyvars' [] fam_tc pat_tys rep_ty
             tys'     = mkTyVarTys tyvars'
             rep_ty   = mkTyConApp rep_tc tys'
             pat_tys  = [mkTyConApp vect_tc tys']
-            rep_tc   = buildAlgTyCon name'
+            rep_tc   = mkAlgTyCon name'
+                           (mkPiTypesPreferFunTy tyvars' liftedTypeKind)
                            tyvars'
                            (map (const Nominal) tyvars')
                            Nothing
                            []          -- no stupid theta
                            rhs
-                           rec_flag    -- FIXME: is this ok?
-                           False       -- Not promotable
-                           False       -- not GADT syntax
                            (DataFamInstTyCon ax fam_tc pat_tys)
+                           rec_flag    -- FIXME: is this ok?
+                           False       -- not GADT syntax
       ; liftDs $ newFamInst (DataFamilyInst rep_tc) ax }
  where
     tyvars    = tyConTyVars vect_tc
@@ -77,9 +77,10 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
       dc_name   <- mkLocalisedName mkPDataDataConOcc orig_name
       comp_tys  <- mkSumTys repr_sel_ty mkPDataType repr
       fam_envs  <- readGEnv global_fam_inst_env
+      rep_nm    <- liftDs $ newTyConRepName dc_name
       liftDs $ buildDataCon fam_envs dc_name
                             False                  -- not infix
-                            NotPromoted            -- not promotable
+                            rep_nm
                             (map (const no_bang) comp_tys)
                             (Just $ map (const HsLazy) comp_tys)
                             []                     -- no field labels
@@ -120,9 +121,10 @@ buildPDatasDataCon orig_name vect_tc repr_tc repr
 
       comp_tys  <- mkSumTys repr_sels_ty mkPDatasType repr
       fam_envs <- readGEnv global_fam_inst_env
+      rep_nm   <- liftDs $ newTyConRepName dc_name
       liftDs $ buildDataCon fam_envs dc_name
                             False                  -- not infix
-                            NotPromoted            -- not promotable
+                            rep_nm
                             (map (const no_bang) comp_tys)
                             (Just $ map (const HsLazy) comp_tys)
                             []                     -- no field labels

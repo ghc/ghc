@@ -53,6 +53,12 @@ module GHC.Exts
         -- @since 4.7.0.0
         Data.Coerce.coerce, Data.Coerce.Coercible,
 
+        -- * Equality
+        type (~~),
+
+        -- * Levity polymorphism
+        GHC.Prim.TYPE, Levity(..),
+
         -- * Transform comprehensions
         Down(..), groupWith, sortWith, the,
 
@@ -72,8 +78,9 @@ module GHC.Exts
         IsList(..)
        ) where
 
-import GHC.Prim hiding (coerce, Constraint)
-import GHC.Base hiding (coerce) -- implicitly comes from GHC.Prim
+import GHC.Prim hiding ( coerce, TYPE )
+import qualified GHC.Prim
+import GHC.Base hiding ( coerce )
 import GHC.Word
 import GHC.Int
 import GHC.Ptr

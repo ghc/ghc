@@ -16,13 +16,12 @@ module CoreSubst (
         deShadowBinds, substSpec, substRulesForImportedIds,
         substTy, substCo, substExpr, substExprSC, substBind, substBindSC,
         substUnfolding, substUnfoldingSC,
-        lookupIdSubst, lookupTvSubst, lookupCvSubst, substIdOcc,
+        lookupIdSubst, lookupTCvSubst, substIdOcc,
         substTickish, substDVarSet,
 
         -- ** Operations on substitutions
         emptySubst, mkEmptySubst, mkSubst, mkOpenSubst, substInScope, isEmptySubst,
-        extendIdSubst, extendIdSubstList, extendTvSubst, extendTvSubstList,
-        extendCvSubst, extendCvSubstList,
+        extendIdSubst, extendIdSubstList, extendTCvSubst, extendTCvSubstList,
         extendSubst, extendSubstList, extendSubstWithVar, zapSubstEnv,
         addInScopeSet, extendInScope, extendInScopeList, extendInScopeIds,
         isInScope, setInScope,
@@ -51,14 +50,13 @@ import qualified Type
 import qualified Coercion
 
         -- We are defining local versions
-import Type     hiding ( substTy, extendTvSubst, extendTvSubstList
+import Type     hiding ( substTy, extendTCvSubst, extendTCvSubstList
                        , isInScope, substTyVarBndr, cloneTyVarBndr )
-import TypeRep (tyVarsOfTypeAcc)
-import Coercion hiding ( substTy, substCo, extendTvSubst, substTyVarBndr, substCoVarBndr )
+import Coercion hiding ( substCo, substCoVarBndr )
 
 import TyCon       ( tyConArity )
 import DataCon
-import PrelNames   ( eqBoxDataConKey, coercibleDataConKey, unpackCStringIdKey
+import PrelNames   ( heqDataConKey, coercibleDataConKey, unpackCStringIdKey
                    , unpackCStringUtf8IdKey )
 import OptCoercion ( optCoercion )
 import PprCore     ( pprCoreBindings, pprRules )
@@ -93,7 +91,8 @@ import TysWiredIn
 ************************************************************************
 -}
 
--- | A substitution environment, containing both 'Id' and 'TyVar' substitutions.
+-- | A substitution environment, containing 'Id', 'TyVar', and 'CoVar'
+-- substitutions.
 --
 -- Some invariants apply to how you use the substitution:
 --
@@ -132,7 +131,7 @@ Note [Extending the Subst]
 For a core Subst, which binds Ids as well, we make a different choice for Ids
 than we do for TyVars.
 
-For TyVars, see Note [Extending the TvSubst] with Type.TvSubstEnv
+For TyVars, see Note [Extending the TCvSubst] with Type.TvSubstEnv
 
 For Ids, we have a different invariant
         The IdSubstEnv is extended *only* when the Unique on an Id changes
@@ -140,7 +139,7 @@ For Ids, we have a different invariant
 
 In consequence:
 
-* If the TvSubstEnv and IdSubstEnv are both empty, substExpr would be a
+* If all subst envs are empty, substExpr would be a
   no-op, so substExprSC ("short cut") does nothing.
 
   However, substExpr still goes ahead and substitutes.  Reason: we may
@@ -218,38 +217,48 @@ extendIdSubst (Subst in_scope ids tvs cvs) v r = Subst in_scope (extendVarEnv id
 extendIdSubstList :: Subst -> [(Id, CoreExpr)] -> Subst
 extendIdSubstList (Subst in_scope ids tvs cvs) prs = Subst in_scope (extendVarEnvList ids prs) tvs cvs
 
+-- | Add a substitution for a 'TyVar' to the 'Subst': the 'TyVar' *must*
+-- be a real TyVar, and not a CoVar
+extend_tv_subst :: Subst -> TyVar -> Type -> Subst
+extend_tv_subst (Subst in_scope ids tvs cvs) tv ty
+  = ASSERT( isTyVar tv )
+    Subst in_scope ids (extendVarEnv tvs tv ty) cvs
+
 -- | Add a substitution for a 'TyVar' to the 'Subst': you must ensure that the in-scope set is
 -- such that the "CoreSubst#in_scope_invariant" is true after extending the substitution like this
-extendTvSubst :: Subst -> TyVar -> Type -> Subst
-extendTvSubst (Subst in_scope ids tvs cvs) v r = Subst in_scope ids (extendVarEnv tvs v r) cvs
+extendTCvSubst :: Subst -> TyVar -> Type -> Subst
+extendTCvSubst subst v r
+  | isTyVar v
+  = extend_tv_subst subst v r
+  | Just co <- isCoercionTy_maybe r
+  = extendCvSubst subst v co
+  | otherwise
+  = pprPanic "CoreSubst.extendTCvSubst" (ppr v <+> ptext (sLit "|->") <+> ppr r)
 
--- | Adds multiple 'TyVar' substitutions to the 'Subst': see also 'extendTvSubst'
-extendTvSubstList :: Subst -> [(TyVar,Type)] -> Subst
-extendTvSubstList (Subst in_scope ids tvs cvs) prs = Subst in_scope ids (extendVarEnvList tvs prs) cvs
+-- | Adds multiple 'TyVar' substitutions to the 'Subst': see also 'extendTCvSubst'
+extendTCvSubstList :: Subst -> [(TyVar,Type)] -> Subst
+extendTCvSubstList subst vrs
+  = foldl' extend subst vrs
+  where extend subst (v, r) = extendTCvSubst subst v r
 
 -- | Add a substitution from a 'CoVar' to a 'Coercion' to the 'Subst': you must ensure that the in-scope set is
 -- such that the "CoreSubst#in_scope_invariant" is true after extending the substitution like this
 extendCvSubst :: Subst -> CoVar -> Coercion -> Subst
 extendCvSubst (Subst in_scope ids tvs cvs) v r = Subst in_scope ids tvs (extendVarEnv cvs v r)
 
--- | Adds multiple 'CoVar' -> 'Coercion' substitutions to the
--- 'Subst': see also 'extendCvSubst'
-extendCvSubstList :: Subst -> [(CoVar,Coercion)] -> Subst
-extendCvSubstList (Subst in_scope ids tvs cvs) prs = Subst in_scope ids tvs (extendVarEnvList cvs prs)
-
 -- | Add a substitution appropriate to the thing being substituted
 --   (whether an expression, type, or coercion). See also
---   'extendIdSubst', 'extendTvSubst', and 'extendCvSubst'.
+--   'extendIdSubst', 'extendTCvSubst'
 extendSubst :: Subst -> Var -> CoreArg -> Subst
 extendSubst subst var arg
   = case arg of
-      Type ty     -> ASSERT( isTyVar var ) extendTvSubst subst var ty
+      Type ty     -> ASSERT( isTyVar var ) extend_tv_subst subst var ty
       Coercion co -> ASSERT( isCoVar var ) extendCvSubst subst var co
       _           -> ASSERT( isId    var ) extendIdSubst subst var arg
 
 extendSubstWithVar :: Subst -> Var -> Var -> Subst
 extendSubstWithVar subst v1 v2
-  | isTyVar v1 = ASSERT( isTyVar v2 ) extendTvSubst subst v1 (mkTyVarTy v2)
+  | isTyVar v1 = ASSERT( isTyVar v2 ) extend_tv_subst subst v1 (mkTyVarTy v2)
   | isCoVar v1 = ASSERT( isCoVar v2 ) extendCvSubst subst v1 (mkCoVarCo v2)
   | otherwise  = ASSERT( isId    v2 ) extendIdSubst subst v1 (Var v2)
 
@@ -272,12 +281,12 @@ lookupIdSubst doc (Subst in_scope ids _ _) v
                 Var v
 
 -- | Find the substitution for a 'TyVar' in the 'Subst'
-lookupTvSubst :: Subst -> TyVar -> Type
-lookupTvSubst (Subst _ _ tvs _) v = ASSERT( isTyVar v) lookupVarEnv tvs v `orElse` Type.mkTyVarTy v
-
--- | Find the coercion substitution for a 'CoVar' in the 'Subst'
-lookupCvSubst :: Subst -> CoVar -> Coercion
-lookupCvSubst (Subst _ _ _ cvs) v = ASSERT( isCoVar v ) lookupVarEnv cvs v `orElse` mkCoVarCo v
+lookupTCvSubst :: Subst -> TyVar -> Type
+lookupTCvSubst (Subst _ _ tvs cvs) v
+  | isTyVar v
+  = lookupVarEnv tvs v `orElse` Type.mkTyVarTy v
+  | otherwise
+  = mkCoercionTy $ lookupVarEnv cvs v `orElse` mkCoVarCo v
 
 delBndr :: Subst -> Var -> Subst
 delBndr (Subst in_scope ids tvs cvs) v
@@ -487,8 +496,8 @@ substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
         | otherwise      = setIdType id1 (substTy subst old_ty)
 
     old_ty = idType old_id
-    no_type_change = isEmptyVarEnv tvs ||
-                     isEmptyVarSet (Type.tyVarsOfType old_ty)
+    no_type_change = (isEmptyVarEnv tvs && isEmptyVarEnv cvs) ||
+                     isEmptyVarSet (tyCoVarsOfType old_ty)
 
         -- new_id has the right IdInfo
         -- The lazy-set is because we're in a loop here, with
@@ -566,40 +575,37 @@ clone_id rec_subst subst@(Subst in_scope idvs tvs cvs) (old_id, uniq)
 
 For types and coercions we just call the corresponding functions in
 Type and Coercion, but we have to repackage the substitution, from a
-Subst to a TvSubst.
+Subst to a TCvSubst.
 -}
 
 substTyVarBndr :: Subst -> TyVar -> (Subst, TyVar)
 substTyVarBndr (Subst in_scope id_env tv_env cv_env) tv
-  = case Type.substTyVarBndr (TvSubst in_scope tv_env) tv of
-        (TvSubst in_scope' tv_env', tv')
-           -> (Subst in_scope' id_env tv_env' cv_env, tv')
+  = case Type.substTyVarBndr (TCvSubst in_scope tv_env cv_env) tv of
+        (TCvSubst in_scope' tv_env' cv_env', tv')
+           -> (Subst in_scope' id_env tv_env' cv_env', tv')
 
 cloneTyVarBndr :: Subst -> TyVar -> Unique -> (Subst, TyVar)
 cloneTyVarBndr (Subst in_scope id_env tv_env cv_env) tv uniq
-  = case Type.cloneTyVarBndr (TvSubst in_scope tv_env) tv uniq of
-        (TvSubst in_scope' tv_env', tv')
-           -> (Subst in_scope' id_env tv_env' cv_env, tv')
+  = case Type.cloneTyVarBndr (TCvSubst in_scope tv_env cv_env) tv uniq of
+        (TCvSubst in_scope' tv_env' cv_env', tv')
+           -> (Subst in_scope' id_env tv_env' cv_env', tv')
 
 substCoVarBndr :: Subst -> TyVar -> (Subst, TyVar)
 substCoVarBndr (Subst in_scope id_env tv_env cv_env) cv
-  = case Coercion.substCoVarBndr (CvSubst in_scope tv_env cv_env) cv of
-        (CvSubst in_scope' tv_env' cv_env', cv')
+  = case Coercion.substCoVarBndr (TCvSubst in_scope tv_env cv_env) cv of
+        (TCvSubst in_scope' tv_env' cv_env', cv')
            -> (Subst in_scope' id_env tv_env' cv_env', cv')
 
 -- | See 'Type.substTy'
 substTy :: Subst -> Type -> Type
-substTy subst ty = Type.substTy (getTvSubst subst) ty
+substTy subst ty = Type.substTy (getTCvSubst subst) ty
 
-getTvSubst :: Subst -> TvSubst
-getTvSubst (Subst in_scope _ tenv _) = TvSubst in_scope tenv
-
-getCvSubst :: Subst -> CvSubst
-getCvSubst (Subst in_scope _ tenv cenv) = CvSubst in_scope tenv cenv
+getTCvSubst :: Subst -> TCvSubst
+getTCvSubst (Subst in_scope _ tenv cenv) = TCvSubst in_scope tenv cenv
 
 -- | See 'Coercion.substCo'
 substCo :: Subst -> Coercion -> Coercion
-substCo subst co = Coercion.substCo (getCvSubst subst) co
+substCo subst co = Coercion.substCo (getTCvSubst subst) co
 
 {-
 ************************************************************************
@@ -611,9 +617,9 @@ substCo subst co = Coercion.substCo (getCvSubst subst) co
 
 substIdType :: Subst -> Id -> Id
 substIdType subst@(Subst _ _ tv_env cv_env) id
-  | (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env) || isEmptyVarSet (Type.tyVarsOfType old_ty) = id
+  | (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env) || isEmptyVarSet (tyCoVarsOfType old_ty) = id
   | otherwise   = setIdType id (substTy subst old_ty)
-                -- The tyVarsOfType is cheaper than it looks
+                -- The tyCoVarsOfType is cheaper than it looks
                 -- because we cache the free tyvars of the type
                 -- in a Note in the id's type itself
   where
@@ -728,7 +734,7 @@ substDVarSet subst fvs
   where
   subst_fv subst fv acc
      | isId fv = expr_fvs (lookupIdSubst (text "substDVarSet") subst fv) isLocalVar emptyVarSet $! acc
-     | otherwise = tyVarsOfTypeAcc (lookupTvSubst subst fv) (const True) emptyVarSet $! acc
+     | otherwise = tyCoVarsOfTypeAcc (lookupTCvSubst subst fv) (const True) emptyVarSet $! acc
 
 ------------------
 substTickish :: Subst -> Tickish Id -> Tickish Id
@@ -785,56 +791,67 @@ InlVanilla.  The WARN is just so I can see if it happens a lot.
 *                                                                      *
 ************************************************************************
 
-Note [Optimise coercion boxes aggressively]
+Note [Getting the map/coerce RULE to work]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We wish to allow the "map/coerce" RULE to fire:
 
-The simple expression optimiser needs to deal with Eq# boxes as follows:
- 1. If the result of optimising the RHS of a non-recursive binding is an
-    Eq# box, that box is substituted rather than turned into a let, just as
-    if it were trivial.
-       let eqv = Eq# co in e ==> e[Eq# co/eqv]
+  {-# RULES "map/coerce" map coerce = coerce #-}
 
- 2. If the result of optimising a case scrutinee is a Eq# box and the case
-    deconstructs it in a trivial way, we evaluate the case then and there.
-      case Eq# co of Eq# cov -> e ==> e[co/cov]
+The naive core produced for this is
 
-We do this for two reasons:
+  forall a b (dict :: Coercible * a b).
+    map @a @b (coerce @a @b @dict) = coerce @[a] @[b] @dict'
 
- 1. Bindings/case scrutinisation of this form is often created by the
-    evidence-binding mechanism and we need them to be inlined to be able
-    desugar RULE LHSes that involve equalities (see e.g. T2291)
+  where dict' :: Coercible [a] [b]
+        dict' = ...
 
- 2. The test T4356 fails Lint because it creates a coercion between types
-    of kind (* -> * -> *) and (?? -> ? -> *), which differ. If we do this
-    inlining aggressively we can collapse away the intermediate coercion between
-    these two types and hence pass Lint again. (This is a sort of a hack.)
+This matches literal uses of `map coerce` in code, but that's not what we
+want. We want it to match, say, `map MkAge` (where newtype Age = MkAge Int)
+too. Some of this is addressed by compulsorily unfolding coerce on the LHS,
+yielding
 
-In fact, our implementation uses slightly liberalised versions of the second rule
-rule so that the optimisations are a bit more generally applicable. Precisely:
- 2a. We reduce any situation where we can spot a case-of-known-constructor
+  forall a b (dict :: Coercible * a b).
+    map @a @b (\(x :: a) -> case dict of
+      MkCoercible (co :: a ~R# b) -> x |> co) = ...
 
-As a result, the only time we should get residual coercion boxes in the code is
-when the type checker generates something like:
+Getting better. But this isn't exactly what gets produced. This is because
+Coercible essentially has ~R# as a superclass, and superclasses get eagerly
+extracted during solving. So we get this:
 
-  \eqv -> let eqv' = Eq# (case eqv of Eq# cov -> ... cov ...)
+  forall a b (dict :: Coercible * a b).
+    case Coercible_SCSel @* @a @b dict of
+      _ [Dead] -> map @a @b (\(x :: a) -> case dict of
+                               MkCoercible (co :: a ~R# b) -> x |> co) = ...
 
-However, the case of lambda-bound equality evidence is fairly rare, so these two
-rules should suffice for solving the rule LHS problem for now.
+Unfortunately, this still abstracts over a Coercible dictionary. We really
+want it to abstract over the ~R# evidence. So, we have Desugar.unfold_coerce,
+which transforms the above to (see also Note [Desugaring coerce as cast] in
+Desugar)
 
-Annoyingly, we cannot use this modified rule 1a instead of 1:
+  forall a b (co :: a ~R# b).
+    let dict = MkCoercible @* @a @b co in
+    case Coercible_SCSel @* @a @b dict of
+      _ [Dead] -> map @a @b (\(x :: a) -> case dict of
+         MkCoercible (co :: a ~R# b) -> x |> co) = let dict = ... in ...
 
- 1a. If we come across a let-bound constructor application with trivial arguments,
-     add an appropriate unfolding to the let binder.  We spot constructor applications
-     by using exprIsConApp_maybe, so this would actually let rule 2a reduce more.
+Now, we need simpleOptExpr to fix this up. It does so by taking three
+separate actions:
+  1. Inline certain non-recursive bindings. The choice whether to inline
+     is made in maybe_substitute. Note the rather specific check for
+     MkCoercible in there.
 
-The reason is that we REALLY NEED coercion boxes to be substituted away. With rule 1a
-we wouldn't simplify this expression at all:
+  2. Stripping silly case expressions, like the Coercible_SCSel one.
+     A case expression is silly if its binder is dead, it has only one,
+     DEFAULT, alternative, and the scrutinee is a coercion.
+     See the `Case` case of simple_opt_expr's `go` function.
 
-  let eqv = Eq# co
-  in foo eqv (bar eqv)
+  3. Look for case expressions that unpack something that was
+     just packed and inline them. This is also done in simple_opt_expr's
+     `go` function.
 
-The rule LHS desugarer can't deal with Let at all, so we need to push that box into
-the use sites.
+This is all a fair amount of special-purpose hackery, but it's for
+a good cause. And it won't hurt other RULES and such that it comes across.
+
 -}
 
 simpleOptExpr :: CoreExpr -> CoreExpr
@@ -844,7 +861,7 @@ simpleOptExpr :: CoreExpr -> CoreExpr
 -- or where the RHS is trivial
 --
 -- We also inline bindings that bind a Eq# box: see
--- See Note [Optimise coercion boxes aggressively].
+-- See Note [Getting the map/coerce RULE to work].
 --
 -- The result is NOT guaranteed occurrence-analysed, because
 -- in  (let x = y in ....) we substitute for x; so y's occ-info
@@ -907,13 +924,13 @@ simple_opt_expr subst expr
     go (Var v)          = lookupIdSubst (text "simpleOptExpr") subst v
     go (App e1 e2)      = simple_app subst e1 [go e2]
     go (Type ty)        = Type     (substTy subst ty)
-    go (Coercion co)    = Coercion (optCoercion (getCvSubst subst) co)
+    go (Coercion co)    = Coercion (optCoercion (getTCvSubst subst) co)
     go (Lit lit)        = Lit lit
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
     go (Cast e co)      | isReflCo co' = go e
                         | otherwise    = Cast (go e) co'
                         where
-                          co' = optCoercion (getCvSubst subst) co
+                          co' = optCoercion (getTCvSubst subst) co
 
     go (Let bind body) = case simple_opt_bind subst bind of
                            (subst', Nothing)   -> simple_opt_expr subst' body
@@ -921,7 +938,7 @@ simple_opt_expr subst expr
 
     go lam@(Lam {})     = go_lam [] subst lam
     go (Case e b ty as)
-       -- See Note [Optimise coercion boxes aggressively]
+       -- See Note [Getting the map/coerce RULE to work]
       | isDeadBinder b
       , Just (con, _tys, es) <- exprIsConApp_maybe in_scope_env e'
       , Just (altcon, bs, rhs) <- findAlt (DataAlt con) as
@@ -930,6 +947,12 @@ simple_opt_expr subst expr
           _       -> mkLets (catMaybes mb_binds) $ simple_opt_expr subst' rhs
             where (subst', mb_binds) = mapAccumL simple_opt_out_bind subst
                                                  (zipEqual "simpleOptExpr" bs es)
+
+         -- Note [Getting the map/coerce RULE to work]
+      | isDeadBinder b
+      , [(DEFAULT, _, rhs)] <- as
+      , isCoercionType (varType b)
+      = go rhs
 
       | otherwise
       = Case e' b' (substTy subst ty)
@@ -1022,7 +1045,7 @@ maybe_substitute :: Subst -> InVar -> OutExpr -> Maybe Subst
 maybe_substitute subst b r
   | Type ty <- r        -- let a::* = TYPE ty in <body>
   = ASSERT( isTyVar b )
-    Just (extendTvSubst subst b ty)
+    Just (extendTCvSubst subst b ty)
 
   | Coercion co <- r
   = ASSERT( isCoVar b )
@@ -1051,8 +1074,9 @@ maybe_substitute subst b r
     trivial | exprIsTrivial r = True
             | (Var fun, args) <- collectArgs r
             , Just dc <- isDataConWorkId_maybe fun
-            , dc `hasKey` eqBoxDataConKey || dc `hasKey` coercibleDataConKey
-            , all exprIsTrivial args = True -- See Note [Optimise coercion boxes aggressively]
+            , dc `hasKey` heqDataConKey || dc `hasKey` coercibleDataConKey
+            , all exprIsTrivial args = True
+                     -- See Note [Getting the map/coerce RULE to work]
             | otherwise = False
 
 ----------------------
@@ -1183,7 +1207,7 @@ data ConCont = CC [CoreExpr] Coercion
 -- where t1..tk are the *universally-qantified* type args of 'dc'
 exprIsConApp_maybe :: InScopeEnv -> CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
 exprIsConApp_maybe (in_scope, id_unf) expr
-  = go (Left in_scope) expr (CC [] (mkReflCo Representational (exprType expr)))
+  = go (Left in_scope) expr (CC [] (mkRepReflCo (exprType expr)))
   where
     go :: Either InScopeSet Subst
        -> CoreExpr -> ConCont
@@ -1275,7 +1299,7 @@ dealWithCoercion :: Coercion -> DataCon -> [CoreExpr]
 dealWithCoercion co dc dc_args
   | isReflCo co
   , let (univ_ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) dc_args
-  = Just (dc, stripTypeArgs univ_ty_args, rest_args)
+  = Just (dc, map exprToType univ_ty_args, rest_args)
 
   | Pair _from_ty to_ty <- coercionKind co
   , Just (to_tc, to_tc_arg_tys) <- splitTyConApp_maybe to_ty
@@ -1286,7 +1310,7 @@ dealWithCoercion co dc dc_args
         -- will probably not be called in such circumstances,
         -- but there't nothing wrong with it
 
-  =     -- Here we do the KPush reduction rule as described in the FC paper
+  =     -- Here we do the KPush reduction rule as described in "Down with kinds"
         -- The transformation applies iff we have
         --      (C e1 ... en) `cast` co
         -- where co :: (T t1 .. tn) ~ to_ty
@@ -1301,35 +1325,31 @@ dealWithCoercion co dc dc_args
         non_univ_args  = dropList dc_univ_tyvars dc_args
         (ex_args, val_args) = splitAtList dc_ex_tyvars non_univ_args
 
-        -- Make the "theta" from Fig 3 of the paper
-        gammas = decomposeCo tc_arity co
-        theta_subst = liftCoSubstWith Representational
-                         (dc_univ_tyvars ++ dc_ex_tyvars)
-                                                -- existentials are at role N
-                         (gammas         ++ map (mkReflCo Nominal)
-                                                (stripTypeArgs ex_args))
+        -- Make the "Psi" from the paper
+        omegas = decomposeCo tc_arity co
+        (psi_subst, to_ex_arg_tys)
+          = liftCoSubstWithEx Representational
+                              dc_univ_tyvars
+                              omegas
+                              dc_ex_tyvars
+                              (map exprToType ex_args)
 
           -- Cast the value arguments (which include dictionaries)
         new_val_args = zipWith cast_arg arg_tys val_args
-        cast_arg arg_ty arg = mkCast arg (theta_subst arg_ty)
+        cast_arg arg_ty arg = mkCast arg (psi_subst arg_ty)
+
+        to_ex_args = map Type to_ex_arg_tys
 
         dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tyvars,
                          ppr arg_tys, ppr dc_args,
                          ppr ex_args, ppr val_args, ppr co, ppr _from_ty, ppr to_ty, ppr to_tc ]
     in
-    ASSERT2( eqType _from_ty (mkTyConApp to_tc (stripTypeArgs $ takeList dc_univ_tyvars dc_args))
-           , dump_doc )
-    ASSERT2( all isTypeArg ex_args, dump_doc )
+    ASSERT2( eqType _from_ty (mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args)), dump_doc )
     ASSERT2( equalLength val_args arg_tys, dump_doc )
-    Just (dc, to_tc_arg_tys, ex_args ++ new_val_args)
+    Just (dc, to_tc_arg_tys, to_ex_args ++ new_val_args)
 
   | otherwise
   = Nothing
-
-stripTypeArgs :: [CoreExpr] -> [Type]
-stripTypeArgs args = ASSERT2( all isTypeArg args, ppr args )
-                     [ty | Type ty <- args]
-  -- We really do want isTypeArg here, not isTyCoArg!
 
 {-
 Note [Unfolding DFuns]

@@ -100,7 +100,7 @@ buildClosure :: [TyVar]         -- ^Type variables passed during closure constru
              -> [VVar]          -- ^Variables in the environment.
              -> Type            -- ^Type of the closure argument.
              -> Type            -- ^Type of the result.
-             -> VM VExpr 
+             -> VM VExpr
              -> VM VExpr
 buildClosure tvs vars vvars arg_ty res_ty mk_body
   = do { (env_ty, env, bind) <- buildEnv vvars
@@ -122,7 +122,7 @@ buildClosure tvs vars vvars arg_ty res_ty mk_body
 -- Build the environment for a single closure.
 --
 buildEnv :: [VVar] -> VM (Type, VExpr, VExpr -> VExpr -> VExpr)
-buildEnv [] 
+buildEnv []
  = do
       ty    <- voidType
       void  <- builtin voidVar

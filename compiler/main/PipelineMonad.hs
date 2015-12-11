@@ -6,7 +6,7 @@ module PipelineMonad (
     CompPipeline(..), evalP
   , PhasePlus(..)
   , PipeEnv(..), PipeState(..), PipelineOutput(..)
-  , getPipeEnv, getPipeState, setDynFlags, setModLocation, setStubO 
+  , getPipeEnv, getPipeState, setDynFlags, setModLocation, setStubO
   ) where
 
 import MonadUtils

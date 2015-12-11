@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies, GADTs, ConstraintKinds, RankNTypes #-}
 module T5655 where
 
-import GHC.Prim (Constraint)
+import Data.Kind (Constraint)
 
 class Show a => Twice a where twice :: a -> a
 

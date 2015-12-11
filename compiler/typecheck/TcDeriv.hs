@@ -42,6 +42,7 @@ import Avail
 import Unify( tcUnifyTy )
 import Class
 import Type
+import Coercion
 import ErrUtils
 import DataCon
 import Maybes
@@ -90,23 +91,22 @@ data DerivSpec theta = DS { ds_loc     :: SrcSpan
                           , ds_cls     :: Class
                           , ds_tys     :: [Type]
                           , ds_tc      :: TyCon
-                          , ds_tc_args :: [Type]
                           , ds_overlap :: Maybe OverlapMode
-                          , ds_newtype :: Bool }
+                          , ds_newtype :: Maybe Type }  -- The newtype rep type
         -- This spec implies a dfun declaration of the form
         --       df :: forall tvs. theta => C tys
         -- The Name is the name for the DFun we'll build
         -- The tyvars bind all the variables in the theta
         -- For type families, the tycon in
         --       in ds_tys is the *family* tycon
-        --       in ds_tc, ds_tc_args is the *representation* tycon
+        --       in ds_tc is the *representation* type
         -- For non-family tycons, both are the same
 
         -- the theta is either the given and final theta, in standalone deriving,
         -- or the not-yet-simplified list of constraints together with their origin
 
-        -- ds_newtype = True  <=> Generalised Newtype Deriving (GND)
-        --              False <=> Vanilla deriving
+        -- ds_newtype = Just rep_ty  <=> Generalised Newtype Deriving (GND)
+        --              Nothing      <=> Vanilla deriving
 
 {-
 Example:
@@ -117,22 +117,21 @@ Example:
      axiom :RTList a = Tree a
 
      DS { ds_tvs = [a,s], ds_cls = C, ds_tys = [s, T [a]]
-        , ds_tc = :RTList, ds_tc_args = [a]
-        , ds_newtype = True }
+        , ds_tc = :RTList, ds_newtype = Just (Tree a) }
 -}
 
 type DerivContext = Maybe ThetaType
    -- Nothing    <=> Vanilla deriving; infer the context of the instance decl
    -- Just theta <=> Standalone deriving: context supplied by programmer
 
-data PredOrigin = PredOrigin PredType CtOrigin
+data PredOrigin = PredOrigin PredType CtOrigin TypeOrKind
 type ThetaOrigin = [PredOrigin]
 
-mkPredOrigin :: CtOrigin -> PredType -> PredOrigin
-mkPredOrigin origin pred = PredOrigin pred origin
+mkPredOrigin :: CtOrigin -> TypeOrKind -> PredType -> PredOrigin
+mkPredOrigin origin t_or_k pred = PredOrigin pred origin t_or_k
 
-mkThetaOrigin :: CtOrigin -> ThetaType -> ThetaOrigin
-mkThetaOrigin origin = map (mkPredOrigin origin)
+mkThetaOrigin :: CtOrigin -> TypeOrKind -> ThetaType -> ThetaOrigin
+mkThetaOrigin origin t_or_k = map (mkPredOrigin origin t_or_k)
 
 data EarlyDerivSpec = InferTheta (DerivSpec ThetaOrigin)
                     | GivenTheta (DerivSpec ThetaType)
@@ -161,8 +160,13 @@ splitEarlyDerivSpec (GivenTheta spec : specs) =
 pprDerivSpec :: Outputable theta => DerivSpec theta -> SDoc
 pprDerivSpec (DS { ds_loc = l, ds_name = n, ds_tvs = tvs,
                    ds_cls = c, ds_tys = tys, ds_theta = rhs })
-  = parens (hsep [ppr l, ppr n, ppr tvs, ppr c, ppr tys]
-            <+> equals <+> ppr rhs)
+  = hang (text "DerivSpec")
+       2 (vcat [ text "ds_loc   =" <+> ppr l
+               , text "ds_name  =" <+> ppr n
+               , text "ds_tvs   =" <+> ppr tvs
+               , text "ds_cls   =" <+> ppr c
+               , text "ds_tys   =" <+> ppr tys
+               , text "ds_theta =" <+> ppr rhs ])
 
 instance Outputable theta => Outputable (DerivSpec theta) where
   ppr = pprDerivSpec
@@ -172,7 +176,7 @@ instance Outputable EarlyDerivSpec where
   ppr (GivenTheta spec) = ppr spec <+> ptext (sLit "(Given)")
 
 instance Outputable PredOrigin where
-  ppr (PredOrigin ty _) = ppr ty -- The origin is not so interesting when debugging
+  ppr (PredOrigin ty _ _) = ppr ty -- The origin is not so interesting when debugging
 
 {- Note [Inferring the instance context]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -542,14 +546,14 @@ deriveStandalone (L loc (DerivDecl deriv_ty overlap_mode))
 
               | isAlgTyCon tc || isDataFamilyTyCon tc  -- All other classes
               -> do { spec <- mkEqnHelp (fmap unLoc overlap_mode)
-                                        tvs cls cls_tys tc tc_args (Just theta)
+                                        tvs cls cls_tys tc tc_args
+                                        (Just theta)
                     ; return [spec] }
 
            _  -> -- Complain about functions, primitive types, etc,
                  failWithTc $ derivingThingErr False cls cls_tys inst_ty $
                  ptext (sLit "The last argument of the instance must be a data or newtype application")
         }
-
 
 warnUselessTypeable :: TcM ()
 warnUselessTypeable
@@ -585,29 +589,31 @@ deriveTyData tvs tc tc_args deriv_pred
 
      do {  -- Given data T a b c = ... deriving( C d ),
            -- we want to drop type variables from T so that (C d (T a)) is well-kinded
-          let (arg_kinds, _)  = splitKindFunTys cls_arg_kind
+          let (arg_kinds, _)  = splitFunTys cls_arg_kind
               n_args_to_drop  = length arg_kinds
               n_args_to_keep  = tyConArity tc - n_args_to_drop
               (tc_args_to_keep, args_to_drop)
                               = splitAt n_args_to_keep tc_args
               inst_ty_kind    = typeKind (mkTyConApp tc tc_args_to_keep)
-              dropped_tvs     = tyVarsOfTypes args_to_drop
+              dropped_tvs     = tyCoVarsOfTypes args_to_drop
 
               -- Match up the kinds, and apply the resulting kind substitution
               -- to the types.  See Note [Unify kinds in deriving]
               -- We are assuming the tycon tyvars and the class tyvars are distinct
               mb_match        = tcUnifyTy inst_ty_kind cls_arg_kind
               Just kind_subst = mb_match
-              (univ_kvs, univ_tvs) = partition isKindVar $ varSetElems $
-                                     mkVarSet deriv_tvs `unionVarSet`
-                                     tyVarsOfTypes tc_args_to_keep
-              univ_kvs'           = filter (`notElemTvSubst` kind_subst) univ_kvs
-              (subst', univ_tvs') = mapAccumL substTyVarBndr kind_subst univ_tvs
-              final_tc_args       = substTys subst' tc_args_to_keep
-              final_cls_tys       = substTys subst' cls_tys
+
+              all_tkvs        = varSetElemsWellScoped $
+                                mkVarSet deriv_tvs `unionVarSet`
+                                tyCoVarsOfTypes tc_args_to_keep
+              unmapped_tkvs   = filter (`notElemTCvSubst` kind_subst) all_tkvs
+              (subst, tkvs)   = mapAccumL substTyVarBndr
+                                          kind_subst unmapped_tkvs
+              final_tc_args   = substTys subst tc_args_to_keep
+              final_cls_tys   = substTys subst cls_tys
 
         ; traceTc "derivTyData1" (vcat [ pprTvBndrs tvs, ppr tc, ppr tc_args, ppr deriv_pred
-                                       , pprTvBndrs (tyVarsOfTypesList tc_args)
+                                       , pprTvBndrs (tyCoVarsOfTypesList tc_args)
                                        , ppr n_args_to_keep, ppr n_args_to_drop
                                        , ppr inst_ty_kind, ppr cls_arg_kind, ppr mb_match
                                        , ppr final_tc_args, ppr final_cls_tys ])
@@ -616,10 +622,10 @@ deriveTyData tvs tc tc_args deriv_pred
         ; checkTc (n_args_to_keep >= 0 && isJust mb_match)
                   (derivingKindErr tc cls cls_tys cls_arg_kind)
 
-        ; traceTc "derivTyData2" (vcat [ ppr univ_tvs ])
+        ; traceTc "derivTyData2" (vcat [ ppr tkvs ])
 
         ; checkTc (allDistinctTyVars args_to_drop &&              -- (a) and (b)
-                   not (any (`elemVarSet` dropped_tvs) univ_tvs)) -- (c)
+                   not (any (`elemVarSet` dropped_tvs) tkvs))     -- (c)
                   (derivingEtaErr cls final_cls_tys (mkTyConApp tc final_tc_args))
                 -- Check that
                 --  (a) The args to drop are all type variables; eg reject:
@@ -632,7 +638,7 @@ deriveTyData tvs tc tc_args deriv_pred
                 --              newtype T a s = ... deriving( ST s )
                 --              newtype K a a = ... deriving( Monad )
 
-        ; spec <- mkEqnHelp Nothing (univ_kvs' ++ univ_tvs')
+        ; spec <- mkEqnHelp Nothing tkvs
                             cls final_cls_tys tc final_tc_args Nothing
         ; traceTc "derivTyData" (ppr spec)
         ; return [spec] } }
@@ -712,7 +718,6 @@ mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta
               -- Note [Looking up family instances for deriving]
          fam_envs <- tcGetFamInstEnvs
        ; let (rep_tc, rep_tc_args, _co) = tcLookupDataFamInst fam_envs tycon tc_args
-
               -- If it's still a data family, the lookup failed; i.e no instance exists
        ; when (isDataFamilyTyCon rep_tc)
               (bale_out (ptext (sLit "No family instance for") <+> quotes (pprTypeApp tycon tc_args)))
@@ -799,9 +804,8 @@ write it out
 
 See Note [Eta reduction for data families] in FamInstEnv
 
-
-************************************************************************
-*                                                                      *
+%************************************************************************
+%*                                                                      *
                 Deriving data types
 *                                                                      *
 ************************************************************************
@@ -809,7 +813,7 @@ See Note [Eta reduction for data families] in FamInstEnv
 
 mkDataTypeEqn :: DynFlags
               -> Maybe OverlapMode
-              -> [Var]                  -- Universally quantified type variables in the instance
+              -> [TyVar]                -- Universally quantified type variables in the instance
               -> Class                  -- Class for which we need to derive an instance
               -> [Type]                 -- Other parameters to the class except the last
               -> TyCon                  -- Type constructor for which the instance is requested
@@ -845,19 +849,19 @@ mk_data_eqn overlap_mode tvs cls cls_tys tycon tc_args rep_tc rep_tc_args mtheta
                    { ds_loc = loc
                    , ds_name = dfun_name, ds_tvs = tvs
                    , ds_cls = cls, ds_tys = inst_tys
-                   , ds_tc = rep_tc, ds_tc_args = rep_tc_args
+                   , ds_tc = rep_tc
                    , ds_theta = inferred_constraints
                    , ds_overlap = overlap_mode
-                   , ds_newtype = False }
+                   , ds_newtype = Nothing }
         Just theta -> do -- Specified context
             return $ GivenTheta $ DS
                    { ds_loc = loc
                    , ds_name = dfun_name, ds_tvs = tvs
                    , ds_cls = cls, ds_tys = inst_tys
-                   , ds_tc = rep_tc, ds_tc_args = rep_tc_args
+                   , ds_tc = rep_tc
                    , ds_theta = theta
                    , ds_overlap = overlap_mode
-                   , ds_newtype = False }
+                   , ds_newtype = Nothing }
   where
     inst_ty  = mkTyConApp tycon tc_args
     inst_tys = cls_tys ++ [inst_ty]
@@ -899,36 +903,46 @@ inferConstraints main_cls cls_tys inst_ty rep_tc rep_tc_args
                  ++ sc_constraints
                  ++ arg_constraints) }
   where
+    (tc_binders, _) = splitPiTys (tyConKind rep_tc)
+    choose_level bndr
+      | isNamedBinder bndr = KindLevel
+      | otherwise          = TypeLevel
+    t_or_ks = map choose_level tc_binders ++ repeat TypeLevel
+       -- want to report *kind* errors when possible
+
     arg_constraints = con_arg_constraints get_std_constrained_tys
 
        -- Constraints arising from the arguments of each constructor
-    con_arg_constraints :: (CtOrigin -> Type -> [PredOrigin]) -> [PredOrigin]
+    con_arg_constraints :: (CtOrigin -> TypeOrKind -> Type -> [PredOrigin])
+                        -> [PredOrigin]
     con_arg_constraints get_arg_constraints
       = [ pred
         | data_con <- tyConDataCons rep_tc
-        , (arg_n, arg_ty) <- ASSERT( isVanillaDataCon data_con )
-                             zip [1..] $  -- ASSERT is precondition of dataConInstOrigArgTys
-                             dataConInstOrigArgTys data_con all_rep_tc_args
+        , (arg_n, arg_t_or_k, arg_ty)
+            <- zip3 [1..] t_or_ks $
+               dataConInstOrigArgTys data_con all_rep_tc_args
         , not (isUnLiftedType arg_ty)
         , let orig = DerivOriginDC data_con arg_n
-        , pred <- get_arg_constraints orig arg_ty ]
+        , pred <- get_arg_constraints orig arg_t_or_k arg_ty ]
+
                 -- No constraints for unlifted types
                 -- See Note [Deriving and unboxed types]
 
     -- is_functor_like: see Note [Inferring the instance context]
     is_functor_like = typeKind inst_ty `tcEqKind` typeToTypeKind
 
-    get_gen1_constraints functor_cls orig ty
-       = mk_functor_like_constraints orig functor_cls $
+    get_gen1_constraints functor_cls orig t_or_k ty
+       = mk_functor_like_constraints orig t_or_k functor_cls $
          get_gen1_constrained_tys last_tv ty
 
-    get_std_constrained_tys :: CtOrigin -> Type -> [PredOrigin]
-    get_std_constrained_tys orig ty
-        | is_functor_like = mk_functor_like_constraints orig main_cls $
+    get_std_constrained_tys :: CtOrigin -> TypeOrKind -> Type -> [PredOrigin]
+    get_std_constrained_tys orig t_or_k ty
+        | is_functor_like = mk_functor_like_constraints orig t_or_k main_cls $
                             deepSubtypesContaining last_tv ty
-        | otherwise       = [mk_cls_pred orig main_cls ty]
+        | otherwise       = [mk_cls_pred orig t_or_k main_cls ty]
 
-    mk_functor_like_constraints :: CtOrigin -> Class -> [Type] -> [PredOrigin]
+    mk_functor_like_constraints :: CtOrigin -> TypeOrKind
+                                -> Class -> [Type] -> [PredOrigin]
     -- 'cls' is usually main_cls (Functor or Traversable etc), but if
     -- main_cls = Generic1, then 'cls' can be Functor; see get_gen1_constraints
     --
@@ -936,11 +950,12 @@ inferConstraints main_cls cls_tys inst_ty rep_tc rep_tc_args
     -- The second constraint checks that the first is well-kinded.
     -- Lacking that, as Trac #10561 showed, we can just generate an
     -- ill-kinded instance.
-    mk_functor_like_constraints orig cls tys
-       = [ pred
+    mk_functor_like_constraints orig t_or_k cls tys
+       = [ pred_o
          | ty <- tys
-         , pred <- [ mk_cls_pred orig cls ty
-                   , mkPredOrigin orig (mkEqPred (typeKind ty) typeToTypeKind) ] ]
+         , pred_o <- [ mk_cls_pred orig t_or_k cls ty
+                     , mkPredOrigin orig KindLevel
+                         (mkPrimEqPred (typeKind ty) typeToTypeKind) ] ]
 
     rep_tc_tvs      = tyConTyVars rep_tc
     last_tv         = last rep_tc_tvs
@@ -952,16 +967,16 @@ inferConstraints main_cls cls_tys inst_ty rep_tc rep_tc_args
     cls_tvs  = classTyVars main_cls
     inst_tys = cls_tys ++ [inst_ty]
     sc_constraints = ASSERT2( equalLength cls_tvs inst_tys, ppr main_cls <+> ppr rep_tc)
-                     mkThetaOrigin DerivOrigin $
+                     mkThetaOrigin DerivOrigin TypeLevel $
                      substTheta cls_subst (classSCTheta main_cls)
     cls_subst = ASSERT( equalLength cls_tvs inst_tys )
-                zipOpenTvSubst cls_tvs inst_tys
+                zipOpenTCvSubst cls_tvs inst_tys
 
         -- Stupid constraints
-    stupid_constraints = mkThetaOrigin DerivOrigin $
+    stupid_constraints = mkThetaOrigin DerivOrigin TypeLevel $
                          substTheta tc_subst (tyConStupidTheta rep_tc)
     tc_subst = ASSERT( equalLength rep_tc_tvs all_rep_tc_args )
-               zipTopTvSubst rep_tc_tvs all_rep_tc_args
+               zipTopTCvSubst rep_tc_tvs all_rep_tc_args
 
         -- Extra Data constraints
         -- The Data class (only) requires that for
@@ -974,13 +989,14 @@ inferConstraints main_cls cls_tys inst_ty rep_tc rep_tc_args
     extra_constraints
       | main_cls `hasKey` dataClassKey
       , all (isLiftedTypeKind . typeKind) rep_tc_args
-      = map (mk_cls_pred DerivOrigin main_cls) rep_tc_args
+      = [ mk_cls_pred DerivOrigin t_or_k main_cls ty
+        | (t_or_k, ty) <- zip t_or_ks rep_tc_args]
       | otherwise
       = []
 
-    mk_cls_pred orig cls ty   -- Don't forget to apply to cls_tys too
+    mk_cls_pred orig t_or_k cls ty   -- Don't forget to apply to cls_tys too
                               -- In the awkward Generic1 casde, cls_tys is empty
-       = mkPredOrigin orig (mkClassPred cls (cls_tys ++ [ty]))
+       = mkPredOrigin orig t_or_k (mkClassPred cls (cls_tys ++ [ty]))
 
 {- Note [Getting base classes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1140,7 +1156,7 @@ canDeriveAnyClass dflags _tycon clas
     target_kind = tyVarKind (last (classTyVars clas))
 
 typeToTypeKind :: Kind
-typeToTypeKind = liftedTypeKind `mkArrowKind` liftedTypeKind
+typeToTypeKind = liftedTypeKind `mkFunTy` liftedTypeKind
 
 type Condition = (DynFlags, TyCon, [Type]) -> Validity
         -- first Bool is whether or not we are allowed to derive Data and Typeable
@@ -1268,7 +1284,7 @@ cond_functorOK allowFunctions allowExQuantifiedLastTyVar (_, rep_tc, _)
     tc_tvs            = tyConTyVars rep_tc
     Just (_, last_tv) = snocView tc_tvs
     bad_stupid_theta  = filter is_bad (tyConStupidTheta rep_tc)
-    is_bad pred       = last_tv `elemVarSet` tyVarsOfType pred
+    is_bad pred       = last_tv `elemVarSet` tyCoVarsOfType pred
 
     data_cons = tyConDataCons rep_tc
     check_con con = allValid (check_universal con : foldDataConArgs (ft_check con) con)
@@ -1280,7 +1296,7 @@ cond_functorOK allowFunctions allowExQuantifiedLastTyVar (_, rep_tc, _)
                 -- in TcGenDeriv
       | Just tv <- getTyVar_maybe (last (tyConAppArgs (dataConOrigResTy con)))
       , tv `elem` dataConUnivTyVars con
-      , not (tv `elemVarSet` tyVarsOfTypes (dataConTheta con))
+      , not (tv `elemVarSet` tyCoVarsOfTypes (dataConTheta con))
       = IsValid   -- See Note [Check that the type variable is truly universal]
       | otherwise
       = NotValid (badCon con existential)
@@ -1404,7 +1420,7 @@ a context for the Data instances:
 ************************************************************************
 -}
 
-mkNewTypeEqn :: DynFlags -> Maybe OverlapMode -> [Var] -> Class
+mkNewTypeEqn :: DynFlags -> Maybe OverlapMode -> [TyVar] -> Class
              -> [Type] -> TyCon -> [Type] -> TyCon -> [Type]
              -> DerivContext
              -> TcRn EarlyDerivSpec
@@ -1420,20 +1436,20 @@ mkNewTypeEqn dflags overlap_mode tvs
        case mtheta of
         Just theta -> return $ GivenTheta $ DS
             { ds_loc = loc
-            , ds_name = dfun_name, ds_tvs = varSetElemsKvsFirst dfun_tvs
+            , ds_name = dfun_name, ds_tvs = varSetElemsWellScoped dfun_tvs
             , ds_cls = cls, ds_tys = inst_tys
-            , ds_tc = rep_tycon, ds_tc_args = rep_tc_args
+            , ds_tc = rep_tycon
             , ds_theta = theta
             , ds_overlap = overlap_mode
-            , ds_newtype = True }
+            , ds_newtype = Just rep_inst_ty }
         Nothing -> return $ InferTheta $ DS
             { ds_loc = loc
-            , ds_name = dfun_name, ds_tvs = varSetElemsKvsFirst dfun_tvs
+            , ds_name = dfun_name, ds_tvs = varSetElemsWellScoped dfun_tvs
             , ds_cls = cls, ds_tys = inst_tys
-            , ds_tc = rep_tycon, ds_tc_args = rep_tc_args
+            , ds_tc = rep_tycon
             , ds_theta = all_preds
             , ds_overlap = overlap_mode
-            , ds_newtype = True }
+            , ds_newtype = Just rep_inst_ty }
   | otherwise
   = case checkSideConditions dflags mtheta cls cls_tys rep_tycon rep_tc_args of
       -- Error with standard class
@@ -1514,7 +1530,7 @@ mkNewTypeEqn dflags overlap_mode tvs
         rep_inst_ty = newTyConInstRhs rep_tycon rep_tc_args
         rep_tys     = cls_tys ++ [rep_inst_ty]
         rep_pred    = mkClassPred cls rep_tys
-        rep_pred_o  = mkPredOrigin DerivOrigin rep_pred
+        rep_pred_o  = mkPredOrigin DerivOrigin TypeLevel rep_pred
                 -- rep_pred is the representation dictionary, from where
                 -- we are gong to get all the methods for the newtype
                 -- dictionary
@@ -1524,12 +1540,12 @@ mkNewTypeEqn dflags overlap_mode tvs
         -- See Note [Newtype deriving superclasses] above
 
         cls_tyvars = classTyVars cls
-        dfun_tvs = tyVarsOfTypes inst_tys
+        dfun_tvs = tyCoVarsOfTypes inst_tys
         inst_ty = mkTyConApp tycon tc_args
         inst_tys = cls_tys ++ [inst_ty]
         sc_theta =
-            mkThetaOrigin DerivOrigin $
-            substTheta (zipOpenTvSubst cls_tyvars inst_tys) (classSCTheta cls)
+            mkThetaOrigin DerivOrigin TypeLevel $
+            substTheta (zipOpenTCvSubst cls_tyvars inst_tys) (classSCTheta cls)
 
 
         -- Next we collect Coercible constraints between
@@ -1537,8 +1553,9 @@ mkNewTypeEqn dflags overlap_mode tvs
         -- newtype type; precisely the constraints required for the
         -- calls to coercible that we are going to generate.
         coercible_constraints =
-            [ let (Pair t1 t2) = mkCoerceClassMethEqn cls (varSetElemsKvsFirst dfun_tvs) inst_tys rep_inst_ty meth
-              in mkPredOrigin (DerivOriginCoerce meth t1 t2) (mkCoerciblePred t1 t2)
+            [ let (Pair t1 t2) = mkCoerceClassMethEqn cls (varSetElemsWellScoped dfun_tvs) inst_tys rep_inst_ty meth
+              in mkPredOrigin (DerivOriginCoerce meth t1 t2) TypeLevel
+                              (mkReprPrimEqPred t1 t2)
             | meth <- classMethods cls ]
 
                 -- If there are no tyvars, there's no need
@@ -1801,23 +1818,27 @@ simplifyDeriv pred tvs theta
        ; let skol_set = mkVarSet tvs_skols
              doc = ptext (sLit "deriving") <+> parens (ppr pred)
 
-       ; wanted <- mapM (\(PredOrigin t o) -> newWanted o (substTy skol_subst t)) theta
+       ; wanted <- mapM (\(PredOrigin t o t_or_k)
+                         -> newWanted o (Just t_or_k) (substTy skol_subst t)) theta
 
        ; traceTc "simplifyDeriv" $
          vcat [ pprTvBndrs tvs $$ ppr theta $$ ppr wanted, doc ]
-       ; residual_wanted <- solveWantedsTcM wanted
+       ; residual_wanted <- simplifyWantedsTcM wanted
 
        ; residual_simple <- zonkSimples (wc_simple residual_wanted)
        ; let (good, bad) = partitionBagWith get_good residual_simple
                          -- See Note [Exotic derived instance contexts]
+
              get_good :: Ct -> Either PredType Ct
              get_good ct | validDerivPred skol_set p
-                         , isWantedCt ct  = Left p
-                         -- NB: residual_wanted may contain unsolved
-                         -- Derived and we stick them into the bad set
-                         -- so that reportUnsolved may decide what to do with them
-                         | otherwise = Right ct
-                         where p = ctPred ct
+                         , isWantedCt ct
+                         = Left p
+                          -- NB: residual_wanted may contain unsolved
+                          -- Derived and we stick them into the bad set
+                          -- so that reportUnsolved may decide what to do with them
+                         | otherwise
+                         = Right ct
+                           where p = ctPred ct
 
        ; traceTc "simplifyDeriv 2" $
          vcat [ ppr tvs_skols, ppr residual_simple, ppr good, ppr bad ]
@@ -1829,7 +1850,7 @@ simplifyDeriv pred tvs theta
        ; unless defer (reportAllUnsolved (residual_wanted { wc_simple = bad }))
 
        ; let min_theta  = mkMinimalBySCs (bagToList good)
-             subst_skol = zipTopTvSubst tvs_skols $ map mkTyVarTy tvs
+             subst_skol = zipTopTCvSubst tvs_skols $ mkTyVarTys tvs
                           -- The reverse substitution (sigh)
        ; return (substTheta subst_skol min_theta) }
 
@@ -1983,10 +2004,10 @@ the renamer.  What a great hack!
 --
 genInst :: DerivSpec ThetaType
         -> TcM (InstInfo RdrName, BagDerivStuff, Maybe Name)
-genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon, ds_tc_args = rep_tc_args
+genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
                  , ds_theta = theta, ds_newtype = is_newtype, ds_tys = tys
                  , ds_name = dfun_name, ds_cls = clas, ds_loc = loc })
-  | is_newtype   -- See Note [Bindings for Generalised Newtype Deriving]
+  | Just rhs_ty <- is_newtype   -- See Note [Bindings for Generalised Newtype Deriving]
   = do { inst_spec <- newDerivClsInst theta spec
        ; traceTc "genInst/is_newtype" (vcat [ppr loc, ppr clas, ppr tvs, ppr tys, ppr rhs_ty])
        ; return ( InstInfo
@@ -2016,8 +2037,6 @@ genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon, ds_tc_args = rep_tc_args
                                                 , ib_extensions = []
                                                 , ib_derived = True } }
        ; return ( inst_info, deriv_stuff, Nothing ) }
-  where
-    rhs_ty = newTyConInstRhs rep_tycon rep_tc_args
 
 -- Generate the bindings needed for a derived class that isn't handled by
 -- -XGeneralizedNewtypeDeriving.
@@ -2049,7 +2068,8 @@ genDerivStuff loc clas dfun_name tycon inst_tys tyvars
            -- resort is -XDeriveAnyClass (since -XGeneralizedNewtypeDeriving
            -- fell through).
           let mini_env   = mkVarEnv (classTyVars clas `zip` inst_tys)
-              mini_subst = mkTvSubst (mkInScopeSet (mkVarSet tyvars)) mini_env
+              mini_subst = mkTCvSubst (mkInScopeSet (mkVarSet tyvars))
+                                      (mini_env, emptyCvSubstEnv)
 
          ; tyfam_insts <-
              ASSERT2( isNothing (canDeriveAnyClass dflags tycon clas)

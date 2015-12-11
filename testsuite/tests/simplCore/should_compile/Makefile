@@ -14,7 +14,7 @@ T11155:
 
 T8274:
 	$(RM) -f T8274.o T8274.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T8274.hs | grep '#'
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques T8274.hs | grep '#'
 
 T7865:
 	$(RM) -f T7865.o T7865.hi

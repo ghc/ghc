@@ -372,6 +372,9 @@ basicKnownKeyNames
         , typeErrorVAppendDataConName
         , typeErrorShowTypeDataConName
 
+        -- homogeneous equality
+        , eqTyConName
+
     ] ++ case cIntegerLibraryType of
            IntegerGMP    -> [integerSDataConName]
            IntegerSimple -> []
@@ -417,7 +420,8 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP, mONAD_FAIL,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
-    cONTROL_EXCEPTION_BASE, gHC_TYPELITS :: Module
+    cONTROL_EXCEPTION_BASE, gHC_TYPELITS, dATA_TYPE_EQUALITY,
+    dATA_COERCE :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
@@ -473,6 +477,8 @@ gHC_EXTS        = mkBaseModule (fsLit "GHC.Exts")
 cONTROL_EXCEPTION_BASE = mkBaseModule (fsLit "Control.Exception.Base")
 gHC_GENERICS    = mkBaseModule (fsLit "GHC.Generics")
 gHC_TYPELITS    = mkBaseModule (fsLit "GHC.TypeLits")
+dATA_TYPE_EQUALITY = mkBaseModule (fsLit "Data.Type.Equality")
+dATA_COERCE     = mkBaseModule (fsLit "Data.Coerce")
 
 gHC_PARR' :: Module
 gHC_PARR' = mkBaseModule (fsLit "GHC.PArr")
@@ -775,6 +781,9 @@ foldMap_RDR             = varQual_RDR dATA_FOLDABLE       (fsLit "foldMap")
 traverse_RDR            = varQual_RDR dATA_TRAVERSABLE    (fsLit "traverse")
 mempty_RDR              = varQual_RDR gHC_BASE            (fsLit "mempty")
 mappend_RDR             = varQual_RDR gHC_BASE            (fsLit "mappend")
+
+eqTyCon_RDR :: RdrName
+eqTyCon_RDR = tcQual_RDR dATA_TYPE_EQUALITY (fsLit "~")
 
 ----------------------
 varQual_RDR, tcQual_RDR, clsQual_RDR, dataQual_RDR
@@ -1360,6 +1369,10 @@ fingerprintDataConName :: Name
 fingerprintDataConName =
     dcQual gHC_FINGERPRINT_TYPE (fsLit "Fingerprint") fingerprintDataConKey
 
+-- homogeneous equality
+eqTyConName :: Name
+eqTyConName        = tcQual dATA_TYPE_EQUALITY (fsLit "~")         eqTyConKey
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1491,8 +1504,8 @@ addrPrimTyConKey, arrayPrimTyConKey, arrayArrayPrimTyConKey, boolTyConKey,
     weakPrimTyConKey, mutableArrayPrimTyConKey, mutableArrayArrayPrimTyConKey,
     mutableByteArrayPrimTyConKey, orderingTyConKey, mVarPrimTyConKey,
     ratioTyConKey, rationalTyConKey, realWorldTyConKey, stablePtrPrimTyConKey,
-    stablePtrTyConKey, anyTyConKey, eqTyConKey, smallArrayPrimTyConKey,
-    smallMutableArrayPrimTyConKey :: Unique
+    stablePtrTyConKey, anyTyConKey, eqTyConKey, heqTyConKey,
+    smallArrayPrimTyConKey, smallMutableArrayPrimTyConKey :: Unique
 addrPrimTyConKey                        = mkPreludeTyConUnique  1
 arrayPrimTyConKey                       = mkPreludeTyConUnique  3
 boolTyConKey                            = mkPreludeTyConUnique  4
@@ -1529,8 +1542,9 @@ stablePtrPrimTyConKey                   = mkPreludeTyConUnique 35
 stablePtrTyConKey                       = mkPreludeTyConUnique 36
 anyTyConKey                             = mkPreludeTyConUnique 37
 eqTyConKey                              = mkPreludeTyConUnique 38
-arrayArrayPrimTyConKey                  = mkPreludeTyConUnique 39
-mutableArrayArrayPrimTyConKey           = mkPreludeTyConUnique 40
+heqTyConKey                             = mkPreludeTyConUnique 39
+arrayArrayPrimTyConKey                  = mkPreludeTyConUnique 40
+mutableArrayArrayPrimTyConKey           = mkPreludeTyConUnique 41
 
 statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     mutVarPrimTyConKey, ioTyConKey,
@@ -1539,34 +1553,35 @@ statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     liftedConKey, unliftedConKey, anyBoxConKey, kindConKey, boxityConKey,
     typeConKey, threadIdPrimTyConKey, bcoPrimTyConKey, ptrTyConKey,
     funPtrTyConKey, tVarPrimTyConKey, eqPrimTyConKey,
-    eqReprPrimTyConKey, voidPrimTyConKey :: Unique
+    eqReprPrimTyConKey, eqPhantPrimTyConKey, voidPrimTyConKey :: Unique
 statePrimTyConKey                       = mkPreludeTyConUnique 50
 stableNamePrimTyConKey                  = mkPreludeTyConUnique 51
 stableNameTyConKey                      = mkPreludeTyConUnique 52
 eqPrimTyConKey                          = mkPreludeTyConUnique 53
 eqReprPrimTyConKey                      = mkPreludeTyConUnique 54
-mutVarPrimTyConKey                      = mkPreludeTyConUnique 55
-ioTyConKey                              = mkPreludeTyConUnique 56
-voidPrimTyConKey                        = mkPreludeTyConUnique 57
-wordPrimTyConKey                        = mkPreludeTyConUnique 58
-wordTyConKey                            = mkPreludeTyConUnique 59
-word8TyConKey                           = mkPreludeTyConUnique 60
-word16TyConKey                          = mkPreludeTyConUnique 61
-word32PrimTyConKey                      = mkPreludeTyConUnique 62
-word32TyConKey                          = mkPreludeTyConUnique 63
-word64PrimTyConKey                      = mkPreludeTyConUnique 64
-word64TyConKey                          = mkPreludeTyConUnique 65
-liftedConKey                            = mkPreludeTyConUnique 66
-unliftedConKey                          = mkPreludeTyConUnique 67
-anyBoxConKey                            = mkPreludeTyConUnique 68
-kindConKey                              = mkPreludeTyConUnique 69
-boxityConKey                            = mkPreludeTyConUnique 70
-typeConKey                              = mkPreludeTyConUnique 71
-threadIdPrimTyConKey                    = mkPreludeTyConUnique 72
-bcoPrimTyConKey                         = mkPreludeTyConUnique 73
-ptrTyConKey                             = mkPreludeTyConUnique 74
-funPtrTyConKey                          = mkPreludeTyConUnique 75
-tVarPrimTyConKey                        = mkPreludeTyConUnique 76
+eqPhantPrimTyConKey                     = mkPreludeTyConUnique 55
+mutVarPrimTyConKey                      = mkPreludeTyConUnique 56
+ioTyConKey                              = mkPreludeTyConUnique 57
+voidPrimTyConKey                        = mkPreludeTyConUnique 58
+wordPrimTyConKey                        = mkPreludeTyConUnique 59
+wordTyConKey                            = mkPreludeTyConUnique 60
+word8TyConKey                           = mkPreludeTyConUnique 61
+word16TyConKey                          = mkPreludeTyConUnique 62
+word32PrimTyConKey                      = mkPreludeTyConUnique 63
+word32TyConKey                          = mkPreludeTyConUnique 64
+word64PrimTyConKey                      = mkPreludeTyConUnique 65
+word64TyConKey                          = mkPreludeTyConUnique 66
+liftedConKey                            = mkPreludeTyConUnique 67
+unliftedConKey                          = mkPreludeTyConUnique 68
+anyBoxConKey                            = mkPreludeTyConUnique 69
+kindConKey                              = mkPreludeTyConUnique 70
+boxityConKey                            = mkPreludeTyConUnique 71
+typeConKey                              = mkPreludeTyConUnique 72
+threadIdPrimTyConKey                    = mkPreludeTyConUnique 73
+bcoPrimTyConKey                         = mkPreludeTyConUnique 74
+ptrTyConKey                             = mkPreludeTyConUnique 75
+funPtrTyConKey                          = mkPreludeTyConUnique 76
+tVarPrimTyConKey                        = mkPreludeTyConUnique 77
 
 -- Parallel array type constructor
 parrTyConKey :: Unique
@@ -1579,33 +1594,17 @@ objectTyConKey                          = mkPreludeTyConUnique 83
 eitherTyConKey :: Unique
 eitherTyConKey                          = mkPreludeTyConUnique 84
 
--- Super Kinds constructors
-superKindTyConKey :: Unique
-superKindTyConKey                     = mkPreludeTyConUnique 85
-
 -- Kind constructors
-liftedTypeKindTyConKey, anyKindTyConKey, openTypeKindTyConKey,
-  unliftedTypeKindTyConKey, constraintKindTyConKey :: Unique
-anyKindTyConKey                         = mkPreludeTyConUnique 86
+liftedTypeKindTyConKey, tYPETyConKey,
+  unliftedTypeKindTyConKey, constraintKindTyConKey, levityTyConKey,
+  starKindTyConKey, unicodeStarKindTyConKey :: Unique
 liftedTypeKindTyConKey                  = mkPreludeTyConUnique 87
-openTypeKindTyConKey                    = mkPreludeTyConUnique 88
+tYPETyConKey                            = mkPreludeTyConUnique 88
 unliftedTypeKindTyConKey                = mkPreludeTyConUnique 89
+levityTyConKey                          = mkPreludeTyConUnique 90
 constraintKindTyConKey                  = mkPreludeTyConUnique 92
-
--- Coercion constructors
-symCoercionTyConKey, transCoercionTyConKey, leftCoercionTyConKey,
-    rightCoercionTyConKey, instCoercionTyConKey, unsafeCoercionTyConKey,
-    csel1CoercionTyConKey, csel2CoercionTyConKey, cselRCoercionTyConKey
-    :: Unique
-symCoercionTyConKey                     = mkPreludeTyConUnique 93
-transCoercionTyConKey                   = mkPreludeTyConUnique 94
-leftCoercionTyConKey                    = mkPreludeTyConUnique 95
-rightCoercionTyConKey                   = mkPreludeTyConUnique 96
-instCoercionTyConKey                    = mkPreludeTyConUnique 97
-unsafeCoercionTyConKey                  = mkPreludeTyConUnique 98
-csel1CoercionTyConKey                   = mkPreludeTyConUnique 99
-csel2CoercionTyConKey                   = mkPreludeTyConUnique 100
-cselRCoercionTyConKey                   = mkPreludeTyConUnique 101
+starKindTyConKey                        = mkPreludeTyConUnique 93
+unicodeStarKindTyConKey                 = mkPreludeTyConUnique 94
 
 pluginTyConKey :: Unique
 pluginTyConKey                          = mkPreludeTyConUnique 102
@@ -1717,7 +1716,6 @@ ipTyConKey = mkPreludeTyConUnique 184
 ipCoNameKey :: Unique
 ipCoNameKey = mkPreludeTyConUnique 185
 
-
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES TyConUniques 200-299
 -----------------------------------------------------
@@ -1739,7 +1737,7 @@ ipCoNameKey = mkPreludeTyConUnique 185
 charDataConKey, consDataConKey, doubleDataConKey, falseDataConKey,
     floatDataConKey, intDataConKey, integerSDataConKey, nilDataConKey,
     ratioDataConKey, stableNameDataConKey, trueDataConKey, wordDataConKey,
-    word8DataConKey, ioDataConKey, integerDataConKey, eqBoxDataConKey,
+    word8DataConKey, ioDataConKey, integerDataConKey, heqDataConKey,
     coercibleDataConKey, nothingDataConKey, justDataConKey :: Unique
 
 charDataConKey                          = mkPreludeDataConUnique  1
@@ -1759,7 +1757,7 @@ trueDataConKey                          = mkPreludeDataConUnique 15
 wordDataConKey                          = mkPreludeDataConUnique 16
 ioDataConKey                            = mkPreludeDataConUnique 17
 integerDataConKey                       = mkPreludeDataConUnique 18
-eqBoxDataConKey                         = mkPreludeDataConUnique 19
+heqDataConKey                           = mkPreludeDataConUnique 19
 
 -- Generic data constructors
 crossDataConKey, inlDataConKey, inrDataConKey, genUnitDataConKey :: Unique
@@ -1799,10 +1797,15 @@ srcLocDataConKey                        = mkPreludeDataConUnique 37
 ipDataConKey :: Unique
 ipDataConKey                            = mkPreludeDataConUnique 38
 
+-- Levity
+liftedDataConKey, unliftedDataConKey :: Unique
+liftedDataConKey                        = mkPreludeDataConUnique 39
+unliftedDataConKey                      = mkPreludeDataConUnique 40
+
 trTyConDataConKey, trModuleDataConKey, trNameSDataConKey :: Unique
-trTyConDataConKey                       = mkPreludeDataConUnique 40
-trModuleDataConKey                      = mkPreludeDataConUnique 41
-trNameSDataConKey                       = mkPreludeDataConUnique 42
+trTyConDataConKey                       = mkPreludeDataConUnique 41
+trModuleDataConKey                      = mkPreludeDataConUnique 42
+trNameSDataConKey                       = mkPreludeDataConUnique 43
 
 typeErrorTextDataConKey,
   typeErrorAppendDataConKey,
@@ -2117,13 +2120,17 @@ toDynIdKey            = mkPreludeMiscIdUnique 509
 bitIntegerIdKey :: Unique
 bitIntegerIdKey       = mkPreludeMiscIdUnique 510
 
+heqSCSelIdKey, coercibleSCSelIdKey :: Unique
+heqSCSelIdKey       = mkPreludeMiscIdUnique 511
+coercibleSCSelIdKey = mkPreludeMiscIdUnique 512
+
 sappendClassOpKey :: Unique
-sappendClassOpKey = mkPreludeMiscIdUnique 511
+sappendClassOpKey = mkPreludeMiscIdUnique 513
 
 memptyClassOpKey, mappendClassOpKey, mconcatClassOpKey :: Unique
-memptyClassOpKey  = mkPreludeMiscIdUnique 512
-mappendClassOpKey = mkPreludeMiscIdUnique 513
-mconcatClassOpKey = mkPreludeMiscIdUnique 514
+memptyClassOpKey  = mkPreludeMiscIdUnique 514
+mappendClassOpKey = mkPreludeMiscIdUnique 515
+mconcatClassOpKey = mkPreludeMiscIdUnique 516
 
 
 {-
@@ -2176,3 +2183,21 @@ derivableClassKeys :: [Unique]
 derivableClassKeys
   = [ eqClassKey, ordClassKey, enumClassKey, ixClassKey,
       boundedClassKey, showClassKey, readClassKey ]
+
+{-
+************************************************************************
+*                                                                      *
+   Semi-builtin names
+*                                                                      *
+************************************************************************
+
+The following names should be considered by GHCi to be in scope always.
+
+-}
+
+pretendNameIsInScope :: Name -> Bool
+pretendNameIsInScope n
+  = any (n `hasKey`)
+    [ starKindTyConKey, liftedTypeKindTyConKey, tYPETyConKey
+    , unliftedTypeKindTyConKey, levityTyConKey, liftedDataConKey
+    , unliftedDataConKey ]

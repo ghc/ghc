@@ -46,7 +46,7 @@ module HsDecls (
   -- ** @RULE@ declarations
   LRuleDecls,RuleDecls(..),RuleDecl(..), LRuleDecl, RuleBndr(..),LRuleBndr,
   collectRuleBndrSigTys,
-  flattenRuleDecls,
+  flattenRuleDecls, pprFullRuleName,
   -- ** @VECTORISE@ declarations
   VectDecl(..), LVectDecl,
   lvectDeclName, lvectInstDecl,
@@ -638,7 +638,7 @@ countTyClDecls decls
 
 -- | Does this declaration have a complete, user-supplied kind signature?
 -- See Note [Complete user-supplied kind signatures]
-hsDeclHasCusk :: TyClDecl name -> Bool
+hsDeclHasCusk :: TyClDecl Name -> Bool
 hsDeclHasCusk (FamDecl { tcdFam = fam_decl }) = famDeclHasCusk fam_decl
 hsDeclHasCusk (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
   = hsTvbAllKinded tyvars && rhs_annotated rhs
@@ -1060,14 +1060,19 @@ getConNames :: ConDecl name -> [Located name]
 getConNames ConDeclH98  {con_name  = name}  = [name]
 getConNames ConDeclGADT {con_names = names} = names
 
+-- don't call with RdrNames, because it can't deal with HsAppsTy
 getConDetails :: ConDecl name -> HsConDeclDetails name
 getConDetails ConDeclH98  {con_details  = details} = details
 getConDetails ConDeclGADT {con_type     = ty     } = details
   where
     (details,_,_,_) = gadtDeclDetails ty
 
+-- don't call with RdrNames, because it can't deal with HsAppsTy
 gadtDeclDetails :: LHsSigType name
-     -> (HsConDeclDetails name,LHsType name,LHsContext name,[LHsTyVarBndr name])
+                -> ( HsConDeclDetails name
+                   , LHsType name
+                   , LHsContext name
+                   , [LHsTyVarBndr name] )
 gadtDeclDetails HsIB {hsib_body = lbody_ty} = (details,res_ty,cxt,tvs)
   where
     (tvs, cxt, tau) = splitLHsSigmaTy lbody_ty
@@ -1635,12 +1640,15 @@ deriving instance (DataId name) => Data (RuleBndr name)
 collectRuleBndrSigTys :: [RuleBndr name] -> [LHsSigWcType name]
 collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ ty <- bndrs]
 
+pprFullRuleName :: Located (SourceText, RuleName) -> SDoc
+pprFullRuleName (L _ (_, n)) = doubleQuotes $ ftext n
+
 instance OutputableBndr name => Outputable (RuleDecls name) where
   ppr (HsRules _ rules) = ppr rules
 
 instance OutputableBndr name => Outputable (RuleDecl name) where
   ppr (HsRule name act ns lhs _fv_lhs rhs _fv_rhs)
-        = sep [text "{-# RULES" <+> doubleQuotes (ftext $ snd $ unLoc name)
+        = sep [text "{-# RULES" <+> pprFullRuleName name
                                 <+> ppr act,
                nest 4 (pp_forall <+> pprExpr (unLoc lhs)),
                nest 4 (equals <+> pprExpr (unLoc rhs) <+> text "#-}") ]

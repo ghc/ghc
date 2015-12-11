@@ -1,4 +1,0 @@
-
-T7481.hs:12:13:
-    ‘D’ of kind ‘* -> *’ is not promotable
-    In the kind ‘D * -> *’

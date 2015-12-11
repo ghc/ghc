@@ -1,15 +1,17 @@
-{-# LANGUAGE DeriveGeneric        #-}
-{-# LANGUAGE TypeOperators        #-}
-{-# LANGUAGE GADTs                #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE StandaloneDeriving   #-}
-{-# LANGUAGE NoImplicitPrelude    #-}
-{-# LANGUAGE PolyKinds            #-}
-{-# LANGUAGE RankNTypes           #-}
-{-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ExplicitNamespaces   #-}
+{-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE StandaloneDeriving     #-}
+{-# LANGUAGE NoImplicitPrelude      #-}
+{-# LANGUAGE PolyKinds              #-}
+{-# LANGUAGE RankNTypes             #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE ExplicitNamespaces     #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -29,9 +31,9 @@
 
 
 module Data.Type.Equality (
-  -- * The equality type
-  (:~:)(..),
-  
+  -- * The equality types
+  (:~:)(..), type (~~),
+
   -- * Working with equality
   sym, trans, castWith, gcastWith, apply, inner, outer,
 
@@ -48,6 +50,16 @@ import GHC.Show
 import GHC.Read
 import GHC.Base
 import Data.Type.Bool
+
+-- | Lifted, homogeneous equality. By lifted, we mean that it can be
+-- bogus (deferred type error). By homogeneous, the two types @a@
+-- and @b@ must have the same kind.
+class a ~~ b => (a :: k) ~ (b :: k) | a -> b, b -> a
+  -- NB: Not exported, as (~) is magical syntax. That's also why there's
+  -- no fixity.
+instance {-# INCOHERENT #-} a ~~ b => a ~ b
+  -- incoherent because we want to use this instance eagerly, even when
+  -- the tyvars are partially unknown.
 
 infix 4 :~:
 

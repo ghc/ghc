@@ -13,7 +13,7 @@ module UniqDSet (
         UniqDSet,    -- type synonym for UniqFM a
 
         -- ** Manipulating these sets
-        delOneFromUniqDSet,
+        delOneFromUniqDSet, delListFromUniqDSet,
         emptyUniqDSet,
         unitUniqDSet,
         mkUniqDSet,
@@ -21,6 +21,7 @@ module UniqDSet (
         unionUniqDSets, unionManyUniqDSets,
         minusUniqDSet,
         intersectUniqDSets,
+        intersectsUniqDSets,
         foldUniqDSet,
         elementOfUniqDSet,
         filterUniqDSet,
@@ -28,8 +29,7 @@ module UniqDSet (
         isEmptyUniqDSet,
         lookupUniqDSet,
         uniqDSetToList,
-        partitionUniqDSet,
-        delListFromUniqDSet,
+        partitionUniqDSet
     ) where
 
 import UniqDFM
@@ -55,6 +55,9 @@ addListToUniqDSet = foldl addOneToUniqDSet
 delOneFromUniqDSet :: Uniquable a => UniqDSet a -> a -> UniqDSet a
 delOneFromUniqDSet = delFromUDFM
 
+delListFromUniqDSet :: Uniquable a => UniqDSet a -> [a] -> UniqDSet a
+delListFromUniqDSet = delListFromUDFM
+
 unionUniqDSets :: UniqDSet a -> UniqDSet a -> UniqDSet a
 unionUniqDSets = plusUDFM
 
@@ -67,6 +70,9 @@ minusUniqDSet = minusUDFM
 
 intersectUniqDSets :: UniqDSet a -> UniqDSet a -> UniqDSet a
 intersectUniqDSets = intersectUDFM
+
+intersectsUniqDSets :: UniqDSet a -> UniqDSet a -> Bool
+intersectsUniqDSets = intersectsUDFM
 
 foldUniqDSet :: (a -> b -> b) -> b -> UniqDSet a -> b
 foldUniqDSet = foldUDFM
@@ -91,6 +97,3 @@ uniqDSetToList = eltsUDFM
 
 partitionUniqDSet :: (a -> Bool) -> UniqDSet a -> (UniqDSet a, UniqDSet a)
 partitionUniqDSet = partitionUDFM
-
-delListFromUniqDSet :: Uniquable a => UniqDSet a -> [a] -> UniqDSet a
-delListFromUniqDSet = delListFromUDFM

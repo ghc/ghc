@@ -12,10 +12,10 @@ module Vectorise.Monad.Base (
   cantVectorise,
   maybeCantVectorise,
   maybeCantVectoriseM,
-  
+
   -- * Debugging
   emitVt, traceVt, dumpOptVt, dumpVt,
-  
+
   -- * Control
   noV, traceNoV,
   ensureV, traceEnsureV,
@@ -43,11 +43,11 @@ import Control.Monad
 -- |Vectorisation can either succeed with new envionment and a value, or return with failure
 -- (including a description of the reason for failure).
 --
-data VResult a 
-  = Yes GlobalEnv LocalEnv a 
+data VResult a
+  = Yes GlobalEnv LocalEnv a
   | No  SDoc
 
-newtype VM a 
+newtype VM a
   = VM { runVM :: Builtins -> GlobalEnv -> LocalEnv -> DsM (VResult a) }
 
 instance Monad VM where
@@ -61,10 +61,10 @@ instance Monad VM where
 instance Applicative VM where
   pure x = VM $ \_ genv lenv -> return (Yes genv lenv x)
   (<*>) = ap
-  
+
 instance Functor VM where
   fmap = liftM
-  
+
 instance MonadIO VM where
   liftIO = liftDs . liftIO
 
@@ -113,7 +113,7 @@ maybeCantVectoriseM s d p
 
 -- |Output a trace message if -ddump-vt-trace is active.
 --
-emitVt :: String -> SDoc -> VM () 
+emitVt :: String -> SDoc -> VM ()
 emitVt herald doc
   = liftDs $ do
       dflags <- getDynFlags
@@ -122,7 +122,7 @@ emitVt herald doc
 
 -- |Output a trace message if -ddump-vt-trace is active.
 --
-traceVt :: String -> SDoc -> VM () 
+traceVt :: String -> SDoc -> VM ()
 traceVt herald doc
   = do dflags <- getDynFlags
        when (1 <= traceLevel dflags) $
@@ -131,17 +131,17 @@ traceVt herald doc
 -- |Dump the given program conditionally.
 --
 dumpOptVt :: DumpFlag -> String -> SDoc -> VM ()
-dumpOptVt flag header doc 
+dumpOptVt flag header doc
   = do { b <- liftDs $ doptM flag
-       ; if b 
-         then dumpVt header doc 
-         else return () 
+       ; if b
+         then dumpVt header doc
+         else return ()
        }
 
 -- |Dump the given program unconditionally.
 --
 dumpVt :: String -> SDoc -> VM ()
-dumpVt header doc 
+dumpVt header doc
   = do { unqual <- liftDs mkPrintUnqualifiedDs
        ; dflags <- liftDs getDynFlags
        ; liftIO $ printOutputForUser dflags unqual (mkDumpDoc header doc)
@@ -190,7 +190,7 @@ tryErrV (VM p) = VM $ \bi genv lenv ->
       Yes genv' lenv' x -> return (Yes genv' lenv' (Just x))
       No reason         -> do { unqual <- mkPrintUnqualifiedDs
                               ; dflags <- getDynFlags
-                              ; liftIO $ 
+                              ; liftIO $
                                   printInfoForUser dflags unqual $
                                     text "Warning: vectorisation failure:" <+> reason
                               ; return (Yes genv  lenv  Nothing)

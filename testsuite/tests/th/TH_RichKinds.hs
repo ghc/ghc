@@ -6,7 +6,7 @@
 
 module TH_RichKinds where
 
-import GHC.Prim
+import GHC.Exts
 import Language.Haskell.TH
 
 $(do  tys <- sequence [ [t| forall a. (a :: Bool) |]

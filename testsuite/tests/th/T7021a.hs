@@ -3,7 +3,7 @@
 
 module T7021a where
 
-import GHC.Prim
+import GHC.Exts
 import Language.Haskell.TH
 
 type IOable a = (Show a, Read a)

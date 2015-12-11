@@ -1,4 +1,5 @@
 
 tcfail196.hs:5:8: error:
-    Illegal polymorphic or qualified type: forall a. a
-    In the type signature: bar :: Num (forall a. a) => Int -> Int
+    • Illegal polymorphic or qualified type: forall a1. a1
+    • In the type signature:
+        bar :: Num (forall a. a) => Int -> Int

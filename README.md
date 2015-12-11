@@ -1,39 +1,91 @@
-The Glasgow Haskell Compiler
-============================
+Dependent Types Branch of GHC
+=============================
 
-[![Build Status](https://api.travis-ci.org/ghc/ghc.svg?branch=master)](http://travis-ci.org/ghc/ghc)
+This is a fork of GHC, with work toward supporting dependent types.
+Anyone is welcome to download and play with this implementation,
+and I am happy to receive feedback and issue reports on GitHub.
 
-This is the source tree for [GHC][1], a compiler and interactive
-environment for the Haskell functional programming language.
+There are two options of using this branch:  manual, and Nix-based.
 
-For more information, visit [GHC's web site][1].
+Manual
+------
+
+This code should build, but I have tested it only on `DEBUG` settings;
+I recommend using build style `devel2` in `build.mk`.
+
+Here is a minimal script you can follow to build this at home;
+see the [GHC Building Guide] [3] for more info.
+
+~~~
+git clone https://github.com/goldfirere/ghc.git
+cd ghc
+git checkout nokinds
+git remote set-url origin git://git.haskell.org/ghc.git   # so submodules work
+git submodule update --init
+cd mk
+cp build.mk.sample build.mk
+## edit build.mk to uncomment the line to choose the `devel2` configuration
+cd ..
+perl boot
+./configure
+make
+~~~
+
+Check out the `testsuite/tests/dependent/should_compile` directory for
+a few sample programs that should compile on this fork of GHC.
+
+For more information about GHC, visit [GHC's web site][1].
 
 Information for developers of GHC can be found on the [GHC Trac][2].
 
+Nix-based
+---------
 
-Getting the Source
-==================
+Thanks to @deepfire, this branch is available in Nixpkgs, which means that with
+some effort it can be fairly automatically employed to build any package from
+Hackage.  This way, though, requires that one installs the Nix package manager in
+parallel with the system package manager -- and this option is currently
+unavailable on Windows.
 
-There are two ways to get a source tree:
+Here are the instructions:
 
- 1. *Download source tarballs*
+1. To install the Nix package manager, taking over /nix for package storage:
 
-  Download the GHC source distribution:
+        curl https://nixos.org/nix/install | sh
 
-        ghc-<version>-src.tar.bz2
+2. Make Nix use the `master` repository of Nixpkgs package definitions:
 
-  which contains GHC itself and the "boot" libraries.
+    	git clone https://github.com/NixOS/nixpkgs.git
+    	pushd ~/.nix-defexpr
+    	rm -rf channels
+    	ln -s ../nixpkgs
+    	popd
+    	echo 'export NIX_PATH=nixpkgs=/home/---<USERNAME>---/nixpkgs' >> ~/.bashrc
+    	export NIX_PATH=nixpkgs=/home/---<USERNAME>---/nixpkgs
 
- 2. *Check out the source code from git*
+3. [OPTIONAL] To enable prebuilt binaries from Peter Simons/NixOS Hydra servers:
 
-        $ git clone --recursive git://git.haskell.org/ghc.git
+    	sudo mkdir /etc/nix
+    	echo 'binary-caches = http://hydra.nixos.org/ http://hydra.cryp.to/' | sudo dd of=/etc/nix/nix.conf
 
-  Note: cloning GHC from Github requires a special setup. See [Getting a GHC
-  repository from Github] [7].
+    	# If you don't do that, everything will still work, just it'll have
+    	# to build everything from source.
 
-  **DO NOT submit pull request directly to the github repo.**
-  *See the GHC team's working conventions re [how to contribute a patch to GHC](http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/FixingBugs "ghc.haskell.org/trac/ghc/wiki/WorkingConventions/FixingBug").*
+4. Enter a shell with `ghc-nokinds` available:
 
+        nix-shell -p haskell.compiler.ghcNokinds
+
+5. See it's indeed `nokinds`:
+
+    	wget https://raw.githubusercontent.com/goldfirere/ghc/nokinds/testsuite/tests/dependent/should_compile/KindEqualities2.hs
+    	runhaskell KindEqualities2.hs
+
+To apply 'nokinds' to building packages from Hackage, the best option would be
+to follow instructions from the "Nix loves Haskell" talk by Peter Simons:
+
+   http://cryp.to/nixos-meetup-3-slides.pdf
+
+..where the relevant compiler name would be "ghcNokinds".
 
 Building & Installing
 =====================

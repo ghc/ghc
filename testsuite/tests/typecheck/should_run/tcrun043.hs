@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, TypeFamilies, ConstraintKinds #-}
 
-import GHC.Prim ( Constraint )
+import GHC.Exts ( Constraint )
 
 type Showish = Show
 

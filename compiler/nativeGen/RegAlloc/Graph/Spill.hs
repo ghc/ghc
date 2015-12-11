@@ -46,7 +46,7 @@ regSpill
         -> UniqSet Int                  -- ^ available stack slots
         -> UniqSet VirtualReg           -- ^ the regs to spill
         -> UniqSM
-            ([LiveCmmDecl statics instr] 
+            ([LiveCmmDecl statics instr]
                  -- code with SPILL and RELOAD meta instructions added.
             , UniqSet Int               -- left over slots
             , SpillStats )              -- stats about what happened during spilling
@@ -83,9 +83,9 @@ regSpill platform code slotsFree regs
 regSpill_top
         :: Instruction instr
         => Platform
-        -> RegMap Int                   
+        -> RegMap Int
                 -- ^ map of vregs to slots they're being spilled to.
-        -> LiveCmmDecl statics instr    
+        -> LiveCmmDecl statics instr
                 -- ^ the top level thing.
         -> SpillM (LiveCmmDecl statics instr)
 
@@ -109,7 +109,7 @@ regSpill_top platform regSlotMap cmm
                 -- after we've done a successful allocation.
                 let liveSlotsOnEntry' :: Map BlockId (Set Int)
                     liveSlotsOnEntry'
-                        = mapFoldWithKey patchLiveSlot 
+                        = mapFoldWithKey patchLiveSlot
                                          liveSlotsOnEntry liveVRegsOnEntry
 
                 let info'
@@ -126,12 +126,12 @@ regSpill_top platform regSlotMap cmm
         -- if registers in this block are being spilled to stack slots,
         -- then record the fact that these slots are now live in those blocks
         -- in the given slotmap.
-        patchLiveSlot 
-                :: BlockId -> RegSet 
+        patchLiveSlot
+                :: BlockId -> RegSet
                 -> Map BlockId (Set Int) -> Map BlockId (Set Int)
 
         patchLiveSlot blockId regsLive slotMap
-         = let  
+         = let
                 -- Slots that are already recorded as being live.
                 curSlotsLive    = fromMaybe Set.empty
                                 $ Map.lookup blockId slotMap
@@ -142,7 +142,7 @@ regSpill_top platform regSlotMap cmm
                                 $ uniqSetToList regsLive
 
                 slotMap'
-                 = Map.insert blockId (Set.union curSlotsLive moreSlotsLive) 
+                 = Map.insert blockId (Set.union curSlotsLive moreSlotsLive)
                               slotMap
 
            in   slotMap'
@@ -295,10 +295,10 @@ patchInstr reg instr
         -- If it's not then something has gone horribly wrong.
         let nReg
              = case reg of
-                RegVirtual vr   
+                RegVirtual vr
                  -> RegVirtual (renameVirtualReg nUnique vr)
 
-                RegReal{}       
+                RegReal{}
                  -> panic "RegAlloc.Graph.Spill.patchIntr: not patching real reg"
 
         let instr'      = patchReg1 reg nReg instr

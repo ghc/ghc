@@ -1,16 +1,16 @@
 
-T7734.hs:4:13:
-    Occurs check: cannot construct the infinite type: t2 ~ t2 -> t1
-    In the first argument of ‘x’, namely ‘x’
-    In the expression: x x
-    Relevant bindings include
-      x :: t2 -> t1 (bound at T7734.hs:4:1)
-      f :: (t2 -> t1) -> t -> t1 (bound at T7734.hs:4:1)
+T7734.hs:4:13: error:
+    • Occurs check: cannot construct the infinite type: r2 ~ r2 -> r1
+    • In the first argument of ‘x’, namely ‘x’
+      In the expression: x x
+    • Relevant bindings include
+        x :: r2 -> r1 (bound at T7734.hs:4:1)
+        f :: (r2 -> r1) -> r -> r1 (bound at T7734.hs:4:1)
 
-T7734.hs:5:13:
-    Occurs check: cannot construct the infinite type: t2 ~ t2 -> t1
-    In the first argument of ‘x’, namely ‘x’
-    In the expression: x x
-    Relevant bindings include
-      x :: t2 -> t1 (bound at T7734.hs:5:5)
-      (&) :: (t2 -> t1) -> t -> t1 (bound at T7734.hs:5:1)
+T7734.hs:5:13: error:
+    • Occurs check: cannot construct the infinite type: r2 ~ r2 -> r1
+    • In the first argument of ‘x’, namely ‘x’
+      In the expression: x x
+    • Relevant bindings include
+        x :: r2 -> r1 (bound at T7734.hs:5:5)
+        (&) :: (r2 -> r1) -> r -> r1 (bound at T7734.hs:5:1)

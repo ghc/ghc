@@ -32,7 +32,7 @@ initBuiltins :: DsM Builtins
 initBuiltins
  = do {   -- 'PArray: representation type for parallel arrays
       ; parrayTyCon <- externalTyCon (fsLit "PArray")
-      
+
           -- 'PData': type family mapping array element types to array representation types
           -- Not all backends use `PDatas`.
       ; pdataTyCon  <- externalTyCon (fsLit "PData")
@@ -78,7 +78,7 @@ initBuiltins
       ; scalar_map       <- externalVar (fsLit "scalar_map")
       ; scalar_zip2      <- externalVar (fsLit "scalar_zipWith")
       ; scalar_zips      <- mapM externalVar (numbered "scalar_zipWith" 3 mAX_DPH_SCALAR_ARGS)
-      ; let scalarZips   = listArray (1, mAX_DPH_SCALAR_ARGS) 
+      ; let scalarZips   = listArray (1, mAX_DPH_SCALAR_ARGS)
                                      (scalar_map : scalar_zip2 : scalar_zips)
 
           -- Types and functions for generic type representations
@@ -115,9 +115,9 @@ initBuiltins
             selElementss  = array     ((2, 0), (mAX_DPH_SUM, mAX_DPH_SUM)) sel_elements
 
           -- Distinct local variable
-      ; liftingContext  <- liftM (\u -> mkSysLocal (fsLit "lc") u intPrimTy) newUnique
+      ; liftingContext  <- liftM (\u -> mkSysLocalOrCoVar (fsLit "lc") u intPrimTy) newUnique
 
-      ; return $ Builtins 
+      ; return $ Builtins
                { parrayTyCon          = parrayTyCon
                , pdataTyCon           = pdataTyCon
                , pdatasTyCon          = pdatasTyCon
@@ -222,11 +222,11 @@ externalType fs
 
 -- |Lookup a 'Class' in 'Data.Array.Parallel.Prim', given its name.
 externalClass :: FastString -> DsM Class
-externalClass fs 
+externalClass fs
   = do { tycon <- dsLookupDPHRdrEnv (mkClsOccFS fs) >>= dsLookupTyCon
        ; case tyConClass_maybe tycon of
-           Nothing  -> pprPanic "Vectorise.Builtins.Initialise" $ 
-                         ptext (sLit "Data.Array.Parallel.Prim.") <> 
+           Nothing  -> pprPanic "Vectorise.Builtins.Initialise" $
+                         ptext (sLit "Data.Array.Parallel.Prim.") <>
                          ftext fs <+> ptext (sLit "is not a type class")
            Just cls -> return cls
        }

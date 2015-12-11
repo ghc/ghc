@@ -2,7 +2,7 @@
 
 module AltPrelude where
 
-import GHC.Prim (Constraint)
+import Data.Kind (Constraint)
 
 class MyFunctor f where
        type FunctorCtxt f a :: Constraint

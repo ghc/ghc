@@ -8,18 +8,10 @@ Desugaring foreign declarations (see also DsCCall).
 
 {-# LANGUAGE CPP #-}
 
-module DsForeign ( dsForeigns
-                 , dsForeigns'
-                 , dsFImport, dsCImport, dsFCall, dsPrimCall
-                 , dsFExport, dsFExportDynamic, mkFExportCBits
-                 , toCType
-                 , foreignExportInitialiser
-                 ) where
+module DsForeign ( dsForeigns ) where
 
 #include "HsVersions.h"
 import TcRnMonad        -- temp
-
-import TypeRep
 
 import CoreSyn
 
@@ -103,7 +95,8 @@ dsForeigns' fos = do
 
    do_decl (ForeignImport { fd_name = id, fd_co = co, fd_fi = spec }) = do
       traceIf (text "fi start" <+> ppr id)
-      (bs, h, c) <- dsFImport (unLoc id) co spec
+      let id' = unLoc id
+      (bs, h, c) <- dsFImport id' co spec
       traceIf (text "fi end" <+> ppr id)
       return (h, c, [], bs)
 
@@ -142,9 +135,8 @@ dsFImport :: Id
           -> Coercion
           -> ForeignImport
           -> DsM ([Binding], SDoc, SDoc)
-dsFImport id co (CImport cconv safety mHeader spec _) = do
-    (ids, h, c) <- dsCImport id co spec (unLoc cconv) (unLoc safety) mHeader
-    return (ids, h, c)
+dsFImport id co (CImport cconv safety mHeader spec _) =
+    dsCImport id co spec (unLoc cconv) (unLoc safety) mHeader
 
 dsCImport :: Id
           -> Coercion
@@ -155,7 +147,7 @@ dsCImport :: Id
           -> DsM ([Binding], SDoc, SDoc)
 dsCImport id co (CLabel cid) cconv _ _ = do
    dflags <- getDynFlags
-   let ty = pFst $ coercionKind co
+   let ty  = pFst $ coercionKind co
        fod = case tyConAppTyCon_maybe (dropForAlls ty) of
              Just tycon
               | tyConUnique tycon == funPtrTyConKey ->
@@ -185,8 +177,8 @@ fun_type_arg_stdcall_info dflags StdCallConv ty
   | Just (tc,[arg_ty]) <- splitTyConApp_maybe ty,
     tyConUnique tc == funPtrTyConKey
   = let
-       (_tvs,sans_foralls)        = tcSplitForAllTys arg_ty
-       (fe_arg_tys, _orig_res_ty) = tcSplitFunTys sans_foralls
+       (bndrs, _) = tcSplitPiTys arg_ty
+       fe_arg_tys = mapMaybe binderRelevantType_maybe bndrs
     in Just $ sum (map (widthInBytes . typeWidth . typeCmmType dflags . getPrimTyOf) fe_arg_tys)
 fun_type_arg_stdcall_info _ _other_conv _
   = Nothing
@@ -203,9 +195,10 @@ dsFCall :: Id -> Coercion -> ForeignCall -> Maybe Header
         -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
 dsFCall fn_id co fcall mDeclHeader = do
     let
-        ty                   = pFst $ coercionKind co
-        (tvs, fun_ty)        = tcSplitForAllTys ty
-        (arg_tys, io_res_ty) = tcSplitFunTys fun_ty
+        ty                     = pFst $ coercionKind co
+        (all_bndrs, io_res_ty) = tcSplitPiTys ty
+        (named_bndrs, arg_tys) = partitionBindersIntoBinders all_bndrs
+        tvs                    = map (binderVar "dsFCall") named_bndrs
                 -- Must use tcSplit* functions because we want to
                 -- see that (IO t) in the corner
 
@@ -270,7 +263,7 @@ dsFCall fn_id co fcall mDeclHeader = do
                   return (fcall, empty)
     let
         -- Build the worker
-        worker_ty     = mkForAllTys tvs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
+        worker_ty     = mkForAllTys named_bndrs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
         the_ccall_app = mkFCall dflags ccall_uniq fcall' val_args ccall_result_ty
         work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
         work_id       = mkSysLocal (fsLit "$wccall") work_uniq worker_ty
@@ -304,8 +297,8 @@ dsPrimCall :: Id -> Coercion -> ForeignCall
 dsPrimCall fn_id co fcall = do
     let
         ty                   = pFst $ coercionKind co
-        (tvs, fun_ty)        = tcSplitForAllTys ty
-        (arg_tys, io_res_ty) = tcSplitFunTys fun_ty
+        (bndrs, io_res_ty)   = tcSplitPiTys ty
+        (tvs, arg_tys)       = partitionBinders bndrs
                 -- Must use tcSplit* functions because we want to
                 -- see that (IO t) in the corner
 
@@ -355,9 +348,9 @@ dsFExport :: Id                 -- Either the exported Id,
 
 dsFExport fn_id co ext_name cconv isDyn = do
     let
-       ty                              = pSnd $ coercionKind co
-       (_tvs,sans_foralls)             = tcSplitForAllTys ty
-       (fe_arg_tys', orig_res_ty)      = tcSplitFunTys sans_foralls
+       ty                     = pSnd $ coercionKind co
+       (bndrs, orig_res_ty)   = tcSplitPiTys ty
+       fe_arg_tys'            = mapMaybe binderRelevantType_maybe bndrs
        -- We must use tcSplits here, because we want to see
        -- the (IO t) in the corner of the type!
        fe_arg_tys | isDyn     = tail fe_arg_tys'
@@ -437,7 +430,7 @@ dsFExportDynamic id co0 cconv = do
         export_ty     = mkFunTy stable_ptr_ty arg_ty
     bindIOId <- dsLookupGlobalId bindIOName
     stbl_value <- newSysLocalDs stable_ptr_ty
-    (h_code, c_code, typestring, args_size) <- dsFExport id (mkReflCo Representational export_ty) fe_nm cconv True
+    (h_code, c_code, typestring, args_size) <- dsFExport id (mkRepReflCo export_ty) fe_nm cconv True
     let
          {-
           The arguments to the external function which will
@@ -482,10 +475,11 @@ dsFExportDynamic id co0 cconv = do
 
  where
   ty                       = pFst (coercionKind co0)
-  (tvs,sans_foralls)       = tcSplitForAllTys ty
-  ([arg_ty], fn_res_ty)    = tcSplitFunTys sans_foralls
+  (bndrs, fn_res_ty)       = tcSplitPiTys ty
+  (tvs, [arg_ty])          = partitionBinders bndrs
   Just (io_tc, res_ty)     = tcSplitIOType_maybe fn_res_ty
         -- Must have an IO type; hence Just
+
 
 toCName :: DynFlags -> Id -> String
 toCName dflags i = showSDoc dflags (pprCode CStyle (ppr (idName i)))
@@ -717,7 +711,7 @@ toCType = f False
            -- see if there is a C type associated with that constructor.
            -- Note that we aren't looking through type synonyms or
            -- anything, as it may be the synonym that is annotated.
-           | TyConApp tycon _ <- t
+           | Just tycon <- tyConAppTyConPicky_maybe t
            , Just (CType _ mHeader (_,cType)) <- tyConCType_maybe tycon
               = (mHeader, ftext cType)
            -- If we don't know a C type for this type, then try looking

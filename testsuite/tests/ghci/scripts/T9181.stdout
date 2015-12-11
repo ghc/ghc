@@ -1,10 +1,16 @@
-type family (*) (a :: Nat) (b :: Nat) :: Nat
-type family (+) (a :: Nat) (b :: Nat) :: Nat
-type family (-) (a :: Nat) (b :: Nat) :: Nat
+type family (*) (a :: Nat) (b :: Nat)
+  Kind: Nat -> Nat -> Nat
+type family (+) (a :: Nat) (b :: Nat)
+  Kind: Nat -> Nat -> Nat
+type family (-) (a :: Nat) (b :: Nat)
+  Kind: Nat -> Nat -> Nat
 type (<=) (x :: Nat) (y :: Nat) = (x <=? y) ~ 'True
-type family (<=?) (a :: Nat) (b :: Nat) :: Bool
-type family CmpNat (a :: Nat) (b :: Nat) :: Ordering
-type family CmpSymbol (a :: Symbol) (b :: Symbol) :: Ordering
+type family (<=?) (a :: Nat) (b :: Nat)
+  Kind: Nat -> Nat -> Bool
+type family CmpNat (a :: Nat) (b :: Nat)
+  Kind: Nat -> Nat -> Ordering
+type family CmpSymbol (a :: Symbol) (b :: Symbol)
+  Kind: Symbol -> Symbol -> Ordering
 data ErrorMessage where
   Text :: Symbol -> ErrorMessage
   ShowType :: t -> ErrorMessage
@@ -20,8 +26,10 @@ data SomeNat where
   SomeNat :: KnownNat n => (Proxy n) -> SomeNat
 data SomeSymbol where
   SomeSymbol :: KnownSymbol n => (Proxy n) -> SomeSymbol
-type family TypeError (a :: ErrorMessage) :: b where
-type family (^) (a :: Nat) (b :: Nat) :: Nat
+type family TypeError (a :: ErrorMessage)
+  Kind: forall b1. ErrorMessage -> b1
+type family (^) (a :: Nat) (b :: Nat)
+  Kind: Nat -> Nat -> Nat
 natVal :: KnownNat n => proxy n -> Integer
 natVal' :: KnownNat n => Proxy# n -> Integer
 sameNat ::

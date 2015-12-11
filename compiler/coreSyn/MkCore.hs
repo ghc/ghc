@@ -19,11 +19,9 @@ module MkCore (
         -- * Floats
         FloatBind(..), wrapFloat,
 
-        -- * Constructing equality evidence boxes
-        mkEqBox,
-
         -- * Constructing small tuples
-        mkCoreVarTup, mkCoreVarTupTy, mkCoreTup,
+        mkCoreVarTup, mkCoreVarTupTy, mkCoreTup, mkCoreUbxTup,
+        mkCoreTupBoxity,
 
         -- * Constructing big tuples
         mkBigCoreVarTup, mkBigCoreVarTupTy,
@@ -64,9 +62,9 @@ import TysWiredIn
 import PrelNames
 
 import HsUtils          ( mkChunkified, chunkify )
-import TcType           ( mkSigmaTy )
+import TcType           ( mkInvSigmaTy )
 import Type
-import Coercion
+import Coercion         ( isCoVar )
 import TysPrim
 import DataCon          ( DataCon, dataConWorkId )
 import IdInfo           ( vanillaIdInfo, setStrictnessInfo,
@@ -78,10 +76,8 @@ import FastString
 import UniqSupply
 import BasicTypes
 import Util
-import Pair
 import DynFlags
 import Data.List
-import Data.Ord
 
 import Data.Char        ( ord )
 #if __GLASGOW_HASKELL__ < 709
@@ -98,18 +94,15 @@ infixl 4 `mkCoreApp`, `mkCoreApps`
 ************************************************************************
 -}
 sortQuantVars :: [Var] -> [Var]
--- Sort the variables (KindVars, TypeVars, and Ids)
--- into order: Kind, then Type, then Id
+-- Sort the variables, putting type and covars first, in scoped order,
+-- and then other Ids
 -- It is a deterministic sort, meaining it doesn't look at the values of
 -- Uniques. For explanation why it's important See Note [Unique Determinism]
 -- in Unique.
-sortQuantVars = sortBy (comparing category)
+sortQuantVars vs = sorted_tcvs ++ ids
   where
-    category :: Var -> Int
-    category v
-     | isKindVar v = 1
-     | isTyVar   v = 2
-     | otherwise   = 3
+    (tcvs, ids) = partition (isTyVar <||> isCoVar) vs
+    sorted_tcvs = toposortTyVars tcvs
 
 -- | Bind a binding group over an expression, using a @let@ or @case@ as
 -- appropriate (see "CoreSyn#let_app_invariant")
@@ -148,8 +141,7 @@ mkCoreApps orig_fun orig_args
   = go orig_fun (exprType orig_fun) orig_args
   where
     go fun _      []                   = fun
-    go fun fun_ty (Type ty     : args) = go (App fun (Type ty)) (applyTy fun_ty ty) args
-    go fun fun_ty (Coercion co : args) = go (App fun (Coercion co)) (applyCo fun_ty co) args
+    go fun fun_ty (Type ty     : args) = go (App fun (Type ty)) (piResultTy fun_ty ty) args
     go fun fun_ty (arg         : args) = ASSERT2( isFunTy fun_ty, ppr fun_ty $$ ppr orig_fun
                                                                   $$ ppr orig_args )
                                          go (mk_val_app fun arg arg_ty res_ty) res_ty args
@@ -194,7 +186,7 @@ mkWildEvBinder pred = mkWildValBinder pred
 -- easy to get into difficulties with shadowing.  That's why it is used so little.
 -- See Note [WildCard binders] in SimplEnv
 mkWildValBinder :: Type -> Id
-mkWildValBinder ty = mkLocalId wildCardName ty
+mkWildValBinder ty = mkLocalIdOrCoVar wildCardName ty
 
 mkWildCase :: CoreExpr -> Type -> Type -> [CoreAlt] -> CoreExpr
 -- Make a case expression whose case binder is unused
@@ -240,19 +232,19 @@ mkCoreLams = mkLams
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Int@
 mkIntExpr :: DynFlags -> Integer -> CoreExpr        -- Result = I# i :: Int
-mkIntExpr dflags i = mkConApp intDataCon  [mkIntLit dflags i]
+mkIntExpr dflags i = mkCoreConApps intDataCon  [mkIntLit dflags i]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Int@
 mkIntExprInt :: DynFlags -> Int -> CoreExpr         -- Result = I# i :: Int
-mkIntExprInt dflags i = mkConApp intDataCon  [mkIntLitInt dflags i]
+mkIntExprInt dflags i = mkCoreConApps intDataCon  [mkIntLitInt dflags i]
 
 -- | Create a 'CoreExpr' which will evaluate to the a @Word@ with the given value
 mkWordExpr :: DynFlags -> Integer -> CoreExpr
-mkWordExpr dflags w = mkConApp wordDataCon [mkWordLit dflags w]
+mkWordExpr dflags w = mkCoreConApps wordDataCon [mkWordLit dflags w]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Word@
 mkWordExprWord :: DynFlags -> Word -> CoreExpr
-mkWordExprWord dflags w = mkConApp wordDataCon [mkWordLitWord dflags w]
+mkWordExprWord dflags w = mkCoreConApps wordDataCon [mkWordLitWord dflags w]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Integer@
 mkIntegerExpr  :: MonadThings m => Integer -> m CoreExpr  -- Result :: Integer
@@ -261,16 +253,16 @@ mkIntegerExpr i = do t <- lookupTyCon integerTyConName
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Float@
 mkFloatExpr :: Float -> CoreExpr
-mkFloatExpr f = mkConApp floatDataCon [mkFloatLitFloat f]
+mkFloatExpr f = mkCoreConApps floatDataCon [mkFloatLitFloat f]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Double@
 mkDoubleExpr :: Double -> CoreExpr
-mkDoubleExpr d = mkConApp doubleDataCon [mkDoubleLitDouble d]
+mkDoubleExpr d = mkCoreConApps doubleDataCon [mkDoubleLitDouble d]
 
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Char@
 mkCharExpr     :: Char             -> CoreExpr      -- Result = C# c :: Int
-mkCharExpr c = mkConApp charDataCon [mkCharLit c]
+mkCharExpr c = mkCoreConApps charDataCon [mkCharLit c]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @String@
 mkStringExpr   :: MonadThings m => String     -> m CoreExpr  -- Result :: String
@@ -295,18 +287,6 @@ mkStringExprFS str
   where
     chars = unpackFS str
     safeChar c = ord c >= 1 && ord c <= 0x7F
-
--- This take a ~# b (or a ~# R b) and returns a ~ b (or Coercible a b)
-mkEqBox :: Coercion -> CoreExpr
-mkEqBox co = ASSERT2( typeKind ty2 `eqKind` k, ppr co $$ ppr ty1 $$ ppr ty2 $$ ppr (typeKind ty1) $$ ppr (typeKind ty2) )
-             Var (dataConWorkId datacon) `mkTyApps` [k, ty1, ty2] `App` Coercion co
-  where (Pair ty1 ty2, role) = coercionKindRole co
-        k = typeKind ty1
-        datacon = case role of
-            Nominal ->          eqBoxDataCon
-            Representational -> coercibleDataCon
-            Phantom ->          pprPanic "mkEqBox does not support boxing phantom coercions"
-                                         (ppr co)
 
 {-
 ************************************************************************
@@ -339,8 +319,23 @@ mkCoreVarTupTy ids = mkBoxedTupleTy (map idType ids)
 mkCoreTup :: [CoreExpr] -> CoreExpr
 mkCoreTup []  = Var unitDataConId
 mkCoreTup [c] = c
-mkCoreTup cs  = mkConApp (tupleDataCon Boxed (length cs))
-                         (map (Type . exprType) cs ++ cs)
+mkCoreTup cs  = mkCoreConApps (tupleDataCon Boxed (length cs))
+                              (map (Type . exprType) cs ++ cs)
+
+-- | Build a small unboxed tuple holding the specified expressions,
+-- with the given types. The types must be the types of the expressions.
+-- Do not include the levity specifiers; this function calculates them
+-- for you.
+mkCoreUbxTup :: [Type] -> [CoreExpr] -> CoreExpr
+mkCoreUbxTup tys exps
+  = ASSERT( tys `equalLength` exps)
+    mkCoreConApps (tupleDataCon Unboxed (length tys))
+             (map (Type . getLevity "mkCoreUbxTup") tys ++ map Type tys ++ exps)
+
+-- | Make a core tuple of the given boxity
+mkCoreTupBoxity :: Boxity -> [CoreExpr] -> CoreExpr
+mkCoreTupBoxity Boxed   exps = mkCoreTup exps
+mkCoreTupBoxity Unboxed exps = mkCoreUbxTup (map exprType exps) exps
 
 -- | Build a big tuple holding the specified variables
 mkBigCoreVarTup :: [Id] -> CoreExpr
@@ -513,11 +508,11 @@ interact well with rules.
 
 -- | Makes a list @[]@ for lists of the specified type
 mkNilExpr :: Type -> CoreExpr
-mkNilExpr ty = mkConApp nilDataCon [Type ty]
+mkNilExpr ty = mkCoreConApps nilDataCon [Type ty]
 
 -- | Makes a list @(:)@ for lists of the specified type
 mkConsExpr :: Type -> CoreExpr -> CoreExpr -> CoreExpr
-mkConsExpr ty hd tl = mkConApp consDataCon [Type ty, hd, tl]
+mkConsExpr ty hd tl = mkCoreConApps consDataCon [Type ty, hd, tl]
 
 -- | Make a list containing the given expressions, where the list has the given type
 mkListExpr :: Type -> [CoreExpr] -> CoreExpr
@@ -595,7 +590,7 @@ mkRuntimeErrorApp
         -> CoreExpr
 
 mkRuntimeErrorApp err_id res_ty err_msg
-  = mkApps (Var err_id) [Type res_ty, err_string]
+  = mkApps (Var err_id) [Type (getLevity "mkRuntimeErrorApp" res_ty), Type res_ty, err_string]
   where
     err_string = Lit (mkMachString err_msg)
 
@@ -688,7 +683,8 @@ mkRuntimeErrorId name = pc_bottoming_Id1 name runtimeErrorTy
 
 runtimeErrorTy :: Type
 -- The runtime error Ids take a UTF8-encoded string as argument
-runtimeErrorTy = mkSigmaTy [openAlphaTyVar] [] (mkFunTy addrPrimTy openAlphaTy)
+runtimeErrorTy = mkInvSigmaTy [levity1TyVar, openAlphaTyVar] []
+                              (mkFunTy addrPrimTy openAlphaTy)
 
 errorName :: Name
 errorName = mkWiredInIdName gHC_ERR (fsLit "error") errorIdKey eRROR_ID
@@ -697,7 +693,7 @@ eRROR_ID :: Id
 eRROR_ID = pc_bottoming_Id2 errorName errorTy
 
 errorTy  :: Type   -- See Note [Error and friends have an "open-tyvar" forall]
-errorTy  = mkSigmaTy [openAlphaTyVar] []
+errorTy  = mkInvSigmaTy [levity1TyVar, openAlphaTyVar] []
              (mkFunTys [ mkClassPred
                            ipClass
                            [ mkStrLitTy (fsLit "callStack")
@@ -712,7 +708,7 @@ uNDEFINED_ID :: Id
 uNDEFINED_ID = pc_bottoming_Id1 undefinedName undefinedTy
 
 undefinedTy  :: Type   -- See Note [Error and friends have an "open-tyvar" forall]
-undefinedTy  = mkSigmaTy [openAlphaTyVar] []
+undefinedTy  = mkInvSigmaTy [levity1TyVar, openAlphaTyVar] []
                  (mkFunTy (mkClassPred
                              ipClass
                              [ mkStrLitTy (fsLit "callStack")
@@ -723,14 +719,14 @@ undefinedTy  = mkSigmaTy [openAlphaTyVar] []
 Note [Error and friends have an "open-tyvar" forall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 'error' and 'undefined' have types
-        error     :: forall (a::OpenKind). String -> a
-        undefined :: forall (a::OpenKind). a
-Notice the 'OpenKind' (manifested as openAlphaTyVar in the code). This ensures that
+        error     :: forall (v :: Levity) (a :: TYPE v). String -> a
+        undefined :: forall (v :: Levity) (a :: TYPE v). a
+Notice the levity polymophism. This ensures that
 "error" can be instantiated at
   * unboxed as well as boxed types
   * polymorphic types
 This is OK because it never returns, so the return type is irrelevant.
-See Note [OpenTypeKind accepts foralls] in TcUnify.
+See Note [Sort-polymorphic tyvars accept foralls] in TcUnify.
 
 
 ************************************************************************

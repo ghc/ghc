@@ -6,13 +6,12 @@
 The @Inst@ type: dictionaries or method instances
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, MultiWayIf #-}
 
 module Inst (
        deeplySkolemise, deeplyInstantiate,
        instCall, instDFunType, instStupidTheta,
        newWanted, newWanteds,
-       emitWanted, emitWanteds,
 
        newOverloadedLit, mkOverLit,
 
@@ -23,15 +22,14 @@ module Inst (
        tcSyntaxName,
 
        -- Simple functions over evidence variables
-       tyVarsOfWC, tyVarsOfBag,
-       tyVarsOfCt, tyVarsOfCts,
-       tyVarsOfCtList, tyVarsOfCtsList,
+       tyCoVarsOfWC,
+       tyCoVarsOfCt, tyCoVarsOfCts,
     ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-}   TcExpr( tcPolyExpr, tcSyntaxOp )
-import {-# SOURCE #-}   TcUnify( unifyType )
+import {-# SOURCE #-}   TcUnify( unifyType, noThing )
 
 import FastString
 import HsSyn
@@ -40,6 +38,8 @@ import TcRnMonad
 import TcEnv
 import TcEvidence
 import InstEnv
+import DataCon     ( dataConWrapId )
+import TysWiredIn  ( heqDataCon )
 import FunDeps
 import TcMType
 import Type
@@ -52,16 +52,13 @@ import Id
 import Name
 import Var      ( EvVar )
 import VarEnv
-import VarSet
 import PrelNames
 import SrcLoc
 import DynFlags
-import Bag
 import Util
 import Outputable
 import Control.Monad( unless )
 import Data.Maybe( isJust )
-import FV
 
 {-
 ************************************************************************
@@ -70,28 +67,6 @@ import FV
 *                                                                      *
 ************************************************************************
 -}
-
-newWanted :: CtOrigin -> PredType -> TcM CtEvidence
-newWanted orig pty
-  = do loc <- getCtLocM orig
-       v <- newEvVar pty
-       return $ CtWanted { ctev_evar = v
-                         , ctev_pred = pty
-                         , ctev_loc = loc }
-
-newWanteds :: CtOrigin -> ThetaType -> TcM [CtEvidence]
-newWanteds orig = mapM (newWanted orig)
-
-emitWanteds :: CtOrigin -> TcThetaType -> TcM [EvVar]
-emitWanteds origin theta = mapM (emitWanted origin) theta
-
-emitWanted :: CtOrigin -> TcPredType -> TcM EvVar
-emitWanted origin pred
-  = do { loc <- getCtLocM origin
-       ; ev  <- newEvVar pred
-       ; emitSimple $ mkNonCanonical $
-         CtWanted { ctev_pred = pred, ctev_evar = ev, ctev_loc = loc }
-       ; return ev }
 
 newMethodFromName :: CtOrigin -> Name -> TcRhoType -> TcM (HsExpr TcId)
 -- Used when Name is the wired-in name for a wired-in class method,
@@ -107,12 +82,11 @@ newMethodFromName origin name inst_ty
               -- meant to find whatever thing is in scope, and that may
               -- be an ordinary function.
 
-       ; let (tvs, theta, _caller_knows_this) = tcSplitSigmaTy (idType id)
-             (the_tv:rest) = tvs
-             subst = zipOpenTvSubst [the_tv] [inst_ty]
+       ; let ty = piResultTy (idType id) inst_ty
+             (theta, _caller_knows_this) = tcSplitPhiTy ty
+       ; wrap <- ASSERT( not (isForAllTy ty) && isSingleton theta )
+                 instCall origin [inst_ty] theta
 
-       ; wrap <- ASSERT( null rest && isSingleton theta )
-                 instCall origin [inst_ty] (substTheta subst theta)
        ; return (mkHsWrap wrap (HsVar (noLoc id))) }
 
 {-
@@ -150,7 +124,10 @@ ToDo: this eta-abstraction plays fast and loose with termination,
 
 deeplySkolemise
   :: TcSigmaType
-  -> TcM (HsWrapper, [TyVar], [EvVar], TcRhoType)
+  -> TcM ( HsWrapper
+         , [TyVar]     -- all skolemised variables
+         , [EvVar]     -- all "given"s
+         , TcRhoType)
 
 deeplySkolemise ty
   | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
@@ -203,6 +180,16 @@ deeplyInstantiate orig ty
             Instantiating a call
 *                                                                      *
 ************************************************************************
+
+Note [Handling boxed equality]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The solver deals entirely in terms of unboxed (primitive) equality.
+There should never be a boxed Wanted equality. Ever. But, what if
+we are calling `foo :: forall a. (F a ~ Bool) => ...`? That equality
+is boxed, so naive treatment here would emit a boxed Wanted equality.
+
+So we simply check for this case and make the right boxing of evidence.
+
 -}
 
 ----------------
@@ -231,25 +218,33 @@ instCallConstraints orig preds
        ; return (mkWpEvApps evs) }
   where
     go pred
-     | Just (Nominal, ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut
-     = do  { co <- unifyType ty1 ty2
+     | Just (Nominal, ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut #1
+     = do  { co <- unifyType noThing ty1 ty2
            ; return (EvCoercion co) }
-     | otherwise
-     = do { ev_var <- emitWanted orig pred
-          ; return (EvId ev_var) }
 
-instDFunType :: DFunId -> [DFunInstType] -> TcM ([TcType], TcThetaType)
+       -- Try short-cut #2
+     | Just (tc, args@[_, _, ty1, ty2]) <- splitTyConApp_maybe pred
+     , tc `hasKey` heqTyConKey
+     = do { co <- unifyType noThing ty1 ty2
+          ; return (EvDFunApp (dataConWrapId heqDataCon) args [EvCoercion co]) }
+
+     | otherwise
+     = emitWanted orig pred
+
+instDFunType :: DFunId -> [DFunInstType]
+             -> TcM ( [TcType]      -- instantiated argument types
+                    , TcThetaType ) -- instantiated constraint
 -- See Note [DFunInstType: instantiating types] in InstEnv
 instDFunType dfun_id dfun_inst_tys
-  = do { (subst, inst_tys) <- go (mkTopTvSubst []) dfun_tvs dfun_inst_tys
+  = do { (subst, inst_tys) <- go emptyTCvSubst dfun_tvs dfun_inst_tys
        ; return (inst_tys, substTheta subst dfun_theta) }
   where
     (dfun_tvs, dfun_theta, _) = tcSplitSigmaTy (idType dfun_id)
 
-    go :: TvSubst -> [TyVar] -> [DFunInstType] -> TcM (TvSubst, [TcType])
+    go :: TCvSubst -> [TyVar] -> [DFunInstType] -> TcM (TCvSubst, [TcType])
     go subst [] [] = return (subst, [])
     go subst (tv:tvs) (Just ty : mb_tys)
-      = do { (subst', tys) <- go (extendTvSubst subst tv ty) tvs mb_tys
+      = do { (subst', tys) <- go (extendTCvSubst subst tv ty) tvs mb_tys
            ; return (subst', ty : tys) }
     go subst (tv:tvs) (Nothing : mb_tys)
       = do { (subst', tv') <- tcInstTyVarX subst tv
@@ -376,8 +371,8 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
     std_id <- tcLookupId std_nm
     let
         -- C.f. newMethodAtLoc
-        ([tv], _, tau)  = tcSplitSigmaTy (idType std_id)
-        sigma1          = substTyWith [tv] [ty] tau
+        ([tv], _, tau) = tcSplitSigmaTy (idType std_id)
+        sigma1         = substTyWith [tv] [ty] tau
         -- Actually, the "tau-type" might be a sigma-type in the
         -- case of locally-polymorphic methods.
 
@@ -393,7 +388,7 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
 syntaxNameCtxt :: HsExpr Name -> CtOrigin -> Type -> TidyEnv
                -> TcRn (TidyEnv, SDoc)
 syntaxNameCtxt name orig ty tidy_env
-  = do { inst_loc <- getCtLocM orig
+  = do { inst_loc <- getCtLocM orig (Just TypeLevel)
        ; let msg = vcat [ ptext (sLit "When checking that") <+> quotes (ppr name)
                           <+> ptext (sLit "(needed by a syntactic construct)")
                         , nest 2 (ptext (sLit "has the required type:")
@@ -478,21 +473,6 @@ addLocalInst :: (InstEnv, [ClsInst]) -> ClsInst -> TcM (InstEnv, [ClsInst])
 -- If overwrite_inst, then we can overwrite a direct match
 addLocalInst (home_ie, my_insts) ispec
    = do {
-         -- Instantiate the dfun type so that we extend the instance
-         -- envt with completely fresh template variables
-         -- This is important because the template variables must
-         -- not overlap with anything in the things being looked up
-         -- (since we do unification).
-             --
-             -- We use tcInstSkolType because we don't want to allocate fresh
-             --  *meta* type variables.
-             --
-             -- We use UnkSkol --- and *not* InstSkol or PatSkol --- because
-             -- these variables must be bindable by tcUnifyTys.  See
-             -- the call to tcUnifyTys in InstEnv, and the special
-             -- treatment that instanceBindFun gives to isOverlappableTyVar
-             -- This is absurdly delicate.
-
              -- Load imported instances, so that we report
              -- duplicates correctly
 
@@ -615,67 +595,3 @@ addClsInstsErr herald ispecs
    -- The sortWith just arranges that instances are dislayed in order
    -- of source location, which reduced wobbling in error messages,
    -- and is better for users
-
-{-
-************************************************************************
-*                                                                      *
-        Simple functions over evidence variables
-*                                                                      *
-************************************************************************
--}
-
----------------- Getting free tyvars -------------------------
-
--- | Returns free variables of constraints as a non-deterministic set
-tyVarsOfCt :: Ct -> TcTyVarSet
-tyVarsOfCt = runFVSet . tyVarsOfCtAcc
-
--- | Returns free variables of constraints as a deterministically ordered.
--- list. See Note [Deterministic FV] in FV.
-tyVarsOfCtList :: Ct -> [TcTyVar]
-tyVarsOfCtList = runFVList . tyVarsOfCtAcc
-
--- | Returns free variables of constraints as a composable FV computation.
--- See Note [Deterministic FV] in FV.
-tyVarsOfCtAcc :: Ct -> FV
-tyVarsOfCtAcc (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })
-  = tyVarsOfTypeAcc xi `unionFV` oneVar tv
-tyVarsOfCtAcc (CFunEqCan { cc_tyargs = tys, cc_fsk = fsk })
-  = tyVarsOfTypesAcc tys `unionFV` oneVar fsk
-tyVarsOfCtAcc (CDictCan { cc_tyargs = tys }) = tyVarsOfTypesAcc tys
-tyVarsOfCtAcc (CIrredEvCan { cc_ev = ev }) = tyVarsOfTypeAcc (ctEvPred ev)
-tyVarsOfCtAcc (CHoleCan { cc_ev = ev }) = tyVarsOfTypeAcc (ctEvPred ev)
-tyVarsOfCtAcc (CNonCanonical { cc_ev = ev }) = tyVarsOfTypeAcc (ctEvPred ev)
-
--- | Returns free variables of a bag of constraints as a non-deterministic
--- set. See Note [Deterministic FV] in FV.
-tyVarsOfCts :: Cts -> TcTyVarSet
-tyVarsOfCts = runFVSet . tyVarsOfCtsAcc
-
--- | Returns free variables of a bag of constraints as a deterministically
--- odered list. See Note [Deterministic FV] in FV.
-tyVarsOfCtsList :: Cts -> [TcTyVar]
-tyVarsOfCtsList = runFVList . tyVarsOfCtsAcc
-
--- | Returns free variables of a bag of constraints as a composable FV
--- computation. See Note [Deterministic FV] in FV.
-tyVarsOfCtsAcc :: Cts -> FV
-tyVarsOfCtsAcc = foldrBag (unionFV . tyVarsOfCtAcc) noVars
-
-
-tyVarsOfWC :: WantedConstraints -> TyVarSet
--- Only called on *zonked* things, hence no need to worry about flatten-skolems
-tyVarsOfWC (WC { wc_simple = simple, wc_impl = implic, wc_insol = insol })
-  = tyVarsOfCts simple `unionVarSet`
-    tyVarsOfBag tyVarsOfImplic implic `unionVarSet`
-    tyVarsOfCts insol
-
-tyVarsOfImplic :: Implication -> TyVarSet
--- Only called on *zonked* things, hence no need to worry about flatten-skolems
-tyVarsOfImplic (Implic { ic_skols = skols
-                       , ic_given = givens, ic_wanted = wanted })
-  = (tyVarsOfWC wanted `unionVarSet` tyVarsOfTypes (map evVarPred givens))
-    `delVarSetList` skols
-
-tyVarsOfBag :: (a -> TyVarSet) -> Bag a -> TyVarSet
-tyVarsOfBag tvs_of = foldrBag (unionVarSet . tvs_of) emptyVarSet

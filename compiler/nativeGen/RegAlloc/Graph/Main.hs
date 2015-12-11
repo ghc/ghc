@@ -30,7 +30,7 @@ import Control.Monad
 
 
 -- | The maximum number of build\/spill cycles we'll allow.
---  
+--
 --   It should only take 3 or 4 cycles for the allocator to converge.
 --   If it takes any longer than this it's probably in an infinite loop,
 --   so it's better just to bail out and report a bug.
@@ -71,11 +71,11 @@ regAlloc dflags regsFree slotsFree code
 -- | Perform solver iterations for the graph coloring allocator.
 --
 --   We extract a register confict graph from the provided cmm code,
---   and try to colour it. If that works then we use the solution rewrite 
+--   and try to colour it. If that works then we use the solution rewrite
 --   the code with real hregs. If coloring doesn't work we add spill code
 --   and try to colour it again. After `maxSpinCount` iterations we give up.
 --
-regAlloc_spin 
+regAlloc_spin
         :: (Instruction instr,
             Outputable instr,
             Outputable statics)
@@ -110,7 +110,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
            (  text "It looks like the register allocator is stuck in an infinite loop."
            $$ text "max cycles  = " <> int maxSpinCount
            $$ text "regsFree    = " <> (hcat $ punctuate space $ map ppr
-                                             $ uniqSetToList $ unionManyUniqSets 
+                                             $ uniqSetToList $ unionManyUniqSets
                                              $ eltsUFM regsFree)
            $$ text "slotsFree   = " <> ppr (sizeUniqSet slotsFree))
 
@@ -126,7 +126,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
         seqGraph graph `seq` return ()
 
         -- Build a map of the cost of spilling each instruction.
-        -- This is a lazy binding, so the map will only be computed if we 
+        -- This is a lazy binding, so the map will only be computed if we
         -- actually have to spill to the stack.
         let spillCosts  = foldl' plusSpillCostInfo zeroSpillCostInfo
                         $ map (slurpSpillCostInfo platform) code
@@ -135,7 +135,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
         let spill       = chooseSpill spillCosts
 
         -- Record startup state in our log.
-        let stat1       
+        let stat1
              = if spinCount == 0
                  then   Just $ RegAllocStatsStart
                         { raLiveCmm     = code
@@ -179,7 +179,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
                                 else graph_colored
 
                 -- Rewrite the code to use real hregs, using the colored graph.
-                let code_patched        
+                let code_patched
                         = map (patchRegsFromGraph platform graph_colored_lint)
                               code_coalesced
 
@@ -197,7 +197,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
                         = map (stripLive dflags) code_spillclean
 
                 -- Record what happened in this stage for debugging
-                let stat                
+                let stat
                      =  RegAllocStatsColored
                         { raCode                = code
                         , raGraph               = graph
@@ -207,11 +207,11 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
                         , raPatched             = code_patched
                         , raSpillClean          = code_spillclean
                         , raFinal               = code_final
-                        , raSRMs                = foldl' addSRM (0, 0, 0) 
+                        , raSRMs                = foldl' addSRM (0, 0, 0)
                                                 $ map countSRMs code_spillclean }
 
                 -- Bundle up all the register allocator statistics.
-                --   .. but make sure to drop them on the floor if they're not 
+                --   .. but make sure to drop them on the floor if they're not
                 --      needed, otherwise we'll get a space leak.
                 let statList =
                         if dump then [stat] ++ maybeToList stat1 ++ debug_codeGraphs
@@ -243,7 +243,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
                 -- NOTE: we have to reverse the SCCs here to get them back into
                 --       the reverse-dependency order required by computeLiveness.
                 --       If they're not in the correct order that function will panic.
-                code_relive     <- mapM (regLiveness platform . reverseBlocksInTops) 
+                code_relive     <- mapM (regLiveness platform . reverseBlocksInTops)
                                         code_spilled
 
                 -- Record what happened in this stage for debugging.
@@ -257,7 +257,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
                         , raSpilled     = code_spilled }
 
                 -- Bundle up all the register allocator statistics.
-                --   .. but make sure to drop them on the floor if they're not 
+                --   .. but make sure to drop them on the floor if they're not
                 --      needed, otherwise we'll get a space leak.
                 let statList =
                         if dump
@@ -289,7 +289,7 @@ buildGraph code
 
         -- Add the reg-reg conflicts to the graph.
         let conflictBag         = unionManyBags conflictList
-        let graph_conflict      
+        let graph_conflict
                 = foldrBag graphAddConflictSet Color.initGraph conflictBag
 
         -- Add the coalescences edges to the graph.
@@ -381,7 +381,7 @@ patchRegsFromGraph platform graph code
                 -- no node in the graph for this virtual, bad news.
                 | otherwise
                 = pprPanic "patchRegsFromGraph: register mapping failed."
-                        (  text "There is no node in the graph for register " 
+                        (  text "There is no node in the graph for register "
                                 <> ppr reg
                         $$ ppr code
                         $$ Color.dotGraph

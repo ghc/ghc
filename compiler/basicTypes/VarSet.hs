@@ -7,7 +7,7 @@
 
 module VarSet (
         -- * Var, Id and TyVar set types
-        VarSet, IdSet, TyVarSet, CoVarSet,
+        VarSet, IdSet, TyVarSet, CoVarSet, TyCoVarSet,
 
         -- ** Manipulating these sets
         emptyVarSet, unitVarSet, mkVarSet,
@@ -18,11 +18,12 @@ module VarSet (
         isEmptyVarSet, delVarSet, delVarSetList, delVarSetByKey,
         minusVarSet, foldVarSet, filterVarSet,
         transCloVarSet, fixVarSet,
-        lookupVarSet, mapVarSet, sizeVarSet, seqVarSet,
+        lookupVarSet, lookupVarSetByName,
+        mapVarSet, sizeVarSet, seqVarSet,
         elemVarSetByKey, partitionVarSet,
 
         -- * Deterministic Var set types
-        DVarSet, DIdSet, DTyVarSet,
+        DVarSet, DIdSet, DTyVarSet, DTyCoVarSet,
 
         -- ** Manipulating these sets
         emptyDVarSet, unitDVarSet, mkDVarSet,
@@ -39,8 +40,9 @@ module VarSet (
 
 #include "HsVersions.h"
 
-import Var      ( Var, TyVar, CoVar, Id )
+import Var      ( Var, TyVar, CoVar, TyCoVar, Id )
 import Unique
+import Name     ( Name )
 import UniqSet
 import UniqDSet
 import UniqFM( disjointUFM )
@@ -55,6 +57,7 @@ type VarSet       = UniqSet Var
 type IdSet        = UniqSet Id
 type TyVarSet     = UniqSet TyVar
 type CoVarSet     = UniqSet CoVar
+type TyCoVarSet   = UniqSet TyCoVar
 
 emptyVarSet     :: VarSet
 intersectVarSet :: VarSet -> VarSet -> VarSet
@@ -78,6 +81,7 @@ foldVarSet      :: (Var -> a -> a) -> a -> VarSet -> a
 lookupVarSet    :: VarSet -> Var -> Maybe Var
                         -- Returns the set element, which may be
                         -- (==) to the argument, but not the same as
+lookupVarSetByName :: VarSet -> Name -> Maybe Var
 mapVarSet       :: (Var -> Var) -> VarSet -> VarSet
 sizeVarSet      :: VarSet -> Int
 filterVarSet    :: (Var -> Bool) -> VarSet -> VarSet
@@ -110,6 +114,7 @@ isEmptyVarSet   = isEmptyUniqSet
 mkVarSet        = mkUniqSet
 foldVarSet      = foldUniqSet
 lookupVarSet    = lookupUniqSet
+lookupVarSetByName = lookupUniqSet
 mapVarSet       = mapUniqSet
 sizeVarSet      = sizeUniqSet
 filterVarSet    = filterUniqSet
@@ -168,9 +173,10 @@ seqVarSet s = sizeVarSet s `seq` ()
 -- See Note [Deterministic UniqFM] in UniqDFM for explanation why we need
 -- DVarSet.
 
-type DVarSet = UniqDSet Var
-type DIdSet = UniqDSet Id
-type DTyVarSet = UniqDSet TyVar
+type DVarSet     = UniqDSet Var
+type DIdSet      = UniqDSet Id
+type DTyVarSet   = UniqDSet TyVar
+type DTyCoVarSet = UniqDSet TyCoVar
 
 emptyDVarSet :: DVarSet
 emptyDVarSet = emptyUniqDSet

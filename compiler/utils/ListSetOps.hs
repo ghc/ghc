@@ -30,22 +30,9 @@ import Util
 
 import Data.List
 
-{-
----------
-#ifndef DEBUG
-getNth :: [a] -> Int -> a
-getNth xs n = xs !! n
-#else
-getNth :: Outputable a => [a] -> Int -> a
-getNth xs n = ASSERT2( xs `lengthAtLeast` n, ppr n $$ ppr xs )
-              xs !! n
-#endif
-----------
--}
-
 getNth :: Outputable a => [a] -> Int -> a
 getNth xs n = ASSERT2( xs `lengthExceeds` n, ppr n $$ ppr xs )
-              xs !! n
+             xs !! n
 
 {-
 ************************************************************************

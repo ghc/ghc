@@ -16,13 +16,13 @@ module TysWiredIn (
         boolTy, boolTyCon, boolTyCon_RDR, boolTyConName,
         trueDataCon,  trueDataConId,  true_RDR,
         falseDataCon, falseDataConId, false_RDR,
-        promotedBoolTyCon, promotedFalseDataCon, promotedTrueDataCon,
+        promotedFalseDataCon, promotedTrueDataCon,
 
         -- * Ordering
+        orderingTyCon,
         ltDataCon, ltDataConId,
         eqDataCon, eqDataConId,
         gtDataCon, gtDataConId,
-        promotedOrderingTyCon,
         promotedLTDataCon, promotedEQDataCon, promotedGTDataCon,
 
         -- * Char
@@ -50,7 +50,7 @@ module TysWiredIn (
         nilDataCon, nilDataConName, nilDataConKey,
         consDataCon_RDR, consDataCon, consDataConName,
 
-        mkListTy, mkPromotedListTy,
+        mkListTy,
 
         -- * Maybe
         maybeTyCon, maybeTyConName,
@@ -59,16 +59,17 @@ module TysWiredIn (
         -- * Tuples
         mkTupleTy, mkBoxedTupleTy,
         tupleTyCon, tupleDataCon, tupleTyConName,
-        promotedTupleTyCon, promotedTupleDataCon,
+        promotedTupleDataCon,
         unitTyCon, unitDataCon, unitDataConId, unitTy, unitTyConKey,
         pairTyCon,
         unboxedUnitTyCon, unboxedUnitDataCon,
-        unboxedSingletonTyCon, unboxedSingletonDataCon,
-        unboxedPairTyCon, unboxedPairDataCon,
         cTupleTyConName, cTupleTyConNames, isCTupleTyConName,
 
         -- * Kinds
         typeNatKindCon, typeNatKind, typeSymbolKindCon, typeSymbolKind,
+        isLiftedTypeKindTyConName, liftedTypeKind, constraintKind,
+        starKindTyConName, unicodeStarKindTyConName,
+        liftedTypeKindTyCon, constraintKindTyCon,
 
         -- * Parallel arrays
         mkPArrTy,
@@ -76,7 +77,7 @@ module TysWiredIn (
         parrTyCon_RDR, parrTyConName,
 
         -- * Equality predicates
-        eqTyCon_RDR, eqTyCon, eqTyConName, eqBoxDataCon,
+        heqTyCon, heqClass, heqDataCon,
         coercibleTyCon, coercibleDataCon, coercibleClass,
 
         -- * Implicit Parameters
@@ -84,13 +85,21 @@ module TysWiredIn (
 
         callStackTyCon,
 
-        mkWiredInTyConName -- This is used in TcTypeNats to define the
-                           -- built-in functions for evaluation.
+        mkWiredInTyConName, -- This is used in TcTypeNats to define the
+                            -- built-in functions for evaluation.
+
+        mkWiredInIdName,    -- used in MkId
+
+        -- * Levity
+        levityTy, levityTyCon, liftedDataCon, unliftedDataCon,
+        liftedPromDataCon, unliftedPromDataCon,
+        liftedDataConTy, unliftedDataConTy,
+        liftedDataConName, unliftedDataConName
     ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} MkId( mkDataConWorkId )
+import {-# SOURCE #-} MkId( mkDataConWorkId, mkDictSelId )
 
 -- friends:
 import PrelNames
@@ -102,13 +111,11 @@ import Coercion
 import Id
 import Constants        ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE )
 import Module           ( Module )
-import Type             ( mkTyConApp )
+import Type
 import DataCon
 import {-# SOURCE #-} ConLike
-import Var
 import TyCon
 import Class            ( Class, mkClass )
-import TypeRep
 import RdrName
 import Name
 import NameSet          ( NameSet, mkNameSet, elemNameSet )
@@ -169,10 +176,15 @@ wiredInTyCons = [ unitTyCon     -- Not treated like other tuples, because
               , listTyCon
               , maybeTyCon
               , parrTyCon
-              , eqTyCon
+              , heqTyCon
               , coercibleTyCon
               , typeNatKindCon
               , typeSymbolKindCon
+              , levityTyCon
+              , constraintKindTyCon
+              , liftedTypeKindTyCon
+              , starKindTyCon
+              , unicodeStarKindTyCon
               , ipTyCon
               ]
 
@@ -195,15 +207,22 @@ mkWiredInCoAxiomName built_in modu fs unique ax
                   (ACoAxiom ax)        -- Relevant CoAxiom
                   built_in
 
--- See Note [Kind-changing of (~) and Coercible]
-eqTyConName, eqBoxDataConName :: Name
-eqTyConName      = mkWiredInTyConName   BuiltInSyntax gHC_TYPES (fsLit "~")   eqTyConKey      eqTyCon
-eqBoxDataConName = mkWiredInDataConName UserSyntax    gHC_TYPES (fsLit "Eq#") eqBoxDataConKey eqBoxDataCon
+mkWiredInIdName :: Module -> FastString -> Unique -> Id -> Name
+mkWiredInIdName mod fs uniq id
+ = mkWiredInName mod (mkOccNameFS Name.varName fs) uniq (AnId id) UserSyntax
 
 -- See Note [Kind-changing of (~) and Coercible]
-coercibleTyConName, coercibleDataConName :: Name
+-- in libraries/ghc-prim/GHC/Types.hs
+heqTyConName, heqDataConName, heqSCSelIdName :: Name
+heqTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "~~")   heqTyConKey      heqTyCon
+heqDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Eq#")  heqDataConKey heqDataCon
+heqSCSelIdName = mkWiredInIdName gHC_TYPES (fsLit "HEq_sc") heqSCSelIdKey heqSCSelId
+
+-- See Note [Kind-changing of (~) and Coercible] in libraries/ghc-prim/GHC/Types.hs
+coercibleTyConName, coercibleDataConName, coercibleSCSelIdName :: Name
 coercibleTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Coercible")  coercibleTyConKey   coercibleTyCon
 coercibleDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "MkCoercible") coercibleDataConKey coercibleDataCon
+coercibleSCSelIdName = mkWiredInIdName gHC_TYPES (fsLit "Coercible_sc") coercibleSCSelIdKey coercibleSCSelId
 
 charTyConName, charDataConName, intTyConName, intDataConName :: Name
 charTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Char") charTyConKey charTyCon
@@ -246,6 +265,20 @@ typeNatKindConName, typeSymbolKindConName :: Name
 typeNatKindConName    = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Nat")    typeNatKindConNameKey    typeNatKindCon
 typeSymbolKindConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Symbol") typeSymbolKindConNameKey typeSymbolKindCon
 
+constraintKindTyConName :: Name
+constraintKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Constraint") constraintKindTyConKey   constraintKindTyCon
+
+liftedTypeKindTyConName, starKindTyConName, unicodeStarKindTyConName
+  :: Name
+liftedTypeKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Type") liftedTypeKindTyConKey liftedTypeKindTyCon
+starKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "*") starKindTyConKey starKindTyCon
+unicodeStarKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "★") unicodeStarKindTyConKey unicodeStarKindTyCon
+
+levityTyConName, liftedDataConName, unliftedDataConName :: Name
+levityTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Levity") levityTyConKey levityTyCon
+liftedDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Lifted") liftedDataConKey liftedDataCon
+unliftedDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Unlifted") unliftedDataConKey unliftedDataCon
+
 parrTyConName, parrDataConName :: Name
 parrTyConName   = mkWiredInTyConName   BuiltInSyntax
                     gHC_PARR' (fsLit "[::]") parrTyConKey parrTyCon
@@ -253,7 +286,7 @@ parrDataConName = mkWiredInDataConName UserSyntax
                     gHC_PARR' (fsLit "PArr") parrDataConKey parrDataCon
 
 boolTyCon_RDR, false_RDR, true_RDR, intTyCon_RDR, charTyCon_RDR,
-    intDataCon_RDR, listTyCon_RDR, consDataCon_RDR, parrTyCon_RDR, eqTyCon_RDR :: RdrName
+    intDataCon_RDR, listTyCon_RDR, consDataCon_RDR, parrTyCon_RDR :: RdrName
 boolTyCon_RDR   = nameRdrName boolTyConName
 false_RDR       = nameRdrName falseDataConName
 true_RDR        = nameRdrName trueDataConName
@@ -263,7 +296,6 @@ intDataCon_RDR  = nameRdrName intDataConName
 listTyCon_RDR   = nameRdrName listTyConName
 consDataCon_RDR = nameRdrName consDataConName
 parrTyCon_RDR   = nameRdrName parrTyConName
-eqTyCon_RDR     = nameRdrName eqTyConName
 
 {-
 ************************************************************************
@@ -274,28 +306,34 @@ eqTyCon_RDR     = nameRdrName eqTyConName
 -}
 
 pcNonRecDataTyCon :: Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
--- Not an enumeration, not promotable
-pcNonRecDataTyCon = pcTyCon False NonRecursive False
+-- Not an enumeration
+pcNonRecDataTyCon = pcTyCon False NonRecursive
 
 -- This function assumes that the types it creates have all parameters at
--- Representational role!
-pcTyCon :: Bool -> RecFlag -> Bool -> Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
-pcTyCon is_enum is_rec is_prom name cType tyvars cons
-  = buildAlgTyCon name
-        tyvars
-        (map (const Representational) tyvars)
-        cType
-        []              -- No stupid theta
-        (DataTyCon cons is_enum)
-        is_rec
-        is_prom
-        False           -- Not in GADT syntax
-        (VanillaAlgTyCon (mkPrelTyConRepName name))
+-- Representational role, and that there is no kind polymorphism.
+pcTyCon :: Bool -> RecFlag -> Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
+pcTyCon is_enum is_rec name cType tyvars cons
+  = mkAlgTyCon name
+                (mkFunTys (map tyVarKind tyvars) liftedTypeKind)
+                tyvars
+                (map (const Representational) tyvars)
+                cType
+                []              -- No stupid theta
+                (DataTyCon cons is_enum)
+                (VanillaAlgTyCon (mkPrelTyConRepName name))
+                is_rec
+                False           -- Not in GADT syntax
 
 pcDataCon :: Name -> [TyVar] -> [Type] -> TyCon -> DataCon
-pcDataCon = pcDataConWithFixity False
+pcDataCon n univs = pcDataConWithFixity False n univs []  -- no ex_tvs
 
-pcDataConWithFixity :: Bool -> Name -> [TyVar] -> [Type] -> TyCon -> DataCon
+pcDataConWithFixity :: Bool      -- ^ declared infix?
+                    -> Name      -- ^ datacon name
+                    -> [TyVar]   -- ^ univ tyvars
+                    -> [TyVar]   -- ^ ex tyvars
+                    -> [Type]    -- ^ args
+                    -> TyCon
+                    -> DataCon
 pcDataConWithFixity infx n = pcDataConWithFixity' infx n (incrUnique (nameUnique n))
 -- The Name's unique is the first of two free uniques;
 -- the first is used for the datacon itself,
@@ -304,18 +342,19 @@ pcDataConWithFixity infx n = pcDataConWithFixity' infx n (incrUnique (nameUnique
 -- To support this the mkPreludeDataConUnique function "allocates"
 -- one DataCon unique per pair of Ints.
 
-pcDataConWithFixity' :: Bool -> Name -> Unique -> [TyVar] -> [Type] -> TyCon -> DataCon
+pcDataConWithFixity' :: Bool -> Name -> Unique -> [TyVar] -> [TyVar]
+                     -> [Type] -> TyCon -> DataCon
 -- The Name should be in the DataName name space; it's the name
 -- of the DataCon itself.
 
-pcDataConWithFixity' declared_infix dc_name wrk_key tyvars arg_tys tycon
+pcDataConWithFixity' declared_infix dc_name wrk_key tyvars ex_tyvars arg_tys tycon
   = data_con
   where
     data_con = mkDataCon dc_name declared_infix prom_info
                 (map (const no_bang) arg_tys)
                 []      -- No labelled fields
                 tyvars
-                []      -- No existential type variables
+                ex_tyvars
                 []      -- No equality spec
                 []      -- No theta
                 arg_tys (mkTyConApp tycon (mkTyVarTys tyvars))
@@ -333,10 +372,7 @@ pcDataConWithFixity' declared_infix dc_name wrk_key tyvars arg_tys tycon
     wrk_name = mkWiredInName modu wrk_occ wrk_key
                              (AnId (dataConWorkId data_con)) UserSyntax
 
-    prom_info | Promoted {} <- promotableTyCon_maybe tycon  -- Knot-tied
-              = Promoted (mkPrelTyConRepName dc_name)
-              | otherwise
-              = NotPromoted
+    prom_info = mkPrelTyConRepName dc_name
 
 {-
 ************************************************************************
@@ -349,12 +385,21 @@ pcDataConWithFixity' declared_infix dc_name wrk_key tyvars arg_tys tycon
 typeNatKindCon, typeSymbolKindCon :: TyCon
 -- data Nat
 -- data Symbol
-typeNatKindCon    = pcTyCon False NonRecursive True typeNatKindConName    Nothing [] []
-typeSymbolKindCon = pcTyCon False NonRecursive True typeSymbolKindConName Nothing [] []
+typeNatKindCon    = pcTyCon False NonRecursive typeNatKindConName    Nothing [] []
+typeSymbolKindCon = pcTyCon False NonRecursive typeSymbolKindConName Nothing [] []
 
 typeNatKind, typeSymbolKind :: Kind
-typeNatKind    = TyConApp (promoteTyCon typeNatKindCon)    []
-typeSymbolKind = TyConApp (promoteTyCon typeSymbolKindCon) []
+typeNatKind    = mkTyConTy typeNatKindCon
+typeSymbolKind = mkTyConTy typeSymbolKindCon
+
+constraintKindTyCon :: TyCon
+constraintKindTyCon = pcTyCon False NonRecursive constraintKindTyConName
+                              Nothing [] []
+
+liftedTypeKind, constraintKind :: Kind
+liftedTypeKind   = tYPE liftedDataConTy
+constraintKind   = mkTyConApp constraintKindTyCon []
+
 
 {-
 ************************************************************************
@@ -485,9 +530,6 @@ tupleTyConName ConstraintTuple a = cTupleTyConName a
 tupleTyConName BoxedTuple      a = tyConName (tupleTyCon Boxed a)
 tupleTyConName UnboxedTuple    a = tyConName (tupleTyCon Unboxed a)
 
-promotedTupleTyCon :: Boxity -> Arity -> TyCon
-promotedTupleTyCon boxity i = promoteTyCon (tupleTyCon boxity i)
-
 promotedTupleDataCon :: Boxity -> Arity -> TyCon
 promotedTupleDataCon boxity i = promoteDataCon (tupleDataCon boxity i)
 
@@ -503,40 +545,43 @@ unboxedTupleArr = listArray (0,mAX_TUPLE_SIZE) [mk_tuple Unboxed i | i <- [0..mA
 mk_tuple :: Boxity -> Int -> (TyCon,DataCon)
 mk_tuple boxity arity = (tycon, tuple_con)
   where
-        tycon   = mkTupleTyCon tc_name tc_kind arity tyvars tuple_con
-                               tup_sort
-                               prom_tc flavour
+        tycon   = mkTupleTyCon tc_name tc_kind tc_arity tyvars tuple_con
+                               tup_sort flavour
 
-        flavour = case boxity of
-                    Boxed   -> VanillaAlgTyCon (mkPrelTyConRepName tc_name)
-                    Unboxed -> UnboxedAlgTyCon
-
-        tup_sort = case boxity of
-                      Boxed   -> BoxedTuple
-                      Unboxed -> UnboxedTuple
-
-        prom_tc = case boxity of
-                    Boxed   -> Promoted (mkPromotedTyCon tycon (promoteKind tc_kind))
-                    Unboxed -> NotPromoted
-
-        modu = case boxity of
-                    Boxed -> gHC_TUPLE
-                    Unboxed -> gHC_PRIM
+        (tup_sort, modu, tc_kind, tc_arity, tyvars, tyvar_tys, flavour)
+          = case boxity of
+          Boxed ->
+            let boxed_tyvars = take arity alphaTyVars in
+            ( BoxedTuple
+            , gHC_TUPLE
+            , mkFunTys (nOfThem arity liftedTypeKind) liftedTypeKind
+            , arity
+            , boxed_tyvars
+            , mkTyVarTys boxed_tyvars
+            , VanillaAlgTyCon (mkPrelTyConRepName tc_name)
+            )
+            -- See Note [Unboxed tuple levity vars] in TyCon
+          Unboxed ->
+            let all_tvs = mkTemplateTyVars (replicate arity levityTy ++
+                                            map (tYPE . mkTyVarTy) (take arity all_tvs))
+                   -- NB: This must be one call to mkTemplateTyVars, to make
+                   -- sure that all the uniques are different
+                (lev_tvs, open_tvs) = splitAt arity all_tvs
+            in
+            ( UnboxedTuple
+            , gHC_PRIM
+            , mkInvForAllTys lev_tvs $
+              mkFunTys (map tyVarKind open_tvs) $
+              unliftedTypeKind
+            , arity * 2
+            , all_tvs
+            , mkTyVarTys open_tvs
+            , UnboxedAlgTyCon
+            )
 
         tc_name = mkWiredInName modu (mkTupleOcc tcName boxity arity) tc_uniq
                                 (ATyCon tycon) BuiltInSyntax
-        tc_kind = mkArrowKinds (map tyVarKind tyvars) res_kind
-
-        res_kind = case boxity of
-                     Boxed   -> liftedTypeKind
-                     Unboxed -> unliftedTypeKind
-
-        tyvars = take arity $ case boxity of
-                   Boxed   -> alphaTyVars
-                   Unboxed -> openAlphaTyVars
-
         tuple_con = pcDataCon dc_name tyvars tyvar_tys tycon
-        tyvar_tys = mkTyVarTys tyvars
         dc_name   = mkWiredInName modu (mkTupleOcc dataName boxity arity) dc_uniq
                                   (AConLike (RealDataCon tuple_con)) BuiltInSyntax
         tc_uniq   = mkTupleTyConUnique   boxity arity
@@ -563,18 +608,6 @@ unboxedUnitTyCon = tupleTyCon Unboxed 0
 unboxedUnitDataCon :: DataCon
 unboxedUnitDataCon = tupleDataCon   Unboxed 0
 
-unboxedSingletonTyCon :: TyCon
-unboxedSingletonTyCon = tupleTyCon Unboxed 1
-
-unboxedSingletonDataCon :: DataCon
-unboxedSingletonDataCon = tupleDataCon Unboxed 1
-
-unboxedPairTyCon :: TyCon
-unboxedPairTyCon = tupleTyCon Unboxed 2
-
-unboxedPairDataCon :: DataCon
-unboxedPairDataCon = tupleDataCon Unboxed 2
-
 {-
 ************************************************************************
 *                                                                      *
@@ -582,6 +615,90 @@ unboxedPairDataCon = tupleDataCon Unboxed 2
 *                                                                      *
 ************************************************************************
 -}
+
+heqTyCon, coercibleTyCon :: TyCon
+heqClass, coercibleClass :: Class
+heqDataCon, coercibleDataCon :: DataCon
+heqSCSelId, coercibleSCSelId :: Id
+
+(heqTyCon, heqClass, heqDataCon, heqSCSelId)
+  = (tycon, klass, datacon, sc_sel_id)
+  where
+    tycon     = mkClassTyCon heqTyConName kind tvs roles
+                             rhs klass NonRecursive
+                             (mkSpecialTyConRepName (fsLit "tcHEq") heqTyConName)
+    klass     = mkClass tvs [] [sc_pred] [sc_sel_id] [] [] (mkAnd []) tycon
+    datacon   = pcDataCon heqDataConName tvs [sc_pred] tycon
+
+    kind      = mkInvForAllTys [kv1, kv2] $ mkFunTys [k1, k2] constraintKind
+    kv1:kv2:_ = drop 9 alphaTyVars -- gets "j" and "k"
+    k1        = mkTyVarTy kv1
+    k2        = mkTyVarTy kv2
+    [av,bv]   = mkTemplateTyVars [k1, k2]
+    tvs       = [kv1, kv2, av, bv]
+    roles     = [Nominal, Nominal, Nominal, Nominal]
+    rhs       = DataTyCon { data_cons = [datacon], is_enum = False }
+
+    sc_pred   = mkTyConApp eqPrimTyCon (mkTyVarTys tvs)
+    sc_sel_id = mkDictSelId heqSCSelIdName klass
+
+(coercibleTyCon, coercibleClass, coercibleDataCon, coercibleSCSelId)
+  = (tycon, klass, datacon, sc_sel_id)
+  where
+    tycon     = mkClassTyCon coercibleTyConName kind tvs roles
+                             rhs klass NonRecursive
+                             (mkPrelTyConRepName coercibleTyConName)
+    klass     = mkClass tvs [] [sc_pred] [sc_sel_id] [] [] (mkAnd []) tycon
+    datacon   = pcDataCon coercibleDataConName tvs [sc_pred] tycon
+
+    kind      = mkInvForAllTys [kKiVar] $ mkFunTys [k, k] constraintKind
+    k         = mkTyVarTy kKiVar
+    [av,bv]   = mkTemplateTyVars [k, k]
+    tvs       = [kKiVar, av, bv]
+    roles     = [Nominal, Representational, Representational]
+    rhs       = DataTyCon { data_cons = [datacon], is_enum = False }
+
+    sc_pred   = mkTyConApp eqReprPrimTyCon [k, k, mkTyVarTy av, mkTyVarTy bv]
+    sc_sel_id = mkDictSelId coercibleSCSelIdName klass
+
+-- For information about the usage of the following type, see Note [TYPE]
+-- in module Kind
+levityTy :: Type
+levityTy = mkTyConTy levityTyCon
+
+levityTyCon :: TyCon
+levityTyCon = pcTyCon True NonRecursive levityTyConName
+                      Nothing [] [liftedDataCon, unliftedDataCon]
+
+liftedDataCon, unliftedDataCon :: DataCon
+liftedDataCon   = pcDataCon liftedDataConName [] [] levityTyCon
+unliftedDataCon = pcDataCon unliftedDataConName [] [] levityTyCon
+
+liftedPromDataCon, unliftedPromDataCon :: TyCon
+liftedPromDataCon   = promoteDataCon liftedDataCon
+unliftedPromDataCon = promoteDataCon unliftedDataCon
+
+liftedDataConTy, unliftedDataConTy :: Type
+liftedDataConTy   = mkTyConTy liftedPromDataCon
+unliftedDataConTy = mkTyConTy unliftedPromDataCon
+
+liftedTypeKindTyCon, starKindTyCon, unicodeStarKindTyCon :: TyCon
+
+   -- See Note [TYPE] in TysPrim
+liftedTypeKindTyCon   = mkSynonymTyCon liftedTypeKindTyConName
+                                       liftedTypeKind
+                                       [] []
+                                       (tYPE liftedDataConTy)
+
+starKindTyCon         = mkSynonymTyCon starKindTyConName
+                                       liftedTypeKind
+                                       [] []
+                                       (tYPE liftedDataConTy)
+
+unicodeStarKindTyCon  = mkSynonymTyCon unicodeStarKindTyConName
+                                       liftedTypeKind
+                                       [] []
+                                       (tYPE liftedDataConTy)
 
 charTy :: Type
 charTy = mkTyConTy charTyCon
@@ -701,7 +818,7 @@ boolTy :: Type
 boolTy = mkTyConTy boolTyCon
 
 boolTyCon :: TyCon
-boolTyCon = pcTyCon True NonRecursive True boolTyConName
+boolTyCon = pcTyCon True NonRecursive boolTyConName
                     (Just (CType "" Nothing ("HsBool", fsLit "HsBool")))
                     [] [falseDataCon, trueDataCon]
 
@@ -714,7 +831,7 @@ falseDataConId = dataConWorkId falseDataCon
 trueDataConId  = dataConWorkId trueDataCon
 
 orderingTyCon :: TyCon
-orderingTyCon = pcTyCon True NonRecursive True orderingTyConName Nothing
+orderingTyCon = pcTyCon True NonRecursive orderingTyConName Nothing
                         [] [ltDataCon, eqDataCon, gtDataCon]
 
 ltDataCon, eqDataCon, gtDataCon :: DataCon
@@ -746,14 +863,8 @@ listTyCon :: TyCon
 listTyCon = buildAlgTyCon listTyConName alpha_tyvar [Representational]
                           Nothing []
                           (DataTyCon [nilDataCon, consDataCon] False )
-                          Recursive True False
+                          Recursive False
                           (VanillaAlgTyCon (mkSpecialTyConRepName (fsLit "tcList") listTyConName))
-
-mkPromotedListTy :: Type -> Type
-mkPromotedListTy ty = mkTyConApp promotedListTyCon [ty]
-
-promotedListTyCon :: TyCon
-promotedListTyCon = promoteTyCon listTyCon
 
 nilDataCon :: DataCon
 nilDataCon  = pcDataCon nilDataConName alpha_tyvar [] listTyCon
@@ -761,7 +872,7 @@ nilDataCon  = pcDataCon nilDataConName alpha_tyvar [] listTyCon
 consDataCon :: DataCon
 consDataCon = pcDataConWithFixity True {- Declared infix -}
                consDataConName
-               alpha_tyvar [alphaTy, mkTyConApp listTyCon alpha_ty] listTyCon
+               alpha_tyvar [] [alphaTy, mkTyConApp listTyCon alpha_ty] listTyCon
 -- Interesting: polymorphic recursion would help here.
 -- We can't use (mkListTy alphaTy) in the defn of consDataCon, else mkListTy
 -- gets the over-specific type (Type -> Type)
@@ -769,7 +880,7 @@ consDataCon = pcDataConWithFixity True {- Declared infix -}
 -- Wired-in type Maybe
 
 maybeTyCon :: TyCon
-maybeTyCon = pcTyCon True NonRecursive True maybeTyConName Nothing alpha_tyvar
+maybeTyCon = pcTyCon False NonRecursive maybeTyConName Nothing alpha_tyvar
                      [nothingDataCon, justDataCon]
 
 nothingDataCon :: DataCon
@@ -826,10 +937,14 @@ done by enumeration\srcloc{lib/prelude/InTup?.hs}.
 \end{itemize}
 -}
 
+-- | Make a tuple type. The list of types should /not/ include any
+-- levity specifications.
 mkTupleTy :: Boxity -> [Type] -> Type
 -- Special case for *boxed* 1-tuples, which are represented by the type itself
-mkTupleTy Boxed  [ty] = ty
-mkTupleTy boxity tys  = mkTyConApp (tupleTyCon boxity (length tys)) tys
+mkTupleTy Boxed   [ty] = ty
+mkTupleTy Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
+mkTupleTy Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))
+                                        (map (getLevity "mkTupleTy") tys ++ tys)
 
 -- | Build the type of a small tuple that holds the specified type of thing
 mkBoxedTupleTy :: [Type] -> Type
@@ -913,78 +1028,19 @@ isPArrFakeCon dcon  = dcon == parrFakeCon (dataConSourceArity dcon)
 
 -- Promoted Booleans
 
-promotedBoolTyCon, promotedFalseDataCon, promotedTrueDataCon :: TyCon
-promotedBoolTyCon     = promoteTyCon boolTyCon
+promotedFalseDataCon, promotedTrueDataCon :: TyCon
 promotedTrueDataCon   = promoteDataCon trueDataCon
 promotedFalseDataCon  = promoteDataCon falseDataCon
 
 -- Promoted Ordering
 
-promotedOrderingTyCon
-  , promotedLTDataCon
+promotedLTDataCon
   , promotedEQDataCon
   , promotedGTDataCon
   :: TyCon
-promotedOrderingTyCon = promoteTyCon orderingTyCon
 promotedLTDataCon     = promoteDataCon ltDataCon
 promotedEQDataCon     = promoteDataCon eqDataCon
 promotedGTDataCon     = promoteDataCon gtDataCon
-
-{- *********************************************************************
-*                                                                      *
-                         Type equalities
-*                                                                      *
-********************************************************************* -}
-
-eqTyCon :: TyCon
-eqTyCon = mkAlgTyCon eqTyConName
-            (ForAllTy kv $ mkArrowKinds [k, k] constraintKind)
-            [kv, a, b]
-            [Nominal, Nominal, Nominal]
-            Nothing
-            []      -- No stupid theta
-            (DataTyCon [eqBoxDataCon] False)
-            (VanillaAlgTyCon (mkSpecialTyConRepName (fsLit "tcEq") eqTyConName))
-            NonRecursive
-            False
-            NotPromoted
-  where
-    kv = kKiVar
-    k = mkTyVarTy kv
-    [a,b] = mkTemplateTyVars [k,k]
-
-eqBoxDataCon :: DataCon
-eqBoxDataCon = pcDataCon eqBoxDataConName args [TyConApp eqPrimTyCon (map mkTyVarTy args)] eqTyCon
-  where
-    kv = kKiVar
-    k = mkTyVarTy kv
-    [a,b] = mkTemplateTyVars [k,k]
-    args = [kv, a, b]
-
-
-coercibleTyCon :: TyCon
-coercibleTyCon = mkClassTyCon coercibleTyConName kind tvs
-                              [Nominal, Representational, Representational]
-                              rhs coercibleClass NonRecursive
-                              (mkPrelTyConRepName coercibleTyConName)
-  where
-     kind = (ForAllTy kv $ mkArrowKinds [k, k] constraintKind)
-     kv = kKiVar
-     k = mkTyVarTy kv
-     [a,b] = mkTemplateTyVars [k,k]
-     tvs = [kv, a, b]
-     rhs = DataTyCon [coercibleDataCon] False
-
-coercibleDataCon :: DataCon
-coercibleDataCon = pcDataCon coercibleDataConName args [TyConApp eqReprPrimTyCon (map mkTyVarTy args)] coercibleTyCon
-  where
-    kv = kKiVar
-    k = mkTyVarTy kv
-    [a,b] = mkTemplateTyVars [k,k]
-    args = [kv, a, b]
-
-coercibleClass :: Class
-coercibleClass = mkClass (tyConTyVars coercibleTyCon) [] [] [] [] [] (mkAnd []) coercibleTyCon
 
 {-
 Note [The Implicit Parameter class]
@@ -1012,7 +1068,7 @@ ipTyCon :: TyCon
 ipTyCon = mkClassTyCon ipTyConName kind [ip,a] [] rhs ipClass NonRecursive
                        (mkPrelTyConRepName ipTyConName)
   where
-    kind = mkArrowKinds [typeSymbolKind, liftedTypeKind] constraintKind
+    kind = mkFunTys [typeSymbolKind, liftedTypeKind] constraintKind
     [ip,a] = mkTemplateTyVars [typeSymbolKind, liftedTypeKind]
     rhs = NewTyCon ipDataCon (mkTyVarTy a) ([], mkTyVarTy a) ipCoAxiom
 

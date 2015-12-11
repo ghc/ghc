@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies, ConstraintKinds #-}
 module ShouldFail where
 
-import GHC.Prim( Constraint )
+import GHC.Exts( Constraint )
 
 type family F a :: Constraint
 

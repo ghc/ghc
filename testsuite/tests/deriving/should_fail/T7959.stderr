@@ -1,8 +1,8 @@
 
-T7959.hs:5:1:
-    Cannot derive instances for nullary classes
-    In the stand-alone deriving instance for ‘A’
+T7959.hs:5:1: error:
+    • Cannot derive instances for nullary classes
+    • In the stand-alone deriving instance for ‘A’
 
-T7959.hs:6:17:
-    Expected kind ‘k0 -> Constraint’, but ‘A’ has kind ‘Constraint’
-    In the data declaration for ‘B’
+T7959.hs:6:17: error:
+    • Expected kind ‘k0 -> Constraint’, but ‘A’ has kind ‘Constraint’
+    • In the data declaration for ‘B’

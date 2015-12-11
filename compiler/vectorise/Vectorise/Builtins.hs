@@ -6,10 +6,10 @@
 module Vectorise.Builtins (
   -- * Restrictions
   mAX_DPH_SCALAR_ARGS,
-  
+
   -- * Builtins
   Builtins(..),
-  
+
   -- * Wrapped selectors
   selTy, selsTy,
   selReplicate,

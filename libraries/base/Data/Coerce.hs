@@ -26,5 +26,4 @@ module Data.Coerce
 import GHC.Prim (coerce)
 import GHC.Types (Coercible)
 
-import GHC.Base () -- for build ordering
-
+import GHC.Base () -- for build ordering; see Notes in GHC.Base for more info

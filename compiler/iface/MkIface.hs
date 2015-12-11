@@ -69,7 +69,6 @@ import Coercion( tidyCo )
 import Annotations
 import CoreSyn
 import Class
-import Kind
 import TyCon
 import CoAxiom
 import ConLike
@@ -1315,8 +1314,8 @@ patSynToIfaceDecl ps
                 }
   where
     (univ_tvs, req_theta, ex_tvs, prov_theta, args, rhs_ty) = patSynSig ps
-    (env1, univ_tvs') = tidyTyVarBndrs emptyTidyEnv univ_tvs
-    (env2, ex_tvs')   = tidyTyVarBndrs env1 ex_tvs
+    (env1, univ_tvs') = tidyTyCoVarBndrs emptyTidyEnv univ_tvs
+    (env2, ex_tvs')   = tidyTyCoVarBndrs env1 ex_tvs
     to_if_pr (id, needs_dummy) = (idName id, needs_dummy)
 
 --------------------------
@@ -1350,15 +1349,18 @@ coAxBranchToIfaceBranch tc lhs_s
 
 -- use this one for standalone branches without incompatibles
 coAxBranchToIfaceBranch' :: TyCon -> CoAxBranch -> IfaceAxBranch
-coAxBranchToIfaceBranch' tc (CoAxBranch { cab_tvs = tvs, cab_lhs = lhs
+coAxBranchToIfaceBranch' tc (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
+                                        , cab_lhs = lhs
                                         , cab_roles = roles, cab_rhs = rhs })
-  = IfaceAxBranch { ifaxbTyVars = toIfaceTvBndrs tv_bndrs
-                  , ifaxbLHS    = tidyToIfaceTcArgs env1 tc lhs
-                  , ifaxbRoles  = roles
-                  , ifaxbRHS    = tidyToIfaceType env1 rhs
+  = IfaceAxBranch { ifaxbTyVars  = toIfaceTvBndrs tv_bndrs
+                  , ifaxbCoVars  = map toIfaceIdBndr cvs
+                  , ifaxbLHS     = tidyToIfaceTcArgs env1 tc lhs
+                  , ifaxbRoles   = roles
+                  , ifaxbRHS     = tidyToIfaceType env1 rhs
                   , ifaxbIncomps = [] }
   where
-    (env1, tv_bndrs) = tidyTyClTyVarBndrs emptyTidyEnv tvs
+
+    (env1, tv_bndrs) = tidyTyClTyCoVarBndrs emptyTidyEnv tvs
     -- Don't re-bind in-scope tyvars
     -- See Note [CoAxBranch type variables] in CoAxiom
 
@@ -1377,7 +1379,7 @@ tyConToIfaceDecl env tycon
                      ifTyVars  = if_tc_tyvars,
                      ifRoles   = tyConRoles tycon,
                      ifSynRhs  = if_syn_type syn_rhs,
-                     ifSynKind = tidyToIfaceType tc_env1 (tyConResKind tycon)
+                     ifSynKind = if_kind
                    })
 
   | Just fam_flav <- famTyConFlav_maybe tycon
@@ -1386,13 +1388,14 @@ tyConToIfaceDecl env tycon
                     ifTyVars  = if_tc_tyvars,
                     ifResVar  = if_res_var,
                     ifFamFlav = to_if_fam_flav fam_flav,
-                    ifFamKind = tidyToIfaceType tc_env1 (tyConResKind tycon),
+                    ifFamKind = if_kind,
                     ifFamInj  = familyTyConInjectivityInfo tycon
                   })
 
   | isAlgTyCon tycon
   = ( tc_env1
     , IfaceData { ifName    = getOccName tycon,
+                  ifKind    = if_kind,
                   ifCType   = tyConCType tycon,
                   ifTyVars  = if_tc_tyvars,
                   ifRoles   = tyConRoles tycon,
@@ -1400,7 +1403,6 @@ tyConToIfaceDecl env tycon
                   ifCons    = ifaceConDecls (algTyConRhs tycon) (algTcFields tycon),
                   ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
                   ifGadtSyntax = isGadtSyntaxTyCon tycon,
-                  ifPromotable = isPromotableTyCon tycon,
                   ifParent  = parent })
 
   | otherwise  -- FunTyCon, PrimTyCon, promoted TyCon/DataCon
@@ -1410,15 +1412,16 @@ tyConToIfaceDecl env tycon
                   ifCType      = Nothing,
                   ifTyVars     = funAndPrimTyVars,
                   ifRoles      = tyConRoles tycon,
+                  ifKind       = if_kind,
                   ifCtxt       = [],
                   ifCons       = IfDataTyCon [] False [],
                   ifRec        = boolToRecFlag False,
                   ifGadtSyntax = False,
-                  ifPromotable = False,
                   ifParent     = IfNoParent })
   where
-    (tc_env1, tc_tyvars) = tidyTyClTyVarBndrs env (tyConTyVars tycon)
-    if_tc_tyvars   = toIfaceTvBndrs tc_tyvars
+    (tc_env1, tc_tyvars) = tidyTyClTyCoVarBndrs env (tyConTyVars tycon)
+    if_tc_tyvars = toIfaceTvBndrs tc_tyvars
+    if_kind = tidyToIfaceType tc_env1 (tyConKind tycon)
     if_syn_type ty = tidyToIfaceType tc_env1 ty
     if_res_var     = getFS `fmap` tyConFamilyResVar_maybe tycon
 
@@ -1460,7 +1463,7 @@ tyConToIfaceDecl env tycon
                     ifConInfix   = dataConIsInfix data_con,
                     ifConWrapper = isJust (dataConWrapId_maybe data_con),
                     ifConExTvs   = toIfaceTvBndrs ex_tvs',
-                    ifConEqSpec  = map to_eq_spec eq_spec,
+                    ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env2 theta,
                     ifConArgTys  = map (tidyToIfaceType con_env2) arg_tys,
                     ifConFields  = map (nameOccName . flSelector)
@@ -1470,7 +1473,8 @@ tyConToIfaceDecl env tycon
                     ifConSrcStricts = map toIfaceSrcBang
                                           (dataConSrcBangs data_con)}
         where
-          (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _) = dataConFullSig data_con
+          (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
+            = dataConFullSig data_con
 
           -- Tidy the univ_tvs of the data constructor to be identical
           -- to the tyConTyVars of the type constructor.  This means
@@ -1482,7 +1486,7 @@ tyConToIfaceDecl env tycon
           con_env1 = (fst tc_env1, mkVarEnv (zipEqual "ifaceConDecl" univ_tvs tc_tyvars))
                      -- A bit grimy, perhaps, but it's simple!
 
-          (con_env2, ex_tvs') = tidyTyVarBndrs con_env1 ex_tvs
+          (con_env2, ex_tvs') = tidyTyCoVarBndrs con_env1 ex_tvs
           to_eq_spec (tv,ty)  = (toIfaceTyVar (tidyTyVar con_env2 tv), tidyToIfaceType con_env2 ty)
 
     ifaceOverloaded flds = case fsEnvElts flds of
@@ -1510,9 +1514,10 @@ classToIfaceDecl :: TidyEnv -> Class -> (TidyEnv, IfaceDecl)
 classToIfaceDecl env clas
   = ( env1
     , IfaceClass { ifCtxt   = tidyToIfaceContext env1 sc_theta,
-                   ifName   = getOccName (classTyCon clas),
+                   ifName   = getOccName tycon,
                    ifTyVars = toIfaceTvBndrs clas_tyvars',
                    ifRoles  = tyConRoles (classTyCon clas),
+                   ifKind   = tidyToIfaceType env1 (tyConKind tycon),
                    ifFDs    = map toIfaceFD clas_fds,
                    ifATs    = map toIfaceAT clas_ats,
                    ifSigs   = map toIfaceClassOp op_stuff,
@@ -1523,7 +1528,7 @@ classToIfaceDecl env clas
       = classExtraBigSig clas
     tycon = classTyCon clas
 
-    (env1, clas_tyvars') = tidyTyVarBndrs env clas_tyvars
+    (env1, clas_tyvars') = tidyTyCoVarBndrs env clas_tyvars
 
     toIfaceAT :: ClassATItem -> IfaceAT
     toIfaceAT (ATI tc def)
@@ -1562,16 +1567,16 @@ tidyToIfaceTcArgs env tc tys = toIfaceTcArgs tc (tidyTypes env tys)
 tidyToIfaceContext :: TidyEnv -> ThetaType -> IfaceContext
 tidyToIfaceContext env theta = map (tidyToIfaceType env) theta
 
-tidyTyClTyVarBndrs :: TidyEnv -> [TyVar] -> (TidyEnv, [TyVar])
-tidyTyClTyVarBndrs env tvs = mapAccumL tidyTyClTyVarBndr env tvs
+tidyTyClTyCoVarBndrs :: TidyEnv -> [TyCoVar] -> (TidyEnv, [TyCoVar])
+tidyTyClTyCoVarBndrs env tvs = mapAccumL tidyTyClTyCoVarBndr env tvs
 
-tidyTyClTyVarBndr :: TidyEnv -> TyVar -> (TidyEnv, TyVar)
+tidyTyClTyCoVarBndr :: TidyEnv -> TyCoVar -> (TidyEnv, TyCoVar)
 -- If the type variable "binder" is in scope, don't re-bind it
 -- In a class decl, for example, the ATD binders mention
 -- (amd must mention) the class tyvars
-tidyTyClTyVarBndr env@(_, subst) tv
+tidyTyClTyCoVarBndr env@(_, subst) tv
  | Just tv' <- lookupVarEnv subst tv = (env, tv')
- | otherwise                         = tidyTyVarBndr env tv
+ | otherwise                         = tidyTyCoVarBndr env tv
 
 tidyTyVar :: TidyEnv -> TyVar -> TyVar
 tidyTyVar (_, subst) tv = lookupVarEnv subst tv `orElse` tv
@@ -1647,7 +1652,6 @@ toIfaceIdDetails (RecSelId { sel_naughty = n
   -- through interface files.  We easily could if it mattered
 toIfaceIdDetails PatSynId     = IfVanillaId
 toIfaceIdDetails ReflectionId = IfVanillaId
-toIfaceIdDetails DefMethId    = IfVanillaId
 
   -- The remaining cases are all "implicit Ids" which don't
   -- appear in interface files at all

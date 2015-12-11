@@ -106,7 +106,6 @@ restoreLinkerGlobals :: () -> IO ()
 restoreLinkerGlobals () = return ()
 #endif
 
-
 {-
 ************************************************************************
 *                                                                      *

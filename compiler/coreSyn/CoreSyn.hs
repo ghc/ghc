@@ -31,8 +31,11 @@ module CoreSyn (
 
         -- ** Simple 'Expr' access functions and predicates
         bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts,
-        collectBinders, collectTyBinders, collectValBinders, collectTyAndValBinders,
+        collectBinders, collectTyAndValBinders,
         collectArgs, collectArgsTicks, flattenBinds,
+
+        exprToType, exprToCoercion_maybe,
+        applyTypeToArg,
 
         isValArg, isTypeArg, isTyCoArg, valArgCount, valBndrCount,
         isRuntimeArg, isRuntimeVar,
@@ -1446,10 +1449,15 @@ mkVarApps :: Expr b -> [Var] -> Expr b
 mkConApp      :: DataCon -> [Arg b] -> Expr b
 
 mkApps    f args = foldl App                       f args
-mkTyApps  f args = foldl (\ e a -> App e (Type a)) f args
 mkCoApps  f args = foldl (\ e a -> App e (Coercion a)) f args
 mkVarApps f vars = foldl (\ e a -> App e (varToCoreExpr a)) f vars
 mkConApp con args = mkApps (Var (dataConWorkId con)) args
+
+mkTyApps  f args = foldl (\ e a -> App e (typeOrCoercion a)) f args
+  where
+    typeOrCoercion ty
+      | Just co <- isCoercionTy_maybe ty = Coercion co
+      | otherwise                        = Type ty
 
 mkConApp2 :: DataCon -> [Type] -> [Var] -> Expr b
 mkConApp2 con tys arg_ids = Var (dataConWorkId con)
@@ -1547,6 +1555,33 @@ varsToCoreExprs vs = map varToCoreExpr vs
 {-
 ************************************************************************
 *                                                                      *
+   Getting a result type
+*                                                                      *
+************************************************************************
+
+These are defined here to avoid a module loop between CoreUtils and CoreFVs
+
+-}
+
+applyTypeToArg :: Type -> CoreExpr -> Type
+-- ^ Determines the type resulting from applying an expression with given type
+-- to a given argument expression
+applyTypeToArg fun_ty arg = piResultTy fun_ty (exprToType arg)
+
+-- | If the expression is a 'Type', converts. Otherwise,
+-- panics. NB: This does /not/ convert 'Coercion' to 'CoercionTy'.
+exprToType :: CoreExpr -> Type
+exprToType (Type ty)     = ty
+exprToType _bad          = pprPanic "exprToType" empty
+
+-- | If the expression is a 'Coercion', converts.
+exprToCoercion_maybe :: CoreExpr -> Maybe Coercion
+exprToCoercion_maybe (Coercion co) = Just co
+exprToCoercion_maybe _             = Nothing
+
+{-
+************************************************************************
+*                                                                      *
 \subsection{Simple access functions}
 *                                                                      *
 ************************************************************************
@@ -1580,13 +1615,11 @@ flattenBinds []                   = []
 -- | We often want to strip off leading lambdas before getting down to
 -- business. This function is your friend.
 collectBinders               :: Expr b -> ([b],         Expr b)
--- | Collect as many type bindings as possible from the front of a nested lambda
-collectTyBinders             :: CoreExpr -> ([TyVar],     CoreExpr)
--- | Collect as many value bindings as possible from the front of a nested lambda
-collectValBinders            :: CoreExpr -> ([Id],        CoreExpr)
--- | Collect type binders from the front of the lambda first,
--- then follow up by collecting as many value bindings as possible
--- from the resulting stripped expression
+-- | Collect type and value binders from nested lambdas, stopping
+-- right before any "forall"s within a non-forall. For example,
+-- forall (a :: *) (b :: Foo ~ Bar) (c :: *). Baz -> forall (d :: *). Blob
+-- will pull out the binders for a, b, c, and Baz, but not for d or anything
+-- within Blob. This is to coordinate with tcSplitSigmaTy.
 collectTyAndValBinders       :: CoreExpr -> ([TyVar], [Id], CoreExpr)
 
 collectBinders expr
@@ -1596,22 +1629,15 @@ collectBinders expr
     go bs e          = (reverse bs, e)
 
 collectTyAndValBinders expr
-  = (tvs, ids, body)
-  where
-    (tvs, body1) = collectTyBinders expr
-    (ids, body)  = collectValBinders body1
+  = go_forall [] [] expr
+  where go_forall tvs ids (Lam b e)
+          | isTyVar b       = go_forall (b:tvs) ids e
+          | isCoVar b       = go_forall tvs (b:ids) e
+        go_forall tvs ids e = go_fun tvs ids e
 
-collectTyBinders expr
-  = go [] expr
-  where
-    go tvs (Lam b e) | isTyVar b = go (b:tvs) e
-    go tvs e                     = (reverse tvs, e)
-
-collectValBinders expr
-  = go [] expr
-  where
-    go ids (Lam b e) | isId b = go (b:ids) e
-    go ids body               = (reverse ids, body)
+        go_fun tvs ids (Lam b e)
+          | isId b          = go_fun tvs (b:ids) e
+        go_fun tvs ids e    = (reverse tvs, reverse ids, e)
 
 -- | Takes a nested application expression and returns the the function
 -- being applied and the arguments to which it is applied

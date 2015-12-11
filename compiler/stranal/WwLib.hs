@@ -14,19 +14,16 @@ module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs
 
 import CoreSyn
 import CoreUtils        ( exprType, mkCast )
-import Id               ( Id, idType, mkSysLocal, idDemandInfo, setIdDemandInfo,
-                          setIdUnfolding,
-                          setIdInfo, idOneShotInfo, setIdOneShotInfo
-                        )
+import Id
 import IdInfo           ( vanillaIdInfo )
 import DataCon
 import Demand
-import MkCore           ( mkRuntimeErrorApp, aBSENT_ERROR_ID )
+import MkCore           ( mkRuntimeErrorApp, aBSENT_ERROR_ID, mkCoreUbxTup )
 import MkId             ( voidArgId, voidPrimId )
 import TysPrim          ( voidPrimTy )
 import TysWiredIn       ( tupleDataCon )
 import Type
-import Coercion hiding  ( substTy, substTyVarBndr )
+import Coercion
 import FamInstEnv
 import BasicTypes       ( Boxity(..), OneShotInfo(..), worstOneShot )
 import Literal          ( absentLiteralOf )
@@ -38,6 +35,7 @@ import Util
 import Outputable
 import DynFlags
 import FastString
+import ListSetOps
 
 {-
 ************************************************************************
@@ -132,7 +130,7 @@ mkWwBodies :: DynFlags
 mkWwBodies dflags fam_envs fun_ty demands res_info one_shots
   = do  { let arg_info = demands `zip` (one_shots ++ repeat NoOneShotInfo)
               all_one_shots = foldr (worstOneShot . snd) OneShotLam arg_info
-        ; (wrap_args, wrap_fn_args, work_fn_args, res_ty) <- mkWWargs emptyTvSubst fun_ty arg_info
+        ; (wrap_args, wrap_fn_args, work_fn_args, res_ty) <- mkWWargs emptyTCvSubst fun_ty arg_info
         ; (useful1, work_args, wrap_fn_str, work_fn_str) <- mkWWstr dflags fam_envs wrap_args
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
@@ -291,7 +289,7 @@ the \x to get what we want.
 -- It chomps bites off foralls, arrows, newtypes
 -- and keeps repeating that until it's satisfied the supplied arity
 
-mkWWargs :: TvSubst             -- Freshening substitution to apply to the type
+mkWWargs :: TCvSubst            -- Freshening substitution to apply to the type
                                 --   See Note [Freshen type variables]
          -> Type                -- The type of the function
          -> [(Demand,OneShotInfo)]     -- Demands and one-shot info for value arguments
@@ -324,7 +322,7 @@ mkWWargs subst fun_ty arg_info
              <- mkWWargs subst' fun_ty' arg_info
         ; return (tv' : wrap_args,
                   Lam tv' . wrap_fn_args,
-                  work_fn_args . (`App` Type (mkTyVarTy tv')),
+                  work_fn_args . (`mkTyApps` [mkTyVarTy tv']),
                   res_ty) }
 
   | Just (co, rep_ty) <- topNormaliseNewType_maybe fun_ty
@@ -352,7 +350,7 @@ applyToVars vars fn = mkVarApps fn vars
 
 mk_wrap_arg :: Unique -> Type -> Demand -> OneShotInfo -> Id
 mk_wrap_arg uniq ty dmd one_shot
-  = mkSysLocal (fsLit "w") uniq ty
+  = mkSysLocalOrCoVar (fsLit "w") uniq ty
        `setIdDemandInfo` dmd
        `setIdOneShotInfo` one_shot
 
@@ -366,7 +364,7 @@ which is obviously wrong.  Type variables can can in principle shadow,
 within a type (e.g. forall a. a -> forall a. a->a).  But type
 variables *are* mentioned in <blah>, so we must substitute.
 
-That's why we carry the TvSubst through mkWWargs
+That's why we carry the TCvSubst through mkWWargs
 
 ************************************************************************
 *                                                                      *
@@ -541,7 +539,7 @@ deepSplitProductType_maybe :: FamInstEnvs -> Type -> Maybe (DataCon, [Type], [Ty
 --       co :: ty ~ rep_ty
 deepSplitProductType_maybe fam_envs ty
   | let (co, ty1) = topNormaliseType_maybe fam_envs ty
-                    `orElse` (mkReflCo Representational ty, ty)
+                    `orElse` (mkRepReflCo ty, ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
   , Just con <- isDataProductTyCon_maybe tc
   , not (isClassTyCon tc)  -- See Note [Do not unpack class dictionaries]
@@ -554,13 +552,13 @@ deepSplitCprType_maybe :: FamInstEnvs -> ConTag -> Type -> Maybe (DataCon, [Type
 --       co :: ty ~ rep_ty
 deepSplitCprType_maybe fam_envs con_tag ty
   | let (co, ty1) = topNormaliseType_maybe fam_envs ty
-                    `orElse` (mkReflCo Representational ty, ty)
+                    `orElse` (mkRepReflCo ty, ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
   , isDataTyCon tc
   , let cons = tyConDataCons tc
   , cons `lengthAtLeast` con_tag -- This might not be true if we import the
                                  -- type constructor via a .hs-bool file (#8743)
-  , let con  = cons !! (con_tag - fIRST_TAG)
+  , let con  = cons `getNth` (con_tag - fIRST_TAG)
   = Just (con, tc_args, dataConInstArgTys con tc_args, co)
 deepSplitCprType_maybe _ _ _ = Nothing
 
@@ -569,15 +567,15 @@ findTypeShape :: FamInstEnvs -> Type -> TypeShape
 -- The data type TypeShape is defined in Demand
 -- See Note [Trimming a demand to a type] in Demand
 findTypeShape fam_envs ty
-  | Just (_, ty') <- splitForAllTy_maybe ty
-  = findTypeShape fam_envs ty'
-
   | Just (tc, tc_args)  <- splitTyConApp_maybe ty
   , Just con <- isDataProductTyCon_maybe tc
   = TsProd (map (findTypeShape fam_envs) $ dataConInstArgTys con tc_args)
 
   | Just (_, res) <- splitFunTy_maybe ty
   = TsFun (findTypeShape fam_envs res)
+
+  | Just (_, ty') <- splitForAllTy_maybe ty
+  = findTypeShape fam_envs ty'
 
   | Just (_, ty') <- topNormaliseType_maybe fam_envs ty
   = findTypeShape fam_envs ty'
@@ -651,13 +649,12 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
         -- Worker:  case (   ...body...  ) of C a b -> (# a, b #)
   = do { (work_uniq : uniqs) <- getUniquesM
        ; let (wrap_wild : args) = zipWith mk_ww_local uniqs (ubx_tup_ty : arg_tys)
-             ubx_tup_con  = tupleDataCon Unboxed (length arg_tys)
              ubx_tup_ty   = exprType ubx_tup_app
-             ubx_tup_app  = mkConApp2 ubx_tup_con arg_tys args
+             ubx_tup_app  = mkCoreUbxTup arg_tys (map varToCoreExpr args)
              con_app      = mkConApp2 data_con inst_tys args `mkCast` mkSymCo co
 
        ; return (True
-                , \ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt ubx_tup_con, args, con_app)]
+                , \ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt (tupleDataCon Unboxed (length arg_tys)), args, con_app)]
                 , \ body     -> mkUnpackCase body co work_uniq data_con args ubx_tup_app
                 , ubx_tup_ty ) }
 
@@ -775,4 +772,4 @@ sanitiseCaseBndr :: Id -> Id
 sanitiseCaseBndr id = id `setIdInfo` vanillaIdInfo
 
 mk_ww_local :: Unique -> Type -> Id
-mk_ww_local uniq ty = mkSysLocal (fsLit "ww") uniq ty
+mk_ww_local uniq ty = mkSysLocalOrCoVar (fsLit "ww") uniq ty

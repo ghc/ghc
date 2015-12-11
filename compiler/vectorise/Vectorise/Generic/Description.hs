@@ -5,7 +5,7 @@
 -- from our generic representation. This module computes a description of what
 -- that generic representation is.
 --
-module Vectorise.Generic.Description 
+module Vectorise.Generic.Description
   ( CompRepr(..)
   , ProdRepr(..)
   , ConRepr(..)
@@ -13,7 +13,7 @@ module Vectorise.Generic.Description
   , tyConRepr
   , sumReprType
   , compOrigType
-  ) 
+  )
 where
 
 import Vectorise.Utils
@@ -31,7 +31,7 @@ import Outputable
 -- | Describes the generic representation of a data type.
 --   If the data type has multiple constructors then we bundle them
 --   together into a generic sum type.
-data SumRepr 
+data SumRepr
         =  -- | Data type has no data constructors.
            EmptySum
 
@@ -57,7 +57,7 @@ data SumRepr
                , repr_sels_ty   :: Type
 
                -- | Function to get the length of a Sels of this type.
-               , repr_selsLength_v :: CoreExpr 
+               , repr_selsLength_v :: CoreExpr
 
                -- | Type of each data constructor.
                , repr_con_tys   :: [Type]
@@ -68,16 +68,16 @@ data SumRepr
 
 
 -- | Describes the representation type of a data constructor.
-data ConRepr  
-        = ConRepr 
+data ConRepr
+        = ConRepr
                 { repr_dc       :: DataCon
-                , repr_prod     :: ProdRepr 
+                , repr_prod     :: ProdRepr
                 }
 
 -- | Describes the representation type of the fields \/ components of a constructor.
---   If the data constructor has multiple fields then we bundle them 
+--   If the data constructor has multiple fields then we bundle them
 --   together into a generic product type.
-data ProdRepr 
+data ProdRepr
         = -- | Data constructor has no fields.
           EmptyProd
 
@@ -115,7 +115,7 @@ data CompRepr
 -- |Determine the generic representation of a data type, given its tycon.
 --
 tyConRepr :: TyCon -> VM SumRepr
-tyConRepr tc 
+tyConRepr tc
   = sum_repr (tyConDataCons tc)
   where
     -- Build the representation type for a data type with the given constructors.
@@ -124,22 +124,22 @@ tyConRepr tc
     sum_repr :: [DataCon] -> VM SumRepr
     sum_repr []    = return EmptySum
     sum_repr [con] = liftM UnarySum (con_repr con)
-    sum_repr cons  
+    sum_repr cons
      = do  let arity    = length cons
            rs           <- mapM con_repr cons
            tys          <- mapM conReprType rs
 
            -- Get the 'Sum' tycon of this arity (eg Sum2).
            sum_tc       <- builtin (sumTyCon arity)
-           
+
            -- Get the 'PData' and 'PDatas' tycons for the sum.
            psum_tc      <- pdataReprTyConExact  sum_tc
            psums_tc     <- pdatasReprTyConExact sum_tc
-           
+
            sel_ty       <- builtin (selTy      arity)
            sels_ty      <- builtin (selsTy     arity)
            selsLength_v <- builtin (selsLength arity)
-           return $ Sum 
+           return $ Sum
                   { repr_sum_tc         = sum_tc
                   , repr_psum_tc        = psum_tc
                   , repr_psums_tc       = psums_tc
@@ -159,7 +159,7 @@ tyConRepr tc
     prod_repr :: [Type] -> VM ProdRepr
     prod_repr []   = return EmptyProd
     prod_repr [ty] = liftM UnaryProd (comp_repr ty)
-    prod_repr tys  
+    prod_repr tys
      = do  let arity    = length tys
            rs           <- mapM comp_repr tys
            tys'         <- mapM compReprType rs
@@ -170,15 +170,15 @@ tyConRepr tc
            -- Get the 'PData' and 'PDatas' tycons for the product.
            ptup_tc      <- pdataReprTyConExact  tup_tc
            ptups_tc     <- pdatasReprTyConExact tup_tc
-           
-           return $ Prod 
+
+           return $ Prod
                   { repr_tup_tc   = tup_tc
                   , repr_ptup_tc  = ptup_tc
                   , repr_ptups_tc = ptups_tc
                   , repr_comp_tys = tys'
                   , repr_comps    = rs
                   }
-    
+
     -- Build the representation type for a single data constructor field.
     comp_repr ty = liftM (Keep ty) (prDictOfReprType ty)
                    `orElseV` return (Wrap ty)
@@ -228,7 +228,7 @@ instance Outputable SumRepr where
          -> sep [text "UnarySum", ppr con]
 
         Sum sumtc psumtc psumstc selty selsty selsLength contys cons
-         -> text "Sum" $+$ braces (nest 4 
+         -> text "Sum" $+$ braces (nest 4
                 $ sep   [ text "repr_sum_tc       = " <> ppr sumtc
                         , text "repr_psum_tc      = " <> ppr psumtc
                         , text "repr_psums_tc     = " <> ppr psumstc
@@ -251,10 +251,10 @@ instance Outputable ProdRepr where
   = case ss of
         EmptyProd
          -> text "EmptyProd"
-         
+
         UnaryProd cr
          -> sep [text "UnaryProd", ppr cr]
-         
+
         Prod tuptcs ptuptcs ptupstcs comptys comps
          -> sep [text "Prod", ppr tuptcs, ppr ptuptcs, ppr ptupstcs, ppr comptys, ppr comps]
 
@@ -264,7 +264,7 @@ instance Outputable CompRepr where
   = case ss of
         Keep t ce
          -> text "Keep" $+$ sep [ppr t, ppr ce]
-        
+
         Wrap t
          -> sep [text "Wrap", ppr t]
 

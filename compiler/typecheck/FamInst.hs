@@ -5,7 +5,6 @@
 module FamInst (
         FamInstEnvs, tcGetFamInstEnvs,
         checkFamInstConsistency, tcExtendLocalFamInstEnv,
-        tcLookupFamInst,
         tcLookupDataFamInst, tcLookupDataFamInst_maybe,
         tcInstNewTyCon_maybe, tcTopNormaliseNewTypeTF_maybe,
         newFamInst,
@@ -17,12 +16,13 @@ module FamInst (
 import HscTypes
 import FamInstEnv
 import InstEnv( roughMatchTcs )
-import Coercion    hiding ( substTy )
+import Coercion
 import TcEvidence
 import LoadIface
 import TcRnMonad
 import SrcLoc
 import TyCon
+import TcType
 import CoAxiom
 import DynFlags
 import Module
@@ -34,15 +34,20 @@ import RdrName
 import DataCon ( dataConName )
 import Maybes
 import Type
-import TypeRep
+import TyCoRep
 import TcMType
 import Name
+import Pair
 import Panic
 import VarSet
 import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Control.Arrow ( first, second )
+
+#if __GLASGOW_HASKELL__ < 709
+import Prelude hiding ( and )
+import Data.Foldable ( and )
+#endif
 
 #include "HsVersions.h"
 
@@ -64,15 +69,18 @@ newFamInst :: FamFlavor -> CoAxiom Unbranched -> TcRnIf gbl lcl FamInst
 -- Called from the vectoriser monad too, hence the rather general type
 newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
   = do { (subst, tvs') <- freshenTyVarBndrs tvs
+       ; (subst, cvs') <- freshenCoVarBndrsX subst cvs
        ; return (FamInst { fi_fam      = tyConName fam_tc
                          , fi_flavor   = flavor
                          , fi_tcs      = roughMatchTcs lhs
                          , fi_tvs      = tvs'
+                         , fi_cvs      = cvs'
                          , fi_tys      = substTys subst lhs
                          , fi_rhs      = substTy  subst rhs
                          , fi_axiom    = axiom }) }
   where
     CoAxBranch { cab_tvs = tvs
+               , cab_cvs = cvs
                , cab_lhs = lhs
                , cab_rhs = rhs } = coAxiomSingleBranch axiom
 
@@ -193,35 +201,7 @@ getFamInsts hpt_fam_insts mod
 *                                                                      *
 ************************************************************************
 
-Look up the instance tycon of a family instance.
-
-The match may be ambiguous (as we know that overlapping instances have
-identical right-hand sides under overlapping substitutions - see
-'FamInstEnv.lookupFamInstEnvConflicts').  However, the type arguments used
-for matching must be equal to or be more specific than those of the family
-instance declaration.  We pick one of the matches in case of ambiguity; as
-the right-hand sides are identical under the match substitution, the choice
-does not matter.
-
-Return the instance tycon and its type instance.  For example, if we have
-
- tcLookupFamInst 'T' '[Int]' yields (':R42T', 'Int')
-
-then we have a coercion (ie, type instance of family instance coercion)
-
- :Co:R42T Int :: T [Int] ~ :R42T Int
-
-which implies that :R42T was declared as 'data instance T [a]'.
 -}
-
-tcLookupFamInst :: FamInstEnvs -> TyCon -> [Type] -> Maybe FamInstMatch
-tcLookupFamInst fam_envs tycon tys
-  | not (isOpenFamilyTyCon tycon)
-  = Nothing
-  | otherwise
-  = case lookupFamInstEnv fam_envs tycon tys of
-      match : _ -> Just match
-      []        -> Nothing
 
 -- | If @co :: T ts ~ rep_ty@ then:
 --
@@ -230,8 +210,7 @@ tcLookupFamInst fam_envs tycon tys
 -- Checks for a newtype, and for being saturated
 -- Just like Coercion.instNewTyCon_maybe, but returns a TcCoercion
 tcInstNewTyCon_maybe :: TyCon -> [TcType] -> Maybe (TcType, TcCoercion)
-tcInstNewTyCon_maybe tc tys = fmap (second TcCoercion) $
-                              instNewTyCon_maybe tc tys
+tcInstNewTyCon_maybe = instNewTyCon_maybe
 
 -- | Like 'tcLookupDataFamInst_maybe', but returns the arguments back if
 -- there is no data family to unwrap.
@@ -243,21 +222,24 @@ tcLookupDataFamInst fam_inst_envs tc tc_args
       <- tcLookupDataFamInst_maybe fam_inst_envs tc tc_args
   = (rep_tc, rep_args, co)
   | otherwise
-  = (tc, tc_args, mkReflCo Representational (mkTyConApp tc tc_args))
+  = (tc, tc_args, mkRepReflCo (mkTyConApp tc tc_args))
 
 tcLookupDataFamInst_maybe :: FamInstEnvs -> TyCon -> [TcType]
                           -> Maybe (TyCon, [TcType], Coercion)
 -- ^ Converts a data family type (eg F [a]) to its representation type (eg FList a)
--- and returns a coercion between the two: co :: F [a] ~R FList a
+-- and returns a coercion between the two: co :: F [a] ~R FList a.
 tcLookupDataFamInst_maybe fam_inst_envs tc tc_args
   | isDataFamilyTyCon tc
   , match : _ <- lookupFamInstEnv fam_inst_envs tc tc_args
-  , FamInstMatch { fim_instance = rep_fam
-                 , fim_tys      = rep_args } <- match
-  , let ax     = famInstAxiom rep_fam
-        rep_tc = dataFamInstRepTyCon rep_fam
+  , FamInstMatch { fim_instance = rep_fam@(FamInst { fi_axiom = ax
+                                                   , fi_cvs   = cvs })
+                 , fim_tys      = rep_args
+                 , fim_cos      = rep_cos } <- match
+  , let rep_tc = dataFamInstRepTyCon rep_fam
         co     = mkUnbranchedAxInstCo Representational ax rep_args
-  = Just (rep_tc, rep_args, co)
+                                      (mkCoVarCos cvs)
+  = ASSERT( null rep_cos ) -- See Note [Constrained family instances] in FamInstEnv
+    Just (rep_tc, rep_args, co)
 
   | otherwise
   = Nothing
@@ -266,7 +248,7 @@ tcLookupDataFamInst_maybe fam_inst_envs tc tc_args
 -- potentially looking through newtype instances.
 --
 -- It is only used by the type inference engine (specifically, when
--- soliving 'Coercible' instances), and hence it is careful to unwrap
+-- solving representational equality), and hence it is careful to unwrap
 -- only if the relevant data constructor is in scope.  That's why
 -- it get a GlobalRdrEnv argument.
 --
@@ -284,7 +266,7 @@ tcTopNormaliseNewTypeTF_maybe :: FamInstEnvs
                               -> Maybe (TcCoercion, Type)
 tcTopNormaliseNewTypeTF_maybe faminsts rdr_env ty
 -- cf. FamInstEnv.topNormaliseType_maybe and Coercion.topNormaliseNewType_maybe
-  = fmap (first TcCoercion) $ topNormaliseTypeX_maybe stepper ty
+  = topNormaliseTypeX_maybe stepper ty
   where
     stepper = unwrap_newtype `composeSteppers` unwrap_newtype_instance
 
@@ -429,8 +411,8 @@ makeInjectivityErrors fi_ax axiom inj conflicts
         rhs             = coAxBranchRHS axiom
 
         are_conflicts   = not $ null conflicts
-        unused_inj_tvs  = unusedInjTvsInRHS inj lhs rhs
-        inj_tvs_unused  = not $ isEmptyVarSet unused_inj_tvs
+        unused_inj_tvs  = unusedInjTvsInRHS (coAxiomTyCon fi_ax) inj lhs rhs
+        inj_tvs_unused  = not $ and (isEmptyVarSet <$> unused_inj_tvs)
         tf_headed       = isTFHeaded rhs
         bare_variables  = bareTvInRHSViolated lhs rhs
         wrong_bare_rhs  = not $ null bare_variables
@@ -448,8 +430,8 @@ makeInjectivityErrors fi_ax axiom inj conflicts
 
 -- | Return a list of type variables that the function is injective in and that
 -- do not appear on injective positions in the RHS of a family instance
--- declaration.
-unusedInjTvsInRHS :: [Bool] -> [Type] -> Type -> TyVarSet
+-- declaration. The returned Pair includes invisible vars followed by visible ones
+unusedInjTvsInRHS :: TyCon -> [Bool] -> [Type] -> Type -> Pair TyVarSet
 -- INVARIANT: [Bool] list contains at least one True value
 -- See Note [Verifying injectivity annotation]. This function implements fourth
 -- check described there.
@@ -457,37 +439,46 @@ unusedInjTvsInRHS :: [Bool] -> [Type] -> Type -> TyVarSet
 -- attempt to unify equation with itself.  We would reject exactly the same
 -- equations but this method gives us more precise error messages by returning
 -- precise names of variables that are not mentioned in the RHS.
-unusedInjTvsInRHS injList lhs rhs =
-  injLHSVars `minusVarSet` injRhsVars
+unusedInjTvsInRHS tycon injList lhs rhs =
+  (`minusVarSet` injRhsVars) <$> injLHSVars
     where
       -- set of type and kind variables in which type family is injective
-      injLHSVars = tyVarsOfTypes (filterByList injList lhs)
+      (invis_pairs, vis_pairs)
+        = partitionInvisibles tycon snd (zipEqual "unusedInjTvsInRHS" injList lhs)
+      invis_lhs = uncurry filterByList $ unzip invis_pairs
+      vis_lhs   = uncurry filterByList $ unzip vis_pairs
+
+      invis_vars = tyCoVarsOfTypes invis_lhs
+      Pair invis_vars' vis_vars = splitVisVarsOfTypes vis_lhs
+      injLHSVars
+        = Pair (invis_vars `minusVarSet` vis_vars `unionVarSet` invis_vars')
+               vis_vars
 
       -- set of type variables appearing in the RHS on an injective position.
       -- For all returned variables we assume their associated kind variables
       -- also appear in the RHS.
-      injRhsVars = closeOverKinds $ collectInjVars rhs
+      injRhsVars = collectInjVars rhs
 
       -- Collect all type variables that are either arguments to a type
       -- constructor or to injective type families.
       collectInjVars :: Type -> VarSet
-      collectInjVars ty | Just (ty1, ty2) <- splitAppTy_maybe ty
-        = collectInjVars ty1 `unionVarSet` collectInjVars ty2
       collectInjVars (TyVarTy v)
-        = unitVarSet v
+        = unitVarSet v `unionVarSet` collectInjVars (tyVarKind v)
       collectInjVars (TyConApp tc tys)
         | isTypeFamilyTyCon tc = collectInjTFVars tys
                                                  (familyTyConInjectivityInfo tc)
         | otherwise            = mapUnionVarSet collectInjVars tys
       collectInjVars (LitTy {})
         = emptyVarSet
-      collectInjVars (FunTy arg res)
+      collectInjVars (ForAllTy (Anon arg) res)
         = collectInjVars arg `unionVarSet` collectInjVars res
       collectInjVars (AppTy fun arg)
         = collectInjVars fun `unionVarSet` collectInjVars arg
       -- no forall types in the RHS of a type family
       collectInjVars (ForAllTy _ _)    =
           panic "unusedInjTvsInRHS.collectInjVars"
+      collectInjVars (CastTy ty _)   = collectInjVars ty
+      collectInjVars (CoercionTy {}) = emptyVarSet
 
       collectInjTFVars :: [Type] -> Injectivity -> VarSet
       collectInjTFVars _ NotInjective
@@ -559,15 +550,15 @@ conflictInjInstErr conflictingEqns errorBuilder tyfamEqn
 
 -- | Build error message for equation with injective type variables unused in
 -- the RHS.
-unusedInjectiveVarsErr :: TyVarSet -> InjErrorBuilder -> CoAxBranch
+unusedInjectiveVarsErr :: Pair TyVarSet -> InjErrorBuilder -> CoAxBranch
                        -> (SDoc, SrcSpan)
-unusedInjectiveVarsErr unused_tyvars errorBuilder tyfamEqn
-  = errorBuilder (injectivityErrorHerald True $$ unusedInjectiveVarsErr)
+unusedInjectiveVarsErr (Pair invis_vars vis_vars) errorBuilder tyfamEqn
+  = errorBuilder (injectivityErrorHerald True $$ msg)
                  [tyfamEqn]
     where
-      tvs = varSetElemsKvsFirst unused_tyvars
-      has_types = any isTypeVar tvs
-      has_kinds = any isKindVar tvs
+      tvs = varSetElemsWellScoped (invis_vars `unionVarSet` vis_vars)
+      has_types = not $ isEmptyVarSet vis_vars
+      has_kinds = not $ isEmptyVarSet invis_vars
 
       doc = sep [ what <+> text "variable" <>
                   plural tvs <+> pprQuotedList tvs
@@ -576,14 +567,13 @@ unusedInjectiveVarsErr unused_tyvars errorBuilder tyfamEqn
                (True, True)   -> text "Type and kind"
                (True, False)  -> text "Type"
                (False, True)  -> text "Kind"
-               (False, False) -> pprPanic "mkUnusedInjectiveVarsErr" $
-                                 ppr unused_tyvars
+               (False, False) -> pprPanic "mkUnusedInjectiveVarsErr" $ ppr tvs
       print_kinds_info = sdocWithDynFlags $ \ dflags ->
                          if has_kinds && not (gopt Opt_PrintExplicitKinds dflags)
                          then text "(enabling -fprint-explicit-kinds might help)"
                          else empty
-      unusedInjectiveVarsErr = doc $$ print_kinds_info $$
-                               text "In the type family equation:"
+      msg = doc $$ print_kinds_info $$
+            text "In the type family equation:"
 
 -- | Build error message for equation that has a type family call at the top
 -- level of RHS

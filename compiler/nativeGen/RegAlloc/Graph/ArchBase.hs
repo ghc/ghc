@@ -4,10 +4,10 @@
 --   as per: "A Generalized Algorithm for Graph-Coloring Register Allocation"
 --           Michael Smith, Normal Ramsey, Glenn Holloway.
 --           PLDI 2004
---      
+--
 --   These general versions are not used in GHC proper because they are too slow.
 --   Instead, hand written optimised versions are provided for each architecture
---   in MachRegs*.hs 
+--   in MachRegs*.hs
 --
 --   This code is here because we can test the architecture specific code against
 --   it.
@@ -16,7 +16,7 @@ module RegAlloc.Graph.ArchBase (
         RegClass(..),
         Reg(..),
         RegSub(..),
-        
+
         worst,
         bound,
         squeese
@@ -33,7 +33,7 @@ data RegClass
         = ClassG32      -- 32 bit GPRs
         | ClassG16      -- 16 bit GPRs
         | ClassG8       -- 8  bit GPRs
-        
+
         -- floating point regs
         | ClassF64      -- 64 bit FPRs
         deriving (Show, Eq, Enum)
@@ -43,7 +43,7 @@ data RegClass
 data Reg
         -- a register of some class
         = Reg RegClass Int
-        
+
         -- a sub-component of one of the other regs
         | RegSub RegSub Reg
         deriving (Show, Eq)
@@ -56,7 +56,7 @@ instance Uniquable Reg where
          $ fromEnum c * 1000 + i
 
         getUnique (RegSub s (Reg c i))
-         = mkRegSubUnique 
+         = mkRegSubUnique
          $ fromEnum s * 10000 + fromEnum c * 1000 + i
 
         getUnique (RegSub _ (RegSub _ _))
@@ -69,11 +69,11 @@ data RegSub
         | SubL8         -- lowest  8 bits
         | SubL8H        -- second lowest 8 bits
         deriving (Show, Enum, Ord, Eq)
-        
+
 
 -- | Worst case displacement
 --
---      a node N of classN has some number of neighbors, 
+--      a node N of classN has some number of neighbors,
 --      all of which are from classC.
 --
 --      (worst neighbors classN classC) is the maximum number of potential
@@ -93,22 +93,22 @@ worst regsOfClass regAlias neighbors classN classC
         -- all the regs in classes N, C
         regsN           = regsOfClass classN
         regsC           = regsOfClass classC
-        
+
         -- all the possible subsets of c which have size < m
-        regsS           = filter (\s -> sizeUniqSet s >= 1 
+        regsS           = filter (\s -> sizeUniqSet s >= 1
                                      && sizeUniqSet s <= neighbors)
                         $ powersetLS regsC
 
         -- for each of the subsets of C, the regs which conflict
         -- with posiblities for N
-        regsS_conflict 
+        regsS_conflict
                 = map (\s -> intersectUniqSets regsN (regAliasS s)) regsS
 
   in    maximum $ map sizeUniqSet $ regsS_conflict
 
 
 -- | For a node N of classN and neighbors of classesC
---      (bound classN classesC) is the maximum number of potential 
+--      (bound classN classesC) is the maximum number of potential
 --      colors for N that can be lost by coloring its neighbors.
 bound   :: (RegClass    -> UniqSet Reg)
         -> (Reg         -> UniqSet Reg)
@@ -118,13 +118,13 @@ bound regsOfClass regAlias classN classesC
  = let  regAliasS regs  = unionManyUniqSets
                         $ map regAlias
                         $ uniqSetToList regs
- 
+
         regsC_aliases
                 = unionManyUniqSets
                 $ map (regAliasS . regsOfClass) classesC
 
         overlap = intersectUniqSets (regsOfClass classN) regsC_aliases
-   
+
    in   sizeUniqSet overlap
 
 
@@ -132,16 +132,16 @@ bound regsOfClass regAlias classN classesC
 --
 --   A version of this should be constructed for each particular architecture,
 --   possibly including uses of bound, so that alised registers don't get
---   counted twice, as per the paper.        
+--   counted twice, as per the paper.
 squeese :: (RegClass    -> UniqSet Reg)
         -> (Reg         -> UniqSet Reg)
         -> RegClass -> [(Int, RegClass)] -> Int
 
 squeese regsOfClass regAlias classN countCs
-        = sum 
-        $ map (\(i, classC) -> worst regsOfClass regAlias i classN classC) 
+        = sum
+        $ map (\(i, classC) -> worst regsOfClass regAlias i classN classC)
         $ countCs
-        
+
 
 -- | powerset (for lists)
 powersetL :: [a] -> [[a]]

@@ -4,7 +4,7 @@
 -- the functions and types you are likely to need when writing a
 -- plugin for GHC. So authors of plugins can probably get away simply
 -- with saying "import GhcPlugins".
--- 
+--
 -- Particularly interesting modules for plugin writers include
 -- "CoreSyn" and "CoreMonad".
 module GhcPlugins(
@@ -14,11 +14,11 @@ module GhcPlugins(
         module CoreUtils, module MkCore, module CoreFVs, module CoreSubst,
         module Rules, module Annotations,
         module DynFlags, module Packages,
-        module Module, module Type, module TyCon, module Coercion, 
+        module Module, module Type, module TyCon, module Coercion,
         module TysWiredIn, module HscTypes, module BasicTypes,
-        module VarSet, module VarEnv, module NameSet, module NameEnv, 
+        module VarSet, module VarEnv, module NameSet, module NameEnv,
         module UniqSet, module UniqFM, module FiniteMap,
-        module Util, module Serialized, module SrcLoc, module Outputable, 
+        module Util, module Serialized, module SrcLoc, module Outputable,
         module UniqSupply, module Unique, module FastString
     ) where
 
@@ -54,9 +54,9 @@ import Packages
 -- Important GHC types
 import Module
 import Type     hiding {- conflict with CoreSubst -}
-                ( substTy, extendTvSubst, extendTvSubstList, isInScope )
+                ( substTy, extendTCvSubst, extendTCvSubstList, isInScope )
 import Coercion hiding {- conflict with CoreSubst -}
-                ( substTy, extendTvSubst, substCo, substTyVarBndr, lookupTyVar )
+                ( substCo )
 import TyCon
 import TysWiredIn
 import HscTypes

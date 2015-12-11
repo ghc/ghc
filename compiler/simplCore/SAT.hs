@@ -145,7 +145,7 @@ mergeSATInfo l r = zipWith mergeSA l r
       | t `eqType` t' = Static (TypeApp t)
       | otherwise     = NotStatic
     mergeSA (Static (CoApp c)) (Static (CoApp c'))
-      | c `coreEqCoercion` c' = Static (CoApp c)
+      | c `eqCoercion` c' = Static (CoApp c)
       | otherwise             = NotStatic
     mergeSA _ _  = pprPanic "mergeSATInfo" $
                           ptext (sLit "Left:")

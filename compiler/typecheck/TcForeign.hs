@@ -43,7 +43,6 @@ import FamInst
 import FamInstEnv
 import Coercion
 import Type
-import TypeRep
 import ForeignCall
 import ErrUtils
 import Id
@@ -62,6 +61,7 @@ import FastString
 import Hooks
 
 import Control.Monad
+import Data.Maybe
 
 -- Defines a binding
 isForeignImport :: LForeignDecl name -> Bool
@@ -121,13 +121,28 @@ normaliseFfiType' :: FamInstEnvs -> Type -> TcM (Coercion, Type, Bag GlobalRdrEl
 normaliseFfiType' env ty0 = go initRecTc ty0
   where
     go :: RecTcChecker -> Type -> TcM (Coercion, Type, Bag GlobalRdrElt)
-    go rec_nts ty | Just ty' <- coreView ty     -- Expand synonyms
-        = go rec_nts ty'
+    go rec_nts ty
+      | Just ty' <- coreView ty     -- Expand synonyms
+      = go rec_nts ty'
 
-    go rec_nts ty@(TyConApp tc tys)
+      | Just (tc, tys) <- splitTyConApp_maybe ty
+      = go_tc_app rec_nts tc tys
+
+      | Just (bndr, inner_ty) <- splitPiTy_maybe ty
+      , Just tyvar <- binderVar_maybe bndr
+      = do (coi, nty1, gres1) <- go rec_nts inner_ty
+           return ( mkHomoForAllCos [tyvar] coi
+                  , mkForAllTy bndr nty1, gres1 )
+
+      | otherwise -- see Note [Don't recur in normaliseFfiType']
+      = return (mkRepReflCo ty, ty, emptyBag)
+
+    go_tc_app :: RecTcChecker -> TyCon -> [Type]
+              -> TcM (Coercion, Type, Bag GlobalRdrElt)
+    go_tc_app rec_nts tc tys
         -- We don't want to look through the IO newtype, even if it is
         -- in scope, so we have a special case for it:
-        | tc_key `elem` [ioTyConKey, funPtrTyConKey]
+        | tc_key `elem` [ioTyConKey, funPtrTyConKey, funTyConKey]
                   -- These *must not* have nominal roles on their parameters!
                   -- See Note [FFI type roles]
         = children_only
@@ -165,23 +180,11 @@ normaliseFfiType' env ty0 = go initRecTc ty0
                                      (repeat Representational) cos
                  return ( mkTyConAppCo Representational tc cos'
                         , mkTyConApp tc tys', unionManyBags gres)
-          nt_co  = mkUnbranchedAxInstCo Representational (newTyConCo tc) tys
+          nt_co  = mkUnbranchedAxInstCo Representational (newTyConCo tc) tys []
           nt_rhs = newTyConInstRhs tc tys
-          nothing = return (Refl Representational ty, ty, emptyBag)
 
-    go rec_nts (FunTy ty1 ty2)
-      = do (coi1,nty1,gres1) <- go rec_nts ty1
-           (coi2,nty2,gres2) <- go rec_nts ty2
-           return (mkFunCo Representational coi1 coi2, mkFunTy nty1 nty2, gres1 `unionBags` gres2)
-
-    go rec_nts (ForAllTy tyvar ty1)
-      = do (coi,nty1,gres1) <- go rec_nts ty1
-           return (mkForAllCo tyvar coi, ForAllTy tyvar nty1, gres1)
-
-    go _ ty@(TyVarTy {}) = return (Refl Representational ty, ty, emptyBag)
-    go _ ty@(LitTy {})   = return (Refl Representational ty, ty, emptyBag)
-    go _ ty@(AppTy {})   = return (Refl Representational ty, ty, emptyBag)
-         -- See Note [Don't recur in normaliseFfiType']
+          ty      = mkTyConApp tc tys
+          nothing = return (mkRepReflCo ty, ty, emptyBag)
 
 checkNewtypeFFI :: GlobalRdrEnv -> TyCon -> Maybe GlobalRdrElt
 checkNewtypeFFI rdr_env tc
@@ -237,13 +240,13 @@ tcFImport :: LForeignDecl Name -> TcM (Id, LForeignDecl Id, Bag GlobalRdrElt)
 tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
                                     , fd_fi = imp_decl }))
   = setSrcSpan dloc $ addErrCtxt (foreignDeclCtxt fo)  $
-    do { sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
+    do { sig_ty <- solveEqualities $ tcHsSigType (ForSigCtxt nm) hs_ty
        ; (norm_co, norm_sig_ty, gres) <- normaliseFfiType sig_ty
        ; let
            -- Drop the foralls before inspecting the
            -- structure of the foreign type.
-             (_, t_ty)         = tcSplitForAllTys norm_sig_ty
-             (arg_tys, res_ty) = tcSplitFunTys t_ty
+             (bndrs, res_ty)   = tcSplitPiTys norm_sig_ty
+             arg_tys           = mapMaybe binderRelevantType_maybe bndrs
              id                = mkLocalId nm sig_ty
                  -- Use a LocalId to obey the invariant that locally-defined
                  -- things are LocalIds.  However, it does not need zonking,
@@ -298,7 +301,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
           addErrTc (illegalForeignTyErr Outputable.empty (ptext (sLit "At least one argument expected")))
         (arg1_ty:arg_tys) -> do
           dflags <- getDynFlags
-          let curried_res_ty = foldr FunTy res_ty arg_tys
+          let curried_res_ty = mkFunTys arg_tys res_ty
           check (isFFIDynTy curried_res_ty arg1_ty)
                 (illegalForeignTyErr argument)
           checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
@@ -415,8 +418,8 @@ tcCheckFEType sig_ty (CExport (L l (CExportStatic esrc str cconv)) src) = do
   where
       -- Drop the foralls before inspecting n
       -- the structure of the foreign type.
-    (_, t_ty) = tcSplitForAllTys sig_ty
-    (arg_tys, res_ty) = tcSplitFunTys t_ty
+    (bndrs, res_ty) = tcSplitPiTys sig_ty
+    arg_tys         = mapMaybe binderRelevantType_maybe bndrs
 
 {-
 ************************************************************************

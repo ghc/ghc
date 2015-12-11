@@ -657,12 +657,12 @@ saveClobberedTemps clobbered dying
               -- (2) no free registers: spill the value
               [] -> do
                   (spill, slot)   <- spillR (RegReal reg) temp
-     
+
                   -- record why this reg was spilled for profiling
                   recordSpill (SpillClobber temp)
-     
+
                   let new_assign  = addToUFM assig temp (InBoth reg slot)
-     
+
                   clobber new_assign (spill : instrs) rest
 
 

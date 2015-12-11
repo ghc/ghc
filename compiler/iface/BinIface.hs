@@ -146,7 +146,7 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
         seekBin bh symtab_p
         symtab <- getSymbolTable bh ncu
         seekBin bh data_p             -- Back to where we were before
-    
+
         -- It is only now that we know how to get a Name
         return $ setUserData bh $ newReadState (getSymtabName ncu dict symtab)
                                                (getDictFastString dict)
@@ -194,8 +194,8 @@ writeBinIface dflags hi_path mod_iface = do
     let bin_dict = BinDictionary {
                        bin_dict_next = dict_next_ref,
                        bin_dict_map  = dict_map_ref }
-  
-    -- Put the main thing, 
+
+    -- Put the main thing,
     bh <- return $ setUserData bh $ newWriteState (putName bin_dict bin_symtab)
                                                   (putFastString bin_dict)
     put_ bh mod_iface
@@ -209,7 +209,7 @@ writeBinIface dflags hi_path mod_iface = do
     symtab_next <- readFastMutInt symtab_next
     symtab_map  <- readIORef symtab_map
     putSymbolTable bh symtab_next symtab_map
-    debugTraceMsg dflags 3 (text "writeBinIface:" <+> int symtab_next 
+    debugTraceMsg dflags 3 (text "writeBinIface:" <+> int symtab_next
                                 <+> text "Names")
 
     -- NB. write the dictionary after the symbol table, because
@@ -256,7 +256,7 @@ getSymbolTable bh ncu = do
     od_names <- sequence (replicate sz (get bh))
     updateNameCache ncu $ \namecache ->
         let arr = listArray (0,sz-1) names
-            (namecache', names) =    
+            (namecache', names) =
                 mapAccumR (fromOnDiskName arr) namecache od_names
         in (namecache', arr)
 
@@ -341,11 +341,11 @@ putTupleName_ bh tc tup_sort thing_tag
   = -- ASSERT(arity < 2^(30 :: Int))
     put_ bh (0x80000000 .|. (sort_tag `shiftL` 28) .|. (thing_tag `shiftL` 26) .|. arity)
   where
-    arity    = fromIntegral (tyConArity tc)
-    sort_tag = case tup_sort of
-                 BoxedTuple      -> 0
-                 UnboxedTuple    -> 1
-                 ConstraintTuple -> pprPanic "putTupleName:ConstraintTuple" (ppr tc)
+    (sort_tag, arity) = case tup_sort of
+      BoxedTuple      -> (0, fromIntegral (tyConArity tc))
+      UnboxedTuple    -> (1, fromIntegral (tyConArity tc `div` 2))
+        -- See Note [Unboxed tuple levity vars] in TyCon
+      ConstraintTuple -> pprPanic "putTupleName:ConstraintTuple" (ppr tc)
 
 -- See Note [Symbol table representation of names]
 getSymtabName :: NameCacheUpdater

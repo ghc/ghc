@@ -12,6 +12,11 @@
     • In the expression: 'p'
       In an equation for ‘a’: a = 'p'
 
+../../typecheck/should_run/Defer01.hs:18:9: warning:
+    • No instance for (Eq B) arising from a use of ‘==’
+    • In the expression: x == x
+      In an equation for ‘b’: b x = x == x
+
 ../../typecheck/should_run/Defer01.hs:25:1: warning:
     Pattern match(es) have inaccessible right hand side
     In an equation for ‘c’: c (C2 x) = ...
@@ -173,7 +178,7 @@
 (deferred type error)
 
 <interactive>:13:8: error:
-    • Couldn't match expected type ‘Bool’ with actual type ‘Int’
+    • Couldn't match type ‘Int’ with ‘Bool’ arising from a use of ‘k’
     • In the first argument of ‘print’, namely ‘(k 2)’
       In the expression: print (k 2)
       In an equation for ‘it’: it = print (k 2)

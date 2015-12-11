@@ -253,8 +253,6 @@ data AnnKeywordId
     | AnnRec
     | AnnRole
     | AnnSafe
-    | AnnStar -- ^ '*'
-    | AnnStarU -- ^ '*', unicode variant.
     | AnnSemi -- ^ ';'
     | AnnSimpleQuote -- ^ '''
     | AnnStatic -- ^ 'static'
@@ -330,9 +328,7 @@ unicodeAnn Annlarrowtail = AnnLarrowtailU
 unicodeAnn Annrarrowtail = AnnrarrowtailU
 unicodeAnn AnnLarrowtail = AnnLarrowtailU
 unicodeAnn AnnRarrowtail = AnnRarrowtailU
-unicodeAnn AnnStar       = AnnStarU
 unicodeAnn ann           = ann
--- What about '*'?
 
 
 -- | Some template haskell tokens have two variants, one with an `e` the other

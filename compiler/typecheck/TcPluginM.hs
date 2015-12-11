@@ -43,6 +43,7 @@ module TcPluginM (
         newWanted,
         newDerived,
         newGiven,
+        newCoercionHole,
 
         -- * Manipulating evidence bindings
         newEvVar,
@@ -53,12 +54,11 @@ module TcPluginM (
     ) where
 
 #ifdef GHCI
-import qualified TcRnMonad
-import qualified TcSMonad
-import qualified TcEnv
-import qualified TcMType
-import qualified Inst
-import qualified FamInst
+import qualified TcRnMonad as TcM
+import qualified TcSMonad  as TcS
+import qualified TcEnv     as TcM
+import qualified TcMType   as TcM
+import qualified FamInst   as TcM
 import qualified IfaceEnv
 import qualified Finder
 
@@ -68,7 +68,8 @@ import TcRnMonad  ( TcGblEnv, TcLclEnv, Ct, CtLoc, TcPluginM
                   , liftIO, traceTc )
 import TcMType    ( TcTyVar, TcType )
 import TcEnv      ( TcTyThing )
-import TcEvidence ( TcCoercion, EvTerm, EvBind, EvBindsVar, mkGivenEvBind )
+import TcEvidence ( TcCoercion, CoercionHole
+                  , EvTerm, EvBind, EvBindsVar, mkGivenEvBind )
 import TcRnTypes  ( CtEvidence(..) )
 import Var        ( EvVar )
 
@@ -106,62 +107,61 @@ lookupOrig mod = unsafeTcPluginTcM . IfaceEnv.lookupOrig mod
 
 
 tcLookupGlobal :: Name -> TcPluginM TyThing
-tcLookupGlobal = unsafeTcPluginTcM . TcEnv.tcLookupGlobal
+tcLookupGlobal = unsafeTcPluginTcM . TcM.tcLookupGlobal
 
 tcLookupTyCon :: Name -> TcPluginM TyCon
-tcLookupTyCon = unsafeTcPluginTcM . TcEnv.tcLookupTyCon
+tcLookupTyCon = unsafeTcPluginTcM . TcM.tcLookupTyCon
 
 tcLookupDataCon :: Name -> TcPluginM DataCon
-tcLookupDataCon = unsafeTcPluginTcM . TcEnv.tcLookupDataCon
+tcLookupDataCon = unsafeTcPluginTcM . TcM.tcLookupDataCon
 
 tcLookupClass :: Name -> TcPluginM Class
-tcLookupClass = unsafeTcPluginTcM . TcEnv.tcLookupClass
+tcLookupClass = unsafeTcPluginTcM . TcM.tcLookupClass
 
 tcLookup :: Name -> TcPluginM TcTyThing
-tcLookup = unsafeTcPluginTcM . TcEnv.tcLookup
+tcLookup = unsafeTcPluginTcM . TcM.tcLookup
 
 tcLookupId :: Name -> TcPluginM Id
-tcLookupId = unsafeTcPluginTcM . TcEnv.tcLookupId
+tcLookupId = unsafeTcPluginTcM . TcM.tcLookupId
 
 
 getTopEnv :: TcPluginM HscEnv
-getTopEnv = unsafeTcPluginTcM TcRnMonad.getTopEnv
+getTopEnv = unsafeTcPluginTcM TcM.getTopEnv
 
 getEnvs :: TcPluginM (TcGblEnv, TcLclEnv)
-getEnvs = unsafeTcPluginTcM TcRnMonad.getEnvs
+getEnvs = unsafeTcPluginTcM TcM.getEnvs
 
 getInstEnvs :: TcPluginM InstEnvs
-getInstEnvs = unsafeTcPluginTcM Inst.tcGetInstEnvs
+getInstEnvs = unsafeTcPluginTcM TcM.tcGetInstEnvs
 
 getFamInstEnvs :: TcPluginM (FamInstEnv, FamInstEnv)
-getFamInstEnvs = unsafeTcPluginTcM FamInst.tcGetFamInstEnvs
+getFamInstEnvs = unsafeTcPluginTcM TcM.tcGetFamInstEnvs
 
-matchFam :: TyCon -> [Type] -> TcPluginM (Maybe (TcCoercion, TcType))
-matchFam tycon args = unsafeTcPluginTcM $ TcSMonad.matchFamTcM tycon args
-
+matchFam :: TyCon -> [Type]
+         -> TcPluginM (Maybe (TcCoercion, TcType))
+matchFam tycon args = unsafeTcPluginTcM $ TcS.matchFamTcM tycon args
 
 newUnique :: TcPluginM Unique
-newUnique = unsafeTcPluginTcM TcRnMonad.newUnique
+newUnique = unsafeTcPluginTcM TcM.newUnique
 
 newFlexiTyVar :: Kind -> TcPluginM TcTyVar
-newFlexiTyVar = unsafeTcPluginTcM . TcMType.newFlexiTyVar
+newFlexiTyVar = unsafeTcPluginTcM . TcM.newFlexiTyVar
 
 isTouchableTcPluginM :: TcTyVar -> TcPluginM Bool
-isTouchableTcPluginM = unsafeTcPluginTcM . TcRnMonad.isTouchableTcM
+isTouchableTcPluginM = unsafeTcPluginTcM . TcM.isTouchableTcM
 
 
 zonkTcType :: TcType -> TcPluginM TcType
-zonkTcType = unsafeTcPluginTcM . TcMType.zonkTcType
+zonkTcType = unsafeTcPluginTcM . TcM.zonkTcType
 
 zonkCt :: Ct -> TcPluginM Ct
-zonkCt = unsafeTcPluginTcM . TcMType.zonkCt
+zonkCt = unsafeTcPluginTcM . TcM.zonkCt
 
 
 -- | Create a new wanted constraint.
 newWanted  :: CtLoc -> PredType -> TcPluginM CtEvidence
-newWanted loc pty = do
-    new_ev <- newEvVar pty
-    return CtWanted { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc }
+newWanted loc pty
+  = unsafeTcPluginTcM (TcM.newWanted (TcM.ctLocOrigin loc) Nothing pty)
 
 -- | Create a new derived constraint.
 newDerived :: CtLoc -> PredType -> TcPluginM CtEvidence
@@ -178,14 +178,18 @@ newGiven loc pty evtm = do
 
 -- | Create a fresh evidence variable.
 newEvVar :: PredType -> TcPluginM EvVar
-newEvVar = unsafeTcPluginTcM . TcMType.newEvVar
+newEvVar = unsafeTcPluginTcM . TcM.newEvVar
+
+-- | Create a fresh coercion hole.
+newCoercionHole :: TcPluginM CoercionHole
+newCoercionHole = unsafeTcPluginTcM $ TcM.newCoercionHole
 
 -- | Bind an evidence variable.  This must not be invoked from
 -- 'tcPluginInit' or 'tcPluginStop', or it will panic.
 setEvBind :: EvBind -> TcPluginM ()
 setEvBind ev_bind = do
     tc_evbinds <- getEvBindsTcPluginM
-    unsafeTcPluginTcM $ TcMType.addTcEvBind tc_evbinds ev_bind
+    unsafeTcPluginTcM $ TcM.addTcEvBind tc_evbinds ev_bind
 
 -- | Access the 'EvBindsVar' carried by the 'TcPluginM' during
 -- constraint solving.  This must not be invoked from 'tcPluginInit'

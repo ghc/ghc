@@ -15,5 +15,5 @@ type instance T8953.F GHC.Types.Char = (T8953.G (T8953.T1 :: * ->
                                                              (* -> *) -> *)
                                                 GHC.Types.Bool :: (* -> *) -> *)
 type family T8953.G (a_0 :: k_1) :: k_1
-type instance T8953.G (T8953.T1 :: k_2 ->
-                                   k1_3 -> *) = (T8953.T2 :: k_2 -> k1_3 -> *)
+type instance T8953.G (T8953.T1 :: k1_2 ->
+                                   k2_3 -> *) = (T8953.T2 :: k1_2 -> k2_3 -> *)

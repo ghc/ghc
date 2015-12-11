@@ -131,8 +131,8 @@ ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
         -- an atomic value (e.g. function args)
 
 ppr_expr _       (Var name)    = ppr name
-ppr_expr add_par (Type ty)     = add_par (ptext (sLit "TYPE") <+> ppr ty)       -- Weird
-ppr_expr add_par (Coercion co) = add_par (ptext (sLit "CO") <+> ppr co)
+ppr_expr add_par (Type ty)     = add_par (ptext (sLit "TYPE:") <+> ppr ty)       -- Weird
+ppr_expr add_par (Coercion co) = add_par (ptext (sLit "CO:") <+> ppr co)
 ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
 
 ppr_expr add_par (Cast expr co)
@@ -183,7 +183,7 @@ ppr_expr add_par (Case expr var ty [(con,args,rhs)])
              ]
     else add_par $
          sep [sep [ptext (sLit "case") <+> pprCoreExpr expr,
-                   ifPprDebug (braces (ppr ty)),
+                   ifPprDebug (text "return" <+> ppr ty),
                    sep [ptext (sLit "of") <+> ppr_bndr var,
                         char '{' <+> ppr_case_pat con args <+> arrow]
                ],
@@ -197,7 +197,7 @@ ppr_expr add_par (Case expr var ty alts)
   = add_par $
     sep [sep [ptext (sLit "case")
                 <+> pprCoreExpr expr
-                <+> ifPprDebug (braces (ppr ty)),
+                <+> ifPprDebug (text "return" <+> ppr ty),
               ptext (sLit "of") <+> ppr_bndr var <+> char '{'],
          nest 2 (vcat (punctuate semi (map pprCoreAlt alts))),
          char '}'

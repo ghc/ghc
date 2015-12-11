@@ -49,7 +49,7 @@ import DynFlags
 import PrelNames
 import TyCon               ( tyConName )
 import ConLike
-import TypeRep             ( TyThing(..) )
+import Type                ( TyThing(..) )
 import Name
 import NameSet
 import RdrName
@@ -614,7 +614,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                     HsRecFieldCon {} -> arg_in_scope lbl
                                     _other           -> True ]
 
-           ; addUsedGREs (map thirdOf3 dot_dot_gres)
+           ; addUsedGREs (map thdOf3 dot_dot_gres)
            ; return [ L loc (HsRecField
                         { hsRecFieldLbl = L loc (FieldOcc arg_rdr sel)
                         , hsRecFieldArg = L loc (mk_arg loc arg_rdr)

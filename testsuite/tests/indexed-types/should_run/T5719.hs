@@ -1,7 +1,7 @@
 {-# LANGUAGE ConstraintKinds, TypeFamilies, FlexibleInstances #-}
 module Main where
 
-import GHC.Prim (Constraint)
+import GHC.Exts (Constraint)
 
 import Prelude hiding (Functor, fmap)
 

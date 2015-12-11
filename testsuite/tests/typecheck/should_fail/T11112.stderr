@@ -1,5 +1,5 @@
 
 T11112.hs:3:9: error:
-    • Constraint ‘Ord s’ used as a type
+    • Expected a type, but ‘Ord s’ has kind ‘Constraint’
     • In the type signature:
         sort :: Ord s -> [s] -> [s]

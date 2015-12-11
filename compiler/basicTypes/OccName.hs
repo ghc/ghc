@@ -56,7 +56,6 @@ module OccName (
         mkDataConWrapperOcc, mkWorkerOcc,
         mkMatcherOcc, mkBuilderOcc,
         mkDefaultMethodOcc,
-        mkGenDefMethodOcc,
         mkDerivedTyConOcc, mkNewTyCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
         mkClassDataConOcc, mkDictOcc, mkIPOcc,
@@ -94,6 +93,7 @@ module OccName (
         extendOccSetList,
         unionOccSets, unionManyOccSets, minusOccSet, elemOccSet, occSetElts,
         foldOccSet, isEmptyOccSet, intersectOccSet, intersectsOccSet,
+        filterOccSet,
 
         -- * Tidying up
         TidyOccEnv, emptyTidyOccEnv, tidyOccName, initTidyOccEnv,
@@ -449,6 +449,7 @@ foldOccSet        :: (OccName -> b -> b) -> b -> OccSet -> b
 isEmptyOccSet     :: OccSet -> Bool
 intersectOccSet   :: OccSet -> OccSet -> OccSet
 intersectsOccSet  :: OccSet -> OccSet -> Bool
+filterOccSet      :: (OccName -> Bool) -> OccSet -> OccSet
 
 emptyOccSet       = emptyUniqSet
 unitOccSet        = unitUniqSet
@@ -464,6 +465,7 @@ foldOccSet        = foldUniqSet
 isEmptyOccSet     = isEmptyUniqSet
 intersectOccSet   = intersectUniqSets
 intersectsOccSet s1 s2 = not (isEmptyOccSet (s1 `intersectOccSet` s2))
+filterOccSet      = filterUniqSet
 
 {-
 ************************************************************************
@@ -582,7 +584,7 @@ isDerivedOccName occ =
 mkDataConWrapperOcc, mkWorkerOcc,
         mkMatcherOcc, mkBuilderOcc,
         mkDefaultMethodOcc,
-        mkGenDefMethodOcc, mkDerivedTyConOcc, mkClassDataConOcc, mkDictOcc,
+        mkDerivedTyConOcc, mkClassDataConOcc, mkDictOcc,
         mkIPOcc, mkSpecOcc, mkForeignExportOcc, mkRepEqOcc,
         mkGenR, mkGen1R, mkGenRCo,
         mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,
@@ -597,7 +599,6 @@ mkWorkerOcc         = mk_simple_deriv varName  "$w"
 mkMatcherOcc        = mk_simple_deriv varName  "$m"
 mkBuilderOcc        = mk_simple_deriv varName  "$b"
 mkDefaultMethodOcc  = mk_simple_deriv varName  "$dm"
-mkGenDefMethodOcc   = mk_simple_deriv varName  "$gdm"
 mkClassOpAuxOcc     = mk_simple_deriv varName  "$c"
 mkDerivedTyConOcc   = mk_simple_deriv tcName   ":"      -- The : prefix makes sure it classifies as a tycon/datacon
 mkClassDataConOcc   = mk_simple_deriv dataName "D:"     -- We go straight to the "real" data con

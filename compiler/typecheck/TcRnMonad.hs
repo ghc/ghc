@@ -452,7 +452,7 @@ newName occ
        ; loc  <- getSrcSpanM
        ; return (mkInternalName uniq occ loc) }
 
-newSysName :: OccName -> TcM Name
+newSysName :: OccName -> TcRnIf gbl lcl Name
 newSysName occ
   = do { uniq <- newUnique
        ; return (mkSystemName uniq occ) }
@@ -460,12 +460,12 @@ newSysName occ
 newSysLocalId :: FastString -> TcType -> TcRnIf gbl lcl TcId
 newSysLocalId fs ty
   = do  { u <- newUnique
-        ; return (mkSysLocal fs u ty) }
+        ; return (mkSysLocalOrCoVar fs u ty) }
 
 newSysLocalIds :: FastString -> [TcType] -> TcRnIf gbl lcl [TcId]
 newSysLocalIds fs tys
   = do  { us <- newUniqueSupply
-        ; return (zipWith (mkSysLocal fs) (uniqsFromSupply us) tys) }
+        ; return (zipWith (mkSysLocalOrCoVar fs) (uniqsFromSupply us) tys) }
 
 instance MonadUnique (IOEnv (Env gbl lcl)) where
         getUniqueM = newUnique
@@ -686,7 +686,7 @@ getErrsVar = do { env <- getLclEnv; return (tcl_errs env) }
 setErrsVar :: TcRef Messages -> TcRn a -> TcRn a
 setErrsVar v = updLclEnv (\ env -> env { tcl_errs =  v })
 
-addErr :: MsgDoc -> TcRn ()    -- Ignores the context stack
+addErr :: MsgDoc -> TcRn ()
 addErr msg = do { loc <- getSrcSpanM; addErrAt loc msg }
 
 failWith :: MsgDoc -> TcRn a
@@ -985,12 +985,13 @@ updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) ->
 popErrCtxt :: TcM a -> TcM a
 popErrCtxt = updCtxt (\ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
 
-getCtLocM :: CtOrigin -> TcM CtLoc
-getCtLocM origin
+getCtLocM :: CtOrigin -> Maybe TypeOrKind -> TcM CtLoc
+getCtLocM origin t_or_k
   = do { env <- getLclEnv
        ; return (CtLoc { ctl_origin = origin
-                       , ctl_env = env
-                       , ctl_depth = initialSubGoalDepth }) }
+                       , ctl_env    = env
+                       , ctl_t_or_k = t_or_k
+                       , ctl_depth  = initialSubGoalDepth }) }
 
 setCtLocM :: CtLoc -> TcM a -> TcM a
 -- Set the SrcSpan and error context from the CtLoc
@@ -1047,15 +1048,30 @@ checkTc :: Bool -> MsgDoc -> TcM ()         -- Check that the boolean is true
 checkTc True  _   = return ()
 checkTc False err = failWithTc err
 
+checkTcM :: Bool -> (TidyEnv, MsgDoc) -> TcM ()
+checkTcM True  _   = return ()
+checkTcM False err = failWithTcM err
+
 failIfTc :: Bool -> MsgDoc -> TcM ()         -- Check that the boolean is false
 failIfTc False _   = return ()
 failIfTc True  err = failWithTc err
+
+failIfTcM :: Bool -> (TidyEnv, MsgDoc) -> TcM ()
+   -- Check that the boolean is false
+failIfTcM False _   = return ()
+failIfTcM True  err = failWithTcM err
+
 
 --         Warnings have no 'M' variant, nor failure
 
 warnTc :: Bool -> MsgDoc -> TcM ()
 warnTc warn_if_true warn_msg
   | warn_if_true = addWarnTc warn_msg
+  | otherwise    = return ()
+
+warnTcM :: Bool -> (TidyEnv, MsgDoc) -> TcM ()
+warnTcM warn_if_true warn_msg
+  | warn_if_true = addWarnTcM warn_msg
   | otherwise    = return ()
 
 addWarnTc :: MsgDoc -> TcM ()
@@ -1091,6 +1107,15 @@ tcInitTidyEnv :: TcM TidyEnv
 tcInitTidyEnv
   = do  { lcl_env <- getLclEnv
         ; return (tcl_tidy lcl_env) }
+
+-- | Get a 'TidyEnv' that includes mappings for all vars free in the given
+-- type. Useful when tidying open types.
+tcInitOpenTidyEnv :: TyCoVarSet -> TcM TidyEnv
+tcInitOpenTidyEnv tvs
+  = do { env1 <- tcInitTidyEnv
+       ; let env2 = tidyFreeTyCoVars env1 tvs
+       ; return env2 }
+
 
 {-
 -----------------------------------
@@ -1144,12 +1169,14 @@ debugTc thing
 newTcEvBinds :: TcM EvBindsVar
 newTcEvBinds = do { ref <- newTcRef emptyEvBindMap
                   ; uniq <- newUnique
+                  ; traceTc "newTcEvBinds" (text "unique =" <+> ppr uniq)
                   ; return (EvBindsVar ref uniq) }
 
 addTcEvBind :: EvBindsVar -> EvBind -> TcM ()
 -- Add a binding to the TcEvBinds by side effect
-addTcEvBind (EvBindsVar ev_ref _) ev_bind
-  = do { traceTc "addTcEvBind" $ ppr ev_bind
+addTcEvBind (EvBindsVar ev_ref u) ev_bind
+  = do { traceTc "addTcEvBind" $ ppr u $$
+                                 ppr ev_bind
        ; bnds <- readTcRef ev_ref
        ; writeTcRef ev_ref (extendEvBinds bnds ev_bind) }
 
@@ -1157,6 +1184,10 @@ getTcEvBinds :: EvBindsVar -> TcM (Bag EvBind)
 getTcEvBinds (EvBindsVar ev_ref _)
   = do { bnds <- readTcRef ev_ref
        ; return (evBindMapBinds bnds) }
+
+getTcEvBindsMap :: EvBindsVar -> TcM EvBindMap
+getTcEvBindsMap (EvBindsVar ev_ref _)
+  = readTcRef ev_ref
 
 chooseUniqueOccTc :: (OccSet -> OccName) -> TcM OccName
 chooseUniqueOccTc fn =
@@ -1205,6 +1236,10 @@ emitInsoluble ct
          updTcRef lie_var (`addInsols` unitBag ct) ;
          v <- readTcRef lie_var ;
          traceTc "emitInsoluble" (ppr v) }
+
+-- | Throw out any constraints emitted by the thing_inside
+discardConstraints :: TcM a -> TcM a
+discardConstraints thing_inside = fst <$> captureConstraints thing_inside
 
 captureConstraints :: TcM a -> TcM (a, WantedConstraints)
 -- (captureConstraints m) runs m, and returns the type constraints it generates
@@ -1271,7 +1306,7 @@ traceTcConstraints msg
 
 emitWildCardHoleConstraints :: [(Name, TcTyVar)] -> TcM ()
 emitWildCardHoleConstraints wcs
-  = do { ctLoc <- getCtLocM HoleOrigin
+  = do { ctLoc <- getCtLocM HoleOrigin Nothing
        ; forM_ wcs $ \(name, tv) -> do {
        ; let real_span = case nameSrcSpan name of
                            RealSrcSpan span  -> span
@@ -1280,7 +1315,8 @@ emitWildCardHoleConstraints wcs
                -- Wildcards are defined locally, and so have RealSrcSpans
              ctLoc' = setCtLocSpan ctLoc real_span
              ty     = mkTyVarTy tv
-             can    = CHoleCan { cc_ev   = CtDerived { ctev_pred = ty, ctev_loc = ctLoc' }
+             can    = CHoleCan { cc_ev   = CtDerived { ctev_pred = ty
+                                                     , ctev_loc  = ctLoc' }
                                , cc_occ  = occName name
                                , cc_hole = TypeHole }
        ; emitInsoluble can } }

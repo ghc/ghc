@@ -1,4 +1,4 @@
-module Vectorise.Monad.Local 
+module Vectorise.Monad.Local
   ( readLEnv
   , setLEnv
   , updLEnv
@@ -12,7 +12,7 @@ module Vectorise.Monad.Local
   , localTyVars
   )
 where
-  
+
 import Vectorise.Monad.Base
 import Vectorise.Env
 
@@ -43,8 +43,8 @@ updLEnv f  = VM $ \_ genv lenv -> return (Yes genv (f lenv) ())
 -- This does not alter the environment of the current state.
 --
 localV :: VM a -> VM a
-localV p 
-  = do  
+localV p
+  = do
     { env <- readLEnv id
     ; x   <- p
     ; setLEnv env
@@ -54,7 +54,7 @@ localV p
 -- |Perform a computation in an empty local environment.
 --
 closedV :: VM a -> VM a
-closedV p 
+closedV p
   = do
     { env <- readLEnv id
     ; setLEnv (emptyLocalEnv { local_bind_name = local_bind_name env })
@@ -68,7 +68,7 @@ closedV p
 getBindName :: VM FastString
 getBindName = readLEnv local_bind_name
 
--- |Run a vectorisation computation in a local environment, 
+-- |Run a vectorisation computation in a local environment,
 -- with this id set as the current binding.
 --
 inBind :: Id -> VM a -> VM a
@@ -77,13 +77,11 @@ inBind id p
        p
 
 -- |Lookup a PA tyvars from the local environment.
---
 lookupTyVarPA :: Var -> VM (Maybe CoreExpr)
-lookupTyVarPA tv 
-  = readLEnv $ \env -> lookupVarEnv (local_tyvar_pa env) tv
+lookupTyVarPA tv
+   = readLEnv $ \env -> lookupVarEnv (local_tyvar_pa env) tv
 
 -- |Add a tyvar to the local environment.
---
 defLocalTyVar :: TyVar -> VM ()
 defLocalTyVar tv = updLEnv $ \env ->
   env { local_tyvars   = tv : local_tyvars env
@@ -91,7 +89,6 @@ defLocalTyVar tv = updLEnv $ \env ->
       }
 
 -- |Add mapping between a tyvar and pa dictionary to the local environment.
---
 defLocalTyVarWithPA :: TyVar -> CoreExpr -> VM ()
 defLocalTyVarWithPA tv pa = updLEnv $ \env ->
   env { local_tyvars   = tv : local_tyvars env
@@ -99,6 +96,5 @@ defLocalTyVarWithPA tv pa = updLEnv $ \env ->
       }
 
 -- |Get the set of tyvars from the local environment.
---
 localTyVars :: VM [TyVar]
 localTyVars = readLEnv (reverse . local_tyvars)

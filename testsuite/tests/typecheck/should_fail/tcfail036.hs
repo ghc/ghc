@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleInstances #-}
+
 -- !!! prelude class name in an instance-tycon position
 --
 module ShouldFail where

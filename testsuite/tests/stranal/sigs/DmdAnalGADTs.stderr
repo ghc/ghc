@@ -1,5 +1,7 @@
 
 ==================== Strictness signatures ====================
+DmdAnalGADTs.$tc'A: m
+DmdAnalGADTs.$tc'B: m
 DmdAnalGADTs.$tcD: m
 DmdAnalGADTs.$trModule: m
 DmdAnalGADTs.diverges: b

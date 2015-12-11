@@ -20,7 +20,6 @@ import Literal          ( literalType )
 import Maybes
 import Name             ( getSrcLoc )
 import ErrUtils         ( MsgDoc, Severity(..), mkLocMessage )
-import TypeRep
 import Type
 import TyCon
 import Util

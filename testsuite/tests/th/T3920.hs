@@ -9,7 +9,7 @@ $(return [])
 
 test :: String
 test = $(do
-	test <- [d| 
+	test <- [d|
 		type family T :: (* -> (* -> * -> *)) -> (* -> *) -> * |]
         blah <- reify ''S
 	return (LitE (StringL (pprint test ++ "\n" ++ pprint blah))))

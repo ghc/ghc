@@ -332,6 +332,8 @@ data GeneralFlag
 
    | Opt_PrintExplicitForalls
    | Opt_PrintExplicitKinds
+   | Opt_PrintExplicitCoercions
+   | Opt_PrintEqualityRelations
    | Opt_PrintUnicodeSyntax
    | Opt_PrintExpandedSynonyms
    | Opt_PrintPotentialInstances
@@ -662,6 +664,7 @@ data ExtensionFlag
    | Opt_StaticPointers
    | Opt_Strict
    | Opt_StrictData
+   | Opt_TypeInType
    | Opt_MonadFailDesugaring
    deriving (Eq, Enum, Show)
 
@@ -3027,6 +3030,8 @@ fFlags = [
   flagGhciSpec "print-evld-with-show"         Opt_PrintEvldWithShow,
   flagSpec "print-explicit-foralls"           Opt_PrintExplicitForalls,
   flagSpec "print-explicit-kinds"             Opt_PrintExplicitKinds,
+  flagSpec "print-explicit-coercions"         Opt_PrintExplicitCoercions,
+  flagSpec "print-equality-relations"         Opt_PrintEqualityRelations,
   flagSpec "print-unicode-syntax"             Opt_PrintUnicodeSyntax,
   flagSpec "print-expanded-synonyms"          Opt_PrintExpandedSynonyms,
   flagSpec "print-potential-instances"        Opt_PrintPotentialInstances,
@@ -3253,6 +3258,7 @@ xFlags = [
   flagSpec "TraditionalRecordSyntax"          Opt_TraditionalRecordSyntax,
   flagSpec "TransformListComp"                Opt_TransformListComp,
   flagSpec "TupleSections"                    Opt_TupleSections,
+  flagSpec "TypeInType"                       Opt_TypeInType,
   flagSpec "TypeFamilies"                     Opt_TypeFamilies,
   flagSpec "TypeOperators"                    Opt_TypeOperators,
   flagSpec "TypeSynonymInstances"             Opt_TypeSynonymInstances,
@@ -3336,6 +3342,9 @@ impliedXFlags
 
     , (Opt_TypeFamilies,     turnOn, Opt_KindSignatures)  -- Type families use kind signatures
     , (Opt_PolyKinds,        turnOn, Opt_KindSignatures)  -- Ditto polymorphic kinds
+    , (Opt_TypeInType,       turnOn, Opt_DataKinds)
+    , (Opt_TypeInType,       turnOn, Opt_PolyKinds)
+    , (Opt_TypeInType,       turnOn, Opt_KindSignatures)
 
     -- AutoDeriveTypeable is not very useful without DeriveDataTypeable
     , (Opt_AutoDeriveTypeable, turnOn, Opt_DeriveDataTypeable)

@@ -43,6 +43,7 @@ import PrelNames
 import BasicTypes hiding (SuccessFlag(..))
 import DynFlags
 import SrcLoc
+import VarSet
 import Util
 import Outputable
 import FastString
@@ -159,7 +160,7 @@ tcPatBndr (PE { pe_ctxt = LetPat lookup_sig no_gen}) bndr_name pat_ty
   , Just poly_id <- completeIdSigPolyId_maybe sig
   = do { bndr_id <- addInlinePrags poly_id (lookupPragEnv prags bndr_name)
        ; traceTc "tcPatBndr(gbl,sig)" (ppr bndr_id $$ ppr (idType bndr_id))
-       ; co <- unifyPatType (idType bndr_id) pat_ty
+       ; co <- unifyPatType bndr_id (idType bndr_id) pat_ty
        ; return (co, bndr_id) }
 
   | otherwise
@@ -344,7 +345,7 @@ tc_pat penv lpat@(LazyPat pat) pat_ty thing_inside
 
         -- Check that the expected pattern type is itself lifted
         ; pat_ty' <- newFlexiTyVarTy liftedTypeKind
-        ; _ <- unifyType pat_ty pat_ty'
+        ; _ <- unifyType noThing pat_ty pat_ty'
 
         ; return (LazyPat pat', res) }
 
@@ -381,7 +382,7 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
          -- we will only be able to use view at one instantation in the
          -- rest of the view
         ; (expr_co, pat_ty) <- tcInfer $ \ pat_ty ->
-                unifyType expr'_inferred (mkFunTy overall_pat_ty pat_ty)
+                unifyType (Just expr) expr'_inferred (mkFunTy overall_pat_ty pat_ty)
 
          -- pattern must have pat_ty
         ; (pat', res) <- tc_lpat pat pat_ty penv thing_inside
@@ -393,7 +394,8 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
 tc_pat penv (SigPatIn pat sig_ty) pat_ty thing_inside
   = do  { (inner_ty, tv_binds, wcs, wrap) <- tcPatSig (inPatBind penv)
                                                             sig_ty pat_ty
-        ; (pat', res) <- tcExtendTyVarEnv2 (wcs ++ tv_binds) $
+        ; (pat', res) <- tcExtendTyVarEnv2 wcs      $
+                         tcExtendTyVarEnv  tv_binds $
                          tc_lpat pat inner_ty penv thing_inside
         ; return (mkHsWrapPat wrap (SigPatOut pat' inner_ty) pat_ty, res) }
 
@@ -423,9 +425,14 @@ tc_pat penv (PArrPat pats _) pat_ty thing_inside
         }
 
 tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
-  = do  { let tc = tupleTyCon boxity (length pats)
+  = do  { let arity = length pats
+              tc = tupleTyCon boxity arity
         ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConAppR tc) pat_ty
-        ; (pats', res) <- tc_lpats penv pats arg_tys thing_inside
+                     -- Unboxed tuples have levity vars, which we discard:
+                     -- See Note [Unboxed tuple levity vars] in TyCon
+        ; let con_arg_tys = case boxity of Unboxed -> drop arity arg_tys
+                                           Boxed   -> arg_tys
+        ; (pats', res) <- tc_lpats penv pats con_arg_tys thing_inside
 
         ; dflags <- getDynFlags
 
@@ -434,14 +441,14 @@ tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
         -- This is a pretty odd place to make the switch, but
         -- it was easy to do.
         ; let
-              unmangled_result = TuplePat pats' boxity arg_tys
+              unmangled_result = TuplePat pats' boxity con_arg_tys
                                  -- pat_ty /= pat_ty iff coi /= IdCo
               possibly_mangled_result
                 | gopt Opt_IrrefutableTuples dflags &&
                   isBoxed boxity            = LazyPat (noLoc unmangled_result)
                 | otherwise                 = unmangled_result
 
-        ; ASSERT( length arg_tys == length pats )      -- Syntactically enforced
+        ; ASSERT( length con_arg_tys == length pats ) -- Syntactically enforced
           return (mkHsWrapPat coi possibly_mangled_result pat_ty, res)
         }
 
@@ -454,7 +461,7 @@ tc_pat penv (ConPatIn con arg_pats) pat_ty thing_inside
 -- Literal patterns
 tc_pat _ (LitPat simple_lit) pat_ty thing_inside
   = do  { let lit_ty = hsLitType simple_lit
-        ; co <- unifyPatType lit_ty pat_ty
+        ; co <- unifyPatType simple_lit lit_ty pat_ty
                 -- coi is of kind: pat_ty ~ lit_ty
         ; res <- thing_inside
         ; return ( mkHsWrapPatCo co (LitPat simple_lit) pat_ty
@@ -497,13 +504,13 @@ tc_pat penv (NPlusKPat (L nm_loc name) (L loc lit) ge minus) pat_ty thing_inside
 tc_pat _ _other_pat _ _ = panic "tc_pat"        -- ConPatOut, SigPatOut
 
 ----------------
-unifyPatType :: TcType -> TcType -> TcM TcCoercion
+unifyPatType :: Outputable a => a -> TcType -> TcType -> TcM TcCoercion
 -- In patterns we want a coercion from the
 -- context type (expected) to the actual pattern type
 -- But we don't want to reverse the args to unifyType because
 -- that controls the actual/expected stuff in error messages
-unifyPatType actual_ty expected_ty
-  = do { coi <- unifyType actual_ty expected_ty
+unifyPatType thing actual_ty expected_ty
+  = do { coi <- unifyType (Just thing) actual_ty expected_ty
        ; return (mkTcSymCo coi) }
 
 {-
@@ -627,9 +634,10 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty arg_pats thing_inside
           -- Add the stupid theta
         ; setSrcSpan con_span $ addDataConStupidTheta data_con ctxt_res_tys
 
-        ; checkExistentials ex_tvs penv
+        ; let all_arg_tys = eqSpecPreds eq_spec ++ theta ++ arg_tys
+        ; checkExistentials ex_tvs all_arg_tys penv
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX
-                               (zipTopTvSubst univ_tvs ctxt_res_tys) ex_tvs
+                               (zipTopTCvSubst univ_tvs ctxt_res_tys) ex_tvs
                      -- Get location from monad, not from ex_tvs
 
         ; let -- pat_ty' = mkTyConApp tycon ctxt_res_tys
@@ -638,8 +646,10 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty arg_pats thing_inside
 
               arg_tys' = substTys tenv arg_tys
 
-        ; traceTc "tcConPat" (vcat [ ppr con_name, ppr univ_tvs, ppr ex_tvs, ppr eq_spec
-                                   , ppr ex_tvs', ppr ctxt_res_tys, ppr arg_tys' ])
+        ; traceTc "tcConPat" (vcat [ ppr con_name, ppr univ_tvs, ppr ex_tvs
+                                   , ppr eq_spec
+                                   , ppr ex_tvs', ppr ctxt_res_tys, ppr arg_tys'
+                                   , ppr arg_pats ])
         ; if null ex_tvs && null eq_spec && null theta
           then do { -- The common case; no class bindings etc
                     -- (see Note [Arrows and patterns])
@@ -656,10 +666,10 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty arg_pats thing_inside
 
           else do   -- The general case, with existential,
                     -- and local equality constraints
-        { let theta'   = substTheta tenv (eqSpecPreds eq_spec ++ theta)
+        { let theta'     = substTheta tenv (eqSpecPreds eq_spec ++ theta)
                            -- order is *important* as we generate the list of
                            -- dictionary binders from theta'
-              no_equalities = not (any isEqPred theta')
+              no_equalities = not (any isNomEqPred theta')
               skol_info = case pe_ctxt penv of
                             LamPat mc -> PatSkol (RealDataCon data_con) mc
                             LetPat {} -> UnkSkol -- Doesn't matter
@@ -697,14 +707,15 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
 
         ; (subst, univ_tvs') <- tcInstTyVars univ_tvs
 
-        ; checkExistentials ex_tvs penv
+        ; let all_arg_tys = ty : prov_theta ++ arg_tys
+        ; checkExistentials ex_tvs all_arg_tys penv
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX subst ex_tvs
         ; let ty'         = substTy tenv ty
               arg_tys'    = substTys tenv arg_tys
               prov_theta' = substTheta tenv prov_theta
               req_theta'  = substTheta tenv req_theta
 
-        ; wrap <- mkWpCastN <$> unifyType ty' pat_ty
+        ; wrap <- mkWpCastN <$> unifyType noThing ty' pat_ty
         ; traceTc "tcPatSynPat" (ppr pat_syn $$
                                  ppr pat_ty $$
                                  ppr ty' $$
@@ -794,11 +805,11 @@ matchExpectedConTy data_tc pat_ty
        ; traceTc "matchExpectedConTy" (vcat [ppr data_tc,
                                              ppr (tyConTyVars data_tc),
                                              ppr fam_tc, ppr fam_args])
-       ; co1 <- unifyType (mkTyConApp fam_tc (substTys subst fam_args)) pat_ty
+       ; co1 <- unifyType noThing (mkTyConApp fam_tc (substTys subst fam_args)) pat_ty
              -- co1 : T (ty1,ty2) ~N pat_ty
 
        ; let tys' = mkTyVarTys tvs'
-             co2 = mkTcUnbranchedAxInstCo co_tc tys'
+             co2 = mkTcUnbranchedAxInstCo co_tc tys' []
              -- co2 : T (ty1,ty2) ~R T7 ty1 ty2
 
        ; return (mkTcSymCo co2 `mkTcTransCo` mkTcSubCo co1, tys') }
@@ -910,7 +921,7 @@ addDataConStupidTheta data_con inst_tys
         -- The origin should always report "occurrence of C"
         -- even when C occurs in a pattern
     stupid_theta = dataConStupidTheta data_con
-    tenv = mkTopTvSubst (dataConUnivTyVars data_con `zip` inst_tys)
+    tenv = mkTopTCvSubst (dataConUnivTyVars data_con `zip` inst_tys)
          -- NB: inst_tys can be longer than the univ tyvars
          --     because the constructor might have existentials
     inst_theta = substTheta tenv stupid_theta
@@ -1022,13 +1033,16 @@ maybeWrapPatCtxt pat tcm thing_inside
    msg = hang (ptext (sLit "In the pattern:")) 2 (ppr pat)
 
 -----------------------------------------------
-checkExistentials :: [TyVar] -> PatEnv -> TcM ()
+checkExistentials :: [TyVar]   -- existentials
+                  -> [Type]    -- argument types
+                  -> PatEnv -> TcM ()
           -- See Note [Arrows and patterns]
-checkExistentials [] _                                 = return ()
-checkExistentials _ (PE { pe_ctxt = LetPat {}})        = failWithTc existentialLetPat
-checkExistentials _ (PE { pe_ctxt = LamPat ProcExpr }) = failWithTc existentialProcPat
-checkExistentials _ (PE { pe_lazy = True })            = failWithTc existentialLazyPat
-checkExistentials _ _                                  = return ()
+checkExistentials ex_tvs tys _
+  | all (not . (`elemVarSet` tyCoVarsOfTypes tys)) ex_tvs = return ()
+checkExistentials _ _ (PE { pe_ctxt = LetPat {}})         = failWithTc existentialLetPat
+checkExistentials _ _ (PE { pe_ctxt = LamPat ProcExpr })  = failWithTc existentialProcPat
+checkExistentials _ _ (PE { pe_lazy = True })             = failWithTc existentialLazyPat
+checkExistentials _ _ _                                   = return ()
 
 existentialLazyPat :: SDoc
 existentialLazyPat

@@ -413,6 +413,10 @@ isBoxed :: Boxity -> Bool
 isBoxed Boxed   = True
 isBoxed Unboxed = False
 
+instance Outputable Boxity where
+  ppr Boxed   = text "Boxed"
+  ppr Unboxed = text "Unboxed"
+
 {-
 ************************************************************************
 *                                                                      *

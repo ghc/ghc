@@ -33,7 +33,7 @@ binSpillReasons reasons
 
 
 -- | Count reg-reg moves remaining in this code.
-countRegRegMovesNat 
+countRegRegMovesNat
         :: Instruction instr
         => NatCmmDecl statics instr -> Int
 
@@ -54,8 +54,8 @@ countRegRegMovesNat cmm
 
 
 -- | Pretty print some RegAllocStats
-pprStats 
-        :: Instruction instr 
+pprStats
+        :: Instruction instr
         => [NatCmmDecl statics instr] -> [RegAllocStats] -> SDoc
 
 pprStats code statss

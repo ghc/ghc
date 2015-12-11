@@ -294,7 +294,7 @@ test('T3064',
             # 2014-12-01: 162457940 (Windows)
             # 2014-12-22: 122836340 (Windows) Death to silent superclasses
 
-           (wordsize(64), 264952256, 5)]),
+           (wordsize(64), 304344936, 5)]),
             # (amd64/Linux) (28/06/2011):  73259544
             # (amd64/Linux) (07/02/2013): 224798696
             # (amd64/Linux) (02/08/2013): 236404384, increase from roles
@@ -313,6 +313,8 @@ test('T3064',
             #                                        much less code for Monad instances
             # (amd64/Linux) (01/12/2015): 264952256, Regression due to Simon's wildcard refactor
             #                                        Tracked as #11151.
+	    # (amd64/Linux) (11/12/2015): 304344936, Regression due to TypeInType
+	    #                                        Tracked as #11196
 
 ###################################
 # deactivated for now, as this metric became too volatile recently
@@ -362,7 +364,7 @@ test('T5030',
            #                        of family-applications leads to less sharing, I think
            # 2015-07-11:  201882912 reason unknown
 
-           (wordsize(64), 403932600, 10)]),
+           (wordsize(64), 653710960, 10)]),
              # Previously 530000000 (+/- 10%)
              # 17/1/13:   602993184  (x86_64/Linux)
              #            (new demand analyser)
@@ -379,6 +381,7 @@ test('T5030',
              # 2014-12-10 449042120  constraint solver got worse again; more aggressive solving
              #                          of family-applications leads to less sharing, I think
              # 2015-03-17 403932600  tweak to solver algorithm
+	     # 2015-12-11 653710960  TypeInType (see #11196)
 
        only_ways(['normal'])
       ],
@@ -391,13 +394,14 @@ test('T5631',
         # expected value: 392904228 (x86/Linux)
         # 2014-04-04:     346389856 (x86 Windows, 64 bit machine)
         # 2014-12-01:     390199244 (Windows laptop)
-           (wordsize(64), 812288344, 5)]),
+           (wordsize(64), 1128828928, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
         # expected value: 690742040 (amd64/Linux) Call Arity improvements
         # 2014-09-09:     739704712 (amd64/Linux) AMP changes
         # 2014-11-04:     776121120 (amd64/Linux) new-flatten-skolems
         # 2015-06-01:     812288344 (amd64/Linux) unknown cause
+	# 2015-12-11:     1128828928 (amd64/Linux) TypeInType (see #11196)
        only_ways(['normal'])
       ],
      compile,
@@ -465,7 +469,7 @@ test('T5321Fun',
              #  (increase due to new codegen)
              # 2014-09-03: 299656164     (specialisation and inlining)
              # 10/12/2014: 206406188     #  Improvements in constraint solver
-            (wordsize(64), 509921312, 10)])
+            (wordsize(64), 565883176, 10)])
              # prev:       585521080
              # 29/08/2012: 713385808     #  (increase due to new codegen)
              # 15/05/2013: 628341952     #  (reason for decrease unknown)
@@ -478,6 +482,7 @@ test('T5321Fun',
              # 10/08/2015: 509921312
              #  (undefined now takes an implicit parameter and GHC -O0 does
              #  not recognize that the application is bottom)
+	     # 11/12/2015: 565883176     #  TypeInType (see #11196)
       ],
       compile,[''])
 
@@ -548,7 +553,7 @@ test('T5837',
              # 2014-12-01: 135914136 (Windows laptop, regression see below)
              # 2014-12-08  115905208  Constraint solver perf improvements (esp kick-out)
 
-           (wordsize(64), 38834096, 10)])
+           (wordsize(64), 43877520, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -564,6 +569,7 @@ test('T5837',
              #                           some optimization
              # 2015-03-17 53424304  Mac  Better depth checking; fails earlier
              # 2015-06-09 38834096  Better "improvement"; I'm not sure whey it improves things
+	     # 2015-12-11 43877520  amd64/Linux, TypeInType (see #11196)
       ],
       compile_fail,['-freduction-depth=50'])
 
@@ -608,18 +614,19 @@ test('T9020',
 test('T9675',
      [ only_ways(['optasm']),
        compiler_stats_num_field('max_bytes_used', # Note [residency]
-          [(wordsize(64), 23776640, 15),
+          [(wordsize(64), 30837312, 15),
           # 2014-10-13    29596552
           # 2014-10-13    26570896   seq the DmdEnv in seqDmdType as well
           # 2014-10-13    18582472   different machines giving different results..
           # 2014-10-13    22220552   use the mean
           # 2015-06-21    28056344   switch to `+RTS -G1`, tighten bound to 15%
           # 2015-10-28    23776640   emit Typeable at definition site
+	  # 2015-12-11    30837312   TypeInType (see #11196)
            (wordsize(32), 15341228, 15)
  	  # 2015-07-11    15341228   (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
        compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
-          [(wordsize(64), 88, 15),
+          [(wordsize(64), 113, 15),
           # 2014-10-13    66
           # 2014-10-13    58         seq the DmdEnv in seqDmdType as well
           # 2014-10-13    49         different machines giving different results...
@@ -627,6 +634,7 @@ test('T9675',
           # 2015-06-15    44         reduced for some reason
           # 2015-06-21    105        switch to `+RTS -G1`
           # 2015-12-04    88         new pattern checker (D1535)
+	  # 2015-12-11    113        TypeInType (see #11196)
             (wordsize(32), 56, 15)
  	  # 2015-07-11    56         (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
@@ -647,10 +655,11 @@ test('T9675',
 test('T9872a',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 2680733672, 5),
+          [(wordsize(64), 3581500440, 5),
           # 2014-12-10    5521332656    Initally created
           # 2014-12-16    5848657456    Flattener parameterized over roles
           # 2014-12-18    2680733672    Reduce type families even more eagerly
+	  # 2015-12-11    3581500440    TypeInType (see #11196)
            (wordsize(32), 1325592896, 5)
           ]),
       ],
@@ -660,10 +669,11 @@ test('T9872a',
 test('T9872b',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 3480212048, 5),
+          [(wordsize(64), 5199926080, 5),
           # 2014-12-10    6483306280    Initally created
           # 2014-12-16    6892251912    Flattener parameterized over roles
           # 2014-12-18    3480212048    Reduce type families even more eagerly
+	  # 2015-12-11    5199926080    TypeInType (see #11196)
            (wordsize(32), 1700000000, 5)
           ]),
       ],
@@ -672,10 +682,11 @@ test('T9872b',
 test('T9872c',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 2963554096, 5),
+          [(wordsize(64), 4723613784, 5),
           # 2014-12-10    5495850096    Initally created
           # 2014-12-16    5842024784    Flattener parameterized over roles
           # 2014-12-18    2963554096    Reduce type families even more eagerly
+	  # 2015-12-11    4723613784    TypeInType (see #11196)
            (wordsize(32), 1500000000, 5)
           ]),
       ],
@@ -683,16 +694,19 @@ test('T9872c',
      [''])
 test('T9872d',
      [ only_ways(['normal']),
-       compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 726679784, 5),
+       expect_broken(11203),
+      # compiler_stats_num_field('bytes allocated',
+      #    [(wordsize(64), 59651432, 5),
           # 2014-12-18    796071864   Initally created
           # 2014-12-18    739189056   Reduce type families even more eagerly
           # 2015-01-07    687562440   TrieMap leaf compression
           # 2015-03-17    726679784   tweak to solver; probably flattens more
-           (wordsize(32), 350369584, 5)
+      #     (wordsize(32), 59651432, 5)
           # some date     328810212
           # 2015-07-11    350369584
-          ]),
+	  # 2015-12-11    59651432    Massive improvement from TypeInType
+	  #                           but see also #11196
+      #    ]),
       ],
      compile,
      [''])

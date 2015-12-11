@@ -30,7 +30,6 @@ import Platform
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types
 import TcType
-import Coercion ( Role(..) )
 import TcEvidence
 import TcRnMonad
 import TcHsSyn
@@ -45,13 +44,13 @@ import CostCentre
 import Id
 import Module
 import VarSet
-import VarEnv
 import ConLike
 import DataCon
 import TysWiredIn
 import PrelNames
 import BasicTypes
 import Maybes
+import VarEnv
 import SrcLoc
 import Util
 import Bag
@@ -300,8 +299,7 @@ dsExpr (ExplicitTuple tup_args boxity)
                 -- The reverse is because foldM goes left-to-right
 
        ; return $ mkCoreLams lam_vars $
-                  mkCoreConApps (tupleDataCon boxity (length tup_args))
-                                (map (Type . exprType) args ++ args) }
+                  mkCoreTupBoxity boxity args }
 
 dsExpr (HsSCC _ cc expr@(L loc _)) = do
     dflags <- getDynFlags
@@ -379,10 +377,10 @@ dsExpr (ExplicitPArr ty xs) = do
     singletonP <- dsDPHBuiltin singletonPVar
     appP       <- dsDPHBuiltin appPVar
     xs'        <- mapM dsLExpr xs
+    let unary  fn x   = mkApps (Var fn) [Type ty, x]
+        binary fn x y = mkApps (Var fn) [Type ty, x, y]
+
     return . foldr1 (binary appP) $ map (unary singletonP) xs'
-  where
-    unary  fn x   = mkApps (Var fn) [Type ty, x]
-    binary fn x y = mkApps (Var fn) [Type ty, x, y]
 
 dsExpr (ArithSeq expr witness seq)
   = case witness of
@@ -446,8 +444,9 @@ dsExpr (HsStatic expr@(L loc _)) = do
                  , moduleNameFS $ moduleName $ nameModule n'
                  , occNameFS    $ nameOccName n'
                  ]
-    let tvars = tyVarsOfTypeList ty
-        speTy = mkForAllTys tvars $ mkTyConApp staticPtrTyCon [ty]
+    let tvars = tyCoVarsOfTypeWellScoped ty
+        speTy = ASSERT( all isTyVar tvars )  -- ty is top-level, so this is OK
+                mkInvForAllTys tvars $ mkTyConApp staticPtrTyCon [ty]
         speId = mkExportedLocalId VanillaId n' speTy
         fp@(Fingerprint w0 w1) = fingerprintName $ idName speId
         fp_core = mkConApp fingerprintDataCon
@@ -456,7 +455,7 @@ dsExpr (HsStatic expr@(L loc _)) = do
                     ]
         sp    = mkConApp staticPtrDataCon [Type ty, fp_core, info, expr_ds]
     liftIO $ modifyIORef static_binds_var ((fp, (speId, mkLams tvars sp)) :)
-    putSrcSpanDs loc $ return $ mkTyApps (Var speId) (map mkTyVarTy tvars)
+    putSrcSpanDs loc $ return $ mkTyApps (Var speId) (mkTyVarTys tvars)
 
   where
 
@@ -547,13 +546,14 @@ Note [Update for GADTs]
 ~~~~~~~~~~~~~~~~~~~~~~~
 Consider
    data T a b where
-     T1 { f1 :: a } :: T a Int
+     T1 :: { f1 :: a } -> T a Int
 
 Then the wrapper function for T1 has type
    $WT1 :: a -> T a Int
 But if x::T a b, then
    x { f1 = v } :: T a b   (not T a Int!)
 So we need to cast (T a Int) to (T a b).  Sigh.
+
 -}
 
 dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
@@ -611,7 +611,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
     mk_alt upd_fld_env con
       = do { let (univ_tvs, ex_tvs, eq_spec,
                   prov_theta, _req_theta, arg_tys, _) = conLikeFullSig con
-                 subst = mkTopTvSubst (univ_tvs `zip` in_inst_tys)
+                 subst = mkTopTCvSubst (univ_tvs `zip` in_inst_tys)
 
                 -- I'm not bothering to clone the ex_tvs
            ; eqs_vars   <- mapM newPredVarDs (substTheta subst (eqSpecPreds eq_spec))
@@ -628,12 +628,12 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                  inst_con = noLoc $ HsWrap wrap (HsVar (noLoc wrap_id))
                         -- Reconstruct with the WrapId so that unpacking happens
                  -- The order here is because of the order in `TcPatSyn`.
-                 wrap =
-                        dict_req_wrap <.>
-                        mkWpEvVarApps theta_vars          <.>
-                        mkWpTyApps    (mkTyVarTys ex_tvs) <.>
-                        mkWpTyApps [ty | (tv, ty) <- univ_tvs `zip` out_inst_tys
-                                       , not (tv `elemVarEnv` wrap_subst) ]
+                 wrap = dict_req_wrap                                           <.>
+                        mkWpEvVarApps theta_vars                                <.>
+                        mkWpTyApps    (mkTyVarTys ex_tvs)                       <.>
+                        mkWpTyApps    [ ty
+                                      | (tv, ty) <- univ_tvs `zip` out_inst_tys
+                                      , not (tv `elemVarEnv` wrap_subst) ]
                  rhs = foldl (\a b -> nlHsApp a b) inst_con val_args
 
                         -- Tediously wrap the application in a cast
@@ -659,9 +659,11 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
 
                  wrap_subst =
                   mkVarEnv [ (tv, mkTcSymCo (mkTcCoVarCo eq_var))
-                           | ((tv,_),eq_var) <- eq_spec `zip` eqs_vars ]
+                           | (spec, eq_var) <- eq_spec `zip` eqs_vars
+                           , let tv = eqSpecTyVar spec ]
 
                  req_wrap = dict_req_wrap <.> mkWpTyApps in_inst_tys
+
                  pat = noLoc $ ConPatOut { pat_con = noLoc con
                                          , pat_tvs = ex_tvs
                                          , pat_dicts = eqs_vars ++ theta_vars
@@ -669,8 +671,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                                          , pat_args = PrefixCon $ map nlVarPat arg_ids
                                          , pat_arg_tys = in_inst_tys
                                          , pat_wrap = req_wrap }
-
-           ; return (mkSimpleMatch [pat] wrapped_rhs)  }
+           ; return (mkSimpleMatch [pat] wrapped_rhs) }
 
 -- Here is where we desugar the Template Haskell brackets and escapes
 
@@ -784,7 +785,7 @@ To test this I've added a (static) flag -fsimple-list-literals, which
 makes all list literals be generated via the simple route.
 -}
 
-dsExplicitList :: PostTc Id Type -> Maybe (SyntaxExpr Id) -> [LHsExpr Id]
+dsExplicitList :: Type -> Maybe (SyntaxExpr Id) -> [LHsExpr Id]
                -> DsM CoreExpr
 -- See Note [Desugaring explicit lists]
 dsExplicitList elt_ty Nothing xs

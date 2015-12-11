@@ -29,11 +29,9 @@ import TysWiredIn
 
 import CmmType
 import Demand
-import Var              ( TyVar )
 import OccName          ( OccName, pprOccName, mkVarOccFS )
 import TyCon            ( TyCon, isPrimTyCon, tyConPrimRep, PrimRep(..) )
-import Type             ( Type, mkForAllTys, mkFunTy, mkFunTys, tyConAppTyCon,
-                          typePrimRep )
+import Type
 import BasicTypes       ( Arity, Fixity(..), FixityDirection(..), Boxity(..) )
 import ForeignCall      ( CLabelString )
 import Unique           ( Unique, mkPrimOpIdUnique )
@@ -538,7 +536,7 @@ primOpType op
     Compare _occ ty -> compare_fun_ty ty
 
     GenPrimOp _occ tyvars arg_tys res_ty ->
-        mkForAllTys tyvars (mkFunTys arg_tys res_ty)
+        mkInvForAllTys tyvars (mkFunTys arg_tys res_ty)
 
 primOpOcc :: PrimOp -> OccName
 primOpOcc op = case primOpInfo op of

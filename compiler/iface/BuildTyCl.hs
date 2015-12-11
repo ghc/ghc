@@ -6,9 +6,6 @@
 {-# LANGUAGE CPP #-}
 
 module BuildTyCl (
-        buildSynonymTyCon,
-        buildFamilyTyCon,
-        buildAlgTyCon,
         buildDataCon,
         buildPatSyn,
         TcMethInfo, buildClass,
@@ -44,32 +41,6 @@ import UniqSupply
 import Util
 import Outputable
 
-------------------------------------------------------
-buildSynonymTyCon :: Name -> [TyVar] -> [Role]
-                  -> Type
-                  -> Kind                   -- ^ Kind of the RHS
-                  -> TyCon
-buildSynonymTyCon tc_name tvs roles rhs rhs_kind
-  = mkSynonymTyCon tc_name kind tvs roles rhs
-  where
-    kind = mkPiKinds tvs rhs_kind
-
-
-buildFamilyTyCon :: Name         -- ^ Type family name
-                 -> [TyVar]      -- ^ Type variables
-                 -> Maybe Name   -- ^ Result variable name
-                 -> FamTyConFlav -- ^ Open, closed or in a boot file?
-                 -> Kind         -- ^ Kind of the RHS
-                 -> Maybe Class  -- ^ Parent, if exists
-                 -> Injectivity  -- ^ Injectivity annotation
-                                 -- See [Injectivity annotation] in HsDecls
-                 -> TyCon
-buildFamilyTyCon tc_name tvs res_tv rhs rhs_kind parent injectivity
-  = mkFamilyTyCon tc_name kind tvs res_tv rhs parent injectivity
-  where kind = mkPiKinds tvs rhs_kind
-
-
-------------------------------------------------------
 distinctAbstractTyConRhs, totallyAbstractTyConRhs :: AlgTyConRhs
 distinctAbstractTyConRhs = AbstractTyCon True
 totallyAbstractTyConRhs  = AbstractTyCon False
@@ -83,8 +54,9 @@ mkDataTyConRhs cons
     }
   where
     is_enum_con con
-       | (_tvs, theta, arg_tys, _res) <- dataConSig con
-       = null theta && null arg_tys
+       | (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res)
+           <- dataConFullSig con
+       = null ex_tvs && null eq_spec && null theta && null arg_tys
 
 
 mkNewTyConRhs :: Name -> TyCon -> DataCon -> TcRnIf m n AlgTyConRhs
@@ -128,22 +100,21 @@ mkNewTyConRhs tycon_name tycon con
     eta_reduce (a:as) (_:rs) ty | Just (fun, arg) <- splitAppTy_maybe ty,
                                   Just tv <- getTyVar_maybe arg,
                                   tv == a,
-                                  not (a `elemVarSet` tyVarsOfType fun)
+                                  not (a `elemVarSet` tyCoVarsOfType fun)
                                 = eta_reduce as rs fun
     eta_reduce tvs rs ty = (reverse tvs, reverse rs, ty)
-
 
 ------------------------------------------------------
 buildDataCon :: FamInstEnvs
             -> Name
             -> Bool                     -- Declared infix
-            -> Promoted TyConRepName    -- Promotable
+            -> TyConRepName
             -> [HsSrcBang]
             -> Maybe [HsImplBang]
                 -- See Note [Bangs on imported data constructors] in MkId
            -> [FieldLabel]             -- Field labels
            -> [TyVar] -> [TyVar]       -- Univ and ext
-           -> [(TyVar,Type)]           -- Equality spec
+           -> [EqSpec]                 -- Equality spec
            -> ThetaType                -- Does not include the "stupid theta"
                                        -- or the GADT equalities
            -> [Type] -> Type           -- Argument and result types
@@ -188,14 +159,14 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
   | null stupid_theta = []      -- The common case
   | otherwise         = filter in_arg_tys stupid_theta
   where
-    tc_subst     = zipTopTvSubst (tyConTyVars tycon) (mkTyVarTys univ_tvs)
+    tc_subst     = zipTopTCvSubst (tyConTyVars tycon) (mkTyVarTys univ_tvs)
     stupid_theta = substTheta tc_subst (tyConStupidTheta tycon)
         -- Start by instantiating the master copy of the
         -- stupid theta, taken from the TyCon
 
-    arg_tyvars      = tyVarsOfTypes arg_tys
+    arg_tyvars      = tyCoVarsOfTypes arg_tys
     in_arg_tys pred = not $ isEmptyVarSet $
-                      tyVarsOfType pred `intersectVarSet` arg_tyvars
+                      tyCoVarsOfType pred `intersectVarSet` arg_tyvars
 
 
 ------------------------------------------------------
@@ -211,31 +182,38 @@ buildPatSyn :: Name -> Bool
 buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
             (univ_tvs, req_theta) (ex_tvs, prov_theta) arg_tys
             pat_ty field_labels
-  = ASSERT((and [ univ_tvs == univ_tvs'
-                , ex_tvs == ex_tvs'
-                , pat_ty `eqType` pat_ty'
-                , prov_theta `eqTypes` prov_theta'
-                , req_theta `eqTypes` req_theta'
-                , arg_tys `eqTypes` arg_tys'
-                ]))
+  = ASSERT2((and [ univ_tvs == univ_tvs1
+                 , ex_tvs == ex_tvs1
+                 , pat_ty `eqType` pat_ty1
+                 , prov_theta `eqTypes` prov_theta1
+                 , req_theta `eqTypes` req_theta1
+                 , arg_tys `eqTypes` arg_tys1
+                 ])
+            , (vcat [ ppr univ_tvs <+> twiddle <+> ppr univ_tvs1
+                    , ppr ex_tvs <+> twiddle <+> ppr ex_tvs1
+                    , ppr pat_ty <+> twiddle <+> ppr pat_ty1
+                    , ppr prov_theta <+> twiddle <+> ppr prov_theta1
+                    , ppr req_theta <+> twiddle <+> ppr req_theta1
+                    , ppr arg_tys <+> twiddle <+> ppr arg_tys1]))
     mkPatSyn src_name declared_infix
              (univ_tvs, req_theta) (ex_tvs, prov_theta)
              arg_tys pat_ty
              matcher builder field_labels
   where
-    ((_:univ_tvs'), req_theta', tau) = tcSplitSigmaTy $ idType matcher_id
-    ([pat_ty', cont_sigma, _], _) = tcSplitFunTys tau
-    (ex_tvs', prov_theta', cont_tau) = tcSplitSigmaTy cont_sigma
-    (arg_tys', _) = tcSplitFunTys cont_tau
+    ((_:_:univ_tvs1), req_theta1, tau) = tcSplitSigmaTy $ idType matcher_id
+    ([pat_ty1, cont_sigma, _], _) = tcSplitFunTys tau
+    (ex_tvs1, prov_theta1, cont_tau) = tcSplitSigmaTy cont_sigma
+    (arg_tys1, _) = tcSplitFunTys cont_tau
+    twiddle = char '~'
 
--- ------------------------------------------------------
-
+------------------------------------------------------
 type TcMethInfo = (Name, Type, Maybe (DefMethSpec Type))
         -- A temporary intermediate, to communicate between
         -- tcClassSigs and buildClass.
 
-buildClass :: Name     -- Name of the class/tycon (they have the same Name)
+buildClass :: Name  -- Name of the class/tycon (they have the same Name)
            -> [TyVar] -> [Role] -> ThetaType
+           -> Kind
            -> [FunDep TyVar]               -- Functional dependencies
            -> [ClassATItem]                -- Associated types
            -> [TcMethInfo]                 -- Method info
@@ -243,7 +221,7 @@ buildClass :: Name     -- Name of the class/tycon (they have the same Name)
            -> RecFlag                      -- Info for type constructor
            -> TcRnIf m n Class
 
-buildClass tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc_isrec
+buildClass tycon_name tvs roles sc_theta kind fds at_items sig_stuff mindef tc_isrec
   = fixM  $ \ rec_clas ->       -- Only name generation inside loop
     do  { traceIf (text "buildClass")
 
@@ -284,10 +262,11 @@ buildClass tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc_isrec
               arg_tys   = sc_theta ++ op_tys
               rec_tycon = classTyCon rec_clas
 
+        ; rep_nm   <- newTyConRepName datacon_name
         ; dict_con <- buildDataCon (panic "buildClass: FamInstEnvs")
                                    datacon_name
                                    False        -- Not declared infix
-                                   NotPromoted  -- Class tycons are not promoted
+                                   rep_nm
                                    (map (const no_bang) args)
                                    (Just (map (const HsLazy) args))
                                    [{- No fields -}]
@@ -305,9 +284,8 @@ buildClass tycon_name tvs roles sc_theta fds at_items sig_stuff mindef tc_isrec
                                          , tup_sort = ConstraintTuple })
                  else return (mkDataTyConRhs [dict_con])
 
-        ; let { clas_kind = mkPiKinds tvs constraintKind
-              ; tycon     = mkClassTyCon tycon_name clas_kind tvs roles
-                                         rhs rec_clas tc_isrec tc_rep_name
+        ; let { tycon = mkClassTyCon tycon_name kind tvs roles
+                                     rhs rec_clas tc_isrec tc_rep_name
                 -- A class can be recursive, and in the case of newtypes
                 -- this matters.  For example
                 --      class C a where { op :: C b => a -> b -> Int }

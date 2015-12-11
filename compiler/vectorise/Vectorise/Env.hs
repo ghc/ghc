@@ -37,8 +37,8 @@ import Data.Maybe
 
 -- |Indicates what scope something (a variable) is in.
 --
-data Scope a b 
-        = Global a 
+data Scope a b
+        = Global a
         | Local  b
 
 
@@ -51,13 +51,13 @@ data LocalEnv
         { local_vars      :: VarEnv (Var, Var)
           -- ^Mapping from local variables to their vectorised and lifted versions.
 
-        , local_tyvars    :: [TyVar]
+        , local_tyvars     :: [TyVar]
           -- ^In-scope type variables.
 
-        , local_tyvar_pa  :: VarEnv CoreExpr
+        , local_tyvar_pa   :: VarEnv CoreExpr
           -- ^Mapping from tyvars to their PA dictionaries.
 
-        , local_bind_name :: FastString
+        , local_bind_name  :: FastString
           -- ^Local binding name. This is only used to generate better names for hoisted
           -- expressions.
         }
@@ -77,7 +77,7 @@ emptyLocalEnv = LocalEnv
 
 -- |The global environment: entities that exist at top-level.
 --
-data GlobalEnv 
+data GlobalEnv
         = GlobalEnv
         { global_vect_avoid           :: Bool
           -- ^'True' implies to avoid vectorisation as far as possible.
@@ -113,7 +113,7 @@ data GlobalEnv
           --     'global_tycons' (to a type other than themselves) and are still not parallel. An
           --     example is '(->)'. Moreover, some types have *not* got a mapping in 'global_tycons'
           --     (because they couldn't be vectorised), but still contain parallel types.
-        
+
         , global_datacons             :: NameEnv DataCon
           -- ^Mapping from DataCons to their vectorised versions.
 
@@ -146,7 +146,7 @@ initGlobalEnv :: Bool
               -> FamInstEnvs
               -> GlobalEnv
 initGlobalEnv vectAvoid info vectDecls instEnvs famInstEnvs
-  = GlobalEnv 
+  = GlobalEnv
   { global_vect_avoid           = vectAvoid
   , global_vars                 = mapVarEnv snd $ vectInfoVar info
   , global_vect_decls           = mkVarEnv vects
@@ -204,7 +204,7 @@ setPRFunsEnv ps genv = genv { global_pr_funs = mkNameEnv ps }
 --
 modVectInfo :: GlobalEnv -> [Id] -> [TyCon] -> [CoreVect]-> VectInfo -> VectInfo
 modVectInfo env mg_ids mg_tyCons vectDecls info
-  = info 
+  = info
     { vectInfoVar            = mk_env ids      (global_vars     env)
     , vectInfoTyCon          = mk_env tyCons   (global_tycons   env)
     , vectInfoDataCon        = mk_env dataCons (global_datacons env)
@@ -222,10 +222,10 @@ modVectInfo env mg_ids mg_tyCons vectDecls info
     tyCons          = mg_tyCons ++ vectTypeTyCons
     dataCons        = concatMap tyConDataCons mg_tyCons ++ vectDataCons
     dataConIds      = map dataConWorkId dataCons
-    selIds          = concat [ classAllSelIds cls 
+    selIds          = concat [ classAllSelIds cls
                              | tycon <- tyCons
                              , cls <- maybeToList . tyConClass_maybe $ tycon]
-    
+
     -- Produce an entry for every declaration that is mentioned in the domain of the 'inspectedEnv'
     mk_env decls inspectedEnv
       = mkNameEnv [(name, (decl, to))

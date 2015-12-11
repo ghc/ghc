@@ -19,7 +19,7 @@ module SimplMonad (
         plusSimplCount, isZeroSimplCount
     ) where
 
-import Id               ( Id, mkSysLocal )
+import Id               ( Id, mkSysLocalOrCoVar )
 import Type             ( Type )
 import FamInstEnv       ( FamInstEnv )
 import CoreSyn          ( RuleEnv(..) )
@@ -176,7 +176,7 @@ getFamEnvs = SM (\st_env us sc -> return (st_fams st_env, us, sc))
 
 newId :: FastString -> Type -> SimplM Id
 newId fs ty = do uniq <- getUniqueM
-                 return (mkSysLocal fs uniq ty)
+                 return (mkSysLocalOrCoVar fs uniq ty)
 
 {-
 ************************************************************************

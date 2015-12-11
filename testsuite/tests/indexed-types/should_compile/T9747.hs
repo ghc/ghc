@@ -4,7 +4,7 @@
 module T9747 where
 import Data.List (intercalate)
 import Data.Proxy
-import GHC.Prim (Constraint)
+import GHC.Exts (Constraint)
 
 data HList :: [*] -> * where
   Nil :: HList '[]

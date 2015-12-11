@@ -45,6 +45,7 @@ module SrcLoc (
         interactiveSrcSpan,
         srcLocSpan, realSrcLocSpan,
         combineSrcSpans,
+        srcSpanFirstCharacter,
 
         -- ** Deconstructing SrcSpan
         srcSpanStart, srcSpanEnd,
@@ -342,6 +343,13 @@ combineRealSrcSpans span1 span2
                                   (srcSpanEndLine span2, srcSpanEndCol span2)
     file = srcSpanFile span1
 
+-- | Convert a SrcSpan into one that represents only its first character
+srcSpanFirstCharacter :: SrcSpan -> SrcSpan
+srcSpanFirstCharacter l@(UnhelpfulSpan {}) = l
+srcSpanFirstCharacter (RealSrcSpan span) = RealSrcSpan $ mkRealSrcSpan loc1 loc2
+  where
+    loc1@(SrcLoc f l c) = realSrcSpanStart span
+    loc2 = SrcLoc f l (c+1)
 {-
 ************************************************************************
 *                                                                      *

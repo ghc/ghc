@@ -10,6 +10,7 @@ module Vectorise.Monad.Naming
   , newLocalVars
   , newDummyVar
   , newTyVar
+  , newCoVar
   )
 where
 
@@ -50,11 +51,11 @@ mkLocalisedName mk_occ name
 
 mkDerivedName :: (OccName -> OccName) -> Name -> VM Name
 -- Similar to mkLocalisedName, but assumes the
--- incoming name is from this module.  
+-- incoming name is from this module.
 -- Works on External names only
-mkDerivedName mk_occ name 
+mkDerivedName mk_occ name
   = do { u   <- liftDs newUnique
-       ; return (mkExternalName u (nameModule name)  
+       ; return (mkExternalName u (nameModule name)
                                   (mk_occ (nameOccName name))
                                   (nameSrcSpan name)) }
 
@@ -69,7 +70,7 @@ mkVectId id ty
   = do { name <- mkLocalisedName mkVectOcc (getName id)
        ; let id' | isDFunId id     = MkId.mkDictFunId name tvs theta cls tys
                  | isExportedId id = Id.mkExportedLocalId VanillaId name ty
-                 | otherwise       = Id.mkLocalId         name ty
+                 | otherwise       = Id.mkLocalIdOrCoVar name ty
        ; return id'
        }
   where
@@ -87,7 +88,7 @@ cloneVar var = liftM (setIdUnique var) (liftDs newUnique)
 -- |Make a fresh exported variable with the given type.
 --
 newExportedVar :: OccName -> Type -> VM Var
-newExportedVar occ_name ty 
+newExportedVar occ_name ty
  = do mod <- liftDs getModule
       u   <- liftDs newUnique
 
@@ -101,7 +102,7 @@ newExportedVar occ_name ty
 newLocalVar :: FastString -> Type -> VM Var
 newLocalVar fs ty
  = do u <- liftDs newUnique
-      return $ mkSysLocal fs u ty
+      return $ mkSysLocalOrCoVar fs u ty
 
 -- |Make several fresh local variables with the given types.
 -- The variable's names are formed using the given string as the prefix.
@@ -121,3 +122,9 @@ newTyVar :: FastString -> Kind -> VM Var
 newTyVar fs k
  = do u <- liftDs newUnique
       return $ mkTyVar (mkSysTvName u fs) k
+
+-- |Mkae a fresh coercion variable with the given kind.
+newCoVar :: FastString -> Kind -> VM Var
+newCoVar fs k
+  = do u <- liftDs newUnique
+       return $ mkCoVar (mkSystemVarName u fs) k

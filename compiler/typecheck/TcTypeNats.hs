@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase, CPP #-}
+
 module TcTypeNats
   ( typeNatTyCons
   , typeNatCoAxiomRules
@@ -19,18 +21,10 @@ import TyCon      ( TyCon, FamTyConFlav(..), mkFamilyTyCon
                   , Injectivity(..) )
 import Coercion   ( Role(..) )
 import TcRnTypes  ( Xi )
-import CoAxiom    ( CoAxiomRule(..), BuiltInSynFamily(..) )
+import CoAxiom    ( CoAxiomRule(..), BuiltInSynFamily(..), Eqn )
 import Name       ( Name, BuiltInSyntax(..) )
-import TysWiredIn ( typeNatKind, typeSymbolKind
-                  , mkWiredInTyConName
-                  , promotedBoolTyCon
-                  , promotedFalseDataCon, promotedTrueDataCon
-                  , promotedOrderingTyCon
-                  , promotedLTDataCon
-                  , promotedEQDataCon
-                  , promotedGTDataCon
-                  )
-import TysPrim    ( mkArrowKinds, mkTemplateTyVars )
+import TysWiredIn
+import TysPrim    ( mkTemplateTyVars )
 import PrelNames  ( gHC_TYPELITS
                   , typeNatAddTyFamNameKey
                   , typeNatMulTyFamNameKey
@@ -43,6 +37,10 @@ import PrelNames  ( gHC_TYPELITS
 import FastString ( FastString, fsLit )
 import qualified Data.Map as Map
 import Data.Maybe ( isJust )
+
+#if __GLASGOW_HASKELL__ < 709
+import Data.Traversable ( traverse )
+#endif
 
 {-------------------------------------------------------------------------------
 Built-in type constructors for functions on type-level nats
@@ -106,7 +104,7 @@ typeNatExpTyCon = mkTypeNatFunTyCon2 name
 typeNatLeqTyCon :: TyCon
 typeNatLeqTyCon =
   mkFamilyTyCon name
-    (mkArrowKinds [ typeNatKind, typeNatKind ] boolKind)
+    (mkFunTys [ typeNatKind, typeNatKind ] boolTy)
     (mkTemplateTyVars [ typeNatKind, typeNatKind ])
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -125,7 +123,7 @@ typeNatLeqTyCon =
 typeNatCmpTyCon :: TyCon
 typeNatCmpTyCon =
   mkFamilyTyCon name
-    (mkArrowKinds [ typeNatKind, typeNatKind ] orderingKind)
+    (mkFunTys [ typeNatKind, typeNatKind ] orderingKind)
     (mkTemplateTyVars [ typeNatKind, typeNatKind ])
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -144,7 +142,7 @@ typeNatCmpTyCon =
 typeSymbolCmpTyCon :: TyCon
 typeSymbolCmpTyCon =
   mkFamilyTyCon name
-    (mkArrowKinds [ typeSymbolKind, typeSymbolKind ] orderingKind)
+    (mkFunTys [ typeSymbolKind, typeSymbolKind ] orderingKind)
     (mkTemplateTyVars [ typeSymbolKind, typeSymbolKind ])
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -168,7 +166,7 @@ typeSymbolCmpTyCon =
 mkTypeNatFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
 mkTypeNatFunTyCon2 op tcb =
   mkFamilyTyCon op
-    (mkArrowKinds [ typeNatKind, typeNatKind ] typeNatKind)
+    (mkFunTys [ typeNatKind, typeNatKind ] typeNatKind)
     (mkTemplateTyVars [ typeNatKind, typeNatKind ])
     Nothing
     (BuiltInSynFamTyCon tcb)
@@ -224,38 +222,33 @@ axCmpNatDef   = mkBinAxiom "CmpNatDef" typeNatCmpTyCon
 axCmpSymbolDef =
   CoAxiomRule
     { coaxrName      = fsLit "CmpSymbolDef"
-    , coaxrTypeArity = 2
-    , coaxrAsmpRoles = []
+    , coaxrAsmpRoles = [Nominal, Nominal]
     , coaxrRole      = Nominal
-    , coaxrProves    = \ts cs ->
-        case (ts,cs) of
-          ([s,t],[]) ->
-            do x <- isStrLitTy s
-               y <- isStrLitTy t
-               return (mkTyConApp typeSymbolCmpTyCon [s,t] ===
-                      ordering (compare x y))
-          _ -> Nothing
-    }
+    , coaxrProves    = \cs ->
+        do [Pair s1 s2, Pair t1 t2] <- return cs
+           [s2', t2'] <- traverse isStrLitTy [s2, t2]
+           return (mkTyConApp typeSymbolCmpTyCon [s1,t1] ===
+                   ordering (compare s2' t2')) }
 
 axSubDef = mkBinAxiom "SubDef" typeNatSubTyCon $
               \x y -> fmap num (minus x y)
 
-axAdd0L     = mkAxiom1 "Add0L"    $ \t -> (num 0 .+. t) === t
-axAdd0R     = mkAxiom1 "Add0R"    $ \t -> (t .+. num 0) === t
-axSub0R     = mkAxiom1 "Sub0R"    $ \t -> (t .-. num 0) === t
-axMul0L     = mkAxiom1 "Mul0L"    $ \t -> (num 0 .*. t) === num 0
-axMul0R     = mkAxiom1 "Mul0R"    $ \t -> (t .*. num 0) === num 0
-axMul1L     = mkAxiom1 "Mul1L"    $ \t -> (num 1 .*. t) === t
-axMul1R     = mkAxiom1 "Mul1R"    $ \t -> (t .*. num 1) === t
-axExp1L     = mkAxiom1 "Exp1L"    $ \t -> (num 1 .^. t) === num 1
-axExp0R     = mkAxiom1 "Exp0R"    $ \t -> (t .^. num 0) === num 1
-axExp1R     = mkAxiom1 "Exp1R"    $ \t -> (t .^. num 1) === t
-axLeqRefl   = mkAxiom1 "LeqRefl"  $ \t -> (t <== t) === bool True
+axAdd0L     = mkAxiom1 "Add0L"    $ \(Pair s t) -> (num 0 .+. s) === t
+axAdd0R     = mkAxiom1 "Add0R"    $ \(Pair s t) -> (s .+. num 0) === t
+axSub0R     = mkAxiom1 "Sub0R"    $ \(Pair s t) -> (s .-. num 0) === t
+axMul0L     = mkAxiom1 "Mul0L"    $ \(Pair s _) -> (num 0 .*. s) === num 0
+axMul0R     = mkAxiom1 "Mul0R"    $ \(Pair s _) -> (s .*. num 0) === num 0
+axMul1L     = mkAxiom1 "Mul1L"    $ \(Pair s t) -> (num 1 .*. s) === t
+axMul1R     = mkAxiom1 "Mul1R"    $ \(Pair s t) -> (s .*. num 1) === t
+axExp1L     = mkAxiom1 "Exp1L"    $ \(Pair s _) -> (num 1 .^. s) === num 1
+axExp0R     = mkAxiom1 "Exp0R"    $ \(Pair s _) -> (s .^. num 0) === num 1
+axExp1R     = mkAxiom1 "Exp1R"    $ \(Pair s t) -> (s .^. num 1) === t
+axLeqRefl   = mkAxiom1 "LeqRefl"  $ \(Pair s _) -> (s <== s) === bool True
 axCmpNatRefl    = mkAxiom1 "CmpNatRefl"
-                $ \t -> (cmpNat t t) === ordering EQ
+                $ \(Pair s _) -> (cmpNat s s) === ordering EQ
 axCmpSymbolRefl = mkAxiom1 "CmpSymbolRefl"
-                $ \t -> (cmpSymbol t t) === ordering EQ
-axLeq0L     = mkAxiom1 "Leq0L"    $ \t -> (num 0 <== t) === bool True
+                $ \(Pair s _) -> (cmpSymbol s s) === ordering EQ
+axLeq0L     = mkAxiom1 "Leq0L"    $ \(Pair s _) -> (num 0 <== s) === bool True
 
 typeNatCoAxiomRules :: Map.Map FastString CoAxiomRule
 typeNatCoAxiomRules = Map.fromList $ map (\x -> (coaxrName x, x))
@@ -314,9 +307,6 @@ x === y = Pair x y
 num :: Integer -> Type
 num = mkNumLitTy
 
-boolKind :: Kind
-boolKind = mkTyConApp promotedBoolTyCon []
-
 bool :: Bool -> Type
 bool b = if b then mkTyConApp promotedTrueDataCon []
               else mkTyConApp promotedFalseDataCon []
@@ -330,7 +320,7 @@ isBoolLitTy tc =
          | otherwise                   -> Nothing
 
 orderingKind :: Kind
-orderingKind = mkTyConApp promotedOrderingTyCon []
+orderingKind = mkTyConApp orderingTyCon []
 
 ordering :: Ordering -> Type
 ordering o =
@@ -362,31 +352,25 @@ mkBinAxiom :: String -> TyCon ->
 mkBinAxiom str tc f =
   CoAxiomRule
     { coaxrName      = fsLit str
-    , coaxrTypeArity = 2
-    , coaxrAsmpRoles = []
+    , coaxrAsmpRoles = [Nominal, Nominal]
     , coaxrRole      = Nominal
-    , coaxrProves    = \ts cs ->
-        case (ts,cs) of
-          ([s,t],[]) -> do x <- isNumLitTy s
-                           y <- isNumLitTy t
-                           z <- f x y
-                           return (mkTyConApp tc [s,t] === z)
-          _ -> Nothing
+    , coaxrProves    = \cs ->
+        do [Pair s1 s2, Pair t1 t2] <- return cs
+           [s2', t2'] <- traverse isNumLitTy [s2, t2]
+           z          <- f s2' t2'
+           return (mkTyConApp tc [s1,t1] === z)
     }
 
 
 
-mkAxiom1 :: String -> (Type -> Pair Type) -> CoAxiomRule
+mkAxiom1 :: String -> (Eqn -> Eqn) -> CoAxiomRule
 mkAxiom1 str f =
   CoAxiomRule
     { coaxrName      = fsLit str
-    , coaxrTypeArity = 1
-    , coaxrAsmpRoles = []
+    , coaxrAsmpRoles = [Nominal]
     , coaxrRole      = Nominal
-    , coaxrProves    = \ts cs ->
-        case (ts,cs) of
-          ([s],[]) -> return (f s)
-          _        -> Nothing
+    , coaxrProves    = \case [eqn] -> Just (f eqn)
+                             _     -> Nothing
     }
 
 
@@ -690,10 +674,3 @@ genLog x base = Just (exactLoop 0 x)
   underLoop s i
     | i < base  = s
     | otherwise = let s1 = s + 1 in s1 `seq` underLoop s1 (div i base)
-
-
-
-
-
-
-

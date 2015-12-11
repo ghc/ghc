@@ -21,7 +21,7 @@ import Id
 import BasicTypes
 import Name
 import RdrName
-import TypeRep
+import Type
 import ByteCodeInstr
 import SrcLoc
 import Exception

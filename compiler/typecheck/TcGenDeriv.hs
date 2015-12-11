@@ -55,7 +55,7 @@ import TysPrim
 import TysWiredIn
 import Type
 import Class
-import TypeRep
+import TyCoRep
 import VarSet
 import VarEnv
 import State
@@ -1395,8 +1395,8 @@ gen_Data_binds dflags loc rep_tc
 
 
 kind1, kind2 :: Kind
-kind1 = liftedTypeKind `mkArrowKind` liftedTypeKind
-kind2 = liftedTypeKind `mkArrowKind` kind1
+kind1 = liftedTypeKind `mkFunTy` liftedTypeKind
+kind2 = liftedTypeKind `mkFunTy` kind1
 
 gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstr_RDR,
     mkDataType_RDR, conIndex_RDR, prefix_RDR, infix_RDR,
@@ -1620,8 +1620,8 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
 
     go co ty | Just ty' <- coreView ty = go co ty'
     go co (TyVarTy    v) | v == var = (if co then caseCoVar else caseVar,True)
-    go co (FunTy x y)  | isPredTy x = go co y
-                       | xc || yc   = (caseFun xr yr,True)
+    go co (ForAllTy (Anon x) y)  | isPredTy x = go co y
+                                 | xc || yc   = (caseFun xr yr,True)
         where (xr,xc) = go (not co) x
               (yr,yc) = go co       y
     go co (AppTy    x y) | xc = (caseWrongArg,   True)
@@ -1639,8 +1639,10 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
        | otherwise        = (caseWrongArg, True)   -- Non-decomposable (eg type function)
        where
          (xrs,xcs) = unzip (map (go co) args)
-    go co (ForAllTy v x) | v /= var && xc = (caseForAll v xr,True)
+    go co (ForAllTy (Named v Invisible) x) | v /= var && xc = (caseForAll v xr,True)
         where (xr,xc) = go co x
+
+    go _ (ForAllTy (Named _ Visible) _) = panic "unexpected visible binder"
     go _ _ = (caseTrivial,False)
 
 -- Return all syntactic subterms of ty that contain var somewhere
@@ -1655,7 +1657,7 @@ deepSubtypesContaining tv
             , ft_ty_app = (:)
             , ft_bad_app = panic "in other argument"
             , ft_co_var = panic "contravariant"
-            , ft_forall = \v xs -> filterOut ((v `elemVarSet`) . tyVarsOfType) xs })
+            , ft_forall = \v xs -> filterOut ((v `elemVarSet`) . tyCoVarsOfType) xs })
 
 
 foldDataConArgs :: FFoldType a -> DataCon -> [a]
@@ -1981,9 +1983,12 @@ mkCoerceClassMethEqn cls inst_tvs cls_tys rhs_ty id
   where
     cls_tvs = classTyVars cls
     in_scope = mkInScopeSet $ mkVarSet inst_tvs
-    lhs_subst = mkTvSubst in_scope (zipTyEnv cls_tvs cls_tys)
-    rhs_subst = mkTvSubst in_scope (zipTyEnv cls_tvs (changeLast cls_tys rhs_ty))
-    (_class_tvs, _class_constraint, user_meth_ty) = tcSplitSigmaTy (varType id)
+    lhs_subst = mkTCvSubst in_scope (zipTyEnv cls_tvs cls_tys, emptyCvSubstEnv)
+    rhs_subst = mkTCvSubst in_scope
+                        ( zipTyEnv cls_tvs (changeLast cls_tys rhs_ty)
+                        , emptyCvSubstEnv )
+    (_class_tvs, _class_constraint, user_meth_ty)
+      = tcSplitSigmaTy (varType id)
 
     changeLast :: [a] -> a -> [a]
     changeLast []     _  = panic "changeLast"
@@ -2047,7 +2052,7 @@ genAuxBindSpec loc (DerivCon2Tag tycon)
     rdr_name = con2tag_RDR tycon
 
     sig_ty = mkLHsSigWcType $ L loc $ HsCoreTy $
-             mkSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
+             mkInvSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
              mkParentType tycon `mkFunTy` intPrimTy
 
     lots_of_constructors = tyConFamilySize tycon > 8
@@ -2071,7 +2076,7 @@ genAuxBindSpec loc (DerivTag2Con tycon)
      L loc (TypeSig [L loc rdr_name] sig_ty))
   where
     sig_ty = mkLHsSigWcType $ L loc $
-             HsCoreTy $ mkForAllTys (tyConTyVars tycon) $
+             HsCoreTy $ mkInvForAllTys (tyConTyVars tycon) $
              intTy `mkFunTy` mkParentType tycon
 
     rdr_name = tag2con_RDR tycon
@@ -2186,7 +2191,7 @@ primLitOps str tycon ty = ( assoc_ty_id str tycon litConTbl ty
                           )
   where
     boxRDR
-      | ty == addrPrimTy = unpackCString_RDR
+      | ty `eqType` addrPrimTy = unpackCString_RDR
       | otherwise = assoc_ty_id str tycon boxConTbl ty
 
 ordOpTbl :: [(Type, (RdrName, RdrName, RdrName, RdrName, RdrName))]

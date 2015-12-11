@@ -14,7 +14,7 @@ module TyCon(
 
         AlgTyConRhs(..), visibleDataCons,
         AlgTyConFlav(..), isNoParent,
-        FamTyConFlav(..), Role(..), Promoted(..), Injectivity(..),
+        FamTyConFlav(..), Role(..), Injectivity(..),
 
         -- ** Field labels
         tyConFieldLabels, tyConFieldLabelEnv,
@@ -30,19 +30,18 @@ module TyCon(
         mkSynonymTyCon,
         mkFamilyTyCon,
         mkPromotedDataCon,
-        mkPromotedTyCon,
+        mkTcTyCon,
 
         -- ** Predicates on TyCons
-        isAlgTyCon,
+        isAlgTyCon, isVanillaAlgTyCon,
         isClassTyCon, isFamInstTyCon,
         isFunTyCon,
         isPrimTyCon,
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon,
         isTypeSynonymTyCon,
         mightBeUnsaturatedTyCon,
-        isPromotedDataCon, isPromotedTyCon,
-        isPromotedDataCon_maybe, isPromotedTyCon_maybe,
-        promotableTyCon_maybe, isPromotableTyCon, promoteTyCon,
+        isPromotedDataCon, isPromotedDataCon_maybe,
+        isKindTyCon, isLiftedTypeKindTyConName,
 
         isDataTyCon, isProductTyCon, isDataProductTyCon_maybe,
         isEnumerationTyCon,
@@ -58,6 +57,7 @@ module TyCon(
         isRecursiveTyCon,
         isImplicitTyCon,
         isTyConWithSrcDataCons,
+        isTcTyCon,
 
         -- ** Extracting information out of TyCons
         tyConName,
@@ -105,7 +105,7 @@ module TyCon(
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TypeRep ( Kind, Type, PredType )
+import {-# SOURCE #-} TyCoRep ( Kind, Type, PredType )
 import {-# SOURCE #-} DataCon ( DataCon, dataConExTyVars, dataConFieldLabels )
 
 import Binary
@@ -318,6 +318,17 @@ it's worth noting that (~#)'s parameters are at role N. Promoted data
 constructors' type arguments are at role R. All kind arguments are at role
 N.
 
+Note [Unboxed tuple levity vars]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The contents of an unboxed tuple may be boxed or unboxed. Accordingly,
+the kind of the unboxed tuple constructor is sort-polymorphic. For example,
+
+   (#,#) :: forall (v :: Levity) (w :: Levity). TYPE v -> TYPE w -> #
+
+These extra tyvars (v and w) cause some delicate processing around tuples,
+where we used to be able to assume that the tycon arity and the
+datacon arity were the same.
+
 Note [Injective type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -454,11 +465,10 @@ data TyCon
         algTcRec    :: RecFlag,     -- ^ Tells us whether the data type is part
                                     -- of a mutually-recursive group or not
 
-        algTcParent :: AlgTyConFlav, -- ^ Gives the class or family declaration
+        algTcParent :: AlgTyConFlav -- ^ Gives the class or family declaration
                                        -- 'TyCon' for derived 'TyCon's representing
                                        -- class or family instances, respectively.
 
-        tcPromoted  :: Promoted TyCon  -- ^ Promoted TyCon, if any
     }
 
   -- | Represents type synonyms
@@ -580,16 +590,12 @@ data TyCon
         tcRepName   :: TyConRepName
     }
 
-  -- | Represents promoted type constructor.
-  | PromotedTyCon {
-        tyConUnique :: Unique, -- ^ Same Unique as the type constructor
-        tyConName   :: Name,   -- ^ Same Name as the type constructor
-        tyConArity  :: Arity,  -- ^ n if ty_con :: * -> ... -> *  n times
-        tyConKind   :: Kind,   -- ^ Always TysPrim.superKind
-        ty_con      :: TyCon,  -- ^ Corresponding type constructor
-        tcRepName   :: TyConRepName
-    }
-
+  -- | These exist only during a recursive type/class type-checking knot.
+  | TcTyCon {
+      tyConUnique :: Unique,
+      tyConName   :: Name,
+      tyConKind   :: Kind
+      }
   deriving Typeable
 
 
@@ -656,10 +662,6 @@ data AlgTyConRhs
                              -- again check Trac #1072.
     }
 
--- | Isomorphic to Maybe, but used when the question is
--- whether or not something is promoted
-data Promoted a = NotPromoted | Promoted a
-
 -- | Extract those 'DataCon's that we are able to learn about.  Note
 -- that visibility in this sense does not correspond to visibility in
 -- the context of any particular user program!
@@ -683,7 +685,7 @@ data AlgTyConFlav
   | UnboxedAlgTyCon
 
   -- | Type constructors representing a class dictionary.
-  -- See Note [ATyCon for classes] in TypeRep
+  -- See Note [ATyCon for classes] in TyCoRep
   | ClassTyCon
         Class           -- INVARIANT: the classTyCon of this Class is the
                         -- current tycon
@@ -746,7 +748,7 @@ isNoParent _                   = False
 
 data Injectivity
   = NotInjective
-  | Injective [Bool]   -- Length is 1-1 with tyConTyVars (incl kind vars)
+  | Injective [Bool]   -- 1-1 with tyConTyVars (incl kind vars)
   deriving( Eq )
 
 -- | Information pertaining to the expansion of a type synonym (@type@)
@@ -756,7 +758,7 @@ data FamTyConFlav
     --
     -- These are introduced by either a top level declaration:
     --
-    -- > data T a :: *
+    -- > data family T a :: *
     --
     -- Or an associated data type declaration, within a class declaration:
     --
@@ -797,26 +799,12 @@ nothing for the axiom to prove!
 
 Note [Promoted data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A data constructor can be promoted to become a type constructor,
-via the PromotedTyCon alternative in TyCon.
-
-* Only data constructors with
-     (a) no kind polymorphism
-     (b) no constraints in its type (eg GADTs)
-  are promoted.  Existentials are ok; see Trac #7347.
+All data constructors can be promoted to become a type constructor,
+via the PromotedDataCon alternative in TyCon.
 
 * The TyCon promoted from a DataCon has the *same* Name and Unique as
   the DataCon.  Eg. If the data constructor Data.Maybe.Just(unique 78,
   say) is promoted to a TyCon whose name is Data.Maybe.Just(unique 78)
-
-* The *kind* of a promoted DataCon may be polymorphic.  Example:
-    type of DataCon           Just :: forall (a:*). a -> Maybe a
-    kind of (promoted) tycon  Just :: forall (a:box). a -> Maybe a
-  The kind is not identical to the type, because of the */box
-  kind signature on the forall'd variable; so the tyConKind field of
-  PromotedTyCon is not identical to the dataConUserType of the
-  DataCon.  But it's the same modulo changing the variable kinds,
-  done by DataCon.promoteType.
 
 * Small note: We promote the *user* type of the DataCon.  Eg
      data T = MkT {-# UNPACK #-} !(Bool, Bool)
@@ -923,8 +911,6 @@ tyConRepName_maybe (AlgTyCon { algTcParent = parent })
 tyConRepName_maybe (FamilyTyCon { famTcFlav = DataFamilyTyCon rep_nm })
   = Just rep_nm
 tyConRepName_maybe (PromotedDataCon { tcRepName = rep_nm })
-  = Just rep_nm
-tyConRepName_maybe (PromotedTyCon { tcRepName = rep_nm })
   = Just rep_nm
 tyConRepName_maybe _ = Nothing
 
@@ -1113,7 +1099,7 @@ So we compromise, and move their Kind calculation to the call site.
 -}
 
 -- | Given the name of the function type constructor and it's kind, create the
--- corresponding 'TyCon'. It is reccomended to use 'TypeRep.funTyCon' if you want
+-- corresponding 'TyCon'. It is reccomended to use 'TyCoRep.funTyCon' if you want
 -- this functionality
 mkFunTyCon :: Name -> Kind -> Name -> TyCon
 mkFunTyCon name kind rep_nm
@@ -1143,9 +1129,8 @@ mkAlgTyCon :: Name
                                 -- (e.g. vanilla, type family)
            -> RecFlag           -- ^ Is the 'TyCon' recursive?
            -> Bool              -- ^ Was the 'TyCon' declared with GADT syntax?
-           -> Promoted TyCon    -- ^ Promoted version
            -> TyCon
-mkAlgTyCon name kind tyvars roles cType stupid rhs parent is_rec gadt_syn prom_tc
+mkAlgTyCon name kind tyvars roles cType stupid rhs parent is_rec gadt_syn
   = AlgTyCon {
         tyConName        = name,
         tyConUnique      = nameUnique name,
@@ -1159,8 +1144,7 @@ mkAlgTyCon name kind tyvars roles cType stupid rhs parent is_rec gadt_syn prom_t
         algTcFields      = fieldsOfAlgTcRhs rhs,
         algTcParent      = ASSERT2( okParent name parent, ppr name $$ ppr parent ) parent,
         algTcRec         = is_rec,
-        algTcGadtSyntax  = gadt_syn,
-        tcPromoted       = prom_tc
+        algTcGadtSyntax  = gadt_syn
     }
 
 -- | Simpler specialization of 'mkAlgTyCon' for classes
@@ -1170,7 +1154,6 @@ mkClassTyCon name kind tyvars roles rhs clas is_rec tc_rep_name
   = mkAlgTyCon name kind tyvars roles Nothing [] rhs
                (ClassTyCon clas tc_rep_name)
                is_rec False
-               NotPromoted    -- Class TyCons are not promoted
 
 mkTupleTyCon :: Name
              -> Kind    -- ^ Kind of the resulting 'TyCon'
@@ -1178,10 +1161,9 @@ mkTupleTyCon :: Name
              -> [TyVar] -- ^ 'TyVar's scoped over: see 'tyConTyVars'
              -> DataCon
              -> TupleSort    -- ^ Whether the tuple is boxed or unboxed
-             -> Promoted TyCon  -- ^ Promoted version
              -> AlgTyConFlav
              -> TyCon
-mkTupleTyCon name kind arity tyvars con sort prom_tc parent
+mkTupleTyCon name kind arity tyvars con sort parent
   = AlgTyCon {
         tyConName        = name,
         tyConUnique      = nameUnique name,
@@ -1196,9 +1178,20 @@ mkTupleTyCon name kind arity tyvars con sort prom_tc parent
         algTcFields      = emptyFsEnv,
         algTcParent      = parent,
         algTcRec         = NonRecursive,
-        algTcGadtSyntax  = False,
-        tcPromoted       = prom_tc
+        algTcGadtSyntax  = False
     }
+
+-- | Makes a tycon suitable for use during type-checking.
+-- The only real need for this is for printing error messages during
+-- a recursive type/class type-checking knot. It has a kind because
+-- TcErrors sometimes calls typeKind.
+-- See also Note [Kind checking recursive type and class declarations]
+-- in TcTyClsDecls.
+mkTcTyCon :: Name -> Kind -> TyCon
+mkTcTyCon name kind
+  = TcTyCon { tyConUnique  = getUnique name
+            , tyConName    = name
+            , tyConKind    = kind }
 
 -- | Create an unlifted primitive 'TyCon', such as @Int#@
 mkPrimTyCon :: Name  -> Kind -> [Role] -> PrimRep -> TyCon
@@ -1206,9 +1199,11 @@ mkPrimTyCon name kind roles rep
   = mkPrimTyCon' name kind roles rep True Nothing
 
 -- | Kind constructors
-mkKindTyCon :: Name -> Kind -> Name -> TyCon
-mkKindTyCon name kind rep_nm
-  = mkPrimTyCon' name kind [] VoidRep True (Just rep_nm)
+mkKindTyCon :: Name -> Kind -> [Role] -> Name -> TyCon
+mkKindTyCon name kind roles rep_nm
+  = tc
+  where
+    tc = mkPrimTyCon' name kind roles VoidRep False (Just rep_nm)
 
 -- | Create a lifted primitive 'TyCon' such as @RealWorld@
 mkLiftedPrimTyCon :: Name  -> Kind -> [Role] -> PrimRep -> TyCon
@@ -1277,23 +1272,6 @@ mkPromotedDataCon con name rep_name kind roles
   where
     arity = length roles
 
--- | Create a promoted type constructor 'TyCon'
--- Somewhat dodgily, we give it the same Name
--- as the type constructor itself
-mkPromotedTyCon :: TyCon -> Kind -> TyCon
-mkPromotedTyCon tc kind
-  = PromotedTyCon {
-        tyConName   = getName tc,
-        tyConUnique = getUnique tc,
-        tyConArity  = tyConArity tc,
-        tyConKind   = kind,
-        ty_con      = tc,
-        tcRepName   = case tyConRepName_maybe tc of
-                        Just rep_nm -> rep_nm
-                        Nothing     -> pprPanic "mkPromotedTyCon" (ppr tc)
-                      -- Promoted TyCons always have a TyConRepName
-  }
-
 isFunTyCon :: TyCon -> Bool
 isFunTyCon (FunTyCon {}) = True
 isFunTyCon _             = False
@@ -1339,6 +1317,12 @@ isAlgTyCon :: TyCon -> Bool
 isAlgTyCon (AlgTyCon {})   = True
 isAlgTyCon _               = False
 
+-- | Returns @True@ for vanilla AlgTyCons -- that is, those created
+-- with a @data@ or @newtype@ declaration.
+isVanillaAlgTyCon :: TyCon -> Bool
+isVanillaAlgTyCon (AlgTyCon { algTcParent = VanillaAlgTyCon _ }) = True
+isVanillaAlgTyCon _                                              = False
+
 isDataTyCon :: TyCon -> Bool
 -- ^ Returns @True@ for data types that are /definitely/ represented by
 -- heap-allocated constructors.  These are scrutinised by Core-level
@@ -1371,21 +1355,24 @@ isInjectiveTyCon (AlgTyCon {})                 Nominal          = True
 isInjectiveTyCon (AlgTyCon {algTcRhs = rhs})   Representational
   = isGenInjAlgRhs rhs
 isInjectiveTyCon (SynonymTyCon {})             _                = False
-isInjectiveTyCon (FamilyTyCon {famTcFlav = flav}) Nominal       = isDataFamFlav flav
-isInjectiveTyCon (FamilyTyCon {})              Representational = False
+isInjectiveTyCon (FamilyTyCon { famTcFlav = DataFamilyTyCon _ })
+                                               Nominal          = True
+isInjectiveTyCon (FamilyTyCon { famTcInj = Injective inj }) _   = and inj
+isInjectiveTyCon (FamilyTyCon {})              _                = False
 isInjectiveTyCon (PrimTyCon {})                _                = True
 isInjectiveTyCon (PromotedDataCon {})          _                = True
-isInjectiveTyCon (PromotedTyCon {ty_con = tc}) r
-  = isInjectiveTyCon tc r
+isInjectiveTyCon tc@(TcTyCon {})               _
+  = pprPanic "isInjectiveTyCon sees a TcTyCon" (ppr tc)
 
 -- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds
 -- (where X is the role passed in):
 --   If (T tys ~X t), then (t's head ~X T).
 -- See also Note [Decomposing equalities] in TcCanonical
 isGenerativeTyCon :: TyCon -> Role -> Bool
-isGenerativeTyCon = isInjectiveTyCon
-  -- as it happens, generativity and injectivity coincide, but there's
-  -- no a priori reason this must be the case
+isGenerativeTyCon (FamilyTyCon { famTcFlav = DataFamilyTyCon _ }) Nominal = True
+isGenerativeTyCon (FamilyTyCon {}) _ = False
+  -- in all other cases, injectivity implies generativitiy
+isGenerativeTyCon tc               r = isInjectiveTyCon tc r
 
 -- | Is this an 'AlgTyConRhs' of a 'TyCon' that is generative and injective
 -- with respect to representational equality?
@@ -1544,8 +1531,8 @@ isClosedSynFamilyTyConWithAxiom_maybe
   (FamilyTyCon {famTcFlav = ClosedSynFamilyTyCon mb}) = mb
 isClosedSynFamilyTyConWithAxiom_maybe _               = Nothing
 
--- | Try to read the injectivity information from a FamilyTyCon. Only
--- FamilyTyCons can be injective so for every other TyCon this function panics.
+-- | Try to read the injectivity information from a FamilyTyCon.
+-- For every other TyCon this function panics.
 familyTyConInjectivityInfo :: TyCon -> Injectivity
 familyTyConInjectivityInfo (FamilyTyCon { famTcInj = inj }) = inj
 familyTyConInjectivityInfo _ = panic "familyTyConInjectivityInfo"
@@ -1605,30 +1592,6 @@ isRecursiveTyCon :: TyCon -> Bool
 isRecursiveTyCon (AlgTyCon {algTcRec = Recursive}) = True
 isRecursiveTyCon _                                 = False
 
-promotableTyCon_maybe :: TyCon -> Promoted TyCon
-promotableTyCon_maybe (AlgTyCon { tcPromoted = prom })   = prom
-promotableTyCon_maybe _                                  = NotPromoted
-
-isPromotableTyCon :: TyCon -> Bool
-isPromotableTyCon tc = case promotableTyCon_maybe tc of
-                         Promoted {} -> True
-                         NotPromoted -> False
-
-promoteTyCon :: TyCon -> TyCon
-promoteTyCon tc = case promotableTyCon_maybe tc of
-                    Promoted prom_tc -> prom_tc
-                    NotPromoted      -> pprPanic "promoteTyCon" (ppr tc)
-
--- | Is this a PromotedTyCon?
-isPromotedTyCon :: TyCon -> Bool
-isPromotedTyCon (PromotedTyCon {}) = True
-isPromotedTyCon _                  = False
-
--- | Retrieves the promoted TyCon if this is a PromotedTyCon;
-isPromotedTyCon_maybe :: TyCon -> Maybe TyCon
-isPromotedTyCon_maybe (PromotedTyCon { ty_con = tc }) = Just tc
-isPromotedTyCon_maybe _ = Nothing
-
 -- | Is this a PromotedDataCon?
 isPromotedDataCon :: TyCon -> Bool
 isPromotedDataCon (PromotedDataCon {}) = True
@@ -1638,6 +1601,22 @@ isPromotedDataCon _                    = False
 isPromotedDataCon_maybe :: TyCon -> Maybe DataCon
 isPromotedDataCon_maybe (PromotedDataCon { dataCon = dc }) = Just dc
 isPromotedDataCon_maybe _ = Nothing
+
+-- | Is this tycon really meant for use at the kind level? That is,
+-- should it be permitted without -XDataKinds?
+isKindTyCon :: TyCon -> Bool
+isKindTyCon tc = isLiftedTypeKindTyConName (tyConName tc) ||
+                 tc `hasKey` constraintKindTyConKey ||
+                 tc `hasKey` tYPETyConKey ||
+                 tc `hasKey` levityTyConKey ||
+                 tc `hasKey` liftedDataConKey ||
+                 tc `hasKey` unliftedDataConKey
+
+isLiftedTypeKindTyConName :: Name -> Bool
+isLiftedTypeKindTyConName
+  = (`hasKey` liftedTypeKindTyConKey) <||>
+    (`hasKey` starKindTyConKey) <||>
+    (`hasKey` unicodeStarKindTyConKey)
 
 -- | Identifies implicit tycons that, in particular, do not go into interface
 -- files (because they are implicitly reconstructed when the interface is
@@ -1658,16 +1637,22 @@ isImplicitTyCon :: TyCon -> Bool
 isImplicitTyCon (FunTyCon {})        = True
 isImplicitTyCon (PrimTyCon {})       = True
 isImplicitTyCon (PromotedDataCon {}) = True
-isImplicitTyCon (PromotedTyCon {})   = True
 isImplicitTyCon (AlgTyCon { algTcRhs = rhs, tyConName = name })
   | TupleTyCon {} <- rhs             = isWiredInName name
   | otherwise                        = False
 isImplicitTyCon (FamilyTyCon { famTcParent = parent }) = isJust parent
 isImplicitTyCon (SynonymTyCon {})    = False
+isImplicitTyCon tc@(TcTyCon {})
+  = pprPanic "isImplicitTyCon sees a TcTyCon" (ppr tc)
 
 tyConCType_maybe :: TyCon -> Maybe CType
 tyConCType_maybe tc@(AlgTyCon {}) = tyConCType tc
 tyConCType_maybe _ = Nothing
+
+-- | Is this a TcTyCon? (That is, one only used during type-checking?)
+isTcTyCon :: TyCon -> Bool
+isTcTyCon (TcTyCon {}) = True
+isTcTyCon _            = False
 
 {-
 -----------------------------------------------
@@ -1795,7 +1780,7 @@ tyConRoles tc
     ; FamilyTyCon {}                      -> const_role Nominal
     ; PrimTyCon { tcRoles = roles }       -> roles
     ; PromotedDataCon { tcRoles = roles } -> roles
-    ; PromotedTyCon {}                    -> const_role Nominal
+    ; TcTyCon {} -> pprPanic "tyConRoles sees a TcTyCon" (ppr tc)
     }
   where
     const_role r = replicate (tyConArity tc) r
@@ -1956,18 +1941,14 @@ tyConFlavour (SynonymTyCon {})    = "type synonym"
 tyConFlavour (FunTyCon {})        = "built-in type"
 tyConFlavour (PrimTyCon {})       = "built-in type"
 tyConFlavour (PromotedDataCon {}) = "promoted data constructor"
-tyConFlavour (PromotedTyCon {})   = "promoted type constructor"
+tyConFlavour tc@(TcTyCon {})
+  = pprPanic "tyConFlavour sees a TcTyCon" (ppr tc)
 
 pprPromotionQuote :: TyCon -> SDoc
 -- Promoted data constructors already have a tick in their OccName
 pprPromotionQuote tc
   = case tc of
       PromotedDataCon {} -> char '\'' -- Always quote promoted DataCons in types
-
-      PromotedTyCon {}   -> ifPprDebug (char '\'')
-                            -- However, we don't quote TyCons in kinds, except with -dppr-debug
-                            -- e.g. type family T a :: Bool -> *
-                            -- cf Trac #5952.
       _                  -> empty
 
 instance NamedThing TyCon where

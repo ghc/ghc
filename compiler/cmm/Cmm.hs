@@ -16,12 +16,12 @@ module Cmm (
 
      -- * Cmm graphs
      CmmReplGraph, GenCmmReplGraph, CmmFwdRewrite, CmmBwdRewrite,
-   
+
      -- * Info Tables
      CmmTopInfo(..), CmmStackInfo(..), CmmInfoTable(..), topInfoTable,
-     ClosureTypeInfo(..), 
+     ClosureTypeInfo(..),
      C_SRT(..), needsSRT,
-     ProfilingInfo(..), ConstrDescription, 
+     ProfilingInfo(..), ConstrDescription,
 
      -- * Statements, expressions and types
      module CmmNode,
@@ -45,8 +45,8 @@ import Data.Word        ( Word8 )
 --  Cmm, GenCmm
 -----------------------------------------------------------------------------
 
--- A CmmProgram is a list of CmmGroups  
--- A CmmGroup is a list of top-level declarations  
+-- A CmmProgram is a list of CmmGroups
+-- A CmmGroup is a list of top-level declarations
 
 -- When object-splitting is on, each group is compiled into a separate
 -- .o file. So typically we put closely related stuff in a CmmGroup.
@@ -150,7 +150,7 @@ data ProfilingInfo
   = NoProfilingInfo
   | ProfilingInfo [Word8] [Word8] -- closure_type, closure_desc
 
--- C_SRT is what StgSyn.SRT gets translated to... 
+-- C_SRT is what StgSyn.SRT gets translated to...
 -- we add a label for the table, and expect only the 'offset/length' form
 
 data C_SRT = NoC_SRT

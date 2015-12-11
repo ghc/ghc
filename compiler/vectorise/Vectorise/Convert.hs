@@ -10,7 +10,7 @@ import Vectorise.Type.Type
 import CoreSyn
 import TyCon
 import Type
-import TypeRep
+import TyCoRep
 import NameSet
 import FastString
 import Outputable
@@ -24,9 +24,9 @@ import Prelude -- avoid redundant import warning due to AMP
 -- For functions, we eta expand the function and convert the arguments and result:
 
 -- For example
--- @   
---    \(x :: Double) -> 
---    \(y :: Double) -> 
+-- @
+--    \(x :: Double) ->
+--    \(y :: Double) ->
 --    ($v_foo $: x) $: y
 -- @
 --
@@ -35,16 +35,16 @@ import Prelude -- avoid redundant import warning due to AMP
 fromVect :: Type        -- ^ The type of the original binding.
          -> CoreExpr    -- ^ Expression giving the closure to use, eg @$v_foo@.
          -> VM CoreExpr
-  
+
 -- Convert the type to the core view if it isn't already.
 --
-fromVect ty expr 
-  | Just ty' <- coreView ty 
+fromVect ty expr
+  | Just ty' <- coreView ty
   = fromVect ty' expr
 
--- For each function constructor in the original type we add an outer 
+-- For each function constructor in the original type we add an outer
 -- lambda to bind the parameter variable, and an inner application of it.
-fromVect (FunTy arg_ty res_ty) expr
+fromVect (ForAllTy (Anon arg_ty) res_ty) expr
   = do
       arg     <- newLocalVar (fsLit "x") arg_ty
       varg    <- toVect arg_ty (Var arg)
@@ -74,25 +74,26 @@ toVect ty expr = identityConv ty >> return expr
 -- are not altered by vectorisation as they contain no parallel arrays.
 --
 identityConv :: Type -> VM ()
-identityConv ty 
-  | Just ty' <- coreView ty 
+identityConv ty
+  | Just ty' <- coreView ty
   = identityConv ty'
 identityConv (TyConApp tycon tys)
   = do { mapM_ identityConv tys
        ; identityConvTyCon tycon
        }
-identityConv (LitTy {})    = noV $ text "identityConv: not sure about literal types under vectorisation"
-identityConv (TyVarTy {})  = noV $ text "identityConv: type variable changes under vectorisation"
-identityConv (AppTy {})    = noV $ text "identityConv: type appl. changes under vectorisation"
-identityConv (FunTy {})    = noV $ text "identityConv: function type changes under vectorisation"
-identityConv (ForAllTy {}) = noV $ text "identityConv: quantified type changes under vectorisation"
+identityConv (LitTy {})      = noV $ text "identityConv: not sure about literal types under vectorisation"
+identityConv (TyVarTy {})    = noV $ text "identityConv: type variable changes under vectorisation"
+identityConv (AppTy {})      = noV $ text "identityConv: type appl. changes under vectorisation"
+identityConv (ForAllTy {})   = noV $ text "identityConv: quantified type changes under vectorisation"
+identityConv (CastTy {})     = noV $ text "identityConv: not sure about casted types under vectorisation"
+identityConv (CoercionTy {}) = noV $ text "identityConv: not sure about coercions under vectorisation"
 
 -- |Check that this type constructor is not changed by vectorisation — i.e., it does not embed any
 -- parallel arrays.
 --
 identityConvTyCon :: TyCon -> VM ()
 identityConvTyCon tc
-  = do 
+  = do
     { isParallel <- (tyConName tc `elemNameSet`) <$> globalParallelTyCons
     ; parray     <- builtin parrayTyCon
     ; if isParallel && not (tc == parray)

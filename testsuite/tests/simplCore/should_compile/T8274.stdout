@@ -1,10 +1,12 @@
 T8274.$trModule2 = TrNameS "main"#
 T8274.$trModule1 = TrNameS "T8274"#
+T8274.$tc'Positives1 = TrNameS "'Positives"#
+  TyCon 0## 0## T8274.$trModule T8274.$tc'Positives1
 T8274.$tcP1 = TrNameS "P"#
-    11095028091707994303##
-    9476557054198009608##
+T8274.$tcP = TyCon 0## 0## T8274.$trModule T8274.$tcP1
+T8274.$tc'Negatives1 = TrNameS "'Negatives"#
+  TyCon 0## 0## T8274.$trModule T8274.$tc'Negatives1
 T8274.$tcN1 = TrNameS "N"#
-    7479687563082171902##
-    17616649989360543185##
+T8274.$tcN = TyCon 0## 0## T8274.$trModule T8274.$tcN1
 p = T8274.Positives 42# 4.23# 4.23## '4'# 4##
 n = T8274.Negatives -4# -4.0# -4.0##

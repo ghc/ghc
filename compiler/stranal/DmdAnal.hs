@@ -31,7 +31,7 @@ import Coercion         ( Coercion, coVarsOfCo )
 import FamInstEnv
 import Util
 import Maybes           ( isJust )
-import TysWiredIn       ( unboxedPairDataCon )
+import TysWiredIn
 import TysPrim          ( realWorldStatePrimTy )
 import ErrUtils         ( dumpIfSet_dyn )
 import Name             ( getName, stableNameCmp )
@@ -296,7 +296,7 @@ io_hack_reqd :: CoreExpr -> DataCon -> [Var] -> Bool
 -- See Note [IO hack in the demand analyser]
 io_hack_reqd scrut con bndrs
   | (bndr:_) <- bndrs
-  , con == unboxedPairDataCon
+  , con == tupleDataCon Unboxed 2
   , idType bndr `eqType` realWorldStatePrimTy
   , (fun, _) <- collectArgs scrut
   = case fun of

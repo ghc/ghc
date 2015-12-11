@@ -5,7 +5,7 @@ import Data.Data ( Data )
 import Outputable ( Outputable, OutputableBndr )
 import Unique ( Uniquable )
 import BasicTypes (Arity)
-import {-# SOURCE #-} TypeRep (Type)
+import {-# SOURCE #-} TyCoRep (Type)
 import Var (TyVar)
 import Name (Name)
 

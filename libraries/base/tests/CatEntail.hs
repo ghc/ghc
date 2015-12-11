@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeOperators, KindSignatures #-}
 module CatEntail where
 import Prelude hiding (id, (.))
-import GHC.Prim (Constraint)
+import GHC.Exts (Constraint)
 import Control.Category
 
 -- One dictionary to rule them all.

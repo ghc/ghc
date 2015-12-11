@@ -4,7 +4,7 @@
 \section[RnEnv]{Environment manipulation for the renamer monad}
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, MultiWayIf #-}
 
 module RnEnv (
         newTopSrcBinder,
@@ -37,7 +37,8 @@ module RnEnv (
         extendTyVarEnvFVRn,
 
         checkDupRdrNames, checkShadowedRdrNames,
-        checkDupNames, checkDupAndShadowedNames, checkTupSize,
+        checkDupNames, checkDupAndShadowedNames, dupNamesErr,
+        checkTupSize,
         addFvRn, mapFvRn, mapMaybeFvRn, mapFvRnCPS,
         warnUnusedMatches,
         warnUnusedTopBinds, warnUnusedLocalBinds,
@@ -57,6 +58,7 @@ import HscTypes
 import TcEnv
 import TcRnMonad
 import RdrHsSyn         ( setRdrNameSpace )
+import TysWiredIn       ( starKindTyConName, unicodeStarKindTyConName )
 import Name
 import NameSet
 import NameEnv
@@ -710,10 +712,17 @@ lookupOccRn rdr_name
 lookupKindOccRn :: RdrName -> RnM Name
 -- Looking up a name occurring in a kind
 lookupKindOccRn rdr_name
-  = do { mb_name <- lookupOccRn_maybe rdr_name
-       ; case mb_name of
-           Just name -> return name
-           Nothing   -> reportUnboundName rdr_name  }
+  = do { typeintype <- xoptM Opt_TypeInType
+       ; if | typeintype   -> lookupTypeOccRn rdr_name
+            | is_star      -> return starKindTyConName
+            | is_uni_star  -> return unicodeStarKindTyConName
+            | otherwise    -> lookupOccRn rdr_name }
+  where
+      -- With -XNoTypeInType, treat any usage of * in kinds as in scope
+      -- this is a dirty hack, but then again so was the old * kind.
+    fs_name = occNameFS $ rdrNameOcc rdr_name
+    is_star     = fs_name == fsLit "*"
+    is_uni_star = fs_name == fsLit "★"
 
 -- lookupPromotedOccRn looks up an optionally promoted RdrName.
 lookupTypeOccRn :: RdrName -> RnM Name

@@ -75,7 +75,7 @@ module Outputable (
 
         -- * Error handling and debugging utilities
         pprPanic, pprSorry, assertPprPanic, pprPgmError,
-        pprTrace, warnPprTrace, pprSTrace,
+        pprTrace, pprTraceIt, warnPprTrace, pprSTrace,
         trace, pgmError, panic, sorry, assertPanic,
         pprDebugAndThen,
     ) where
@@ -255,6 +255,12 @@ mkUserStyle :: PrintUnqualified -> Depth -> PprStyle
 mkUserStyle unqual depth
    | opt_PprStyle_Debug = PprDebug
    | otherwise          = PprUser unqual depth
+
+instance Outputable PprStyle where
+  ppr (PprUser {})  = text "user-style"
+  ppr (PprCode {})  = text "code-style"
+  ppr (PprDump {})  = text "dump-style"
+  ppr (PprDebug {}) = text "debug-style"
 
 {-
 Orthogonal to the above printing styles are (possibly) some
@@ -698,6 +704,11 @@ instance Outputable Bool where
     ppr True  = ptext (sLit "True")
     ppr False = ptext (sLit "False")
 
+instance Outputable Ordering where
+    ppr LT = text "LT"
+    ppr EQ = text "EQ"
+    ppr GT = text "GT"
+
 instance Outputable Int32 where
    ppr n = integer $ fromIntegral n
 
@@ -1051,6 +1062,10 @@ pprTrace :: String -> SDoc -> a -> a
 pprTrace str doc x
    | opt_NoDebugOutput = x
    | otherwise         = pprDebugAndThen unsafeGlobalDynFlags trace (text str) doc x
+
+-- | @pprTraceIt desc x@ is equivalent to @pprTrace desc (ppr x) x@
+pprTraceIt :: Outputable a => String -> a -> a
+pprTraceIt desc x = pprTrace desc (ppr x) x
 
 
 -- | If debug output is on, show some 'SDoc' on the screen along

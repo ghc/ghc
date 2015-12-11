@@ -9,10 +9,10 @@ module Serialized (
     -- * Main Serialized data type
     Serialized,
     seqSerialized,
-    
+
     -- * Going into and out of 'Serialized'
     toSerialized, fromSerialized,
-    
+
     -- * Handy serialization functions
     serializeWithData, deserializeWithData,
   ) where

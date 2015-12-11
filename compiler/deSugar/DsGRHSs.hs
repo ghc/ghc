@@ -19,12 +19,12 @@ import HsSyn
 import MkCore
 import CoreSyn
 import Var
-import Type
 
 import DsMonad
 import DsUtils
 import TysWiredIn
 import PrelNames
+import Type   ( Type )
 import Module
 import Name
 import Util
@@ -140,7 +140,8 @@ isTrueLHsExpr (L _ (HsVar (L _ v))) |  v `hasKey` otherwiseIdKey
         -- trueDataConId doesn't have the same unique as trueDataCon
 isTrueLHsExpr (L _ (HsTick tickish e))
     | Just ticks <- isTrueLHsExpr e
-    = Just (\x -> ticks x >>= return .  (Tick tickish))
+    = Just (\x -> do wrapped <- ticks x
+                     return (Tick tickish wrapped))
    -- This encodes that the result is constant True for Hpc tick purposes;
    -- which is specifically what isTrueLHsExpr is trying to find out.
 isTrueLHsExpr (L _ (HsBinTick ixT _ e))

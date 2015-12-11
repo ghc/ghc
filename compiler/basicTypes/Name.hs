@@ -77,8 +77,8 @@ module Name (
         module OccName
     ) where
 
-import {-# SOURCE #-} TypeRep( TyThing )
-import {-# SOURCE #-} PrelNames( liftedTypeKindTyConKey )
+import {-# SOURCE #-} TyCoRep( TyThing )
+import {-# SOURCE #-} PrelNames( starKindTyConKey, unicodeStarKindTyConKey )
 
 import OccName
 import Module
@@ -645,7 +645,7 @@ pprInfixName  n = pprInfixVar (isSymOcc (getOccName n)) (ppr n)
 
 pprPrefixName :: NamedThing a => a -> SDoc
 pprPrefixName thing
- |  name `hasKey` liftedTypeKindTyConKey
+ | name `hasKey` starKindTyConKey || name `hasKey` unicodeStarKindTyConKey
  = ppr name   -- See Note [Special treatment for kind *]
  | otherwise
  = pprPrefixVar (isSymOcc (nameOccName name)) (ppr name)
@@ -661,7 +661,7 @@ an operator, it is really a special case.
 This pprPrefixName stuff is really only used when printing HsSyn,
 which has to be polymorphic in the name type, and hence has to go via
 the overloaded function pprPrefixOcc.  It's easier where we know the
-type being pretty printed; eg the pretty-printing code in TypeRep.
+type being pretty printed; eg the pretty-printing code in TyCoRep.
 
 See Trac #7645, which led to this.
 -}

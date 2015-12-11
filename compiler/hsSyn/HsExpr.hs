@@ -594,7 +594,6 @@ in the ParsedSource.
 There are unfortunately enough differences between the ParsedSource and the
 RenamedSource that the API Annotations cannot be used directly with
 RenamedSource, so this allows a simple mapping to be used based on the location.
->>>>>>> origin/master
 -}
 
 instance OutputableBndr id => Outputable (HsExpr id) where

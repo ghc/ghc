@@ -4,4 +4,5 @@ import Module
 import Unique
 
 mAIN :: Module
-liftedTypeKindTyConKey :: Unique
+starKindTyConKey :: Unique
+unicodeStarKindTyConKey :: Unique

@@ -60,10 +60,7 @@ import CoreMonad        ( FloatOutSwitches(..) )
 import CoreUtils        ( exprType, exprOkForSpeculation, exprIsBottom )
 import CoreArity        ( exprBotStrictness_maybe )
 import CoreFVs          -- all of it
-import Coercion         ( isCoVar )
-import CoreSubst        ( Subst, emptySubst, substBndrs, substRecBndrs,
-                          extendIdSubst, extendSubstWithVar, cloneBndrs,
-                          cloneRecIdBndrs, substTy, substCo, substDVarSet )
+import CoreSubst
 import MkCore           ( sortQuantVars )
 import Id
 import IdInfo
@@ -358,16 +355,16 @@ lvlExpr env (_, AnnLet bind body)
            -- float, then neither will the body
        ; return (Let bind' body') }
 
-lvlExpr env (_, AnnCase scrut@(scrut_fvs,_) case_bndr ty alts)
+lvlExpr env (_, AnnCase scrut case_bndr ty alts)
   = do { scrut' <- lvlMFE True env scrut
-       ; lvlCase env scrut_fvs scrut' case_bndr ty alts }
+       ; lvlCase env (freeVarsOf scrut) scrut' case_bndr ty alts }
 
 -------------------------------------------
 lvlCase :: LevelEnv             -- Level of in-scope names/tyvars
         -> DVarSet              -- Free vars of input scrutinee
         -> LevelledExpr         -- Processed scrutinee
         -> Id -> Type           -- Case binder and result type
-        -> [AnnAlt Id DVarSet]  -- Input alternatives
+        -> [CoreAltWithFVs]     -- Input alternatives
         -> LvlM LevelledExpr    -- Result expression
 lvlCase env scrut_fvs scrut' case_bndr ty alts
   | [(con@(DataAlt {}), bs, body)] <- alts
@@ -472,7 +469,7 @@ lvlMFE strict_ctxt env (_, AnnCast e (_, co))
 lvlMFE True env e@(_, AnnCase {})
   = lvlExpr env e     -- Don't share cases
 
-lvlMFE strict_ctxt env ann_expr@(fvs, _)
+lvlMFE strict_ctxt env ann_expr
   |  isUnLiftedType (exprType expr)
          -- Can't let-bind it; see Note [Unlifted MFEs]
          -- This includes coercions, which we don't want to float anyway
@@ -489,6 +486,7 @@ lvlMFE strict_ctxt env ann_expr@(fvs, _)
                      (mkVarApps (Var var) abs_vars)) }
   where
     expr     = deAnnotate ann_expr
+    fvs      = freeVarsOf ann_expr
     is_bot   = exprIsBottom expr      -- Note [Bottoming floats]
     dest_lvl = destLevel env fvs (isFunction ann_expr) is_bot
     abs_vars = abstractVars dest_lvl env fvs
@@ -679,7 +677,7 @@ lvlBind :: LevelEnv
         -> CoreBindWithFVs
         -> LvlM (LevelledBind, LevelEnv)
 
-lvlBind env (AnnNonRec bndr rhs@(rhs_fvs,_))
+lvlBind env (AnnNonRec bndr rhs)
   | isTyVar bndr    -- Don't do anything for TyVar binders
                     --   (simplifier gets rid of them pronto)
   || isCoVar bndr   -- Difficult to fix up CoVar occurrences (see extendPolyLvlEnv)
@@ -709,7 +707,8 @@ lvlBind env (AnnNonRec bndr rhs@(rhs_fvs,_))
        ; return (NonRec (TB bndr' (FloatMe dest_lvl)) rhs', env') }
 
   where
-    bind_fvs   = rhs_fvs `unionDVarSet` runFVDSet (idFreeVarsAcc bndr)
+    rhs_fvs    = freeVarsOf rhs
+    bind_fvs   = rhs_fvs `unionDVarSet` dIdFreeVars bndr
     abs_vars   = abstractVars dest_lvl env bind_fvs
     dest_lvl   = destLevel env bind_fvs (isFunction rhs) is_bot
     is_bot     = exprIsBottom (deAnnotate rhs)
@@ -769,7 +768,7 @@ lvlBind env (AnnRec pairs)
     (bndrs,rhss) = unzip pairs
 
         -- Finding the free vars of the binding group is annoying
-    bind_fvs = ((unionDVarSets [ rhs_fvs | (_, (rhs_fvs,_)) <- pairs])
+    bind_fvs = ((unionDVarSets [ freeVarsOf rhs | (_, rhs) <- pairs])
                 `unionDVarSet`
                 (runFVDSet $ unionsFV [ idFreeVarsAcc bndr
                                       | (bndr, (_,_)) <- pairs]))
@@ -1006,7 +1005,8 @@ abstractVars :: Level -> LevelEnv -> DVarSet -> [OutVar]
         -- See Note [Unique Determinism] in Unique for explanation of why
         -- Uniques are not deterministic.
 abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
-  = map zap $ sortQuantVars $ uniq
+  =  -- NB: sortQuantVars might not put duplicates next to each other
+    map zap $ sortQuantVars $ uniq
     [out_var | out_fv  <- dVarSetElems (substDVarSet subst in_fvs)
              , out_var <- dVarSetElems (close out_fv)
              , abstract_me out_var ]
@@ -1033,7 +1033,7 @@ abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
                              -- Result includes the input variable itself
     close v = foldDVarSet (unionDVarSet . close)
                           (unitDVarSet v)
-                          (runFVDSet $ varTypeTyVarsAcc v)
+                          (runFVDSet $ varTypeTyCoVarsAcc v)
 
 type LvlM result = UniqSM result
 
@@ -1060,7 +1060,7 @@ newPolyBndrs dest_lvl
     add_id    env (v, v') = extendVarEnv env v ((v':abs_vars), mkVarApps (Var v') abs_vars)
 
     mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $         -- Note [transferPolyIdInfo] in Id.hs
-                             mkSysLocal (mkFastString str) uniq poly_ty
+                             mkSysLocalOrCoVar (mkFastString str) uniq poly_ty
                            where
                              str     = "poly_" ++ occNameString (getOccName bndr)
                              poly_ty = mkPiTypes abs_vars (substTy subst (idType bndr))
@@ -1070,7 +1070,7 @@ newLvlVar :: LevelledExpr        -- The RHS of the new binding
           -> LvlM Id
 newLvlVar lvld_rhs is_bot
   = do { uniq <- getUniqueM
-       ; return (add_bot_info (mkLocalId (mk_name uniq) rhs_ty)) }
+       ; return (add_bot_info (mkLocalIdOrCoVar (mk_name uniq) rhs_ty)) }
   where
     add_bot_info var  -- We could call annotateBotStr always, but the is_bot
                       -- flag just tells us when we don't need to do so

@@ -2,7 +2,7 @@ module Vectorise.Utils.Hoisting
   ( Inline(..)
   , addInlineArity
   , inlineMe
-  
+
   , hoistBinding
   , hoistExpr
   , hoistVExpr
@@ -31,7 +31,7 @@ import Prelude -- avoid redundant import warning due to AMP
 
 -- |Records whether we should inline a particular binding.
 --
-data Inline 
+data Inline
         = Inline Arity
         | DontInline
 

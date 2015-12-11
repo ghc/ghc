@@ -28,8 +28,8 @@ import Unique
 -- | Identifier for a stack slot.
 type StackSlot = Int
 
-data StackMap 
-        = StackMap 
+data StackMap
+        = StackMap
         { -- | The slots that are still available to be allocated.
           stackMapNextFreeSlot  :: !Int
 

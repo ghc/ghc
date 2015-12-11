@@ -48,7 +48,7 @@ collectAnnTypeArgs expr = go expr []
 collectAnnDictArgs :: AnnExpr Var ann -> (AnnExpr Var ann, [AnnExpr Var ann])
 collectAnnDictArgs expr = go expr []
   where
-    go e@(_, AnnApp f arg) dicts 
+    go e@(_, AnnApp f arg) dicts
       | isPredTy . exprType . deAnnotate $ arg = go f (arg : dicts)
       | otherwise                              = (e, dicts)
     go e                        dicts          = (e, dicts)
@@ -64,7 +64,7 @@ collectAnnTypeBinders expr = go [] expr
 collectAnnValBinders :: AnnExpr Var ann -> ([Var], AnnExpr Var ann)
 collectAnnValBinders expr = go [] expr
   where
-    go bs (_, AnnLam b e) | isId b 
+    go bs (_, AnnLam b e) | isId b
                           && (not . isPredTy . idType $ b) = go (b : bs) e
     go bs e                                                = (reverse bs, e)
 
@@ -75,7 +75,7 @@ isAnnTypeArg _              = False
 
 -- PD "Parallel Data" Functions -----------------------------------------------
 --
---   Given some data that has a PA dictionary, we can convert it to its 
+--   Given some data that has a PA dictionary, we can convert it to its
 --   representation type, perform some operation on the data, then convert it back.
 --
 --   In the DPH backend, the types of these functions are defined
@@ -92,14 +92,14 @@ emptyPD = paMethod emptyPDVar emptyPD_PrimVar
 replicatePD :: CoreExpr     -- ^ Number of copies in the resulting array.
             -> CoreExpr     -- ^ Value to replicate.
             -> VM CoreExpr
-replicatePD len x 
+replicatePD len x
   = liftM (`mkApps` [len,x])
         $ paMethod replicatePDVar replicatePD_PrimVar (exprType x)
 
 -- |Select some elements from an array that correspond to a particular tag value and pack them into a new
 -- array.
 --
--- > packByTagPD Int# [:23, 42, 95, 50, 27, 49:]  3 [:1, 2, 1, 2, 3, 2:] 2 
+-- > packByTagPD Int# [:23, 42, 95, 50, 27, 49:]  3 [:1, 2, 1, 2, 3, 2:] 2
 -- >   ==> [:42, 50, 49:]
 --
 packByTagPD :: Type       -- ^ Element type.
@@ -146,7 +146,7 @@ isScalar ty
 
 zipScalars :: [Type] -> Type -> VM CoreExpr
 zipScalars arg_tys res_ty
-  = do 
+  = do
     { scalar <- builtin scalarClass
     ; (dfuns, _) <- mapAndUnzipM (\ty -> lookupInst scalar [ty]) ty_args
     ; zipf <- builtin (scalarZip $ length arg_tys)

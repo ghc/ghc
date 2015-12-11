@@ -106,11 +106,10 @@ typeArity ty
   = go initRecTc ty
   where
     go rec_nts ty
-      | Just (_, ty')  <- splitForAllTy_maybe ty
-      = go rec_nts ty'
-
-      | Just (arg,res) <- splitFunTy_maybe ty
-      = typeOneShot arg : go rec_nts res
+      | Just (bndr, ty')  <- splitPiTy_maybe ty
+      = if isIdLikeBinder bndr
+        then typeOneShot (binderType bndr) : go rec_nts ty'
+        else go rec_nts ty'
 
       | Just (tc,tys) <- splitTyConApp_maybe ty
       , Just (ty', _) <- instNewTyCon_maybe tc tys
@@ -771,11 +770,11 @@ arityType env (Tick t e)
 arityType _ _ = vanillaArityType
 
 {-
-************************************************************************
-*                                                                      *
+%************************************************************************
+%*                                                                      *
               The main eta-expander
-*                                                                      *
-************************************************************************
+%*                                                                      *
+%************************************************************************
 
 We go for:
    f = \x1..xn -> N  ==>   f = \x1..xn y1..ym -> N y1..ym
@@ -964,21 +963,19 @@ mkEtaWW :: Arity -> CoreExpr -> InScopeSet -> Type
 mkEtaWW orig_n orig_expr in_scope orig_ty
   = go orig_n empty_subst orig_ty []
   where
-    empty_subst = TvSubst in_scope emptyTvSubstEnv
+    empty_subst = mkEmptyTCvSubst in_scope
 
     go n subst ty eis       -- See Note [exprArity invariant]
        | n == 0
-       = (getTvInScope subst, reverse eis)
+       = (getTCvInScope subst, reverse eis)
 
-       | Just (tv,ty') <- splitForAllTy_maybe ty
-       , let (subst', tv') = Type.substTyVarBndr subst tv
-           -- Avoid free vars of the original expression
-       = go n subst' ty' (EtaVar tv' : eis)
-
-       | Just (arg_ty, res_ty) <- splitFunTy_maybe ty
-       , let (subst', eta_id') = freshEtaId n subst arg_ty
-           -- Avoid free vars of the original expression
-       = go (n-1) subst' res_ty (EtaVar eta_id' : eis)
+       | Just (bndr,ty') <- splitPiTy_maybe ty
+       = let ((subst', eta_id'), new_n) = caseBinder bndr
+               (\tv -> (Type.substTyVarBndr subst tv, n))
+               (\arg_ty -> (freshEtaVar n subst arg_ty, n-1))
+         in
+            -- Avoid free vars of the original expression
+         go new_n subst' ty' (EtaVar eta_id' : eis)
 
        | Just (co, ty') <- topNormaliseNewType_maybe ty
        =        -- Given this:
@@ -992,7 +989,7 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
        | otherwise       -- We have an expression of arity > 0,
                          -- but its type isn't a function.
        = WARN( True, (ppr orig_n <+> ppr orig_ty) $$ ppr orig_expr )
-         (getTvInScope subst, reverse eis)
+         (getTCvInScope subst, reverse eis)
         -- This *can* legitmately happen:
         -- e.g.  coerce Int (\x. x) Essentially the programmer is
         -- playing fast and loose with types (Happy does this a lot).
@@ -1011,7 +1008,7 @@ subst_bind = substBindSC
 
 
 --------------
-freshEtaId :: Int -> TvSubst -> Type -> (TvSubst, Id)
+freshEtaVar :: Int -> TCvSubst -> Type -> (TCvSubst, Var)
 -- Make a fresh Id, with specified type (after applying substitution)
 -- It should be "fresh" in the sense that it's not in the in-scope set
 -- of the TvSubstEnv; and it should itself then be added to the in-scope
@@ -1019,10 +1016,10 @@ freshEtaId :: Int -> TvSubst -> Type -> (TvSubst, Id)
 --
 -- The Int is just a reasonable starting point for generating a unique;
 -- it does not necessarily have to be unique itself.
-freshEtaId n subst ty
+freshEtaVar n subst ty
       = (subst', eta_id')
       where
         ty'     = Type.substTy subst ty
-        eta_id' = uniqAway (getTvInScope subst) $
-                  mkSysLocal (fsLit "eta") (mkBuiltinUnique n) ty'
-        subst'  = extendTvInScope subst eta_id'
+        eta_id' = uniqAway (getTCvInScope subst) $
+                  mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) ty'
+        subst'  = extendTCvInScope subst eta_id'

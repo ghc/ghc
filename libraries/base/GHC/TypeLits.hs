@@ -284,5 +284,3 @@ withSNat f x y = magicDict (WrapN f) x y
 withSSymbol :: (KnownSymbol a => Proxy a -> b)
             -> SSymbol a      -> Proxy a -> b
 withSSymbol f x y = magicDict (WrapS f) x y
-
-

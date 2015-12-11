@@ -17,8 +17,9 @@ import TcRnMonad
 import TcEnv
 import TcMType
 import TysPrim
-import TypeRep
+import TysWiredIn  ( levityTy )
 import Name
+import Coercion    ( emptyCvSubstEnv )
 import SrcLoc
 import PatSyn
 import NameSet
@@ -71,7 +72,7 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
        ; let (arg_names, rec_fields, is_infix) = collectPatSynArgInfo details
        ; (tclvl, wanted, (lpat', (args, pat_ty)))
             <- pushLevelAndCaptureConstraints  $
-               do { pat_ty <- newFlexiTyVarTy openTypeKind
+               do { pat_ty <- newOpenFlexiTyVarTy
                   ; tcPat PatSyn lpat pat_ty $
                do { args <- mapM tcLookupId arg_names
                   ; return (args, pat_ty) } }
@@ -89,7 +90,7 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
        ; traceTc "tcInferPatSynDecl }" $ ppr name
        ; tc_patsyn_finish lname dir is_infix lpat'
                           (univ_tvs, req_theta, ev_binds, req_dicts)
-                          (ex_tvs, map mkTyVarTy ex_tvs, prov_theta, emptyTcEvBinds, prov_dicts)
+                          (ex_tvs, mkTyVarTys ex_tvs, prov_theta, emptyTcEvBinds, map EvId prov_dicts)
                           (zip args $ repeat idHsWrapper)
                           pat_ty rec_fields }
 
@@ -133,14 +134,15 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
            buildImplication skol_info univ_tvs req_dicts $
            tcPat PatSyn lpat pat_ty $ do
            { ex_sigtvs <- mapM (\tv -> newSigTyVar (getName tv) (tyVarKind tv)) ex_tvs
-           ; let subst = mkTvSubst (mkInScopeSet (zipVarEnv ex_sigtvs ex_sigtvs)) $
-                         zipTyEnv ex_tvs (map mkTyVarTy ex_sigtvs)
-           ; let ex_tys = substTys subst $ map mkTyVarTy ex_tvs
+           ; let subst = mkTCvSubst (mkInScopeSet (zipVarEnv ex_sigtvs ex_sigtvs)) $
+                         ( zipTyEnv ex_tvs (mkTyVarTys ex_sigtvs)
+                         , emptyCvSubstEnv )
+           ; let ex_tys = substTys subst $ mkTyVarTys ex_tvs
                  prov_theta' = substTheta subst prov_theta
            ; wrapped_args <- forM (zipEqual "tcCheckPatSynDecl" arg_names arg_tys) $ \(arg_name, arg_ty) -> do
                { arg <- tcLookupId arg_name
                ; let arg_ty' = substTy subst arg_ty
-               ; coi <- unifyType (varType arg) arg_ty'
+               ; coi <- unifyType (Just arg) (varType arg) arg_ty'
                ; return (setVarType arg arg_ty, mkWpCastN coi) }
            ; return (ex_tys, prov_theta', wrapped_args) }
 
@@ -151,7 +153,7 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L loc name), psb_args = details,
        ; (implic2, prov_ev_binds, prov_dicts) <-
            buildImplication skol_info ex_tvs_rhs prov_dicts_rhs $ do
            { let origin = PatOrigin -- TODO
-           ; emitWanteds origin prov_theta' }
+           ; mapM (emitWanted origin) prov_theta' }
 
        -- Solve the constraints now, because we are about to make a PatSyn,
        -- which should not contain unification variables and the like (Trac #10997)
@@ -194,7 +196,7 @@ tc_patsyn_finish :: Located Name  -- ^ PatSyn Name
                  -> Bool              -- ^ Whether infix
                  -> LPat Id           -- ^ Pattern of the PatSyn
                  -> ([TcTyVar], [PredType], TcEvBinds, [EvVar])
-                 -> ([TcTyVar], [TcType], [PredType], TcEvBinds, [EvVar])
+                 -> ([TcTyVar], [TcType], [PredType], TcEvBinds, [EvTerm])
                  -> [(Var, HsWrapper)]  -- ^ Pattern arguments
                  -> TcType              -- ^ Pattern type
                  -> [Name]              -- ^ Selector names
@@ -207,10 +209,10 @@ tc_patsyn_finish lname dir is_infix lpat'
                  pat_ty field_labels
   = do { -- Zonk everything.  We are about to build a final PatSyn
          -- so there had better be no unification variables in there
-         univ_tvs     <- mapM zonkQuantifiedTyVar univ_tvs
-       ; ex_tvs       <- mapM zonkQuantifiedTyVar ex_tvs
-       ; prov_theta   <- zonkTcThetaType prov_theta
-       ; req_theta    <- zonkTcThetaType req_theta
+         univ_tvs     <- mapMaybeM zonkQuantifiedTyVar univ_tvs
+       ; ex_tvs       <- mapMaybeM zonkQuantifiedTyVar ex_tvs
+       ; prov_theta   <- zonkTcTypes prov_theta
+       ; req_theta    <- zonkTcTypes req_theta
        ; pat_ty       <- zonkTcType pat_ty
        ; wrapped_args <- mapM zonk_wrapped_arg wrapped_args
        ; let qtvs    = univ_tvs ++ ex_tvs
@@ -281,7 +283,7 @@ tc_patsyn_finish lname dir is_infix lpat'
 tcPatSynMatcher :: Located Name
                 -> LPat Id
                 -> ([TcTyVar], ThetaType, TcEvBinds, [EvVar])
-                -> ([TcTyVar], [TcType], ThetaType, TcEvBinds, [EvVar])
+                -> ([TcTyVar], [TcType], ThetaType, TcEvBinds, [EvTerm])
                 -> [(Var, HsWrapper)]
                 -> TcType
                 -> TcM ((Id, Bool), LHsBinds Id)
@@ -290,9 +292,13 @@ tcPatSynMatcher (L loc name) lpat
                 (univ_tvs, req_theta, req_ev_binds, req_dicts)
                 (ex_tvs, ex_tys, prov_theta, prov_ev_binds, prov_dicts)
                 wrapped_args pat_ty
-  = do { uniq <- newUnique
-       ; let tv_name = mkInternalName uniq (mkTyVarOcc "r") loc
-             res_tv  = mkTcTyVar tv_name openTypeKind (SkolemTv False)
+  = do { lev_uniq <- newUnique
+       ; tv_uniq  <- newUnique
+       ; let lev_name = mkInternalName lev_uniq (mkTyVarOcc "rlev") loc
+             tv_name  = mkInternalName tv_uniq (mkTyVarOcc "r") loc
+             lev_tv   = mkTcTyVar lev_name levityTy   (SkolemTv False)
+             lev      = mkTyVarTy lev_tv
+             res_tv   = mkTcTyVar tv_name  (tYPE lev) (SkolemTv False)
              is_unlifted = null wrapped_args && null prov_dicts
              res_ty = mkTyVarTy res_tv
              (cont_arg_tys, cont_args)
@@ -300,7 +306,7 @@ tcPatSynMatcher (L loc name) lpat
                | otherwise   = unzip [ (varType arg, mkLHsWrap wrap $ nlHsVar arg)
                                      | (arg, wrap) <- wrapped_args
                                      ]
-             cont_ty = mkSigmaTy ex_tvs prov_theta $
+             cont_ty = mkInvSigmaTy ex_tvs prov_theta $
                        mkFunTys cont_arg_tys res_ty
 
              fail_ty = mkFunTy voidPrimTy res_ty
@@ -311,13 +317,14 @@ tcPatSynMatcher (L loc name) lpat
        ; fail         <- newSysLocalId (fsLit "fail")  fail_ty
 
        ; let matcher_tau   = mkFunTys [pat_ty, cont_ty, fail_ty] res_ty
-             matcher_sigma = mkSigmaTy (res_tv:univ_tvs) req_theta matcher_tau
+             matcher_sigma = mkInvSigmaTy (lev_tv:res_tv:univ_tvs) req_theta matcher_tau
              matcher_id    = mkExportedLocalId PatSynId matcher_name matcher_sigma
                              -- See Note [Exported LocalIds] in Id
 
-             cont_dicts = map nlHsVar prov_dicts
              cont' = mkLHsWrap (mkWpLet prov_ev_binds) $
-                     nlHsTyApps cont ex_tys (cont_dicts ++ cont_args)
+                     foldl nlHsApp
+                       (mkLHsWrap (mkWpEvApps prov_dicts)
+                                  (nlHsTyApp cont ex_tys)) cont_args
 
              fail' = nlHsApps fail [nlHsVar voidPrimId]
 
@@ -342,7 +349,7 @@ tcPatSynMatcher (L loc name) lpat
                        , mg_res_ty = res_ty
                        , mg_origin = Generated
                        }
-             match = mkMatch [] (mkHsLams (res_tv:univ_tvs) req_dicts body')
+             match = mkMatch [] (mkHsLams (lev_tv:res_tv:univ_tvs) req_dicts body')
                              (noLoc EmptyLocalBinds)
              mg = MG{ mg_alts = L (getLoc match) [match]
                     , mg_arg_tys = []
@@ -393,7 +400,7 @@ mkPatSynBuilderId dir  (L _ name) qtvs theta arg_tys pat_ty
   = return Nothing
   | otherwise
   = do { builder_name <- newImplicitBinder name mkBuilderOcc
-       ; let builder_sigma = mkSigmaTy qtvs theta (mkFunTys builder_arg_tys pat_ty)
+       ; let builder_sigma = mkInvSigmaTy qtvs theta (mkFunTys builder_arg_tys pat_ty)
              builder_id    =
               -- See Note [Exported LocalIds] in Id
               mkExportedLocalId VanillaId builder_name builder_sigma

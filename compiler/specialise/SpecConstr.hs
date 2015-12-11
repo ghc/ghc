@@ -31,13 +31,13 @@ import Literal          ( litIsLifted )
 import HscTypes         ( ModGuts(..) )
 import WwLib            ( mkWorkerArgs )
 import DataCon
-import Coercion         hiding( substTy, substCo )
+import Coercion         hiding( substCo )
 import Rules
 import Type             hiding ( substTy )
 import TyCon            ( isRecursiveTyCon, tyConName )
 import Id
 import PprCore          ( pprParendExpr )
-import MkCore           ( mkImpossibleExpr, sortQuantVars )
+import MkCore           ( mkImpossibleExpr )
 import Var
 import VarEnv
 import VarSet
@@ -1643,7 +1643,7 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
 --        return ()
 
                 -- And build the results
-        ; let spec_id    = mkLocalId spec_name (mkPiTypes spec_lam_args body_ty)
+        ; let spec_id    = mkLocalIdOrCoVar spec_name (mkPiTypes spec_lam_args body_ty)
                              -- See Note [Transfer strictness]
                              `setIdStrictness` spec_str
                              `setIdArity` count isId spec_lam_args
@@ -1850,7 +1850,7 @@ callToPats env bndr_occs (Call _ args con_env)
                 -- See Note [Shadowing] at the top
 
               (ktvs, ids)   = partition isTyVar qvars
-              qvars'        = sortQuantVars ktvs ++ map sanitise ids
+              qvars'        = toposortTyVars ktvs ++ map sanitise ids
                 -- Order into kind variables, type variables, term variables
                 -- The kind of a type variable may mention a kind variable
                 -- and the type of a term variable may mention a type variable
@@ -2001,7 +2001,7 @@ argToPat _env _in_scope _val_env arg _arg_occ
 wildCardPat :: Type -> UniqSM (Bool, CoreArg)
 wildCardPat ty
   = do { uniq <- getUniqueM
-       ; let id = mkSysLocal (fsLit "sc") uniq ty
+       ; let id = mkSysLocalOrCoVar (fsLit "sc") uniq ty
        ; return (False, varToCoreExpr id) }
 
 argsToPats :: ScEnv -> InScopeSet -> ValueEnv

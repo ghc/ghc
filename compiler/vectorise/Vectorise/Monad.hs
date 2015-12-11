@@ -10,12 +10,12 @@ module Vectorise.Monad (
   liftBuiltinDs,
   builtin,
   builtins,
-  
+
   -- * Variables
   lookupVar,
   lookupVar_maybe,
-  addGlobalParallelVar, 
-  addGlobalParallelTyCon, 
+  addGlobalParallelVar,
+  addGlobalParallelTyCon,
 ) where
 
 import Vectorise.Monad.Base
@@ -72,13 +72,13 @@ initV hsc_env guts info thing_inside
     dflags = hsc_dflags hsc_env
 
     dumpIfVtTrace = dumpIfSet_dyn dflags Opt_D_dump_vt_trace
-    
+
     bindsToIds (NonRec v _)   = [v]
     bindsToIds (Rec    binds) = map fst binds
-    
+
     ids = concatMap bindsToIds (mg_binds guts)
 
-    go 
+    go
       = do {   -- set up tables of builtin entities
            ; builtins        <- initBuiltins
            ; builtin_vars    <- initBuiltinVars builtins
@@ -96,15 +96,15 @@ initV hsc_env guts info thing_inside
            ; let genv = extendImportedVarsEnv builtin_vars
                         . setPAFunsEnv        builtin_pas
                         . setPRFunsEnv        builtin_prs
-                        $ initGlobalEnv (gopt Opt_VectorisationAvoidance dflags) 
+                        $ initGlobalEnv (gopt Opt_VectorisationAvoidance dflags)
                                         info (mg_vect_decls guts) instEnvs famInstEnvs
- 
+
                -- perform vectorisation
            ; r <- runVM thing_inside builtins genv emptyLocalEnv
            ; case r of
                Yes genv _ x -> return $ Just (new_info genv, x)
                No reason    -> do { unqual <- mkPrintUnqualifiedDs
-                                  ; liftIO $ 
+                                  ; liftIO $
                                       printOutputForUser dflags unqual $
                                         mkDumpDoc "Warning: vectorisation failure:" reason
                                   ; return Nothing
@@ -193,6 +193,6 @@ addGlobalParallelVar var
 addGlobalParallelTyCon :: TyCon -> VM ()
 addGlobalParallelTyCon tycon
   = do { traceVt "addGlobalParallelTyCon" (ppr tycon)
-       ; updGEnv $ \env -> 
+       ; updGEnv $ \env ->
            env{global_parallel_tycons = extendNameSet (global_parallel_tycons env) (tyConName tycon)}
        }

@@ -6,9 +6,9 @@ TYPE SIGNATURES
   s :: forall t t1. Q t (Z [Char]) t1 -> Q t (Z [Char]) t1
 TYPE CONSTRUCTORS
   data Q s a chain = Node s a chain
-    Promotable
+    Kind: * -> * -> * -> *
   data Z a = Z a
-    Promotable
+    Kind: * -> *
   class Zork s a b | a -> b where
     huh :: Q s a chain -> ST s ()
     {-# MINIMAL huh #-}

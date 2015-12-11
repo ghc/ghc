@@ -52,19 +52,17 @@ data Coercion a b where
 -- Steenbergen for 'type-equality', Edward Kmett for 'eq', and Gabor Greif
 -- for 'type-eq'
 
-newtype Sym a b = Sym { unsym :: Coercion b a }
-
 -- | Type-safe cast, using representational equality
 coerceWith :: Coercion a b -> a -> b
 coerceWith Coercion x = coerce x
 
 -- | Symmetry of representational equality
-sym :: forall a b. Coercion a b -> Coercion b a
-sym Coercion = unsym (coerce (Sym Coercion :: Sym a a))
+sym :: Coercion a b -> Coercion b a
+sym Coercion = Coercion
 
 -- | Transitivity of representational equality
 trans :: Coercion a b -> Coercion b c -> Coercion a c
-trans c Coercion = coerce c
+trans Coercion Coercion = Coercion
 
 -- | Convert propositional (nominal) equality to representational equality
 repr :: (a Eq.:~: b) -> Coercion a b
@@ -98,4 +96,4 @@ instance TestCoercion ((Eq.:~:) a) where
   testCoercion Eq.Refl Eq.Refl = Just Coercion
 
 instance TestCoercion (Coercion a) where
-  testCoercion c Coercion = Just $ coerce (sym c)
+  testCoercion Coercion Coercion = Just Coercion

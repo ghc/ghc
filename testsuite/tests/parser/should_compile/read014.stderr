@@ -1,7 +1,7 @@
 
 read014.hs:4:1: Warning:
     Top-level binding with no type signature:
-      ng1 :: forall t a. Num a => t -> a -> a
+      ng1 :: forall r a. Num a => r -> a -> a
 
 read014.hs:4:5: Warning: Defined but not used: ‘x’
 

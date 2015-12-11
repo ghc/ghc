@@ -226,7 +226,6 @@ okSymChar c
       OtherSymbol          -> True
       _                    -> False
 
-
 -- | All reserved identifiers. Taken from section 2.4 of the 2010 Report.
 reservedIds :: Set.Set String
 reservedIds = Set.fromList [ "case", "class", "data", "default", "deriving"

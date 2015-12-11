@@ -37,7 +37,7 @@ import CoreFVs          ( exprFreeVars, exprsFreeVars, bindFreeVars
 import CoreUtils        ( exprType, eqExpr, mkTick, mkTicks,
                           stripTicksTopT, stripTicksTopE )
 import PprCore          ( pprRules )
-import Type             ( Type, substTy, mkTvSubst )
+import Type             ( Type, substTy, mkTCvSubst )
 import TcType           ( tcSplitTyConApp_maybe )
 import TysPrim          ( anyTypeOfKind )
 import Coercion
@@ -50,7 +50,7 @@ import VarSet
 import Name             ( Name, NamedThing(..), nameIsLocalOrFrom )
 import NameSet
 import NameEnv
-import Unify            ( ruleMatchTyX, MatchEnv(..) )
+import Unify            ( ruleMatchTyX )
 import BasicTypes       ( Activation, CompilerPhase, isActive, pprRuleName )
 import StaticFlags      ( opt_PprStyle_Debug )
 import DynFlags         ( DynFlags )
@@ -61,6 +61,7 @@ import Bag
 import Util
 import Data.List
 import Data.Ord
+import Control.Monad    ( guard )
 
 {-
 Note [Overall plumbing for rules]
@@ -561,7 +562,17 @@ matchN (in_scope, id_unf) rule_name tmpl_vars tmpl_es target_es
              -- See Note [Unbound template type variables]
         where
           fake_ty = anyTypeOfKind kind
-          kind = Type.substTy (mkTvSubst in_scope tv_subst) (tyVarKind tmpl_var)
+          cv_subst = to_co_env id_subst
+          kind = Type.substTy (mkTCvSubst in_scope (tv_subst, cv_subst))
+                              (tyVarKind tmpl_var)
+
+          to_co_env env = foldVarEnv_Directly to_co emptyVarEnv env
+          to_co uniq expr env
+            | Just co <- exprToCoercion_maybe expr
+            = extendVarEnv_Directly env uniq co
+
+            | otherwise
+            = env
 
     unbound var = pprPanic "Template variable unbound in rewrite rule" $
                   vcat [ ptext (sLit "Variable:") <+> ppr var
@@ -779,19 +790,20 @@ match_co :: RuleMatchEnv
          -> Coercion
          -> Coercion
          -> Maybe RuleSubst
-match_co renv subst (CoVarCo cv) co
-  = match_var renv subst cv (Coercion co)
-match_co renv subst (Refl r1 ty1) co
-  = case co of
-       Refl r2 ty2
-         | r1 == r2 -> match_ty renv subst ty1 ty2
-       _            -> Nothing
-match_co renv subst (TyConAppCo r1 tc1 cos1) co2
-  = case co2 of
-       TyConAppCo r2 tc2 cos2
-         | r1 == r2 && tc1 == tc2
-         -> match_cos renv subst cos1 cos2
-       _ -> Nothing
+match_co renv subst co1 co2
+  | Just cv <- getCoVar_maybe co1
+  = match_var renv subst cv (Coercion co2)
+  | Just (ty1, r1) <- isReflCo_maybe co1
+  = do { (ty2, r2) <- isReflCo_maybe co2
+       ; guard (r1 == r2)
+       ; match_ty renv subst ty1 ty2 }
+match_co renv subst co1 co2
+  | Just (tc1, cos1) <- splitTyConAppCo_maybe co1
+  = case splitTyConAppCo_maybe co2 of
+      Just (tc2, cos2)
+        |  tc1 == tc2
+        -> match_cos renv subst cos1 cos2
+      _ -> Nothing
 match_co _ _ _co1 _co2
     -- Currently just deals with CoVarCo, TyConAppCo and Refl
 #ifdef DEBUG
@@ -806,12 +818,10 @@ match_cos :: RuleMatchEnv
          -> [Coercion]
          -> Maybe RuleSubst
 match_cos renv subst (co1:cos1) (co2:cos2) =
-    case match_co renv subst co1 co2 of
-       Just subst' -> match_cos renv subst' cos1 cos2
-       Nothing -> Nothing
+  do { subst' <- match_co renv subst co1 co2
+     ; match_cos renv subst' cos1 cos2 }
 match_cos _ subst [] [] = Just subst
 match_cos _ _ cos1 cos2 = pprTrace "match_cos: not same length" (ppr cos1 $$ ppr cos2) Nothing
-
 
 -------------
 rnMatchBndr2 :: RuleMatchEnv -> RuleSubst -> Var -> Var -> RuleMatchEnv
@@ -932,11 +942,11 @@ match_ty :: RuleMatchEnv
 -- We only want to replace (f T) with f', not (f Int).
 
 match_ty renv subst ty1 ty2
-  = do  { tv_subst' <- Unify.ruleMatchTyX menv tv_subst ty1 ty2
+  = do  { tv_subst'
+            <- Unify.ruleMatchTyX (rv_tmpls renv) (rv_lcl renv) tv_subst ty1 ty2
         ; return (subst { rs_tv_subst = tv_subst' }) }
   where
     tv_subst = rs_tv_subst subst
-    menv = ME { me_tmpls = rv_tmpls renv, me_env = rv_lcl renv }
 
 {-
 Note [Expanding variables]

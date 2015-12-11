@@ -32,7 +32,7 @@ import Unique
 import Util
 import Name
 import BasicTypes
-import TypeRep (Type, ThetaType)
+import TyCoRep (Type, ThetaType)
 import Var
 import Type (mkTyConApp)
 
@@ -169,7 +169,7 @@ conLikeResTy (PatSynCon ps)    tys = patSynInstResTy ps tys
 --
 -- 7) The original result type
 conLikeFullSig :: ConLike
-               -> ([TyVar], [TyVar], [(TyVar,Type)]
+               -> ([TyVar], [TyVar], [EqSpec]
                   , ThetaType, ThetaType, [Type], Type)
 conLikeFullSig (RealDataCon con) =
   let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, res_ty) = dataConFullSig con

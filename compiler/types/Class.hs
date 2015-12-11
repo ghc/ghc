@@ -17,19 +17,22 @@ module Class (
         mkClass, classTyVars, classArity,
         classKey, className, classATs, classATItems, classTyCon, classMethods,
         classOpItems, classBigSig, classExtraBigSig, classTvsFds, classSCTheta,
-        classAllSelIds, classSCSelId, classMinimalDef, classHasFds
+        classAllSelIds, classSCSelId, classMinimalDef, classHasFds,
+        naturallyCoherentClass
     ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TyCon     ( TyCon, tyConName, tyConUnique )
-import {-# SOURCE #-} TypeRep   ( Type, PredType )
+import {-# SOURCE #-} TyCoRep   ( Type, PredType )
 import Var
 import Name
 import BasicTypes
 import Unique
 import Util
 import SrcLoc
+import PrelNames    ( eqTyConKey, coercibleTyConKey, typeableClassKey,
+                      heqTyConKey )
 import Outputable
 import FastString
 import BooleanFormula (BooleanFormula)
@@ -51,7 +54,7 @@ data Class
   = Class {
         classTyCon :: TyCon,    -- The data type constructor for
                                 -- dictionaries of this class
-                                -- See Note [ATyCon for classes] in TypeRep
+                                -- See Note [ATyCon for classes] in TyCoRep
 
         className :: Name,              -- Just the cached name of the TyCon
         classKey  :: Unique,            -- Cached unique of TyCon
@@ -59,7 +62,7 @@ data Class
         classTyVars  :: [TyVar],        -- The class kind and type variables;
                                         -- identical to those of the TyCon
 
-        classFunDeps :: [FunDep TyVar], -- The functional dependencies
+        classFunDeps :: [FunDep TyVar],  -- The functional dependencies
 
         -- Superclasses: eg: (F a ~ b, F b ~ G a, Eq a, Show b)
         -- We need value-level selectors for both the dictionary
@@ -254,6 +257,15 @@ classExtraBigSig (Class {classTyVars = tyvars, classFunDeps = fundeps,
                          classSCTheta = sc_theta, classSCSels = sc_sels,
                          classATStuff = ats, classOpStuff = op_stuff})
   = (tyvars, fundeps, sc_theta, sc_sels, ats, op_stuff)
+
+-- | If a class is "naturally coherent", then we needn't worry at all, in any
+-- way, about overlapping/incoherent instances. Just solve the thing!
+naturallyCoherentClass :: Class -> Bool
+naturallyCoherentClass cls
+  = cls `hasKey` heqTyConKey ||
+    cls `hasKey` eqTyConKey ||
+    cls `hasKey` coercibleTyConKey ||
+    cls `hasKey` typeableClassKey
 
 {-
 ************************************************************************

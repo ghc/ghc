@@ -148,6 +148,7 @@ Library
         Data.IORef
         Data.Int
         Data.Ix
+        Data.Kind
         Data.List
         Data.List.NonEmpty
         Data.Maybe

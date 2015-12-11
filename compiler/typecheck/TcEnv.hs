@@ -48,7 +48,7 @@ module TcEnv(
         tcGetDefaultTys,
 
         -- Global type variables
-        tcGetGlobalTyVars,
+        tcGetGlobalTyCoVars,
 
         -- Template Haskell stuff
         checkWellStaged, tcMetaTy, thLevel,
@@ -82,7 +82,6 @@ import PatSyn  ( PatSyn )
 import ConLike
 import TyCon
 import CoAxiom
-import TypeRep
 import Class
 import Name
 import NameEnv
@@ -211,7 +210,7 @@ tcLookupLocatedTyCon :: Located Name -> TcM TyCon
 tcLookupLocatedTyCon = addLocM tcLookupTyCon
 
 -- Find the instance that exactly matches a type class application.  The class arguments must be precisely
--- the same as in the instance declaration (modulo renaming).
+-- the same as in the instance declaration (modulo renaming & casts).
 --
 tcLookupInstance :: Class -> [Type] -> TcM ClsInst
 tcLookupInstance cls tys
@@ -225,10 +224,8 @@ tcLookupInstance cls tys
   where
     errNotExact = ptext (sLit "Not an exact match (i.e., some variables get instantiated)")
 
-    uniqueTyVars tys = all isTyVarTy tys && hasNoDups (map extractTyVar tys)
-      where
-        extractTyVar (TyVarTy tv) = tv
-        extractTyVar _            = panic "TcEnv.tcLookupInstance: extractTyVar"
+    uniqueTyVars tys = all isTyVarTy tys
+                    && hasNoDups (map (getTyVar "tcLookupInstance") tys)
 
 tcGetInstEnvs :: TcM InstEnvs
 -- Gets both the external-package inst-env
@@ -359,7 +356,6 @@ tcLookupLocalIds ns
                 _ -> pprPanic "tcLookupLocalIds" (ppr name)
 
 getInLocalScope :: TcM (Name -> Bool)
-  -- Ids only
 getInLocalScope = do { lcl_env <- getLclTypeEnv
                      ; return (`elemNameEnv` lcl_env) }
 
@@ -373,8 +369,8 @@ tcExtendKindEnv2 things thing_inside
     upd_env env = env { tcl_env = extendNameEnvList (tcl_env env) things }
 
 tcExtendKindEnv :: [(Name, TcKind)] -> TcM r -> TcM r
-tcExtendKindEnv name_kind_prs
-  = tcExtendKindEnv2 [(n, AThing k) | (n,k) <- name_kind_prs]
+tcExtendKindEnv nks
+  = tcExtendKindEnv2 $ mapSnd AThing nks
 
 -----------------------
 -- Scoped type and kind variables
@@ -384,6 +380,8 @@ tcExtendTyVarEnv tvs thing_inside
 
 tcExtendTyVarEnv2 :: [(Name,TcTyVar)] -> TcM r -> TcM r
 tcExtendTyVarEnv2 binds thing_inside
+  -- this should be used only for explicitly mentioned scoped variables.
+  -- thus, no coercion variables
   = do { tc_extend_local_env NotTopLevel
                     [(name, ATyVar name tv) | (name, tv) <- binds] $
          do { env <- getLclEnv
@@ -397,7 +395,8 @@ tcExtendTyVarEnv2 binds thing_inside
     -- OccName that the programmer originally used for them
     add :: TidyEnv -> (Name, TcTyVar) -> TidyEnv
     add (env,subst) (name, tyvar)
-        = case tidyOccName env (nameOccName name) of
+        = ASSERT( isTyVar tyvar )
+          case tidyOccName env (nameOccName name) of
             (env', occ') ->  (env', extendVarEnv subst tyvar tyvar')
                 where
                   tyvar' = setTyVarName tyvar name'
@@ -414,8 +413,8 @@ isClosedLetBndr :: Id -> TopLevelFlag
 -- looking at its type, which is slightly more liberal, and a whole
 -- lot easier to implement, than looking at its free variables
 isClosedLetBndr id
-  | isEmptyVarSet (tyVarsOfType (idType id)) = TopLevel
-  | otherwise                                = NotTopLevel
+  | isEmptyVarSet (tyCoVarsOfType (idType id)) = TopLevel
+  | otherwise                                  = NotTopLevel
 
 tcExtendLetEnv :: TopLevelFlag -> [TcId] -> TcM a -> TcM a
 -- Used for both top-level value bindings and and nested let/where-bindings
@@ -465,7 +464,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
 --          (see Kind.defaultKind, done in zonkQuantifiedTyVar)
 --      (b) There are no via-Indirect occurrences of the bound variables
 --          in the types, because instantiation does not look through such things
---      (c) The call to tyVarsOfTypes is ok without looking through refs
+--      (c) The call to tyCoVarsOfTypes is ok without looking through refs
 
 -- The second argument of type TyVarSet is a set of type variables
 -- that are bound together with extra_env and should not be regarded
@@ -507,12 +506,12 @@ tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
           TopLevel    -> ASSERT2( isEmptyVarSet id_tvs, ppr id $$ ppr (idType id) )
                          tvs
           NotTopLevel -> tvs `unionVarSet` id_tvs
-        where id_tvs = tyVarsOfType (idType id)
+        where id_tvs = tyCoVarsOfType (idType id)
 
     get_tvs (_, ATyVar _ tv) tvs          -- See Note [Global TyVars]
-      = tvs `unionVarSet` tyVarsOfType (tyVarKind tv) `extendVarSet` tv
+      = tvs `unionVarSet` tyCoVarsOfType (tyVarKind tv) `extendVarSet` tv
 
-    get_tvs (_, AThing k) tvs = tvs `unionVarSet` tyVarsOfType k
+    get_tvs (_, AThing k) tvs = tvs `unionVarSet` tyCoVarsOfType k
 
     get_tvs (_, AGlobal {})       tvs = tvs
     get_tvs (_, APromotionErr {}) tvs = tvs
@@ -716,7 +715,7 @@ data InstBindings a
       , ib_derived :: Bool
            -- True <=> This code was generated by GHC from a deriving clause
            --          or standalone deriving declaration
-           -- Used only to improve error messages
+           --          Used only to improve error messages
       }
 
 instance OutputableBndr a => Outputable (InstInfo a) where
@@ -862,7 +861,7 @@ notFound name
                 vcat[ptext (sLit "GHC internal error:") <+> quotes (ppr name) <+>
                      ptext (sLit "is not in scope during type checking, but it passed the renamer"),
                      ptext (sLit "tcl_env of environment:") <+> ppr (tcl_env lcl_env)]
-                       -- Take case: printing the whole gbl env can
+                       -- Take care: printing the whole gbl env can
                        -- cause an infinite loop, in the case where we
                        -- are in the middle of a recursive TyCon/Class group;
                        -- so let's just not print it!  Getting a loop here is

@@ -1,16 +1,36 @@
 
-T2994.hs:11:10:
+T2994.hs:11:10: error:
     Expecting one more argument to ‘MonadReader Int’
     Expected a constraint,
       but ‘MonadReader Int’ has kind ‘* -> Constraint’
     In the instance declaration for ‘MonadReader Int’
 
-T2994.hs:13:23:
-    Expecting one more argument to ‘Reader' r’
-    The first argument of ‘MonadReader’ should have kind ‘*’,
-      but ‘Reader' r’ has kind ‘* -> *’
+T2994.hs:11:10: error:
+    Malformed instance head: MonadReader Int
+    In the instance declaration for ‘MonadReader Int’
+
+T2994.hs:13:10: error:
+    Expecting one more argument to ‘MonadReader (Reader' r)’
+    Expected a constraint,
+      but ‘MonadReader (Reader' r)’ has kind ‘* -> Constraint’
     In the instance declaration for ‘MonadReader (Reader' r)’
 
-T2994.hs:15:10:
-    ‘MonadReader’ is applied to too many type arguments
+T2994.hs:13:10: error:
+    Malformed instance head: MonadReader (Reader' r)
+    In the instance declaration for ‘MonadReader (Reader' r)’
+
+T2994.hs:13:23: error:
+    Expecting one more argument to ‘Reader' r’
+    Expected a type, but ‘Reader' r’ has kind ‘* -> *’
+    In the first argument of ‘MonadReader’, namely ‘Reader' r’
+    In the instance declaration for ‘MonadReader (Reader' r)’
+
+T2994.hs:15:10: error:
+    Expecting one fewer argument to ‘MonadReader r r’
+    Expected kind ‘(* -> *) -> Constraint’,
+      but ‘MonadReader r r’ has kind ‘Constraint’
+    In the instance declaration for ‘MonadReader r r (Reader' r)’
+
+T2994.hs:15:10: error:
+    Malformed instance head: MonadReader r r (Reader' r)
     In the instance declaration for ‘MonadReader r r (Reader' r)’

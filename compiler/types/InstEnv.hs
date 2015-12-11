@@ -21,7 +21,7 @@ module InstEnv (
 
         InstEnvs(..), VisibleOrphanModules, InstEnv,
         emptyInstEnv, extendInstEnv, deleteFromInstEnv, identicalClsInstHead,
-        extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv', lookupInstEnv, instEnvElts,
+        extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv, instEnvElts,
         memberInstEnv, instIsVisible,
         classInstances, orphNamesOfClsInst, instanceBindFun,
         instanceCantMatch, roughMatchTcs
@@ -261,9 +261,10 @@ mkImportedInstance cls_nm mb_tcs dfun oflag orphan
 roughMatchTcs :: [Type] -> [Maybe Name]
 roughMatchTcs tys = map rough tys
   where
-    rough ty = case tcSplitTyConApp_maybe ty of
-                  Just (tc,_) -> Just (tyConName tc)
-                  Nothing     -> Nothing
+    rough ty
+      | Just (ty', _) <- tcSplitCastTy_maybe ty = rough ty'
+      | Just (tc,_) <- tcSplitTyConApp_maybe ty = Just (tyConName tc)
+      | otherwise                               = Nothing
 
 instanceCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
 -- (instanceCantMatch tcs1 tcs2) returns True if tcs1 cannot
@@ -676,7 +677,6 @@ where the 'Nothing' indicates that 'b' can be freely instantiated.
 -- |Look up an instance in the given instance environment. The given class application must match exactly
 -- one instance and the match may not contain any flexi type variables.  If the lookup is unsuccessful,
 -- yield 'Left errorMessage'.
---
 lookupUniqueInstEnv :: InstEnvs
                     -> Class -> [Type]
                     -> Either MsgDoc (ClsInst, [Type])
@@ -711,6 +711,7 @@ lookupInstEnv' ie vis_mods cls tys
   where
     rough_tcs  = roughMatchTcs tys
     all_tvs    = all isNothing rough_tcs
+
     --------------
     lookup env = case lookupUFM env cls of
                    Nothing -> ([],[])   -- No instances for this class
@@ -728,7 +729,7 @@ lookupInstEnv' ie vis_mods cls tys
       = find ms us rest
 
       | Just subst <- tcMatchTys tpl_tv_set tpl_tys tys
-      = find ((item, map (lookup_tv subst) tpl_tvs) : ms) us rest
+      = find ((item, map (lookupTyVar subst) tpl_tvs) : ms) us rest
 
         -- Does not match, so next check whether the things unify
         -- See Note [Overlapping instances] and Note [Incoherent instances]
@@ -736,7 +737,7 @@ lookupInstEnv' ie vis_mods cls tys
       = find ms us rest
 
       | otherwise
-      = ASSERT2( tyVarsOfTypes tys `disjointVarSet` tpl_tv_set,
+      = ASSERT2( tyCoVarsOfTypes tys `disjointVarSet` tpl_tv_set,
                  (ppr cls <+> ppr tys <+> ppr all_tvs) $$
                  (ppr tpl_tvs <+> ppr tpl_tys)
                 )
@@ -748,13 +749,6 @@ lookupInstEnv' ie vis_mods cls tys
             Nothing  -> find ms us        rest
       where
         tpl_tv_set = mkVarSet tpl_tvs
-
-    ----------------
-    lookup_tv :: TvSubst -> TyVar -> DFunInstType
-        -- See Note [DFunInstType: instantiating types]
-    lookup_tv subst tv = case lookupTyVar subst tv of
-                                Just ty -> Just ty
-                                Nothing -> Nothing
 
 ---------------
 -- This is the common way to call this function.
@@ -936,7 +930,7 @@ incoherent instances as long as there are others.
 ************************************************************************
 -}
 
-instanceBindFun :: TyVar -> BindFlag
+instanceBindFun :: TyCoVar -> BindFlag
 instanceBindFun tv | isTcTyVar tv && isOverlappableTyVar tv = Skolem
                    | otherwise                              = BindMe
    -- Note [Binding when looking up instances]

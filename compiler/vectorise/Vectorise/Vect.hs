@@ -19,7 +19,7 @@ module Vectorise.Vect
   , vCaseDEFAULT
   )
 where
-  
+
 import CoreSyn
 import Type           ( Type )
 import Var
@@ -97,7 +97,7 @@ vLams :: Var      -- ^ Var bound to the lifting context.
       -> [VVar]   -- ^ Parameter vars for the abstraction.
       -> VExpr    -- ^ Body of the abstraction.
       -> VExpr
-vLams lc vs (ve, le) 
+vLams lc vs (ve, le)
   = (mkLams vvs ve, mkLams (lc:lvs) le)
   where
     (vvs, lvs) = unzip vs
@@ -107,10 +107,10 @@ vLams lc vs (ve, le)
 -- The lifted version is also applied to the variable of the lifting context.
 --
 vVarApps :: Var -> VExpr -> [VVar] -> VExpr
-vVarApps lc (ve, le) vvs 
+vVarApps lc (ve, le) vvs
   = (ve `mkVarApps` vs, le `mkVarApps` (lc : ls))
   where
-    (vs, ls) = unzip vvs 
+    (vs, ls) = unzip vvs
 
 
 vCaseDEFAULT :: VExpr  -- scrutiniy

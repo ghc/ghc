@@ -1,4 +1,17 @@
 {-
+
+NOTA BENE: Do NOT use ($) anywhere in this module! The type of ($) is
+slightly magical (it can return unlifted types), and it is wired in.
+But, it is also *defined* in this module, with a non-magical type.
+GHC gets terribly confused (and *hangs*) if you try to use ($) in this
+module, because it has different types in different scenarios.
+
+This is not a problem in general, because the type ($), being wired in, is not
+written out to the interface file, so importing files don't get confused.
+The problem is only if ($) is used here. So don't!
+
+---------------------------------------------
+
 The overall structure of the GHC Prelude is a bit tricky.
 
   a) We want to avoid "orphan modules", i.e. ones with instance
@@ -1086,13 +1099,13 @@ instance Alternative IO where
 instance MonadPlus IO
 
 returnIO :: a -> IO a
-returnIO x = IO $ \ s -> (# s, x #)
+returnIO x = IO (\ s -> (# s, x #))
 
 bindIO :: IO a -> (a -> IO b) -> IO b
-bindIO (IO m) k = IO $ \ s -> case m s of (# new_s, a #) -> unIO (k a) new_s
+bindIO (IO m) k = IO (\ s -> case m s of (# new_s, a #) -> unIO (k a) new_s)
 
 thenIO :: IO a -> IO b -> IO b
-thenIO (IO m) k = IO $ \ s -> case m s of (# new_s, _ #) -> unIO k new_s
+thenIO (IO m) k = IO (\ s -> case m s of (# new_s, _ #) -> unIO k new_s)
 
 unIO :: IO a -> (State# RealWorld -> (# State# RealWorld, a #))
 unIO (IO a) = a

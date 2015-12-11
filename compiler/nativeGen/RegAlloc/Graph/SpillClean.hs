@@ -50,7 +50,7 @@ import qualified Data.Set       as Set
 
 
 -- | The identification number of a spill slot.
---   A value is stored in a spill slot when we don't have a free 
+--   A value is stored in a spill slot when we don't have a free
 --   register to hold it.
 type Slot = Int
 
@@ -58,8 +58,8 @@ type Slot = Int
 -- | Clean out unneeded spill\/reloads from this top level thing.
 cleanSpills
         :: Instruction instr
-        => Platform 
-        -> LiveCmmDecl statics instr 
+        => Platform
+        -> LiveCmmDecl statics instr
         -> LiveCmmDecl statics instr
 
 cleanSpills platform cmm
@@ -84,7 +84,7 @@ cleanSpin platform spinCount code
 
         code_forward    <- mapBlockTopM (cleanBlockForward platform) code
         code_backward   <- cleanTopBackward code_forward
-        
+
         -- During the cleaning of each block we collected information about
         -- what regs were valid across each jump. Based on this, work out
         -- whether it will be safe to erase reloads after join points for
@@ -158,7 +158,7 @@ cleanForward platform blockId assoc acc (li1 : li2 : instrs)
         = do
                 modify $ \s -> s { sCleanedReloadsAcc = sCleanedReloadsAcc s + 1 }
                 cleanForward platform blockId assoc acc
-                 $ li1 : LiveInstr (mkRegRegMoveInstr platform reg1 reg2) Nothing 
+                 $ li1 : LiveInstr (mkRegRegMoveInstr platform reg1 reg2) Nothing
                        : instrs
 
 cleanForward platform blockId assoc acc (li@(LiveInstr i1 _) : instrs)
@@ -245,7 +245,7 @@ cleanReload platform blockId assoc li@(LiveInstr (RELOAD slot reg) _)
         | otherwise
         = do    -- Update the association.
                 let assoc'
-                        = addAssoc (SReg reg)  (SSlot slot)     
+                        = addAssoc (SReg reg)  (SSlot slot)
                                 -- doing the reload makes reg and slot the same value
                         $ delAssoc (SReg reg)
                                 -- reg value changes on reload
@@ -290,7 +290,7 @@ cleanReload _ _ _ _
 --       we should really be updating the noReloads set as we cross jumps also.
 --
 -- TODO: generate noReloads from liveSlotsOnEntry
--- 
+--
 cleanTopBackward
         :: Instruction instr
         => LiveCmmDecl statics instr
@@ -300,17 +300,17 @@ cleanTopBackward cmm
  = case cmm of
         CmmData{}
          -> return cmm
-        
+
         CmmProc info label live sccs
          | LiveInfo _ _ _ liveSlotsOnEntry <- info
          -> do  sccs'   <- mapM (mapSCCM (cleanBlockBackward liveSlotsOnEntry)) sccs
-                return  $ CmmProc info label live sccs' 
+                return  $ CmmProc info label live sccs'
 
 
-cleanBlockBackward 
+cleanBlockBackward
         :: Instruction instr
         => Map BlockId (Set Int)
-        -> LiveBasicBlock instr 
+        -> LiveBasicBlock instr
         -> CleanM (LiveBasicBlock instr)
 
 cleanBlockBackward liveSlotsOnEntry (BasicBlock blockId instrs)
@@ -332,7 +332,7 @@ cleanBackward liveSlotsOnEntry noReloads acc lis
         cleanBackward' liveSlotsOnEntry reloadedBy noReloads acc lis
 
 
-cleanBackward' 
+cleanBackward'
         :: Instruction instr
         => Map BlockId (Set Int)
         -> UniqFM [BlockId]
@@ -379,17 +379,17 @@ cleanBackward' liveSlotsOnEntry reloadedBy noReloads acc (li : instrs)
         --       liveness map doesn't get updated.
         | LiveInstr instr _     <- li
         , targets               <- jumpDestsOfInstr instr
-        = do    
+        = do
                 let slotsReloadedByTargets
                         = Set.unions
                         $ catMaybes
-                        $ map (flip Map.lookup liveSlotsOnEntry) 
+                        $ map (flip Map.lookup liveSlotsOnEntry)
                         $ targets
-                
+
                 let noReloads'
-                        = foldl' delOneFromUniqSet noReloads 
+                        = foldl' delOneFromUniqSet noReloads
                         $ Set.toList slotsReloadedByTargets
-                
+
                 cleanBackward liveSlotsOnEntry noReloads' (li : acc) instrs
 
         -- some other instruction
@@ -423,7 +423,7 @@ findRegOfSlot assoc slot
 
 -------------------------------------------------------------------------------
 -- | Cleaner monad.
-type CleanM 
+type CleanM
         = State CleanS
 
 -- | Cleaner state.

@@ -97,8 +97,6 @@
 
 (AK ListComprehensions.hs:18:22-30 AnnVal = [ListComprehensions.hs:18:28])
 
-(AK ListComprehensions.hs:18:28 AnnStar = [ListComprehensions.hs:18:28])
-
 (AK ListComprehensions.hs:19:22-33 AnnLarrow = [ListComprehensions.hs:19:24-25])
 
 (AK ListComprehensions.hs:19:22-33 AnnVbar = [ListComprehensions.hs:20:20])

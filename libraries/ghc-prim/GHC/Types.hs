@@ -1,5 +1,5 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
-             MultiParamTypeClasses, RoleAnnotations, CPP #-}
+             MultiParamTypeClasses, RoleAnnotations, CPP, TypeOperators #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Types
@@ -29,7 +29,12 @@ module GHC.Types (
         isTrue#,
         SPEC(..),
         Nat, Symbol,
-        Coercible,
+        type (~~), Coercible,
+        TYPE, Levity(..), Type, type (*), type (★), Constraint,
+          -- The historical type * should ideally be written as
+          -- `type *`, without the parentheses. But that's a true
+          -- pain to parse, and for little gain.
+
         -- * Runtime type representation
         Module(..), TrName(..), TyCon(..)
     ) where
@@ -37,6 +42,24 @@ module GHC.Types (
 import GHC.Prim
 
 infixr 5 :
+
+{- *********************************************************************
+*                                                                      *
+                  Kinds
+*                                                                      *
+********************************************************************* -}
+
+-- | The kind of constraints, like @Show a@
+data Constraint
+
+-- | The kind of types with values. For example @Int :: Type@.
+type Type = TYPE 'Lifted
+
+-- | A backward-compatible (pre-GHC 8.0) synonym for 'Type'
+type * = TYPE 'Lifted
+
+-- | A unicode backward-compatible (pre-GHC 8.0) synonym for 'Type'
+type ★ = TYPE 'Lifted
 
 {- *********************************************************************
 *                                                                      *
@@ -50,7 +73,6 @@ data Nat
 -- | (Kind) This is the kind of type-level symbols.
 -- Declared here because class IP needs it
 data Symbol
-
 
 {- *********************************************************************
 *                                                                      *
@@ -164,12 +186,10 @@ inside GHC, to change the kind and type.
 -}
 
 
--- | A data constructor used to box up all unlifted equalities
---
--- The type constructor is special in that GHC pretends that it
--- has kind (? -> ? -> Fact) rather than (* -> * -> *)
-data (~) a b = Eq# ((~#) a b)
-
+-- | Lifted, heterogeneous equality. By lifted, we mean that it
+-- can be bogus (deferred type error). By heterogeneous, the two
+-- types @a@ and @b@ might have different kinds.
+class a ~~ b
 
 -- | This two-parameter class has instances for types @a@ and @b@ if
 --      the compiler can infer that they have the same representation. This class
@@ -218,15 +238,7 @@ data (~) a b = Eq# ((~#) a b)
 --      by Joachim Breitner, Richard A. Eisenberg, Simon Peyton Jones and Stephanie Weirich.
 --
 --      @since 4.7.0.0
-data Coercible a b = MkCoercible ((~#) a b)
--- It's really ~R# (representational equality), not ~#,
--- but  * we don't yet have syntax for ~R#,
---      * the compiled code is the same either way
---      * TysWiredIn has the truthful types
--- Also see Note [Kind-changing of (~) and Coercible]
-
--- | Alias for 'tagToEnum#'. Returns True if its parameter is 1# and False
---   if it is 0#.
+class Coercible a b
 
 {- *********************************************************************
 *                                                                      *
@@ -237,6 +249,8 @@ data Coercible a b = MkCoercible ((~#) a b)
 data {-# CTYPE "HsBool" #-} Bool = False | True
 
 {-# INLINE isTrue# #-}
+-- | Alias for 'tagToEnum#'. Returns True if its parameter is 1# and False
+--   if it is 0#.
 isTrue# :: Int# -> Bool   -- See Note [Optimizing isTrue#]
 isTrue# x = tagToEnum# x
 
@@ -309,6 +323,18 @@ you're reading this in 2023 then things went wrong). See #8326.
 -- Libraries can specify this by using 'SPEC' data type to inform which
 -- loops should be aggressively specialized.
 data SPEC = SPEC | SPEC2
+
+-- | GHC divides all proper types (that is, types that can perhaps be
+-- inhabited, as distinct from type constructors or type-level data)
+-- into two worlds: lifted types and unlifted types. For example,
+-- @Int@ is lifted while @Int#@ is unlifted. Certain operations need
+-- to be polymorphic in this distinction. A classic example is 'unsafeCoerce#',
+-- which needs to be able to coerce between lifted and unlifted types.
+-- To achieve this, we use kind polymorphism: lifted types have kind
+-- @TYPE Lifted@ and unlifted ones have kind @TYPE Unlifted@. 'Levity'
+-- is the kind of 'Lifted' and 'Unlifted'. @*@ is a synonym for @TYPE Lifted@
+-- and @#@ is a synonym for @TYPE Unlifted@.
+data Levity = Lifted | Unlifted
 
 {- *********************************************************************
 *                                                                      *

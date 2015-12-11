@@ -1,4 +1,4 @@
-{-# LANGUAGE KindSignatures, TypeFamilies, PolyKinds #-}
+{-# LANGUAGE KindSignatures, TypeFamilies, PolyKinds, FlexibleInstances #-}
 
 module T7341 where
 

@@ -1,0 +1,319 @@
+stack:
+
+BUGS TO POST:
+1. perfomance bug in OptCoercion: #11195
+2. defer-type-errors are now more eager. need to float in.  #11197
+   Test cases: Defer02, T7861 (but that's impredicative)
+3. The irreducible hetero wanteds story: #11198
+  - suboptimal error messages:
+    T9196
+    T8262
+    T8603
+    tcfail122
+
+4. Performance: #11196
+   T3064 (14%)
+   T5030 (61.8%)
+   T5837 (13%)
+   T5321Fun (11%)
+   T5631 (39%)
+   T9872d (-91.8%)
+   T9872a (33.6%)
+   T9872c (59.4%)
+   T9872b (49.4%)
+   T9675 (29.7%) (and 28.4% peak_megabytes_allocated)
+   haddock.base (12.4%)
+   haddock.Cabal (9.5%)
+
+
+PERFORMANCE STUFF:
+ T5030: I think the root of the problem is that I have a lot more coercions than
+ the baseline. And, I think, the reason for that is that I have a
+ (sym (a;b;c;...;zz)) where HEAD has it the right way round. During optimization,
+ the sym is pushed into the trans, and the individual pieces are axioms, which
+ resist the sym. So I get a *lot* of syms! Moving on.
+
+ T3738: I have no clue. The core appears to be the same. Is the problem
+ further down the pipeline? Ditto T5536.
+ 
+ T10370: 
+
+ 
+
+
+- BUG: match_ty needs to be more delicate looking under TyConApps:
+  match_ty (Just (x :: Age)) (Just 5 |> Maybe Int ~ Maybe Age) won't work
+
+- flattening foralls is inadequate (though not quite wrong). The tyvar
+  kind isn't flattened. Also see go_bndr in flatten_co.
+
+fix toHsType w.r.t. implicit parameters (typecheck/should_compile/T8565.hs)
+
+FAILURES:
+typecheck/should_compile/T6018:
+  - TF injectivity solver fails here. The problem is that we end up with s0 ~ s1 and s0 ~ s2 in the inert
+    set, where we want to find s1 ~ s2. And, because we process deriveds last, the model doesn't get updated
+    accordingly until the end, and then there isn't the right kick-out to re-process TF injectivity stuff.
+    I would like Simon's advice.
+
+
+
+TICKETS:
+#9017:
+#9173: mention expression in error
+#7961: main ticket.
+#10524: Typeable k
+#8566: about dropping Given kind equalities
+#11142: skolem escape
+
+QUESTIONS:
+- Should TYPE / Levity / Lifted / Unlifted be in the Prelude? If not,
+how to deal with :info, which suppresses output that mentions un-imported things.
+Current sol'n: make these things BuiltInSyntax.
+
+- think about induction recursion
+- TH will need some updating -- in particular, its treatment of quantification
+  over kinds (quantification forbidden) and types (quantification required)
+  is problematic.
+
+- Writing a bogus GADT return type causes a panic. The problem is that
+checkValidDataCon is supposed to check if rejigConRes was valid. To do
+this, checkValidDataCon needs the user-specified result type. Normally,
+this is retrieved from dataConOrigResTy. The problem is that, now,
+the dataConOrigResTy is substed by the kind substitution produced in
+rejigConRes. This is an ugly circular dependency. We could (1) store the
+original, unsubsted result ty in the DataCon for just this reason, or
+(2) install lots of ugly plumbing in TcTyClsDecls to carry the unsubsted
+result ty, or (3) do something else. I want SPJ's input, as both (1)
+and (2) are terrible.
+
+- I'm deeply disturbed by match_co. It's looking into coercions! Can we fix?
+
+fix:
+  - Make better use of TcTyCon. It could be used to remove AThing, for example.
+    Also: zonking a type could replace a TcTyCon with the same-named TyCon from
+    the monad. We'd still need a knot, but the knot would only have to surround
+    the final zonks, *not* constraint generation/solving. Vast improvement.
+
+  - DsMeta:mk_extra_tvs needs an overhaul.
+
+  - zonk_eq_types could do better with synonym expansion and injectivity tracking
+
+  - We should deprecate some old kind behavior. Specifically, consider
+    foo :: forall a. (a :: k) -> *
+    vs
+    bar :: forall a. a -> b
+
+    The first works, while the second doesn't. That's a bit inconsistent.
+
+  - better use of new VarSet features (CoreFVs using accumulators, FloatIn not converting from det
+    maps to nondet maps)
+
+  - Parser improvement ideas:
+     1. Have HsAppsTy contain alternating non-symbolic regions and symbols.
+     2. Change the _no_ops versions only to exclude dataconops, allowing * to appear.
+
+  - Refactor noThing
+
+  - Change OccurrenceOf to take a list of instantiating types. Perhaps
+    easier after visible types.
+
+  - break out NthCo into ForAllKindCo
+  - change optCoercion to take a Role hint (or perhaps a Maybe Role)
+
+  - implement better dependency checking
+
+  - Fix #15 by refusing to have kind family applications inferred in type
+    patterns.
+
+  - unifyWantedLikeEv handles coercions. But make sure other, similar scenarios
+    do too.
+
+  - Make sure coercions in types get optimised, too.
+
+  - look for uses of eqType. The typechecker should really stick to tcEqType!
+    BUT: consider making Constraint ~R *. Then, tcEqType & eqType are the same.
+  - when -fprint-explicit-coercions is on, make sure to print any types
+    of printed coboxes.
+  - make use of uo_thing in more error messages
+  - write optType. Use it instead of substTy in OptCoercion and other places.
+  - check out typecheck/should_compile/tc167.hs. It might be possible to
+    do better here. (About weird typing rule for (->))
+  - do we need to annotate kind variables to have a proper CUSK? I think so.
+    Here is Doel's example from Hac Phi of this problem at the term level:
+
+       type family Wat (t :: k) :: *
+       type instance Wat (t :: *) = Int
+       type instance Wat (t :: * -> *) = Double
+
+       data T (t :: k) = forall (t' :: k). T (Proxy t') (Wat t')
+
+       -- foo :: forall f. T f
+       foo = T (Proxy :: Proxy Maybe) 1.0
+
+
+       type family Wat (k :: *) (t :: k) :: *
+       type instance Wat *        t = Int
+       type instance Wat (* -> *) t = Double
+
+       data T (k :: *) (t :: k) :: * where
+         T :: forall (k :: *) (t :: k).
+	      forall (t' :: k).
+	      Proxy k t' -> Wat k t' -> T k t
+
+       foo = T (* -> *) (Any (* -> *)) Maybe Proxy 1.0
+       ???
+
+
+  - mkExpectedActualMsg has a lot of backward-compatibility stuff
+- Are there uses of the `OrCoVar` functions that could be streamlined?
+  Also, look at uses of isCoercionType in module Id
+  - consider re-engineering the boxity problems in solver. look for the "LikeEv" functions
+
+  - Do we need special rule for boxity of ($)? I don't think so, anymore. SPJ agrees. Maybe.
+  - hsq_implict --> hsq_undeclared; hsq_explicit --> hsq_declared
+  - APromotionErr (?)
+  - :kind in GHCi is unhappy with
+    data Sg (s :: *) (t :: TyFun s * -> *) :: * where
+      (:&) :: Pi (fst :: s) -> t @@ fst -> Sg s t
+
+  - the kind-var finder in zonkRule only looks in tyvars. look in covars? how
+    to identify type-level covars? does this matter?
+  - add VisibilityFlag to Anon... see if we can sort out some constraint/* nonsense. Also, add relevance info to Anon, and work Binders into Lam and Case. This also allows us to get rid of DFunTy in iface/* stuff.
+  - perhaps change promoteCoercion --> promoteCoercion_maybe that fails if
+    it can't do any optimization.
+
+check out usages of:
+
+changed functions:
+
+removed functions:
+
+please remove:
+--------------------------------
+- See https://ghc.haskell.org/trac/ghc/wiki/DependentHaskell/Internal#User-facingdesignissues about constrained family instances.
+
+- znokCtEvidence now does more zonking, because I needed that in simplifyInfer.
+
+- dataConWrappers now are rejigged w.r.t. GADTs. This is just simpler and
+  has no user effect.
+
+- Some interesting stuff is in TcHsType.splitTelescopeTvs, in particular see
+Note [Typechecking telescopes].
+
+- We are now instantiating tycons at application sites, not var sites. Very
+interesting from a theoretical standpoint.
+
+- There is a general assumption that all types are implicit in terms. This will have
+  to be revisited. In particular, all usages of the splitForAllTys functions will
+  need to be re-checked. Also, I think the following functions will need to be changed:
+   - mkLams
+   - tcInstType
+   - tcSplitDFunTy
+   - toIfaceClassOp
+
+- Why isn't CPush implemented near Simplify.lhs:1200?
+
+- Poly-kinded typeable goes to lengths to ensure that only *kind* variables
+  are around. This seems unnecessary. I've removed the code. Let's see if
+  anything breaks -- it should break rather obviously.
+
+- (Removed) Note [Do not create Given kind equalities] says
+  "But the Right Thing is to add kind equalities!"
+
+- *ALL* types are now kinds (of course). Including things like Double and IO.
+
+- No kind unification algorithm (separate from that for types)
+
+- No two coercions of the same type are ever apart.
+
+- Promoted covar arguments in promoted datacons have role P.
+
+- flattening a coercion flattens the types it coerces.
+
+(old):
+After compiling:
+- consider adding full definition of lifting to core-spec.
+- use optType throughout code
+- make CoVar constructor of Var
+- merge tcView and coreView??
+
+
+Notes:
+
+----------------------------------------
+Stuff for implementing Π:
+
+RAE is taking a break.
+  - deeplySkolemise and its one use in tcGen have different types. Sort this out.
+  - deeplyInstantiate needs to be just like deeplySkolemise, but different.
+  - Phase information flows *up*, never *down*. That is, we always infer
+    phase information and then check when necessary. We don't try to check
+    phases top-down. This avoids the need for dependence meta-variables.
+  - How to deal with unifying Ids? This will be a problem in deeplyInstantiate.
+  - We'll need a new EvTerm (and possibly a new HsWrapper) which stores a tyvar
+    to be demoted.
+
+stack:
+     - iface stuff
+       - ForAllTy --> PiTy
+       - ForAllCo --> PiCo
+       - function coercions are now PiCo
+       - changes in PiCoBndr
+     - matchExpectedFunTys now returns DependenceFlags
+       - unifyOpFunTysWrap returns TcPhaseType
+       - tcMatchesCase takes TcArgType
+       - tcArg takes TcArgType
+       - tcArgs does too
+       - matchFunTys callback does
+       - tcSplitSigmaTy is strange: it separates dependent things from non-dependent ones in a weird way. Remove?
+       - newSysLocalIds --> newSysLocals
+     - liftCoSubstVarBndr --> liftCoSubstBinder
+     - fix Coercion.applyCo, which shouldn't be necessary
+     - coBndrBoundVars --> coBndrBinders
+     - normalise_tycovar_bndr --> normalise_binder
+     - coreFlattenVarBndr --> coreFlattenBinder
+     - optTyVarBndr --> optBinder
+     - substTyVarBndr[Callback] -->(?) substBinder[Callback]
+     - substTyCoVarBndr2 --> substBinder2
+     - ppr_forall_type --> ppr_pi_type
+     - tidyTyCoVarBndr --> tidyBinder
+     - mkForAllTy[s] --> mkPiTy[s]
+     - removed mkNamedForAllTy
+     - mkCoercionBinder now takes a BinderVar, not a CoVar
+     - splitForAllTys --> splitPiTys
+     - splitForAllTys[B] --> splitDepPiTys
+     - tcSplitNamedForAllTysB --> tcSplitDepPiTys
+     - isForAllTy --> isPiTy, and check usages
+     - isNamedForAllTy --> isDepPiTy
+     - splitForAllTy --> splitPiTy
+     - check usages of dropForAlls: it keeps dependent products!
+     - splitForAllTysInvisible --> splitPiTysInvis; now returns Binders
+     - write cmpBinderInfo
+     - use rnBinder2 instead of rnBinderVar2
+     - nonDependentType_maybe --> nonDependentBinder_maybe
+     - prefer nonDependentType_maybe over not (isDependentBinder
+     - paDictArgType should take a Binder
+     - abstractType takes Binders
+  - fixed Named/Anon
+  - write splitPiTy_maybe
+  - write promoteExpr_maybe
+  - TyVarTy can now contain Ids!
+  - Lam takes a Binder
+  - pattern arguments are Binders
+  - fix TyCoRep.pprForAll: very broken right now. Also, see Outputable BinderVar.
+
+
+  - will need to modify FloatIn.fiExpr#mk_arg_fvs to use splitPiType instead of
+    splitFunTy
+  - will need to update DmdAnal.addDataConPatDmds to deal with strictness on
+    dependent ids
+
+
+BEFORE MERGING:
+Restore:
+  - README.md
+  - .gitmodules
+
+Remove:
+  - rae.txt

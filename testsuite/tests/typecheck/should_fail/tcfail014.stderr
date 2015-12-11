@@ -1,8 +1,8 @@
 
-tcfail014.hs:5:33:
-    Occurs check: cannot construct the infinite type: t8 ~ t8 -> t7
-    In the first argument of ‘z’, namely ‘z’
-    In the expression: z z
-    Relevant bindings include
-      z :: t8 -> t7 (bound at tcfail014.hs:5:27)
-      h :: (t8 -> t7) -> t7 (bound at tcfail014.hs:5:25)
+tcfail014.hs:5:33: error:
+    • Occurs check: cannot construct the infinite type: r8 ~ r8 -> r7
+    • In the first argument of ‘z’, namely ‘z’
+      In the expression: z z
+    • Relevant bindings include
+        z :: r8 -> r7 (bound at tcfail014.hs:5:27)
+        h :: (r8 -> r7) -> r7 (bound at tcfail014.hs:5:25)

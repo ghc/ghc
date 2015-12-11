@@ -4,12 +4,13 @@ TYPE SIGNATURES
     forall c t t1. (Num t, Num t1, Coll c, Elem c ~ (t, t1)) => c -> c
 TYPE CONSTRUCTORS
   class Coll c where
-    type family Elem c :: * open
+    type family Elem c open
+      Kind: * -> *
     empty :: c
     insert :: Elem c -> c -> c
     {-# MINIMAL empty, insert #-}
   data ListColl a = L [a]
-    Promotable
+    Kind: * -> *
 COERCION AXIOMS
   axiom Foo.TFCo:R:ElemListColl ::
     Elem (ListColl a) = a -- Defined at T3017.hs:13:9

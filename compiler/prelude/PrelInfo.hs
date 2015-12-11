@@ -34,14 +34,18 @@ import DataCon
 import Id
 import Name
 import MkId
+import NameEnv
 import TysPrim
 import TysWiredIn
 import HscTypes
+import UniqFM
 import Class
 import TyCon
 import Util
+import Panic ( panic )
 import {-# SOURCE #-} TcTypeNats ( typeNatTyCons )
 
+import Data.List  ( intercalate )
 import Data.Array
 
 {-
@@ -77,7 +81,19 @@ knownKeyNames :: [Name]
 -- you get a Name with the correct known key
 -- (See Note [Known-key names] in PrelNames)
 knownKeyNames
-  = concat [ tycon_kk_names funTyCon
+  | debugIsOn
+  , not (isNullUFM badNamesEnv)
+  = panic ("badKnownKeyNames:\n" ++ badNamesStr)
+       -- NB: We can't use ppr here, because this is sometimes evaluated in a
+       -- context where there are no DynFlags available, leading to a cryptic
+       -- "<<details unavailable>>" error. (This seems to happen only in the
+       -- stage 2 compiler, for reasons I [Richard] have no clue of.)
+
+  | otherwise
+  = names
+  where
+  names =
+    concat [ tycon_kk_names funTyCon
            , concatMap tycon_kk_names primTyCons
 
            , concatMap tycon_kk_names wiredInTyCons
@@ -95,28 +111,40 @@ knownKeyNames
            , map idName wiredInIds
            , map (idName . primOpId) allThePrimOps
            , basicKnownKeyNames ]
-  where
+
     -- "kk" short for "known-key"
-    tycon_kk_names :: TyCon -> [Name]
-    tycon_kk_names tc = tyConName tc : (rep_names tc ++ concatMap thing_kk_names (implicitTyConThings tc))
+  tycon_kk_names :: TyCon -> [Name]
+  tycon_kk_names tc = tyConName tc : (rep_names tc ++ concatMap thing_kk_names (implicitTyConThings tc))
 
-    datacon_kk_names dc
-      | Promoted tc <- promoteDataCon_maybe dc = dataConName dc : rep_names tc
-      | otherwise                              = [dataConName dc]
+  datacon_kk_names dc
+   = dataConName dc : rep_names (promoteDataCon dc)
 
-    thing_kk_names :: TyThing -> [Name]
-    thing_kk_names (ATyCon tc)                 = tycon_kk_names tc
-    thing_kk_names (AConLike (RealDataCon dc)) = datacon_kk_names dc
-    thing_kk_names thing                       = [getName thing]
+  thing_kk_names :: TyThing -> [Name]
+  thing_kk_names (ATyCon tc)                 = tycon_kk_names tc
+  thing_kk_names (AConLike (RealDataCon dc)) = datacon_kk_names dc
+  thing_kk_names thing                       = [getName thing]
 
-    -- The TyConRepName for a known-key TyCon has a known key,
-    -- but isn't itself an implicit thing.  Yurgh.
-    -- NB: if any of the wired-in TyCons had record fields, the record
-    --     field names would be in a similar situation.  Ditto class ops.
-    --     But it happens that there aren't any
-    rep_names tc = case tyConRepName_maybe tc of
-                         Just n  -> [n]
-                         Nothing -> []
+  -- The TyConRepName for a known-key TyCon has a known key,
+  -- but isn't itself an implicit thing.  Yurgh.
+  -- NB: if any of the wired-in TyCons had record fields, the record
+  --     field names would be in a similar situation.  Ditto class ops.
+  --     But it happens that there aren't any
+  rep_names tc = case tyConRepName_maybe tc of
+                       Just n  -> [n]
+                       Nothing -> []
+
+  namesEnv      = foldl (\m n -> extendNameEnv_Acc (:) singleton m n n)
+                        emptyUFM names
+  badNamesEnv   = filterNameEnv (\ns -> length ns > 1) namesEnv
+  badNamesPairs = nameEnvUniqueElts badNamesEnv
+  badNamesStrs  = map pairToStr badNamesPairs
+  badNamesStr   = unlines badNamesStrs
+
+  pairToStr (uniq, ns) = "        " ++
+                         show uniq ++
+                         ": [" ++
+                         intercalate ", " (map (occNameString . nameOccName) ns) ++
+                         "]"
 
 {-
 We let a lot of "non-standard" values be visible, so that we can make

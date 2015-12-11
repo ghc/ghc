@@ -131,7 +131,7 @@ arfGraph pass@FwdPass { fp_lattice = lattice,
                         fp_transfer = transfer,
                         fp_rewrite  = rewrite } entries g in_fact = graph g in_fact
   where
-    {- nested type synonyms would be so lovely here 
+    {- nested type synonyms would be so lovely here
     type ARF  thing = forall e x . thing e x -> f        -> m (DG f n e x, Fact x f)
     type ARFX thing = forall e x . thing e x -> Fact e f -> m (DG f n e x, Fact x f)
     -}
@@ -190,7 +190,7 @@ arfGraph pass@FwdPass { fp_lattice = lattice,
 
     -- | Compose fact transformers and concatenate the resulting
     -- rewritten graphs.
-    {-# INLINE cat #-} 
+    {-# INLINE cat #-}
     cat ft1 ft2 f = do { (g1,f1) <- ft1 f
                        ; (g2,f2) <- ft2 f1
                        ; let !g = g1 `dgSplice` g2
@@ -199,7 +199,7 @@ arfGraph pass@FwdPass { fp_lattice = lattice,
     arfx :: forall x .
             (Block n C x ->        f -> UniqSM (DG f n C x, Fact x f))
          -> (Block n C x -> Fact C f -> UniqSM (DG f n C x, Fact x f))
-    arfx arf thing fb = 
+    arfx arf thing fb =
       arf thing $ fromJust $ lookupFact (entryLabel thing) $ joinInFacts lattice fb
      -- joinInFacts adds debugging information
 
@@ -398,14 +398,14 @@ arbGraph pass@BwdPass { bp_lattice  = lattice,
                         bp_transfer = transfer,
                         bp_rewrite  = rewrite } entries g in_fact = graph g in_fact
   where
-    {- nested type synonyms would be so lovely here 
+    {- nested type synonyms would be so lovely here
     type ARB  thing = forall e x . thing e x -> Fact x f -> m (DG f n e x, f)
     type ARBX thing = forall e x . thing e x -> Fact x f -> m (DG f n e x, Fact e f)
     -}
     graph ::              Graph n e x -> Fact x f -> UniqSM (DG f n e x, Fact e f)
     block :: forall e x . Block n e x -> Fact x f -> UniqSM (DG f n e x, f)
     body  :: [Label] -> Body n -> Fact C f -> UniqSM (DG f n C C, Fact C f)
-    node  :: forall e x . (ShapeLifter e x) 
+    node  :: forall e x . (ShapeLifter e x)
              => n e x       -> Fact x f -> UniqSM (DG f n e x, f)
     cat :: forall e a x info info' info''.
            (info' -> UniqSM (DG f n e a, info''))
@@ -450,7 +450,7 @@ arbGraph pass@BwdPass { bp_lattice  = lattice,
 
     -- | Compose fact transformers and concatenate the resulting
     -- rewritten graphs.
-    {-# INLINE cat #-} 
+    {-# INLINE cat #-}
     cat ft1 ft2 f = do { (g2,f2) <- ft2 f
                        ; (g1,f1) <- ft1 f2
                        ; let !g = g1 `dgSplice` g2
@@ -591,7 +591,7 @@ fixpoint direction DataflowLattice{ fact_bot = _, fact_join = join }
 
            let newblocks' = case rg of
                               GMany _ blks _ -> mapUnion blks newblocks
-     
+
            loop todo' fbase' newblocks'
 
 
@@ -633,7 +633,7 @@ iteration.
 Note [Unreachable blocks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 A block that is not in the domain of tfb_fbase is "currently unreachable".
-A currently-unreachable block is not even analyzed.  Reason: consider 
+A currently-unreachable block is not even analyzed.  Reason: consider
 constant prop and this graph, with entry point L1:
   L1: x:=3; goto L4
   L2: x:=4; goto L4
@@ -849,7 +849,7 @@ getFact lat l fb = case lookupFact l fb of Just  f -> f
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -}
 -- $fuel
--- A value of type 'FwdRewrite' or 'BwdRewrite' /respects fuel/ if 
+-- A value of type 'FwdRewrite' or 'BwdRewrite' /respects fuel/ if
 -- any function contained within the value satisfies the following properties:
 --
 --   * When fuel is exhausted, it always returns 'Nothing'.
@@ -857,7 +857,7 @@ getFact lat l fb = case lookupFact l fb of Just  f -> f
 --   * When it returns @Just g rw@, it consumes /exactly/ one unit
 --     of fuel, and new rewrite 'rw' also respects fuel.
 --
--- Provided that functions passed to 'mkFRewrite', 'mkFRewrite3', 
+-- Provided that functions passed to 'mkFRewrite', 'mkFRewrite3',
 -- 'mkBRewrite', and 'mkBRewrite3' are not aware of the fuel supply,
 -- the results respect fuel.
 --

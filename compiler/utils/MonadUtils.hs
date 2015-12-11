@@ -11,8 +11,8 @@ module MonadUtils
 
         , liftIO1, liftIO2, liftIO3, liftIO4
 
-        , zipWith3M, zipWith3M_, zipWithAndUnzipM
-        , mapAndUnzipM, mapAndUnzip3M, mapAndUnzip4M
+        , zipWith3M, zipWith3M_, zipWith4M, zipWithAndUnzipM
+        , mapAndUnzipM, mapAndUnzip3M, mapAndUnzip4M, mapAndUnzip5M
         , mapAccumLM
         , mapSndM
         , concatMapM
@@ -76,6 +76,19 @@ zipWith3M_ :: Monad m => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m ()
 zipWith3M_ f as bs cs = do { _ <- zipWith3M f as bs cs
                            ; return () }
 
+zipWith4M :: Monad m => (a -> b -> c -> d -> m e)
+          -> [a] -> [b] -> [c] -> [d] -> m [e]
+zipWith4M _ []     _      _      _      = return []
+zipWith4M _ _      []     _      _      = return []
+zipWith4M _ _      _      []     _      = return []
+zipWith4M _ _      _      _      []     = return []
+zipWith4M f (x:xs) (y:ys) (z:zs) (a:as)
+  = do { r  <- f x y z a
+       ; rs <- zipWith4M f xs ys zs as
+       ; return $ r:rs
+       }
+
+
 zipWithAndUnzipM :: Monad m
                  => (a -> b -> m (c, d)) -> [a] -> [b] -> m ([c], [d])
 {-# INLINE zipWithAndUnzipM #-}
@@ -101,6 +114,13 @@ mapAndUnzip4M f (x:xs) = do
     (r1,  r2,  r3,  r4)  <- f x
     (rs1, rs2, rs3, rs4) <- mapAndUnzip4M f xs
     return (r1:rs1, r2:rs2, r3:rs3, r4:rs4)
+
+mapAndUnzip5M :: Monad m => (a -> m (b,c,d,e,f)) -> [a] -> m ([b],[c],[d],[e],[f])
+mapAndUnzip5M _ [] = return ([],[],[],[],[])
+mapAndUnzip5M f (x:xs) = do
+    (r1, r2, r3, r4, r5)      <- f x
+    (rs1, rs2, rs3, rs4, rs5) <- mapAndUnzip5M f xs
+    return (r1:rs1, r2:rs2, r3:rs3, r4:rs4, r5:rs5)
 
 -- | Monadic version of mapAccumL
 mapAccumLM :: Monad m

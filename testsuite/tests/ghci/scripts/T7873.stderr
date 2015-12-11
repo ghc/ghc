@@ -1,0 +1,7 @@
+
+<interactive>:2:1: error:
+    • Kind variable ‘k’ is implicitly bound in datatype
+      ‘D1’, but does not appear as the kind of any
+      of its type variables. Perhaps you meant
+      to bind it (with TypeInType) explicitly somewhere?
+    • In the data declaration for ‘D1’

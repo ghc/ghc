@@ -210,7 +210,7 @@ unariseIdBinder us rho x = case repType (idType x) of
                        in (us1, rho', ys)
 
 unboxedTupleBindersFrom :: UniqSupply -> Id -> [UnaryType] -> [Id]
-unboxedTupleBindersFrom us x tys = zipWith (mkSysLocal fs) (uniqsFromSupply us) tys
+unboxedTupleBindersFrom us x tys = zipWith (mkSysLocalOrCoVar fs) (uniqsFromSupply us) tys
   where fs = occNameFS (getOccName x)
 
 concatMapVarSet :: (Var -> [Var]) -> VarSet -> VarSet

@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies, ConstraintKinds #-}
 
 import qualified Data.Set as S
-import GHC.Prim ( Constraint )
+import GHC.Exts ( Constraint )
 
 class RMonad m where
     type RMonadCtxt m a :: Constraint
@@ -22,7 +22,7 @@ instance RMonad S.Set where
 
 
 main = do
-    print $ (returnR 1 ++        returnR 2) `bindR` 
+    print $ (returnR 1 ++        returnR 2) `bindR`
             (\x -> returnR (x + 1) ++        returnR (x + 2))
-    print $ (returnR 1 `S.union` returnR 2) `bindR` 
+    print $ (returnR 1 `S.union` returnR 2) `bindR`
             (\x -> returnR (x + 1) `S.union` returnR (x + 2))

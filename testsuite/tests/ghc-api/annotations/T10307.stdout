@@ -12,7 +12,6 @@
 ((Test10307.hs:5:3-34,AnnDcolon), [Test10307.hs:5:31-32]),
 ((Test10307.hs:5:3-34,AnnSemi), [Test10307.hs:6:3]),
 ((Test10307.hs:5:3-34,AnnType), [Test10307.hs:5:3-6]),
-((Test10307.hs:5:34,AnnStar), [Test10307.hs:5:34]),
 ((Test10307.hs:6:3-34,AnnEqual), [Test10307.hs:6:31]),
 ((Test10307.hs:6:3-34,AnnType), [Test10307.hs:6:3-6]),
 ((Test10307.hs:6:8-34,AnnEqual), [Test10307.hs:6:31]),

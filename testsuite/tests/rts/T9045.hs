@@ -1,3 +1,4 @@
+{-# LANGUAGE ImpredicativeTypes #-}
 -- This is nofib/smp/threads006.  It fails in GHC 7.8.2 with a GC crash.
 
 {-# OPTIONS_GHC -O2 #-}

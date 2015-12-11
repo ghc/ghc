@@ -119,7 +119,35 @@ matchOneConLike :: [Id]
                 -> [EquationInfo]
                 -> DsM (CaseAlt ConLike)
 matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
-  = do  { arg_vars <- selectConMatchVars val_arg_tys args1
+  = do  { let inst_tys = ASSERT( tvs1 `equalLength` ex_tvs )
+                         arg_tys ++ mkTyVarTys tvs1
+
+              val_arg_tys = conLikeInstOrigArgTys con1 inst_tys
+        -- dataConInstOrigArgTys takes the univ and existential tyvars
+        -- and returns the types of the *value* args, which is what we want
+
+              match_group :: [Id]
+                          -> [(ConArgPats, EquationInfo)] -> DsM MatchResult
+              -- All members of the group have compatible ConArgPats
+              match_group arg_vars arg_eqn_prs
+                = ASSERT( notNull arg_eqn_prs )
+                  do { (wraps, eqns') <- liftM unzip (mapM shift arg_eqn_prs)
+                     ; let group_arg_vars = select_arg_vars arg_vars arg_eqn_prs
+                     ; match_result <- match (group_arg_vars ++ vars) ty eqns'
+                     ; return (adjustMatchResult (foldr1 (.) wraps) match_result) }
+
+              shift (_, eqn@(EqnInfo { eqn_pats = ConPatOut{ pat_tvs = tvs, pat_dicts = ds,
+                                                             pat_binds = bind, pat_args = args
+                                                  } : pats }))
+                = do ds_bind <- dsTcEvBinds bind
+                     return ( wrapBinds (tvs `zip` tvs1)
+                            . wrapBinds (ds  `zip` dicts1)
+                            . mkCoreLets ds_bind
+                            , eqn { eqn_pats = conArgPats val_arg_tys args ++ pats }
+                            )
+              shift (_, (EqnInfo { eqn_pats = ps })) = pprPanic "matchOneCon/shift" (ppr ps)
+
+        ; arg_vars <- selectConMatchVars val_arg_tys args1
                 -- Use the first equation as a source of
                 -- suggestions for the new variables
 
@@ -140,36 +168,11 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
               = firstPat eqn1
     fields1 = map flSelector (conLikeFieldLabels con1)
 
-    val_arg_tys = conLikeInstOrigArgTys con1 inst_tys
-    inst_tys = ASSERT( tvs1 `equalLength` ex_tvs )
-               arg_tys ++ mkTyVarTys tvs1
-        -- dataConInstOrigArgTys takes the univ and existential tyvars
-        -- and returns the types of the *value* args, which is what we want
-
     ex_tvs = conLikeExTyVars con1
-
-    match_group :: [Id] -> [(ConArgPats, EquationInfo)] -> DsM MatchResult
-    -- All members of the group have compatible ConArgPats
-    match_group arg_vars arg_eqn_prs
-      = ASSERT( notNull arg_eqn_prs )
-        do { (wraps, eqns') <- liftM unzip (mapM shift arg_eqn_prs)
-           ; let group_arg_vars = select_arg_vars arg_vars arg_eqn_prs
-           ; match_result <- match (group_arg_vars ++ vars) ty eqns'
-           ; return (adjustMatchResult (foldr1 (.) wraps) match_result) }
-
-    shift (_, eqn@(EqnInfo { eqn_pats = ConPatOut{ pat_tvs = tvs, pat_dicts = ds,
-                                                   pat_binds = bind, pat_args = args
-                                        } : pats }))
-      = do ds_bind <- dsTcEvBinds bind
-           return ( wrapBinds (tvs `zip` tvs1)
-                  . wrapBinds (ds  `zip` dicts1)
-                  . mkCoreLets ds_bind
-                  , eqn { eqn_pats = conArgPats val_arg_tys args ++ pats }
-                  )
-    shift (_, (EqnInfo { eqn_pats = ps })) = pprPanic "matchOneCon/shift" (ppr ps)
 
     -- Choose the right arg_vars in the right order for this group
     -- Note [Record patterns]
+    select_arg_vars :: [Id] -> [(ConArgPats, EquationInfo)] -> [Id]
     select_arg_vars arg_vars ((arg_pats, _) : _)
       | RecCon flds <- arg_pats
       , let rpats = rec_flds flds
@@ -208,9 +211,9 @@ selectConMatchVars arg_tys (RecCon {})      = newSysLocalsDs arg_tys
 selectConMatchVars _       (PrefixCon ps)   = selectMatchVars (map unLoc ps)
 selectConMatchVars _       (InfixCon p1 p2) = selectMatchVars [unLoc p1, unLoc p2]
 
-conArgPats :: [Type]    -- Instantiated argument types
-                        -- Used only to fill in the types of WildPats, which
-                        -- are probably never looked at anyway
+conArgPats :: [Type]      -- Instantiated argument types
+                          -- Used only to fill in the types of WildPats, which
+                          -- are probably never looked at anyway
            -> ConArgPats
            -> [Pat Id]
 conArgPats _arg_tys (PrefixCon ps)   = map unLoc ps
@@ -280,4 +283,5 @@ Originally I tried to use
         (\b -> let e = d in expr2) a
 to do this substitution.  While this is "correct" in a way, it fails
 Lint, because e::Ord b but d::Ord a.
+
 -}

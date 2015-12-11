@@ -13,9 +13,9 @@
 -- types.  As '([::])' is being vectorised, any type constructor whose definition involves
 -- '([::])', either directly or indirectly, will be vectorised.
 
-module Vectorise.Type.Classify 
+module Vectorise.Type.Classify
   ( classifyTyCons
-  ) 
+  )
 where
 
 import NameSet
@@ -23,11 +23,10 @@ import UniqSet
 import UniqFM
 import DataCon
 import TyCon
-import TypeRep
-import Type hiding (tyConsOfType)
+import TyCoRep
+import qualified Type
 import PrelNames
 import Digraph
-
 
 -- |From a list of type constructors, extract those that can be vectorised, returning them in two
 -- sets, where the first result list /must be/ vectorised and the second result list /need not be/
@@ -66,14 +65,14 @@ classifyTyCons convStatus parTyCons tcs = classify [] [] [] [] convStatus parTyC
       = classify conv keep (par ++ tcs_par) (tcs ++ novect) cs pts' rs
       where
         refs = ds `delListFromUniqSet` tcs
-        
+
           -- the tycons that directly or indirectly depend on parallel arrays
         tcs_par | any ((`elemNameSet` parTyCons) . tyConName) . eltsUFM $ refs = tcs
                 | otherwise                                                    = []
 
         pts' = pts `extendNameSetList` map tyConName tcs_par
 
-        can_convert  = (isNullUFM (filterUniqSet ((`elemNameSet` pts) . tyConName) (refs `minusUFM` cs)) 
+        can_convert  = (isNullUFM (filterUniqSet ((`elemNameSet` pts) . tyConName) (refs `minusUFM` cs))
                         && all convertable tcs)
                        || isShowClass tcs
         must_convert = foldUFM (||) False (intersectUFM_C const cs refs)
@@ -81,10 +80,10 @@ classifyTyCons convStatus parTyCons tcs = classify [] [] [] [] convStatus parTyC
 
         -- We currently admit Haskell 2011-style data and newtype declarations as well as type
         -- constructors representing classes.
-        convertable tc 
+        convertable tc
           = (isDataTyCon tc || isNewTyCon tc) && all isVanillaDataCon (tyConDataCons tc)
             || isClassTyCon tc
-            
+
         -- !!!FIXME: currently we allow 'Show' in vectorised code without actually providing a
         --   vectorised definition (to be able to vectorise 'Num')
         isShowClass [tc] = tyConName tc == showClassName
@@ -120,18 +119,6 @@ tyConsOfTypes = unionManyUniqSets . map tyConsOfType
 -- |Collect the set of TyCons that occur in this type.
 --
 tyConsOfType :: Type -> UniqSet TyCon
-tyConsOfType ty
-  | Just ty' <- coreView ty    = tyConsOfType ty'
-tyConsOfType (TyVarTy _)       = emptyUniqSet
-tyConsOfType (TyConApp tc tys) = extend (tyConsOfTypes tys)
-  where
-    extend |  isUnLiftedTyCon tc
-           || isTupleTyCon   tc = id
+tyConsOfType ty = filterUniqSet not_tuple_or_unlifted $ Type.tyConsOfType ty
+  where not_tuple_or_unlifted tc = not (isUnLiftedTyCon tc || isTupleTyCon tc)
 
-           | otherwise          = (`addOneToUniqSet` tc)
-
-tyConsOfType (AppTy a b)       = tyConsOfType a `unionUniqSets` tyConsOfType b
-tyConsOfType (FunTy a b)       = (tyConsOfType a `unionUniqSets` tyConsOfType b)
-                                 `addOneToUniqSet` funTyCon
-tyConsOfType (LitTy _)         = emptyUniqSet
-tyConsOfType (ForAllTy _ ty)   = tyConsOfType ty

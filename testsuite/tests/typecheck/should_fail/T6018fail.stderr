@@ -66,7 +66,7 @@ T6018fail.hs:59:10: error:
 
 T6018fail.hs:62:15: error:
     Type family equation violates injectivity annotation.
-    Kind variable ‘k1’ cannot be inferred from the right-hand side.
+    Kind variable ‘k’ cannot be inferred from the right-hand side.
     (enabling -fprint-explicit-kinds might help)
     In the type family equation:
       PolyKindVars '[] = '[] -- Defined at T6018fail.hs:62:15
@@ -76,7 +76,7 @@ T6018fail.hs:66:15: error:
     Kind variable ‘k’ cannot be inferred from the right-hand side.
     (enabling -fprint-explicit-kinds might help)
     In the type family equation:
-      forall (k :: BOX) (a :: k) (b :: k).
+      forall k (a :: k) (b :: k).
         Fc a b = Int -- Defined at T6018fail.hs:66:15
 
 T6018fail.hs:70:15: error:
@@ -85,7 +85,7 @@ T6018fail.hs:70:15: error:
     cannot be inferred from the right-hand side.
     (enabling -fprint-explicit-kinds might help)
     In the type family equation:
-      forall (k :: BOX) (a :: k) (b :: k).
+      forall k (a :: k) (b :: k).
         Gc a b = Int -- Defined at T6018fail.hs:70:15
 
 T6018fail.hs:75:15: error:
@@ -142,7 +142,7 @@ T6018fail.hs:118:15: error:
     cannot be inferred from the right-hand side.
     (enabling -fprint-explicit-kinds might help)
     In the type family equation:
-      forall (k :: BOX) a b (c :: k).
+      forall k a b (c :: k).
         G7 a b c = [G7a a b c] -- Defined at T6018fail.hs:118:15
 
 T6018fail.hs:129:1: error:

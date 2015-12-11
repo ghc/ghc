@@ -2,7 +2,7 @@
 
 -- |Vectorise variables and literals.
 
-module Vectorise.Var 
+module Vectorise.Var
   ( vectBndr
   , vectBndrNew
   , vectBndrIn

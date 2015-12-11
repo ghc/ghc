@@ -516,6 +516,7 @@ cpeRhsE env (Var f `App` _{-type-} `App` arg)
   | f `hasKey` lazyIdKey          -- Replace (lazy a) by a
   = cpeRhsE env arg               -- See Note [lazyId magic] in MkId
 
+cpeRhsE env (Var f `App` _{-levity-} `App` _{-type-} `App` arg)
     -- See Note [runRW magic] in MkId
   | f `hasKey` runRWKey           -- Replace (runRW# f) by (f realWorld#),
   = case arg of                   -- beta reducing if possible
@@ -680,11 +681,11 @@ cpeApp env expr
 
     collect_args (App fun arg@(Type arg_ty)) depth
       = do { (fun',hd,fun_ty,floats,ss) <- collect_args fun depth
-           ; return (App fun' arg, hd, applyTy fun_ty arg_ty, floats, ss) }
+           ; return (App fun' arg, hd, piResultTy fun_ty arg_ty, floats, ss) }
 
-    collect_args (App fun arg@(Coercion arg_co)) depth
+    collect_args (App fun arg@(Coercion {})) depth
       = do { (fun',hd,fun_ty,floats,ss) <- collect_args fun depth
-           ; return (App fun' arg, hd, applyCo fun_ty arg_co, floats, ss) }
+           ; return (App fun' arg, hd, funResultTy fun_ty, floats, ss) }
 
     collect_args (App fun arg) depth
       = do { (fun',hd,fun_ty,floats,ss) <- collect_args fun (depth+1)
@@ -1127,7 +1128,7 @@ canFloatFromNoCaf platform (Floats ok_to_spec fs) rhs
     -- any non-static things or it would *already* be Caffy
     rhs_ok = rhsIsStatic platform (\_ -> False)
                          (\i -> pprPanic "rhsIsStatic" (integer i))
-                         -- Integer literals should not show up 
+                         -- Integer literals should not show up
 
 wantFloatNested :: RecFlag -> Bool -> Floats -> CpeRhs -> Bool
 wantFloatNested is_rec strict_or_unlifted floats rhs
@@ -1258,7 +1259,7 @@ newVar :: Type -> UniqSM Id
 newVar ty
  = seqType ty `seq` do
      uniq <- getUniqueM
-     return (mkSysLocal (fsLit "sat") uniq ty)
+     return (mkSysLocalOrCoVar (fsLit "sat") uniq ty)
 
 
 ------------------------------------------------------------------------------

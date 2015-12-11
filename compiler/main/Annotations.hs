@@ -42,8 +42,8 @@ type AnnPayload = Serialized    -- ^ The "payload" of an annotation
                                 --   and can be persisted to an interface file
 
 -- | An annotation target
-data AnnTarget name 
-  = NamedTarget name          -- ^ We are annotating something with a name: 
+data AnnTarget name
+  = NamedTarget name          -- ^ We are annotating something with a name:
                               --      a type or identifier
   | ModuleTarget Module       -- ^ We are annotating a particular module
 
@@ -99,7 +99,7 @@ mkAnnEnv = extendAnnEnvList emptyAnnEnv
 
 -- | Add the given annotation to the environment.
 extendAnnEnvList :: AnnEnv -> [Annotation] -> AnnEnv
-extendAnnEnvList (MkAnnEnv env) anns 
+extendAnnEnvList (MkAnnEnv env) anns
   = MkAnnEnv $ addListToUFM_C (++) env $
     map (\ann -> (getUnique (ann_target ann), [ann_value ann])) anns
 
@@ -107,11 +107,11 @@ extendAnnEnvList (MkAnnEnv env) anns
 plusAnnEnv :: AnnEnv -> AnnEnv -> AnnEnv
 plusAnnEnv (MkAnnEnv env1) (MkAnnEnv env2) = MkAnnEnv $ plusUFM_C (++) env1 env2
 
--- | Find the annotations attached to the given target as 'Typeable' 
---   values of your choice. If no deserializer is specified, 
+-- | Find the annotations attached to the given target as 'Typeable'
+--   values of your choice. If no deserializer is specified,
 --   only transient annotations will be returned.
 findAnns :: Typeable a => ([Word8] -> a) -> AnnEnv -> CoreAnnTarget -> [a]
-findAnns deserialize (MkAnnEnv ann_env) 
+findAnns deserialize (MkAnnEnv ann_env)
   = (mapMaybe (fromSerialized deserialize))
     . (lookupWithDefaultUFM ann_env [])
 

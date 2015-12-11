@@ -30,7 +30,7 @@ System FC, as implemented in GHC\footnote{This
 document was originally prepared by Richard Eisenberg (\texttt{eir@cis.upenn.edu}),
 but it should be maintained by anyone who edits the functions or data structures
 mentioned in this file. Please feel free to contact Richard for more information.}\\
-\Large 23 April 2015
+\Large 23 October, 2015
 \end{center}
 
 \section{Introduction}
@@ -89,6 +89,8 @@ variables:
 \ottn
 }
 
+We sometimes omit the type/kind annotation to a variable when it is obvious from context.
+
 \subsection{Expressions}
 
 The datatype that represents expressions:
@@ -106,6 +108,9 @@ is ok-for-speculation. See \verb|#let_app_invariant#| in \ghcfile{coreSyn/CoreSy
 \item The $[[_]]$ case for a $[[case]]$ must come first.
 \item The list of case alternatives must be exhaustive.
 \item Types and coercions can only appear on the right-hand-side of an application.
+\item The $[[t]]$ form of an expression must not then turn out to be a coercion.
+In other words, the payload inside of a \texttt{Type} constructor must not turn out
+to be built with \texttt{CoercionTy}. 
 \end{itemize}
 
 Bindings for $[[let]]$ statements:
@@ -132,18 +137,36 @@ A program is just a list of bindings:
 
 \gram{\ottt}
 
+\ctor{ForAllTy}s are represented in two different ways, depending on whether
+the \ctor{ForAllTy} is anonymous (written $[[t1 -> t2]]$) or
+named (written $[[forall n . t]]$).
+
 There are some invariants on types:
 \begin{itemize}
+\item The name used in a type must be a type-level name (\ctor{TyVar}).
 \item The type $[[t1]]$ in the form $[[t1 t2]]$ must not be a type constructor
 $[[T]]$. It should be another application or a type variable.
 \item The form $[[T </ ti // i /> ]]$ (\texttt{TyConApp})
 does \emph{not} need to be saturated.
 \item A saturated application of $[[(->) t1 t2]]$ should be represented as
 $[[t1 -> t2]]$. This is a different point in the grammar, not just pretty-printing.
-The constructor for a saturated $[[(->)]]$ is \texttt{FunTy}.
+The constructor for a saturated $[[(->)]]$ is \texttt{ForAllTy}.
 \item A type-level literal is represented in GHC with a different datatype than
 a term-level literal, but we are ignoring this distinction here.
+\item A coercion used as a type should appear only in the right-hand side of
+  an application.
 \end{itemize}
+
+Note that the use of the $[[T </ ti // i />]]$ form and the $[[t1 -> t2]]$ form
+are purely representational. The metatheory would remain the same if these forms
+were removed in favor of $[[t1 t2]]$. Nevertheless, we keep all three forms in
+this documentation to accurately reflect the implementation.
+
+The \texttt{Named} variant of a \texttt{Binder} (the first argument to a
+\texttt{ForAllTy}) also tracks visibility of arguments. Visibility affects
+only source Haskell, and is omitted from this presentation.
+
+We use the notation $[[t1 k1~#k2 t2]]$ to stand for $[[(~#) k1 k2 t1 t2]]$.
 
 \subsection{Coercions}
 
@@ -156,12 +179,22 @@ Invariants on coercions:
 reflexive, use $[[T_R </ gi // i />]]$, never $[[<T>_R g1 g2]] \ldots$.
 \item The $[[T]]$ in $[[T_R </gi//i/>]]$ is never a type synonym, though it could
 be a type function.
+\item Every non-reflexive coercion coerces between two distinct types.
+\item The name in a coercion must be a term-level name (\ctor{Id}).
+\item The contents of $[[<t>_R]]$ must not be a coercion. In other words,
+the payload in a \texttt{Refl} must not be built with \texttt{CoercionTy}.
 \end{itemize}
+
+The \texttt{UnivCo} constructor takes several arguments: the two types coerced
+between, a coercion relating these types' kinds, a role for the universal coercion,
+and a provenance. The provenance states what created the universal coercion:
+
+\gram{\ottprov}
 
 Roles label what equality relation a coercion is a witness of. Nominal equality
 means that two types are identical (have the same name); representational equality
 means that two types have the same representation (introduced by newtypes); and
-phantom equality includes all types. See \url{http://ghc.haskell.org/trac/ghc/wiki/Roles}
+phantom equality includes all types. See \url{http://ghc.haskell.org/trac/ghc/wiki/Roles} and \url{http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/coercible.pdf}
 for more background.
 
 \gram{\ottR}
@@ -176,6 +209,9 @@ Axioms:
 \ottC\ottinterrule
 \ottaxBranch
 }
+
+The left-hand sides $[[ </ tj // j /> ]]$ of different branches of one axiom must
+all have the same length.
 
 The definition for $[[axBranch]]$ above does not include the list of
 incompatible branches (field \texttt{cab\_incomps} of \texttt{CoAxBranch}),
@@ -218,6 +254,21 @@ for this formalism:
 We include some representative primitive type constructors. There are many more in \ghcfile{prelude/TysPrim.lhs}.
 
 \gram{\ottH}
+
+Note that although GHC contains distinct type constructors $[[*]]$
+and $[[Constraint]]$, this formalism treats only $[[*]]$. These two type
+constructors are considered wholly equivalent. In particular the function
+\texttt{eqType} returns \texttt{True} when comparing $[[*]]$ and $[[Constraint]]$.
+We need them both because they serve different functions in source Haskell.
+
+\paragraph{$[[TYPE]]$}
+The type system is rooted at the special constant $[[TYPE]]$ and the
+(quite normal) datatype \texttt{data Levity = Lifted | Unlifted}.
+The type of $[[TYPE]]$ is $[[Levity -> TYPE 'Lifted]]$. The idea is that
+$[[TYPE 'Lifted]]$ classifies lifted types and $[[TYPE 'Unlifted]]$
+classifies unlifted types. Indeed $[[*]]$ is just a plain old type
+synonym for $[[TYPE 'Lifted]]$, and $[[#]]$ is just a plain old type
+synonym for $[[TYPE 'Unlifted]]$.
 
 \section{Contexts}
 
@@ -275,18 +326,12 @@ as for strictness and exportability. See the source code for further information
 
 \begin{itemize}
 \item Some explication of \ottdrulename{Tm\_LetRec} is helpful: The idea behind the
-second premise ($[[</ G, G'i |-ty s'i : ki // i />]]$) is that we wish
+second premise ($[[</ G, G'i |-ty si : ki // i />]]$) is that we wish
 to check each substituted type $[[s'i]]$ in a context containing all the types
 that come before it in the list of bindings. The $[[G'i]]$ are contexts
 containing the names and kinds of all type variables (and term variables,
 for that matter) up to the $i$th binding. This logic is extracted from
 \coderef{coreSyn/CoreLint.lhs}{lintAndScopeIds}.
-
-\item There is one more case for $[[G |-tm e : t]]$, for type expressions.
-This is included in the GHC code but is elided
-here because the case is never used in practice. Type expressions
-can only appear in arguments to functions, and these are handled
-in \ottdrulename{Tm\_AppType}.
 
 \item The GHC source code checks all arguments in an application expression
 all at once using \coderef{coreSyn/CoreSyn.lhs}{collectArgs}
@@ -318,16 +363,12 @@ a dead id and for one-tuples. These checks are omitted here.
 In the coercion typing judgment, the $\#$ marks are left off the equality
 operators to reduce clutter. This is not actually inconsistent, because
 the GHC function that implements this check, \texttt{lintCoercion}, actually
-returns four separate values (the kind, the two types, and the role), not
-a type with head $[[(~#)]]$ or $[[(~R#)]]$. Note that the difference between
+returns five separate values (the two kinds, the two types, and the role), not
+a type with head $[[(~#)]]$ or $[[(~Rep#)]]$. Note that the difference between
 these two forms of equality is interpreted in the rules \ottdrulename{Co\_CoVarCoNom}
 and \ottdrulename{Co\_CoVarCoRepr}.
 
 \ottdefnlintCoercion{}
-
-In \ottdrulename{Co\_AxiomInstCo}, the use of $[[inits]]$ creates substitutions from
-the first $i$ mappings in $[[ </ [ni |-> si] // i /> ]]$. This has the effect of
-folding the substitution over the kinds for kind-checking.
 
 See Section~\ref{sec:tyconroles} for more information about $[[tyConRolesX]]$, and
 see Section~\ref{sec:axiom_rules} for more information about $[[coaxrProves]]$.
@@ -342,7 +383,7 @@ There are two very similar checks for names, one declared as a local function:
 
 \subsection{Substitution consistency}
 
-\ottdefncheckTyKind{}
+\ottdefnlintTyKind{}
 
 \subsection{Case alternative consistency}
 
@@ -364,9 +405,9 @@ There are two very similar checks for names, one declared as a local function:
 
 \ottdefnlintXXapp{}
 
-\subsection{Sub-kinding}
+\subsection{Axiom argument kinding}
 
-\ottdefnisSubKind{}
+\ottdefncheckXXki{}
 
 \subsection{Roles}
 \label{sec:tyconroles}
@@ -462,7 +503,7 @@ algebraic datatype. Coercions (say, in a GADT) are considered term arguments.
 \begin{itemize}
 \item The logic in this rule is implemented in \coderef{coreSyn/CoreSubst.lhs}{exprIsConApp\_maybe}.
 \item The $[[coercionKind]]$ function (\coderef{types/Coercion.lhs}{coercionKind})
-extracts the two types (and their kind) from
+extracts the two types (and their kinds) from
 a coercion. It does not require a typing context, as it does not \emph{check} the
 coercion, just extracts its types.
 \item The $[[dataConRepType]]$ function (\coderef{basicTypes/DataCon.lhs}{dataConRepType}) extracts the full type of a data constructor. Following the notation for
@@ -472,6 +513,8 @@ groups: universally quantified types, existentially quantified types, and terms.
 \emph{type} variables with \emph{coercions}. This substitution is called lifting
 and is implemented in \coderef{types/Coercion.lhs}{liftCoSubst}. The notation is
 essentially a pun on the fact that types and coercions have such similar structure.
+This operation is quite non-trivial. Please see \emph{System FC with Explicit
+Kind Equality} for details.
 \item Note that the types $[[ </ sbb // bb /> ]]$---the existentially quantified
 types---do not change during this step.
 \end{itemize}

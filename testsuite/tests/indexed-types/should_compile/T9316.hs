@@ -85,4 +85,3 @@ forAllSubscriptionChannels f =
   withSomeSing BookingsChannel $ \(sChannel) ->
     case witnessC sChannel of
       Dict -> f sChannel
-

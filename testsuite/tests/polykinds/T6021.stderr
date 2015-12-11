@@ -1,5 +1,4 @@
 
 T6021.hs:5:22: error:
-    Type variable ‘b’ used as a kind
-    In the kind ‘b’
-    In the instance declaration for ‘Panic (a :: b) b’
+    Variable ‘b’ used as both a kind and a type
+    Did you intend to use TypeInType?

@@ -597,11 +597,13 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
     list of some in the instances it knows about. With this flag it
     prints *all* the instances it knows about.
 
-``-fprint-explicit-foralls, -fprint-explicit-kinds, -fprint-unicode-syntax``
+``-fprint-explicit-foralls, -fprint-explicit-kinds, -fprint-unicode-syntax, -fprint-explicit-coercions, -fprint-equality-relations``
     .. index::
        single: -fprint-explicit-foralls
        single: -fprint-explicit-kinds
        single: -fprint-unicode-syntax
+       single: -fprint-explicit-coercions
+       single: -fprint-equality-relations
 
     These three flags control the way in which GHC displays types, in
     error messages and in GHCi. Using ``-fprint-explicit-foralls`` makes
@@ -662,6 +664,21 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
         ghci> :t (>>)
         (>>) :: ∀ (m :: * → *) a b. Monad m ⇒ m a → m b → m b
 
+    Using ``-fprint-explicit-coercions`` makes GHC print coercions in
+    types. When trying to prove the equality between types of different
+    kinds, GHC uses type-level coercions. Users will rarely need to
+    see these, as they are meant to be internal.
+
+    Using ``-fprint-equality-relations`` tells GHC to distinguish between
+    its equality relations when printing. For example, ``~`` is homogeneous
+    lifted equality (the kinds of its arguments are the same) while
+    ``~~`` is heterogeneous lifted equality (the kinds of its arguments
+    might be different) and ``~#`` is heterogeneous unlifted equality,
+    the internal equality relation used in GHC's solver. Generally,
+    users should not need to worry about the subtleties here; ``~`` is
+    probably what you want. Without ``-fprint-equality-relations``, GHC
+    prints all of these as ``~``.
+	
 ``-fprint-expanded-synonyms``
     .. index::
        single: -fprint-expanded-synonyms

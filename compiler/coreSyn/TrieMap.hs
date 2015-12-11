@@ -12,11 +12,10 @@
 module TrieMap(
    CoreMap, emptyCoreMap, extendCoreMap, lookupCoreMap, foldCoreMap,
    TypeMap, emptyTypeMap, extendTypeMap, lookupTypeMap, foldTypeMap,
-   CoercionMap,
+   LooseTypeMap,
    MaybeMap,
    ListMap,
-   TrieMap(..), insertTM, deleteTM,
-   lookupTypeMapTyCon
+   TrieMap(..), insertTM, deleteTM
  ) where
 
 import CoreSyn
@@ -24,13 +23,11 @@ import Coercion
 import Literal
 import Name
 import Type
-import TypeRep
-import TyCon(TyCon)
+import TyCoRep
 import Var
 import UniqFM
 import Unique( Unique )
 import FastString(FastString)
-import CoAxiom(CoAxiomRule(coaxrName))
 
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
@@ -652,222 +649,41 @@ fdA k m = foldTM k (am_deflt m)
 ************************************************************************
 -}
 
+-- We should really never care about the contents of a coercion. Instead,
+-- just look up the coercion's type.
 newtype CoercionMap a = CoercionMap (CoercionMapG a)
 
 instance TrieMap CoercionMap where
-    type Key CoercionMap = Coercion
-    emptyTM = CoercionMap emptyTM
-    lookupTM k (CoercionMap m) = lookupTM (deBruijnize k) m
-    alterTM k f (CoercionMap m) = CoercionMap (alterTM (deBruijnize k) f m)
-    foldTM k (CoercionMap m) = foldTM k m
-    mapTM f (CoercionMap m) = CoercionMap (mapTM f m)
+   type Key CoercionMap = Coercion
+   emptyTM                     = CoercionMap emptyTM
+   lookupTM k  (CoercionMap m) = lookupTM (deBruijnize k) m
+   alterTM k f (CoercionMap m) = CoercionMap (alterTM (deBruijnize k) f m)
+   foldTM k    (CoercionMap m) = foldTM k m
+   mapTM f     (CoercionMap m) = CoercionMap (mapTM f m)
 
 type CoercionMapG = GenMap CoercionMapX
-data CoercionMapX a
-  = KM { km_refl   :: RoleMap (TypeMapG a)
-       , km_tc_app :: RoleMap (NameEnv (ListMap CoercionMapG a))
-       , km_app    :: CoercionMapG (CoercionMapG a)
-       , km_forall :: CoercionMapG (BndrMap a) -- See Note [Binders]
-       , km_var    :: VarMap a
-       , km_axiom  :: NameEnv (IntMap.IntMap (ListMap CoercionMapG a))
-       , km_univ   :: RoleMap (TypeMapG (TypeMapG a))
-       , km_sym    :: CoercionMapG a
-       , km_trans  :: CoercionMapG (CoercionMapG a)
-       , km_nth    :: IntMap.IntMap (CoercionMapG a)
-       , km_left   :: CoercionMapG a
-       , km_right  :: CoercionMapG a
-       , km_inst   :: CoercionMapG (TypeMapG a)
-       , km_sub    :: CoercionMapG a
-       , km_axiom_rule :: Map.Map FastString
-                                  (ListMap TypeMapG (ListMap CoercionMapG a))
-       }
-
-instance Eq (DeBruijn Coercion) where
-    D env1 co1 == D env2 co2 = go co1 co2 where
-        go (Refl eq1 ty1) (Refl eq2 ty2)
-            = eq1 == eq2 && D env1 ty1 == D env2 ty2
-        go (TyConAppCo eq1 tc1 cos1) (TyConAppCo eq2 tc2 cos2)
-            = eq1 == eq2 && tc1 == tc2 && D env1 cos1 == D env2 cos2
-        go (AppCo co11 co12) (AppCo co21 co22)
-            = D env1 co11 == D env2 co21 &&
-              D env1 co12 == D env2 co22
-        go (ForAllCo v1 co1) (ForAllCo v2 co2)
-            = D env1 (tyVarKind v1)     == D env2 (tyVarKind v2) &&
-              D (extendCME env1 v1) co1 == D (extendCME env2 v2) co2
-        go (CoVarCo cv1) (CoVarCo cv2)
-            = case (lookupCME env1 cv1, lookupCME env2 cv2) of
-                (Just bv1, Just bv2) -> bv1 == bv2
-                (Nothing, Nothing)   -> cv1 == cv2
-                _ -> False
-        go (AxiomInstCo con1 ind1 cos1) (AxiomInstCo con2 ind2 cos2)
-            = con1 == con2 && ind1 == ind2 && D env1 cos1 == D env2 cos2
-        go (UnivCo _ r1 ty11 ty12) (UnivCo _ r2 ty21 ty22)
-            = r1 == r2 && D env1 ty11 == D env2 ty21 &&
-                          D env1 ty12 == D env2 ty22
-        go (SymCo co1) (SymCo co2)
-            = D env1 co1 == D env2 co2
-        go (TransCo co11 co12) (TransCo co21 co22)
-            = D env1 co11 == D env2 co21 &&
-              D env1 co12 == D env2 co22
-        go (NthCo d1 co1) (NthCo d2 co2)
-            = d1 == d2 && D env1 co1 == D env2 co2
-        go (LRCo d1 co1) (LRCo d2 co2)
-            = d1 == d2 && D env1 co1 == D env2 co2
-        go (InstCo co1 ty1) (InstCo co2 ty2)
-            = D env1 co1 == D env2 co2 && D env1 ty1 == D env2 ty2
-        go (SubCo co1) (SubCo co2)
-            = D env1 co1 == D env2 co2
-        go (AxiomRuleCo a1 ts1 cs1) (AxiomRuleCo a2 ts2 cs2)
-            = a1 == a2 && D env1 ts1 == D env2 ts2 && D env1 cs1 == D env2 cs2
-        go _ _ = False
-
-
-emptyC :: CoercionMapX a
-emptyC = KM { km_refl = emptyTM, km_tc_app = emptyTM
-            , km_app = emptyTM, km_forall = emptyTM
-            , km_var = emptyTM, km_axiom = emptyNameEnv
-            , km_univ = emptyTM, km_sym = emptyTM, km_trans = emptyTM
-            , km_nth = emptyTM, km_left = emptyTM, km_right = emptyTM
-            , km_inst = emptyTM, km_sub = emptyTM
-            , km_axiom_rule = emptyTM }
+newtype CoercionMapX a = CoercionMapX (TypeMapX a)
 
 instance TrieMap CoercionMapX where
-   type Key CoercionMapX = DeBruijn Coercion
-   emptyTM  = emptyC
-   lookupTM = lkC
-   alterTM  = xtC
-   foldTM   = fdC
-   mapTM    = mapC
+  type Key CoercionMapX = DeBruijn Coercion
+  emptyTM = CoercionMapX emptyTM
+  lookupTM = lkC
+  alterTM  = xtC
+  foldTM f (CoercionMapX core_tm) = foldTM f core_tm
+  mapTM f (CoercionMapX core_tm)  = CoercionMapX (mapTM f core_tm)
 
-mapC :: (a->b) -> CoercionMapX a -> CoercionMapX b
-mapC f (KM { km_refl = krefl, km_tc_app = ktc
-           , km_app = kapp, km_forall = kforall
-           , km_var = kvar, km_axiom = kax
-           , km_univ   = kuniv  , km_sym = ksym, km_trans = ktrans
-           , km_nth = knth, km_left = kml, km_right = kmr
-           , km_inst = kinst, km_sub = ksub
-           , km_axiom_rule = kaxr })
-  = KM { km_refl   = mapTM (mapTM f) krefl
-       , km_tc_app = mapTM (mapNameEnv (mapTM f)) ktc
-       , km_app    = mapTM (mapTM f) kapp
-       , km_forall = mapTM (mapTM f) kforall
-       , km_var    = mapTM f kvar
-       , km_axiom  = mapNameEnv (IntMap.map (mapTM f)) kax
-       , km_univ   = mapTM (mapTM (mapTM f)) kuniv
-       , km_sym    = mapTM f ksym
-       , km_trans  = mapTM (mapTM f) ktrans
-       , km_nth    = IntMap.map (mapTM f) knth
-       , km_left   = mapTM f kml
-       , km_right  = mapTM f kmr
-       , km_inst   = mapTM (mapTM f) kinst
-       , km_sub    = mapTM f ksub
-       , km_axiom_rule = mapTM (mapTM (mapTM f)) kaxr
-       }
+instance Eq (DeBruijn Coercion) where
+  D env1 co1 == D env2 co2
+    = D env1 (coercionType co1) ==
+      D env2 (coercionType co2)
 
 lkC :: DeBruijn Coercion -> CoercionMapX a -> Maybe a
-lkC (D env co) m = go co m
-  where
-    go (Refl r ty)             = km_refl   >.> lookupTM r >=> lkG (D env ty)
-    go (TyConAppCo r tc cs)    = km_tc_app >.> lookupTM r >=> lkNamed tc >=>
-                                    lkList (lkG . D env) cs
-    go (AxiomInstCo ax ind cs) = km_axiom  >.> lkNamed ax >=> lookupTM ind >=>
-                                    lkList (lkG . D env) cs
-    go (AppCo c1 c2)           = km_app    >.> lkG (D env c1) >=> lkG (D env c2)
-    go (TransCo c1 c2)         = km_trans  >.> lkG (D env c1) >=> lkG (D env c2)
-
-    -- the provenance is not used in the map
-    go (UnivCo _ r t1 t2)      = km_univ   >.> lookupTM r >=> lkG (D env t1) >=>
-                                    lkG (D env t2)
-    go (InstCo c t)            = km_inst   >.> lkG (D env c)  >=> lkG (D env t)
-    go (ForAllCo v c)          = km_forall >.> lkG (D (extendCME env v) c) >=>
-                                    lkBndr env v
-    go (CoVarCo v)             = km_var    >.> lkVar env v
-    go (SymCo c)               = km_sym    >.> lkG (D env c)
-    go (NthCo n c)             = km_nth    >.> lookupTM n >=> lkG (D env c)
-    go (LRCo CLeft  c)         = km_left   >.> lkG (D env c)
-    go (LRCo CRight c)         = km_right  >.> lkG (D env c)
-    go (SubCo c)               = km_sub    >.> lkG (D env c)
-    go (AxiomRuleCo co ts cs)  = km_axiom_rule >.>
-                                    lookupTM (coaxrName co) >=>
-                                    lkList (lkG . D env) ts >=>
-                                    lkList (lkG . D env) cs
-
+lkC (D env co) (CoercionMapX core_tm) = lkT (D env $ coercionType co)
+                                        core_tm
 
 xtC :: DeBruijn Coercion -> XT a -> CoercionMapX a -> CoercionMapX a
-xtC (D env c) f m = case c of
- Refl r ty          -> m { km_refl   = km_refl m   |> xtR r
-                                                  |>> xtG (D env ty) f }
- TyConAppCo r tc cs -> m { km_tc_app = km_tc_app m |> xtR r |>> xtNamed tc
-                                                  |>> xtList (xtG . D env) cs f}
- AxiomInstCo ax ind cs -> m { km_axiom  = km_axiom m |> xtNamed ax |>> xtInt ind
-                                                  |>> xtList (xtG . D env) cs f}
- AppCo c1 c2        -> m { km_app    = km_app m    |> xtG (D env c1)
-                                                  |>> xtG (D env c2) f }
- TransCo c1 c2      -> m { km_trans  = km_trans m  |> xtG (D env c1)
-                                                  |>> xtG (D env c2) f }
- -- the provenance is not used in the map
- UnivCo _ r t1 t2   -> m { km_univ   = km_univ m   |> xtR r
-                                                  |>> xtG (D env t1)
-                                                  |>> xtG (D env t2) f }
- InstCo c t         -> m { km_inst   = km_inst m   |> xtG (D env c)
-                                                  |>> xtG (D env t) f}
- ForAllCo v c       -> m { km_forall = km_forall m
-                                                |> xtG (D (extendCME env v) c)
-                                               |>> xtBndr env v f }
- CoVarCo v          -> m { km_var    = km_var m    |> xtVar env  v f }
- SymCo c            -> m { km_sym    = km_sym m    |> xtG (D env c) f }
- NthCo n c          -> m { km_nth    = km_nth m    |> xtInt n
-                                                  |>> xtG (D env c) f }
- LRCo CLeft  c      -> m { km_left   = km_left m   |> xtG (D env c) f }
- LRCo CRight c      -> m { km_right  = km_right m  |> xtG (D env c) f }
- SubCo c            -> m { km_sub    = km_sub m    |> xtG (D env c) f }
- AxiomRuleCo co ts cs -> m { km_axiom_rule = km_axiom_rule m
-                                                |>  alterTM (coaxrName co)
-                                                |>> xtList (xtG . D env) ts
-                                                |>> xtList (xtG . D env) cs f }
-
-fdC :: (a -> b -> b) -> CoercionMapX a -> b -> b
-fdC k m = foldTM (foldTM k) (km_refl m)
-        . foldTM (foldTM (foldTM k)) (km_tc_app m)
-        . foldTM (foldTM k) (km_app m)
-        . foldTM (foldTM k) (km_forall m)
-        . foldTM k (km_var m)
-        . foldTM (foldTM (foldTM k)) (km_axiom m)
-        . foldTM (foldTM (foldTM k)) (km_univ   m)
-        . foldTM k (km_sym m)
-        . foldTM (foldTM k) (km_trans m)
-        . foldTM (foldTM k) (km_nth m)
-        . foldTM k          (km_left m)
-        . foldTM k          (km_right m)
-        . foldTM (foldTM k) (km_inst m)
-        . foldTM k          (km_sub m)
-        . foldTM (foldTM (foldTM k)) (km_axiom_rule m)
-
-newtype RoleMap a = RM { unRM :: (IntMap.IntMap a) }
-
-instance TrieMap RoleMap where
-  type Key RoleMap = Role
-  emptyTM = RM emptyTM
-  lookupTM = lkR
-  alterTM = xtR
-  foldTM = fdR
-  mapTM = mapR
-
-lkR :: Role -> RoleMap a -> Maybe a
-lkR Nominal          = lookupTM 1 . unRM
-lkR Representational = lookupTM 2 . unRM
-lkR Phantom          = lookupTM 3 . unRM
-
-xtR :: Role -> XT a -> RoleMap a -> RoleMap a
-xtR Nominal          f = RM . alterTM 1 f . unRM
-xtR Representational f = RM . alterTM 2 f . unRM
-xtR Phantom          f = RM . alterTM 3 f . unRM
-
-fdR :: (a -> b -> b) -> RoleMap a -> b -> b
-fdR f (RM m) = foldTM f m
-
-mapR :: (a -> b) -> RoleMap a -> RoleMap b
-mapR f = RM . mapTM f . unRM
+xtC (D env co) f (CoercionMapX m)
+  = CoercionMapX (xtT (D env $ coercionType co) f m)
 
 {-
 ************************************************************************
@@ -877,49 +693,12 @@ mapR f = RM . mapTM f . unRM
 ************************************************************************
 -}
 
--- | @TypeMap a@ is a map from 'Type' to @a@.  If you are a client, this
--- is the type you want.
-newtype TypeMap a = TypeMap (TypeMapG a)
-
--- Below are some client-oriented functions which operate on 'TypeMap'.
-
-instance TrieMap TypeMap where
-    type Key TypeMap = Type
-    emptyTM = TypeMap emptyTM
-    lookupTM k (TypeMap m) = lookupTM (deBruijnize k) m
-    alterTM k f (TypeMap m) = TypeMap (alterTM (deBruijnize k) f m)
-    foldTM k (TypeMap m) = foldTM k m
-    mapTM f (TypeMap m) = TypeMap (mapTM f m)
-
-foldTypeMap :: (a -> b -> b) -> b -> TypeMap a -> b
-foldTypeMap k z m = foldTM k m z
-
-emptyTypeMap :: TypeMap a
-emptyTypeMap = emptyTM
-
-lookupTypeMap :: TypeMap a -> Type -> Maybe a
-lookupTypeMap cm t = lookupTM t cm
-
--- Returns the type map entries that have keys starting with the given tycon.
--- This only considers saturated applications (i.e. TyConApp ones).
-lookupTypeMapTyCon :: TypeMap a -> TyCon -> [a]
-lookupTypeMapTyCon (TypeMap EmptyMap) _ = []
-lookupTypeMapTyCon (TypeMap (SingletonMap (D _ (TyConApp tc' _)) v)) tc
-    | tc' == tc = [v]
-    | otherwise = []
-lookupTypeMapTyCon (TypeMap SingletonMap{}) _ = []
-lookupTypeMapTyCon (TypeMap (MultiMap TM { tm_tc_app = cs })) tc =
-  case lookupUFM cs tc of
-    Nothing -> []
-    Just xs -> foldTM (:) xs []
-
-extendTypeMap :: TypeMap a -> Type -> a -> TypeMap a
-extendTypeMap m t v = alterTM t (const (Just v)) m
-
 -- | @TypeMapG a@ is a map from @DeBruijn Type@ to @a@.  The extended
 -- key makes it suitable for recursive traversal, since it can track binders,
 -- but it is strictly internal to this module.  If you are including a 'TypeMap'
--- inside another 'TrieMap', this is the type you want.
+-- inside another 'TrieMap', this is the type you want. Note that this
+-- lookup does not do a kind-check. Thus, all keys in this map must have
+-- the same kind.
 type TypeMapG = GenMap TypeMapX
 
 -- | @TypeMapX a@ is the base map from @DeBruijn Type@ to @a@, but without the
@@ -927,11 +706,21 @@ type TypeMapG = GenMap TypeMapX
 data TypeMapX a
   = TM { tm_var    :: VarMap a
        , tm_app    :: TypeMapG (TypeMapG a)
-       , tm_fun    :: TypeMapG (TypeMapG a)
-       , tm_tc_app :: NameEnv (ListMap TypeMapG a)
+       , tm_tycon  :: NameEnv a
        , tm_forall :: TypeMapG (BndrMap a) -- See Note [Binders]
        , tm_tylit  :: TyLitMap a
+       , tm_coerce :: Maybe a
        }
+    -- Note that there is no tyconapp case; see Note [Equality on AppTys] in Type
+
+-- | squeeze out any synonyms, convert Constraint to *, and change TyConApps
+-- to nested AppTys. Why the last one? See Note [Equality on AppTys] in Type
+trieMapView :: Type -> Maybe Type
+trieMapView ty | Just ty' <- coreViewOneStarKind ty = Just ty'
+trieMapView (TyConApp tc tys@(_:_)) = Just $ foldl AppTy (TyConApp tc []) tys
+trieMapView (ForAllTy (Anon arg) res)
+  = Just ((TyConApp funTyCon [] `AppTy` arg) `AppTy` res)
+trieMapView _ = Nothing
 
 instance TrieMap TypeMapX where
    type Key TypeMapX = DeBruijn Type
@@ -943,89 +732,99 @@ instance TrieMap TypeMapX where
 
 instance Eq (DeBruijn Type) where
   env_t@(D env t) == env_t'@(D env' t')
-    | Just new_t  <- coreView t  = D env new_t == env_t'
-    | Just new_t' <- coreView t' = env_t       == D env' new_t'
-    | otherwise                  =
-      case (t, t') of
+    | Just new_t  <- coreViewOneStarKind t  = D env new_t == env_t'
+    | Just new_t' <- coreViewOneStarKind t' = env_t       == D env' new_t'
+    | otherwise
+    = case (t, t') of
+        (CastTy t1 _, _)  -> D env t1 == D env t'
+        (_, CastTy t1' _) -> D env t  == D env t1'
+
         (TyVarTy v, TyVarTy v')
             -> case (lookupCME env v, lookupCME env' v') of
                 (Just bv, Just bv') -> bv == bv'
                 (Nothing, Nothing)  -> v == v'
                 _ -> False
-        (AppTy t1 t2, AppTy t1' t2')
+                -- See Note [Equality on AppTys] in Type
+        (AppTy t1 t2, s) | Just (t1', t2') <- repSplitAppTy_maybe s
             -> D env t1 == D env' t1' && D env t2 == D env' t2'
-        (FunTy t1 t2, FunTy t1' t2')
+        (s, AppTy t1' t2') | Just (t1, t2) <- repSplitAppTy_maybe s
+            -> D env t1 == D env' t1' && D env t2 == D env' t2'
+        (ForAllTy (Anon t1) t2, ForAllTy (Anon t1') t2')
             -> D env t1 == D env' t1' && D env t2 == D env' t2'
         (TyConApp tc tys, TyConApp tc' tys')
             -> tc == tc' && D env tys == D env' tys'
         (LitTy l, LitTy l')
             -> l == l'
-        (ForAllTy tv ty, ForAllTy tv' ty')
+        (ForAllTy (Named tv _) ty, ForAllTy (Named tv' _) ty')
             -> D env (tyVarKind tv)    == D env' (tyVarKind tv') &&
                D (extendCME env tv) ty == D (extendCME env' tv') ty'
+        (CoercionTy {}, CoercionTy {})
+            -> True
         _ -> False
 
-instance Outputable a => Outputable (TypeMap a) where
+instance Outputable a => Outputable (TypeMapG a) where
   ppr m = text "TypeMap elts" <+> ppr (foldTM (:) m [])
 
 emptyT :: TypeMapX a
 emptyT = TM { tm_var  = emptyTM
             , tm_app  = EmptyMap
-            , tm_fun  = EmptyMap
-            , tm_tc_app = emptyNameEnv
+            , tm_tycon  = emptyNameEnv
             , tm_forall = EmptyMap
-            , tm_tylit  = emptyTyLitMap }
+            , tm_tylit  = emptyTyLitMap
+            , tm_coerce = Nothing }
 
 mapT :: (a->b) -> TypeMapX a -> TypeMapX b
-mapT f (TM { tm_var  = tvar, tm_app = tapp, tm_fun = tfun
-           , tm_tc_app = ttcapp, tm_forall = tforall, tm_tylit = tlit })
+mapT f (TM { tm_var  = tvar, tm_app = tapp, tm_tycon = ttycon
+           , tm_forall = tforall, tm_tylit = tlit
+           , tm_coerce = tcoerce })
   = TM { tm_var    = mapTM f tvar
        , tm_app    = mapTM (mapTM f) tapp
-       , tm_fun    = mapTM (mapTM f) tfun
-       , tm_tc_app = mapNameEnv (mapTM f) ttcapp
+       , tm_tycon  = mapNameEnv f ttycon
        , tm_forall = mapTM (mapTM f) tforall
-       , tm_tylit  = mapTM f tlit }
+       , tm_tylit  = mapTM f tlit
+       , tm_coerce = fmap f tcoerce }
 
 -----------------
 lkT :: DeBruijn Type -> TypeMapX a -> Maybe a
 lkT (D env ty) m = go ty m
   where
-    go ty | Just ty' <- coreView ty = go ty'
-    go (TyVarTy v)       = tm_var    >.> lkVar env v
-    go (AppTy t1 t2)     = tm_app    >.> lkG (D env t1) >=> lkG (D env t2)
-    go (FunTy t1 t2)     = tm_fun    >.> lkG (D env t1) >=> lkG (D env t2)
-    go (TyConApp tc tys) = tm_tc_app >.> lkNamed tc >=> lkList (lkG . D env) tys
-    go (LitTy l)         = tm_tylit  >.> lkTyLit l
-    go (ForAllTy tv ty)  = tm_forall >.> lkG (D (extendCME env tv) ty)
-                                     >=> lkBndr env tv
-
+    go ty | Just ty' <- trieMapView ty = go ty'
+    go (TyVarTy v)                 = tm_var    >.> lkVar env v
+    go (AppTy t1 t2)               = tm_app    >.> lkG (D env t1)
+                                               >=> lkG (D env t2)
+    go (TyConApp tc [])            = tm_tycon  >.> lkNamed tc
+    go ty@(TyConApp _ (_:_))       = pprPanic "lkT TyConApp" (ppr ty)
+    go (LitTy l)                   = tm_tylit  >.> lkTyLit l
+    go (ForAllTy (Named tv _) ty)  = tm_forall >.> lkG (D (extendCME env tv) ty)
+                                               >=> lkBndr env tv
+    go ty@(ForAllTy (Anon _) _)    = pprPanic "lkT FunTy" (ppr ty)
+    go (CastTy t _)                = go t
+    go (CoercionTy {})             = tm_coerce
 
 -----------------
 xtT :: DeBruijn Type -> XT a -> TypeMapX a -> TypeMapX a
-xtT (D env ty) f m
-  | Just ty' <- coreView ty = xtT (D env ty') f m
+xtT (D env ty) f m | Just ty' <- trieMapView ty = xtT (D env ty') f m
 
 xtT (D env (TyVarTy v))       f m = m { tm_var    = tm_var m |> xtVar env v f }
 xtT (D env (AppTy t1 t2))     f m = m { tm_app    = tm_app m |> xtG (D env t1)
-                                                 |>> xtG (D env t2) f }
-xtT (D env (FunTy t1 t2))     f m = m { tm_fun    = tm_fun m |> xtG (D env t1)
-                                                 |>> xtG (D env t2) f }
-xtT (D env (ForAllTy tv ty))  f m = m { tm_forall = tm_forall m
-                                                |> xtG (D (extendCME env tv) ty)
-                                                |>> xtBndr env tv f }
-xtT (D env (TyConApp tc tys)) f m = m { tm_tc_app = tm_tc_app m |> xtNamed tc
-                                                |>> xtList (xtG . D env) tys f }
+                                                            |>> xtG (D env t2) f }
+xtT (D _   (TyConApp tc []))  f m = m { tm_tycon  = tm_tycon m |> xtNamed tc f }
 xtT (D _   (LitTy l))         f m = m { tm_tylit  = tm_tylit m |> xtTyLit l f }
+xtT (D env (CastTy t _))      f m = xtT (D env t) f m
+xtT (D _   (CoercionTy {}))   f m = m { tm_coerce = tm_coerce m |> f }
+xtT (D env (ForAllTy (Named tv _) ty))  f m
+  = m { tm_forall = tm_forall m |> xtG (D (extendCME env tv) ty)
+                                |>> xtBndr env tv f }
+xtT (D _   ty@(TyConApp _ (_:_)))    _ _ = pprPanic "xtT TyConApp" (ppr ty)
+xtT (D _   ty@(ForAllTy (Anon _) _)) _ _ = pprPanic "xtT FunTy" (ppr ty)
 
 fdT :: (a -> b -> b) -> TypeMapX a -> b -> b
 fdT k m = foldTM k (tm_var m)
         . foldTM (foldTM k) (tm_app m)
-        . foldTM (foldTM k) (tm_fun m)
-        . foldTM (foldTM k) (tm_tc_app m)
+        . foldTM k (tm_tycon m)
         . foldTM (foldTM k) (tm_forall m)
         . foldTyLit k (tm_tylit m)
-
-
+        . foldMaybe k (tm_coerce m)
 
 ------------------------
 data TyLitMap a = TLM { tlm_number :: Map.Map Integer a
@@ -1062,6 +861,55 @@ xtTyLit l f m =
 foldTyLit :: (a -> b -> b) -> TyLitMap a -> b -> b
 foldTyLit l m = flip (Map.fold l) (tlm_string m)
               . flip (Map.fold l) (tlm_number m)
+
+-------------------------------------------------
+-- | @TypeMap a@ is a map from 'Type' to @a@.  If you are a client, this
+-- is the type you want. The keys in this map may have different kinds.
+newtype TypeMap a = TypeMap (TypeMapG (TypeMapG a))
+
+lkTT :: DeBruijn Type -> TypeMap a -> Maybe a
+lkTT (D env ty) (TypeMap m) = lkG (D env $ typeKind ty) m
+                          >>= lkG (D env ty)
+
+xtTT :: DeBruijn Type -> XT a -> TypeMap a -> TypeMap a
+xtTT (D env ty) f (TypeMap m)
+  = TypeMap (m |> xtG (D env $ typeKind ty)
+               |>> xtG (D env ty) f)
+
+-- Below are some client-oriented functions which operate on 'TypeMap'.
+
+instance TrieMap TypeMap where
+    type Key TypeMap = Type
+    emptyTM = TypeMap emptyTM
+    lookupTM k m = lkTT (deBruijnize k) m
+    alterTM k f m = xtTT (deBruijnize k) f m
+    foldTM k (TypeMap m) = foldTM (foldTM k) m
+    mapTM f (TypeMap m) = TypeMap (mapTM (mapTM f) m)
+
+foldTypeMap :: (a -> b -> b) -> b -> TypeMap a -> b
+foldTypeMap k z m = foldTM k m z
+
+emptyTypeMap :: TypeMap a
+emptyTypeMap = emptyTM
+
+lookupTypeMap :: TypeMap a -> Type -> Maybe a
+lookupTypeMap cm t = lookupTM t cm
+
+extendTypeMap :: TypeMap a -> Type -> a -> TypeMap a
+extendTypeMap m t v = alterTM t (const (Just v)) m
+
+-- | A 'LooseTypeMap' doesn't do a kind-check. Thus, when lookup up (t |> g),
+-- you'll find entries inserted under (t), even if (g) is non-reflexive.
+newtype LooseTypeMap a
+  = LooseTypeMap (TypeMapG a)
+
+instance TrieMap LooseTypeMap where
+  type Key LooseTypeMap = Type
+  emptyTM = LooseTypeMap emptyTM
+  lookupTM k (LooseTypeMap m) = lookupTM (deBruijnize k) m
+  alterTM k f (LooseTypeMap m) = LooseTypeMap (alterTM (deBruijnize k) f m)
+  foldTM f (LooseTypeMap m) = foldTM f m
+  mapTM f (LooseTypeMap m) = LooseTypeMap (mapTM f m)
 
 {-
 ************************************************************************

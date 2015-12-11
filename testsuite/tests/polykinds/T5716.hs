@@ -5,7 +5,7 @@
 module T5716 where
 
 
-data family DF a 
+data family DF a
 data instance DF Int = DFInt
 
 data U = U1 (DF Int)

@@ -177,8 +177,8 @@ cseRhs env (id',rhs)
           | always_active -> (extendCSEnv env rhs' id', (zapped_id, rhs'))
           | otherwise     -> (env,                      (id', rhs'))
         Just id
-          | always_active -> (extendCSSubst env id' id, (id', mkTicks ticks $ Var id))
-          | otherwise     -> (env,                      (id', mkTicks ticks $ Var id))
+          | always_active -> (extendCSSubst env id' id, (id', mkTicks ticks $ varToCoreExpr id))
+          | otherwise     -> (env,                      (id', mkTicks ticks $ varToCoreExpr id))
           -- In the Just case, we have
           --        x = rhs
           --        ...

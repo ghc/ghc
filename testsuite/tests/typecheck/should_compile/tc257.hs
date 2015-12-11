@@ -1,7 +1,7 @@
 {-# LANGUAGE KindSignatures, ConstraintKinds, MultiParamTypeClasses, FlexibleInstances, UndecidableInstances #-}
 module Ctx where
 
-import GHC.Prim( Constraint )
+import Data.Kind ( Constraint )
 
 data Proxy (ctxt :: * -> Constraint) = Proxy
 

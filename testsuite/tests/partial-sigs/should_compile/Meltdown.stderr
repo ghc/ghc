@@ -6,7 +6,7 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
   type role NukeMonad phantom phantom phantom
   data NukeMonad a b c
-    Promotable
+    Kind: * -> * -> * -> *
 COERCION AXIOMS
 INSTANCES
   instance Functor (NukeMonad a b) -- Defined at Meltdown.hs:8:10

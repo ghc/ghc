@@ -37,6 +37,13 @@ import FastString
 import Pair             ( Pair(..) )
 import Data.List        ( nubBy )
 import Data.Maybe
+import Data.Foldable    ( fold )
+
+#if __GLASGOW_HASKELL__ < 709
+import Prelude hiding ( and )
+import Control.Applicative ( (<$>) )
+import Data.Foldable       ( and )
+#endif
 
 {-
 ************************************************************************
@@ -104,8 +111,8 @@ data FunDepEqn loc
                                  -- Non-empty only for FunDepEqns arising from instance decls
 
           , fd_eqs  :: [Pair Type]  -- Make these pairs of types equal
-          , fd_pred1 :: PredType    -- The FunDepEqn arose from 
-          , fd_pred2 :: PredType    --  combining these two constraints 
+          , fd_pred1 :: PredType    -- The FunDepEqn arose from
+          , fd_pred2 :: PredType    --  combining these two constraints
           , fd_loc :: loc  }
 
 {-
@@ -185,7 +192,7 @@ improveFromAnother _ _ _ = []
 pprEquation :: FunDepEqn a -> SDoc
 pprEquation (FDEqn { fd_qtvs = qtvs, fd_eqs = pairs })
   = vcat [ptext (sLit "forall") <+> braces (pprWithCommas ppr qtvs),
-          nest 2 (vcat [ ppr t1 <+> ptext (sLit "~") <+> ppr t2 
+          nest 2 (vcat [ ppr t1 <+> ptext (sLit "~") <+> ppr t2
                        | Pair t1 t2 <- pairs])]
 
 improveFromInstEnv :: InstEnvs
@@ -221,10 +228,10 @@ improveFromInstEnv inst_env mk_loc pred
 improveFromInstEnv _ _ _ = []
 
 
-improveClsFD :: [TyVar] -> FunDep TyVar   -- One functional dependency from the class
-             -> ClsInst                   -- An instance template
-             -> [Type] -> [Maybe Name]    -- Arguments of this (C tys) predicate
-             -> [([TyVar], [Pair Type])]  -- Empty or singleton
+improveClsFD :: [TyVar] -> FunDep TyVar    -- One functional dependency from the class
+             -> ClsInst                    -- An instance template
+             -> [Type] -> [Maybe Name]     -- Arguments of this (C tys) predicate
+             -> [([TyCoVar], [Pair Type])] -- Empty or singleton
 
 improveClsFD clas_tvs fd
              (ClsInst { is_tvs = qtvs, is_tys = tys_inst, is_tcs = rough_tcs_inst })
@@ -295,7 +302,7 @@ improveClsFD clas_tvs fd
                         -- equation in there is useful)
 
                     meta_tvs = [ setVarType tv (substTy subst (varType tv))
-                               | tv <- qtvs, tv `notElemTvSubst` subst ]
+                               | tv <- qtvs, tv `notElemTCvSubst` subst ]
                         -- meta_tvs are the quantified type variables
                         -- that have not been substituted out
                         --
@@ -318,8 +325,8 @@ improveClsFD clas_tvs fd
     (ltys2, rtys2) = instFD fd clas_tvs tys_actual
 
 {-
-************************************************************************
-*                                                                      *
+%************************************************************************
+%*                                                                      *
         The Coverage condition for instance declarations
 *                                                                      *
 ************************************************************************
@@ -368,21 +375,21 @@ checkInstCoverage be_liberal clas theta inst_taus
   where
     (tyvars, fds) = classTvsFds clas
     fundep_ok fd
-       | isEmptyVarSet undetermined_tvs = IsValid
-       | otherwise                      = NotValid msg
+       | and (isEmptyVarSet <$> undetermined_tvs) = IsValid
+       | otherwise                                = NotValid msg
        where
          (ls,rs) = instFD fd tyvars inst_taus
-         ls_tvs = tyVarsOfTypes ls
-         rs_tvs = tyVarsOfTypes rs
+         ls_tvs = tyCoVarsOfTypes ls
+         rs_tvs = splitVisVarsOfTypes rs
 
          undetermined_tvs | be_liberal = liberal_undet_tvs
                           | otherwise  = conserv_undet_tvs
 
-         liberal_undet_tvs = rs_tvs `minusVarSet`oclose theta (closeOverKinds ls_tvs)
-         conserv_undet_tvs = rs_tvs `minusVarSet` closeOverKinds ls_tvs
-            -- closeOverKinds: see Note [Closing over kinds in coverage]
+         closed_ls_tvs = oclose theta ls_tvs
+         liberal_undet_tvs = (`minusVarSet` closed_ls_tvs) <$> rs_tvs
+         conserv_undet_tvs = (`minusVarSet` ls_tvs)        <$> rs_tvs
 
-         undet_list = varSetElemsKvsFirst undetermined_tvs
+         undet_list = varSetElemsWellScoped (fold undetermined_tvs)
 
          msg = vcat [ -- text "ls_tvs" <+> ppr ls_tvs
                       -- , text "closed ls_tvs" <+> ppr (closeOverKinds ls_tvs)
@@ -404,9 +411,10 @@ checkInstCoverage be_liberal clas theta inst_taus
                             <+> pprQuotedList rs ]
                     , ptext (sLit "Un-determined variable") <> plural undet_list <> colon
                             <+> pprWithCommas ppr undet_list
-                    , ppWhen (all isKindVar undet_list) $
+                    , ppWhen (isEmptyVarSet $ pSnd undetermined_tvs) $
                       ptext (sLit "(Use -fprint-explicit-kinds to see the kind variables in the types)")
-                    , ppWhen (not be_liberal && isEmptyVarSet liberal_undet_tvs) $
+                    , ppWhen (not be_liberal &&
+                              and (isEmptyVarSet <$> liberal_undet_tvs)) $
                       ptext (sLit "Using UndecidableInstances might help") ]
 
 {- Note [Closing over kinds in coverage]
@@ -471,7 +479,8 @@ closeOverKinds *again* now to {a,k1,b,k2,ab,k3}, so that we fix all
 the variables free in (Succ {k3} ab).
 
 Bottom line:
-  * closeOverKinds on initial seeds (in checkInstCoverage)
+  * closeOverKinds on initial seeds (done automatically
+    by tyCoVarsOfTypes in checkInstCoverage)
   * and closeOverKinds whenever extending those seeds (in oclose)
 
 Note [The liberal coverage condition]
@@ -493,7 +502,7 @@ oclose is used (only) when checking the coverage condition for
 an instance declaration
 -}
 
-oclose :: [PredType] -> TyVarSet -> TyVarSet
+oclose :: [PredType] -> TyCoVarSet -> TyCoVarSet
 -- See Note [The liberal coverage condition]
 oclose preds fixed_tvs
   | null tv_fds = fixed_tvs -- Fast escape hatch for common case.
@@ -506,8 +515,8 @@ oclose preds fixed_tvs
             | otherwise                = fixed_tvs
             -- closeOverKinds: see Note [Closing over kinds in coverage]
 
-    tv_fds  :: [(TyVarSet,TyVarSet)]
-    tv_fds  = [ (tyVarsOfTypes ls, tyVarsOfTypes rs)
+    tv_fds  :: [(TyCoVarSet,TyCoVarSet)]
+    tv_fds  = [ (tyCoVarsOfTypes ls, tyCoVarsOfTypes rs)
               | pred <- preds
               , (ls, rs) <- determined pred ]
 
@@ -593,10 +602,11 @@ checkFunDeps inst_envs (ClsInst { is_tvs = qtvs1, is_cls = cls
       = False
       | otherwise
       = case tcUnifyTys bind_fn ltys1 ltys2 of
-          Nothing    -> False
-          Just subst -> isNothing $   -- Bogus legacy test (Trac #10675)
-                                      -- See Note [Bogus consistency check]
-                        tcUnifyTys bind_fn (substTys subst rtys1) (substTys subst rtys2)
+          Nothing         -> False
+          Just subst
+            -> isNothing $   -- Bogus legacy test (Trac #10675)
+                             -- See Note [Bogus consistency check]
+               tcUnifyTys bind_fn (substTys subst rtys1) (substTys subst rtys2)
 
       where
         trimmed_tcs    = trimRoughMatchTcs cls_tvs fd rough_tcs1

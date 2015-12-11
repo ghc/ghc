@@ -26,7 +26,7 @@ import TcBinds
 import TcUnify
 import TcHsType
 import TcMType
-import Type     ( getClassPredTys_maybe )
+import Type     ( getClassPredTys_maybe, varSetElemsWellScoped )
 import TcType
 import TcRnMonad
 import BuildTyCl( TcMethInfo )
@@ -45,7 +45,6 @@ import VarSet
 import Outputable
 import SrcLoc
 import TyCon
-import TypeRep
 import Maybes
 import BasicTypes
 import Bag
@@ -209,7 +208,8 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
             -- Base the local_dm_name on the selector name, because
             -- type errors from tcInstanceMethodBody come from here
 
-       ; spec_prags <- tcSpecPrags global_dm_id prags
+       ; spec_prags <- discardConstraints $
+                       tcSpecPrags global_dm_id prags
        ; warnTc (not (null spec_prags))
                 (ptext (sLit "Ignoring SPECIALISE pragmas on default method")
                  <+> quotes (ppr sel_name))
@@ -436,7 +436,7 @@ warningMinimalDefIncomplete mindef
 tcATDefault :: Bool -- If a warning should be emitted when a default instance
                     -- definition is not provided by the user
             -> SrcSpan
-            -> TvSubst
+            -> TCvSubst
             -> NameSet
             -> ClassATItem
             -> TcM [FamInst]
@@ -456,10 +456,12 @@ tcATDefault emit_warn loc inst_subst defined_ats (ATI fam_tc defs)
   = do { let (subst', pat_tys') = mapAccumL subst_tv inst_subst
                                             (tyConTyVars fam_tc)
              rhs'     = substTy subst' rhs_ty
-             tv_set'  = tyVarsOfTypes pat_tys'
-             tvs'     = varSetElemsKvsFirst tv_set'
+             tcv_set' = tyCoVarsOfTypes pat_tys'
+             (tv_set', cv_set') = partitionVarSet isTyVar tcv_set'
+             tvs'     = varSetElemsWellScoped tv_set'
+             cvs'     = varSetElemsWellScoped cv_set'
        ; rep_tc_name <- newFamInstTyConName (L loc (tyConName fam_tc)) pat_tys'
-       ; let axiom = mkSingleCoAxiom Nominal rep_tc_name tvs'
+       ; let axiom = mkSingleCoAxiom Nominal rep_tc_name tvs' cvs'
                                      fam_tc pat_tys' rhs'
            -- NB: no validity check. We check validity of default instances
            -- in the class definition. Because type instance arguments cannot
@@ -468,7 +470,7 @@ tcATDefault emit_warn loc inst_subst defined_ats (ATI fam_tc defs)
 
        ; traceTc "mk_deflt_at_instance" (vcat [ ppr fam_tc, ppr rhs_ty
                                               , pprCoAxiom axiom ])
-       ; fam_inst <- ASSERT( tyVarsOfType rhs' `subVarSet` tv_set' )
+       ; fam_inst <- ASSERT( tyCoVarsOfType rhs' `subVarSet` tv_set' )
                      newFamInst SynFamilyInst axiom
        ; return [fam_inst] }
 
@@ -481,7 +483,7 @@ tcATDefault emit_warn loc inst_subst defined_ats (ATI fam_tc defs)
       | Just ty <- lookupVarEnv (getTvSubstEnv subst) tc_tv
       = (subst, ty)
       | otherwise
-      = (extendTvSubst subst tc_tv ty', ty')
+      = (extendTCvSubst subst tc_tv ty', ty')
       where
         ty' = mkTyVarTy (updateTyVarKind (substTy subst) tc_tv)
 

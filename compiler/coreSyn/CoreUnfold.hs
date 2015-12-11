@@ -1370,4 +1370,3 @@ computeDiscount dflags arg_discounts res_discount arg_infos cont_info
                 -- Otherwise we, rather arbitrarily, threshold it.  Yuk.
                 -- But we want to aovid inlining large functions that return
                 -- constructors into contexts that are simply "interesting"
-

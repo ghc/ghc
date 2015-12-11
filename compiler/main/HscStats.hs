@@ -58,19 +58,19 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     decls = map unLoc ldecls
 
     pp_val (_, 0) = empty
-    pp_val (str, n) 
+    pp_val (str, n)
       | not short   = hcat [text str, int n]
       | otherwise   = hcat [text (trim str), equals, int n, semi]
-    
+
     trim ls    = takeWhile (not.isSpace) (dropWhile isSpace ls)
 
-    (fixity_sigs, bind_tys, bind_specs, bind_inlines, generic_sigs) 
+    (fixity_sigs, bind_tys, bind_specs, bind_inlines, generic_sigs)
         = count_sigs [d | SigD d <- decls]
                 -- NB: this omits fixity decls on local bindings and
                 -- in class decls. ToDo
 
     tycl_decls = [d | TyClD d <- decls]
-    (class_ds, type_ds, data_ds, newt_ds, type_fam_ds) = 
+    (class_ds, type_ds, data_ds, newt_ds, type_fam_ds) =
       countTyClDecls tycl_decls
 
     inst_decls = [d | InstD d <- decls]

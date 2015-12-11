@@ -25,7 +25,7 @@ module PatSyn (
 #include "HsVersions.h"
 
 import Type
-import TcType( mkSigmaTy )
+import TcType( mkInvSigmaTy )
 import Name
 import Outputable
 import Unique
@@ -80,14 +80,16 @@ data PatSyn
              -- Matcher function.
              -- If Bool is True then prov_theta and arg_tys are empty
              -- and type is
-             --   forall (r :: ?) univ_tvs. req_theta
+             --   forall (v :: Levity) (r :: TYPE v) univ_tvs.
+             --                          req_theta
              --                       => res_ty
              --                       -> (forall ex_tvs. Void# -> r)
              --                       -> (Void# -> r)
              --                       -> r
              --
              -- Otherwise type is
-             --   forall (r :: ?) univ_tvs. req_theta
+             --   forall (v :: Levity) (r :: TYPE v) univ_tvs.
+             --                          req_theta
              --                       => res_ty
              --                       -> (forall ex_tvs. prov_theta => arg_tys -> r)
              --                       -> (Void# -> r)
@@ -326,8 +328,8 @@ patSynType :: PatSyn -> Type
 patSynType (MkPatSyn { psUnivTyVars = univ_tvs, psReqTheta = req_theta
                      , psExTyVars   = ex_tvs,   psProvTheta = prov_theta
                      , psArgs = orig_args, psOrigResTy = orig_res_ty })
-  = mkSigmaTy univ_tvs req_theta $
-    mkSigmaTy ex_tvs prov_theta $
+  = mkInvSigmaTy univ_tvs req_theta $
+    mkInvSigmaTy ex_tvs prov_theta $
     mkFunTys orig_args orig_res_ty
 
 -- | Should the 'PatSyn' be presented infix?

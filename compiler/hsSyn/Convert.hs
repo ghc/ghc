@@ -446,9 +446,9 @@ cvtConstr (ForallC tvs ctxt con)
         ; let qvars = case (tvs,con_qvars con') of
                 ([],Nothing) -> Nothing
                 _  ->
-                  Just $ mkHsQTvs (hsQTvBndrs tvs' ++
-                                   hsQTvBndrs (fromMaybe (HsQTvs PlaceHolder [])
-                                              (con_qvars con')))
+                  Just $ mkHsQTvs (hsQTvExplicit tvs' ++
+                                   hsQTvExplicit (fromMaybe (HsQTvs PlaceHolder [])
+                                                            (con_qvars con')))
         ; returnL $ con' { con_qvars = qvars
                          , con_cxt = Just $
                                      L loc (ctxt' ++
@@ -482,9 +482,9 @@ cvtDerivs cs = do { cs' <- mapM cvt_one cs
                          ; return (mkLHsSigType ty) }
 
 cvt_fundep :: FunDep -> CvtM (Located (Class.FunDep (Located RdrName)))
-cvt_fundep (FunDep xs ys) = do { xs' <- mapM tName xs
-                               ; ys' <- mapM tName ys
-                               ; returnL (map noLoc xs', map noLoc ys') }
+cvt_fundep (FunDep xs ys) = do { xs' <- mapM tNameL xs
+                               ; ys' <- mapM tNameL ys
+                               ; returnL (xs', ys') }
 
 
 ------------------------------------------
@@ -785,7 +785,7 @@ the trees to reflect the fixities of the underlying operators:
 This is done by the renamer (see @mkOppAppRn@, @mkConOppPatRn@, and
 @mkHsOpTyRn@ in RnTypes), which expects that the input will be completely
 right-biased for types and left-biased for everything else. So we left-bias the
-trees of @UInfixP@ and @UInfixE@ and right-bias the trees of @UInfixT@.
+trees of @UInfixP@ and @UInfixE@ and use HsAppsTy for UInfixT.
 
 Sample input:
 
@@ -1004,12 +1004,12 @@ cvtTvs tvs = do { tvs' <- mapM cvt_tv tvs; return (mkHsQTvs tvs') }
 
 cvt_tv :: TH.TyVarBndr -> CvtM (LHsTyVarBndr RdrName)
 cvt_tv (TH.PlainTV nm)
-  = do { nm' <- tName nm
-       ; returnL $ UserTyVar (noLoc nm') }
+  = do { nm' <- tNameL nm
+       ; returnL $ UserTyVar nm' }
 cvt_tv (TH.KindedTV nm ki)
-  = do { nm' <- tName nm
+  = do { nm' <- tNameL nm
        ; ki' <- cvtKind ki
-       ; returnL $ KindedTyVar (noLoc nm') ki' }
+       ; returnL $ KindedTyVar nm' ki' }
 
 cvtRole :: TH.Role -> Maybe Coercion.Role
 cvtRole TH.NominalR          = Just Coercion.Nominal
@@ -1054,8 +1054,8 @@ cvtTypeKind ty_str ty
              | [x']    <- tys' -> returnL (HsListTy x')
              | otherwise
                         -> mk_apps (HsTyVar (noLoc (getRdrName listTyCon))) tys'
-           VarT nm -> do { nm' <- tName nm
-                         ; mk_apps (HsTyVar (noLoc nm')) tys' }
+           VarT nm -> do { nm' <- tNameL nm
+                         ; mk_apps (HsTyVar nm') tys' }
            ConT nm -> do { nm' <- tconName nm
                          ; mk_apps (HsTyVar (noLoc nm')) tys' }
 
@@ -1066,7 +1066,7 @@ cvtTypeKind ty_str ty
                    ; ty'  <- cvtType ty
                    ; loc <- getL
                    ; let hs_ty | null tvs  = rho_ty
-                               | otherwise = L loc (HsForAllTy { hst_bndrs = hsQTvBndrs tvs'
+                               | otherwise = L loc (HsForAllTy { hst_bndrs = hsQTvExplicit tvs'
                                                                , hst_body  = rho_ty })
                          rho_ty | null cxt  = ty'
                                 | otherwise = L loc (HsQualTy { hst_ctxt = cxt'
@@ -1087,8 +1087,8 @@ cvtTypeKind ty_str ty
              -> mk_apps mkAnonWildCardTy tys'
 
            WildCardT (Just nm)
-             -> do { nm' <- tName nm
-                   ; mk_apps (mkNamedWildCardTy (noLoc nm')) tys' }
+             -> do { nm' <- tNameL nm
+                   ; mk_apps (mkNamedWildCardTy nm') tys' }
 
            InfixT t1 s t2
              -> do { s'  <- tconName s
@@ -1098,8 +1098,10 @@ cvtTypeKind ty_str ty
                    }
 
            UInfixT t1 s t2
-             -> do { t2' <- cvtType t2
-                   ; cvtOpAppT t1 s t2'
+             -> do { t1' <- cvtType t1
+                   ; t2' <- cvtType t2
+                   ; s'  <- tconName s
+                   ; return $ cvtOpAppT t1' s' t2'
                    } -- Note [Converting UInfix]
 
            ParensT t
@@ -1157,23 +1159,26 @@ split_ty_app ty = go ty []
     go f as           = return (f,as)
 
 cvtTyLit :: TH.TyLit -> HsTyLit
-cvtTyLit (NumTyLit i) = HsNumTy (show i) i
-cvtTyLit (StrTyLit s) = HsStrTy s        (fsLit s)
+cvtTyLit (TH.NumTyLit i) = HsNumTy (show i) i
+cvtTyLit (TH.StrTyLit s) = HsStrTy s        (fsLit s)
 
-{- | @cvtOpAppT x op y@ converts @op@ and @y@ and produces the operator
-application @x `op` y@. The produced tree of infix types will be right-biased,
-provided @y@ is.
-
-See the @cvtOpApp@ documentation for how this function works.
+{- | @cvtOpAppT x op y@ takes converted arguments and flattens any HsAppsTy
+   structure in them.
 -}
-cvtOpAppT :: TH.Type -> TH.Name -> LHsType RdrName -> CvtM (LHsType RdrName)
-cvtOpAppT (UInfixT x op2 y) op1 z
-  = do { l <- cvtOpAppT y op1 z
-       ; cvtOpAppT x op2 l }
-cvtOpAppT x op y
-  = do { op' <- tconNameL op
-       ; x' <- cvtType x
-       ; returnL (mkHsOpTy x' op' y) }
+cvtOpAppT :: LHsType RdrName -> RdrName -> LHsType RdrName -> LHsType RdrName
+cvtOpAppT t1@(L loc1 _) op t2@(L loc2 _)
+  = L (combineSrcSpans loc1 loc2) $
+    HsAppsTy (t1' ++ [HsAppInfix (noLoc op)] ++ t2')
+  where
+    t1' | L _ (HsAppsTy t1s) <- t1
+        = t1s
+        | otherwise
+        = [HsAppPrefix t1]
+
+    t2' | L _ (HsAppsTy t2s) <- t2
+        = t2s
+        | otherwise
+        = [HsAppPrefix t2]
 
 cvtKind :: TH.Kind -> CvtM (LHsKind RdrName)
 cvtKind = cvtTypeKind "kind"

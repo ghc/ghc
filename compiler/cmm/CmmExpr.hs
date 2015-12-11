@@ -430,10 +430,10 @@ data GlobalReg
   | XmmReg                      -- 128-bit SIMD vector register
         {-# UNPACK #-} !Int     -- its number
 
-  | YmmReg                      -- 256-bit SIMD vector register 
+  | YmmReg                      -- 256-bit SIMD vector register
         {-# UNPACK #-} !Int     -- its number
 
-  | ZmmReg                      -- 512-bit SIMD vector register 
+  | ZmmReg                      -- 512-bit SIMD vector register
         {-# UNPACK #-} !Int     -- its number
 
   -- STG registers

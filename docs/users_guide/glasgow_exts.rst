@@ -7000,9 +7000,6 @@ Note the following specific points:
        ghci> :k T
        T :: forall (k :: BOX). (k -> *) -> k -> *
 
-   Here the kind variable ``k`` itself has a kind annotation "``BOX``".
-   This is just GHC's way of saying "``k`` is a kind variable".
-
 -  Just as in the world of terms, you can restrict polymorphism using a
    kind signature (sometimes called a kind annotation)
 

@@ -71,7 +71,7 @@ partitionUniqSet :: (a -> Bool) -> UniqSet a -> (UniqSet a, UniqSet a)
 
 sizeUniqSet :: UniqSet a -> Int
 isEmptyUniqSet :: UniqSet a -> Bool
-lookupUniqSet :: Uniquable a => UniqSet a -> a -> Maybe a
+lookupUniqSet :: Uniquable a => UniqSet b -> a -> Maybe b
 uniqSetToList :: UniqSet a -> [a]
 
 {-

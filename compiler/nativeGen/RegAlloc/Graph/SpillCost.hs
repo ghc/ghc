@@ -136,12 +136,12 @@ slurpSpillCostInfo platform cmm
 
 -- | Take all the virtual registers from this set.
 takeVirtuals :: UniqSet Reg -> UniqSet VirtualReg
-takeVirtuals set 
+takeVirtuals set
         = mapUniqSet get_virtual
         $ filterUniqSet isVirtualReg set
         where
-                get_virtual (RegVirtual vr) = vr 
-                get_virtual _ = panic "getVirt" 
+                get_virtual (RegVirtual vr) = vr
+                get_virtual _ = panic "getVirt"
 
 
 -- | Choose a node to spill from this graph
@@ -215,7 +215,7 @@ spillCost_chaitin info graph reg
         = 0
 
         -- Otherwise revert to chaitin's regular cost function.
-        | otherwise     = fromIntegral (uses + defs) 
+        | otherwise     = fromIntegral (uses + defs)
                         / fromIntegral (nodeDegree graph reg)
         where (_, defs, uses, lifetime)
                 = fromMaybe (reg, 0, 0, 0) $ lookupUFM info reg
@@ -232,7 +232,7 @@ spillCost_length info _ reg
         | lifetime <= 1         = 1/0
         | otherwise             = 1 / fromIntegral lifetime
         where (_, _, _, lifetime)
-                = fromMaybe (reg, 0, 0, 0) 
+                = fromMaybe (reg, 0, 0, 0)
                 $ lookupUFM info reg
 
 
@@ -246,19 +246,19 @@ lifeMapFromSpillCostInfo info
 
 -- | Determine the degree (number of neighbors) of this node which
 --   have the same class.
-nodeDegree 
+nodeDegree
         :: (VirtualReg -> RegClass)
-        -> Graph VirtualReg RegClass RealReg 
-        -> VirtualReg 
+        -> Graph VirtualReg RegClass RealReg
+        -> VirtualReg
         -> Int
 
 nodeDegree classOfVirtualReg graph reg
         | Just node     <- lookupUFM (graphMap graph) reg
 
-        , virtConflicts 
-           <- length       
+        , virtConflicts
+           <- length
            $ filter (\r -> classOfVirtualReg r == classOfVirtualReg reg)
-           $ uniqSetToList 
+           $ uniqSetToList
            $ nodeConflicts node
 
         = virtConflicts + sizeUniqSet (nodeExclusions node)
@@ -269,11 +269,11 @@ nodeDegree classOfVirtualReg graph reg
 
 -- | Show a spill cost record, including the degree from the graph
 --   and final calulated spill cost.
-pprSpillCostRecord 
+pprSpillCostRecord
         :: (VirtualReg -> RegClass)
         -> (Reg -> SDoc)
-        -> Graph VirtualReg RegClass RealReg 
-        -> SpillCostRecord 
+        -> Graph VirtualReg RegClass RealReg
+        -> SpillCostRecord
         -> SDoc
 
 pprSpillCostRecord regClass pprReg graph (reg, uses, defs, life)
@@ -283,6 +283,6 @@ pprSpillCostRecord regClass pprReg graph (reg, uses, defs, life)
         , ppr defs
         , ppr life
         , ppr $ nodeDegree regClass graph reg
-        , text $ show $ (fromIntegral (uses + defs) 
+        , text $ show $ (fromIntegral (uses + defs)
                        / fromIntegral (nodeDegree regClass graph reg) :: Float) ]
 

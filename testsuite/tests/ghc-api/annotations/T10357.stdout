@@ -31,7 +31,6 @@
 ((Test10357.hs:7:28,AnnComma), [Test10357.hs:7:29]),
 ((Test10357.hs:7:31-36,AnnVal), [Test10357.hs:7:33]),
 ((Test10357.hs:7:31-40,AnnVal), [Test10357.hs:7:38]),
-((Test10357.hs:7:33,AnnStar), [Test10357.hs:7:33]),
 ((Test10357.hs:7:43-52,AnnBackquote), [Test10357.hs:7:43, Test10357.hs:7:52]),
 ((Test10357.hs:7:43-52,AnnVal), [Test10357.hs:7:44-51]),
 ((Test10357.hs:8:18-59,AnnCloseP), [Test10357.hs:8:59]),

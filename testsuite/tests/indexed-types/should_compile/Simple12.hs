@@ -14,4 +14,3 @@ mkf p = undefined
 -- foo :: a ~ F a => a -> a
 -- foo :: a ~ F a => a -> F a
 foo p = same p (mkf p)
-
