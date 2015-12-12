@@ -18,6 +18,18 @@
 MAKEFLAGS += --no-builtin-rules
 .SUFFIXES:
 
+ifneq "$(filter maintainer-clean distclean clean clean_% help,$(MAKECMDGOALS))" ""
+-include mk/config.mk
+else
+include mk/config.mk
+ifeq "$(ProjectVersion)" ""
+$(error Please run ./configure first)
+endif
+endif
+
+include mk/custom-settings.mk
+
+
 ifeq "$(wildcard distrib/)" ""
 
 # We're in a bindist
@@ -45,7 +57,7 @@ install show:
 .PHONY: install-strip
 install-strip:
 	# See Note [install-strip].
-	$(MAKE) --no-print-directory -f ghc.mk INSTALL_PROGRAM='$(INSTALL_PROGRAM) -s' install
+	$(MAKE) --no-print-directory -f ghc.mk INSTALL_PROGRAM='$(INSTALL_PROGRAM) -s' install BINDIST=YES NO_INCLUDE_DEPS=YES
 
 else
 
@@ -57,17 +69,6 @@ default : all
 .PHONY: help
 help:
 	@cat MAKEHELP.md
-
-ifneq "$(filter maintainer-clean distclean clean clean_% help,$(MAKECMDGOALS))" ""
--include mk/config.mk
-else
-include mk/config.mk
-ifeq "$(ProjectVersion)" ""
-$(error Please run ./configure first)
-endif
-endif
-
-include mk/custom-settings.mk
 
 # Verify that stage 0 LLVM backend isn't affected by Bug #9439 if needed
 ifeq "$(GHC_LLVM_AFFECTED_BY_9439)" "1"

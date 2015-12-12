@@ -10,11 +10,13 @@
 #
 # -----------------------------------------------------------------------------
 
+ifneq "$(BINDIST)" "YES"
 HADDOCK_VER := $(shell grep "^version:" utils/haddock/haddock.cabal | sed "s/version: *//")
 HADDOCK_MAJOR_VER := $(shell echo $(HADDOCK_VER) | sed 's/\([0-9]\{1,\}\)\.\([0-9]\{1,\}\)\.\([0-9]\{1,\}\)/\1/')
 HADDOCK_MINOR_VER := $(shell echo $(HADDOCK_VER) | sed 's/\([0-9]\{1,\}\)\.\([0-9]\{1,\}\)\.\([0-9]\{1,\}\)/\2/')
 HADDOCK_PATCH_VER := $(shell echo $(HADDOCK_VER) | sed 's/\([0-9]\{1,\}\)\.\([0-9]\{1,\}\)\.\([0-9]\{1,\}\)/\3/')
 HADDOCK_VERSION_STRING := $(shell echo $$(($(HADDOCK_MAJOR_VER) * 1000 + $(HADDOCK_MINOR_VER) * 10 + $(HADDOCK_PATCH_VER))))
+endif
 
 define haddock  # args: $1 = dir,  $2 = distdir
 $(call trace, haddock($1,$2))
