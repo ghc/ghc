@@ -70,6 +70,8 @@ xhtml           = library  "xhtml"
 -- * doc/            : produced by haddock
 -- * package-data.mk : contains output of ghc-cabal applied to pkgCabal
 -- TODO: simplify to just 'show stage'?
+-- TODO: we divert from the previous convention for ghc-cabal and ghc-pkg,
+-- which used to store stage0 build results in 'dist' folder
 defaultTargetDirectory :: Stage -> Package -> FilePath
 defaultTargetDirectory stage pkg
     | pkg   == compiler = "stage" ++ show (fromEnum stage + 1)

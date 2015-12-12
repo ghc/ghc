@@ -16,8 +16,8 @@ defaultPackages = mconcat
 
 packagesStage0 :: Packages
 packagesStage0 = mconcat
-    [ append [ binPackageDb, binary, cabal, compiler, ghc, hoopl, hpc
-             , templateHaskell, transformers ]
+    [ append [ binPackageDb, binary, cabal, compiler, ghc, ghcCabal, ghcPkg
+             , hoopl, hpc, templateHaskell, transformers ]
     , notM windowsHost ? notM (anyHostOs ["ios"]) ? append [terminfo] ]
 
 -- TODO: what do we do with parallel, stm, random, primitive, vector and dph?
