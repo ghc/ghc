@@ -25,7 +25,6 @@ import TcEvidence
 import Id( mkLocalId )
 import Inst
 import Name
-import Coercion ( Role(..) )
 import TysWiredIn
 import VarSet
 import TysPrim

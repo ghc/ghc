@@ -129,7 +129,6 @@ import HscTypes
 import TcEvidence
 import TysWiredIn ( callStackTyCon, ipClass )
 import Type
-import CoAxiom  ( Role )
 import Class    ( Class )
 import TyCon    ( TyCon )
 import Coercion ( Coercion, mkHoleCo )

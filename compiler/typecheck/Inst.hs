@@ -43,7 +43,6 @@ import TysWiredIn  ( heqDataCon )
 import FunDeps
 import TcMType
 import Type
-import Coercion ( Role(..) )
 import TcType
 import HscTypes
 import Class( Class )
