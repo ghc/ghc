@@ -31,7 +31,8 @@ import qualified Data.Map as Map
 import Documentation.Haddock.Types
 import BasicTypes (Fixity(..))
 import GHC hiding (NoLink)
-import DynFlags (ExtensionFlag, Language)
+import DynFlags (Language)
+import qualified GHC.LanguageExtensions as LangExt
 import OccName
 import Outputable
 import NameSet (NameSet)
@@ -400,7 +401,7 @@ data HaddockModInfo name = HaddockModInfo
   , hmi_portability :: Maybe String
   , hmi_safety      :: Maybe String
   , hmi_language    :: Maybe Language
-  , hmi_extensions  :: [ExtensionFlag]
+  , hmi_extensions  :: [LangExt.Extension]
   }
 
 

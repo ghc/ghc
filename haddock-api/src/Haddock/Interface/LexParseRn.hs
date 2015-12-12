@@ -22,7 +22,8 @@ import Control.Applicative
 import Data.IntSet (toList)
 import Data.List
 import Documentation.Haddock.Doc (metaDocConcat)
-import DynFlags (ExtensionFlag(..), languageExtensions)
+import DynFlags (languageExtensions)
+import qualified GHC.LanguageExtensions as LangExt
 import FastString
 import GHC
 import Haddock.Interface.ParseModuleHeader
@@ -65,7 +66,7 @@ processModuleHeader dflags gre safety mayStr = do
             doc' = overDoc (rename dflags gre) doc
         return (hmi', Just doc')
 
-  let flags :: [ExtensionFlag]
+  let flags :: [LangExt.Extension]
       -- We remove the flags implied by the language setting and we display the language instead
       flags = map toEnum (toList $ extensionFlags dflags) \\ languageExtensions (language dflags)
   return (hmi { hmi_safety = Just $ showPpr dflags safety
