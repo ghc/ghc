@@ -3381,6 +3381,7 @@ impliedXFlags
     , (Opt_DuplicateRecordFields, turnOn, Opt_DisambiguateRecordFields)
 
     , (Opt_TemplateHaskell, turnOn, Opt_TemplateHaskellQuotes)
+    , (Opt_Strict, turnOn, Opt_StrictData)
   ]
 
 -- Note [Documenting optimisation flags]

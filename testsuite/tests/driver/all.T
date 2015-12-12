@@ -334,7 +334,7 @@ test('T2464', normal, compile, [''])
 test('T3674',
      [ignore_output,
       extra_clean(['T3674_pre.hi', 'T3674_pre.o', 'T3674_pre', 'T3674_pre.exe'])],
-     run_command, 
+     run_command,
      ['$MAKE -s --no-print-directory T3674'])
 
 test('rtsopts001',
@@ -446,7 +446,7 @@ test('T10182',
      extra_clean(['T10182.o', 'T10182a.o', 'T10182.o-boot', 'T10182.hi', 'T10182a.hi', 'T10182.hi-boot']),
      run_command,
      ['$MAKE -s --no-print-directory T10182'])
-     
+
 test('T365',
      [extra_clean(['test_preprocessor.txt']),
       pre_cmd('touch test_preprocessor.txt'),
@@ -460,3 +460,4 @@ test('T9360b', normal, run_command, ['{compiler} -e "" --interactive'])
 test('T10970', normal, compile_and_run, ['-hide-all-packages -package base -package containers'])
 test('T10970a', normal, compile_and_run, [''])
 test('T4931', normal, compile_and_run, [''])
+test('T11182', normal, compile_and_run, [''])
