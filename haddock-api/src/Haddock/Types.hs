@@ -33,7 +33,8 @@ import Documentation.Haddock.Types
 import BasicTypes (Fixity(..))
 
 import GHC hiding (NoLink)
-import DynFlags (ExtensionFlag, Language)
+import DynFlags (Language)
+import qualified GHC.LanguageExtensions as LangExt
 import Coercion
 import NameSet
 import OccName
@@ -494,7 +495,7 @@ data HaddockModInfo name = HaddockModInfo
   , hmi_portability :: Maybe String
   , hmi_safety      :: Maybe String
   , hmi_language    :: Maybe Language
-  , hmi_extensions  :: [ExtensionFlag]
+  , hmi_extensions  :: [LangExt.Extension]
   }
 
 
