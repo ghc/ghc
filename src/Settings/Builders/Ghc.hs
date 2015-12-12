@@ -5,7 +5,7 @@ module Settings.Builders.Ghc (
 import Expression
 import Oracles
 import GHC
-import Predicates (package, stagedBuilder, splitObjects, stage0, notStage0)
+import Predicates (package, file, stagedBuilder, splitObjects, stage0, notStage0)
 import Settings
 
 -- TODO: add support for -dyno
@@ -21,6 +21,7 @@ ghcArgs = stagedBuilder Ghc ? do
     let buildObj = ("//*." ++ osuf way) ?== output || ("//*." ++ obootsuf way) ?== output
     libs    <- getPkgDataList DepExtraLibs
     libDirs <- getPkgDataList DepLibDirs
+    version <- getSetting ProjectVersion
     mconcat [ commonGhcArgs
             , arg "-H32m"
             , stage0    ? arg "-O"
@@ -30,6 +31,8 @@ ghcArgs = stagedBuilder Ghc ? do
             , buildObj ? splitObjects ? arg "-split-objs"
             , package ghc ? arg "-no-hs-main"
             -- , not buildObj ? arg "-no-auto-link-packages"
+            , package runghc ? file "//Main.o" ?
+              append ["-cpp", "-DVERSION=\"" ++ version ++ "\""]
             , not buildObj ? append [ "-optl-l" ++ lib | lib <- libs    ]
             , not buildObj ? append [ "-optl-L" ++ dir | dir <- libDirs ]
             , buildObj ? arg "-c"

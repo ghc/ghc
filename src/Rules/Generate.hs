@@ -71,6 +71,11 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
                 writeFileChanged file contents
                 putBuild $ "| Successfully generated '" ++ file ++ "'."
 
+        priority 2.0 $
+            when (pkg == runghc) $ buildPath -/- "Main.hs" %> \file -> do
+                copyFileChanged (pkgPath pkg -/- "runghc.hs") file
+                putBuild $ "| Successfully generated '" ++ file ++ "'."
+
 quote :: String -> String
 quote s = "\"" ++ s ++ "\""
 

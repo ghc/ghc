@@ -1,8 +1,9 @@
 module GHC (
     array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
-    deepseq, directory, filepath, ghc, ghcCabal, ghcPkg, ghcPrim, ghcPwd,
-    haskeline, hoopl, hpc, integerGmp, integerSimple, parallel, pretty,
-    primitive, process, stm, templateHaskell, terminfo, time, transformers,
+    compareSizes, deepseq, directory, dllSplit, filepath, ghc, ghcCabal, ghcPkg, ghcPrim,
+    ghcPwd, ghcTags, haskeline, hsc2hs, hoopl, hpc, hpcBin, integerGmp, integerSimple,
+    mkUserGuidePart, parallel, pretty,
+    primitive, process, runghc, stm, templateHaskell, terminfo, time, transformers,
     unix, win32, xhtml,
 
     defaultKnownPackages, defaultTargetDirectory, defaultProgramPath
@@ -20,16 +21,19 @@ import Stage
 defaultKnownPackages :: [Package]
 defaultKnownPackages =
     [ array, base, binPackageDb, binary, bytestring, cabal, compiler
-    , containers, deepseq, directory, filepath, ghc, ghcCabal, ghcPkg, ghcPrim
-    , ghcPwd, haskeline, hoopl, hpc, integerGmp, integerSimple, parallel, pretty
-    , primitive, process, stm, templateHaskell, terminfo, time, transformers
-    , unix, win32, xhtml ]
+    , containers, compareSizes, deepseq, directory, dllSplit, filepath, ghc
+    , ghcCabal, ghcPkg, ghcPrim
+    , ghcPwd, ghcTags, haskeline, hsc2hs, hoopl, hpc, hpcBin, integerGmp, integerSimple
+    , mkUserGuidePart, parallel, pretty, primitive, process, runghc, stm, templateHaskell, terminfo
+    , time, transformers, unix, win32, xhtml ]
 
 -- Package definitions
 array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
-    deepseq, directory, filepath, ghc, ghcCabal, ghcPkg, ghcPrim, ghcPwd,
-    haskeline, hoopl, hpc, integerGmp, integerSimple, parallel, pretty,
-    primitive, process, stm, templateHaskell, terminfo, time, transformers,
+    compareSizes, deepseq, directory, dllSplit, filepath, ghc, ghcCabal, ghcPkg,
+    ghcPrim, ghcPwd,
+    ghcTags, haskeline, hsc2hs, hoopl, hpc, hpcBin, integerGmp, integerSimple,
+    mkUserGuidePart, parallel, pretty,
+    primitive, process, runghc, stm, templateHaskell, terminfo, time, transformers,
     unix, win32, xhtml :: Package
 
 array           = library  "array"
@@ -40,23 +44,30 @@ bytestring      = library  "bytestring"
 cabal           = library  "Cabal"          `setPath` "libraries/Cabal/Cabal"
 compiler        = topLevel "ghc"            `setPath` "compiler"
 containers      = library  "containers"
+compareSizes    = utility  "compareSizes"   `setPath` "utils/compare_sizes"
 deepseq         = library  "deepseq"
 directory       = library  "directory"
+dllSplit        = utility  "dll-split"
 filepath        = library  "filepath"
 ghc             = topLevel "ghc-bin"        `setPath` "ghc"
 ghcCabal        = utility  "ghc-cabal"
 ghcPkg          = utility  "ghc-pkg"
 ghcPrim         = library  "ghc-prim"
 ghcPwd          = utility  "ghc-pwd"
+ghcTags         = utility  "ghctags"
 haskeline       = library  "haskeline"
+hsc2hs          = utility  "hsc2hs"
 hoopl           = library  "hoopl"
 hpc             = library  "hpc"
+hpcBin          = utility  "hpc-bin"        `setPath` "utils/hpc"
 integerGmp      = library  "integer-gmp"
 integerSimple   = library  "integer-simple"
+mkUserGuidePart = utility  "mkUserGuidePart"
 parallel        = library  "parallel"
 pretty          = library  "pretty"
 primitive       = library  "primitive"
 process         = library  "process"
+runghc          = utility  "runghc"
 stm             = library  "stm"
 templateHaskell = library  "template-haskell"
 terminfo        = library  "terminfo"
@@ -66,7 +77,6 @@ unix            = library  "unix"
 win32           = library  "Win32"
 xhtml           = library  "xhtml"
 
-
 -- GHC build results will be placed into target directories with the following
 -- typical structure:
 -- * build/          : contains compiled object code
@@ -74,7 +84,8 @@ xhtml           = library  "xhtml"
 -- * package-data.mk : contains output of ghc-cabal applied to pkgCabal
 -- TODO: simplify to just 'show stage'?
 -- TODO: we divert from the previous convention for ghc-cabal and ghc-pkg,
--- which used to store stage0 build results in 'dist' folder
+-- which used to store stage 0 build results in 'dist' folder
+-- On top of that, mkUserGuidePart used dist for stage 1 for some reason.
 defaultTargetDirectory :: Stage -> Package -> FilePath
 defaultTargetDirectory stage pkg
     | pkg   == compiler = "stage" ++ show (fromEnum stage + 1)
@@ -84,11 +95,18 @@ defaultTargetDirectory stage pkg
 
 defaultProgramPath :: Stage -> Package -> Maybe FilePath
 defaultProgramPath stage pkg
-    | pkg == ghc      = program $ "ghc-stage" ++ show (fromEnum stage + 1)
-    | pkg == ghcCabal = program $ pkgName pkg
-    | pkg == ghcPkg   = program $ pkgName pkg
-    | pkg == ghcPwd   = program $ pkgName pkg
-    | otherwise       = Nothing
+    | pkg == compareSizes    = program $ pkgName pkg
+    | pkg == dllSplit        = program $ pkgName pkg
+    | pkg == ghc             = program $ "ghc-stage" ++ show (fromEnum stage + 1)
+    | pkg == ghcCabal        = program $ pkgName pkg
+    | pkg == ghcPkg          = program $ pkgName pkg
+    | pkg == ghcPwd          = program $ pkgName pkg
+    | pkg == ghcTags         = program $ pkgName pkg
+    | pkg == hsc2hs          = program $ pkgName pkg
+    | pkg == hpcBin          = program $ pkgName pkg
+    | pkg == mkUserGuidePart = program $ pkgName pkg
+    | pkg == runghc          = program $ pkgName pkg
+    | otherwise              = Nothing
   where
     program name = Just $ pkgPath pkg -/- defaultTargetDirectory stage pkg
                                       -/- "build/tmp" -/- name <.> exe

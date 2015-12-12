@@ -54,7 +54,8 @@ buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
 
     -- TODO: this looks fragile as haskell objects can match this rule if their
     -- names start with "HS" and they are on top of the module hierarchy.
-    priority 2 $ (buildPath -/- "HS*.o") %> \obj -> do
+    -- This happens with hsc2hs, which has top-level file HSCParser.hs.
+    when (pkg /= hsc2hs) $ priority 2 $ (buildPath -/- "HS*.o") %> \obj -> do
         cSrcs <- cSources target
         hSrcs <- hSources target
         let cObjs = [ buildPath -/- src -<.> "o" | src <- cSrcs ]
