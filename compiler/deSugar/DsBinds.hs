@@ -1195,6 +1195,5 @@ dsEvCallStack cs = do
                   let ip_co = unwrapIP (exprType tmExpr)
                   return (pushCS nameExpr locExpr (mkCastDs tmExpr ip_co))
   case cs of
-    EvCsTop name loc tm -> mkPush name loc tm
     EvCsPushCall name loc tm -> mkPush (occNameFS $ getOccName name) loc tm
-    EvCsEmpty -> panic "Cannot have an empty CallStack"
+    EvCsEmpty -> return emptyCS

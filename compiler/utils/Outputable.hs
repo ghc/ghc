@@ -113,7 +113,6 @@ import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
 #if __GLASGOW_HASKELL__ > 710
 import GHC.Stack
-import GHC.Exception
 #endif
 
 {-
@@ -1071,8 +1070,8 @@ pprTraceIt desc x = pprTrace desc (ppr x) x
 -- | If debug output is on, show some 'SDoc' on the screen along
 -- with a call stack when available.
 #if __GLASGOW_HASKELL__ > 710
-pprSTrace :: (?location :: CallStack) => SDoc -> a -> a
-pprSTrace = pprTrace (showCallStack ?location)
+pprSTrace :: (?callStack :: CallStack) => SDoc -> a -> a
+pprSTrace = pprTrace (prettyCallStack ?callStack)
 #else
 pprSTrace :: SDoc -> a -> a
 pprSTrace = pprTrace "no callstack info"

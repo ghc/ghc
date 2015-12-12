@@ -1,3 +1,4 @@
 conc021: wurble
 CallStack (from ImplicitParams):
   error, called at conc021.hs:9:9 in main:Main
+  foo, called at conc021.hs:6:1 in main:Main

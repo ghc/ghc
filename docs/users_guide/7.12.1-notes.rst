@@ -31,28 +31,25 @@ Language
                                -- | Just a normal sum
                                Sum :: Int -> Int -> Expr Int
 
--  Implicit parameters of the new ghc-prim type ``GHC.Types.CallStack``
-   are treated specially, and automatically solved for the current
-   source location. For example
+-  Implicit parameters of the new ``base`` type ``GHC.Stack.CallStack``
+   are treated specially in function calls, the solver automatically
+   appends the source location of the call to the ``CallStack`` in
+   the environment. For example
 
    ::
+        myerror :: (?callStack :: CallStack) => String -> a
+        myerror msg = error (msg ++ "\n" ++ prettyCallStack ?callStack)
 
-                             f = print (?stk :: CallStack)
+        ghci> myerror "die"
+        *** Exception: die
+        CallStack (from ImplicitParams):
+          myerror, called at <interactive>:2:1 in interactive:Ghci1
 
-   will print the singleton stack containing the occurrence of ``?stk``.
-   If there is another ``CallStack`` implicit in-scope, the new location
-   will be appended to the existing stack, e.g.
+   prints the call-site of ``myerror``. The name of the implicit
+   parameter does not matter, but within ``base`` we call it
+   ``?callStack``.
 
-   ::
-
-                             f :: (?stk :: CallStack) => IO ()
-                             f = print (?stk :: CallStack)
-
-   will print the occurrence of ``?stk`` and the call-site of ``f``. The
-   name of the implicit parameter does not matter.
-
-   See the release notes for ghc-prim for a description of the
-   ``CallStack`` type.
+   See :ref:`lib-base` for a description of the ``CallStack`` type.
 
 -  To conform to the common case, the default role assigned to
    parameters of datatypes declared in ``hs-boot`` files is
@@ -279,18 +276,21 @@ array
 
 -  Version number XXXXX (was 0.5.0.0)
 
+
+.. _lib-base:
+
 base
 ~~~~
 
 -  Version number 4.9.0.0 (was 4.7.0.0)
 
--  A new module ``GHC.SrcLoc`` was added, exporting a new type
-   ``SrcLoc``. A ``SrcLoc`` contains package, module, and file names, as
-   well as start and end positions.
-
--  A new type ``CallStack`` was added for use with the new implicit
-   callstack parameters. A ``CallStack`` is a ``[(String, SrcLoc)]``,
+-  ``GHC.Stack`` exports two new types ``SrcLoc`` and ``CallStack``. A
+   ``SrcLoc`` contains package, module, and file names, as well as start
+   and end positions. A ``CallStack`` is a ``[(String, SrcLoc)]``,
    sorted by most-recent call.
+
+-  ``error`` and ``undefined`` will now report a partial stack-trace
+   using the new ``CallStack`` feature (and the ``-prof`` stack if available).
 
 -  A new function, ``interruptible``, was added to ``GHC.IO`` allowing
    an ``IO`` action to be run such that it can be interrupted by an

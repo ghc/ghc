@@ -1,28 +1,16 @@
+
 CallStack (from ImplicitParams):
-  ?loc, called at IPLocation.hs:8:31 in main:Main
+  f1, called at IPLocation.hs:34:11 in main:Main
 CallStack (from ImplicitParams):
-  ?loc, called at IPLocation.hs:12:31 in main:Main
-  f1, called at IPLocation.hs:40:11 in main:Main
+  x, called at IPLocation.hs:16:8 in main:Main
 CallStack (from ImplicitParams):
-  ?loc, called at IPLocation.hs:16:34 in main:Main
-  f2, called at IPLocation.hs:41:11 in main:Main
+  x, called at IPLocation.hs:21:8 in main:Main
+  f4, called at IPLocation.hs:36:11 in main:Main
+
 CallStack (from ImplicitParams):
-  ?loc, called at IPLocation.hs:17:34 in main:Main
-  f2, called at IPLocation.hs:41:11 in main:Main
-CallStack (from ImplicitParams):
-  ?loc, called at IPLocation.hs:42:48 in main:Main
-  x, called at IPLocation.hs:22:8 in main:Main
-CallStack (from ImplicitParams):
-  ?loc, called at IPLocation.hs:43:48 in main:Main
-  x, called at IPLocation.hs:27:8 in main:Main
-  f4, called at IPLocation.hs:43:11 in main:Main
-CallStack (from ImplicitParams):
-  ?loc3, called at IPLocation.hs:44:48 in main:Main
-CallStack (from ImplicitParams):
-  ?loc, called at IPLocation.hs:35:33 in main:Main
-  f6, called at IPLocation.hs:36:8 in main:Main
-  f6, called at IPLocation.hs:36:8 in main:Main
-  f6, called at IPLocation.hs:36:8 in main:Main
-  f6, called at IPLocation.hs:36:8 in main:Main
-  f6, called at IPLocation.hs:36:8 in main:Main
-  f6, called at IPLocation.hs:45:11 in main:Main
+  f6, called at IPLocation.hs:30:8 in main:Main
+  f6, called at IPLocation.hs:30:8 in main:Main
+  f6, called at IPLocation.hs:30:8 in main:Main
+  f6, called at IPLocation.hs:30:8 in main:Main
+  f6, called at IPLocation.hs:30:8 in main:Main
+  f6, called at IPLocation.hs:38:11 in main:Main

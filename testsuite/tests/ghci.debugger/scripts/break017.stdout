@@ -9,7 +9,8 @@ as = 'b' : 'c' : (_t1::[Char])
 Forcing
 *** Exception: Prelude.undefined
 CallStack (from ImplicitParams):
-  error, called at libraries/base/GHC/Err.hs:42:14 in base:GHC.Err
+  error, called at libraries/base/GHC/Err.hs:43:14 in base:GHC.Err
   undefined, called at <interactive>:3:17 in interactive:Ghci1
+  it, called at <interactive>:3:1 in interactive:Ghci1
 Printing 2
 as = 'b' : 'c' : (_t2::[Char])

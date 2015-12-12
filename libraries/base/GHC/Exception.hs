@@ -27,9 +27,9 @@ module GHC.Exception
        , SomeException(..), ErrorCall(..,ErrorCall), ArithException(..)
        , divZeroException, overflowException, ratioZeroDenomException
        , errorCallException, errorCallWithCallStackException
-       , showCallStack, popCallStack, showSrcLoc
          -- re-export CallStack and SrcLoc from GHC.Types
-       , CallStack(..), SrcLoc(..)
+       , CallStack, getCallStack, prettyCallStack
+       , SrcLoc(..), prettySrcLoc
        ) where
 
 import Data.Maybe
@@ -187,7 +187,7 @@ errorCallWithCallStackException :: String -> CallStack -> SomeException
 errorCallWithCallStackException s stk = unsafeDupablePerformIO $ do
   ccsStack <- currentCallStack
   let
-    implicitParamCallStack = showCallStackLines (popCallStack stk)
+    implicitParamCallStack = prettyCallStackLines stk
     ccsCallStack = showCCSStack ccsStack
     stack = intercalate "\n" $ implicitParamCallStack ++ ccsCallStack
   return $ toException (ErrorCallWithLocation s stack)
@@ -196,11 +196,14 @@ showCCSStack :: [String] -> [String]
 showCCSStack [] = []
 showCCSStack stk = "CallStack (from -prof):" : map ("  " ++) (reverse stk)
 
+-- prettySrcLoc and prettyCallStack are defined here to avoid hs-boot
+-- files. See Note [Definition of CallStack]
+
 -- | Pretty print 'SrcLoc'
 --
--- @since 4.9.0.0
-showSrcLoc :: SrcLoc -> String
-showSrcLoc SrcLoc {..}
+-- @since 4.8.1.0
+prettySrcLoc :: SrcLoc -> String
+prettySrcLoc SrcLoc {..}
   = foldr (++) ""
       [ srcLocFile, ":"
       , show srcLocStartLine, ":"
@@ -210,22 +213,17 @@ showSrcLoc SrcLoc {..}
 
 -- | Pretty print 'CallStack'
 --
--- @since 4.9.0.0
-showCallStack :: CallStack -> String
-showCallStack = intercalate "\n" . showCallStackLines
+-- @since 4.8.1.0
+prettyCallStack :: CallStack -> String
+prettyCallStack = intercalate "\n" . prettyCallStackLines
 
-showCallStackLines :: CallStack -> [String]
-showCallStackLines (CallStack stk) =
-    "CallStack (from ImplicitParams):" : map (("  " ++) . showCallSite) stk
+prettyCallStackLines :: CallStack -> [String]
+prettyCallStackLines cs = case getCallStack cs of
+  []  -> []
+  stk -> "CallStack (from ImplicitParams):"
+       : map (("  " ++) . prettyCallSite) stk
   where
-    showCallSite (f, loc) = f ++ ", called at " ++ showSrcLoc loc
-
--- | Remove the most recent callsite from the 'CallStack'
---
--- @since 4.9.0.0
-popCallStack :: CallStack -> CallStack
-popCallStack (CallStack (_:rest)) = CallStack rest
-popCallStack _ = error "CallStack cannot be empty!"
+    prettyCallSite (f, loc) = f ++ ", called at " ++ prettySrcLoc loc
 
 -- |Arithmetic exceptions.
 data ArithException

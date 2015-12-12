@@ -154,7 +154,41 @@ simpl_top wanteds
            ; if something_happened
              then do { wc_residual <- nestTcS (solveWantedsAndDrop wc)
                      ; try_class_defaulting wc_residual }
-             else return wc }
+                  -- See Note [Overview of implicit CallStacks]
+             else try_callstack_defaulting wc }
+
+    try_callstack_defaulting :: WantedConstraints -> TcS WantedConstraints
+    try_callstack_defaulting wc
+      | isEmptyWC wc
+      = return wc
+      | otherwise
+      = defaultCallStacks wc
+
+-- | Default any remaining @CallStack@ constraints to empty @CallStack@s.
+defaultCallStacks :: WantedConstraints -> TcS WantedConstraints
+-- See Note [Overview of implicit CallStacks]
+defaultCallStacks wanteds
+  = do simples <- handle_simples (wc_simple wanteds)
+       implics <- mapBagM handle_implic (wc_impl wanteds)
+       return (wanteds { wc_simple = simples, wc_impl = implics })
+
+  where
+
+  handle_simples simples
+    = catBagMaybes <$> mapBagM defaultCallStack simples
+
+  handle_implic implic = do
+    wanteds <- defaultCallStacks (ic_wanted implic)
+    return (implic { ic_wanted = wanteds })
+
+  defaultCallStack ct@(CDictCan { cc_ev = ev_w })
+    | Just _ <- isCallStackCt ct
+    = do { solveCallStack ev_w EvCsEmpty
+         ; return Nothing }
+
+  defaultCallStack ct
+    = return (Just ct)
+
 
 -- | Type-check a thing, returning the result and any EvBinds produced
 -- during solving. Emits errors -- but does not fail -- if there is trouble.
@@ -227,7 +261,7 @@ Option (i) had many disadvantages:
       untouchable.
 
 Instead our new defaulting story is to pull defaulting out of the solver loop and
-go with option (i), implemented at SimplifyTop. Namely:
+go with option (ii), implemented at SimplifyTop. Namely:
      - First, have a go at solving the residual constraint of the whole
        program
      - Try to approximate it with a simple constraint

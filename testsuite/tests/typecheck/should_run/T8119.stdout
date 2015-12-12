@@ -1,2 +1,3 @@
-test `asTypeOf` (undefined :: a -> b) :: Int -> Int
+test `asTypeOf` (undefined :: a -> b)
+  :: (?callStack::CallStack) => Int -> Int
 \x -> test x :: Int -> Int

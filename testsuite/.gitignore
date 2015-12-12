@@ -1551,6 +1551,7 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /tests/typecheck/should_run/T9497c-run
 /tests/typecheck/should_run/T9858c
 /tests/typecheck/should_run/T9858d
+/tests/typecheck/should_run/T10845
 /tests/typecheck/should_run/TcCoercible
 /tests/typecheck/should_run/TcNullaryTC
 /tests/typecheck/should_run/TcTypeNatSimpleRun

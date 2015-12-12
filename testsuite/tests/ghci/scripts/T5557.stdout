@@ -1,8 +1,10 @@
 *** Exception: Prelude.undefined
 CallStack (from ImplicitParams):
-  error, called at libraries/base/GHC/Err.hs:42:14 in base:GHC.Err
+  error, called at libraries/base/GHC/Err.hs:43:14 in base:GHC.Err
   undefined, called at <interactive>:2:12 in interactive:Ghci1
+  it, called at <interactive>:2:1 in interactive:Ghci1
 *** Exception: Prelude.undefined
 CallStack (from ImplicitParams):
-  error, called at libraries/base/GHC/Err.hs:42:14 in base:GHC.Err
+  error, called at libraries/base/GHC/Err.hs:43:14 in base:GHC.Err
   undefined, called at <interactive>:3:12 in interactive:Ghci1
+  it, called at <interactive>:3:1 in interactive:Ghci1

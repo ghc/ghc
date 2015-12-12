@@ -34,7 +34,15 @@
 
   * New `GHC.Generics.packageName` operation
 
-  * New `GHC.Stack.CallStack` data type
+  * New `GHC.Stack.Types` module now contains the definition of
+    `CallStack` and `SrcLoc`
+
+  * New `GHC.Stack.Types.pushCallStack` function pushes a call-site onto a `CallStack`
+
+  * `GHC.SrcLoc` has been removed
+
+  * `GHC.Stack.showCallStack` and `GHC.SrcLoc.showSrcLoc` are now called
+    `GHC.Stack.prettyCallStack` and `GHC.Stack.prettySrcLoc` respectively
 
   * `Complex` now has `Generic`, `Generic1`, `Functor`, `Foldable`, `Traversable`,
     `Applicative`, and `Monad` instances
@@ -113,7 +121,7 @@
 
   * `Lifetime` is now exported from `GHC.Event`
 
-  * Implicit-parameter based source location support exposed in `GHC.SrcLoc`.
+  * Implicit-parameter based source location support exposed in `GHC.SrcLoc` and `GHC.Stack`.
     See GHC User's Manual for more information.
 
 ## 4.8.0.0  *Mar 2015*

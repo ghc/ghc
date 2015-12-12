@@ -8151,37 +8151,46 @@ a type signature for ``y``, then ``y`` will get type
 Special implicit parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-GHC treats implicit parameters of type ``GHC.Types.CallStack``
-specially, by resolving them to the current location in the program.
-Consider:
+Implicit parameters of the new ``base`` type ``GHC.Stack.CallStack`` are
+treated specially in function calls, the solver automatically appends
+the source location of the call to the ``CallStack`` in the
+environment. For example
 
 ::
+   myerror :: (?callStack :: CallStack) => String -> a
+   myerror msg = error (msg ++ "\n" ++ prettyCallStack ?callStack)
 
-      f :: String
-      f = show (?loc :: CallStack)
+   ghci> myerror "die"
+   *** Exception: die
+   CallStack (from ImplicitParams):
+     myerror, called at <interactive>:2:1 in interactive:Ghci1
 
-GHC will automatically resolve ``?loc`` to its source location. If
-another implicit parameter with type ``CallStack`` is in scope, GHC will
-append the two locations, creating an explicit call-stack. For example:
+prints the call-site of ``myerror``. The name of the implicit
+parameter does not matter, but within ``base`` we call it
+``?callStack``.
 
-::
-
-      f :: (?stk :: CallStack) => String
-      f = show (?stk :: CallStack)
-
-will produce the location of ``?stk``, followed by ``f``\'s call-site.
-Note that the name of the implicit parameter does not matter (we used
-``?loc`` above), GHC will solve any implicit parameter with the right
-type. The name does, however, matter when pushing new locations onto
-existing stacks. Consider:
+The ``CallStack`` will only extend as far as the types allow it, for
+example
 
 ::
+   head :: (?callStack :: CallStack) => [a] -> a
+   head []     = myerror "empty"
+   head (x:xs) = x
+   
+   bad :: Int
+   bad = head []
 
-      f :: (?stk :: CallStack) => String
-      f = show (?loc :: CallStack)
+   ghci> bad
+   *** Exception: empty
+   CallStack (from ImplicitParams):
+     myerror, called at Bad.hs:8:15 in main:Bad
+     head, called at Bad.hs:12:7 in main:Bad
 
-When we call ``f``, the stack will include the use of ``?loc``, but not
-the call to ``f``; in this case the names must match.
+includes the call-site of ``myerror`` in ``head``, and of ``head`` in
+``bad``, but not the call-site of ``bad`` at the GHCi prompt.
+
+GHC will never report an unbound implicit ``CallStack``, and will
+instead default such occurrences to the empty ``CallStack``.
 
 ``CallStack`` is kept abstract, but GHC provides a function
 
@@ -8192,15 +8201,9 @@ the call to ``f``; in this case the names must match.
 to access the individual call-sites in the stack. The ``String`` is the
 name of the function that was called, and the ``SrcLoc`` provides the
 package, module, and file name, as well as the line and column numbers.
-The stack will never be empty, as the first call-site will be the
-location at which the implicit parameter was used. GHC will also never
-infer ``?loc :: CallStack`` as a type constraint, which means that
-functions must explicitly ask to be told about their call-sites.
+GHC will infer ``CallStack`` constraints using the same rules as for
+ordinary implicit parameters.
 
-A potential "gotcha" when using implicit ``CallStack``\ s is that the
-``:type`` command in GHCi will not report the ``?loc :: CallStack``
-constraint, as the typechecker will immediately solve it. Use ``:info``
-instead to print the unsolved type.
 
 .. _kinding:
 
