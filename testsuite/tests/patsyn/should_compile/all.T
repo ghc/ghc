@@ -42,5 +42,3 @@ test('poly-export3', normal, compile, [''])
 test('multi-export', normal, compile, [''])
 test('export-super-class', normal, compile, [''])
 test('export-record-selector', normal, compile, [''])
-
-

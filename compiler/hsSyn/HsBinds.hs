@@ -40,7 +40,8 @@ import FastString
 import BooleanFormula (LBooleanFormula)
 
 import Data.Data hiding ( Fixity )
-import Data.List
+import Data.List hiding ( foldr )
+import qualified Data.List as L (foldr)
 import Data.Ord
 import Data.Foldable ( Foldable(..) )
 #if __GLASGOW_HASKELL__ < 709
@@ -485,7 +486,15 @@ plusHsValBinds _ _
 getTypeSigNames :: HsValBinds a -> NameSet
 -- Get the names that have a user type sig
 getTypeSigNames (ValBindsOut _ sigs)
-  = mkNameSet [unLoc n | L _ (TypeSig names _) <- sigs, n <- names]
+  = L.foldr get_type_sig emptyNameSet sigs
+  where
+    get_type_sig :: LSig Name -> NameSet -> NameSet
+    get_type_sig sig ns =
+      case sig of
+        L _ (TypeSig names _) -> extendNameSetList ns (map unLoc names)
+        L _ (PatSynSig name _) -> extendNameSet ns (unLoc name)
+        _ -> ns
+
 getTypeSigNames _
   = panic "HsBinds.getTypeSigNames"
 

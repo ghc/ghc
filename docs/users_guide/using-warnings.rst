@@ -632,6 +632,17 @@ command line.
     about any polymorphic local bindings. As part of the warning GHC
     also reports the inferred type. The option is off by default.
 
+``-fwarn-missing-pat-syn-sigs``
+  .. index ::
+       single: -fwarn-missing-pat-syn-sigs
+       single: type signatures, missing, pattern synonyms
+
+  If you would like GHC to check that every pattern synonym has a type
+  signature, use the ``-fwarn-missing-pat-syn-sigs`` option. If this option is
+  used in conjunction with ``-fwarn-missing-exported-sigs`` then only
+  exported pattern synonyms must have a type signature. GHC also reports the
+  inferred type. This option is off by default.
+
 ``-fwarn-name-shadowing``
     .. index::
        single: -fwarn-name-shadowing

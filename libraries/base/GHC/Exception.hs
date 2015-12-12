@@ -170,6 +170,7 @@ throw e = raise# (toException e)
 data ErrorCall = ErrorCallWithLocation String String
     deriving (Eq, Ord)
 
+pattern ErrorCall :: String -> ErrorCall
 pattern ErrorCall err <- ErrorCallWithLocation err _ where
   ErrorCall err = ErrorCallWithLocation err ""
 

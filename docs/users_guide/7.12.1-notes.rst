@@ -114,23 +114,23 @@ Language
 
      -- Foo.hs
      module Foo where
-     
+
      data family T a
 
      -- Bar.hs
      module Bar where
-     
+
      import Foo
-     
+
      data instance T Int = MkT
 
      -- Baz.hs
      module Baz where
-     
+
      import Bar (T(MkT))
 
    In previous versions of GHC, this required a workaround via an
-   explicit export list in Bar. 
+   explicit export list in Bar.
 
 
 
@@ -192,6 +192,10 @@ Compiler
    ``Semigroup``, and when a custom definition ``(<>)`` is made. Fixing these
    warnings makes sure the definition of ``Semigroup`` as a superclass of
    ``Monoid`` does not break any code.
+
+- Added the ``-fwarn-missing-pat-syn-sigs`` flag. When enabled, this will issue
+  a warning when a pattern synonym definition doesn't have a type signature.
+  It is turned off by default but enabled by ``-Wall``.
 
 GHCi
 ~~~~

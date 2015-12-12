@@ -1,0 +1,19 @@
+
+T11053.hs:7:1: warning:
+    Top-level binding with no type signature: T :: Bool
+
+T11053.hs:9:1: warning:
+    Top-level binding with no type signature:
+      J :: forall t. t -> Maybe t
+
+T11053.hs:11:1: warning:
+    Top-level binding with no type signature:
+      J1 :: forall t. t -> Maybe t
+
+T11053.hs:13:1: warning:
+    Top-level binding with no type signature:
+      J2 :: forall t. t -> Maybe t
+
+T11053.hs:15:1: warning:
+    Top-level binding with no type signature:
+      J3 :: forall t. t -> Maybe t

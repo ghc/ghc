@@ -537,6 +537,7 @@ data WarningFlag =
    | Opt_WarnDeferredTypeErrors
    | Opt_WarnNonCanonicalMonadInstances   -- since 8.0
    | Opt_WarnNonCanonicalMonoidInstances  -- since 8.0
+   | Opt_WarnMissingPatSynSigs            -- since 8.0
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -2954,7 +2955,8 @@ fWarningFlags = [
   flagSpec "warn-unused-pattern-binds"        Opt_WarnUnusedPatternBinds,
   flagSpec "warn-unused-top-binds"            Opt_WarnUnusedTopBinds,
   flagSpec "warn-warnings-deprecations"       Opt_WarnWarningsDeprecations,
-  flagSpec "warn-wrong-do-bind"               Opt_WarnWrongDoBind]
+  flagSpec "warn-wrong-do-bind"               Opt_WarnWrongDoBind,
+  flagSpec "warn-missing-pat-syn-sigs"        Opt_WarnMissingPatSynSigs]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
 negatableFlags :: [FlagSpec GeneralFlag]
@@ -3499,7 +3501,8 @@ minusWallOpts
         Opt_WarnOrphans,
         Opt_WarnUnusedDoBind,
         Opt_WarnTrustworthySafe,
-        Opt_WarnUntickedPromotedConstructors
+        Opt_WarnUntickedPromotedConstructors,
+        Opt_WarnMissingPatSynSigs
       ]
 
 -- | Things you get with -Wcompat.
