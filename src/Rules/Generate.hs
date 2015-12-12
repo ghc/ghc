@@ -4,7 +4,7 @@ import Expression
 import GHC
 import Oracles
 import Rules.Actions
-import Rules.Resources
+import Rules.Resources (Resources)
 import Settings
 
 primopsSource :: FilePath
@@ -64,6 +64,12 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
             contents <- interpretPartial target generatePlatformH
             writeFileChanged file contents
             putBuild $ "| Successfully generated '" ++ file ++ "'."
+
+        priority 2.0 $
+            when (pkg == ghcPkg) $ buildPath -/- "Version.hs" %> \file -> do
+                contents <- interpretPartial target generateGhcPkgVersionHs
+                writeFileChanged file contents
+                putBuild $ "| Successfully generated '" ++ file ++ "'."
 
 quote :: String -> String
 quote s = "\"" ++ s ++ "\""
@@ -211,3 +217,15 @@ generatePlatformH = do
         , "#define TARGET_VENDOR " ++ quote targetVendor
         , ""
         , "#endif /* __PLATFORM_H__ */" ]
+
+generateGhcPkgVersionHs :: Expr String
+generateGhcPkgVersionHs = do
+    projectVersion <- getSetting ProjectVersion
+    targetOs       <- getSetting TargetOs
+    targetArch     <- getSetting TargetArch
+    return $ unlines
+        [ "module Version where"
+        , "version, targetOS, targetARCH :: String"
+        , "version    = " ++ quote projectVersion
+        , "targetOS   = " ++ quote targetOs
+        , "targetARCH = " ++ quote targetArch ]
