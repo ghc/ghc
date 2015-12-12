@@ -1487,20 +1487,24 @@ data Dec
   | TySynInstD Name TySynEqn      -- ^ @{ type instance ... }@
 
   -- | open type families (may also appear in [Dec] of 'ClassD' and 'InstanceD')
-  | OpenTypeFamilyD Name
-         [TyVarBndr] FamilyResultSig
-         (Maybe InjectivityAnn)
+  | OpenTypeFamilyD TypeFamilyHead
          -- ^ @{ type family T a b c = (r :: *) | r -> a b }@
 
-  | ClosedTypeFamilyD Name
-      [TyVarBndr] FamilyResultSig
-      (Maybe InjectivityAnn)
-      [TySynEqn]
+  | ClosedTypeFamilyD TypeFamilyHead [TySynEqn]
        -- ^ @{ type family F a b = (r :: *) | r -> a where ... }@
 
   | RoleAnnotD Name [Role]        -- ^ @{ type role T nominal representational }@
   | StandaloneDerivD Cxt Type     -- ^ @{ deriving instance Ord a => Ord (Foo a) }@
   | DefaultSigD Name Type         -- ^ @{ default size :: Data a => a -> Int }@
+  deriving( Show, Eq, Ord, Data, Typeable, Generic )
+
+-- | Common elements of 'OpenTypeFamilyD' and 'ClosedTypeFamilyD'.
+-- By analogy with with "head" for type classes and type class instances as
+-- defined in /Type classes: an exploration of the design space/, the
+-- @TypeFamilyHead@ is defined to be the elements of the declaration between
+-- @type family@ and @where@.
+data TypeFamilyHead =
+  TypeFamilyHead Name [TyVarBndr] FamilyResultSig (Maybe InjectivityAnn)
   deriving( Show, Eq, Ord, Data, Typeable, Generic )
 
 -- | One equation of a type family instance or closed type family. The

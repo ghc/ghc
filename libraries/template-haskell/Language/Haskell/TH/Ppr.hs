@@ -318,21 +318,15 @@ ppr_dec isTop (TySynInstD tc (TySynEqn tys rhs))
   where
     maybeInst | isTop     = text "instance"
               | otherwise = empty
-ppr_dec isTop (OpenTypeFamilyD tc tvs res inj)
-  = text "type" <+> maybeFamily <+> ppr tc <+> hsep (map ppr tvs) <+>
-    ppr res <+> maybeInj
+ppr_dec isTop (OpenTypeFamilyD tfhead)
+  = text "type" <+> maybeFamily <+> ppr_tf_head tfhead
   where
     maybeFamily | isTop     = text "family"
                 | otherwise = empty
-    maybeInj | (Just inj') <- inj = ppr inj'
-             | otherwise          = empty
-ppr_dec _ (ClosedTypeFamilyD tc tvs res inj eqns)
-  = hang (hsep [ text "type family", ppr tc, hsep (map ppr tvs), ppr res
-               , maybeInj, text "where" ])
+ppr_dec _ (ClosedTypeFamilyD tfhead@(TypeFamilyHead tc _ _ _) eqns)
+  = hang (text "type family" <+> ppr_tf_head tfhead <+> text "where")
       nestDepth (vcat (map ppr_eqn eqns))
   where
-    maybeInj | (Just inj') <- inj = ppr inj'
-             | otherwise          = empty
     ppr_eqn (TySynEqn lhs rhs)
       = ppr tc <+> sep (map pprParendType lhs) <+> text "=" <+> ppr rhs
 
@@ -376,6 +370,13 @@ ppr_newtype maybeInst ctxt t argsDoc c decs
 ppr_tySyn :: Doc -> Name -> Doc -> Type -> Doc
 ppr_tySyn maybeInst t argsDoc rhs
   = text "type" <+> maybeInst <+> ppr t <+> argsDoc <+> text "=" <+> ppr rhs
+
+ppr_tf_head :: TypeFamilyHead -> Doc
+ppr_tf_head (TypeFamilyHead tc tvs res inj)
+  = ppr tc <+> hsep (map ppr tvs) <+> ppr res <+> maybeInj
+  where
+    maybeInj | (Just inj') <- inj = ppr inj'
+             | otherwise          = empty
 
 ------------------------------
 instance Ppr FunDep where

@@ -1114,22 +1114,19 @@ reifyTyCon tc
                                                   (filterByList ms tvs)
                      in (sig, inj)
        ; tvs' <- reifyTyVars tvs (Just tc)
+       ; let tfHead =
+               TH.TypeFamilyHead (reifyName tc) tvs' resultSig injectivity
        ; if isOpenTypeFamilyTyCon tc
          then do { fam_envs <- tcGetFamInstEnvs
                  ; instances <- reifyFamilyInstances tc
                                   (familyInstances fam_envs tc)
-                 ; return (TH.FamilyI
-                             (TH.OpenTypeFamilyD (reifyName tc) tvs'
-                                                 resultSig injectivity)
-                             instances) }
+                 ; return (TH.FamilyI (TH.OpenTypeFamilyD tfHead) instances) }
          else do { eqns <-
                      case isClosedSynFamilyTyConWithAxiom_maybe tc of
                        Just ax -> mapM (reifyAxBranch tc) $
                                   fromBranches $ coAxiomBranches ax
                        Nothing -> return []
-                 ; return (TH.FamilyI
-                      (TH.ClosedTypeFamilyD (reifyName tc) tvs' resultSig
-                                            injectivity eqns)
+                 ; return (TH.FamilyI (TH.ClosedTypeFamilyD tfHead eqns)
                       []) } }
 
   | isDataFamilyTyCon tc
@@ -1234,7 +1231,8 @@ reifyClass cls
       TH.TySynInstD n . TH.TySynEqn (map TH.VarT args) <$> reifyType ty
 
     tfNames :: TH.Dec -> (TH.Name, [TH.Name])
-    tfNames (TH.OpenTypeFamilyD   n args _ _)   = (n, map bndrName args)
+    tfNames (TH.OpenTypeFamilyD (TH.TypeFamilyHead n args _ _))
+      = (n, map bndrName args)
     tfNames d = pprPanic "tfNames" (text (show d))
 
     bndrName :: TH.TyVarBndr -> TH.Name

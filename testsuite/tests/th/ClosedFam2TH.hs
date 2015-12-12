@@ -5,11 +5,12 @@ module ClosedFam2 where
 import Language.Haskell.TH
 
 $( return [ ClosedTypeFamilyD
-              (mkName "Equals")
-              [ KindedTV (mkName "a") (VarT (mkName "k"))
-              , KindedTV (mkName "b") (VarT (mkName "k")) ]
-              ( TyVarSig (KindedTV (mkName "r") (VarT (mkName "k"))))
-              Nothing
+              (TypeFamilyHead
+                (mkName "Equals")
+                [ KindedTV (mkName "a") (VarT (mkName "k"))
+                , KindedTV (mkName "b") (VarT (mkName "k")) ]
+                ( TyVarSig (KindedTV (mkName "r") (VarT (mkName "k"))))
+                Nothing)
               [ TySynEqn [ (VarT (mkName "a"))
                          , (VarT (mkName "a")) ]
                          (ConT (mkName "Int"))

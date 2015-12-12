@@ -1,5 +1,5 @@
 
-TH_RichKinds2.hs:23:4: Warning:
+TH_RichKinds2.hs:24:4: Warning:
     data SMaybe_0 (t_1 :: k_0 -> *) (t_3 :: GHC.Base.Maybe k_0)
     = forall . t_3 ~ 'GHC.Base.Nothing => SNothing_4
     | forall a_5 . t_3 ~ 'GHC.Base.Just a_5 => SJust_6 (t_1 a_5)

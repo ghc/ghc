@@ -1,5 +1,5 @@
 
-T9160.hs:18:12: error:
+T9160.hs:19:12: error:
     Expecting one more argument to ‘Maybe’
     Expected a type, but ‘Maybe’ has kind ‘* -> *’
     In the type ‘Maybe’

@@ -8,7 +8,8 @@ $( do { cls_nm <- newName "C"
       ; k_nm   <- newName "k"
       ; f_nm   <- newName "F"
       ; return [ClassD [] cls_nm [KindedTV a_nm (VarT k_nm)] []
-                   [OpenTypeFamilyD f_nm [] (KindSig (VarT k_nm)) Nothing ]] } )
+                 [OpenTypeFamilyD
+                   (TypeFamilyHead f_nm [] (KindSig (VarT k_nm)) Nothing)]]})
 
 -- Splices in:
 --     class C (a :: k) where

@@ -299,20 +299,16 @@ cvtDec (TySynInstD tc eqn)
             { tfid_inst = TyFamInstDecl { tfid_eqn = eqn'
                                         , tfid_fvs = placeHolderNames } } }
 
-cvtDec (OpenTypeFamilyD tc tvs result injectivity)
-  = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
-       ; result' <- cvtFamilyResultSig result
-       ; injectivity' <- traverse cvtInjectivityAnnotation injectivity
+cvtDec (OpenTypeFamilyD head)
+  = do { (tc', tyvars', result', injectivity') <- cvt_tyfam_head head
        ; returnJustL $ TyClD $ FamDecl $
-         FamilyDecl OpenTypeFamily tc' tvs' result' injectivity' }
+         FamilyDecl OpenTypeFamily tc' tyvars' result' injectivity' }
 
-cvtDec (ClosedTypeFamilyD tc tyvars result injectivity eqns)
-  = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tyvars
-       ; result' <- cvtFamilyResultSig result
+cvtDec (ClosedTypeFamilyD head eqns)
+  = do { (tc', tyvars', result', injectivity') <- cvt_tyfam_head head
        ; eqns' <- mapM (cvtTySynEqn tc') eqns
-       ; injectivity' <- traverse cvtInjectivityAnnotation injectivity
        ; returnJustL $ TyClD $ FamDecl $
-         FamilyDecl (ClosedTypeFamily (Just eqns')) tc' tvs' result'
+         FamilyDecl (ClosedTypeFamily (Just eqns')) tc' tyvars' result'
                                       injectivity' }
 
 cvtDec (TH.RoleAnnotD tc roles)
@@ -382,6 +378,19 @@ cvt_tyinst_hdr cxt tc tys
        ; tc'  <- tconNameL tc
        ; tys' <- mapM cvtType tys
        ; return (cxt', tc', mkHsImplicitBndrs tys') }
+
+----------------
+cvt_tyfam_head :: TypeFamilyHead
+               -> CvtM ( Located RdrName
+                       , LHsQTyVars RdrName
+                       , Hs.LFamilyResultSig RdrName
+                       , Maybe (Hs.LInjectivityAnn RdrName))
+
+cvt_tyfam_head (TypeFamilyHead tc tyvars result injectivity)
+  = do {(_, tc', tyvars') <- cvt_tycl_hdr [] tc tyvars
+       ; result' <- cvtFamilyResultSig result
+       ; injectivity' <- traverse cvtInjectivityAnnotation injectivity
+       ; return (tc', tyvars', result', injectivity') }
 
 -------------------------------------------------------------------
 --              Partitioning declarations

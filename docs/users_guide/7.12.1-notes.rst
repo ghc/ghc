@@ -252,6 +252,11 @@ Template Haskell
 -  The ``Lift`` class is now derivable via the ``-XDeriveLift`` extension. See
    :ref:`deriving-lift` for more information.
 
+-  The ``FamilyD`` data constructor and ``FamFlavour`` data type have
+   been removed. Data families are now represented by ``DataFamilyD`` and
+   open type families are now represented by ``OpenTypeFamilyD`` instead
+   of ``FamilyD``. Common elements of ``OpenTypeFamilyD`` and
+   ``ClosedTypeFamilyD`` have been moved to ``TypeFamilyHead``.
 
 Runtime system
 ~~~~~~~~~~~~~~

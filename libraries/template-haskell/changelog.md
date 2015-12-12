@@ -18,6 +18,13 @@
 
   * Add `Show` instances for `NameFlavour` and `NameSpace`
 
+  * Remove `FamilyD` and `FamFlavour`.  Add `DataFamilyD` and `OpenTypeFamilyD`
+    as the representation of data families and open type families
+    respectively. (#6018)
+
+  * Add `TypeFamilyHead` for common elements of `OpenTypeFamilyD` and
+    `ClosedTypeFamilyD` (#10902)
+
   * TODO: document API changes and important bugfixes
 
 

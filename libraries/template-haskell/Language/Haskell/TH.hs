@@ -65,7 +65,7 @@ module Language.Haskell.TH(
         Dec(..), Con(..), Clause(..),
         Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
         Inline(..), RuleMatch(..), Phases(..), RuleBndr(..), AnnTarget(..),
-        FunDep(..), FamFlavour(..), TySynEqn(..),
+        FunDep(..), FamFlavour(..), TySynEqn(..), TypeFamilyHead(..),
         Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
     -- ** Expressions
         Exp(..), Match(..), Body(..), Guard(..), Stmt(..), Range(..), Lit(..),
