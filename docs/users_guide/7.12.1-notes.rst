@@ -12,7 +12,36 @@ Highlights
 
 The highlights, since the 7.10 branch, are:
 
--  TODO FIXME
+- TODO FIXME
+
+- nokinds
+
+- Record pattern synonyms
+
+- ``-XDeriveAnyClass``
+
+- More reliable DWARF debugging information
+
+- Injective type classes
+
+- Applicative ``do`` notation
+
+- Support for wildcards in data and type family instances
+
+- ``Strict`` and ``StrictData`` extensions, allowing modules to be compiled with
+   strict-by-default bindings.
+
+- ``DuplicateRecordFields``, allowing multiple datatypes to declare the same
+  record field names provided they are used unambiguously
+
+- Support for implicit parameters providing light-weight callstacks and source locations
+
+- User-defined error messages for type errors
+
+- A rewritten (and greatly improved) pattern exhaustiveness checker
+
+- The reworked users guide you are now reading
+
 
 Full details
 ------------
@@ -23,20 +52,17 @@ Language
 -  TODO FIXME.
 
 -  The parser now supports Haddock comments on GADT data constructors.
-   For example,
+   For example ::
 
-   ::
-
-                             data Expr a where
-                               -- | Just a normal sum
-                               Sum :: Int -> Int -> Expr Int
+        data Expr a where
+            -- | Just a normal sum
+            Sum :: Int -> Int -> Expr Int
 
 -  Implicit parameters of the new ``base`` type ``GHC.Stack.CallStack``
    are treated specially in function calls, the solver automatically
    appends the source location of the call to the ``CallStack`` in
-   the environment. For example
+   the environment. For example ::
 
-   ::
         myerror :: (?callStack :: CallStack) => String -> a
         myerror msg = error (msg ++ "\n" ++ prettyCallStack ?callStack)
 
@@ -84,12 +110,12 @@ Language
       pattern P :: a -> b -> (a, b)
       pattern P{x,y} = (x,y)
 
-   will allow `P` to be used like a record data constructor and also defines
-   selector functions `x :: (a, b) -> a` and `y :: (a, b) -> b`.
+   will allow ``P`` to be used like a record data constructor and also defines
+   selector functions ``x :: (a, b) -> a`` and ``y :: (a, b) -> b``.
 
 -  Pattern synonyms can now be bundled with type constructors. For a pattern
-   synonym `P` and a type constructor `T`, `P` can be bundled with `T` so that
-   when `T` is imported `P` is also imported. With this change
+   synonym ``P`` and a type constructor ``T``, ``P`` can be bundled with ``T``
+   so that when ``T`` is imported ``P`` is also imported. With this change
    a library author can provide either real data constructors or pattern
    synonyms in an opaque manner. See :ref:`pattern-synonyms` for details. ::
 
@@ -127,7 +153,7 @@ Language
      import Bar (T(MkT))
 
    In previous versions of GHC, this required a workaround via an
-   explicit export list in Bar.
+   explicit export list in ``Bar``.
 
 
 
@@ -190,9 +216,9 @@ Compiler
    warnings makes sure the definition of ``Semigroup`` as a superclass of
    ``Monoid`` does not break any code.
 
-- Added the ``-fwarn-missing-pat-syn-sigs`` flag. When enabled, this will issue
-  a warning when a pattern synonym definition doesn't have a type signature.
-  It is turned off by default but enabled by ``-Wall``.
+-  Added the ``-fwarn-missing-pat-syn-sigs`` flag. When enabled, this will issue
+   a warning when a pattern synonym definition doesn't have a type signature.
+   It is turned off by default but enabled by ``-Wall``.
 
 GHCi
 ~~~~
@@ -364,25 +390,25 @@ ghc
    strictness annotations as the user wrote them, whether from an
    imported module or not.
 
--  Moved `startsVarSym`, `startsVarId`, `startsConSym`, `startsConId`,
-   `startsVarSymASCII`, and `isVarSymChar` from `Lexeme` to the `GHC.Lemexe`
-   module of the `ghc-boot` library.
+-  Moved ``startsVarSym``, ``startsVarId``, ``startsConSym``, ``startsConId``,
+   ``startsVarSymASCII``, and ``isVarSymChar`` from ``Lexeme`` to the
+   ``GHC.Lemexe`` module of the ``ghc-boot`` library.
 
-- Add `isImport`, `isDecl`, and `isStmt` functions.
+-  Add ``isImport``, ``isDecl``, and ``isStmt`` functions.
 
 ghc-boot
 ~~~~~~~~
 
 -  This is an internal package. Use with caution.
 
--  This package was renamed from `bin-package-db` to reflect its new purpose
+-  This package was renamed from ``bin-package-db`` to reflect its new purpose
    of containing intra-GHC functionality that needs to be shared across
    multiple GHC boot libraries.
 
--  Added `GHC.Lexeme`, which contains functions for determining if a
+-  Added ``GHC.Lexeme``, which contains functions for determining if a
    character can be the first letter of a variable or data constructor in
-   Haskell, as defined by GHC. (These functions were moved from `Lexeme`
-   in `ghc`.)
+   Haskell, as defined by GHC. (These functions were moved from ``Lexeme``
+   in ``ghc``.)
 
 ghc-prim
 ~~~~~~~~
