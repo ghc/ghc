@@ -1,8 +1,9 @@
 module GHC (
     array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
-    deepseq, directory, filepath, ghc, ghcCabal, ghcPkg, ghcPrim, haskeline,
-    hoopl, hpc, integerGmp, integerSimple, parallel, pretty, primitive, process,
-    stm, templateHaskell, terminfo, time, transformers, unix, win32, xhtml,
+    deepseq, directory, filepath, ghc, ghcCabal, ghcPkg, ghcPrim, ghcPwd,
+    haskeline, hoopl, hpc, integerGmp, integerSimple, parallel, pretty,
+    primitive, process, stm, templateHaskell, terminfo, time, transformers,
+    unix, win32, xhtml,
 
     defaultKnownPackages, defaultTargetDirectory, defaultProgramPath
     ) where
@@ -20,15 +21,16 @@ defaultKnownPackages :: [Package]
 defaultKnownPackages =
     [ array, base, binPackageDb, binary, bytestring, cabal, compiler
     , containers, deepseq, directory, filepath, ghc, ghcCabal, ghcPkg, ghcPrim
-    , haskeline, hoopl, hpc, integerGmp, integerSimple, parallel, pretty
+    , ghcPwd, haskeline, hoopl, hpc, integerGmp, integerSimple, parallel, pretty
     , primitive, process, stm, templateHaskell, terminfo, time, transformers
     , unix, win32, xhtml ]
 
 -- Package definitions
 array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
-    deepseq, directory, filepath, ghc, ghcCabal, ghcPkg, ghcPrim, haskeline,
-    hoopl, hpc, integerGmp, integerSimple, parallel, pretty, primitive, process,
-    stm, templateHaskell, terminfo, time, transformers, unix, win32, xhtml :: Package
+    deepseq, directory, filepath, ghc, ghcCabal, ghcPkg, ghcPrim, ghcPwd,
+    haskeline, hoopl, hpc, integerGmp, integerSimple, parallel, pretty,
+    primitive, process, stm, templateHaskell, terminfo, time, transformers,
+    unix, win32, xhtml :: Package
 
 array           = library  "array"
 base            = library  "base"
@@ -45,6 +47,7 @@ ghc             = topLevel "ghc-bin"        `setPath` "ghc"
 ghcCabal        = utility  "ghc-cabal"
 ghcPkg          = utility  "ghc-pkg"
 ghcPrim         = library  "ghc-prim"
+ghcPwd          = utility  "ghc-pwd"
 haskeline       = library  "haskeline"
 hoopl           = library  "hoopl"
 hpc             = library  "hpc"
@@ -84,6 +87,7 @@ defaultProgramPath stage pkg
     | pkg == ghc      = program $ "ghc-stage" ++ show (fromEnum stage + 1)
     | pkg == ghcCabal = program $ pkgName pkg
     | pkg == ghcPkg   = program $ pkgName pkg
+    | pkg == ghcPwd   = program $ pkgName pkg
     | otherwise       = Nothing
   where
     program name = Just $ pkgPath pkg -/- defaultTargetDirectory stage pkg
