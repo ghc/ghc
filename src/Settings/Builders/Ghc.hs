@@ -96,7 +96,8 @@ packageGhcArgs = do
     pkgKey             <- getPkgData PackageKey
     pkgDepIds          <- getPkgDataList DepIds
     mconcat
-        [ (pkg /= deriveConstants) ? arg "-hide-all-packages"
+        [ not (pkg == deriveConstants || pkg == genapply) ?
+          arg "-hide-all-packages"
         , arg "-no-user-package-db"
         , stage0 ? arg "-package-db libraries/bootstrapping.conf"
         , isLibrary pkg ?
@@ -105,6 +106,7 @@ packageGhcArgs = do
           else arg $ "-package-name "     ++ pkgKey
         , append $ map ("-package-id " ++) pkgDepIds ]
 
+-- TODO: Improve handling of "cabal_macros.h"
 includeGhcArgs :: Args
 includeGhcArgs = do
     pkg     <- getPackage
@@ -120,8 +122,9 @@ includeGhcArgs = do
             , arg $ "-I" ++ autogenPath
             , append [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
             , append [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
-            , arg "-optP-include"
-            , arg $ "-optP" ++ autogenPath -/- "cabal_macros.h" ]
+            , not (pkg == deriveConstants || pkg == genapply) ?
+              append [ "-optP-include"
+                     , "-optP" ++ autogenPath -/- "cabal_macros.h" ] ]
 
 -- TODO: see ghc.mk
 -- # And then we strip it out again before building the package:

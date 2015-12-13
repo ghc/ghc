@@ -19,7 +19,7 @@ packagesStage0 :: Packages
 packagesStage0 = mconcat
     [ append [ binPackageDb, binary, cabal, compiler, ghc, ghcCabal, ghcPkg
              , hsc2hs, hoopl, hpc, templateHaskell, transformers ]
-    , stage0 ? append [deriveConstants] -- TODO: simplify
+    , stage0 ? append [deriveConstants, genapply] -- TODO: simplify
     , notM windowsHost ? notM (anyHostOs ["ios"]) ? append [terminfo] ]
 
 -- TODO: what do we do with parallel, stm, random, primitive, vector and dph?

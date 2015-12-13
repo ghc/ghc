@@ -27,9 +27,14 @@ compilePackage _ target @ (PartialTarget stage pkg) = do
             let way = detectWay obj
             build $ fullTargetWithWay target (Ghc stage) way [src] [obj]
 
-    -- TODO: get rid of this special case
+    -- TODO: get rid of these special cases
     priority 2.0 $ buildPath -/- "DeriveConstants.o" %> \obj -> do
         let src = pkgPath pkg -/- "DeriveConstants.hs"
+        need [src]
+        build $ fullTargetWithWay target (Ghc stage) vanilla [src] [obj]
+
+    priority 2.0 $ buildPath -/- "GenApply.o" %> \obj -> do
+        let src = pkgPath pkg -/- "GenApply.hs"
         need [src]
         build $ fullTargetWithWay target (Ghc stage) vanilla [src] [obj]
 
