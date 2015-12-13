@@ -3211,9 +3211,7 @@ defaultFlags settings
 
     ++ default_PIC platform
 
-    ++ (if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
-        then wayGeneralFlags platform WayDyn
-        else [])
+    ++ concatMap (wayGeneralFlags platform) (defaultWays settings)
 
     where platform = sTargetPlatform settings
 
