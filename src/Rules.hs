@@ -39,7 +39,7 @@ generateTargets = action $ do
 
     need $ reverse targets
 
--- TODO: add Stage2 (compiler only?)
+-- TODO: use stage 2 compiler for building stage 2 packages (instead of stage 1)
 packageRules :: Rules ()
 packageRules = do
     resources <- resourceRules

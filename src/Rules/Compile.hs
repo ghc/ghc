@@ -17,6 +17,7 @@ compilePackage _ target @ (PartialTarget stage package) = do
     matchBuildResult buildPath "hi-boot" ?> \hiboot ->
         need [ hiboot -<.> obootsuf (detectWay hiboot) ]
 
+    -- TODO: add dependencies for #include of .h and .hs-incl files (gcc -MM?)
     matchBuildResult buildPath "o" ?> \obj -> do
         (src, deps) <- dependencies buildPath obj
         need $ src : deps

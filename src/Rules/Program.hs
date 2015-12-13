@@ -18,9 +18,10 @@ buildProgram _ target @ (PartialTarget stage pkg) = do
     (\f -> program == Just f) ?> \bin -> do
         cSrcs <- cSources target -- TODO: remove code duplication (Library.hs)
         hSrcs <- hSources target
-        let cObjs = [ buildPath -/- src -<.> osuf vanilla | src <- cSrcs  ]
-            hObjs = [ buildPath -/- src  <.> osuf vanilla | src <- hSrcs  ]
-                 ++ [ buildPath -/- "Paths_hsc2hs.o"      | pkg == hsc2hs ]
+        let cObjs = [ buildPath -/- src -<.> osuf vanilla | src <- cSrcs   ]
+            hObjs = [ buildPath -/- src  <.> osuf vanilla | src <- hSrcs   ]
+                 ++ [ buildPath -/- "Paths_hsc2hs.o"      | pkg == hsc2hs  ]
+                 ++ [ buildPath -/- "Paths_haddock.o"     | pkg == haddock ]
             objs  = cObjs ++ hObjs
         need objs
         build $ fullTargetWithWay target (Ghc stage) vanilla objs [bin]

@@ -165,6 +165,8 @@ customPackageArgs = do
                   , ghcWithInterpreter ?
                     notStage0 ? arg "--flags=ghci"
                   ]
+        , package haddock ?
+          builder GhcCabal ? append ["--flag", "in-ghc-tree"]
         ]
 
 withBuilderKey :: Builder -> String
