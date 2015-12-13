@@ -48,8 +48,9 @@ askPackageData path key = do
         file    = path -/- "package-data.mk"
     maybeValue <- askOracle $ PackageDataKey (file, fullKey)
     case maybeValue of
-        Nothing    -> putError $ "No key '" ++ key ++ "' in " ++ file ++ "."
+        Nothing    -> return ""
         Just value -> return value
+        -- Nothing    -> putError $ "No key '" ++ key ++ "' in " ++ file ++ "."
 
 pkgData :: PackageData -> Action String
 pkgData packageData = case packageData of

@@ -3,7 +3,7 @@ module Predicates (
     module Oracles.Config.Flag,
     module Oracles.Config.Setting,
     stage, package, builder, stagedBuilder, file, way,
-    stage0, stage1, stage2, notStage0, registerPackage, splitObjects
+    stage0, stage1, stage2, notStage0, notPackage, registerPackage, splitObjects
     ) where
 
 import Expression
@@ -44,6 +44,9 @@ stage2 = stage Stage2
 
 notStage0 :: Predicate
 notStage0 = notM stage0
+
+notPackage :: Package -> Predicate
+notPackage = notM . package
 
 -- TODO: Actually, we don't register compiler in some circumstances -- fix.
 registerPackage :: Predicate

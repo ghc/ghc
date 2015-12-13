@@ -7,8 +7,8 @@ import Rules.Resources
 import Settings
 
 compilePackage :: Resources -> PartialTarget -> Rules ()
-compilePackage _ target @ (PartialTarget stage package) = do
-    let path      = targetPath stage package
+compilePackage _ target @ (PartialTarget stage pkg) = do
+    let path      = targetPath stage pkg
         buildPath = path -/- "build"
 
     matchBuildResult buildPath "hi" ?> \hi ->
@@ -26,6 +26,12 @@ compilePackage _ target @ (PartialTarget stage package) = do
         else do
             let way = detectWay obj
             build $ fullTargetWithWay target (Ghc stage) way [src] [obj]
+
+    -- TODO: get rid of this special case
+    priority 2.0 $ buildPath -/- "DeriveConstants.o" %> \obj -> do
+        let src = pkgPath pkg -/- "DeriveConstants.hs"
+        need [src]
+        build $ fullTargetWithWay target (Ghc stage) vanilla [src] [obj]
 
     matchBuildResult buildPath "o-boot" ?> \obj -> do
         (src, deps) <- dependencies buildPath obj

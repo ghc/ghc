@@ -5,7 +5,7 @@ module Settings.Builders.Ghc (
 import Expression
 import Oracles
 import GHC
-import Predicates (package, file, stagedBuilder, splitObjects, stage0, notStage0)
+import Predicates hiding (way, stage)
 import Settings
 
 -- TODO: add support for -dyno
@@ -50,7 +50,7 @@ ghcMArgs = stagedBuilder GhcM ? do
             , append $ concat [ ["-dep-suffix", wayPrefix w] | w <- ways ]
             , append =<< getInputs ]
 
--- This is included into ghcArgs, ghcMArgs and haddockArgs.
+-- This is included into ghcArgs, ghcMArgs and haddockArgs
 commonGhcArgs :: Args
 commonGhcArgs = do
     way     <- getWay
@@ -87,6 +87,7 @@ wayGhcArgs = do
             , (way == debug || way == debugDynamic) ?
               append ["-ticky", "-DTICKY_TICKY"] ]
 
+-- TODO: Improve handling of "-hide-all-packages"
 packageGhcArgs :: Args
 packageGhcArgs = do
     stage              <- getStage
@@ -95,7 +96,7 @@ packageGhcArgs = do
     pkgKey             <- getPkgData PackageKey
     pkgDepIds          <- getPkgDataList DepIds
     mconcat
-        [ arg "-hide-all-packages"
+        [ (pkg /= deriveConstants) ? arg "-hide-all-packages"
         , arg "-no-user-package-db"
         , stage0 ? arg "-package-db libraries/bootstrapping.conf"
         , isLibrary pkg ?

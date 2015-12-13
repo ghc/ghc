@@ -1,6 +1,6 @@
 module GHC (
     array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
-    compareSizes, deepseq, directory, dllSplit, filepath, ghc, ghcCabal, ghcPkg, ghcPrim,
+    compareSizes, deepseq, deriveConstants, directory, dllSplit, filepath, ghc, ghcCabal, ghcPkg, ghcPrim,
     ghcPwd, ghcTags, haddock, haskeline, hsc2hs, hoopl, hpc, hpcBin, integerGmp, integerSimple,
     mkUserGuidePart, parallel, pretty,
     primitive, process, runghc, stm, templateHaskell, terminfo, time, transformers,
@@ -21,7 +21,7 @@ import Stage
 defaultKnownPackages :: [Package]
 defaultKnownPackages =
     [ array, base, binPackageDb, binary, bytestring, cabal, compiler
-    , containers, compareSizes, deepseq, directory, dllSplit, filepath, ghc
+    , containers, compareSizes, deepseq, deriveConstants, directory, dllSplit, filepath, ghc
     , ghcCabal, ghcPkg, ghcPrim
     , ghcPwd, ghcTags, haddock, haskeline, hsc2hs, hoopl, hpc, hpcBin, integerGmp, integerSimple
     , mkUserGuidePart, parallel, pretty, primitive, process, runghc, stm, templateHaskell, terminfo
@@ -29,7 +29,7 @@ defaultKnownPackages =
 
 -- Package definitions
 array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
-    compareSizes, deepseq, directory, dllSplit, filepath, ghc, ghcCabal, ghcPkg,
+    compareSizes, deepseq, deriveConstants, directory, dllSplit, filepath, ghc, ghcCabal, ghcPkg,
     ghcPrim, ghcPwd,
     ghcTags, haddock, haskeline, hsc2hs, hoopl, hpc, hpcBin, integerGmp, integerSimple,
     mkUserGuidePart, parallel, pretty,
@@ -46,6 +46,7 @@ compiler        = topLevel "ghc"            `setPath` "compiler"
 containers      = library  "containers"
 compareSizes    = utility  "compareSizes"   `setPath` "utils/compare_sizes"
 deepseq         = library  "deepseq"
+deriveConstants = utility  "deriveConstants"
 directory       = library  "directory"
 dllSplit        = utility  "dll-split"
 filepath        = library  "filepath"
@@ -78,7 +79,7 @@ unix            = library  "unix"
 win32           = library  "Win32"
 xhtml           = library  "xhtml"
 
--- TODO: deriveConstants, genapply, genprimocode, hp2ps
+-- TODO: genapply, genprimocode, hp2ps
 
 -- TODO: The following utils are not included into the build system because
 -- they seem to be unused or unrelated to the build process: chechUniques,
@@ -104,6 +105,7 @@ defaultTargetDirectory stage pkg
 defaultProgramPath :: Stage -> Package -> Maybe FilePath
 defaultProgramPath stage pkg
     | pkg == compareSizes    = program $ pkgName pkg
+    | pkg == deriveConstants = program $ pkgName pkg
     | pkg == dllSplit        = program $ pkgName pkg
     | pkg == ghc             = program $ "ghc-stage" ++ show (fromEnum stage + 1)
     | pkg == ghcCabal        = program $ pkgName pkg

@@ -45,6 +45,17 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
 
             postProcessPackageData $ path -/- "package-data.mk"
 
+    -- TODO: Track dependency on this generated file
+    -- TODO: Use a cabal file instead of manual hacks?
+    priority 2.0 $ path -/- "package-data.mk" %> \mk -> do
+        let contents = unlines
+                [ "utils_deriveConstants_dist-boot_MODULES = DeriveConstants"
+                , "utils_deriveConstants_dist-boot_PROGNAME = deriveConstants"
+                , "utils_deriveConstants_dist-boot_HS_SRC_DIRS = ."
+                , "utils_deriveConstants_dist-boot_INSTALL_INPLACE = YES"
+                , "utils_deriveConstants_dist-boot_HC_OPTS = -package process -package containers" ]
+        writeFileChanged mk contents
+
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'
 -- For example, get rid of
