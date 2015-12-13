@@ -9,6 +9,7 @@ getPackages :: Expr [Package]
 getPackages = fromDiffExpr $ defaultPackages <> userPackages
 
 -- These are the packages we build by default
+-- TODO: simplify
 defaultPackages :: Packages
 defaultPackages = mconcat
     [ stage0 ? packagesStage0
@@ -19,7 +20,7 @@ packagesStage0 :: Packages
 packagesStage0 = mconcat
     [ append [ binPackageDb, binary, cabal, compiler, ghc, ghcCabal, ghcPkg
              , hsc2hs, hoopl, hpc, templateHaskell, transformers ]
-    , stage0 ? append [deriveConstants, genapply] -- TODO: simplify
+    , stage0 ? append [deriveConstants, genapply, genprimopcode]
     , notM windowsHost ? notM (anyHostOs ["ios"]) ? append [terminfo] ]
 
 -- TODO: what do we do with parallel, stm, random, primitive, vector and dph?

@@ -96,7 +96,7 @@ packageGhcArgs = do
     pkgKey             <- getPkgData PackageKey
     pkgDepIds          <- getPkgDataList DepIds
     mconcat
-        [ not (pkg == deriveConstants || pkg == genapply) ?
+        [ not (pkg == deriveConstants || pkg == genapply || pkg == genprimopcode) ?
           arg "-hide-all-packages"
         , arg "-no-user-package-db"
         , stage0 ? arg "-package-db libraries/bootstrapping.conf"
@@ -122,7 +122,7 @@ includeGhcArgs = do
             , arg $ "-I" ++ autogenPath
             , append [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
             , append [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
-            , not (pkg == deriveConstants || pkg == genapply) ?
+            , not (pkg == deriveConstants || pkg == genapply || pkg == genprimopcode) ?
               append [ "-optP-include"
                      , "-optP" ++ autogenPath -/- "cabal_macros.h" ] ]
 
