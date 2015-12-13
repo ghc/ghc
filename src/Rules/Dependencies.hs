@@ -24,8 +24,11 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
         hDepFile %> \file -> do
             srcs <- interpretPartial target getPackageSources
             when (pkg == compiler) $ need [platformH]
+            putBuild $ "srcs = " ++ show srcs
             need srcs
-            build $ fullTarget target (GhcM stage) srcs [file]
+            if srcs == []
+            then writeFileChanged file ""
+            else build $ fullTarget target (GhcM stage) srcs [file]
             removeFileIfExists $ file <.> "bak"
 
         (buildPath -/- ".dependencies") %> \file -> do
@@ -34,7 +37,7 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
             need $ hDepFile : cDepFiles -- need all for more parallelism
             cDeps <- fmap concat $ mapM readFile' cDepFiles
             hDeps <- readFile' hDepFile
-            -- TODO: very ugly and fragile
+            -- TODO: very ugly and fragile; use gcc -MM instead?
             let hsIncl hs incl = buildPath -/- hs <.> "o" ++ " : "
                               ++ buildPath -/- incl ++ "\n"
                 extraDeps = if pkg /= compiler then [] else

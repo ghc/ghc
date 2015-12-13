@@ -23,6 +23,7 @@ buildProgram _ target @ (PartialTarget stage pkg) = do
                  ++ [ buildPath -/- "Paths_hsc2hs.o"      | pkg == hsc2hs  ]
                  ++ [ buildPath -/- "Paths_haddock.o"     | pkg == haddock ]
             objs  = cObjs ++ hObjs
+        putBuild $ "objs = " ++ show objs
         need objs
         build $ fullTargetWithWay target (Ghc stage) vanilla objs [bin]
         synopsis <- interpretPartial target $ getPkgData Synopsis

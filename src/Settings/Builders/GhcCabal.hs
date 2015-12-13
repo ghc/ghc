@@ -1,6 +1,6 @@
 module Settings.Builders.GhcCabal (
-    cabalArgs, ghcCabalHsColourArgs, bootPackageDbArgs, customPackageArgs,
-    ccArgs, cppArgs, ccWarnings, argStagedSettingList, needDll0
+    cabalArgs, ghcCabalHsColourArgs, ghcIncludeDirs, bootPackageDbArgs,
+    customPackageArgs, ccArgs, cppArgs, ccWarnings, argStagedSettingList, needDll0
     ) where
 
 import Expression

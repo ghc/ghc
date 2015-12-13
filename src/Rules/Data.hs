@@ -1,12 +1,13 @@
 module Rules.Data (buildPackageData) where
 
 import Expression
-import GHC (deriveConstants, genapply, genprimopcode)
+import GHC (deriveConstants, genapply, genprimopcode, hp2ps)
 import Oracles
 import Predicates (registerPackage)
 import Rules.Actions
 import Rules.Resources
 import Settings
+import Settings.Builders.GhcCabal
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 buildPackageData :: Resources -> PartialTarget -> Rules ()
@@ -78,6 +79,25 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
                 , "utils_genprimopcode_dist-boot_HS_SRC_DIRS = ."
                 , "utils_genprimopcode_dist-boot_INSTALL_INPLACE = YES"
                 , "utils_genprimopcode_dist-boot_HC_OPTS = -package array" ]
+        writeFileChanged mk contents
+
+    -- TODO: PROGNAME was $(CrossCompilePrefix)hp2ps
+    -- TODO: code duplication around ghcIncludeDirs
+    -- TODO: now using DEP_EXTRA_LIBS instead of EXTRA_LIBRARIES
+    priority 2.0 $
+        when (pkg == hp2ps) $ path -/- "package-data.mk" %> \mk -> do
+        let cSrcs = [ "AreaBelow.c", "Curves.c", "Error.c", "Main.c"
+                    , "Reorder.c", "TopTwenty.c", "AuxFile.c", "Deviation.c"
+                    , "HpFile.c", "Marks.c", "Scale.c", "TraceElement.c"
+                    , "Axes.c", "Dimensions.c", "Key.c", "PsFile.c", "Shade.c"
+                    , "Utilities.c" ]
+            contents = unlines
+                [ "utils_hp2ps_dist-boot_PROGNAME = hp2ps"
+                , "utils_hp2ps_dist-boot_C_SRCS = " ++ unwords cSrcs
+                , "utils_hp2ps_dist-boot_INSTALL = YES"
+                , "utils_hp2ps_dist-boot_INSTALL_INPLACE = YES"
+                , "utils_hp2ps_dist-boot_DEP_EXTRA_LIBS = m"
+                , "utils_hp2ps_dist-boot_CC_OPTS = " ++ unwords (map ("-I"++) ghcIncludeDirs) ]
         writeFileChanged mk contents
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:

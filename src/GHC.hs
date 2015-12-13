@@ -1,11 +1,10 @@
 module GHC (
     array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
     compareSizes, deepseq, deriveConstants, directory, dllSplit, filepath,
-    genapply, genprimopcode, ghc, ghcCabal, ghcPkg, ghcPrim,
-    ghcPwd, ghcTags, haddock, haskeline, hsc2hs, hoopl, hpc, hpcBin, integerGmp, integerSimple,
-    mkUserGuidePart, parallel, pretty,
-    primitive, process, runghc, stm, templateHaskell, terminfo, time, transformers,
-    unix, win32, xhtml,
+    genapply, genprimopcode, ghc, ghcCabal, ghcPkg, ghcPrim, ghcPwd, ghcTags,
+    haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
+    integerSimple, mkUserGuidePart, parallel, pretty, primitive, process,
+    runghc, stm, templateHaskell, terminfo, time, transformers, unix, win32, xhtml,
 
     defaultKnownPackages, defaultTargetDirectory, defaultProgramPath
     ) where
@@ -24,18 +23,18 @@ defaultKnownPackages =
     [ array, base, binPackageDb, binary, bytestring, cabal, compiler
     , containers, compareSizes, deepseq, deriveConstants, directory, dllSplit
     , filepath, genapply, genprimopcode, ghc, ghcCabal, ghcPkg, ghcPrim
-    , ghcPwd, ghcTags, haddock, haskeline, hsc2hs, hoopl, hpc, hpcBin, integerGmp, integerSimple
-    , mkUserGuidePart, parallel, pretty, primitive, process, runghc, stm, templateHaskell, terminfo
-    , time, transformers, unix, win32, xhtml ]
+    , ghcPwd, ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin
+    , integerGmp, integerSimple, mkUserGuidePart, parallel, pretty, primitive
+    , process, runghc, stm, templateHaskell, terminfo, time, transformers, unix
+    , win32, xhtml ]
 
 -- Package definitions
 array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
     compareSizes, deepseq, deriveConstants, directory, dllSplit, filepath,
     genapply, genprimopcode, ghc, ghcCabal, ghcPkg, ghcPrim, ghcPwd,
-    ghcTags, haddock, haskeline, hsc2hs, hoopl, hpc, hpcBin, integerGmp, integerSimple,
-    mkUserGuidePart, parallel, pretty,
-    primitive, process, runghc, stm, templateHaskell, terminfo, time, transformers,
-    unix, win32, xhtml :: Package
+    ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
+    integerSimple, mkUserGuidePart, parallel, pretty, primitive, process,
+    runghc, stm, templateHaskell, terminfo, time, transformers, unix, win32, xhtml :: Package
 
 array           = library  "array"
 base            = library  "base"
@@ -63,6 +62,7 @@ haddock         = utility  "haddock"
 haskeline       = library  "haskeline"
 hsc2hs          = utility  "hsc2hs"
 hoopl           = library  "hoopl"
+hp2ps           = utility  "hp2ps"
 hpc             = library  "hpc"
 hpcBin          = utility  "hpc-bin"        `setPath` "utils/hpc"
 integerGmp      = library  "integer-gmp"
@@ -81,8 +81,6 @@ transformers    = library  "transformers"
 unix            = library  "unix"
 win32           = library  "Win32"
 xhtml           = library  "xhtml"
-
--- TODO: hp2ps
 
 -- TODO: The following utils are not included into the build system because
 -- they seem to be unused or unrelated to the build process: chechUniques,
@@ -119,6 +117,7 @@ defaultProgramPath stage pkg
     | pkg == ghcTags         = program $ pkgName pkg
     | pkg == haddock         = program $ pkgName pkg
     | pkg == hsc2hs          = program $ pkgName pkg
+    | pkg == hp2ps           = program $ pkgName pkg
     | pkg == hpcBin          = program $ pkgName pkg
     | pkg == mkUserGuidePart = program $ pkgName pkg
     | pkg == runghc          = program $ pkgName pkg

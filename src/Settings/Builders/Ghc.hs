@@ -30,7 +30,8 @@ ghcArgs = stagedBuilder Ghc ? do
             , arg "-Wall"
             , arg "-fwarn-tabs"
             , isLibrary pkg ? splitObjects ? arg "-split-objs"
-            , package ghc ? arg "-no-hs-main"
+            , package ghc ? arg "-no-hs-main" -- TODO: simplify
+            , package hp2ps ? arg "-no-hs-main"
             , not buildObj ? arg "-no-auto-link-packages"
             , package runghc ? file "//Main.o" ?
               append ["-cpp", "-DVERSION=\"" ++ version ++ "\""]
@@ -96,7 +97,8 @@ packageGhcArgs = do
     pkgKey             <- getPkgData PackageKey
     pkgDepIds          <- getPkgDataList DepIds
     mconcat
-        [ not (pkg == deriveConstants || pkg == genapply || pkg == genprimopcode) ?
+        [ not (pkg == deriveConstants || pkg == genapply
+            || pkg == genprimopcode   || pkg == hp2ps) ?
           arg "-hide-all-packages"
         , arg "-no-user-package-db"
         , stage0 ? arg "-package-db libraries/bootstrapping.conf"
@@ -122,7 +124,8 @@ includeGhcArgs = do
             , arg $ "-I" ++ autogenPath
             , append [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
             , append [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
-            , not (pkg == deriveConstants || pkg == genapply || pkg == genprimopcode) ?
+            , not (pkg == deriveConstants || pkg == genapply
+                || pkg == genprimopcode   || pkg == hp2ps) ?
               append [ "-optP-include"
                      , "-optP" ++ autogenPath -/- "cabal_macros.h" ] ]
 
