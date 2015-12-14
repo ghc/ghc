@@ -508,7 +508,7 @@
  data Board 
        = Board (Array BoardPos BoardSquare)
                MoveNumber              -- current player & and move
-               (Maybe ChessFile)       -- e.p. possibilties.
+               (Maybe ChessFile)       -- e.p. possibilities.
 
 
 

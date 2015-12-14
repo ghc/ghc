@@ -425,11 +425,11 @@ tcCheckSatisfiability :: Bag EvVar -> TcM Bool
 tcCheckSatisfiability givens
   = do { lcl_env <- TcM.getLclEnv
        ; let given_loc = mkGivenLoc topTcLevel UnkSkol lcl_env
-       ; traceTc "checkSatisfiabilty {" (ppr givens)
+       ; traceTc "checkSatisfiability {" (ppr givens)
        ; (res, _ev_binds) <- runTcS $
              do { cts <- solveSimpleGivens given_loc (bagToList givens)
                 ; return (not (isEmptyBag cts)) }
-       ; traceTc "checkSatisfiabilty }" (ppr res)
+       ; traceTc "checkSatisfiability }" (ppr res)
        ; return (not res) }
 
 {-

@@ -859,7 +859,7 @@ yieldCapability (Capability** pCap, Task *task, rtsBool gcAllowed)
 //
 //  - A bound thread can only be migrated by the holder of the
 //    Capability on which the bound thread currently lives.  So, if we
-//    hold Capabilty C, and task->cap == C, then task cannot be
+//    hold Capability C, and task->cap == C, then task cannot be
 //    migrated under our feet.
 
 // Note [migrated bound threads 2]
