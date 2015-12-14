@@ -28,7 +28,7 @@ defaultKnownPackages =
     , process, runghc, stm, templateHaskell, terminfo, time, transformers, unix
     , win32, xhtml ]
 
--- Package definitions
+-- Package definitions (see Package.hs)
 array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
     compareSizes, deepseq, deriveConstants, directory, dllSplit, filepath,
     genapply, genprimopcode, ghc, ghcCabal, ghcPkg, ghcPrim, ghcPwd,

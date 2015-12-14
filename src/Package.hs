@@ -9,11 +9,14 @@ import GHC.Generics (Generic)
 -- It is helpful to distinguish package names from strings.
 type PackageName = String
 
+-- type PackageType = Program | Library
+
 -- pkgPath is the path to the source code relative to the root
 data Package = Package
      {
          pkgName :: PackageName, -- Examples: "ghc", "Cabal"
          pkgPath :: FilePath     -- "compiler", "libraries/Cabal/Cabal"
+         -- pkgType :: PackageType  -- TopLevel, Library
      }
      deriving Generic
 
