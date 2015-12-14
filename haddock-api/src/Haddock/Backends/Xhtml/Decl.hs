@@ -38,8 +38,7 @@ import GHC
 import GHC.Exts
 import Name
 import BooleanFormula
-import RdrName ( rdrNameOcc, mkRdrUnqual )
-import PrelNames            ( mkUnboundName )
+import RdrName ( rdrNameOcc )
 
 ppDecl :: Bool -> LinksInfo -> LHsDecl DocName
        -> DocForDecl DocName -> [DocInstance DocName] -> [(DocName, Fixity)]
@@ -244,12 +243,6 @@ ppFamilyInfo assoc DataFamily
     | assoc = keyword "data"
     | otherwise = keyword "data family"
 ppFamilyInfo _ (ClosedTypeFamily _) = keyword "type family"
-
-
-ppFamilyKind :: Unicode -> Qualification -> Maybe (LHsKind DocName) -> Html
-ppFamilyKind unicode qual (Just kind) =
-    dcolon unicode <+> ppLKind unicode qual kind
-ppFamilyKind _ _ Nothing = noHtml
 
 
 ppTyFamHeader :: Bool -> Bool -> FamilyDecl DocName

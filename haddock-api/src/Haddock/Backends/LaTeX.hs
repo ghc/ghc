@@ -25,10 +25,9 @@ import qualified Pretty
 import GHC
 import OccName
 import Name                 ( nameOccName )
-import RdrName              ( rdrNameOcc, mkRdrUnqual )
+import RdrName              ( rdrNameOcc )
 import FastString           ( unpackFS, unpackLitString, zString )
 import Outputable           ( panic)
-import PrelNames            ( mkUnboundName )
 
 import qualified Data.Map as Map
 import System.Directory

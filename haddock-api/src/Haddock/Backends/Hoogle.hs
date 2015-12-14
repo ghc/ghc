@@ -21,7 +21,6 @@ import Haddock.GhcUtils
 import Haddock.Types hiding (Version)
 import Haddock.Utils hiding (out)
 
-import Bag
 import GHC
 import Outputable
 import NameSet
@@ -140,7 +139,6 @@ ppSigWithDoc dflags (TypeSig names sig) subdocs
         getDoc :: Located Name -> [Documentation Name]
         getDoc n = maybe [] (return . fst) (lookup (unL n) subdocs)
 
-        typ = unL (hsSigWcType sig)
 ppSigWithDoc _ _ _ = []
 
 ppSig :: DynFlags -> Sig Name -> [String]

@@ -22,14 +22,13 @@ import Class
 import CoAxiom
 import ConLike
 import Data.Either (lefts, rights)
-import Data.List( partition )
 import DataCon
 import FamInstEnv
 import HsSyn
 import Name
 import RdrName ( mkVarUnqual )
 import PatSyn
-import SrcLoc ( Located, noLoc, unLoc, noSrcSpan )
+import SrcLoc ( Located, noLoc, unLoc )
 import TcType ( tcSplitSigmaTy )
 import TyCon
 import Type

@@ -11,7 +11,6 @@ import Haddock.Syb
 import Haddock.Backends.Hyperlinker.Types
 
 import qualified GHC
-import qualified FieldLabel as GHC
 
 import Control.Applicative
 import Data.Data

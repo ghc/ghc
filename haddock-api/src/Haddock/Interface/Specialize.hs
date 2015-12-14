@@ -54,7 +54,7 @@ specialize' = flip $ foldr (uncurry specialize)
 --
 -- Again, it is just a convenience function around 'specialize'. Note that
 -- length of type list should be the same as the number of binders.
-specializeTyVarBndrs :: (Eq name, Typeable name, DataId name)
+specializeTyVarBndrs :: (Eq name, DataId name)
                      => Data a
                      => LHsQTyVars name -> [HsType name]
                      -> a -> a
@@ -66,7 +66,7 @@ specializeTyVarBndrs bndrs typs =
     bname (KindedTyVar (L _ name) _) = name
 
 
-specializePseudoFamilyDecl :: (Eq name, Typeable name, DataId name)
+specializePseudoFamilyDecl :: (Eq name, DataId name)
                            => LHsQTyVars name -> [HsType name]
                            -> PseudoFamilyDecl name
                            -> PseudoFamilyDecl name
@@ -76,7 +76,7 @@ specializePseudoFamilyDecl bndrs typs decl =
     specializeTyVars = specializeTyVarBndrs bndrs typs
 
 
-specializeSig :: forall name . (Eq name, Typeable name, DataId name, SetName name)
+specializeSig :: forall name . (Eq name, DataId name, SetName name)
               => LHsQTyVars name -> [HsType name]
               -> Sig name
               -> Sig name
@@ -93,7 +93,7 @@ specializeSig _ _ sig = sig
 
 -- | Make all details of instance head (signatures, associated types)
 -- specialized to that particular instance type.
-specializeInstHead :: (Eq name, Typeable name, DataId name, SetName name)
+specializeInstHead :: (Eq name, DataId name, SetName name)
                    => InstHead name -> InstHead name
 specializeInstHead ihd@InstHead { ihdInstType = clsi@ClassInst { .. }, .. } =
     ihd { ihdInstType = instType' }
@@ -149,7 +149,7 @@ sugarTuples typ =
 
 
 sugarOperators :: NamedThing name => HsType name -> HsType name
-sugarOperators (HsAppTy (L _ (HsAppTy (L loc (HsTyVar (L l name))) la)) lb)
+sugarOperators (HsAppTy (L _ (HsAppTy (L _ (HsTyVar (L l name))) la)) lb)
     | isSymOcc $ getOccName name' = mkHsOpTy la (L l name) lb
     | isBuiltInSyntax name' && getOccString name == "(->)" = HsFunTy la lb
   where
@@ -290,6 +290,7 @@ renameType (HsExplicitTupleTy phs ltys) =
     HsExplicitTupleTy phs <$> renameLTypes ltys
 renameType t@(HsTyLit _) = pure t
 renameType (HsWildCardTy wc) = pure (HsWildCardTy wc)
+renameType (HsAppsTy _) = error "HsAppsTy: Only used before renaming"
 
 
 renameLType :: SetName name => LHsType name -> Rename name (LHsType name)

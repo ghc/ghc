@@ -33,7 +33,6 @@ import FamInstEnv
 import FastString
 import GHC
 import GhcMonad (withSession)
-import Id
 import InstEnv
 import MonadUtils (liftIO)
 import Name
@@ -41,7 +40,6 @@ import Outputable (text, sep, (<+>))
 import PrelNames
 import SrcLoc
 import TcRnDriver (tcRnGetInfo)
-import TcType (tcSplitSigmaTy)
 import TyCon
 import TyCoRep
 import TysPrim( funTyCon )
