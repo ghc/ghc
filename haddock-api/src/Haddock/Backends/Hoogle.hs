@@ -122,8 +122,8 @@ ppExport dflags ExportDecl { expItemDecl    = L _ decl
         f (TyClD d@DataDecl{})  = ppData dflags d subdocs
         f (TyClD d@SynDecl{})   = ppSynonym dflags d
         f (TyClD d@ClassDecl{}) = ppClass dflags d subdocs
-        f (ForD (ForeignImport name typ _ _)) = pp_sig dflags [name] (hsSigType typ)
-        f (ForD (ForeignExport name typ _ _)) = pp_sig dflags [name] (hsSigType typ)
+        f (ForD (ForeignImport name typ _ _)) = [pp_sig dflags [name] (hsSigType typ)]
+        f (ForD (ForeignExport name typ _ _)) = [pp_sig dflags [name] (hsSigType typ)]
         f (SigD sig) = ppSig dflags sig ++ ppFixities
         f _ = []
 
@@ -157,10 +157,10 @@ ppClass :: DynFlags -> TyClDecl Name -> [(Name, DocForDecl Name)] -> [String]
 ppClass dflags decl subdocs = (out dflags decl{tcdSigs=[]} ++ ppTyFams) :  ppMethods
     where
 
-        ppMethods = concat . map (ppSig' . unL . add_ctxt) $ tcdSigs decl
-        ppSig' = flip (ppSigWithDoc dflags) subdocs . addContext
+        ppMethods = concat . map (ppSig' . unLoc . add_ctxt) $ tcdSigs decl
+        ppSig' = flip (ppSigWithDoc dflags) subdocs
 
-        add_ctxt = addClassContext (tcdName x) (tyClDeclTyVars x)
+        add_ctxt = addClassContext (tcdName decl) (tyClDeclTyVars decl)
 
         ppTyFams
             | null $ tcdATs decl = ""

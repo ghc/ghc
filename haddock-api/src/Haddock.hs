@@ -269,7 +269,7 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
       (Map.map SrcExternal extSrcMap)
       (Map.fromList [ (ifaceMod iface, SrcLocal) | iface <- ifaces ])
 
-    pkgSrcMap = Map.mapKeys modulePackageKey extSrcMap
+    pkgSrcMap = Map.mapKeys moduleUnitId extSrcMap
     pkgSrcMap'
       | Flag_HyperlinkedSource `elem` flags =
           Map.insert pkgKey hypSrcModuleNameUrlFormat pkgSrcMap

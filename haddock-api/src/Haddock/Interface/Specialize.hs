@@ -36,7 +36,7 @@ specialize :: (Eq name, Typeable name)
 specialize name details =
     everywhere $ mkT step
   where
-    step (HsTyVar name') | name == name' = details
+    step (HsTyVar (L _ name')) | name == name' = details
     step typ = typ
 
 
@@ -56,18 +56,18 @@ specialize' = flip $ foldr (uncurry specialize)
 -- length of type list should be the same as the number of binders.
 specializeTyVarBndrs :: (Eq name, Typeable name, DataId name)
                      => Data a
-                     => LHsTyVarBndrs name -> [HsType name]
+                     => LHsQTyVars name -> [HsType name]
                      -> a -> a
 specializeTyVarBndrs bndrs typs =
     specialize' $ zip bndrs' typs
   where
-    bndrs' = map (bname . unLoc) . hsq_tvs $ bndrs
-    bname (UserTyVar name) = name
+    bndrs' = map (bname . unLoc) . hsq_explicit $ bndrs
+    bname (UserTyVar (L _ name)) = name
     bname (KindedTyVar (L _ name) _) = name
 
 
 specializePseudoFamilyDecl :: (Eq name, Typeable name, DataId name)
-                           => LHsTyVarBndrs name -> [HsType name]
+                           => LHsQTyVars name -> [HsType name]
                            -> PseudoFamilyDecl name
                            -> PseudoFamilyDecl name
 specializePseudoFamilyDecl bndrs typs decl =
@@ -76,14 +76,17 @@ specializePseudoFamilyDecl bndrs typs decl =
     specializeTyVars = specializeTyVarBndrs bndrs typs
 
 
-specializeSig :: (Eq name, Typeable name, DataId name, SetName name)
-              => LHsTyVarBndrs name -> [HsType name]
+specializeSig :: forall name . (Eq name, Typeable name, DataId name, SetName name)
+              => LHsQTyVars name -> [HsType name]
               -> Sig name
               -> Sig name
-specializeSig bndrs typs (TypeSig lnames (L loc typ) prn) =
-    TypeSig lnames (L loc typ') prn
+specializeSig bndrs typs (TypeSig lnames typ) =
+    TypeSig lnames (typ { hsib_body = (hsib_body typ) { hswc_body = noLoc typ'}})
   where
-    typ' = rename fv . sugar $ specializeTyVarBndrs bndrs typs typ
+    true_type :: HsType name
+    true_type = unLoc (hswc_body (hsib_body typ))
+    typ' :: HsType name
+    typ' = rename fv . sugar $ specializeTyVarBndrs bndrs typs true_type
     fv = foldr Set.union Set.empty . map freeVariables $ typs
 specializeSig _ _ sig = sig
 
@@ -120,7 +123,7 @@ sugar =
 
 
 sugarLists :: NamedThing name => HsType name -> HsType name
-sugarLists (HsAppTy (L _ (HsTyVar name)) ltyp)
+sugarLists (HsAppTy (L _ (HsTyVar (L _ name))) ltyp)
     | isBuiltInSyntax name' && strName == "[]" = HsListTy ltyp
   where
     name' = getName name
@@ -134,7 +137,7 @@ sugarTuples typ =
   where
     aux apps (HsAppTy (L _ ftyp) atyp) = aux (atyp:apps) ftyp
     aux apps (HsParTy (L _ typ')) = aux apps typ'
-    aux apps (HsTyVar name)
+    aux apps (HsTyVar (L _ name))
         | isBuiltInSyntax name' && suitable = HsTupleTy HsBoxedTuple apps
       where
         name' = getName name
@@ -146,8 +149,8 @@ sugarTuples typ =
 
 
 sugarOperators :: NamedThing name => HsType name -> HsType name
-sugarOperators (HsAppTy (L _ (HsAppTy (L loc (HsTyVar name)) la)) lb)
-    | isSymOcc $ getOccName name' = mkHsOpTy la (L loc name) lb
+sugarOperators (HsAppTy (L _ (HsAppTy (L loc (HsTyVar (L l name))) la)) lb)
+    | isSymOcc $ getOccName name' = mkHsOpTy la (L l name) lb
     | isBuiltInSyntax name' && getOccString name == "(->)" = HsFunTy la lb
   where
     name' = getName name
@@ -219,13 +222,13 @@ freeVariables =
     everythingWithState Set.empty Set.union query
   where
     query term ctx = case cast term :: Maybe (HsType name) of
-        Just (HsForAllTy _ _ bndrs _ _) ->
+        Just (HsForAllTy bndrs _) ->
             (Set.empty, Set.union ctx (bndrsNames bndrs))
-        Just (HsTyVar name)
+        Just (HsTyVar (L _ name))
             | getName name `Set.member` ctx -> (Set.empty, ctx)
             | otherwise -> (Set.singleton $ getNameRep name, ctx)
         _ -> (Set.empty, ctx)
-    bndrsNames = Set.fromList . map (getName . tyVarName . unLoc) . hsq_tvs
+    bndrsNames = Set.fromList . map (getName . tyVarName . unLoc)
 
 
 -- | Make given type visually unambiguous.
@@ -256,26 +259,26 @@ data RenameEnv name = RenameEnv
 
 
 renameType :: SetName name => HsType name -> Rename name (HsType name)
-renameType (HsForAllTy ex mspan lbndrs lctx lt) = rebind lbndrs $ \lbndrs' ->
+renameType (HsForAllTy bndrs lt) = rebind bndrs $ \bndrs' ->
     HsForAllTy
-        <$> pure ex
-        <*> pure mspan
-        <*> pure lbndrs'
-        <*> located renameContext lctx
+        <$> pure bndrs'
         <*> renameLType lt
-renameType (HsTyVar name) = HsTyVar <$> renameName name
+renameType (HsQualTy lctxt lt) =
+  HsQualTy
+        <$> located renameContext lctxt
+        <*> renameLType lt
+renameType (HsTyVar name) = HsTyVar <$> located renameName name
 renameType (HsAppTy lf la) = HsAppTy <$> renameLType lf <*> renameLType la
 renameType (HsFunTy la lr) = HsFunTy <$> renameLType la <*> renameLType lr
 renameType (HsListTy lt) = HsListTy <$> renameLType lt
 renameType (HsPArrTy lt) = HsPArrTy <$> renameLType lt
 renameType (HsTupleTy srt lt) = HsTupleTy srt <$> mapM renameLType lt
 renameType (HsOpTy la lop lb) =
-    HsOpTy <$> renameLType la <*> renameLTyOp lop <*> renameLType lb
+    HsOpTy <$> renameLType la <*> located renameName lop <*> renameLType lb
 renameType (HsParTy lt) = HsParTy <$> renameLType lt
 renameType (HsIParamTy ip lt) = HsIParamTy ip <$> renameLType lt
 renameType (HsEqTy la lb) = HsEqTy <$> renameLType la <*> renameLType lb
 renameType (HsKindSig lt lk) = HsKindSig <$> renameLType lt <*> pure lk
-renameType t@(HsQuasiQuoteTy _) = pure t
 renameType t@(HsSpliceTy _ _) = pure t
 renameType (HsDocTy lt doc) = HsDocTy <$> renameLType lt <*> pure doc
 renameType (HsBangTy bang lt) = HsBangTy bang <$> renameLType lt
@@ -286,9 +289,7 @@ renameType (HsExplicitListTy ph ltys) =
 renameType (HsExplicitTupleTy phs ltys) =
     HsExplicitTupleTy phs <$> renameLTypes ltys
 renameType t@(HsTyLit _) = pure t
-renameType (HsWrapTy wrap t) = HsWrapTy wrap <$> renameType t
-renameType HsWildcardTy = pure HsWildcardTy
-renameType (HsNamedWildcardTy name) = HsNamedWildcardTy <$> renameName name
+renameType (HsWildCardTy wc) = pure (HsWildCardTy wc)
 
 
 renameLType :: SetName name => LHsType name -> Rename name (LHsType name)
@@ -302,21 +303,20 @@ renameLTypes = mapM renameLType
 renameContext :: SetName name => HsContext name -> Rename name (HsContext name)
 renameContext = renameLTypes
 
-
+{-
 renameLTyOp :: SetName name => LHsTyOp name -> Rename name (LHsTyOp name)
 renameLTyOp (wrap, lname) = (,) wrap <$> located renameName lname
+-}
 
 
 renameName :: SetName name => name -> Rename name name
 renameName name = do
     RenameEnv { rneCtx = ctx } <- ask
-    pure $ case Map.lookup (getName name) ctx of
-        Just name' -> name'
-        Nothing -> name
+    pure $ fromMaybe name (Map.lookup (getName name) ctx)
 
 
 rebind :: SetName name
-       => LHsTyVarBndrs name -> (LHsTyVarBndrs name -> Rename name a)
+       => [LHsTyVarBndr name] -> ([LHsTyVarBndr name] -> Rename name a)
        -> Rename name a
 rebind lbndrs action = do
     (lbndrs', env') <- runState (rebindLTyVarBndrs lbndrs) <$> ask
@@ -324,16 +324,14 @@ rebind lbndrs action = do
 
 
 rebindLTyVarBndrs :: SetName name
-                  => LHsTyVarBndrs name -> Rebind name (LHsTyVarBndrs name)
-rebindLTyVarBndrs lbndrs = do
-    tys' <- mapM (located rebindTyVarBndr) $ hsq_tvs lbndrs
-    pure $ lbndrs { hsq_tvs = tys' }
+                  => [LHsTyVarBndr name] -> Rebind name [LHsTyVarBndr name]
+rebindLTyVarBndrs lbndrs = mapM (located rebindTyVarBndr) lbndrs
 
 
 rebindTyVarBndr :: SetName name
                 => HsTyVarBndr name -> Rebind name (HsTyVarBndr name)
-rebindTyVarBndr (UserTyVar name) =
-    UserTyVar <$> rebindName name
+rebindTyVarBndr (UserTyVar (L l name)) =
+    UserTyVar . L l <$> rebindName name
 rebindTyVarBndr (KindedTyVar name kinds) =
     KindedTyVar <$> located rebindName name <*> pure kinds
 
@@ -403,5 +401,5 @@ located f (L loc e) = L loc <$> f e
 
 
 tyVarName :: HsTyVarBndr name -> name
-tyVarName (UserTyVar name) = name
+tyVarName (UserTyVar name) = unLoc name
 tyVarName (KindedTyVar (L _ name) _) = name

@@ -100,14 +100,8 @@ tyThingToLHsDecl t = case t of
     (synifySigWcType ImplicitizeForAll (dataConUserType dc)))
 
   AConLike (PatSynCon ps) ->
-      let (univ_tvs, req_theta, ex_tvs, prov_theta, arg_tys, res_ty) = patSynSig ps
-          qtvs = univ_tvs ++ ex_tvs
-          ty = mkFunTys arg_tys res_ty
-      in allOK . SigD $ PatSynSig (synifyName ps)
-                          (Implicit, synifyTyVars qtvs)
-                          (synifyCtx req_theta)
-                          (synifyCtx prov_theta)
-                          (synifyType WithinType ty)
+    allOK . SigD $ PatSynSig (synifyName ps) (synifySigType WithinType
+                                  (patSynType ps))
   where
     withErrs e x = return (e, x)
     allOK x = return (mempty, x)
@@ -457,5 +451,5 @@ synifyFamInst fi opaque = do
         return . TypeInst . Just . unLoc . synifyType WithinType $ fi_rhs fi
     ityp (DataFamilyInst c) =
         DataInst <$> synifyTyCon (Just $ famInstAxiom fi) c
-    (ks,ts) = partitionInvisibles (classTyCon cls) id $ fi_tys fi
+    (ks,ts) = partitionInvisibles (famInstTyCon fi) id $ fi_tys fi
     synifyTypes = map (unLoc. synifyType WithinType)

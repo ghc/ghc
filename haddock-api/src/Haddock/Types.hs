@@ -326,7 +326,7 @@ instance SetName DocName where
 data InstType name
   = ClassInst
       { clsiCtx :: [HsType name]
-      , clsiTyVars :: LHsTyVarBndrs name
+      , clsiTyVars :: LHsQTyVars name
       , clsiSigs :: [Sig name]
       , clsiAssocTys :: [PseudoFamilyDecl name]
       }
@@ -353,7 +353,7 @@ data PseudoFamilyDecl name = PseudoFamilyDecl
     { pfdInfo :: FamilyInfo name
     , pfdLName :: Located name
     , pfdTyVars :: [LHsType name]
-    , pfdKindSig :: Maybe (LHsKind name)
+    , pfdKindSig :: LFamilyResultSig name
     }
 
 
@@ -361,14 +361,14 @@ mkPseudoFamilyDecl :: FamilyDecl name -> PseudoFamilyDecl name
 mkPseudoFamilyDecl (FamilyDecl { .. }) = PseudoFamilyDecl
     { pfdInfo = fdInfo
     , pfdLName = fdLName
-    , pfdTyVars = [ L loc (mkType bndr) | L loc bndr <- hsq_tvs fdTyVars ]
-    , pfdKindSig = fdKindSig
+    , pfdTyVars = [ L loc (mkType bndr) | L loc bndr <- hsq_explicit fdTyVars ]
+    , pfdKindSig = fdResultSig
     }
   where
     mkType (KindedTyVar (L loc name) lkind) =
         HsKindSig tvar lkind
       where
-        tvar = L loc (HsTyVar name)
+        tvar = L loc (HsTyVar (L loc name))
     mkType (UserTyVar name) = HsTyVar name
 
 

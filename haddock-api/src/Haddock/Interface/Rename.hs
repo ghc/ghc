@@ -294,7 +294,7 @@ renameInstHead InstHead {..} = do
   itype <- case ihdInstType of
     ClassInst { .. } -> ClassInst
         <$> mapM renameType clsiCtx
-        <*> renameLTyVarBndrs clsiTyVars
+        <*> renameLHsQTyVars clsiTyVars
         <*> mapM renameSig clsiSigs
         <*> mapM renamePseudoFamilyDecl clsiAssocTys
     TypeInst  ts -> TypeInst  <$> traverse renameType ts
@@ -390,7 +390,7 @@ renamePseudoFamilyDecl (PseudoFamilyDecl { .. }) =  PseudoFamilyDecl
     <$> renameFamilyInfo pfdInfo
     <*> renameL pfdLName
     <*> mapM renameLType pfdTyVars
-    <*> renameMaybeLKind pfdKindSig
+    <*> renameFamilyResultSig pfdKindSig
 
 
 renameFamilyInfo :: FamilyInfo Name -> RnM (FamilyInfo DocName)

@@ -1,6 +1,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
 
 
 module Haddock.Backends.Hyperlinker.Ast (enrich) where
@@ -10,6 +11,7 @@ import Haddock.Syb
 import Haddock.Backends.Hyperlinker.Types
 
 import qualified GHC
+import qualified FieldLabel as GHC
 
 import Control.Applicative
 import Data.Data
@@ -56,8 +58,8 @@ variables =
   where
     var term = case cast term of
         (Just (GHC.L sspan (GHC.HsVar name))) ->
-            pure (sspan, RtkVar name)
-        (Just (GHC.L _ (GHC.RecordCon (GHC.L sspan name) _ _))) ->
+            pure (sspan, RtkVar (GHC.unLoc name))
+        (Just (GHC.L _ (GHC.RecordCon (GHC.L sspan name) _ _ _))) ->
             pure (sspan, RtkVar name)
         _ -> empty
     rec term = case cast term of
@@ -72,7 +74,7 @@ types =
   where
     ty term = case cast term of
         (Just (GHC.L sspan (GHC.HsTyVar name))) ->
-            pure (sspan, RtkType name)
+            pure (sspan, RtkType (GHC.unLoc name))
         _ -> empty
 
 -- | Obtain details map for identifier bindings.
@@ -85,12 +87,12 @@ binds =
     everything (<|>) (fun `combine` pat `combine` tvar)
   where
     fun term = case cast term of
-        (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ _ :: GHC.HsBind GHC.Name)) ->
+        (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ :: GHC.HsBind GHC.Name)) ->
             pure (sspan, RtkBind name)
         _ -> empty
     pat term = case cast term of
         (Just (GHC.L sspan (GHC.VarPat name))) ->
-            pure (sspan, RtkBind name)
+            pure (sspan, RtkBind (GHC.unLoc name))
         (Just (GHC.L _ (GHC.ConPatIn (GHC.L sspan name) recs))) ->
             [(sspan, RtkVar name)] ++ everything (<|>) rec recs
         (Just (GHC.L _ (GHC.AsPat (GHC.L sspan name) _))) ->
@@ -102,7 +104,7 @@ binds =
         _ -> empty
     tvar term = case cast term of
         (Just (GHC.L sspan (GHC.UserTyVar name))) ->
-            pure (sspan, RtkBind name)
+            pure (sspan, RtkBind (GHC.unLoc name))
         (Just (GHC.L _ (GHC.KindedTyVar (GHC.L sspan name) _))) ->
             pure (sspan, RtkBind name)
         _ -> empty
@@ -121,7 +123,7 @@ decls (group, _, _, _) = concatMap ($ group)
         GHC.FamDecl fam -> pure . decl $ GHC.fdLName fam
         GHC.ClassDecl{..} -> [decl tcdLName] ++ concatMap sig tcdSigs
     fun term = case cast term of
-        (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ _ :: GHC.HsBind GHC.Name))
+        (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ :: GHC.HsBind GHC.Name))
             | GHC.isExternalName name -> pure (sspan, RtkDecl name)
         _ -> empty
     con term = case cast term of
@@ -134,9 +136,10 @@ decls (group, _, _, _) = concatMap ($ group)
             pure . tyref $ GHC.tfe_tycon eqn
         _ -> empty
     fld term = case cast term of
-        Just field -> map decl $ GHC.cd_fld_names field
+        Just (field :: GHC.ConDeclField GHC.Name)
+          -> map (decl . fmap GHC.selectorFieldOcc) $ GHC.cd_fld_names field
         Nothing -> empty
-    sig (GHC.L _ (GHC.TypeSig names _ _)) = map decl names
+    sig (GHC.L _ (GHC.TypeSig names _)) = map decl names
     sig _ = []
     decl (GHC.L sspan name) = (sspan, RtkDecl name)
     tyref (GHC.L sspan name) = (sspan, RtkType name)
@@ -153,7 +156,8 @@ imports src@(_, imps, _, _) =
         (Just (GHC.IEVar v)) -> pure $ var v
         (Just (GHC.IEThingAbs t)) -> pure $ typ t
         (Just (GHC.IEThingAll t)) -> pure $ typ t
-        (Just (GHC.IEThingWith t vs)) -> [typ t] ++ map var vs
+        (Just (GHC.IEThingWith t _ vs _fls)) ->
+          [typ t] ++ map var vs
         _ -> empty
     typ (GHC.L sspan name) = (sspan, RtkType name)
     var (GHC.L sspan name) = (sspan, RtkVar name)

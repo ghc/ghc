@@ -270,24 +270,25 @@ ppTyFamHeader summary associated d@(FamilyDecl { fdInfo = info
   ) <+>
 
   ppFamDeclBinderWithVars summary d <+>
-
-  (case result of
-    NoSig               -> noHtml
-    KindSig kind        -> dcolon unicode  <+> ppLKind unicode qual kind
-    TyVarSig (L _ bndr) -> equals <+> ppHsTyVarBndr unicode qual bndr
-  ) <+>
+  ppResultSig result unicode qual <+>
 
   (case injectivity of
      Nothing                   -> noHtml
      Just (L _ injectivityAnn) -> ppInjectivityAnn unicode qual injectivityAnn
   )
 
+ppResultSig :: FamilyResultSig DocName -> Unicode -> Qualification -> Html
+ppResultSig result unicode qual = case result of
+    NoSig               -> noHtml
+    KindSig kind        -> dcolon unicode  <+> ppLKind unicode qual kind
+    TyVarSig (L _ bndr) -> equals <+> ppHsTyVarBndr unicode qual bndr
+
 ppPseudoFamilyHeader :: Unicode -> Qualification -> PseudoFamilyDecl DocName
                      -> Html
 ppPseudoFamilyHeader unicode qual (PseudoFamilyDecl { .. }) =
     ppFamilyInfo True pfdInfo <+>
     ppAppNameTypes (unLoc pfdLName) [] (map unLoc pfdTyVars) unicode qual <+>
-    ppFamilyKind unicode qual pfdKindSig
+    ppResultSig (unLoc pfdKindSig) unicode qual
 
 ppInjectivityAnn :: Bool -> Qualification -> InjectivityAnn DocName -> Html
 ppInjectivityAnn unicode qual (InjectivityAnn lhs rhs) =
@@ -530,7 +531,7 @@ ppClassDecl summary links instances fixities loc d subdocs
     minimalBit = case [ s | MinimalSig _ (L _ s) <- sigs ] of
       -- Miminal complete definition = every shown method
       And xs : _ | sort [getName n | L _ (Var (L _ n)) <- xs] ==
-                   sort [getName n | TypeSig ns _ _ <- sigs, L _ n <- ns]
+                   sort [getName n | TypeSig ns _ <- sigs, L _ n <- ns]
         -> noHtml
 
       -- Minimal complete definition = the only shown method
@@ -612,9 +613,12 @@ ppInstanceSigs :: LinksInfo -> Splice -> Unicode -> Qualification
               -> [Sig DocName]
               -> [Html]
 ppInstanceSigs links splice unicode qual sigs = do
-    TypeSig lnames (L loc typ) _ <- sigs
+    TypeSig lnames typ <- sigs
     let names = map unLoc lnames
-    return $ ppSimpleSig links splice unicode qual loc names typ
+        L loc rtyp = get_type typ
+    return $ ppSimpleSig links splice unicode qual loc names rtyp
+    where
+      get_type = hswc_body . hsib_body
 
 
 lookupAnySubdoc :: Eq id1 => id1 -> [(id1, DocForDecl id2)] -> DocForDecl id2
