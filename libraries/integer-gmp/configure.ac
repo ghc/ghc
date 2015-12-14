@@ -6,10 +6,7 @@ AC_CONFIG_SRCDIR([cbits/wrappers.c])
 
 AC_CANONICAL_TARGET
 
-AC_ARG_WITH([cc],
-            [C compiler],
-            [CC=$withval])
-AC_PROG_CC()
+AC_PROG_CC
 dnl make extensions visible to allow feature-tests to detect them lateron
 AC_USE_SYSTEM_EXTENSIONS
 
