@@ -103,6 +103,7 @@ import Data.Int
 import qualified Data.IntMap as IM
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.String
 import Data.Word
 import System.IO        ( Handle )
 import System.FilePath
@@ -285,6 +286,9 @@ data SDocContext = SDC
     -- ^ The most recently used colour.  This allows nesting colours.
   , sdocDynFlags   :: !DynFlags
   }
+
+instance IsString SDoc where
+  fromString = text
 
 initSDocContext :: DynFlags -> PprStyle -> SDocContext
 initSDocContext dflags sty = SDC
