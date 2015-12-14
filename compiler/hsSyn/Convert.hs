@@ -481,14 +481,12 @@ cvt_id_arg (i, str, ty)
                                        , cd_fld_type =  ty'
                                        , cd_fld_doc = Nothing}) }
 
-cvtDerivs :: [TH.Name] -> CvtM (HsDeriving RdrName)
+cvtDerivs :: TH.Cxt -> CvtM (HsDeriving RdrName)
 cvtDerivs [] = return Nothing
-cvtDerivs cs = do { cs' <- mapM cvt_one cs
-                  ; return (Just (noLoc cs')) }
-        where
-          cvt_one c = do { c' <- tconName c
-                         ; ty <- returnL $ HsTyVar (noLoc c')
-                         ; return (mkLHsSigType ty) }
+cvtDerivs cs = fmap (Just . mkSigTypes) (cvtContext cs)
+  where
+    mkSigTypes :: Located (HsContext RdrName) -> Located [LHsSigType RdrName]
+    mkSigTypes = fmap (map mkLHsSigType)
 
 cvt_fundep :: FunDep -> CvtM (Located (Class.FunDep (Located RdrName)))
 cvt_fundep (FunDep xs ys) = do { xs' <- mapM tNameL xs

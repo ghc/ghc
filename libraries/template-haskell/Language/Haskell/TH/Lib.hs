@@ -338,19 +338,21 @@ funD nm cs =
 tySynD :: Name -> [TyVarBndr] -> TypeQ -> DecQ
 tySynD tc tvs rhs = do { rhs1 <- rhs; return (TySynD tc tvs rhs1) }
 
-dataD :: CxtQ -> Name -> [TyVarBndr] -> [ConQ] -> [Name] -> DecQ
+dataD :: CxtQ -> Name -> [TyVarBndr] -> [ConQ] -> CxtQ -> DecQ
 dataD ctxt tc tvs cons derivs =
   do
     ctxt1 <- ctxt
     cons1 <- sequence cons
-    return (DataD ctxt1 tc tvs cons1 derivs)
+    derivs1 <- derivs
+    return (DataD ctxt1 tc tvs cons1 derivs1)
 
-newtypeD :: CxtQ -> Name -> [TyVarBndr] -> ConQ -> [Name] -> DecQ
+newtypeD :: CxtQ -> Name -> [TyVarBndr] -> ConQ -> CxtQ -> DecQ
 newtypeD ctxt tc tvs con derivs =
   do
     ctxt1 <- ctxt
     con1 <- con
-    return (NewtypeD ctxt1 tc tvs con1 derivs)
+    derivs1 <- derivs
+    return (NewtypeD ctxt1 tc tvs con1 derivs1)
 
 classD :: CxtQ -> Name -> [TyVarBndr] -> [FunDep] -> [DecQ] -> DecQ
 classD ctxt cls tvs fds decs =
@@ -423,21 +425,23 @@ pragAnnD target expr
 pragLineD :: Int -> String -> DecQ
 pragLineD line file = return $ PragmaD $ LineP line file
 
-dataInstD :: CxtQ -> Name -> [TypeQ] -> [ConQ] -> [Name] -> DecQ
+dataInstD :: CxtQ -> Name -> [TypeQ] -> [ConQ] -> CxtQ -> DecQ
 dataInstD ctxt tc tys cons derivs =
   do
     ctxt1 <- ctxt
     tys1  <- sequence tys
     cons1 <- sequence cons
-    return (DataInstD ctxt1 tc tys1 cons1 derivs)
+    derivs1 <- derivs
+    return (DataInstD ctxt1 tc tys1 cons1 derivs1)
 
-newtypeInstD :: CxtQ -> Name -> [TypeQ] -> ConQ -> [Name] -> DecQ
+newtypeInstD :: CxtQ -> Name -> [TypeQ] -> ConQ -> CxtQ -> DecQ
 newtypeInstD ctxt tc tys con derivs =
   do
     ctxt1 <- ctxt
     tys1  <- sequence tys
     con1  <- con
-    return (NewtypeInstD ctxt1 tc tys1 con1 derivs)
+    derivs1 <- derivs
+    return (NewtypeInstD ctxt1 tc tys1 con1 derivs1)
 
 tySynInstD :: Name -> TySynEqnQ -> DecQ
 tySynInstD tc eqn =

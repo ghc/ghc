@@ -284,6 +284,12 @@ Template Haskell
    of ``FamilyD``. Common elements of ``OpenTypeFamilyD`` and
    ``ClosedTypeFamilyD`` have been moved to ``TypeFamilyHead``.
 
+-  The representation of ``data``, ``newtype``, ``data instance``, and
+   ``newtype instance`` declarations has been changed to allow for
+   multi-parameter type classes in the ``deriving`` clause. In particular,
+   ``dataD`` and ``newtypeD`` now take a ``CxtQ`` instead of a ``[Name]``
+   for the list of derived classes.
+
 Runtime system
 ~~~~~~~~~~~~~~
 

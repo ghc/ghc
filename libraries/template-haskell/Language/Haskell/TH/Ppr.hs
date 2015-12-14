@@ -339,7 +339,7 @@ ppr_dec _ (StandaloneDerivD cxt ty)
 ppr_dec _ (DefaultSigD n ty)
   = hsep [ text "default", pprPrefixOcc n, dcolon, ppr ty ]
 
-ppr_data :: Doc -> Cxt -> Name -> Doc -> [Con] -> [Name] -> Doc
+ppr_data :: Doc -> Cxt -> Name -> Doc -> [Con] -> Cxt -> Doc
 ppr_data maybeInst ctxt t argsDoc cs decs
   = sep [text "data" <+> maybeInst
             <+> pprCxt ctxt
@@ -348,14 +348,13 @@ ppr_data maybeInst ctxt t argsDoc cs decs
          if null decs
            then empty
            else nest nestDepth
-              $ text "deriving"
-                <+> parens (hsep $ punctuate comma $ map ppr decs)]
+              $ text "deriving" <+> ppr_cxt_preds decs]
   where
     pref :: [Doc] -> [Doc]
     pref []     = []      -- No constructors; can't happen in H98
     pref (d:ds) = (char '=' <+> d):map (char '|' <+>) ds
 
-ppr_newtype :: Doc -> Cxt -> Name -> Doc -> Con -> [Name] -> Doc
+ppr_newtype :: Doc -> Cxt -> Name -> Doc -> Con -> Cxt -> Doc
 ppr_newtype maybeInst ctxt t argsDoc c decs
   = sep [text "newtype" <+> maybeInst
             <+> pprCxt ctxt
@@ -364,8 +363,7 @@ ppr_newtype maybeInst ctxt t argsDoc c decs
          if null decs
            then empty
            else nest nestDepth
-                $ text "deriving"
-                  <+> parens (hsep $ punctuate comma $ map ppr decs)]
+                $ text "deriving" <+> ppr_cxt_preds decs]
 
 ppr_tySyn :: Doc -> Name -> Doc -> Type -> Doc
 ppr_tySyn maybeInst t argsDoc rhs
@@ -588,8 +586,12 @@ instance Ppr Role where
 ------------------------------
 pprCxt :: Cxt -> Doc
 pprCxt [] = empty
-pprCxt [t] = ppr t <+> text "=>"
-pprCxt ts = parens (sep $ punctuate comma $ map ppr ts) <+> text "=>"
+pprCxt ts = ppr_cxt_preds ts <+> text "=>"
+
+ppr_cxt_preds :: Cxt -> Doc
+ppr_cxt_preds [] = empty
+ppr_cxt_preds [t] = ppr t
+ppr_cxt_preds ts = parens (sep $ punctuate comma $ map ppr ts)
 
 ------------------------------
 instance Ppr Range where

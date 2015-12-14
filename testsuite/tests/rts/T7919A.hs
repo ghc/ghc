@@ -16,11 +16,11 @@ stepName = mkName "step"
 -- data Large = Large Int ... Int  -- generate 'size' fields, not strict
 largeData =
   dataD
-    (return [])
+    (cxt [])
     (dataName)
     []
     [normalC dataName (replicate size (((,) <$> notStrict) `ap` [t| Int |]))]
-    []
+    (cxt [])
 
 conE' :: Name -> [ExpQ] -> ExpQ
 conE' n es = foldl appE (conE n) es

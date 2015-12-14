@@ -763,19 +763,19 @@ repBangTy ty = do
 --                      Deriving clause
 -------------------------------------------------------
 
-repDerivs :: HsDeriving Name -> DsM (Core [TH.Name])
-repDerivs Nothing = coreList nameTyConName []
-repDerivs (Just (L _ ctxt))
-  = repList nameTyConName (rep_deriv . hsSigType) ctxt
+repDerivs :: HsDeriving Name -> DsM (Core TH.CxtQ)
+repDerivs deriv = do
+    let clauses
+          | Nothing <- deriv         = []
+          | Just (L _ ctxt) <- deriv = ctxt
+    tys <- repList typeQTyConName
+                   (rep_deriv . hsSigType)
+                   clauses
+           :: DsM (Core [TH.PredQ])
+    repCtxt tys
   where
-    rep_deriv :: LHsType Name -> DsM (Core TH.Name)
-        -- Deriving clauses must have the simple H98 form
-    rep_deriv ty
-      | Just (L _ cls, []) <- hsTyGetAppHead_maybe ty
-      = lookupOcc cls
-      | otherwise
-      = notHandled "Non-H98 deriving clause" (ppr ty)
-
+    rep_deriv :: LHsType Name -> DsM (Core TH.TypeQ)
+    rep_deriv (L _ ty) = repTy ty
 
 -------------------------------------------------------
 --   Signatures in a class decl, or a group of bindings
@@ -1937,7 +1937,7 @@ repFun (MkC nm) (MkC b) = rep2 funDName [nm, b]
 
 repData :: Core TH.CxtQ -> Core TH.Name -> Core [TH.TyVarBndr]
         -> Maybe (Core [TH.TypeQ])
-        -> Core [TH.ConQ] -> Core [TH.Name] -> DsM (Core TH.DecQ)
+        -> Core [TH.ConQ] -> Core TH.CxtQ -> DsM (Core TH.DecQ)
 repData (MkC cxt) (MkC nm) (MkC tvs) Nothing (MkC cons) (MkC derivs)
   = rep2 dataDName [cxt, nm, tvs, cons, derivs]
 repData (MkC cxt) (MkC nm) (MkC _) (Just (MkC tys)) (MkC cons) (MkC derivs)
@@ -1945,7 +1945,7 @@ repData (MkC cxt) (MkC nm) (MkC _) (Just (MkC tys)) (MkC cons) (MkC derivs)
 
 repNewtype :: Core TH.CxtQ -> Core TH.Name -> Core [TH.TyVarBndr]
            -> Maybe (Core [TH.TypeQ])
-           -> Core TH.ConQ -> Core [TH.Name] -> DsM (Core TH.DecQ)
+           -> Core TH.ConQ -> Core TH.CxtQ -> DsM (Core TH.DecQ)
 repNewtype (MkC cxt) (MkC nm) (MkC tvs) Nothing (MkC con) (MkC derivs)
   = rep2 newtypeDName [cxt, nm, tvs, con, derivs]
 repNewtype (MkC cxt) (MkC nm) (MkC _) (Just (MkC tys)) (MkC con) (MkC derivs)

@@ -1453,11 +1453,11 @@ data Dec
   = FunD Name [Clause]            -- ^ @{ f p1 p2 = b where decs }@
   | ValD Pat Body [Dec]           -- ^ @{ p = b where decs }@
   | DataD Cxt Name [TyVarBndr]
-         [Con] [Name]             -- ^ @{ data Cxt x => T x = A x | B (T x)
-                                  --       deriving (Z,W)}@
+         [Con] Cxt                -- ^ @{ data Cxt x => T x = A x | B (T x)
+                                  --       deriving (Z,W Q)}@
   | NewtypeD Cxt Name [TyVarBndr]
-         Con [Name]               -- ^ @{ newtype Cxt x => T x = A (B x)
-                                  --       deriving (Z,W)}@
+         Con Cxt                  -- ^ @{ newtype Cxt x => T x = A (B x)
+                                  --       deriving (Z,W Q)}@
   | TySynD Name [TyVarBndr] Type  -- ^ @{ type T x = (x,x) }@
   | ClassD Cxt Name [TyVarBndr]
          [FunDep] [Dec]           -- ^ @{ class Eq a => Ord a where ds }@
@@ -1478,11 +1478,11 @@ data Dec
          -- ^ @{ data family T a b c :: * }@
 
   | DataInstD Cxt Name [Type]
-         [Con] [Name]             -- ^ @{ data instance Cxt x => T [x] = A x
+         [Con] Cxt                -- ^ @{ data instance Cxt x => T [x] = A x
                                   --                                | B (T x)
-                                  --       deriving (Z,W)}@
+                                  --       deriving (Z,W Q)}@
   | NewtypeInstD Cxt Name [Type]
-         Con [Name]               -- ^ @{ newtype instance Cxt x => T [x] = A (B x)
+         Con Cxt                  -- ^ @{ newtype instance Cxt x => T [x] = A (B x)
                                   --       deriving (Z,W)}@
   | TySynInstD Name TySynEqn      -- ^ @{ type instance ... }@
 
