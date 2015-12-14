@@ -122,10 +122,10 @@ data Handle__
     Handle__ {
       haDevice      :: !dev,
       haType        :: HandleType,           -- type (read/write/append etc.)
-      haByteBuffer  :: !(IORef (Buffer Word8)),
+      haByteBuffer  :: !(IORef (Buffer Word8)), -- See [note Buffering Implementation]
       haBufferMode  :: BufferMode,
       haLastDecode  :: !(IORef (dec_state, Buffer Word8)),
-      haCharBuffer  :: !(IORef (Buffer CharBufElem)), -- the current buffer
+      haCharBuffer  :: !(IORef (Buffer CharBufElem)), -- See [note Buffering Implementation]
       haBuffers     :: !(IORef (BufferList CharBufElem)),  -- spare buffers
       haEncoder     :: Maybe (TextEncoder enc_state),
       haDecoder     :: Maybe (TextDecoder dec_state),

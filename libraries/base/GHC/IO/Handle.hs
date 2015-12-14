@@ -508,7 +508,7 @@ hIsSeekable handle =
       _                    -> IODevice.isSeekable haDevice
 
 -- -----------------------------------------------------------------------------
--- Changing echo status (Non-standard GHC extensions)
+-- Changing echo status
 
 -- | Set the echoing status of a handle connected to a terminal.
 

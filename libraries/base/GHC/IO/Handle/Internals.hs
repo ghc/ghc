@@ -480,15 +480,19 @@ flushCharBuffer h_@Handle__{..} = do
     ReadBuffer  -> do
         flushCharReadBuffer h_
     WriteBuffer ->
+        -- Nothing to do here. Char buffer on a write Handle is always empty
+        -- between Handle operations.
+        -- See [note Buffer Flushing], GHC.IO.Handle.Types.
         when (not (isEmptyBuffer cbuf)) $
            error "internal IO library error: Char buffer non-empty"
 
 -- -----------------------------------------------------------------------------
 -- Writing data (flushing write buffers)
 
--- flushWriteBuffer flushes the buffer iff it contains pending write
--- data.  Flushes both the Char and the byte buffer, leaving both
--- empty.
+-- flushWriteBuffer flushes the byte buffer iff it contains pending write
+-- data. Because the Char buffer on a write Handle is always empty between
+-- Handle operations (see [note Buffer Flushing], GHC.IO.Handle.Types),
+-- both buffers are empty after this.
 flushWriteBuffer :: Handle__ -> IO ()
 flushWriteBuffer h_@Handle__{..} = do
   buf <- readIORef haByteBuffer
@@ -519,7 +523,7 @@ writeCharBuffer h_@Handle__{..} !cbuf = do
   debugIO ("writeCharBuffer after encoding: cbuf=" ++ summaryBuffer cbuf' ++
         " bbuf=" ++ summaryBuffer bbuf')
 
-          -- flush if the write buffer is full
+          -- flush the byte buffer if it is full
   if isFullBuffer bbuf'
           --  or we made no progress
      || not (isEmptyBuffer cbuf') && bufL cbuf' == bufL cbuf
