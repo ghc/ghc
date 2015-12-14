@@ -700,17 +700,13 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
   where
     mk_eqn_info vars (L _ (Match _ pats _ grhss))
       = do { dflags <- getDynFlags
-           ; let upats = map (strictify dflags) pats
+           ; let upats = map (getMaybeStrictPat dflags) pats
                  dicts = toTcTypeBag (collectEvVarsPats upats) -- Only TcTyVars
            ; tm_cs <- genCaseTmCs2 mb_scr upats vars
            ; match_result <- addDictsDs dicts $  -- See Note [Type and Term Equality Propagation]
                                addTmCsDs tm_cs $ -- See Note [Type and Term Equality Propagation]
                                  dsGRHSs ctxt upats grhss rhs_ty
            ; return (EqnInfo { eqn_pats = upats, eqn_rhs  = match_result}) }
-
-    strictify dflags pat =
-      let (is_strict, pat') = getUnBangedLPat dflags pat
-      in if is_strict then BangPat pat' else unLoc pat'
 
     handleWarnings = if isGenerated origin
                      then discardWarningsDs
@@ -760,20 +756,26 @@ matchSinglePat :: CoreExpr -> HsMatchContext Name -> LPat Id
 -- Do not warn about incomplete patterns
 -- Used for things like [ e | pat <- stuff ], where
 -- incomplete patterns are just fine
-matchSinglePat (Var var) ctx (L _ pat) ty match_result
+matchSinglePat (Var var) ctx pat ty match_result
   = do { dflags <- getDynFlags
        ; locn   <- getSrcSpanDs
-
+       ; let pat' = getMaybeStrictPat dflags pat
        -- pattern match check warnings
-       ; dsPmWarn dflags (DsMatchContext ctx locn) (checkSingle var pat)
+       ; dsPmWarn dflags (DsMatchContext ctx locn) (checkSingle var pat')
 
        ; match [var] ty
-               [EqnInfo { eqn_pats = [pat], eqn_rhs  = match_result }] }
+               [EqnInfo { eqn_pats = [pat'], eqn_rhs  = match_result }] }
 
 matchSinglePat scrut hs_ctx pat ty match_result
   = do { var <- selectSimpleMatchVarL pat
        ; match_result' <- matchSinglePat (Var var) hs_ctx pat ty match_result
        ; return (adjustMatchResult (bindNonRec var scrut) match_result') }
+
+getMaybeStrictPat :: DynFlags -> LPat Id -> Pat Id
+getMaybeStrictPat dflags pat =
+  let (is_strict, pat') = getUnBangedLPat dflags pat
+  in if is_strict then BangPat pat' else unLoc pat'
+
 
 {-
 ************************************************************************
