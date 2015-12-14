@@ -713,16 +713,12 @@ lookupKindOccRn :: RdrName -> RnM Name
 -- Looking up a name occurring in a kind
 lookupKindOccRn rdr_name
   = do { typeintype <- xoptM Opt_TypeInType
-       ; if | typeintype   -> lookupTypeOccRn rdr_name
-            | is_star      -> return starKindTyConName
-            | is_uni_star  -> return unicodeStarKindTyConName
-            | otherwise    -> lookupOccRn rdr_name }
-  where
+       ; if | typeintype           -> lookupTypeOccRn rdr_name
       -- With -XNoTypeInType, treat any usage of * in kinds as in scope
       -- this is a dirty hack, but then again so was the old * kind.
-    fs_name = occNameFS $ rdrNameOcc rdr_name
-    is_star     = fs_name == fsLit "*"
-    is_uni_star = fs_name == fsLit "★"
+            | is_star rdr_name     -> return starKindTyConName
+            | is_uni_star rdr_name -> return unicodeStarKindTyConName
+            | otherwise            -> lookupOccRn rdr_name }
 
 -- lookupPromotedOccRn looks up an optionally promoted RdrName.
 lookupTypeOccRn :: RdrName -> RnM Name
@@ -731,16 +727,17 @@ lookupTypeOccRn rdr_name
   = do { mb_name <- lookupOccRn_maybe rdr_name
        ; case mb_name of {
              Just name -> return name ;
-             Nothing   -> lookup_demoted rdr_name } }
+             Nothing   -> do { dflags <- getDynFlags
+                             ; lookup_demoted rdr_name dflags } } }
 
-lookup_demoted :: RdrName -> RnM Name
-lookup_demoted rdr_name
+lookup_demoted :: RdrName -> DynFlags -> RnM Name
+lookup_demoted rdr_name dflags
   | Just demoted_rdr <- demoteRdrName rdr_name
     -- Maybe it's the name of a *data* constructor
   = do { data_kinds <- xoptM Opt_DataKinds
        ; mb_demoted_name <- lookupOccRn_maybe demoted_rdr
        ; case mb_demoted_name of
-           Nothing -> reportUnboundName rdr_name
+           Nothing -> unboundNameX WL_Any rdr_name star_info
            Just demoted_name
              | data_kinds ->
              do { whenWOptM Opt_WarnUntickedPromotedConstructors $
@@ -760,6 +757,20 @@ lookup_demoted rdr_name
            , quotes (char '\'' <> ppr name)
            , text "instead of"
            , quotes (ppr name) <> dot ]
+
+    star_info
+      | is_star rdr_name || is_uni_star rdr_name
+      = if xopt Opt_TypeInType dflags
+        then text "NB: With TypeInType, you must import" <+>
+             ppr rdr_name <+> text "from Data.Kind"
+        else empty
+
+      | otherwise
+      = empty
+
+is_star, is_uni_star :: RdrName -> Bool
+is_star     = (fsLit "*" ==) . occNameFS . rdrNameOcc
+is_uni_star = (fsLit "★" ==) . occNameFS . rdrNameOcc
 
 {-
 Note [Demotion]

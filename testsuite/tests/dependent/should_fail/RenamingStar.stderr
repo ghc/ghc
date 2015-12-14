@@ -1,0 +1,11 @@
+
+RenamingStar.hs:5:13: error:
+    Not in scope: type constructor or class ‘*’
+    NB: With TypeInType, you must import * from Data.Kind
+
+RenamingStar.hs:5:13: error:
+    Illegal operator ‘*’ in type ‘*’
+      Use TypeOperators to allow operators in types
+
+RenamingStar.hs:5:13: error:
+    Operator applied to too few arguments: *
