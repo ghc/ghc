@@ -31,3 +31,4 @@ test('T4851', normal, compile, [''])
 
 test('T5908', normal, compile, [''])
 test('T10112', normal, compile, [''])
+test('T11216', [expect_broken(11216)], compile, [''])
