@@ -565,7 +565,7 @@ pprIfaceLamBndr (b, IfaceNoOneShot) = ppr b
 pprIfaceLamBndr (b, IfaceOneShot)   = ppr b <> text "[OneShot]"
 
 pprIfaceIdBndr :: (IfLclName, IfaceType) -> SDoc
-pprIfaceIdBndr (name, ty) = hsep [ppr name, dcolon, ppr ty]
+pprIfaceIdBndr (name, ty) = parens (ppr name <+> dcolon <+> ppr ty)
 
 pprIfaceTvBndr :: IfaceTvBndr -> SDoc
 pprIfaceTvBndr (tv, IfaceTyConApp tc ITC_Nil)
