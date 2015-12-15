@@ -1,2 +1,2 @@
-<stdin>: hGetChar: illegal operation (handle is closed)
-<stdin>: hGetChar: illegal operation (handle is closed)
+<stdin>: hGetChar: illegal operation (handle is semi-closed)
+<stdin>: hGetChar: illegal operation (handle is semi-closed)

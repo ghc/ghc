@@ -42,7 +42,8 @@ module GHC.IO.Handle.Internals (
   decodeByteBuf,
 
   augmentIOError,
-  ioe_closedHandle, ioe_EOF, ioe_notReadable, ioe_notWritable,
+  ioe_closedHandle, ioe_semiclosedHandle,
+  ioe_EOF, ioe_notReadable, ioe_notWritable,
   ioe_finalizedHandle, ioe_bufsiz,
 
   hClose_help, hLookAhead_,
@@ -238,7 +239,7 @@ checkWritableHandle :: (Handle__ -> IO a) -> Handle__ -> IO a
 checkWritableHandle act h_@Handle__{..}
   = case haType of
       ClosedHandle         -> ioe_closedHandle
-      SemiClosedHandle     -> ioe_closedHandle
+      SemiClosedHandle     -> ioe_semiclosedHandle
       ReadHandle           -> ioe_notWritable
       ReadWriteHandle      -> do
         buf <- readIORef haCharBuffer
@@ -277,7 +278,7 @@ checkReadableHandle :: (Handle__ -> IO a) -> Handle__ -> IO a
 checkReadableHandle act h_@Handle__{..} =
     case haType of
       ClosedHandle         -> ioe_closedHandle
-      SemiClosedHandle     -> ioe_closedHandle
+      SemiClosedHandle     -> ioe_semiclosedHandle
       AppendHandle         -> ioe_notReadable
       WriteHandle          -> ioe_notReadable
       ReadWriteHandle      -> do
@@ -307,7 +308,7 @@ checkSeekableHandle :: (Handle__ -> IO a) -> Handle__ -> IO a
 checkSeekableHandle act handle_@Handle__{haDevice=dev} =
     case haType handle_ of
       ClosedHandle      -> ioe_closedHandle
-      SemiClosedHandle  -> ioe_closedHandle
+      SemiClosedHandle  -> ioe_semiclosedHandle
       AppendHandle      -> ioe_notSeekable
       _ -> do b <- IODevice.isSeekable dev
               if b then act handle_
@@ -316,13 +317,16 @@ checkSeekableHandle act handle_@Handle__{haDevice=dev} =
 -- -----------------------------------------------------------------------------
 -- Handy IOErrors
 
-ioe_closedHandle, ioe_EOF,
+ioe_closedHandle, ioe_semiclosedHandle, ioe_EOF,
   ioe_notReadable, ioe_notWritable, ioe_cannotFlushNotSeekable,
   ioe_notSeekable :: IO a
 
 ioe_closedHandle = ioException
    (IOError Nothing IllegalOperation ""
         "handle is closed" Nothing Nothing)
+ioe_semiclosedHandle = ioException
+   (IOError Nothing IllegalOperation ""
+        "handle is semi-closed" Nothing Nothing)
 ioe_EOF = ioException
    (IOError Nothing EOF "" "" Nothing Nothing)
 ioe_notReadable = ioException

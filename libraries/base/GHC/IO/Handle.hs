@@ -113,7 +113,7 @@ hFileSize handle =
     withHandle_ "hFileSize" handle $ \ handle_@Handle__{haDevice=dev} -> do
     case haType handle_ of
       ClosedHandle              -> ioe_closedHandle
-      SemiClosedHandle          -> ioe_closedHandle
+      SemiClosedHandle          -> ioe_semiclosedHandle
       _ -> do flushWriteBuffer handle_
               r <- IODevice.getSize dev
               if r /= -1
@@ -129,7 +129,7 @@ hSetFileSize handle size =
     withHandle_ "hSetFileSize" handle $ \ handle_@Handle__{haDevice=dev} -> do
     case haType handle_ of
       ClosedHandle              -> ioe_closedHandle
-      SemiClosedHandle          -> ioe_closedHandle
+      SemiClosedHandle          -> ioe_semiclosedHandle
       _ -> do flushWriteBuffer handle_
               IODevice.setSize dev size
               return ()
@@ -473,7 +473,7 @@ hIsReadable handle =
     withHandle_ "hIsReadable" handle $ \ handle_ -> do
     case haType handle_ of
       ClosedHandle         -> ioe_closedHandle
-      SemiClosedHandle     -> ioe_closedHandle
+      SemiClosedHandle     -> ioe_semiclosedHandle
       htype                -> return (isReadableHandleType htype)
 
 hIsWritable :: Handle -> IO Bool
@@ -482,7 +482,7 @@ hIsWritable handle =
     withHandle_ "hIsWritable" handle $ \ handle_ -> do
     case haType handle_ of
       ClosedHandle         -> ioe_closedHandle
-      SemiClosedHandle     -> ioe_closedHandle
+      SemiClosedHandle     -> ioe_semiclosedHandle
       htype                -> return (isWritableHandleType htype)
 
 -- | Computation 'hGetBuffering' @hdl@ returns the current buffering mode
@@ -503,7 +503,7 @@ hIsSeekable handle =
     withHandle_ "hIsSeekable" handle $ \ handle_@Handle__{..} -> do
     case haType of
       ClosedHandle         -> ioe_closedHandle
-      SemiClosedHandle     -> ioe_closedHandle
+      SemiClosedHandle     -> ioe_semiclosedHandle
       AppendHandle         -> return False
       _                    -> IODevice.isSeekable haDevice
 
