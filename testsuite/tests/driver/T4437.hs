@@ -34,6 +34,7 @@ expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "AlternativeLayoutRule",
                              "AlternativeLayoutRuleTransitional",
                              "OverloadedLabels",
+                             "UndecidableSuperClasses",
                              "TemplateHaskellQuotes",
                              "MonadFailDesugaring",
                              "TypeInType"]

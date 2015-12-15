@@ -3,7 +3,7 @@
 module TcCanonical(
      canonicalize,
      unifyDerived,
-
+     makeSuperClasses, mkGivensWithSuperClasses,
      StopOrContinue(..), stopWith, continueWith
   ) where
 
@@ -27,6 +27,7 @@ import OccName( OccName )
 import Outputable
 import DynFlags( DynFlags )
 import VarSet
+import NameSet
 import RdrName
 
 import Pair
@@ -147,11 +148,11 @@ canonicalize ct@(CNonCanonical { cc_ev = ev })
        ; {-# SCC "canEvVar" #-}
          canEvNC ev }
 
-canonicalize (CDictCan { cc_ev = ev
-                       , cc_class  = cls
-                       , cc_tyargs = xis })
+canonicalize (CDictCan { cc_ev = ev, cc_class  = cls
+                       , cc_tyargs = xis, cc_pend_sc = pend_sc })
   = {-# SCC "canClass" #-}
-    canClass ev cls xis -- Do not add any superclasses
+    canClass ev cls xis pend_sc
+
 canonicalize (CTyEqCan { cc_ev = ev
                        , cc_tyvar  = tv
                        , cc_rhs    = xi
@@ -191,59 +192,118 @@ canEvNC ev
 ************************************************************************
 -}
 
-canClass, canClassNC
-   :: CtEvidence
-   -> Class -> [Type] -> TcS (StopOrContinue Ct)
+canClassNC :: CtEvidence -> Class -> [Type] -> TcS (StopOrContinue Ct)
+-- Precondition: EvVar is class evidence
+canClassNC ev cls tys = canClass ev cls tys (has_scs cls)
+  where
+    has_scs cls = not (null (classSCTheta cls))
+
+canClass :: CtEvidence -> Class -> [Type] -> Bool -> TcS (StopOrContinue Ct)
 -- Precondition: EvVar is class evidence
 
--- The canClassNC version is used on non-canonical constraints
--- and adds superclasses.  The plain canClass version is used
--- for already-canonical class constraints (but which might have
--- been subsituted or somthing), and hence do not need superclasses
-
-canClassNC ev cls tys
-  = canClass ev cls tys
-    `andWhenContinue` emitSuperclasses
-
-canClass ev cls tys
+canClass ev cls tys pend_sc
   =   -- all classes do *nominal* matching
     ASSERT2( ctEvRole ev == Nominal, ppr ev $$ ppr cls $$ ppr tys )
     do { (xis, cos) <- flattenManyNom ev tys
        ; let co = mkTcTyConAppCo Nominal (classTyCon cls) cos
              xi = mkClassPred cls xis
              mk_ct new_ev = CDictCan { cc_ev = new_ev
-                                     , cc_tyargs = xis, cc_class = cls }
+                                     , cc_tyargs = xis
+                                     , cc_class = cls
+                                     , cc_pend_sc = pend_sc }
        ; mb <- rewriteEvidence ev xi co
        ; traceTcS "canClass" (vcat [ ppr ev
                                    , ppr xi, ppr mb ])
        ; return (fmap mk_ct mb) }
 
-emitSuperclasses :: Ct -> TcS (StopOrContinue Ct)
-emitSuperclasses ct@(CDictCan { cc_ev = ev , cc_tyargs = xis_new, cc_class = cls })
-            -- Add superclasses of this one here, See Note [Adding superclasses].
-            -- But only if we are not simplifying the LHS of a rule.
- = do { newSCWorkFromFlavored ev cls xis_new
-      -- Arguably we should "seq" the coercions if they are derived,
-      -- as we do below for emit_kind_constraint, to allow errors in
-      -- superclasses to be executed if deferred to runtime!
-      ; continueWith ct }
-emitSuperclasses _ = panic "emit_superclasses of non-class!"
+{- Note [The superclass story]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We need to add superclass constraints for two reasons:
 
-{- Note [Adding superclasses]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Since dictionaries are canonicalized only once in their lifetime, the
-place to add their superclasses is canonicalisation.  See Note [Add
-superclasses only during canonicalisation].  Here is what we do:
+* For givens, they give us a route to to proof.  E.g.
+    f :: Ord a => a -> Bool
+    f x = x == x
+  We get a Wanted (Eq a), which can only be solved from the superclass
+  of the Given (Ord a).
 
-  Givens:   Add all their superclasses as Givens.
-            They may be needed to prove Wanteds.
+* For wanteds, they may give useful functional dependencies.  E.g.
+     class C a b | a -> b where ...
+     class C a b => D a b where ...
+  Now a Wanted constraint (D Int beta) has (C Int beta) as a superclass
+  and that might tell us about beta, via C's fundeps.  We can get this
+  by generateing a Derived (C Int beta) constraint.  It's derived because
+  we don't actually have to cough up any evidence for it; it's only there
+  to generate fundep equalities.
 
-  Wanteds/Derived:
-            Add all their superclasses as Derived.
-            The sole reason is to expose functional dependencies
-            in superclasses or equality superclasses.
+See Note [Why adding superclasses can help].
 
-Examples of how adding superclasses as Derived is useful
+For these reasons we want to generate superclass constraints for both
+Givens and Wanteds. But:
+
+* (Minor) they are often not needed, so generating them aggressively
+  is a waste of time.
+
+* (Major) if we want recursive superclasses, there would be an infinite
+  number of them.  Here is a real-life example (Trac #10318);
+
+     class (Frac (Frac a) ~ Frac a,
+            Fractional (Frac a),
+            IntegralDomain (Frac a))
+         => IntegralDomain a where
+      type Frac a :: *
+
+  Notice that IntegralDomain has an associated type Frac, and one
+  of IntegralDomain's superclasses is another IntegralDomain constraint.
+
+So here's the plan:
+
+1. Generate superclasses for given (but not wanted) constraints;
+   see Note [Aggressively expand given superclasses].  However
+   stop if you encounter the same class twice.  That is, expand
+   eagerly, but have a conservative termination condition: see
+   Note [Expanding superclasses] in TcType.
+
+2. Solve the wanteds as usual, but do /no/ expansion of superclasses
+   in solveSimpleGivens or solveSimpleWanteds.
+   See Note [Danger of adding superclasses during solving]
+
+3. If we have any remaining unsolved wanteds, try harder:
+   take both the Givens and Wanteds, and expand superclasses again.
+   This may succeed in generating (a finite number of) extra Givens,
+   and extra Deriveds. Both may help the proof.
+   This is done in TcSimplify.expandSuperClasses.
+
+4. Go round to (2) again.  This loop (2,3,4) is implemented
+   in TcSimplify.simpl_loop.
+
+We try to terminate the loop by flagging which class constraints
+(given or wanted) are potentially un-expanded.  This is what the
+cc_pend_sc flag is for in CDictCan.  So in Step 3 we only expand
+superclasses for constraints with cc_pend_sc set to true (i.e.
+isPendingScDict holds).
+
+When we take a CNonCanonical or CIrredCan, but end up classifying it
+as a CDictCan, we set the cc_pend_sc flag to False.
+
+Note [Aggressively expand given superclasses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In step (1) of Note [The superclass story], why do we aggressively
+expand Given superclasses by one layer?  Mainly because of some very
+obscure cases like this:
+
+   instance Bad a => Eq (T a)
+
+   f :: (Ord (T a)) => blah
+   f x = ....needs Eq (T a), Ord (T a)....
+
+Here if we can't satisfy (Eq (T a)) from the givens we'll use the
+instance declaration; but then we are stuck with (Bad a).  Sigh.
+This is really a case of non-confluent proofs, but to stop our users
+complaining we expand one layer in advance.
+
+Note [Why adding superclasses can help]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Examples of how adding superclasses can help:
 
     --- Example 1
         class C a b | a -> b
@@ -280,34 +340,8 @@ Examples of how adding superclasses as Derived is useful
       [D] beta ~ b
     which is what we want.
 
----------- Historical note -----------
-Example of why adding superclass of a Wanted as a Given would
-be terrible, see Note [Do not add superclasses of solved dictionaries]
-in TcSMonad, which has this example:
-        class Ord a => C a where
-        instance Ord [a] => C [a] where ...
-Suppose we are trying to solve
-  [G] d1 : Ord a
-  [W] d2 : C [a]
-If we (bogusly) added the superclass of d2 as Given we'd have
-  [G] d1 : Ord a
-  [W] d2 : C [a]
-  [G] d3 : Ord [a]   -- Superclass of d2, bogus
-
-Then we'll use the instance decl to give
-  [G] d1 : Ord a     Solved: d2 : C [a] = $dfCList d4
-  [G] d3 : Ord [a]   -- Superclass of d2, bogus
-  [W] d4: Ord [a]
-
-And now we could bogusly solve d4 from d3.
----------- End of historical note -----------
-
-Note [Add superclasses only during canonicalisation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We add superclasses only during canonicalisation, on the passage
-from CNonCanonical to CDictCan.  A class constraint can be repeatedly
-rewritten, and there's no point in repeatedly adding its superclasses.
-
+Note [Danger of adding superclasses during solving]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here's a serious, but now out-dated example, from Trac #4497:
 
    class Num (RealOf t) => Normed t
@@ -334,27 +368,70 @@ Mind you, now that Wanteds cannot rewrite Derived, I think this particular
 situation can't happen.
   -}
 
-newSCWorkFromFlavored :: CtEvidence -> Class -> [Xi] -> TcS ()
--- Returns superclasses, see Note [Adding superclasses]
-newSCWorkFromFlavored flavor cls xis
-  | CtGiven { ctev_evar = evar, ctev_loc = loc } <- flavor
-  = do { given_evs <- newGivenEvVars (mk_given_loc loc)
-                                     (mkEvScSelectors (EvId evar) cls xis)
-       ; emitWorkNC given_evs }
+mkGivensWithSuperClasses :: CtLoc -> [EvId] -> TcS [Ct]
+-- From a given EvId, make its Ct, plus the Ct's of its superclasses
+-- See Note [The superclass story]
+-- The loop-breaking here follows Note [Expanding superclasses] in TcType
+mkGivensWithSuperClasses loc ev_ids = concatMapM go ev_ids
+  where
+    go ev_id = mk_superclasses emptyNameSet $
+               CtGiven { ctev_evar = ev_id
+                       , ctev_pred = evVarPred ev_id
+                       , ctev_loc  = loc }
 
-  | isEmptyVarSet (tyCoVarsOfTypes xis)
-  = return () -- Wanteds with no variables yield no deriveds.
+makeSuperClasses :: [Ct] -> TcS [Ct]
+-- Returns strict superclasses, transitively, see Note [The superclasses story]
+-- See Note [The superclass story]
+-- The loop-breaking here follows Note [Expanding superclasses] in TcType
+makeSuperClasses cts = concatMapM go cts
+  where
+    go (CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys })
+          = mk_strict_superclasses emptyNameSet ev cls tys
+    go ct = pprPanic "makeSuperClasses" (ppr ct)
+
+mk_superclasses :: NameSet -> CtEvidence -> TcS [Ct]
+-- Return this constraint, plus its superclasses, if any
+mk_superclasses rec_clss ev
+  | ClassPred cls tys <- classifyPredType (ctEvPred ev)
+  = mk_superclasses_of rec_clss ev cls tys
+
+  | otherwise   -- Superclass is not a class predicate
+  = return [mkNonCanonical ev]
+
+mk_superclasses_of :: NameSet -> CtEvidence -> Class -> [Type] -> TcS [Ct]
+-- Return this class constraint, plus its superclasses
+mk_superclasses_of rec_clss ev cls tys
+  | loop_found
+  = return [this_ct]
+  | otherwise
+  = do { sc_cts <- mk_strict_superclasses rec_clss' ev cls tys
+       ; return (this_ct : sc_cts) }
+  where
+    cls_nm     = className cls
+    loop_found = cls_nm `elemNameSet` rec_clss
+    rec_clss'  | isCTupleClass cls = rec_clss  -- Never contribute to recursion
+               | otherwise         = rec_clss `extendNameSet` cls_nm
+    this_ct    = CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys
+                          , cc_pend_sc = loop_found }
+
+mk_strict_superclasses :: NameSet -> CtEvidence -> Class -> [Type] -> TcS [Ct]
+mk_strict_superclasses rec_clss ev cls tys
+  | CtGiven { ctev_evar = evar, ctev_loc = loc } <- ev
+  = do { sc_evs <- newGivenEvVars (mk_given_loc loc)
+                                  (mkEvScSelectors (EvId evar) cls tys)
+       ; concatMapM (mk_superclasses rec_clss) sc_evs }
+
+
+  | isEmptyVarSet (tyCoVarsOfTypes tys)
+  = return [] -- Wanteds with no variables yield no deriveds.
               -- See Note [Improvement from Ground Wanteds]
 
   | otherwise -- Wanted/Derived case, just add those SC that can lead to improvement.
-  = do { let sc_rec_theta = transSuperClasses cls xis
-             impr_theta   = filter isImprovementPred sc_rec_theta
-             loc          = ctEvLoc flavor
-       ; traceTcS "newSCWork/Derived" $ text "impr_theta =" <+> ppr impr_theta
-       ; emitNewDeriveds loc impr_theta }
-
+  = do { let loc = ctEvLoc ev
+       ; sc_evs <- mapM (newDerivedNC loc) (immSuperClasses cls tys)
+       ; concatMapM (mk_superclasses rec_clss) sc_evs }
   where
-    size = sizeTypes xis
+    size = sizeTypes tys
     mk_given_loc loc
        | isCTupleClass cls
        = loc   -- For tuple predicates, just take them apart, without
@@ -372,6 +449,8 @@ newSCWorkFromFlavored flavor cls xis
 
        | otherwise  -- Probably doesn't happen, since this function
        = loc        -- is only used for Givens, but does no harm
+
+
 
 {-
 ************************************************************************
@@ -1876,3 +1955,4 @@ unify_derived loc role    orig_ty1 orig_ty2
 maybeSym :: SwapFlag -> TcCoercion -> TcCoercion
 maybeSym IsSwapped  co = mkTcSymCo co
 maybeSym NotSwapped co = co
+

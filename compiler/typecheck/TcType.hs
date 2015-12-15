@@ -88,7 +88,7 @@ module TcType (
 
   ---------------------------------
   -- Predicate types
-  mkMinimalBySCs, transSuperClasses, transSuperClassesPred,
+  mkMinimalBySCs, transSuperClasses,
   pickQuantifiablePreds,
   immSuperClasses,
   isImprovementPred,
@@ -1590,7 +1590,33 @@ canUnifyWithPolyType dflags details
       _other                         -> True
           -- We can have non-meta tyvars in given constraints
 
-{-
+{- Note [Expanding superclasses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we expand superclasses, we use the following algorithm:
+
+expand( so_far, pred ) returns the transitive superclasses of pred,
+                               not including pred itself
+ 1. If pred is not a class constraint, return empty set
+       Otherwise pred = C ts
+ 2. If C is in so_far, return empty set (breaks loops)
+ 3. Find the immediate superclasses constraints of (C ts)
+ 4. For each such sc_pred, return (sc_pred : expand( so_far+C, D ss )
+
+Notice that
+
+ * With normal Haskell-98 classes, the loop-detector will never bite,
+   so we'll get all the superclasses.
+
+ * Since there is only a finite number of distinct classes, expansion
+   must terminate.
+
+ * The loop breaking is a bit conservative. Notably, a tuple class
+   could contain many times without threatening termination:
+      (Eq a, (Ord a, Ix a))
+   And this is try of any class that we can statically guarantee
+   as non-recursive (in some sense).  For now, we just make a special
+   case for tuples
+
 ************************************************************************
 *                                                                      *
 \subsection{Predicate types}
@@ -1693,30 +1719,48 @@ pickQuantifiablePreds qtvs theta
 
 -- Superclasses
 
+type PredWithSCs = (PredType, [PredType])
+
 mkMinimalBySCs :: [PredType] -> [PredType]
 -- Remove predicates that can be deduced from others by superclasses
-mkMinimalBySCs ptys = [ pty | pty <- ptys
-                            , pty `not_in_preds` rec_scs ]
+-- Result is a subset of the input
+mkMinimalBySCs ptys = go preds_with_scs []
  where
-   rec_scs           = concatMap trans_super_classes ptys
-   not_in_preds p ps = not (any (eqType p) ps)
+   preds_with_scs :: [PredWithSCs]
+   preds_with_scs = [ (pred, transSuperClasses pred)
+                    | pred <- ptys ]
 
-   trans_super_classes pred   -- Superclasses of pred, excluding pred itself
-     = case classifyPredType pred of
-         ClassPred cls tys -> transSuperClasses cls tys
-         _                 -> []
+   go :: [PredWithSCs]   -- Work list
+      -> [PredWithSCs]   -- Accumulating result
+      -> [PredType]
+   go [] min_preds = map fst min_preds
+   go (work_item@(p,_) : work_list) min_preds
+     | p `in_cloud` work_list || p `in_cloud` min_preds
+     = go work_list min_preds
+     | otherwise
+     = go work_list (work_item : min_preds)
 
-transSuperClasses :: Class -> [Type] -> [PredType]
-transSuperClasses cls tys    -- Superclasses of (cls tys),
-                             -- excluding (cls tys) itself
-  = concatMap transSuperClassesPred (immSuperClasses cls tys)
+   in_cloud :: PredType -> [PredWithSCs] -> Bool
+   in_cloud p ps = or [ p `eqType` p' | (_, scs) <- ps, p' <- scs ]
 
-transSuperClassesPred :: PredType -> [PredType]
--- (transSuperClassesPred p) returns (p : p's superclasses)
-transSuperClassesPred p
-  = case classifyPredType p of
-      ClassPred cls tys -> p : transSuperClasses cls tys
-      _                 -> [p]
+transSuperClasses :: PredType -> [PredType]
+-- (transSuperClasses p) returns (p's superclasses)
+-- not including p
+-- See Note [Expanding superclasses]
+transSuperClasses p
+  = go emptyNameSet p
+  where
+    go :: NameSet -> PredType -> [PredType]
+    go rec_clss p
+       | ClassPred cls tys <- classifyPredType p
+       , let cls_nm = className cls
+       , not (cls_nm `elemNameSet` rec_clss)
+       , let rec_clss' | isCTupleClass cls = rec_clss
+                       | otherwise         = rec_clss `extendNameSet` cls_nm
+       = [ p' | sc <- immSuperClasses cls tys
+              , p'  <- sc : go rec_clss' sc ]
+       | otherwise
+       = []
 
 immSuperClasses :: Class -> [Type] -> [PredType]
 immSuperClasses cls tys

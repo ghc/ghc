@@ -1927,9 +1927,6 @@ Validity checking is done once the mutually-recursive knot has been
 tied, so we can look at things freely.
 -}
 
-checkClassCycleErrs :: Class -> TcM ()
-checkClassCycleErrs cls = mapM_ recClsErr (calcClassCycles cls)
-
 checkValidTyCl :: TyCon -> TcM TyCon
 checkValidTyCl tc
   = setSrcSpan (getSrcSpan tc) $
@@ -2208,9 +2205,10 @@ checkNewDataCon con
 checkValidClass :: Class -> TcM ()
 checkValidClass cls
   = do  { constrained_class_methods <- xoptM Opt_ConstrainedClassMethods
-        ; multi_param_type_classes <- xoptM Opt_MultiParamTypeClasses
-        ; nullary_type_classes <- xoptM Opt_NullaryTypeClasses
-        ; fundep_classes <- xoptM Opt_FunctionalDependencies
+        ; multi_param_type_classes  <- xoptM Opt_MultiParamTypeClasses
+        ; nullary_type_classes      <- xoptM Opt_NullaryTypeClasses
+        ; fundep_classes            <- xoptM Opt_FunctionalDependencies
+        ; undecidable_super_classes <- xoptM Opt_UndecidableSuperClasses
 
         -- Check that the class is unary, unless multiparameter type classes
         -- are enabled; also recognize deprecated nullary type classes
@@ -2225,7 +2223,11 @@ checkValidClass cls
 
           -- Now check for cyclic superclasses
           -- If there are superclass cycles, checkClassCycleErrs bails.
-        ; checkClassCycleErrs cls
+        ; unless undecidable_super_classes $
+          case checkClassCycles cls of
+             Just err -> setSrcSpan (getSrcSpan cls) $
+                         addErrTc err
+             Nothing  -> return ()
 
         -- Check the class operations.
         -- But only if there have been no earlier errors
@@ -2540,11 +2542,6 @@ recSynErr syn_decls
   where
     sorted_decls = sortLocated syn_decls
     ppr_decl (L loc decl) = ppr loc <> colon <+> ppr decl
-
-recClsErr :: [TyCon] -> TcRn ()
-recClsErr cycles
-  = addErr (sep [ptext (sLit "Cycle in class declaration (via superclasses):"),
-                 nest 2 (hsep (intersperse (text "->") (map ppr cycles)))])
 
 badDataConTyCon :: DataCon -> Type -> Type -> SDoc
 badDataConTyCon data_con res_ty_tmpl actual_res_ty

@@ -81,7 +81,7 @@ module TcRnTypes(
         toDerivedWC,
         andWC, unionsWC, addSimples, addImplics, mkSimpleWC, addInsols,
         tyCoVarsOfWC, dropDerivedWC, dropDerivedSimples, dropDerivedInsols,
-        isDroppableDerivedLoc, insolubleImplic, trulyInsoluble,
+        isDroppableDerivedLoc, insolubleImplic,
         arisesFromGivens,
 
         Implication(..), ImplicStatus(..), isInsolubleStatus,
@@ -1339,7 +1339,13 @@ data Ct
   = CDictCan {  -- e.g.  Num xi
       cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
       cc_class  :: Class,
-      cc_tyargs :: [Xi]        -- cc_tyargs are function-free, hence Xi
+      cc_tyargs :: [Xi],       -- cc_tyargs are function-free, hence Xi
+      cc_pend_sc :: Bool       -- True <=> (a) cc_class has superclasses
+                               --          (b) we have not yet added those
+                               --              superclasses as Givens
+           -- NB: cc_pend_sc is used for G/W/D.  For W/D the reason
+           --     we need superclasses is to expose possible improvement
+           --     via fundeps
     }
 
   | CIrredEvCan {  -- These stand for yet-unusable predicates
@@ -1872,11 +1878,11 @@ trulyInsoluble :: TcLevel -> Ct -> Bool
 -- The constraint is in the wc_insol set,
 -- but we do not treat as truly isoluble
 --  a) type-holes, arising from PartialTypeSignatures,
---  b) an out-of-scope variable
+--     (except out-of-scope variables masquerading as type-holes)
 -- Yuk!
-trulyInsoluble tc_lvl insol
-  =  isOutOfScopeCt insol
-  || isRigidEqPred tc_lvl (classifyPredType (ctPred insol))
+trulyInsoluble _tc_lvl insol
+  | CHoleCan {} <- insol = isOutOfScopeCt insol
+  | otherwise            = True
 
 instance Outputable WantedConstraints where
   ppr (WC {wc_simple = s, wc_impl = i, wc_insol = n})

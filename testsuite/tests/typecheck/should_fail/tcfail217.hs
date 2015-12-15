@@ -4,4 +4,4 @@ module TcFail where
 
 type Aish = A
 
-class cls (Aish cls) => A cls c where
+class Aish a => A a where

@@ -4,6 +4,8 @@
               MultiParamTypeClasses, FunctionalDependencies #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
   -- ip :: IP x a => a  is strictly speaking ambiguous, but IP is magic
+{-# LANGUAGE UndecidableSuperClasses #-}
+  -- Because of the type-variable superclasses for tuples
 
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 -- -fno-warn-unused-imports needed for the GHC.Tuple import below. Sigh.

@@ -3,23 +3,23 @@ TYPE SIGNATURES
     forall (f :: * -> *). Applicative f => (Int -> f Int) -> f Int
   test2 ::
     forall (f :: * -> *) b a.
-    (Num b, Num a, Applicative f) =>
+    (Applicative f, Num a, Num b) =>
     (a -> f b) -> f b
   test3 ::
     forall (m :: * -> *) a a1 a2.
-    (Monad m, Num a2) =>
+    (Num a2, Monad m) =>
     (a2 -> m a1) -> (a1 -> a1 -> m a) -> m a
   test4 ::
     forall (m :: * -> *) a a1 a2.
-    (Monad m, Num a2) =>
+    (Num a2, Monad m) =>
     (a2 -> m a1) -> (a1 -> a1 -> m a) -> m a
   test5 ::
     forall (m :: * -> *) a a1 a2.
-    (Monad m, Num a2) =>
+    (Num a2, Monad m) =>
     (a2 -> m a1) -> (a1 -> a1 -> m a) -> m a
   test6 ::
     forall r (m :: * -> *) a.
-    (Monad m, Num (m a)) =>
+    (Num (m a), Monad m) =>
     (m a -> m (m a)) -> r -> m a
 TYPE CONSTRUCTORS
 COERCION AXIOMS

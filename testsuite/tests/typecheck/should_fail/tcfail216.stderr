@@ -1,4 +1,7 @@
 
-tcfail216.hs:5:1:
-    Cycle in class declaration (via superclasses): A -> A
-    In the class declaration for ‘A’
+tcfail216.hs:4:1: error:
+    • Potential superclass cycle for ‘A’
+        one of whose superclass constraints is headed by a type variable:
+          ‘cls (A cls)’
+      Use UndecidableSuperClasses to accept this
+    • In the class declaration for ‘A’

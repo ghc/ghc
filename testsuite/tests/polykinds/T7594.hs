@@ -1,11 +1,13 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE GADTs           #-}
 {-# LANGUAGE Rank2Types      #-}
+
 module T7594 where
 
 import GHC.Exts (Constraint)

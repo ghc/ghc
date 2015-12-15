@@ -13,7 +13,8 @@ files for imported data types.
 
 module TcTyDecls(
         calcRecFlags, RecTyInfo(..),
-        calcSynCycles, calcClassCycles,
+        calcSynCycles,
+        checkClassCycles,
 
         -- * Roles
         RoleAnnots, extractRoleAnnots, emptyRoleAnnots, lookupRoleAnnots,
@@ -56,19 +57,18 @@ import BasicTypes
 import SrcLoc
 import Unique ( mkBuiltinUnique )
 import Outputable
-import UniqSet
 import Util
 import Maybes
 import Data.List
 import Bag
-import FastString ( fastStringToByteString )
+import FastString
 
 import Control.Monad
 
 {-
 ************************************************************************
 *                                                                      *
-        Cycles in class and type synonym declarations
+        Cycles in type synonym declarations
 *                                                                      *
 ************************************************************************
 
@@ -139,123 +139,100 @@ mkSynEdges syn_decls = [ (ldecl, name, nameSetElems fvs)
 calcSynCycles :: [LTyClDecl Name] -> [SCC (LTyClDecl Name)]
 calcSynCycles = stronglyConnCompFromEdgedVertices . mkSynEdges
 
-{-
-Note [Superclass cycle check]
+{- Note [Superclass cycle check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We can't allow cycles via superclasses because it would result in the
-type checker looping when it canonicalises a class constraint (superclasses
-are added during canonicalisation).  More precisely, given a constraint
+The superclass cycle check for C decides if we can statically
+guarantee that expanding C's superclass cycles transitively is
+guaranteed to terminate.  This is a Haskell98 requirement,
+but one that we lift with -XUndecidableSuperClasses.
+
+The worry is that a superclass cycle could make the type checker loop.
+More precisely, with a constraint (Given or Wanted)
     C ty1 .. tyn
-we want to instantiate all of C's superclasses, transitively, and
-that set must be finite.  So if
-     class (D b, E b a) => C a b
-then when we encounter the constraint
-     C ty1 ty2
-we'll instantiate the superclasses
-     (D ty2, E ty2 ty1)
-and then *their* superclasses, and so on.  This set must be finite!
+one approach is to instantiate all of C's superclasses, transitively.
+We can only do so if that set is finite.
 
-It is OK for superclasses to be type synonyms for other classes, so
-must "look through" type synonyms. Eg
-     type X a = C [a]
-     class X a => C a   -- No!  Recursive superclass!
+This potential loop occurs only through superclasses.  This, for
+exmaple, is fine
+  class C a where
+    op :: C b => a -> b -> b
+even though C's full definition uses C.
 
-We want definitions such as:
+Making the check static also makes it conservative.  Eg
+  type family F a
+  class F a => C a
+Here an instance of (F a) might mention C:
+  type instance F [a] = C a
+and now we'd have a loop.
 
-  class C cls a where cls a => a -> a
-  class C D a => D a where
+The static check works like this, starting with C
+  * Look at C's superclass predicates
+  * If any is a type-function application,
+    or is headed by a type variable, fail
+  * If any has C at the head, fail
+  * If any has a type class D at the head,
+    make the same test with D
 
-to be accepted, even though a naive acyclicity check would reject the
-program as having a cycle between D and its superclass.  Why? Because
-when we instantiate
-     D ty1
-we get the superclas
-     C D ty1
-and C has no superclasses, so we have terminated with a finite set.
-
-More precisely, the rule is this: the superclasses sup_C of a class C
-are rejected iff:
-
-  C \elem expand(sup_C)
-
-Where expand is defined as follows:
-
-(1)  expand(a ty1 ... tyN) = expand(ty1) \union ... \union expand(tyN)
-
-(2)  expand(D ty1 ... tyN) = {D}
-                             \union sup_D[ty1/x1, ..., tyP/xP]
-                             \union expand(ty(P+1)) ... \union expand(tyN)
-           where (D x1 ... xM) is a class, P = min(M,N)
-
-(3)  expand(T ty1 ... tyN) = expand(ty1) \union ... \union expand(tyN)
-        where T is not a class
-
-Eqn (1) is conservative; when there's a type variable at the head,
-look in all the argument types.  Eqn (2) expands superclasses; the
-third component of the union is like Eqn (1).  Eqn (3) happens mainly
-when the context is a (constraint) tuple, such as (Eq a, Show a).
-
-Furthermore, expand always looks through type synonyms.
+A tricky point is: what if there is a type variable at the head?
+Consider this:
+   class f (C f) => C f
+   class c       => Id c
+and now expand superclasses for constraint (C Id):
+     C Id
+ --> Id (C Id)
+ --> C Id
+ --> ....
+Each step expands superclasses one layer, and clearly does not terminate.
 -}
 
-calcClassCycles :: Class -> [[TyCon]]
-calcClassCycles cls
-  = nubBy eqAsCycle $
-    expandTheta (unitUniqSet cls) [classTyCon cls] (classSCTheta cls) []
+checkClassCycles :: Class -> Maybe SDoc
+-- Nothing  <=> ok
+-- Just err <=> possible cycle error
+checkClassCycles cls
+  = do { (definite_cycle, err) <- go emptyNameSet cls
+       ; let herald | definite_cycle = ptext (sLit "Superclass cycle for")
+                    | otherwise      = ptext (sLit "Potential superclass cycle for")
+       ; return (vcat [ herald <+> quotes (ppr cls)
+                      , nest 2 err, hint]) }
   where
-    -- The last TyCon in the cycle is always the same as the first
-    eqAsCycle xs ys = any (xs ==) (cycles (tail ys))
-    cycles xs = take n . map (take n) . tails . cycle $ xs
-      where n = length xs
+    hint = ptext (sLit "Use UndecidableSuperClasses to accept this")
 
-    -- No more superclasses to expand ==> no problems with cycles
-    -- See Note [Superclass cycle check]
-    expandTheta :: UniqSet Class -- Path of Classes to here in set form
-                -> [TyCon]       -- Path to here
-                -> ThetaType     -- Superclass work list
-                -> [[TyCon]]     -- Input error paths
-                -> [[TyCon]]     -- Final error paths
-    expandTheta _    _    []           = id
-    expandTheta seen path (pred:theta) = expandType seen path pred . expandTheta seen path theta
+    go :: NameSet -> Class -> Maybe (Bool, SDoc)
+    go so_far cls = firstJusts $
+                    map (go_pred (so_far `extendNameSet` getName cls)) $
+                    classSCTheta cls
 
-    expandType seen path (TyConApp tc tys)
-      -- Expand unsaturated classes to their superclass theta if they are yet unseen.
-      -- If they have already been seen then we have detected an error!
+    go_pred :: NameSet -> PredType -> Maybe (Bool, SDoc)
+       -- Nothing <=> ok
+       -- Just (True, err)  <=> definite cycle
+       -- Just (False, err) <=> possible cycle
+    go_pred so_far pred  -- NB: tcSplitTyConApp looks through synonyms
+       | Just (tc, _) <- tcSplitTyConApp_maybe pred
+       = go_tc so_far pred tc
+       | hasTyVarHead pred
+       = Just (False, hang (ptext (sLit "one of whose superclass constraints is headed by a type variable:"))
+                         2 (quotes (ppr pred)))
+       | otherwise
+       = Nothing
+
+    go_tc :: NameSet -> PredType -> TyCon -> Maybe (Bool, SDoc)
+    go_tc so_far pred tc
+      | isFamilyTyCon tc
+      = Just (False, hang (ptext (sLit "one of whose superclass constraints is headed by a type family:"))
+                        2 (quotes (ppr pred)))
       | Just cls <- tyConClass_maybe tc
-      , let (env, remainder) = papp (classTyVars cls) tys
-            rest_tys = either (const []) id remainder
-      = if cls `elementOfUniqSet` seen
-         then (reverse (classTyCon cls:path):)
-              . flip (foldr (expandType seen path)) tys
-         else expandTheta (addOneToUniqSet seen cls) (tc:path)
-                          (substTys (mkTopTCvSubst env) (classSCTheta cls))
-              . flip (foldr (expandType seen path)) rest_tys
+      = go_cls so_far cls
+      | otherwise   -- Equality predicate, for example
+      = Nothing
 
-      -- For synonyms, try to expand them: some arguments might be
-      -- phantoms, after all. We can expand with impunity because at
-      -- this point the type synonym cycle check has already happened.
-      | Just (tvs, rhs) <- synTyConDefn_maybe tc
-      , let (env, remainder) = papp tvs tys
-            rest_tys = either (const []) id remainder
-      = expandType seen (tc:path) (substTy (mkTopTCvSubst env) rhs)
-        . flip (foldr (expandType seen path)) rest_tys
-
-      -- For non-class, non-synonyms, just check the arguments
-      | otherwise
-      = flip (foldr (expandType seen path)) tys
-
-    expandType _    _    (TyVarTy {})     = id
-    expandType _    _    (LitTy {})       = id
-    expandType seen path (AppTy t1 t2)    = expandType seen path t1 . expandType seen path t2
-    expandType seen path (ForAllTy b t)   = expandType seen path (binderType b) . expandType seen path t
-    expandType seen path (CastTy ty _co)  = expandType seen path ty
-    expandType _    _    (CoercionTy {})  = id
-
-    papp :: [TyVar] -> [Type] -> ([(TyVar, Type)], Either [TyVar] [Type])
-    papp []       tys      = ([], Right tys)
-    papp tvs      []       = ([], Left tvs)
-    papp (tv:tvs) (ty:tys) = ((tv, ty):env, remainder)
-      where (env, remainder) = papp tvs tys
+    go_cls :: NameSet -> Class -> Maybe (Bool, SDoc)
+    go_cls so_far cls
+       | getName cls  `elemNameSet` so_far
+       = Just (True, ptext (sLit "one of whose superclasses is") <+> quotes (ppr cls))
+       | otherwise
+       = do { (b,err) <- go so_far cls
+          ; return (b, ptext (sLit "one of whose superclasses is") <+> quotes (ppr cls)
+                       $$ err) }
 
 {-
 ************************************************************************

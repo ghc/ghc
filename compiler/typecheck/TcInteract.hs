@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 
 module TcInteract (
-     solveSimpleGivens,   -- Solves [EvVar],GivenLoc
+     solveSimpleGivens,   -- Solves [Ct]
      solveSimpleWanteds,  -- Solves Cts
 
      solveCallStack,      -- for use in TcSimplify
@@ -132,24 +132,18 @@ that prepareInertsForImplications will discard the insolubles, so we
 must keep track of them separately.
 -}
 
-solveSimpleGivens :: CtLoc -> [EvVar] -> TcS Cts
--- Solves the givens, adding them to the inert set
--- Returns any insoluble givens, which represent inaccessible code,
--- taking those ones out of the inert set
-solveSimpleGivens loc givens
+solveSimpleGivens :: [Ct] -> TcS Cts
+solveSimpleGivens givens
   | null givens  -- Shortcut for common case
   = return emptyCts
   | otherwise
-  = do { go (map mk_given_ct givens)
+  = do { go givens
        ; takeGivenInsolubles }
   where
-    mk_given_ct ev_id = mkNonCanonical (CtGiven { ctev_evar = ev_id
-                                                , ctev_pred = evVarPred ev_id
-                                                , ctev_loc  = loc })
     go givens = do { solveSimples (listToBag givens)
                    ; new_givens <- runTcPluginsGiven
-                   ; when (notNull new_givens) (go new_givens)
-                   }
+                   ; when (notNull new_givens) $
+                     go new_givens }
 
 solveSimpleWanteds :: Cts -> TcS WantedConstraints
 -- NB: 'simples' may contain /derived/ equalities, floated

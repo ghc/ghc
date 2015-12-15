@@ -345,7 +345,7 @@ warnRedundantConstraints ctxt env info ev_vars
                      _        -> ev_vars
 
    improving ev_var = any isImprovementPred $
-                      transSuperClassesPred (idType ev_var)
+                      transSuperClasses (idType ev_var)
 
 {- Note [Redundant constraints in instance decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -406,8 +406,9 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
                                                   True, mkUserTypeErrorReporter)
               , ("insoluble1",   is_given_eq,     True, mkGroupReporter mkEqErr)
               , ("insoluble2",   utterly_wrong,   True, mkGroupReporter mkEqErr)
-              , ("insoluble3",   rigid_nom_tv_eq, True, mkSkolReporter)
-              , ("insoluble4",   rigid_nom_eq,    True, mkGroupReporter mkEqErr)
+              , ("skolem eq1",   very_wrong,      True, mkSkolReporter)
+              , ("skolem eq2",   skolem_eq,       True, mkSkolReporter)
+              , ("non-tv eq",    non_tv_eq,       True, mkSkolReporter)
               , ("Out of scope", is_out_of_scope, True,  mkHoleReporter)
               , ("Holes",        is_hole,         False, mkHoleReporter)
 
@@ -420,28 +421,41 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
               , ("Irreds",          is_irred,        False, mkGroupReporter mkIrredErr)
               , ("Dicts",           is_dict,         False, mkGroupReporter mkDictErr) ]
 
-    rigid_nom_eq, rigid_nom_tv_eq, is_hole, is_dict,
+    -- rigid_nom_eq, rigid_nom_tv_eq,
+    is_hole, is_dict,
       is_equality, is_ip, is_irred :: Ct -> PredTree -> Bool
-
-    utterly_wrong _ (EqPred NomEq ty1 ty2) = isRigidTy ty1 && isRigidTy ty2
-    utterly_wrong _ _                      = False
-
-    is_out_of_scope ct _ = isOutOfScopeCt ct
-    is_hole         ct _ = isHoleCt ct
 
     is_given_eq ct pred
        | EqPred {} <- pred = arisesFromGivens ct
        | otherwise         = False
        -- I think all given residuals are equalities
 
+    -- Things like (Int ~N Bool)
+    utterly_wrong _ (EqPred NomEq ty1 ty2) = isRigidTy ty1 && isRigidTy ty2
+    utterly_wrong _ _                      = False
+
+    -- Things like (a ~N Int)
+    very_wrong _ (EqPred NomEq ty1 ty2) = isSkolemTy tc_lvl ty1 && isRigidTy ty2
+    very_wrong _ _                      = False
+
+    -- Things like (a ~N b) or (a  ~N  F Bool)
+    skolem_eq _ (EqPred NomEq ty1 _) =  isSkolemTy tc_lvl ty1
+    skolem_eq _ _                    = False
+
+    -- Things like (F a  ~N  Int)
+    non_tv_eq _ (EqPred NomEq ty1 _) = not (isTyVarTy ty1)
+    non_tv_eq _ _                    = False
+
+--    rigid_nom_eq _ pred = isRigidEqPred tc_lvl pred
+--
+--    rigid_nom_tv_eq _ pred
+--      | EqPred _ ty1 _ <- pred = isRigidEqPred tc_lvl pred && isTyVarTy ty1
+--      | otherwise              = False
+
+    is_out_of_scope ct _ = isOutOfScopeCt ct
+    is_hole         ct _ = isHoleCt ct
+
     is_user_type_error ct _ = isUserTypeErrorCt ct
-
-    -- Skolem (i.e. non-meta) type variable on the left
-    rigid_nom_eq _ pred = isRigidEqPred tc_lvl pred
-
-    rigid_nom_tv_eq _ pred
-      | EqPred _ ty1 _ <- pred = isRigidEqPred tc_lvl pred && isTyVarTy ty1
-      | otherwise              = False
 
     is_equality _ (EqPred {}) = True
     is_equality _ _           = False
@@ -457,6 +471,15 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
 
 
 ---------------
+isSkolemTy :: TcLevel -> Type -> Bool
+isSkolemTy tc_lvl ty
+  = case getTyVar_maybe ty of
+      Nothing -> False
+      Just tv -> isSkolemTyVar tv
+              || (isSigTyVar tv && isTouchableMetaTyVar tc_lvl tv)
+         -- The latter case is for touchable SigTvs
+         -- we postpone untouchables to a latter test (too obscure)
+
 isTyFun_maybe :: Type -> Maybe TyCon
 isTyFun_maybe ty = case tcSplitTyConApp_maybe ty of
                       Just (tc,_) | isTypeFamilyTyCon tc -> Just tc
@@ -476,15 +499,19 @@ type ReporterSpec
     , Reporter)                  -- The reporter itself
 
 mkSkolReporter :: Reporter
--- Suppress duplicates with the same LHS
+-- Suppress duplicates with either the same LHS, or same location
 mkSkolReporter ctxt cts
-  = mapM_ (reportGroup mkEqErr ctxt) (equivClasses cmp_lhs_type cts)
+  = mapM_ (reportGroup mkEqErr ctxt) (group cts)
   where
-    cmp_lhs_type ct1 ct2
-      = case (classifyPredType (ctPred ct1), classifyPredType (ctPred ct2)) of
-           (EqPred eq_rel1 ty1 _, EqPred eq_rel2 ty2 _) ->
-             (eq_rel1 `compare` eq_rel2) `thenCmp` (ty1 `cmpType` ty2)
-           _ -> pprPanic "mkSkolReporter" (ppr ct1 $$ ppr ct2)
+     group [] = []
+     group (ct:cts) = (ct : yeses) : group noes
+        where
+          (yeses, noes) = partition (group_with ct) cts
+
+     group_with ct1 ct2
+       | EQ <- cmp_loc      ct1 ct2 = True
+       | EQ <- cmp_lhs_type ct1 ct2 = True
+       | otherwise                  = False
 
 mkHoleReporter :: Reporter
 -- Reports errors one at a time
@@ -515,7 +542,16 @@ mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
 mkGroupReporter mk_err ctxt cts
   = mapM_ (reportGroup mk_err ctxt) (equivClasses cmp_loc cts)
   where
-    cmp_loc ct1 ct2 = ctLocSpan (ctLoc ct1) `compare` ctLocSpan (ctLoc ct2)
+
+cmp_lhs_type :: Ct -> Ct -> Ordering
+cmp_lhs_type ct1 ct2
+  = case (classifyPredType (ctPred ct1), classifyPredType (ctPred ct2)) of
+       (EqPred eq_rel1 ty1 _, EqPred eq_rel2 ty2 _) ->
+         (eq_rel1 `compare` eq_rel2) `thenCmp` (ty1 `cmpType` ty2)
+       _ -> pprPanic "mkSkolReporter" (ppr ct1 $$ ppr ct2)
+
+cmp_loc :: Ct -> Ct -> Ordering
+cmp_loc ct1 ct2 = ctLocSpan (ctLoc ct1) `compare` ctLocSpan (ctLoc ct2)
 
 reportGroup :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg) -> ReportErrCtxt
             -> [Ct] -> TcM ()
