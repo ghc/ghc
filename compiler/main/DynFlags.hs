@@ -1328,14 +1328,6 @@ wayUnsetGeneralFlags _ WayDyn      = [-- There's no point splitting objects
 wayUnsetGeneralFlags _ WayProf     = []
 wayUnsetGeneralFlags _ WayEventLog = []
 
-wayExtras :: Platform -> Way -> DynFlags -> DynFlags
-wayExtras _ (WayCustom {}) dflags = dflags
-wayExtras _ WayThreaded dflags = dflags
-wayExtras _ WayDebug    dflags = dflags
-wayExtras _ WayDyn      dflags = dflags
-wayExtras _ WayProf     dflags = dflags
-wayExtras _ WayEventLog dflags = dflags
-
 wayOptc :: Platform -> Way -> [String]
 wayOptc _ (WayCustom {}) = []
 wayOptc platform WayThreaded = case platformOS platform of
@@ -3692,12 +3684,11 @@ addWay w = upd (addWay' w)
 addWay' :: Way -> DynFlags -> DynFlags
 addWay' w dflags0 = let platform = targetPlatform dflags0
                         dflags1 = dflags0 { ways = w : ways dflags0 }
-                        dflags2 = wayExtras platform w dflags1
-                        dflags3 = foldr setGeneralFlag' dflags2
+                        dflags2 = foldr setGeneralFlag' dflags1
                                         (wayGeneralFlags platform w)
-                        dflags4 = foldr unSetGeneralFlag' dflags3
+                        dflags3 = foldr unSetGeneralFlag' dflags2
                                         (wayUnsetGeneralFlags platform w)
-                    in dflags4
+                    in dflags3
 
 removeWayDyn :: DynP ()
 removeWayDyn = upd (\dfs -> dfs { ways = filter (WayDyn /=) (ways dfs) })
