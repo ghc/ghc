@@ -476,6 +476,23 @@ mkStatePrimTy ty = TyConApp statePrimTyCon [ty]
 statePrimTyCon :: TyCon   -- See Note [The State# TyCon]
 statePrimTyCon   = pcPrimTyCon statePrimTyConName [Nominal] VoidRep
 
+{-
+RealWorld is deeply magical.  It is *primitive*, but it is not
+*unlifted* (hence ptrArg).  We never manipulate values of type
+RealWorld; it's only used in the type system, to parameterise State#.
+-}
+
+realWorldTyCon :: TyCon
+realWorldTyCon = mkLiftedPrimTyCon realWorldTyConName liftedTypeKind [] PtrRep
+realWorldTy :: Type
+realWorldTy          = mkTyConTy realWorldTyCon
+realWorldStatePrimTy :: Type
+realWorldStatePrimTy = mkStatePrimTy realWorldTy        -- State# RealWorld
+
+-- Note: the ``state-pairing'' types are not truly primitive,
+-- so they are defined in \tr{TysWiredIn.hs}, not here.
+
+
 voidPrimTy :: Type
 voidPrimTy = TyConApp voidPrimTyCon []
 
@@ -491,6 +508,14 @@ proxyPrimTyCon = mkPrimTyCon proxyPrimTyConName kind [Nominal,Nominal] VoidRep
                mkFunTy k unliftedTypeKind
         kv   = kKiVar
         k    = mkTyVarTy kv
+
+
+{- *********************************************************************
+*                                                                      *
+                Primitive equality constraints
+    See Note [Equality types and classes] in TysWiredIn
+*                                                                      *
+********************************************************************* -}
 
 eqPrimTyCon :: TyCon  -- The representation type for equality predicates
                       -- See Note [The ~# TyCon]
@@ -531,29 +556,12 @@ eqPhantPrimTyCon = mkPrimTyCon eqPhantPrimTyConName kind
         k1            = mkTyVarTy kv1
         k2            = mkTyVarTy kv2
 
-{-
-RealWorld is deeply magical.  It is *primitive*, but it is not
-*unlifted* (hence ptrArg).  We never manipulate values of type
-RealWorld; it's only used in the type system, to parameterise State#.
--}
 
-realWorldTyCon :: TyCon
-realWorldTyCon = mkLiftedPrimTyCon realWorldTyConName liftedTypeKind [] PtrRep
-realWorldTy :: Type
-realWorldTy          = mkTyConTy realWorldTyCon
-realWorldStatePrimTy :: Type
-realWorldStatePrimTy = mkStatePrimTy realWorldTy        -- State# RealWorld
-
-{-
-Note: the ``state-pairing'' types are not truly primitive, so they are
-defined in \tr{TysWiredIn.hs}, not here.
-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-\subsection[TysPrim-arrays]{The primitive array types}
+             The primitive array types
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 arrayPrimTyCon, mutableArrayPrimTyCon, mutableByteArrayPrimTyCon,
     byteArrayPrimTyCon, arrayArrayPrimTyCon, mutableArrayArrayPrimTyCon,
@@ -584,13 +592,12 @@ mkMutableArrayArrayPrimTy s = TyConApp mutableArrayArrayPrimTyCon [s]
 mkSmallMutableArrayPrimTy :: Type -> Type -> Type
 mkSmallMutableArrayPrimTy s elt = TyConApp smallMutableArrayPrimTyCon [s, elt]
 
-{-
-************************************************************************
+
+{- *********************************************************************
 *                                                                      *
-\subsection[TysPrim-mut-var]{The mutable variable type}
+                The mutable variable type
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 mutVarPrimTyCon :: TyCon
 mutVarPrimTyCon = pcPrimTyCon mutVarPrimTyConName [Nominal, Representational] PtrRep

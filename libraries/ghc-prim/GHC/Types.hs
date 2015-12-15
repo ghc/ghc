@@ -189,9 +189,9 @@ inside GHC, to change the kind and type.
 -- | Lifted, heterogeneous equality. By lifted, we mean that it
 -- can be bogus (deferred type error). By heterogeneous, the two
 -- types @a@ and @b@ might have different kinds.
-class a ~~ b
+class a ~~ b     -- See Note [Equality types and clases in TysWiredIn]
 
--- | This two-parameter class has instances for types @a@ and @b@ if
+-- | @Coercible@ is a two-parameter class that has instances for types @a@ and @b@ if
 --      the compiler can infer that they have the same representation. This class
 --      does not have regular instances; instead they are created on-the-fly during
 --      type-checking. Trying to manually declare an instance of @Coercible@
@@ -238,7 +238,7 @@ class a ~~ b
 --      by Joachim Breitner, Richard A. Eisenberg, Simon Peyton Jones and Stephanie Weirich.
 --
 --      @since 4.7.0.0
-class Coercible a b
+class Coercible a b    -- See Note [Equality types and clases in TysWiredIn]
 
 {- *********************************************************************
 *                                                                      *
