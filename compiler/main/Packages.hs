@@ -1157,7 +1157,7 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
         rts_tag = mkBuildTag ways2
 
         mkDynName x
-         | gopt Opt_Static dflags       = x
+         | WayDyn `notElem` ways dflags = x
          | "HS" `isPrefixOf` x          =
               x ++ '-':programName dflags ++ projectVersion dflags
            -- For non-Haskell libraries, we use the name "Cfoo". The .a
@@ -1362,10 +1362,10 @@ unitIdPackageIdString dflags pkg_key
 -- | Will the 'Name' come from a dynamically linked library?
 isDllName :: DynFlags -> UnitId -> Module -> Name -> Bool
 -- Despite the "dll", I think this function just means that
--- the synbol comes from another dynamically-linked package,
+-- the symbol comes from another dynamically-linked package,
 -- and applies on all platforms, not just Windows
 isDllName dflags _this_pkg this_mod name
-  | gopt Opt_Static dflags = False
+  | WayDyn `notElem` ways dflags = False
   | Just mod <- nameModule_maybe name
     -- Issue #8696 - when GHC is dynamically linked, it will attempt
     -- to load the dynamic dependencies of object files at compile

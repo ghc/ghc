@@ -1545,7 +1545,7 @@ linkDynLib dflags0 o_files dep_packages
          | ( osElfTarget (platformOS (targetPlatform dflags)) ||
              osMachOTarget (platformOS (targetPlatform dflags)) ) &&
            dynLibLoader dflags == SystemDependent &&
-           not (gopt Opt_Static dflags)
+           WayDyn `elem` ways dflags
             = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
          | otherwise = ["-L" ++ l]
 

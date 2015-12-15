@@ -483,7 +483,7 @@ ghcLinkInfoNoteName = "GHC link info"
 
 findHSLib :: DynFlags -> [String] -> String -> IO (Maybe FilePath)
 findHSLib dflags dirs lib = do
-  let batch_lib_file = if gopt Opt_Static dflags
+  let batch_lib_file = if WayDyn `notElem` ways dflags
                        then "lib" ++ lib <.> "a"
                        else mkSOName (targetPlatform dflags) lib
   found <- filterM doesFileExist (map (</> batch_lib_file) dirs)
@@ -1417,7 +1417,7 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
         -- DATA segment or dyld traps at runtime writing into TEXT: see #7722
         rmodel | platformOS (targetPlatform dflags) == OSiOS = "dynamic-no-pic"
                | gopt Opt_PIC dflags                         = "pic"
-               | not (gopt Opt_Static dflags)                = "dynamic-no-pic"
+               | WayDyn `elem` ways dflags                   = "dynamic-no-pic"
                | otherwise                                   = "static"
         tbaa | gopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
              | otherwise                = "--enable-tbaa=false"
@@ -1733,7 +1733,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
         get_pkg_lib_path_opts l
          | osElfTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
-           not (gopt Opt_Static dflags)
+           WayDyn `elem` ways dflags
             = let libpath = if gopt Opt_RelativeDynlibPaths dflags
                             then "$ORIGIN" </>
                                  (l `makeRelativeTo` full_output_fn)
@@ -1753,7 +1753,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
               in ["-L" ++ l] ++ rpathlink ++ rpath
          | osMachOTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
-           not (gopt Opt_Static dflags) &&
+           WayDyn `elem` ways dflags &&
            gopt Opt_RPath dflags
             = let libpath = if gopt Opt_RelativeDynlibPaths dflags
                             then "@loader_path" </>

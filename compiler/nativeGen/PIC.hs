@@ -167,7 +167,7 @@ cmmMakePicReference dflags lbl
                                 (platformOS     $ targetPlatform dflags)
                                 lbl ]
 
-        | (gopt Opt_PIC dflags || not (gopt Opt_Static dflags)) && absoluteLabel lbl
+        | (gopt Opt_PIC dflags || WayDyn `elem` ways dflags) && absoluteLabel lbl
         = CmmMachOp (MO_Add (wordWidth dflags))
                 [ CmmReg (CmmGlobal PicBaseReg)
                 , CmmLit $ picRelative
@@ -220,14 +220,14 @@ howToAccessLabel
 -- To access the function at SYMBOL from our local module, we just need to
 -- dereference the local __imp_SYMBOL.
 --
--- If Opt_Static is set then we assume that all our code will be linked
+-- If not compiling with -dynamic we assume that all our code will be linked
 -- into the same .exe file. In this case we always access symbols directly,
 -- and never use __imp_SYMBOL.
 --
 howToAccessLabel dflags _ OSMinGW32 this_mod _ lbl
 
         -- Assume all symbols will be in the same PE, so just access them directly.
-        | gopt Opt_Static dflags
+        | WayDyn `notElem` ways dflags
         = AccessDirectly
 
         -- If the target symbol is in another PE we need to access it via the
@@ -317,7 +317,7 @@ howToAccessLabel dflags _ os _ _ _
         --           if we don't dynamically link to Haskell code,
         --           it actually manages to do so without messing things up.
         | osElfTarget os
-        , not (gopt Opt_PIC dflags) && gopt Opt_Static dflags
+        , not (gopt Opt_PIC dflags) && WayDyn `notElem` ways dflags
         = AccessDirectly
 
 howToAccessLabel dflags arch os this_mod DataReference lbl
@@ -439,7 +439,7 @@ needImportedSymbols dflags arch os
         -- PowerPC Linux: -fPIC or -dynamic
         | osElfTarget os
         , arch  == ArchPPC
-        = gopt Opt_PIC dflags || not (gopt Opt_Static dflags)
+        = gopt Opt_PIC dflags || WayDyn `elem` ways dflags
 
         -- PowerPC 64 Linux: always
         | osElfTarget os
@@ -449,7 +449,7 @@ needImportedSymbols dflags arch os
         -- i386 (and others?): -dynamic but not -fPIC
         | osElfTarget os
         , arch /= ArchPPC_64 ELF_V1 && arch /= ArchPPC_64 ELF_V2
-        = not (gopt Opt_Static dflags) && not (gopt Opt_PIC dflags)
+        = WayDyn `elem` ways dflags && not (gopt Opt_PIC dflags)
 
         | otherwise
         = False
@@ -650,7 +650,7 @@ pprImportedSymbol _ (Platform { platformOS = OSDarwin }) _
 --    section.
 --    The "official" GOT mechanism (label@got) isn't intended to be used
 --    in position dependent code, so we have to create our own "fake GOT"
---    when not Opt_PIC && not (gopt Opt_Static dflags).
+--    when not Opt_PIC && WayDyn `elem` ways dflags.
 --
 -- 2) PowerPC Linux is just plain broken.
 --    While it's theoretically possible to use GOT offsets larger

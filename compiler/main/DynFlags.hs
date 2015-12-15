@@ -423,7 +423,6 @@ data GeneralFlag
    | Opt_Ticky_Allocd
    | Opt_Ticky_LNE
    | Opt_Ticky_Dyn_Thunk
-   | Opt_Static
    | Opt_RPath
    | Opt_RelativeDynlibPaths
    | Opt_Hpc
@@ -2162,10 +2161,7 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 updateWays :: DynFlags -> DynFlags
 updateWays dflags
     = let theWays = sort $ nub $ ways dflags
-          f = if WayDyn `elem` theWays then unSetGeneralFlag'
-                                       else setGeneralFlag'
-      in f Opt_Static
-       $ dflags {
+      in dflags {
              ways        = theWays,
              buildTag    = mkBuildTag (filter (not . wayRTSOnly) theWays),
              rtsBuildTag = mkBuildTag                            theWays
@@ -3303,8 +3299,7 @@ defaultFlags settings
 
     ++ (if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
         then wayGeneralFlags platform WayDyn
-        else [Opt_Static])
-        -- Opt_Static needs to be set if and only if WayDyn is not used (#7478)
+        else [])
 
     where platform = sTargetPlatform settings
 
@@ -4170,7 +4165,7 @@ picCCOpts dflags
       -- correctly.  They need to reference data in the Haskell
       -- objects, but can't without -fPIC.  See
       -- http://ghc.haskell.org/trac/ghc/wiki/Commentary/PositionIndependentCode
-       | gopt Opt_PIC dflags || not (gopt Opt_Static dflags) ->
+       | gopt Opt_PIC dflags || WayDyn `elem` ways dflags ->
           ["-fPIC", "-U__PIC__", "-D__PIC__"]
        | otherwise                             -> []
 
@@ -4302,7 +4297,7 @@ makeDynFlagsConsistent dflags
  | hscTarget dflags == HscLlvm &&
    not ((arch == ArchX86_64) && (os == OSLinux || os == OSDarwin || os == OSFreeBSD)) &&
    not ((isARM arch) && (os == OSLinux)) &&
-   (not (gopt Opt_Static dflags) || gopt Opt_PIC dflags)
+   (gopt Opt_PIC dflags || WayDyn `elem` ways dflags)
     = if cGhcWithNativeCodeGen == "YES"
       then let dflags' = dflags { hscTarget = HscAsm }
                warn = "Using native code generator rather than LLVM, as LLVM is incompatible with -fPIC and -dynamic on this platform"

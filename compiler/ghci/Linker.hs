@@ -827,11 +827,8 @@ dynLoadObjs _      pls []   = return pls
 dynLoadObjs dflags pls objs = do
     let platform = targetPlatform dflags
     (soFile, libPath , libName) <- newTempLibName dflags (soExt platform)
-    let -- When running TH for a non-dynamic way, we still need to make
-        -- -l flags to link against the dynamic libraries, so we turn
-        -- Opt_Static off
-        dflags1 = gopt_unset dflags Opt_Static
-        dflags2 = dflags1 {
+    let
+        dflags2 = dflags {
                       -- We don't want the original ldInputs in
                       -- (they're already linked in), but we do want
                       -- to link against previous dynLoadObjs
@@ -847,6 +844,10 @@ dynLoadObjs dflags pls objs = do
                                  , Option ("-l" ++  l)
                                  ])
                             (temp_sos pls),
+                      -- When running TH for a non-dynamic way, we still
+                      -- need to make -l flags to link against the dynamic
+                      -- libraries, so we need to add WayDyn to ways.
+                      --
                       -- Even if we're e.g. profiling, we still want
                       -- the vanilla dynamic libraries, so we set the
                       -- ways / build tag to be just WayDyn.
