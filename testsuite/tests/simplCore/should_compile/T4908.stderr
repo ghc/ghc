@@ -9,7 +9,7 @@ T4908.$trModule2 :: TrName
  Str=DmdType m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
-T4908.$trModule2 = TrNameS "main"#
+T4908.$trModule2 = GHC.Types.TrNameS "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 T4908.$trModule1 :: TrName
@@ -18,7 +18,7 @@ T4908.$trModule1 :: TrName
  Str=DmdType m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T4908.$trModule1 = TrNameS "T4908"#
+T4908.$trModule1 = GHC.Types.TrNameS "T4908"#
 
 -- RHS size: {terms: 3, types: 0, coercions: 0}
 T4908.$trModule :: Module
@@ -27,7 +27,8 @@ T4908.$trModule :: Module
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
-T4908.$trModule = Module T4908.$trModule2 T4908.$trModule1
+T4908.$trModule =
+  GHC.Types.Module T4908.$trModule2 T4908.$trModule1
 
 Rec {
 -- RHS size: {terms: 19, types: 5, coercions: 0}
@@ -39,9 +40,9 @@ T4908.f_$s$wf =
       __DEFAULT ->
         case sc1 of ds1 {
           __DEFAULT -> T4908.f_$s$wf sc ds1 (-# ds 1#);
-          0# -> True
+          0# -> GHC.Types.True
         };
-      0# -> True
+      0# -> GHC.Types.True
     }
 end Rec }
 
@@ -61,11 +62,11 @@ T4908.$wf =
         case b of _ [Occ=Dead] { I# ds1 ->
         case ds1 of ds2 {
           __DEFAULT -> T4908.f_$s$wf a ds2 (-# ds 1#);
-          0# -> True
+          0# -> GHC.Types.True
         }
         }
         };
-      0# -> True
+      0# -> GHC.Types.True
     }
 
 -- RHS size: {terms: 8, types: 6, coercions: 0}
@@ -87,7 +88,7 @@ f =
 ------ Local rules for imported ids --------
 "SC:$wf0" [0]
     forall (sc :: Int) (sc1 :: Int#) (sc2 :: Int#).
-      T4908.$wf sc2 (sc, I# sc1)
+      T4908.$wf sc2 (sc, GHC.Types.I# sc1)
       = T4908.f_$s$wf sc sc1 sc2
 
 

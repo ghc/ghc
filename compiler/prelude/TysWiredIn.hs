@@ -68,7 +68,8 @@ module TysWiredIn (
         -- * Kinds
         typeNatKindCon, typeNatKind, typeSymbolKindCon, typeSymbolKind,
         isLiftedTypeKindTyConName, liftedTypeKind, constraintKind,
-        starKindTyConName, unicodeStarKindTyConName,
+        starKindTyCon, starKindTyConName,
+        unicodeStarKindTyCon, unicodeStarKindTyConName,
         liftedTypeKindTyCon, constraintKindTyCon,
 
         -- * Parallel arrays

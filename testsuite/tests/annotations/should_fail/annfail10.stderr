@@ -1,29 +1,28 @@
 
 annfail10.hs:9:1: error:
-    Ambiguous type variable ‘a0’ arising from an annotation
-    prevents the constraint ‘(Data a0)’ from being solved.
-    Probable fix: use a type annotation to specify what ‘a0’ should be.
-    These potential instances exist:
-      instance (Data a, Data b) => Data (Either a b)
-        -- Defined in ‘Data.Data’
-      instance Data All -- Defined in ‘Data.Data’
-      instance (Data (f a), Data a, Typeable f) => Data (Alt f a)
-        -- Defined in ‘Data.Data’
-      ...plus 39 others
-      (use -fprint-potential-instances to see them all)
-    In the annotation: {-# ANN f 1 #-}
+    • Ambiguous type variable ‘a0’ arising from an annotation
+      prevents the constraint ‘(Data.Data.Data a0)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘a0’ should be.
+      These potential instances exist:
+        instance (Data.Data.Data a, Data.Data.Data b) =>
+                 Data.Data.Data (Either a b)
+          -- Defined in ‘Data.Data’
+        instance Data.Data.Data Ordering -- Defined in ‘Data.Data’
+        instance Data.Data.Data Integer -- Defined in ‘Data.Data’
+        ...plus 15 others
+        ...plus 24 instance involving out-of-scope typess
+        (use -fprint-potential-instances to see them all)
+    • In the annotation: {-# ANN f 1 #-}
 
 annfail10.hs:9:11: error:
-    Ambiguous type variable ‘a0’ arising from the literal ‘1’
-    prevents the constraint ‘(Num a0)’ from being solved.
-    Probable fix: use a type annotation to specify what ‘a0’ should be.
-    These potential instances exist:
-      instance forall k (f :: k -> *) (a :: k).
-               Num (f a) =>
-               Num (Alt f a)
-        -- Defined in ‘Data.Monoid’
-      instance Num a => Num (Product a) -- Defined in ‘Data.Monoid’
-      instance Num a => Num (Sum a) -- Defined in ‘Data.Monoid’
-      ...plus 14 others
-      (use -fprint-potential-instances to see them all)
-    In the annotation: {-# ANN f 1 #-}
+    • Ambiguous type variable ‘a0’ arising from the literal ‘1’
+      prevents the constraint ‘(Num a0)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘a0’ should be.
+      These potential instances exist:
+        instance Num Integer -- Defined in ‘GHC.Num’
+        instance Num Double -- Defined in ‘GHC.Float’
+        instance Num Float -- Defined in ‘GHC.Float’
+        ...plus two others
+        ...plus 12 instance involving out-of-scope typess
+        (use -fprint-potential-instances to see them all)
+    • In the annotation: {-# ANN f 1 #-}

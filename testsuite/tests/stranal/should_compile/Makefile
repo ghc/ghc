@@ -8,11 +8,13 @@ include $(TOP)/mk/test.mk
 #   with two unboxed args.  See Trac #10482 for background
 T10482:
 	$(RM) -f T10482.o T10482.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T10482.hs | grep 'T10482.*wfoo.*Int'
+	# Set -dppr-cols to ensure output doesn't wrap
+	'$(TEST_HC)' $(TEST_HC_OPTS) -dppr-cols=200 -O -c -ddump-simpl T10482.hs | grep 'T10482.*wfoo.*Int'
 
 T10482a:
 	$(RM) -f T10482a.o T10482a.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T10482a.hs | grep 'wf.*Int'
+	# Set -dppr-cols to ensure output doesn't wrap
+	'$(TEST_HC)' $(TEST_HC_OPTS) -dppr-cols=200 -O -c -ddump-simpl T10482a.hs | grep 'wf.*Int'
 
 T10694:
 	$(RM) -f T10694.o

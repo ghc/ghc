@@ -12,114 +12,125 @@ T7360.$WFoo3 [InlPrag=INLINE] :: Int -> Foo
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=False)
          Tmpl= \ (dt [Occ=Once!] :: Int) ->
-                 case dt of _ [Occ=Dead] { I# dt [Occ=Once] -> T7360.Foo3 dt }}]
+                 case dt of _ [Occ=Dead] { GHC.Types.I# dt [Occ=Once] ->
+                 T7360.Foo3 dt
+                 }}]
 T7360.$WFoo3 =
   \ (dt [Occ=Once!] :: Int) ->
-    case dt of _ [Occ=Dead] { I# dt [Occ=Once] -> T7360.Foo3 dt }
+    case dt of _ [Occ=Dead] { GHC.Types.I# dt [Occ=Once] ->
+    T7360.Foo3 dt
+    }
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
-T7360.$trModule2 :: TrName
+T7360.$trModule2 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=DmdType m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
-T7360.$trModule2 = TrNameS "main"#
+T7360.$trModule2 = GHC.Types.TrNameS "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
-T7360.$trModule1 :: TrName
+T7360.$trModule1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=DmdType m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T7360.$trModule1 = TrNameS "T7360"#
+T7360.$trModule1 = GHC.Types.TrNameS "T7360"#
 
 -- RHS size: {terms: 3, types: 0, coercions: 0}
-T7360.$trModule :: Module
+T7360.$trModule :: GHC.Types.Module
 [GblId[ReflectionId],
  Caf=NoCafRefs,
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
-T7360.$trModule = Module T7360.$trModule2 T7360.$trModule1
+T7360.$trModule =
+  GHC.Types.Module T7360.$trModule2 T7360.$trModule1
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
-T7360.$tc'Foo6 :: TrName
+T7360.$tc'Foo6 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=DmdType m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T7360.$tc'Foo6 = TrNameS "'Foo3"#
+T7360.$tc'Foo6 = GHC.Types.TrNameS "'Foo3"#
 
 -- RHS size: {terms: 5, types: 0, coercions: 0}
-T7360.$tc'Foo3 :: TyCon
+T7360.$tc'Foo3 :: GHC.Types.TyCon
 [GblId[ReflectionId],
  Caf=NoCafRefs,
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 50}]
-T7360.$tc'Foo3 = TyCon 0## 0## T7360.$trModule T7360.$tc'Foo6
+T7360.$tc'Foo3 =
+  GHC.Types.TyCon 0## 0## T7360.$trModule T7360.$tc'Foo6
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
-T7360.$tc'Foo5 :: TrName
+T7360.$tc'Foo5 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=DmdType m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T7360.$tc'Foo5 = TrNameS "'Foo2"#
+T7360.$tc'Foo5 = GHC.Types.TrNameS "'Foo2"#
 
 -- RHS size: {terms: 5, types: 0, coercions: 0}
-T7360.$tc'Foo2 :: TyCon
+T7360.$tc'Foo2 :: GHC.Types.TyCon
 [GblId[ReflectionId],
  Caf=NoCafRefs,
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 50}]
-T7360.$tc'Foo2 = TyCon 0## 0## T7360.$trModule T7360.$tc'Foo5
+T7360.$tc'Foo2 =
+  GHC.Types.TyCon 0## 0## T7360.$trModule T7360.$tc'Foo5
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
-T7360.$tc'Foo4 :: TrName
+T7360.$tc'Foo4 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=DmdType m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T7360.$tc'Foo4 = TrNameS "'Foo1"#
+T7360.$tc'Foo4 = GHC.Types.TrNameS "'Foo1"#
 
 -- RHS size: {terms: 5, types: 0, coercions: 0}
-T7360.$tc'Foo1 :: TyCon
+T7360.$tc'Foo1 :: GHC.Types.TyCon
 [GblId[ReflectionId],
  Caf=NoCafRefs,
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 50}]
-T7360.$tc'Foo1 = TyCon 0## 0## T7360.$trModule T7360.$tc'Foo4
+T7360.$tc'Foo1 =
+  GHC.Types.TyCon 0## 0## T7360.$trModule T7360.$tc'Foo4
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
-T7360.$tcFoo1 :: TrName
+T7360.$tcFoo1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=DmdType m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
-T7360.$tcFoo1 = TrNameS "Foo"#
+T7360.$tcFoo1 = GHC.Types.TrNameS "Foo"#
 
 -- RHS size: {terms: 5, types: 0, coercions: 0}
-T7360.$tcFoo :: TyCon
+T7360.$tcFoo :: GHC.Types.TyCon
 [GblId[ReflectionId],
  Caf=NoCafRefs,
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 50}]
-T7360.$tcFoo = TyCon 0## 0## T7360.$trModule T7360.$tcFoo1
+T7360.$tcFoo =
+  GHC.Types.TyCon 0## 0## T7360.$trModule T7360.$tcFoo1
 
 -- RHS size: {terms: 5, types: 2, coercions: 0}
 fun1 [InlPrag=NOINLINE] :: Foo -> ()
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U>]
-fun1 = \ (x :: Foo) -> case x of _ [Occ=Dead] { __DEFAULT -> () }
+fun1 =
+  \ (x :: Foo) ->
+    case x of _ [Occ=Dead] { __DEFAULT -> GHC.Tuple.() }
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 T7360.fun5 :: ()
@@ -136,7 +147,7 @@ T7360.fun4 :: Int
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-T7360.fun4 = I# 0#
+T7360.fun4 = GHC.Types.I# 0#
 
 -- RHS size: {terms: 16, types: 13, coercions: 0}
 fun2 :: forall a. [a] -> ((), Int)
@@ -151,7 +162,9 @@ fun2 :: forall a. [a] -> ((), Int)
                   case x of wild {
                     [] -> T7360.fun4;
                     : _ [Occ=Dead] _ [Occ=Dead] ->
-                      case GHC.List.$wlenAcc @ a wild 0# of ww2 { __DEFAULT -> I# ww2 }
+                      case GHC.List.$wlenAcc @ a wild 0# of ww2 { __DEFAULT ->
+                      GHC.Types.I# ww2
+                      }
                   })}]
 fun2 =
   \ (@ a) (x :: [a]) ->
@@ -159,7 +172,9 @@ fun2 =
      case x of wild {
        [] -> T7360.fun4;
        : ds ds1 ->
-         case GHC.List.$wlenAcc @ a wild 0# of ww2 { __DEFAULT -> I# ww2 }
+         case GHC.List.$wlenAcc @ a wild 0# of ww2 { __DEFAULT ->
+         GHC.Types.I# ww2
+         }
      })
 
 

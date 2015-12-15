@@ -11,8 +11,13 @@ Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
                      integer-gmp-1.0.0.0]
 
 ==================== Typechecker ====================
-Roles12.$tcC2 = TyCon 0## 0## Roles12.$trModule (TrNameS "C2"#)
+Roles12.$tcC2
+  = GHC.Types.TyCon
+      0## 0## Roles12.$trModule (GHC.Types.TrNameS "C2"#)
 Roles12.$tc'D:C2
-  = TyCon 0## 0## Roles12.$trModule (TrNameS "'D:C2"#)
-Roles12.$trModule = Module (TrNameS "main"#) (TrNameS "Roles12"#)
+  = GHC.Types.TyCon
+      0## 0## Roles12.$trModule (GHC.Types.TrNameS "'D:C2"#)
+Roles12.$trModule
+  = GHC.Types.Module
+      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Roles12"#)
 

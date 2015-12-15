@@ -1,6 +1,6 @@
 
 WCompatWarningsOn.hs:13:5: warning:
-    • Could not deduce (MonadFail m)
+    • Could not deduce (Control.Monad.Fail.MonadFail m)
         arising from the failable pattern ‘Just _’
         (this will become an error a future GHC release)
       from the context: Monad m
@@ -8,7 +8,7 @@ WCompatWarningsOn.hs:13:5: warning:
                    monadFail :: Monad m => m a
         at WCompatWarningsOn.hs:11:1-27
       Possible fix:
-        add (MonadFail m) to the context of
+        add (Control.Monad.Fail.MonadFail m) to the context of
           the type signature for:
             monadFail :: Monad m => m a
     • In a stmt of a 'do' block: Just _ <- undefined
@@ -26,7 +26,7 @@ WCompatWarningsOn.hs:16:1: warning:
 
 WCompatWarningsOn.hs:22:3: warning:
     Noncanonical ‘(<>) = mappend’ definition detected
-    in the instance declaration for ‘Semigroup S’.
+    in the instance declaration for ‘Semi.Semigroup S’.
     Move definition from ‘mappend’ to ‘(<>)’
 
 WCompatWarningsOn.hs:25:3: warning:

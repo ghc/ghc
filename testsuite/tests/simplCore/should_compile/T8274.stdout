@@ -1,12 +1,12 @@
-T8274.$trModule2 = TrNameS "main"#
-T8274.$trModule1 = TrNameS "T8274"#
-T8274.$tc'Positives1 = TrNameS "'Positives"#
-  TyCon 0## 0## T8274.$trModule T8274.$tc'Positives1
-T8274.$tcP1 = TrNameS "P"#
-T8274.$tcP = TyCon 0## 0## T8274.$trModule T8274.$tcP1
-T8274.$tc'Negatives1 = TrNameS "'Negatives"#
-  TyCon 0## 0## T8274.$trModule T8274.$tc'Negatives1
-T8274.$tcN1 = TrNameS "N"#
-T8274.$tcN = TyCon 0## 0## T8274.$trModule T8274.$tcN1
+T8274.$trModule2 = GHC.Types.TrNameS "main"#
+T8274.$trModule1 = GHC.Types.TrNameS "T8274"#
+T8274.$tc'Positives1 = GHC.Types.TrNameS "'Positives"#
+  GHC.Types.TyCon 0## 0## T8274.$trModule T8274.$tc'Positives1
+T8274.$tcP1 = GHC.Types.TrNameS "P"#
+T8274.$tcP = GHC.Types.TyCon 0## 0## T8274.$trModule T8274.$tcP1
+T8274.$tc'Negatives1 = GHC.Types.TrNameS "'Negatives"#
+  GHC.Types.TyCon 0## 0## T8274.$trModule T8274.$tc'Negatives1
+T8274.$tcN1 = GHC.Types.TrNameS "N"#
+T8274.$tcN = GHC.Types.TyCon 0## 0## T8274.$trModule T8274.$tcN1
 p = T8274.Positives 42# 4.23# 4.23## '4'# 4##
 n = T8274.Negatives -4# -4.0# -4.0##

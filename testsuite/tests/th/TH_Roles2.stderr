@@ -5,17 +5,18 @@ TYPE CONSTRUCTORS
     Kind: forall k1. k1 -> *
 COERCION AXIOMS
 Dependent modules: []
-Dependent packages: [array-0.5.1.0, base-4.9.0.0, deepseq-1.4.1.1,
+Dependent packages: [array-0.5.1.0, base-4.9.0.0, deepseq-1.4.2.0,
                      ghc-boot-0.0.0.0, ghc-prim-0.5.0.0, integer-gmp-1.0.0.0,
                      pretty-1.1.2.0, template-haskell-2.11.0.0]
 
 ==================== Typechecker ====================
 TH_Roles2.$tcT
-  = TyCon
+  = GHC.Types.TyCon
       6325001754388382679##
       4656387726417942748##
       TH_Roles2.$trModule
-      (TrNameS "T"#)
+      (GHC.Types.TrNameS "T"#)
 TH_Roles2.$trModule
-  = Module (TrNameS "main"#) (TrNameS "TH_Roles2"#)
+  = GHC.Types.Module
+      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "TH_Roles2"#)
 

@@ -25,19 +25,49 @@ Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
                      integer-gmp-1.0.0.0]
 
 ==================== Typechecker ====================
-Roles1.$tcT7 = TyCon 0## 0## Roles1.$trModule (TrNameS "T7"#)
-Roles1.$tc'K7 = TyCon 0## 0## Roles1.$trModule (TrNameS "'K7"#)
-Roles1.$tcT6 = TyCon 0## 0## Roles1.$trModule (TrNameS "T6"#)
-Roles1.$tc'K6 = TyCon 0## 0## Roles1.$trModule (TrNameS "'K6"#)
-Roles1.$tcT5 = TyCon 0## 0## Roles1.$trModule (TrNameS "T5"#)
-Roles1.$tc'K5 = TyCon 0## 0## Roles1.$trModule (TrNameS "'K5"#)
-Roles1.$tcT4 = TyCon 0## 0## Roles1.$trModule (TrNameS "T4"#)
-Roles1.$tc'K4 = TyCon 0## 0## Roles1.$trModule (TrNameS "'K4"#)
-Roles1.$tcT3 = TyCon 0## 0## Roles1.$trModule (TrNameS "T3"#)
-Roles1.$tc'K3 = TyCon 0## 0## Roles1.$trModule (TrNameS "'K3"#)
-Roles1.$tcT2 = TyCon 0## 0## Roles1.$trModule (TrNameS "T2"#)
-Roles1.$tc'K2 = TyCon 0## 0## Roles1.$trModule (TrNameS "'K2"#)
-Roles1.$tcT1 = TyCon 0## 0## Roles1.$trModule (TrNameS "T1"#)
-Roles1.$tc'K1 = TyCon 0## 0## Roles1.$trModule (TrNameS "'K1"#)
-Roles1.$trModule = Module (TrNameS "main"#) (TrNameS "Roles1"#)
+Roles1.$tcT7
+  = GHC.Types.TyCon
+      0## 0## Roles1.$trModule (GHC.Types.TrNameS "T7"#)
+Roles1.$tc'K7
+  = GHC.Types.TyCon
+      0## 0## Roles1.$trModule (GHC.Types.TrNameS "'K7"#)
+Roles1.$tcT6
+  = GHC.Types.TyCon
+      0## 0## Roles1.$trModule (GHC.Types.TrNameS "T6"#)
+Roles1.$tc'K6
+  = GHC.Types.TyCon
+      0## 0## Roles1.$trModule (GHC.Types.TrNameS "'K6"#)
+Roles1.$tcT5
+  = GHC.Types.TyCon
+      0## 0## Roles1.$trModule (GHC.Types.TrNameS "T5"#)
+Roles1.$tc'K5
+  = GHC.Types.TyCon
+      0## 0## Roles1.$trModule (GHC.Types.TrNameS "'K5"#)
+Roles1.$tcT4
+  = GHC.Types.TyCon
+      0## 0## Roles1.$trModule (GHC.Types.TrNameS "T4"#)
+Roles1.$tc'K4
+  = GHC.Types.TyCon
+      0## 0## Roles1.$trModule (GHC.Types.TrNameS "'K4"#)
+Roles1.$tcT3
+  = GHC.Types.TyCon
+      0## 0## Roles1.$trModule (GHC.Types.TrNameS "T3"#)
+Roles1.$tc'K3
+  = GHC.Types.TyCon
+      0## 0## Roles1.$trModule (GHC.Types.TrNameS "'K3"#)
+Roles1.$tcT2
+  = GHC.Types.TyCon
+      0## 0## Roles1.$trModule (GHC.Types.TrNameS "T2"#)
+Roles1.$tc'K2
+  = GHC.Types.TyCon
+      0## 0## Roles1.$trModule (GHC.Types.TrNameS "'K2"#)
+Roles1.$tcT1
+  = GHC.Types.TyCon
+      0## 0## Roles1.$trModule (GHC.Types.TrNameS "T1"#)
+Roles1.$tc'K1
+  = GHC.Types.TyCon
+      0## 0## Roles1.$trModule (GHC.Types.TrNameS "'K1"#)
+Roles1.$trModule
+  = GHC.Types.Module
+      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Roles1"#)
 

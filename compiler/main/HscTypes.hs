@@ -159,7 +159,9 @@ import CoAxiom
 import ConLike
 import DataCon
 import PatSyn
-import PrelNames        ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
+import PrelNames        ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule
+                        , eqTyConName )
+import TysWiredIn
 import Packages hiding  ( Version(..) )
 import DynFlags
 import DriverPhases     ( Phase, HscSource(..), isHsBootOrSig, hscSourceString )
@@ -1562,26 +1564,25 @@ mkPrintUnqualified dflags env = QueryQualify qual_name
                                              (mkQualPackage dflags)
   where
   qual_name mod occ
-        | [] <- unqual_gres
-        , moduleUnitId mod `elem` [primUnitId, baseUnitId, thUnitId]
-        , not (isDerivedOccName occ)
-        = NameUnqual   -- For names from ubiquitous packages that come with GHC, if
-                       -- there are no entities called unqualified 'occ', then
-                       -- print unqualified.  Doing so does not cause ambiguity,
-                       -- and it reduces the amount of qualification in error
-                       -- messages.  We can't do this for all packages, because we
-                       -- might get errors like "Can't unify T with T".  But the
-                       -- ubiquitous packages don't contain any such gratuitous
-                       -- name clashes.
-                       --
-                       -- A motivating example is 'Constraint'. It's often not in
-                       -- scope, but printing GHC.Prim.Constraint seems overkill.
-
         | [gre] <- unqual_gres
         , right_name gre
         = NameUnqual   -- If there's a unique entity that's in scope
                        -- unqualified with 'occ' AND that entity is
                        -- the right one, then we can use the unqualified name
+
+        | [] <- unqual_gres
+        , any is_name forceUnqualNames
+        , not (isDerivedOccName occ)
+        = NameUnqual   -- Don't qualify names that come from modules
+                       -- that come with GHC, often appear in error messages,
+                       -- but aren't typically in scope. Doing this does not
+                       -- cause ambiguity, and it reduces the amount of
+                       -- qualification in error messages thus improving
+                       -- readability.
+                       --
+                       -- A motivating example is 'Constraint'. It's often not
+                       -- in scope, but printing GHC.Prim.Constraint seems
+                       -- overkill.
 
         | [gre] <- qual_gres
         = NameQual (greQualModName gre)
@@ -1595,6 +1596,15 @@ mkPrintUnqualified dflags env = QueryQualify qual_name
         = NameNotInScope1   -- Can happen if 'f' is bound twice in the module
                             -- Eg  f = True; g = 0; f = False
       where
+        is_name :: Name -> Bool
+        is_name name = nameModule name == mod && nameOccName name == occ
+
+        forceUnqualNames :: [Name]
+        forceUnqualNames =
+          map tyConName [ constraintKindTyCon, heqTyCon, coercibleTyCon
+                        , starKindTyCon, unicodeStarKindTyCon, ipTyCon ]
+          ++ [ eqTyConName ]
+
         right_name gre = nameModule_maybe (gre_name gre) == Just mod
 
         unqual_gres = lookupGRE_RdrName (mkRdrUnqual occ) env

@@ -5,17 +5,17 @@ Result size of Tidy Core = {terms: 33, types: 20, coercions: 0}
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 a :: TrName
 [GblId, Caf=NoCafRefs, Str=DmdType]
-a = TrNameS "main"#
+a = GHC.Types.TrNameS "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 a1 :: TrName
 [GblId, Caf=NoCafRefs, Str=DmdType]
-a1 = TrNameS "T9400"#
+a1 = GHC.Types.TrNameS "T9400"#
 
 -- RHS size: {terms: 3, types: 0, coercions: 0}
 T9400.$trModule :: Module
 [GblId[ReflectionId], Caf=NoCafRefs, Str=DmdType]
-T9400.$trModule = Module a a1
+T9400.$trModule = GHC.Types.Module a a1
 
 -- RHS size: {terms: 22, types: 15, coercions: 0}
 main :: IO ()
@@ -45,7 +45,8 @@ main =
              @ ()
              @ ()
              (putStrLn (unpackCString# "efg"#))
-             (patError @ 'Lifted @ (IO ()) "T9400.hs:(17,5)-(18,29)|case"#))))
+             (Control.Exception.Base.patError
+                @ 'Lifted @ (IO ()) "T9400.hs:(17,5)-(18,29)|case"#))))
 
 
 

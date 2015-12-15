@@ -2,15 +2,18 @@ Left user error (error)
 Stopped at <exception thrown>
 _exception :: e = _
 _exception = SomeException
-               (IOError Nothing UserError [] "error" Nothing Nothing)
+               (GHC.IO.Exception.IOError
+                  Nothing GHC.IO.Exception.UserError [] "error" Nothing Nothing)
 *** Exception: user error (error)
 Stopped at <exception thrown>
 _exception :: e = _
 _exception = SomeException
-               (IOError Nothing UserError [] "error" Nothing Nothing)
+               (GHC.IO.Exception.IOError
+                  Nothing GHC.IO.Exception.UserError [] "error" Nothing Nothing)
 *** Exception: user error (error)
 Stopped at <exception thrown>
 _exception :: e = _
 _exception = SomeException
-               (IOError Nothing UserError [] "error" Nothing Nothing)
+               (GHC.IO.Exception.IOError
+                  Nothing GHC.IO.Exception.UserError [] "error" Nothing Nothing)
 Left user error (error)

@@ -1,16 +1,16 @@
 
 T5095.hs:9:11: error:
-    Overlapping instances for Eq a arising from a use of ‘==’
-    Matching instances:
-      instance [overlappable] Show a => Eq a -- Defined at T5095.hs:5:31
-      instance (Eq a, Eq b) => Eq (Either a b)
-        -- Defined in ‘Data.Either’
-      instance Eq All -- Defined in ‘Data.Monoid’
-      ...plus 36 others
-      ...plus one instance involving out-of-scope types
-      (use -fprint-potential-instances to see them all)
-    (The choice depends on the instantiation of ‘a’
-     To pick the first instance above, use IncoherentInstances
-     when compiling the other instance declarations)
-    In the expression: x == y
-    In an equation for ‘f’: f x y = x == y
+    • Overlapping instances for Eq a arising from a use of ‘==’
+      Matching instances:
+        instance [overlappable] Show a => Eq a -- Defined at T5095.hs:5:31
+        instance (Eq a, Eq b) => Eq (Either a b)
+          -- Defined in ‘Data.Either’
+        instance Eq Ordering -- Defined in ‘GHC.Classes’
+        ...plus 24 others
+        ...plus 13 instance involving out-of-scope typess
+        (use -fprint-potential-instances to see them all)
+      (The choice depends on the instantiation of ‘a’
+       To pick the first instance above, use IncoherentInstances
+       when compiling the other instance declarations)
+    • In the expression: x == y
+      In an equation for ‘f’: f x y = x == y

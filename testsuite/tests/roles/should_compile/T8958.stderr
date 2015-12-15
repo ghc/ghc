@@ -21,17 +21,27 @@ Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
                      integer-gmp-1.0.0.0]
 
 ==================== Typechecker ====================
-T8958.$tcMap = TyCon 0## 0## T8958.$trModule (TrNameS "Map"#)
-T8958.$tc'MkMap = TyCon 0## 0## T8958.$trModule (TrNameS "'MkMap"#)
+T8958.$tcMap
+  = GHC.Types.TyCon
+      0## 0## T8958.$trModule (GHC.Types.TrNameS "Map"#)
+T8958.$tc'MkMap
+  = GHC.Types.TyCon
+      0## 0## T8958.$trModule (GHC.Types.TrNameS "'MkMap"#)
 T8958.$tcRepresentational
-  = TyCon 0## 0## T8958.$trModule (TrNameS "Representational"#)
+  = GHC.Types.TyCon
+      0## 0## T8958.$trModule (GHC.Types.TrNameS "Representational"#)
 T8958.$tc'D:Representational
-  = TyCon 0## 0## T8958.$trModule (TrNameS "'D:Representational"#)
+  = GHC.Types.TyCon
+      0## 0## T8958.$trModule (GHC.Types.TrNameS "'D:Representational"#)
 T8958.$tcNominal
-  = TyCon 0## 0## T8958.$trModule (TrNameS "Nominal"#)
+  = GHC.Types.TyCon
+      0## 0## T8958.$trModule (GHC.Types.TrNameS "Nominal"#)
 T8958.$tc'D:Nominal
-  = TyCon 0## 0## T8958.$trModule (TrNameS "'D:Nominal"#)
-T8958.$trModule = Module (TrNameS "main"#) (TrNameS "T8958"#)
+  = GHC.Types.TyCon
+      0## 0## T8958.$trModule (GHC.Types.TrNameS "'D:Nominal"#)
+T8958.$trModule
+  = GHC.Types.Module
+      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "T8958"#)
 AbsBinds [a] []
   {Exports: [T8958.$fRepresentationala <= $dRepresentational
                <>]

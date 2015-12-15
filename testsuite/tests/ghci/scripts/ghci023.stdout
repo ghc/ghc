@@ -3,15 +3,15 @@
 (1,2,3)
 -- layout rule instead of explicit braces and semicolons works too
 (1,2,3)
-catMaybes :: [Maybe a] -> [a]
-fromJust :: Maybe a -> a
-fromMaybe :: a -> Maybe a -> a
-isJust :: Maybe a -> Bool
-isNothing :: Maybe a -> Bool
-listToMaybe :: [a] -> Maybe a
-mapMaybe :: (a -> Maybe b) -> [a] -> [b]
+Data.Maybe.catMaybes :: [Maybe a] -> [a]
+Data.Maybe.fromJust :: Maybe a -> a
+Data.Maybe.fromMaybe :: a -> Maybe a -> a
+Data.Maybe.isJust :: Maybe a -> Bool
+Data.Maybe.isNothing :: Maybe a -> Bool
+Data.Maybe.listToMaybe :: [a] -> Maybe a
+Data.Maybe.mapMaybe :: (a -> Maybe b) -> [a] -> [b]
 maybe :: b -> (a -> b) -> Maybe a -> b
-maybeToList :: Maybe a -> [a]
+Data.Maybe.maybeToList :: Maybe a -> [a]
 data Maybe a = Nothing | Just a
 -- via readFile
 (True,False)

@@ -3,40 +3,42 @@
 Result size of Tidy Core = {terms: 32, types: 13, coercions: 0}
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
-T3717.$trModule2 :: TrName
+T3717.$trModule2 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=DmdType m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
-T3717.$trModule2 = TrNameS "main"#
+T3717.$trModule2 = GHC.Types.TrNameS "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
-T3717.$trModule1 :: TrName
+T3717.$trModule1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=DmdType m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T3717.$trModule1 = TrNameS "T3717"#
+T3717.$trModule1 = GHC.Types.TrNameS "T3717"#
 
 -- RHS size: {terms: 3, types: 0, coercions: 0}
-T3717.$trModule :: Module
+T3717.$trModule :: GHC.Types.Module
 [GblId[ReflectionId],
  Caf=NoCafRefs,
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
-T3717.$trModule = Module T3717.$trModule2 T3717.$trModule1
+T3717.$trModule =
+  GHC.Types.Module T3717.$trModule2 T3717.$trModule1
 
 Rec {
 -- RHS size: {terms: 10, types: 2, coercions: 0}
-T3717.$wfoo [InlPrag=[0], Occ=LoopBreaker] :: Int# -> Int#
+T3717.$wfoo [InlPrag=[0], Occ=LoopBreaker]
+  :: GHC.Prim.Int# -> GHC.Prim.Int#
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U>]
 T3717.$wfoo =
-  \ (ww :: Int#) ->
+  \ (ww :: GHC.Prim.Int#) ->
     case ww of ds {
-      __DEFAULT -> T3717.$wfoo (-# ds 1#);
+      __DEFAULT -> T3717.$wfoo (GHC.Prim.-# ds 1#);
       0# -> 0#
     }
 end Rec }
@@ -51,13 +53,13 @@ foo [InlPrag=INLINE[0]] :: Int -> Int
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once!] :: Int) ->
-                 case w of _ [Occ=Dead] { I# ww1 [Occ=Once] ->
-                 case T3717.$wfoo ww1 of ww2 { __DEFAULT -> I# ww2 }
+                 case w of _ [Occ=Dead] { GHC.Types.I# ww1 [Occ=Once] ->
+                 case T3717.$wfoo ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
                  }}]
 foo =
   \ (w :: Int) ->
-    case w of _ [Occ=Dead] { I# ww1 ->
-    case T3717.$wfoo ww1 of ww2 { __DEFAULT -> I# ww2 }
+    case w of _ [Occ=Dead] { GHC.Types.I# ww1 ->
+    case T3717.$wfoo ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
     }
 
 

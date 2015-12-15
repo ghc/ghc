@@ -27,10 +27,10 @@ TYPE SIGNATURES
   acos :: forall a. Floating a => a -> a
   acosh :: forall a. Floating a => a -> a
   all ::
-    forall (t :: * -> *) a. Foldable t => (a -> Bool) -> t a -> Bool
-  and :: forall (t :: * -> *). Foldable t => t Bool -> Bool
+    forall (t :: * -> *) a. P.Foldable t => (a -> Bool) -> t a -> Bool
+  and :: forall (t :: * -> *). P.Foldable t => t Bool -> Bool
   any ::
-    forall (t :: * -> *) a. Foldable t => (a -> Bool) -> t a -> Bool
+    forall (t :: * -> *) a. P.Foldable t => (a -> Bool) -> t a -> Bool
   appendFile :: FilePath -> String -> IO ()
   asTypeOf :: forall a. a -> a -> a
   asin :: forall a. Floating a => a -> a
@@ -41,9 +41,9 @@ TYPE SIGNATURES
   break :: forall a. (a -> Bool) -> [a] -> ([a], [a])
   ceiling :: forall a b. (RealFrac a, Integral b) => a -> b
   compare :: forall a. Ord a => a -> a -> Ordering
-  concat :: forall (t :: * -> *) a. Foldable t => t [a] -> [a]
+  concat :: forall (t :: * -> *) a. P.Foldable t => t [a] -> [a]
   concatMap ::
-    forall (t :: * -> *) a b. Foldable t => (a -> [b]) -> t a -> [b]
+    forall (t :: * -> *) a b. P.Foldable t => (a -> [b]) -> t a -> [b]
   const :: forall a b. a -> b -> a
   cos :: forall a. Floating a => a -> a
   cosh :: forall a. Floating a => a -> a
@@ -56,13 +56,14 @@ TYPE SIGNATURES
   dropWhile :: forall a. (a -> Bool) -> [a] -> [a]
   either :: forall a c b. (a -> c) -> (b -> c) -> Either a b -> c
   elem ::
-    forall (t :: * -> *) a. (Foldable t, Eq a) => a -> t a -> Bool
+    forall (t :: * -> *) a. (P.Foldable t, Eq a) => a -> t a -> Bool
   encodeFloat :: forall a. RealFloat a => Integer -> Int -> a
   enumFrom :: forall a. Enum a => a -> [a]
   enumFromThen :: forall a. Enum a => a -> a -> [a]
   enumFromThenTo :: forall a. Enum a => a -> a -> a -> [a]
   enumFromTo :: forall a. Enum a => a -> a -> [a]
-  error :: forall a. (?callStack::CallStack) => [Char] -> a
+  error ::
+    forall a. (?callStack::GHC.Stack.Types.CallStack) => [Char] -> a
   even :: forall a. Integral a => a -> Bool
   exp :: forall a. Floating a => a -> a
   exponent :: forall a. RealFloat a => a -> Int
@@ -77,16 +78,16 @@ TYPE SIGNATURES
     forall (f :: * -> *) a b. Functor f => (a -> b) -> f a -> f b
   foldl ::
     forall (t :: * -> *) b a.
-    Foldable t =>
+    P.Foldable t =>
     (b -> a -> b) -> b -> t a -> b
   foldl1 ::
-    forall (t :: * -> *) a. Foldable t => (a -> a -> a) -> t a -> a
+    forall (t :: * -> *) a. P.Foldable t => (a -> a -> a) -> t a -> a
   foldr ::
     forall (t :: * -> *) a b.
-    Foldable t =>
+    P.Foldable t =>
     (a -> b -> b) -> b -> t a -> b
   foldr1 ::
-    forall (t :: * -> *) a. Foldable t => (a -> a -> a) -> t a -> a
+    forall (t :: * -> *) a. P.Foldable t => (a -> a -> a) -> t a -> a
   fromEnum :: forall a. Enum a => a -> Int
   fromInteger :: forall a. Num a => Integer -> a
   fromIntegral :: forall a b. (Num b, Integral a) => a -> b
@@ -109,7 +110,7 @@ TYPE SIGNATURES
   iterate :: forall a. (a -> a) -> a -> [a]
   last :: forall a. [a] -> a
   lcm :: forall a. Integral a => a -> a -> a
-  length :: forall (t :: * -> *) a. Foldable t => t a -> Int
+  length :: forall (t :: * -> *) a. P.Foldable t => t a -> Int
   lex :: ReadS String
   lines :: String -> [String]
   log :: forall a. Floating a => a -> a
@@ -118,32 +119,35 @@ TYPE SIGNATURES
   map :: forall a b. (a -> b) -> [a] -> [b]
   mapM ::
     forall (t :: * -> *) (m :: * -> *) a b.
-    (Traversable t, Monad m) =>
+    (P.Traversable t, Monad m) =>
     (a -> m b) -> t a -> m (t b)
   mapM_ ::
     forall (t :: * -> *) (m :: * -> *) a b.
-    (Foldable t, Monad m) =>
+    (P.Foldable t, Monad m) =>
     (a -> m b) -> t a -> m ()
   max :: forall a. Ord a => a -> a -> a
   maxBound :: forall t. Bounded t => t
-  maximum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
+  maximum ::
+    forall (t :: * -> *) a. (P.Foldable t, Ord a) => t a -> a
   maybe :: forall b a. b -> (a -> b) -> Maybe a -> b
   min :: forall a. Ord a => a -> a -> a
   minBound :: forall t. Bounded t => t
-  minimum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
+  minimum ::
+    forall (t :: * -> *) a. (P.Foldable t, Ord a) => t a -> a
   mod :: forall a. Integral a => a -> a -> a
   negate :: forall a. Num a => a -> a
   not :: Bool -> Bool
   notElem ::
-    forall (t :: * -> *) a. (Foldable t, Eq a) => a -> t a -> Bool
-  null :: forall (t :: * -> *) a. Foldable t => t a -> Bool
+    forall (t :: * -> *) a. (P.Foldable t, Eq a) => a -> t a -> Bool
+  null :: forall (t :: * -> *) a. P.Foldable t => t a -> Bool
   odd :: forall a. Integral a => a -> Bool
-  or :: forall (t :: * -> *). Foldable t => t Bool -> Bool
+  or :: forall (t :: * -> *). P.Foldable t => t Bool -> Bool
   otherwise :: Bool
   pi :: forall t. Floating t => t
   pred :: forall a. Enum a => a -> a
   print :: forall a. Show a => a -> IO ()
-  product :: forall (t :: * -> *) a. (Foldable t, Num a) => t a -> a
+  product ::
+    forall (t :: * -> *) a. (P.Foldable t, Num a) => t a -> a
   properFraction ::
     forall a b. (RealFrac a, Integral b) => a -> (b, a)
   putChar :: Char -> IO ()
@@ -175,11 +179,11 @@ TYPE SIGNATURES
   seq :: forall a b. a -> b -> b
   sequence ::
     forall (t :: * -> *) (m :: * -> *) a.
-    (Traversable t, Monad m) =>
+    (P.Traversable t, Monad m) =>
     t (m a) -> m (t a)
   sequence_ ::
     forall (t :: * -> *) (m :: * -> *) a.
-    (Foldable t, Monad m) =>
+    (P.Foldable t, Monad m) =>
     t (m a) -> m ()
   show :: forall a. Show a => a -> String
   showChar :: Char -> ShowS
@@ -198,7 +202,7 @@ TYPE SIGNATURES
   sqrt :: forall a. Floating a => a -> a
   subtract :: forall a. Num a => a -> a -> a
   succ :: forall a. Enum a => a -> a
-  sum :: forall (t :: * -> *) a. (Foldable t, Num a) => t a -> a
+  sum :: forall (t :: * -> *) a. (P.Foldable t, Num a) => t a -> a
   tail :: forall a. [a] -> [a]
   take :: forall a. Int -> [a] -> [a]
   takeWhile :: forall a. (a -> Bool) -> [a] -> [a]
@@ -209,7 +213,7 @@ TYPE SIGNATURES
   toRational :: forall a. Real a => a -> Rational
   truncate :: forall a b. (RealFrac a, Integral b) => a -> b
   uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
-  undefined :: forall t. (?callStack::CallStack) => t
+  undefined :: forall t. (?callStack::GHC.Stack.Types.CallStack) => t
   unlines :: [String] -> String
   until :: forall a. (a -> Bool) -> (a -> a) -> a -> a
   unwords :: [String] -> String

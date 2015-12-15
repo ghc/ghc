@@ -1,5 +1,5 @@
 
-ghci019.hs:9:10: Warning:
-    No explicit implementation for
-      either ‘==’ or ‘/=’
-    In the instance declaration for ‘Eq Foo’
+ghci019.hs:9:10: warning:
+    • No explicit implementation for
+        either ‘Prelude.==’ or ‘Prelude./=’
+    • In the instance declaration for ‘Prelude.Eq Foo’
