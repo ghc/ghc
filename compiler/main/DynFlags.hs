@@ -504,7 +504,7 @@ data WarningFlag =
    | Opt_WarnUnusedPatternBinds
    | Opt_WarnUnusedImports
    | Opt_WarnUnusedMatches
-   | Opt_WarnContextQuantification
+   | Opt_WarnContextQuantification    -- remove in 8.2
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
    | Opt_WarnAMP -- Introduced in GHC 7.8, obsolete since 7.10
@@ -2904,7 +2904,8 @@ fWarningFlags = [
   flagSpec "warn-dodgy-foreign-imports"       Opt_WarnDodgyForeignImports,
   flagSpec "warn-dodgy-imports"               Opt_WarnDodgyImports,
   flagSpec "warn-empty-enumerations"          Opt_WarnEmptyEnumerations,
-  flagSpec "warn-context-quantification"      Opt_WarnContextQuantification,
+  flagSpec' "warn-context-quantification"      Opt_WarnContextQuantification
+    (\_ -> deprecate "it is subsumed by an error message that cannot be disabled"),
   flagSpec' "warn-duplicate-constraints"      Opt_WarnDuplicateConstraints
     (\_ -> deprecate "it is subsumed by -fwarn-redundant-constraints"),
   flagSpec "warn-redundant-constraints"       Opt_WarnRedundantConstraints,
@@ -3473,7 +3474,6 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnInlineRuleShadowing,
         Opt_WarnAlternativeLayoutRuleTransitional,
         Opt_WarnUnsupportedLlvmVersion,
-        Opt_WarnContextQuantification,
         Opt_WarnTabs
       ]
 

@@ -264,8 +264,8 @@ f :: forall a. a -> b         is an error
 f :: forall a. () => a -> b   is an error
 f :: forall a. a -> (() => b) binds "a" and "b"
 
-The -fwarn-context-quantification flag warns about
-this situation. See rnHsTyKi for case HsForAllTy Qualified.
+This situation is now considered to be an error. See rnHsTyKi for case
+HsForAllTy Qualified.
 
 Note [Dealing with *]
 ~~~~~~~~~~~~~~~~~~~~~

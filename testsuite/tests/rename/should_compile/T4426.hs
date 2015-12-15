@@ -1,5 +1,4 @@
 {-# LANGUAGE RankNTypes #-}
-{- # OPTIONS_GHC -fwarn-context-quantification #-}
 
 module T4426 where
 

@@ -19,9 +19,8 @@ generally likely to indicate bugs in your program. These are:
 ``-fwarn-missing-methods``, ``-fwarn-wrong-do-bind``,
 ``-fwarn-unsupported-calling-conventions``,
 ``-fwarn-dodgy-foreign-imports``, ``-fwarn-inline-rule-shadowing``,
-``-fwarn-unsupported-llvm-version``, ``-fwarn-context-quantification``,
-and ``-fwarn-tabs``. The following flags are simple ways to select
-standard “packages” of warnings:
+``-fwarn-unsupported-llvm-version`` and ``-fwarn-tabs``. The following flags are
+simple ways to select standard “packages” of warnings:
 
 ``-W``
     .. index::
@@ -893,27 +892,6 @@ command line.
     ::
 
         do { mapM_ popInt xs ; return 10 }
-
-``-fwarn-context-quantification``
-    .. index::
-       single: -fwarn-context-quantification
-       single: implicit context quantification, warning
-       single: context, implicit quantification
-
-    Report if a variable is quantified only due to its presence in a
-    context (see :ref:`universal-quantification`). For example,
-
-    ::
-
-        type T a = Monad m => a -> f a
-
-    It is recommended to write this polymorphic type as
-
-    ::
-
-        type T a = forall m. Monad m => a -> f a
-
-    instead.
 
 ``-fwarn-wrong-do-bind``
     .. index::

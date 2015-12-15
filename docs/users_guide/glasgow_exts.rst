@@ -8379,8 +8379,8 @@ example:
 
 As of GHC 7.10, this is deprecated. The
 ``-fwarn-context-quantification`` flag detects this situation and issues
-a warning. In GHC 7.12, declarations such as ``MkSwizzle'`` will cause
-an out-of-scope error.
+a warning. In GHC 8.0 this flag was deprecated and declarations such as
+``MkSwizzle'`` will cause an out-of-scope error.
 
 As for type signatures, implicit quantification happens for
 non-overloaded types too. So if you write this:
