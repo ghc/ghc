@@ -871,11 +871,11 @@ mkBinaryTickBox ixT ixF e = do
 -- also make irrefutable patterns ordinary patterns if -XStrict.
 --
 -- Example:
--- ~pat    => False, pat -- when -XStrict
--- ~pat    => False, ~pat -- without -XStrict
--- ~(~pat) => False, ~pat -- when -XStrict
--- pat     => True, pat -- when -XStrict
--- !pat    => True, pat -- always
+-- ~pat    => False, pat   -- when -XStrict
+-- ~pat    => False, ~pat  -- without -XStrict
+-- ~(~pat) => False, ~pat  -- when -XStrict
+-- pat     => True,  pat   -- when -XStrict
+-- !pat    => True,  pat   -- always
 getUnBangedLPat :: DynFlags
                 -> LPat id  -- ^ Original pattern
                 -> (Bool, LPat id) -- is bind strict?, pattern without bangs
