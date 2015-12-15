@@ -1946,17 +1946,27 @@ necessarily the second.  Hence strictApply1Dmd and lazyApply1Dmd
 Howver, consider
     catch# (\st -> case x of ...) (..handler..) st
 We'll see that the entire thing is strict in 'x', so 'x' may be evaluated
-before the catch#.  So fi evaluting 'x' causes a divide-by-zero exception,
+before the catch#.  So if evaluting 'x' causes a divide-by-zero exception,
 it won't be caught.  This seems acceptable:
+
   - x might be evaluated somewhere else outside the catch# anyway
   - It's an imprecise eception anyway.  Synchronous exceptions (in the
     IO monad) will never move in this way.
-There was originally a comment
-  "Catch is actually strict in its first argument
-   but we don't want to tell the strictness
-   analyser about that, so that exceptions stay inside it."
-but tracing it back through the commit logs did not give any
-rationale.  And making catch# lazy has performance costs for everyone.
+
+Unfortunately, there is a tricky wrinkle here, as pointed out in #10712.
+Consider,
+
+    let r = \st -> raiseIO# blah st
+    in catch (\st -> ...(r st)..) handler st
+
+If we give the first argument of catch a strict signature, we'll get
+a demand 'C(S)' for 'r'; that is, 'r' is definitely called with one
+argument, which indeed it is. The trouble comes when we feed 'C(S)'
+into 'r's RHS as the demand of the body as this will lead us to conclude that
+the whole 'let' will diverge; clearly this isn't right.
+
+There's something very special about catch: it turns divergence into
+non-divergence.
 -}
 
 primop  CatchOp "catch#" GenPrimOp
@@ -1965,7 +1975,7 @@ primop  CatchOp "catch#" GenPrimOp
        -> State# RealWorld
        -> (# State# RealWorld, a #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,lazyApply2Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [lazyApply1Dmd,lazyApply2Dmd,topDmd] topRes }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -2069,7 +2079,7 @@ primop  CatchRetryOp "catchRetry#" GenPrimOp
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,lazyApply1Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [lazyApply1Dmd,lazyApply1Dmd,topDmd] topRes }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -2079,7 +2089,7 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
    -> (b -> State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,lazyApply2Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [lazyApply1Dmd,lazyApply2Dmd,topDmd] topRes }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
