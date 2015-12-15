@@ -8238,6 +8238,7 @@ the source location of the call to the ``CallStack`` in the
 environment. For example
 
 ::
+
    myerror :: (?callStack :: CallStack) => String -> a
    myerror msg = error (msg ++ "\n" ++ prettyCallStack ?callStack)
 
@@ -8254,10 +8255,11 @@ The ``CallStack`` will only extend as far as the types allow it, for
 example
 
 ::
+
    head :: (?callStack :: CallStack) => [a] -> a
    head []     = myerror "empty"
    head (x:xs) = x
-   
+
    bad :: Int
    bad = head []
 
