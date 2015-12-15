@@ -662,7 +662,7 @@ heqSCSelId, coercibleSCSelId :: Id
     sc_sel_id = mkDictSelId coercibleSCSelIdName klass
 
 -- For information about the usage of the following type, see Note [TYPE]
--- in module Kind
+-- in module TysPrim
 levityTy :: Type
 levityTy = mkTyConTy levityTyCon
 
