@@ -56,8 +56,7 @@ import Coercion hiding ( substCo, substCoVarBndr )
 
 import TyCon       ( tyConArity )
 import DataCon
-import PrelNames   ( heqDataConKey, coercibleDataConKey, unpackCStringIdKey
-                   , unpackCStringUtf8IdKey )
+import PrelNames
 import OptCoercion ( optCoercion )
 import PprCore     ( pprCoreBindings, pprRules )
 import Module      ( Module )
@@ -67,7 +66,6 @@ import Id
 import Name     ( Name )
 import Var
 import IdInfo
-import Unique
 import UniqSupply
 import Maybes
 import ErrUtils
@@ -840,9 +838,7 @@ separate actions:
      is made in maybe_substitute. Note the rather specific check for
      MkCoercible in there.
 
-  2. Stripping silly case expressions, like the Coercible_SCSel one.
-     A case expression is silly if its binder is dead, it has only one,
-     DEFAULT, alternative, and the scrutinee is a coercion.
+  2. Stripping case expressions like the Coercible_SCSel one.
      See the `Case` case of simple_opt_expr's `go` function.
 
   3. Look for case expressions that unpack something that was
@@ -952,6 +948,9 @@ simple_opt_expr subst expr
       | isDeadBinder b
       , [(DEFAULT, _, rhs)] <- as
       , isCoercionType (varType b)
+      , (Var fun, _args) <- collectArgs e
+      , fun `hasKey` coercibleSCSelIdKey
+         -- without this last check, we get #11230
       = go rhs
 
       | otherwise
