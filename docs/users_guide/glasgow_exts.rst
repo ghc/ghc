@@ -5751,6 +5751,87 @@ A small example:
 Note that deriving ``Eq`` is necessary for the pattern matching to work
 since it gets translated into an equality comparison.
 
+.. _overloaded-labels:
+
+Overloaded labels
+-----------------
+
+GHC supports *overloaded labels*, a form of identifier whose interpretation may
+depend both on its type and on its literal text.  When the
+``-XOverloadedLabels`` extension is enabled, an overloaded label can written
+with a prefix hash, for example ``#foo``.  The type of this expression is
+``IsLabel "foo" a => a``.
+
+The class ``IsLabel`` is defined as:
+
+::
+
+    class IsLabel (x :: Symbol) a where
+      fromLabel :: Proxy# x -> a
+
+This is rather similar to the class ``IsString`` (see
+:ref:`overloaded-strings`), but with an additional type parameter that makes the
+text of the label available as a type-level string (see
+:ref:`type-level-literals`).
+
+There are no predefined instances of this class.  It is not in scope by default,
+but can be brought into scope by importing
+:base-ref:`GHC.OverloadedLabels <GHC-OverloadedLabels.html>`:.  Unlike
+``IsString``, there are no special defaulting rules for ``IsLabel``.
+
+During typechecking, GHC will replace an occurrence of an overloaded label like
+``#foo`` with
+
+::
+
+    fromLabel (proxy# :: Proxy# "foo")
+
+This will have some type ``alpha`` and require the solution of a class
+constraint ``IsLabel "foo" alpha``.
+
+The intention is for ``IsLabel`` to be used to support overloaded record fields
+and perhaps anonymous records.  Thus, it may be given instances for base
+datatypes (in particular ``(->)``) in the future.
+
+When writing an overloaded label, there must be no space between the hash sign
+and the following identifier.  :ref:`magic-hash` makes use of postfix hash
+signs; if ``OverloadedLabels`` and ``MagicHash`` are both enabled then ``x#y``
+means ``x# y``, but if only ``OverloadedLabels`` is enabled then it means ``x
+#y``.  To avoid confusion, you are strongly encouraged to put a space before the
+hash when using ``OverloadedLabels``.
+
+When using ``OverloadedLabels`` (or ``MagicHash``) in a ``.hsc`` file (see
+:ref:`hsc2hs`), the hash signs must be doubled (write ``##foo`` instead of
+``#foo``) to avoid them being treated as ``hsc2hs`` directives.
+
+Here is an extension of the record access example in :ref:`type-level-literals`
+showing how an overloaded label can be used as a record selector:
+
+::
+
+    {-# LANGUAGE DataKinds, KindSignatures, MultiParamTypeClasses,
+                 FunctionalDependencies, FlexibleInstances,
+                 OverloadedLabels, ScopedTypeVariables #-}
+
+    import GHC.OverloadedLabels (IsLabel(..))
+    import GHC.TypeLits (Symbol)
+
+    data Label (l :: Symbol) = Get
+
+    class Has a l b | a l -> b where
+      from :: a -> Label l -> b
+
+    data Point = Point Int Int deriving Show
+
+    instance Has Point "x" Int where from (Point x _) _ = x
+    instance Has Point "y" Int where from (Point _ y) _ = y
+
+    instance Has a l b => IsLabel l (a -> b) where
+      fromLabel _ x = from x (Get :: Label l)
+
+    example = #x (Point 1 2)
+
+
 .. _overloaded-lists:
 
 Overloaded lists
