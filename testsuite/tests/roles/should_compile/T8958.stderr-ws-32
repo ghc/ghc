@@ -5,7 +5,7 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
   type role Map nominal representational
   newtype (Nominal k, Representational v) => Map k v = MkMap [(k, v)]
-    Promotable
+    Kind: * -> * -> *
   class Nominal a
   type role Representational representational
   class Representational a
@@ -25,8 +25,12 @@ T8958.$tcMap = TyCon 0L## 0L## T8958.$trModule (TrNameS "Map"#)
 T8958.$tc'MkMap = TyCon 0L## 0L## T8958.$trModule (TrNameS "'MkMap"#)
 T8958.$tcRepresentational
   = TyCon 0L## 0L## T8958.$trModule (TrNameS "Representational"#)
+T8958.$tc'D:Representational
+  = TyCon 0L## 0L## T8958.$trModule (TrNameS "'D:Representational"#)
 T8958.$tcNominal
   = TyCon 0L## 0L## T8958.$trModule (TrNameS "Nominal"#)
+T8958.$tc'D:Nominal
+  = TyCon 0L## 0L## T8958.$trModule (TrNameS "'D:Nominal"#)
 T8958.$trModule = Module (TrNameS "main"#) (TrNameS "T8958"#)
 AbsBinds [a] []
   {Exports: [T8958.$fRepresentationala <= $dRepresentational

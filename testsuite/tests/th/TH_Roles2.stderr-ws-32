@@ -2,6 +2,7 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
   type role T representational
   data T (a :: k)
+    Kind: forall k1. k1 -> *
 COERCION AXIOMS
 Dependent modules: []
 Dependent packages: [array-0.5.1.0, base-4.9.0.0, deepseq-1.4.1.1,
