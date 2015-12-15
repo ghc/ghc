@@ -313,7 +313,7 @@ iterate f a = a :| List.iterate f (f a)
 
 -- | @'cycle' xs@ returns the infinite repetition of @xs@:
 --
--- > cycle [1,2,3] = 1 :| [2,3,1,2,3,...]
+-- > cycle (1 :| [2,3]) = 1 :| [2,3,1,2,3,...]
 cycle :: NonEmpty a -> NonEmpty a
 cycle = fromList . List.cycle . toList
 
