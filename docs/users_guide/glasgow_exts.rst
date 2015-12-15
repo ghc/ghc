@@ -12917,27 +12917,17 @@ optionally had by adding ``!`` in front of a variable.
      let !pat = ...
 
    Adding ``~`` in front of ``x`` gives the regular lazy
-   behavior. Notice that we do not put bangs on nested patterns. For
-   example ::
+   behavior.
+   The general rule is that we add an implicit bang on the outermost pattern,
+   unless disabled with ``~``.
 
-     let (p,q) = if flob then (undefined, undefined) else (True, False)
-     in ...
+-  **Pattern matching in case expressions, lambdas, do-notation, etc**
 
-   will behave like ::
-
-     let !(p,q) = if flob then (undefined, undefined) else (True,False)
-     in ...
-
-   which will strictly evaluate the right hand side, and bind ``p``
-   and ``q`` to the components of the pair. But the pair itself is
-   lazy (unless we also compile the ``Prelude`` with ``Strict``; see
-   :ref:`strict-modularity` below). So ``p`` and ``q`` may end up bound to
-   undefined. See also :ref:`recursive-and-polymorphic-let-bindings` below.
-
--  **Case expressions.**
-
-   The patterns of a case expression get an implicit bang, unless
-   disabled with ``~``. For example ::
+   The outermost pattern of all pattern matches gets an implicit bang,
+   unless disabled with ``~``.
+   This applies to case expressions, patterns in lambda, do-notation,
+   list comprehension, and so on.
+   For example ::
 
        case x of (a,b) -> rhs
 
@@ -12961,6 +12951,33 @@ optionally had by adding ``!`` in front of a variable.
 
    is lazy in Haskell; but with ``Strict`` the added bang makes it
    strict.
+
+   Similarly ::
+
+      \ x -> body
+      do { x <- rhs; blah }
+      [ e | x <- rhs; blah }
+
+   all get implicit bangs on the ``x`` pattern.
+
+-  ** Nested patterns **
+
+   Notice that we do *not* put bangs on nested patterns. For
+   example ::
+
+     let (p,q) = if flob then (undefined, undefined) else (True, False)
+     in ...
+
+   will behave like ::
+
+     let !(p,q) = if flob then (undefined, undefined) else (True,False)
+     in ...
+
+   which will strictly evaluate the right hand side, and bind ``p``
+   and ``q`` to the components of the pair. But the pair itself is
+   lazy (unless we also compile the ``Prelude`` with ``Strict``; see
+   :ref:`strict-modularity` below). So ``p`` and ``q`` may end up bound to
+   undefined. See also :ref:`recursive-and-polymorphic-let-bindings` below.
 
 -  **Top level bindings.**
 
