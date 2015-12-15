@@ -52,9 +52,24 @@ main = do
             mbPath <- getExecPath
             case mbPath of
                 Nothing  -> dieProg ("cannot find ghc")
-                Just path ->
-                    let ghc = takeDirectory (normalise path) </> "ghc"
-                    in uncurry (doIt ghc) $ getGhcArgs args'
+                Just path -> do
+                    ghc <- findGhc path
+                    uncurry (doIt ghc) $ getGhcArgs args'
+
+-- In some cases, runghc isn't given a path to ghc explicitly. This can occur
+-- if $1_$2_SHELL_WRAPPER = NO (which is always the case on Windows). In such
+-- a scenario, we must guess where ghc lives. Given a path where ghc might
+-- live, we check for the existence of ghc. If we can't find it, we assume that
+-- we're building ghc from source, in which case we fall back on ghc-stage2.
+-- (See Trac #1185.)
+findGhc :: FilePath -> IO FilePath
+findGhc path = do
+    let ghcDir = takeDirectory (normalise path)
+        ghc    = ghcDir </> "ghc" <.> exeExtension
+    ghcExists <- doesFileExist ghc
+    return $ if ghcExists
+             then ghc
+             else ghcDir </> "ghc-stage2" <.> exeExtension
 
 data RunGhcFlags = RunGhcFlags (Maybe FilePath) -- GHC location
                  | Help -- Print help text
@@ -177,4 +192,3 @@ foreign import WINDOWS_CCONV unsafe "windows.h GetModuleFileNameW"
 #else
 getExecPath = return Nothing
 #endif
-

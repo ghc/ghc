@@ -42,4 +42,3 @@ install_runhaskell:
 	$(call removeFiles,"$(DESTDIR)$(bindir)/runghc")
 	$(LN_S) runghc-$(ProjectVersion) "$(DESTDIR)$(bindir)/runghc"
 endif
-
