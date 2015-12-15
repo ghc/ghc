@@ -54,6 +54,7 @@ import StringBuffer
 import SysTools
 import UniqFM
 import Util
+import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Either ( rights, partitionEithers )
 import qualified Data.Map as Map
@@ -1986,7 +1987,7 @@ preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
                 | Just (Unlit _) <- mb_phase    = True
                 | Nothing <- mb_phase, Unlit _ <- startPhase src_fn  = True
                   -- note: local_opts is only required if there's no Unlit phase
-                | xopt Opt_Cpp dflags'          = True
+                | xopt LangExt.Cpp dflags'      = True
                 | gopt Opt_Pp  dflags'          = True
                 | otherwise                     = False
 

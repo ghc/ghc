@@ -87,6 +87,9 @@ import Data.List
 import Data.Maybe
 import Data.Word
 
+-- ghc-boot
+import qualified GHC.LanguageExtensions as LangExt
+
 -- bytestring
 import Data.ByteString (ByteString)
 
@@ -1127,7 +1130,7 @@ varid span buf len =
       return $ L span keyword
     Just (ITstatic, _) -> do
       flags <- getDynFlags
-      if xopt Opt_StaticPointers flags
+      if xopt LangExt.StaticPointers flags
         then return $ L span ITstatic
         else return $ L span $ ITvarid fs
     Just (keyword, 0) -> do
@@ -2117,39 +2120,39 @@ mkPState flags buf loc =
       annotations_comments = []
     }
     where
-      bitmap =     FfiBit                      `setBitIf` xopt Opt_ForeignFunctionInterface flags
-               .|. InterruptibleFfiBit         `setBitIf` xopt Opt_InterruptibleFFI         flags
-               .|. CApiFfiBit                  `setBitIf` xopt Opt_CApiFFI                  flags
-               .|. ParrBit                     `setBitIf` xopt Opt_ParallelArrays           flags
-               .|. ArrowsBit                   `setBitIf` xopt Opt_Arrows                   flags
-               .|. ThBit                       `setBitIf` xopt Opt_TemplateHaskell          flags
-               .|. ThQuotesBit                 `setBitIf` xopt Opt_TemplateHaskellQuotes    flags
-               .|. QqBit                       `setBitIf` xopt Opt_QuasiQuotes              flags
-               .|. IpBit                       `setBitIf` xopt Opt_ImplicitParams           flags
-               .|. OverloadedLabelsBit         `setBitIf` xopt Opt_OverloadedLabels         flags
-               .|. ExplicitForallBit           `setBitIf` xopt Opt_ExplicitForAll           flags
-               .|. BangPatBit                  `setBitIf` xopt Opt_BangPatterns             flags
-               .|. HaddockBit                  `setBitIf` gopt Opt_Haddock                  flags
-               .|. MagicHashBit                `setBitIf` xopt Opt_MagicHash                flags
-               .|. RecursiveDoBit              `setBitIf` xopt Opt_RecursiveDo              flags
-               .|. UnicodeSyntaxBit            `setBitIf` xopt Opt_UnicodeSyntax            flags
-               .|. UnboxedTuplesBit            `setBitIf` xopt Opt_UnboxedTuples            flags
-               .|. DatatypeContextsBit         `setBitIf` xopt Opt_DatatypeContexts         flags
-               .|. TransformComprehensionsBit  `setBitIf` xopt Opt_TransformListComp        flags
-               .|. TransformComprehensionsBit  `setBitIf` xopt Opt_MonadComprehensions      flags
-               .|. RawTokenStreamBit           `setBitIf` gopt Opt_KeepRawTokenStream       flags
-               .|. HpcBit                      `setBitIf` gopt Opt_Hpc                      flags
-               .|. AlternativeLayoutRuleBit    `setBitIf` xopt Opt_AlternativeLayoutRule    flags
-               .|. RelaxedLayoutBit            `setBitIf` xopt Opt_RelaxedLayout            flags
-               .|. SccProfilingOnBit           `setBitIf` gopt Opt_SccProfilingOn           flags
-               .|. NondecreasingIndentationBit `setBitIf` xopt Opt_NondecreasingIndentation flags
-               .|. SafeHaskellBit              `setBitIf` safeImportsOn                     flags
-               .|. TraditionalRecordSyntaxBit  `setBitIf` xopt Opt_TraditionalRecordSyntax  flags
-               .|. ExplicitNamespacesBit       `setBitIf` xopt Opt_ExplicitNamespaces flags
-               .|. LambdaCaseBit               `setBitIf` xopt Opt_LambdaCase               flags
-               .|. BinaryLiteralsBit           `setBitIf` xopt Opt_BinaryLiterals           flags
-               .|. NegativeLiteralsBit         `setBitIf` xopt Opt_NegativeLiterals         flags
-               .|. PatternSynonymsBit          `setBitIf` xopt Opt_PatternSynonyms          flags
+      bitmap =     FfiBit                      `setBitIf` xopt LangExt.ForeignFunctionInterface flags
+               .|. InterruptibleFfiBit         `setBitIf` xopt LangExt.InterruptibleFFI         flags
+               .|. CApiFfiBit                  `setBitIf` xopt LangExt.CApiFFI                  flags
+               .|. ParrBit                     `setBitIf` xopt LangExt.ParallelArrays           flags
+               .|. ArrowsBit                   `setBitIf` xopt LangExt.Arrows                   flags
+               .|. ThBit                       `setBitIf` xopt LangExt.TemplateHaskell          flags
+               .|. ThQuotesBit                 `setBitIf` xopt LangExt.TemplateHaskellQuotes    flags
+               .|. QqBit                       `setBitIf` xopt LangExt.QuasiQuotes              flags
+               .|. IpBit                       `setBitIf` xopt LangExt.ImplicitParams           flags
+               .|. OverloadedLabelsBit         `setBitIf` xopt LangExt.OverloadedLabels         flags
+               .|. ExplicitForallBit           `setBitIf` xopt LangExt.ExplicitForAll           flags
+               .|. BangPatBit                  `setBitIf` xopt LangExt.BangPatterns             flags
+               .|. HaddockBit                  `setBitIf` gopt Opt_Haddock                      flags
+               .|. MagicHashBit                `setBitIf` xopt LangExt.MagicHash                flags
+               .|. RecursiveDoBit              `setBitIf` xopt LangExt.RecursiveDo              flags
+               .|. UnicodeSyntaxBit            `setBitIf` xopt LangExt.UnicodeSyntax            flags
+               .|. UnboxedTuplesBit            `setBitIf` xopt LangExt.UnboxedTuples            flags
+               .|. DatatypeContextsBit         `setBitIf` xopt LangExt.DatatypeContexts         flags
+               .|. TransformComprehensionsBit  `setBitIf` xopt LangExt.TransformListComp        flags
+               .|. TransformComprehensionsBit  `setBitIf` xopt LangExt.MonadComprehensions      flags
+               .|. RawTokenStreamBit           `setBitIf` gopt Opt_KeepRawTokenStream           flags
+               .|. HpcBit                      `setBitIf` gopt Opt_Hpc                          flags
+               .|. AlternativeLayoutRuleBit    `setBitIf` xopt LangExt.AlternativeLayoutRule    flags
+               .|. RelaxedLayoutBit            `setBitIf` xopt LangExt.RelaxedLayout            flags
+               .|. SccProfilingOnBit           `setBitIf` gopt Opt_SccProfilingOn               flags
+               .|. NondecreasingIndentationBit `setBitIf` xopt LangExt.NondecreasingIndentation flags
+               .|. SafeHaskellBit              `setBitIf` safeImportsOn                         flags
+               .|. TraditionalRecordSyntaxBit  `setBitIf` xopt LangExt.TraditionalRecordSyntax  flags
+               .|. ExplicitNamespacesBit       `setBitIf` xopt LangExt.ExplicitNamespaces flags
+               .|. LambdaCaseBit               `setBitIf` xopt LangExt.LambdaCase               flags
+               .|. BinaryLiteralsBit           `setBitIf` xopt LangExt.BinaryLiterals           flags
+               .|. NegativeLiteralsBit         `setBitIf` xopt LangExt.NegativeLiterals         flags
+               .|. PatternSynonymsBit          `setBitIf` xopt LangExt.PatternSynonyms          flags
       --
       setBitIf :: ExtBits -> Bool -> ExtsBitmap
       b `setBitIf` cond | cond      = xbit b
@@ -2238,7 +2241,7 @@ srcParseErr dflags buf len
                         (text "Perhaps you need a 'let' in a 'do' block?"
                          $$ text "e.g. 'let x = 5' instead of 'x = 5'")
   where token = lexemeToString (offsetBytes (-len) buf) len
-        th_enabled = xopt Opt_TemplateHaskell dflags
+        th_enabled = xopt LangExt.TemplateHaskell dflags
 
 -- Report a parse failure, giving the span of the previous token as
 -- the location of the error.  This is the entry point for errors
@@ -2309,7 +2312,7 @@ alternativeLayoutRuleToken t
          justClosedExplicitLetBlock <- getJustClosedExplicitLetBlock
          setJustClosedExplicitLetBlock False
          dflags <- getDynFlags
-         let transitional = xopt Opt_AlternativeLayoutRuleTransitional dflags
+         let transitional = xopt LangExt.AlternativeLayoutRuleTransitional dflags
              thisLoc = getLoc t
              thisCol = srcSpanStartCol thisLoc
              newLine = srcSpanStartLine thisLoc > srcSpanEndLine lastLoc

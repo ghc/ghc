@@ -60,6 +60,7 @@ import FastString
 import Type(mkStrLitTy, tidyOpenType)
 import PrelNames( mkUnboundName, gHC_PRIM )
 import TcValidity (checkValidType)
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.List (partition)
@@ -806,7 +807,7 @@ chooseInferredQuantifiers inferred_theta tau_tvs
                              | pred <- my_theta
                              , all (not . (`eqType` pred)) annotated_theta ]
              final_theta   = annotated_theta ++ inferred_diff
-       ; partial_sigs      <- xoptM Opt_PartialTypeSignatures
+       ; partial_sigs      <- xoptM LangExt.PartialTypeSignatures
        ; warn_partial_sigs <- woptM Opt_WarnPartialTypeSignatures
        ; msg <- mkLongErrAt loc (mk_msg inferred_diff partial_sigs) empty
        ; traceTc "completeTheta" $
@@ -1898,7 +1899,7 @@ decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
        -- be polymorphic, because we are going to force them
        -- See Trac #4498, #8762
 
-    mono_restriction  = xopt Opt_MonomorphismRestriction dflags
+    mono_restriction  = xopt LangExt.MonomorphismRestriction dflags
                      && any restricted binds
 
     is_closed_ns :: NameSet -> Bool -> Bool
@@ -1923,7 +1924,7 @@ decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
         -- These won't be in the local type env.
         -- Ditto class method etc from the current module
 
-    mono_local_binds = xopt Opt_MonoLocalBinds dflags
+    mono_local_binds = xopt LangExt.MonoLocalBinds dflags
                     && not closed_flag
 
     closed_flag = foldr (is_closed_ns . bind_fvs) True binds

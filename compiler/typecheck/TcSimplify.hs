@@ -17,8 +17,7 @@ module TcSimplify(
 
 import Bag
 import Class         ( Class, classKey, classTyCon )
-import DynFlags      ( ExtensionFlag( Opt_AllowAmbiguousTypes )
-                     , WarningFlag ( Opt_WarnMonomorphism )
+import DynFlags      ( WarningFlag ( Opt_WarnMonomorphism )
                      , DynFlags( solverIterations ) )
 import Inst
 import ListSetOps
@@ -46,6 +45,7 @@ import VarSet
 import BasicTypes    ( IntWithInf, intGtLimit )
 import ErrUtils      ( emptyMessages )
 import FastString
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad ( when, unless )
 import Data.List     ( partition )
@@ -390,7 +390,7 @@ simplifyAmbiguityCheck ty wanteds
        -- Normally report all errors; but with -XAllowAmbiguousTypes
        -- report only insoluble ones, since they represent genuinely
        -- inaccessible code
-       ; allow_ambiguous <- xoptM Opt_AllowAmbiguousTypes
+       ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
        ; traceTc "reportUnsolved(ambig) {" empty
        ; tc_lvl <- TcM.getTcLevel
        ; unless (allow_ambiguous && not (insolubleWC tc_lvl final_wc))

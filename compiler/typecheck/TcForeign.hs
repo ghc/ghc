@@ -59,6 +59,7 @@ import SrcLoc
 import Bag
 import FastString
 import Hooks
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.Maybe
@@ -309,7 +310,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
       return $ CImport (L lc cconv') (L ls safety) mh (CFunction target) src
   | cconv == PrimCallConv = do
       dflags <- getDynFlags
-      checkTc (xopt Opt_GHCForeignImportPrim dflags)
+      checkTc (xopt LangExt.GHCForeignImportPrim dflags)
               (text "Use GHCForeignImportPrim to allow `foreign import prim'.")
       checkCg checkCOrAsmOrLlvmOrInterp
       checkCTarget target

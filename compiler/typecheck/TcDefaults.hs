@@ -17,11 +17,11 @@ import TcSimplify
 import TcMType
 import TcType
 import PrelNames
-import DynFlags
 import SrcLoc
 import Data.Maybe
 import Outputable
 import FastString
+import qualified GHC.LanguageExtensions as LangExt
 
 tcDefaults :: [LDefaultDecl Name]
            -> TcM (Maybe [Type])    -- Defaulting types to heave
@@ -46,7 +46,7 @@ tcDefaults [L _ (DefaultDecl [])]
 tcDefaults [L locn (DefaultDecl mono_tys)]
   = setSrcSpan locn                     $
     addErrCtxt defaultDeclCtxt          $
-    do  { ovl_str <- xoptM Opt_OverloadedStrings
+    do  { ovl_str <- xoptM LangExt.OverloadedStrings
         ; num_class    <- tcLookupClass numClassName
         ; is_str_class <- tcLookupClass isStringClassName
         ; let deflt_clss | ovl_str   = [num_class, is_str_class]

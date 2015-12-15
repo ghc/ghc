@@ -290,6 +290,11 @@ Template Haskell
    ``dataD`` and ``newtypeD`` now take a ``CxtQ`` instead of a ``[Name]``
    for the list of derived classes.
 
+-  ``isExtEnabled`` can now be used to determine whether a language extension
+   is enabled in the ``Q`` monad. Similarly, ``extsEnabled`` can be used to list
+   all enabled language extensions.
+
+
 Runtime system
 ~~~~~~~~~~~~~~
 
@@ -415,6 +420,9 @@ ghc-boot
    character can be the first letter of a variable or data constructor in
    Haskell, as defined by GHC. (These functions were moved from ``Lexeme``
    in ``ghc``.)
+
+-  Added ``GHC.LanguageExtensions`` which contains a type listing all
+   supported language extensions.
 
 ghc-prim
 ~~~~~~~~

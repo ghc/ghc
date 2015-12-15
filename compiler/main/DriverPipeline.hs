@@ -62,6 +62,7 @@ import MonadUtils
 import Platform
 import TcRnTypes
 import Hooks
+import qualified GHC.LanguageExtensions as LangExt
 
 import Exception
 import System.Directory
@@ -135,8 +136,8 @@ compileOne' m_tc_result mHscMessage
        location    = ms_location summary
        input_fnpp  = ms_hspp_file summary
        mod_graph   = hsc_mod_graph hsc_env0
-       needsTH     = any (xopt Opt_TemplateHaskell . ms_hspp_opts) mod_graph
-       needsQQ     = any (xopt Opt_QuasiQuotes     . ms_hspp_opts) mod_graph
+       needsTH     = any (xopt LangExt.TemplateHaskell . ms_hspp_opts) mod_graph
+       needsQQ     = any (xopt LangExt.QuasiQuotes     . ms_hspp_opts) mod_graph
        needsLinker = needsTH || needsQQ
        isDynWay    = any (== WayDyn) (ways dflags0)
        isProfWay   = any (== WayProf) (ways dflags0)
@@ -231,8 +232,8 @@ compileOne' m_tc_result mHscMessage
        location    = ms_location summary
        input_fn    = expectJust "compile:hs" (ml_hs_file location)
        mod_graph   = hsc_mod_graph hsc_env0
-       needsTH     = any (xopt Opt_TemplateHaskell . ms_hspp_opts) mod_graph
-       needsQQ     = any (xopt Opt_QuasiQuotes     . ms_hspp_opts) mod_graph
+       needsTH     = any (xopt LangExt.TemplateHaskell . ms_hspp_opts) mod_graph
+       needsQQ     = any (xopt LangExt.QuasiQuotes     . ms_hspp_opts) mod_graph
        needsLinker = needsTH || needsQQ
        isDynWay    = any (== WayDyn) (ways dflags0)
        isProfWay   = any (== WayProf) (ways dflags0)
@@ -841,7 +842,7 @@ runPhase (RealPhase (Cpp sf)) input_fn dflags0
        setDynFlags dflags1
        liftIO $ checkProcessArgsResult dflags1 unhandled_flags
 
-       if not (xopt Opt_Cpp dflags1) then do
+       if not (xopt LangExt.Cpp dflags1) then do
            -- we have to be careful to emit warnings only once.
            unless (gopt Opt_Pp dflags1) $
                liftIO $ handleFlagWarnings dflags1 warns

@@ -106,6 +106,7 @@ import Maybes
 import Util
 import Bag
 import Inst (tcGetInsts)
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 
@@ -303,7 +304,7 @@ tcRnModuleTcRnM hsc_env hsc_src
         setGblEnv (tcg_env { tcg_self_boot = boot_info }) $ do {
 
         -- Deal with imports; first add implicit prelude
-        implicit_prelude <- xoptM Opt_ImplicitPrelude;
+        implicit_prelude <- xoptM LangExt.ImplicitPrelude;
         let { prel_imports = mkPrelImports (moduleName this_mod) prel_imp_loc
                                          implicit_prelude import_decls } ;
 
@@ -2052,7 +2053,7 @@ tcRnType :: HscEnv
          -> IO (Messages, Maybe (Type, Kind))
 tcRnType hsc_env normalise rdr_type
   = runTcInteractive hsc_env $
-    setXOptM Opt_PolyKinds $   -- See Note [Kind-generalise in tcRnType]
+    setXOptM LangExt.PolyKinds $   -- See Note [Kind-generalise in tcRnType]
     do { (HsWC { hswc_wcs = wcs, hswc_body = rn_type }, _fvs)
                <- rnHsWcType GHCiCtx (mkHsWildCardBndrs rdr_type)
                   -- The type can have wild cards, but no implicit

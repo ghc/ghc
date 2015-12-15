@@ -52,6 +52,8 @@ import BasicTypes       ( compareFixity, funTyFixity, negateFixity,
 import Outputable
 import FastString
 import Maybes
+import qualified GHC.LanguageExtensions as LangExt
+
 import Data.List        ( nubBy )
 import Control.Monad    ( unless, when )
 
@@ -409,7 +411,7 @@ rnHsTyKi what doc (HsFunTy ty1 ty2)
        ; return (res_ty, fvs1 `plusFV` fvs2) }
 
 rnHsTyKi what doc listTy@(HsListTy ty)
-  = do { data_kinds <- xoptM Opt_DataKinds
+  = do { data_kinds <- xoptM LangExt.DataKinds
        ; when (not data_kinds && isRnKindLevel what)
               (addErr (dataKindsErr what listTy))
        ; (ty', fvs) <- rnLHsTyKi what doc ty
@@ -417,7 +419,7 @@ rnHsTyKi what doc listTy@(HsListTy ty)
 
 rnHsTyKi what doc t@(HsKindSig ty k)
   = do { checkTypeInType what t
-       ; kind_sigs_ok <- xoptM Opt_KindSignatures
+       ; kind_sigs_ok <- xoptM LangExt.KindSignatures
        ; unless kind_sigs_ok (badKindSigErr doc ty)
        ; (ty', fvs1) <- rnLHsTyKi what doc ty
        ; (k', fvs2) <- rnLHsKind doc k
@@ -431,7 +433,7 @@ rnHsTyKi what doc t@(HsPArrTy ty)
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
 rnHsTyKi what doc tupleTy@(HsTupleTy tup_con tys)
-  = do { data_kinds <- xoptM Opt_DataKinds
+  = do { data_kinds <- xoptM LangExt.DataKinds
        ; when (not data_kinds && isRnKindLevel what)
               (addErr (dataKindsErr what tupleTy))
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi what doc) tys
@@ -439,7 +441,7 @@ rnHsTyKi what doc tupleTy@(HsTupleTy tup_con tys)
 
 -- Ensure that a type-level integer is nonnegative (#8306, #8412)
 rnHsTyKi what _ tyLit@(HsTyLit t)
-  = do { data_kinds <- xoptM Opt_DataKinds
+  = do { data_kinds <- xoptM LangExt.DataKinds
        ; unless data_kinds (addErr (dataKindsErr what tyLit))
        ; when (negLit t) (addErr negLitErr)
        ; checkTypeInType what tyLit
@@ -536,14 +538,14 @@ rnHsTyKi _ _ (HsCoreTy ty)
 
 rnHsTyKi what doc ty@(HsExplicitListTy k tys)
   = do { checkTypeInType what ty
-       ; data_kinds <- xoptM Opt_DataKinds
+       ; data_kinds <- xoptM LangExt.DataKinds
        ; unless data_kinds (addErr (dataKindsErr what ty))
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi what doc) tys
        ; return (HsExplicitListTy k tys', fvs) }
 
 rnHsTyKi what doc ty@(HsExplicitTupleTy kis tys)
   = do { checkTypeInType what ty
-       ; data_kinds <- xoptM Opt_DataKinds
+       ; data_kinds <- xoptM LangExt.DataKinds
        ; unless data_kinds (addErr (dataKindsErr what ty))
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi what doc) tys
        ; return (HsExplicitTupleTy kis tys', fvs) }
@@ -604,7 +606,7 @@ rnLTyVar (L loc rdr_name)
 rnHsTyOp :: Outputable a
          => RnTyKiWhat -> a -> Located RdrName -> RnM (Located Name, FreeVars)
 rnHsTyOp what overall_ty (L loc op)
-  = do { ops_ok <- xoptM Opt_TypeOperators
+  = do { ops_ok <- xoptM LangExt.TypeOperators
        ; op' <- rnTyVar what op
        ; unless (ops_ok
                  || op' == starKindTyConName
@@ -690,7 +692,7 @@ checkTypeInType :: Outputable ty
                 -> RnM ()
 checkTypeInType what ty
   | isRnKindLevel what
-  = do { type_in_type <- xoptM Opt_TypeInType
+  = do { type_in_type <- xoptM LangExt.TypeInType
        ; unless type_in_type $
          addErr (text "Illegal kind:" <+> ppr ty $$
                  text "Did you mean to enable TypeInType?") }
@@ -718,7 +720,7 @@ bindSigTyVarsFV :: [Name]
 -- with a separate type signature, to bring its tyvars into scope
 -- With no -XScopedTypeVariables, this is a no-op
 bindSigTyVarsFV tvs thing_inside
-  = do  { scoped_tyvars <- xoptM Opt_ScopedTypeVariables
+  = do  { scoped_tyvars <- xoptM LangExt.ScopedTypeVariables
         ; if not scoped_tyvars then
                 thing_inside
           else
@@ -815,7 +817,7 @@ bindLHsTyVarBndr doc mb_assoc kv_names tv_names hs_tv_bndr thing_inside
         do { check_dup lv rdr
 
              -- check for -XKindSignatures
-           ; sig_ok <- xoptM Opt_KindSignatures
+           ; sig_ok <- xoptM LangExt.KindSignatures
            ; unless sig_ok (badKindSigErr doc kind)
 
              -- deal with kind vars in the user-written kind
@@ -864,11 +866,11 @@ bindImplicitKvs doc mb_assoc free_kvs tv_names thing_inside
              (bound_kvs, new_kvs) = partitionWith part_kvs free_kvs
 
           -- check whether we're mixing types & kinds illegally
-       ; type_in_type <- xoptM Opt_TypeInType
+       ; type_in_type <- xoptM LangExt.TypeInType
        ; unless type_in_type $
          mapM_ (check_tv_used_in_kind tv_names) bound_kvs
 
-       ; poly_kinds <- xoptM Opt_PolyKinds
+       ; poly_kinds <- xoptM LangExt.PolyKinds
        ; unless poly_kinds $
          addErr (badKindBndrs doc new_kvs)
 
@@ -1577,7 +1579,7 @@ extract_tv t_or_k ltv@(L _ tv) acc
 
 mixedVarsErr :: Located RdrName -> RnM ()
 mixedVarsErr (L loc tv)
-  = do { typeintype <- xoptM Opt_TypeInType
+  = do { typeintype <- xoptM LangExt.TypeInType
        ; unless typeintype $
          addErrAt loc $ text "Variable" <+> quotes (ppr tv) <+>
                         text "used as both a kind and a type" $$

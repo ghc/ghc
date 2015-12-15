@@ -46,6 +46,7 @@ import ListSetOps
 import Id
 import Type
 import PatSyn
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.Either      ( partitionEithers, isRight, rights )
@@ -198,7 +199,7 @@ rnImportDecl this_mod
   = setSrcSpan loc $ do
 
     when (isJust mb_pkg) $ do
-        pkg_imports <- xoptM Opt_PackageImports
+        pkg_imports <- xoptM LangExt.PackageImports
         when (not pkg_imports) $ addErr packageImportErr
 
     -- If there's an error in loadInterface, (e.g. interface
@@ -543,7 +544,7 @@ getLocalNonValBinders fixity_env
                 hs_instds = inst_decls,
                 hs_fords  = foreign_decls })
   = do  { -- Process all type/class decls *except* family instances
-        ; overload_ok <- xoptM Opt_DuplicateRecordFields
+        ; overload_ok <- xoptM LangExt.DuplicateRecordFields
         ; (tc_avails, tc_fldss) <- fmap unzip $ mapM (new_tc overload_ok)
                                                      (tyClGroupConcat tycl_decls)
         ; traceRn (text "getLocalNonValBinders 1" <+> ppr tc_avails)

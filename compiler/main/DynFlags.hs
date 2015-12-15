@@ -22,7 +22,6 @@ module DynFlags (
         DumpFlag(..),
         GeneralFlag(..),
         WarningFlag(..),
-        ExtensionFlag(..),
         Language(..),
         PlatformConstants(..),
         FatalMessager, LogAction, FlushOut(..), FlushErr(..),
@@ -207,6 +206,7 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 
 import GHC.Foreign (withCString, peekCString)
+import qualified GHC.LanguageExtensions as LangExt
 
 -- Note [Updating flag description in the User's Guide]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -559,116 +559,6 @@ instance Show SafeHaskellMode where
 instance Outputable SafeHaskellMode where
     ppr = text . show
 
-data ExtensionFlag
--- See Note [Updating flag description in the User's Guide]
-   = Opt_Cpp
-   | Opt_OverlappingInstances
-   | Opt_UndecidableInstances
-   | Opt_IncoherentInstances
-   | Opt_UndecidableSuperClasses
-   | Opt_MonomorphismRestriction
-   | Opt_MonoPatBinds
-   | Opt_MonoLocalBinds
-   | Opt_RelaxedPolyRec           -- Deprecated
-   | Opt_ExtendedDefaultRules     -- Use GHC's extended rules for defaulting
-   | Opt_ForeignFunctionInterface
-   | Opt_UnliftedFFITypes
-   | Opt_InterruptibleFFI
-   | Opt_CApiFFI
-   | Opt_GHCForeignImportPrim
-   | Opt_JavaScriptFFI
-   | Opt_ParallelArrays           -- Syntactic support for parallel arrays
-   | Opt_Arrows                   -- Arrow-notation syntax
-   | Opt_TemplateHaskell
-   | Opt_TemplateHaskellQuotes    -- subset of TH supported by stage1, no splice
-   | Opt_QuasiQuotes
-   | Opt_ImplicitParams
-   | Opt_ImplicitPrelude
-   | Opt_ScopedTypeVariables
-   | Opt_AllowAmbiguousTypes
-   | Opt_UnboxedTuples
-   | Opt_BangPatterns
-   | Opt_TypeFamilies
-   | Opt_OverloadedStrings
-   | Opt_OverloadedLists
-   | Opt_NumDecimals
-   | Opt_DisambiguateRecordFields
-   | Opt_RecordWildCards
-   | Opt_RecordPuns
-   | Opt_ViewPatterns
-   | Opt_GADTs
-   | Opt_GADTSyntax
-   | Opt_NPlusKPatterns
-   | Opt_DoAndIfThenElse
-   | Opt_RebindableSyntax
-   | Opt_ConstraintKinds
-   | Opt_PolyKinds                -- Kind polymorphism
-   | Opt_DataKinds                -- Datatype promotion
-   | Opt_InstanceSigs
-   | Opt_ApplicativeDo
-
-   | Opt_StandaloneDeriving
-   | Opt_DeriveDataTypeable
-   | Opt_AutoDeriveTypeable       -- Automatic derivation of Typeable
-   | Opt_DeriveFunctor
-   | Opt_DeriveTraversable
-   | Opt_DeriveFoldable
-   | Opt_DeriveGeneric            -- Allow deriving Generic/1
-   | Opt_DefaultSignatures        -- Allow extra signatures for defmeths
-   | Opt_DeriveAnyClass           -- Allow deriving any class
-   | Opt_DeriveLift               -- Allow deriving Lift
-
-   | Opt_TypeSynonymInstances
-   | Opt_FlexibleContexts
-   | Opt_FlexibleInstances
-   | Opt_ConstrainedClassMethods
-   | Opt_MultiParamTypeClasses
-   | Opt_NullaryTypeClasses
-   | Opt_FunctionalDependencies
-   | Opt_UnicodeSyntax
-   | Opt_ExistentialQuantification
-   | Opt_MagicHash
-   | Opt_EmptyDataDecls
-   | Opt_KindSignatures
-   | Opt_RoleAnnotations
-   | Opt_ParallelListComp
-   | Opt_TransformListComp
-   | Opt_MonadComprehensions
-   | Opt_GeneralizedNewtypeDeriving
-   | Opt_RecursiveDo
-   | Opt_PostfixOperators
-   | Opt_TupleSections
-   | Opt_PatternGuards
-   | Opt_LiberalTypeSynonyms
-   | Opt_RankNTypes
-   | Opt_ImpredicativeTypes
-   | Opt_TypeOperators
-   | Opt_ExplicitNamespaces
-   | Opt_PackageImports
-   | Opt_ExplicitForAll
-   | Opt_AlternativeLayoutRule
-   | Opt_AlternativeLayoutRuleTransitional
-   | Opt_DatatypeContexts
-   | Opt_NondecreasingIndentation
-   | Opt_RelaxedLayout
-   | Opt_TraditionalRecordSyntax
-   | Opt_LambdaCase
-   | Opt_MultiWayIf
-   | Opt_BinaryLiterals
-   | Opt_NegativeLiterals
-   | Opt_DuplicateRecordFields
-   | Opt_OverloadedLabels
-   | Opt_EmptyCase
-   | Opt_PatternSynonyms
-   | Opt_PartialTypeSignatures
-   | Opt_NamedWildCards
-   | Opt_StaticPointers
-   | Opt_Strict
-   | Opt_StrictData
-   | Opt_TypeInType
-   | Opt_MonadFailDesugaring
-   deriving (Eq, Enum, Show)
-
 type SigOf = Map ModuleName Module
 
 getSigOf :: DynFlags -> ModuleName -> Maybe Module
@@ -844,9 +734,11 @@ data DynFlags = DynFlags {
   warnUnsafeOnLoc       :: SrcSpan,
   trustworthyOnLoc      :: SrcSpan,
   -- Don't change this without updating extensionFlags:
-  extensions            :: [OnOff ExtensionFlag],
+  extensions            :: [OnOff LangExt.Extension],
   -- extensionFlags should always be equal to
   --     flattenExtensionFlags language extensions
+  -- LangExt.Extension is defined in libraries/ghc-boot so that it can be used
+  -- by template-haskell
   extensionFlags        :: IntSet,
 
   -- Unfolding control
@@ -1683,32 +1575,32 @@ data OnOff a = On a
 
 -- OnOffs accumulate in reverse order, so we use foldr in order to
 -- process them in the right order
-flattenExtensionFlags :: Maybe Language -> [OnOff ExtensionFlag] -> IntSet
+flattenExtensionFlags :: Maybe Language -> [OnOff LangExt.Extension] -> IntSet
 flattenExtensionFlags ml = foldr f defaultExtensionFlags
     where f (On f)  flags = IntSet.insert (fromEnum f) flags
           f (Off f) flags = IntSet.delete (fromEnum f) flags
           defaultExtensionFlags = IntSet.fromList (map fromEnum (languageExtensions ml))
 
-languageExtensions :: Maybe Language -> [ExtensionFlag]
+languageExtensions :: Maybe Language -> [LangExt.Extension]
 
 languageExtensions Nothing
     -- Nothing => the default case
-    = Opt_NondecreasingIndentation -- This has been on by default for some time
-    : delete Opt_DatatypeContexts  -- The Haskell' committee decided to
-                                   -- remove datatype contexts from the
-                                   -- language:
+    = LangExt.NondecreasingIndentation -- This has been on by default for some time
+    : delete LangExt.DatatypeContexts  -- The Haskell' committee decided to
+                                       -- remove datatype contexts from the
+                                       -- language:
    -- http://www.haskell.org/pipermail/haskell-prime/2011-January/003335.html
       (languageExtensions (Just Haskell2010))
 
    -- NB: MonoPatBinds is no longer the default
 
 languageExtensions (Just Haskell98)
-    = [Opt_ImplicitPrelude,
-       Opt_MonomorphismRestriction,
-       Opt_NPlusKPatterns,
-       Opt_DatatypeContexts,
-       Opt_TraditionalRecordSyntax,
-       Opt_NondecreasingIndentation
+    = [LangExt.ImplicitPrelude,
+       LangExt.MonomorphismRestriction,
+       LangExt.NPlusKPatterns,
+       LangExt.DatatypeContexts,
+       LangExt.TraditionalRecordSyntax,
+       LangExt.NondecreasingIndentation
            -- strictly speaking non-standard, but we always had this
            -- on implicitly before the option was added in 7.1, and
            -- turning it off breaks code, so we're keeping it on for
@@ -1717,15 +1609,15 @@ languageExtensions (Just Haskell98)
       ]
 
 languageExtensions (Just Haskell2010)
-    = [Opt_ImplicitPrelude,
-       Opt_MonomorphismRestriction,
-       Opt_DatatypeContexts,
-       Opt_TraditionalRecordSyntax,
-       Opt_EmptyDataDecls,
-       Opt_ForeignFunctionInterface,
-       Opt_PatternGuards,
-       Opt_DoAndIfThenElse,
-       Opt_RelaxedPolyRec]
+    = [LangExt.ImplicitPrelude,
+       LangExt.MonomorphismRestriction,
+       LangExt.DatatypeContexts,
+       LangExt.TraditionalRecordSyntax,
+       LangExt.EmptyDataDecls,
+       LangExt.ForeignFunctionInterface,
+       LangExt.PatternGuards,
+       LangExt.DoAndIfThenElse,
+       LangExt.RelaxedPolyRec]
 
 -- | Test whether a 'DumpFlag' is set
 dopt :: DumpFlag -> DynFlags -> Bool
@@ -1791,19 +1683,19 @@ wopt_set dfs f = dfs{ warningFlags = IntSet.insert (fromEnum f) (warningFlags df
 wopt_unset :: DynFlags -> WarningFlag -> DynFlags
 wopt_unset dfs f = dfs{ warningFlags = IntSet.delete (fromEnum f) (warningFlags dfs) }
 
--- | Test whether a 'ExtensionFlag' is set
-xopt :: ExtensionFlag -> DynFlags -> Bool
+-- | Test whether a 'LangExt.Extension' is set
+xopt :: LangExt.Extension -> DynFlags -> Bool
 xopt f dflags = fromEnum f `IntSet.member` extensionFlags dflags
 
--- | Set a 'ExtensionFlag'
-xopt_set :: DynFlags -> ExtensionFlag -> DynFlags
+-- | Set a 'LangExt.Extension'
+xopt_set :: DynFlags -> LangExt.Extension -> DynFlags
 xopt_set dfs f
     = let onoffs = On f : extensions dfs
       in dfs { extensions = onoffs,
                extensionFlags = flattenExtensionFlags (language dfs) onoffs }
 
--- | Unset a 'ExtensionFlag'
-xopt_unset :: DynFlags -> ExtensionFlag -> DynFlags
+-- | Unset a 'LangExt.Extension'
+xopt_unset :: DynFlags -> LangExt.Extension -> DynFlags
 xopt_unset dfs f
     = let onoffs = Off f : extensions dfs
       in dfs { extensions = onoffs,
@@ -1896,11 +1788,11 @@ combineSafeFlags a b | a == Sf_None         = return b
 unsafeFlags, unsafeFlagsForInfer
   :: [(String, DynFlags -> SrcSpan, DynFlags -> Bool, DynFlags -> DynFlags)]
 unsafeFlags = [ ("-XGeneralizedNewtypeDeriving", newDerivOnLoc,
-                    xopt Opt_GeneralizedNewtypeDeriving,
-                    flip xopt_unset Opt_GeneralizedNewtypeDeriving)
+                    xopt LangExt.GeneralizedNewtypeDeriving,
+                    flip xopt_unset LangExt.GeneralizedNewtypeDeriving)
               , ("-XTemplateHaskell", thOnLoc,
-                    xopt Opt_TemplateHaskell,
-                    flip xopt_unset Opt_TemplateHaskell)
+                    xopt LangExt.TemplateHaskell,
+                    flip xopt_unset LangExt.TemplateHaskell)
               ]
 unsafeFlagsForInfer = unsafeFlags
 
@@ -2240,7 +2132,7 @@ dynamic_flags :: [Flag (CmdLineP DynFlags)]
 dynamic_flags = [
     defFlag "n"
       (NoArg (addWarn "The -n flag is deprecated and no longer has any effect"))
-  , defFlag "cpp"      (NoArg (setExtensionFlag Opt_Cpp))
+  , defFlag "cpp"      (NoArg (setExtensionFlag LangExt.Cpp))
   , defFlag "F"        (NoArg (setGeneralFlag Opt_Pp))
   , defFlag "#include"
       (HasArg (\s -> do
@@ -3057,42 +2949,42 @@ fFlags = [
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
-fLangFlags :: [FlagSpec ExtensionFlag]
+fLangFlags :: [FlagSpec LangExt.Extension]
 fLangFlags = [
 -- See Note [Updating flag description in the User's Guide]
 -- See Note [Supporting CLI completion]
-  flagSpec' "th"                              Opt_TemplateHaskell
+  flagSpec' "th"                              LangExt.TemplateHaskell
     (\on -> deprecatedForExtension "TemplateHaskell" on
          >> checkTemplateHaskellOk on),
-  flagSpec' "fi"                              Opt_ForeignFunctionInterface
+  flagSpec' "fi"                              LangExt.ForeignFunctionInterface
     (deprecatedForExtension "ForeignFunctionInterface"),
-  flagSpec' "ffi"                             Opt_ForeignFunctionInterface
+  flagSpec' "ffi"                             LangExt.ForeignFunctionInterface
     (deprecatedForExtension "ForeignFunctionInterface"),
-  flagSpec' "arrows"                          Opt_Arrows
+  flagSpec' "arrows"                          LangExt.Arrows
     (deprecatedForExtension "Arrows"),
-  flagSpec' "implicit-prelude"                Opt_ImplicitPrelude
+  flagSpec' "implicit-prelude"                LangExt.ImplicitPrelude
     (deprecatedForExtension "ImplicitPrelude"),
-  flagSpec' "bang-patterns"                   Opt_BangPatterns
+  flagSpec' "bang-patterns"                   LangExt.BangPatterns
     (deprecatedForExtension "BangPatterns"),
-  flagSpec' "monomorphism-restriction"        Opt_MonomorphismRestriction
+  flagSpec' "monomorphism-restriction"        LangExt.MonomorphismRestriction
     (deprecatedForExtension "MonomorphismRestriction"),
-  flagSpec' "mono-pat-binds"                  Opt_MonoPatBinds
+  flagSpec' "mono-pat-binds"                  LangExt.MonoPatBinds
     (deprecatedForExtension "MonoPatBinds"),
-  flagSpec' "extended-default-rules"          Opt_ExtendedDefaultRules
+  flagSpec' "extended-default-rules"          LangExt.ExtendedDefaultRules
     (deprecatedForExtension "ExtendedDefaultRules"),
-  flagSpec' "implicit-params"                 Opt_ImplicitParams
+  flagSpec' "implicit-params"                 LangExt.ImplicitParams
     (deprecatedForExtension "ImplicitParams"),
-  flagSpec' "scoped-type-variables"           Opt_ScopedTypeVariables
+  flagSpec' "scoped-type-variables"           LangExt.ScopedTypeVariables
     (deprecatedForExtension "ScopedTypeVariables"),
-  flagSpec' "parr"                            Opt_ParallelArrays
+  flagSpec' "parr"                            LangExt.ParallelArrays
     (deprecatedForExtension "ParallelArrays"),
-  flagSpec' "PArr"                            Opt_ParallelArrays
+  flagSpec' "PArr"                            LangExt.ParallelArrays
     (deprecatedForExtension "ParallelArrays"),
-  flagSpec' "allow-overlapping-instances"     Opt_OverlappingInstances
+  flagSpec' "allow-overlapping-instances"     LangExt.OverlappingInstances
     (deprecatedForExtension "OverlappingInstances"),
-  flagSpec' "allow-undecidable-instances"     Opt_UndecidableInstances
+  flagSpec' "allow-undecidable-instances"     LangExt.UndecidableInstances
     (deprecatedForExtension "UndecidableInstances"),
-  flagSpec' "allow-incoherent-instances"      Opt_IncoherentInstances
+  flagSpec' "allow-incoherent-instances"      LangExt.IncoherentInstances
     (deprecatedForExtension "IncoherentInstances")
   ]
 
@@ -3110,7 +3002,7 @@ supportedExtensions = concatMap toFlagSpecNamePair xFlags
       -- make sure that `ghc --supported-extensions` omits
       -- "TemplateHaskell" when it's known to be unsupported. See also
       -- GHC #11102 for rationale
-      | flagSpecFlag flg == Opt_TemplateHaskell  = [noName]
+      | flagSpecFlag flg == LangExt.TemplateHaskell  = [noName]
 #endif
       | otherwise = [name, noName]
       where
@@ -3136,136 +3028,136 @@ safeHaskellFlags = [mkF Sf_Unsafe, mkF Sf_Trustworthy, mkF Sf_Safe]
     where mkF flag = flagSpec (show flag) flag
 
 -- | These -X<blah> flags can all be reversed with -XNo<blah>
-xFlags :: [FlagSpec ExtensionFlag]
+xFlags :: [FlagSpec LangExt.Extension]
 xFlags = [
 -- See Note [Updating flag description in the User's Guide]
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
-  flagSpec "AllowAmbiguousTypes"              Opt_AllowAmbiguousTypes,
-  flagSpec "AlternativeLayoutRule"            Opt_AlternativeLayoutRule,
+  flagSpec "AllowAmbiguousTypes"              LangExt.AllowAmbiguousTypes,
+  flagSpec "AlternativeLayoutRule"            LangExt.AlternativeLayoutRule,
   flagSpec "AlternativeLayoutRuleTransitional"
-                                          Opt_AlternativeLayoutRuleTransitional,
-  flagSpec "Arrows"                           Opt_Arrows,
-  flagSpec "AutoDeriveTypeable"               Opt_AutoDeriveTypeable,
-  flagSpec "BangPatterns"                     Opt_BangPatterns,
-  flagSpec "BinaryLiterals"                   Opt_BinaryLiterals,
-  flagSpec "CApiFFI"                          Opt_CApiFFI,
-  flagSpec "CPP"                              Opt_Cpp,
-  flagSpec "ConstrainedClassMethods"          Opt_ConstrainedClassMethods,
-  flagSpec "ConstraintKinds"                  Opt_ConstraintKinds,
-  flagSpec "DataKinds"                        Opt_DataKinds,
-  flagSpec' "DatatypeContexts"                Opt_DatatypeContexts
+                                          LangExt.AlternativeLayoutRuleTransitional,
+  flagSpec "Arrows"                           LangExt.Arrows,
+  flagSpec "AutoDeriveTypeable"               LangExt.AutoDeriveTypeable,
+  flagSpec "BangPatterns"                     LangExt.BangPatterns,
+  flagSpec "BinaryLiterals"                   LangExt.BinaryLiterals,
+  flagSpec "CApiFFI"                          LangExt.CApiFFI,
+  flagSpec "CPP"                              LangExt.Cpp,
+  flagSpec "ConstrainedClassMethods"          LangExt.ConstrainedClassMethods,
+  flagSpec "ConstraintKinds"                  LangExt.ConstraintKinds,
+  flagSpec "DataKinds"                        LangExt.DataKinds,
+  flagSpec' "DatatypeContexts"                LangExt.DatatypeContexts
     (\ turn_on -> when turn_on $
          deprecate $ "It was widely considered a misfeature, " ++
                      "and has been removed from the Haskell language."),
-  flagSpec "DefaultSignatures"                Opt_DefaultSignatures,
-  flagSpec "DeriveAnyClass"                   Opt_DeriveAnyClass,
-  flagSpec "DeriveDataTypeable"               Opt_DeriveDataTypeable,
-  flagSpec "DeriveFoldable"                   Opt_DeriveFoldable,
-  flagSpec "DeriveFunctor"                    Opt_DeriveFunctor,
-  flagSpec "DeriveGeneric"                    Opt_DeriveGeneric,
-  flagSpec "DeriveLift"                       Opt_DeriveLift,
-  flagSpec "DeriveTraversable"                Opt_DeriveTraversable,
-  flagSpec "DisambiguateRecordFields"         Opt_DisambiguateRecordFields,
-  flagSpec "DoAndIfThenElse"                  Opt_DoAndIfThenElse,
-  flagSpec' "DoRec"                           Opt_RecursiveDo
+  flagSpec "DefaultSignatures"                LangExt.DefaultSignatures,
+  flagSpec "DeriveAnyClass"                   LangExt.DeriveAnyClass,
+  flagSpec "DeriveDataTypeable"               LangExt.DeriveDataTypeable,
+  flagSpec "DeriveFoldable"                   LangExt.DeriveFoldable,
+  flagSpec "DeriveFunctor"                    LangExt.DeriveFunctor,
+  flagSpec "DeriveGeneric"                    LangExt.DeriveGeneric,
+  flagSpec "DeriveLift"                       LangExt.DeriveLift,
+  flagSpec "DeriveTraversable"                LangExt.DeriveTraversable,
+  flagSpec "DisambiguateRecordFields"         LangExt.DisambiguateRecordFields,
+  flagSpec "DoAndIfThenElse"                  LangExt.DoAndIfThenElse,
+  flagSpec' "DoRec"                           LangExt.RecursiveDo
     (deprecatedForExtension "RecursiveDo"),
-  flagSpec "DuplicateRecordFields"            Opt_DuplicateRecordFields,
-  flagSpec "EmptyCase"                        Opt_EmptyCase,
-  flagSpec "EmptyDataDecls"                   Opt_EmptyDataDecls,
-  flagSpec "ExistentialQuantification"        Opt_ExistentialQuantification,
-  flagSpec "ExplicitForAll"                   Opt_ExplicitForAll,
-  flagSpec "ExplicitNamespaces"               Opt_ExplicitNamespaces,
-  flagSpec "ExtendedDefaultRules"             Opt_ExtendedDefaultRules,
-  flagSpec "FlexibleContexts"                 Opt_FlexibleContexts,
-  flagSpec "FlexibleInstances"                Opt_FlexibleInstances,
-  flagSpec "ForeignFunctionInterface"         Opt_ForeignFunctionInterface,
-  flagSpec "FunctionalDependencies"           Opt_FunctionalDependencies,
-  flagSpec "GADTSyntax"                       Opt_GADTSyntax,
-  flagSpec "GADTs"                            Opt_GADTs,
-  flagSpec "GHCForeignImportPrim"             Opt_GHCForeignImportPrim,
-  flagSpec' "GeneralizedNewtypeDeriving"      Opt_GeneralizedNewtypeDeriving
+  flagSpec "DuplicateRecordFields"            LangExt.DuplicateRecordFields,
+  flagSpec "EmptyCase"                        LangExt.EmptyCase,
+  flagSpec "EmptyDataDecls"                   LangExt.EmptyDataDecls,
+  flagSpec "ExistentialQuantification"        LangExt.ExistentialQuantification,
+  flagSpec "ExplicitForAll"                   LangExt.ExplicitForAll,
+  flagSpec "ExplicitNamespaces"               LangExt.ExplicitNamespaces,
+  flagSpec "ExtendedDefaultRules"             LangExt.ExtendedDefaultRules,
+  flagSpec "FlexibleContexts"                 LangExt.FlexibleContexts,
+  flagSpec "FlexibleInstances"                LangExt.FlexibleInstances,
+  flagSpec "ForeignFunctionInterface"         LangExt.ForeignFunctionInterface,
+  flagSpec "FunctionalDependencies"           LangExt.FunctionalDependencies,
+  flagSpec "GADTSyntax"                       LangExt.GADTSyntax,
+  flagSpec "GADTs"                            LangExt.GADTs,
+  flagSpec "GHCForeignImportPrim"             LangExt.GHCForeignImportPrim,
+  flagSpec' "GeneralizedNewtypeDeriving"      LangExt.GeneralizedNewtypeDeriving
                                               setGenDeriving,
-  flagSpec "ImplicitParams"                   Opt_ImplicitParams,
-  flagSpec "ImplicitPrelude"                  Opt_ImplicitPrelude,
-  flagSpec "ImpredicativeTypes"               Opt_ImpredicativeTypes,
-  flagSpec' "IncoherentInstances"             Opt_IncoherentInstances
+  flagSpec "ImplicitParams"                   LangExt.ImplicitParams,
+  flagSpec "ImplicitPrelude"                  LangExt.ImplicitPrelude,
+  flagSpec "ImpredicativeTypes"               LangExt.ImpredicativeTypes,
+  flagSpec' "IncoherentInstances"             LangExt.IncoherentInstances
                                               setIncoherentInsts,
-  flagSpec "InstanceSigs"                     Opt_InstanceSigs,
-  flagSpec "ApplicativeDo"                    Opt_ApplicativeDo,
-  flagSpec "InterruptibleFFI"                 Opt_InterruptibleFFI,
-  flagSpec "JavaScriptFFI"                    Opt_JavaScriptFFI,
-  flagSpec "KindSignatures"                   Opt_KindSignatures,
-  flagSpec "LambdaCase"                       Opt_LambdaCase,
-  flagSpec "LiberalTypeSynonyms"              Opt_LiberalTypeSynonyms,
-  flagSpec "MagicHash"                        Opt_MagicHash,
-  flagSpec "MonadComprehensions"              Opt_MonadComprehensions,
-  flagSpec "MonadFailDesugaring"              Opt_MonadFailDesugaring,
-  flagSpec "MonoLocalBinds"                   Opt_MonoLocalBinds,
-  flagSpec' "MonoPatBinds"                    Opt_MonoPatBinds
+  flagSpec "InstanceSigs"                     LangExt.InstanceSigs,
+  flagSpec "ApplicativeDo"                    LangExt.ApplicativeDo,
+  flagSpec "InterruptibleFFI"                 LangExt.InterruptibleFFI,
+  flagSpec "JavaScriptFFI"                    LangExt.JavaScriptFFI,
+  flagSpec "KindSignatures"                   LangExt.KindSignatures,
+  flagSpec "LambdaCase"                       LangExt.LambdaCase,
+  flagSpec "LiberalTypeSynonyms"              LangExt.LiberalTypeSynonyms,
+  flagSpec "MagicHash"                        LangExt.MagicHash,
+  flagSpec "MonadComprehensions"              LangExt.MonadComprehensions,
+  flagSpec "MonadFailDesugaring"              LangExt.MonadFailDesugaring,
+  flagSpec "MonoLocalBinds"                   LangExt.MonoLocalBinds,
+  flagSpec' "MonoPatBinds"                    LangExt.MonoPatBinds
     (\ turn_on -> when turn_on $
          deprecate "Experimental feature now removed; has no effect"),
-  flagSpec "MonomorphismRestriction"          Opt_MonomorphismRestriction,
-  flagSpec "MultiParamTypeClasses"            Opt_MultiParamTypeClasses,
-  flagSpec "MultiWayIf"                       Opt_MultiWayIf,
-  flagSpec "NPlusKPatterns"                   Opt_NPlusKPatterns,
-  flagSpec "NamedFieldPuns"                   Opt_RecordPuns,
-  flagSpec "NamedWildCards"                   Opt_NamedWildCards,
-  flagSpec "NegativeLiterals"                 Opt_NegativeLiterals,
-  flagSpec "NondecreasingIndentation"         Opt_NondecreasingIndentation,
-  flagSpec' "NullaryTypeClasses"              Opt_NullaryTypeClasses
+  flagSpec "MonomorphismRestriction"          LangExt.MonomorphismRestriction,
+  flagSpec "MultiParamTypeClasses"            LangExt.MultiParamTypeClasses,
+  flagSpec "MultiWayIf"                       LangExt.MultiWayIf,
+  flagSpec "NPlusKPatterns"                   LangExt.NPlusKPatterns,
+  flagSpec "NamedFieldPuns"                   LangExt.RecordPuns,
+  flagSpec "NamedWildCards"                   LangExt.NamedWildCards,
+  flagSpec "NegativeLiterals"                 LangExt.NegativeLiterals,
+  flagSpec "NondecreasingIndentation"         LangExt.NondecreasingIndentation,
+  flagSpec' "NullaryTypeClasses"              LangExt.NullaryTypeClasses
     (deprecatedForExtension "MultiParamTypeClasses"),
-  flagSpec "NumDecimals"                      Opt_NumDecimals,
-  flagSpec' "OverlappingInstances"            Opt_OverlappingInstances
+  flagSpec "NumDecimals"                      LangExt.NumDecimals,
+  flagSpec' "OverlappingInstances"            LangExt.OverlappingInstances
                                               setOverlappingInsts,
-  flagSpec "OverloadedLabels"                 Opt_OverloadedLabels,
-  flagSpec "OverloadedLists"                  Opt_OverloadedLists,
-  flagSpec "OverloadedStrings"                Opt_OverloadedStrings,
-  flagSpec "PackageImports"                   Opt_PackageImports,
-  flagSpec "ParallelArrays"                   Opt_ParallelArrays,
-  flagSpec "ParallelListComp"                 Opt_ParallelListComp,
-  flagSpec "PartialTypeSignatures"            Opt_PartialTypeSignatures,
-  flagSpec "PatternGuards"                    Opt_PatternGuards,
-  flagSpec' "PatternSignatures"               Opt_ScopedTypeVariables
+  flagSpec "OverloadedLabels"                 LangExt.OverloadedLabels,
+  flagSpec "OverloadedLists"                  LangExt.OverloadedLists,
+  flagSpec "OverloadedStrings"                LangExt.OverloadedStrings,
+  flagSpec "PackageImports"                   LangExt.PackageImports,
+  flagSpec "ParallelArrays"                   LangExt.ParallelArrays,
+  flagSpec "ParallelListComp"                 LangExt.ParallelListComp,
+  flagSpec "PartialTypeSignatures"            LangExt.PartialTypeSignatures,
+  flagSpec "PatternGuards"                    LangExt.PatternGuards,
+  flagSpec' "PatternSignatures"               LangExt.ScopedTypeVariables
     (deprecatedForExtension "ScopedTypeVariables"),
-  flagSpec "PatternSynonyms"                  Opt_PatternSynonyms,
-  flagSpec "PolyKinds"                        Opt_PolyKinds,
-  flagSpec "PolymorphicComponents"            Opt_RankNTypes,
-  flagSpec "PostfixOperators"                 Opt_PostfixOperators,
-  flagSpec "QuasiQuotes"                      Opt_QuasiQuotes,
-  flagSpec "Rank2Types"                       Opt_RankNTypes,
-  flagSpec "RankNTypes"                       Opt_RankNTypes,
-  flagSpec "RebindableSyntax"                 Opt_RebindableSyntax,
-  flagSpec' "RecordPuns"                      Opt_RecordPuns
+  flagSpec "PatternSynonyms"                  LangExt.PatternSynonyms,
+  flagSpec "PolyKinds"                        LangExt.PolyKinds,
+  flagSpec "PolymorphicComponents"            LangExt.RankNTypes,
+  flagSpec "PostfixOperators"                 LangExt.PostfixOperators,
+  flagSpec "QuasiQuotes"                      LangExt.QuasiQuotes,
+  flagSpec "Rank2Types"                       LangExt.RankNTypes,
+  flagSpec "RankNTypes"                       LangExt.RankNTypes,
+  flagSpec "RebindableSyntax"                 LangExt.RebindableSyntax,
+  flagSpec' "RecordPuns"                      LangExt.RecordPuns
     (deprecatedForExtension "NamedFieldPuns"),
-  flagSpec "RecordWildCards"                  Opt_RecordWildCards,
-  flagSpec "RecursiveDo"                      Opt_RecursiveDo,
-  flagSpec "RelaxedLayout"                    Opt_RelaxedLayout,
-  flagSpec' "RelaxedPolyRec"                  Opt_RelaxedPolyRec
+  flagSpec "RecordWildCards"                  LangExt.RecordWildCards,
+  flagSpec "RecursiveDo"                      LangExt.RecursiveDo,
+  flagSpec "RelaxedLayout"                    LangExt.RelaxedLayout,
+  flagSpec' "RelaxedPolyRec"                  LangExt.RelaxedPolyRec
     (\ turn_on -> unless turn_on $
          deprecate "You can't turn off RelaxedPolyRec any more"),
-  flagSpec "RoleAnnotations"                  Opt_RoleAnnotations,
-  flagSpec "ScopedTypeVariables"              Opt_ScopedTypeVariables,
-  flagSpec "StandaloneDeriving"               Opt_StandaloneDeriving,
-  flagSpec "StaticPointers"                   Opt_StaticPointers,
-  flagSpec "Strict"                           Opt_Strict,
-  flagSpec "StrictData"                       Opt_StrictData,
-  flagSpec' "TemplateHaskell"                 Opt_TemplateHaskell
+  flagSpec "RoleAnnotations"                  LangExt.RoleAnnotations,
+  flagSpec "ScopedTypeVariables"              LangExt.ScopedTypeVariables,
+  flagSpec "StandaloneDeriving"               LangExt.StandaloneDeriving,
+  flagSpec "StaticPointers"                   LangExt.StaticPointers,
+  flagSpec "Strict"                           LangExt.Strict,
+  flagSpec "StrictData"                       LangExt.StrictData,
+  flagSpec' "TemplateHaskell"                 LangExt.TemplateHaskell
                                               checkTemplateHaskellOk,
-  flagSpec "TemplateHaskellQuotes"            Opt_TemplateHaskellQuotes,
-  flagSpec "TraditionalRecordSyntax"          Opt_TraditionalRecordSyntax,
-  flagSpec "TransformListComp"                Opt_TransformListComp,
-  flagSpec "TupleSections"                    Opt_TupleSections,
-  flagSpec "TypeInType"                       Opt_TypeInType,
-  flagSpec "TypeFamilies"                     Opt_TypeFamilies,
-  flagSpec "TypeOperators"                    Opt_TypeOperators,
-  flagSpec "TypeSynonymInstances"             Opt_TypeSynonymInstances,
-  flagSpec "UnboxedTuples"                    Opt_UnboxedTuples,
-  flagSpec "UndecidableInstances"             Opt_UndecidableInstances,
-  flagSpec "UndecidableSuperClasses"          Opt_UndecidableSuperClasses,
-  flagSpec "UnicodeSyntax"                    Opt_UnicodeSyntax,
-  flagSpec "UnliftedFFITypes"                 Opt_UnliftedFFITypes,
-  flagSpec "ViewPatterns"                     Opt_ViewPatterns
+  flagSpec "TemplateHaskellQuotes"            LangExt.TemplateHaskellQuotes,
+  flagSpec "TraditionalRecordSyntax"          LangExt.TraditionalRecordSyntax,
+  flagSpec "TransformListComp"                LangExt.TransformListComp,
+  flagSpec "TupleSections"                    LangExt.TupleSections,
+  flagSpec "TypeInType"                       LangExt.TypeInType,
+  flagSpec "TypeFamilies"                     LangExt.TypeFamilies,
+  flagSpec "TypeOperators"                    LangExt.TypeOperators,
+  flagSpec "TypeSynonymInstances"             LangExt.TypeSynonymInstances,
+  flagSpec "UnboxedTuples"                    LangExt.UnboxedTuples,
+  flagSpec "UndecidableInstances"             LangExt.UndecidableInstances,
+  flagSpec "UndecidableSuperClasses"          LangExt.UndecidableSuperClasses,
+  flagSpec "UnicodeSyntax"                    LangExt.UnicodeSyntax,
+  flagSpec "UnliftedFFITypes"                 LangExt.UnliftedFFITypes,
+  flagSpec "ViewPatterns"                     LangExt.ViewPatterns
   ]
 
 defaultFlags :: Settings -> [GeneralFlag]
@@ -3321,57 +3213,57 @@ impliedGFlags = [(Opt_DeferTypeErrors, turnOn, Opt_DeferTypedHoles)
 impliedOffGFlags :: [(GeneralFlag, TurnOnFlag, GeneralFlag)]
 impliedOffGFlags = [(Opt_Strictness, turnOff, Opt_WorkerWrapper)]
 
-impliedXFlags :: [(ExtensionFlag, TurnOnFlag, ExtensionFlag)]
+impliedXFlags :: [(LangExt.Extension, TurnOnFlag, LangExt.Extension)]
 impliedXFlags
 -- See Note [Updating flag description in the User's Guide]
-  = [ (Opt_RankNTypes,                turnOn, Opt_ExplicitForAll)
-    , (Opt_ScopedTypeVariables,       turnOn, Opt_ExplicitForAll)
-    , (Opt_LiberalTypeSynonyms,       turnOn, Opt_ExplicitForAll)
-    , (Opt_ExistentialQuantification, turnOn, Opt_ExplicitForAll)
-    , (Opt_FlexibleInstances,         turnOn, Opt_TypeSynonymInstances)
-    , (Opt_FunctionalDependencies,    turnOn, Opt_MultiParamTypeClasses)
-    , (Opt_MultiParamTypeClasses,     turnOn, Opt_ConstrainedClassMethods)  -- c.f. Trac #7854
+  = [ (LangExt.RankNTypes,                turnOn, LangExt.ExplicitForAll)
+    , (LangExt.ScopedTypeVariables,       turnOn, LangExt.ExplicitForAll)
+    , (LangExt.LiberalTypeSynonyms,       turnOn, LangExt.ExplicitForAll)
+    , (LangExt.ExistentialQuantification, turnOn, LangExt.ExplicitForAll)
+    , (LangExt.FlexibleInstances,         turnOn, LangExt.TypeSynonymInstances)
+    , (LangExt.FunctionalDependencies,    turnOn, LangExt.MultiParamTypeClasses)
+    , (LangExt.MultiParamTypeClasses,     turnOn, LangExt.ConstrainedClassMethods)  -- c.f. Trac #7854
 
-    , (Opt_RebindableSyntax, turnOff, Opt_ImplicitPrelude)      -- NB: turn off!
+    , (LangExt.RebindableSyntax, turnOff, LangExt.ImplicitPrelude)      -- NB: turn off!
 
-    , (Opt_GADTs,            turnOn, Opt_GADTSyntax)
-    , (Opt_GADTs,            turnOn, Opt_MonoLocalBinds)
-    , (Opt_TypeFamilies,     turnOn, Opt_MonoLocalBinds)
+    , (LangExt.GADTs,            turnOn, LangExt.GADTSyntax)
+    , (LangExt.GADTs,            turnOn, LangExt.MonoLocalBinds)
+    , (LangExt.TypeFamilies,     turnOn, LangExt.MonoLocalBinds)
 
-    , (Opt_TypeFamilies,     turnOn, Opt_KindSignatures)  -- Type families use kind signatures
-    , (Opt_PolyKinds,        turnOn, Opt_KindSignatures)  -- Ditto polymorphic kinds
-    , (Opt_TypeInType,       turnOn, Opt_DataKinds)
-    , (Opt_TypeInType,       turnOn, Opt_PolyKinds)
-    , (Opt_TypeInType,       turnOn, Opt_KindSignatures)
+    , (LangExt.TypeFamilies,     turnOn, LangExt.KindSignatures)  -- Type families use kind signatures
+    , (LangExt.PolyKinds,        turnOn, LangExt.KindSignatures)  -- Ditto polymorphic kinds
+    , (LangExt.TypeInType,       turnOn, LangExt.DataKinds)
+    , (LangExt.TypeInType,       turnOn, LangExt.PolyKinds)
+    , (LangExt.TypeInType,       turnOn, LangExt.KindSignatures)
 
     -- AutoDeriveTypeable is not very useful without DeriveDataTypeable
-    , (Opt_AutoDeriveTypeable, turnOn, Opt_DeriveDataTypeable)
+    , (LangExt.AutoDeriveTypeable, turnOn, LangExt.DeriveDataTypeable)
 
     -- We turn this on so that we can export associated type
     -- type synonyms in subordinates (e.g. MyClass(type AssocType))
-    , (Opt_TypeFamilies,     turnOn, Opt_ExplicitNamespaces)
-    , (Opt_TypeOperators, turnOn, Opt_ExplicitNamespaces)
+    , (LangExt.TypeFamilies,     turnOn, LangExt.ExplicitNamespaces)
+    , (LangExt.TypeOperators, turnOn, LangExt.ExplicitNamespaces)
 
-    , (Opt_ImpredicativeTypes,  turnOn, Opt_RankNTypes)
+    , (LangExt.ImpredicativeTypes,  turnOn, LangExt.RankNTypes)
 
         -- Record wild-cards implies field disambiguation
         -- Otherwise if you write (C {..}) you may well get
         -- stuff like " 'a' not in scope ", which is a bit silly
         -- if the compiler has just filled in field 'a' of constructor 'C'
-    , (Opt_RecordWildCards,     turnOn, Opt_DisambiguateRecordFields)
+    , (LangExt.RecordWildCards,     turnOn, LangExt.DisambiguateRecordFields)
 
-    , (Opt_ParallelArrays, turnOn, Opt_ParallelListComp)
+    , (LangExt.ParallelArrays, turnOn, LangExt.ParallelListComp)
 
-    , (Opt_JavaScriptFFI, turnOn, Opt_InterruptibleFFI)
+    , (LangExt.JavaScriptFFI, turnOn, LangExt.InterruptibleFFI)
 
-    , (Opt_DeriveTraversable, turnOn, Opt_DeriveFunctor)
-    , (Opt_DeriveTraversable, turnOn, Opt_DeriveFoldable)
+    , (LangExt.DeriveTraversable, turnOn, LangExt.DeriveFunctor)
+    , (LangExt.DeriveTraversable, turnOn, LangExt.DeriveFoldable)
 
     -- Duplicate record fields require field disambiguation
-    , (Opt_DuplicateRecordFields, turnOn, Opt_DisambiguateRecordFields)
+    , (LangExt.DuplicateRecordFields, turnOn, LangExt.DisambiguateRecordFields)
 
-    , (Opt_TemplateHaskell, turnOn, Opt_TemplateHaskellQuotes)
-    , (Opt_Strict, turnOn, Opt_StrictData)
+    , (LangExt.TemplateHaskell, turnOn, LangExt.TemplateHaskellQuotes)
+    , (LangExt.Strict, turnOn, LangExt.StrictData)
   ]
 
 -- Note [Documenting optimisation flags]
@@ -3528,39 +3420,39 @@ disableGlasgowExts :: DynP ()
 disableGlasgowExts = do unSetGeneralFlag Opt_PrintExplicitForalls
                         mapM_ unSetExtensionFlag glasgowExtsFlags
 
-glasgowExtsFlags :: [ExtensionFlag]
+glasgowExtsFlags :: [LangExt.Extension]
 glasgowExtsFlags = [
-             Opt_ConstrainedClassMethods
-           , Opt_DeriveDataTypeable
-           , Opt_DeriveFoldable
-           , Opt_DeriveFunctor
-           , Opt_DeriveGeneric
-           , Opt_DeriveTraversable
-           , Opt_EmptyDataDecls
-           , Opt_ExistentialQuantification
-           , Opt_ExplicitNamespaces
-           , Opt_FlexibleContexts
-           , Opt_FlexibleInstances
-           , Opt_ForeignFunctionInterface
-           , Opt_FunctionalDependencies
-           , Opt_GeneralizedNewtypeDeriving
-           , Opt_ImplicitParams
-           , Opt_KindSignatures
-           , Opt_LiberalTypeSynonyms
-           , Opt_MagicHash
-           , Opt_MultiParamTypeClasses
-           , Opt_ParallelListComp
-           , Opt_PatternGuards
-           , Opt_PostfixOperators
-           , Opt_RankNTypes
-           , Opt_RecursiveDo
-           , Opt_ScopedTypeVariables
-           , Opt_StandaloneDeriving
-           , Opt_TypeOperators
-           , Opt_TypeSynonymInstances
-           , Opt_UnboxedTuples
-           , Opt_UnicodeSyntax
-           , Opt_UnliftedFFITypes ]
+             LangExt.ConstrainedClassMethods
+           , LangExt.DeriveDataTypeable
+           , LangExt.DeriveFoldable
+           , LangExt.DeriveFunctor
+           , LangExt.DeriveGeneric
+           , LangExt.DeriveTraversable
+           , LangExt.EmptyDataDecls
+           , LangExt.ExistentialQuantification
+           , LangExt.ExplicitNamespaces
+           , LangExt.FlexibleContexts
+           , LangExt.FlexibleInstances
+           , LangExt.ForeignFunctionInterface
+           , LangExt.FunctionalDependencies
+           , LangExt.GeneralizedNewtypeDeriving
+           , LangExt.ImplicitParams
+           , LangExt.KindSignatures
+           , LangExt.LiberalTypeSynonyms
+           , LangExt.MagicHash
+           , LangExt.MultiParamTypeClasses
+           , LangExt.ParallelListComp
+           , LangExt.PatternGuards
+           , LangExt.PostfixOperators
+           , LangExt.RankNTypes
+           , LangExt.RecursiveDo
+           , LangExt.ScopedTypeVariables
+           , LangExt.StandaloneDeriving
+           , LangExt.TypeOperators
+           , LangExt.TypeSynonymInstances
+           , LangExt.UnboxedTuples
+           , LangExt.UnicodeSyntax
+           , LangExt.UnliftedFFITypes ]
 
 foreign import ccall unsafe "rts_isProfiled" rtsIsProfiledIO :: IO CInt
 
@@ -3729,11 +3621,11 @@ setWarningFlag   f = upd (\dfs -> wopt_set dfs f)
 unSetWarningFlag f = upd (\dfs -> wopt_unset dfs f)
 
 --------------------------
-setExtensionFlag, unSetExtensionFlag :: ExtensionFlag -> DynP ()
+setExtensionFlag, unSetExtensionFlag :: LangExt.Extension -> DynP ()
 setExtensionFlag f = upd (setExtensionFlag' f)
 unSetExtensionFlag f = upd (unSetExtensionFlag' f)
 
-setExtensionFlag', unSetExtensionFlag' :: ExtensionFlag -> DynFlags -> DynFlags
+setExtensionFlag', unSetExtensionFlag' :: LangExt.Extension -> DynFlags -> DynFlags
 setExtensionFlag' f dflags = foldr ($) (xopt_set dflags f) deps
   where
     deps = [ if turn_on then setExtensionFlag'   d

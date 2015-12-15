@@ -43,8 +43,9 @@ import BasicTypes
 import DynFlags
 import Util
 import FastString
-import Control.Monad
+import qualified GHC.LanguageExtensions as LangExt
 
+import Control.Monad
 import Data.Int
 #if __GLASGOW_HASKELL__ < 709
 import Data.Traversable (traverse)
@@ -184,7 +185,7 @@ warnAboutOverflowedLiterals dflags lit
         maxB = toInteger (maxBound :: a)
         sug | minB == -i   -- Note [Suggest NegativeLiterals]
             , i > 0
-            , not (xopt Opt_NegativeLiterals dflags)
+            , not (xopt LangExt.NegativeLiterals dflags)
             = ptext (sLit "If you are trying to write a large negative literal, use NegativeLiterals")
             | otherwise = Outputable.empty
 

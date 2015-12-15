@@ -66,6 +66,7 @@ import DynFlags
 import FastString
 import Util
 import MonadUtils
+import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 
 {-**********************************************************************
@@ -118,7 +119,7 @@ dsHsBind dflags
         ; let var' | inline_regardless = var `setIdUnfolding` mkCompulsoryUnfolding core_expr
                    | otherwise         = var
         ; let core_bind@(id,_) = makeCorePair dflags var' False 0 core_expr
-              force_var = if xopt Opt_Strict dflags
+              force_var = if xopt LangExt.Strict dflags
                           then [id]
                           else []
         ; return (force_var, [core_bind]) }
@@ -131,7 +132,7 @@ dsHsBind dflags
         ; rhs <- dsHsWrapper co_fn (mkLams args body')
         ; let core_binds@(id,_) = makeCorePair dflags fun False 0 rhs
               force_var =
-                if xopt Opt_Strict dflags
+                if xopt LangExt.Strict dflags
                    && matchGroupArity matches == 0 -- no need to force lambdas
                 then [id]
                 else []
@@ -163,7 +164,7 @@ dsHsBind dflags
                    , abs_ev_binds = ev_binds, abs_binds = binds })
   | ABE { abe_wrap = wrap, abe_poly = global
         , abe_mono = local, abe_prags = prags } <- export
-  , not (xopt Opt_Strict dflags)                 -- handle strict binds
+  , not (xopt LangExt.Strict dflags)             -- handle strict binds
   , not (anyBag (isBangedPatBind . unLoc) binds) -- in the next case
   = -- push type constraints deeper for pattern match check
     addDictsDs (toTcTypeBag (listToBag dicts)) $

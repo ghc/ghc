@@ -83,6 +83,7 @@ import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilD
 import Util             ( looksLikePackageName )
 import Prelude
 
+import qualified GHC.LanguageExtensions as LangExt
 }
 
 {- Last updated: 18 Nov 2015
@@ -3315,14 +3316,14 @@ fileSrcSpan = do
 -- Hint about the MultiWayIf extension
 hintMultiWayIf :: SrcSpan -> P ()
 hintMultiWayIf span = do
-  mwiEnabled <- liftM ((Opt_MultiWayIf `xopt`) . dflags) getPState
+  mwiEnabled <- liftM ((LangExt.MultiWayIf `xopt`) . dflags) getPState
   unless mwiEnabled $ parseErrorSDoc span $
     text "Multi-way if-expressions need MultiWayIf turned on"
 
 -- Hint about if usage for beginners
 hintIf :: SrcSpan -> String -> P (LHsExpr RdrName)
 hintIf span msg = do
-  mwiEnabled <- liftM ((Opt_MultiWayIf `xopt`) . dflags) getPState
+  mwiEnabled <- liftM ((LangExt.MultiWayIf `xopt`) . dflags) getPState
   if mwiEnabled
     then parseErrorSDoc span $ text $ "parse error in if statement"
     else parseErrorSDoc span $ text $ "parse error in if statement: "++msg
@@ -3339,7 +3340,7 @@ hintExplicitForall span = do
       ]
 
 namedWildCardsEnabled :: P Bool
-namedWildCardsEnabled = liftM ((Opt_NamedWildCards `xopt`) . dflags) getPState
+namedWildCardsEnabled = liftM ((LangExt.NamedWildCards `xopt`) . dflags) getPState
 
 {-
 %************************************************************************

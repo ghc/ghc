@@ -54,6 +54,7 @@ import Outputable
 import FastString
 import BasicTypes
 import Module
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.Maybe
@@ -197,7 +198,7 @@ checkAmbiguity ctxt ty
          -- Solve the constraints eagerly because an ambiguous type
          -- can cause a cascade of further errors.  Since the free
          -- tyvars are skolemised, we can safely use tcSimplifyTop
-       ; allow_ambiguous <- xoptM Opt_AllowAmbiguousTypes
+       ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
        ; (_wrap, wanted) <- addErrCtxt (mk_msg allow_ambiguous) $
                             captureConstraints $
                             tcSubType_NC ctxt ty ty
@@ -289,7 +290,7 @@ checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Not used for instance decls; checkValidInstance instead
 checkValidType ctxt ty
   = do { traceTc "checkValidType" (ppr ty <+> text "::" <+> ppr (typeKind ty))
-       ; rankn_flag  <- xoptM Opt_RankNTypes
+       ; rankn_flag  <- xoptM LangExt.RankNTypes
        ; let gen_rank :: Rank -> Rank
              gen_rank r | rankn_flag = ArbitraryRank
                         | otherwise  = r
@@ -351,7 +352,7 @@ check_kind :: TidyEnv -> UserTypeCtxt -> TcType -> TcM ()
 check_kind env ctxt ty
   | TySynCtxt {} <- ctxt
   , returnsConstraintKind actual_kind
-  = do { ck <- xoptM Opt_ConstraintKinds
+  = do { ck <- xoptM LangExt.ConstraintKinds
        ; if ck
          then  when (isConstraintKind actual_kind)
                     (do { dflags <- getDynFlags
@@ -490,7 +491,7 @@ check_syn_tc_app env ctxt rank ty tc tys
        --      type Foo a = Tree [a]
        --      f :: Foo a b -> ...
   = do  { -- See Note [Liberal type synonyms]
-        ; liberal <- xoptM Opt_LiberalTypeSynonyms
+        ; liberal <- xoptM LangExt.LiberalTypeSynonyms
         ; if not liberal || isTypeFamilyTyCon tc then
                 -- For H98 and synonym families, do check the type args
                 mapM_ check_arg tys
@@ -515,10 +516,10 @@ check_syn_tc_app env ctxt rank ty tc tys
 check_ubx_tuple :: TidyEnv -> UserTypeCtxt -> KindOrType
                 -> [KindOrType] -> TcM ()
 check_ubx_tuple env ctxt ty tys
-  = do  { ub_tuples_allowed <- xoptM Opt_UnboxedTuples
+  = do  { ub_tuples_allowed <- xoptM LangExt.UnboxedTuples
         ; checkTcM ub_tuples_allowed (ubxArgTyErr env ty)
 
-        ; impred <- xoptM Opt_ImpredicativeTypes
+        ; impred <- xoptM LangExt.ImpredicativeTypes
         ; let rank' = if impred then ArbitraryRank else tyConArgMonoType
                 -- c.f. check_arg_type
                 -- However, args are allowed to be unlifted, or
@@ -548,7 +549,7 @@ check_arg_type :: TidyEnv -> UserTypeCtxt -> Rank -> KindOrType -> TcM ()
 check_arg_type _ _ _ (CoercionTy {}) = return ()
 
 check_arg_type env ctxt rank ty
-  = do  { impred <- xoptM Opt_ImpredicativeTypes
+  = do  { impred <- xoptM LangExt.ImpredicativeTypes
         ; let rank' = case rank of          -- Predictive => must be monotype
                         MustBeMonoType     -> MustBeMonoType  -- Monotype, regardless
                         _other | impred    -> ArbitraryRank
@@ -700,13 +701,14 @@ check_eq_pred env dflags pred tc tys
   =         -- Equational constraints are valid in all contexts if type
             -- families are permitted
     do { checkTc (length tys == tyConArity tc) (tyConArityErr tc tys)
-       ; checkTcM (xopt Opt_TypeFamilies dflags || xopt Opt_GADTs dflags)
+       ; checkTcM (xopt LangExt.TypeFamilies dflags
+                   || xopt LangExt.GADTs dflags)
                   (eqPredTyErr env pred) }
 
 check_tuple_pred :: Bool -> TidyEnv -> DynFlags -> UserTypeCtxt -> PredType -> [PredType] -> TcM ()
 check_tuple_pred under_syn env dflags ctxt pred ts
   = do { -- See Note [ConstraintKinds in predicates]
-         checkTcM (under_syn || xopt Opt_ConstraintKinds dflags)
+         checkTcM (under_syn || xopt LangExt.ConstraintKinds dflags)
                   (predTupleErr env pred)
        ; mapM_ (check_pred_help under_syn env dflags ctxt) ts }
     -- This case will not normally be executed because without
@@ -720,14 +722,14 @@ check_irred_pred under_syn env dflags ctxt pred
          --   see Note [ConstraintKinds in predicates]
          -- But (X t1 t2) is always ok because we just require ConstraintKinds
          -- at the definition site (Trac #9838)
-        failIfTcM (not under_syn && not (xopt Opt_ConstraintKinds dflags)
+        failIfTcM (not under_syn && not (xopt LangExt.ConstraintKinds dflags)
                                 && hasTyVarHead pred)
                   (predIrredErr env pred)
 
          -- Make sure it is OK to have an irred pred in this context
          -- See Note [Irreducible predicates in superclasses]
        ; failIfTcM (is_superclass ctxt
-                    && not (xopt Opt_UndecidableInstances dflags)
+                    && not (xopt LangExt.UndecidableInstances dflags)
                     && has_tyfun_head pred)
                    (predSuperClassErr env pred) }
   where
@@ -773,8 +775,8 @@ check_class_pred env dflags ctxt pred cls tys
   where
     check_arity = checkTc (classArity cls == length tys)
                           (tyConArityErr (classTyCon cls) tys)
-    flexible_contexts = xopt Opt_FlexibleContexts     dflags
-    undecidable_ok    = xopt Opt_UndecidableInstances dflags
+    flexible_contexts = xopt LangExt.FlexibleContexts     dflags
+    undecidable_ok    = xopt LangExt.UndecidableInstances dflags
 
     arg_tys_ok = case ctxt of
         SpecInstCtxt -> True    -- {-# SPECIALISE instance Eq (T Int) #-} is fine
@@ -931,15 +933,15 @@ checkValidInstHead ctxt clas cls_args
            -- but not for SPECIALISE isntance pragmas
        ; let ty_args = filterOutInvisibleTypes (classTyCon clas) cls_args
        ; unless spec_inst_prag $
-         do { checkTc (xopt Opt_TypeSynonymInstances dflags ||
+         do { checkTc (xopt LangExt.TypeSynonymInstances dflags ||
                        all tcInstHeadTyNotSynonym ty_args)
                  (instTypeErr clas cls_args head_type_synonym_msg)
-            ; checkTc (xopt Opt_FlexibleInstances dflags ||
+            ; checkTc (xopt LangExt.FlexibleInstances dflags ||
                        all tcInstHeadTyAppAllTyVars ty_args)
                  (instTypeErr clas cls_args head_type_args_tyvars_msg)
-            ; checkTc (xopt Opt_MultiParamTypeClasses dflags ||
+            ; checkTc (xopt LangExt.MultiParamTypeClasses dflags ||
                        length ty_args == 1 ||  -- Only count type arguments
-                       (xopt Opt_NullaryTypeClasses dflags &&
+                       (xopt LangExt.NullaryTypeClasses dflags &&
                         null ty_args))
                  (instTypeErr clas cls_args head_one_type_msg) }
 
@@ -1068,7 +1070,7 @@ checkValidInstance ctxt hs_type ty
         --   e.g.  Bar a => Bar Int is ambiguous, but it also fails
         --   the termination condition, because 'a' appears more often
         --   in the constraint than in the head
-        ; undecidable_ok <- xoptM Opt_UndecidableInstances
+        ; undecidable_ok <- xoptM LangExt.UndecidableInstances
         ; traceTc "cvi" (ppr undecidable_ok $$ ppr ty)
         ; if undecidable_ok
           then checkAmbiguity ctxt ty
@@ -1400,7 +1402,7 @@ checkValidTyFamEqn mb_clsinfo fam_tc tvs cvs typats rhs loc
        ; check_lifted env rhs
 
          -- We have a decidable instance unless otherwise permitted
-       ; undecidable_ok <- xoptM Opt_UndecidableInstances
+       ; undecidable_ok <- xoptM LangExt.UndecidableInstances
        ; unless undecidable_ok $
            mapM_ addErrTc (checkFamInstRhs typats (tcTyFamInsts rhs))
 

@@ -2,6 +2,7 @@ module Main where
 
 import DynFlags
 import GHC
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad (forM_)
 import Control.Monad.IO.Class (liftIO)
@@ -14,7 +15,7 @@ main = do
     dflags <- getSessionDynFlags
     setSessionDynFlags $ dflags
       `gopt_unset` Opt_ImplicitImportQualified
-      `xopt_unset` Opt_ImplicitPrelude
+      `xopt_unset` LangExt.ImplicitPrelude
 
     forM_ exprs $ \expr ->
       handleSourceError printException $ do

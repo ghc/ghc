@@ -56,6 +56,8 @@ import SrcLoc
 import Bag
 import Outputable
 import Util
+import qualified GHC.LanguageExtensions as LangExt
+
 #if __GLASGOW_HASKELL__ < 709
 import Data.Traversable ( traverse )
 #endif
@@ -1479,7 +1481,7 @@ zonkTvCollecting :: TyVarSet -> TcRef TyVarSet -> UnboundTyVarZonker
 -- This variant collects unbound type variables in a mutable variable
 -- Works on both types and kinds
 zonkTvCollecting kind_vars unbound_tv_set tv
-  = do { poly_kinds <- xoptM Opt_PolyKinds
+  = do { poly_kinds <- xoptM LangExt.PolyKinds
        ; if tv `elemVarSet` kind_vars && not poly_kinds then defaultKindVar tv else do
        { ty_or_tv <- zonkQuantifiedTyVarOrType tv
        ; case ty_or_tv of

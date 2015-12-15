@@ -100,7 +100,7 @@ import FastString
 import SrcLoc
 import Bag
 import Pair
-import DynFlags
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Maybes
@@ -765,7 +765,7 @@ quantifyTyVars gbl_tvs (Pair dep_tkvs nondep_tkvs)
              -- to *, and zonk the tyvars as usual.  Notice that this
              -- may make quantifyTyVars return a shorter list
              -- than it was passed, but that's ok
-       ; poly_kinds <- xoptM Opt_PolyKinds
+       ; poly_kinds <- xoptM LangExt.PolyKinds
        ; dep_vars2 <- if poly_kinds
                       then return dep_kvs
                       else do { let (meta_kvs, skolem_kvs) = partition is_meta dep_kvs

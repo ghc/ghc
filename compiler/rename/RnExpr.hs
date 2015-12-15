@@ -45,6 +45,7 @@ import SrcLoc
 import FastString
 import Control.Monad
 import TysWiredIn       ( nilDataConName )
+import qualified GHC.LanguageExtensions as LangExt
 
 {-
 ************************************************************************
@@ -95,7 +96,7 @@ rnUnboundVar v
                 ; return (HsVar (noLoc n), emptyFVs) } }
 
 rnExpr (HsVar (L l v))
-  = do { opt_DuplicateRecordFields <- xoptM Opt_DuplicateRecordFields
+  = do { opt_DuplicateRecordFields <- xoptM LangExt.DuplicateRecordFields
        ; mb_name <- lookupOccRn_overloaded opt_DuplicateRecordFields v
        ; case mb_name of {
            Nothing -> rnUnboundVar v ;
@@ -119,7 +120,7 @@ rnExpr (HsOverLabel v)
   = return (HsOverLabel v, emptyFVs)
 
 rnExpr (HsLit lit@(HsString src s))
-  = do { opt_OverloadedStrings <- xoptM Opt_OverloadedStrings
+  = do { opt_OverloadedStrings <- xoptM LangExt.OverloadedStrings
        ; if opt_OverloadedStrings then
             rnExpr (HsOverLit (mkHsIsString src s placeHolderType))
          else do {
@@ -231,7 +232,7 @@ rnExpr (HsDo do_or_lc (L l stmts) _)
         ; return ( HsDo do_or_lc (L l stmts') placeHolderType, fvs ) }
 
 rnExpr (ExplicitList _ _  exps)
-  = do  { opt_OverloadedLists <- xoptM Opt_OverloadedLists
+  = do  { opt_OverloadedLists <- xoptM LangExt.OverloadedLists
         ; (exps', fvs) <- rnExprs exps
         ; if opt_OverloadedLists
            then do {
@@ -301,7 +302,7 @@ rnExpr (HsType a)
        ; return (HsType t, fvT) }
 
 rnExpr (ArithSeq _ _ seq)
-  = do { opt_OverloadedLists <- xoptM Opt_OverloadedLists
+  = do { opt_OverloadedLists <- xoptM LangExt.OverloadedLists
        ; (new_seq, fvs) <- rnArithSeq seq
        ; if opt_OverloadedLists
            then do {
@@ -681,7 +682,7 @@ postProcessStmtsForApplicativeDo ctxt stmts
        -- rearrange the statements using ApplicativeStmt if
        -- -XApplicativeDo is on.  Also strip out the FreeVars attached
        -- to each Stmt body.
-         ado_is_on <- xoptM Opt_ApplicativeDo
+         ado_is_on <- xoptM LangExt.ApplicativeDo
        ; let is_do_expr | DoExpr <- ctxt = True
                         | otherwise = False
        ; if ado_is_on && is_do_expr
@@ -779,7 +780,7 @@ rnStmt ctxt rnBody (L loc (BindStmt pat body _ _)) thing_inside
                 -- The binders do not scope over the expression
         ; (bind_op, fvs1) <- lookupStmtName ctxt bindMName
 
-        ; xMonadFailEnabled <- fmap (xopt Opt_MonadFailDesugaring) getDynFlags
+        ; xMonadFailEnabled <- fmap (xopt LangExt.MonadFailDesugaring) getDynFlags
         ; let failFunction | xMonadFailEnabled = failMName
                            | otherwise         = failMName_preMFP
         ; (fail_op, fvs2) <- lookupSyntaxName failFunction
@@ -1088,7 +1089,7 @@ rn_rec_stmt rnBody _ (L loc (BindStmt pat' body _ _), fv_pat)
   = do { (body', fv_expr) <- rnBody body
        ; (bind_op, fvs1) <- lookupSyntaxName bindMName
 
-       ; xMonadFailEnabled <- fmap (xopt Opt_MonadFailDesugaring) getDynFlags
+       ; xMonadFailEnabled <- fmap (xopt LangExt.MonadFailDesugaring) getDynFlags
        ; let failFunction | xMonadFailEnabled = failMName
                           | otherwise         = failMName_preMFP
        ; (fail_op, fvs2) <- lookupSyntaxName failFunction
@@ -1763,7 +1764,7 @@ okParStmt dflags ctxt stmt
 okDoStmt dflags ctxt stmt
   = case stmt of
        RecStmt {}
-         | Opt_RecursiveDo `xopt` dflags -> IsValid
+         | LangExt.RecursiveDo `xopt` dflags -> IsValid
          | ArrowExpr <- ctxt -> IsValid    -- Arrows allows 'rec'
          | otherwise         -> NotValid (ptext (sLit "Use RecursiveDo"))
        BindStmt {} -> IsValid
@@ -1778,10 +1779,10 @@ okCompStmt dflags _ stmt
        LetStmt {}  -> IsValid
        BodyStmt {} -> IsValid
        ParStmt {}
-         | Opt_ParallelListComp `xopt` dflags -> IsValid
+         | LangExt.ParallelListComp `xopt` dflags -> IsValid
          | otherwise -> NotValid (ptext (sLit "Use ParallelListComp"))
        TransStmt {}
-         | Opt_TransformListComp `xopt` dflags -> IsValid
+         | LangExt.TransformListComp `xopt` dflags -> IsValid
          | otherwise -> NotValid (ptext (sLit "Use TransformListComp"))
        RecStmt {}  -> emptyInvalid
        LastStmt {} -> emptyInvalid  -- Should not happen (dealt with by checkLastStmt)
@@ -1794,7 +1795,7 @@ okPArrStmt dflags _ stmt
        LetStmt {}  -> IsValid
        BodyStmt {} -> IsValid
        ParStmt {}
-         | Opt_ParallelListComp `xopt` dflags -> IsValid
+         | LangExt.ParallelListComp `xopt` dflags -> IsValid
          | otherwise -> NotValid (ptext (sLit "Use ParallelListComp"))
        TransStmt {} -> emptyInvalid
        RecStmt {}   -> emptyInvalid
@@ -1804,7 +1805,7 @@ okPArrStmt dflags _ stmt
 ---------
 checkTupleSection :: [LHsTupArg RdrName] -> RnM ()
 checkTupleSection args
-  = do  { tuple_section <- xoptM Opt_TupleSections
+  = do  { tuple_section <- xoptM LangExt.TupleSections
         ; checkErr (all tupArgPresent args || tuple_section) msg }
   where
     msg = ptext (sLit "Illegal tuple section: use TupleSections")

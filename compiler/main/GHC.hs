@@ -341,6 +341,7 @@ import FastString
 import qualified Parser
 import Lexer
 import ApiAnnotation
+import qualified GHC.LanguageExtensions as LangExt
 
 import System.Directory ( doesFileExist )
 import Data.Maybe
@@ -1047,7 +1048,7 @@ getModuleGraph = liftM hsc_mod_graph getSession
 -- have Template Haskell enabled whether it is actually needed or not.
 needsTemplateHaskell :: ModuleGraph -> Bool
 needsTemplateHaskell ms =
-    any (xopt Opt_TemplateHaskell . ms_hspp_opts) ms
+    any (xopt LangExt.TemplateHaskell . ms_hspp_opts) ms
 
 -- | Return @True@ <==> module is loaded.
 isLoaded :: GhcMonad m => ModuleName -> m Bool

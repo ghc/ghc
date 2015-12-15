@@ -59,6 +59,7 @@ import Outputable
 import SrcLoc
 import Util
 import BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Maybes
@@ -587,7 +588,7 @@ tcFamInstDeclCombined mb_clsinfo fam_tc_lname
   = do { -- Type family instances require -XTypeFamilies
          -- and can't (currently) be in an hs-boot file
        ; traceTc "tcFamInstDecl" (ppr fam_tc_lname)
-       ; type_families <- xoptM Opt_TypeFamilies
+       ; type_families <- xoptM LangExt.TypeFamilies
        ; is_boot <- tcIsHsBootOrSig   -- Are we compiling an hs-boot file?
        ; checkTc type_families $ badFamInstDecl fam_tc_lname
        ; checkTc (not is_boot) $ badBootFamInstDeclErr
@@ -1239,7 +1240,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                                      mapAndUnzip3M tc_item op_items
        ; return (ids, listToBag binds, listToBag (catMaybes mb_implics)) }
   where
-    set_exts :: [ExtensionFlag] -> TcM a -> TcM a
+    set_exts :: [LangExt.Extension] -> TcM a -> TcM a
     set_exts es thing = foldr setXOptM thing es
 
     hs_sig_fn = mkHsSigFun sigs
@@ -1413,7 +1414,7 @@ mkMethIds sig_fn clas tyvars dfun_ev_vars inst_tys sel_id
             Just lhs_ty  -- There is a signature in the instance declaration
                          -- See Note [Instance method signatures]
                -> setSrcSpan (getLoc (hsSigType lhs_ty)) $
-                  do { inst_sigs <- xoptM Opt_InstanceSigs
+                  do { inst_sigs <- xoptM LangExt.InstanceSigs
                      ; checkTc inst_sigs (misplacedInstSig sel_name lhs_ty)
                      ; sig_ty  <- tcHsSigType (FunSigCtxt sel_name False) lhs_ty
                      ; let poly_sig_ty = mkInvSigmaTy tyvars theta sig_ty

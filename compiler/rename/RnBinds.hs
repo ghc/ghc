@@ -48,9 +48,11 @@ import Bag
 import Util
 import Outputable
 import FastString
-import Data.List        ( partition, sort )
 import Maybes           ( orElse )
+import qualified GHC.LanguageExtensions as LangExt
+
 import Control.Monad
+import Data.List        ( partition, sort )
 #if __GLASGOW_HASKELL__ < 709
 import Data.Traversable ( traverse )
 #endif
@@ -476,7 +478,7 @@ rnBind sig_fn bind@(FunBind { fun_id = name
   = do  { let plain_name = unLoc name
 
         ; (matches', rhs_fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
-                                -- bindSigTyVars tests for Opt_ScopedTyVars
+                                -- bindSigTyVars tests for LangExt.ScopedTyVars
                                  rnMatchGroup (FunRhs plain_name)
                                               rnLExpr matches
         ; let is_infix = isInfixFunBind bind
@@ -623,7 +625,7 @@ rnPatSynBind _sig_fn bind@(PSB { psb_id = L _ name
                                , psb_def = pat
                                , psb_dir = dir })
        -- invariant: no free vars here when it's a FunBind
-  = do  { pattern_synonym_ok <- xoptM Opt_PatternSynonyms
+  = do  { pattern_synonym_ok <- xoptM LangExt.PatternSynonyms
         ; unless pattern_synonym_ok (addErr patternSynonymErr)
 
         ; ((pat', details'), fvs1) <- rnPat PatSyn pat $ \pat' -> do
@@ -781,7 +783,7 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
        -- Rename the bindings RHSs.  Again there's an issue about whether the
        -- type variables from the class/instance head are in scope.
        -- Answer no in Haskell 2010, but yes if you have -XScopedTypeVariables
-       ; scoped_tvs  <- xoptM Opt_ScopedTypeVariables
+       ; scoped_tvs  <- xoptM LangExt.ScopedTypeVariables
        ; (binds'', bind_fvs) <- maybe_extend_tyvar_env scoped_tvs $
               do { binds_w_dus <- mapBagM (rnLBind (mkSigTvFn other_sigs')) binds'
                  ; let bind_fvs = foldrBag (\(_,_,fv1) fv2 -> fv1 `plusFV` fv2)
@@ -881,7 +883,7 @@ renameSig ctxt sig@(TypeSig vs ty)
         ; return (TypeSig new_vs new_ty, fvs) }
 
 renameSig ctxt sig@(ClassOpSig is_deflt vs ty)
-  = do  { defaultSigs_on <- xoptM Opt_DefaultSignatures
+  = do  { defaultSigs_on <- xoptM LangExt.DefaultSignatures
         ; when (is_deflt && not defaultSigs_on) $
           addErr (defaultSigErr sig)
         ; new_v <- mapM (lookupSigOccRn ctxt sig) vs
@@ -1017,7 +1019,7 @@ rnMatchGroup :: Outputable (body RdrName) => HsMatchContext Name
              -> MatchGroup RdrName (Located (body RdrName))
              -> RnM (MatchGroup Name (Located (body Name)), FreeVars)
 rnMatchGroup ctxt rnBody (MG { mg_alts = L _ ms, mg_origin = origin })
-  = do { empty_case_ok <- xoptM Opt_EmptyCase
+  = do { empty_case_ok <- xoptM LangExt.EmptyCase
        ; when (null ms && not empty_case_ok) (addErr (emptyCaseErr ctxt))
        ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
        ; return (mkMatchGroupName origin new_ms, ms_fvs) }
@@ -1097,7 +1099,7 @@ rnGRHS' :: HsMatchContext Name
         -> GRHS RdrName (Located (body RdrName))
         -> RnM (GRHS Name (Located (body Name)), FreeVars)
 rnGRHS' ctxt rnBody (GRHS guards rhs)
-  = do  { pattern_guards_allowed <- xoptM Opt_PatternGuards
+  = do  { pattern_guards_allowed <- xoptM LangExt.PatternGuards
         ; ((guards', rhs'), fvs) <- rnStmts (PatGuard ctxt) rnLExpr guards $ \ _ ->
                                     rnBody rhs
 

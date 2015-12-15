@@ -56,6 +56,7 @@ import Pair (Pair(..))
 import Unique( hasKey )
 import DynFlags
 import Util
+import qualified GHC.LanguageExtensions as LangExt
 
 {-
 **********************************************************************
@@ -1768,7 +1769,7 @@ matchClassInst dflags inerts clas tys loc
 -- First check whether there is an in-scope Given that could
 -- match this constraint.  In that case, do not use top-level
 -- instances.  See Note [Instance and Given overlap]
-  | not (xopt Opt_IncoherentInstances dflags)
+  | not (xopt LangExt.IncoherentInstances dflags)
   , not (naturallyCoherentClass clas)
   , let matchable_givens = matchableGivens loc pred inerts
   , not (isEmptyBag matchable_givens)

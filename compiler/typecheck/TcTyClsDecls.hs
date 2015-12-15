@@ -66,6 +66,7 @@ import DynFlags
 import FastString
 import Unique
 import BasicTypes
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.List
@@ -875,7 +876,7 @@ tcDataDefn rec_info     -- Knot-tied; don't look at this eagerly
        ; stupid_tc_theta <- solveEqualities $ tcHsContext ctxt
        ; stupid_theta    <- zonkTcTypeToTypes emptyZonkEnv
                                               stupid_tc_theta
-       ; kind_signatures <- xoptM Opt_KindSignatures
+       ; kind_signatures <- xoptM LangExt.KindSignatures
        ; is_boot         <- tcIsHsBootOrSig -- Are we compiling an hs-boot file?
 
              -- Check that we don't use kind signatures without Glasgow extensions
@@ -1329,7 +1330,7 @@ Relevant tickets: #3699 and #10586.
 dataDeclChecks :: Name -> NewOrData -> ThetaType -> [LConDecl Name] -> TcM Bool
 dataDeclChecks tc_name new_or_data stupid_theta cons
   = do {   -- Check that we don't use GADT syntax in H98 world
-         gadtSyntax_ok <- xoptM Opt_GADTSyntax
+         gadtSyntax_ok <- xoptM LangExt.GADTSyntax
        ; let gadt_syntax = consUseGadtSyntax cons
        ; checkTc (gadtSyntax_ok || not gadt_syntax) (badGadtDecl tc_name)
 
@@ -1344,7 +1345,7 @@ dataDeclChecks tc_name new_or_data stupid_theta cons
 
                 -- Check that there's at least one condecl,
          -- or else we're reading an hs-boot file, or -XEmptyDataDecls
-       ; empty_data_decls <- xoptM Opt_EmptyDataDecls
+       ; empty_data_decls <- xoptM LangExt.EmptyDataDecls
        ; is_boot <- tcIsHsBootOrSig  -- Are we compiling an hs-boot file?
        ; checkTc (not (null cons) || empty_data_decls || is_boot)
                  (emptyConDeclsErr tc_name)
@@ -1998,8 +1999,8 @@ checkValidTyCon tc
                ; traceTc "cvtc2" (ppr tc)
 
                ; dflags          <- getDynFlags
-               ; existential_ok  <- xoptM Opt_ExistentialQuantification
-               ; gadt_ok         <- xoptM Opt_GADTs
+               ; existential_ok  <- xoptM LangExt.ExistentialQuantification
+               ; gadt_ok         <- xoptM LangExt.GADTs
                ; let ex_ok = existential_ok || gadt_ok
                      -- Data cons can have existential context
                ; mapM_ (checkValidDataCon dflags ex_ok tc) data_cons
@@ -2146,7 +2147,7 @@ checkValidDataCon dflags existential_ok tc con
     ctxt = ConArgCtxt (dataConName con)
 
     check_bang (HsSrcBang _ _ SrcLazy, _, n)
-      | not (xopt Opt_StrictData dflags)
+      | not (xopt LangExt.StrictData dflags)
       = addErrTc
           (bad_bang n (ptext (sLit "Lazy annotation (~) without StrictData")))
     check_bang (HsSrcBang _ want_unpack strict_mark, rep_bang, n)
@@ -2160,7 +2161,7 @@ checkValidDataCon dflags existential_ok tc con
       = addWarnTc (bad_bang n (ptext (sLit "Ignoring unusable UNPACK pragma")))
       where
         is_strict = case strict_mark of
-                      NoSrcStrict -> xopt Opt_StrictData dflags
+                      NoSrcStrict -> xopt LangExt.StrictData dflags
                       bang        -> isSrcStrict bang
 
     check_bang _
@@ -2204,11 +2205,11 @@ checkNewDataCon con
 -------------------------------
 checkValidClass :: Class -> TcM ()
 checkValidClass cls
-  = do  { constrained_class_methods <- xoptM Opt_ConstrainedClassMethods
-        ; multi_param_type_classes  <- xoptM Opt_MultiParamTypeClasses
-        ; nullary_type_classes      <- xoptM Opt_NullaryTypeClasses
-        ; fundep_classes            <- xoptM Opt_FunctionalDependencies
-        ; undecidable_super_classes <- xoptM Opt_UndecidableSuperClasses
+  = do  { constrained_class_methods <- xoptM LangExt.ConstrainedClassMethods
+        ; multi_param_type_classes  <- xoptM LangExt.MultiParamTypeClasses
+        ; nullary_type_classes      <- xoptM LangExt.NullaryTypeClasses
+        ; fundep_classes            <- xoptM LangExt.FunctionalDependencies
+        ; undecidable_super_classes <- xoptM LangExt.UndecidableSuperClasses
 
         -- Check that the class is unary, unless multiparameter type classes
         -- are enabled; also recognize deprecated nullary type classes
@@ -2292,7 +2293,7 @@ checkFamFlag :: Name -> TcM ()
 -- The parser won't even parse them, but I suppose a GHC API
 -- client might have a go!
 checkFamFlag tc_name
-  = do { idx_tys <- xoptM Opt_TypeFamilies
+  = do { idx_tys <- xoptM LangExt.TypeFamilies
        ; checkTc idx_tys err_msg }
   where
     err_msg = hang (ptext (sLit "Illegal family declaration for") <+> quotes (ppr tc_name))
@@ -2343,7 +2344,7 @@ checkValidRoleAnnots role_annots tc
           \decl@(L loc (RoleAnnotDecl _ the_role_annots)) ->
           addRoleAnnotCtxt name $
           setSrcSpan loc $ do
-          { role_annots_ok <- xoptM Opt_RoleAnnotations
+          { role_annots_ok <- xoptM LangExt.RoleAnnotations
           ; checkTc role_annots_ok $ needXRoleAnnotations tc
           ; checkTc (vis_vars `equalLength` the_role_annots)
                     (wrongNumberOfRoles vis_vars decl)
@@ -2351,7 +2352,7 @@ checkValidRoleAnnots role_annots tc
           -- Representational or phantom roles for class parameters
           -- quickly lead to incoherence. So, we require
           -- IncoherentInstances to have them. See #8773.
-          ; incoherent_roles_ok <- xoptM Opt_IncoherentInstances
+          ; incoherent_roles_ok <- xoptM LangExt.IncoherentInstances
           ; checkTc (  incoherent_roles_ok
                     || (not $ isClassTyCon tc)
                     || (all (== Nominal) vis_roles))

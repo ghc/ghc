@@ -36,6 +36,7 @@ Library
     exposed-modules:
             GHC.Lexeme
             GHC.PackageDb
+            GHC.LanguageExtensions
 
     build-depends: base       >= 4   && < 5,
                    binary     >= 0.7 && < 0.8,

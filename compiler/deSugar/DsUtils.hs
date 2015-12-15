@@ -72,6 +72,7 @@ import SrcLoc
 import Util
 import DynFlags
 import FastString
+import qualified GHC.LanguageExtensions as LangExt
 
 import TcEvidence
 
@@ -885,7 +886,7 @@ getUnBangedLPat dflags (L l (ParPat p))
 getUnBangedLPat _ (L _ (BangPat p))
   = (True,p)
 getUnBangedLPat dflags (L _ (LazyPat p))
-  | xopt Opt_Strict dflags
+  | xopt LangExt.Strict dflags
   = (False,p)
 getUnBangedLPat dflags p
-  = (xopt Opt_Strict dflags,p)
+  = (xopt LangExt.Strict dflags,p)

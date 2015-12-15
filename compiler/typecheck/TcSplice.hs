@@ -108,6 +108,7 @@ import qualified Language.Haskell.TH.Syntax as TH
 -- Because GHC.Desugar might not be in the base library of the bootstrapping compiler
 import GHC.Desugar      ( AnnotationWrapper(..) )
 
+import qualified Data.IntSet as IntSet
 import qualified Data.Map as Map
 import Data.Dynamic  ( fromDynamic, toDyn )
 import Data.Typeable ( typeOf, Typeable, typeRep )
@@ -850,6 +851,11 @@ instance TH.Quasi TcM where
       th_state_var <- fmap tcg_th_state getGblEnv
       updTcRef th_state_var (\m -> Map.insert (typeOf x) (toDyn x) m)
 
+  qIsExtEnabled = xoptM
+
+  qExtsEnabled = do
+    dflags <- hsc_dflags <$> getTopEnv
+    return $ map toEnum $ IntSet.elems $ extensionFlags dflags
 
 {-
 ************************************************************************

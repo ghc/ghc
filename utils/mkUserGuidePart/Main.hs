@@ -1,7 +1,6 @@
 module Main (main) where
 
 import DynFlags
-import Data.List (stripPrefix)
 import Control.Monad (forM_)
 import Types hiding (flag)
 import Table
@@ -43,11 +42,7 @@ whatGlasgowExtsDoes = unlines
     $ [ ".. hlist::", ""]
     ++ map ((" * "++) . parseExt) glasgowExtsFlags
   where
-    parseExt f
-      | Just ext <- stripPrefix "Opt_" (show f)
-      = inlineCode $ "-X" ++ ext
-      | otherwise
-      = error ("Can't parse extension: " ++ show f)
+    parseExt ext = inlineCode $ "-X" ++ show ext
 
 -- | Generate a reference table of the given set of flags. This is used in
 -- the users guide.

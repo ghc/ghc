@@ -69,6 +69,8 @@ import Outputable
 import FastString
 import Control.Monad
 import Class(classTyCon)
+import qualified GHC.LanguageExtensions as LangExt
+
 import Data.Function
 import Data.List
 import qualified Data.Set as Set
@@ -416,8 +418,8 @@ tcExpr expr@(SectionR op arg2) res_ty
 tcExpr expr@(SectionL arg1 op) res_ty
   = do { (op', op_ty) <- tcInferFun op
        ; dflags <- getDynFlags      -- Note [Left sections]
-       ; let n_reqd_args | xopt Opt_PostfixOperators dflags = 1
-                         | otherwise                        = 2
+       ; let n_reqd_args | xopt LangExt.PostfixOperators dflags = 1
+                         | otherwise                            = 2
 
        ; (co_fn, (arg1_ty:arg_tys), op_res_ty) <- unifyOpFunTysWrap op n_reqd_args op_ty
        ; co_res <- unifyType (Just expr) (mkFunTys arg_tys op_res_ty) res_ty

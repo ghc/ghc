@@ -209,6 +209,7 @@ import Outputable
 import FastString
 import ErrUtils( Validity(..), MsgDoc, isValid )
 import FV
+import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
 import Control.Monad (liftM, ap)
@@ -1586,7 +1587,7 @@ canUnifyWithPolyType dflags details
   = case details of
       MetaTv { mtv_info = ReturnTv } -> True      -- See Note [ReturnTv]
       MetaTv { mtv_info = SigTv }    -> False
-      MetaTv { mtv_info = TauTv }    -> xopt Opt_ImpredicativeTypes dflags
+      MetaTv { mtv_info = TauTv }    -> xopt LangExt.ImpredicativeTypes dflags
       _other                         -> True
           -- We can have non-meta tyvars in given constraints
 
@@ -2304,7 +2305,7 @@ unlifted_only = ptext (sLit "foreign import prim only accepts simple unlifted ty
 
 validIfUnliftedFFITypes :: DynFlags -> Validity
 validIfUnliftedFFITypes dflags
-  | xopt Opt_UnliftedFFITypes dflags =  IsValid
+  | xopt LangExt.UnliftedFFITypes dflags =  IsValid
   | otherwise = NotValid (ptext (sLit "To marshal unlifted types, use UnliftedFFITypes"))
 
 {-

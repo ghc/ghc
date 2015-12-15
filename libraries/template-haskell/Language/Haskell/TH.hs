@@ -26,6 +26,9 @@ module Language.Haskell.TH(
         ParentName,
         Arity,
         Unlifted,
+        -- *** Language extension lookup
+        Extension(..),
+        extsEnabled, isExtEnabled,
         -- *** Name lookup
         lookupTypeName,  -- :: String -> Q (Maybe Name)
         lookupValueName, -- :: String -> Q (Maybe Name)

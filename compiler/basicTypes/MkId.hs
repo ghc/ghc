@@ -74,6 +74,7 @@ import DynFlags
 import Outputable
 import FastString
 import ListSetOps
+import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Maybe       ( maybeToList )
 
@@ -622,7 +623,7 @@ dataConSrcToImplBang
 
 dataConSrcToImplBang dflags fam_envs arg_ty
               (HsSrcBang ann unpk NoSrcStrict)
-  | xopt Opt_StrictData dflags -- StrictData => strict field
+  | xopt LangExt.StrictData dflags -- StrictData => strict field
   = dataConSrcToImplBang dflags fam_envs arg_ty
                   (HsSrcBang ann unpk SrcStrict)
   | otherwise -- no StrictData => lazy field
@@ -771,13 +772,13 @@ isUnpackableType dflags fam_envs ty
          -- We'd get a black hole if we used dataConImplBangs
 
     attempt_unpack (HsSrcBang _ SrcUnpack NoSrcStrict)
-      = xopt Opt_StrictData dflags
+      = xopt LangExt.StrictData dflags
     attempt_unpack (HsSrcBang _ SrcUnpack SrcStrict)
       = True
     attempt_unpack (HsSrcBang _  NoSrcUnpack SrcStrict)
       = True  -- Be conservative
     attempt_unpack (HsSrcBang _  NoSrcUnpack NoSrcStrict)
-      = xopt Opt_StrictData dflags -- Be conservative
+      = xopt LangExt.StrictData dflags -- Be conservative
     attempt_unpack _ = False
 
 {-

@@ -45,7 +45,6 @@ import TcRnMonad
 import TcHsSyn             ( hsOverLitName )
 import RnEnv
 import RnTypes
-import DynFlags
 import PrelNames
 import TyCon               ( tyConName )
 import ConLike
@@ -62,6 +61,8 @@ import FastString
 import Literal             ( inCharRange )
 import TysWiredIn          ( nilDataCon )
 import DataCon
+import qualified GHC.LanguageExtensions as LangExt
+
 import Control.Monad       ( when, liftM, ap )
 import Data.Ratio
 
@@ -376,7 +377,7 @@ rnPatAndThen mk (SigPatIn pat sig)
 
 rnPatAndThen mk (LitPat lit)
   | HsString src s <- lit
-  = do { ovlStr <- liftCps (xoptM Opt_OverloadedStrings)
+  = do { ovlStr <- liftCps (xoptM LangExt.OverloadedStrings)
        ; if ovlStr
          then rnPatAndThen mk
                            (mkNPat (noLoc (mkHsIsString src s placeHolderType))
@@ -410,7 +411,7 @@ rnPatAndThen mk (AsPat rdr pat)
        ; return (AsPat new_name pat') }
 
 rnPatAndThen mk p@(ViewPat expr pat _ty)
-  = do { liftCps $ do { vp_flag <- xoptM Opt_ViewPatterns
+  = do { liftCps $ do { vp_flag <- xoptM LangExt.ViewPatterns
                       ; checkErr vp_flag (badViewPat p) }
          -- Because of the way we're arranging the recursive calls,
          -- this will be in the right context
@@ -424,13 +425,13 @@ rnPatAndThen mk (ConPatIn con stuff)
    -- rnConPatAndThen takes care of reconstructing the pattern
    -- The pattern for the empty list needs to be replaced by an empty explicit list pattern when overloaded lists is turned on.
   = case unLoc con == nameRdrName (dataConName nilDataCon) of
-      True    -> do { ol_flag <- liftCps $ xoptM Opt_OverloadedLists
+      True    -> do { ol_flag <- liftCps $ xoptM LangExt.OverloadedLists
                     ; if ol_flag then rnPatAndThen mk (ListPat [] placeHolderType Nothing)
                                  else rnConPatAndThen mk con stuff}
       False   -> rnConPatAndThen mk con stuff
 
 rnPatAndThen mk (ListPat pats _ _)
-  = do { opt_OverloadedLists <- liftCps $ xoptM Opt_OverloadedLists
+  = do { opt_OverloadedLists <- liftCps $ xoptM LangExt.OverloadedLists
        ; pats' <- rnLPatsAndThen mk pats
        ; case opt_OverloadedLists of
           True -> do { (to_list_name,_) <- liftCps $ lookupSyntaxName toListName
@@ -530,8 +531,8 @@ rnHsRecFields
 -- This is used for record construction and pattern-matching, but not updates.
 
 rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
-  = do { pun_ok      <- xoptM Opt_RecordPuns
-       ; disambig_ok <- xoptM Opt_DisambiguateRecordFields
+  = do { pun_ok      <- xoptM LangExt.RecordPuns
+       ; disambig_ok <- xoptM LangExt.DisambiguateRecordFields
        ; parent <- check_disambiguation disambig_ok mb_con
        ; flds1  <- mapM (rn_fld pun_ok parent) flds
        ; mapM_ (addErr . dupFieldErr ctxt) dup_flds
@@ -579,7 +580,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
     rn_dotdot (Just n) (Just con) flds -- ".." on record construction / pat match
       = ASSERT( n == length flds )
         do { loc <- getSrcSpanM -- Rather approximate
-           ; dd_flag <- xoptM Opt_RecordWildCards
+           ; dd_flag <- xoptM LangExt.RecordWildCards
            ; checkErr dd_flag (needFlagDotDot ctxt)
            ; (rdr_env, lcl_env) <- getRdrEnvs
            ; con_fields <- lookupConstructorFields con
@@ -654,8 +655,8 @@ rnHsRecUpdFields
     :: [LHsRecUpdField RdrName]
     -> RnM ([LHsRecUpdField Name], FreeVars)
 rnHsRecUpdFields flds
-  = do { pun_ok        <- xoptM Opt_RecordPuns
-       ; overload_ok   <- xoptM Opt_DuplicateRecordFields
+  = do { pun_ok        <- xoptM LangExt.RecordPuns
+       ; overload_ok   <- xoptM LangExt.DuplicateRecordFields
        ; (flds1, fvss) <- mapAndUnzipM (rn_fld pun_ok overload_ok) flds
        ; mapM_ (addErr . dupFieldErr HsRecFieldUpd) dup_flds
 
@@ -770,7 +771,7 @@ generalizeOverLitVal lit = lit
 
 rnOverLit :: HsOverLit t -> RnM (HsOverLit Name, FreeVars)
 rnOverLit origLit
-  = do  { opt_NumDecimals <- xoptM Opt_NumDecimals
+  = do  { opt_NumDecimals <- xoptM LangExt.NumDecimals
         ; let { lit@(OverLit {ol_val=val})
             | opt_NumDecimals = origLit {ol_val = generalizeOverLitVal (ol_val origLit)}
             | otherwise       = origLit

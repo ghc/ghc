@@ -40,6 +40,7 @@ import SrcLoc
 import FastString
 import DynFlags
 import PrelNames (monadFailClassName)
+import qualified GHC.LanguageExtensions as LangExt
 
 -- Create chunkified tuple tybes for monad comprehensions
 import MkCore
@@ -890,8 +891,8 @@ tcMonadFailOp orig pat fail_op res_ty
 
   | otherwise
   = do { -- Issue MonadFail warnings
-         rebindableSyntax <- xoptM Opt_RebindableSyntax
-       ; desugarFlag      <- xoptM Opt_MonadFailDesugaring
+         rebindableSyntax <- xoptM LangExt.RebindableSyntax
+       ; desugarFlag      <- xoptM LangExt.MonadFailDesugaring
        ; missingWarning   <- woptM Opt_WarnMissingMonadFailInstance
        ; if | rebindableSyntax && (desugarFlag || missingWarning)
               -> warnRebindableClash pat

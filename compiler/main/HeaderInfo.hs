@@ -38,6 +38,7 @@ import Bag              ( emptyBag, listToBag, unitBag )
 import MonadUtils
 import Exception
 import BasicTypes
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import System.IO
@@ -83,7 +84,7 @@ getImports dflags buf filename source_filename = do
                 ordinary_imps = filter ((/= moduleName gHC_PRIM) . unLoc . ideclName . unLoc)
                                        ord_idecls
 
-                implicit_prelude = xopt Opt_ImplicitPrelude dflags
+                implicit_prelude = xopt LangExt.ImplicitPrelude dflags
                 implicit_imports = mkPrelImports (unLoc mod) main_loc
                                                  implicit_prelude imps
                 convImport (L _ i) = (fmap sl_fs (ideclPkgQual i), ideclName i)

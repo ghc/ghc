@@ -26,7 +26,6 @@ import BasicTypes       ( TopLevelFlag, isTopLevel )
 import Outputable
 import Module
 import SrcLoc
-import DynFlags
 import RnTypes          ( rnLHsType )
 
 import Control.Monad    ( unless, when )
@@ -37,6 +36,7 @@ import TcEnv            ( checkWellStaged )
 import THNames          ( liftName )
 
 #ifdef GHCI
+import DynFlags
 import FastString
 import ErrUtils         ( dumpIfSet_dyn_printer )
 import TcEnv            ( tcMetaTy )
@@ -48,6 +48,8 @@ import THNames          ( quoteExpName, quotePatName, quoteDecName, quoteTypeNam
 import {-# SOURCE #-} TcExpr   ( tcMonoExpr )
 import {-# SOURCE #-} TcSplice ( runMetaD, runMetaE, runMetaP, runMetaT, tcTopSpliceExpr )
 #endif
+
+import qualified GHC.LanguageExtensions as LangExt
 
 {-
 ************************************************************************
@@ -61,7 +63,7 @@ rnBracket :: HsExpr RdrName -> HsBracket RdrName -> RnM (HsExpr Name, FreeVars)
 rnBracket e br_body
   = addErrCtxt (quotationCtxtDoc br_body) $
     do { -- Check that -XTemplateHaskellQuotes is enabled and available
-         thQuotesEnabled <- xoptM Opt_TemplateHaskellQuotes
+         thQuotesEnabled <- xoptM LangExt.TemplateHaskellQuotes
        ; unless thQuotesEnabled $
            failWith ( vcat
                       [ text "Syntax error on" <+> ppr e

@@ -23,7 +23,11 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.Haskell.TH.Syntax where
+module Language.Haskell.TH.Syntax
+    ( module Language.Haskell.TH.Syntax
+      -- * Language extensions
+    , module Language.Haskell.TH.LanguageExtensions
+    ) where
 
 import Data.Data hiding (Fixity(..))
 #if __GLASGOW_HASKELL__ < 709
@@ -39,6 +43,7 @@ import Data.Word
 import Data.Ratio
 import GHC.Generics     ( Generic )
 import GHC.Lexeme       ( startsVarSym, startsVarId )
+import Language.Haskell.TH.LanguageExtensions
 
 #ifdef HAS_NATURAL
 import Numeric.Natural
@@ -90,6 +95,9 @@ class (Applicative m, Monad m) => Quasi m where
 
   qPutQ :: Typeable a => a -> m ()
 
+  qIsExtEnabled :: Extension -> m Bool
+  qExtsEnabled :: m [Extension]
+
 -----------------------------------------------------
 --      The IO instance of Quasi
 --
@@ -123,6 +131,8 @@ instance Quasi IO where
   qAddModFinalizer _  = badIO "addModFinalizer"
   qGetQ               = badIO "getQ"
   qPutQ _             = badIO "putQ"
+  qIsExtEnabled _     = badIO "isExtEnabled"
+  qExtsEnabled        = badIO "extsEnabled"
 
   qRunIO m = m
 
@@ -424,13 +434,21 @@ addTopDecls ds = Q (qAddTopDecls ds)
 addModFinalizer :: Q () -> Q ()
 addModFinalizer act = Q (qAddModFinalizer (unQ act))
 
--- | Get state from the Q monad.
+-- | Get state from the 'Q' monad.
 getQ :: Typeable a => Q (Maybe a)
 getQ = Q qGetQ
 
--- | Replace the state in the Q monad.
+-- | Replace the state in the 'Q' monad.
 putQ :: Typeable a => a -> Q ()
 putQ x = Q (qPutQ x)
+
+-- | Determine whether the given language extension is enabled in the 'Q' monad.
+isExtEnabled :: Extension -> Q Bool
+isExtEnabled ext = Q (qIsExtEnabled ext)
+
+-- | List all enabled language extensions.
+extsEnabled :: Q [Extension]
+extsEnabled = Q qExtsEnabled
 
 instance Quasi Q where
   qNewName          = newName
@@ -450,6 +468,8 @@ instance Quasi Q where
   qAddModFinalizer  = addModFinalizer
   qGetQ             = getQ
   qPutQ             = putQ
+  qIsExtEnabled     = isExtEnabled
+  qExtsEnabled      = extsEnabled
 
 
 ----------------------------------------------------

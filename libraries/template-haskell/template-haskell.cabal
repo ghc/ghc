@@ -41,6 +41,7 @@ Library
         Language.Haskell.TH.PprLib
         Language.Haskell.TH.Quote
         Language.Haskell.TH.Syntax
+        Language.Haskell.TH.LanguageExtensions
 
     other-modules:
         Language.Haskell.TH.Lib.Map

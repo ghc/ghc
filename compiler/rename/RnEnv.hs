@@ -83,6 +83,7 @@ import Data.List
 import Data.Function    ( on )
 import ListSetOps       ( minusList )
 import Constants        ( mAX_TUPLE_SIZE )
+import qualified GHC.LanguageExtensions as LangExt
 
 {-
 *********************************************************
@@ -302,7 +303,7 @@ lookupTopBndrRn_maybe rdr_name
            -- See Note [Type and class operator definitions]
           let occ = rdrNameOcc rdr_name
         ; when (isTcOcc occ && isSymOcc occ)
-               (do { op_ok <- xoptM Opt_TypeOperators
+               (do { op_ok <- xoptM LangExt.TypeOperators
                    ; unless op_ok (addErr (opDeclErr rdr_name)) })
 
         ; env <- getGlobalRdrEnv
@@ -712,7 +713,7 @@ lookupOccRn rdr_name
 lookupKindOccRn :: RdrName -> RnM Name
 -- Looking up a name occurring in a kind
 lookupKindOccRn rdr_name
-  = do { typeintype <- xoptM Opt_TypeInType
+  = do { typeintype <- xoptM LangExt.TypeInType
        ; if | typeintype           -> lookupTypeOccRn rdr_name
       -- With -XNoTypeInType, treat any usage of * in kinds as in scope
       -- this is a dirty hack, but then again so was the old * kind.
@@ -734,7 +735,7 @@ lookup_demoted :: RdrName -> DynFlags -> RnM Name
 lookup_demoted rdr_name dflags
   | Just demoted_rdr <- demoteRdrName rdr_name
     -- Maybe it's the name of a *data* constructor
-  = do { data_kinds <- xoptM Opt_DataKinds
+  = do { data_kinds <- xoptM LangExt.DataKinds
        ; mb_demoted_name <- lookupOccRn_maybe demoted_rdr
        ; case mb_demoted_name of
            Nothing -> unboundNameX WL_Any rdr_name star_info
@@ -760,7 +761,7 @@ lookup_demoted rdr_name dflags
 
     star_info
       | is_star rdr_name || is_uni_star rdr_name
-      = if xopt Opt_TypeInType dflags
+      = if xopt LangExt.TypeInType dflags
         then text "NB: With TypeInType, you must import" <+>
              ppr rdr_name <+> text "from Data.Kind"
         else empty
@@ -1528,7 +1529,7 @@ lookupIfThenElse :: RnM (Maybe (SyntaxExpr Name), FreeVars)
 -- case we desugar directly rather than calling an existing function
 -- Hence the (Maybe (SyntaxExpr Name)) return type
 lookupIfThenElse
-  = do { rebindable_on <- xoptM Opt_RebindableSyntax
+  = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if not rebindable_on
          then return (Nothing, emptyFVs)
          else do { ite <- lookupOccRn (mkVarUnqual (fsLit "ifThenElse"))
@@ -1537,7 +1538,7 @@ lookupIfThenElse
 lookupSyntaxName :: Name                                -- The standard name
                  -> RnM (SyntaxExpr Name, FreeVars)     -- Possibly a non-standard name
 lookupSyntaxName std_name
-  = do { rebindable_on <- xoptM Opt_RebindableSyntax
+  = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if not rebindable_on then
            return (HsVar (noLoc std_name), emptyFVs)
          else
@@ -1548,7 +1549,7 @@ lookupSyntaxName std_name
 lookupSyntaxNames :: [Name]                          -- Standard names
                   -> RnM ([HsExpr Name], FreeVars)   -- See comments with HsExpr.ReboundNames
 lookupSyntaxNames std_names
-  = do { rebindable_on <- xoptM Opt_RebindableSyntax
+  = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if not rebindable_on then
              return (map (HsVar . noLoc) std_names, emptyFVs)
         else
@@ -1692,7 +1693,8 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
         -- punning or wild-cards are on (cf Trac #2723)
     is_shadowed_gre gre | isRecFldGRE gre
         = do { dflags <- getDynFlags
-             ; return $ not (xopt Opt_RecordPuns dflags || xopt Opt_RecordWildCards dflags) }
+             ; return $ not (xopt LangExt.RecordPuns dflags
+                             || xopt LangExt.RecordWildCards dflags) }
     is_shadowed_gre _other = return True
 
 {-

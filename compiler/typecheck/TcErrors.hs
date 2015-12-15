@@ -47,6 +47,7 @@ import DynFlags
 import StaticFlags      ( opt_PprStyle_Debug )
 import ListSetOps       ( equivClasses )
 import Maybes
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad    ( when )
 import Data.List        ( partition, mapAccumL, nub, sortBy )
@@ -126,7 +127,7 @@ reportUnsolved wanted
                         | warn_holes      = HoleWarn
                         | otherwise       = HoleDefer
 
-       ; partial_sigs      <- xoptM Opt_PartialTypeSignatures
+       ; partial_sigs      <- xoptM LangExt.PartialTypeSignatures
        ; warn_partial_sigs <- woptM Opt_WarnPartialTypeSignatures
        ; let type_holes | not partial_sigs  = HoleError
                         | warn_partial_sigs = HoleWarn

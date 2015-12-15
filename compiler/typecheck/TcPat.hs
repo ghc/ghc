@@ -48,6 +48,7 @@ import Util
 import Outputable
 import FastString
 import Maybes( orElse )
+import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 
 {-
@@ -674,8 +675,8 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty arg_pats thing_inside
                             LamPat mc -> PatSkol (RealDataCon data_con) mc
                             LetPat {} -> UnkSkol -- Doesn't matter
 
-        ; gadts_on    <- xoptM Opt_GADTs
-        ; families_on <- xoptM Opt_TypeFamilies
+        ; gadts_on    <- xoptM LangExt.GADTs
+        ; families_on <- xoptM LangExt.TypeFamilies
         ; checkTc (no_equalities || gadts_on || families_on)
                   (text "A pattern match on a GADT requires the" <+>
                    text "GADTs or TypeFamilies language extension")

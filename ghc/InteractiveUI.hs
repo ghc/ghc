@@ -62,6 +62,7 @@ import Maybes ( orElse, expectJust )
 import NameSet
 import Panic hiding ( showException )
 import Util
+import qualified GHC.LanguageExtensions as LangExt
 
 -- Haskell Libraries
 import System.Console.Haskeline as Haskeline
@@ -380,8 +381,8 @@ interactiveUI config srcs maybe_exprs = do
    -- as the global DynFlags, plus -XExtendedDefaultRules and
    -- -XNoMonomorphismRestriction.
    dflags <- getDynFlags
-   let dflags' = (`xopt_set` Opt_ExtendedDefaultRules)
-               . (`xopt_unset` Opt_MonomorphismRestriction)
+   let dflags' = (`xopt_set` LangExt.ExtendedDefaultRules)
+               . (`xopt_unset` LangExt.MonomorphismRestriction)
                $ dflags
    GHC.setInteractiveDynFlags dflags'
 
@@ -859,7 +860,7 @@ checkInputForLayout :: String -> InputT GHCi (Maybe String)
                     -> InputT GHCi (Maybe String)
 checkInputForLayout stmt getStmt = do
    dflags' <- getDynFlags
-   let dflags = xopt_set dflags' Opt_AlternativeLayoutRule
+   let dflags = xopt_set dflags' LangExt.AlternativeLayoutRule
    st0 <- getGHCiState
    let buf'   =  stringToStringBuffer stmt
        loc    = mkRealSrcLoc (fsLit (progname st0)) (line_number st0) 1
@@ -1962,7 +1963,7 @@ setGHCContextFromGHCiState = do
   iidecls <- filterM (tryBool.checkAdd) (transient_ctx st ++ remembered_ctx st)
   dflags <- GHC.getSessionDynFlags
   GHC.setContext $
-     if xopt Opt_ImplicitPrelude dflags && not (any isPreludeImport iidecls)
+     if xopt LangExt.ImplicitPrelude dflags && not (any isPreludeImport iidecls)
         then iidecls ++ [implicitPreludeImport]
         else iidecls
     -- XXX put prel at the end, so that guessCurrentModule doesn't pick it up.
@@ -2371,7 +2372,7 @@ showImports = do
 
       prel_imp
         | any isPreludeImport (rem_ctx ++ trans_ctx) = []
-        | not (xopt Opt_ImplicitPrelude dflags)      = []
+        | not (xopt LangExt.ImplicitPrelude dflags)      = []
         | otherwise = ["import Prelude -- implicit"]
 
       trans_comment s = s ++ " -- added automatically"

@@ -62,6 +62,7 @@ import Outputable
 import FastString
 import Bag
 import Pair
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.List
@@ -395,10 +396,10 @@ renameDeriv is_boot inst_infos bagBinds
 
   | otherwise
   = discardWarnings $         -- Discard warnings about unused bindings etc
-    setXOptM Opt_EmptyCase $  -- Derived decls (for empty types) can have
-                              --    case x of {}
-    setXOptM Opt_ScopedTypeVariables $  -- Derived decls (for newtype-deriving) can
-    setXOptM Opt_KindSignatures $       -- used ScopedTypeVariables & KindSignatures
+    setXOptM LangExt.EmptyCase $  -- Derived decls (for empty types) can have
+                                  --    case x of {}
+    setXOptM LangExt.ScopedTypeVariables $  -- Derived decls (for newtype-deriving) can
+    setXOptM LangExt.KindSignatures $       -- used ScopedTypeVariables & KindSignatures
     do  {
         -- Bring the extra deriving stuff into scope
         -- before renaming the instances themselves
@@ -1105,27 +1106,27 @@ sideConditions mtheta cls
   | cls_key == enumClassKey        = Just (cond_std `andCond` cond_isEnumeration)
   | cls_key == ixClassKey          = Just (cond_std `andCond` cond_enumOrProduct cls)
   | cls_key == boundedClassKey     = Just (cond_std `andCond` cond_enumOrProduct cls)
-  | cls_key == dataClassKey        = Just (checkFlag Opt_DeriveDataTypeable `andCond`
+  | cls_key == dataClassKey        = Just (checkFlag LangExt.DeriveDataTypeable `andCond`
                                            cond_std `andCond`
                                            cond_args cls)
-  | cls_key == functorClassKey     = Just (checkFlag Opt_DeriveFunctor `andCond`
+  | cls_key == functorClassKey     = Just (checkFlag LangExt.DeriveFunctor `andCond`
                                            cond_vanilla `andCond`
                                            cond_functorOK True False)
-  | cls_key == foldableClassKey    = Just (checkFlag Opt_DeriveFoldable `andCond`
+  | cls_key == foldableClassKey    = Just (checkFlag LangExt.DeriveFoldable `andCond`
                                            cond_vanilla `andCond`
                                            cond_functorOK False True)
                                            -- Functor/Fold/Trav works ok
                                            -- for rank-n types
-  | cls_key == traversableClassKey = Just (checkFlag Opt_DeriveTraversable `andCond`
+  | cls_key == traversableClassKey = Just (checkFlag LangExt.DeriveTraversable `andCond`
                                            cond_vanilla `andCond`
                                            cond_functorOK False False)
-  | cls_key == genClassKey         = Just (checkFlag Opt_DeriveGeneric `andCond`
+  | cls_key == genClassKey         = Just (checkFlag LangExt.DeriveGeneric `andCond`
                                            cond_vanilla `andCond`
                                            cond_RepresentableOk)
-  | cls_key == gen1ClassKey        = Just (checkFlag Opt_DeriveGeneric `andCond`
+  | cls_key == gen1ClassKey        = Just (checkFlag LangExt.DeriveGeneric `andCond`
                                            cond_vanilla `andCond`
                                            cond_Representable1Ok)
-  | cls_key == liftClassKey        = Just (checkFlag Opt_DeriveLift `andCond`
+  | cls_key == liftClassKey        = Just (checkFlag LangExt.DeriveLift `andCond`
                                            cond_vanilla `andCond`
                                            cond_args cls)
   | otherwise                      = Nothing
@@ -1141,7 +1142,7 @@ canDeriveAnyClass :: DynFlags -> TyCon -> Class -> Maybe SDoc
 -- Just s:  we can't, reason s
 -- Precondition: the class is not one of the standard ones
 canDeriveAnyClass dflags _tycon clas
-  | not (xopt Opt_DeriveAnyClass dflags)
+  | not (xopt LangExt.DeriveAnyClass dflags)
   = Just (ptext (sLit "Try enabling DeriveAnyClass"))
   | not (any (target_kind `tcEqKind`) [ liftedTypeKind, typeToTypeKind ])
   = Just (ptext (sLit "The last argument of class") <+> quotes (ppr clas)
@@ -1316,7 +1317,7 @@ cond_functorOK allowFunctions allowExQuantifiedLastTyVar (_, rep_tc, _)
     functions   = ptext (sLit "must not contain function types")
     wrong_arg   = ptext (sLit "must use the type variable only as the last argument of a data type")
 
-checkFlag :: ExtensionFlag -> Condition
+checkFlag :: LangExt.Extension -> Condition
 checkFlag flag (dflags, _, _)
   | xopt flag dflags = IsValid
   | otherwise        = NotValid why
@@ -1472,8 +1473,8 @@ mkNewTypeEqn dflags overlap_mode tvs
                                , ptext (sLit "Defaulting to the DeriveAnyClass strategy for instantiating") <+> ppr cls ])
               go_for_it
   where
-        newtype_deriving  = xopt Opt_GeneralizedNewtypeDeriving dflags
-        deriveAnyClass    = xopt Opt_DeriveAnyClass             dflags
+        newtype_deriving  = xopt LangExt.GeneralizedNewtypeDeriving dflags
+        deriveAnyClass    = xopt LangExt.DeriveAnyClass             dflags
         go_for_it         = mk_data_eqn overlap_mode tvs cls cls_tys tycon tc_args
                               rep_tycon rep_tc_args mtheta
         bale_out    = bale_out' newtype_deriving
@@ -2016,8 +2017,8 @@ genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
                         { ib_binds      = gen_Newtype_binds loc clas tvs tys rhs_ty
                         , ib_tyvars     = map Var.varName tvs   -- Scope over bindings
                         , ib_pragmas    = []
-                        , ib_extensions = [ Opt_ImpredicativeTypes
-                                          , Opt_RankNTypes ]
+                        , ib_extensions = [ LangExt.ImpredicativeTypes
+                                          , LangExt.RankNTypes ]
                         , ib_derived    = True } }
                 , emptyBag
                 , Just $ getName $ head $ tyConDataCons rep_tycon ) }

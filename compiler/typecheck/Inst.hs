@@ -56,6 +56,8 @@ import SrcLoc
 import DynFlags
 import Util
 import Outputable
+import qualified GHC.LanguageExtensions as LangExt
+
 import Control.Monad( unless )
 import Data.Maybe( isJust )
 
@@ -409,8 +411,8 @@ getOverlapFlag :: Maybe OverlapMode -> TcM OverlapFlag
 --     set the OverlapMode to 'm'
 getOverlapFlag overlap_mode
   = do  { dflags <- getDynFlags
-        ; let overlap_ok    = xopt Opt_OverlappingInstances dflags
-              incoherent_ok = xopt Opt_IncoherentInstances  dflags
+        ; let overlap_ok    = xopt LangExt.OverlappingInstances dflags
+              incoherent_ok = xopt LangExt.IncoherentInstances  dflags
               use x = OverlapFlag { isSafeOverlap = safeLanguageOn dflags
                                   , overlapMode   = x }
               default_oflag | incoherent_ok = use (Incoherent "")

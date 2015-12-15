@@ -369,3 +369,4 @@ test('T10819',
      extra_clean(['T10819_Lib.hi', 'T10819_Lib.o']),
      multimod_compile,
      ['T10819.hs', '-v0 ' + config.ghc_th_way_flags])
+test('T10820', normal, compile_and_run, ['-v0'])

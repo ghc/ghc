@@ -70,8 +70,6 @@ import VarEnv
 import TysWiredIn
 import BasicTypes
 import SrcLoc
-import DynFlags ( ExtensionFlag( Opt_DataKinds, Opt_MonoLocalBinds
-                               , Opt_TypeInType ) )
 import Constants ( mAX_CTUPLE_SIZE )
 import ErrUtils( MsgDoc )
 import Unique
@@ -81,6 +79,7 @@ import Outputable
 import FastString
 import PrelNames hiding ( wildCardName )
 import Pair
+import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Maybe
 import Control.Monad
@@ -321,7 +320,7 @@ tcLHsType ty = addTypeCtxt ty (tc_infer_lhs_type typeLevelMode ty)
 -- or if NoMonoLocalBinds is set. Otherwise, nope.
 decideKindGeneralisationPlan :: Type -> TcM Bool
 decideKindGeneralisationPlan ty
-  = do { mono_locals <- xoptM Opt_MonoLocalBinds
+  = do { mono_locals <- xoptM LangExt.MonoLocalBinds
        ; in_scope <- getInLocalScope
        ; let fvs        = tyCoVarsOfTypeList ty
              should_gen = not mono_locals || all (not . in_scope . getName) fvs
@@ -980,7 +979,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
        ; case thing of
            ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)
 
-           AThing kind -> do { data_kinds <- xoptM Opt_DataKinds
+           AThing kind -> do { data_kinds <- xoptM LangExt.DataKinds
                              ; unless (isTypeLevel (mode_level mode) ||
                                        data_kinds) $
                                promotionErr name NoDataKinds
@@ -992,8 +991,8 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                  -- But this is a terribly large amount of work! Not worth it.
 
            AGlobal (ATyCon tc)
-             -> do { type_in_type <- xoptM Opt_TypeInType
-                   ; data_kinds   <- xoptM Opt_DataKinds
+             -> do { type_in_type <- xoptM LangExt.TypeInType
+                   ; data_kinds   <- xoptM LangExt.DataKinds
                    ; unless (isTypeLevel (mode_level mode) ||
                              data_kinds ||
                              isKindTyCon tc) $
@@ -1005,10 +1004,10 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                    ; return (mkTyConApp tc [], tyConKind tc) }
 
            AGlobal (AConLike (RealDataCon dc))
-             -> do { data_kinds <- xoptM Opt_DataKinds
+             -> do { data_kinds <- xoptM LangExt.DataKinds
                    ; unless (data_kinds || specialPromotedDc dc) $
                        promotionErr name NoDataKinds
-                   ; type_in_type <- xoptM Opt_TypeInType
+                   ; type_in_type <- xoptM LangExt.TypeInType
                    ; unless ( type_in_type ||
                               ( isTypeLevel (mode_level mode) &&
                                 isLegacyPromotableDataCon dc ) ||
