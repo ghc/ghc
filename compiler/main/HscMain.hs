@@ -270,8 +270,8 @@ ioMsgMaybe' ioA = do
 
 #ifdef GHCI
 hscTcRnLookupRdrName :: HscEnv -> Located RdrName -> IO [Name]
-hscTcRnLookupRdrName hsc_env0 rdr_name 
-  = runInteractiveHsc hsc_env0 $ 
+hscTcRnLookupRdrName hsc_env0 rdr_name
+  = runInteractiveHsc hsc_env0 $
     do { hsc_env <- getHscEnv
        ; ioMsgMaybe $ tcRnLookupRdrName hsc_env rdr_name }
 #endif
@@ -809,8 +809,8 @@ hscFileFrontEnd mod_summary = do
 --
 -- It used to be that we only did safe inference on modules that had no Safe
 -- Haskell flags, but now we perform safe inference on all modules as we want
--- to allow users to set the `-fwarn-safe`, `-fwarn-unsafe` and
--- `-fwarn-trustworthy-safe` flags on Trustworthy and Unsafe modules so that a
+-- to allow users to set the `-Wsafe`, `-Wunsafe` and
+-- `-Wtrustworthy-safe` flags on Trustworthy and Unsafe modules so that a
 -- user can ensure their assumptions are correct and see reasons for why a
 -- module is safe or unsafe.
 --

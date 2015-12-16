@@ -690,17 +690,17 @@ And one general flag:
 
 And three warning flags:
 
-``-fwarn-unsafe``
+``-Wunsafe``
     Issue a warning if the module being compiled is regarded to be
     unsafe. Should be used to check the safety type of modules when
     using safe inference.
 
-``-fwarn-safe``
+``-Wsafe``
     Issue a warning if the module being compiled is regarded to be safe.
     Should be used to check the safety type of modules when using safe
     inference.
 
-``-fwarn-trustworthy-safe``
+``-Wtrustworthy-safe``
     Issue a warning if the module being compiled is marked as
     -XTrustworthy but it could instead be marked as
     -XSafe , a more informative bound. Can be used to detect once a Safe Haskell
@@ -742,7 +742,7 @@ taken:
 There is a more detailed discussion of the issues involved in
 compilation safety and some potential solutions on the
 :ghc-wiki:`GHC Wiki <SafeHaskell/SafeCompilation>`.
-          
+
 Additionally, the use of :ref:`annotations <annotation-pragmas>` is forbidden,
 as that would allow bypassing Safe Haskell restrictions. See :ghc-ticket:`10826`
 for details.

@@ -182,7 +182,7 @@ execStmt stmt ExecOptions{..} = do
     -- wait on this when a computation is running
     statusMVar <- liftIO $ newEmptyMVar
 
-    -- Turn off -fwarn-unused-local-binds when running a statement, to hide
+    -- Turn off -Wunused-local-binds when running a statement, to hide
     -- warnings about the implicit bindings we introduce.
     let ic       = hsc_IC hsc_env -- use the interactive dflags
         idflags' = ic_dflags ic `wopt_unset` Opt_WarnUnusedLocalBinds

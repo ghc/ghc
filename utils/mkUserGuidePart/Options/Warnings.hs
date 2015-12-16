@@ -40,7 +40,7 @@ warningsOptions =
          , flagDescription =
            "Turn type errors into warnings, :ref:`deferring the error until "++
            "runtime <defer-type-errors>`. Implies ``-fdefer-typed-holes``. "++
-           "See also ``-fwarn-deferred-type-errors``"
+           "See also ``-Wdeferred-type-errors``"
          , flagType = DynamicFlag
          , flagReverse = "-fno-defer-type-errors"
          }
@@ -49,7 +49,7 @@ warningsOptions =
            "Convert :ref:`typed hole <typed-holes>` errors into warnings, "++
            ":ref:`deferring the error until runtime <defer-type-errors>`. "++
            "Implied by ``-fdefer-type-errors``. "++
-           "See also ``-fwarn-typed-holes``."
+           "See also ``-Wtyped-holes``."
          , flagType = DynamicFlag
          , flagReverse = "-fno-defer-typed-holes"
          }
@@ -58,234 +58,234 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-fno-helpful-errors"
          }
-  , flag { flagName = "-fwarn-deprecated-flags"
+  , flag { flagName = "-Wdeprecated-flags"
          , flagDescription =
            "warn about uses of commandline flags that are deprecated"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-deprecated-flags"
+         , flagReverse = "-Wno-deprecated-flags"
          }
-  , flag { flagName = "-fwarn-duplicate-constraints"
+  , flag { flagName = "-Wduplicate-constraints"
          , flagDescription =
            "warn when a constraint appears duplicated in a type signature"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-duplicate-constraints"
+         , flagReverse = "-Wno-duplicate-constraints"
          }
-  , flag { flagName = "-fwarn-duplicate-exports"
+  , flag { flagName = "-Wduplicate-exports"
          , flagDescription = "warn when an entity is exported multiple times"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-duplicate-exports"
+         , flagReverse = "-Wno-duplicate-exports"
          }
-  , flag { flagName = "-fwarn-hi-shadowing"
+  , flag { flagName = "-Whi-shadowing"
          , flagDescription =
            "warn when a ``.hi`` file in the current directory shadows a library"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-hi-shadowing"
+         , flagReverse = "-Wno-hi-shadowing"
          }
-  , flag { flagName = "-fwarn-identities"
+  , flag { flagName = "-Widentities"
          , flagDescription =
            "warn about uses of Prelude numeric conversions that are probably "++
            "the identity (and hence could be omitted)"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-identities"
+         , flagReverse = "-Wno-identities"
          }
-  , flag { flagName = "-fwarn-implicit-prelude"
+  , flag { flagName = "-Wimplicit-prelude"
          , flagDescription = "warn when the Prelude is implicitly imported"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-implicit-prelude"
+         , flagReverse = "-Wno-implicit-prelude"
          }
-  , flag { flagName = "-fwarn-incomplete-patterns"
+  , flag { flagName = "-Wincomplete-patterns"
          , flagDescription = "warn when a pattern match could fail"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-incomplete-patterns"
+         , flagReverse = "-Wno-incomplete-patterns"
          }
-  , flag { flagName = "-fwarn-incomplete-uni-patterns"
+  , flag { flagName = "-Wincomplete-uni-patterns"
          , flagDescription =
            "warn when a pattern match in a lambda expression or "++
            "pattern binding could fail"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-incomplete-uni-patterns"
+         , flagReverse = "-Wno-incomplete-uni-patterns"
          }
-  , flag { flagName = "-fwarn-incomplete-record-updates"
+  , flag { flagName = "-Wincomplete-record-updates"
          , flagDescription = "warn when a record update could fail"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-incomplete-record-updates"
+         , flagReverse = "-Wno-incomplete-record-updates"
          }
-  , flag { flagName = "-fwarn-lazy-unlifted-bindings"
+  , flag { flagName = "-Wlazy-unlifted-bindings"
          , flagDescription =
            "*(deprecated)* warn when a pattern binding looks lazy but "++
            "must be strict"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-lazy-unlifted-bindings"
+         , flagReverse = "-Wno-lazy-unlifted-bindings"
          }
-  , flag { flagName = "-fwarn-missing-fields"
+  , flag { flagName = "-Wmissing-fields"
          , flagDescription = "warn when fields of a record are uninitialised"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-missing-fields"
+         , flagReverse = "-Wno-missing-fields"
          }
-  , flag { flagName = "-fwarn-missing-import-lists"
+  , flag { flagName = "-Wmissing-import-lists"
          , flagDescription =
            "warn when an import declaration does not explicitly list all the"++
            "names brought into scope"
          , flagType = DynamicFlag
          , flagReverse = "-fnowarn-missing-import-lists"
          }
-  , flag { flagName = "-fwarn-missing-methods"
+  , flag { flagName = "-Wmissing-methods"
          , flagDescription = "warn when class methods are undefined"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-missing-methods"
+         , flagReverse = "-Wno-missing-methods"
          }
-  , flag { flagName = "-fwarn-missing-signatures"
+  , flag { flagName = "-Wmissing-signatures"
          , flagDescription = "warn about top-level functions without signatures"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-missing-signatures"
+         , flagReverse = "-Wno-missing-signatures"
          }
-  , flag { flagName = "-fwarn-missing-exported-sigs"
+  , flag { flagName = "-Wmissing-exported-sigs"
          , flagDescription =
            "warn about top-level functions without signatures, only if they "++
-           "are exported. takes precedence over -fwarn-missing-signatures"
+           "are exported. takes precedence over -Wmissing-signatures"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-missing-exported-sigs"
+         , flagReverse = "-Wno-missing-exported-sigs"
          }
-  , flag { flagName = "-fwarn-missing-local-sigs"
+  , flag { flagName = "-Wmissing-local-sigs"
          , flagDescription =
            "warn about polymorphic local bindings without signatures"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-missing-local-sigs"
+         , flagReverse = "-Wno-missing-local-sigs"
          }
-  , flag { flagName = "-fwarn-missing-monadfail-instance"
+  , flag { flagName = "-Wmissing-monadfail-instance"
          , flagDescription =
            "warn when a failable pattern is used in a do-block that does " ++
            "not have a ``MonadFail`` instance."
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-missing-monadfail-instance"
+         , flagReverse = "-Wno-missing-monadfail-instance"
          }
-  , flag { flagName = "-fwarn-semigroup"
+  , flag { flagName = "-Wsemigroup"
          , flagDescription =
            "warn when a ``Monoid`` is not ``Semigroup``, and on non-" ++
            "``Semigroup`` definitions of ``(<>)``?"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-semigroup"
+         , flagReverse = "-Wno-semigroup"
          }
-  , flag { flagName = "-fwarn-missed-specialisations"
+  , flag { flagName = "-Wmissed-specialisations"
          , flagDescription =
            "warn when specialisation of an imported, overloaded function fails."
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-missed-specialisations"
+         , flagReverse = "-Wno-missed-specialisations"
          }
-  , flag { flagName = "-fwarn-all-missed-specialisations"
+  , flag { flagName = "-Wall-missed-specialisations"
          , flagDescription =
            "warn when specialisation of any overloaded function fails."
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-all-missed-specialisations"
+         , flagReverse = "-Wno-all-missed-specialisations"
          }
-  , flag { flagName = "-fwarn-monomorphism-restriction"
+  , flag { flagName = "-Wmonomorphism-restriction"
          , flagDescription = "warn when the Monomorphism Restriction is applied"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-monomorphism-restriction"
+         , flagReverse = "-Wno-monomorphism-restriction"
          }
-  , flag { flagName = "-fwarn-name-shadowing"
+  , flag { flagName = "-Wname-shadowing"
          , flagDescription = "warn when names are shadowed"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-name-shadowing"
+         , flagReverse = "-Wno-name-shadowing"
          }
-  , flag { flagName = "-fwarn-noncanonical-monad-instance"
+  , flag { flagName = "-Wnoncanonical-monad-instance"
          , flagDescription =
            "warn when ``Applicative`` or ``Monad`` instances have "++
            "noncanonical definitions of ``return``, ``pure``, ``(>>)``, "++
            "or ``(*>)``. "++
            "See flag description in :ref:`options-sanity` for more details."
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-noncanonical-monad-instance"
+         , flagReverse = "-Wno-noncanonical-monad-instance"
          }
-  , flag { flagName = "-fwarn-noncanonical-monoid-instance"
+  , flag { flagName = "-Wnoncanonical-monoid-instance"
          , flagDescription =
            "warn when ``Semigroup`` or ``Monoid`` instances have "++
            "noncanonical definitions of ``(<>)`` or ``mappend``. "++
            "See flag description in :ref:`options-sanity` for more details."
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-noncanonical-monoid-instance"
+         , flagReverse = "-Wno-noncanonical-monoid-instance"
          }
-  , flag { flagName = "-fwarn-orphans"
+  , flag { flagName = "-Worphans"
          , flagDescription =
            "warn when the module contains :ref:`orphan instance declarations "++
            "or rewrite rules <orphan-modules>`"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-orphans"
+         , flagReverse = "-Wno-orphans"
          }
-  , flag { flagName = "-fwarn-overlapping-patterns"
+  , flag { flagName = "-Woverlapping-patterns"
          , flagDescription = "warn about overlapping patterns"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-overlapping-patterns"
+         , flagReverse = "-Wno-overlapping-patterns"
          }
-  , flag { flagName = "-fwarn-tabs"
+  , flag { flagName = "-Wtabs"
          , flagDescription = "warn if there are tabs in the source file"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-tabs"
+         , flagReverse = "-Wno-tabs"
          }
-  , flag { flagName = "-fwarn-type-defaults"
+  , flag { flagName = "-Wtype-defaults"
          , flagDescription = "warn when defaulting happens"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-type-defaults"
+         , flagReverse = "-Wno-type-defaults"
          }
-  , flag { flagName = "-fwarn-unrecognised-pragmas"
+  , flag { flagName = "-Wunrecognised-pragmas"
          , flagDescription =
            "warn about uses of pragmas that GHC doesn't recognise"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-unrecognised-pragmas"
+         , flagReverse = "-Wno-unrecognised-pragmas"
          }
-  , flag { flagName = "-fwarn-unticked-promoted-constructors"
+  , flag { flagName = "-Wunticked-promoted-constructors"
          , flagDescription = "warn if promoted constructors are not ticked"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-unticked-promoted-constructors"
+         , flagReverse = "-Wno-unticked-promoted-constructors"
          }
-  , flag { flagName = "-fwarn-unused-binds"
+  , flag { flagName = "-Wunused-binds"
          , flagDescription =
            "warn about bindings that are unused. Alias for "++
-           "``-fwarn-unused-top-binds``, ``-fwarn-unused-local-binds`` and "++
-           "``-fwarn-unused-pattern-binds``"
+           "``-Wunused-top-binds``, ``-Wunused-local-binds`` and "++
+           "``-Wunused-pattern-binds``"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-unused-binds"
+         , flagReverse = "-Wno-unused-binds"
          }
-  , flag { flagName = "-fwarn-unused-top-binds"
+  , flag { flagName = "-Wunused-top-binds"
          , flagDescription = "warn about top-level bindings that are unused"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-unused-top-binds"
+         , flagReverse = "-Wno-unused-top-binds"
          }
-  , flag { flagName = "-fwarn-unused-local-binds"
+  , flag { flagName = "-Wunused-local-binds"
          , flagDescription = "warn about local bindings that are unused"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-unused-local-binds"
+         , flagReverse = "-Wno-unused-local-binds"
          }
-  , flag { flagName = "-fwarn-unused-pattern-binds"
+  , flag { flagName = "-Wunused-pattern-binds"
          , flagDescription = "warn about pattern match bindings that are unused"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-unused-pattern-binds"
+         , flagReverse = "-Wno-unused-pattern-binds"
          }
-  , flag { flagName = "-fwarn-unused-imports"
+  , flag { flagName = "-Wunused-imports"
          , flagDescription = "warn about unnecessary imports"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-unused-imports"
+         , flagReverse = "-Wno-unused-imports"
          }
-  , flag { flagName = "-fwarn-unused-matches"
+  , flag { flagName = "-Wunused-matches"
          , flagDescription = "warn about variables in patterns that aren't used"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-unused-matches"
+         , flagReverse = "-Wno-unused-matches"
          }
-  , flag { flagName = "-fwarn-unused-do-bind"
+  , flag { flagName = "-Wunused-do-bind"
          , flagDescription =
            "warn about do bindings that appear to throw away values of types "++
            "other than ``()``"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-unused-do-bind"
+         , flagReverse = "-Wno-unused-do-bind"
          }
-  , flag { flagName = "-fwarn-wrong-do-bind"
+  , flag { flagName = "-Wwrong-do-bind"
          , flagDescription =
            "warn about do bindings that appear to throw away monadic values "++
            "that you should have bound instead"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-wrong-do-bind"
+         , flagReverse = "-Wno-wrong-do-bind"
          }
-  , flag { flagName = "-fwarn-unsafe"
+  , flag { flagName = "-Wunsafe"
          , flagDescription =
            "warn if the module being compiled is regarded to be unsafe. "++
            "Should be used to check the safety status of modules when using "++
@@ -294,9 +294,9 @@ warningsOptions =
            "``-XTrustworthy``) and so can be used to have the compiler check "++
            "any assumptions made."
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-unsafe"
+         , flagReverse = "-Wno-unsafe"
          }
-  , flag { flagName = "-fwarn-safe"
+  , flag { flagName = "-Wsafe"
          , flagDescription =
            "warn if the module being compiled is regarded to be safe. Should "++
            "be used to check the safety status of modules when using safe "++
@@ -305,63 +305,63 @@ warningsOptions =
            "``-XTrustworthy``) and so can be used to have the compiler check "++
            "any assumptions made."
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-safe"
+         , flagReverse = "-Wno-safe"
          }
-  , flag { flagName = "-fwarn-trustworthy-safe"
+  , flag { flagName = "-Wtrustworthy-safe"
          , flagDescription =
            "warn if the module being compiled is marked as ``-XTrustworthy`` "++
            "but it could instead be marked as ``-XSafe``, a more informative "++
            "bound. Can be used to detect once a Safe Haskell bound can be "++
            "improved as dependencies are updated."
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-safe"
+         , flagReverse = "-Wno-safe"
          }
-  , flag { flagName = "-fwarn-warnings-deprecations"
+  , flag { flagName = "-Wwarnings-deprecations"
          , flagDescription =
            "warn about uses of functions & types that have warnings or "++
            "deprecated pragmas"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-warnings-deprecations"
+         , flagReverse = "-Wno-warnings-deprecations"
          }
-  , flag { flagName = "-fwarn-amp"
+  , flag { flagName = "-Wamp"
          , flagDescription =
            "*(deprecated)* warn on definitions conflicting with the "++
            "Applicative-Monad Proposal (AMP)"
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-amp"
+         , flagReverse = "-Wno-amp"
          }
-  , flag { flagName = "-fwarn-deferred-type-errors"
+  , flag { flagName = "-Wdeferred-type-errors"
          , flagDescription =
            "Report warnings when :ref:`deferred type errors "++
            "<defer-type-errors>` are enabled. This option is enabled by "++
            "default. See ``-fdefer-type-errors``."
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-deferred-type-errors"
+         , flagReverse = "-Wno-deferred-type-errors"
          }
-  , flag { flagName = "-fwarn-typed-holes"
+  , flag { flagName = "-Wtyped-holes"
          , flagDescription =
            "Report warnings when :ref:`typed hole <typed-holes>` errors are "++
            ":ref:`deferred until runtime <defer-type-errors>`. See "++
            "``-fdefer-typed-holes``."
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-typed-holes"
+         , flagReverse = "-Wno-typed-holes"
          }
-  , flag { flagName = "-fwarn-partial-type-signatures"
+  , flag { flagName = "-Wpartial-type-signatures"
          , flagDescription =
            "warn about holes in partial type signatures when "++
            "``-XPartialTypeSignatures`` is enabled. Not applicable when "++
            "``-XPartialTypesignatures`` is not enabled, in which case errors "++
            "are generated for such holes. See :ref:`partial-type-signatures`."
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-partial-type-signatures"
+         , flagReverse = "-Wno-partial-type-signatures"
          }
-  , flag { flagName = "-fwarn-deriving-typeable"
+  , flag { flagName = "-Wderiving-typeable"
          , flagDescription =
            "warn when encountering a request to derive an instance of class "++
            "``Typeable``. As of GHC 7.10, such declarations are unnecessary "++
            "and are ignored by the compiler because GHC has a custom solver "++
            "for discharging this type of constraint."
          , flagType = DynamicFlag
-         , flagReverse = "-fno-warn-deriving-typeable"
+         , flagReverse = "-Wno-deriving-typeable"
          }
   ]

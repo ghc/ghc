@@ -130,7 +130,7 @@ Overloaded functions are not your friend:
 Give explicit type signatures:
     Signatures are the basic trick; putting them on exported, top-level
     functions is good software-engineering practice, anyway. (Tip: using
-    ``-fwarn-missing-signatures``-fwarn-missing-signatures option can
+    ``-Wmissing-signatures``-Wmissing-signatures option can
     help enforce good signature-practice).
 
     The automatic specialisation of overloaded functions (with ``-O``)

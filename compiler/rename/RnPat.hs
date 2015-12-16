@@ -178,7 +178,7 @@ data NameMaker
   = LamMk       -- Lambdas
       Bool      -- True <=> report unused bindings
                 --   (even if True, the warning only comes out
-                --    if -fwarn-unused-matches is on)
+                --    if -Wunused-matches is on)
 
   | LetMk       -- Let bindings, incl top level
                 -- Do *not* check for unused bindings

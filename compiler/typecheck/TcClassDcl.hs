@@ -491,7 +491,7 @@ warnMissingAT :: Name -> TcM ()
 warnMissingAT name
   = do { warn <- woptM Opt_WarnMissingMethods
        ; traceTc "warn" (ppr name <+> ppr warn)
-       ; warnTc warn  -- Warn only if -fwarn-missing-methods
+       ; warnTc warn  -- Warn only if -Wmissing-methods
                 (ptext (sLit "No explicit") <+> text "associated type"
                     <+> ptext (sLit "or default declaration for     ")
                     <+> quotes (ppr name)) }

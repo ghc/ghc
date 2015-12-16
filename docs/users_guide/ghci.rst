@@ -1372,7 +1372,7 @@ breakpoint. Note: GHC considers the TAB character to have a width of 1,
 wherever it occurs; in other words it counts characters, rather than
 columns. This matches what some editors do, and doesn't match others.
 The best advice is to avoid tab characters in your source code
-altogether (see ``-fwarn-tabs`` in :ref:`options-sanity`).
+altogether (see ``-Wtabs`` in :ref:`options-sanity`).
 
 If the module is omitted, then the most recently-loaded module is used.
 
@@ -2697,11 +2697,11 @@ Setting GHC command-line options in GHCi
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Normal GHC command-line options may also be set using ``:set``. For
-example, to turn on ``-fwarn-missing-signatures``, you would say:
+example, to turn on ``-Wmissing-signatures``, you would say:
 
 ::
 
-    Prelude> :set -fwarn-missing-signatures
+    Prelude> :set -Wmissing-signatures
 
 Any GHC command-line option that is designated as dynamic (see the table
 in :ref:`flag-reference`), may be set using ``:set``. To unset an
@@ -2712,7 +2712,7 @@ option, you can set the reverse option:
 
 ::
 
-    Prelude> :set -fno-warn-incomplete-patterns -XNoMultiParamTypeClasses
+    Prelude> :set -Wno-incomplete-patterns -XNoMultiParamTypeClasses
 
 :ref:`flag-reference` lists the reverse for each option where
 applicable.

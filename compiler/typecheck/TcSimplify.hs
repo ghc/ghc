@@ -340,7 +340,7 @@ How is this implemented? It's complicated! So we'll step through it all:
  compilation should fail. These are handled as normal constraint resolution
  failures from here-on (see step 6).
 
- Otherwise, we may be inferring safety (or using `-fwarn-unsafe`), and
+ Otherwise, we may be inferring safety (or using `-Wunsafe`), and
  compilation should succeed, but print warnings and/or mark the compiled module
  as `-XUnsafe`. In this case, we call `insertSafeOverlapFailureTcS` which adds
  the unsafe (but resolved!) constraint to the `inert_safehask` field of
@@ -350,7 +350,7 @@ How is this implemented? It's complicated! So we'll step through it all:
  constraint resolution. Once finished, we call `getSafeOverlapFailures` to
  retrieve the list of overlapping instances that were successfully resolved,
  but unsafe. Remember, this is only applicable for generating warnings
- (`-fwarn-unsafe`) or inferring a module unsafe. `-XSafe` and `-XTrustworthy`
+ (`-Wunsafe`) or inferring a module unsafe. `-XSafe` and `-XTrustworthy`
  cause compilation failure by not resolving the unsafe constraint at all.
  `simpl_top` returns a list of unresolved constraints (all types), and resolved
  (but unsafe) resolved dictionary constraints.

@@ -160,6 +160,13 @@ Language
 Compiler
 ~~~~~~~~
 
+-  Warnings can now be controlled with ``-W(no-)...`` flags in addition to
+   the old ``-f(no-)warn...`` ones. This was done as the first part of a
+   rewrite of the warning system to provide better control over warnings,
+   better warning messages, and more common syntax compared to other
+   compilers. The old ``-f``-based warning flags will remain functional for
+   the forseeable future.
+
 -  Added the option ``-dth-dec-file``. This dumps out a .th.hs file of
    all Template Haskell declarations in a corresponding .hs file. The
    idea is that application developers can check this into their
@@ -184,14 +191,14 @@ Compiler
    Enabling ``-fworker-wrapper`` while strictness analysis is disabled (by
    ``-fno-strictness``) has no effect.
 
--  Added the options ``-fwarn-missed-specialisations`` and
-   ``-fwarn-all-missed-specialisations``. When enabled, the simplifier will
+-  Added the options ``-Wmissed-specialisations`` and
+   ``-Wall-missed-specialisations``. When enabled, the simplifier will
    produce a warning when a overloaded imported function cannot be
    specialised (typically due to a missing ``INLINEABLE`` pragma). This
    is intended to alert users to cases where they apply ``INLINEABLE`` but
    may not get the speed-up they expect.
 
--  Added the option ``-fwarn-noncanonical-monad-instances`` which helps
+-  Added the option ``-Wnoncanonical-monad-instances`` which helps
    detect noncanonical ``Applicative``/``Monad`` instance definitions.
    See flag description in :ref:`options-sanity` for more details.
 
@@ -204,19 +211,19 @@ Compiler
    allows library authors eager to make their code future compatible to adapt
    to new features before they even generate warnings.
 
--  Added the ``-fwarn-missing-monadfail-instance`` flag. When enabled, this
+-  Added the ``-Wmissing-monadfail-instance`` flag. When enabled, this
    will issue a warning if a failable pattern is used in a context that does
    not have a ``MonadFail`` constraint. This flag represents phase 1 of the
    `MonadFail Proposal (MFP)
    <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
 
--  Added the ``-fwarn-semigroup`` flag. When enabled, this
+-  Added the ``-Wsemigroup`` flag. When enabled, this
    will issue a warning if a type is an instance of ``Monoid`` but not
    ``Semigroup``, and when a custom definition ``(<>)`` is made. Fixing these
    warnings makes sure the definition of ``Semigroup`` as a superclass of
    ``Monoid`` does not break any code.
 
--  Added the ``-fwarn-missing-pat-syn-sigs`` flag. When enabled, this will issue
+-  Added the ``-Wmissing-pat-syn-sigs`` flag. When enabled, this will issue
    a warning when a pattern synonym definition doesn't have a type signature.
    It is turned off by default but enabled by ``-Wall``.
 

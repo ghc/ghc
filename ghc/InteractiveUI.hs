@@ -2093,27 +2093,24 @@ showDynFlags show_all dflags = do
   showLanguages' show_all dflags
   putStrLn $ showSDoc dflags $
      text "GHCi-specific dynamic flag settings:" $$
-         nest 2 (vcat (map (setting gopt) ghciFlags))
+         nest 2 (vcat (map (setting "-f" "-fno-" gopt) ghciFlags))
   putStrLn $ showSDoc dflags $
      text "other dynamic, non-language, flag settings:" $$
-         nest 2 (vcat (map (setting gopt) others))
+         nest 2 (vcat (map (setting "-f" "-fno-" gopt) others))
   putStrLn $ showSDoc dflags $
      text "warning settings:" $$
-         nest 2 (vcat (map (setting wopt) DynFlags.fWarningFlags))
+         nest 2 (vcat (map (setting "-W" "-Wno-" wopt) DynFlags.wWarningFlags))
   where
-        setting test flag
+        setting prefix noPrefix test flag
           | quiet     = empty
-          | is_on     = fstr name
-          | otherwise = fnostr name
+          | is_on     = text prefix <> text name
+          | otherwise = text noPrefix <> text name
           where name = flagSpecName flag
                 f = flagSpecFlag flag
                 is_on = test f dflags
                 quiet = not show_all && test f default_dflags == is_on
 
         default_dflags = defaultDynFlags (settings dflags)
-
-        fstr   str = text "-f"    <> text str
-        fnostr str = text "-fno-" <> text str
 
         (ghciFlags,others)  = partition (\f -> flagSpecFlag f `elem` flgs)
                                         DynFlags.fFlags

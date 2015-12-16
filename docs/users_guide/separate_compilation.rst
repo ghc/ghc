@@ -1071,9 +1071,9 @@ module:
    of the variables, type constructors, or classes that are free in the
    left hand side of the rule are declared in ``M``.
 
-If you use the flag ``-fwarn-orphans``, GHC will warn you if you are
+If you use the flag ``-Worphans``, GHC will warn you if you are
 creating an orphan module. Like any warning, you can switch the warning
-off with ``-fno-warn-orphans``, and ``-Werror`` will make the
+off with ``-Wno-orphans``, and ``-Werror`` will make the
 compilation fail if the warning is issued.
 
 You can identify an orphan module by looking in its interface file,

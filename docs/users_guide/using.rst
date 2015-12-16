@@ -98,14 +98,14 @@ Command line options in source files
 Sometimes it is useful to make the connection between a source file and
 the command-line options it requires quite tight. For instance, if a
 Haskell source file deliberately uses name shadowing, it should be
-compiled with the ``-fno-warn-name-shadowing`` option. Rather than
+compiled with the ``-Wno-name-shadowing`` option. Rather than
 maintaining the list of per-file options in a ``Makefile``, it is
 possible to do this directly in the source file using the
 ``OPTIONS_GHC`` :ref:`pragma <options-pragma>`.
 
 ::
 
-    {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+    {-# OPTIONS_GHC -Wno-name-shadowing #-}
     module X where
     ...
 
@@ -678,7 +678,7 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
     users should not need to worry about the subtleties here; ``~`` is
     probably what you want. Without ``-fprint-equality-relations``, GHC
     prints all of these as ``~``.
-	
+
 ``-fprint-expanded-synonyms``
     .. index::
        single: -fprint-expanded-synonyms

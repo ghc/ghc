@@ -259,7 +259,7 @@ data ReportErrCtxt
           , cec_expr_holes :: HoleChoice  -- Holes in expressions
           , cec_type_holes :: HoleChoice  -- Holes in types
 
-          , cec_warn_redundant :: Bool    -- True <=> -fwarn-redundant-constraints
+          , cec_warn_redundant :: Bool    -- True <=> -Wredundant-constraints
 
           , cec_suppress :: Bool    -- True <=> More important errors have occurred,
                                     --          so create bindings if need be, but
@@ -590,7 +590,7 @@ maybeReportHoleError ctxt ct err
 
   -- Otherwise this is a typed hole in an expression
   | otherwise
-  = -- If deferring, report a warning only if -fwarn-typed-holds is on
+  = -- If deferring, report a warning only if -Wtyped-holds is on
     case cec_expr_holes ctxt of
        HoleError -> reportError err
        HoleWarn  -> reportWarning err

@@ -9,7 +9,7 @@ ghci024:
 	@echo "~~~~~~~~~~ Testing :set -a"
 	printf ":set -a\n" \
 	    | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci \
-	    | grep -E "^([^ ]|  -fno-print-explicit-foralls|  -fno-warn-implicit-prelude)"
+	    | grep -E "^([^ ]|  -fno-print-explicit-foralls|  -Wno-implicit-prelude)"
 	@echo "~~~~~~~~~~ Testing :show languages"
 	printf ":show languages\n" \
 	    | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci

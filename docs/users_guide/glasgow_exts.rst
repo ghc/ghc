@@ -2029,7 +2029,7 @@ example, consider these two candidate definitions of ``absurd``:
 
 We much prefer (B). Why? Because GHC can figure out that
 ``(True :~: False)`` is an empty type. So (B) has no partiality and GHC
-should be able to compile with ``-fwarn-incomplete-patterns``. (Though
+should be able to compile with ``-Wincomplete-patterns``. (Though
 the pattern match checking is not yet clever enough to do that.) On the
 other hand (A) looks dangerous, and GHC doesn't check to make sure that,
 in fact, the function can never get called.
@@ -2156,7 +2156,7 @@ interests of supporting backward compatibility; for example, a newer
 version of ``A`` might export ``g``, and you want ``B`` to work in
 either case.
 
-The warning ``-fwarn-dodgy-imports``, which is off by default but
+The warning ``-Wdodgy-imports``, which is off by default but
 included with ``-W``, warns if you hide something that the imported
 module does not export.
 
@@ -4494,7 +4494,7 @@ methods.
 This is
 mostly useful in classes whose `minimal set <#minimal-pragma>`__ is
 empty, and especially when writing
-`generic functions <#generic-programming>`__. 
+`generic functions <#generic-programming>`__.
 
 As an example, consider a simple pretty-printer class ``SPretty``, which outputs
 pretty strings: ::
@@ -8510,7 +8510,7 @@ example:
     newtype Swizzle' = MkSwizzle' (Ord a => [a] -> [a])
 
 As of GHC 7.10, this is deprecated. The
-``-fwarn-context-quantification`` flag detects this situation and issues
+``-Wcontext-quantification`` flag detects this situation and issues
 a warning. In GHC 8.0 this flag was deprecated and declarations such as
 ``MkSwizzle'`` will cause an out-of-scope error.
 
@@ -9264,7 +9264,7 @@ in a partial type signature, informing the programmer of the inferred
 type. When the ``-XPartialTypeSignatures`` flag is enabled, the
 type-checker will accept the inferred type for each hole, generating
 warnings instead of errors. Additionally, these warnings can be silenced
-with the ``-fno-warn-partial-type-signatures`` flag.
+with the ``-Wno-partial-type-signatures`` flag.
 
 .. _pts-syntax:
 
@@ -9563,7 +9563,7 @@ Enabling deferring of type errors
 The flag ``-fdefer-type-errors`` controls whether type errors are
 deferred to runtime. Type errors will still be emitted as warnings, but
 will not prevent compilation. You can use
-``-fno-warn-deferred-type-errors`` to suppress these warnings.
+``-Wno-deferred-type-errors`` to suppress these warnings.
 
 This flag implies the ``-fdefer-typed-holes`` flag, which enables this
 behaviour for `typed holes <#typed-holes>`__. Should you so wish, it is
@@ -11250,7 +11250,7 @@ library in which one module gathers together and re-exports the exports
 of several others.
 
 You can suppress the warnings with the flag
-``-fno-warn-warnings-deprecations``.
+``-Wno-warnings-deprecations``.
 
 .. _minimal-pragma:
 
@@ -11296,10 +11296,10 @@ If no ``MINIMAL`` pragma is given in the class declaration, it is just as if
 a pragma ``{-# MINIMAL op1, op2, ..., opn #-}`` was given, where the
 ``opi`` are the methods (a) that lack a default method in the class
 declaration, and (b) whose name that does not start with an underscore
-(c.f. ``-fwarn-missing-methods``, :ref:`options-sanity`).
+(c.f. ``-Wmissing-methods``, :ref:`options-sanity`).
 
 This warning can be turned off with the flag
-``-fno-warn-missing-methods``.
+``-Wno-missing-methods``.
 
 .. _inline-noinline-pragma:
 
@@ -12143,7 +12143,7 @@ been a better chance that ``f``\'s RULE might fire.
 The way to get predictable behaviour is to use a NOINLINE pragma, or an
 INLINE[⟨phase⟩] pragma, on ``f``, to ensure that it is not inlined until
 its RULEs have had a chance to fire. The warning flag
-``-fwarn-inline-rule-shadowing`` (see :ref:`options-sanity`) warns about
+``-Winline-rule-shadowing`` (see :ref:`options-sanity`) warns about
 this situation.
 
 .. _conlike:

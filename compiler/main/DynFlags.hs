@@ -48,7 +48,8 @@ module DynFlags (
         PkgConfRef(..),
         Option(..), showOpt,
         DynLibLoader(..),
-        fFlags, fWarningFlags, fLangFlags, xFlags,
+        fFlags, fLangFlags, xFlags,
+        wWarningFlags,
         dynFlagDependencies,
         tablesNextToCode, mkTablesNextToCode,
         SigOf, getSigOf,
@@ -503,7 +504,7 @@ data WarningFlag =
    | Opt_WarnUnusedPatternBinds
    | Opt_WarnUnusedImports
    | Opt_WarnUnusedMatches
-   | Opt_WarnContextQuantification    -- remove in 8.2
+   | Opt_WarnContextQuantification -- remove in 8.2
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
    | Opt_WarnAMP -- Introduced in GHC 7.8, obsolete since 7.10
@@ -2610,8 +2611,10 @@ dynamic_flags = [
   , defFlag "fno-glasgow-exts"
       (NoArg (do disableGlasgowExts
                  deprecate "Use individual extensions instead"))
-  , defFlag "fwarn-unused-binds" (NoArg enableUnusedBinds)
-  , defFlag "fno-warn-unused-binds" (NoArg disableUnusedBinds)
+  , defFlag "Wunused-binds" (NoArg enableUnusedBinds)
+  , defFlag "Wno-unused-binds" (NoArg disableUnusedBinds)
+  , defHiddenFlag "fwarn-unused-binds" (NoArg enableUnusedBinds)
+  , defHiddenFlag "fno-warn-unused-binds" (NoArg disableUnusedBinds)
 
         ------ Safe Haskell flags -------------------------------------------
   , defFlag "fpackage-trust"   (NoArg setPackageTrust)
@@ -2622,20 +2625,22 @@ dynamic_flags = [
          ------ Debugging flags ----------------------------------------------
   , defGhcFlag "g"             (OptIntSuffix setDebugLevel)
  ]
- ++ map (mkFlag turnOn  ""     setGeneralFlag  ) negatableFlags
- ++ map (mkFlag turnOff "no-"  unSetGeneralFlag) negatableFlags
- ++ map (mkFlag turnOn  "d"    setGeneralFlag  ) dFlags
- ++ map (mkFlag turnOff "dno-" unSetGeneralFlag) dFlags
- ++ map (mkFlag turnOn  "f"    setGeneralFlag  ) fFlags
- ++ map (mkFlag turnOff "fno-" unSetGeneralFlag) fFlags
- ++ map (mkFlag turnOn  "f"    setWarningFlag  ) fWarningFlags
- ++ map (mkFlag turnOff "fno-" unSetWarningFlag) fWarningFlags
- ++ map (mkFlag turnOn  "f"    setExtensionFlag  ) fLangFlags
- ++ map (mkFlag turnOff "fno-" unSetExtensionFlag) fLangFlags
- ++ map (mkFlag turnOn  "X"    setExtensionFlag  ) xFlags
- ++ map (mkFlag turnOff "XNo"  unSetExtensionFlag) xFlags
- ++ map (mkFlag turnOn  "X"    setLanguage) languageFlags
- ++ map (mkFlag turnOn  "X"    setSafeHaskell) safeHaskellFlags
+ ++ map (mkFlag turnOn  ""          setGeneralFlag    ) negatableFlags
+ ++ map (mkFlag turnOff "no-"       unSetGeneralFlag  ) negatableFlags
+ ++ map (mkFlag turnOn  "d"         setGeneralFlag    ) dFlags
+ ++ map (mkFlag turnOff "dno-"      unSetGeneralFlag  ) dFlags
+ ++ map (mkFlag turnOn  "f"         setGeneralFlag    ) fFlags
+ ++ map (mkFlag turnOff "fno-"      unSetGeneralFlag  ) fFlags
+ ++ map (mkFlag turnOn  "W"         setWarningFlag    ) wWarningFlags
+ ++ map (mkFlag turnOff "Wno-"      unSetWarningFlag  ) wWarningFlags
+ ++ map (mkFlag turnOn  "fwarn-"    setWarningFlag   . hideFlag) wWarningFlags
+ ++ map (mkFlag turnOff "fno-warn-" unSetWarningFlag . hideFlag) wWarningFlags
+ ++ map (mkFlag turnOn  "f"         setExtensionFlag  ) fLangFlags
+ ++ map (mkFlag turnOff "fno-"      unSetExtensionFlag) fLangFlags
+ ++ map (mkFlag turnOn  "X"         setExtensionFlag  ) xFlags
+ ++ map (mkFlag turnOff "XNo"       unSetExtensionFlag) xFlags
+ ++ map (mkFlag turnOn  "X"         setLanguage       ) languageFlags
+ ++ map (mkFlag turnOn  "X"         setSafeHaskell    ) safeHaskellFlags
  ++ [ defFlag "XGenerics"
         (NoArg (deprecate $
                   "it does nothing; look into -XDefaultSignatures " ++
@@ -2740,6 +2745,13 @@ flagHiddenSpec name flag = flagHiddenSpec' name flag nop
 flagHiddenSpec' :: String -> flag -> (TurnOnFlag -> DynP ()) -> FlagSpec flag
 flagHiddenSpec' name flag act = FlagSpec name flag act HiddenFlag
 
+-- | Hide a 'FlagSpec' from being displayed in @--show-options@.
+--
+-- This is for example useful for flags that are obsolete, but should not
+-- (yet) be deprecated for compatibility reasons.
+hideFlag :: FlagSpec a -> FlagSpec a
+hideFlag fs = fs { flagSpecGhcMode = HiddenFlag }
+
 mkFlag :: TurnOnFlag            -- ^ True <=> it should be turned on
        -> String                -- ^ The flag prefix
        -> (flag -> DynP ())     -- ^ What to do when the flag is found
@@ -2765,80 +2777,80 @@ useInstead flag turn_on
 nop :: TurnOnFlag -> DynP ()
 nop _ = return ()
 
--- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
-fWarningFlags :: [FlagSpec WarningFlag]
-fWarningFlags = [
+-- | These @-W\<blah\>@ flags can all be reversed with @-Wno-\<blah\>@
+wWarningFlags :: [FlagSpec WarningFlag]
+wWarningFlags = [
 -- See Note [Updating flag description in the User's Guide]
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
-  flagSpec "warn-alternative-layout-rule-transitional"
+  flagSpec "alternative-layout-rule-transitional"
                                       Opt_WarnAlternativeLayoutRuleTransitional,
-  flagSpec' "warn-amp"                        Opt_WarnAMP
+  flagSpec' "amp"                        Opt_WarnAMP
     (\_ -> deprecate "it has no effect"),
-  flagSpec' "warn-auto-orphans"               Opt_WarnAutoOrphans
+  flagSpec' "auto-orphans"               Opt_WarnAutoOrphans
     (\_ -> deprecate "it has no effect"),
-  flagSpec "warn-deferred-type-errors"        Opt_WarnDeferredTypeErrors,
-  flagSpec "warn-deprecations"                Opt_WarnWarningsDeprecations,
-  flagSpec "warn-deprecated-flags"            Opt_WarnDeprecatedFlags,
-  flagSpec "warn-deriving-typeable"           Opt_WarnDerivingTypeable,
-  flagSpec "warn-dodgy-exports"               Opt_WarnDodgyExports,
-  flagSpec "warn-dodgy-foreign-imports"       Opt_WarnDodgyForeignImports,
-  flagSpec "warn-dodgy-imports"               Opt_WarnDodgyImports,
-  flagSpec "warn-empty-enumerations"          Opt_WarnEmptyEnumerations,
-  flagSpec' "warn-context-quantification"      Opt_WarnContextQuantification
+  flagSpec "deferred-type-errors"        Opt_WarnDeferredTypeErrors,
+  flagSpec "deprecations"                Opt_WarnWarningsDeprecations,
+  flagSpec "deprecated-flags"            Opt_WarnDeprecatedFlags,
+  flagSpec "deriving-typeable"           Opt_WarnDerivingTypeable,
+  flagSpec "dodgy-exports"               Opt_WarnDodgyExports,
+  flagSpec "dodgy-foreign-imports"       Opt_WarnDodgyForeignImports,
+  flagSpec "dodgy-imports"               Opt_WarnDodgyImports,
+  flagSpec "empty-enumerations"          Opt_WarnEmptyEnumerations,
+  flagSpec' "context-quantification"     Opt_WarnContextQuantification
     (\_ -> deprecate "it is subsumed by an error message that cannot be disabled"),
-  flagSpec' "warn-duplicate-constraints"      Opt_WarnDuplicateConstraints
-    (\_ -> deprecate "it is subsumed by -fwarn-redundant-constraints"),
-  flagSpec "warn-redundant-constraints"       Opt_WarnRedundantConstraints,
-  flagSpec "warn-duplicate-exports"           Opt_WarnDuplicateExports,
-  flagSpec "warn-hi-shadowing"                Opt_WarnHiShadows,
-  flagSpec "warn-implicit-prelude"            Opt_WarnImplicitPrelude,
-  flagSpec "warn-incomplete-patterns"         Opt_WarnIncompletePatterns,
-  flagSpec "warn-incomplete-record-updates"   Opt_WarnIncompletePatternsRecUpd,
-  flagSpec "warn-incomplete-uni-patterns"     Opt_WarnIncompleteUniPatterns,
-  flagSpec "warn-inline-rule-shadowing"       Opt_WarnInlineRuleShadowing,
-  flagSpec "warn-identities"                  Opt_WarnIdentities,
-  flagSpec "warn-missing-fields"              Opt_WarnMissingFields,
-  flagSpec "warn-missing-import-lists"        Opt_WarnMissingImportList,
-  flagSpec "warn-missing-local-sigs"          Opt_WarnMissingLocalSigs,
-  flagSpec "warn-missing-methods"             Opt_WarnMissingMethods,
-  flagSpec "warn-missing-monadfail-instance"  Opt_WarnMissingMonadFailInstance,
-  flagSpec "warn-semigroup"                   Opt_WarnSemigroup,
-  flagSpec "warn-missing-signatures"          Opt_WarnMissingSigs,
-  flagSpec "warn-missing-exported-sigs"       Opt_WarnMissingExportedSigs,
-  flagSpec "warn-monomorphism-restriction"    Opt_WarnMonomorphism,
-  flagSpec "warn-name-shadowing"              Opt_WarnNameShadowing,
-  flagSpec "warn-noncanonical-monad-instances"
+  flagSpec' "duplicate-constraints"      Opt_WarnDuplicateConstraints
+    (\_ -> deprecate "it is subsumed by -Wredundant-constraints"),
+  flagSpec "redundant-constraints"       Opt_WarnRedundantConstraints,
+  flagSpec "duplicate-exports"           Opt_WarnDuplicateExports,
+  flagSpec "hi-shadowing"                Opt_WarnHiShadows,
+  flagSpec "implicit-prelude"            Opt_WarnImplicitPrelude,
+  flagSpec "incomplete-patterns"         Opt_WarnIncompletePatterns,
+  flagSpec "incomplete-record-updates"   Opt_WarnIncompletePatternsRecUpd,
+  flagSpec "incomplete-uni-patterns"     Opt_WarnIncompleteUniPatterns,
+  flagSpec "inline-rule-shadowing"       Opt_WarnInlineRuleShadowing,
+  flagSpec "identities"                  Opt_WarnIdentities,
+  flagSpec "missing-fields"              Opt_WarnMissingFields,
+  flagSpec "missing-import-lists"        Opt_WarnMissingImportList,
+  flagSpec "missing-local-sigs"          Opt_WarnMissingLocalSigs,
+  flagSpec "missing-methods"             Opt_WarnMissingMethods,
+  flagSpec "missing-monadfail-instance"  Opt_WarnMissingMonadFailInstance,
+  flagSpec "semigroup"                   Opt_WarnSemigroup,
+  flagSpec "missing-signatures"          Opt_WarnMissingSigs,
+  flagSpec "missing-exported-sigs"       Opt_WarnMissingExportedSigs,
+  flagSpec "monomorphism-restriction"    Opt_WarnMonomorphism,
+  flagSpec "name-shadowing"              Opt_WarnNameShadowing,
+  flagSpec "noncanonical-monad-instances"
                                          Opt_WarnNonCanonicalMonadInstances,
-  flagSpec "warn-noncanonical-monoid-instances"
+  flagSpec "noncanonical-monoid-instances"
                                          Opt_WarnNonCanonicalMonoidInstances,
-  flagSpec "warn-orphans"                     Opt_WarnOrphans,
-  flagSpec "warn-overflowed-literals"         Opt_WarnOverflowedLiterals,
-  flagSpec "warn-overlapping-patterns"        Opt_WarnOverlappingPatterns,
-  flagSpec "warn-missed-specialisations"      Opt_WarnMissedSpecs,
-  flagSpec "warn-all-missed-specialisations"  Opt_WarnAllMissedSpecs,
-  flagSpec' "warn-safe"                       Opt_WarnSafe setWarnSafe,
-  flagSpec "warn-trustworthy-safe"            Opt_WarnTrustworthySafe,
-  flagSpec "warn-tabs"                        Opt_WarnTabs,
-  flagSpec "warn-type-defaults"               Opt_WarnTypeDefaults,
-  flagSpec "warn-typed-holes"                 Opt_WarnTypedHoles,
-  flagSpec "warn-partial-type-signatures"     Opt_WarnPartialTypeSignatures,
-  flagSpec "warn-unrecognised-pragmas"        Opt_WarnUnrecognisedPragmas,
-  flagSpec' "warn-unsafe"                     Opt_WarnUnsafe setWarnUnsafe,
-  flagSpec "warn-unsupported-calling-conventions"
+  flagSpec "orphans"                     Opt_WarnOrphans,
+  flagSpec "overflowed-literals"         Opt_WarnOverflowedLiterals,
+  flagSpec "overlapping-patterns"        Opt_WarnOverlappingPatterns,
+  flagSpec "missed-specialisations"      Opt_WarnMissedSpecs,
+  flagSpec "all-missed-specialisations"  Opt_WarnAllMissedSpecs,
+  flagSpec' "safe"                       Opt_WarnSafe setWarnSafe,
+  flagSpec "trustworthy-safe"            Opt_WarnTrustworthySafe,
+  flagSpec "tabs"                        Opt_WarnTabs,
+  flagSpec "type-defaults"               Opt_WarnTypeDefaults,
+  flagSpec "typed-holes"                 Opt_WarnTypedHoles,
+  flagSpec "partial-type-signatures"     Opt_WarnPartialTypeSignatures,
+  flagSpec "unrecognised-pragmas"        Opt_WarnUnrecognisedPragmas,
+  flagSpec' "unsafe"                     Opt_WarnUnsafe setWarnUnsafe,
+  flagSpec "unsupported-calling-conventions"
                                          Opt_WarnUnsupportedCallingConventions,
-  flagSpec "warn-unsupported-llvm-version"    Opt_WarnUnsupportedLlvmVersion,
-  flagSpec "warn-unticked-promoted-constructors"
+  flagSpec "unsupported-llvm-version"    Opt_WarnUnsupportedLlvmVersion,
+  flagSpec "unticked-promoted-constructors"
                                          Opt_WarnUntickedPromotedConstructors,
-  flagSpec "warn-unused-do-bind"              Opt_WarnUnusedDoBind,
-  flagSpec "warn-unused-imports"              Opt_WarnUnusedImports,
-  flagSpec "warn-unused-local-binds"          Opt_WarnUnusedLocalBinds,
-  flagSpec "warn-unused-matches"              Opt_WarnUnusedMatches,
-  flagSpec "warn-unused-pattern-binds"        Opt_WarnUnusedPatternBinds,
-  flagSpec "warn-unused-top-binds"            Opt_WarnUnusedTopBinds,
-  flagSpec "warn-warnings-deprecations"       Opt_WarnWarningsDeprecations,
-  flagSpec "warn-wrong-do-bind"               Opt_WarnWrongDoBind,
-  flagSpec "warn-missing-pat-syn-sigs"        Opt_WarnMissingPatSynSigs]
+  flagSpec "unused-do-bind"              Opt_WarnUnusedDoBind,
+  flagSpec "unused-imports"              Opt_WarnUnusedImports,
+  flagSpec "unused-local-binds"          Opt_WarnUnusedLocalBinds,
+  flagSpec "unused-matches"              Opt_WarnUnusedMatches,
+  flagSpec "unused-pattern-binds"        Opt_WarnUnusedPatternBinds,
+  flagSpec "unused-top-binds"            Opt_WarnUnusedTopBinds,
+  flagSpec "warnings-deprecations"       Opt_WarnWarningsDeprecations,
+  flagSpec "wrong-do-bind"               Opt_WarnWrongDoBind,
+  flagSpec "missing-pat-syn-sigs"        Opt_WarnMissingPatSynSigs]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
 negatableFlags :: [FlagSpec GeneralFlag]
@@ -3405,7 +3417,7 @@ enableUnusedBinds = mapM_ setWarningFlag unusedBindsFlags
 disableUnusedBinds :: DynP ()
 disableUnusedBinds = mapM_ unSetWarningFlag unusedBindsFlags
 
--- Things you get with -fwarn-unused-binds
+-- Things you get with -Wunused-binds
 unusedBindsFlags :: [WarningFlag]
 unusedBindsFlags = [ Opt_WarnUnusedTopBinds
                    , Opt_WarnUnusedLocalBinds

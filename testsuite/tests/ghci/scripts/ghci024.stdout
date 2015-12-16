@@ -9,7 +9,7 @@ other dynamic, non-language, flag settings:
   -fforce-recomp
   -fimplicit-import-qualified
 warning settings:
-  -fno-warn-tabs
+  -Wno-tabs
 ~~~~~~~~~~ Testing :set -a
 options currently set: none.
 base language is: Haskell2010
@@ -18,7 +18,7 @@ GHCi-specific dynamic flag settings:
   -fno-print-explicit-foralls
 other dynamic, non-language, flag settings:
 warning settings:
-  -fno-warn-implicit-prelude
+  -Wno-implicit-prelude
 ~~~~~~~~~~ Testing :show languages
 base language is: Haskell2010
 with the following modifiers:

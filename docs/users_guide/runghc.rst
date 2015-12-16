@@ -28,7 +28,7 @@ directories in the system search path.
 runghc will try to work out where the boundaries between
 ``[runghc flags]`` and ``[GHC flags]``, and ``[program args]`` and
 ``module`` are, but you can use a ``--`` flag if it doesn't get it
-right. For example, ``runghc -- -fwarn-unused-bindings Foo`` means
+right. For example, ``runghc -- -Wunused-bindings Foo`` means
 runghc won't try to use ``warn-unused-bindings`` as the path to GHC, but
 instead will pass the flag to GHC. If a GHC flag doesn't start with a
 dash then you need to prefix it with ``--ghc-arg=`` or runghc will think
