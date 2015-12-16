@@ -973,6 +973,8 @@ versionedAppDir :: DynFlags -> IO FilePath
 versionedAppDir dflags = do
   appdir <- getAppUserDataDirectory (programName dflags)
   return $ appdir </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':projectVersion dflags)
+  -- NB: This functionality is reimplemented in Cabal, so if you
+  -- change it, be sure to update Cabal.
 
 -- | The target code type of the compilation (if any).
 --
