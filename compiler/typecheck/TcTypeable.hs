@@ -194,9 +194,7 @@ mkTyConRepBinds (dflags, mod_expr, pkg_str, mod_str, tr_datacon, trn_datacon) ty
     hashThis :: String
     hashThis = unwords [pkg_str, mod_str, tycon_str]
 
-    Fingerprint high low
-       | gopt Opt_SuppressUniques dflags = Fingerprint 0 0
-       | otherwise                       = fingerprintString hashThis
+    Fingerprint high low = fingerprintString hashThis
 
     word64 :: Word64 -> HsLit
     word64 | wORD_SIZE dflags == 4 = \n -> HsWord64Prim (show n) (toInteger n)
