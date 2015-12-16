@@ -42,3 +42,6 @@ test('poly-export3', normal, compile, [''])
 test('multi-export', normal, compile, [''])
 test('export-super-class', normal, compile, [''])
 test('export-record-selector', normal, compile, [''])
+test('T10897', expect_broken(10897), multi_compile, ['T10897', [
+                                       ('T10897a.hs','-c')
+                                      ,('T10897b.hs', '-c')], ''])
