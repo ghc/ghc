@@ -616,36 +616,7 @@ unboxedUnitDataCon = tupleDataCon   Unboxed 0
 *                                                                      *
 ********************************************************************* -}
 
-{- Note [Equality types and classes]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We have the following gallery of equality types and classes
-
-* (a ~ b) :: Constraint     is defined in base:Data.Type.Equality,
-  It is an ordinary type class; it is kind-homogenous, lifted,
-  and has (a ~~ b) as a superclass
-
-* (a ~~ b) :: Constraint    is defined in ghc-prim:GHC.Types
-  It is a wired-in class (heqTyCon, heqClass).
-  It is kind-inhomogeous, lifted,
-  and has (a ~# b) as a superclass
-
-* (a ~# b) :: Constraint    is a primitive equality constraint
-                            for Nominal equality
-  Is is primitive (eqPrimTyCon), and kind-inhomogeneous
-
-* (a :~: b) :: *            is defined in base:Data.Type.Equality
-  It is an ordinary GADT, which provides evidence for type equality
-
-* (Coercible a b) :: Constraint    is defined in ghc-prim:GHC.Types
-  It is a wired-in class (coercibleTyCon, coercibleClass).
-  It is kind-homogeous, lifted,
-  and has (a ~R# b) as a superclass
-
-* (a ~R# b) :: Constraint   is a primitive equality constraint
-                            for Representational equality
-  Is is primitive (eqReprPrimTyCon), and kind-inhomogeneous
--}
-
+-- See Note [The equality types story] in TysPrim
 heqTyCon, coercibleTyCon :: TyCon
 heqClass, coercibleClass :: Class
 heqDataCon, coercibleDataCon :: DataCon

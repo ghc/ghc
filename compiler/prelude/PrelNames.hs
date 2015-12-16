@@ -1372,7 +1372,7 @@ fingerprintDataConName :: Name
 fingerprintDataConName =
     dcQual gHC_FINGERPRINT_TYPE (fsLit "Fingerprint") fingerprintDataConKey
 
--- homogeneous equality
+-- homogeneous equality. See Note [The equality types story] in TysPrim
 eqTyConName :: Name
 eqTyConName        = tcQual dATA_TYPE_EQUALITY (fsLit "~")         eqTyConKey
 

@@ -54,17 +54,16 @@ import Data.Type.Bool
 -- | Lifted, homogeneous equality. By lifted, we mean that it can be
 -- bogus (deferred type error). By homogeneous, the two types @a@
 -- and @b@ must have the same kind.
-class a ~~ b
-   => (a :: k) ~ (b :: k) | a -> b, b -> a
-  -- See Note [Equality types and clases in TysWiredIn]
+class a ~~ b => (a :: k) ~ (b :: k) | a -> b, b -> a
+  -- See Note [The equality types story] in TysPrim
   -- NB: All this class does is to wrap its superclass, which is
   --     the "real", inhomogeneous equality; this is needed when
   --     we have a Given (a~b), and we want to prove things from it
-  -- NB: Not exported, as (~) is magical syntax.
-  --     That's also why there's no fixity.
+  -- NB: Not exported, as (~) is magical syntax. That's also why there's
+  -- no fixity.
 
 instance {-# INCOHERENT #-} a ~~ b => a ~ b
-  -- See Note [Equality types and clases in TysWiredIn]
+  -- See Note [The equality types story] in TysPrim
   -- If we have a Wanted (t1 ~ t2), we want to immediately
   -- simplify it to (t1 ~~ t2) and solve that instead
   --
@@ -79,7 +78,7 @@ infix 4 :~:
 -- in the body of the pattern-match, the compiler knows that @a ~ b@.
 --
 -- @since 4.7.0.0
-data a :~: b where  -- See Note [Equality types and clases in TysWiredIn]
+data a :~: b where  -- See Note [The equality types story] in TysPrim
   Refl :: a :~: a
 
 -- with credit to Conal Elliott for 'ty', Erik Hesselink & Martijn van

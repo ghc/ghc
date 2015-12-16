@@ -2091,6 +2091,8 @@ So a Given has EvVar inside it rather that (as previously) an EvTerm.
 -}
 
 -- | A place for type-checking evidence to go after it is generated.
+-- Wanted equalities are always HoleDest; other wanteds are always
+-- EvVarDest.
 data TcEvDest
   = EvVarDest EvVar         -- ^ bind this var to the evidence
   | HoleDest  CoercionHole  -- ^ fill in this hole with the evidence

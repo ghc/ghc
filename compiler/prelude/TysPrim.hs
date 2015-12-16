@@ -443,16 +443,144 @@ doublePrimTyCon = pcPrimTyCon0 doublePrimTyConName DoubleRep
 *                                                                      *
 ************************************************************************
 
-Note [The ~# TyCon]
-~~~~~~~~~~~~~~~~~~~~
-There is a perfectly ordinary type constructor ~# that represents the type
-of coercions (which, remember, are values).  For example
-   Refl Int :: ~# * * Int Int
+Note [The equality types story]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC sports a veritable menagerie of equality types:
 
-It is a kind-polymorphic type constructor like Any:
-   Refl Maybe :: ~# (* -> *) (* -> *) Maybe Maybe
+              Hetero?   Levity      Result       Role      Defining module
+              ------------------------------------------------------------
+  ~#          hetero    unlifted    #            nominal   GHC.Prim
+  ~~          hetero    lifted      Constraint   nominal   GHC.Types
+  ~           homo      lifted      Constraint   nominal   Data.Type.Equality
+  :~:         homo      lifted      *            nominal   Data.Type.Equality
 
-(~) only appears saturated. So we check that in CoreLint.
+  ~R#         hetero    unlifted    #            repr.     GHC.Prim
+  Coercible   homo      lifted      Constraint   repr.     GHC.Types
+  Coercion    homo      lifted      *            repr.     Data.Type.Coercion
+
+  ~P#         hetero    unlifted                 phantom   GHC.Prim
+
+Recall that "hetero" means the equality can related types of different
+kinds. Knowing that (t1 ~# t2) or (t1 ~R# t2) or even that (t1 ~P# t2)
+also means that (k1 ~# k2), where (t1 :: k1) and (t2 :: k2).
+
+To produce less confusion for end users, when not dumping and without
+-fprint-equality-relations, each of these groups is printed as the bottommost
+listed equality. That is, (~#) and (~~) are both rendered as (~) in
+error messages, and (~R#) is rendered as Coercible.
+
+Let's take these one at a time:
+
+(~#) :: forall k1 k2. k1 -> k2 -> #
+This is The Type Of Equality in GHC. It classifies nominal coercions.
+This type is used in the solver for recording equality constraints.
+It responds "yes" to Type.isEqPred and classifies as an EqPred in
+Type.classifyPredType.
+
+All wanted constraints of this type are built with coercion holes.
+(See Note [Coercion holes] in TyCoRep.) But see also
+Note [Deferred errors for coercion holes] in TcErrors to see how
+equality constraints are deferred.
+
+Within GHC, ~# is called eqPrimTyCon, and it is defined in TysPrim.
+
+
+(~~) :: forall k1 k2. k1 -> k2 -> Constraint
+This is (almost) an ordinary class, defined as if by
+  class a ~# b => a ~~ b
+  instance a ~# b => a ~~ b
+Here's what's unusual about it:
+ * We can't actually declare it that way because we don't have syntax for ~#.
+   And ~# isn't a constraint, so even if we could write it, it wouldn't kind
+   check.
+
+ * Users cannot write instances of it.
+
+ * It is "naturally coherent". This means that the solver won't hesitate to
+   solve a goal of type (a ~~ b) even if there is, say (Int ~~ c) in the
+   context. (Normally, it waits to learn more, just in case the given
+   influences what happens next.) This is quite like having
+   IncoherentInstances enabled.
+
+ * It always terminates. That is, in the UndecidableInstances checks, we
+   don't worry if a (~~) constraint is too big, as we know that solving
+   equality terminates.
+
+On the other hand, this behaves just like any class w.r.t. eager superclass
+unpacking in the solver. So a lifted equality given quickly becomes an unlifted
+equality given. This is good, because the solver knows all about unlifted
+equalities. There is some special-casing in TcInteract.matchClassInst to
+pretend that there is an instance of this class, as we can't write the instance
+in Haskell.
+
+Within GHC, ~~ is called heqTyCon, and it is defined in TysWiredIn.
+
+
+(~) :: forall k. k -> k -> Constraint
+This is defined in Data.Type.Equality:
+  class a ~~ b => (a :: k) ~ (b :: k)
+  instance a ~~ b => a ~ b
+This is even more so an ordinary class than (~~), with the following exceptions:
+ * Users cannot write instances of it.
+
+ * It is "naturally coherent". (See (~~).)
+
+ * (~) is magical syntax, as ~ is a reserved symbol. It cannot be exported
+   or imported.
+
+ * It always terminates.
+
+Within GHC, ~ is called eqTyCon, and it is defined in PrelNames. Note that
+it is *not* wired in.
+
+
+(:~:) :: forall k. k -> k -> *
+This is a perfectly ordinary GADT, wrapping (~). It is not defined within
+GHC at all.
+
+
+(~R#) :: forall k1 k2. k1 -> k2 -> #
+The is the representational analogue of ~#. This is the type of representational
+equalities that the solver works on. All wanted constraints of this type are
+built with coercion holes.
+
+Within GHC, ~R# is called eqReprPrimTyCon, and it is defined in TysPrim.
+
+
+Coercible :: forall k. k -> k -> Constraint
+This is quite like (~~) in the way it's defined and treated within GHC, but
+it's homogeneous. Homogeneity helps with type inference (as GHC can solve one
+kind from the other) and, in my (Richard's) estimation, will be more intuitive
+for users.
+
+An alternative design included HCoercible (like (~~)) and Coercible (like (~)).
+One annoyance was that we want `coerce :: Coercible a b => a -> b`, and
+we need the type of coerce to be fully wired-in. So the HCoercible/Coercible
+split required that both types be fully wired-in. Instead of doing this,
+I just got rid of HCoercible, as I'm not sure who would use it, anyway.
+
+Within GHC, Coercible is called coercibleTyCon, and it is defined in
+TysWiredIn.
+
+
+Coercion :: forall k. k -> k -> *
+This is a perfectly ordinary GADT, wrapping Coercible. It is not defined
+within GHC at all.
+
+
+(~P#) :: forall k1 k2. k1 -> k2 -> #
+This is the phantom analogue of ~# and it is barely used at all.
+(The solver has no idea about this one.) Here is the motivation:
+
+    data Phant a = MkPhant
+    type role Phant phantom
+
+    Phant <Int, Bool>_P :: Phant Int ~P# Phant Bool
+
+We just need to have something to put on that last line. You probably
+don't need to worry about it.
+
+
 
 Note [The State# TyCon]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -513,12 +641,12 @@ proxyPrimTyCon = mkPrimTyCon proxyPrimTyConName kind [Nominal,Nominal] VoidRep
 {- *********************************************************************
 *                                                                      *
                 Primitive equality constraints
-    See Note [Equality types and classes] in TysWiredIn
+    See Note [The equality types story]
 *                                                                      *
 ********************************************************************* -}
 
 eqPrimTyCon :: TyCon  -- The representation type for equality predicates
-                      -- See Note [The ~# TyCon]
+                      -- See Note [The equality types story]
 eqPrimTyCon  = mkPrimTyCon eqPrimTyConName kind roles VoidRep
   where kind = ForAllTy (Named kv1 Invisible) $
                ForAllTy (Named kv2 Invisible) $
@@ -531,7 +659,7 @@ eqPrimTyCon  = mkPrimTyCon eqPrimTyConName kind roles VoidRep
 -- like eqPrimTyCon, but the type for *Representational* coercions
 -- this should only ever appear as the type of a covar. Its role is
 -- interpreted in coercionRole
-eqReprPrimTyCon :: TyCon
+eqReprPrimTyCon :: TyCon   -- See Note [The equality types story]
 eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName kind
                               roles VoidRep
   where kind = ForAllTy (Named kv1 Invisible) $

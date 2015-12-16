@@ -617,7 +617,8 @@ buildImplication skol_info skol_tvs given thing_inside
       -- But with the solver producing unlifted equalities, we need
       -- to have an EvBindsVar for them when they might be deferred to
       -- runtime. Otherwise, they end up as top-level unlifted bindings,
-      -- which are verboten.
+      -- which are verboten. See also Note [Deferred errors for coercion holes]
+      -- in TcErrors.
          else
     do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints thing_inside
        ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info skol_tvs given wanted

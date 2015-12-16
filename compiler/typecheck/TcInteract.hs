@@ -2098,12 +2098,14 @@ solveCallStack ev ev_cs = do
 *                                                                     *
 ***********************************************************************-}
 
+-- See also Note [The equality types story] in TysPrim
 matchLiftedEquality :: [Type] -> TcS LookupInstResult
 matchLiftedEquality args
   = return (GenInst { lir_new_theta = [ mkTyConApp eqPrimTyCon args ]
                     , lir_mk_ev     = EvDFunApp (dataConWrapId heqDataCon) args
                     , lir_safe_over = True })
 
+-- See also Note [The equality types story] in TysPrim
 matchLiftedCoercible :: [Type] -> TcS LookupInstResult
 matchLiftedCoercible args@[k, t1, t2]
   = return (GenInst { lir_new_theta = [ mkTyConApp eqReprPrimTyCon args' ]
