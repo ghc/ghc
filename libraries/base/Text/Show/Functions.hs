@@ -1,6 +1,6 @@
 {-# LANGUAGE Safe #-}
 -- This module deliberately declares orphan instances:
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 -----------------------------------------------------------------------------
 -- |

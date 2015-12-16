@@ -5,8 +5,8 @@
            , NondecreasingIndentation
            , RankNTypes
   #-}
-{-# OPTIONS_GHC -fno-warn-unused-matches #-}
-{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------

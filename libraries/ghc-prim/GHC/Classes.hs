@@ -7,11 +7,11 @@
 {-# LANGUAGE UndecidableSuperClasses #-}
   -- Because of the type-variable superclasses for tuples
 
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
--- -fno-warn-unused-imports needed for the GHC.Tuple import below. Sigh.
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+-- -Wno-unused-imports needed for the GHC.Tuple import below. Sigh.
 
-{-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
--- -fno-warn-unused-top-binds is there (I hope) to stop Haddock complaining
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
+-- -Wno-unused-top-binds is there (I hope) to stop Haddock complaining
 -- about the constraint tuples being defined but not used
 
 {-# OPTIONS_HADDOCK hide #-}

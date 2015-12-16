@@ -3,7 +3,7 @@
            , NoImplicitPrelude
            , BangPatterns
   #-}
-{-# OPTIONS_GHC -fno-warn-identities #-}
+{-# OPTIONS_GHC -Wno-identities #-}
 -- Whether there are identities depends on the platform
 {-# OPTIONS_HADDOCK hide #-}
 

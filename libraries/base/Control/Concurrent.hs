@@ -5,7 +5,7 @@
            , ScopedTypeVariables
            , RankNTypes
   #-}
-{-# OPTIONS_GHC -fno-warn-deprecations #-}
+{-# OPTIONS_GHC -Wno-deprecations #-}
 -- kludge for the Control.Concurrent.QSem, Control.Concurrent.QSemN
 -- and Control.Concurrent.SampleVar imports.
 

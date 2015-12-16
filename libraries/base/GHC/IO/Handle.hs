@@ -4,7 +4,7 @@
            , RecordWildCards
            , NondecreasingIndentation
   #-}
-{-# OPTIONS_GHC -fno-warn-unused-matches #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
 
 -----------------------------------------------------------------------------
 -- |

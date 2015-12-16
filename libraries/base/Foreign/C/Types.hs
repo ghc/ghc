@@ -1,8 +1,8 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, GeneralizedNewtypeDeriving,
              StandaloneDeriving #-}
-{-# OPTIONS_GHC -fno-warn-unused-binds #-}
--- XXX -fno-warn-unused-binds stops us warning about unused constructors,
+{-# OPTIONS_GHC -Wno-unused-binds #-}
+-- XXX -Wno-unused-binds stops us warning about unused constructors,
 -- but really we should just remove them if we don't want them
 
 -----------------------------------------------------------------------------
