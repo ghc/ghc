@@ -396,7 +396,7 @@ ungroup group_ =
   mkDecls (typesigs . hs_valds)  SigD   group_ ++
   mkDecls (valbinds . hs_valds)  ValD   group_
   where
-    typesigs (ValBindsOut _ sigs) = filter isVanillaLSig sigs
+    typesigs (ValBindsOut _ sigs) = filter isUserLSig sigs
     typesigs _ = error "expected ValBindsOut"
 
     valbinds (ValBindsOut binds _) = concatMap bagToList . snd . unzip $ binds
@@ -428,7 +428,7 @@ filterDecls = filter (isHandled . unL . fst)
     isHandled (ForD (ForeignImport {})) = True
     isHandled (TyClD {}) = True
     isHandled (InstD {}) = True
-    isHandled (SigD d) = isVanillaLSig (reL d)
+    isHandled (SigD d) = isUserLSig (reL d)
     isHandled (ValD _) = True
     -- we keep doc declarations to be able to get at named docs
     isHandled (DocD _) = True
@@ -441,7 +441,7 @@ filterClasses decls = [ if isClassD d then (L loc (filterClass d), doc) else x
                       | x@(L loc d, doc) <- decls ]
   where
     filterClass (TyClD c) =
-      TyClD $ c { tcdSigs = filter (liftA2 (||) isVanillaLSig isMinimalLSig) $ tcdSigs c }
+      TyClD $ c { tcdSigs = filter (liftA2 (||) isUserLSig isMinimalLSig) $ tcdSigs c }
     filterClass _ = error "expected TyClD"
 
 
