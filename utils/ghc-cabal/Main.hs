@@ -167,7 +167,7 @@ doCopy directory distDir
                                                  (installDirTemplates lbi)
                 progs = withPrograms lbi
                 stripProgram' = stripProgram {
-                    programFindLocation = \_ _ -> return (Just strip) }
+                    programFindLocation = \_ _ -> return (Just (strip,[])) }
 
             progs' <- configureProgram verbosity stripProgram' progs
             let lbi' = lbi {
@@ -216,12 +216,12 @@ doRegister directory distDir ghc ghcpkg topdir
                 ghcpkgconf = topdir </> "package.conf.d"
                 ghcProgram' = ghcProgram {
                     programPostConf = \_ cp -> return cp { programDefaultArgs = ["-B" ++ topdir] },
-                    programFindLocation = \_ _ -> return (Just ghc) }
+                    programFindLocation = \_ _ -> return (Just (ghc,[])) }
                 ghcPkgProgram' = ghcPkgProgram {
                     programPostConf = \_ cp -> return cp { programDefaultArgs =
                                                                 ["--global-package-db", ghcpkgconf]
                                                                 ++ ["--force" | not (null myDestDir) ] },
-                    programFindLocation = \_ _ -> return (Just ghcpkg) }
+                    programFindLocation = \_ _ -> return (Just (ghcpkg,[])) }
                 configurePrograms ps conf = foldM (flip (configureProgram verbosity)) conf ps
 
             progs' <- configurePrograms [ghcProgram', ghcPkgProgram'] progs
