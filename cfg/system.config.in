@@ -45,12 +45,12 @@ ar-supports-at-file = @ArSupportsAtFile@
 # Build options:
 #===============
 
-supports-package-key = @SUPPORTS_PACKAGE_KEY@
-solaris-broken-shld  = @SOLARIS_BROKEN_SHLD@
-split-objects-broken = @SplitObjsBroken@
-ghc-unregisterised   = @Unregisterised@
-ghc-source-path      = @hardtop@
-leading-underscore   = @LeadingUnderscore@
+supports-component-id = @SUPPORTS_COMPONENT_ID@
+solaris-broken-shld   = @SOLARIS_BROKEN_SHLD@
+split-objects-broken  = @SplitObjsBroken@
+ghc-unregisterised    = @Unregisterised@
+ghc-source-path       = @hardtop@
+leading-underscore    = @LeadingUnderscore@
 
 # Information about build, host and target systems:
 #==================================================
