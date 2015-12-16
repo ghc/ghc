@@ -111,3 +111,4 @@ fixAbsolutePathOnWindows path = do
 -- Instances for storing in the Shake database
 instance Binary Builder
 instance Hashable Builder
+instance NFData Builder

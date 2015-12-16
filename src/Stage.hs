@@ -13,3 +13,4 @@ instance Show Stage where
 -- Instances for storing in the Shake database
 instance Binary Stage
 instance Hashable Stage
+instance NFData Stage

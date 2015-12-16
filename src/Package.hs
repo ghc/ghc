@@ -49,3 +49,4 @@ instance Ord Package where
 instance Binary Package
 instance Hashable Package where
     hashWithSalt salt = hashWithSalt salt . show
+instance NFData Package
