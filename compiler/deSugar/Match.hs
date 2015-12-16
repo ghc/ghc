@@ -196,15 +196,15 @@ match vars@(v:_) ty eqns    -- Eqns *can* be empty
     match_group [] = panic "match_group"
     match_group eqns@((group,_) : _)
         = case group of
-            PgCon _    -> matchConFamily  vars ty (subGroup [(c,e) | (PgCon c, e) <- eqns])
-            PgSyn _    -> matchPatSyn     vars ty (dropGroup eqns)
-            PgLit _    -> matchLiterals   vars ty (subGroup [(l,e) | (PgLit l, e) <- eqns])
-            PgAny      -> matchVariables  vars ty (dropGroup eqns)
-            PgN _      -> matchNPats      vars ty (dropGroup eqns)
-            PgNpK _    -> matchNPlusKPats vars ty (dropGroup eqns)
-            PgBang     -> matchBangs      vars ty (dropGroup eqns)
-            PgCo _     -> matchCoercion   vars ty (dropGroup eqns)
-            PgView _ _ -> matchView       vars ty (dropGroup eqns)
+            PgCon {}  -> matchConFamily  vars ty (subGroup [(c,e) | (PgCon c, e) <- eqns])
+            PgSyn {}  -> matchPatSyn     vars ty (dropGroup eqns)
+            PgLit {}  -> matchLiterals   vars ty (subGroup [(l,e) | (PgLit l, e) <- eqns])
+            PgAny     -> matchVariables  vars ty (dropGroup eqns)
+            PgN {}    -> matchNPats      vars ty (dropGroup eqns)
+            PgNpK {}  -> matchNPlusKPats vars ty (dropGroup eqns)
+            PgBang    -> matchBangs      vars ty (dropGroup eqns)
+            PgCo {}   -> matchCoercion   vars ty (dropGroup eqns)
+            PgView {} -> matchView       vars ty (dropGroup eqns)
             PgOverloadedList -> matchOverloadedList vars ty (dropGroup eqns)
 
     -- FIXME: we should also warn about view patterns that should be
@@ -789,7 +789,7 @@ data PatGroup
   = PgAny               -- Immediate match: variables, wildcards,
                         --                  lazy patterns
   | PgCon DataCon       -- Constructor patterns (incl list, tuple)
-  | PgSyn PatSyn
+  | PgSyn PatSyn [Type] -- See Note [Pattern synonym groups]
   | PgLit Literal       -- Literal patterns
   | PgN   Literal       -- Overloaded literals
   | PgNpK Literal       -- n+k patterns
@@ -828,7 +828,28 @@ subGroup group
     -- pg_map :: Map a [EquationInfo]
     -- Equations seen so far in reverse order of appearance
 
-{-
+{- Note [Pattern synonym groups]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we see
+  f (P a) = e1
+  f (P b) = e2
+    ...
+where P is a pattern synonym, can we put (P a -> e1) and (P b -> e2) in the
+same group?  We can if P is a constructor, but /not/ if P is a pattern synonym.
+Consider (Trac #11224)
+   -- readMaybe :: Read a => String -> Maybe a
+   pattern PRead :: Read a => () => a -> String
+   pattern PRead a <- (readMaybe -> Just a)
+
+   f (PRead (x::Int))  = e1
+   f (PRead (y::Bool)) = e2
+This is all fine: we match the string by trying to read an Int; if that
+fails we try to read a Bool. But clearly we can't combine the two into a single
+match.
+
+Conclusion: we can combine when we invoke PRead /at the same type/.  Hence
+in PgSyn we record the instantiaing types, and use them in sameGroup.
+
 Note [Take care with pattern order]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the subGroup function we must be very careful about pattern re-ordering,
@@ -841,14 +862,15 @@ sameGroup :: PatGroup -> PatGroup -> Bool
 -- Same group means that a single case expression
 -- or test will suffice to match both, *and* the order
 -- of testing within the group is insignificant.
-sameGroup PgAny      PgAny      = True
-sameGroup PgBang     PgBang     = True
-sameGroup (PgCon _)  (PgCon _)  = True          -- One case expression
-sameGroup (PgSyn p1) (PgSyn p2) = p1==p2
-sameGroup (PgLit _)  (PgLit _)  = True          -- One case expression
-sameGroup (PgN l1)   (PgN l2)   = l1==l2        -- Order is significant
-sameGroup (PgNpK l1) (PgNpK l2) = l1==l2        -- See Note [Grouping overloaded literal patterns]
-sameGroup (PgCo t1)  (PgCo t2)  = t1 `eqType` t2
+sameGroup PgAny         PgAny         = True
+sameGroup PgBang        PgBang        = True
+sameGroup (PgCon _)     (PgCon _)     = True    -- One case expression
+sameGroup (PgSyn p1 t1) (PgSyn p2 t2) = p1==p2 && eqTypes t1 t2
+                                                -- eqTypes: See Note [Pattern synonym groups]
+sameGroup (PgLit _)     (PgLit _)     = True    -- One case expression
+sameGroup (PgN l1)      (PgN l2)      = l1==l2  -- Order is significant
+sameGroup (PgNpK l1)    (PgNpK l2)    = l1==l2  -- See Note [Grouping overloaded literal patterns]
+sameGroup (PgCo t1)     (PgCo t2)     = t1 `eqType` t2
         -- CoPats are in the same goup only if the type of the
         -- enclosed pattern is the same. The patterns outside the CoPat
         -- always have the same type, so this boils down to saying that
@@ -956,19 +978,19 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     eq_list eq (x:xs) (y:ys) = eq x y && eq_list eq xs ys
 
 patGroup :: DynFlags -> Pat Id -> PatGroup
-patGroup _      (WildPat {})                  = PgAny
-patGroup _      (BangPat {})                  = PgBang
-patGroup _      (ConPatOut { pat_con = con }) = case unLoc con of
-    RealDataCon dcon -> PgCon dcon
-    PatSynCon psyn -> PgSyn psyn
-patGroup dflags (LitPat lit)                  = PgLit (hsLitKey dflags lit)
-patGroup _      (NPat (L _ olit) mb_neg _)
-                                     = PgN   (hsOverLitKey olit (isJust mb_neg))
-patGroup _      (NPlusKPat _ (L _ olit) _ _)  = PgNpK (hsOverLitKey olit False)
-patGroup _      (CoPat _ p _)                 = PgCo  (hsPatType p) -- Type of innelexp pattern
-patGroup _      (ViewPat expr p _)            = PgView expr (hsPatType (unLoc p))
-patGroup _      (ListPat _ _ (Just _))        = PgOverloadedList
-patGroup _      pat                           = pprPanic "patGroup" (ppr pat)
+patGroup _ (ConPatOut { pat_con = L _ con
+                      , pat_arg_tys = tys })
+ | RealDataCon dcon <- con              = PgCon dcon
+ | PatSynCon psyn <- con                = PgSyn psyn tys
+patGroup _ (WildPat {})                 = PgAny
+patGroup _ (BangPat {})                 = PgBang
+patGroup _ (NPat (L _ olit) mb_neg _)   = PgN   (hsOverLitKey olit (isJust mb_neg))
+patGroup _ (NPlusKPat _ (L _ olit) _ _) = PgNpK (hsOverLitKey olit False)
+patGroup _ (CoPat _ p _)                = PgCo  (hsPatType p) -- Type of innelexp pattern
+patGroup _ (ViewPat expr p _)           = PgView expr (hsPatType (unLoc p))
+patGroup _ (ListPat _ _ (Just _))       = PgOverloadedList
+patGroup dflags (LitPat lit)            = PgLit (hsLitKey dflags lit)
+patGroup _ pat                          = pprPanic "patGroup" (ppr pat)
 
 {-
 Note [Grouping overloaded literal patterns]

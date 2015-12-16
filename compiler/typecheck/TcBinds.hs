@@ -60,9 +60,7 @@ import FastString
 import Type(mkStrLitTy, tidyOpenType)
 import PrelNames( mkUnboundName, gHC_PRIM )
 import TcValidity (checkValidType)
-
 import Control.Monad
-import Data.List (partition)
 
 #include "HsVersions.h"
 
@@ -1706,23 +1704,12 @@ tcTySig (L loc (PatSynSig (L _ name) sig_ty))
        ; prov' <- zonkTcTypes prov'
        ; ty'   <- zonkTcType  ty'
 
-       ; let (_, pat_ty) = tcSplitFunTys ty'
-             univ_set = tyCoVarsOfType pat_ty
-             (univ_tvs, ex_tvs) = partition (`elemVarSet` univ_set) qtvs'
-             bad_tvs = varSetElems (tyCoVarsOfTypes req' `minusVarSet` univ_set)
-
-       ; unless (null bad_tvs) $ addErr $
-         hang (ptext (sLit "The 'required' context") <+> quotes (pprTheta req'))
-            2 (ptext (sLit "mentions existential type variable") <> plural bad_tvs
-               <+> pprQuotedList bad_tvs)
-
-       ; traceTc "tcTySig }" $ ppr (ex_tvs, prov') $$ ppr (univ_tvs, req') $$ ppr ty'
-       ; let tpsi = TPSI{ patsig_name = name,
-                          patsig_tau  = ty',
-                          patsig_ex   = ex_tvs,
-                          patsig_univ = univ_tvs,
-                          patsig_prov = prov',
-                          patsig_req  = req' }
+       ; traceTc "tcTySig }" $ vcat [ ppr qtvs', ppr req', ppr prov', ppr ty' ]
+       ; let tpsi = TPSI { patsig_name = name
+                         ,  patsig_tvs  = qtvs'
+                         , patsig_req  = req'
+                         , patsig_prov = prov'
+                         , patsig_tau  = ty' }
        ; return [TcPatSynSig tpsi] }
 
 tcTySig _ = return []

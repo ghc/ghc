@@ -1177,11 +1177,10 @@ data TcIdSigBndr   -- See Note [Complete and partial type signatures]
 data TcPatSynInfo
   = TPSI {
         patsig_name  :: Name,
-        patsig_tau   :: TcSigmaType,
-        patsig_ex    :: [TcTyVar],
+        patsig_tvs   :: [TcTyVar],
+        patsig_req   :: TcThetaType,
         patsig_prov  :: TcThetaType,
-        patsig_univ  :: [TcTyVar],
-        patsig_req   :: TcThetaType
+        patsig_tau   :: TcSigmaType
     }
 
 findScopedTyVars  -- See Note [Binding scoped type variables]

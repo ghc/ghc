@@ -1987,7 +1987,7 @@ Here
 
  * The type signature pattern (f :: a->Int) binds "a" -> a_sig in the envt
 
- * Then unificaiton makes a_sig := a_sk
+ * Then unification makes a_sig := a_sk
 
 That's why we must make a_sig a MetaTv (albeit a SigTv),
 not a SkolemTv, so that it can unify to a_sk.

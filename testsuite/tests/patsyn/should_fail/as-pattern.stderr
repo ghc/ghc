@@ -1,4 +1,5 @@
 
-as-pattern.hs:4:18:
-    Pattern synonym definition cannot contain as-patterns (@):
-      x@(Just y)
+as-pattern.hs:4:18: error:
+    • Pattern synonym definition cannot contain as-patterns (@):
+        x@(Just y)
+    • In the declaration for pattern synonym ‘P’
