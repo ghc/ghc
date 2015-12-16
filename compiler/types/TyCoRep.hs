@@ -114,7 +114,7 @@ module TyCoRep (
 import {-# SOURCE #-} DataCon( dataConTyCon, dataConFullSig
                               , DataCon, eqSpecTyVar )
 import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy
-                          , partitionInvisibles )
+                          , partitionInvisibles, coreView )
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
 import {-# SOURCE #-} Coercion
@@ -412,13 +412,13 @@ Some basic functions, put here to break loops eg with the pretty printer
 -}
 
 isLiftedTypeKind :: Kind -> Bool
-isLiftedTypeKind (TyConApp tc []) = isLiftedTypeKindTyConName (tyConName tc)
+isLiftedTypeKind ki | Just ki' <- coreView ki = isLiftedTypeKind ki'
 isLiftedTypeKind (TyConApp tc [TyConApp lev []])
   = tc `hasKey` tYPETyConKey && lev `hasKey` liftedDataConKey
 isLiftedTypeKind _                = False
 
 isUnliftedTypeKind :: Kind -> Bool
-isUnliftedTypeKind (TyConApp tc []) = tc `hasKey` unliftedTypeKindTyConKey
+isUnliftedTypeKind ki | Just ki' <- coreView ki = isUnliftedTypeKind ki'
 isUnliftedTypeKind (TyConApp tc [TyConApp lev []])
   = tc `hasKey` tYPETyConKey && lev `hasKey` unliftedDataConKey
 isUnliftedTypeKind _ = False
