@@ -127,7 +127,7 @@ decls (group, _, _, _) = concatMap ($ group)
         _ -> empty
     con term = case cast term of
         (Just cdcl) ->
-            map decl (GHC.con_names cdcl) ++ everything (<|>) fld cdcl
+            map decl (GHC.getConNames cdcl) ++ everything (<|>) fld cdcl
         Nothing -> empty
     ins term = case cast term of
         (Just (GHC.DataFamInstD inst)) -> pure . tyref $ GHC.dfid_tycon inst
