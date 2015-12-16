@@ -39,7 +39,7 @@ Library
             GHC.LanguageExtensions
 
     build-depends: base       >= 4   && < 5,
-                   binary     >= 0.7 && < 0.8,
+                   binary     == 0.8.*,
                    bytestring >= 0.9 && < 1,
                    directory  >= 1   && < 1.3,
                    filepath

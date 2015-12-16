@@ -1,6 +1,4 @@
-{-# LANGUAGE CPP #-}
--- This module deliberately defines orphan instances for now (Binary Version).
-{-# OPTIONS_GHC -fno-warn-orphans -fno-warn-name-shadowing #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.PackageDb
@@ -380,15 +378,6 @@ instance (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
               (map fromStringRep hiddenModules)
               (map (\(k,v) -> (fromStringRep k, v)) instantiatedWith)
               exposed trusted)
-
-instance Binary Version where
-  put (Version a b) = do
-    put a
-    put b
-  get = do
-    a <- get
-    b <- get
-    return (Version a b)
 
 instance (BinaryStringRep a, BinaryStringRep b) =>
          Binary (OriginalModule a b) where
