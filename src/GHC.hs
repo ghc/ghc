@@ -1,5 +1,5 @@
 module GHC (
-    array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
+    array, base, ghcBoot, binary, bytestring, cabal, compiler, containers,
     compareSizes, deepseq, deriveConstants, directory, dllSplit, filepath,
     genapply, genprimopcode, ghc, ghcCabal, ghcPkg, ghcPrim, ghcPwd, ghcTags,
     haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
@@ -20,7 +20,7 @@ import Stage
 -- which can be overridden in Settings/User.hs.
 defaultKnownPackages :: [Package]
 defaultKnownPackages =
-    [ array, base, binPackageDb, binary, bytestring, cabal, compiler
+    [ array, base, ghcBoot, binary, bytestring, cabal, compiler
     , containers, compareSizes, deepseq, deriveConstants, directory, dllSplit
     , filepath, genapply, genprimopcode, ghc, ghcCabal, ghcPkg, ghcPrim
     , ghcPwd, ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin
@@ -29,7 +29,7 @@ defaultKnownPackages =
     , win32, xhtml ]
 
 -- Package definitions (see Package.hs)
-array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
+array, base, ghcBoot, binary, bytestring, cabal, compiler, containers,
     compareSizes, deepseq, deriveConstants, directory, dllSplit, filepath,
     genapply, genprimopcode, ghc, ghcCabal, ghcPkg, ghcPrim, ghcPwd,
     ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
@@ -38,7 +38,7 @@ array, base, binPackageDb, binary, bytestring, cabal, compiler, containers,
 
 array           = library  "array"
 base            = library  "base"
-binPackageDb    = library  "bin-package-db"
+ghcBoot         = library  "ghc-boot"
 binary          = library  "binary"
 bytestring      = library  "bytestring"
 cabal           = library  "Cabal"          `setPath` "libraries/Cabal/Cabal"

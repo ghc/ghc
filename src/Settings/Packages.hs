@@ -18,7 +18,7 @@ defaultPackages = mconcat
 
 packagesStage0 :: Packages
 packagesStage0 = mconcat
-    [ append [ binPackageDb, binary, cabal, compiler, ghc, ghcCabal, ghcPkg
+    [ append [ ghcBoot, binary, cabal, compiler, ghc, ghcCabal, ghcPkg
              , hsc2hs, hoopl, hpc, templateHaskell, transformers ]
     , stage0 ? append [deriveConstants, genapply, genprimopcode, hp2ps]
     , notM windowsHost ? notM (anyHostOs ["ios"]) ? append [terminfo] ]
