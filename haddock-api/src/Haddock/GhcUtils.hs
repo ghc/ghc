@@ -95,6 +95,10 @@ filterSigNames p (TypeSig ns ty) =
   case filter (p . unLoc) ns of
     []       -> Nothing
     filtered -> Just (TypeSig filtered ty)
+filterSigNames p (ClassOpSig is_default ns ty) =
+  case filter (p . unLoc) ns of
+    []       -> Nothing
+    filtered -> Just (ClassOpSig is_default filtered ty)
 filterSigNames _ _                           = Nothing
 
 ifTrueJust :: Bool -> name -> Maybe name
@@ -105,13 +109,19 @@ sigName :: LSig name -> [name]
 sigName (L _ sig) = sigNameNoLoc sig
 
 sigNameNoLoc :: Sig name -> [name]
-sigNameNoLoc (TypeSig   ns _)          = map unLoc ns
-sigNameNoLoc (PatSynSig n _)           = [unLoc n]
-sigNameNoLoc (SpecSig   n _ _)         = [unLoc n]
-sigNameNoLoc (InlineSig n _)           = [unLoc n]
+sigNameNoLoc (TypeSig      ns _)       = map unLoc ns
+sigNameNoLoc (ClassOpSig _ ns _)       = map unLoc ns
+sigNameNoLoc (PatSynSig    n _)        = [unLoc n]
+sigNameNoLoc (SpecSig      n _ _)      = [unLoc n]
+sigNameNoLoc (InlineSig    n _)        = [unLoc n]
 sigNameNoLoc (FixSig (FixitySig ns _)) = map unLoc ns
 sigNameNoLoc _                         = []
 
+-- | Was this signature given by the user?
+isUserLSig :: LSig name -> Bool
+isUserLSig (L _(TypeSig {}))    = True
+isUserLSig (L _(ClassOpSig {})) = True
+isUserLSig _                    = False
 
 isTyClD :: HsDecl a -> Bool
 isTyClD (TyClD _) = True

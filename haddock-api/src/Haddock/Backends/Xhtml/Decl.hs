@@ -451,7 +451,7 @@ ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan
 ppShortClassDecl summary links (ClassDecl { tcdCtxt = lctxt, tcdLName = lname, tcdTyVars = tvs
                                           , tcdFDs = fds, tcdSigs = sigs, tcdATs = ats }) loc
     subdocs splice unicode qual =
-  if not (any isVanillaLSig sigs) && null ats
+  if not (any isUserLSig sigs) && null ats
     then (if summary then id else topDeclElem links loc splice [nm]) hdr
     else (if summary then id else topDeclElem links loc splice [nm]) (hdr <+> keyword "where")
       +++ shortSubDecls False
@@ -492,7 +492,7 @@ ppClassDecl summary links instances fixities loc d subdocs
     sigs = map unLoc lsigs
 
     classheader
-      | any isVanillaLSig lsigs = topDeclElem links loc splice [nm] (hdr unicode qual <+> keyword "where" <+> fixs)
+      | any isUserLSig lsigs = topDeclElem links loc splice [nm] (hdr unicode qual <+> keyword "where" <+> fixs)
       | otherwise = topDeclElem links loc splice [nm] (hdr unicode qual <+> fixs)
 
     -- Only the fixity relevant to the class header
