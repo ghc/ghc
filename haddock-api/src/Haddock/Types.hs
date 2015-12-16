@@ -301,6 +301,14 @@ instance NamedThing DocName where
   getName (Documented name _) = name
   getName (Undocumented name) = name
 
+-- | Useful for debugging
+instance Outputable DocName where
+  ppr = ppr . getName
+
+instance OutputableBndr DocName where
+  pprBndr _ = ppr . getName
+  pprPrefixOcc = pprPrefixOcc . getName
+  pprInfixOcc = pprInfixOcc . getName
 
 class NamedThing name => SetName name where
 
