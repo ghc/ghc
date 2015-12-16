@@ -819,12 +819,6 @@ isFixityLSig :: LSig name -> Bool
 isFixityLSig (L _ (FixSig {})) = True
 isFixityLSig _                 = False
 
-isVanillaLSig :: LSig name -> Bool       -- User type signatures
--- A badly-named function, but it's part of the GHCi (used
--- by Haddock) so I don't want to change it gratuitously.
-isVanillaLSig (L _(TypeSig {})) = True
-isVanillaLSig _                 = False
-
 isTypeLSig :: LSig name -> Bool  -- Type signatures
 isTypeLSig (L _(TypeSig {}))    = True
 isTypeLSig (L _(ClassOpSig {})) = True
