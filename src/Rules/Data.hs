@@ -1,7 +1,7 @@
 module Rules.Data (buildPackageData) where
 
 import Expression
-import GHC (genprimopcode, hp2ps)
+import GHC (hp2ps)
 import Oracles
 import Predicates (registerPackage)
 import Rules.Actions
