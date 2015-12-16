@@ -2,7 +2,7 @@ module Settings.User (
     userArgs, userPackages, userLibWays, userRtsWays, userTargetDirectory,
     userProgramPath, userKnownPackages, integerLibrary,
     trackBuildSystem, buildHaddock, validating, ghciWithDebugger, ghcProfiled,
-    ghcDebugged, dynamicGhcPrograms, laxDependencies
+    ghcDebugged, dynamicGhcPrograms, laxDependencies, buildSystemConfigFile
     ) where
 
 import Expression
@@ -77,3 +77,6 @@ laxDependencies = False
 
 buildHaddock :: Predicate
 buildHaddock = return True
+
+buildSystemConfigFile :: Bool
+buildSystemConfigFile = False
