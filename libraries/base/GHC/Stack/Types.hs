@@ -65,10 +65,14 @@ import GHC.Integer ()
 -- myerror msg = error (msg ++ "\n" ++ prettyCallStack ?callStack)
 -- @
 --
+-- Will produce the following when evaluated,
+--
+-- @
 -- ghci> myerror "die"
 -- *** Exception: die
 -- CallStack (from ImplicitParams):
 --   myerror, called at <interactive>:2:1 in interactive:Ghci1
+-- @
 --
 -- @CallStack@s do not interact with the RTS and do not require compilation with
 -- @-prof@. On the other hand, as they are built up explicitly using
@@ -80,7 +84,10 @@ import GHC.Integer ()
 -- ordered with the most recently called function at the head.
 --
 -- @since 4.8.1.0
-data CallStack = CallStack { getCallStack :: [([Char], SrcLoc)] }
+data CallStack = CallStack { getCallStack :: [([Char], SrcLoc)]
+                             -- ^ Get a list of stack frames with the most
+                             -- recently called function at the head.
+                           }
   -- See Note [Overview of implicit CallStacks]
 
 

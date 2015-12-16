@@ -75,7 +75,7 @@ ccModule p = (# peek CostCentre, module) p
 ccSrcSpan :: Ptr CostCentre -> IO CString
 ccSrcSpan p = (# peek CostCentre, srcloc) p
 
--- | returns a '[String]' representing the current call stack.  This
+-- | Returns a @[String]@ representing the current call stack.  This
 -- can be useful for debugging.
 --
 -- The implementation uses the call-stack simulation maintined by the
@@ -85,7 +85,6 @@ ccSrcSpan p = (# peek CostCentre, srcloc) p
 -- uninformative.
 --
 -- @since 4.5.0.0
-
 currentCallStack :: IO [String]
 currentCallStack = ccsToStrings =<< getCurrentCCS ()
 
