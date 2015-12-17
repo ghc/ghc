@@ -100,11 +100,6 @@ else
 
 # Unix: override libdir and datadir to put ghc-specific stuff in
 # a subdirectory with the version number included.
-#
-# datadir is set to libdir here as GHC needs package.conf and unlit
-# to be in the same place (and things like ghc-pkg need to agree on
-# where package.conf is, so we just set it globally).
-#
 ghclibdir     = $(libdir)/$(CrossCompilePrefix)ghc-$(ProjectVersion)
 ghcdocdir     = $(datarootdir)/doc/ghc
 endif
