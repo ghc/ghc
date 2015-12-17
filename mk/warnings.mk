@@ -47,11 +47,6 @@ SRC_HC_WARNING_OPTS_STAGE2 += -Wnoncanonical-monad-instances
 # Libraries that have dubious RULES
 libraries/bytestring_dist-install_EXTRA_HC_OPTS += -Wno-inline-rule-shadowing
 
-# Cabal doesn't promise to be warning-free
-utils/ghc-cabal_dist_EXTRA_HC_OPTS += -w
-libraries/Cabal/Cabal_dist-boot_EXTRA_HC_OPTS += -w
-libraries/Cabal/Cabal_dist-install_EXTRA_HC_OPTS += -w
-
 # Turn off import warnings for bad unused imports
 libraries/containers_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports
 libraries/bytestring_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports
