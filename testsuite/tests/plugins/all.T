@@ -63,5 +63,8 @@ test('T10294a',
      run_command,
      ['$MAKE -s --no-print-directory T10294a'])
 
-test('frontend01', [ extra_clean(['FrontendPlugin.hi', 'FrontendPlugin.o', 'frontend01', 'frontend01.o', 'frontend01.hi']) ],
+test('frontend01',
+     [extra_clean(['FrontendPlugin.hi', 'FrontendPlugin.o',
+                   'frontend01', 'frontend01.o', 'frontend01.hi']),
+      unless(have_dynamic(), expect_broken(10301))],
      run_command, ['$MAKE -s --no-print-directory frontend01'])
