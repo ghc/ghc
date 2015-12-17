@@ -87,21 +87,24 @@ optCoercion :: TCvSubst -> Coercion -> NormalCo
 --   *and* optimises it to reduce its size
 optCoercion env co
   | opt_NoOptCoercion = substCo env co
-  | debugIsOn         = let out_co = opt_co1 lc False co
-                            Pair in_ty1  in_ty2  = coercionKind co
-                            Pair out_ty1 out_ty2 = coercionKind out_co
-                        in
-                        ASSERT2( substTy env in_ty1 `eqType` out_ty1 &&
-                                 substTy env in_ty2 `eqType` out_ty2
-                               , text "optCoercion changed types!"
-                              $$ hang (text "in_co:") 2 (ppr co)
-                              $$ hang (text "in_ty1:") 2 (ppr in_ty1)
-                              $$ hang (text "in_ty2:") 2 (ppr in_ty2)
-                              $$ hang (text "out_co:") 2 (ppr out_co)
-                              $$ hang (text "out_ty1:") 2 (ppr out_ty1)
-                              $$ hang (text "out_ty2:") 2 (ppr out_ty2)
-                              $$ hang (text "subst:") 2 (ppr env) )
-                        out_co
+  | debugIsOn
+  = let out_co = opt_co1 lc False co
+        (Pair in_ty1  in_ty2,  in_role)  = coercionKindRole co
+        (Pair out_ty1 out_ty2, out_role) = coercionKindRole out_co
+    in
+    ASSERT2( substTy env in_ty1 `eqType` out_ty1 &&
+             substTy env in_ty2 `eqType` out_ty2 &&
+             in_role == out_role
+           , text "optCoercion changed types!"
+             $$ hang (text "in_co:") 2 (ppr co)
+             $$ hang (text "in_ty1:") 2 (ppr in_ty1)
+             $$ hang (text "in_ty2:") 2 (ppr in_ty2)
+             $$ hang (text "out_co:") 2 (ppr out_co)
+             $$ hang (text "out_ty1:") 2 (ppr out_ty1)
+             $$ hang (text "out_ty2:") 2 (ppr out_ty2)
+             $$ hang (text "subst:") 2 (ppr env) )
+    out_co
+
   | otherwise         = opt_co1 lc False co
   where
     lc = mkSubstLiftingContext env
@@ -230,9 +233,9 @@ opt_co4 env sym rep r (AxiomInstCo con ind cos)
                                  cos)
       -- Note that the_co does *not* have sym pushed into it
 
-opt_co4 env sym _ r (UnivCo prov _r t1 t2)
+opt_co4 env sym rep r (UnivCo prov _r t1 t2)
   = ASSERT( r == _r )
-    opt_univ env sym prov r t1 t2
+    opt_univ env sym prov (chooseRole rep r) t1 t2
 
 opt_co4 env sym rep r (TransCo co1 co2)
                       -- sym (g `o` h) = sym h `o` sym g
