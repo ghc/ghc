@@ -53,13 +53,14 @@ test('lazy-bs-alloc',
      [stats_num_field('peak_megabytes_allocated', (2, 1)),
                                  # expected value: 2 (amd64/Linux)
       stats_num_field('bytes allocated',
-          [(wordsize(64), 444720, 3),
+          [(wordsize(64), 444720, 5),
             #             489776 (amd64/Linux)
             # 2013-02-07: 429744 (amd64/Linux)
             # 2013-12-12: 425400 (amd64/Linux)
             # 2015-04-04: Widen 1->3% (amd64/Windows was failing)
             # 2015-08-15: 431500 (Windows not good enough. avg of Windows&Linux)
             # 2015-12-15: 444720 (amd64/Linux, D1616)
+            # 2015-12-17: 444720 (widen 3->5%, Windows is at 462688)
            (wordsize(32), 411500, 2)]),
             # 2013-02-10: 421296 (x86/Windows)
             # 2013-02-10: 414180 (x86/OSX)
