@@ -100,6 +100,7 @@ import ErrUtils
 import Util
 import Unique
 import VarSet           ( isEmptyVarSet, filterVarSet )
+import Data.List        ( find )
 import Data.Maybe
 import BasicTypes hiding( SuccessFlag(..) )
 import Maybes( MaybeErr(..) )
@@ -1196,6 +1197,8 @@ reifyThing (AGlobal (AnId id))
         ; let v = reifyName id
         ; case idDetails id of
             ClassOpId cls -> return (TH.ClassOpI v ty (reifyName cls))
+            RecSelId{sel_tycon=RecSelData tc}
+                          -> return (TH.VarI (reifySelector id tc) ty Nothing)
             _             -> return (TH.VarI     v ty Nothing)
     }
 
@@ -1329,7 +1332,8 @@ reifyDataCon tys dc
        ; r_arg_tys <- reifyTypes arg_tys
 
        ; let main_con | not (null fields)
-                      = TH.RecC name (zip3 (map (reifyName . flSelector) fields) stricts r_arg_tys)
+                      = TH.RecC name
+                          (zip3 (map reifyFieldLabel fields) stricts r_arg_tys)
                       | dataConIsInfix dc
                       = ASSERT( length arg_tys == 2 )
                         TH.InfixC (s1,r_a1) name (s2,r_a2)
@@ -1676,6 +1680,25 @@ reifyName thing
             | OccName.isTcOcc   occ = TH.mkNameG_tc
             | otherwise             = pprPanic "reifyName" (ppr name)
 
+-- See Note [Reifying field labels]
+reifyFieldLabel :: FieldLabel -> TH.Name
+reifyFieldLabel fl
+  | flIsOverloaded fl
+              = TH.Name (TH.mkOccName occ_str) (TH.NameQ (TH.mkModName mod_str))
+  | otherwise = TH.mkNameG_v pkg_str mod_str occ_str
+  where
+    name    = flSelector fl
+    mod     = ASSERT( isExternalName name ) nameModule name
+    pkg_str = unitIdString (moduleUnitId mod)
+    mod_str = moduleNameString (moduleName mod)
+    occ_str = unpackFS (flLabel fl)
+
+reifySelector :: Id -> TyCon -> TH.Name
+reifySelector id tc
+  = case find ((idName id ==) . flSelector) (tyConFieldLabels tc) of
+      Just fl -> reifyFieldLabel fl
+      Nothing -> pprPanic "reifySelector: missing field" (ppr id $$ ppr tc)
+
 ------------------------------
 reifyFixity :: Name -> TcM TH.Fixity
 reifyFixity name
@@ -1763,6 +1786,32 @@ will appear in TH syntax like this
 
   data T a = forall b. (a ~ [b]) => MkT1 b
            | (a ~ Int) => MkT2
+
+Note [Reifying field labels]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When reifying a datatype declared with DuplicateRecordFields enabled, we want
+the reified names of the fields to be labels rather than selector functions.
+That is, we want (reify ''T) and (reify 'foo) to produce
+
+    data T = MkT { foo :: Int }
+    foo :: T -> Int
+
+rather than
+
+    data T = MkT { $sel:foo:MkT :: Int }
+    $sel:foo:MkT :: T -> Int
+
+because otherwise TH code that uses the field names as strings will silently do
+the wrong thing.  Thus we use the field label (e.g. foo) as the OccName, rather
+than the selector (e.g. $sel:foo:MkT).  Since the Orig name M.foo isn't in the
+environment, NameG can't be used to represent such fields.  Instead,
+reifyFieldLabel uses NameQ.
+
+However, this means that extracting the field name from the output of reify, and
+trying to reify it again, may fail with an ambiguity error if there are multiple
+such fields defined in the module (see the test case
+overloadedrecflds/should_fail/T11103.hs).  The "proper" fix requires changes to
+the TH AST to make it able to represent duplicate record fields.
 -}
 
 #endif  /* GHCI */

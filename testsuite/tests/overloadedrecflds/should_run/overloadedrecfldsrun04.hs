@@ -13,5 +13,18 @@ $(return [])
 
 -- ... and check that we can inspect it
 main = do  putStrLn $(do { info <- reify ''R
-                         ; lift (pprint info) })
+                         ; case info of
+                             TyConI (DataD _ _ _ [RecC _ [(n, _, _)]] _) ->
+                                 do { info' <- reify n
+                                    ; lift (pprint info ++ "\n" ++ pprint info')
+                                    }
+                             _ -> error "unexpected result of reify"
+                         })
+           putStrLn $(do { info <- reify 'foo
+                         ; case info of
+                             VarI n _ _ ->
+                                 do { info' <- reify n
+                                    ; lift (pprint info ++ "\n" ++ pprint info')
+                                    }
+                         })
            print (foo (MkR { foo = 42 }))
