@@ -711,6 +711,47 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
         Expected type: ST s Int
           Actual type: ST s Bool
 
+``-fprint-typechecker-elaboration``
+    .. index::
+       single: -fprint-typechecker-elaboration
+
+    When enabled, GHC also prints extra information from the typechecker in
+    warnings. For example:
+
+    ::
+
+        main :: IO ()
+        main = do
+          return $ let a = "hello" in a
+          return ()
+
+    This warning message:
+
+    ::
+
+        A do-notation statement discarded a result of type ‘[Char]’
+        Suppress this warning by saying
+          ‘_ <- ($) return let a = "hello" in a’
+        or by using the flag -fno-warn-unused-do-bind
+
+    Becomes this:
+
+    ::
+
+        A do-notation statement discarded a result of type ‘[Char]’
+        Suppress this warning by saying
+          ‘_ <- ($)
+                  return
+                  let
+                    AbsBinds [] []
+                      {Exports: [a <= a
+                                   <>]
+                       Exported types: a :: [Char]
+                                       [LclId, Str=DmdType]
+                       Binds: a = "hello"}
+                  in a’
+        or by using the flag -fno-warn-unused-do-bind
+
 ``-ferror-spans``
     .. index::
        single: -ferror-spans

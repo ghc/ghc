@@ -46,6 +46,12 @@ verbosityOptions =
          , flagType = DynamicFlag
          , flagReverse = "-fno-print-expanded-synonyms"
          }
+  , flag { flagName = "-fprint-typechecker-elaboration"
+         , flagDescription =
+           "Print extra information from typechecker."
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-print-typechecker-elaboration"
+         }
   , flag { flagName = "-ferror-spans"
          , flagDescription = "Output full span in error messages"
          , flagType = DynamicFlag

@@ -38,6 +38,7 @@ import Var
 import Bag
 import FastString
 import BooleanFormula (LBooleanFormula)
+import DynFlags
 
 import Data.Data hiding ( Fixity )
 import Data.List hiding ( foldr )
@@ -546,13 +547,20 @@ ppr_monobind (PatSynBind psb) = ppr psb
 ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
                        , abs_exports = exports, abs_binds = val_binds
                        , abs_ev_binds = ev_binds })
-  = hang (ptext (sLit "AbsBinds") <+> brackets (interpp'SP tyvars)
-                                  <+> brackets (interpp'SP dictvars))
-       2 $ braces $ vcat
-    [ ptext (sLit "Exports:") <+> brackets (sep (punctuate comma (map ppr exports)))
-    , ptext (sLit "Exported types:") <+> vcat [pprBndr LetBind (abe_poly ex) | ex <- exports]
-    , ptext (sLit "Binds:") <+> pprLHsBinds val_binds
-    , ifPprDebug (ptext (sLit "Evidence:") <+> ppr ev_binds) ]
+  = sdocWithDynFlags $ \ dflags ->
+    if gopt Opt_PrintTypechekerElaboration dflags then
+      -- Show extra information (bug number: #10662)
+      hang (ptext (sLit "AbsBinds") <+> brackets (interpp'SP tyvars)
+                                    <+> brackets (interpp'SP dictvars))
+         2 $ braces $ vcat
+      [ ptext (sLit "Exports:") <+>
+          brackets (sep (punctuate comma (map ppr exports)))
+      , ptext (sLit "Exported types:") <+>
+          vcat [pprBndr LetBind (abe_poly ex) | ex <- exports]
+      , ptext (sLit "Binds:") <+> pprLHsBinds val_binds
+      , ptext (sLit "Evidence:") <+> ppr ev_binds ]
+    else
+      pprLHsBinds val_binds
 
 instance (OutputableBndr id) => Outputable (ABExport id) where
   ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })

@@ -338,6 +338,7 @@ data GeneralFlag
    | Opt_PrintUnicodeSyntax
    | Opt_PrintExpandedSynonyms
    | Opt_PrintPotentialInstances
+   | Opt_PrintTypechekerElaboration
 
    -- optimisation opts
    | Opt_CallArity
@@ -2951,6 +2952,7 @@ fFlags = [
   flagSpec "print-unicode-syntax"             Opt_PrintUnicodeSyntax,
   flagSpec "print-expanded-synonyms"          Opt_PrintExpandedSynonyms,
   flagSpec "print-potential-instances"        Opt_PrintPotentialInstances,
+  flagSpec "print-typechecker-elaboration"    Opt_PrintTypechekerElaboration,
   flagSpec "prof-cafs"                        Opt_AutoSccsOnIndividualCafs,
   flagSpec "prof-count-entries"               Opt_ProfCountEntries,
   flagSpec "regs-graph"                       Opt_RegsGraph,
