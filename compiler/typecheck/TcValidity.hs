@@ -875,7 +875,10 @@ constraintSynErr env kind
 dupPredWarn :: TidyEnv -> [[PredType]] -> (TidyEnv, SDoc)
 dupPredWarn env dups
   = ( env
-    , ptext (sLit "Duplicate constraint(s):") <+> pprWithCommas (ppr_tidy env) (map head dups) )
+    , text "Duplicate constraint" <> plural primaryDups <> text ":"
+      <+> pprWithCommas (ppr_tidy env) primaryDups )
+  where
+    primaryDups = map head dups
 
 tyConArityErr :: TyCon -> [TcType] -> SDoc
 -- For type-constructor arity errors, be careful to report

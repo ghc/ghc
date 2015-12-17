@@ -7,6 +7,7 @@ test('T9230', normal, compile_without_flag('-fno-warn-tabs'), [''])
 test('T10908', normal, compile, [''])
 test('T11077', normal, compile, ['-fwarn-missing-exported-sigs'])
 test('T11128', normal, compile, [''])
+test('PluralS', normal, compile, [''])
 
 test('DeprU',
 	extra_clean([

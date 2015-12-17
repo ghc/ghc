@@ -2245,9 +2245,13 @@ warnDefaulting wanteds default_ty
                         foldr (unionVarSet . tyCoVarsOfCt) emptyVarSet wanteds
              tidy_wanteds = map (tidyCt tidy_env) wanteds
              (loc, ppr_wanteds) = pprWithArising tidy_wanteds
-             warn_msg  = hang (ptext (sLit "Defaulting the following constraint(s) to type")
-                                <+> quotes (ppr default_ty))
-                            2 ppr_wanteds
+             warn_msg =
+                hang (hsep [ text "Defaulting the following"
+                           , text "constraint" <> plural tidy_wanteds
+                           , text "to type"
+                           , quotes (ppr default_ty) ])
+                     2
+                     ppr_wanteds
        ; setCtLocM loc $ warnTc warn_default warn_msg }
 
 {-
