@@ -440,7 +440,7 @@ ArityType 'at', then
    assuming the calls of f respect the one-shot-ness of
    its definition.
 
-   NB 'f' is an arbitary expression, eg (f = g e1 e2).  This 'f'
+   NB 'f' is an arbitrary expression, eg (f = g e1 e2).  This 'f'
    can have ArityType as ATop, with length as > 0, only if e1 e2 are
    themselves.
 

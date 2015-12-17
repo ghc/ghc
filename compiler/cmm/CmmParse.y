@@ -192,7 +192,7 @@ where info_ptr and field1..fieldN describe the stack frame, and
 arg1..argN are the arguments passed to f using the NativeNodeCall
 convention. Note if a field is longer than a word (e.g. a D_ on
 a 32-bit machine) then the call will push as many words as
-necessary to the stack to accomodate it (e.g. 2).
+necessary to the stack to accommodate it (e.g. 2).
 
 
 ----------------------------------------------------------------------------- -}

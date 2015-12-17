@@ -80,7 +80,7 @@ infixl 3 &&&
 -}
 
 type IfaceTopBndr = OccName
-  -- It's convenient to have an OccName in the IfaceSyn, altough in each
+  -- It's convenient to have an OccName in the IfaceSyn, although in each
   -- case the namespace is implied by the context. However, having an
   -- OccNames makes things like ifaceDeclImplicitBndrs and ifaceDeclFingerprints
   -- very convenient.

@@ -36,7 +36,7 @@ import qualified Data.ByteString.Lazy.Char8 as B8
    ELF (Executable and Linking Format) is described in the System V Application
    Binary Interface (or ABI). The latter is composed of two parts: a generic
    part and a processor specific part. The generic ABI describes the parts of
-   the interface that remain constant accross all hardware implementations of
+   the interface that remain constant across all hardware implementations of
    System V.
 
    The latest release of the specification of the generic ABI is the version

@@ -91,7 +91,7 @@ The above would be rendered as,
 Headings
 ~~~~~~~~
 
-While ReST can accomodate a wide range of heading styles, we have standardized
+While ReST can accommodate a wide range of heading styles, we have standardized
 on this convention in the User's Guide,
 
 .. code-block:: rest

@@ -115,7 +115,7 @@
    How much Haskell stack space to reserve for the saving of registers
    etc. in the case of a stack/heap overflow.
 
-   This must be large enough to accomodate the largest stack frame
+   This must be large enough to accommodate the largest stack frame
    pushed in one of the heap check fragments in HeapStackCheck.hc
    (ie. currently the generic heap checks - 3 words for StgRetDyn,
    18 words for the saved registers, see StgMacros.h).

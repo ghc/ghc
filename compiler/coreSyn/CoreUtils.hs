@@ -539,7 +539,7 @@ trimConArgs :: AltCon -> [CoreArg] -> [CoreArg]
 -- >        C b x y -> ...
 --
 -- We want to drop the leading type argument of the scrutinee
--- leaving the arguments to match agains the pattern
+-- leaving the arguments to match against the pattern
 
 trimConArgs DEFAULT      args = ASSERT( null args ) []
 trimConArgs (LitAlt _)   args = ASSERT( null args ) []

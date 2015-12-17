@@ -208,7 +208,7 @@ instance Binary a => Binary (EvalResult a)
 --
 -- * We print them, e.g. "*** Exception: <something>"
 -- * UserInterrupt has a special meaning
--- * In ghc -e, exitWith should exit with the appropraite exit code
+-- * In ghc -e, exitWith should exit with the appropriate exit code
 --
 -- So all we need to do is distinguish UserInterrupt and ExitCode, and
 -- all other exceptions can be represented by their 'show' string.
