@@ -5,7 +5,7 @@
 test('haddock.base',
      [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 11119767632, 5)
+          [(wordsize(64), 26282821104, 5)
             # 2012-08-14: 5920822352 (amd64/Linux)
             # 2012-09-20: 5829972376 (amd64/Linux)
             # 2012-10-08: 5902601224 (amd64/Linux)
@@ -25,7 +25,8 @@ test('haddock.base',
             # 2014-01-08: 9014511528 (x86_64/Linux) - Eliminate so-called "silent superclass parameters" (and others)
             # 2015-07-22: 9418857192 (x86_64/Linux) - Just slowly creeping up.
             # 2015-10-03: 9894189856 (x86_64/Linux) - Still creeping
-	    # 2015-12-11: 11119767632 (amd64/Linux) TypeInType (see #11196)
+            # 2015-12-11: 11119767632 (amd64/Linux) - TypeInType (see #11196)
+            # 2015-12-17: 26282821104 (x86_64/Linux) - Update Haddock to master
 
           ,(platform('i386-unknown-mingw32'), 4434804940, 5)
             # 2013-02-10:                     3358693084 (x86/Windows)
@@ -48,7 +49,7 @@ test('haddock.base',
 test('haddock.Cabal',
      [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 8114833312, 5)
+          [(wordsize(64), 9982130512, 5)
             # 2012-08-14: 3255435248 (amd64/Linux)
             # 2012-08-29: 3324606664 (amd64/Linux, new codegen)
             # 2012-10-08: 3373401360 (amd64/Linux)
@@ -68,8 +69,9 @@ test('haddock.Cabal',
             # 2014-10-04: 6019839624 (x86_64/Linux - Burning Bridges, Cabal update)
             # 2014-12-14: 6387320816 (x86_64/Linux) - Update to Haddock 2.16
             # 2015-01-22: 6710234312 (x86_64/Linux) - Cabal updated
-            # 2015-06-29: 7413958344 (x86_64/Linux) due to #10482, not yet investigated
-	    # 2015-12-11: 8114833312 (amd64/Linux) TypeInType (See #11196)
+            # 2015-06-29: 7413958344 (x86_64/Linux) - due to #10482, not yet investigated
+            # 2015-12-11: 8114833312 (amd64/Linux) - TypeInType (See #11196)
+            # 2015-12-17: 9982130512 (amd64/Linux) - Update Haddock to master
 
           ,(platform('i386-unknown-mingw32'), 3293415576, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)
@@ -91,7 +93,7 @@ test('haddock.Cabal',
 test('haddock.compiler',
      [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 49395782136, 10)
+          [(wordsize(64), 58017214568, 10)
             # 2012P-08-14: 26070600504 (amd64/Linux)
             # 2012-08-29: 26353100288 (amd64/Linux, new CG)
             # 2012-09-18: 26882813032 (amd64/Linux)
@@ -104,6 +106,7 @@ test('haddock.compiler',
             # 2015-06-29: 40624322224 (amd64/Linux) due to #10482, not yet investigated
             # 2015-12-03: 44721228752 (amd64/Linux) slow creep upwards
             # 2015-12-15: 49395782136 (amd64/Linux) more creep, following kind-equalities
+            # 2015-12-17: 58017214568 (amd64/Linux) update Haddock to master
 
           ,(platform('i386-unknown-mingw32'),   902576468, 10)
             # 2012-10-30:                     13773051312 (x86/Windows)
