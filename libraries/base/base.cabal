@@ -144,7 +144,11 @@ Library
         Data.Foldable
         Data.Function
         Data.Functor
+        Data.Functor.Classes
+        Data.Functor.Compose
         Data.Functor.Identity
+        Data.Functor.Product
+        Data.Functor.Sum
         Data.IORef
         Data.Int
         Data.Ix

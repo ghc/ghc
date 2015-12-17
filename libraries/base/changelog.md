@@ -73,6 +73,10 @@
   * New module `Control.Monad.IO.Class` (previously provided by `transformers`
     package). (#10773)
 
+  * New modules `Data.Functor.Classes`, `Data.Functor.Compose`,
+    `Data.Functor.Product`, and `Data.Functor.Sum` (previously provided by
+    `transformers` package). (#11135)
+
   * New module `Control.Monad.Fail` providing new `MonadFail(fail)`
     class (#10751)
 

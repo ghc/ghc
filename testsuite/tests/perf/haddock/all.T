@@ -5,7 +5,7 @@
 test('haddock.base',
      [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 26282821104, 5)
+          [(wordsize(64), 27812188000, 5)
             # 2012-08-14: 5920822352 (amd64/Linux)
             # 2012-09-20: 5829972376 (amd64/Linux)
             # 2012-10-08: 5902601224 (amd64/Linux)
@@ -27,6 +27,7 @@ test('haddock.base',
             # 2015-10-03: 9894189856 (x86_64/Linux) - Still creeping
             # 2015-12-11: 11119767632 (amd64/Linux) - TypeInType (see #11196)
             # 2015-12-17: 26282821104 (x86_64/Linux) - Update Haddock to master
+            # 2015-12-17: 27812188000 (x86_64/Linux) - Move Data.Functor.* into base
 
           ,(platform('i386-unknown-mingw32'), 4434804940, 5)
             # 2013-02-10:                     3358693084 (x86/Windows)
