@@ -4117,25 +4117,24 @@ compilerInfo dflags
        ("Support SMP",                 cGhcWithSMP),
        ("Tables next to code",         cGhcEnableTablesNextToCode),
        ("RTS ways",                    cGhcRTSWays),
-       ("RTS expects libdw",           cGhcRtsWithLibdw),
-       ("Support dynamic-too",         if isWindows then "NO" else "YES"),
+       ("RTS expects libdw",           showBool cGhcRtsWithLibdw),
+       ("Support dynamic-too",         showBool $ not isWindows),
        ("Support parallel --make",     "YES"),
        ("Support reexported-modules",  "YES"),
        ("Support thinning and renaming package flags", "YES"),
        ("Requires unified installed package IDs", "YES"),
        ("Uses package keys",           "YES"),
-       ("Dynamic by default",          if dYNAMIC_BY_DEFAULT dflags
-                                       then "YES" else "NO"),
-       ("GHC Dynamic",                 if dynamicGhc
-                                       then "YES" else "NO"),
-       ("GHC Profiled",                if rtsIsProfiled
-                                       then "YES" else "NO"),
+       ("Dynamic by default",          showBool $ dYNAMIC_BY_DEFAULT dflags),
+       ("GHC Dynamic",                 showBool dynamicGhc),
+       ("GHC Profiled",                showBool rtsIsProfiled),
        ("Leading underscore",          cLeadingUnderscore),
        ("Debug on",                    show debugIsOn),
        ("LibDir",                      topDir dflags),
        ("Global Package DB",           systemPackageConfig dflags)
       ]
   where
+    showBool True  = "YES"
+    showBool False = "NO"
     isWindows = platformOS (targetPlatform dflags) == OSMinGW32
 
 #include "../includes/dist-derivedconstants/header/GHCConstantsHaskellWrappers.hs"

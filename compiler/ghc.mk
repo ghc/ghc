@@ -102,8 +102,12 @@ endif
 	@echo 'cGhcWithSMP           = "$(GhcWithSMP)"'                     >> $@
 	@echo 'cGhcRTSWays           :: String'                             >> $@
 	@echo 'cGhcRTSWays           = "$(GhcRTSWays)"'                     >> $@
-	@echo 'cGhcRtsWithLibdw      :: String'                             >> $@
-	@echo 'cGhcRtsWithLibdw      = "$(GhcRtsWithLibdw)"'                >> $@
+	@echo 'cGhcRtsWithLibdw      :: Bool'                               >> $@
+ifeq "$(GhcRtsWithLibdw)" "YES"
+	@echo 'cGhcRtsWithLibdw      = True'                                >> $@
+else
+	@echo 'cGhcRtsWithLibdw      = False'                               >> $@
+endif
 	@echo 'cGhcEnableTablesNextToCode :: String'                        >> $@
 	@echo 'cGhcEnableTablesNextToCode = "$(GhcEnableTablesNextToCode)"' >> $@
 	@echo 'cLeadingUnderscore    :: String'                             >> $@
