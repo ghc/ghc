@@ -84,7 +84,7 @@ test('enum02',          enum_setups, compile_and_run, [''])
 test('enum03',          enum_setups, compile_and_run, [''])
 test('enum04',          normal, compile_and_run, [''])
 
-test('exceptionsrun001', expect_broken_for(10712, opt_ways), compile_and_run, [''])
+test('exceptionsrun001',        normal, compile_and_run, [''])
 test('exceptionsrun002', 	normal, compile_and_run, [''])
 test('foldableArray',   normal, compile_and_run, [''])
 test('list001'	,	when(fast(), skip), compile_and_run, [''])
