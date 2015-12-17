@@ -9,7 +9,7 @@ test('sigof02t',
      ['$MAKE -s --no-print-directory sigof02t'])
 
 test('sigof02m',
-     [ clean_cmd('rm -rf tmp_sigof02m') ],
+     [ clean_cmd('rm -rf tmp_sigof02m'), normalise_slashes ],
      run_command,
      ['$MAKE -s --no-print-directory sigof02m'])
 
@@ -30,7 +30,7 @@ test('sigof02dt',
 
 
 test('sigof02dm',
-     [ clean_cmd('rm -rf tmp_sigof02dm') ],
+     [ clean_cmd('rm -rf tmp_sigof02dm'), normalise_slashes ],
      run_command,
      ['$MAKE -s --no-print-directory sigof02dm'])
 
