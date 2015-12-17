@@ -20,7 +20,7 @@ import Data.Dynamic ( fromDynamic,Dynamic )
 main::IO()
 main = do
         [libdir] <- getArgs
-        testOneFile libdir "LiteralsTest"
+        testOneFile libdir "LiteralsTest2"
 
 testOneFile libdir fileName = do
     p <- runGhc (Just libdir) $ do
