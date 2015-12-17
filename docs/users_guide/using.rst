@@ -18,15 +18,11 @@ quick introduction to the basic usage of GHC for compiling a Haskell
 program, before the following sections dive into the full syntax.
 
 Let's create a Hello World program, and compile and run it. First,
-create a file ``hello.hs`` containing the Haskell code:
-
-::
+create a file ``hello.hs`` containing the Haskell code: ::
 
     main = putStrLn "Hello, World!"
 
-To compile the program, use GHC like this:
-
-::
+To compile the program, use GHC like this: ::
 
     $ ghc hello.hs
 
@@ -40,9 +36,7 @@ By default GHC will be very quiet about what it is doing, only printing
 error messages. If you want to see in more detail what's going on behind
 the scenes, add ``-v`` to the command line.
 
-Then we can run the program like this:
-
-::
+Then we can run the program like this: ::
 
     $ ./hello
     Hello World!
@@ -72,9 +66,7 @@ Command-line arguments
    single: command-line; arguments
    single: arguments; command-line
 
-An invocation of GHC takes the following form:
-
-::
+An invocation of GHC takes the following form: ::
 
     ghc [argument...]
 
@@ -101,9 +93,7 @@ Haskell source file deliberately uses name shadowing, it should be
 compiled with the ``-Wno-name-shadowing`` option. Rather than
 maintaining the list of per-file options in a ``Makefile``, it is
 possible to do this directly in the source file using the
-``OPTIONS_GHC`` :ref:`pragma <options-pragma>`.
-
-::
+``OPTIONS_GHC`` :ref:`pragma <options-pragma>` ::
 
     {-# OPTIONS_GHC -Wno-name-shadowing #-}
     module X where
@@ -362,17 +352,13 @@ Using ``ghc`` ``--make``
 In this mode, GHC will build a multi-module Haskell program by following
 dependencies from one or more root modules (usually just ``Main``). For
 example, if your ``Main`` module is in a file called ``Main.hs``, you
-could compile and link the program like this:
-
-::
+could compile and link the program like this: ::
 
     ghc --make Main.hs
 
 In fact, GHC enters make mode automatically if there are any Haskell
 source files on the command line and no other mode is specified, so in
-this case we could just type
-
-::
+this case we could just type ::
 
     ghc Main.hs
 
@@ -432,9 +418,7 @@ Expression evaluation mode
 
 This mode is very similar to interactive mode, except that there is a
 single expression to evaluate which is specified on the command line as
-an argument to the ``-e`` option:
-
-::
+an argument to the ``-e`` option: ::
 
     ghc -e expr
 
@@ -443,16 +427,12 @@ loaded exactly as in interactive mode. The expression is evaluated in
 the context of the loaded modules.
 
 For example, to load and run a Haskell program containing a module
-``Main``, we might say
-
-::
+``Main``, we might say ::
 
     ghc -e Main.main Main.hs
 
 or we can just use this mode to evaluate expressions in the context of
-the ``Prelude``:
-
-::
+the ``Prelude``: ::
 
     $ ghc -e "interact (unlines.map reverse.lines)"
     hello
@@ -608,9 +588,7 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
     These three flags control the way in which GHC displays types, in
     error messages and in GHCi. Using ``-fprint-explicit-foralls`` makes
     GHC print explicit ``forall`` quantification at the top level of a
-    type; normally this is suppressed. For example, in GHCi:
-
-    ::
+    type; normally this is suppressed. For example, in GHCi: ::
 
         ghci> let f x = x
         ghci> :t f
@@ -622,17 +600,13 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
     However, regardless of the flag setting, the quantifiers are printed
     under these circumstances:
 
-    -  For nested ``foralls``, e.g.
-
-       ::
+    -  For nested ``foralls``, e.g. ::
 
            ghci> :t GHC.ST.runST
            GHC.ST.runST :: (forall s. GHC.ST.ST s a) -> a
 
     -  If any of the quantified type variables has a kind that mentions
-       a kind variable, e.g.
-
-       ::
+       a kind variable, e.g. ::
 
            ghci> :i Data.Type.Equality.sym
            Data.Type.Equality.sym ::
@@ -642,9 +616,7 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
 
     Using ``-fprint-explicit-kinds`` makes GHC print kind arguments in
     types, which are normally suppressed. This can be important when you
-    are using kind polymorphism. For example:
-
-    ::
+    are using kind polymorphism. For example: ::
 
         ghci> :set -XPolyKinds
         ghci> data T a = MkT
@@ -656,9 +628,7 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
 
     When ``-fprint-unicode-syntax`` is enabled, GHC prints type
     signatures using the unicode symbols from the ``-XUnicodeSyntax``
-    extension.
-
-    ::
+    extension. ::
 
         ghci> :set -fprint-unicode-syntax
         ghci> :t (>>)
@@ -684,25 +654,19 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
        single: -fprint-expanded-synonyms
 
     When enabled, GHC also prints type-synonym-expanded types in type
-    errors. For example, with this type synonyms:
-
-    ::
+    errors. For example, with this type synonyms: ::
 
         type Foo = Int
         type Bar = Bool
         type MyBarST s = ST s Bar
 
-    This error message:
-
-    ::
+    This error message: ::
 
         Couldn't match type 'Int' with 'Bool'
         Expected type: ST s Foo
           Actual type: MyBarST s
 
-    Becomes this:
-
-    ::
+    Becomes this: ::
 
         Couldn't match type 'Int' with 'Bool'
         Expected type: ST s Foo
@@ -716,27 +680,21 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
        single: -fprint-typechecker-elaboration
 
     When enabled, GHC also prints extra information from the typechecker in
-    warnings. For example:
-
-    ::
+    warnings. For example: ::
 
         main :: IO ()
         main = do
           return $ let a = "hello" in a
           return ()
 
-    This warning message:
-
-    ::
+    This warning message: ::
 
         A do-notation statement discarded a result of type ‘[Char]’
         Suppress this warning by saying
           ‘_ <- ($) return let a = "hello" in a’
         or by using the flag -fno-warn-unused-do-bind
 
-    Becomes this:
-
-    ::
+    Becomes this: ::
 
         A do-notation statement discarded a result of type ‘[Char]’
         Suppress this warning by saying
@@ -760,21 +718,15 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
     relating to an error message. Normally, GHC emits the source
     location of the start of the syntactic entity only.
 
-    For example:
-
-    ::
+    For example: ::
 
         test.hs:3:6: parse error on input `where'
 
-    becomes:
-
-    ::
+    becomes: ::
 
         test296.hs:3:6-10: parse error on input `where'
 
-    And multi-line spans are possible too:
-
-    ::
+    And multi-line spans are possible too: ::
 
         test.hs:(5,4)-(6,7):
             Conflicting definitions for `a'
