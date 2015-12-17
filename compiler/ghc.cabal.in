@@ -587,7 +587,6 @@ Library
             ByteCodeItbls
             ByteCodeLink
             Debugger
-            LibFFI
             Linker
             RtClosureInspect
             DebuggerUtils

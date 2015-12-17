@@ -727,6 +727,12 @@ include $(patsubst %, %/ghc.mk, $(BUILD_DIRS))
 .PHONY: stage1_libs
 stage1_libs : $(ALL_STAGE1_LIBS)
 
+# We need this extra dependency when building our own libffi, because
+# GHCi.FFI.hs #includes ffi.h
+ifneq "$(UseSystemLibFFI)" "YES"
+libraries/ghci/dist-install/build/GHCi/FFI.hs : $(libffi_HEADERS)
+endif
+
 # ----------------------------------------------
 # Per-package compiler flags
 #
