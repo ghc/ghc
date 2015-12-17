@@ -31,7 +31,7 @@ import Control.Arrow ((***))
 -- -----------------------------------------------------------------------------
 -- Argument kinds (rougly equivalent to PrimRep)
 
-data ArgRep 
+data ArgRep
   = N   -- non-ptr
   | P   -- ptr
   | V   -- void
@@ -96,7 +96,7 @@ longRegs    n = [ "L" ++ show m | m <- [1..n] ]
 -- Loading/saving register arguments to the stack
 
 loadRegArgs :: RegStatus -> Int -> [ArgRep] -> (Doc,Int)
-loadRegArgs regstatus sp args 
+loadRegArgs regstatus sp args
  = (loadRegOffs reg_locs, sp')
  where (reg_locs, _, sp') = assignRegs regstatus sp args
 
@@ -120,7 +120,7 @@ assign sp [] regs doc = (doc, [], sp)
 assign sp (V : args) regs doc = assign sp args regs doc
 assign sp (arg : args) regs doc
  = case findAvailableReg arg regs of
-    Just (reg, regs') -> assign (sp + argSize arg)  args regs' 
+    Just (reg, regs') -> assign (sp + argSize arg)  args regs'
                             ((reg, sp) : doc)
     Nothing -> (doc, (arg:args), sp)
 
@@ -178,7 +178,7 @@ mkBitmap args = foldr f 0 args
 -- The entry convention to an stg_ap_ function is as follows: all the
 -- arguments are on the stack (we might revisit this at some point,
 -- but it doesn't make any difference on x86), and THERE IS AN EXTRA
--- EMPTY STACK SLOT at the top of the stack.  
+-- EMPTY STACK SLOT at the top of the stack.
 --
 -- Why?  Because in several cases, stg_ap_* will need an extra stack
 -- slot, eg. to push a return address in the THUNK case, and this is a
@@ -312,10 +312,10 @@ genMkPAP regstatus macro jump live ticker disamb
                 -- for a PAP, we have to arrange that the stack contains a
                 -- return address in the event that stg_PAP_entry fails its
                 -- heap check.  See stg_PAP_entry in Apply.hc for details.
-             if is_pap 
+             if is_pap
                 then text "R2 = " <> mkApplyInfoName this_call_args <> semi
 
-                else empty, 
+                else empty,
             if is_fun_case then mb_tag_node arity else empty,
             if overflow_regs
                 then text "jump_SAVE_CCCS" <> parens (text jump) <> semi
@@ -328,7 +328,7 @@ genMkPAP regstatus macro jump live ticker disamb
            = assignRegs regstatus stk_args_offset args
 
            -- register assignment for *this function call*
-        (reg_locs', reg_call_leftovers, reg_call_sp_stk_args) 
+        (reg_locs', reg_call_leftovers, reg_call_sp_stk_args)
            = assignRegs regstatus stk_args_offset (take arity args)
 
         load_regs
@@ -350,14 +350,14 @@ genMkPAP regstatus macro jump live ticker disamb
            | otherwise    = reg_call_leftovers
 
         stack_args_size = sum (map argSize this_call_stack_args)
-           
+
         overflow_regs = args_in_regs && length reg_locs > length reg_locs'
 
         save_extra_regs = (doc, (size,size))
           where
              -- we have extra arguments in registers to save
               extra_reg_locs = drop (length reg_locs') (reverse reg_locs)
-              adj_reg_locs = [ (reg, off - adj + 1) | 
+              adj_reg_locs = [ (reg, off - adj + 1) |
                                (reg,off) <- extra_reg_locs ]
               adj = case extra_reg_locs of
                       (reg, fst_off):_ -> fst_off
@@ -413,7 +413,7 @@ genMkPAP regstatus macro jump live ticker disamb
 --          Sp++;
 --          JMP_(GET_ENTRY(R1.cl));
 
-    exact_arity_case 
+    exact_arity_case
         = text "if (arity == " <> int n_args <> text ") {" $$
           let
              (reg_doc, sp')
@@ -424,7 +424,7 @@ genMkPAP regstatus macro jump live ticker disamb
 --          text "TICK_SLOW_CALL_" <> text ticker <> text "_CORRECT();",
             reg_doc,
             text "Sp_adj(" <> int sp' <> text ");",
-            if is_pap 
+            if is_pap
                 then text "R2 = " <> fun_info_label <> semi
                 else empty,
             if is_fun_case then mb_tag_node n_args else empty,
@@ -451,7 +451,7 @@ genMkPAP regstatus macro jump live ticker disamb
            text "} else {" $$
            let
              save_regs
-                | args_in_regs = 
+                | args_in_regs =
                         text "Sp_adj(" <> int (-sp_offset) <> text ");" $$
                         saveRegOffs  reg_locs
                 | otherwise =
@@ -469,8 +469,8 @@ genMkPAP regstatus macro jump live ticker disamb
                    ]
                   else empty
                 ,
-                text macro <> char '(' <> int n_args <> comma <> 
-                                        int all_args_size <>  
+                text macro <> char '(' <> int n_args <> comma <>
+                                        int all_args_size <>
                                         text "," <> fun_info_label <>
                                         text "," <> text disamb <>
                                         text ");"
@@ -634,10 +634,10 @@ genApply regstatus args =
 --        print "    [IND_STATIC]      &&ind_lbl,"
 --        print "    [IND_PERM]       &&ind_lbl,"
 --        print "  };"
-    
+
        tickForArity (length args),
        text "",
-       text "IF_DEBUG(apply,foreign \"C\" debugBelch(\"" <> fun_ret_label <> 
+       text "IF_DEBUG(apply,foreign \"C\" debugBelch(\"" <> fun_ret_label <>
           text "... \"); foreign \"C\" printClosure(R1 \"ptr\"));",
 
        text "IF_DEBUG(sanity,foreign \"C\" checkStackFrame(Sp+WDS(" <> int (1 + all_args_size)
@@ -645,14 +645,14 @@ genApply regstatus args =
 
 --       text "IF_DEBUG(sanity,checkStackChunk(Sp+" <> int (1 + all_args_size) <>
 --        text ", CurrentTSO->stack + CurrentTSO->stack_size));",
-    
+
 --       text "TICK_SLOW_CALL(" <> int (length args) <> text ");",
 
        let do_assert [] _ = []
            do_assert (arg:args) offset
                 | isPtr arg = this : rest
                 | otherwise = rest
-                where this = text "ASSERT(LOOKS_LIKE_CLOSURE_PTR(Sp(" 
+                where this = text "ASSERT(LOOKS_LIKE_CLOSURE_PTR(Sp("
                                  <> int offset <> text ")));"
                       rest = do_assert args (offset + argSize arg)
        in
@@ -767,7 +767,7 @@ genApply regstatus args =
          text "foreign \"C\" barf(\"" <> fun_ret_label <> text "\") never returns;"
        ),
        text "}"
-        
+
         ]),
        text "}"
       ]),
@@ -797,7 +797,7 @@ genApplyFast regstatus args =
     vcat [
      fun_fast_label,
      char '{',
-     nest 4 (vcat [     
+     nest 4 (vcat [
         text "W_ info;",
         text "W_ arity;",
 
@@ -827,7 +827,7 @@ genApplyFast regstatus args =
             fun_doc
            ]),
           char '}',
-          
+
           text "default: {",
           nest 4 (vcat [
              text "Sp_adj" <> parens (int (-sp_offset)) <> semi,
@@ -861,7 +861,7 @@ mkStackApplyEntryLabel:: [ArgRep] -> Doc
 mkStackApplyEntryLabel args = text "stg_ap_stk_" <> text (concatMap showArg args)
 
 genStackApply :: RegStatus -> [ArgRep] -> Doc
-genStackApply regstatus args = 
+genStackApply regstatus args =
   let fn_entry_label = mkStackApplyEntryLabel args in
   vcat [
     fn_entry_label,
@@ -926,12 +926,12 @@ main = do
                 text "#include \"AutoApply.h\"",
                 text "",
 
-                vcat (intersperse (text "") $ 
+                vcat (intersperse (text "") $
                    map (genApply regstatus) applyTypes),
-                vcat (intersperse (text "") $ 
+                vcat (intersperse (text "") $
                    map (genStackFns regstatus) stackApplyTypes),
 
-                vcat (intersperse (text "") $ 
+                vcat (intersperse (text "") $
                    map (genApplyFast regstatus) applyTypes),
 
                 genStackApplyArray stackApplyTypes,
@@ -1001,7 +1001,7 @@ stackApplyTypes = [
         [P,P,P,P,P,P,P,P]
    ]
 
-genStackFns regstatus args 
+genStackFns regstatus args
   =  genStackApply regstatus args
   $$ genStackSave regstatus args
 
@@ -1039,7 +1039,6 @@ genBitmapArray types =
   ]
   where
    gen_bitmap ty = text "W_" <+> int bitmap_val <> semi
-        where bitmap_val = 
+        where bitmap_val =
                 (fromIntegral (mkBitmap ty) `shiftL` BITMAP_BITS_SHIFT)
                  .|. sum (map argSize ty)
-

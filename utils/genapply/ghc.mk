@@ -10,18 +10,14 @@
 #
 # -----------------------------------------------------------------------------
 
-utils/genapply_dist_MODULES = GenApply
-utils/genapply_dist_PROGNAME = genapply
+utils/genapply_USES_CABAL           = YES
+utils/genapply_PACKAGE              = genapply
+utils/genapply_dist_PROGNAME        = genapply
+utils/genapply_dist_INSTALL         = NO
 utils/genapply_dist_INSTALL_INPLACE = YES
 
-utils/genapply_HC_OPTS += -package pretty
-
 ifeq "$(GhcUnregisterised)" "YES"
-utils/genapply_HC_OPTS += -DNO_REGS
+utils/genapply_CONFIGURE_OPTS = --flag unregisterised
 endif
-
-utils/genapply/GenApply.hs : includes/ghcconfig.h
-utils/genapply/GenApply.hs : includes/MachRegs.h
-utils/genapply/GenApply.hs : includes/Constants.h
 
 $(eval $(call build-prog,utils/genapply,dist,0))
