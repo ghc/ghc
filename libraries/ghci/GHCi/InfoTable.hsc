@@ -63,7 +63,7 @@ platform :: Arch
 platform =
 #if defined(sparc_HOST_ARCH)
        ArchSparc
-#elif defined(ppc_HOST_ARCH)
+#elif defined(powerpc_HOST_ARCH)
        ArchPPC
 #elif defined(x86_HOST_ARCH)
        ArchX86
