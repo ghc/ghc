@@ -1,5 +1,4 @@
-{-# LANGUAGE GADTs, RecordWildCards, UnboxedTuples, MagicHash,
-    ScopedTypeVariables #-}
+{-# LANGUAGE GADTs, RecordWildCards, MagicHash, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 -- |
