@@ -24,14 +24,14 @@ haddockArgs = builder Haddock ? do
         , arg $ "--dump-interface=" ++ output
         , arg "--html"
         , arg "--hoogle"
-        , arg $ "--title=" ++ pkgName pkg ++ "-" ++ version ++ ": " ++ synopsis
+        , arg $ "--title=" ++ pkgNameString pkg ++ "-" ++ version ++ ": " ++ synopsis
         , arg $ "--prologue=" ++ path -/- "haddock-prologue.txt"
         , append $ map ("--hide=" ++) hidden
         , append $ [ "--read-interface=../" ++ dep
                      ++ ",../" ++ dep ++ "/src/%{MODULE/./-}.html\\#%{NAME},"
                      ++ pkgHaddockFile depPkg
                    | (dep, depName) <- zip deps depNames
-                   , Just depPkg <- [findKnownPackage depName] ]
+                   , Just depPkg <- [findKnownPackage $ PackageName depName] ]
         , append [ "--optghc=" ++ opt | opt <- ghcOpts ]
         , specified HsColour ?
           arg "--source-module=src/%{MODULE/./-}.html"

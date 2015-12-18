@@ -1,7 +1,10 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Package (
-    Package (..), PackageName, PackageType (..),
+    Package (..), PackageName(..), PackageType (..),
     -- * Queries
+    pkgNameString,
     pkgCabalFile,
     matchPackageNames,
     -- * Helpers for constructing and using 'Package's
@@ -10,9 +13,15 @@ module Package (
 
 import Base
 import GHC.Generics (Generic)
+import Data.String
 
--- | It is helpful to distinguish package names from strings.
-type PackageName = String
+-- | The name of a Cabal package
+newtype PackageName = PackageName { getPackageName :: String }
+                    deriving ( Eq, Ord, IsString, Generic, Binary, Hashable
+                             , NFData)
+
+instance Show PackageName where
+    show (PackageName name) = name
 
 -- | We regard packages as either being libraries or programs. This is
 -- bit of a convenient lie as Cabal packages can be both, but it works
@@ -29,18 +38,21 @@ data Package = Package
      }
      deriving Generic
 
--- Relative path to cabal file, e.g.: "libraries/Cabal/Cabal/Cabal.cabal"
+pkgNameString :: Package -> String
+pkgNameString = getPackageName . pkgName
+
+-- | Relative path to cabal file, e.g.: "libraries/Cabal/Cabal/Cabal.cabal"
 pkgCabalFile :: Package -> FilePath
-pkgCabalFile pkg = pkgPath pkg -/- pkgName pkg <.> "cabal"
+pkgCabalFile pkg = pkgPath pkg -/- getPackageName (pkgName pkg) <.> "cabal"
 
 topLevel :: PackageName -> Package
-topLevel name = Package name name Library
+topLevel name = Package name (getPackageName name) Library
 
 library :: PackageName -> Package
-library name = Package name ("libraries" -/- name) Library
+library name = Package name ("libraries" -/- getPackageName name) Library
 
 utility :: PackageName -> Package
-utility name = Package name ("utils" -/- name) Program
+utility name = Package name ("utils" -/- getPackageName name) Program
 
 setPath :: Package -> FilePath -> Package
 setPath pkg path = pkg { pkgPath = path }
@@ -57,7 +69,7 @@ isProgram (Package {pkgType=Program}) = True
 isProgram _ = False
 
 instance Show Package where
-    show = pkgName
+    show = show . pkgName
 
 instance Eq Package where
     (==) = (==) `on` pkgName

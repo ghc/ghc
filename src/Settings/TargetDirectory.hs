@@ -22,8 +22,9 @@ pkgDataFile stage pkg = targetPath stage pkg -/- "package-data.mk"
 -- Relative path to a package haddock file, e.g.:
 -- "libraries/array/dist-install/doc/html/array/array.haddock"
 pkgHaddockFile :: Package -> FilePath
-pkgHaddockFile pkg @ (Package name _ _) =
+pkgHaddockFile pkg =
     targetPath Stage1 pkg -/- "doc/html" -/- name -/- name <.> "haddock"
+  where name = pkgNameString pkg
 
 -- Relative path to a package library file, e.g.:
 -- "libraries/array/dist-install/build/libHSarray-0.5.1.0.a"
