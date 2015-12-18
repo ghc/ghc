@@ -65,6 +65,9 @@ push = Socket (Proxy :: Proxy Push) f
   where
     f :: Restrict op (Implements Push) => SockOp Push op -> Operation op
     f SWrite = undefined
+-- Seeing that this pattern match is exhaustive
+-- requires a reasonably vigorous effort on given
+-- superclass expansion.
 
 pull :: Socket Pull
 pull = Socket (Proxy :: Proxy Pull) f

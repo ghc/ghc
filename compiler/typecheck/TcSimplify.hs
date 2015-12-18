@@ -429,30 +429,47 @@ tcCheckSatisfiability given_ids
        ; (res, _ev_binds) <- runTcS $
              do { traceTcS "checkSatisfiability {" (ppr given_ids)
                 ; given_cts <- mkGivensWithSuperClasses given_loc (bagToList given_ids)
-                     -- Need their superclasses, because (Int ~ Bool) has (Int ~~ Bool)
-                     -- as a superclass, and it's the latter that is insoluble
+                     -- See Note [Superclases and satisfiability]
                 ; insols <- solveSimpleGivens given_cts
                 ; insols <- try_harder insols
                 ; traceTcS "checkSatisfiability }" (ppr insols)
                 ; return (isEmptyBag insols) }
        ; return res }
-  where
+ where
     try_harder :: Cts -> TcS Cts
     -- Maybe we have to search up the superclass chain to find
     -- an unsatisfiable constraint.  Example: pmcheck/T3927b.
+    -- At the moment we try just once
     try_harder insols
       | not (isEmptyBag insols)   -- We've found that it's definitely unsatisfiable
       = return insols             -- Hurrah -- stop now.
       | otherwise
       = do { pending_given <- getPendingScDicts
            ; new_given <- makeSuperClasses pending_given
-           ; if null new_given     -- No new superclasses to try, so no point
-             then return emptyBag  --                             in continuing
-             else                  -- Some new superclasses; have a go
-        do { insols <- solveSimpleGivens new_given
-           ; try_harder insols } }
+           ; solveSimpleGivens new_given }
 
-{- ********************************************************************************
+{- Note [Superclases and satisfiability]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Expand superclasses before starting, because (Int ~ Bool), has
+(Int ~~ Bool) as a superclass, which in turn has (Int ~N# Bool)
+as a superclass, and it's the latter that is insoluble.  See
+Note [The equality types story] in TysPrim.
+
+If we fail to prove unsatisfiability we (arbitrarily) try just once to
+find superclasses, using try_harder.  Reason: we might have a type
+signature
+   f :: F op (Implements push) => ..
+where F is a type function.  This happened in Trac #3972.
+
+We could do more than once but we'd have to have /some/ limit: in the
+the recurisve case, we would go on forever in the common case where
+the constraints /are/ satisfiable (Trac #10592 comment:12!).
+
+For stratightforard situations without type functions the try_harder
+step does nothing.
+
+
+***********************************************************************************
 *                                                                                 *
 *                            Inference
 *                                                                                 *
@@ -1010,16 +1027,21 @@ solveWanteds wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics 
 simpl_loop :: Int -> IntWithInf -> Cts -> Bool
            -> WantedConstraints
            -> TcS WantedConstraints
-simpl_loop n limit floated_eqs no_new_given_scs
+simpl_loop n limit floated_eqs no_new_scs
            wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
+  | isEmptyBag floated_eqs && no_new_scs
+  = return wc  -- Done!
+
   | n `intGtLimit` limit
   = failTcS (hang (ptext (sLit "solveWanteds: too many iterations")
                    <+> parens (ptext (sLit "limit =") <+> ppr limit))
-                2 (vcat [ ptext (sLit "Set limit with -fsolver-iterations=n; n=0 for no limit")
-                        , ppr wc ] ))
-
-  | isEmptyBag floated_eqs && no_new_given_scs
-  = return wc  -- Done!
+                2 (vcat [ ptext (sLit "Unsolved:") <+> ppr wc
+                        , ppUnless (isEmptyBag floated_eqs) $
+                          ptext (sLit "Floated equalities:") <+> ppr floated_eqs
+                        , ppUnless no_new_scs $
+                          ptext (sLit "New superclasses found")
+                        , ptext (sLit "Set limit with -fconstraint-solver-iterations=n; n=0 for no limit")
+                  ]))
 
   | otherwise
   = do { traceTcS "simpl_loop, iteration" (int n)
@@ -1064,7 +1086,7 @@ expandSuperClasses wc@(WC { wc_simple = unsolved, wc_insol = insols })
          else
     do { new_given  <- makeSuperClasses pending_given
        ; new_insols <- solveSimpleGivens new_given
-       ; new_wanted <-  makeSuperClasses pending_wanted
+       ; new_wanted <- makeSuperClasses pending_wanted
        ; return (False, wc { wc_simple = unsolved' `unionBags` listToBag new_wanted
                            , wc_insol = insols `unionBags` new_insols }) } }
 
