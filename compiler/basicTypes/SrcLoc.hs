@@ -240,7 +240,7 @@ instance Data SrcSpan where
 -}
 
 {- |
-A SrcSpan delimits a portion of a text file.  It could be represented
+A 'RealSrcSpan' delimits a portion of a text file.  It could be represented
 by a pair of (line,column) coordinates, but in fact we optimise
 slightly by using more compact representations for single-line and
 zero-length spans, both of which are quite common.
@@ -250,28 +250,17 @@ span.  That is, a span of (1,1)-(1,2) is one character long, and a
 span of (1,1)-(1,1) is zero characters long.
 -}
 data RealSrcSpan
-  = SrcSpanOneLine              -- a common case: a single line
-        { srcSpanFile     :: !FastString,
-          srcSpanLine     :: {-# UNPACK #-} !Int,
-          srcSpanSCol     :: {-# UNPACK #-} !Int,
-          srcSpanECol     :: {-# UNPACK #-} !Int
-        }
-
-  | SrcSpanMultiLine
+  = RealSrcSpan'
         { srcSpanFile     :: !FastString,
           srcSpanSLine    :: {-# UNPACK #-} !Int,
           srcSpanSCol     :: {-# UNPACK #-} !Int,
           srcSpanELine    :: {-# UNPACK #-} !Int,
           srcSpanECol     :: {-# UNPACK #-} !Int
         }
-
-  | SrcSpanPoint
-        { srcSpanFile     :: !FastString,
-          srcSpanLine     :: {-# UNPACK #-} !Int,
-          srcSpanCol      :: {-# UNPACK #-} !Int
-        }
   deriving (Eq, Typeable)
 
+-- | A 'SrcSpan' identifies either a specific portion of a text file
+-- or a human-readable description of a location.
 data SrcSpan =
     RealSrcSpan !RealSrcSpan
   | UnhelpfulSpan !FastString   -- Just a general indication
@@ -296,21 +285,27 @@ srcLocSpan (UnhelpfulLoc str) = UnhelpfulSpan str
 srcLocSpan (RealSrcLoc l) = RealSrcSpan (realSrcLocSpan l)
 
 realSrcLocSpan :: RealSrcLoc -> RealSrcSpan
-realSrcLocSpan (SrcLoc file line col) = SrcSpanPoint file line col
+realSrcLocSpan (SrcLoc file line col) = RealSrcSpan' file line col line col
 
 -- | Create a 'SrcSpan' between two points in a file
 mkRealSrcSpan :: RealSrcLoc -> RealSrcLoc -> RealSrcSpan
-mkRealSrcSpan loc1 loc2
-  | line1 == line2 = if col1 == col2
-                        then SrcSpanPoint file line1 col1
-                        else SrcSpanOneLine file line1 col1 col2
-  | otherwise      = SrcSpanMultiLine file line1 col1 line2 col2
+mkRealSrcSpan loc1 loc2 = RealSrcSpan' file line1 col1 line2 col2
   where
         line1 = srcLocLine loc1
         line2 = srcLocLine loc2
         col1 = srcLocCol loc1
         col2 = srcLocCol loc2
         file = srcLocFile loc1
+
+-- | 'True' if the span is known to straddle only one line.
+isOneLineRealSpan :: RealSrcSpan -> Bool
+isOneLineRealSpan (RealSrcSpan' _ line1 _ line2 _)
+  = line1 == line2
+
+-- | 'True' if the span is a single point
+isPointRealSpan :: RealSrcSpan -> Bool
+isPointRealSpan (RealSrcSpan' _ line1 col1 line2 col2)
+  = line1 == line2 && col1 == col2
 
 -- | Create a 'SrcSpan' between two points in a file
 mkSrcSpan :: SrcLoc -> SrcLoc -> SrcSpan
@@ -331,11 +326,7 @@ combineSrcSpans (RealSrcSpan span1) (RealSrcSpan span2)
 -- within both spans. Assumes the "file" part is the same in both inputs
 combineRealSrcSpans :: RealSrcSpan -> RealSrcSpan -> RealSrcSpan
 combineRealSrcSpans span1 span2
- = if line_start == line_end
-   then if col_start == col_end
-        then SrcSpanPoint     file line_start col_start
-        else SrcSpanOneLine   file line_start col_start col_end
-   else      SrcSpanMultiLine file line_start col_start line_end col_end
+  = RealSrcSpan' file line_start col_start line_end col_end
   where
     (line_start, col_start) = min (srcSpanStartLine span1, srcSpanStartCol span1)
                                   (srcSpanStartLine span2, srcSpanStartCol span2)
@@ -392,21 +383,10 @@ srcSpanEndLine :: RealSrcSpan -> Int
 srcSpanStartCol :: RealSrcSpan -> Int
 srcSpanEndCol :: RealSrcSpan -> Int
 
-srcSpanStartLine SrcSpanOneLine{ srcSpanLine=l } = l
-srcSpanStartLine SrcSpanMultiLine{ srcSpanSLine=l } = l
-srcSpanStartLine SrcSpanPoint{ srcSpanLine=l } = l
-
-srcSpanEndLine SrcSpanOneLine{ srcSpanLine=l } = l
-srcSpanEndLine SrcSpanMultiLine{ srcSpanELine=l } = l
-srcSpanEndLine SrcSpanPoint{ srcSpanLine=l } = l
-
-srcSpanStartCol SrcSpanOneLine{ srcSpanSCol=l } = l
-srcSpanStartCol SrcSpanMultiLine{ srcSpanSCol=l } = l
-srcSpanStartCol SrcSpanPoint{ srcSpanCol=l } = l
-
-srcSpanEndCol SrcSpanOneLine{ srcSpanECol=c } = c
-srcSpanEndCol SrcSpanMultiLine{ srcSpanECol=c } = c
-srcSpanEndCol SrcSpanPoint{ srcSpanCol=c } = c
+srcSpanStartLine RealSrcSpan'{ srcSpanSLine=l } = l
+srcSpanEndLine RealSrcSpan'{ srcSpanELine=l } = l
+srcSpanStartCol RealSrcSpan'{ srcSpanSCol=l } = l
+srcSpanEndCol RealSrcSpan'{ srcSpanECol=c } = c
 
 {-
 ************************************************************************
@@ -462,14 +442,17 @@ instance Show RealSrcLoc where
 
 -- Show is used by Lexer.x, because we derive Show for Token
 instance Show RealSrcSpan where
-  show (SrcSpanOneLine file l sc ec)
+  show span@(RealSrcSpan' file sl sc el ec)
+    | isPointRealSpan span
+    = "SrcSpanPoint " ++ show file ++ " " ++ intercalate " " (map show [sl,sc])
+
+    | isOneLineRealSpan span
     = "SrcSpanOneLine " ++ show file ++ " "
-                        ++ intercalate " " (map show [l,sc,ec])
-  show (SrcSpanMultiLine file sl sc el ec)
+                        ++ intercalate " " (map show [sl,sc,ec])
+
+    | otherwise
     = "SrcSpanMultiLine " ++ show file ++ " "
                           ++ intercalate " " (map show [sl,sc,el,ec])
-  show (SrcSpanPoint file l c)
-    = "SrcSpanPoint " ++ show file ++ " " ++ intercalate " " (map show [l,c])
 
 
 instance Outputable RealSrcSpan where
@@ -500,26 +483,28 @@ pprUserSpan _         (UnhelpfulSpan s) = ftext s
 pprUserSpan show_path (RealSrcSpan s)   = pprUserRealSpan show_path s
 
 pprUserRealSpan :: Bool -> RealSrcSpan -> SDoc
-pprUserRealSpan show_path (SrcSpanOneLine src_path line start_col end_col)
+pprUserRealSpan show_path span@(RealSrcSpan' src_path line col _ _)
+  | isPointRealSpan span
   = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
          , int line <> colon
-         , int start_col
-         , ppUnless (end_col - start_col <= 1) (char '-' <> int (end_col - 1)) ]
+         , int col ]
+
+pprUserRealSpan show_path span@(RealSrcSpan' src_path line scol _ ecol)
+  | isOneLineRealSpan span
+  = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
+         , int line <> colon
+         , int scol
+         , ppUnless (ecol - scol <= 1) (char '-' <> int (ecol - 1)) ]
             -- For single-character or point spans, we just
             -- output the starting column number
 
-pprUserRealSpan show_path (SrcSpanMultiLine src_path sline scol eline ecol)
+pprUserRealSpan show_path (RealSrcSpan' src_path sline scol eline ecol)
   = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
          , parens (int sline <> comma <> int scol)
          , char '-'
          , parens (int eline <> comma <> int ecol') ]
  where
    ecol' = if ecol == 0 then ecol else ecol - 1
-
-pprUserRealSpan show_path (SrcSpanPoint src_path line col)
-  = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
-         , int line <> colon
-         , int col ]
 
 {-
 ************************************************************************
