@@ -18,7 +18,7 @@ defaultPackages = mconcat
 
 packagesStage0 :: Packages
 packagesStage0 = mconcat
-    [ append [ binPackageDb, binary, cabal, compiler, ghc, ghcCabal, ghcPkg
+    [ append [ ghcBoot, binary, cabal, compiler, ghc, ghcCabal, ghcPkg
              , hsc2hs, hoopl, hpc, templateHaskell, transformers ]
     , stage0 ? append [deriveConstants, genapply, genprimopcode, hp2ps]
     , notM windowsHost ? notM (anyHostOs ["ios"]) ? append [terminfo] ]
@@ -29,10 +29,11 @@ packagesStage1 = mconcat
     [ packagesStage0
     , append [ array, base, bytestring, containers, compareSizes, deepseq
              , directory, dllSplit, filepath
-             , ghcPrim, ghcPwd, haskeline, hpcBin, integerLibrary
+             , ghci, ghcPrim, ghcPwd, haskeline, hpcBin, integerLibrary
              , mkUserGuidePart, pretty, process, runghc, time ]
     , windowsHost      ? append [win32]
     , notM windowsHost ? append [unix]
+    , notM windowsHost ? append [iservBin]
     , buildHaddock     ? append [xhtml] ]
 
 packagesStage2 :: Packages

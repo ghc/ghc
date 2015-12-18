@@ -28,16 +28,6 @@ compilePackage _ target @ (PartialTarget stage pkg) = do
             build $ fullTargetWithWay target (Ghc stage) way [src] [obj]
 
     -- TODO: get rid of these special cases
-    priority 2.0 $ buildPath -/- "DeriveConstants.o" %> \obj -> do
-        let src = pkgPath pkg -/- "DeriveConstants.hs"
-        need [src]
-        build $ fullTargetWithWay target (Ghc stage) vanilla [src] [obj]
-
-    priority 2.0 $ buildPath -/- "GenApply.o" %> \obj -> do
-        let src = pkgPath pkg -/- "GenApply.hs"
-        need [src]
-        build $ fullTargetWithWay target (Ghc stage) vanilla [src] [obj]
-
     matchBuildResult buildPath "o-boot" ?> \obj -> do
         (src, deps) <- dependencies buildPath obj
         need $ src : deps

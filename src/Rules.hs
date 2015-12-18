@@ -16,15 +16,15 @@ generateTargets = action $ do
         libTargets <- fmap concat . forM libPkgs $ \pkg -> do
             let target    = PartialTarget stage pkg
                 buildPath = targetPath stage pkg -/- "build"
-            libName     <- interpretPartial target $ getPkgData LibName
+            compId      <- interpretPartial target $ getPkgData ComponentId
             needGhciLib <- interpretPartial target $ getPkgData BuildGhciLib
             needHaddock <- interpretPartial target buildHaddock
             ways        <- interpretPartial target getWays
-            let ghciLib = buildPath -/- "HS" ++ libName <.> "o"
+            let ghciLib = buildPath -/- "HS" ++ compId <.> "o"
                 haddock = pkgHaddockFile pkg
             libs <- fmap concat . forM ways $ \way -> do
                 extension <- libsuf way
-                let name = buildPath -/- "libHS" ++ libName
+                let name = buildPath -/- "libHS" ++ compId
                 dll0 <- needDll0 stage pkg
                 return $ [ name <.> extension ]
                       ++ [ name ++ "-0" <.> extension | dll0 ]

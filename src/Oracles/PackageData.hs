@@ -16,8 +16,7 @@ import qualified Data.HashMap.Strict as Map
 -- such as 'path_MODULES = Data.Array Data.Array.Base ...'.
 -- pkgListData Modules therefore returns ["Data.Array", "Data.Array.Base", ...]
 data PackageData = BuildGhciLib FilePath
-                 | LibName      FilePath
-                 | PackageKey   FilePath
+                 | ComponentId  FilePath
                  | Synopsis     FilePath
                  | Version      FilePath
 
@@ -55,8 +54,7 @@ askPackageData path key = do
 pkgData :: PackageData -> Action String
 pkgData packageData = case packageData of
     BuildGhciLib path -> askPackageData path "BUILD_GHCI_LIB"
-    LibName      path -> askPackageData path "LIB_NAME"
-    PackageKey   path -> askPackageData path "PACKAGE_KEY"
+    ComponentId  path -> askPackageData path "COMPONENT_ID"
     Synopsis     path -> askPackageData path "SYNOPSIS"
     Version      path -> askPackageData path "VERSION"
 

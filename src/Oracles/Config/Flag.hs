@@ -16,7 +16,8 @@ data Flag = ArSupportsAtFile
           | LeadingUnderscore
           | SolarisBrokenShld
           | SplitObjectsBroken
-          | SupportsPackageKey
+          | SupportsComponentId
+          | WithLibdw
 
 -- Note, if a flag is set to empty string we treat it as set to NO. This seems
 -- fragile, but some flags do behave like this, e.g. GccIsClang.
@@ -31,7 +32,8 @@ flag f = do
         LeadingUnderscore  -> "leading-underscore"
         SolarisBrokenShld  -> "solaris-broken-shld"
         SplitObjectsBroken -> "split-objects-broken"
-        SupportsPackageKey -> "supports-package-key"
+        SupportsComponentId -> "supports-component-id"
+        WithLibdw          -> "with-libdw"
     value <- askConfigWithDefault key . putError
         $ "\nFlag '" ++ key ++ "' not set in configuration files."
     unless (value == "YES" || value == "NO" || value == "") . putError

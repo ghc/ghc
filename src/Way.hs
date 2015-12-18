@@ -169,3 +169,6 @@ instance Binary Way where
 
 instance Hashable Way where
     hashWithSalt salt = hashWithSalt salt . show
+
+instance NFData Way where
+    rnf (Way s) = s `seq` ()

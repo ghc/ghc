@@ -106,6 +106,7 @@ generateConfigHs = do
     cGHC_SPLIT_PGM             <- fmap takeBaseName $ getBuilderPath GhcSplit
     cLibFFI                    <- lift useLibFFIForAdjustors
     rtsWays                    <- getRtsWays
+    cGhcRtsWithLibdw           <- getFlag WithLibdw
     let cGhcRTSWays = unwords $ map show rtsWays
     return $ unlines
         [ "{-# LANGUAGE CPP #-}"
@@ -169,7 +170,9 @@ generateConfigHs = do
         , "cGhcThreaded :: Bool"
         , "cGhcThreaded = " ++ show (threaded `elem` rtsWays)
         , "cGhcDebugged :: Bool"
-        , "cGhcDebugged = " ++ show ghcDebugged ]
+        , "cGhcDebugged = " ++ show ghcDebugged
+        , "cGhcRtsWithLibdw :: Bool"
+        , "cGhcRtsWithLibdw = " ++ show cGhcRtsWithLibdw ]
 
 generatePlatformH :: Expr String
 generatePlatformH = do

@@ -45,12 +45,12 @@ ar-supports-at-file = @ArSupportsAtFile@
 # Build options:
 #===============
 
-supports-package-key = @SUPPORTS_PACKAGE_KEY@
-solaris-broken-shld  = @SOLARIS_BROKEN_SHLD@
-split-objects-broken = @SplitObjsBroken@
-ghc-unregisterised   = @Unregisterised@
-ghc-source-path      = @hardtop@
-leading-underscore   = @LeadingUnderscore@
+supports-component-id = @SUPPORTS_COMPONENT_ID@
+solaris-broken-shld   = @SOLARIS_BROKEN_SHLD@
+split-objects-broken  = @SplitObjsBroken@
+ghc-unregisterised    = @Unregisterised@
+ghc-source-path       = @hardtop@
+leading-underscore    = @LeadingUnderscore@
 
 # Information about build, host and target systems:
 #==================================================
@@ -116,3 +116,9 @@ iconv-lib-dirs     = @ICONV_LIB_DIRS@
 
 gmp-include-dirs   = @GMP_INCLUDE_DIRS@
 gmp-lib-dirs       = @GMP_LIB_DIRS@
+
+
+# Optional Dependencies:
+#=======================
+
+with-libdw         = @HaveLibdw@

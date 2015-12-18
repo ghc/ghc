@@ -2,6 +2,7 @@
 module Oracles.Dependencies (dependencies, dependenciesOracle) where
 
 import Base
+import Control.Monad.Trans.Maybe
 import qualified Data.HashMap.Strict as Map
 
 newtype DependenciesKey = DependenciesKey (FilePath, FilePath)
@@ -16,12 +17,11 @@ newtype DependenciesKey = DependenciesKey (FilePath, FilePath)
 dependencies :: FilePath -> FilePath -> Action (FilePath, [FilePath])
 dependencies path obj = do
     let depFile = path -/- ".dependencies"
-    res1 <- askOracle $ DependenciesKey (depFile, obj)
-    -- if no dependencies found attempt to drop the way prefix (for *.c sources)
-    res2 <- case res1 of
-        Nothing -> askOracle $ DependenciesKey (depFile, obj -<.> "o")
-        _       -> return res1
-    case res2 of
+    -- if no dependencies found then attempt to drop the way prefix (for *.c sources)
+    res <- runMaybeT $ msum
+           $ map (\obj' -> MaybeT $ askOracle $ DependenciesKey (depFile, obj'))
+                 [obj, obj -<.> "o"]
+    case res of
         Nothing -> putError $ "No dependencies found for '" ++ obj ++ "'."
         Just [] -> putError $ "Empty dependency list for '" ++ obj ++ "'."
         Just (src:depFiles) -> return (src, depFiles)

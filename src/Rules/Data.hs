@@ -1,7 +1,7 @@
 module Rules.Data (buildPackageData) where
 
 import Expression
-import GHC (deriveConstants, genapply, genprimopcode, hp2ps)
+import GHC (hp2ps)
 import Oracles
 import Predicates (registerPackage)
 import Rules.Actions
@@ -46,40 +46,6 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
                 fullTarget target (GhcPkg stage) [cabalFile] outs
 
             postProcessPackageData $ path -/- "package-data.mk"
-
-    -- TODO: Track dependency on this generated file
-    -- TODO: Use a cabal file instead of manual hacks?
-    priority 2.0 $
-        when (pkg == deriveConstants) $ path -/- "package-data.mk" %> \mk -> do
-        let contents = unlines
-                [ "utils_deriveConstants_dist-boot_MODULES = DeriveConstants"
-                , "utils_deriveConstants_dist-boot_PROGNAME = deriveConstants"
-                , "utils_deriveConstants_dist-boot_HS_SRC_DIRS = ."
-                , "utils_deriveConstants_dist-boot_INSTALL_INPLACE = YES"
-                , "utils_deriveConstants_dist-boot_HC_OPTS = -package process -package containers" ]
-        writeFileChanged mk contents
-
-    priority 2.0 $
-        when (pkg == genapply) $ path -/- "package-data.mk" %> \mk -> do
-        ghcUnreg <- flag GhcUnregisterised
-        let hcOpts = "-package pretty" ++ if ghcUnreg then " -DNO_REGS" else ""
-            contents = unlines
-                [ "utils_genapply_dist-boot_MODULES = GenApply"
-                , "utils_genapply_dist-boot_PROGNAME = genapply"
-                , "utils_genapply_dist-boot_HS_SRC_DIRS = ."
-                , "utils_genapply_dist-boot_INSTALL_INPLACE = YES"
-                , "utils_genapply_dist-boot_HC_OPTS = " ++ hcOpts ]
-        writeFileChanged mk contents
-
-    priority 2.0 $
-        when (pkg == genprimopcode) $ path -/- "package-data.mk" %> \mk -> do
-        let contents = unlines
-                [ "utils_genprimopcode_dist-boot_MODULES = Lexer Main ParserM Parser Syntax"
-                , "utils_genprimopcode_dist-boot_PROGNAME = genprimopcode"
-                , "utils_genprimopcode_dist-boot_HS_SRC_DIRS = ."
-                , "utils_genprimopcode_dist-boot_INSTALL_INPLACE = YES"
-                , "utils_genprimopcode_dist-boot_HC_OPTS = -package array" ]
-        writeFileChanged mk contents
 
     -- TODO: PROGNAME was $(CrossCompilePrefix)hp2ps
     -- TODO: code duplication around ghcIncludeDirs

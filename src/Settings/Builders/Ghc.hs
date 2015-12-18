@@ -91,11 +91,11 @@ wayGhcArgs = do
 -- TODO: Improve handling of "-hide-all-packages"
 packageGhcArgs :: Args
 packageGhcArgs = do
-    stage              <- getStage
-    pkg                <- getPackage
-    supportsPackageKey <- getFlag SupportsPackageKey
-    pkgKey             <- getPkgData PackageKey
-    pkgDepIds          <- getPkgDataList DepIds
+    stage               <- getStage
+    pkg                 <- getPackage
+    supportsComponentId <- getFlag SupportsComponentId
+    compId              <- getPkgData ComponentId
+    pkgDepIds           <- getPkgDataList DepIds
     mconcat
         [ not (pkg == deriveConstants || pkg == genapply
             || pkg == genprimopcode   || pkg == hp2ps) ?
@@ -103,9 +103,9 @@ packageGhcArgs = do
         , arg "-no-user-package-db"
         , stage0 ? arg "-package-db libraries/bootstrapping.conf"
         , isLibrary pkg ?
-          if supportsPackageKey || stage /= Stage0
-          then arg $ "-this-package-key " ++ pkgKey
-          else arg $ "-package-name "     ++ pkgKey
+          if supportsComponentId || stage /= Stage0
+          then arg $ "-this-package-key " ++ compId
+          else arg $ "-package-name "     ++ compId
         , append $ map ("-package-id " ++) pkgDepIds ]
 
 -- TODO: Improve handling of "cabal_macros.h"
