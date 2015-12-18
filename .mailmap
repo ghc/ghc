@@ -27,12 +27,14 @@ Austin Seipp            <austin@well-typed.com>             <as@hacks.yi.org>
 Austin Seipp            <austin@well-typed.com>             <as@nijoruj.org>
 Austin Seipp            <austin@well-typed.com>             <aseipp@pobox.com>
 Austin Seipp            <austin@well-typed.com>             <mad.one@gmail.com>
+Bartosz Nitka           <niteria@gmail.com>                 <bnitka@fb.com>
 Bas van Dijk            <v.dijk.bas@gmail.com>              basvandijk@home.nl <unknown>
 Bas van Dijk            <v.dijk.bas@gmail.com>              v.dijk.bas@gmail.com <unknown>
 Ben Chan                <usrbincc@yahoo.com>                # See Note [usrbincc].
 Ben Gamari              <bgamari.foss@gmail.com>            <ben@panda.(none)>
 Ben Gamari              <bgamari.foss@gmail.com>            <ben@panda1.milkyway>
 Ben Gamari              <bgamari.foss@gmail.com>            <ben@smart-cactus.org>
+Ben Gamari              <bgamari.foss@gmail.com>            <ben@well-typed.com>
 Ben Lippmeier           <benl@ouroborus.net>
 Ben Lippmeier           <benl@ouroborus.net>                <Ben.Lippmeier@anu.edu.au>
 Ben Lippmeier           <benl@ouroborus.net>                Ben.Lippmeier.anu.edu.au <unknown>
@@ -80,6 +82,7 @@ David Waern             <davve@dtek.chalmers.se>            davve@dtek.chalmers.
 Dimitrios Vytiniotis    <dimitris@microsoft.com>
 Dimitrios Vytiniotis    <dimitris@microsoft.com>            <dimitris@MSRC-1361792.europe.corp.microsoft.com>
 Dimitrios Vytiniotis    <dimitris@microsoft.com>            dimitris@microsoft.com <unknown>
+Divam Narula            <dfordivam@gmail.com>               # https://www.linkedin.com/in/dfordivam
 Don Stewart             <dons@galois.com>                   <dons@cse.unsw.edu.au>
 Don Stewart             <dons@galois.com>                   dons <unknown>
 Don Stewart             <dons@galois.com>                   dons@cse.unsw.edu.au <unknown>
@@ -90,6 +93,7 @@ Duncan Coutts           <duncan@well-typed.com>             <duncan@community.ha
 Duncan Coutts           <duncan@well-typed.com>             <duncan@haskell.org>
 Edward Z. Yang          <ezyang@cs.stanford.edu>            <ezyang@mit.edu>
 Evan Hauck              <khyperia@live.com>
+Fumiaki Kinoshita       <fumiexcel@gmail.com>
 Gabor Pali              <pali.gabor@gmail.com>              <pgj@FreeBSD.org>
 Gabriele Keller         <keller@cse.unsw.edu.au>            keller <unknown>
 Gabriele Keller         <keller@cse.unsw.edu.au>            keller@.cse.unsw.edu.au <unknown>
@@ -162,9 +166,11 @@ Marc Weber              <marco-oweber@gmx.de>               marco-oweber@gmx.de 
 Marcin 'Qrczak' Kowalczyk <qrczak@knm.org.pl>               qrczak <unknown>
 Marco Túlio Gontijo e Silva <marcot@marcot.eti.br>
 Marco Túlio Gontijo e Silva <marcot@marcot.eti.br>          <marcot@debian.org>
-Markus Großer           <markus.grosser@tum.de>
 Marios Titas            <redneb@gmx.com>                    <geopoul@gmail.com>
+Markus Großer           <markus.grosser@tum.de>
 Matt Chapman            <matthewc@cse.unsw.edu.au>          matthewc <unknown>
+Matthew Farkas-Dyck     <strake888@gmail.com>
+Matthew Farkas-Dyck     <strake888@gmail.com>               <mfdyck@google.com>
 Matthias Kilian         <kili@outback.escape.de>            kili@outback.escape.de <unknown>
 Michael D. Adams        <t-madams@microsoft.com>            <adamsmd@cs.indiana.edu>
 Michael Weber           <michaelw@debian.org>               michaelw <unknown>
@@ -195,6 +201,8 @@ Rob Ennals              <rob@ennals.org>                    rje <unknown> # SPJ'
 Roman Leshchinskiy      <rl@cse.unsw.edu.au>                rl@cse.unsw.edu.au <unknown>
 Ross Paterson           <ross@soi.city.ac.uk>               ross <unknown>
 Ryan Lortie             <desrt@desrt.ca>                    desrt <unknown>
+Ryan Scott              <ryan.gl.scott@gmail.com>
+Ryan Scott              <ryan.gl.scott@gmail.com>           <ryan.gl.scott@ku.edu>
 Sam Anklesaria          <amsay@amsay.net>
 Sam Anklesaria          <amsay@amsay.net>                   amsay@amsay.net <unknown>
 Sean Seefried           <sean.seefried@gmail.com>           sseefried <unknown>
@@ -230,6 +238,7 @@ Stephen Blackheath      <stephen@blacksapphire.com>         <oversensitive.pasto
 Sungwoo Park            <gla@postech.ac.kr>                 gla <unknown> # https://ghc.haskell.org/trac/ghc/wiki/TeamGHC
 Sven Panne              <sven.panne@aedion.de>              panne <unknown>
 Sven Panne              <sven.panne@aedion.de>              sven.panne@aedion.de <unknown>
+Sylvain Henry           <hsyl20@gmail.com>
 Sébastien Carlier       <sebc@posse42.net>                  sebc <unknown>
 Thorkil Naur            <naur@post11.tele.dk>               naur@post11.tele.dk <unknown>
 Tibor Erdesz            <erdeszt@gmail.com>
