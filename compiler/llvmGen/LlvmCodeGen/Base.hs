@@ -12,7 +12,7 @@ module LlvmCodeGen.Base (
         LiveGlobalRegs,
         LlvmUnresData, LlvmData, UnresLabel, UnresStatic,
 
-        LlvmVersion, supportedLlvmVersion,
+        LlvmVersion, supportedLlvmVersion, llvmVersionStr,
 
         LlvmM,
         runLlvm, liftStream, withClearVars, varLookup, varInsert,
@@ -183,6 +183,9 @@ type LlvmVersion = (Int, Int)
 -- | The LLVM Version that is currently supported.
 supportedLlvmVersion :: LlvmVersion
 supportedLlvmVersion = sUPPORTED_LLVM_VERSION
+
+llvmVersionStr :: LlvmVersion -> String
+llvmVersionStr (major, minor) = show major ++ "." ++ show minor
 
 -- ----------------------------------------------------------------------------
 -- * Environment Handling

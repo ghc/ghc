@@ -66,6 +66,8 @@ import Util
 import DynFlags
 import Exception
 
+import LlvmCodeGen.Base (llvmVersionStr, supportedLlvmVersion)
+
 import Data.IORef
 import Control.Monad
 import System.Exit
@@ -653,7 +655,8 @@ figureLlvmVersion dflags = do
                 errorMsg dflags $ vcat
                     [ text "Warning:", nest 9 $
                           text "Couldn't figure out LLVM version!" $$
-                          text "Make sure you have installed LLVM"]
+                          text ("Make sure you have installed LLVM " ++
+                                llvmVersionStr supportedLlvmVersion) ]
                 return Nothing)
   return ver
 

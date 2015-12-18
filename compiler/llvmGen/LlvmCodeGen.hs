@@ -54,6 +54,9 @@ llvmCodeGen dflags h us cmm_stream
        let doWarn = wopt Opt_WarnUnsupportedLlvmVersion dflags
        when (ver /= supportedLlvmVersion && doWarn) $
            putMsg dflags (text "You are using an unsupported version of LLVM!"
+                            $+$ text ("Currently only " ++
+                                      llvmVersionStr supportedLlvmVersion ++
+                                      " is supported.")
                             $+$ text "We will try though...")
 
        -- run code generation
