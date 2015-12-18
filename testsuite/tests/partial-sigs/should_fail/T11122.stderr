@@ -1,0 +1,7 @@
+
+T11122.hs:19:18: warning:
+    • Found type wildcard ‘_’ standing for ‘Int’
+    • In the type signature:
+        parser :: Parser _
+    • Relevant bindings include
+        parser :: Parser Int (bound at T11122.hs:21:1)

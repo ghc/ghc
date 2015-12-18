@@ -60,4 +60,4 @@ test('WildcardInTypeSynonymRHS', normal, compile_fail, [''])
 test('T10615', normal, compile_fail, [''])
 test('T10045', normal, compile_fail, [''])
 test('T10999', normal, compile_fail, [''])
-
+test('T11122', normal, compile, [''])
