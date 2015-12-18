@@ -1,9 +1,9 @@
 module GHC (
     array, base, ghcBoot, binary, bytestring, cabal, compiler, containers,
     compareSizes, deepseq, deriveConstants, directory, dllSplit, filepath,
-    genapply, genprimopcode, ghc, ghcCabal, ghcPkg, ghcPrim, ghcPwd, ghcTags,
+    genapply, genprimopcode, ghc, ghcCabal, ghci, ghcPkg, ghcPrim, ghcPwd, ghcTags,
     haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
-    integerSimple, mkUserGuidePart, parallel, pretty, primitive, process,
+    integerSimple, iservBin, mkUserGuidePart, parallel, pretty, primitive, process,
     runghc, stm, templateHaskell, terminfo, time, transformers, unix, win32, xhtml,
 
     defaultKnownPackages, defaultTargetDirectory, defaultProgramPath
@@ -22,11 +22,11 @@ defaultKnownPackages :: [Package]
 defaultKnownPackages =
     [ array, base, ghcBoot, binary, bytestring, cabal, compiler
     , containers, compareSizes, deepseq, deriveConstants, directory, dllSplit
-    , filepath, genapply, genprimopcode, ghc, ghcCabal, ghcPkg, ghcPrim
+    , filepath, genapply, genprimopcode, ghc, ghcCabal, ghci, ghcPkg, ghcPrim
     , ghcPwd, ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin
-    , integerGmp, integerSimple, mkUserGuidePart, parallel, pretty, primitive
-    , process, runghc, stm, templateHaskell, terminfo, time, transformers, unix
-    , win32, xhtml ]
+    , integerGmp, integerSimple, iservBin, mkUserGuidePart, parallel, pretty
+    , primitive , process, runghc, stm, templateHaskell, terminfo, time
+    , transformers, unix, win32, xhtml ]
 
 -- Package definitions (see Package.hs)
 array, base, ghcBoot, binary, bytestring, cabal, compiler, containers,
@@ -54,6 +54,7 @@ genapply        = utility  "genapply"
 genprimopcode   = utility  "genprimopcode"
 ghc             = topLevel "ghc-bin"        `setPath` "ghc"
 ghcCabal        = utility  "ghc-cabal"
+ghci            = library  "ghci"           `setPath` "libraries/ghci"
 ghcPkg          = utility  "ghc-pkg"
 ghcPrim         = library  "ghc-prim"
 ghcPwd          = utility  "ghc-pwd"
@@ -67,6 +68,7 @@ hpc             = library  "hpc"
 hpcBin          = utility  "hpc-bin"        `setPath` "utils/hpc"
 integerGmp      = library  "integer-gmp"
 integerSimple   = library  "integer-simple"
+iservBin        = topLevel "iserv-bin"      `setPath` "iserv"
 mkUserGuidePart = utility  "mkUserGuidePart"
 parallel        = library  "parallel"
 pretty          = library  "pretty"

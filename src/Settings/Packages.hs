@@ -29,10 +29,11 @@ packagesStage1 = mconcat
     [ packagesStage0
     , append [ array, base, bytestring, containers, compareSizes, deepseq
              , directory, dllSplit, filepath
-             , ghcPrim, ghcPwd, haskeline, hpcBin, integerLibrary
+             , ghci, ghcPrim, ghcPwd, haskeline, hpcBin, integerLibrary
              , mkUserGuidePart, pretty, process, runghc, time ]
     , windowsHost      ? append [win32]
     , notM windowsHost ? append [unix]
+    , notM windowsHost ? append [iservBin]
     , buildHaddock     ? append [xhtml] ]
 
 packagesStage2 :: Packages
