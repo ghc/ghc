@@ -11,6 +11,9 @@ module GHCi.InfoTable
   , conInfoPtr
   ) where
 
+#if !defined(TABLES_NEXT_TO_CODE)
+import Data.Maybe (fromJust)
+#endif
 import Foreign
 import Foreign.C
 import GHC.Ptr
