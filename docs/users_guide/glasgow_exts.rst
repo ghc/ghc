@@ -10097,6 +10097,8 @@ Run "main.exe" and here is your output:
     $ ./main
     Hello
 
+.. _th-profiling:
+
 Using Template Haskell with Profiling
 -------------------------------------
 
@@ -10116,9 +10118,11 @@ runtime.
 This causes difficulties if you have a multi-module program containing
 Template Haskell code and you need to compile it for profiling, because
 GHC cannot load the profiled object code and use it when executing the
-splices. Fortunately GHC provides a workaround. The basic idea is to
-compile the program twice:
+splices.
 
+Fortunately GHC provides two workarounds.
+
+The first option is to compile the program twice:
 
 1. Compile the program or library first the normal way, without ``-prof``.
 
@@ -10136,6 +10140,13 @@ compile the program twice:
    .. index::
       single : ``-osuf``
 
+The second option is to add the flag ``-fexternal-interpreter`` (see
+:ref:`external-interpreter`), which runs the interpreter in a separate
+process, wherein it can load and run the profiled code directly.
+There's no need to compile the code twice, just add
+``-fexternal-interpreter`` and it should just work.  (this option is
+experimental in GHC 8.0.x, but it may become the default in future
+releases).
 
 .. _th-quasiquotation:
 

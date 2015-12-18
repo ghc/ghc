@@ -2938,6 +2938,47 @@ breakpoints in object-code modules, for example. Only the exports of an
 object-code module will be visible in GHCi, rather than all top-level
 bindings as in interpreted modules.
 
+.. _external-interpreter:
+
+Running the interpreter in a separate process
+---------------------------------------------
+
+Normally GHCi runs the interpreted code in the same process as GHC
+itself, on top of the same RTS and sharing the same heap.  However, if
+the flag ``-fexternal-interpreter`` is given, then GHC will spawn a
+separate process for running interpreted code, and communicate with it
+using messages over a pipe.
+
+``-fexternal-interpreter``
+    .. index::
+       single: -fexternal-interpreter
+
+    Run interpreted code (for GHCi, Template Haskell, Quasi-quoting,
+    or Annotations) in a separate process.  The interpreter will run
+    in profiling mode if ``-prof`` is in effect, and in
+    dynamically-linked mode if ``-dynamic`` is in effect.
+
+    There are a couple of caveats that will hopefully be removed in
+    the future: this option is currently not implemented on Windows
+    (it is a no-op), and the external interpreter does not support the
+    GHCi debugger, so breakpoints and single-stepping don't work with
+    ``-fexternal-interpreter``.
+
+    See also the ``-pgmi`` (:ref:`replacing-phases`) and ``-opti``
+    (:ref:`forcing-options-through`) flags.
+
+Why might we want to do this?  The main reason is that the RTS running
+the interpreted code can be a different flavour (profiling or
+dynamically-linked) from GHC itself.  So for example, when compiling
+Template Haskell code with ``-prof``, we don't need to compile the
+modules without ``-prof`` first (see :ref:`th-profiling`) because we
+can run the profiled object code in the interpreter.  GHCi can also
+load and run profiled object code when run with
+``-fexternal-interpreter`` and ``-prof``.
+
+This feature is experimental in GHC 8.0.x, but it may become the
+default in future releases.
+
 .. _ghci-faq:
 
 FAQ and Things To Watch Out For

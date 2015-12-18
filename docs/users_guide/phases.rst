@@ -92,6 +92,15 @@ given compilation phase:
 
     Use ⟨cmd⟩ as the libtool command (when using ``-staticlib`` only).
 
+``-pgmi ⟨cmd⟩``
+    .. index::
+       single: -pgmi
+
+    Use ⟨cmd⟩ as the external interpreter command (see:
+    :ref:`external-interpreter`).  Default: ``ghc-iserv-prof`` if
+    ``-prof`` is enabled, ``ghc-iserv-dyn`` if ``-dynamic`` is
+    enabled, or ``ghc-iserv`` otherwise.
+
 .. _forcing-options-through:
 
 Forcing options to a particular phase
@@ -164,6 +173,16 @@ the following flags:
 
     Pass ⟨option⟩ to ``windres`` when embedding manifests on Windows.
     See ``-fno-embed-manifest`` in :ref:`options-linker`.
+
+``-opti ⟨option⟩``
+    .. index::
+       single: -opti
+
+    Pass ⟨option⟩ to the interpreter sub-process (see
+    :ref:`external-interpreter`).  A common use for this is to pass
+    RTS options e.g., ``-opti+RTS -opti-A64m``, or to enable verbosity
+    with ``-opti-v`` to see what messages are being exchanged by GHC
+    and the interpreter.
 
 So, for example, to force an ``-Ewurble`` option to the assembler, you
 would tell the driver ``-opta-Ewurble`` (the dash before the E is
