@@ -454,9 +454,9 @@ GHC sports a veritable menagerie of equality types:
   ~           homo      lifted      Constraint   nominal   Data.Type.Equality
   :~:         homo      lifted      *            nominal   Data.Type.Equality
 
-  ~R#         hetero    unlifted    #            repr.     GHC.Prim
-  Coercible   homo      lifted      Constraint   repr.     GHC.Types
-  Coercion    homo      lifted      *            repr.     Data.Type.Coercion
+  ~R#         hetero    unlifted    #            repr      GHC.Prim
+  Coercible   homo      lifted      Constraint   repr      GHC.Types
+  Coercion    homo      lifted      *            repr      Data.Type.Coercion
 
   ~P#         hetero    unlifted                 phantom   GHC.Prim
 
@@ -471,7 +471,9 @@ error messages, and (~R#) is rendered as Coercible.
 
 Let's take these one at a time:
 
-(~#) :: forall k1 k2. k1 -> k2 -> #
+    --------------------------
+    (~#) :: forall k1 k2. k1 -> k2 -> #
+    --------------------------
 This is The Type Of Equality in GHC. It classifies nominal coercions.
 This type is used in the solver for recording equality constraints.
 It responds "yes" to Type.isEqPred and classifies as an EqPred in
@@ -485,7 +487,9 @@ equality constraints are deferred.
 Within GHC, ~# is called eqPrimTyCon, and it is defined in TysPrim.
 
 
-(~~) :: forall k1 k2. k1 -> k2 -> Constraint
+    --------------------------
+    (~~) :: forall k1 k2. k1 -> k2 -> Constraint
+    --------------------------
 This is (almost) an ordinary class, defined as if by
   class a ~# b => a ~~ b
   instance a ~# b => a ~~ b
@@ -516,7 +520,9 @@ in Haskell.
 Within GHC, ~~ is called heqTyCon, and it is defined in TysWiredIn.
 
 
-(~) :: forall k. k -> k -> Constraint
+    --------------------------
+    (~) :: forall k. k -> k -> Constraint
+    --------------------------
 This is defined in Data.Type.Equality:
   class a ~~ b => (a :: k) ~ (b :: k)
   instance a ~~ b => a ~ b
@@ -534,12 +540,16 @@ Within GHC, ~ is called eqTyCon, and it is defined in PrelNames. Note that
 it is *not* wired in.
 
 
-(:~:) :: forall k. k -> k -> *
+    --------------------------
+    (:~:) :: forall k. k -> k -> *
+    --------------------------
 This is a perfectly ordinary GADT, wrapping (~). It is not defined within
 GHC at all.
 
 
-(~R#) :: forall k1 k2. k1 -> k2 -> #
+    --------------------------
+    (~R#) :: forall k1 k2. k1 -> k2 -> #
+    --------------------------
 The is the representational analogue of ~#. This is the type of representational
 equalities that the solver works on. All wanted constraints of this type are
 built with coercion holes.
@@ -547,7 +557,9 @@ built with coercion holes.
 Within GHC, ~R# is called eqReprPrimTyCon, and it is defined in TysPrim.
 
 
-Coercible :: forall k. k -> k -> Constraint
+    --------------------------
+    Coercible :: forall k. k -> k -> Constraint
+    --------------------------
 This is quite like (~~) in the way it's defined and treated within GHC, but
 it's homogeneous. Homogeneity helps with type inference (as GHC can solve one
 kind from the other) and, in my (Richard's) estimation, will be more intuitive
@@ -563,12 +575,16 @@ Within GHC, Coercible is called coercibleTyCon, and it is defined in
 TysWiredIn.
 
 
-Coercion :: forall k. k -> k -> *
+    --------------------------
+    Coercion :: forall k. k -> k -> *
+    --------------------------
 This is a perfectly ordinary GADT, wrapping Coercible. It is not defined
 within GHC at all.
 
 
-(~P#) :: forall k1 k2. k1 -> k2 -> #
+    --------------------------
+    (~P#) :: forall k1 k2. k1 -> k2 -> #
+    --------------------------
 This is the phantom analogue of ~# and it is barely used at all.
 (The solver has no idea about this one.) Here is the motivation:
 
