@@ -45,6 +45,7 @@ module DynFlags (
         GhcMode(..), isOneShot,
         GhcLink(..), isNoLink,
         PackageFlag(..), PackageArg(..), ModRenaming(..),
+        IgnorePackageFlag(..), TrustFlag(..),
         PkgConfRef(..),
         Option(..), showOpt,
         DynLibLoader(..),
@@ -691,8 +692,12 @@ data DynFlags = DynFlags {
         -- ^ The @-package-db@ flags given on the command line, in the order
         -- they appeared.
 
+  ignorePackageFlags    :: [IgnorePackageFlag],
+        -- ^ The @-ignore-package@ flags from the command line
   packageFlags          :: [PackageFlag],
         -- ^ The @-package@ and @-hide-package@ flags from the command-line
+  trustFlags            :: [TrustFlag],
+        -- ^ The @-trust@ and @-distrust@ flags
   packageEnv            :: Maybe FilePath,
         -- ^ Filepath to the package environment file (if overriding default)
 
@@ -1088,13 +1093,16 @@ data ModRenaming = ModRenaming {
   } deriving (Eq)
 
 -- | Flags for manipulating packages.
+newtype IgnorePackageFlag = IgnorePackage String -- ^ @-ignore-package@
+
+data TrustFlag
+  = TrustPackage    String -- ^ @-trust@
+  | DistrustPackage String -- ^ @-distrust@
+
 data PackageFlag
   = ExposePackage   PackageArg ModRenaming -- ^ @-package@, @-package-id@
                                            -- and @-package-key@
   | HidePackage     String -- ^ @-hide-package@
-  | IgnorePackage   String -- ^ @-ignore-package@
-  | TrustPackage    String -- ^ @-trust-package@
-  | DistrustPackage String -- ^ @-distrust-package@
   deriving (Eq)
 
 defaultHscTarget :: Platform -> HscTarget
@@ -1424,6 +1432,8 @@ defaultDynFlags mySettings =
 
         extraPkgConfs           = id,
         packageFlags            = [],
+        ignorePackageFlags      = [],
+        trustFlags              = [],
         packageEnv              = Nothing,
         pkgDatabase             = Nothing,
         -- This gets filled in with GHC.setSessionDynFlags
@@ -3778,11 +3788,12 @@ exposeUnitId p =
 hidePackage p =
   upd (\s -> s{ packageFlags = HidePackage p : packageFlags s })
 ignorePackage p =
-  upd (\s -> s{ packageFlags = IgnorePackage p : packageFlags s })
+  upd (\s -> s{ ignorePackageFlags = IgnorePackage p : ignorePackageFlags s })
+
 trustPackage p = exposePackage p >> -- both trust and distrust also expose a package
-  upd (\s -> s{ packageFlags = TrustPackage p : packageFlags s })
+  upd (\s -> s{ trustFlags = TrustPackage p : trustFlags s })
 distrustPackage p = exposePackage p >>
-  upd (\s -> s{ packageFlags = DistrustPackage p : packageFlags s })
+  upd (\s -> s{ trustFlags = DistrustPackage p : trustFlags s })
 
 exposePackage' :: String -> DynFlags -> DynFlags
 exposePackage' p dflags
