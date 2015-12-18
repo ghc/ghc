@@ -188,7 +188,7 @@ traceShowM = traceM . show
 -- available.
 --
 -- In the current GHC implementation, the call stack is only
--- availble if the program was compiled with @-prof@; otherwise
+-- available if the program was compiled with @-prof@; otherwise
 -- 'traceStack' behaves exactly like 'trace'.  Entries in the call
 -- stack correspond to @SCC@ annotations, so it is a good idea to use
 -- @-fprof-auto@ or @-fprof-auto-calls@ to add SCC annotations automatically.
