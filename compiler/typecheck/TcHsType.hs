@@ -600,13 +600,16 @@ tc_hs_type mode (HsExplicitListTy _k tys) exp_kind
     mk_nil  k     = mkTyConApp (promoteDataCon nilDataCon) [k]
 
 tc_hs_type mode (HsExplicitTupleTy _ tys) exp_kind
-  = do { tks <- mapM (tc_infer_lhs_type mode) tys
-       ; let n          = length tys
-             kind_con   = tupleTyCon           Boxed n
-             ty_con     = promotedTupleDataCon Boxed n
-             (taus, ks) = unzip tks
+  -- using newMetaKindVar means that we force instantiations of any polykinded
+  -- types. At first, I just used tc_infer_lhs_type, but that led to #11255.
+  = do { ks   <- replicateM arity newMetaKindVar
+       ; taus <- zipWithM (tc_lhs_type mode) tys ks
+       ; let kind_con   = tupleTyCon           Boxed arity
+             ty_con     = promotedTupleDataCon Boxed arity
              tup_k      = mkTyConApp kind_con ks
        ; checkExpectedKind (mkTyConApp ty_con (ks ++ taus)) tup_k exp_kind }
+  where
+    arity = length tys
 
 --------- Constraint types
 tc_hs_type mode (HsIParamTy n ty) exp_kind
