@@ -128,7 +128,6 @@ Library
         cbits/genSym.c
 
     hs-source-dirs:
-        backpack
         basicTypes
         cmm
         codeGen
