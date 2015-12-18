@@ -55,6 +55,8 @@ libraries/vector_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports
 # haddock's attoparsec uses deprecated `inlinePerformIO`
 utils/haddock_dist_EXTRA_HC_OPTS += -Wno-deprecations
 
+# not yet de-tabbed
+libraries/time_dist-install_EXTRA_HC_OPTS += -Wno-tabs
 # On Windows, there are also some unused import warnings
 ifeq "$(HostOS_CPP)" "mingw32"
 libraries/time_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports -Wno-identities
@@ -89,6 +91,7 @@ libraries/vector_dist-install_EXTRA_HC_OPTS += -Wwarn
 
 # temporarily turn off unused-imports warnings for xhtml
 libraries/xhtml_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports
+libraries/xhtml_dist-install_EXTRA_HC_OPTS += -Wno-tabs
 
 libraries/dph/dph-base_dist-install_EXTRA_HC_OPTS += -Wwarn
 libraries/dph/dph-prim-interface_dist-install_EXTRA_HC_OPTS += -Wwarn
@@ -109,16 +112,6 @@ libraries/Win32_dist-install_EXTRA_HC_OPTS += -Wno-trustworthy-safe
 # We need -Wno-deprecated-flags to avoid failure with -Werror
 GhcLibExtraHcOpts += -Wno-deprecated-flags
 GhcBootLibExtraHcOpts += -fno-warn-deprecated-flags
-
-# The warning suppression flag below is a temporary kludge. While working with
-# modules that contain tabs, please de-tab them so this flag can be eventually
-# removed. See
-# http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
-# for details
-#
-GhcLibExtraHcOpts += -Wno-tabs
-GhcBootLibExtraHcOpts += -fno-warn-tabs
-
 
 # Note [Order of warning flags]
 #
