@@ -1098,9 +1098,11 @@ if grep '	' compiler/ghc.cabal.in 2>&1 >/dev/null; then
    AC_MSG_ERROR([compiler/ghc.cabal.in contains tab characters; please remove them])
 fi
 
-if test -e shake/cfg/system.config.in; then
-    AC_CONFIG_FILES([shake/cfg/system.config])
+# Create the configuration for the Shake-based build system if it is present
+if test -e build/cfg/system.config.in; then
+    AC_CONFIG_FILES([build/cfg/system.config])
 fi
+
 AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal settings docs/users_guide/ghc_config.py docs/index.html libraries/prologue.txt distrib/configure.ac])
 AC_OUTPUT
 
