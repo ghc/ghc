@@ -319,7 +319,7 @@ int rts_isDynamic(void)
 // Used for detecting a non-empty FPU stack on x86 (see #4914)
 void checkFPUStack(void)
 {
-#ifdef x86_HOST_ARCH
+#ifdef i386_HOST_ARCH
     static unsigned char buf[108];
     asm("FSAVE %0":"=m" (buf));
 

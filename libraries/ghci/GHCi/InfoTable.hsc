@@ -66,7 +66,7 @@ platform =
        ArchSparc
 #elif defined(powerpc_HOST_ARCH)
        ArchPPC
-#elif defined(x86_HOST_ARCH)
+#elif defined(i386_HOST_ARCH)
        ArchX86
 #elif defined(x86_64_HOST_ARCH)
        ArchX86_64
