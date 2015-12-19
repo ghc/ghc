@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-
+{-# LANGUAGE CPP #-}
 
 module Test.Haddock.Config
     ( TestPackage(..), CheckConfig(..), DirConfig(..), Config(..)
@@ -218,9 +218,13 @@ baseDependencies ghcPath = do
     -- consequences of unsetting it - but looks like it works (for now).
     unsetEnv "GHC_PACKAGE_PATH"
 
-    (_, _, cfg) <- configure normal (Just ghcPath) Nothing
+    (comp, _, cfg) <- configure normal (Just ghcPath) Nothing
         defaultProgramConfiguration
+#if MIN_VERSION_Cabal(1,23,0)
+    pkgIndex <- getInstalledPackages normal comp [GlobalPackageDB] cfg
+#else
     pkgIndex <- getInstalledPackages normal [GlobalPackageDB] cfg
+#endif
     mapM (getDependency pkgIndex) ["base", "process", "ghc-prim"]
   where
     getDependency pkgIndex name = case ifaces pkgIndex name of
