@@ -1243,6 +1243,7 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /tests/plugins/plugins06
 /tests/plugins/plugins07
 /tests/plugins/rule-defining-plugin/pkg.T10420/
+/tests/plugins/rule-defining-plugin/pkg.T11244/
 /tests/plugins/rule-defining-plugin/pkg.plugins07/
 /tests/plugins/simple-plugin/dist/
 /tests/plugins/simple-plugin/install/

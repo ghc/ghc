@@ -26,7 +26,7 @@ module DynamicLoading (
 import Linker           ( linkModule, getHValue )
 import GHCi             ( wormhole )
 import SrcLoc           ( noSrcSpan )
-import Finder           ( findImportedModule, cannotFindModule )
+import Finder           ( findPluginModule, cannotFindModule )
 import TcRnMonad        ( initTcInteractive, initIfaceTcRn )
 import LoadIface        ( loadPluginInterface )
 import RdrName          ( RdrName, ImportSpec(..), ImpDeclSpec(..)
@@ -203,12 +203,10 @@ lessUnsafeCoerce dflags context what = do
 -- loaded very partially: just enough that it can be used, without its
 -- rules and instances affecting (and being linked from!) the module
 -- being compiled.  This was introduced by 57d6798.
---
--- See Note [Care with plugin imports] in LoadIface.
 lookupRdrNameInModuleForPlugins :: HscEnv -> ModuleName -> RdrName -> IO (Maybe Name)
 lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     -- First find the package the module resides in by searching exposed packages and home modules
-    found_module <- findImportedModule hsc_env mod_name Nothing
+    found_module <- findPluginModule hsc_env mod_name
     case found_module of
         Found _ mod -> do
             -- Find the exports of the module

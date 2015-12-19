@@ -23,6 +23,7 @@ module Packages (
         listVisibleModuleNames,
         lookupModuleInAllPackages,
         lookupModuleWithSuggestions,
+        lookupPluginModuleWithSuggestions,
         LookupResult(..),
         ModuleSuggestion(..),
         ModuleOrigin(..),
@@ -269,7 +270,10 @@ data PackageState = PackageState {
   -- | This is a full map from 'ModuleName' to all modules which may possibly
   -- be providing it.  These providers may be hidden (but we'll still want
   -- to report them in error messages), or it may be an ambiguous import.
-  moduleToPkgConfAll    :: ModuleToPkgConfAll
+  moduleToPkgConfAll    :: ModuleToPkgConfAll,
+
+  -- | A map, like 'moduleToPkgConfAll', but controlling plugin visibility.
+  pluginModuleToPkgConfAll    :: ModuleToPkgConfAll
   }
 
 emptyPackageState :: PackageState
@@ -277,7 +281,8 @@ emptyPackageState = PackageState {
     pkgIdMap = emptyUFM,
     preloadPackages = [],
     explicitPackages = [],
-    moduleToPkgConfAll = Map.empty
+    moduleToPkgConfAll = Map.empty,
+    pluginModuleToPkgConfAll = Map.empty
     }
 
 type InstalledPackageIndex = Map UnitId PackageConfig
@@ -531,14 +536,16 @@ applyTrustFlag dflags unusable pkgs flag =
 applyPackageFlag
    :: DynFlags
    -> UnusablePackages
+   -> Bool -- if False, if you expose a package, it implicitly hides
+           -- any previously exposed packages with the same name
    -> [PackageConfig]
    -> VisibilityMap           -- Initially exposed
    -> PackageFlag               -- flag to apply
    -> IO VisibilityMap        -- Now exposed
 
-applyPackageFlag dflags unusable pkgs vm flag =
+applyPackageFlag dflags unusable no_hide_others pkgs vm flag =
   case flag of
-    ExposePackage arg (ModRenaming b rns) ->
+    ExposePackage _ arg (ModRenaming b rns) ->
        case selectPackages (matching arg) pkgs unusable of
          Left ps         -> packageFlagErr dflags flag ps
          Right (p:_,_) -> return vm'
@@ -546,10 +553,27 @@ applyPackageFlag dflags unusable pkgs vm flag =
            n = fsPackageName p
            vm' = addToUFM_C edit vm_cleared (packageConfigId p) (b, rns, n)
            edit (b, rns, n) (b', rns', _) = (b || b', rns ++ rns', n)
-           -- ToDo: ATM, -hide-all-packages implicitly triggers change in
-           -- behavior, maybe eventually make it toggleable with a separate
-           -- flag
-           vm_cleared | gopt Opt_HideAllPackages dflags = vm
+           -- In the old days, if you said `ghc -package p-0.1 -package p-0.2`
+           -- (or if p-0.1 was registered in the pkgdb as exposed: True),
+           -- the second package flag would override the first one and you
+           -- would only see p-0.2 in exposed modules.  This is good for
+           -- usability.
+           --
+           -- However, with thinning and renaming (or Backpack), there might be
+           -- situations where you legitimately want to see two versions of a
+           -- package at the same time, and this behavior would make it
+           -- impossible to do so.  So we decided that if you pass
+           -- -hide-all-packages, this should turn OFF the overriding behavior
+           -- where an exposed package hides all other packages with the same
+           -- name.  This should not affect Cabal at all, which only ever
+           -- exposes one package at a time.
+           --
+           -- NB: Why a variable no_hide_others?  We have to apply this logic to
+           -- -plugin-package too, and it's more consistent if the switch in
+           -- behavior is based off of
+           -- -hide-all-packages/-hide-all-plugin-packages depending on what
+           -- flag is in question.
+           vm_cleared | no_hide_others = vm
                       | otherwise = filterUFM_Directly
                             (\k (_,_,n') -> k == getUnique (packageConfigId p)
                                                 || n /= n') vm
@@ -602,7 +626,7 @@ packageFlagErr :: DynFlags
 
 -- for missing DPH package we emit a more helpful error message, because
 -- this may be the result of using -fdph-par or -fdph-seq.
-packageFlagErr dflags (ExposePackage (PackageArg pkg) _) []
+packageFlagErr dflags (ExposePackage _ (PackageArg pkg) _) []
   | is_dph_package pkg
   = throwGhcExceptionIO (CmdLineError (showSDoc dflags $ dph_err))
   where dph_err = text "the " <> text pkg <> text " package is not installed."
@@ -635,17 +659,7 @@ packageFlagErr' dflags flag_doc reasons
 pprFlag :: PackageFlag -> SDoc
 pprFlag flag = case flag of
     HidePackage p   -> text "-hide-package " <> text p
-    ExposePackage a rns -> ppr_arg a <> ppr_rns rns
-  where ppr_arg arg = case arg of
-                     PackageArg    p -> text "-package " <> text p
-                     PackageIdArg  p -> text "-package-id " <> text p
-                     UnitIdArg p -> text "-package-key " <> text p
-        ppr_rns (ModRenaming True []) = Outputable.empty
-        ppr_rns (ModRenaming b rns) =
-            if b then text "with" else Outputable.empty <+>
-            char '(' <> hsep (punctuate comma (map ppr_rn rns)) <> char ')'
-        ppr_rn (orig, new) | orig == new = ppr orig
-                           | otherwise = ppr orig <+> text "as" <+> ppr new
+    ExposePackage doc _ _ -> text doc
 
 pprTrustFlag :: TrustFlag -> SDoc
 pprTrustFlag flag = case flag of
@@ -1016,7 +1030,8 @@ mkPackageState dflags0 dbs preload0 = do
   -- -hide-package).  This needs to know about the unusable packages, since if a
   -- user tries to enable an unusable package, we should let them know.
   --
-  vis_map2 <- foldM (applyPackageFlag dflags unusable pkgs1)
+  vis_map2 <- foldM (applyPackageFlag dflags unusable
+                        (gopt Opt_HideAllPackages dflags) pkgs1)
                             vis_map1 other_flags
 
   --
@@ -1029,6 +1044,33 @@ mkPackageState dflags0 dbs preload0 = do
   -- Update the visibility map, so we treat wired packages as visible.
   let vis_map = updateVisibilityMap wired_map vis_map2
 
+  let hide_plugin_pkgs = gopt Opt_HideAllPluginPackages dflags
+  plugin_vis_map <-
+    case pluginPackageFlags dflags of
+        -- common case; try to share the old vis_map
+        [] | not hide_plugin_pkgs -> return vis_map
+           | otherwise -> return emptyUFM
+        _ -> do let plugin_vis_map1
+                        | hide_plugin_pkgs = emptyUFM
+                        -- Use the vis_map PRIOR to wired in,
+                        -- because otherwise applyPackageFlag
+                        -- won't work.
+                        | otherwise = vis_map2
+                plugin_vis_map2
+                    <- foldM (applyPackageFlag dflags unusable
+                                (gopt Opt_HideAllPluginPackages dflags) pkgs1)
+                             plugin_vis_map1
+                             (reverse (pluginPackageFlags dflags))
+                -- Updating based on wired in packages is mostly
+                -- good hygiene, because it won't matter: no wired in
+                -- package has a compiler plugin.
+                -- TODO: If a wired in package had a compiler plugin,
+                -- and you tried to pick different wired in packages
+                -- with the plugin flags and the normal flags... what
+                -- would happen?  I don't know!  But this doesn't seem
+                -- likely to actually happen.
+                return (updateVisibilityMap wired_map plugin_vis_map2)
+
   --
   -- Here we build up a set of the packages mentioned in -package
   -- flags on the command line; these are called the "preload"
@@ -1040,7 +1082,7 @@ mkPackageState dflags0 dbs preload0 = do
                    in fromMaybe key (Map.lookup key wired_map)
                  | f <- other_flags, p <- get_exposed f ]
 
-      get_exposed (ExposePackage a _) = take 1 . sortByVersion
+      get_exposed (ExposePackage _ a _) = take 1 . sortByVersion
                                       . filter (matching a)
                                       $ pkgs1
       get_exposed _                 = []
@@ -1073,7 +1115,8 @@ mkPackageState dflags0 dbs preload0 = do
                                 then packageConfigId pkg : xs
                                 else xs) [] pkg_db,
     pkgIdMap            = pkg_db,
-    moduleToPkgConfAll  = mkModuleToPkgConfAll dflags pkg_db vis_map
+    moduleToPkgConfAll  = mkModuleToPkgConfAll dflags pkg_db vis_map,
+    pluginModuleToPkgConfAll = mkModuleToPkgConfAll dflags pkg_db plugin_vis_map
     }
   return (pstate, new_dep_preload, this_package)
 
@@ -1270,8 +1313,25 @@ lookupModuleWithSuggestions :: DynFlags
                             -> ModuleName
                             -> Maybe FastString
                             -> LookupResult
-lookupModuleWithSuggestions dflags m mb_pn
-  = case Map.lookup m (moduleToPkgConfAll pkg_state) of
+lookupModuleWithSuggestions dflags
+  = lookupModuleWithSuggestions' dflags
+        (moduleToPkgConfAll (pkgState dflags))
+
+lookupPluginModuleWithSuggestions :: DynFlags
+                                  -> ModuleName
+                                  -> Maybe FastString
+                                  -> LookupResult
+lookupPluginModuleWithSuggestions dflags
+  = lookupModuleWithSuggestions' dflags
+        (pluginModuleToPkgConfAll (pkgState dflags))
+
+lookupModuleWithSuggestions' :: DynFlags
+                            -> ModuleToPkgConfAll
+                            -> ModuleName
+                            -> Maybe FastString
+                            -> LookupResult
+lookupModuleWithSuggestions' dflags mod_map m mb_pn
+  = case Map.lookup m mod_map of
         Nothing -> LookupNotFound suggestions
         Just xs ->
           case foldl' classify ([],[],[]) (Map.toList xs) of
@@ -1290,7 +1350,6 @@ lookupModuleWithSuggestions dflags m mb_pn
             | otherwise              -> (x:hidden_pkg, hidden_mod,   exposed)
 
     pkg_lookup = expectJust "lookupModuleWithSuggestions" . lookupPackage dflags
-    pkg_state = pkgState dflags
     mod_pkg = pkg_lookup . moduleUnitId
 
     -- Filters out origins which are not associated with the given package

@@ -18,7 +18,8 @@ main =
      _ <- runGhc (Just libdir) $ do
                 dflags <- getSessionDynFlags
                 setSessionDynFlags (dflags {
-                    packageFlags = [ExposePackage (PackageArg "ghc")
+                    packageFlags = [ExposePackage "-package ghc"
+                                                  (PackageArg "ghc")
                                                   (ModRenaming True [])]
                     })
                 dflags <- getSessionDynFlags

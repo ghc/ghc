@@ -176,7 +176,7 @@ The GHC command line options that control packages are:
 
 ``-hide-all-packages``
     .. index::
-       single: -hide-package
+       single: -hide-all-packages
 
     Ignore the exposed flag on installed packages, and hide them all by
     default. If you use this flag, then any packages you require

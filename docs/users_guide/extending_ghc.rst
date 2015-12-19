@@ -213,9 +213,54 @@ would invoke GHC like this:
     Linking Test ...
     $
 
-Since plugins are exported by registered packages, it's safe to put
-dependencies on them in cabal for example, and specify plugin arguments
-to GHC through the ``ghc-options`` field.
+Plugin modules live in a separate namespace from
+the user import namespace.  By default, these two namespaces are
+the same; however, there are a few command line options which
+control specifically plugin packages:
+
+``-plugin-package ⟨pkg⟩``
+    .. index::
+        single: -plugin-package
+
+    This option causes the installed package ⟨pkg⟩ to be exposed
+    for plugins, such as ``-fplugin``. The
+    package ⟨pkg⟩ can be specified in full with its version number (e.g.
+    ``network-1.0``) or the version number can be omitted if there is
+    only one version of the package installed. If there are multiple
+    versions of ⟨pkg⟩ installed and ``-hide-all-plugin-packages`` was not
+    specified, then all other versions will become hidden.  ``-plugin-package``
+    supports thinning and renaming described in
+    :ref:`package-thinning-and-renaming`.
+
+    Unlike ``-package``, this option does NOT cause package ⟨pkg⟩ to be linked
+    into the resulting executable or shared object.
+
+``-plugin-package-id ⟨pkg-id⟩``
+    .. index::
+       single: -plugin-package-id
+
+    Exposes a package in the plugin namespace like ``-plugin-package``, but the
+    package is named by its installed package ID rather than by name. This is a
+    more robust way to name packages, and can be used to select packages that
+    would otherwise be shadowed. Cabal passes ``-plugin-package-id`` flags to
+    GHC.  ``-plugin-package-id`` supports thinning and renaming described in
+    :ref:`package-thinning-and-renaming`.
+
+``-hide-all-plugin-packages``
+    .. index::
+       single: -hide-all-plugin-packages
+
+    By default, all exposed packages in the normal, source import
+    namespace are also available for plugins.  This causes those
+    packages to be hidden by default.
+    If you use this flag, then any packages with plugins you require
+    need to be explicitly exposed using
+    ``-plugin-package`` options.
+
+To declare a dependency on a plugin, add it to the ``ghc-plugins`` field
+in Cabal.  You should only put a plugin in ``build-depends`` if you
+require compatibility with older versions of Cabal, or also have a source
+import on the plugin in question.
 
 .. _writing-compiler-plugins:
 

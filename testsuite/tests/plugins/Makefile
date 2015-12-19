@@ -2,19 +2,24 @@ TOP=../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+# Each of the tests also exercise the various ways to bring plugins into scope
+
+# -hide-all-plugin-packages + -plugin-package
 .PHONY: plugins01
 plugins01:
-	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 plugins01.hs -package-db simple-plugin/pkg.plugins01/local.package.conf -fplugin Simple.Plugin -fplugin-opt Simple.Plugin:Irrelevant_Option -package simple-plugin
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 plugins01.hs -package-db simple-plugin/pkg.plugins01/local.package.conf -fplugin Simple.Plugin -fplugin-opt Simple.Plugin:Irrelevant_Option -hide-all-plugin-packages -plugin-package simple-plugin
 	./plugins01
 
+# -hide-all-packages + -plugin-package
 .PHONY: plugins07
 plugins07:
-	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 -O plugins07.hs -package-db rule-defining-plugin/pkg.plugins07/local.package.conf -package rule-defining-plugin -fplugin=RuleDefiningPlugin
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 -O plugins07.hs -package-db rule-defining-plugin/pkg.plugins07/local.package.conf -hide-all-packages -package base -plugin-package rule-defining-plugin -fplugin=RuleDefiningPlugin
 	./plugins07
 
+# -package (should work for backwards compatibility)
 .PHONY: T10420
 T10420:
-	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 -O T10420.hs -package-db rule-defining-plugin/pkg.T10420/local.package.conf -package rule-defining-plugin
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 -O T10420.hs -package-db rule-defining-plugin/pkg.T10420/local.package.conf -hide-all-packages -package base -package rule-defining-plugin
 	./T10420
 
 .PHONY: T10294
@@ -31,3 +36,8 @@ frontend01:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -Wall -package ghc -c FrontendPlugin.hs
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --frontend FrontendPlugin -ffrontend-opt foobar frontend01
 	./frontend01
+
+# -hide-all-plugin-packages + -package (this should not work!)
+.PHONY: T11244
+T11244:
+	! "$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 -O T11244.hs -package-db rule-defining-plugin/pkg.T11244/local.package.conf -hide-all-plugin-packages -package rule-defining-plugin -fplugin=RuleDefiningPlugin

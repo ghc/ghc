@@ -2377,6 +2377,13 @@ setOptions wds =
       -- then, dynamic flags
       newDynFlags False minus_opts
 
+packageFlagsChanged :: DynFlags -> DynFlags -> Bool
+packageFlagsChanged idflags1 idflags0 =
+    packageFlags idflags1 /= packageFlags idflags0 ||
+    ignorePackageFlags idflags1 /= ignorePackageFlags idflags0 ||
+    pluginPackageFlags idflags1 /= pluginPackageFlags idflags0 ||
+    trustFlags idflags1 /= trustFlags idflags0
+
 newDynFlags :: Bool -> [String] -> GHCi ()
 newDynFlags interactive_only minus_opts = do
       let lopts = map noLoc minus_opts
@@ -2390,8 +2397,7 @@ newDynFlags interactive_only minus_opts = do
             $ "Some flags have not been recognized: "
             ++ (concat . intersperse ", " $ map unLoc leftovers))
 
-      when (interactive_only &&
-              packageFlags idflags1 /= packageFlags idflags0) $ do
+      when (interactive_only && packageFlagsChanged idflags1 idflags0) $ do
           liftIO $ hPutStrLn stderr "cannot set package flags with :seti; use :set"
       GHC.setInteractiveDynFlags idflags1
       installInteractivePrint (interactivePrint idflags1) False
@@ -2405,7 +2411,7 @@ newDynFlags interactive_only minus_opts = do
         -- the new packages.
         hsc_env <- GHC.getSession
         let dflags2 = hsc_dflags hsc_env
-        when (packageFlags dflags2 /= packageFlags dflags0) $ do
+        when (packageFlagsChanged dflags2 dflags0) $ do
           when (verbosity dflags2 > 0) $
             liftIO . putStrLn $
               "package flags have changed, resetting and loading new packages..."

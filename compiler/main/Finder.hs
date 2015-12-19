@@ -10,6 +10,7 @@ module Finder (
     flushFinderCaches,
     FindResult(..),
     findImportedModule,
+    findPluginModule,
     findExactModule,
     findHomeModule,
     findExposedPackageModule,
@@ -89,7 +90,7 @@ lookupFinderCache ref key = do
    return $! lookupModuleEnv c key
 
 -- -----------------------------------------------------------------------------
--- The two external entry points
+-- The three external entry points
 
 -- | Locate a module that was imported by the user.  We have the
 -- module's name, and possibly a package name.  Without a package
@@ -111,6 +112,16 @@ findImportedModule hsc_env mod_name mb_pkg =
     unqual_import = home_import
                     `orIfNotFound`
                     findExposedPackageModule hsc_env mod_name Nothing
+
+-- | Locate a plugin module requested by the user, for a compiler
+-- plugin.  This consults the same set of exposed packages as
+-- 'findImportedModule', unless @-hide-all-plugin-packages@ or
+-- @-plugin-package@ are specified.
+findPluginModule :: HscEnv -> ModuleName -> IO FindResult
+findPluginModule hsc_env mod_name =
+  findHomeModule hsc_env mod_name
+  `orIfNotFound`
+  findExposedPluginPackageModule hsc_env mod_name
 
 -- | Locate a specific 'Module'.  The purpose of this function is to
 -- create a 'ModLocation' for a given 'Module', that is to find out
@@ -160,7 +171,19 @@ homeSearchCache hsc_env mod_name do_this = do
 findExposedPackageModule :: HscEnv -> ModuleName -> Maybe FastString
                          -> IO FindResult
 findExposedPackageModule hsc_env mod_name mb_pkg
-  = case lookupModuleWithSuggestions (hsc_dflags hsc_env) mod_name mb_pkg of
+  = findLookupResult hsc_env
+  $ lookupModuleWithSuggestions
+        (hsc_dflags hsc_env) mod_name mb_pkg
+
+findExposedPluginPackageModule :: HscEnv -> ModuleName
+                               -> IO FindResult
+findExposedPluginPackageModule hsc_env mod_name
+  = findLookupResult hsc_env
+  $ lookupPluginModuleWithSuggestions
+        (hsc_dflags hsc_env) mod_name Nothing
+
+findLookupResult :: HscEnv -> LookupResult -> IO FindResult
+findLookupResult hsc_env r = case r of
      LookupFound m pkg_conf ->
        findPackageModule_ hsc_env m pkg_conf
      LookupMultiple rs ->
