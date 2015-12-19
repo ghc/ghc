@@ -43,7 +43,7 @@ shakePath :: FilePath
 shakePath = "shake-build"
 
 shakeFilesPath :: FilePath
-shakeFilesPath = shakeFilesPath -/- ".db"
+shakeFilesPath = shakePath -/- ".db"
 
 configPath :: FilePath
 configPath = shakePath -/- "cfg"
