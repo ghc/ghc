@@ -51,6 +51,7 @@ data Arch
           { ppc_64ABI :: PPC_64ABI
           }
         | ArchSPARC
+        | ArchSPARC64
         | ArchARM
           { armISA    :: ArmISA
           , armISAExt :: [ArmISAExt]

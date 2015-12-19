@@ -2135,7 +2135,8 @@ joinObjectFiles dflags o_files output_fn = do
                         -- gcc on sparc sets -Wl,--relax implicitly, but
                         -- -r and --relax are incompatible for ld, so
                         -- disable --relax explicitly.
-                     ++ (if platformArch (targetPlatform dflags) == ArchSPARC
+                     ++ (if platformArch (targetPlatform dflags)
+                                `elem` [ArchSPARC, ArchSPARC64]
                          && ldIsGnuLd
                             then [SysTools.Option "-Wl,-no-relax"]
                             else [])
