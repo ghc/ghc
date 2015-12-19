@@ -35,6 +35,7 @@ Ben Gamari              <bgamari.foss@gmail.com>            <ben@panda.(none)>
 Ben Gamari              <bgamari.foss@gmail.com>            <ben@panda1.milkyway>
 Ben Gamari              <bgamari.foss@gmail.com>            <ben@smart-cactus.org>
 Ben Gamari              <bgamari.foss@gmail.com>            <ben@well-typed.com>
+Ben Gamari              <bgamari.foss@gmail.com>            <bgamari@smart-cactus.org>
 Ben Lippmeier           <benl@ouroborus.net>
 Ben Lippmeier           <benl@ouroborus.net>                <Ben.Lippmeier@anu.edu.au>
 Ben Lippmeier           <benl@ouroborus.net>                Ben.Lippmeier.anu.edu.au <unknown>
@@ -63,7 +64,7 @@ Colin Watson            <cjwatson@debian.org>               <cjwatson@canonical.
 Csernik Flaviu Andrei   <fcsernik@gmail.com>                # https://github.com/archblob
 Daan Leijen             <daan@microsoft.com>                daan <unknown>
 Dan Licata              <drl@cs.cmu.edu>                    # Commit 6a05ec.
-Dana N. Xu              <na.xu@inria.fr>                    <nx200@cad> # TODO. Doesn't work (weird char?).
+Dana N. Xu              <na.xu@inria.fr>                    <nx200@cam.a.cuk[3~[Dd> # Weird characters.
 Dana N. Xu              <na.xu@inria.fr>                    <nx200@cam.ac.uk> # "Static Contract Checking for Haskell".
 Dana N. Xu              <na.xu@inria.fr>                    nx <unknown>
 Daniel Fischer          <daniel.is.fischer@googlemail.com>  <daniel.is.fischer@web.de>
@@ -171,6 +172,7 @@ Markus Großer           <markus.grosser@tum.de>
 Matt Chapman            <matthewc@cse.unsw.edu.au>          matthewc <unknown>
 Matthew Farkas-Dyck     <strake888@gmail.com>
 Matthew Farkas-Dyck     <strake888@gmail.com>               <mfdyck@google.com>
+Matthew Hyatt           <matthewnhyatt@gmail.com>
 Matthias Kilian         <kili@outback.escape.de>            kili@outback.escape.de <unknown>
 Michael D. Adams        <t-madams@microsoft.com>            <adamsmd@cs.indiana.edu>
 Michael Weber           <michaelw@debian.org>               michaelw <unknown>
