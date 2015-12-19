@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 --

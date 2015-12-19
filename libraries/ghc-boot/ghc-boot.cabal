@@ -1,8 +1,10 @@
 name:           ghc-boot
 version:        0.0.0.0
 license:        BSD3
+license-file:   LICENSE
+category:       GHC
 maintainer:     ghc-devs@haskell.org
-bug-reports:    glasgow-haskell-bugs@haskell.org
+bug-reports:    https://ghc.haskell.org/trac/ghc/newticket
 synopsis:       Shared functionality between GHC and its boot libraries
 description:    This library is shared between GHC, ghc-pkg, and other boot
                 libraries.
@@ -18,6 +20,7 @@ description:    This library is shared between GHC, ghc-pkg, and other boot
                 and program do not have to depend on Cabal.
 cabal-version:  >=1.10
 build-type:     Simple
+extra-source-files: changelog.md
 
 source-repository head
     type:     git
@@ -26,12 +29,7 @@ source-repository head
 
 Library
     default-language: Haskell2010
-    other-extensions:
-            GeneralizedNewtypeDeriving
-            RecordWildCards
-            StandaloneDeriving
-            Trustworthy
-            TypeSynonymInstances
+    other-extensions: DeriveGeneric, RankNTypes, ScopedTypeVariables
 
     exposed-modules:
             GHC.Lexeme
@@ -39,9 +37,9 @@ Library
             GHC.LanguageExtensions
             GHC.Serialized
 
-    build-depends: base       >= 4   && < 5,
+    build-depends: base       >= 4.7 && < 4.10,
                    binary     == 0.8.*,
-                   bytestring >= 0.9 && < 1,
-                   directory  >= 1   && < 1.3,
-                   filepath
+                   bytestring == 0.10.*,
+                   directory  == 1.2.*,
+                   filepath   >= 1.3 && < 1.5
 
