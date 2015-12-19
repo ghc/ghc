@@ -29,6 +29,8 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Version
+
+import System.Directory
 import System.FilePath
 import System.IO
 
@@ -47,6 +49,7 @@ ppHoogle dflags package version synopsis prologue ifaces odir = do
                    ["@version " ++ showVersion version
                    | not (null (versionBranch version)) ] ++
                    concat [ppModule dflags i | i <- ifaces, OptHide `notElem` ifaceOptions i]
+    createDirectoryIfMissing True odir
     h <- openFile (odir </> filename) WriteMode
     hSetEncoding h utf8
     hPutStr h (unlines contents)

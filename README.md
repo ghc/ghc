@@ -46,24 +46,45 @@ format.
 
 Please create issues when you have any problems and pull requests if you have some code.
 
-###### Hacking
+##### Hacking
 
-To get started you'll need a latest GHC release installed. Below is an
-example setup using cabal sandboxes.
+To get started you'll need a latest GHC release installed.
+
+Clone the repository:
 
 ```bash
   git clone https://github.com/haskell/haddock.git
   cd haddock
-  cabal sandbox init
-  cabal sandbox add-source haddock-library
-  cabal sandbox add-source haddock-api
-  # adjust -j to the number of cores you want to use
-  cabal install -j4 --dependencies-only --enable-tests
-  cabal configure --enable-tests
-  cabal build -j4
-  # run the test suite
-  cabal test
 ```
+
+and then proceed using your favourite build tool.
+
+###### Using Cabal sandboxes
+
+```bash
+cabal sandbox init
+cabal sandbox add-source haddock-library
+cabal sandbox add-source haddock-api
+cabal sandbox add-source haddock-test
+# adjust -j to the number of cores you want to use
+cabal install -j4 --dependencies-only --enable-tests
+cabal configure --enable-tests
+cabal build -j4
+# run the test suite
+export HADDOCK_PATH="dist/build/haddock/haddock"
+cabal test
+```
+
+###### Using Stack
+
+```bash
+stack init
+stack install
+# run the test suite
+export HADDOCK_PATH="$HOME/.local/bin/haddock"
+stack test
+```
+
 
 If you're a GHC developer and want to update Haddock to work with your
 changes, you should be working on `ghc-head` branch instead of master.

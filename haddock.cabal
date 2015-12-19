@@ -126,24 +126,31 @@ executable haddock
 test-suite html-test
   type:             exitcode-stdio-1.0
   default-language: Haskell2010
-  main-is:          run.lhs
+  main-is:          Main.hs
   hs-source-dirs:   html-test
-  build-depends:    base, directory, process, filepath, Cabal
+  build-depends:    base, filepath, haddock-test
 
 test-suite hypsrc-test
   type:             exitcode-stdio-1.0
   default-language: Haskell2010
-  main-is:          run.hs
+  main-is:          Main.hs
   hs-source-dirs:   hypsrc-test
-  build-depends:    base, directory, process, filepath, Cabal
+  build-depends:    base, filepath, haddock-test
   ghc-options:      -Wall -fwarn-tabs
 
 test-suite latex-test
   type:             exitcode-stdio-1.0
   default-language: Haskell2010
-  main-is:          run.lhs
+  main-is:          Main.hs
   hs-source-dirs:   latex-test
-  build-depends:    base, directory, process, filepath, Cabal
+  build-depends:    base, filepath, haddock-test
+
+test-suite hoogle-test
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          Main.hs
+  hs-source-dirs:   hoogle-test
+  build-depends:    base, filepath, haddock-test
 
 source-repository head
   type:     git
