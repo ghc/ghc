@@ -126,6 +126,7 @@ _darcs/
 /libraries/frames.html
 /libraries/ghc-boot/GNUmakefile
 /libraries/ghc-boot/ghc.mk
+/libraries/ghci/ghc.mk
 /libraries/haddock-util.js
 /libraries/hslogo-16.png
 /libraries/index-frames.html

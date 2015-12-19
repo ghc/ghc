@@ -224,6 +224,10 @@ Meanings of specific keywords:
     Computes the size, in bytes, of ``struct_type``. It will have type
     ``Int``.
 
+``#alignment ⟨struct_type⟩``
+    Computes the alignment, in bytes, of ``struct_type``. It will have type
+    ``Int``.
+
 ``#enum ⟨type⟩, ⟨constructor⟩, ⟨value⟩, ⟨value⟩, ...``
     A shortcut for multiple definitions which use ``#const``. Each
     ``value`` is a name of a C integer constant, e.g. enumeration value.

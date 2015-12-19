@@ -28,3 +28,15 @@ hsc2hs004:
 T3837:
 	LANG=C '$(HSC2HS)' $@.hsc
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c $@.hs
+
+.PHONY: T4340
+T4340:
+	'$(HSC2HS)' $@.hsc
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make $@
+	./$@
+
+.PHONY: T10272
+T10272:
+	'$(HSC2HS)' --cross-compile $@.hsc
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make $@
+	./$@

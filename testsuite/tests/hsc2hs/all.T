@@ -25,3 +25,13 @@ test('T3837',
      run_command,
      ['$MAKE -s --no-print-directory T3837'])
 
+test('T4340',
+     [extra_clean(['T4340.hs', 'T4340_hsc_make.c',
+                   'T4340_hsc.c', 'T4340_hsc.h'])],
+     run_command,
+     ['$MAKE -s --no-print-directory T4340'])
+
+test('T10272',
+     [extra_clean(['T10272.hs', 'T10272_hsc_make.c'])],
+     run_command,
+     ['$MAKE -s --no-print-directory T10272'])

@@ -321,6 +321,32 @@ Package system
 
 -  TODO FIXME.
 
+hsc2hs
+~~~~~~
+
+-  ``hsc2hs`` now supports the ``#alignment`` macro, which can be used to
+    calculate the alignment of a struct in bytes. Previously, ``#alignment``
+    had to be implemented manually via a ``#let`` directive, e.g., ::
+
+      #let alignment t = "%lu", (unsigned long)offsetof(struct {char x__; t (y__); }, y__)
+
+    As a result, if you have the above directive in your code, it will now emit
+    a warning when compiled with GHC 8.0. ::
+
+      Module.hsc:24:0: warning: "hsc_alignment" redefined [enabled by default]
+      In file included from dist/build/Module_hsc_make.c:1:0:
+      /path/to/ghc/lib/template-hsc.h:88:0: note: this is the location of the previous definition
+       #define hsc_alignment(t...) \
+       ^
+
+    To make your code free of warnings on GHC 8.0 and still support earlier
+    versions, surround the directive with a pragma checking for the right GHC
+    version. ::
+
+      #if __GLASGOW_HASKELL__ < 800
+      #let alignment t = "%lu", (unsigned long)offsetof(struct {char x__; t (y__); }, y__)
+      #endif
+
 Libraries
 ---------
 
