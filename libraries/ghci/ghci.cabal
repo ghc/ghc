@@ -1,41 +1,66 @@
-Name: ghci
-Version: 0.0
-Copyright: XXX
-License: BSD3
--- XXX License-File: LICENSE
-Author: XXX
-Maintainer: XXX
-Synopsis: XXX
-Description:
+name:           ghci
+version:        0
+license:        BSD3
+license-file:   LICENSE
+category:       GHC
+maintainer:     ghc-devs@haskell.org
+bug-reports:    https://ghc.haskell.org/trac/ghc/newticket
+synopsis:       XXX
+description:
         XXX
-Category: Development
-build-type: Simple
-cabal-version: >=1.10
+cabal-version:  >=1.10
+build-type:     Simple
+extra-source-files: changelog.md
 
-Library
-    Default-Language: Haskell2010
-    Exposed-Modules: GHCi.Message,
-                     GHCi.ResolvedBCO,
-                     GHCi.RemoteTypes,
-                     GHCi.ObjLink,
-                     GHCi.CreateBCO,
-                     GHCi.FFI,
-                     GHCi.InfoTable,
-                     GHCi.Run,
-                     GHCi.Signals,
-                     GHCi.TH,
-                     GHCi.TH.Binary,
-                     SizedSeq
-    Build-Depends: base       >= 4   && < 5,
-                   binary     >= 0.7 && < 0.9,
-                   bytestring >= 0.10 && < 0.11,
-                   containers >= 0.5 && < 0.6,
-                   deepseq    >= 1.4 && < 1.5,
-                   filepath   >= 1.4 && < 1.5,
-                   ghc-boot,
-                   array      >= 0.5 && < 0.6,
-                   template-haskell >= 2.11 && < 2.12,
-                   transformers >= 0.4 && < 0.6
+source-repository head
+    type:     git
+    location: http://git.haskell.org/ghc.git
+    subdir:   libraries/ghci
+
+library
+    default-language: Haskell2010
+    other-extensions:
+        BangPatterns
+        CPP
+        DeriveGeneric
+        ExistentialQuantification
+        FlexibleInstances
+        GADTs
+        GeneralizedNewtypeDeriving
+        InstanceSigs
+        MagicHash
+        MultiParamTypeClasses
+        RecordWildCards
+        ScopedTypeVariables
+        StandaloneDeriving
+        TupleSections
+        UnboxedTuples
+
+    exposed-modules:
+        GHCi.Message,
+        GHCi.ResolvedBCO,
+        GHCi.RemoteTypes,
+        GHCi.ObjLink,
+        GHCi.CreateBCO,
+        GHCi.FFI,
+        GHCi.InfoTable,
+        GHCi.Run,
+        GHCi.Signals,
+        GHCi.TH,
+        GHCi.TH.Binary,
+        SizedSeq
+
+    Build-Depends:
+        array            == 0.5.*,
+        base             == 4.9.*,
+        binary           == 0.8.*,
+        bytestring       == 0.10.*,
+        containers       == 0.5.*,
+        deepseq          == 1.4.*,
+        filepath         == 1.4.*,
+        ghc-boot         == 0.0.*,
+        template-haskell == 2.11.*,
+        transformers     == 0.5.*
 
     if !os(windows)
-       Build-Depends: unix >= 2.7 && < 2.8
+        Build-Depends: unix == 2.7.*
