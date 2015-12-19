@@ -1155,7 +1155,7 @@ SRC_DIST_TESTSUITE_TARBALL        = $(SRC_DIST_ROOT)/$(SRC_DIST_TESTSUITE_NAME).
 # Files to include in source distributions
 #
 SRC_DIST_GHC_DIRS = mk rules docs distrib bindisttest libffi includes \
-    utils docs rts compiler ghc driver libraries libffi-tarballs
+    utils docs rts compiler ghc driver libraries libffi-tarballs iserv
 SRC_DIST_GHC_FILES += \
     configure.ac config.guess config.sub configure \
     aclocal.m4 README.md ANNOUNCE HACKING.md INSTALL.md LICENSE Makefile \
