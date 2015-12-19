@@ -39,11 +39,14 @@ import qualified System.Directory as IO
 import System.IO
 
 -- Build system files and paths
+shakePath :: FilePath
+shakePath = "shake-build"
+
 shakeFilesPath :: FilePath
-shakeFilesPath = "_build/"
+shakeFilesPath = shakeFilesPath -/- ".db"
 
 configPath :: FilePath
-configPath = "shake/cfg/"
+configPath = shakePath -/- "cfg"
 
 bootPackageConstraints :: FilePath
 bootPackageConstraints = shakeFilesPath ++ "boot-package-constraints"
