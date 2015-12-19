@@ -107,11 +107,14 @@ RTS options for SMP parallelism
 
 There are two ways to run a program on multiple processors: call
 ``Control.Concurrent.setNumCapabilities`` from your program, or use the
-RTS ``-N`` option.
+RTS ``-N`` options.
 
 ``-N⟨x⟩``
+``-Nmax⟨x⟩``
+
     .. index::
        single: -N⟨x⟩; RTS option
+       single: -Nmax(x); RTS option
 
     Use ⟨x⟩ simultaneous threads when running the program.
 
@@ -132,6 +135,9 @@ RTS ``-N`` option.
     Omitting ⟨x⟩, i.e. ``+RTS -N -RTS``, lets the runtime choose the
     value of ⟨x⟩ itself based on how many processors are in your
     machine.
+
+    With Nmax⟨x⟩, i.e. ``+RTS -Nmax3 -RTS``, the runtime will choose at
+    most (x), also limited by the number of processors on the system.
 
     Be careful when using all the processors in your machine: if some of
     your processors are in use by other programs, this can actually harm
