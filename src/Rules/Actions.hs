@@ -16,13 +16,16 @@ buildWithResources rs target = do
     needBuilder laxDependencies builder
     path    <- builderPath builder
     argList <- interpret target getArgs
+    verbose <- interpret target verboseCommands
+    let quitelyUnlessVerbose = if verbose then withVerbosity Loud else quietly
     -- The line below forces the rule to be rerun if the args hash has changed
     checkArgsHash target
     withResources rs $ do
-        putBuild $ "/--------\n| Running " ++ show builder ++ " with arguments:"
-        mapM_ (putBuild . ("|   " ++)) $ interestingInfo builder argList
-        putBuild $ "\\--------"
-        quietly $ case builder of
+        unless verbose $ do
+            putBuild $ "/--------\n| Running " ++ show builder ++ " with arguments:"
+            mapM_ (putBuild . ("|   " ++)) $ interestingInfo builder argList
+            putBuild $ "\\--------"
+        quitelyUnlessVerbose $ case builder of
             Ar -> arCmd path argList
 
             HsCpp -> do

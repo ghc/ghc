@@ -2,7 +2,8 @@ module Settings.User (
     userArgs, userPackages, userLibWays, userRtsWays, userTargetDirectory,
     userProgramPath, userKnownPackages, integerLibrary,
     trackBuildSystem, buildHaddock, validating, ghciWithDebugger, ghcProfiled,
-    ghcDebugged, dynamicGhcPrograms, laxDependencies, buildSystemConfigFile
+    ghcDebugged, dynamicGhcPrograms, laxDependencies, buildSystemConfigFile,
+    verboseCommands
     ) where
 
 import Expression
@@ -81,3 +82,9 @@ buildHaddock = return True
 
 buildSystemConfigFile :: Bool
 buildSystemConfigFile = False
+
+-- Set to True to print full command lines during the build process. Note, this
+-- is a Predicate, hence you can enable verbose output for a chosen package
+-- only, e.g.: verboseCommands = package ghcPrim
+verboseCommands :: Predicate
+verboseCommands = return False
