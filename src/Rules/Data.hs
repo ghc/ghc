@@ -38,7 +38,8 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
             buildWithResources [(ghcCabal rs, 1)] $
                 fullTarget target GhcCabal [cabalFile] outs
 
-            -- TODO: find out of ghc-cabal can be concurrent with ghc-pkg
+            -- ghc-pkg produces inplace-pkg-config when run on packages with
+            -- library components only
             when (isLibrary pkg) .
                 whenM (interpretPartial target registerPackage) .
                 buildWithResources [(ghcPkg rs, 1)] $

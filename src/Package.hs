@@ -1,23 +1,31 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Package (
-    Package (..), PackageName, pkgCabalFile, setPath, topLevel, library, utility,
-    matchPackageNames
+    Package (..), PackageName, PackageType (..),
+    -- * Queries
+    pkgCabalFile,
+    matchPackageNames,
+    -- * Helpers for constructing 'Package's
+    setPath, topLevel, library, utility, setPkgType
     ) where
 
 import Base
 import GHC.Generics (Generic)
 
--- It is helpful to distinguish package names from strings.
+-- | It is helpful to distinguish package names from strings.
 type PackageName = String
 
--- type PackageType = Program | Library
+-- | We regard packages as either being libraries or programs. This is
+-- bit of a convenient lie as Cabal packages can be both, but it works
+-- for now.
+data PackageType = Program | Library
+                 deriving Generic
 
--- pkgPath is the path to the source code relative to the root
 data Package = Package
      {
-         pkgName :: PackageName, -- Examples: "ghc", "Cabal"
-         pkgPath :: FilePath     -- "compiler", "libraries/Cabal/Cabal"
-         -- pkgType :: PackageType  -- TopLevel, Library
+         pkgName :: PackageName, -- ^ Examples: "ghc", "Cabal"
+         pkgPath :: FilePath,    -- ^ pkgPath is the path to the source code relative to the root.
+                                 -- e.g. "compiler", "libraries/Cabal/Cabal"
+         pkgType :: PackageType
      }
      deriving Generic
 
@@ -26,16 +34,19 @@ pkgCabalFile :: Package -> FilePath
 pkgCabalFile pkg = pkgPath pkg -/- pkgName pkg <.> "cabal"
 
 topLevel :: PackageName -> Package
-topLevel name = Package name name
+topLevel name = Package name name Library
 
 library :: PackageName -> Package
-library name = Package name ("libraries" -/- name)
+library name = Package name ("libraries" -/- name) Library
 
 utility :: PackageName -> Package
-utility name = Package name ("utils" -/- name)
+utility name = Package name ("utils" -/- name) Program
 
 setPath :: Package -> FilePath -> Package
 setPath pkg path = pkg { pkgPath = path }
+
+setPkgType :: Package -> PackageType -> Package
+setPkgType pkg ty = pkg { pkgType = ty }
 
 instance Show Package where
     show = pkgName
@@ -56,3 +67,7 @@ instance Binary Package
 instance Hashable Package where
     hashWithSalt salt = hashWithSalt salt . show
 instance NFData Package
+
+instance Binary PackageType
+instance Hashable PackageType
+instance NFData PackageType
