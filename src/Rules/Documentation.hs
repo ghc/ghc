@@ -15,14 +15,18 @@ buildPackageDocumentation _ target @ (PartialTarget stage package) =
         haddockFile = pkgHaddockFile package
     in when (stage == Stage1) $ do
         haddockFile %> \file -> do
-            whenM (specified HsColour) $ do
-                need [cabalFile]
-                build $ fullTarget target GhcCabalHsColour [cabalFile] []
             srcs <- interpretPartial target getPackageSources
             deps <- interpretPartial target $ getPkgDataList DepNames
             let haddocks = [ pkgHaddockFile depPkg
                            | Just depPkg <- map findKnownPackage deps ]
             need $ srcs ++ haddocks
+
+            -- HsColour sources
+            whenM (specified HsColour) $ do
+                need [cabalFile]
+                build $ fullTarget target GhcCabalHsColour [cabalFile] []
+
+            -- Build Haddock documentation
             let haddockWay = if dynamicGhcPrograms then dynamic else vanilla
             build $ fullTargetWithWay target Haddock haddockWay srcs [file]
 
