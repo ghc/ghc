@@ -55,9 +55,7 @@ libraries/vector_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports
 # haddock's attoparsec uses deprecated `inlinePerformIO`
 utils/haddock_dist_EXTRA_HC_OPTS += -Wno-deprecations
 
-# not yet de-tabbed
-libraries/time_dist-install_EXTRA_HC_OPTS += -Wno-tabs
-# On Windows, there are also some unused import warnings
+# On Windows, there are/were some unused import warnings
 ifeq "$(HostOS_CPP)" "mingw32"
 libraries/time_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports -Wno-identities
 endif
