@@ -5,7 +5,7 @@ module Package (
     pkgCabalFile,
     matchPackageNames,
     -- * Helpers for constructing 'Package's
-    setPath, topLevel, library, utility, setPkgType
+    setPath, topLevel, library, utility, setType
     ) where
 
 import Base
@@ -45,8 +45,8 @@ utility name = Package name ("utils" -/- name) Program
 setPath :: Package -> FilePath -> Package
 setPath pkg path = pkg { pkgPath = path }
 
-setPkgType :: Package -> PackageType -> Package
-setPkgType pkg ty = pkg { pkgType = ty }
+setType :: Package -> PackageType -> Package
+setType pkg ty = pkg { pkgType = ty }
 
 instance Show Package where
     show = pkgName

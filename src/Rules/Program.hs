@@ -17,10 +17,6 @@ buildProgram _ target @ (PartialTarget stage pkg) = do
         buildPath = path -/- "build"
         program   = programPath stage pkg
 
-            -- return $  [ ghciLib | needGhciLib == "YES" && stage == Stage1 ]
-            --        ++ [ haddock | needHaddock          && stage == Stage1 ]
-            --        ++ libs
-
     (\f -> program == Just f) ?> \bin -> do
         cSrcs <- cSources target -- TODO: remove code duplication (Library.hs)
         hSrcs <- hSources target

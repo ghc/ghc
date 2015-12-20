@@ -20,15 +20,13 @@ module Base (
     shakeFilesPath, configPath, bootPackageConstraints, packageDependencies,
 
     -- * Output
-    putColoured, putOracle, putBuild, putSuccess, putError,
-    renderBox,
+    putColoured, putOracle, putBuild, putSuccess, putError, renderBox,
     module System.Console.ANSI,
 
     -- * Miscellaneous utilities
     bimap, minusOrd, intersectOrd,
     removeFileIfExists,
-    replaceEq, replaceSeparators, decodeModule,
-    unifyPath, (-/-), chunksOfSize,
+    replaceEq, replaceSeparators, decodeModule, unifyPath, (-/-), chunksOfSize,
     ) where
 
 import Control.Applicative
