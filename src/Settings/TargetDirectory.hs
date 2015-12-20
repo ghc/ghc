@@ -1,5 +1,5 @@
 module Settings.TargetDirectory (
-    targetDirectory, targetPath, pkgHaddockFile
+    targetDirectory, targetPath, pkgHaddockFile, pkgLibraryFile, pkgGhciLibraryFile
     ) where
 
 import Expression
@@ -20,3 +20,18 @@ targetPath stage pkg = pkgPath pkg -/- targetDirectory stage pkg
 pkgHaddockFile :: Package -> FilePath
 pkgHaddockFile pkg @ (Package name _) =
     targetPath Stage1 pkg -/- "doc/html" -/- name -/- name <.> "haddock"
+
+-- Relative path to a package library file, e.g.:
+-- "libraries/array/dist-install/build/libHSarray-0.5.1.0.a"
+-- TODO: remove code duplication for computing buildPath
+pkgLibraryFile :: Stage -> Package -> String -> Way -> Action FilePath
+pkgLibraryFile stage pkg componentId way = do
+    extension <- libsuf way
+    let buildPath = targetPath stage pkg -/- "build"
+    return $ buildPath -/- "libHS" ++ componentId <.> extension
+
+-- Relative path to a package ghci library file, e.g.:
+-- "libraries/array/dist-install/build/HSarray-0.5.1.0.o"
+pkgGhciLibraryFile :: Stage -> Package -> String -> FilePath
+pkgGhciLibraryFile stage pkg componentId =
+    targetPath stage pkg -/- "build" -/- "HS" ++ componentId <.> "o"

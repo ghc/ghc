@@ -1,11 +1,9 @@
 module Rules (generateTargets, packageRules) where
 
 import Expression
-import Oracles
 import Rules.Package
 import Rules.Resources
 import Settings
-import Settings.Builders.GhcCabal
 
 -- generateTargets needs top-level build targets
 generateTargets :: Rules ()
@@ -14,29 +12,11 @@ generateTargets = action $ do
         pkgs <- interpretWithStage stage getPackages
         let (libPkgs, programPkgs) = partition isLibrary pkgs
         libTargets <- fmap concat . forM libPkgs $ \pkg -> do
-            let target    = PartialTarget stage pkg
-                buildPath = targetPath stage pkg -/- "build"
-            compId      <- interpretPartial target $ getPkgData ComponentId
-            needGhciLib <- interpretPartial target $ getPkgData BuildGhciLib
+            let target = PartialTarget stage pkg
             needHaddock <- interpretPartial target buildHaddock
-            ways        <- interpretPartial target getWays
-            let ghciLib = buildPath -/- "HS" ++ compId <.> "o"
-                haddock = pkgHaddockFile pkg
-            libs <- fmap concat . forM ways $ \way -> do
-                extension <- libsuf way
-                let name = buildPath -/- "libHS" ++ compId
-                dll0 <- needDll0 stage pkg
-                return $ [ name <.> extension ]
-                      ++ [ name ++ "-0" <.> extension | dll0 ]
-
-            return $  [ ghciLib | needGhciLib == "YES" && stage == Stage1 ]
-                   ++ [ haddock | needHaddock          && stage == Stage1 ]
-                   ++ libs
-
+            return $ [ pkgHaddockFile pkg | needHaddock && stage == Stage1 ]
         let programTargets = map (fromJust . programPath stage) programPkgs
-
         return $ libTargets ++ programTargets
-
     need $ reverse targets
 
 -- TODO: use stage 2 compiler for building stage 2 packages (instead of stage 1)
