@@ -48,12 +48,13 @@ SRC_HC_WARNING_OPTS_STAGE2 += -Wnoncanonical-monad-instances
 libraries/bytestring_dist-install_EXTRA_HC_OPTS += -Wno-inline-rule-shadowing
 
 # Turn off import warnings for bad unused imports
-libraries/bytestring_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports
 utils/haddock_dist_EXTRA_HC_OPTS += -Wno-unused-imports
 libraries/vector_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports
 
 # haddock's attoparsec uses deprecated `inlinePerformIO`
 utils/haddock_dist_EXTRA_HC_OPTS += -Wno-deprecations
+# binary too
+libraries/binary_dist-install_EXTRA_HC_OPTS += -Wno-deprecations
 
 # On Windows, there are/were some unused import warnings
 ifeq "$(HostOS_CPP)" "mingw32"
@@ -65,9 +66,6 @@ libraries/haskeline_dist-install_EXTRA_HC_OPTS += -Wno-deprecations
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -Wno-redundant-constraints
 
-# binary upstream has some warnings, so don't use -Werror for it
-libraries/binary_dist-boot_EXTRA_HC_OPTS += -Wwarn
-libraries/binary_dist-install_EXTRA_HC_OPTS += -Wwarn
 
 # temporarily turn off unused-imports warnings for pretty
 libraries/pretty_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports
