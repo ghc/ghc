@@ -40,12 +40,12 @@ ghcCabalHsColourArgs = builder GhcCabalHsColour ? do
 -- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?
 libraryArgs :: Args
 libraryArgs = do
-    ways <- getWays
-    ghci <- lift ghcWithInterpreter
+    ways     <- getWays
+    withGhci <- lift ghcWithInterpreter
     append [ if vanilla `elem` ways
              then  "--enable-library-vanilla"
              else "--disable-library-vanilla"
-           , if vanilla `elem` ways && ghci && not dynamicGhcPrograms
+           , if vanilla `elem` ways && withGhci && not dynamicGhcPrograms
              then  "--enable-library-for-ghci"
              else "--disable-library-for-ghci"
            , if profiling `elem` ways
@@ -224,12 +224,12 @@ needDll0 stage pkg = do
 -- * otherwise, we must collapse it into one space-separated string.
 dll0Args :: Args
 dll0Args = do
-    stage <- getStage
-    pkg   <- getPackage
-    dll0  <- lift $ needDll0 stage pkg
-    ghci  <- lift ghcWithInterpreter
-    arg . unwords . concat $ [ modules     | dll0         ]
-                          ++ [ ghciModules | dll0 && ghci ] -- see #9552
+    stage    <- getStage
+    pkg      <- getPackage
+    dll0     <- lift $ needDll0 stage pkg
+    withGhci <- lift ghcWithInterpreter
+    arg . unwords . concat $ [ modules     | dll0             ]
+                          ++ [ ghciModules | dll0 && withGhci ] -- see #9552
   where
     modules = [ "Annotations"
               , "ApiAnnotation"

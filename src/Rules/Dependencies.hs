@@ -24,7 +24,6 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
         hDepFile %> \file -> do
             srcs <- interpretPartial target getPackageSources
             when (pkg == compiler) $ need [platformH]
-            putBuild $ "srcs = " ++ show srcs
             need srcs
             if srcs == []
             then writeFileChanged file ""
