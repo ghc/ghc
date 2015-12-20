@@ -47,8 +47,9 @@ buildProgram _ target @ (PartialTarget stage pkg) = do
         need $ objs ++ libs
         build $ fullTargetWithWay target (Ghc stage) vanilla objs [bin]
         synopsis <- interpretPartial target $ getPkgData Synopsis
-        putSuccess $ "/--------\n| Successfully built program '"
-            ++ pkgName pkg ++ "' (stage " ++ show stage ++ ")."
-        putSuccess $ "| Executable: " ++ bin
-        putSuccess $ "| Package synopsis: "
-            ++ dropWhileEnd isPunctuation synopsis ++ "." ++ "\n\\--------"
+        putSuccess $ renderBox
+            [ "Successfully built program '"
+              ++ pkgName pkg ++ "' (stage " ++ show stage ++ ")."
+            , "Executable: " ++ bin
+            , "Package synopsis: " ++ dropWhileEnd isPunctuation synopsis ++ "."
+            ]
