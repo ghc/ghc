@@ -18,7 +18,7 @@ defaultPackages = mconcat
 
 packagesStage0 :: Packages
 packagesStage0 = mconcat
-    [ append [ ghcBoot, binary, cabal, compiler, ghc, ghcCabal, ghcPkg
+    [ append [ binary, cabal, compiler, ghc, ghcBoot, ghcCabal, ghcPkg
              , hsc2hs, hoopl, hpc, templateHaskell, transformers ]
     , stage0 ? append [deriveConstants, genapply, genprimopcode, hp2ps]
     , notM windowsHost ? notM (anyHostOs ["ios"]) ? append [terminfo] ]
@@ -41,9 +41,10 @@ packagesStage2 = mconcat
     [ append [ghcTags]
     , buildHaddock ? append [haddock] ]
 
+-- TODO: switch to Set Package as the order of packages should not matter?
 knownPackages :: [Package]
-knownPackages = defaultKnownPackages ++ userKnownPackages
+knownPackages = sort $ defaultKnownPackages ++ userKnownPackages
 
--- Note: this is slow but we keep it simple as there not too many packages (30)
+-- Note: this is slow but we keep it simple as there are just ~50 packages
 findKnownPackage :: PackageName -> Maybe Package
 findKnownPackage name = find (\pkg -> pkgName pkg == name) knownPackages

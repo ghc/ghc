@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Package (
-    Package (..), PackageName, pkgCabalFile, setPath, topLevel, library, utility
+    Package (..), PackageName, pkgCabalFile, setPath, topLevel, library, utility,
+    matchPackageNames
     ) where
 
 import Base
@@ -44,6 +45,11 @@ instance Eq Package where
 
 instance Ord Package where
     compare = compare `on` pkgName
+
+-- Given a sorted list of packages and a sorted list of package names, returns
+-- packages whose names appear in the list of names
+matchPackageNames :: [Package] -> [PackageName] -> [Package]
+matchPackageNames = intersectOrd (\pkg name -> compare (pkgName pkg) name)
 
 -- Instances for storing in the Shake database
 instance Binary Package

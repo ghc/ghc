@@ -31,8 +31,7 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
             -- We configure packages in the order of their dependencies
             deps <- packageDeps pkg
             pkgs <- interpretPartial target getPackages
-            let cmp p name = compare (pkgName p) name
-                depPkgs    = intersectOrd cmp (sort pkgs) deps
+            let depPkgs = matchPackageNames (sort pkgs) deps
             need [ targetPath stage p -/- "package-data.mk" | p <- depPkgs ]
 
             need [cabalFile]
