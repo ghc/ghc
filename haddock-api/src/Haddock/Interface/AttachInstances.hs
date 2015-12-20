@@ -60,7 +60,18 @@ attachInstances expInfo ifaces instIfaceMap = mapM attach ifaces
     attach iface = do
       newItems <- mapM (attachToExportItem expInfo iface ifaceMap instIfaceMap)
                        (ifaceExportItems iface)
-      return $ iface { ifaceExportItems = newItems }
+      let orphanInstances = attachOrphanInstances expInfo iface ifaceMap instIfaceMap (ifaceInstances iface)
+      return $ iface { ifaceExportItems = newItems
+                     , ifaceOrphanInstances = orphanInstances
+                     }
+
+attachOrphanInstances :: ExportInfo -> Interface -> IfaceMap -> InstIfaceMap -> [ClsInst] -> [DocInstance Name]
+attachOrphanInstances expInfo iface ifaceMap instIfaceMap cls_instances =
+  [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap, (L (getSrcSpan n) n))
+  | let is = [ (instanceSig i, getName i) | i <- cls_instances, isOrphan (is_orphan i) ]
+  , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
+  , not $ isInstanceHidden expInfo cls tys
+  ]
 
 
 attachToExportItem :: ExportInfo -> Interface -> IfaceMap -> InstIfaceMap

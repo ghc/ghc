@@ -16,7 +16,7 @@
 module Haddock.Backends.Xhtml.Decl (
   ppDecl,
 
-  ppTyName, ppTyFamHeader, ppTypeApp,
+  ppTyName, ppTyFamHeader, ppTypeApp, ppOrphanInstances,
   tyvarNames
 ) where
 
@@ -561,14 +561,32 @@ ppInstances links origin instances splice unicode qual
     instName = getOccString origin
     instDecl :: Int -> DocInstance DocName -> (SubDecl,Located DocName)
     instDecl no (inst, mdoc, loc) =
-        ((ppInstHead links splice unicode qual mdoc origin no inst), loc)
+        ((ppInstHead links splice unicode qual mdoc origin False no inst), loc)
+
+
+ppOrphanInstances :: LinksInfo
+                  -> [DocInstance DocName]
+                  -> Splice -> Unicode -> Qualification
+                  -> Html
+ppOrphanInstances links instances splice unicode qual
+  = subOrphanInstances qual links True (zipWith instDecl [1..] instances)
+  where
+    instOrigin :: InstHead name -> InstOrigin name
+    instOrigin inst = OriginClass (ihdClsName inst)
+
+    instDecl :: Int -> DocInstance DocName -> (SubDecl,Located DocName)
+    instDecl no (inst, mdoc, loc) =
+        ((ppInstHead links splice unicode qual mdoc (instOrigin inst) True no inst), loc)
 
 
 ppInstHead :: LinksInfo -> Splice -> Unicode -> Qualification
            -> Maybe (MDoc DocName)
-           -> InstOrigin DocName -> Int -> InstHead DocName
+           -> InstOrigin DocName
+           -> Bool -- ^ Is instance orphan
+           -> Int  -- ^ Normal
+           -> InstHead DocName
            -> SubDecl
-ppInstHead links splice unicode qual mdoc origin no ihd@(InstHead {..}) =
+ppInstHead links splice unicode qual mdoc origin orphan no ihd@(InstHead {..}) =
     case ihdInstType of
         ClassInst { .. } ->
             ( subInstHead iid $ ppContextNoLocs clsiCtx unicode qual <+> typ
@@ -576,7 +594,7 @@ ppInstHead links splice unicode qual mdoc origin no ihd@(InstHead {..}) =
             , [subInstDetails iid ats sigs]
             )
           where
-            iid = instanceId origin no ihd
+            iid = instanceId origin no orphan ihd
             sigs = ppInstanceSigs links splice unicode qual clsiSigs
             ats = ppInstanceAssocTys links splice unicode qual clsiAssocTys
         TypeInst rhs ->
@@ -618,8 +636,9 @@ lookupAnySubdoc :: Eq id1 => id1 -> [(id1, DocForDecl id2)] -> DocForDecl id2
 lookupAnySubdoc n = fromMaybe noDocForDecl . lookup n
 
 
-instanceId :: InstOrigin DocName -> Int -> InstHead DocName -> String
-instanceId origin no ihd = concat
+instanceId :: InstOrigin DocName -> Int -> Bool -> InstHead DocName -> String
+instanceId origin no orphan ihd = concat $
+    [ "o:" | orphan ] ++
     [ qual origin
     , ":" ++ getOccString origin
     , ":" ++ (occNameString . getOccName . ihdClsName) ihd

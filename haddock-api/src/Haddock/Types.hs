@@ -126,6 +126,10 @@ data Interface = Interface
   , ifaceInstances       :: ![ClsInst]
   , ifaceFamInstances    :: ![FamInst]
 
+    -- | Orphan instances
+  , ifaceOrphanInstances :: ![DocInstance Name]
+  , ifaceRnOrphanInstances :: ![DocInstance DocName]
+
     -- | The number of haddockable and haddocked items in the module, as a
     -- tuple. Haddockable items are the exports and the module itself.
   , ifaceHaddockCoverage :: !(Int, Int)

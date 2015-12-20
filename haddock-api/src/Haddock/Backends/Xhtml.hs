@@ -522,10 +522,10 @@ ppHtmlModuleMiniSynopsis odir _doctitle themes iface unicode qual debug = do
 
 ifaceToHtml :: SourceURLs -> WikiURLs -> Interface -> Bool -> Qualification -> Html
 ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
-  = ppModuleContents qual exports +++
+  = ppModuleContents qual exports (not . null $ ifaceRnOrphanInstances iface) +++
     description +++
     synopsis +++
-    divInterface (maybe_doc_hdr +++ bdy)
+    divInterface (maybe_doc_hdr +++ bdy +++ orphans)
   where
     exports = numberSectionHeadings (ifaceRnExportItems iface)
 
@@ -563,6 +563,9 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
     bdy =
       foldr (+++) noHtml $
         mapMaybe (processExport False linksInfo unicode qual) exports
+
+    orphans =
+      ppOrphanInstances linksInfo (ifaceRnOrphanInstances iface) False unicode qual
 
     linksInfo = (maybe_source_url, maybe_wiki_url)
 
@@ -604,16 +607,22 @@ ppTyClBinderWithVarsMini mdl decl =
       ns = tyvarNames $ tcdTyVars decl -- it's safe to use tcdTyVars, see code above
   in ppTypeApp n [] ns (\is_infix -> ppNameMini is_infix mdl . nameOccName . getName) ppTyName
 
-ppModuleContents :: Qualification -> [ExportItem DocName] -> Html
-ppModuleContents qual exports
-  | null sections = noHtml
-  | otherwise     = contentsDiv
+ppModuleContents :: Qualification
+                 -> [ExportItem DocName]
+                 -> Bool -- ^ Orphans sections
+                 -> Html
+ppModuleContents qual exports orphan
+  | null sections && not orphan  = noHtml
+  | otherwise                    = contentsDiv
  where
   contentsDiv = divTableOfContents << (
     sectionName << "Contents" +++
-    unordList sections)
+    unordList (sections ++ orphanSection))
 
   (sections, _leftovers{-should be []-}) = process 0 exports
+  orphanSection
+    | orphan =  [ linkedAnchor "section.orphans" << "Orphan instances" ]
+    | otherwise = []
 
   process :: Int -> [ExportItem DocName] -> ([Html],[ExportItem DocName])
   process _ [] = ([], [])

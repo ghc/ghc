@@ -228,7 +228,7 @@ buildHomeLinks ifaces = foldl upd Map.empty (reverse ifaces)
         foldl' keep_old old_env exported_names
       | otherwise = foldl' keep_new old_env exported_names
       where
-        exported_names = ifaceVisibleExports iface
+        exported_names = ifaceVisibleExports iface ++ map getName (ifaceInstances iface)
         mdl            = ifaceMod iface
         keep_old env n = Map.insertWith (\_ old -> old) n mdl env
         keep_new env n = Map.insert n mdl env
