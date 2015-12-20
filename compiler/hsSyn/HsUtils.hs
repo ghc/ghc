@@ -981,7 +981,7 @@ hsConDeclsBinders cons = go id cons
                    where r' = remSeen (concatMap (cd_fld_names . unLoc) flds)
                          remSeen' = foldr (.) remSeen
                                         [deleteBy ((==) `on`
-                                                   rdrNameFieldOcc . unLoc) v
+                                              unLoc . rdrNameFieldOcc . unLoc) v
                                         | v <- r']
                          (ns, fs) = go remSeen' rs
 
@@ -990,7 +990,10 @@ hsConDeclsBinders cons = go id cons
                ([L loc (unLoc name)] ++ ns, r' ++ fs)
                   where r' = remSeen (concatMap (cd_fld_names . unLoc)
                                                 (unLoc flds))
-                        remSeen' = foldr (.) remSeen [deleteBy ((==) `on` rdrNameFieldOcc . unLoc) v | v <- r']
+                        remSeen'
+                          = foldr (.) remSeen
+                               [deleteBy ((==) `on`
+                                   unLoc . rdrNameFieldOcc . unLoc) v | v <- r']
                         (ns, fs) = go remSeen' rs
              L loc (ConDeclH98 { con_name = name }) ->
                 ([L loc (unLoc name)] ++ ns, fs)

@@ -675,7 +675,8 @@ type LFieldOcc name = Located (FieldOcc name)
 -- | Represents an *occurrence* of an unambiguous field.  We store
 -- both the 'RdrName' the user originally wrote, and after the
 -- renamer, the selector function.
-data FieldOcc name = FieldOcc { rdrNameFieldOcc  :: RdrName
+data FieldOcc name = FieldOcc { rdrNameFieldOcc  :: Located RdrName
+                                 -- ^ See Note [Located RdrNames] in HsExpr
                               , selectorFieldOcc :: PostRn name name
                               }
   deriving Typeable
@@ -686,7 +687,7 @@ deriving instance (Data name, Data (PostRn name name)) => Data (FieldOcc name)
 instance Outputable (FieldOcc name) where
   ppr = ppr . rdrNameFieldOcc
 
-mkFieldOcc :: RdrName -> FieldOcc RdrName
+mkFieldOcc :: Located RdrName -> FieldOcc RdrName
 mkFieldOcc rdr = FieldOcc rdr PlaceHolder
 
 
@@ -699,9 +700,10 @@ mkFieldOcc rdr = FieldOcc rdr PlaceHolder
 --
 -- See Note [HsRecField and HsRecUpdField] in HsPat and
 -- Note [Disambiguating record fields] in TcExpr.
+-- See Note [Located RdrNames] in HsExpr
 data AmbiguousFieldOcc name
-  = Unambiguous RdrName (PostRn name name)
-  | Ambiguous   RdrName (PostTc name name)
+  = Unambiguous (Located RdrName) (PostRn name name)
+  | Ambiguous   (Located RdrName) (PostTc name name)
   deriving (Typeable)
 deriving instance ( Data name
                   , Data (PostRn name name)
@@ -715,12 +717,12 @@ instance OutputableBndr (AmbiguousFieldOcc name) where
   pprInfixOcc  = pprInfixOcc . rdrNameAmbiguousFieldOcc
   pprPrefixOcc = pprPrefixOcc . rdrNameAmbiguousFieldOcc
 
-mkAmbiguousFieldOcc :: RdrName -> AmbiguousFieldOcc RdrName
+mkAmbiguousFieldOcc :: Located RdrName -> AmbiguousFieldOcc RdrName
 mkAmbiguousFieldOcc rdr = Unambiguous rdr PlaceHolder
 
 rdrNameAmbiguousFieldOcc :: AmbiguousFieldOcc name -> RdrName
-rdrNameAmbiguousFieldOcc (Unambiguous rdr _) = rdr
-rdrNameAmbiguousFieldOcc (Ambiguous   rdr _) = rdr
+rdrNameAmbiguousFieldOcc (Unambiguous (L _ rdr) _) = rdr
+rdrNameAmbiguousFieldOcc (Ambiguous   (L _ rdr) _) = rdr
 
 selectorAmbiguousFieldOcc :: AmbiguousFieldOcc Id -> Id
 selectorAmbiguousFieldOcc (Unambiguous _ sel) = sel

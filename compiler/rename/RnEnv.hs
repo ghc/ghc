@@ -912,8 +912,10 @@ lookupGlobalOccRn_overloaded overload_ok rdr_name
                 []    -> return Nothing
                 [gre] | isRecFldGRE gre
                          -> do { addUsedGRE True gre
-                               ; let fld_occ :: FieldOcc Name
-                                     fld_occ = FieldOcc rdr_name (gre_name gre)
+                               ; let
+                                   fld_occ :: FieldOcc Name
+                                   fld_occ
+                                     = FieldOcc (noLoc rdr_name) (gre_name gre)
                                ; return (Just (Right [fld_occ])) }
                       | otherwise
                          -> do { addUsedGRE True gre
@@ -921,7 +923,10 @@ lookupGlobalOccRn_overloaded overload_ok rdr_name
                 gres  | all isRecFldGRE gres && overload_ok
                             -- Don't record usage for ambiguous selectors
                             -- until we know which is meant
-                         -> return (Just (Right (map (FieldOcc rdr_name . gre_name) gres)))
+                         -> return
+                             (Just (Right
+                                     (map (FieldOcc (noLoc rdr_name) . gre_name)
+                                           gres)))
                 gres     -> do { addNameClashErrRn rdr_name gres
                                ; return (Just (Left (gre_name (head gres)))) } }
 
@@ -1452,8 +1457,9 @@ lookupTyFixityRn (L _ n) = lookupFixityRn n
 -- 'Name' if @DuplicateRecordFields@ is in use (Trac #1173). If there are
 -- multiple possible selectors with different fixities, generate an error.
 lookupFieldFixityRn :: AmbiguousFieldOcc Name -> RnM Fixity
-lookupFieldFixityRn (Unambiguous rdr n) = lookupFixityRn' n (rdrNameOcc rdr)
-lookupFieldFixityRn (Ambiguous   rdr _) = get_ambiguous_fixity rdr
+lookupFieldFixityRn (Unambiguous (L _ rdr) n)
+  = lookupFixityRn' n (rdrNameOcc rdr)
+lookupFieldFixityRn (Ambiguous   (L _ rdr) _) = get_ambiguous_fixity rdr
   where
     get_ambiguous_fixity :: RdrName -> RnM Fixity
     get_ambiguous_fixity rdr_name = do

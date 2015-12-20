@@ -973,8 +973,8 @@ mkOneRecordSelector all_cons idDetails fl
     mk_sel_pat con = ConPatIn (L loc (getName con)) (RecCon rec_fields)
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
     rec_field  = noLoc (HsRecField
-                        { hsRecFieldLbl = L loc (FieldOcc (mkVarUnqual lbl)
-                                                 sel_name)
+                        { hsRecFieldLbl
+                           = L loc (FieldOcc (L loc $ mkVarUnqual lbl) sel_name)
                         , hsRecFieldArg = L loc (VarPat (L loc field_var))
                         , hsRecPun = False })
     sel_lname = L loc sel_name

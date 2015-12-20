@@ -1695,7 +1695,7 @@ extendPatSynEnv val_decls local_fix_env thing = do {
           bnd_name <- newTopSrcBinder (L bind_loc n)
           let rnames = map recordPatSynSelectorId as
               mkFieldOcc :: Located RdrName -> LFieldOcc RdrName
-              mkFieldOcc (L l name) = L l (FieldOcc name PlaceHolder)
+              mkFieldOcc (L l name) = L l (FieldOcc (L l name) PlaceHolder)
               field_occs =  map mkFieldOcc rnames
           flds     <- mapM (newRecordSelector False [bnd_name]) field_occs
           return ((bnd_name, flds): names)

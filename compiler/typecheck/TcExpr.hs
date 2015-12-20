@@ -1261,7 +1261,7 @@ tcInferId :: Name -> TcM (HsExpr TcId, TcRhoType)
 tcInferId n = tcInferIdWithOrig (OccurrenceOf n) (nameRdrName n) n
 
 tcInferRecSelId :: AmbiguousFieldOcc Name -> TcM (HsExpr TcId, TcRhoType)
-tcInferRecSelId (Unambiguous lbl sel)
+tcInferRecSelId (Unambiguous (L _ lbl) sel)
   = tcInferIdWithOrig (OccurrenceOfRecSel lbl) lbl sel
 tcInferRecSelId (Ambiguous lbl _)
   = ambiguousSelector lbl
@@ -1643,11 +1643,11 @@ See also Note [HsRecField and HsRecUpdField] in HsPat.
 -- Given a RdrName that refers to multiple record fields, and the type
 -- of its argument, try to determine the name of the selector that is
 -- meant.
-disambiguateSelector :: RdrName -> Type -> RnM Name
-disambiguateSelector rdr parent_type
+disambiguateSelector :: Located RdrName -> Type -> RnM Name
+disambiguateSelector lr@(L _ rdr) parent_type
  = do { fam_inst_envs <- tcGetFamInstEnvs
       ; case tyConOf fam_inst_envs parent_type of
-          Nothing -> ambiguousSelector rdr
+          Nothing -> ambiguousSelector lr
           Just p  ->
             do { xs <- lookupParents rdr
                ; let parent = RecSelData p
@@ -1658,8 +1658,8 @@ disambiguateSelector rdr parent_type
 
 -- This field name really is ambiguous, so add a suitable "ambiguous
 -- occurrence" error, then give up.
-ambiguousSelector :: RdrName -> RnM a
-ambiguousSelector rdr
+ambiguousSelector :: Located RdrName -> RnM a
+ambiguousSelector (L _ rdr)
   = do { env <- getGlobalRdrEnv
        ; let gres = lookupGRE_RdrName rdr env
        ; setErrCtxt [] $ addNameClashErrRn rdr gres
@@ -1757,7 +1757,8 @@ disambiguateRecordBinds record_expr record_tau rbnds res_ty
       = do { i <- tcLookupId n
            ; let L loc af = hsRecFieldLbl upd
                  lbl      = rdrNameAmbiguousFieldOcc af
-           ; return $ L l upd { hsRecFieldLbl = L loc (Unambiguous lbl i) } }
+           ; return $ L l upd { hsRecFieldLbl
+                                  = L loc (Unambiguous (L loc lbl) i) } }
 
 
 -- Extract the outermost TyCon of a type, if there is one; for
@@ -1851,12 +1852,16 @@ tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
                                  , hsRecFieldArg = rhs }))
       = do { let lbl = rdrNameAmbiguousFieldOcc af
                  sel_id = selectorAmbiguousFieldOcc af
-                 f = L loc (FieldOcc lbl (idName sel_id))
+                 f = L loc (FieldOcc (L loc lbl) (idName sel_id))
            ; mb <- tcRecordField con_like flds_w_tys f rhs
            ; case mb of
                Nothing         -> return Nothing
-               Just (f', rhs') -> return (Just (L l (fld { hsRecFieldLbl = L loc (Unambiguous lbl (selectorFieldOcc (unLoc f')))
-                                                         , hsRecFieldArg = rhs' }))) }
+               Just (f', rhs') ->
+                 return (Just
+                         (L l (fld { hsRecFieldLbl
+                                      = L loc (Unambiguous (L loc lbl)
+                                               (selectorFieldOcc (unLoc f')))
+                                   , hsRecFieldArg = rhs' }))) }
 
 tcRecordField :: ConLike -> Assoc FieldLabelString Type -> LFieldOcc Name -> LHsExpr Name
               -> TcM (Maybe (LFieldOcc Id, LHsExpr Id))
@@ -1876,7 +1881,7 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc lbl sel_name)) rhs
       = do { addErrTc (badFieldCon con_like field_lbl)
            ; return Nothing }
   where
-        field_lbl = occNameFS $ rdrNameOcc lbl
+        field_lbl = occNameFS $ rdrNameOcc (unLoc lbl)
 
 
 checkMissingFields ::  ConLike -> HsRecordBinds Name -> TcM ()

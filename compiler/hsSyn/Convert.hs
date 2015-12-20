@@ -475,11 +475,13 @@ cvt_arg (Unpacked,  ty)
 
 cvt_id_arg :: (TH.Name, TH.Strict, TH.Type) -> CvtM (LConDeclField RdrName)
 cvt_id_arg (i, str, ty)
-  = do  { i' <- vNameL i
+  = do  { L li i' <- vNameL i
         ; ty' <- cvt_arg (str,ty)
-        ; return $ noLoc (ConDeclField { cd_fld_names = [fmap (flip FieldOcc PlaceHolder) i']
-                                       , cd_fld_type =  ty'
-                                       , cd_fld_doc = Nothing}) }
+        ; return $ noLoc (ConDeclField
+                          { cd_fld_names
+                              = [L li $ FieldOcc (L li i') PlaceHolder]
+                          , cd_fld_type =  ty'
+                          , cd_fld_doc = Nothing}) }
 
 cvtDerivs :: TH.Cxt -> CvtM (HsDeriving RdrName)
 cvtDerivs [] = return Nothing
@@ -737,10 +739,12 @@ cvtl e = wrapL (cvt e)
     cvt (SigE e t)       = do { e' <- cvtl e; t' <- cvtType t
                               ; return $ ExprWithTySig e' (mkLHsSigWcType t') }
     cvt (RecConE c flds) = do { c' <- cNameL c
-                              ; flds' <- mapM (cvtFld mkFieldOcc) flds
+                              ; flds' <- mapM (cvtFld (mkFieldOcc . noLoc)) flds
                               ; return $ mkRdrRecordCon c' (HsRecFields flds' Nothing) }
     cvt (RecUpdE e flds) = do { e' <- cvtl e
-                              ; flds'<- mapM (cvtFld mkAmbiguousFieldOcc) flds
+                              ; flds'
+                                  <- mapM (cvtFld (mkAmbiguousFieldOcc . noLoc))
+                                           flds
                               ; return $ mkRdrRecordUpd e' flds' }
     cvt (StaticE e)      = fmap HsStatic $ cvtl e
     cvt (UnboundVarE s)  = do { s' <- vName s; return $ HsVar (noLoc s') }
@@ -984,8 +988,9 @@ cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
 
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField RdrName (LPat RdrName))
 cvtPatFld (s,p)
-  = do  { s' <- vNameL s; p' <- cvtPat p
-        ; return (noLoc $ HsRecField { hsRecFieldLbl = fmap mkFieldOcc s'
+  = do  { L ls s' <- vNameL s; p' <- cvtPat p
+        ; return (noLoc $ HsRecField { hsRecFieldLbl
+                                         = L ls $ mkFieldOcc (L ls s')
                                      , hsRecFieldArg = p'
                                      , hsRecPun      = False}) }
 
