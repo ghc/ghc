@@ -407,8 +407,6 @@ generate directory distdir dll0Modules config_args
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
                 -- TODO: move inside withLibLBI
                 variablePrefix ++ "_COMPONENT_ID = " ++ display (localCompatPackageKey lbi),
-                -- copied from mkComponentsLocalBuildInfo
-                variablePrefix ++ "_COMPONENT_ID = " ++ display (localComponentId lbi),
                 variablePrefix ++ "_MODULES = " ++ unwords mods,
                 variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords otherMods,
                 variablePrefix ++ "_SYNOPSIS =" ++ synopsis pd,
@@ -417,9 +415,7 @@ generate directory distdir dll0Modules config_args
                 variablePrefix ++ "_DEP_IPIDS = " ++ unwords dep_ipids,
                 variablePrefix ++ "_DEP_NAMES = " ++ unwords depNames,
                 variablePrefix ++ "_DEP_COMPONENT_IDS = " ++ unwords depLibNames,
-                variablePrefix ++ "_TRANSITIVE_DEPS = " ++ unwords transitiveDeps,
                 variablePrefix ++ "_TRANSITIVE_DEP_COMPONENT_IDS = " ++ unwords transitiveDepLibNames,
-                variablePrefix ++ "_TRANSITIVE_DEP_NAMES = " ++ unwords transitiveDepNames,
                 variablePrefix ++ "_INCLUDE_DIRS = " ++ unwords (includeDirs bi),
                 variablePrefix ++ "_INCLUDES = " ++ unwords (includes bi),
                 variablePrefix ++ "_INSTALL_INCLUDES = " ++ unwords (installIncludes bi),
