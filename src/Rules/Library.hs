@@ -46,11 +46,12 @@ buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
         else build $ fullTarget target Ar objs [a]
 
         synopsis <- interpretPartial target $ getPkgData Synopsis
-        putSuccess $ "/--------\n| Successfully built package library '"
-            ++ pkgName pkg
-            ++ "' (stage " ++ show stage ++ ", way "++ show way ++ ")."
-        putSuccess $ "| Package synopsis: "
-            ++ dropWhileEnd isPunctuation synopsis ++ "." ++ "\n\\--------"
+        putSuccess $ renderBox
+            [ "Successfully built package library '"
+              ++ pkgName pkg
+              ++ "' (stage " ++ show stage ++ ", way "++ show way ++ ")."
+            , "Package synopsis: " ++ dropWhileEnd isPunctuation synopsis ++ "."
+            ]
 
     -- TODO: this looks fragile as haskell objects can match this rule if their
     -- names start with "HS" and they are on top of the module hierarchy.

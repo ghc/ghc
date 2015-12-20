@@ -1,4 +1,5 @@
 module Base (
+    -- * General utilities
     module Control.Applicative,
     module Control.Monad.Extra,
     module Control.Monad.Reader,
@@ -7,18 +8,27 @@ module Base (
     module Data.List,
     module Data.Maybe,
     module Data.Monoid,
+
+    -- * Shake
     module Development.Shake,
     module Development.Shake.Classes,
     module Development.Shake.Config,
     module Development.Shake.FilePath,
     module Development.Shake.Util,
-    module System.Console.ANSI,
+
+    -- * Paths
     shakeFilesPath, configPath, bootPackageConstraints, packageDependencies,
+
+    -- * Output
+    putColoured, putOracle, putBuild, putSuccess, putError,
+    renderBox,
+    module System.Console.ANSI,
+
+    -- * Miscellaneous utilities
+    bimap, minusOrd, intersectOrd,
+    removeFileIfExists,
     replaceEq, replaceSeparators, decodeModule,
     unifyPath, (-/-), chunksOfSize,
-    putColoured, putOracle, putBuild, putSuccess, putError,
-    bimap, minusOrd, intersectOrd,
-    removeFileIfExists
     ) where
 
 import Control.Applicative
@@ -29,7 +39,7 @@ import Data.Function
 import Data.List
 import Data.Maybe
 import Data.Monoid
-import Development.Shake hiding (unit, (*>))
+import Development.Shake hiding (unit, (*>), parallel)
 import Development.Shake.Classes
 import Development.Shake.Config
 import Development.Shake.FilePath
@@ -55,34 +65,35 @@ packageDependencies :: FilePath
 packageDependencies = shakeFilesPath -/- "package-dependencies"
 
 -- Utility functions
--- Find and replace all occurrences of a value in a list
+-- | Find and replace all occurrences of a value in a list
 replaceEq :: Eq a => a -> a -> [a] -> [a]
 replaceEq from = replaceIf (== from)
 
--- Find and replace all occurrences of path separators in a String with a Char
+-- | Find and replace all occurrences of path separators in a String with a Char
 replaceSeparators :: Char -> String -> String
 replaceSeparators = replaceIf isPathSeparator
 
 replaceIf :: (a -> Bool) -> a -> [a] -> [a]
 replaceIf p to = map (\from -> if p from then to else from)
 
--- Given a module name extract the directory and file names, e.g.:
--- decodeModule "Data.Functor.Identity" = ("Data/Functor/", "Identity")
+-- | Given a module name extract the directory and file names, e.g.:
+--
+-- > decodeModule "Data.Functor.Identity" = ("Data/Functor/", "Identity")
 decodeModule :: String -> (FilePath, String)
 decodeModule = splitFileName . replaceEq '.' '/'
 
--- Normalise a path and convert all path separators to /, even on Windows.
+-- | Normalise a path and convert all path separators to @/@, even on Windows.
 unifyPath :: FilePath -> FilePath
 unifyPath = toStandard . normaliseEx
 
--- Combine paths using </> and apply unifyPath to the result
+-- | Combine paths using '</>' and apply 'unifyPath' to the result
 (-/-) :: FilePath -> FilePath -> FilePath
 a -/- b = unifyPath $ a </> b
 
 infixr 6 -/-
 
--- (chunksOfSize size strings) splits a given list of strings into chunks not
--- exceeding the given 'size'.
+-- | @chunksOfSize size strings@ splits a given list of strings into chunks not
+-- exceeding the given @size@.
 chunksOfSize :: Int -> [String] -> [[String]]
 chunksOfSize _    [] = []
 chunksOfSize size strings = reverse chunk : chunksOfSize size rest
@@ -94,7 +105,7 @@ chunksOfSize size strings = reverse chunk : chunksOfSize size rest
       where
         newSize = chunkSize + length s
 
--- A more colourful version of Shake's putNormal
+-- | A more colourful version of Shake's putNormal
 putColoured :: Color -> String -> Action ()
 putColoured colour msg = do
     liftIO $ setSGR [SetColor Foreground Vivid colour]
@@ -102,23 +113,40 @@ putColoured colour msg = do
     liftIO $ setSGR []
     liftIO $ hFlush stdout
 
--- Make oracle output more distinguishable
+-- | Make oracle output more distinguishable
 putOracle :: String -> Action ()
 putOracle = putColoured Blue
 
--- Make build output more distinguishable
+-- | Make build output more distinguishable
 putBuild :: String -> Action ()
 putBuild = putColoured White
 
--- A more colourful version of success message
+-- | A more colourful version of success message
 putSuccess :: String -> Action ()
 putSuccess = putColoured Green
 
--- A more colourful version of error message
+-- | A more colourful version of error message
 putError :: String -> Action a
 putError msg = do
     putColoured Red msg
     error $ "GHC build system error: " ++ msg
+
+-- | Render the given set of lines in a ASCII box
+renderBox :: [String] -> String
+renderBox ls =
+    unlines $ [begin] ++ map (bar++) ls ++ [end]
+  where
+    (begin,bar,end)
+      | useUnicode = ( "╭──────────"
+                     , "│ "
+                     , "╰──────────"
+                     )
+      | otherwise  = ( "/----------"
+                     , "| "
+                     , "\\----------"
+                     )
+    -- FIXME: See Shake #364.
+    useUnicode = False
 
 -- Depending on Data.Bifunctor only for this function seems an overkill
 bimap :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
