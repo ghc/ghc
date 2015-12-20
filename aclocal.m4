@@ -1975,15 +1975,17 @@ AC_DEFUN([XCODE_VERSION],[
 AC_DEFUN([FIND_LLVM_PROG],[
     # Test for program with version name.
     FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3-$4])
-    if test "$$1" = ""; then
+    if test -z "$$1"; then
         # Test for program without version name.
         FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3])
-        AC_MSG_CHECKING([$$1 is version $4])
-        if test `$$1 --version | grep -c "version $4"` -gt 0 ; then
-            AC_MSG_RESULT(yes)
-        else
-            AC_MSG_RESULT(no)
-            $1=""
+        if test -n "$$1"; then
+            AC_MSG_CHECKING([$$1 is version $4])
+            if test `$$1 --version | grep -c "version $4"` -gt 0 ; then
+                AC_MSG_RESULT(yes)
+            else
+                AC_MSG_RESULT(no)
+                $1=""
+            fi
         fi
     fi
 ])
