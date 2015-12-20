@@ -1,7 +1,7 @@
 module GHC (
-    array, base, ghcBoot, binary, bytestring, cabal, compiler, containers,
-    compareSizes, deepseq, deriveConstants, directory, dllSplit, filepath,
-    genapply, genprimopcode, ghc, ghcCabal, ghci, ghcPkg, ghcPrim, ghcPwd, ghcTags,
+    array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
+    deepseq, deriveConstants, directory, dllSplit, filepath, genapply,
+    genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim, ghcPwd, ghcTags,
     haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
     integerSimple, iservBin, mkUserGuidePart, parallel, pretty, primitive, process,
     runghc, stm, templateHaskell, terminfo, time, transformers, unix, win32, xhtml,
@@ -20,25 +20,24 @@ import Stage
 -- which can be overridden in Settings/User.hs.
 defaultKnownPackages :: [Package]
 defaultKnownPackages =
-    [ array, base, ghcBoot, binary, bytestring, cabal, compiler
-    , containers, compareSizes, deepseq, deriveConstants, directory, dllSplit
-    , filepath, genapply, genprimopcode, ghc, ghcCabal, ghci, ghcPkg, ghcPrim
+    [ array, base, binary, bytestring, cabal, compiler, containers, compareSizes
+    , deepseq, deriveConstants, directory, dllSplit, filepath, genapply
+    , genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim
     , ghcPwd, ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin
     , integerGmp, integerSimple, iservBin, mkUserGuidePart, parallel, pretty
     , primitive , process, runghc, stm, templateHaskell, terminfo, time
     , transformers, unix, win32, xhtml ]
 
 -- Package definitions (see Package.hs)
-array, base, ghcBoot, binary, bytestring, cabal, compiler, containers,
-    compareSizes, deepseq, deriveConstants, directory, dllSplit, filepath,
-    genapply, genprimopcode, ghc, ghcCabal, ghcPkg, ghcPrim, ghcPwd,
+array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
+    deepseq, deriveConstants, directory, dllSplit, filepath, genapply,
+    genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim, ghcPwd,
     ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
-    integerSimple, mkUserGuidePart, parallel, pretty, primitive, process,
+    integerSimple, iservBin, mkUserGuidePart, parallel, pretty, primitive, process,
     runghc, stm, templateHaskell, terminfo, time, transformers, unix, win32, xhtml :: Package
 
 array           = library  "array"
 base            = library  "base"
-ghcBoot         = library  "ghc-boot"
 binary          = library  "binary"
 bytestring      = library  "bytestring"
 cabal           = library  "Cabal"          `setPath` "libraries/Cabal/Cabal"
@@ -53,8 +52,9 @@ filepath        = library  "filepath"
 genapply        = utility  "genapply"
 genprimopcode   = utility  "genprimopcode"
 ghc             = topLevel "ghc-bin"        `setPath` "ghc"
+ghcBoot         = library  "ghc-boot"
 ghcCabal        = utility  "ghc-cabal"
-ghci            = library  "ghci"           `setPath` "libraries/ghci"
+ghci            = library  "ghci"
 ghcPkg          = utility  "ghc-pkg"
 ghcPrim         = library  "ghc-prim"
 ghcPwd          = utility  "ghc-pwd"
