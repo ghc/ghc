@@ -1,2 +1,2 @@
-@mkdir _shake 2> nul
-@ghc --make -Wall src/Main.hs -isrc -rtsopts -with-rtsopts=-I0 -outputdir=_shake -o _shake/build && _shake\build --lint --directory ".." %*
+@mkdir .shake 2> nul
+@ghc --make -Wall src/Main.hs -isrc -rtsopts -with-rtsopts=-I0 -outputdir=.shake -o .shake/build && .shake\build --lint --directory ".." %*

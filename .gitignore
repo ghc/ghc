@@ -1,6 +1,3 @@
-*.o
-*.hi
-_shake/
-_build/
+.shake/
+.db/
 cfg/system.config
-arg/*/*.txt

@@ -49,10 +49,10 @@ configPath :: FilePath
 configPath = shakePath -/- "cfg"
 
 bootPackageConstraints :: FilePath
-bootPackageConstraints = shakeFilesPath ++ "boot-package-constraints"
+bootPackageConstraints = shakeFilesPath -/- "boot-package-constraints"
 
 packageDependencies :: FilePath
-packageDependencies = shakeFilesPath ++ "package-dependencies"
+packageDependencies = shakeFilesPath -/- "package-dependencies"
 
 -- Utility functions
 -- Find and replace all occurrences of a value in a list
