@@ -32,7 +32,7 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
             deps <- packageDeps pkg
             pkgs <- interpretPartial target getPackages
             let depPkgs = matchPackageNames (sort pkgs) deps
-            need [ targetPath stage p -/- "package-data.mk" | p <- depPkgs ]
+            need $ map (pkgDataFile stage) depPkgs
 
             need [cabalFile]
             buildWithResources [(ghcCabal rs, 1)] $
