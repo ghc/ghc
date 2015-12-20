@@ -10,12 +10,12 @@ generateTargets :: Rules ()
 generateTargets = action $ do
     targets <- fmap concat . forM [Stage0 ..] $ \stage -> do
         pkgs <- interpretWithStage stage getPackages
-        let (libPkgs, programPkgs) = partition isLibrary pkgs
+        let libPkgs = filter isLibrary pkgs
         libTargets <- fmap concat . forM libPkgs $ \pkg -> do
             let target = PartialTarget stage pkg
             needHaddock <- interpretPartial target buildHaddock
-            return $ [ pkgHaddockFile pkg | needHaddock && stage == Stage1 ]
-        let programTargets = map (fromJust . programPath stage) programPkgs
+            return [ pkgHaddockFile pkg | needHaddock && stage == Stage1 ]
+        let programTargets = [ prog | Just prog <- programPath stage <$> pkgs ]
         return $ libTargets ++ programTargets
     need $ reverse targets
 
