@@ -112,6 +112,9 @@
 
   * Re-export `Const` from `Control.Applicative` for backwards compatibility.
 
+  * Expand `Floating` class to include operations that allow for better
+    precision: `log1p`, `expm1`, `log1pexp` and `log1mexp`. These are not
+    available from `Prelude`, but the full class is exported from `Numeric`.
 
 ## 4.8.2.0  *Oct 2015*
 

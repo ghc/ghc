@@ -37,6 +37,7 @@ module Data.Complex
         )  where
 
 import GHC.Generics (Generic, Generic1)
+import GHC.Float (Floating(..))
 import Data.Data (Data)
 import Foreign (Storable, castPtr, peek, poke, pokeElemOff, peekElemOff, sizeOf,
                 alignment)
@@ -194,6 +195,20 @@ instance  (RealFloat a) => Floating (Complex a) where
     asinh z        =  log (z + sqrt (1+z*z))
     acosh z        =  log (z + (z+1) * sqrt ((z-1)/(z+1)))
     atanh z        =  0.5 * log ((1.0+z) / (1.0-z))
+
+    log1p x@(a :+ b)
+      | abs a < 0.5 && abs b < 0.5
+      , u <- 2*a + a*a + b*b = log1p (u/(1 + sqrt(u+1))) :+ atan2 (1 + a) b
+      | otherwise = log (1 + x)
+    {-# INLINE log1p #-}
+
+    expm1 x@(a :+ b)
+      | a*a + b*b < 1
+      , u <- expm1 a
+      , v <- sin (b/2)
+      , w <- -2*v*v = (u*w + u + w) :+ (u+1)*sin b
+      | otherwise = exp x - 1
+    {-# INLINE expm1 #-}
 
 instance Storable a => Storable (Complex a) where
     sizeOf a       = 2 * sizeOf (realPart a)

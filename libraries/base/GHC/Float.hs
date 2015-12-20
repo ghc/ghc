@@ -4,6 +4,7 @@
            , MagicHash
            , UnboxedTuples
   #-}
+{-# LANGUAGE CApiFFI #-}
 -- We believe we could deorphan this module, by moving lots of things
 -- around, but we haven't got there yet:
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -61,6 +62,46 @@ class  (Fractional a) => Floating a  where
     sinh, cosh, tanh    :: a -> a
     asinh, acosh, atanh :: a -> a
 
+    -- | @'log1p' x@ computes @'log' (1 + x)@, but provides more precise
+    -- results for small (absolute) values of @x@ if possible.
+    --
+    -- @since 4.9.0.0
+    log1p               :: a -> a
+
+    -- | @'expm1' x@ computes @'exp' x - 1@, but provides more precise
+    -- results for small (absolute) values of @x@ if possible.
+    --
+    -- @since 4.9.0.0
+    expm1               :: a -> a
+
+    -- | @'log1pexp' x@ computes @'log' (1 + 'exp' x)@, but provides more
+    -- precise results if possible.
+    --
+    -- Examples:
+    --
+    -- * if @x@ is a large negative number, @'log' (1 + 'exp' x)@ will be
+    --   imprecise for the reasons given in 'log1p'.
+    --
+    -- * if @'exp' x@ is close to @-1@, @'log' (1 + 'exp' x)@ will be
+    --   imprecise for the reasons given in 'expm1'.
+    --
+    -- @since 4.9.0.0
+    log1pexp            :: a -> a
+
+    -- | @'log1mexp' x@ computes @'log' (1 - 'exp' x)@, but provides more
+    -- precise results if possible.
+    --
+    -- Examples:
+    --
+    -- * if @x@ is a large negative number, @'log' (1 - 'exp' x)@ will be
+    --   imprecise for the reasons given in 'log1p'.
+    --
+    -- * if @'exp' x@ is close to @1@, @'log' (1 - 'exp' x)@ will be
+    --   imprecise for the reasons given in 'expm1'.
+    --
+    -- @since 4.9.0.0
+    log1mexp            :: a -> a
+
     {-# INLINE (**) #-}
     {-# INLINE logBase #-}
     {-# INLINE sqrt #-}
@@ -71,6 +112,15 @@ class  (Fractional a) => Floating a  where
     sqrt x              =  x ** 0.5
     tan  x              =  sin  x / cos  x
     tanh x              =  sinh x / cosh x
+
+    {-# INLINE log1p #-}
+    {-# INLINE expm1 #-}
+    {-# INLINE log1pexp #-}
+    {-# INLINE log1mexp #-}
+    log1p x = log (1 + x)
+    expm1 x = exp x - 1
+    log1pexp x = log1p (exp x)
+    log1mexp x = log1p (negate (exp x))
 
 -- | Efficient, machine-independent access to the components of a
 -- floating-point number.
@@ -307,6 +357,19 @@ instance  Floating Float  where
     acosh x = log (x + (x+1.0) * sqrt ((x-1.0)/(x+1.0)))
     atanh x = 0.5 * log ((1.0+x) / (1.0-x))
 
+    log1p = log1pFloat
+    expm1 = expm1Float
+
+    log1mexp a
+      | a <= log 2 = log (negate (expm1Float a))
+      | otherwise  = log1pFloat (negate (exp a))
+    {-# INLINE log1mexp #-}
+    log1pexp a
+      | a <= 18   = log1pFloat (exp a)
+      | a <= 100  = a + exp (negate a)
+      | otherwise = a
+    {-# INLINE log1pexp #-}
+
 instance  RealFloat Float  where
     floatRadix _        =  FLT_RADIX        -- from float.h
     floatDigits _       =  FLT_MANT_DIG     -- ditto
@@ -414,6 +477,19 @@ instance  Floating Double  where
     asinh x = log (x + sqrt (1.0+x*x))
     acosh x = log (x + (x+1.0) * sqrt ((x-1.0)/(x+1.0)))
     atanh x = 0.5 * log ((1.0+x) / (1.0-x))
+
+    log1p = log1pDouble
+    expm1 = expm1Double
+
+    log1mexp a
+      | a <= log 2 = log (negate (expm1Double a))
+      | otherwise  = log1pDouble (negate (exp a))
+    {-# INLINE log1mexp #-}
+    log1pexp a
+      | a <= 18   = log1pDouble (exp a)
+      | a <= 100  = a + exp (negate a)
+      | otherwise = a
+    {-# INLINE log1pexp #-}
 
 -- RULES for Integer and Int
 {-# RULES
@@ -1068,6 +1144,16 @@ foreign import ccall unsafe "isDoubleInfinite" isDoubleInfinite :: Double -> Int
 foreign import ccall unsafe "isDoubleDenormalized" isDoubleDenormalized :: Double -> Int
 foreign import ccall unsafe "isDoubleNegativeZero" isDoubleNegativeZero :: Double -> Int
 foreign import ccall unsafe "isDoubleFinite" isDoubleFinite :: Double -> Int
+
+
+------------------------------------------------------------------------
+-- libm imports for extended floating
+------------------------------------------------------------------------
+foreign import capi unsafe "math.h log1p" log1pDouble :: Double -> Double
+foreign import capi unsafe "math.h expm1" expm1Double :: Double -> Double
+foreign import capi unsafe "math.h log1pf" log1pFloat :: Float -> Float
+foreign import capi unsafe "math.h expm1f" expm1Float :: Float -> Float
+
 
 ------------------------------------------------------------------------
 -- Coercion rules

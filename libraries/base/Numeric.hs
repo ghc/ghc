@@ -56,6 +56,7 @@ module Numeric (
         -- * Miscellaneous
 
         fromRat,
+        Floating(..)
 
         ) where
 

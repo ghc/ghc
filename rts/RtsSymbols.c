@@ -157,6 +157,10 @@
       SymI_HasProto(erfc)                                \
       SymI_HasProto(erff)                                \
       SymI_HasProto(erfcf)                               \
+      SymI_HasProto(expm1)                               \
+      SymI_HasProto(expm1f)                              \
+      SymI_HasProto(log1p)                               \
+      SymI_HasProto(log1pf)                              \
       SymI_HasProto(memcpy)                              \
       SymI_HasProto(rts_InstallConsoleEvent)             \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
