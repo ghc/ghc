@@ -740,7 +740,7 @@ ppSideBySideConstr subdocs unicode leader (L loc con) =
 
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField DocName ->  LaTeX
 ppSideBySideField subdocs unicode (ConDeclField names ltype _) =
-  decltt (cat (punctuate comma (map (ppBinder . rdrNameOcc . rdrNameFieldOcc . unLoc) names))
+  decltt (cat (punctuate comma (map (ppBinder . rdrNameOcc . unLoc . rdrNameFieldOcc . unLoc) names))
     <+> dcolon unicode <+> ppLType unicode ltype) <-> rDoc mbDoc
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above

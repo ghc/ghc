@@ -826,7 +826,7 @@ ppSideBySideConstr subdocs fixities unicode qual (L _ con)
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Unicode -> Qualification
                   -> ConDeclField DocName -> SubDecl
 ppSideBySideField subdocs unicode qual (ConDeclField names ltype _) =
-  (hsep (punctuate comma (map ((ppBinder False) . rdrNameOcc . rdrNameFieldOcc . unLoc) names)) <+> dcolon unicode <+> ppLType unicode qual ltype,
+  (hsep (punctuate comma (map ((ppBinder False) . rdrNameOcc . unLoc . rdrNameFieldOcc . unLoc) names)) <+> dcolon unicode <+> ppLType unicode qual ltype,
     mbDoc,
     [])
   where
@@ -837,7 +837,7 @@ ppSideBySideField subdocs unicode qual (ConDeclField names ltype _) =
 
 ppShortField :: Bool -> Unicode -> Qualification -> ConDeclField DocName -> Html
 ppShortField summary unicode qual (ConDeclField names ltype _)
-  = hsep (punctuate comma (map ((ppBinder summary) . rdrNameOcc . rdrNameFieldOcc . unLoc) names))
+  = hsep (punctuate comma (map ((ppBinder summary) . rdrNameOcc . unLoc . rdrNameFieldOcc . unLoc) names))
     <+> dcolon unicode <+> ppLType unicode qual ltype
 
 
