@@ -249,6 +249,11 @@ GHCi
 
 -  Added support for top-level function declarations (#7253).
 
+-  The new commands ``:all-types``, ``:loc-at``, ``:type-at``, and
+   ``:uses`` designed for editor-integration
+   (such as Emacs' ``haskell-mode``) originally premiered by ``ghci-ng``
+   have been integrated into GHCi (#10874).
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 

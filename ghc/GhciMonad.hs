@@ -21,6 +21,7 @@ module GhciMonad (
 
         runStmt, runDecls, resume, timeIt, recordBreak, revertCAFs,
 
+        printForUserNeverQualify, printForUserModInfo,
         printForUser, printForUserPartWay, prettyLocations,
         initInterpBuffering,
         turnOffBuffering, turnOffBuffering_,
@@ -30,6 +31,7 @@ module GhciMonad (
 
 #include "HsVersions.h"
 
+import GhciInfo (ModInfo)
 import qualified GHC
 import GhcMonad         hiding (liftIO)
 import Outputable       hiding (printForUser, printForUserPartWay)
@@ -55,6 +57,7 @@ import System.Console.Haskeline (CompletionFunc, InputT)
 import qualified System.Console.Haskeline as Haskeline
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
+import Data.Map.Strict (Map)
 
 -----------------------------------------------------------------------------
 -- GHCi monad
@@ -107,6 +110,8 @@ data GHCiState = GHCiState
         long_help  :: String,
         lastErrorLocations :: IORef [(FastString, Int)],
 
+        mod_infos  :: !(Map ModuleName ModInfo),
+
         -- hFlush stdout; hFlush stderr in the interpreter
         flushStdHandles :: ForeignHValue,
         -- hSetBuffering NoBuffering for stdin/stdout/stderr
@@ -135,6 +140,8 @@ data GHCiOption
         | ShowType              -- show the type of expressions
         | RevertCAFs            -- revert CAFs after every evaluation
         | Multiline             -- use multiline commands
+        | CollectInfo           -- collect and cache information about
+                                -- modules after load
         deriving Eq
 
 data BreakLocation
@@ -272,6 +279,18 @@ unsetOption :: GHCiOption -> GHCi ()
 unsetOption opt
  = do st <- getGHCiState
       setGHCiState (st{ options = filter (/= opt) (options st) })
+
+printForUserNeverQualify :: GhcMonad m => SDoc -> m ()
+printForUserNeverQualify doc = do
+  dflags <- getDynFlags
+  liftIO $ Outputable.printForUser dflags stdout neverQualify doc
+
+printForUserModInfo :: GhcMonad m => GHC.ModuleInfo -> SDoc -> m ()
+printForUserModInfo info doc = do
+  dflags <- getDynFlags
+  mUnqual <- GHC.mkPrintUnqualifiedForModule info
+  unqual <- maybe GHC.getPrintUnqual return mUnqual
+  liftIO $ Outputable.printForUser dflags stdout unqual doc
 
 printForUser :: GhcMonad m => SDoc -> m ()
 printForUser doc = do

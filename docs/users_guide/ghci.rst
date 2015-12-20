@@ -1903,6 +1903,21 @@ commonly used commands.
     available, or otherwise the module will be compiled to byte-code.
     Using the ``*`` prefix forces the module to be loaded as byte-code.
 
+``:all-types``
+    .. index::
+       single: :all-types
+
+    List all types collected for expressions and (local) bindings
+    currently loaded (while :ref:`+c` was active) with their respective
+    source-code span, e.g.
+
+    ::
+
+       GhciTypes> :all-types
+       GhciTypes.hs:(38,13)-(38,24): Maybe Id
+       GhciTypes.hs:(45,10)-(45,29): Outputable SpanInfo
+       GhciTypes.hs:(45,10)-(45,29): (Rational -> SpanInfo -> SDoc) -> Outputable SpanInfo
+
 ``:back ⟨n⟩``
     .. index::
        single: :back
@@ -2301,6 +2316,23 @@ commonly used commands.
 
     -  ``Prelude`` otherwise.
 
+``:loc-at ⟨module⟩ ⟨line⟩ ⟨col⟩ ⟨end-line⟩ ⟨end-col⟩ [⟨name⟩]``
+    .. index::
+       single: :loc-at
+
+    Tries to find the definition site of the name at the given
+    source-code span, e.g.:
+
+    ::
+
+        X> :loc-at X.hs 6 14 6 16 mu
+        X.hs:(8,7)-(8,9)
+
+    This command is useful when integrating GHCi with text editors and
+    IDEs for providing a goto-definition facility.
+
+    The ``:loc-at`` command requires :ref:`+c` to be set.
+
 ``:main ⟨arg1⟩ ... ⟨argn⟩``
     .. index::
        single: :main
@@ -2599,6 +2631,26 @@ commonly used commands.
     restriction is *not* applied to the expression during type
     inference.
 
+``:type-at ⟨module⟩ ⟨line⟩ ⟨col⟩ ⟨end-line⟩ ⟨end-col⟩ [⟨name⟩]``
+    .. index::
+       single: :type-at
+
+    Reports the inferred type at the given span/position in the module, e.g.:
+
+    ::
+
+       *X> :type-at X.hs 6 6 6 7 f
+       Int -> Int
+
+    This command is useful when integrating GHCi with text editors and
+    IDEs for providing a show-type-under-point facility.
+
+    The last string parameter is useful for when the span is out of
+    date, i.e. the file changed and the code has moved. In which case
+    ``:type-at`` falls back to a general :ref:`:type` like lookup.
+
+    The ``:type-at`` command requires :ref:`+c` to be set.
+
 ``:undef ⟨name⟩``
     .. index::
        single: :undef
@@ -2611,6 +2663,26 @@ commonly used commands.
 
     Unsets certain options. See :ref:`ghci-set` for a list of available
     options.
+
+``:uses ⟨module⟩ ⟨line⟩ ⟨col⟩ ⟨end-line⟩ ⟨end-col⟩ [⟨name⟩]``
+    .. index::
+       single: :uses
+
+    Reports all module-local uses of the thing at the given position
+    in the module, e.g.:
+
+    ::
+
+       :uses GhciFind.hs 53 66 53 70 name
+       GhciFind.hs:(46,25)-(46,29)
+       GhciFind.hs:(47,37)-(47,41)
+       GhciFind.hs:(53,66)-(53,70)
+       GhciFind.hs:(57,62)-(57,66)
+
+    This command is useful for highlighting and navigating all uses of
+    an identifier in editors and IDEs.
+
+    The ``:type-at`` command requires :ref:`+c` to be set.
 
 ``:! ⟨command⟩``
     .. index::
@@ -2648,6 +2720,14 @@ GHCi options
 GHCi options may be set using ``:set`` and unset using ``:unset``.
 
 The available GHCi options are:
+
+``+c``
+    .. index::
+       single: +c
+
+    Collect type and location information after loading modules.
+    The commands :ref:`:all-types`, :ref:`loc-at`, :ref:`type-at`,
+    and :ref:`uses` require ``+c`` to be active.
 
 ``+m``
     .. index::

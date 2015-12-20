@@ -1,5 +1,14 @@
-{-# LANGUAGE CPP, MagicHash, NondecreasingIndentation, TupleSections,
-             RecordWildCards, MultiWayIf #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
+
 {-# OPTIONS -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
@@ -25,6 +34,7 @@ module InteractiveUI (
 import qualified GhciMonad ( args, runStmt )
 import GhciMonad hiding ( args, runStmt )
 import GhciTags
+import GhciInfo
 import Debugger
 
 -- The GHC interface
@@ -35,7 +45,7 @@ import GhcMonad ( modifySession )
 import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
              TyThing(..), Phase, BreakIndex, Resume, SingleStep, Ghc,
-             handleSourceError )
+             getModuleGraph, handleSourceError )
 import HsImpExp
 import HsSyn
 import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
@@ -73,6 +83,7 @@ import Control.DeepSeq (deepseq)
 import Control.Monad as Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.Except
 
 import Data.Array
 import qualified Data.ByteString.Char8 as BS
@@ -82,6 +93,7 @@ import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
 import Data.List ( find, group, intercalate, intersperse, isPrefixOf, nub,
                    partition, sort, sortBy )
 import Data.Maybe
+import qualified Data.Map as M
 
 import Exception hiding (catch)
 import Foreign
@@ -187,7 +199,11 @@ ghciCommands = map mkCmd [
   ("undef",     keepGoing undefineMacro,        completeMacro),
   ("unset",     keepGoing unsetOptions,         completeSetOptions)
   ] ++ map mkCmdHidden [ -- hidden commands
-  ("complete",  keepGoing completeCmd)
+  ("all-types", keepGoing' allTypesCmd),
+  ("complete",  keepGoing completeCmd),
+  ("loc-at",    keepGoing' locAtCmd),
+  ("type-at",   keepGoing' typeAtCmd),
+  ("uses",      keepGoing' usesCmd)
   ]
  where
   mkCmd (n,a,c) = Command { cmdName = n
@@ -318,6 +334,7 @@ defFullHelpText =
   "    +r            revert top-level expressions after each evaluation\n" ++
   "    +s            print timing/memory stats after each evaluation\n" ++
   "    +t            print type after evaluation\n" ++
+  "    +c            collect type/location info after loading modules\n" ++
   "    -<flags>      most GHC command line flags can also be set here\n" ++
   "                         (eg. -v2, -XFlexibleInstances, etc.)\n" ++
   "                    for GHCi-specific flags, see User's Guide,\n"++
@@ -437,6 +454,7 @@ interactiveUI config srcs maybe_exprs = do
                    short_help         = shortHelpText config,
                    long_help          = fullHelpText config,
                    lastErrorLocations = lastErrLocationsRef,
+                   mod_infos          = M.empty,
                    flushStdHandles    = flush,
                    noBuffering        = nobuffering
                  }
@@ -1425,6 +1443,7 @@ deferredLoad defer load = do
 loadModule :: [(FilePath, Maybe Phase)] -> InputT GHCi SuccessFlag
 loadModule fs = timeIt (const Nothing) (loadModule' fs)
 
+-- | @:load@ command
 loadModule_ :: Bool -> [FilePath] -> InputT GHCi ()
 loadModule_ defer fs = deferredLoad defer (loadModule (zip fs (repeat Nothing)))
 
@@ -1447,10 +1466,9 @@ loadModule' files = do
   _ <- GHC.load LoadAllTargets
 
   GHC.setTargets targets
-  doLoad False LoadAllTargets
+  doLoadAndCollectInfo False LoadAllTargets
 
-
--- :add
+-- | @:add@ command
 addModule :: [FilePath] -> InputT GHCi ()
 addModule files = do
   lift revertCAFs -- always revert CAFs on load/add.
@@ -1459,15 +1477,41 @@ addModule files = do
   -- remove old targets with the same id; e.g. for :add *M
   mapM_ GHC.removeTarget [ tid | Target tid _ _ <- targets ]
   mapM_ GHC.addTarget targets
-  _ <- doLoad False LoadAllTargets
+  _ <- doLoadAndCollectInfo False LoadAllTargets
   return ()
 
-
--- :reload
+-- | @:reload@ command
 reloadModule :: Bool -> String -> InputT GHCi ()
-reloadModule defer m = deferredLoad defer load
-  where load = doLoad True $
-               if null m then LoadAllTargets else LoadUpTo (GHC.mkModuleName m)
+reloadModule defer m = deferredLoad defer $
+                       doLoadAndCollectInfo True loadTargets
+  where
+    loadTargets | null m    = LoadAllTargets
+                | otherwise = LoadUpTo (GHC.mkModuleName m)
+
+-- | Load/compile targets and (optionally) collect module-info
+--
+-- This collects the necessary SrcSpan annotated type information (via
+-- 'collectInfo') required by the @:all-types@, @:loc-at@, @:type-at@,
+-- and @:uses@ commands.
+--
+-- Meta-info collection is not enabled by default and needs to be
+-- enabled explicitly via @:set +c@.  The reason is that collecting
+-- the type-information for all sub-spans can be quite expensive, and
+-- since those commands are designed to be used by editors and
+-- tooling, it's useless to collect this data for normal GHCi
+-- sessions.
+doLoadAndCollectInfo :: Bool -> LoadHowMuch -> InputT GHCi SuccessFlag
+doLoadAndCollectInfo retain_context howmuch = do
+  doCollectInfo <- lift (isOptionSet CollectInfo)
+
+  doLoad retain_context howmuch >>= \case
+    Succeeded | doCollectInfo -> do
+      loaded <- getModuleGraph >>= filterM GHC.isLoaded . map GHC.ms_mod_name
+      v <- mod_infos <$> getGHCiState
+      !newInfos <- collectInfo v loaded
+      modifyGHCiState (\st -> st { mod_infos = newInfos })
+      return Succeeded
+    flag -> return flag
 
 doLoad :: Bool -> LoadHowMuch -> InputT GHCi SuccessFlag
 doLoad retain_context howmuch = do
@@ -1589,27 +1633,158 @@ modulesLoadedMsg ok mods = do
   when (verbosity dflags > 0) $
      liftIO $ putStrLn $ showSDocForUser dflags unqual msg
 
+
+-- | Run an 'ExceptT' wrapped 'GhcMonad' while handling source errors
+-- and printing 'throwE' strings to 'stderr'
+runExceptGhcMonad :: GHC.GhcMonad m => ExceptT SDoc m () -> m ()
+runExceptGhcMonad act = handleSourceError GHC.printException $
+                        either handleErr pure =<<
+                        runExceptT act
+  where
+    handleErr sdoc = do
+        dflags <- getDynFlags
+        liftIO . hPutStrLn stderr . showSDocForUser dflags alwaysQualify $ sdoc
+
+-- | Inverse of 'runExceptT' for \"pure\" computations
+-- (c.f. 'except' for 'Except')
+exceptT :: Applicative m => Either e a -> ExceptT e m a
+exceptT = ExceptT . pure
+
 -----------------------------------------------------------------------------
--- :type
+-- | @:type@ command
 
 typeOfExpr :: String -> InputT GHCi ()
-typeOfExpr str
-  = handleSourceError GHC.printException
-  $ do
-       ty <- GHC.exprType str
-       printForUser $ sep [text str, nest 2 (dcolon <+> pprTypeForUser ty)]
+typeOfExpr str = handleSourceError GHC.printException $ do
+    ty <- GHC.exprType str
+    printForUser $ sep [text str, nest 2 (dcolon <+> pprTypeForUser ty)]
 
 -----------------------------------------------------------------------------
--- :kind
+-- | @:type-at@ command
+
+typeAtCmd :: String -> InputT GHCi ()
+typeAtCmd str = runExceptGhcMonad $ do
+    (span',sample) <- exceptT $ parseSpanArg str
+    infos      <- mod_infos <$> getGHCiState
+    (info, ty) <- findType infos span' sample
+    lift $ printForUserModInfo (modinfoInfo info)
+                               (sep [text sample,nest 2 (dcolon <+> ppr ty)])
+
+-----------------------------------------------------------------------------
+-- | @:uses@ command
+
+usesCmd :: String -> InputT GHCi ()
+usesCmd str = runExceptGhcMonad $ do
+    (span',sample) <- exceptT $ parseSpanArg str
+    infos  <- mod_infos <$> getGHCiState
+    uses   <- findNameUses infos span' sample
+    forM_ uses (liftIO . putStrLn . showSrcSpan)
+
+-----------------------------------------------------------------------------
+-- | @:loc-at@ command
+
+locAtCmd :: String -> InputT GHCi ()
+locAtCmd str = runExceptGhcMonad $ do
+    (span',sample) <- exceptT $ parseSpanArg str
+    infos    <- mod_infos <$> getGHCiState
+    (_,_,sp) <- findLoc infos span' sample
+    liftIO . putStrLn . showSrcSpan $ sp
+
+-----------------------------------------------------------------------------
+-- | @:all-types@ command
+
+allTypesCmd :: String -> InputT GHCi ()
+allTypesCmd _ = runExceptGhcMonad $ do
+    infos <- mod_infos <$> getGHCiState
+    forM_ (M.elems infos) $ \mi ->
+        forM_ (modinfoSpans mi) (lift . printSpan)
+  where
+    printSpan span'
+      | Just ty <- spaninfoType span' = do
+        df <- getDynFlags
+        let tyInfo = unwords . words $
+                     showSDocForUser df alwaysQualify (pprTypeForUser ty)
+        liftIO . putStrLn $
+            showRealSrcSpan (spaninfoSrcSpan span') ++ ": " ++ tyInfo
+      | otherwise = return ()
+
+-----------------------------------------------------------------------------
+-- Helpers for locAtCmd/typeAtCmd/usesCmd
+
+-- | Parse a span: <module-name/filepath> <sl> <sc> <el> <ec> <string>
+parseSpanArg :: String -> Either SDoc (RealSrcSpan,String)
+parseSpanArg s = do
+    (fp,s0) <- readAsString (skipWs s)
+    s0'     <- skipWs1 s0
+    (sl,s1) <- readAsInt s0'
+    s1'     <- skipWs1 s1
+    (sc,s2) <- readAsInt s1'
+    s2'     <- skipWs1 s2
+    (el,s3) <- readAsInt s2'
+    s3'     <- skipWs1 s3
+    (ec,s4) <- readAsInt s3'
+
+    trailer <- case s4 of
+        [] -> Right ""
+        _  -> skipWs1 s4
+
+    let fs    = mkFastString fp
+        span' = mkRealSrcSpan (mkRealSrcLoc fs sl sc)
+                              (mkRealSrcLoc fs el ec)
+
+    return (span',trailer)
+  where
+    readAsInt :: String -> Either SDoc (Int,String)
+    readAsInt "" = Left "Premature end of string while expecting Int"
+    readAsInt s0 = case reads s0 of
+        [s_rest] -> Right s_rest
+        _        -> Left ("Couldn't read" <+> text (show s0) <+> "as Int")
+
+    readAsString :: String -> Either SDoc (String,String)
+    readAsString s0
+      | '"':_ <- s0 = case reads s0 of
+          [s_rest] -> Right s_rest
+          _        -> leftRes
+      | s_rest@(_:_,_) <- breakWs s0 = Right s_rest
+      | otherwise = leftRes
+      where
+        leftRes = Left ("Couldn't read" <+> text (show s0) <+> "as String")
+
+    skipWs1 :: String -> Either SDoc String
+    skipWs1 (c:cs) | isWs c = Right (skipWs cs)
+    skipWs1 s0 = Left ("Expected whitespace in" <+> text (show s0))
+
+    isWs    = (`elem` [' ','\t'])
+    skipWs  = dropWhile isWs
+    breakWs = break isWs
+
+
+-- | Pretty-print \"real\" 'SrcSpan's as
+-- @<filename>:(<line>,<col>)-(<line-end>,<col-end>)@
+-- while simply unpacking 'UnhelpfulSpan's
+showSrcSpan :: SrcSpan -> String
+showSrcSpan (UnhelpfulSpan s)  = unpackFS s
+showSrcSpan (RealSrcSpan spn)  = showRealSrcSpan spn
+
+-- | Variant of 'showSrcSpan' for 'RealSrcSpan's
+showRealSrcSpan :: RealSrcSpan -> String
+showRealSrcSpan spn = concat [ fp, ":(", show sl, ",", show sc
+                             , ")-(", show el, ",", show ec, ")"
+                             ]
+  where
+    fp = unpackFS (srcSpanFile spn)
+    sl = srcSpanStartLine spn
+    sc = srcSpanStartCol  spn
+    el = srcSpanEndLine   spn
+    ec = srcSpanEndCol    spn
+
+-----------------------------------------------------------------------------
+-- | @:kind@ command
 
 kindOfType :: Bool -> String -> InputT GHCi ()
-kindOfType norm str
-  = handleSourceError GHC.printException
-  $ do
-       (ty, kind) <- GHC.typeKind norm str
-       printForUser $ vcat [ text str <+> dcolon <+> pprTypeForUser kind
-                           , ppWhen norm $ equals <+> pprTypeForUser ty ]
-
+kindOfType norm str = handleSourceError GHC.printException $ do
+    (ty, kind) <- GHC.typeKind norm str
+    printForUser $ vcat [ text str <+> dcolon <+> pprTypeForUser kind
+                        , ppWhen norm $ equals <+> pprTypeForUser ty ]
 
 -----------------------------------------------------------------------------
 -- :quit
@@ -2307,6 +2482,7 @@ strToGHCiOpt "m" = Just Multiline
 strToGHCiOpt "s" = Just ShowTiming
 strToGHCiOpt "t" = Just ShowType
 strToGHCiOpt "r" = Just RevertCAFs
+strToGHCiOpt "c" = Just CollectInfo
 strToGHCiOpt _   = Nothing
 
 optToStr :: GHCiOption -> String
@@ -2314,6 +2490,7 @@ optToStr Multiline  = "m"
 optToStr ShowTiming = "s"
 optToStr ShowType   = "t"
 optToStr RevertCAFs = "r"
+optToStr CollectInfo = "c"
 
 
 -- ---------------------------------------------------------------------------
@@ -2389,7 +2566,7 @@ showImports = do
         | not (xopt LangExt.ImplicitPrelude dflags)      = []
         | otherwise = ["import Prelude -- implicit"]
 
-      trans_comment s = s ++ " -- added automatically"
+      trans_comment s = s ++ " -- added automatically" :: String
   --
   liftIO $ mapM_ putStrLn (prel_imp ++ map show_one rem_ctx
                                     ++ map (trans_comment . show_one) trans_ctx)
