@@ -2,7 +2,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -56,38 +55,13 @@ import Data.Eq
 import Data.Ord
 import Data.Foldable (Foldable(..))
 import Data.Functor ((<$>))
+import Data.Functor.Const (Const(..))
 
 import GHC.Base
 import GHC.Generics
 import GHC.List (repeat, zipWith)
-import GHC.Read (Read(readsPrec), readParen, lex)
-import GHC.Show (Show(showsPrec), showParen, showString)
-
-newtype Const a b = Const { getConst :: a }
-                  deriving (Generic, Generic1, Monoid, Eq, Ord)
-
-instance Read a => Read (Const a b) where
-    readsPrec d = readParen (d > 10)
-        $ \r -> [(Const x,t) | ("Const", s) <- lex r, (x, t) <- readsPrec 11 s]
-
-instance Show a => Show (Const a b) where
-    showsPrec d (Const x) = showParen (d > 10) $
-                            showString "Const " . showsPrec 11 x
-
-instance Foldable (Const m) where
-    foldMap _ _ = mempty
-
-instance Functor (Const m) where
-    fmap _ (Const v) = Const v
-
-instance Monoid m => Applicative (Const m) where
-    pure _ = Const mempty
-    (<*>) = coerce (mappend :: m -> m -> m)
--- This is pretty much the same as
--- Const f <*> Const v = Const (f `mappend` v)
--- but guarantees that mappend for Const a b will have the same arity
--- as the one for a; it won't create a closure to raise the arity
--- to 2.
+import GHC.Read (Read)
+import GHC.Show (Show)
 
 newtype WrappedMonad m a = WrapMonad { unwrapMonad :: m a }
                          deriving (Generic, Generic1, Monad)

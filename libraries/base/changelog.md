@@ -104,6 +104,15 @@
   * The `IsString` instance for `[Char]` has been modified to eliminate
     ambiguity arising from overloaded strings and functions like `(++)`.
 
+  * Move `Const` from `Control.Applicative` to its own module in
+   `Data.Functor.Const`. (#11135)
+
+  * Enable `PolyKinds` in the `Data.Functor.Const` module to give `Const`
+    the kind `* -> k -> *`. (#10039)
+
+  * Re-export `Const` from `Control.Applicative` for backwards compatibility.
+
+
 ## 4.8.2.0  *Oct 2015*
 
   * Bundled with GHC 7.10.3

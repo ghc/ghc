@@ -146,6 +146,7 @@ Library
         Data.Functor
         Data.Functor.Classes
         Data.Functor.Compose
+        Data.Functor.Const
         Data.Functor.Identity
         Data.Functor.Product
         Data.Functor.Sum
