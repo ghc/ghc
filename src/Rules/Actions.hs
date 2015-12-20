@@ -7,22 +7,6 @@ import Settings.Args
 import Settings.Builders.Ar
 import qualified Target
 
-insideBox :: [String] -> String
-insideBox ls =
-    unlines $ [begin] ++ map (bar++) ls ++ [end]
-  where
-    (begin,bar,end)
-      | useUnicode = ( "╭──────────"
-                     , "│ "
-                     , "╰──────────"
-                     )
-      | otherwise  = ( "/----------"
-                     , "| "
-                     , "\\----------"
-                     )
-    -- FIXME: See Shake #364.
-    useUnicode = False
-
 -- Build a given target using an appropriate builder and acquiring necessary
 -- resources. Force a rebuilt if the argument list has changed since the last
 -- built (that is, track changes in the build system).
@@ -38,8 +22,8 @@ buildWithResources rs target = do
     checkArgsHash target
     withResources rs $ do
         unless verbose $ do
-            putBuild $ insideBox $ [ "Running " ++ show builder ++ " with arguments:" ]
-                                ++ map ("  "++) (interestingInfo builder argList)
+            putBuild $ renderBox $ [ "Running " ++ show builder ++ " with arguments:" ]
+                                  ++ map ("  "++) (interestingInfo builder argList)
         quietlyUnlessVerbose $ case builder of
             Ar -> arCmd path argList
 

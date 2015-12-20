@@ -21,6 +21,7 @@ module Base (
 
     -- * Output
     putColoured, putOracle, putBuild, putSuccess, putError,
+    renderBox,
     module System.Console.ANSI,
 
     -- * Miscellaneous utilities
@@ -129,6 +130,23 @@ putError :: String -> Action a
 putError msg = do
     putColoured Red msg
     error $ "GHC build system error: " ++ msg
+
+-- | Render the given set of lines in a ASCII box
+renderBox :: [String] -> String
+renderBox ls =
+    unlines $ [begin] ++ map (bar++) ls ++ [end]
+  where
+    (begin,bar,end)
+      | useUnicode = ( "╭──────────"
+                     , "│ "
+                     , "╰──────────"
+                     )
+      | otherwise  = ( "/----------"
+                     , "| "
+                     , "\\----------"
+                     )
+    -- FIXME: See Shake #364.
+    useUnicode = False
 
 -- Depending on Data.Bifunctor only for this function seems an overkill
 bimap :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
