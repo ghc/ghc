@@ -95,16 +95,22 @@ needBuilder laxDependencies builder = do
         GhcM _ -> True
         _      -> False
 
--- On Windows: if the path starts with "/", prepend it with the correct path to
--- the root, e.g: "/usr/local/bin/ghc.exe" => "C:/msys/usr/local/bin/ghc.exe".
+-- TODO: this is fragile, e.g. we currently only handle C: drive
+-- On Windows:
+-- * if the path starts with "/c/" change the prefix to "C:/"
+-- * otherwise, if the path starts with "/", prepend it with the correct path
+-- to the root, e.g: "/usr/local/bin/ghc.exe" => "C:/msys/usr/local/bin/ghc.exe"
 fixAbsolutePathOnWindows :: FilePath -> Action FilePath
 fixAbsolutePathOnWindows path = do
     windows <- windowsHost
     -- Note, below is different from FilePath.isAbsolute:
     if (windows && "/" `isPrefixOf` path)
     then do
-        root <- windowsRoot
-        return . unifyPath $ root ++ drop 1 path
+        if ("/c/" `isPrefixOf` path)
+        then return $ "C:" ++ drop 2 path
+        else do
+            root <- windowsRoot
+            return . unifyPath $ root ++ drop 1 path
     else
         return path
 
