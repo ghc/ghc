@@ -41,6 +41,9 @@ a[href]:link { color: rgb(196,69,29); }
 a[href]:visited { color: rgb(171,105,84); }
 a[href]:hover { text-decoration:underline; }
 
+a[href].def:link, a[href].def:visited { color: black; }
+a[href].def:hover { color: rgb(78, 98, 114); }
+
 /* @end */
 
 /* @group Fonts & Sizes */
@@ -143,15 +146,21 @@ ul.links li a {
   background-image: url(plus.gif);
   background-repeat: no-repeat;
 }
-p.caption.collapser,
-p.caption.expander {
-  background-position: 0 0.4em;
-}
 .collapser, .expander {
   padding-left: 14px;
   margin-left: -14px;
   cursor: pointer;
 }
+p.caption.collapser,
+p.caption.expander {
+  background-position: 0 0.4em;
+}
+
+.instance.collapser, .instance.expander {
+  margin-left: 0px;
+  background-position: left center;
+}
+
 
 pre {
   padding: 0.25em;
@@ -318,6 +327,7 @@ div#style-menu-holder {
   height: 80%;
   top: 10%;
   padding: 0;
+  max-width: 75%;
 }
 
 #synopsis .caption {
@@ -378,6 +388,15 @@ div#style-menu-holder {
   margin: 0 -0.5em 0 0.5em;
 }
 
+#interface td.src .link {
+  float: right;
+  color: #919191;
+  border-left: 1px solid #919191;
+  background: #f0f0f0;
+  padding: 0 0.5em 0.2em;
+  margin: 0 -0.5em 0 0.5em;
+}
+
 #interface span.fixity {
   color: #919191;
   border-left: 1px solid #919191;
@@ -406,30 +425,39 @@ div#style-menu-holder {
   margin-top: 0.8em;
 }
 
-.subs dl {
+.clearfix:after {
+  clear: both;
+  content: " ";
+  display: block;
+  height: 0;
+  visibility: hidden;
+}
+
+.subs ul {
+  list-style: none;
+  display: table;
   margin: 0;
 }
 
-.subs dt {
-  float: left;
-  clear: left;
-  display: block;
-  margin: 1px 0;
+.subs ul li {
+  display: table-row;
 }
 
-.subs dd {
-  float: right;
-  width: 90%;
-  display: block;
+.subs ul li dfn {
+  display: table-cell;
+  font-style: normal;
+  font-weight: bold;
+  margin: 1px 0;
+  white-space: nowrap;
+}
+
+.subs ul li > .doc {
+  display: table-cell;
   padding-left: 0.5em;
   margin-bottom: 0.5em;
 }
 
-.subs dd.empty {
-  display: none;
-}
-
-.subs dd p {
+.subs ul li > .doc p {
   margin: 0;
 }
 
@@ -443,6 +471,11 @@ div#style-menu-holder {
 .inst, .inst li {
   list-style: none;
   margin-left: 1em;
+}
+
+/* Workaround for bug in Firefox (issue #384) */
+.inst-left {
+  float: left;
 }
 
 .top p.src {

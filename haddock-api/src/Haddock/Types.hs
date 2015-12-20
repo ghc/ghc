@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable, StandaloneDeriving #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable, StandaloneDeriving, TypeFamilies, RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
@@ -27,15 +27,22 @@ import Control.Arrow hiding ((<+>))
 import Control.DeepSeq
 import Data.Typeable
 import Data.Map (Map)
+import Data.Data (Data)
 import qualified Data.Map as Map
 import Documentation.Haddock.Types
 import BasicTypes (Fixity(..))
+
 import GHC hiding (NoLink)
-import DynFlags (ExtensionFlag, Language)
+import DynFlags (Language)
+import qualified GHC.LanguageExtensions as LangExt
+import Coercion
+import NameSet
 import OccName
 import Outputable
 import Control.Applicative (Applicative(..))
 import Control.Monad (ap)
+
+import Haddock.Backends.Hyperlinker.Types
 
 -----------------------------------------------------------------------------
 -- * Convenient synonyms
@@ -50,7 +57,6 @@ type SubMap        = Map Name [Name]
 type DeclMap       = Map Name [LHsDecl Name]
 type InstMap       = Map SrcSpan Name
 type FixMap        = Map Name Fixity
-type SrcMap        = Map PackageKey FilePath
 type DocPaths      = (FilePath, Maybe FilePath) -- paths to HTML and sources
 
 
@@ -126,6 +132,10 @@ data Interface = Interface
 
     -- | Warnings for things defined in this module.
   , ifaceWarningMap :: !WarningMap
+
+    -- | Tokenized source code of module (avaliable if Haddock is invoked with
+    -- source generation flag).
+  , ifaceTokenizedSrc :: !(Maybe [RichToken])
   }
 
 type WarningMap = Map Name (Doc Name)
@@ -267,7 +277,6 @@ unrenameDocForDecl (doc, fnArgsDoc) =
 -- | Type of environment used to cross-reference identifiers in the syntax.
 type LinkEnv = Map Name Module
 
-
 -- | Extends 'Name' with cross-reference information.
 data DocName
   = Documented Name Module
@@ -277,12 +286,45 @@ data DocName
   | Undocumented Name
      -- ^ This thing is not part of the (existing or resulting)
      -- documentation, as far as Haddock knows.
-  deriving Eq
+  deriving (Eq, Data)
 
+type instance PostRn DocName NameSet  = PlaceHolder
+type instance PostRn DocName Fixity   = PlaceHolder
+type instance PostRn DocName Bool     = PlaceHolder
+type instance PostRn DocName [Name]   = PlaceHolder
+
+type instance PostTc DocName Kind     = PlaceHolder
+type instance PostTc DocName Type     = PlaceHolder
+type instance PostTc DocName Coercion = PlaceHolder
 
 instance NamedThing DocName where
   getName (Documented name _) = name
   getName (Undocumented name) = name
+
+-- | Useful for debugging
+instance Outputable DocName where
+  ppr = ppr . getName
+
+instance OutputableBndr DocName where
+  pprBndr _ = ppr . getName
+  pprPrefixOcc = pprPrefixOcc . getName
+  pprInfixOcc = pprInfixOcc . getName
+
+class NamedThing name => SetName name where
+
+    setName :: Name -> name -> name
+
+
+instance SetName Name where
+
+    setName name' _ = name'
+
+
+instance SetName DocName where
+
+    setName name' (Documented _ mdl) = Documented name' mdl
+    setName name' (Undocumented _) = Undocumented name'
+
 
 
 -----------------------------------------------------------------------------
@@ -291,21 +333,83 @@ instance NamedThing DocName where
 
 -- | The three types of instances
 data InstType name
-  = ClassInst [HsType name]         -- ^ Context
+  = ClassInst
+      { clsiCtx :: [HsType name]
+      , clsiTyVars :: LHsQTyVars name
+      , clsiSigs :: [Sig name]
+      , clsiAssocTys :: [PseudoFamilyDecl name]
+      }
   | TypeInst  (Maybe (HsType name)) -- ^ Body (right-hand side)
   | DataInst (TyClDecl name)        -- ^ Data constructors
 
 instance OutputableBndr a => Outputable (InstType a) where
-  ppr (ClassInst a) = text "ClassInst" <+> ppr a
+  ppr (ClassInst { .. }) = text "ClassInst"
+      <+> ppr clsiCtx
+      <+> ppr clsiTyVars
+      <+> ppr clsiSigs
   ppr (TypeInst  a) = text "TypeInst"  <+> ppr a
   ppr (DataInst  a) = text "DataInst"  <+> ppr a
 
--- | An instance head that may have documentation.
-type DocInstance name = (InstHead name, Maybe (MDoc name))
+
+-- | Almost the same as 'FamilyDecl' except for type binders.
+--
+-- In order to perform type specialization for class instances, we need to
+-- substitute class variables to appropriate type. However, type variables in
+-- associated type are specified using 'LHsTyVarBndrs' instead of 'HsType'.
+-- This makes type substitution impossible and to overcome this issue,
+-- 'PseudoFamilyDecl' type is introduced.
+data PseudoFamilyDecl name = PseudoFamilyDecl
+    { pfdInfo :: FamilyInfo name
+    , pfdLName :: Located name
+    , pfdTyVars :: [LHsType name]
+    , pfdKindSig :: LFamilyResultSig name
+    }
+
+
+mkPseudoFamilyDecl :: FamilyDecl name -> PseudoFamilyDecl name
+mkPseudoFamilyDecl (FamilyDecl { .. }) = PseudoFamilyDecl
+    { pfdInfo = fdInfo
+    , pfdLName = fdLName
+    , pfdTyVars = [ L loc (mkType bndr) | L loc bndr <- hsq_explicit fdTyVars ]
+    , pfdKindSig = fdResultSig
+    }
+  where
+    mkType (KindedTyVar (L loc name) lkind) =
+        HsKindSig tvar lkind
+      where
+        tvar = L loc (HsTyVar (L loc name))
+    mkType (UserTyVar name) = HsTyVar name
+
+
+-- | An instance head that may have documentation and a source location.
+type DocInstance name = (InstHead name, Maybe (MDoc name), Located name)
 
 -- | The head of an instance. Consists of a class name, a list of kind
 -- parameters, a list of type parameters and an instance type
-type InstHead name = (name, [HsType name], [HsType name], InstType name)
+data InstHead name = InstHead
+    { ihdClsName :: name
+    , ihdKinds :: [HsType name]
+    , ihdTypes :: [HsType name]
+    , ihdInstType :: InstType name
+    }
+
+
+-- | An instance origin information.
+--
+-- This is used primarily in HTML backend to generate unique instance
+-- identifiers (for expandable sections).
+data InstOrigin name
+    = OriginClass name
+    | OriginData name
+    | OriginFamily name
+
+
+instance NamedThing name => NamedThing (InstOrigin name) where
+
+    getName (OriginClass name) = getName name
+    getName (OriginData name) = getName name
+    getName (OriginFamily name) = getName name
+
 
 -----------------------------------------------------------------------------
 -- * Documentation comments
@@ -399,7 +503,7 @@ data HaddockModInfo name = HaddockModInfo
   , hmi_portability :: Maybe String
   , hmi_safety      :: Maybe String
   , hmi_language    :: Maybe Language
-  , hmi_extensions  :: [ExtensionFlag]
+  , hmi_extensions  :: [LangExt.Extension]
   }
 
 
@@ -491,11 +595,11 @@ instance Functor ErrMsgM where
         fmap f (Writer (a, msgs)) = Writer (f a, msgs)
 
 instance Applicative ErrMsgM where
-    pure = return
-    (<*>) = ap
+    pure a = Writer (a, [])
+    (<*>)  = ap
 
 instance Monad ErrMsgM where
-        return a = Writer (a, [])
+        return   = pure
         m >>= k  = Writer $ let
                 (a, w)  = runWriter m
                 (b, w') = runWriter (k a)
@@ -544,10 +648,27 @@ instance Functor ErrMsgGhc where
   fmap f (WriterGhc x) = WriterGhc (fmap (first f) x)
 
 instance Applicative ErrMsgGhc where
-    pure = return
+    pure a = WriterGhc (return (a, []))
     (<*>) = ap
 
 instance Monad ErrMsgGhc where
-  return a = WriterGhc (return (a, []))
+  return = pure
   m >>= k = WriterGhc $ runWriterGhc m >>= \ (a, msgs1) ->
                fmap (second (msgs1 ++)) (runWriterGhc (k a))
+
+
+-----------------------------------------------------------------------------
+-- * Pass sensitive types
+-----------------------------------------------------------------------------
+
+type instance PostRn DocName NameSet        = PlaceHolder
+type instance PostRn DocName Fixity         = PlaceHolder
+type instance PostRn DocName Bool           = PlaceHolder
+type instance PostRn DocName Name           = DocName
+type instance PostRn DocName (Located Name) = Located DocName
+type instance PostRn DocName [Name]         = PlaceHolder
+type instance PostRn DocName DocName        = DocName
+
+type instance PostTc DocName Kind     = PlaceHolder
+type instance PostTc DocName Type     = PlaceHolder
+type instance PostTc DocName Coercion = PlaceHolder

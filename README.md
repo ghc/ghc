@@ -1,5 +1,7 @@
-Haddock, a Haskell Documentation Tool
-=====================================
+# Haddock, a Haskell Documentation Tool
+
+
+#### About haddock
 
 This is Haddock, a tool for automatically generating documentation
 from annotated Haskell source code.  It is primary intended for
@@ -26,12 +28,45 @@ generated.  Abstract types and classes are handled correctly.  In
 fact, even without any documentation annotations, Haddock can generate
 useful documentation from your source code.
 
+
+#### Documentation formats
+
 Haddock can generate documentation in multiple formats; currently HTML
 is implemented, and there is partial support for generating LaTeX and
 Hoogle.
 
+
+#### Source code documentation
+
 Full documentation can be found in the doc/ subdirectory, in DocBook
 format.
 
-Please create issues when you have any problems and pull requests if
-you have some code.
+
+#### Contributing
+
+Please create issues when you have any problems and pull requests if you have some code.
+
+###### Hacking
+
+To get started you'll need a latest GHC release installed. Below is an
+example setup using cabal sandboxes.
+
+```bash
+  git clone https://github.com/haskell/haddock.git
+  cd haddock
+  cabal sandbox init
+  cabal sandbox add-source haddock-library
+  cabal sandbox add-source haddock-api
+  # adjust -j to the number of cores you want to use
+  cabal install -j4 --dependencies-only --enable-tests
+  cabal configure --enable-tests
+  cabal build -j4
+  # run the test suite
+  cabal test
+```
+
+If you're a GHC developer and want to update Haddock to work with your
+changes, you should be working on `ghc-head` branch instead of master.
+See instructions at
+https://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/Git/Submodules
+for an example workflow.

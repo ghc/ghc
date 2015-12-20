@@ -16,6 +16,7 @@ module Haddock.Utils (
   -- * Misc utilities
   restrictTo, emptyHsQTvs,
   toDescription, toInstalledDescription,
+  mkEmptySigWcType, addClassContext, lHsQTyVarsToTypes,
 
   -- * Filename utilities
   moduleHtmlFile, moduleHtmlFile',
@@ -63,6 +64,7 @@ import Haddock.GhcUtils
 
 import GHC
 import Name
+import HsTypes (selectorFieldOcc)
 
 import Control.Monad ( liftM )
 import Data.Char ( isAlpha, isAlphaNum, isAscii, ord, chr )
@@ -123,6 +125,34 @@ toInstalledDescription = fmap mkMeta . hmi_description . instInfo
 mkMeta :: Doc a -> MDoc a
 mkMeta x = emptyMetaDoc { _doc = x }
 
+mkEmptySigWcType :: LHsType Name -> LHsSigWcType Name
+-- Dubious, because the implicit binders are empty even
+-- though the type might have free varaiables
+mkEmptySigWcType ty = mkEmptyImplicitBndrs (mkEmptyWildCardBndrs ty)
+
+addClassContext :: Name -> LHsQTyVars Name -> LSig Name -> LSig Name
+-- Add the class context to a class-op signature
+addClassContext cls tvs0 (L pos (ClassOpSig _ lname ltype))
+  = L pos (TypeSig lname (mkEmptySigWcType (go (hsSigType ltype))))
+          -- The mkEmptySigWcType is suspicious
+  where
+    go (L loc (HsForAllTy { hst_bndrs = tvs, hst_body = ty }))
+       = L loc (HsForAllTy { hst_bndrs = tvs, hst_body = go ty })
+    go (L loc (HsQualTy { hst_ctxt = ctxt, hst_body = ty }))
+       = L loc (HsQualTy { hst_ctxt = add_ctxt ctxt, hst_body = ty })
+    go (L loc ty)
+       = L loc (HsQualTy { hst_ctxt = add_ctxt (L loc []), hst_body = L loc ty })
+
+    extra_pred = nlHsTyConApp cls (lHsQTyVarsToTypes tvs0)
+    add_ctxt (L loc preds) = L loc (extra_pred : preds)
+
+addClassContext _ _ sig = sig   -- E.g. a MinimalSig is fine
+
+lHsQTyVarsToTypes :: LHsQTyVars Name -> [LHsType Name]
+lHsQTyVarsToTypes tvs
+  = [ noLoc (HsTyVar (noLoc (hsLTyVarName tv)))
+    | tv <- hsQTvExplicit tvs ]
+
 --------------------------------------------------------------------------------
 -- * Making abstract declarations
 --------------------------------------------------------------------------------
@@ -150,19 +180,36 @@ restrictDataDefn names defn@(HsDataDefn { dd_ND = new_or_data, dd_cons = cons })
 restrictCons :: [Name] -> [LConDecl Name] -> [LConDecl Name]
 restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
   where
-    keep d | any (\n -> n `elem` names) (map unLoc $ con_names d) =
-      case con_details d of
+    keep d | any (\n -> n `elem` names) (map unLoc $ getConNames d) =
+      case getConDetails h98d of
         PrefixCon _ -> Just d
         RecCon fields
           | all field_avail (unL fields) -> Just d
-          | otherwise -> Just (d { con_details = PrefixCon (field_types (map unL (unL fields))) })
+          | otherwise -> Just (h98d { con_details = PrefixCon (field_types (map unL (unL fields))) })
           -- if we have *all* the field names available, then
           -- keep the record declaration.  Otherwise degrade to
           -- a constructor declaration.  This isn't quite right, but
           -- it's the best we can do.
         InfixCon _ _ -> Just d
       where
-        field_avail (L _ (ConDeclField ns _ _)) = all (\n -> unLoc n `elem` names) ns
+        h98d = h98ConDecl d
+        h98ConDecl c@ConDeclH98{} = c
+        h98ConDecl c@ConDeclGADT{} = c'
+          where
+            (details,_res_ty,cxt,tvs) = gadtDeclDetails (con_type c)
+            c' :: ConDecl Name
+            c' = ConDeclH98
+                   { con_name = head (con_names c)
+                   , con_qvars = Just $ HsQTvs { hsq_implicit = mempty
+                                               , hsq_explicit = tvs }
+                   , con_cxt = Just cxt
+                   , con_details = details
+                   , con_doc = con_doc c
+                   }
+
+        field_avail :: LConDeclField Name -> Bool
+        field_avail (L _ (ConDeclField fs _ _))
+            = all (\f -> selectorFieldOcc (unLoc f) `elem` names) fs
         field_types flds = [ t | ConDeclField _ t _ <- flds ]
 
     keep _ = Nothing
@@ -174,11 +221,12 @@ restrictDecls names = mapMaybe (filterLSigNames (`elem` names))
 restrictATs :: [Name] -> [LFamilyDecl Name] -> [LFamilyDecl Name]
 restrictATs names ats = [ at | at <- ats , unL (fdLName (unL at)) `elem` names ]
 
-emptyHsQTvs :: LHsTyVarBndrs Name
+emptyHsQTvs :: LHsQTyVars Name
 -- This function is here, rather than in HsTypes, because it *renamed*, but
 -- does not necessarily have all the rigt kind variables.  It is used
 -- in Haddock just for printing, so it doesn't matter
-emptyHsQTvs = HsQTvs { hsq_kvs = error "haddock:emptyHsQTvs", hsq_tvs = [] }
+emptyHsQTvs = HsQTvs { hsq_implicit = error "haddock:emptyHsQTvs"
+                     , hsq_explicit = [] }
 
 
 --------------------------------------------------------------------------------

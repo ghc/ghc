@@ -1,5 +1,5 @@
 name:                 haddock-api
-version:              2.16.0
+version:              2.16.2
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
@@ -18,8 +18,10 @@ stability:            experimental
 data-dir:
   resources
 data-files:
+  html/solarized.css
   html/frames.html
   html/haddock-util.js
+  html/highlight.js
   html/Classic.theme/haskell_icon.gif
   html/Classic.theme/minus.gif
   html/Classic.theme/plus.gif
@@ -36,19 +38,21 @@ library
       Haskell2010
 
   build-depends:
-      base >= 4.3 && < 4.9
+      base >= 4.3 && < 4.10
     , bytestring
     , filepath
     , directory
     , containers
+    , transformers
     , deepseq
     , array
     , xhtml >= 3000.2 && < 3000.3
     , Cabal >= 1.10
-    , ghc == 7.9.*
+    , ghc-boot
+    , ghc >= 7.10 && < 7.12
 
     , ghc-paths
-    , haddock-library == 1.2.0.*
+    , haddock-library == 1.2.*
 
   hs-source-dirs:
       src
@@ -66,6 +70,7 @@ library
     Haddock.Interface.AttachInstances
     Haddock.Interface.LexParseRn
     Haddock.Interface.ParseModuleHeader
+    Haddock.Interface.Specialize
     Haddock.Parser
     Haddock.Utils
     Haddock.Backends.Xhtml
@@ -79,6 +84,12 @@ library
     Haddock.Backends.LaTeX
     Haddock.Backends.HaddockDB
     Haddock.Backends.Hoogle
+    Haddock.Backends.Hyperlinker
+    Haddock.Backends.Hyperlinker.Ast
+    Haddock.Backends.Hyperlinker.Parser
+    Haddock.Backends.Hyperlinker.Renderer
+    Haddock.Backends.Hyperlinker.Types
+    Haddock.Backends.Hyperlinker.Utils
     Haddock.ModuleTree
     Haddock.Types
     Haddock.Doc
@@ -86,8 +97,29 @@ library
     Haddock.InterfaceFile
     Haddock.Options
     Haddock.GhcUtils
+    Haddock.Syb
     Haddock.Convert
     Paths_haddock_api
+
+test-suite spec
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          Spec.hs
+  ghc-options: -Wall
+
+  hs-source-dirs:
+      test
+    , src
+
+  other-modules:
+    Haddock.Backends.Hyperlinker.ParserSpec
+
+  build-depends:
+      base >= 4.3 && < 4.9
+    , containers
+    , ghc >= 7.10 && < 7.12
+    , hspec
+    , QuickCheck == 2.*
 
 source-repository head
   type:     git

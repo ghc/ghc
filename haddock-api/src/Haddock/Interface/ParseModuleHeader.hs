@@ -11,7 +11,6 @@
 -----------------------------------------------------------------------------
 module Haddock.Interface.ParseModuleHeader (parseModuleHeader) where
 
-import Control.Applicative ((<$>))
 import Control.Monad (mplus)
 import Data.Char
 import DynFlags

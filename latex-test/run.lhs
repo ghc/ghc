@@ -6,7 +6,7 @@ import Control.Monad
 import Control.Applicative
 import Data.List
 import Data.Maybe
-import Distribution.InstalledPackageInfo
+import Distribution.InstalledPackageInfo hiding (dataDir)
 import Distribution.Package (PackageName (..))
 import Distribution.Simple.Compiler
 import Distribution.Simple.GHC

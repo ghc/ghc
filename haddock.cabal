@@ -1,5 +1,5 @@
 name:                 haddock
-version:              2.16.0
+version:              2.16.2
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
@@ -29,6 +29,8 @@ extra-source-files:
   haddock-api/src/haddock.sh
   html-test/src/*.hs
   html-test/ref/*.html
+  hypsrc-test/src/*.hs
+  hypsrc-test/ref/*.html
   latex-test/src/Simple/*.hs
   latex-test/ref/Simple/*.tex
   latex-test/ref/Simple/*.sty
@@ -42,10 +44,10 @@ executable haddock
   default-language:     Haskell2010
   main-is:              Main.hs
   hs-source-dirs:       driver
-  ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2
+  ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2 -threaded
 
   build-depends:
-    base >= 4.3 && < 4.9
+    base >= 4.3 && < 4.10
   if flag(in-ghc-tree)
     hs-source-dirs: haddock-api/src, haddock-library/vendor/attoparsec-0.12.1.1, haddock-library/src
     cpp-options: -DIN_GHC_TREE
@@ -57,6 +59,7 @@ executable haddock
       array,
       xhtml >= 3000.2 && < 3000.3,
       Cabal >= 1.10,
+      ghc-boot,
       ghc >= 7.11 && < 7.13,
       bytestring,
       transformers
@@ -88,6 +91,7 @@ executable haddock
       Haddock.Interface.AttachInstances
       Haddock.Interface.LexParseRn
       Haddock.Interface.ParseModuleHeader
+      Haddock.Interface.Specialize
       Haddock.Parser
       Haddock.Utils
       Haddock.Backends.Xhtml
@@ -101,6 +105,12 @@ executable haddock
       Haddock.Backends.LaTeX
       Haddock.Backends.HaddockDB
       Haddock.Backends.Hoogle
+      Haddock.Backends.Hyperlinker
+      Haddock.Backends.Hyperlinker.Ast
+      Haddock.Backends.Hyperlinker.Parser
+      Haddock.Backends.Hyperlinker.Renderer
+      Haddock.Backends.Hyperlinker.Types
+      Haddock.Backends.Hyperlinker.Utils
       Haddock.ModuleTree
       Haddock.Types
       Haddock.Doc
@@ -108,9 +118,10 @@ executable haddock
       Haddock.InterfaceFile
       Haddock.Options
       Haddock.GhcUtils
+      Haddock.Syb
       Haddock.Convert
   else
-    build-depends:  haddock-api == 2.16.0
+    build-depends:  haddock-api == 2.16.*
 
 test-suite html-test
   type:             exitcode-stdio-1.0
@@ -118,6 +129,14 @@ test-suite html-test
   main-is:          run.lhs
   hs-source-dirs:   html-test
   build-depends:    base, directory, process, filepath, Cabal
+
+test-suite hypsrc-test
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          run.hs
+  hs-source-dirs:   hypsrc-test
+  build-depends:    base, directory, process, filepath, Cabal
+  ghc-options:      -Wall -fwarn-tabs
 
 test-suite latex-test
   type:             exitcode-stdio-1.0

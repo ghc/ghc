@@ -22,6 +22,7 @@ import Control.Arrow hiding ((<+>))
 import Data.List
 import Data.Ord (comparing)
 import Data.Function (on)
+import Data.Maybe ( maybeToList, mapMaybe )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -32,16 +33,15 @@ import FamInstEnv
 import FastString
 import GHC
 import GhcMonad (withSession)
-import Id
 import InstEnv
 import MonadUtils (liftIO)
 import Name
 import Outputable (text, sep, (<+>))
 import PrelNames
+import SrcLoc
 import TcRnDriver (tcRnGetInfo)
-import TcType (tcSplitSigmaTy)
 import TyCon
-import TypeRep
+import TyCoRep
 import TysPrim( funTyCon )
 import Var hiding (varName)
 #define FSLIT(x) (mkFastString# (x#))
@@ -68,25 +68,26 @@ attachToExportItem :: ExportInfo -> Interface -> IfaceMap -> InstIfaceMap
                    -> Ghc (ExportItem Name)
 attachToExportItem expInfo iface ifaceMap instIfaceMap export =
   case attachFixities export of
-    e@ExportDecl { expItemDecl = L _ (TyClD d) } -> do
+    e@ExportDecl { expItemDecl = L eSpan (TyClD d) } -> do
       mb_info <- getAllInfo (tcdName d)
       insts <- case mb_info of
         Just (_, _, cls_instances, fam_instances) ->
-          let fam_insts = [ (synifyFamInst i opaque, n)
+          let fam_insts = [ (synifyFamInst i opaque, doc,spanNameE n (synifyFamInst i opaque) (L eSpan (tcdName d)) )
                           | i <- sortBy (comparing instFam) fam_instances
-                          , let n = instLookup instDocMap (getName i) iface ifaceMap instIfaceMap
+                          , let n = getName i
+                          , let doc = instLookup instDocMap n iface ifaceMap instIfaceMap
                           , not $ isNameHidden expInfo (fi_fam i)
                           , not $ any (isTypeHidden expInfo) (fi_tys i)
                           , let opaque = isTypeHidden expInfo (fi_rhs i)
                           ]
-              cls_insts = [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap)
+              cls_insts = [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap, spanName n (synifyInstHead i) (L eSpan (tcdName d)))
                           | let is = [ (instanceSig i, getName i) | i <- cls_instances ]
                           , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
                           , not $ isInstanceHidden expInfo cls tys
                           ]
               -- fam_insts but with failing type fams filtered out
-              cleanFamInsts = [ (fi, n) | (Right fi, n) <- fam_insts ]
-              famInstErrs = [ errm | (Left errm, _) <- fam_insts ]
+              cleanFamInsts = [ (fi, n, L l r) | (Right fi, n, L l (Right r)) <- fam_insts ]
+              famInstErrs = [ errm | (Left errm, _, _) <- fam_insts ]
           in do
             dfs <- getDynFlags
             let mkBug = (text "haddock-bug:" <+>) . text
@@ -105,6 +106,18 @@ attachToExportItem expInfo iface ifaceMap instIfaceMap export =
       ] }
 
     attachFixities e = e
+    -- spanName: attach the location to the name that is the same file as the instance location
+    spanName s (InstHead { ihdClsName = clsn }) (L instL instn) =
+        let s1 = getSrcSpan s
+            sn = if srcSpanFileName_maybe s1 == srcSpanFileName_maybe instL
+                    then instn
+                    else clsn
+        in L (getSrcSpan s) sn
+    -- spanName on Either
+    spanNameE s (Left e) _ =  L (getSrcSpan s) (Left e)
+    spanNameE s (Right ok) linst =
+      let L l r = spanName s ok linst
+      in L l (Right r)
 
 
 instLookup :: (InstalledInterface -> Map.Map Name a) -> Name
@@ -146,18 +159,26 @@ instHead (_, _, cls, args)
 argCount :: Type -> Int
 argCount (AppTy t _) = argCount t + 1
 argCount (TyConApp _ ts) = length ts
-argCount (FunTy _ _ ) = 2
+argCount (ForAllTy (Anon _) _ ) = 2
 argCount (ForAllTy _ t) = argCount t
+argCount (CastTy t _) = argCount t
 argCount _ = 0
 
 simplify :: Type -> SimpleType
+simplify (ForAllTy (Anon t1) t2) = SimpleType funTyConName [simplify t1, simplify t2]
 simplify (ForAllTy _ t) = simplify t
-simplify (FunTy t1 t2) = SimpleType funTyConName [simplify t1, simplify t2]
-simplify (AppTy t1 t2) = SimpleType s (ts ++ [simplify t2])
+simplify (AppTy t1 t2) = SimpleType s (ts ++ maybeToList (simplify_maybe t2))
   where (SimpleType s ts) = simplify t1
 simplify (TyVarTy v) = SimpleType (tyVarName v) []
-simplify (TyConApp tc ts) = SimpleType (tyConName tc) (map simplify ts)
+simplify (TyConApp tc ts) = SimpleType (tyConName tc)
+                                       (mapMaybe simplify_maybe ts)
 simplify (LitTy l) = SimpleTyLit l
+simplify (CastTy ty _) = simplify ty
+simplify (CoercionTy _) = error "simplify:Coercion"
+
+simplify_maybe :: Type -> Maybe SimpleType
+simplify_maybe (CoercionTy {}) = Nothing
+simplify_maybe ty              = Just (simplify ty)
 
 -- Used for sorting
 instFam :: FamInst -> ([Int], Name, [SimpleType], Int, SimpleType)
@@ -207,9 +228,10 @@ isTypeHidden expInfo = typeHidden
         TyVarTy {} -> False
         AppTy t1 t2 -> typeHidden t1 || typeHidden t2
         TyConApp tcon args -> nameHidden (getName tcon) || any typeHidden args
-        FunTy t1 t2 -> typeHidden t1 || typeHidden t2
-        ForAllTy _ ty -> typeHidden ty
+        ForAllTy bndr ty -> typeHidden (binderType bndr) || typeHidden ty
         LitTy _ -> False
+        CastTy ty _ -> typeHidden ty
+        CoercionTy {} -> False
 
     nameHidden :: Name -> Bool
     nameHidden = isNameHidden expInfo

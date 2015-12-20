@@ -35,7 +35,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_SpuriousSuperclassCons
 	  ><th
 	    >Safe Haskell</th
 	    ><td
-	    >Safe-Inferred</td
+	    >Safe</td
 	    ></tr
 	  ></table
 	><p class="caption"
@@ -74,7 +74,7 @@ Fix spurious superclass constraints bug.</pre
 	><p class="src"
 	  ><span class="keyword"
 	    >data</span
-	    > <a name="t:SomeType" class="def"
+	    > <a href="" id="t:SomeType" class="def"
 	    >SomeType</a
 	    > f a</p
 	  ><div class="subs instances"
@@ -83,26 +83,106 @@ Fix spurious superclass constraints bug.</pre
 	    ><div id="section.i:SomeType" class="show"
 	    ><table
 	      ><tr
-		><td class="src"
-		  ><a href=""
-		    >Functor</a
-		    > (<a href=""
-		    >SomeType</a
-		    > f)</td
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span id="control.i:id:SomeType:Functor:1" class="instance expander" onclick="toggleSection('i:id:SomeType:Functor:1')"
+		      ></span
+		      > <a href=""
+		      >Functor</a
+		      > (<a href=""
+		      >SomeType</a
+		      > f)</span
+		    ></td
 		  ><td class="doc empty"
 		  >&nbsp;</td
 		  ></tr
 		><tr
-		><td class="src"
-		  ><a href=""
-		    >Applicative</a
-		    > f =&gt; <a href=""
-		    >Applicative</a
-		    > (<a href=""
-		    >SomeType</a
-		    > f)</td
+		><td colspan="2"
+		  ><div id="section.i:id:SomeType:Functor:1" class="inst-details hide"
+		    ><div class="subs methods"
+		      ><p class="caption"
+			>Methods</p
+			><p class="src"
+			><a href=""
+			  >fmap</a
+			  > :: (a -&gt; b) -&gt; <a href=""
+			  >SomeType</a
+			  > f a -&gt; <a href=""
+			  >SomeType</a
+			  > f b</p
+			><p class="src"
+			><a href=""
+			  >(&lt;$)</a
+			  > :: a -&gt; <a href=""
+			  >SomeType</a
+			  > f b -&gt; <a href=""
+			  >SomeType</a
+			  > f a</p
+			></div
+		      ></div
+		    ></td
+		  ></tr
+		><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span id="control.i:id:SomeType:Applicative:2" class="instance expander" onclick="toggleSection('i:id:SomeType:Applicative:2')"
+		      ></span
+		      > <a href=""
+		      >Applicative</a
+		      > f =&gt; <a href=""
+		      >Applicative</a
+		      > (<a href=""
+		      >SomeType</a
+		      > f)</span
+		    ></td
 		  ><td class="doc empty"
 		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><div id="section.i:id:SomeType:Applicative:2" class="inst-details hide"
+		    ><div class="subs methods"
+		      ><p class="caption"
+			>Methods</p
+			><p class="src"
+			><a href=""
+			  >pure</a
+			  > :: a -&gt; <a href=""
+			  >SomeType</a
+			  > f a</p
+			><p class="src"
+			><a href=""
+			  >(&lt;*&gt;)</a
+			  > :: <a href=""
+			  >SomeType</a
+			  > f (a -&gt; b) -&gt; <a href=""
+			  >SomeType</a
+			  > f a -&gt; <a href=""
+			  >SomeType</a
+			  > f b</p
+			><p class="src"
+			><a href=""
+			  >(*&gt;)</a
+			  > :: <a href=""
+			  >SomeType</a
+			  > f a -&gt; <a href=""
+			  >SomeType</a
+			  > f b -&gt; <a href=""
+			  >SomeType</a
+			  > f b</p
+			><p class="src"
+			><a href=""
+			  >(&lt;*)</a
+			  > :: <a href=""
+			  >SomeType</a
+			  > f a -&gt; <a href=""
+			  >SomeType</a
+			  > f b -&gt; <a href=""
+			  >SomeType</a
+			  > f a</p
+			></div
+		      ></div
+		    ></td
 		  ></tr
 		></table
 	      ></div
@@ -114,7 +194,7 @@ Fix spurious superclass constraints bug.</pre
     ><p
       >Produced by <a href=""
 	>Haddock</a
-	> version 2.15.0</p
+	> version 2.16.2</p
       ></div
     ></body
   ></html

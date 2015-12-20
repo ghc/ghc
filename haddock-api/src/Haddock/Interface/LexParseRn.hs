@@ -18,20 +18,20 @@ module Haddock.Interface.LexParseRn
   , processModuleHeader
   ) where
 
-import Control.Applicative
 import Data.IntSet (toList)
 import Data.List
 import Documentation.Haddock.Doc (metaDocConcat)
-import DynFlags (ExtensionFlag(..), languageExtensions)
+import DynFlags (languageExtensions)
+import qualified GHC.LanguageExtensions as LangExt
 import FastString
 import GHC
 import Haddock.Interface.ParseModuleHeader
 import Haddock.Parser
 import Haddock.Types
 import Name
-import RdrHsSyn   ( setRdrNameSpace )
 import Outputable ( showPpr )
 import RdrName
+import RnEnv (dataTcOccs)
 
 processDocStrings :: DynFlags -> GlobalRdrEnv -> [HsDocString]
                   -> Maybe (MDoc Name)
@@ -65,7 +65,7 @@ processModuleHeader dflags gre safety mayStr = do
             doc' = overDoc (rename dflags gre) doc
         return (hmi', Just doc')
 
-  let flags :: [ExtensionFlag]
+  let flags :: [LangExt.Extension]
       -- We remove the flags implied by the language setting and we display the language instead
       flags = map toEnum (toList $ extensionFlags dflags) \\ languageExtensions (language dflags)
   return (hmi { hmi_safety = Just $ showPpr dflags safety
@@ -75,7 +75,13 @@ processModuleHeader dflags gre safety mayStr = do
   where
     failure = (emptyHaddockModInfo, Nothing)
 
-
+-- | Takes a 'GlobalRdrEnv' which (hopefully) contains all the
+-- definitions and a parsed comment and we attempt to make sense of
+-- where the identifiers in the comment point to. We're in effect
+-- trying to convert 'RdrName's to 'Name's, with some guesswork and
+-- fallbacks in case we can't locate the identifiers.
+--
+-- See the comments in the source for implementation commentary.
 rename :: DynFlags -> GlobalRdrEnv -> Doc RdrName -> Doc Name
 rename dflags gre = rn
   where
@@ -83,19 +89,36 @@ rename dflags gre = rn
       DocAppend a b -> DocAppend (rn a) (rn b)
       DocParagraph doc -> DocParagraph (rn doc)
       DocIdentifier x -> do
-        let choices = dataTcOccs' x
+        -- Generate the choices for the possible kind of thing this
+        -- is.
+        let choices = dataTcOccs x
+        -- Try to look up all the names in the GlobalRdrEnv that match
+        -- the names.
         let names = concatMap (\c -> map gre_name (lookupGRE_RdrName c gre)) choices
+
         case names of
+          -- We found no names in the env so we start guessing.
           [] ->
             case choices of
               [] -> DocMonospaced (DocString (showPpr dflags x))
-              [a] -> outOfScope dflags a
-              a:b:_ | isRdrTc a -> outOfScope dflags a
-                    | otherwise -> outOfScope dflags b
+              -- There was nothing in the environment so we need to
+              -- pick some default from what's available to us. We
+              -- diverge here from the old way where we would default
+              -- to type constructors as we're much more likely to
+              -- actually want anchors to regular definitions than
+              -- type constructor names (such as in #253). So now we
+              -- only get type constructor links if they are actually
+              -- in scope.
+              a:_ -> outOfScope dflags a
+
+          -- There is only one name in the environment that matches so
+          -- use it.
           [a] -> DocIdentifier a
-          a:b:_ | isTyConName a -> DocIdentifier a | otherwise -> DocIdentifier b
-              -- If an id can refer to multiple things, we give precedence to type
-              -- constructors.
+          -- But when there are multiple names available, default to
+          -- type constructors: somewhat awfully GHC returns the
+          -- values in the list positionally.
+          a:b:_ | isTyConName a -> DocIdentifier a
+                | otherwise -> DocIdentifier b
 
       DocWarning doc -> DocWarning (rn doc)
       DocEmphasis doc -> DocEmphasis (rn doc)
@@ -116,21 +139,14 @@ rename dflags gre = rn
       DocString str -> DocString str
       DocHeader (Header l t) -> DocHeader $ Header l (rn t)
 
-dataTcOccs' :: RdrName -> [RdrName]
--- If the input is a data constructor, return both it and a type
--- constructor.  This is useful when we aren't sure which we are
--- looking at.
---
--- We use this definition instead of the GHC's to provide proper linking to
--- functions accross modules. See ticket #253 on Haddock Trac.
-dataTcOccs' rdr_name
-  | isDataOcc occ             = [rdr_name, rdr_name_tc]
-  | otherwise                 = [rdr_name]
-  where
-    occ = rdrNameOcc rdr_name
-    rdr_name_tc = setRdrNameSpace rdr_name tcName
-
-
+-- | Wrap an identifier that's out of scope (i.e. wasn't found in
+-- 'GlobalReaderEnv' during 'rename') in an appropriate doc. Currently
+-- we simply monospace the identifier in most cases except when the
+-- identifier is qualified: if the identifier is qualified then we can
+-- still try to guess and generate anchors accross modules but the
+-- users shouldn't rely on this doing the right thing. See tickets
+-- #253 and #375 on the confusion this causes depending on which
+-- default we pick in 'rename'.
 outOfScope :: DynFlags -> RdrName -> Doc a
 outOfScope dflags x =
   case x of

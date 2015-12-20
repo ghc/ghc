@@ -16,7 +16,6 @@
 module Haddock.GhcUtils where
 
 
-import Control.Applicative  ( (<$>) )
 import Control.Arrow
 import Data.Function
 
@@ -69,7 +68,7 @@ getMainDeclBinder _ = []
 -- to correlate InstDecls with their Instance/CoAxiom Names, via the
 -- instanceMap.
 getInstLoc :: InstDecl name -> SrcSpan
-getInstLoc (ClsInstD (ClsInstDecl { cid_poly_ty = L l _ })) = l
+getInstLoc (ClsInstD (ClsInstDecl { cid_poly_ty = ty })) = getLoc (hsSigType ty)
 getInstLoc (DataFamInstD (DataFamInstDecl { dfid_tycon = L l _ })) = l
 getInstLoc (TyFamInstD (TyFamInstDecl
   -- Since CoAxioms' Names refer to the whole line for type family instances
@@ -92,10 +91,14 @@ filterSigNames p (FixSig (FixitySig ns ty)) =
     []       -> Nothing
     filtered -> Just (FixSig (FixitySig filtered ty))
 filterSigNames _ orig@(MinimalSig _ _)      = Just orig
-filterSigNames p (TypeSig ns ty nwcs) =
+filterSigNames p (TypeSig ns ty) =
   case filter (p . unLoc) ns of
     []       -> Nothing
-    filtered -> Just (TypeSig filtered ty nwcs)
+    filtered -> Just (TypeSig filtered ty)
+filterSigNames p (ClassOpSig is_default ns ty) =
+  case filter (p . unLoc) ns of
+    []       -> Nothing
+    filtered -> Just (ClassOpSig is_default filtered ty)
 filterSigNames _ _                           = Nothing
 
 ifTrueJust :: Bool -> name -> Maybe name
@@ -106,13 +109,19 @@ sigName :: LSig name -> [name]
 sigName (L _ sig) = sigNameNoLoc sig
 
 sigNameNoLoc :: Sig name -> [name]
-sigNameNoLoc (TypeSig   ns _ _)        = map unLoc ns
-sigNameNoLoc (PatSynSig n _ _ _ _)     = [unLoc n]
-sigNameNoLoc (SpecSig   n _ _)         = [unLoc n]
-sigNameNoLoc (InlineSig n _)           = [unLoc n]
+sigNameNoLoc (TypeSig      ns _)       = map unLoc ns
+sigNameNoLoc (ClassOpSig _ ns _)       = map unLoc ns
+sigNameNoLoc (PatSynSig    n _)        = [unLoc n]
+sigNameNoLoc (SpecSig      n _ _)      = [unLoc n]
+sigNameNoLoc (InlineSig    n _)        = [unLoc n]
 sigNameNoLoc (FixSig (FixitySig ns _)) = map unLoc ns
 sigNameNoLoc _                         = []
 
+-- | Was this signature given by the user?
+isUserLSig :: LSig name -> Bool
+isUserLSig (L _(TypeSig {}))    = True
+isUserLSig (L _(ClassOpSig {})) = True
+isUserLSig _                    = False
 
 isTyClD :: HsDecl a -> Bool
 isTyClD (TyClD _) = True
@@ -188,17 +197,18 @@ class Parent a where
 
 instance Parent (ConDecl Name) where
   children con =
-    case con_details con of
-      RecCon fields -> map unL $ concatMap (cd_fld_names . unL) (unL fields)
+    case getConDetails con of
+      RecCon fields -> map (selectorFieldOcc . unL) $
+                         concatMap (cd_fld_names . unL) (unL fields)
       _             -> []
 
 instance Parent (TyClDecl Name) where
   children d
-    | isDataDecl  d = map unL $ concatMap (con_names . unL)
+    | isDataDecl  d = map unL $ concatMap (getConNames . unL)
                               $ (dd_cons . tcdDataDefn) $ d
     | isClassDecl d =
         map (unL . fdLName . unL) (tcdATs d) ++
-        [ unL n | L _ (TypeSig ns _ _) <- tcdSigs d, n <- ns ]
+        [ unL n | L _ (TypeSig ns _) <- tcdSigs d, n <- ns ]
     | otherwise = []
 
 
@@ -208,7 +218,7 @@ family = getName &&& children
 
 
 familyConDecl :: ConDecl Name -> [(Name, [Name])]
-familyConDecl d = zip (map unL (con_names d)) (repeat $ children d)
+familyConDecl d = zip (map unL (getConNames d)) (repeat $ children d)
 
 -- | A mapping from the parent (main-binder) to its children and from each
 -- child to its grand-children, recursively.

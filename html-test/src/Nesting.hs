@@ -119,3 +119,18 @@ definition lists too.
 -}
 j :: t
 j = undefined
+
+{-|
+      - list may start at arbitrary depth
+
+      - and consecutive items at that depth
+      belong to the same list
+
+      - of course we can still
+
+          * nest items like we are used to
+
+      - and then get back to initial list
+-}
+k :: t
+k = undefined

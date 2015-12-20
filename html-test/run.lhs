@@ -21,7 +21,6 @@ import System.Exit
 import System.FilePath
 import System.Process (ProcessHandle, runProcess, waitForProcess, system)
 
-
 packageRoot, dataDir, haddockPath, baseDir, testDir, outDir :: FilePath
 baseDir = takeDirectory __FILE__
 testDir       = baseDir </> "src"
@@ -112,11 +111,11 @@ check modules strict = do
       then do
         out <- readFile outfile
         ref <- readFile reffile
-        if not $ haddockEq out ref
+        if not $ haddockEq (outfile, out) (reffile, ref)
           then do
             putStrLn $ "Output for " ++ mod ++ " has changed! Exiting with diff:"
-            let ref' = stripLinks ref
-                out' = stripLinks out
+            let ref' = maybeStripLinks outfile ref
+                out' = maybeStripLinks reffile out
             let reffile' = outDir </> takeFileName reffile ++ ".nolinks"
                 outfile' = outDir </> takeFileName outfile ++ ".ref.nolinks"
             writeFile reffile' ref'
@@ -134,6 +133,10 @@ check modules strict = do
       else do
         putStrLn $ "Pass: " ++ mod ++ " (no .ref file)"
 
+-- | List of modules in which we don't 'stripLinks'
+preserveLinksModules :: [String]
+preserveLinksModules = map (++ ".html") ["Bug253"]
+
 -- | A rather nasty way to drop the Haddock version string from the
 -- end of the generated HTML files so that we don't have to change
 -- every single test every time we change versions. We rely on the the
@@ -146,9 +149,16 @@ dropVersion = reverse . dropTillP . reverse
     dropTillP ('p':'<':xs) = xs
     dropTillP (_:xs) = dropTillP xs
 
-haddockEq :: String -> String -> Bool
-haddockEq file1 file2 =
-  stripLinks (dropVersion file1) == stripLinks (dropVersion file2)
+haddockEq :: (FilePath, String) -> (FilePath, String) -> Bool
+haddockEq (fn1, file1) (fn2, file2) =
+  maybeStripLinks fn1 (dropVersion file1)
+  == maybeStripLinks fn2 (dropVersion file2)
+
+maybeStripLinks :: String -- ^ Module we're considering for stripping
+                -> String -> String
+maybeStripLinks m = if any (`isSuffixOf` m) preserveLinksModules
+                    then id
+                    else stripLinks
 
 stripLinks :: String -> String
 stripLinks str =

@@ -30,6 +30,7 @@ import Haddock.Backends.Xhtml
 import Haddock.Backends.Xhtml.Themes (getThemes)
 import Haddock.Backends.LaTeX
 import Haddock.Backends.Hoogle
+import Haddock.Backends.Hyperlinker
 import Haddock.Interface
 import Haddock.Parser
 import Haddock.Types
@@ -39,11 +40,13 @@ import Haddock.Options
 import Haddock.Utils
 
 import Control.Monad hiding (forM_)
+import Control.Applicative
 import Data.Foldable (forM_)
 import Data.List (isPrefixOf)
 import Control.Exception
 import Data.Maybe
 import Data.IORef
+import Data.Map (Map)
 import qualified Data.Map as Map
 import System.IO
 import System.Exit
@@ -118,11 +121,8 @@ handleGhcExceptions =
   -- error messages propagated as exceptions
   handleGhcException $ \e -> do
     hFlush stdout
-    case e of
-      PhaseFailed _ code -> exitWith code
-      _ -> do
-        print (e :: GhcException)
-        exitFailure
+    print (e :: GhcException)
+    exitFailure
 
 
 -------------------------------------------------------------------------------
@@ -157,6 +157,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
           _ -> return flags
 
   unless (Flag_NoWarnings `elem` flags) $ do
+    hypSrcWarnings flags
     forM_ (warnings args) $ \warning -> do
       hPutStrLn stderr warning
 
@@ -225,13 +226,16 @@ renderStep dflags flags qual pkgs interfaces = do
   let
     ifaceFiles = map snd pkgs
     installedIfaces = concatMap ifInstalledIfaces ifaceFiles
-    srcMap = Map.fromList [ (ifPackageKey if_, x) | ((_, Just x), if_) <- pkgs ]
-  render dflags flags qual interfaces installedIfaces srcMap
+    extSrcMap = Map.fromList $ do
+      ((_, Just path), ifile) <- pkgs
+      iface <- ifInstalledIfaces ifile
+      return (instMod iface, path)
+  render dflags flags qual interfaces installedIfaces extSrcMap
 
 
 -- | Render the interfaces with whatever backend is specified in the flags.
-render :: DynFlags -> [Flag] -> QualOption -> [Interface] -> [InstalledInterface] -> SrcMap -> IO ()
-render dflags flags qual ifaces installedIfaces srcMap = do
+render :: DynFlags -> [Flag] -> QualOption -> [Interface] -> [InstalledInterface] -> Map Module FilePath -> IO ()
+render dflags flags qual ifaces installedIfaces extSrcMap = do
 
   let
     title                = fromMaybe "" (optTitle flags)
@@ -242,6 +246,7 @@ render dflags flags qual ifaces installedIfaces srcMap = do
     opt_index_url        = optIndexUrl       flags
     odir                 = outputDir         flags
     opt_latex_style      = optLaTeXStyle     flags
+    opt_source_css       = optSourceCssFile  flags
 
     visibleIfaces    = [ i | i <- ifaces, OptHide `notElem` ifaceOptions i ]
 
@@ -250,15 +255,35 @@ render dflags flags qual ifaces installedIfaces srcMap = do
     allVisibleIfaces = [ i | i <- allIfaces, OptHide `notElem` instOptions i ]
 
     pkgMod           = ifaceMod (head ifaces)
-    pkgKey            = modulePackageKey pkgMod
-    pkgStr           = Just (packageKeyString pkgKey)
-    (pkgName,pkgVer) = modulePackageInfo dflags flags pkgMod
+    pkgKey           = moduleUnitId pkgMod
+    pkgStr           = Just (unitIdString pkgKey)
+    pkgNameVer       = modulePackageInfo dflags flags pkgMod
 
     (srcBase, srcModule, srcEntity, srcLEntity) = sourceUrls flags
-    srcMap' = maybe srcMap (\path -> Map.insert pkgKey path srcMap) srcEntity
+
+    srcModule'
+      | Flag_HyperlinkedSource `elem` flags = Just hypSrcModuleUrlFormat
+      | otherwise = srcModule
+
+    srcMap = mkSrcMap $ Map.union
+      (Map.map SrcExternal extSrcMap)
+      (Map.fromList [ (ifaceMod iface, SrcLocal) | iface <- ifaces ])
+
+    pkgSrcMap = Map.mapKeys moduleUnitId extSrcMap
+    pkgSrcMap'
+      | Flag_HyperlinkedSource `elem` flags =
+          Map.insert pkgKey hypSrcModuleNameUrlFormat pkgSrcMap
+      | Just srcNameUrl <- srcEntity = Map.insert pkgKey srcNameUrl pkgSrcMap
+      | otherwise = pkgSrcMap
+
     -- TODO: Get these from the interface files as with srcMap
-    srcLMap' = maybe Map.empty (\path -> Map.singleton pkgKey path) srcLEntity
-    sourceUrls' = (srcBase, srcModule, srcMap', srcLMap')
+    pkgSrcLMap'
+      | Flag_HyperlinkedSource `elem` flags =
+          Map.singleton pkgKey hypSrcModuleLineUrlFormat
+      | Just path <- srcLEntity = Map.singleton pkgKey path
+      | otherwise = Map.empty
+
+    sourceUrls' = (srcBase, srcModule', pkgSrcMap', pkgSrcLMap')
 
   libDir   <- getHaddockLibDir flags
   prologue <- getPrologue dflags flags
@@ -288,16 +313,27 @@ render dflags flags qual ifaces installedIfaces srcMap = do
   -- TODO: we throw away Meta for both Hoogle and LaTeX right now,
   -- might want to fix that if/when these two get some work on them
   when (Flag_Hoogle `elem` flags) $ do
-    let pkgNameStr | unpackFS pkgNameFS == "main" && title /= []
-                               = title
-                   | otherwise = unpackFS pkgNameFS
-          where PackageName pkgNameFS = pkgName
-    ppHoogle dflags pkgNameStr pkgVer title (fmap _doc prologue) visibleIfaces
-      odir
+    case pkgNameVer of
+      Nothing -> putStrLn . unlines $
+          [ "haddock: Unable to find a package providing module "
+            ++ moduleNameString (moduleName pkgMod) ++ ", skipping Hoogle."
+          , ""
+          , "         Perhaps try specifying the desired package explicitly"
+            ++ " using the --package-name"
+          , "         and --package-version arguments."
+          ]
+      Just (PackageName pkgNameFS, pkgVer) ->
+          let pkgNameStr | unpackFS pkgNameFS == "main" && title /= [] = title
+                         | otherwise = unpackFS pkgNameFS
+          in ppHoogle dflags pkgNameStr pkgVer title (fmap _doc prologue)
+               visibleIfaces odir
 
   when (Flag_LaTeX `elem` flags) $ do
     ppLaTeX title pkgStr visibleIfaces odir (fmap _doc prologue) opt_latex_style
                   libDir
+
+  when (Flag_HyperlinkedSource `elem` flags) $ do
+    ppHyperlinkedSource odir libDir opt_source_css pretty srcMap ifaces
 
 -- | From GHC 7.10, this function has a potential to crash with a
 -- nasty message such as @expectJust getPackageDetails@ because
@@ -312,12 +348,12 @@ modulePackageInfo :: DynFlags
                             -- contain the package name or version
                             -- provided by the user which we
                             -- prioritise
-                  -> Module -> (PackageName, Data.Version.Version)
+                  -> Module -> Maybe (PackageName, Data.Version.Version)
 modulePackageInfo dflags flags modu =
-  (fromMaybe (packageName pkg) (optPackageName flags),
-   fromMaybe (packageVersion pkg) (optPackageVersion flags))
+    cmdline <|> pkgDb
   where
-    pkg = getPackageDetails dflags (modulePackageKey modu)
+    cmdline = (,) <$> optPackageName flags <*> optPackageVersion flags
+    pkgDb = (\pkg -> (packageName pkg, packageVersion pkg)) <$> lookupPackage dflags (moduleUnitId modu)
 
 
 -------------------------------------------------------------------------------
@@ -465,6 +501,35 @@ shortcutFlags flags = do
     byeVersion = bye $
       "Haddock version " ++ projectVersion ++ ", (c) Simon Marlow 2006\n"
       ++ "Ported to use the GHC API by David Waern 2006-2008\n"
+
+
+-- | Generate some warnings about potential misuse of @--hyperlinked-source@.
+hypSrcWarnings :: [Flag] -> IO ()
+hypSrcWarnings flags = do
+
+    when (hypSrc && any isSourceUrlFlag flags) $
+        hPutStrLn stderr $ concat
+            [ "Warning: "
+            , "--source-* options are ignored when "
+            , "--hyperlinked-source is enabled."
+            ]
+
+    when (not hypSrc && any isSourceCssFlag flags) $
+        hPutStrLn stderr $ concat
+            [ "Warning: "
+            , "source CSS file is specified but "
+            , "--hyperlinked-source is disabled."
+            ]
+
+  where
+    hypSrc = Flag_HyperlinkedSource `elem` flags
+    isSourceUrlFlag (Flag_SourceBaseURL _) = True
+    isSourceUrlFlag (Flag_SourceModuleURL _) = True
+    isSourceUrlFlag (Flag_SourceEntityURL _) = True
+    isSourceUrlFlag (Flag_SourceLEntityURL _) = True
+    isSourceUrlFlag _ = False
+    isSourceCssFlag (Flag_SourceCss _) = True
+    isSourceCssFlag _ = False
 
 
 updateHTMLXRefs :: [(DocPaths, InterfaceFile)] -> IO ()

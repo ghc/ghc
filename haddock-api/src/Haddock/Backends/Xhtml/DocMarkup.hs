@@ -19,8 +19,6 @@ module Haddock.Backends.Xhtml.DocMarkup (
   docElement, docSection, docSection_,
 ) where
 
-import Control.Applicative ((<$>))
-
 import Data.List
 import Haddock.Backends.Xhtml.Names
 import Haddock.Backends.Xhtml.Utils
@@ -64,7 +62,10 @@ parHtmlMarkup qual insertAnchors ppId = Markup {
                                   then anchor ! [href url]
                                        << fromMaybe url mLabel
                                   else toHtml $ fromMaybe url mLabel,
-  markupAName                = \aname -> namedAnchor aname << "",
+  markupAName                = \aname
+                               -> if insertAnchors
+                                  then namedAnchor aname << ""
+                                  else noHtml,
   markupPic                  = \(Picture uri t) -> image ! ([src uri] ++ fromMaybe [] (return . title <$> t)),
   markupProperty             = pre . toHtml,
   markupExample              = examplesToHtml,
@@ -160,8 +161,9 @@ hackMarkup fmt' h' =
       UntouchedDoc d -> (markup fmt $ _doc d, [_meta d])
       CollapsingHeader (Header lvl titl) par n nm ->
         let id_ = makeAnchorId $ "ch:" ++ fromMaybe "noid:" nm ++ show n
-            col' = collapseControl id_ True "caption"
-            instTable = (thediv ! collapseSection id_ False [] <<)
+            expanded = False
+            col' = collapseControl id_ expanded "caption"
+            instTable = (thediv ! collapseSection id_ expanded [] <<)
             lvs = zip [1 .. ] [h1, h2, h3, h4, h5, h6]
             getHeader = fromMaybe caption (lookup lvl lvs)
             subCaption = getHeader ! col' << markup fmt titl

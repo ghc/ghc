@@ -1,3 +1,38 @@
+Changes in version 2.16.2
+
+ * Generate hyperlinked source ourselves (#410, part of GSOC 2015)
+
+ * Fix expansion icon for user-collapsible sections (#412)
+
+ * Break up response file arguments on newlines
+
+ * Various HTML fixes (#301, #406, #407, #421)
+
+ * Line anchors in hyperlinked source (#420)
+
+Changes in version 2.16.1
+
+ * Don't default to type constructors for out-of-scope names (#253 and
+   #375)
+
+ * Fix Hoogle display of constructors (#361)
+
+ * Fully qualify names in Hoogle instances output (#263)
+
+ * Output method documentation in Hoogle backend (#259)
+
+ * Don't print instance safety information in Hoogle (#168)
+
+ * Expand response files in arguments (#285)
+
+ * Build the main executable with -threaded (#399)
+
+ * Use SrcSpan of declarations for inferred type sigs (#207)
+
+ * Fix cross-module instance locations (#383)
+
+ * Fix alignment of Source link for instances in Firefox (#384)
+
 Changes in version 2.16.0
 
  * Experimental collapsible header support (#335)
@@ -25,6 +60,12 @@ Changes in version 2.16.0
    number. The way it is rendered is subject to change.
 
  * properly render package ID (not package key) in index (#329)
+
+ * links to source location of class instance definitions
+
+ * Fix code blocks in presence of Windows line endings
+
+ * Deal better with long synopsis lines (#151)
 
 Changes in version 2.15.0
 

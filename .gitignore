@@ -2,9 +2,12 @@
 /haddock-api/dist/
 /haddock-library/dist/
 /html-test/out/
+/hypsrc-test/out/
 /latex-test/out/
 
 /doc/haddock
+/doc/haddock.ps
+/doc/haddock.pdf
 /doc/autom4te.cache/
 /doc/config.log
 /doc/config.mk
@@ -12,3 +15,6 @@
 /doc/configure
 tags
 TAGS
+
+.cabal-sandbox
+cabal.sandbox.config

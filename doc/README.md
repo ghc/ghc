@@ -1,5 +1,4 @@
-Haddock documentation
----------------------
+# Haddock documentation
 
 The documentation is in DocBook XML format.  You need some tools to
 process it: at least xsltproc, and the DocBook XML DTD and XSL
@@ -8,19 +7,19 @@ process the documentation on your system, and a Makefile to actually
 do the processing (so, on Windows, you'll need Cygwin or MSys in
 addition to the DocBook XML tools).  To build the HTML documentation:
 
-   $ autoconf
-   $ ./configure
-   $ make html
+    $ autoconf
+    $ ./configure
+    $ make html
 
 which leaves the HTML documentation in a haddock/ subdirectory.
 
 Printable documentation can also be produced, eg.:
 
-   $ make pdf
+    $ make pdf
 
 or
 
-   $ make ps
+    $ make ps
 
 Generating the printed formats requires more tools (fop or xmltex) and
 tends to be a bit harder.

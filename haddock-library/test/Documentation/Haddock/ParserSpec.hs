@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Documentation.Haddock.ParserSpec (main, spec) where
@@ -55,8 +56,10 @@ spec = do
       it "accepts hexadecimal character references" $ do
         "&#x65;" `shouldParseTo` "e"
 
-      it "allows to backslash-escape characters" $ do
-        property $ \x -> ['\\', x] `shouldParseTo` DocString [x]
+      it "allows to backslash-escape characters except \\r" $ do
+        property $ \case
+          '\r' -> "\\\r" `shouldParseTo` DocString "\\"
+          x -> ['\\', x] `shouldParseTo` DocString [x]
 
       context "when parsing strings contaning numeric character references" $ do
         it "will implicitly convert digits to characters" $ do
@@ -692,6 +695,23 @@ spec = do
                              <> DocUnorderedList [ DocParagraph "bar" ]
                            ]
           <> DocOrderedList [ DocParagraph "baz" ]
+
+      it "allows arbitrary initial indent of a list" $ do
+        unlines
+          [ "     * foo"
+          , "     * bar"
+          , ""
+          , "         * quux"
+          , ""
+          , "     * baz"
+          ]
+        `shouldParseTo`
+        DocUnorderedList
+          [ DocParagraph "foo"
+          , DocParagraph "bar"
+            <> DocUnorderedList [ DocParagraph "quux" ]
+          , DocParagraph "baz"
+          ]
 
       it "definition lists can come back to top level with a different list" $ do
         "[foo]: foov\n\n    [bar]: barv\n\n1. baz" `shouldParseTo`

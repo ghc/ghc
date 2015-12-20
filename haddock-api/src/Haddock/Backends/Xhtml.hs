@@ -36,7 +36,6 @@ import Haddock.GhcUtils
 
 import Control.Monad         ( when, unless )
 import Data.Char             ( toUpper )
-import Data.Functor          ( (<$>) )
 import Data.List             ( sortBy, groupBy, intercalate, isPrefixOf )
 import Data.Maybe
 import System.FilePath hiding ( (</>) )
@@ -305,7 +304,7 @@ mkNode qual ss p (Node s leaf pkg srcPkg short ts) =
 
     htmlModule = thespan ! modAttrs << (cBtn +++
       if leaf
-        then ppModule (mkModule (stringToPackageKey (fromMaybe "" pkg))
+        then ppModule (mkModule (stringToUnitId (fromMaybe "" pkg))
                                        (mkModuleName mdl))
         else toHtml s
       )
@@ -547,7 +546,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
     synopsis
       | no_doc_at_all = noHtml
       | otherwise
-      = divSynposis $
+      = divSynopsis $
             paragraph ! collapseControl "syn" False "caption" << "Synopsis" +++
             shortDeclList (
                 mapMaybe (processExport True linksInfo unicode qual) exports
@@ -584,7 +583,7 @@ processForMiniSynopsis mdl unicode qual ExportDecl { expItemDecl = L _loc decl0 
         (DataDecl{})   -> [keyword "data" <+> b]
         (SynDecl{})    -> [keyword "type" <+> b]
         (ClassDecl {}) -> [keyword "class" <+> b]
-    SigD (TypeSig lnames (L _ _) _) ->
+    SigD (TypeSig lnames _) ->
       map (ppNameMini Prefix mdl . nameOccName . getName . unLoc) lnames
     _ -> []
 processForMiniSynopsis _ _ qual (ExportGroup lvl _id txt) =

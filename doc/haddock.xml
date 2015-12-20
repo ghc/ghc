@@ -12,7 +12,7 @@
 
 <book id="haddock">
   <bookinfo>
-    <date>2004-08-02</date>
+    <date>2015-06-02</date>
     <title>Haddock User Guide</title>
     <author>
       <firstname>Simon</firstname>
@@ -24,12 +24,21 @@
       <surname>Waern</surname>
     </author>
     <address><email>david.waern@gmail.com</email></address>
+    <author>
+      <firstname>Mateusz</firstname>
+      <surname>Kowalczyk</surname>
+    </author>
+    <address><email>fuuzetsu@fuuzetsu.co.uk</email></address>
     <copyright>
       <year>2010</year>
       <holder>Simon Marlow, David Waern</holder>
     </copyright>
+    <copyright>
+      <year>2013-2015</year>
+      <holder>Mateusz Kowalczyk</holder>
+    </copyright>
     <abstract>
-      <para>This document describes Haddock version 2.15.1, a Haskell
+      <para>This document describes Haddock version 2.16.2, a Haskell
       documentation tool.</para>
     </abstract>
   </bookinfo>
@@ -336,11 +345,27 @@
       <varlistentry>
         <term>
           <indexterm><primary><option>-i</option></primary></indexterm>
-          <option>-i</option> <replaceable>path</replaceable>,<replaceable>file</replaceable>
+          <option>-i</option> <replaceable>file</replaceable>
+        </term>
+        <term>
+          <indexterm><primary><option>-i</option></primary></indexterm>
+          <option>-i</option> <replaceable>docpath</replaceable>,<replaceable>file</replaceable>
+        </term>
+        <term>
+          <indexterm><primary><option>-i</option></primary></indexterm>
+          <option>-i</option> <replaceable>docpath</replaceable>,<replaceable>srcpath</replaceable>,<replaceable>file</replaceable>
         </term>
         <term>
           <indexterm><primary><option>--read-interface</option></primary></indexterm>
-          <option>--read-interface</option>=<replaceable>path</replaceable>,<replaceable>file</replaceable>
+          <option>--read-interface</option>=<replaceable>file</replaceable>
+        </term>
+        <term>
+          <indexterm><primary><option>--read-interface</option></primary></indexterm>
+          <option>--read-interface</option>=<replaceable>docpath</replaceable>,<replaceable>file</replaceable>
+        </term>
+        <term>
+          <indexterm><primary><option>--read-interface</option></primary></indexterm>
+          <option>--read-interface</option>=<replaceable>docpath</replaceable>,<replaceable>srcpath</replaceable>,<replaceable>file</replaceable>
         </term>
         <listitem>
           <para>Read the interface file in
@@ -348,18 +373,24 @@
           produced by running Haddock with the
           <option>--dump-interface</option> option.  The interface
           describes a set of modules whose HTML documentation is
-          located in <replaceable>path</replaceable> (which may be a
-          relative pathname).  The <replaceable>path</replaceable> is
-          optional, and defaults to <quote>.</quote>.</para>
+          located in <replaceable>docpath</replaceable> (which may be a
+          relative pathname).  The <replaceable>docpath</replaceable> is
+          optional, and defaults to <quote>.</quote>. The
+          <replaceable>srcpath</replaceable> is optional but has no default
+          value.</para>
 
           <para>This option allows Haddock to produce separate sets of
           documentation with hyperlinks between them.  The
-          <replaceable>path</replaceable> is used to direct hyperlinks
+          <replaceable>docpath</replaceable> is used to direct hyperlinks
           to point to the right files; so make sure you don't move the
           HTML files later or these links will break.  Using a
-          relative <replaceable>path</replaceable> means that a
+          relative <replaceable>docpath</replaceable> means that a
           documentation subtree can still be moved around without
           breaking links.</para>
+
+          <para>Similarly to <replaceable>docpath</replaceable>, <replaceable>srcpath</replaceable> is used generate cross-package hyperlinks but
+          within sources rendered with <option>--hyperlinked-source</option>
+          option.</para>
 
           <para>Multiple <option>--read-interface</option> options may
           be given.</para>
@@ -516,6 +547,43 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
             and the command is
             instead <literal>\usepackage{<replaceable>style</replaceable>}</literal>.
           </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <indexterm><primary><option>--hyperlinked-source</option></primary></indexterm>
+          <option>--hyperlinked-source</option>
+        </term>
+        <listitem>
+          <para>Generate hyperlinked source code (as HTML web page). All
+          rendered files will be put into
+          <filename class='directory'>src/</filename> subfolder of output
+          directory.</para>
+          <para>Usually, this should be used in combination with
+          <option>--html</option> option - generated documentation will then
+          contain references to appropriate code fragments. Previously, this
+          behaviour could be achieved by generating sources using external
+          tool and specifying <option>--source-base</option>,
+          <option>--source-module</option>, <option>--source-entity</option>
+          and related options. Note that these flags are ignored once
+          <option>--hyperlinked-source</option> is set.</para>
+          <para>In order to make cross-package source hyperlinking possible,
+          appropriate source paths have to be set up when providing
+          interface files using <option>--read-interface</option>
+          option.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <indexterm><primary><option>--source-css</option></primary></indexterm>
+          <option>--source-css=<replaceable>style</replaceable></option>
+        </term>
+        <listitem>
+          <para>Use custom CSS file for sources rendered by the
+          <option>--hyperlinked-source</option> option. If no custom style
+          file is provided, Haddock will use default one.</para>
         </listitem>
       </varlistentry>
 
@@ -2029,7 +2097,18 @@ This belongs to the list above!
                     2. No newline separation even in indented lists.
 -}
 </programlisting>
+    <para>The indentation of the first list item is honoured. That is,
+    in the following example the items are on the same level. Before
+    Haddock 2.16.1, the second item would have been nested under the
+    first item which was unexpected.
+    </para>
+<programlisting>
+{-|
+    * foo
 
+    * bar
+-}
+</programlisting>
       </section>
 
       <section>

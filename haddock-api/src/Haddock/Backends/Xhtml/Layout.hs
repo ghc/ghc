@@ -14,7 +14,7 @@ module Haddock.Backends.Xhtml.Layout (
   miniBody,
 
   divPackageHeader, divContent, divModuleHeader, divFooter,
-  divTableOfContents, divDescription, divSynposis, divInterface,
+  divTableOfContents, divDescription, divSynopsis, divInterface,
   divIndex, divAlphabet, divModuleList,
 
   sectionName,
@@ -31,7 +31,7 @@ module Haddock.Backends.Xhtml.Layout (
   subConstructors,
   subEquations,
   subFields,
-  subInstances,
+  subInstances, subInstHead, subInstDetails,
   subMethods,
   subMinimal,
 
@@ -44,7 +44,6 @@ import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Utils
 import Haddock.Types
 import Haddock.Utils (makeAnchorId)
-
 import qualified Data.Map as Map
 import Text.XHtml hiding ( name, title, p, quote )
 
@@ -77,7 +76,7 @@ nonEmptySectionName c
 
 
 divPackageHeader, divContent, divModuleHeader, divFooter,
-  divTableOfContents, divDescription, divSynposis, divInterface,
+  divTableOfContents, divDescription, divSynopsis, divInterface,
   divIndex, divAlphabet, divModuleList
     :: Html -> Html
 
@@ -87,7 +86,7 @@ divModuleHeader     = sectionDiv "module-header"
 divFooter           = sectionDiv "footer"
 divTableOfContents  = sectionDiv "table-of-contents"
 divDescription      = sectionDiv "description"
-divSynposis         = sectionDiv "synopsis"
+divSynopsis         = sectionDiv "synopsis"
 divInterface        = sectionDiv "interface"
 divIndex            = sectionDiv "index"
 divAlphabet         = sectionDiv "alphabet"
@@ -128,14 +127,12 @@ divSubDecls cssClass captionName = maybe noHtml wrap
 
 subDlist :: Qualification -> [SubDecl] -> Maybe Html
 subDlist _ [] = Nothing
-subDlist qual decls = Just $ dlist << map subEntry decls +++ clearDiv
+subDlist qual decls = Just $ ulist << map subEntry decls
   where
     subEntry (decl, mdoc, subs) =
-      dterm ! [theclass "src"] << decl
-      +++
-      docElement ddef << (fmap (docToHtml Nothing qual) mdoc +++ subs)
-
-    clearDiv = thediv ! [ theclass "clear" ] << noHtml
+      li <<
+        (define ! [theclass "src"] << decl +++
+         docElement thediv << (fmap (docToHtml Nothing qual) mdoc +++ subs))
 
 
 subTable :: Qualification -> [SubDecl] -> Maybe Html
@@ -148,6 +145,22 @@ subTable qual decls = Just $ table << aboves (concatMap subRow decls)
        docElement td << fmap (docToHtml Nothing qual) mdoc)
       : map (cell . (td <<)) subs
 
+
+-- | Sub table with source information (optional).
+subTableSrc :: Qualification -> LinksInfo -> Bool -> [(SubDecl,Located DocName)] -> Maybe Html
+subTableSrc _ _  _ [] = Nothing
+subTableSrc qual lnks splice decls = Just $ table << aboves (concatMap subRow decls)
+  where
+    subRow ((decl, mdoc, subs),L loc dn) =
+      (td ! [theclass "src clearfix"] <<
+        (thespan ! [theclass "inst-left"] << decl)
+        <+> linkHtml loc dn
+      <->
+      docElement td << fmap (docToHtml Nothing qual) mdoc
+      )
+      : map (cell . (td <<)) subs
+    linkHtml loc@(RealSrcSpan _) dn = links lnks loc splice dn
+    linkHtml _ _ = noHtml
 
 subBlock :: [Html] -> Maybe Html
 subBlock [] = Nothing
@@ -174,16 +187,42 @@ subEquations :: Qualification -> [SubDecl] -> Html
 subEquations qual = divSubDecls "equations" "Equations" . subTable qual
 
 
+-- | Generate sub table for instance declarations, with source
 subInstances :: Qualification
              -> String -- ^ Class name, used for anchor generation
-             -> [SubDecl] -> Html
-subInstances qual nm = maybe noHtml wrap . instTable
+             -> LinksInfo -> Bool
+             -> [(SubDecl,Located DocName)] -> Html
+subInstances qual nm lnks splice = maybe noHtml wrap . instTable
   where
     wrap = (subSection <<) . (subCaption +++)
-    instTable = fmap (thediv ! collapseSection id_ True [] <<) . subTable qual
+    instTable = fmap (thediv ! collapseSection id_ True [] <<) . subTableSrc qual lnks splice
     subSection = thediv ! [theclass "subs instances"]
     subCaption = paragraph ! collapseControl id_ True "caption" << "Instances"
     id_ = makeAnchorId $ "i:" ++ nm
+
+ 
+subInstHead :: String -- ^ Instance unique id (for anchor generation)
+            -> Html -- ^ Header content (instance name and type)
+            -> Html
+subInstHead iid hdr =
+    expander noHtml <+> hdr
+  where
+    expander = thespan ! collapseControl (instAnchorId iid) False "instance"
+
+
+subInstDetails :: String -- ^ Instance unique id (for anchor generation)
+               -> [Html] -- ^ Associated type contents
+               -> [Html] -- ^ Method contents (pretty-printed signatures)
+               -> Html
+subInstDetails iid ats mets =
+    section << (subAssociatedTypes ats <+> subMethods mets)
+  where
+    section = thediv ! collapseSection (instAnchorId iid) False "inst-details"
+
+
+instAnchorId :: String -> String
+instAnchorId iid = makeAnchorId $ "i:" ++ iid
+
 
 subMethods :: [Html] -> Html
 subMethods = divSubDecls "methods" "Methods" . subBlock
@@ -200,12 +239,19 @@ declElem = paragraph ! [theclass "src"]
 -- a box for top level documented names
 -- it adds a source and wiki link at the right hand side of the box
 topDeclElem :: LinksInfo -> SrcSpan -> Bool -> [DocName] -> Html -> Html
-topDeclElem ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice names html =
-    declElem << (html <+> srcLink <+> wikiLink)
+topDeclElem lnks loc splice names html =
+    declElem << (html <+> (links lnks loc splice $ head names))
+        -- FIXME: is it ok to simply take the first name?
+
+-- | Adds a source and wiki link at the right hand side of the box.
+-- Name must be documented, otherwise we wouldn't get here.
+links :: LinksInfo -> SrcSpan -> Bool -> DocName -> Html
+links ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice (Documented n mdl) =
+   (srcLink <+> wikiLink)
   where srcLink = let nameUrl = Map.lookup origPkg sourceMap
                       lineUrl = Map.lookup origPkg lineMap
                       mUrl | splice    = lineUrl
-                                         -- Use the lineUrl as a backup
+                                        -- Use the lineUrl as a backup
                            | otherwise = maybe lineUrl Just nameUrl in
           case mUrl of
             Nothing  -> noHtml
@@ -225,12 +271,9 @@ topDeclElem ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice names htm
         -- TODO: do something about type instances. They will point to
         -- the module defining the type family, which is wrong.
         origMod = nameModule n
-        origPkg = modulePackageKey origMod
-
-        -- Name must be documented, otherwise we wouldn't get here
-        Documented n mdl = head names
-        -- FIXME: is it ok to simply take the first name?
+        origPkg = moduleUnitId origMod
 
         fname = case loc of
-                RealSrcSpan l -> unpackFS (srcSpanFile l)
-                UnhelpfulSpan _ -> error "topDeclElem UnhelpfulSpan"
+          RealSrcSpan l -> unpackFS (srcSpanFile l)
+          UnhelpfulSpan _ -> error "links: UnhelpfulSpan"
+links _ _ _ _ = noHtml
