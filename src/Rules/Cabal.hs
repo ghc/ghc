@@ -1,11 +1,12 @@
 module Rules.Cabal (cabalRules) where
 
-import Expression
 import Data.Version
 import Distribution.Package hiding (Package)
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
 import Distribution.Verbosity
+import Expression
+import GHC
 import Package hiding (library)
 import Settings
 
@@ -13,7 +14,8 @@ cabalRules :: Rules ()
 cabalRules = do
     -- Cache boot package constraints (to be used in cabalArgs)
     bootPackageConstraints %> \out -> do
-        pkgs <- interpretWithStage Stage0 getPackages
+        bootPkgs <- interpretWithStage Stage0 getPackages
+        let pkgs = filter (\p -> p /= compiler && isLibrary p) bootPkgs
         constraints <- forM (sort pkgs) $ \pkg -> do
             need [pkgCabalFile pkg]
             pd <- liftIO . readPackageDescription silent $ pkgCabalFile pkg
