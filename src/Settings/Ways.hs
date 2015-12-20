@@ -4,6 +4,9 @@ import Expression
 import Predicates
 import Settings.User
 
+-- TODO: use a single expression Ways parameterised by package instead of
+-- expressions libWays and rtsWays
+
 -- Combining default ways with user modifications
 getLibWays :: Expr [Way]
 getLibWays = fromDiffExpr $ defaultLibWays <> userLibWays

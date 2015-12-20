@@ -22,8 +22,9 @@ userKnownPackages :: [Package]
 userKnownPackages = []
 
 -- Control which ways libraries and rts are built
+-- TODO: skip profiling for speed, skip dynamic since it's currently broken
 userLibWays :: Ways
-userLibWays = mempty
+userLibWays = remove [profiling, dynamic]
 
 userRtsWays :: Ways
 userRtsWays = mempty
