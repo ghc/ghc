@@ -281,7 +281,7 @@ isRight (Right _) = True
 type family EqEither a b where
   EqEither ('Left x)  ('Left y)  = x == y
   EqEither ('Right x) ('Right y) = x == y
-  EqEither a         b           = 'False
+  EqEither _a         _b         = 'False
 type instance a == b = EqEither a b
 
 {-

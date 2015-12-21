@@ -51,7 +51,7 @@ import Digraph          ( SCC, flattenSCC, stronglyConnCompFromEdgedVertices )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
-import Data.List ( sortBy )
+import Data.List ( (\\), nubBy, sortBy )
 import Maybes( orElse, mapMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 #if __GLASGOW_HASKELL__ < 709
@@ -668,7 +668,13 @@ rnFamInstDecl doc mb_cls tycon (HsIB { hsib_body = pats }) payload rnPayload
                      []             -> pprPanic "rnFamInstDecl" (ppr tycon)
                      (L loc _ : []) -> loc
                      (L loc _ : ps) -> combineSrcSpans loc (getLoc (last ps))
-       ; tv_rdr_names <- extractHsTysRdrTyVars pats
+             -- Duplicates are needed to warn about unused type variables
+             -- See Note [Wild cards in family instances] in TcTyClsDecls
+       ; tv_rdr_names_all <- extractHsTysRdrTyVarsDups pats
+       ; let tv_rdr_names = rmDupsInRdrTyVars tv_rdr_names_all
+             tv_rdr_dups = nubBy eqLocated
+                (freeKiTyVarsTypeVars tv_rdr_names_all
+                 \\ freeKiTyVarsTypeVars tv_rdr_names)
 
        ; var_names <- mapM (newTyVarNameRn mb_cls . L loc . unLoc) $
                       freeKiTyVarsAllVars tv_rdr_names
@@ -678,6 +684,10 @@ rnFamInstDecl doc mb_cls tycon (HsIB { hsib_body = pats }) payload rnPayload
               <- bindLocalNamesFV var_names $
                  do { (pats', pat_fvs) <- rnLHsTypes (FamPatCtx tycon) pats
                     ; (payload', rhs_fvs) <- rnPayload doc payload
+
+                    ; tv_nms_dups <- mapM (lookupOccRn . unLoc) tv_rdr_dups
+                    ; let tv_nms_used = extendNameSetList rhs_fvs tv_nms_dups
+                    ; warnUnusedMatches var_names tv_nms_used
 
                          -- See Note [Renaming associated types]
                     ; let bad_tvs = case mb_cls of

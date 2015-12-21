@@ -862,7 +862,8 @@ of ``-W(no-)*``.
        single: matches, unused
 
     Report all unused variables which arise from pattern matches,
-    including patterns consisting of a single variable. For instance
+    including patterns consisting of a single variable. This includes
+    unused type variables in type family instances. For instance
     ``f x y = []`` would report ``x`` and ``y`` as unused. The warning
     is suppressed if the variable name begins with an underscore, thus:
 

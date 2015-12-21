@@ -6184,12 +6184,17 @@ declaration doesn't matter, it can be replaced with an underscore
     -- Equivalent to
     data instance F Int b = Int
 
+When the flag ``-fwarn-unused-matches`` is enabled, type variables that are
+mentioned in the patterns on the left hand side, but not used on the right
+hand side are reported. Variables that occur multiple times on the left hand side
+are also considered used. To suppress the warnings, unused variables should
+be either replaced or prefixed with underscores. Type variables starting with
+an underscore (``_x``) are otherwise treated as ordinary type variables.
+
 This resembles the wildcards that can be used in
 :ref:`partial-type-signatures`. However, there are some differences.
-Only anonymous wildcards are allowed in these instance declarations,
-named and extra-constraints wildcards are not. No error messages
-reporting the inferred types are generated, nor does the flag
-``-XPartialTypeSignatures`` have any effect.
+No error messages reporting the inferred types are generated, nor does
+the flag ``-XPartialTypeSignatures`` have any effect.
 
 Data and newtype instance declarations are only permitted when an
 appropriate family declaration is in scope - just as a class instance
@@ -6357,8 +6362,9 @@ for data instances. For example, the ``[e]`` instance for ``Elem`` is
 
 Type arguments can be replaced with underscores (``_``) if the names of
 the arguments don't matter. This is the same as writing type variables
-with unique names. The same rules apply as for
-:ref:`data-instance-declarations`.
+with unique names. Unused type arguments should be replaced or prefixed
+with underscores to avoid warnings when the `-fwarn-unused-matches` flag
+is enabled. The same rules apply as for :ref:`data-instance-declarations`.
 
 Type family instance declarations are only legitimate when an
 appropriate family declaration is in scope - just like class instances
@@ -9493,9 +9499,9 @@ wildcards are not supported in pattern or expression signatures.
     foo (x :: _) = (x :: _)
     -- Inferred: forall w_. w_ -> w_
 
-Anonymous wildcards *can* occur in type or data instance declarations.
-However, these declarations are not partial type signatures and
-different rules apply. See :ref:`data-instance-declarations` for more
+Anonymous and named wildcards *can* occur in type or data instance
+declarations. However, these declarations are not partial type signatures
+and different rules apply. See :ref:`data-instance-declarations` for more
 details.
 
 Partial type signatures can also be used in :ref:`template-haskell`

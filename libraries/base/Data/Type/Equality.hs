@@ -205,37 +205,37 @@ families.
 
 -- all of the following closed type families are local to this module
 type family EqStar (a :: *) (b :: *) where
-  EqStar a a = 'True
-  EqStar a b = 'False
+  EqStar _a _a = 'True
+  EqStar _a _b = 'False
 
 -- This looks dangerous, but it isn't. This allows == to be defined
 -- over arbitrary type constructors.
 type family EqArrow (a :: k1 -> k2) (b :: k1 -> k2) where
-  EqArrow a a = 'True
-  EqArrow a b = 'False
+  EqArrow _a _a = 'True
+  EqArrow _a _b = 'False
 
 type family EqBool a b where
   EqBool 'True  'True  = 'True
   EqBool 'False 'False = 'True
-  EqBool a     b       = 'False
+  EqBool _a     _b     = 'False
 
 type family EqOrdering a b where
   EqOrdering 'LT 'LT = 'True
   EqOrdering 'EQ 'EQ = 'True
   EqOrdering 'GT 'GT = 'True
-  EqOrdering a  b    = 'False
+  EqOrdering _a  _b  = 'False
 
 type EqUnit (a :: ()) (b :: ()) = 'True
 
 type family EqList a b where
   EqList '[]        '[]        = 'True
   EqList (h1 ': t1) (h2 ': t2) = (h1 == h2) && (t1 == t2)
-  EqList a          b          = 'False
+  EqList _a         _b         = 'False
 
 type family EqMaybe a b where
   EqMaybe 'Nothing   'Nothing  = 'True
   EqMaybe ('Just x) ('Just y)  = x == y
-  EqMaybe a        b           = 'False
+  EqMaybe _a        _b         = 'False
 
 type family Eq2 a b where
   Eq2 '(a1, b1) '(a2, b2) = a1 == a2 && b1 == b2

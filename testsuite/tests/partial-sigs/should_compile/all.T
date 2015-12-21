@@ -32,6 +32,9 @@ test('Meltdown', normal, compile, ['-ddump-types -fno-warn-partial-type-signatur
 # Bug
 test('MonoLocalBinds', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('NamedTyVar', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
+test('NamedWildcardInDataFamilyInstanceLHS', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
+test('NamedWildcardInTypeFamilyInstanceLHS', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
+test('NamedWildcardsAsTyVars', normal, compile, [''])
 test('ParensAroundContext', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('PatBind', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 # Bug

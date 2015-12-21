@@ -231,6 +231,11 @@ Compiler
    a warning when a pattern synonym definition doesn't have a type signature.
    It is turned off by default but enabled by ``-Wall``.
 
+-  Changed the ``-fwarn-unused-matches`` flag to report unused type variables
+   in data and type families in addition to its previous behaviour.
+   To avoid warnings, unused type variables should be prefixed or replaced with
+   underscores.
+
 GHCi
 ~~~~
 

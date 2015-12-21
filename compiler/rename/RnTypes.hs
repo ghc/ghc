@@ -26,6 +26,7 @@ module RnTypes (
         warnUnusedForAlls, bindLHsTyVarBndr,
         bindSigTyVarsFV, bindHsQTyVars, bindLRdrNames,
         extractHsTyRdrTyVars, extractHsTysRdrTyVars,
+        extractHsTysRdrTyVarsDups, rmDupsInRdrTyVars,
         extractRdrKindSigVars, extractDataDefnKindVars,
         freeKiTyVarsAllVars, freeKiTyVarsKindVars, freeKiTyVarsTypeVars
   ) where
@@ -54,7 +55,7 @@ import FastString
 import Maybes
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List        ( nubBy )
+import Data.List        ( (\\), nubBy, partition )
 import Control.Monad    ( unless, when )
 
 #if __GLASGOW_HASKELL__ < 709
@@ -102,27 +103,62 @@ rn_hs_sig_wc_type :: Bool   -- see rnImplicitBndrs
 -- rn_hs_sig_wc_type is used for source-language type signatures
 rn_hs_sig_wc_type no_implicit_if_forall ctxt
                   (HsIB { hsib_body = wc_ty }) thing_inside
-  = rnImplicitBndrs no_implicit_if_forall (hswc_body wc_ty) $ \ vars ->
-    rn_hs_wc_type ctxt wc_ty $ \ wc_ty' ->
-    thing_inside (HsIB { hsib_vars = vars
-                       , hsib_body = wc_ty' })
+  = do { let hs_ty = hswc_body wc_ty
+       ; free_vars <- extract_filtered_rdr_ty_vars hs_ty
+       ; (free_vars', nwc_rdrs) <- partition_nwcs free_vars
+       ; rnImplicitBndrs no_implicit_if_forall free_vars' hs_ty $ \ vars ->
+    do { rn_hs_wc_type ctxt wc_ty nwc_rdrs $ \ wc_ty' ->
+         thing_inside (HsIB { hsib_vars = vars
+                            , hsib_body = wc_ty' }) } }
 
 rnHsWcType :: HsDocContext -> LHsWcType RdrName -> RnM (LHsWcType Name, FreeVars)
-rnHsWcType ctxt wc_ty
-  = rn_hs_wc_type ctxt wc_ty $ \ wc_ty' ->
-    return (wc_ty', emptyFVs)
+rnHsWcType ctxt wc_ty@(HsWC { hswc_body = hs_ty })
+  = do { free_vars <- extract_filtered_rdr_ty_vars hs_ty
+       ; (_, nwc_rdrs) <- partition_nwcs free_vars
+       ; rn_hs_wc_type ctxt wc_ty nwc_rdrs $ \ wc_ty' ->
+         return (wc_ty', emptyFVs) }
 
-rn_hs_wc_type :: HsDocContext -> LHsWcType RdrName
+-- | Finds free type and kind variables in a type, without duplicates and
+-- variables that are already in LocalRdrEnv.
+extract_filtered_rdr_ty_vars :: LHsType RdrName -> RnM FreeKiTyVars
+extract_filtered_rdr_ty_vars hs_ty
+  = do { rdr_env <- getLocalRdrEnv
+       ; filterInScope rdr_env <$> extractHsTyRdrTyVars hs_ty }
+
+-- | When the NamedWildCards extension is enabled, removes type variables
+-- that start with an underscore from the FreeKiTyVars in the argument
+-- and returns them in a separate list.
+-- When the extension is disabled, the function returns the argument and
+-- empty list.
+-- See Note [Renaming named wild cards]
+partition_nwcs :: FreeKiTyVars -> RnM (FreeKiTyVars, [Located RdrName])
+partition_nwcs free_vars@(FKTV { fktv_tys = tys, fktv_all = all })
+  = do { wildcards_enabled <- fmap (xopt LangExt.NamedWildCards) getDynFlags
+       ; let (nwcs, no_nwcs) =
+                if wildcards_enabled
+                then partition (startsWithUnderscore . rdrNameOcc . unLoc) tys
+                else ([], tys)
+             free_vars' = free_vars { fktv_tys = no_nwcs
+                                    , fktv_all = all \\ nwcs }
+       ; return (free_vars', nwcs) }
+
+-- | Renames a type with wild card binders.
+-- Expects a list of names of type variables that should be replaced with
+-- named wild cards. (See Note [Renaming named wild cards])
+-- Although the parser does not create named wild cards, it is possible to find
+-- them in declaration splices, so the function tries to collect them.
+rn_hs_wc_type :: HsDocContext -> LHsWcType RdrName -> [Located RdrName]
               -> (LHsWcType Name -> RnM (a, FreeVars))
               -> RnM (a, FreeVars)
-rn_hs_wc_type ctxt (HsWC { hswc_body = hs_ty }) thing_inside
-  = do { let nwc_rdrs = collectNamedWildCards hs_ty
+rn_hs_wc_type ctxt (HsWC { hswc_body = hs_ty }) nwc_rdrs thing_inside
+  = do { let nwc_collected = collectNamedWildCards hs_ty
+       -- the parser doesn't generate named wcs, but they may be in splices
        ; rdr_env <- getLocalRdrEnv
        ; nwcs <- sequence [ newLocalBndrRn lrdr
-                          | lrdr@(L _ rdr) <- nwc_rdrs
+                          | lrdr@(L _ rdr) <- nwc_collected ++ nwc_rdrs
                           , not (inScope rdr_env rdr) ]
-                 -- nwcs :: [Name]   Named wildcards
-       ; bindLocalNamesFV nwcs $
+       ; setLocalRdrEnv (extendLocalRdrEnvNwcs rdr_env nwcs) $
+         bindLocalNamesFV nwcs $
     do { (wc_ty, fvs1) <- rnWcSigTy ctxt hs_ty
        ; let wc_ty' :: HsWildCardBndrs Name (LHsType Name)
              wc_ty' = wc_ty { hswc_wcs = nwcs ++ hswc_wcs wc_ty }
@@ -131,16 +167,20 @@ rn_hs_wc_type ctxt (HsWC { hswc_body = hs_ty }) thing_inside
 
 rnWcSigTy :: HsDocContext -> LHsType RdrName
           -> RnM (LHsWcType Name, FreeVars)
--- Renames just the top level of a type signature
+-- ^ Renames just the top level of a type signature
 -- It's exactly like rnHsTyKi, except that it uses rnWcSigContext
 -- on a qualified type, and return info on any extra-constraints
 -- wildcard.  Some code duplication, but no big deal.
 rnWcSigTy ctxt (L loc hs_ty@(HsForAllTy { hst_bndrs = tvs, hst_body = hs_tau }))
   = bindLHsTyVarBndrs ctxt Nothing [] tvs $ \ _ tvs' ->
+    do { lcl_env <- getLocalRdrEnv
+       ; let explicitly_bound = fmap hsLTyVarName tvs'
+       ; setLocalRdrEnv (delLocalRdrEnvNwcs lcl_env explicitly_bound) $
+           -- See Note [Renaming named wild cards]
     do { (hs_tau', fvs) <- rnWcSigTy ctxt hs_tau
        ; warnUnusedForAlls (inTypeDoc hs_ty) tvs' fvs
        ; let hs_ty' = HsForAllTy { hst_bndrs = tvs', hst_body = hswc_body hs_tau' }
-       ; return ( hs_tau' { hswc_body = L loc hs_ty' }, fvs) }
+       ; return ( hs_tau' { hswc_body = L loc hs_ty' }, fvs) } }
 
 rnWcSigTy ctxt (L loc (HsQualTy { hst_ctxt = hs_ctxt, hst_body = tau }))
   = do { (hs_ctxt', fvs1) <- rnWcSigContext ctxt hs_ctxt
@@ -163,23 +203,37 @@ rnWcSigTy ctxt hs_ty
 rnWcSigContext :: HsDocContext -> LHsContext RdrName
                -> RnM (HsWildCardBndrs Name (LHsContext Name), FreeVars)
 rnWcSigContext ctxt (L loc hs_ctxt)
-  | Just (hs_ctxt1, hs_ctxt_last) <- snocView hs_ctxt
-  , L lx (HsWildCardTy wc) <- ignoreParens hs_ctxt_last
-  = do { (hs_ctxt1', fvs) <- mapFvRn (rnLHsTyKi RnTopConstraint ctxt) hs_ctxt1
-       ; wc'              <- setSrcSpan lx $
-                             rnExtraConstraintWildCard ctxt wc
-       ; let hs_ctxt' = hs_ctxt1' ++ [L lx (HsWildCardTy wc')]
-             awcs     = concatMap collectAnonWildCards hs_ctxt1'
-             -- NB: *not* including the extra-constraint wildcard
-       ; return ( HsWC { hswc_wcs = awcs
-                       , hswc_ctx = Just lx
-                       , hswc_body = L loc hs_ctxt' }
-                , fvs ) }
-  | otherwise
-  = do { (hs_ctxt', fvs) <- mapFvRn (rnLHsTyKi RnTopConstraint ctxt) hs_ctxt
-       ; return (HsWC { hswc_wcs = concatMap collectAnonWildCards hs_ctxt'
-                      , hswc_ctx = Nothing
-                      , hswc_body = L loc hs_ctxt' }, fvs) }
+  = getLocalRdrEnv >>= rn_wc_sig_context
+  where
+    rn_wc_sig_context :: LocalRdrEnv
+                      -> RnM (HsWildCardBndrs Name (LHsContext Name), FreeVars)
+    rn_wc_sig_context lcl_env
+      | Just (hs_ctxt1, hs_ctxt_last) <- snocView hs_ctxt
+      , L lx (HsWildCardTy wc) <- (to_nwc lcl_env . ignoreParens) hs_ctxt_last
+      = do { (hs_ctxt1', fvs) <- mapFvRn rn_top_constraint hs_ctxt1
+           ; wc'              <- setSrcSpan lx $
+                                 rnExtraConstraintWildCard ctxt wc
+           ; let hs_ctxt' = hs_ctxt1' ++ [L lx (HsWildCardTy wc')]
+                 awcs     = concatMap collectAnonWildCards hs_ctxt1'
+                 -- NB: *not* including the extra-constraint wildcard
+           ; return ( HsWC { hswc_wcs = awcs
+                           , hswc_ctx = Just lx
+                           , hswc_body = L loc hs_ctxt' }
+                    , fvs ) }
+      | otherwise
+      = do { (hs_ctxt', fvs) <- mapFvRn rn_top_constraint hs_ctxt
+           ; return (HsWC { hswc_wcs = concatMap collectAnonWildCards hs_ctxt'
+                          , hswc_ctx = Nothing
+                          , hswc_body = L loc hs_ctxt' }, fvs) }
+
+    to_nwc :: LocalRdrEnv -> LHsType RdrName -> LHsType RdrName
+    to_nwc _  lnwc@(L _ (HsWildCardTy {})) = lnwc
+    to_nwc lcl_env (L loc (HsTyVar lname@(L _ rdr_name)))
+      | rdr_name `inLocalRdrEnvNwcsRdrName` lcl_env
+      = L loc (HsWildCardTy (NamedWildCard lname))
+    to_nwc _ lt = lt
+
+    rn_top_constraint = rnLHsTyKi RnTopConstraint ctxt
 
 
 {- ******************************************************
@@ -193,24 +247,23 @@ rnHsSigType :: HsDocContext -> LHsSigType RdrName
 -- Used for source-language type signatures
 -- that cannot have wildcards
 rnHsSigType ctx (HsIB { hsib_body = hs_ty })
-  = rnImplicitBndrs True hs_ty $ \ vars ->
+  = do { vars <- extract_filtered_rdr_ty_vars hs_ty
+       ; rnImplicitBndrs True vars hs_ty $ \ vars ->
     do { (body', fvs) <- rnLHsType ctx hs_ty
        ; return (HsIB { hsib_vars = vars
-                      , hsib_body = body' }, fvs) }
+                      , hsib_body = body' }, fvs) } }
 
 rnImplicitBndrs :: Bool    -- True <=> no implicit quantification
                            --          if type is headed by a forall
                            -- E.g.  f :: forall a. a->b
                            -- Do not quantify over 'b' too.
+                -> FreeKiTyVars
                 -> LHsType RdrName
                 -> ([Name] -> RnM (a, FreeVars))
                 -> RnM (a, FreeVars)
-rnImplicitBndrs no_implicit_if_forall hs_ty@(L loc _) thing_inside
-  = do { rdr_env <- getLocalRdrEnv
-       ; free_vars <- filterInScope rdr_env <$>
-                      extractHsTyRdrTyVars hs_ty
-       ; let real_tv_rdrs  -- Implicit quantification only if
-                        -- there is no explicit forall
+rnImplicitBndrs no_implicit_if_forall free_vars hs_ty@(L loc _) thing_inside
+  = do { let real_tv_rdrs  -- Implicit quantification only if
+                           -- there is no explicit forall
                | no_implicit_if_forall
                , L _ (HsForAllTy {}) <- hs_ty = []
                | otherwise                    = freeKiTyVarsTypeVars free_vars
@@ -297,6 +350,28 @@ and
 as our lists. We can then do normal fixity resolution on these. The fixities
 must come along for the ride just so that the list stays in sync with the
 operators.
+
+Note [Renaming named wild cards]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Identifiers starting with an underscore are always parsed as type variables.
+(Parser.y) When the NamedWildCards extension is enabled, the renamer replaces
+those variables with named wild cards.
+
+The NameSet lre_nwcs in LocalRdrEnv is used to keep the names of the type
+variables that should be replaced with named wild cards. The set is filled only
+in functions that return a LHsWcType and thus expect to find wild cards.
+In other functions, the set remains empty and the wild cards are not created.
+Because of this, the replacement does not occur in contexts where the wild
+cards are not expected, like data type declarations or type synonyms.
+(See the comments in Trac #10982)
+
+While renaming HsForAllTy (rnWcSigTy, rnHsTyKi), the explicitly bound names are
+removed from the lre_nwcs NameSet. As a result, they are not replaced in the
+quantifier body even if they start with an underscore. (Trac #11098) Eg
+
+    qux :: _a -> (forall _a . _a -> _a) -> _a
+
+The _a bound by forall is a tyvar, the _a outside the parens are wild cards.
 -}
 
 rnLHsTyKi  :: RnTyKiWhat
@@ -350,10 +425,14 @@ rnHsTyKi :: RnTyKiWhat -> HsDocContext -> HsType RdrName -> RnM (HsType Name, Fr
 rnHsTyKi what doc ty@(HsForAllTy { hst_bndrs = tyvars, hst_body  = tau })
   = do { checkTypeInType what ty
        ; bindLHsTyVarBndrs doc Nothing [] tyvars $ \ _ tyvars' ->
+    do { lcl_env <- getLocalRdrEnv
+       ; let explicitly_bound = fmap hsLTyVarName tyvars'
+       ; setLocalRdrEnv (delLocalRdrEnvNwcs lcl_env explicitly_bound) $
+           -- See Note [Renaming named wild cards]
     do { (tau',  fvs) <- rnLHsTyKi what doc tau
        ; warnUnusedForAlls (inTypeDoc ty) tyvars' fvs
        ; return ( HsForAllTy { hst_bndrs = tyvars', hst_body =  tau' }
-                , fvs) }}
+                , fvs) } } }
 
 rnHsTyKi what doc ty@(HsQualTy { hst_ctxt = lctxt
                                , hst_body = tau })
@@ -363,9 +442,13 @@ rnHsTyKi what doc ty@(HsQualTy { hst_ctxt = lctxt
        ; return (HsQualTy { hst_ctxt = ctxt', hst_body =  tau' }
                 , fvs1 `plusFV` fvs2) }
 
-rnHsTyKi what _ (HsTyVar (L loc rdr_name))
-  = do { name <- rnTyVar what rdr_name
-       ; return (HsTyVar (L loc name), unitFV name) }
+rnHsTyKi what doc (HsTyVar lname@(L loc rdr_name))
+  = do { lcl_env <- getLocalRdrEnv
+           -- See Note [Renaming named wild cards]
+       ; if rdr_name `inLocalRdrEnvNwcsRdrName` lcl_env
+         then rnHsTyKi what doc (HsWildCardTy (NamedWildCard lname))
+         else do { name <- rnTyVar what rdr_name
+                 ; return (HsTyVar (L loc name), unitFV name) } }
 
 rnHsTyKi what doc ty@(HsOpTy ty1 l_op ty2)
   = setSrcSpan (getLoc l_op) $
@@ -1418,6 +1501,8 @@ extractHsTyRdrTyVars :: LHsType RdrName -> RnM FreeKiTyVars
 --                        or the free (sort, kind) variables of a HsKind
 -- It's used when making the for-alls explicit.
 -- Does not return any wildcards
+-- When the same name occurs multiple times in the types, only the first
+-- occurence is returned.
 -- See Note [Kind and type-variable binders]
 extractHsTyRdrTyVars ty
   = do { FKTV kis k_set tys t_set all <- extract_lty TypeLevel ty emptyFKTV
@@ -1425,13 +1510,25 @@ extractHsTyRdrTyVars ty
                       (nubL tys) t_set
                       (nubL all)) }
 
-extractHsTysRdrTyVars :: [LHsType RdrName] -> RnM FreeKiTyVars
+-- | Extracts free type and kind variables from types in a list.
+-- When the same name occurs multiple times in the types, only the first
+-- occurence is returned and the rest is filtered out.
 -- See Note [Kind and type-variable binders]
+extractHsTysRdrTyVars :: [LHsType RdrName] -> RnM FreeKiTyVars
 extractHsTysRdrTyVars tys
-  = do { FKTV kis k_set tys t_set all <- extract_ltys TypeLevel tys emptyFKTV
-       ; return (FKTV (nubL kis) k_set
-                      (nubL tys) t_set
-                      (nubL all)) }
+  = rmDupsInRdrTyVars <$> extractHsTysRdrTyVarsDups tys
+
+-- | Extracts free type and kind variables from types in a list.
+-- When the same name occurs multiple times in the types, all occurences
+-- are returned.
+extractHsTysRdrTyVarsDups :: [LHsType RdrName] -> RnM FreeKiTyVars
+extractHsTysRdrTyVarsDups tys
+  = extract_ltys TypeLevel tys emptyFKTV
+
+-- | Removes multiple occurences of the same name from FreeKiTyVars.
+rmDupsInRdrTyVars :: FreeKiTyVars -> FreeKiTyVars
+rmDupsInRdrTyVars (FKTV kis k_set tys t_set all)
+  = FKTV (nubL kis) k_set (nubL tys) t_set (nubL all)
 
 extractRdrKindSigVars :: LFamilyResultSig RdrName -> RnM [Located RdrName]
 extractRdrKindSigVars (L _ resultSig)

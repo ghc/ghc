@@ -1,0 +1,14 @@
+TYPE SIGNATURES
+TYPE CONSTRUCTORS
+  data MyKind = A | B
+    Kind: *
+  data family Sing (a :: k)
+COERCION AXIOMS
+  axiom NamedWildcardInDataFamilyInstanceLHS.TFCo:R:SingMyKind_a ::
+    Sing = NamedWildcardInDataFamilyInstanceLHS.R:SingMyKind_a
+      -- Defined at NamedWildcardInDataFamilyInstanceLHS.hs:8:15
+FAMILY INSTANCES
+  data instance Sing
+Dependent modules: []
+Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
+                     integer-gmp-1.0.0.0]

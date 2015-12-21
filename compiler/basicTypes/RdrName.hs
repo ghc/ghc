@@ -41,6 +41,7 @@ module RdrName (
         lookupLocalRdrEnv, lookupLocalRdrOcc,
         elemLocalRdrEnv, inLocalRdrEnvScope,
         localRdrEnvElts, delLocalRdrEnvList,
+        extendLocalRdrEnvNwcs, inLocalRdrEnvNwcsRdrName, delLocalRdrEnvNwcs,
 
         -- * Global mapping of 'RdrName' to 'GlobalRdrElt's
         GlobalRdrEnv, emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv,
@@ -321,34 +322,43 @@ instance Ord RdrName where
 -- | This environment is used to store local bindings (@let@, @where@, lambda, @case@).
 -- It is keyed by OccName, because we never use it for qualified names
 -- We keep the current mapping, *and* the set of all Names in scope
--- Reason: see Note [Splicing Exact Names] in RnEnv
+-- Reason: see Note [Splicing Exact names] in RnEnv
+-- The field lre_nwcs is used to keep names of type variables that should
+-- be replaced with named wildcards.
+-- See Note [Renaming named wild cards] in RnTypes
 data LocalRdrEnv = LRE { lre_env      :: OccEnv Name
-                       , lre_in_scope :: NameSet }
+                       , lre_in_scope :: NameSet
+                       , lre_nwcs     :: NameSet }
 
 instance Outputable LocalRdrEnv where
-  ppr (LRE {lre_env = env, lre_in_scope = ns})
+  ppr (LRE {lre_env = env, lre_in_scope = ns, lre_nwcs = nwcs})
     = hang (ptext (sLit "LocalRdrEnv {"))
          2 (vcat [ ptext (sLit "env =") <+> pprOccEnv ppr_elt env
-                 , ptext (sLit "in_scope =") <+> braces (pprWithCommas ppr (nameSetElems ns))
+                 , ptext (sLit "in_scope =")
+                    <+> braces (pprWithCommas ppr (nameSetElems ns))
+                 , ptext (sLit "nwcs =")
+                    <+> braces (pprWithCommas ppr (nameSetElems nwcs))
                  ] <+> char '}')
     where
       ppr_elt name = parens (ppr (getUnique (nameOccName name))) <+> ppr name
                      -- So we can see if the keys line up correctly
 
 emptyLocalRdrEnv :: LocalRdrEnv
-emptyLocalRdrEnv = LRE { lre_env = emptyOccEnv, lre_in_scope = emptyNameSet }
+emptyLocalRdrEnv = LRE { lre_env = emptyOccEnv
+                       , lre_in_scope = emptyNameSet
+                       , lre_nwcs = emptyNameSet }
 
 extendLocalRdrEnv :: LocalRdrEnv -> Name -> LocalRdrEnv
 -- The Name should be a non-top-level thing
-extendLocalRdrEnv (LRE { lre_env = env, lre_in_scope = ns }) name
+extendLocalRdrEnv lre@(LRE { lre_env = env, lre_in_scope = ns }) name
   = WARN( isExternalName name, ppr name )
-    LRE { lre_env      = extendOccEnv env (nameOccName name) name
+    lre { lre_env      = extendOccEnv env (nameOccName name) name
         , lre_in_scope = extendNameSet ns name }
 
 extendLocalRdrEnvList :: LocalRdrEnv -> [Name] -> LocalRdrEnv
-extendLocalRdrEnvList (LRE { lre_env = env, lre_in_scope = ns }) names
+extendLocalRdrEnvList lre@(LRE { lre_env = env, lre_in_scope = ns }) names
   = WARN( any isExternalName names, ppr names )
-    LRE { lre_env = extendOccEnvList env [(nameOccName n, n) | n <- names]
+    lre { lre_env = extendOccEnvList env [(nameOccName n, n) | n <- names]
         , lre_in_scope = extendNameSetList ns names }
 
 lookupLocalRdrEnv :: LocalRdrEnv -> RdrName -> Maybe Name
@@ -374,9 +384,29 @@ inLocalRdrEnvScope :: Name -> LocalRdrEnv -> Bool
 inLocalRdrEnvScope name (LRE { lre_in_scope = ns }) = name `elemNameSet` ns
 
 delLocalRdrEnvList :: LocalRdrEnv -> [OccName] -> LocalRdrEnv
-delLocalRdrEnvList (LRE { lre_env = env, lre_in_scope = ns }) occs
-  = LRE { lre_env = delListFromOccEnv env occs
-        , lre_in_scope = ns }
+delLocalRdrEnvList lre@(LRE { lre_env = env }) occs
+  = lre { lre_env = delListFromOccEnv env occs }
+
+extendLocalRdrEnvNwcs:: LocalRdrEnv -> [Name] -> LocalRdrEnv
+extendLocalRdrEnvNwcs lre@(LRE { lre_nwcs = nwcs }) names
+  = lre { lre_nwcs = extendNameSetList nwcs names }
+
+inLocalRdrEnvNwcs :: Name -> LocalRdrEnv -> Bool
+inLocalRdrEnvNwcs name (LRE { lre_nwcs = nwcs }) = name `elemNameSet` nwcs
+
+inLocalRdrEnvNwcsRdrName :: RdrName -> LocalRdrEnv -> Bool
+inLocalRdrEnvNwcsRdrName rdr_name lcl_env@(LRE { lre_nwcs = nwcs })
+  | isEmptyNameSet nwcs = False
+  | otherwise = case rdr_name of
+      Unqual occ -> case lookupLocalRdrOcc lcl_env occ of
+          Just name -> inLocalRdrEnvNwcs name lcl_env
+          Nothing   -> False
+      Exact name -> inLocalRdrEnvNwcs name lcl_env
+      _ -> False
+
+delLocalRdrEnvNwcs :: LocalRdrEnv -> [Name] -> LocalRdrEnv
+delLocalRdrEnvNwcs lre@(LRE { lre_nwcs = nwcs }) names
+  = lre { lre_nwcs = delListFromNameSet nwcs names }
 
 {-
 Note [Local bindings with Exact Names]

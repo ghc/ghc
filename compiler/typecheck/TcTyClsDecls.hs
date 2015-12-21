@@ -1315,10 +1315,20 @@ freshly generated names. These names are collected after renaming
 partial type signatures. The latter generate fresh meta-variables whereas the
 former generate fresh skolems.
 
-Named and extra-constraints wild cards are not supported in type/data family
+When the flag -fwarn-unused-matches is on, the compiler reports warnings
+about unused type variables. (rnFamInstDecl) A type variable is considered
+used when it is either occurs on the RHS of the family instance, or it occurs
+multiple times in the patterns on the LHS. In the first case, the variable
+is in the set of free variables returned by rnPayload. In the second case, there
+are multiple occurences of it in FreeKiTyVars returned by the rmDupsInRdrTyVars.
+
+The warnings are not reported for anonymous wild cards and for type variables
+with names beginning with an underscore.
+
+Extra-constraints wild cards are not supported in type/data family
 instance declarations.
 
-Relevant tickets: #3699 and #10586.
+Relevant tickets: #3699, #10586 and #10982.
 
 ************************************************************************
 *                                                                      *

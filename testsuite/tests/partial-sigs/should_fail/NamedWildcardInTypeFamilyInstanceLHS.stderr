@@ -1,4 +1,0 @@
-
-NamedWildcardInTypeFamilyInstanceLHS.hs:5:5: error:
-    Wildcard ‘_t’ not allowed
-      in a type pattern of family instance for ‘F’

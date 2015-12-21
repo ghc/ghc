@@ -230,3 +230,4 @@ test('T10989',
       extra_clean(['dummy.hs', 'dummy.lhs', 'dummy.tags'])
     ],
     ghci_script, ['T10989.script'])
+test('T11098', normal, ghci_script, ['T11098.script'])

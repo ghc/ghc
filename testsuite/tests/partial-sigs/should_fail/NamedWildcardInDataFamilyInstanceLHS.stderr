@@ -1,4 +1,0 @@
-
-NamedWildcardInDataFamilyInstanceLHS.hs:8:21: error:
-    Wildcard ‘_a’ not allowed
-      in a type pattern of family instance for ‘Sing’

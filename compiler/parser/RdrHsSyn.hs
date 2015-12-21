@@ -639,6 +639,7 @@ eitherToP :: Either (SrcSpan, SDoc) a -> P a
 -- Adapts the Either monad to the P monad
 eitherToP (Left (loc, doc)) = parseErrorSDoc loc doc
 eitherToP (Right thing)     = return thing
+
 checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsType RdrName]
             -> Either (SrcSpan, SDoc) (LHsQTyVars RdrName)
 -- Check whether the given list of type parameters are all type variables

@@ -1678,12 +1678,7 @@ tyapp :: { Located (HsAppType RdrName) }
 
 atype :: { LHsType RdrName }
         : ntgtycon                       { sL1 $1 (HsTyVar $1) }      -- Not including unit tuples
-        | tyvar                          {% do { nwc <- namedWildCardsEnabled -- (See Note [Unit tuples])
-                                               ; let tv@(L _ (Unqual name)) = $1
-                                               ; return $ if (startsWithUnderscore name && nwc)
-                                                          then (sL1 $1 (mkNamedWildCardTy tv))
-                                                          else (sL1 $1 (HsTyVar tv)) } }
-
+        | tyvar                          { sL1 $1 (HsTyVar $1) }      -- (See Note [Unit tuples])
         | strict_mark atype              {% ams (sLL $1 $> (HsBangTy (snd $ unLoc $1) $2))
                                                 (fst $ unLoc $1) }  -- Constructor sigs only
         | '{' fielddecls '}'             {% amms (checkRecordSyntax
@@ -3338,9 +3333,6 @@ hintExplicitForall span = do
       , text "Perhaps you intended to use RankNTypes or a similar language"
       , text "extension to enable explicit-forall syntax: \x2200 <tvs>. <type>"
       ]
-
-namedWildCardsEnabled :: P Bool
-namedWildCardsEnabled = liftM ((LangExt.NamedWildCards `xopt`) . dflags) getPState
 
 {-
 %************************************************************************
