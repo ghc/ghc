@@ -32,10 +32,6 @@ getPkgDataList key = lift . pkgDataList . key =<< getTargetPath
 programPath :: Stage -> Package -> Maybe FilePath
 programPath = userProgramPath
 
-isLibrary :: Package -> Bool
-isLibrary (Package {pkgType=Library}) = True
-isLibrary _ = False
-
 -- Find all Haskell source files for the current target. TODO: simplify.
 getPackageSources :: Expr [FilePath]
 getPackageSources = do

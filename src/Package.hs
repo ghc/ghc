@@ -4,8 +4,8 @@ module Package (
     -- * Queries
     pkgCabalFile,
     matchPackageNames,
-    -- * Helpers for constructing 'Package's
-    setPath, topLevel, library, utility, setType
+    -- * Helpers for constructing and using 'Package's
+    setPath, topLevel, library, utility, setType, isLibrary, isProgram
     ) where
 
 import Base
@@ -47,6 +47,14 @@ setPath pkg path = pkg { pkgPath = path }
 
 setType :: Package -> PackageType -> Package
 setType pkg ty = pkg { pkgType = ty }
+
+isLibrary :: Package -> Bool
+isLibrary (Package {pkgType=Library}) = True
+isLibrary _ = False
+
+isProgram :: Package -> Bool
+isProgram (Package {pkgType=Program}) = True
+isProgram _ = False
 
 instance Show Package where
     show = pkgName
