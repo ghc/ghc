@@ -57,7 +57,6 @@ shakeFilesPath = shakePath -/- ".db"
 configPath :: FilePath
 configPath = shakePath -/- "cfg"
 
--- TODO: shall we read this from system.config instead?
 programInplacePath :: FilePath
 programInplacePath = "inplace/bin"
 

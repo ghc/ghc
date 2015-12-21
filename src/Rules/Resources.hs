@@ -4,8 +4,8 @@ import Base
 
 data Resources = Resources
     {
-        ghcCabal :: Resource,
-        ghcPkg   :: Resource
+        resGhcCabal :: Resource,
+        resGhcPkg   :: Resource
     }
 
 -- Unfortunately parallel invokations of ghc-cabal or ghc-pkg do not work:

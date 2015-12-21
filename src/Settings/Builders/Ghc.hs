@@ -1,6 +1,4 @@
-module Settings.Builders.Ghc (
-    ghcArgs, ghcMArgs, ghcLinkArgs, commonGhcArgs
-    ) where
+module Settings.Builders.Ghc (ghcArgs, ghcMArgs, commonGhcArgs) where
 
 import Expression
 import Oracles
@@ -9,7 +7,6 @@ import Predicates hiding (way, stage)
 import Settings
 
 -- TODO: add support for -dyno
--- TODO: consider adding a new builder for programs (e.g. GhcLink?)
 -- $1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.hs-boot
 --     $$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
 --     $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno
@@ -24,6 +21,7 @@ ghcArgs = stagedBuilder Ghc ? do
     libDirs <- getPkgDataList DepLibDirs
     version <- getSetting ProjectVersion
     mconcat [ commonGhcArgs
+            , ghcCabalBootArgs
             , arg "-H32m"
             , stage0    ? arg "-O"
             , notStage0 ? arg "-O2"
@@ -32,7 +30,7 @@ ghcArgs = stagedBuilder Ghc ? do
             , isLibrary pkg ? splitObjects ? arg "-split-objs"
             , package ghc ? arg "-no-hs-main" -- TODO: simplify
             , package hp2ps ? arg "-no-hs-main"
-            , not buildObj ? arg "-no-auto-link-packages"
+            , (pkg /= ghcCabal) ? not buildObj ? arg "-no-auto-link-packages"
             , package runghc ? file "//Main.o" ?
               append ["-cpp", "-DVERSION=\"" ++ version ++ "\""]
             , not buildObj ? append [ "-optl-l" ++ lib | lib <- libs    ]
@@ -97,8 +95,7 @@ packageGhcArgs = do
     compId              <- getPkgData ComponentId
     pkgDepIds           <- getPkgDataList DepIds
     mconcat
-        [ not (pkg == deriveConstants || pkg == genapply
-            || pkg == genprimopcode   || pkg == hp2ps) ?
+        [ not (pkg == hp2ps || pkg == ghcCabal && stage == Stage0) ?
           arg "-hide-all-packages"
         , arg "-no-user-package-db"
         , stage0 ? arg "-package-db libraries/bootstrapping.conf"
@@ -111,6 +108,7 @@ packageGhcArgs = do
 -- TODO: Improve handling of "cabal_macros.h"
 includeGhcArgs :: Args
 includeGhcArgs = do
+    stage   <- getStage
     pkg     <- getPackage
     path    <- getTargetPath
     srcDirs <- getPkgDataList SrcDirs
@@ -124,17 +122,24 @@ includeGhcArgs = do
             , arg $ "-I" ++ autogenPath
             , append [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
             , append [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
-            , not (pkg == deriveConstants || pkg == genapply
-                || pkg == genprimopcode   || pkg == hp2ps) ?
+            , not (pkg == hp2ps || pkg == ghcCabal && stage == Stage0) ?
               append [ "-optP-include"
                      , "-optP" ++ autogenPath -/- "cabal_macros.h" ] ]
 
--- TODO: see ghc.mk
--- # And then we strip it out again before building the package:
--- define libraries/ghc-prim_PACKAGE_MAGIC
--- libraries/ghc-prim_dist-install_MODULES := $$(filter-out GHC.Prim,$$(libraries/ghc-prim_dist-install_MODULES))
--- endef
-
+-- Boostrapping ghcCabal
+-- TODO: do we need -DCABAL_VERSION=$(CABAL_VERSION)?
+ghcCabalBootArgs :: Args
+ghcCabalBootArgs = package ghcCabal ? stage0 ? mconcat
+    [ arg "--make"
+    , arg "-DBOOTSTRAPPING"
+    , arg "-DMIN_VERSION_binary_0_8_0"
+    , arg "-DGENERICS"
+    , arg "-optP-include"
+    , arg $ "-optP" ++ pkgPath ghcCabal -/- "cabal_macros_boot.h"
+    , arg "-ilibraries/Cabal/Cabal"
+    , arg "-ilibraries/binary/src"
+    , arg "-ilibraries/filepath"
+    , arg "-ilibraries/hpc" ]
 
 -- # Options for passing to plain ld
 -- $1_$2_$3_ALL_LD_OPTS = \
@@ -167,22 +172,6 @@ includeGhcArgs = do
 -- # were compiled with the right GHC.
 -- $1_$2_$$($1_$2_PROGRAM_WAY)_GHC_LD_OPTS += -no-auto-link-packages -no-hs-main
 -- endif
-
-ghcLinkArgs :: Args
-ghcLinkArgs = mempty
-    -- way  <- getRtsWays
-    -- path <- getTargetPath
-    -- mconcat [ commonGhcArgs
-    --         , (way == dynamic) ? needDll0Args ?
-    --           arg $ "-dll-split " ++ path -/- "dll-split"
-    --         , appendSubD "-optl" (getSettingList . ConfLdLinkerArgs =<< getStage)
-    --         , appendSubD "-optl-L" (lift $ pkgDataList DepLibDirs)
-    --         , appendSubD "-optl-l" (lift $ pkgDataList DepExtraLibs)
-    --         , splitObjects ? arg "-split-objs"
-    --         , package ghc ? arg "-no-hs-main"
-    --         , append =<< getInputs
-    --         , arg "-o", arg =<< getOutput ]
-
 
 -- # Link a dynamic library
 -- # On windows we have to supply the extra libs this one links to when building it.

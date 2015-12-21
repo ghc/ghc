@@ -1,7 +1,7 @@
 module Rules.Program (buildProgram) where
 
 import Expression hiding (splitPath)
-import GHC (hsc2hs, haddock)
+import GHC hiding (ghci)
 import Oracles
 import Rules.Actions
 import Rules.Library
@@ -13,11 +13,13 @@ import Settings.Builders.GhcCabal
 -- TODO: Do we need to consider other ways when building programs?
 buildProgram :: Resources -> PartialTarget -> Rules ()
 buildProgram _ target @ (PartialTarget stage pkg) = do
-    let path      = targetPath stage pkg
-        buildPath = path -/- "build"
-        program   = programPath stage pkg
+    let path       = targetPath stage pkg
+        buildPath  = path -/- "build"
+        match file = case programPath stage pkg of
+            Nothing      -> False
+            Just prgPath -> ("//" ++ prgPath) ?== file
 
-    (\f -> program == Just f) ?> \bin -> do
+    match ?> \bin -> do
         cSrcs <- cSources target -- TODO: remove code duplication (Library.hs)
         hSrcs <- hSources target
         let cObjs = [ buildPath -/- src -<.> osuf vanilla | src <- cSrcs   ]
@@ -40,12 +42,14 @@ buildProgram _ target @ (PartialTarget stage pkg) = do
                 dll0     <- needDll0 stage dep
                 return $ [ libFile ] ++ [ lib0File | dll0 ]
             return $ libFiles ++ [ pkgGhciLibraryFile stage dep compId | ghci ]
-        need $ objs ++ libs
-        build $ fullTargetWithWay target (Ghc stage) vanilla objs [bin]
+        let binDeps = if pkg == ghcCabal && stage == Stage0
+                      then [ pkgPath pkg -/- src <.> "hs" | src <- hSrcs ]
+                      else objs ++ libs
+        need binDeps
+        build $ fullTargetWithWay target (Ghc stage) vanilla binDeps [bin]
         synopsis <- interpretPartial target $ getPkgData Synopsis
         putSuccess $ renderBox
             [ "Successfully built program '"
               ++ pkgName pkg ++ "' (stage " ++ show stage ++ ")."
             , "Executable: " ++ bin
-            , "Package synopsis: " ++ dropWhileEnd isPunctuation synopsis ++ "."
-            ]
+            , "Package synopsis: " ++ dropWhileEnd isPunctuation synopsis ++ "." ]

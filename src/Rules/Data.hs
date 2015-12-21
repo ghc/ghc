@@ -1,7 +1,7 @@
 module Rules.Data (buildPackageData) where
 
 import Expression
-import GHC (hp2ps)
+import GHC
 import Oracles
 import Predicates (registerPackage)
 import Rules.Actions
@@ -15,56 +15,63 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
     let path      = targetPath stage pkg
         cabalFile = pkgCabalFile pkg
         configure = pkgPath pkg -/- "configure"
+        dataFile  = pkgDataFile stage pkg
 
-    fmap (path -/-)
-        [ "package-data.mk"
-        , "haddock-prologue.txt"
-        , "setup-config"
-        , "build" -/- "autogen" -/- "cabal_macros.h"
-        -- TODO: Is this needed? Also check out Paths_cpsa.hs.
-        -- , "build" -/- "autogen" -/- ("Paths_" ++ name) <.> "hs"
-        ] &%> \outs -> do
-            -- GhcCabal may run the configure script, so we depend on it
-            -- We don't know who built the configure script from configure.ac
-            whenM (doesFileExist $ configure <.> "ac") $ need [configure]
+    dataFile %> \mk -> do
+        -- GhcCabal may run the configure script, so we depend on it
+        -- We don't know who built the configure script from configure.ac
+        whenM (doesFileExist $ configure <.> "ac") $ need [configure]
 
-            -- We configure packages in the order of their dependencies
-            deps <- packageDeps pkg
-            pkgs <- interpretPartial target getPackages
-            let depPkgs = matchPackageNames (sort pkgs) deps
-            need $ map (pkgDataFile stage) depPkgs
+        -- We configure packages in the order of their dependencies
+        deps <- packageDeps pkg
+        pkgs <- interpretPartial target getPackages
+        let depPkgs = matchPackageNames (sort pkgs) deps
+        need $ map (pkgDataFile stage) depPkgs
 
-            need [cabalFile]
-            buildWithResources [(ghcCabal rs, 1)] $
-                fullTarget target GhcCabal [cabalFile] outs
+        need [cabalFile]
+        buildWithResources [(resGhcCabal rs, 1)] $
+            fullTarget target GhcCabal [cabalFile] [mk]
 
-            -- ghc-pkg produces inplace-pkg-config when run on packages with
-            -- library components only
-            when (isLibrary pkg) .
-                whenM (interpretPartial target registerPackage) .
-                buildWithResources [(ghcPkg rs, 1)] $
-                fullTarget target (GhcPkg stage) [cabalFile] outs
+        -- ghc-pkg produces inplace-pkg-config when run on packages with
+        -- library components only
+        when (isLibrary pkg) .
+            whenM (interpretPartial target registerPackage) .
+            buildWithResources [(resGhcPkg rs, 1)] $
+            fullTarget target (GhcPkg stage) [cabalFile] [mk]
 
-            postProcessPackageData $ path -/- "package-data.mk"
+        postProcessPackageData dataFile
 
     -- TODO: PROGNAME was $(CrossCompilePrefix)hp2ps
     -- TODO: code duplication around ghcIncludeDirs
-    -- TODO: now using DEP_EXTRA_LIBS instead of EXTRA_LIBRARIES
-    priority 2.0 $
-        when (pkg == hp2ps) $ path -/- "package-data.mk" %> \mk -> do
-        let cSrcs = [ "AreaBelow.c", "Curves.c", "Error.c", "Main.c"
-                    , "Reorder.c", "TopTwenty.c", "AuxFile.c", "Deviation.c"
-                    , "HpFile.c", "Marks.c", "Scale.c", "TraceElement.c"
-                    , "Axes.c", "Dimensions.c", "Key.c", "PsFile.c", "Shade.c"
-                    , "Utilities.c" ]
-            contents = unlines
-                [ "utils_hp2ps_dist-boot_PROGNAME = hp2ps"
-                , "utils_hp2ps_dist-boot_C_SRCS = " ++ unwords cSrcs
-                , "utils_hp2ps_dist-boot_INSTALL = YES"
-                , "utils_hp2ps_dist-boot_INSTALL_INPLACE = YES"
-                , "utils_hp2ps_dist-boot_DEP_EXTRA_LIBS = m"
-                , "utils_hp2ps_dist-boot_CC_OPTS = " ++ unwords (map ("-I"++) ghcIncludeDirs) ]
-        writeFileChanged mk contents
+    priority 2.0 $ do
+        when (pkg == hp2ps) $ dataFile %> \mk -> do
+            let cSrcs = [ "AreaBelow.c", "Curves.c", "Error.c", "Main.c"
+                        , "Reorder.c", "TopTwenty.c", "AuxFile.c", "Deviation.c"
+                        , "HpFile.c", "Marks.c", "Scale.c", "TraceElement.c"
+                        , "Axes.c", "Dimensions.c", "Key.c", "PsFile.c"
+                        , "Shade.c", "Utilities.c" ]
+                contents = unlines
+                    [ "utils_hp2ps_dist-boot_PROGNAME = hp2ps"
+                    , "utils_hp2ps_dist-boot_C_SRCS = " ++ unwords cSrcs
+                    , "utils_hp2ps_dist-boot_INSTALL = YES"
+                    , "utils_hp2ps_dist-boot_INSTALL_INPLACE = YES"
+                    , "utils_hp2ps_dist-boot_DEP_EXTRA_LIBS = m"
+                    , "utils_hp2ps_dist-boot_CC_OPTS = "
+                      ++ unwords (map ("-I"++) ghcIncludeDirs) ]
+            writeFileChanged mk contents
+            putBuild $ "| Successfully generated '" ++ mk ++ "'."
+
+        -- Bootstrapping `ghcCabal`: although `ghcCabal` is a proper cabal
+        -- package, we cannot generate the corresponding `package-data.mk` file
+        -- by running by running `ghcCabal`, because it has not yet been built.
+        when (pkg == ghcCabal && stage == Stage0) $ dataFile %> \mk -> do
+            let contents = unlines
+                    [ "utils_ghc-cabal_dist-boot_PROGNAME = ghc-cabal"
+                    , "utils_ghc-cabal_dist-boot_MODULES = Main"
+                    , "utils_ghc-cabal_dist-boot_SYNOPSIS = Bootstrapped ghc-cabal utility."
+                    , "utils_ghc-cabal_dist-boot_HS_SRC_DIRS = ." ]
+            writeFileChanged mk contents
+            putBuild $ "| Successfully generated '" ++ mk ++ "'."
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'
