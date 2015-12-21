@@ -66,6 +66,7 @@ builderKey builder = case builder of
     Ld               -> "ld"
     Unlit            -> "unlit"
 
+-- TODO: Paths to some builders should be determined using defaultProgramPath
 builderPath :: Builder -> Action FilePath
 builderPath builder = do
     path <- askConfigWithDefault (builderKey builder) $

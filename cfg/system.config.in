@@ -5,29 +5,29 @@
 #===================
 
 system-ghc     = @WithGhc@
-ghc-stage1     = @hardtop@/inplace/bin/ghc-stage1
-ghc-stage2     = @hardtop@/inplace/bin/ghc-stage2
-ghc-stage3     = @hardtop@/inplace/bin/ghc-stage3
+ghc-stage1     = inplace/bin/ghc-stage1
+ghc-stage2     = inplace/bin/ghc-stage2
+ghc-stage3     = inplace/bin/ghc-stage3
 
 system-gcc     = @CC_STAGE0@
 gcc            = @WhatGccIsCalled@
 
 system-ghc-pkg = @GhcPkgCmd@
-ghc-pkg        = @hardtop@/inplace/bin/ghc-pkg
+ghc-pkg        = inplace/bin/ghc-pkg
 
-ghc-cabal      = @hardtop@/inplace/bin/ghc-cabal
+ghc-cabal      = inplace/bin/ghc-cabal
 
-haddock        = @hardtop@/inplace/bin/haddock
+haddock        = inplace/bin/haddock
 
-hsc2hs         = @hardtop@/inplace/bin/hsc2hs
+hsc2hs         = inplace/bin/hsc2hs
 
-genprimopcode  = @hardtop@/inplace/bin/genprimopcode
+genprimopcode  = inplace/bin/genprimopcode
 
 hs-cpp         = @HaskellCPPCmd@
 hs-cpp-args    = @HaskellCPPArgs@
 
-unlit          = @hardtop@/inplace/lib/unlit
-ghc-split      = @hardtop@/inplace/lib/ghc-split
+unlit          = inplace/lib/unlit
+ghc-split      = inplace/lib/ghc-split
 
 ld             = @LdCmd@
 ar             = @ArCmd@

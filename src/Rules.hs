@@ -5,7 +5,8 @@ import Rules.Package
 import Rules.Resources
 import Settings
 
--- generateTargets needs top-level build targets
+-- TODO: not all program targets should be needed explicitly
+-- | generateTargets needs top-level build targets
 generateTargets :: Rules ()
 generateTargets = action $ do
     targets <- fmap concat . forM [Stage0 ..] $ \stage -> do
@@ -17,7 +18,7 @@ generateTargets = action $ do
             return [ pkgHaddockFile pkg | needHaddock && stage == Stage1 ]
         let programTargets = [ prog | Just prog <- programPath stage <$> pkgs ]
         return $ libTargets ++ programTargets
-    need $ reverse targets
+    need targets
 
 -- TODO: use stage 2 compiler for building stage 2 packages (instead of stage 1)
 packageRules :: Rules ()

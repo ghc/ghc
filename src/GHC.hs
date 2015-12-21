@@ -105,25 +105,19 @@ defaultTargetDirectory stage pkg
     | stage == Stage0   = "dist-boot"
     | otherwise         = "dist-install"
 
+-- TODO: simplify
+-- | Returns a relative path to the program executable
 defaultProgramPath :: Stage -> Package -> Maybe FilePath
 defaultProgramPath stage pkg
-    | pkg == compareSizes    = program $ pkgName pkg
-    | pkg == deriveConstants = program $ pkgName pkg
-    | pkg == dllSplit        = program $ pkgName pkg
-    | pkg == genapply        = program $ pkgName pkg
-    | pkg == genprimopcode   = program $ pkgName pkg
-    | pkg == ghc             = program $ "ghc-stage" ++ show (fromEnum stage + 1)
-    | pkg == ghcCabal        = program $ pkgName pkg
-    | pkg == ghcPkg          = program $ pkgName pkg
-    | pkg == ghcPwd          = program $ pkgName pkg
-    | pkg == ghcTags         = program $ pkgName pkg
-    | pkg == haddock         = program $ pkgName pkg
-    | pkg == hsc2hs          = program $ pkgName pkg
-    | pkg == hp2ps           = program $ pkgName pkg
-    | pkg == hpcBin          = program $ pkgName pkg
-    | pkg == mkUserGuidePart = program $ pkgName pkg
-    | pkg == runghc          = program $ pkgName pkg
-    | otherwise              = Nothing
+    | pkg == ghc     = Just . inplaceProgram $ "ghc-stage" ++ show (fromEnum stage + 1)
+    | pkg == haddock = case stage of
+        Stage2 -> Just . inplaceProgram $ pkgName pkg
+        _      -> Nothing
+    | isProgram pkg  = case stage of
+        Stage0 -> Just . inplaceProgram $ pkgName pkg
+        _      -> Just . installProgram $ pkgName pkg
+    | otherwise = Nothing
   where
-    program name = Just $ pkgPath pkg -/- defaultTargetDirectory stage pkg
+    inplaceProgram name = programInplacePath -/- name <.> exe
+    installProgram name = pkgPath pkg -/- defaultTargetDirectory stage pkg
                                       -/- "build/tmp" -/- name <.> exe

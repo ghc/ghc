@@ -17,7 +17,8 @@ module Base (
     module Development.Shake.Util,
 
     -- * Paths
-    shakeFilesPath, configPath, bootPackageConstraints, packageDependencies,
+    shakeFilesPath, configPath, programInplacePath,
+    bootPackageConstraints, packageDependencies,
 
     -- * Output
     putColoured, putOracle, putBuild, putSuccess, putError, renderBox,
@@ -55,6 +56,10 @@ shakeFilesPath = shakePath -/- ".db"
 
 configPath :: FilePath
 configPath = shakePath -/- "cfg"
+
+-- TODO: shall we read this from system.config instead?
+programInplacePath :: FilePath
+programInplacePath = "inplace/bin"
 
 bootPackageConstraints :: FilePath
 bootPackageConstraints = shakeFilesPath -/- "boot-package-constraints"

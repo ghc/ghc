@@ -184,9 +184,10 @@ withBuilderKey b = case b of
 -- Expression 'with Gcc' appends "--with-gcc=/path/to/gcc" and needs Gcc.
 with :: Builder -> Args
 with b = specified b ? do
+    top  <- getSetting GhcSourcePath
     path <- getBuilderPath b
     lift $ needBuilder laxDependencies b
-    append [withBuilderKey b ++ path]
+    append [withBuilderKey b ++ top -/- path]
 
 withStaged :: (Stage -> Builder) -> Args
 withStaged sb = (with . sb) =<< getStage
