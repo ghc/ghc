@@ -394,5 +394,4 @@ test('CustomTypeErrors01', normal, compile_fail, [''])
 test('CustomTypeErrors02', normal, compile_fail, [''])
 test('CustomTypeErrors03', normal, compile_fail, [''])
 test('T11112', normal, compile_fail, [''])
-
-
+test('ClassOperator', expect_broken(11264), compile, [''])
