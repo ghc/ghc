@@ -243,7 +243,7 @@ GHCi
 ~~~~
 
 -  ``Main`` with an explicit module header but without ``main`` is now
-   an error (#7765).
+   an error (:ghc-ticket:`7765`).
 
 -  The ``:back`` and ``:forward`` commands now take an optional count
    allowing the user to move forward or backward in history several
@@ -251,16 +251,16 @@ GHCi
 
 -  Added commands ``:load!`` and ``:reload!``, effectively setting
    "-fdefer-type-errors" before loading a module and unsetting it after
-   loading if it has not been set before (#8353).
+   loading if it has not been set before (:ghc-ticket:`8353`).
 
--  ``ghci -e`` now behaves like ``ghc -e`` (#9360).
+-  ``ghci -e`` now behaves like ``ghc -e`` (:ghc-ticket:`9360`).
 
--  Added support for top-level function declarations (#7253).
+-  Added support for top-level function declarations (:ghc-ticket:`7253`).
 
 -  The new commands ``:all-types``, ``:loc-at``, ``:type-at``, and
    ``:uses`` designed for editor-integration
    (such as Emacs' ``haskell-mode``) originally premiered by ``ghci-ng``
-   have been integrated into GHCi (#10874).
+   have been integrated into GHCi (:ghc-ticket:`10874`).
 
 Template Haskell
 ~~~~~~~~~~~~~~~~
@@ -379,6 +379,8 @@ array
 base
 ~~~~
 
+See ``changelog.md`` in the ``base`` package for full release notes.
+
 -  Version number 4.9.0.0 (was 4.7.0.0)
 
 -  ``GHC.Stack`` exports two new types ``SrcLoc`` and ``CallStack``. A
@@ -408,8 +410,35 @@ base
   ``Applicative``. If this causes performance regressions, try to make the
   implementation of ``(*>)`` match that of ``(>>)``.
 
+- Add ``URec``, ``UAddr``, ``UChar``, ``UDouble``, ``UFloat``, ``UInt``, and ``UWord`` to
+  ``GHC.Generics`` as part of making GHC generics capable of handling unlifted
+  types (:ghc-ticket:`10868`)
+
+- Expand ``Floating`` class to include operations that allow for better
+  precision: ``log1p``, ``expm1``, ``log1pexp`` and ``log1mexp``. These are not
+  available from ``Prelude``, but the full class is exported from ``Numeric``.
+
+- Add ``Data.List.NonEmpty`` and ``Data.Semigroup`` (to become
+  super-class of ``Monoid`` in the future). These modules were
+  provided by the ``semigroups`` package previously. (:ghc-ticket:`10365`)
+
+- The constraints of various functions in ``Control.Monad`` have been
+  generalized from ``Monad`` to ``Applicative`` including ``filterM``,
+  ``zipWithM`` and ``replicateM_`` (see :ghc-ticket:`10168`).
+
 - Add ``GHC.TypeLits.TypeError`` and ``ErrorMessage`` to allow users
   to define custom compile-time error messages.
+
+- The ``Generic`` instance for ``Proxy`` is now poly-kinded (see :ghc-ticket:`10775`)
+
+- The ``IsString`` instance for ``[Char]`` has been modified to eliminate
+  ambiguity arising from overloaded strings and functions like ``(++)``.
+
+- Move ``Const`` from ``Control.Applicative`` to its own module in
+  ``Data.Functor.Const``. (see :ghc-ticket:`11135`)
+
+- Enable ``PolyKinds`` in the ``Data.Functor.Const`` module to give ``Const``
+  the kind ``* -> k -> *`` (see :ghc-ticket:`10039`).
 
 binary
 ~~~~~~
