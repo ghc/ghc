@@ -57,7 +57,7 @@ module TyCoRep (
 
         -- Free variables
         tyCoVarsOfType, tyCoVarsOfTypeDSet, tyCoVarsOfTypes, tyCoVarsOfTypesDSet,
-        tyCoVarsOfTypeAcc, tyCoVarsOfTypeList,
+        tyCoVarsBndrAcc, tyCoVarsOfTypeAcc, tyCoVarsOfTypeList,
         tyCoVarsOfTypesAcc, tyCoVarsOfTypesList,
         closeOverKindsDSet, closeOverKindsAcc,
         coVarsOfType, coVarsOfTypes,
@@ -989,19 +989,24 @@ tyCoVarsOfTypeList ty = runFVList $ tyCoVarsOfTypeAcc ty
 -- | The worker for `tyVarsOfType` and `tyVarsOfTypeList`.
 -- The previous implementation used `unionVarSet` which is O(n+m) and can
 -- make the function quadratic.
--- It's exported, so that it can be composed with other functions that compute
--- free variables.
+-- It's exported, so that it can be composed with
+-- other functions that compute free variables.
 -- See Note [FV naming conventions] in FV.
+--
+-- Eta-expanded because that makes it run faster (apparently)
 tyCoVarsOfTypeAcc :: Type -> FV
-tyCoVarsOfTypeAcc (TyVarTy v)         fv_cand in_scope acc = (oneVar v `unionFV` tyCoVarsOfTypeAcc (tyVarKind v)) fv_cand in_scope acc
-tyCoVarsOfTypeAcc (TyConApp _ tys)    fv_cand in_scope acc = tyCoVarsOfTypesAcc tys fv_cand in_scope acc
-tyCoVarsOfTypeAcc (LitTy {})          fv_cand in_scope acc = noVars fv_cand in_scope acc
-tyCoVarsOfTypeAcc (AppTy fun arg)     fv_cand in_scope acc = (tyCoVarsOfTypeAcc fun `unionFV` tyCoVarsOfTypeAcc arg) fv_cand in_scope acc
-tyCoVarsOfTypeAcc (ForAllTy bndr ty) fv_cand in_scope acc
-  = (delBinderVarFV bndr (tyCoVarsOfTypeAcc ty)
-     `unionFV` tyCoVarsOfTypeAcc (binderType bndr)) fv_cand in_scope acc
-tyCoVarsOfTypeAcc (CastTy ty co)      fv_cand in_scope acc = (tyCoVarsOfTypeAcc ty `unionFV` tyCoVarsOfCoAcc co) fv_cand in_scope acc
-tyCoVarsOfTypeAcc (CoercionTy co)     fv_cand in_scope acc = tyCoVarsOfCoAcc co fv_cand in_scope acc
+tyCoVarsOfTypeAcc (TyVarTy v)        a b c = (oneVar v `unionFV` tyCoVarsOfTypeAcc (tyVarKind v)) a b c
+tyCoVarsOfTypeAcc (TyConApp _ tys)   a b c = tyCoVarsOfTypesAcc tys a b c
+tyCoVarsOfTypeAcc (LitTy {})         a b c = noVars a b c
+tyCoVarsOfTypeAcc (AppTy fun arg)    a b c = (tyCoVarsOfTypeAcc fun `unionFV` tyCoVarsOfTypeAcc arg) a b c
+tyCoVarsOfTypeAcc (ForAllTy bndr ty) a b c = tyCoVarsBndrAcc bndr (tyCoVarsOfTypeAcc ty)  a b c
+tyCoVarsOfTypeAcc (CastTy ty co)     a b c = (tyCoVarsOfTypeAcc ty `unionFV` tyCoVarsOfCoAcc co) a b c
+tyCoVarsOfTypeAcc (CoercionTy co)    a b c = tyCoVarsOfCoAcc co a b c
+
+tyCoVarsBndrAcc :: TyBinder -> FV -> FV
+-- Free vars of (forall b. <thing with fvs>)
+tyCoVarsBndrAcc bndr fvs = delBinderVarFV bndr fvs
+                           `unionFV` tyCoVarsOfTypeAcc (binderType bndr)
 
 -- | Returns free variables of types, including kind variables as
 -- a non-deterministic set. For type synonyms it does /not/ expand the

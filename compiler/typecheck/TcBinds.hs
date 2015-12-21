@@ -60,7 +60,9 @@ import FastString
 import Type(mkStrLitTy, tidyOpenType)
 import PrelNames( mkUnboundName, gHC_PRIM )
 import TcValidity (checkValidType)
+import Pair( Pair(..) )
 import Control.Monad
+import Data.List( partition )
 
 #include "HsVersions.h"
 
@@ -1681,35 +1683,76 @@ tcTySig (L loc (TypeSig names sig_ty))
        ; return (map TcIdSig sigs) }
 
 tcTySig (L loc (PatSynSig (L _ name) sig_ty))
-  | HsIB { hsib_vars = sig_vars
+  | HsIB { hsib_vars = implicit_hs_tvs
          , hsib_body = hs_ty }  <- sig_ty
-  , (tv_bndrs, req, prov, body_ty) <- splitLHsPatSynTy hs_ty
+  , (univ_hs_tvs, hs_req,  hs_ty1) <- splitLHsSigmaTy hs_ty
+  , (ex_hs_tvs,   hs_prov, hs_ty2) <- splitLHsSigmaTy hs_ty1
+  , (hs_arg_tys, hs_body_ty)       <- splitHsFunType  hs_ty2
   = setSrcSpan loc $
-    do { (tvs1, (req', prov', ty', tvs2))
-           <- tcImplicitTKBndrs sig_vars $
-              tcHsTyVarBndrs tv_bndrs    $ \ tvs2 ->
-              do { req'  <- tcHsContext req
-                 ; prov' <- tcHsContext prov
-                 ; ty'   <- tcHsLiftedType body_ty
+    do { (implicit_tvs, (univ_tvs, req, ex_tvs, prov, arg_tys, body_ty))
+           <- solveEqualities $
+              tcImplicitTKBndrs implicit_hs_tvs $
+              tcHsTyVarBndrs univ_hs_tvs  $ \ univ_tvs ->
+              tcHsTyVarBndrs ex_hs_tvs    $ \ ex_tvs   ->
+              do { req     <- tcHsContext hs_req
+                 ; prov    <- tcHsContext hs_prov
+                 ; arg_tys <- mapM tcHsOpenType (hs_arg_tys :: [LHsType Name])
+                 ; body_ty <- tcHsLiftedType hs_body_ty
                  ; let bound_tvs
-                         = unionVarSets [ allBoundVariabless req'
-                                        , allBoundVariabless prov'
-                                        , allBoundVariables ty' ]
-                 ; return ((req', prov', ty', tvs2), bound_tvs) }
+                         = unionVarSets [ allBoundVariabless req
+                                        , allBoundVariabless prov
+                                        , allBoundVariabless (body_ty : arg_tys)
+                                        ]
+                 ; return ( (univ_tvs, req, ex_tvs, prov, arg_tys, body_ty)
+                          , bound_tvs) }
 
        -- These are /signatures/ so we zonk to squeeze out any kind
-       -- unification variables.  ToDo: checkValidType?
-       ; qtvs' <- mapMaybeM zonkQuantifiedTyVar (tvs1 ++ tvs2)
-       ; req'  <- zonkTcTypes req'
-       ; prov' <- zonkTcTypes prov'
-       ; ty'   <- zonkTcType  ty'
+       -- unification variables.
+       -- ToDo: checkValidType?
+       ; implicit_tvs <- mapM zonkTcTyCoVarBndr implicit_tvs
+       ; univ_tvs     <- mapM zonkTcTyCoVarBndr univ_tvs
+       ; ex_tvs       <- mapM zonkTcTyCoVarBndr ex_tvs
+       ; req          <- zonkTcTypes req
+       ; prov         <- zonkTcTypes prov
+       ; arg_tys      <- zonkTcTypes arg_tys
+       ; body_ty      <- zonkTcType  body_ty
 
-       ; traceTc "tcTySig }" $ vcat [ ppr qtvs', ppr req', ppr prov', ppr ty' ]
+       -- Kind generalisation; c.f. kindGeneralise
+       ; let free_kvs = tyCoVarsOfTelescope (implicit_tvs ++ univ_tvs ++ ex_tvs) $
+                        tyCoVarsOfTypes (body_ty : req ++ prov ++ arg_tys)
+
+       ; kvs <- quantifyTyVars emptyVarSet $
+                Pair free_kvs emptyVarSet
+
+       ; let bad_tvs = filter (`elemVarSet` tyCoVarsOfType body_ty) ex_tvs
+
+       ; unless (null bad_tvs) $ addErr $
+         hang (ptext (sLit "The result type") <+> quotes (ppr body_ty))
+            2 (ptext (sLit "mentions existential type variable") <> plural bad_tvs
+               <+> pprQuotedList bad_tvs)
+
+       ; let univ_fvs = closeOverKinds $
+                        (tyCoVarsOfTypes (body_ty : req) `extendVarSetList` univ_tvs)
+             (extra_univ, extra_ex) = partition (`elemVarSet` univ_fvs) $
+                                      kvs ++ implicit_tvs
+       ; traceTc "tcTySig }" $
+         vcat [ text "implicit_tvs" <+> ppr implicit_tvs
+              , text "kvs" <+> ppr kvs
+              , text "extra_univ" <+> ppr extra_univ
+              , text "univ_tvs" <+> ppr univ_tvs
+              , text "req" <+> ppr req
+              , text "extra_ex" <+> ppr extra_ex
+              , text "ex_tvs_" <+> ppr ex_tvs
+              , text "prov" <+> ppr prov
+              , text "arg_tys" <+> ppr arg_tys
+              , text "body_ty" <+> ppr body_ty ]
        ; let tpsi = TPSI { patsig_name = name
-                         ,  patsig_tvs  = qtvs'
-                         , patsig_req  = req'
-                         , patsig_prov = prov'
-                         , patsig_tau  = ty' }
+                         , patsig_univ_tvs = extra_univ ++ univ_tvs
+                         , patsig_req      = req
+                         , patsig_ex_tvs   = extra_ex   ++ ex_tvs
+                         , patsig_prov     = prov
+                         , patsig_arg_tys  = arg_tys
+                         , patsig_body_ty  = body_ty }
        ; return [TcPatSynSig tpsi] }
 
 tcTySig _ = return []
