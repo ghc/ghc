@@ -106,11 +106,17 @@ defaultTargetDirectory stage pkg
     | otherwise         = "dist-install"
 
 -- TODO: simplify
+-- TODO: haddock and ghtTags should be built in stage2 only
 -- | Returns a relative path to the program executable
 defaultProgramPath :: Stage -> Package -> Maybe FilePath
 defaultProgramPath stage pkg
     | pkg == ghc     = Just . inplaceProgram $ "ghc-stage" ++ show (fromEnum stage + 1)
     | pkg == haddock = case stage of
+        Stage1 -> Just . inplaceProgram $ pkgName pkg
+        Stage2 -> Just . inplaceProgram $ pkgName pkg
+        _      -> Nothing
+    | pkg == ghcTags = case stage of
+        Stage1 -> Just . inplaceProgram $ pkgName pkg
         Stage2 -> Just . inplaceProgram $ pkgName pkg
         _      -> Nothing
     | isProgram pkg  = case stage of
