@@ -81,7 +81,7 @@ dsLocalBinds (HsIPBinds binds)  body = dsIPBinds  binds body
 -------------------------
 dsValBinds :: HsValBinds Id -> CoreExpr -> DsM CoreExpr
 dsValBinds (ValBindsOut binds _) body = foldrM ds_val_bind body binds
-dsValBinds (ValBindsIn  _     _) _    = panic "dsValBinds ValBindsIn"
+dsValBinds (ValBindsIn {})       _    = panic "dsValBinds ValBindsIn"
 
 -------------------------
 dsIPBinds :: HsIPBinds Id -> CoreExpr -> DsM CoreExpr

@@ -665,9 +665,9 @@ repBangTy ty = do
 
 repDerivs :: HsDeriving Name -> DsM (Core TH.CxtQ)
 repDerivs deriv = do
-    let clauses
-          | Just (L _ ctxt) <- deriv = ctxt
-          | otherwise                = []
+    let clauses = case deriv of
+                    Nothing         -> []
+                    Just (L _ ctxt) -> ctxt
     tys <- repList typeQTyConName
                    (rep_deriv . hsSigType)
                    clauses

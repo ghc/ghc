@@ -749,7 +749,7 @@ collect_out_binds :: Bool -> [(RecFlag, LHsBinds id)] -> [id]
 collect_out_binds ps = foldr (collect_binds ps . snd) []
 
 collect_binds :: Bool -> LHsBindsLR idL idR -> [idL] -> [idL]
--- Collect Ids, or Ids + patter synonyms, depending on boolean flag
+-- Collect Ids, or Ids + pattern synonyms, depending on boolean flag
 collect_binds ps binds acc = foldrBag (collect_bind ps . unLoc) acc binds
 
 collect_bind :: Bool -> HsBindLR idL idR -> [idL] -> [idL]
