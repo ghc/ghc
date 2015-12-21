@@ -7,7 +7,7 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
-module GhciTags (
+module GHCi.UI.Tags (
   createCTagsWithLineNumbersCmd,
   createCTagsWithRegExesCmd,
   createETagsFileCmd
@@ -15,7 +15,7 @@ module GhciTags (
 
 import Exception
 import GHC
-import GhciMonad
+import GHCi.UI.Monad
 import Outputable
 
 -- ToDo: figure out whether we need these, and put something appropriate
@@ -61,7 +61,7 @@ ghciCreateTagsFile :: TagsKind -> FilePath -> GHCi ()
 ghciCreateTagsFile kind file = do
   createTagsFile kind file
 
--- ToDo: 
+-- ToDo:
 --      - remove restriction that all modules must be interpreted
 --        (problem: we don't know source locations for entities unless
 --        we compiled the module.
@@ -213,4 +213,3 @@ showETag TagInfo{ tagName = tag, tagLine = lineNo, tagCol = colNo,
     ++ "\x01" ++ show lineNo
     ++ "," ++ show charPos
 showETag _ = throwGhcException (CmdLineError "missing source file info in showETag")
-

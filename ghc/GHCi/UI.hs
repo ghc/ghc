@@ -20,7 +20,7 @@
 --
 -----------------------------------------------------------------------------
 
-module InteractiveUI (
+module GHCi.UI (
         interactiveUI,
         GhciSettings(..),
         defaultGhciSettings,
@@ -31,10 +31,10 @@ module InteractiveUI (
 #include "HsVersions.h"
 
 -- GHCi
-import qualified GhciMonad ( args, runStmt )
-import GhciMonad hiding ( args, runStmt )
-import GhciTags
-import GhciInfo
+import qualified GHCi.UI.Monad as GhciMonad ( args, runStmt, runDecls )
+import GHCi.UI.Monad hiding ( args, runStmt, runDecls )
+import GHCi.UI.Tags
+import GHCi.UI.Info
 import Debugger
 
 -- The GHC interface
@@ -434,7 +434,7 @@ interactiveUI config srcs maybe_exprs = do
    eval_wrapper <- mkEvalWrapper default_progname default_args
    startGHCi (runGHCi srcs maybe_exprs)
         GHCiState{ progname           = default_progname,
-                   GhciMonad.args     = default_args,
+                   args               = default_args,
                    evalWrapper        = eval_wrapper,
                    prompt             = defPrompt config,
                    prompt2            = defPrompt2 config,

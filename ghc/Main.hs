@@ -25,7 +25,7 @@ import HscMain          ( newHscEnv )
 import DriverPipeline   ( oneShot, compileFile )
 import DriverMkDepend   ( doMkDependHS )
 #ifdef GHCI
-import InteractiveUI    ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
+import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
 
 -- Frontend plugins

@@ -56,10 +56,10 @@ Executable ghc
         CPP-Options: -DGHCI
         GHC-Options: -fno-warn-name-shadowing
         Other-Modules:
-            GhciInfo
-            GhciMonad
-            GhciTags
-            InteractiveUI
+            GHCi.UI
+            GHCi.UI.Info
+            GHCi.UI.Monad
+            GHCi.UI.Tags
         Other-Extensions:
             BangPatterns
             FlexibleInstances

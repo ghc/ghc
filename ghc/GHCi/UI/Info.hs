@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Get information on modules, expreesions, and identifiers
-module GhciInfo
+module GHCi.UI.Info
     ( ModInfo(..)
     , SpanInfo(..)
     , spanInfoFromRealSrcSpan
