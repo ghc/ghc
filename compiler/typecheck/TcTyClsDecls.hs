@@ -396,10 +396,8 @@ getInitialKind decl@(ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs =
 getInitialKind decl@(DataDecl { tcdLName = L _ name
                               , tcdTyVars = ktvs
                               , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
-                                                         , dd_cons = cons' } })
-  = let cons = cons' -- AZ list monad coming
-    in
-     do { (decl_kind, _) <-
+                                                         , dd_cons = cons } })
+  = do  { (decl_kind, _) <-
            kcHsTyVarBndrs (hsDeclHasCusk decl) ktvs $ \_ _ ->
            do { res_k <- case m_sig of
                            Just ksig -> tcLHsKind ksig
@@ -867,9 +865,8 @@ tcDataDefn rec_info     -- Knot-tied; don't look at this eagerly
            tc_name tvs tycon_kind res_kind
          (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                      , dd_ctxt = ctxt, dd_kindSig = mb_ksig
-                     , dd_cons = cons' })
- = let cons = cons' -- AZ List monad coming
-   in do { extra_tvs <- tcDataKindSig res_kind
+                     , dd_cons = cons })
+ =  do { extra_tvs <- tcDataKindSig res_kind
        ; let final_tvs  = tvs `chkAppend` extra_tvs
              roles      = rti_roles rec_info tc_name
 
