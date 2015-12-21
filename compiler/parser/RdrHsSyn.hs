@@ -1411,7 +1411,7 @@ checkImportSpec ie@(L _ specs) =
 mkImpExpSubSpec :: [Located (Maybe RdrName)] -> P ([AddAnn], ImpExpSubSpec)
 mkImpExpSubSpec [] = return ([], ImpExpList [])
 mkImpExpSubSpec [L l Nothing] =
-  return ([\s -> addAnnotation l AnnDotdot s], ImpExpAll)
+  return ([\s -> addAnnotation s AnnDotdot l], ImpExpAll)
 mkImpExpSubSpec xs =
   if (any (isNothing . unLoc) xs)
     then return $ ([], ImpExpAllWith xs)
