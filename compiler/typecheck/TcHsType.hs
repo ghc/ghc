@@ -827,7 +827,7 @@ tcInstBinderX mb_kind_info subst binder
   | Just tv <- binderVar_maybe binder
   = case lookup_tv tv of
       Just ki -> return (extendTCvSubst subst tv ki, ki)
-      Nothing -> do { (subst', tv') <- tcInstTyVarX subst tv
+      Nothing -> do { (subst', tv') <- newMetaTyVarX subst tv
                     ; return (subst', mkTyVarTy tv') }
 
      -- This is the *only* constraint currently handled in types.

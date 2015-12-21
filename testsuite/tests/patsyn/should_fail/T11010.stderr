@@ -1,8 +1,14 @@
 
-T11010.hs:8:1: error:
-    The 'required' context ‘a ~ Int’
-      mentions existential type variable ‘a’
-
-T11010.hs:16:1: error:
-    The 'required' context ‘a ~ Int’
-      mentions existential type variable ‘a’
+T11010.hs:9:36: error:
+    • Couldn't match type ‘a1’ with ‘Int’
+      ‘a1’ is a rigid type variable bound by
+        a pattern with constructor:
+          Fun :: forall b a. String -> (a -> b) -> Expr a -> Expr b,
+        in a pattern synonym declaration
+        at T11010.hs:9:26
+      Expected type: a -> b
+        Actual type: a1 -> b
+    • In the declaration for pattern synonym ‘IntFun’
+    • Relevant bindings include
+        x :: Expr a1 (bound at T11010.hs:9:36)
+        f :: a1 -> b (bound at T11010.hs:9:34)

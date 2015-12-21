@@ -7,12 +7,14 @@
 
 {-# LANGUAGE CPP #-}
 
-module TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl
+module TcPatSyn ( tcPatSynSig, tcInferPatSynDecl, tcCheckPatSynDecl
                 , tcPatSynBuilderBind, tcPatSynBuilderOcc, nonBidirectionalErr
   ) where
 
 import HsSyn
 import TcPat
+import TcHsType( tcImplicitTKBndrs, tcHsTyVarBndrs
+               , tcHsContext, tcHsLiftedType, tcHsOpenType )
 import TcRnMonad
 import TcEnv
 import TcMType
@@ -47,9 +49,130 @@ import Data.Monoid( mconcat, mappend, mempty )
 import Bag
 import Util
 import Data.Maybe
-import Control.Monad ( zipWithM )
+import Control.Monad ( unless, zipWithM )
+import Data.List( partition )
+import Pair( Pair(..) )
 
 #include "HsVersions.h"
+
+{- *********************************************************************
+*                                                                      *
+        Type checking a pattern synonym signature
+*                                                                      *
+************************************************************************
+
+Note [Pattern synonym signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Pattern synonym signatures are surprisingly tricky (see Trac #11224 for example).
+In general they look like this:
+
+   pattern P :: forall univ_tvs. req
+             => forall ex_tvs. prov
+             => arg1 -> .. -> argn -> body_ty
+
+For parsing and renaming we treat the signature as an ordinary LHsSigType.
+
+Once we get to type checking, we decompose it into its parts, in tcPatSynSig.
+
+* Note that 'forall univ_tvs' and 'req =>'
+        and 'forall ex_tvs'   and 'prov =>'
+  are all optional.  We gather the pieces at the the top of tcPatSynSig
+
+* Initially the implicitly-bound tyvars (added by the renamer) include both
+  universal and existential vars.
+
+* After we kind-check the pieces and convert to Types, we do kind generalisation.
+
+* Note [Splitting the implicit tyvars in a pattern synonym]
+  Now the tricky bit: we must split
+     the implicitly-bound variables, and
+     the kind-generalised variables
+  into universal and existential.  We do so as follows:
+
+     Note [The pattern-synonym signature splitting rule]
+     the universals are the ones mentioned in
+          - univ_tvs (and the kinds thereof)
+          - prov
+          - body_ty
+     the existential are the rest
+
+* Moreover see Note
+-}
+
+tcPatSynSig :: Name -> LHsSigType Name -> TcM TcPatSynInfo
+tcPatSynSig name sig_ty
+  | HsIB { hsib_vars = implicit_hs_tvs
+         , hsib_body = hs_ty }  <- sig_ty
+  , (univ_hs_tvs, hs_req,  hs_ty1) <- splitLHsSigmaTy hs_ty
+  , (ex_hs_tvs,   hs_prov, hs_ty2) <- splitLHsSigmaTy hs_ty1
+  , (hs_arg_tys, hs_body_ty)       <- splitHsFunType  hs_ty2
+  = do { (implicit_tvs, (univ_tvs, req, ex_tvs, prov, arg_tys, body_ty))
+           <- solveEqualities $
+              tcImplicitTKBndrs implicit_hs_tvs $
+              tcHsTyVarBndrs univ_hs_tvs  $ \ univ_tvs ->
+              tcHsTyVarBndrs ex_hs_tvs    $ \ ex_tvs   ->
+              do { req     <- tcHsContext hs_req
+                 ; prov    <- tcHsContext hs_prov
+                 ; arg_tys <- mapM tcHsOpenType (hs_arg_tys :: [LHsType Name])
+                 ; body_ty <- tcHsLiftedType hs_body_ty
+                 ; let bound_tvs
+                         = unionVarSets [ allBoundVariabless req
+                                        , allBoundVariabless prov
+                                        , allBoundVariabless (body_ty : arg_tys)
+                                        ]
+                 ; return ( (univ_tvs, req, ex_tvs, prov, arg_tys, body_ty)
+                          , bound_tvs) }
+
+       -- These are /signatures/ so we zonk to squeeze out any kind
+       -- unification variables.
+       -- ToDo: checkValidType?
+       ; implicit_tvs <- mapM zonkTcTyCoVarBndr implicit_tvs
+       ; univ_tvs     <- mapM zonkTcTyCoVarBndr univ_tvs
+       ; ex_tvs       <- mapM zonkTcTyCoVarBndr ex_tvs
+       ; req          <- zonkTcTypes req
+       ; prov         <- zonkTcTypes prov
+       ; arg_tys      <- zonkTcTypes arg_tys
+       ; body_ty      <- zonkTcType  body_ty
+
+       -- Kind generalisation; c.f. kindGeneralise
+       ; let free_kvs = tyCoVarsOfTelescope (implicit_tvs ++ univ_tvs ++ ex_tvs) $
+                        tyCoVarsOfTypes (body_ty : req ++ prov ++ arg_tys)
+
+       ; kvs <- quantifyTyVars emptyVarSet (Pair free_kvs emptyVarSet)
+
+       -- Complain about:  pattern P :: () => forall x. x -> P x
+       -- The renamer thought it was fine, but the existential 'x'
+       -- should not appear in the result type
+       ; let bad_tvs = filter (`elemVarSet` tyCoVarsOfType body_ty) ex_tvs
+       ; unless (null bad_tvs) $ addErr $
+         hang (ptext (sLit "The result type") <+> quotes (ppr body_ty))
+            2 (ptext (sLit "mentions existential type variable") <> plural bad_tvs
+               <+> pprQuotedList bad_tvs)
+
+         -- Split [Splitting the implicit tyvars in a pattern synonym]
+       ; let univ_fvs = closeOverKinds $
+                        (tyCoVarsOfTypes (body_ty : req) `extendVarSetList` univ_tvs)
+             (extra_univ, extra_ex) = partition (`elemVarSet` univ_fvs) $
+                                      kvs ++ implicit_tvs
+       ; traceTc "tcTySig }" $
+         vcat [ text "implicit_tvs" <+> ppr implicit_tvs
+              , text "kvs" <+> ppr kvs
+              , text "extra_univ" <+> ppr extra_univ
+              , text "univ_tvs" <+> ppr univ_tvs
+              , text "req" <+> ppr req
+              , text "extra_ex" <+> ppr extra_ex
+              , text "ex_tvs_" <+> ppr ex_tvs
+              , text "prov" <+> ppr prov
+              , text "arg_tys" <+> ppr arg_tys
+              , text "body_ty" <+> ppr body_ty ]
+       ; return (TPSI { patsig_name = name
+                      , patsig_univ_tvs = extra_univ ++ univ_tvs
+                      , patsig_req      = req
+                      , patsig_ex_tvs   = extra_ex   ++ ex_tvs
+                      , patsig_prov     = prov
+                      , patsig_arg_tys  = arg_tys
+                      , patsig_body_ty  = body_ty }) }
+
 
 {-
 ************************************************************************
@@ -117,15 +240,21 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details
 
        ; tcCheckPatSynPat lpat
 
+       -- Right!  Let's check the pattern against the signature
+       -- See Note [Checking against a pattern signature]
        ; req_dicts <- newEvVars req_theta
-       ; (tclvl, wanted, (lpat', (ex_tys, prov_dicts, args'))) <-
+       ; (tclvl, wanted, (lpat', (ex_tvs', prov_dicts, args'))) <-
            ASSERT2( equalLength arg_names arg_tys, ppr name $$ ppr arg_names $$ ppr arg_tys )
            pushLevelAndCaptureConstraints $
            tcPat PatSyn lpat pat_ty $
-           do { (subst, ex_tvs') <- tcInstTyVars ex_tvs
+           do { (subst, ex_tvs') <- if   isUnidirectional dir
+                                    then newMetaTyVars    ex_tvs
+                                    else newMetaSigTyVars ex_tvs
+                    -- See the "Existential type variables part of
+                    -- Note [Checking against a pattern signature]
               ; prov_dicts <- mapM (emitWanted origin) (substTheta subst prov_theta)
-              ; args' <- zipWithM (tc_arg subst) arg_names arg_tys
-              ; return (mkTyVarTys ex_tvs', prov_dicts, args') }
+              ; args'      <- zipWithM (tc_arg subst) arg_names arg_tys
+              ; return (ex_tvs', prov_dicts, args') }
 
        ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info univ_tvs req_dicts wanted
 
@@ -134,10 +263,14 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details
        -- Since all the inputs are implications the returned bindings will be empty
        ; _ <- simplifyTop (emptyWC `addImplics` implics)
 
+       -- ToDo: in the bidirectional case, check that the ex_tvs' are all distinct
+       -- Otherwise we may get a type error when typechecking the builder,
+       -- when that should be impossible
+
        ; traceTc "tcCheckPatSynDecl }" $ ppr name
        ; tc_patsyn_finish lname dir is_infix lpat'
                           (univ_tvs, req_theta, ev_binds, req_dicts)
-                          (ex_tvs, ex_tys, prov_theta, prov_dicts)
+                          (ex_tvs, mkTyVarTys ex_tvs', prov_theta, prov_dicts)
                           (args', arg_tys)
                           pat_ty rec_fields }
   where
@@ -153,6 +286,10 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details
 
 {- Note [Checking against a pattern signature]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When checking the actual supplied pattern against the pattern synonym
+signature, we need to be quite careful.
+
+----- Provided constraints
 Example
 
     data T a where
@@ -166,6 +303,34 @@ make available to matches against P, is derivable from the
 acutal pattern.  For example:
     f (P (x::a)) = ...here (Eq a) should be available...
 And yes, (Eq a) is derivable from the (Ord a) bound by P's rhs.
+
+----- Existential type variables
+Unusually, we instantiate the existential tyvars of the pattern with
+*meta* type variables.  For example
+
+    data S where
+      MkS :: Eq a => [a] -> S
+
+    pattern P :: () => Eq x => x -> S
+    pattern P x <- MkS x
+
+The pattern synonym conceals from its client the fact that MkS has a
+list inside it.  The client just thinks it's a type 'x'.  So we must
+unify x := [a] during type checking, and then use the instantiating type
+[a] (called ex_tys) when building the matcher.  In this case we'll get
+
+   $mP :: S -> (forall x. Ex x => x -> r) -> r -> r
+   $mP x k = case x of
+               MkS a (d:Eq a) (ys:[a]) -> let dl :: Eq [a]
+                                              dl = $dfunEqList d
+                                          in k [a] dl ys
+
+This "concealing" story works for /uni-directional/ pattern synonmys,
+but obviously not for bidirectional ones.  So in the bidirectional case
+we use SigTv, rather than a generic TauTv, meta-tyvar so that.  And
+we should really check that those SigTvs don't get unified with each
+other.
+
 -}
 
 collectPatSynArgInfo :: HsPatSynDetails (Located Name) -> ([Name], [Name], Bool)

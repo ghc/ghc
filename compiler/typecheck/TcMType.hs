@@ -27,7 +27,7 @@ module TcMType (
   cloneMetaTyVar,
   newFmvTyVar, newFskTyVar,
 
-  newMetaTyVar, readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
+  readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
   newMetaDetails, isFilledMetaTyVar, isUnfilledMetaTyVar,
 
   --------------------------------
@@ -47,7 +47,7 @@ module TcMType (
 
   --------------------------------
   -- Instantiation
-  tcInstTyVars, tcInstTyVarX,
+  newMetaTyVars, newMetaTyVarX, newMetaSigTyVars,
   newSigTyVar,
   tcInstType,
   tcInstSkolTyVars, tcInstSkolTyVarsLoc, tcInstSuperSkolTyVarsX,
@@ -437,19 +437,6 @@ mkMetaTyVarName :: Unique -> FastString -> Name
 -- TcCanonical.canEqTyVarTyVar (nicer_to_update_tv2)
 mkMetaTyVarName uniq str = mkSysTvName uniq str
 
-newMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
--- Make a new meta tyvar out of thin air
-newMetaTyVar meta_info kind
-  = do  { uniq <- newUnique
-        ; let name = mkMetaTyVarName uniq s
-              s = case meta_info of
-                        ReturnTv    -> fsLit "r"
-                        TauTv       -> fsLit "t"
-                        FlatMetaTv  -> fsLit "fmv"
-                        SigTv       -> fsLit "a"
-        ; details <- newMetaDetails meta_info
-        ; return (mkTcTyVar name kind details) }
-
 newSigTyVar :: Name -> Kind -> TcM TcTyVar
 newSigTyVar name kind
   = do { details <- newMetaDetails SigTv
@@ -615,8 +602,21 @@ coercion variables, except for the special case of the promoted Eq#. But,
 that can't ever appear in user code, so we're safe!
 -}
 
+newAnonMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
+-- Make a new meta tyvar out of thin air
+newAnonMetaTyVar meta_info kind
+  = do  { uniq <- newUnique
+        ; let name = mkMetaTyVarName uniq s
+              s = case meta_info of
+                        ReturnTv    -> fsLit "r"
+                        TauTv       -> fsLit "t"
+                        FlatMetaTv  -> fsLit "fmv"
+                        SigTv       -> fsLit "a"
+        ; details <- newMetaDetails meta_info
+        ; return (mkTcTyVar name kind details) }
+
 newFlexiTyVar :: Kind -> TcM TcTyVar
-newFlexiTyVar kind = newMetaTyVar TauTv kind
+newFlexiTyVar kind = newAnonMetaTyVar TauTv kind
 
 newFlexiTyVarTy  :: Kind -> TcM TcType
 newFlexiTyVarTy kind = do
@@ -627,7 +627,7 @@ newFlexiTyVarTys :: Int -> Kind -> TcM [TcType]
 newFlexiTyVarTys n kind = mapM newFlexiTyVarTy (nOfThem n kind)
 
 newReturnTyVar :: Kind -> TcM TcTyVar
-newReturnTyVar kind = newMetaTyVar ReturnTv kind
+newReturnTyVar kind = newAnonMetaTyVar ReturnTv kind
 
 newReturnTyVarTy :: Kind -> TcM TcType
 newReturnTyVarTy kind = mkTyVarTy <$> newReturnTyVar kind
@@ -652,20 +652,23 @@ newOpenReturnTyVar
        ; tv <- newReturnTyVar k
        ; return (tv, k) }
 
-tcInstTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
+newMetaSigTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
+newMetaSigTyVars = mapAccumLM newMetaSigTyVarX emptyTCvSubst
+
+newMetaTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
 -- Instantiate with META type variables
 -- Note that this works for a sequence of kind, type, and coercion variables
 -- variables.  Eg    [ (k:*), (a:k->k) ]
 --             Gives [ (k7:*), (a8:k7->k7) ]
-tcInstTyVars = mapAccumLM tcInstTyVarX emptyTCvSubst
+newMetaTyVars = mapAccumLM newMetaTyVarX emptyTCvSubst
     -- emptyTCvSubst has an empty in-scope set, but that's fine here
     -- Since the tyvars are freshly made, they cannot possibly be
     -- captured by any existing for-alls.
 
-tcInstTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
+newMetaTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 -- Make a new unification variable tyvar whose Name and Kind come from
 -- an existing TyVar. We substitute kind variables in the kind.
-tcInstTyVarX subst tyvar
+newMetaTyVarX subst tyvar
   = do  { uniq <- newUnique
                -- See Note [Levity polymorphic variables accept foralls]
         ; let info = if isLevityPolymorphic (tyVarKind tyvar)
@@ -674,6 +677,16 @@ tcInstTyVarX subst tyvar
         ; details <- newMetaDetails info
         ; let name   = mkSystemName uniq (getOccName tyvar)
                        -- See Note [Name of an instantiated type variable]
+              kind   = substTy subst (tyVarKind tyvar)
+              new_tv = mkTcTyVar name kind details
+        ; return (extendTCvSubst subst tyvar (mkTyVarTy new_tv), new_tv) }
+
+newMetaSigTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
+-- Just like newMetaTyVarX, but make a SigTv
+newMetaSigTyVarX subst tyvar
+  = do  { uniq <- newUnique
+        ; details <- newMetaDetails SigTv
+        ; let name   = mkSystemName uniq (getOccName tyvar)
               kind   = substTy subst (tyVarKind tyvar)
               new_tv = mkTcTyVar name kind details
         ; return (extendTCvSubst subst tyvar (mkTyVarTy new_tv), new_tv) }
