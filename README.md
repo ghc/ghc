@@ -31,3 +31,7 @@ $ make inplace/bin/ghc-cabal   # This needs to be fixed
 $ shake-build/build.bat
 ```
 Also see the Building GHC on Windows guide: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Windows.
+
+How to contribute
+-----------------
+The best way to contribute is to try the new build system, report the issues you found, and attempt to fix them. Please note the codebase is very unstable at present and we expect a lot of further refactoring. Before attempting to fix any issue do make sure no one else is already working on it. The documentation is currently non-existent, but we will start addressing this once the codebase stabilises.
