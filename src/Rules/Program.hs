@@ -29,7 +29,7 @@ buildProgram _ target @ (PartialTarget stage pkg) = do
             objs  = cObjs ++ hObjs
         pkgs     <- interpretPartial target getPackages
         ways     <- interpretPartial target getWays
-        depNames <- interpretPartial target $ getPkgDataList DepNames
+        depNames <- interpretPartial target $ getPkgDataList TransitiveDepNames
         ghciFlag <- interpretPartial target $ getPkgData BuildGhciLib
         let deps = matchPackageNames (sort pkgs) (sort depNames)
             ghci = ghciFlag == "YES" && stage == Stage1
@@ -44,8 +44,8 @@ buildProgram _ target @ (PartialTarget stage pkg) = do
             return $ libFiles ++ [ pkgGhciLibraryFile stage dep compId | ghci ]
         let binDeps = if pkg == ghcCabal && stage == Stage0
                       then [ pkgPath pkg -/- src <.> "hs" | src <- hSrcs ]
-                      else objs ++ libs
-        need binDeps
+                      else objs
+        need $ binDeps ++ libs
         build $ fullTargetWithWay target (Ghc stage) vanilla binDeps [bin]
         synopsis <- interpretPartial target $ getPkgData Synopsis
         putSuccess $ renderBox

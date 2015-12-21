@@ -20,7 +20,7 @@ packagesStage0 :: Packages
 packagesStage0 = mconcat
     [ append [ binary, cabal, compiler, ghc, ghcBoot, ghcCabal, ghcPkg
              , hsc2hs, hoopl, hpc, templateHaskell, transformers ]
-    , stage0 ? append [deriveConstants, genapply, genprimopcode, hp2ps]
+    , stage0 ? append [deriveConstants, dllSplit, genapply, genprimopcode, hp2ps]
     , notM windowsHost ? notM (anyHostOs ["ios"]) ? append [terminfo] ]
 
 -- TODO: what do we do with parallel, stm, random, primitive, vector and dph?
@@ -28,9 +28,8 @@ packagesStage1 :: Packages
 packagesStage1 = mconcat
     [ packagesStage0
     , append [ array, base, bytestring, containers, compareSizes, deepseq
-             , directory, dllSplit, filepath
-             , ghci, ghcPrim, ghcPwd, haskeline, hpcBin, integerLibrary
-             , mkUserGuidePart, pretty, process, runghc, time ]
+             , directory, filepath, ghci, ghcPrim, ghcPwd, haskeline, hpcBin
+             , integerLibrary, mkUserGuidePart, pretty, process, runghc, time ]
     , windowsHost      ? append [win32]
     , notM windowsHost ? append [unix]
     , notM windowsHost ? append [iservBin]

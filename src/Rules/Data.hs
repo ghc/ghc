@@ -12,8 +12,7 @@ import Settings.Builders.GhcCabal
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 buildPackageData :: Resources -> PartialTarget -> Rules ()
 buildPackageData rs target @ (PartialTarget stage pkg) = do
-    let path      = targetPath stage pkg
-        cabalFile = pkgCabalFile pkg
+    let cabalFile = pkgCabalFile pkg
         configure = pkgPath pkg -/- "configure"
         dataFile  = pkgDataFile stage pkg
 
