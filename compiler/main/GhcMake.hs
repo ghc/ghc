@@ -1886,13 +1886,11 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                 | isJust (ml_hs_file location) ->
                         -- Home package
                          just_found location mod
-                | otherwise ->
-                        -- Drop external-pkg
-                        ASSERT(moduleUnitId mod /= thisPackage dflags)
-                        return Nothing
 
-             err -> return $ Just $ Left $ noModError dflags loc wanted_mod err
+             _ -> return Nothing
                         -- Not found
+                        -- (If it is TRULY not found at all, we'll
+                        -- error when we actually try to compile)
 
     just_found location mod = do
                 -- Adjust location to point to the hs-boot source file,
