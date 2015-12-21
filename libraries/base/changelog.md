@@ -34,15 +34,7 @@
 
   * New `GHC.Generics.packageName` operation
 
-  * New `GHC.Stack.Types` module now contains the definition of
-    `CallStack` and `SrcLoc`
-
-  * New `GHC.Stack.Types.pushCallStack` function pushes a call-site onto a `CallStack`
-
-  * `GHC.SrcLoc` has been removed
-
-  * `GHC.Stack.showCallStack` and `GHC.SrcLoc.showSrcLoc` are now called
-    `GHC.Stack.prettyCallStack` and `GHC.Stack.prettySrcLoc` respectively
+  * New `GHC.Stack.CallStack` data type
 
   * `Complex` now has `Generic`, `Generic1`, `Functor`, `Foldable`, `Traversable`,
     `Applicative`, and `Monad` instances
@@ -108,6 +100,9 @@
 
   * Redesign `GHC.Generics` to use type-level literals to represent the
     metadata of generic representation types (#9766)
+
+  * The `IsString` instance for `[Char]` has been modified to eliminate
+    ambiguity arising from overloaded strings and functions like `(++)`.
 
 ## 4.8.2.0  *Oct 2015*
 
