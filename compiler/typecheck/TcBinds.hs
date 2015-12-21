@@ -32,7 +32,6 @@ import TcEvidence
 import TcHsType
 import TcPat
 import TcMType
-import ConLike
 import Inst( deeplyInstantiate )
 import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
@@ -174,10 +173,10 @@ Then we get
                                fm
 -}
 
-tcTopBinds :: HsValBinds Name -> TcM (TcGblEnv, TcLclEnv)
+tcTopBinds :: [(RecFlag, LHsBinds Name)] -> [LSig Name] -> TcM (TcGblEnv, TcLclEnv)
 -- The TcGblEnv contains the new tcg_binds and tcg_spects
 -- The TcLclEnv has an extended type envt for the new bindings
-tcTopBinds (ValBindsOut binds sigs)
+tcTopBinds binds sigs
   = do  { -- Pattern synonym bindings populate the global environment
           (binds', (tcg_env, tcl_env)) <- tcValBinds TopLevel binds sigs $
             do { gbl <- getGblEnv
@@ -192,8 +191,6 @@ tcTopBinds (ValBindsOut binds sigs)
         -- The top level bindings are flattened into a giant
         -- implicitly-mutually-recursive LHsBinds
 
-tcTopBinds (ValBindsIn {}) = panic "tcTopBinds"
-
 tcRecSelBinds :: HsValBinds Name -> TcM TcGblEnv
 tcRecSelBinds (ValBindsOut binds sigs)
   = tcExtendGlobalValEnv [sel_id | L _ (IdSig sel_id) <- sigs] $
@@ -203,10 +200,10 @@ tcRecSelBinds (ValBindsOut binds sigs)
        ; return tcg_env' }
 tcRecSelBinds (ValBindsIn {}) = panic "tcRecSelBinds"
 
-tcHsBootSigs :: HsValBinds Name -> TcM [Id]
+tcHsBootSigs :: [(RecFlag, LHsBinds Name)] -> [LSig Name] -> TcM [Id]
 -- A hs-boot file has only one BindGroup, and it only has type
 -- signatures in it.  The renamer checked all this
-tcHsBootSigs (ValBindsOut binds sigs)
+tcHsBootSigs binds sigs
   = do  { checkTc (null binds) badBootDeclErr
         ; concat <$> mapM (addLocM tc_boot_sig) (filter isTypeLSig sigs) }
   where
@@ -218,7 +215,6 @@ tcHsBootSigs (ValBindsOut binds sigs)
                ; return (mkVanillaGlobal name sigma_ty) }
         -- Notice that we make GlobalIds, not LocalIds
     tc_boot_sig s = pprPanic "tcHsBootSigs/tc_boot_sig" (ppr s)
-tcHsBootSigs groups = pprPanic "tcHsBootSigs" (ppr groups)
 
 badBootDeclErr :: MsgDoc
 badBootDeclErr = ptext (sLit "Illegal declarations in an hs-boot file")
@@ -267,9 +263,8 @@ tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
     toDict ipClass x ty = HsWrap $ mkWpCastR $
                           wrapIP $ mkClassPred ipClass [x,ty]
 
-{-
-Note [Implicit parameter untouchables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Implicit parameter untouchables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We add the type variables in the types of the implicit parameters
 as untouchables, not so much because we really must not unify them,
 but rather because we otherwise end up with constraints like this
@@ -281,29 +276,6 @@ time by defaulting.  No no no.
 
 However [Oct 10] this is all handled automatically by the
 untouchable-range idea.
-
-Note [Placeholder PatSyn kinds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this (Trac #9161)
-
-  {-# LANGUAGE PatternSynonyms, DataKinds #-}
-  pattern A = ()
-  b :: A
-  b = undefined
-
-Here, the type signature for b mentions A.  But A is a pattern
-synonym, which is typechecked (for very good reasons; a view pattern
-in the RHS may mention a value binding) as part of a group of
-bindings.  It is entirely reasonable to reject this, but to do so
-we need A to be in the kind environment when kind-checking the signature for B.
-
-Hence the tcExtendKindEnv2 patsyn_placeholder_kinds, which adds a binding
-    A -> AGlobal (AConLike (PatSynCon _|_))
-to the environment. Then TcHsType.tcTyVar will find A in the kind environment,
-and will give a 'wrongThingErr' as a result.  But the lookup of A won't fail.
-
-The _|_ (= panic "fakePatSynCon") works because the wrongThingErr call, in
-tcTyVar, doesn't look inside the TcTyThing.
 
 Note [Inlining and hs-boot files]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -359,9 +331,10 @@ tcValBinds :: TopLevelFlag
            -> TcM ([(RecFlag, LHsBinds TcId)], thing)
 
 tcValBinds top_lvl binds sigs thing_inside
-  = do  {  -- Typecheck the signature
-        ; (poly_ids, sig_fn) <- tcExtendKindEnv2 patsyn_placeholder_kinds $
-                                         -- See Note [Placeholder PatSyn kinds]
+  = do  { let patsyns = getPatSynBinds binds
+
+            -- Typecheck the signature
+        ; (poly_ids, sig_fn) <- tcAddPatSynPlaceholders patsyns $
                                 tcTySigs sigs
 
         ; _self_boot <- tcSelfBootInfo
@@ -390,12 +363,6 @@ tcValBinds top_lvl binds sigs thing_inside
                    ; let extra_binds = [ (NonRecursive, builder) | builder <- patsyn_builders ]
                    ; return (extra_binds, thing) }
             ; return (binds' ++ extra_binds', thing) }}
-  where
-    patsyns = [psb | (_, lbinds) <- binds, L _ (PatSynBind psb) <- bagToList lbinds]
-    patsyn_placeholder_kinds -- See Note [Placeholder PatSyn kinds]
-      = [(name, placeholder_patsyn_tything)| PSB{ psb_id = L _ name } <- patsyns ]
-    placeholder_patsyn_tything
-      = AGlobal $ AConLike $ PatSynCon $ panic "fakePatSynCon"
 
 ------------------------
 tcBindGroups :: TopLevelFlag -> TcSigFun -> TcPragEnv

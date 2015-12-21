@@ -2134,6 +2134,7 @@ promotionErr name err
                NoDataKinds    -> text "Perhaps you intended to use DataKinds"
                NoTypeInTypeTC -> text "Perhaps you intended to use TypeInType"
                NoTypeInTypeDC -> text "Perhaps you intended to use TypeInType"
+               PatSynPE       -> text "Pattern synonyms cannot be promoted"
                _ -> text "it is defined and used in the same recursive group"
 
 {-

@@ -632,16 +632,16 @@ tcRnHsBootDecls hsc_src decls
    = do { (first_group, group_tail) <- findSplice decls
 
                 -- Rename the declarations
-        ; (tcg_env, HsGroup {
-                   hs_tyclds = tycl_decls,
-                   hs_instds = inst_decls,
-                   hs_derivds = deriv_decls,
-                   hs_fords  = for_decls,
-                   hs_defds  = def_decls,
-                   hs_ruleds = rule_decls,
-                   hs_vects  = vect_decls,
-                   hs_annds  = _,
-                   hs_valds  = val_binds }) <- rnTopSrcDecls first_group
+        ; (tcg_env, HsGroup { hs_tyclds = tycl_decls
+                            , hs_instds = inst_decls
+                            , hs_derivds = deriv_decls
+                            , hs_fords  = for_decls
+                            , hs_defds  = def_decls
+                            , hs_ruleds = rule_decls
+                            , hs_vects  = vect_decls
+                            , hs_annds  = _
+                            , hs_valds  = ValBindsOut val_binds val_sigs })
+              <- rnTopSrcDecls first_group
         -- The empty list is for extra dependencies coming from .hs-boot files
         -- See Note [Extra dependencies from .hs-boot files] in RnSource
         ; (gbl_env, lie) <- captureConstraints $ setGblEnv tcg_env $ do {
@@ -659,12 +659,12 @@ tcRnHsBootDecls hsc_src decls
                 -- Typecheck type/class/isntance decls
         ; traceTc "Tc2 (boot)" empty
         ; (tcg_env, inst_infos, _deriv_binds)
-             <- tcTyClsInstDecls tycl_decls inst_decls deriv_decls
+             <- tcTyClsInstDecls tycl_decls inst_decls deriv_decls val_binds
         ; setGblEnv tcg_env     $ do {
 
                 -- Typecheck value declarations
         ; traceTc "Tc5" empty
-        ; val_ids <- tcHsBootSigs val_binds
+        ; val_ids <- tcHsBootSigs val_binds val_sigs
 
                 -- Wrap up
                 -- No simplification or zonking to do
@@ -1143,7 +1143,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                          hs_annds  = annotation_decls,
                          hs_ruleds = rule_decls,
                          hs_vects  = vect_decls,
-                         hs_valds  = val_binds })
+                         hs_valds  = hs_val_binds@(ValBindsOut val_binds val_sigs) })
  = do {         -- Type-check the type and class decls, and all imported decls
                 -- The latter come in via tycl_decls
         traceTc "Tc2 (src)" empty ;
@@ -1151,8 +1151,8 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- Source-language instances, including derivings,
                 -- and import the supporting declarations
         traceTc "Tc3" empty ;
-        (tcg_env, inst_infos, deriv_binds)
-            <- tcTyClsInstDecls tycl_decls inst_decls deriv_decls ;
+        (tcg_env, inst_infos, ValBindsOut deriv_binds deriv_sigs)
+            <- tcTyClsInstDecls tycl_decls inst_decls deriv_decls val_binds ;
         setGblEnv tcg_env       $ do {
 
                 -- Generate Applicative/Monad proposal (AMP) warnings
@@ -1175,12 +1175,12 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- Now GHC-generated derived bindings, generics, and selectors
                 -- Do not generate warnings from compiler-generated code;
                 -- hence the use of discardWarnings
-        tc_envs <- discardWarnings (tcTopBinds deriv_binds) ;
+        tc_envs <- discardWarnings (tcTopBinds deriv_binds deriv_sigs) ;
         setEnvs tc_envs $ do {
 
                 -- Value declarations next
         traceTc "Tc5" empty ;
-        tc_envs@(tcg_env, tcl_env) <- tcTopBinds val_binds;
+        tc_envs@(tcg_env, tcl_env) <- tcTopBinds val_binds val_sigs;
         setEnvs tc_envs $ do {  -- Environment doesn't change now
 
                 -- Second pass over class and instance declarations,
@@ -1210,8 +1210,8 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
             ; fo_fvs = foldrBag (\gre fvs -> fvs `addOneFV` gre_name gre)
                                 emptyFVs fo_gres
 
-            ; sig_names = mkNameSet (collectHsValBinders val_binds)
-                          `minusNameSet` getTypeSigNames val_binds
+            ; sig_names = mkNameSet (collectHsValBinders hs_val_binds)
+                          `minusNameSet` getTypeSigNames val_sigs
 
                 -- Extend the GblEnv with the (as yet un-zonked)
                 -- bindings, rules, foreign decls
@@ -1231,6 +1231,8 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
 
         return (tcg_env', tcl_env)
     }}}}}}
+
+tcTopSrcDecls _ = panic "tcTopSrcDecls: ValBindsIn"
 
 
 tcSemigroupWarnings :: TcM ()
@@ -1420,51 +1422,21 @@ tcMissingParentClassWarn warnFlag isName shouldName
 tcTyClsInstDecls :: [TyClGroup Name]
                  -> [LInstDecl Name]
                  -> [LDerivDecl Name]
+                 -> [(RecFlag, LHsBinds Name)]
                  -> TcM (TcGblEnv,            -- The full inst env
                          [InstInfo Name],     -- Source-code instance decls to process;
                                               -- contains all dfuns for this module
                           HsValBinds Name)    -- Supporting bindings for derived instances
 
-tcTyClsInstDecls tycl_decls inst_decls deriv_decls
- = tcExtendKindEnv2 [ (con, APromotionErr FamDataConPE)
-                    | lid <- inst_decls, con <- get_cons lid ] $
-      -- Note [AFamDataCon: not promoting data family constructors]
+tcTyClsInstDecls tycl_decls inst_decls deriv_decls binds
+ = tcAddDataFamConPlaceholders inst_decls           $
+   tcAddPatSynPlaceholders (getPatSynBinds binds) $
    do { tcg_env <- tcTyAndClassDecls tycl_decls ;
       ; setGblEnv tcg_env $
         tcInstDecls1 tycl_decls inst_decls deriv_decls }
-  where
-    -- get_cons extracts the *constructor* bindings of the declaration
-    get_cons :: LInstDecl Name -> [Name]
-    get_cons (L _ (TyFamInstD {}))                     = []
-    get_cons (L _ (DataFamInstD { dfid_inst = fid }))  = get_fi_cons fid
-    get_cons (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = fids } }))
-      = concatMap (get_fi_cons . unLoc) fids
-
-    get_fi_cons :: DataFamInstDecl Name -> [Name]
-    get_fi_cons (DataFamInstDecl { dfid_defn = HsDataDefn { dd_cons = cons } })
-      = map unLoc $ concatMap (getConNames . unLoc) cons
-
-{-
-Note [AFamDataCon: not promoting data family constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-  data family T a
-  data instance T Int = MkT
-  data Proxy (a :: k)
-  data S = MkS (Proxy 'MkT)
-
-Is it ok to use the promoted data family instance constructor 'MkT' in
-the data declaration for S?  No, we don't allow this. It *might* make
-sense, but at least it would mean that we'd have to interleave
-typechecking instances and data types, whereas at present we do data
-types *then* instances.
-
-So to check for this we put in the TcLclEnv a binding for all the family
-constructors, bound to AFamDataCon, so that if we trip over 'MkT' when
-type checking 'S' we'll produce a decent error message.
 
 
-************************************************************************
+{- *********************************************************************
 *                                                                      *
         Checking for 'main'
 *                                                                      *

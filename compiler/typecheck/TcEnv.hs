@@ -36,6 +36,8 @@ module TcEnv(
         getScopedTyVarBinds, getInLocalScope,
         wrongThingErr, pprBinders,
 
+        tcAddDataFamConPlaceholders, tcAddPatSynPlaceholders,
+        getPatSynBinds, getTypeSigNames,
         tcExtendRecEnv,         -- For knot-tying
 
         -- Instances
@@ -84,6 +86,7 @@ import TyCon
 import CoAxiom
 import Class
 import Name
+import NameSet
 import NameEnv
 import VarEnv
 import HscTypes
@@ -94,6 +97,7 @@ import Module
 import Outputable
 import Encoding
 import FastString
+import Bag
 import ListSetOps
 import Util
 import Maybes( MaybeErr(..) )
@@ -538,7 +542,104 @@ tcExtendIdBndrs bndrs thing_inside
                    thing_inside }
 
 
-{-
+{- *********************************************************************
+*                                                                      *
+             Adding placeholders
+*                                                                      *
+********************************************************************* -}
+
+tcAddDataFamConPlaceholders :: [LInstDecl Name] -> TcM a -> TcM a
+-- See Note [AFamDataCon: not promoting data family constructors]
+tcAddDataFamConPlaceholders inst_decls thing_inside
+  = tcExtendKindEnv2 [ (con, APromotionErr FamDataConPE)
+                     | lid <- inst_decls, con <- get_cons lid ]
+      thing_inside
+      -- Note [AFamDataCon: not promoting data family constructors]
+  where
+    -- get_cons extracts the *constructor* bindings of the declaration
+    get_cons :: LInstDecl Name -> [Name]
+    get_cons (L _ (TyFamInstD {}))                     = []
+    get_cons (L _ (DataFamInstD { dfid_inst = fid }))  = get_fi_cons fid
+    get_cons (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = fids } }))
+      = concatMap (get_fi_cons . unLoc) fids
+
+    get_fi_cons :: DataFamInstDecl Name -> [Name]
+    get_fi_cons (DataFamInstDecl { dfid_defn = HsDataDefn { dd_cons = cons } })
+      = map unLoc $ concatMap (getConNames . unLoc) cons
+
+
+tcAddPatSynPlaceholders :: [PatSynBind Name Name] -> TcM a -> TcM a
+-- See Note [Don't promote pattern synonyms]
+tcAddPatSynPlaceholders pat_syns thing_inside
+  = tcExtendKindEnv2 [ (name, APromotionErr PatSynPE)
+                     | PSB{ psb_id = L _ name } <- pat_syns ]
+       thing_inside
+
+getPatSynBinds :: [(RecFlag, LHsBinds Name)] -> [PatSynBind Name Name]
+getPatSynBinds binds
+  = [ psb | (_, lbinds) <- binds
+          , L _ (PatSynBind psb) <- bagToList lbinds ]
+
+
+getTypeSigNames :: [LSig Name] -> NameSet
+-- Get the names that have a user type sig
+getTypeSigNames sigs
+  = foldr get_type_sig emptyNameSet sigs
+  where
+    get_type_sig :: LSig Name -> NameSet -> NameSet
+    get_type_sig sig ns =
+      case sig of
+        L _ (TypeSig names _) -> extendNameSetList ns (map unLoc names)
+        L _ (PatSynSig name _) -> extendNameSet ns (unLoc name)
+        _ -> ns
+
+
+{- Note [AFamDataCon: not promoting data family constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  data family T a
+  data instance T Int = MkT
+  data Proxy (a :: k)
+  data S = MkS (Proxy 'MkT)
+
+Is it ok to use the promoted data family instance constructor 'MkT' in
+the data declaration for S?  No, we don't allow this. It *might* make
+sense, but at least it would mean that we'd have to interleave
+typechecking instances and data types, whereas at present we do data
+types *then* instances.
+
+So to check for this we put in the TcLclEnv a binding for all the family
+constructors, bound to AFamDataCon, so that if we trip over 'MkT' when
+type checking 'S' we'll produce a decent error message.
+
+Note [Don't promote pattern synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We never promote pattern synonyms.
+
+Consider this (Trac #11265):
+  pattern A = True
+  instance Eq A
+We want a civilised error message from the occurrence of 'A'
+in the instance, yet 'A' really has not yet been type checked.
+
+Similarly (Trac #9161)
+  {-# LANGUAGE PatternSynonyms, DataKinds #-}
+  pattern A = ()
+  b :: A
+  b = undefined
+Here, the type signature for b mentions A.  But A is a pattern
+synonym, which is typechecked as part of a group of bindings (for very
+good reasons; a view pattern in the RHS may mention a value binding).
+It is entirely reasonable to reject this, but to do so we need A to be
+in the kind environment when kind-checking the signature for B.
+
+Hence tcAddPatSynPlaceholers adds a binding
+    A -> APromotionErr PatSynPE
+to the environment. Then TcHsType.tcTyVar will find A in the kind
+environment, and will give a 'wrongThingErr' as a result.  But the
+lookup of A won't fail.
+
+
 ************************************************************************
 *                                                                      *
 \subsection{Rules}
