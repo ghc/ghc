@@ -2139,18 +2139,18 @@ checkValidDataCon dflags existential_ok tc con
           -- Check that UNPACK pragmas and bangs work out
           -- E.g.  reject   data T = MkT {-# UNPACK #-} Int     -- No "!"
           --                data T = MkT {-# UNPACK #-} !a      -- Can't unpack
-        ; mapM_ check_bang (zip3 (dataConSrcBangs con) (dataConImplBangs con) [1..])
+        ; zipWith3M_ check_bang (dataConSrcBangs con) (dataConImplBangs con) [1..]
 
         ; traceTc "Done validity of data con" (ppr con <+> ppr (dataConRepType con))
     }
   where
     ctxt = ConArgCtxt (dataConName con)
 
-    check_bang (HsSrcBang _ _ SrcLazy, _, n)
+    check_bang (HsSrcBang _ _ SrcLazy) _ n
       | not (xopt LangExt.StrictData dflags)
       = addErrTc
           (bad_bang n (ptext (sLit "Lazy annotation (~) without StrictData")))
-    check_bang (HsSrcBang _ want_unpack strict_mark, rep_bang, n)
+    check_bang (HsSrcBang _ want_unpack strict_mark) rep_bang n
       | isSrcUnpacked want_unpack, not is_strict
       = addWarnTc (bad_bang n (ptext (sLit "UNPACK pragma lacks '!'")))
       | isSrcUnpacked want_unpack
@@ -2164,7 +2164,7 @@ checkValidDataCon dflags existential_ok tc con
                       NoSrcStrict -> xopt LangExt.StrictData dflags
                       bang        -> isSrcStrict bang
 
-    check_bang _
+    check_bang _ _ _
       = return ()
 
     bad_bang n herald
