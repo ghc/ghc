@@ -494,7 +494,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
 
     wrongNumberErr loc =
       parseErrorSDoc loc $
-      text "pattern synonym 'where' clause can not be empty." $$
+      text "pattern synonym 'where' clause cannot be empty" $$
       text "In the pattern synonym declaration for: " <+> ppr (patsyn_name)
 
 mkConDeclH98 :: Located RdrName -> Maybe [LHsTyVarBndr RdrName]
