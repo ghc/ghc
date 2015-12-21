@@ -1,21 +1,20 @@
-{-# LANGUAGE Trustworthy            #-}
 {-# LANGUAGE CPP                    #-}
-{-# LANGUAGE NoImplicitPrelude      #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE TypeSynonymInstances   #-}
-{-# LANGUAGE TypeOperators          #-}
-{-# LANGUAGE MagicHash              #-}
-{-# LANGUAGE KindSignatures         #-}
-{-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE GADTs                  #-}
-{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE KindSignatures         #-}
+{-# LANGUAGE MagicHash              #-}
+{-# LANGUAGE NoImplicitPrelude      #-}
 {-# LANGUAGE PolyKinds              #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE StandaloneDeriving     #-}
-{-# LANGUAGE DeriveGeneric          #-}
-{-# LANGUAGE PolyKinds              #-}
-{-# LANGUAGE MagicHash              #-}
+{-# LANGUAGE Trustworthy            #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE TypeSynonymInstances   #-}
+{-# LANGUAGE UndecidableInstances   #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -75,12 +74,24 @@ module GHC.Generics  (
 --   type 'Rep' (Tree a) =
 --     'D1' ('MetaData \"Tree\" \"Main\" \"package-name\" 'False)
 --       ('C1' ('MetaCons \"Leaf\" 'PrefixI 'False)
---          ('S1' 'MetaNoSel ('Rec0' a))
+--          ('S1' '(MetaSel 'Nothing
+--                           'NoSourceUnpackedness
+--                           'NoSourceStrictness
+--                           'DecidedLazy)
+--                 ('Rec0' a))
 --        ':+:'
 --        'C1' ('MetaCons \"Node\" 'PrefixI 'False)
---          ('S1' 'MetaNoSel ('Rec0' (Tree a))
+--          ('S1' ('MetaSel 'Nothing
+--                          'NoSourceUnpackedness
+--                          'NoSourceStrictness
+--                          'DecidedLazy)
+--                ('Rec0' (Tree a))
 --           ':*:'
---           'S1' 'MetaNoSel ('Rec0' (Tree a))))
+--           'S1' ('MetaSel 'Nothing
+--                          'NoSourceUnpackedness
+--                          'NoSourceStrictness
+--                          'DecidedLazy)
+--                ('Rec0' (Tree a))))
 --   ...
 -- @
 --
@@ -114,8 +125,27 @@ module GHC.Generics  (
 --
 -- Now let us explain the additional tags being used in the complete representation:
 --
---    * The @'S1' 'MetaNoSel@ indicates that there is no record field selector
---      associated with this field of the constructor.
+--    * The @'S1' ('MetaSel 'Nothing 'NoSourceUnpackedness 'NoSourceStrictness
+--      'DecidedLazy)@ tag indicates several things. The @'Nothing@ indicates
+--      that there is no record field selector associated with this field of
+--      the constructor (if there were, it would have been marked @'Just
+--      \"recordName\"@ instead). The other types contain meta-information on
+--      the field's strictness:
+--
+--      * There is no @{\-\# UNPACK \#-\}@ or @{\-\# NOUNPACK \#-\}@ annotation
+--        in the source, so it is tagged with @'NoSourceUnpackedness@.
+--
+--      * There is no strictness (@!@) or laziness (@~@) annotation in the
+--        source, so it is tagged with @'NoSourceStrictness@.
+--
+--      * The compiler infers that the field is lazy, so it is tagged with
+--        @'DecidedLazy@. Bear in mind that what the compiler decides may be
+--        quite different from what is written in the source. See
+--        'DecidedStrictness' for a more detailed explanation.
+--
+--      The @'MetaSel@ type is also an instance of the type class 'Selector',
+--      which can be used to obtain information about the field at the value
+--      level.
 --
 --    * The @'C1' ('MetaCons \"Leaf\" 'PrefixI 'False)@ and
 --      @'C1' ('MetaCons \"Node\" 'PrefixI 'False)@ invocations indicate that the enclosed part is
@@ -462,12 +492,24 @@ module GHC.Generics  (
 --   type 'Rep1' Tree =
 --     'D1' ('MetaData \"Tree\" \"Main\" \"package-name\" 'False)
 --       ('C1' ('MetaCons \"Leaf\" 'PrefixI 'False)
---          ('S1' 'MetaNoSel 'Par1')
+--          ('S1' ('MetaSel 'Nothing
+--                          'NoSourceUnpackedness
+--                          'NoSourceStrictness
+--                          'DecidedLazy)
+--                'Par1')
 --        ':+:'
 --        'C1' ('MetaCons \"Node\" 'PrefixI 'False)
---          ('S1' 'MetaNoSel ('Rec1' Tree)
+--          ('S1' ('MetaSel 'Nothing
+--                          'NoSourceUnpackedness
+--                          'NoSourceStrictness
+--                          'DecidedLazy)
+--                ('Rec1' Tree)
 --           ':*:'
---           'S1' 'MetaNoSel ('Rec1' Tree)))
+--           'S1' ('MetaSel 'Nothing
+--                          'NoSourceUnpackedness
+--                          'NoSourceStrictness
+--                          'DecidedLazy)
+--                ('Rec1' Tree)))
 --   ...
 --  @
 --
@@ -513,9 +555,17 @@ module GHC.Generics  (
 --   type 'Rep1' WithInt =
 --     'D1' ('MetaData \"WithInt\" \"Main\" \"package-name\" 'False)
 --       ('C1' ('MetaCons \"WithInt\" 'PrefixI 'False)
---         ('S1' 'MetaNoSel ('Rec0' Int)
+--         ('S1' ('MetaSel 'Nothing
+--                         'NoSourceUnpackedness
+--                         'NoSourceStrictness
+--                         'DecidedLazy)
+--               ('Rec0' Int)
 --          ':*:'
---          'S1' 'MetaNoSel 'Par1'))
+--          'S1' ('MetaSel 'Nothing
+--                          'NoSourceUnpackedness
+--                          'NoSourceStrictness
+--                          'DecidedLazy)
+--               'Par1'))
 -- @
 --
 -- If the parameter @a@ appears underneath a composition of other type constructors,
@@ -532,9 +582,17 @@ module GHC.Generics  (
 --   type 'Rep1' Rose =
 --     'D1' ('MetaData \"Rose\" \"Main\" \"package-name\" 'False)
 --       ('C1' ('MetaCons \"Fork\" 'PrefixI 'False)
---         ('S1' 'MetaNoSel 'Par1'
+--         ('S1' ('MetaSel 'Nothing
+--                         'NoSourceUnpackedness
+--                         'NoSourceStrictness
+--                         'DecidedLazy)
+--               'Par1'
 --          ':*:'
---          'S1' 'MetaNoSel ([] ':.:' 'Rec1' Rose)
+--          'S1' ('MetaSel 'Nothing
+--                          'NoSourceUnpackedness
+--                          'NoSourceStrictness
+--                          'DecidedLazy)
+--               ([] ':.:' 'Rec1' Rose)))
 -- @
 --
 -- where
@@ -596,7 +654,11 @@ module GHC.Generics  (
 --   type 'Rep' IntHash =
 --     'D1' ('MetaData \"IntHash\" \"Main\" \"package-name\" 'False)
 --       ('C1' ('MetaCons \"IntHash\" 'PrefixI 'False)
---         ('S1' 'MetaNoSel 'UInt'))
+--         ('S1' ('MetaSel 'Nothing
+--                         'NoSourceUnpackedness
+--                         'NoSourceStrictness
+--                         'DecidedLazy)
+--               'UInt'))
 -- @
 --
 -- Currently, only the six unlifted types listed above are generated, but this
@@ -627,8 +689,9 @@ module GHC.Generics  (
   , D1, C1, S1, D, C, S
 
   -- * Meta-information
-  , Datatype(..), Constructor(..), Selector(..), NoSelector
+  , Datatype(..), Constructor(..), Selector(..)
   , Fixity(..), FixityI(..), Associativity(..), prec
+  , SourceUnpackedness(..), SourceStrictness(..), DecidedStrictness(..)
   , Meta(..)
 
   -- * Generic type classes
@@ -641,10 +704,11 @@ import GHC.Integer ( Integer, integerToInt )
 import GHC.Prim ( Addr#, Char#, Double#, Float#, Int#, Word# )
 import GHC.Ptr ( Ptr )
 import GHC.Types
-import Data.Maybe  ( Maybe(..) )
+import Data.Maybe  ( Maybe(..), fromMaybe )
 import Data.Either ( Either(..) )
 
 -- Needed for instances
+import GHC.Base    ( String )
 import GHC.Classes ( Eq, Ord )
 import GHC.Read    ( Read )
 import GHC.Show    ( Show )
@@ -814,22 +878,78 @@ data Associativity = LeftAssociative
                    | NotAssociative
   deriving (Eq, Show, Ord, Read, Generic)
 
+-- | The unpackedness of a field as the user wrote it in the source code. For
+-- example, in the following data type:
+--
+-- @
+-- data E = ExampleConstructor     Int
+--            {\-\# NOUNPACK \#-\} Int
+--            {\-\#   UNPACK \#-\} Int
+-- @
+--
+-- The fields of @ExampleConstructor@ have 'NoSourceUnpackedness',
+-- 'SourceNoUnpack', and 'SourceUnpack', respectively.
+data SourceUnpackedness = NoSourceUnpackedness
+                        | SourceNoUnpack
+                        | SourceUnpack
+  deriving (Eq, Show, Ord, Read, Generic)
+
+-- | The strictness of a field as the user wrote it in the source code. For
+-- example, in the following data type:
+--
+-- @
+-- data E = ExampleConstructor Int ~Int !Int
+-- @
+--
+-- The fields of @ExampleConstructor@ have 'NoSourceStrictness',
+-- 'SourceLazy', and 'SourceStrict', respectively.
+data SourceStrictness = NoSourceStrictness
+                      | SourceLazy
+                      | SourceStrict
+  deriving (Eq, Show, Ord, Read, Generic)
+
+-- | The strictness that GHC infers for a field during compilation. Whereas
+-- there are nine different combinations of 'SourceUnpackedness' and
+-- 'SourceStrictness', the strictness that GHC decides will ultimately be one
+-- of lazy, strict, or unpacked. What GHC decides is affected both by what the
+-- user writes in the source code and by GHC flags. As an example, consider
+-- this data type:
+--
+-- @
+-- data E = ExampleConstructor {\-\# UNPACK \#-\} !Int !Int Int
+-- @
+--
+-- * If compiled without optimization or other language extensions, then the
+--   fields of @ExampleConstructor@ will have 'DecidedStrict', 'DecidedStrict',
+--   and 'DecidedLazy', respectively.
+--
+-- * If compiled with @-XStrictData@ enabled, then the fields will have
+--   'DecidedStrict', 'DecidedStrict', and 'DecidedStrict', respectively.
+--
+-- * If compiled with @-O2@ enabled, then the fields will have 'DecidedUnpack',
+--   'DecidedStrict', and 'DecidedLazy', respectively.
+data DecidedStrictness = DecidedLazy
+                       | DecidedStrict
+                       | DecidedUnpack
+  deriving (Eq, Show, Ord, Read, Generic)
+
 -- | Class for datatypes that represent records
 class Selector s where
   -- | The name of the selector
   selName :: t s (f :: * -> *) a -> [Char]
+  -- | The selector's unpackedness annotation (if any)
+  selSourceUnpackedness :: t s (f :: * -> *) a -> SourceUnpackedness
+  -- | The selector's strictness annotation (if any)
+  selSourceStrictness :: t s (f :: * -> *) a -> SourceStrictness
+  -- | The strictness that the compiler inferred for the selector
+  selDecidedStrictness :: t s (f :: * -> *) a -> DecidedStrictness
 
--- | Used for constructor fields without a name
--- Deprecated in 7.9
-{-# DEPRECATED NoSelector "'NoSelector' is no longer used" #-}
-data NoSelector
-instance Selector NoSelector        where selName _ = ""
-
-instance (KnownSymbol s) => Selector ('MetaSel s) where
-  selName _ = symbolVal (Proxy :: Proxy s)
-
-instance Selector 'MetaNoSel where
-  selName _ = ""
+instance (SingI mn, SingI su, SingI ss, SingI ds)
+    => Selector ('MetaSel mn su ss ds) where
+  selName _ = fromMaybe "" (fromSing (sing :: Sing mn))
+  selSourceUnpackedness _ = fromSing (sing :: Sing su)
+  selSourceStrictness   _ = fromSing (sing :: Sing ss)
+  selDecidedStrictness  _ = fromSing (sing :: Sing ds)
 
 -- | Representable types of kind *.
 -- This class is derivable in GHC with the DeriveGeneric flag on.
@@ -857,7 +977,7 @@ class Generic1 f where
 --------------------------------------------------------------------------------
 
 -- | Datatype to represent metadata associated with a datatype (@MetaData@),
--- constructor (@MetaCons@), or field (@MetaSel@ and @MetaNoSel@).
+-- constructor (@MetaCons@), or field selector (@MetaSel@).
 --
 -- * In @MetaData n m p nt@, @n@ is the datatype's name, @m@ is the module in
 --   which the datatype is defined, @p@ is the package in which the datatype
@@ -866,14 +986,14 @@ class Generic1 f where
 -- * In @MetaCons n f s@, @n@ is the constructor's name, @f@ is its fixity,
 --   and @s@ is @'True@ if the constructor contains record selectors.
 --
--- * Fields with record selectors are tagged with @MetaSel s@, where @s@ is
---   the record selector name.
---
--- * Fields without record selectors are tagged with @MetaNoSel@.
+-- * In @MetaSel mn su ss ds@, if the field is uses record syntax, then @mn@ is
+--   'Just' the record name. Otherwise, @mn@ is 'Nothing. @su@ and @ss@ are the
+--   field's unpackedness and strictness annotations, and @ds@ is the
+--   strictness that GHC infers for the field.
 data Meta = MetaData Symbol Symbol Symbol Bool
           | MetaCons Symbol FixityI Bool
-          | MetaSel  Symbol
-          | MetaNoSel
+          | MetaSel  (Maybe Symbol)
+                     SourceUnpackedness SourceStrictness DecidedStrictness
 
 --------------------------------------------------------------------------------
 -- Derived instances
@@ -930,6 +1050,16 @@ class (kparam ~ 'KProxy) => SingKind (kparam :: KProxy k) where
   -- | Convert a singleton to its unrefined version.
   fromSing :: Sing (a :: k) -> DemoteRep kparam
 
+-- Singleton symbols
+data instance Sing (_s :: Symbol) where
+  SSym :: KnownSymbol s => Sing s
+
+instance KnownSymbol a => SingI a where sing = SSym
+
+instance SingKind ('KProxy :: KProxy Symbol) where
+  type DemoteRep ('KProxy :: KProxy Symbol) = String
+  fromSing (SSym :: Sing s) = symbolVal (Proxy :: Proxy s)
+
 -- Singleton booleans
 data instance Sing (_a :: Bool) where
   STrue  :: Sing 'True
@@ -942,6 +1072,21 @@ instance SingKind ('KProxy :: KProxy Bool) where
   type DemoteRep ('KProxy :: KProxy Bool) = Bool
   fromSing STrue  = True
   fromSing SFalse = False
+
+-- Singleton Maybe
+data instance Sing (_b :: Maybe _a) where
+  SNothing :: Sing 'Nothing
+  SJust    :: Sing a -> Sing ('Just a)
+
+instance            SingI 'Nothing  where sing = SNothing
+instance SingI a => SingI ('Just a) where sing = SJust sing
+
+instance SingKind ('KProxy :: KProxy a) =>
+    SingKind ('KProxy :: KProxy (Maybe a)) where
+  type DemoteRep ('KProxy :: KProxy (Maybe a)) =
+      Maybe (DemoteRep ('KProxy :: KProxy a))
+  fromSing SNothing  = Nothing
+  fromSing (SJust a) = Just (fromSing a)
 
 -- Singleton Fixity
 data instance Sing (_a :: FixityI) where
@@ -972,3 +1117,51 @@ instance SingKind ('KProxy :: KProxy Associativity) where
   fromSing SLeftAssociative  = LeftAssociative
   fromSing SRightAssociative = RightAssociative
   fromSing SNotAssociative   = NotAssociative
+
+-- Singleton SourceUnpackedness
+data instance Sing (_a :: SourceUnpackedness) where
+  SNoSourceUnpackedness :: Sing 'NoSourceUnpackedness
+  SSourceNoUnpack       :: Sing 'SourceNoUnpack
+  SSourceUnpack         :: Sing 'SourceUnpack
+
+instance SingI 'NoSourceUnpackedness where sing = SNoSourceUnpackedness
+instance SingI 'SourceNoUnpack       where sing = SSourceNoUnpack
+instance SingI 'SourceUnpack         where sing = SSourceUnpack
+
+instance SingKind ('KProxy :: KProxy SourceUnpackedness) where
+  type DemoteRep ('KProxy :: KProxy SourceUnpackedness) = SourceUnpackedness
+  fromSing SNoSourceUnpackedness = NoSourceUnpackedness
+  fromSing SSourceNoUnpack       = SourceNoUnpack
+  fromSing SSourceUnpack         = SourceUnpack
+
+-- Singleton SourceStrictness
+data instance Sing (_a :: SourceStrictness) where
+  SNoSourceStrictness :: Sing 'NoSourceStrictness
+  SSourceLazy         :: Sing 'SourceLazy
+  SSourceStrict       :: Sing 'SourceStrict
+
+instance SingI 'NoSourceStrictness where sing = SNoSourceStrictness
+instance SingI 'SourceLazy         where sing = SSourceLazy
+instance SingI 'SourceStrict       where sing = SSourceStrict
+
+instance SingKind ('KProxy :: KProxy SourceStrictness) where
+  type DemoteRep ('KProxy :: KProxy SourceStrictness) = SourceStrictness
+  fromSing SNoSourceStrictness = NoSourceStrictness
+  fromSing SSourceLazy         = SourceLazy
+  fromSing SSourceStrict       = SourceStrict
+
+-- Singleton DecidedStrictness
+data instance Sing (_a :: DecidedStrictness) where
+  SDecidedLazy   :: Sing 'DecidedLazy
+  SDecidedStrict :: Sing 'DecidedStrict
+  SDecidedUnpack :: Sing 'DecidedUnpack
+
+instance SingI 'DecidedLazy   where sing = SDecidedLazy
+instance SingI 'DecidedStrict where sing = SDecidedStrict
+instance SingI 'DecidedUnpack where sing = SDecidedUnpack
+
+instance SingKind ('KProxy :: KProxy DecidedStrictness) where
+  type DemoteRep ('KProxy :: KProxy DecidedStrictness) = DecidedStrictness
+  fromSing SDecidedLazy   = DecidedLazy
+  fromSing SDecidedStrict = DecidedStrict
+  fromSing SDecidedUnpack = DecidedUnpack

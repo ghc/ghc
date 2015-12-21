@@ -12530,11 +12530,23 @@ representation:
     instance Generic (UserTree a) where
       -- Representation type
       type Rep (UserTree a) =
-        M1 D ('MetaData "UserTree" "Main" "package-name" "foo" 'False) (
+        M1 D ('MetaData "UserTree" "Main" "package-name" 'False) (
               M1 C ('MetaCons "Node" 'PrefixI 'False) (
-                    M1 S 'MetaNoSel (K1 R a)
-                :*: M1 S 'MetaNoSel (K1 R (UserTree a))
-                :*: M1 S 'MetaNoSel (K1 R (UserTree a)))
+                    M1 S ('MetaSel 'Nothing
+                                   'NoSourceUnpackedness
+                                   'NoSourceStrictness
+                                   'DecidedLazy)
+                         (K1 R a)
+                :*: M1 S ('MetaSel 'Nothing
+                                   'NoSourceUnpackedness
+                                   'NoSourceStrictness
+                                   'DecidedLazy)
+                         (K1 R (UserTree a))
+                :*: M1 S ('MetaSel 'Nothing
+                                   'NoSourceUnpackedness
+                                   'NoSourceStrictness
+                                   'DecidedLazy)
+                         (K1 R (UserTree a)))
           :+: M1 C ('MetaCons "Leaf" 'PrefixI 'False) U1)
 
       -- Conversion functions
@@ -12612,11 +12624,15 @@ As an example, this data declaration: ::
 
 results in the following ``Generic`` instance: ::
 
-    instance Generic IntHash where
-      type Rep IntHash =
-        D1 D1IntHash
-          (C1 C1_0IntHash
-            (S1 NoSelector UInt))
+    instance 'Generic' IntHash where
+      type 'Rep' IntHash =
+        'D1' ('MetaData "IntHash" "Main" "package-name" 'False)
+          ('C1' ('MetaCons "IntHash" 'PrefixI 'False)
+            ('S1' ('MetaSel 'Nothing
+                            'NoSourceUnpackedness
+                            'NoSourceStrictness
+                            'DecidedLazy)
+                  'UInt'))
 
 A user could provide, for example, a ``GSerialize UInt`` instance so that a
 ``Serialize IntHash`` instance could be easily defined in terms of

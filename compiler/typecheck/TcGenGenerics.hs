@@ -43,6 +43,7 @@ import FastString
 import Util
 
 import Control.Monad (mplus)
+import Data.List (zip4)
 import Data.Maybe (isJust)
 
 #include "HsVersions.h"
@@ -496,15 +497,23 @@ tc_mkRepTy gk_ tycon =
 
     let tcLookupPromDataCon = fmap promoteDataCon . tcLookupDataCon
 
-    md      <- tcLookupPromDataCon metaDataDataConName
-    mc      <- tcLookupPromDataCon metaConsDataConName
-    ms      <- tcLookupPromDataCon metaSelDataConName
-    mns     <- tcLookupPromDataCon metaNoSelDataConName
-    pPrefix <- tcLookupPromDataCon prefixIDataConName
-    pInfix  <- tcLookupPromDataCon infixIDataConName
-    pLA     <- tcLookupPromDataCon leftAssociativeDataConName
-    pRA     <- tcLookupPromDataCon rightAssociativeDataConName
-    pNA     <- tcLookupPromDataCon notAssociativeDataConName
+    md         <- tcLookupPromDataCon metaDataDataConName
+    mc         <- tcLookupPromDataCon metaConsDataConName
+    ms         <- tcLookupPromDataCon metaSelDataConName
+    pPrefix    <- tcLookupPromDataCon prefixIDataConName
+    pInfix     <- tcLookupPromDataCon infixIDataConName
+    pLA        <- tcLookupPromDataCon leftAssociativeDataConName
+    pRA        <- tcLookupPromDataCon rightAssociativeDataConName
+    pNA        <- tcLookupPromDataCon notAssociativeDataConName
+    pSUpk      <- tcLookupPromDataCon sourceUnpackDataConName
+    pSNUpk     <- tcLookupPromDataCon sourceNoUnpackDataConName
+    pNSUpkness <- tcLookupPromDataCon noSourceUnpackednessDataConName
+    pSLzy      <- tcLookupPromDataCon sourceLazyDataConName
+    pSStr      <- tcLookupPromDataCon sourceStrictDataConName
+    pNSStrness <- tcLookupPromDataCon noSourceStrictnessDataConName
+    pDLzy      <- tcLookupPromDataCon decidedLazyDataConName
+    pDStr      <- tcLookupPromDataCon decidedStrictDataConName
+    pDUpk      <- tcLookupPromDataCon decidedUnpackDataConName
 
     fix_env <- getFixityEnv
 
@@ -518,22 +527,26 @@ tc_mkRepTy gk_ tycon =
         mkC      a = mkTyConApp c1 [ metaConsTy a
                                    , prod (dataConInstOrigArgTys a
                                             . mkTyVarTys . tyConTyVars $ tycon)
+                                          (dataConSrcBangs    a)
+                                          (dataConImplBangs   a)
                                           (dataConFieldLabels a)]
-        mkS mlbl a = mkTyConApp s1 [metaSelTy mlbl, a]
+        mkS mlbl su ss ib a = mkTyConApp s1 [metaSelTy mlbl su ss ib, a]
 
         -- Sums and products are done in the same way for both Rep and Rep1
         sumP [] = mkTyConTy v1
         sumP l  = foldBal mkSum' . map mkC  $ l
         -- The Bool is True if this constructor has labelled fields
-        prod :: [Type] -> [FieldLabel] -> Type
-        prod [] _ = mkTyConTy u1
-        prod l fl = foldBal mkProd [ ASSERT(null fl || length fl > j)
-                                     arg t (if null fl then Nothing
+        prod :: [Type] -> [HsSrcBang] -> [HsImplBang] -> [FieldLabel] -> Type
+        prod [] _  _  _  = mkTyConTy u1
+        prod l  sb ib fl = foldBal mkProd
+                                   [ ASSERT(null fl || length fl > j)
+                                     arg t sb' ib' (if null fl
+                                                       then Nothing
                                                        else Just (fl !! j))
-                                   | (t,j) <- zip l [0..] ]
+                                   | (t,sb',ib',j) <- zip4 l sb ib [0..] ]
 
-        arg :: Type -> Maybe FieldLabel -> Type
-        arg t fl = mkS fl $ case gk_ of
+        arg :: Type -> HsSrcBang -> HsImplBang -> Maybe FieldLabel -> Type
+        arg t (HsSrcBang _ su ss) ib fl = mkS fl su ss ib $ case gk_ of
             -- Here we previously used Par0 if t was a type variable, but we
             -- realized that we can't always guarantee that we are wrapping-up
             -- all type variables in Par0. So we decided to stop using Par0
@@ -580,10 +593,29 @@ tc_mkRepTy gk_ tycon =
 
         selName = mkStrLitTy . flLabel
 
+        mbSel Nothing  = mkTyConApp promotedNothingDataCon [typeSymbolKind]
+        mbSel (Just s) = mkTyConApp promotedJustDataCon
+                                    [typeSymbolKind, selName s]
+
         metaDataTy   = mkTyConApp md [dtName, mdName, pkgName, isNT]
         metaConsTy c = mkTyConApp mc [ctName c, ctFix c, isRec c]
-        metaSelTy Nothing  = mkTyConTy mns
-        metaSelTy (Just s) = mkTyConApp ms [selName s]
+        metaSelTy mlbl su ss ib =
+            mkTyConApp ms [mbSel mlbl, pSUpkness, pSStrness, pDStrness]
+          where
+            pSUpkness = mkTyConTy $ case su of
+                                         SrcUnpack   -> pSUpk
+                                         SrcNoUnpack -> pSNUpk
+                                         NoSrcUnpack -> pNSUpkness
+
+            pSStrness = mkTyConTy $ case ss of
+                                         SrcLazy     -> pSLzy
+                                         SrcStrict   -> pSStr
+                                         NoSrcStrict -> pNSStrness
+
+            pDStrness = mkTyConTy $ case ib of
+                                         HsLazy      -> pDLzy
+                                         HsStrict    -> pDStr
+                                         HsUnpack{}  -> pDUpk
 
     return (mkD tycon)
 
@@ -607,7 +639,7 @@ mkBoxTy uAddr uChar uDouble uFloat uInt uWord rec0 ty
   | ty `eqType` floatPrimTy  = mkTyConTy uFloat
   | ty `eqType` intPrimTy    = mkTyConTy uInt
   | ty `eqType` wordPrimTy   = mkTyConTy uWord
-  | otherwise          = mkTyConApp rec0 [ty]
+  | otherwise                = mkTyConApp rec0 [ty]
 
 --------------------------------------------------------------------------------
 -- Dealing with sums

@@ -109,11 +109,19 @@ GHC.Generics representation types:
                                                                            'GHC.Types.True)
                                                                         (GHC.Generics.S1
                                                                            ('GHC.Generics.MetaSel
-                                                                              "element")
+                                                                              ('GHC.Base.Just
+                                                                                 "element")
+                                                                              'GHC.Generics.NoSourceUnpackedness
+                                                                              'GHC.Generics.NoSourceStrictness
+                                                                              'GHC.Generics.DecidedLazy)
                                                                            (GHC.Generics.Rec0 a)
                                                                          GHC.Generics.:*: GHC.Generics.S1
                                                                                             ('GHC.Generics.MetaSel
-                                                                                               "rest")
+                                                                                               ('GHC.Base.Just
+                                                                                                  "rest")
+                                                                                               'GHC.Generics.NoSourceUnpackedness
+                                                                                               'GHC.Generics.NoSourceStrictness
+                                                                                               'GHC.Generics.DecidedLazy)
                                                                                             (GHC.Generics.Rec0
                                                                                                (GenDerivOutput.List
                                                                                                   a))))
@@ -131,11 +139,19 @@ GHC.Generics representation types:
                                                                         'GHC.Types.True)
                                                                      (GHC.Generics.S1
                                                                         ('GHC.Generics.MetaSel
-                                                                           "element")
+                                                                           ('GHC.Base.Just
+                                                                              "element")
+                                                                           'GHC.Generics.NoSourceUnpackedness
+                                                                           'GHC.Generics.NoSourceStrictness
+                                                                           'GHC.Generics.DecidedLazy)
                                                                         GHC.Generics.Par1
                                                                       GHC.Generics.:*: GHC.Generics.S1
                                                                                          ('GHC.Generics.MetaSel
-                                                                                            "rest")
+                                                                                            ('GHC.Base.Just
+                                                                                               "rest")
+                                                                                            'GHC.Generics.NoSourceUnpackedness
+                                                                                            'GHC.Generics.NoSourceStrictness
+                                                                                            'GHC.Generics.DecidedLazy)
                                                                                          (GHC.Generics.Rec1
                                                                                             GenDerivOutput.List)))
   type GHC.Generics.Rep (GenDerivOutput.Rose a) = GHC.Generics.D1
@@ -156,10 +172,18 @@ GHC.Generics representation types:
                                                                            'GHC.Generics.PrefixI
                                                                            'GHC.Types.False)
                                                                         (GHC.Generics.S1
-                                                                           'GHC.Generics.MetaNoSel
+                                                                           ('GHC.Generics.MetaSel
+                                                                              'GHC.Base.Nothing
+                                                                              'GHC.Generics.NoSourceUnpackedness
+                                                                              'GHC.Generics.NoSourceStrictness
+                                                                              'GHC.Generics.DecidedLazy)
                                                                            (GHC.Generics.Rec0 a)
                                                                          GHC.Generics.:*: GHC.Generics.S1
-                                                                                            'GHC.Generics.MetaNoSel
+                                                                                            ('GHC.Generics.MetaSel
+                                                                                               'GHC.Base.Nothing
+                                                                                               'GHC.Generics.NoSourceUnpackedness
+                                                                                               'GHC.Generics.NoSourceStrictness
+                                                                                               'GHC.Generics.DecidedLazy)
                                                                                             (GHC.Generics.Rec0
                                                                                                (GenDerivOutput.List
                                                                                                   (GenDerivOutput.Rose
@@ -179,10 +203,20 @@ GHC.Generics representation types:
                                                                         'GHC.Generics.PrefixI
                                                                         'GHC.Types.False)
                                                                      (GHC.Generics.S1
-                                                                        'GHC.Generics.MetaNoSel
+                                                                        ('GHC.Generics.MetaSel
+                                                                           'GHC.Base.Nothing
+                                                                           'GHC.Generics.NoSourceUnpackedness
+                                                                           'GHC.Generics.NoSourceStrictness
+                                                                           'GHC.Generics.DecidedLazy)
                                                                         GHC.Generics.Par1
                                                                       GHC.Generics.:*: GHC.Generics.S1
-                                                                                         'GHC.Generics.MetaNoSel
+                                                                                         ('GHC.Generics.MetaSel
+                                                                                            'GHC.Base.Nothing
+                                                                                            'GHC.Generics.NoSourceUnpackedness
+                                                                                            'GHC.Generics.NoSourceStrictness
+                                                                                            'GHC.Generics.DecidedLazy)
                                                                                          (GenDerivOutput.List
                                                                                           GHC.Generics.:.: GHC.Generics.Rec1
                                                                                                              GenDerivOutput.Rose)))
+
+

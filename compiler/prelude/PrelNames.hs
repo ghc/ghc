@@ -392,8 +392,11 @@ genericTyConNames = [
     uFloatTyConName, uIntTyConName, uWordTyConName,
     prefixIDataConName, infixIDataConName, leftAssociativeDataConName,
     rightAssociativeDataConName, notAssociativeDataConName,
-    metaDataDataConName, metaConsDataConName,
-    metaSelDataConName, metaNoSelDataConName
+    sourceUnpackDataConName, sourceNoUnpackDataConName,
+    noSourceUnpackednessDataConName, sourceLazyDataConName,
+    sourceStrictDataConName, noSourceStrictnessDataConName,
+    decidedLazyDataConName, decidedStrictDataConName, decidedUnpackDataConName,
+    metaDataDataConName, metaConsDataConName, metaSelDataConName
   ]
 
 {-
@@ -873,8 +876,11 @@ v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
   uFloatTyConName, uIntTyConName, uWordTyConName,
   prefixIDataConName, infixIDataConName, leftAssociativeDataConName,
   rightAssociativeDataConName, notAssociativeDataConName,
-  metaDataDataConName, metaConsDataConName,
-  metaSelDataConName, metaNoSelDataConName :: Name
+  sourceUnpackDataConName, sourceNoUnpackDataConName,
+  noSourceUnpackednessDataConName, sourceLazyDataConName,
+  sourceStrictDataConName, noSourceStrictnessDataConName,
+  decidedLazyDataConName, decidedStrictDataConName, decidedUnpackDataConName,
+  metaDataDataConName, metaConsDataConName, metaSelDataConName :: Name
 
 v1TyConName  = tcQual gHC_GENERICS (fsLit "V1") v1TyConKey
 u1TyConName  = tcQual gHC_GENERICS (fsLit "U1") u1TyConKey
@@ -915,10 +921,19 @@ leftAssociativeDataConName  = dcQual gHC_GENERICS (fsLit "LeftAssociative")   le
 rightAssociativeDataConName = dcQual gHC_GENERICS (fsLit "RightAssociative")  rightAssociativeDataConKey
 notAssociativeDataConName   = dcQual gHC_GENERICS (fsLit "NotAssociative")    notAssociativeDataConKey
 
+sourceUnpackDataConName         = dcQual gHC_GENERICS (fsLit "SourceUnpack")         sourceUnpackDataConKey
+sourceNoUnpackDataConName       = dcQual gHC_GENERICS (fsLit "SourceNoUnpack")       sourceNoUnpackDataConKey
+noSourceUnpackednessDataConName = dcQual gHC_GENERICS (fsLit "NoSourceUnpackedness") noSourceUnpackednessDataConKey
+sourceLazyDataConName           = dcQual gHC_GENERICS (fsLit "SourceLazy")           sourceLazyDataConKey
+sourceStrictDataConName         = dcQual gHC_GENERICS (fsLit "SourceStrict")         sourceStrictDataConKey
+noSourceStrictnessDataConName   = dcQual gHC_GENERICS (fsLit "NoSourceStrictness")   noSourceStrictnessDataConKey
+decidedLazyDataConName          = dcQual gHC_GENERICS (fsLit "DecidedLazy")          decidedLazyDataConKey
+decidedStrictDataConName        = dcQual gHC_GENERICS (fsLit "DecidedStrict")        decidedStrictDataConKey
+decidedUnpackDataConName        = dcQual gHC_GENERICS (fsLit "DecidedUnpack")        decidedUnpackDataConKey
+
 metaDataDataConName  = dcQual gHC_GENERICS (fsLit "MetaData")  metaDataDataConKey
 metaConsDataConName  = dcQual gHC_GENERICS (fsLit "MetaCons")  metaConsDataConKey
 metaSelDataConName   = dcQual gHC_GENERICS (fsLit "MetaSel")   metaSelDataConKey
-metaNoSelDataConName = dcQual gHC_GENERICS (fsLit "MetaNoSel") metaNoSelDataConKey
 
 -- Base strings Strings
 unpackCStringName, unpackCStringFoldrName,
@@ -1823,17 +1838,28 @@ typeErrorShowTypeDataConKey             = mkPreludeDataConUnique 53
 
 prefixIDataConKey, infixIDataConKey, leftAssociativeDataConKey,
     rightAssociativeDataConKey, notAssociativeDataConKey,
-    metaDataDataConKey, metaConsDataConKey,
-    metaSelDataConKey, metaNoSelDataConKey :: Unique
+    sourceUnpackDataConKey, sourceNoUnpackDataConKey,
+    noSourceUnpackednessDataConKey, sourceLazyDataConKey,
+    sourceStrictDataConKey, noSourceStrictnessDataConKey,
+    decidedLazyDataConKey, decidedStrictDataConKey, decidedUnpackDataConKey,
+    metaDataDataConKey, metaConsDataConKey, metaSelDataConKey :: Unique
 prefixIDataConKey                       = mkPreludeDataConUnique 54
 infixIDataConKey                        = mkPreludeDataConUnique 55
 leftAssociativeDataConKey               = mkPreludeDataConUnique 56
 rightAssociativeDataConKey              = mkPreludeDataConUnique 57
 notAssociativeDataConKey                = mkPreludeDataConUnique 58
-metaDataDataConKey                      = mkPreludeDataConUnique 59
-metaConsDataConKey                      = mkPreludeDataConUnique 60
-metaSelDataConKey                       = mkPreludeDataConUnique 61
-metaNoSelDataConKey                     = mkPreludeDataConUnique 62
+sourceUnpackDataConKey                  = mkPreludeDataConUnique 59
+sourceNoUnpackDataConKey                = mkPreludeDataConUnique 60
+noSourceUnpackednessDataConKey          = mkPreludeDataConUnique 61
+sourceLazyDataConKey                    = mkPreludeDataConUnique 62
+sourceStrictDataConKey                  = mkPreludeDataConUnique 63
+noSourceStrictnessDataConKey            = mkPreludeDataConUnique 64
+decidedLazyDataConKey                   = mkPreludeDataConUnique 65
+decidedStrictDataConKey                 = mkPreludeDataConUnique 66
+decidedUnpackDataConKey                 = mkPreludeDataConUnique 67
+metaDataDataConKey                      = mkPreludeDataConUnique 68
+metaConsDataConKey                      = mkPreludeDataConUnique 69
+metaSelDataConKey                       = mkPreludeDataConUnique 70
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES DataUniques 100-150

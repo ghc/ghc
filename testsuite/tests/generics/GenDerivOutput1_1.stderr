@@ -155,7 +155,7 @@ Derived instances:
 
 
 GHC.Generics representation types:
-    type GHC.Generics.Rep1 CanDoRep1_1.Dd = GHC.Generics.D1
+  type GHC.Generics.Rep1 CanDoRep1_1.Dd = GHC.Generics.D1
                                             ('GHC.Generics.MetaData
                                                "Dd" "CanDoRep1_1" "main" 'GHC.Types.False)
                                             (GHC.Generics.C1
@@ -167,15 +167,23 @@ GHC.Generics representation types:
                                                                    "D1d"
                                                                    'GHC.Generics.PrefixI
                                                                    'GHC.Types.True)
-                                                                  (GHC.Generics.S1
-                                                                   ('GHC.Generics.MetaSel "d11d")
-                                                                     GHC.Generics.Par1
-                                                                   GHC.Generics.:*: GHC.Generics.S1
+                                                                (GHC.Generics.S1
+                                                                   ('GHC.Generics.MetaSel
+                                                                      ('GHC.Base.Just "d11d")
+                                                                      'GHC.Generics.NoSourceUnpackedness
+                                                                      'GHC.Generics.NoSourceStrictness
+                                                                      'GHC.Generics.DecidedLazy)
+                                                                   GHC.Generics.Par1
+                                                                 GHC.Generics.:*: GHC.Generics.S1
                                                                                     ('GHC.Generics.MetaSel
-                                                                                       "d12d")
-                                                                                      (GHC.Generics.Rec1
-                                                                                         CanDoRep1_1.Dd)))
-    type GHC.Generics.Rep (CanDoRep1_1.Dd a) = GHC.Generics.D1
+                                                                                       ('GHC.Base.Just
+                                                                                          "d12d")
+                                                                                       'GHC.Generics.NoSourceUnpackedness
+                                                                                       'GHC.Generics.NoSourceStrictness
+                                                                                       'GHC.Generics.DecidedLazy)
+                                                                                    (GHC.Generics.Rec1
+                                                                                       CanDoRep1_1.Dd)))
+  type GHC.Generics.Rep (CanDoRep1_1.Dd a) = GHC.Generics.D1
                                                ('GHC.Generics.MetaData
                                                   "Dd" "CanDoRep1_1" "main" 'GHC.Types.False)
                                                (GHC.Generics.C1
@@ -187,16 +195,24 @@ GHC.Generics representation types:
                                                                       "D1d"
                                                                       'GHC.Generics.PrefixI
                                                                       'GHC.Types.True)
-                                                                     (GHC.Generics.S1
-                                                                      ('GHC.Generics.MetaSel "d11d")
-                                                                        (GHC.Generics.Rec0 a)
-                                                                      GHC.Generics.:*: GHC.Generics.S1
+                                                                   (GHC.Generics.S1
+                                                                      ('GHC.Generics.MetaSel
+                                                                         ('GHC.Base.Just "d11d")
+                                                                         'GHC.Generics.NoSourceUnpackedness
+                                                                         'GHC.Generics.NoSourceStrictness
+                                                                         'GHC.Generics.DecidedLazy)
+                                                                      (GHC.Generics.Rec0 a)
+                                                                    GHC.Generics.:*: GHC.Generics.S1
                                                                                        ('GHC.Generics.MetaSel
-                                                                                          "d12d")
-                                                                                         (GHC.Generics.Rec0
-                                                                                            (CanDoRep1_1.Dd
-                                                                                               a))))
-    type GHC.Generics.Rep (CanDoRep1_1.Dc a) = GHC.Generics.D1
+                                                                                          ('GHC.Base.Just
+                                                                                             "d12d")
+                                                                                          'GHC.Generics.NoSourceUnpackedness
+                                                                                          'GHC.Generics.NoSourceStrictness
+                                                                                          'GHC.Generics.DecidedLazy)
+                                                                                       (GHC.Generics.Rec0
+                                                                                          (CanDoRep1_1.Dd
+                                                                                             a))))
+  type GHC.Generics.Rep (CanDoRep1_1.Dc a) = GHC.Generics.D1
                                                ('GHC.Generics.MetaData
                                                   "Dc" "CanDoRep1_1" "main" 'GHC.Types.False)
                                                (GHC.Generics.C1
@@ -208,16 +224,24 @@ GHC.Generics representation types:
                                                                       "D1c"
                                                                       'GHC.Generics.PrefixI
                                                                       'GHC.Types.True)
-                                                                     (GHC.Generics.S1
-                                                                      ('GHC.Generics.MetaSel "d11c")
-                                                                        (GHC.Generics.Rec0 a)
-                                                                      GHC.Generics.:*: GHC.Generics.S1
+                                                                   (GHC.Generics.S1
+                                                                      ('GHC.Generics.MetaSel
+                                                                         ('GHC.Base.Just "d11c")
+                                                                         'GHC.Generics.NoSourceUnpackedness
+                                                                         'GHC.Generics.NoSourceStrictness
+                                                                         'GHC.Generics.DecidedLazy)
+                                                                      (GHC.Generics.Rec0 a)
+                                                                    GHC.Generics.:*: GHC.Generics.S1
                                                                                        ('GHC.Generics.MetaSel
-                                                                                          "d12c")
-                                                                                         (GHC.Generics.Rec0
-                                                                                            (CanDoRep1_1.Dc
-                                                                                               a))))
-    type GHC.Generics.Rep1 CanDoRep1_1.Db = GHC.Generics.D1
+                                                                                          ('GHC.Base.Just
+                                                                                             "d12c")
+                                                                                          'GHC.Generics.NoSourceUnpackedness
+                                                                                          'GHC.Generics.NoSourceStrictness
+                                                                                          'GHC.Generics.DecidedLazy)
+                                                                                       (GHC.Generics.Rec0
+                                                                                          (CanDoRep1_1.Dc
+                                                                                             a))))
+  type GHC.Generics.Rep1 CanDoRep1_1.Db = GHC.Generics.D1
                                             ('GHC.Generics.MetaData
                                                "Db" "CanDoRep1_1" "main" 'GHC.Types.False)
                                             (GHC.Generics.C1
@@ -229,15 +253,23 @@ GHC.Generics representation types:
                                                                    "D1b"
                                                                    'GHC.Generics.PrefixI
                                                                    'GHC.Types.True)
-                                                                  (GHC.Generics.S1
-                                                                   ('GHC.Generics.MetaSel "d11b")
-                                                                     GHC.Generics.Par1
-                                                                   GHC.Generics.:*: GHC.Generics.S1
+                                                                (GHC.Generics.S1
+                                                                   ('GHC.Generics.MetaSel
+                                                                      ('GHC.Base.Just "d11b")
+                                                                      'GHC.Generics.NoSourceUnpackedness
+                                                                      'GHC.Generics.NoSourceStrictness
+                                                                      'GHC.Generics.DecidedLazy)
+                                                                   GHC.Generics.Par1
+                                                                 GHC.Generics.:*: GHC.Generics.S1
                                                                                     ('GHC.Generics.MetaSel
-                                                                                       "d12b")
-                                                                                      (GHC.Generics.Rec1
-                                                                                         CanDoRep1_1.Db)))
-    type GHC.Generics.Rep (CanDoRep1_1.Da a) = GHC.Generics.D1
+                                                                                       ('GHC.Base.Just
+                                                                                          "d12b")
+                                                                                       'GHC.Generics.NoSourceUnpackedness
+                                                                                       'GHC.Generics.NoSourceStrictness
+                                                                                       'GHC.Generics.DecidedLazy)
+                                                                                    (GHC.Generics.Rec1
+                                                                                       CanDoRep1_1.Db)))
+  type GHC.Generics.Rep (CanDoRep1_1.Da a) = GHC.Generics.D1
                                                ('GHC.Generics.MetaData
                                                   "Da" "CanDoRep1_1" "main" 'GHC.Types.False)
                                                (GHC.Generics.C1
@@ -249,16 +281,24 @@ GHC.Generics representation types:
                                                                       "D1"
                                                                       'GHC.Generics.PrefixI
                                                                       'GHC.Types.True)
-                                                                     (GHC.Generics.S1
-                                                                      ('GHC.Generics.MetaSel "d11a")
-                                                                        (GHC.Generics.Rec0 a)
-                                                                      GHC.Generics.:*: GHC.Generics.S1
+                                                                   (GHC.Generics.S1
+                                                                      ('GHC.Generics.MetaSel
+                                                                         ('GHC.Base.Just "d11a")
+                                                                         'GHC.Generics.NoSourceUnpackedness
+                                                                         'GHC.Generics.NoSourceStrictness
+                                                                         'GHC.Generics.DecidedLazy)
+                                                                      (GHC.Generics.Rec0 a)
+                                                                    GHC.Generics.:*: GHC.Generics.S1
                                                                                        ('GHC.Generics.MetaSel
-                                                                                          "d12a")
-                                                                                         (GHC.Generics.Rec0
-                                                                                            (CanDoRep1_1.Da
-                                                                                               a))))
-    type GHC.Generics.Rep1 CanDoRep1_1.Da = GHC.Generics.D1
+                                                                                          ('GHC.Base.Just
+                                                                                             "d12a")
+                                                                                          'GHC.Generics.NoSourceUnpackedness
+                                                                                          'GHC.Generics.NoSourceStrictness
+                                                                                          'GHC.Generics.DecidedLazy)
+                                                                                       (GHC.Generics.Rec0
+                                                                                          (CanDoRep1_1.Da
+                                                                                             a))))
+  type GHC.Generics.Rep1 CanDoRep1_1.Da = GHC.Generics.D1
                                             ('GHC.Generics.MetaData
                                                "Da" "CanDoRep1_1" "main" 'GHC.Types.False)
                                             (GHC.Generics.C1
@@ -270,15 +310,23 @@ GHC.Generics representation types:
                                                                    "D1"
                                                                    'GHC.Generics.PrefixI
                                                                    'GHC.Types.True)
-                                                                  (GHC.Generics.S1
-                                                                   ('GHC.Generics.MetaSel "d11a")
-                                                                     GHC.Generics.Par1
-                                                                   GHC.Generics.:*: GHC.Generics.S1
+                                                                (GHC.Generics.S1
+                                                                   ('GHC.Generics.MetaSel
+                                                                      ('GHC.Base.Just "d11a")
+                                                                      'GHC.Generics.NoSourceUnpackedness
+                                                                      'GHC.Generics.NoSourceStrictness
+                                                                      'GHC.Generics.DecidedLazy)
+                                                                   GHC.Generics.Par1
+                                                                 GHC.Generics.:*: GHC.Generics.S1
                                                                                     ('GHC.Generics.MetaSel
-                                                                                       "d12a")
-                                                                                      (GHC.Generics.Rec1
-                                                                                         CanDoRep1_1.Da)))
-    type GHC.Generics.Rep (CanDoRep1_1.Db a) = GHC.Generics.D1
+                                                                                       ('GHC.Base.Just
+                                                                                          "d12a")
+                                                                                       'GHC.Generics.NoSourceUnpackedness
+                                                                                       'GHC.Generics.NoSourceStrictness
+                                                                                       'GHC.Generics.DecidedLazy)
+                                                                                    (GHC.Generics.Rec1
+                                                                                       CanDoRep1_1.Da)))
+  type GHC.Generics.Rep (CanDoRep1_1.Db a) = GHC.Generics.D1
                                                ('GHC.Generics.MetaData
                                                   "Db" "CanDoRep1_1" "main" 'GHC.Types.False)
                                                (GHC.Generics.C1
@@ -290,16 +338,24 @@ GHC.Generics representation types:
                                                                       "D1b"
                                                                       'GHC.Generics.PrefixI
                                                                       'GHC.Types.True)
-                                                                     (GHC.Generics.S1
-                                                                      ('GHC.Generics.MetaSel "d11b")
-                                                                        (GHC.Generics.Rec0 a)
-                                                                      GHC.Generics.:*: GHC.Generics.S1
+                                                                   (GHC.Generics.S1
+                                                                      ('GHC.Generics.MetaSel
+                                                                         ('GHC.Base.Just "d11b")
+                                                                         'GHC.Generics.NoSourceUnpackedness
+                                                                         'GHC.Generics.NoSourceStrictness
+                                                                         'GHC.Generics.DecidedLazy)
+                                                                      (GHC.Generics.Rec0 a)
+                                                                    GHC.Generics.:*: GHC.Generics.S1
                                                                                        ('GHC.Generics.MetaSel
-                                                                                          "d12b")
-                                                                                         (GHC.Generics.Rec0
-                                                                                            (CanDoRep1_1.Db
-                                                                                               a))))
-    type GHC.Generics.Rep1 CanDoRep1_1.Dc = GHC.Generics.D1
+                                                                                          ('GHC.Base.Just
+                                                                                             "d12b")
+                                                                                          'GHC.Generics.NoSourceUnpackedness
+                                                                                          'GHC.Generics.NoSourceStrictness
+                                                                                          'GHC.Generics.DecidedLazy)
+                                                                                       (GHC.Generics.Rec0
+                                                                                          (CanDoRep1_1.Db
+                                                                                             a))))
+  type GHC.Generics.Rep1 CanDoRep1_1.Dc = GHC.Generics.D1
                                             ('GHC.Generics.MetaData
                                                "Dc" "CanDoRep1_1" "main" 'GHC.Types.False)
                                             (GHC.Generics.C1
@@ -311,13 +367,21 @@ GHC.Generics representation types:
                                                                    "D1c"
                                                                    'GHC.Generics.PrefixI
                                                                    'GHC.Types.True)
-                                                                  (GHC.Generics.S1
-                                                                   ('GHC.Generics.MetaSel "d11c")
-                                                                     GHC.Generics.Par1
-                                                                   GHC.Generics.:*: GHC.Generics.S1
+                                                                (GHC.Generics.S1
+                                                                   ('GHC.Generics.MetaSel
+                                                                      ('GHC.Base.Just "d11c")
+                                                                      'GHC.Generics.NoSourceUnpackedness
+                                                                      'GHC.Generics.NoSourceStrictness
+                                                                      'GHC.Generics.DecidedLazy)
+                                                                   GHC.Generics.Par1
+                                                                 GHC.Generics.:*: GHC.Generics.S1
                                                                                     ('GHC.Generics.MetaSel
-                                                                                       "d12c")
-                                                                                      (GHC.Generics.Rec1
-                                                                                         CanDoRep1_1.Dc)))
+                                                                                       ('GHC.Base.Just
+                                                                                          "d12c")
+                                                                                       'GHC.Generics.NoSourceUnpackedness
+                                                                                       'GHC.Generics.NoSourceStrictness
+                                                                                       'GHC.Generics.DecidedLazy)
+                                                                                    (GHC.Generics.Rec1
+                                                                                       CanDoRep1_1.Dc)))
 
 

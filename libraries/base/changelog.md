@@ -78,6 +78,11 @@
     super-class of `Monoid` in the future). These modules were
     provided by the `semigroups` package previously. (#10365)
 
+  * Add `selSourceUnpackedness`, `selSourceStrictness`, and
+    `selDecidedStrictness`, three functions which look up strictness
+    information of a field in a data constructor, to the `Selector` type class
+    in `GHC.Generics` (#10716)
+
   * Add `URec`, `UAddr`, `UChar`, `UDouble`, `UFloat`, `UInt`, and `UWord` to
     `GHC.Generics` as part of making GHC generics capable of handling
     unlifted types (#10868)

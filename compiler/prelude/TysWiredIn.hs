@@ -54,7 +54,8 @@ module TysWiredIn (
 
         -- * Maybe
         maybeTyCon, maybeTyConName,
-        nothingDataCon, nothingDataConName, justDataCon, justDataConName,
+        nothingDataCon, nothingDataConName, promotedNothingDataCon,
+        justDataCon, justDataConName, promotedJustDataCon,
 
         -- * Tuples
         mkTupleTy, mkBoxedTupleTy,
@@ -1045,6 +1046,11 @@ isPArrFakeCon dcon  = dcon == parrFakeCon (dataConSourceArity dcon)
 promotedFalseDataCon, promotedTrueDataCon :: TyCon
 promotedTrueDataCon   = promoteDataCon trueDataCon
 promotedFalseDataCon  = promoteDataCon falseDataCon
+
+-- Promoted Maybe
+promotedNothingDataCon, promotedJustDataCon :: TyCon
+promotedNothingDataCon = promoteDataCon nothingDataCon
+promotedJustDataCon    = promoteDataCon justDataCon
 
 -- Promoted Ordering
 

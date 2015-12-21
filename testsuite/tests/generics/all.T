@@ -17,6 +17,8 @@ test('GenCannotDoRep1_6', normal, compile_fail, [''])
 test('GenCannotDoRep1_7', normal, compile_fail, [''])
 test('GenCannotDoRep1_8', normal, compile_fail, [''])
 
+test('GFullyStrict', normal, compile_and_run, [''])
+
 test('T5462Yes1', outputdir('out_T5462Yes1')
     , multimod_compile_and_run, ['T5462Yes1', '-iGEq -iGEnum -iGFunctor'])
 test('T5462Yes2', outputdir('out_T5462Yes2')
