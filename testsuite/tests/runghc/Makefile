@@ -10,3 +10,15 @@ T7859:
 #compile.
 T8601:
 	-echo 'main = putStrLn "Hello World!"' | '$(RUNGHC)' -f '$(TEST_HC)' -hide-package --ghc-arg=bytestring
+
+T11247:
+	# Should all work:
+	'$(RUNGHC)' T11247-hs
+	'$(RUNGHC)' T11247-hs.hs
+	'$(RUNGHC)' T11247-lhs
+	'$(RUNGHC)' T11247-lhs.lhs
+	'$(RUNGHC)' T11247-no-extension
+	# Should print a "nice" error message that it can't find "foo." and
+	# "foo.bar"
+	-'$(RUNGHC)' foo.
+	-'$(RUNGHC)' foo.bar
