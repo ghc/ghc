@@ -24,7 +24,11 @@
 
   * `ZipList` now has `Foldable` and `Traversable` instances
 
-  * `Identity` now has a `Monoid` instance
+  * `Identity` now has `Semigroup` and `Monoid` instances
+
+  * `Identity` and `Const` now have `Bounded`, `Enum` and `Ix` instances
+
+  * `Identity` and `Const` now have `Storable` instances
 
   * `()` now has a `Storable` instance
 

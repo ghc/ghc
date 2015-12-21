@@ -39,13 +39,17 @@ import Control.Monad.Zip
 import Data.Coerce
 import Data.Data (Data)
 import Data.Foldable
+import Data.Ix (Ix)
+import Data.Semigroup (Semigroup)
+import Foreign.Storable (Storable)
 import GHC.Generics (Generic, Generic1)
 
 -- | Identity functor and monad. (a non-strict monad)
 --
 -- @since 4.8.0.0
 newtype Identity a = Identity { runIdentity :: a }
-    deriving (Eq, Ord, Data, Monoid, Traversable, Generic, Generic1)
+    deriving ( Bounded, Enum, Eq, Ix, Ord, Data, Monoid, Semigroup
+             , Storable, Traversable, Generic, Generic1)
 
 -- | This instance would be equivalent to the derived instances of the
 -- 'Identity' newtype if the 'runIdentity' field were removed

@@ -22,15 +22,19 @@
 module Data.Functor.Const (Const(..)) where
 
 import Data.Foldable (Foldable(foldMap))
+import Foreign.Storable (Storable)
 
+import GHC.Arr (Ix)
 import GHC.Base
+import GHC.Enum (Bounded, Enum)
 import GHC.Generics (Generic, Generic1)
 import GHC.Read (Read(readsPrec), readParen, lex)
 import GHC.Show (Show(showsPrec), showParen, showString)
 
 -- | The 'Const' functor.
 newtype Const a b = Const { getConst :: a }
-                  deriving (Generic, Generic1, Monoid, Eq, Ord)
+                  deriving ( Generic, Generic1, Bounded, Enum, Eq, Ix, Ord
+                           , Monoid, Storable)
 
 -- | This instance would be equivalent to the derived instances of the
 -- 'Const' newtype if the 'runConst' field were removed
