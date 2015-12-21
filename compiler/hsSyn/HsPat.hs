@@ -33,8 +33,6 @@ module HsPat (
 
         collectEvVarsPats,
 
-        hasFreeVarsLPat, hasFreeVarsPat,
-
         pprParendLPat, pprConArgs
     ) where
 
@@ -641,33 +639,3 @@ collectEvVarsPat pat =
     ConPatIn _  _     -> panic "foldMapPatBag: ConPatIn"
     SigPatIn _ _      -> panic "foldMapPatBag: SigPatIn"
     _other_pat        -> emptyBag
-
-hasFreeVarsLPat :: LPat id -> Bool
-hasFreeVarsLPat (L _ pat) = hasFreeVarsPat pat
-
--- | Checks whether a pattern contains any unbound variables from
--- `VarPat`s or `AsPat`s.
-hasFreeVarsPat :: Pat id -> Bool
-hasFreeVarsPat pat =
-  case pat of
-    VarPat {}         -> True
-    AsPat {}          -> True
-    NPlusKPat {}      -> True
-    NPat {}           -> False
-    LitPat {}         -> False
-    WildPat {}        -> False
-    ViewPat _ p _     -> hasFreeVarsLPat p
-    LazyPat  p        -> hasFreeVarsLPat p
-    ParPat   p        -> hasFreeVarsLPat p
-    BangPat  p        -> hasFreeVarsLPat p
-    ListPat  ps _ _   -> any hasFreeVarsLPat ps
-    TuplePat ps _ _   -> any hasFreeVarsLPat ps
-    PArrPat  ps _     -> any hasFreeVarsLPat ps
-    ConPatOut {pat_args = ps}
-                      -> any hasFreeVarsLPat (hsConPatArgs ps)
-    SigPatOut p _     -> hasFreeVarsLPat p
-    CoPat _ p _       -> hasFreeVarsPat p
-    ConPatIn _ p      -> any hasFreeVarsLPat (hsConPatArgs p)
-    SigPatIn p _      -> hasFreeVarsLPat p
-
-    SplicePat {}      -> panic "hasFreVarsPat: SplicePat"

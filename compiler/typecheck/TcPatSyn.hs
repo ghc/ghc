@@ -721,10 +721,7 @@ tcCheckPatSynPat = go
     go1   (ConPatIn _ info)   = mapM_ go (hsConPatArgs info)
     go1   VarPat{}            = return ()
     go1   WildPat{}           = return ()
-    go1   pat@(AsPat _ p)     =
-      if hasFreeVarsLPat p
-        then asPatInPatSynErr pat
-        else go p
+    go1 p@(AsPat _ _)         = asPatInPatSynErr p
     go1   (LazyPat pat)       = go pat
     go1   (ParPat pat)        = go pat
     go1   (BangPat pat)       = go pat
@@ -744,7 +741,7 @@ tcCheckPatSynPat = go
 asPatInPatSynErr :: OutputableBndr name => Pat name -> TcM a
 asPatInPatSynErr pat
   = failWithTc $
-    hang (ptext (sLit "Pattern synonym definition cannot contain as-patterns (@) which contain free variables:"))
+    hang (ptext (sLit "Pattern synonym definition cannot contain as-patterns (@):"))
        2 (ppr pat)
 
 thInPatSynErr :: OutputableBndr name => Pat name -> TcM a

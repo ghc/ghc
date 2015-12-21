@@ -1,5 +1,0 @@
-
-T9793-fail.hs:6:16: error:
-    • Pattern synonym definition cannot contain as-patterns (@) which contain free variables:
-        x@(y : _)
-    • In the declaration for pattern synonym ‘P’
