@@ -2146,6 +2146,7 @@ checkValidDataCon dflags existential_ok tc con
   where
     ctxt = ConArgCtxt (dataConName con)
 
+    check_bang :: HsSrcBang -> HsImplBang -> Int -> TcM ()
     check_bang (HsSrcBang _ _ SrcLazy) _ n
       | not (xopt LangExt.StrictData dflags)
       = addErrTc
