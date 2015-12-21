@@ -19,3 +19,15 @@ $ ./configure
 $ make inplace/bin/ghc-cabal   # This needs to be fixed
 $ shake-build/build.sh
 ```
+
+On Windows,
+```
+$ git clone --recursive git://git.haskell.org/ghc.git
+$ cd ghc
+$ git clone git://github.com/snowleopard/shaking-up-ghc shake-build
+$ ./boot
+$ ./configure --enable-tarballs-autodownload
+$ make inplace/bin/ghc-cabal   # This needs to be fixed
+$ shake-build/build.bat
+```
+Also see the Building GHC on Windows guide: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Windows.
