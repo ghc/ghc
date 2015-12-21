@@ -1227,17 +1227,17 @@ cvtTyLit (TH.StrTyLit s) = HsStrTy s        (fsLit s)
 cvtOpAppT :: LHsType RdrName -> RdrName -> LHsType RdrName -> LHsType RdrName
 cvtOpAppT t1@(L loc1 _) op t2@(L loc2 _)
   = L (combineSrcSpans loc1 loc2) $
-    HsAppsTy (t1' ++ [HsAppInfix (noLoc op)] ++ t2')
+    HsAppsTy (t1' ++ [noLoc $ HsAppInfix (noLoc op)] ++ t2')
   where
     t1' | L _ (HsAppsTy t1s) <- t1
         = t1s
         | otherwise
-        = [HsAppPrefix t1]
+        = [noLoc $ HsAppPrefix t1]
 
     t2' | L _ (HsAppsTy t2s) <- t2
         = t2s
         | otherwise
-        = [HsAppPrefix t2]
+        = [noLoc $ HsAppPrefix t2]
 
 cvtKind :: TH.Kind -> CvtM (LHsKind RdrName)
 cvtKind = cvtTypeKind "kind"

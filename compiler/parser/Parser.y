@@ -1662,12 +1662,12 @@ btype_no_ops :: { LHsType RdrName }
         : btype_no_ops atype            { sLL $1 $> $ HsAppTy $1 $2 }
         | atype                         { $1 }
 
-tyapps :: { Located [HsAppType RdrName] }   -- NB: This list is reversed
-        : tyapp                         { sL1 $1 [unLoc $1] }
-        | tyapps tyapp                  { sLL $1 $> $ (unLoc $2) : (unLoc $1) }
+tyapps :: { Located [LHsAppType RdrName] }   -- NB: This list is reversed
+        : tyapp                         { sL1 $1 [$1] }
+        | tyapps tyapp                  { sLL $1 $> $ $2 : (unLoc $1) }
 
 -- See Note [HsAppsTy] in HsTypes
-tyapp :: { Located (HsAppType RdrName) }
+tyapp :: { LHsAppType RdrName }
         : atype                         { sL1 $1 $ HsAppPrefix $1 }
         | qtyconop                      { sL1 $1 $ HsAppInfix $1 }
         | tyvarop                       { sL1 $1 $ HsAppInfix $1 }

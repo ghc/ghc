@@ -27,7 +27,7 @@ module HsTypes (
         HsContext, LHsContext,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
-        HsAppType(..),
+        HsAppType(..),LHsAppType,
 
         LBangType, BangType,
         HsSrcBang(..), HsImplBang(..),
@@ -387,7 +387,7 @@ data HsType name
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsAppsTy            [HsAppType name]  -- Used only before renaming,
+  | HsAppsTy            [LHsAppType name]  -- Used only before renaming,
                                           -- Note [HsAppsTy]
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
@@ -541,6 +541,9 @@ data HsWildCardInfo name
       -- A named wild card ('_a').
     deriving (Typeable)
 deriving instance (DataId name) => Data (HsWildCardInfo name)
+
+type LHsAppType name = Located (HsAppType name)
+      -- ^ 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSimpleQuote'
 
 data HsAppType name
   = HsAppInfix (Located name)       -- either a symbol or an id in backticks
@@ -996,9 +999,9 @@ splitHsFunType orig_ty@(L _ (HsAppTy t1 t2))
 splitHsFunType other = ([], other)
 
 ignoreParens :: LHsType name -> LHsType name
-ignoreParens (L _ (HsParTy ty))                = ignoreParens ty
-ignoreParens (L _ (HsAppsTy [HsAppPrefix ty])) = ignoreParens ty
-ignoreParens ty                                = ty
+ignoreParens (L _ (HsParTy ty))                      = ignoreParens ty
+ignoreParens (L _ (HsAppsTy [L _ (HsAppPrefix ty)])) = ignoreParens ty
+ignoreParens ty                                      = ty
 
 {-
 ************************************************************************
@@ -1108,9 +1111,9 @@ pprParendHsType ty = ppr_mono_ty TyConPrec ty
 
 -- Before printing a type, remove outermost HsParTy parens
 prepare :: HsType name -> HsType name
-prepare (HsParTy ty)                      = prepare (unLoc ty)
-prepare (HsAppsTy [HsAppPrefix (L _ ty)]) = prepare ty
-prepare ty                                = ty
+prepare (HsParTy ty)                            = prepare (unLoc ty)
+prepare (HsAppsTy [L _ (HsAppPrefix (L _ ty))]) = prepare ty
+prepare ty                                      = ty
 
 ppr_mono_lty :: (OutputableBndr name) => TyPrec -> LHsType name -> SDoc
 ppr_mono_lty ctxt_prec ty = ppr_mono_ty ctxt_prec (unLoc ty)
@@ -1150,7 +1153,7 @@ ppr_mono_ty ctxt_prec (HsEqTy ty1 ty2)
 
 ppr_mono_ty ctxt_prec (HsAppsTy tys)
   = maybeParen ctxt_prec TyConPrec $
-    hsep (map (ppr_app_ty TopPrec) tys)
+    hsep (map (ppr_app_ty TopPrec . unLoc) tys)
 
 ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
   = maybeParen ctxt_prec TyConPrec $

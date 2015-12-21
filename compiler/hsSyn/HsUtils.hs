@@ -968,7 +968,9 @@ hsConDeclsBinders cons = go id cons
              L loc (ConDeclGADT { con_names = names
                                 , con_type = HsIB { hsib_body = res_ty}}) ->
                case tau of
-                 L _ (HsFunTy (L _ (HsAppsTy [HsAppPrefix (L _ (HsRecTy flds))])) _res_ty)
+                 L _ (HsFunTy
+                      (L _ (HsAppsTy
+                            [L _ (HsAppPrefix (L _ (HsRecTy flds)))])) _res_ty)
                          -> record_gadt flds
                  L _ (HsFunTy (L _ (HsRecTy flds)) _res_ty)
                          -> record_gadt flds
@@ -1109,7 +1111,7 @@ lPatImplicits = hs_lpat
 
 -- | Retrieves the head of an HsAppsTy, if this can be done unambiguously,
 -- without consulting fixities.
-getAppsTyHead_maybe :: [HsAppType name] -> Maybe (LHsType name, [LHsType name])
+getAppsTyHead_maybe :: [LHsAppType name] -> Maybe (LHsType name, [LHsType name])
 getAppsTyHead_maybe tys = case splitHsAppsTy tys of
   ([app1:apps], []) ->  -- no symbols, some normal types
     Just (mkHsAppTys app1 apps, [])
@@ -1124,13 +1126,13 @@ getAppsTyHead_maybe tys = case splitHsAppsTy tys of
 -- element of @non_syms@ followed by the first element of @syms@ followed by
 -- the next element of @non_syms@, etc. It is guaranteed that the non_syms list
 -- has one more element than the syms list.
-splitHsAppsTy :: [HsAppType name] -> ([[LHsType name]], [Located name])
+splitHsAppsTy :: [LHsAppType name] -> ([[LHsType name]], [Located name])
 splitHsAppsTy = go [] [] []
   where
     go acc acc_non acc_sym [] = (reverse (reverse acc : acc_non), reverse acc_sym)
-    go acc acc_non acc_sym (HsAppPrefix ty : rest)
+    go acc acc_non acc_sym (L _ (HsAppPrefix ty) : rest)
       = go (ty : acc) acc_non acc_sym rest
-    go acc acc_non acc_sym (HsAppInfix op : rest)
+    go acc acc_non acc_sym (L _ (HsAppInfix op) : rest)
       = go [] (reverse acc : acc_non) (op : acc_sym) rest
 
 -- retrieve the name of the "head" of a nested type application

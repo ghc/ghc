@@ -996,7 +996,7 @@ collectWildCards :: LHsType name -> [Located (HsWildCardInfo name)]
 collectWildCards lty = go lty
   where
     go (L loc ty) = case ty of
-      HsAppsTy tys            -> gos (mapMaybe prefix_types_only tys)
+      HsAppsTy tys            -> gos (mapMaybe (prefix_types_only . unLoc) tys)
       HsAppTy ty1 ty2         -> go ty1 `mappend` go ty2
       HsFunTy ty1 ty2         -> go ty1 `mappend` go ty2
       HsListTy ty             -> go ty
@@ -1619,12 +1619,13 @@ extract_lty t_or_k (L _ ty) acc
       HsWildCardTy {}           -> return acc
 
 extract_apps :: TypeOrKind
-             -> [HsAppType RdrName] -> FreeKiTyVars -> RnM FreeKiTyVars
+             -> [LHsAppType RdrName] -> FreeKiTyVars -> RnM FreeKiTyVars
 extract_apps t_or_k tys acc = foldrM (extract_app t_or_k) acc tys
 
-extract_app :: TypeOrKind -> HsAppType RdrName -> FreeKiTyVars -> RnM FreeKiTyVars
-extract_app t_or_k (HsAppInfix tv)  acc = extract_tv t_or_k tv acc
-extract_app t_or_k (HsAppPrefix ty) acc = extract_lty t_or_k ty acc
+extract_app :: TypeOrKind -> LHsAppType RdrName -> FreeKiTyVars
+            -> RnM FreeKiTyVars
+extract_app t_or_k (L _ (HsAppInfix tv))  acc = extract_tv t_or_k tv acc
+extract_app t_or_k (L _ (HsAppPrefix ty)) acc = extract_lty t_or_k ty acc
 
 extract_hs_tv_bndrs :: [LHsTyVarBndr RdrName] -> FreeKiTyVars
                     -> FreeKiTyVars -> RnM FreeKiTyVars
