@@ -196,7 +196,7 @@ data Type
         TyBinder
         Type            -- ^ A Π type.
                         -- This includes arrow types, constructed with
-                        -- @ForAllTy (Anon ...)@.
+                        -- @ForAllTy (Anon ...)@. See also Note [TyBinder].
 
   | LitTy TyLit     -- ^ Type literals are similar to type constructors.
 
@@ -225,6 +225,7 @@ data TyLit
 
 -- | A 'TyBinder' represents an argument to a function. TyBinders can be dependent
 -- ('Named') or nondependent ('Anon'). They may also be visible or not.
+-- See also Note [TyBinder]
 data TyBinder
   = Named TyVar VisibilityFlag
   | Anon Type   -- visibility is determined by the type (Constraint vs. *)
@@ -264,6 +265,20 @@ type KindOrType = Type -- See Note [Arguments to type constructors]
 type Kind = Type
 
 {-
+Note [TyBinder]
+~~~~~~~~~~~~~~~
+This represents the type of binders -- that is, the type of an argument
+to a Pi-type. GHC Core currently supports two different Pi-types:
+a non-dependent function, written with ->, and a dependent compile-time-only
+polytype, written with forall. Both Pi-types classify terms/types that
+take an argument. In other words, if `x` is either a function or a polytype,
+`x arg` makes sense (for an appropriate `arg`). It is thus often convenient
+to group Pi-types together. This is ForAllTy.
+
+The two constructors for TyBinder sort out the two different possibilities.
+`Named` builds a polytype, while `Anon` builds an ordinary function.
+(ForAllTy (Anon arg) res used to be called FunTy arg res.)
+
 Note [The kind invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 The kinds
