@@ -35,9 +35,8 @@ import Data.List (lines, words, unlines, unwords)
 class IsString a where
     fromString :: String -> a
 
-{-
-Note [IsString String]
-~~~~~~~~~~~~~~~~~~~~~~
+{- Note [IsString String]
+~~~~~~~~~~~~~~~~~~~~~~~~~
 Previously, the IsString instance that covered String was a flexible
 instance for [Char]. This is in some sense the most accurate choice,
 but there are cases where it can lead to an ambiguity, for instance:
@@ -74,6 +73,8 @@ would be, and it certainly hasn't been implemented.
 A test case (should_run/overloadedstringsrun01.hs) has been added to
 ensure the good behavior of the above example remains in the future.
 -}
+
 instance (a ~ Char) => IsString [a] where
+         -- See Note [IsString String]
     fromString xs = xs
 
