@@ -653,7 +653,7 @@ qcnames1 :: { ([AddAnn], [Located (Maybe RdrName)]) }     -- A reversed list
                                                     l@(L _ Nothing) ->
                                                       return ([mj AnnComma $2, mj AnnDotdot l]
                                                               ,($3  : snd $1))
-                                                    l -> (aa l (AnnComma, $2) >>
+                                                    l -> (aa (head (snd $1)) (AnnComma, $2) >>
                                                           return (fst $1, $3 : snd $1)) }
 
 
