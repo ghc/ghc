@@ -78,7 +78,8 @@ extern __thread gc_thread* gct;
    x86/Linux, because we have too few registers available. In my
    tests it was worth about 5% in GC performance, but of course that
    might change as gcc improves. -- SDM 2009/04/03 */
-#elif (defined(i386_HOST_ARCH) && defined(linux_HOST_OS))
+#elif (defined(i386_HOST_ARCH) && (defined(linux_HOST_OS) \
+                                   || defined(solaris2_HOST_OS)))
 extern __thread gc_thread* gct;
 #define SET_GCT(to) gct = (to)
 #define DECLARE_GCT __thread gc_thread* gct;
