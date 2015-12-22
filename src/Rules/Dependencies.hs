@@ -24,7 +24,24 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
         hDepFile %> \file -> do
             srcs <- interpretPartial target getPackageSources
             when (pkg == compiler) $ need [platformH]
-            need srcs
+            -- TODO: very ugly and fragile; use gcc -MM instead?
+            let extraDeps = if pkg /= compiler then [] else fmap (buildPath -/-)
+                   [ "primop-vector-uniques.hs-incl"
+                   , "primop-data-decl.hs-incl"
+                   , "primop-tag.hs-incl"
+                   , "primop-list.hs-incl"
+                   , "primop-strictness.hs-incl"
+                   , "primop-fixity.hs-incl"
+                   , "primop-primop-info.hs-incl"
+                   , "primop-out-of-line.hs-incl"
+                   , "primop-has-side-effects.hs-incl"
+                   , "primop-can-fail.hs-incl"
+                   , "primop-code-size.hs-incl"
+                   , "primop-commutable.hs-incl"
+                   , "primop-vector-tys-exports.hs-incl"
+                   , "primop-vector-tycons.hs-incl"
+                   , "primop-vector-tys.hs-incl" ]
+            need $ srcs ++ extraDeps
             if srcs == []
             then writeFileChanged file ""
             else build $ fullTarget target (GhcM stage) srcs [file]
@@ -36,23 +53,4 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
             need $ hDepFile : cDepFiles -- need all for more parallelism
             cDeps <- fmap concat $ mapM readFile' cDepFiles
             hDeps <- readFile' hDepFile
-            -- TODO: very ugly and fragile; use gcc -MM instead?
-            let hsIncl hs incl = buildPath -/- hs <.> "o" ++ " : "
-                              ++ buildPath -/- incl ++ "\n"
-                extraDeps = if pkg /= compiler then [] else
-                       hsIncl "PrelNames" "primop-vector-uniques.hs-incl"
-                    ++ hsIncl "PrimOp"    "primop-data-decl.hs-incl"
-                    ++ hsIncl "PrimOp"    "primop-tag.hs-incl"
-                    ++ hsIncl "PrimOp"    "primop-list.hs-incl"
-                    ++ hsIncl "PrimOp"    "primop-strictness.hs-incl"
-                    ++ hsIncl "PrimOp"    "primop-fixity.hs-incl"
-                    ++ hsIncl "PrimOp"    "primop-primop-info.hs-incl"
-                    ++ hsIncl "PrimOp"    "primop-out-of-line.hs-incl"
-                    ++ hsIncl "PrimOp"    "primop-has-side-effects.hs-incl"
-                    ++ hsIncl "PrimOp"    "primop-can-fail.hs-incl"
-                    ++ hsIncl "PrimOp"    "primop-code-size.hs-incl"
-                    ++ hsIncl "PrimOp"    "primop-commutable.hs-incl"
-                    ++ hsIncl "TysPrim"   "primop-vector-tys-exports.hs-incl"
-                    ++ hsIncl "TysPrim"   "primop-vector-tycons.hs-incl"
-                    ++ hsIncl "TysPrim"   "primop-vector-tys.hs-incl"
-            writeFileChanged file $ cDeps ++ hDeps ++ extraDeps
+            writeFileChanged file $ cDeps ++ hDeps
