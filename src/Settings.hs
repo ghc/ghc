@@ -53,26 +53,25 @@ getPackageSources = do
     return $ foundSources ++ fixGhcPrim generatedSources
 
 -- findModuleFiles scans a list of given directories and finds files matching a
--- given extension pattern (e.g., "*hs") that correspond to modules of the
--- currently built package. Missing module files are returned in a separate
--- list. The returned pair contains the following:
+-- given pattern (e.g., "*hs") that correspond to modules of the currently built
+-- package. Missing module files are returned in a separate list. The returned
+-- pair contains the following:
 -- * a list of found module files, with paths being relative to one of given
 --   directories, e.g. "codeGen/CodeGen/Platform.hs" for the compiler package.
 -- * a list of module files that have not been found, with paths being relative
 --   to the module directory, e.g. "CodeGen/Platform", and with no extension.
 findModuleFiles :: [FilePath] -> FilePattern -> Expr ([FilePath], [FilePath])
-findModuleFiles dirs extension = do
+findModuleFiles dirs pattern = do
     modules <- getPkgDataList Modules
     let decodedMods    = sort . map decodeModule $ modules
         modDirFiles    = map (bimap head sort . unzip)
                        . groupBy ((==) `on` fst) $ decodedMods
-        matchExtension = (?==) ("*" <.> extension)
 
     result <- lift . fmap concat . forM dirs $ \dir -> do
         todo <- filterM (doesDirectoryExist . (dir -/-) . fst) modDirFiles
         forM todo $ \(mDir, mFiles) -> do
             let fullDir = dir -/- mDir
-            files <- fmap (filter matchExtension) $ getDirectoryContents fullDir
+            files <- getDirectoryFiles fullDir [pattern]
             let cmp fe f = compare (dropExtension fe) f
                 found    = intersectOrd cmp files mFiles
             return (map (fullDir -/-) found, (mDir, map dropExtension found))

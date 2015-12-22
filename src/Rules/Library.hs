@@ -49,7 +49,7 @@ buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
         putSuccess $ renderBox
             [ "Successfully built package library '"
               ++ pkgName pkg
-              ++ "' (stage " ++ show stage ++ ", way "++ show way ++ ")."
+              ++ "' (" ++ show stage ++ ", way "++ show way ++ ")."
             , "Package synopsis: " ++ dropWhileEnd isPunctuation synopsis ++ "."
             ]
 
