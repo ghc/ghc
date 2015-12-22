@@ -503,16 +503,24 @@ cvtConstr (RecGadtC c varstrtys ty idx)
         ; let rec_ty = noLoc (HsFunTy (noLoc $ HsRecTy rec_flds) ret_ty)
         ; returnL $ mkGadtDecl c' (mkLHsSigType rec_ty) }
 
-cvt_arg :: (TH.Strict, TH.Type) -> CvtM (LHsType RdrName)
-cvt_arg (NotStrict, ty) = cvtType ty
-cvt_arg (IsStrict,  ty)
-  = do { ty' <- cvtType ty
-       ; returnL $ HsBangTy (HsSrcBang Nothing NoSrcUnpack SrcStrict) ty' }
-cvt_arg (Unpacked,  ty)
-  = do { ty' <- cvtType ty
-       ; returnL $ HsBangTy (HsSrcBang Nothing SrcUnpack   SrcStrict) ty' }
+cvtSrcUnpackedness :: TH.SourceUnpackedness -> SrcUnpackedness
+cvtSrcUnpackedness NoSourceUnpackedness = NoSrcUnpack
+cvtSrcUnpackedness SourceNoUnpack       = SrcNoUnpack
+cvtSrcUnpackedness SourceUnpack         = SrcUnpack
 
-cvt_id_arg :: (TH.Name, TH.Strict, TH.Type) -> CvtM (LConDeclField RdrName)
+cvtSrcStrictness :: TH.SourceStrictness -> SrcStrictness
+cvtSrcStrictness NoSourceStrictness = NoSrcStrict
+cvtSrcStrictness SourceLazy         = SrcLazy
+cvtSrcStrictness SourceStrict       = SrcStrict
+
+cvt_arg :: (TH.Bang, TH.Type) -> CvtM (LHsType RdrName)
+cvt_arg (Bang su ss, ty)
+  = do { ty' <- cvtType ty
+       ; let su' = cvtSrcUnpackedness su
+       ; let ss' = cvtSrcStrictness ss
+       ; returnL $ HsBangTy (HsSrcBang Nothing su' ss') ty' }
+
+cvt_id_arg :: (TH.Name, TH.Bang, TH.Type) -> CvtM (LConDeclField RdrName)
 cvt_id_arg (i, str, ty)
   = do  { L li i' <- vNameL i
         ; ty' <- cvt_arg (str,ty)

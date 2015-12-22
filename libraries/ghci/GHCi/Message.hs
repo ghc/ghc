@@ -158,6 +158,7 @@ data Message a where
   ReifyRoles :: TH.Name -> Message (THResult [TH.Role])
   ReifyAnnotations :: TH.AnnLookup -> TypeRep -> Message (THResult [ByteString])
   ReifyModule :: TH.Module -> Message (THResult TH.ModuleInfo)
+  ReifyConStrictness :: TH.Name -> Message (THResult [TH.DecidedStrictness])
 
   AddDependentFile :: FilePath -> Message (THResult ())
   AddTopDecls :: [TH.Dec] -> Message (THResult ())
@@ -291,12 +292,13 @@ getMessage = do
       35 -> Msg <$> ReifyRoles <$> get
       36 -> Msg <$> (ReifyAnnotations <$> get <*> get)
       37 -> Msg <$> ReifyModule <$> get
-      38 -> Msg <$> AddDependentFile <$> get
-      39 -> Msg <$> AddTopDecls <$> get
-      40 -> Msg <$> (IsExtEnabled <$> get)
-      41 -> Msg <$> return ExtsEnabled
-      42 -> Msg <$> return QDone
-      43 -> Msg <$> QException <$> get
+      38 -> Msg <$> ReifyConStrictness <$> get
+      39 -> Msg <$> AddDependentFile <$> get
+      40 -> Msg <$> AddTopDecls <$> get
+      41 -> Msg <$> (IsExtEnabled <$> get)
+      42 -> Msg <$> return ExtsEnabled
+      43 -> Msg <$> return QDone
+      44 -> Msg <$> QException <$> get
       _  -> Msg <$> QFail <$> get
 
 putMessage :: Message a -> Put
@@ -339,13 +341,14 @@ putMessage m = case m of
   ReifyRoles a                -> putWord8 35 >> put a
   ReifyAnnotations a b        -> putWord8 36 >> put a >> put b
   ReifyModule a               -> putWord8 37 >> put a
-  AddDependentFile a          -> putWord8 38 >> put a
-  AddTopDecls a               -> putWord8 39 >> put a
-  IsExtEnabled a              -> putWord8 40 >> put a
-  ExtsEnabled                 -> putWord8 41
-  QDone                       -> putWord8 42
-  QException a                -> putWord8 43 >> put a
-  QFail a                     -> putWord8 44 >> put a
+  ReifyConStrictness a        -> putWord8 38 >> put a
+  AddDependentFile a          -> putWord8 39 >> put a
+  AddTopDecls a               -> putWord8 40 >> put a
+  IsExtEnabled a              -> putWord8 41 >> put a
+  ExtsEnabled                 -> putWord8 42
+  QDone                       -> putWord8 43
+  QException a                -> putWord8 44 >> put a
+  QFail a                     -> putWord8 45 >> put a
 
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages

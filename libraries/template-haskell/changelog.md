@@ -25,6 +25,18 @@
   * Add `TypeFamilyHead` for common elements of `OpenTypeFamilyD` and
     `ClosedTypeFamilyD` (#10902)
 
+  * The `Strict` datatype was split among different datatypes: three for
+    writing the strictness information of data constructors' fields as denoted
+    in Haskell source code (`SourceUnpackedness` and `SourceStrictness`, as
+    well as `Bang`), and one for strictness information after a constructor is
+    compiled (`DecidedStrictness`). `Strict`, `StrictType` and `VarStrictType`
+    have been deprecated in favor of `Bang`, `BangType` and `VarBangType`, and
+    three functions (`isStrict`, `isLazy`, and `unpack`) were removed because
+    they no longer serve any use in this new design. (#10697)
+
+  * Add `reifyConStrictness` to query a data constructor's `DecidedStrictness`
+    values for its fields (#10697)
+
   * TODO: document API changes and important bugfixes
 
 

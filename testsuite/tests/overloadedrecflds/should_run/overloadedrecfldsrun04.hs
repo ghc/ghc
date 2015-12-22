@@ -7,7 +7,10 @@ import Language.Haskell.TH.Syntax
 
 -- Splice in a datatype with field...
 $(return [DataD [] (mkName "R") [] Nothing
-          [RecC (mkName "MkR") [(mkName "foo", NotStrict, ConT ''Int)]] []])
+  [RecC (mkName "MkR") [( mkName "foo"
+                        , Bang NoSourceUnpackedness NoSourceStrictness
+                        , ConT ''Int
+                        )]] []])
 
 -- New TH story means reify only sees R if we do this:
 $(return [])

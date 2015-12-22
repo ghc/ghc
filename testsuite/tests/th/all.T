@@ -358,6 +358,15 @@ test('T10306', normal, compile, ['-v0'])
 test('T10596', normal, compile, ['-v0'])
 test('T10620', normal, compile_and_run, ['-v0'])
 test('T10638', normal, compile_fail, ['-v0'])
+test('T10697_decided_1', normal, compile_and_run, ['-v0'])
+test('T10697_decided_2', normal, compile_and_run, ['-XStrictData -v0'])
+test('T10697_decided_3', normal,
+                         compile_and_run,
+                         ['-XStrictData -funbox-strict-fields -O2 -v0'])
+test('T10697_source',
+     extra_clean(['T10697_sourceUtil.hi', 'T10697_sourceUtil.o']),
+     multimod_compile_and_run,
+     ['T10697_source', '-w ' + config.ghc_th_way_flags])
 test('T10704',
      extra_clean(['T10704a.o','T10704a.hi']),
      multimod_compile_and_run,

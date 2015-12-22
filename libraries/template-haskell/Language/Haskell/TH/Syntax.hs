@@ -76,9 +76,10 @@ class (Applicative m, Monad m) => Quasi m where
        -- Returns list of matching instance Decs
        --    (with empty sub-Decs)
        -- Works for classes and type functions
-  qReifyRoles       :: Name -> m [Role]
-  qReifyAnnotations :: Data a => AnnLookup -> m [a]
-  qReifyModule      :: Module -> m ModuleInfo
+  qReifyRoles         :: Name -> m [Role]
+  qReifyAnnotations   :: Data a => AnnLookup -> m [a]
+  qReifyModule        :: Module -> m ModuleInfo
+  qReifyConStrictness :: Name -> m [DecidedStrictness]
 
   qLocation :: m Loc
 
@@ -117,22 +118,23 @@ instance Quasi IO where
   qReport True  msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
   qReport False msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
 
-  qLookupName _ _     = badIO "lookupName"
-  qReify _            = badIO "reify"
-  qReifyFixity _      = badIO "reifyFixity"
-  qReifyInstances _ _ = badIO "reifyInstances"
-  qReifyRoles _       = badIO "reifyRoles"
-  qReifyAnnotations _ = badIO "reifyAnnotations"
-  qReifyModule _      = badIO "reifyModule"
-  qLocation           = badIO "currentLocation"
-  qRecover _ _        = badIO "recover" -- Maybe we could fix this?
-  qAddDependentFile _ = badIO "addDependentFile"
-  qAddTopDecls _      = badIO "addTopDecls"
-  qAddModFinalizer _  = badIO "addModFinalizer"
-  qGetQ               = badIO "getQ"
-  qPutQ _             = badIO "putQ"
-  qIsExtEnabled _     = badIO "isExtEnabled"
-  qExtsEnabled        = badIO "extsEnabled"
+  qLookupName _ _       = badIO "lookupName"
+  qReify _              = badIO "reify"
+  qReifyFixity _        = badIO "reifyFixity"
+  qReifyInstances _ _   = badIO "reifyInstances"
+  qReifyRoles _         = badIO "reifyRoles"
+  qReifyAnnotations _   = badIO "reifyAnnotations"
+  qReifyModule _        = badIO "reifyModule"
+  qReifyConStrictness _ = badIO "reifyConStrictness"
+  qLocation             = badIO "currentLocation"
+  qRecover _ _          = badIO "recover" -- Maybe we could fix this?
+  qAddDependentFile _   = badIO "addDependentFile"
+  qAddTopDecls _        = badIO "addTopDecls"
+  qAddModFinalizer _    = badIO "addModFinalizer"
+  qGetQ                 = badIO "getQ"
+  qPutQ _               = badIO "putQ"
+  qIsExtEnabled _       = badIO "isExtEnabled"
+  qExtsEnabled          = badIO "extsEnabled"
 
   qRunIO m = m
 
@@ -391,6 +393,21 @@ reifyAnnotations an = Q (qReifyAnnotations an)
 reifyModule :: Module -> Q ModuleInfo
 reifyModule m = Q (qReifyModule m)
 
+-- | @reifyConStrictness nm@ looks up the strictness information for the fields
+-- of the constructor with the name @nm@. Note that the strictness information
+-- that 'reifyConStrictness' returns may not correspond to what is written in
+-- the source code. For example, in the following data declaration:
+--
+-- @
+-- data Pair a = Pair a a
+-- @
+--
+-- 'reifyConStrictness' would return @['DecidedLazy', DecidedLazy]@ under most
+-- circumstances, but it would return @['DecidedStrict', DecidedStrict]@ if the
+-- @-XStrictData@ language extension was enabled.
+reifyConStrictness :: Name -> Q [DecidedStrictness]
+reifyConStrictness n = Q (qReifyConStrictness n)
+
 -- | Is the list of instances returned by 'reifyInstances' nonempty?
 isInstance :: Name -> [Type] -> Q Bool
 isInstance nm tys = do { decs <- reifyInstances nm tys
@@ -451,25 +468,26 @@ extsEnabled :: Q [Extension]
 extsEnabled = Q qExtsEnabled
 
 instance Quasi Q where
-  qNewName          = newName
-  qReport           = report
-  qRecover          = recover
-  qReify            = reify
-  qReifyFixity      = reifyFixity
-  qReifyInstances   = reifyInstances
-  qReifyRoles       = reifyRoles
-  qReifyAnnotations = reifyAnnotations
-  qReifyModule      = reifyModule
-  qLookupName       = lookupName
-  qLocation         = location
-  qRunIO            = runIO
-  qAddDependentFile = addDependentFile
-  qAddTopDecls      = addTopDecls
-  qAddModFinalizer  = addModFinalizer
-  qGetQ             = getQ
-  qPutQ             = putQ
-  qIsExtEnabled     = isExtEnabled
-  qExtsEnabled      = extsEnabled
+  qNewName            = newName
+  qReport             = report
+  qRecover            = recover
+  qReify              = reify
+  qReifyFixity        = reifyFixity
+  qReifyInstances     = reifyInstances
+  qReifyRoles         = reifyRoles
+  qReifyAnnotations   = reifyAnnotations
+  qReifyModule        = reifyModule
+  qReifyConStrictness = reifyConStrictness
+  qLookupName         = lookupName
+  qLocation           = location
+  qRunIO              = runIO
+  qAddDependentFile   = addDependentFile
+  qAddTopDecls        = addTopDecls
+  qAddModFinalizer    = addModFinalizer
+  qGetQ               = getQ
+  qPutQ               = putQ
+  qIsExtEnabled       = isExtEnabled
+  qExtsEnabled        = extsEnabled
 
 
 ----------------------------------------------------
@@ -1593,22 +1611,39 @@ type Cxt = [Pred]                 -- ^ @(Eq a, Ord b)@
 -- be tuples of other constraints.
 type Pred = Type
 
-data Strict = IsStrict | NotStrict | Unpacked
-         deriving( Show, Eq, Ord, Data, Typeable, Generic )
+data SourceUnpackedness
+  = NoSourceUnpackedness -- ^ @C a@
+  | SourceNoUnpack       -- ^ @C { {\-\# NOUNPACK \#-\} } a@
+  | SourceUnpack         -- ^ @C { {\-\# UNPACK \#-\} } a@
+        deriving (Show, Eq, Ord, Data, Typeable, Generic)
 
-data Con = NormalC Name [StrictType]         -- ^ @C Int a@
-         | RecC Name [VarStrictType]         -- ^ @C { v :: Int, w :: a }@
-         | InfixC StrictType Name StrictType -- ^ @Int :+ a@
-         | ForallC [TyVarBndr] Cxt Con       -- ^ @forall a. Eq a => C [a]@
-         | GadtC [Name] [StrictType]
-                 Name                        -- See Note [GADT return type]
-                 [Type]                      -- Indices of the type constructor
-                                             -- ^ @C :: a -> b -> T b Int@
-         | RecGadtC [Name] [VarStrictType]
-                    Name                     -- See Note [GADT return type]
-                    [Type]                   -- Indices of the type constructor
-                                             -- ^ @C :: { v :: Int } -> T b Int@
-         deriving( Show, Eq, Ord, Data, Typeable, Generic )
+data SourceStrictness = NoSourceStrictness    -- ^ @C a@
+                      | SourceLazy            -- ^ @C {~}a@
+                      | SourceStrict          -- ^ @C {!}a@
+        deriving (Show, Eq, Ord, Data, Typeable, Generic)
+
+-- | Unlike 'SourceStrictness' and 'SourceUnpackedness', 'DecidedStrictness'
+-- refers to the strictness that the compiler chooses for a data constructor
+-- field, which may be different from what is written in source code. See
+-- 'reifyConStrictness' for more information.
+data DecidedStrictness = DecidedLazy
+                       | DecidedStrict
+                       | DecidedUnpack
+        deriving (Show, Eq, Ord, Data, Typeable, Generic)
+
+data Con = NormalC Name [BangType]       -- ^ @C Int a@
+         | RecC Name [VarBangType]       -- ^ @C { v :: Int, w :: a }@
+         | InfixC BangType Name BangType -- ^ @Int :+ a@
+         | ForallC [TyVarBndr] Cxt Con   -- ^ @forall a. Eq a => C [a]@
+         | GadtC [Name] [BangType]
+                 Name                    -- See Note [GADT return type]
+                 [Type]                  -- Indices of the type constructor
+                                         -- ^ @C :: a -> b -> T b Int@
+         | RecGadtC [Name] [VarBangType]
+                    Name                 -- See Note [GADT return type]
+                    [Type]               -- Indices of the type constructor
+                                         -- ^ @C :: { v :: Int } -> T b Int@
+        deriving (Show, Eq, Ord, Data, Typeable, Generic)
 
 -- Note [GADT return type]
 -- ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1621,8 +1656,23 @@ data Con = NormalC Name [StrictType]         -- ^ @C Int a@
 -- data T a where
 --     MkT :: S Int
 
-type StrictType = (Strict, Type)
-type VarStrictType = (Name, Strict, Type)
+data Bang = Bang SourceUnpackedness SourceStrictness
+         -- ^ @C { {\-\# UNPACK \#-\} !}a@
+        deriving (Show, Eq, Ord, Data, Typeable, Generic)
+
+type BangType    = (Bang, Type)
+type VarBangType = (Name, Bang, Type)
+
+-- | As of @template-haskell-2.11.0.0@, 'Strict' has been replaced by 'Bang'.
+type Strict      = Bang
+
+-- | As of @template-haskell-2.11.0.0@, 'StrictType' has been replaced by
+-- 'BangType'.
+type StrictType    = BangType
+
+-- | As of @template-haskell-2.11.0.0@, 'VarStrictType' has been replaced by
+-- 'VarBangType'.
+type VarStrictType = VarBangType
 
 data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> -> \<type\>@
           | AppT Type Type                -- ^ @T a b@

@@ -45,7 +45,10 @@ instance Binary TH.Pragma
 instance Binary TH.Safety
 instance Binary TH.Callconv
 instance Binary TH.Foreign
-instance Binary TH.Strict
+instance Binary TH.Bang
+instance Binary TH.SourceUnpackedness
+instance Binary TH.SourceStrictness
+instance Binary TH.DecidedStrictness
 instance Binary TH.FixityDirection
 instance Binary TH.OccName
 instance Binary TH.Con

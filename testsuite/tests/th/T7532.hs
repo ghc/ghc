@@ -8,4 +8,4 @@ import T7532a
 instance C Bool where
   data D Bool = MkD
 
-$(bang)
+$(bang')

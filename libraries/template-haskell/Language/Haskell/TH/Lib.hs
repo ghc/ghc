@@ -18,31 +18,38 @@ import Data.Word( Word8 )
 -- * Type synonyms
 ----------------------------------------------------------
 
-type InfoQ          = Q Info
-type PatQ           = Q Pat
-type FieldPatQ      = Q FieldPat
-type ExpQ           = Q Exp
-type TExpQ a        = Q (TExp a)
-type DecQ           = Q Dec
-type DecsQ          = Q [Dec]
-type ConQ           = Q Con
-type TypeQ          = Q Type
-type TyLitQ         = Q TyLit
-type CxtQ           = Q Cxt
-type PredQ          = Q Pred
-type MatchQ         = Q Match
-type ClauseQ        = Q Clause
-type BodyQ          = Q Body
-type GuardQ         = Q Guard
-type StmtQ          = Q Stmt
-type RangeQ         = Q Range
-type StrictTypeQ    = Q StrictType
-type VarStrictTypeQ = Q VarStrictType
-type FieldExpQ      = Q FieldExp
-type RuleBndrQ      = Q RuleBndr
-type TySynEqnQ      = Q TySynEqn
-type Role           = TH.Role       -- must be defined here for DsMeta to find it
-type InjectivityAnn = TH.InjectivityAnn
+type InfoQ               = Q Info
+type PatQ                = Q Pat
+type FieldPatQ           = Q FieldPat
+type ExpQ                = Q Exp
+type TExpQ a             = Q (TExp a)
+type DecQ                = Q Dec
+type DecsQ               = Q [Dec]
+type ConQ                = Q Con
+type TypeQ               = Q Type
+type TyLitQ              = Q TyLit
+type CxtQ                = Q Cxt
+type PredQ               = Q Pred
+type MatchQ              = Q Match
+type ClauseQ             = Q Clause
+type BodyQ               = Q Body
+type GuardQ              = Q Guard
+type StmtQ               = Q Stmt
+type RangeQ              = Q Range
+type SourceStrictnessQ   = Q SourceStrictness
+type SourceUnpackednessQ = Q SourceUnpackedness
+type BangQ               = Q Bang
+type BangTypeQ           = Q BangType
+type VarBangTypeQ        = Q VarBangType
+type StrictTypeQ         = Q StrictType
+type VarStrictTypeQ      = Q VarStrictType
+type FieldExpQ           = Q FieldExp
+type RuleBndrQ           = Q RuleBndr
+type TySynEqnQ           = Q TySynEqn
+
+-- must be defined here for DsMeta to find it
+type Role                = TH.Role
+type InjectivityAnn      = TH.InjectivityAnn
 
 ----------------------------------------------------------
 -- * Lowercase pattern syntax functions
@@ -529,13 +536,13 @@ tySynEqn lhs rhs =
 cxt :: [PredQ] -> CxtQ
 cxt = sequence
 
-normalC :: Name -> [StrictTypeQ] -> ConQ
+normalC :: Name -> [BangTypeQ] -> ConQ
 normalC con strtys = liftM (NormalC con) $ sequence strtys
 
-recC :: Name -> [VarStrictTypeQ] -> ConQ
+recC :: Name -> [VarBangTypeQ] -> ConQ
 recC con varstrtys = liftM (RecC con) $ sequence varstrtys
 
-infixC :: Q (Strict, Type) -> Name -> Q (Strict, Type) -> ConQ
+infixC :: Q (Bang, Type) -> Name -> Q (Bang, Type) -> ConQ
 infixC st1 con st2 = do st1' <- st1
                         st2' <- st2
                         return $ InfixC st1' con st2'
@@ -644,17 +651,37 @@ promotedNilT = return PromotedNilT
 promotedConsT :: TypeQ
 promotedConsT = return PromotedConsT
 
-isStrict, notStrict, unpacked :: Q Strict
-isStrict = return $ IsStrict
-notStrict = return $ NotStrict
-unpacked = return Unpacked
+noSourceUnpackedness, sourceNoUnpack, sourceUnpack :: SourceUnpackednessQ
+noSourceUnpackedness = return NoSourceUnpackedness
+sourceNoUnpack       = return SourceNoUnpack
+sourceUnpack         = return SourceUnpack
 
+noSourceStrictness, sourceLazy, sourceStrict :: SourceStrictnessQ
+noSourceStrictness = return NoSourceStrictness
+sourceLazy         = return SourceLazy
+sourceStrict       = return SourceStrict
+
+bang :: SourceUnpackednessQ -> SourceStrictnessQ -> BangQ
+bang u s = do u' <- u
+              s' <- s
+              return (Bang u' s')
+
+bangType :: BangQ -> TypeQ -> BangTypeQ
+bangType = liftM2 (,)
+
+varBangType :: Name -> BangTypeQ -> VarBangTypeQ
+varBangType v bt = do (b, t) <- bt
+                      return (v, b, t)
+
+{-# DEPRECATED strictType
+               "As of @template-haskell-2.11.0.0@, 'StrictType' has been replaced by 'BangType'. Please use 'bangType' instead." #-}
 strictType :: Q Strict -> TypeQ -> StrictTypeQ
-strictType = liftM2 (,)
+strictType = bangType
 
+{-# DEPRECATED varStrictType
+               "As of @template-haskell-2.11.0.0@, 'VarStrictType' has been replaced by 'VarBangType'. Please use 'varBangType' instead." #-}
 varStrictType :: Name -> StrictTypeQ -> VarStrictTypeQ
-varStrictType v st = do (s, t) <- st
-                        return (v, s, t)
+varStrictType = varBangType
 
 -- * Type Literals
 

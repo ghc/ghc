@@ -323,6 +323,9 @@ Template Haskell
    is enabled in the ``Q`` monad. Similarly, ``extsEnabled`` can be used to list
    all enabled language extensions.
 
+-  One can now reify the strictness information of a constructors' fields using
+   Template Haskell's ``reifyConStrictness`` function, which takes into account
+   whether flags such as `-XStrictData` or `-funbox-strict-fields` are enabled.
 
 Runtime system
 ~~~~~~~~~~~~~~

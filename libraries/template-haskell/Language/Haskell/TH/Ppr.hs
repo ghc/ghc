@@ -497,14 +497,14 @@ instance Ppr Clause where
 
 ------------------------------
 instance Ppr Con where
-    ppr (NormalC c sts) = ppr c <+> sep (map pprStrictType sts)
+    ppr (NormalC c sts) = ppr c <+> sep (map pprBangType sts)
 
     ppr (RecC c vsts)
-        = ppr c <+> braces (sep (punctuate comma $ map pprVarStrictType vsts))
+        = ppr c <+> braces (sep (punctuate comma $ map pprVarBangType vsts))
 
-    ppr (InfixC st1 c st2) = pprStrictType st1
+    ppr (InfixC st1 c st2) = pprBangType st1
                          <+> pprName' Infix c
-                         <+> pprStrictType st2
+                         <+> pprBangType st2
 
     ppr (ForallC ns ctxt (GadtC c sts ty idx))
         = commaSep c <+> dcolon <+> pprForall ns ctxt <+> pprGadtRHS sts ty idx
@@ -529,27 +529,69 @@ pprForall ns ctxt
 
 pprRecFields :: [(Name, Strict, Type)] -> Name -> [Type] -> Doc
 pprRecFields vsts ty idx
-    = braces (sep (punctuate comma $ map pprVarStrictType vsts))
+    = braces (sep (punctuate comma $ map pprVarBangType vsts))
   <+> arrow <+> ppr ty <+> sep (map ppr idx)
 
 pprGadtRHS :: [(Strict, Type)] -> Name -> [Type] -> Doc
 pprGadtRHS [] ty idx
     = ppr ty <+> sep (map ppr idx)
 pprGadtRHS sts ty idx
-    = sep (punctuate (space <> arrow) (map pprStrictType sts))
+    = sep (punctuate (space <> arrow) (map pprBangType sts))
   <+> arrow <+> ppr ty <+> sep (map ppr idx)
 
 ------------------------------
-pprVarStrictType :: (Name, Strict, Type) -> Doc
+pprVarBangType :: VarBangType -> Doc
 -- Slight infelicity: with print non-atomic type with parens
-pprVarStrictType (v, str, t) = ppr v <+> dcolon <+> pprStrictType (str, t)
+pprVarBangType (v, bang, t) = ppr v <+> dcolon <+> pprBangType (bang, t)
 
 ------------------------------
+pprBangType :: BangType -> Doc
+-- Make sure we print
+--
+-- Con {-# UNPACK #-} a
+--
+-- rather than
+--
+-- Con {-# UNPACK #-}a
+--
+-- when there's no strictness annotation. If there is a strictness annotation,
+-- it's okay to not put a space between it and the type.
+pprBangType (bt@(Bang _ NoSourceStrictness), t) = ppr bt <+> pprParendType t
+pprBangType (bt, t) = ppr bt <> pprParendType t
+
+------------------------------
+instance Ppr Bang where
+    ppr (Bang su ss) = ppr su <+> ppr ss
+
+------------------------------
+instance Ppr SourceUnpackedness where
+    ppr NoSourceUnpackedness = empty
+    ppr SourceNoUnpack       = text "{-# NOUNPACK #-}"
+    ppr SourceUnpack         = text "{-# UNPACK #-}"
+
+------------------------------
+instance Ppr SourceStrictness where
+    ppr NoSourceStrictness = empty
+    ppr SourceLazy         = char '~'
+    ppr SourceStrict       = char '!'
+
+------------------------------
+instance Ppr DecidedStrictness where
+    ppr DecidedLazy   = empty
+    ppr DecidedStrict = char '!'
+    ppr DecidedUnpack = text "{-# UNPACK #-} !"
+
+------------------------------
+{-# DEPRECATED pprVarStrictType
+               "As of @template-haskell-2.11.0.0@, 'VarStrictType' has been replaced by 'VarBangType'. Please use 'pprVarBangType' instead." #-}
+pprVarStrictType :: (Name, Strict, Type) -> Doc
+pprVarStrictType = pprVarBangType
+
+------------------------------
+{-# DEPRECATED pprStrictType
+               "As of @template-haskell-2.11.0.0@, 'StrictType' has been replaced by 'BangType'. Please use 'pprBangType' instead." #-}
 pprStrictType :: (Strict, Type) -> Doc
--- Prints with parens if not already atomic
-pprStrictType (IsStrict, t) = char '!' <> pprParendType t
-pprStrictType (NotStrict, t) = pprParendType t
-pprStrictType (Unpacked, t) = text "{-# UNPACK #-} !" <> pprParendType t
+pprStrictType = pprBangType
 
 ------------------------------
 pprParendType :: Type -> Doc

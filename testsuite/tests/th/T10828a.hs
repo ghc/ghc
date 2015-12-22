@@ -11,7 +11,12 @@ $( return
            [ PlainTV (mkName "a") ]
            (Just StarT)
            [ NormalC (mkName "MkT")
-                   [ (NotStrict, VarT (mkName "a"))
-                   , (NotStrict, VarT (mkName "a"))]
+                   [ ( Bang NoSourceUnpackedness NoSourceStrictness
+                     , VarT (mkName "a")
+                     )
+                   , ( Bang NoSourceUnpackedness NoSourceStrictness
+                     , VarT (mkName "a")
+                     )
+                   ]
            ]
            [] ])

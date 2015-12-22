@@ -118,6 +118,7 @@ instance TH.Quasi GHCiQ where
     where typerep = typeOf (undefined :: a)
 
   qReifyModule m = ghcCmd (ReifyModule m)
+  qReifyConStrictness name = ghcCmd (ReifyConStrictness name)
   qLocation = fromMaybe noLoc . qsLocation <$> getState
   qRunIO m = GHCiQ $ \s -> fmap (,s) m
   qAddDependentFile file = ghcCmd (AddDependentFile file)

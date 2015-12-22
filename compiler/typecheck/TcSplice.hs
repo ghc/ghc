@@ -815,6 +815,10 @@ instance TH.Quasi TcM where
   qReifyRoles       = reifyRoles
   qReifyAnnotations = reifyAnnotations
   qReifyModule      = reifyModule
+  qReifyConStrictness nm = do { nm' <- lookupThName nm
+                              ; dc  <- tcLookupDataCon nm'
+                              ; let bangs = dataConImplBangs dc
+                              ; return (map reifyDecidedStrictness bangs) }
 
         -- For qRecover, discard error messages if
         -- the recovery action is chosen.  Otherwise
@@ -1335,7 +1339,9 @@ reifyDataCon isGadtDataCon tys dc
              -- used for GADTs data constructors
              (g_univ_tvs, g_ex_tvs, g_eq_spec, g_theta, g_arg_tys, _)
                  = dataConFullSig dc
-             stricts   = map reifyStrict (dataConSrcBangs dc)
+             (srcUnpks, srcStricts)
+                 = mapAndUnzip reifySourceBang (dataConSrcBangs dc)
+             dcdBangs  = zipWith TH.Bang srcUnpks srcStricts
              fields    = dataConFieldLabels dc
              name      = reifyName dc
              r_ty_name = reifyName (dataConTyCon dc) -- return type for GADTs
@@ -1350,21 +1356,21 @@ reifyDataCon isGadtDataCon tys dc
 
        ; let main_con | not (null fields) && not isGadtDataCon
                       = TH.RecC name (zip3 (map reifyFieldLabel fields)
-                                      stricts r_arg_tys)
+                                      dcdBangs r_arg_tys)
                       | not (null fields)
                       = TH.RecGadtC [name]
                                    (zip3 (map (reifyName . flSelector) fields)
-                                    stricts r_arg_tys) r_ty_name idx_tys
+                                    dcdBangs r_arg_tys) r_ty_name idx_tys
                       | dataConIsInfix dc
                       = ASSERT( length arg_tys == 2 )
                         TH.InfixC (s1,r_a1) name (s2,r_a2)
                       | isGadtDataCon
-                      = TH.GadtC [name] (stricts `zip` r_arg_tys) r_ty_name
+                      = TH.GadtC [name] (dcdBangs `zip` r_arg_tys) r_ty_name
                                  idx_tys
                       | otherwise
-                      = TH.NormalC name (stricts `zip` r_arg_tys)
+                      = TH.NormalC name (dcdBangs `zip` r_arg_tys)
              [r_a1, r_a2] = r_arg_tys
-             [s1,   s2]   = stricts
+             [s1,   s2]   = dcdBangs
              (ex_tvs', theta') | isGadtDataCon = ( g_unsbst_univ_tvs ++ g_ex_tvs
                                                  , g_theta )
                                | otherwise     = ( ex_tvs, theta )
@@ -1373,7 +1379,7 @@ reifyDataCon isGadtDataCon tys dc
                          { cxt <- reifyCxt theta'
                          ; ex_tvs'' <- reifyTyVars ex_tvs' Nothing
                          ; return (TH.ForallC ex_tvs'' cxt main_con) }
-       ; ASSERT( length arg_tys == length stricts )
+       ; ASSERT( length arg_tys == length dcdBangs )
          ret_con }
 
 -- Note [Reifying GADT data constructors]
@@ -1759,11 +1765,24 @@ reifyFixity name
       conv_dir BasicTypes.InfixL = TH.InfixL
       conv_dir BasicTypes.InfixN = TH.InfixN
 
-reifyStrict :: DataCon.HsSrcBang -> TH.Strict
-reifyStrict (HsSrcBang _ _         SrcLazy)     = TH.NotStrict
-reifyStrict (HsSrcBang _ _         NoSrcStrict) = TH.NotStrict
-reifyStrict (HsSrcBang _ SrcUnpack SrcStrict)   = TH.Unpacked
-reifyStrict (HsSrcBang _ _         SrcStrict)   = TH.IsStrict
+reifyUnpackedness :: DataCon.SrcUnpackedness -> TH.SourceUnpackedness
+reifyUnpackedness NoSrcUnpack = TH.NoSourceUnpackedness
+reifyUnpackedness SrcNoUnpack = TH.SourceNoUnpack
+reifyUnpackedness SrcUnpack   = TH.SourceUnpack
+
+reifyStrictness :: DataCon.SrcStrictness -> TH.SourceStrictness
+reifyStrictness NoSrcStrict = TH.NoSourceStrictness
+reifyStrictness SrcStrict   = TH.SourceStrict
+reifyStrictness SrcLazy     = TH.SourceLazy
+
+reifySourceBang :: DataCon.HsSrcBang
+                -> (TH.SourceUnpackedness, TH.SourceStrictness)
+reifySourceBang (HsSrcBang _ u s) = (reifyUnpackedness u, reifyStrictness s)
+
+reifyDecidedStrictness :: DataCon.HsImplBang -> TH.DecidedStrictness
+reifyDecidedStrictness HsLazy     = TH.DecidedLazy
+reifyDecidedStrictness HsStrict   = TH.DecidedStrict
+reifyDecidedStrictness HsUnpack{} = TH.DecidedUnpack
 
 ------------------------------
 lookupThAnnLookup :: TH.AnnLookup -> TcM CoreAnnTarget

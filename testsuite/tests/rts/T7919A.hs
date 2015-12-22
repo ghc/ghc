@@ -20,7 +20,9 @@ largeData =
     (dataName)
     []
     Nothing
-    [normalC dataName (replicate size (((,) <$> notStrict) `ap` [t| Int |]))]
+    [normalC dataName
+             (replicate size (((,) <$> bang noSourceUnpackedness
+                                       noSourceStrictness) `ap` [t| Int |]))]
     (cxt [])
 
 conE' :: Name -> [ExpQ] -> ExpQ
