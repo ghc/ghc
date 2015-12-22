@@ -1189,6 +1189,35 @@ type HsTyPats name = HsImplicitBndrs name [LHsType name]
             -- ^ Type patterns (with kind and type bndrs)
             -- See Note [Family instance declaration binders]
 
+{- Note [Family instance declaration binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The HsTyPats field is LHS patterns or a type/data family instance.
+
+The hsib_vars of the HsImplicitBndrs are the template variables of the
+type patterns, i.e. fv(pat_tys).  Note in particular
+
+* The hsib_vars *includes* any anonymous wildcards.  For example
+     type instance F a _ = a
+  The hsib_vars will be {a, _}.  Remember that each separate wildcard
+  '_' gets its own unique.  In this context wildcards behave just like
+  an ordinary type variable, only anonymous.
+
+* The hsib_vars *including* type variables that are already in scope
+
+   Eg   class C s t where
+          type F t p :: *
+        instance C w (a,b) where
+          type F (a,b) x = x->a
+   The hsib_vars of the F decl are {a,b,x}, even though the F decl
+   is nested inside the 'instance' decl.
+
+   However after the renamer, the uniques will match up:
+        instance C w7 (a8,b9) where
+          type F (a8,b9) x10 = x10->a8
+   so that we can compare the type pattern in the 'instance' decl and
+   in the associated 'type' decl
+-}
+
 type TyFamInstEqn  name = TyFamEqn name (HsTyPats name)
 type TyFamDefltEqn name = TyFamEqn name (LHsQTyVars name)
   -- See Note [Type family instance declarations in HsSyn]
@@ -1281,27 +1310,6 @@ data InstDecl name  -- Both class and family instances
       { tfid_inst :: TyFamInstDecl name }
   deriving (Typeable)
 deriving instance (DataId id) => Data (InstDecl id)
-
-{-
-Note [Family instance declaration binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A {Ty|Data}FamInstDecl is a data/type family instance declaration
-the pats field is LHS patterns, and the tvs of the HsBSig
-tvs are fv(pat_tys), *including* ones that are already in scope
-
-   Eg   class C s t where
-          type F t p :: *
-        instance C w (a,b) where
-          type F (a,b) x = x->a
-   The tcdTyVars of the F decl are {a,b,x}, even though the F decl
-   is nested inside the 'instance' decl.
-
-   However after the renamer, the uniques will match up:
-        instance C w7 (a8,b9) where
-          type F (a8,b9) x10 = x10->a8
-   so that we can compare the type patter in the 'instance' decl and
-   in the associated 'type' decl
--}
 
 instance (OutputableBndr name) => Outputable (TyFamInstDecl name) where
   ppr = pprTyFamInstDecl TopLevel

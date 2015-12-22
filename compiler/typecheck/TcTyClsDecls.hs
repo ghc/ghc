@@ -33,7 +33,6 @@ import TcClassDcl
 import TcUnify
 import TcHsType
 import TcMType
-import RnTypes( collectAnonWildCards )
 import TcType
 import FamInst
 import FamInstEnv
@@ -46,7 +45,6 @@ import CoAxiom
 import TyCon
 import DataCon
 import Id
--- import IdInfo
 import Var
 import VarEnv
 import VarSet
@@ -1122,15 +1120,11 @@ tc_fam_ty_pats :: FamTyConShape
 -- (and, if C is poly-kinded, so will its kind parameter).
 
 tc_fam_ty_pats (name, _, kind) mb_clsinfo
-               (HsIB { hsib_body = arg_pats, hsib_vars = vars })
+               (HsIB { hsib_body = arg_pats, hsib_vars = tv_names })
                kind_checker
-  = do { -- See Note [Wild cards in family instances]
-       ; let wcs      = concatMap collectAnonWildCards arg_pats
-             tv_names = vars ++ wcs
-
-         -- Kind-check and quantify
+  = do { -- Kind-check and quantify
          -- See Note [Quantifying over family patterns]
-       ; (_, (res_kind, typats)) <- tcImplicitTKBndrs tv_names $
+         (_, (res_kind, typats)) <- tcImplicitTKBndrs tv_names $
          do { (res_kind, args, leftovers, n)
                 <- tcInferArgs name kind (snd <$> mb_clsinfo) arg_pats
             ; case leftovers of
@@ -1290,42 +1284,6 @@ none. The role of the kind signature (a :: Maybe k) is to add a constraint
 that 'a' must have that kind, and to bring 'k' into scope.
 
 
-Note [Wild cards in family instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Wild cards can be used in type/data family instance declarations to indicate
-that the name of a type variable doesn't matter. Each wild card will be
-replaced with a new unique type variable. For instance:
-
-    type family F a b :: *
-    type instance F Int _ = Int
-
-is the same as
-
-    type family F a b :: *
-    type instance F Int b = Int
-
-This is implemented as follows: during renaming anonymous wild cards are given
-freshly generated names. These names are collected after renaming
-(rnFamInstDecl) and used to make new type variables during type checking
-(tc_fam_ty_pats). One should not confuse these wild cards with the ones from
-partial type signatures. The latter generate fresh meta-variables whereas the
-former generate fresh skolems.
-
-When the flag -fwarn-unused-matches is on, the compiler reports warnings
-about unused type variables. (rnFamInstDecl) A type variable is considered
-used when it is either occurs on the RHS of the family instance, or it occurs
-multiple times in the patterns on the LHS. In the first case, the variable
-is in the set of free variables returned by rnPayload. In the second case, there
-are multiple occurences of it in FreeKiTyVars returned by the rmDupsInRdrTyVars.
-
-The warnings are not reported for anonymous wild cards and for type variables
-with names beginning with an underscore.
-
-Extra-constraints wild cards are not supported in type/data family
-instance declarations.
-
-Relevant tickets: #3699, #10586 and #10982.
 
 ************************************************************************
 *                                                                      *

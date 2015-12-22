@@ -46,12 +46,12 @@ import FastString
 import SrcLoc
 import DynFlags
 import HscTypes         ( HscEnv, hsc_dflags )
-import ListSetOps       ( findDupsEq, removeDups )
+import ListSetOps       ( findDupsEq, removeDups, equivClasses )
 import Digraph          ( SCC, flattenSCC, stronglyConnCompFromEdgedVertices )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
-import Data.List ( (\\), nubBy, sortBy )
+import Data.List ( sortBy )
 import Maybes( orElse, mapMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 #if __GLASGOW_HASKELL__ < 709
@@ -668,16 +668,14 @@ rnFamInstDecl doc mb_cls tycon (HsIB { hsib_body = pats }) payload rnPayload
                      []             -> pprPanic "rnFamInstDecl" (ppr tycon)
                      (L loc _ : []) -> loc
                      (L loc _ : ps) -> combineSrcSpans loc (getLoc (last ps))
-             -- Duplicates are needed to warn about unused type variables
-             -- See Note [Wild cards in family instances] in TcTyClsDecls
-       ; tv_rdr_names_all <- extractHsTysRdrTyVarsDups pats
-       ; let tv_rdr_names = rmDupsInRdrTyVars tv_rdr_names_all
-             tv_rdr_dups = nubBy eqLocated
-                (freeKiTyVarsTypeVars tv_rdr_names_all
-                 \\ freeKiTyVarsTypeVars tv_rdr_names)
 
+       ; pat_kity_vars_with_dups <- extractHsTysRdrTyVarsDups pats
+             -- Use the "...Dups" form becuase it's needed
+             -- below to report unsed binder on the LHS
        ; var_names <- mapM (newTyVarNameRn mb_cls . L loc . unLoc) $
-                      freeKiTyVarsAllVars tv_rdr_names
+                      freeKiTyVarsAllVars $
+                      rmDupsInRdrTyVars pat_kity_vars_with_dups
+
              -- All the free vars of the family patterns
              -- with a sensible binding location
        ; ((pats', payload'), fvs)
@@ -685,7 +683,16 @@ rnFamInstDecl doc mb_cls tycon (HsIB { hsib_body = pats }) payload rnPayload
                  do { (pats', pat_fvs) <- rnLHsTypes (FamPatCtx tycon) pats
                     ; (payload', rhs_fvs) <- rnPayload doc payload
 
-                    ; tv_nms_dups <- mapM (lookupOccRn . unLoc) tv_rdr_dups
+                       -- Report unused binders on the LHS
+                       -- See Note [Unused type variables in family instances]
+                    ; let groups :: [[Located RdrName]]
+                          groups = equivClasses cmpLocated $
+                                   freeKiTyVarsAllVars pat_kity_vars_with_dups
+                    ; tv_nms_dups <- mapM (lookupOccRn . unLoc) $
+                                     [ tv | (tv:_:_) <- groups ]
+                          -- Add to the used variables any variables that
+                          -- appear *more than once* on the LHS
+                          -- e.g.   F a Int a = Bool
                     ; let tv_nms_used = extendNameSetList rhs_fvs tv_nms_dups
                     ; warnUnusedMatches var_names tv_nms_used
 
@@ -701,9 +708,17 @@ rnFamInstDecl doc mb_cls tycon (HsIB { hsib_body = pats }) payload rnPayload
                     ; unless (null bad_tvs) (badAssocRhs bad_tvs)
                     ; return ((pats', payload'), rhs_fvs `plusFV` pat_fvs) }
 
-       ; let all_fvs = fvs `addOneFV` unLoc tycon'
+       ; let anon_wcs = concatMap collectAnonWildCards pats'
+             all_ibs  = anon_wcs ++ var_names
+                        -- all_ibs: include anonymous wildcards in the implicit
+                        -- binders In a type pattern they behave just like any
+                        -- other type variable except for being anoymous.  See
+                        -- Note [Wildcards in family instances]
+             all_fvs  = fvs `addOneFV` unLoc tycon'
+
        ; return (tycon',
-                 HsIB { hsib_body = pats', hsib_vars = var_names },
+                 HsIB { hsib_body = pats'
+                      , hsib_vars = all_ibs },
                  payload',
                  all_fvs) }
              -- type instance => use, hence addOneFV
@@ -781,7 +796,46 @@ rnATInstDecls rnFun cls tv_ns at_insts
   = rnList (rnFun (Just (cls, tv_ns))) at_insts
     -- See Note [Renaming associated types]
 
-{-
+{- Note [Wildcards in family instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Wild cards can be used in type/data family instance declarations to indicate
+that the name of a type variable doesn't matter. Each wild card will be
+replaced with a new unique type variable. For instance:
+
+    type family F a b :: *
+    type instance F Int _ = Int
+
+is the same as
+
+    type family F a b :: *
+    type instance F Int b = Int
+
+This is implemented as follows: during renaming anonymous wild cards
+'_' are given freshly generated names. These names are collected after
+renaming (rnFamInstDecl) and used to make new type variables during
+type checking (tc_fam_ty_pats). One should not confuse these wild
+cards with the ones from partial type signatures. The latter generate
+fresh meta-variables whereas the former generate fresh skolems.
+
+Note [Unused type variables in family instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When the flag -fwarn-unused-matches is on, the compiler reports warnings
+about unused type variables. (rnFamInstDecl) A type variable is considered
+used
+ * when it is either occurs on the RHS of the family instance, or
+   e.g.   type instance F a b = a    -- a is used on the RHS
+
+ * it occurs multiple times in the patterns on the LHS
+   e.g.   type instance F a a = Int  -- a appears more than once on LHS
+
+As usual, the warnings are not reported for for type variables with names
+beginning with an underscore.
+
+Extra-constraints wild cards are not supported in type/data family
+instance declarations.
+
+Relevant tickets: #3699, #10586 and #10982.
+
 Note [Renaming associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Check that the RHS of the decl mentions only type variables
