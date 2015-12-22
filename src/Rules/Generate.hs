@@ -29,11 +29,12 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
         buildPath   = path -/- "build"
         primopsTxt  = targetPath stage compiler -/- "build/primops.txt"
         platformH   = targetPath stage compiler -/- "ghc_boot_platform.h"
-    in do -- TODO: do we need to copy *.(l)hs-boot files here? Never happens?
-        buildPath -/- "*.hs" %> \file -> do
+        generated f = (buildPath ++ "//*.hs") ?== f && not ("//autogen/*" ?== f)
+    in do
+        generated ?> \file -> do
             dirs  <- interpretPartial target $ getPkgDataList SrcDirs
             files <- getDirectoryFiles "" $
-                [ packagePath -/- d -/- takeBaseName file <.> "*" | d <- dirs ]
+                [ packagePath -/- d ++ "//" ++ takeBaseName file <.> "*" | d <- dirs ]
             let gens = [ (f, b) | f <- files, Just b <- [determineBuilder f] ]
             when (length gens /= 1) . putError $
                 "Exactly one generator expected for " ++ file
@@ -41,6 +42,9 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
             let (src, builder) = head gens
             need [src]
             build $ fullTarget target builder [src] [file]
+            let srcBoot = src -<.> "hs-boot"
+            whenM (doesFileExist srcBoot) $
+                copyFileChanged srcBoot $ file -<.> "hs-boot"
 
         when (pkg == compiler) $ primopsTxt %> \file -> do
             need [platformH, primopsSource]
@@ -80,7 +84,7 @@ quote :: String -> String
 quote s = "\"" ++ s ++ "\""
 
 -- TODO: do we need ghc-split? Always or is it platform specific?
--- TODO: add tracking
+-- TODO: add tracking by moving these functions to separate tracked files
 generateConfigHs :: Expr String
 generateConfigHs = do
     cProjectName        <- getSetting ProjectName
