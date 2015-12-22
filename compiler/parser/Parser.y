@@ -1652,7 +1652,8 @@ typedoc :: { LHsType RdrName }
 
 -- See Note [Parsing ~]
 btype :: { LHsType RdrName }
-        : tyapps                      { sL1 $1 $ HsAppsTy (splitTildeApps (reverse (unLoc $1))) }
+        : tyapps                      {%  splitTildeApps (reverse (unLoc $1)) >>=
+                                          \ts -> return $ sL1 $1 $ HsAppsTy ts }
 
 -- Used for parsing Haskell98-style data constructors,
 -- in order to forbid the blasphemous

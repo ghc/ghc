@@ -93,6 +93,7 @@ import Util
 import ApiAnnotation
 import Data.List
 import qualified GHC.LanguageExtensions as LangExt
+import MonadUtils
 
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative ((<$>))
@@ -1071,21 +1072,25 @@ splitTilde t = go t
 
 -- | Transform tyapps with strict_marks into uses of twiddle
 -- [~a, ~b, c, ~d] ==> (~a) ~ b c ~ d
-splitTildeApps :: [LHsAppType RdrName] -> [LHsAppType RdrName]
-splitTildeApps []         = []
-splitTildeApps (t : rest) = t : concatMap go rest
+splitTildeApps :: [LHsAppType RdrName] -> P [LHsAppType RdrName]
+splitTildeApps []         = return []
+splitTildeApps (t : rest) = do
+  rest' <- concatMapM go rest
+  return (t : rest')
   where go (L l (HsAppPrefix
             (L loc (HsBangTy
                     (HsSrcBang Nothing NoSrcUnpack SrcLazy)
                     ty))))
-          = [L tilde_loc (HsAppInfix (L tilde_loc eqTyCon_RDR)),
-             L l (HsAppPrefix ty)]
-             -- NOTE: no annotation is attached to an HsAppPrefix, so the
-             --       surrounding SrcSpan is not critical
+          = addAnnotation l AnnTilde l >>
+            return
+              [L tilde_loc (HsAppInfix (L tilde_loc eqTyCon_RDR)),
+               L l (HsAppPrefix ty)]
+               -- NOTE: no annotation is attached to an HsAppPrefix, so the
+               --       surrounding SrcSpan is not critical
           where
             tilde_loc = srcSpanFirstCharacter loc
 
-        go t = [t]
+        go t = return [t]
 
 
 
