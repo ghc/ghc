@@ -889,10 +889,10 @@ role and kind, which is done in the UnivCo constructor.
 data UnivCoProvenance
   = UnsafeCoerceProv   -- ^ From @unsafeCoerce#@. These are unsound.
 
-  | PhantomProv CoercionN -- ^ See Note [Phantom coercions]
+  | PhantomProv Coercion -- ^ See Note [Phantom coercions]
 
-  | ProofIrrelProv CoercionN  -- ^ From the fact that any two coercions are
-                              --   considered equivalent. See Note [ProofIrrelProv]
+  | ProofIrrelProv Coercion  -- ^ From the fact that any two coercions are
+                             --   considered equivalent. See Note [ProofIrrelProv]
 
   | PluginProv String  -- ^ From a plugin, which asserts that this coercion
                        --   is sound. The string is for the use of the plugin.
