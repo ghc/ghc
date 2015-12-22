@@ -50,12 +50,12 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
                         , "Axes.c", "Dimensions.c", "Key.c", "PsFile.c"
                         , "Shade.c", "Utilities.c" ]
                 contents = unlines
-                    [ "utils_hp2ps_dist-boot_PROGNAME = hp2ps"
-                    , "utils_hp2ps_dist-boot_C_SRCS = " ++ unwords cSrcs
-                    , "utils_hp2ps_dist-boot_INSTALL = YES"
-                    , "utils_hp2ps_dist-boot_INSTALL_INPLACE = YES"
-                    , "utils_hp2ps_dist-boot_DEP_EXTRA_LIBS = m"
-                    , "utils_hp2ps_dist-boot_CC_OPTS = "
+                    [ "utils_hp2ps_stage0_PROGNAME = hp2ps"
+                    , "utils_hp2ps_stage0_C_SRCS = " ++ unwords cSrcs
+                    , "utils_hp2ps_stage0_INSTALL = YES"
+                    , "utils_hp2ps_stage0_INSTALL_INPLACE = YES"
+                    , "utils_hp2ps_stage0_DEP_EXTRA_LIBS = m"
+                    , "utils_hp2ps_stage0_CC_OPTS = "
                       ++ unwords (map ("-I"++) ghcIncludeDirs) ]
             writeFileChanged mk contents
             putBuild $ "| Successfully generated '" ++ mk ++ "'."
@@ -65,10 +65,10 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
         -- by running by running `ghcCabal`, because it has not yet been built.
         when (pkg == ghcCabal && stage == Stage0) $ dataFile %> \mk -> do
             let contents = unlines
-                    [ "utils_ghc-cabal_dist-boot_PROGNAME = ghc-cabal"
-                    , "utils_ghc-cabal_dist-boot_MODULES = Main"
-                    , "utils_ghc-cabal_dist-boot_SYNOPSIS = Bootstrapped ghc-cabal utility."
-                    , "utils_ghc-cabal_dist-boot_HS_SRC_DIRS = ." ]
+                    [ "utils_ghc-cabal_stage0_PROGNAME = ghc-cabal"
+                    , "utils_ghc-cabal_stage0_MODULES = Main"
+                    , "utils_ghc-cabal_stage0_SYNOPSIS = Bootstrapped ghc-cabal utility."
+                    , "utils_ghc-cabal_stage0_HS_SRC_DIRS = ." ]
             writeFileChanged mk contents
             putBuild $ "| Successfully generated '" ++ mk ++ "'."
 

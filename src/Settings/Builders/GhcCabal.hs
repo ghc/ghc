@@ -95,7 +95,7 @@ ccArgs = validating ? ccWarnings
 ccWarnings :: Args
 ccWarnings = do
     let gccGe46 = notM $ (flag GccIsClang ||^ flag GccLt46)
-    mconcat [ arg "-Werror"
+    mconcat [ turnWarningsIntoErrors ? arg "-Werror"
             , arg "-Wall"
             , flag GccIsClang ? arg "-Wno-unknown-pragmas"
             , gccGe46 ? notM windowsHost ? arg "-Werror=unused-but-set-variable"
@@ -120,8 +120,8 @@ cppArgs = append $ map ("-I" ++) ghcIncludeDirs
 -- TODO: move this somewhere
 customPackageArgs :: Args
 customPackageArgs = do
-    nextStage <- fmap succ getStage
-    rtsWays   <- getRtsWays
+    stage   <- getStage
+    rtsWays <- getRtsWays
     mconcat
         [ package integerGmp ?
           mconcat [ windowsHost ? builder GhcCabal ?
@@ -137,8 +137,7 @@ customPackageArgs = do
 
         , package compiler ?
           builder GhcCabal ?
-          mconcat [ arg $ "--ghc-option=-DSTAGE=" ++ show nextStage
-                  , arg $ "--flags=stage" ++ show nextStage
+          mconcat [ arg $ "--ghc-option=-DSTAGE=" ++ show (fromEnum stage + 1)
                   , arg "--disable-library-for-ghci"
                   , anyTargetOs ["openbsd"] ? arg "--ld-options=-E"
                   , flag GhcUnregisterised ? arg "--ghc-option=-DNO_REGS"
@@ -157,17 +156,15 @@ customPackageArgs = do
                     ghciWithDebugger ?
                     notStage0 ? arg "--ghc-option=-DDEBUGGER"
                   , ghcProfiled ?
-                    notStage0 ? arg "--ghc-pkg-option=--force"
-                  ]
+                    notStage0 ? arg "--ghc-pkg-option=--force" ]
+
         , package ghc ?
           builder GhcCabal ?
-          mconcat [ arg $ "--flags=stage" ++ show nextStage
-                  , ghcWithInterpreter ?
-                    notStage0 ? arg "--flags=ghci"
-                  ]
+          mconcat [ ghcWithInterpreter ?
+                    notStage0 ? arg "--flags=ghci" ]
+
         , package haddock ?
-          builder GhcCabal ? append ["--flag", "in-ghc-tree"]
-        ]
+          builder GhcCabal ? append ["--flag", "in-ghc-tree"] ]
 
 withBuilderKey :: Builder -> String
 withBuilderKey b = case b of

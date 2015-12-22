@@ -94,29 +94,15 @@ xhtml           = library  "xhtml"
 -- * build/          : contains compiled object code
 -- * doc/            : produced by haddock
 -- * package-data.mk : contains output of ghc-cabal applied to pkgCabal
--- TODO: simplify to just 'show stage'?
--- TODO: we divert from the previous convention for ghc-cabal and ghc-pkg,
--- which used to store stage 0 build results in 'dist' folder
--- On top of that, mkUserGuidePart used dist for stage 1 for some reason.
 defaultTargetDirectory :: Stage -> Package -> FilePath
-defaultTargetDirectory stage pkg
-    | pkg   == compiler = "stage" ++ show (fromEnum stage + 1)
-    | pkg   == ghc      = "stage" ++ show (fromEnum stage + 1)
-    | stage == Stage0   = "dist-boot"
-    | otherwise         = "dist-install"
+defaultTargetDirectory stage _ = "stage" ++ show (fromEnum stage)
 
 -- TODO: simplify
--- TODO: haddock and ghtTags should be built in stage2 only
 -- | Returns a relative path to the program executable
 defaultProgramPath :: Stage -> Package -> Maybe FilePath
 defaultProgramPath stage pkg
     | pkg == ghc     = Just . inplaceProgram $ "ghc-stage" ++ show (fromEnum stage + 1)
-    | pkg == haddock = case stage of
-        Stage1 -> Just . inplaceProgram $ pkgName pkg
-        Stage2 -> Just . inplaceProgram $ pkgName pkg
-        _      -> Nothing
-    | pkg == ghcTags = case stage of
-        Stage1 -> Just . inplaceProgram $ pkgName pkg
+    | pkg == haddock || pkg == ghcTags = case stage of
         Stage2 -> Just . inplaceProgram $ pkgName pkg
         _      -> Nothing
     | isProgram pkg  = case stage of

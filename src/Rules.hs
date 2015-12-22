@@ -20,10 +20,9 @@ generateTargets = action $ do
         return $ libTargets ++ programTargets
     need targets
 
--- TODO: use stage 2 compiler for building stage 2 packages (instead of stage 1)
 packageRules :: Rules ()
 packageRules = do
     resources <- resourceRules
-    forM_ [Stage0, Stage1] $ \stage ->
+    forM_ [Stage0 ..] $ \stage ->
         forM_ knownPackages $ \pkg ->
             buildPackage resources $ PartialTarget stage pkg

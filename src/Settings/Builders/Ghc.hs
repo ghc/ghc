@@ -122,6 +122,8 @@ includeGhcArgs = do
             , arg $ "-I" ++ autogenPath
             , append [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
             , append [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
+            , (pkg == compiler || pkg == ghc) ?
+              arg ("-I" ++ pkgPath compiler -/- "stage" ++ show (fromEnum stage))
             , not (pkg == hp2ps || pkg == ghcCabal && stage == Stage0) ?
               append [ "-optP-include"
                      , "-optP" ++ autogenPath -/- "cabal_macros.h" ] ]

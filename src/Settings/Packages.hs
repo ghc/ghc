@@ -35,6 +35,8 @@ packagesStage1 = mconcat
     , notM windowsHost ? append [iservBin]
     , buildHaddock     ? append [xhtml] ]
 
+-- TODO: currently there is an unchecked assumption that we only build programs
+-- in Stage2 and Stage3. Can we check this in compile time?
 packagesStage2 :: Packages
 packagesStage2 = mconcat
     [ append [ghcTags]

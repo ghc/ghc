@@ -27,21 +27,23 @@ buildProgram _ target @ (PartialTarget stage pkg) = do
                  ++ [ buildPath -/- "Paths_hsc2hs.o"      | pkg == hsc2hs  ]
                  ++ [ buildPath -/- "Paths_haddock.o"     | pkg == haddock ]
             objs  = cObjs ++ hObjs
-        pkgs     <- interpretPartial target getPackages
         ways     <- interpretPartial target getWays
         depNames <- interpretPartial target $ getPkgDataList TransitiveDepNames
-        ghciFlag <- interpretPartial target $ getPkgData BuildGhciLib
+        let libStage  = min stage Stage1 -- libraries are built only in Stage0/1
+            libTarget = PartialTarget libStage pkg
+        pkgs     <- interpretPartial libTarget getPackages
+        ghciFlag <- interpretPartial libTarget $ getPkgData BuildGhciLib
         let deps = matchPackageNames (sort pkgs) (sort depNames)
             ghci = ghciFlag == "YES" && stage == Stage1
         libs <- fmap concat . forM deps $ \dep -> do
-            let depTarget = PartialTarget stage dep
+            let depTarget = PartialTarget libStage dep
             compId <- interpretPartial depTarget $ getPkgData ComponentId
             libFiles <- fmap concat . forM ways $ \way -> do
-                libFile  <- pkgLibraryFile stage dep compId           way
-                lib0File <- pkgLibraryFile stage dep (compId ++ "-0") way
-                dll0     <- needDll0 stage dep
+                libFile  <- pkgLibraryFile libStage dep compId           way
+                lib0File <- pkgLibraryFile libStage dep (compId ++ "-0") way
+                dll0     <- needDll0 libStage dep
                 return $ [ libFile ] ++ [ lib0File | dll0 ]
-            return $ libFiles ++ [ pkgGhciLibraryFile stage dep compId | ghci ]
+            return $ libFiles ++ [ pkgGhciLibraryFile libStage dep compId | ghci ]
         let binDeps = if pkg == ghcCabal && stage == Stage0
                       then [ pkgPath pkg -/- src <.> "hs" | src <- hSrcs ]
                       else objs
@@ -50,6 +52,6 @@ buildProgram _ target @ (PartialTarget stage pkg) = do
         synopsis <- interpretPartial target $ getPkgData Synopsis
         putSuccess $ renderBox
             [ "Successfully built program '"
-              ++ pkgName pkg ++ "' (stage " ++ show stage ++ ")."
+              ++ pkgName pkg ++ "' (" ++ show stage ++ ")."
             , "Executable: " ++ bin
             , "Package synopsis: " ++ dropWhileEnd isPunctuation synopsis ++ "." ]
