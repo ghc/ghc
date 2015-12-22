@@ -41,17 +41,17 @@ buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
         let objs = cObjs ++ splitObjs ++ eObjs
 
         asuf <- libsuf way
-        if ("//*-0" <.> asuf) ?== a
+        let isLib0 = ("//*-0" <.> asuf) ?== a
+        if isLib0
         then build $ fullTarget target Ar [] [a] -- TODO: scan for dlls
         else build $ fullTarget target Ar objs [a]
 
         synopsis <- interpretPartial target $ getPkgData Synopsis
-        putSuccess $ renderBox
+        unless isLib0 . putSuccess $ renderBox
             [ "Successfully built package library '"
               ++ pkgName pkg
               ++ "' (" ++ show stage ++ ", way "++ show way ++ ")."
-            , "Package synopsis: " ++ dropWhileEnd isPunctuation synopsis ++ "."
-            ]
+            , "Package synopsis: " ++ dropWhileEnd isPunctuation synopsis ++ "." ]
 
     -- TODO: this looks fragile as haskell objects can match this rule if their
     -- names start with "HS" and they are on top of the module hierarchy.
