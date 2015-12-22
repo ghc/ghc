@@ -981,8 +981,6 @@ ppr_mono_ty ctxt_prec (HsDocTy ty _) unicode
 
 ppr_mono_ty _ (HsWildCardTy (AnonWildCard _)) _ = char '_'
 
-ppr_mono_ty _ (HsWildCardTy (NamedWildCard (L _ name))) _ = ppDocName name
-
 ppr_mono_ty _ (HsTyLit t) u = ppr_tylit t u
 
 ppr_mono_ty _ (HsAppsTy {}) _ = panic "ppr_mono_ty:HsAppsTy"

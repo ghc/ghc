@@ -997,9 +997,6 @@ ppr_mono_ty ctxt_prec (HsDocTy ty _) unicode qual
   = ppr_mono_lty ctxt_prec ty unicode qual
 
 ppr_mono_ty _ (HsWildCardTy (AnonWildCard _)) _ _ = char '_'
-
-ppr_mono_ty _ (HsWildCardTy (NamedWildCard (L _ name))) _ q = ppDocName q Prefix True name
-
 ppr_mono_ty _ (HsTyLit n) _ _ = ppr_tylit n
 
 ppr_tylit :: HsTyLit -> Html
