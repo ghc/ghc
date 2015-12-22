@@ -1,5 +1,11 @@
 
-NamedExtraConstraintsWildcard.hs:4:15: error:
-    Named wildcard ‘_a’ not allowed as an extra-contraint
-      Use an anonymous wildcard instead
-      in the type signature for ‘foo’
+NamedExtraConstraintsWildcard.hs:5:1: error:
+    • Could not deduce: t0
+      from the context: (Eq a, t)
+        bound by the inferred type for ‘foo’:
+                   (Eq a, t) => a -> a
+        at NamedExtraConstraintsWildcard.hs:5:1-15
+    • In the ambiguity check for the inferred type for ‘foo’
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      When checking the inferred type
+        foo :: forall a (t :: Constraint). (Eq a, t) => a -> a

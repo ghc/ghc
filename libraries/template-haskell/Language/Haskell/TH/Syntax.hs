@@ -1698,7 +1698,7 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> -> \<t
           | StarT                         -- ^ @*@
           | ConstraintT                   -- ^ @Constraint@
           | LitT TyLit                    -- ^ @0,1,2, etc.@
-          | WildCardT (Maybe Name)        -- ^ @_, _a, etc.@
+          | WildCardT                     -- ^ @_,
       deriving( Show, Eq, Ord, Data, Typeable, Generic )
 
 data TyVarBndr = PlainTV  Name            -- ^ @a@

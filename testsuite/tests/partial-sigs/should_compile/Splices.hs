@@ -1,5 +1,5 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NamedWildCards #-}
+{-# LANGUAGE TemplateHaskell, NamedWildCards #-}
+
 module Splices where
 
 import Language.Haskell.TH

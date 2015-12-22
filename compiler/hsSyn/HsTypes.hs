@@ -43,9 +43,8 @@ module HsTypes (
         rdrNameAmbiguousFieldOcc, selectorAmbiguousFieldOcc,
         unambiguousFieldOcc, ambiguousFieldOcc,
 
-        HsWildCardInfo(..), mkAnonWildCardTy, mkNamedWildCardTy,
-        wildCardName, sameWildCard, sameNamedWildCard,
-        isAnonWildCard, isNamedWildCard,
+        HsWildCardInfo(..), mkAnonWildCardTy,
+        wildCardName, sameWildCard,
 
         mkHsImplicitBndrs, mkHsWildCardBndrs, hsImplicitBody,
         mkEmptyImplicitBndrs, mkEmptyWildCardBndrs,
@@ -178,6 +177,44 @@ is a bit complicated.  Here's how it works.
       class C (a :: k -> *) where ...
   The 'k' is implicitly bound in the hsq_tvs field of LHsQTyVars
 
+Note [The wildcard story for types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Types can have wildcards in them, to support partial type signatures,
+like       f :: Int -> (_ , _a) -> _a
+
+A wildcard in a type can be
+
+  * An anonymous wildcard,
+        written '_'
+    In HsType this is represented by HsWildCardTy.
+    After the renamer, this contains a Name which uniquely
+    identifies this particular occurrence.
+
+  * A named wildcard,
+        written '_a', '_foo', etc
+    In HsType this is represented by (HsTyVar "_a")
+    i.e. a perfectly ordinary type variable that happens
+         to start with an underscore
+
+Note carefully:
+
+* When NamedWildCards is off, type variables that start with an
+  underscore really /are/ ordinary type variables.  And indeed, even
+  when NamedWildCards is on you can bind _a explicitly as an ordinary
+  type variable:
+        data T _a _b = MkT _b _a
+  Or even:
+        f :: forall _a. _a -> _b
+  Here _a is an ordinary forall'd binder, but (With NamedWildCards)
+  _b is a named wildcard.  (See the comments in Trac #10982)
+
+* All wildcards, whether named or anonymous, are bound by the
+  HsWildCardBndrs construct, which wraps types that are allowed
+  to have wildcards.
+
+* After type checking is done, we report what types the wildcards
+  got unified with.
+
 -}
 
 type LHsContext name = Located (HsContext name)
@@ -242,7 +279,9 @@ data HsImplicitBndrs name thing   -- See Note [HsType binders]
     }
   deriving (Typeable)
 
-data HsWildCardBndrs name thing   -- See Note [HsType binders]
+data HsWildCardBndrs name thing
+    -- See Note [HsType binders]
+    -- See Note [The wildcard story for types]
   = HsWC { hswc_wcs :: PostRn name [Name]
                 -- Wild cards, both named and anonymous
 
@@ -517,6 +556,7 @@ data HsType name
       -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsWildCardTy (HsWildCardInfo name)  -- A type wildcard
+      -- See Note [The wildcard story for types]
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in ApiAnnotation
@@ -533,12 +573,10 @@ data HsTyLit
 mkHsOpTy :: LHsType name -> Located name -> LHsType name -> HsType name
 mkHsOpTy ty1 op ty2 = HsOpTy ty1 op ty2
 
-data HsWildCardInfo name
+newtype HsWildCardInfo name      -- See Note [The wildcard story for types]
     = AnonWildCard (PostRn name (Located Name))
       -- A anonymous wild card ('_'). A fresh Name is generated for
       -- each individual anonymous wildcard during renaming
-    | NamedWildCard (Located name)
-      -- A named wild card ('_a').
     deriving (Typeable)
 deriving instance (DataId name) => Data (HsWildCardInfo name)
 
@@ -891,36 +929,13 @@ hsLTyVarBndrsToTypes (HsQTvs { hsq_explicit = tvbs }) = map hsLTyVarBndrToType t
 mkAnonWildCardTy :: HsType RdrName
 mkAnonWildCardTy = HsWildCardTy (AnonWildCard PlaceHolder)
 
-mkNamedWildCardTy :: Located n -> HsType n
-mkNamedWildCardTy = HsWildCardTy . NamedWildCard
-
-isAnonWildCard :: HsWildCardInfo name -> Bool
-isAnonWildCard (AnonWildCard _) = True
-isAnonWildCard _                = False
-
-isNamedWildCard :: HsWildCardInfo name -> Bool
-isNamedWildCard = not . isAnonWildCard
-
 wildCardName :: HsWildCardInfo Name -> Name
-wildCardName (NamedWildCard (L _ n)) = n
 wildCardName (AnonWildCard  (L _ n)) = n
 
--- Two wild cards are the same when: they're both named and have the same
--- name, or they're both anonymous and have the same location.
-sameWildCard :: Eq name
-             => Located (HsWildCardInfo name)
+-- Two wild cards are the same when they have the same location
+sameWildCard :: Located (HsWildCardInfo name)
              -> Located (HsWildCardInfo name) -> Bool
 sameWildCard (L l1 (AnonWildCard _))   (L l2 (AnonWildCard _))   = l1 == l2
-sameWildCard (L _  (NamedWildCard (L _ n1)))
-             (L _  (NamedWildCard (L _ n2))) = n1 == n2
-sameWildCard _ _ = False
-
-sameNamedWildCard :: Eq name
-                  => Located (HsWildCardInfo name)
-                  -> Located (HsWildCardInfo name) -> Bool
-sameNamedWildCard (L _  (NamedWildCard (L _ n1)))
-                  (L _  (NamedWildCard (L _ n2))) = n1 == n2
-sameNamedWildCard _ _ = False
 
 splitHsAppTys :: LHsType Name -> [LHsType Name] -> (LHsType Name, [LHsType Name])
   -- no need to worry about HsAppsTy here
@@ -1030,9 +1045,8 @@ instance (Outputable thing) => Outputable (HsImplicitBndrs name thing) where
 instance (Outputable thing) => Outputable (HsWildCardBndrs name thing) where
     ppr (HsWC { hswc_body = ty }) = ppr ty
 
-instance (Outputable name) => Outputable (HsWildCardInfo name) where
+instance Outputable (HsWildCardInfo name) where
     ppr (AnonWildCard _)  = char '_'
-    ppr (NamedWildCard n) = ppr n
 
 pprHsForAll :: OutputableBndr name => [LHsTyVarBndr name] -> LHsContext name -> SDoc
 pprHsForAll = pprHsForAllExtra Nothing
@@ -1145,7 +1159,6 @@ ppr_mono_ty _    (HsExplicitListTy _ tys) = quote $ brackets (interpp'SP tys)
 ppr_mono_ty _    (HsExplicitTupleTy _ tys) = quote $ parens (interpp'SP tys)
 ppr_mono_ty _    (HsTyLit t)         = ppr_tylit t
 ppr_mono_ty _    (HsWildCardTy (AnonWildCard _))     = char '_'
-ppr_mono_ty _    (HsWildCardTy (NamedWildCard name)) = ppr name
 
 ppr_mono_ty ctxt_prec (HsEqTy ty1 ty2)
   = maybeParen ctxt_prec TyOpPrec $

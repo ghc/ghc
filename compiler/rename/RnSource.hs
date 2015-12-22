@@ -1667,7 +1667,7 @@ rnConDeclDetails _ doc (InfixCon ty1 ty2)
 
 rnConDeclDetails con doc (RecCon (L l fields))
   = do  { fls <- lookupConstructorFields con
-        ; (new_fields, fvs) <- rnConDeclFields fls doc fields
+        ; (new_fields, fvs) <- rnConDeclFields doc fls fields
                 -- No need to check for duplicate fields
                 -- since that is done by RnNames.extendGlobalRdrEnvRn
         ; return (RecCon (L l new_fields), fvs) }

@@ -41,7 +41,6 @@ module RdrName (
         lookupLocalRdrEnv, lookupLocalRdrOcc,
         elemLocalRdrEnv, inLocalRdrEnvScope,
         localRdrEnvElts, delLocalRdrEnvList,
-        extendLocalRdrEnvNwcs, inLocalRdrEnvNwcsRdrName, delLocalRdrEnvNwcs,
 
         -- * Global mapping of 'RdrName' to 'GlobalRdrElt's
         GlobalRdrEnv, emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv,
@@ -327,17 +326,14 @@ instance Ord RdrName where
 -- be replaced with named wildcards.
 -- See Note [Renaming named wild cards] in RnTypes
 data LocalRdrEnv = LRE { lre_env      :: OccEnv Name
-                       , lre_in_scope :: NameSet
-                       , lre_nwcs     :: NameSet }
+                       , lre_in_scope :: NameSet }
 
 instance Outputable LocalRdrEnv where
-  ppr (LRE {lre_env = env, lre_in_scope = ns, lre_nwcs = nwcs})
+  ppr (LRE {lre_env = env, lre_in_scope = ns})
     = hang (ptext (sLit "LocalRdrEnv {"))
          2 (vcat [ ptext (sLit "env =") <+> pprOccEnv ppr_elt env
                  , ptext (sLit "in_scope =")
                     <+> braces (pprWithCommas ppr (nameSetElems ns))
-                 , ptext (sLit "nwcs =")
-                    <+> braces (pprWithCommas ppr (nameSetElems nwcs))
                  ] <+> char '}')
     where
       ppr_elt name = parens (ppr (getUnique (nameOccName name))) <+> ppr name
@@ -345,8 +341,7 @@ instance Outputable LocalRdrEnv where
 
 emptyLocalRdrEnv :: LocalRdrEnv
 emptyLocalRdrEnv = LRE { lre_env = emptyOccEnv
-                       , lre_in_scope = emptyNameSet
-                       , lre_nwcs = emptyNameSet }
+                       , lre_in_scope = emptyNameSet }
 
 extendLocalRdrEnv :: LocalRdrEnv -> Name -> LocalRdrEnv
 -- The Name should be a non-top-level thing
@@ -386,27 +381,6 @@ inLocalRdrEnvScope name (LRE { lre_in_scope = ns }) = name `elemNameSet` ns
 delLocalRdrEnvList :: LocalRdrEnv -> [OccName] -> LocalRdrEnv
 delLocalRdrEnvList lre@(LRE { lre_env = env }) occs
   = lre { lre_env = delListFromOccEnv env occs }
-
-extendLocalRdrEnvNwcs:: LocalRdrEnv -> [Name] -> LocalRdrEnv
-extendLocalRdrEnvNwcs lre@(LRE { lre_nwcs = nwcs }) names
-  = lre { lre_nwcs = extendNameSetList nwcs names }
-
-inLocalRdrEnvNwcs :: Name -> LocalRdrEnv -> Bool
-inLocalRdrEnvNwcs name (LRE { lre_nwcs = nwcs }) = name `elemNameSet` nwcs
-
-inLocalRdrEnvNwcsRdrName :: RdrName -> LocalRdrEnv -> Bool
-inLocalRdrEnvNwcsRdrName rdr_name lcl_env@(LRE { lre_nwcs = nwcs })
-  | isEmptyNameSet nwcs = False
-  | otherwise = case rdr_name of
-      Unqual occ -> case lookupLocalRdrOcc lcl_env occ of
-          Just name -> inLocalRdrEnvNwcs name lcl_env
-          Nothing   -> False
-      Exact name -> inLocalRdrEnvNwcs name lcl_env
-      _ -> False
-
-delLocalRdrEnvNwcs :: LocalRdrEnv -> [Name] -> LocalRdrEnv
-delLocalRdrEnvNwcs lre@(LRE { lre_nwcs = nwcs }) names
-  = lre { lre_nwcs = delListFromNameSet nwcs names }
 
 {-
 Note [Local bindings with Exact Names]

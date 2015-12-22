@@ -618,10 +618,7 @@ equalityT :: TypeQ
 equalityT = return EqualityT
 
 wildCardT :: TypeQ
-wildCardT = return (WildCardT Nothing)
-
-namedWildCardT :: Name -> TypeQ
-namedWildCardT = return . WildCardT . Just
+wildCardT = return WildCardT
 
 {-# DEPRECATED classP "As of template-haskell-2.10, constraint predicates (Pred) are just types (Type), in keeping with ConstraintKinds. Please use 'conT' and 'appT'." #-}
 classP :: Name -> [Q Type] -> Q Pred

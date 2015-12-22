@@ -1,5 +1,5 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE TemplateHaskell, PartialTypeSignatures, NamedWildCards #-}
+
 module SplicesUsed where
 
 import Splices

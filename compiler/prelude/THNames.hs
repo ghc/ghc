@@ -89,7 +89,7 @@ templateHaskellNames = [
     forallTName, varTName, conTName, appTName, equalityTName,
     tupleTName, unboxedTupleTName, arrowTName, listTName, sigTName, litTName,
     promotedTName, promotedTupleTName, promotedNilTName, promotedConsTName,
-    wildCardTName, namedWildCardTName,
+    wildCardTName,
     -- TyLit
     numTyLitName, strTyLitName,
     -- TyVarBndr
@@ -391,7 +391,7 @@ forallTName, varTName, conTName, tupleTName, unboxedTupleTName, arrowTName,
     listTName, appTName, sigTName, equalityTName, litTName,
     promotedTName, promotedTupleTName,
     promotedNilTName, promotedConsTName,
-    wildCardTName, namedWildCardTName :: Name
+    wildCardTName :: Name
 forallTName         = libFun (fsLit "forallT")        forallTIdKey
 varTName            = libFun (fsLit "varT")           varTIdKey
 conTName            = libFun (fsLit "conT")           conTIdKey
@@ -408,8 +408,6 @@ promotedTupleTName  = libFun (fsLit "promotedTupleT") promotedTupleTIdKey
 promotedNilTName    = libFun (fsLit "promotedNilT")   promotedNilTIdKey
 promotedConsTName   = libFun (fsLit "promotedConsT")  promotedConsTIdKey
 wildCardTName       = libFun (fsLit "wildCardT")      wildCardTIdKey
-namedWildCardTName  = libFun (fsLit "namedWildCardT") namedWildCardTIdKey
-
 
 -- data TyLit = ...
 numTyLitName, strTyLitName :: Name
@@ -849,7 +847,7 @@ forallTIdKey, varTIdKey, conTIdKey, tupleTIdKey, unboxedTupleTIdKey, arrowTIdKey
     listTIdKey, appTIdKey, sigTIdKey, equalityTIdKey, litTIdKey,
     promotedTIdKey, promotedTupleTIdKey,
     promotedNilTIdKey, promotedConsTIdKey,
-    wildCardTIdKey, namedWildCardTIdKey :: Unique
+    wildCardTIdKey :: Unique
 forallTIdKey        = mkPreludeMiscIdUnique 380
 varTIdKey           = mkPreludeMiscIdUnique 381
 conTIdKey           = mkPreludeMiscIdUnique 382
@@ -866,7 +864,6 @@ promotedTupleTIdKey = mkPreludeMiscIdUnique 392
 promotedNilTIdKey   = mkPreludeMiscIdUnique 393
 promotedConsTIdKey  = mkPreludeMiscIdUnique 394
 wildCardTIdKey      = mkPreludeMiscIdUnique 395
-namedWildCardTIdKey = mkPreludeMiscIdUnique 396
 
 -- data TyLit = ...
 numTyLitIdKey, strTyLitIdKey :: Unique

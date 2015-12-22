@@ -1142,12 +1142,8 @@ cvtTypeKind ty_str ty
            LitT lit
              -> returnL (HsTyLit (cvtTyLit lit))
 
-           WildCardT Nothing
+           WildCardT
              -> mk_apps mkAnonWildCardTy tys'
-
-           WildCardT (Just nm)
-             -> do { nm' <- tNameL nm
-                   ; mk_apps (mkNamedWildCardTy nm') tys' }
 
            InfixT t1 s t2
              -> do { s'  <- tconName s
