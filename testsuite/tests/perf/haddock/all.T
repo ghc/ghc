@@ -50,7 +50,7 @@ test('haddock.base',
 test('haddock.Cabal',
      [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 9982130512, 5)
+          [(wordsize(64), 10519532424, 5)
             # 2012-08-14: 3255435248 (amd64/Linux)
             # 2012-08-29: 3324606664 (amd64/Linux, new codegen)
             # 2012-10-08: 3373401360 (amd64/Linux)
@@ -73,6 +73,7 @@ test('haddock.Cabal',
             # 2015-06-29: 7413958344 (x86_64/Linux) - due to #10482, not yet investigated
             # 2015-12-11: 8114833312 (amd64/Linux) - TypeInType (See #11196)
             # 2015-12-17: 9982130512 (amd64/Linux) - Update Haddock to master
+            # 2015-12-22: 10519532424 (amd64/Linux) - Lots of new Semigroup instances in Cabal
 
           ,(platform('i386-unknown-mingw32'), 3293415576, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)
