@@ -3,7 +3,7 @@ module Settings.User (
     userProgramPath, userKnownPackages, integerLibrary,
     trackBuildSystem, buildHaddock, validating, ghciWithDebugger, ghcProfiled,
     ghcDebugged, dynamicGhcPrograms, laxDependencies, buildSystemConfigFile,
-    verboseCommands
+    verboseCommands, turnWarningsIntoErrors
     ) where
 
 import Expression
@@ -88,3 +88,7 @@ buildSystemConfigFile = False
 -- only, e.g.: verboseCommands = package ghcPrim
 verboseCommands :: Predicate
 verboseCommands = return False
+
+-- | To enable -Werror in Stage2 set turnWarningsIntoErrors = stage2.
+turnWarningsIntoErrors :: Predicate
+turnWarningsIntoErrors = return False
