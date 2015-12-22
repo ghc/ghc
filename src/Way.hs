@@ -28,6 +28,7 @@ data WayUnit = Threaded
              | GranSim
              deriving (Eq, Enum)
 
+-- TODO: get rid of non-derived Show instances
 instance Show WayUnit where
     show unit = case unit of
         Threaded  -> "thr"

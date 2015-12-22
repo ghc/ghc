@@ -37,7 +37,7 @@ instance Monoid a => Monoid (ReaderT Target Action a) where
 
 -- PartialTarget is a partially constructed Target with fields Stage and
 -- Package only. PartialTarget's are used for generating build rules.
-data PartialTarget = PartialTarget Stage Package
+data PartialTarget = PartialTarget Stage Package deriving Show
 
 -- Convert PartialTarget to Target assuming that unknown fields won't be used.
 fromPartial :: PartialTarget -> Target
