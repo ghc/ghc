@@ -2098,6 +2098,7 @@ So a Given has EvVar inside it rather that (as previously) an EvTerm.
 data TcEvDest
   = EvVarDest EvVar         -- ^ bind this var to the evidence
   | HoleDest  CoercionHole  -- ^ fill in this hole with the evidence
+              -- See Note [Coercion holes] in TyCoRep
 
 data CtEvidence
   = CtGiven { ctev_pred :: TcPredType      -- See Note [Ct/evidence invariant]
