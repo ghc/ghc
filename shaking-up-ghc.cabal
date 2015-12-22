@@ -1,0 +1,91 @@
+name:                shaking-up-ghc
+version:             0.1.0.0
+synopsis:            GHC build system
+license:             BSD3
+license-file:        LICENSE
+author:              Andrey Mokhov, Github: @snowleopard
+maintainer:          Andrey Mokhov, Github: @snowleopard
+copyright:           Andrey Mokhov, Github: @snowleopard
+category:            Development
+build-type:          Simple
+cabal-version:       >=1.10
+
+source-repository head
+    type:     git
+    location: https://github.com/snowleopard/shaking-up-ghc
+
+executable ghc-shake
+    main-is:             Main.hs
+    hs-source-dirs:      src
+    other-modules:       Base
+                       , Builder
+                       , Expression
+                       , GHC
+                       , Oracles
+                       , Oracles.ArgsHash
+                       , Oracles.Config
+                       , Oracles.Config.Flag
+                       , Oracles.Config.Setting
+                       , Oracles.Dependencies
+                       , Oracles.ModuleFiles
+                       , Oracles.PackageData
+                       , Oracles.PackageDeps
+                       , Oracles.WindowsRoot
+                       , Package
+                       , Predicates
+                       , Rules
+                       , Rules.Actions
+                       , Rules.Cabal
+                       , Rules.Compile
+                       , Rules.Config
+                       , Rules.Data
+                       , Rules.Dependencies
+                       , Rules.Documentation
+                       , Rules.Generate
+                       , Rules.Library
+                       , Rules.Oracles
+                       , Rules.Package
+                       , Rules.Program
+                       , Rules.Resources
+                       , Settings
+                       , Settings.Args
+                       , Settings.Builders.Alex
+                       , Settings.Builders.Ar
+                       , Settings.Builders.Gcc
+                       , Settings.Builders.GenPrimopCode
+                       , Settings.Builders.Ghc
+                       , Settings.Builders.GhcCabal
+                       , Settings.Builders.GhcPkg
+                       , Settings.Builders.Haddock
+                       , Settings.Builders.Happy
+                       , Settings.Builders.Hsc2Hs
+                       , Settings.Builders.HsCpp
+                       , Settings.Builders.Ld
+                       , Settings.Packages
+                       , Settings.TargetDirectory
+                       , Settings.User
+                       , Settings.Ways
+                       , Stage
+                       , Target
+                       , Way
+
+    default-extensions:  BangPatterns
+                       , LambdaCase
+                       , MultiWayIf
+                       , OverloadedStrings
+                       , TupleSections
+    other-extensions:    DeriveDataTypeable
+                       , DeriveGeneric
+                       , FlexibleInstances
+    build-depends:       base
+                       , ansi-terminal >= 0.6
+                       , Cabal >= 1.22
+                       , containers >= 0.5
+                       , directory >= 1.2
+                       , extra >= 1.4
+                       , mtl >= 2.2
+                       , shake >= 0.15
+                       , transformers >= 0.4
+                       , unordered-containers >= 0.2
+    default-language:    Haskell2010
+    ghc-options:         -Wall -rtsopts -with-rtsopts=-I0 -j
