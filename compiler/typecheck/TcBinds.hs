@@ -19,7 +19,8 @@ module TcBinds ( tcLocalBinds, tcTopBinds, tcRecSelBinds,
 
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
-import {-# SOURCE #-} TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl, tcPatSynBuilderBind )
+import {-# SOURCE #-} TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl
+                               , tcPatSynBuilderBind, tcPatSynSig )
 import DynFlags
 import HsSyn
 import HscTypes( isHsBootOrSig )
@@ -63,7 +64,6 @@ import TcValidity (checkValidType)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
-import Data.List (partition)
 
 #include "HsVersions.h"
 
@@ -1684,46 +1684,8 @@ tcTySig (L loc (TypeSig names sig_ty))
        ; return (map TcIdSig sigs) }
 
 tcTySig (L loc (PatSynSig (L _ name) sig_ty))
-  | HsIB { hsib_vars = sig_vars
-         , hsib_body = hs_ty }  <- sig_ty
-  , (tv_bndrs, req, prov, body_ty) <- splitLHsPatSynTy hs_ty
   = setSrcSpan loc $
-    do { (tvs1, (req', prov', ty', tvs2))
-           <- tcImplicitTKBndrs sig_vars $
-              tcHsTyVarBndrs tv_bndrs    $ \ tvs2 ->
-              do { req'  <- tcHsContext req
-                 ; prov' <- tcHsContext prov
-                 ; ty'   <- tcHsLiftedType body_ty
-                 ; let bound_tvs
-                         = unionVarSets [ allBoundVariabless req'
-                                        , allBoundVariabless prov'
-                                        , allBoundVariables ty' ]
-                 ; return ((req', prov', ty', tvs2), bound_tvs) }
-
-       -- These are /signatures/ so we zonk to squeeze out any kind
-       -- unification variables.  ToDo: checkValidType?
-       ; qtvs' <- mapMaybeM zonkQuantifiedTyVar (tvs1 ++ tvs2)
-       ; req'  <- zonkTcTypes req'
-       ; prov' <- zonkTcTypes prov'
-       ; ty'   <- zonkTcType  ty'
-
-       ; let (_, pat_ty) = tcSplitFunTys ty'
-             univ_set = tyCoVarsOfType pat_ty
-             (univ_tvs, ex_tvs) = partition (`elemVarSet` univ_set) qtvs'
-             bad_tvs = varSetElems (tyCoVarsOfTypes req' `minusVarSet` univ_set)
-
-       ; unless (null bad_tvs) $ addErr $
-         hang (ptext (sLit "The 'required' context") <+> quotes (pprTheta req'))
-            2 (ptext (sLit "mentions existential type variable") <> plural bad_tvs
-               <+> pprQuotedList bad_tvs)
-
-       ; traceTc "tcTySig }" $ ppr (ex_tvs, prov') $$ ppr (univ_tvs, req') $$ ppr ty'
-       ; let tpsi = TPSI{ patsig_name = name,
-                          patsig_tau  = ty',
-                          patsig_ex   = ex_tvs,
-                          patsig_univ = univ_tvs,
-                          patsig_prov = prov',
-                          patsig_req  = req' }
+    do { tpsi <- tcPatSynSig name sig_ty
        ; return [TcPatSynSig tpsi] }
 
 tcTySig _ = return []

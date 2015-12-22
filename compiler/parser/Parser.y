@@ -1191,28 +1191,9 @@ where_decls :: { Located ([AddAnn]
                                           ,sL1 $3 (snd $ unLoc $3)) }
 
 pattern_synonym_sig :: { LSig RdrName }
-        : 'pattern' con '::' ptype
+        : 'pattern' con '::' sigtype
                    {% ams (sLL $1 $> $ PatSynSig $2 (mkLHsSigType $4))
                           [mj AnnPattern $1, mu AnnDcolon $3] }
-
-ptype   :: { LHsType RdrName }
-        : 'forall' tv_bndrs '.' ptype
-                   {% hintExplicitForall (getLoc $1) >>
-                      ams (sLL $1 $> $
-                           HsForAllTy { hst_bndrs = $2
-                                      , hst_body = $4 })
-                          [mu AnnForall $1, mj AnnDot $3] }
-
-        | context '=>' context '=>' type
-                   {% ams (sLL $1 $> $
-                           HsQualTy { hst_ctxt = $1, hst_body = sLL $3 $> $
-                           HsQualTy { hst_ctxt = $3, hst_body = $5 } })
-                           [mu AnnDarrow $2, mu AnnDarrow $4] }
-        | context '=>' type
-                   {% ams (sLL $1 $> $
-                           HsQualTy { hst_ctxt = $1, hst_body = $3 })
-                           [mu AnnDarrow $2] }
-        | type     { $1 }
 
 -----------------------------------------------------------------------------
 -- Nested declarations

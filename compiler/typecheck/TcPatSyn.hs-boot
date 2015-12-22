@@ -2,10 +2,13 @@ module TcPatSyn where
 
 import Name      ( Name )
 import Id        ( Id )
-import HsSyn     ( PatSynBind, LHsBinds )
+import HsSyn     ( PatSynBind, LHsBinds, LHsSigType )
 import TcRnTypes ( TcM, TcPatSynInfo )
 import TcRnMonad ( TcGblEnv)
 import Outputable ( Outputable )
+
+tcPatSynSig :: Name -> LHsSigType Name
+            -> TcM TcPatSynInfo
 
 tcInferPatSynDecl :: PatSynBind Name Name
                   -> TcM (LHsBinds Id, TcGblEnv)

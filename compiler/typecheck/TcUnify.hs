@@ -267,7 +267,7 @@ matchExpectedTyConApp tc orig_ty
     -- This happened in Trac #7368
     defer is_return
       = ASSERT2( classifiesTypeWithValues res_kind, ppr tc )
-        do { (k_subst, kvs') <- tcInstTyVars kvs
+        do { (k_subst, kvs') <- newMetaTyVars kvs
            ; let arg_kinds' = substTys k_subst arg_kinds
                  kappa_tys  = mkTyVarTys kvs'
            ; tau_tys <- mapM (newMaybeReturnTyVarTy is_return) arg_kinds'
@@ -482,7 +482,7 @@ tc_sub_type_ds origin ctxt ty_actual ty_expected
 
   | (tvs, theta, in_rho) <- tcSplitSigmaTy ty_actual
   , not (null tvs && null theta)
-  = do { (subst, tvs') <- tcInstTyVars tvs
+  = do { (subst, tvs') <- newMetaTyVars tvs
        ; let tys'    = mkTyVarTys tvs'
              theta'  = substTheta subst theta
              in_rho' = substTy subst in_rho

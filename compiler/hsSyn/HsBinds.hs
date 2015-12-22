@@ -892,13 +892,8 @@ ppr_sig (SpecInstSig _ ty)
   = pragBrackets (ptext (sLit "SPECIALIZE instance") <+> ppr ty)
 ppr_sig (MinimalSig _ bf)         = pragBrackets (pprMinimalSig bf)
 ppr_sig (PatSynSig name sig_ty)
-  = pprPatSynSig (unLoc name) False -- TODO: is_bindir
-                 (pprHsForAllTvs qtvs)
-                 (pprHsContextMaybe (unLoc req))
-                 (pprHsContextMaybe (unLoc prov))
-                 (ppr ty)
-  where
-    (qtvs, req, prov, ty) = splitLHsPatSynTy (hsSigType sig_ty)
+  = ptext (sLit "pattern") <+> pprPrefixOcc (unLoc name) <+> dcolon
+                           <+> ppr sig_ty
 
 pprPatSynSig :: (OutputableBndr name)
              => name -> Bool -> SDoc -> Maybe SDoc -> Maybe SDoc -> SDoc -> SDoc

@@ -827,7 +827,7 @@ tcInstBinderX mb_kind_info subst binder
   | Just tv <- binderVar_maybe binder
   = case lookup_tv tv of
       Just ki -> return (extendTCvSubst subst tv ki, ki)
-      Nothing -> do { (subst', tv') <- tcInstTyVarX subst tv
+      Nothing -> do { (subst', tv') <- newMetaTyVarX subst tv
                     ; return (subst', mkTyVarTy tv') }
 
      -- This is the *only* constraint currently handled in types.
@@ -2055,7 +2055,7 @@ Here
 
  * The type signature pattern (f :: a->Int) binds "a" -> a_sig in the envt
 
- * Then unificaiton makes a_sig := a_sk
+ * Then unification makes a_sig := a_sk
 
 That's why we must make a_sig a MetaTv (albeit a SigTv),
 not a SkolemTv, so that it can unify to a_sk.

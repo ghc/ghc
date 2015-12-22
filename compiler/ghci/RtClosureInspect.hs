@@ -606,7 +606,7 @@ instTyVars :: [TyVar] -> TR (TCvSubst, [TcTyVar])
 -- Instantiate fresh mutable type variables from some TyVars
 -- This function preserves the print-name, which helps error messages
 instTyVars tvs
-  = liftTcM $ fst <$> captureConstraints (tcInstTyVars tvs)
+  = liftTcM $ fst <$> captureConstraints (newMetaTyVars tvs)
 
 type RttiInstantiation = [(TcTyVar, TyVar)]
    -- Associates the typechecker-world meta type variables

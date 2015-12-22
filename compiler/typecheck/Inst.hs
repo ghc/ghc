@@ -157,7 +157,7 @@ deeplyInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 
 deeplyInstantiate orig ty
   | Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
-  = do { (subst, tvs') <- tcInstTyVars tvs
+  = do { (subst, tvs') <- newMetaTyVars tvs
        ; ids1  <- newSysLocalIds (fsLit "di") (substTys subst arg_tys)
        ; let theta' = substTheta subst theta
        ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
@@ -248,7 +248,7 @@ instDFunType dfun_id dfun_inst_tys
       = do { (subst', tys) <- go (extendTCvSubst subst tv ty) tvs mb_tys
            ; return (subst', ty : tys) }
     go subst (tv:tvs) (Nothing : mb_tys)
-      = do { (subst', tv') <- tcInstTyVarX subst tv
+      = do { (subst', tv') <- newMetaTyVarX subst tv
            ; (subst'', tys) <- go subst' tvs mb_tys
            ; return (subst'', mkTyVarTy tv' : tys) }
     go _ _ _ = pprPanic "instDFunTypes" (ppr dfun_id $$ ppr dfun_inst_tys)

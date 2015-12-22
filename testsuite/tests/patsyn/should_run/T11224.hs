@@ -1,10 +1,10 @@
-{-# LANGUAGE PatternSynonyms , ViewPatterns #-}
+{-# LANGUAGE  PatternSynonyms, ViewPatterns #-}
 
--- inlining a pattern synonym shouldn't change semantics
+module Main where
 
 import Text.Read
 
--- pattern PRead :: () => Read a => a -> String
+pattern PRead :: Read a => () => a -> String
 pattern PRead a <- (readMaybe -> Just a)
 
 foo :: String -> Int
@@ -26,3 +26,4 @@ main = do
   print $ bar "1"       -- 1
   print $ bar "[1,2,3]" -- 6
   print $ bar "xxx"     -- 666
+

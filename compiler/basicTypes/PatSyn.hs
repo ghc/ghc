@@ -159,8 +159,8 @@ so pattern P has type
 
 with the following typeclass constraints:
 
-        provides: (Show (Maybe t), Ord b)
         requires: (Eq t, Num t)
+        provides: (Show (Maybe t), Ord b)
 
 In this case, the fields of MkPatSyn will be set as follows:
 

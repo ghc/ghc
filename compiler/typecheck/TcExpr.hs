@@ -842,15 +842,15 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
 
               mk_inst_ty :: TCvSubst -> (TyVar, TcType) -> TcM (TCvSubst, TcType)
               -- Deals with instantiation of kind variables
-              --   c.f. TcMType.tcInstTyVars
+              --   c.f. TcMType.newMetaTyVars
               mk_inst_ty subst (tv, result_inst_ty)
                 | is_fixed_tv tv   -- Same as result type
                 = return (extendTCvSubst subst tv result_inst_ty, result_inst_ty)
                 | otherwise        -- Fresh type, of correct kind
-                = do { (subst', new_tv) <- tcInstTyVarX subst tv
+                = do { (subst', new_tv) <- newMetaTyVarX subst tv
                      ; return (subst', mkTyVarTy new_tv) }
 
-        ; (result_subst, con1_tvs') <- tcInstTyVars con1_tvs
+        ; (result_subst, con1_tvs') <- newMetaTyVars con1_tvs
         ; let result_inst_tys = mkTyVarTys con1_tvs'
 
         ; (scrut_subst, scrut_inst_tys) <- mapAccumLM mk_inst_ty emptyTCvSubst
@@ -1327,7 +1327,7 @@ tc_infer_id orig lbl id_name
        --   * No need to deeply instantiate because type has all foralls at top
        = do { let wrap_id           = dataConWrapId con
                   (tvs, theta, rho) = tcSplitSigmaTy (idType wrap_id)
-            ; (subst, tvs') <- tcInstTyVars tvs
+            ; (subst, tvs') <- newMetaTyVars tvs
             ; let tys'   = mkTyVarTys tvs'
                   theta' = substTheta subst theta
                   rho'   = substTy subst rho

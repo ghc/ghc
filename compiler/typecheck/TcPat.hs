@@ -706,7 +706,7 @@ tcPatSynPat :: PatEnv -> Located Name -> PatSyn
 tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
   = do  { let (univ_tvs, req_theta, ex_tvs, prov_theta, arg_tys, ty) = patSynSig pat_syn
 
-        ; (subst, univ_tvs') <- tcInstTyVars univ_tvs
+        ; (subst, univ_tvs') <- newMetaTyVars univ_tvs
 
         ; let all_arg_tys = ty : prov_theta ++ arg_tys
         ; checkExistentials ex_tvs all_arg_tys penv
@@ -776,7 +776,7 @@ matchExpectedPatTy inner_match pat_ty
          -- that is the other way round to matchExpectedPatTy
 
   | otherwise
-  = do { (subst, tvs') <- tcInstTyVars tvs
+  = do { (subst, tvs') <- newMetaTyVars tvs
        ; wrap1 <- instCall PatOrigin (mkTyVarTys tvs') (substTheta subst theta)
        ; (wrap2, arg_tys) <- matchExpectedPatTy inner_match (TcType.substTy subst tau)
        ; return (wrap2 <.> wrap1, arg_tys) }
@@ -800,7 +800,7 @@ matchExpectedConTy data_tc pat_ty
   | Just (fam_tc, fam_args, co_tc) <- tyConFamInstSig_maybe data_tc
          -- Comments refer to Note [Matching constructor patterns]
          -- co_tc :: forall a. T [a] ~ T7 a
-  = do { (subst, tvs') <- tcInstTyVars (tyConTyVars data_tc)
+  = do { (subst, tvs') <- newMetaTyVars (tyConTyVars data_tc)
              -- tys = [ty1,ty2]
 
        ; traceTc "matchExpectedConTy" (vcat [ppr data_tc,
