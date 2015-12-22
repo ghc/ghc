@@ -458,7 +458,8 @@
 
 #if defined(openbsd_HOST_OS)
 #define RTS_OPENBSD_ONLY_SYMBOLS                            \
-     SymE_NeedsProto(__guard_local)
+     SymE_NeedsProto(__guard_local)                         \
+     SymE_NeedsProto(_DYNAMIC)
 #else
 #define RTS_OPENBSD_ONLY_SYMBOLS
 #endif
