@@ -29,7 +29,7 @@ import qualified GHC.Event.Internal as E
 import GHC.Base
 
 new :: IO E.Backend
-new = error "EPoll back end not implemented for this platform"
+new = errorWithoutStackTrace "EPoll back end not implemented for this platform"
 
 available :: Bool
 available = False

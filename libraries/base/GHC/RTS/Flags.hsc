@@ -87,7 +87,7 @@ instance Enum GiveGCStats where
     toEnum #{const ONELINE_GC_STATS} = OneLineGCStats
     toEnum #{const SUMMARY_GC_STATS} = SummaryGCStats
     toEnum #{const VERBOSE_GC_STATS} = VerboseGCStats
-    toEnum e = error ("invalid enum for GiveGCStats: " ++ show e)
+    toEnum e = errorWithoutStackTrace ("invalid enum for GiveGCStats: " ++ show e)
 
 -- | Parameters of the garbage collector.
 --
@@ -185,7 +185,7 @@ instance Enum DoCostCentres where
     toEnum #{const COST_CENTRES_VERBOSE} = CostCentresVerbose
     toEnum #{const COST_CENTRES_ALL}     = CostCentresAll
     toEnum #{const COST_CENTRES_XML}     = CostCentresXML
-    toEnum e = error ("invalid enum for DoCostCentres: " ++ show e)
+    toEnum e = errorWithoutStackTrace ("invalid enum for DoCostCentres: " ++ show e)
 
 -- | Parameters pertaining to the cost-center profiler.
 --
@@ -228,7 +228,7 @@ instance Enum DoHeapProfile where
     toEnum #{const HEAP_BY_RETAINER}     = HeapByRetainer
     toEnum #{const HEAP_BY_LDV}          = HeapByLDV
     toEnum #{const HEAP_BY_CLOSURE_TYPE} = HeapByClosureType
-    toEnum e = error ("invalid enum for DoHeapProfile: " ++ show e)
+    toEnum e = errorWithoutStackTrace ("invalid enum for DoHeapProfile: " ++ show e)
 
 -- | Parameters of the cost-center profiler
 --
@@ -267,7 +267,7 @@ instance Enum DoTrace where
     toEnum #{const TRACE_NONE}     = TraceNone
     toEnum #{const TRACE_EVENTLOG} = TraceEventLog
     toEnum #{const TRACE_STDERR}   = TraceStderr
-    toEnum e = error ("invalid enum for DoTrace: " ++ show e)
+    toEnum e = errorWithoutStackTrace ("invalid enum for DoTrace: " ++ show e)
 
 -- | Parameters pertaining to event tracing
 --

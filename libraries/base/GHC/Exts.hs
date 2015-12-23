@@ -103,8 +103,8 @@ maxTupleSize = 62
 the :: Eq a => [a] -> a
 the (x:xs)
   | all (x ==) xs = x
-  | otherwise     = error "GHC.Exts.the: non-identical elements"
-the []            = error "GHC.Exts.the: empty list"
+  | otherwise     = errorWithoutStackTrace "GHC.Exts.the: non-identical elements"
+the []            = errorWithoutStackTrace "GHC.Exts.the: empty list"
 
 -- | The 'sortWith' function sorts a list of elements using the
 -- user supplied function to project something out of each element

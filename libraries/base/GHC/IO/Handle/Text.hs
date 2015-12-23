@@ -564,7 +564,7 @@ getSpareBuffer Handle__{haCharBuffer=ref,
                         haBufferMode=mode}
  = do
    case mode of
-     NoBuffering -> return (mode, error "no buffer!")
+     NoBuffering -> return (mode, errorWithoutStackTrace "no buffer!")
      _ -> do
           bufs <- readIORef spare_ref
           buf  <- readIORef ref

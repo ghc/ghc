@@ -173,13 +173,13 @@ can do better, so we override the default method for index.
 {-# NOINLINE indexError #-}
 indexError :: Show a => (a,a) -> a -> String -> b
 indexError rng i tp
-  = error (showString "Ix{" . showString tp . showString "}.index: Index " .
+  = errorWithoutStackTrace (showString "Ix{" . showString tp . showString "}.index: Index " .
            showParen True (showsPrec 0 i) .
            showString " out of range " $
            showParen True (showsPrec 0 rng) "")
 
 hopelessIndexError :: Int -- Try to use 'indexError' instead!
-hopelessIndexError = error "Error in array index"
+hopelessIndexError = errorWithoutStackTrace "Error in array index"
 
 ----------------------------------------------------------------------
 instance  Ix Char  where
@@ -399,7 +399,7 @@ instance Eq (STArray s i e) where
 
 {-# NOINLINE arrEleBottom #-}
 arrEleBottom :: a
-arrEleBottom = error "(Array.!): undefined array element"
+arrEleBottom = errorWithoutStackTrace "(Array.!): undefined array element"
 
 -- | Construct an array with the specified bounds and containing values
 -- for given indices within these bounds.
@@ -504,7 +504,7 @@ safeRangeSize (l,u) = let r = rangeSize (l, u)
 
 -- Don't inline this error message everywhere!!
 negRange :: Int   -- Uninformative, but Ix does not provide Show
-negRange = error "Negative range size"
+negRange = errorWithoutStackTrace "Negative range size"
 
 {-# INLINE[1] safeIndex #-}
 -- See Note [Double bounds-checking of index values]
@@ -531,7 +531,7 @@ lessSafeIndex (l,u) _ i = index (l,u) i
 
 -- Don't inline this long error message everywhere!!
 badSafeIndex :: Int -> Int -> Int
-badSafeIndex i' n = error ("Error in array index; " ++ show i' ++
+badSafeIndex i' n = errorWithoutStackTrace ("Error in array index; " ++ show i' ++
                         " not in range [0.." ++ show n ++ ")")
 
 {-# INLINE unsafeAt #-}
@@ -604,7 +604,7 @@ foldl1Elems f = \ arr@(Array _ _ n _) ->
     go i | i == 0    = unsafeAt arr 0
          | otherwise = f (go (i-1)) (unsafeAt arr i)
   in
-    if n == 0 then error "foldl1: empty Array" else go (n-1)
+    if n == 0 then errorWithoutStackTrace "foldl1: empty Array" else go (n-1)
 
 -- | A right fold over the elements with no starting value
 {-# INLINABLE foldr1Elems #-}
@@ -614,7 +614,7 @@ foldr1Elems f = \ arr@(Array _ _ n _) ->
     go i | i == n-1  = unsafeAt arr i
          | otherwise = f (unsafeAt arr i) (go (i + 1))
   in
-    if n == 0 then error "foldr1: empty Array" else go 0
+    if n == 0 then errorWithoutStackTrace "foldr1: empty Array" else go 0
 
 -- | The list of associations of an array in index order.
 {-# INLINE assocs #-}

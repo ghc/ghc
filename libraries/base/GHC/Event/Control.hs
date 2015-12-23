@@ -159,7 +159,7 @@ readControlMessage ctrl fd
                         r <- c_read (fromIntegral fd) (castPtr p_siginfo)
                              sizeof_siginfo_t
                         when (r /= fromIntegral sizeof_siginfo_t) $
-                            error "failed to read siginfo_t"
+                            errorWithoutStackTrace "failed to read siginfo_t"
                         let !s' = fromIntegral s
                         return $ CMsgSignal fp s'
 
@@ -195,7 +195,7 @@ sendMessage fd msg = alloca $ \p -> do
   case msg of
     CMsgWakeup        -> poke p io_MANAGER_WAKEUP
     CMsgDie           -> poke p io_MANAGER_DIE
-    CMsgSignal _fp _s -> error "Signals can only be sent from within the RTS"
+    CMsgSignal _fp _s -> errorWithoutStackTrace "Signals can only be sent from within the RTS"
   fromIntegral `fmap` c_write (fromIntegral fd) p 1
 
 #if defined(HAVE_EVENTFD)

@@ -4,16 +4,32 @@
 
   * Bundled with GHC 8.0
 
+  * `error` and `undefined` now print a partial stack-trace alongside the error message.
+
+  * New `errorWithoutStackTrace` function throws an error without printing the stack trace.
+
   * The restore operation provided by `mask` and `uninterruptibleMask` now
     restores the previous masking state whatever the current masking state is.
-
-  * Redundant typeclass constraints have been removed:
-     - `Data.Ratio.{denominator,numerator}` have no `Integral` constraint anymore
-     - **TODO**
 
   * New `GHC.Generics.packageName` operation
 
   * New `GHC.Stack.CallStack` data type
+
+  * New `GHC.Generics.packageName` operation
+
+  * New `GHC.Stack.Types` module now contains the definition of
+    `CallStack` and `SrcLoc`
+
+  * New `GHC.Stack.Types.emptyCallStack` function builds an empty `CallStack`
+
+  * New `GHC.Stack.Types.freezeCallStack` function freezes a `CallStack` preventing future `pushCallStack` operations from having any effect
+
+  * New `GHC.Stack.Types.pushCallStack` function pushes a call-site onto a `CallStack`
+
+  * `GHC.SrcLoc` has been removed
+
+  * `GHC.Stack.showCallStack` and `GHC.SrcLoc.showSrcLoc` are now called
+    `GHC.Stack.prettyCallStack` and `GHC.Stack.prettySrcLoc` respectively
 
   * add `Data.List.NonEmpty` and `Data.Semigroup` (to become
     super-class of `Monoid` in the future). These modules were
@@ -118,6 +134,10 @@
 
   * Generalize `Debug.Trace.{traceM, traceShowM}` from `Monad` to `Applicative`
     (#10023)
+
+  * Redundant typeclass constraints have been removed:
+     - `Data.Ratio.{denominator,numerator}` have no `Integral` constraint anymore
+     - **TODO**
 
   * Generalise `forever` from `Monad` to `Applicative`
 

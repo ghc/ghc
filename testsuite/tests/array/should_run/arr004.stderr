@@ -1,3 +1,1 @@
 arr004: (Array.!): undefined array element
-CallStack (from ImplicitParams):
-  error, called at libraries/base/GHC/Arr.hs:402:16 in base:GHC.Arr

@@ -45,7 +45,7 @@ import GHC.Show (show)
 -- This fugly hack is brought by GHC's apparent reluctance to deal
 -- with MagicHash and UnboxedTuples when inferring types. Eek!
 #define CHECK_BOUNDS(_func_,_len_,_k_) \
-if (_k_) < 0 || (_k_) >= (_len_) then error ("GHC.Event.Array." ++ (_func_) ++ ": bounds error, index " ++ show (_k_) ++ ", capacity " ++ show (_len_)) else
+if (_k_) < 0 || (_k_) >= (_len_) then errorWithoutStackTrace ("GHC.Event.Array." ++ (_func_) ++ ": bounds error, index " ++ show (_k_) ++ ", capacity " ++ show (_len_)) else
 #else
 #define CHECK_BOUNDS(_func_,_len_,_k_)
 #endif
@@ -247,7 +247,7 @@ copy' d dstart s sstart maxCount = copyHack d s undefined
   copyHack :: Storable b => AC b -> AC b -> b -> IO (AC b)
   copyHack dac@(AC _ oldLen _) (AC src slen _) dummy = do
     when (maxCount < 0 || dstart < 0 || dstart > oldLen || sstart < 0 ||
-          sstart > slen) $ error "copy: bad offsets or lengths"
+          sstart > slen) $ errorWithoutStackTrace "copy: bad offsets or lengths"
     let size = sizeOf dummy
         count = min maxCount (slen - sstart)
     if count == 0
@@ -267,7 +267,7 @@ removeAt a i = removeHack a undefined
   removeHack :: Storable b => Array b -> b -> IO ()
   removeHack (Array ary) dummy = do
     AC fp oldLen cap <- readIORef ary
-    when (i < 0 || i >= oldLen) $ error "removeAt: invalid index"
+    when (i < 0 || i >= oldLen) $ errorWithoutStackTrace "removeAt: invalid index"
     let size   = sizeOf dummy
         newLen = oldLen - 1
     when (newLen > 0 && i < newLen) .

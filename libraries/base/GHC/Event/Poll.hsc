@@ -17,7 +17,7 @@ import GHC.Base
 import qualified GHC.Event.Internal as E
 
 new :: IO E.Backend
-new = error "Poll back end not implemented for this platform"
+new = errorWithoutStackTrace "Poll back end not implemented for this platform"
 
 available :: Bool
 available = False
@@ -62,7 +62,7 @@ modifyFd p fd oevt nevt =
     return True
 
 modifyFdOnce :: Poll -> Fd -> E.Event -> IO Bool
-modifyFdOnce = error "modifyFdOnce not supported in Poll backend"
+modifyFdOnce = errorWithoutStackTrace "modifyFdOnce not supported in Poll backend"
 
 reworkFd :: Poll -> PollFd -> IO ()
 reworkFd p (PollFd fd npevt opevt) = do
@@ -72,7 +72,7 @@ reworkFd p (PollFd fd npevt opevt) = do
     else do
       found <- A.findIndex ((== fd) . pfdFd) ary
       case found of
-        Nothing        -> error "reworkFd: event not found"
+        Nothing        -> errorWithoutStackTrace "reworkFd: event not found"
         Just (i,_)
           | npevt /= 0 -> A.unsafeWrite ary i $ PollFd fd npevt 0
           | otherwise  -> A.removeAt ary i

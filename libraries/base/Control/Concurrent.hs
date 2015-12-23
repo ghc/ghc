@@ -412,7 +412,7 @@ threadWaitRead fd
                           return ()
                         -- hWaitForInput does work properly, but we can only
                         -- do this for stdin since we know its FD.
-                  _ -> error "threadWaitRead requires -threaded on Windows, or use System.IO.hWaitForInput"
+                  _ -> errorWithoutStackTrace "threadWaitRead requires -threaded on Windows, or use System.IO.hWaitForInput"
 #else
   = GHC.Conc.threadWaitRead fd
 #endif
@@ -428,7 +428,7 @@ threadWaitWrite :: Fd -> IO ()
 threadWaitWrite fd
 #ifdef mingw32_HOST_OS
   | threaded  = withThread (waitFd fd 1)
-  | otherwise = error "threadWaitWrite requires -threaded on Windows"
+  | otherwise = errorWithoutStackTrace "threadWaitWrite requires -threaded on Windows"
 #else
   = GHC.Conc.threadWaitWrite fd
 #endif
@@ -452,7 +452,7 @@ threadWaitReadSTM fd
                                         Just (Left e)   -> throwSTM (e :: IOException)
                   let killAction = return ()
                   return (waitAction, killAction)
-  | otherwise = error "threadWaitReadSTM requires -threaded on Windows"
+  | otherwise = errorWithoutStackTrace "threadWaitReadSTM requires -threaded on Windows"
 #else
   = GHC.Conc.threadWaitReadSTM fd
 #endif
@@ -476,7 +476,7 @@ threadWaitWriteSTM fd
                                         Just (Left e)   -> throwSTM (e :: IOException)
                   let killAction = return ()
                   return (waitAction, killAction)
-  | otherwise = error "threadWaitWriteSTM requires -threaded on Windows"
+  | otherwise = errorWithoutStackTrace "threadWaitWriteSTM requires -threaded on Windows"
 #else
   = GHC.Conc.threadWaitWriteSTM fd
 #endif

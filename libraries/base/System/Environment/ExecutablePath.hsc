@@ -84,7 +84,7 @@ _NSGetExecutablePath =
                         status2 <- c__NSGetExecutablePath newBuf bufsize
                         if status2 == 0
                              then peekFilePath newBuf
-                             else error "_NSGetExecutablePath: buffer too small"
+                             else errorWithoutStackTrace "_NSGetExecutablePath: buffer too small"
 
 foreign import ccall unsafe "stdlib.h realpath"
     c_realpath :: CString -> CString -> IO CString
@@ -145,7 +145,7 @@ getExecutablePath = go 2048  -- plenty, PATH_MAX is 512 under Win32
     go size = allocaArray (fromIntegral size) $ \ buf -> do
         ret <- c_GetModuleFileName nullPtr buf size
         case ret of
-            0 -> error "getExecutablePath: GetModuleFileNameW returned an error"
+            0 -> errorWithoutStackTrace "getExecutablePath: GetModuleFileNameW returned an error"
             _ | ret < size -> peekFilePath buf
               | otherwise  -> go (size * 2)
 
@@ -166,7 +166,7 @@ getExecutablePath =
             -- If argc > 0 then argv[0] is guaranteed by the standard
             -- to be a pointer to a null-terminated string.
             then peek p_argv >>= peek >>= peekFilePath
-            else error $ "getExecutablePath: " ++ msg
+            else errorWithoutStackTrace $ "getExecutablePath: " ++ msg
   where msg = "no OS specific implementation and program name couldn't be " ++
               "found in argv"
 

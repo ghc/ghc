@@ -108,7 +108,7 @@ newDefaultBackend :: IO Backend
 #if defined(HAVE_POLL)
 newDefaultBackend = Poll.new
 #else
-newDefaultBackend = error "no back end for this platform"
+newDefaultBackend = errorWithoutStackTrace "no back end for this platform"
 #endif
 
 -- | Create a new event manager.
@@ -168,7 +168,7 @@ loop mgr = do
     Created -> go `finally` cleanup mgr
     Dying   -> cleanup mgr
     _       -> do cleanup mgr
-                  error $ "GHC.Event.Manager.loop: state is already " ++
+                  errorWithoutStackTrace $ "GHC.Event.Manager.loop: state is already " ++
                       show state
  where
   go = do running <- step mgr

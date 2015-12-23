@@ -458,7 +458,7 @@ tourView (Winner e (LLoser _ e' tl m tr) m') =
 -- Utility functions
 
 moduleError :: String -> String -> a
-moduleError fun msg = error ("GHC.Event.PSQ." ++ fun ++ ':' : ' ' : msg)
+moduleError fun msg = errorWithoutStackTrace ("GHC.Event.PSQ." ++ fun ++ ':' : ' ' : msg)
 {-# NOINLINE moduleError #-}
 
 ------------------------------------------------------------------------

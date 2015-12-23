@@ -144,7 +144,7 @@ isNothing _       = False
 -- *** Exception: Maybe.fromJust: Nothing
 --
 fromJust          :: Maybe a -> a
-fromJust Nothing  = error "Maybe.fromJust: Nothing" -- yuck
+fromJust Nothing  = errorWithoutStackTrace "Maybe.fromJust: Nothing" -- yuck
 fromJust (Just x) = x
 
 -- | The 'fromMaybe' function takes a default value and and 'Maybe'

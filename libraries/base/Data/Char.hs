@@ -97,7 +97,7 @@ digitToInt c
   | (fromIntegral dec::Word) <= 9 = dec
   | (fromIntegral hexl::Word) <= 5 = hexl + 10
   | (fromIntegral hexu::Word) <= 5 = hexu + 10
-  | otherwise = error ("Char.digitToInt: not a digit " ++ show c) -- sigh
+  | otherwise = errorWithoutStackTrace ("Char.digitToInt: not a digit " ++ show c) -- sigh
   where
     dec = ord c - ord '0'
     hexl = ord c - ord 'a'

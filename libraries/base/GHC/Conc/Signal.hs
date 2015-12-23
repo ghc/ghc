@@ -55,7 +55,7 @@ setHandler sig handler = do
   let int = fromIntegral sig
   withMVar signal_handlers $ \arr ->
     if not (inRange (boundsIOArray arr) int)
-      then error "GHC.Conc.setHandler: signal out of range"
+      then errorWithoutStackTrace "GHC.Conc.setHandler: signal out of range"
       else do old <- unsafeReadIOArray arr int
               unsafeWriteIOArray arr int handler
               return old

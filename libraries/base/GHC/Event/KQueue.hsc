@@ -19,7 +19,7 @@ import qualified GHC.Event.Internal as E
 import GHC.Base
 
 new :: IO E.Backend
-new = error "KQueue back end not implemented for this platform"
+new = errorWithoutStackTrace "KQueue back end not implemented for this platform"
 
 available :: Bool
 available = False
@@ -274,7 +274,7 @@ toEvent :: Filter -> E.Event
 toEvent (Filter f)
   | f == (#const EVFILT_READ) = E.evtRead
   | f == (#const EVFILT_WRITE) = E.evtWrite
-  | otherwise = error $ "toEvent: unknown filter " ++ show f
+  | otherwise = errorWithoutStackTrace $ "toEvent: unknown filter " ++ show f
 
 foreign import ccall unsafe "kqueue"
     c_kqueue :: IO CInt

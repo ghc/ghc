@@ -287,5 +287,5 @@ checkBuffer buf@Buffer{ bufState = state, bufL=r, bufR=w, bufSize=size } = do
 
 check :: Buffer a -> Bool -> IO ()
 check _   True  = return ()
-check buf False = error ("buffer invariant violation: " ++ summaryBuffer buf)
+check buf False = errorWithoutStackTrace ("buffer invariant violation: " ++ summaryBuffer buf)
 

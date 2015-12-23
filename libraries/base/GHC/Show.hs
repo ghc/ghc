@@ -396,7 +396,7 @@ intToDigit :: Int -> Char
 intToDigit (I# i)
     | isTrue# (i >=# 0#)  && isTrue# (i <=#  9#) = unsafeChr (ord '0' + I# i)
     | isTrue# (i >=# 10#) && isTrue# (i <=# 15#) = unsafeChr (ord 'a' + I# i - 10)
-    | otherwise =  error ("Char.intToDigit: not a digit " ++ show (I# i))
+    | otherwise =  errorWithoutStackTrace ("Char.intToDigit: not a digit " ++ show (I# i))
 
 showSignedInt :: Int -> Int -> ShowS
 showSignedInt (I# p) (I# n) r
@@ -464,7 +464,7 @@ integerToString n0 cs0
         (# q, r #) ->
             if q > 0 then q : r : jsplitb p ns
                      else     r : jsplitb p ns
-    jsplith _ [] = error "jsplith: []"
+    jsplith _ [] = errorWithoutStackTrace "jsplith: []"
 
     jsplitb :: Integer -> [Integer] -> [Integer]
     jsplitb _ []     = []
@@ -483,7 +483,7 @@ integerToString n0 cs0
                 r = fromInteger r'
             in if q > 0 then jhead q $ jblock r $ jprintb ns cs
                         else jhead r $ jprintb ns cs
-    jprinth [] _ = error "jprinth []"
+    jprinth [] _ = errorWithoutStackTrace "jprinth []"
 
     jprintb :: [Integer] -> String -> String
     jprintb []     cs = cs

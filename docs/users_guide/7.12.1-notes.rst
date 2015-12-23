@@ -393,7 +393,7 @@ See ``changelog.md`` in the ``base`` package for full release notes.
 
 -  ``GHC.Stack`` exports two new types ``SrcLoc`` and ``CallStack``. A
    ``SrcLoc`` contains package, module, and file names, as well as start
-   and end positions. A ``CallStack`` is a ``[(String, SrcLoc)]``,
+   and end positions. A ``CallStack`` is essentially a ``[(String, SrcLoc)]``,
    sorted by most-recent call.
 
 -  ``error`` and ``undefined`` will now report a partial stack-trace

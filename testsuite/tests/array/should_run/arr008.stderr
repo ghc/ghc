@@ -1,3 +1,1 @@
 arr008: Ix{Int}.index: Index (2) out of range ((0,1))
-CallStack (from ImplicitParams):
-  error, called at libraries/base/GHC/Arr.hs:176:5 in base:GHC.Arr

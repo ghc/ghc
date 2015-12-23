@@ -841,8 +841,8 @@ concat = foldr (++) []
 -- which takes an index of any integral type.
 (!!)                    :: [a] -> Int -> a
 #ifdef USE_REPORT_PRELUDE
-xs     !! n | n < 0 =  error "Prelude.!!: negative index"
-[]     !! _         =  error "Prelude.!!: index too large"
+xs     !! n | n < 0 =  errorWithoutStackTrace "Prelude.!!: negative index"
+[]     !! _         =  errorWithoutStackTrace "Prelude.!!: index too large"
 (x:_)  !! 0         =  x
 (_:xs) !! n         =  xs !! (n-1)
 #else
@@ -852,10 +852,10 @@ xs     !! n | n < 0 =  error "Prelude.!!: negative index"
 -- if so we should be careful not to trip up known-bottom
 -- optimizations.
 tooLarge :: Int -> a
-tooLarge _ = error (prel_list_str ++ "!!: index too large")
+tooLarge _ = errorWithoutStackTrace (prel_list_str ++ "!!: index too large")
 
 negIndex :: a
-negIndex = error $ prel_list_str ++ "!!: negative index"
+negIndex = errorWithoutStackTrace $ prel_list_str ++ "!!: negative index"
 
 {-# INLINABLE (!!) #-}
 xs !! n
@@ -996,7 +996,7 @@ unzip3   =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
 
 errorEmptyList :: String -> a
 errorEmptyList fun =
-  error (prel_list_str ++ fun ++ ": empty list")
+  errorWithoutStackTrace (prel_list_str ++ fun ++ ": empty list")
 
 prel_list_str :: String
 prel_list_str = "Prelude."

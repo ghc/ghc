@@ -28,7 +28,7 @@ import Data.Function ( fix )
 import Data.Maybe
 import Data.Monoid ( Dual(..), Sum(..), Product(..)
                    , First(..), Last(..), Alt(..) )
-import GHC.Base ( Monad, error, (.) )
+import GHC.Base ( Monad, errorWithoutStackTrace, (.) )
 import GHC.List ( head, tail )
 import GHC.ST
 import System.IO
@@ -63,7 +63,7 @@ class (Monad m) => MonadFix m where
 instance MonadFix Maybe where
     mfix f = let a = f (unJust a) in a
              where unJust (Just x) = x
-                   unJust Nothing  = error "mfix Maybe: Nothing"
+                   unJust Nothing  = errorWithoutStackTrace "mfix Maybe: Nothing"
 
 instance MonadFix [] where
     mfix f = case fix (f . head) of
@@ -79,7 +79,7 @@ instance MonadFix ((->) r) where
 instance MonadFix (Either e) where
     mfix f = let a = f (unRight a) in a
              where unRight (Right x) = x
-                   unRight (Left  _) = error "mfix Either: Left"
+                   unRight (Left  _) = errorWithoutStackTrace "mfix Either: Left"
 
 instance MonadFix (ST s) where
         mfix = fixST

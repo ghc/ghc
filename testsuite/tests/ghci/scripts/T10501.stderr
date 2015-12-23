@@ -1,7 +1,5 @@
 *** Exception: Prelude.head: empty list
-CallStack (from ImplicitParams):
-  error, called at libraries/base/GHC/List.hs:999:3 in base:GHC.List
 *** Exception: Prelude.undefined
 CallStack (from ImplicitParams):
-  error, called at libraries/base/GHC/Err.hs:43:14 in base:GHC.Err
+  error, called at libraries/base/GHC/Err.hs:50:14 in base:GHC.Err
   undefined, called at <interactive>:1:17 in interactive:Ghci1

@@ -52,11 +52,11 @@ instance Read (Proxy s) where
   readsPrec d = readParen (d > 10) (\r -> [(Proxy, s) | ("Proxy",s) <- lex r ])
 
 instance Enum (Proxy s) where
-    succ _               = error "Proxy.succ"
-    pred _               = error "Proxy.pred"
+    succ _               = errorWithoutStackTrace "Proxy.succ"
+    pred _               = errorWithoutStackTrace "Proxy.pred"
     fromEnum _           = 0
     toEnum 0             = Proxy
-    toEnum _             = error "Proxy.toEnum: 0 expected"
+    toEnum _             = errorWithoutStackTrace "Proxy.toEnum: 0 expected"
     enumFrom _           = [Proxy]
     enumFromThen _ _     = [Proxy]
     enumFromThenTo _ _ _ = [Proxy]

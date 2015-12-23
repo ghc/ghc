@@ -73,12 +73,12 @@ parseLine s = case words s of
 readHex' :: Enum a => String -> a
 readHex' ('0':'x':s) = case readHex s of
     [(n,"")] -> toEnum n -- explicitly call toEnum to catch overflow errors.
-    _ -> error $ "Can't read hex: " ++ show s
-readHex' s = error $ "Can't read hex: " ++ show s
+    _ -> errorWithoutStackTrace $ "Can't read hex: " ++ show s
+readHex' s = errorWithoutStackTrace $ "Can't read hex: " ++ show s
 
 readCharHex :: String -> Char
 readCharHex s = if c > fromEnum (maxBound :: Word16)
-                    then error "Can't handle non-BMP character."
+                    then errorWithoutStackTrace "Can't handle non-BMP character."
                     else toEnum c
     where c = readHex' s
 
@@ -255,7 +255,7 @@ showHex' s = "\\x" ++ showHex s ""
 
 repDualByte :: Enum c => c -> String
 repDualByte c
-    | n >= 2^(16::Int) = error "value is too high!"
+    | n >= 2^(16::Int) = errorWithoutStackTrace "value is too high!"
     -- NOTE : this assumes little-endian architecture.  But we're only using this on Windows,
     -- so it's probably OK.
     | otherwise = showHex' (n `mod` 256) ++ showHex' (n `div` 256)
