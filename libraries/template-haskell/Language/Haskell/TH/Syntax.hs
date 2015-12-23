@@ -1712,7 +1712,10 @@ data FamilyResultSig = NoSig              -- ^ no signature
       deriving( Show, Eq, Ord, Data, Typeable, Generic )
 
 -- | Injectivity annotation
-data InjectivityAnn = InjectivityAnn Name [Name]
+type InjectivityAnn = [InjectivityCond]
+
+-- | Injectivity condition
+data InjectivityCond = InjectivityCond [Name] [Name]
   deriving ( Show, Eq, Ord, Data, Typeable, Generic )
 
 data TyLit = NumTyLit Integer             -- ^ @2@

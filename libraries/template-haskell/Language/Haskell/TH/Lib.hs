@@ -9,7 +9,7 @@ module Language.Haskell.TH.Lib where
     -- be "public" functions.  The main module TH
     -- re-exports them all.
 
-import Language.Haskell.TH.Syntax hiding (Role, InjectivityAnn)
+import Language.Haskell.TH.Syntax hiding (Role, InjectivityCond)
 import qualified Language.Haskell.TH.Syntax as TH
 import Control.Monad( liftM, liftM2, liftM3 )
 import Data.Word( Word8 )
@@ -49,7 +49,7 @@ type TySynEqnQ           = Q TySynEqn
 
 -- must be defined here for DsMeta to find it
 type Role                = TH.Role
-type InjectivityAnn      = TH.InjectivityAnn
+type InjectivityCond     = TH.InjectivityCond
 
 ----------------------------------------------------------
 -- * Lowercase pattern syntax functions
@@ -737,10 +737,10 @@ tyVarSig :: TyVarBndr -> FamilyResultSig
 tyVarSig = TyVarSig
 
 -------------------------------------------------------------------------------
--- *   Injectivity annotation
+-- *   Injectivity annotations
 
-injectivityAnn :: Name -> [Name] -> InjectivityAnn
-injectivityAnn = TH.InjectivityAnn
+injectivityCond :: [Name] -> [Name] -> InjectivityCond
+injectivityCond = TH.InjectivityCond
 
 -------------------------------------------------------------------------------
 -- *   Role

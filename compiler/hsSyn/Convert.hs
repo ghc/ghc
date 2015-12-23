@@ -1267,10 +1267,17 @@ cvtFamilyResultSig (TH.TyVarSig bndr) = do { tv <- cvt_tv bndr
 -- | Convert injectivity annotation of a type family.
 cvtInjectivityAnnotation :: TH.InjectivityAnn
                          -> CvtM (Hs.LInjectivityAnn RdrName)
-cvtInjectivityAnnotation (TH.InjectivityAnn annLHS annRHS)
-  = do { annLHS' <- tNameL annLHS
-       ; annRHS' <- mapM tNameL annRHS
-       ; returnL (Hs.InjectivityAnn annLHS' annRHS') }
+cvtInjectivityAnnotation injConds
+  = do { injConds' <- mapM cvtInjectivityCondition injConds
+       ; returnL (Hs.InjectivityAnn injConds') }
+
+-- | Convert a single injectivity condition.
+cvtInjectivityCondition :: TH.InjectivityCond
+                        -> CvtM (Hs.LInjectivityCond RdrName)
+cvtInjectivityCondition (TH.InjectivityCond lhs rhs)
+  = do { lhs' <- mapM tNameL lhs
+       ; rhs' <- mapM tNameL rhs
+       ; returnL (Hs.InjectivityCond lhs' rhs') }
 
 -----------------------------------------------------------
 cvtFixity :: TH.Fixity -> Hs.Fixity

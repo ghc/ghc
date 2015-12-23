@@ -373,12 +373,20 @@ repInjectivityAnn :: Maybe (LInjectivityAnn Name)
                   -> DsM (Core (Maybe TH.InjectivityAnn))
 repInjectivityAnn Nothing =
     do { coreNothing injAnnTyConName }
-repInjectivityAnn (Just (L _ (InjectivityAnn lhs rhs))) =
-    do { lhs'   <- lookupBinder (unLoc lhs)
-       ; rhs1   <- mapM (lookupBinder . unLoc) rhs
-       ; rhs2   <- coreList nameTyConName rhs1
-       ; injAnn <- rep2 injectivityAnnName [unC lhs', unC rhs2]
+repInjectivityAnn (Just (L _ (InjectivityAnn conds))) =
+    do { conds' <- mapM repInjectivityCond conds
+       ; injAnn <- coreList injCondTyConName conds'
        ; coreJust injAnnTyConName injAnn }
+
+-- | Represent a single injectivity condition
+repInjectivityCond :: LInjectivityCond Name
+                   -> DsM (Core (TH.InjectivityCond))
+repInjectivityCond (L _ (InjectivityCond lhs rhs)) =
+    do { lhsNames <- mapM (lookupBinder . unLoc) lhs
+       ; rhsNames <- mapM (lookupBinder . unLoc) rhs
+       ; lhsList   <- coreList nameTyConName lhsNames
+       ; rhsList   <- coreList nameTyConName rhsNames
+       ; rep2 injectivityCondName [unC lhsList, unC rhsList] }
 
 repFamilyDecls :: [LFamilyDecl Name] -> DsM [Core TH.DecQ]
 repFamilyDecls fds = liftM de_loc (mapM repFamilyDecl fds)

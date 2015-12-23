@@ -894,12 +894,12 @@ improveLocalFunEqs loc inerts fam_tc args fsk
     --------------------
     improvement_eqns
       | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
-      =    -- Try built-in families, notably for arithmethic
-         concatMap (do_one_built_in ops) funeqs_for_tc
+      = -- Try built-in families, notably for arithmethic
+        concatMap (do_one_built_in ops) funeqs_for_tc
 
       | Injective injective_args <- familyTyConInjectivityInfo fam_tc
-      =    -- Try improvement from type families with injectivity annotations
-         concatMap (do_one_injective injective_args) funeqs_for_tc
+      = -- Try improvement from type families with injectivity annotations
+        concatMap (do_injectivity injective_args) funeqs_for_tc
 
       | otherwise
       = []
@@ -910,12 +910,18 @@ improveLocalFunEqs loc inerts fam_tc args fsk
     do_one_built_in _ _ = pprPanic "interactFunEq 1" (ppr fam_tc)
 
     --------------------
+    do_injectivity injectivity_conds funeq =
+        concatMap (do_one_injective funeq) injectivity_conds
+
     -- See Note [Type inference for type families with injectivity]
-    do_one_injective injective_args
-                    (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk })
+    do_one_injective (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk })
+                     (injective_from, injective_to)
       | rhs `tcEqType` lookupFlattenTyVar tv_eqs ifsk
+      -- JSTOLAREK: make sure this implementation works as expected
+      , and (zipWith tcEqType (filterByList injective_from  args)
+                              (filterByList injective_from iargs))
       = [Pair arg iarg | (arg, iarg, True)
-                           <- zip3 args iargs injective_args ]
+                           <- zip3 args iargs injective_to ]
       | otherwise
       = []
     do_one_injective _ _ = pprPanic "interactFunEq 2" (ppr fam_tc)
@@ -1464,6 +1470,7 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
   , Injective injective_args <- familyTyConInjectivityInfo fam_tc
   = -- it is possible to have several compatible equations in an open type
     -- family but we only want to derive equalities from one such equation.
+    -- Thus we apply `take 1`
     concatMapM (injImproveEqns injective_args) (take 1 $
       buildImprovementData (lookupFamInstEnvByTyCon fam_envs fam_tc)
                            fi_tys fi_rhs (const Nothing))
@@ -1492,23 +1499,33 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
           [ (ax_args, subst, unsubstTvs, wrap axiom)
           | axiom <- axioms
           , let ax_args = axiomLHS axiom
-          , let ax_rhs  = axiomRHS axiom
+                ax_rhs  = axiomRHS axiom
           , Just subst <- [tcUnifyTyWithTFs False ax_rhs rhs_ty]
           , let tvs           = tyCoVarsOfTypes ax_args
                 notInSubst tv = not (tv `elemVarEnv` getTvSubstEnv subst)
                 unsubstTvs    = filterVarSet (notInSubst <&&> isTyVar) tvs ]
 
-      injImproveEqns :: [Bool]
+      injImproveEqns :: [InjCondition]
                      -> ([Type], TCvSubst, TyCoVarSet, Maybe CoAxBranch)
                      -> TcS [Eqn]
-      injImproveEqns inj_args (ax_args, theta, unsubstTvs, cabr) = do
+      injImproveEqns injConds improvementData =
+          concatMapM (injImproveCond improvementData) injConds
+
+      injImproveCond :: ([Type], TCvSubst, TyVarSet, Maybe CoAxBranch)
+                     -> InjCondition
+                     -> TcS [Eqn]
+      injImproveCond (ax_args, theta, unsubstTvs, cabr) (inj_from, inj_to) = do
         (theta', _) <- instFlexiTcS (varSetElems unsubstTvs)
         let subst = theta `unionTCvSubst` theta'
-        return [ Pair arg (substTy subst ax_arg)
-               | case cabr of
-                  Just cabr' -> apartnessCheck (substTys subst ax_args) cabr'
-                  _          -> True
-               , (arg, ax_arg, True) <- zip3 args ax_args inj_args ]
+            inj_args    = filterByList inj_from    args
+            inj_ax_args = filterByList inj_from ax_args
+        if and (zipWith tcEqType inj_args inj_ax_args)
+        then return [ Pair arg (substTy subst ax_arg)
+                    | case cabr of
+                        Just br -> apartnessCheck (substTys subst ax_args) br
+                        Nothing -> True
+                    , (arg, ax_arg, True) <- zip3 args ax_args inj_to ]
+        else return []
 
 
 shortCutReduction :: CtEvidence -> TcTyVar -> TcCoercion

@@ -55,7 +55,7 @@ instance Binary TH.Con
 instance Binary TH.AnnLookup
 instance Binary TH.ModuleInfo
 instance Binary TH.Clause
-instance Binary TH.InjectivityAnn
+instance Binary TH.InjectivityCond
 instance Binary TH.FamilyResultSig
 instance Binary TH.TypeFamilyHead
 

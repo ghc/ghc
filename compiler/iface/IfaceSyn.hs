@@ -749,13 +749,19 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon, ifTyVars = tyvars
   where
     pp_inj Nothing    _   = empty
     pp_inj (Just res) inj
-       | Injective injectivity <- inj = hsep [ equals, ppr res
-                                             , pp_inj_cond res injectivity]
-       | otherwise = hsep [ equals, ppr res ]
+       | Injective injectivity <- inj = hsep [ equals, ppr res, dcolon, ppr kind
+                                             , pp_inj_conds res injectivity]
+       | otherwise = hsep [ equals, ppr res, dcolon, ppr kind ]
 
-    pp_inj_cond res inj = case filterByList inj tyvars of
-       []  -> empty
-       tvs -> hsep [vbar, ppr res, text "->", interppSP (map fst tvs)]
+    pp_inj_conds _ []
+      = empty -- not possible (invariant from the parser)
+    pp_inj_conds res conds
+      = text "|" <+> hsep (punctuate (text ",") (map (ppr_inj_cond res) conds))
+
+    ppr_inj_cond res (lhs, rhs)
+      = hsep [ ppr res, pp_inj_tvs lhs, text "->", pp_inj_tvs rhs]
+
+    pp_inj_tvs inj = interppSP (map fst (filterByList inj tyvars))
 
     pp_rhs IfaceDataFamilyTyCon
       = ppShowIface ss (ptext (sLit "data"))

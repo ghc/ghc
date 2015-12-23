@@ -414,9 +414,13 @@ instance Ppr FamilyResultSig where
     ppr (TyVarSig bndr) = text "=" <+> ppr bndr
 
 ------------------------------
-instance Ppr InjectivityAnn where
-    ppr (InjectivityAnn lhs rhs) =
-        char '|' <+> ppr lhs <+> text "->" <+> hsep (map ppr rhs)
+instance Ppr InjectivityCond where
+    ppr (InjectivityCond lhs rhs) =
+        ppr lhs <+> text "->" <+> hsep (map ppr rhs)
+
+pprInjAnn :: InjectivityAnn -> Doc
+pprInjAnn [] = empty
+pprInjAnn injConds = char '|' <+> sep (punctuate comma $ map ppr injConds)
 
 ------------------------------
 instance Ppr Foreign where

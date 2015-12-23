@@ -1268,11 +1268,14 @@ reifyTyCon tc
                          sig = TH.TyVarSig (TH.KindedTV thName kind')
                          inj = case injAnnot of
                                  NotInjective -> Nothing
-                                 Injective ms ->
-                                     Just (TH.InjectivityAnn thName injRHS)
+                                 Injective ms -> Just (map reifyInjCond ms)
                                    where
-                                     injRHS = map (reifyName . tyVarName)
-                                                  (filterByList ms tvs)
+                                     reifyInjNames inj =
+                                         map (reifyName . tyVarName)
+                                             (filterByList inj tvs)
+                                     reifyInjCond (from, to) =
+                                         TH.InjectivityCond (reifyInjNames from)
+                                                            (reifyInjNames to)
                      in (sig, inj)
        ; tvs' <- reifyTyVars tvs (Just tc)
        ; let tfHead =

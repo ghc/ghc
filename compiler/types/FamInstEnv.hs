@@ -25,7 +25,7 @@ module FamInstEnv (
 
         -- Injectivity
         InjectivityCheckResult(..),
-        lookupFamInstEnvInjectivityConflicts, injectiveBranches,
+        famInstEnvInjectivityConflicts, injectiveBranches,
 
         -- Normalisation
         topNormaliseType, topNormaliseType_maybe,
@@ -544,20 +544,21 @@ data InjectivityCheckResult
     -- stores axioms after unification.
 
 -- | Check whether two type family axioms don't violate injectivity annotation.
-injectiveBranches :: [Bool] -> CoAxBranch -> CoAxBranch
+injectiveBranches :: InjCondition -> CoAxBranch -> CoAxBranch
                   -> InjectivityCheckResult
-injectiveBranches injectivity
+injectiveBranches (injFrom, injTo)
                   ax1@(CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
                   ax2@(CoAxBranch { cab_lhs = lhs2, cab_rhs = rhs2 })
   -- See Note [Verifying injectivity annotation]. This function implements first
   -- check described there.
-  = let getInjArgs  = filterByList injectivity
+  = let getInjFrom = filterByList injFrom
+        getInjTo   = filterByList injTo
     in case tcUnifyTyWithTFs True rhs1 rhs2 of -- True = two-way pre-unification
        Nothing -> InjectivityAccepted -- RHS are different, so equations are
                                       -- injective.
        Just subst -> -- RHS unify under a substitution
-        let lhs1Subst = Type.substTys subst (getInjArgs lhs1)
-            lhs2Subst = Type.substTys subst (getInjArgs lhs2)
+        let lhs1Subst = Type.substTys subst (getInjTo lhs1)
+            lhs2Subst = Type.substTys subst (getInjTo lhs2)
         -- If LHSs are equal under the substitution used for RHSs then this pair
         -- of equations does not violate injectivity annotation. If LHSs are not
         -- equal under that substitution then this pair of equations violates
@@ -838,14 +839,14 @@ See also Note [Injective type families] in TyCon
 -- instance environment without causing conflicts with supplied injectivity
 -- annotations.  Returns list of conflicting axioms (type instance
 -- declarations).
-lookupFamInstEnvInjectivityConflicts
-    :: [Bool]         -- injectivity annotation for this type family instance
-                      -- INVARIANT: list contains at least one True value
-    ->  FamInstEnvs   -- all type instances seens so far
+famInstEnvInjectivityConflicts
+    ::  FamInstEnvs   -- all type instances seens so far
     ->  FamInst       -- new type instance that we're checking
+    ->  InjCondition  -- injectivity condition
     -> [CoAxBranch]   -- conflicting instance delcarations
-lookupFamInstEnvInjectivityConflicts injList (pkg_ie, home_ie)
-                             fam_inst@(FamInst { fi_axiom = new_axiom })
+famInstEnvInjectivityConflicts (pkg_ie, home_ie)
+                                fam_inst@(FamInst { fi_axiom = new_axiom })
+                                injCond
   -- See Note [Verifying injectivity annotation]. This function implements
   -- check (1.B1) for open type families described there.
   = lookup_inj_fam_conflicts home_ie ++ lookup_inj_fam_conflicts pkg_ie
@@ -857,7 +858,7 @@ lookupFamInstEnvInjectivityConflicts injList (pkg_ie, home_ie)
       -- a pair of equations conflicts with the injectivity annotation.
       isInjConflict (FamInst { fi_axiom = old_axiom })
           | InjectivityAccepted <-
-            injectiveBranches injList (coAxiomSingleBranch old_axiom) new_branch
+            injectiveBranches injCond (coAxiomSingleBranch old_axiom) new_branch
           = False -- no conflict
           | otherwise = True
 

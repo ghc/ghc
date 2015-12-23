@@ -939,14 +939,22 @@ overlap_pragma :: { Maybe (Located OverlapMode) }
 -- Injective type families
 
 opt_injective_info :: { Located ([AddAnn], Maybe (LInjectivityAnn RdrName)) }
-        : {- empty -}               { noLoc ([], Nothing) }
-        | '|' injectivity_cond      { sLL $1 $> ([mj AnnVbar $1]
-                                                , Just ($2)) }
+        : {- empty -}          { noLoc ([], Nothing) }
+        | '|' injectivity_ann
+         { sLL $1 $> ( [mj AnnVbar $1]
+                     , Just (sLL $1 $> (InjectivityAnn (reverse (unLoc $2))))) }
 
-injectivity_cond :: { LInjectivityAnn RdrName }
-        : tyvarid '->' inj_varids
-           {% ams (sLL $1 $> (InjectivityAnn $1 (reverse (unLoc $3))))
-                  [mu AnnRarrow $2] }
+injectivity_ann ::  { Located [LInjectivityCond RdrName] }
+        : injectivity_ann ',' injectivity_cond
+                           {% do { addAnnotation (gl $1) AnnComma (gl $2)
+                                 ; return (sLL $1 $> ($3 : unLoc $1)) } }
+        | injectivity_cond { sL1 $1 [$1] }
+
+injectivity_cond :: { LInjectivityCond RdrName }
+        : inj_varids '->' inj_varids
+           {% do { addAnnotation (gl $1) AnnRarrow (gl $2)
+                 ; return (sLL $1 $> (InjectivityCond (reverse (unLoc $1))
+                                                      (reverse (unLoc $3)))) } }
 
 inj_varids :: { Located [Located RdrName] }
         : inj_varids tyvarid  { sLL $1 $> ($2 : unLoc $1) }
@@ -1083,9 +1091,10 @@ opt_at_kind_inj_sig :: { Located ([AddAnn], ( LFamilyResultSig RdrName
         :            { noLoc ([], (noLoc NoSig, Nothing)) }
         | '::' kind  { sLL $1 $> ( [mu AnnDcolon $1]
                                  , (sLL $2 $> (KindSig $2), Nothing)) }
-        | '='  tv_bndr '|' injectivity_cond
-                { sLL $1 $> ([mj AnnEqual $1, mj AnnVbar $3]
-                            , (sLL $1 $2 (TyVarSig $2), Just $4))}
+        | '='  tv_bndr '|' injectivity_ann { sLL $1 $>
+        ( [mj AnnEqual $1, mj AnnVbar $3]
+         , (sLL $1 $2 (TyVarSig $2)
+            , Just (sLL $3 $> (InjectivityAnn (reverse (unLoc $4)))))) }
 
 -- tycl_hdr parses the header of a class or data type decl,
 -- which takes the form

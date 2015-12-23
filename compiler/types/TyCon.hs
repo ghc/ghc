@@ -14,7 +14,7 @@ module TyCon(
 
         AlgTyConRhs(..), visibleDataCons,
         AlgTyConFlav(..), isNoParent,
-        FamTyConFlav(..), Role(..), Injectivity(..),
+        FamTyConFlav(..), Role(..), Injectivity(..), InjCondition,
 
         -- ** Field labels
         tyConFieldLabels, tyConFieldLabelEnv,
@@ -746,9 +746,13 @@ isNoParent _                   = False
 
 --------------------
 
+-- Length of Bool lists is 1-1 with tyConTyVars (incl kind vars)
+-- INVARIANT: Second list contains at least one True
+type InjCondition = ([Bool], [Bool])
+
 data Injectivity
   = NotInjective
-  | Injective [Bool]   -- 1-1 with tyConTyVars (incl kind vars)
+  | Injective [InjCondition]
   deriving( Eq )
 
 -- | Information pertaining to the expansion of a type synonym (@type@)
@@ -1357,7 +1361,8 @@ isInjectiveTyCon (AlgTyCon {algTcRhs = rhs})   Representational
 isInjectiveTyCon (SynonymTyCon {})             _                = False
 isInjectiveTyCon (FamilyTyCon { famTcFlav = DataFamilyTyCon _ })
                                                Nominal          = True
-isInjectiveTyCon (FamilyTyCon { famTcInj = Injective inj }) _   = and inj
+-- SLPJ: Tempoararily commented out... injectivity is different now
+-- isInjectiveTyCon (FamilyTyCon { famTcInj = Injective inj }) _   = and inj
 isInjectiveTyCon (FamilyTyCon {})              _                = False
 isInjectiveTyCon (PrimTyCon {})                _                = True
 isInjectiveTyCon (PromotedDataCon {})          _                = True

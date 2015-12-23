@@ -1493,19 +1493,35 @@ rnInjectivityAnn :: LHsQTyVars Name            -- ^ Type variables declared in
                  -> LFamilyResultSig Name      -- ^ Result signature
                  -> LInjectivityAnn RdrName    -- ^ Injectivity annotation
                  -> RnM (LInjectivityAnn Name)
-rnInjectivityAnn tvBndrs (L _ (TyVarSig resTv))
-                 (L srcSpan (InjectivityAnn injFrom injTo))
+rnInjectivityAnn tvBndrs resSig (L srcSpan (InjectivityAnn injConds))
  = do
-   { (injDecl'@(L _ (InjectivityAnn injFrom' injTo')), noRnErrors)
+   { injConds' <- mapM (rnInjectivityCond tvBndrs resSig) injConds
+   ; return $ L srcSpan (InjectivityAnn injConds') }
+
+
+-- | Rename injectivity annotation. Note that injectivity annotation is just the
+-- part after the "|".  Everything that appears before it is renamed in
+-- rnFamDecl.
+rnInjectivityCond :: LHsQTyVars Name             -- ^ Type variables declared in
+                                                 --   type family head
+                  -> LFamilyResultSig Name       -- ^ Result signature
+                  -> LInjectivityCond RdrName    -- ^ Injectivity annotation
+                  -> RnM (LInjectivityCond Name)
+rnInjectivityCond tvBndrs (L _ (TyVarSig resTv))
+                  (L srcSpan (InjectivityCond injFrom injTo))
+ = do
+   { (injDecl'@(L _ (InjectivityCond injFrom' injTo')), noRnErrors)
           <- askNoErrs $
              bindLocalNames [hsLTyVarName resTv] $
              -- The return type variable scopes over the injectivity annotation
              -- e.g.   type family F a = (r::*) | r -> a
-             do { injFrom' <- rnLTyVar injFrom
+             do { injFrom' <- mapM rnLTyVar injFrom
                 ; injTo'   <- mapM rnLTyVar injTo
-                ; return $ L srcSpan (InjectivityAnn injFrom' injTo') }
+                ; return $ L srcSpan (InjectivityCond injFrom' injTo') }
 
-   ; let tvNames  = Set.fromList $ hsAllLTyVarNames tvBndrs
+-- JSTOLAREK: implement this
+{-
+   ; let tvNames  = Set.fromList $ hsLKiTyVarNames tvBndrs
          resName  = hsLTyVarName resTv
          -- See Note [Renaming injectivity annotation]
          lhsValid = EQ == (stableNameCmp resName (unLoc injFrom'))
@@ -1528,6 +1544,7 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig resTv))
                         [ text "Unknown type variable" <> plural errorVars
                         , text "on the RHS of injectivity condition:"
                         , interpp'SP errorVars ] ) }
+-}
 
    ; return injDecl' }
 
@@ -1539,12 +1556,12 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig resTv))
 --
 -- So we rename injectivity annotation like we normally would except that
 -- this time we expect "result" to be reported not in scope by rnLTyVar.
-rnInjectivityAnn _ _ (L srcSpan (InjectivityAnn injFrom injTo)) =
+rnInjectivityCond _ _ (L srcSpan (InjectivityCond injFrom injTo)) =
    setSrcSpan srcSpan $ do
    (injDecl', _) <- askNoErrs $ do
-     injFrom' <- rnLTyVar injFrom
+     injFrom' <- mapM rnLTyVar injFrom
      injTo'   <- mapM rnLTyVar injTo
-     return $ L srcSpan (InjectivityAnn injFrom' injTo')
+     return $ L srcSpan (InjectivityCond injFrom' injTo')
    return $ injDecl'
 
 {-

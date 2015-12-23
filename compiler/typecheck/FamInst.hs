@@ -381,37 +381,39 @@ checkForConflicts inst_envs fam_inst
 -- annotation.
 checkForInjectivityConflicts :: FamInstEnvs -> FamInst -> TcM Bool
 checkForInjectivityConflicts instEnvs famInst
-    | isTypeFamilyTyCon tycon
-    -- type family is injective in at least one argument
-    , Injective inj <- familyTyConInjectivityInfo tycon = do
-    { let axiom = coAxiomSingleBranch fi_ax
-          conflicts = lookupFamInstEnvInjectivityConflicts inj instEnvs famInst
-          -- see Note [Verifying injectivity annotation] in FamInstEnv
-          errs = makeInjectivityErrors fi_ax axiom inj conflicts
-    ; mapM_ (\(err, span) -> setSrcSpan span $ addErr err) errs
-    ; return (null errs)
-    }
+   | isTypeFamilyTyCon tycon
+   -- type family is injective in at least one argument
+   , Injective injConds <- familyTyConInjectivityInfo tycon = do
+   { let axiom     = coAxiomSingleBranch fi_ax
+         conflicts = concatMap (famInstEnvInjectivityConflicts instEnvs famInst)
+                                injConds
+         -- see Note [Verifying injectivity annotation] in FamInstEnv
+         errs = concatMap (makeInjectivityErrors fi_ax axiom conflicts) injConds
+   ; mapM_ (\(err, span) -> setSrcSpan span $ addErr err) errs
+   ; return (null errs)
+   }
 
-    -- if there was no injectivity annotation or tycon does not represent a
-    -- type family we report no conflicts
-    | otherwise = return True
-    where tycon = famInstTyCon famInst
-          fi_ax = fi_axiom famInst
+   -- if there was no injectivity annotation or tycon does not represent a
+   -- type family we report no conflicts
+   | otherwise = return True
+   where
+      tycon = famInstTyCon famInst
+      fi_ax = fi_axiom famInst
 
 -- | Build a list of injectivity errors together with their source locations.
 makeInjectivityErrors
    :: CoAxiom br   -- ^ Type family for which we generate errors
    -> CoAxBranch   -- ^ Currently checked equation (represented by axiom)
-   -> [Bool]       -- ^ Injectivity annotation
    -> [CoAxBranch] -- ^ List of injectivity conflicts
+   -> InjCondition -- ^ Injectivity condition
    -> [(SDoc, SrcSpan)]
-makeInjectivityErrors fi_ax axiom inj conflicts
-  = ASSERT2( any id inj, text "No injective type variables" )
+makeInjectivityErrors fi_ax axiom conflicts injCond
+  = ASSERT2( or (snd injCond), text "No injective type variables" )
     let lhs             = coAxBranchLHS axiom
         rhs             = coAxBranchRHS axiom
 
         are_conflicts   = not $ null conflicts
-        unused_inj_tvs  = unusedInjTvsInRHS (coAxiomTyCon fi_ax) inj lhs rhs
+        unused_inj_tvs  = unusedInjTvsInRHS (coAxiomTyCon fi_ax) injCond lhs rhs
         inj_tvs_unused  = not $ and (isEmptyVarSet <$> unused_inj_tvs)
         tf_headed       = isTFHeaded rhs
         bare_variables  = bareTvInRHSViolated lhs rhs
@@ -431,7 +433,7 @@ makeInjectivityErrors fi_ax axiom inj conflicts
 -- | Return a list of type variables that the function is injective in and that
 -- do not appear on injective positions in the RHS of a family instance
 -- declaration. The returned Pair includes invisible vars followed by visible ones
-unusedInjTvsInRHS :: TyCon -> [Bool] -> [Type] -> Type -> Pair TyVarSet
+unusedInjTvsInRHS :: TyCon -> InjCondition -> [Type] -> Type -> Pair TyVarSet
 -- INVARIANT: [Bool] list contains at least one True value
 -- See Note [Verifying injectivity annotation]. This function implements fourth
 -- check described there.
@@ -439,12 +441,12 @@ unusedInjTvsInRHS :: TyCon -> [Bool] -> [Type] -> Type -> Pair TyVarSet
 -- attempt to unify equation with itself.  We would reject exactly the same
 -- equations but this method gives us more precise error messages by returning
 -- precise names of variables that are not mentioned in the RHS.
-unusedInjTvsInRHS tycon injList lhs rhs =
+unusedInjTvsInRHS tycon (injFrom, injTo) lhs rhs =
   (`minusVarSet` injRhsVars) <$> injLHSVars
     where
       -- set of type and kind variables in which type family is injective
       (invis_pairs, vis_pairs)
-        = partitionInvisibles tycon snd (zipEqual "unusedInjTvsInRHS" injList lhs)
+        = partitionInvisibles tycon snd (zipEqual "unusedInjTvsInRHS" injTo lhs)
       invis_lhs = uncurry filterByList $ unzip invis_pairs
       vis_lhs   = uncurry filterByList $ unzip vis_pairs
 
@@ -457,6 +459,9 @@ unusedInjTvsInRHS tycon injList lhs rhs =
       -- set of type variables appearing in the RHS on an injective position.
       -- For all returned variables we assume their associated kind variables
       -- also appear in the RHS.
+
+      -- JSTOLAREK: build a tuple here using injFrom. Actually, this is the part
+      -- that needs the fixpoint iteration (I think).
       injRhsVars = collectInjVars rhs
 
       -- Collect all type variables that are either arguments to a type
@@ -465,8 +470,11 @@ unusedInjTvsInRHS tycon injList lhs rhs =
       collectInjVars (TyVarTy v)
         = unitVarSet v `unionVarSet` collectInjVars (tyVarKind v)
       collectInjVars (TyConApp tc tys)
+        -- JSTOLAREK: this might change when we iterate to a fixpoint
+{-
         | isTypeFamilyTyCon tc = collectInjTFVars tys
                                                  (familyTyConInjectivityInfo tc)
+-}
         | otherwise            = mapUnionVarSet collectInjVars tys
       collectInjVars (LitTy {})
         = emptyVarSet
@@ -480,11 +488,14 @@ unusedInjTvsInRHS tycon injList lhs rhs =
       collectInjVars (CastTy ty _)   = collectInjVars ty
       collectInjVars (CoercionTy {}) = emptyVarSet
 
+{-
+      -- JSTOLAREK: this might change when we iterate to a fixpoint
       collectInjTFVars :: [Type] -> Injectivity -> VarSet
       collectInjTFVars _ NotInjective
           = emptyVarSet
       collectInjTFVars tys (Injective injList)
           = mapUnionVarSet collectInjVars (filterByList injList tys)
+-}
 
 
 -- | Is type headed by a type family application?
