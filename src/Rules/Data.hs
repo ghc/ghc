@@ -44,19 +44,19 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
     -- TODO: code duplication around ghcIncludeDirs
     priority 2.0 $ do
         when (pkg == hp2ps) $ dataFile %> \mk -> do
-            let cSrcs = [ "AreaBelow.c", "Curves.c", "Error.c", "Main.c"
-                        , "Reorder.c", "TopTwenty.c", "AuxFile.c", "Deviation.c"
-                        , "HpFile.c", "Marks.c", "Scale.c", "TraceElement.c"
-                        , "Axes.c", "Dimensions.c", "Key.c", "PsFile.c"
-                        , "Shade.c", "Utilities.c" ]
-                contents = unlines
-                    [ "utils_hp2ps_stage0_PROGNAME = hp2ps"
-                    , "utils_hp2ps_stage0_C_SRCS = " ++ unwords cSrcs
-                    , "utils_hp2ps_stage0_INSTALL = YES"
-                    , "utils_hp2ps_stage0_INSTALL_INPLACE = YES"
-                    , "utils_hp2ps_stage0_DEP_EXTRA_LIBS = m"
-                    , "utils_hp2ps_stage0_CC_OPTS = "
-                      ++ unwords (map ("-I"++) ghcIncludeDirs) ]
+            let prefix = "utils_hp2ps_stage" ++ show (fromEnum stage) ++ "_"
+                cSrcs  = [ "AreaBelow.c", "Curves.c", "Error.c", "Main.c"
+                         , "Reorder.c", "TopTwenty.c", "AuxFile.c"
+                         , "Deviation.c", "HpFile.c", "Marks.c", "Scale.c"
+                         , "TraceElement.c", "Axes.c", "Dimensions.c", "Key.c"
+                         , "PsFile.c", "Shade.c", "Utilities.c" ]
+                contents = unlines $ map (prefix++)
+                    [ "PROGNAME = hp2ps"
+                    , "C_SRCS = " ++ unwords cSrcs
+                    , "INSTALL = YES"
+                    , "INSTALL_INPLACE = YES"
+                    , "DEP_EXTRA_LIBS = m"
+                    , "CC_OPTS = " ++ unwords (map ("-I"++) ghcIncludeDirs) ]
             writeFileChanged mk contents
             putBuild $ "| Successfully generated '" ++ mk ++ "'."
 

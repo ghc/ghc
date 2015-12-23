@@ -14,7 +14,7 @@ windowsRoot = askOracle $ WindowsRoot ()
 -- the root is slow (at least the current implementation).
 windowsRootOracle :: Rules ()
 windowsRootOracle = do
-    root <- newCache $ \() -> do
+    root <- newCache $ \_ -> do
         Stdout out <- quietly $ cmd ["cygpath", "-m", "/"]
         let root = dropWhileEnd isSpace out
         putOracle $ "Detected root on Windows: " ++ root
