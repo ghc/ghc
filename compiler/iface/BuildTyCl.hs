@@ -182,12 +182,14 @@ buildPatSyn :: Name -> Bool
 buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
             (univ_tvs, req_theta) (ex_tvs, prov_theta) arg_tys
             pat_ty field_labels
-  = ASSERT2((and [ univ_tvs == univ_tvs1
-                 , ex_tvs == ex_tvs1
-                 , pat_ty `eqType` pat_ty1
-                 , prov_theta `eqTypes` prov_theta1
-                 , req_theta `eqTypes` req_theta1
-                 , arg_tys `eqTypes` arg_tys1
+  = -- The assertion checks that the matcher is
+    -- compatible with the pattern synonym
+    ASSERT2((and [ univ_tvs `equalLength` univ_tvs1
+                 , ex_tvs `equalLength` ex_tvs1
+                 , pat_ty `eqType` substTy subst pat_ty1
+                 , prov_theta `eqTypes` substTys subst prov_theta1
+                 , req_theta `eqTypes` substTys subst req_theta1
+                 , arg_tys `eqTypes` substTys subst arg_tys1
                  ])
             , (vcat [ ppr univ_tvs <+> twiddle <+> ppr univ_tvs1
                     , ppr ex_tvs <+> twiddle <+> ppr ex_tvs1
@@ -205,6 +207,8 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
     (ex_tvs1, prov_theta1, cont_tau) = tcSplitSigmaTy cont_sigma
     (arg_tys1, _) = tcSplitFunTys cont_tau
     twiddle = char '~'
+    subst = zipTopTCvSubst (univ_tvs1 ++ ex_tvs1)
+                           (mkTyVarTys (univ_tvs ++ ex_tvs))
 
 ------------------------------------------------------
 type TcMethInfo = (Name, Type, Maybe (DefMethSpec Type))
