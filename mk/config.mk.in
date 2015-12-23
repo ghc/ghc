@@ -755,6 +755,17 @@ endif
 
 ifeq "$(TARGETPLATFORM)" "x86_64-unknown-mingw32"
 STRIP_CMD      = $(TOP)/inplace/mingw/bin/strip.exe
+else ifeq "$(TARGETPLATFORM)" "arm-unknown-linux"
+# The Cortex A8 hardware apparently has a bug which ld.gold will check for;
+# however in order to do so it must have unstripped executables lest we
+# see warnings of the form (see #10376, #10464),
+#
+#     /usr/bin/ld.gold: warning: cannot scan executable section 1 of ... for
+#     Cortex-A8 erratum because it has no mapping symbols.
+#
+# Consequently we disabling stripping by default on this architecture.
+# The hack of using `:` to disable stripping is implemented by ghc-cabal.
+STRIP_CMD      = :
 else
 STRIP_CMD      = strip
 endif
