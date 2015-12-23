@@ -1389,6 +1389,7 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /tests/rts/T8242
 /tests/rts/T9045
 /tests/rts/T9078
+/tests/rts/T10728
 /tests/rts/atomicinc
 /tests/rts/bug1010
 /tests/rts/derefnull

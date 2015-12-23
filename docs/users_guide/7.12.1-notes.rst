@@ -40,6 +40,8 @@ The highlights, since the 7.10 branch, are:
 
 - A rewritten (and greatly improved) pattern exhaustiveness checker
 
+- ``-maxN(x)`` added to compliment ``-N``
+
 - GHC can run the interpreter in a separate process (see
   :ref:`external-interpreter`), and the interpreter can now run profiled
   code.
@@ -331,6 +333,9 @@ Runtime system
 ~~~~~~~~~~~~~~
 
 -  Support for performance monitoring with PAPI has been dropped.
+
+-  ``-maxN(x)`` flag added to compliment ``-N``, it will choose to use at most
+   (x) capabilities, limited by the number of processors as ``-N`` is.
 
 Build system
 ~~~~~~~~~~~~

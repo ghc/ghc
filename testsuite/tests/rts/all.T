@@ -1,9 +1,9 @@
 test('testblockalloc',
-     [c_src, only_ways(['normal','threaded1']), extra_run_opts('+RTS -I0')], 
+     [c_src, only_ways(['normal','threaded1']), extra_run_opts('+RTS -I0')],
      compile_and_run, [''])
 
 test('testmblockalloc',
-     [c_src, only_ways(['normal','threaded1']), extra_run_opts('+RTS -I0')], 
+     [c_src, only_ways(['normal','threaded1']), extra_run_opts('+RTS -I0')],
      compile_and_run, [''])
 # -I0 is important: the idle GC will run the memory leak detector,
 # which will crash because the mblocks we allocate are not in a state
@@ -53,7 +53,7 @@ test('divbyzero',
       when(opsys('mingw32'), omit_ways(prof_ways))],
      compile_and_run, [''])
 
-test('outofmem', when(opsys('darwin'), skip), 
+test('outofmem', when(opsys('darwin'), skip),
                  run_command, ['$MAKE -s --no-print-directory outofmem'])
 test('outofmem2', extra_run_opts('+RTS -M5m -RTS'),
                   run_command, ['$MAKE -s --no-print-directory outofmem2'])
@@ -111,8 +111,8 @@ test('T2615',
 
 # omit dyn and profiling ways, because we don't build dyn_l or p_l
 # variants of the RTS by default
-test('traceEvent', [ omit_ways(['dyn'] + prof_ways), 
-                     extra_run_opts('+RTS -ls -RTS') ], 
+test('traceEvent', [ omit_ways(['dyn'] + prof_ways),
+                     extra_run_opts('+RTS -ls -RTS') ],
                    compile_and_run, ['-eventlog'])
 
 test('T4059',
@@ -333,3 +333,6 @@ test('T10590', [ignore_output, when(opsys('mingw32'),skip)], compile_and_run, ['
 # 20000 was easily enough to trigger the bug with 7.10
 test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000') ],
                compile_and_run, ['T10904lib.c'])
+
+test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), req_smp],
+           compile_and_run, ['-threaded'])

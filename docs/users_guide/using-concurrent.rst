@@ -110,11 +110,11 @@ There are two ways to run a program on multiple processors: call
 RTS ``-N`` options.
 
 ``-N⟨x⟩``
-``-Nmax⟨x⟩``
+``-maxN⟨x⟩``
 
     .. index::
        single: -N⟨x⟩; RTS option
-       single: -Nmax(x); RTS option
+       single: -maxN(x); RTS option
 
     Use ⟨x⟩ simultaneous threads when running the program.
 
@@ -136,8 +136,9 @@ RTS ``-N`` options.
     value of ⟨x⟩ itself based on how many processors are in your
     machine.
 
-    With Nmax⟨x⟩, i.e. ``+RTS -Nmax3 -RTS``, the runtime will choose at
-    most (x), also limited by the number of processors on the system.
+    With ``-maxN⟨x⟩``, i.e. ``+RTS -maxN3 -RTS``, the runtime will choose
+    at most (x), also limited by the number of processors on the system.
+    Omitting (x) is an error, if you need a default use option ``-N``.
 
     Be careful when using all the processors in your machine: if some of
     your processors are in use by other programs, this can actually harm
