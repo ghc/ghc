@@ -129,4 +129,4 @@ test('SigTvKinds2', expect_broken(11203), compile_fail, [''])
 test('T9017', normal, compile_fail, [''])
 test('T11249', normal, compile, [''])
 test('T11248', normal, compile, [''])
-
+test('T11278', normal, compile, [''])

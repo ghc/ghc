@@ -517,6 +517,7 @@ cTupleTyConNameSet :: NameSet
 cTupleTyConNameSet = mkNameSet cTupleTyConNames
 
 isCTupleTyConName :: Name -> Bool
+-- Use Type.isCTupleClass where possible
 isCTupleTyConName n
  = ASSERT2( isExternalName n, ppr n )
    nameModule n == gHC_CLASSES
