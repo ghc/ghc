@@ -25,9 +25,8 @@ module Base (
     module System.Console.ANSI,
 
     -- * Miscellaneous utilities
-    bimap, minusOrd, intersectOrd,
-    removeFileIfExists,
-    replaceEq, replaceSeparators, decodeModule, unifyPath, (-/-), chunksOfSize,
+    bimap, minusOrd, intersectOrd, removeFileIfExists, replaceEq, chunksOfSize,
+    replaceSeparators, decodeModule, encodeModule, unifyPath, (-/-)
     ) where
 
 import Control.Applicative
@@ -78,11 +77,17 @@ replaceSeparators = replaceIf isPathSeparator
 replaceIf :: (a -> Bool) -> a -> [a] -> [a]
 replaceIf p to = map (\from -> if p from then to else from)
 
--- | Given a module name extract the directory and file names, e.g.:
+-- | Given a module name extract the directory and file name, e.g.:
 --
 -- > decodeModule "Data.Functor.Identity" = ("Data/Functor/", "Identity")
 decodeModule :: String -> (FilePath, String)
 decodeModule = splitFileName . replaceEq '.' '/'
+
+-- | Given the directory and file name find the corresponding module name, e.g.:
+--
+-- > encodeModule "Data/Functor/" "Identity.hs" = "Data.Functor.Identity"
+encodeModule :: FilePath -> String -> String
+encodeModule dir file = replaceEq '/' '.' $ dir -/- takeBaseName file
 
 -- | Normalise a path and convert all path separators to @/@, even on Windows.
 unifyPath :: FilePath -> FilePath
