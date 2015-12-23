@@ -1068,7 +1068,9 @@ contains strings with non-ascii characters.
 The ``-interactive-print`` flag allows to specify any function of type
 ``C a => a -> IO ()``, for some constraint ``C``, as the function for
 printing evaluated expressions. The function can reside in any loaded
-module or any registered package.
+module or any registered package, but only when it resides in a registered
+package will it survive a ``:cd``, ``:add``, ``:load``, ``:reload`` or
+``:set``.
 
 As an example, suppose we have following special printing module:
 
