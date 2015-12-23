@@ -349,6 +349,35 @@ and
 as our lists. We can then do normal fixity resolution on these. The fixities
 must come along for the ride just so that the list stays in sync with the
 operators.
+
+Note [QualTy in kinds]
+~~~~~~~~~~~~~~~~~~~~~~
+I was wondering whether QualTy could occur only at TypeLevel.  But no,
+we can have a qualified type in a kind too. Here is an example:
+
+  type family F a where
+    F Bool = Nat
+    F Nat  = Type
+
+  type family G a where
+    G Type = Type -> Type
+    G ()   = Nat
+
+  data X :: forall k1 k2. (F k1 ~ G k2) => k1 -> k2 -> Type where
+    MkX :: X 'True '()
+
+See that k1 becomes Bool and k2 becomes (), so the equality is
+satisfied. If I write MkX :: X 'True 'False, compilation fails with a
+suitable message:
+
+  MkX :: X 'True '()
+    • Couldn't match kind ‘G Bool’ with ‘Nat’
+      Expected kind: G Bool
+        Actual kind: F Bool
+
+However: in a kind, the constraints in the QualTy must all be
+equalities; or at least, any kinds with a class constraint are
+uninhabited.
 -}
 
 data RnTyKiEnv
@@ -436,9 +465,8 @@ rnHsTyKi env ty@(HsForAllTy { hst_bndrs = tyvars, hst_body  = tau })
        ; return ( HsForAllTy { hst_bndrs = tyvars', hst_body =  tau' }
                 , fvs) } }
 
-rnHsTyKi env ty@(HsQualTy { hst_ctxt = lctxt
-                          , hst_body = tau })
-  = do { checkTypeInType env ty
+rnHsTyKi env ty@(HsQualTy { hst_ctxt = lctxt, hst_body = tau })
+  = do { checkTypeInType env ty  -- See Note [QualTy in kinds]
        ; (ctxt', fvs1) <- rnTyKiContext env lctxt
        ; (tau',  fvs2) <- rnLHsTyKi env tau
        ; return (HsQualTy { hst_ctxt = ctxt', hst_body =  tau' }
