@@ -8,6 +8,12 @@ This is supposed to go into the `shake-build` directory of the GHC source tree.
 Trying it
 ---------
 
+Prerequisits
+```
+$ cabal install alex
+$ cabal install shake
+```
+
 On Linux,
 ```
 $ git clone git://git.haskell.org/ghc
