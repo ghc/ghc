@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module GHC (
     array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
     deepseq, deriveConstants, directory, dllSplit, filepath, genapply,
@@ -103,11 +104,11 @@ defaultProgramPath :: Stage -> Package -> Maybe FilePath
 defaultProgramPath stage pkg
     | pkg == ghc     = Just . inplaceProgram $ "ghc-stage" ++ show (fromEnum stage + 1)
     | pkg == haddock || pkg == ghcTags = case stage of
-        Stage2 -> Just . inplaceProgram $ pkgName pkg
+        Stage2 -> Just . inplaceProgram $ pkgNameString pkg
         _      -> Nothing
     | isProgram pkg  = case stage of
-        Stage0 -> Just . inplaceProgram $ pkgName pkg
-        _      -> Just . installProgram $ pkgName pkg
+        Stage0 -> Just . inplaceProgram $ pkgNameString pkg
+        _      -> Just . installProgram $ pkgNameString pkg
     | otherwise = Nothing
   where
     inplaceProgram name = programInplacePath -/- name <.> exe

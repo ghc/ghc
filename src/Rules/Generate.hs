@@ -147,7 +147,7 @@ generateConfigHs = do
         , "cStage                :: String"
         , "cStage                = show (STAGE :: Int)"
         , "cIntegerLibrary       :: String"
-        , "cIntegerLibrary       = " ++ quote (pkgName integerLibrary)
+        , "cIntegerLibrary       = " ++ quote (pkgNameString integerLibrary)
         , "cIntegerLibraryType   :: IntegerLibrary"
         , "cIntegerLibraryType   = " ++ cIntegerLibraryType
         , "cSupportsSplitObjs    :: String"

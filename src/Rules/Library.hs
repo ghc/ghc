@@ -49,7 +49,7 @@ buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
         synopsis <- interpretPartial target $ getPkgData Synopsis
         unless isLib0 . putSuccess $ renderBox
             [ "Successfully built package library '"
-              ++ pkgName pkg
+              ++ pkgNameString pkg
               ++ "' (" ++ show stage ++ ", way "++ show way ++ ")."
             , "Package synopsis: " ++ dropWhileEnd isPunctuation synopsis ++ "." ]
 

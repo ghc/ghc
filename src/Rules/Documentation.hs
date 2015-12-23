@@ -16,7 +16,7 @@ buildPackageDocumentation _ target @ (PartialTarget stage pkg) =
     in when (stage == Stage1) $ do
         haddockFile %> \file -> do
             srcs <- interpretPartial target getPackageSources
-            deps <- interpretPartial target $ getPkgDataList DepNames
+            deps <- map PackageName <$> interpretPartial target (getPkgDataList DepNames)
             let haddocks = [ pkgHaddockFile depPkg
                            | Just depPkg <- map findKnownPackage deps ]
             need $ srcs ++ haddocks

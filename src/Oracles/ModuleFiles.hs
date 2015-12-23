@@ -64,7 +64,7 @@ packageInfo pkg
 moduleFilesOracle :: Rules ()
 moduleFilesOracle = do
     answer <- newCache $ \(pkg, extraDirs) -> do
-        putOracle $ "Searching module files of package " ++ pkgName pkg ++ "..."
+        putOracle $ "Searching module files of package " ++ pkgNameString pkg ++ "..."
         unless (null extraDirs) $ putOracle $ "Extra directory = " ++ show extraDirs
 
         (srcDirs, modules) <- packageInfo pkg

@@ -1,7 +1,7 @@
 module Rules.Cabal (cabalRules) where
 
 import Data.Version
-import Distribution.Package hiding (Package)
+import Distribution.Package as DP hiding (Package)
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
 import Distribution.Verbosity
@@ -19,9 +19,9 @@ cabalRules = do
         constraints <- forM (sort pkgs) $ \pkg -> do
             need [pkgCabalFile pkg]
             pd <- liftIO . readPackageDescription silent $ pkgCabalFile pkg
-            let identifier       = package . packageDescription $ pd
-                version          = showVersion . pkgVersion $ identifier
-                PackageName name = Distribution.Package.pkgName identifier
+            let identifier          = package . packageDescription $ pd
+                version             = showVersion . pkgVersion $ identifier
+                DP.PackageName name = DP.pkgName identifier
             return $ name ++ " == " ++ version
         writeFileChanged out . unlines $ constraints
 
@@ -34,8 +34,8 @@ cabalRules = do
             let depsLib  = collectDeps $ condLibrary pd
                 depsExes = map (collectDeps . Just . snd) $ condExecutables pd
                 deps     = concat $ depsLib : depsExes
-                depNames = [ name | Dependency (PackageName name) _ <- deps ]
-            return . unwords $ Package.pkgName pkg : sort depNames
+                depNames = [ name | Dependency (DP.PackageName name) _ <- deps ]
+            return . unwords $ pkgNameString pkg : sort depNames
         writeFileChanged out . unlines $ pkgDeps
 
 collectDeps :: Maybe (CondTree v [Dependency] a) -> [Dependency]

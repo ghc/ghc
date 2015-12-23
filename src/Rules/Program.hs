@@ -33,7 +33,7 @@ buildProgram _ target @ (PartialTarget stage pkg) = do
             libTarget = PartialTarget libStage pkg
         pkgs     <- interpretPartial libTarget getPackages
         ghciFlag <- interpretPartial libTarget $ getPkgData BuildGhciLib
-        let deps = matchPackageNames (sort pkgs) (sort depNames)
+        let deps = matchPackageNames (sort pkgs) (map PackageName $ sort depNames)
             ghci = ghciFlag == "YES" && stage == Stage1
         libs <- fmap concat . forM deps $ \dep -> do
             let depTarget = PartialTarget libStage dep
@@ -52,6 +52,6 @@ buildProgram _ target @ (PartialTarget stage pkg) = do
         synopsis <- interpretPartial target $ getPkgData Synopsis
         putSuccess $ renderBox
             [ "Successfully built program '"
-              ++ pkgName pkg ++ "' (" ++ show stage ++ ")."
+              ++ pkgNameString pkg ++ "' (" ++ show stage ++ ")."
             , "Executable: " ++ bin
             , "Package synopsis: " ++ dropWhileEnd isPunctuation synopsis ++ "." ]
