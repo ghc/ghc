@@ -3,12 +3,14 @@ module Rules.Oracles (oracleRules) where
 import Base
 import Oracles
 import Oracles.ArgsHash
+import Oracles.ModuleFiles
 
 oracleRules :: Rules ()
 oracleRules = do
+    argsHashOracle     -- see Oracles.ArgsHash
     configOracle       -- see Oracles.Config
+    dependenciesOracle -- see Oracles.Dependencies
+    moduleFilesOracle  -- see Oracles.ModuleFiles
     packageDataOracle  -- see Oracles.PackageData
     packageDepsOracle  -- see Oracles.PackageDeps
-    dependenciesOracle -- see Oracles.Dependencies
-    argsHashOracle     -- see Oracles.ArgsHash
     windowsRootOracle  -- see Oracles.WindowsRoot

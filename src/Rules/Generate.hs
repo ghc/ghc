@@ -3,6 +3,7 @@ module Rules.Generate (generatePackageCode) where
 import Expression
 import GHC
 import Oracles
+import Oracles.ModuleFiles
 import Rules.Actions
 import Rules.Resources (Resources)
 import Settings
@@ -25,16 +26,14 @@ determineBuilder file = fmap fst $ find (\(_, e) -> e == ext) knownGenerators
 generatePackageCode :: Resources -> PartialTarget -> Rules ()
 generatePackageCode _ target @ (PartialTarget stage pkg) =
     let path        = targetPath stage pkg
-        packagePath = pkgPath pkg
         buildPath   = path -/- "build"
         primopsTxt  = targetPath stage compiler -/- "build/primops.txt"
         platformH   = targetPath stage compiler -/- "ghc_boot_platform.h"
         generated f = (buildPath ++ "//*.hs") ?== f && not ("//autogen/*" ?== f)
     in do
         generated ?> \file -> do
-            dirs  <- interpretPartial target $ getPkgDataList SrcDirs
-            files <- getDirectoryFiles "" $
-                [ packagePath -/- d ++ "//" ++ takeBaseName file <.> "*" | d <- dirs ]
+            let pattern = "//" ++ takeBaseName file <.> "*"
+            files <- fmap (filter (pattern ?==)) $ moduleFiles stage pkg
             let gens = [ (f, b) | f <- files, Just b <- [determineBuilder f] ]
             when (length gens /= 1) . putError $
                 "Exactly one generator expected for " ++ file
