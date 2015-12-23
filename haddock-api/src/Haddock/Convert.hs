@@ -283,7 +283,7 @@ synifyDataCon use_gadt_syntax dc =
 
   field_tys = zipWith con_decl_field (dataConFieldLabels dc) linear_tys
   con_decl_field fl synTy = noLoc $
-    ConDeclField [noLoc $ FieldOcc (mkVarUnqual $ flLabel fl) (flSelector fl)] synTy
+    ConDeclField [noLoc $ FieldOcc (noLoc $ mkVarUnqual $ flLabel fl) (flSelector fl)] synTy
                  Nothing
   hs_arg_tys = case (use_named_field_syntax, use_infix_syntax) of
           (True,True) -> Left "synifyDataCon: contradiction!"

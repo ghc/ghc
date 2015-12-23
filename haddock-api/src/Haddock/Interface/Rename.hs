@@ -289,7 +289,6 @@ renameLContext (L loc context) = do
 
 renameWildCardInfo :: HsWildCardInfo Name -> RnM (HsWildCardInfo DocName)
 renameWildCardInfo (AnonWildCard  (L l name)) = AnonWildCard . L l <$> rename name
-renameWildCardInfo (NamedWildCard (L l name)) = NamedWildCard . L l <$> rename name
 
 renameInstHead :: InstHead Name -> RnM (InstHead DocName)
 renameInstHead InstHead {..} = do

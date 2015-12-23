@@ -845,7 +845,7 @@ ppSideBySideConstr subdocs fixities unicode qual (L _ con)
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Unicode -> Qualification
                   -> ConDeclField DocName -> SubDecl
 ppSideBySideField subdocs unicode qual (ConDeclField names ltype _) =
-  (hsep (punctuate comma (map ((ppBinder False) . rdrNameOcc . rdrNameFieldOcc . unLoc) names)) <+> dcolon unicode <+> ppLType unicode qual ltype,
+  (hsep (punctuate comma (map ((ppBinder False) . rdrNameOcc . unLoc . rdrNameFieldOcc . unLoc) names)) <+> dcolon unicode <+> ppLType unicode qual ltype,
     mbDoc,
     [])
   where
@@ -856,7 +856,7 @@ ppSideBySideField subdocs unicode qual (ConDeclField names ltype _) =
 
 ppShortField :: Bool -> Unicode -> Qualification -> ConDeclField DocName -> Html
 ppShortField summary unicode qual (ConDeclField names ltype _)
-  = hsep (punctuate comma (map ((ppBinder summary) . rdrNameOcc . rdrNameFieldOcc . unLoc) names))
+  = hsep (punctuate comma (map ((ppBinder summary) . rdrNameOcc . unLoc . rdrNameFieldOcc . unLoc) names))
     <+> dcolon unicode <+> ppLType unicode qual ltype
 
 
@@ -1016,9 +1016,6 @@ ppr_mono_ty ctxt_prec (HsDocTy ty _) unicode qual
   = ppr_mono_lty ctxt_prec ty unicode qual
 
 ppr_mono_ty _ (HsWildCardTy (AnonWildCard _)) _ _ = char '_'
-
-ppr_mono_ty _ (HsWildCardTy (NamedWildCard (L _ name))) _ q = ppDocName q Prefix True name
-
 ppr_mono_ty _ (HsTyLit n) _ _ = ppr_tylit n
 
 ppr_tylit :: HsTyLit -> Html
