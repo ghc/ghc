@@ -1,4 +1,6 @@
 {-# LANGUAGE PatternSynonyms, TypeOperators, TypeFamilies, MultiParamTypeClasses, GADTs #-}
+{-# LANGUAGE FunctionalDependencies #-}
+
 -- | Test operators with or without fixity declarations
 module Operators where
 
@@ -42,7 +44,9 @@ data family a ** b
 infix 9 **
 
 -- | Class with fixity, including associated types
-class a ><> b where
+class a ><> b | a -> b where
+  -- Dec 2015: Added @a -> b@ functional dependency to clean up ambiguity
+  -- See GHC #11264
   type a <>< b :: *
   data a ><< b
   (>><), (<<>) :: a -> b -> ()
