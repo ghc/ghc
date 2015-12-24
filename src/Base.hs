@@ -22,7 +22,6 @@ module Base (
 
     -- * Output
     putColoured, putOracle, putBuild, putSuccess, putError, renderBox,
-    module System.Console.ANSI,
 
     -- * Miscellaneous utilities
     bimap, minusOrd, intersectOrd, replaceEq, quote, chunksOfSize,
