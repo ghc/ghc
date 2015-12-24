@@ -10,6 +10,7 @@ data Coercion
 data LeftOrRight
 data UnivCoProvenance
 data TCvSubst
+data VisibilityFlag
 
 type PredType = Type
 type Kind = Type

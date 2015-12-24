@@ -1547,7 +1547,7 @@ data Dec
 -- @TypeFamilyHead@ is defined to be the elements of the declaration between
 -- @type family@ and @where@.
 data TypeFamilyHead =
-  TypeFamilyHead Name [TyVarBndr] FamilyResultSig (Maybe InjectivityAnn)
+  TypeFamilyHead Name [TyVarBndr] FamilyResultSig InjectivityAnn
   deriving( Show, Eq, Ord, Data, Typeable, Generic )
 
 -- | One equation of a type family instance or closed type family. The

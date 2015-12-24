@@ -5,7 +5,8 @@ Traversable instances.
 
 {-# LANGUAGE CPP #-}
 
-module Pair ( Pair(..), unPair, toPair, swap, pLiftFst, pLiftSnd ) where
+module Pair ( Pair(..), unPair, toPair, swap
+            , zipPairs, pLiftFst, pLiftSnd ) where
 
 #include "HsVersions.h"
 
@@ -58,3 +59,7 @@ pLiftFst f (Pair a b) = Pair (f a) b
 
 pLiftSnd :: (a -> a) -> Pair a -> Pair a
 pLiftSnd f (Pair a b) = Pair a (f b)
+
+zipPairs :: [a] -> [a] -> [Pair a]
+zipPairs (x:xs) (y:ys) = Pair x y : zipPairs xs ys
+zipPairs _      _      = []

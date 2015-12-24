@@ -42,6 +42,8 @@ import Demand
 import Class
 import FieldLabel
 import NameSet
+import FamInstEnv( pprInjCond )
+import InstEnv( IsOrphan )
 import CoAxiom ( BranchIndex )
 import Name
 import CostCentre
@@ -57,10 +59,9 @@ import Fingerprint
 import Binary
 import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
 import HsBinds
-import TyCon ( Role (..), Injectivity(..) )
+import TyCon ( Role (..), Injectivity )
 import StaticFlags (opt_PprStyle_Debug)
-import Util( filterOut, filterByList )
-import InstEnv
+import Util( filterOut )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
 
@@ -742,26 +743,23 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon, ifTyVars = tyvars
 
   | otherwise
   = hang (text "type family" <+> pprIfaceDeclHead [] ss tycon kind tyvars)
-       2 (pp_inj res_var inj <+> ppShowRhs ss (pp_rhs rhs))
+       2 (ppr_res res_var <+> ppr_inj inj <+> ppShowRhs ss (pp_rhs rhs))
     $$
     nest 2 ( vcat [ text "Kind:" <+> ppr kind
                   , ppShowRhs ss (pp_branches rhs) ] )
   where
-    pp_inj Nothing    _   = empty
-    pp_inj (Just res) inj
-       | Injective injectivity <- inj = hsep [ equals, ppr res, dcolon, ppr kind
-                                             , pp_inj_conds res injectivity]
-       | otherwise = hsep [ equals, ppr res, dcolon, ppr kind ]
+    ppr_res Nothing    = empty
+    ppr_res (Just res) = equals <+> ppr res
 
-    pp_inj_conds _ []
-      = empty -- not possible (invariant from the parser)
-    pp_inj_conds res conds
-      = text "|" <+> hsep (punctuate (text ",") (map (ppr_inj_cond res) conds))
+    ppr_inj []    = empty
+    ppr_inj conds = text "|" <+> sep (punctuate (text ",") (map ppr_cond conds))
 
-    ppr_inj_cond res (lhs, rhs)
-      = hsep [ ppr res, pp_inj_tvs lhs, text "->", pp_inj_tvs rhs]
+    pp_res = case res_var of
+               Just res -> ppr res
+               Nothing  -> pprPanic "pprIfaceConDecl" (ppr tycon)
+    pp_inj_tvs = pp_res : map ppr tyvars
 
-    pp_inj_tvs inj = interppSP (map fst (filterByList inj tyvars))
+    ppr_cond cond = pprInjCond cond pp_inj_tvs
 
     pp_rhs IfaceDataFamilyTyCon
       = ppShowIface ss (ptext (sLit "data"))

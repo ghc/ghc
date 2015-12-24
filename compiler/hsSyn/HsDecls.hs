@@ -710,67 +710,97 @@ pprTyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_ND = nd } })
 *                                                                      *
 ********************************************************************* -}
 
--- Note [FamilyResultSig]
--- ~~~~~~~~~~~~~~~~~~~~~~
---
--- This data type represents the return signature of a type family.  Possible
--- values are:
---
---  * NoSig - the user supplied no return signature:
---       type family Id a where ...
---
---  * KindSig - the user supplied the return kind:
---       type family Id a :: * where ...
---
---  * TyVarSig - user named the result with a type variable and possibly
---    provided a kind signature for that variable:
---       type family Id a = r where ...
---       type family Id a = (r :: *) where ...
---
---    Naming result of a type family is required if we want to provide
---    injectivity annotation for a type family:
---       type family Id a = r | r -> a where ...
---
--- See also: Note [Injectivity annotation]
+type LFamilyDecl name = Located (FamilyDecl name)
+data FamilyDecl name = FamilyDecl
+  { fdInfo           :: FamilyInfo name              -- type/data, closed/open
+  , fdLName          :: Located name                 -- type constructor
+  , fdTyVars         :: LHsQTyVars name              -- type variables
+  , fdResultSig      :: LFamilyResultSig name        -- result signature
+  , fdInjectivityAnn :: Maybe (LInjectivityAnn name) -- optional injectivity ann
+  }
+  -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
+  --             'ApiAnnotation.AnnData', 'ApiAnnotation.AnnFamily',
+  --             'ApiAnnotation.AnnWhere', 'ApiAnnotation.AnnOpenP',
+  --             'ApiAnnotation.AnnDcolon', 'ApiAnnotation.AnnCloseP',
+  --             'ApiAnnotation.AnnEqual', 'ApiAnnotation.AnnRarrow',
+  --             'ApiAnnotation.AnnVbar'
 
--- Note [Injectivity annotation]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- A user can declare a type family to be injective:
---
---    type family Id a = r | r -> a where ...
---
---  * The part after the "|" is called "injectivity annotation".
---  * "r -> a" part is called "injectivity condition"; at the moment terms
---    "injectivity annotation" and "injectivity condition" are synonymous
---    because we only allow a single injectivity condition.
---  * "r" is the "LHS of injectivity condition". LHS can only contain the
---    variable naming the result of a type family.
+  -- For details on above see note [Api annotations] in ApiAnnotation
+  deriving ( Typeable )
+deriving instance (DataId id) => Data (FamilyDecl id)
 
---  * "a" is the "RHS of injectivity condition". RHS contains space-separated
---    type and kind variables representing the arguments of a type
---    family. Variables can be omitted if a type family is not injective in
---    these arguments. Example:
---          type family Foo a b c = d | d -> a c where ...
---
--- Note that:
---  a) naming of type family result is required to provide injectivity
---     annotation
---  b) for associated types if the result was named then injectivity annotation
---     is mandatory. Otherwise result type variable is indistinguishable from
---     associated type default.
---
--- It is possible that in the future this syntax will be extended to support
--- more complicated injectivity annotations. For example we could declare that
--- if we know the result of Plus and one of its arguments we can determine the
--- other argument:
---
---    type family Plus a b = (r :: Nat) | r a -> b, r b -> a where ...
---
--- Here injectivity annotation would consist of two comma-separated injectivity
--- conditions.
---
--- See also Note [Injective type families] in TyCon
+data FamilyInfo name
+  = DataFamily
+  | OpenTypeFamily
+     -- | 'Nothing' if we're in an hs-boot file and the user
+     -- said "type family Foo x where .."
+  | ClosedTypeFamily (Maybe [LTyFamInstEqn name])
+  deriving( Typeable )
+deriving instance (DataId name) => Data (FamilyInfo name)
+
+
+{- Note [FamilyResultSig]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This data type represents the return signature of a type family.  Possible
+values are:
+
+ * NoSig - the user supplied no return signature:
+      type family Id a where ...
+
+ * KindSig - the user supplied the return kind:
+      type family Id a :: * where ...
+
+ * TyVarSig - user named the result with a type variable and possibly
+   provided a kind signature for that variable:
+      type family Id a = r where ...
+      type family Id a = (r :: *) where ...
+
+   Naming result of a type family is required if we want to provide
+   injectivity annotation for a type family:
+      type family Id a = r | r -> a where ...
+
+See also: Note [Injectivity annotation]
+
+Note [Injectivity annotation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A user can declare a type family to be injective:
+
+   type family Id a = r | r -> a where ...
+
+ * The part after the "|" is called "injectivity annotation".
+ * "r -> a" part is called "injectivity condition"; at the moment terms
+   "injectivity annotation" and "injectivity condition" are synonymous
+   because we only allow a single injectivity condition.
+ * "r" is the "LHS of injectivity condition". LHS can only contain the
+   variable naming the result of a type family.
+
+ * "a" is the "RHS of injectivity condition". RHS contains space-separated
+   type and kind variables representing the arguments of a type
+   family. Variables can be omitted if a type family is not injective in
+   these arguments. Example:
+         type family Foo a b c = d | d -> a c where ...
+
+Note that:
+ a) naming of type family result is required to provide injectivity
+    annotation
+ b) for associated types if the result was named then injectivity annotation
+    is mandatory. Otherwise result type variable is indistinguishable from
+    associated type default.
+
+It is possible that in the future this syntax will be extended to support
+more complicated injectivity annotations. For example we could declare that
+if we know the result of Plus and one of its arguments we can determine the
+other argument:
+
+   type family Plus a b = (r :: Nat) | r a -> b, r b -> a where ...
+
+Here injectivity annotation would consist of two comma-separated injectivity
+conditions.
+
+See also Note [Injective type families] in TyCon
+-}
 
 type LFamilyResultSig name = Located (FamilyResultSig name)
 data FamilyResultSig name = -- see Note [FamilyResultSig]
@@ -795,26 +825,6 @@ data FamilyResultSig name = -- see Note [FamilyResultSig]
 
   deriving ( Typeable )
 deriving instance (DataId name) => Data (FamilyResultSig name)
-
-type LFamilyDecl name = Located (FamilyDecl name)
-data FamilyDecl name = FamilyDecl
-  { fdInfo           :: FamilyInfo name              -- type/data, closed/open
-  , fdLName          :: Located name                 -- type constructor
-  , fdTyVars         :: LHsQTyVars name              -- type variables
-  , fdResultSig      :: LFamilyResultSig name        -- result signature
-  , fdInjectivityAnn :: Maybe (LInjectivityAnn name) -- optional injectivity ann
-  }
-  -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
-  --             'ApiAnnotation.AnnData', 'ApiAnnotation.AnnFamily',
-  --             'ApiAnnotation.AnnWhere', 'ApiAnnotation.AnnOpenP',
-  --             'ApiAnnotation.AnnDcolon', 'ApiAnnotation.AnnCloseP',
-  --             'ApiAnnotation.AnnEqual', 'ApiAnnotation.AnnRarrow',
-  --             'ApiAnnotation.AnnVbar'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  deriving ( Typeable )
-
-deriving instance (DataId id) => Data (FamilyDecl id)
 
 type LInjectivityAnn name = Located (InjectivityAnn name)
 
@@ -841,15 +851,6 @@ data InjectivityCond name
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   deriving ( Data, Typeable )
-
-data FamilyInfo name
-  = DataFamily
-  | OpenTypeFamily
-     -- | 'Nothing' if we're in an hs-boot file and the user
-     -- said "type family Foo x where .."
-  | ClosedTypeFamily (Maybe [LTyFamInstEqn name])
-  deriving( Typeable )
-deriving instance (DataId name) => Data (FamilyInfo name)
 
 -- | Does this family declaration have a complete, user-supplied kind signature?
 famDeclHasCusk :: FamilyDecl name -> Bool

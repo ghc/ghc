@@ -55,7 +55,7 @@ module Type (
         stripCoercionTy, splitCoercionType_maybe,
 
         splitPiTysInvisible, filterOutInvisibleTypes,
-        filterOutInvisibleTyVars, partitionInvisibles,
+        filterOutInvisibleTyVars, tagVisibility, pickVisibles, pickInvisibles,
         synTyConResKind,
         tyConBinders,
 
@@ -1295,11 +1295,11 @@ dropForAlls ty | Just ty' <- coreView ty = dropForAlls ty'
 
 -- | Given a tycon and its arguments, filters out any invisible arguments
 filterOutInvisibleTypes :: TyCon -> [Type] -> [Type]
-filterOutInvisibleTypes tc tys = snd $ partitionInvisibles tc id tys
+filterOutInvisibleTypes tc tys = pickVisibles $ tagVisibility tc id tys
 
 -- | Like 'filterOutInvisibles', but works on 'TyVar's
 filterOutInvisibleTyVars :: TyCon -> [TyVar] -> [TyVar]
-filterOutInvisibleTyVars tc tvs = snd $ partitionInvisibles tc mkTyVarTy tvs
+filterOutInvisibleTyVars tc tvs = pickVisibles $ tagVisibility tc mkTyVarTy tvs
 
 -- | Given a tycon and a list of things (which correspond to arguments),
 -- partitions the things into the invisible ones and the visible ones.
@@ -1318,19 +1318,19 @@ filterOutInvisibleTyVars tc tvs = snd $ partitionInvisibles tc mkTyVarTy tvs
 -- If you're absolutely sure that your tycon's kind doesn't end in a variable,
 -- it's OK if the callback function panics, as that's the only time it's
 -- consulted.
-partitionInvisibles :: TyCon -> (a -> Type) -> [a] -> ([a], [a])
-partitionInvisibles tc get_ty = go emptyTCvSubst (tyConKind tc)
+tagVisibility :: TyCon -> (a -> Type) -> [a] -> [(a, VisibilityFlag)]
+tagVisibility tc get_ty = go emptyTCvSubst (tyConKind tc)
   where
-    go _ _ [] = ([], [])
+    go _ _ [] = []
     go subst (ForAllTy bndr res_ki) (x:xs)
-      | isVisibleBinder bndr = second (x :) (go subst' res_ki xs)
-      | otherwise            = first  (x :) (go subst' res_ki xs)
+      = (x, binderVisibility bndr) : go subst' res_ki xs
       where
         subst' = extendTCvSubstBinder subst bndr (get_ty x)
     go subst (TyVarTy tv) xs
       | Just ki <- lookupTyVar subst tv = go subst ki xs
-    go _ _ xs = ([], xs)  -- something is ill-kinded. But this can happen
-                          -- when printing errors. Assume everything is visible.
+    go _ _ xs = [(x,Visible) | x <- xs]
+                   -- Something is ill-kinded. But this can happen
+                   -- when printing errors. Assume everything is visible.
 
 -- like splitPiTys, but returns only *invisible* binders, including constraints
 splitPiTysInvisible :: Type -> ([TyBinder], Type)
@@ -2208,8 +2208,9 @@ splitVisVarsOfType orig_ty = Pair invis_vars vis_vars
 
     invisible vs = Pair vs emptyVarSet
 
-    go_tc tc tys = let (invis, vis) = partitionInvisibles tc id tys in
-                   invisible (tyCoVarsOfTypes invis) `mappend` foldMap go vis
+    go_tc tc tys = let tagged = tagVisibility tc id tys in
+                   invisible (tyCoVarsOfTypes (pickInvisibles tagged))
+                   `mappend` foldMap go (pickVisibles tagged)
 
 splitVisVarsOfTypes :: [Type] -> Pair TyCoVarSet
 splitVisVarsOfTypes = foldMap splitVisVarsOfType

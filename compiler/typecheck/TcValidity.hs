@@ -1341,14 +1341,14 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
      -- annotation supplied by the user.
      -- See Note [Verifying injectivity annotation] in FamInstEnv
     check_injectivity prev_branches cur_branch
-      | Injective injConds <- injectivity
+      | not (null injectivity)
       -- JSTOLAREK: I suspect that errors might be reported in an un-intuitive
       -- order. Test this.
       = do { let conflicts = concatMap (\inj -> fst $
                            foldl (gather_conflicts inj prev_branches cur_branch)
-                                 ([], 0) prev_branches) injConds
+                                 ([], 0) prev_branches) injectivity
                  errs = concatMap (makeInjectivityErrors ax cur_branch
-                                                         conflicts) injConds
+                                                         conflicts) injectivity
            ; mapM_ (\(err, span) -> setSrcSpan span $ addErr err) errs }
       | otherwise
       = return ()

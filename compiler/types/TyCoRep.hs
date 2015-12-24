@@ -27,7 +27,7 @@ module TyCoRep (
         TyLit(..),
         KindOrType, Kind,
         PredType, ThetaType,      -- Synonyms
-        VisibilityFlag(..),
+        VisibilityFlag(..), pickVisibles, pickInvisibles,
 
         -- Coercions
         Coercion(..), LeftOrRight(..),
@@ -114,7 +114,7 @@ module TyCoRep (
 import {-# SOURCE #-} DataCon( dataConTyCon, dataConFullSig
                               , DataCon, eqSpecTyVar )
 import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy
-                          , partitionInvisibles, coreView )
+                          , tagVisibility, coreView )
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
 import {-# SOURCE #-} Coercion
@@ -242,6 +242,10 @@ instance Binary VisibilityFlag where
     case h of
       0 -> return Visible
       _ -> return Invisible
+
+pickVisibles, pickInvisibles :: [(a,VisibilityFlag)] -> [a]
+pickVisibles   prs = [ x | (x, Visible)   <- prs ]
+pickInvisibles prs = [ x | (x, Invisible) <- prs ]
 
 type KindOrType = Type -- See Note [Arguments to type constructors]
 
@@ -2363,7 +2367,7 @@ pprTcApp_help to_type p pp tc tys dflags style
 suppressInvisibles :: (a -> Type) -> DynFlags -> TyCon -> [a] -> [a]
 suppressInvisibles to_type dflags tc xs
   | gopt Opt_PrintExplicitKinds dflags = xs
-  | otherwise                          = snd $ partitionInvisibles tc to_type xs
+  | otherwise                          = pickVisibles $ tagVisibility tc to_type xs
 
 ----------------
 pprTyList :: TyPrec -> Type -> Type -> SDoc

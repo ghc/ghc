@@ -368,7 +368,7 @@ tc_iface_decl parent _ (IfaceFamily {ifName = occ_name, ifTyVars = tv_bndrs,
      ; rhs      <- forkM (mk_doc tc_name) $
                    tc_fam_flav tc_name fam_flav
      ; res_name <- traverse (newIfaceName . mkTyVarOccFS) res
-     ; let tycon = mkFamilyTyCon tc_name kind tyvars res_name rhs parent inj
+     ; let tycon = mkFamilyTyCon tc_name kind tyvars rhs parent res_name inj
      ; return (ATyCon tycon) }
    where
      mk_doc n = ptext (sLit "Type synonym") <+> ppr n

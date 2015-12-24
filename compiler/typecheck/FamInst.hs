@@ -383,7 +383,7 @@ checkForInjectivityConflicts :: FamInstEnvs -> FamInst -> TcM Bool
 checkForInjectivityConflicts instEnvs famInst
    | isTypeFamilyTyCon tycon
    -- type family is injective in at least one argument
-   , Injective injConds <- familyTyConInjectivityInfo tycon = do
+   , injConds <- familyTyConInjectivityInfo tycon = do
    { let axiom     = coAxiomSingleBranch fi_ax
          conflicts = concatMap (famInstEnvInjectivityConflicts instEnvs famInst)
                                 injConds
@@ -407,10 +407,9 @@ makeInjectivityErrors
    -> [CoAxBranch] -- ^ List of injectivity conflicts
    -> InjCondition -- ^ Injectivity condition
    -> [(SDoc, SrcSpan)]
-makeInjectivityErrors fi_ax axiom conflicts injCond
-  = ASSERT2( or (snd injCond), text "No injective type variables" )
-    let lhs             = coAxBranchLHS axiom
-        rhs             = coAxBranchRHS axiom
+makeInjectivityErrors fi_ax ax_branch conflicts injCond
+  = let lhs             = coAxBranchLHS ax_branch
+        rhs             = coAxBranchRHS ax_branch
 
         are_conflicts   = not $ null conflicts
         unused_inj_tvs  = unusedInjTvsInRHS (coAxiomTyCon fi_ax) injCond lhs rhs
@@ -423,7 +422,7 @@ makeInjectivityErrors fi_ax axiom conflicts injCond
                         = ( hang herald
                                2 (vcat (map (pprCoAxBranch fi_ax) eqns))
                           , coAxBranchSpan (head eqns) )
-        errorIf p f     = if p then [f err_builder axiom] else []
+        errorIf p f     = if p then [f err_builder ax_branch] else []
      in    errorIf are_conflicts  (conflictInjInstErr     conflicts     )
         ++ errorIf inj_tvs_unused (unusedInjectiveVarsErr unused_inj_tvs)
         ++ errorIf tf_headed       tfHeadedErr
@@ -433,28 +432,36 @@ makeInjectivityErrors fi_ax axiom conflicts injCond
 -- | Return a list of type variables that the function is injective in and that
 -- do not appear on injective positions in the RHS of a family instance
 -- declaration. The returned Pair includes invisible vars followed by visible ones
-unusedInjTvsInRHS :: TyCon -> InjCondition -> [Type] -> Type -> Pair TyVarSet
--- INVARIANT: [Bool] list contains at least one True value
+-- E.g.    type family F a b = r | r a -> b
+--         type instance F (x,y) (Maybe z) = [y]
+-- Here the dependent 'Maybe z' mentions type variables that are not
+-- determined  by the (x,y) and [y] from the LHS of the injectivity condition
+--
 -- See Note [Verifying injectivity annotation]. This function implements fourth
 -- check described there.
+--
+-- Return a pair that separates the un-determined variables that appear
+-- only in invisible positions of the family TyCon from the others
+--
+unusedInjTvsInRHS :: TyCon -> InjCondition -> [Type] -> Type
+                  -> Pair TyVarSet   -- (invisible, visible)
 -- In theory, instead of implementing this whole check in this way, we could
 -- attempt to unify equation with itself.  We would reject exactly the same
 -- equations but this method gives us more precise error messages by returning
 -- precise names of variables that are not mentioned in the RHS.
-unusedInjTvsInRHS tycon (injFrom, injTo) lhs rhs =
-  (`minusVarSet` injRhsVars) <$> injLHSVars
-    where
-      -- set of type and kind variables in which type family is injective
-      (invis_pairs, vis_pairs)
-        = partitionInvisibles tycon snd (zipEqual "unusedInjTvsInRHS" injTo lhs)
-      invis_lhs = uncurry filterByList $ unzip invis_pairs
-      vis_lhs   = uncurry filterByList $ unzip vis_pairs
+unusedInjTvsInRHS tycon inj_cond lhs_tys rhs_ty
+   = Pair bad_invisible bad_visible
+   where
+      dep_tys :: [(Type, VisibilityFlag)]    -- Types that should be determined
+      dep_tys = getInjRHS inj_cond $
+                 (rhs_ty, Visible) : tagVisibility tycon id lhs_tys
 
-      invis_vars = tyCoVarsOfTypes invis_lhs
-      Pair invis_vars' vis_vars = splitVisVarsOfTypes vis_lhs
-      injLHSVars
-        = Pair (invis_vars `minusVarSet` vis_vars `unionVarSet` invis_vars')
-               vis_vars
+      bad_visible, bad_invisible :: VarSet
+      bad_visible = tyCoVarsOfTypes (pickVisibles dep_tys)
+                    `minusVarSet` determined_vars
+      bad_invisible = tyCoVarsOfTypes (pickInvisibles dep_tys)
+                      `minusVarSet` determined_vars
+                      `minusVarSet` bad_visible
 
       -- set of type variables appearing in the RHS on an injective position.
       -- For all returned variables we assume their associated kind variables
@@ -462,7 +469,9 @@ unusedInjTvsInRHS tycon (injFrom, injTo) lhs rhs =
 
       -- JSTOLAREK: build a tuple here using injFrom. Actually, this is the part
       -- that needs the fixpoint iteration (I think).
-      injRhsVars = collectInjVars rhs
+      determined_vars :: VarSet
+      determined_vars = mapUnionVarSet collectInjVars $
+                        getInjLHS inj_cond (rhs_ty : lhs_tys)
 
       -- Collect all type variables that are either arguments to a type
       -- constructor or to injective type families.
@@ -491,9 +500,7 @@ unusedInjTvsInRHS tycon (injFrom, injTo) lhs rhs =
 {-
       -- JSTOLAREK: this might change when we iterate to a fixpoint
       collectInjTFVars :: [Type] -> Injectivity -> VarSet
-      collectInjTFVars _ NotInjective
-          = emptyVarSet
-      collectInjTFVars tys (Injective injList)
+      collectInjTFVars tys injList
           = mapUnionVarSet collectInjVars (filterByList injList tys)
 -}
 

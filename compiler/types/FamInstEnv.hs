@@ -26,6 +26,7 @@ module FamInstEnv (
         -- Injectivity
         InjectivityCheckResult(..),
         famInstEnvInjectivityConflicts, injectiveBranches,
+        getInjLHS, getInjRHS, pprInjCond,
 
         -- Normalisation
         topNormaliseType, topNormaliseType_maybe,
@@ -546,30 +547,31 @@ data InjectivityCheckResult
 -- | Check whether two type family axioms don't violate injectivity annotation.
 injectiveBranches :: InjCondition -> CoAxBranch -> CoAxBranch
                   -> InjectivityCheckResult
-injectiveBranches (injFrom, injTo)
+injectiveBranches cond
                   ax1@(CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
                   ax2@(CoAxBranch { cab_lhs = lhs2, cab_rhs = rhs2 })
   -- See Note [Verifying injectivity annotation]. This function implements first
   -- check described there.
-  = let getInjFrom = filterByList injFrom
-        getInjTo   = filterByList injTo
-    in case tcUnifyTyWithTFs True rhs1 rhs2 of -- True = two-way pre-unification
-       Nothing -> InjectivityAccepted -- RHS are different, so equations are
-                                      -- injective.
-       Just subst -> -- RHS unify under a substitution
-        let lhs1Subst = Type.substTys subst (getInjTo lhs1)
-            lhs2Subst = Type.substTys subst (getInjTo lhs2)
+  = let tys1 = rhs1 : lhs1
+        tys2 = rhs2 : lhs2
+    in case tcUnifyTysWithTFs True
+               (getInjLHS cond tys1) (getInjLHS cond tys2) of -- True = two-way pre-unification
+       Nothing -> InjectivityAccepted -- RHS are different,
+                                      -- so equations are injective.
+       Just subst  -- RHS unify under a substitution
         -- If LHSs are equal under the substitution used for RHSs then this pair
         -- of equations does not violate injectivity annotation. If LHSs are not
         -- equal under that substitution then this pair of equations violates
         -- injectivity annotation, but for closed type families it still might
         -- be the case that one LHS after substitution is unreachable.
-        in if eqTypes lhs1Subst lhs2Subst
-           then InjectivityAccepted
-           else InjectivityUnified ( ax1 { cab_lhs = Type.substTys subst lhs1
-                                         , cab_rhs = Type.substTy  subst rhs1 })
-                                   ( ax2 { cab_lhs = Type.substTys subst lhs2
-                                         , cab_rhs = Type.substTy  subst rhs2 })
+           | eqTypes (Type.substTys subst (getInjRHS cond tys1))
+                     (Type.substTys subst (getInjRHS cond tys2))
+           -> InjectivityAccepted
+           | otherwise
+           -> InjectivityUnified ( ax1 { cab_lhs = Type.substTys subst lhs1
+                                       , cab_rhs = Type.substTy  subst rhs1 })
+                                 ( ax2 { cab_lhs = Type.substTys subst lhs2
+                                       , cab_rhs = Type.substTy  subst rhs2 })
 
 -- takes a CoAxiom with unknown branch incompatibilities and computes
 -- the compatibilities
@@ -583,6 +585,16 @@ computeAxiomIncomps ax@(CoAxiom { co_ax_branches = branches })
 
     mk_incomps :: CoAxBranch -> [CoAxBranch] -> [CoAxBranch]
     mk_incomps br = filter (not . compatibleBranches br)
+
+
+getInjLHS, getInjRHS :: InjCondition -> [a] -> [a]
+getInjLHS (InjCond cond) tys = [ ty | (InjLHS, ty) <- cond `zip` tys ]
+getInjRHS (InjCond cond) tys = [ ty | (InjRHS, ty) <- cond `zip` tys ]
+
+pprInjCond :: InjCondition -> [SDoc] -> SDoc
+pprInjCond cond pp_tvs = fsep [ hsep (getInjLHS cond pp_tvs)
+                              , arrow
+                              , hsep (getInjRHS cond pp_tvs) ]
 
 {-
 ************************************************************************

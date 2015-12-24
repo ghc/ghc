@@ -724,8 +724,8 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = OpenTypeFamily, fdLName = L _ tc_name
   ; let all_tvs = kvs' ++ tvs'
   ; inj' <- tcInjectivity all_tvs inj
   ; let tycon = mkFamilyTyCon tc_name full_kind all_tvs
-                               (resultVariableName sig) OpenSynFamilyTyCon
-                               parent inj'
+                               OpenSynFamilyTyCon parent
+                               (resultVariableName sig) inj'
   ; return tycon }
 
 tcFamDecl1 parent
@@ -750,9 +750,8 @@ tcFamDecl1 parent
        ; case mb_eqns of
            Nothing   ->
                return $ mkFamilyTyCon tc_name kind tvs'
-                                      (resultVariableName sig)
                                       AbstractClosedSynFamilyTyCon parent
-                                      inj'
+                                      (resultVariableName sig) inj'
            Just eqns -> do {
 
          -- Process the equations, creating CoAxBranches
@@ -779,8 +778,9 @@ tcFamDecl1 parent
               | null eqns = Nothing   -- mkBranchedCoAxiom fails on empty list
               | otherwise = Just (mkBranchedCoAxiom co_ax_name fam_tc branches)
 
-             fam_tc = mkFamilyTyCon tc_name kind tvs' (resultVariableName sig)
-                      (ClosedSynFamilyTyCon mb_co_ax) parent inj'
+             fam_tc = mkFamilyTyCon tc_name kind tvs'
+                         (ClosedSynFamilyTyCon mb_co_ax) parent
+                         (resultVariableName sig) inj'
 
        ; return fam_tc } }
 
@@ -797,9 +797,9 @@ tcFamDecl1 parent
   ; tc_rep_name <- newTyConRepName tc_name
   ; let final_tvs = (kvs' ++ tvs') `chkAppend` extra_tvs -- we may not need these
         tycon = mkFamilyTyCon tc_name tycon_kind final_tvs
-                              (resultVariableName sig)
                               (DataFamilyTyCon tc_rep_name)
-                              parent NotInjective
+                              parent
+                              (resultVariableName sig) []
 
   ; return tycon }
 
@@ -812,7 +812,7 @@ tcFamDecl1 parent
 tcInjectivity :: [TyVar] -> Maybe (LInjectivityAnn Name)
               -> TcM Injectivity
 tcInjectivity _ Nothing
-  = return NotInjective
+  = return []
 
   -- User provided an injectivity annotation, so for each tyvar argument we
   -- check whether a type family was declared injective in that argument. We
@@ -834,26 +834,28 @@ tcInjectivity _ Nothing
   -- reason is that the implementation would not be straightforward.)
 tcInjectivity tvs (Just (L loc (InjectivityAnn injConds)))
   = setSrcSpan loc $
-    do { injConds' <- mapM (tcInjectivityCond tvs) injConds
-       ; return $ Injective injConds' }
+    mapM (tcInjectivityCond tvs) injConds
 
 tcInjectivityCond :: [TyVar] -> LInjectivityCond Name
                   -> TcM InjCondition
 tcInjectivityCond the_tvs (L loc (InjectivityCond lInjNames rInjNames))
   = setSrcSpan loc $
-    do { l_bools <- find_bools lInjNames
-       ; r_bools <- find_bools rInjNames
+    do { l_ktvs <- find_ktvs lInjNames
+       ; r_ktvs <- find_ktvs rInjNames
+       ; let to_spec tv | tv `elemVarSet` l_ktvs = InjLHS
+                        | tv `elemVarSet` r_ktvs = InjRHS
+                        | otherwise              = InjNil
+             specs = map to_spec the_tvs
        ; traceTc "tcInjectivityCond"
            (vcat [ ppr the_tvs, ppr lInjNames, ppr rInjNames
-                 , ppr l_bools, ppr r_bools ])
-       ; return (l_bools, r_bools) }
+                 , ppr l_ktvs, ppr r_ktvs, ppr specs ])
+       ; return (InjCond specs) }
   where
-    find_bools names
+    find_ktvs names
        = do { inj_tvs <- mapM (tcLookupTyVar . unLoc) names
-            ; let inj_ktvs  = closeOverKinds $
-                              filterVarSet isTyVar $  -- no injective coercion vars
-                              mkVarSet inj_tvs
-            ; return (map (`elemVarSet` inj_ktvs) the_tvs) }
+            ; return (closeOverKinds $
+                      filterVarSet isTyVar $  -- no injective coercion vars
+                      mkVarSet inj_tvs ) }
 
 tcTySynRhs :: RecTyInfo
            -> Name
@@ -2285,8 +2287,8 @@ checkValidRoleAnnots role_annots tc
     name                   = tyConName tc
     tyvars                 = tyConTyVars tc
     roles                  = tyConRoles tc
-    (vis_roles, vis_vars)  = unzip $ snd $
-                             partitionInvisibles tc (mkTyVarTy . snd) $
+    (vis_roles, vis_vars)  = unzip $ pickVisibles $
+                             tagVisibility tc (mkTyVarTy . snd) $
                              zip roles tyvars
     role_annot_decl_maybe  = lookupRoleAnnots role_annots name
 

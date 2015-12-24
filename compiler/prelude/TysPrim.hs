@@ -920,10 +920,10 @@ anyTy :: Type
 anyTy = mkTyConTy anyTyCon
 
 anyTyCon :: TyCon
-anyTyCon = mkFamilyTyCon anyTyConName kind [kKiVar] Nothing
+anyTyCon = mkFamilyTyCon anyTyConName kind [kKiVar]
                          (ClosedSynFamilyTyCon Nothing)
                          Nothing
-                         NotInjective
+                         Nothing []  -- No result var, not injective
   where
     kind = ForAllTy (Named kKiVar Invisible) (mkTyVarTy kKiVar)
 

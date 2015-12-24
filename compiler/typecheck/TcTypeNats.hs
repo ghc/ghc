@@ -17,8 +17,7 @@ module TcTypeNats
 import Type
 import Pair
 import TcType     ( TcType, tcEqType )
-import TyCon      ( TyCon, FamTyConFlav(..), mkFamilyTyCon
-                  , Injectivity(..) )
+import TyCon      ( TyCon, FamTyConFlav(..), mkFamilyTyCon )
 import Coercion   ( Role(..) )
 import TcRnTypes  ( Xi )
 import CoAxiom    ( CoAxiomRule(..), BuiltInSynFamily(..), Eqn )
@@ -102,78 +101,60 @@ typeNatExpTyCon = mkTypeNatFunTyCon2 name
                 typeNatExpTyFamNameKey typeNatExpTyCon
 
 typeNatLeqTyCon :: TyCon
-typeNatLeqTyCon =
-  mkFamilyTyCon name
-    (mkFunTys [ typeNatKind, typeNatKind ] boolTy)
-    (mkTemplateTyVars [ typeNatKind, typeNatKind ])
-    Nothing
-    (BuiltInSynFamTyCon ops)
-    Nothing
-    NotInjective
-
+typeNatLeqTyCon
+  = mk_family_tc name ops
+         (mkFunTys [ typeNatKind, typeNatKind ] boolTy)
+         (mkTemplateTyVars [ typeNatKind, typeNatKind ])
   where
-  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "<=?")
-                typeNatLeqTyFamNameKey typeNatLeqTyCon
-  ops = BuiltInSynFamily
-    { sfMatchFam      = matchFamLeq
-    , sfInteractTop   = interactTopLeq
-    , sfInteractInert = interactInertLeq
-    }
+    name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "<=?")
+                  typeNatLeqTyFamNameKey typeNatLeqTyCon
+    ops = BuiltInSynFamily
+      { sfMatchFam      = matchFamLeq
+      , sfInteractTop   = interactTopLeq
+      , sfInteractInert = interactInertLeq
+      }
 
 typeNatCmpTyCon :: TyCon
-typeNatCmpTyCon =
-  mkFamilyTyCon name
-    (mkFunTys [ typeNatKind, typeNatKind ] orderingKind)
-    (mkTemplateTyVars [ typeNatKind, typeNatKind ])
-    Nothing
-    (BuiltInSynFamTyCon ops)
-    Nothing
-    NotInjective
-
+typeNatCmpTyCon
+  = mk_family_tc name ops
+        (mkFunTys [ typeNatKind, typeNatKind ] orderingKind)
+        (mkTemplateTyVars [ typeNatKind, typeNatKind ])
   where
-  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "CmpNat")
-                typeNatCmpTyFamNameKey typeNatCmpTyCon
-  ops = BuiltInSynFamily
-    { sfMatchFam      = matchFamCmpNat
-    , sfInteractTop   = interactTopCmpNat
-    , sfInteractInert = \_ _ _ _ -> []
-    }
+    name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "CmpNat")
+                  typeNatCmpTyFamNameKey typeNatCmpTyCon
+    ops = BuiltInSynFamily
+      { sfMatchFam      = matchFamCmpNat
+      , sfInteractTop   = interactTopCmpNat
+      , sfInteractInert = \_ _ _ _ -> []
+      }
 
 typeSymbolCmpTyCon :: TyCon
-typeSymbolCmpTyCon =
-  mkFamilyTyCon name
-    (mkFunTys [ typeSymbolKind, typeSymbolKind ] orderingKind)
-    (mkTemplateTyVars [ typeSymbolKind, typeSymbolKind ])
-    Nothing
-    (BuiltInSynFamTyCon ops)
-    Nothing
-    NotInjective
-
+typeSymbolCmpTyCon
+  = mk_family_tc name ops
+         (mkFunTys [ typeSymbolKind, typeSymbolKind ] orderingKind)
+         (mkTemplateTyVars [ typeSymbolKind, typeSymbolKind ])
   where
-  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "CmpSymbol")
-                typeSymbolCmpTyFamNameKey typeSymbolCmpTyCon
-  ops = BuiltInSynFamily
-    { sfMatchFam      = matchFamCmpSymbol
-    , sfInteractTop   = interactTopCmpSymbol
-    , sfInteractInert = \_ _ _ _ -> []
-    }
-
-
-
-
+    name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "CmpSymbol")
+                  typeSymbolCmpTyFamNameKey typeSymbolCmpTyCon
+    ops = BuiltInSynFamily
+      { sfMatchFam      = matchFamCmpSymbol
+      , sfInteractTop   = interactTopCmpSymbol
+      , sfInteractInert = \_ _ _ _ -> []
+      }
 
 -- Make a binary built-in constructor of kind: Nat -> Nat -> Nat
 mkTypeNatFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
-mkTypeNatFunTyCon2 op tcb =
-  mkFamilyTyCon op
-    (mkFunTys [ typeNatKind, typeNatKind ] typeNatKind)
-    (mkTemplateTyVars [ typeNatKind, typeNatKind ])
-    Nothing
-    (BuiltInSynFamTyCon tcb)
-    Nothing
-    NotInjective
+mkTypeNatFunTyCon2 op tcb
+  = mk_family_tc op tcb
+       (mkFunTys [ typeNatKind, typeNatKind ] typeNatKind)
+       (mkTemplateTyVars [ typeNatKind, typeNatKind ])
 
-
+mk_family_tc :: Name -> BuiltInSynFamily -> Kind -> [TyVar] -> TyCon
+mk_family_tc op tcb kind tvs
+  = mkFamilyTyCon op kind tvs
+                  (BuiltInSynFamTyCon tcb)
+                  Nothing   -- No class
+                  Nothing []    -- No result var, no injectivity
 
 {-------------------------------------------------------------------------------
 Built-in rules axioms

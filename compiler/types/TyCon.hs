@@ -14,7 +14,8 @@ module TyCon(
 
         AlgTyConRhs(..), visibleDataCons,
         AlgTyConFlav(..), isNoParent,
-        FamTyConFlav(..), Role(..), Injectivity(..), InjCondition,
+        FamTyConFlav(..), Role(..),
+        Injectivity, InjCondition(..), InjSpec(..),
 
         -- ** Field labels
         tyConFieldLabels, tyConFieldLabelEnv,
@@ -166,7 +167,7 @@ Note [Type synonym families]
     a FamilyTyCon 'G', whose FamTyConFlav is ClosedSynFamilyTyCon, with the
     appropriate CoAxiom representing the equations
 
-We also support injective type families -- see Note [Injective type families]
+We also support injective type families -- see Note [Injectivity information]
 
 Note [Data type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -328,27 +329,6 @@ the kind of the unboxed tuple constructor is sort-polymorphic. For example,
 These extra tyvars (v and w) cause some delicate processing around tuples,
 where we used to be able to assume that the tycon arity and the
 datacon arity were the same.
-
-Note [Injective type families]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-We allow injectivity annotations for type families (both open and closed):
-
-  type family F (a :: k) (b :: k) = r | r -> a
-  type family G a b = res | res -> a b where ...
-
-Injectivity information is stored in the `famTcInj` field of `FamilyTyCon`.
-`famTcInj` maybe stores a list of Bools, where each entry corresponds to a
-single element of `tyConTyVars` (both lists should have identical length). If no
-injectivity annotation was provided `famTcInj` is Nothing. From this follows an
-invariant that if `famTcInj` is a Just then at least one element in the list
-must be True.
-
-See also:
- * [Injectivity annotation] in HsDecls
- * [Renaming injectivity annotation] in RnSource
- * [Verifying injectivity annotation] in FamInstEnv
- * [Type inference for type families with injectivity] in TcInteract
 
 
 ************************************************************************
@@ -540,8 +520,8 @@ data TyCon
                                       -- See Note [Associated families and their parent class]
 
         famTcInj     :: Injectivity   -- ^ is this a type family injective in
-                                      -- its type variables? Nothing if no
-                                      -- injectivity annotation was given
+                                      -- its type variables?
+                                      -- Always empty for DataFamilyTyCons
     }
 
   -- | Primitive types; cannot be defined in Haskell. This includes
@@ -746,15 +726,6 @@ isNoParent _                   = False
 
 --------------------
 
--- Length of Bool lists is 1-1 with tyConTyVars (incl kind vars)
--- INVARIANT: Second list contains at least one True
-type InjCondition = ([Bool], [Bool])
-
-data Injectivity
-  = NotInjective
-  | Injective [InjCondition]
-  deriving( Eq )
-
 -- | Information pertaining to the expansion of a type synonym (@type@)
 data FamTyConFlav
   = -- | Represents an open type family without a fixed right hand
@@ -895,6 +866,87 @@ so the coercion tycon CoT must have
  and    arity:   0
 
 ************************************************************************
+*                                                                      *
+                 Injecivity
+*                                                                      *
+************************************************************************
+
+Note [Injectivity information]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We allow injectivity annotations for type families (both open and closed):
+
+  type family F (a :: k) (b :: k) = r | r -> a
+  type family G a b = res | res -> a b where ...
+
+Injectivity information is stored in the `famTcInj` field of `FamilyTyCon`.
+`famTcInj` maybe stores a list of Bools, where each entry corresponds to a
+single element of `tyConTyVars` (both lists should have identical length). If no
+injectivity annotation was provided `famTcInj` is Nothing. From this follows an
+invariant that if `famTcInj` is a Just then at least one element in the list
+must be True.
+
+See also:
+ * [Injectivity annotation] in HsDecls
+ * [Renaming injectivity annotation] in RnSource
+ * [Verifying injectivity annotation] in FamInstEnv
+ * [Type inference for type families with injectivity] in TcInteract
+
+Note that
+ * The list in InjCondition is 1-1 with
+        (result : tyConTyVars)
+   where tyConTyVars includes kind vars
+
+ * If famTcResVar = Nothing (i.e. there is no result var),
+   then: head InjCondition = InjNil.  This situation is rather
+   rare, but it's in principle ok to have
+       type family F a b | a -> b
+   But then you can't refer to the result, hence InjNil
+
+ * The intended meaning of InjCondition is that
+   if all the InjLHS True fields match
+   then all the InjRHS True fields should match
+
+ * InjCondition contains at least one InjRHS (otherwise there is no
+   reason to have it)
+
+Example:  type family F a b c = r | r c -> b
+   The InjCondition is [InjLHS, InjNil, InjRHS, InjLHS]
+   corresponding to        r       a       b       c
+-}
+
+type Injectivity = [InjCondition]  -- See Note [Injectivity information]
+
+newtype InjCondition = InjCond [InjSpec]
+  deriving( Eq )
+
+data InjSpec = InjLHS | InjRHS | InjNil
+  deriving( Eq )
+
+okInjCond :: [TyVar] -> Maybe Name -> InjCondition -> Bool
+-- Check the invariants for an injectivity condition
+-- See Note [Injectivity information]
+okInjCond tvs res_var (InjCond ss)
+  | not (any (== InjRHS) ss)
+  = False  -- No InjRHS anywhere
+  | length ss /= length tvs + 1
+  = False
+  | Nothing <- res_var
+  , (res_spec : _) <- ss
+  , not (res_spec == InjNil)
+  = False
+  | otherwise
+  = True
+
+instance Outputable InjCondition where
+  ppr (InjCond cs) = ppr cs
+
+instance Outputable InjSpec where
+  ppr InjLHS = text "InjLHS"
+  ppr InjRHS = text "InjRHS"
+  ppr InjNil = text "InjNil"
+
+
+{- *********************************************************************
 *                                                                      *
                  TyConRepName
 *                                                                      *
@@ -1242,10 +1294,14 @@ mkSynonymTyCon name kind tyvars roles rhs
     }
 
 -- | Create a type family 'TyCon'
-mkFamilyTyCon:: Name -> Kind -> [TyVar] -> Maybe Name -> FamTyConFlav
-             -> Maybe Class -> Injectivity -> TyCon
-mkFamilyTyCon name kind tyvars resVar flav parent inj
-  = FamilyTyCon
+mkFamilyTyCon:: Name -> Kind -> [TyVar] -> FamTyConFlav
+             -> Maybe Class
+             -> Maybe Name -> Injectivity
+             -> TyCon
+mkFamilyTyCon name kind tyvars flav parent resVar inj
+  = ASSERT2( all (okInjCond tyvars resVar) inj
+           , ppr name $$ ppr tyvars $$ ppr resVar $$ ppr inj )
+    FamilyTyCon
       { tyConUnique = nameUnique name
       , tyConName   = name
       , tyConKind   = kind
@@ -1965,15 +2021,22 @@ instance Data.Data TyCon where
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "TyCon"
 
-instance Binary Injectivity where
-    put_ bh NotInjective   = putByte bh 0
-    put_ bh (Injective xs) = putByte bh 1 >> put_ bh xs
+instance Binary InjSpec where
+    put_ bh InjLHS = putByte bh 0
+    put_ bh InjRHS = putByte bh 1
+    put_ bh InjNil = putByte bh 2
 
     get bh = do { h <- getByte bh
                 ; case h of
-                    0 -> return NotInjective
-                    _ -> do { xs <- get bh
-                            ; return (Injective xs) } }
+                    0 -> return InjLHS
+                    1 -> return InjRHS
+                    _ -> return InjNil }
+
+instance Binary InjCondition where
+    put_ bh (InjCond xs) = put_ bh xs
+
+    get bh = do { xs <- get bh
+                ; return (InjCond xs) }
 
 {-
 ************************************************************************
