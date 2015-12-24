@@ -39,7 +39,7 @@ import Data.Function
 import Data.List
 import Data.Maybe
 import Data.Monoid
-import Development.Shake hiding (unit, (*>))
+import Development.Shake hiding (unit, (*>), parallel)
 import Development.Shake.Classes
 import Development.Shake.Config
 import Development.Shake.FilePath
