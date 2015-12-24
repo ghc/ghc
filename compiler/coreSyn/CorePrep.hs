@@ -516,15 +516,11 @@ cpeRhsE env (Var f `App` _{-type-} `App` arg)
   | f `hasKey` lazyIdKey          -- Replace (lazy a) by a
   = cpeRhsE env arg               -- See Note [lazyId magic] in MkId
 
-cpeRhsE env (Var f `App` _{-levity-} `App` _{-type-} `App` arg)
+cpeRhsE env (Var f `App` _levity `App` _type `App` arg)
     -- See Note [runRW magic] in MkId
   | f `hasKey` runRWKey           -- Replace (runRW# f) by (f realWorld#),
   = case arg of                   -- beta reducing if possible
-      Lam s body -> cpeRhsE env (substExpr (text "runRW#") subst body)
-        where subst = extendIdSubst emptySubst s (Var realWorldPrimId)
-                      -- XXX I think we can use emptySubst here
-                      -- because realWorldPrimId is a global variable
-                      -- and so cannot be bound by a lambda in body
+      Lam s body -> cpeRhsE (extendCorePrepEnv env s realWorldPrimId) body
       _          -> cpeRhsE env (arg `App` Var realWorldPrimId)
 
 cpeRhsE env expr@(App {}) = cpeApp env expr
@@ -1161,12 +1157,12 @@ allLazyNested is_rec (Floats IfUnboxedOk _) = isNonRec is_rec
 --                      The environment
 -- ---------------------------------------------------------------------------
 
-data CorePrepEnv = CPE {
-                       cpe_dynFlags    :: DynFlags,
-                       cpe_env         :: (IdEnv Id), -- Clone local Ids
-                       cpe_mkIntegerId :: Id,
-                       cpe_integerSDataCon :: Maybe DataCon
-                   }
+data CorePrepEnv
+  = CPE { cpe_dynFlags        :: DynFlags
+        , cpe_env             :: IdEnv Id   -- Clone local Ids
+        , cpe_mkIntegerId     :: Id
+        , cpe_integerSDataCon :: Maybe DataCon
+    }
 
 lookupMkIntegerName :: DynFlags -> HscEnv -> IO Id
 lookupMkIntegerName dflags hsc_env
