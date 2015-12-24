@@ -3,9 +3,9 @@ version:             0.1.0.0
 synopsis:            GHC build system
 license:             BSD3
 license-file:        LICENSE
-author:              Andrey Mokhov, Github: @snowleopard
-maintainer:          Andrey Mokhov, Github: @snowleopard
-copyright:           Andrey Mokhov, Github: @snowleopard
+author:              Andrey Mokhov <andrey.mokhov@gmail.com>, github: @snowleopard
+maintainer:          Andrey Mokhov <andrey.mokhov@gmail.com>, github: @snowleopard
+copyright:           Andrey Mokhov 2014-2015
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
