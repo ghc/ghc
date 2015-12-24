@@ -72,11 +72,11 @@ executable ghc-shake
     default-extensions:  BangPatterns
                        , LambdaCase
                        , MultiWayIf
-                       , OverloadedStrings
                        , TupleSections
     other-extensions:    DeriveDataTypeable
                        , DeriveGeneric
                        , FlexibleInstances
+                       , OverloadedStrings
     build-depends:       base
                        , ansi-terminal >= 0.6
                        , Cabal >= 1.22
