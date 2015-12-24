@@ -4,6 +4,7 @@ import Data.Monoid
 import Expression
 import Predicates
 import Settings.User
+import Oracles.Config.Flag
 
 -- TODO: use a single expression Ways parameterised by package instead of
 -- expressions libWays and rtsWays

@@ -2,7 +2,9 @@ module Settings.Packages (getPackages, knownPackages, findKnownPackage) where
 
 import Base
 import Expression
+import GHC
 import Predicates
+import Oracles.Config.Setting
 import Settings.User
 
 -- Combining default list of packages with user modifications
