@@ -26,7 +26,7 @@ module Base (
 
     -- * Miscellaneous utilities
     bimap, minusOrd, intersectOrd, removeFileIfExists, replaceEq, chunksOfSize,
-    replaceSeparators, decodeModule, encodeModule, unifyPath, (-/-)
+    replaceSeparators, decodeModule, encodeModule, unifyPath, (-/-), versionToInt
     ) where
 
 import Control.Applicative
@@ -37,7 +37,7 @@ import Data.Function
 import Data.List
 import Data.Maybe
 import Data.Monoid
-import Development.Shake hiding (unit, (*>), parallel)
+import Development.Shake hiding (unit, (*>))
 import Development.Shake.Classes
 import Development.Shake.Config
 import Development.Shake.FilePath
@@ -76,6 +76,12 @@ replaceSeparators = replaceIf isPathSeparator
 
 replaceIf :: (a -> Bool) -> a -> [a] -> [a]
 replaceIf p to = map (\from -> if p from then to else from)
+
+-- | Given a version string such as "2.16.2" produce an integer equivalent
+versionToInt :: String -> Int
+versionToInt s = major * 1000 + minor * 10 + patch
+  where
+    [major, minor, patch] = map read . words $ replaceEq '.' ' ' s
 
 -- | Given a module name extract the directory and file name, e.g.:
 --

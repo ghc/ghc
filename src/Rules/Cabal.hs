@@ -1,13 +1,12 @@
 module Rules.Cabal (cabalRules) where
 
 import Data.Version
-import Distribution.Package as DP hiding (Package)
+import Distribution.Package as DP
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
 import Distribution.Verbosity
 import Expression
 import GHC
-import Package hiding (library)
 import Settings
 
 cabalRules :: Rules ()

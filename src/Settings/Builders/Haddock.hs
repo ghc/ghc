@@ -16,6 +16,7 @@ haddockArgs = builder Haddock ? do
     hidden   <- getPkgDataList HiddenModules
     deps     <- getPkgDataList Deps
     depNames <- getPkgDataList DepNames
+    hVersion <- lift . pkgData . Version $ targetPath Stage2 haddock
     ghcOpts  <- fromDiffExpr commonGhcArgs
     mconcat
         [ arg $ "--odir=" ++ takeDirectory output
@@ -26,6 +27,7 @@ haddockArgs = builder Haddock ? do
         , arg "--hoogle"
         , arg $ "--title=" ++ pkgNameString pkg ++ "-" ++ version ++ ": " ++ synopsis
         , arg $ "--prologue=" ++ path -/- "haddock-prologue.txt"
+        , arg $ "--optghc=-D__HADDOCK_VERSION__=" ++ show (versionToInt hVersion)
         , append $ map ("--hide=" ++) hidden
         , append $ [ "--read-interface=../" ++ dep
                      ++ ",../" ++ dep ++ "/src/%{MODULE/./-}.html\\#%{NAME},"
@@ -40,7 +42,7 @@ haddockArgs = builder Haddock ? do
         , customPackageArgs
         , append =<< getInputs
         , arg "+RTS"
-        , arg $ "-t" ++ path </> "haddock.t"
+        , arg $ "-t" ++ path -/- "haddock.t"
         , arg "--machine-readable" ]
 
 customPackageArgs :: Args

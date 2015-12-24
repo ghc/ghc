@@ -1,8 +1,7 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, DeriveDataTypeable #-}
 
 module Package (
-    Package (..), PackageName(..), PackageType (..),
+    Package (..), PackageName (..), PackageType (..),
     -- * Queries
     pkgNameString,
     pkgCabalFile,
@@ -18,7 +17,7 @@ import Data.String
 -- | The name of a Cabal package
 newtype PackageName = PackageName { getPackageName :: String }
                     deriving ( Eq, Ord, IsString, Generic, Binary, Hashable
-                             , NFData)
+                             , Typeable, NFData)
 
 instance Show PackageName where
     show (PackageName name) = name
