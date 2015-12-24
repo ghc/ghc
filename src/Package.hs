@@ -16,8 +16,7 @@ import Data.String
 
 -- | The name of a Cabal package
 newtype PackageName = PackageName { getPackageName :: String }
-                    deriving ( Eq, Ord, IsString, Generic, Binary, Hashable
-                             , Typeable, NFData)
+    deriving (Eq, Ord, IsString, Generic, Binary, Hashable, Typeable, NFData)
 
 instance Show PackageName where
     show (PackageName name) = name
@@ -25,8 +24,7 @@ instance Show PackageName where
 -- | We regard packages as either being libraries or programs. This is
 -- bit of a convenient lie as Cabal packages can be both, but it works
 -- for now.
-data PackageType = Program | Library
-                 deriving Generic
+data PackageType = Program | Library deriving Generic
 
 data Package = Package
      {

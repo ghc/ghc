@@ -20,10 +20,10 @@ packagesStage0 :: Packages
 packagesStage0 = mconcat
     [ append [ binary, cabal, compiler, ghc, ghcBoot, ghcCabal, ghcPkg
              , hsc2hs, hoopl, hpc, templateHaskell, transformers ]
+    -- the stage0 predicate makes sure these packages are built only in Stage0
     , stage0 ? append [deriveConstants, dllSplit, genapply, genprimopcode, hp2ps]
     , notM windowsHost ? notM (anyHostOs ["ios"]) ? append [terminfo] ]
 
--- TODO: what do we do with parallel, stm, random, primitive, vector and dph?
 packagesStage1 :: Packages
 packagesStage1 = mconcat
     [ packagesStage0
@@ -35,7 +35,7 @@ packagesStage1 = mconcat
     , notM windowsHost ? append [iservBin]
     , buildHaddock     ? append [xhtml] ]
 
--- TODO: currently there is an unchecked assumption that we only build programs
+-- TODO: currently there is an unchecked assumption that we build only programs
 -- in Stage2 and Stage3. Can we check this in compile time?
 packagesStage2 :: Packages
 packagesStage2 = mconcat
@@ -43,9 +43,11 @@ packagesStage2 = mconcat
     , buildHaddock ? append [haddock] ]
 
 -- TODO: switch to Set Package as the order of packages should not matter?
+-- Otherwise we have to keep remembering to sort packages from time to time.
 knownPackages :: [Package]
 knownPackages = sort $ defaultKnownPackages ++ userKnownPackages
 
 -- Note: this is slow but we keep it simple as there are just ~50 packages
+-- TODO: speed up?
 findKnownPackage :: PackageName -> Maybe Package
 findKnownPackage name = find (\pkg -> pkgName pkg == name) knownPackages
