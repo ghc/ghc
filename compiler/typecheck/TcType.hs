@@ -63,7 +63,6 @@ module TcType (
   tcInstHeadTyNotSynonym, tcInstHeadTyAppAllTyVars,
   tcGetTyVar_maybe, tcGetTyVar, nextRole,
   tcSplitSigmaTy, tcDeepSplitSigmaTy_maybe,
-  tcSplitCastTy_maybe,
 
   ---------------------------------
   -- Predicates.
@@ -81,7 +80,7 @@ module TcType (
   ---------------------------------
   -- Misc type manipulators
   deNoteType, occurCheckExpand, OccCheckResult(..),
-  orphNamesOfType, orphNamesOfDFunHead, orphNamesOfCo,
+  orphNamesOfType, orphNamesOfCo,
   orphNamesOfTypes, orphNamesOfCoCon,
   getDFunTyKey,
   evVarPred_maybe, evVarPred,
@@ -188,10 +187,10 @@ import VarSet
 import Coercion
 import Type
 import TyCon
-import CoAxiom
 
 -- others:
 import DynFlags
+import CoreFVs
 import Name -- hiding (varName)
             -- We use this to make dictionaries for type literals.
             -- Perhaps there's a better way to do this?
@@ -1227,12 +1226,6 @@ tcIsTyVarTy (TyVarTy _)   = True
 tcIsTyVarTy _             = False
 
 -----------------------
-tcSplitCastTy_maybe :: TcType -> Maybe (TcType, Coercion)
-tcSplitCastTy_maybe ty | Just ty' <- coreView ty = tcSplitCastTy_maybe ty'
-tcSplitCastTy_maybe (CastTy ty co)             = Just (ty, co)
-tcSplitCastTy_maybe _                          = Nothing
-
------------------------
 tcSplitDFunTy :: Type -> ([TyVar], [Type], Class, [Type])
 -- Split the type of a dictionary function
 -- We don't use tcSplitSigmaTy,  because a DFun may (with NDP)
@@ -2010,83 +2003,6 @@ deNoteType ty = ty
 Find the free tycons and classes of a type.  This is used in the front
 end of the compiler.
 -}
-
-orphNamesOfTyCon :: TyCon -> NameSet
-orphNamesOfTyCon tycon = unitNameSet (getName tycon) `unionNameSet` case tyConClass_maybe tycon of
-    Nothing  -> emptyNameSet
-    Just cls -> unitNameSet (getName cls)
-
-orphNamesOfType :: Type -> NameSet
-orphNamesOfType ty | Just ty' <- coreView ty = orphNamesOfType ty'
-                -- Look through type synonyms (Trac #4912)
-orphNamesOfType (TyVarTy _)          = emptyNameSet
-orphNamesOfType (LitTy {})           = emptyNameSet
-orphNamesOfType (TyConApp tycon tys) = orphNamesOfTyCon tycon
-                                       `unionNameSet` orphNamesOfTypes tys
-orphNamesOfType (ForAllTy bndr res)  = orphNamesOfTyCon funTyCon   -- NB!  See Trac #8535
-                                       `unionNameSet` orphNamesOfType (binderType bndr)
-                                       `unionNameSet` orphNamesOfType res
-orphNamesOfType (AppTy fun arg)      = orphNamesOfType fun `unionNameSet` orphNamesOfType arg
-orphNamesOfType (CastTy ty co)       = orphNamesOfType ty `unionNameSet` orphNamesOfCo co
-orphNamesOfType (CoercionTy co)      = orphNamesOfCo co
-
-orphNamesOfThings :: (a -> NameSet) -> [a] -> NameSet
-orphNamesOfThings f = foldr (unionNameSet . f) emptyNameSet
-
-orphNamesOfTypes :: [Type] -> NameSet
-orphNamesOfTypes = orphNamesOfThings orphNamesOfType
-
-orphNamesOfDFunHead :: Type -> NameSet
--- Find the free type constructors and classes
--- of the head of the dfun instance type
--- The 'dfun_head_type' is because of
---      instance Foo a => Baz T where ...
--- The decl is an orphan if Baz and T are both not locally defined,
---      even if Foo *is* locally defined
-orphNamesOfDFunHead dfun_ty
-  = case tcSplitSigmaTy dfun_ty of
-        (_, _, head_ty) -> orphNamesOfType head_ty
-
-orphNamesOfCo :: Coercion -> NameSet
-orphNamesOfCo (Refl _ ty)           = orphNamesOfType ty
-orphNamesOfCo (TyConAppCo _ tc cos) = unitNameSet (getName tc) `unionNameSet` orphNamesOfCos cos
-orphNamesOfCo (AppCo co1 co2)       = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
-orphNamesOfCo (ForAllCo _ kind_co co)
-  = orphNamesOfCo kind_co `unionNameSet` orphNamesOfCo co
-orphNamesOfCo (CoVarCo _)           = emptyNameSet
-orphNamesOfCo (AxiomInstCo con _ cos) = orphNamesOfCoCon con `unionNameSet` orphNamesOfCos cos
-orphNamesOfCo (UnivCo p _ t1 t2)    = orphNamesOfProv p `unionNameSet` orphNamesOfType t1 `unionNameSet` orphNamesOfType t2
-orphNamesOfCo (SymCo co)            = orphNamesOfCo co
-orphNamesOfCo (TransCo co1 co2)     = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
-orphNamesOfCo (NthCo _ co)          = orphNamesOfCo co
-orphNamesOfCo (LRCo  _ co)          = orphNamesOfCo co
-orphNamesOfCo (InstCo co arg)       = orphNamesOfCo co `unionNameSet` orphNamesOfCo arg
-orphNamesOfCo (CoherenceCo co1 co2) = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
-orphNamesOfCo (KindCo co)           = orphNamesOfCo co
-orphNamesOfCo (SubCo co)            = orphNamesOfCo co
-orphNamesOfCo (AxiomRuleCo _ cs)    = orphNamesOfCos cs
-
-orphNamesOfProv :: UnivCoProvenance -> NameSet
-orphNamesOfProv UnsafeCoerceProv    = emptyNameSet
-orphNamesOfProv (PhantomProv co)    = orphNamesOfCo co
-orphNamesOfProv (ProofIrrelProv co) = orphNamesOfCo co
-orphNamesOfProv (PluginProv _)      = emptyNameSet
-orphNamesOfProv (HoleProv _)        = emptyNameSet
-
-orphNamesOfCos :: [Coercion] -> NameSet
-orphNamesOfCos = orphNamesOfThings orphNamesOfCo
-
-orphNamesOfCoCon :: CoAxiom br -> NameSet
-orphNamesOfCoCon (CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
-  = orphNamesOfTyCon tc `unionNameSet` orphNamesOfCoAxBranches branches
-
-orphNamesOfCoAxBranches :: Branches br -> NameSet
-orphNamesOfCoAxBranches
-  = foldr (unionNameSet . orphNamesOfCoAxBranch) emptyNameSet . fromBranches
-
-orphNamesOfCoAxBranch :: CoAxBranch -> NameSet
-orphNamesOfCoAxBranch (CoAxBranch { cab_lhs = lhs, cab_rhs = rhs })
-  = orphNamesOfTypes lhs `unionNameSet` orphNamesOfType rhs
 
 {-
 ************************************************************************

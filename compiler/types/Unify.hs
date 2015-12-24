@@ -8,6 +8,8 @@ module Unify (
         tcMatchTy, tcMatchTys, tcMatchTyX, tcMatchTysX, tcUnifyTyWithTFs,
         ruleMatchTyX,
 
+        -- * Rough matching
+        roughMatchTcs, instanceCantMatch,
         typesCantMatch,
 
         -- Side-effect free unification
@@ -26,6 +28,7 @@ import Var
 import VarEnv
 import VarSet
 import Kind
+import Name( Name )
 import Type hiding ( getTvSubstEnv )
 import Coercion hiding ( getCvSubstEnv )
 import TyCon
@@ -153,6 +156,35 @@ ruleMatchTyX tmpl_tvs rn_env tenv tmpl target
 
 matchBindFun :: TyCoVarSet -> TyVar -> BindFlag
 matchBindFun tvs tv = if tv `elemVarSet` tvs then BindMe else Skolem
+
+
+{- *********************************************************************
+*                                                                      *
+                Rough matching
+*                                                                      *
+********************************************************************* -}
+
+-- See Note [Rough match] field in InstEnv
+
+roughMatchTcs :: [Type] -> [Maybe Name]
+roughMatchTcs tys = map rough tys
+  where
+    rough ty
+      | Just (ty', _) <- splitCastTy_maybe ty   = rough ty'
+      | Just (tc,_)   <- splitTyConApp_maybe ty = Just (tyConName tc)
+      | otherwise                               = Nothing
+
+instanceCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
+-- (instanceCantMatch tcs1 tcs2) returns True if tcs1 cannot
+-- possibly be instantiated to actual, nor vice versa;
+-- False is non-committal
+instanceCantMatch (mt : ts) (ma : as) = itemCantMatch mt ma || instanceCantMatch ts as
+instanceCantMatch _         _         =  False  -- Safe
+
+itemCantMatch :: Maybe Name -> Maybe Name -> Bool
+itemCantMatch (Just t) (Just a) = t /= a
+itemCantMatch _        _        = False
+
 
 {-
 ************************************************************************

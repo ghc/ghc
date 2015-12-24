@@ -1032,7 +1032,9 @@ tcTyFamInstEqn fam_tc_shape@(fam_tc_name,_,_) mb_clsinfo
        ; rhs_ty <- zonkTcTypeToType emptyZonkEnv rhs_ty
        ; traceTc "tcTyFamInstEqn" (ppr fam_tc_name <+> pprTvBndrs tvs')
           -- don't print out the pats here, as they might be zonked inside the knot
-       ; return (mkCoAxBranch tvs' [] pats' rhs_ty loc) }
+       ; return (mkCoAxBranch tvs' [] pats' rhs_ty
+                              (map (const Nominal) tvs')
+                              loc) }
 
 kcDataDefn :: Name                -- ^ the family name, for error msgs only
            -> HsTyPats Name       -- ^ the patterns, for error msgs only

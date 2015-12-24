@@ -47,7 +47,7 @@ module Type (
         mkNumLitTy, isNumLitTy,
         mkStrLitTy, isStrLitTy,
 
-        mkCastTy, mkCoercionTy,
+        mkCastTy, mkCoercionTy, splitCastTy_maybe,
 
         userTypeError_maybe, pprUserTypeErrorTy,
 
@@ -933,6 +933,11 @@ kind *! But, it means that we should push any kind casts through the
 ForAllTy. The only trouble is avoiding capture.
 
 -}
+
+splitCastTy_maybe :: Type -> Maybe (Type, Coercion)
+splitCastTy_maybe ty | Just ty' <- coreView ty = splitCastTy_maybe ty'
+splitCastTy_maybe (CastTy ty co)               = Just (ty, co)
+splitCastTy_maybe _                            = Nothing
 
 -- | Make a 'CastTy'. The Coercion must be nominal.
 mkCastTy :: Type -> Coercion -> Type

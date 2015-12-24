@@ -17,7 +17,7 @@ module BuildTyCl (
 #include "HsVersions.h"
 
 import IfaceEnv
-import FamInstEnv( FamInstEnvs )
+import FamInstEnv( FamInstEnvs, mkNewTypeCoAxiom )
 import TysWiredIn( isCTupleTyConName )
 import PrelNames( tyConRepModOcc )
 import DataCon
@@ -31,7 +31,6 @@ import Class
 import TyCon
 import Type
 import Id
-import Coercion
 import TcType
 
 import SrcLoc( noSrcSpan )
@@ -65,12 +64,12 @@ mkNewTyConRhs :: Name -> TyCon -> DataCon -> TcRnIf m n AlgTyConRhs
 --   because the latter is part of a knot, whereas the former is not.
 mkNewTyConRhs tycon_name tycon con
   = do  { co_tycon_name <- newImplicitBinder tycon_name mkNewTyCoOcc
-        ; let co_tycon = mkNewTypeCo co_tycon_name tycon etad_tvs etad_roles etad_rhs
-        ; traceIf (text "mkNewTyConRhs" <+> ppr co_tycon)
+        ; let nt_ax = mkNewTypeCoAxiom co_tycon_name tycon etad_tvs etad_roles etad_rhs
+        ; traceIf (text "mkNewTyConRhs" <+> ppr nt_ax)
         ; return (NewTyCon { data_con    = con,
                              nt_rhs      = rhs_ty,
                              nt_etad_rhs = (etad_tvs, etad_rhs),
-                             nt_co       = co_tycon } ) }
+                             nt_co       = nt_ax } ) }
                              -- Coreview looks through newtypes with a Nothing
                              -- for nt_co, or uses explicit coercions otherwise
   where

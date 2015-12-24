@@ -37,6 +37,7 @@ module IfaceSyn (
 #include "HsVersions.h"
 
 import IfaceType
+import CoreSyn( IsOrphan )
 import PprCore()            -- Printing DFunArgs
 import Demand
 import Class
@@ -60,7 +61,6 @@ import HsBinds
 import TyCon ( Role (..), Injectivity(..) )
 import StaticFlags (opt_PprStyle_Debug)
 import Util( filterOut, filterByList )
-import InstEnv
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
 

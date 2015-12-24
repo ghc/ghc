@@ -55,7 +55,7 @@ module TyCoRep (
         pprPrefixApp, pprArrowChain, ppr_type,
         pprDataCons,
 
-        -- Free variables
+        -- * Free variables
         tyCoVarsOfType, tyCoVarsOfTypeDSet, tyCoVarsOfTypes, tyCoVarsOfTypesDSet,
         tyCoVarsBndrAcc, tyCoVarsOfTypeAcc, tyCoVarsOfTypeList,
         tyCoVarsOfTypesAcc, tyCoVarsOfTypesList,
@@ -69,7 +69,7 @@ module TyCoRep (
         closeOverKinds,
         tyCoVarsOfTelescope,
 
-        -- Substitutions
+        -- * Substitutions
         TCvSubst(..), TvSubstEnv, CvSubstEnv,
         emptyTvSubstEnv, emptyCvSubstEnv, composeTCvSubstEnv, composeTCvSubst,
         emptyTCvSubst, mkEmptyTCvSubst, isEmptyTCvSubst, mkTCvSubst, getTvSubstEnv,
@@ -1210,6 +1210,7 @@ tyCoVarsOfTelescope [] fvs = fvs
 tyCoVarsOfTelescope (v:vs) fvs = tyCoVarsOfTelescope vs fvs
                                  `delVarSet` v
                                  `unionVarSet` tyCoVarsOfType (varType v)
+
 {-
 %************************************************************************
 %*                                                                      *
