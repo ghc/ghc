@@ -2,11 +2,11 @@ module Base (
     -- * General utilities
     module Control.Applicative,
     module Control.Monad.Extra,
-    module Control.Monad.Reader,
     module Data.Function,
     module Data.List,
     module Data.Maybe,
     module Data.Monoid,
+    MonadTrans(lift),
 
     -- * Shake
     module Development.Shake,

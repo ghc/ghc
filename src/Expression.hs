@@ -24,6 +24,8 @@ module Expression (
     module Way
     ) where
 
+import Control.Monad.Trans.Reader
+
 import Base
 import Package
 import Builder

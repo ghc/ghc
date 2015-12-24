@@ -3,6 +3,8 @@ module Builder (
     Builder (..), builderPath, getBuilderPath, specified, needBuilder
     ) where
 
+import Control.Monad.Trans.Reader
+
 import Base
 import GHC.Generics (Generic)
 import Oracles

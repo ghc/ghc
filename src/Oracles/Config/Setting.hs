@@ -6,6 +6,8 @@ module Oracles.Config.Setting (
     ghcCanonVersion, cmdLineLengthLimit
     ) where
 
+import Control.Monad.Trans.Reader
+
 import Base
 import Oracles.Config
 import Stage

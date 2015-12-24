@@ -4,6 +4,8 @@ module Oracles.Config.Flag (
     ghcWithNativeCodeGen, supportsSplitObjects
     ) where
 
+import Control.Monad.Trans.Reader
+
 import Base
 import Oracles.Config
 import Oracles.Config.Setting
