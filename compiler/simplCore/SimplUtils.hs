@@ -633,20 +633,23 @@ interestingArg env e = go env 0 e
            Just (DoneEx e)             -> go (zapSubstEnv env)             n e
            Just (ContEx tvs cvs ids e) -> go (setSubstEnv env tvs cvs ids) n e
 
-    go _   _ (Lit {})              = ValueArg
-    go _   _ (Type _)              = TrivArg
-    go _   _ (Coercion _)          = TrivArg
-    go env n (App fn (Type _))     = go env n fn
-    go env n (App fn (Coercion _)) = go env n fn
-    go env n (App fn _)            = go env (n+1) fn
-    go env n (Tick _ a)            = go env n a
-    go env n (Cast e _)            = go env n e
+    go _   _ (Lit {})          = ValueArg
+    go _   _ (Type _)          = TrivArg
+    go _   _ (Coercion _)      = TrivArg
+    go env n (App fn (Type _)) = go env n fn
+    go env n (App fn _)        = go env (n+1) fn
+    go env n (Tick _ a)        = go env n a
+    go env n (Cast e _)        = go env n e
     go env n (Lam v e)
-       | isTyVar v                 = go env n     e
-       | n>0                       = go env (n-1) e
-       | otherwise                 = ValueArg
-    go env n (Let _ e)             = case go env n e of { ValueArg -> ValueArg; _ -> NonTrivArg }
-    go _ _ (Case {})               = NonTrivArg
+       | isTyVar v             = go env n e
+       | n>0                   = NonTrivArg     -- (\x.b) e   is NonTriv
+       | otherwise             = ValueArg
+    go _ _ (Case {})           = NonTrivArg
+    go env n (Let b e)         = case go env' n e of
+                                   ValueArg -> ValueArg
+                                   _        -> NonTrivArg
+                               where
+                                 env' = env `addNewInScopeIds` bindersOf b
 
     go_var n v
        | isConLikeId v     = ValueArg   -- Experimenting with 'conlike' rather that
