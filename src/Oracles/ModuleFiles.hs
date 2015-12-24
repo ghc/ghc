@@ -1,76 +1,44 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving, ScopedTypeVariables #-}
 module Oracles.ModuleFiles (moduleFiles, haskellModuleFiles, moduleFilesOracle) where
 
-import Base hiding (exe)
-import Distribution.ModuleName
-import Distribution.PackageDescription
-import Distribution.PackageDescription.Parse
-import Distribution.Verbosity
-import GHC
+import Base
 import Oracles.PackageData
-import Package hiding (library)
+import Package
 import Stage
 import Settings.TargetDirectory
 
-newtype ModuleFilesKey = ModuleFilesKey (Package, [FilePath])
+newtype ModuleFilesKey = ModuleFilesKey ([String], [FilePath])
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
 moduleFiles :: Stage -> Package -> Action [FilePath]
 moduleFiles stage pkg = do
     let path = targetPath stage pkg
+    srcDirs <- fmap sort . pkgDataList $ SrcDirs path
     modules <- fmap sort . pkgDataList $ Modules path
-    (found, _ :: [FilePath]) <- askOracle $ ModuleFilesKey (pkg, [])
-    let cmp (m1, _) m2 = compare m1 m2
-        foundFiles     = map snd $ intersectOrd cmp found modules
-    return foundFiles
+    let dirs = [ pkgPath pkg -/- dir | dir <- srcDirs ]
+    found :: [(String, FilePath)] <- askOracle $ ModuleFilesKey (modules, dirs)
+    return $ map snd found
 
 haskellModuleFiles :: Stage -> Package -> Action ([FilePath], [String])
 haskellModuleFiles stage pkg = do
     let path    = targetPath stage pkg
         autogen = path -/- "build/autogen"
+    srcDirs <- fmap sort . pkgDataList $ SrcDirs path
     modules <- fmap sort . pkgDataList $ Modules path
-    (found, missingMods) <- askOracle $ ModuleFilesKey (pkg, [autogen])
-    let cmp (m1, _) m2 = compare m1 m2
-        foundFiles     = map snd $ intersectOrd cmp found modules
+    let dirs = [ pkgPath pkg -/- dir | dir <- srcDirs ]
+    foundSrcDirs <- askOracle $ ModuleFilesKey (modules, dirs     )
+    foundAutogen <- askOracle $ ModuleFilesKey (modules, [autogen])
+
+    let found          = foundSrcDirs ++ foundAutogen
+        missingMods    = modules `minusOrd` (sort $ map fst found)
         otherMods      = map (replaceEq '/' '.' . dropExtension) otherFiles
-        (haskellFiles, otherFiles) = partition ("//*hs" ?==) foundFiles
+        (haskellFiles, otherFiles) = partition ("//*hs" ?==) (map snd found)
     return (haskellFiles, missingMods ++ otherMods)
-
-extract :: Monoid a => Maybe (CondTree v c a) -> a
-extract Nothing = mempty
-extract (Just (CondNode leaf _ ifs)) = leaf <> mconcat (map f ifs)
-  where
-    f (_, t, mt) = extract (Just t) <> extract mt
-
--- Look up Haskell source directories and module names of a package
-packageInfo :: Package -> Action ([FilePath], [ModuleName])
-packageInfo pkg
-    | pkg == hp2ps = return (["."], [])
-    | otherwise    = do
-        need [pkgCabalFile pkg]
-        pd <- liftIO . readPackageDescription silent $ pkgCabalFile pkg
-
-        let lib = extract                     $ condLibrary     pd
-            exe = extract . Just . snd . head $ condExecutables pd
-
-        let (srcDirs, modules) = if lib /= mempty
-                then ( hsSourceDirs $ libBuildInfo lib, libModules lib)
-                else ( hsSourceDirs $    buildInfo exe
-                     , [fromString . dropExtension $ modulePath exe]
-                     ++ exeModules exe)
-
-        return (if null srcDirs then ["."] else srcDirs, modules)
 
 moduleFilesOracle :: Rules ()
 moduleFilesOracle = do
-    answer <- newCache $ \(pkg, extraDirs) -> do
-        putOracle $ "Searching module files of package " ++ pkgNameString pkg ++ "..."
-        unless (null extraDirs) $ putOracle $ "Extra directory = " ++ show extraDirs
-
-        (srcDirs, modules) <- packageInfo pkg
-
-        let dirs         = extraDirs ++ [ pkgPath pkg -/- dir | dir <- srcDirs ]
-            decodedPairs = sort $ map (splitFileName . toFilePath) modules
+    answer <- newCache $ \(modules, dirs) -> do
+        let decodedPairs = map decodeModule modules
             modDirFiles  = map (bimap head sort . unzip)
                          . groupBy ((==) `on` fst) $ decodedPairs
 
@@ -79,18 +47,12 @@ moduleFilesOracle = do
             forM todo $ \(mDir, mFiles) -> do
                 let fullDir = dir -/- mDir
                 files <- getDirectoryFiles fullDir ["*"]
-                let noBoot = filter (not . (isSuffixOf "-boot")) files
+                let noBoot   = filter (not . (isSuffixOf "-boot")) files
                     cmp fe f = compare (dropExtension fe) f
                     found    = intersectOrd cmp noBoot mFiles
-                return (map (fullDir -/-) found, (mDir, map dropExtension found))
+                return (map (fullDir -/-) found, mDir)
 
-        let foundFiles   = sort [ (encodeModule d f, f)
-                                | (fs, (d, _)) <- result, f <- fs ]
-            foundPairs   = [ (d, f) | (d, fs) <- map snd result, f <- fs ]
-            missingPairs = decodedPairs `minusOrd` sort foundPairs
-            missingMods  = map (uncurry encodeModule) missingPairs
-
-        return (foundFiles, missingMods)
+        return $ sort [ (encodeModule d f, f) | (fs, d) <- result, f <- fs ]
 
     _ <- addOracle $ \(ModuleFilesKey query) -> answer query
     return ()
