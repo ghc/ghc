@@ -7,6 +7,7 @@ import Rules.Actions
 import Rules.Generate
 import Rules.Resources
 import Settings
+import Development.Shake.Util (parseMakefile)
 
 buildPackageDependencies :: Resources -> PartialTarget -> Rules ()
 buildPackageDependencies _ target @ (PartialTarget stage pkg) =

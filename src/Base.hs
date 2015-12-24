@@ -12,7 +12,6 @@ module Base (
     module Development.Shake,
     module Development.Shake.Classes,
     module Development.Shake.FilePath,
-    module Development.Shake.Util,
 
     -- * Paths
     shakeFilesPath, configPath, sourcePath, programInplacePath,
@@ -38,7 +37,6 @@ import Data.Monoid
 import Development.Shake hiding (unit, (*>), parallel)
 import Development.Shake.Classes
 import Development.Shake.FilePath
-import Development.Shake.Util
 import System.Console.ANSI
 import qualified System.Directory as IO
 import System.IO
