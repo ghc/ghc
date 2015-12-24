@@ -461,12 +461,12 @@ dataFamilyD tc tvs kind
     = return $ DataFamilyD tc tvs kind
 
 openTypeFamilyD :: Name -> [TyVarBndr] -> FamilyResultSig
-                -> Maybe InjectivityAnn -> DecQ
+                -> InjectivityAnn -> DecQ
 openTypeFamilyD tc tvs res inj
     = return $ OpenTypeFamilyD (TypeFamilyHead tc tvs res inj)
 
 closedTypeFamilyD :: Name -> [TyVarBndr] -> FamilyResultSig
-                  -> Maybe InjectivityAnn -> [TySynEqnQ] -> DecQ
+                  -> InjectivityAnn -> [TySynEqnQ] -> DecQ
 closedTypeFamilyD tc tvs result injectivity eqns =
   do eqns1 <- sequence eqns
      return (ClosedTypeFamilyD (TypeFamilyHead tc tvs result injectivity) eqns1)
@@ -487,14 +487,14 @@ closedTypeFamilyD tc tvs result injectivity eqns =
 familyNoKindD :: FamFlavour -> Name -> [TyVarBndr] -> DecQ
 familyNoKindD flav tc tvs =
     case flav of
-      TypeFam -> return $ OpenTypeFamilyD (TypeFamilyHead tc tvs NoSig Nothing)
+      TypeFam -> return $ OpenTypeFamilyD (TypeFamilyHead tc tvs NoSig [])
       DataFam -> return $ DataFamilyD tc tvs Nothing
 
 familyKindD :: FamFlavour -> Name -> [TyVarBndr] -> Kind -> DecQ
 familyKindD flav tc tvs k =
     case flav of
       TypeFam ->
-        return $ OpenTypeFamilyD (TypeFamilyHead tc tvs (KindSig k) Nothing)
+        return $ OpenTypeFamilyD (TypeFamilyHead tc tvs (KindSig k) [])
       DataFam -> return $ DataFamilyD tc tvs (Just k)
 
 {-# DEPRECATED closedTypeFamilyNoKindD, closedTypeFamilyKindD
@@ -502,12 +502,12 @@ familyKindD flav tc tvs k =
 closedTypeFamilyNoKindD :: Name -> [TyVarBndr] -> [TySynEqnQ] -> DecQ
 closedTypeFamilyNoKindD tc tvs eqns =
  do eqns1 <- sequence eqns
-    return (ClosedTypeFamilyD (TypeFamilyHead tc tvs NoSig Nothing) eqns1)
+    return (ClosedTypeFamilyD (TypeFamilyHead tc tvs NoSig []) eqns1)
 
 closedTypeFamilyKindD :: Name -> [TyVarBndr] -> Kind -> [TySynEqnQ] -> DecQ
 closedTypeFamilyKindD tc tvs kind eqns =
  do eqns1 <- sequence eqns
-    return (ClosedTypeFamilyD (TypeFamilyHead tc tvs (KindSig kind) Nothing)
+    return (ClosedTypeFamilyD (TypeFamilyHead tc tvs (KindSig kind) [])
             eqns1)
 
 roleAnnotD :: Name -> [Role] -> DecQ

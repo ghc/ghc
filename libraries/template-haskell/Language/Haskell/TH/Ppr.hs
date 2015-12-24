@@ -393,8 +393,8 @@ ppr_tf_head :: TypeFamilyHead -> Doc
 ppr_tf_head (TypeFamilyHead tc tvs res inj)
   = ppr tc <+> hsep (map ppr tvs) <+> ppr res <+> maybeInj
   where
-    maybeInj | (Just inj') <- inj = ppr inj'
-             | otherwise          = empty
+    maybeInj | null inj  = empty
+             | otherwise = ppr inj
 
 ------------------------------
 instance Ppr FunDep where
