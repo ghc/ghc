@@ -281,8 +281,8 @@ mkDictSelId name clas
     arg_tys        = dataConRepArgTys data_con  -- Includes the dictionary superclasses
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
 
-    sel_ty = mkInvForAllTys tyvars (mkFunTy (mkClassPred clas (mkTyVarTys tyvars))
-                                            (getNth arg_tys val_index))
+    sel_ty = mkSpecForAllTys tyvars (mkFunTy (mkClassPred clas (mkTyVarTys tyvars))
+                                             (getNth arg_tys val_index))
 
     base_info = noCafIdInfo
                 `setArityInfo`         1
@@ -930,7 +930,7 @@ mkPrimOpId prim_op
   = id
   where
     (tyvars,arg_tys,res_ty, arity, strict_sig) = primOpSig prim_op
-    ty   = mkInvForAllTys tyvars (mkFunTys arg_tys res_ty)
+    ty   = mkSpecForAllTys tyvars (mkFunTys arg_tys res_ty)
     name = mkWiredInName gHC_PRIM (primOpOcc prim_op)
                          (mkPrimOpIdUnique (primOpTag prim_op))
                          (AnId id) UserSyntax
@@ -1014,7 +1014,7 @@ mkDictFunId dfun_name tvs theta clas tys
 
 mkDictFunTy :: [TyVar] -> ThetaType -> Class -> [Type] -> Type
 mkDictFunTy tvs theta clas tys
- = mkInvSigmaTy tvs theta (mkClassPred clas tys)
+ = mkSpecSigmaTy tvs theta (mkClassPred clas tys)
 
 {-
 ************************************************************************
@@ -1062,7 +1062,7 @@ dollarId = pcMiscPrelId dollarName ty
              (noCafIdInfo `setUnfoldingInfo` unf)
   where
     fun_ty = mkFunTy alphaTy openBetaTy
-    ty     = mkInvForAllTys [levity2TyVar, alphaTyVar, openBetaTyVar] $
+    ty     = mkSpecForAllTys [levity2TyVar, alphaTyVar, openBetaTyVar] $
              mkFunTy fun_ty fun_ty
     unf    = mkInlineUnfolding (Just 2) rhs
     [f,x]  = mkTemplateLocals [fun_ty, alphaTy]
@@ -1076,7 +1076,7 @@ proxyHashId
   = pcMiscPrelId proxyName ty
        (noCafIdInfo `setUnfoldingInfo` evaldUnfolding) -- Note [evaldUnfoldings]
   where
-    ty      = mkInvForAllTys [kv, tv] (mkProxyPrimTy k t)
+    ty      = mkSpecForAllTys [kv, tv] (mkProxyPrimTy k t)
     kv      = kKiVar
     k       = mkTyVarTy kv
     [tv]    = mkTemplateTyVars [k]
@@ -1091,9 +1091,9 @@ unsafeCoerceId
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
 
-    ty  = mkInvForAllTys [ levity1TyVar, levity2TyVar
-                         , openAlphaTyVar, openBetaTyVar ]
-                         (mkFunTy openAlphaTy openBetaTy)
+    ty  = mkSpecForAllTys [ levity1TyVar, levity2TyVar
+                          , openAlphaTyVar, openBetaTyVar ]
+                          (mkFunTy openAlphaTy openBetaTy)
 
     [x] = mkTemplateLocals [openAlphaTy]
     rhs = mkLams [ levity1TyVar, levity2TyVar
@@ -1125,8 +1125,8 @@ seqId = pcMiscPrelId seqName ty info
                   -- LHS of rules.  That way we can have rules for 'seq';
                   -- see Note [seqId magic]
 
-    ty  = mkInvForAllTys [alphaTyVar,betaTyVar]
-                         (mkFunTy alphaTy (mkFunTy betaTy betaTy))
+    ty  = mkSpecForAllTys [alphaTyVar,betaTyVar]
+                          (mkFunTy alphaTy (mkFunTy betaTy betaTy))
 
     [x,y] = mkTemplateLocals [alphaTy, betaTy]
     rhs = mkLams [alphaTyVar,betaTyVar,x,y] (Case (Var x) x betaTy [(DEFAULT, [], Var y)])
@@ -1158,16 +1158,16 @@ lazyId :: Id    -- See Note [lazyId magic]
 lazyId = pcMiscPrelId lazyIdName ty info
   where
     info = noCafIdInfo
-    ty  = mkInvForAllTys [alphaTyVar] (mkFunTy alphaTy alphaTy)
+    ty  = mkSpecForAllTys [alphaTyVar] (mkFunTy alphaTy alphaTy)
 
 oneShotId :: Id -- See Note [The oneShot function]
 oneShotId = pcMiscPrelId oneShotName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
-    ty  = mkInvForAllTys [ levity1TyVar, levity2TyVar
-                         , openAlphaTyVar, openBetaTyVar ]
-                         (mkFunTy fun_ty fun_ty)
+    ty  = mkSpecForAllTys [ levity1TyVar, levity2TyVar
+                          , openAlphaTyVar, openBetaTyVar ]
+                          (mkFunTy fun_ty fun_ty)
     fun_ty = mkFunTy alphaTy betaTy
     [body, x] = mkTemplateLocals [fun_ty, openAlphaTy]
     x' = setOneShotLambda x
@@ -1188,7 +1188,7 @@ runRWId = pcMiscPrelId runRWName ty info
     arg_ty  = stateRW `mkFunTy` ret_ty
     -- (State# RealWorld -> (# State# RealWorld, o #))
     --   -> (# State# RealWorld, o #)
-    ty      = mkInvForAllTys [levity1TyVar, openAlphaTyVar] $
+    ty      = mkSpecForAllTys [levity1TyVar, openAlphaTyVar] $
               arg_ty `mkFunTy` ret_ty
 
 --------------------------------------------------------------------------------
@@ -1196,7 +1196,7 @@ magicDictId :: Id  -- See Note [magicDictId magic]
 magicDictId = pcMiscPrelId magicDictName ty info
   where
   info = noCafIdInfo `setInlinePragInfo` neverInlinePragma
-  ty   = mkInvForAllTys [alphaTyVar] alphaTy
+  ty   = mkSpecForAllTys [alphaTyVar] alphaTy
 
 --------------------------------------------------------------------------------
 
@@ -1210,7 +1210,7 @@ coerceId = pcMiscPrelId coerceName ty info
     eqRPrimTy = mkTyConApp eqReprPrimTyCon [ liftedTypeKind
                                            , liftedTypeKind
                                            , alphaTy, betaTy ]
-    ty        = mkInvForAllTys [alphaTyVar, betaTyVar] $
+    ty        = mkSpecForAllTys [alphaTyVar, betaTyVar] $
                 mkFunTys [eqRTy, alphaTy] betaTy
 
     [eqR,x,eq] = mkTemplateLocals [eqRTy, alphaTy, eqRPrimTy]

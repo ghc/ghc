@@ -632,7 +632,7 @@ addTickHsExpr (ExprWithTySigOut e ty) =
                (addTickLHsExprNever e) -- No need to tick the inner expression
                (return ty)             -- for expressions with signatures
 
-addTickHsExpr e@(HsType _) = return e
+addTickHsExpr e@(HsTypeOut _) = return e
 
 -- Others should never happen in expression content.
 addTickHsExpr e  = pprPanic "addTickHsExpr" (ppr e)
@@ -870,8 +870,8 @@ addTickHsCmd (HsCmdArrForm e fix cmdtop) =
                (return fix)
                (mapM (liftL (addTickHsCmdTop)) cmdtop)
 
-addTickHsCmd (HsCmdCast co cmd)
-  = liftM2 HsCmdCast (return co) (addTickHsCmd cmd)
+addTickHsCmd (HsCmdWrap w cmd)
+  = liftM2 HsCmdWrap (return w) (addTickHsCmd cmd)
 
 -- Others should never happen in a command context.
 --addTickHsCmd e  = pprPanic "addTickHsCmd" (ppr e)

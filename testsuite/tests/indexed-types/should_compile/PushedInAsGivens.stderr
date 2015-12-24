@@ -8,6 +8,7 @@ PushedInAsGivens.hs:10:31: error:
         at PushedInAsGivens.hs:9:13-44
     • In the expression: y
       In the first argument of ‘length’, namely ‘[x, y]’
+      In the expression: length [x, y]
     • Relevant bindings include
         x :: a1 (bound at PushedInAsGivens.hs:10:17)
         foo :: a1 -> Int (bound at PushedInAsGivens.hs:10:13)

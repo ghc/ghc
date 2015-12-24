@@ -75,6 +75,7 @@ import TyCoRep
 import FamInst
 import FamInstEnv
 import InstEnv
+import Inst
 import NameEnv
 import PrelNames
 import TysWiredIn
@@ -84,7 +85,6 @@ import Var
 import Module
 import LoadIface
 import Class
-import Inst
 import TyCon
 import CoAxiom
 import PatSyn ( patSynName )
@@ -174,11 +174,12 @@ tcTypedBracket brack@(TExpBr expr) res_ty
                                 -- NC for no context; tcBracket does that
 
        ; meta_ty <- tcTExpTy expr_ty
-       ; co <- unifyType (Just expr) meta_ty res_ty
        ; ps' <- readMutVar ps_ref
        ; texpco <- tcLookupId unsafeTExpCoerceName
-       ; return (mkHsWrapCo co (unLoc (mkHsApp (nlHsTyApp texpco [expr_ty])
-                                               (noLoc (HsTcBracketOut brack ps'))))) }
+       ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
+                       (unLoc (mkHsApp (nlHsTyApp texpco [expr_ty])
+                                              (noLoc (HsTcBracketOut brack ps'))))
+                       meta_ty res_ty }
 tcTypedBracket other_brack _
   = pprPanic "tcTypedBracket" (ppr other_brack)
 
@@ -187,9 +188,9 @@ tcUntypedBracket brack ps res_ty
   = do { traceTc "tc_bracket untyped" (ppr brack $$ ppr ps)
        ; ps' <- mapM tcPendingSplice ps
        ; meta_ty <- tcBrackTy brack
-       ; co <- unifyType (Just brack) meta_ty res_ty
        ; traceTc "tc_bracket done untyped" (ppr meta_ty)
-       ; return (mkHsWrapCo co (HsTcBracketOut brack ps'))  }
+       ; tcWrapResultO (Shouldn'tHappenOrigin "untyped bracket")
+                       (HsTcBracketOut brack ps') meta_ty res_ty }
 
 ---------------
 tcBrackTy :: HsBracket Name -> TcM TcType
@@ -512,7 +513,7 @@ tcTopSpliceExpr :: SpliceType -> TcM (LHsExpr Id) -> TcM (LHsExpr Id)
 -- Note that set the level to Splice, regardless of the original level,
 -- before typechecking the expression.  For example:
 --      f x = $( ...$(g 3) ... )
--- The recursive call to tcMonoExpr will simply expand the
+-- The recursive call to tcPolyExpr will simply expand the
 -- inner escape before dealing with the outer one
 
 tcTopSpliceExpr isTypedSplice tc_action

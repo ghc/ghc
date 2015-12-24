@@ -648,7 +648,7 @@ mkProxyPrimTy k ty = TyConApp proxyPrimTyCon [k, ty]
 
 proxyPrimTyCon :: TyCon
 proxyPrimTyCon = mkPrimTyCon proxyPrimTyConName kind [Nominal,Nominal] VoidRep
-  where kind = ForAllTy (Named kv Invisible) $
+  where kind = ForAllTy (Named kv Specified) $
                mkFunTy k unliftedTypeKind
         kv   = kKiVar
         k    = mkTyVarTy kv
@@ -664,8 +664,8 @@ proxyPrimTyCon = mkPrimTyCon proxyPrimTyConName kind [Nominal,Nominal] VoidRep
 eqPrimTyCon :: TyCon  -- The representation type for equality predicates
                       -- See Note [The equality types story]
 eqPrimTyCon  = mkPrimTyCon eqPrimTyConName kind roles VoidRep
-  where kind = ForAllTy (Named kv1 Invisible) $
-               ForAllTy (Named kv2 Invisible) $
+  where kind = ForAllTy (Named kv1 Specified) $
+               ForAllTy (Named kv2 Specified) $
                mkFunTys [k1, k2] unliftedTypeKind
         [kv1, kv2] = mkTemplateTyVars [liftedTypeKind, liftedTypeKind]
         k1 = mkTyVarTy kv1
@@ -678,8 +678,8 @@ eqPrimTyCon  = mkPrimTyCon eqPrimTyConName kind roles VoidRep
 eqReprPrimTyCon :: TyCon   -- See Note [The equality types story]
 eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName kind
                               roles VoidRep
-  where kind = ForAllTy (Named kv1 Invisible) $
-               ForAllTy (Named kv2 Invisible) $
+  where kind = ForAllTy (Named kv1 Specified) $
+               ForAllTy (Named kv2 Specified) $
                mkFunTys [k1, k2] unliftedTypeKind
         [kv1, kv2]    = mkTemplateTyVars [liftedTypeKind, liftedTypeKind]
         k1            = mkTyVarTy kv1
@@ -693,8 +693,8 @@ eqPhantPrimTyCon :: TyCon
 eqPhantPrimTyCon = mkPrimTyCon eqPhantPrimTyConName kind
                                [Nominal, Nominal, Phantom, Phantom]
                                VoidRep
-  where kind = ForAllTy (Named kv1 Invisible) $
-               ForAllTy (Named kv2 Invisible) $
+  where kind = ForAllTy (Named kv1 Specified) $
+               ForAllTy (Named kv2 Specified) $
                mkFunTys [k1, k2] unliftedTypeKind
         [kv1, kv2]    = mkTemplateTyVars [liftedTypeKind, liftedTypeKind]
         k1            = mkTyVarTy kv1
@@ -925,7 +925,7 @@ anyTyCon = mkFamilyTyCon anyTyConName kind [kKiVar] Nothing
                          Nothing
                          NotInjective
   where
-    kind = ForAllTy (Named kKiVar Invisible) (mkTyVarTy kKiVar)
+    kind = ForAllTy (Named kKiVar Specified) (mkTyVarTy kKiVar)
 
 anyTypeOfKind :: Kind -> Type
 anyTypeOfKind kind = TyConApp anyTyCon [kind]

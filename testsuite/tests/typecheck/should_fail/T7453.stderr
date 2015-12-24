@@ -13,6 +13,14 @@ T7453.hs:9:15: error:
           z = aux
             where
                 aux = Id v
+      In an equation for ‘cast1’:
+          cast1 v
+            = runId z
+            where
+                z :: Id t
+                z = aux
+                  where
+                      aux = Id v
     • Relevant bindings include
         aux :: Id r (bound at T7453.hs:10:21)
         z :: Id t (bound at T7453.hs:9:11)
@@ -33,6 +41,14 @@ T7453.hs:15:15: error:
           z = aux
             where
                 aux = const v
+      In an equation for ‘cast2’:
+          cast2 v
+            = z ()
+            where
+                z :: () -> t
+                z = aux
+                  where
+                      aux = const v
     • Relevant bindings include
         aux :: forall b. b -> r (bound at T7453.hs:16:21)
         z :: () -> t1 (bound at T7453.hs:15:11)
@@ -51,8 +67,16 @@ T7453.hs:21:15: error:
           z = v
             where
                 aux = const v
+      In an equation for ‘cast3’:
+          cast3 v
+            = z
+            where
+                z :: t
+                z = v
+                  where
+                      aux = const v
     • Relevant bindings include
         aux :: forall b. b -> r (bound at T7453.hs:22:21)
         z :: t1 (bound at T7453.hs:21:11)
         v :: r (bound at T7453.hs:19:7)
-        cast3 :: r -> t (bound at T7453.hs:19:1)
+        cast3 :: r -> forall t. t (bound at T7453.hs:19:1)

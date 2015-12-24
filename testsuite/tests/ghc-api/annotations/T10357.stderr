@@ -4,34 +4,34 @@ Test10357.hs:4:13: error: Variable not in scope: one
 Test10357.hs:4:19: error: Variable not in scope: x
 
 Test10357.hs:5:7: error:
-    Variable not in scope: multPoly :: t0 -> t1 -> t
+    Variable not in scope: multPoly :: t0 -> t2 -> t
 
 Test10357.hs:6:10: error:
-    Variable not in scope: poly :: t2 -> [Double] -> t0
+    Variable not in scope: poly :: t1 -> [Double] -> t0
 
 Test10357.hs:6:15: error:
-    Data constructor not in scope: LE
-    Perhaps you meant ‘LT’ (imported from Prelude)
+    • Data constructor not in scope: LE
+    • Perhaps you meant ‘LT’ (imported from Prelude)
 
 Test10357.hs:7:10: error:
-    Variable not in scope: addPoly :: t3 -> t4 -> t1
+    Variable not in scope: addPoly :: t3 -> t6 -> t2
 
 Test10357.hs:7:19: error:
-    Variable not in scope: poly :: t6 -> [Double] -> t5
+    Variable not in scope: poly :: t5 -> [Double] -> t4
 
 Test10357.hs:7:24: error:
-    Data constructor not in scope: LE
-    Perhaps you meant ‘LT’ (imported from Prelude)
+    • Data constructor not in scope: LE
+    • Perhaps you meant ‘LT’ (imported from Prelude)
 
 Test10357.hs:7:43: error:
-    Variable not in scope: multPoly :: t5 -> t -> t3
+    Variable not in scope: multPoly :: t4 -> t -> t3
 
 Test10357.hs:8:19: error:
     Variable not in scope: poly :: t8 -> [Double] -> t7
 
 Test10357.hs:8:24: error:
-    Data constructor not in scope: LE
-    Perhaps you meant ‘LT’ (imported from Prelude)
+    • Data constructor not in scope: LE
+    • Perhaps you meant ‘LT’ (imported from Prelude)
 
 Test10357.hs:8:43: error:
-    Variable not in scope: multPoly :: t7 -> t -> t4
+    Variable not in scope: multPoly :: t7 -> t -> t6

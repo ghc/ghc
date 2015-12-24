@@ -6,6 +6,7 @@
         ‘Ghci1.Planet’ is defined at <interactive>:4:1-49
     In the second argument of ‘(==)’, namely ‘Mercury’
     In the expression: mercury == Mercury
+    In an equation for ‘it’: it = mercury == Mercury
 
 <interactive>:11:10: error:
     Couldn't match expected type ‘Planet’
@@ -14,3 +15,4 @@
         ‘Planet’ is defined at <interactive>:7:1-41
     In the second argument of ‘(==)’, namely ‘Earth’
     In the expression: Venus == Earth
+    In an equation for ‘it’: it = Venus == Earth

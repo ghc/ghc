@@ -50,7 +50,7 @@ test('tcrun031', normal, compile_and_run, [''])
 test('tcrun032', normal, compile_and_run, [''])
 test('tcrun033', normal, compile_and_run, [''])
 test('tcrun034', normal, compile_and_run, [''])
-test('tcrun035', normal, compile_fail, [''])
+test('tcrun035', normal, compile_and_run, [''])
 test('tcrun036', normal, compile_and_run, [''])
 test('tcrun037', normal, compile_and_run, [''])
 

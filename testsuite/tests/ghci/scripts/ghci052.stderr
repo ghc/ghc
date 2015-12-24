@@ -6,6 +6,7 @@
         ‘Ghci1.Planet’ is defined at <interactive>:4:1-37
     In the first argument of ‘pn’, namely ‘Mercury’
     In the expression: pn Mercury
+    In an equation for ‘it’: it = pn Mercury
 
 <interactive>:9:4: error:
     Couldn't match expected type ‘Ghci1.Planet’
@@ -14,6 +15,7 @@
         ‘Ghci1.Planet’ is defined at <interactive>:4:1-37
     In the first argument of ‘pn’, namely ‘Venus’
     In the expression: pn Venus
+    In an equation for ‘it’: it = pn Venus
 
 <interactive>:10:4: error:
     Couldn't match expected type ‘Ghci1.Planet’
@@ -22,6 +24,7 @@
         ‘Ghci1.Planet’ is defined at <interactive>:4:1-37
     In the first argument of ‘pn’, namely ‘Mars’
     In the expression: pn Mars
+    In an equation for ‘it’: it = pn Mars
 
 <interactive>:12:44: error:
     Couldn't match expected type ‘Planet’

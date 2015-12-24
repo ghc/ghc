@@ -9,6 +9,7 @@ T1899.hs:14:36: error:
         Actual type: [a]
     • In the first argument of ‘Auxiliary’, namely ‘varSet’
       In the first argument of ‘Prop’, namely ‘(Auxiliary varSet)’
+      In the expression: Prop (Auxiliary varSet)
     • Relevant bindings include
         varSet :: [a] (bound at T1899.hs:10:11)
         transRHS :: [a] -> Int -> Constraint a (bound at T1899.hs:10:2)

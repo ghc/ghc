@@ -4,3 +4,4 @@ T7368.hs:3:10: error:
       When matching the kind of ‘Maybe’
     • In the first argument of ‘b’, namely ‘(l Nothing)’
       In the expression: b (l Nothing)
+      In an equation for ‘f’: f = b (l Nothing)

@@ -62,7 +62,7 @@ import TysWiredIn
 import PrelNames
 
 import HsUtils          ( mkChunkified, chunkify )
-import TcType           ( mkInvSigmaTy )
+import TcType           ( mkSpecSigmaTy )
 import Type
 import Coercion         ( isCoVar )
 import TysPrim
@@ -684,8 +684,8 @@ mkRuntimeErrorId name = pc_bottoming_Id1 name runtimeErrorTy
 
 runtimeErrorTy :: Type
 -- The runtime error Ids take a UTF8-encoded string as argument
-runtimeErrorTy = mkInvSigmaTy [levity1TyVar, openAlphaTyVar] []
-                              (mkFunTy addrPrimTy openAlphaTy)
+runtimeErrorTy = mkSpecSigmaTy [levity1TyVar, openAlphaTyVar] []
+                               (mkFunTy addrPrimTy openAlphaTy)
 
 errorName :: Name
 errorName = mkWiredInIdName gHC_ERR (fsLit "error") errorIdKey eRROR_ID
@@ -694,7 +694,7 @@ eRROR_ID :: Id
 eRROR_ID = pc_bottoming_Id2 errorName errorTy
 
 errorTy  :: Type   -- See Note [Error and friends have an "open-tyvar" forall]
-errorTy  = mkInvSigmaTy [levity1TyVar, openAlphaTyVar] []
+errorTy  = mkSpecSigmaTy [levity1TyVar, openAlphaTyVar] []
              (mkFunTys [ mkClassPred
                            ipClass
                            [ mkStrLitTy (fsLit "callStack")
@@ -709,7 +709,7 @@ uNDEFINED_ID :: Id
 uNDEFINED_ID = pc_bottoming_Id1 undefinedName undefinedTy
 
 undefinedTy  :: Type   -- See Note [Error and friends have an "open-tyvar" forall]
-undefinedTy  = mkInvSigmaTy [levity1TyVar, openAlphaTyVar] []
+undefinedTy  = mkSpecSigmaTy [levity1TyVar, openAlphaTyVar] []
                  (mkFunTy (mkClassPred
                              ipClass
                              [ mkStrLitTy (fsLit "callStack")
@@ -727,7 +727,7 @@ Notice the levity polymophism. This ensures that
   * unboxed as well as boxed types
   * polymorphic types
 This is OK because it never returns, so the return type is irrelevant.
-See Note [Sort-polymorphic tyvars accept foralls] in TcUnify.
+See Note [Sort-polymorphic tyvars accept foralls] in TcMType.
 
 
 ************************************************************************

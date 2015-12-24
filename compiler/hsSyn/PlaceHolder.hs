@@ -15,9 +15,9 @@ import RdrName
 import Var
 import Coercion
 import {-# SOURCE #-} ConLike (ConLike)
-import TcEvidence (HsWrapper)
 import FieldLabel
 import SrcLoc (Located)
+import TcEvidence ( HsWrapper )
 
 import Data.Data hiding ( Fixity )
 import BasicTypes       (Fixity)
@@ -64,6 +64,9 @@ placeHolderNames = PlaceHolder
 
 placeHolderNamesTc :: NameSet
 placeHolderNamesTc = emptyNameSet
+
+placeHolderHsWrapper :: PlaceHolder
+placeHolderHsWrapper = PlaceHolder
 
 {-
 

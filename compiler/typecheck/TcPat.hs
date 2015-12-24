@@ -11,12 +11,12 @@ TcPat: Typechecking patterns
 module TcPat ( tcLetPat, TcSigFun
              , TcPragEnv, lookupPragEnv, emptyPragEnv
              , LetBndrSpec(..), addInlinePrags
-             , tcPat, tcPats, newNoSigLetBndr
+             , tcPat, tcPat_O, tcPats, newNoSigLetBndr
              , addDataConStupidTheta, badFieldCon, polyPatSig ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferRho)
+import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferSigma )
 
 import HsSyn
 import TcHsSyn
@@ -67,7 +67,8 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
   = tc_lpat pat pat_ty penv thing_inside
   where
     penv = PE { pe_lazy = True
-              , pe_ctxt = LetPat sig_fn no_gen }
+              , pe_ctxt = LetPat sig_fn no_gen
+              , pe_orig = PatOrigin }
 
 -----------------
 tcPats :: HsMatchContext Name
@@ -90,23 +91,31 @@ tcPats :: HsMatchContext Name
 tcPats ctxt pats pat_tys thing_inside
   = tc_lpats penv pats pat_tys thing_inside
   where
-    penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt }
+    penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
 
 tcPat :: HsMatchContext Name
       -> LPat Name -> TcSigmaType
-      -> TcM a                 -- Checker for body, given
-                               -- its result type
+      -> TcM a                     -- Checker for body
       -> TcM (LPat TcId, a)
-tcPat ctxt pat pat_ty thing_inside
+tcPat ctxt = tcPat_O ctxt PatOrigin
+
+-- | A variant of 'tcPat' that takes a custom origin
+tcPat_O :: HsMatchContext Name
+        -> CtOrigin              -- ^ origin to use if the type needs inst'ing
+        -> LPat Name -> TcSigmaType
+        -> TcM a                 -- Checker for body
+        -> TcM (LPat TcId, a)
+tcPat_O ctxt orig pat pat_ty thing_inside
   = tc_lpat pat pat_ty penv thing_inside
   where
-    penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt }
+    penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = orig }
 
 
 -----------------
 data PatEnv
   = PE { pe_lazy :: Bool        -- True <=> lazy context, so no existentials allowed
        , pe_ctxt :: PatCtxt     -- Context in which the whole pattern appears
+       , pe_orig :: CtOrigin    -- origin to use if the pat_ty needs inst'ing
        }
 
 data PatCtxt
@@ -171,6 +180,8 @@ tcPatBndr (PE { pe_ctxt = LetPat lookup_sig no_gen}) bndr_name pat_ty
 
 tcPatBndr (PE { pe_ctxt = _lam_or_proc }) bndr_name pat_ty
   = return (mkTcNomReflCo pat_ty, mkLocalId bndr_name pat_ty)
+               -- whether or not there is a sig is irrelevant, as this
+               -- is local
 
 ------------
 newNoSigLetBndr :: LetBndrSpec -> Name -> TcType -> TcM TcId
@@ -369,26 +380,20 @@ tc_pat penv (AsPat (L nm_loc name) pat) pat_ty thing_inside
 
 tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
   = do  {
-         -- Morally, expr must have type `forall a1...aN. OPT' -> B`
+         -- Expr must have type `forall a1...aN. OPT' -> B`
          -- where overall_pat_ty is an instance of OPT'.
-         -- Here, we infer a rho type for it,
-         -- which replaces the leading foralls and constraints
-         -- with fresh unification variables.
-        ; (expr',expr'_inferred) <- tcInferRho expr
+        ; (expr',expr'_inferred) <- tcInferSigma expr
 
          -- next, we check that expr is coercible to `overall_pat_ty -> pat_ty`
-         -- NOTE: this forces pat_ty to be a monotype (because we use a unification
-         -- variable to find it).  this means that in an example like
-         -- (view -> f)    where view :: _ -> forall b. b
-         -- we will only be able to use view at one instantation in the
-         -- rest of the view
-        ; (expr_co, pat_ty) <- tcInfer $ \ pat_ty ->
-                unifyType (Just expr) expr'_inferred (mkFunTy overall_pat_ty pat_ty)
+        ; (expr_wrap, pat_ty) <- tcInfer $ \ pat_ty ->
+                tcSubTypeDS_O (exprCtOrigin (unLoc expr)) GenSigCtxt (Just expr)
+                              expr'_inferred
+                              (mkFunTy overall_pat_ty pat_ty)
 
          -- pattern must have pat_ty
         ; (pat', res) <- tc_lpat pat pat_ty penv thing_inside
 
-        ; return (ViewPat (mkLHsWrapCo expr_co expr') pat' overall_pat_ty, res) }
+        ; return (ViewPat (mkLHsWrap expr_wrap expr') pat' overall_pat_ty, res) }
 
 -- Type signatures in patterns
 -- See Note [Pattern coercions] below
@@ -403,7 +408,7 @@ tc_pat penv (SigPatIn pat sig_ty) pat_ty thing_inside
 ------------------------
 -- Lists, tuples, arrays
 tc_pat penv (ListPat pats _ Nothing) pat_ty thing_inside
-  = do  { (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTyR pat_ty
+  = do  { (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy penv pat_ty
         ; (pats', res) <- tcMultiple (\p -> tc_lpat p elt_ty)
                                      pats penv thing_inside
         ; return (mkHsWrapPat coi (ListPat pats' elt_ty Nothing) pat_ty, res)
@@ -412,14 +417,14 @@ tc_pat penv (ListPat pats _ Nothing) pat_ty thing_inside
 tc_pat penv (ListPat pats _ (Just (_,e))) pat_ty thing_inside
   = do  { list_pat_ty <- newFlexiTyVarTy liftedTypeKind
         ; e' <- tcSyntaxOp ListOrigin e (mkFunTy pat_ty list_pat_ty)
-        ; (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTyR list_pat_ty
+        ; (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy penv list_pat_ty
         ; (pats', res) <- tcMultiple (\p -> tc_lpat p elt_ty)
                                      pats penv thing_inside
         ; return (mkHsWrapPat coi (ListPat pats' elt_ty (Just (pat_ty,e'))) list_pat_ty, res)
         }
 
 tc_pat penv (PArrPat pats _) pat_ty thing_inside
-  = do  { (coi, elt_ty) <- matchExpectedPatTy matchExpectedPArrTyR pat_ty
+  = do  { (coi, elt_ty) <- matchExpectedPatTy matchExpectedPArrTy penv pat_ty
         ; (pats', res) <- tcMultiple (\p -> tc_lpat p elt_ty)
                                      pats penv thing_inside
         ; return (mkHsWrapPat coi (PArrPat pats' elt_ty) pat_ty, res)
@@ -428,7 +433,8 @@ tc_pat penv (PArrPat pats _) pat_ty thing_inside
 tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
   = do  { let arity = length pats
               tc = tupleTyCon boxity arity
-        ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConAppR tc) pat_ty
+        ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc)
+                                               penv pat_ty
                      -- Unboxed tuples have levity vars, which we discard:
                      -- See Note [Unboxed tuple levity vars] in TyCon
         ; let con_arg_tys = case boxity of Unboxed -> drop arity arg_tys
@@ -470,9 +476,10 @@ tc_pat _ (LitPat simple_lit) pat_ty thing_inside
 
 ------------------------
 -- Overloaded patterns: n, and n+k
-tc_pat _ (NPat (L l over_lit) mb_neg eq) pat_ty thing_inside
+tc_pat (PE { pe_orig = pat_orig })
+       (NPat (L l over_lit) mb_neg eq) pat_ty thing_inside
   = do  { let orig = LiteralOrigin over_lit
-        ; lit'    <- newOverloadedLit orig over_lit pat_ty
+        ; (wrap, lit') <- newOverloadedLit over_lit pat_ty pat_orig
         ; eq'     <- tcSyntaxOp orig eq (mkFunTys [pat_ty, pat_ty] boolTy)
         ; mb_neg' <- case mb_neg of
                         Nothing  -> return Nothing      -- Positive literal
@@ -481,18 +488,22 @@ tc_pat _ (NPat (L l over_lit) mb_neg eq) pat_ty thing_inside
                             do { neg' <- tcSyntaxOp orig neg (mkFunTy pat_ty pat_ty)
                                ; return (Just neg') }
         ; res <- thing_inside
-        ; return (NPat (L l lit') mb_neg' eq', res) }
+        ; return (mkHsWrapPat wrap (NPat (L l lit') mb_neg' eq') pat_ty, res) }
 
 tc_pat penv (NPlusKPat (L nm_loc name) (L loc lit) ge minus) pat_ty thing_inside
   = do  { (co, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
         ; let pat_ty' = idType bndr_id
               orig    = LiteralOrigin lit
-        ; lit' <- newOverloadedLit orig lit pat_ty'
+        ; (wrap_lit, lit') <- newOverloadedLit lit pat_ty' (pe_orig penv)
 
         -- The '>=' and '-' parts are re-mappable syntax
         ; ge'    <- tcSyntaxOp orig ge    (mkFunTys [pat_ty', pat_ty'] boolTy)
         ; minus' <- tcSyntaxOp orig minus (mkFunTys [pat_ty', pat_ty'] pat_ty')
-        ; let pat' = NPlusKPat (L nm_loc bndr_id) (L loc lit') ge' minus'
+        ; let pat' = mkHsWrapPat wrap_lit
+                                 (NPlusKPat (L nm_loc bndr_id)
+                                            (L loc lit')
+                                            ge' minus')
+                                 pat_ty
 
         -- The Report says that n+k patterns must be in Integral
         -- We may not want this when using re-mappable syntax, though (ToDo?)
@@ -630,7 +641,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty arg_pats thing_inside
           -- Instantiate the constructor type variables [a->ty]
           -- This may involve doing a family-instance coercion,
           -- and building a wrapper
-        ; (wrap, ctxt_res_tys) <- matchExpectedPatTy (matchExpectedConTy tycon) pat_ty
+        ; (wrap, ctxt_res_tys) <- matchExpectedConTy penv tycon pat_ty
 
           -- Add the stupid theta
         ; setSrcSpan con_span $ addDataConStupidTheta data_con ctxt_res_tys
@@ -750,57 +761,36 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
         ; return (mkHsWrapPat wrap res_pat pat_ty, res) }
 
 ----------------------------
-downgrade :: (TcRhoType -> TcM (TcCoercionN, a))
-          -> TcRhoType -> TcM (TcCoercionR, a)
-downgrade f a = do { (co,res) <- f a; return (mkTcSubCo co, res) }
-
-matchExpectedListTyR :: TcRhoType -> TcM (TcCoercionR, TcRhoType)
-matchExpectedListTyR = downgrade matchExpectedListTy
-matchExpectedPArrTyR :: TcRhoType -> TcM (TcCoercionR, TcRhoType)
-matchExpectedPArrTyR = downgrade matchExpectedPArrTy
-matchExpectedTyConAppR :: TyCon -> TcRhoType -> TcM (TcCoercionR, [TcSigmaType])
-matchExpectedTyConAppR tc = downgrade (matchExpectedTyConApp tc)
-
-----------------------------
-matchExpectedPatTy :: (TcRhoType -> TcM (TcCoercionR, a))
-                    -> TcRhoType            -- Type of the pattern
-                    -> TcM (HsWrapper, a)
+-- | Convenient wrapper for calling a matchExpectedXXX function
+matchExpectedPatTy :: (TcRhoType -> TcM (TcCoercionN, a))
+                    -> PatEnv -> TcSigmaType -> TcM (HsWrapper, a)
 -- See Note [Matching polytyped patterns]
 -- Returns a wrapper : pat_ty ~R inner_ty
-matchExpectedPatTy inner_match pat_ty
-  | null tvs && null theta
-  = do { (co, res) <- inner_match pat_ty   -- 'co' is Representational
-       ; traceTc "matchExpectedPatTy" (ppr pat_ty $$ ppr co $$ ppr (isTcReflCo co))
-       ; return (mkWpCastR (mkTcSymCo co), res) }
-         -- The Sym is because the inner_match returns a coercion
-         -- that is the other way round to matchExpectedPatTy
-
-  | otherwise
-  = do { (subst, tvs') <- newMetaTyVars tvs
-       ; wrap1 <- instCall PatOrigin (mkTyVarTys tvs') (substTheta subst theta)
-       ; (wrap2, arg_tys) <- matchExpectedPatTy inner_match (TcType.substTy subst tau)
-       ; return (wrap2 <.> wrap1, arg_tys) }
-  where
-    (tvs, theta, tau) = tcSplitSigmaTy pat_ty
+matchExpectedPatTy inner_match (PE { pe_orig = orig }) pat_ty
+  = do { (wrap, pat_rho) <- topInstantiate orig pat_ty
+       ; (co, res) <- inner_match pat_rho
+       ; traceTc "matchExpectedPatTy" (ppr pat_ty $$ ppr wrap)
+       ; return (mkWpCastN (mkTcSymCo co) <.> wrap, res) }
 
 ----------------------------
-matchExpectedConTy :: TyCon      -- The TyCon that this data
+matchExpectedConTy :: PatEnv
+                   -> TyCon      -- The TyCon that this data
                                  -- constructor actually returns
                                  -- In the case of a data family this is
                                  -- the /representation/ TyCon
-                   -> TcRhoType  -- The type of the pattern; in the case
-                                 -- of a data family this would mention
-                                 -- the /family/ TyCon
-                   -> TcM (TcCoercionR, [TcSigmaType])
+                   -> TcSigmaType  -- The type of the pattern; in the case
+                                   -- of a data family this would mention
+                                   -- the /family/ TyCon
+                   -> TcM (HsWrapper, [TcSigmaType])
 -- See Note [Matching constructor patterns]
--- Returns a coercion : T ty1 ... tyn ~R pat_ty
--- This is the same way round as matchExpectedListTy etc
--- but the other way round to matchExpectedPatTy
-matchExpectedConTy data_tc pat_ty
+-- Returns a wrapper : pat_ty "->" T ty1 ... tyn
+matchExpectedConTy (PE { pe_orig = orig }) data_tc pat_ty
   | Just (fam_tc, fam_args, co_tc) <- tyConFamInstSig_maybe data_tc
          -- Comments refer to Note [Matching constructor patterns]
          -- co_tc :: forall a. T [a] ~ T7 a
-  = do { (subst, tvs') <- newMetaTyVars (tyConTyVars data_tc)
+  = do { (wrap, pat_ty) <- topInstantiate orig pat_ty
+
+       ; (subst, tvs') <- newMetaTyVars (tyConTyVars data_tc)
              -- tys = [ty1,ty2]
 
        ; traceTc "matchExpectedConTy" (vcat [ppr data_tc,
@@ -808,16 +798,21 @@ matchExpectedConTy data_tc pat_ty
                                              ppr fam_tc, ppr fam_args])
        ; co1 <- unifyType noThing (mkTyConApp fam_tc (substTys subst fam_args)) pat_ty
              -- co1 : T (ty1,ty2) ~N pat_ty
+             -- could use tcSubType here... but it's the wrong way round
+             -- for actual vs. expected in error messages.
 
        ; let tys' = mkTyVarTys tvs'
              co2 = mkTcUnbranchedAxInstCo co_tc tys' []
              -- co2 : T (ty1,ty2) ~R T7 ty1 ty2
 
-       ; return (mkTcSymCo co2 `mkTcTransCo` mkTcSubCo co1, tys') }
+       ; return ( wrap <.> (mkWpCastR $
+                            mkTcSubCo (mkTcSymCo co1) `mkTcTransCo` co2)
+                , tys') }
 
   | otherwise
-  = matchExpectedTyConAppR data_tc pat_ty
-             -- coi : T tys ~R pat_ty
+  = do { (wrap, pat_rho) <- topInstantiate orig pat_ty
+       ; (coi, tys) <- matchExpectedTyConApp data_tc pat_rho
+       ; return (mkWpCastN (mkTcSymCo coi) <.> wrap, tys) }
 
 {-
 Note [Matching constructor patterns]

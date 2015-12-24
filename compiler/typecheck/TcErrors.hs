@@ -1239,7 +1239,8 @@ mkEqInfoMsg ct ty1 ty2
               = snd (mkAmbigMsg False ct)
               | otherwise = empty
 
-    invis_msg | Just Invisible <- tcEqTypeVis ty1 ty2
+    invis_msg | Just vis <- tcEqTypeVis ty1 ty2
+              , vis /= Visible
               = sdocWithDynFlags $ \dflags ->
                 if gopt Opt_PrintExplicitKinds dflags
                 then text "Use -fprint-explicit-kinds to see the kind arguments"
@@ -2111,7 +2112,7 @@ pprSkol implics tv
   = case skol_info of
       UnkSkol         -> pp_tv <+> ptext (sLit "is an unknown type variable")
       SigSkol ctxt ty -> ppr_rigid (pprSigSkolInfo ctxt
-                                      (mkInvForAllTys skol_tvs ty))
+                                      (mkSpecForAllTys skol_tvs ty))
       _               -> ppr_rigid (pprSkolInfo skol_info)
   where
     pp_tv = quotes (ppr tv)
@@ -2167,7 +2168,8 @@ relevantBindings want_filtering ctxt ct
            vcat [ ppr ct
                 , pprCtOrigin (ctLocOrigin loc)
                 , ppr ct_tvs
-                , ppr [id | TcIdBndr id _ <- tcl_bndrs lcl_env] ]
+                , pprWithCommas id [ ppr id <+> dcolon <+> ppr (idType id)
+                                   | TcIdBndr id _ <- tcl_bndrs lcl_env ] ]
 
        ; (tidy_env', docs, discards)
               <- go env1 ct_tvs (maxRelevantBinds dflags)

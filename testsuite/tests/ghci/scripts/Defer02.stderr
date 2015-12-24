@@ -12,7 +12,7 @@
     • In the expression: 'p'
       In an equation for ‘a’: a = 'p'
 
-../../typecheck/should_run/Defer01.hs:18:9: warning:
+../../typecheck/should_run/Defer01.hs:18:7: warning:
     • No instance for (Eq B) arising from a use of ‘==’
     • In the expression: x == x
       In an equation for ‘b’: b x = x == x
@@ -52,6 +52,7 @@
         at ../../typecheck/should_run/Defer01.hs:33:6
     • In the expression: x
       In the expression: (x, 'c')
+      In an equation for ‘h’: h x = (x, 'c')
     • Relevant bindings include
         x :: a (bound at ../../typecheck/should_run/Defer01.hs:34:3)
         h :: a -> (Char, Char)
@@ -61,6 +62,7 @@
     • Couldn't match expected type ‘Bool’ with actual type ‘T a’
     • In the first argument of ‘not’, namely ‘(K a)’
       In the expression: (not (K a))
+      In the expression: seq (not (K a)) ()
     • Relevant bindings include
         a :: a (bound at ../../typecheck/should_run/Defer01.hs:39:3)
         i :: a -> () (bound at ../../typecheck/should_run/Defer01.hs:39:1)
@@ -110,6 +112,7 @@
     • Probable cause: ‘putChar’ is applied to too few arguments
       In the first argument of ‘(>>)’, namely ‘putChar’
       In the expression: putChar >> putChar 'p'
+      In an equation for ‘l’: l = putChar >> putChar 'p'
 *** Exception: ../../typecheck/should_run/Defer01.hs:11:40: error:
     • Couldn't match type ‘Char’ with ‘[Char]’
       Expected type: String
@@ -123,7 +126,7 @@
     • In the expression: 'p'
       In an equation for ‘a’: a = 'p'
 (deferred type error)
-*** Exception: ../../typecheck/should_run/Defer01.hs:18:9: error:
+*** Exception: ../../typecheck/should_run/Defer01.hs:18:7: error:
     • No instance for (Eq B) arising from a use of ‘==’
     • In the expression: x == x
       In an equation for ‘b’: b x = x == x
@@ -135,6 +138,7 @@
         Actual type: C Bool
     • In the first argument of ‘c’, namely ‘(C2 True)’
       In the first argument of ‘print’, namely ‘(c (C2 True))’
+      In the expression: print (c (C2 True))
 *** Exception: ../../typecheck/should_run/Defer01.hs:28:5: error:
     • No instance for (Num (a -> a)) arising from the literal ‘1’
         (maybe you haven't applied a function to enough arguments?)
@@ -158,6 +162,7 @@
         at ../../typecheck/should_run/Defer01.hs:33:6
     • In the expression: x
       In the expression: (x, 'c')
+      In an equation for ‘h’: h x = (x, 'c')
     • Relevant bindings include
         x :: a (bound at ../../typecheck/should_run/Defer01.hs:34:3)
         h :: a -> (Char, Char)
@@ -167,6 +172,7 @@
     • Couldn't match expected type ‘Bool’ with actual type ‘T a’
     • In the first argument of ‘not’, namely ‘(K a)’
       In the expression: (not (K a))
+      In the expression: seq (not (K a)) ()
     • Relevant bindings include
         a :: a (bound at ../../typecheck/should_run/Defer01.hs:39:3)
         i :: a -> () (bound at ../../typecheck/should_run/Defer01.hs:39:1)
@@ -188,4 +194,5 @@
     • Probable cause: ‘putChar’ is applied to too few arguments
       In the first argument of ‘(>>)’, namely ‘putChar’
       In the expression: putChar >> putChar 'p'
+      In an equation for ‘l’: l = putChar >> putChar 'p'
 (deferred type error)

@@ -21,11 +21,11 @@ module TcMType (
   newFlexiTyVarTys,             -- Int -> Kind -> TcM [TcType]
   newOpenFlexiTyVarTy,
   newReturnTyVar, newReturnTyVarTy,
-  newMaybeReturnTyVarTy,
   newOpenReturnTyVar,
   newMetaKindVar, newMetaKindVars,
   cloneMetaTyVar,
   newFmvTyVar, newFskTyVar,
+  tauTvForReturnTv,
 
   readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
   newMetaDetails, isFilledMetaTyVar, isUnfilledMetaTyVar,
@@ -632,12 +632,6 @@ newReturnTyVar kind = newAnonMetaTyVar ReturnTv kind
 newReturnTyVarTy :: Kind -> TcM TcType
 newReturnTyVarTy kind = mkTyVarTy <$> newReturnTyVar kind
 
--- | Either makes a normal Flexi or a ReturnTv Flexi
-newMaybeReturnTyVarTy :: Bool  -- True <=> make a ReturnTv
-                      -> Kind -> TcM TcType
-newMaybeReturnTyVarTy True  = newReturnTyVarTy
-newMaybeReturnTyVarTy False = newFlexiTyVarTy
-
 -- | Create a tyvar that can be a lifted or unlifted type.
 newOpenFlexiTyVarTy :: TcM TcType
 newOpenFlexiTyVarTy
@@ -651,6 +645,23 @@ newOpenReturnTyVar
        ; let k = tYPE lev
        ; tv <- newReturnTyVar k
        ; return (tv, k) }
+
+-- | If the type is a ReturnTv, fill it with a new meta-TauTv. Otherwise,
+-- no change. This function can look through ReturnTvs and returns a partially
+-- zonked type as an optimisation.
+tauTvForReturnTv :: TcType -> TcM TcType
+tauTvForReturnTv ty
+  | Just tv <- tcGetTyVar_maybe ty
+  , isReturnTyVar tv
+  = do { contents <- readMetaTyVar tv
+       ; case contents of
+           Flexi -> do { tau_ty <- newFlexiTyVarTy (tyVarKind tv)
+                       ; writeMetaTyVar tv tau_ty
+                       ; return tau_ty }
+           Indirect ty -> tauTvForReturnTv ty }
+  | otherwise
+  = ASSERT( all (not . isReturnTyVar) (tyCoVarsOfTypeList ty) )
+    return ty
 
 newMetaSigTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
 newMetaSigTyVars = mapAccumLM newMetaSigTyVarX emptyTCvSubst
@@ -671,9 +682,8 @@ newMetaTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 newMetaTyVarX subst tyvar
   = do  { uniq <- newUnique
                -- See Note [Levity polymorphic variables accept foralls]
-        ; let info = if isLevityPolymorphic (tyVarKind tyvar)
-                     then ReturnTv
-                     else TauTv
+        ; let info | isLevityPolymorphic (tyVarKind tyvar) = ReturnTv
+                   | otherwise                             = TauTv
         ; details <- newMetaDetails info
         ; let name   = mkSystemName uniq (getOccName tyvar)
                        -- See Note [Name of an instantiated type variable]

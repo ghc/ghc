@@ -1,5 +1,5 @@
 
-Forall1Bad.hs:9:13:
-    Couldn't match expected type ‘Char’ with actual type ‘Bool’
-    In the first argument of ‘fall’, namely ‘True’
-    In the expression: fall True
+Forall1Bad.hs:9:8: error:
+    • Couldn't match expected type ‘Char’ with actual type ‘Bool’
+    • In the expression: fall True
+      In an equation for ‘test’: test = fall True

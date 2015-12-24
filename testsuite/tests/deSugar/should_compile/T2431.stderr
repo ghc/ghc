@@ -37,7 +37,9 @@ a2 = GHC.Types.TrNameS "'Refl"#
 -- RHS size: {terms: 5, types: 0, coercions: 0}
 T2431.$tc'Refl :: GHC.Types.TyCon
 [GblId[ReflectionId], Caf=NoCafRefs, Str=DmdType]
-T2431.$tc'Refl = GHC.Types.TyCon 0## 0## T2431.$trModule a2
+T2431.$tc'Refl =
+  GHC.Types.TyCon
+    15026191172322750497## 3898273167927206410## T2431.$trModule a2
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 a3 :: GHC.Types.TrName
@@ -47,7 +49,9 @@ a3 = GHC.Types.TrNameS ":~:"#
 -- RHS size: {terms: 5, types: 0, coercions: 0}
 T2431.$tc:~: :: GHC.Types.TyCon
 [GblId[ReflectionId], Caf=NoCafRefs, Str=DmdType]
-T2431.$tc:~: = GHC.Types.TyCon 0## 0## T2431.$trModule a3
+T2431.$tc:~: =
+  GHC.Types.TyCon
+    9759653149176674453## 12942818337407067047## T2431.$trModule a3
 
 -- RHS size: {terms: 4, types: 8, coercions: 0}
 absurd :: forall a. Int :~: Bool -> a

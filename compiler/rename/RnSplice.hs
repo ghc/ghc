@@ -45,7 +45,7 @@ import Var              ( Id )
 import THNames          ( quoteExpName, quotePatName, quoteDecName, quoteTypeName
                         , decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
 
-import {-# SOURCE #-} TcExpr   ( tcMonoExpr )
+import {-# SOURCE #-} TcExpr   ( tcPolyExpr )
 import {-# SOURCE #-} TcSplice ( runMetaD, runMetaE, runMetaP, runMetaT, tcTopSpliceExpr )
 #endif
 
@@ -295,7 +295,7 @@ runRnSplice flavour run_meta ppr_res splice
              -- Typecheck the expression
        ; meta_exp_ty   <- tcMetaTy meta_ty_name
        ; zonked_q_expr <- tcTopSpliceExpr Untyped $
-                          tcMonoExpr the_expr meta_exp_ty
+                          tcPolyExpr the_expr meta_exp_ty
 
              -- Run the expression
        ; result <- run_meta zonked_q_expr

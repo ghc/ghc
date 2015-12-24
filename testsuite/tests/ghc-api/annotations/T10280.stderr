@@ -1,8 +1,8 @@
 
 Test10280.hs:4:8: error:
     Variable not in scope:
-      atomicModifyIORef :: t0 -> (a0 -> (b0, ())) -> t
+      atomicModifyIORef :: t0 -> (a0 -> (t1, ())) -> t
 
 Test10280.hs:4:26: error: Variable not in scope: ciTokens
 
-Test10280.hs:4:44: error: Variable not in scope: f :: a0 -> b0
+Test10280.hs:4:44: error: Variable not in scope: f :: a0 -> t1

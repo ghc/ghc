@@ -17,6 +17,7 @@ T3440.hs:11:22: error:
         at T3440.hs:10:11
     • In the expression: x
       In the expression: (x, y)
+      In an equation for ‘unwrap’: unwrap (GADT x y) = (x, y)
     • Relevant bindings include
         y :: Fam a1 (bound at T3440.hs:11:16)
         x :: a1 (bound at T3440.hs:11:14)

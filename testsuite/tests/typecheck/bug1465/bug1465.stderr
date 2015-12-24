@@ -6,3 +6,4 @@ C.hs:6:11: error:
         ‘bug1465-1.0:A.T’ is defined in ‘A’ in package ‘bug1465-1.0’
     In the expression: B2.f
     In the expression: [B1.f, B2.f]
+    In an equation for ‘x’: x = [B1.f, B2.f]

@@ -9,8 +9,6 @@ T10503.hs:8:6: error:
         the type signature for:
           h :: forall k r. ((Proxy 'KProxy ~ Proxy 'KProxy) => r) -> r
         at T10503.hs:8:6
-      Expected type: ((Proxy 'KProxy ~ Proxy 'KProxy) => r) -> r
-        Actual type: ((Proxy 'KProxy ~ Proxy 'KProxy) => r) -> r
     • In the ambiguity check for ‘h’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the type signature:

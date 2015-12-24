@@ -9,7 +9,7 @@ PluralS.hs:15:17: warning:
 PluralS.hs:17:29: warning:
     • Defaulting the following constraints to type ‘Integer’
         (Num a0) arising from the literal ‘123’ at PluralS.hs:17:29-31
-        (Show a0) arising from a use of ‘show’ at PluralS.hs:17:24-27
+        (Show a0) arising from a use of ‘show’ at PluralS.hs:17:24-31
     • In the first argument of ‘show’, namely ‘123’
       In the expression: show 123
       In an equation for ‘defaultingNumAndShow’:

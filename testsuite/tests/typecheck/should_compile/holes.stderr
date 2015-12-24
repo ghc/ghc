@@ -1,33 +1,33 @@
 
 holes.hs:3:5: warning:
-    Found hole: _ :: t
-    Where: ‘t’ is a rigid type variable bound by
+    • Found hole: _ :: t
+      Where: ‘t’ is a rigid type variable bound by
                the inferred type of f :: t at holes.hs:3:1
-    In the expression: _
-    In an equation for ‘f’: f = _
-    Relevant bindings include f :: t (bound at holes.hs:3:1)
+    • In the expression: _
+      In an equation for ‘f’: f = _
+    • Relevant bindings include f :: t (bound at holes.hs:3:1)
 
 holes.hs:6:7: warning:
-    Found hole: _ :: Char
-    In the expression: _
-    In an equation for ‘g’: g x = _
-    Relevant bindings include
-      x :: Int (bound at holes.hs:6:3)
-      g :: Int -> Char (bound at holes.hs:6:1)
+    • Found hole: _ :: Char
+    • In the expression: _
+      In an equation for ‘g’: g x = _
+    • Relevant bindings include
+        x :: Int (bound at holes.hs:6:3)
+        g :: Int -> Char (bound at holes.hs:6:1)
 
 holes.hs:8:5: warning:
-    Found hole: _ :: [Char]
-    In the first argument of ‘(++)’, namely ‘_’
-    In the expression: _ ++ "a"
-    In an equation for ‘h’: h = _ ++ "a"
-    Relevant bindings include h :: [Char] (bound at holes.hs:8:1)
+    • Found hole: _ :: [Char]
+    • In the first argument of ‘(++)’, namely ‘_’
+      In the expression: _ ++ "a"
+      In an equation for ‘h’: h = _ ++ "a"
+    • Relevant bindings include h :: [Char] (bound at holes.hs:8:1)
 
 holes.hs:11:15: warning:
-    Found hole: _ :: b0
-    Where: ‘b0’ is an ambiguous type variable
-    In the second argument of ‘const’, namely ‘_’
-    In the expression: const y _
-    In an equation for ‘z’: z y = const y _
-    Relevant bindings include
-      y :: [a] (bound at holes.hs:11:3)
-      z :: [a] -> [a] (bound at holes.hs:11:1)
+    • Found hole: _ :: b0
+      Where: ‘b0’ is an ambiguous type variable
+    • In the second argument of ‘const’, namely ‘_’
+      In the expression: const y _
+      In an equation for ‘z’: z y = const y _
+    • Relevant bindings include
+        y :: [a] (bound at holes.hs:11:3)
+        z :: [a] -> [a] (bound at holes.hs:11:1)

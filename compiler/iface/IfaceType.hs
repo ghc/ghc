@@ -696,8 +696,9 @@ pprIfaceForAll bndrs@(IfaceTv _ vis : _)
     (bndrs', doc) = ppr_itv_bndrs bndrs vis
 
     add_separator stuff = case vis of
-                            Invisible -> stuff <>  dot
                             Visible   -> stuff <+> arrow
+                            _inv      -> stuff <>  dot
+
 
 -- | Render the ... in @(forall ... .)@ or @(forall ... ->)@.
 -- Returns both the list of not-yet-rendered binders and the doc.
@@ -705,9 +706,9 @@ pprIfaceForAll bndrs@(IfaceTv _ vis : _)
 ppr_itv_bndrs :: [IfaceForAllBndr]
              -> VisibilityFlag  -- ^ visibility of the first binder in the list
              -> ([IfaceForAllBndr], SDoc)
-ppr_itv_bndrs all_bndrs@(IfaceTv tv vis : bndrs) vis1
-  | vis == vis1 = let (bndrs', doc) = ppr_itv_bndrs bndrs vis1 in
-                  (bndrs', pprIfaceTvBndr tv <+> doc)
+ppr_itv_bndrs all_bndrs@(bndr@(IfaceTv _ vis) : bndrs) vis1
+  | vis `sameVis` vis1 = let (bndrs', doc) = ppr_itv_bndrs bndrs vis1 in
+                         (bndrs', pprIfaceForAllBndr bndr <+> doc)
   | otherwise   = (all_bndrs, empty)
 ppr_itv_bndrs [] _ = ([], empty)
 
@@ -719,7 +720,11 @@ pprIfaceForAllCoBndrs :: [(IfLclName, IfaceCoercion)] -> SDoc
 pprIfaceForAllCoBndrs bndrs = hsep $ map pprIfaceForAllCoBndr bndrs
 
 pprIfaceForAllBndr :: IfaceForAllBndr -> SDoc
-pprIfaceForAllBndr (IfaceTv tv _) = pprIfaceTvBndr tv
+pprIfaceForAllBndr (IfaceTv tv Invisible) = sdocWithDynFlags $ \dflags ->
+                                            if gopt Opt_PrintExplicitForalls dflags
+                                            then braces $ pprIfaceTvBndr tv
+                                            else pprIfaceTvBndr tv
+pprIfaceForAllBndr (IfaceTv tv _)         = pprIfaceTvBndr tv
 
 pprIfaceForAllCoBndr :: (IfLclName, IfaceCoercion) -> SDoc
 pprIfaceForAllCoBndr (tv, kind_co)

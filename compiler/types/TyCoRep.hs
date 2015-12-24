@@ -38,9 +38,11 @@ module TyCoRep (
         mkFunTy, mkFunTys,
         isLiftedTypeKind, isUnliftedTypeKind,
         isCoercionType, isLevityTy, isLevityVar,
+        sameVis,
 
         -- Functions over binders
-        binderType, delBinderVar,
+        binderType, delBinderVar, isInvisibleBinder, isVisibleBinder,
+        isNamedBinder, isAnonBinder,
 
         -- Functions over coercions
         pickLR,
@@ -228,19 +230,32 @@ data TyBinder
   | Anon Type   -- visibility is determined by the type (Constraint vs. *)
     deriving (Data.Typeable, Data.Data)
 
--- | Is something required to appear in source Haskell ('Visible') or
--- prohibited from appearing in source Haskell ('Invisible')?
-data VisibilityFlag = Visible | Invisible
+-- | Is something required to appear in source Haskell ('Visible'),
+-- permitted by request ('Specified') (visible type application), or
+-- prohibited entirely from appearing in source Haskell ('Invisible')?
+-- Examples in Note [VisibilityFlag]
+data VisibilityFlag = Visible | Specified | Invisible
   deriving (Eq, Data.Typeable, Data.Data)
+
+-- | Do these denote the same level of visibility? Except that
+-- 'Specified' and 'Invisible' are considered the same. Used
+-- for printing.
+sameVis :: VisibilityFlag -> VisibilityFlag -> Bool
+sameVis Visible Visible = True
+sameVis Visible _       = False
+sameVis _       Visible = False
+sameVis _       _       = True
 
 instance Binary VisibilityFlag where
   put_ bh Visible   = putByte bh 0
-  put_ bh Invisible = putByte bh 1
+  put_ bh Specified = putByte bh 1
+  put_ bh Invisible = putByte bh 2
 
   get bh = do
     h <- getByte bh
     case h of
       0 -> return Visible
+      1 -> return Specified
       _ -> return Invisible
 
 type KindOrType = Type -- See Note [Arguments to type constructors]
@@ -308,6 +323,49 @@ relation, ignores casts and coercion arguments, as long as the
 two types have the same kind. This allows us to be a little sloppier
 in keeping track of coercions, which is a good thing. It also means
 that eqType does not depend on eqCoercion, which is also a good thing.
+
+Note [VisibilityFlag]
+~~~~~~~~~~~~~~~~~~~~~
+All named binders are equipped with a visibility flag, which says
+whether or not arguments for this binder should be visible (explicit)
+in source Haskell. Historically, all named binders (that is, polytype
+binders) have been Invisible. But now it's more complicated.
+
+Invisible:
+ Argument does not ever appear in source Haskell. With visible type
+ application, only GHC-generated polytypes have Invisible binders.
+ This exactly corresponds to "generalized" variables from the
+ Visible Type Applications paper (ESOP'16).
+
+ Example: f x = x
+ `f` will be inferred to have type `forall a. a -> a`, where `a` is
+ Invisible. Note that there is no type annotation for `f`.
+
+ Printing: With -fprint-explicit-foralls, Invisible binders are written
+ in braces. Otherwise, they are printed like Specified binders.
+
+Specified:
+ The argument for this binder may appear in source Haskell only with
+ visible type application. Otherwise, it is omitted.
+
+ Example: id :: forall a. a -> a
+ `a` is a Specified binder, because you can say `id @Int` in source Haskell.
+
+ Example: const :: a -> b -> a
+ Both `a` and `b` are Specified binders, even though they are not bound
+ by an explicit forall.
+
+ Printing: a list of Specified binders are put between `forall` and `.`:
+ const :: forall a b. a -> b -> a
+
+Visible:
+ The argument must be given. Visible binders come up only with TypeInType.
+
+ Example: data Proxy k (a :: k) = P
+ The kind of Proxy is forall k -> k -> *, where k is a Visible binder.
+
+ Printing: As in the example above, Visible binders are put between `forall`
+ and `->`. This syntax is not parsed (yet), however.
 
 -------------------------------------
                 Note [PredTy]
@@ -402,6 +460,23 @@ delBinderVar vars (Anon {})    = vars
 delBinderVarFV :: TyBinder -> FV -> FV
 delBinderVarFV (Named tv _) vars fv_cand in_scope acc = delFV tv vars fv_cand in_scope acc
 delBinderVarFV (Anon {})    vars fv_cand in_scope acc = vars fv_cand in_scope acc
+
+-- | Does this binder bind an invisible argument?
+isInvisibleBinder :: TyBinder -> Bool
+isInvisibleBinder (Named _ vis) = vis /= Visible
+isInvisibleBinder (Anon ty)     = isPredTy ty
+
+-- | Does this binder bind a visible argument?
+isVisibleBinder :: TyBinder -> Bool
+isVisibleBinder = not . isInvisibleBinder
+
+isNamedBinder :: TyBinder -> Bool
+isNamedBinder (Named {}) = True
+isNamedBinder _          = False
+
+isAnonBinder :: TyBinder -> Bool
+isAnonBinder (Anon {}) = True
+isAnonBinder _         = False
 
 -- | Create the plain type constructor type which has been applied to no type arguments at all.
 mkTyConTy :: TyCon -> Type
@@ -2063,10 +2138,11 @@ ppr_type _ (CoercionTy co)
 
 ppr_forall_type :: TyPrec -> Type -> SDoc
 ppr_forall_type p ty
-  = maybeParen p FunPrec $ ppr_sigma_type True ty
+  = maybeParen p FunPrec $
+    sdocWithDynFlags $ \dflags ->
+    ppr_sigma_type dflags True ty
     -- True <=> we always print the foralls on *nested* quantifiers
     -- Opt_PrintExplicitForalls only affects top-level quantifiers
-    -- False <=> we don't print an extra-constraints wildcard
 
 ppr_tvar :: TyVar -> SDoc
 ppr_tvar tv  -- Note [Infix type variables]
@@ -2090,13 +2166,27 @@ if_print_coercions yes no
     else no
 
 -------------------
-ppr_sigma_type :: Bool -> Type -> SDoc
--- First Bool <=> Show the foralls unconditionally
--- Second Bool <=> Show an extra-constraints wildcard
-ppr_sigma_type show_foralls_unconditionally ty
-  = sep [ if   show_foralls_unconditionally
-          then pprForAll bndrs
-          else pprUserForAll bndrs
+ppr_sigma_type :: DynFlags
+               -> Bool -- ^ True <=> Show the foralls unconditionally
+               -> Type -> SDoc
+-- Suppose we have (forall a. Show a => forall b. a -> b). When we're not
+-- printing foralls, we want to drop both the (forall a) and the (forall b).
+-- This logic does so.
+ppr_sigma_type dflags False orig_ty
+  | not (gopt Opt_PrintExplicitForalls dflags)
+  , all (isEmptyVarSet . tyCoVarsOfType . binderType) named
+      -- See Note [When to print foralls]
+  = sep [ pprThetaArrowTy (map binderType ctxt)
+        , pprArrowChain TopPrec (ppr_fun_tail tau) ]
+  where
+    (invis_bndrs, tau) = split [] orig_ty
+    (named, ctxt)      = partition isNamedBinder invis_bndrs
+
+    split acc (ForAllTy bndr ty) | isInvisibleBinder bndr = split (bndr:acc) ty
+    split acc ty                                          = (reverse acc, ty)
+
+ppr_sigma_type _ _ ty
+  = sep [ pprForAll bndrs
         , pprThetaArrowTy ctxt
         , pprArrowChain TopPrec (ppr_fun_tail tau) ]
   where
@@ -2110,12 +2200,13 @@ ppr_sigma_type show_foralls_unconditionally ty
     split2 ps ty                                       = (reverse ps, ty)
 
     -- We don't want to lose synonyms, so we mustn't use splitFunTys here.
-    ppr_fun_tail (ForAllTy (Anon ty1) ty2)
-      | not (isPredTy ty1) = ppr_type FunPrec ty1 : ppr_fun_tail ty2
-    ppr_fun_tail other_ty = [ppr_type TopPrec other_ty]
+ppr_fun_tail :: Type -> [SDoc]
+ppr_fun_tail (ForAllTy (Anon ty1) ty2)
+  | not (isPredTy ty1) = ppr_type FunPrec ty1 : ppr_fun_tail ty2
+ppr_fun_tail other_ty = [ppr_type TopPrec other_ty]
 
 pprSigmaType :: Type -> SDoc
-pprSigmaType ty = ppr_sigma_type False ty
+pprSigmaType ty = sdocWithDynFlags $ \dflags -> ppr_sigma_type dflags False ty
 
 pprUserForAll :: [TyBinder] -> SDoc
 -- Print a user-level forall; see Note [When to print foralls]
@@ -2128,7 +2219,7 @@ pprUserForAll bndrs
       = not (isEmptyVarSet (tyCoVarsOfType (binderType bndr)))
 
 pprForAllImplicit :: [TyVar] -> SDoc
-pprForAllImplicit tvs = pprForAll (zipWith Named tvs (repeat Invisible))
+pprForAllImplicit tvs = pprForAll (zipWith Named tvs (repeat Specified))
 
 -- | Render the "forall ... ." or "forall ... ->" bit of a type.
 -- Do not pass in anonymous binders!
@@ -2140,8 +2231,8 @@ pprForAll bndrs@(Named _ vis : _)
     (bndrs', doc) = ppr_tv_bndrs bndrs vis
 
     add_separator stuff = case vis of
-                            Invisible -> stuff <>  dot
                             Visible   -> stuff <+> arrow
+                            _inv      -> stuff <>  dot
 pprForAll bndrs = pprPanic "pprForAll: anonymous binder" (ppr bndrs)
 
 pprTvBndrs :: [TyVar] -> SDoc
@@ -2154,8 +2245,14 @@ ppr_tv_bndrs :: [TyBinder]
              -> VisibilityFlag  -- ^ visibility of the first binder in the list
              -> ([TyBinder], SDoc)
 ppr_tv_bndrs all_bndrs@(Named tv vis : bndrs) vis1
-  | vis == vis1 = let (bndrs', doc) = ppr_tv_bndrs bndrs vis1 in
-                  (bndrs', pprTvBndr tv <+> doc)
+  | vis `sameVis` vis1 = let (bndrs', doc) = ppr_tv_bndrs bndrs vis1
+                             pp_tv = sdocWithDynFlags $ \dflags ->
+                                     if Invisible == vis &&
+                                        gopt Opt_PrintExplicitForalls dflags
+                                     then braces (pprTvBndrNoParens tv)
+                                     else pprTvBndr tv
+                         in
+                         (bndrs', pp_tv <+> doc)
   | otherwise   = (all_bndrs, empty)
 ppr_tv_bndrs [] _ = ([], empty)
 ppr_tv_bndrs bndrs _ = pprPanic "ppr_tv_bndrs: anonymous binder" (ppr bndrs)
@@ -2167,13 +2264,22 @@ pprTvBndr tv
              where
                kind = tyVarKind tv
 
+pprTvBndrNoParens :: TyVar -> SDoc
+pprTvBndrNoParens tv
+  | isLiftedTypeKind kind = ppr_tvar tv
+  | otherwise             = ppr_tvar tv <+> dcolon <+> pprKind kind
+             where
+               kind = tyVarKind tv
+
 instance Outputable TyBinder where
   ppr (Named v Visible)   = ppr v
+  ppr (Named v Specified) = char '@' <> ppr v
   ppr (Named v Invisible) = braces (ppr v)
   ppr (Anon ty)       = text "[anon]" <+> ppr ty
 
 instance Outputable VisibilityFlag where
   ppr Visible   = text "[vis]"
+  ppr Specified = text "[spec]"
   ppr Invisible = text "[invis]"
 
 -----------------
@@ -2231,7 +2337,7 @@ pprDataConWithArgs :: DataCon -> SDoc
 pprDataConWithArgs dc = sep [forAllDoc, thetaDoc, ppr dc <+> argsDoc]
   where
     (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty) = dataConFullSig dc
-    forAllDoc = pprUserForAll $ map (\tv -> Named tv Invisible) $
+    forAllDoc = pprUserForAll $ map (\tv -> Named tv Specified) $
                 ((univ_tvs `minusList` map eqSpecTyVar eq_spec) ++ ex_tvs)
     thetaDoc  = pprThetaArrowTy theta
     argsDoc   = hsep (fmap pprParendType arg_tys)

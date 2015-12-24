@@ -751,7 +751,7 @@ checkExtraConstraintWildCard env wc
   = checkWildCard env mb_bad
   where
     mb_bad | not (extraConstraintWildCardsAllowed env)
-           = Just (ptext (sLit "Extra-contraint wildcard") <+> quotes (ppr wc)
+           = Just (ptext (sLit "Extra-constraint wildcard") <+> quotes (ppr wc)
                    <+> ptext (sLit "not allowed"))
            | otherwise
            = Nothing
@@ -774,6 +774,7 @@ wildCardsAllowed env
        RuleCtx {}          -> True
        FamPatCtx {}        -> True   -- Not named wildcards though
        GHCiCtx {}          -> True
+       HsTypeCtx {}        -> True
        _                   -> False
 
 rnAnonWildCard :: HsWildCardInfo RdrName -> RnM (HsWildCardInfo Name)

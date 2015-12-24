@@ -8,6 +8,8 @@ T5380.hs:7:27: error:
         at T5380.hs:6:10
     • In the expression: b
       In the expression: proc () -> if b then f -< () else f -< ()
+      In an equation for ‘testB’:
+          testB b f = proc () -> if b then f -< () else f -< ()
     • Relevant bindings include
         b :: not_bool (bound at T5380.hs:7:7)
         testB :: not_bool -> (() -> ()) -> () -> not_unit
@@ -24,6 +26,7 @@ T5380.hs:7:34: error:
         Actual type: () -> ()
     • In the expression: f
       In the command: f -< ()
+      In the expression: proc () -> if b then f -< () else f -< ()
     • Relevant bindings include
         testB :: not_bool -> (() -> ()) -> () -> not_unit
           (bound at T5380.hs:7:1)

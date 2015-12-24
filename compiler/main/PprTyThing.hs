@@ -147,18 +147,10 @@ ppr_ty_thing hdr_only path ty_thing
                  -- Nothing is unexpected here; TyThings have External names
 
 pprTypeForUser :: Type -> SDoc
--- We do two things here.
--- a) We tidy the type, regardless
--- b) Swizzle the foralls to the top, so that without
---    -fprint-explicit-foralls we'll suppress all the foralls
--- Prime example: a class op might have type
---      forall a. C a => forall b. Ord b => stuff
--- Then we want to display
---      (C a, Ord b) => stuff
+-- The type is tidied
 pprTypeForUser ty
-  = pprSigmaType (mkInvSigmaTy tvs ctxt tau)
+  = pprSigmaType tidy_ty
   where
-    (tvs, ctxt, tau) = tcSplitSigmaTy tidy_ty
     (_, tidy_ty)     = tidyOpenType emptyTidyEnv ty
      -- Often the types/kinds we print in ghci are fully generalised
      -- and have no free variables, but it turns out that we sometimes

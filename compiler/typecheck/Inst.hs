@@ -6,14 +6,15 @@
 The @Inst@ type: dictionaries or method instances
 -}
 
-{-# LANGUAGE CPP, MultiWayIf #-}
+{-# LANGUAGE CPP, MultiWayIf, TupleSections #-}
 
 module Inst (
-       deeplySkolemise, deeplyInstantiate,
+       deeplySkolemise,
+       topInstantiate, topInstantiateInferred, deeplyInstantiate,
        instCall, instDFunType, instStupidTheta,
        newWanted, newWanteds,
 
-       newOverloadedLit, mkOverLit,
+       newOverloadedLit, newNonTrivialOverloadedLit, mkOverLit,
 
        newClsInst,
        tcGetInsts, tcGetInstEnvs, getOverlapFlag,
@@ -149,6 +150,65 @@ deeplySkolemise ty
   | otherwise
   = return (idHsWrapper, [], [], ty)
 
+-- | Instantiate all outer type variables
+-- and any context. Never looks through arrows.
+topInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
+-- if    topInstantiate ty = (wrap, rho)
+-- and   e :: ty
+-- then  wrap e :: rho
+topInstantiate = top_instantiate True
+
+-- | Instantiate all outer 'Invisible' binders
+-- and any context. Never looks through arrows or specified type variables.
+-- Used for visible type application.
+topInstantiateInferred :: CtOrigin -> TcSigmaType
+                       -> TcM (HsWrapper, TcSigmaType)
+-- if    topInstantiate ty = (wrap, rho)
+-- and   e :: ty
+-- then  wrap e :: rho
+topInstantiateInferred = top_instantiate False
+
+top_instantiate :: Bool   -- True <=> instantiate *all* variables
+                -> CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
+top_instantiate inst_all orig ty
+  | not (null binders && null theta)
+  = do { let (inst_bndrs, leave_bndrs) = span should_inst binders
+             (inst_theta, leave_theta)
+               | null leave_bndrs = (theta, [])
+               | otherwise        = ([], theta)
+       ; (subst, inst_tvs') <- newMetaTyVars (map (binderVar "top_inst") inst_bndrs)
+       ; let inst_theta' = substTheta subst inst_theta
+             sigma'      = substTy    subst (mkForAllTys leave_bndrs $
+                                             mkFunTys leave_theta rho)
+
+       ; wrap1 <- instCall orig (mkTyVarTys inst_tvs') inst_theta'
+       ; traceTc "Instantiating"
+                 (vcat [ text "all tyvars?" <+> ppr inst_all
+                       , text "origin" <+> pprCtOrigin orig
+                       , text "type" <+> ppr ty
+                       , text "with" <+> ppr inst_tvs'
+                       , text "theta:" <+>  ppr inst_theta' ])
+
+       ; (wrap2, rho2) <-
+           if null leave_bndrs
+
+         -- account for types like forall a. Num a => forall b. Ord b => ...
+           then top_instantiate inst_all orig sigma'
+
+         -- but don't loop if there were any un-inst'able tyvars
+           else return (idHsWrapper, sigma')
+
+       ; return (wrap2 <.> wrap1, rho2) }
+
+  | otherwise = return (idHsWrapper, ty)
+  where
+    (binders, phi) = tcSplitNamedPiTys ty
+    (theta, rho)   = tcSplitPhiTy phi
+
+    should_inst bndr
+      | inst_all  = True
+      | otherwise = binderVisibility bndr == Invisible
+
 deeplyInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 --   Int -> forall a. a -> a  ==>  (\x:Int. [] x alpha) :: Int -> alpha
 -- In general if
@@ -175,6 +235,7 @@ deeplyInstantiate orig ty
                  mkFunTys arg_tys rho2) }
 
   | otherwise = return (idHsWrapper, ty)
+
 
 {-
 ************************************************************************
@@ -269,39 +330,54 @@ instStupidTheta orig theta
 *                                                                      *
 ************************************************************************
 
+-}
+
+{-
 In newOverloadedLit we convert directly to an Int or Integer if we
 know that's what we want.  This may save some time, by not
 temporarily generating overloaded literals, but it won't catch all
 cases (the rest are caught in lookupInst).
+
 -}
 
-newOverloadedLit :: CtOrigin
-                 -> HsOverLit Name
-                 -> TcRhoType
-                 -> TcM (HsOverLit TcId)
-newOverloadedLit orig lit res_ty
-    = do dflags <- getDynFlags
-         newOverloadedLit' dflags orig lit res_ty
-
-newOverloadedLit' :: DynFlags
-                  -> CtOrigin
-                  -> HsOverLit Name
-                  -> TcRhoType
-                  -> TcM (HsOverLit TcId)
-newOverloadedLit' dflags orig
-  lit@(OverLit { ol_val = val, ol_rebindable = rebindable
-               , ol_witness = meth_name }) res_ty
-
+newOverloadedLit :: HsOverLit Name
+                 -> TcSigmaType  -- if nec'y, this type is instantiated...
+                 -> CtOrigin     -- ... using this CtOrigin
+                 -> TcM (HsWrapper, HsOverLit TcId)
+                   -- wrapper :: input type "->" type of result
+newOverloadedLit
+  lit@(OverLit { ol_val = val, ol_rebindable = rebindable }) res_ty res_orig
   | not rebindable
-  , Just expr <- shortCutLit dflags val res_ty
+    -- all built-in overloaded lits are not higher-rank, so skolemise.
+    -- this is necessary for shortCutLit.
+  = do { (wrap, insted_ty) <- deeplyInstantiate res_orig res_ty
+       ; dflags <- getDynFlags
+       ; case shortCutLit dflags val insted_ty of
         -- Do not generate a LitInst for rebindable syntax.
         -- Reason: If we do, tcSimplify will call lookupInst, which
         --         will call tcSyntaxName, which does unification,
         --         which tcSimplify doesn't like
-  = return (lit { ol_witness = expr, ol_type = res_ty
-                , ol_rebindable = rebindable })
+           Just expr -> return ( wrap
+                               , lit { ol_witness = expr, ol_type = insted_ty
+                                     , ol_rebindable = False } )
+           Nothing   -> (wrap, ) <$>
+                        newNonTrivialOverloadedLit orig lit insted_ty }
 
   | otherwise
+  = do { lit' <- newNonTrivialOverloadedLit orig lit res_ty
+       ; return (idHsWrapper, lit') }
+  where
+    orig = LiteralOrigin lit
+
+-- Does not handle things that 'shortCutLit' can handle. See also
+-- newOverloadedLit in TcUnify
+newNonTrivialOverloadedLit :: CtOrigin
+                           -> HsOverLit Name
+                           -> TcSigmaType
+                           -> TcM (HsOverLit TcId)
+newNonTrivialOverloadedLit orig
+  lit@(OverLit { ol_val = val, ol_witness = meth_name
+               , ol_rebindable = rebindable }) res_ty
   = do  { hs_lit <- mkOverLit val
         ; let lit_ty = hsLitType hs_lit
         ; fi' <- tcSyntaxOp orig meth_name (mkFunTy lit_ty res_ty)
@@ -310,8 +386,8 @@ newOverloadedLit' dflags orig
                 -- whereas res_ty might be openTypeKind. This was a bug in 6.2.2
                 -- However this'll be picked up by tcSyntaxOp if necessary
         ; let witness = HsApp (noLoc fi') (noLoc (HsLit hs_lit))
-        ; return (lit { ol_witness = witness, ol_type = res_ty
-                      , ol_rebindable = rebindable }) }
+        ; return (lit { ol_witness = witness, ol_type = res_ty,
+                        ol_rebindable = rebindable }) }
 
 ------------
 mkOverLit :: OverLitVal -> TcM HsLit

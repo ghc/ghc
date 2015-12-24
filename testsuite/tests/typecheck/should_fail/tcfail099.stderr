@@ -8,6 +8,7 @@ tcfail099.hs:9:20: error:
         at tcfail099.hs:9:7-9
     • In the first argument of ‘f’, namely ‘arg’
       In the expression: f arg
+      In an equation for ‘call’: call (C f) arg = f arg
     • Relevant bindings include
         arg :: r (bound at tcfail099.hs:9:12)
         f :: a -> Int (bound at tcfail099.hs:9:9)

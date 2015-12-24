@@ -11,6 +11,7 @@ T3330a.hs:19:34: error:
         Actual type: s ix
     • In the first argument of ‘hmapM’, namely ‘p’
       In the first argument of ‘execWriter’, namely ‘(hmapM p collect x)’
+      In the expression: execWriter (hmapM p collect x)
     • Relevant bindings include
         x :: PF s r ix (bound at T3330a.hs:19:12)
         p :: s ix (bound at T3330a.hs:19:10)
@@ -28,6 +29,7 @@ T3330a.hs:19:44: error:
         Actual type: PF s r ix
     • In the third argument of ‘hmapM’, namely ‘x’
       In the first argument of ‘execWriter’, namely ‘(hmapM p collect x)’
+      In the expression: execWriter (hmapM p collect x)
     • Relevant bindings include
         x :: PF s r ix (bound at T3330a.hs:19:12)
         p :: s ix (bound at T3330a.hs:19:10)

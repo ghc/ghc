@@ -66,7 +66,11 @@ T7360.$tc'Foo3 :: GHC.Types.TyCon
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 50}]
 T7360.$tc'Foo3 =
-  GHC.Types.TyCon 0## 0## T7360.$trModule T7360.$tc'Foo6
+  GHC.Types.TyCon
+    10507205234936349519##
+    8302184214013227554##
+    T7360.$trModule
+    T7360.$tc'Foo6
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 T7360.$tc'Foo5 :: GHC.Types.TrName
@@ -85,7 +89,11 @@ T7360.$tc'Foo2 :: GHC.Types.TyCon
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 50}]
 T7360.$tc'Foo2 =
-  GHC.Types.TyCon 0## 0## T7360.$trModule T7360.$tc'Foo5
+  GHC.Types.TyCon
+    9825259700232563546##
+    11056638024476048052##
+    T7360.$trModule
+    T7360.$tc'Foo5
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 T7360.$tc'Foo4 :: GHC.Types.TrName
@@ -104,7 +112,11 @@ T7360.$tc'Foo1 :: GHC.Types.TyCon
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 50}]
 T7360.$tc'Foo1 =
-  GHC.Types.TyCon 0## 0## T7360.$trModule T7360.$tc'Foo4
+  GHC.Types.TyCon
+    2058692068419561651##
+    9152017373001677943##
+    T7360.$trModule
+    T7360.$tc'Foo4
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 T7360.$tcFoo1 :: GHC.Types.TrName
@@ -123,7 +135,11 @@ T7360.$tcFoo :: GHC.Types.TyCon
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 50}]
 T7360.$tcFoo =
-  GHC.Types.TyCon 0## 0## T7360.$trModule T7360.$tcFoo1
+  GHC.Types.TyCon
+    8358641983981300860##
+    582034888424804490##
+    T7360.$trModule
+    T7360.$tcFoo1
 
 -- RHS size: {terms: 5, types: 2, coercions: 0}
 fun1 [InlPrag=NOINLINE] :: Foo -> ()

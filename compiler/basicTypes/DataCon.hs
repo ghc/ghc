@@ -768,7 +768,7 @@ mkDataCon name declared_infix prom_info
 
     tag = assoc "mkDataCon" (tyConDataCons rep_tycon `zip` [fIRST_TAG..]) con
     rep_arg_tys = dataConRepArgTys con
-    rep_ty = mkInvForAllTys univ_tvs $ mkInvForAllTys ex_tvs $
+    rep_ty = mkSpecForAllTys univ_tvs $ mkInvForAllTys ex_tvs $
              mkFunTys rep_arg_tys $
              mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
 
@@ -1024,8 +1024,8 @@ dataConUserType (MkData { dcUnivTyVars = univ_tvs,
                           dcExTyVars = ex_tvs, dcEqSpec = eq_spec,
                           dcOtherTheta = theta, dcOrigArgTys = arg_tys,
                           dcOrigResTy = res_ty })
-  = mkInvForAllTys ((univ_tvs `minusList` map eqSpecTyVar eq_spec) ++
-                    ex_tvs) $
+  = mkSpecForAllTys ((univ_tvs `minusList` map eqSpecTyVar eq_spec) ++
+                      ex_tvs) $
     mkFunTys theta $
     mkFunTys arg_tys $
     res_ty

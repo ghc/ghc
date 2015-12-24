@@ -1,7 +1,8 @@
 
-T10495.hs:5:7: error:
-    Couldn't match representation of type ‘a0’ with that of ‘b0’
-      arising from a use of ‘coerce’
-    In the expression: coerce
-    In an equation for ‘foo’: foo = coerce
-    Relevant bindings include foo :: a0 -> b0 (bound at T10495.hs:5:1)
+T10495.hs:5:1: error:
+    • Couldn't match representation of type ‘a0’ with that of ‘b0’
+        arising from a use of ‘coerce’
+    • When instantiating ‘foo’, initially inferred to have
+      this overly-general type:
+        forall a b. Coercible a b => a -> b
+      NB: This instantiation can be caused by the monomorphism restriction.

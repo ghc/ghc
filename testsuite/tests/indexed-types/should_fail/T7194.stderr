@@ -8,6 +8,7 @@ T7194.hs:18:35: error:
         at T7194.hs:17:18-41
     • In the expression: foo y
       In the first argument of ‘length’, namely ‘[x, foo y]’
+      In the expression: length [x, foo y]
     • Relevant bindings include
         y :: a (bound at T7194.hs:18:20)
         g :: a -> Int (bound at T7194.hs:18:18)

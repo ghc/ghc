@@ -5,6 +5,8 @@ T8227.hs:16:44: error:
       NB: ‘Scalar’ is a type function, and may not be injective
     • In the first argument of ‘arcLengthToParam’, namely ‘eps’
       In the expression: arcLengthToParam eps eps
+      In an equation for ‘absoluteToParam’:
+          absoluteToParam eps seg = arcLengthToParam eps eps
     • Relevant bindings include
         seg :: a (bound at T8227.hs:16:21)
         eps :: Scalar (V a) (bound at T8227.hs:16:17)

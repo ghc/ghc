@@ -6,6 +6,8 @@ T5439.hs:82:28: error:
         Actual type: f (Attempt (WaitOpResult (WaitOps rs)))
     • In the first argument of ‘complete’, namely ‘ev’
       In the expression: complete ev
+      In a stmt of a 'do' block:
+        c <- complete ev $ inj $ Failure (e :: SomeException)
     • Relevant bindings include
         register :: Bool -> Peano n -> WaitOps (HDrop n rs) -> IO Bool
           (bound at T5439.hs:64:9)
@@ -23,3 +25,5 @@ T5439.hs:82:39: error:
         ‘Failure (e :: SomeException)’
       In the second argument of ‘($)’, namely
         ‘inj $ Failure (e :: SomeException)’
+      In a stmt of a 'do' block:
+        c <- complete ev $ inj $ Failure (e :: SomeException)

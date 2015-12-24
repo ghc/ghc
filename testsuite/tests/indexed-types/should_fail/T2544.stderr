@@ -1,22 +1,24 @@
 
 T2544.hs:17:18: error:
-    Couldn't match type ‘IxMap i0’ with ‘IxMap l’
-    NB: ‘IxMap’ is a type function, and may not be injective
-    The type variable ‘i0’ is ambiguous
-    Expected type: IxMap l [Int]
-      Actual type: IxMap i0 [Int]
-    In the first argument of ‘BiApp’, namely ‘empty’
-    In the expression: BiApp empty empty
-    Relevant bindings include
-      empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:17:4)
+    • Couldn't match type ‘IxMap i0’ with ‘IxMap l’
+      NB: ‘IxMap’ is a type function, and may not be injective
+      The type variable ‘i0’ is ambiguous
+      Expected type: IxMap l [Int]
+        Actual type: IxMap i0 [Int]
+    • In the first argument of ‘BiApp’, namely ‘empty’
+      In the expression: BiApp empty empty
+      In an equation for ‘empty’: empty = BiApp empty empty
+    • Relevant bindings include
+        empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:17:4)
 
 T2544.hs:17:24: error:
-    Couldn't match type ‘IxMap i1’ with ‘IxMap r’
-    NB: ‘IxMap’ is a type function, and may not be injective
-    The type variable ‘i1’ is ambiguous
-    Expected type: IxMap r [Int]
-      Actual type: IxMap i1 [Int]
-    In the second argument of ‘BiApp’, namely ‘empty’
-    In the expression: BiApp empty empty
-    Relevant bindings include
-      empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:17:4)
+    • Couldn't match type ‘IxMap i1’ with ‘IxMap r’
+      NB: ‘IxMap’ is a type function, and may not be injective
+      The type variable ‘i1’ is ambiguous
+      Expected type: IxMap r [Int]
+        Actual type: IxMap i1 [Int]
+    • In the second argument of ‘BiApp’, namely ‘empty’
+      In the expression: BiApp empty empty
+      In an equation for ‘empty’: empty = BiApp empty empty
+    • Relevant bindings include
+        empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:17:4)

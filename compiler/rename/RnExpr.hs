@@ -298,9 +298,9 @@ rnExpr (HsMultiIf _ty alts)
        -- ; return (HsMultiIf ty alts', fvs) }
        ; return (HsMultiIf placeHolderType alts', fvs) }
 
-rnExpr (HsType a)
-  = do { (t, fvT) <- rnLHsType HsTypeCtx a
-       ; return (HsType t, fvT) }
+rnExpr (HsType ty)
+  = do { (ty', fvT) <- rnHsWcType HsTypeCtx ty
+       ; return (HsType ty', fvT) }
 
 rnExpr (ArithSeq _ _ seq)
   = do { opt_OverloadedLists <- xoptM LangExt.OverloadedLists
@@ -524,7 +524,7 @@ rnCmd (HsCmdDo (L l stmts) _)
             rnStmts ArrowExpr rnLCmd stmts (\ _ -> return ((), emptyFVs))
         ; return ( HsCmdDo (L l stmts') placeHolderType, fvs ) }
 
-rnCmd cmd@(HsCmdCast {}) = pprPanic "rnCmd" (ppr cmd)
+rnCmd cmd@(HsCmdWrap {}) = pprPanic "rnCmd" (ppr cmd)
 
 ---------------------------------------------------
 type CmdNeeds = FreeVars        -- Only inhabitants are
@@ -541,7 +541,7 @@ methodNamesCmd (HsCmdArrApp _arrow _arg _ HsFirstOrderApp _rtl)
 methodNamesCmd (HsCmdArrApp _arrow _arg _ HsHigherOrderApp _rtl)
   = unitFV appAName
 methodNamesCmd (HsCmdArrForm {}) = emptyFVs
-methodNamesCmd (HsCmdCast _ cmd) = methodNamesCmd cmd
+methodNamesCmd (HsCmdWrap _ cmd) = methodNamesCmd cmd
 
 methodNamesCmd (HsCmdPar c) = methodNamesLCmd c
 
@@ -1819,7 +1819,8 @@ sectionErr expr
 
 patSynErr :: HsExpr RdrName -> RnM (HsExpr Name, FreeVars)
 patSynErr e = do { addErr (sep [ptext (sLit "Pattern syntax in expression context:"),
-                                nest 4 (ppr e)])
+                                nest 4 (ppr e)] $$
+                           text "Did you mean to enable TypeApplications?")
                  ; return (EWildPat, emptyFVs) }
 
 badIpBinds :: Outputable a => SDoc -> a -> SDoc

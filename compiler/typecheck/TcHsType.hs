@@ -15,6 +15,7 @@ module TcHsType (
 
         tcHsClsInstType,
         tcHsDeriv, tcHsVectInst,
+        tcHsTypeApp,
         UserTypeCtxt(..),
         tcImplicitTKBndrs, tcImplicitTKBndrsType, tcHsTyVarBndrs,
 
@@ -202,7 +203,7 @@ tc_hs_sig_type (HsIB { hsib_body = hs_ty
   = do { (tkvs, ty) <- solveEqualities $
                        tcImplicitTKBndrsType sig_vars $
                        tc_lhs_type typeLevelMode hs_ty kind
-       ; return (mkInvForAllTys tkvs ty) }
+       ; return (mkSpecForAllTys tkvs ty) }
 
 -----------------
 tcHsDeriv :: LHsSigType Name -> TcM ([TyVar], Class, [Type], Kind)
@@ -244,7 +245,7 @@ tcHsClsInstType user_ctxt hs_inst_ty@(HsIB { hsib_vars = sig_vars
                        ; head_ty' <- tc_lhs_type typeLevelMode
                                                  head_ty constraintKind
                        ; return (mkPhiTy theta head_ty') }
-       ; let inst_ty = mkInvForAllTys tkvs phi_ty
+       ; let inst_ty = mkSpecForAllTys tkvs phi_ty
        ; inst_ty <- kindGeneralizeType inst_ty
        ; inst_ty <- zonkTcType inst_ty
        ; checkValidInstance user_ctxt hs_inst_ty inst_ty }
@@ -266,6 +267,21 @@ tcHsVectInst ty
            _ -> failWithTc (text "Too many arguments passed to" <+> ppr cls_name) }
   | otherwise
   = failWithTc $ ptext (sLit "Malformed instance type")
+
+----------------------------------------------
+-- | Type-check a visible type application
+tcHsTypeApp :: LHsWcType Name -> Kind -> TcM Type
+tcHsTypeApp wc_ty kind
+  | HsWC { hswc_wcs = sig_wcs, hswc_ctx = extra, hswc_body = hs_ty } <- wc_ty
+  = ASSERT( isNothing extra )  -- handled in RnTypes.rnExtraConstraintWildCard
+    tcWildCardBinders sig_wcs $ \ _ ->
+    do { ty <- tcCheckLHsType hs_ty kind
+       ; ty <- zonkTcType ty
+       ; checkValidType TypeAppCtxt ty
+       ; return ty }
+        -- NB: we don't call emitWildcardHoleConstraints here, because
+        -- we want any holes in visible type applications to be used
+        -- without fuss. No errors, warnings, extensions, etc.
 
 {-
         These functions are used during knot-tying in
@@ -504,7 +520,7 @@ tc_hs_type mode hs_ty@(HsForAllTy { hst_bndrs = hs_tvs, hst_body = ty }) exp_kin
     -- Why exp_kind?  See Note [Body kind of forall]
     do { ty' <- tc_lhs_type mode ty exp_kind
        ; let bound_vars = allBoundVariables ty'
-       ; return (mkNakedInvSigmaTy tvs' [] ty', bound_vars) }
+       ; return (mkNakedSpecSigmaTy tvs' [] ty', bound_vars) }
 
 tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = ty }) exp_kind
   = do { ctxt' <- tc_hs_context mode ctxt
@@ -1275,12 +1291,15 @@ kcHsTyVarBndrs cusk (HsQTvs { hsq_implicit = kv_ns
     do { (full_kind, _, stuff) <- bind_telescope hs_tvs (thing_inside kvs)
        ; let qkvs = filter (not . isMetaTyVar) $
                     tyCoVarsOfTypeWellScoped full_kind
+                      -- these have to be the vars made with new_skolem_tv
+                      -- above. Thus, they are known to the user and should
+                      -- be Specified, not Invisible, when kind-generalizing
 
                 -- the free non-meta variables in the returned kind will
                 -- contain both *mentioned* kind vars and *unmentioned* kind
                 -- vars (See case (1) under Note [Typechecking telescopes])
              gen_kind  = if cusk
-                         then mkInvForAllTys qkvs $ full_kind
+                         then mkSpecForAllTys qkvs $ full_kind
                          else full_kind
        ; return (gen_kind, stuff) } }
   where

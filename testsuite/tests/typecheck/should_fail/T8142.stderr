@@ -1,25 +1,26 @@
 
 T8142.hs:6:18: error:
-    Couldn't match type ‘Nu g0’ with ‘Nu g’
-    NB: ‘Nu’ is a type function, and may not be injective
-    The type variable ‘g0’ is ambiguous
-    Expected type: Nu ((,) t) -> Nu g
-      Actual type: Nu ((,) t0) -> Nu g0
-    In the ambiguity check for the inferred type for ‘h’
-    To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
-    When checking the inferred type
-      h :: forall t (g :: * -> *). Nu ((,) t) -> Nu g
-    In an equation for ‘tracer’:
-        tracer
-          = h
-          where
-              h = (\ (_, b) -> ((outI . fmap h) b)) . out
+    • Couldn't match type ‘Nu g0’ with ‘Nu g’
+      NB: ‘Nu’ is a type function, and may not be injective
+      The type variable ‘g0’ is ambiguous
+      Expected type: Nu ((,) t) -> Nu g
+        Actual type: Nu ((,) t0) -> Nu g0
+    • In the ambiguity check for the inferred type for ‘h’
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      When checking the inferred type
+        h :: forall t (g :: * -> *). Nu ((,) t) -> Nu g
+      In an equation for ‘tracer’:
+          tracer
+            = h
+            where
+                h = (\ (_, b) -> ((outI . fmap h) b)) . out
 
 T8142.hs:6:57: error:
-    Couldn't match type ‘Nu ((,) t)’ with ‘g (Nu ((,) t))’
-    Expected type: Nu ((,) t) -> (t, g (Nu ((,) t)))
-      Actual type: Nu ((,) t) -> (t, Nu ((,) t))
-    In the second argument of ‘(.)’, namely ‘out’
-    In the expression: (\ (_, b) -> ((outI . fmap h) b)) . out
-    Relevant bindings include
-      h :: Nu ((,) t) -> Nu g (bound at T8142.hs:6:18)
+    • Couldn't match type ‘Nu ((,) t)’ with ‘g (Nu ((,) t))’
+      Expected type: Nu ((,) t) -> (t, g (Nu ((,) t)))
+        Actual type: Nu ((,) t) -> (t, Nu ((,) t))
+    • In the second argument of ‘(.)’, namely ‘out’
+      In the expression: (\ (_, b) -> ((outI . fmap h) b)) . out
+      In an equation for ‘h’: h = (\ (_, b) -> ((outI . fmap h) b)) . out
+    • Relevant bindings include
+        h :: Nu ((,) t) -> Nu g (bound at T8142.hs:6:18)

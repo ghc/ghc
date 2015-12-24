@@ -1,9 +1,9 @@
 
 tcfail005.hs:3:9: error:
-    • Couldn't match expected type ‘[r]’
+    • Couldn't match expected type ‘[t]’
                   with actual type ‘(Integer, Char)’
     • In the expression: (1, 'a')
       In a pattern binding: (h : i) = (1, 'a')
     • Relevant bindings include
-        h :: r (bound at tcfail005.hs:3:2)
-        i :: [r] (bound at tcfail005.hs:3:4)
+        h :: t (bound at tcfail005.hs:3:2)
+        i :: [t] (bound at tcfail005.hs:3:4)

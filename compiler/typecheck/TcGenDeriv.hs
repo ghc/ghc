@@ -1639,10 +1639,10 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
        | otherwise        = (caseWrongArg, True)   -- Non-decomposable (eg type function)
        where
          (xrs,xcs) = unzip (map (go co) args)
-    go co (ForAllTy (Named v Invisible) x) | v /= var && xc = (caseForAll v xr,True)
+    go _  (ForAllTy (Named _ Visible) _) = panic "unexpected visible binder"
+    go co (ForAllTy (Named v _)       x) | v /= var && xc = (caseForAll v xr,True)
         where (xr,xc) = go co x
 
-    go _ (ForAllTy (Named _ Visible) _) = panic "unexpected visible binder"
     go _ _ = (caseTrivial,False)
 
 -- Return all syntactic subterms of ty that contain var somewhere
@@ -2052,7 +2052,7 @@ genAuxBindSpec loc (DerivCon2Tag tycon)
     rdr_name = con2tag_RDR tycon
 
     sig_ty = mkLHsSigWcType $ L loc $ HsCoreTy $
-             mkInvSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
+             mkSpecSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
              mkParentType tycon `mkFunTy` intPrimTy
 
     lots_of_constructors = tyConFamilySize tycon > 8
@@ -2076,7 +2076,7 @@ genAuxBindSpec loc (DerivTag2Con tycon)
      L loc (TypeSig [L loc rdr_name] sig_ty))
   where
     sig_ty = mkLHsSigWcType $ L loc $
-             HsCoreTy $ mkInvForAllTys (tyConTyVars tycon) $
+             HsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
              intTy `mkFunTy` mkParentType tycon
 
     rdr_name = tag2con_RDR tycon

@@ -25,7 +25,7 @@ module HsUtils(
   mkHsWrap, mkLHsWrap, mkHsWrapCo, mkHsWrapCoR, mkLHsWrapCo,
   mkHsDictLet, mkHsLams,
   mkHsOpApp, mkHsDo, mkHsComp, mkHsWrapPat, mkHsWrapPatCo,
-  mkLHsPar, mkHsCmdCast,
+  mkLHsPar, mkHsCmdWrap, mkLHsCmdWrap, isLHsTypeExpr_maybe, isLHsTypeExpr,
 
   nlHsTyApp, nlHsTyApps, nlHsVar, nlHsLit, nlHsApp, nlHsApps, nlHsIntLit, nlHsVarApps,
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
@@ -445,6 +445,21 @@ nlHsFunTy a b           = noLoc (HsFunTy a b)
 nlHsTyConApp :: name -> [LHsType name] -> LHsType name
 nlHsTyConApp tycon tys  = foldl nlHsAppTy (nlHsTyVar tycon) tys
 
+-- | Extract a type argument from an HsExpr, with the list of wildcards in
+-- the type
+isLHsTypeExpr_maybe :: LHsExpr name -> Maybe (LHsWcType name)
+isLHsTypeExpr_maybe (L _ (HsPar e))       = isLHsTypeExpr_maybe e
+isLHsTypeExpr_maybe (L _ (HsType ty))     = Just ty
+  -- the HsTypeOut case is ill-typed. We never need it here anyway.
+isLHsTypeExpr_maybe _                     = Nothing
+
+-- | Is an expression a visible type application?
+isLHsTypeExpr :: LHsExpr name -> Bool
+isLHsTypeExpr (L _ (HsPar e))     = isLHsTypeExpr e
+isLHsTypeExpr (L _ (HsType _))    = True
+isLHsTypeExpr (L _ (HsTypeOut _)) = True
+isLHsTypeExpr _                   = False
+
 {-
 Tuples.  All these functions are *pre-typechecker* because they lack
 types on the tuple.
@@ -609,9 +624,12 @@ mkHsWrapCoR co e = mkHsWrap (mkWpCastR co) e
 mkLHsWrapCo :: TcCoercionN -> LHsExpr id -> LHsExpr id
 mkLHsWrapCo co (L loc e) = L loc (mkHsWrapCo co e)
 
-mkHsCmdCast :: TcCoercion -> HsCmd id -> HsCmd id
-mkHsCmdCast co cmd | isTcReflCo co = cmd
-                   | otherwise     = HsCmdCast co cmd
+mkHsCmdWrap :: HsWrapper -> HsCmd id -> HsCmd id
+mkHsCmdWrap w cmd | isIdHsWrapper w = cmd
+                  | otherwise       = HsCmdWrap w cmd
+
+mkLHsCmdWrap :: HsWrapper -> LHsCmd id -> LHsCmd id
+mkLHsCmdWrap w (L loc c) = L loc (mkHsCmdWrap w c)
 
 mkHsWrapPat :: HsWrapper -> Pat id -> Type -> Pat id
 mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p

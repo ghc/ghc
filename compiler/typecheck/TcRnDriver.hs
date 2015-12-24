@@ -1974,7 +1974,7 @@ tcRnExpr hsc_env rdr_expr
     uniq <- newUnique ;
     let { fresh_it  = itName uniq (getLoc rdr_expr) } ;
     (tclvl, lie, (_tc_expr, res_ty)) <- pushLevelAndCaptureConstraints $
-                                        tcInferRho rn_expr ;
+                                        tcInferSigma rn_expr ;
     ((qtvs, dicts, _), lie_top) <- captureConstraints $
                                    {-# SCC "simplifyInfer" #-}
                                    simplifyInfer tclvl

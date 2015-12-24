@@ -2245,6 +2245,56 @@ data constructor in an import or export list with the keyword
 ``pattern``, to allow the import or export of a data constructor without
 its parent type constructor (see :ref:`patsyn-impexp`).
 
+.. _visible-type-application:
+
+Visible type application
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``-XTypeApplications`` extension allows you to use
+*visible type application* in expressions. Here is an
+example: ``show (read @Int "5")``. The ``@Int``
+is the visible type application; it specifies the value of the type variable
+in ``read``'s type.
+
+A visible type application is preceded with an ``@``
+sign. (To disambiguate the syntax, the ``@`` must be
+preceded with a non-identifier letter, usually a space. For example,
+``read@Int 5`` would not parse.) It can be used whenever
+the full polymorphic type of the function is known. If the function
+is an identifier (the common case), its type is considered known only when
+the identifier has been given a type signature. If the identifier does
+not have a type signature, visible type application cannot be used.
+
+Here are the details:
+
+- If an identifier's type signature does not include an
+  explicit ``forall``, the type variable arguments appear
+  in the left-to-right order in which the variables appear in the type.
+  So, ``foo :: Monad m => a b -> m (a c)``
+  will have its type variables
+  ordered as ``m, a, b, c``.
+
+- Class methods' type arguments include the class type
+  variables, followed by any variables an individual method is polymorphic
+  in. So, ``class Monad m where return :: a -> m a`` means
+  that ``return``'s type arguments are ``m, a``.
+
+- With the ``-XRankNTypes`` extension
+  (:ref:`universal-quantification`), it is possible to declare
+  type arguments somewhere other than the beginning of a type. For example,
+  we can have ``pair :: forall a. a -> forall b. b -> (a, b)``
+  and then say ``pair @Bool True @Char`` which would have
+  type ``Char -> (Bool, Char)``.
+
+- Partial type signatures (:ref:`partial-type-signatures`)
+  work nicely with visible type
+  application. If you want to specify only the second type argument to
+  ``wurble``, then you can say ``wurble @_ @Int``.
+  The first argument is a wildcard, just like in a partial type signature.
+  However, if used in a visible type application, it is *not*
+  necessary to specify ``-XPartialTypeSignatures`` and your
+  code will not generate a warning informing you of the omitted type.
+
 .. _syntax-stolen:
 
 Summary of stolen syntax

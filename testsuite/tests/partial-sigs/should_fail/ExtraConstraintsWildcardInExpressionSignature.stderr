@@ -1,4 +1,4 @@
 
 ExtraConstraintsWildcardInExpressionSignature.hs:3:20: error:
-    Extra-contraint wildcard ‘_’ not allowed
+    Extra-constraint wildcard ‘_’ not allowed
       in an expression type signature

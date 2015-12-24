@@ -1,11 +1,12 @@
 
-tcfail131.hs:7:9: error:
-    • Couldn't match expected type ‘b’ with actual type ‘Integer’
+tcfail131.hs:7:11: error:
+    • Couldn't match expected type ‘Integer’ with actual type ‘b’
       ‘b’ is a rigid type variable bound by
         the type signature for:
           g :: forall b. Num b => b -> b
         at tcfail131.hs:6:8
-    • In the expression: f x x
+    • In the first argument of ‘f’, namely ‘x’
+      In the expression: f x x
       In an equation for ‘g’: g x = f x x
     • Relevant bindings include
         x :: b (bound at tcfail131.hs:7:5)

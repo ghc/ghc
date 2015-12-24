@@ -3210,6 +3210,7 @@ xFlags = [
   flagSpec "TraditionalRecordSyntax"          LangExt.TraditionalRecordSyntax,
   flagSpec "TransformListComp"                LangExt.TransformListComp,
   flagSpec "TupleSections"                    LangExt.TupleSections,
+  flagSpec "TypeApplications"                 LangExt.TypeApplications,
   flagSpec "TypeInType"                       LangExt.TypeInType,
   flagSpec "TypeFamilies"                     LangExt.TypeFamilies,
   flagSpec "TypeOperators"                    LangExt.TypeOperators,
@@ -3324,6 +3325,7 @@ impliedXFlags
 
     , (LangExt.TemplateHaskell, turnOn, LangExt.TemplateHaskellQuotes)
     , (LangExt.Strict, turnOn, LangExt.StrictData)
+    , (LangExt.TypeApplications, turnOn, LangExt.AllowAmbiguousTypes)
   ]
 
 -- Note [Documenting optimisation flags]

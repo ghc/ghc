@@ -25,4 +25,4 @@ T10438.hs:7:22: warning:
         r :: r2 (bound at T10438.hs:6:11)
         g :: r2 -> r2 (bound at T10438.hs:6:9)
         f :: r (bound at T10438.hs:5:5)
-        foo :: r -> r1 -> r1 (bound at T10438.hs:5:1)
+        foo :: r -> forall r1. r1 -> r1 (bound at T10438.hs:5:1)

@@ -35,7 +35,8 @@ module Type (
         splitListTyConApp_maybe,
         repSplitTyConApp_maybe,
 
-        mkForAllTy, mkForAllTys, mkInvForAllTys, mkVisForAllTys,
+        mkForAllTy, mkForAllTys, mkInvForAllTys, mkSpecForAllTys,
+        mkVisForAllTys,
         mkNamedForAllTy,
         splitForAllTy_maybe, splitForAllTys, splitForAllTy,
         splitPiTy_maybe, splitPiTys, splitPiTy,
@@ -83,6 +84,7 @@ module Type (
         predTypeEqRel,
 
         -- ** Binders
+        sameVis,
         mkNamedBinder, mkAnonBinder, isNamedBinder, isAnonBinder,
         isIdLikeBinder, binderVisibility, binderVar_maybe,
         binderVar, binderRelevantType_maybe, caseBinder,
@@ -1187,6 +1189,12 @@ mkInvForAllTys :: [TyVar] -> Type -> Type
 mkInvForAllTys tvs = ASSERT( all isTyVar tvs )
                      mkForAllTys (map (flip Named Invisible) tvs)
 
+-- | Like mkForAllTys, but assumes all variables are dependent and specified,
+-- a common case
+mkSpecForAllTys :: [TyVar] -> Type -> Type
+mkSpecForAllTys tvs = ASSERT( all isTyVar tvs )
+                      mkForAllTys (map (flip Named Specified) tvs)
+
 -- | Like mkForAllTys, but assumes all variables are dependent and visible
 mkVisForAllTys :: [TyVar] -> Type -> Type
 mkVisForAllTys tvs = ASSERT( all isTyVar tvs )
@@ -1196,6 +1204,7 @@ mkPiType  :: Var -> Type -> Type
 -- ^ Makes a @(->)@ type or an implicit forall type, depending
 -- on whether it is given a type variable or a term variable.
 -- This is used, for example, when producing the type of a lambda.
+-- Always uses Invisible binders.
 mkPiTypes :: [Var] -> Type -> Type
 -- ^ 'mkPiType' for multiple type or value arguments
 
@@ -1422,14 +1431,6 @@ mkNamedBinder = Named
 mkAnonBinder :: Type -> TyBinder
 mkAnonBinder = Anon
 
-isNamedBinder :: TyBinder -> Bool
-isNamedBinder (Named {}) = True
-isNamedBinder _          = False
-
-isAnonBinder :: TyBinder -> Bool
-isAnonBinder (Anon {}) = True
-isAnonBinder _         = False
-
 -- | Does this binder bind a variable that is /not/ erased? Returns
 -- 'True' for anonymous binders.
 isIdLikeBinder :: TyBinder -> Bool
@@ -1447,15 +1448,6 @@ binderVisibility (Named _ vis) = vis
 binderVisibility (Anon ty)
   | isVisibleType ty = Visible
   | otherwise        = Invisible
-
--- | Does this binder bind an invisible argument?
-isInvisibleBinder :: TyBinder -> Bool
-isInvisibleBinder (Named _ vis) = vis == Invisible
-isInvisibleBinder (Anon ty)     = isPredTy ty
-
--- | Does this binder bind a visible argument?
-isVisibleBinder :: TyBinder -> Bool
-isVisibleBinder = not . isInvisibleBinder
 
 -- | Extract a bound variable in a binder, if any
 binderVar_maybe :: TyBinder -> Maybe Var

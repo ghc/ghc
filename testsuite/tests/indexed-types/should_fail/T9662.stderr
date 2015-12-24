@@ -6,7 +6,7 @@ T9662.hs:47:8: error:
           test :: forall sh k m n.
                   Shape (((sh :. k) :. m) :. n) -> Shape (((sh :. m) :. n) :. k)
         at T9662.hs:44:9
-      Expected type: Exp (((sh :. k) :. m) :. n)
+      Expected type: Exp (((sh :. m) :. n) :. k)
                      -> Exp (((sh :. m) :. n) :. k)
         Actual type: Exp
                        (Tuple (((Atom a0 :. Atom Int) :. Atom Int) :. Atom Int))
@@ -22,6 +22,13 @@ T9662.hs:47:8: error:
              (atom :. atom :. atom :. atom)
              (\ (sh :. k :. m :. n) -> (sh :. m :. n :. k)))
           id
+      In an equation for ‘test’:
+          test
+            = backpermute
+                (modify
+                   (atom :. atom :. atom :. atom)
+                   (\ (sh :. k :. m :. n) -> (sh :. m :. n :. k)))
+                id
     • Relevant bindings include
         test :: Shape (((sh :. k) :. m) :. n)
                 -> Shape (((sh :. m) :. n) :. k)

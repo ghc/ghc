@@ -247,13 +247,14 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
                   tcPolyCheck NonRecursive no_prag_fn local_dm_sig
                               (L bind_loc lm_bind)
 
-        ; let export = ABE { abe_poly  = global_dm_id
+        ; let export = ABE { abe_poly      = global_dm_id
                            -- We have created a complete type signature in
                            -- instTcTySig, hence it is safe to call
                            -- completeSigPolyId
-                           , abe_mono  = completeIdSigPolyId local_dm_sig
-                           , abe_wrap  = idHsWrapper
-                           , abe_prags = IsDefaultMethod }
+                           , abe_mono      = completeIdSigPolyId local_dm_sig
+                           , abe_wrap      = idHsWrapper
+                           , abe_inst_wrap = idHsWrapper
+                           , abe_prags     = IsDefaultMethod }
               full_bind = AbsBinds { abs_tvs      = tyvars
                                    , abs_ev_vars  = [this_dict]
                                    , abs_exports  = [export]

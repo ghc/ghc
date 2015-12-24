@@ -25,7 +25,7 @@ module PatSyn (
 #include "HsVersions.h"
 
 import Type
-import TcType( mkInvSigmaTy )
+import TcType( mkSpecSigmaTy )
 import Name
 import Outputable
 import Unique
@@ -328,8 +328,8 @@ patSynType :: PatSyn -> Type
 patSynType (MkPatSyn { psUnivTyVars = univ_tvs, psReqTheta = req_theta
                      , psExTyVars   = ex_tvs,   psProvTheta = prov_theta
                      , psArgs = orig_args, psOrigResTy = orig_res_ty })
-  = mkInvSigmaTy univ_tvs req_theta $
-    mkInvSigmaTy ex_tvs prov_theta $
+  = mkSpecSigmaTy univ_tvs req_theta $  -- use mkSpecSigmaTy because it
+    mkSpecSigmaTy ex_tvs prov_theta $   -- prints better
     mkFunTys orig_args orig_res_ty
 
 -- | Should the 'PatSyn' be presented infix?

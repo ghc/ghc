@@ -573,7 +573,7 @@ mk_tuple boxity arity = (tycon, tuple_con)
             in
             ( UnboxedTuple
             , gHC_PRIM
-            , mkInvForAllTys lev_tvs $
+            , mkSpecForAllTys lev_tvs $
               mkFunTys (map tyVarKind open_tvs) $
               unliftedTypeKind
             , arity * 2
@@ -633,7 +633,7 @@ heqSCSelId, coercibleSCSelId :: Id
     klass     = mkClass tvs [] [sc_pred] [sc_sel_id] [] [] (mkAnd []) tycon
     datacon   = pcDataCon heqDataConName tvs [sc_pred] tycon
 
-    kind      = mkInvForAllTys [kv1, kv2] $ mkFunTys [k1, k2] constraintKind
+    kind      = mkSpecForAllTys [kv1, kv2] $ mkFunTys [k1, k2] constraintKind
     kv1:kv2:_ = drop 9 alphaTyVars -- gets "j" and "k"
     k1        = mkTyVarTy kv1
     k2        = mkTyVarTy kv2
@@ -654,7 +654,7 @@ heqSCSelId, coercibleSCSelId :: Id
     klass     = mkClass tvs [] [sc_pred] [sc_sel_id] [] [] (mkAnd []) tycon
     datacon   = pcDataCon coercibleDataConName tvs [sc_pred] tycon
 
-    kind      = mkInvForAllTys [kKiVar] $ mkFunTys [k, k] constraintKind
+    kind      = mkSpecForAllTys [kKiVar] $ mkFunTys [k, k] constraintKind
     k         = mkTyVarTy kKiVar
     [av,bv]   = mkTemplateTyVars [k, k]
     tvs       = [kKiVar, av, bv]

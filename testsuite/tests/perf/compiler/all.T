@@ -394,7 +394,7 @@ test('T5631',
         # expected value: 392904228 (x86/Linux)
         # 2014-04-04:     346389856 (x86 Windows, 64 bit machine)
         # 2014-12-01:     390199244 (Windows laptop)
-           (wordsize(64), 1128828928, 5)]),
+           (wordsize(64), 1198327544, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
         # expected value: 690742040 (amd64/Linux) Call Arity improvements
@@ -402,6 +402,7 @@ test('T5631',
         # 2014-11-04:     776121120 (amd64/Linux) new-flatten-skolems
         # 2015-06-01:     812288344 (amd64/Linux) unknown cause
 	# 2015-12-11:     1128828928 (amd64/Linux) TypeInType (see #11196)
+	# 2015-12-21:     1198327544 (Mac) TypeApplications (will fix with #11196)
        only_ways(['normal'])
       ],
      compile,

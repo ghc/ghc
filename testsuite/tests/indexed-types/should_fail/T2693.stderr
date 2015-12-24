@@ -4,6 +4,7 @@ T2693.hs:12:15: error:
       The type variables ‘b1’, ‘a6’, ‘a8’ are ambiguous
     • In the first argument of ‘fst’, namely ‘x’
       In the first argument of ‘(+)’, namely ‘fst x’
+      In the expression: fst x + fst x
     • Relevant bindings include n :: a8 (bound at T2693.hs:12:7)
 
 T2693.hs:12:23: error:
@@ -11,6 +12,7 @@ T2693.hs:12:23: error:
       The type variables ‘b2’, ‘a7’, ‘a8’ are ambiguous
     • In the first argument of ‘fst’, namely ‘x’
       In the second argument of ‘(+)’, namely ‘fst x’
+      In the expression: fst x + fst x
     • Relevant bindings include n :: a8 (bound at T2693.hs:12:7)
 
 T2693.hs:19:15: error:
@@ -18,6 +20,7 @@ T2693.hs:19:15: error:
       The type variables ‘b0’, ‘a2’, ‘a5’ are ambiguous
     • In the first argument of ‘fst’, namely ‘x’
       In the first argument of ‘(+)’, namely ‘fst x’
+      In the expression: fst x + snd x
     • Relevant bindings include n :: a5 (bound at T2693.hs:19:7)
 
 T2693.hs:19:23: error:
@@ -25,6 +28,7 @@ T2693.hs:19:23: error:
       The type variables ‘a3’, ‘a4’, ‘a5’ are ambiguous
     • In the first argument of ‘snd’, namely ‘x’
       In the second argument of ‘(+)’, namely ‘snd x’
+      In the expression: fst x + snd x
     • Relevant bindings include n :: a5 (bound at T2693.hs:19:7)
 
 T2693.hs:29:20: error:
@@ -34,3 +38,7 @@ T2693.hs:29:20: error:
         Actual type: () -> Maybe (TFn a0)
     • In the first argument of ‘mapM’, namely ‘g’
       In a stmt of a 'do' block: pvs <- mapM g undefined
+      In the expression:
+        do { pvs <- mapM g undefined;
+             let n = (map pvrX pvs) `min` (map pvrX pvs);
+             undefined }

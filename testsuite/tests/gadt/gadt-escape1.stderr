@@ -10,8 +10,10 @@ gadt-escape1.hs:19:58: error:
         the inferred type of weird1 :: r at gadt-escape1.hs:19:1
       Possible fix: add a type signature for ‘weird1’
       Expected type: r
-      Actual type: ExpGADT t
+        Actual type: ExpGADT t
     • In the expression: a
       In a case alternative: Hidden (ExpInt _) a -> a
+      In the expression:
+        case (hval :: Hidden) of { Hidden (ExpInt _) a -> a }
     • Relevant bindings include
         weird1 :: r (bound at gadt-escape1.hs:19:1)

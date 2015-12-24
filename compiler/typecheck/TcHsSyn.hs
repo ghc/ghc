@@ -320,6 +320,7 @@ zonkTyBndrX :: ZonkEnv -> TyVar -> TcM (ZonkEnv, TyVar)
 zonkTyBndrX env tv
   = ASSERT( isImmutableTyVar tv )
     do { ki <- zonkTcTypeToType env (tyVarKind tv)
+               -- Internal names tidy up better, for iface files.
        ; let tv' = mkTyVar (tyVarName tv) ki
        ; return (extendTyZonkEnv1 env tv', tv') }
 
@@ -433,12 +434,15 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
                           , abs_ev_binds = new_ev_binds
                           , abs_exports = new_exports, abs_binds = new_val_bind }) }
   where
-    zonkExport env (ABE{ abe_wrap = wrap, abe_poly = poly_id
+    zonkExport env (ABE{ abe_wrap = wrap, abe_inst_wrap = inst_wrap
+                       , abe_poly = poly_id
                        , abe_mono = mono_id, abe_prags = prags })
         = do new_poly_id <- zonkIdBndr env poly_id
              (_, new_wrap) <- zonkCoFn env wrap
+             (_, new_inst_wrap) <- zonkCoFn env inst_wrap
              new_prags <- zonkSpecPrags env prags
-             return (ABE{ abe_wrap = new_wrap, abe_poly = new_poly_id
+             return (ABE{ abe_wrap = new_wrap, abe_inst_wrap = new_inst_wrap
+                        , abe_poly = new_poly_id
                         , abe_mono = zonkIdOcc env mono_id
                         , abe_prags = new_prags })
 
@@ -731,6 +735,9 @@ zonkExpr env (HsWrap co_fn expr)
 zonkExpr _ (HsUnboundVar v)
   = return (HsUnboundVar v)
 
+  -- nothing to do here. The payload is an LHsType, not a Type.
+zonkExpr _ e@(HsTypeOut {}) = return e
+
 zonkExpr _ expr = pprPanic "zonkExpr" (ppr expr)
 
 -------------------------------------------------------------------------
@@ -740,10 +747,10 @@ zonkCmd   :: ZonkEnv -> HsCmd TcId    -> TcM (HsCmd Id)
 
 zonkLCmd  env cmd  = wrapLocM (zonkCmd env) cmd
 
-zonkCmd env (HsCmdCast co cmd)
-  = do { co' <- zonkCoToCo env co
-       ; cmd' <- zonkCmd env cmd
-       ; return (HsCmdCast co' cmd') }
+zonkCmd env (HsCmdWrap w cmd)
+  = do { (env1, w') <- zonkCoFn env w
+       ; cmd' <- zonkCmd env1 cmd
+       ; return (HsCmdWrap w' cmd') }
 zonkCmd env (HsCmdArrApp e1 e2 ty ho rl)
   = do new_e1 <- zonkLExpr env e1
        new_e2 <- zonkLExpr env e2
@@ -811,11 +818,10 @@ zonkCoFn env WpHole   = return (env, WpHole)
 zonkCoFn env (WpCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
                                     ; (env2, c2') <- zonkCoFn env1 c2
                                     ; return (env2, WpCompose c1' c2') }
-zonkCoFn env (WpFun c1 c2 t1 t2) = do { (env1, c1') <- zonkCoFn env c1
-                                      ; (env2, c2') <- zonkCoFn env1 c2
-                                      ; t1'         <- zonkTcTypeToType env2 t1
-                                      ; t2'         <- zonkTcTypeToType env2 t2
-                                      ; return (env2, WpFun c1' c2' t1' t2') }
+zonkCoFn env (WpFun c1 c2 t1) = do { (env1, c1') <- zonkCoFn env c1
+                                   ; (env2, c2') <- zonkCoFn env1 c2
+                                   ; t1'         <- zonkTcTypeToType env2 t1
+                                   ; return (env2, WpFun c1' c2' t1') }
 zonkCoFn env (WpCast co) = do { co' <- zonkCoToCo env co
                               ; return (env, WpCast co') }
 zonkCoFn env (WpEvLam ev)   = do { (env', ev') <- zonkEvBndrX env ev

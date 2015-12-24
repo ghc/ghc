@@ -309,11 +309,12 @@ checkValidType ctxt ty
                  RuleSigCtxt _  -> rank1
                  TySynCtxt _    -> rank0
 
-                 ExprSigCtxt     -> rank1
-                 FunSigCtxt {}   -> rank1
-                 InfSigCtxt _    -> ArbitraryRank        -- Inferred type
-                 ConArgCtxt _    -> rank1 -- We are given the type of the entire
-                                          -- constructor, hence rank 1
+                 ExprSigCtxt    -> rank1
+                 TypeAppCtxt    -> rank0
+                 FunSigCtxt {}  -> rank1
+                 InfSigCtxt _   -> ArbitraryRank        -- Inferred type
+                 ConArgCtxt _   -> rank1 -- We are given the type of the entire
+                                         -- constructor, hence rank 1
 
                  ForSigCtxt _   -> rank1
                  SpecInstCtxt   -> rank1
@@ -381,6 +382,7 @@ expectedKindInCtxt GhciCtxt        = AnythingKind
 -- The types in a 'default' decl can have varying kinds
 -- See Note [Extended defaults]" in TcEnv
 expectedKindInCtxt DefaultDeclCtxt = AnythingKind
+expectedKindInCtxt TypeAppCtxt     = AnythingKind
 expectedKindInCtxt (ForSigCtxt _)  = TheKind liftedTypeKind
 expectedKindInCtxt InstDeclCtxt    = TheKind constraintKind
 expectedKindInCtxt SpecInstCtxt    = TheKind constraintKind
@@ -791,6 +793,7 @@ okIPCtxt :: UserTypeCtxt -> Bool
 okIPCtxt (FunSigCtxt {})    = True
 okIPCtxt (InfSigCtxt {})    = True
 okIPCtxt ExprSigCtxt        = True
+okIPCtxt TypeAppCtxt        = True
 okIPCtxt PatSigCtxt         = True
 okIPCtxt ResSigCtxt         = True
 okIPCtxt GenSigCtxt         = True
@@ -1080,7 +1083,7 @@ checkValidInstance ctxt hs_type ty
           else checkInstTermination inst_tys theta
 
         ; case (checkInstCoverage undecidable_ok clas theta inst_tys) of
-            IsValid  -> return ()   -- Check succeeded
+            IsValid      -> return ()   -- Check succeeded
             NotValid msg -> addErrTc (instTypeErr clas inst_tys msg)
 
         ; return (tvs, theta, clas, inst_tys) }

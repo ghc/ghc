@@ -872,7 +872,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                 | otherwise
                 = SpecPrags spec_inst_prags
 
-             export = ABE { abe_wrap = idHsWrapper, abe_poly = dfun_id
+             export = ABE { abe_wrap = idHsWrapper, abe_inst_wrap = idHsWrapper
+                          , abe_poly = dfun_id
                           , abe_mono = self_dict, abe_prags = dfun_spec_prags }
                           -- NB: see Note [SPECIALISE instance pragmas]
              main_bind = AbsBinds { abs_tvs = inst_tyvars
@@ -986,7 +987,9 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds _fam_envs sc_t
            ; addTcEvBind ev_binds_var $ mkWantedEvBind sc_ev_id sc_ev_tm
            ; let sc_top_ty = mkInvForAllTys tyvars (mkPiTypes dfun_evs sc_pred)
                  sc_top_id = mkLocalId sc_top_name sc_top_ty
-                 export = ABE { abe_wrap = idHsWrapper, abe_poly = sc_top_id
+                 export = ABE { abe_wrap = idHsWrapper
+                              , abe_inst_wrap = idHsWrapper
+                              , abe_poly = sc_top_id
                               , abe_mono = sc_ev_id
                               , abe_prags = SpecPrags [] }
                  local_ev_binds = TcEvBinds ev_binds_var
@@ -1318,7 +1321,8 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                         -- method to this version. Note [INLINE and default methods]
 
 
-                 export = ABE { abe_wrap = hs_wrap, abe_poly = meth_id1
+                 export = ABE { abe_wrap = hs_wrap, abe_inst_wrap = idHsWrapper
+                              , abe_poly = meth_id1
                               , abe_mono = local_meth_id
                               , abe_prags = mk_meth_spec_prags meth_id1 spec_inst_prags [] }
                  bind = AbsBinds { abs_tvs = tyvars, abs_ev_vars = dfun_ev_vars
@@ -1374,10 +1378,11 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                               (L bind_loc lm_bind)
 
         ; let specs  = mk_meth_spec_prags global_meth_id spec_inst_prags spec_prags
-              export = ABE { abe_poly  = global_meth_id
-                           , abe_mono  = local_meth_id
-                           , abe_wrap  = hs_wrap
-                           , abe_prags = specs }
+              export = ABE { abe_poly      = global_meth_id
+                           , abe_mono      = local_meth_id
+                           , abe_wrap      = hs_wrap
+                           , abe_inst_wrap = idHsWrapper
+                           , abe_prags     = specs }
 
               local_ev_binds = TcEvBinds ev_binds_var
               full_bind = AbsBinds { abs_tvs      = tyvars
@@ -1417,7 +1422,7 @@ mkMethIds sig_fn clas tyvars dfun_ev_vars inst_tys sel_id
                   do { inst_sigs <- xoptM LangExt.InstanceSigs
                      ; checkTc inst_sigs (misplacedInstSig sel_name lhs_ty)
                      ; sig_ty  <- tcHsSigType (FunSigCtxt sel_name False) lhs_ty
-                     ; let poly_sig_ty = mkInvSigmaTy tyvars theta sig_ty
+                     ; let poly_sig_ty = mkSpecSigmaTy tyvars theta sig_ty
                            ctxt = FunSigCtxt sel_name True
                      ; tc_sig  <- instTcTySig ctxt lhs_ty sig_ty local_meth_name
                      ; hs_wrap <- addErrCtxtM (methSigCtxt sel_name poly_sig_ty poly_meth_ty) $
@@ -1438,7 +1443,7 @@ mkMethIds sig_fn clas tyvars dfun_ev_vars inst_tys sel_id
     sel_name      = idName sel_id
     sel_occ       = nameOccName sel_name
     local_meth_ty = instantiateMethod clas sel_id inst_tys
-    poly_meth_ty  = mkInvSigmaTy tyvars theta local_meth_ty
+    poly_meth_ty  = mkSpecSigmaTy tyvars theta local_meth_ty
     theta         = map idType dfun_ev_vars
 
 methSigCtxt :: Name -> TcType -> TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)

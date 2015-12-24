@@ -963,7 +963,7 @@ ppr_rough Nothing   = dot
 ppr_rough (Just tc) = ppr tc
 
 tv_to_forall_bndr :: IfaceTvBndr -> IfaceForAllBndr
-tv_to_forall_bndr tv = IfaceTv tv Invisible
+tv_to_forall_bndr tv = IfaceTv tv Specified
 
 {-
 Note [Result type of a data family GADT]

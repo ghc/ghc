@@ -120,6 +120,7 @@ data Extension
    | PartialTypeSignatures
    | NamedWildCards
    | StaticPointers
+   | TypeApplications
    | Strict
    | StrictData
    | MonadFailDesugaring

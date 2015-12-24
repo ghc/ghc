@@ -15,7 +15,7 @@ module TcBinds ( tcLocalBinds, tcTopBinds, tcRecSelBinds,
                  TcPragEnv, mkPragEnv,
                  tcUserTypeSig, instTcTySig, chooseInferredQuantifiers,
                  instTcTySigFromId, tcExtendTyVarEnvFromSig,
-                 badBootDeclErr, mkExport ) where
+                 badBootDeclErr ) where
 
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
@@ -32,7 +32,7 @@ import TcEvidence
 import TcHsType
 import TcPat
 import TcMType
-import Inst( deeplyInstantiate )
+import Inst( topInstantiate, deeplyInstantiate )
 import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
 import TyCon
@@ -556,7 +556,7 @@ tcPolyNoGen rec_tc prag_fn tc_sig_fn bind_list
        ; mono_ids' <- mapM tc_mono_info mono_infos
        ; return (binds', mono_ids') }
   where
-    tc_mono_info (name, _, mono_id)
+    tc_mono_info (MBI { mbi_poly_name = name, mbi_mono_id = mono_id })
       = do { mono_ty' <- zonkTcType (idType mono_id)
              -- Zonk, mainly to expose unboxed types to checkStrictBinds
            ; let mono_id' = setIdType mono_id mono_ty'
@@ -601,11 +601,11 @@ tcPolyCheck rec_tc prag_fn
        ; spec_prags <- tcSpecPrags poly_id prag_sigs
        ; poly_id    <- addInlinePrags poly_id prag_sigs
 
-       ; let (_, _, mono_id) = mono_info
-             export = ABE { abe_wrap = idHsWrapper
-                          , abe_poly = poly_id
-                          , abe_mono = mono_id
-                          , abe_prags = SpecPrags spec_prags }
+       ; let export = ABE { abe_wrap      = idHsWrapper
+                          , abe_inst_wrap = idHsWrapper
+                          , abe_poly      = poly_id
+                          , abe_mono      = mbi_mono_id mono_info
+                          , abe_prags     = SpecPrags spec_prags }
              abs_bind = L loc $ AbsBinds
                         { abs_tvs = skol_tvs
                         , abs_ev_vars = ev_vars, abs_ev_binds = [ev_binds]
@@ -616,6 +616,54 @@ tcPolyCheck _rec_tc _prag_fn sig _bind
   = pprPanic "tcPolyCheck" (ppr sig)
 
 ------------------
+{-
+Note [Instantiate when inferring a type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  f = (*)
+As there is no incentive to instantiate the RHS, tcMonoBinds will
+produce a type of forall a. Num a => a -> a -> a for `f`. This will then go
+through simplifyInfer and such, remaining unchanged.
+
+There are two problems with this:
+ 1) If the definition were `g _ = (*)`, we get a very unusual type of
+    `forall {a}. a -> forall b. Num b => b -> b -> b` for `g`. This is
+    surely confusing for users.
+
+ 2) The monomorphism restriction can't work. The MR is dealt with in
+    simplifyInfer, and simplifyInfer has no way of instantiating. This
+    could perhaps be worked around, but it may be hard to know even
+    when instantiation should happen.
+
+There is an easy solution to all three problems: instantiate (deeply) when
+inferring a type. So that's what we do. Note that this decision is
+user-facing.
+
+Here are the details:
+ * tcMonoBinds produces the "monomorphic" ids to be put in the AbsBinds.
+   It is inconvenient to instantiate in this function or below. So the
+   monomorphic ids will be uninstantiated (and hence actually polymorphic,
+   but that doesn't ruin anyone's day).
+
+ * In the same captureConstraints as the tcMonoBinds, we instantiate all
+   the types of the monomorphic ids. Instantiating will produce constraints
+   to solve and instantiated types. These constraints and the instantiated
+   types go into simplifyInfer. HsWrappers are produced that go from
+   the "mono" types to the instantiated ones.
+
+ * simplifyInfer does its magic, figuring out how to regeneralize.
+
+ * mkExport then does the impedence matching and needs to connect the
+   monomorphic ids to the polymorphic types as decided by simplifyInfer.
+   Because the instantiation happens before simplifyInfer, we also pass in
+   the HsWrappers obtained via instantiating so that mkExport can connect
+   all the pieces.
+
+ * We produce an AbsBinds with the right (instantiated and then, perhaps,
+   regeneralized) polytypes and the not-yet-instantiated "monomorphic" ids,
+   using the built HsWrappers to connect. Done!
+-}
+
 tcPolyInfer
   :: RecFlag       -- Whether it's recursive after breaking
                    -- dependencies based on type signatures
@@ -624,19 +672,36 @@ tcPolyInfer
   -> [LHsBind Name]
   -> TcM (LHsBinds TcId, [TcId])
 tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
-  = do { (tclvl, wanted, (binds', mono_infos))
+  = do { (tclvl, wanted, (binds', mono_infos, wrappers, insted_tys))
              <- pushLevelAndCaptureConstraints  $
-                tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
+             do { (binds', mono_infos)
+                    <- tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
+                  -- See Note [Instantiate when inferring a type]
+                ; traceTc "Note [Instantiate when inferring a type]" $
+                    vcat (map (pprBndr LetBind . mbi_mono_id) mono_infos)
+                ; (wrappers, insted_tys)
+                    <- tcExtendIdBndrs
+                         [ TcIdBndr mono_id NotTopLevel
+                         | MBI { mbi_mono_id = mono_id } <- mono_infos ] $
+                       mapAndUnzipM deeply_instantiate mono_infos
+                     -- during instantiation, we might encounter an error
+                     -- whose message will want to list these binders as
+                     -- relevant.
 
-       ; let name_taus = [(name, idType mono_id) | (name, _, mono_id) <- mono_infos]
-             sigs      = [ sig | (_, Just sig, _) <- mono_infos ]
+                ; return (binds', mono_infos, wrappers, insted_tys) }
+
+       ; let name_taus = [ (mbi_poly_name info, tau)
+                         | (info, tau) <- zip mono_infos insted_tys]
+             sigs      = [ sig | MBI { mbi_sig = Just sig } <- mono_infos ]
+
        ; traceTc "simplifyInfer call" (ppr tclvl $$ ppr name_taus $$ ppr wanted)
        ; (qtvs, givens, ev_binds)
                  <- simplifyInfer tclvl mono sigs name_taus wanted
 
        ; let inferred_theta = map evVarPred givens
        ; exports <- checkNoErrs $
-                    mapM (mkExport prag_fn qtvs inferred_theta) mono_infos
+                    zipWith3M (mkExport prag_fn qtvs inferred_theta)
+                              mono_infos wrappers insted_tys
 
        ; loc <- getSrcSpanM
        ; let poly_ids = map abe_poly exports
@@ -649,12 +714,23 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
        ; return (unitBag abs_bind, poly_ids) }
          -- poly_ids are guaranteed zonked by mkExport
 
+  where
+    deeply_instantiate :: MonoBindInfo -> TcM (HsWrapper, TcRhoType)
+    deeply_instantiate (MBI { mbi_mono_id = mono_id, mbi_orig = orig })
+      = do { mono_ty <- zonkTcType (idType mono_id)
+              -- NB: zonk to uncover any foralls
+           ; addErrCtxtM (instErrCtxt mono_id mono_ty) $
+             deeplyInstantiate orig mono_ty }
+
 --------------
 mkExport :: TcPragEnv
          -> [TyVar] -> TcThetaType      -- Both already zonked
          -> MonoBindInfo
+         -> HsWrapper -- the instantiation wrapper;
+                      -- see Note [Instantiate when inferring a type]
+         -> TcTauType -- the instantiated type
          -> TcM (ABExport Id)
--- Only called for generalisation plan IferGen, not by CheckGen or NoGen
+-- Only called for generalisation plan InferGen, not by CheckGen or NoGen
 --
 -- mkExport generates exports with
 --      zonked type variables,
@@ -667,14 +743,19 @@ mkExport :: TcPragEnv
 
 -- Pre-condition: the qtvs and theta are already zonked
 
-mkExport prag_fn qtvs theta mono_info@(poly_name, mb_sig, mono_id)
-  = do  { mono_ty  <- zonkTcType (idType mono_id)
+mkExport prag_fn qtvs theta
+         mono_info@(MBI { mbi_poly_name = poly_name
+                        , mbi_sig       = mb_sig
+                        , mbi_mono_id   = mono_id })
+         inst_wrap inst_ty
+  = do  { inst_ty <- zonkTcType inst_ty
+
         ; poly_id <- case mb_sig of
               Just sig | Just poly_id <- completeIdSigPolyId_maybe sig
                        -> return poly_id
               _other   -> checkNoErrs $
                           mkInferredPolyId qtvs theta
-                                           poly_name mb_sig mono_ty
+                                           poly_name mb_sig inst_ty
               -- The checkNoErrs ensures that if the type is ambiguous
               -- we don't carry on to the impedence matching, and generate
               -- a duplicate ambiguity error.  There is a similar
@@ -688,9 +769,12 @@ mkExport prag_fn qtvs theta mono_info@(poly_name, mb_sig, mono_id)
         -- See Note [Impedence matching]
         -- NB: we have already done checkValidType, including an ambiguity check,
         --     on the type; either when we checked the sig or in mkInferredPolyId
-        ; let sel_poly_ty = mkInvSigmaTy qtvs theta mono_ty
+        ; let sel_poly_ty = mkInvSigmaTy qtvs theta inst_ty
+                -- this type is just going into tcSubType, so Inv vs. Spec doesn't
+                -- matter
+
               poly_ty     = idType poly_id
-        ; wrap <- if sel_poly_ty `eqType` poly_ty
+        ; wrap <- if sel_poly_ty `eqType` poly_ty  -- NB: eqType ignores visibility
                   then return idHsWrapper  -- Fast path; also avoids complaint when we infer
                                            -- an ambiguouse type and have AllowAmbiguousType
                                            -- e..g infer  x :: forall a. F a -> Int
@@ -701,7 +785,8 @@ mkExport prag_fn qtvs theta mono_info@(poly_name, mb_sig, mono_id)
         ; when warn_missing_sigs $ localSigWarn poly_id mb_sig
 
         ; return (ABE { abe_wrap = wrap
-                        -- abe_wrap :: idType poly_id ~ (forall qtvs. theta => mono_ty)
+                        -- abe_wrap :: idType poly_id ~ (forall qtvs. theta => inst_ty)
+                      , abe_inst_wrap = inst_wrap
                       , abe_poly = poly_id
                       , abe_mono = mono_id
                       , abe_prags = SpecPrags spec_prags}) }
@@ -724,13 +809,12 @@ mkInferredPolyId qtvs inferred_theta poly_name mb_sig mono_ty
                -- We can discard the coercion _co, because we'll reconstruct
                -- it in the call to tcSubType below
 
-       ; (my_tvs, theta') <- chooseInferredQuantifiers
-                                inferred_theta (tyCoVarsOfType mono_ty') mb_sig
+       ; (binders, theta') <- chooseInferredQuantifiers inferred_theta
+                                (tyCoVarsOfType mono_ty') qtvs mb_sig
 
-       ; let qtvs' = filter (`elemVarSet` my_tvs) qtvs   -- Maintain original order
-             inferred_poly_ty = mkInvSigmaTy qtvs' theta' mono_ty'
+       ; let inferred_poly_ty = mkForAllTys binders (mkPhiTy theta' mono_ty')
 
-       ; traceTc "mkInferredPolyId" (vcat [ppr poly_name, ppr qtvs, ppr my_tvs, ppr theta'
+       ; traceTc "mkInferredPolyId" (vcat [ppr poly_name, ppr qtvs, ppr theta'
                                           , ppr inferred_poly_ty])
        ; addErrCtxtM (mk_inf_msg poly_name inferred_poly_ty) $
          checkValidType (InfSigCtxt poly_name) inferred_poly_ty
@@ -739,25 +823,32 @@ mkInferredPolyId qtvs inferred_theta poly_name mb_sig mono_ty
        ; return (mkLocalIdOrCoVar poly_name inferred_poly_ty) }
 
 
-chooseInferredQuantifiers :: TcThetaType -> TcTyVarSet -> Maybe TcIdSigInfo
-                          -> TcM (TcTyVarSet, TcThetaType)
-chooseInferredQuantifiers inferred_theta tau_tvs Nothing
+chooseInferredQuantifiers :: TcThetaType   -- inferred
+                          -> TcTyVarSet    -- tvs free in tau type
+                          -> [TcTyVar]     -- inferred quantified tvs
+                          -> Maybe TcIdSigInfo
+                          -> TcM ([TcTyBinder], TcThetaType)
+chooseInferredQuantifiers inferred_theta tau_tvs qtvs Nothing
   = do { let free_tvs = closeOverKinds (growThetaTyVars inferred_theta tau_tvs)
                         -- Include kind variables!  Trac #7916
              my_theta = pickQuantifiablePreds free_tvs inferred_theta
-       ; return (free_tvs, my_theta) }
+             binders  = [ mkNamedBinder tv Invisible
+                        | tv <- qtvs
+                        , tv `elemVarSet` free_tvs ]
+       ; return (binders, my_theta) }
 
-chooseInferredQuantifiers inferred_theta tau_tvs
+chooseInferredQuantifiers inferred_theta tau_tvs qtvs
                           (Just (TISI { sig_bndr = bndr_info
                                       , sig_ctxt = ctxt
-                                      , sig_theta = annotated_theta }))
+                                      , sig_theta = annotated_theta
+                                      , sig_skols = annotated_tvs }))
   | PartialSig { sig_cts = extra } <- bndr_info
   , Nothing <- extra
   = do { annotated_theta <- zonkTcTypes annotated_theta
        ; let free_tvs = closeOverKinds (tyCoVarsOfTypes annotated_theta
                                         `unionVarSet` tau_tvs)
        ; traceTc "ciq" (vcat [ ppr bndr_info, ppr annotated_theta, ppr free_tvs])
-       ; return (free_tvs, annotated_theta) }
+       ; return (mk_binders free_tvs, annotated_theta) }
 
   | PartialSig { sig_cts = extra } <- bndr_info
   , Just loc <- extra
@@ -786,7 +877,7 @@ chooseInferredQuantifiers inferred_theta tau_tvs
                 | otherwise         -> return ()
            False                    -> reportError msg
 
-       ; return (free_tvs, final_theta) }
+       ; return (mk_binders free_tvs, final_theta) }
 
   | otherwise = pprPanic "chooseInferredQuantifiers" (ppr bndr_info)
 
@@ -798,12 +889,21 @@ chooseInferredQuantifiers inferred_theta tau_tvs
               , if suppress_hint then empty else pts_hint
               , typeSigCtxt ctxt bndr_info ]
 
+    spec_tv_set = mkVarSet $ map snd annotated_tvs
+    mk_binders free_tvs
+      = [ mkNamedBinder tv vis
+        | tv <- qtvs
+        , tv `elemVarSet` free_tvs
+        , let vis | tv `elemVarSet` spec_tv_set = Specified
+                  | otherwise                   = Invisible ]
+                          -- Pulling from qtvs maintains original order
 
 mk_impedence_match_msg :: MonoBindInfo
                        -> TcType -> TcType
                        -> TidyEnv -> TcM (TidyEnv, SDoc)
 -- This is a rare but rather awkward error messages
-mk_impedence_match_msg (name, mb_sig, _) inf_ty sig_ty tidy_env
+mk_impedence_match_msg (MBI { mbi_poly_name = name, mbi_sig = mb_sig })
+                       inf_ty sig_ty tidy_env
  = do { (tidy_env1, inf_ty) <- zonkTidyTcType tidy_env  inf_ty
       ; (tidy_env2, sig_ty) <- zonkTidyTcType tidy_env1 sig_ty
       ; let msg = vcat [ ptext (sLit "When checking that the inferred type")
@@ -911,14 +1011,13 @@ We can get these by "impedance matching":
 
 Suppose the shared quantified tyvars are qtvs and constraints theta.
 Then we want to check that
-   f's final inferred polytype is more polymorphic than
-      forall qtvs. theta => f_mono_ty
+     forall qtvs. theta => f_mono_ty   is more polymorphic than   f's polytype
 and the proof is the impedance matcher.
 
 Notice that the impedance matcher may do defaulting.  See Trac #7173.
 
 It also cleverly does an ambiguity check; for example, rejecting
-   f :: F a -> a
+   f :: F a -> F a
 where F is a non-injective type function.
 -}
 
@@ -940,7 +1039,7 @@ recoveryCode binder_names sig_fn
       = mkLocalId name forall_a_a
 
 forall_a_a :: TcType
-forall_a_a = mkInvForAllTys [levity1TyVar, openAlphaTyVar] openAlphaTy
+forall_a_a = mkSpecForAllTys [levity1TyVar, openAlphaTyVar] openAlphaTy
 
 {- *********************************************************************
 *                                                                      *
@@ -952,13 +1051,13 @@ Note [Handling SPECIALISE pragmas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The basic idea is this:
 
-   f:: Num a => a -> b -> a
+   foo :: Num a => a -> b -> a
    {-# SPECIALISE foo :: Int -> b -> Int #-}
 
 We check that
-   (forall a. Num a => a -> a)
+   (forall a b. Num a => a -> b -> a)
       is more polymorphic than
-   Int -> Int
+   forall b. Int -> b -> Int
 (for which we could use tcSubType, but see below), generating a HsWrapper
 to connect the two, something like
       wrap = /\b. <hole> Int b dNumInt
@@ -1009,8 +1108,8 @@ Some wrinkles
 
 1. We don't use full-on tcSubType, because that does co and contra
    variance and that in turn will generate too complex a LHS for the
-   RULE.  So we use a single invocation of deeplySkolemise /
-   deeplyInstantiate in tcSpecWrapper.  (Actually I think that even
+   RULE.  So we use a single invocation of skolemise /
+   topInstantiate in tcSpecWrapper.  (Actually I think that even
    the "deeply" stuff may be too much, because it introduces lambdas,
    though I think it can be made to work without too much trouble.)
 
@@ -1142,8 +1241,8 @@ tcSpecWrapper :: UserTypeCtxt -> TcType -> TcType -> TcM HsWrapper
 -- See Note [Handling SPECIALISE pragmas], wrinkle 1
 tcSpecWrapper ctxt poly_ty spec_ty
   = do { (sk_wrap, inst_wrap)
-               <- tcGen ctxt spec_ty $ \ _ spec_tau ->
-                  do { (inst_wrap, tau) <- deeplyInstantiate orig poly_ty
+               <- tcSkolemise ctxt spec_ty $ \ _ spec_tau ->
+                  do { (inst_wrap, tau) <- topInstantiate orig poly_ty
                      ; _ <- unifyType noThing spec_tau tau
                             -- Deliberately ignore the evidence
                             -- See Note [Handling SPECIALISE pragmas],
@@ -1377,24 +1476,31 @@ tcMonoBinds is_rec sig_fn no_gen
                          -- use ReturnTv to allow impredicativity
         ; let rhs_ty = mkTyVarTy rhs_tv
         ; mono_id <- newNoSigLetBndr no_gen name rhs_ty
-        ; (co_fn, matches') <- tcExtendIdBndrs [TcIdBndr mono_id NotTopLevel] $
-                                 -- We extend the error context even for a non-recursive
-                                 -- function so that in type error messages we show the
-                                 -- type of the thing whose rhs we are type checking
-                               tcMatchesFun name matches rhs_ty
+        ; (co_fn, matches')
+            <- tcExtendIdBndrs [TcIdBndr mono_id NotTopLevel] $
+                  -- We extend the error context even for a non-recursive
+                  -- function so that in type error messages we show the
+                  -- type of the thing whose rhs we are type checking
+               tcMatchesFun name matches rhs_ty
 
         ; return (unitBag $ L b_loc $
                      FunBind { fun_id = L nm_loc mono_id,
                                fun_matches = matches', bind_fvs = fvs,
                                fun_co_fn = co_fn, fun_tick = [] },
-                  [(name, Nothing, mono_id)]) }
+                  [MBI { mbi_poly_name = name
+                       , mbi_sig       = Nothing
+                       , mbi_mono_id   = mono_id
+                       , mbi_orig      = matchesCtOrigin matches }]) }
 
 tcMonoBinds _ sig_fn no_gen binds
   = do  { tc_binds <- mapM (wrapLocM (tcLhs sig_fn no_gen)) binds
 
         -- Bring the monomorphic Ids, into scope for the RHSs
         ; let mono_info  = getMonoBindInfo tc_binds
-              rhs_id_env = [(name, mono_id) | (name, mb_sig, mono_id) <- mono_info
+              rhs_id_env = [(name, mono_id) | MBI { mbi_poly_name = name
+                                                  , mbi_sig       = mb_sig
+                                                  , mbi_mono_id   = mono_id }
+                                                    <- mono_info
                                             , case mb_sig of
                                                 Just sig -> isPartialSig sig
                                                 Nothing  -> True ]
@@ -1403,9 +1509,9 @@ tcMonoBinds _ sig_fn no_gen binds
 
         ; traceTc "tcMonoBinds" $ vcat [ ppr n <+> ppr id <+> ppr (idType id)
                                        | (n,id) <- rhs_id_env]
-        ; binds' <- tcExtendLetEnvIds NotTopLevel rhs_id_env $
-                    mapM (wrapLocM tcRhs) tc_binds
-        ; return (listToBag binds', mono_info) }
+        ; (binds', mono_infos') <- tcExtendLetEnvIds NotTopLevel rhs_id_env $
+                                  mapAndUnzipM (wrapLocFstM tcRhs) tc_binds
+        ; return (listToBag binds', concat mono_infos') }
 
 ------------------------
 -- tcLhs typechecks the LHS of the bindings, to construct the environment in which
@@ -1427,9 +1533,11 @@ data TcMonoBind         -- Half completed; LHS done, RHS not done
   = TcFunBind  MonoBindInfo  SrcSpan (MatchGroup Name (LHsExpr Name))
   | TcPatBind [MonoBindInfo] (LPat TcId) (GRHSs Name (LHsExpr Name)) TcSigmaType
 
-type MonoBindInfo = (Name, Maybe TcIdSigInfo, TcId)
-        -- Type signature (if any), and
-        -- the monomorphic bound things
+data MonoBindInfo = MBI { mbi_poly_name :: Name
+                        , mbi_sig       :: Maybe TcIdSigInfo
+                        , mbi_mono_id   :: TcId
+                        , mbi_orig      :: CtOrigin }
+                            -- origin associated with RHS
 
 tcLhs :: TcSigFun -> LetBndrSpec -> HsBind Name -> TcM TcMonoBind
 tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_matches = matches })
@@ -1443,12 +1551,22 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_matches = matches })
        -- Both InferGen and CheckGen gives rise to LetLclBndr
     do  { mono_name <- newLocalName name
         ; let mono_id = mkLocalIdOrCoVar mono_name tau
-        ; return (TcFunBind (name, Just sig, mono_id) nm_loc matches) }
+        ; return (TcFunBind (MBI { mbi_poly_name = name
+                                 , mbi_sig       = Just sig
+                                 , mbi_mono_id   = mono_id
+                                 , mbi_orig      =
+                                     Shouldn'tHappenOrigin "FunBind sig" })
+                            nm_loc matches) }
 
   | otherwise
   = do  { mono_ty <- newOpenFlexiTyVarTy
         ; mono_id <- newNoSigLetBndr no_gen name mono_ty
-        ; return (TcFunBind (name, Nothing, mono_id) nm_loc matches) }
+        ; return (TcFunBind (MBI { mbi_poly_name = name
+                                 , mbi_sig       = Nothing
+                                 , mbi_mono_id   = mono_id
+                                 , mbi_orig      =
+                                     Shouldn'tHappenOrigin "FunBind nosig" })
+                            nm_loc matches) }
 
 tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
   = do  { let tc_pat exp_ty = tcLetPat sig_fn no_gen pat exp_ty $
@@ -1458,11 +1576,15 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
                 -- names, which the pattern has brought into scope.
               lookup_info :: Name -> TcM MonoBindInfo
               lookup_info name
-                 = do { mono_id <- tcLookupId name
-                      ; let mb_sig = case sig_fn name of
-                                       Just (TcIdSig sig) -> Just sig
-                                       _                  -> Nothing
-                     ; return (name, mb_sig, mono_id) }
+                = do { mono_id <- tcLookupId name
+                     ; let mb_sig = case sig_fn name of
+                                      Just (TcIdSig sig) -> Just sig
+                                      _                  -> Nothing
+                     ; return (MBI { mbi_poly_name = name
+                                   , mbi_sig       = mb_sig
+                                   , mbi_mono_id   = mono_id
+                                   , mbi_orig      =
+                                       Shouldn'tHappenOrigin "PatBind" }) }
 
         ; ((pat', infos), pat_ty) <- addErrCtxt (patMonoBindsCtxt pat grhss) $
                                      tcInfer tc_pat
@@ -1473,18 +1595,20 @@ tcLhs _ _ other_bind = pprPanic "tcLhs" (ppr other_bind)
         -- AbsBind, VarBind impossible
 
 -------------------
-tcRhs :: TcMonoBind -> TcM (HsBind TcId)
-tcRhs (TcFunBind info@(_, mb_sig, mono_id) loc matches)
+tcRhs :: TcMonoBind -> TcM (HsBind TcId, [MonoBindInfo])  -- fills in the mbi_orig
+tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
+                 loc matches)
   = tcExtendIdBinderStackForRhs [info]  $
     tcExtendTyVarEnvForRhs mb_sig       $
     do  { traceTc "tcRhs: fun bind" (ppr mono_id $$ ppr (idType mono_id))
         ; (co_fn, matches') <- tcMatchesFun (idName mono_id)
-                                            matches (idType mono_id)
-        ; return (FunBind { fun_id = L loc mono_id
-                          , fun_matches = matches'
-                          , fun_co_fn = co_fn
-                          , bind_fvs = placeHolderNamesTc
-                          , fun_tick = [] }) }
+                                 matches (idType mono_id)
+        ; return ( FunBind { fun_id = L loc mono_id
+                           , fun_matches = matches'
+                           , fun_co_fn = co_fn
+                           , bind_fvs = placeHolderNamesTc
+                           , fun_tick = [] }
+                 , [info { mbi_orig = matchesCtOrigin matches }] ) }
 
 -- TODO: emit Hole Constraints for wildcards
 tcRhs (TcPatBind infos pat' grhss pat_ty)
@@ -1496,9 +1620,13 @@ tcRhs (TcPatBind infos pat' grhss pat_ty)
     do  { traceTc "tcRhs: pat bind" (ppr pat' $$ ppr pat_ty)
         ; grhss' <- addErrCtxt (patMonoBindsCtxt pat' grhss) $
                     tcGRHSsPat grhss pat_ty
-        ; return (PatBind { pat_lhs = pat', pat_rhs = grhss', pat_rhs_ty = pat_ty
-                          , bind_fvs = placeHolderNamesTc
-                          , pat_ticks = ([],[]) }) }
+        ; let orig   = grhssCtOrigin grhss
+              infos' = [ info { mbi_orig = orig } | info <- infos ]
+        ; return ( PatBind { pat_lhs = pat', pat_rhs = grhss'
+                           , pat_rhs_ty = pat_ty
+                           , bind_fvs = placeHolderNamesTc
+                           , pat_ticks = ([],[]) }
+                 , infos' ) }
 
 tcExtendTyVarEnvForRhs :: Maybe TcIdSigInfo -> TcM a -> TcM a
 tcExtendTyVarEnvForRhs Nothing thing_inside
@@ -1531,7 +1659,9 @@ tcExtendIdBinderStackForRhs :: [MonoBindInfo] -> TcM a -> TcM a
 -- If we had the *polymorphic* version of f in the TcIdBinderStack, it
 -- would not be reported as relevant, because its type is closed
 tcExtendIdBinderStackForRhs infos thing_inside
-  = tcExtendIdBndrs [TcIdBndr mono_id NotTopLevel | (_, _, mono_id) <- infos] thing_inside
+  = tcExtendIdBndrs [ TcIdBndr mono_id NotTopLevel
+                    | MBI { mbi_mono_id = mono_id } <- infos ]
+                    thing_inside
     -- NotTopLevel: it's a monomorphic binding
 
 ---------------------
@@ -1998,3 +2128,17 @@ typeSigCtxt ctxt (PartialSig { sig_hs_ty = hs_ty })
   = pprSigCtxt ctxt empty (ppr hs_ty)
 typeSigCtxt ctxt (CompleteSig id)
   = pprSigCtxt ctxt empty (ppr (idType id))
+
+instErrCtxt :: TcId -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
+instErrCtxt id ty env
+  = do { let (env', ty') = tidyOpenType env ty
+       ; return (env', hang (text "When instantiating" <+> quotes (ppr id) <>
+                             text ", initially inferred to have" $$
+                             text "this overly-general type:")
+                          2 (ppr ty') $$
+                       extra) }
+  where
+    extra = sdocWithDynFlags $ \dflags ->
+            ppWhen (xopt LangExt.MonomorphismRestriction dflags) $
+            text "NB: This instantiation can be caused by the" <+>
+            text "monomorphism restriction."

@@ -29,12 +29,13 @@ NamedWildcardExplicitForall.hs:13:26: error:
         baz :: _a -> Bool -> (_a, Bool)
           (bound at NamedWildcardExplicitForall.hs:14:1)
 
-NamedWildcardExplicitForall.hs:14:12: error:
-    • Couldn't match expected type ‘_a’ with actual type ‘Bool’
+NamedWildcardExplicitForall.hs:14:16: error:
+    • Couldn't match expected type ‘Bool’ with actual type ‘_a’
       ‘_a’ is a rigid type variable bound by
         the inferred type of baz :: _a -> Bool -> (_a, Bool)
         at NamedWildcardExplicitForall.hs:13:15
-    • In the expression: not x
+    • In the first argument of ‘not’, namely ‘x’
+      In the expression: not x
       In the expression: (not x, not y)
     • Relevant bindings include
         x :: _a (bound at NamedWildcardExplicitForall.hs:14:5)

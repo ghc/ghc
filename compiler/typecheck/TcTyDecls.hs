@@ -626,10 +626,10 @@ initialRoleEnv1 is_boot annots_env tc
               _                              -> replicate num_exps Nothing
         default_roles = build_default_roles visflags role_annots
 
-        build_default_roles (Invisible : viss) ras
-          = Nominal : build_default_roles viss ras
         build_default_roles (Visible : viss) (m_annot : ras)
           = (m_annot `orElse` default_role) : build_default_roles viss ras
+        build_default_roles (_inv    : viss) ras
+          = Nominal : build_default_roles viss ras
         build_default_roles [] [] = []
         build_default_roles _ _ = pprPanic "initialRoleEnv1 (2)"
                                            (vcat [ppr tc, ppr role_annots])
@@ -885,7 +885,7 @@ mkDefaultMethodIds tycons
   where
     mk_dm_ty :: Class -> Id -> DefMethSpec Type -> Type
     mk_dm_ty _ sel_id VanillaDM        = idType sel_id
-    mk_dm_ty cls _   (GenericDM dm_ty) = mkInvSigmaTy cls_tvs [pred] dm_ty
+    mk_dm_ty cls _   (GenericDM dm_ty) = mkSpecSigmaTy cls_tvs [pred] dm_ty
        where
          cls_tvs = classTyVars cls
          pred    = mkClassPred cls (mkTyVarTys cls_tvs)
@@ -960,18 +960,19 @@ mkOneRecordSelector all_cons idDetails fl
 
     -- Selector type; Note [Polymorphic selectors]
     field_ty   = conLikeFieldType con1 lbl
-    data_tvs   = tyCoVarsOfType data_ty
-    is_naughty = not (tyCoVarsOfType field_ty `subVarSet` data_tvs)
+    data_tvs   = tyCoVarsOfTypeWellScoped data_ty
+    data_tv_set= mkVarSet data_tvs
+    is_naughty = not (tyCoVarsOfType field_ty `subVarSet` data_tv_set)
     (field_tvs, field_theta, field_tau) = tcSplitSigmaTy field_ty
-    all_tvs    = varSetElemsWellScoped $ data_tvs `extendVarSetList` field_tvs
     sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
-           | otherwise  = ASSERT( all isTyVar all_tvs )
-                          mkInvForAllTys all_tvs            $
+           | otherwise  = mkSpecForAllTys data_tvs          $
                           mkPhiTy (conLikeStupidTheta con1) $   -- Urgh!
-                          mkPhiTy field_theta               $   -- Urgh!
+                          mkFunTy data_ty                   $
+                          mkSpecForAllTys field_tvs         $
+                          mkPhiTy field_theta               $
                           -- req_theta is empty for normal DataCon
                           mkPhiTy req_theta                 $
-                          mkFunTy data_ty field_tau
+                          field_tau
 
     -- Make the binding: sel (C2 { fld = x }) = x
     --                   sel (C7 { fld = x }) = x
@@ -1017,7 +1018,8 @@ mkOneRecordSelector all_cons idDetails fl
 
     (univ_tvs, _, eq_spec, _, req_theta, _, data_ty) = conLikeFullSig con1
 
-    inst_tys = substTyVars (mkTopTCvSubst (map eqSpecPair eq_spec)) univ_tvs
+    eq_subst = mkTopTCvSubst (map eqSpecPair eq_spec)
+    inst_tys = substTyVars eq_subst univ_tvs
 
     unit_rhs = mkLHsTupleExpr []
     msg_lit = HsStringPrim "" (fastStringToByteString lbl)
@@ -1025,14 +1027,14 @@ mkOneRecordSelector all_cons idDetails fl
 {-
 Note [Polymorphic selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When a record has a polymorphic field, we pull the foralls out to the front.
-   data T = MkT { f :: forall a. [a] -> a }
-Then f :: forall a. T -> [a] -> a
-NOT  f :: T -> forall a. [a] -> a
+We take care to build the type of a polymorphic selector in the right
+order, so that visible type application works.
 
-This is horrid.  It's only needed in deeply obscure cases, which I hate.
-The only case I know is test tc163, which is worth looking at.  It's far
-from clear that this test should succeed at all!
+  data Ord a => T a = MkT { field :: forall b. (Num a, Show b) => (a, b) }
+
+We want
+
+  field :: forall a. Ord a => T a -> forall b. (Num a, Show b) => (a, b)
 
 Note [Naughty record selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
