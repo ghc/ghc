@@ -1698,7 +1698,7 @@ def normalise_callstacks(str):
 
 def normalise_type_reps(str):
     """ Normalise out fingerprints from Typeable TyCon representations """
-    return re.sub(r'TyCon\s*\d+\#\#\s*\d+\#\#\s*',
+    return re.sub(r'TyCon\s*\d+L?\#\#\s*\d+L?\#\#\s*',
                   'TyCon FINGERPRINT FINGERPRINT ',
                   str,
                   flags=re.MULTILINE)
