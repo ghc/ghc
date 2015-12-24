@@ -1,5 +1,8 @@
 module Settings.Builders.Haddock (haddockArgs) where
 
+import Development.Shake.FilePath
+import Base
+import Package
 import Expression
 import Oracles
 import Predicates hiding (file)

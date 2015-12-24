@@ -1,5 +1,6 @@
 module Rules.Documentation (buildPackageDocumentation) where
 
+import Base
 import Expression
 import Oracles
 import Rules.Actions

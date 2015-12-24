@@ -1,5 +1,6 @@
 module Rules.Compile (compilePackage) where
 
+import Base
 import Expression
 import Oracles
 import Rules.Actions

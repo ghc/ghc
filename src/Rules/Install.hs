@@ -1,5 +1,6 @@
 module Rules.Install (installTargets, installRules) where
 
+import Base
 import Expression
 import GHC
 import Rules.Generate

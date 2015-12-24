@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 module Oracles.ArgsHash (checkArgsHash, argsHashOracle) where
 
+import Base
 import Expression
 import Settings
 import Settings.Args

@@ -1,5 +1,6 @@
 module Settings.Ways (getWays, getLibWays, getRtsWays) where
 
+import Data.Monoid
 import Expression
 import Predicates
 import Settings.User

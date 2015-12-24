@@ -1,5 +1,7 @@
 module Settings.Builders.GhcPkg (ghcPkgArgs) where
 
+import Base
+import Builder
 import Expression
 import Predicates
 import Settings

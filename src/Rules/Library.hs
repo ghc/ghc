@@ -2,6 +2,7 @@ module Rules.Library (buildPackageLibrary, cSources, hSources) where
 
 import Data.Char
 
+import Base
 import Expression hiding (splitPath)
 import GHC
 import Oracles

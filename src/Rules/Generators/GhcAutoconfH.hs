@@ -1,5 +1,6 @@
 module Rules.Generators.GhcAutoconfH (generateGhcAutoconfH) where
 
+import Base
 import Expression
 import Oracles
 

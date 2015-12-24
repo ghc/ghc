@@ -1,5 +1,6 @@
 module Rules.Dependencies (buildPackageDependencies) where
 
+import Base
 import Expression
 import Oracles
 import Rules.Actions

@@ -3,6 +3,7 @@ module Rules.Generate (
     derivedConstantsPath, generatedDependencies
     ) where
 
+import Base
 import Expression
 import GHC
 import Rules.Generators.ConfigHs

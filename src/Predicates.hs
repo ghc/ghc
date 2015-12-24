@@ -6,6 +6,7 @@ module Predicates (
     stage0, stage1, stage2, notStage0, notPackage, registerPackage, splitObjects
     ) where
 
+import Base
 import Expression
 import GHC
 import Oracles.Config.Flag

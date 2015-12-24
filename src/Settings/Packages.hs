@@ -1,5 +1,6 @@
 module Settings.Packages (getPackages, knownPackages, findKnownPackage) where
 
+import Base
 import Expression
 import Predicates
 import Settings.User

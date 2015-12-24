@@ -18,7 +18,6 @@ module Expression (
     getInput, getOutput,
 
     -- * Re-exports
-    module Base,
     module Builder,
     module Package,
     module Stage,

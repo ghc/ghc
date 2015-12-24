@@ -1,5 +1,6 @@
 module Rules.Cabal (cabalRules) where
 
+import Base
 import Data.Version
 import Distribution.Package as DP
 import Distribution.PackageDescription

@@ -1,5 +1,9 @@
 module Settings.Builders.Hsc2Hs (hsc2HsArgs) where
 
+import Control.Monad.Trans.Class
+import Control.Monad.Extra
+
+import Base
 import Expression
 import Oracles
 import Predicates (builder, stage0, notStage0)

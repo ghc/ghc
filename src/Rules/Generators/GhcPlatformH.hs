@@ -1,5 +1,6 @@
 module Rules.Generators.GhcPlatformH (generateGhcPlatformH) where
 
+import Base
 import Expression
 import Oracles
 
