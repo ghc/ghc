@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 module Oracles.WindowsRoot (windowsRoot, windowsRootOracle) where
 
+import Data.Char (isSpace)
 import Base
 
 newtype WindowsRoot = WindowsRoot ()
