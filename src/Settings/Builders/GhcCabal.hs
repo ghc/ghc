@@ -3,13 +3,7 @@ module Settings.Builders.GhcCabal (
     customPackageArgs, ccArgs, cppArgs, ccWarnings, argStagedSettingList, needDll0
     ) where
 
-import Data.Monoid
-import Control.Monad.Trans.Class
-import Control.Monad.Extra
-
-import Development.Shake
-import Development.Shake.FilePath
-import Base ((-/-), bootPackageConstraints)
+import Base
 import Oracles.Config.Setting
 import Oracles.Config.Flag
 import GHC
