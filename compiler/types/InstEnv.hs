@@ -15,29 +15,27 @@ module InstEnv (
         ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprInstances,
         instanceHead, instanceSig, mkLocalInstance, mkImportedInstance,
         instanceDFunId, tidyClsInstDFun, instanceRoughTcs,
-        fuzzyClsInstCmp,
-
-        IsOrphan(..), isOrphan, notOrphan,
+        fuzzyClsInstCmp, orphNamesOfClsInst,
 
         InstEnvs(..), VisibleOrphanModules, InstEnv,
         emptyInstEnv, extendInstEnv, deleteFromInstEnv, identicalClsInstHead,
         extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv, instEnvElts,
         memberInstEnv, instIsVisible,
-        classInstances, orphNamesOfClsInst, instanceBindFun,
+        classInstances, instanceBindFun,
         instanceCantMatch, roughMatchTcs
     ) where
 
 #include "HsVersions.h"
 
-import CoreSyn ( IsOrphan(..), isOrphan, notOrphan, chooseOrphanAnchor )
+import TcType -- InstEnv is really part of the type checker,
+              -- and depends on TcType in many ways
+import CoreSyn ( IsOrphan(..), isOrphan, chooseOrphanAnchor )
 import Module
 import Class
 import Var
 import VarSet
 import Name
 import NameSet
-import TcType
-import TyCon
 import Unify
 import Outputable
 import ErrUtils
@@ -167,6 +165,7 @@ tidyClsInstDFun tidy_dfun ispec
 instanceRoughTcs :: ClsInst -> [Maybe Name]
 instanceRoughTcs = is_tcs
 
+
 instance NamedThing ClsInst where
    getName ispec = getName (is_dfun ispec)
 
@@ -195,6 +194,22 @@ instanceHead (ClsInst { is_tvs = tvs, is_tys = tys, is_dfun = dfun })
    = (tvs, cls, tys)
    where
      (_, _, cls, _) = tcSplitDFunTy (idType dfun)
+
+-- | Collects the names of concrete types and type constructors that make
+-- up the head of a class instance. For instance, given `class Foo a b`:
+--
+-- `instance Foo (Either (Maybe Int) a) Bool` would yield
+--      [Either, Maybe, Int, Bool]
+--
+-- Used in the implementation of ":info" in GHCi.
+--
+-- The 'tcSplitSigmaTy' is because of
+--      instance Foo a => Baz T where ...
+-- The decl is an orphan if Baz and T are both not locally defined,
+--      even if Foo *is* locally defined
+orphNamesOfClsInst :: ClsInst -> NameSet
+orphNamesOfClsInst (ClsInst { is_cls_nm = cls_nm, is_tys = tys })
+  = orphNamesOfTypes tys `unionNameSet` unitNameSet cls_nm
 
 instanceSig :: ClsInst -> ([TyVar], [Type], Class, [Type])
 -- Decomposes the DFunId
@@ -257,25 +272,6 @@ mkImportedInstance cls_nm mb_tcs dfun oflag orphan
             , is_orphan = orphan }
   where
     (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
-
-roughMatchTcs :: [Type] -> [Maybe Name]
-roughMatchTcs tys = map rough tys
-  where
-    rough ty
-      | Just (ty', _) <- tcSplitCastTy_maybe ty = rough ty'
-      | Just (tc,_) <- tcSplitTyConApp_maybe ty = Just (tyConName tc)
-      | otherwise                               = Nothing
-
-instanceCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
--- (instanceCantMatch tcs1 tcs2) returns True if tcs1 cannot
--- possibly be instantiated to actual, nor vice versa;
--- False is non-committal
-instanceCantMatch (mt : ts) (ma : as) = itemCantMatch mt ma || instanceCantMatch ts as
-instanceCantMatch _         _         =  False  -- Safe
-
-itemCantMatch :: Maybe Name -> Maybe Name -> Bool
-itemCantMatch (Just t) (Just a) = t /= a
-itemCantMatch _        _        = False
 
 {-
 Note [When exactly is an instance decl an orphan?]
@@ -393,16 +389,6 @@ classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = 
     get env = case lookupUFM env cls of
                 Just (ClsIE insts) -> filter (instIsVisible vis_mods) insts
                 Nothing            -> []
-
--- | Collects the names of concrete types and type constructors that make
--- up the head of a class instance. For instance, given `class Foo a b`:
---
--- `instance Foo (Either (Maybe Int) a) Bool` would yield
---      [Either, Maybe, Int, Bool]
---
--- Used in the implementation of ":info" in GHCi.
-orphNamesOfClsInst :: ClsInst -> NameSet
-orphNamesOfClsInst = orphNamesOfDFunHead . idType . instanceDFunId
 
 -- | Checks for an exact match of ClsInst in the instance environment.
 -- We use this when we do signature checking in TcRnDriver

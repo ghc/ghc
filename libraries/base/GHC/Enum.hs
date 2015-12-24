@@ -123,7 +123,7 @@ boundedEnumFromThen n1 n2
 {-# NOINLINE toEnumError #-}
 toEnumError :: (Show a) => String -> Int -> (a,a) -> b
 toEnumError inst_ty i bnds =
-    error $ "Enum.toEnum{" ++ inst_ty ++ "}: tag (" ++
+    errorWithoutStackTrace $ "Enum.toEnum{" ++ inst_ty ++ "}: tag (" ++
             show i ++
             ") is outside of bounds " ++
             show bnds
@@ -131,7 +131,7 @@ toEnumError inst_ty i bnds =
 {-# NOINLINE fromEnumError #-}
 fromEnumError :: (Show a) => String -> a -> b
 fromEnumError inst_ty x =
-    error $ "Enum.fromEnum{" ++ inst_ty ++ "}: value (" ++
+    errorWithoutStackTrace $ "Enum.fromEnum{" ++ inst_ty ++ "}: value (" ++
             show x ++
             ") is outside of Int's bounds " ++
             show (minBound::Int, maxBound::Int)
@@ -139,12 +139,12 @@ fromEnumError inst_ty x =
 {-# NOINLINE succError #-}
 succError :: String -> a
 succError inst_ty =
-    error $ "Enum.succ{" ++ inst_ty ++ "}: tried to take `succ' of maxBound"
+    errorWithoutStackTrace $ "Enum.succ{" ++ inst_ty ++ "}: tried to take `succ' of maxBound"
 
 {-# NOINLINE predError #-}
 predError :: String -> a
 predError inst_ty =
-    error $ "Enum.pred{" ++ inst_ty ++ "}: tried to take `pred' of minBound"
+    errorWithoutStackTrace $ "Enum.pred{" ++ inst_ty ++ "}: tried to take `pred' of minBound"
 
 ------------------------------------------------------------------------
 -- Tuples
@@ -155,11 +155,11 @@ instance Bounded () where
     maxBound = ()
 
 instance Enum () where
-    succ _      = error "Prelude.Enum.().succ: bad argument"
-    pred _      = error "Prelude.Enum.().pred: bad argument"
+    succ _      = errorWithoutStackTrace "Prelude.Enum.().succ: bad argument"
+    pred _      = errorWithoutStackTrace "Prelude.Enum.().pred: bad argument"
 
     toEnum x | x == 0    = ()
-             | otherwise = error "Prelude.Enum.().toEnum: bad argument"
+             | otherwise = errorWithoutStackTrace "Prelude.Enum.().toEnum: bad argument"
 
     fromEnum () = 0
     enumFrom ()         = [()]
@@ -266,14 +266,14 @@ instance Bounded Bool where
 
 instance Enum Bool where
   succ False = True
-  succ True  = error "Prelude.Enum.Bool.succ: bad argument"
+  succ True  = errorWithoutStackTrace "Prelude.Enum.Bool.succ: bad argument"
 
   pred True  = False
-  pred False  = error "Prelude.Enum.Bool.pred: bad argument"
+  pred False  = errorWithoutStackTrace "Prelude.Enum.Bool.pred: bad argument"
 
   toEnum n | n == 0    = False
            | n == 1    = True
-           | otherwise = error "Prelude.Enum.Bool.toEnum: bad argument"
+           | otherwise = errorWithoutStackTrace "Prelude.Enum.Bool.toEnum: bad argument"
 
   fromEnum False = 0
   fromEnum True  = 1
@@ -293,16 +293,16 @@ instance Bounded Ordering where
 instance Enum Ordering where
   succ LT = EQ
   succ EQ = GT
-  succ GT = error "Prelude.Enum.Ordering.succ: bad argument"
+  succ GT = errorWithoutStackTrace "Prelude.Enum.Ordering.succ: bad argument"
 
   pred GT = EQ
   pred EQ = LT
-  pred LT = error "Prelude.Enum.Ordering.pred: bad argument"
+  pred LT = errorWithoutStackTrace "Prelude.Enum.Ordering.pred: bad argument"
 
   toEnum n | n == 0 = LT
            | n == 1 = EQ
            | n == 2 = GT
-  toEnum _ = error "Prelude.Enum.Ordering.toEnum: bad argument"
+  toEnum _ = errorWithoutStackTrace "Prelude.Enum.Ordering.toEnum: bad argument"
 
   fromEnum LT = 0
   fromEnum EQ = 1
@@ -323,10 +323,10 @@ instance  Bounded Char  where
 instance  Enum Char  where
     succ (C# c#)
        | isTrue# (ord# c# /=# 0x10FFFF#) = C# (chr# (ord# c# +# 1#))
-       | otherwise             = error ("Prelude.Enum.Char.succ: bad argument")
+       | otherwise             = errorWithoutStackTrace ("Prelude.Enum.Char.succ: bad argument")
     pred (C# c#)
        | isTrue# (ord# c# /=# 0#) = C# (chr# (ord# c# -# 1#))
-       | otherwise                = error ("Prelude.Enum.Char.pred: bad argument")
+       | otherwise                = errorWithoutStackTrace ("Prelude.Enum.Char.pred: bad argument")
 
     toEnum   = chr
     fromEnum = ord
@@ -449,10 +449,10 @@ instance  Bounded Int where
 
 instance  Enum Int  where
     succ x
-       | x == maxBound  = error "Prelude.Enum.succ{Int}: tried to take `succ' of maxBound"
+       | x == maxBound  = errorWithoutStackTrace "Prelude.Enum.succ{Int}: tried to take `succ' of maxBound"
        | otherwise      = x + 1
     pred x
-       | x == minBound  = error "Prelude.Enum.pred{Int}: tried to take `pred' of minBound"
+       | x == minBound  = errorWithoutStackTrace "Prelude.Enum.pred{Int}: tried to take `pred' of minBound"
        | otherwise      = x - 1
 
     toEnum   x = x

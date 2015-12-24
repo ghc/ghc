@@ -58,7 +58,8 @@ import HsSyn
 import HscTypes
 import InstEnv
 import IfaceEnv   ( newInteractiveBinder )
-import FamInstEnv ( FamInst, orphNamesOfFamInst )
+import FamInstEnv ( FamInst )
+import CoreFVs    ( orphNamesOfFamInst )
 import TyCon
 import Type     hiding( typeKind )
 import TcType           hiding( typeKind )

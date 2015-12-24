@@ -95,7 +95,7 @@ module Prelude (
 
     -- ** Miscellaneous functions
     id, const, (.), flip, ($), until,
-    asTypeOf, error, undefined,
+    asTypeOf, error, errorWithoutStackTrace, undefined,
     seq, ($!),
 
     -- * List operations

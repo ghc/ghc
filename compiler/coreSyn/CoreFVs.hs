@@ -30,10 +30,15 @@ module CoreFVs (
         idRuleVars, idRuleRhsVars, stableUnfoldingVars,
         ruleRhsFreeVars, ruleFreeVars, rulesFreeVars,
         rulesFreeVarsDSet,
-        ruleLhsFreeIds, exprsOrphNames,
+        ruleLhsFreeIds,
         vectsFreeVars,
 
         expr_fvs,
+
+        -- * Orphan names
+        orphNamesOfType, orphNamesOfCo, orphNamesOfAxiom,
+        orphNamesOfTypes, orphNamesOfCoCon,
+        exprsOrphNames, orphNamesOfFamInst,
 
         -- * Core syntax tree annotation with free variables
         FVAnn,                  -- annotation, abstract
@@ -59,8 +64,12 @@ import Literal ( literalType )
 import Name
 import VarSet
 import Var
-import TcType
 import Type
+import TyCoRep
+import TyCon
+import CoAxiom
+import FamInstEnv
+import TysPrim( funTyConName )
 import Coercion
 import Maybes( orElse )
 import Util
@@ -261,6 +270,96 @@ exprOrphNames e
 -- | Finds the free /external/ names of several expressions: see 'exprOrphNames' for details
 exprsOrphNames :: [CoreExpr] -> NameSet
 exprsOrphNames es = foldr (unionNameSet . exprOrphNames) emptyNameSet es
+
+
+{- **********************************************************************
+%*                                                                      *
+                    orphNamesXXX
+
+%*                                                                      *
+%********************************************************************* -}
+
+orphNamesOfTyCon :: TyCon -> NameSet
+orphNamesOfTyCon tycon = unitNameSet (getName tycon) `unionNameSet` case tyConClass_maybe tycon of
+    Nothing  -> emptyNameSet
+    Just cls -> unitNameSet (getName cls)
+
+orphNamesOfType :: Type -> NameSet
+orphNamesOfType ty | Just ty' <- coreView ty = orphNamesOfType ty'
+                -- Look through type synonyms (Trac #4912)
+orphNamesOfType (TyVarTy _)          = emptyNameSet
+orphNamesOfType (LitTy {})           = emptyNameSet
+orphNamesOfType (TyConApp tycon tys) = orphNamesOfTyCon tycon
+                                       `unionNameSet` orphNamesOfTypes tys
+orphNamesOfType (ForAllTy bndr res)  = unitNameSet funTyConName    -- NB!  See Trac #8535
+                                       `unionNameSet` orphNamesOfType (binderType bndr)
+                                       `unionNameSet` orphNamesOfType res
+orphNamesOfType (AppTy fun arg)      = orphNamesOfType fun `unionNameSet` orphNamesOfType arg
+orphNamesOfType (CastTy ty co)       = orphNamesOfType ty `unionNameSet` orphNamesOfCo co
+orphNamesOfType (CoercionTy co)      = orphNamesOfCo co
+
+orphNamesOfThings :: (a -> NameSet) -> [a] -> NameSet
+orphNamesOfThings f = foldr (unionNameSet . f) emptyNameSet
+
+orphNamesOfTypes :: [Type] -> NameSet
+orphNamesOfTypes = orphNamesOfThings orphNamesOfType
+
+orphNamesOfCo :: Coercion -> NameSet
+orphNamesOfCo (Refl _ ty)           = orphNamesOfType ty
+orphNamesOfCo (TyConAppCo _ tc cos) = unitNameSet (getName tc) `unionNameSet` orphNamesOfCos cos
+orphNamesOfCo (AppCo co1 co2)       = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
+orphNamesOfCo (ForAllCo _ kind_co co)
+  = orphNamesOfCo kind_co `unionNameSet` orphNamesOfCo co
+orphNamesOfCo (CoVarCo _)           = emptyNameSet
+orphNamesOfCo (AxiomInstCo con _ cos) = orphNamesOfCoCon con `unionNameSet` orphNamesOfCos cos
+orphNamesOfCo (UnivCo p _ t1 t2)    = orphNamesOfProv p `unionNameSet` orphNamesOfType t1 `unionNameSet` orphNamesOfType t2
+orphNamesOfCo (SymCo co)            = orphNamesOfCo co
+orphNamesOfCo (TransCo co1 co2)     = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
+orphNamesOfCo (NthCo _ co)          = orphNamesOfCo co
+orphNamesOfCo (LRCo  _ co)          = orphNamesOfCo co
+orphNamesOfCo (InstCo co arg)       = orphNamesOfCo co `unionNameSet` orphNamesOfCo arg
+orphNamesOfCo (CoherenceCo co1 co2) = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
+orphNamesOfCo (KindCo co)           = orphNamesOfCo co
+orphNamesOfCo (SubCo co)            = orphNamesOfCo co
+orphNamesOfCo (AxiomRuleCo _ cs)    = orphNamesOfCos cs
+
+orphNamesOfProv :: UnivCoProvenance -> NameSet
+orphNamesOfProv UnsafeCoerceProv    = emptyNameSet
+orphNamesOfProv (PhantomProv co)    = orphNamesOfCo co
+orphNamesOfProv (ProofIrrelProv co) = orphNamesOfCo co
+orphNamesOfProv (PluginProv _)      = emptyNameSet
+orphNamesOfProv (HoleProv _)        = emptyNameSet
+
+orphNamesOfCos :: [Coercion] -> NameSet
+orphNamesOfCos = orphNamesOfThings orphNamesOfCo
+
+orphNamesOfCoCon :: CoAxiom br -> NameSet
+orphNamesOfCoCon (CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
+  = orphNamesOfTyCon tc `unionNameSet` orphNamesOfCoAxBranches branches
+
+orphNamesOfAxiom :: CoAxiom br -> NameSet
+orphNamesOfAxiom axiom
+  = orphNamesOfTypes (concatMap coAxBranchLHS $ fromBranches $ coAxiomBranches axiom)
+    `extendNameSet` getName (coAxiomTyCon axiom)
+
+orphNamesOfCoAxBranches :: Branches br -> NameSet
+orphNamesOfCoAxBranches
+  = foldr (unionNameSet . orphNamesOfCoAxBranch) emptyNameSet . fromBranches
+
+orphNamesOfCoAxBranch :: CoAxBranch -> NameSet
+orphNamesOfCoAxBranch (CoAxBranch { cab_lhs = lhs, cab_rhs = rhs })
+  = orphNamesOfTypes lhs `unionNameSet` orphNamesOfType rhs
+
+-- | orphNamesOfAxiom collects the names of the concrete types and
+-- type constructors that make up the LHS of a type family instance,
+-- including the family name itself.
+--
+-- For instance, given `type family Foo a b`:
+-- `type instance Foo (F (G (H a))) b = ...` would yield [Foo,F,G,H]
+--
+-- Used in the implementation of ":info" in GHCi.
+orphNamesOfFamInst :: FamInst -> NameSet
+orphNamesOfFamInst fam_inst = orphNamesOfAxiom (famInstAxiom fam_inst)
 
 {-
 ************************************************************************

@@ -255,7 +255,7 @@ hSetEncoding hdl encoding = do
     closeTextCodecs h_
     openTextEncoding (Just encoding) haType $ \ mb_encoder mb_decoder -> do
     bbuf <- readIORef haByteBuffer
-    ref <- newIORef (error "last_decode")
+    ref <- newIORef (errorWithoutStackTrace "last_decode")
     return (Handle__{ haLastDecode = ref,
                       haDecoder = mb_decoder,
                       haEncoder = mb_encoder,
@@ -571,7 +571,7 @@ hSetBinaryMode handle bin =
                    | otherwise = nativeNewlineMode
 
          bbuf <- readIORef haByteBuffer
-         ref <- newIORef (error "codec_state", bbuf)
+         ref <- newIORef (errorWithoutStackTrace "codec_state", bbuf)
 
          return Handle__{ haLastDecode = ref,
                           haEncoder  = mb_encoder,

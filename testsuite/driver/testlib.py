@@ -23,6 +23,11 @@ import subprocess
 from testglobals import *
 from testutil import *
 
+try:
+    basestring
+except: # Python 3
+    basestring = (str,bytes)
+
 if config.use_threads:
     import threading
     try:
@@ -691,8 +696,8 @@ def test_common_work (name, opts, func, args):
         elif config.speed > 0:
             # However, if we EXPLICITLY asked for a way (with extra_ways)
             # please test it!
-            explicit_ways = filter(lambda way: way in opts.extra_ways, do_ways)
-            other_ways = filter(lambda way: way not in opts.extra_ways, do_ways)
+            explicit_ways = list(filter(lambda way: way in opts.extra_ways, do_ways))
+            other_ways = list(filter(lambda way: way not in opts.extra_ways, do_ways))
             do_ways = other_ways[:1] + explicit_ways
 
         if not config.clean_only:
@@ -1721,7 +1726,7 @@ def normalise_errmsg( str ):
     # Also filter out bullet characters.  This is because bullets are used to
     # separate error sections, and tests shouldn't be sensitive to how the
     # the division happens.
-    bullet = u'•'.encode('utf8')
+    bullet = u'•'.encode('utf8') if isinstance(str, bytes) else u'•'
     str = str.replace(bullet, '')
     return str
 

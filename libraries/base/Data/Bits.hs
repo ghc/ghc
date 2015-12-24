@@ -529,7 +529,7 @@ instance Bits Integer where
    rotate x i = shift x i   -- since an Integer never wraps around
 
    bitSizeMaybe _ = Nothing
-   bitSize _  = error "Data.Bits.bitSize(Integer)"
+   bitSize _  = errorWithoutStackTrace "Data.Bits.bitSize(Integer)"
    isSigned _ = True
 
 -----------------------------------------------------------------------------

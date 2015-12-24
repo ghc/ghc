@@ -480,7 +480,7 @@ openTempFile' loc tmp_dir template binary mode = findTempName
          -- Otherwise, something is wrong, because (break (== '.')) should
          -- always return a pair with either the empty string or a string
          -- beginning with '.' as the second component.
-         _                      -> error "bug in System.IO.openTempFile"
+         _                      -> errorWithoutStackTrace "bug in System.IO.openTempFile"
 
     findTempName = do
       rs <- rand_string

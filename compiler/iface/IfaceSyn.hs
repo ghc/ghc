@@ -37,6 +37,7 @@ module IfaceSyn (
 #include "HsVersions.h"
 
 import IfaceType
+import CoreSyn( IsOrphan )
 import PprCore()            -- Printing DFunArgs
 import Demand
 import Class

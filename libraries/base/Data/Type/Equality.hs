@@ -122,7 +122,7 @@ instance a ~ b => Read (a :~: b) where
 
 instance a ~ b => Enum (a :~: b) where
   toEnum 0 = Refl
-  toEnum _ = error "Data.Type.Equality.toEnum: bad argument"
+  toEnum _ = errorWithoutStackTrace "Data.Type.Equality.toEnum: bad argument"
 
   fromEnum Refl = 0
 

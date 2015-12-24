@@ -206,11 +206,12 @@ of the branches.
 -- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 data CoAxiom br
   = CoAxiom                   -- Type equality axiom.
-    { co_ax_unique   :: Unique        -- unique identifier
-    , co_ax_name     :: Name          -- name for pretty-printing
-    , co_ax_role     :: Role          -- role of the axiom's equality
-    , co_ax_tc       :: TyCon         -- the head of the LHS patterns
-    , co_ax_branches :: Branches br   -- the branches that form this axiom
+    { co_ax_unique   :: Unique        -- Unique identifier
+    , co_ax_name     :: Name          -- Name for pretty-printing
+    , co_ax_role     :: Role          -- Role of the axiom's equality
+    , co_ax_tc       :: TyCon         -- The head of the LHS patterns
+                                      -- e.g.  the newtype or family tycon
+    , co_ax_branches :: Branches br   -- The branches that form this axiom
     , co_ax_implicit :: Bool          -- True <=> the axiom is "implicit"
                                       -- See Note [Implicit axioms]
          -- INVARIANT: co_ax_implicit == True implies length co_ax_branches == 1.
@@ -229,6 +230,7 @@ data CoAxBranch
                                     -- in TcTyClsDecls
     , cab_roles    :: [Role]        -- See Note [CoAxBranch roles]
     , cab_lhs      :: [Type]        -- Type patterns to match against
+                                    -- See Note [CoAxiom saturation]
     , cab_rhs      :: Type          -- Right-hand side of the equality
     , cab_incomps  :: [CoAxBranch]  -- The previous incompatible branches
                                     -- See Note [Storing compatibility]
@@ -307,7 +309,10 @@ coAxBranchIncomps = cab_incomps
 placeHolderIncomps :: [CoAxBranch]
 placeHolderIncomps = panic "placeHolderIncomps"
 
-{-
+{- Note [CoAxiom saturation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* When co
+
 Note [CoAxBranch type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the case of a CoAxBranch of an associated type-family instance,

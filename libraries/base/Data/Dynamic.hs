@@ -135,7 +135,7 @@ dynApply (Dynamic t1 f) (Dynamic t2 x) =
 dynApp :: Dynamic -> Dynamic -> Dynamic
 dynApp f x = case dynApply f x of 
              Just r -> r
-             Nothing -> error ("Type error in dynamic application.\n" ++
+             Nothing -> errorWithoutStackTrace ("Type error in dynamic application.\n" ++
                                "Can't apply function " ++ show f ++
                                " to argument " ++ show x)
 

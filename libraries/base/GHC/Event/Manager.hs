@@ -172,7 +172,7 @@ newDefaultBackend = EPoll.new
 #elif defined(HAVE_POLL)
 newDefaultBackend = Poll.new
 #else
-newDefaultBackend = error "no back end for this platform"
+newDefaultBackend = errorWithoutStackTrace "no back end for this platform"
 #endif
 
 -- | Create a new event manager.
@@ -212,7 +212,7 @@ failOnInvalidFile loc fd m = do
   when (not ok) $
     let msg = "Failed while attempting to modify registration of file " ++
               show fd ++ " at location " ++ loc
-    in error msg
+    in errorWithoutStackTrace msg
 
 registerControlFd :: EventManager -> Fd -> Event -> IO ()
 registerControlFd mgr fd evs =
@@ -267,7 +267,7 @@ loop mgr@EventManager{..} = do
     -- in Thread.restartPollLoop.  See #8235
     Finished  -> return ()
     _         -> do cleanup mgr
-                    error $ "GHC.Event.Manager.loop: state is already " ++
+                    errorWithoutStackTrace $ "GHC.Event.Manager.loop: state is already " ++
                             show state
  where
   go = do state <- step mgr

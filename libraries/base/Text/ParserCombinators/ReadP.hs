@@ -248,7 +248,7 @@ gather (R m)
   gath _ Fail         = Fail
   gath l (Look f)     = Look (\s -> gath l (f s))
   gath l (Result k p) = k (l []) <|> gath l p
-  gath _ (Final _)    = error "do not use readS_to_P in gather!"
+  gath _ (Final _)    = errorWithoutStackTrace "do not use readS_to_P in gather!"
 
 -- ---------------------------------------------------------------------------
 -- Derived operations

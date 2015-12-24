@@ -95,7 +95,7 @@ getFileHash path = withBinaryFile path ReadMode $ \h -> do
       let loop = do
             count <- hGetBuf h arrPtr _BUFSIZE
             eof <- hIsEOF h
-            when (count /= _BUFSIZE && not eof) $ error $
+            when (count /= _BUFSIZE && not eof) $ errorWithoutStackTrace $
               "GHC.Fingerprint.getFileHash: only read " ++ show count ++ " bytes"
 
             f arrPtr count

@@ -156,7 +156,7 @@ class Foldable t where
     --
     -- @'foldr1' f = 'Prelude.foldr1' f . 'toList'@
     foldr1 :: (a -> a -> a) -> t a -> a
-    foldr1 f xs = fromMaybe (error "foldr1: empty structure")
+    foldr1 f xs = fromMaybe (errorWithoutStackTrace "foldr1: empty structure")
                     (foldr mf Nothing xs)
       where
         mf x m = Just (case m of
@@ -168,7 +168,7 @@ class Foldable t where
     --
     -- @'foldl1' f = 'Prelude.foldl1' f . 'toList'@
     foldl1 :: (a -> a -> a) -> t a -> a
-    foldl1 f xs = fromMaybe (error "foldl1: empty structure")
+    foldl1 f xs = fromMaybe (errorWithoutStackTrace "foldl1: empty structure")
                     (foldl mf Nothing xs)
       where
         mf m y = Just (case m of
@@ -198,12 +198,12 @@ class Foldable t where
 
     -- | The largest element of a non-empty structure.
     maximum :: forall a . Ord a => t a -> a
-    maximum = fromMaybe (error "maximum: empty structure") .
+    maximum = fromMaybe (errorWithoutStackTrace "maximum: empty structure") .
        getMax . foldMap (Max #. (Just :: a -> Maybe a))
 
     -- | The least element of a non-empty structure.
     minimum :: forall a . Ord a => t a -> a
-    minimum = fromMaybe (error "minimum: empty structure") .
+    minimum = fromMaybe (errorWithoutStackTrace "minimum: empty structure") .
        getMin . foldMap (Min #. (Just :: a -> Maybe a))
 
     -- | The 'sum' function computes the sum of the numbers of a structure.
@@ -276,8 +276,8 @@ instance Foldable Proxy where
     {-# INLINE foldr #-}
     foldl _ z _ = z
     {-# INLINE foldl #-}
-    foldl1 _ _ = error "foldl1: Proxy"
-    foldr1 _ _ = error "foldr1: Proxy"
+    foldl1 _ _ = errorWithoutStackTrace "foldl1: Proxy"
+    foldr1 _ _ = errorWithoutStackTrace "foldr1: Proxy"
     length _   = 0
     null _     = True
     elem _ _   = False

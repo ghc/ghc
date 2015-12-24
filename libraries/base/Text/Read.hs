@@ -87,4 +87,4 @@ readMaybe s = case readEither s of
 -- | The 'read' function reads input from a string, which must be
 -- completely consumed by the input process.
 read :: Read a => String -> a
-read s = either error id (readEither s)
+read s = either errorWithoutStackTrace id (readEither s)

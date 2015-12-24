@@ -125,7 +125,7 @@ class Semigroup a where
   -- respectively.
   stimes :: Integral b => b -> a -> a
   stimes y0 x0
-    | y0 <= 0   = error "stimes: positive multiplier expected"
+    | y0 <= 0   = errorWithoutStackTrace "stimes: positive multiplier expected"
     | otherwise = f x0 y0
     where
       f x y
@@ -154,7 +154,7 @@ instance Semigroup b => Semigroup (a -> b) where
 instance Semigroup [a] where
   (<>) = (++)
   stimes n x
-    | n < 0 = error "stimes: [], negative multiplier"
+    | n < 0 = errorWithoutStackTrace "stimes: [], negative multiplier"
     | otherwise = rep n
     where
       rep 0 = []
@@ -166,7 +166,7 @@ instance Semigroup a => Semigroup (Maybe a) where
   Just a  <> Just b  = Just (a <> b)
   stimes _ Nothing  = Nothing
   stimes n (Just a) = case compare n 0 of
-    LT -> error "stimes: Maybe, negative multiplier"
+    LT -> errorWithoutStackTrace "stimes: Maybe, negative multiplier"
     EQ -> Nothing
     GT -> Just (stimes n a)
 
@@ -231,7 +231,7 @@ instance Num a => Semigroup (Product a) where
 -- and so it should be preferred where possible.
 stimesMonoid :: (Integral b, Monoid a) => b -> a -> a
 stimesMonoid n x0 = case compare n 0 of
-  LT -> error "stimesMonoid: negative multiplier"
+  LT -> errorWithoutStackTrace "stimesMonoid: negative multiplier"
   EQ -> mempty
   GT -> f x0 n
     where
@@ -250,7 +250,7 @@ stimesMonoid n x0 = case compare n 0 of
 -- works in /O(1)/ rather than /O(log n)/
 stimesIdempotentMonoid :: (Integral b, Monoid a) => b -> a -> a
 stimesIdempotentMonoid n x = case compare n 0 of
-  LT -> error "stimesIdempotentMonoid: negative multiplier"
+  LT -> errorWithoutStackTrace "stimesIdempotentMonoid: negative multiplier"
   EQ -> mempty
   GT -> x
 
@@ -260,7 +260,7 @@ stimesIdempotentMonoid n x = case compare n 0 of
 -- works in /O(1)/ rather than /O(log n)/.
 stimesIdempotent :: Integral b => b -> a -> a
 stimesIdempotent n x
-  | n <= 0 = error "stimesIdempotent: positive multiplier expected"
+  | n <= 0 = errorWithoutStackTrace "stimesIdempotent: positive multiplier expected"
   | otherwise = x
 
 instance Semigroup a => Semigroup (Const a b) where
@@ -616,7 +616,7 @@ instance Semigroup a => Semigroup (Option a) where
 
   stimes _ (Option Nothing) = Option Nothing
   stimes n (Option (Just a)) = case compare n 0 of
-    LT -> error "stimes: Option, negative multiplier"
+    LT -> errorWithoutStackTrace "stimes: Option, negative multiplier"
     EQ -> Option Nothing
     GT -> Option (Just (stimes n a))
 

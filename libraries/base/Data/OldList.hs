@@ -563,7 +563,7 @@ insertBy cmp x ys@(y:ys')
 -- and returns the greatest element of the list by the comparison function.
 -- The list must be finite and non-empty.
 maximumBy               :: (a -> a -> Ordering) -> [a] -> a
-maximumBy _ []          =  error "List.maximumBy: empty list"
+maximumBy _ []          =  errorWithoutStackTrace "List.maximumBy: empty list"
 maximumBy cmp xs        =  foldl1 maxBy xs
                         where
                            maxBy x y = case cmp x y of
@@ -574,7 +574,7 @@ maximumBy cmp xs        =  foldl1 maxBy xs
 -- and returns the least element of the list by the comparison function.
 -- The list must be finite and non-empty.
 minimumBy               :: (a -> a -> Ordering) -> [a] -> a
-minimumBy _ []          =  error "List.minimumBy: empty list"
+minimumBy _ []          =  errorWithoutStackTrace "List.minimumBy: empty list"
 minimumBy cmp xs        =  foldl1 minBy xs
                         where
                            minBy x y = case cmp x y of
@@ -629,8 +629,8 @@ genericIndex :: (Integral i) => [a] -> i -> a
 genericIndex (x:_)  0 = x
 genericIndex (_:xs) n
  | n > 0     = genericIndex xs (n-1)
- | otherwise = error "List.genericIndex: negative argument."
-genericIndex _ _      = error "List.genericIndex: index too large."
+ | otherwise = errorWithoutStackTrace "List.genericIndex: negative argument."
+genericIndex _ _      = errorWithoutStackTrace "List.genericIndex: index too large."
 
 -- | The 'genericReplicate' function is an overloaded version of 'replicate',
 -- which accepts any 'Integral' value as the number of repetitions to make.

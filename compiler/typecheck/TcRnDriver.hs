@@ -53,6 +53,7 @@ import TcRnMonad
 import TcEvidence
 import PprTyThing( pprTyThing )
 import Coercion( pprCoAxiom )
+import CoreFVs( orphNamesOfFamInst )
 import FamInst
 import InstEnv
 import FamInstEnv

@@ -471,13 +471,13 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
        ; when (length matches /= 1) (wrongNumberErr loc)
        ; return $ mkMatchGroup FromSource matches }
   where
-    fromDecl (L loc decl@(ValD (PatBind pat@(L _ (ConPatIn (L _ name) details)) rhs _ _ _))) =
+    fromDecl (L loc decl@(ValD (PatBind pat@(L _ (ConPatIn ln@(L _ name) details)) rhs _ _ _))) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr loc decl
            ; match <- case details of
-               PrefixCon pats -> return $ Match NonFunBindMatch pats Nothing rhs
+               PrefixCon pats -> return $ Match (FunBindMatch ln False) pats Nothing rhs
                InfixCon pat1 pat2 ->
-                         return $ Match NonFunBindMatch [pat1, pat2] Nothing rhs
+                         return $ Match (FunBindMatch ln True) [pat1, pat2] Nothing rhs
                RecCon{} -> recordPatSynErr loc pat
            ; return $ L loc match }
     fromDecl (L loc decl) = extraDeclErr loc decl

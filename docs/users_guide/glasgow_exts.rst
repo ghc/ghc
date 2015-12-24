@@ -8282,14 +8282,14 @@ a type signature for ``y``, then ``y`` will get type
 ``let`` will see the inner binding of ``?x``, so ``(f 9)`` will return
 ``14``.
 
-.. _implicit-parameters-special:
+.. _implicit-callstacks:
 
-Special implicit parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Implicit CallStacks
+~~~~~~~~~~~~~~~~~~~
 
 Implicit parameters of the new ``base`` type ``GHC.Stack.CallStack`` are
-treated specially in function calls, the solver automatically appends
-the source location of the call to the ``CallStack`` in the
+treated specially in function calls, the solver automatically pushes
+the source location of the call onto the ``CallStack`` in the
 environment. For example
 
 ::
@@ -8341,6 +8341,24 @@ name of the function that was called, and the ``SrcLoc`` provides the
 package, module, and file name, as well as the line and column numbers.
 GHC will infer ``CallStack`` constraints using the same rules as for
 ordinary implicit parameters.
+
+``GHC.Stack`` additionally exports a function ``freezeCallStack`` that
+allows users to freeze a ``CallStack``, preventing any future push
+operations from having an effect. This can be used by library authors
+to prevent ``CallStack``s from exposing unecessary implementation
+details. Consider the ``head`` example above, the ``myerror`` line in
+the printed stack is not particularly enlightening, so we might choose
+to surpress it by freezing the ``CallStack`` that we pass to ``myerror``.
+
+::
+   head :: (?callStack :: CallStack) => [a] -> a
+   head []     = let ?callStack = freezeCallStack ?callStack in myerror "empty"
+   head (x:xs) = x
+
+   ghci> head []]
+   *** Exception: empty
+   CallStack (from ImplicitParams):
+     head, called at Bad.hs:12:7 in main:Bad
 
 
 .. _kinding:

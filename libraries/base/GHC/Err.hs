@@ -21,7 +21,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Err( absentErr, error, undefined ) where
+module GHC.Err( absentErr, error, errorWithoutStackTrace, undefined ) where
 import GHC.CString ()
 import GHC.Types (Char)
 import GHC.Stack.Types
@@ -35,6 +35,33 @@ import {-# SOURCE #-} GHC.Exception( errorCallWithCallStackException )
 error :: (?callStack :: CallStack) => [Char] -> a
 error s = raise# (errorCallWithCallStackException s ?callStack)
 
+-- | A variant of 'error' that does not produce a stack trace.
+--
+-- @since 4.9.0.0
+errorWithoutStackTrace :: [Char] -> a
+errorWithoutStackTrace s
+  = let ?callStack = freezeCallStack ?callStack
+    in error s
+{-# NOINLINE errorWithoutStackTrace #-}
+
+-- Note [Errors in base]
+-- ~~~~~~~~~~~~~~~~~~~~~
+-- As of base-4.9.0.0, `error` produces a stack trace alongside the
+-- error message using the Implicit CallStack machinery. This provides
+-- a partial stack trace, containing the call-site of each function
+-- with a (?callStack :: CallStack) implicit parameter constraint.
+--
+-- In base, however, the only functions that have such constraints are
+-- error and undefined, so the stack traces from partial functions in
+-- base will never contain a call-site in user code. Instead we'll
+-- usually just get the actual call to error. Base functions already
+-- have a good habit of providing detailed error messages, including the
+-- name of the offending partial function, so the partial stack-trace
+-- does not provide any extra information, just noise. Thus, we export
+-- the callstack-aware error, but within base we use the
+-- errorWithoutStackTrace variant for more hygienic erorr messages.
+
+
 -- | A special case of 'error'.
 -- It is expected that compilers will recognize this and insert error
 -- messages which are more appropriate to the context in which 'undefined'
@@ -45,4 +72,4 @@ undefined =  error "Prelude.undefined"
 -- | Used for compiler-generated error message;
 -- encoding saves bytes of string junk.
 absentErr :: a
-absentErr = error "Oops! The program has entered an `absent' argument!\n"
+absentErr = errorWithoutStackTrace "Oops! The program has entered an `absent' argument!\n"

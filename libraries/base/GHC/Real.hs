@@ -205,7 +205,7 @@ class  (Real a, Fractional a) => RealFrac a  where
                                 -1 -> n
                                 0  -> if even n then n else m
                                 1  -> m
-                                _  -> error "round default defn: Bad value"
+                                _  -> errorWithoutStackTrace "round default defn: Bad value"
 
     ceiling x           =  if r > 0 then n + 1 else n
                            where (n,r) = properFraction x
@@ -476,7 +476,7 @@ odd             =  not . even
         Int -> Int -> Int #-}
 {-# INLINABLE [1] (^) #-}    -- See Note [Inlining (^)]
 (^) :: (Num a, Integral b) => a -> b -> a
-x0 ^ y0 | y0 < 0    = error "Negative exponent"
+x0 ^ y0 | y0 < 0    = errorWithoutStackTrace "Negative exponent"
         | y0 == 0   = 1
         | otherwise = f x0 y0
     where -- f : x0 ^ y0 = x ^ y
@@ -585,7 +585,7 @@ x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
 {-# RULES "(^)/Rational"    (^) = (^%^) #-}
 (^%^)           :: Integral a => Rational -> a -> Rational
 (n :% d) ^%^ e
-    | e < 0     = error "Negative exponent"
+    | e < 0     = errorWithoutStackTrace "Negative exponent"
     | e == 0    = 1 :% 1
     | otherwise = (n ^ e) :% (d ^ e)
 

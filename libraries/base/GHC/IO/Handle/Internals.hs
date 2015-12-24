@@ -628,7 +628,7 @@ mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side = do
    let buf_state = initBufferState ha_type
    bbuf <- Buffered.newBuffer dev buf_state
    bbufref <- newIORef bbuf
-   last_decode <- newIORef (error "codec_state", bbuf)
+   last_decode <- newIORef (errorWithoutStackTrace "codec_state", bbuf)
 
    (cbufref,bmode) <-
          if buffered then getCharBuffer dev buf_state
@@ -848,7 +848,7 @@ readTextDevice h_@Handle__{..} cbuf = do
   (bbuf2,cbuf') <-
       case haDecoder of
           Nothing      -> do
-               writeIORef haLastDecode (error "codec_state", bbuf1)
+               writeIORef haLastDecode (errorWithoutStackTrace "codec_state", bbuf1)
                latin1_decode bbuf1 cbuf
           Just decoder -> do
                state <- getState decoder
@@ -937,7 +937,7 @@ decodeByteBuf h_@Handle__{..} cbuf = do
   (bbuf2,cbuf') <-
       case haDecoder of
           Nothing      -> do
-               writeIORef haLastDecode (error "codec_state", bbuf0)
+               writeIORef haLastDecode (errorWithoutStackTrace "codec_state", bbuf0)
                latin1_decode bbuf0 cbuf
           Just decoder -> do
                state <- getState decoder

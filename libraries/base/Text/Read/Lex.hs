@@ -504,7 +504,7 @@ valInteger b0 ds0 = go b0 (length ds0) $ map fromIntegral ds0
       where
         d = d1 * b + d2
     combine _ []  = []
-    combine _ [_] = error "this should not happen"
+    combine _ [_] = errorWithoutStackTrace "this should not happen"
 
 -- Calculate a Rational from the exponent [of 10 to multiply with],
 -- the integral part of the mantissa and the digits of the fractional
@@ -536,7 +536,7 @@ valDig 16 c
   | 'A' <= c && c <= 'F' = Just (ord c - ord 'A' + 10)
   | otherwise            = Nothing
 
-valDig _ _ = error "valDig: Bad base"
+valDig _ _ = errorWithoutStackTrace "valDig: Bad base"
 
 valDecDig :: Char -> Maybe Int
 valDecDig c

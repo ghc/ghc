@@ -83,7 +83,7 @@ instance Storable CPINFO where
 
 pokeArray' :: Storable a => String -> Int -> Ptr a -> [a] -> IO ()
 pokeArray' msg sz ptr xs | length xs == sz = pokeArray ptr xs
-                         | otherwise       = error $ msg ++ ": expected " ++ show sz ++ " elements in list but got " ++ show (length xs)
+                         | otherwise       = errorWithoutStackTrace $ msg ++ ": expected " ++ show sz ++ " elements in list but got " ++ show (length xs)
 
 
 foreign import WINDOWS_CCONV unsafe "windows.h GetCPInfo"
@@ -189,7 +189,7 @@ byteView (Buffer {..}) = Buffer { bufState = bufState, bufRaw = castForeignPtr b
 cwcharView :: Buffer Word8 -> Buffer CWchar
 cwcharView (Buffer {..}) = Buffer { bufState = bufState, bufRaw = castForeignPtr bufRaw, bufSize = half bufSize, bufL = half bufL, bufR = half bufR }
   where half x = case x `divMod` 2 of (y, 0) -> y
-                                      _      -> error "cwcharView: utf16_(encode|decode) (wrote out|consumed) non multiple-of-2 number of bytes"
+                                      _      -> errorWithoutStackTrace "cwcharView: utf16_(encode|decode) (wrote out|consumed) non multiple-of-2 number of bytes"
 
 utf16_native_encode :: CodeBuffer Char CWchar
 utf16_native_encode ibuf obuf = do
@@ -227,9 +227,9 @@ cpDecode cp max_char_size = \ibuf obuf -> do
       -- If we successfully translate all of the UTF-16 buffer, we need to know why we couldn't get any more
       -- UTF-16 out of the Windows API
       InputUnderflow | isEmptyBuffer mbuf' -> return (why1, ibuf', obuf)
-                     | otherwise           -> error "cpDecode: impossible underflown UTF-16 buffer"
+                     | otherwise           -> errorWithoutStackTrace "cpDecode: impossible underflown UTF-16 buffer"
       -- InvalidSequence should be impossible since mbuf' is output from Windows.
-      InvalidSequence -> error "InvalidSequence on output of Windows API"
+      InvalidSequence -> errorWithoutStackTrace "InvalidSequence on output of Windows API"
       -- If we run out of space in obuf, we need to ask for more output buffer space, while also returning
       -- the characters we have managed to consume so far.
       OutputUnderflow -> do
@@ -287,7 +287,7 @@ cpEncode cp _max_char_size = \ibuf obuf -> do
       -- If we succesfully translate all of the UTF-16 buffer, we need to know why
       -- we weren't able to get any more UTF-16 out of the UTF-32 buffer
       InputUnderflow | isEmptyBuffer mbuf' -> return (why1, ibuf', obuf)
-                     | otherwise           -> error "cpEncode: impossible underflown UTF-16 buffer"
+                     | otherwise           -> errorWithoutStackTrace "cpEncode: impossible underflown UTF-16 buffer"
       -- With OutputUnderflow/InvalidSequence we only care about the failings of the UTF-16->CP translation.
       -- Yes, InvalidSequence is possible even though mbuf' is guaranteed to be valid UTF-16, because
       -- the code page may not be able to represent the encoded Unicode codepoint.
@@ -371,7 +371,7 @@ bSearch msg code ibuf mbuf target_to_elems = go
         LT -> go' (md+1) mx
         GT -> go' mn (md-1)
     go' mn mx | mn <= mx  = go mn (mn + ((mx - mn) `div` 2)) mx
-              | otherwise = error $ "bSearch(" ++ msg ++ "): search crossed! " ++ show (summaryBuffer ibuf, summaryBuffer mbuf, target_to_elems, mn, mx)
+              | otherwise = errorWithoutStackTrace $ "bSearch(" ++ msg ++ "): search crossed! " ++ show (summaryBuffer ibuf, summaryBuffer mbuf, target_to_elems, mn, mx)
 
 cpRecode :: forall from to. Storable from
          => (Ptr from -> Int -> Ptr to -> Int -> IO (Either Bool Int))

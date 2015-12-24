@@ -40,6 +40,7 @@ import TcEvidence
 import InstEnv
 import DataCon     ( dataConWrapId )
 import TysWiredIn  ( heqDataCon )
+import CoreSyn     ( isOrphan )
 import FunDeps
 import TcMType
 import Type

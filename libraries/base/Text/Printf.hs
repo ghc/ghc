@@ -871,7 +871,7 @@ dfmt c p a d =
 --
 -- @since 4.7.0.0
 perror :: String -> a
-perror s = error $ "printf: " ++ s
+perror s = errorWithoutStackTrace $ "printf: " ++ s
 
 -- | Calls 'perror' to indicate an unknown format letter for
 -- a given type.

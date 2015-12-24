@@ -1,4 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# OPTIONS_HADDOCK hide #-}
+-- we hide this module from haddock to enforce GHC.Stack as the main
+-- access point.
 
 -----------------------------------------------------------------------------
 -- |
@@ -11,14 +14,14 @@
 -- Portability :  non-portable (GHC Extensions)
 --
 -- type definitions for call-stacks via implicit parameters.
--- Use GHC.Exts from the base package instead of importing this
+-- Use "GHC.Stack" from the base package instead of importing this
 -- module directly.
 --
 -----------------------------------------------------------------------------
 
 module GHC.Stack.Types (
     -- * Implicit parameter call stacks
-    CallStack, getCallStack, pushCallStack,
+    CallStack(..), emptyCallStack, freezeCallStack, getCallStack, pushCallStack,
     -- * Source locations
     SrcLoc(..)
   ) where
@@ -84,11 +87,25 @@ import GHC.Integer ()
 -- ordered with the most recently called function at the head.
 --
 -- @since 4.8.1.0
-data CallStack = CallStack { getCallStack :: [([Char], SrcLoc)]
-                             -- ^ Get a list of stack frames with the most
-                             -- recently called function at the head.
-                           }
+data CallStack
+  = EmptyCallStack
+  | PushCallStack ([Char], SrcLoc) CallStack
+  | FreezeCallStack CallStack
+    -- ^ Freeze the stack at the given @CallStack@, preventing any further
+    -- call-sites from being pushed onto it.
+
   -- See Note [Overview of implicit CallStacks]
+
+-- | Extract a list of call-sites from the 'CallStack'.
+--
+-- The list is ordered by most recent call.
+--
+-- @since 4.8.1.0
+getCallStack :: CallStack -> [([Char], SrcLoc)]
+getCallStack stk = case stk of
+  EmptyCallStack        -> []
+  PushCallStack cs stk' -> cs : getCallStack stk'
+  FreezeCallStack stk'  -> getCallStack stk'
 
 
 -- Note [Definition of CallStack]
@@ -109,10 +126,31 @@ data CallStack = CallStack { getCallStack :: [([Char], SrcLoc)]
 
 -- | Push a call-site onto the stack.
 --
+-- This function has no effect on a frozen 'CallStack'.
+--
 -- @since 4.9.0.0
 pushCallStack :: ([Char], SrcLoc) -> CallStack -> CallStack
-pushCallStack callSite (CallStack stk)
-  = CallStack (callSite : stk)
+pushCallStack cs stk = case stk of
+  FreezeCallStack _ -> stk
+  _                 -> PushCallStack cs stk
+{-# INLINE pushCallStack #-}
+
+
+-- | The empty 'CallStack'.
+--
+-- @since 4.9.0.0
+emptyCallStack :: CallStack
+emptyCallStack = EmptyCallStack
+{-# INLINE emptyCallStack #-}
+
+-- | Freeze a call-stack, preventing any further call-sites from being appended.
+--
+-- prop> pushCallStack callSite (freezeCallStack callStack) = freezeCallStack callStack
+--
+-- @since 4.9.0.0
+freezeCallStack :: CallStack -> CallStack
+freezeCallStack stk = FreezeCallStack stk
+{-# INLINE freezeCallStack #-}
 
 
 -- | A single location in the source code.

@@ -76,7 +76,7 @@ instance Applicative (ST s) where
 
 instance Monad (ST s) where
 
-        fail s   = error s
+        fail s   = errorWithoutStackTrace s
 
         (ST m) >>= k
          = ST $ \ s ->

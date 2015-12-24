@@ -185,10 +185,10 @@ checkHandleInvariants h_ = do
  cbuf <- readIORef (haCharBuffer h_)
  checkBuffer cbuf
  when (isWriteBuffer cbuf && not (isEmptyBuffer cbuf)) $
-   error ("checkHandleInvariants: char write buffer non-empty: " ++
+   errorWithoutStackTrace ("checkHandleInvariants: char write buffer non-empty: " ++
           summaryBuffer bbuf ++ ", " ++ summaryBuffer cbuf)
  when (isWriteBuffer bbuf /= isWriteBuffer cbuf) $
-   error ("checkHandleInvariants: buffer modes differ: " ++
+   errorWithoutStackTrace ("checkHandleInvariants: buffer modes differ: " ++
           summaryBuffer bbuf ++ ", " ++ summaryBuffer cbuf)
 
 #else

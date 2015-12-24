@@ -12,11 +12,11 @@ module FamInstEnv (
 
         FamInstEnvs, FamInstEnv, emptyFamInstEnv, emptyFamInstEnvs,
         extendFamInstEnv, deleteFromFamInstEnv, extendFamInstEnvList,
-        identicalFamInstHead, famInstEnvElts, familyInstances, orphNamesOfFamInst,
+        identicalFamInstHead, famInstEnvElts, familyInstances,
 
         -- * CoAxioms
         mkCoAxBranch, mkBranchedCoAxiom, mkUnbranchedCoAxiom, mkSingleCoAxiom,
-        computeAxiomIncomps,
+        mkNewTypeCoAxiom,
 
         FamInstMatch(..),
         lookupFamInstEnv, lookupFamInstEnvConflicts, lookupFamInstEnvByTyCon,
@@ -39,10 +39,8 @@ module FamInstEnv (
 
 #include "HsVersions.h"
 
-import InstEnv
 import Unify
 import Type
-import TcType ( orphNamesOfTypes )
 import TyCoRep
 import TyCon
 import Coercion
@@ -60,11 +58,11 @@ import Util
 import Var
 import Pair
 import SrcLoc
-import NameSet
 import FastString
 import MonadUtils
 import Control.Monad
 import Data.Function ( on )
+import Data.List( mapAccumL )
 
 {-
 ************************************************************************
@@ -93,6 +91,12 @@ data FamInst  -- See Note [FamInsts and CoAxioms]
   = FamInst { fi_axiom  :: CoAxiom Unbranched -- The new coercion axiom
                                               -- introduced by this family
                                               -- instance
+                 -- INVARIANT: apart from freshening (see below)
+                 --    fi_tvs = cab_tvs of the (single) axiom branch
+                 --    fi_cvs = cab_cvs ...ditto...
+                 --    fi_tys = cab_lhs ...ditto...
+                 --    fi_rhs = cab_rhs ...ditto...
+
             , fi_flavor :: FamFlavor
 
             -- Everything below here is a redundant,
@@ -107,15 +111,12 @@ data FamInst  -- See Note [FamInsts and CoAxioms]
 
             -- Used for "proper matching"; ditto
             , fi_tvs :: [TyVar]      -- Template tyvars for full match
+            , fi_cvs :: [CoVar]      -- Template covars for full match
                  -- Like ClsInsts, these variables are always fresh
                  -- See Note [Template tyvars are fresh] in InstEnv
-                 -- INVARIANT: fi_tvs = coAxiomTyVars fi_axiom
-
-            , fi_cvs    :: [CoVar]      -- Template covars for full match
 
             , fi_tys    :: [Type]       --   The LHS type patterns
             -- May be eta-reduced; see Note [Eta reduction for data families]
-
 
             , fi_rhs :: Type         --   the RHS, with its freshened vars
             }
@@ -160,6 +161,9 @@ Bottom line:
        i.e. LHS is unsaturated
   - fi_rhs will be (rep_tc fi_tvs)
        i.e. RHS is un-saturated
+
+  But when fi_flavour = SynFamilyInst,
+  - fi_tys has the exact arity of the family tycon
 -}
 
 -- Obtain the axiom of a family instance
@@ -391,21 +395,6 @@ familyInstances (pkg_fie, home_fie) fam
                 Just (FamIE insts) -> insts
                 Nothing                      -> []
 
--- | Collects the names of the concrete types and type constructors that
--- make up the LHS of a type family instance, including the family
--- name itself.
---
--- For instance, given `type family Foo a b`:
--- `type instance Foo (F (G (H a))) b = ...` would yield [Foo,F,G,H]
---
--- Used in the implementation of ":info" in GHCi.
-orphNamesOfFamInst :: FamInst -> NameSet
-orphNamesOfFamInst fam_inst
-  = orphNamesOfTypes (concat (map cab_lhs (fromBranches $ coAxiomBranches axiom)))
-    `extendNameSet` getName (coAxiomTyCon axiom)
-  where
-    axiom = fi_axiom fam_inst
-
 extendFamInstEnvList :: FamInstEnv -> [FamInst] -> FamInstEnv
 extendFamInstEnvList inst_env fis = foldl extendFamInstEnv inst_env fis
 
@@ -526,7 +515,7 @@ irrelevant (clause 1 of compatible) or benign (clause 2 of compatible).
 compatibleBranches :: CoAxBranch -> CoAxBranch -> Bool
 compatibleBranches (CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
                    (CoAxBranch { cab_lhs = lhs2, cab_rhs = rhs2 })
-  = case tcUnifyTysFG instanceBindFun lhs1 lhs2 of
+  = case tcUnifyTysFG (const BindMe) lhs1 lhs2 of
       SurelyApart -> True
       Unifiable subst
         | Type.substTy subst rhs1 `eqType` Type.substTy subst rhs2
@@ -576,15 +565,19 @@ injectiveBranches cond
 -- takes a CoAxiom with unknown branch incompatibilities and computes
 -- the compatibilities
 -- See Note [Storing compatibility] in CoAxiom
-computeAxiomIncomps :: CoAxiom br -> CoAxiom br
-computeAxiomIncomps ax@(CoAxiom { co_ax_branches = branches })
-  = ax { co_ax_branches = mapAccumBranches go branches }
+computeAxiomIncomps :: [CoAxBranch] -> [CoAxBranch]
+computeAxiomIncomps branches
+  = snd (mapAccumL go [] branches)
   where
-    go :: [CoAxBranch] -> CoAxBranch -> CoAxBranch
-    go prev_branches br = br { cab_incomps = mk_incomps br prev_branches }
+    go :: [CoAxBranch] -> CoAxBranch -> ([CoAxBranch], CoAxBranch)
+    go prev_brs cur_br
+       = (cur_br : prev_brs, new_br)
+       where
+         new_br = cur_br { cab_incomps = mk_incomps prev_brs cur_br }
 
-    mk_incomps :: CoAxBranch -> [CoAxBranch] -> [CoAxBranch]
-    mk_incomps br = filter (not . compatibleBranches br)
+    mk_incomps :: [CoAxBranch] -> CoAxBranch -> [CoAxBranch]
+    mk_incomps prev_brs cur_br
+       = filter (not . compatibleBranches cur_br) prev_brs
 
 
 getInjLHS, getInjRHS :: InjCondition -> [a] -> [a]
@@ -602,6 +595,8 @@ pprInjCond cond pp_tvs = fsep [ hsep (getInjLHS cond pp_tvs)
            Constructing axioms
     These functions are here because tidyType / tcUnifyTysFG
     are not available in CoAxiom
+
+    Also computeAxiomIncomps is too sophisticated for CoAxiom
 *                                                                      *
 ************************************************************************
 
@@ -617,13 +612,14 @@ mkCoAxBranch :: [TyVar] -- original, possibly stale, tyvars
              -> [CoVar] -- possibly stale covars
              -> [Type]  -- LHS patterns
              -> Type    -- RHS
+             -> [Role]
              -> SrcSpan
              -> CoAxBranch
-mkCoAxBranch tvs cvs lhs rhs loc
+mkCoAxBranch tvs cvs lhs rhs roles loc
   = CoAxBranch { cab_tvs     = tvs1
                , cab_cvs     = cvs1
                , cab_lhs     = tidyTypes env lhs
-               , cab_roles   = map (const Nominal) tvs1
+               , cab_roles   = roles
                , cab_rhs     = tidyType  env rhs
                , cab_loc     = loc
                , cab_incomps = placeHolderIncomps }
@@ -636,13 +632,12 @@ mkCoAxBranch tvs cvs lhs rhs loc
 -- Coercion
 mkBranchedCoAxiom :: Name -> TyCon -> [CoAxBranch] -> CoAxiom Branched
 mkBranchedCoAxiom ax_name fam_tc branches
-  = computeAxiomIncomps $
-    CoAxiom { co_ax_unique   = nameUnique ax_name
+  = CoAxiom { co_ax_unique   = nameUnique ax_name
             , co_ax_name     = ax_name
             , co_ax_tc       = fam_tc
             , co_ax_role     = Nominal
             , co_ax_implicit = False
-            , co_ax_branches = manyBranches branches }
+            , co_ax_branches = manyBranches (computeAxiomIncomps branches) }
 
 mkUnbranchedCoAxiom :: Name -> TyCon -> CoAxBranch -> CoAxiom Unbranched
 mkUnbranchedCoAxiom ax_name fam_tc branch
@@ -667,7 +662,26 @@ mkSingleCoAxiom role ax_name tvs cvs fam_tc lhs_tys rhs_ty
             , co_ax_implicit = False
             , co_ax_branches = unbranched (branch { cab_incomps = [] }) }
   where
-    branch = mkCoAxBranch tvs cvs lhs_tys rhs_ty (getSrcSpan ax_name)
+    branch = mkCoAxBranch tvs cvs lhs_tys rhs_ty
+                          (map (const Nominal) tvs)
+                          (getSrcSpan ax_name)
+
+-- | Create a coercion constructor (axiom) suitable for the given
+--   newtype 'TyCon'. The 'Name' should be that of a new coercion
+--   'CoAxiom', the 'TyVar's the arguments expected by the @newtype@ and
+--   the type the appropriate right hand side of the @newtype@, with
+--   the free variables a subset of those 'TyVar's.
+mkNewTypeCoAxiom :: Name -> TyCon -> [TyVar] -> [Role] -> Type -> CoAxiom Unbranched
+mkNewTypeCoAxiom name tycon tvs roles rhs_ty
+  = CoAxiom { co_ax_unique   = nameUnique name
+            , co_ax_name     = name
+            , co_ax_implicit = True  -- See Note [Implicit axioms] in TyCon
+            , co_ax_role     = Representational
+            , co_ax_tc       = tycon
+            , co_ax_branches = unbranched (branch { cab_incomps = [] }) }
+  where
+    branch = mkCoAxBranch tvs [] (mkTyVarTys tvs) rhs_ty
+                          roles (getSrcSpan name)
 
 {-
 ************************************************************************
@@ -1131,7 +1145,7 @@ apartnessCheck :: [Type]     -- ^ /flattened/ target arguments. Make sure
                -> Bool       -- ^ True <=> equation can fire
 apartnessCheck flattened_target (CoAxBranch { cab_incomps = incomps })
   = all (isSurelyApart
-         . tcUnifyTysFG instanceBindFun flattened_target
+         . tcUnifyTysFG (const BindMe) flattened_target
          . coAxBranchLHS) incomps
   where
     isSurelyApart SurelyApart = True

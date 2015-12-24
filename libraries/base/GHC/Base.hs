@@ -187,8 +187,8 @@ not True = False
 (&&) True True = True
 otherwise = True
 
-build = error "urk"
-foldr = error "urk"
+build = errorWithoutStackTrace "urk"
+foldr = errorWithoutStackTrace "urk"
 #endif
 
 -- | The 'Maybe' type encapsulates an optional value.  A value of type
@@ -498,7 +498,7 @@ class Applicative m => Monad m where
     -- details). The definition here will be removed in a future
     -- release.
     fail        :: String -> m a
-    fail s      = error s
+    fail s      = errorWithoutStackTrace s
 
 {- Note [Recursive bindings for Applicative/Monad]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

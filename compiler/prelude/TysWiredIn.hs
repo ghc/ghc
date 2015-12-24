@@ -108,8 +108,8 @@ import PrelNames
 import TysPrim
 
 -- others:
+import FamInstEnv( mkNewTypeCoAxiom )
 import CoAxiom
-import Coercion
 import Id
 import Constants        ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE )
 import Module           ( Module )
@@ -1094,7 +1094,7 @@ ipTyCon = mkClassTyCon ipTyConName kind [ip,a] [] rhs ipClass NonRecursive
     rhs = NewTyCon ipDataCon (mkTyVarTy a) ([], mkTyVarTy a) ipCoAxiom
 
 ipCoAxiom :: CoAxiom Unbranched
-ipCoAxiom = mkNewTypeCo ipCoName ipTyCon [ip,a] [Nominal, Nominal] (mkTyVarTy a)
+ipCoAxiom = mkNewTypeCoAxiom ipCoName ipTyCon [ip,a] [Nominal, Nominal] (mkTyVarTy a)
   where
     [ip,a] = mkTemplateTyVars [typeSymbolKind, liftedTypeKind]
 

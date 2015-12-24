@@ -658,7 +658,7 @@ formatRealFloatAlt fmt decs alt x
           "0"     -> "0.0e0"
           [d]     -> d : ".0e" ++ show_e'
           (d:ds') -> d : '.' : ds' ++ "e" ++ show_e'
-          []      -> error "formatRealFloat/doFmt/FFExponent: []"
+          []      -> errorWithoutStackTrace "formatRealFloat/doFmt/FFExponent: []"
        Just dec ->
         let dec' = max dec 1 in
         case is of
@@ -704,7 +704,7 @@ roundTo base d is =
   case f d True is of
     x@(0,_) -> x
     (1,xs)  -> (1, 1:xs)
-    _       -> error "roundTo: bad Value"
+    _       -> errorWithoutStackTrace "roundTo: bad Value"
  where
   b2 = base `quot` 2
 

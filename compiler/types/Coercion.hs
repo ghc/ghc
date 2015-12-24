@@ -34,7 +34,7 @@ module Coercion (
         mkForAllCo, mkForAllCos, mkHomoForAllCos, mkHomoForAllCos_NoRefl,
         mkPhantomCo, mkHomoPhantomCo, toPhantomCo,
         mkUnsafeCo, mkHoleCo, mkUnivCo, mkSubCo,
-        mkNewTypeCo, mkAxiomInstCo, mkProofIrrelCo,
+        mkAxiomInstCo, mkProofIrrelCo,
         downgradeRole, maybeSubCo, mkAxiomRuleCo,
         mkCoherenceCo, mkCoherenceRightCo, mkCoherenceLeftCo,
         mkKindCo, castCoercionKind,
@@ -1193,27 +1193,6 @@ castCoercionKind g h1 h2
   = g `mkCoherenceLeftCo` h1 `mkCoherenceRightCo` h2
 
 -- See note [Newtype coercions] in TyCon
-
--- | Create a coercion constructor (axiom) suitable for the given
---   newtype 'TyCon'. The 'Name' should be that of a new coercion
---   'CoAxiom', the 'TyVar's the arguments expected by the @newtype@ and
---   the type the appropriate right hand side of the @newtype@, with
---   the free variables a subset of those 'TyVar's.
-mkNewTypeCo :: Name -> TyCon -> [TyVar] -> [Role] -> Type -> CoAxiom Unbranched
-mkNewTypeCo name tycon tvs roles rhs_ty
-  = CoAxiom { co_ax_unique   = nameUnique name
-            , co_ax_name     = name
-            , co_ax_implicit = True  -- See Note [Implicit axioms] in TyCon
-            , co_ax_role     = Representational
-            , co_ax_tc       = tycon
-            , co_ax_branches = unbranched branch }
-  where branch = CoAxBranch { cab_loc = getSrcSpan name
-                            , cab_tvs = tvs
-                            , cab_cvs = []
-                            , cab_lhs = mkTyVarTys tvs
-                            , cab_roles   = roles
-                            , cab_rhs     = rhs_ty
-                            , cab_incomps = [] }
 
 mkPiCos :: Role -> [Var] -> Coercion -> Coercion
 mkPiCos r vs co = foldr (mkPiCo r) co vs

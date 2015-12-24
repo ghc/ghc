@@ -123,7 +123,7 @@ threadDelay time
 registerDelay :: Int -> IO (TVar Bool)
 registerDelay usecs
   | threaded = waitForDelayEventSTM usecs
-  | otherwise = error "registerDelay: requires -threaded"
+  | otherwise = errorWithoutStackTrace "registerDelay: requires -threaded"
 
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 
@@ -299,7 +299,7 @@ toWin32ConsoleEvent ev =
        _ -> Nothing
 
 win32ConsoleHandler :: MVar (ConsoleEvent -> IO ())
-win32ConsoleHandler = unsafePerformIO (newMVar (error "win32ConsoleHandler"))
+win32ConsoleHandler = unsafePerformIO (newMVar (errorWithoutStackTrace "win32ConsoleHandler"))
 
 wakeupIOManager :: IO ()
 wakeupIOManager = c_sendIOManagerEvent io_MANAGER_WAKEUP

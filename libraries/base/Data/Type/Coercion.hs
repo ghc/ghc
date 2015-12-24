@@ -77,7 +77,7 @@ instance Coercible a b => Read (Coercion a b) where
 
 instance Coercible a b => Enum (Coercion a b) where
   toEnum 0 = Coercion
-  toEnum _ = error "Data.Type.Coercion.toEnum: bad argument"
+  toEnum _ = errorWithoutStackTrace "Data.Type.Coercion.toEnum: bad argument"
 
   fromEnum Coercion = 0
 

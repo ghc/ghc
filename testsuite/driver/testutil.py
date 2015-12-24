@@ -33,6 +33,6 @@ def getStdout(cmd_and_args):
     r = p.wait()
     if r != 0:
         raise Exception("Command failed: " + str(cmd_and_args))
-    if stderr != '':
+    if stderr:
         raise Exception("stderr from command: " + str(cmd_and_args))
     return stdout

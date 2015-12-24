@@ -364,19 +364,19 @@ instance Outputable Subst where
 -- Do *not* attempt to short-cut in the case of an empty substitution!
 -- See Note [Extending the Subst]
 substExprSC :: SDoc -> Subst -> CoreExpr -> CoreExpr
-substExprSC _doc subst orig_expr
+substExprSC doc subst orig_expr
   | isEmptySubst subst = orig_expr
   | otherwise          = -- pprTrace "enter subst-expr" (doc $$ ppr orig_expr) $
-                         subst_expr subst orig_expr
+                         subst_expr doc subst orig_expr
 
 substExpr :: SDoc -> Subst -> CoreExpr -> CoreExpr
-substExpr _doc subst orig_expr = subst_expr subst orig_expr
+substExpr doc subst orig_expr = subst_expr doc subst orig_expr
 
-subst_expr :: Subst -> CoreExpr -> CoreExpr
-subst_expr subst expr
+subst_expr :: SDoc -> Subst -> CoreExpr -> CoreExpr
+subst_expr doc subst expr
   = go expr
   where
-    go (Var v)         = lookupIdSubst (text "subst_expr") subst v
+    go (Var v)         = lookupIdSubst (doc $$ text "subst_expr") subst v
     go (Type ty)       = Type (substTy subst ty)
     go (Coercion co)   = Coercion (substCo subst co)
     go (Lit lit)       = Lit lit
@@ -389,11 +389,11 @@ subst_expr subst expr
        --         lose a binder. We optimise the LHS of rules at
        --         construction time
 
-    go (Lam bndr body) = Lam bndr' (subst_expr subst' body)
+    go (Lam bndr body) = Lam bndr' (subst_expr doc subst' body)
                        where
                          (subst', bndr') = substBndr subst bndr
 
-    go (Let bind body) = Let bind' (subst_expr subst' body)
+    go (Let bind body) = Let bind' (subst_expr doc subst' body)
                        where
                          (subst', bind') = substBind subst bind
 
@@ -401,7 +401,7 @@ subst_expr subst expr
                                  where
                                  (subst', bndr') = substBndr subst bndr
 
-    go_alt subst (con, bndrs, rhs) = (con, bndrs', subst_expr subst' rhs)
+    go_alt subst (con, bndrs, rhs) = (con, bndrs', subst_expr doc subst' rhs)
                                  where
                                    (subst', bndrs') = substBndrs subst bndrs
 
@@ -421,18 +421,22 @@ substBindSC subst bind    -- Short-cut if the substitution is empty
           where
             (bndrs, rhss)    = unzip pairs
             (subst', bndrs') = substRecBndrs subst bndrs
-            rhss' | isEmptySubst subst' = rhss
-                  | otherwise           = map (subst_expr subst') rhss
+            rhss' | isEmptySubst subst'
+                  = rhss
+                  | otherwise
+                  = map (subst_expr (text "substBindSC") subst') rhss
 
-substBind subst (NonRec bndr rhs) = (subst', NonRec bndr' (subst_expr subst rhs))
-                                  where
-                                    (subst', bndr') = substBndr subst bndr
+substBind subst (NonRec bndr rhs)
+  = (subst', NonRec bndr' (subst_expr (text "substBind") subst rhs))
+  where
+    (subst', bndr') = substBndr subst bndr
 
-substBind subst (Rec pairs) = (subst', Rec (bndrs' `zip` rhss'))
-                            where
-                                (bndrs, rhss)    = unzip pairs
-                                (subst', bndrs') = substRecBndrs subst bndrs
-                                rhss' = map (subst_expr subst') rhss
+substBind subst (Rec pairs)
+   = (subst', Rec (bndrs' `zip` rhss'))
+   where
+       (bndrs, rhss)    = unzip pairs
+       (subst', bndrs') = substRecBndrs subst bndrs
+       rhss' = map (subst_expr (text "substBind") subst') rhss
 
 -- | De-shadowing the program is sometimes a useful pre-pass. It can be done simply
 -- by running over the bindings with an empty substitution, because substitution
@@ -736,8 +740,10 @@ substDVarSet subst fvs
 
 ------------------
 substTickish :: Subst -> Tickish Id -> Tickish Id
-substTickish subst (Breakpoint n ids) = Breakpoint n (map do_one ids)
- where do_one = getIdFromTrivialExpr . lookupIdSubst (text "subst_tickish") subst
+substTickish subst (Breakpoint n ids)
+   = Breakpoint n (map do_one ids)
+ where
+    do_one = getIdFromTrivialExpr . lookupIdSubst (text "subst_tickish") subst
 substTickish _subst other = other
 
 {- Note [Substitute lazily]
@@ -1457,7 +1463,7 @@ pushCoercionIntoLambda in_scope x e co
           subst = extendIdSubst (mkEmptySubst in_scope')
                                 x
                                 (mkCast (Var x') co1)
-      in Just (x', subst_expr subst e `mkCast` co2)
+      in Just (x', subst_expr (text "pushCoercionIntoLambda") subst e `mkCast` co2)
     | otherwise
     = pprTrace "exprIsLambda_maybe: Unexpected lambda in case" (ppr (Lam x e))
       Nothing

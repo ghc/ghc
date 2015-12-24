@@ -766,7 +766,7 @@ alwaysSucceeds i = do ( i >> retry ) `orElse` ( return () )
 -- False or raising an exception are both treated as invariant failures.
 always :: STM Bool -> STM ()
 always i = alwaysSucceeds ( do v <- i
-                               if (v) then return () else ( error "Transactional invariant violation" ) )
+                               if (v) then return () else ( errorWithoutStackTrace "Transactional invariant violation" ) )
 
 -- |Shared memory locations that support atomic memory transactions.
 data TVar a = TVar (TVar# RealWorld a)

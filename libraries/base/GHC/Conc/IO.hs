@@ -198,6 +198,6 @@ registerDelay usecs
 #else
   | threaded = Event.registerDelay usecs
 #endif
-  | otherwise = error "registerDelay: requires -threaded"
+  | otherwise = errorWithoutStackTrace "registerDelay: requires -threaded"
 
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool

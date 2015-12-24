@@ -44,12 +44,10 @@ import TcEvidence
 import TcType
 import Type
 import Coercion
-import TysWiredIn ( mkListTy, mkBoxedTupleTy, charTy
-                  , typeNatKind, typeSymbolKind )
+import TysWiredIn ( typeNatKind, typeSymbolKind )
 import Id
 import MkId(proxyHashId)
 import Class
-import DataCon  ( dataConTyCon )
 import Name
 import IdInfo   ( IdDetails(..) )
 import VarSet
@@ -1147,11 +1145,9 @@ help GHC by manually keeping the 'rep' *outside* the lambda.
 dsEvCallStack :: EvCallStack -> DsM CoreExpr
 -- See Note [Overview of implicit CallStacks] in TcEvidence.hs
 dsEvCallStack cs = do
-  df              <- getDynFlags
-  m               <- getModule
-  srcLocDataCon   <- dsLookupDataCon srcLocDataConName
-  let srcLocTyCon  = dataConTyCon srcLocDataCon
-  let srcLocTy     = mkTyConTy srcLocTyCon
+  df            <- getDynFlags
+  m             <- getModule
+  srcLocDataCon <- dsLookupDataCon srcLocDataConName
   let mkSrcLoc l =
         liftM (mkCoreConApps srcLocDataCon)
               (sequence [ mkStringExprFS (unitIdFS $ moduleUnitId m)
@@ -1163,26 +1159,12 @@ dsEvCallStack cs = do
                         , return $ mkIntExprInt df (srcSpanEndCol l)
                         ])
 
-  -- Be careful to use [Char] instead of String here to avoid
-  -- unnecessary dependencies on GHC.Base, particularly when
-  -- building GHC.Err.absentError
-  let callSiteTy = mkBoxedTupleTy [mkListTy charTy, srcLocTy]
+  emptyCS <- Var <$> dsLookupGlobalId emptyCallStackName
 
-  matchId         <- newSysLocalDs $ mkListTy callSiteTy
-
-  callStackDataCon <- dsLookupDataCon callStackDataConName
-  let callStackTyCon = dataConTyCon callStackDataCon
-  let callStackTy    = mkTyConTy callStackTyCon
-  let emptyCS        = mkCoreConApps callStackDataCon [mkNilExpr callSiteTy]
+  pushCSVar <- dsLookupGlobalId pushCallStackName
   let pushCS name loc rest =
-        mkWildCase rest callStackTy callStackTy
-                   [( DataAlt callStackDataCon
-                    , [matchId]
-                    , mkCoreConApps callStackDataCon
-                       [mkConsExpr callSiteTy
-                                   (mkCoreTup [name, loc])
-                                   (Var matchId)]
-                    )]
+        mkCoreApps (Var pushCSVar) [mkCoreTup [name, loc], rest]
+
   let mkPush name loc tm = do
         nameExpr <- mkStringExprFS name
         locExpr <- mkSrcLoc loc
