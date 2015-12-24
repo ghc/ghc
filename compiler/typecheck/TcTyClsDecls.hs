@@ -718,11 +718,11 @@ tcFamDecl1 :: Maybe Class -> FamilyDecl Name -> TcM TyCon
 tcFamDecl1 parent (FamilyDecl { fdInfo = OpenTypeFamily, fdLName = L _ tc_name
                               , fdTyVars = tvs, fdResultSig = L _ sig
                               , fdInjectivityAnn = inj })
-  = tcTyClTyVars tc_name tvs $ \ kvs' tvs' full_kind _res_kind -> do
+  = tcTyClTyVars tc_name tvs $ \ kvs' tvs' full_kind res_kind -> do
   { traceTc "open type family:" (ppr tc_name)
   ; checkFamFlag tc_name
   ; let all_tvs = kvs' ++ tvs'
-  ; inj' <- tcInjectivity all_tvs inj
+  ; inj' <- tcInjectivity all_tvs sig res_kind inj
   ; let tycon = mkFamilyTyCon tc_name full_kind all_tvs
                                OpenSynFamilyTyCon parent
                                (resultVariableName sig) inj'
@@ -738,9 +738,9 @@ tcFamDecl1 parent
          -- the variables in the header scope only over the injectivity
          -- declaration but this is not involved here
        ; (tvs', inj', kind) <- tcTyClTyVars tc_name tvs
-                               $ \ kvs' tvs' full_kind _res_kind ->
+                               $ \ kvs' tvs' full_kind res_kind ->
                                do { let all_tvs = kvs' ++ tvs'
-                                  ; inj' <- tcInjectivity all_tvs inj
+                                  ; inj' <- tcInjectivity all_tvs sig res_kind inj
                                   ; return (all_tvs, inj', full_kind) }
 
        ; checkFamFlag tc_name -- make sure we have -XTypeFamilies
@@ -809,9 +809,11 @@ tcFamDecl1 parent
 -- True on position
 -- N means that a function is injective in its Nth argument. False means it is
 -- not.
-tcInjectivity :: [TyVar] -> Maybe (LInjectivityAnn Name)
+tcInjectivity :: [TyVar]
+              -> FamilyResultSig Name -> Kind
+              -> Maybe (LInjectivityAnn Name)
               -> TcM Injectivity
-tcInjectivity _ Nothing
+tcInjectivity _ _ _ Nothing
   = return []
 
   -- User provided an injectivity annotation, so for each tyvar argument we
@@ -832,9 +834,14 @@ tcInjectivity _ Nothing
   -- therefore we can always infer the result kind if we know the result type.
   -- But this does not seem to be useful in any way so we don't do it.  (Another
   -- reason is that the implementation would not be straightforward.)
-tcInjectivity tvs (Just (L loc (InjectivityAnn injConds)))
+tcInjectivity tvs res_sig res_kind (Just (L loc (InjectivityAnn injConds)))
   = setSrcSpan loc $
+    tcExtendTyVarEnv res_tv $
     mapM (tcInjectivityCond tvs) injConds
+  where
+    res_tv = case res_sig of
+               TyVarSig res_tv -> [mkTyVar (hsLTyVarName res_tv) res_kind]
+               _               -> []
 
 tcInjectivityCond :: [TyVar] -> LInjectivityCond Name
                   -> TcM InjCondition
