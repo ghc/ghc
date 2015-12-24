@@ -25,7 +25,6 @@ git submodule update --init
 git clone git://github.com/snowleopard/shaking-up-ghc shake-build
 ./boot
 ./configure
-make inplace/bin/ghc-cabal   # This needs to be fixed
 ```
 
 Now you have a couple of options:
@@ -45,7 +44,6 @@ $ cd ghc
 $ git clone git://github.com/snowleopard/shaking-up-ghc shake-build
 $ ./boot
 $ ./configure --enable-tarballs-autodownload
-$ make inplace/bin/ghc-cabal   # This needs to be fixed
 $ shake-build/build.bat
 ```
 Also see the [Building GHC on Windows guide][ghc-windows-building-guide].
