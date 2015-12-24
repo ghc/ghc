@@ -11,7 +11,6 @@ module Base (
     -- * Shake
     module Development.Shake,
     module Development.Shake.Classes,
-    module Development.Shake.Config,
     module Development.Shake.FilePath,
     module Development.Shake.Util,
 
@@ -38,7 +37,6 @@ import Data.Maybe
 import Data.Monoid
 import Development.Shake hiding (unit, (*>), parallel)
 import Development.Shake.Classes
-import Development.Shake.Config
 import Development.Shake.FilePath
 import Development.Shake.Util
 import System.Console.ANSI
