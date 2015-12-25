@@ -1,7 +1,9 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Expr where
 
-import Data.Generics
+import Data.Data
+import Data.Typeable
 import Language.Haskell.TH as TH
 import Language.Haskell.TH.Quote
 
@@ -29,6 +31,7 @@ eval (BinopExpr op x y) = (opToFun op) (eval x) (eval y)
     opToFun MulOp = (*)
     opToFun DivOp = (div)
 
+small :: CharParser st Char
 small   = lower <|> char '_'
 large   = upper
 idchar  = small <|> large <|> digit <|> char '\''
@@ -74,7 +77,8 @@ parseExpr (Loc {loc_filename = file, loc_start = (line,col)}) s =
             eof
             return e
 
-expr = QuasiQuoter { quoteExp = parseExprExp, quotePat = parseExprPat }
+expr = QuasiQuoter { quoteExp = parseExprExp, quotePat = parseExprPat,
+                     quoteType = undefined, quoteDec = undefined }
 
 parseExprExp :: String -> Q Exp
 parseExprExp s =  do  loc <- location
@@ -97,3 +101,15 @@ antiExprPat  (AntiIntExpr v)  = Just $ conP  (mkName "IntExpr")
                                                 [varP (mkName v)]
 antiExprPat  (AntiExpr v)     = Just $ varP  (mkName v)
 antiExprPat  _                = Nothing
+
+-- Copied from syb for the test
+
+-- | Extend a generic query by a type-specific case
+extQ :: ( Typeable a
+        , Typeable b
+        )
+     => (a -> q)
+     -> (b -> q)
+     -> a
+     -> q
+extQ f g a = maybe (f a) g (cast a)
