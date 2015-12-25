@@ -21,7 +21,7 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
             need [srcFile]
             build $ fullTarget target (GccM stage) [srcFile] [out]
 
-        hDepFile %> \file -> do
+        hDepFile %> \out -> do
             srcs <- interpretPartial target getPackageSources
             when (pkg == compiler) $ need [platformH]
             -- TODO: very ugly and fragile; use gcc -MM instead?
@@ -43,14 +43,21 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
                    , "primop-vector-tys.hs-incl" ]
             need $ srcs ++ extraDeps
             if srcs == []
-            then writeFileChanged file ""
-            else build $ fullTarget target (GhcM stage) srcs [file]
-            removeFileIfExists $ file <.> "bak"
+            then writeFileChanged out ""
+            else build $ fullTarget target (GhcM stage) srcs [out]
+            removeFileIfExists $ out <.> "bak"
 
-        (buildPath -/- ".dependencies") %> \file -> do
+        (buildPath -/- ".dependencies") %> \out -> do
             cSrcs <- pkgDataList $ CSrcs path
             let cDepFiles = [ buildPath -/- src <.> "deps" | src <- cSrcs ]
             need $ hDepFile : cDepFiles -- need all for more parallelism
             cDeps <- fmap concat $ mapM readFile' cDepFiles
             hDeps <- readFile' hDepFile
-            writeFileChanged file $ cDeps ++ hDeps
+            let result = unlines
+                       . map (\(src, deps) -> unwords $ src : deps)
+                       . map (bimap unifyPath (map unifyPath))
+                       . map (bimap head concat . unzip)
+                       . groupBy ((==) `on` fst)
+                       . sortBy (compare `on` fst)
+                       . parseMakefile $ cDeps ++ hDeps
+            writeFileChanged out result

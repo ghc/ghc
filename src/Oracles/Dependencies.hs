@@ -31,11 +31,8 @@ dependenciesOracle :: Rules ()
 dependenciesOracle = do
     deps <- newCache $ \file -> do
         putOracle $ "Reading dependencies from " ++ file ++ "..."
-        contents <- parseMakefile <$> readFile' file
-        return . Map.fromList . map (bimap unifyPath (map unifyPath))
-                              . map (bimap head concat . unzip)
-                              . groupBy ((==) `on` fst)
-                              . sortBy (compare `on` fst) $ contents
+        contents <- map words <$> readFileLines file
+        return . Map.fromList $ map (\(x:xs) -> (x, xs)) contents
 
     _ <- addOracle $ \(DependenciesKey (file, obj)) -> Map.lookup obj <$> deps file
     return ()
