@@ -49,7 +49,9 @@ $ shake-build/build.bat
 Also see the [Building GHC on Windows guide][ghc-windows-building-guide].
 
 
+### Resetting the build
 
+To reset the new build system delete the `shake-build/.db` directory which stores the Shake database. This will force Shake to rerun all rules, even if the results of the previous build are still in the GHC tree. This is a temporary solution; we are working on a proper reset functionality (see [#32](https://github.com/snowleopard/shaking-up-ghc/issues/32)).
 
 
 How to contribute
