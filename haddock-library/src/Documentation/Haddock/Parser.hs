@@ -73,6 +73,8 @@ overIdentifier f d = g d
     g (DocCodeBlock x) = DocCodeBlock $ g x
     g (DocHyperlink x) = DocHyperlink x
     g (DocPic x) = DocPic x
+    g (DocMathInline x) = DocMathInline x
+    g (DocMathDisplay x) = DocMathDisplay x
     g (DocAName x) = DocAName x
     g (DocProperty x) = DocProperty x
     g (DocExamples x) = DocExamples x
@@ -113,7 +115,9 @@ parseStringBS = snd . parse p
   where
     p :: Parser (DocH mod Identifier)
     p = docConcat <$> many (monospace <|> anchor <|> identifier <|> moduleName
-                            <|> picture <|> markdownImage <|> hyperlink <|> bold
+                            <|> picture <|> mathDisplay <|> mathInline
+                            <|> markdownImage
+                            <|> hyperlink <|> bold
                             <|> emphasis <|> encodedChar <|> string'
                             <|> skipSpecialChar)
 
@@ -223,6 +227,22 @@ moduleName = DocModule <$> (char '"' *> modid <* char '"')
 picture :: Parser (DocH mod a)
 picture = DocPic . makeLabeled Picture . decodeUtf8
           <$> disallowNewline ("<<" *> takeUntil ">>")
+
+-- | Inline math parser, surrounded by \\( and \\).
+--
+-- >>> parseString "\\(\\int_{-\\infty}^{\\infty} e^{-x^2/2} = \\sqrt{2\\pi}\\)"
+-- DocMathInline "\\int_{-\\infty}^{\\infty} e^{-x^2/2} = \\sqrt{2\\pi}"
+mathInline :: Parser (DocH mod a)
+mathInline = DocMathInline . decodeUtf8
+             <$> disallowNewline  ("\\(" *> takeUntil "\\)")
+
+-- | Display math parser, surrounded by \\[ and \\].
+--
+-- >>> parseString "\\[\\int_{-\\infty}^{\\infty} e^{-x^2/2} = \\sqrt{2\\pi}\\]"
+-- DocMathDisplay "\\int_{-\\infty}^{\\infty} e^{-x^2/2} = \\sqrt{2\\pi}"
+mathDisplay :: Parser (DocH mod a)
+mathDisplay = DocMathDisplay . decodeUtf8
+              <$> ("\\[" *> takeUntil "\\]")
 
 markdownImage :: Parser (DocH mod a)
 markdownImage = fromHyperlink <$> ("!" *> linkParser)

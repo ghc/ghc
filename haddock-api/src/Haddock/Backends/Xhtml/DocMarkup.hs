@@ -33,6 +33,7 @@ import Data.Maybe (fromMaybe)
 import GHC
 import Name
 
+
 parHtmlMarkup :: Qualification -> Bool
               -> (Bool -> a -> Html) -> DocMarkup a Html
 parHtmlMarkup qual insertAnchors ppId = Markup {
@@ -67,6 +68,8 @@ parHtmlMarkup qual insertAnchors ppId = Markup {
                                   then namedAnchor aname << ""
                                   else noHtml,
   markupPic                  = \(Picture uri t) -> image ! ([src uri] ++ fromMaybe [] (return . title <$> t)),
+  markupMathInline           = \mathjax -> toHtml ("\\(" ++ mathjax ++ "\\)"),
+  markupMathDisplay          = \mathjax -> toHtml ("\\[" ++ mathjax ++ "\\]"),
   markupProperty             = pre . toHtml,
   markupExample              = examplesToHtml,
   markupHeader               = \(Header l t) -> makeHeader l t

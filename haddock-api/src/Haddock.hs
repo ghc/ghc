@@ -247,6 +247,7 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
     odir                 = outputDir         flags
     opt_latex_style      = optLaTeXStyle     flags
     opt_source_css       = optSourceCssFile  flags
+    opt_mathjax          = optMathjax        flags
 
     visibleIfaces    = [ i | i <- ifaces, OptHide `notElem` ifaceOptions i ]
 
@@ -297,7 +298,7 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
 
   when (Flag_GenContents `elem` flags) $ do
     ppHtmlContents dflags odir title pkgStr
-                   themes opt_index_url sourceUrls' opt_wiki_urls
+                   themes opt_mathjax opt_index_url sourceUrls' opt_wiki_urls
                    allVisibleIfaces True prologue pretty
                    (makeContentsQual qual)
     copyHtmlBits odir libDir themes
@@ -305,7 +306,7 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
   when (Flag_Html `elem` flags) $ do
     ppHtml dflags title pkgStr visibleIfaces odir
                 prologue
-                themes sourceUrls' opt_wiki_urls
+                themes opt_mathjax sourceUrls' opt_wiki_urls
                 opt_contents_url opt_index_url unicode qual
                 pretty
     copyHtmlBits odir libDir themes
