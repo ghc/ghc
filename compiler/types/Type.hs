@@ -941,7 +941,10 @@ splitCastTy_maybe ty | Just ty' <- coreView ty = splitCastTy_maybe ty'
 splitCastTy_maybe (CastTy ty co)               = Just (ty, co)
 splitCastTy_maybe _                            = Nothing
 
--- | Make a 'CastTy'. The Coercion must be nominal.
+-- | Make a 'CastTy'. The Coercion must be nominal. This function looks
+-- at the entire structure of the type and coercion in an attempt to
+-- maintain representation invariance (that is, any two types that are `eqType`
+-- look the same). Be very wary of calling this in a loop.
 mkCastTy :: Type -> Coercion -> Type
 -- Running example:
 --   T :: forall k1. k1 -> forall k2. k2 -> Bool -> Maybe k1 -> *
@@ -955,9 +958,13 @@ mkCastTy :: Type -> Coercion -> Type
 --   (T Nat 3 Symbol |> <Symbol> -> <Bool> -> <Maybe Nat> -> co)
 --      "foo" True (Just 2)
 --
--- General approach:
---
-mkCastTy ty (Refl {}) = ty
+mkCastTy ty co | isReflexiveCo co = ty
+-- NB: Do the slow check here. This is important to keep the splitXXX
+-- functions working properly. Otherwise, we may end up with something
+-- like (((->) |> something_reflexive_but_not_obviously_so) biz baz)
+-- fails under splitFunTy_maybe. This happened with the cheaper check
+-- in test dependent/should_compile/dynamic-paper.
+
 mkCastTy (CastTy ty co1) co2 = mkCastTy ty (co1 `mkTransCo` co2)
 -- See Note [Weird typing rule for ForAllTy]
 mkCastTy (ForAllTy (Named tv vis) inner_ty) co

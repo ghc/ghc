@@ -1302,12 +1302,11 @@ dealWithStringLiteral fun str co
 dealWithCoercion :: Coercion -> DataCon -> [CoreExpr]
                  -> Maybe (DataCon, [Type], [CoreExpr])
 dealWithCoercion co dc dc_args
-  | isReflCo co
+  | isReflCo co || from_ty `eqType` to_ty  -- try cheap test first
   , let (univ_ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) dc_args
   = Just (dc, map exprToType univ_ty_args, rest_args)
 
-  | Pair _from_ty to_ty <- coercionKind co
-  , Just (to_tc, to_tc_arg_tys) <- splitTyConApp_maybe to_ty
+  | Just (to_tc, to_tc_arg_tys) <- splitTyConApp_maybe to_ty
   , to_tc == dataConTyCon dc
         -- These two tests can fail; we might see
         --      (C x y) `cast` (g :: T a ~ S [a]),
@@ -1347,14 +1346,18 @@ dealWithCoercion co dc dc_args
 
         dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tyvars,
                          ppr arg_tys, ppr dc_args,
-                         ppr ex_args, ppr val_args, ppr co, ppr _from_ty, ppr to_ty, ppr to_tc ]
+                         ppr ex_args, ppr val_args, ppr co, ppr from_ty, ppr to_ty, ppr to_tc ]
     in
-    ASSERT2( eqType _from_ty (mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args)), dump_doc )
+    ASSERT2( eqType from_ty (mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args)), dump_doc )
     ASSERT2( equalLength val_args arg_tys, dump_doc )
     Just (dc, to_tc_arg_tys, to_ex_args ++ new_val_args)
 
   | otherwise
   = Nothing
+
+  where
+    Pair from_ty to_ty = coercionKind co
+
 
 {-
 Note [Unfolding DFuns]

@@ -57,7 +57,7 @@ module Coercion (
 
         pickLR,
 
-        isReflCo, isReflCo_maybe,
+        isReflCo, isReflCo_maybe, isReflexiveCo, isReflexiveCo_maybe,
 
         -- ** Coercion variables
         mkCoVar, isCoVar, coVarName, setCoVarName, setCoVarUnique,
@@ -428,13 +428,35 @@ mkHeteroCoercionType Nominal          = mkHeteroPrimEqPred
 mkHeteroCoercionType Representational = mkHeteroReprPrimEqPred
 mkHeteroCoercionType Phantom          = panic "mkHeteroCoercionType"
 
+-- | Tests if this coercion is obviously reflexive. Guaranteed to work
+-- very quickly. Sometimes a coercion can be reflexive, but not obviously
+-- so. c.f. 'isReflexiveCo'
 isReflCo :: Coercion -> Bool
 isReflCo (Refl {}) = True
 isReflCo _         = False
 
+-- | Returns the type coerced if this coercion is reflexive. Guaranteed
+-- to work very quickly. Sometimes a coercion can be reflexive, but not
+-- obviously so. c.f. 'isReflexiveCo_maybe'
 isReflCo_maybe :: Coercion -> Maybe (Type, Role)
 isReflCo_maybe (Refl r ty) = Just (ty, r)
 isReflCo_maybe _           = Nothing
+
+-- | Slowly checks if the coercion is reflexive. Don't call this in a loop,
+-- as it walks over the entire coercion.
+isReflexiveCo :: Coercion -> Bool
+isReflexiveCo = isJust . isReflexiveCo_maybe
+
+-- | Extracts the coerced type from a reflexive coercion. This potentially
+-- walks over the entire coercion, so avoid doing this in a loop.
+isReflexiveCo_maybe :: Coercion -> Maybe (Type, Role)
+isReflexiveCo_maybe (Refl r ty) = Just (ty, r)
+isReflexiveCo_maybe co
+  | ty1 `eqType` ty2
+  = Just (ty1, r)
+  | otherwise
+  = Nothing
+  where (Pair ty1 ty2, r) = coercionKindRole co
 
 {-
 %************************************************************************
@@ -1700,7 +1722,7 @@ coercionKind co = go co
       = let Pair _ k2          = go k_co
             tv2                = setTyVarKind tv1 k2
             Pair ty1 ty2       = go co
-            ty2' = substTyWith [tv1] [TyVarTy tv2 `mkCastTy` mkSymCo k_co] ty2 in
+            ty2' = substTyWith [tv1] [TyVarTy tv2 `mk_cast_ty` mkSymCo k_co] ty2 in
         mkNamedForAllTy <$> Pair tv1 tv2 <*> pure Invisible <*> Pair ty1 ty2'
     go (CoVarCo cv)         = toPair $ coVarTypes cv
     go (AxiomInstCo ax ind cos)
@@ -1750,6 +1772,11 @@ coercionKind co = go co
     -- See Note [Nested InstCos]
     go_app (InstCo co arg) args = go_app co (arg:args)
     go_app co              args = applyTys <$> go co <*> (sequenceA $ map go args)
+
+    -- The real mkCastTy is too slow, and we can easily have nested ForAllCos.
+    mk_cast_ty :: Type -> Coercion -> Type
+    mk_cast_ty ty (Refl {}) = ty
+    mk_cast_ty ty co        = CastTy ty co
 
 -- | Apply 'coercionKind' to multiple 'Coercion's
 coercionKinds :: [Coercion] -> Pair [Type]
