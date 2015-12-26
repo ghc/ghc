@@ -19,15 +19,16 @@ module Base (
     -- * Paths
     shakeFilesPath, configPath, sourcePath, programInplacePath,
     bootPackageConstraints, packageDependencies,
+    bootstrappingConf, bootstrappingConfInitialised,
 
     -- * Output
     putColoured, putOracle, putBuild, putSuccess, putError, renderBox,
     module System.Console.ANSI,
 
     -- * Miscellaneous utilities
-    bimap, minusOrd, intersectOrd, removeFileIfExists, replaceEq, quote,
-    chunksOfSize, replaceSeparators, decodeModule, encodeModule, unifyPath,
-    (-/-), versionToInt
+    bimap, minusOrd, intersectOrd, replaceEq, quote, chunksOfSize,
+    replaceSeparators, decodeModule, encodeModule, unifyPath, (-/-),
+    versionToInt, removeFileIfExists, removeDirectoryIfExists
     ) where
 
 import Control.Applicative
@@ -70,6 +71,12 @@ bootPackageConstraints = shakeFilesPath -/- "boot-package-constraints"
 
 packageDependencies :: FilePath
 packageDependencies = shakeFilesPath -/- "package-dependencies"
+
+bootstrappingConf :: FilePath
+bootstrappingConf = "libraries/bootstrapping.conf"
+
+bootstrappingConfInitialised :: FilePath
+bootstrappingConfInitialised = shakeFilesPath -/- "bootstrapping-conf-initialised"
 
 -- Utility functions
 -- | Find and replace all occurrences of a value in a list
@@ -194,6 +201,11 @@ intersectOrd cmp = loop
          EQ -> x : loop xs ys
          GT ->     loop (x:xs) ys
 
--- Convenient helper function for removing a file that doesn't necessarily exist
+-- | Remove a file that doesn't necessarily exist
 removeFileIfExists :: FilePath -> Action ()
 removeFileIfExists f = liftIO . whenM (IO.doesFileExist f) $ IO.removeFile f
+
+-- | Remove a directory that doesn't necessarily exist
+removeDirectoryIfExists :: FilePath -> Action ()
+removeDirectoryIfExists d =
+    liftIO . whenM (IO.doesDirectoryExist d) $ IO.removeDirectoryRecursive d

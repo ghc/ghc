@@ -7,6 +7,7 @@ import Distribution.PackageDescription.Parse
 import Distribution.Verbosity
 import Expression
 import GHC
+import Rules.Actions
 import Settings
 
 cabalRules :: Rules ()
@@ -36,6 +37,18 @@ cabalRules = do
                 depNames = [ name | Dependency (DP.PackageName name) _ <- deps ]
             return . unwords $ pkgNameString pkg : sort depNames
         writeFileChanged out . unlines $ pkgDeps
+
+    -- When the file exists, the bootstrappingConf has been initialised
+    -- TODO: get rid of an extra file?
+    bootstrappingConfInitialised %> \out -> do
+        removeDirectoryIfExists bootstrappingConf
+        -- TODO: can we get rid of this fake target?
+        let target = PartialTarget Stage0 cabal
+        build $ fullTarget target (GhcPkg Stage0) [] [bootstrappingConf]
+        let message = "Successfully initialised " ++ bootstrappingConf
+        writeFileChanged out message
+        putSuccess message
+
 
 collectDeps :: Maybe (CondTree v [Dependency] a) -> [Dependency]
 collectDeps Nothing = []

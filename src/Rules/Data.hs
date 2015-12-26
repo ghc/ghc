@@ -35,8 +35,8 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
         -- library components only
         when (isLibrary pkg) .
             whenM (interpretPartial target registerPackage) .
-            buildWithResources [(resGhcPkg rs, 1)] $
-            fullTarget target (GhcPkg stage) [cabalFile] [mk]
+                buildWithResources [(resGhcPkg rs, 1)] $
+                    fullTarget target (GhcPkg stage) [cabalFile] [mk]
 
         postProcessPackageData dataFile
 
@@ -58,7 +58,7 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
                     , "DEP_EXTRA_LIBS = m"
                     , "CC_OPTS = " ++ unwords (map ("-I"++) ghcIncludeDirs) ]
             writeFileChanged mk contents
-            putBuild $ "| Successfully generated '" ++ mk ++ "'."
+            putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 
         -- Bootstrapping `ghcCabal`: although `ghcCabal` is a proper cabal
         -- package, we cannot generate the corresponding `package-data.mk` file
@@ -70,7 +70,7 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
                     , "utils_ghc-cabal_stage0_SYNOPSIS = Bootstrapped ghc-cabal utility."
                     , "utils_ghc-cabal_stage0_HS_SRC_DIRS = ." ]
             writeFileChanged mk contents
-            putBuild $ "| Successfully generated '" ++ mk ++ "'."
+            putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'

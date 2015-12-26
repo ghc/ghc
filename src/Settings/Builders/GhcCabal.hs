@@ -17,7 +17,7 @@ cabalArgs = builder GhcCabal ? do
             , dll0Args
             , withStaged Ghc
             , withStaged GhcPkg
-            , stage0 ? bootPackageDbArgs
+            , bootPackageDbArgs
             , libraryArgs
             , with HsColour
             , configureArgs
@@ -77,9 +77,12 @@ configureArgs = do
         , conf "--with-cc" $ argStagedBuilderPath Gcc ]
 
 bootPackageDbArgs :: Args
-bootPackageDbArgs = do
+bootPackageDbArgs = stage0 ? do
     path <- getSetting GhcSourcePath
-    arg $ "--package-db=" ++ path -/- "libraries/bootstrapping.conf"
+    lift $ need [bootstrappingConfInitialised]
+    isGhc <- (||) <$> stagedBuilder Ghc <*> stagedBuilder GhcM
+    let prefix = if isGhc then "-package-db " else "--package-db="
+    arg $ prefix ++ path -/- bootstrappingConf
 
 packageConstraints :: Args
 packageConstraints = stage0 ? do

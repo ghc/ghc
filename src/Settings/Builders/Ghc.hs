@@ -5,6 +5,7 @@ import Oracles
 import GHC
 import Predicates hiding (way, stage)
 import Settings
+import Settings.Builders.GhcCabal (bootPackageDbArgs)
 
 -- TODO: add support for -dyno
 -- $1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.hs-boot
@@ -98,7 +99,7 @@ packageGhcArgs = do
         [ not (pkg == hp2ps || pkg == ghcCabal && stage == Stage0) ?
           arg "-hide-all-packages"
         , arg "-no-user-package-db"
-        , stage0 ? arg "-package-db libraries/bootstrapping.conf"
+        , bootPackageDbArgs
         , isLibrary pkg ?
           if supportsComponentId || stage /= Stage0
           then arg $ "-this-package-key " ++ compId

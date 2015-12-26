@@ -31,7 +31,7 @@ generate :: FilePath -> PartialTarget -> Expr String -> Action ()
 generate file target expr = do
     contents <- interpretPartial target expr
     writeFileChanged file contents
-    putBuild $ "| Successfully generated '" ++ file ++ "'."
+    putSuccess $ "| Successfully generated '" ++ file ++ "'."
 
 
 generatePackageCode :: Resources -> PartialTarget -> Rules ()
@@ -82,17 +82,18 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
 
             when (pkg == runghc) $ buildPath -/- "Main.hs" %> \file -> do
                 copyFileChanged (pkgPath pkg -/- "runghc.hs") file
-                putBuild $ "| Successfully generated '" ++ file ++ "'."
+                putSuccess $ "| Successfully generated '" ++ file ++ "'."
 
 generateRules :: Rules ()
 generateRules = do
     "includes/ghcautoconf.h" <~ generateGhcAutoconfH
     "includes/ghcplatform.h" <~ generateGhcPlatformH
   where
-    file <~ gen = file %> \out -> generate out fakeTarget gen
+    file <~ gen = file %> \out -> generate out emptyTarget gen
 
 -- TODO: Use the Types, Luke! (drop partial function)
-fakeTarget :: PartialTarget
-fakeTarget = PartialTarget (error "fakeTarget: unknown stage")
-                           (error "fakeTarget: unknown package")
-
+-- We sometimes need to evaluate expressions that do not require knowing all
+-- information about the target. In this case, we don't want to know anything.
+emptyTarget :: PartialTarget
+emptyTarget = PartialTarget (error "Rules.Generate.emptyTarget: unknown stage")
+                            (error "Rules.Generate.emptyTarget: unknown package")
