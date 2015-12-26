@@ -6,6 +6,9 @@ import Predicates (builder, stage0, notStage0)
 import Settings
 import Settings.Builders.GhcCabal hiding (cppArgs)
 
+templateHsc :: FilePath
+templateHsc = "inplace/lib/template-hsc.h"
+
 hsc2HsArgs :: Args
 hsc2HsArgs = builder Hsc2Hs ? do
     stage   <- getStage
@@ -21,6 +24,7 @@ hsc2HsArgs = builder Hsc2Hs ? do
     version <- if stage == Stage0
                then lift $ ghcCanonVersion
                else getSetting ProjectVersionInt
+    lift $ need [templateHsc]
     mconcat [ arg $ "--cc=" ++ ccPath
             , arg $ "--ld=" ++ ccPath
             , notM windowsHost ? arg "--cross-safe"
@@ -33,7 +37,7 @@ hsc2HsArgs = builder Hsc2Hs ? do
             , notStage0 ? arg ("--cflag=-D" ++ tArch ++ "_HOST_ARCH=1")
             , notStage0 ? arg ("--cflag=-D" ++ tOs   ++ "_HOST_OS=1"  )
             , arg ("--cflag=-D__GLASGOW_HASKELL__=" ++ version)
-            , arg $ "--template=" ++ top -/- "inplace/lib/template-hsc.h"
+            , arg $ "--template=" ++ top -/- templateHsc
             , arg $ "-I" ++ top -/- "inplace/lib/include/"
             , arg =<< getInput
             , arg "-o", arg =<< getOutput ]
