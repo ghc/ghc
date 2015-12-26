@@ -13,6 +13,7 @@ hsc2HsArgs = builder Hsc2Hs ? do
     gmpDirs <- getSettingList GmpIncludeDirs
     cFlags  <- getCFlags
     lFlags  <- getLFlags
+    top     <- getSetting GhcSourcePath
     hArch   <- getSetting HostArch
     hOs     <- getSetting HostOs
     tArch   <- getSetting TargetArch
@@ -32,6 +33,8 @@ hsc2HsArgs = builder Hsc2Hs ? do
             , notStage0 ? arg ("--cflag=-D" ++ tArch ++ "_HOST_ARCH=1")
             , notStage0 ? arg ("--cflag=-D" ++ tOs   ++ "_HOST_OS=1"  )
             , arg ("--cflag=-D__GLASGOW_HASKELL__=" ++ version)
+            , arg $ "--template=" ++ top -/- "inplace/lib/template-hsc.h"
+            , arg $ "-I" ++ top -/- "inplace/lib/include/"
             , arg =<< getInput
             , arg "-o", arg =<< getOutput ]
 
