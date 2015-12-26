@@ -9,9 +9,7 @@ on the [wiki page][ghc-shake-wiki] and in this [blog post][shake-blog-post].
 
 This is supposed to go into the `shake-build` directory of the GHC source tree.
 
-
-
-
+[Join us on #shaking-up-ghc on Freenode](irc://chat.freenode.net/#shaking-up-ghc)
 
 Trying it
 ---------
