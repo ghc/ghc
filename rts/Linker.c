@@ -3617,7 +3617,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
    sections = (Section*)stgCallocBytes(
        sizeof(Section),
        hdr->NumberOfSections + 1, /* +1 for the global BSS section see below */
-       "ocGetNames_ELF(sections)");
+       "ocGetNames_PEi386(sections)");
    oc->sections = sections;
    oc->n_sections = hdr->NumberOfSections + 1;
 
