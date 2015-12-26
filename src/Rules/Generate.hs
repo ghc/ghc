@@ -4,8 +4,9 @@ import Expression
 import GHC
 import Rules.Generators.ConfigHs
 import Rules.Generators.GhcAutoconfH
+import Rules.Generators.GhcBootPlatformH
+import Rules.Generators.GhcPlatformH
 import Rules.Generators.VersionHs
-import Rules.Generators.PlatformH
 import Oracles.ModuleFiles
 import Rules.Actions
 import Rules.Resources (Resources)
@@ -56,12 +57,12 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
             whenM (doesFileExist srcBoot) $
                 copyFileChanged srcBoot $ file -<.> "hs-boot"
 
+        -- TODO: needing platformH is ugly and fragile
         when (pkg == compiler) $ primopsTxt %> \file -> do
             need [platformH, primopsSource]
             build $ fullTarget target HsCpp [primopsSource] [file]
 
         -- TODO: why different folders for generated files?
-        -- TODO: needing platformH is ugly and fragile
         fmap (buildPath -/-)
             [ "GHC/PrimopWrappers.hs"
             , "autogen/GHC/Prim.hs"
@@ -77,7 +78,7 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
                 file <~ generateVersionHs
 
             when (pkg == compiler) $ platformH %> \file -> do
-                file <~ generatePlatformH
+                file <~ generateGhcBootPlatformH
 
             when (pkg == runghc) $ buildPath -/- "Main.hs" %> \file -> do
                 copyFileChanged (pkgPath pkg -/- "runghc.hs") file
@@ -86,6 +87,7 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
 generateRules :: Rules ()
 generateRules = do
     "includes/ghcautoconf.h" <~ generateGhcAutoconfH
+    "includes/ghcplatform.h" <~ generateGhcPlatformH
   where
     file <~ gen = file %> \out -> generate out fakeTarget gen
 

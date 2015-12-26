@@ -1,11 +1,11 @@
-module Rules.Generators.PlatformH (generatePlatformH) where
+module Rules.Generators.GhcBootPlatformH (generateGhcBootPlatformH) where
 
 import Expression
 import Oracles
 
-generatePlatformH :: Expr String
-generatePlatformH = do
-    lift $ need [sourcePath -/- "Rules/Generators/PlatformH.hs"]
+generateGhcBootPlatformH :: Expr String
+generateGhcBootPlatformH = do
+    lift $ need [sourcePath -/- "Rules/Generators/GhcBootPlatformH.hs"]
     stage <- getStage
     let cppify = replaceEq '-' '_' . replaceEq '.' '_'
         chooseSetting x y = getSetting $ if stage == Stage0 then x else y
