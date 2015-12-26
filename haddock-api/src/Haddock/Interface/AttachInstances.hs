@@ -28,6 +28,7 @@ import qualified Data.Set as Set
 
 import Class
 import DynFlags
+import CoreSyn (isOrphan)
 import ErrUtils
 import FamInstEnv
 import FastString
