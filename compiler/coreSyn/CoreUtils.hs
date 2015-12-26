@@ -616,7 +616,7 @@ refineDefaultAlt us tycon tys imposs_deflt_cons all_alts
         -- Check for no data constructors
         -- This can legitimately happen for abstract types and type families,
         -- so don't report that
-  = pprTrace "prepareDefault" (ppr tycon) (False, all_alts)
+  = (False, all_alts)
 
   | otherwise      -- The common case
   = (False, all_alts)

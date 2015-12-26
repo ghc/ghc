@@ -117,13 +117,6 @@ tcMatchesCase :: (Outputable (body Name)) =>
                  -- wrapper goes from MatchGroup's ty to expected ty
 
 tcMatchesCase ctxt scrut_ty matches res_ty
-  | isEmptyMatchGroup matches   -- Allow empty case expressions
-  = return (MG { mg_alts = noLoc []
-               , mg_arg_tys = [scrut_ty]
-               , mg_res_ty = res_ty
-               , mg_origin = mg_origin matches })
-
-  | otherwise
   = do { res_ty <- tauifyMultipleMatches matches res_ty
        ; tcMatches ctxt [scrut_ty] res_ty matches }
 
@@ -220,8 +213,7 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
 
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                                   , mg_origin = origin })
-  = ASSERT( not (null matches) )        -- Ensure that rhs_ty is filled in
-    do { matches' <- mapM (tcMatch ctxt pat_tys rhs_ty) matches
+  = do { matches' <- mapM (tcMatch ctxt pat_tys rhs_ty) matches
        ; return (MG { mg_alts = L l matches'
                     , mg_arg_tys = pat_tys
                     , mg_res_ty = rhs_ty

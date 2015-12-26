@@ -272,7 +272,7 @@ test('T7532',
      ['T7532', '-v0 ' + config.ghc_th_way_flags])
 test('T2222', normal, compile, ['-v0'])
 test('T1849', normal, ghci_script, ['T1849.script'])
-test('T7681', when(compiler_debugged(), expect_broken(11287)), compile, ['-v0'])
+test('T7681', normal, compile, ['-v0'])
 test('T7910', normal, compile_and_run, ['-v0'])
 
 test('ClosedFam1TH', normal, compile, ['-dsuppress-uniques -v0'])
