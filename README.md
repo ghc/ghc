@@ -38,13 +38,13 @@ Now you have a couple of options:
 
 ### Windows
 
-```
-$ git clone --recursive git://git.haskell.org/ghc.git
-$ cd ghc
-$ git clone git://github.com/snowleopard/shaking-up-ghc shake-build
-$ ./boot
-$ ./configure --enable-tarballs-autodownload
-$ shake-build/build.bat
+```bash
+git clone --recursive git://git.haskell.org/ghc.git
+cd ghc
+git clone git://github.com/snowleopard/shaking-up-ghc shake-build
+./boot
+./configure --enable-tarballs-autodownload
+shake-build/build.bat
 ```
 Also see the [Building GHC on Windows guide][ghc-windows-building-guide].
 
