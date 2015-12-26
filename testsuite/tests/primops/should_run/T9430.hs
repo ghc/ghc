@@ -3,7 +3,11 @@
 
 module Main where
 
+import Data.Bits
 import GHC.Exts
+
+wordWidth :: Int
+wordWidth = finiteBitSize (0 :: Word)
 
 checkI
     :: (Int, Int)                          -- ^ expected results
@@ -96,10 +100,10 @@ main = do
     check "timesWord2# maxBound 1" $ checkW (0, maxBound) timesWord2# maxBound 1
     check "timesWord2# 1 maxBound" $ checkW (0, maxBound) timesWord2# 1 maxBound
     -- Overflows
-    check "timesWord2# " $ checkW (1, 0) timesWord2# (2 ^ 63) 2
-    check "timesWord2# " $ checkW (2, 0) timesWord2# (2 ^ 63) (2 ^ 2)
-    check "timesWord2# " $ checkW (4, 0) timesWord2# (2 ^ 63) (2 ^ 3)
-    check "timesWord2# " $ checkW (8, 0) timesWord2# (2 ^ 63) (2 ^ 4)
+    check "timesWord2# (2^(N-1)) 2"   $ checkW (1, 0) timesWord2# (2 ^ (wordWidth-1)) 2
+    check "timesWord2# (2^(N-1)) 2^2" $ checkW (2, 0) timesWord2# (2 ^ (wordWidth-1)) (2 ^ 2)
+    check "timesWord2# (2^(N-1)) 2^3" $ checkW (4, 0) timesWord2# (2 ^ (wordWidth-1)) (2 ^ 3)
+    check "timesWord2# (2^(N-1)) 2^4" $ checkW (8, 0) timesWord2# (2 ^ (wordWidth-1)) (2 ^ 4)
     check "timesWord2# maxBound 2" $
       checkW (1, maxBound - 1) timesWord2# maxBound 2
     check "timesWord2# 2 maxBound" $
@@ -112,17 +116,17 @@ main = do
     check "quotRemWord2# 0 0 1" $ checkW2 (0, 0) quotRemWord2# 0 0 1
     check "quotRemWord2# 0 4 2" $ checkW2 (2, 0) quotRemWord2# 0 4 2
     check "quotRemWord2# 0 7 3" $ checkW2 (2, 1) quotRemWord2# 0 7 3
-    check "quotRemWord2# 1 0 (2 ^ 63)" $
-      checkW2 (2, 0) quotRemWord2# 1 0 (2 ^ 63)
-    check "quotRemWord2# 1 1 (2 ^ 63)" $
-      checkW2 (2, 1) quotRemWord2# 1 1 (2 ^ 63)
+    check "quotRemWord2# 1 0 (2^(N-1))" $
+      checkW2 (2, 0) quotRemWord2# 1 0 (2 ^ (wordWidth-1))
+    check "quotRemWord2# 1 1 (2^(N-1))" $
+      checkW2 (2, 1) quotRemWord2# 1 1 (2 ^ (wordWidth-1))
     check "quotRemWord2# 1 0 maxBound" $
       checkW2 (1, 1) quotRemWord2# 1 0 maxBound
     check "quotRemWord2# 2 0 maxBound" $
       checkW2 (2, 2) quotRemWord2# 2 0 maxBound
     check "quotRemWord2# 1 maxBound maxBound" $
       checkW2 (2, 1) quotRemWord2# 1 maxBound maxBound
-    check "quotRemWord2# (2 ^ 63) 0 maxBound" $
-      checkW2 (2 ^ 63, 2 ^ 63) quotRemWord2# (2 ^ 63) 0 maxBound
-    check "quotRemWord2# (2 ^ 63) maxBound maxBound" $
-      checkW2 (2 ^ 63 + 1, 2 ^ 63) quotRemWord2# (2 ^ 63) maxBound maxBound
+    check "quotRemWord2# (2^(N-1)) 0 maxBound" $
+      checkW2 (2 ^ (wordWidth-1), 2 ^ (wordWidth-1)) quotRemWord2# (2 ^ (wordWidth-1)) 0 maxBound
+    check "quotRemWord2# (2^(N-1)) maxBound maxBound" $
+      checkW2 (2 ^ (wordWidth-1) + 1, 2 ^ (wordWidth-1)) quotRemWord2# (2 ^ (wordWidth-1)) maxBound maxBound
