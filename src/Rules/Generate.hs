@@ -71,14 +71,14 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
                 build $ fullTarget target GenPrimopCode [primopsTxt] [file]
 
         priority 2.0 $ do
-            when (pkg == ghcPkg) $ buildPath -/- "Config.hs" %> \file -> do
+            when (pkg == compiler) $ buildPath -/- "Config.hs" %> \file -> do
                 file <~ generateConfigHs
-
-            when (pkg == ghcPkg) $ buildPath -/- "Version.hs" %> \file -> do
-                file <~ generateVersionHs
 
             when (pkg == compiler) $ platformH %> \file -> do
                 file <~ generateGhcBootPlatformH
+
+            when (pkg == ghcPkg) $ buildPath -/- "Version.hs" %> \file -> do
+                file <~ generateVersionHs
 
             when (pkg == runghc) $ buildPath -/- "Main.hs" %> \file -> do
                 copyFileChanged (pkgPath pkg -/- "runghc.hs") file
