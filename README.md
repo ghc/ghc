@@ -48,6 +48,22 @@ $ shake-build/build.bat
 ```
 Also see the [Building GHC on Windows guide][ghc-windows-building-guide].
 
+### Mac OS X
+
+```bash
+git clone git://git.haskell.org/ghc
+cd ghc
+git submodule update --init
+git clone git://github.com/snowleopard/shaking-up-ghc shake-build
+./boot
+./configure --with-gcc=$(which clang) # See #26
+./shake-build/build.sh includes/ghcautoconf.h # See #48
+./shake-build/build.sh includes/ghcplatform.h # See #48
+cp utils/hsc2hs/template-hsc.h inplace/lib/template-hsc.h # See #44
+./shake-build/build.sh
+```
+
+See the Linux section for running in a Cabal sandbox.
 
 ### Resetting the build
 
