@@ -41,6 +41,8 @@ hscolour       = @HSCOLOUR@
 gcc-is-clang        = @GccIsClang@
 gcc-lt-46           = @GccLT46@
 ar-supports-at-file = @ArSupportsAtFile@
+cc-llvm-backend     = @CC_LLVM_BACKEND@
+cc-clang-backend    = @CC_CLANG_BACKEND@
 
 # Build options:
 #===============

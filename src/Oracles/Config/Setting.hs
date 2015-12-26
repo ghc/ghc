@@ -21,6 +21,8 @@ data Setting = BuildArch
              | BuildOs
              | BuildPlatform
              | BuildVendor
+             | CcClangBackend
+             | CcLlvmBackend
              | DynamicExtension
              | GhcMajorVersion
              | GhcMinorVersion
@@ -60,6 +62,8 @@ setting key = askConfig $ case key of
     BuildOs            -> "build-os"
     BuildPlatform      -> "build-platform"
     BuildVendor        -> "build-vendor"
+    CcClangBackend     -> "cc-clang-backend"
+    CcLlvmBackend      -> "cc-llvm-backend"
     DynamicExtension   -> "dynamic-extension"
     GhcMajorVersion    -> "ghc-major-version"
     GhcMinorVersion    -> "ghc-minor-version"
