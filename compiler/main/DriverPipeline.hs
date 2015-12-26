@@ -130,22 +130,6 @@ compileOne' m_tc_result mHscMessage
             hsc_env0 summary mod_index nmods mb_old_iface maybe_old_linkable
             source_modified0
  = do
-   let dflags0     = ms_hspp_opts summary
-       this_mod    = ms_mod summary
-       src_flavour = ms_hsc_src summary
-       location    = ms_location summary
-       input_fnpp  = ms_hspp_file summary
-       mod_graph   = hsc_mod_graph hsc_env0
-       needsTH     = any (xopt LangExt.TemplateHaskell . ms_hspp_opts) mod_graph
-       needsQQ     = any (xopt LangExt.QuasiQuotes     . ms_hspp_opts) mod_graph
-       needsLinker = needsTH || needsQQ
-       isDynWay    = any (== WayDyn) (ways dflags0)
-       isProfWay   = any (== WayProf) (ways dflags0)
-   -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
-   -- the linker can correctly load the object files.
-   let dflags1 = if needsLinker && dynamicGhc && not isDynWay && not isProfWay
-                  then gopt_set dflags0 Opt_BuildDynamicToo
-                  else dflags0
 
    debugTraceMsg dflags1 2 (text "compile: input file" <+> text input_fnpp)
 
@@ -229,8 +213,11 @@ compileOne' m_tc_result mHscMessage
             return hmi0 { hm_linkable = Just linkable }
 
  where dflags0     = ms_hspp_opts summary
+
+       this_mod    = ms_mod summary
        location    = ms_location summary
        input_fn    = expectJust "compile:hs" (ml_hs_file location)
+       input_fnpp  = ms_hspp_file summary
        mod_graph   = hsc_mod_graph hsc_env0
        needsTH     = any (xopt LangExt.TemplateHaskell . ms_hspp_opts) mod_graph
        needsQQ     = any (xopt LangExt.QuasiQuotes     . ms_hspp_opts) mod_graph
