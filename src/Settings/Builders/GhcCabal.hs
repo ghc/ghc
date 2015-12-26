@@ -80,7 +80,7 @@ bootPackageDbArgs :: Args
 bootPackageDbArgs = stage0 ? do
     path <- getSetting GhcSourcePath
     lift $ need [bootstrappingConfInitialised]
-    isGhc <- (||) <$> stagedBuilder Ghc <*> stagedBuilder GhcM
+    isGhc <- stagedBuilder Ghc ||^ stagedBuilder GhcM
     let prefix = if isGhc then "-package-db " else "--package-db="
     arg $ prefix ++ path -/- bootstrappingConf
 
