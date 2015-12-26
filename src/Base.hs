@@ -17,7 +17,7 @@ module Base (
     module Development.Shake.Util,
 
     -- * Paths
-    shakeFilesPath, configPath, programInplacePath,
+    shakeFilesPath, configPath, sourcePath, programInplacePath,
     bootPackageConstraints, packageDependencies,
 
     -- * Output
@@ -25,8 +25,9 @@ module Base (
     module System.Console.ANSI,
 
     -- * Miscellaneous utilities
-    bimap, minusOrd, intersectOrd, removeFileIfExists, replaceEq, chunksOfSize,
-    replaceSeparators, decodeModule, encodeModule, unifyPath, (-/-), versionToInt
+    bimap, minusOrd, intersectOrd, removeFileIfExists, replaceEq, quote,
+    chunksOfSize, replaceSeparators, decodeModule, encodeModule, unifyPath,
+    (-/-), versionToInt
     ) where
 
 import Control.Applicative
@@ -56,6 +57,11 @@ shakeFilesPath = shakePath -/- ".db"
 configPath :: FilePath
 configPath = shakePath -/- "cfg"
 
+-- | Path to source files of the build system, e.g. this file is located at
+-- sourcePath -/- "Base.hs". We use this to `need` some of the source files.
+sourcePath :: FilePath
+sourcePath = shakePath -/- "src"
+
 programInplacePath :: FilePath
 programInplacePath = "inplace/bin"
 
@@ -76,6 +82,10 @@ replaceSeparators = replaceIf isPathSeparator
 
 replaceIf :: (a -> Bool) -> a -> [a] -> [a]
 replaceIf p to = map (\from -> if p from then to else from)
+
+-- | Add quotes to a String
+quote :: String -> String
+quote s = "\"" ++ s ++ "\""
 
 -- | Given a version string such as "2.16.2" produce an integer equivalent
 versionToInt :: String -> Int

@@ -42,6 +42,9 @@ executable ghc-shake
                        , Rules.Dependencies
                        , Rules.Documentation
                        , Rules.Generate
+                       , Rules.Generators.ConfigHs
+                       , Rules.Generators.GhcPkgVersionHs
+                       , Rules.Generators.PlatformH
                        , Rules.Library
                        , Rules.Oracles
                        , Rules.Package
