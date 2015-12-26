@@ -43,7 +43,7 @@ executable ghc-shake
                        , Rules.Documentation
                        , Rules.Generate
                        , Rules.Generators.ConfigHs
-                       , Rules.Generators.GhcPkgVersionHs
+                       , Rules.Generators.VersionHs
                        , Rules.Generators.PlatformH
                        , Rules.Library
                        , Rules.Oracles

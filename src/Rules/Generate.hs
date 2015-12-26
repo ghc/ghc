@@ -3,7 +3,7 @@ module Rules.Generate (generatePackageCode) where
 import Expression
 import GHC
 import Rules.Generators.ConfigHs
-import Rules.Generators.GhcPkgVersionHs
+import Rules.Generators.VersionHs
 import Rules.Generators.PlatformH
 import Oracles.ModuleFiles
 import Rules.Actions
@@ -32,6 +32,10 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
         primopsTxt  = targetPath stage compiler -/- "build/primops.txt"
         platformH   = targetPath stage compiler -/- "ghc_boot_platform.h"
         generated f = (buildPath ++ "//*.hs") ?== f && not ("//autogen/*" ?== f)
+        generate file expr = do
+            contents <- interpretPartial target expr
+            writeFileChanged file contents
+            putBuild $ "| Successfully generated '" ++ file ++ "'."
     in do
         generated ?> \file -> do
             let pattern = "//" ++ takeBaseName file <.> "*"
@@ -60,23 +64,16 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
                 need [primopsTxt]
                 build $ fullTarget target GenPrimopCode [primopsTxt] [file]
 
-        priority 2.0 $ buildPath -/- "Config.hs" %> \file -> do
-            contents <- interpretPartial target generateConfigHs
-            writeFileChanged file contents
-            putBuild $ "| Successfully generated '" ++ file ++ "'."
+        priority 2.0 $ do
+            when (pkg == ghcPkg) $ buildPath -/- "Config.hs" %> \file -> do
+                generate file generateConfigHs
 
-        when (pkg == compiler) $ platformH %> \file -> do
-            contents <- interpretPartial target generatePlatformH
-            writeFileChanged file contents
-            putBuild $ "| Successfully generated '" ++ file ++ "'."
-
-        priority 2.0 $
             when (pkg == ghcPkg) $ buildPath -/- "Version.hs" %> \file -> do
-                contents <- interpretPartial target generateGhcPkgVersionHs
-                writeFileChanged file contents
-                putBuild $ "| Successfully generated '" ++ file ++ "'."
+                generate file generateVersionHs
 
-        priority 2.0 $
+            when (pkg == compiler) $ platformH %> \file -> do
+                generate file generatePlatformH
+
             when (pkg == runghc) $ buildPath -/- "Main.hs" %> \file -> do
                 copyFileChanged (pkgPath pkg -/- "runghc.hs") file
                 putBuild $ "| Successfully generated '" ++ file ++ "'."

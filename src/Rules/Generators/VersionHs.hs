@@ -1,11 +1,11 @@
-module Rules.Generators.GhcPkgVersionHs (generateGhcPkgVersionHs) where
+module Rules.Generators.VersionHs (generateVersionHs) where
 
 import Expression
 import Oracles
 
-generateGhcPkgVersionHs :: Expr String
-generateGhcPkgVersionHs = do
-    lift $ need [sourcePath -/- "Rules/Generators/GhcPkgVersionHs.hs"]
+generateVersionHs :: Expr String
+generateVersionHs = do
+    lift $ need [sourcePath -/- "Rules/Generators/VersionHs.hs"]
     projectVersion <- getSetting ProjectVersion
     targetOs       <- getSetting TargetOs
     targetArch     <- getSetting TargetArch
