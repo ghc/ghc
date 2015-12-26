@@ -1,0 +1,72 @@
+
+T10619.hs:9:15: error:
+    • Couldn't match type ‘forall a. a -> a’ with ‘b -> b’
+      Expected type: (b -> b) -> b -> b
+        Actual type: (forall a. a -> a) -> b -> b
+    • In the expression:
+        ((\ x -> x) :: (forall a. a -> a) -> forall b. b -> b)
+      In the expression:
+        if True then
+            ((\ x -> x) :: (forall a. a -> a) -> forall b. b -> b)
+        else
+            \ y -> y
+      In an equation for ‘foo’:
+          foo _
+            = if True then
+                  ((\ x -> x) :: (forall a. a -> a) -> forall b. b -> b)
+              else
+                  \ y -> y
+    • Relevant bindings include
+        foo :: r -> (b -> b) -> b -> b (bound at T10619.hs:8:1)
+
+T10619.hs:14:15: error:
+    • Couldn't match type ‘b’ with ‘a’
+        because type variable ‘a’ would escape its scope
+      This (rigid, skolem) type variable is bound by
+        a type expected by the context:
+          a -> a
+        at T10619.hs:14:15-65
+      Expected type: (b -> b) -> b -> b
+        Actual type: (forall a. a -> a) -> forall b. b -> b
+    • In the expression:
+        ((\ x -> x) :: (forall a. a -> a) -> forall b. b -> b)
+      In the expression:
+        if True then
+            \ y -> y
+        else
+            ((\ x -> x) :: (forall a. a -> a) -> forall b. b -> b)
+      In an equation for ‘bar’:
+          bar _
+            = if True then
+                  \ y -> y
+              else
+                  ((\ x -> x) :: (forall a. a -> a) -> forall b. b -> b)
+    • Relevant bindings include
+        bar :: r -> (b -> b) -> b -> b (bound at T10619.hs:12:1)
+
+T10619.hs:16:13: error:
+    • Couldn't match type ‘forall a. a -> a’ with ‘b -> b’
+      Expected type: (b -> b) -> b -> b
+        Actual type: (forall a. a -> a) -> b -> b
+    • In the expression:
+          (\ x -> x) :: (forall a. a -> a) -> forall b. b -> b
+      In an equation for ‘baz’:
+          baz True = (\ x -> x) :: (forall a. a -> a) -> forall b. b -> b
+    • Relevant bindings include
+        baz :: Bool -> (b -> b) -> b -> b (bound at T10619.hs:16:1)
+
+T10619.hs:20:14: error:
+    • Couldn't match type ‘b’ with ‘a’
+        because type variable ‘a’ would escape its scope
+      This (rigid, skolem) type variable is bound by
+        a type expected by the context:
+          a -> a
+        at T10619.hs:20:14-64
+      Expected type: (b -> b) -> b -> b
+        Actual type: (forall a. a -> a) -> forall b. b -> b
+    • In the expression:
+          (\ x -> x) :: (forall a. a -> a) -> forall b. b -> b
+      In an equation for ‘quux’:
+          quux True = (\ x -> x) :: (forall a. a -> a) -> forall b. b -> b
+    • Relevant bindings include
+        quux :: Bool -> (b -> b) -> b -> b (bound at T10619.hs:19:1)
