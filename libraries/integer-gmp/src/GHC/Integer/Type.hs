@@ -1659,7 +1659,7 @@ resizeMutBigNat# (MBN# mba0#) nsz# s
         (# s'', mba# #) -> (# s'', MBN# mba# #)
   where
     bsz# = nsz# `uncheckedIShiftL#` GMP_LIMB_SHIFT#
-    (# s', n# #) = getSizeofMutBigNat# (MBN# mba0#) s
+    (# s', n# #) = getSizeofMutableByteArray# mba0# s
 
 shrinkMutBigNat# :: MutBigNat s -> GmpSize# -> State# s -> State# s
 shrinkMutBigNat# (MBN# mba0#) nsz# s
@@ -1667,7 +1667,7 @@ shrinkMutBigNat# (MBN# mba0#) nsz# s
   | True                  = shrinkMutableByteArray# mba0# bsz# s'
   where
     bsz# = nsz# `uncheckedIShiftL#` GMP_LIMB_SHIFT#
-    (# s', n# #) = getSizeofMutBigNat# (MBN# mba0#) s
+    (# s', n# #) = getSizeofMutableByteArray# mba0# s
 
 unsafeSnocFreezeBigNat# :: MutBigNat s -> GmpLimb# -> S s BigNat
 unsafeSnocFreezeBigNat# mbn0@(MBN# mba0#) limb# s = go s'
