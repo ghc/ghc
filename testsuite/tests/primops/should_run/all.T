@@ -12,3 +12,4 @@ test('T10678',
       only_ways('normal')
      ],
      compile_and_run, ['-O'])
+test('T11296', normal, compile_and_run, [''])
