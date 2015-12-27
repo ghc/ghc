@@ -208,6 +208,7 @@ argStagedBuilderPath :: (Stage -> Builder) -> Args
 argStagedBuilderPath sb = (argM . builderPath . sb) =<< getStage
 
 -- Pass arguments to Gcc and corresponding lists of sub-arguments of GhcCabal
+-- TODO: simplify
 appendCcArgs :: [String] -> Args
 appendCcArgs xs = do
     mconcat [ stagedBuilder Gcc  ? append xs

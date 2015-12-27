@@ -47,20 +47,21 @@ build = buildWithResources []
 
 interestingInfo :: Builder -> [String] -> [String]
 interestingInfo builder ss = case builder of
-    Alex     -> prefixAndSuffix 0 3 ss
-    Ar       -> prefixAndSuffix 2 1 ss
-    Gcc _    -> prefixAndSuffix 0 4 ss
-    GccM _   -> prefixAndSuffix 0 1 ss
-    Ghc _    -> prefixAndSuffix 0 4 ss
-    GhcCabal -> prefixAndSuffix 3 0 ss
-    GhcM _   -> prefixAndSuffix 1 1 ss
-    GhcPkg _ -> prefixAndSuffix 3 0 ss
-    Haddock  -> prefixAndSuffix 1 0 ss
-    Happy    -> prefixAndSuffix 0 3 ss
-    Hsc2Hs   -> prefixAndSuffix 0 3 ss
-    HsCpp    -> prefixAndSuffix 0 1 ss
-    Ld       -> prefixAndSuffix 4 0 ss
-    _        -> ss
+    Alex            -> prefixAndSuffix 0 3 ss
+    Ar              -> prefixAndSuffix 2 1 ss
+    DeriveConstants -> prefixAndSuffix 3 0 ss
+    Gcc _           -> prefixAndSuffix 0 4 ss
+    GccM _          -> prefixAndSuffix 0 1 ss
+    Ghc _           -> prefixAndSuffix 0 4 ss
+    GhcCabal        -> prefixAndSuffix 3 0 ss
+    GhcM _          -> prefixAndSuffix 1 1 ss
+    GhcPkg _        -> prefixAndSuffix 3 0 ss
+    Haddock         -> prefixAndSuffix 1 0 ss
+    Happy           -> prefixAndSuffix 0 3 ss
+    Hsc2Hs          -> prefixAndSuffix 0 3 ss
+    HsCpp           -> prefixAndSuffix 0 1 ss
+    Ld              -> prefixAndSuffix 4 0 ss
+    _               -> ss
   where
     prefixAndSuffix n m list =
         let len = length list in

@@ -3,6 +3,7 @@ module Settings.Args (getArgs) where
 import Expression
 import Settings.Builders.Alex
 import Settings.Builders.Ar
+import Settings.Builders.DeriveConstants
 import Settings.Builders.Gcc
 import Settings.Builders.GenPrimopCode
 import Settings.Builders.Ghc
@@ -32,6 +33,7 @@ defaultArgs = mconcat
     , arArgs
     , cabalArgs
     , customPackageArgs
+    , deriveConstantsArgs
     , gccArgs
     , gccMArgs
     , genPrimopCodeArgs

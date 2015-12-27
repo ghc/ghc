@@ -1,4 +1,6 @@
-module Rules.Generate (generatePackageCode, generateRules) where
+module Rules.Generate (
+    generatePackageCode, generateRules, includesDependencies
+    ) where
 
 import Expression
 import GHC
@@ -14,6 +16,19 @@ import Settings
 
 primopsSource :: FilePath
 primopsSource = "compiler/prelude/primops.txt.pp"
+
+derivedConstantsPath :: FilePath
+derivedConstantsPath = "includes/dist-derivedconstants/header"
+
+-- TODO: can we drop COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS)?
+includesDependencies :: [FilePath]
+includesDependencies =
+    [ "includes/ghcautoconf.h"
+    , "includes/ghcplatform.h"
+    , derivedConstantsPath -/- "DerivedConstants.h"
+    , derivedConstantsPath -/- "GHCConstantsHaskellType.hs"
+    , derivedConstantsPath -/- "GHCConstantsHaskellWrappers.hs"
+    , derivedConstantsPath -/- "GHCConstantsHaskellExports.hs" ]
 
 -- The following generators and corresponding source extensions are supported:
 knownGenerators :: [ (Builder, String) ]
@@ -32,7 +47,6 @@ generate file target expr = do
     contents <- interpretPartial target expr
     writeFileChanged file contents
     putSuccess $ "| Successfully generated '" ++ file ++ "'."
-
 
 generatePackageCode :: Resources -> PartialTarget -> Rules ()
 generatePackageCode _ target @ (PartialTarget stage pkg) =
@@ -71,6 +85,10 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
                 build $ fullTarget target GenPrimopCode [primopsTxt] [file]
 
         priority 2.0 $ do
+            when (pkg == compiler && stage == Stage1) $
+                derivedConstantsPath ++ "//*" %> \file -> do
+                    build $ fullTarget target DeriveConstants [] [file]
+
             when (pkg == compiler) $ buildPath -/- "Config.hs" %> \file -> do
                 file <~ generateConfigHs
 
