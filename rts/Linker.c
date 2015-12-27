@@ -4159,7 +4159,7 @@ ocRunInit_PEi386 ( ObjectCode *oc )
 #  define ELF_TARGET_X64_64
 #  define ELF_64BIT
 #  define ELF_TARGET_AMD64 /* Used inside <elf.h> on Solaris 11 */
-#elif defined(powerpc64_HOST_ARCH)
+#elif defined(powerpc64_HOST_ARCH) || defined(powerpc64le_HOST_ARCH)
 #  define ELF_64BIT
 #endif
 
