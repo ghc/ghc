@@ -246,6 +246,16 @@ Compiler
    To avoid warnings, unused type variables should be prefixed or replaced with
    underscores.
 
+-  Added the ``-Wtoo-many-guards`` flag. When enabled, this will issue a
+   warning if a pattern match contains too many guards (over 20 at the
+   moment). It is enabled by default but makes a difference only if pattern
+   match checking is also enabled.
+
+-  Added the ``-ffull-guard-reasoning`` flag. When enabled, pattern match
+   checking tries its best to reason about guards. Since the additional
+   expressivity may come with a high price in terms of compilation time and
+   memory consumption, it is turned off by default.
+
 GHCi
 ~~~~
 

@@ -538,6 +538,36 @@ of ``-W(no-)*``.
     This option isn't enabled by default because it can be very noisy,
     and it often doesn't indicate a bug in the program.
 
+``-Wtoo-many-guards``
+    .. index::
+       single: -Wtoo-many-guards
+       single: too many guards, warning
+
+    The option ``-Wtoo-many-guards`` warns about places where a
+    pattern match contains too many guards (over 20 at the moment).
+    It is enabled by default but has an effect only if any form of
+    exhaustivness/overlapping checking is enabled (one of
+    ``-Wincomplete-patterns``,
+    ``-Wincomplete-uni-patterns``,
+    ``-Wincomplete-record-updates``,
+    ``-Woverlapping-patterns``). The warning can be suppressed by
+    enabling either ``-Wno-too-many-guards``, which just hides the
+    warning, or ``-ffull-guard-reasoning``.
+
+``-ffull-guard-reasoning``
+    .. index::
+       single: -ffull-guard-reasoning
+       single: guard reasoning, warning
+
+    The option ``-ffull-guard-reasoning`` forces pattern match checking
+    to run in full. This gives more precise warnings concerning pattern
+    guards but in most cases increases memory consumption and
+    compilation time. Hence, it is off by default. Enabling
+    ``-ffull-guard-reasoning`` also implies ``-Wno-too-many-guards``.
+    Note that (like ``-Wtoo-many-guards``) ``-ffull-guard-reasoning``
+    makes a difference only if pattern match checking is already
+    enabled.
+
 ``-Wmissing-fields``
     .. index::
        single: -Wmissing-fields

@@ -381,11 +381,15 @@ Bugs in GHC
    yield points are inserted at every function entrypoint (at the expense of a
    bit of performance).
 
--  GHC can warn about non-exhaustive or overlapping patterns (see
-   :ref:`options-sanity`), and usually does so correctly. But not
-   always. It gets confused by string patterns, and by guards, and can
-   then emit bogus warnings. The entire overlap-check code needs an
-   overhaul really.
+-  GHC's updated exhaustiveness and coverage checker (see
+   :ref:`options-sanity`) is quite expressive but with a rather high
+   performance cost (in terms of both time and memory consumption), mainly
+   due to guards. Two flags have been introduced to give more control to
+   the user over guard reasoning: ``-Wtoo-many-guards``
+   and ``-ffull-guard-reasoning`` (see :ref:`options-sanity`).
+   When ``-ffull-guard-reasoning`` is on, pattern match checking for guards
+   runs in full power, which may run out of memory/substantially increase
+   compilation time.
 
 -  GHC does not allow you to have a data type with a context that
    mentions type variables that are not data type parameters. For

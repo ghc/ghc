@@ -1,3 +1,8 @@
+{-# LANGUAGE CPP #-}
+#if __GLASGOW_HASKELL__ > 710
+{-# OPTIONS_GHC -Wno-too-many-guards #-}
+#endif
+
 module Test where
 
 foo :: Double -> Int

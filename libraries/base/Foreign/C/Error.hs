@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# OPTIONS_GHC -ffull-guard-reasoning #-}
 
 -----------------------------------------------------------------------------
 -- |

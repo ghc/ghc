@@ -4,11 +4,17 @@ Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 Pattern Matching Coverage Checking.
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, GADTs, DataKinds, KindSignatures #-}
 
 module Check (
         -- Actual check and pretty printing
         checkSingle, checkMatches, dsPmWarn,
+
+        -- Check for exponential explosion due to guards
+        computeNoGuards,
+        isAnyPmCheckEnabled,
+        warnManyGuards,
+        maximum_failing_guards,
 
         -- See Note [Type and Term Equality Propagation]
         genCaseTmCs1, genCaseTmCs2
@@ -76,30 +82,29 @@ data PmConstraint = TmConstraint PmExpr PmExpr -- ^ Term equalities: e ~ e
                   | TyConstraint [EvVar]   -- ^ Type equalities
                   | BtConstraint Id        -- ^ Strictness constraints: x ~ _|_
 
+data PatTy = PAT | VA -- Used only as a kind, to index PmPat
+
 -- The *arity* of a PatVec [p1,..,pn] is
 -- the number of p1..pn that are not Guards
 
-data PmPat p = PmCon { pm_con_con     :: DataCon
-                     , pm_con_arg_tys :: [Type]
-                     , pm_con_tvs     :: [TyVar]
-                     , pm_con_dicts   :: [EvVar]
-                     , pm_con_args    :: [p] }
-               -- For PmCon arguments' meaning see @ConPatOut@ in hsSyn/HsPat.hs
-             | PmVar { pm_var_id      :: Id }
-             | PmLit { pm_lit_lit     :: PmLit } -- See Note [Literals in PmPat]
+data PmPat :: PatTy -> * where
+  PmCon :: { pm_con_con     :: DataCon
+           , pm_con_arg_tys :: [Type]
+           , pm_con_tvs     :: [TyVar]
+           , pm_con_dicts   :: [EvVar]
+           , pm_con_args    :: [PmPat t] } -> PmPat t
+           -- For PmCon arguments' meaning see @ConPatOut@ in hsSyn/HsPat.hs
+  PmVar :: { pm_var_id   :: Id    } -> PmPat t
+  PmLit :: { pm_lit_lit  :: PmLit } -> PmPat t -- See Note [Literals in PmPat]
+  PmGrd :: { pm_grd_pv   :: PatVec
+           , pm_grd_expr :: PmExpr } -> PmPat 'PAT
 
 -- data T a where
 --     MkT :: forall p q. (Eq p, Ord q) => p -> q -> T [p]
 -- or  MkT :: forall p q r. (Eq p, Ord q, [p] ~ r) => p -> q -> T r
 
-data Pattern = PmGuard PatVec PmExpr      -- ^ Guard Patterns
-             | NonGuard (PmPat Pattern)   -- ^ Other Patterns
-
-newtype ValAbs = VA (PmPat ValAbs) -- Value Abstractions
-
--- Not sure if this is needed
-instance Outputable ValAbs where
-  ppr = ppr . valAbsToPmExpr
+type Pattern = PmPat 'PAT -- ^ Patterns
+type ValAbs  = PmPat 'VA  -- ^ Value Abstractions
 
 type PatVec    = [Pattern] -- Pattern Vectors
 type ValVecAbs = [ValAbs]  -- Value Vector Abstractions
@@ -141,7 +146,7 @@ checkSingle var p = do
   let lp = [noLoc p]
   vec <- liftUs (translatePat p)
   vsa <- initial_uncovered [var]
-  (c,d,us') <- patVectProc (vec,[]) vsa -- no guards
+  (c,d,us') <- patVectProc False (vec,[]) vsa -- no guards
   us <- pruneVSA us'
   return $ case (c,d) of
     (True,  _)     -> ([],   [],   us)
@@ -149,8 +154,8 @@ checkSingle var p = do
     (False, False) -> ([lp], [],   us)
 
 -- | Check a matchgroup (case, functions, etc.)
-checkMatches :: [Id] -> [LMatch Id (LHsExpr Id)] -> DsM PmResult
-checkMatches vars matches
+checkMatches :: Bool -> [Id] -> [LMatch Id (LHsExpr Id)] -> DsM PmResult
+checkMatches oversimplify vars matches
   | null matches = return ([],[],[])
   | otherwise    = do
       missing    <- initial_uncovered vars
@@ -163,7 +168,7 @@ checkMatches vars matches
 
     go (m:ms) missing = do
       clause        <- liftUs (translateMatch m)
-      (c,  d,  us ) <- patVectProc clause missing
+      (c,  d,  us ) <- patVectProc oversimplify clause missing
       (rs, is, us') <- go ms us
       return $ case (c,d) of
         (True,  _)     -> (  rs,   is, us')
@@ -174,13 +179,38 @@ checkMatches vars matches
 -- delta with all term and type constraints in scope.
 initial_uncovered :: [Id] -> DsM ValSetAbs
 initial_uncovered vars = do
-  ty_cs <- TyConstraint . bagToList <$> getDictsDs
+  cs <- getCsPmM
+  let vsa = foldr Cons Singleton (map PmVar vars)
+  return $ if null cs then vsa
+                      else mkConstraint cs vsa
+
+-- | Collect all term and type constraints from the local environment
+getCsPmM :: DsM [PmConstraint]
+getCsPmM = do
+  ty_cs <- bagToList <$> getDictsDs
   tm_cs <- map simpleToTmCs . bagToList <$> getTmCsDs
-  let vsa = map (VA . PmVar) vars
-  return $ mkConstraint (ty_cs:tm_cs) (foldr Cons Singleton vsa)
+  return $ if null ty_cs
+    then tm_cs
+    else TyConstraint ty_cs : tm_cs
   where
     simpleToTmCs :: (Id, PmExpr) -> PmConstraint
     simpleToTmCs (x,e) = TmConstraint (PmExprVar x) e
+
+-- | Total number of guards in a translated match that could fail.
+noFailingGuards :: [(PatVec,[PatVec])] -> Int
+noFailingGuards clauses = sum [ countPatVecs gvs | (_, gvs) <- clauses ]
+  where
+    countPatVec  gv  = length [ () | p <- gv, not (cantFailPattern p) ]
+    countPatVecs gvs = sum [ countPatVec gv | gv <- gvs ]
+
+computeNoGuards :: [LMatch Id (LHsExpr Id)] -> PmM Int
+computeNoGuards matches = do
+  matches' <- mapM (liftUs . translateMatch) matches
+  return (noFailingGuards matches')
+
+maximum_failing_guards :: Int
+maximum_failing_guards = 20 -- Find a better number
+
 {-
 %************************************************************************
 %*                                                                      *
@@ -194,7 +224,7 @@ initial_uncovered vars = do
 
 nullaryConPattern :: DataCon -> Pattern
 -- Nullary data constructor and nullary type constructor
-nullaryConPattern con = NonGuard $
+nullaryConPattern con =
   PmCon { pm_con_con = con, pm_con_arg_tys = []
         , pm_con_tvs = [], pm_con_dicts = [], pm_con_args = [] }
 
@@ -203,47 +233,48 @@ truePattern = nullaryConPattern trueDataCon
 
 -- | A fake guard pattern (True <- _) used to represent cases we cannot handle
 fake_pat :: Pattern
-fake_pat = PmGuard [truePattern] (PmExprOther EWildPat)
+fake_pat = PmGrd { pm_grd_pv   = [truePattern]
+                 , pm_grd_expr = PmExprOther EWildPat }
 
 vanillaConPattern :: DataCon -> [Type] -> PatVec -> Pattern
 -- ADT constructor pattern => no existentials, no local constraints
-vanillaConPattern con arg_tys args = NonGuard $
+vanillaConPattern con arg_tys args =
   PmCon { pm_con_con = con, pm_con_arg_tys = arg_tys
         , pm_con_tvs = [], pm_con_dicts = [], pm_con_args = args }
 
 nilPattern :: Type -> Pattern
-nilPattern ty = NonGuard $
+nilPattern ty =
   PmCon { pm_con_con = nilDataCon, pm_con_arg_tys = [ty]
         , pm_con_tvs = [], pm_con_dicts = []
         , pm_con_args = [] }
 
 mkListPatVec :: Type -> PatVec -> PatVec -> PatVec
-mkListPatVec ty xs ys = [NonGuard $ PmCon { pm_con_con = consDataCon
-                                          , pm_con_arg_tys = [ty]
-                                          , pm_con_tvs = [], pm_con_dicts = []
-                                          , pm_con_args = xs++ys }]
+mkListPatVec ty xs ys = [PmCon { pm_con_con = consDataCon
+                               , pm_con_arg_tys = [ty]
+                               , pm_con_tvs = [], pm_con_dicts = []
+                               , pm_con_args = xs++ys }]
 
 mkLitPattern :: HsLit -> Pattern
-mkLitPattern lit = NonGuard $ PmLit { pm_lit_lit = PmSLit lit }
+mkLitPattern lit = PmLit { pm_lit_lit = PmSLit lit }
 
 -- -----------------------------------------------------------------------
 -- * Transform (Pat Id) into of (PmPat Id)
 
 translatePat :: Pat Id -> UniqSM PatVec
 translatePat pat = case pat of
-  WildPat ty         -> mkPatternVarsSM [ty]
-  VarPat  id         -> return [idPatternVar (unLoc id)]
-  ParPat p           -> translatePat (unLoc p)
-  LazyPat _          -> mkPatternVarsSM [hsPatType pat] -- like a variable
+  WildPat ty  -> mkPmVarsSM [ty]
+  VarPat  id  -> return [PmVar (unLoc id)]
+  ParPat p    -> translatePat (unLoc p)
+  LazyPat _   -> mkPmVarsSM [hsPatType pat] -- like a variable
 
   -- ignore strictness annotations for now
-  BangPat p          -> translatePat (unLoc p)
+  BangPat p   -> translatePat (unLoc p)
 
   AsPat lid p -> do
      -- Note [Translating As Patterns]
     ps <- translatePat (unLoc p)
     let [e] = map valAbsToPmExpr (coercePatVec ps)
-        g   = PmGuard [idPatternVar (unLoc lid)] e
+        g   = PmGrd [PmVar (unLoc lid)] e
     return (ps ++ [g])
 
   SigPatOut p _ty -> translatePat (unLoc p)
@@ -258,8 +289,8 @@ translatePat pat = case pat of
   NPlusKPat (L _ n) k ge minus -> do
     (xp, xe) <- mkPmId2FormsSM (idType n)
     let ke = L (getLoc k) (HsOverLit (unLoc k))
-        g1 = mkGuard [truePattern]    (OpApp xe (noLoc ge)    no_fixity ke)
-        g2 = mkGuard [idPatternVar n] (OpApp xe (noLoc minus) no_fixity ke)
+        g1 = mkGuard [truePattern] (OpApp xe (noLoc ge)    no_fixity ke)
+        g2 = mkGuard [PmVar n]     (OpApp xe (noLoc minus) no_fixity ke)
     return [xp, g1, g2]
 
   -- (fun -> pat)   ===>   x (pat <- fun x)
@@ -272,7 +303,7 @@ translatePat pat = case pat of
         let g = mkGuard ps (HsApp lexpr xe)
         return [xp,g]
       False -> do
-        var <- mkPatternVarSM arg_ty
+        var <- mkPmVarSM arg_ty
         return [var, fake_pat]
 
   -- list
@@ -288,7 +319,7 @@ translatePat pat = case pat of
         translatePat (ListPat lpats e_ty Nothing)
     | otherwise -> do
         -- See Note [Guards and Approximation]
-        var <- mkPatternVarSM pat_ty
+        var <- mkPmVarSM pat_ty
         return [var, fake_pat]
 
   ConPatOut { pat_con = L _ (PatSynCon _) } -> do
@@ -298,7 +329,7 @@ translatePat pat = case pat of
     -- to   v (Just (x, y) <- matchP v (\x y -> Just (x,y)) Nothing
     -- That is, a combination of a variable pattern and a guard
     -- But there are complications with GADTs etc, and this isn't done yet
-    var <- mkPatternVarSM (hsPatType pat)
+    var <- mkPmVarSM (hsPatType pat)
     return [var,fake_pat]
 
   ConPatOut { pat_con     = L _ (RealDataCon con)
@@ -307,11 +338,11 @@ translatePat pat = case pat of
             , pat_dicts   = dicts
             , pat_args    = ps } -> do
     args <- translateConPatVec arg_tys ex_tvs con ps
-    return [ NonGuard $ PmCon { pm_con_con     = con
-                              , pm_con_arg_tys = arg_tys
-                              , pm_con_tvs     = ex_tvs
-                              , pm_con_dicts   = dicts
-                              , pm_con_args    = args }]
+    return [PmCon { pm_con_con     = con
+                  , pm_con_arg_tys = arg_tys
+                  , pm_con_tvs     = ex_tvs
+                  , pm_con_dicts   = dicts
+                  , pm_con_args    = args }]
 
   NPat (L _ ol) mb_neg _eq -> translateNPat ol mb_neg
 
@@ -328,7 +359,7 @@ translatePat pat = case pat of
     return [vanillaConPattern fake_con [ty] (concat tidy_ps)]
 
   TuplePat ps boxity tys -> do
-    tidy_ps   <- translatePatVec (map unLoc ps)
+    tidy_ps <- translatePatVec (map unLoc ps)
     let tuple_con = tupleDataCon boxity (length ps)
     return [vanillaConPattern tuple_con tys (concat tidy_ps)]
 
@@ -352,7 +383,7 @@ translateNPat (OverLit val False _ ty) mb_neg
       Nothing -> c src i
       Just _  -> c src (-i)
 translateNPat ol mb_neg
-  = return [NonGuard $ PmLit { pm_lit_lit = PmOLit (isJust mb_neg) ol }]
+  = return [PmLit { pm_lit_lit = PmOLit (isJust mb_neg) ol }]
 
 -- | Translate a list of patterns (Note: each pattern is translated
 -- to a pattern vector but we do not concatenate the results).
@@ -367,11 +398,11 @@ translateConPatVec _univ_tys _ex_tvs _ (InfixCon p1 p2)
   = concat <$> translatePatVec (map unLoc [p1,p2])
 translateConPatVec  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
     -- Nothing matched. Make up some fresh term variables
-  | null fs        = mkPatternVarsSM arg_tys
+  | null fs        = mkPmVarsSM arg_tys
     -- The data constructor was not defined using record syntax. For the
     -- pattern to be in record syntax it should be empty (e.g. Just {}).
     -- So just like the previous case.
-  | null orig_lbls = ASSERT(null matched_lbls) mkPatternVarsSM arg_tys
+  | null orig_lbls = ASSERT(null matched_lbls) mkPmVarsSM arg_tys
     -- Some of the fields appear, in the original order (there may be holes).
     -- Generate a simple constructor pattern and make up fresh variables for
     -- the rest of the fields
@@ -379,20 +410,20 @@ translateConPatVec  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
   = ASSERT(length orig_lbls == length arg_tys)
       let translateOne (lbl, ty) = case lookup lbl matched_pats of
             Just p  -> translatePat p
-            Nothing -> mkPatternVarsSM [ty]
+            Nothing -> mkPmVarsSM [ty]
       in  concatMapM translateOne (zip orig_lbls arg_tys)
     -- The fields that appear are not in the correct order. Make up fresh
     -- variables for all fields and add guards after matching, to force the
     -- evaluation in the correct order.
   | otherwise = do
-      arg_var_pats    <- mkPatternVarsSM arg_tys
+      arg_var_pats    <- mkPmVarsSM arg_tys
       translated_pats <- forM matched_pats $ \(x,pat) -> do
         pvec <- translatePat pat
         return (x, pvec)
 
-      let zipped = zip orig_lbls [ x | NonGuard (PmVar x) <- arg_var_pats ]
+      let zipped = zip orig_lbls [ x | PmVar x <- arg_var_pats ]
           guards = map (\(name,pvec) -> case lookup name zipped of
-                            Just x  -> PmGuard pvec (PmExprVar x)
+                            Just x  -> PmGrd pvec (PmExprVar x)
                             Nothing -> panic "translateConPatVec: lookup")
                        translated_pats
 
@@ -450,22 +481,22 @@ translateGuards guards = do
     any_unhandled gv = any (not . shouldKeep) gv
 
     shouldKeep :: Pattern -> Bool
-    shouldKeep (NonGuard p)
+    shouldKeep p
       | PmVar {} <- p      = True
       | PmCon {} <- p      = length (allConstructors (pm_con_con p)) == 1
                              && all shouldKeep (pm_con_args p)
-    shouldKeep (PmGuard pv e)
+    shouldKeep (PmGrd pv e)
       | all shouldKeep pv  = True
       | isNotPmExprOther e = True  -- expensive but we want it
     shouldKeep _other_pat  = False -- let the rest..
 
 -- | Check whether a pattern can fail to match
 cantFailPattern :: Pattern -> Bool
-cantFailPattern (NonGuard p)
+cantFailPattern p
   | PmVar {} <- p = True
   | PmCon {} <- p = length (allConstructors (pm_con_con p)) == 1
                     && all cantFailPattern (pm_con_args p)
-cantFailPattern (PmGuard pv _e)
+cantFailPattern (PmGrd pv _e)
                   = all cantFailPattern pv
 cantFailPattern _ = False
 
@@ -594,13 +625,17 @@ replaces guards that cannot be reasoned about (like the ones we described in
 -- * Process a vector
 
 -- Covered, Uncovered, Divergent
-process_guards :: UniqSupply -> [PatVec] -> (ValSetAbs, ValSetAbs, ValSetAbs)
-process_guards _us [] = (Singleton, Empty, Empty) -- No guard == True guard
-process_guards us  gs
+process_guards :: UniqSupply -> Bool -> [PatVec]
+               -> (ValSetAbs, ValSetAbs, ValSetAbs)
+process_guards _us _oversimplify [] = (Singleton, Empty, Empty) -- No guard
+process_guards  us  oversimplify gs
   -- If we have a list of guards but one of them is empty (True by default)
   -- then we know that it is exhaustive (just a shortcut)
-  | any null gs = (Singleton, Empty, Singleton)
-  | otherwise   = go us Singleton gs
+  | any null gs  = (Singleton, Empty, Singleton)
+  -- If the user wants the same behaviour (almost no expressivity about guards)
+  | oversimplify = go us Singleton [[fake_pat]] -- to signal failure
+  -- If the user want the full reasoning (may be non-performant)
+  | otherwise    = go us Singleton gs
   where
     go _usupply missing []       = (Empty, missing, Empty)
     go  usupply missing (gv:gvs) = (mkUnion cs css, uss, mkUnion ds dss)
@@ -616,20 +651,18 @@ process_guards us  gs
 -- ----------------------------------------------------------------------------
 -- * Basic utilities
 
-patternType :: Pattern -> Type
-patternType (PmGuard pv _) = ASSERT(patVecArity pv == 1) (patternType p)
-  where Just p = find ((==1) . patternArity) pv
-patternType (NonGuard pat) = pmPatType pat
-
 -- | Get the type out of a PmPat. For guard patterns (ps <- e) we use the type
 -- of the first (or the single -WHEREVER IT IS- valid to use?) pattern
 pmPatType :: PmPat p -> Type
 pmPatType (PmCon { pm_con_con = con, pm_con_arg_tys = tys })
-                                     = mkTyConApp (dataConTyCon con) tys
+  = mkTyConApp (dataConTyCon con) tys
 pmPatType (PmVar { pm_var_id  = x }) = idType x
 pmPatType (PmLit { pm_lit_lit = l }) = pmLitType l
+pmPatType (PmGrd { pm_grd_pv  = pv })
+  = ASSERT(patVecArity pv == 1) (pmPatType p)
+  where Just p = find ((==1) . patternArity) pv
 
-mkOneConFull :: Id -> UniqSupply -> DataCon -> (PmPat ValAbs, [PmConstraint])
+mkOneConFull :: Id -> UniqSupply -> DataCon -> (ValAbs, [PmConstraint])
 --  *  x :: T tys, where T is an algebraic data type
 --     NB: in the case of a data familiy, T is the *representation* TyCon
 --     e.g.   data instance T (a,b) = T1 a b
@@ -673,12 +706,12 @@ mkOneConFull x usupply con = (con_abs, constraints)
                        , pm_con_args    = arguments }
 
     constraints -- term and type constraints
-      | null evvars = [ TmConstraint (PmExprVar x) (pmPatToPmExpr con_abs) ]
-      | otherwise   = [ TmConstraint (PmExprVar x) (pmPatToPmExpr con_abs)
+      | null evvars = [ TmConstraint (PmExprVar x) (valAbsToPmExpr con_abs) ]
+      | otherwise   = [ TmConstraint (PmExprVar x) (valAbsToPmExpr con_abs)
                       , TyConstraint evvars ]
 
 mkConVars :: UniqSupply -> [Type] -> [ValAbs] -- ys, fresh with the given type
-mkConVars us tys = zipWith mkValAbsVar (listSplitUniqSupply us) tys
+mkConVars us tys = zipWith mkPmVar (listSplitUniqSupply us) tys
 
 tailVSA :: ValSetAbs -> ValSetAbs
 tailVSA Empty               = Empty
@@ -692,9 +725,9 @@ wrapK con arg_tys ex_tvs dicts = go (dataConSourceArity con) emptylist
   where
     go :: Int -> DList ValAbs -> ValSetAbs -> ValSetAbs
     go _ _    Empty = Empty
-    go 0 args vsa   = VA (PmCon { pm_con_con  = con, pm_con_arg_tys = arg_tys
-                                , pm_con_tvs  = ex_tvs, pm_con_dicts = dicts
-                                , pm_con_args = toList args }) `mkCons` vsa
+    go 0 args vsa   = PmCon { pm_con_con  = con, pm_con_arg_tys = arg_tys
+                            , pm_con_tvs  = ex_tvs, pm_con_dicts = dicts
+                            , pm_con_args = toList args } `mkCons` vsa
     go _ _    Singleton           = panic "wrapK: Singleton"
     go n args (Cons vs vsa)       = go (n-1) (args `snoc` vs) vsa
     go n args (Constraint cs vsa) = cs `mkConstraint` go n args vsa
@@ -740,25 +773,16 @@ mkCons va vsa  = Cons va vsa
 -- * More smart constructors and fresh variable generation
 
 mkGuard :: PatVec -> HsExpr Id -> Pattern
-mkGuard pv e = PmGuard pv (hsExprToPmExpr e)
+mkGuard pv e = PmGrd pv (hsExprToPmExpr e)
 
 mkPmVar :: UniqSupply -> Type -> PmPat p
 mkPmVar usupply ty = PmVar (mkPmId usupply ty)
 
-idPatternVar :: Id -> Pattern
-idPatternVar x = NonGuard (PmVar x)
+mkPmVarSM :: Type -> UniqSM Pattern
+mkPmVarSM ty = flip mkPmVar ty <$> getUniqueSupplyM
 
-mkPatternVar :: UniqSupply -> Type -> Pattern
-mkPatternVar us ty = NonGuard (mkPmVar us ty)
-
-mkValAbsVar :: UniqSupply -> Type -> ValAbs
-mkValAbsVar us ty = VA (mkPmVar us ty)
-
-mkPatternVarSM :: Type -> UniqSM Pattern
-mkPatternVarSM ty = flip mkPatternVar ty <$> getUniqueSupplyM
-
-mkPatternVarsSM :: [Type] -> UniqSM PatVec
-mkPatternVarsSM tys = mapM mkPatternVarSM tys
+mkPmVarsSM :: [Type] -> UniqSM PatVec
+mkPmVarsSM tys = mapM mkPmVarSM tys
 
 mkPmId :: UniqSupply -> Type -> Id
 mkPmId usupply ty = mkLocalId name ty
@@ -771,34 +795,32 @@ mkPmId2FormsSM :: Type -> UniqSM (Pattern, LHsExpr Id)
 mkPmId2FormsSM ty = do
   us <- getUniqueSupplyM
   let x = mkPmId us ty
-  return (idPatternVar x, noLoc (HsVar (noLoc x)))
+  return (PmVar x, noLoc (HsVar (noLoc x)))
 
 -- ----------------------------------------------------------------------------
 -- * Converting between Value Abstractions, Patterns and PmExpr
 
 valAbsToPmExpr :: ValAbs -> PmExpr
-valAbsToPmExpr (VA va) = pmPatToPmExpr va
-
-pmPatToPmExpr :: PmPat ValAbs -> PmExpr
-pmPatToPmExpr (PmCon { pm_con_con  = c
-                     , pm_con_args = ps }) = PmExprCon c (map valAbsToPmExpr ps)
-pmPatToPmExpr (PmVar { pm_var_id   = x  }) = PmExprVar x
-pmPatToPmExpr (PmLit { pm_lit_lit  = l  }) = PmExprLit l
+valAbsToPmExpr (PmCon { pm_con_con = c, pm_con_args = ps })
+  = PmExprCon c (map valAbsToPmExpr ps)
+valAbsToPmExpr (PmVar { pm_var_id  = x }) = PmExprVar x
+valAbsToPmExpr (PmLit { pm_lit_lit = l }) = PmExprLit l
 
 -- Convert a pattern vector to a value list abstraction by dropping the guards
 -- recursively (See Note [Translating As Patterns])
-coercePatVec :: PatVec -> [ValAbs]
-coercePatVec pv = [ VA (coercePmPat p) | NonGuard p <- pv]
+coercePatVec :: PatVec -> ValVecAbs
+coercePatVec pv = concatMap coercePmPat pv
 
-coercePmPat :: PmPat Pattern -> PmPat ValAbs
-coercePmPat (PmVar { pm_var_id  = x }) = PmVar { pm_var_id  = x }
-coercePmPat (PmLit { pm_lit_lit = l }) = PmLit { pm_lit_lit = l }
+coercePmPat :: Pattern -> [ValAbs]
+coercePmPat (PmVar { pm_var_id  = x }) = [PmVar { pm_var_id  = x }]
+coercePmPat (PmLit { pm_lit_lit = l }) = [PmLit { pm_lit_lit = l }]
 coercePmPat (PmCon { pm_con_con = con, pm_con_arg_tys = arg_tys
                    , pm_con_tvs = tvs, pm_con_dicts = dicts
                    , pm_con_args = args })
-  = PmCon { pm_con_con  = con, pm_con_arg_tys = arg_tys
-          , pm_con_tvs  = tvs, pm_con_dicts = dicts
-          , pm_con_args = coercePatVec args }
+  = [PmCon { pm_con_con  = con, pm_con_arg_tys = arg_tys
+           , pm_con_tvs  = tvs, pm_con_dicts = dicts
+           , pm_con_args = coercePatVec args }]
+coercePmPat (PmGrd {}) = [] -- drop the guards
 
 no_fixity :: a -- TODO: Can we retrieve the fixity from the operator name?
 no_fixity = panic "Check: no fixity"
@@ -937,8 +959,8 @@ patVecArity :: PatVec -> PmArity
 patVecArity = sum . map patternArity
 
 patternArity :: Pattern -> PmArity
-patternArity (PmGuard  {}) = 0
-patternArity (NonGuard {}) = 1
+patternArity (PmGrd {}) = 0
+patternArity _other_pat = 1
 
 {-
 %************************************************************************
@@ -949,10 +971,11 @@ patternArity (NonGuard {}) = 1
 -}
 
 -- | Process a single vector
-patVectProc :: (PatVec, [PatVec]) -> ValSetAbs -> PmM (Bool, Bool, ValSetAbs)
-patVectProc (vec,gvs) vsa = do
+patVectProc :: Bool -> (PatVec, [PatVec]) -> ValSetAbs
+            -> PmM (Bool, Bool, ValSetAbs)
+patVectProc oversimplify (vec,gvs) vsa = do
   us <- getUniqueSupplyM
-  let (c_def, u_def, d_def) = process_guards us gvs -- default (continuation)
+  let (c_def, u_def, d_def) = process_guards us oversimplify gvs
   (usC, usU, usD) <- getUniqueSupplyM3
   mb_c <- anySatVSA (covered   usC c_def vec vsa)
   mb_d <- anySatVSA (divergent usD d_def vec vsa)
@@ -991,25 +1014,24 @@ pmTraverse  us  gvsa  rec vec  (Union vsa1 vsa2)
   where (us1, us2) = splitUniqSupply us
 pmTraverse us gvsa rec vec (Constraint cs vsa)
   = mkConstraint cs (pmTraverse us gvsa rec vec vsa)
-pmTraverse us gvsa rec (p:ps) vsa =
-  case p of
-    -- Guard Case
-    PmGuard pv e ->
-      let (us1, us2) = splitUniqSupply us
-          y  = mkPmId us1 (patternType p)
-          cs = [TmConstraint (PmExprVar y) e]
-      in  mkConstraint cs $ tailVSA $
-            pmTraverse us2 gvsa rec (pv++ps) (VA (PmVar y) `mkCons` vsa)
+pmTraverse us gvsa rec (p:ps) vsa
+  | PmGrd pv e <- p
+  = -- Guard Case
+    let (us1, us2) = splitUniqSupply us
+        y  = mkPmId us1 (pmPatType p)
+        cs = [TmConstraint (PmExprVar y) e]
+    in  mkConstraint cs $ tailVSA $
+          pmTraverse us2 gvsa rec (pv++ps) (PmVar y `mkCons` vsa)
 
-    -- Constructor/Variable/Literal Case
-    NonGuard pat
-      | Cons (VA va) vsa <- vsa -> rec us gvsa pat ps va vsa
-      | otherwise -> panic "pmTraverse: singleton" -- can't be anything else
+  -- Constructor/Variable/Literal Case
+  | Cons va vsa <- vsa = rec us gvsa p ps va vsa
+  -- Impossible: length mismatch for ValSetAbs and PatVec
+  | otherwise = panic "pmTraverse: singleton" -- can't be anything else
 
 type PmMatcher =  UniqSupply
                -> ValSetAbs
-               -> PmPat Pattern -> PatVec    -- Vector head and tail
-               -> PmPat ValAbs  -> ValSetAbs -- VSA    head and tail
+               -> Pattern -> PatVec    -- Vector head and tail
+               -> ValAbs  -> ValSetAbs -- VSA    head and tail
                -> ValSetAbs
 
 cMatcher, uMatcher, dMatcher :: PmMatcher
@@ -1019,13 +1041,13 @@ cMatcher, uMatcher, dMatcher :: PmMatcher
 
 -- CVar
 cMatcher us gvsa (PmVar x) ps va vsa
-  = VA va `mkCons` (cs `mkConstraint` covered us gvsa ps vsa)
-  where cs = [TmConstraint (PmExprVar x) (pmPatToPmExpr va)]
+  = va `mkCons` (cs `mkConstraint` covered us gvsa ps vsa)
+  where cs = [TmConstraint (PmExprVar x) (valAbsToPmExpr va)]
 
 -- CLitCon
 cMatcher us gvsa (PmLit l) ps (va@(PmCon {})) vsa
-  = VA va `mkCons` (cs `mkConstraint` covered us gvsa ps vsa)
-  where cs = [ TmConstraint (PmExprLit l) (pmPatToPmExpr va) ]
+  = va `mkCons` (cs `mkConstraint` covered us gvsa ps vsa)
+  where cs = [ TmConstraint (PmExprLit l) (valAbsToPmExpr va) ]
 
 -- CConLit
 cMatcher us gvsa (p@(PmCon {})) ps (PmLit l) vsa
@@ -1049,8 +1071,8 @@ cMatcher us gvsa (p@(PmCon { pm_con_con = c1, pm_con_args = args1 })) ps
 -- CLitLit
 cMatcher us gvsa (PmLit l1) ps (va@(PmLit l2)) vsa = case eqPmLit l1 l2 of
   -- See Note [Undecidable Equality for Overloaded Literals]
-  True  -> VA va `mkCons` covered us gvsa ps vsa -- match
-  False -> Empty                                 -- mismatch
+  True  -> va `mkCons` covered us gvsa ps vsa -- match
+  False -> Empty                              -- mismatch
 
 -- CConVar
 cMatcher us gvsa (p@(PmCon { pm_con_con = con })) ps (PmVar x) vsa
@@ -1066,13 +1088,16 @@ cMatcher us gvsa (p@(PmLit l)) ps (PmVar x) vsa
     lit_abs = PmLit l
     cs      = [TmConstraint (PmExprVar x) (PmExprLit l)]
 
+-- Impossible: handled by pmTraverse
+cMatcher _ _ (PmGrd {}) _ _ _ = panic "Check.cMatcher: Guard"
+
 -- uMatcher
 -- ----------------------------------------------------------------------------
 
 -- UVar
 uMatcher us gvsa (PmVar x) ps va vsa
-  = VA va `mkCons` (cs `mkConstraint` uncovered us gvsa ps vsa)
-  where cs = [TmConstraint (PmExprVar x) (pmPatToPmExpr va)]
+  = va `mkCons` (cs `mkConstraint` uncovered us gvsa ps vsa)
+  where cs = [TmConstraint (PmExprVar x) (valAbsToPmExpr va)]
 
 -- ULitCon
 uMatcher us gvsa (PmLit l) ps (va@(PmCon {})) vsa
@@ -1093,7 +1118,7 @@ uMatcher us gvsa (p@(PmCon {})) ps (PmLit l) vsa
 -- UConCon
 uMatcher us gvsa ( p@(PmCon { pm_con_con = c1, pm_con_args = args1 })) ps
                  (va@(PmCon { pm_con_con = c2, pm_con_args = args2 })) vsa
-  | c1 /= c2  = VA va `mkCons` vsa
+  | c1 /= c2  = va `mkCons` vsa
   | otherwise = wrapK c1 (pm_con_arg_tys p)
                          (pm_con_tvs     p)
                          (pm_con_dicts   p)
@@ -1103,44 +1128,46 @@ uMatcher us gvsa ( p@(PmCon { pm_con_con = c1, pm_con_args = args1 })) ps
 -- ULitLit
 uMatcher us gvsa (PmLit l1) ps (va@(PmLit l2)) vsa = case eqPmLit l1 l2 of
   -- See Note [Undecidable Equality for Overloaded Literals]
-  True  -> VA va `mkCons` uncovered us gvsa ps vsa -- match
-  False -> VA va `mkCons` vsa                      -- mismatch
+  True  -> va `mkCons` uncovered us gvsa ps vsa -- match
+  False -> va `mkCons` vsa                      -- mismatch
 
 -- UConVar
 uMatcher us gvsa (p@(PmCon { pm_con_con = con })) ps (PmVar x) vsa
-  = uncovered us2 gvsa (NonGuard p : ps) inst_vsa
+  = uncovered us2 gvsa (p : ps) inst_vsa
   where
     (us1, us2) = splitUniqSupply us
 
     -- Unfold the variable to all possible constructor patterns
     cons_cs  = zipWith (mkOneConFull x) (listSplitUniqSupply us1)
                                         (allConstructors con)
-    add_one (va,cs) valset = mkUnion valset
-                                     (mkCons (VA va) (mkConstraint cs vsa))
+    add_one (va,cs) valset = mkUnion valset (va `mkCons` mkConstraint cs vsa)
     inst_vsa = foldr add_one Empty cons_cs -- instantiated vsa [x mapsto K_j ys]
 
 -- ULitVar
 uMatcher us gvsa (p@(PmLit l)) ps (PmVar x) vsa
   = mkUnion (uMatcher us gvsa p ps (PmLit l) (mkConstraint match_cs vsa))
-            (non_match_cs `mkConstraint` (VA (PmVar x) `mkCons` vsa))
+            (non_match_cs `mkConstraint` (PmVar x `mkCons` vsa))
   where
     match_cs     = [ TmConstraint (PmExprVar x) (PmExprLit l)]
    -- See Note [Representation of Term Equalities]
     non_match_cs = [ TmConstraint falsePmExpr
                                   (PmExprEq (PmExprVar x) (PmExprLit l)) ]
 
+-- Impossible: handled by pmTraverse
+uMatcher _ _ (PmGrd {}) _ _ _ = panic "Check.uMatcher: Guard"
+
 -- dMatcher
 -- ----------------------------------------------------------------------------
 
 -- DVar
 dMatcher us gvsa (PmVar x) ps va vsa
-  = VA va `mkCons` (cs `mkConstraint` divergent us gvsa ps vsa)
-  where cs = [TmConstraint (PmExprVar x) (pmPatToPmExpr va)]
+  = va `mkCons` (cs `mkConstraint` divergent us gvsa ps vsa)
+  where cs = [TmConstraint (PmExprVar x) (valAbsToPmExpr va)]
 
 -- DLitCon
 dMatcher us gvsa (PmLit l) ps (va@(PmCon {})) vsa
-  = VA va `mkCons` (cs `mkConstraint` divergent us gvsa ps vsa)
-  where cs = [ TmConstraint (PmExprLit l) (pmPatToPmExpr va) ]
+  = va `mkCons` (cs `mkConstraint` divergent us gvsa ps vsa)
+  where cs = [ TmConstraint (PmExprLit l) (valAbsToPmExpr va) ]
 
 -- DConLit
 dMatcher us gvsa (p@(PmCon { pm_con_con = con })) ps (PmLit l) vsa
@@ -1164,12 +1191,12 @@ dMatcher us gvsa (p@(PmCon { pm_con_con = c1, pm_con_args = args1 })) ps
 -- DLitLit
 dMatcher us gvsa (PmLit l1) ps (va@(PmLit l2)) vsa = case eqPmLit l1 l2 of
   -- See Note [Undecidable Equality for Overloaded Literals]
-  True  -> VA va `mkCons` divergent us gvsa ps vsa -- match
-  False -> Empty                                   -- mismatch
+  True  -> va `mkCons` divergent us gvsa ps vsa -- match
+  False -> Empty                                -- mismatch
 
 -- DConVar
 dMatcher us gvsa (p@(PmCon { pm_con_con = con })) ps (PmVar x) vsa
-  = mkUnion (VA (PmVar x) `mkCons` mkConstraint [BtConstraint x] vsa)
+  = mkUnion (PmVar x `mkCons` mkConstraint [BtConstraint x] vsa)
             (dMatcher us2 gvsa p ps con_abs (mkConstraint all_cs vsa))
   where
     (us1, us2)        = splitUniqSupply us
@@ -1177,10 +1204,13 @@ dMatcher us gvsa (p@(PmCon { pm_con_con = con })) ps (PmVar x) vsa
 
 -- DLitVar
 dMatcher us gvsa (PmLit l) ps (PmVar x) vsa
-  = mkUnion (VA (PmVar x) `mkCons` mkConstraint [BtConstraint x] vsa)
+  = mkUnion (PmVar x `mkCons` mkConstraint [BtConstraint x] vsa)
             (dMatcher us gvsa (PmLit l) ps (PmLit l) (mkConstraint cs vsa))
   where
     cs = [TmConstraint (PmExprVar x) (PmExprLit l)]
+
+-- Impossible: handled by pmTraverse
+dMatcher _ _ (PmGrd {}) _ _ _ = panic "Check.dMatcher: Guard"
 
 -- ----------------------------------------------------------------------------
 -- * Propagation of term constraints inwards when checking nested matches
@@ -1292,6 +1322,26 @@ guards in the first pattern `p' though.
 %************************************************************************
 -}
 
+-- | Check whether any part of pattern match checking is enabled (does not
+-- matter whether it is the redundancy check or the exhaustiveness check).
+isAnyPmCheckEnabled :: DynFlags -> DsMatchContext -> Bool
+isAnyPmCheckEnabled dflags (DsMatchContext kind _loc)
+  = wopt Opt_WarnOverlappingPatterns dflags || exhaustive dflags kind
+
+-- | Issue a warning if the guards are too many and the checker gives up
+warnManyGuards :: DsMatchContext -> DsM ()
+warnManyGuards (DsMatchContext kind loc)
+  = putSrcSpanDs loc $ warnDs $ vcat
+      [ sep [ ptext (sLit "Too many guards in") <+> pprMatchContext kind
+            , ptext (sLit "Guard checking has been over-simplified") ]
+      , parens (ptext (sLit "Use:") <+> (opt_1 $$ opt_2)) ]
+  where
+    opt_1 = hang (ptext (sLit "-Wno-too-many-guards")) 2 $
+      ptext (sLit "to suppress this warning")
+    opt_2 = hang (ptext (sLit "-ffull-guard-reasoning")) 2 $ vcat
+      [ ptext (sLit "to run the full checker (may increase")
+      , ptext (sLit "compilation time and memory consumption)") ]
+
 dsPmWarn :: DynFlags -> DsMatchContext -> DsM PmResult -> DsM ()
 dsPmWarn dflags ctx@(DsMatchContext kind loc) mPmResult
   = when (flag_i || flag_u) $ do
@@ -1396,7 +1446,7 @@ with each other):
      U10 = { x  |> { False ~ (x ~ 1), .., False ~ (x ~ 9), False ~ (x ~ 10) } }
      ...
 
-     If replace { False ~ (x ~ 1) }, with { y ~ False, y ~ (x ~ 1) }
+     If we replace { False ~ (x ~ 1) } with { y ~ False, y ~ (x ~ 1) }
      we get twice as many constraints. Also note that half of them are just the
      substitution [x |-> False].
 

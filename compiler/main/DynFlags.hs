@@ -481,6 +481,8 @@ data GeneralFlag
    | Opt_DistrustAllPackages
    | Opt_PackageTrust
 
+   -- pm checking with guards
+   | Opt_FullGuardReasoning
    deriving (Eq, Show, Enum)
 
 data WarningFlag =
@@ -502,6 +504,7 @@ data WarningFlag =
    | Opt_WarnMissingLocalSigs
    | Opt_WarnNameShadowing
    | Opt_WarnOverlappingPatterns
+   | Opt_WarnTooManyGuards
    | Opt_WarnTypeDefaults
    | Opt_WarnMonomorphism
    | Opt_WarnUnusedTopBinds
@@ -2356,6 +2359,7 @@ dynamic_flags = [
   , defGhcFlag "no-rtsopts"     (NoArg (setRtsOptsEnabled RtsOptsNone))
   , defGhcFlag "no-rtsopts-suggestions"
       (noArg (\d -> d {rtsOptsSuggestions = False} ))
+
   , defGhcFlag "main-is"        (SepArg setMainIs)
   , defGhcFlag "haddock"        (NoArg (setGeneralFlag Opt_Haddock))
   , defGhcFlag "haddock-opts"   (hasArg addHaddockOpts)
@@ -2875,6 +2879,7 @@ wWarningFlags = [
   flagSpec "orphans"                     Opt_WarnOrphans,
   flagSpec "overflowed-literals"         Opt_WarnOverflowedLiterals,
   flagSpec "overlapping-patterns"        Opt_WarnOverlappingPatterns,
+  flagSpec "too-many-guards"             Opt_WarnTooManyGuards,
   flagSpec "missed-specialisations"      Opt_WarnMissedSpecs,
   flagSpec "all-missed-specialisations"  Opt_WarnAllMissedSpecs,
   flagSpec' "safe"                       Opt_WarnSafe setWarnSafe,
@@ -3007,7 +3012,8 @@ fFlags = [
   flagSpec "unbox-strict-fields"              Opt_UnboxStrictFields,
   flagSpec "vectorisation-avoidance"          Opt_VectorisationAvoidance,
   flagSpec "vectorise"                        Opt_Vectorise,
-  flagSpec "worker-wrapper"                   Opt_WorkerWrapper
+  flagSpec "worker-wrapper"                   Opt_WorkerWrapper,
+  flagSpec "full-guard-reasoning"             Opt_FullGuardReasoning
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
@@ -3399,6 +3405,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
 standardWarnings :: [WarningFlag]
 standardWarnings -- see Note [Documenting warning flags]
     = [ Opt_WarnOverlappingPatterns,
+        Opt_WarnTooManyGuards,
         Opt_WarnWarningsDeprecations,
         Opt_WarnDeprecatedFlags,
         Opt_WarnDeferredTypeErrors,

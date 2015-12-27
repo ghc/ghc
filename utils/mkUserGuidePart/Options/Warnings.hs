@@ -222,6 +222,11 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-Wno-tabs"
          }
+  , flag { flagName = "-Wtoo-many-guards"
+         , flagDescription = "warn when a match has too many guards"
+         , flagType = DynamicFlag
+         , flagReverse = "-Wno-too-many-guards"
+         }
   , flag { flagName = "-Wtype-defaults"
          , flagDescription = "warn when defaulting happens"
          , flagType = DynamicFlag
@@ -363,5 +368,13 @@ warningsOptions =
            "for discharging this type of constraint."
          , flagType = DynamicFlag
          , flagReverse = "-Wno-deriving-typeable"
+         }
+  , flag { flagName = "-ffull-guard-reasoning"
+         , flagDescription =
+           "enable the full reasoning of the pattern match checker "++
+           "concerning guards, for more precise exhaustiveness/coverage "++
+           "warnings"
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-full-guard-reasoning"
          }
   ]

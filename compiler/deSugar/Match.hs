@@ -47,7 +47,7 @@ import Name
 import Outputable
 import BasicTypes ( isGenerated )
 
-import Control.Monad( unless )
+import Control.Monad( when, unless )
 import qualified Data.Map as Map
 
 {-
@@ -688,11 +688,25 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
         ; eqns_info   <- mapM (mk_eqn_info new_vars) matches
 
         -- pattern match check warnings
-        ; unless (isGenerated origin) $
-            -- See Note [Type and Term Equality Propagation]
-            addTmCsDs (genCaseTmCs1 mb_scr new_vars) $
-              dsPmWarn dflags (DsMatchContext ctxt locn) $
-                checkMatches new_vars matches
+        ; unless (isGenerated origin) $ do
+
+            when (isAnyPmCheckEnabled dflags (DsMatchContext ctxt locn)) $ do
+
+              -- Count the number of guards that can fail
+              guards <- computeNoGuards matches
+
+              let simplify = not (gopt Opt_FullGuardReasoning dflags)
+                              && (guards > maximum_failing_guards)
+
+              -- See Note [Type and Term Equality Propagation]
+              addTmCsDs (genCaseTmCs1 mb_scr new_vars) $
+                dsPmWarn dflags (DsMatchContext ctxt locn) $
+                  checkMatches simplify new_vars matches
+
+              when (not (gopt Opt_FullGuardReasoning dflags)
+                      && wopt Opt_WarnTooManyGuards dflags
+                      && guards > maximum_failing_guards)
+                   (warnManyGuards (DsMatchContext ctxt locn))
 
         ; result_expr <- handleWarnings $
                          matchEquations ctxt new_vars eqns_info rhs_ty
