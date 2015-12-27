@@ -19,12 +19,14 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
         (buildPath <//> "*.c.deps") %> \out -> do
             let srcFile = dropBuild . dropExtension $ out
             when (pkg == compiler) . need $ platformH : includesDependencies
+            when (pkg == hp2ps) . need $ ["includes/ghcautoconf.h", "includes/ghcplatform.h"]
             need [srcFile]
             build $ fullTarget target (GccM stage) [srcFile] [out]
 
         hDepFile %> \out -> do
             srcs <- interpretPartial target getPackageSources
             when (pkg == compiler) . need $ platformH : includesDependencies
+            when (pkg == hp2ps) . need $ ["includes/ghcautoconf.h", "includes/ghcplatform.h"]
             -- TODO: very ugly and fragile; use gcc -MM instead?
             let extraDeps = if pkg /= compiler then [] else fmap (buildPath -/-)
                    [ "primop-vector-uniques.hs-incl"
