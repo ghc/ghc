@@ -437,42 +437,6 @@ compiler/stage3/package-data.mk : compiler/ghc.mk
 
 compiler_PACKAGE = ghc
 
-# Note [fiddle-stage1-version]
-# The version of the GHC package changes every day, since the
-# patchlevel is the current date.  We don't want to force
-# recompilation of the entire compiler when this happens, so for stage
-# 1 we omit the patchlevel from the version number.  For stage 2 we
-# have to include the patchlevel since this is the package we install,
-# however.
-#
-# Note: we also have to tweak the version number of the package itself
-# when it gets registered; see Note [munge-stage1-package-config]
-# below.
-# The ProjectPatchLevel > 20000000 iff it's a date. If it's e.g. 6.12.1
-# then we don't want to remove it
-ifneq "$(CLEANING)" "YES"
-ifeq "$(shell [ $(ProjectPatchLevel) -gt 20000000 ] && echo YES)" "YES"
-compiler_stage1_VERSION_MUNGED = YES
-endif
-endif
-
-ifeq "$(compiler_stage1_VERSION_MUNGED)" "YES"
-compiler_stage1_MUNGED_VERSION = $(subst .$(ProjectPatchLevel),,$(ProjectVersion))
-define compiler_PACKAGE_MAGIC
-compiler_stage1_VERSION = $(compiler_stage1_MUNGED_VERSION)
-compiler_stage1_COMPONENT_ID = $(subst .$(ProjectPatchLevel),,$(compiler_stage1_COMPONENT_ID))
-endef
-
-# NB: the COMPONENT_ID munging has no effect for new-style unit ids
-# (which indeed, have nothing version like in them, but are important for
-# old-style unit ids which do.)  The subst operation is idempotent, so
-# as long as we do it at least once we should be good.
-
-# Don't register the non-munged package
-compiler_stage1_REGISTER_PACKAGE = NO
-
-endif
-
 # Don't do splitting for the GHC package, it takes too long and
 # there's not much benefit.
 compiler_stage1_SplitObjs = NO
@@ -706,23 +670,6 @@ compiler/prelude/PrimOp_HC_OPTS  += -fforce-recomp
 
 ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
 compiler/utils/Util_HC_OPTS += -DDYNAMIC_GHC_PROGRAMS
-endif
-
-# Note [munge-stage1-package-config]
-# Strip the date/patchlevel from the version of stage1.  See Note
-# [fiddle-stage1-version] above.
-# NB: The sed expression for hs-libraries is a bit weird to be POSIX-compliant.
-ifeq "$(compiler_stage1_VERSION_MUNGED)" "YES"
-compiler/stage1/inplace-pkg-config-munged: compiler/stage1/inplace-pkg-config
-	sed -e 's/^\(version: .*\)\.$(ProjectPatchLevel)$$/\1/' \
-	    -e 's/^\(id: .*\)\.$(ProjectPatchLevel)$$/\1/' \
-	    -e 's/^\(hs-libraries: HSghc-.*\)\.$(ProjectPatchLevel)\(-[A-Za-z0-9][A-Za-z0-9]*\)*$$/\1\2/' \
-	  < $< > $@
-	"$(compiler_stage1_GHC_PKG)" update --force $(compiler_stage1_GHC_PKG_OPTS) $@
-
-# We need to make sure the munged config is in the database before we
-# try to configure ghc-bin
-ghc/stage1/package-data.mk : compiler/stage1/inplace-pkg-config-munged
 endif
 
 endif

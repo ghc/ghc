@@ -38,6 +38,7 @@ define foreachLibrary
 # $1 = function to call for each library
 # We will give it the package path and the tag as arguments
 $$(foreach hashline,libraries/ghc-boot#-#no-remote-repo#no-vcs        \
+                    libraries/ghci#-#no-remote-repo#no-vcs                  \
                     libraries/base#-#no-remote-repo#no-vcs                  \
                     libraries/ghc-prim#-#no-remote-repo#no-vcs              \
                     libraries/integer-gmp#-#no-remote-repo#no-vcs           \

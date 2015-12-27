@@ -144,7 +144,10 @@ sub boot_pkgs {
 
     for $package (@library_dirs) {
         my $dir = &basename($package);
-        my @cabals = glob("$package/*.cabal");
+        my @cabals = glob("$package/*.cabal.in");
+        if ($#cabals < 0) {
+            @cabals = glob("$package/*.cabal");
+        }
         if ($#cabals > 0) {
             die "Too many .cabal file in $package\n";
         }
@@ -155,6 +158,7 @@ sub boot_pkgs {
             if (-f $cabal) {
                 $pkg = $cabal;
                 $pkg =~ s#.*/##;
+                $pkg =~ s/\.cabal.in$//;
                 $pkg =~ s/\.cabal$//;
                 $top = $package;
                 $top =~ s#[^/]+#..#g;

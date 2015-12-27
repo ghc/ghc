@@ -27,14 +27,14 @@ Executable ghc
     Default-Language: Haskell2010
 
     Main-Is: Main.hs
-    Build-Depends: base       >= 3   && < 5,
+    Build-Depends: base       >= 4   && < 5,
                    array      >= 0.1 && < 0.6,
                    bytestring >= 0.9 && < 0.11,
                    directory  >= 1   && < 1.3,
                    process    >= 1   && < 1.5,
                    filepath   >= 1   && < 1.5,
-                   ghc-boot   == 0.0.*,
-                   ghc
+                   ghc-boot   == @ProjectVersionMunged@,
+                   ghc        == @ProjectVersionMunged@
 
     if os(windows)
         Build-Depends: Win32  == 2.3.*
@@ -49,7 +49,7 @@ Executable ghc
         Build-depends:
             containers     == 0.5.*,
             deepseq        == 1.4.*,
-            ghci,
+            ghci           == @ProjectVersionMunged@,
             haskeline      == 0.7.*,
             time           == 1.6.*,
             transformers   == 0.5.*

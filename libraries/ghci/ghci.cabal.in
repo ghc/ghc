@@ -1,5 +1,8 @@
+-- WARNING: ghci.cabal is automatically generated from ghci.cabal.in by
+-- ../../configure.  Make sure you are editing ghci.cabal.in, not ghci.cabal.
+
 name:           ghci
-version:        0
+version:        @ProjectVersionMunged@
 license:        BSD3
 license-file:   LICENSE
 category:       GHC
@@ -37,17 +40,17 @@ library
         UnboxedTuples
 
     exposed-modules:
-        GHCi.Message,
-        GHCi.ResolvedBCO,
-        GHCi.RemoteTypes,
-        GHCi.ObjLink,
-        GHCi.CreateBCO,
-        GHCi.FFI,
-        GHCi.InfoTable,
-        GHCi.Run,
-        GHCi.Signals,
-        GHCi.TH,
-        GHCi.TH.Binary,
+        GHCi.Message
+        GHCi.ResolvedBCO
+        GHCi.RemoteTypes
+        GHCi.ObjLink
+        GHCi.CreateBCO
+        GHCi.FFI
+        GHCi.InfoTable
+        GHCi.Run
+        GHCi.Signals
+        GHCi.TH
+        GHCi.TH.Binary
         SizedSeq
 
     Build-Depends:
@@ -58,7 +61,7 @@ library
         containers       == 0.5.*,
         deepseq          == 1.4.*,
         filepath         == 1.4.*,
-        ghc-boot         == 0.0.*,
+        ghc-boot         == @ProjectVersionMunged@,
         template-haskell == 2.11.*,
         transformers     == 0.5.*
 

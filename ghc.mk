@@ -1349,6 +1349,7 @@ distclean : clean
 	$(call removeFiles,mk/project.mk)
 	$(call removeFiles,compiler/ghc.cabal)
 	$(call removeFiles,ghc/ghc-bin.cabal)
+	$(call removeFiles,libraries/ghci/ghci.cabal)
 	$(call removeFiles,utils/runghc/runghc.cabal)
 	$(call removeFiles,settings)
 	$(call removeFiles,docs/users_guide/ug-book.xml)

@@ -1,5 +1,9 @@
+-- WARNING: ghc-boot.cabal is automatically generated from ghc-boot.cabal.in by
+-- ../../configure.  Make sure you are editing ghc-boot.cabal.in, not
+-- ghc-boot.cabal.
+
 name:           ghc-boot
-version:        0.0.0.0
+version:        @ProjectVersionMunged@
 license:        BSD3
 license-file:   LICENSE
 category:       GHC
