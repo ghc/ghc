@@ -593,7 +593,9 @@ selectPackages matches pkgs unusable
   = let (ps,rest) = partition matches pkgs
     in if null ps
         then Left (filter (matches.fst) (Map.elems unusable))
-        else Right (sortByVersion ps, rest)
+        -- NB: packages from later package databases are LATER
+        -- in the list.  We want to prefer the latest package.
+        else Right (sortByVersion (reverse ps), rest)
 
 -- A package named on the command line can either include the
 -- version, or just the name if it is unambiguous.

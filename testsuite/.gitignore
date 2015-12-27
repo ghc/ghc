@@ -121,6 +121,9 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /tests/cabal/cabal05/r-0.1.0.0/
 /tests/cabal/cabal06/inst-*/
 /tests/cabal/cabal06/tmp*
+/tests/cabal/cabal08/Main
+/tests/cabal/cabal08/inst-*
+/tests/cabal/cabal08/tmp*
 /tests/cabal/local01.package.conf/
 /tests/cabal/local03.package.conf/
 /tests/cabal/local04.package.conf/
