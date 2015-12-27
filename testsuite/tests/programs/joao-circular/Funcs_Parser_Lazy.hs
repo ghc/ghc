@@ -1280,7 +1280,6 @@ happyNewToken action sts stk (tk:tks) =
 	TIdent happy_dollar_dollar -> cont 51;
 	TintVal happy_dollar_dollar -> cont 52;
 	TrealVal happy_dollar_dollar -> cont 53;
-	_ -> happyError tks
 	}
 
 happyThen = \m k -> k m
