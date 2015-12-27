@@ -1,5 +1,6 @@
 module Rules.Generate (
-    generatePackageCode, generateRules, includesDependencies
+    generatePackageCode, generateRules,
+    derivedConstantsPath, includesDependencies
     ) where
 
 import Expression

@@ -1,11 +1,19 @@
-module Rules.Install (installRules) where
+module Rules.Install (installTargets, installRules) where
 
 import Expression
 import GHC
+import Rules.Generate
+
+installTargets :: [FilePath]
+installTargets = [ "inplace/lib/template-hsc.h"
+                 , "inplace/lib/platformConstants" ]
 
 installRules :: Rules ()
 installRules = do
-    "inplace/lib/template-hsc.h" %> \out -> do
-        let source = pkgPath hsc2hs -/- "template-hsc.h"
-        putBuild $ "| Copying " ++ source ++ " -> " ++ out
+    "inplace/lib/template-hsc.h"    <~ pkgPath hsc2hs
+    "inplace/lib/platformConstants" <~ derivedConstantsPath
+  where
+    file <~ dir = file %> \out -> do
+        let source = dir -/- takeFileName out
         copyFileChanged source out
+        putSuccess $ "| Installed " ++ source ++ " -> " ++ out

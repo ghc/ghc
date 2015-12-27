@@ -1,6 +1,7 @@
 module Rules (generateTargets, packageRules) where
 
 import Expression
+import Rules.Install
 import Rules.Package
 import Rules.Resources
 import Settings
@@ -18,7 +19,8 @@ generateTargets = action $ do
             return [ pkgHaddockFile pkg | needHaddock && stage == Stage1 ]
         let programTargets = [ prog | Just prog <- programPath stage <$> pkgs ]
         return $ libTargets ++ programTargets
-    need targets
+
+    need $ targets ++ installTargets
 
 packageRules :: Rules ()
 packageRules = do
