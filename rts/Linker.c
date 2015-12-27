@@ -4809,7 +4809,7 @@ ocGetNames_ELF ( ObjectCode* oc )
               if (start == NULL) goto fail;
               alloc = SECTION_MMAP;
           }
-          addProddableBlock(oc, ehdrC + offset, size);
+          addProddableBlock(oc, start, size);
       }
 
       addSection(&sections[i], kind, alloc, start, size,
