@@ -4,6 +4,7 @@ import Expression
 import GHC
 import Oracles
 import Rules.Actions
+import Rules.Generate
 import Rules.Resources
 import Settings
 
@@ -17,13 +18,13 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
     in do
         (buildPath <//> "*.c.deps") %> \out -> do
             let srcFile = dropBuild . dropExtension $ out
-            when (pkg == compiler) $ need [platformH]
+            when (pkg == compiler) . need $ platformH : includesDependencies
             need [srcFile]
             build $ fullTarget target (GccM stage) [srcFile] [out]
 
         hDepFile %> \out -> do
             srcs <- interpretPartial target getPackageSources
-            when (pkg == compiler) $ need [platformH]
+            when (pkg == compiler) . need $ platformH : includesDependencies
             -- TODO: very ugly and fragile; use gcc -MM instead?
             let extraDeps = if pkg /= compiler then [] else fmap (buildPath -/-)
                    [ "primop-vector-uniques.hs-incl"
