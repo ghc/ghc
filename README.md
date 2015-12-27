@@ -55,9 +55,6 @@ git submodule update --init
 git clone git://github.com/snowleopard/shaking-up-ghc shake-build
 ./boot
 ./configure --with-gcc=$(which clang) # See #26
-./shake-build/build.sh includes/ghcautoconf.h # See #48
-./shake-build/build.sh includes/ghcplatform.h # See #48
-cp utils/hsc2hs/template-hsc.h inplace/lib/template-hsc.h # See #44
 ./shake-build/build.sh
 ```
 
