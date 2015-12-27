@@ -46,6 +46,7 @@ executable ghc-shake
                        , Rules.Generators.GhcAutoconfH
                        , Rules.Generators.GhcBootPlatformH
                        , Rules.Generators.GhcPlatformH
+                       , Rules.Generators.GhcVersionH
                        , Rules.Generators.VersionHs
                        , Rules.Install
                        , Rules.Library

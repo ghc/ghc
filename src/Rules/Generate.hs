@@ -9,6 +9,7 @@ import Rules.Generators.ConfigHs
 import Rules.Generators.GhcAutoconfH
 import Rules.Generators.GhcBootPlatformH
 import Rules.Generators.GhcPlatformH
+import Rules.Generators.GhcVersionH
 import Rules.Generators.VersionHs
 import Oracles.ModuleFiles
 import Rules.Actions
@@ -107,6 +108,7 @@ generateRules :: Rules ()
 generateRules = do
     "includes/ghcautoconf.h" <~ generateGhcAutoconfH
     "includes/ghcplatform.h" <~ generateGhcPlatformH
+    "includes/ghcversion.h"  <~ generateGhcVersionH
   where
     file <~ gen = file %> \out -> generate out emptyTarget gen
 
