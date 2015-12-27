@@ -4,36 +4,39 @@
 # Paths to builders:
 #===================
 
-system-ghc     = @WithGhc@
-ghc-stage1     = inplace/bin/ghc-stage1
-ghc-stage2     = inplace/bin/ghc-stage2
-ghc-stage3     = inplace/bin/ghc-stage3
+system-ghc       = @WithGhc@
+ghc-stage1       = inplace/bin/ghc-stage1
+ghc-stage2       = inplace/bin/ghc-stage2
+ghc-stage3       = inplace/bin/ghc-stage3
 
-system-gcc     = @CC_STAGE0@
-gcc            = @WhatGccIsCalled@
+system-gcc       = @CC_STAGE0@
+gcc              = @WhatGccIsCalled@
 
-system-ghc-pkg = @GhcPkgCmd@
-ghc-pkg        = inplace/bin/ghc-pkg
+system-ghc-pkg   = @GhcPkgCmd@
+ghc-pkg          = inplace/bin/ghc-pkg
 
-ghc-cabal      = inplace/bin/ghc-cabal
+ghc-cabal        = inplace/bin/ghc-cabal
 
-haddock        = inplace/bin/haddock
+haddock          = inplace/bin/haddock
 
-hsc2hs         = inplace/bin/hsc2hs
+hsc2hs           = inplace/bin/hsc2hs
 
-genprimopcode  = inplace/bin/genprimopcode
+genprimopcode    = inplace/bin/genprimopcode
+derive-constants = inplace/bin/deriveConstants
 
-hs-cpp         = @HaskellCPPCmd@
-hs-cpp-args    = @HaskellCPPArgs@
+hs-cpp           = @HaskellCPPCmd@
+hs-cpp-args      = @HaskellCPPArgs@
 
-unlit          = inplace/lib/unlit
-ghc-split      = inplace/lib/ghc-split
+unlit            = inplace/lib/unlit
+ghc-split        = inplace/lib/ghc-split
 
-ld             = @LdCmd@
-ar             = @ArCmd@
-alex           = @AlexCmd@
-happy          = @HappyCmd@
-hscolour       = @HSCOLOUR@
+alex             = @AlexCmd@
+ar               = @ArCmd@
+happy            = @HappyCmd@
+hscolour         = @HSCOLOUR@
+ld               = @LdCmd@
+nm               = @NmCmd@
+objdump          = @ObjdumpCmd@
 
 # Information about builders:
 #============================

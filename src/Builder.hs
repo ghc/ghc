@@ -19,6 +19,7 @@ import Stage
 -- TODO: do we really need staged builders?
 data Builder = Alex
              | Ar
+             | DeriveConstants
              | Gcc Stage
              | GccM Stage
              | GenPrimopCode
@@ -35,6 +36,8 @@ data Builder = Alex
              | HsCpp
              | Hsc2Hs
              | Ld
+             | Nm
+             | Objdump
              | Unlit
              deriving (Show, Eq, Generic)
 
@@ -43,6 +46,7 @@ builderKey :: Builder -> String
 builderKey builder = case builder of
     Alex             -> "alex"
     Ar               -> "ar"
+    DeriveConstants  -> "derive-constants"
     Gcc Stage0       -> "system-gcc"
     Gcc _            -> "gcc"
     GccM stage       -> builderKey $ Gcc stage -- synonym for 'Gcc -MM'
@@ -64,6 +68,8 @@ builderKey builder = case builder of
     Hsc2Hs           -> "hsc2hs"
     HsCpp            -> "hs-cpp"
     Ld               -> "ld"
+    Nm               -> "nm"
+    Objdump          -> "objdump"
     Unlit            -> "unlit"
 
 -- TODO: Paths to some builders should be determined using defaultProgramPath
