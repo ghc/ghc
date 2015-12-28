@@ -1,5 +1,5 @@
 name:                integer-gmp
-version:             1.0.0.0
+version:             1.0.0.1
 synopsis:            Integer library based on GMP
 license:             BSD3
 license-file:        LICENSE
