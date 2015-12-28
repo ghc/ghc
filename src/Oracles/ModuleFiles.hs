@@ -21,8 +21,9 @@ moduleFiles stage pkg = do
 
 haskellModuleFiles :: Stage -> Package -> Action ([FilePath], [String])
 haskellModuleFiles stage pkg = do
-    let path    = targetPath stage pkg
-        autogen = path -/- "build/autogen"
+    let path        = targetPath stage pkg
+        autogen     = path -/- "build/autogen"
+        dropPkgPath = drop $ length (pkgPath pkg) + 1
     srcDirs <- fmap sort . pkgDataList $ SrcDirs path
     modules <- fmap sort . pkgDataList $ Modules path
     let dirs = [ pkgPath pkg -/- dir | dir <- srcDirs ]
@@ -31,9 +32,10 @@ haskellModuleFiles stage pkg = do
 
     let found          = foundSrcDirs ++ foundAutogen
         missingMods    = modules `minusOrd` (sort $ map fst found)
-        otherMods      = map (replaceEq '/' '.' . dropExtension) otherFiles
+        otherFileToMod = replaceEq '/' '.' . dropExtension . dropPkgPath
         (haskellFiles, otherFiles) = partition ("//*hs" ?==) (map snd found)
-    return (haskellFiles, missingMods ++ otherMods)
+
+    return (haskellFiles, missingMods ++ map otherFileToMod otherFiles)
 
 moduleFilesOracle :: Rules ()
 moduleFilesOracle = do
