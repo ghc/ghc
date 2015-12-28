@@ -85,10 +85,11 @@ unix            = library  "unix"
 win32           = library  "Win32"
 xhtml           = library  "xhtml"
 
+-- TODO: The following utils are not implemented yet: unlit, driver/ghc-split
 -- TODO: The following utils are not included into the build system because
--- they seem to be unused or unrelated to the build process: chechUniques,
+-- they seem to be unused or unrelated to the build process: checkUniques,
 -- completion, count_lines, coverity, debugNGC, describe-unexpected, genargs,
--- lndir, mkdirhier, testremove, touchy, unlit, vagrant
+-- lndir, mkdirhier, testremove, touchy, vagrant
 
 -- GHC build results will be placed into target directories with the following
 -- typical structure:
