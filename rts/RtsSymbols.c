@@ -119,6 +119,10 @@
       SymI_HasProto(_wstat64)                            \
       SymI_HasProto(_fstat64)                            \
       SymI_HasProto(_wsopen)                             \
+      SymI_HasProto(expm1f)                              \
+      SymI_HasProto(log1pf)                              \
+      SymI_HasProto(log1p)                               \
+      SymI_HasProto(expm1)                               \
       RTS_WIN32_ONLY(SymI_HasProto(_imp___environ))      \
       RTS_WIN64_ONLY(SymI_HasProto(__imp__environ))      \
       RTS_WIN32_ONLY(SymI_HasProto(_imp___iob))          \
