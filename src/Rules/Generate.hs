@@ -1,6 +1,6 @@
 module Rules.Generate (
     generatePackageCode, generateRules,
-    derivedConstantsPath, includesDependencies
+    derivedConstantsPath, generatedDependencies
     ) where
 
 import Expression
@@ -19,18 +19,47 @@ import Settings
 primopsSource :: FilePath
 primopsSource = "compiler/prelude/primops.txt.pp"
 
+primopsTxt :: Stage -> FilePath
+primopsTxt stage = targetPath stage compiler -/- "build/primops.txt"
+
+platformH :: Stage -> FilePath
+platformH stage = targetPath stage compiler -/- "ghc_boot_platform.h"
+
 derivedConstantsPath :: FilePath
 derivedConstantsPath = "includes/dist-derivedconstants/header"
 
 -- TODO: can we drop COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS)?
-includesDependencies :: [FilePath]
-includesDependencies =
-    [ "includes/ghcautoconf.h"
-    , "includes/ghcplatform.h"
-    , derivedConstantsPath -/- "DerivedConstants.h"
-    , derivedConstantsPath -/- "GHCConstantsHaskellType.hs"
-    , derivedConstantsPath -/- "GHCConstantsHaskellWrappers.hs"
-    , derivedConstantsPath -/- "GHCConstantsHaskellExports.hs" ]
+generatedDependencies :: Stage -> Package -> [FilePath]
+generatedDependencies stage pkg
+    | pkg == hp2ps    = [ "includes/ghcautoconf.h"
+                        , "includes/ghcplatform.h" ]
+    | pkg == compiler = let buildPath = targetPath stage compiler -/- "build"
+                        in
+                        [ "includes/ghcautoconf.h"
+                        , "includes/ghcplatform.h"
+                        , derivedConstantsPath -/- "DerivedConstants.h"
+                        , derivedConstantsPath -/- "GHCConstantsHaskellType.hs"
+                        , derivedConstantsPath -/- "GHCConstantsHaskellWrappers.hs"
+                        , derivedConstantsPath -/- "GHCConstantsHaskellExports.hs"
+                        , platformH stage ]
+                        ++
+                        fmap (buildPath -/-)
+                        [ "primop-vector-uniques.hs-incl"
+                        , "primop-data-decl.hs-incl"
+                        , "primop-tag.hs-incl"
+                        , "primop-list.hs-incl"
+                        , "primop-strictness.hs-incl"
+                        , "primop-fixity.hs-incl"
+                        , "primop-primop-info.hs-incl"
+                        , "primop-out-of-line.hs-incl"
+                        , "primop-has-side-effects.hs-incl"
+                        , "primop-can-fail.hs-incl"
+                        , "primop-code-size.hs-incl"
+                        , "primop-commutable.hs-incl"
+                        , "primop-vector-tys-exports.hs-incl"
+                        , "primop-vector-tycons.hs-incl"
+                        , "primop-vector-tys.hs-incl" ]
+    | otherwise = []
 
 -- The following generators and corresponding source extensions are supported:
 knownGenerators :: [ (Builder, String) ]
@@ -52,10 +81,7 @@ generate file target expr = do
 
 generatePackageCode :: Resources -> PartialTarget -> Rules ()
 generatePackageCode _ target @ (PartialTarget stage pkg) =
-    let path        = targetPath stage pkg
-        buildPath   = path -/- "build"
-        primopsTxt  = targetPath stage compiler -/- "build/primops.txt"
-        platformH   = targetPath stage compiler -/- "ghc_boot_platform.h"
+    let buildPath   = targetPath stage pkg -/- "build"
         generated f = (buildPath ++ "//*.hs") ?== f && not ("//autogen/*" ?== f)
         file <~ gen = generate file target gen
     in do
@@ -74,8 +100,8 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
                 copyFileChanged srcBoot $ file -<.> "hs-boot"
 
         -- TODO: needing platformH is ugly and fragile
-        when (pkg == compiler) $ primopsTxt %> \file -> do
-            need [platformH, primopsSource]
+        when (pkg == compiler) $ primopsTxt stage %> \file -> do
+            need [platformH stage, primopsSource]
             build $ fullTarget target HsCpp [primopsSource] [file]
 
         -- TODO: why different folders for generated files?
@@ -83,8 +109,8 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
             [ "GHC/PrimopWrappers.hs"
             , "autogen/GHC/Prim.hs"
             , "*.hs-incl" ] |%> \file -> do
-                need [primopsTxt]
-                build $ fullTarget target GenPrimopCode [primopsTxt] [file]
+                need [primopsTxt stage]
+                build $ fullTarget target GenPrimopCode [primopsTxt stage] [file]
 
         priority 2.0 $ do
             when (pkg == compiler && stage == Stage1) $
@@ -94,7 +120,7 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
             when (pkg == compiler) $ buildPath -/- "Config.hs" %> \file -> do
                 file <~ generateConfigHs
 
-            when (pkg == compiler) $ platformH %> \file -> do
+            when (pkg == compiler) $ platformH stage %> \file -> do
                 file <~ generateGhcBootPlatformH
 
             when (pkg == ghcPkg) $ buildPath -/- "Version.hs" %> \file -> do
