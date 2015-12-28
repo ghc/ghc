@@ -14,9 +14,10 @@ import Stage
 -- Ghc StageN, N > 0, is the one built on stage (N - 1)
 -- GhcPkg Stage0 is the bootstrapping GhcPkg
 -- GhcPkg StageN, N > 0, is the one built in Stage0 (TODO: need only Stage1?)
--- TODO: add Cpp builders
--- TODO: rename Gcc to Cc?
--- TODO: do we really need staged builders?
+-- TODO: Do we really need HsCpp builder? Can't we use a generic Cpp
+--       builder instead? It would also be used instead of GccM.
+-- TODO: rename Gcc to CCompiler? We sometimes use gcc and sometimes clang.
+-- TODO: why are Gcc/GccM staged?
 data Builder = Alex
              | Ar
              | DeriveConstants
@@ -26,7 +27,6 @@ data Builder = Alex
              | Ghc Stage
              | GhcCabal
              | GhcCabalHsColour
-             | GhcLink Stage
              | GhcM Stage
              | GhcPkg Stage
              | GhcSplit
@@ -55,7 +55,6 @@ builderKey builder = case builder of
     Ghc Stage1       -> "ghc-stage1"
     Ghc Stage2       -> "ghc-stage2"
     Ghc Stage3       -> "ghc-stage3"
-    GhcLink stage    -> builderKey $ Ghc stage -- using Ghc as linker
     GhcM stage       -> builderKey $ Ghc stage -- synonym for 'Ghc -M'
     GhcCabal         -> "ghc-cabal"
     GhcCabalHsColour -> builderKey $ GhcCabal -- synonym for 'GhcCabal hscolour'
