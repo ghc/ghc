@@ -335,7 +335,7 @@ Library
 
     -- OS Specific
     if os(windows)
-        extra-libraries: wsock32, user32, shell32
+        extra-libraries: wsock32, user32, shell32, mingwex
         exposed-modules:
             GHC.IO.Encoding.CodePage.API
             GHC.IO.Encoding.CodePage.Table
