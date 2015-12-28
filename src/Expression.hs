@@ -18,12 +18,13 @@ module Expression (
     getInput, getOutput,
 
     -- * Re-exports
-    module Base,
     module Builder,
     module Package,
     module Stage,
     module Way
     ) where
+
+import Control.Monad.Trans.Reader
 
 import Base
 import Package

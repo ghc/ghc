@@ -4,6 +4,7 @@ module Oracles.PackageData (
     pkgData, pkgDataList, packageDataOracle
     ) where
 
+import Development.Shake.Config
 import Base
 import qualified Data.HashMap.Strict as Map
 

@@ -3,6 +3,14 @@ module Settings.Builders.GhcCabal (
     customPackageArgs, ccArgs, cppArgs, ccWarnings, argStagedSettingList, needDll0
     ) where
 
+import Base
+import Oracles.Config.Setting
+import Oracles.Config.Flag
+import GHC
+import Package
+import Way
+import Builder
+import Stage
 import Expression
 import Predicates hiding (stage)
 import Settings

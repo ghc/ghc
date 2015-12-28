@@ -1,5 +1,6 @@
 module Rules.Data (buildPackageData) where
 
+import Base
 import Expression
 import GHC
 import Oracles

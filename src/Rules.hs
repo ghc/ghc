@@ -1,5 +1,6 @@
 module Rules (generateTargets, packageRules) where
 
+import Base
 import Expression
 import Rules.Install
 import Rules.Package

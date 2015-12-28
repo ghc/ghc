@@ -1,15 +1,13 @@
+-- | Convenient predicates
 module Predicates (
-    module GHC,
-    module Oracles.Config.Flag,
-    module Oracles.Config.Setting,
     stage, package, builder, stagedBuilder, file, way,
     stage0, stage1, stage2, notStage0, notPackage, registerPackage, splitObjects
     ) where
 
+import Base
 import Expression
 import GHC
 import Oracles.Config.Flag
-import Oracles.Config.Setting
 
 -- Basic predicates
 stage :: Stage -> Predicate

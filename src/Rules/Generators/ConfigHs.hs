@@ -1,5 +1,6 @@
 module Rules.Generators.ConfigHs (generateConfigHs) where
 
+import Base
 import Expression
 import GHC
 import Oracles

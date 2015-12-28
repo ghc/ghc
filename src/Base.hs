@@ -2,19 +2,16 @@ module Base (
     -- * General utilities
     module Control.Applicative,
     module Control.Monad.Extra,
-    module Control.Monad.Reader,
-    module Data.Char,
     module Data.Function,
     module Data.List,
     module Data.Maybe,
     module Data.Monoid,
+    MonadTrans(lift),
 
     -- * Shake
     module Development.Shake,
     module Development.Shake.Classes,
-    module Development.Shake.Config,
     module Development.Shake.FilePath,
-    module Development.Shake.Util,
 
     -- * Paths
     shakeFilesPath, configPath, sourcePath, programInplacePath,
@@ -23,7 +20,6 @@ module Base (
 
     -- * Output
     putColoured, putOracle, putBuild, putSuccess, putError, renderBox,
-    module System.Console.ANSI,
 
     -- * Miscellaneous utilities
     bimap, minusOrd, intersectOrd, replaceEq, quote, chunksOfSize,
@@ -34,16 +30,13 @@ module Base (
 import Control.Applicative
 import Control.Monad.Extra
 import Control.Monad.Reader
-import Data.Char
 import Data.Function
 import Data.List
 import Data.Maybe
 import Data.Monoid
-import Development.Shake hiding (unit, (*>))
+import Development.Shake hiding (unit, (*>), parallel)
 import Development.Shake.Classes
-import Development.Shake.Config
 import Development.Shake.FilePath
-import Development.Shake.Util
 import System.Console.ANSI
 import qualified System.Directory as IO
 import System.IO

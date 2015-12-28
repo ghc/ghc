@@ -1,8 +1,10 @@
 module Settings.Builders.Gcc (gccArgs, gccMArgs) where
 
+import Development.Shake.FilePath
 import Expression
 import GHC
 import Oracles
+import Base ((-/-))
 import Predicates (package, stagedBuilder)
 import Settings
 

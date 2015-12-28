@@ -1,5 +1,7 @@
 module Settings.Args (getArgs) where
 
+import Data.Monoid
+
 import Expression
 import Settings.Builders.Alex
 import Settings.Builders.Ar

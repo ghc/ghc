@@ -1,5 +1,6 @@
 module Rules.Actions (build, buildWithResources) where
 
+import Base
 import Expression
 import Oracles.ArgsHash
 import Settings

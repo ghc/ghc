@@ -3,6 +3,8 @@ module Target (
     Target (..), PartialTarget (..), fromPartial, fullTarget, fullTargetWithWay
     ) where
 
+import Control.Monad.Trans.Reader
+
 import Base
 import Builder
 import GHC.Generics (Generic)

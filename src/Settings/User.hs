@@ -6,8 +6,8 @@ module Settings.User (
     verboseCommands, turnWarningsIntoErrors
     ) where
 
+import GHC
 import Expression
-import Predicates
 
 -- No user-specific settings by default
 -- TODO: rename to userArgs

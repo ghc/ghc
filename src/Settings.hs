@@ -7,6 +7,7 @@ module Settings (
     getPackagePath, getTargetDirectory, getTargetPath, getPackageSources
     ) where
 
+import Base
 import Expression
 import Oracles
 import Oracles.ModuleFiles
@@ -16,13 +17,13 @@ import Settings.User
 import Settings.Ways
 
 getPackagePath :: Expr FilePath
-getPackagePath = liftM pkgPath getPackage
+getPackagePath = pkgPath <$> getPackage
 
 getTargetDirectory :: Expr FilePath
-getTargetDirectory = liftM2 targetDirectory getStage getPackage
+getTargetDirectory = targetDirectory <$> getStage <*> getPackage
 
 getTargetPath :: Expr FilePath
-getTargetPath = liftM2 targetPath getStage getPackage
+getTargetPath = targetPath <$> getStage <*> getPackage
 
 getPkgData :: (FilePath -> PackageData) -> Expr String
 getPkgData key = lift . pkgData . key =<< getTargetPath

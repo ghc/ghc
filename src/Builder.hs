@@ -3,17 +3,19 @@ module Builder (
     Builder (..), builderPath, getBuilderPath, specified, needBuilder
     ) where
 
+import Control.Monad.Trans.Reader
+
 import Base
 import GHC.Generics (Generic)
 import Oracles
 import Stage
 
--- A Builder is an external command invoked in separate process using Shake.cmd
+-- | A 'Builder' is an external command invoked in separate process using 'Shake.cmd'
 --
--- Ghc Stage0 is the bootstrapping compiler
--- Ghc StageN, N > 0, is the one built on stage (N - 1)
--- GhcPkg Stage0 is the bootstrapping GhcPkg
--- GhcPkg StageN, N > 0, is the one built in Stage0 (TODO: need only Stage1?)
+-- @Ghc Stage0@ is the bootstrapping compiler
+-- @Ghc StageN@, N > 0, is the one built on stage (N - 1)
+-- @GhcPkg Stage0@ is the bootstrapping @GhcPkg@
+-- @GhcPkg StageN@, N > 0, is the one built in Stage0 (TODO: need only Stage1?)
 -- TODO: Do we really need HsCpp builder? Can't we use a generic Cpp
 --       builder instead? It would also be used instead of GccM.
 -- TODO: rename Gcc to CCompiler? We sometimes use gcc and sometimes clang.
@@ -71,7 +73,8 @@ builderKey builder = case builder of
     Objdump          -> "objdump"
     Unlit            -> "unlit"
 
--- TODO: Paths to some builders should be determined using defaultProgramPath
+-- | Determine the location of a 'Builder'
+-- TODO: Paths to some builders should be determined using 'defaultProgramPath'
 builderPath :: Builder -> Action FilePath
 builderPath builder = do
     path <- askConfigWithDefault (builderKey builder) $
@@ -85,8 +88,8 @@ getBuilderPath = lift . builderPath
 specified :: Builder -> Action Bool
 specified = fmap (not . null) . builderPath
 
--- Make sure a builder exists on the given path and rebuild it if out of date.
--- If laxDependencies is True then we do not rebuild GHC even if it is out of
+-- | Make sure a builder exists on the given path and rebuild it if out of date.
+-- If 'laxDependencies' is True then we do not rebuild GHC even if it is out of
 -- date (can save a lot of build time when changing GHC).
 needBuilder :: Bool -> Builder -> Action ()
 needBuilder laxDependencies builder = do

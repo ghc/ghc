@@ -1,5 +1,6 @@
 module Settings.Builders.Ar (arArgs, arCmd) where
 
+import Base
 import Expression
 import Oracles
 import Predicates (builder)

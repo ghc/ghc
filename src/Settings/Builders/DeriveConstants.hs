@@ -2,6 +2,7 @@ module Settings.Builders.DeriveConstants (
     derivedConstantsPath, deriveConstantsArgs
     ) where
 
+import Base
 import Expression
 import Oracles.Config.Flag
 import Oracles.Config.Setting

@@ -3,6 +3,7 @@ module Settings.TargetDirectory (
     pkgGhciLibraryFile
     ) where
 
+import Base
 import Expression
 import Settings.User
 

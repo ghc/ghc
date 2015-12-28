@@ -1,5 +1,6 @@
 module Settings.Builders.Ghc (ghcArgs, ghcMArgs, commonGhcArgs) where
 
+import Base
 import Expression
 import Oracles
 import GHC

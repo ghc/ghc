@@ -1,5 +1,8 @@
 module Rules.Program (buildProgram) where
 
+import Data.Char
+
+import Base
 import Expression hiding (splitPath)
 import GHC hiding (ghci)
 import Oracles
