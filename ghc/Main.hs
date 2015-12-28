@@ -598,8 +598,8 @@ mode_flags =
           "LibDir",
           "Global Package DB",
           "C compiler flags",
-          "Gcc Linker flags",
-          "Ld Linker flags"],
+          "C compiler link flags",
+          "ld flags"],
     let k' = "-print-" ++ map (replaceSpace . toLower) k
         replaceSpace ' ' = '-'
         replaceSpace c   = c
