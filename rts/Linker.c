@@ -4002,7 +4002,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
             S = (size_t) lookupSymbol_( (char*)symbol );
             if ((void*)S != NULL) goto foundit;
 
-            if (lookupStrHashTable(reqSymHash, symbol) != NULL)
+            if (lookupStrHashTable(reqSymHash, symbol) != NULL || oc->archiveMemberName == NULL)
             {
                 errorBelch("%" PATH_FMT ": unknown symbol `%s'", oc->fileName, symbol);
                 return 0;
