@@ -139,6 +139,10 @@ typedef struct _RtsSymbolInfo {
 /* Hash table mapping symbol names to RtsSymbolInfo */
 static /*Str*/HashTable *symhash;
 
+/* Hash table mapping the required symbols,
+   these are essentially symbols in use from linking object files. */
+static HashTable *reqSymHash;
+
 /* List of currently loaded objects */
 ObjectCode *objects = NULL;     /* initially empty */
 
@@ -564,7 +568,9 @@ initLinker_ (int retain_cafs)
     initMutex(&dl_mutex);
 #endif
 #endif
-    symhash = allocStrHashTable();
+    symhash    = allocStrHashTable();
+    reqSymHash = allocStrHashTable();
+
 
     /* populate the symbol table with stuff from the RTS */
     for (sym = rtsSyms; sym->lbl != NULL; sym++) {
@@ -3793,6 +3799,13 @@ ocGetNames_PEi386 ( ObjectCode* oc )
                                      isWeak, oc)) {
              return 0;
          }
+
+         /* If symbol is an object file or required by archive then add it for relocation */
+         if (oc->archiveMemberName == NULL)
+         {
+             insertStrHashTable(reqSymHash, sname, NULL);
+         }
+
       } else {
 #        if 0
          debugBelch(
