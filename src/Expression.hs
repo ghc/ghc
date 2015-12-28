@@ -18,6 +18,7 @@ module Expression (
     getInput, getOutput,
 
     -- * Re-exports
+    module Data.Monoid,
     module Builder,
     module Package,
     module Stage,
@@ -25,6 +26,7 @@ module Expression (
     ) where
 
 import Control.Monad.Trans.Reader
+import Data.Monoid
 
 import Base
 import Package

@@ -3,7 +3,7 @@ module Rules.Program (buildProgram) where
 import Data.Char
 
 import Base
-import Expression hiding (splitPath)
+import Expression
 import GHC hiding (ghci)
 import Oracles
 import Rules.Actions
