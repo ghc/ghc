@@ -3803,7 +3803,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          /* If symbol is an object file or required by archive then add it for relocation */
          if (oc->archiveMemberName == NULL)
          {
-             insertStrHashTable(reqSymHash, sname, NULL);
+             insertStrHashTable(reqSymHash, sname, (void*)HS_BOOL_TRUE);
          }
 
       } else {
@@ -4001,8 +4001,12 @@ ocResolve_PEi386 ( ObjectCode* oc )
             copyName ( sym->Name, strtab, symbol, 1000-1 );
             S = (size_t) lookupSymbol_( (char*)symbol );
             if ((void*)S != NULL) goto foundit;
-            errorBelch("%" PATH_FMT ": unknown symbol `%s'", oc->fileName, symbol);
-            return 0;
+
+            if (lookupStrHashTable(reqSymHash, symbol) != NULL)
+            {
+                errorBelch("%" PATH_FMT ": unknown symbol `%s'", oc->fileName, symbol);
+                return 0;
+            }
            foundit:;
          }
          /* All supported relocations write at least 4 bytes */
