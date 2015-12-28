@@ -1704,6 +1704,10 @@ def normalise_type_reps(str):
     return re.sub(tyCon_re, 'TyCon FINGERPRINT FINGERPRINT ', str)
 
 def normalise_errmsg( str ):
+    """Normalise error-messages emitted via stderr"""
+    # IBM AIX's `ld` is a bit chatty
+    if opsys('aix'):
+        str = str.replace('ld: 0706-027 The -x flag is ignored.\n', '')
     # remove " error:" and lower-case " Warning:" to make patch for
     # trac issue #10021 smaller
     str = modify_lines(str, lambda l: re.sub(' error:', '', l))
