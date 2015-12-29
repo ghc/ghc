@@ -7,6 +7,7 @@ import Expression
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Predicates (builder, file)
+import Settings.Builders.Common
 import Settings.Builders.GhcCabal
 
 derivedConstantsPath :: FilePath
@@ -39,7 +40,7 @@ includeCcArgs = do
         , ccWarnings
         , append confCcArgs
         , flag GhcUnregisterised ? arg "-DUSE_MINIINTERPRETER"
-        , append $ map ("-I" ++) ghcIncludeDirs -- TODO: fix code duplication
+        , includesArgs
         , arg "-Irts"
         , notM ghcWithSMP ? arg "-DNOSMP"
         , arg "-fcommon" ]

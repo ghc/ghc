@@ -8,7 +8,7 @@ import Predicates (registerPackage)
 import Rules.Actions
 import Rules.Resources
 import Settings
-import Settings.Builders.GhcCabal
+import Settings.Builders.Common
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 buildPackageData :: Resources -> PartialTarget -> Rules ()
@@ -42,9 +42,9 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
         postProcessPackageData dataFile
 
     -- TODO: PROGNAME was $(CrossCompilePrefix)hp2ps
-    -- TODO: code duplication around ghcIncludeDirs
     priority 2.0 $ do
         when (pkg == hp2ps) $ dataFile %> \mk -> do
+            includes <- interpretPartial target $ fromDiffExpr includesArgs
             let prefix = "utils_hp2ps_stage" ++ show (fromEnum stage) ++ "_"
                 cSrcs  = [ "AreaBelow.c", "Curves.c", "Error.c", "Main.c"
                          , "Reorder.c", "TopTwenty.c", "AuxFile.c"
@@ -57,7 +57,7 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
                     , "INSTALL = YES"
                     , "INSTALL_INPLACE = YES"
                     , "DEP_EXTRA_LIBS = m"
-                    , "CC_OPTS = " ++ unwords (map ("-I"++) ghcIncludeDirs) ]
+                    , "CC_OPTS = " ++ unwords includes ]
             writeFileChanged mk contents
             putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 

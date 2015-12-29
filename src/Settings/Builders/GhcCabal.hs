@@ -1,5 +1,5 @@
 module Settings.Builders.GhcCabal (
-    cabalArgs, ghcCabalHsColourArgs, ghcIncludeDirs, bootPackageDbArgs,
+    cabalArgs, ghcCabalHsColourArgs, bootPackageDbArgs,
     customPackageArgs, ccArgs, cppArgs, ccWarnings, argStagedSettingList, needDll0
     ) where
 
@@ -14,6 +14,7 @@ import Stage
 import Expression
 import Predicates hiding (stage)
 import Settings
+import Settings.Builders.Common
 
 cabalArgs :: Args
 cabalArgs = builder GhcCabal ? do
@@ -115,13 +116,8 @@ ccWarnings = do
 ldArgs :: Args
 ldArgs = mempty
 
-ghcIncludeDirs :: [FilePath]
-ghcIncludeDirs = [ "includes", "includes/dist"
-                 , "includes/dist-derivedconstants/header"
-                 , "includes/dist-ghcconstants/header" ]
-
 cppArgs :: Args
-cppArgs = append $ map ("-I" ++) ghcIncludeDirs
+cppArgs = includesArgs
 
 -- TODO: Is this needed?
 -- ifeq "$(GMP_PREFER_FRAMEWORK)" "YES"

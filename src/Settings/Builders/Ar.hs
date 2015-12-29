@@ -26,15 +26,15 @@ arCmd path argList = do
         fileArgs = drop arFlagsCount argList
     if arSupportsAtFile
     then useAtFile path flagArgs fileArgs
-    else useSuccessiveInvokations path flagArgs fileArgs
+    else useSuccessiveInvocations path flagArgs fileArgs
 
 useAtFile :: FilePath -> [String] -> [String] -> Action ()
 useAtFile path flagArgs fileArgs = withTempFile $ \tmp -> do
     writeFile' tmp $ unwords fileArgs
     cmd [path] flagArgs ('@' : tmp)
 
-useSuccessiveInvokations :: FilePath -> [String] -> [String] -> Action ()
-useSuccessiveInvokations path flagArgs fileArgs = do
+useSuccessiveInvocations :: FilePath -> [String] -> [String] -> Action ()
+useSuccessiveInvocations path flagArgs fileArgs = do
     maxChunk <- cmdLineLengthLimit
     forM_ (chunksOfSize maxChunk fileArgs) $ \argsChunk ->
         unit . cmd [path] $ flagArgs ++ argsChunk
