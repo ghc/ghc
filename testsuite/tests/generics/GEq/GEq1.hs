@@ -46,9 +46,11 @@ f2 = F 0.0 4 'h'
 
 u0 :: U Int
 u0 = U 1 "1"# '1'# 1.0## 1.0# 1# 1##
+{-# NOINLINE u0 #-}
 
 uf0 :: UF Int Int Int
 uf0 = UF 2 2 "1"# '2'# 2.0## 2.0# 2# 2##
+{-# NOINLINE uf0 #-}
 
 -- Generic instances
 instance                   GEq C
