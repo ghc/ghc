@@ -17,6 +17,8 @@ module Finder (
     mkHomeModLocation,
     mkHomeModLocation2,
     mkHiOnlyModLocation,
+    mkHiPath,
+    mkObjPath,
     addHomeModuleToFinder,
     uncacheModule,
     mkStubPaths,

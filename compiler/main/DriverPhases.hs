@@ -25,6 +25,8 @@ module DriverPhases (
    isHaskellSigSuffix,
    isSourceSuffix,
 
+   isHaskellishTarget,
+
    isHaskellishFilename,
    isHaskellSrcFilename,
    isHaskellSigFilename,
@@ -42,6 +44,7 @@ import Outputable
 import Platform
 import System.FilePath
 import Binary
+import Util
 
 -----------------------------------------------------------------------------
 -- Phases
@@ -332,6 +335,23 @@ isDynLibSuffix platform s = s `elem` dynlib_suffixes platform
 
 isSourceSuffix :: String -> Bool
 isSourceSuffix suff  = isHaskellishSuffix suff || isCishSuffix suff
+
+-- | When we are given files (modified by -x arguments) we need
+-- to determine if they are Haskellish or not to figure out
+-- how we should try to compile it.  The rules are:
+--
+--      1. If no -x flag was specified, we check to see if
+--         the file looks like a module name, has no extension,
+--         or has a Haskell source extension.
+--
+--      2. If an -x flag was specified, we just make sure the
+--         specified suffix is a Haskell one.
+isHaskellishTarget :: (String, Maybe Phase) -> Bool
+isHaskellishTarget (f,Nothing) =
+  looksLikeModuleName f || isHaskellSrcFilename f || '.' `notElem` f
+isHaskellishTarget (_,Just phase) =
+  phase `notElem` [ As True, As False, Cc, Cobjc, Cobjcxx, CmmCpp, Cmm
+                  , StopLn]
 
 isHaskellishFilename, isHaskellSrcFilename, isCishFilename,
     isHaskellUserSrcFilename, isSourceFilename, isHaskellSigFilename

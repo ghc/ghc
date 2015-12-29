@@ -25,7 +25,7 @@ module DriverPipeline (
 
         -- Exports for hooks to override runPhase and link
    PhasePlus(..), CompPipeline(..), PipeEnv(..), PipeState(..),
-   phaseOutputFilename, getPipeState, getPipeEnv,
+   phaseOutputFilename, getOutputFilename, getPipeState, getPipeEnv,
    hscPostBackendPhase, getLocation, setModLocation, setDynFlags,
    runPhase, exeFileName,
    mkExtraObjToLinkIntoBinary, mkNoteObjsToLinkIntoBinary,
@@ -708,6 +708,9 @@ runHookedPhase pp input dflags =
 -- output.  All the logic about which filenames we generate output
 -- into is embodied in the following function.
 
+-- | Computes the next output filename after we run @next_phase@.
+-- Like 'getOutputFilename', but it operates in the 'CompPipeline' monad
+-- (which specifies all of the ambient information.)
 phaseOutputFilename :: Phase{-next phase-} -> CompPipeline FilePath
 phaseOutputFilename next_phase = do
   PipeEnv{stop_phase, src_basename, output_spec} <- getPipeEnv
@@ -716,6 +719,21 @@ phaseOutputFilename next_phase = do
   liftIO $ getOutputFilename stop_phase output_spec
                              src_basename dflags next_phase maybe_loc
 
+-- | Computes the next output filename for something in the compilation
+-- pipeline.  This is controlled by several variables:
+--
+--      1. 'Phase': the last phase to be run (e.g. 'stopPhase').  This
+--         is used to tell if we're in the last phase or not, because
+--         in that case flags like @-o@ may be important.
+--      2. 'PipelineOutput': is this intended to be a 'Temporary' or
+--         'Persistent' build output?  Temporary files just go in
+--         a fresh temporary name.
+--      3. 'String': what was the basename of the original input file?
+--      4. 'DynFlags': the obvious thing
+--      5. 'Phase': the phase we want to determine the output filename of.
+--      6. @Maybe ModLocation@: the 'ModLocation' of the module we're
+--         compiling; this can be used to override the default output
+--         of an object file.  (TODO: do we actually need this?)
 getOutputFilename
   :: Phase -> PipelineOutput -> String
   -> DynFlags -> Phase{-next phase-} -> Maybe ModLocation -> IO FilePath
