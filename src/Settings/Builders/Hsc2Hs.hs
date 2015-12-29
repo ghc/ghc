@@ -9,6 +9,7 @@ import Oracles
 import Predicates (builder, stage0, notStage0)
 import Settings
 import Settings.Builders.GhcCabal hiding (cppArgs)
+import Settings.Builders.Common (cIncludeArgs)
 
 templateHsc :: FilePath
 templateHsc = "inplace/lib/template-hsc.h"
@@ -48,18 +49,14 @@ hsc2HsArgs = builder Hsc2Hs ? do
 
 getCFlags :: Expr [String]
 getCFlags = fromDiffExpr $ do
-    pkg       <- getPackage
     path      <- getTargetPath
-    iDirs     <- getPkgDataList IncludeDirs
-    dDirs     <- getPkgDataList DepIncludeDirs
     cppArgs   <- getPkgDataList CppArgs
     depCcArgs <- getPkgDataList DepCcArgs
     mconcat [ ccArgs
             , argStagedSettingList ConfCcArgs
             , remove ["-O"]
             , argStagedSettingList ConfCppArgs
-            , arg $ "-I" ++ path -/- "build/autogen"
-            , append [ "-I" ++ pkgPath pkg -/- dir | dir <- iDirs ++ dDirs ]
+            , cIncludeArgs
             , append cppArgs
             , append depCcArgs
             , ccWarnings

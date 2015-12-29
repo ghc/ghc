@@ -17,6 +17,7 @@ import Settings.Builders.Hsc2Hs
 import Settings.Builders.HsCpp
 import Settings.Builders.Ld
 import Settings.Packages.Compiler
+import Settings.Packages.Directory
 import Settings.User
 
 getArgs :: Expr [String]
@@ -50,4 +51,5 @@ defaultBuilderArgs = mconcat
 
 defaultPackageArgs :: Args
 defaultPackageArgs = mconcat
-    [ compilerArgs ]
+    [ compilerArgs
+    , directoryArgs ]

@@ -7,6 +7,7 @@ import GHC
 import Predicates hiding (way, stage)
 import Settings
 import Settings.Builders.GhcCabal (bootPackageDbArgs)
+import Settings.Builders.Common (cIncludeArgs)
 
 -- TODO: add support for -dyno
 -- $1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.hs-boot
@@ -114,16 +115,13 @@ includeGhcArgs = do
     pkg     <- getPackage
     path    <- getTargetPath
     srcDirs <- getPkgDataList SrcDirs
-    incDirs <- getPkgDataList IncludeDirs
     let buildPath   = path -/- "build"
         autogenPath = buildPath -/- "autogen"
     mconcat [ arg "-i"
             , arg $ "-i" ++ buildPath
             , arg $ "-i" ++ autogenPath
-            , arg $ "-I" ++ buildPath
-            , arg $ "-I" ++ autogenPath
             , append [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
-            , append [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
+            , cIncludeArgs
             , (pkg == compiler || pkg == ghc) ?
               arg ("-I" ++ pkgPath compiler -/- "stage" ++ show (fromEnum stage))
             , not (pkg == hp2ps || pkg == ghcCabal && stage == Stage0) ?
