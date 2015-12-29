@@ -88,16 +88,18 @@ data PatTy = PAT | VA -- Used only as a kind, to index PmPat
 -- the number of p1..pn that are not Guards
 
 data PmPat :: PatTy -> * where
-  PmCon :: { pm_con_con     :: DataCon
-           , pm_con_arg_tys :: [Type]
-           , pm_con_tvs     :: [TyVar]
-           , pm_con_dicts   :: [EvVar]
-           , pm_con_args    :: [PmPat t] } -> PmPat t
-           -- For PmCon arguments' meaning see @ConPatOut@ in hsSyn/HsPat.hs
-  PmVar :: { pm_var_id   :: Id    } -> PmPat t
-  PmLit :: { pm_lit_lit  :: PmLit } -> PmPat t -- See Note [Literals in PmPat]
-  PmGrd :: { pm_grd_pv   :: PatVec
-           , pm_grd_expr :: PmExpr } -> PmPat 'PAT
+  PmCon  :: { pm_con_con     :: DataCon
+            , pm_con_arg_tys :: [Type]
+            , pm_con_tvs     :: [TyVar]
+            , pm_con_dicts   :: [EvVar]
+            , pm_con_args    :: [PmPat t] } -> PmPat t
+            -- For PmCon arguments' meaning see @ConPatOut@ in hsSyn/HsPat.hs
+  PmVar  :: { pm_var_id   :: Id    } -> PmPat t
+  PmLit  :: { pm_lit_lit  :: PmLit } -> PmPat t -- See Note [Literals in PmPat]
+  PmNLit :: { pm_lit_id :: Id
+            , pm_lit_not :: [PmLit] } -> PmPat 'VA
+  PmGrd  :: { pm_grd_pv   :: PatVec
+            , pm_grd_expr :: PmExpr } -> PmPat 'PAT
 
 -- data T a where
 --     MkT :: forall p q. (Eq p, Ord q) => p -> q -> T [p]
@@ -656,9 +658,10 @@ process_guards  us  oversimplify gs
 pmPatType :: PmPat p -> Type
 pmPatType (PmCon { pm_con_con = con, pm_con_arg_tys = tys })
   = mkTyConApp (dataConTyCon con) tys
-pmPatType (PmVar { pm_var_id  = x }) = idType x
-pmPatType (PmLit { pm_lit_lit = l }) = pmLitType l
-pmPatType (PmGrd { pm_grd_pv  = pv })
+pmPatType (PmVar  { pm_var_id  = x }) = idType x
+pmPatType (PmLit  { pm_lit_lit = l }) = pmLitType l
+pmPatType (PmNLit { pm_lit_id  = x }) = idType x
+pmPatType (PmGrd  { pm_grd_pv  = pv })
   = ASSERT(patVecArity pv == 1) (pmPatType p)
   where Just p = find ((==1) . patternArity) pv
 
@@ -801,10 +804,11 @@ mkPmId2FormsSM ty = do
 -- * Converting between Value Abstractions, Patterns and PmExpr
 
 valAbsToPmExpr :: ValAbs -> PmExpr
-valAbsToPmExpr (PmCon { pm_con_con = c, pm_con_args = ps })
+valAbsToPmExpr (PmCon  { pm_con_con = c, pm_con_args = ps })
   = PmExprCon c (map valAbsToPmExpr ps)
-valAbsToPmExpr (PmVar { pm_var_id  = x }) = PmExprVar x
-valAbsToPmExpr (PmLit { pm_lit_lit = l }) = PmExprLit l
+valAbsToPmExpr (PmVar  { pm_var_id  = x }) = PmExprVar x
+valAbsToPmExpr (PmLit  { pm_lit_lit = l }) = PmExprLit l
+valAbsToPmExpr (PmNLit { pm_lit_id  = x }) = PmExprVar x
 
 -- Convert a pattern vector to a value list abstraction by dropping the guards
 -- recursively (See Note [Translating As Patterns])
@@ -1058,6 +1062,14 @@ cMatcher us gvsa (p@(PmCon {})) ps (PmLit l) vsa
     (con_abs, all_cs) = mkOneConFull y us2 (pm_con_con p)
     cs = TmConstraint (PmExprVar y) (PmExprLit l) : all_cs
 
+-- CConNLit
+cMatcher us gvsa (p@(PmCon { pm_con_con = con })) ps
+                 (PmNLit { pm_lit_id = x }) vsa
+  = cMatcher us2 gvsa p ps con_abs (mkConstraint all_cs vsa)
+  where
+    (us1, us2)        = splitUniqSupply us
+    (con_abs, all_cs) = mkOneConFull x us1 con
+
 -- CConCon
 cMatcher us gvsa (p@(PmCon { pm_con_con = c1, pm_con_args = args1 })) ps
                     (PmCon { pm_con_con = c2, pm_con_args = args2 }) vsa
@@ -1088,6 +1100,16 @@ cMatcher us gvsa (p@(PmLit l)) ps (PmVar x) vsa
     lit_abs = PmLit l
     cs      = [TmConstraint (PmExprVar x) (PmExprLit l)]
 
+-- CLitNLit
+cMatcher us gvsa (p@(PmLit l)) ps
+                 (PmNLit { pm_lit_id = x, pm_lit_not = lits }) vsa
+  | all (not . eqPmLit l) lits
+  = cMatcher us gvsa p ps lit_abs (mkConstraint cs vsa)
+  | otherwise = Empty
+  where
+    lit_abs = PmLit l
+    cs      = [TmConstraint (PmExprVar x) (PmExprLit l)]
+
 -- Impossible: handled by pmTraverse
 cMatcher _ _ (PmGrd {}) _ _ _ = panic "Check.cMatcher: Guard"
 
@@ -1114,6 +1136,10 @@ uMatcher us gvsa (p@(PmCon {})) ps (PmLit l) vsa
     (us1, us2) = splitUniqSupply us
     y  = mkPmId us1 (pmPatType p)
     cs = [TmConstraint (PmExprVar y) (PmExprLit l)]
+
+-- UConNLit
+uMatcher us gvsa (p@(PmCon {})) ps (PmNLit { pm_lit_id = x }) vsa
+  = uMatcher us gvsa p ps (PmVar x) vsa
 
 -- UConCon
 uMatcher us gvsa ( p@(PmCon { pm_con_con = c1, pm_con_args = args1 })) ps
@@ -1146,7 +1172,20 @@ uMatcher us gvsa (p@(PmCon { pm_con_con = con })) ps (PmVar x) vsa
 -- ULitVar
 uMatcher us gvsa (p@(PmLit l)) ps (PmVar x) vsa
   = mkUnion (uMatcher us gvsa p ps (PmLit l) (mkConstraint match_cs vsa))
-            (non_match_cs `mkConstraint` (PmVar x `mkCons` vsa))
+            (non_match_cs `mkConstraint` (PmNLit x [l] `mkCons` vsa))
+  where
+    match_cs     = [ TmConstraint (PmExprVar x) (PmExprLit l)]
+   -- See Note [Representation of Term Equalities]
+    non_match_cs = [ TmConstraint falsePmExpr
+                                  (PmExprEq (PmExprVar x) (PmExprLit l)) ]
+
+-- ULitNLit
+uMatcher us gvsa (p@(PmLit l)) ps
+                 (va@(PmNLit { pm_lit_id = x, pm_lit_not = lits })) vsa
+  | all (not . eqPmLit l) lits
+  = mkUnion (uMatcher us gvsa p ps (PmLit l) (mkConstraint match_cs vsa))
+            (non_match_cs `mkConstraint` (PmNLit x (l:lits) `mkCons` vsa))
+  | otherwise = va `mkCons` vsa
   where
     match_cs     = [ TmConstraint (PmExprVar x) (PmExprLit l)]
    -- See Note [Representation of Term Equalities]
@@ -1178,6 +1217,14 @@ dMatcher us gvsa (p@(PmCon { pm_con_con = con })) ps (PmLit l) vsa
     (con_abs, all_cs) = mkOneConFull y us2 con
     cs = TmConstraint (PmExprVar y) (PmExprLit l) : all_cs
 
+-- DConNLit
+dMatcher us gvsa (p@(PmCon { pm_con_con = con })) ps
+                 (PmNLit { pm_lit_id = x }) vsa
+  = dMatcher us2 gvsa p ps con_abs (mkConstraint all_cs vsa)
+  where
+    (us1, us2)        = splitUniqSupply us
+    (con_abs, all_cs) = mkOneConFull x us1 con
+
 -- DConCon
 dMatcher us gvsa (p@(PmCon { pm_con_con = c1, pm_con_args = args1 })) ps
                     (PmCon { pm_con_con = c2, pm_con_args = args2 }) vsa
@@ -1208,6 +1255,16 @@ dMatcher us gvsa (PmLit l) ps (PmVar x) vsa
             (dMatcher us gvsa (PmLit l) ps (PmLit l) (mkConstraint cs vsa))
   where
     cs = [TmConstraint (PmExprVar x) (PmExprLit l)]
+
+-- DLitNLit
+dMatcher us gvsa (p@(PmLit l)) ps
+                 (PmNLit { pm_lit_id = x, pm_lit_not = lits }) vsa
+  | all (not . eqPmLit l) lits
+  = dMatcher us gvsa p ps lit_abs (mkConstraint cs vsa)
+  | otherwise = Empty
+  where
+    lit_abs = PmLit l
+    cs      = [TmConstraint (PmExprVar x) (PmExprLit l)]
 
 -- Impossible: handled by pmTraverse
 dMatcher _ _ (PmGrd {}) _ _ _ = panic "Check.dMatcher: Guard"
