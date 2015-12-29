@@ -630,7 +630,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
                  do { traceTc "tcSubTypeDS_NC_O following filled act meta-tyvar:"
                         (ppr tv_a <+> text "-->" <+> ppr ty_a')
                     ; tc_sub_type_ds eq_orig inst_orig ctxt ty_a' ty_e }
-               Unfilled _   -> mkWpCastN <$> unify }
+               Unfilled _   -> unify }
 
 
     go ty_a (TyVarTy tv_e)
@@ -645,33 +645,14 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
                Unfilled details
                  |  canUnifyWithPolyType dflags details
                     && isTouchableMetaTyVar tclvl tv_e  -- don't want skolems here
-                 -> mkWpCastN <$> unify
+                 -> unify
 
      -- We've avoided instantiating ty_actual just in case ty_expected is
      -- polymorphic. But we've now assiduously determined that it is *not*
      -- polymorphic. So instantiate away. This is needed for e.g. test
      -- typecheck/should_compile/T4284.
                  |  otherwise
-                 -> do { (wrap, rho_a) <- deeplyInstantiate inst_orig ty_actual
-
-                           -- if we haven't recurred through an arrow, then
-                           -- the eq_orig will list ty_actual. In this case,
-                           -- we want to update the origin to reflect the
-                           -- instantiation. If we *have* recurred through
-                           -- an arrow, it's better not to update.
-                       ; let eq_orig' = case eq_orig of
-                               TypeEqOrigin { uo_actual   = orig_ty_actual
-                                            , uo_expected = orig_ty_expected
-                                            , uo_thing    = thing }
-                                 |  orig_ty_actual `tcEqType` ty_actual
-                                 -> TypeEqOrigin
-                                      { uo_actual = rho_a
-                                      , uo_expected = orig_ty_expected
-                                      , uo_thing    = thing }
-                               _ -> eq_orig
-
-                       ; cow <- uType eq_orig' TypeLevel rho_a ty_expected
-                       ; return (mkWpCastN cow <.> wrap) } }
+                 -> inst_and_unify }
 
     go (ForAllTy (Anon act_arg) act_res) (ForAllTy (Anon exp_arg) exp_res)
       | not (isPredTy act_arg)
@@ -693,11 +674,37 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
            ; return (body_wrap <.> in_wrap) }
 
       | otherwise   -- Revert to unification
-      = do { cow <- unify
-           ; return (mkWpCastN cow) }
+      = inst_and_unify
+         -- It's still possible that ty_actual has nested foralls. Instantiate
+         -- these, as there's no way unification will succeed with them in.
+         -- See typecheck/should_compiler/T11350 for an example of when this
+         -- is important.
+
+    inst_and_unify = do { (wrap, rho_a) <- deeplyInstantiate inst_orig ty_actual
+
+                           -- if we haven't recurred through an arrow, then
+                           -- the eq_orig will list ty_actual. In this case,
+                           -- we want to update the origin to reflect the
+                           -- instantiation. If we *have* recurred through
+                           -- an arrow, it's better not to update.
+                        ; let eq_orig' = case eq_orig of
+                                TypeEqOrigin { uo_actual   = orig_ty_actual
+                                             , uo_expected = orig_ty_expected
+                                             , uo_thing    = thing }
+                                  |  orig_ty_actual `tcEqType` ty_actual
+                                  ,  not (isIdHsWrapper wrap)
+                                  -> TypeEqOrigin
+                                       { uo_actual = rho_a
+                                       , uo_expected = orig_ty_expected
+                                       , uo_thing    = thing }
+                                _ -> eq_orig
+
+                        ; cow <- uType eq_orig' TypeLevel rho_a ty_expected
+                        ; return (mkWpCastN cow <.> wrap) }
+
 
      -- use versions without synonyms expanded
-    unify = uType eq_orig TypeLevel ty_actual ty_expected
+    unify = mkWpCastN <$> uType eq_orig TypeLevel ty_actual ty_expected
 
 -----------------
 -- needs both un-type-checked (for origins) and type-checked (for wrapping)
