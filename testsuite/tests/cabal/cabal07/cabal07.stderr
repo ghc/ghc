@@ -1,6 +1,0 @@
-
-Q.hs:3:1: error:
-    Failed to load interface for ‘Data.Set’
-    It is a member of the hidden package ‘containers-0.5.7.0’.
-    Perhaps you need to add ‘containers’ to the build-depends in your .cabal file.
-    Use -v to see a list of the files searched for.
