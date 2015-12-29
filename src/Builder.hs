@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Builder (
-    Builder (..), builderPath, getBuilderPath, specified, needBuilder
+    Builder (..), isStaged, builderPath, getBuilderPath, specified, needBuilder
     ) where
 
 import Control.Monad.Trans.Reader
@@ -42,6 +42,14 @@ data Builder = Alex
              | Objdump
              | Unlit
              deriving (Show, Eq, Generic)
+
+isStaged :: Builder -> Bool
+isStaged (Gcc    _) = True
+isStaged (GccM   _) = True
+isStaged (Ghc    _) = True
+isStaged (GhcM   _) = True
+isStaged (GhcPkg _) = True
+isStaged _          = False
 
 -- Configuration files refer to Builders as follows:
 builderKey :: Builder -> String

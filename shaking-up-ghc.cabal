@@ -84,6 +84,7 @@ executable ghc-shake
                        , DeriveGeneric
                        , FlexibleInstances
                        , OverloadedStrings
+                       , RecordWildCards
     build-depends:       base
                        , ansi-terminal >= 0.6
                        , Cabal >= 1.22

@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 module Rules.Actions (build, buildWithResources) where
 
 import Base
@@ -22,9 +23,7 @@ buildWithResources rs target = do
     -- The line below forces the rule to be rerun if the args hash has changed
     checkArgsHash target
     withResources rs $ do
-        unless verbose $ do
-            putBuild $ renderBox $ [ "Running " ++ show builder ++ " with arguments:" ]
-                                  ++ map ("  "++) (interestingInfo builder argList)
+        unless verbose $ putInfo target
         quietlyUnlessVerbose $ case builder of
             Ar -> arCmd path argList
 
@@ -46,28 +45,19 @@ buildWithResources rs target = do
 build :: Target -> Action ()
 build = buildWithResources []
 
-interestingInfo :: Builder -> [String] -> [String]
-interestingInfo builder ss = case builder of
-    Alex            -> prefixAndSuffix 0 3 ss
-    Ar              -> prefixAndSuffix 2 1 ss
-    DeriveConstants -> prefixAndSuffix 3 0 ss
-    Gcc _           -> prefixAndSuffix 0 4 ss
-    GccM _          -> prefixAndSuffix 0 1 ss
-    Ghc _           -> prefixAndSuffix 0 4 ss
-    GhcCabal        -> prefixAndSuffix 3 0 ss
-    GhcM _          -> prefixAndSuffix 1 1 ss
-    GhcPkg _        -> prefixAndSuffix 3 0 ss
-    Haddock         -> prefixAndSuffix 1 0 ss
-    Happy           -> prefixAndSuffix 0 3 ss
-    Hsc2Hs          -> prefixAndSuffix 0 3 ss
-    HsCpp           -> prefixAndSuffix 0 1 ss
-    Ld              -> prefixAndSuffix 4 0 ss
-    _               -> ss
+-- Print out key information about the command being executed
+putInfo :: Target.Target -> Action ()
+putInfo (Target.Target {..}) = putBuild $ renderBox $
+    [ "Running " ++ show builder
+      ++ " (" ++ stageInfo
+      ++ "package = " ++ pkgNameString package
+      ++ wayInfo ++ "):"
+    , "    input: " ++ digest inputs
+    , "=> output: " ++ digest outputs ]
   where
-    prefixAndSuffix n m list =
-        let len = length list in
-        if len <= n + m + 1
-        then list
-        else take n list
-             ++ ["... skipping " ++ show (len - n - m) ++ " arguments ..."]
-             ++ drop (len - m) list
+    stageInfo = if isStaged builder then "" else "stage = " ++ show stage ++ ", "
+    wayInfo   = if way == vanilla   then "" else ", way = " ++ show way
+    digest list = case list of
+        []  -> "none"
+        [x] -> x
+        xs  -> head xs ++ " (and " ++ show (length xs - 1) ++ " more)"
