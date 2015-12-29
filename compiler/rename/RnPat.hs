@@ -599,10 +599,10 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                    = rdr `elemLocalRdrEnv` lcl_env
                    || notNull [ gre | gre <- lookupGRE_RdrName rdr rdr_env
                                     , case gre_par gre of
-                                        ParentIs p               -> p /= parent_tc
-                                        FldParent { par_is = p } -> p /= parent_tc
-                                        PatternSynonym           -> True
-                                        NoParent                 -> True ]
+                                        ParentIs p     -> Just p /= parent_tc
+                                        FldParent p _  -> Just p /= parent_tc
+                                        PatternSynonym -> False
+                                        NoParent       -> True ]
                    where
                      rdr = mkVarUnqual lbl
 
@@ -629,19 +629,23 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
     -- When disambiguation is on, return name of parent tycon.
     check_disambiguation disambig_ok mb_con
       | disambig_ok, Just con <- mb_con
-      = do { env <- getGlobalRdrEnv; return (Just (find_tycon env con)) }
+      = do { env <- getGlobalRdrEnv; return (find_tycon env con) }
       | otherwise = return Nothing
 
-    find_tycon :: GlobalRdrEnv -> Name {- DataCon -} -> Name {- TyCon -}
+    find_tycon :: GlobalRdrEnv -> Name {- DataCon -} -> Maybe Name {- TyCon -}
     -- Return the parent *type constructor* of the data constructor
-    -- That is, the parent of the data constructor.
+    -- (that is, the parent of the data constructor),
+    -- or 'Nothing' if it is a pattern synonym.
     -- That's the parent to use for looking up record fields.
     find_tycon env con
       | Just (AConLike (RealDataCon dc)) <- wiredInNameTyThing_maybe con
-      = tyConName (dataConTyCon dc)   -- Special case for [], which is built-in syntax
-                                      -- and not in the GlobalRdrEnv (Trac #8448)
-      | [GRE { gre_par = ParentIs p }] <- lookupGRE_Name env con
-      = p
+      = Just (tyConName (dataConTyCon dc))
+        -- Special case for [], which is built-in syntax
+        -- and not in the GlobalRdrEnv (Trac #8448)
+      | [gre] <- lookupGRE_Name env con
+      = case gre_par gre of
+          ParentIs p -> Just p
+          _          -> Nothing
 
       | otherwise
       = pprPanic "find_tycon" (ppr con $$ ppr (lookupGRE_Name env con))
