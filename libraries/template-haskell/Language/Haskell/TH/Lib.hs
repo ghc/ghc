@@ -471,7 +471,7 @@ closedTypeFamilyD tc tvs result injectivity eqns =
   do eqns1 <- sequence eqns
      return (ClosedTypeFamilyD (TypeFamilyHead tc tvs result injectivity) eqns1)
 
--- These were deprecated in GHC 7.12 with a plan to remove them in 7.14. If you
+-- These were deprecated in GHC 8.0 with a plan to remove them in 8.2. If you
 -- remove this check please also:
 --   1. remove deprecated functions
 --   2. remove CPP language extension from top of this module

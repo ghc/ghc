@@ -607,7 +607,7 @@ Qualified currently behaves exactly as Implicit,
 but it is deprecated to use it for implicit quantification.
 In this case, GHC 7.10 gives a warning; see
 Note [Context quantification] in RnTypes, and Trac #4426.
-In GHC 7.12, Qualified will no longer bind variables
+In GHC 8.0, Qualified will no longer bind variables
 and this will become an error.
 
 The kind variables bound in the hsq_implicit field come both
