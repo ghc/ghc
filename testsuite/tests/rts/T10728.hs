@@ -35,6 +35,6 @@ getN = getFullArgs >>= return . go
   where
     go :: [String] -> Int
     go as = case reads (
-      dropWhile (not . isDigit) . (!! 1) $ as ) :: [(Int, String)] of
+      dropWhile (not . isDigit) . (!! 2) $ as ) :: [(Int, String)] of
         [x] -> fst x
         _ -> 0

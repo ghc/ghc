@@ -20,9 +20,18 @@ import GHC.Windows
 # else
 #  error Unknown mingw32 arch
 # endif
+#else
+import GHC.IO.Encoding
+import qualified GHC.Foreign as GHC
+#endif
 
--- Ignore the arguments to hs_init on Windows for the sake of Unicode compat
+-- | Computation 'getFullArgs' is the "raw" version of 'getArgs', similar
+-- to @argv@ in other languages. It returns a list of the program's
+-- command line arguments, starting with the program name, and
+-- including those normally eaten by the RTS (+RTS ... -RTS).
 getFullArgs :: IO [String]
+#ifdef mingw32_HOST_OS
+-- Ignore the arguments to hs_init on Windows for the sake of Unicode compat
 getFullArgs = do
     p_arg_string <- c_GetCommandLine
     alloca $ \p_argc -> do
@@ -43,11 +52,6 @@ foreign import WINDOWS_CCONV unsafe "windows.h CommandLineToArgvW"
 foreign import WINDOWS_CCONV unsafe "Windows.h LocalFree"
     c_LocalFree :: Ptr a -> IO (Ptr a)
 #else
-import GHC.IO.Encoding
-import GHC.Num
-import qualified GHC.Foreign as GHC
-
-getFullArgs :: IO [String]
 getFullArgs =
   alloca $ \ p_argc ->
   alloca $ \ p_argv -> do
@@ -55,7 +59,7 @@ getFullArgs =
    p    <- fromIntegral `liftM` peek p_argc
    argv <- peek p_argv
    enc <- getFileSystemEncoding
-   peekArray (p - 1) (advancePtr argv 1) >>= mapM (GHC.peekCString enc)
+   peekArray p argv >>= mapM (GHC.peekCString enc)
 
 foreign import ccall unsafe "getFullProgArgv"
     getFullProgArgv :: Ptr CInt -> Ptr (Ptr CString) -> IO ()
