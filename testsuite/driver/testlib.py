@@ -1697,12 +1697,11 @@ def normalise_callstacks(str):
     # Ignore line number differences in call stacks (#10834).
     return re.sub(', called at (.+):[\\d]+:[\\d]+ in [\\w\-\.]+:', repl, str)
 
+tyCon_re = re.compile(r'TyCon\s*\d+L?\#\#\s*\d+L?\#\#\s*', flags=re.MULTILINE)
+
 def normalise_type_reps(str):
     """ Normalise out fingerprints from Typeable TyCon representations """
-    return re.sub(r'TyCon\s*\d+L?\#\#\s*\d+L?\#\#\s*',
-                  'TyCon FINGERPRINT FINGERPRINT ',
-                  str,
-                  flags=re.MULTILINE)
+    return re.sub(tyCon_re, 'TyCon FINGERPRINT FINGERPRINT ', str)
 
 def normalise_errmsg( str ):
     # remove " error:" and lower-case " Warning:" to make patch for
