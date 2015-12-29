@@ -7017,7 +7017,7 @@ which implicitly defines an instance of the form
 Injective type families
 -----------------------
 
-Starting with GHC 7.12 type families can be annotated with injectivity
+Starting with GHC 8.0 type families can be annotated with injectivity
 information. This information is then used by GHC during type checking
 to resolve type ambiguities in situations where a type variable appears
 only under type family applications.
