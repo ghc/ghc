@@ -272,6 +272,7 @@ module GHC (
         ApiAnns,AnnKeywordId(..),AnnotationComment(..),
         getAnnotation, getAndRemoveAnnotation,
         getAnnotationComments, getAndRemoveAnnotationComments,
+        unicodeAnn,
 
         -- * Miscellaneous
         --sessionHscEnv,

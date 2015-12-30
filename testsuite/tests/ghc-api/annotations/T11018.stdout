@@ -142,7 +142,7 @@
 ((Test11018.hs:43:11-17,AnnOpenP), [Test11018.hs:43:11]),
 ((Test11018.hs:43:12,AnnComma), [Test11018.hs:43:13]),
 ((Test11018.hs:43:14,AnnComma), [Test11018.hs:43:15]),
-((Test11018.hs:43:22-34,AnnLarrowtailU), [Test11018.hs:43:30]),
+((Test11018.hs:43:22-34,AnnlarrowtailU), [Test11018.hs:43:30]),
 ((Test11018.hs:43:32-34,AnnVal), [Test11018.hs:43:33]),
 ((Test11018.hs:45:1-36,AnnDcolon), [Test11018.hs:45:5-6]),
 ((Test11018.hs:45:1-36,AnnSemi), [Test11018.hs:46:1]),

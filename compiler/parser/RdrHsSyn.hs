@@ -1268,7 +1268,7 @@ mkImport (L lc cconv) (L ls safety) (L loc (StringLiteral esrc entity), v, ty)
   | cconv == PrimCallConv                      = do
   let funcTarget = CFunction (StaticTarget esrc entity Nothing True)
       importSpec = CImport (L lc PrimCallConv) (L ls safety) Nothing funcTarget
-                           (L loc (unpackFS entity))
+                           (L loc esrc)
   return (ForD (ForeignImport { fd_name = v, fd_sig_ty = ty
                               , fd_co = noForeignImportCoercionYet
                               , fd_fi = importSpec }))
