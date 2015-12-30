@@ -58,6 +58,7 @@ executable ghc-shake
                        , Settings.Args
                        , Settings.Builders.Alex
                        , Settings.Builders.Ar
+                       , Settings.Builders.Common
                        , Settings.Builders.Gcc
                        , Settings.Builders.GenPrimopCode
                        , Settings.Builders.Ghc
@@ -69,6 +70,8 @@ executable ghc-shake
                        , Settings.Builders.HsCpp
                        , Settings.Builders.Ld
                        , Settings.Packages
+                       , Settings.Packages.Compiler
+                       , Settings.Packages.Directory
                        , Settings.TargetDirectory
                        , Settings.User
                        , Settings.Ways
