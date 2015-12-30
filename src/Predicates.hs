@@ -1,6 +1,6 @@
 -- | Convenient predicates
 module Predicates (
-    stage, package, builder, stagedBuilder, file, way,
+    stage, package, builder, stagedBuilder, builderGhc, file, way,
     stage0, stage1, stage2, notStage0, notPackage, registerPackage, splitObjects
     ) where
 
@@ -23,6 +23,9 @@ builder b = fmap (b ==) getBuilder
 -- For staged builders, e.g. Ghc Stage
 stagedBuilder :: (Stage -> Builder) -> Predicate
 stagedBuilder sb = (builder . sb) =<< getStage
+
+builderGhc :: Predicate
+builderGhc = stagedBuilder Ghc ||^ stagedBuilder GhcM
 
 file :: FilePattern -> Predicate
 file f = fmap (any (f ?==)) getOutputs
