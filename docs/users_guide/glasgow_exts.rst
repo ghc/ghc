@@ -8401,6 +8401,7 @@ the printed stack is not particularly enlightening, so we might choose
 to surpress it by freezing the ``CallStack`` that we pass to ``myerror``.
 
 ::
+
    head :: (?callStack :: CallStack) => [a] -> a
    head []     = let ?callStack = freezeCallStack ?callStack in myerror "empty"
    head (x:xs) = x
