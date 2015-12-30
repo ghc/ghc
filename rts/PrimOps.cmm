@@ -35,6 +35,9 @@ import CLOSURE ghczmprim_GHCziTypes_False_closure;
 #if defined(USE_MINIINTERPRETER) || !defined(mingw32_HOST_OS)
 import CLOSURE sm_mutex;
 #endif
+#ifdef PROFILING
+import CLOSURE CCS_MAIN;
+#endif
 
 /*-----------------------------------------------------------------------------
   Array Primitives
