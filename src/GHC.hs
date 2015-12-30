@@ -5,7 +5,7 @@ module GHC (
     genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim, ghcPwd, ghcTags,
     haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
     integerSimple, iservBin, mkUserGuidePart, parallel, pretty, primitive, process,
-    runghc, stm, templateHaskell, terminfo, time, transformers, unix, win32, xhtml,
+    runGhc, stm, templateHaskell, terminfo, time, transformers, unix, win32, xhtml,
 
     defaultKnownPackages, defaultTargetDirectory, defaultProgramPath
     ) where
@@ -26,7 +26,7 @@ defaultKnownPackages =
     , genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim
     , ghcPwd, ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin
     , integerGmp, integerSimple, iservBin, mkUserGuidePart, parallel, pretty
-    , primitive , process, runghc, stm, templateHaskell, terminfo, time
+    , primitive , process, runGhc, stm, templateHaskell, terminfo, time
     , transformers, unix, win32, xhtml ]
 
 -- Package definitions (see Package.hs)
@@ -35,7 +35,7 @@ array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
     genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim, ghcPwd,
     ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
     integerSimple, iservBin, mkUserGuidePart, parallel, pretty, primitive, process,
-    runghc, stm, templateHaskell, terminfo, time, transformers, unix, win32, xhtml :: Package
+    runGhc, stm, templateHaskell, terminfo, time, transformers, unix, win32, xhtml :: Package
 
 array           = library  "array"
 base            = library  "base"
@@ -75,7 +75,7 @@ parallel        = library  "parallel"
 pretty          = library  "pretty"
 primitive       = library  "primitive"
 process         = library  "process"
-runghc          = utility  "runghc"
+runGhc          = utility  "runGhc"
 stm             = library  "stm"
 templateHaskell = library  "template-haskell"
 terminfo        = library  "terminfo"
@@ -97,17 +97,17 @@ xhtml           = library  "xhtml"
 -- * doc/            : produced by haddock
 -- * package-data.mk : contains output of ghc-cabal applied to pkgCabal
 defaultTargetDirectory :: Stage -> Package -> FilePath
-defaultTargetDirectory stage _ = "stage" ++ show (fromEnum stage)
+defaultTargetDirectory stage _ = stageString stage
 
 -- TODO: simplify
 -- | Returns a relative path to the program executable
 defaultProgramPath :: Stage -> Package -> Maybe FilePath
 defaultProgramPath stage pkg
-    | pkg == ghc     = Just . inplaceProgram $ "ghc-stage" ++ show (fromEnum stage + 1)
+    | pkg == ghc = Just . inplaceProgram $ "ghc-stage" ++ show (fromEnum stage + 1)
     | pkg == haddock || pkg == ghcTags = case stage of
         Stage2 -> Just . inplaceProgram $ pkgNameString pkg
         _      -> Nothing
-    | isProgram pkg  = case stage of
+    | isProgram pkg = case stage of
         Stage0 -> Just . inplaceProgram $ pkgNameString pkg
         _      -> Just . installProgram $ pkgNameString pkg
     | otherwise = Nothing

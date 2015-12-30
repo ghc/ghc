@@ -32,7 +32,7 @@ packagesStage1 = mconcat
     [ packagesStage0
     , append [ array, base, bytestring, containers, compareSizes, deepseq
              , directory, filepath, ghci, ghcPrim, ghcPwd, haskeline, hpcBin
-             , integerLibrary, mkUserGuidePart, pretty, process, runghc, time ]
+             , integerLibrary, mkUserGuidePart, pretty, process, runGhc, time ]
     , windowsHost      ? append [win32]
     , notM windowsHost ? append [unix]
     , notM windowsHost ? append [iservBin]

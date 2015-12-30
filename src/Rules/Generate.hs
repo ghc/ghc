@@ -127,7 +127,7 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
             when (pkg == ghcPkg) $ buildPath -/- "Version.hs" %> \file -> do
                 file <~ generateVersionHs
 
-            when (pkg == runghc) $ buildPath -/- "Main.hs" %> \file -> do
+            when (pkg == runGhc) $ buildPath -/- "Main.hs" %> \file -> do
                 copyFileChanged (pkgPath pkg -/- "runghc.hs") file
                 putSuccess $ "| Successfully generated '" ++ file ++ "'."
 

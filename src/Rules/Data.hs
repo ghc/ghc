@@ -45,7 +45,7 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
     priority 2.0 $ do
         when (pkg == hp2ps) $ dataFile %> \mk -> do
             includes <- interpretPartial target $ fromDiffExpr includesArgs
-            let prefix = "utils_hp2ps_stage" ++ show (fromEnum stage) ++ "_"
+            let prefix = "utils_hp2ps_" ++ stageString stage ++ "_"
                 cSrcs  = [ "AreaBelow.c", "Curves.c", "Error.c", "Main.c"
                          , "Reorder.c", "TopTwenty.c", "AuxFile.c"
                          , "Deviation.c", "HpFile.c", "Marks.c", "Scale.c"

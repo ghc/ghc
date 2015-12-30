@@ -91,10 +91,10 @@ setting key = askConfig $ case key of
 
 settingList :: SettingList -> Action [String]
 settingList key = fmap words $ askConfig $ case key of
-    ConfCcArgs        stage -> "conf-cc-args-stage"         ++ show (fromEnum stage)
-    ConfCppArgs       stage -> "conf-cpp-args-stage"        ++ show (fromEnum stage)
-    ConfGccLinkerArgs stage -> "conf-gcc-linker-args-stage" ++ show (fromEnum stage)
-    ConfLdLinkerArgs  stage -> "conf-ld-linker-args-stage"  ++ show (fromEnum stage)
+    ConfCcArgs        stage -> "conf-cc-args-"         ++ stageString stage
+    ConfCppArgs       stage -> "conf-cpp-args-"        ++ stageString stage
+    ConfGccLinkerArgs stage -> "conf-gcc-linker-args-" ++ stageString stage
+    ConfLdLinkerArgs  stage -> "conf-ld-linker-args-"  ++ stageString stage
     GmpIncludeDirs          -> "gmp-include-dirs"
     GmpLibDirs              -> "gmp-lib-dirs"
     HsCppArgs               -> "hs-cpp-args"
