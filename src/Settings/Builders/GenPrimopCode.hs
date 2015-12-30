@@ -4,7 +4,6 @@ import Expression
 import Predicates (builder, file)
 
 -- Stdin/stdout are handled in a special way. See Rules/Actions.hs.
--- TODO: Do we want to keep "--usage"? It seems to be unused.
 genPrimopCodeArgs :: Args
 genPrimopCodeArgs = builder GenPrimopCode ? mconcat
     [ file "//PrimopWrappers.hs"                 ? arg "--make-haskell-wrappers"

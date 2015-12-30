@@ -3,7 +3,6 @@ module Settings.Builders.Ghc (ghcArgs, ghcMArgs, commonGhcArgs) where
 import Base
 import Expression
 import Oracles
-import GHC
 import Predicates hiding (way, stage)
 import Settings
 import Settings.Builders.GhcCabal (bootPackageDbArgs)
@@ -22,20 +21,14 @@ ghcArgs = stagedBuilder Ghc ? do
     let buildObj = ("//*." ++ osuf way) ?== output || ("//*." ++ obootsuf way) ?== output
     libs    <- getPkgDataList DepExtraLibs
     libDirs <- getPkgDataList DepLibDirs
-    version <- getSetting ProjectVersion
     mconcat [ commonGhcArgs
-            , ghcCabalBootArgs
             , arg "-H32m"
             , stage0    ? arg "-O"
             , notStage0 ? arg "-O2"
             , arg "-Wall"
             , arg "-fwarn-tabs"
             , isLibrary pkg ? splitObjects ? arg "-split-objs"
-            , package ghc ? arg "-no-hs-main" -- TODO: simplify
-            , package hp2ps ? arg "-no-hs-main"
-            , (pkg /= ghcCabal) ? not buildObj ? arg "-no-auto-link-packages"
-            , package runghc ? file "//Main.o" ?
-              append ["-cpp", "-DVERSION=\"" ++ version ++ "\""]
+            , not buildObj ? arg "-no-auto-link-packages"
             , not buildObj ? append [ "-optl-l" ++ lib | lib <- libs    ]
             , not buildObj ? append [ "-optl-L" ++ dir | dir <- libDirs ]
             , buildObj ? arg "-c"
@@ -98,8 +91,7 @@ packageGhcArgs = do
     compId              <- getPkgData ComponentId
     pkgDepIds           <- getPkgDataList DepIds
     mconcat
-        [ not (pkg == hp2ps || pkg == ghcCabal && stage == Stage0) ?
-          arg "-hide-all-packages"
+        [ arg "-hide-all-packages"
         , arg "-no-user-package-db"
         , bootPackageDbArgs
         , isLibrary pkg ?
@@ -111,7 +103,6 @@ packageGhcArgs = do
 -- TODO: Improve handling of "cabal_macros.h"
 includeGhcArgs :: Args
 includeGhcArgs = do
-    stage   <- getStage
     pkg     <- getPackage
     path    <- getTargetPath
     srcDirs <- getPkgDataList SrcDirs
@@ -122,26 +113,8 @@ includeGhcArgs = do
             , arg $ "-i" ++ autogenPath
             , append [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
             , cIncludeArgs
-            , (pkg == compiler || pkg == ghc) ?
-              arg ("-I" ++ pkgPath compiler -/- "stage" ++ show (fromEnum stage))
-            , not (pkg == hp2ps || pkg == ghcCabal && stage == Stage0) ?
-              append [ "-optP-include"
-                     , "-optP" ++ autogenPath -/- "cabal_macros.h" ] ]
-
--- Boostrapping ghcCabal
--- TODO: do we need -DCABAL_VERSION=$(CABAL_VERSION)?
-ghcCabalBootArgs :: Args
-ghcCabalBootArgs = package ghcCabal ? stage0 ? mconcat
-    [ arg "--make"
-    , arg "-DBOOTSTRAPPING"
-    , arg "-DMIN_VERSION_binary_0_8_0"
-    , arg "-DGENERICS"
-    , arg "-optP-include"
-    , arg $ "-optP" ++ pkgPath ghcCabal -/- "cabal_macros_boot.h"
-    , arg "-ilibraries/Cabal/Cabal"
-    , arg "-ilibraries/binary/src"
-    , arg "-ilibraries/filepath"
-    , arg "-ilibraries/hpc" ]
+            , arg "-optP-include"
+            , arg $ "-optP" ++ autogenPath -/- "cabal_macros.h" ]
 
 -- # Options for passing to plain ld
 -- $1_$2_$3_ALL_LD_OPTS = \

@@ -1,4 +1,4 @@
-module Settings.Packages.Directory (directoryArgs) where
+module Settings.Packages.Directory (directoryPackageArgs) where
 
 import Expression
 import GHC (directory)
@@ -8,6 +8,6 @@ import Predicates (stagedBuilder, package)
 -- effectively empty. I presume it was expected that GHC will be used for
 -- compiling all C files, but I don't know why. It seems that directory.c is the
 -- only file which requires special treatment when using GCC.
-directoryArgs :: Args
-directoryArgs = package directory ?
+directoryPackageArgs :: Args
+directoryPackageArgs = package directory ?
     stagedBuilder Gcc ? arg "-D__GLASGOW_HASKELL__"

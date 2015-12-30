@@ -11,7 +11,7 @@ hsCppArgs = builder HsCpp ? do
     mconcat [ append =<< getSettingList HsCppArgs
             , arg "-P"
             , cppArgs
-            , arg $ "-Icompiler/stage" ++ show (fromEnum stage)
+            , arg $ "-Icompiler/" ++ stageString stage
             , arg "-x"
             , arg "c"
             , arg =<< getInput ]

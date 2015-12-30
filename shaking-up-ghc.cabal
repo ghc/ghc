@@ -72,6 +72,10 @@ executable ghc-shake
                        , Settings.Packages
                        , Settings.Packages.Compiler
                        , Settings.Packages.Directory
+                       , Settings.Packages.Ghc
+                       , Settings.Packages.GhcCabal
+                       , Settings.Packages.Hp2ps
+                       , Settings.Packages.RunGhc
                        , Settings.TargetDirectory
                        , Settings.User
                        , Settings.Ways

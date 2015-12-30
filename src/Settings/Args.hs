@@ -18,6 +18,10 @@ import Settings.Builders.HsCpp
 import Settings.Builders.Ld
 import Settings.Packages.Compiler
 import Settings.Packages.Directory
+import Settings.Packages.Ghc
+import Settings.Packages.GhcCabal
+import Settings.Packages.Hp2ps
+import Settings.Packages.RunGhc
 import Settings.User
 
 getArgs :: Expr [String]
@@ -51,5 +55,9 @@ defaultBuilderArgs = mconcat
 
 defaultPackageArgs :: Args
 defaultPackageArgs = mconcat
-    [ compilerArgs
-    , directoryArgs ]
+    [ compilerPackageArgs
+    , directoryPackageArgs
+    , ghcPackageArgs
+    , ghcCabalPackageArgs
+    , hp2psPackageArgs
+    , runGhcPackageArgs ]

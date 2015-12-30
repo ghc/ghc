@@ -1,9 +1,13 @@
-module Settings.Packages.Compiler (compilerArgs) where
+module Settings.Packages.Compiler (compilerPackageArgs) where
 
+import Base
 import Expression
 import GHC (compiler)
-import Predicates (builder, package)
+import Predicates (builder, builderGhc, package)
 
-compilerArgs :: Args
-compilerArgs = package compiler ?
-    mconcat [ builder Alex ? arg "--latin1" ]
+compilerPackageArgs :: Args
+compilerPackageArgs = package compiler ? do
+    stage <- getStage
+    mconcat [ builder Alex ? arg "--latin1"
+
+            , builderGhc ? arg ("-I" ++ pkgPath compiler -/- stageString stage) ]
