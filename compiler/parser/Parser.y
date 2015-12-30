@@ -2863,9 +2863,9 @@ constructors with 'type' keyword.
 
 This ambiguity causes reduce/reduce conflicts in parser, which are always
 resolved in favour of variable constructors. To get rid of conflicts we demand
-that ambigous type constructors (those, which are formed by the same
+that ambiguous type constructors (those, which are formed by the same
 productions as variable constructors) are always prefixed with 'type' keyword.
-Unambigous type constructors may occur both with or without 'type' keyword.
+Unambiguous type constructors may occur both with or without 'type' keyword.
 -}
 
 qtyconop :: { Located RdrName } -- Qualified or unqualified

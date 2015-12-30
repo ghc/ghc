@@ -1953,7 +1953,7 @@ isGHCiMonad hsc_env ty
                 _ <- tcLookupInstance ghciClass [userTy]
                 return name
 
-            Just _  -> failWithTc $ text "Ambigous type!"
+            Just _  -> failWithTc $ text "Ambiguous type!"
             Nothing -> failWithTc $ text ("Can't find type:" ++ ty)
 
 -- tcRnExpr just finds the type of an expression
