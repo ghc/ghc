@@ -7,12 +7,14 @@ import Rules.Generate
 
 installTargets :: [FilePath]
 installTargets = [ "inplace/lib/template-hsc.h"
-                 , "inplace/lib/platformConstants" ]
+                 , "inplace/lib/platformConstants"
+                 , "inplace/lib/settings" ]
 
 installRules :: Rules ()
 installRules = do
     "inplace/lib/template-hsc.h"    <~ pkgPath hsc2hs
     "inplace/lib/platformConstants" <~ derivedConstantsPath
+    "inplace/lib/settings"          <~ "."
   where
     file <~ dir = file %> \out -> do
         let source = dir -/- takeFileName out
