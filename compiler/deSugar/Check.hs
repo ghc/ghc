@@ -1420,9 +1420,11 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) mPmResult
       vcat (map (ppr_eqn f kind) (take maximum_output qs)) $$ dots qs
 
     pprEqnsU qs = pp_context ctx (ptext (sLit "are non-exhaustive")) $ \_ ->
-      let us = map ppr_uncovered qs
-      in  hang (ptext (sLit "Patterns not matched:")) 4
-               (vcat (take maximum_output us) $$ dots us)
+      case qs of -- See #11245
+           [([],_)] -> ptext (sLit "Guards do not cover entire pattern space")
+           _missing -> let us = map ppr_uncovered qs
+                       in  hang (ptext (sLit "Patterns not matched:")) 4
+                                (vcat (take maximum_output us) $$ dots us)
 
 dots :: [a] -> SDoc
 dots qs | qs `lengthExceeds` maximum_output = ptext (sLit "...")
