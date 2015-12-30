@@ -399,7 +399,7 @@ For example, remembering that ``putStrLn :: String -> IO ()``:
 
 .. _ghci-stmts:
 
-Using ``do-``\ notation at the prompt
+Using ``do`` notation at the prompt
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. index::
