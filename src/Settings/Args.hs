@@ -16,11 +16,15 @@ import Settings.Builders.Happy
 import Settings.Builders.Hsc2Hs
 import Settings.Builders.HsCpp
 import Settings.Builders.Ld
+import Settings.Packages.Base
 import Settings.Packages.Compiler
 import Settings.Packages.Directory
 import Settings.Packages.Ghc
 import Settings.Packages.GhcCabal
+import Settings.Packages.GhcPrim
+import Settings.Packages.Haddock
 import Settings.Packages.Hp2ps
+import Settings.Packages.IntegerGmp
 import Settings.Packages.RunGhc
 import Settings.User
 
@@ -37,13 +41,12 @@ defaultBuilderArgs :: Args
 defaultBuilderArgs = mconcat
     [ alexArgs
     , arArgs
-    , cabalArgs
-    , customPackageArgs
     , deriveConstantsArgs
     , gccArgs
     , gccMArgs
     , genPrimopCodeArgs
     , ghcArgs
+    , ghcCabalArgs
     , ghcCabalHsColourArgs
     , ghcMArgs
     , ghcPkgArgs
@@ -55,9 +58,13 @@ defaultBuilderArgs = mconcat
 
 defaultPackageArgs :: Args
 defaultPackageArgs = mconcat
-    [ compilerPackageArgs
+    [ basePackageArgs
+    , compilerPackageArgs
     , directoryPackageArgs
     , ghcPackageArgs
     , ghcCabalPackageArgs
+    , ghcPrimPackageArgs
+    , haddockPackageArgs
     , hp2psPackageArgs
+    , integerGmpPackageArgs
     , runGhcPackageArgs ]

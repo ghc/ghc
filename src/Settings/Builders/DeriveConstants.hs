@@ -8,7 +8,6 @@ import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Predicates (builder, file)
 import Settings.Builders.Common
-import Settings.Builders.GhcCabal
 
 derivedConstantsPath :: FilePath
 derivedConstantsPath = "includes/dist-derivedconstants/header"
@@ -30,14 +29,14 @@ deriveConstantsArgs = builder DeriveConstants ? do
         , arg "--nm-program", arg =<< getBuilderPath Nm
         , specified Objdump ? mconcat [ arg "--objdump-program"
                                       , arg =<< getBuilderPath Objdump ]
-        , arg "--target-os", arg =<< getSetting TargetOs ]
+        , arg "--target-os", argSetting TargetOs ]
 
 includeCcArgs :: Args
 includeCcArgs = do
     confCcArgs <- lift . settingList $ ConfCcArgs Stage1
     mconcat
-        [ ccArgs
-        , ccWarnings
+        [ cArgs
+        , cWarnings
         , append confCcArgs
         , flag GhcUnregisterised ? arg "-DUSE_MINIINTERPRETER"
         , includesArgs

@@ -1,6 +1,5 @@
 module Settings.Builders.GhcCabal (
-    cabalArgs, ghcCabalHsColourArgs, bootPackageDbArgs,
-    customPackageArgs, ccArgs, cppArgs, ccWarnings, argStagedSettingList, needDll0
+    ghcCabalArgs, ghcCabalHsColourArgs, bootPackageDbArgs, cppArgs, needDll0
     ) where
 
 import Base
@@ -16,8 +15,8 @@ import Predicates hiding (stage)
 import Settings
 import Settings.Builders.Common
 
-cabalArgs :: Args
-cabalArgs = builder GhcCabal ? do
+ghcCabalArgs :: Args
+ghcCabalArgs = builder GhcCabal ? do
     path <- getPackagePath
     dir  <- getTargetDirectory
     mconcat [ arg "configure"
@@ -68,7 +67,7 @@ libraryArgs = do
 configureArgs :: Args
 configureArgs = do
     let conf key = appendSubD $ "--configure-option=" ++ key
-        cFlags   = mconcat [ ccArgs
+        cFlags   = mconcat [ cArgs
                            , remove ["-Werror"]
                            , argStagedSettingList ConfCcArgs ]
         ldFlags  = ldArgs  <> (argStagedSettingList ConfGccLinkerArgs)
@@ -97,80 +96,11 @@ packageConstraints = stage0 ? do
     constraints <- lift . readFileLines $ bootPackageConstraints
     append $ concat [ ["--constraint", c] | c <- constraints ]
 
--- TODO: should be in a different file
--- TODO: put all validating options together in one file
-ccArgs :: Args
-ccArgs = validating ? ccWarnings
-
--- TODO: should be in a different file
-ccWarnings :: Args
-ccWarnings = do
-    let gccGe46 = notM $ (flag GccIsClang ||^ flag GccLt46)
-    mconcat [ turnWarningsIntoErrors ? arg "-Werror"
-            , arg "-Wall"
-            , flag GccIsClang ? arg "-Wno-unknown-pragmas"
-            , gccGe46 ? notM windowsHost ? arg "-Werror=unused-but-set-variable"
-            , gccGe46 ? arg "-Wno-error=inline" ]
-
 ldArgs :: Args
 ldArgs = mempty
 
 cppArgs :: Args
 cppArgs = includesArgs
-
--- TODO: Is this needed?
--- ifeq "$(GMP_PREFER_FRAMEWORK)" "YES"
--- libraries/integer-gmp_CONFIGURE_OPTS += --with-gmp-framework-preferred
--- endif
-
--- TODO: move this somewhere
-customPackageArgs :: Args
-customPackageArgs = do
-    stage   <- getStage
-    rtsWays <- getRtsWays
-    mconcat
-        [ package integerGmp ?
-          mconcat [ windowsHost ? builder GhcCabal ?
-                    arg "--configure-option=--with-intree-gmp"
-                  , appendCcArgs ["-I" ++ pkgPath integerGmp -/- "gmp"] ]
-
-        , package base ?
-          builder GhcCabal ?
-          arg ("--flags=" ++ takeFileName (pkgPath integerLibrary))
-
-        , package ghcPrim ?
-          builder GhcCabal ? arg "--flag=include-ghc-prim"
-
-        , package compiler ?
-          builder GhcCabal ?
-          mconcat [ arg $ "--ghc-option=-DSTAGE=" ++ show (fromEnum stage + 1)
-                  , arg "--disable-library-for-ghci"
-                  , anyTargetOs ["openbsd"] ? arg "--ld-options=-E"
-                  , flag GhcUnregisterised ? arg "--ghc-option=-DNO_REGS"
-                  , notM ghcWithSMP ? arg "--ghc-option=-DNOSMP"
-                  , notM ghcWithSMP ? arg "--ghc-option=-optc-DNOSMP"
-                  , (threaded `elem` rtsWays) ?
-                    notStage0 ? arg "--ghc-option=-optc-DTHREADED_RTS"
-                  , ghcWithNativeCodeGen ? arg "--flags=ncg"
-                  , ghcWithInterpreter ?
-                    notStage0 ? arg "--flags=ghci"
-                  , ghcWithInterpreter ?
-                    ghcEnableTablesNextToCode ?
-                    notM (flag GhcUnregisterised) ?
-                    notStage0 ? arg "--ghc-option=-DGHCI_TABLES_NEXT_TO_CODE"
-                  , ghcWithInterpreter ?
-                    ghciWithDebugger ?
-                    notStage0 ? arg "--ghc-option=-DDEBUGGER"
-                  , ghcProfiled ?
-                    notStage0 ? arg "--ghc-pkg-option=--force" ]
-
-        , package ghc ?
-          builder GhcCabal ?
-          mconcat [ ghcWithInterpreter ?
-                    notStage0 ? arg "--flags=ghci" ]
-
-        , package haddock ?
-          builder GhcCabal ? append ["--flag", "in-ghc-tree"] ]
 
 withBuilderKey :: Builder -> String
 withBuilderKey b = case b of
@@ -194,30 +124,6 @@ with b = specified b ? do
 
 withStaged :: (Stage -> Builder) -> Args
 withStaged sb = (with . sb) =<< getStage
-
-argM :: Action String -> Args
-argM = (arg =<<) . lift
-
-argSetting :: Setting -> Args
-argSetting = argM . setting
-
-argSettingList :: SettingList -> Args
-argSettingList = (append =<<) . lift . settingList
-
-argStagedSettingList :: (Stage -> SettingList) -> Args
-argStagedSettingList ss = (argSettingList . ss) =<< getStage
-
-argStagedBuilderPath :: (Stage -> Builder) -> Args
-argStagedBuilderPath sb = (argM . builderPath . sb) =<< getStage
-
--- Pass arguments to Gcc and corresponding lists of sub-arguments of GhcCabal
--- TODO: simplify
-appendCcArgs :: [String] -> Args
-appendCcArgs xs = do
-    mconcat [ stagedBuilder Gcc  ? append xs
-            , stagedBuilder GccM ? append xs
-            , builder GhcCabal   ? appendSub "--configure-option=CFLAGS" xs
-            , builder GhcCabal   ? appendSub "--gcc-options" xs ]
 
 needDll0 :: Stage -> Package -> Action Bool
 needDll0 stage pkg = do

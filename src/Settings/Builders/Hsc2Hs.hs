@@ -8,8 +8,7 @@ import Expression
 import Oracles
 import Predicates (builder, stage0, notStage0)
 import Settings
-import Settings.Builders.GhcCabal hiding (cppArgs)
-import Settings.Builders.Common (cIncludeArgs)
+import Settings.Builders.Common
 
 templateHsc :: FilePath
 templateHsc = "inplace/lib/template-hsc.h"
@@ -52,14 +51,14 @@ getCFlags = fromDiffExpr $ do
     path      <- getTargetPath
     cppArgs   <- getPkgDataList CppArgs
     depCcArgs <- getPkgDataList DepCcArgs
-    mconcat [ ccArgs
+    mconcat [ cArgs
             , argStagedSettingList ConfCcArgs
             , remove ["-O"]
             , argStagedSettingList ConfCppArgs
             , cIncludeArgs
             , append cppArgs
             , append depCcArgs
-            , ccWarnings
+            , cWarnings
             , arg "-include", arg $ path -/- "build/autogen/cabal_macros.h" ]
 
 getLFlags :: Expr [String]

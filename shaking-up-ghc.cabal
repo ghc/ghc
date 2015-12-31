@@ -60,6 +60,7 @@ executable ghc-shake
                        , Settings.Builders.Alex
                        , Settings.Builders.Ar
                        , Settings.Builders.Common
+                       , Settings.Builders.DeriveConstants
                        , Settings.Builders.Gcc
                        , Settings.Builders.GenPrimopCode
                        , Settings.Builders.Ghc
@@ -71,11 +72,15 @@ executable ghc-shake
                        , Settings.Builders.HsCpp
                        , Settings.Builders.Ld
                        , Settings.Packages
+                       , Settings.Packages.Base
                        , Settings.Packages.Compiler
                        , Settings.Packages.Directory
                        , Settings.Packages.Ghc
                        , Settings.Packages.GhcCabal
+                       , Settings.Packages.GhcPrim
+                       , Settings.Packages.Haddock
                        , Settings.Packages.Hp2ps
+                       , Settings.Packages.IntegerGmp
                        , Settings.Packages.RunGhc
                        , Settings.TargetDirectory
                        , Settings.User
