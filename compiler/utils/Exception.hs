@@ -6,7 +6,6 @@ module Exception
     )
     where
 
-import Control.Applicative as A
 import Control.Exception
 import Control.Monad.IO.Class
 
@@ -29,7 +28,7 @@ tryIO = try
 -- implementations of 'gbracket' and 'gfinally' use 'gmask'
 -- thus rarely require overriding.
 --
-class (A.Applicative m, MonadIO m) => ExceptionMonad m where
+class MonadIO m => ExceptionMonad m where
 
   -- | Generalised version of 'Control.Exception.catch', allowing an arbitrary
   -- exception handling monad instead of just 'IO'.

@@ -103,7 +103,6 @@ instance Monad m => Applicative (EwM m) where
 instance Monad m => Monad (EwM m) where
     (EwM f) >>= k = EwM (\l e w -> do (e', w', r) <- f l e w
                                       unEwM (k r) l e' w')
-    return = pure
 
 runEwM :: EwM m a -> m (Errs, Warns, a)
 runEwM action = unEwM action (panic "processArgs: no arg yet") emptyBag emptyBag
@@ -151,7 +150,6 @@ instance Monad (CmdLineP s) where
                   let (a, s') = runCmdLine m s
                   in runCmdLine (k a) s'
 
-    return = pure
 
 getCmdLineState :: CmdLineP s s
 getCmdLineState   = CmdLineP $ \s -> (s,s)

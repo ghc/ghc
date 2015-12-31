@@ -374,7 +374,6 @@ instance Applicative UnifyResultM where
   (<*>) = ap
 
 instance Monad UnifyResultM where
-  return = pure
 
   SurelyApart  >>= _ = SurelyApart
   MaybeApart x >>= f = case f x of
@@ -908,7 +907,6 @@ instance Applicative UM where
       (<*>)  = ap
 
 instance Monad UM where
-  return   = pure
   fail _   = UM (\_ _ -> SurelyApart) -- failed pattern match
   m >>= k  = UM (\env state ->
                   do { (state', v) <- unUM m env state

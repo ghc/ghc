@@ -1517,7 +1517,6 @@ instance Applicative Validate where
     (<*>) = ap
 
 instance Monad Validate where
-   return = pure
    m >>= k = V $ do
       (a, es, ws) <- runValidate m
       (b, es', ws') <- runValidate (k a)

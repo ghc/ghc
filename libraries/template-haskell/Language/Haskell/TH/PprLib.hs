@@ -155,7 +155,6 @@ instance Applicative PprM where
       (<*>) = ap
 
 instance Monad PprM where
-    return = pure
     m >>= k  = PprM $ \s -> let (x, s') = runPprM m s
                             in runPprM (k x) s'
 

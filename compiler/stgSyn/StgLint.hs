@@ -315,7 +315,6 @@ instance Applicative LintM where
       (*>)  = thenL_
 
 instance Monad LintM where
-    return = pure
     (>>=) = thenL
     (>>)  = (*>)
 

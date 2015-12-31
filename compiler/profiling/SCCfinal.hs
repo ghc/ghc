@@ -233,7 +233,6 @@ instance Applicative MassageM where
       (*>) = thenMM_
 
 instance Monad MassageM where
-    return = pure
     (>>=) = thenMM
     (>>)  = (*>)
 

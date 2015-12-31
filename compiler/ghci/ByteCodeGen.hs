@@ -1684,7 +1684,6 @@ instance Applicative BcM where
 instance Monad BcM where
   (>>=) = thenBc
   (>>)  = (*>)
-  return = pure
 
 instance HasDynFlags BcM where
     getDynFlags = BcM $ \st -> return (st, hsc_dflags (bcm_hsc_env st))

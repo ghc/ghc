@@ -437,7 +437,7 @@ data TyCoMapper env m
       }
 
 {-# INLINABLE mapType #-}  -- See Note [Specialising mappers]
-mapType :: (Applicative m, Monad m) => TyCoMapper env m -> env -> Type -> m Type
+mapType :: Monad m => TyCoMapper env m -> env -> Type -> m Type
 mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
                            , tcm_tybinder = tybinder })
         env ty
@@ -460,7 +460,7 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
       | otherwise = (TyConApp,   AppTy,   CastTy,   ForAllTy . Anon)
 
 {-# INLINABLE mapCoercion #-}  -- See Note [Specialising mappers]
-mapCoercion :: (Applicative m, Monad m)
+mapCoercion :: Monad m
             => TyCoMapper env m -> env -> Coercion -> m Coercion
 mapCoercion mapper@(TyCoMapper { tcm_smart = smart, tcm_covar = covar
                                , tcm_hole = cohole, tcm_tybinder = tybinder })

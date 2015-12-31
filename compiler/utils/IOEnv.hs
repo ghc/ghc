@@ -62,7 +62,6 @@ unIOEnv (IOEnv m) = m
 instance Monad (IOEnv m) where
     (>>=)  = thenM
     (>>)   = (*>)
-    return = pure
     fail _ = failM -- Ignore the string
 
 #if __GLASGOW_HASKELL__ > 710

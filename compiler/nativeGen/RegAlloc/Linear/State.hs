@@ -57,7 +57,6 @@ instance Applicative (RegM freeRegs) where
 
 instance Monad (RegM freeRegs) where
   m >>= k   =  RegM $ \s -> case unReg m s of { (# s, a #) -> unReg (k a) s }
-  return    =  pure
 
 instance HasDynFlags (RegM a) where
     getDynFlags = RegM $ \s -> (# s, ra_DynFlags s #)

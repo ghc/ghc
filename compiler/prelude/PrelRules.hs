@@ -645,7 +645,6 @@ instance Applicative RuleM where
     (<*>) = ap
 
 instance Monad RuleM where
-  return = pure
   RuleM f >>= g = RuleM $ \dflags iu e -> case f dflags iu e of
     Nothing -> Nothing
     Just r -> runRuleM (g r) dflags iu e

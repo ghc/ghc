@@ -46,7 +46,6 @@ instance Monad m => Applicative (Stream m a) where
   (<*>) = ap
 
 instance Monad m => Monad (Stream m a) where
-  return = pure
 
   Stream m >>= k = Stream $ do
                 r <- m

@@ -52,7 +52,7 @@ import Numeric.Natural
 --
 -----------------------------------------------------
 
-class (Applicative m, Monad m) => Quasi m where
+class Monad m => Quasi m where
   qNewName :: String -> m Name
         -- ^ Fresh names
 
@@ -170,7 +170,6 @@ runQ (Q m) = m
 instance Monad Q where
   Q m >>= k  = Q (m >>= \x -> unQ (k x))
   (>>) = (*>)
-  return     = pure
   fail s     = report True s >> Q (fail "Q monad failure")
 
 instance Functor Q where

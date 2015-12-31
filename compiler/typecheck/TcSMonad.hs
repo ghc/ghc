@@ -2246,7 +2246,6 @@ instance Applicative TcS where
   (<*>) = ap
 
 instance Monad TcS where
-  return = pure
   fail err  = TcS (\_ -> fail err)
   m >>= k   = TcS (\ebs -> unTcS m ebs >>= \r -> unTcS (k r) ebs)
 

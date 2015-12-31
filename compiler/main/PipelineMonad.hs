@@ -31,7 +31,6 @@ instance Applicative CompPipeline where
     (<*>) = ap
 
 instance Monad CompPipeline where
-  return = pure
   P m >>= k = P $ \env state -> do (state',a) <- m env state
                                    unP (k a) env state'
 

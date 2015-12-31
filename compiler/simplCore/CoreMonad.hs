@@ -88,8 +88,8 @@ import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Word
-import qualified Control.Applicative as A
 import Control.Monad
+import Control.Applicative ( Alternative(..) )
 
 import Prelude hiding   ( read )
 
@@ -557,7 +557,6 @@ instance Functor CoreM where
     fmap = liftM
 
 instance Monad CoreM where
-    return = pure
     mx >>= f = CoreM $ \s -> do
             (x, s', w1) <- unCoreM mx s
             (y, s'', w2) <- unCoreM (f x) s'
@@ -566,12 +565,12 @@ instance Monad CoreM where
             -- forcing w before building the tuple avoids a space leak
             -- (Trac #7702)
 
-instance A.Applicative CoreM where
+instance Applicative CoreM where
     pure x = CoreM $ \s -> nop s x
     (<*>) = ap
     m *> k = m >>= \_ -> k
 
-instance MonadPlus IO => A.Alternative CoreM where
+instance MonadPlus IO => Alternative CoreM where
     empty = mzero
     (<|>) = mplus
 

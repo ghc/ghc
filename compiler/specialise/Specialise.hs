@@ -2091,7 +2091,6 @@ instance Monad SpecM where
                                case f y of
                                    SpecM z ->
                                        z
-    return = pure
     fail str = SpecM $ fail str
 
 #if __GLASGOW_HASKELL__ > 710

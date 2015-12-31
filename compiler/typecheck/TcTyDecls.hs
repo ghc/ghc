@@ -788,7 +788,6 @@ instance Applicative RoleM where
     (<*>) = ap
 
 instance Monad RoleM where
-  return   = pure
   a >>= f  = RM $ \m_info vps nvps state ->
                   let (a', state') = unRM a m_info vps nvps state in
                   unRM (f a') m_info vps nvps state'

@@ -17,7 +17,6 @@ module Maybes (
         MaybeT(..), liftMaybeT
     ) where
 
-import Control.Applicative as A
 import Control.Monad
 import Control.Monad.Trans.Maybe
 import Data.Maybe
@@ -84,7 +83,6 @@ instance Applicative (MaybeErr err) where
   (<*>) = ap
 
 instance Monad (MaybeErr err) where
-  return = A.pure
   Succeeded v >>= k = k v
   Failed e    >>= _ = Failed e
 

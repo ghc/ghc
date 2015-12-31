@@ -994,7 +994,6 @@ instance Applicative LneM where
     (<*>) = ap
 
 instance Monad LneM where
-    return = pure
     (>>=)  = thenLne
 
 instance MonadFix LneM where

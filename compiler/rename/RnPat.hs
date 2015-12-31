@@ -107,7 +107,6 @@ instance Applicative CpsRn where
     (<*>) = ap
 
 instance Monad CpsRn where
-  return = pure
   (CpsRn m) >>= mk = CpsRn (\k -> m (\v -> unCpsRn (mk v) k))
 
 runCps :: CpsRn a -> RnM (a, FreeVars)

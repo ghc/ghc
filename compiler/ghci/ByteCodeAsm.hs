@@ -170,7 +170,6 @@ instance Applicative Assembler where
     (<*>) = ap
 
 instance Monad Assembler where
-  return = pure
   NullAsm x >>= f = f x
   AllocPtr p k >>= f = AllocPtr p (k >=> f)
   AllocLit l k >>= f = AllocLit l (k >=> f)

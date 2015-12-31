@@ -228,7 +228,6 @@ instance Applicative Hsc where
     (<*>) = ap
 
 instance Monad Hsc where
-    return = pure
     Hsc m >>= k = Hsc $ \e w -> do (a, w1) <- m e w
                                    case k a of
                                        Hsc k' -> k' e w1

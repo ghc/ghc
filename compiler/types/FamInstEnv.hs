@@ -1378,7 +1378,6 @@ withLC :: LiftingContext -> NormM a -> NormM a
 withLC lc thing = NormM $ \ envs _old_lc r -> runNormM thing envs lc r
 
 instance Monad NormM where
-  return     = pure
   ma >>= fmb = NormM $ \env lc r ->
                let a = runNormM ma env lc r in
                runNormM (fmb a) env lc r

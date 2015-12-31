@@ -2903,7 +2903,6 @@ instance Applicative TcPluginM where
   (<*>) = ap
 
 instance Monad TcPluginM where
-  return = pure
   fail x   = TcPluginM (const $ fail x)
   TcPluginM m >>= k =
     TcPluginM (\ ev -> do a <- m ev

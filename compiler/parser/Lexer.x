@@ -1783,7 +1783,6 @@ instance Applicative P where
   (<*>) = ap
 
 instance Monad P where
-  return = pure
   (>>=) = thenP
   fail = failP
 

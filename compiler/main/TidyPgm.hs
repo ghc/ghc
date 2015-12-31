@@ -775,7 +775,6 @@ instance Applicative DFFV where
     (<*>) = ap
 
 instance Monad DFFV where
-  return = pure
   (DFFV m) >>= k = DFFV $ \env st ->
     case m env st of
        (st',a) -> case k a of

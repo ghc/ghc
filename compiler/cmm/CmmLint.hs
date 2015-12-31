@@ -222,7 +222,6 @@ instance Monad CmmLint where
                                 case m dflags of
                                 Left e -> Left e
                                 Right a -> unCL (k a) dflags
-  return = pure
 
 instance HasDynFlags CmmLint where
     getDynFlags = CmmLint (\dflags -> Right dflags)

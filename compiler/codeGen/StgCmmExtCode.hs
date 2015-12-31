@@ -89,7 +89,6 @@ instance Applicative CmmParse where
 
 instance Monad CmmParse where
   (>>=) = thenExtFC
-  return = pure
 
 instance HasDynFlags CmmParse where
     getDynFlags = EC (\_ _ d -> do dflags <- getDynFlags

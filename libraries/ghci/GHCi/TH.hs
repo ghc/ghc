@@ -72,7 +72,6 @@ instance Monad GHCiQ where
     do (m', s')  <- runGHCiQ m s
        (a,  s'') <- runGHCiQ (f m') s'
        return (a, s'')
-  return    = pure
   fail err  = GHCiQ $ \s -> throwIO (GHCiQException s err)
 
 getState :: GHCiQ QState

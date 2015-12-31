@@ -51,7 +51,6 @@ newtype VM a
   = VM { runVM :: Builtins -> GlobalEnv -> LocalEnv -> DsM (VResult a) }
 
 instance Monad VM where
-  return = pure
   VM p >>= f = VM $ \bi genv lenv -> do
                                        r <- p bi genv lenv
                                        case r of

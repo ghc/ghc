@@ -218,7 +218,6 @@ instance Applicative LlvmM where
     (<*>) = ap
 
 instance Monad LlvmM where
-    return = pure
     m >>= f  = LlvmM $ \env -> do (x, env') <- runLlvmM m env
                                   runLlvmM (f x) env'
 

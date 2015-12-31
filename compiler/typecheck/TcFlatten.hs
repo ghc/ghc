@@ -526,7 +526,6 @@ newtype FlatM a
   = FlatM { runFlatM :: FlattenEnv -> TcS a }
 
 instance Monad FlatM where
-  return = pure
   m >>= k  = FlatM $ \env ->
              do { a  <- runFlatM m env
                 ; runFlatM (k a) env }

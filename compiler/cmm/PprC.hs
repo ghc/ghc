@@ -1008,7 +1008,6 @@ instance Applicative TE where
 
 instance Monad TE where
    TE m >>= k  = TE $ \s -> case m s of (a, s') -> unTE (k a) s'
-   return = pure
 
 te_lbl :: CLabel -> TE ()
 te_lbl lbl = TE $ \(temps,lbls) -> ((), (temps, Map.insert lbl () lbls))

@@ -127,7 +127,6 @@ splitUniqSupply4 us = (us1, us2, us3, us4)
 newtype UniqSM result = USM { unUSM :: UniqSupply -> (# result, UniqSupply #) }
 
 instance Monad UniqSM where
-  return = pure
   (>>=) = thenUs
   (>>)  = (*>)
 

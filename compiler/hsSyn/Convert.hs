@@ -87,7 +87,6 @@ instance Applicative CvtM where
     (<*>) = ap
 
 instance Monad CvtM where
-  return = pure
   (CvtM m) >>= k = CvtM $ \loc -> case m loc of
                                   Left err -> Left err
                                   Right (loc',v) -> unCvtM (k v) loc'

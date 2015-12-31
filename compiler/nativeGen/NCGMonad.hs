@@ -94,7 +94,6 @@ instance Applicative NatM where
 
 instance Monad NatM where
   (>>=) = thenNat
-  return = pure
 
 
 thenNat :: NatM a -> (a -> NatM b) -> NatM b

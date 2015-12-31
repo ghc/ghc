@@ -983,7 +983,6 @@ instance Applicative CmmOptM where
     (<*>) = ap
 
 instance Monad CmmOptM where
-  return = pure
   (CmmOptM f) >>= g =
     CmmOptM $ \dflags this_mod imports ->
                 case f dflags this_mod imports of

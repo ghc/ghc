@@ -1433,7 +1433,6 @@ instance Applicative OccCheckResult where
       (<*>) = ap
 
 instance Monad OccCheckResult where
-  return            = pure
   OC_OK x     >>= k = k x
   OC_Forall   >>= _ = OC_Forall
   OC_NonTyVar >>= _ = OC_NonTyVar
