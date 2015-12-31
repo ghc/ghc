@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Stage (Stage (..), stageString) where
 
-import Base
+import Development.Shake.Classes
 import GHC.Generics (Generic)
 
 -- TODO: explain stages

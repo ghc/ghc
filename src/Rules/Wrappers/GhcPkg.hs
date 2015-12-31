@@ -12,8 +12,9 @@ import Oracles
 ghcPkgWrapper :: FilePath -> Expr String
 ghcPkgWrapper program = do
     lift $ need [sourcePath -/- "Rules/Wrappers/GhcPkg.hs"]
-    top <- getSetting GhcSourcePath
-    let pkgConf = top -/- "inplace" -/- "lib" -/- "package.conf.d"
+    top   <- getSetting GhcSourcePath
+    stage <- getStage
+    let pkgConf = top -/- packageConfiguration stage
     return $ unlines
         [ "#!/bin/bash"
         , "exec " ++ (top -/- program)

@@ -16,7 +16,7 @@ module Base (
     -- * Paths
     shakeFilesPath, configPath, sourcePath, programInplacePath,
     bootPackageConstraints, packageDependencies,
-    bootstrappingConf, bootstrappingConfInitialised,
+    packageConfiguration, packageConfigurationInitialised,
 
     -- * Output
     putColoured, putOracle, putBuild, putSuccess, putError, renderBox,
@@ -40,6 +40,9 @@ import Development.Shake.FilePath
 import System.Console.ANSI
 import qualified System.Directory as IO
 import System.IO
+
+-- TODO: reexport Stage, etc.?
+import Stage
 
 -- Build system files and paths
 shakePath :: FilePath
@@ -65,11 +68,13 @@ bootPackageConstraints = shakeFilesPath -/- "boot-package-constraints"
 packageDependencies :: FilePath
 packageDependencies = shakeFilesPath -/- "package-dependencies"
 
-bootstrappingConf :: FilePath
-bootstrappingConf = "libraries/bootstrapping.conf"
+packageConfiguration :: Stage -> FilePath
+packageConfiguration Stage0 = "libraries/bootstrapping.conf"
+packageConfiguration _      = "inplace/lib/package.conf.d"
 
-bootstrappingConfInitialised :: FilePath
-bootstrappingConfInitialised = shakeFilesPath -/- "bootstrapping-conf-initialised"
+packageConfigurationInitialised :: Stage -> FilePath
+packageConfigurationInitialised stage =
+    shakeFilesPath -/- "package-configuration-initialised-" ++ stageString stage
 
 -- Utility functions
 -- | Find and replace all occurrences of a value in a list

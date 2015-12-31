@@ -85,11 +85,13 @@ configureArgs = do
         , conf "--with-cc" $ argStagedBuilderPath Gcc ]
 
 bootPackageDbArgs :: Args
-bootPackageDbArgs = stage0 ? do
-    path <- getSetting GhcSourcePath
-    lift $ need [bootstrappingConfInitialised]
-    prefix <- ifM builderGhc (return "-package-db ") (return "--package-db=")
-    arg $ prefix ++ path -/- bootstrappingConf
+bootPackageDbArgs = do
+    stage <- getStage
+    lift $ need [packageConfigurationInitialised stage]
+    stage0 ? do
+        path <- getSetting GhcSourcePath
+        prefix <- ifM builderGhc (return "-package-db ") (return "--package-db=")
+        arg $ prefix ++ path -/- packageConfiguration Stage0
 
 packageConstraints :: Args
 packageConstraints = stage0 ? do
