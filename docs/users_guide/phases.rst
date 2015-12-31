@@ -328,8 +328,8 @@ defined by your local GHC installation, the following trick is useful:
     .. index::
        single: __GLASGOW_HASKELL_TH__
 
-    This is set to ``YES`` when the compiler supports Template Haskell,
-    and to ``NO`` when not. The latter is the case for a stage-1
+    This is set to ``1`` when the compiler supports Template Haskell,
+    and to ``0`` when not. The latter is the case for a stage-1
     compiler during bootstrapping, or on architectures where the
     interpreter is not available.
 
