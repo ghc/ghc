@@ -42,7 +42,7 @@ cabalRules = do
     -- When the file exists, the packageConfiguration has been initialised
     -- TODO: get rid of an extra file?
 
-    forM_ [Stage0 ..] $ \stage ->
+    forM_ [Stage0, Stage1] $ \stage ->
         packageConfigurationInitialised stage %> \out -> do
             let target  = PartialTarget stage cabal
                 pkgConf = packageConfiguration stage

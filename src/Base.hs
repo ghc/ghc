@@ -72,9 +72,11 @@ packageConfiguration :: Stage -> FilePath
 packageConfiguration Stage0 = "libraries/bootstrapping.conf"
 packageConfiguration _      = "inplace/lib/package.conf.d"
 
+-- StageN, N > 0, share the same packageConfiguration (see above)
 packageConfigurationInitialised :: Stage -> FilePath
 packageConfigurationInitialised stage =
-    shakeFilesPath -/- "package-configuration-initialised-" ++ stageString stage
+    shakeFilesPath -/- "package-configuration-initialised-"
+    ++ stageString (min stage Stage1)
 
 -- Utility functions
 -- | Find and replace all occurrences of a value in a list
