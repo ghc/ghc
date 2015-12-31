@@ -2001,30 +2001,30 @@ doCpp dflags raw input_fn output_fn = do
                       | otherwise = SysTools.runCc dflags (SysTools.Option "-E" : args)
 
     let target_defs =
-          [ "-D" ++ HOST_OS     ++ "_BUILD_OS=1",
-            "-D" ++ HOST_ARCH   ++ "_BUILD_ARCH=1",
-            "-D" ++ TARGET_OS   ++ "_HOST_OS=1",
-            "-D" ++ TARGET_ARCH ++ "_HOST_ARCH=1" ]
+          [ "-D" ++ HOST_OS     ++ "_BUILD_OS",
+            "-D" ++ HOST_ARCH   ++ "_BUILD_ARCH",
+            "-D" ++ TARGET_OS   ++ "_HOST_OS",
+            "-D" ++ TARGET_ARCH ++ "_HOST_ARCH" ]
         -- remember, in code we *compile*, the HOST is the same our TARGET,
         -- and BUILD is the same as our HOST.
 
     let sse_defs =
-          [ "-D__SSE__=1"    | isSseEnabled    dflags ] ++
-          [ "-D__SSE2__=1"   | isSse2Enabled   dflags ] ++
-          [ "-D__SSE4_2__=1" | isSse4_2Enabled dflags ]
+          [ "-D__SSE__"      | isSseEnabled      dflags ] ++
+          [ "-D__SSE2__"     | isSse2Enabled     dflags ] ++
+          [ "-D__SSE4_2__"   | isSse4_2Enabled   dflags ]
 
     let avx_defs =
-          [ "-D__AVX__=1"  | isAvxEnabled  dflags ] ++
-          [ "-D__AVX2__=1" | isAvx2Enabled dflags ] ++
-          [ "-D__AVX512CD__=1" | isAvx512cdEnabled dflags ] ++
-          [ "-D__AVX512ER__=1" | isAvx512erEnabled dflags ] ++
-          [ "-D__AVX512F__=1"  | isAvx512fEnabled  dflags ] ++
-          [ "-D__AVX512PF__=1" | isAvx512pfEnabled dflags ]
+          [ "-D__AVX__"      | isAvxEnabled      dflags ] ++
+          [ "-D__AVX2__"     | isAvx2Enabled     dflags ] ++
+          [ "-D__AVX512CD__" | isAvx512cdEnabled dflags ] ++
+          [ "-D__AVX512ER__" | isAvx512erEnabled dflags ] ++
+          [ "-D__AVX512F__"  | isAvx512fEnabled  dflags ] ++
+          [ "-D__AVX512PF__" | isAvx512pfEnabled dflags ]
 
     backend_defs <- getBackendDefs dflags
 
 #ifdef GHCI
-    let th_defs = [ "-D__GLASGOW_HASKELL_TH__=1" ]
+    let th_defs = [ "-D__GLASGOW_HASKELL_TH__" ]
 #else
     let th_defs = [ "-D__GLASGOW_HASKELL_TH__=0" ]
 #endif
