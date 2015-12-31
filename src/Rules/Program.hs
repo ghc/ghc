@@ -29,6 +29,11 @@ buildProgram _ target @ (PartialTarget stage pkg) = do
     let match file = case programPath stage pkg of
             Nothing      -> False
             Just program -> program == file
+        matchWrapped file = case programPath stage pkg of
+            Nothing      -> False
+            Just program -> case computeWrappedPath program of
+                Nothing             -> False
+                Just wrappedProgram -> wrappedProgram == file
 
     match ?> \bin -> do
         windows <- windowsHost
@@ -37,15 +42,16 @@ buildProgram _ target @ (PartialTarget stage pkg) = do
         else case find ((== target) . fst) wrappers of
             Nothing -> buildBinary target bin -- No wrapper found
             Just (_, wrapper) -> do
-                wrappedBin <- moveToLib bin
-                buildBinary target wrappedBin
+                let Just wrappedBin = computeWrappedPath bin
+                need [wrappedBin]
                 buildWrapper target wrapper bin wrappedBin
 
+    matchWrapped ?> \bin -> buildBinary target bin
+
 -- Replace programInplacePath with programInplaceLibPath in a given path
-moveToLib :: FilePath -> Action FilePath
-moveToLib path = case stripPrefix programInplacePath path of
-    Just suffix -> return $ programInplaceLibPath ++ suffix
-    Nothing     -> putError $ "moveToLib: cannot move " ++ path
+computeWrappedPath :: FilePath -> Maybe FilePath
+computeWrappedPath =
+    fmap (programInplaceLibPath ++) . stripPrefix programInplacePath
 
 buildWrapper :: PartialTarget -> Wrapper -> FilePath -> FilePath -> Action ()
 buildWrapper target @ (PartialTarget stage pkg) wrapper wrapperPath binPath = do
