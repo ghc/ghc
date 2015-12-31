@@ -14,7 +14,13 @@ This is supposed to go into the `shake-build` directory of the GHC source tree.
 Trying it
 ---------
 
-### Linux
+Please see the [Preparation][ghc-preparation] on the haskell wiki
+for general preparation. The preparation steps for the `shake` build system are
+identical to those for the `make` build system. This means that you don't need
+to adjust anything if you are already familiar with building ghc using the `make`
+build system.
+
+### Linux / Mac OS X
 
 ```bash
 git clone git://git.haskell.org/ghc
@@ -23,6 +29,9 @@ git submodule update --init
 git clone git://github.com/snowleopard/shaking-up-ghc shake-build
 ./boot
 ./configure
+# or if you want to use clang (e.g. building on OS X)
+./configure --with-gcc=$(which clang) # See #26
+
 ```
 
 Now you have a couple of options:
@@ -46,20 +55,6 @@ shake-build/build.bat
 ```
 Also see the [Building GHC on Windows guide][ghc-windows-building-guide].
 
-### Mac OS X
-
-```bash
-git clone git://git.haskell.org/ghc
-cd ghc
-git submodule update --init
-git clone git://github.com/snowleopard/shaking-up-ghc shake-build
-./boot
-./configure --with-gcc=$(which clang) # See #26
-./shake-build/build.sh
-```
-
-See the Linux section for running in a Cabal sandbox.
-
 ### Resetting the build
 
 To reset the new build system run the build script with `-B` flag. This will force Shake to rerun all rules, even if the results of the previous build are still in the GHC tree. This is a temporary solution; we are working on a proper reset functionality (see [#32](https://github.com/snowleopard/shaking-up-ghc/issues/32)).
@@ -76,10 +71,8 @@ documentation is currently non-existent, but we will start addressing this
 once the codebase stabilises.
 
 
-
-
-
 [ghc-shake-wiki]: https://ghc.haskell.org/trac/ghc/wiki/Building/Shake
+[ghc-preparation]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation
 [ghc-windows-building-guide]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Windows
 [ghc]: https://en.wikipedia.org/wiki/Glasgow_Haskell_Compiler
 [shake-blog-post]: https://blogs.ncl.ac.uk/andreymokhov/shaking-up-ghc
