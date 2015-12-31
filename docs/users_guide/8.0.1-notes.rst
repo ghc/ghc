@@ -288,6 +288,11 @@ Template Haskell
    without interpreter support). Also, ``-XTemplateHaskellQuotes`` is
    considered safe under Safe Haskell.
 
+-  The ``__GLASGOW_HASKELL_TH__`` CPP constant denoting support for
+   ``-XTemplateHaskell`` introduced in GHC 7.10.1 has been changed to
+   use the values ``1``/``0`` instead of the previous ``YES``/``NO``
+   values.
+
 -  Partial type signatures can now be used in splices, see
    :ref:`pts-where`.
 
