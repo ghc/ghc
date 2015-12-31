@@ -10,6 +10,7 @@ import Rules.Actions
 import Rules.Library
 import Rules.Resources
 import Rules.Wrappers.Ghc
+import Rules.Wrappers.GhcPkg
 import Settings
 import Settings.Builders.GhcCabal
 
@@ -22,7 +23,8 @@ type Wrapper = FilePath -> Expr String
 
 -- List of wrappers we build
 wrappers :: [(PartialTarget, Wrapper)]
-wrappers = [(PartialTarget Stage0 ghc, ghcWrapper)]
+wrappers = [ (PartialTarget Stage0 ghc, ghcWrapper)
+           , (PartialTarget Stage0 ghcPkg, ghcPkgWrapper)]
 
 buildProgram :: Resources -> PartialTarget -> Rules ()
 buildProgram _ target @ (PartialTarget stage pkg) = do
