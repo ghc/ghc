@@ -61,9 +61,6 @@ import VarEnv
 import State
 import Util
 import Var
-#if __GLASGOW_HASKELL__ < 709
-import MonadUtils
-#endif
 import Outputable
 import Lexeme
 import FastString

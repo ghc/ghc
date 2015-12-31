@@ -117,9 +117,6 @@ import Data.List        hiding (group)
 
 import GHC.Exts
 
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative (Applicative)
-#endif
 import Control.Applicative ( liftA2 )
 import Control.Monad    ( liftM )
 import GHC.IO.Encoding (mkTextEncoding, textEncodingName)

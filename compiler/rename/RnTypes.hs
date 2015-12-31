@@ -58,10 +58,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import Data.List        ( (\\), nubBy, partition )
 import Control.Monad    ( unless, when )
 
-#if __GLASGOW_HASKELL__ < 709
-import Data.Monoid      ( mappend, mempty, mconcat )
-#endif
-
 #include "HsVersions.h"
 
 {-

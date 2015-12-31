@@ -47,10 +47,6 @@ import MkCore
 
 import Control.Monad
 
-#if __GLASGOW_HASKELL__ < 709
-import Data.Traversable ( traverse )
-#endif
-
 #include "HsVersions.h"
 
 {-

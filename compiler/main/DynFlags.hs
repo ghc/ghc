@@ -182,9 +182,7 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 import Control.Monad.Trans.Reader
-#if MIN_VERSION_transformers(0,4,0)
 import Control.Monad.Trans.Except
-#endif
 import Control.Exception (throwIO)
 
 import Data.Bits
@@ -195,7 +193,6 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Monoid (Monoid)
 import Data.Word
 import System.FilePath
 import System.Directory
@@ -850,10 +847,8 @@ instance (Monad m, HasDynFlags m) => HasDynFlags (ReaderT a m) where
 instance (Monad m, HasDynFlags m) => HasDynFlags (MaybeT m) where
     getDynFlags = lift getDynFlags
 
-#if MIN_VERSION_transformers(0,4,0)
 instance (Monad m, HasDynFlags m) => HasDynFlags (ExceptT e m) where
     getDynFlags = lift getDynFlags
-#endif
 
 class ContainsDynFlags t where
     extractDynFlags :: t -> DynFlags

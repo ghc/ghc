@@ -77,9 +77,6 @@ import Data.Char ( toUpper )
 import Data.List as List
 import Data.Map (Map)
 import Data.Set (Set)
-#if __GLASGOW_HASKELL__ < 709
-import Data.Monoid hiding ((<>))
-#endif
 #if __GLASGOW_HASKELL__ > 710
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup

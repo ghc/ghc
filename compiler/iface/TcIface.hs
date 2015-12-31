@@ -72,9 +72,6 @@ import ListSetOps
 import Data.List
 import Control.Monad
 import qualified Data.Map as Map
-#if __GLASGOW_HASKELL__ < 709
-import Data.Traversable ( traverse )
-#endif
 
 {-
 This module takes

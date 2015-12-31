@@ -41,9 +41,6 @@ import Control.Monad
 #if __GLASGOW_HASKELL__ > 710
 import qualified Control.Monad.Fail as MonadFail
 #endif
-#if __GLASGOW_HASKELL__ < 709
-import Data.Traversable ( traverse )
-#endif
 import Control.Applicative hiding ( empty )
 import qualified Control.Applicative
 

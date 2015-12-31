@@ -39,9 +39,6 @@ import Type (mkTyConApp)
 import Data.Function (on)
 import qualified Data.Data as Data
 import qualified Data.Typeable
-#if __GLASGOW_HASKELL__ <= 708
-import Control.Applicative ((<$>))
-#endif
 
 {-
 ************************************************************************

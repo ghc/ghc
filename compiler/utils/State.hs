@@ -1,10 +1,6 @@
-{-# LANGUAGE UnboxedTuples, CPP #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 module State where
-
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative
-#endif
 
 newtype State s a = State { runState' :: s -> (# a, s #) }
 

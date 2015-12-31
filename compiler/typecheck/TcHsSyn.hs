@@ -58,9 +58,6 @@ import Outputable
 import Util
 import qualified GHC.LanguageExtensions as LangExt
 
-#if __GLASGOW_HASKELL__ < 709
-import Data.Traversable ( traverse )
-#endif
 import Control.Monad
 import Data.List  ( partition )
 

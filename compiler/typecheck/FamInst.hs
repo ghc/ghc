@@ -44,11 +44,6 @@ import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-#if __GLASGOW_HASKELL__ < 709
-import Prelude hiding ( and )
-import Data.Foldable ( and )
-#endif
-
 #include "HsVersions.h"
 
 {-

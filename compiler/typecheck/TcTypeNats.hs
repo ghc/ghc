@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, CPP #-}
+{-# LANGUAGE LambdaCase #-}
 
 module TcTypeNats
   ( typeNatTyCons
@@ -37,10 +37,6 @@ import PrelNames  ( gHC_TYPELITS
 import FastString ( FastString, fsLit )
 import qualified Data.Map as Map
 import Data.Maybe ( isJust )
-
-#if __GLASGOW_HASKELL__ < 709
-import Data.Traversable ( traverse )
-#endif
 
 {-------------------------------------------------------------------------------
 Built-in type constructors for functions on type-level nats

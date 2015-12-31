@@ -6,7 +6,6 @@
 This module converts Template Haskell syntax into HsSyn
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
@@ -39,9 +38,6 @@ import MonadUtils ( foldrM )
 
 import qualified Data.ByteString as BS
 import Control.Monad( unless, liftM, ap )
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative (Applicative(..))
-#endif
 
 import Data.Char ( chr )
 import Data.Word ( Word8 )

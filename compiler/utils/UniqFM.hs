@@ -81,9 +81,6 @@ import qualified Data.Foldable as Foldable
 import qualified Data.Traversable as Traversable
 import Data.Typeable
 import Data.Data
-#if __GLASGOW_HASKELL__ < 709
-import Data.Monoid
-#endif
 #if __GLASGOW_HASKELL__ > 710
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup

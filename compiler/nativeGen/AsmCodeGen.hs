@@ -84,9 +84,6 @@ import Data.List
 import Data.Maybe
 import Data.Ord         ( comparing )
 import Control.Exception
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative (Applicative(..))
-#endif
 import Control.Monad
 import System.IO
 

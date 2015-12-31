@@ -30,9 +30,6 @@ module Language.Haskell.TH.Syntax
     ) where
 
 import Data.Data hiding (Fixity(..))
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative( Applicative(..) )
-#endif
 import Data.IORef
 import System.IO.Unsafe ( unsafePerformIO )
 import Control.Monad (liftM)

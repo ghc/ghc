@@ -34,10 +34,6 @@ import Util
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 
-#if MIN_VERSION_base(4,8,0)
-#else
-import Data.Monoid ( Monoid, mappend, mempty )
-#endif
 #if __GLASGOW_HASKELL__ > 710
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup

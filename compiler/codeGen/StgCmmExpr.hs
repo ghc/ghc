@@ -50,9 +50,7 @@ import Outputable
 import Control.Monad (unless,void)
 import Control.Arrow (first)
 
-#if __GLASGOW_HASKELL__ >= 709
 import Prelude hiding ((<*>))
-#endif
 
 ------------------------------------------------------------------------
 --              cgExpr: the main function

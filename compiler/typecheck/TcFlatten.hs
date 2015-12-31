@@ -31,9 +31,6 @@ import Control.Monad
 import MonadUtils ( zipWithAndUnzipM )
 import GHC.Exts ( inline )
 
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative ( Applicative(..), (<$>) )
-#endif
 import Control.Arrow ( first )
 
 {-

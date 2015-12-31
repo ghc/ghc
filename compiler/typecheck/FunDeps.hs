@@ -39,12 +39,6 @@ import Data.List        ( nubBy )
 import Data.Maybe
 import Data.Foldable    ( fold )
 
-#if __GLASGOW_HASKELL__ < 709
-import Prelude hiding ( and )
-import Control.Applicative ( (<$>) )
-import Data.Foldable       ( and )
-#endif
-
 {-
 ************************************************************************
 *                                                                      *

@@ -13,7 +13,6 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 
 module HsBinds where
@@ -44,11 +43,6 @@ import Data.Data hiding ( Fixity )
 import Data.List hiding ( foldr )
 import Data.Ord
 import Data.Foldable ( Foldable(..) )
-#if __GLASGOW_HASKELL__ < 709
-import Data.Traversable ( Traversable(..) )
-import Data.Monoid ( mappend )
-import Control.Applicative hiding (empty)
-#endif
 
 {-
 ************************************************************************
@@ -1029,8 +1023,6 @@ instance Foldable HsPatSynDetails where
     foldr1 f (RecordPatSyn args) =
       Data.List.foldr1 f (map (Data.Foldable.foldr1 f) args)
 
--- TODO: After a few more versions, we should probably use these.
-#if __GLASGOW_HASKELL__ >= 709
     length (InfixPatSyn _ _) = 2
     length (PrefixPatSyn args) = Data.List.length args
     length (RecordPatSyn args) = Data.List.length args
@@ -1042,7 +1034,6 @@ instance Foldable HsPatSynDetails where
     toList (InfixPatSyn left right) = [left, right]
     toList (PrefixPatSyn args) = args
     toList (RecordPatSyn args) = foldMap toList args
-#endif
 
 instance Traversable HsPatSynDetails where
     traverse f (InfixPatSyn left right) = InfixPatSyn <$> f left <*> f right

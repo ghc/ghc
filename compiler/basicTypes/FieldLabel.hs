@@ -56,7 +56,6 @@ Of course, datatypes with no constructors cannot have any fields.
 
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveFoldable #-}
@@ -78,11 +77,6 @@ import Outputable
 import Binary
 
 import Data.Data
-
-#if __GLASGOW_HASKELL__ < 709
-import Data.Foldable ( Foldable )
-import Data.Traversable ( Traversable )
-#endif
 
 -- | Field labels are just represented as strings;
 -- they are not necessarily unique (even within a module)

@@ -18,9 +18,6 @@ module OrdList (
 
 import Outputable
 
-#if __GLASGOW_HASKELL__ < 709
-import Data.Monoid ( Monoid(..) )
-#endif
 #if __GLASGOW_HASKELL__ > 710
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup

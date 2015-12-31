@@ -221,12 +221,6 @@ import Data.Maybe       ( isJust, mapMaybe )
 import Control.Monad    ( guard )
 import Control.Arrow    ( first, second )
 
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative ( Applicative, (<*>), (<$>), pure )
-import Data.Monoid         ( Monoid(..) )
-import Data.Foldable       ( foldMap )
-#endif
-
 -- $type_classification
 -- #type_classification#
 --

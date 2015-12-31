@@ -1,6 +1,5 @@
 -- (c) The University of Glasgow, 1992-2006
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveFunctor      #-}
@@ -85,10 +84,6 @@ import Util
 import Outputable
 import FastString
 
-#if __GLASGOW_HASKELL__ < 709
-import Data.Foldable ( Foldable )
-import Data.Traversable ( Traversable )
-#endif
 import Data.Bits
 import Data.Data
 import Data.List

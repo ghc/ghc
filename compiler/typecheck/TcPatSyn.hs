@@ -42,9 +42,6 @@ import MkId
 import TcTyDecls
 import ConLike
 import FieldLabel
-#if __GLASGOW_HASKELL__ < 709
-import Data.Monoid( mconcat, mappend, mempty )
-#endif
 import Bag
 import Util
 import Data.Maybe

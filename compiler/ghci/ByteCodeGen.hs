@@ -47,10 +47,6 @@ import OrdList
 
 import Data.List
 import Foreign
-
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative (Applicative(..))
-#endif
 import Control.Monad
 import Data.Char
 

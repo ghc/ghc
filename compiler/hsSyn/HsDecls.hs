@@ -3,7 +3,6 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable,
              DeriveTraversable #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -110,10 +109,6 @@ import FastString
 import Bag
 import Data.Maybe ( fromMaybe )
 import Data.Data        hiding (TyCon,Fixity)
-#if __GLASGOW_HASKELL__ < 709
-import Data.Foldable ( Foldable )
-import Data.Traversable ( Traversable )
-#endif
 
 {-
 ************************************************************************

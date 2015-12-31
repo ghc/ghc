@@ -52,9 +52,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad    ( when )
 import Data.List        ( partition, mapAccumL, nub, sortBy )
 
-#if __GLASGOW_HASKELL__ < 709
-import Data.Monoid      ( Monoid, mempty, mappend, mconcat )
-#endif
 #if __GLASGOW_HASKELL__ > 710
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup

@@ -450,12 +450,7 @@ runGhc mb_top_dir ghc = do
 -- to this function will create a new session which should not be shared among
 -- several threads.
 
-#if __GLASGOW_HASKELL__ < 710
--- Pre-AMP change
-runGhcT :: (ExceptionMonad m, Functor m) =>
-#else
-runGhcT :: (ExceptionMonad m) =>
-#endif
+runGhcT :: ExceptionMonad m =>
            Maybe FilePath  -- ^ See argument to 'initGhcMonad'.
         -> GhcT m a        -- ^ The action to perform.
         -> m a

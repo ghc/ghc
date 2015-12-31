@@ -39,13 +39,7 @@ import Data.List  ( zip4, foldl' )
 import BasicTypes
 import FastString
 
-#if __GLASGOW_HASKELL__ < 709
-bimap :: (a -> b) -> (c -> d) -> Either a c -> Either b d
-bimap f _ (Left x)  = Left (f x)
-bimap _ f (Right x) = Right (f x)
-#else
 import Data.Bifunctor ( bimap )
-#endif
 
 {-
 ************************************************************************

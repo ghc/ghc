@@ -47,11 +47,7 @@ import Platform
 import Util
 import Coercion     (mkUnbranchedAxInstCo,mkSymCo,Role(..))
 
-#if __GLASGOW_HASKELL__ >= 709
 import Control.Applicative ( Alternative(..) )
-#else
-import Control.Applicative ( Applicative(..), Alternative(..) )
-#endif
 
 import Control.Monad
 #if __GLASGOW_HASKELL__ > 710

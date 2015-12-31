@@ -45,9 +45,6 @@ import FastString
 import DynFlags
 import Util
 import UniqDFM (udfmToUfm)
-#if __GLASGOW_HASKELL__ < 709
-import MonadUtils
-#endif
 
 import Control.Monad
 import Data.Maybe

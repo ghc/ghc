@@ -25,9 +25,6 @@ import SrcLoc
 import FastString -- sLit
 import VarSet
 
-#if __GLASGOW_HASKELL__ < 709
-import Data.Functor ((<$>))
-#endif
 import Data.Maybe (mapMaybe)
 import Data.List (groupBy, sortBy, nubBy)
 import Control.Monad.Trans.State.Lazy

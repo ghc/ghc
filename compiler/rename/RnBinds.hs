@@ -9,8 +9,6 @@ type-synonym declarations; those cannot be done at this stage because
 they may be affected by renaming (which isn't fully worked out yet).
 -}
 
-{-# LANGUAGE CPP #-}
-
 module RnBinds (
    -- Renaming top-level bindings
    rnTopBindsLHS, rnTopBindsRHS, rnValBindsRHS,
@@ -53,9 +51,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.List        ( partition, sort )
-#if __GLASGOW_HASKELL__ < 709
-import Data.Traversable ( traverse )
-#endif
 
 {-
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper

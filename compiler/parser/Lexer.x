@@ -74,9 +74,6 @@ module Lexer (
   ) where
 
 -- base
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative
-#endif
 import Control.Monad
 #if __GLASGOW_HASKELL__ > 710
 import Control.Monad.Fail

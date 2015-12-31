@@ -188,12 +188,7 @@ instance ExceptionMonad m => ExceptionMonad (GhcT m) where
 instance MonadIO m => HasDynFlags (GhcT m) where
   getDynFlags = GhcT $ \(Session r) -> liftM hsc_dflags (liftIO $ readIORef r)
 
-#if __GLASGOW_HASKELL__ < 710
--- Pre-AMP change
-instance (ExceptionMonad m, Functor m) => GhcMonad (GhcT m) where
-#else
-instance (ExceptionMonad m) => GhcMonad (GhcT m) where
-#endif
+instance ExceptionMonad m => GhcMonad (GhcT m) where
   getSession = GhcT $ \(Session r) -> liftIO $ readIORef r
   setSession s' = GhcT $ \(Session r) -> liftIO $ writeIORef r s'
 

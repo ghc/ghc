@@ -213,9 +213,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
 import Control.Monad (liftM, ap)
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative (Applicative(..), (<$>) )
-#endif
 import Data.Functor.Identity
 
 {-

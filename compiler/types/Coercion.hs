@@ -123,12 +123,6 @@ import TysPrim          ( eqPhantPrimTyCon )
 import ListSetOps
 import Maybes
 
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative hiding ( empty )
-import Prelude hiding ( and )
-import Data.Traversable (traverse, sequenceA)
-import Data.Foldable ( and )
-#endif
 import Control.Monad (foldM)
 import FastString
 import Control.Arrow ( first )

@@ -54,9 +54,6 @@ import Control.Monad
 import Data.List ( sortBy )
 import Maybes( orElse, mapMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
-#if __GLASGOW_HASKELL__ < 709
-import Data.Traversable (traverse)
-#endif
 
 {-
 @rnSourceDecl@ `renames' declarations.

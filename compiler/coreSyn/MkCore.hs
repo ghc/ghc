@@ -80,9 +80,6 @@ import DynFlags
 import Data.List
 
 import Data.Char        ( ord )
-#if __GLASGOW_HASKELL__ < 709
-import Data.Word        ( Word )
-#endif
 
 infixl 4 `mkCoreApp`, `mkCoreApps`
 

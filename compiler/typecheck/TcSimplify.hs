@@ -51,10 +51,6 @@ import Control.Monad ( when, unless )
 import Data.List     ( partition )
 import Data.Foldable    ( fold )
 
-#if __GLASGOW_HASKELL__ < 709
-import Data.Traversable ( traverse )
-#endif
-
 {-
 *********************************************************************************
 *                                                                               *

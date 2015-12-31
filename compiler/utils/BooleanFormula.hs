@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable,
+             DeriveTraversable #-}
 
 --------------------------------------------------------------------------------
 -- | Boolean formulas without quantifiers and without negation.
@@ -6,9 +7,6 @@
 --
 -- This module is used to represent minimal complete definitions for classes.
 --
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable,
-             DeriveTraversable #-}
-
 module BooleanFormula (
         BooleanFormula(..), LBooleanFormula,
         mkFalse, mkTrue, mkAnd, mkOr, mkVar,
@@ -20,10 +18,6 @@ module BooleanFormula (
 
 import Data.List ( nub, intersperse )
 import Data.Data
-#if __GLASGOW_HASKELL__ < 709
-import Data.Foldable ( Foldable )
-import Data.Traversable ( Traversable )
-#endif
 
 import MonadUtils
 import Outputable

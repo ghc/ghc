@@ -46,9 +46,6 @@ import Id
 import FastString
 import Data.Data        ( Data, Typeable )
 import Data.Maybe       ( isJust, isNothing )
-#if __GLASGOW_HASKELL__ < 709
-import Data.Monoid
-#endif
 
 {-
 ************************************************************************
