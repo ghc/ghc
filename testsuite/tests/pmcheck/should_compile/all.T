@@ -32,3 +32,4 @@ test('pmc004', only_compiler_types(['ghc']), compile, ['-fwarn-incomplete-patter
 test('pmc005', only_compiler_types(['ghc']), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('pmc006', only_compiler_types(['ghc']), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('pmc007', only_compiler_types(['ghc']), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T11245', only_compiler_types(['ghc']), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
