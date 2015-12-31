@@ -54,6 +54,7 @@ executable ghc-shake
                        , Rules.Package
                        , Rules.Program
                        , Rules.Resources
+                       , Rules.Wrappers.Ghc
                        , Settings
                        , Settings.Args
                        , Settings.Builders.Alex
