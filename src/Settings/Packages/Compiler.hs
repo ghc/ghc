@@ -5,7 +5,7 @@ import Expression
 import GHC (compiler)
 import Oracles.Config.Setting
 import Oracles.Config.Flag
-import Predicates (builder, builderGhc, package, notStage0)
+import Predicates (builder, builderGhc, package, notStage0, stage1)
 import Settings
 
 compilerPackageArgs :: Args
@@ -36,4 +36,6 @@ compilerPackageArgs = package compiler ? do
                 ghciWithDebugger ?
                 notStage0 ? arg "--ghc-option=-DDEBUGGER"
               , ghcProfiled ?
-                notStage0 ? arg "--ghc-pkg-option=--force" ] ]
+                notStage0 ? arg "--ghc-pkg-option=--force" ]
+
+            , builder Haddock ? stage1 ? arg "--optghc=-DSTAGE=2" ]

@@ -43,19 +43,11 @@ haddockArgs = builder Haddock ? do
           arg "--source-module=src/%{MODULE/./-}.html"
         , specified HsColour ?
           arg "--source-entity=src/%{MODULE/./-}.html\\#%{NAME}"
-        , customPackageArgs
         , append =<< getInputs
         , arg "+RTS"
         , arg $ "-t" ++ path -/- "haddock.t"
-        , arg "--machine-readable" ]
-
-customPackageArgs :: Args
-customPackageArgs = mconcat
-    [ package compiler ? stage1 ?
-      arg "--optghc=-DSTAGE=2" ]
-    -- TODO: move to getPackageSources
-    -- , package ghcPrim  ? stage1 ?
-    --   arg "libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs" ]
+        , arg "--machine-readable"
+        , arg "-RTS" ]
 
 -- From ghc.mk:
 -- # -----------------------------------------------
