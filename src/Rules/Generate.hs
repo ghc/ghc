@@ -89,7 +89,7 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
     in do
         generated ?> \file -> do
             let srcFile = dropBuild file
-                pattern = "//" ++ srcFile <.> "*"
+                pattern = "//" ++ srcFile -<.> "*"
             files <- fmap (filter (pattern ?==)) $ moduleFiles stage pkg
             let gens = [ (f, b) | f <- files, Just b <- [determineBuilder f] ]
             when (length gens /= 1) . putError $
