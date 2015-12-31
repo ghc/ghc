@@ -810,6 +810,8 @@ exprIsBottom e
     go n (Cast e _)              = go n e
     go n (Let _ e)               = go n e
     go n (Lam v e) | isTyVar v   = go n e
+    go _ (Case _ _ _ alts)       = null alts
+       -- See Note [Empty case alternatives] in CoreSyn
     go _ _                       = False
 
 {- Note [Bottoming expressions]
