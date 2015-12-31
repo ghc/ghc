@@ -83,11 +83,13 @@ generate file target expr = do
 generatePackageCode :: Resources -> PartialTarget -> Rules ()
 generatePackageCode _ target @ (PartialTarget stage pkg) =
     let buildPath   = targetPath stage pkg -/- "build"
+        dropBuild   = drop (length buildPath + 1)
         generated f = (buildPath ++ "//*.hs") ?== f && not ("//autogen/*" ?== f)
         file <~ gen = generate file target gen
     in do
         generated ?> \file -> do
-            let pattern = "//" ++ takeBaseName file <.> "*"
+            let srcFile = dropBuild file
+                pattern = "//" ++ srcFile <.> "*"
             files <- fmap (filter (pattern ?==)) $ moduleFiles stage pkg
             let gens = [ (f, b) | f <- files, Just b <- [determineBuilder f] ]
             when (length gens /= 1) . putError $
