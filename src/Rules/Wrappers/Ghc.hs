@@ -11,4 +11,4 @@ ghcWrapper program = do
     return $ unlines
         [ "#!/bin/bash"
         , "exec " ++ (top -/- program)
-          ++ " -B" ++ (top -/- takeDirectory program) ++ " ${1+\"$@\"}" ]
+          ++ " -B" ++ (top -/- "inplace" -/- "lib") ++ " ${1+\"$@\"}" ]
