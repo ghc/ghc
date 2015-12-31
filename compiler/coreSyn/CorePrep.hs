@@ -522,6 +522,18 @@ cpeRhsE env (Var f `App` _levity `App` _type `App` arg)
   = case arg of                   -- beta reducing if possible
       Lam s body -> cpeRhsE (extendCorePrepEnv env s realWorldPrimId) body
       _          -> cpeRhsE env (arg `App` Var realWorldPrimId)
+                    -- See Note [runRW arg]
+
+{- Note [runRW arg]
+~~~~~~~~~~~~~~~~~~~
+If we got, say
+   runRW# (case bot of {})
+which happened in Trac #11291, we do /not/ want to turn it into
+   (case bot of {}) realWorldPrimId#
+because that gives a panic in CoreToStg.myCollectArgs, which expects
+only variables in function position.  But if we are sure to make
+runRW# strict (which we do in MkId), this can't happen
+-}
 
 cpeRhsE env expr@(App {}) = cpeApp env expr
 

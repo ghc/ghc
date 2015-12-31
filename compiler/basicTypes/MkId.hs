@@ -1179,7 +1179,14 @@ oneShotId = pcMiscPrelId oneShotName ty info
 runRWId :: Id -- See Note [runRW magic] in this module
 runRWId = pcMiscPrelId runRWName ty info
   where
-    info    = noCafIdInfo `setInlinePragInfo` neverInlinePragma
+    info = noCafIdInfo `setInlinePragInfo` neverInlinePragma
+                       `setStrictnessInfo` strict_sig
+                       `setArityInfo`      1
+    strict_sig = mkClosedStrictSig [strictApply1Dmd] topRes
+      -- Important to express its strictness,
+      -- since it is not inlined until CorePrep
+      -- Also see Note [runRW arg] in CorePrep
+
     -- State# RealWorld
     stateRW = mkTyConApp statePrimTyCon [realWorldTy]
     -- (# State# RealWorld, o #)
