@@ -1191,9 +1191,7 @@ runPhase (RealPhase cc_phase) input_fn dflags
                        ++ verbFlags
                        ++ [ "-S" ]
                        ++ cc_opt
-                       ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt
-                          , "-include", ghcVersionH
-                          ]
+                       ++ [ "-include", ghcVersionH ]
                        ++ framework_paths
                        ++ split_opt
                        ++ include_paths
@@ -2032,10 +2030,7 @@ doCpp dflags raw input_fn output_fn = do
 #endif
     -- Default CPP defines in Haskell source
     ghcVersionH <- getGhcVersionPathName dflags
-    let hsSourceCppOpts =
-          [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt
-          , "-include", ghcVersionH
-          ]
+    let hsSourceCppOpts = [ "-include", ghcVersionH ]
 
     -- MIN_VERSION macros
     let uids = explicitPackages (pkgState dflags)

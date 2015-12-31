@@ -60,9 +60,7 @@ $(includes_H_VERSION) : mk/project.mk | $$(dir $$@)/.
 	@echo "#ifndef __GHCVERSION_H__"  > $@
 	@echo "#define __GHCVERSION_H__" >> $@
 	@echo >> $@
-	@echo "#ifndef __GLASGOW_HASKELL__" >> $@
-	@echo "# define __GLASGOW_HASKELL__ $(ProjectVersionInt)" >> $@
-	@echo "#endif" >> $@
+	@echo "#define __GLASGOW_HASKELL__ $(ProjectVersionInt)" >> $@
 	@echo >> $@
 	@if [ -n "$(ProjectPatchLevel1)" ]; then \
 	  echo "#define __GLASGOW_HASKELL_PATCHLEVEL1__ $(ProjectPatchLevel1)" >> $@; \
