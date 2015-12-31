@@ -370,17 +370,12 @@ endif
 # at it, because that takes too long and doesn't buy much, but we do want
 # to inline certain key external functions, so we instruct GHC not to
 # throw away inlinings as it would normally do in -O0 mode.
-compiler/stage1/build/Parser_HC_OPTS += -O0 -fno-ignore-interface-pragmas
-# If we're bootstrapping the compiler during stage2, or we're being
-# built by a GHC whose version is > 7.8, we need -fcmm-sink to be
+# Since GHC version 7.8, we need -fcmm-sink to be
 # passed to the compiler. This is required on x86 to avoid the
 # register allocator running out of stack slots when compiling this
 # module with -fPIC -dynamic.
 # See #8182 for all the details
-ifeq "$(CMM_SINK_BOOTSTRAP_IS_NEEDED)" "YES"
-compiler/stage1/build/Parser_HC_OPTS += -fcmm-sink
-endif
-# We also pass -fcmm-sink to every stage != 1
+compiler/stage1/build/Parser_HC_OPTS += -O0 -fno-ignore-interface-pragmas -fcmm-sink
 compiler/stage2/build/Parser_HC_OPTS += -O0 -fno-ignore-interface-pragmas -fcmm-sink
 compiler/stage3/build/Parser_HC_OPTS += -O0 -fno-ignore-interface-pragmas -fcmm-sink
 
