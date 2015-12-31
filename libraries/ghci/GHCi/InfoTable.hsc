@@ -56,8 +56,16 @@ type ItblCodes = Either [Word8] [Word32]
 funPtrToInt :: FunPtr a -> Int
 funPtrToInt (FunPtr a) = I## (addr2Int## a)
 
-data Arch = ArchSPARC | ArchPPC | ArchX86 | ArchX86_64 | ArchAlpha | ArchARM
-          | ArchARM64 | ArchPPC64 | ArchPPC64LE
+data Arch = ArchSPARC
+          | ArchPPC
+          | ArchX86
+          | ArchX86_64
+          | ArchAlpha
+          | ArchARM
+          | ArchARM64
+          | ArchPPC64
+          | ArchPPC64LE
+          | ArchUnknown
  deriving Show
 
 platform :: Arch
@@ -81,7 +89,11 @@ platform =
 #elif defined(powerpc64le_HOST_ARCH)
        ArchPPC64LE
 #else
-#error Unknown architecture
+#    if defined(TABLES_NEXT_TO_CODE)
+#        error Unimplemented architecture
+#    else
+       ArchUnknown
+#    endif
 #endif
 
 mkJumpToAddr :: EntryFunPtr -> ItblCodes
@@ -244,6 +256,11 @@ mkJumpToAddr a = case platform of
         in Right [ 0x3D800000 .|. hi16 w32,
                    0x618C0000 .|. lo16 w32,
                    0x7D8903A6, 0x4E800420 ]
+
+    -- This code must not be called. You either need to
+    -- add your architecture as a distinct case or
+    -- use non-TABLES_NEXT_TO_CODE mode
+    ArchUnknown -> error "mkJumpToAddr: ArchUnknown is unsupported"
 
 byte0 :: (Integral w) => w -> Word8
 byte0 w = fromIntegral w
