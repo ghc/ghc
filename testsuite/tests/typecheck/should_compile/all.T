@@ -383,7 +383,8 @@ test('T5792',normal,run_command,
 test('PolytypeDecomp', normal, compile, [''])
 test('T6011', normal, compile, [''])
 test('T6055', normal, compile, [''])
-test('DfltProb1', normal, compile, [''])
+test('DfltProb1', normal, compile, ['-O'])
+# Add -O for DfltProb1 to expose Trac #11291
 test('DfltProb2', normal, compile, [''])
 test('T6134', normal, compile, [''])
 test('T6018', extra_clean(['T6018.hi' , 'T6018.o'
