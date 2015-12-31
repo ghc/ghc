@@ -542,7 +542,7 @@ See Maessen's paper 1999 "Bottom extraction: factoring error handling out
 of functional programs" (unpublished I think).
 
 When we do this, we set the strictness and arity of the new bottoming
-Id, *immediately*, for two reasons:
+Id, *immediately*, for three reasons:
 
   * To prevent the abstracted thing being immediately inlined back in again
     via preInlineUnconditionally.  The latter has a test for bottoming Ids
@@ -550,6 +550,17 @@ Id, *immediately*, for two reasons:
 
   * So that it's properly exposed as such in the interface file, even if
     this is all happening after strictness analysis.
+
+  * In case we do CSE with the same expression that *is* marked bottom
+        lvl          = error "urk"
+          x{str=bot) = error "urk"
+    Here we don't want to replace 'x' with 'lvl', else we may get Lint
+    errors, e.g. via a case with empty alternatives:  (case x of {})
+    Lint complains unless the scrutinee of such a case is clearly bottom.
+
+    This was reported in Trac #11290.   But since the whole bottoming-float
+    thing is based on the cheap-and-cheerful exprIsBottom, I'm not sure
+    that it'll nail all such cases.
 
 Note [Bottoming floats: eta expansion] c.f Note [Bottoming floats]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
