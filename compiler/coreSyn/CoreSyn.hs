@@ -391,31 +391,32 @@ See #type_let#
 
 Note [Empty case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The alternatives of a case expression should be exhaustive.
+The alternatives of a case expression should be exhaustive.  But
+this exhaustive list can be empty!
 
-A case expression can have empty alternatives if (and only if) the
-scrutinee is bound to raise an exception or diverge. When do we know
-this?  See Note [Bottoming expressions] in CoreUtils.
+* A case expression can have empty alternatives if (and only if) the
+  scrutinee is bound to raise an exception or diverge. When do we know
+  this?  See Note [Bottoming expressions] in CoreUtils.
 
-The possiblity of empty alternatives is one reason we need a type on
-the case expression: if the alternatives are empty we can't get the
-type from the alternatives!
+* The possiblity of empty alternatives is one reason we need a type on
+  the case expression: if the alternatives are empty we can't get the
+  type from the alternatives!
 
-In the case of empty types (see Note [Bottoming expressions]), say
-  data T
-we do NOT want to replace
-   case (x::T) of Bool {}   -->   error Bool "Inaccessible case"
-because x might raise an exception, and *that*'s what we want to see!
-(Trac #6067 is an example.) To preserve semantics we'd have to say
-   x `seq` error Bool "Inaccessible case"
- but the 'seq' is just a case, so we are back to square 1.  Or I suppose
-we could say
-   x |> UnsafeCoerce T Bool
-but that loses all trace of the fact that this originated with an empty
-set of alternatives.
+* In the case of empty types (see Note [Bottoming expressions]), say
+    data T
+  we do NOT want to replace
+    case (x::T) of Bool {}   -->   error Bool "Inaccessible case"
+  because x might raise an exception, and *that*'s what we want to see!
+  (Trac #6067 is an example.) To preserve semantics we'd have to say
+     x `seq` error Bool "Inaccessible case"
+  but the 'seq' is just a case, so we are back to square 1.  Or I suppose
+  we could say
+     x |> UnsafeCoerce T Bool
+  but that loses all trace of the fact that this originated with an empty
+  set of alternatives.
 
-We can use the empty-alternative construct to coerce error values from
-one type to another.  For example
+* We can use the empty-alternative construct to coerce error values from
+  one type to another.  For example
 
     f :: Int -> Int
     f n = error "urk"
@@ -423,14 +424,22 @@ one type to another.  For example
     g :: Int -> (# Char, Bool #)
     g x = case f x of { 0 -> ..., n -> ... }
 
-Then if we inline f in g's RHS we get
+  Then if we inline f in g's RHS we get
     case (error Int "urk") of (# Char, Bool #) { ... }
-and we can discard the alternatives since the scrutinee is bottom to give
+  and we can discard the alternatives since the scrutinee is bottom to give
     case (error Int "urk") of (# Char, Bool #) {}
 
-This is nicer than using an unsafe coerce between Int ~ (# Char,Bool #),
-if for no other reason that we don't need to instantiate the (~) at an
-unboxed type.
+  This is nicer than using an unsafe coerce between Int ~ (# Char,Bool #),
+  if for no other reason that we don't need to instantiate the (~) at an
+  unboxed type.
+
+* We treat a case expression with empty alternatives as trivial iff
+  its scrutinee is (see CoreUtils.exprIsTrivial).  This is actually
+  important; see Note [Empty case is trivial] in CoreUtils
+
+* An empty case is replaced by its scrutinee during the CoreToStg
+  conversion; remember STG is un-typed, so there is no need for
+  the empty case to do the type conversion.
 
 
 ************************************************************************
