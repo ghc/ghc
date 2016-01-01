@@ -178,6 +178,10 @@ data Instr
         -- invariants for a BasicBlock (see Cmm).
         | NEWBLOCK BlockId
 
+        -- define a new label within a block. Used to refer to points within a
+        -- block during generation of debugging information.
+        | LABEL BlockId
+
         -- specify current stack offset for
         -- benefit of subsequent passes
         | DELTA   Int
@@ -783,6 +787,7 @@ x86_isMetaInstr instr
         LOCATION{}      -> True
         LDATA{}         -> True
         NEWBLOCK{}      -> True
+        LABEL{}         -> True
         DELTA{}         -> True
         _               -> False
 

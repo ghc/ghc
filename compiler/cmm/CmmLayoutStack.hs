@@ -795,7 +795,7 @@ manifestSp dflags stackmaps stack0 sp0 sp_high
 
     -- Add unwind pseudo-instructions to document Sp level for debugging
     add_unwind_info block
-      | debugLevel dflags > 0 = CmmUnwind Sp sp_unwind : block
+      | debugLevel dflags > 0 = CmmUnwind (ExistingLabel $ entryLabel first) Sp sp_unwind : block
       | otherwise             = block
     sp_unwind = CmmRegOff (CmmGlobal Sp) (sp0 - wORD_SIZE dflags)
 
