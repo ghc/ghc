@@ -363,7 +363,7 @@ test('T10620', normal, compile_and_run, ['-v0'])
 test('T10638', normal, compile_fail, ['-v0'])
 test('T10697_decided_1', normal, compile_and_run, ['-v0'])
 test('T10697_decided_2', normal, compile_and_run, ['-XStrictData -v0'])
-test('T10697_decided_3', normal,
+test('T10697_decided_3', omit_ways(['ghci']),  # ghci doesn't support -O(2)
                          compile_and_run,
                          ['-XStrictData -funbox-strict-fields -O2 -v0'])
 test('T10697_source',
