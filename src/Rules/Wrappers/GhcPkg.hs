@@ -4,17 +4,14 @@ import Base
 import Expression
 import Oracles
 
--- Note about wrapper:
--- bindir is usually GhcSourcePath / inplace / bin
--- topdir is usually GhcSourcePath / inplace / lib
--- datadir is usually the same as topdir
-
 ghcPkgWrapper :: FilePath -> Expr String
 ghcPkgWrapper program = do
     lift $ need [sourcePath -/- "Rules/Wrappers/GhcPkg.hs"]
     top   <- getSetting GhcSourcePath
     stage <- getStage
-    let pkgConf = top -/- packageConfiguration stage
+    -- Use the package configuration for the next stage in the wrapper.
+    -- The wrapper is generated in StageN, but used in StageN+1.
+    let pkgConf = top -/- packageConfiguration (succ stage)
     return $ unlines
         [ "#!/bin/bash"
         , "exec " ++ (top -/- program)
