@@ -1,5 +1,5 @@
 module Settings.Builders.DeriveConstants (
-    derivedConstantsPath, deriveConstantsArgs
+    derivedConstantsPath, deriveConstantsBuilderArgs
     ) where
 
 import Base
@@ -13,8 +13,8 @@ derivedConstantsPath :: FilePath
 derivedConstantsPath = "includes/dist-derivedconstants/header"
 
 -- TODO: do we need to support `includes_CC_OPTS += -DDYNAMIC_BY_DEFAULT`?
-deriveConstantsArgs :: Args
-deriveConstantsArgs = builder DeriveConstants ? do
+deriveConstantsBuilderArgs :: Args
+deriveConstantsBuilderArgs = builder DeriveConstants ? do
     cFlags <- fromDiffExpr includeCcArgs
     mconcat
         [ file "//DerivedConstants.h"             ? arg "--gen-header"

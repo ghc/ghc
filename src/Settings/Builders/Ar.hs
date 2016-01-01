@@ -1,17 +1,17 @@
-module Settings.Builders.Ar (arArgs, arCmd) where
+module Settings.Builders.Ar (arBuilderArgs, arCmd) where
 
 import Base
 import Expression
 import Oracles
 import Predicates (builder)
 
-arArgs :: Args
-arArgs = builder Ar ? mconcat [ arg "q"
-                              , arg =<< getOutput
-                              , append =<< getInputs ]
+arBuilderArgs :: Args
+arBuilderArgs = builder Ar ? mconcat [ arg "q"
+                                     , arg =<< getOutput
+                                     , append =<< getInputs ]
 
--- This count includes arg "q" and arg file parameters in arArgs (see above).
--- Update this value appropriately when changing arArgs.
+-- This count includes arg "q" and arg file parameters in arBuilderArgs.
+-- Update this value appropriately when changing arBuilderArgs.
 arFlagsCount :: Int
 arFlagsCount = 2
 

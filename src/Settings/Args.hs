@@ -39,22 +39,22 @@ getArgs = fromDiffExpr $ defaultBuilderArgs <> defaultPackageArgs <> userArgs
 -- TODO: is GhcHcOpts=-Rghc-timing needed?
 defaultBuilderArgs :: Args
 defaultBuilderArgs = mconcat
-    [ alexArgs
-    , arArgs
-    , deriveConstantsArgs
-    , gccArgs
-    , gccMArgs
-    , genPrimopCodeArgs
-    , ghcArgs
-    , ghcCabalArgs
-    , ghcCabalHsColourArgs
-    , ghcMArgs
-    , ghcPkgArgs
-    , haddockArgs
-    , happyArgs
-    , hsc2HsArgs
-    , hsCppArgs
-    , ldArgs ]
+    [ alexBuilderArgs
+    , arBuilderArgs
+    , deriveConstantsBuilderArgs
+    , gccBuilderArgs
+    , gccMBuilderArgs
+    , genPrimopCodeBuilderArgs
+    , ghcBuilderArgs
+    , ghcCabalBuilderArgs
+    , ghcCabalHsColourBuilderArgs
+    , ghcMBuilderArgs
+    , ghcPkgBuilderArgs
+    , haddockBuilderArgs
+    , happyBuilderArgs
+    , hsc2hsBuilderArgs
+    , hsCppBuilderArgs
+    , ldBuilderArgs ]
 
 defaultPackageArgs :: Args
 defaultPackageArgs = mconcat

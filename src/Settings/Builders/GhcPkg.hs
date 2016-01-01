@@ -1,4 +1,4 @@
-module Settings.Builders.GhcPkg (ghcPkgArgs) where
+module Settings.Builders.GhcPkg (ghcPkgBuilderArgs) where
 
 import Base
 import Builder
@@ -7,8 +7,8 @@ import Predicates
 import Settings
 import Settings.Builders.GhcCabal
 
-ghcPkgArgs :: Args
-ghcPkgArgs = stagedBuilder GhcPkg ? (initArgs <> updateArgs)
+ghcPkgBuilderArgs :: Args
+ghcPkgBuilderArgs = stagedBuilder GhcPkg ? (initArgs <> updateArgs)
 
 initPredicate :: Predicate
 initPredicate = orM $ map (file . packageConfiguration) [Stage0 ..]

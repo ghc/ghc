@@ -1,11 +1,11 @@
-module Settings.Builders.Ld (ldArgs) where
+module Settings.Builders.Ld (ldBuilderArgs) where
 
 import Expression
 import Oracles
 import Predicates (builder)
 
-ldArgs :: Args
-ldArgs = builder Ld ? do
+ldBuilderArgs :: Args
+ldBuilderArgs = builder Ld ? do
     args <- getSettingList . ConfLdLinkerArgs =<< getStage
     mconcat [ append args
             , arg "-r"

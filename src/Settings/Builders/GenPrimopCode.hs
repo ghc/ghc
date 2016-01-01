@@ -1,11 +1,11 @@
-module Settings.Builders.GenPrimopCode (genPrimopCodeArgs) where
+module Settings.Builders.GenPrimopCode (genPrimopCodeBuilderArgs) where
 
 import Expression
 import Predicates (builder, file)
 
 -- Stdin/stdout are handled in a special way. See Rules/Actions.hs.
-genPrimopCodeArgs :: Args
-genPrimopCodeArgs = builder GenPrimopCode ? mconcat
+genPrimopCodeBuilderArgs :: Args
+genPrimopCodeBuilderArgs = builder GenPrimopCode ? mconcat
     [ file "//PrimopWrappers.hs"                 ? arg "--make-haskell-wrappers"
     , file "//Prim.hs"                           ? arg "--make-haskell-source"
     , file "//primop-data-decl.hs-incl"          ? arg "--data-decl"

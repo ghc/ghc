@@ -1,4 +1,4 @@
-module Settings.Builders.Hsc2Hs (hsc2HsArgs) where
+module Settings.Builders.Hsc2Hs (hsc2hsBuilderArgs) where
 
 import Control.Monad.Trans.Class
 import Control.Monad.Extra
@@ -13,8 +13,8 @@ import Settings.Builders.Common
 templateHsc :: FilePath
 templateHsc = "inplace/lib/template-hsc.h"
 
-hsc2HsArgs :: Args
-hsc2HsArgs = builder Hsc2Hs ? do
+hsc2hsBuilderArgs :: Args
+hsc2hsBuilderArgs = builder Hsc2Hs ? do
     stage   <- getStage
     ccPath  <- lift . builderPath $ Gcc stage
     gmpDirs <- getSettingList GmpIncludeDirs

@@ -1,4 +1,4 @@
-module Settings.Builders.Haddock (haddockArgs) where
+module Settings.Builders.Haddock (haddockBuilderArgs) where
 
 import Development.Shake.FilePath
 import Base
@@ -10,8 +10,8 @@ import Predicates hiding (file)
 import Settings
 import Settings.Builders.Ghc
 
-haddockArgs :: Args
-haddockArgs = builder Haddock ? do
+haddockBuilderArgs :: Args
+haddockBuilderArgs = builder Haddock ? do
     output   <- getOutput
     pkg      <- getPackage
     path     <- getTargetPath

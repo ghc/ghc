@@ -1,4 +1,4 @@
-module Settings.Builders.Ghc (ghcArgs, ghcMArgs, commonGhcArgs) where
+module Settings.Builders.Ghc (ghcBuilderArgs, ghcMBuilderArgs, commonGhcArgs) where
 
 import Base
 import Expression
@@ -13,8 +13,8 @@ import Settings.Builders.Common (cIncludeArgs)
 --     $$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
 --     $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno
 --     $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@)))
-ghcArgs :: Args
-ghcArgs = stagedBuilder Ghc ? do
+ghcBuilderArgs :: Args
+ghcBuilderArgs = stagedBuilder Ghc ? do
     output <- getOutput
     way    <- getWay
     pkg    <- getPackage
@@ -35,8 +35,8 @@ ghcArgs = stagedBuilder Ghc ? do
             , append =<< getInputs
             , arg "-o", arg =<< getOutput ]
 
-ghcMArgs :: Args
-ghcMArgs = stagedBuilder GhcM ? do
+ghcMBuilderArgs :: Args
+ghcMBuilderArgs = stagedBuilder GhcM ? do
     ways <- getWays
     mconcat [ arg "-M"
             , commonGhcArgs
@@ -45,7 +45,7 @@ ghcMArgs = stagedBuilder GhcM ? do
             , append $ concat [ ["-dep-suffix", wayPrefix w] | w <- ways ]
             , append =<< getInputs ]
 
--- This is included into ghcArgs, ghcMArgs and haddockArgs
+-- This is included into ghcBuilderArgs, ghcMBuilderArgs and haddockBuilderArgs
 commonGhcArgs :: Args
 commonGhcArgs = do
     way     <- getWay

@@ -1,5 +1,6 @@
 module Settings.Builders.GhcCabal (
-    ghcCabalArgs, ghcCabalHsColourArgs, bootPackageDbArgs, cppArgs, needDll0
+    ghcCabalBuilderArgs, ghcCabalHsColourBuilderArgs,
+    bootPackageDbArgs, cppArgs, needDll0
     ) where
 
 import Base
@@ -15,8 +16,8 @@ import Predicates hiding (stage)
 import Settings
 import Settings.Builders.Common
 
-ghcCabalArgs :: Args
-ghcCabalArgs = builder GhcCabal ? do
+ghcCabalBuilderArgs :: Args
+ghcCabalBuilderArgs = builder GhcCabal ? do
     path <- getPackagePath
     dir  <- getTargetDirectory
     mconcat [ arg "configure"
@@ -36,8 +37,8 @@ ghcCabalArgs = builder GhcCabal ? do
             , with Alex
             , with Happy ]
 
-ghcCabalHsColourArgs :: Args
-ghcCabalHsColourArgs = builder GhcCabalHsColour ? do
+ghcCabalHsColourBuilderArgs :: Args
+ghcCabalHsColourBuilderArgs = builder GhcCabalHsColour ? do
     path <- getPackagePath
     dir  <- getTargetDirectory
     mconcat [ arg "hscolour"
