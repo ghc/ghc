@@ -1591,7 +1591,7 @@ context :: { LHsContext RdrName }
                                                 } }
 
 context_no_ops :: { LHsContext RdrName }
-        : btype_no_ops                 {% do { let { ty = splitTilde $1 }
+        : btype_no_ops                 {% do { ty <- splitTilde $1
                                              ; (anns,ctx) <- checkContext ty
                                              ; if null (unLoc ctx)
                                                    then addAnnotation (gl ty) AnnUnit (gl ty)
@@ -1899,7 +1899,8 @@ constr_stuff :: { Located (Located RdrName, HsConDeclDetails RdrName) }
     -- see Note [Parsing data constructors is hard]
         : btype_no_ops                         {% do { c <- splitCon $1
                                                      ; return $ sLL $1 $> c } }
-        | btype_no_ops conop btype_no_ops      {  sLL $1 $> ($2, InfixCon (splitTilde $1) $3) }
+        | btype_no_ops conop btype_no_ops      {% do { ty <- splitTilde $1
+                                                     ; return $ sLL $1 $> ($2, InfixCon ty $3) } }
 
 {- Note [Parsing data constructors is hard]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3336,9 +3337,6 @@ For the general principles of the following routines, see Note [Api annotations]
 in ApiAnnotation.hs
 
 -}
-
-addAnnsAt :: SrcSpan -> [AddAnn] -> P ()
-addAnnsAt loc anns = mapM_ (\a -> a loc) anns
 
 -- |Construct an AddAnn from the annotation keyword and the location
 -- of the keyword itself
