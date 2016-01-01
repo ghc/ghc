@@ -1053,18 +1053,27 @@ isFunLhs e = go e [] []
 
 -- | Transform btype_no_ops with strict_mark's into HsEqTy's
 -- (((~a) ~b) c) ~d ==> ((~a) ~ (b c)) ~ d
-splitTilde :: LHsType RdrName -> LHsType RdrName
+splitTilde :: LHsType RdrName -> P (LHsType RdrName)
 splitTilde t = go t
   where go (L loc (HsAppTy t1 t2))
-          | L _ (HsBangTy (HsSrcBang Nothing NoSrcUnpack SrcLazy) t2') <- t2
-          = L loc (HsEqTy (go t1) t2')
+          | L lo (HsBangTy (HsSrcBang Nothing NoSrcUnpack SrcLazy) t2') <- t2
+          = do
+              moveAnnotations lo loc
+              t1' <- go t1
+              return (L loc (HsEqTy t1' t2'))
           | otherwise
-          = case go t1 of
-              (L _ (HsEqTy tl tr)) ->
-                L loc (HsEqTy tl (L (combineLocs tr t2) (HsAppTy tr t2)))
-              t -> L loc (HsAppTy t t2)
+          = do
+              t1' <- go t1
+              case t1' of
+                (L lo (HsEqTy tl tr)) -> do
+                  let lr = combineLocs tr t2
+                  moveAnnotations lo loc
+                  return (L loc (HsEqTy tl (L lr (HsAppTy tr t2))))
+                t -> do
+                  return (L loc (HsAppTy t t2))
 
-        go t = t
+        go t = return t
+
 
 -- | Transform tyapps with strict_marks into uses of twiddle
 -- [~a, ~b, c, ~d] ==> (~a) ~ b c ~ d
@@ -1077,7 +1086,7 @@ splitTildeApps (t : rest) = do
             (L loc (HsBangTy
                     (HsSrcBang Nothing NoSrcUnpack SrcLazy)
                     ty))))
-          = addAnnotation l AnnTilde l >>
+          = addAnnotation l AnnTilde tilde_loc >>
             return
               [L tilde_loc (HsAppInfix (L tilde_loc eqTyCon_RDR)),
                L l (HsAppPrefix ty)]

@@ -1,0 +1,3 @@
+
+Test11321.hs:12:15: error:
+    Not in scope: type constructor or class ‘Sing’
