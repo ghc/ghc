@@ -321,9 +321,7 @@ instance ArrowPlus a => Alternative (ArrowMonad a) where
    empty = ArrowMonad zeroArrow
    ArrowMonad x <|> ArrowMonad y = ArrowMonad (x <+> y)
 
-instance (ArrowApply a, ArrowPlus a) => MonadPlus (ArrowMonad a) where
-   mzero = ArrowMonad zeroArrow
-   ArrowMonad x `mplus` ArrowMonad y = ArrowMonad (x <+> y)
+instance (ArrowApply a, ArrowPlus a) => MonadPlus (ArrowMonad a)
 
 -- | Any instance of 'ArrowApply' can be made into an instance of
 --   'ArrowChoice' by defining 'left' = 'leftApp'.

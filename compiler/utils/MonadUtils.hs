@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 
 -- | Utilities related to Monad and Applicative classes
 --   Mostly for backwards compatability.
@@ -30,11 +31,12 @@ module MonadUtils
 
 import Maybes
 
-import Control.Applicative
 import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.IO.Class
-import Prelude -- avoid redundant import warning due to AMP
+#if __GLASGOW_HASKELL__ < 800
+import Control.Monad.Trans.Error () -- for orphan `instance MonadPlus IO`
+#endif
 
 -------------------------------------------------------------------------------
 -- Lift combinators

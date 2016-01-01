@@ -659,9 +659,7 @@ instance Alternative STM where
   empty = retry
   (<|>) = orElse
 
-instance MonadPlus STM where
-  mzero = empty
-  mplus = (<|>)
+instance MonadPlus STM
 
 -- | Unsafely performs IO in the STM monad.  Beware: this is a highly
 -- dangerous thing to do.

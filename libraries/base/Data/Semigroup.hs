@@ -592,9 +592,7 @@ instance Alternative Option where
   Option Nothing <|> b = b
   a <|> _ = a
 
-instance MonadPlus Option where
-  mzero = Option Nothing
-  mplus = (<|>)
+instance MonadPlus Option
 
 instance MonadFix Option where
   mfix f = Option (mfix (getOption . f))

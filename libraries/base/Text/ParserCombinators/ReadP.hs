@@ -108,9 +108,7 @@ instance Applicative P where
   pure x = Result x Fail
   (<*>) = ap
 
-instance MonadPlus P where
-  mzero = empty
-  mplus = (<|>)
+instance MonadPlus P
 
 instance Monad P where
   (Get f)      >>= k = Get (\c -> f c >>= k)
@@ -175,12 +173,10 @@ instance MonadFail ReadP where
   fail _    = R (\_ -> Fail)
 
 instance Alternative ReadP where
-    empty = mzero
-    (<|>) = mplus
+  empty = pfail
+  (<|>) = (+++)
 
-instance MonadPlus ReadP where
-  mzero = pfail
-  mplus = (+++)
+instance MonadPlus ReadP
 
 -- ---------------------------------------------------------------------------
 -- Operations over P

@@ -656,13 +656,11 @@ instance MonadFail.MonadFail RuleM where
 #endif
 
 instance Alternative RuleM where
-    empty = mzero
-    (<|>) = mplus
+  empty = RuleM $ \_ _ _ -> Nothing
+  RuleM f1 <|> RuleM f2 = RuleM $ \dflags iu args ->
+    f1 dflags iu args <|> f2 dflags iu args
 
-instance MonadPlus RuleM where
-  mzero = RuleM $ \_ _ _ -> Nothing
-  mplus (RuleM f1) (RuleM f2) = RuleM $ \dflags iu args ->
-    f1 dflags iu args `mplus` f2 dflags iu args
+instance MonadPlus RuleM
 
 instance HasDynFlags RuleM where
     getDynFlags = RuleM $ \dflags _ _ -> Just dflags

@@ -4,7 +4,7 @@
 \section[CoreMonad]{The core pipeline monad}
 -}
 
-{-# LANGUAGE CPP, UndecidableInstances #-}
+{-# LANGUAGE CPP #-}
 
 module CoreMonad (
     -- * Configuration of the core-to-core passes
@@ -570,15 +570,11 @@ instance Applicative CoreM where
     (<*>) = ap
     m *> k = m >>= \_ -> k
 
-instance MonadPlus IO => Alternative CoreM where
-    empty = mzero
-    (<|>) = mplus
+instance Alternative CoreM where
+    empty   = CoreM (const Control.Applicative.empty)
+    m <|> n = CoreM (\rs -> unCoreM m rs <|> unCoreM n rs)
 
--- For use if the user has imported Control.Monad.Error from MTL
--- Requires UndecidableInstances
-instance MonadPlus IO => MonadPlus CoreM where
-    mzero = CoreM (const mzero)
-    m `mplus` n = CoreM (\rs -> unCoreM m rs `mplus` unCoreM n rs)
+instance MonadPlus CoreM
 
 instance MonadUnique CoreM where
     getUniqueSupplyM = do

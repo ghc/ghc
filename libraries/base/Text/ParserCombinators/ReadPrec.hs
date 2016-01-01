@@ -87,13 +87,11 @@ instance Monad ReadPrec where
 instance MonadFail.MonadFail ReadPrec where
   fail s    = P (\_ -> fail s)
 
-instance MonadPlus ReadPrec where
-  mzero = pfail
-  mplus = (+++)
+instance MonadPlus ReadPrec
 
 instance Alternative ReadPrec where
-    empty = mzero
-    (<|>) = mplus
+  empty = pfail
+  (<|>) = (+++)
 
 -- precedences
 type Prec = Int
