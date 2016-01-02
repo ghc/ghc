@@ -275,10 +275,10 @@ layout dflags procpoints liveness entry entry_args final_stackmaps final_sp_high
        --
        let middle_pre = blockToList $ foldl blockSnoc middle1 middle2
 
-           final_blocks = manifestSp dflags final_stackmaps stack0 sp0 final_sp_high entry0
-                              middle_pre sp_off last1 fixup_blocks
+       final_blocks <- manifestSp dflags final_stackmaps stack0 sp0 final_sp_high entry0
+                                  middle_pre sp_off last1 fixup_blocks
 
-           acc_stackmaps' = mapUnion acc_stackmaps out
+       let acc_stackmaps' = mapUnion acc_stackmaps out
 
            -- If this block jumps to the GC, then we do not take its
            -- stack usage into account for the high-water mark.
@@ -527,8 +527,9 @@ makeFixupBlock dflags sp0 l stack tscope assigs
   | otherwise = do
     tmp_lbl <- newBlockId
     let sp_off = sp0 - sm_sp stack
-        block = blockJoin (CmmEntry tmp_lbl tscope)
-                          (maybeAddSpAdj dflags sp_off (blockFromList assigs))
+    fixed_up <- maybeAddSpAdj dflags sp0 sp_off (blockFromList assigs)
+    let block = blockJoin (CmmEntry tmp_lbl tscope)
+                          fixed_up
                           (CmmBranch l)
     return (tmp_lbl, [block])
 
@@ -780,36 +781,37 @@ manifestSp
    -> ByteOff            -- sp_off
    -> CmmNode O C        -- last node
    -> [CmmBlock]         -- new blocks
-   -> [CmmBlock]         -- final blocks with Sp manifest
+   -> UniqSM [CmmBlock]  -- final blocks with Sp manifest
 
 manifestSp dflags stackmaps stack0 sp0 sp_high
            first middle_pre sp_off last fixup_blocks
-  = final_block : fixup_blocks'
+  = do
+    let -- Add unwind pseudo-instructions to document Sp level for debugging
+        add_unwind_info block
+          | debugLevel dflags > 0 = CmmUnwind (ExistingLabel $ entryLabel first) Sp sp_unwind : block
+          | otherwise             = block
+        sp_unwind = CmmRegOff (CmmGlobal Sp) (sp0 - wORD_SIZE dflags)
+
+    final_middle <- maybeAddSpAdj dflags sp0 sp_off $
+                    blockFromList $
+                    add_unwind_info $
+                    map adj_pre_sp $
+                    elimStackStores stack0 stackmaps area_off $
+                    middle_pre
+
+    let final_last    = optStackCheck (adj_post_sp last)
+
+        final_block   = blockJoin first final_middle final_last
+
+        fixup_blocks' = map (mapBlock3' (id, adj_post_sp, id)) fixup_blocks
+
+    pure $ final_block : fixup_blocks'
   where
     area_off = getAreaOff stackmaps
 
     adj_pre_sp, adj_post_sp :: CmmNode e x -> CmmNode e x
     adj_pre_sp  = mapExpDeep (areaToSp dflags sp0            sp_high area_off)
     adj_post_sp = mapExpDeep (areaToSp dflags (sp0 - sp_off) sp_high area_off)
-
-    -- Add unwind pseudo-instructions to document Sp level for debugging
-    add_unwind_info block
-      | debugLevel dflags > 0 = CmmUnwind (ExistingLabel $ entryLabel first) Sp sp_unwind : block
-      | otherwise             = block
-    sp_unwind = CmmRegOff (CmmGlobal Sp) (sp0 - wORD_SIZE dflags)
-
-    final_middle = maybeAddSpAdj dflags sp_off $
-                   blockFromList $
-                   add_unwind_info $
-                   map adj_pre_sp $
-                   elimStackStores stack0 stackmaps area_off $
-                   middle_pre
-
-    final_last    = optStackCheck (adj_post_sp last)
-
-    final_block   = blockJoin first final_middle final_last
-
-    fixup_blocks' = map (mapBlock3' (id, adj_post_sp, id)) fixup_blocks
 
 
 getAreaOff :: BlockEnv StackMap -> (Area -> StackLoc)
@@ -820,10 +822,18 @@ getAreaOff stackmaps (Young l) =
     Nothing -> pprPanic "getAreaOff" (ppr l)
 
 
-maybeAddSpAdj :: DynFlags -> ByteOff -> Block CmmNode O O -> Block CmmNode O O
-maybeAddSpAdj _      0      block = block
-maybeAddSpAdj dflags sp_off block
-   = block `blockSnoc` CmmAssign spReg (cmmOffset dflags (CmmReg spReg) sp_off)
+maybeAddSpAdj :: DynFlags
+              -> ByteOff            -- ^ Sp on entry to the block
+              -> ByteOff            -- ^ sp_off
+              -> Block CmmNode O O  -- ^ the block to append the adjustment to
+              -> UniqSM (Block CmmNode O O)
+maybeAddSpAdj _      _   0      block = pure block
+maybeAddSpAdj dflags sp0 sp_off block
+   = do
+     lbl <- newBlockId
+     pure $ block `blockSnoc` CmmAssign spReg (cmmOffset dflags (CmmReg spReg) sp_off)
+                  `blockSnoc` CmmUnwind (NewLabel lbl) Sp
+                                        (cmmRegOff (CmmGlobal Sp) (sp0 - wORD_SIZE dflags - sp_off))
 
 
 {-
