@@ -63,6 +63,7 @@ import Literal
 import Digraph
 import Util
 import Unique
+import UniqSupply (MonadUnique(..))
 import DynFlags
 import FastString
 import Outputable
@@ -345,8 +346,8 @@ assignTemp e = do { dflags <- getDynFlags
                   ; emitAssign (CmmLocal reg) e
                   ; return reg }
 
-newTemp :: CmmType -> FCode LocalReg
-newTemp rep = do { uniq <- newUnique
+newTemp :: MonadUnique m => CmmType -> m LocalReg
+newTemp rep = do { uniq <- getUniqueM
                  ; return (LocalReg uniq rep) }
 
 newUnboxedTupleRegs :: Type -> FCode ([LocalReg], [ForeignHint])

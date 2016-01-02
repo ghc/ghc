@@ -41,6 +41,7 @@ import ForeignCall
 import DynFlags
 import Maybes
 import Outputable
+import UniqSupply
 import BasicTypes
 
 import Control.Monad
@@ -274,22 +275,20 @@ maybe_assign_temp e = do
 emitSaveThreadState :: FCode ()
 emitSaveThreadState = do
   dflags <- getDynFlags
+  code <- saveThreadState dflags
+  emit code
+
+-- | Produce code to save the current thread state to @CurrentTSO@
+saveThreadState :: MonadUnique m => DynFlags -> m CmmAGraph
+saveThreadState dflags = do
   tso <- newTemp (gcWord dflags)
-  cn <- newTemp (bWord dflags)
-  emit $ saveThreadState dflags tso cn
-
-
--- saveThreadState must be usable from the stack layout pass, where we
--- don't have FCode.  Therefore it takes LocalRegs as arguments, so
--- the caller can create these.
-saveThreadState :: DynFlags -> LocalReg -> LocalReg -> CmmAGraph
-saveThreadState dflags tso cn =
-  catAGraphs [
+  close_nursery <- closeNursery dflags tso
+  pure $ catAGraphs [
     -- tso = CurrentTSO;
     mkAssign (CmmLocal tso) stgCurrentTSO,
     -- tso->stackobj->sp = Sp;
     mkStore (cmmOffset dflags (CmmLoad (cmmOffset dflags (CmmReg (CmmLocal tso)) (tso_stackobj dflags)) (bWord dflags)) (stack_SP dflags)) stgSp,
-    closeNursery dflags tso cn,
+    close_nursery,
     -- and save the current cost centre stack in the TSO when profiling:
     if gopt Opt_SccProfilingOn dflags then
         mkStore (cmmOffset dflags (CmmReg (CmmLocal tso)) (tso_CCCS dflags)) curCCS
@@ -299,14 +298,18 @@ saveThreadState dflags tso cn =
 emitCloseNursery :: FCode ()
 emitCloseNursery = do
   dflags <- getDynFlags
-  tso <- newTemp (gcWord dflags)
-  cn <- newTemp (bWord dflags)
-  emit $ mkAssign (CmmLocal tso) stgCurrentTSO <*>
-         closeNursery dflags tso cn
+  tso <- newTemp (bWord dflags)
+  code <- closeNursery dflags tso
+  emit $ mkAssign (CmmLocal tso) stgCurrentTSO <*> code
 
-{-
+{- |
+@closeNursery dflags tso@ produces code to close the nursery.
+A local register holding the value of @CurrentTSO@ is expected for
+efficiency.
+
 Closing the nursery corresponds to the following code:
 
+@
   tso = CurrentTSO;
   cn = CurrentNuresry;
 
@@ -318,15 +321,13 @@ Closing the nursery corresponds to the following code:
 
   // Set cn->free to the next unoccupied word in the block
   cn->free = Hp + WDS(1);
+@
 -}
-
-closeNursery :: DynFlags -> LocalReg -> LocalReg -> CmmAGraph
-closeNursery df tso cn =
-  let
-      tsoreg     = CmmLocal tso
-      cnreg      = CmmLocal cn
-  in
-  catAGraphs [
+closeNursery :: MonadUnique m => DynFlags -> LocalReg -> m CmmAGraph
+closeNursery df tso = do
+  let tsoreg  = CmmLocal tso
+  cnreg      <- CmmLocal <$> newTemp (bWord df)
+  pure $ catAGraphs [
     mkAssign cnreg stgCurrentNursery,
 
     -- CurrentNursery->free = Hp+1;
@@ -350,21 +351,16 @@ closeNursery df tso cn =
 emitLoadThreadState :: FCode ()
 emitLoadThreadState = do
   dflags <- getDynFlags
+  code <- loadThreadState dflags
+  emit code
+
+-- | Produce code to load the current thread state from @CurrentTSO@
+loadThreadState :: MonadUnique m => DynFlags -> m CmmAGraph
+loadThreadState dflags = do
   tso <- newTemp (gcWord dflags)
   stack <- newTemp (gcWord dflags)
-  cn <- newTemp (bWord dflags)
-  bdfree <- newTemp (bWord dflags)
-  bdstart <- newTemp (bWord dflags)
-  emit $ loadThreadState dflags tso stack cn bdfree bdstart
-
--- loadThreadState must be usable from the stack layout pass, where we
--- don't have FCode.  Therefore it takes LocalRegs as arguments, so
--- the caller can create these.
-loadThreadState :: DynFlags
-                -> LocalReg -> LocalReg -> LocalReg -> LocalReg -> LocalReg
-                -> CmmAGraph
-loadThreadState dflags tso stack cn bdfree bdstart =
-  catAGraphs [
+  open_nursery <- openNursery dflags tso
+  pure $ catAGraphs [
     -- tso = CurrentTSO;
     mkAssign (CmmLocal tso) stgCurrentTSO,
     -- stack = tso->stackobj;
@@ -378,7 +374,7 @@ loadThreadState dflags tso stack cn bdfree bdstart =
     --   HpAlloc is assumed to be set to non-zero only by a failed
     --   a heap check, see HeapStackCheck.cmm:GC_GENERIC
     mkAssign hpAlloc (zeroExpr dflags),
-    openNursery dflags tso cn bdfree bdstart,
+    open_nursery,
     -- and load the current cost centre stack from the TSO when profiling:
     if gopt Opt_SccProfilingOn dflags
        then storeCurCCS
@@ -391,16 +387,17 @@ loadThreadState dflags tso stack cn bdfree bdstart =
 emitOpenNursery :: FCode ()
 emitOpenNursery = do
   dflags <- getDynFlags
-  tso <- newTemp (gcWord dflags)
-  cn <- newTemp (bWord dflags)
-  bdfree <- newTemp (bWord dflags)
-  bdstart <- newTemp (bWord dflags)
-  emit $ mkAssign (CmmLocal tso) stgCurrentTSO <*>
-         openNursery dflags tso cn bdfree bdstart
+  tso <- newTemp (bWord dflags)
+  code <- openNursery dflags tso
+  emit $ mkAssign (CmmLocal tso) stgCurrentTSO <*> code
 
-{-
+{- |
+@openNursery dflags tso@ produces code to open the nursery. A local register
+holding the value of @CurrentTSO@ is expected for efficiency.
+
 Opening the nursery corresponds to the following code:
 
+@
    tso = CurrentTSO;
    cn = CurrentNursery;
    bdfree = CurrentNuresry->free;
@@ -420,23 +417,20 @@ Opening the nursery corresponds to the following code:
    // Set HpLim to the end of the current nursery block (note that this block
    // might be a block group, consisting of several adjacent blocks.
    HpLim = bdstart + CurrentNursery->blocks*BLOCK_SIZE_W - 1;
+@
 -}
+openNursery :: MonadUnique m => DynFlags -> LocalReg -> m CmmAGraph
+openNursery df tso = do
+  let tsoreg =  CmmLocal tso
+  cnreg      <- CmmLocal <$> newTemp (bWord df)
+  bdfreereg  <- CmmLocal <$> newTemp (bWord df)
+  bdstartreg <- CmmLocal <$> newTemp (bWord df)
 
-openNursery :: DynFlags
-            -> LocalReg -> LocalReg -> LocalReg -> LocalReg
-            -> CmmAGraph
-openNursery df tso cn bdfree bdstart =
-  let
-      tsoreg     = CmmLocal tso
-      cnreg      = CmmLocal cn
-      bdfreereg  = CmmLocal bdfree
-      bdstartreg = CmmLocal bdstart
-  in
   -- These assignments are carefully ordered to reduce register
   -- pressure and generate not completely awful code on x86.  To see
   -- what code we generate, look at the assembly for
   -- stg_returnToStackTop in rts/StgStartup.cmm.
-  catAGraphs [
+  pure $ catAGraphs [
      mkAssign cnreg stgCurrentNursery,
      mkAssign bdfreereg  (CmmLoad (nursery_bdescr_free df cnreg)  (bWord df)),
 

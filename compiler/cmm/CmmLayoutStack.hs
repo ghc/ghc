@@ -19,6 +19,7 @@ import CmmProcPoint
 import SMRep
 import Hoopl
 import UniqSupply
+import StgCmmUtils      ( newTemp )
 import Maybes
 import UniqFM
 import Util
@@ -998,12 +999,9 @@ lowerSafeForeignCall dflags block
     id <- newTemp (bWord dflags)
     new_base <- newTemp (cmmRegType dflags (CmmGlobal BaseReg))
     let (caller_save, caller_load) = callerSaveVolatileRegs dflags
-    load_stack <- newTemp (gcWord dflags)
-    tso <- newTemp (gcWord dflags)
-    cn <- newTemp (bWord dflags)
-    bdfree <- newTemp (bWord dflags)
-    bdstart <- newTemp (bWord dflags)
-    let suspend = saveThreadState dflags tso cn  <*>
+    save_state_code <- saveThreadState dflags
+    load_state_code <- loadThreadState dflags
+    let suspend = save_state_code  <*>
                   caller_save <*>
                   mkMiddle (callSuspendThread dflags id intrbl)
         midCall = mkUnsafeCall tgt res args
@@ -1012,7 +1010,7 @@ lowerSafeForeignCall dflags block
                   -- might now have a different Capability!
                   mkAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base)) <*>
                   caller_load <*>
-                  loadThreadState dflags tso load_stack cn bdfree bdstart
+                  load_state_code
 
         (_, regs, copyout) =
              copyOutOflow dflags NativeReturn Jump (Young succ)
@@ -1049,9 +1047,6 @@ lowerSafeForeignCall dflags block
 
 foreignLbl :: FastString -> CmmExpr
 foreignLbl name = CmmLit (CmmLabel (mkForeignLabel name Nothing ForeignLabelInExternalPackage IsFunction))
-
-newTemp :: CmmType -> UniqSM LocalReg
-newTemp rep = getUniqueM >>= \u -> return (LocalReg u rep)
 
 callSuspendThread :: DynFlags -> LocalReg -> Bool -> CmmNode O O
 callSuspendThread dflags id intrbl =
