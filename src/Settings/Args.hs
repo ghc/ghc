@@ -7,6 +7,7 @@ import Settings.Builders.Alex
 import Settings.Builders.Ar
 import Settings.Builders.DeriveConstants
 import Settings.Builders.Gcc
+import Settings.Builders.GenApply
 import Settings.Builders.GenPrimopCode
 import Settings.Builders.Ghc
 import Settings.Builders.GhcCabal
@@ -25,6 +26,7 @@ import Settings.Packages.GhcPrim
 import Settings.Packages.Haddock
 import Settings.Packages.Hp2ps
 import Settings.Packages.IntegerGmp
+import Settings.Packages.Rts
 import Settings.Packages.RunGhc
 import Settings.User
 
@@ -44,6 +46,7 @@ defaultBuilderArgs = mconcat
     , deriveConstantsBuilderArgs
     , gccBuilderArgs
     , gccMBuilderArgs
+    , genApplyBuilderArgs
     , genPrimopCodeBuilderArgs
     , ghcBuilderArgs
     , ghcCabalBuilderArgs
@@ -67,4 +70,5 @@ defaultPackageArgs = mconcat
     , haddockPackageArgs
     , hp2psPackageArgs
     , integerGmpPackageArgs
+    , rtsPackageArgs
     , runGhcPackageArgs ]

@@ -38,6 +38,7 @@ executable ghc-shake
                        , Rules.Cabal
                        , Rules.Compile
                        , Rules.Config
+                       , Rules.Copy
                        , Rules.Data
                        , Rules.Dependencies
                        , Rules.Documentation
@@ -48,7 +49,6 @@ executable ghc-shake
                        , Rules.Generators.GhcPlatformH
                        , Rules.Generators.GhcVersionH
                        , Rules.Generators.VersionHs
-                       , Rules.Install
                        , Rules.Library
                        , Rules.Oracles
                        , Rules.Package
@@ -63,6 +63,7 @@ executable ghc-shake
                        , Settings.Builders.Common
                        , Settings.Builders.DeriveConstants
                        , Settings.Builders.Gcc
+                       , Settings.Builders.GenApply
                        , Settings.Builders.GenPrimopCode
                        , Settings.Builders.Ghc
                        , Settings.Builders.GhcCabal
@@ -82,6 +83,7 @@ executable ghc-shake
                        , Settings.Packages.Haddock
                        , Settings.Packages.Hp2ps
                        , Settings.Packages.IntegerGmp
+                       , Settings.Packages.Rts
                        , Settings.Packages.RunGhc
                        , Settings.TargetDirectory
                        , Settings.User

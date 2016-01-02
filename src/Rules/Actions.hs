@@ -27,14 +27,12 @@ buildWithResources rs target = do
         quietlyUnlessVerbose $ case builder of
             Ar -> arCmd path argList
 
-            HsCpp -> do
-                let file = head $ Target.outputs target  -- TODO: ugly
-                Stdout output <- cmd [path] argList
-                writeFileChanged file output
+            HsCpp    -> captureStdout target path argList
+            GenApply -> captureStdout target path argList
 
             GenPrimopCode -> do
-                let src  = head $ Target.inputs target -- TODO: ugly
-                    file = head $ Target.outputs target
+                src  <- interpret target getInput
+                file <- interpret target getOutput
                 input <- readFile' src
                 Stdout output <- cmd (Stdin input) [path] argList
                 writeFileChanged file output
@@ -44,6 +42,12 @@ buildWithResources rs target = do
 -- Most targets are built without explicitly acquiring resources
 build :: Target -> Action ()
 build = buildWithResources []
+
+captureStdout :: Target -> FilePath -> [String] -> Action ()
+captureStdout target path argList = do
+    file <- interpret target getOutput
+    Stdout output <- cmd [path] argList
+    writeFileChanged file output
 
 -- Print out key information about the command being executed
 putInfo :: Target.Target -> Action ()

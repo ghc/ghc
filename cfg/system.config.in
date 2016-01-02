@@ -22,6 +22,7 @@ haddock          = inplace/bin/haddock
 hsc2hs           = inplace/bin/hsc2hs
 
 genprimopcode    = inplace/bin/genprimopcode
+genapply         = inplace/bin/genapply
 derive-constants = inplace/bin/deriveConstants
 
 hs-cpp           = @HaskellCPPCmd@

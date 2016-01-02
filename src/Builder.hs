@@ -25,6 +25,7 @@ data Builder = Alex
              | DeriveConstants
              | Gcc Stage
              | GccM Stage
+             | GenApply
              | GenPrimopCode
              | Ghc Stage
              | GhcCabal
@@ -60,6 +61,7 @@ builderKey builder = case builder of
     Gcc Stage0       -> "system-gcc"
     Gcc _            -> "gcc"
     GccM stage       -> builderKey $ Gcc stage -- synonym for 'Gcc -MM'
+    GenApply         -> "genapply"
     GenPrimopCode    -> "genprimopcode"
     Ghc Stage0       -> "system-ghc"
     Ghc Stage1       -> "ghc-stage1"
