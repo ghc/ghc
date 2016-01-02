@@ -4,7 +4,7 @@ module CmmLayoutStack (
   ) where
 
 import StgCmmUtils      ( callerSaveVolatileRegs ) -- XXX layering violation
-import StgCmmForeign    ( saveThreadState, loadThreadState ) -- XXX layering violation
+import StgCmmForeign    ( saveThreadState, loadThreadState, InitialSp ) -- XXX layering violation
 
 import BasicTypes
 import Cmm
@@ -999,6 +999,32 @@ expecting them (see Note {safe foreign call convention]). Note also
 that safe foreign call is replace by an unsafe one in the Cmm graph.
 -}
 
+findLastUnwinding :: GlobalReg -> CmmBlock -> Maybe CmmExpr
+findLastUnwinding reg block =
+    case mapMaybe isUnwind $ blockToList mid of
+      [] -> Nothing
+      xs -> Just $ last xs
+  where
+    (_,mid,_) = blockSplit block
+    isUnwind (CmmUnwind _ reg' expr)
+      | reg == reg'  = Just expr
+    isUnwind _       = Nothing
+
+-- | @substReg reg expr subst@ replaces all occurrences of @CmmReg reg@ in
+-- @expr@ with @subst@.
+substReg :: DynFlags -> CmmReg -> CmmExpr -> CmmExpr -> CmmExpr
+substReg dflags reg = go
+  where
+    go (CmmReg reg')        subst
+      | reg == reg'               = subst
+    go (CmmRegOff reg' off) subst
+      | reg == reg'               =
+        CmmMachOp (MO_Add rep) [subst, CmmLit (CmmInt (fromIntegral off) rep)]
+      where rep = typeWidth (cmmRegType dflags reg')
+    go (CmmLoad e ty)       subst = CmmLoad (go e subst) ty
+    go (CmmMachOp op es)    subst = CmmMachOp op (map (flip go subst) es)
+    go other                _     = other
+
 lowerSafeForeignCall :: DynFlags -> CmmBlock -> UniqSM CmmBlock
 lowerSafeForeignCall dflags block
   | (entry@(CmmEntry _ tscp), middle, CmmForeignCall { .. }) <- blockSplit block
@@ -1008,8 +1034,11 @@ lowerSafeForeignCall dflags block
     id <- newTemp (bWord dflags)
     new_base <- newTemp (cmmRegType dflags (CmmGlobal BaseReg))
     let (caller_save, caller_load) = callerSaveVolatileRegs dflags
-    save_state_code <- saveThreadState dflags Nothing
-    load_state_code <- loadThreadState dflags Nothing
+    let initialSp = findLastUnwinding Sp block
+        substSp :: Maybe InitialSp
+        substSp = substReg dflags (CmmGlobal Sp) <$> initialSp
+    save_state_code <- saveThreadState dflags substSp
+    load_state_code <- loadThreadState dflags substSp
     let suspend = save_state_code  <*>
                   caller_save <*>
                   mkMiddle (callSuspendThread dflags id intrbl)
