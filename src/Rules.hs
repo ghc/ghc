@@ -2,7 +2,8 @@ module Rules (generateTargets, packageRules) where
 
 import Base
 import Expression
-import Rules.Install
+import GHC
+import Rules.Copy
 import Rules.Package
 import Rules.Resources
 import Settings
@@ -13,7 +14,7 @@ generateTargets :: Rules ()
 generateTargets = action $ do
     targets <- fmap concat . forM [Stage0 ..] $ \stage -> do
         pkgs <- interpretWithStage stage getPackages
-        let libPkgs = filter isLibrary pkgs
+        let libPkgs = filter isLibrary pkgs \\ [rts]
         libTargets <- fmap concat . forM libPkgs $ \pkg -> do
             let target = PartialTarget stage pkg
             needHaddock <- interpretPartial target buildHaddock
@@ -21,7 +22,8 @@ generateTargets = action $ do
         let programTargets = [ prog | Just prog <- programPath stage <$> pkgs ]
         return $ libTargets ++ programTargets
 
-    need $ targets ++ installTargets
+    rtsLib <- pkgLibraryFile Stage1 rts "rts" vanilla
+    need $ targets ++ installTargets ++ [ rtsLib ]
 
 packageRules :: Rules ()
 packageRules = do

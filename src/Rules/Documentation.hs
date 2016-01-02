@@ -2,6 +2,7 @@ module Rules.Documentation (buildPackageDocumentation) where
 
 import Base
 import Expression
+import GHC
 import Oracles
 import Rules.Actions
 import Rules.Resources
@@ -19,7 +20,8 @@ buildPackageDocumentation _ target @ (PartialTarget stage pkg) =
             srcs <- interpretPartial target getPackageSources
             deps <- map PackageName <$> interpretPartial target (getPkgDataList DepNames)
             let haddocks = [ pkgHaddockFile depPkg
-                           | Just depPkg <- map findKnownPackage deps ]
+                           | Just depPkg <- map findKnownPackage deps
+                           , depPkg /= rts ]
             need $ srcs ++ haddocks
 
             -- HsColour sources

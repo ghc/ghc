@@ -73,6 +73,24 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
             writeFileChanged mk contents
             putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 
+        when (pkg == rts) $ dataFile %> \mk -> do
+            windows <- windowsHost
+            let prefix = "rts_" ++ stageString stage ++ "_"
+                dirs   = [ ".", "hooks", "sm", "eventlog" ]
+                      ++ [ "posix" | not windows ]
+                      ++ [ "win32" |     windows ]
+            -- TODO: rts/dist/build/sm/Evac_thr.c, rts/dist/build/sm/Scav_thr.c
+            -- TODO: adding cmm sources to C_SRCS is a hack; rethink after #18
+            cSrcs    <- getDirectoryFiles (pkgPath pkg) (map (-/- "*.c") dirs)
+            cmmSrcs  <- getDirectoryFiles (pkgPath pkg) ["*.cmm"]
+            let extraSrcs = [ targetDirectory Stage1 rts -/- "build/AutoApply.cmm" ]
+            includes <- interpretPartial target $ fromDiffExpr includesArgs
+            let contents = unlines $ map (prefix++)
+                    [ "C_SRCS = "   ++ unwords (cSrcs ++ cmmSrcs ++ extraSrcs)
+                    , "CC_OPTS = "  ++ unwords includes ]
+            writeFileChanged mk contents
+            putSuccess $ "| Successfully generated '" ++ mk ++ "'."
+
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'
 -- For example, get rid of

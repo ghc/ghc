@@ -17,7 +17,6 @@ ghcBuilderArgs :: Args
 ghcBuilderArgs = stagedBuilder Ghc ? do
     output <- getOutput
     way    <- getWay
-    pkg    <- getPackage
     let buildObj = ("//*." ++ osuf way) ?== output || ("//*." ++ obootsuf way) ?== output
     libs    <- getPkgDataList DepExtraLibs
     libDirs <- getPkgDataList DepLibDirs
@@ -27,7 +26,7 @@ ghcBuilderArgs = stagedBuilder Ghc ? do
             , notStage0 ? arg "-O2"
             , arg "-Wall"
             , arg "-fwarn-tabs"
-            , isLibrary pkg ? splitObjects ? arg "-split-objs"
+            , splitObjects ? arg "-split-objs"
             , not buildObj ? arg "-no-auto-link-packages"
             , not buildObj ? append [ "-optl-l" ++ lib | lib <- libs    ]
             , not buildObj ? append [ "-optl-L" ++ dir | dir <- libDirs ]

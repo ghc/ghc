@@ -32,8 +32,6 @@ derivedConstantsPath = "includes/dist-derivedconstants/header"
 -- TODO: can we drop COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS)?
 generatedDependencies :: Stage -> Package -> [FilePath]
 generatedDependencies stage pkg
-    | pkg == hp2ps    = [ "includes/ghcautoconf.h"
-                        , "includes/ghcplatform.h" ]
     | pkg == compiler = let buildPath = targetPath stage compiler -/- "build"
                         in
                         [ "includes/ghcautoconf.h"
@@ -60,14 +58,19 @@ generatedDependencies stage pkg
                         , "primop-vector-tys-exports.hs-incl"
                         , "primop-vector-tycons.hs-incl"
                         , "primop-vector-tys.hs-incl" ]
+    | pkg == hp2ps    = [ "includes/ghcautoconf.h"
+                        , "includes/ghcplatform.h" ]
+    | pkg == rts      = let buildPath = targetPath stage rts -/- "build"
+                        in
+                        fmap (buildPath -/-) ["ffi.h", "ffitarget.h"]
     | otherwise = []
 
 -- The following generators and corresponding source extensions are supported:
 knownGenerators :: [ (Builder, String) ]
-knownGenerators =  [ (Alex   , ".x"  )
-                   , (Happy  , ".y"  )
-                   , (Happy  , ".ly" )
-                   , (Hsc2Hs , ".hsc") ]
+knownGenerators =  [ (Alex  , ".x"  )
+                   , (Happy , ".y"  )
+                   , (Happy , ".ly" )
+                   , (Hsc2Hs, ".hsc") ]
 
 determineBuilder :: FilePath -> Maybe Builder
 determineBuilder file = fmap fst $ find (\(_, e) -> e == ext) knownGenerators
@@ -114,6 +117,9 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
             , "*.hs-incl" ] |%> \file -> do
                 need [primopsTxt stage]
                 build $ fullTarget target GenPrimopCode [primopsTxt stage] [file]
+
+        when (pkg == rts) $ buildPath -/- "AutoApply.cmm" %> \file -> do
+            build $ fullTarget target GenApply [] [file]
 
         priority 2.0 $ do
             when (pkg == compiler && stage == Stage1) $

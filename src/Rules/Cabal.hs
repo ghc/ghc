@@ -29,7 +29,7 @@ cabalRules = do
     -- Cache package dependencies
     packageDependencies %> \out -> do
         pkgs <- interpretWithStage Stage1 getPackages
-        pkgDeps <- forM (sort pkgs) $ \pkg -> do
+        pkgDeps <- forM (sort pkgs) $ \pkg -> if pkg == rts then return [] else do
             need [pkgCabalFile pkg]
             pd <- liftIO . readPackageDescription silent $ pkgCabalFile pkg
             let depsLib  = collectDeps $ condLibrary pd

@@ -1,6 +1,6 @@
 -- | Convenient predicates
 module Predicates (
-    stage, package, builder, stagedBuilder, builderGhc, file, way,
+    stage, package, builder, stagedBuilder, builderGcc, builderGhc, file, way,
     stage0, stage1, stage2, notStage0, notPackage, registerPackage, splitObjects
     ) where
 
@@ -23,6 +23,9 @@ builder b = fmap (b ==) getBuilder
 -- For staged builders, e.g. Ghc Stage
 stagedBuilder :: (Stage -> Builder) -> Predicate
 stagedBuilder sb = (builder . sb) =<< getStage
+
+builderGcc :: Predicate
+builderGcc = stagedBuilder Gcc ||^ stagedBuilder GccM
 
 builderGhc :: Predicate
 builderGhc = stagedBuilder Ghc ||^ stagedBuilder GhcM
@@ -55,7 +58,8 @@ registerPackage = return True
 
 splitObjects :: Predicate
 splitObjects = do
-    goodStage   <- notStage0 -- We don't split bootstrap (stage 0) packages
-    goodPackage <- notM $ package compiler -- We don't split compiler
-    supported   <- lift supportsSplitObjects
+    goodStage <- notStage0 -- We don't split bootstrap (stage 0) packages
+    pkg       <- getPackage
+    supported <- lift supportsSplitObjects
+    let goodPackage = isLibrary pkg && pkg /= compiler && pkg /= rts
     return $ goodStage && goodPackage && supported

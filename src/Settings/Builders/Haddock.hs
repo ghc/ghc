@@ -37,7 +37,8 @@ haddockBuilderArgs = builder Haddock ? do
                      ++ ",../" ++ dep ++ "/src/%{MODULE/./-}.html\\#%{NAME},"
                      ++ pkgHaddockFile depPkg
                    | (dep, depName) <- zip deps depNames
-                   , Just depPkg <- [findKnownPackage $ PackageName depName] ]
+                   , Just depPkg <- [findKnownPackage $ PackageName depName]
+                   , depPkg /= rts ]
         , append [ "--optghc=" ++ opt | opt <- ghcOpts ]
         , specified HsColour ?
           arg "--source-module=src/%{MODULE/./-}.html"

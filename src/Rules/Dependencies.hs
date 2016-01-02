@@ -16,7 +16,7 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
         dropBuild = (pkgPath pkg ++) . drop (length buildPath)
         hDepFile  = buildPath -/- ".hs-dependencies"
     in do
-        (buildPath <//> "*.c.deps") %> \out -> do
+        [ buildPath ++ "//*.c.deps", buildPath ++ "//*.cmm.deps" ] |%> \out -> do
             let srcFile = dropBuild . dropExtension $ out
             orderOnly $ generatedDependencies stage pkg
             need [srcFile]
