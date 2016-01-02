@@ -12,6 +12,7 @@ module StgCmmForeign (
   cgForeignCall,
   emitPrimCall, emitCCall,
   emitForeignCall,     -- For CmmParse
+  InitialSp,
   emitSaveThreadState,
   saveThreadState,
   emitLoadThreadState,
@@ -30,6 +31,7 @@ import StgCmmUtils
 import StgCmmClosure
 import StgCmmLayout
 
+import BlockId (newBlockId)
 import Cmm
 import CmmUtils
 import MkGraph
@@ -275,19 +277,34 @@ maybe_assign_temp e = do
 emitSaveThreadState :: FCode ()
 emitSaveThreadState = do
   dflags <- getDynFlags
-  code <- saveThreadState dflags
+  code <- saveThreadState dflags Nothing
   emit code
 
+-- | Given a @initial :: InitialSp@, @initial (CmmReg sp)@ is an expression
+-- of the current.
+type InitialSp = CmmExpr -> CmmExpr
+
 -- | Produce code to save the current thread state to @CurrentTSO@
-saveThreadState :: MonadUnique m => DynFlags -> m CmmAGraph
-saveThreadState dflags = do
+saveThreadState :: MonadUnique m => DynFlags -> Maybe InitialSp -> m CmmAGraph
+saveThreadState dflags initialSp = do
   tso <- newTemp (gcWord dflags)
   close_nursery <- closeNursery dflags tso
+  lbl <- newBlockId
+
   pure $ catAGraphs [
     -- tso = CurrentTSO;
     mkAssign (CmmLocal tso) stgCurrentTSO,
     -- tso->stackobj->sp = Sp;
     mkStore (cmmOffset dflags (CmmLoad (cmmOffset dflags (CmmReg (CmmLocal tso)) (tso_stackobj dflags)) (bWord dflags)) (stack_SP dflags)) stgSp,
+    -- unwind Sp = initialSp(tso->stackobj->sp)
+    case initialSp of
+      Just initial | debugLevel dflags > 0 ->
+        let tsoValue =
+              CmmLoad (cmmOffset dflags stgCurrentTSO (tso_stackobj dflags))
+                      (bWord dflags)
+            spValue = cmmOffset dflags tsoValue (stack_SP dflags)
+        in mkUnwind (NewLabel lbl) Sp (initial $ CmmLoad spValue (bWord dflags))
+      _ -> mkNop,
     close_nursery,
     -- and save the current cost centre stack in the TSO when profiling:
     if gopt Opt_SccProfilingOn dflags then
@@ -351,15 +368,16 @@ closeNursery df tso = do
 emitLoadThreadState :: FCode ()
 emitLoadThreadState = do
   dflags <- getDynFlags
-  code <- loadThreadState dflags
+  code <- loadThreadState dflags Nothing
   emit code
 
 -- | Produce code to load the current thread state from @CurrentTSO@
-loadThreadState :: MonadUnique m => DynFlags -> m CmmAGraph
-loadThreadState dflags = do
+loadThreadState :: MonadUnique m => DynFlags -> Maybe (CmmExpr -> CmmExpr) -> m CmmAGraph
+loadThreadState dflags initialSp = do
   tso <- newTemp (gcWord dflags)
   stack <- newTemp (gcWord dflags)
   open_nursery <- openNursery dflags tso
+  lbl <- newBlockId
   pure $ catAGraphs [
     -- tso = CurrentTSO;
     mkAssign (CmmLocal tso) stgCurrentTSO,
@@ -367,6 +385,11 @@ loadThreadState dflags = do
     mkAssign (CmmLocal stack) (CmmLoad (cmmOffset dflags (CmmReg (CmmLocal tso)) (tso_stackobj dflags)) (bWord dflags)),
     -- Sp = stack->sp;
     mkAssign sp (CmmLoad (cmmOffset dflags (CmmReg (CmmLocal stack)) (stack_SP dflags)) (bWord dflags)),
+    -- unwind Sp = initialSp(Sp);
+    case initialSp of
+      Just initial | debugLevel dflags > 0 ->
+        mkUnwind (NewLabel lbl) Sp (initial (CmmReg sp))
+      _ -> mkNop,
     -- SpLim = stack->stack + RESERVED_STACK_WORDS;
     mkAssign spLim (cmmOffsetW dflags (cmmOffset dflags (CmmReg (CmmLocal stack)) (stack_STACK dflags))
                                 (rESERVED_STACK_WORDS dflags)),

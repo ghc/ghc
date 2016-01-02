@@ -7,7 +7,7 @@ module MkGraph
   , lgraphOfAGraph, labelAGraph
 
   , stackStubExpr
-  , mkNop, mkAssign, mkStore, mkUnsafeCall, mkFinalCall, mkCallReturnsTo
+  , mkNop, mkAssign, mkStore, mkUnwind, mkUnsafeCall, mkFinalCall, mkCallReturnsTo
   , mkJumpReturnsTo
   , mkJump, mkJumpExtra
   , mkRawJump
@@ -195,6 +195,9 @@ mkAssign l r  = mkMiddle $ CmmAssign l r
 
 mkStore      :: CmmExpr -> CmmExpr -> CmmAGraph
 mkStore  l r  = mkMiddle $ CmmStore  l r
+
+mkUnwind     :: NewOrExistingLabel -> GlobalReg -> CmmExpr -> CmmAGraph
+mkUnwind lbl r e = mkMiddle $ CmmUnwind lbl r e
 
 ---------- Control transfer
 mkJump          :: DynFlags -> Convention -> CmmExpr

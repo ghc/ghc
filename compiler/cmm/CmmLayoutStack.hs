@@ -1008,8 +1008,8 @@ lowerSafeForeignCall dflags block
     id <- newTemp (bWord dflags)
     new_base <- newTemp (cmmRegType dflags (CmmGlobal BaseReg))
     let (caller_save, caller_load) = callerSaveVolatileRegs dflags
-    save_state_code <- saveThreadState dflags
-    load_state_code <- loadThreadState dflags
+    save_state_code <- saveThreadState dflags Nothing
+    load_state_code <- loadThreadState dflags Nothing
     let suspend = save_state_code  <*>
                   caller_save <*>
                   mkMiddle (callSuspendThread dflags id intrbl)
