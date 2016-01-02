@@ -650,22 +650,23 @@ qcnames :: { ([AddAnn], [Located (Maybe RdrName)]) }
   | qcnames1                      { $1 }
 
 qcnames1 :: { ([AddAnn], [Located (Maybe RdrName)]) }     -- A reversed list
-        :  qcnames1 ',' qcname_ext_w_wildcard  {% case (last (snd $1)) of
+        :  qcnames1 ',' qcname_ext_w_wildcard  {% case (head (snd $1)) of
                                                     l@(L _ Nothing) ->
-                                                      return ([mj AnnComma $2, mj AnnDotdot l]
-                                                              ,($3  : snd $1))
-                                                    l -> (aa (head (snd $1)) (AnnComma, $2) >>
-                                                          return (fst $1, $3 : snd $1)) }
+                                                       return ([mj AnnComma $2, mj AnnDotdot l]
+                                                               ,(snd (unLoc $3)  : snd $1))
+                                                    l -> (ams (head (snd $1)) [mj AnnComma $2] >>
+                                                          return (fst $1 ++ fst (unLoc $3),
+                                                                  snd (unLoc $3) : snd $1)) }
 
 
-        -- Annotations readded in mkImpExpSubSpec
-        |  qcname_ext_w_wildcard                   { ([],[$1])  }
+        -- Annotations re-added in mkImpExpSubSpec
+        |  qcname_ext_w_wildcard                   { (fst (unLoc $1),[snd (unLoc $1)]) }
 
 -- Variable, data constructor or wildcard
 -- or tagged type constructor
-qcname_ext_w_wildcard :: { Located (Maybe RdrName) }
-        :  qcname_ext               { Just `fmap` $1 }
-        |  '..'                     { Nothing <$ $1 }
+qcname_ext_w_wildcard :: { Located ([AddAnn],Located (Maybe RdrName)) }
+        :  qcname_ext               { sL1 $1 ([],Just `fmap` $1) }
+        |  '..'                     { sL1 $1 ([mj AnnDotdot $1], sL1 $1 Nothing) }
 
 qcname_ext :: { Located RdrName }
         :  qcname                   { $1 }
