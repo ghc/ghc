@@ -287,7 +287,13 @@ saveThreadState dflags = do
     -- tso = CurrentTSO;
     mkAssign (CmmLocal tso) stgCurrentTSO,
     -- tso->stackobj->sp = Sp;
-    mkStore (cmmOffset dflags (CmmLoad (cmmOffset dflags (CmmReg (CmmLocal tso)) (tso_stackobj dflags)) (bWord dflags)) (stack_SP dflags)) stgSp,
+    mkStore (cmmOffset dflags
+                       (CmmLoad (cmmOffset dflags
+                                           (CmmReg (CmmLocal tso))
+                                           (tso_stackobj dflags))
+                                (bWord dflags))
+                       (stack_SP dflags))
+            stgSp,
     close_nursery,
     -- and save the current cost centre stack in the TSO when profiling:
     if gopt Opt_SccProfilingOn dflags then
