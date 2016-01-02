@@ -47,3 +47,4 @@ test('T10897', normal, multi_compile, ['T10897', [
 test('T11224b', normal, compile, [''])
 test('MoreEx', normal, compile, [''])
 test('T11283', normal, compile, [''])
+test('T11336', normal, compile, [''])
