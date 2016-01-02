@@ -295,7 +295,13 @@ saveThreadState dflags initialSp = do
     -- tso = CurrentTSO;
     mkAssign (CmmLocal tso) stgCurrentTSO,
     -- tso->stackobj->sp = Sp;
-    mkStore (cmmOffset dflags (CmmLoad (cmmOffset dflags (CmmReg (CmmLocal tso)) (tso_stackobj dflags)) (bWord dflags)) (stack_SP dflags)) stgSp,
+    mkStore (cmmOffset dflags
+                       (CmmLoad (cmmOffset dflags
+                                           (CmmReg (CmmLocal tso))
+                                           (tso_stackobj dflags))
+                                (bWord dflags))
+                       (stack_SP dflags))
+            stgSp,
     -- unwind Sp = initialSp(tso->stackobj->sp)
     case initialSp of
       Just initial | debugLevel dflags > 0 ->
