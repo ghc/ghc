@@ -4,6 +4,7 @@
 {- BlockId module should probably go away completely, being superseded by Label -}
 module BlockId
   ( BlockId, mkBlockId -- ToDo: BlockId should be abstract, but it isn't yet
+  , newBlockId
   , BlockSet, BlockEnv
   , IsSet(..), setInsertList, setDeleteList, setUnions
   , IsMap(..), mapInsertList, mapDeleteList, mapUnions
@@ -16,6 +17,7 @@ import IdInfo
 import Name
 import Outputable
 import Unique
+import UniqSupply
 
 import Compiler.Hoopl as Hoopl hiding (Unique)
 import Compiler.Hoopl.Internals (uniqueToLbl, lblToUnique)
@@ -42,6 +44,9 @@ instance Outputable BlockId where
 
 mkBlockId :: Unique -> BlockId
 mkBlockId unique = uniqueToLbl $ intToUnique $ getKey unique
+
+newBlockId :: MonadUnique m => m BlockId
+newBlockId = mkBlockId <$> getUniqueM
 
 retPtLbl :: BlockId -> CLabel
 retPtLbl label = mkReturnPtLabel $ getUnique label
