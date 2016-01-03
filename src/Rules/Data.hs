@@ -87,7 +87,8 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
             includes <- interpretPartial target $ fromDiffExpr includesArgs
             let contents = unlines $ map (prefix++)
                     [ "C_SRCS = "   ++ unwords (cSrcs ++ cmmSrcs ++ extraSrcs)
-                    , "CC_OPTS = "  ++ unwords includes ]
+                    , "CC_OPTS = "  ++ unwords includes
+                    , "COMPONENT_ID = " ++ "rts" ]
             writeFileChanged mk contents
             putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 
