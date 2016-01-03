@@ -2758,7 +2758,9 @@ ocFlushInstructionCache( ObjectCode *oc )
     }
 
     // Jump islands
-    __clear_cache(oc->symbol_extras, &oc->symbol_extras[oc->n_symbol_extras]);
+    // Note the (+1) to ensure that the last symbol extra is covered by the
+    // flush.
+    __clear_cache(oc->symbol_extras, &oc->symbol_extras[oc->n_symbol_extras+1]);
 }
 
 #endif
