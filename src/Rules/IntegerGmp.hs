@@ -53,6 +53,7 @@ integerGmpRules = do
 
         -- remove the old build folder, if it exists.
         liftIO $ removeFiles integerGmpBuild ["//*"]
+        liftIO $ removeFiles (integerGmpBase -/- "objs") ["//*"]
 
         -- unpack the gmp tarball.
         -- Note: We use a tarball like gmp-4.2.4-nodoc.tar.bz2, which is
@@ -102,10 +103,13 @@ integerGmpRules = do
             copyFileChanged (integerGmpBuild -/- file) file'
             putBuild $ "| Copy " ++ file ++ " -> " ++ file'
 
-        -- TODO: do we need these as well?
-        -- mkdir integerGmpBase -/- objs
-        -- unit $ cmd Shell [Cwd integerGmpBase -/- "objs"] "$AR_STAGE1 x ../libgmp.a"
-        -- $RANLIB_CMD integerGmpBase -/- "libgmp.a"
+        ar  <- builderPath Ar
+        ran <- builderPath Ranlib
+        -- unpack libgmp.a
+        putBuild "| Unpacking libgmp.a..."
+        unit $ cmd Shell [Cwd integerGmpBase] "mkdir -p objs"
+        unit $ cmd Shell [Cwd (integerGmpBase -/- "objs")] [ar] " x ../libgmp.a"
+        unit $ cmd Shell [Cwd integerGmpBase] [ran] " libgmp.a"
 
         putSuccess "| Successfully build custom library 'integer-gmp'"
 
