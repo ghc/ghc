@@ -62,6 +62,9 @@ generatedDependencies stage pkg
                         , "includes/ghcplatform.h" ]
     | pkg == rts      = let buildPath = targetPath stage rts -/- "build"
                         in
+                        [ "includes/ghcversion.h" -- missing only in stage1. See #76
+                        , derivedConstantsPath -/- "DerivedConstants.h" ]
+                        ++
                         fmap (buildPath -/-) ["ffi.h", "ffitarget.h"]
     | otherwise = []
 
