@@ -5,6 +5,7 @@ import Rules.Config
 import Rules.Generate
 import Rules.Copy
 import Rules.Libffi
+import Rules.IntegerGmp
 import Rules.Oracles
 
 main :: IO ()
@@ -15,6 +16,7 @@ main = shakeArgs options $ do
     generateTargets -- see Rules
     generateRules   -- see Rules.Generate
     libffiRules     -- see Rules.Libffi
+    integerGmpRules -- see Rules.IntegerGmp
     oracleRules     -- see Rules.Oracles
     packageRules    -- see Rules
   where
