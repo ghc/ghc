@@ -5032,7 +5032,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
       int is_target_thm=0, T=0;
 #endif
 
-      IF_DEBUG(linker,debugBelch( "Rel entry %3d is raw(%6p %6p)",
+      IF_DEBUG(linker,debugBelch( "Rel entry %3d is raw(%6p %6p): ",
                              j, (void*)offset, (void*)info ));
       if (!info) {
          IF_DEBUG(linker,debugBelch( " ZERO" ));
