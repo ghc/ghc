@@ -229,7 +229,7 @@ procToFrame initUws blk
         flatten b@DebugBlock{ dblPosition=pos, dblUnwind=uws, dblBlocks=blocks }
           | Just p <- pos  = (p, (b, uws')):nested
           | otherwise      = nested -- block was optimized out
-          where uws'   = map (\(UnwindDecl lbl uw) -> UnwindDecl lbl (initUws `Map.union` uw)) uws
+          where uws'   = map (\(UnwindDecl lbl uw) -> UnwindDecl lbl (uw `Map.union` initUws)) uws
                 nested = concatMap flatten blocks
 
         -- | If the current procedure has an info table, then we also say that
