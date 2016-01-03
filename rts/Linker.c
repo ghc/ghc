@@ -2742,6 +2742,17 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
 #endif
 #endif // NEED_SYMBOL_EXTRAS
 
+// Signed extend a number to a 32-bit int.
+static inline StgInt32 sign_extend32(nat bits, StgWord32 x) {
+  return ((StgInt32) (x << (32 - bits))) >> (32 - bits);
+}
+
+// Does the given signed integer fit into the given bit width?
+static inline StgBool is_int(nat bits, StgInt32 x) {
+  return bits > 32 || (-(1 << (bits-1)) <= x
+                       && x < (1 << (bits-1)));
+}
+
 #if defined(arm_HOST_ARCH)
 
 static void
@@ -5068,15 +5079,16 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 #endif
       }
 
-      IF_DEBUG(linker,debugBelch( "Reloc: P = %p   S = %p   A = %p\n",
-                             (void*)P, (void*)S, (void*)A ));
+      int reloc_type = ELF_R_TYPE(info);
+      IF_DEBUG(linker,debugBelch( "Reloc: P = %p   S = %p   A = %p   type=%d\n",
+                             (void*)P, (void*)S, (void*)A, reloc_type ));
       checkProddableBlock ( oc, pP, sizeof(Elf_Word) );
 
 #ifdef i386_HOST_ARCH
       value = S + A;
 #endif
 
-      switch (ELF_R_TYPE(info)) {
+      switch (reloc_type) {
 #        ifdef i386_HOST_ARCH
          case R_386_32:   *pP = value;     break;
          case R_386_PC32: *pP = value - P; break;
@@ -5098,44 +5110,50 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
          case R_ARM_CALL:
          case R_ARM_JUMP24:
          {
+            // N.B. LLVM's LLD linker's relocation implement is a fantastic
+            // resource
             StgWord32 *word = (StgWord32 *)P;
-            StgInt32 imm = (*word & 0x00ffffff) << 2;
-            StgInt32 offset;
-            int overflow;
+            StgInt32 imm = (*word & ((1<<24)-1)) << 2;
 
-            // Sign extend 24 to 32 bits
-            if (imm & 0x02000000)
-               imm -= 0x04000000;
-            offset = ((S + imm) | T) - P;
+            const StgBool is_blx = (*word & 0xf0000000) == 0xf0000000;
+            const StgWord32 hBit = is_blx ? ((*word >> 24) & 1) : 0;
+            imm |= hBit << 1;
 
-            overflow = offset <= (StgInt32)0xfe000000 || offset >= (StgInt32)0x02000000;
+            // Sign extend to 32 bits
+            // I would have thought this would be 24 bits but LLD uses 26 here.
+            // Hmm.
+            imm = sign_extend32(26, imm);
 
+            StgWord32 result = ((S + imm) | T) - P;
+
+            const StgBool overflow = !is_int(26, (StgInt32) result);
+
+            // Handle overflow and Thumb interworking
             if ((is_target_thm && ELF_R_TYPE(info) == R_ARM_JUMP24) || overflow) {
                // Generate veneer
                // The +8 below is to undo the PC-bias compensation done by the object producer
                SymbolExtra *extra = makeArmSymbolExtra(oc, ELF_R_SYM(info), S+imm+8, 0, is_target_thm);
                // The -8 below is to compensate for PC bias
-               offset = (StgWord32) &extra->jumpIsland - P - 8;
-               offset &= ~1; // Clear thumb indicator bit
-            } else if (is_target_thm && ELF_R_TYPE(info) == R_ARM_CALL) {
-               StgWord32 cond = (*word & 0xf0000000) >> 28;
-               if (cond == 0xe) {
-                  // Change instruction to BLX
-                  *word |= 0xf0000000; // Set first nibble
-                  *word = (*word & ~0x01ffffff)
-                        | ((offset >> 2) & 0x00ffffff)  // imm24
-                        | ((offset & 0x2) << 23);       // H
-                  break;
-               } else {
-                  errorBelch("%s: Can't transition from ARM to Thumb when cond != 0xe\n",
-                        oc->fileName);
+               result = (StgWord32) ((StgInt32) extra->jumpIsland - P - 8);
+               result &= ~1; // Clear thumb indicator bit
+               if (!is_int(26, (StgInt32) result)) {
+                  errorBelch("Unable to fixup overflow'd R_ARM_CALL: jump island=%p, reloc=%p\n",
+                             (void*) extra->jumpIsland, (void*) P);
                   return 0;
                }
             }
 
-            offset >>= 2;
+            const StgWord32 imm24 = (result & 0x03fffffc) >> 2;
             *word = (*word & ~0x00ffffff)
-                  | (offset & 0x00ffffff);
+                  | (imm24 & 0x00ffffff);
+
+            const StgBool switch_mode = is_target_thm && (reloc_type == R_ARM_CALL);
+            if (switch_mode) {
+               const StgWord32 hBit = (result & 0x2) >> 1;
+               // Change instruction to BLX
+               *word = (*word & ~0xFF000000) | ((0xfa | hBit) << 24);
+               IF_DEBUG(linker, debugBelch("Changed BL to BLX at %p\n", word));
+            }
             break;
          }
 
@@ -5143,20 +5161,17 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
          case R_ARM_MOVW_ABS_NC:
          {
             StgWord32 *word = (StgWord32 *)P;
-            StgInt32 offset = ((*word & 0xf0000) >> 4)
-                            | (*word & 0xfff);
-            // Sign extend from 16 to 32 bits
-            offset = (offset ^ 0x8000) - 0x8000;
+            StgWord32 imm12 = *word & 0xfff;
+            StgWord32 imm4 = (*word >> 16) & 0xf;
+            StgInt32 offset = imm4 << 12 | imm12;
+            StgWord32 result = (S + offset) | T;
 
-            offset += S;
-            if (ELF_R_TYPE(info) == R_ARM_MOVT_ABS)
-               offset >>= 16;
-            else
-               offset |= T;
+            if (reloc_type == R_ARM_MOVT_ABS)
+                result = (result & 0xffff0000) >> 16;
 
-            *word = (*word & 0xfff0f000)
-                  | ((offset & 0xf000) << 4)
-                  | (offset & 0x0fff);
+            StgWord32 result12 = result & 0xfff;
+            StgWord32 result4 = (result >> 12) & 0xf;
+            *word = (*word & ~0xf0fff) | (result4 << 16) | result12;
             break;
          }
 
