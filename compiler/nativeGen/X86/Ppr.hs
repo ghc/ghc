@@ -489,7 +489,7 @@ pprInstr (NEWBLOCK _)
    = panic "PprMach.pprInstr: NEWBLOCK"
 
 pprInstr (LABEL lbl)
-   = ppr lbl <> colon
+   = pprLabel $ mkAsmTempLabel $ getUnique lbl
 
 pprInstr (LDATA _ _)
    = panic "PprMach.pprInstr: LDATA"

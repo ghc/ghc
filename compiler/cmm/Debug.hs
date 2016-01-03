@@ -20,7 +20,7 @@ module Debug (
 
   ) where
 
-import BlockId         ( blockLbl )
+import BlockId
 import CLabel
 import Cmm
 import CmmUtils
@@ -32,6 +32,7 @@ import PprCore         ()
 import PprCmmExpr      ( pprExpr )
 import SrcLoc
 import Util
+import Unique
 
 import Compiler.Hoopl
 
@@ -269,7 +270,10 @@ type UnwindTable = Map.Map GlobalReg UnwindExpr
 
 -- | An unwinding table associated with a particular point in the generated
 -- code.
-data UnwindDecl = UnwindDecl !Label !UnwindTable
+data UnwindDecl = UnwindDecl !CLabel !UnwindTable
+
+instance Outputable UnwindDecl where
+  ppr (UnwindDecl lbl tbl) = parens $ ppr lbl <+> ppr tbl
 
 -- | Expressions, used for unwind information
 data UnwindExpr = UwConst Int                   -- ^ literal value
@@ -302,7 +306,8 @@ extractUnwindTables b = mapMaybe nodeToUnwind $ blockToList mid
 
     nodeToUnwind :: CmmNode O O -> Maybe UnwindDecl
     nodeToUnwind (CmmUnwind lbl g so) =
-        Just $ UnwindDecl lbl' (Map.singleton g (toUnwindExpr so))
+        -- FIXME: why a block label if this isn't a block?
+        Just $ UnwindDecl (mkAsmTempLabel $ getUnique lbl') (Map.singleton g (toUnwindExpr so))
       where
         lbl' = case lbl of
                  NewLabel l      -> l
