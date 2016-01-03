@@ -676,7 +676,7 @@ data DynFlags = DynFlags {
   floatLamArgs          :: Maybe Int,   -- ^ Arg count for lambda floating
                                         --   See CoreMonad.FloatOutSwitches
 
-  historySize           :: Int,
+  historySize           :: Int,         -- ^ Simplification history size
 
   importPaths           :: [FilePath],
   mainModIs             :: Module,
