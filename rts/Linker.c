@@ -79,10 +79,18 @@
 #endif
 
 
-/* PowerPC has relative branch instructions with only 24 bit displacements
- * and therefore needs jump islands contiguous with each object code module.
+/* PowerPC and ARM have relative branch instructions with only 24 bit
+ * displacements and therefore need jump islands contiguous with each object
+ * code module.
  */
-#if (USE_MMAP && defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS))
+#if defined(powerpc_HOST_ARCH)
+#define SHORT_REL_BRANCH 1
+#endif
+#if defined(arm_HOST_ARCH)
+#define SHORT_REL_BRANCH 1
+#endif
+
+#if (USE_MMAP && defined(SHORT_REL_BRANCH) && defined(linux_HOST_OS))
 #define USE_CONTIGUOUS_MMAP 1
 #else
 #define USE_CONTIGUOUS_MMAP 0
