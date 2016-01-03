@@ -664,7 +664,6 @@ data DynFlags = DynFlags {
 
   historySize           :: Int,
 
-  cmdlineHcIncludes     :: [String],    -- ^ @\-\#includes@
   importPaths           :: [FilePath],
   mainModIs             :: Module,
   mainFunIs             :: Maybe String,
@@ -1454,7 +1453,6 @@ defaultDynFlags mySettings =
         enableTimeStats         = False,
         ghcHeapSize             = Nothing,
 
-        cmdlineHcIncludes       = [],
         importPaths             = ["."],
         mainModIs               = mAIN,
         mainFunIs               = Nothing,
@@ -2243,8 +2241,7 @@ dynamic_flags = [
   , defFlag "cpp"      (NoArg (setExtensionFlag LangExt.Cpp))
   , defFlag "F"        (NoArg (setGeneralFlag Opt_Pp))
   , defFlag "#include"
-      (HasArg (\s -> do
-         addCmdlineHCInclude s
+      (HasArg (\_s -> do
          addWarn ("-#include and INCLUDE pragmas are " ++
                   "deprecated: They no longer have any effect")))
   , defFlag "v"        (OptIntSuffix setVerbosity)
@@ -3850,9 +3847,6 @@ setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })
 
 setDebugLevel :: Maybe Int -> DynP ()
 setDebugLevel mb_n = upd (\dfs -> dfs{ debugLevel = mb_n `orElse` 2 })
-
-addCmdlineHCInclude :: String -> DynP ()
-addCmdlineHCInclude a = upd (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes s})
 
 data PkgConfRef
   = GlobalPkgConf
