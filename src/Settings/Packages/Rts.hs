@@ -1,12 +1,19 @@
-module Settings.Packages.Rts (rtsPackageArgs) where
+module Settings.Packages.Rts (rtsPackageArgs, rtsConfIn, rtsConf) where
 
 import Base
 import Expression
 import GHC (rts)
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Predicates (builderGcc, builderGhc, package, file)
+import Predicates (builder, builderGcc, builderGhc, package, file)
 import Settings
+import Settings.Builders.Common
+
+rtsConfIn :: FilePath
+rtsConfIn = pkgPath rts -/- "package.conf.in"
+
+rtsConf :: FilePath
+rtsConf = targetPath Stage1 rts -/- "package.conf.inplace"
 
 rtsPackageArgs :: Args
 rtsPackageArgs = package rts ? do
@@ -27,11 +34,14 @@ rtsPackageArgs = package rts ? do
     ghcUnreg       <- yesNo $ flag GhcUnregisterised
     ghcEnableTNC   <- yesNo ghcEnableTablesNextToCode
     way            <- getWay
-    stage          <- getStage
+    path           <- getTargetPath
+    top            <- getSetting GhcSourcePath
+    windows        <- lift $ windowsHost
+    let libffiName = if windows then "ffi-6" else "ffi"
     mconcat
         [ builderGcc ? mconcat
           [ arg "-Irts"
-          , arg $ "-I" ++ targetPath stage rts -/- "build"
+          , arg $ "-I" ++ path -/- "build"
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
 
           , (file "//RtsMessages.*" ||^ file "//Trace.*") ?
@@ -54,7 +64,46 @@ rtsPackageArgs = package rts ? do
             , "-DGhcUnregisterised="         ++ quote ghcUnreg
             , "-DGhcEnableTablesNextToCode=" ++ quote ghcEnableTNC ] ]
 
-        , builderGhc ? arg "-Irts" ]
+        , builderGhc ? (arg "-Irts" <> includesArgs)
+
+        , builder (GhcPkg Stage1) ? mconcat
+          [ remove [path -/- "inplace-pkg-config"]
+          , arg $ rtsConf ]
+
+        , builder HsCpp ? mconcat
+          [ arg ("-DTOP=" ++ quote top)
+          , arg "-DFFI_INCLUDE_DIR="
+          , arg "-DFFI_LIB_DIR="
+          , arg $ "-DFFI_LIB=" ++ quote ("C" ++ libffiName) ] ]
+
+-- #-----------------------------------------------------------------------------
+-- # Use system provided libffi
+
+-- ifeq "$(UseSystemLibFFI)" "YES"
+
+-- rts_PACKAGE_CPP_OPTS += -DFFI_INCLUDE_DIR=$(FFIIncludeDir)
+-- rts_PACKAGE_CPP_OPTS += -DFFI_LIB_DIR=$(FFILibDir)
+-- rts_PACKAGE_CPP_OPTS += '-DFFI_LIB='
+
+-- endif
+
+-- #-----------------------------------------------------------------------------
+-- # Add support for reading DWARF debugging information, if available
+
+-- ifeq "$(GhcRtsWithLibdw)" "YES"
+-- rts_CC_OPTS          += -DUSE_LIBDW
+-- rts_PACKAGE_CPP_OPTS += -DUSE_LIBDW
+-- endif
+
+-- # If -DDEBUG is in effect, adjust package conf accordingly..
+-- ifneq "$(strip $(filter -optc-DDEBUG,$(GhcRtsHcOpts)))" ""
+-- rts_PACKAGE_CPP_OPTS += -DDEBUG
+-- endif
+
+-- ifeq "$(HaveLibMingwEx)" "YES"
+-- rts_PACKAGE_CPP_OPTS += -DHAVE_LIBMINGWEX
+-- endif
+
 
 
 -- #-----------------------------------------------------------------------------

@@ -22,7 +22,7 @@ module Base (
     putColoured, putOracle, putBuild, putSuccess, putError, renderBox,
 
     -- * Miscellaneous utilities
-    bimap, minusOrd, intersectOrd, replaceEq, quote, chunksOfSize,
+    bimap, minusOrd, intersectOrd, replaceEq, replace, quote, chunksOfSize,
     replaceSeparators, decodeModule, encodeModule, unifyPath, (-/-),
     versionToInt, removeFileIfExists, removeDirectoryIfExists
     ) where
@@ -89,6 +89,17 @@ replaceSeparators = replaceIf isPathSeparator
 
 replaceIf :: (a -> Bool) -> a -> [a] -> [a]
 replaceIf p to = map (\from -> if p from then to else from)
+
+-- | Find all occurrences of substring 'from' and replace them to 'to' in a
+-- given string. Not very efficient, but simple and fast enough for our purposes
+replace :: Eq a => [a] -> [a] -> [a] -> [a]
+replace from to = go
+  where
+    skipFrom = drop $ length from
+    go [] = []
+    go s @ (x : xs)
+        | from `isPrefixOf` s = to ++ go (skipFrom s)
+        | otherwise           = x  :  go xs
 
 -- | Add quotes to a String
 quote :: String -> String

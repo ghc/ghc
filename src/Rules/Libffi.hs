@@ -29,16 +29,6 @@ fixLibffiMakefile = unlines . map
 target :: PartialTarget
 target = PartialTarget Stage0 libffi
 
--- Not efficient, but simple and works fast enough for libffi Makefile.in
-replace :: String -> String -> String -> String
-replace from to = go
-  where
-    skipFrom = drop $ length from
-    go [] = []
-    go s @ (x : xs)
-        | from `isPrefixOf` s = to ++ go (skipFrom s)
-        | otherwise           = x  :  go xs
-
 -- TODO: remove code duplication (see Settings/Builders/GhcCabal.hs)
 configureEnvironment :: Action [CmdOption]
 configureEnvironment = do

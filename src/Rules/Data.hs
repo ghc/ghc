@@ -9,6 +9,7 @@ import Rules.Actions
 import Rules.Resources
 import Settings
 import Settings.Builders.Common
+import Settings.Packages.Rts
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 buildPackageData :: Resources -> PartialTarget -> Rules ()
@@ -37,7 +38,7 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
         when (isLibrary pkg) .
             whenM (interpretPartial target registerPackage) .
                 buildWithResources [(resGhcPkg rs, 1)] $
-                    fullTarget target (GhcPkg stage) [cabalFile] [mk]
+                    fullTarget target (GhcPkg stage) [cabalFile] []
 
         postProcessPackageData dataFile
 
@@ -73,24 +74,37 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
             writeFileChanged mk contents
             putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 
-        when (pkg == rts) $ dataFile %> \mk -> do
-            windows <- windowsHost
-            let prefix = "rts_" ++ stageString stage ++ "_"
-                dirs   = [ ".", "hooks", "sm", "eventlog" ]
-                      ++ [ "posix" | not windows ]
-                      ++ [ "win32" |     windows ]
-            -- TODO: rts/dist/build/sm/Evac_thr.c, rts/dist/build/sm/Scav_thr.c
-            -- TODO: adding cmm sources to C_SRCS is a hack; rethink after #18
-            cSrcs    <- getDirectoryFiles (pkgPath pkg) (map (-/- "*.c") dirs)
-            cmmSrcs  <- getDirectoryFiles (pkgPath pkg) ["*.cmm"]
-            let extraSrcs = [ targetDirectory Stage1 rts -/- "build/AutoApply.cmm" ]
-            includes <- interpretPartial target $ fromDiffExpr includesArgs
-            let contents = unlines $ map (prefix++)
-                    [ "C_SRCS = "   ++ unwords (cSrcs ++ cmmSrcs ++ extraSrcs)
-                    , "CC_OPTS = "  ++ unwords includes
-                    , "COMPONENT_ID = " ++ "rts" ]
-            writeFileChanged mk contents
-            putSuccess $ "| Successfully generated '" ++ mk ++ "'."
+        when (pkg == rts && stage == Stage1) $ do
+            dataFile %> \mk -> do
+                windows <- windowsHost
+                let prefix = "rts_" ++ stageString stage ++ "_"
+                    dirs   = [ ".", "hooks", "sm", "eventlog" ]
+                          ++ [ "posix" | not windows ]
+                          ++ [ "win32" |     windows ]
+                -- TODO: rts/dist/build/sm/Evac_thr.c, rts/dist/build/sm/Scav_thr.c
+                -- TODO: adding cmm sources to C_SRCS is a hack; rethink after #18
+                cSrcs    <- getDirectoryFiles (pkgPath pkg) (map (-/- "*.c") dirs)
+                cmmSrcs  <- getDirectoryFiles (pkgPath pkg) ["*.cmm"]
+                let extraSrcs = [ targetDirectory Stage1 rts -/- "build/AutoApply.cmm" ]
+                includes <- interpretPartial target $ fromDiffExpr includesArgs
+                let contents = unlines $ map (prefix++)
+                        [ "C_SRCS = "   ++ unwords (cSrcs ++ cmmSrcs ++ extraSrcs)
+                        , "CC_OPTS = "  ++ unwords includes
+                        , "COMPONENT_ID = " ++ "rts" ]
+                writeFileChanged mk contents
+                putSuccess $ "| Successfully generated '" ++ mk ++ "'."
+
+                need [rtsConf]
+                buildWithResources [(resGhcPkg rs, 1)] $
+                    fullTarget target (GhcPkg stage) [rtsConf] []
+
+            rtsConf %> \_ -> do
+                need [rtsConfIn]
+                build $ fullTarget target HsCpp [rtsConfIn] [rtsConf]
+                old <- liftIO $ readFile rtsConf
+                let new = unlines . map (replace "\"\"" "")
+                        . filter (not . null) $ lines old
+                liftIO $ length new `seq` writeFile rtsConf new
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'
