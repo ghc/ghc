@@ -38,6 +38,8 @@ hscolour         = @HSCOLOUR@
 ld               = @LdCmd@
 nm               = @NmCmd@
 objdump          = @ObjdumpCmd@
+ranlib           = @REAL_RANLIB_CMD@
+tar              = @TarCmd@
 
 # Information about builders:
 #============================

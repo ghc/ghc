@@ -41,6 +41,8 @@ data Builder = Alex
              | Ld
              | Nm
              | Objdump
+             | Ranlib
+             | Tar
              | Unlit
              deriving (Show, Eq, Generic)
 
@@ -81,6 +83,8 @@ builderKey builder = case builder of
     Ld               -> "ld"
     Nm               -> "nm"
     Objdump          -> "objdump"
+    Ranlib           -> "ranlib"
+    Tar              -> "tar"
     Unlit            -> "unlit"
 
 -- | Determine the location of a 'Builder'
