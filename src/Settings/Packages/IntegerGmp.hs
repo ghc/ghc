@@ -3,7 +3,7 @@ module Settings.Packages.IntegerGmp (integerGmpPackageArgs) where
 import Base
 import Expression
 import GHC (integerGmp)
-import Predicates (builder, package)
+import Predicates (builder, builderGcc, package)
 
 -- TODO: Is this needed?
 -- ifeq "$(GMP_PREFER_FRAMEWORK)" "YES"
@@ -11,9 +11,12 @@ import Predicates (builder, package)
 -- endif
 integerGmpPackageArgs :: Args
 integerGmpPackageArgs = package integerGmp ?
-    builder GhcCabal ? mconcat
-        [ arg "--configure-option=--with-intree-gmp"
-        , appendSub "--configure-option=CFLAGS" includeGmp
-        , appendSub "--gcc-options"             includeGmp ]
+    mconcat
+        [ builder GhcCabal ? mconcat
+            [ arg "--configure-option=--with-intree-gmp"
+            , appendSub "--configure-option=CFLAGS" includeGmp
+            , appendSub "--gcc-options"             includeGmp ]
+        , builderGcc ? ( arg $ "-I" ++ pkgPath integerGmp -/- "gmp" )
+        ]
   where
     includeGmp = ["-I" ++ pkgPath integerGmp -/- "gmp"]
