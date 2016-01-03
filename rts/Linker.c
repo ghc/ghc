@@ -3718,6 +3718,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
    oc->n_symbols = hdr->NumberOfSymbols;
    oc->symbols   = stgCallocBytes(sizeof(char*), oc->n_symbols,
                                   "ocGetNames_PEi386(oc->symbols)");
+   Symbol* symbols = stgCallocBytes(sizeof(Symbol), oc->n_symbols,
+                            "ocGetNames_PEi386(oc->symbols)");
 
    /* Work out the size of the global BSS section */
    StgWord globalBssSize = 0;
@@ -3789,7 +3791,33 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       }
 
       if (addr != NULL ) {
-         sname = cstring_from_COFF_symbol_name ( symtab_i->Name, strtab );
+
+        COFF_section* sectabent
+              = (COFF_section*)myindex(sizeof_COFF_section,
+              sectab,
+              symtab_i->SectionNumber);
+
+        sname = cstring_from_COFF_symbol_name(symtab_i->Name, strtab);
+
+         /* store symbols information */
+         symbols[i].start = addr;
+
+         if (i == oc->n_symbols - 1)
+         {
+             UInt32 sz = sectabent->SizeOfRawData;
+             if (sz < sectabent->VirtualSize) sz = sectabent->VirtualSize;
+             symbols[i].end = ((UChar*)(oc->image))
+                            + sectabent->PointerToRawData
+                            + sz;
+         }
+         else if (i > 0)
+         {
+             symbols[i].end = ((UChar*)symbols[i - 0].start) - 1;
+         }
+
+         symbols[i].SectionNumber = symtab_i->SectionNumber;
+         symbols[i].name = sname;
+
          /* debugBelch("addSymbol %p `%s \n", addr,sname);  */
          IF_DEBUG(linker, debugBelch("addSymbol %p `%s'\n", addr,sname);)
          ASSERT(i >= 0 && i < oc->n_symbols);
@@ -3797,13 +3825,21 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          oc->symbols[i] = (char*)sname;
          if (! ghciInsertSymbolTable(oc->fileName, symhash, (char*)sname, addr,
                                      isWeak, oc)) {
+             stgFree(symbols);
              return 0;
          }
 
-         /* If symbol is an object file or required by archive then add it for relocation */
+         /* If symbol is an object file add as required it for relocation */
          if (oc->archiveMemberName == NULL)
          {
-             insertStrHashTable(reqSymHash, sname, (void*)HS_BOOL_TRUE);
+             insertStrHashTable(reqSymHash, sname, addr);
+         }
+         else if (lookupStrHashTable(reqSymHash, sname) != NULL)
+         {
+             /* If symbol is from an archive file and is required by a required symbol,
+                then also add it as required it for relocation */
+             // Start = addr
+             // End =
          }
 
       } else {
@@ -3833,6 +3869,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       i += symtab_i->NumberOfAuxSymbols;
    }
 
+   stgFree(symbols);
    return 1;
 }
 
