@@ -49,6 +49,7 @@ executable ghc-shake
                        , Rules.Generators.GhcPlatformH
                        , Rules.Generators.GhcVersionH
                        , Rules.Generators.VersionHs
+                       , Rules.Libffi
                        , Rules.Library
                        , Rules.Oracles
                        , Rules.Package
@@ -73,6 +74,7 @@ executable ghc-shake
                        , Settings.Builders.Hsc2Hs
                        , Settings.Builders.HsCpp
                        , Settings.Builders.Ld
+                       , Settings.Builders.Tar
                        , Settings.Packages
                        , Settings.Packages.Base
                        , Settings.Packages.Compiler

@@ -4,6 +4,7 @@ import Base
 import Expression
 import GHC
 import Rules.Generate
+import Rules.Libffi
 import Settings.TargetDirectory
 
 installTargets :: [FilePath]
@@ -14,9 +15,11 @@ installTargets = [ "inplace/lib/template-hsc.h"
 copyRules :: Rules ()
 copyRules = do
     targetPath Stage1 rts -/- "build/ffi*.h" %> \ffih -> do
+        need [libffiLibrary]
         ffiHPaths <- getDirectoryFiles "" ["libffi/build/inst/lib/*/include/ffi.h"]
         when (length ffiHPaths /= 1) $
-            putError "copyRules: cannot determine location of ffi.h"
+            putError $ "copyRules: exactly one ffi.h header expected"
+                     ++ "(found: " ++ show ffiHPaths ++ ")."
         let ffiHPath = takeDirectory $ head ffiHPaths
         copy ffih ffiHPath
 

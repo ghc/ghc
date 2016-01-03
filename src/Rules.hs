@@ -14,7 +14,7 @@ generateTargets :: Rules ()
 generateTargets = action $ do
     targets <- fmap concat . forM [Stage0 ..] $ \stage -> do
         pkgs <- interpretWithStage stage getPackages
-        let libPkgs = filter isLibrary pkgs \\ [rts]
+        let libPkgs = filter isLibrary pkgs \\ [rts, libffi]
         libTargets <- fmap concat . forM libPkgs $ \pkg -> do
             let target = PartialTarget stage pkg
             needHaddock <- interpretPartial target buildHaddock

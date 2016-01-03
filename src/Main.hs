@@ -4,6 +4,7 @@ import Rules.Cabal
 import Rules.Config
 import Rules.Generate
 import Rules.Copy
+import Rules.Libffi
 import Rules.Oracles
 
 main :: IO ()
@@ -13,6 +14,7 @@ main = shakeArgs options $ do
     copyRules       -- see Rules.Copy
     generateTargets -- see Rules
     generateRules   -- see Rules.Generate
+    libffiRules     -- see Rules.Libffi
     oracleRules     -- see Rules.Oracles
     packageRules    -- see Rules
   where

@@ -99,9 +99,6 @@ packageConstraints = stage0 ? do
     constraints <- lift . readFileLines $ bootPackageConstraints
     append $ concat [ ["--constraint", c] | c <- constraints ]
 
-ldArgs :: Args
-ldArgs = mempty
-
 cppArgs :: Args
 cppArgs = includesArgs
 

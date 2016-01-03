@@ -29,14 +29,17 @@ cabalRules = do
     -- Cache package dependencies
     packageDependencies %> \out -> do
         pkgs <- interpretWithStage Stage1 getPackages
-        pkgDeps <- forM (sort pkgs) $ \pkg -> if pkg == rts then return [] else do
-            need [pkgCabalFile pkg]
-            pd <- liftIO . readPackageDescription silent $ pkgCabalFile pkg
-            let depsLib  = collectDeps $ condLibrary pd
-                depsExes = map (collectDeps . Just . snd) $ condExecutables pd
-                deps     = concat $ depsLib : depsExes
-                depNames = [ name | Dependency (DP.PackageName name) _ <- deps ]
-            return . unwords $ pkgNameString pkg : sort depNames
+        pkgDeps <- forM (sort pkgs) $ \pkg ->
+            if pkg == rts
+            then return $ pkgNameString pkg
+            else do
+                need [pkgCabalFile pkg]
+                pd <- liftIO . readPackageDescription silent $ pkgCabalFile pkg
+                let depsLib  = collectDeps $ condLibrary pd
+                    depsExes = map (collectDeps . Just . snd) $ condExecutables pd
+                    deps     = concat $ depsLib : depsExes
+                    depNames = [ name | Dependency (DP.PackageName name) _ <- deps ]
+                return . unwords $ pkgNameString pkg : sort depNames
         writeFileChanged out . unlines $ pkgDeps
 
     -- When the file exists, the packageConfiguration has been initialised

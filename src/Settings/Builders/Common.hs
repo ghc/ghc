@@ -1,5 +1,5 @@
 module Settings.Builders.Common (
-    includesArgs, cIncludeArgs, cArgs, cWarnings,
+    includesArgs, cIncludeArgs, ldArgs, cArgs, cWarnings,
     argSetting, argSettingList, argStagedBuilderPath, argStagedSettingList
     ) where
 
@@ -27,6 +27,9 @@ cIncludeArgs = do
             , arg $ "-I" ++ buildPath -/- "autogen"
             , append [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
             , append [ "-I" ++                 dir | dir <- depDirs ] ]
+
+ldArgs :: Args
+ldArgs = mempty
 
 -- TODO: put all validating options together in one file
 cArgs :: Args

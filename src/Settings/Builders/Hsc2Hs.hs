@@ -63,13 +63,13 @@ getCFlags = fromDiffExpr $ do
 
 getLFlags :: Expr [String]
 getLFlags = fromDiffExpr $ do
-    ldArgs    <- getPkgDataList LdArgs
+    pkgLdArgs <- getPkgDataList LdArgs
     libDirs   <- getPkgDataList DepLibDirs
     extraLibs <- getPkgDataList DepExtraLibs
     depLdArgs <- getPkgDataList DepLdArgs
     mconcat [ argStagedSettingList ConfGccLinkerArgs
-            --, ldArgs -- TODO: resolve name conflict (ldArgs is currently empty)
-            , append ldArgs
+            , ldArgs
+            , append pkgLdArgs
             , append $ [ "-L" ++ unifyPath dir | dir <- libDirs ]
             , append $ [ "-l" ++ unifyPath dir | dir <- extraLibs ]
             , append depLdArgs ]

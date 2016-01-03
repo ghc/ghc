@@ -4,9 +4,9 @@ module GHC (
     deepseq, deriveConstants, directory, dllSplit, filepath, genapply,
     genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim, ghcPwd,
     ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
-    integerSimple, iservBin, mkUserGuidePart, parallel, pretty, primitive,
-    process, rts, runGhc, stm, templateHaskell, terminfo, time, transformers,
-    unix, win32, xhtml,
+    integerSimple, iservBin, libffi, mkUserGuidePart, parallel, pretty,
+    primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time,
+    transformers, unix, win32, xhtml,
 
     defaultKnownPackages, defaultTargetDirectory, defaultProgramPath
     ) where
@@ -26,18 +26,18 @@ defaultKnownPackages =
     , deepseq, deriveConstants, directory, dllSplit, filepath, genapply
     , genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim
     , ghcPwd, ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin
-    , integerGmp, integerSimple, iservBin, mkUserGuidePart, parallel, pretty
-    , primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time
-    , transformers, unix, win32, xhtml ]
+    , integerGmp, integerSimple, iservBin, libffi, mkUserGuidePart, parallel
+    , pretty, primitive, process, rts, runGhc, stm, templateHaskell, terminfo
+    , time, transformers, unix, win32, xhtml ]
 
 -- Package definitions (see Package.hs)
 array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
     deepseq, deriveConstants, directory, dllSplit, filepath, genapply,
     genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim, ghcPwd,
     ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
-    integerSimple, iservBin, mkUserGuidePart, parallel, pretty, primitive,
-    process, rts, runGhc, stm, templateHaskell, terminfo, time, transformers,
-    unix, win32, xhtml :: Package
+    integerSimple, iservBin, libffi, mkUserGuidePart, parallel, pretty,
+    primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time,
+    transformers, unix, win32, xhtml :: Package
 
 array           = library  "array"
 base            = library  "base"
@@ -72,6 +72,7 @@ hpcBin          = utility  "hpc-bin"        `setPath` "utils/hpc"
 integerGmp      = library  "integer-gmp"
 integerSimple   = library  "integer-simple"
 iservBin        = topLevel "iserv-bin"      `setPath` "iserv" `setType` Program
+libffi          = topLevel "libffi"
 mkUserGuidePart = utility  "mkUserGuidePart"
 parallel        = library  "parallel"
 pretty          = library  "pretty"

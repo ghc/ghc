@@ -103,4 +103,4 @@ buildBinary target @ (PartialTarget stage pkg) bin = do
         [ "Successfully built program '"
           ++ pkgNameString pkg ++ "' (" ++ show stage ++ ")."
         , "Executable: " ++ bin
-        , "Package synopsis: " ++ dropWhileEnd isPunctuation synopsis ++ "." ]
+        , "Program synopsis: " ++ dropWhileEnd isPunctuation synopsis ++ "." ]
