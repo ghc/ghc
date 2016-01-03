@@ -99,7 +99,9 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
                     fullTarget target (GhcPkg stage) [rtsConf] []
 
             rtsConf %> \_ -> do
-                need [rtsConfIn]
+                need [rtsConfIn
+                     , "includes/ghcautoconf.h"
+                     , "includes/ghcplatform.h" ]
                 build $ fullTarget target HsCpp [rtsConfIn] [rtsConf]
                 old <- liftIO $ readFile rtsConf
                 let new = unlines . map (replace "\"\"" "")
