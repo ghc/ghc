@@ -2750,17 +2750,6 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
 #endif
 #endif // NEED_SYMBOL_EXTRAS
 
-// Signed extend a number to a 32-bit int.
-static inline StgInt32 sign_extend32(nat bits, StgWord32 x) {
-  return ((StgInt32) (x << (32 - bits))) >> (32 - bits);
-}
-
-// Does the given signed integer fit into the given bit width?
-static inline StgBool is_int(nat bits, StgInt32 x) {
-  return bits > 32 || (-(1 << (bits-1)) <= x
-                       && x < (1 << (bits-1)));
-}
-
 #if defined(arm_HOST_ARCH)
 
 static void
@@ -4989,6 +4978,21 @@ end:
    if (fd >= 0) close(fd);
    return result;
 }
+
+#ifdef arm_HOST_ARCH
+// TODO: These likely belong in a library somewhere
+
+// Signed extend a number to a 32-bit int.
+static inline StgInt32 sign_extend32(nat bits, StgWord32 x) {
+    return ((StgInt32) (x << (32 - bits))) >> (32 - bits);
+}
+
+// Does the given signed integer fit into the given bit width?
+static inline StgBool is_int(nat bits, StgInt32 x) {
+    return bits > 32 || (-(1 << (bits-1)) <= x
+                         && x < (1 << (bits-1)));
+}
+#endif
 
 /* Do ELF relocations which lack an explicit addend.  All x86-linux
    and arm-linux relocations appear to be of this form. */
