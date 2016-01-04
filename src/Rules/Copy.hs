@@ -6,6 +6,7 @@ import GHC
 import Rules.Actions
 import Rules.Generate
 import Rules.Libffi
+import Settings.Packages.Rts
 import Settings.TargetDirectory
 
 installTargets :: [FilePath]
@@ -23,7 +24,8 @@ copyRules = do
                      ++ "(found: " ++ show ffiHPaths ++ ")."
         
         copyFile (takeDirectory (head ffiHPaths) -/- takeFileName ffih) ffih
-        copyFile libffiLibrary (targetPath Stage1 rts -/- "build" -/- "libCffi.a")
+        libffiName <- rtsLibffiLibraryName
+        copyFile libffiLibrary (targetPath Stage1 rts -/- "build/lib" ++ libffiName <.> "a")
 
     "inplace/lib/template-hsc.h"    <~ pkgPath hsc2hs
     "inplace/lib/platformConstants" <~ derivedConstantsPath

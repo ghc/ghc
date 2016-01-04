@@ -1,4 +1,6 @@
-module Settings.Packages.Rts (rtsPackageArgs, rtsConfIn, rtsConf) where
+module Settings.Packages.Rts (
+    rtsPackageArgs, rtsConfIn, rtsConf, rtsLibffiLibraryName
+    ) where
 
 import Base
 import Expression
@@ -14,6 +16,11 @@ rtsConfIn = pkgPath rts -/- "package.conf.in"
 
 rtsConf :: FilePath
 rtsConf = targetPath Stage1 rts -/- "package.conf.inplace"
+
+rtsLibffiLibraryName :: Action FilePath
+rtsLibffiLibraryName = do
+    windows <- windowsHost
+    return $ if windows then "Cffi-6" else "Cffi"
 
 rtsPackageArgs :: Args
 rtsPackageArgs = package rts ? do
@@ -36,8 +43,7 @@ rtsPackageArgs = package rts ? do
     way            <- getWay
     path           <- getTargetPath
     top            <- getSetting GhcSourcePath
-    windows        <- lift $ windowsHost
-    let libffiName = if windows then "ffi-6" else "ffi"
+    libffiName     <- lift $ rtsLibffiLibraryName
     mconcat
         [ builderGcc ? mconcat
           [ arg "-Irts"
@@ -74,7 +80,7 @@ rtsPackageArgs = package rts ? do
           [ arg ("-DTOP=" ++ quote top)
           , arg "-DFFI_INCLUDE_DIR="
           , arg "-DFFI_LIB_DIR="
-          , arg $ "-DFFI_LIB=" ++ quote ("C" ++ libffiName) ] ]
+          , arg $ "-DFFI_LIB=" ++ quote libffiName ] ]
 
 -- #-----------------------------------------------------------------------------
 -- # Use system provided libffi
