@@ -175,7 +175,7 @@ putError msg = do
 -- | Render the given set of lines in a ASCII box
 renderBox :: [String] -> String
 renderBox ls =
-    unlines $ [begin] ++ map (bar++) ls ++ [end]
+    unlines ([begin] ++ map (bar++) ls) ++ end
   where
     (begin,bar,end)
       | useUnicode = ( "╭──────────"

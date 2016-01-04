@@ -1,9 +1,15 @@
 {-# LANGUAGE RecordWildCards #-}
-module Rules.Actions (build, buildWithResources) where
+module Rules.Actions (
+    build, buildWithResources, copyFile, createDirectory, moveDirectory,
+    fixFile, runConfigure, runMake, runBuilder
+    ) where
+
+import qualified System.Directory as IO
 
 import Base
 import Expression
 import Oracles.ArgsHash
+import Oracles.Config.Setting
 import Settings
 import Settings.Args
 import Settings.Builders.Ar
@@ -25,7 +31,14 @@ buildWithResources rs target = do
     withResources rs $ do
         unless verbose $ putInfo target
         quietlyUnlessVerbose $ case builder of
-            Ar -> arCmd path argList
+            Ar -> do
+                output <- interpret target getOutput
+                if "//*.a" ?== output
+                then arCmd path argList
+                else do
+                    input <- interpret target getInput
+                    top   <- setting GhcSourcePath
+                    cmd [path] [Cwd output] "x" (top -/- input)
 
             HsCpp    -> captureStdout target path argList
             GenApply -> captureStdout target path argList
@@ -49,13 +62,62 @@ captureStdout target path argList = do
     Stdout output <- cmd [path] argList
     writeFileChanged file output
 
+copyFile :: FilePath -> FilePath -> Action ()
+copyFile source target = do
+    putBuild $ renderBox [ "Copy file"
+                         , "    input: " ++ source
+                         , "=> output: " ++ target ]
+    copyFileChanged source target
+
+createDirectory :: FilePath -> Action ()
+createDirectory dir = do
+    putBuild $ "| Create directory " ++ dir
+    liftIO $ IO.createDirectoryIfMissing True dir
+
+-- Note, the source directory is untracked
+moveDirectory :: FilePath -> FilePath -> Action ()
+moveDirectory source target = do
+    putBuild $ renderBox [ "Move directory"
+                         , "    input: " ++ source
+                         , "=> output: " ++ target ]
+    liftIO $ IO.renameDirectory source target
+
+-- Transform a given file by applying a function to its contents
+fixFile :: FilePath -> (String -> String) -> Action ()
+fixFile file f = do
+    putBuild $ "| Fix " ++ file
+    old <- liftIO $ readFile file
+    let new = f old
+    length new `seq` liftIO $ writeFile file new
+
+runConfigure :: FilePath -> [CmdOption] -> [String] -> Action ()
+runConfigure dir opts args = do
+    need [dir -/- "configure"]
+    putBuild $ "| Run configure in " ++ dir ++ "..."
+    quietly $ cmd Shell (EchoStdout False) [Cwd dir] "bash configure" opts args
+
+runMake :: FilePath -> [String] -> Action ()
+runMake dir args = do
+    need [dir -/- "Makefile"]
+    let note = if null args then "" else " (" ++ intercalate "," args ++ ")"
+    putBuild $ "| Run make" ++ note ++ " in " ++ dir ++ "..."
+    quietly $ cmd Shell (EchoStdout False) "make" ["-C", dir, "MAKEFLAGS="] args
+
+runBuilder :: Builder -> [String] -> Action ()
+runBuilder builder args = do
+    needBuilder laxDependencies builder
+    path <- builderPath builder
+    let note = if null args then "" else " (" ++ intercalate "," args ++ ")"
+    putBuild $ "| Run " ++ show builder ++ note
+    quietly $ cmd [path] args
+
 -- Print out key information about the command being executed
 putInfo :: Target.Target -> Action ()
-putInfo (Target.Target {..}) = putBuild $ renderBox $
-    [ "Running " ++ show builder
+putInfo (Target.Target {..}) = putBuild $ renderBox
+    [ "Run " ++ show builder
       ++ " (" ++ stageInfo
       ++ "package = " ++ pkgNameString package
-      ++ wayInfo ++ "):"
+      ++ wayInfo ++ ")"
     , "    input: " ++ digest inputs
     , "=> output: " ++ digest outputs ]
   where

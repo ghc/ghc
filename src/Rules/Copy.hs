@@ -3,6 +3,7 @@ module Rules.Copy (installTargets, copyRules) where
 import Base
 import Expression
 import GHC
+import Rules.Actions
 import Rules.Generate
 import Rules.Libffi
 import Settings.TargetDirectory
@@ -20,16 +21,10 @@ copyRules = do
         when (length ffiHPaths /= 1) $
             putError $ "copyRules: exactly one ffi.h header expected"
                      ++ "(found: " ++ show ffiHPaths ++ ")."
-        let ffiHPath = takeDirectory $ head ffiHPaths
-        copy ffih ffiHPath
+        copyFile (takeDirectory (head ffiHPaths) -/- takeFileName ffih) ffih
 
     "inplace/lib/template-hsc.h"    <~ pkgPath hsc2hs
     "inplace/lib/platformConstants" <~ derivedConstantsPath
     "inplace/lib/settings"          <~ "."
   where
-    file <~ dir = file %> \_ -> copy file dir
-
-    copy file dir = do
-        let source = dir -/- takeFileName file
-        copyFileChanged source file
-        putBuild $ "| Copy " ++ source ++ " -> " ++ file
+    file <~ dir = file %> \_ -> copyFile (dir -/- file) file

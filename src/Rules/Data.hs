@@ -118,10 +118,9 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
 -- is replaced by libraries_deepseq_dist-install_VERSION = 1.4.0.0
 -- Reason: Shake's built-in makefile parser doesn't recognise slashes
 postProcessPackageData :: FilePath -> Action ()
-postProcessPackageData file = do
-    contents <- fmap (filter ('$' `notElem`) . lines) . liftIO $ readFile file
-    length contents `seq` writeFileLines file $ map processLine contents
+postProcessPackageData file = fixFile file fixPackageData
+  where
+    fixPackageData = unlines . map processLine . filter ('$' `notElem`) . lines
+    processLine line = replaceSeparators '_' prefix ++ suffix
       where
-        processLine line = replaceSeparators '_' prefix ++ suffix
-          where
-            (prefix, suffix) = break (== '=') line
+        (prefix, suffix) = break (== '=') line

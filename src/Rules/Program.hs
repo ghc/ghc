@@ -59,7 +59,7 @@ buildWrapper :: PartialTarget -> Wrapper -> FilePath -> FilePath -> Action ()
 buildWrapper target @ (PartialTarget stage pkg) wrapper wrapperPath binPath = do
     contents <- interpretPartial target $ wrapper binPath
     writeFileChanged wrapperPath contents
-    () <- cmd "chmod +x " [wrapperPath]
+    unit $ cmd "chmod +x " [wrapperPath]
     putSuccess $ "| Successfully created wrapper for '" ++ pkgNameString pkg
                ++ "' (" ++ show stage ++ ")."
 
