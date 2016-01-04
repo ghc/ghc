@@ -53,7 +53,6 @@ cc-clang-backend    = @CC_CLANG_BACKEND@
 # Build options:
 #===============
 
-supports-component-id = @SUPPORTS_COMPONENT_ID@
 solaris-broken-shld   = @SOLARIS_BROKEN_SHLD@
 split-objects-broken  = @SplitObjsBroken@
 ghc-unregisterised    = @Unregisterised@

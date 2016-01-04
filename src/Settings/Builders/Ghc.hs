@@ -84,19 +84,14 @@ wayGhcArgs = do
 -- TODO: Improve handling of "-hide-all-packages"
 packageGhcArgs :: Args
 packageGhcArgs = do
-    stage               <- getStage
-    pkg                 <- getPackage
-    supportsComponentId <- getFlag SupportsComponentId
-    compId              <- getPkgData ComponentId
-    pkgDepIds           <- getPkgDataList DepIds
+    pkg       <- getPackage
+    compId    <- getPkgData ComponentId
+    pkgDepIds <- getPkgDataList DepIds
     mconcat
         [ arg "-hide-all-packages"
         , arg "-no-user-package-db"
         , bootPackageDbArgs
-        , isLibrary pkg ?
-          if supportsComponentId || stage /= Stage0
-          then arg $ "-this-package-key " ++ compId
-          else arg $ "-package-name "     ++ compId
+        , isLibrary pkg ? (arg $ "-this-package-key " ++ compId)
         , append $ map ("-package-id " ++) pkgDepIds ]
 
 -- TODO: Improve handling of "cabal_macros.h"
