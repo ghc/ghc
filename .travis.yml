@@ -1,0 +1,32 @@
+sudo: false
+
+matrix:
+  include:
+    - env: CABALVER=1.22 GHCVER=7.10.3
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3,zlib1g-dev,terminfo-dev],  sources: [hvr-ghc]}}
+
+before_install:
+
+    - PATH="$HOME/.cabal/bin:$PATH"
+    - PATH="/opt/ghc/$GHCVER/bin:$PATH"
+    - PATH="/opt/cabal/$CABALVER/bin:$PATH"
+    - export PATH
+
+    - .travis/print-env.sh
+
+install:
+    - .travis/install-cabal-happy-alex.sh
+    - .travis/install-ghc.sh
+    - .travis/install-ghc-shake.sh
+
+script:
+    - .travis/run-ghc-shake.sh
+
+cache:
+    directories:
+        - $HOME/.cabal
+        # - ghc/shake-build/.cabal-sandbox
+        # - ghc/shake-build/cabal.sandbox.config
+
+# before_cache:
+#     - rm -rf ghc/shake-build
