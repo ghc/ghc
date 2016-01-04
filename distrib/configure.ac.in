@@ -6,7 +6,6 @@ dnl
 
 AC_INIT([The Glorious Glasgow Haskell Compilation System], [@ProjectVersion@], [glasgow-haskell-bugs@haskell.org], [ghc])
 
-FP_BINDIST_GHC_PWD
 FP_FIND_ROOT
 
 dnl--------------------------------------------------------------------

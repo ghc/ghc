@@ -1737,33 +1737,9 @@ AC_DEFUN([FP_CURSES],
 # Calculate absolute path to build tree
 # --------------------------------------------------------------
 
-AC_DEFUN([FP_INTREE_GHC_PWD],[
-AC_MSG_NOTICE(Building in-tree ghc-pwd)
-    dnl This would be
-    dnl     make -C utils/ghc-pwd clean && make -C utils/ghc-pwd
-    dnl except we don't want to have to know what make is called. Sigh.
-    rm -rf utils/ghc-pwd/dist-boot
-    mkdir  utils/ghc-pwd/dist-boot
-    dnl If special linker flags are needed to build things, then allow
-    dnl the user to pass them in via LDFLAGS.
-    changequote(, )dnl
-    GHC_LDFLAGS=`perl -e 'foreach (@ARGV) { print "-optl$_ " }' -- $LDFLAGS`
-    changequote([, ])dnl
-    if ! "$WithGhc" $GHC_LDFLAGS -v0 -no-user-$GHC_PACKAGE_DB_FLAG -hidir utils/ghc-pwd/dist-boot -odir utils/ghc-pwd/dist-boot -stubdir utils/ghc-pwd/dist-boot --make utils/ghc-pwd/Main.hs -o utils/ghc-pwd/dist-boot/ghc-pwd
-    then
-        AC_MSG_ERROR([Building ghc-pwd failed])
-    fi
-
-    GHC_PWD=utils/ghc-pwd/dist-boot/ghc-pwd
-])
-
-AC_DEFUN([FP_BINDIST_GHC_PWD],[
-    GHC_PWD=utils/ghc-pwd/dist-install/build/tmp/ghc-pwd-bindist
-])
-
 AC_DEFUN([FP_FIND_ROOT],[
 AC_MSG_CHECKING(for path to top of build tree)
-    hardtop=`$GHC_PWD`
+    hardtop=`pwd`
 
     dnl Remove common automounter nonsense
     hardtop=`echo $hardtop | sed 's|^/tmp_mnt.*\(/local/.*\)$|\1|' | sed 's|^/tmp_mnt/|/|'`
