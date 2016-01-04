@@ -1023,7 +1023,12 @@ breakpointCond _ r = r
 
 data Opaque = forall a. O a
 
--- | Constant function.
+-- | @const x@ is a unary function which evaluates to @x@ for all inputs.
+--
+-- For instance,
+--
+-- >>> map (const 42) [0..3]
+-- [42,42,42,42]
 const                   :: a -> b -> a
 const x _               =  x
 
