@@ -197,7 +197,8 @@ pprNode node = pp_node <+> pp_debug
                    else empty
 
       -- unwind reg = expr;
-      CmmUnwind _ r e -> ptext (sLit "unwind ") <> ppr r <+> char '=' <+> ppr e
+      CmmUnwind lbl r e -> ptext (sLit "unwind ") <> ppr r <+> char '=' <+> ppr e
+                            <+> text "//" <+> ppr lbl
 
       -- reg = expr;
       CmmAssign reg expr -> ppr reg <+> equals <+> ppr expr <> semi
