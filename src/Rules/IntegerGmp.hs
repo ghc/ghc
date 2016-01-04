@@ -50,7 +50,7 @@ configureArguments = do
 integerGmpRules :: Rules ()
 integerGmpRules = do
     integerGmpLibrary %> \_ -> do
-        when trackBuildSystem $ need [sourcePath -/- "Rules" -/- "integerGmp.hs"]
+        when trackBuildSystem $ need [sourcePath -/- "Rules/IntegerGmp.hs"]
 
         -- remove the old build folder, if it exists.
         liftIO $ removeFiles integerGmpBuild ["//*"]
