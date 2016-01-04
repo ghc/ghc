@@ -8,6 +8,7 @@ import GHC
 import Oracles
 import Predicates (splitObjects)
 import Rules.Actions
+import Rules.IntegerGmp
 import Rules.Resources
 import Settings
 import qualified System.Directory as IO
@@ -78,5 +79,7 @@ hSources target = do
 
 extraObjects :: PartialTarget -> Action [FilePath]
 extraObjects (PartialTarget _ pkg)
-    | pkg == integerGmp = getDirectoryFiles "" [pkgPath pkg -/- "gmp/objs/*.o"]
+    | pkg == integerGmp = do
+        need [integerGmpLibrary]
+        getDirectoryFiles "" [pkgPath pkg -/- "gmp/objs/*.o"]
     | otherwise         = return []

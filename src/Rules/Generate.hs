@@ -29,44 +29,44 @@ platformH stage = targetPath stage compiler -/- "ghc_boot_platform.h"
 derivedConstantsPath :: FilePath
 derivedConstantsPath = "includes/dist-derivedconstants/header"
 
+defaultGeneratedDependencies :: [FilePath]
+defaultGeneratedDependencies = 
+    [ "includes/ghcautoconf.h"
+    , "includes/ghcplatform.h"
+    , derivedConstantsPath -/- "DerivedConstants.h"
+    , derivedConstantsPath -/- "GHCConstantsHaskellType.hs"
+    , derivedConstantsPath -/- "GHCConstantsHaskellWrappers.hs"
+    , derivedConstantsPath -/- "GHCConstantsHaskellExports.hs" 
+    , targetPath Stage1 rts -/- "build/ffi.h"
+    , targetPath Stage1 rts -/- "build/ffitarget.h" ]
+
 -- TODO: can we drop COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS)?
 generatedDependencies :: Stage -> Package -> [FilePath]
-generatedDependencies stage pkg
-    | pkg == compiler = let buildPath = targetPath stage compiler -/- "build"
-                        in
-                        [ "includes/ghcautoconf.h"
-                        , "includes/ghcplatform.h"
-                        , derivedConstantsPath -/- "DerivedConstants.h"
-                        , derivedConstantsPath -/- "GHCConstantsHaskellType.hs"
-                        , derivedConstantsPath -/- "GHCConstantsHaskellWrappers.hs"
-                        , derivedConstantsPath -/- "GHCConstantsHaskellExports.hs"
-                        , platformH stage ]
-                        ++
-                        fmap (buildPath -/-)
-                        [ "primop-vector-uniques.hs-incl"
-                        , "primop-data-decl.hs-incl"
-                        , "primop-tag.hs-incl"
-                        , "primop-list.hs-incl"
-                        , "primop-strictness.hs-incl"
-                        , "primop-fixity.hs-incl"
-                        , "primop-primop-info.hs-incl"
-                        , "primop-out-of-line.hs-incl"
-                        , "primop-has-side-effects.hs-incl"
-                        , "primop-can-fail.hs-incl"
-                        , "primop-code-size.hs-incl"
-                        , "primop-commutable.hs-incl"
-                        , "primop-vector-tys-exports.hs-incl"
-                        , "primop-vector-tycons.hs-incl"
-                        , "primop-vector-tys.hs-incl" ]
-    | pkg == hp2ps    = [ "includes/ghcautoconf.h"
-                        , "includes/ghcplatform.h" ]
-    | pkg == rts      = let buildPath = targetPath stage rts -/- "build"
-                        in
-                        [ "includes/ghcversion.h" -- missing only in stage1. See #76
-                        , derivedConstantsPath -/- "DerivedConstants.h" ]
-                        ++
-                        fmap (buildPath -/-) ["ffi.h", "ffitarget.h"]
-    | otherwise = []
+generatedDependencies stage pkg = 
+    defaultGeneratedDependencies ++ extraGeneratedDependencies
+  where
+    extraGeneratedDependencies
+        | pkg == compiler = let buildPath = targetPath stage compiler -/- "build"
+                            in
+                            [ platformH stage ]
+                            ++
+                            fmap (buildPath -/-)
+                            [ "primop-vector-uniques.hs-incl"
+                            , "primop-data-decl.hs-incl"
+                            , "primop-tag.hs-incl"
+                            , "primop-list.hs-incl"
+                            , "primop-strictness.hs-incl"
+                            , "primop-fixity.hs-incl"
+                            , "primop-primop-info.hs-incl"
+                            , "primop-out-of-line.hs-incl"
+                            , "primop-has-side-effects.hs-incl"
+                            , "primop-can-fail.hs-incl"
+                            , "primop-code-size.hs-incl"
+                            , "primop-commutable.hs-incl"
+                            , "primop-vector-tys-exports.hs-incl"
+                            , "primop-vector-tycons.hs-incl"
+                            , "primop-vector-tys.hs-incl" ]
+        | otherwise = []
 
 -- The following generators and corresponding source extensions are supported:
 knownGenerators :: [ (Builder, String) ]
@@ -125,10 +125,6 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
             build $ fullTarget target GenApply [] [file]
 
         priority 2.0 $ do
-            when (pkg == compiler && stage == Stage1) $
-                derivedConstantsPath ++ "//*" %> \file -> do
-                    build $ fullTarget target DeriveConstants [] [file]
-
             when (pkg == compiler) $ buildPath -/- "Config.hs" %> \file -> do
                 file <~ generateConfigHs
 
@@ -147,6 +143,11 @@ generateRules = do
     "includes/ghcautoconf.h" <~ generateGhcAutoconfH
     "includes/ghcplatform.h" <~ generateGhcPlatformH
     "includes/ghcversion.h"  <~ generateGhcVersionH
+
+    -- TODO: simplify
+    derivedConstantsPath ++ "//*" %> \file -> do
+        build $ fullTarget (PartialTarget Stage1 rts) DeriveConstants [] [file]
+
   where
     file <~ gen = file %> \out -> generate out emptyTarget gen
 

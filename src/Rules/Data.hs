@@ -99,14 +99,19 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
                     fullTarget target (GhcPkg stage) [rtsConf] []
 
             rtsConf %> \_ -> do
-                need [rtsConfIn
+                need [ rtsConfIn
                      , "includes/ghcautoconf.h"
                      , "includes/ghcplatform.h" ]
                 build $ fullTarget target HsCpp [rtsConfIn] [rtsConf]
-                old <- liftIO $ readFile rtsConf
-                let new = unlines . map (replace "\"\"" "" . replace "rts/dist/build" "rts/stage1/build")
-                        . filter (not . null) $ lines old
-                liftIO $ length new `seq` writeFile rtsConf new
+
+                let fixRtsConf = unlines 
+                               . map
+                               ( replace "\"\"" ""
+                               . replace "rts/dist/build" "rts/stage1/build" )
+                               . filter (not . null) 
+                               . lines
+
+                fixFile rtsConf fixRtsConf
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'
