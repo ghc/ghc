@@ -5137,7 +5137,8 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
             const StgBool overflow = !is_int(26, (StgInt32) result);
 
             // Handle overflow and Thumb interworking
-            if ((is_target_thm && ELF_R_TYPE(info) == R_ARM_JUMP24) || overflow) {
+            const StgBool needs_veneer = (is_target_thm && ELF_R_TYPE(info) == R_ARM_JUMP24) || overflow;
+            if (needs_veneer) {
                // Generate veneer
                // The +8 below is to undo the PC-bias compensation done by the object producer
                SymbolExtra *extra = makeArmSymbolExtra(oc, ELF_R_SYM(info), S+imm+8, 0, is_target_thm);
@@ -5151,12 +5152,14 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
                }
             }
 
+            // Update the branch target
             const StgWord32 imm24 = (result & 0x03fffffc) >> 2;
             *word = (*word & ~0x00ffffff)
                   | (imm24 & 0x00ffffff);
 
+            // Change the relocated branch into a BLX if necessary
             const StgBool switch_mode = is_target_thm && (reloc_type == R_ARM_CALL);
-            if (switch_mode) {
+            if (!needs_veneer && switch_mode) {
                const StgWord32 hBit = (result & 0x2) >> 1;
                // Change instruction to BLX
                *word = (*word & ~0xFF000000) | ((0xfa | hBit) << 24);
