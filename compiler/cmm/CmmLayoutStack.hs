@@ -28,6 +28,7 @@ import DynFlags
 import FastString
 import Outputable hiding ( isEmpty )
 import qualified Data.Set as Set
+import Control.Monad ((<=<))
 import Control.Monad.Fix
 import Data.Array as Array
 import Data.Bits
@@ -788,12 +789,13 @@ manifestSp dflags stackmaps stack0 sp0 sp_high
   = do
     let -- Add unwind pseudo-instructions to document Sp level for debugging
         add_unwind_info block
-          | debugLevel dflags > 0 = CmmUnwind (ExistingLabel $ entryLabel first) Sp sp_unwind : block
-          | otherwise             = block
+          | debugLevel dflags > 0 = do lbl <- newBlockId
+                                       pure $ CmmUnwind (NewLabel lbl) Sp sp_unwind : block
+          | otherwise             = pure block
         sp_unwind = CmmRegOff (CmmGlobal Sp) (sp0 - wORD_SIZE dflags)
 
-    final_middle <- maybeAddSpAdj dflags sp0 sp_off $
-                    blockFromList $
+    final_middle <- maybeAddSpAdj dflags sp0 sp_off <=<
+                    pure . blockFromList <=<
                     add_unwind_info $
                     map adj_pre_sp $
                     elimStackStores stack0 stackmaps area_off $
