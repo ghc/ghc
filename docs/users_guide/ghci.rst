@@ -20,7 +20,7 @@ language extensions that GHC provides. GHCi also includes an interactive
 debugger (see :ref:`ghci-debugger`).
 
 .. [1]
-   The ‘i’ stands for “Interactive”
+   The "i" stands for “Interactive”
 
 .. [2]
    except ``foreign export``, at the moment
@@ -34,7 +34,7 @@ Introduction to GHCi
 Let's start with an example GHCi session. You can fire up GHCi with the
 command ``ghci``:
 
-::
+.. code-block:: none
 
     $ ghci
     GHCi, version 8.0.1: http://www.haskell.org/ghc/  :? for help
@@ -42,7 +42,7 @@ command ``ghci``:
 
 There may be a short pause while GHCi loads the prelude and standard
 libraries, after which the prompt is shown. As the banner says, you can
-type ``:?`` to see the list of commands available, and a half line
+type :ghci-cmd:`:?` to see the list of commands available, and a half line
 description of each of them. We'll explain most of these commands as we
 go along, and there is complete documentation for all the commands in
 :ref:`ghci-commands`.
@@ -52,7 +52,7 @@ Haskell expressions can be typed at the prompt:
 .. index::
    single: prompt; GHCi
 
-::
+.. code-block:: none
 
     Prelude> 1+2
     3
@@ -75,9 +75,7 @@ Loading source files
 --------------------
 
 Suppose we have the following Haskell source code, which we place in a
-file ``Main.hs``:
-
-::
+file ``Main.hs``: ::
 
     main = print (fac 20)
 
@@ -88,18 +86,18 @@ You can save ``Main.hs`` anywhere you like, but if you save it somewhere
 other than the current directory [3]_ then we will need to change to the
 right directory in GHCi:
 
-::
+.. code-block:: none
 
     Prelude> :cd dir
 
 where ⟨dir⟩ is the directory (or folder) in which you saved ``Main.hs``.
 
-To load a Haskell source file into GHCi, use the ``:load`` command:
+To load a Haskell source file into GHCi, use the :ghci-cmd:`:load` command:
 
 .. index::
    single: :load
 
-::
+.. code-block:: none
 
     Prelude> :load Main
     Compiling Main             ( Main.hs, interpreted )
@@ -107,21 +105,21 @@ To load a Haskell source file into GHCi, use the ``:load`` command:
     *Main>
 
 GHCi has loaded the ``Main`` module, and the prompt has changed to
-“\ ``*Main>``\ ” to indicate that the current context for expressions
+``*Main>`` to indicate that the current context for expressions
 typed at the prompt is the ``Main`` module we just loaded (we'll explain
 what the ``*`` means later in :ref:`ghci-scope`). So we can now type
 expressions involving the functions from ``Main.hs``:
 
-::
+.. code-block:: none
 
     *Main> fac 17
     355687428096000
 
 Loading a multi-module program is just as straightforward; just give the
-name of the “topmost” module to the ``:load`` command (hint: ``:load``
-can be abbreviated to ``:l``). The topmost module will normally be
-``Main``, but it doesn't have to be. GHCi will discover which modules
-are required, directly or indirectly, by the topmost module, and load
+name of the "topmost" module to the :ghci-cmd:`:load` command (hint:
+:ghci-cmd:`:load` can be abbreviated to ``:l``). The topmost module will
+normally be ``Main``, but it doesn't have to be. GHCi will discover which
+modules are required, directly or indirectly, by the topmost module, and load
 them all in dependency order.
 
 .. [3]
@@ -147,7 +145,7 @@ for most modules, the module name must match the filename. If it
 doesn't, GHCi won't be able to find it.
 
 There is one exception to this general rule: when you load a program
-with ``:load``, or specify it when you invoke ``ghci``, you can give a
+with :ghci-cmd:`:load`, or specify it when you invoke ``ghci``, you can give a
 filename rather than a module name. This filename is loaded if it
 exists, and it may contain any module you like. This is particularly
 convenient if you have several ``Main`` modules in the same directory
@@ -156,11 +154,11 @@ and you can't call them all ``Main.hs``.
 The search path for finding source files is specified with the ``-i``
 option on the GHCi command line, like so:
 
-::
+.. code-block:: none
 
     ghci -idir1:...:dirn
 
-or it can be set using the ``:set`` command from within GHCi (see
+or it can be set using the :ghci-cmd:`:set` command from within GHCi (see
 :ref:`ghci-cmd-line-options`) [4]_
 
 One consequence of the way that GHCi follows dependencies to find
@@ -185,7 +183,7 @@ Making changes and recompilation
    single: :reload
 
 If you make some changes to the source code and want GHCi to recompile
-the program, give the ``:reload`` command. The program will be
+the program, give the :ghci-cmd:`:reload` command. The program will be
 recompiled as necessary, with GHCi doing its best to avoid actually
 recompiling modules if their external dependencies haven't changed. This
 is the same mechanism we use to avoid re-compiling modules in the batch
@@ -211,13 +209,13 @@ Why should we want to run compiled code? Well, compiled code is roughly
 of a program that aren't changing very often, and use the interpreter
 for the code being actively developed.
 
-When loading up source modules with ``:load``, GHCi normally looks for
+When loading up source modules with :ghci-cmd:`:load`, GHCi normally looks for
 any corresponding compiled object files, and will use one in preference
 to interpreting the source if possible. For example, suppose we have a 4-module
 program consisting of modules ``A``, ``B``, ``C``, and ``D``. Modules ``B`` and
 ``C`` both import ``D`` only, and ``A`` imports both ``B`` and ``C``:
 
-::
+.. code-block:: none
 
           A
          / \
@@ -227,7 +225,7 @@ program consisting of modules ``A``, ``B``, ``C``, and ``D``. Modules ``B`` and
 
 We can compile ``D``, then load the whole program, like this:
 
-::
+.. code-block:: none
 
     Prelude> :! ghc -c -dynamic D.hs
     Prelude> :load A
@@ -246,10 +244,10 @@ Note the ``-dynamic`` flag to GHC: GHCi uses dynamically-linked object
 code (if you are on a platform that supports it), and so in order to use
 compiled code with GHCi it must be compiled for dynamic linking.
 
-At any time you can use the command ``:show modules`` to get a list of
+At any time you can use the command :ghci-cmd:`:show modules` to get a list of
 the modules currently loaded into GHCi:
 
-::
+.. code-block:: none
 
     *Main> :show modules
     D                ( D.hs, D.o )
@@ -262,7 +260,7 @@ If we now modify the source of ``D`` (or pretend to: using the Unix command
 ``touch`` on the source file is handy for this), the compiler will no
 longer be able to use the object file, because it might be out of date:
 
-::
+.. code-block:: none
 
     *Main> :! touch D.hs
     *Main> :reload
@@ -277,7 +275,7 @@ recompiled.
 
 So let's try compiling one of the other modules:
 
-::
+.. code-block:: none
 
     *Main> :! ghc -c C.hs
     *Main> :load A
@@ -292,16 +290,16 @@ compiled module may only depend on other compiled modules, and in this
 case ``C`` depends on ``D``, which doesn't have an object file, so GHCi also
 rejected ``C``\'s object file. Ok, so let's also compile ``D``:
 
-::
+.. code-block:: none
 
     *Main> :! ghc -c D.hs
     *Main> :reload
     Ok, modules loaded: A, B, C, D.
 
 Nothing happened! Here's another lesson: newly compiled modules aren't
-picked up by ``:reload``, only ``:load``:
+picked up by :ghci-cmd:`:reload`, only :ghci-cmd:`:load`:
 
-::
+.. code-block:: none
 
     *Main> :load A
     Compiling B                ( B.hs, interpreted )
@@ -314,9 +312,9 @@ available for use in expressions at the prompt when the module is
 interpreted (see :ref:`ghci-scope`). For this reason, you might
 sometimes want to force GHCi to load a module using the interpreter.
 This can be done by prefixing a ``*`` to the module name or filename
-when using ``:load``, for example
+when using :ghci-cmd:`:load`, for example
 
-::
+.. code-block:: none
 
     Prelude> :load *A
     Compiling A                ( A.hs, interpreted )
@@ -349,7 +347,7 @@ Interactive evaluation at the prompt
 When you type an expression at the prompt, GHCi immediately evaluates
 and prints the result:
 
-::
+.. code-block:: none
 
     Prelude> reverse "hello"
     "olleh"
@@ -365,7 +363,7 @@ GHCi does more than simple expression evaluation at the prompt. If you
 enter an expression of type ``IO a`` for some ``a``, then GHCi
 *executes* it as an IO-computation.
 
-::
+.. code-block:: none
 
     Prelude> "hello"
     "hello"
@@ -375,7 +373,7 @@ enter an expression of type ``IO a`` for some ``a``, then GHCi
 This works even if the type of the expression is more general, provided
 it can be *instantiated* to ``IO a``. For example
 
-::
+.. code-block:: none
 
     Prelude> return True
     True
@@ -389,7 +387,7 @@ if):
 
 For example, remembering that ``putStrLn :: String -> IO ()``:
 
-::
+.. code-block:: none
 
     Prelude> putStrLn "hello"
     hello
@@ -415,7 +413,7 @@ same as the syntax of a statement in a Haskell ``do`` expression.
 However, there's no monad overloading here: statements typed at the
 prompt must be in the ``IO`` monad.
 
-::
+.. code-block:: none
 
     Prelude> x <- return 42
     Prelude> print x
@@ -441,7 +439,7 @@ statement if and only if:
 Of course, you can also bind normal non-IO expressions using the
 ``let``\-statement:
 
-::
+.. code-block:: none
 
     Prelude> let x = 42
     Prelude> x
@@ -452,7 +450,7 @@ Another important difference between the two types of binding is that
 the monadic bind (``p <- e``) is *strict* (it evaluates ``e``), whereas
 with the ``let`` form, the expression isn't evaluated immediately:
 
-::
+.. code-block:: none
 
     Prelude> let x = error "help!"
     Prelude> print x
@@ -464,7 +462,7 @@ unlike monadic bindings.
 
 You can also define functions at the prompt:
 
-::
+.. code-block:: none
 
     Prelude> add a b = a + b
     Prelude> add 1 2
@@ -476,7 +474,7 @@ clauses, or groups of mutually recursive functions, because the complete
 definition has to be given on a single line, using explicit semicolons
 instead of layout:
 
-::
+.. code-block:: none
 
     Prelude> f op n [] = n ; f op n (h:t) = h `op` f op n t
     Prelude> f (+) 0 [1..3]
@@ -487,7 +485,7 @@ To alleviate this issue, GHCi commands can be split over multiple lines,
 by wrapping them in ``:{`` and ``:}`` (each on a single line of its
 own):
 
-::
+.. code-block:: none
 
     Prelude> :{
     Prelude| g op n [] = n
@@ -511,15 +509,15 @@ including entities that are in scope in the current module context.
 
 .. warning::
     Temporary bindings introduced at the prompt only last until the
-    next ``:load`` or ``:reload`` command, at which time they will be simply
-    lost. However, they do survive a change of context with ``:module``: the
-    temporary bindings just move to the new location.
+    next :ghci-cmd:`:load` or :ghci-cmd:`:reload` command, at which time they
+    will be simply lost. However, they do survive a change of context with
+    :ghci-cmd:`:module`: the temporary bindings just move to the new location.
 
 .. hint::
     To get a list of the bindings currently in scope, use the
-    ``:show bindings`` command:
+    :ghci-cmd:`:show bindings` command:
 
-    ::
+    .. code-block:: none
 
         Prelude> :show bindings
         x :: Int
@@ -529,7 +527,7 @@ including entities that are in scope in the current module context.
     If you turn on the ``+t`` option, GHCi will show the type of each
     variable bound by a statement. For example:
 
-    ::
+    .. code-block:: none
 
         Prelude> :set +t
         Prelude> let (x:xs) = [1..]
@@ -551,7 +549,7 @@ above, GHCi also has a multiline mode, enabled by ``:set +m``,
 statement is unfinished and allows further lines to be added. A
 multi-line input is terminated with an empty line. For example:
 
-::
+.. code-block:: none
 
     Prelude> :set +m
     Prelude> let x = 42
@@ -562,7 +560,7 @@ indicates that the next line continues the previous one by changing the
 prompt. Note that layout is in effect, so to add more bindings to this
 ``let`` we have to line them up:
 
-::
+.. code-block:: none
 
     Prelude> :set +m
     Prelude> let x = 42
@@ -572,7 +570,7 @@ prompt. Note that layout is in effect, so to add more bindings to this
 
 Explicit braces and semicolons can be used instead of layout:
 
-::
+.. code-block:: none
 
     Prelude> do {
     Prelude| putStrLn "hello"
@@ -587,7 +585,7 @@ is finished, so no empty line is required.
 
 Multiline mode is useful when entering monadic ``do`` statements:
 
-::
+.. code-block:: none
 
     Control.Monad.State> flip evalStateT 0 $ do
     Control.Monad.State| i <- get
@@ -602,7 +600,7 @@ Multiline mode is useful when entering monadic ``do`` statements:
 During a multiline interaction, the user can interrupt and return to the
 top-level prompt.
 
-::
+.. code-block:: none
 
     Prelude> do
     Prelude| putStrLn "Hello, World!"
@@ -618,7 +616,7 @@ At the GHCi prompt you can also enter any top-level Haskell declaration,
 including ``data``, ``type``, ``newtype``, ``class``, ``instance``,
 ``deriving``, and ``foreign`` declarations. For example:
 
-::
+.. code-block:: none
 
     Prelude> data T = A | B | C deriving (Eq, Ord, Show, Enum)
     Prelude> [A ..]
@@ -639,7 +637,7 @@ declarations still refer to the old type. However, while the old and the
 new type have the same name, GHCi will treat them as distinct. For
 example:
 
-::
+.. code-block:: none
 
     Prelude> data T = A | B
     Prelude> let f A = True; f B = False
@@ -673,32 +671,32 @@ When you type an expression at the prompt, what identifiers and types
 are in scope? GHCi provides a flexible way to control exactly how the
 context for an expression is constructed:
 
--  The ``:load``, ``:add``, and ``:reload`` commands
+-  The :ghci-cmd:`:load`, :ghci-cmd:`:add`, and :ghci-cmd:`:reload` commands
    (:ref:`ghci-load-scope`).
 
 -  The ``import`` declaration (:ref:`ghci-import-decl`).
 
--  The ``:module`` command (:ref:`ghci-module-cmd`).
+-  The :ghci-cmd:`:module` command (:ref:`ghci-module-cmd`).
 
-The command ``:show imports`` will show a summary of which modules
+The command :ghci-cmd:`:show imports` will show a summary of which modules
 contribute to the top-level scope.
 
 .. hint::
     GHCi will tab-complete names that are in scope; for example, if
     you run GHCi and type ``J<tab>`` then GHCi will expand it to
-    “\ ``Just``\ ”.
+    ``Just``.
 
 .. _ghci-load-scope:
 
 The effect of ``:load`` on what is in scope
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The ``:load``, ``:add``, and ``:reload`` commands
+The :ghci-cmd:`:load`, :ghci-cmd:`:add`, and :ghci-cmd:`:reload` commands
 (:ref:`loading-source-files` and :ref:`ghci-compiled`) affect the
 top-level scope. Let's start with the simple cases; when you start GHCi
 the prompt looks like this:
 
-::
+.. code-block:: none
 
     Prelude>
 
@@ -708,7 +706,7 @@ visible in a Haskell source file with no ``import`` declarations.
 
 If we now load a file into GHCi, the prompt will change:
 
-::
+.. code-block:: none
 
     Prelude> :load Main.hs
     Compiling Main             ( Main.hs, interpreted )
@@ -732,16 +730,16 @@ the module are visible.
     loads the interpreted version of a module, add the ``*`` when loading
     the module, e.g. ``:load *M``.
 
-In general, after a ``:load`` command, an automatic import is added to
+In general, after a :ghci-cmd:`:load` command, an automatic import is added to
 the scope for the most recently loaded "target" module, in a ``*``-form
 if possible. For example, if you say ``:load foo.hs bar.hs`` and
 ``bar.hs`` contains module ``Bar``, then the scope will be set to
 ``*Bar`` if ``Bar`` is interpreted, or if ``Bar`` is compiled it will be
 set to ``Prelude Bar`` (GHCi automatically adds ``Prelude`` if it isn't
 present and there aren't any ``*``-form modules). These
-automatically-added imports can be seen with ``:show imports``:
+automatically-added imports can be seen with :ghci-cmd:`:show imports`:
 
-::
+.. code-block:: none
 
     Prelude> :load hello.hs
     [1 of 1] Compiling Main             ( hello.hs, interpreted )
@@ -751,8 +749,8 @@ automatically-added imports can be seen with ``:show imports``:
     *Main>
 
 and the automatically-added import is replaced the next time you use
-``:load``, ``:add``, or ``:reload``. It can also be removed by
-``:module`` as with normal imports.
+:ghci-cmd:`:load`, :ghci-cmd:`:add`, or :ghci-cmd:`:reload`. It can also be
+removed by :ghci-cmd:`:module` as with normal imports.
 
 .. _ghci-import-decl:
 
@@ -766,7 +764,7 @@ in effect at the prompt.
 
 To add modules to the scope, use ordinary Haskell ``import`` syntax:
 
-::
+.. code-block:: none
 
     Prelude> import System.IO
     Prelude System.IO> hPutStrLn stdout "hello\n"
@@ -776,9 +774,9 @@ To add modules to the scope, use ordinary Haskell ``import`` syntax:
 The full Haskell import syntax is supported, including ``hiding`` and
 ``as`` clauses. The prompt shows the modules that are currently
 imported, but it omits details about ``hiding``, ``as``, and so on. To
-see the full story, use ``:show imports``:
+see the full story, use :ghci-cmd:`:show imports`:
 
-::
+.. code-block:: none
 
     Prelude> import System.IO
     Prelude System.IO> import Data.Map as Map
@@ -802,10 +800,10 @@ behaves in the same way for expressions typed at the prompt.
 Controlling what is in scope with the ``:module`` command
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Another way to manipulate the scope is to use the ``:module`` command,
-whose syntax is this:
+Another way to manipulate the scope is to use the :ghci-cmd:`:module`
+command, whose syntax is this:
 
-::
+.. code-block:: none
 
     :module +|- *mod1 ... *modn
 
@@ -815,10 +813,10 @@ the current scope is replaced by the set of modules specified. Note that
 if you use this form and leave out ``Prelude``, an implicit ``Prelude``
 import will be added automatically.
 
-The ``:module`` command provides a way to do two things that cannot be
+The :ghci-cmd:`:module` command provides a way to do two things that cannot be
 done with ordinary ``import`` declarations:
 
--  ``:module`` supports the ``*`` modifier on modules, which opens the
+-  :ghci-cmd:`:module` supports the ``*`` modifier on modules, which opens the
    full top-level scope of a module, rather than just its exports.
 
 -  Imports can be *removed* from the context, using the syntax
@@ -841,24 +839,24 @@ behaviour can be disabled with the ``-fno-implicit-import-qualified`` flag.
 ``:module`` and ``:load``
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-It might seem that ``:module``/``import`` and
-``:load``/``:add``/``:reload`` do similar things: you can use both to
-bring a module into scope. However, there is a very important
+It might seem that :ghci-cmd:`:module`/``import`` and
+:ghci-cmd:`:load`/:ghci-cmd:`:add`/:ghci-cmd:`:reload` do similar things: you
+can use both to bring a module into scope. However, there is a very important
 difference. GHCi is concerned with two sets of modules:
 
 -  The set of modules that are currently *loaded*. This set is modified
-   by ``:load``, ``:add`` and ``:reload``, and can be shown with
-   ``:show modules``.
+   by :ghci-cmd:`:load`, :ghci-cmd:`:add` and :ghci-cmd:`:reload`, and can be shown with
+   :ghci-cmd:`:show modules`.
 
--  The set of modules that are currently *in scope* at the prompt. This
-   set is modified by ``import`` and ``:module``, and it is also
-   modified automatically after ``:load``, ``:add``, and ``:reload``, as
-   described above. The set of modules in scope can be shown with
-   ``:show imports``.
+-  The set of modules that are currently *in scope* at the prompt. This set is
+   modified by ``import`` and :ghci-cmd:`:module`, and it is also modified
+   automatically after :ghci-cmd:`:load`, :ghci-cmd:`:add`, and
+   :ghci-cmd:`:reload`, as described above. The set of modules in scope can be
+   shown with :ghci-cmd:`:show imports`.
 
-You can add a module to the scope (via ``:module`` or ``import``) only
+You can add a module to the scope (via :ghci-cmd:`:module` or ``import``) only
 if either (a) it is loaded, or (b) it is a module from a package that
-GHCi knows about. Using ``:module`` or ``import`` to try bring into
+GHCi knows about. Using :ghci-cmd:`:module` or ``import`` to try bring into
 scope a non-loaded module may result in the message
 “\ ``module M is not loaded``\ ”.
 
@@ -870,11 +868,11 @@ function to access the command-line arguments. However, we cannot simply
 pass the arguments to the ``main`` function while we are testing in
 ghci, as the ``main`` function doesn't take its directly.
 
-Instead, we can use the ``:main`` command. This runs whatever ``main``
+Instead, we can use the :ghci-cmd:`:main` command. This runs whatever ``main``
 is in scope, with any arguments being treated the same as command-line
 arguments, e.g.:
 
-::
+.. code-block:: none
 
     Prelude> main = System.Environment.getArgs >>= print
     Prelude> :main foo bar
@@ -884,7 +882,7 @@ We can also quote arguments which contains characters like spaces, and
 they are treated like Haskell strings, or we can just use Haskell list
 syntax:
 
-::
+.. code-block:: none
 
     Prelude> :main foo "bar baz"
     ["foo","bar baz"]
@@ -892,9 +890,9 @@ syntax:
     ["foo","bar baz"]
 
 Finally, other functions can be called, either with the ``-main-is``
-flag or the ``:run`` command:
+flag or the :ghci-cmd:`:run` command:
 
-::
+.. code-block:: none
 
     Prelude> foo = putStrLn "foo" >> System.Environment.getArgs >>= print
     Prelude> bar = putStrLn "bar" >> System.Environment.getArgs >>= print
@@ -916,7 +914,7 @@ Whenever an expression (or a non-binding statement, to be precise) is
 typed at the prompt, GHCi implicitly binds its value to the variable
 ``it``. For example:
 
-::
+.. code-block:: none
 
     Prelude> 1+2
     3
@@ -927,7 +925,7 @@ What actually happens is that GHCi typechecks the expression, and if it
 doesn't have an ``IO`` type, then it transforms it as follows: an
 expression ``e`` turns into
 
-::
+.. code-block:: none
 
     let it = e;
     print it
@@ -937,7 +935,7 @@ which is then run as an IO-action.
 Hence, the original expression must have a type which is an instance of
 the ``Show`` class, or GHCi will complain:
 
-::
+.. code-block:: none
 
     Prelude> id
 
@@ -955,7 +953,7 @@ If the expression was instead of type ``IO a`` for some ``a``, then
 ``it`` will be bound to the result of the ``IO`` computation, which is
 of type ``a``. eg.:
 
-::
+.. code-block:: none
 
     Prelude> Time.getClockTime
     Wed Mar 14 12:23:13 GMT 2001
@@ -964,7 +962,7 @@ of type ``a``. eg.:
 
 The corresponding translation for an IO-typed ``e`` is
 
-::
+.. code-block:: none
 
     it <- e
 
@@ -982,7 +980,7 @@ Type defaulting in GHCi
 
 Consider this GHCi session:
 
-::
+.. code-block:: none
 
       ghci> reverse []
 
@@ -991,7 +989,7 @@ What should GHCi do? Strictly speaking, the program is ambiguous.
 ``Show a => String`` and how that displays depends on the type ``a``.
 For example:
 
-::
+.. code-block:: none
 
       ghci> reverse ([] :: String)
       ""
@@ -1022,9 +1020,7 @@ is given, the following additional differences apply:
 -  The unit type ``()`` and the list type ``[]`` are added to the start of
    the standard list of types which are tried when doing type defaulting.
 
-The last point means that, for example, this program:
-
-::
+The last point means that, for example, this program: ::
 
     main :: IO ()
     main = print def
@@ -1057,10 +1053,9 @@ Using a custom interactive printing function
 .. index::
    single: Custom printing function; in GHCi
 
-[**New in version 7.6.1**] By default, GHCi prints the result of
-expressions typed at the prompt using the function ``System.IO.print``.
-Its type signature is ``Show a => a -> IO ()``, and it works by
-converting the value to ``String`` using ``show``.
+Since GHC 7.6.1, GHCi prints the result of expressions typed at the prompt
+using the function ``System.IO.print``. Its type signature is ``Show a => a ->
+IO ()``, and it works by converting the value to ``String`` using ``show``.
 
 This is not ideal in certain cases, like when the output is long, or
 contains strings with non-ascii characters.
@@ -1069,34 +1064,32 @@ The ``-interactive-print`` flag allows to specify any function of type
 ``C a => a -> IO ()``, for some constraint ``C``, as the function for
 printing evaluated expressions. The function can reside in any loaded
 module or any registered package, but only when it resides in a registered
-package will it survive a ``:cd``, ``:add``, ``:load``, ``:reload`` or
-``:set``.
+package will it survive a :ghci-cmd:`:cd`, :ghci-cmd:`:add`, :ghci-cmd:`:load`,
+:ghci-cmd:`:reload` or, :ghci-cmd:`:set`.
 
-As an example, suppose we have following special printing module:
+As an example, suppose we have following special printing module: ::
 
-::
+    module SpecPrinter where
+    import System.IO
 
-             module SpecPrinter where
-             import System.IO
-
-             sprint a = putStrLn $ show a ++ "!"
+    sprint a = putStrLn $ show a ++ "!"
 
 The ``sprint`` function adds an exclamation mark at the end of any
 printed value. Running GHCi with the command:
 
-::
+.. code-block:: none
 
-             ghci -interactive-print=SpecPrinter.sprinter SpecPrinter
+    ghci -interactive-print=SpecPrinter.sprinter SpecPrinter
 
 will start an interactive session where values with be printed using
 ``sprint``:
 
-::
+.. code-block:: none
 
-             *SpecPrinter> [1,2,3]
-             [1,2,3]!
-             *SpecPrinter> 42
-             42!
+    *SpecPrinter> [1,2,3]
+    [1,2,3]!
+    *SpecPrinter> 42
+    42!
 
 A custom pretty printing function can be used, for example, to format
 tree-like and nested structures in a more readable way.
@@ -1104,10 +1097,10 @@ tree-like and nested structures in a more readable way.
 The ``-interactive-print`` flag can also be used when running GHC in
 ``-e mode``:
 
-::
+.. code-block:: none
 
-             % ghc -e "[1,2,3]" -interactive-print=SpecPrinter.sprint SpecPrinter
-             [1,2,3]!
+    % ghc -e "[1,2,3]" -interactive-print=SpecPrinter.sprint SpecPrinter
+    [1,2,3]!
 
 .. _ghci-debugger:
 
@@ -1158,9 +1151,7 @@ it is thrown from within compiled code (see
 Breakpoints and inspecting variables
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Let's use quicksort as a running example. Here's the code:
-
-::
+Let's use quicksort as a running example. Here's the code: ::
 
     qsort [] = []
     qsort (a:as) = qsort left ++ [a] ++ qsort right
@@ -1170,7 +1161,7 @@ Let's use quicksort as a running example. Here's the code:
 
 First, load the module into GHCi:
 
-::
+.. code-block:: none
 
     Prelude> :l qsort.hs
     [1 of 1] Compiling Main             ( qsort.hs, interpreted )
@@ -1180,7 +1171,7 @@ First, load the module into GHCi:
 Now, let's set a breakpoint on the right-hand-side of the second
 equation of qsort:
 
-::
+.. code-block:: none
 
     *Main> :break 2
     Breakpoint 0 activated at qsort.hs:2:15-46
@@ -1194,7 +1185,7 @@ the breakpoint, which in this case is the expression
 
 Now, we run the program:
 
-::
+.. code-block:: none
 
     *Main> main
     Stopped at qsort.hs:2:15-46
@@ -1207,16 +1198,16 @@ Now, we run the program:
 Execution has stopped at the breakpoint. The prompt has changed to
 indicate that we are currently stopped at a breakpoint, and the
 location: ``[qsort.hs:2:15-46]``. To further clarify the location, we
-can use the ``:list`` command:
+can use the :ghci-cmd:`:list` command:
 
-::
+.. code-block:: none
 
     [qsort.hs:2:15-46] *Main> :list
     1  qsort [] = []
     2  qsort (a:as) = qsort left ++ [a] ++ qsort right
     3    where (left,right) = (filter (<=a) as, filter (>a) as)
 
-The ``:list`` command lists the source code around the current
+The :ghci-cmd:`:list` command lists the source code around the current
 breakpoint. If your output device supports it, then GHCi will highlight
 the active subexpression in bold.
 
@@ -1225,11 +1216,11 @@ on which the breakpoint was placed (``a``, ``left``, ``right``), and
 additionally a binding for the result of the expression (``_result``).
 These variables are just like other variables that you might define in
 GHCi; you can use them in expressions that you type at the prompt, you
-can ask for their types with ``:type``, and so on. There is one
+can ask for their types with :ghci-cmd:`:type`, and so on. There is one
 important difference though: these variables may only have partial
 types. For example, if we try to display the value of ``left``:
 
-::
+.. code-block:: none
 
     [qsort.hs:2:15-46] *Main> left
 
@@ -1246,10 +1237,10 @@ you ask to display ``left`` at the prompt, GHCi can't figure out which
 instance of ``Show`` to use, so it emits the type error above.
 
 Fortunately, the debugger includes a generic printing command,
-``:print``, which can inspect the actual runtime value of a variable and
+:ghci-cmd:`:print`, which can inspect the actual runtime value of a variable and
 attempt to reconstruct its type. If we try it on ``left``:
 
-::
+.. code-block:: none
 
     [qsort.hs:2:15-46] *Main> :set -fprint-evld-with-show
     [qsort.hs:2:15-46] *Main> :print left
@@ -1257,34 +1248,34 @@ attempt to reconstruct its type. If we try it on ``left``:
 
 This isn't particularly enlightening. What happened is that ``left`` is
 bound to an unevaluated computation (a suspension, or thunk), and
-``:print`` does not force any evaluation. The idea is that ``:print``
-can be used to inspect values at a breakpoint without any unfortunate
-side effects. It won't force any evaluation, which could cause the
-program to give a different answer than it would normally, and hence it
-won't cause any exceptions to be raised, infinite loops, or further
-breakpoints to be triggered (see :ref:`nested-breakpoints`). Rather than
-forcing thunks, ``:print`` binds each thunk to a fresh variable
-beginning with an underscore, in this case ``_t1``.
+:ghci-cmd:`:print` does not force any evaluation. The idea is that
+:ghci-cmd:`:print` can be used to inspect values at a breakpoint without any
+unfortunate side effects. It won't force any evaluation, which could cause the
+program to give a different answer than it would normally, and hence it won't
+cause any exceptions to be raised, infinite loops, or further breakpoints to be
+triggered (see :ref:`nested-breakpoints`). Rather than forcing thunks,
+:ghci-cmd:`:print` binds each thunk to a fresh variable beginning with an
+underscore, in this case ``_t1``.
 
-The flag ``-fprint-evld-with-show`` instructs ``:print`` to reuse
+The flag ``-fprint-evld-with-show`` instructs :ghci-cmd:`:print` to reuse
 available ``Show`` instances when possible. This happens only when the
 contents of the variable being inspected are completely evaluated.
 
-If we aren't concerned about preserving the evaluatedness of a variable,
-we can use ``:force`` instead of ``:print``. The ``:force`` command
-behaves exactly like ``:print``, except that it forces the evaluation of
-any thunks it encounters:
+If we aren't concerned about preserving the evaluatedness of a variable, we can
+use :ghci-cmd:`:force` instead of :ghci-cmd:`:print`. The :ghci-cmd:`:force`
+command behaves exactly like :ghci-cmd:`:print`, except that it forces the
+evaluation of any thunks it encounters:
 
-::
+.. code-block:: none
 
     [qsort.hs:2:15-46] *Main> :force left
     left = [4,0,3,1]
 
-Now, since ``:force`` has inspected the runtime value of ``left``, it
+Now, since :ghci-cmd:`:force` has inspected the runtime value of ``left``, it
 has reconstructed its type. We can see the results of this type
 reconstruction:
 
-::
+.. code-block:: none
 
     [qsort.hs:2:15-46] *Main> :show bindings
     _result :: [Integer]
@@ -1297,16 +1288,16 @@ Not only do we now know the type of ``left``, but all the other partial
 types have also been resolved. So we can ask for the value of ``a``, for
 example:
 
-::
+.. code-block:: none
 
     [qsort.hs:2:15-46] *Main> a
     8
 
 You might find it useful to use Haskell's ``seq`` function to evaluate
 individual thunks rather than evaluating the whole expression with
-``:force``. For example:
+:ghci-cmd:`:force`. For example:
 
-::
+.. code-block:: none
 
     [qsort.hs:2:15-46] *Main> :print right
     right = (_t1::[Integer])
@@ -1317,12 +1308,12 @@ individual thunks rather than evaluating the whole expression with
 
 We evaluated only the ``_t1`` thunk, revealing the head of the list, and
 the tail is another thunk now bound to ``_t2``. The ``seq`` function is
-a little inconvenient to use here, so you might want to use ``:def`` to
+a little inconvenient to use here, so you might want to use :ghci-cmd:`:def` to
 make a nicer interface (left as an exercise for the reader!).
 
 Finally, we can continue the current execution:
 
-::
+.. code-block:: none
 
     [qsort.hs:2:15-46] *Main> :continue
     Stopped at qsort.hs:2:15-46
@@ -1343,7 +1334,7 @@ Setting breakpoints
 Breakpoints can be set in various ways. Perhaps the easiest way to set a
 breakpoint is to name a top-level function:
 
-::
+.. code-block:: none
 
        :break identifier
 
@@ -1354,7 +1345,7 @@ before any pattern matching has taken place.
 
 Breakpoints can also be set by line (and optionally column) number:
 
-::
+.. code-block:: none
 
        :break line
        :break line column
@@ -1392,18 +1383,18 @@ Listing and deleting breakpoints
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The list of breakpoints currently enabled can be displayed using
-``:show breaks``:
+:ghci-cmd:`:show breaks`:
 
-::
+.. code-block:: none
 
     *Main> :show breaks
     [0] Main qsort.hs:1:11-12
     [1] Main qsort.hs:2:15-46
 
-To delete a breakpoint, use the ``:delete`` command with the number
-given in the output from ``:show breaks``:
+To delete a breakpoint, use the :ghci-cmd:`:delete` command with the number
+given in the output from :ghci-cmd:`:show breaks`:
 
-::
+.. code-block:: none
 
     *Main> :delete 0
     *Main> :show breaks
@@ -1418,28 +1409,28 @@ Single-stepping
 
 Single-stepping is a great way to visualise the execution of your
 program, and it is also a useful tool for identifying the source of a
-bug. GHCi offers two variants of stepping. Use ``:step`` to enable all
+bug. GHCi offers two variants of stepping. Use :ghci-cmd:`:step` to enable all
 the breakpoints in the program, and execute until the next breakpoint is
-reached. Use ``:steplocal`` to limit the set of enabled breakpoints to
-those in the current top level function. Similarly, use ``:stepmodule``
+reached. Use :ghci-cmd:`:steplocal` to limit the set of enabled breakpoints to
+those in the current top level function. Similarly, use :ghci-cmd:`:stepmodule`
 to single step only on breakpoints contained in the current module. For
 example:
 
-::
+.. code-block:: none
 
     *Main> :step main
     Stopped at qsort.hs:5:7-47
     _result :: IO ()
 
-The command ``:step expr`` begins the evaluation of ⟨expr⟩ in
+The command :ghci-cmd:`:step expr` begins the evaluation of ⟨expr⟩ in
 single-stepping mode. If ⟨expr⟩ is omitted, then it single-steps from
-the current breakpoint. ``:steplocal`` and ``:stepmodule`` work
+the current breakpoint. :ghci-cmd:`:steplocal` and :ghci-cmd:`:stepmodule` work
 similarly.
 
-The ``:list`` command is particularly useful when single-stepping, to
+The :ghci-cmd:`:list` command is particularly useful when single-stepping, to
 see where you currently are:
 
-::
+.. code-block:: none
 
     [qsort.hs:5:7-47] *Main> :list
     4
@@ -1448,9 +1439,9 @@ see where you currently are:
     [qsort.hs:5:7-47] *Main>
 
 In fact, GHCi provides a way to run a command when a breakpoint is hit,
-so we can make it automatically do ``:list``:
+so we can make it automatically do :ghci-cmd:`:list`:
 
-::
+.. code-block:: none
 
     [qsort.hs:5:7-47] *Main> :set stop :list
     [qsort.hs:5:7-47] *Main> :step
@@ -1471,7 +1462,7 @@ prompt triggers a second breakpoint, the new breakpoint becomes the
 "current" one, and the old one is saved on a stack. An arbitrary number
 of breakpoint contexts can be built up in this way. For example:
 
-::
+.. code-block:: none
 
     [qsort.hs:2:15-46] *Main> :st qsort [1,3]
     Stopped at qsort.hs:(1,0)-(3,55)
@@ -1483,9 +1474,9 @@ started a new evaluation with ``:step qsort [1,3]``. This new evaluation
 stopped after one step (at the definition of ``qsort``). The prompt has
 changed, now prefixed with ``...``, to indicate that there are saved
 breakpoints beyond the current one. To see the stack of contexts, use
-``:show context``:
+:ghci-cmd:`:show context`:
 
-::
+.. code-block:: none
 
     ... [qsort.hs:(1,0)-(3,55)] *Main> :show context
     --> main
@@ -1494,9 +1485,9 @@ breakpoints beyond the current one. To see the stack of contexts, use
       Stopped at qsort.hs:(1,0)-(3,55)
     ... [qsort.hs:(1,0)-(3,55)] *Main>
 
-To abandon the current evaluation, use ``:abandon``:
+To abandon the current evaluation, use :ghci-cmd:`:abandon`:
 
-::
+.. code-block:: none
 
     ... [qsort.hs:(1,0)-(3,55)] *Main> :abandon
     [qsort.hs:2:15-46] *Main> :abandon
@@ -1515,9 +1506,9 @@ then just entering ``_result`` at the prompt will show it. However,
 there's one caveat to doing this: evaluating ``_result`` will be likely
 to trigger further breakpoints, starting with the breakpoint we are
 currently stopped at (if we stopped at a real breakpoint, rather than
-due to ``:step``). So it will probably be necessary to issue a
-``:continue`` immediately when evaluating ``_result``. Alternatively,
-you can use ``:force`` which ignores breakpoints.
+due to :ghci-cmd:`:step`). So it will probably be necessary to issue a
+:ghci-cmd:`:continue` immediately when evaluating ``_result``. Alternatively,
+you can use :ghci-cmd:`:force` which ignores breakpoints.
 
 .. _tracing:
 
@@ -1542,10 +1533,10 @@ to backtrack from a breakpoint to previous evaluation steps: essentially
 this is like single-stepping backwards, and should in many cases provide
 enough information to answer the "how did I get here?" question.
 
-To use tracing, evaluate an expression with the ``:trace`` command. For
+To use tracing, evaluate an expression with the :ghci-cmd:`:trace` command. For
 example, if we set a breakpoint on the base case of ``qsort``:
 
-::
+.. code-block:: none
 
     *Main> :list qsort
     1  qsort [] = []
@@ -1558,7 +1549,7 @@ example, if we set a breakpoint on the base case of ``qsort``:
 
 and then run a small ``qsort`` with tracing:
 
-::
+.. code-block:: none
 
     *Main> :trace qsort [3,2,1]
     Stopped at qsort.hs:1:11-12
@@ -1567,7 +1558,7 @@ and then run a small ``qsort`` with tracing:
 
 We can now inspect the history of evaluation steps:
 
-::
+.. code-block:: none
 
     [qsort.hs:1:11-12] *Main> :hist
     -1  : qsort.hs:3:24-38
@@ -1588,9 +1579,9 @@ We can now inspect the history of evaluation steps:
     -16 : qsort.hs:(1,0)-(3,55)
     <end of history>
 
-To examine one of the steps in the history, use ``:back``:
+To examine one of the steps in the history, use :ghci-cmd:`:back`:
 
-::
+.. code-block:: none
 
     [qsort.hs:1:11-12] *Main> :back
     Logged breakpoint at qsort.hs:3:24-38
@@ -1602,14 +1593,14 @@ To examine one of the steps in the history, use ``:back``:
 Note that the local variables at each step in the history have been
 preserved, and can be examined as usual. Also note that the prompt has
 changed to indicate that we're currently examining the first step in the
-history: ``-1``. The command ``:forward`` can be used to traverse
+history: ``-1``. The command :ghci-cmd:`:forward` can be used to traverse
 forward in the history.
 
-The ``:trace`` command can be used with or without an expression. When
+The :ghci-cmd:`:trace` command can be used with or without an expression. When
 used without an expression, tracing begins from the current breakpoint,
-just like ``:step``.
+just like :ghci-cmd:`:step`.
 
-The history is only available when using ``:trace``; the reason for this
+The history is only available when using :ghci-cmd:`:trace`; the reason for this
 is we found that logging each breakpoint in the history cuts performance
 by a factor of 2 or more. By default, GHCi remembers the last 50 steps
 in the history, but this can be changed with the ``-fghci-hist-size=n`` option).
@@ -1633,7 +1624,7 @@ compiling with profiling and using ``Debug.Trace.traceStack`` or
 The GHCi debugger offers a way to hopefully shed some light on these
 errors quickly and without modifying or recompiling the source code. One
 way would be to set a breakpoint on the location in the source code that
-throws the exception, and then use ``:trace`` and ``:history`` to
+throws the exception, and then use :ghci-cmd:`:trace` and :ghci-cmd:`:history` to
 establish the context. However, ``head`` is in a library and we can't
 set a breakpoint on it directly. For this reason, GHCi provides the
 flags ``-fbreak-on-exception`` which causes the evaluator to stop when
@@ -1642,10 +1633,10 @@ but stops only on uncaught exceptions. When stopping at an exception,
 GHCi will act just as it does when a breakpoint is hit, with the
 deviation that it will not show you any source code location. Due to
 this, these commands are only really useful in conjunction with
-``:trace``, in order to log the steps leading up to the exception. For
+:ghci-cmd:`:trace`, in order to log the steps leading up to the exception. For
 example:
 
-::
+.. code-block:: none
 
     *Main> :set -fbreak-on-exception
     *Main> :trace qsort ("abc" ++ undefined)
@@ -1697,7 +1688,7 @@ use the well known ``map`` function:
 
 We set a breakpoint on ``map``, and call it.
 
-::
+.. code-block:: none
 
     *Main> :break 5
     Breakpoint 0 activated at  map.hs:5:15-28
@@ -1720,7 +1711,7 @@ intelligence built-in to update the type of ``f`` whenever the types of
 force ``x`` a bit, in order to recover both its type and the argument
 part of ``f``.
 
-::
+.. code-block:: none
 
     *Main> seq x ()
     *Main> :print x
@@ -1729,7 +1720,7 @@ part of ``f``.
 We can check now that as expected, the type of ``x`` has been
 reconstructed, and with it the type of ``f`` has been too:
 
-::
+.. code-block:: none
 
     *Main> :t x
     x :: Integer
@@ -1739,7 +1730,7 @@ reconstructed, and with it the type of ``f`` has been too:
 From here, we can apply f to any argument of type Integer and observe
 the results.
 
-::
+.. code-block:: none
 
     *Main> let b = f 10
     *Main> :t b
@@ -1800,12 +1791,12 @@ Invoking GHCi
 GHCi is invoked with the command ``ghci`` or ``ghc --interactive``. One
 or more modules or filenames can also be specified on the command line;
 this instructs GHCi to load the specified modules or filenames (and all
-the modules they depend on), just as if you had said ``:load modules``
+the modules they depend on), just as if you had said :ghci-cmd:`:load modules`
 at the GHCi prompt (see :ref:`ghci-commands`). For example, to start
 GHCi and load the program whose topmost module is in the file
 ``Main.hs``, we could say:
 
-::
+.. code-block:: none
 
     $ ghci Main.hs
 
@@ -1826,7 +1817,7 @@ first time they are needed.
 For hidden packages, however, you need to request the package be loaded
 by using the ``-package`` flag:
 
-::
+.. code-block:: none
 
     $ ghci -package readline
     GHCi, version 6.8.1: http://www.haskell.org/ghc/  :? for help
@@ -1836,7 +1827,7 @@ by using the ``-package`` flag:
 
 The following command works to load new packages into a running GHCi:
 
-::
+.. code-block:: none
 
     Prelude> :set -package name
 
@@ -1854,7 +1845,7 @@ Extra libraries may be specified on the command line using the normal
 foreign object code; for using libraries of Haskell source code, see
 :ref:`ghci-modules-filenames`.) For example, to load the “m” library:
 
-::
+.. code-block:: none
 
     $ ghci -lm
 
@@ -1889,55 +1880,48 @@ name followed by zero or more parameters. The command name may be
 abbreviated, with ambiguities being resolved in favour of the more
 commonly used commands.
 
-``:abandon``
-    .. index::
-       single: :abandon
+.. comment
+
+    This section makes use of the GHC-specific :directive:`ghci-cmd` directive
+    defined in :file:`conf.py`. This is used to describe and cross-reference GHCi
+    commands.
+
+
+.. ghci-cmd:: :abandon
 
     Abandons the current evaluation (only available when stopped at a
     breakpoint).
 
-``:add[*] ⟨module⟩``
-    .. index::
-       single: :add
+.. ghci-cmd:: :add;[*] ⟨module⟩
 
     Add ⟨module⟩(s) to the current target set, and perform a reload.
     Normally pre-compiled code for the module will be loaded if
     available, or otherwise the module will be compiled to byte-code.
     Using the ``*`` prefix forces the module to be loaded as byte-code.
 
-``:all-types``
-    .. index::
-       single: :all-types
+.. ghci-cmd:: :all-types
 
     List all types collected for expressions and (local) bindings
-    currently loaded (while :ref:`+c` was active) with their respective
-    source-code span, e.g.
-
-    ::
+    currently loaded (while :ghci-cmd:`:set +c` was active) with their respective
+    source-code span, e.g. ::
 
        GhciTypes> :all-types
        GhciTypes.hs:(38,13)-(38,24): Maybe Id
        GhciTypes.hs:(45,10)-(45,29): Outputable SpanInfo
        GhciTypes.hs:(45,10)-(45,29): (Rational -> SpanInfo -> SDoc) -> Outputable SpanInfo
 
-``:back ⟨n⟩``
-    .. index::
-       single: :back
+.. ghci-cmd:: :back; ⟨n⟩
 
     Travel back ⟨n⟩ steps in the history. ⟨n⟩ is one if omitted. See
     :ref:`tracing` for more about GHCi's debugging facilities. See also:
-    ``:trace``, ``:history``, ``:forward``.
+    :ghci-cmd:`:trace`, :ghci-cmd:`:history`, :ghci-cmd:`:forward`.
 
-``:break [⟨identifier⟩ | [⟨module⟩] ⟨line⟩ [⟨column⟩]]``
-    .. index::
-       single: :break
+.. ghci-cmd:: :break; [⟨identifier⟩ | [⟨module⟩] ⟨line⟩ [⟨column⟩]]
 
     Set a breakpoint on the specified function or line and column. See
     :ref:`setting-breakpoints`.
 
-``:browse[!] [[*] ⟨module⟩]``
-    .. index::
-       single: :browse
+.. ghci-cmd:: :browse;[!] [[*] ⟨module⟩]
 
     Displays the identifiers exported by the module ⟨module⟩, which must
     be either loaded into GHCi or be a member of a package. If ⟨module⟩
@@ -1954,16 +1938,14 @@ commonly used commands.
 
        The ``*``-form is only available for modules which are
        interpreted; for compiled modules (including modules from
-       packages) only the non-\ ``*`` form of ``:browse`` is available.
+       packages) only the non-\ ``*`` form of :ghci-cmd:`:browse` is available.
 
     -  Data constructors and class methods are usually displayed in the
        context of their data type or class declaration. However, if the
        ``!`` symbol is appended to the command, thus ``:browse!``, they
        are listed individually. The ``!``-form also annotates the
        listing with comments giving possible imports for each group of
-       entries. Here is an example:
-
-       ::
+       entries. Here is an example: ::
 
            Prelude> :browse! Data.Maybe
            -- not currently imported
@@ -1989,13 +1971,11 @@ commonly used commands.
        scope (via ``Prelude``) and are therefore available either
        unqualified, or with a ``Prelude.`` qualifier.
 
-``:cd ⟨dir⟩``
-    .. index::
-       single: :cd
+.. ghci-cmd:: :cd; ⟨dir⟩
 
     Changes the current working directory to ⟨dir⟩. A "``~``" symbol
     at the beginning of ⟨dir⟩ will be replaced by the contents of the
-    environment variable ``HOME``. See also the ``:show paths`` command
+    environment variable ``HOME``. See also the :ghci-cmd:`:show paths` command
     for showing the current working directory.
 
     Note: changing directories causes all currently loaded modules to be
@@ -2003,25 +1983,21 @@ commonly used commands.
     relative directories, and changing the search path in the middle of
     a session is not supported.
 
-``:cmd ⟨expr⟩``
-    .. index::
-       single: :cmd
+.. ghci-cmd:: :cmd; ⟨expr⟩
 
     Executes ⟨expr⟩ as a computation of type ``IO String``, and then
     executes the resulting string as a list of GHCi commands. Multiple
-    commands are separated by newlines. The ``:cmd`` command is useful
-    with ``:def`` and ``:set stop``.
+    commands are separated by newlines. The :ghci-cmd:`:cmd` command is useful
+    with :ghci-cmd:`:def` and :ghci-cmd:`:set stop`.
 
-``:complete ⟨type⟩ [⟨n⟩-][⟨m⟩] ⟨string-literal⟩``
-    .. index::
-       single: :complete
+.. ghci-cmd:: :complete; ⟨type⟩ [⟨n⟩-][⟨m⟩] ⟨string-literal⟩
 
     This command allows to request command completions from GHCi even
     when interacting over a pipe instead of a proper terminal and is
     designed for integrating GHCi's completion with text editors and
     IDEs.
 
-    When called, ``:complete`` prints the ⟨n⟩\ :sup:`th` to
+    When called, :ghci-cmd:`:complete` prints the ⟨n⟩\ :sup:`th` to
     ⟨m⟩\ :sup:`th` completion candidates for the partial input
     ⟨string-literal⟩ for the completion domain denoted by ⟨type⟩.
     Currently, only the ``repl`` domain is supported which denotes the
@@ -2033,7 +2009,7 @@ commonly used commands.
     requested via the range argument, ⟨n⟩ and ⟨m⟩ are implicitly capped
     to the number of available completition candidates.
 
-    The output of ``:complete`` begins with a header line containing
+    The output of :ghci-cmd:`:complete` begins with a header line containing
     three space-delimited fields:
 
     -  An integer denoting the number ``l`` of printed completions,
@@ -2046,7 +2022,7 @@ commonly used commands.
     completion candidate encoded as (quoted) string literal. Here are
     some example invocations showing the various cases:
 
-    ::
+    .. code-block:: none
 
         Prelude> :complete repl 0 ""
         0 470 ""
@@ -2077,30 +2053,23 @@ commonly used commands.
         Prelude> :complete repl 5-10 "map"
         0 3 ""
 
-``:continue``
-    .. index::
-       single: :continue
+.. ghci-cmd:: :continue
 
     Continue the current evaluation, when stopped at a breakpoint.
 
-``:ctags [⟨filename⟩]``, ``:etags [⟨filename⟩]``
-    .. index::
-       single: :ctags
-       single: :etags
+.. ghci-cmd:: :ctags; [⟨filename⟩]
 
-    Generates a “tags” file for Vi-style editors (``:ctags``) or
-    Emacs-style editors (``:etags``). If no filename is specified, the
+    Generates a "tags" file for Vi-style editors (:ghci-cmd:`:ctags`) or
+    Emacs-style editors (:ghci-cmd:`:etags`). If no filename is specified, the
     default ``tags`` or ``TAGS`` is used, respectively. Tags for all the
     functions, constructors and types in the currently loaded modules
     are created. All modules must be interpreted for these commands to
     work.
 
-``:def! ⟨name⟩ ⟨expr⟩``
-    .. index::
-       single: :def
+.. ghci-cmd:: :def;[!] ⟨name⟩ ⟨expr⟩
 
-    ``:def`` is used to define new commands, or macros, in GHCi. The
-    command ``:def`` ⟨name⟩ ⟨expr⟩ defines a new GHCi command ``:name``,
+    :ghci-cmd:`:def` is used to define new commands, or macros, in GHCi. The
+    command ``:def ⟨name⟩ ⟨expr⟩`` defines a new GHCi command ``:name``,
     implemented by the Haskell expression ⟨expr⟩, which must have type
     ``String -> IO String``. When ``:name args`` is typed at the prompt,
     GHCi will run the expression ``(name args)``, take the resulting
@@ -2110,9 +2079,9 @@ commonly used commands.
 
     That's all a little confusing, so here's a few examples. To start
     with, here's a new GHCi command which doesn't take any arguments or
-    produce any results, it just outputs the current date & time:
+    produce any results, it just outputs the current date and time:
 
-    ::
+    .. code-block:: none
 
         Prelude> let date _ = Time.getClockTime >>= print >> return ""
         Prelude> :def date date
@@ -2120,9 +2089,9 @@ commonly used commands.
         Fri Mar 23 15:16:40 GMT 2001
 
     Here's an example of a command that takes an argument. It's a
-    re-implementation of ``:cd``:
+    re-implementation of :ghci-cmd:`:cd`:
 
-    ::
+    .. code-block:: none
 
         Prelude> let mycd d = Directory.setCurrentDirectory d >> return ""
         Prelude> :def mycd mycd
@@ -2131,7 +2100,7 @@ commonly used commands.
     Or I could define a simple way to invoke "``ghc --make Main``"
     in the current directory:
 
-    ::
+    .. code-block:: none
 
         Prelude> :def make (\_ -> return ":! ghc --make Main")
 
@@ -2139,7 +2108,7 @@ commonly used commands.
     might be useful for creating a set of bindings that we want to
     repeatedly load into the GHCi session:
 
-    ::
+    .. code-block:: none
 
         Prelude> :def . readFile
         Prelude> :. cmds.ghci
@@ -2152,71 +2121,58 @@ commonly used commands.
     unless the ``:def!`` form is used, in which case the old command
     with that name is silently overwritten.
 
-``:delete * | ⟨num⟩ ...``
-    .. index::
-       single: :delete
+.. ghci-cmd:: :delete; * | ⟨num⟩ ...
 
-    Delete one or more breakpoints by number (use ``:show breaks`` to
+    Delete one or more breakpoints by number (use :ghci-cmd:`:show breaks` to
     see the number of each breakpoint). The ``*`` form deletes all the
     breakpoints.
 
-``:edit ⟨file⟩``
-    .. index::
-       single: :edit
+.. ghci-cmd:: :edit; ⟨file⟩
 
     Opens an editor to edit the file ⟨file⟩, or the most recently loaded
     module if ⟨file⟩ is omitted. If there were errors during the last
     loading, the cursor will be positioned at the line of the first
     error. The editor to invoke is taken from the ``EDITOR`` environment
     variable, or a default editor on your system if ``EDITOR`` is not
-    set. You can change the editor using ``:set editor``.
+    set. You can change the editor using :ghci-cmd:`:set editor`.
 
-``:etags``
-    See ``:ctags``.
+.. ghci-cmd:: :etags
 
-``:force ⟨identifier⟩ ...``
-    .. index::
-       single: :force
+    See :ghci-cmd:`:ctags`.
 
-    Prints the value of ⟨identifier⟩ in the same way as ``:print``.
-    Unlike ``:print``, ``:force`` evaluates each thunk that it
+.. ghci-cmd:: :force; ⟨identifier⟩ ...
+
+    Prints the value of ⟨identifier⟩ in the same way as :ghci-cmd:`:print`.
+    Unlike :ghci-cmd:`:print`, :ghci-cmd:`:force` evaluates each thunk that it
     encounters while traversing the value. This may cause exceptions or
     infinite loops, or further breakpoints (which are ignored, but
     displayed).
 
-``:forward ⟨n⟩``
-    .. index::
-       single: :forward
+.. ghci-cmd:: :forward; ⟨n⟩
 
     Move forward ⟨n⟩ steps in the history. ⟨n⟩ is one if omitted. See
     :ref:`tracing` for more about GHCi's debugging facilities. See also:
-    ``:trace``, ``:history``, ``:back``.
+    :ghci-cmd:`:trace`, :ghci-cmd:`:history`, :ghci-cmd:`:back`.
 
-``:help``, ``:?``
-    .. index::
-       single: :help
-       single: :?
+.. ghci-cmd:: :help
 
     Displays a list of the available commands.
 
-``:``
+.. ghci-cmd:: :
+
     .. index::
-       single: :
+       pair: Repeating last command; in GHCi
 
     Repeat the previous command.
 
-``:history [num]``
-    .. index::
-       single: :history
+.. ghci-cmd:: :history; [num]
 
     Display the history of evaluation steps. With a number, displays
-    that many steps (default: 20). For use with ``:trace``; see
+    that many steps (default: 20). For use with :ghci-cmd:`:trace`; see
     :ref:`tracing`. To set the number of history entries stored by GHCi,
     use ``-fghci-hist-size=n``.
 
-``:info[!] ⟨name⟩``
-    .. index::
-       single: :info
+.. ghci-cmd:: :info;[!] ⟨name⟩
 
     Displays information about the given name(s). For example, if ⟨name⟩
     is a class, then the class methods and their types will be printed;
@@ -2229,31 +2185,28 @@ commonly used commands.
     them. To avoid showing irrelevant information, an instance is shown
     only if (a) its head mentions ⟨name⟩, and (b) all the other things
     mentioned in the instance are in scope (either qualified or
-    otherwise) as a result of a ``:load`` or ``:module`` commands.
+    otherwise) as a result of a :ghci-cmd:`:load` or :ghci-cmd:`:module`
+    commands.
 
     The command ``:info!`` works in a similar fashion but it removes
     restriction (b), showing all instances that are in scope and mention
     ⟨name⟩ in their head.
 
-``:issafe [⟨module⟩]``
-    .. index::
-       single: :issafe
+.. ghci-cmd:: :issafe; [⟨module⟩]
 
     Displays Safe Haskell information about the given module (or the
     current module if omitted). This includes the trust type of the
     module and its containing package.
 
-``:kind[!] ⟨type⟩``
-    .. index::
-       single: :kind
+.. ghci-cmd:: :kind;[!] ⟨type⟩
 
     Infers and prints the kind of ⟨type⟩. The latter can be an arbitrary
     type expression, including a partial application of a type
-    constructor, such as ``Either Int``. In fact, ``:kind`` even allows
+    constructor, such as ``Either Int``. In fact, :ghci-cmd:`:kind` even allows
     you to write a partial application of a type synonym (usually
     disallowed), so that this works:
 
-    ::
+    .. code-block:: none
 
         ghci> type T a b = (a,b,a)
         ghci> :k T Int Bool
@@ -2267,27 +2220,21 @@ commonly used commands.
     the type by expanding out type synonyms and evaluating type-function
     applications, and display the normalised result.
 
-``:list ⟨identifier⟩``
-    .. index::
-       single: :list
+.. ghci-cmd:: :list; ⟨identifier⟩
 
     Lists the source code around the definition of ⟨identifier⟩ or the
     current breakpoint if not given. This requires that the identifier
     be defined in an interpreted module. If your output device supports
     it, then GHCi will highlight the active subexpression in bold.
 
-``:list [⟨module⟩] ⟨line⟩``
-    .. index::
-       single: :list
+.. ghci-cmd:: :list [⟨module⟩]; ⟨line⟩
 
     Lists the source code around the given line number of ⟨module⟩. This
     requires that the module be interpreted. If your output device
     supports it, then GHCi will highlight the active subexpression in
     bold.
 
-``:load[!] [*]⟨module⟩``
-    .. index::
-       single: :load
+.. ghci-cmd:: :load;[!] [*]⟨module⟩
 
     Recursively loads the specified ⟨module⟩s, and all the modules they
     depend on. Here, each ⟨module⟩ must be a module name or filename,
@@ -2295,7 +2242,7 @@ commonly used commands.
 
     All previously loaded modules, except package modules, are
     forgotten. The new set of modules is known as the target set. Note
-    that ``:load`` can be used without any arguments to unload all the
+    that :ghci-cmd:`:load` can be used without any arguments to unload all the
     currently loaded modules and bindings.
 
     Normally pre-compiled code for a module will be loaded if available,
@@ -2309,23 +2256,21 @@ commonly used commands.
     and unset after loading if the flag has not already been set before.
     See :ref:`defer-type-errors` for further motivation and details.
 
-    After a ``:load`` command, the current context is set to:
+    After a :ghci-cmd:`:load` command, the current context is set to:
 
     -  ⟨module⟩, if it was loaded successfully, or
 
     -  the most recently successfully loaded module, if any other
-       modules were loaded as a result of the current ``:load``, or
+       modules were loaded as a result of the current :ghci-cmd:`:load`, or
 
     -  ``Prelude`` otherwise.
 
-``:loc-at ⟨module⟩ ⟨line⟩ ⟨col⟩ ⟨end-line⟩ ⟨end-col⟩ [⟨name⟩]``
-    .. index::
-       single: :loc-at
+.. ghci-cmd:: :loc-at; ⟨module⟩ ⟨line⟩ ⟨col⟩ ⟨end-line⟩ ⟨end-col⟩ [⟨name⟩]
 
     Tries to find the definition site of the name at the given
     source-code span, e.g.:
 
-    ::
+    .. code-block:: none
 
         X> :loc-at X.hs 6 14 6 16 mu
         X.hs:(8,7)-(8,9)
@@ -2333,11 +2278,9 @@ commonly used commands.
     This command is useful when integrating GHCi with text editors and
     IDEs for providing a goto-definition facility.
 
-    The ``:loc-at`` command requires :ref:`+c` to be set.
+    The ``:loc-at`` command requires :ghci-cmd:`:set +c` to be set.
 
-``:main ⟨arg1⟩ ... ⟨argn⟩``
-    .. index::
-       single: :main
+.. ghci-cmd:: :main; ⟨arg1⟩ ... ⟨argn⟩
 
     When a program is compiled and executed, it can use the ``getArgs``
     function to access the command-line arguments. However, we cannot
@@ -2345,11 +2288,11 @@ commonly used commands.
     testing in ghci, as the ``main`` function doesn't take its arguments
     directly.
 
-    Instead, we can use the ``:main`` command. This runs whatever
+    Instead, we can use the :ghci-cmd:`:main` command. This runs whatever
     ``main`` is in scope, with any arguments being treated the same as
     command-line arguments, e.g.:
 
-    ::
+    .. code-block:: none
 
         Prelude> main = System.Environment.getArgs >>= print
         Prelude> :main foo bar
@@ -2359,7 +2302,7 @@ commonly used commands.
     and they are treated like Haskell strings, or we can just use
     Haskell list syntax:
 
-    ::
+    .. code-block:: none
 
         Prelude> :main foo "bar baz"
         ["foo","bar baz"]
@@ -2367,9 +2310,9 @@ commonly used commands.
         ["foo","bar baz"]
 
     Finally, other functions can be called, either with the ``-main-is``
-    flag or the ``:run`` command:
+    flag or the :ghci-cmd:`:run` command:
 
-    ::
+    .. code-block:: none
 
         Prelude> foo = putStrLn "foo" >> System.Environment.getArgs >>= print
         Prelude> bar = putStrLn "bar" >> System.Environment.getArgs >>= print
@@ -2381,41 +2324,34 @@ commonly used commands.
         bar
         ["foo","bar baz"]
 
-``:module +|- [*]⟨mod1⟩ ...``, ``import mod``
-    .. index::
-       single: :module
+.. ghci-cmd:: :module; +|- [*]⟨mod1⟩ ...
+.. ghci-cmd:: import; ⟨mod⟩
 
     Sets or modifies the current context for statements typed at the
     prompt. The form ``import mod`` is equivalent to ``:module +mod``.
     See :ref:`ghci-scope` for more details.
 
-``:print ⟨names⟩``
-    .. index::
-       single: :print
+.. ghci-cmd:: :print; ⟨names⟩
 
-    Prints a value without forcing its evaluation. ``:print`` may be
+    Prints a value without forcing its evaluation. :ghci-cmd:`:print` may be
     used on values whose types are unknown or partially known, which
     might be the case for local variables with polymorphic types at a
-    breakpoint. While inspecting the runtime value, ``:print`` attempts
+    breakpoint. While inspecting the runtime value, :ghci-cmd:`:print` attempts
     to reconstruct the type of the value, and will elaborate the type in
     GHCi's environment if possible. If any unevaluated components
-    (thunks) are encountered, then ``:print`` binds a fresh variable
+    (thunks) are encountered, then :ghci-cmd:`:print` binds a fresh variable
     with a name beginning with ``_t`` to each thunk. See
-    :ref:`breakpoints` for more information. See also the ``:sprint``
-    command, which works like ``:print`` but does not bind new
+    :ref:`breakpoints` for more information. See also the :ghci-cmd:`:sprint`
+    command, which works like :ghci-cmd:`:print` but does not bind new
     variables.
 
-``:quit``
-    .. index::
-       single: :quit
+.. ghci-cmd:: :quit
 
-    Quits GHCi. You can also quit by typing control-D at the prompt.
+    Quits GHCi. You can also quit by typing :kbd:`Control-D` at the prompt.
 
-``:reload[!]``
-    .. index::
-       single: :reload
+.. ghci-cmd:: :reload;[!]
 
-    Attempts to reload the current target set (see ``:load``) if any of
+    Attempts to reload the current target set (see :ghci-cmd:`:load`) if any of
     the modules in the set, or any dependent module, has changed. Note
     that this may entail loading new modules, or dropping modules which
     are no longer indirectly required by the target.
@@ -2427,50 +2363,46 @@ commonly used commands.
     and unset after loading if the flag has not already been set before.
     See :ref:`defer-type-errors` for further motivation and details.
 
-``:run``
-    .. index::
-       single: :run
+.. ghci-cmd:: :run
 
-    See ``:main``.
+    See :ghci-cmd:`:main`.
 
-``:script [⟨n⟩] ⟨filename⟩``
-    .. index::
-       single: :script
+.. ghci-cmd:: :script; [⟨n⟩] ⟨filename⟩
 
     Executes the lines of a file as a series of GHCi commands. This
     command is compatible with multiline statements as set by
-    ``:set +m``
+    :ghci-cmd:`:set +m`
 
-``:set [⟨option⟩ ...]``
-    .. index::
-       single: :set
+.. ghci-cmd:: :set; [⟨option⟩ ...]
 
     Sets various options. See :ref:`ghci-set` for a list of available
     options and :ref:`interactive-mode-options` for a list of
-    GHCi-specific flags. The ``:set`` command by itself shows which
+    GHCi-specific flags. The :ghci-cmd:`:set` command by itself shows which
     options are currently set. It also lists the current dynamic flag
     settings, with GHCi-specific flags listed separately.
 
-``:set args ⟨arg⟩``
+.. ghci-cmd:: :set args; ⟨arg⟩
+
     .. index::
-       single: :set args
        single: getArgs, behavior in GHCi
 
     Sets the list of arguments which are returned when the program calls
     ``System.getArgs``.
 
-``:set editor ⟨cmd⟩``
-    Sets the command used by ``:edit`` to ⟨cmd⟩.
+.. ghci-cmd:: :set editor; ⟨cmd⟩
 
-``:set prog ⟨prog⟩``
+    Sets the command used by :ghci-cmd:`:edit` to ⟨cmd⟩.
+
+.. ghci-cmd:: :set prog; ⟨prog⟩
+
     .. index::
-       single: :set prog
        single: getProgName, behavior in GHCi
 
     Sets the string to be returned when the program calls
     ``System.getProgName``.
 
-``:set prompt ⟨prompt⟩``
+.. ghci-cmd:: :set prompt; ⟨prompt⟩
+
     .. index::
        single: GHCi prompt; setting
 
@@ -2481,25 +2413,27 @@ commonly used commands.
     is replaced by ``%``. If ⟨prompt⟩ starts with ``"`` then it is parsed as
     a Haskell String; otherwise it is treated as a literal string.
 
-``:set prompt2 ⟨prompt⟩``
-    Sets the string to be used as the continuation prompt (used when
-    using the ``:{`` command) in GHCi.
+.. ghci-cmd:: :set prompt2; ⟨prompt⟩
 
-``:set stop ⟨num⟩ ⟨cmd⟩``
+    Sets the string to be used as the continuation prompt (used when
+    using the :ghci-cmd:`:{` command) in GHCi.
+
+.. ghci-cmd:: :set stop; ⟨num⟩ ⟨cmd⟩
+
     Set a command to be executed when a breakpoint is hit, or a new item
-    in the history is selected. The most common use of ``:set stop`` is
+    in the history is selected. The most common use of :ghci-cmd:`:set stop` is
     to display the source code at the current location, e.g.
     ``:set stop :list``.
 
     If a number is given before the command, then the commands are run
     when the specified breakpoint (only) is hit. This can be quite
     useful: for example, ``:set stop 1 :continue`` effectively disables
-    breakpoint 1, by running ``:continue`` whenever it is hit (although
-    GHCi will still emit a message to say the breakpoint was hit).
-    What's more, with cunning use of ``:def`` and ``:cmd`` you can use
-    ``:set stop`` to implement conditional breakpoints:
+    breakpoint 1, by running :ghci-cmd:`:continue` whenever it is hit (although
+    GHCi will still emit a message to say the breakpoint was hit). What's more,
+    with cunning use of :ghci-cmd:`:def` and :ghci-cmd:`:cmd` you can use
+    :ghci-cmd:`:set stop` to implement conditional breakpoints:
 
-    ::
+    .. code-block:: none
 
         *Main> :def cond \expr -> return (":cmd if (" ++ expr ++ ") then return \"\" else return \":continue\"")
         *Main> :set stop 0 :cond (x < 3)
@@ -2507,94 +2441,68 @@ commonly used commands.
     Ignoring breakpoints for a specified number of iterations is also
     possible using similar techniques.
 
-``:seti [⟨option⟩ ...]``
-    .. index::
-       single: :seti
+.. ghci-cmd:: :seti; [⟨option⟩ ...]
 
-    Like ``:set``, but options set with ``:seti`` affect only
+    Like :ghci-cmd:`:set`, but options set with :ghci-cmd:`:seti` affect only
     expressions and commands typed at the prompt, and not modules loaded
-    with ``:load`` (in contrast, options set with ``:set`` apply
+    with :ghci-cmd:`:load` (in contrast, options set with :ghci-cmd:`:set` apply
     everywhere). See :ref:`ghci-interactive-options`.
 
     Without any arguments, displays the current set of options that are
     applied to expressions and commands typed at the prompt.
 
-``:show bindings``
-    .. index::
-       single: :show bindings
+.. ghci-cmd:: :show bindings
 
     Show the bindings made at the prompt and their types.
 
-``:show breaks``
-    .. index::
-       single: :show breaks
+.. ghci-cmd:: :show breaks
 
     List the active breakpoints.
 
-``:show context``
-    .. index::
-       single: :show context
+.. ghci-cmd:: :show context
 
     List the active evaluations that are stopped at breakpoints.
 
-``:show imports``
-    .. index::
-       single: :show imports
+.. ghci-cmd:: :show imports
 
     Show the imports that are currently in force, as created by
-    ``import`` and ``:module`` commands.
+    ``import`` and :ghci-cmd:`:module` commands.
 
-``:show modules``
-    .. index::
-       single: :show modules
+.. ghci-cmd:: :show modules
 
     Show the list of modules currently loaded.
 
-``:show packages``
-    .. index::
-       single: :show packages
+.. ghci-cmd:: :show packages
 
     Show the currently active package flags, as well as the list of
     packages currently loaded.
 
-``:show paths``
-    .. index::
-       single: :show paths
+.. ghci-cmd:: :show paths
 
-    Show the current working directory (as set via ``:cd`` command), as
-    well as the list of directories searched for source files (as set by
-    the ``-i`` option).
+    Show the current working directory (as set via :ghci-cmd:`:cd` command), as
+    well as the list of directories searched for source files (as set by the
+    ``-i`` option).
 
-``:show language``
-    .. index::
-       single: :show language
+.. ghci-cmd:: :show language
 
     Show the currently active language flags for source files.
 
-``:showi language``
-    .. index::
-       single: :showi language
+.. ghci-cmd:: :showi language
 
     Show the currently active language flags for expressions typed at
-    the prompt (see also ``:seti``).
+    the prompt (see also :ghci-cmd:`:seti`).
 
-``:show [args|prog|prompt|editor|stop]``
-    .. index::
-       single: :show
+.. ghci-cmd:: :show; [args|prog|prompt|editor|stop]
 
-    Displays the specified setting (see ``:set``).
+    Displays the specified setting (see :ghci-cmd:`:set`).
 
-``:sprint``
-    .. index::
-       single: :sprint
+.. ghci-cmd:: :sprint; ⟨expr⟩
 
-    Prints a value without forcing its evaluation. ``:sprint`` is
-    similar to ``:print``, with the difference that unevaluated subterms
-    are not bound to new variables, they are simply denoted by ‘\_’.
+    Prints a value without forcing its evaluation. :ghci-cmd:`:sprint` is
+    similar to :ghci-cmd:`:print`, with the difference that unevaluated subterms
+    are not bound to new variables, they are simply denoted by ``_``.
 
-``:step [⟨expr⟩]``
-    .. index::
-       single: :step
+.. ghci-cmd:: :step; [⟨expr⟩]
 
     Enable all breakpoints and begin evaluating an expression in
     single-stepping mode. In this mode evaluation will be stopped after
@@ -2602,44 +2510,34 @@ commonly used commands.
     is not given, evaluation will resume at the last breakpoint. See
     :ref:`single-stepping`.
 
-``:steplocal``
-    .. index::
-       single: :steplocal
+.. ghci-cmd:: :steplocal
 
     Enable only breakpoints in the current top-level binding and resume
     evaluation at the last breakpoint.
 
-``:stepmodule``
-    .. index::
-       single: :stepmodule
+.. ghci-cmd:: :stepmodule
 
     Enable only breakpoints in the current module and resume evaluation
     at the last breakpoint.
 
-``:trace expr``
-    .. index::
-       single: :trace
+.. ghci-cmd:: :trace; ⟨expr⟩
 
     Evaluates the given expression (or from the last breakpoint if no
     expression is given), and additionally logs the evaluation steps for
-    later inspection using ``:history``. See :ref:`tracing`.
+    later inspection using :ghci-cmd:`:history`. See :ref:`tracing`.
 
-``:type ⟨expression⟩``
-    .. index::
-       single: :type
+.. ghci-cmd:: :type; ⟨expression⟩
 
     Infers and prints the type of ⟨expression⟩, including explicit
     forall quantifiers for polymorphic types. The monomorphism
     restriction is *not* applied to the expression during type
     inference.
 
-``:type-at ⟨module⟩ ⟨line⟩ ⟨col⟩ ⟨end-line⟩ ⟨end-col⟩ [⟨name⟩]``
-    .. index::
-       single: :type-at
+.. ghci-cmd:: :type-at; ⟨module⟩ ⟨line⟩ ⟨col⟩ ⟨end-line⟩ ⟨end-col⟩ [⟨name⟩]
 
     Reports the inferred type at the given span/position in the module, e.g.:
 
-    ::
+    .. code-block:: none
 
        *X> :type-at X.hs 6 6 6 7 f
        Int -> Int
@@ -2649,31 +2547,25 @@ commonly used commands.
 
     The last string parameter is useful for when the span is out of
     date, i.e. the file changed and the code has moved. In which case
-    ``:type-at`` falls back to a general :ref:`:type` like lookup.
+    :ghci-cmd:`:type-at` falls back to a general :ghci-cmd:`:type` like lookup.
 
-    The ``:type-at`` command requires :ref:`+c` to be set.
+    The :ghci-cmd:`:type-at` command requires :ghci-cmd:`:set +c` to be set.
 
-``:undef ⟨name⟩``
-    .. index::
-       single: :undef
+.. ghci-cmd:: :undef; ⟨name⟩
 
-    Undefines the user-defined command ⟨name⟩ (see ``:def`` above).
+    Undefines the user-defined command ⟨name⟩ (see :ghci-cmd:`:def` above).
 
-``:unset ⟨option⟩``
-    .. index::
-       single: :unset
+.. ghci-cmd:: :unset; ⟨option⟩
 
     Unsets certain options. See :ref:`ghci-set` for a list of available
     options.
 
-``:uses ⟨module⟩ ⟨line⟩ ⟨col⟩ ⟨end-line⟩ ⟨end-col⟩ [⟨name⟩]``
-    .. index::
-       single: :uses
+.. ghci-cmd:: :uses; ⟨module⟩ ⟨line⟩ ⟨col⟩ ⟨end-line⟩ ⟨end-col⟩ [⟨name⟩]
 
     Reports all module-local uses of the thing at the given position
     in the module, e.g.:
 
-    ::
+    .. code-block:: none
 
        :uses GhciFind.hs 53 66 53 70 name
        GhciFind.hs:(46,25)-(46,29)
@@ -2684,11 +2576,11 @@ commonly used commands.
     This command is useful for highlighting and navigating all uses of
     an identifier in editors and IDEs.
 
-    The ``:type-at`` command requires :ref:`+c` to be set.
+    The :ghci-cmd:`:uses` command requires :ghci-cmd:`:set +c` to be set.
 
-``:! ⟨command⟩``
+.. ghci-cmd:: :! ⟨command⟩
+
     .. index::
-       single: :!
        single: shell commands; in GHCi
 
     Executes the shell command ⟨command⟩.
@@ -2700,15 +2592,14 @@ The ``:set`` and ``:seti`` commands
 -----------------------------------
 
 .. index::
-   single: :set
+   single: :set; command in GHCi
    single: :seti
 
-The ``:set`` command sets two types of options: GHCi options, which
-begin with "``+``", and "command-line" options, which begin with
-"``-``".
+The :ghci-cmd:`:set` command sets two types of options: GHCi options, which
+begin with "``+``", and "command-line" options, which begin with "``-``".
 
 .. note::
-    At the moment, the ``:set`` command doesn't support any kind of
+    At the moment, the :ghci-cmd:`:set` command doesn't support any kind of
     quoting in its arguments: quotes will not be removed and cannot be used
     to group words together. For example, ``:set -DFOO='BAR BAZ'`` will not
     do what you expect.
@@ -2719,29 +2610,28 @@ GHCi options
 .. index::
    single: options; GHCi
 
-GHCi options may be set using ``:set`` and unset using ``:unset``.
+GHCi options may be set using :ghci-cmd:`:set` and unset using :ghci-cmd:`:unset`.
 
 The available GHCi options are:
 
-``+c``
-    .. index::
-       single: +c
+.. ghci-cmd:: :set +c
 
     Collect type and location information after loading modules.
-    The commands :ref:`:all-types`, :ref:`loc-at`, :ref:`type-at`,
-    and :ref:`uses` require ``+c`` to be active.
+    The commands :ghci-cmd:`:all-types`, :ghci-cmd:`:loc-at`,
+    :ghci-cmd:`:type-at`, and :ghci-cmd:`:uses` require ``+c`` to be active.
 
-``+m``
+.. ghci-cmd:: :set +m
+
     .. index::
-       single: +m
+       single: multiline input; in GHCi
 
     Enable parsing of multiline commands. A multiline command is
     prompted for when the current input line contains open layout
     contexts (see :ref:`ghci-multiline`).
 
-``+r``
+.. ghci-cmd:: :set +r
+
     .. index::
-       single: +r
        single: CAFs; in GHCi
        single: Constant Applicative Form
 
@@ -2755,9 +2645,7 @@ The available GHCi options are:
     consuming large amounts of space, or if you need repeatable
     performance measurements.
 
-``+s``
-    .. index::
-       single: +s
+.. ghci-cmd:: :set +s
 
     Display some stats after evaluating each expression, including the
     elapsed time and number of bytes allocated. NOTE: the allocation
@@ -2765,34 +2653,35 @@ The available GHCi options are:
     allocation area, because it is calculated at every GC. Hence, you
     might see values of zero if no GC has occurred.
 
-``+t``
+.. ghci-cmd:: :set +t
+
     .. index::
-       single: +t
+       single: displaying type; in GHCi
 
     Display the type of each variable bound after a statement is entered
     at the prompt. If the statement is a single expression, then the
-    only variable binding will be for the variable ‘\ ``it``\ ’.
+    only variable binding will be for the variable ``it``.
 
 .. _ghci-cmd-line-options:
 
 Setting GHC command-line options in GHCi
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Normal GHC command-line options may also be set using ``:set``. For
+Normal GHC command-line options may also be set using :ghci-cmd:`:set`. For
 example, to turn on ``-Wmissing-signatures``, you would say:
 
-::
+.. code-block:: none
 
     Prelude> :set -Wmissing-signatures
 
 Any GHC command-line option that is designated as dynamic (see the table
-in :ref:`flag-reference`), may be set using ``:set``. To unset an
+in :ref:`flag-reference`), may be set using :ghci-cmd:`:set`. To unset an
 option, you can set the reverse option:
 
 .. index::
    single: dynamic; options
 
-::
+.. code-block:: none
 
     Prelude> :set -Wno-incomplete-patterns -XNoMultiParamTypeClasses
 
@@ -2818,14 +2707,14 @@ GHCi actually maintains *two* sets of options:
 -  The *interactive options* apply when evaluating expressions and
    commands typed at the GHCi prompt.
 
-The ``:set`` command modifies both, but there is also a ``:seti``
-command (for "set interactive") that affects only the interactive
-options set.
+The :ghci-cmd:`:set` command modifies both, but there is also a
+:ghci-cmd:`:seti` command (for "set interactive") that affects only the
+interactive options set.
 
 It is often useful to change the interactive options, without having
 that option apply to loaded modules too. For example
 
-::
+.. code-block:: none
 
     :seti -XMonoLocalBinds
 
@@ -2835,14 +2724,14 @@ will cause extra recompilation, because GHC will think that it needs to
 recompile the module because the flags have changed.
 
 If you are setting language options in your ``.ghci`` file, it is good
-practice to use ``:seti`` rather than ``:set``, unless you really do
-want them to apply to all modules you load in GHCi.
+practice to use :ghci-cmd:`:seti` rather than :ghci-cmd:`:set`, unless you
+really do want them to apply to all modules you load in GHCi.
 
-The two sets of options can be inspected using the ``:set`` and
-``:seti`` commands respectively, with no arguments. For example, in a
+The two sets of options can be inspected using the :ghci-cmd:`:set` and
+:ghci-cmd:`:seti` commands respectively, with no arguments. For example, in a
 clean GHCi session we might see something like this:
 
-::
+.. code-block:: none
 
     Prelude> :seti
     base language is: Haskell2010
@@ -2884,42 +2773,44 @@ When it starts, unless the ``-ignore-dot-ghci`` flag is given, GHCi
 reads and executes commands from the following files, in this order, if
 they exist:
 
-1. ``./.ghci``
+1. :file:`./.ghci`
 
-2. ``appdata/ghc/ghci.conf``, where ⟨appdata⟩ depends on your system,
+2. :file:`{appdata}/ghc/ghci.conf`, where ⟨appdata⟩ depends on your system,
    but is usually something like
-   ``C:/Documents and Settings/user/Application Data``
+   :file:`C:/Documents and Settings/user/Application Data`
 
-3. On Unix: ``$HOME/.ghc/ghci.conf``
+3. On Unix: :file:`$HOME/.ghc/ghci.conf`
 
-4. ``$HOME/.ghci``
+4. :file:`$HOME/.ghci`
 
-The ``ghci.conf`` file is most useful for turning on favourite options
-(eg. ``:set +s``), and defining useful macros. Note: when setting
-language options in this file it is usually desirable to use ``:seti``
-rather than ``:set`` (see :ref:`ghci-interactive-options`).
+The :file:`ghci.conf` file is most useful for turning on favourite options
+(e.g. ``:set +s``), and defining useful macros.
 
-Placing a ``.ghci`` file in a directory with a Haskell project is a
+.. note::
+    When setting language options in this file it is usually desirable to use
+    :ghci-cmd:`:seti` rather than :ghci-cmd:`:set` (see :ref:`ghci-interactive-options`).
+
+Placing a :file:`.ghci` file in a directory with a Haskell project is a
 useful way to set certain project-wide options so you don't have to type
 them every time you start GHCi: eg. if your project uses multi-parameter
 type classes, scoped type variables, and CPP, and has source files in
 three subdirectories A, B and C, you might put the following lines in
 ``.ghci``:
 
-::
+.. code-block:: none
 
     :set -XMultiParamTypeClasses -XScopedTypeVariables -cpp
     :set -iA:B:C
 
 (Note that strictly speaking the ``-i`` flag is a static one, but in
-fact it works to set it using ``:set`` like this. The changes won't take
-effect until the next ``:load``, though.)
+fact it works to set it using :ghci-cmd:`:set` like this. The changes won't take
+effect until the next :ghci-cmd:`:load`, though.)
 
 Once you have a library of GHCi macros, you may want to source them from
 separate files, or you may want to source your ``.ghci`` file into your
 running GHCi session while debugging it
 
-::
+.. code-block:: none
 
     :def source readFile
 
@@ -2953,7 +2844,7 @@ be aware of when names may conflict with built-in commands, especially
 regarding tab completion.
 
 For example, consider if you had a macro named ``:time`` and in the
-shell, typed ``:t 3`` - what should happen? The current algorithm we use
+shell, typed ``:t 3`` — what should happen? The current algorithm we use
 for completing commands is:
 
 1. First, look up an exact match on the name from the defined macros.
@@ -3004,13 +2895,13 @@ Compiling to object code inside GHCi
 By default, GHCi compiles Haskell source code into byte-code that is
 interpreted by the runtime system. GHCi can also compile Haskell code to
 object code: to turn on this feature, use the ``-fobject-code`` flag
-either on the command line or with ``:set`` (the option ``-fbyte-code``
+either on the command line or with :ghci-cmd:`:set` (the option ``-fbyte-code``
 restores byte-code compilation again). Compiling to object code takes
 longer, but typically the code will execute 10-20 times faster than
 byte-code.
 
 Compiling to object code inside GHCi is particularly useful if you are
-developing a compiled application, because the ``:reload`` command
+developing a compiled application, because the :ghci-cmd:`:reload` command
 typically runs much faster than restarting GHC with ``--make`` from the
 command-line, because all the interface files are already cached in
 memory.
@@ -3098,14 +2989,14 @@ After using ``getContents``, I can't use ``stdin``, until I do ``:load`` or ``:r
     Handle in a state known as semi-closed, wherein any further I/O
     operations on it are forbidden. Because I/O state is retained
     between computations, the semi-closed state persists until the next
-    ``:load`` or ``:reload`` command.
+    :ghci-cmd:`:load` or :ghci-cmd:`:reload` command.
 
     You can make ``stdin`` reset itself after every evaluation by giving
     GHCi the command ``:set +r``. This works because ``stdin`` is just a
     top-level expression that can be reverted to its unevaluated state
     in the same way as any other top-level expression (CAF).
 
-I can't use Control-C to interrupt computations in GHCi on Windows.
+I can't use :kbd:`Control-C` to interrupt computations in GHCi on Windows.
     See :ref:`ghci-windows`.
 
 The default buffering mode is different in GHCi to GHC.
@@ -3114,9 +3005,7 @@ The default buffering mode is different in GHCi to GHC.
     what you want in an interpreter: output appears as it is generated.
 
     If you want line-buffered behaviour, as in GHC, you can start your
-    program thus:
-
-    ::
+    program thus: ::
 
         main = do { hSetBuffering stdout LineBuffering; ... }
 
