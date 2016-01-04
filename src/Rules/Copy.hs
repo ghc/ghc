@@ -21,7 +21,9 @@ copyRules = do
         when (length ffiHPaths /= 1) $
             putError $ "copyRules: exactly one ffi.h header expected"
                      ++ "(found: " ++ show ffiHPaths ++ ")."
+        
         copyFile (takeDirectory (head ffiHPaths) -/- takeFileName ffih) ffih
+        copyFile libffiLibrary (targetPath Stage1 rts -/- "build" -/- "libCffi.a")
 
     "inplace/lib/template-hsc.h"    <~ pkgPath hsc2hs
     "inplace/lib/platformConstants" <~ derivedConstantsPath
