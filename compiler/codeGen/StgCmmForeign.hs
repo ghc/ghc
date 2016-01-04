@@ -309,7 +309,7 @@ saveThreadState dflags initialSp = do
               CmmLoad (cmmOffset dflags stgCurrentTSO (tso_stackobj dflags))
                       (bWord dflags)
             spValue = cmmOffset dflags tsoValue (stack_SP dflags)
-        in mkUnwind (NewLabel lbl) Sp (initial $ CmmLoad spValue (bWord dflags))
+        in mkUnwind (NewLabel lbl) Sp (initial spValue)
       _ -> mkNop,
     close_nursery,
     -- and save the current cost centre stack in the TSO when profiling:
