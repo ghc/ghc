@@ -16,6 +16,7 @@ import Oracles.ModuleFiles
 import Rules.Actions
 import Rules.Resources (Resources)
 import Settings
+import Settings.Builders.DeriveConstants
 
 primopsSource :: FilePath
 primopsSource = "compiler/prelude/primops.txt.pp"
@@ -26,47 +27,55 @@ primopsTxt stage = targetPath stage compiler -/- "build/primops.txt"
 platformH :: Stage -> FilePath
 platformH stage = targetPath stage compiler -/- "ghc_boot_platform.h"
 
-derivedConstantsPath :: FilePath
-derivedConstantsPath = "includes/dist-derivedconstants/header"
+includesDependencies :: [FilePath]
+includesDependencies = ("includes" -/-) <$> 
+    [ "ghcautoconf.h"
+    , "ghcplatform.h"
+    , "ghcversion.h" ]
 
-defaultGeneratedDependencies :: [FilePath]
-defaultGeneratedDependencies = 
-    [ "includes/ghcautoconf.h"
-    , "includes/ghcplatform.h"
-    , derivedConstantsPath -/- "DerivedConstants.h"
-    , derivedConstantsPath -/- "GHCConstantsHaskellType.hs"
-    , derivedConstantsPath -/- "GHCConstantsHaskellWrappers.hs"
-    , derivedConstantsPath -/- "GHCConstantsHaskellExports.hs" 
-    , targetPath Stage1 rts -/- "build/ffi.h"
-    , targetPath Stage1 rts -/- "build/ffitarget.h" ]
+derivedConstantsDependencies :: [FilePath]
+derivedConstantsDependencies = (derivedConstantsPath -/-) <$> []
+    -- [ "DerivedConstants.h"
+    -- , "GHCConstantsHaskellType.hs"
+    -- , "GHCConstantsHaskellWrappers.hs"
+    -- , "GHCConstantsHaskellExports.hs" ]
+
+libffiDependencies :: [FilePath]
+libffiDependencies = (targetPath Stage1 rts -/-) <$>
+    [ "build/ffi.h"
+    , "build/ffitarget.h" ]
+
+defaultDependencies :: [FilePath]
+defaultDependencies =
+    includesDependencies ++ derivedConstantsDependencies ++ libffiDependencies
+
+compilerDependencies :: Stage -> [FilePath]
+compilerDependencies stage =
+    [ platformH stage ]
+    ++
+    fmap ((targetPath stage compiler -/- "build") -/-)
+    [ "primop-vector-uniques.hs-incl"
+    , "primop-data-decl.hs-incl"
+    , "primop-tag.hs-incl"
+    , "primop-list.hs-incl"
+    , "primop-strictness.hs-incl"
+    , "primop-fixity.hs-incl"
+    , "primop-primop-info.hs-incl"
+    , "primop-out-of-line.hs-incl"
+    , "primop-has-side-effects.hs-incl"
+    , "primop-can-fail.hs-incl"
+    , "primop-code-size.hs-incl"
+    , "primop-commutable.hs-incl"
+    , "primop-vector-tys-exports.hs-incl"
+    , "primop-vector-tycons.hs-incl"
+    , "primop-vector-tys.hs-incl" ]
 
 -- TODO: can we drop COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS)?
-generatedDependencies :: Stage -> Package -> [FilePath]
-generatedDependencies stage pkg = 
-    defaultGeneratedDependencies ++ extraGeneratedDependencies
-  where
-    extraGeneratedDependencies
-        | pkg == compiler = let buildPath = targetPath stage compiler -/- "build"
-                            in
-                            [ platformH stage ]
-                            ++
-                            fmap (buildPath -/-)
-                            [ "primop-vector-uniques.hs-incl"
-                            , "primop-data-decl.hs-incl"
-                            , "primop-tag.hs-incl"
-                            , "primop-list.hs-incl"
-                            , "primop-strictness.hs-incl"
-                            , "primop-fixity.hs-incl"
-                            , "primop-primop-info.hs-incl"
-                            , "primop-out-of-line.hs-incl"
-                            , "primop-has-side-effects.hs-incl"
-                            , "primop-can-fail.hs-incl"
-                            , "primop-code-size.hs-incl"
-                            , "primop-commutable.hs-incl"
-                            , "primop-vector-tys-exports.hs-incl"
-                            , "primop-vector-tycons.hs-incl"
-                            , "primop-vector-tys.hs-incl" ]
-        | otherwise = []
+-- TODO: improve
+generatedDependencies :: Stage -> [FilePath]
+generatedDependencies stage 
+    | stage == Stage1 = defaultDependencies ++ compilerDependencies stage
+    | otherwise = []
 
 -- The following generators and corresponding source extensions are supported:
 knownGenerators :: [ (Builder, String) ]
