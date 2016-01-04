@@ -1,13 +1,12 @@
 module Rules.Libffi (libffiRules, libffiLibrary) where
 
-import System.Directory
-
 import Base
 import Expression
 import GHC
 import Oracles.Config.Setting
 import Rules.Actions
 import Settings.Builders.Common
+import Settings.User
 
 -- We use this file to track the whole libffi library
 libffiLibrary :: FilePath
@@ -63,40 +62,30 @@ configureArguments = do
 libffiRules :: Rules ()
 libffiRules = do
     libffiLibrary %> \_ -> do
-        need [sourcePath -/- "Rules/Libffi.hs"]
+        when trackBuildSystem $ need [sourcePath -/- "Rules/Libffi.hs"]
         liftIO $ removeFiles libffiBuild ["//*"]
         tarballs <- getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
         when (length tarballs /= 1) $
             putError $ "libffiRules: exactly one libffi tarball expected"
                      ++ "(found: " ++ show tarballs ++ ")."
-        let libname = dropExtension . dropExtension . takeFileName $ head tarballs
 
         need tarballs
         build $ fullTarget target Tar tarballs ["libffi-tarballs"]
 
-        let libffiExtracted = "libffi-tarballs" -/- libname
-        liftIO $ renameDirectory libffiExtracted libffiBuild
-        putBuild $ "| Move " ++ libffiExtracted ++ " -> " ++ libffiBuild
+        let libname = dropExtension . dropExtension . takeFileName $ head tarballs
+        moveDirectory ("libffi-tarballs" -/- libname) libffiBuild
 
-        old <- liftIO $ readFile libffiMakefile
-        let new = fixLibffiMakefile old
-        length new `seq` liftIO $ writeFile libffiMakefile new
-        putBuild $ "| Fix " ++ libffiMakefile
+        fixFile libffiMakefile fixLibffiMakefile
 
-        forM_ ["config.guess", "config.sub"] $ \file -> do
-            copyFileChanged file $ libffiBuild -/- file
-            putBuild $ "| Copy " ++ file ++ " -> " ++ (libffiBuild -/- file)
+        forM_ ["config.guess", "config.sub"] $ \file ->
+            copyFile file (libffiBuild -/- file)
 
-        putBuild $ "| Running libffi configure..."
         envs <- configureEnvironment
         args <- configureArguments
-        unit $ cmd Shell [Cwd libffiBuild] "bash configure" envs args
+        runConfigure libffiBuild envs args
 
-        putBuild $ "| Running make..."
-        unit $ cmd Shell "make" ["-C", libffiBuild, "MAKEFLAGS="]
-
-        putBuild $ "| Running make install..."
-        unit $ cmd Shell "make" ["-C", libffiBuild, "MAKEFLAGS= install"]
+        runMake libffiBuild []
+        runMake libffiBuild ["install"]
 
         putSuccess $ "| Successfully built custom library 'libffi'"
 

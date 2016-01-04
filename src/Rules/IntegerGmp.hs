@@ -1,12 +1,11 @@
 module Rules.IntegerGmp (integerGmpRules, integerGmpLibrary) where
 
-import System.Directory
-
 import Base
 import Expression
 import GHC
 import Oracles.Config.Setting
 import Rules.Actions
+import Settings.User
 
 integerGmpBase :: FilePath
 integerGmpBase = "libraries" -/- "integer-gmp" -/- "gmp"
@@ -28,9 +27,8 @@ target = PartialTarget Stage0 integerGmp
 configureEnvironment :: Action [CmdOption]
 configureEnvironment = do
     sequence [ builderEnv "CC" $ Gcc Stage1
-             , builderEnv "CXX" $ Gcc Stage1
              , builderEnv "AR" Ar
-             , builderEnv "NM" Nm]
+             , builderEnv "NM" Nm ]
   where
     builderEnv var builder = do
         needBuilder False builder
@@ -49,7 +47,7 @@ configureArguments = do
 integerGmpRules :: Rules ()
 integerGmpRules = do
     integerGmpLibrary %> \_ -> do
-        need [sourcePath -/- "Rules" -/- "integerGmp.hs"]
+        when trackBuildSystem $ need [sourcePath -/- "Rules" -/- "integerGmp.hs"]
 
         -- remove the old build folder, if it exists.
         liftIO $ removeFiles integerGmpBuild ["//*"]
@@ -64,53 +62,45 @@ integerGmpRules = do
         when (length tarballs /= 1) $
             putError $ "integerGmpRules: exactly one tarball expected"
                      ++ "(found: " ++ show tarballs ++ ")."
-        let filename = dropExtension . dropExtension . takeFileName $ head tarballs
-        let suffix = "-nodoc-patched"
-        unless (suffix `isSuffixOf` filename) $
-            putError $ "integerGmpRules: expected suffix " ++ suffix
-                     ++ " (found: " ++ filename ++ ")."
-        let libname = take (length filename - length suffix) filename
 
         need tarballs
         build $ fullTarget target Tar tarballs [integerGmpBase]
 
         -- move gmp-<version> to gmpbuild
-        let integerGmpExtracted = integerGmpBase -/- libname
-        liftIO $ renameDirectory integerGmpExtracted integerGmpBuild
-        putBuild $ "| Move " ++ integerGmpExtracted ++ " -> " ++ integerGmpBuild
+        let filename = dropExtension . dropExtension . takeFileName $ head tarballs
+            suffix   = "-nodoc-patched"
+        unless (suffix `isSuffixOf` filename) $
+            putError $ "integerGmpRules: expected suffix " ++ suffix
+                     ++ " (found: " ++ filename ++ ")."
+        let libname = take (length filename - length suffix) filename
+        moveDirectory (integerGmpBase -/- libname) integerGmpBuild
 
         -- apply patches
         -- TODO: replace "patch" with PATCH_CMD
-        unit $ cmd Shell [Cwd integerGmpBase] "patch -p0 < gmpsrc.patch"
-        unit $ cmd Shell [Cwd integerGmpBuild] "patch -p1 < " [integerGmpPatch]
-        putBuild $ "| Applied gmpsrc.patch and " ++ takeFileName integerGmpPatch
+        unit . quietly $ cmd Shell (EchoStdout False) [Cwd integerGmpBase] "patch -p0 < gmpsrc.patch"
+        putBuild $ "| Apply " ++ (integerGmpBase -/- "gmpsrc.patch")
+        unit . quietly $ cmd Shell (EchoStdout False) [Cwd integerGmpBuild] "patch -p1 < " [integerGmpPatch]
+        putBuild $ "| Apply " ++ (integerGmpBase -/- integerGmpPatch)
 
         -- TODO: What's `chmod +x libraries/integer-gmp/gmp/ln` for?
 
-        -- ./configure
-        putBuild "| Running libffi configure..."
         envs <- configureEnvironment
         args <- configureArguments
-        unit $ cmd Shell [Cwd integerGmpBuild] "bash configure" envs args
+        runConfigure integerGmpBuild envs args
 
-        -- make
-        putBuild "| Running make..."
-        unit $ cmd Shell "make" ["-C", integerGmpBuild, "MAKEFLAGS="]
+        runMake integerGmpBuild []
 
         -- copy library and header
-        forM_ ["gmp.h", ".libs" -/- "libgmp.a"] $ \file -> do
-            let file' = integerGmpBase -/- takeFileName file
-            copyFileChanged (integerGmpBuild -/- file) file'
-            putBuild $ "| Copy " ++ file ++ " -> " ++ file'
+        -- TODO: why copy library, can we move it instead?
+        forM_ ["gmp.h", ".libs" -/- "libgmp.a"] $ \file ->
+            copyFile (integerGmpBuild -/- file) (integerGmpBase -/- takeFileName file)
 
-        ar  <- builderPath Ar
-        ran <- builderPath Ranlib
-        -- unpack libgmp.a
-        putBuild "| Unpacking libgmp.a..."
-        unit $ cmd Shell [Cwd integerGmpBase] "mkdir -p objs"
-        unit $ cmd Shell [Cwd (integerGmpBase -/- "objs")] [ar] " x ../libgmp.a"
-        unit $ cmd Shell [Cwd integerGmpBase] [ran] " libgmp.a"
+        let objsDir = integerGmpBase -/- "objs"
+        createDirectory objsDir
+        build $ fullTarget target Ar [integerGmpLibrary] [objsDir]
 
-        putSuccess "| Successfully build custom library 'integer-gmp'"
+        runBuilder Ranlib [integerGmpLibrary]
+
+        putSuccess "| Successfully built custom library 'integer-gmp'"
 
     "libraries/integer-gmp/gmp/gmp.h" %> \_ -> need [integerGmpLibrary]
