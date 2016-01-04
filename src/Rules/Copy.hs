@@ -27,4 +27,4 @@ copyRules = do
     "inplace/lib/platformConstants" <~ derivedConstantsPath
     "inplace/lib/settings"          <~ "."
   where
-    file <~ dir = file %> \_ -> copyFile (dir -/- file) file
+    file <~ dir = file %> \_ -> copyFile (dir -/- takeFileName file) file
