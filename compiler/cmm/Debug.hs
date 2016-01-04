@@ -12,11 +12,14 @@
 module Debug (
 
   DebugBlock(..), dblIsEntry,
-  UnwindTable, UnwindDecl(..), UnwindExpr(..),
   cmmDebugGen,
   cmmDebugLabels,
   cmmDebugLink,
-  debugToMap
+  debugToMap,
+
+  -- * Unwinding information
+  UnwindTable, UnwindPoints(..), UnwindExpr(..),
+  addDefaultUnwindings
 
   ) where
 
@@ -57,7 +60,7 @@ data DebugBlock =
   , dblPosition   :: !(Maybe Int)  -- ^ Output position relative to
                                    -- other blocks. @Nothing@ means
                                    -- the block was optimized out
-  , dblUnwind     :: [UnwindDecl]  -- ^ Unwind information
+  , dblUnwind     :: UnwindPoints  -- ^ Unwind information
   , dblBlocks     :: ![DebugBlock] -- ^ Nested blocks
   }
 
@@ -75,16 +78,17 @@ instance Outputable DebugBlock where
             (maybe empty ppr (dblSourceTick blk)) <+>
             (maybe (text "removed") ((text "pos " <>) . ppr)
                    (dblPosition blk)) <+>
-            hsep (punctuate comma $ map pprUwTbl $ dblUnwind blk) $$
+            pprUwPts (dblUnwind blk) $$
             (if null (dblBlocks blk) then empty else ppr (dblBlocks blk))
-    where pprUw (g, expr) = ppr g <> char '=' <> ppr expr
-          pprUwTbl (UnwindDecl lbl m) =
+    where pprUwPts (UnwindPoints pts) = hsep $ punctuate comma $ map pprUwPt pts
+          pprUwPt (lbl, uws) =
             braces $ ppr lbl<>colon
-            <+> hsep (punctuate comma $ map pprUw $ Map.toList m)
+            <+> hsep (punctuate comma $ map pprUw $ Map.toList uws)
+          pprUw (g, expr) = ppr g <> char '=' <> ppr expr
 
 -- | Intermediate data structure holding debug-relevant context information
 -- about a block.
-type BlockContext = (CmmBlock, RawCmmDecl, [UnwindDecl])
+type BlockContext = (CmmBlock, RawCmmDecl, UnwindPoints)
 
 -- | Extract debug data from a group of procedures. We will prefer
 -- source notes that come from the given module (presumably the module
@@ -205,25 +209,29 @@ blockContexts decls = Map.map reverse $ foldr walkProc Map.empty decls
         walkProc CmmData{}                 m = m
         walkProc prc@(CmmProc _ _ _ graph) m
           | mapNull blocks = m
-          | otherwise      = snd $ walkBlock prc entry [] (emptyLbls, m)
+          | otherwise      = snd $ walkBlock prc entry Map.empty (emptyLbls, m)
           where blocks = toBlockMap graph
                 entry  = [mapFind (g_entry graph) blocks]
                 emptyLbls = setEmpty :: LabelSet
 
-        walkBlock :: RawCmmDecl -> [Block CmmNode C C] -> [UnwindDecl]
+        walkBlock :: RawCmmDecl -> [Block CmmNode C C]
+                  -> UnwindTable     -- ^ unwinding table of predecessor block
                   -> (LabelSet, Map.Map CmmTickScope [BlockContext])
                   -> (LabelSet, Map.Map CmmTickScope [BlockContext])
-        walkBlock _   []             _      c            = c
-        walkBlock prc (block:blocks) unwind (visited, m)
+        walkBlock _   []             _          c            = c
+        walkBlock prc (block:blocks) predUnwind (visited, m)
           | lbl `setMember` visited
-          = walkBlock prc blocks unwind (visited, m)
+          = walkBlock prc blocks predUnwind (visited, m)
           | otherwise
-          = walkBlock prc blocks unwind $
-            walkBlock prc succs unwind'
+          = walkBlock prc blocks predUnwind $
+            walkBlock prc succs succUnwind
               (lbl `setInsert` visited,
                insertMulti scope (block, prc, unwind') m)
           where CmmEntry lbl scope = firstNode block
-                unwind' = extractUnwindTables block ++ unwind
+                -- fold in unwinding information from predecessor block
+                unwind' = addDefaultUnwindings predUnwind
+                        $ extractUnwindTables block
+                succUnwind = lastUnwindingPoint unwind'
                 (CmmProc _ _ _ graph) = prc
                 succs = map (flip mapFind (toBlockMap graph))
                             (successors (lastNode block))
@@ -268,12 +276,12 @@ debugToMap = mapUnions . map go
 -- with.
 type UnwindTable = Map.Map GlobalReg UnwindExpr
 
--- | An unwinding table associated with a particular point in the generated
--- code.
-data UnwindDecl = UnwindDecl !CLabel !UnwindTable
+-- | A sequence of locations within a block annotated with unwinding tables.
+-- This list is sorted in the order that the labels occur in the block.
+newtype UnwindPoints = UnwindPoints [(CLabel, UnwindTable)]
 
-instance Outputable UnwindDecl where
-  ppr (UnwindDecl lbl tbl) = parens $ ppr lbl <+> ppr tbl
+instance Outputable UnwindPoints where
+  ppr (UnwindPoints pts) = ppr pts
 
 -- | Expressions, used for unwind information
 data UnwindExpr = UwConst Int                   -- ^ literal value
@@ -299,15 +307,27 @@ instance Outputable UnwindExpr where
                             = pprPrec 2 e0 <> char '*' <> pprPrec 2 e1
   pprPrec _ other           = parens (pprPrec 0 other)
 
-extractUnwindTables :: CmmBlock -> [UnwindDecl]
-extractUnwindTables b = mapMaybe nodeToUnwind $ blockToList mid
+
+-- | @addDefaultUnwindings uws points@ adds default unwinding information
+-- from @uws@ to @points@.
+addDefaultUnwindings :: UnwindTable -> UnwindPoints -> UnwindPoints
+addDefaultUnwindings uws (UnwindPoints pts) =
+    UnwindPoints $ map (fmap (`Map.union` uws)) pts
+
+-- | The unwinding table from the last unwinding point in a block
+lastUnwindingPoint :: UnwindPoints -> UnwindTable
+lastUnwindingPoint (UnwindPoints pts) = snd $ last pts
+
+extractUnwindTables :: CmmBlock -> UnwindPoints
+extractUnwindTables b =
+    UnwindPoints $ mapMaybe nodeToUnwind $ blockToList mid
   where
     (_, mid, _) = blockSplit b
 
-    nodeToUnwind :: CmmNode O O -> Maybe UnwindDecl
+    nodeToUnwind :: CmmNode O O -> Maybe (CLabel, UnwindTable)
     nodeToUnwind (CmmUnwind lbl g so) =
         -- FIXME: why a block label if this isn't a block?
-        Just $ UnwindDecl (mkAsmTempLabel $ getUnique lbl') (Map.singleton g (toUnwindExpr so))
+        Just (mkAsmTempLabel (getUnique lbl'), Map.singleton g (toUnwindExpr so))
       where
         lbl' = case lbl of
                  NewLabel l      -> l

@@ -220,16 +220,16 @@ procToFrame initUws blk
                    , dwFdeBlocks  = map (uncurry blockToFrame)
                                         (first setHasInfo blockUw0 : blockUws)
                    }
-  where blockUws :: [(DebugBlock, [UnwindDecl])]
-        blockUw0:blockUws = map snd $ sortBy (comparing fst)
-                                    $ flatten blk
+  where blockUws :: [(DebugBlock, UnwindPoints)]
+        blockUw0:blockUws =
+          map snd $ sortBy (comparing fst) $ flatten blk
 
         flatten :: DebugBlock
-                -> [(Int, (DebugBlock, [UnwindDecl]))]
+                -> [(Int, (DebugBlock, UnwindPoints))]
         flatten b@DebugBlock{ dblPosition=pos, dblUnwind=uws, dblBlocks=blocks }
           | Just p <- pos  = (p, (b, uws')):nested
           | otherwise      = nested -- block was optimized out
-          where uws'   = map (\(UnwindDecl lbl uw) -> UnwindDecl lbl (uw `Map.union` initUws)) uws
+          where uws'   = addDefaultUnwindings initUws uws
                 nested = concatMap flatten blocks
 
         -- | If the current procedure has an info table, then we also say that
@@ -240,7 +240,7 @@ procToFrame initUws blk
         setHasInfo child =
             child { dblHasInfoTbl = dblHasInfoTbl child || dblHasInfoTbl blk }
 
-blockToFrame :: DebugBlock -> [UnwindDecl] -> DwarfFrameBlock
+blockToFrame :: DebugBlock -> UnwindPoints -> DwarfFrameBlock
 blockToFrame blk uws
   = DwarfFrameBlock { dwFdeBlkHasInfo = dblHasInfoTbl blk
                     , dwFdeUnwind     = uws

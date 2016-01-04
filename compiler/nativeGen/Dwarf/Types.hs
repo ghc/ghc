@@ -270,8 +270,11 @@ data DwarfFrameProc
 data DwarfFrameBlock
   = DwarfFrameBlock
     { dwFdeBlkHasInfo :: Bool
-    , dwFdeUnwind     :: [UnwindDecl]
+    , dwFdeUnwind     :: UnwindPoints
     }
+
+instance Outputable DwarfFrameBlock where
+  ppr (DwarfFrameBlock hasInfo unwinds) = braces $ ppr hasInfo <+> ppr unwinds
 
 -- | Header for the @.debug_frame@ section. Here we emit the "Common
 -- Information Entry" record that etablishes general call frame
@@ -338,7 +341,8 @@ pprFrameProc frameLbl initUw (DwarfFrameProc procLbl hasInfo blocks)
         procEnd     = mkAsmTempEndLabel procLbl
         ifInfo str  = if hasInfo then text str else empty
                       -- see [Note: Info Offset]
-    in vcat [ pprData4' (ppr fdeEndLabel <> char '-' <> ppr fdeLabel)
+    in pprTrace "FrameProc" (ppr procLbl <+> ppr hasInfo <+> ppr blocks) $
+       vcat [ pprData4' (ppr fdeEndLabel <> char '-' <> ppr fdeLabel)
             , ppr fdeLabel <> colon
             , pprData4' (ppr frameLbl <> char '-' <>
                          ptext dwarfFrameLabel)    -- Reference to CIE
@@ -355,11 +359,11 @@ pprFrameProc frameLbl initUw (DwarfFrameProc procLbl hasInfo blocks)
 -- optimisations saves a lot of space, as subsequent blocks often have
 -- the same unwind information.
 pprFrameBlock :: DwarfFrameBlock -> S.State UnwindTable SDoc
-pprFrameBlock (DwarfFrameBlock hasInfo uws0) =
+pprFrameBlock (DwarfFrameBlock hasInfo (UnwindPoints uws0)) =
     vcat <$> zipWithM pprFrameDecl (True : repeat False) uws0
   where
-    pprFrameDecl :: Bool -> UnwindDecl -> S.State UnwindTable SDoc
-    pprFrameDecl firstDecl (UnwindDecl lbl uws) = S.state $ \oldUws ->
+    pprFrameDecl :: Bool -> (CLabel, UnwindTable) -> S.State UnwindTable SDoc
+    pprFrameDecl firstDecl (lbl, uws) = S.state $ \oldUws ->
         let isChanged g v | old == Just v  = Nothing
                           | otherwise      = Just (old, v)
                           where old = Map.lookup g oldUws
