@@ -2,9 +2,11 @@ module Rules.Dependencies (buildPackageDependencies) where
 
 import Base
 import Expression
+import GHC
 import Oracles
 import Rules.Actions
 import Rules.Generate
+import Rules.IntegerGmp
 import Rules.Resources
 import Settings
 import Development.Shake.Util (parseMakefile)
@@ -17,6 +19,9 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
         hDepFile  = buildPath -/- ".hs-dependencies"
     in do
         [ buildPath ++ "//*.c.deps", buildPath ++ "//*.cmm.deps" ] |%> \out -> do
+            -- integerGmp (cbits/wrappers.c) depends on the integerGmp library,
+            -- which provides gmp.h
+            when (pkg == integerGmp) $ need [integerGmpLibraryH]
             let srcFile = dropBuild . dropExtension $ out
             orderOnly $ generatedDependencies stage pkg
             need [srcFile]
