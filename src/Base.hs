@@ -172,22 +172,40 @@ putError msg = do
     putColoured Red msg
     error $ "GHC build system error: " ++ msg
 
--- | Render the given set of lines in a ASCII box
+-- | Render the given set of lines in a nice box of ASCII
 renderBox :: [String] -> String
-renderBox ls =
-    unlines ([begin] ++ map (bar++) ls) ++ end
+renderBox ls = concatMap ('\n' :) (boxTop : map renderLine ls ++ [boxBot])
   where
-    (begin,bar,end)
-      | useUnicode = ( "╭──────────"
-                     , "│ "
-                     , "╰──────────"
-                     )
-      | otherwise  = ( "/----------"
-                     , "| "
-                     , "\\----------"
-                     )
+    -- Minimum total width of the box in characters
+    minimumBoxWidth = 32
+
     -- FIXME: See Shake #364.
     useUnicode = False
+
+    -- Characters to draw the box
+    (dash, pipe, topLeft, topRight, botLeft, botRight, padding)
+        | useUnicode = ('─', '│', '╭',  '╮', '╰', '╯', ' ')
+        | otherwise  = ('-', '|', '/', '\\', '\\', '/', ' ')
+
+    -- Box width, taking minimum desired length and content into account.
+    -- The -4 is for the beginning and end pipe/padding symbols, as
+    -- in "| xxx |".
+    boxContentWidth = (minimumBoxWidth - 4) `max` maxContentLength
+      where
+        maxContentLength = maximum (map length ls)
+
+    renderLine l = concat
+        [ [pipe, padding]
+        , padToLengthWith boxContentWidth padding l
+        , [padding, pipe] ]
+      where
+        padToLengthWith n filler x = x ++ replicate (n - length x) filler
+
+    (boxTop, boxBot) = ( topLeft : dashes ++ [topRight]
+                       , botLeft : dashes ++ [botRight] )
+      where
+        -- +1 for each non-dash (= corner) char
+        dashes = replicate (boxContentWidth + 2) dash
 
 -- Depending on Data.Bifunctor only for this function seems an overkill
 bimap :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
