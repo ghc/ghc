@@ -1,6 +1,8 @@
 Shaking up GHC
 ==============
 
+[![Build Status](https://travis-ci.org/snowleopard/shaking-up-ghc.svg)](https://travis-ci.org/snowleopard/shaking-up-ghc)
+
 As part of my 6-month research secondment to Microsoft Research in Cambridge
 I am taking up the challenge of migrating the current [GHC][ghc] build system
 based on standard `make` into a new and (hopefully) better one based on
