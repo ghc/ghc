@@ -10,7 +10,8 @@ import Settings
 -- TODO: add tracking by moving these functions to separate tracked files
 generateConfigHs :: Expr String
 generateConfigHs = do
-    lift $ need [sourcePath -/- "Rules/Generators/ConfigHs.hs"]
+    when trackBuildSystem . lift $
+        need [sourcePath -/- "Rules/Generators/ConfigHs.hs"]
     cProjectName        <- getSetting ProjectName
     cProjectGitCommitId <- getSetting ProjectGitCommitId
     cProjectVersion     <- getSetting ProjectVersion

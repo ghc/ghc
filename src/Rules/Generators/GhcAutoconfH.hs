@@ -3,6 +3,7 @@ module Rules.Generators.GhcAutoconfH (generateGhcAutoconfH) where
 import Base
 import Expression
 import Oracles
+import Settings.User
 
 -- TODO: change `mk/config.h` to `shake-build/cfg/config.h`
 configH :: FilePath
@@ -16,7 +17,8 @@ undefinePackage s
 
 generateGhcAutoconfH :: Expr String
 generateGhcAutoconfH = do
-    lift $ need [sourcePath -/- "Rules/Generators/GhcAutoconfH.hs"]
+    when trackBuildSystem . lift $
+        need [sourcePath -/- "Rules/Generators/GhcAutoconfH.hs"]
     configHContents  <- lift $ map undefinePackage <$> readFileLines configH
     tablesNextToCode <- lift $ ghcEnableTablesNextToCode
     ghcUnreg         <- getFlag GhcUnregisterised

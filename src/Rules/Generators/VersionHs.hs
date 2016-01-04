@@ -3,10 +3,12 @@ module Rules.Generators.VersionHs (generateVersionHs) where
 import Base
 import Expression
 import Oracles
+import Settings.User
 
 generateVersionHs :: Expr String
 generateVersionHs = do
-    lift $ need [sourcePath -/- "Rules/Generators/VersionHs.hs"]
+    when trackBuildSystem . lift $
+        need [sourcePath -/- "Rules/Generators/VersionHs.hs"]
     projectVersion <- getSetting ProjectVersion
     targetOs       <- getSetting TargetOs
     targetArch     <- getSetting TargetArch

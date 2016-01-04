@@ -3,10 +3,12 @@ module Rules.Generators.GhcBootPlatformH (generateGhcBootPlatformH) where
 import Base
 import Expression
 import Oracles
+import Settings.User
 
 generateGhcBootPlatformH :: Expr String
 generateGhcBootPlatformH = do
-    lift $ need [sourcePath -/- "Rules/Generators/GhcBootPlatformH.hs"]
+    when trackBuildSystem . lift $
+        need [sourcePath -/- "Rules/Generators/GhcBootPlatformH.hs"]
     stage <- getStage
     let cppify = replaceEq '-' '_' . replaceEq '.' '_'
         chooseSetting x y = getSetting $ if stage == Stage0 then x else y

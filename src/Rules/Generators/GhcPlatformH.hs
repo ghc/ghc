@@ -3,10 +3,12 @@ module Rules.Generators.GhcPlatformH (generateGhcPlatformH) where
 import Base
 import Expression
 import Oracles
+import Settings.User
 
 generateGhcPlatformH :: Expr String
 generateGhcPlatformH = do
-    lift $ need [sourcePath -/- "Rules/Generators/GhcPlatformH.hs"]
+    when trackBuildSystem . lift $
+        need [sourcePath -/- "Rules/Generators/GhcPlatformH.hs"]
     let cppify = replaceEq '-' '_' . replaceEq '.' '_'
     hostPlatform   <- getSetting HostPlatform
     hostArch       <- getSetting HostArch
