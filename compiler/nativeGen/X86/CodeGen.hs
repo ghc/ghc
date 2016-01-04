@@ -157,7 +157,7 @@ stmtToInstrs stmt = do
   case stmt of
     CmmComment s      -> return (unitOL (COMMENT s))
     CmmTick {}        -> return nilOL
-    CmmUnwind (NewLabel lbl) _ _ -> return (unitOL (LABEL lbl))
+    CmmUnwind (NewLabel lbl) regs -> return (unitOL (LABEL lbl))
     CmmUnwind {}      -> return nilOL
 
     CmmAssign reg src

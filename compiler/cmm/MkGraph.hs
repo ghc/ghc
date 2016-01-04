@@ -197,7 +197,7 @@ mkStore      :: CmmExpr -> CmmExpr -> CmmAGraph
 mkStore  l r  = mkMiddle $ CmmStore  l r
 
 mkUnwind     :: NewOrExistingLabel -> GlobalReg -> CmmExpr -> CmmAGraph
-mkUnwind lbl r e = mkMiddle $ CmmUnwind lbl r e
+mkUnwind lbl r e = mkMiddle $ CmmUnwind lbl [(r,e)]
 
 ---------- Control transfer
 mkJump          :: DynFlags -> Convention -> CmmExpr

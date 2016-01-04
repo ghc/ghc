@@ -790,7 +790,7 @@ manifestSp dflags stackmaps stack0 sp0 sp_high
     let -- Add unwind pseudo-instructions to document Sp level for debugging
         add_unwind_info block
           | debugLevel dflags > 0 = do lbl <- newBlockId
-                                       pure $ CmmUnwind (NewLabel lbl) Sp sp_unwind : block
+                                       pure $ CmmUnwind (NewLabel lbl) [(Sp, sp_unwind)] : block
           | otherwise             = pure block
         sp_unwind = CmmRegOff (CmmGlobal Sp) (sp0 - wORD_SIZE dflags)
 
@@ -834,8 +834,9 @@ maybeAddSpAdj dflags sp0 sp_off block
    = do
      lbl <- newBlockId
      pure $ block `blockSnoc` CmmAssign spReg (cmmOffset dflags (CmmReg spReg) sp_off)
-                  `blockSnoc` CmmUnwind (NewLabel lbl) Sp
-                                        (cmmRegOff (CmmGlobal Sp) (sp0 - wORD_SIZE dflags - sp_off))
+                  `blockSnoc` CmmUnwind (NewLabel lbl)
+                                  [(Sp, cmmRegOff (CmmGlobal Sp)
+                                                  (sp0 - wORD_SIZE dflags - sp_off))]
 
 
 {-
@@ -1008,9 +1009,8 @@ findLastUnwinding reg block =
       xs -> Just $ last xs
   where
     (_,mid,_) = blockSplit block
-    isUnwind (CmmUnwind _ reg' expr)
-      | reg == reg'  = Just expr
-    isUnwind _       = Nothing
+    isUnwind (CmmUnwind _ regs) = lookup reg regs
+    isUnwind _                  = Nothing
 
 -- | @substReg reg expr subst@ replaces all occurrences of @CmmReg reg@ in
 -- @expr@ with @subst@.
