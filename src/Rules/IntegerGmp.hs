@@ -1,4 +1,4 @@
-module Rules.IntegerGmp (integerGmpRules, integerGmpLibrary) where
+module Rules.IntegerGmp (integerGmpRules, integerGmpLibrary, integerGmpLibraryH) where
 
 import Base
 import Expression
@@ -15,6 +15,9 @@ integerGmpBuild = integerGmpBase -/- "gmpbuild"
 
 integerGmpLibrary :: FilePath
 integerGmpLibrary = integerGmpBase -/- "libgmp.a"
+
+integerGmpLibraryH :: FilePath
+integerGmpLibraryH = integerGmpBase -/- "gmp.h"
 
 -- relative to integerGmpBuild
 integerGmpPatch :: FilePath
@@ -103,4 +106,4 @@ integerGmpRules = do
 
         putSuccess "| Successfully built custom library 'integer-gmp'"
 
-    "libraries/integer-gmp/gmp/gmp.h" %> \_ -> need [integerGmpLibrary]
+    integerGmpLibraryH %> \_ -> need [integerGmpLibrary]
