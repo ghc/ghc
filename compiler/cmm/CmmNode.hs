@@ -248,6 +248,10 @@ type UpdFrameOffset = ByteOff
 data NewOrExistingLabel = NewLabel !Label | ExistingLabel !Label
                         deriving (Eq)
 
+instance Outputable NewOrExistingLabel where
+  ppr (NewLabel lbl) = text "NewLabel" <+> ppr lbl
+  ppr (ExistingLabel lbl) = text "ExistingLabel" <+> ppr lbl
+
 -- | A convention maps a list of values (function arguments or return
 -- values) to registers or stack locations.
 data Convention
