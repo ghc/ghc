@@ -110,3 +110,17 @@ texinfo_documents = [
    u'GHC Team', 'GHCUsersGuide', 'The Glasgow Haskell Compiler.',
    'Compilers'),
 ]
+
+def parse_ghci_cmd(env, sig, signode):
+    from sphinx import addnodes
+    name = sig.split(';')[0]
+    sig = sig.replace(';', '')
+    signode += addnodes.desc_name(name, sig)
+    return name
+
+def setup(app):
+    # the :ghci-cmd: directive used in ghci.rst
+    app.add_object_type('ghci-cmd', 'ghci-cmd',
+                        parse_node=parse_ghci_cmd,
+                        objname='GHCi command',
+                        indextemplate='pair: %s; GHCi command')
