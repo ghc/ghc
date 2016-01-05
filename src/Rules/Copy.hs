@@ -5,9 +5,6 @@ import Expression
 import GHC
 import Rules.Actions
 import Rules.Generate
-import Rules.Libffi
-import Settings.Packages.Rts
-import Settings.TargetDirectory
 
 installTargets :: [FilePath]
 installTargets = [ "inplace/lib/template-hsc.h"
@@ -16,17 +13,6 @@ installTargets = [ "inplace/lib/template-hsc.h"
 
 copyRules :: Rules ()
 copyRules = do
-    targetPath Stage1 rts -/- "build/ffi*.h" %> \ffih -> do
-        need [libffiLibrary]
-        ffiHPaths <- getDirectoryFiles "" ["libffi/build/inst/lib/*/include/ffi.h"]
-        when (length ffiHPaths /= 1) $
-            putError $ "copyRules: exactly one ffi.h header expected"
-                     ++ "(found: " ++ show ffiHPaths ++ ")."
-        
-        copyFile (takeDirectory (head ffiHPaths) -/- takeFileName ffih) ffih
-        libffiName <- rtsLibffiLibraryName
-        copyFile libffiLibrary (targetPath Stage1 rts -/- "build/lib" ++ libffiName <.> "a")
-
     "inplace/lib/template-hsc.h"    <~ pkgPath hsc2hs
     "inplace/lib/platformConstants" <~ derivedConstantsPath
     "inplace/lib/settings"          <~ "."

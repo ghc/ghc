@@ -1,4 +1,4 @@
-module Rules.Libffi (libffiRules, libffiLibrary) where
+module Rules.Libffi (libffiRules, libffiDependencies) where
 
 import Base
 import Expression
@@ -6,14 +6,21 @@ import GHC
 import Oracles
 import Rules.Actions
 import Settings.Builders.Common
+import Settings.Packages.Rts
+import Settings.TargetDirectory
 import Settings.User
 
--- We use this file to track the whole libffi library
-libffiLibrary :: FilePath
-libffiLibrary = libffiBuild -/- "inst/lib/libffi.a"
+rtsBuildPath :: FilePath
+rtsBuildPath = targetPath Stage1 rts -/- "build"
+
+libffiDependencies :: [FilePath]
+libffiDependencies = (rtsBuildPath -/-) <$> [ "ffi.h", "ffitarget.h" ]
 
 libffiBuild :: FilePath
 libffiBuild = "libffi/build"
+
+libffiLibrary :: FilePath
+libffiLibrary = libffiBuild -/- "inst/lib/libffi.a"
 
 libffiMakefile :: FilePath
 libffiMakefile = libffiBuild -/- "Makefile.in"
@@ -61,7 +68,7 @@ configureArguments = do
 
 libffiRules :: Rules ()
 libffiRules = do
-    libffiLibrary %> \_ -> do
+    libffiDependencies &%> \_ -> do
         when trackBuildSystem $ need [sourcePath -/- "Rules/Libffi.hs"]
         liftIO $ removeFiles libffiBuild ["//*"]
         tarballs <- getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
@@ -86,10 +93,15 @@ libffiRules = do
 
         runMake libffiBuild []
         runMake libffiBuild ["install"]
+       
+        forM_ ["ffi.h", "ffitarget.h"] $ \file -> do
+            let src = libffiBuild -/- "inst/lib" -/- libname -/- "include" -/- file
+            copyFile src (rtsBuildPath -/- file)
+    
+        libffiName <- rtsLibffiLibraryName
+        copyFile libffiLibrary (rtsBuildPath -/- "lib" ++ libffiName <.> "a")
 
         putSuccess $ "| Successfully built custom library 'libffi'"
-
-    "libffi/build/inst/lib/*/include/*.h" %> \_ -> need [libffiLibrary]
 
 -- chmod +x libffi/ln
 -- # wc on OS X has spaces in its output, which libffi's Makefile
