@@ -2,8 +2,8 @@
 module GHC (
     array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
     deepseq, deriveConstants, directory, dllSplit, filepath, genapply,
-    genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim, ghcPwd,
-    ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
+    genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim, ghcTags,
+    haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
     integerSimple, iservBin, libffi, mkUserGuidePart, parallel, pretty,
     primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time,
     transformers, unix, win32, xhtml,
@@ -25,16 +25,16 @@ defaultKnownPackages =
     [ array, base, binary, bytestring, cabal, compiler, containers, compareSizes
     , deepseq, deriveConstants, directory, dllSplit, filepath, genapply
     , genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim
-    , ghcPwd, ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin
-    , integerGmp, integerSimple, iservBin, libffi, mkUserGuidePart, parallel
-    , pretty, primitive, process, rts, runGhc, stm, templateHaskell, terminfo
-    , time, transformers, unix, win32, xhtml ]
+    , ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp
+    , integerSimple, iservBin, libffi, mkUserGuidePart, parallel, pretty
+    , primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time
+    , transformers, unix, win32, xhtml ]
 
 -- Package definitions (see Package.hs)
 array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
     deepseq, deriveConstants, directory, dllSplit, filepath, genapply,
-    genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim, ghcPwd,
-    ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
+    genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim, ghcTags,
+    haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
     integerSimple, iservBin, libffi, mkUserGuidePart, parallel, pretty,
     primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time,
     transformers, unix, win32, xhtml :: Package
@@ -60,7 +60,6 @@ ghcCabal        = utility  "ghc-cabal"
 ghci            = library  "ghci"
 ghcPkg          = utility  "ghc-pkg"
 ghcPrim         = library  "ghc-prim"
-ghcPwd          = utility  "ghc-pwd"
 ghcTags         = utility  "ghctags"
 haddock         = utility  "haddock"
 haskeline       = library  "haskeline"

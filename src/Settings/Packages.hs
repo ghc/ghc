@@ -31,7 +31,7 @@ packagesStage1 :: Packages
 packagesStage1 = mconcat
     [ packagesStage0
     , append [ array, base, bytestring, containers, compareSizes, deepseq
-             , directory, filepath, ghci, ghcPrim, ghcPwd, haskeline, hpcBin
+             , directory, filepath, ghci, ghcPrim, haskeline, hpcBin
              , integerLibrary, mkUserGuidePart, pretty, process, rts, runGhc
              , time ]
     , windowsHost      ? append [win32]
