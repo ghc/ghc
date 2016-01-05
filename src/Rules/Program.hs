@@ -24,6 +24,7 @@ type Wrapper = FilePath -> Expr String
 -- List of wrappers we build
 wrappers :: [(PartialTarget, Wrapper)]
 wrappers = [ (PartialTarget Stage0 ghc, ghcWrapper)
+           , (PartialTarget Stage1 ghc, ghcWrapper)
            , (PartialTarget Stage0 ghcPkg, ghcPkgWrapper)]
 
 buildProgram :: Resources -> PartialTarget -> Rules ()
