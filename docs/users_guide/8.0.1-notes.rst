@@ -279,6 +279,11 @@ GHCi
    (such as Emacs' ``haskell-mode``) originally premiered by ``ghci-ng``
    have been integrated into GHCi (:ghc-ticket:`10874`).
 
+-  GHCi now supports decoupled operation between the interpreter and the
+   shell. While this is largely an implementation detail, it opens up a few
+   interesting possibilities in the future. See :ghc-wiki:`RemoteGHCi` for
+   details.
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
