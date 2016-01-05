@@ -72,6 +72,7 @@ compilerDependencies stage =
 generatedDependencies :: Stage -> Package -> [FilePath]
 generatedDependencies stage pkg
     | pkg == compiler = compilerDependencies stage
+    | pkg == rts = derivedConstantsDependencies
     | stage == Stage0 = defaultDependencies
     | otherwise = []
 
