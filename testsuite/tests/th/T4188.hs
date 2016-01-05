@@ -24,5 +24,3 @@ $(do { dec1 <- reify ''T1
      ; runIO (putStrLn (pprint dec3))
      ; runIO (hFlush stdout)
      ; return [] })
-
-   

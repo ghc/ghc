@@ -381,11 +381,7 @@ test('T10796a', normal, compile, ['-v0'])
 test('T10796b', normal, compile_fail, ['-v0'])
 test('T10811', normal, compile, ['-v0'])
 test('T10810', normal, compile, ['-v0'])
-test('T10828', normalise_version('array', 'base', 'binary', 'bytestring',
-                                 'containers', 'deepseq', 'ghc-boot',
-                                 'ghc-prim', 'integer-gmp', 'pretty',
-                                 'template-haskell'
-                              ), compile, ['-v0 -ddump-tc -dsuppress-uniques'])
+test('T10828', normal, compile, ['-v0 -dsuppress-uniques'])
 test('T10828a', normal, compile_fail, ['-v0'])
 test('T10828b', normal, compile_fail, ['-v0'])
 test('T10891', normal, compile, ['-v0'])
@@ -397,5 +393,6 @@ test('T10819',
      multimod_compile,
      ['T10819.hs', '-v0 ' + config.ghc_th_way_flags])
 test('T10820', normal, compile_and_run, ['-v0'])
+test('T11341', normal, compile, ['-v0 -dsuppress-uniques'])
 
 test('TH_finalizer', normal, compile, ['-v0'])

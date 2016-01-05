@@ -33,7 +33,7 @@ $( return
                    , VarT (mkName "b")
                    )
                  ]
-                 ( mkName "T" )
-                 [ ConT (mkName "Int") ]
+                 (AppT (ConT (mkName "T"))
+                       (ConT (mkName "Int")))
            ]
            [] ])
