@@ -5,8 +5,9 @@ license:              BSD3
 build-type:           Simple
 license-file:         LICENSE
 stability:            experimental
-synopsis:             Size comparison util
-description:          Size comparison util
+synopsis:             Size comparison utility.
+description:          A small utility for comparing the sizes of files used by
+                      the GHC build system.
 category:             Development
 
 executable compareSizes

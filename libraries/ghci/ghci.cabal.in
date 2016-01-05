@@ -8,9 +8,11 @@ license-file:   LICENSE
 category:       GHC
 maintainer:     ghc-devs@haskell.org
 bug-reports:    https://ghc.haskell.org/trac/ghc/newticket
-synopsis:       XXX
+synopsis:       The library supporting GHC's interactive interpreter
 description:
-        XXX
+            This library offers interfaces which mediate interactions between the
+            @ghci@ interactive shell and @iserv@, GHC's out-of-process interpreter
+            backend.
 cabal-version:  >=1.10
 build-type:     Simple
 extra-source-files: changelog.md

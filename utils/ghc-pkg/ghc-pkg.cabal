@@ -6,8 +6,11 @@ License: BSD3
 -- XXX License-File: LICENSE
 Author: XXX
 Maintainer: cvs-fptools@haskell.org
-Synopsis: XXX
-Description: XXX
+Synopsis: A utility for querying and managing the GHC package database.
+Description:
+    GHC maintains a database of known packages. This tools allows tools
+    and users to query and modify this database. See @ghc-pkg --help@ for
+    usage information.
 Category: Development
 build-type: Simple
 cabal-version: >=1.10

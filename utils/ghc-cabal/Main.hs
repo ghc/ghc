@@ -409,7 +409,7 @@ generate directory distdir dll0Modules config_args
                 variablePrefix ++ "_COMPONENT_ID = " ++ display (localCompatPackageKey lbi),
                 variablePrefix ++ "_MODULES = " ++ unwords mods,
                 variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords otherMods,
-                variablePrefix ++ "_SYNOPSIS =" ++ synopsis pd,
+                variablePrefix ++ "_SYNOPSIS =" ++ (unwords $ lines $ synopsis pd),
                 variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
                 variablePrefix ++ "_DEPS = " ++ unwords deps,
                 variablePrefix ++ "_DEP_IPIDS = " ++ unwords dep_ipids,
