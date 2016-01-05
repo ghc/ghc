@@ -1,14 +1,10 @@
 -- (c) The University of Glasgow 2006
 
 {-# LANGUAGE CPP #-}
-#if __GLASGOW_HASKELL__ > 710
-{-# OPTIONS_GHC -Wno-too-many-guards #-}
-#endif
  -- This module used to take 10GB of memory to compile with the new
  -- (Nov '15) pattern-match check. In order to be able to compile it,
  -- do not enable -ffull-guard-reasoning. Instead, simplify the guards
- -- (default behaviour when guards are too many) but suppress the
- -- "too-many-guards" warning (-Werror is on).
+ -- (default behaviour when guards are too many).
 
 module OptCoercion ( optCoercion, checkAxInstCo ) where
 

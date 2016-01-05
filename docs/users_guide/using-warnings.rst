@@ -545,14 +545,15 @@ of ``-W(no-)*``.
 
     The option ``-Wtoo-many-guards`` warns about places where a
     pattern match contains too many guards (over 20 at the moment).
-    It is enabled by default but has an effect only if any form of
-    exhaustivness/overlapping checking is enabled (one of
+    It has an effect only if any form of exhaustivness/overlapping
+    checking is enabled (one of
     ``-Wincomplete-patterns``,
     ``-Wincomplete-uni-patterns``,
     ``-Wincomplete-record-updates``,
-    ``-Woverlapping-patterns``). The warning can be suppressed by
-    enabling either ``-Wno-too-many-guards``, which just hides the
-    warning, or ``-ffull-guard-reasoning``.
+    ``-Woverlapping-patterns``). When enabled, the warning can be
+    suppressed by enabling either ``-Wno-too-many-guards``, which just
+    hides the warning, or ``-ffull-guard-reasoning`` which runs the
+    full check, independently of the number of guards.
 
 ``-ffull-guard-reasoning``
     .. index::
