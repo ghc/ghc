@@ -89,6 +89,14 @@ rtsPackageArgs = package rts ? do
           , arg "-DFFI_LIB_DIR="
           , arg $ "-DFFI_LIB=" ++ quote libffiName ] ]
 
+
+-- # If we're compiling on windows, enforce that we only support XP+
+-- # Adding this here means it doesn't have to be done in individual .c files
+-- # and also centralizes the versioning.
+-- ifeq "$$(TargetOS_CPP)" "mingw32"
+-- rts_dist_$1_CC_OPTS += -DWINVER=$(rts_WINVER)
+-- endif
+
 -- #-----------------------------------------------------------------------------
 -- # Use system provided libffi
 
