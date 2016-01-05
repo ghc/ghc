@@ -79,6 +79,10 @@ hSources target = do
 extraObjects :: PartialTarget -> Action [FilePath]
 extraObjects (PartialTarget _ pkg)
     | pkg == integerGmp = do
-        need [integerGmpLibrary]
-        getDirectoryFiles "" [pkgPath pkg -/- "gmp/objs/*.o"]
+        need [integerGmpLibraryH]
+        objsExist <- doesDirectoryExist integerGmpObjects
+        putBuild $ "objsExist = " ++ show objsExist
+        if objsExist
+        then getDirectoryFiles "" [integerGmpObjects -/- "*.o"]
+        else return []
     | otherwise         = return []

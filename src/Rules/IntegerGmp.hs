@@ -1,4 +1,4 @@
-module Rules.IntegerGmp (integerGmpRules, integerGmpLibrary, integerGmpLibraryH) where
+module Rules.IntegerGmp (integerGmpRules, integerGmpObjects, integerGmpLibraryH) where
 
 import Base
 import Expression
@@ -8,16 +8,25 @@ import Rules.Actions
 import Settings.User
 
 integerGmpBase :: FilePath
-integerGmpBase = "libraries" -/- "integer-gmp" -/- "gmp"
+integerGmpBase = "libraries/integer-gmp/gmp"
 
 integerGmpBuild :: FilePath
 integerGmpBuild = integerGmpBase -/- "gmpbuild"
 
+integerGmpObjects :: FilePath
+integerGmpObjects = integerGmpBase -/- "objs"
+
 integerGmpLibrary :: FilePath
 integerGmpLibrary = integerGmpBase -/- "libgmp.a"
 
+integerGmpLibraryInTreeH :: FilePath
+integerGmpLibraryInTreeH = integerGmpBase -/- "gmp.h"
+
 integerGmpLibraryH :: FilePath
-integerGmpLibraryH = integerGmpBase -/- "gmp.h"
+integerGmpLibraryH = pkgPath integerGmp -/- "include/ghc-gmp.h"
+
+integerGmpLibraryFakeH :: FilePath
+integerGmpLibraryFakeH = integerGmpBase -/- "ghc-gmp.h"
 
 -- relative to integerGmpBuild
 integerGmpPatch :: FilePath
@@ -49,12 +58,14 @@ configureArguments = do
 -- TODO: we rebuild integer-gmp every time.
 integerGmpRules :: Rules ()
 integerGmpRules = do
-    integerGmpLibrary %> \_ -> do
+
+    -- TODO: split into multiple rules
+    integerGmpLibraryH %> \_ -> do
         when trackBuildSystem $ need [sourcePath -/- "Rules/IntegerGmp.hs"]
 
         -- remove the old build folder, if it exists.
         liftIO $ removeFiles integerGmpBuild ["//*"]
-        liftIO $ removeFiles (integerGmpBase -/- "objs") ["//*"]
+        liftIO $ removeFiles (integerGmpObjects) ["//*"]
 
         -- unpack the gmp tarball.
         -- Note: We use a tarball like gmp-4.2.4-nodoc.tar.bz2, which is
@@ -91,19 +102,24 @@ integerGmpRules = do
         args <- configureArguments
         runConfigure integerGmpBuild envs args
 
-        runMake integerGmpBuild []
+        -- check whether we need to build in tree gmp
+        -- this is indicated by line "HaveFrameworkGMP = YES" in `config.mk`
+        configMk <- liftIO . readFile $ integerGmpBase -/- "config.mk"
+        if "HaveFrameworkGMP = YES" `isInfixOf` configMk
+        then do
+            putBuild "\n| GMP framework detected and will be used"
+            copyFile integerGmpLibraryFakeH integerGmpLibraryH
+        else do
+            putBuild "\n| No GMP framework detected"
+            runMake integerGmpBuild []
 
-        -- copy library and header
-        -- TODO: why copy library, can we move it instead?
-        forM_ ["gmp.h", ".libs" -/- "libgmp.a"] $ \file ->
-            copyFile (integerGmpBuild -/- file) (integerGmpBase -/- takeFileName file)
+            copyFile integerGmpLibraryInTreeH integerGmpLibraryH
+            -- TODO: why copy library, can we move it instead?
+            copyFile (integerGmpBuild -/- ".libs/libgmp.a") integerGmpLibrary
 
-        let objsDir = integerGmpBase -/- "objs"
-        createDirectory objsDir
-        build $ fullTarget target Ar [integerGmpLibrary] [objsDir]
+            createDirectory integerGmpObjects
+            build $ fullTarget target Ar [integerGmpLibrary] [integerGmpObjects]
 
-        runBuilder Ranlib [integerGmpLibrary]
+            runBuilder Ranlib [integerGmpLibrary]
 
         putSuccess "| Successfully built custom library 'integer-gmp'"
-
-    integerGmpLibraryH %> \_ -> need [integerGmpLibrary]

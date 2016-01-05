@@ -14,6 +14,8 @@ import Rules.Generators.GhcVersionH
 import Rules.Generators.VersionHs
 import Oracles.ModuleFiles
 import Rules.Actions
+import Rules.IntegerGmp
+import Rules.Libffi
 import Rules.Resources (Resources)
 import Settings
 import Settings.Builders.DeriveConstants
@@ -33,13 +35,12 @@ includesDependencies = ("includes" -/-) <$>
     , "ghcplatform.h"
     , "ghcversion.h" ]
 
-libffiDependencies :: [FilePath]
-libffiDependencies = (targetPath Stage1 rts -/-) <$>
-    [ "build/ffi.h"
-    , "build/ffitarget.h" ]
+integerGmpDependencies :: [FilePath]
+integerGmpDependencies = [integerGmpLibraryH]
 
 defaultDependencies :: [FilePath]
-defaultDependencies = includesDependencies ++ libffiDependencies
+defaultDependencies =
+    includesDependencies ++ libffiDependencies ++ integerGmpDependencies
 
 derivedConstantsDependencies :: [FilePath]
 derivedConstantsDependencies = (derivedConstantsPath -/-) <$>
@@ -69,15 +70,10 @@ compilerDependencies stage =
        , "primop-vector-tycons.hs-incl"
        , "primop-vector-tys.hs-incl" ]
 
-integerGmpDependencies :: [FilePath]
-integerGmpDependencies = ((pkgPath integerGmp -/- "gmp") -/-) <$>
-    [ "gmp.h" ] -- identical to integerGmpLibraryH, but doesn't require the import.
-
 generatedDependencies :: Stage -> Package -> [FilePath]
 generatedDependencies stage pkg
     | pkg == compiler = compilerDependencies stage
     | pkg == rts = derivedConstantsDependencies
-    | pkg == integerGmp = integerGmpDependencies
     | stage == Stage0 = defaultDependencies
     | otherwise = []
 
