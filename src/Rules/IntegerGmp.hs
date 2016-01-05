@@ -105,7 +105,9 @@ integerGmpRules = do
 
         -- check whether we need to build in tree gmp
         -- this is indicated by line "HaveFrameworkGMP = YES" in `config.mk`
-        need [pkgDataFile Stage1 integerGmp]
+
+        runConfigure (pkgPath integerGmp) [] []
+
         configMk <- liftIO . readFile $ integerGmpBase -/- "config.mk"
         if "HaveFrameworkGMP = YES" `isInfixOf` configMk
         then do
