@@ -5,8 +5,12 @@ License: BSD3
 -- XXX License-File: LICENSE
 Author: XXX
 Maintainer: XXX
-Synopsis: XXX
-Description: XXX
+Synopsis: A utility for producing package metadata from Cabal package
+          descriptions for GHC's build system
+Description: This program is responsible for producing @package-data.mk@ files
+             for Cabal packages. These files are used by GHC's @make@-based
+             build system to determine the source files included by package,
+             package dependencies, and other metadata.
 Category: Development
 build-type: Simple
 cabal-version: >=1.10

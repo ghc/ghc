@@ -5,9 +5,10 @@ License: BSD3
 -- XXX License-File: LICENSE
 -- XXX Author:
 -- XXX Maintainer:
-Synopsis: XXX
+Synopsis: Generate various portions of GHC's documentation
 Description:
-	XXX
+    This tool is responsible for producing ReStructuredText sources which
+    are included in GHC's user's guide and manpage.
 build-type: Simple
 cabal-version: >=1.10
 

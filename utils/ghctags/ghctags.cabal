@@ -5,7 +5,7 @@ License: BSD3
 -- XXX License-File: LICENSE
 Author: XXX
 Maintainer: XXX
-Synopsis: XXX
+Synopsis: A simple generator of vi- and emacs-compatible TAGS files.
 Description: XXX
 Category: Development
 build-type: Simple

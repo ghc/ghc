@@ -10,7 +10,7 @@ synopsis:       GHC primitives
 cabal-version:  >=1.10
 build-type:     Custom
 description:
-    GHC primitives.
+    This package contains the primitive types and operations supplied by GHC.
 
 extra-source-files: changelog.md
 
