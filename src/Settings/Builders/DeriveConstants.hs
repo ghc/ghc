@@ -33,7 +33,7 @@ deriveConstantsBuilderArgs = builder DeriveConstants ? do
 
 includeCcArgs :: Args
 includeCcArgs = do
-    confCcArgs <- lift . settingList $ ConfCcArgs Stage1
+    confCcArgs <- getSettingList $ ConfCcArgs Stage1
     mconcat
         [ cArgs
         , cWarnings

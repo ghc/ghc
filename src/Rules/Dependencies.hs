@@ -18,13 +18,13 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
     in do
         [ buildPath ++ "//*.c.deps", buildPath ++ "//*.cmm.deps" ] |%> \out -> do
             let srcFile = dropBuild . dropExtension $ out
-            orderOnly $ generatedDependencies stage
+            orderOnly $ generatedDependencies stage pkg
             need [srcFile]
             build $ fullTarget target (GccM stage) [srcFile] [out]
 
         hDepFile %> \out -> do
             srcs <- interpretPartial target getPackageSources
-            orderOnly $ generatedDependencies stage
+            orderOnly $ generatedDependencies stage pkg
             need srcs
             if srcs == []
             then writeFileChanged out ""

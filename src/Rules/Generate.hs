@@ -28,17 +28,10 @@ platformH :: Stage -> FilePath
 platformH stage = targetPath stage compiler -/- "ghc_boot_platform.h"
 
 includesDependencies :: [FilePath]
-includesDependencies = ("includes" -/-) <$> 
+includesDependencies = ("includes" -/-) <$>
     [ "ghcautoconf.h"
     , "ghcplatform.h"
     , "ghcversion.h" ]
-
-derivedConstantsDependencies :: [FilePath]
-derivedConstantsDependencies = (derivedConstantsPath -/-) <$> []
-    -- [ "DerivedConstants.h"
-    -- , "GHCConstantsHaskellType.hs"
-    -- , "GHCConstantsHaskellWrappers.hs"
-    -- , "GHCConstantsHaskellExports.hs" ]
 
 libffiDependencies :: [FilePath]
 libffiDependencies = (targetPath Stage1 rts -/-) <$>
@@ -46,8 +39,14 @@ libffiDependencies = (targetPath Stage1 rts -/-) <$>
     , "build/ffitarget.h" ]
 
 defaultDependencies :: [FilePath]
-defaultDependencies =
-    includesDependencies ++ derivedConstantsDependencies ++ libffiDependencies
+defaultDependencies = includesDependencies ++ libffiDependencies
+
+derivedConstantsDependencies :: [FilePath]
+derivedConstantsDependencies = (derivedConstantsPath -/-) <$>
+    [ "DerivedConstants.h"
+    , "GHCConstantsHaskellType.hs"
+    , "GHCConstantsHaskellWrappers.hs"
+    , "GHCConstantsHaskellExports.hs" ]
 
 compilerDependencies :: Stage -> [FilePath]
 compilerDependencies stage =
@@ -69,12 +68,18 @@ compilerDependencies stage =
     , "primop-vector-tys-exports.hs-incl"
     , "primop-vector-tycons.hs-incl"
     , "primop-vector-tys.hs-incl" ]
+    ++
+    if stage == Stage0
+    then defaultDependencies ++ derivedConstantsDependencies
+    else []
+
 
 -- TODO: can we drop COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS)?
--- TODO: improve
-generatedDependencies :: Stage -> [FilePath]
-generatedDependencies stage 
-    | stage == Stage1 = defaultDependencies ++ compilerDependencies stage
+generatedDependencies :: Stage -> Package -> [FilePath]
+generatedDependencies stage pkg
+    | pkg == compiler = compilerDependencies stage
+    | stage == Stage0 = defaultDependencies
+    | stage == Stage1 = derivedConstantsDependencies
     | otherwise = []
 
 -- The following generators and corresponding source extensions are supported:
