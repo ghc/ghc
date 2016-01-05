@@ -40,8 +40,8 @@ $( return
                      , VarT (mkName "a")
                      )
                    ]
-                   ( mkName "T" )
-                   [ VarT (mkName "a") ]
+                   (AppT (ConT (mkName "T"))
+                         (VarT (mkName "a")))
            , ForallC [PlainTV (mkName "a"), PlainTV (mkName "b")]
                      [AppT (AppT EqualityT (VarT $ mkName "a"  ) )
                                            (ConT $ mkName "Int") ] $
@@ -55,8 +55,8 @@ $( return
                     , VarT (mkName "b")
                     )
                   ]
-                  ( mkName "T" )
-                  [ ConT (mkName "Int") ] ]
+                  (AppT (ConT (mkName "T"))
+                        (ConT (mkName "Int"))) ]
            [] ])
 
 $( do { -- test reification

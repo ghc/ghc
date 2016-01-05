@@ -189,10 +189,10 @@ cvtDec (TySynD tc tvs rhs)
                   , tcdRhs = rhs' } }
 
 cvtDec (DataD ctxt tc tvs ksig constrs derivs)
-  = do  { let isGadtCon (GadtC    _ _ _ _) = True
-              isGadtCon (RecGadtC _ _ _ _) = True
-              isGadtCon (ForallC  _ _ c  ) = isGadtCon c
-              isGadtCon _                  = False
+  = do  { let isGadtCon (GadtC    _ _ _) = True
+              isGadtCon (RecGadtC _ _ _) = True
+              isGadtCon (ForallC  _ _ c) = isGadtCon c
+              isGadtCon _                = False
               isGadtDecl  = all isGadtCon constrs
               isH98Decl   = all (not . isGadtCon) constrs
         ; unless (isGadtDecl || isH98Decl)
@@ -480,22 +480,18 @@ cvtConstr (ForallC tvs ctxt con)
                                    unLoc (fromMaybe (noLoc [])
                                           (con_cxt con'))) } }
 
-cvtConstr (GadtC c strtys ty idx)
-  = do  { c'   <- mapM cNameL c
-        ; args <- mapM cvt_arg strtys
-        ; idx' <- mapM cvtType idx
-        ; ty'  <- tconNameL ty
-        ; L _ ret_ty <- mk_apps (HsTyVar ty') idx'
-        ; c_ty       <- mk_arr_apps args ret_ty
+cvtConstr (GadtC c strtys ty)
+  = do  { c'      <- mapM cNameL c
+        ; args    <- mapM cvt_arg strtys
+        ; L _ ty' <- cvtType ty
+        ; c_ty    <- mk_arr_apps args ty'
         ; returnL $ mkGadtDecl c' (mkLHsSigType c_ty)}
 
-cvtConstr (RecGadtC c varstrtys ty idx)
+cvtConstr (RecGadtC c varstrtys ty)
   = do  { c'       <- mapM cNameL c
-        ; ty'      <- tconNameL ty
+        ; ty'      <- cvtType ty
         ; rec_flds <- mapM cvt_id_arg varstrtys
-        ; idx'     <- mapM cvtType idx
-        ; ret_ty   <- mk_apps (HsTyVar ty') idx'
-        ; let rec_ty = noLoc (HsFunTy (noLoc $ HsRecTy rec_flds) ret_ty)
+        ; let rec_ty = noLoc (HsFunTy (noLoc $ HsRecTy rec_flds) ty')
         ; returnL $ mkGadtDecl c' (mkLHsSigType rec_ty) }
 
 cvtSrcUnpackedness :: TH.SourceUnpackedness -> SrcUnpackedness

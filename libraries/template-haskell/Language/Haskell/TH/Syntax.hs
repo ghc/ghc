@@ -1632,25 +1632,40 @@ data Con = NormalC Name [BangType]       -- ^ @C Int a@
          | InfixC BangType Name BangType -- ^ @Int :+ a@
          | ForallC [TyVarBndr] Cxt Con   -- ^ @forall a. Eq a => C [a]@
          | GadtC [Name] [BangType]
-                 Name                    -- See Note [GADT return type]
-                 [Type]                  -- Indices of the type constructor
+                 Type                    -- See Note [GADT return type]
                                          -- ^ @C :: a -> b -> T b Int@
          | RecGadtC [Name] [VarBangType]
-                    Name                 -- See Note [GADT return type]
-                    [Type]               -- Indices of the type constructor
+                    Type                 -- See Note [GADT return type]
                                          -- ^ @C :: { v :: Int } -> T b Int@
         deriving (Show, Eq, Ord, Data, Typeable, Generic)
 
 -- Note [GADT return type]
 -- ~~~~~~~~~~~~~~~~~~~~~~~
 --
--- The name of the return type stored by a GADT constructor does not necessarily
--- match the name of the data type:
+-- The return type of a GADT constructor does not necessarily match the name of
+-- the data type:
 --
 -- type S = T
 --
 -- data T a where
 --     MkT :: S Int
+--
+--
+-- type S a = T
+--
+-- data T a where
+--     MkT :: S Char Int
+--
+--
+-- type Id a = a
+-- type S a = T
+--
+-- data T a where
+--     MkT :: Id (S Char Int)
+--
+--
+-- That is why we allow the return type stored by a constructor to be an
+-- arbitrary type. See also #11341
 
 data Bang = Bang SourceUnpackedness SourceStrictness
          -- ^ @C { {\-\# UNPACK \#-\} !}a@

@@ -13,6 +13,7 @@ TcSplice: Template Haskell splices
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module TcSplice(
@@ -1338,41 +1339,42 @@ reifyDataCon isGadtDataCon tys dc
              (ex_tvs, theta, arg_tys)
                  = dataConInstSig dc tys
              -- used for GADTs data constructors
-             (g_univ_tvs, g_ex_tvs, g_eq_spec, g_theta, g_arg_tys, _)
+             (g_univ_tvs, g_ex_tvs, g_eq_spec, g_theta, g_arg_tys, g_res_ty)
                  = dataConFullSig dc
              (srcUnpks, srcStricts)
                  = mapAndUnzip reifySourceBang (dataConSrcBangs dc)
              dcdBangs  = zipWith TH.Bang srcUnpks srcStricts
              fields    = dataConFieldLabels dc
              name      = reifyName dc
-             r_ty_name = reifyName (dataConTyCon dc) -- return type for GADTs
-             -- return type indices
+             -- Universal tvs present in eq_spec need to be filtered out, as
+             -- they will not appear anywhere in the type.
              subst     = mkTopTCvSubst (map eqSpecPair g_eq_spec)
-             idx       = substTyVars subst g_univ_tvs
-             -- universal tvs that were not substituted
              g_unsbst_univ_tvs = filter (`notElemTCvSubst` subst) g_univ_tvs
 
        ; r_arg_tys <- reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)
-       ; idx_tys   <- reifyTypes idx
 
-       ; let main_con | not (null fields) && not isGadtDataCon
-                      = TH.RecC name (zip3 (map reifyFieldLabel fields)
-                                      dcdBangs r_arg_tys)
-                      | not (null fields)
-                      = TH.RecGadtC [name]
-                                   (zip3 (map (reifyName . flSelector) fields)
-                                    dcdBangs r_arg_tys) r_ty_name idx_tys
-                      | dataConIsInfix dc
-                      = ASSERT( length arg_tys == 2 )
-                        TH.InfixC (s1,r_a1) name (s2,r_a2)
-                      | isGadtDataCon
-                      = TH.GadtC [name] (dcdBangs `zip` r_arg_tys) r_ty_name
-                                 idx_tys
-                      | otherwise
-                      = TH.NormalC name (dcdBangs `zip` r_arg_tys)
-             [r_a1, r_a2] = r_arg_tys
+       ; let [r_a1, r_a2] = r_arg_tys
              [s1,   s2]   = dcdBangs
-             (ex_tvs', theta') | isGadtDataCon = ( g_unsbst_univ_tvs ++ g_ex_tvs
+
+       ; main_con <-
+           if | not (null fields) && not isGadtDataCon ->
+                  return $ TH.RecC name (zip3 (map reifyFieldLabel fields)
+                                         dcdBangs r_arg_tys)
+              | not (null fields) -> do
+                  { res_ty <- reifyType g_res_ty
+                  ; return $ TH.RecGadtC [name]
+                                     (zip3 (map (reifyName . flSelector) fields)
+                                      dcdBangs r_arg_tys) res_ty }
+              | dataConIsInfix dc ->
+                  ASSERT( length arg_tys == 2 )
+                  return $ TH.InfixC (s1,r_a1) name (s2,r_a2)
+              | isGadtDataCon -> do
+                  { res_ty <- reifyType g_res_ty
+                  ; return $ TH.GadtC [name] (dcdBangs `zip` r_arg_tys) res_ty }
+              | otherwise ->
+                  return $ TH.NormalC name (dcdBangs `zip` r_arg_tys)
+
+       ; let (ex_tvs', theta') | isGadtDataCon = ( g_unsbst_univ_tvs ++ g_ex_tvs
                                                  , g_theta )
                                | otherwise     = ( ex_tvs, theta )
              ret_con | null ex_tvs' && null theta' = return main_con

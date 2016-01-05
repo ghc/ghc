@@ -1964,21 +1964,20 @@ repConstr (PrefixCon ps) Nothing [con]
     = do arg_tys  <- repList bangTypeQTyConName repBangTy ps
          rep2 normalCName [unC con, unC arg_tys]
 
-repConstr (PrefixCon ps) (Just res_ty) cons
-    = do arg_tys      <- repList bangTypeQTyConName repBangTy ps
-         (res_n, idx) <- repGadtReturnTy res_ty
-         rep2 gadtCName [ unC (nonEmptyCoreList cons), unC arg_tys, unC res_n
-                        , unC idx]
+repConstr (PrefixCon ps) (Just (L _ res_ty)) cons
+    = do arg_tys     <- repList bangTypeQTyConName repBangTy ps
+         res_ty' <- repTy res_ty
+         rep2 gadtCName [ unC (nonEmptyCoreList cons), unC arg_tys, unC res_ty']
 
 repConstr (RecCon (L _ ips)) resTy cons
     = do args     <- concatMapM rep_ip ips
          arg_vtys <- coreList varBangTypeQTyConName args
          case resTy of
            Nothing -> rep2 recCName [unC (head cons), unC arg_vtys]
-           Just res_ty -> do
-             (res_n, idx) <- repGadtReturnTy res_ty
+           Just (L _ res_ty) -> do
+             res_ty' <- repTy res_ty
              rep2 recGadtCName [unC (nonEmptyCoreList cons), unC arg_vtys,
-                                unC res_n, unC idx]
+                                unC res_ty']
 
     where
       rep_ip (L _ ip) = mapM (rep_one_ip (cd_fld_type ip)) (cd_fld_names ip)
@@ -1995,15 +1994,6 @@ repConstr (InfixCon st1 st2) Nothing [con]
 
 repConstr (InfixCon {}) (Just _) _ = panic "repConstr: infix GADT constructor?"
 repConstr _ _ _                    = panic "repConstr: invariant violated"
-
-repGadtReturnTy :: LHsType Name -> DsM (Core TH.Name, Core [TH.TypeQ])
-repGadtReturnTy res_ty | Just (n, tys) <- hsTyGetAppHead_maybe res_ty
-  = do { n'   <- lookupLOcc n
-       ; tys' <- repList typeQTyConName repLTy tys
-       ; return (n', tys') }
-repGadtReturnTy res_ty
-  = failWithDs (ptext (sLit "Malformed constructor result type:")
-            <+> ppr res_ty)
 
 ------------ Types -------------------
 
