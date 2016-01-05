@@ -27,6 +27,7 @@ import Settings.Packages.GhcPrim
 import Settings.Packages.Haddock
 import Settings.Packages.Hp2ps
 import Settings.Packages.IntegerGmp
+import Settings.Packages.IservBin
 import Settings.Packages.Rts
 import Settings.Packages.RunGhc
 import Settings.User
@@ -72,5 +73,6 @@ defaultPackageArgs = mconcat
     , haddockPackageArgs
     , hp2psPackageArgs
     , integerGmpPackageArgs
+    , iservBinPackageArgs
     , rtsPackageArgs
     , runGhcPackageArgs ]
