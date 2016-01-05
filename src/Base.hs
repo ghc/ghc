@@ -174,7 +174,7 @@ putError msg = do
 
 -- | Render the given set of lines in a nice box of ASCII
 renderBox :: [String] -> String
-renderBox ls = concatMap ('\n' :) (boxTop : map renderLine ls ++ [boxBot])
+renderBox ls = tail $ concatMap ('\n' :) (boxTop : map renderLine ls ++ [boxBot])
   where
     -- Minimum total width of the box in characters
     minimumBoxWidth = 32
