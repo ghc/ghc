@@ -87,6 +87,7 @@ executable ghc-shake
                        , Settings.Packages.Haddock
                        , Settings.Packages.Hp2ps
                        , Settings.Packages.IntegerGmp
+                       , Settings.Packages.IservBin
                        , Settings.Packages.Rts
                        , Settings.Packages.RunGhc
                        , Settings.TargetDirectory
