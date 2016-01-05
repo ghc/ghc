@@ -1,9 +1,23 @@
 sudo: false
 
 matrix:
-  include:
-    - env: CABALVER=1.22 GHCVER=7.10.3
-      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3,zlib1g-dev,terminfo-dev],  sources: [hvr-ghc]}}
+    include:
+        - env:
+            CABALVER=1.22
+            GHCVER=7.10.3
+
+          addons: {
+              apt: {
+                  packages: [
+                      ghc-7.10.3,
+                      alex-3.1.4,
+                      happy-1.19.5,
+                      cabal-install-1.22,
+                      zlib1g-dev
+                  ],
+                  sources: [hvr-ghc]
+              }
+          }
 
 before_install:
 
@@ -12,21 +26,33 @@ before_install:
     - PATH="/opt/cabal/$CABALVER/bin:$PATH"
     - export PATH
 
-    - .travis/print-env.sh
+    - env
+    - ghc --version
+    - cabal --version
+    - alex --version
+    - happy --version
+    - cabal update
 
 install:
-    - .travis/install-cabal-happy-alex.sh
-    - .travis/install-ghc.sh
-    - .travis/install-ghc-shake.sh
+
+    - travis_retry git clone git://git.haskell.org/ghc --recurse-submodules
+
+    # Travis clones the project into ".", but we need it as a child directory
+    # of "ghc/". For this reason, we - rather hackily - move the GHC-Shake
+    # ".git"  directory into the appropriate location, and perform a hard reset
+    # in order to regenerate the GHC-Shake files.
+    - mkdir ghc/shake-build
+    - mv .git ghc/shake-build
+    - ( cd ghc/shake-build && git reset --hard HEAD )
+
+    - ( cd ghc/shake-build && cabal install --only-dependencies )
+
+    - ( cd ghc && ./boot )
+    - ( cd ghc && ./configure )
 
 script:
-    - .travis/run-ghc-shake.sh
+    - ./ghc/shake-build/build.sh -j --no-progress
 
 cache:
     directories:
         - $HOME/.cabal
-        # - ghc/shake-build/.cabal-sandbox
-        # - ghc/shake-build/cabal.sandbox.config
-
-# before_cache:
-#     - rm -rf ghc/shake-build

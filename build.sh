@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-root="$(dirname "$0")"
+root="$(dirname "$(readlink -f "$0")")"
 
 mkdir -p "$root/.shake"
 
