@@ -59,6 +59,7 @@ script:
 cache:
     directories:
         - $HOME/.cabal
+        - $HOME/.ghc
 
 notifications:
     irc:
