@@ -1,13 +1,11 @@
 -- | Convenient predicates
 module Predicates (
     stage, package, builder, stagedBuilder, builderGcc, builderGhc, file, way,
-    stage0, stage1, stage2, notStage0, notPackage, registerPackage, splitObjects
+    stage0, stage1, stage2, notStage0, notPackage, registerPackage
     ) where
 
 import Base
 import Expression
-import GHC
-import Oracles.Config.Flag
 
 -- Basic predicates
 stage :: Stage -> Predicate
@@ -55,11 +53,3 @@ notPackage = notM . package
 -- TODO: Actually, we don't register compiler in some circumstances -- fix.
 registerPackage :: Predicate
 registerPackage = return True
-
-splitObjects :: Predicate
-splitObjects = do
-    goodStage <- notStage0 -- We don't split bootstrap (stage 0) packages
-    pkg       <- getPackage
-    supported <- lift supportsSplitObjects
-    let goodPackage = isLibrary pkg && pkg /= compiler && pkg /= rts
-    return $ goodStage && goodPackage && supported

@@ -3,7 +3,7 @@ module Settings.User (
     userProgramPath, userKnownPackages, integerLibrary,
     trackBuildSystem, buildHaddock, validating, ghciWithDebugger, ghcProfiled,
     ghcDebugged, dynamicGhcPrograms, laxDependencies, buildSystemConfigFile,
-    verboseCommands, turnWarningsIntoErrors
+    verboseCommands, turnWarningsIntoErrors, splitObjects
     ) where
 
 import GHC
@@ -56,6 +56,10 @@ trackBuildSystem = True
 
 validating :: Bool
 validating = False
+
+-- To switch off split objects change to 'return False'
+splitObjects :: Predicate
+splitObjects = return False -- FIXME: should be defaultSplitObjects, see #84.
 
 dynamicGhcPrograms :: Bool
 dynamicGhcPrograms = False

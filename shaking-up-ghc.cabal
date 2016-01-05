@@ -76,6 +76,7 @@ executable ghc-shake
                        , Settings.Builders.HsCpp
                        , Settings.Builders.Ld
                        , Settings.Builders.Tar
+                       , Settings.Default
                        , Settings.Packages
                        , Settings.Packages.Base
                        , Settings.Packages.Compiler

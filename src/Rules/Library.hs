@@ -6,7 +6,6 @@ import Base hiding (splitPath)
 import Expression
 import GHC
 import Oracles
-import Predicates (splitObjects)
 import Rules.Actions
 import Rules.IntegerGmp
 import Rules.Resources
