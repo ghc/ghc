@@ -69,10 +69,15 @@ compilerDependencies stage =
        , "primop-vector-tycons.hs-incl"
        , "primop-vector-tys.hs-incl" ]
 
+integerGmpDependencies :: [FilePath]
+integerGmpDependencies = ((pkgPath integerGmp -/- "gmp") -/-) <$>
+    [ "gmp.h" ] -- identical to integerGmpLibraryH, but doesn't require the import.
+
 generatedDependencies :: Stage -> Package -> [FilePath]
 generatedDependencies stage pkg
     | pkg == compiler = compilerDependencies stage
     | pkg == rts = derivedConstantsDependencies
+    | pkg == integerGmp = integerGmpDependencies
     | stage == Stage0 = defaultDependencies
     | otherwise = []
 
