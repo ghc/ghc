@@ -51,35 +51,28 @@ derivedConstantsDependencies = (derivedConstantsPath -/-) <$>
 compilerDependencies :: Stage -> [FilePath]
 compilerDependencies stage =
     [ platformH stage ]
-    ++
-    fmap ((targetPath stage compiler -/- "build") -/-)
-    [ "primop-vector-uniques.hs-incl"
-    , "primop-data-decl.hs-incl"
-    , "primop-tag.hs-incl"
-    , "primop-list.hs-incl"
-    , "primop-strictness.hs-incl"
-    , "primop-fixity.hs-incl"
-    , "primop-primop-info.hs-incl"
-    , "primop-out-of-line.hs-incl"
-    , "primop-has-side-effects.hs-incl"
-    , "primop-can-fail.hs-incl"
-    , "primop-code-size.hs-incl"
-    , "primop-commutable.hs-incl"
-    , "primop-vector-tys-exports.hs-incl"
-    , "primop-vector-tycons.hs-incl"
-    , "primop-vector-tys.hs-incl" ]
-    ++
-    if stage == Stage0
-    then defaultDependencies ++ derivedConstantsDependencies
-    else []
+    ++ defaultDependencies ++ derivedConstantsDependencies
+    ++ fmap ((targetPath stage compiler -/- "build") -/-)
+       [ "primop-vector-uniques.hs-incl"
+       , "primop-data-decl.hs-incl"
+       , "primop-tag.hs-incl"
+       , "primop-list.hs-incl"
+       , "primop-strictness.hs-incl"
+       , "primop-fixity.hs-incl"
+       , "primop-primop-info.hs-incl"
+       , "primop-out-of-line.hs-incl"
+       , "primop-has-side-effects.hs-incl"
+       , "primop-can-fail.hs-incl"
+       , "primop-code-size.hs-incl"
+       , "primop-commutable.hs-incl"
+       , "primop-vector-tys-exports.hs-incl"
+       , "primop-vector-tycons.hs-incl"
+       , "primop-vector-tys.hs-incl" ]
 
-
--- TODO: can we drop COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS)?
 generatedDependencies :: Stage -> Package -> [FilePath]
 generatedDependencies stage pkg
     | pkg == compiler = compilerDependencies stage
     | stage == Stage0 = defaultDependencies
-    | stage == Stage1 = derivedConstantsDependencies
     | otherwise = []
 
 -- The following generators and corresponding source extensions are supported:
