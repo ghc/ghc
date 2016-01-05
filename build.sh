@@ -39,7 +39,7 @@ ghc                           \
     -rtsopts                  \
     -with-rtsopts=-I0         \
     -outputdir="$root/.shake" \
-    -j -O                      \
+    -j -O                     \
     -o "$root/.shake/build"
 
 "$root/.shake/build"       \
