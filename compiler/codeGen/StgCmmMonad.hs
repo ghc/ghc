@@ -127,6 +127,12 @@ instance Monad FCode where
 {-# INLINE thenFC #-}
 {-# INLINE returnFC #-}
 
+instance MonadUnique FCode where
+  getUniqueSupplyM = cgs_uniqs <$> getState
+  getUniqueM = FCode $ \_ st ->
+    let (u, us') = takeUniqFromSupply (cgs_uniqs st)
+    in (# u, st { cgs_uniqs = us' } #)
+
 initC :: IO CgState
 initC  = do { uniqs <- mkSplitUniqSupply 'c'
             ; return (initCgState uniqs) }
