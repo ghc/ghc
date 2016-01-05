@@ -6,6 +6,7 @@ import GHC
 import Oracles.Config.Setting
 import Rules.Actions
 import Settings.User
+import Settings.TargetDirectory
 
 integerGmpBase :: FilePath
 integerGmpBase = "libraries/integer-gmp/gmp"
@@ -104,6 +105,7 @@ integerGmpRules = do
 
         -- check whether we need to build in tree gmp
         -- this is indicated by line "HaveFrameworkGMP = YES" in `config.mk`
+        need [pkgDataFile Stage1 integerGmp]
         configMk <- liftIO . readFile $ integerGmpBase -/- "config.mk"
         if "HaveFrameworkGMP = YES" `isInfixOf` configMk
         then do
