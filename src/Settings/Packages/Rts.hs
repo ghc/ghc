@@ -49,6 +49,13 @@ rtsPackageArgs = package rts ? do
           [ arg "-Irts"
           , arg $ "-I" ++ path -/- "build"
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
+          -- rts **must** be compiled with optimizations. The INLINE_HEADER macro,
+          -- requires that functions are inlined to work as expected.  Inlining
+          -- only happens for optimized builds. Otherwise we can assume that
+          -- there is a non-inlined variant to use instead. But rts does not
+          -- provide non-inlined alternatives and hence needs the function to
+          -- be inlined. See also Issue #90
+          , arg $ "-O2"
 
           , (file "//RtsMessages.*" ||^ file "//Trace.*") ?
             arg ("-DProjectVersion=" ++ quote projectVersion)
