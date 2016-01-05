@@ -23,6 +23,7 @@ ghcCabalBootArgs = stage0 ? do
         [ remove ["-hide-all-packages"]
         , removePair "-optP-include" $ "-optP" ++ cabalMacros
         , arg "--make"
+        , arg "-j"
         , arg "-DBOOTSTRAPPING"
         , arg "-DMIN_VERSION_binary_0_8_0"
         , arg "-DGENERICS"
