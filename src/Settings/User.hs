@@ -82,7 +82,7 @@ laxDependencies :: Bool
 laxDependencies = False
 
 buildHaddock :: Predicate
-buildHaddock = return True
+buildHaddock = return False -- FIXME: should be return True, see #98
 
 buildSystemConfigFile :: Bool
 buildSystemConfigFile = False
