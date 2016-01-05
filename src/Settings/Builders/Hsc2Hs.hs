@@ -20,7 +20,7 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
     gmpDirs <- getSettingList GmpIncludeDirs
     cFlags  <- getCFlags
     lFlags  <- getLFlags
-    top     <- getSetting GhcSourcePath
+    top     <- getTopDirectory
     hArch   <- getSetting HostArch
     hOs     <- getSetting HostOs
     tArch   <- getSetting TargetArch

@@ -90,7 +90,7 @@ bootPackageDbArgs = do
     stage <- getStage
     lift $ need [packageConfigurationInitialised stage]
     stage0 ? do
-        path <- getSetting GhcSourcePath
+        path   <- getTopDirectory
         prefix <- ifM builderGhc (return "-package-db ") (return "--package-db=")
         arg $ prefix ++ path -/- packageConfiguration Stage0
 
@@ -117,7 +117,7 @@ withBuilderKey b = case b of
 -- Expression 'with Gcc' appends "--with-gcc=/path/to/gcc" and needs Gcc.
 with :: Builder -> Args
 with b = specified b ? do
-    top  <- getSetting GhcSourcePath
+    top  <- getTopDirectory
     path <- getBuilderPath b
     lift $ needBuilder laxDependencies b
     append [withBuilderKey b ++ top -/- path]

@@ -8,8 +8,8 @@ import qualified System.Directory as IO
 
 import Base
 import Expression
+import Oracles
 import Oracles.ArgsHash
-import Oracles.Config.Setting
 import Settings
 import Settings.Args
 import Settings.Builders.Ar
@@ -37,7 +37,7 @@ buildWithResources rs target = do
                 then arCmd path argList
                 else do
                     input <- interpret target getInput
-                    top   <- setting GhcSourcePath
+                    top   <- topDirectory
                     cmd [path] [Cwd output] "x" (top -/- input)
 
             HsCpp    -> captureStdout target path argList

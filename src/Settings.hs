@@ -3,7 +3,7 @@ module Settings (
     module Settings.TargetDirectory,
     module Settings.User,
     module Settings.Ways,
-    getPkgData, getPkgDataList, programPath, isLibrary,
+    getPkgData, getPkgDataList, getTopDirectory, programPath, isLibrary,
     getPackagePath, getTargetDirectory, getTargetPath, getPackageSources
     ) where
 
@@ -30,6 +30,9 @@ getPkgData key = lift . pkgData . key =<< getTargetPath
 
 getPkgDataList :: (FilePath -> PackageDataList) -> Expr [String]
 getPkgDataList key = lift . pkgDataList . key =<< getTargetPath
+
+getTopDirectory :: Expr FilePath
+getTopDirectory = lift topDirectory
 
 programPath :: Stage -> Package -> Maybe FilePath
 programPath = userProgramPath

@@ -3,7 +3,7 @@ module Rules.Libffi (libffiRules, libffiLibrary) where
 import Base
 import Expression
 import GHC
-import Oracles.Config.Setting
+import Oracles
 import Rules.Actions
 import Settings.Builders.Common
 import Settings.User
@@ -51,7 +51,7 @@ configureEnvironment = do
 
 configureArguments :: Action [String]
 configureArguments = do
-    top            <- setting GhcSourcePath
+    top            <- topDirectory
     targetPlatform <- setting TargetPlatform
     return [ "--prefix=" ++ top ++ "/libffi/build/inst"
            , "--libdir=" ++ top ++ "/libffi/build/inst/lib"

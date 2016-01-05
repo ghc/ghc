@@ -42,7 +42,7 @@ rtsPackageArgs = package rts ? do
     ghcEnableTNC   <- yesNo ghcEnableTablesNextToCode
     way            <- getWay
     path           <- getTargetPath
-    top            <- getSetting GhcSourcePath
+    top            <- getTopDirectory
     libffiName     <- lift $ rtsLibffiLibraryName
     mconcat
         [ builderGcc ? mconcat
