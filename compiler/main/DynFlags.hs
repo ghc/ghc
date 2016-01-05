@@ -992,7 +992,15 @@ opt_i dflags = sOpt_i (settings dflags)
 versionedAppDir :: DynFlags -> IO FilePath
 versionedAppDir dflags = do
   appdir <- getAppUserDataDirectory (programName dflags)
-  return $ appdir </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':projectVersion dflags)
+  return $ appdir </> versionedFilePath dflags
+
+-- | A filepath like @x86_64-linux-7.6.3@ with the platform string to use when
+-- constructing platform-version-dependent files that need to co-exist.
+--
+versionedFilePath :: DynFlags -> FilePath
+versionedFilePath dflags =     TARGET_ARCH
+                        ++ '-':TARGET_OS
+                        ++ '-':projectVersion dflags
   -- NB: This functionality is reimplemented in Cabal, so if you
   -- change it, be sure to update Cabal.
 
@@ -3841,46 +3849,58 @@ setUnitId p s =  s{ thisPackage = stringToUnitId p }
 -- | Find the package environment (if one exists)
 --
 -- We interpret the package environment as a set of package flags; to be
--- specific, if we find a package environment
+-- specific, if we find a package environment file like
 --
--- > id1
--- > id2
--- > ..
--- > idn
+-- > clear-package-db
+-- > global-package-db
+-- > package-db blah/package.conf.d
+-- > package-id id1
+-- > package-id id2
 --
 -- we interpret this as
 --
 -- > [ -hide-all-packages
+-- > , -clear-package-db
+-- > , -global-package-db
+-- > , -package-db blah/package.conf.d
 -- > , -package-id id1
 -- > , -package-id id2
--- > , ..
--- > , -package-id idn
 -- > ]
+--
+-- There's also an older syntax alias for package-id, which is just an
+-- unadorned package id
+--
+-- > id1
+-- > id2
+--
 interpretPackageEnv :: DynFlags -> IO DynFlags
 interpretPackageEnv dflags = do
     mPkgEnv <- runMaybeT $ msum $ [
                    getCmdLineArg >>= \env -> msum [
-                       loadEnvFile  env
-                     , loadEnvName  env
+                       probeEnvFile env
+                     , probeEnvName env
                      , cmdLineError env
                      ]
                  , getEnvVar >>= \env -> msum [
-                       loadEnvFile env
-                     , loadEnvName env
-                     , envError    env
+                       probeEnvFile env
+                     , probeEnvName env
+                     , envError     env
                      ]
-                 , loadEnvFile localEnvFile
-                 , loadEnvName defaultEnvName
+                 , notIfHideAllPackages >> msum [
+                       findLocalEnvFile >>= probeEnvFile
+                     , probeEnvName defaultEnvName
+                     ]
                  ]
     case mPkgEnv of
       Nothing ->
         -- No environment found. Leave DynFlags unchanged.
         return dflags
-      Just ids -> do
+      Just envfile -> do
+        content <- readFile envfile
         let setFlags :: DynP ()
             setFlags = do
               setGeneralFlag Opt_HideAllPackages
-              mapM_ exposePackageId (lines ids)
+              parseEnvFile envfile content
 
             (_, dflags') = runCmdLine (runEwM setFlags) dflags
 
@@ -3893,13 +3913,31 @@ interpretPackageEnv dflags = do
      appdir <- liftMaybeT $ versionedAppDir dflags
      return $ appdir </> "environments" </> name
 
-    loadEnvName :: String -> MaybeT IO String
-    loadEnvName name = loadEnvFile =<< namedEnvPath name
+    probeEnvName :: String -> MaybeT IO FilePath
+    probeEnvName name = probeEnvFile =<< namedEnvPath name
 
-    loadEnvFile :: String -> MaybeT IO String
-    loadEnvFile path = do
+    probeEnvFile :: FilePath -> MaybeT IO FilePath
+    probeEnvFile path = do
       guard =<< liftMaybeT (doesFileExist path)
-      liftMaybeT $ readFile path
+      return path
+
+    parseEnvFile :: FilePath -> String -> DynP ()
+    parseEnvFile envfile = mapM_ parseEntry . lines
+      where
+        parseEntry str = case words str of
+          ["package-db", db]    -> addPkgConfRef (PkgConfFile (envdir </> db))
+            -- relative package dbs are interpreted relative to the env file
+            where envdir = takeDirectory envfile
+          ["clear-package-db"]  -> clearPkgConf
+          ["global-package-db"] -> addPkgConfRef GlobalPkgConf
+          ["user-package-db"]   -> addPkgConfRef UserPkgConf
+          ["package-id", pkgid] -> exposePackageId pkgid
+          -- and the original syntax introduced in 7.10:
+          [pkgid]               -> exposePackageId pkgid
+          []                    -> return ()
+          _                     -> throwGhcException $ CmdLineError $
+                                        "Can't parse environment file entry: "
+                                     ++ envfile ++ ": " ++ str
 
     -- Various ways to define which environment to use
 
@@ -3914,11 +3952,34 @@ interpretPackageEnv dflags = do
         Left err  -> if isDoesNotExistError err then mzero
                                                 else liftMaybeT $ throwIO err
 
+    notIfHideAllPackages :: MaybeT IO ()
+    notIfHideAllPackages =
+      guard (not (gopt Opt_HideAllPackages dflags))
+
     defaultEnvName :: String
     defaultEnvName = "default"
 
-    localEnvFile :: FilePath
-    localEnvFile = "./.ghc.environment"
+    -- e.g. .ghc.environment.x86_64-linux-7.6.3
+    localEnvFileName :: FilePath
+    localEnvFileName = ".ghc.environment" <.> versionedFilePath dflags
+
+    -- Search for an env file, starting in the current dir and looking upwards.
+    -- Fail if we get to the users home dir or the filesystem root. That is,
+    -- we don't look for an env file in the user's home dir. The user-wide
+    -- env lives in ghc's versionedAppDir/environments/default
+    findLocalEnvFile :: MaybeT IO FilePath
+    findLocalEnvFile = do
+        curdir  <- liftMaybeT getCurrentDirectory
+        homedir <- liftMaybeT getHomeDirectory
+        let probe dir | isDrive dir || dir == homedir
+                      = mzero
+            probe dir = do
+              let file = dir </> localEnvFileName
+              exists <- liftMaybeT (doesFileExist file)
+              if exists
+                then return file
+                else probe (takeDirectory dir)
+        probe curdir
 
     -- Error reporting
 

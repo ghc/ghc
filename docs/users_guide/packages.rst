@@ -1311,26 +1311,47 @@ Package environments
 .. index::
    single: package environments
 
-A *package environment* is a file that tells ``ghc`` precisely which
-packages should be visible. It contains package IDs, one per line:
+A *package environment file* is a file that tells ``ghc`` precisely which
+packages should be visible. It can be used to create environments for ``ghc``
+or ``ghci`` that are local to a shell session or to some file system location.
+They are intended to be managed by build/package tools, to enable ``ghc`` and
+``ghci`` to automatically use an environment created by the tool.
+
+The file contains package IDs and optionally package databases, one directive
+per line:
 
 ::
 
-    package_id_1
-    package_id_2
+    clear-package-db
+    global-package-db
+    user-package-db
+    package-db db.d/
+    package-id id_1
+    package-id id_2
     ...
-    package_id_n
+    package-id id_n
 
-If a package environment is found, it is equivalent to passing these
+If such a package environment is found, it is equivalent to passing these
 command line arguments to ``ghc``:
 
 ::
 
     -hide-all-packages
-    -package-id package_id_1
-    -package-id package_id_2
+    -clear-package-db
+    -global-package-db
+    -user-package-db
+    -package-db db.d/
+    -package-id id_1
+    -package-id id_2
     ...
-    -package-id package_id_n
+    -package-id id_n
+
+Note the implicit ``-hide-all-packages`` and the fact that it is
+``-package-id``, not ``-package``. This is because the environment specifies
+precisely which packages should be visible.
+
+Note that for the ``package-db`` directive, if a relative path is given it
+must be relative to the location of the package environment file.
 
 In order, ``ghc`` will look for the package environment in the following
 locations:
@@ -1346,7 +1367,11 @@ locations:
 -  File ``$HOME/.ghc/arch-os-version/environments/name`` if the
    environment variable ``GHC_ENVIRONMENT`` is set to ⟨name⟩.
 
--  File ``./.ghc.environment`` if it exists.
+Additionally, unless ``-hide-all-packages`` is specified ``ghc`` will also
+look for the package environment in the following locations:
+
+-  File ``.ghc.environment.arch-os-version`` if it exists in the current
+   directory or any parent directory (but not the user's home directory).
 
 -  File ``$HOME/.ghc/arch-os-version/environments/default`` if it
    exists.
