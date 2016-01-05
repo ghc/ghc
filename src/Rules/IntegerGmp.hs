@@ -6,7 +6,6 @@ import GHC
 import Oracles.Config.Setting
 import Rules.Actions
 import Settings.User
-import Settings.TargetDirectory
 
 integerGmpBase :: FilePath
 integerGmpBase = "libraries/integer-gmp/gmp"
@@ -103,19 +102,19 @@ integerGmpRules = do
         args <- configureArguments
         runConfigure integerGmpBuild envs args
 
-        -- check whether we need to build in tree gmp
-        -- this is indicated by line "HaveFrameworkGMP = YES" in `config.mk`
-
+        -- TODO: currently we configure integerGmp package twice -- optimise
         runConfigure (pkgPath integerGmp) [] []
 
+        -- check whether we need to build in tree gmp
+        -- this is indicated by line "HaveFrameworkGMP = YES" in `config.mk`
         configMk <- liftIO . readFile $ integerGmpBase -/- "config.mk"
         if "HaveFrameworkGMP = YES" `isInfixOf` configMk
         then do
-            putBuild "\n| GMP framework detected and will be used"
+            putBuild "| GMP framework detected and will be used"
             copyFile integerGmpLibraryFakeH integerGmpLibraryH
         else do
-            putBuild "\n| No GMP framework detected"
-            runMake integerGmpBuild []
+            putBuild "| No GMP framework detected; in tree GMP will be built"
+            runMake integerGmpBuild ["LIBTOOL=\"bash libtool\""]
 
             copyFile integerGmpLibraryInTreeH integerGmpLibraryH
             -- TODO: why copy library, can we move it instead?
