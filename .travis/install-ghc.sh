@@ -10,6 +10,3 @@ git clone git://git.haskell.org/ghc
 
 echo -e "${COLOR}Initialize GHC submodules${RESET}"
 ( cd ghc && git submodule update --init )
-
-echo -e "${COLOR}GHC boot/configure${RESET}"
-( cd ghc && ./boot && ./configure)

@@ -14,3 +14,6 @@ mv .git "$SHAKEDIR/"
 echo -e "${COLOR}Installing deps into sandbox${RESET}"
 ( cd "$SHAKEDIR" && cabal sandbox init )
 ( cd "$SHAKEDIR" && cabal install --only-dependencies . )
+
+echo -e "${COLOR}GHC boot/configure${RESET}"
+( cd ghc && ./boot && ./configure)
