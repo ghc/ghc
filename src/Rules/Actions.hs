@@ -71,7 +71,7 @@ copyFile source target = do
 
 createDirectory :: FilePath -> Action ()
 createDirectory dir = do
-    putBuild $ "| Create directory " ++ dir
+    putBuild $ "\n| Create directory " ++ dir
     liftIO $ IO.createDirectoryIfMissing True dir
 
 -- Note, the source directory is untracked
@@ -85,7 +85,7 @@ moveDirectory source target = do
 -- Transform a given file by applying a function to its contents
 fixFile :: FilePath -> (String -> String) -> Action ()
 fixFile file f = do
-    putBuild $ "| Fix " ++ file
+    putBuild $ "\n| Fix " ++ file
     old <- liftIO $ readFile file
     let new = f old
     length new `seq` liftIO $ writeFile file new
@@ -93,14 +93,14 @@ fixFile file f = do
 runConfigure :: FilePath -> [CmdOption] -> [String] -> Action ()
 runConfigure dir opts args = do
     need [dir -/- "configure"]
-    putBuild $ "| Run configure in " ++ dir ++ "..."
+    putBuild $ "\n| Run configure in " ++ dir ++ "..."
     quietly $ cmd Shell (EchoStdout False) [Cwd dir] "bash configure" opts args
 
 runMake :: FilePath -> [String] -> Action ()
 runMake dir args = do
     need [dir -/- "Makefile"]
     let note = if null args then "" else " (" ++ intercalate "," args ++ ")"
-    putBuild $ "| Run make" ++ note ++ " in " ++ dir ++ "..."
+    putBuild $ "\n| Run make" ++ note ++ " in " ++ dir ++ "..."
     quietly $ cmd Shell (EchoStdout False) "make" ["-C", dir, "MAKEFLAGS="] args
 
 runBuilder :: Builder -> [String] -> Action ()
@@ -108,7 +108,7 @@ runBuilder builder args = do
     needBuilder laxDependencies builder
     path <- builderPath builder
     let note = if null args then "" else " (" ++ intercalate "," args ++ ")"
-    putBuild $ "| Run " ++ show builder ++ note
+    putBuild $ "\n| Run " ++ show builder ++ note
     quietly $ cmd [path] args
 
 -- Print out key information about the command being executed
