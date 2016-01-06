@@ -1,3 +1,15 @@
+Changes in version 2.17.0
+
+ * Included with GHC 8.0.1
+
+ * Support typesetting of mathematical expressions via Mathjax (#397)
+
+ * Describe orphan instances defined in a module in its documentation (#449)
+
+ * Produce specialized type signatures for typeclass methods (#425)
+
+ * Support GCC-like response files (#470)
+
 Changes in version 2.16.2
 
  * Generate hyperlinked source ourselves (#410, part of GSOC 2015)
