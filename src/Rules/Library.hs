@@ -80,9 +80,5 @@ extraObjects :: PartialTarget -> Action [FilePath]
 extraObjects (PartialTarget _ pkg)
     | pkg == integerGmp = do
         need [integerGmpLibraryH]
-        objsExist <- doesDirectoryExist integerGmpObjects
-        putBuild $ "objsExist = " ++ show objsExist
-        if objsExist
-        then getDirectoryFiles "" [integerGmpObjects -/- "*.o"]
-        else return []
+        getDirectoryFiles "" [integerGmpObjects -/- "*.o"]
     | otherwise         = return []
