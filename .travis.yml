@@ -18,6 +18,10 @@ addons:
         sources: hvr-ghc
 
 before_install:
+    osx:
+        - brew update
+        - brew outdated ghc || brew upgrade ghc
+        - brew outdated cabal-install || brew upgrade cabal-install
 
     - PATH="$HOME/.cabal/bin:$PATH"
     - PATH="/opt/ghc/$GHCVER/bin:$PATH"
