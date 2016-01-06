@@ -114,7 +114,7 @@ integerGmpRules = do
             copyFile integerGmpLibraryFakeH integerGmpLibraryH
         else do
             putBuild "| No GMP framework detected; in tree GMP will be built"
-            runMake integerGmpBuild ["MAKEFLAGS='LIBTOOL=bash\\ libtool'"]
+            runMake integerGmpBuild []
 
             copyFile (integerGmpBuild -/- "gmp.h") integerGmpLibraryInTreeH
             copyFile (integerGmpBuild -/- "gmp.h") integerGmpLibraryH
