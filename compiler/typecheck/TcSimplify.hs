@@ -66,7 +66,10 @@ simplifyTop :: WantedConstraints -> TcM (Bag EvBind)
 -- in a degenerate implication, so we do that here instead
 simplifyTop wanteds
   = do { traceTc "simplifyTop {" $ text "wanted = " <+> ppr wanteds
-       ; ((final_wc, unsafe_ol), binds1) <- runTcS $ simpl_top wanteds
+       ; ((final_wc, unsafe_ol), binds1) <- runTcS $
+            do { final_wc <- simpl_top wanteds
+               ; unsafe_ol <- getSafeOverlapFailures
+               ; return (final_wc, unsafe_ol) }
        ; traceTc "End simplifyTop }" empty
 
        ; traceTc "reportUnsolved {" empty
@@ -101,7 +104,7 @@ solveEqualities :: TcM a -> TcM a
 solveEqualities thing_inside
   = do { (result, wanted) <- captureConstraints thing_inside
        ; traceTc "solveEqualities {" $ text "wanted = " <+> ppr wanted
-       ; (final_wc, _) <- runTcSEqualities $ simpl_top wanted
+       ; final_wc <- runTcSEqualities $ simpl_top wanted
        ; traceTc "End solveEqualities }" empty
 
        ; traceTc "reportAllUnsolved {" empty
@@ -109,19 +112,12 @@ solveEqualities thing_inside
        ; traceTc "reportAllUnsolved }" empty
        ; return result }
 
-type SafeOverlapFailures = Cts
--- ^ See Note [Safe Haskell Overlapping Instances Implementation]
-
-type FinalConstraints = (WantedConstraints, SafeOverlapFailures)
-
-simpl_top :: WantedConstraints -> TcS FinalConstraints
+simpl_top :: WantedConstraints -> TcS WantedConstraints
     -- See Note [Top-level Defaulting Plan]
 simpl_top wanteds
   = do { wc_first_go <- nestTcS (solveWantedsAndDrop wanteds)
                             -- This is where the main work happens
-       ; wc_final <- try_tyvar_defaulting wc_first_go
-       ; unsafe_ol <- getSafeOverlapFailures
-       ; return (wc_final, unsafe_ol) }
+       ; try_tyvar_defaulting wc_first_go }
   where
     try_tyvar_defaulting :: WantedConstraints -> TcS WantedConstraints
     try_tyvar_defaulting wc
@@ -310,69 +306,71 @@ Note [Safe Haskell Overlapping Instances Implementation]
 How is this implemented? It's complicated! So we'll step through it all:
 
  1) `InstEnv.lookupInstEnv` -- Performs instance resolution, so this is where
- we check if a particular type-class method call is safe or unsafe. We do this
- through the return type, `ClsInstLookupResult`, where the last parameter is a
- list of instances that are unsafe to overlap. When the method call is safe,
- the list is null.
+    we check if a particular type-class method call is safe or unsafe. We do this
+    through the return type, `ClsInstLookupResult`, where the last parameter is a
+    list of instances that are unsafe to overlap. When the method call is safe,
+    the list is null.
 
  2) `TcInteract.matchClassInst` -- This module drives the instance resolution
- / dictionary generation. The return type is `LookupInstResult`, which either
- says no instance matched, or one found, and if it was a safe or unsafe
- overlap.
+    / dictionary generation. The return type is `LookupInstResult`, which either
+    says no instance matched, or one found, and if it was a safe or unsafe
+    overlap.
 
  3) `TcInteract.doTopReactDict` -- Takes a dictionary / class constraint and
- tries to resolve it by calling (in part) `matchClassInst`. The resolving
- mechanism has a work list (of constraints) that it process one at a time. If
- the constraint can't be resolved, it's added to an inert set. When compiling
- an `-XSafe` or `-XTrustworthy` module, we follow this approach as we know
- compilation should fail. These are handled as normal constraint resolution
- failures from here-on (see step 6).
+     tries to resolve it by calling (in part) `matchClassInst`. The resolving
+     mechanism has a work list (of constraints) that it process one at a time. If
+     the constraint can't be resolved, it's added to an inert set. When compiling
+     an `-XSafe` or `-XTrustworthy` module, we follow this approach as we know
+     compilation should fail. These are handled as normal constraint resolution
+     failures from here-on (see step 6).
 
- Otherwise, we may be inferring safety (or using `-Wunsafe`), and
- compilation should succeed, but print warnings and/or mark the compiled module
- as `-XUnsafe`. In this case, we call `insertSafeOverlapFailureTcS` which adds
- the unsafe (but resolved!) constraint to the `inert_safehask` field of
- `InertCans`.
+     Otherwise, we may be inferring safety (or using `-Wunsafe`), and
+     compilation should succeed, but print warnings and/or mark the compiled module
+     as `-XUnsafe`. In this case, we call `insertSafeOverlapFailureTcS` which adds
+     the unsafe (but resolved!) constraint to the `inert_safehask` field of
+     `InertCans`.
 
- 4) `TcSimplify.simpl_top` -- Top-level function for driving the simplifier for
- constraint resolution. Once finished, we call `getSafeOverlapFailures` to
- retrieve the list of overlapping instances that were successfully resolved,
- but unsafe. Remember, this is only applicable for generating warnings
- (`-Wunsafe`) or inferring a module unsafe. `-XSafe` and `-XTrustworthy`
- cause compilation failure by not resolving the unsafe constraint at all.
- `simpl_top` returns a list of unresolved constraints (all types), and resolved
- (but unsafe) resolved dictionary constraints.
+ 4) `TcSimplify.simplifyTop`:
+       * Call simpl_top, the top-level function for driving the simplifier for
+         constraint resolution.
 
- 5) `TcSimplify.simplifyTop` -- Is the caller of `simpl_top`. For unresolved
- constraints, it calls `TcErrors.reportUnsolved`, while for unsafe overlapping
- instance constraints, it calls `TcErrors.warnAllUnsolved`. Both functions
- convert constraints into a warning message for the user.
+       * Once finished, call `getSafeOverlapFailures` to retrieve the
+         list of overlapping instances that were successfully resolved,
+         but unsafe. Remember, this is only applicable for generating warnings
+         (`-Wunsafe`) or inferring a module unsafe. `-XSafe` and `-XTrustworthy`
+         cause compilation failure by not resolving the unsafe constraint at all.
 
- 6) `TcErrors.*Unsolved` -- Generates error messages for constraints by
- actually calling `InstEnv.lookupInstEnv` again! Yes, confusing, but all we
- know is the constraint that is unresolved or unsafe. For dictionary, all we
- know is that we need a dictionary of type C, but not what instances are
- available and how they overlap. So we once again call `lookupInstEnv` to
- figure that out so we can generate a helpful error message.
+       * For unresolved constraints (all types), call `TcErrors.reportUnsolved`,
+         while for resolved but unsafe overlapping dictionary constraints, call
+         `TcErrors.warnAllUnsolved`. Both functions convert constraints into a
+         warning message for the user.
 
- 7) `TcSimplify.simplifyTop` -- In the case of `warnAllUnsolved` for resolved,
- but unsafe dictionary constraints, we collect the generated warning message
- (pop it) and call `TcRnMonad.recordUnsafeInfer` to mark the module we are
- compiling as unsafe, passing the warning message along as the reason.
+       * In the case of `warnAllUnsolved` for resolved, but unsafe
+         dictionary constraints, we collect the generated warning
+         message (pop it) and call `TcRnMonad.recordUnsafeInfer` to
+         mark the module we are compiling as unsafe, passing the
+         warning message along as the reason.
 
- 8) `TcRnMonad.recordUnsafeInfer` -- Save the unsafe result and reason in an
- IORef called `tcg_safeInfer`.
+ 5) `TcErrors.*Unsolved` -- Generates error messages for constraints by
+    actually calling `InstEnv.lookupInstEnv` again! Yes, confusing, but all we
+    know is the constraint that is unresolved or unsafe. For dictionary, all we
+    know is that we need a dictionary of type C, but not what instances are
+    available and how they overlap. So we once again call `lookupInstEnv` to
+    figure that out so we can generate a helpful error message.
 
- 9) `HscMain.tcRnModule'` -- Reads `tcg_safeInfer` after type-checking, calling
- `HscMain.markUnsafeInfer` (passing the reason along) when safe-inferrence
- failed.
+ 6) `TcRnMonad.recordUnsafeInfer` -- Save the unsafe result and reason in an
+      IORef called `tcg_safeInfer`.
+
+ 7) `HscMain.tcRnModule'` -- Reads `tcg_safeInfer` after type-checking, calling
+    `HscMain.markUnsafeInfer` (passing the reason along) when safe-inferrence
+    failed.
 -}
 
 ------------------
 simplifyAmbiguityCheck :: Type -> WantedConstraints -> TcM ()
 simplifyAmbiguityCheck ty wanteds
   = do { traceTc "simplifyAmbiguityCheck {" (text "type = " <+> ppr ty $$ text "wanted = " <+> ppr wanteds)
-       ; ((final_wc, _), _) <- runTcS $ simpl_top wanteds
+       ; (final_wc, _) <- runTcS $ simpl_top wanteds
        ; traceTc "End simplifyAmbiguityCheck }" empty
 
        -- Normally report all errors; but with -XAllowAmbiguousTypes
@@ -402,7 +400,6 @@ simplifyDefault theta
        ; unsolved <- simplifyWantedsTcM wanted
 
        ; traceTc "reportUnsolved {" empty
-       -- See Note [Deferring coercion errors to runtime]
        ; reportAllUnsolved unsolved
        ; traceTc "reportUnsolved }" empty
 
