@@ -1,13 +1,10 @@
 sudo: false
 
-os:
-    - linux
-    - osx
-
-env:
-    matrix:
-        linux:
-            - CABALVER=1.22 GHCVER=7.10.3
+matrix:
+    include:
+        - os: linux
+          env: CABALVER=1.22 GHCVER=7.10.3
+        - os: osx
 
 addons:
     apt:
