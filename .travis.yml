@@ -19,8 +19,7 @@ addons:
 
 before_install:
     - if [ $TRAVIS_OS_NAME == osx ]; then brew update; fi
-    - if [ $TRAVIS_OS_NAME == osx ]; then brew outdated ghc || brew upgrade ghc; fi
-    - if [ $TRAVIS_OS_NAME == osx ]; then brew outdated cabal-install || brew upgrade cabal-install; fi
+    - if [ $TRAVIS_OS_NAME == osx ]; then brew install ghc cabal-install; fi
 
     - PATH="$HOME/.cabal/bin:$PATH"
     - PATH="/opt/ghc/$GHCVER/bin:$PATH"
