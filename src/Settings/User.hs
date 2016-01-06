@@ -8,11 +8,11 @@ module Settings.User (
 
 import GHC
 import Expression
+import Predicates
 
--- No user-specific settings by default
--- TODO: rename to userArgs
+-- Control user-specific settings
 userArgs :: Args
-userArgs = mempty
+userArgs = builderGhc ? remove ["-Wall", "-fwarn-tabs"]
 
 -- Control which packages get to be built
 userPackages :: Packages
