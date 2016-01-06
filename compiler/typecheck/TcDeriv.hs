@@ -29,6 +29,7 @@ import FamInstEnv
 import TcHsType
 import TcMType
 import TcSimplify
+import TcUnify( buildImplicationFor )
 import LoadIface( loadInterfaceForName )
 import Module( getModule )
 
@@ -1816,18 +1817,23 @@ simplifyDeriv pred tvs theta
                 -- We use *non-overlappable* (vanilla) skolems
                 -- See Note [Overlap and deriving]
 
-       ; let skol_set = mkVarSet tvs_skols
+       ; let skol_set  = mkVarSet tvs_skols
+             skol_info = DerivSkol pred
              doc = ptext (sLit "deriving") <+> parens (ppr pred)
+             mk_ct (PredOrigin t o t_or_k)
+                 = newWanted o (Just t_or_k) (substTy skol_subst t)
 
-       ; wanted <- mapM (\(PredOrigin t o t_or_k)
-                         -> newWanted o (Just t_or_k) (substTy skol_subst t)) theta
+       ; (wanted, tclvl) <- pushTcLevelM (mapM mk_ct theta)
 
        ; traceTc "simplifyDeriv" $
          vcat [ pprTvBndrs tvs $$ ppr theta $$ ppr wanted, doc ]
        ; residual_wanted <- simplifyWantedsTcM wanted
+            -- Result is zonked
 
-       ; residual_simple <- zonkSimples (wc_simple residual_wanted)
-       ; let (good, bad) = partitionBagWith get_good residual_simple
+       ; let residual_simple = wc_simple residual_wanted
+             (good, bad) = partitionBagWith get_good residual_simple
+             unsolved    = residual_wanted { wc_simple = bad }
+
                          -- See Note [Exotic derived instance contexts]
 
              get_good :: Ct -> Either PredType Ct
@@ -1848,7 +1854,12 @@ simplifyDeriv pred tvs theta
        -- constraints.  They'll come up again when we typecheck the
        -- generated instance declaration
        ; defer <- goptM Opt_DeferTypeErrors
-       ; unless defer (reportAllUnsolved (residual_wanted { wc_simple = bad }))
+       ; (implic, _) <- buildImplicationFor tclvl skol_info tvs_skols [] unsolved
+                   -- The buildImplication is just to bind the skolems, in
+                   -- case they are mentioned in error messages
+                   -- See Trac #11347
+       ; unless defer (reportAllUnsolved (mkImplicWC implic))
+
 
        ; let min_theta  = mkMinimalBySCs (bagToList good)
              subst_skol = zipTopTCvSubst tvs_skols $ mkTyVarTys tvs

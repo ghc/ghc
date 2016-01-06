@@ -830,7 +830,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                                   , ic_skols  = inst_tyvars
                                   , ic_no_eqs = False
                                   , ic_given  = dfun_ev_vars
-                                  , ic_wanted = addImplics emptyWC sc_meth_implics
+                                  , ic_wanted = mkImplicWC sc_meth_implics
                                   , ic_status = IC_Unsolved
                                   , ic_binds  = Just dfun_ev_binds_var
                                   , ic_env    = env
