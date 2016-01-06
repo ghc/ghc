@@ -1,0 +1,8 @@
+install:
+    - set PATH=C:\msys64\usr\bin;%PATH%
+    - bash "pacman -S git tar binutils autoconf make libtool automake python2 p7zip patch gcc mingw-w64-$(uname -m)-python3-sphinx"
+
+build_script:
+    - echo "test"
+
+test: off
