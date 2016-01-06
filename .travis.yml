@@ -5,7 +5,9 @@ os:
     - osx
 
 env:
-    - CABALVER=1.22 GHCVER=7.10.3
+    matrix:
+        linux:
+            - CABALVER=1.22 GHCVER=7.10.3
 
 addons:
     apt:
@@ -20,10 +22,10 @@ addons:
 before_install:
     - if [ $TRAVIS_OS_NAME == osx ]; then brew update; fi
     - if [ $TRAVIS_OS_NAME == osx ]; then brew install ghc cabal-install; fi
-
+    - if [ $TRAVIS_OS_NAME == osx ]; then cabal install alex happy; fi
+    - if [ $TRAVIS_OS_NAME == linux ]; then PATH="/opt/ghc/$GHCVER/bin:$PATH"; fi
+    - if [ $TRAVIS_OS_NAME == linux ]; then PATH="/opt/cabal/$CABALVER/bin:$PATH"; fi
     - PATH="$HOME/.cabal/bin:$PATH"
-    - PATH="/opt/ghc/$GHCVER/bin:$PATH"
-    - PATH="/opt/cabal/$CABALVER/bin:$PATH"
     - export PATH
 
     - env
