@@ -149,7 +149,8 @@ tcTyClGroup tyclds
                  -- Also extend the local type envt with bindings giving
                  -- the (polymorphic) kind of each knot-tied TyCon or Class
                  -- See Note [Type checking recursive type and class declarations]
-             tcExtendKindEnv names_w_poly_kinds              $
+             tcExtendKindEnv2 [ mkTcTyConPair name kind
+                              | (name, kind) <-  names_w_poly_kinds ]    $
 
                  -- Kind and type check declarations for this group
              mapM (tcTyClDecl rec_flags) decls }
@@ -289,8 +290,6 @@ kcTyClGroup (TyClGroup { group_tyclds = decls })
 
              -- Step 3: Set extended envt, kind-check the non-synonyms
              ; setLclEnv lcl_env $
-               tcExtendRecEnv (tcTyConPairs initial_kinds) $
-              -- See Note [Kind checking recursive type and class declarations]
                mapM_ kcLTyClDecl non_syn_decls
 
              ; return lcl_env }
@@ -304,16 +303,11 @@ kcTyClGroup (TyClGroup { group_tyclds = decls })
         ; return res }
 
   where
-    tcTyConPairs :: [(Name,TcTyThing)] -> [(Name,TyThing)]
-    tcTyConPairs initial_kinds = [ (name, ATyCon tc)
-                                 | (name, AThing kind) <- initial_kinds
-                                 , let tc = mkTcTyCon name kind ]
-
     generalise :: TcTypeEnv -> Name -> TcM (Name, Kind)
     -- For polymorphic things this is a no-op
     generalise kind_env name
       = do { let kc_kind = case lookupNameEnv kind_env name of
-                               Just (AThing k) -> k
+                               Just (ATcTyCon tc) -> tyConKind tc
                                _ -> pprPanic "kcTyClGroup" (ppr name $$ ppr kind_env)
            ; kvs <- kindGeneralize kc_kind
            ; kc_kind' <- zonkTcTypeToType emptyZonkEnv kc_kind
@@ -343,6 +337,11 @@ kcTyClGroup (TyClGroup { group_tyclds = decls })
     generaliseFamDecl kind_env (FamilyDecl { fdLName = L _ name })
       = generalise kind_env name
 
+mkTcTyConPair :: Name -> TcKind -> (Name, TcTyThing)
+-- Makes a binding to put in the local envt, binding
+-- a name to a TcTyCon with the specified kind
+mkTcTyConPair name kind = (name,  ATcTyCon (mkTcTyCon name kind))
+
 mk_thing_env :: [LTyClDecl Name] -> [(Name, TcTyThing)]
 mk_thing_env [] = []
 mk_thing_env (decl : decls)
@@ -361,9 +360,10 @@ getInitialKinds decls
     do { pairss <- mapM (addLocM getInitialKind) decls
        ; return (concat pairss) }
 
-getInitialKind :: TyClDecl Name -> TcM [(Name, TcTyThing)]
+getInitialKind :: TyClDecl Name
+               -> TcM [(Name, TcTyThing)]    -- Mixture of ATcTyCon and APromotionErr
 -- Allocate a fresh kind variable for each TyCon and Class
--- For each tycon, return   (tc, AThing k)
+-- For each tycon, return   (name, ATcTyCon (TcCyCon with kind k))
 --                 where k is the kind of tc, derived from the LHS
 --                       of the definition (and probably including
 --                       kind unification variables)
@@ -375,7 +375,7 @@ getInitialKind :: TyClDecl Name -> TcM [(Name, TcTyThing)]
 --   * The result kinds signature on a TyClDecl
 --
 -- ALSO for each datacon, return (dc, APromotionErr RecDataConPE)
--- Note [ARecDataCon: Recursion and promoting data constructors]
+--    See Note [ARecDataCon: Recursion and promoting data constructors]
 --
 -- No family instances are passed to getInitialKinds
 
@@ -385,7 +385,7 @@ getInitialKind decl@(ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs =
            do { inner_prs <- getFamDeclInitialKinds ats
               ; return (constraintKind, inner_prs) }
        ; cl_kind <- zonkTcType cl_kind
-       ; let main_pr = (name, AThing cl_kind)
+       ; let main_pr = mkTcTyConPair name cl_kind
        ; return (main_pr : inner_prs) }
 
 getInitialKind decl@(DataDecl { tcdLName = L _ name
@@ -399,7 +399,7 @@ getInitialKind decl@(DataDecl { tcdLName = L _ name
                            Nothing   -> return liftedTypeKind
               ; return (res_k, ()) }
         ; decl_kind <- zonkTcType decl_kind
-        ; let main_pr = (name, AThing decl_kind)
+        ; let main_pr = mkTcTyConPair name decl_kind
               inner_prs = [ (unLoc con, APromotionErr RecDataConPE)
                           | L _ con' <- cons, con <- getConNames con' ]
         ; return (main_pr : inner_prs) }
@@ -434,7 +434,7 @@ getFamDeclInitialKind decl@(FamilyDecl { fdLName     = L _ name
                         | otherwise                -> newMetaKindVar
               ; return (res_k, ()) }
        ; fam_kind <- zonkTcType fam_kind
-       ; return [ (name, AThing fam_kind) ] }
+       ; return [ mkTcTyConPair name fam_kind ] }
 
 ----------------
 kcSynDecls :: [SCC (LTyClDecl Name)]
@@ -442,8 +442,8 @@ kcSynDecls :: [SCC (LTyClDecl Name)]
 kcSynDecls [] = getLclEnv
 kcSynDecls (group : groups)
   = do  { (n,k) <- kcSynDecl1 group
-        ; lcl_env <- tcExtendKindEnv [(n,k)] (kcSynDecls groups)
-        ; return lcl_env }
+        ; tcExtendKindEnv2 [ mkTcTyConPair n k ] $
+          kcSynDecls groups }
 
 kcSynDecl1 :: SCC (LTyClDecl Name)
            -> TcM (Name,TcKind) -- Kind bindings
@@ -553,10 +553,10 @@ Consider:
 
 When kind checking the `data T' declaration the local env contains the
 mappings:
-  T -> AThing <some initial kind>
-  K -> ARecDataCon
+  T -> ATcTyCon <some initial kind>
+  K -> APromotionErr
 
-ANothing is only used for DataCons, and only used during type checking
+APromotionErr is only used for DataCons, and only used during type checking
 in tcTyClGroup.
 
 
@@ -594,8 +594,8 @@ kind-checking the RHS of T's decl, we *do* need to know T's kind (so
 that we can correctly elaboarate (T k f a).  How can we get T's kind
 without looking at T?  Delicate answer: during tcTyClDecl, we extend
 
-  *Global* env with T -> ATyCon (the (not yet built) TyCon for T)
-  *Local*  env with T -> AThing (polymorphic kind of T)
+  *Global* env with T -> ATyCon (the (not yet built) final TyCon for T)
+  *Local*  env with T -> ATcTyCon (TcTyCon with the polymorphic kind of T)
 
 Then:
 
@@ -621,7 +621,7 @@ using this initial kind for recursive occurrences.
 
 The initial kind is stored in exactly the same way during kind-checking
 as it is during type-checking (Note [Type checking recursive type and class
-declarations]): in the *local* environment, with AThing. But we still
+declarations]): in the *local* environment, with ATcTyCon. But we still
 must store *something* in the *global* environment. Even though we
 discard the result of kind-checking, we sometimes need to produce error
 messages. These error messages will want to refer to the tycons being
