@@ -1999,7 +1999,7 @@ decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
       | otherwise
       = Nothing
 
-    -- The Haskell 98 monomorphism resetriction
+    -- The Haskell 98 monomorphism restriction
     restricted (PatBind {})                              = True
     restricted (VarBind { var_id = v })                  = no_sig v
     restricted (FunBind { fun_id = v, fun_matches = m }) = restricted_match m
