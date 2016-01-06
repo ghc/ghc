@@ -35,6 +35,6 @@ targetsForStage stage = do
 packageRules :: Rules ()
 packageRules = do
     resources <- resourceRules
-    for allStages $ \stage ->
+    for_ allStages $ \stage ->
         for_ knownPackages $ \pkg ->
             buildPackage resources $ PartialTarget stage pkg
