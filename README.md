@@ -59,7 +59,7 @@ Also see the [Building GHC on Windows guide][ghc-windows-building-guide].
 
 ### Resetting the build
 
-To reset the new build system run the build script with `-B` flag. This will force Shake to rerun all rules, even if the results of the previous build are still in the GHC tree. This is a temporary solution; we are working on a proper reset functionality (see [#32](https://github.com/snowleopard/shaking-up-ghc/issues/32)).
+To reset the new build system run the build script with `-B` flag. This forces Shake to rerun all rules, even if results of the previous build are still in the GHC tree. This is a temporary solution; we are working on a proper reset functionality (see [#32](https://github.com/snowleopard/shaking-up-ghc/issues/32)).
 
 
 How to contribute
