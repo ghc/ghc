@@ -99,15 +99,15 @@ runConfigure dir opts args = do
 runMake :: FilePath -> [String] -> Action ()
 runMake dir args = do
     need [dir -/- "Makefile"]
-    let note = if null args then "" else " (" ++ intercalate "," args ++ ")"
+    let note = if null args then "" else " (" ++ intercalate ", " args ++ ")"
     putBuild $ "| Run make" ++ note ++ " in " ++ dir ++ "..."
-    quietly $ cmd Shell (EchoStdout False) "make" ["-C", dir, "MAKEFLAGS="] args
+    quietly $ cmd Shell (EchoStdout False) "make" ["-C", dir] args
 
 runBuilder :: Builder -> [String] -> Action ()
 runBuilder builder args = do
     needBuilder laxDependencies builder
     path <- builderPath builder
-    let note = if null args then "" else " (" ++ intercalate "," args ++ ")"
+    let note = if null args then "" else " (" ++ intercalate ", " args ++ ")"
     putBuild $ "| Run " ++ show builder ++ note
     quietly $ cmd [path] args
 

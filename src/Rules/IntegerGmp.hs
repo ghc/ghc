@@ -114,7 +114,7 @@ integerGmpRules = do
             copyFile integerGmpLibraryFakeH integerGmpLibraryH
         else do
             putBuild "| No GMP framework detected; in tree GMP will be built"
-            runMake integerGmpBuild ["LIBTOOL=\"bash libtool\""]
+            runMake integerGmpBuild ["MAKEFLAGS='LIBTOOL=bash\\ libtool'"]
 
             copyFile integerGmpLibraryInTreeH integerGmpLibraryH
             -- TODO: why copy library, can we move it instead?

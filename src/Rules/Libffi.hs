@@ -91,13 +91,13 @@ libffiRules = do
         args <- configureArguments
         runConfigure libffiBuild envs args
 
-        runMake libffiBuild []
-        runMake libffiBuild ["install"]
-       
+        runMake libffiBuild ["MAKEFLAGS="]
+        runMake libffiBuild ["MAKEFLAGS=", "install"]
+
         forM_ ["ffi.h", "ffitarget.h"] $ \file -> do
             let src = libffiBuild -/- "inst/lib" -/- libname -/- "include" -/- file
             copyFile src (rtsBuildPath -/- file)
-    
+
         libffiName <- rtsLibffiLibraryName
         copyFile libffiLibrary (rtsBuildPath -/- "lib" ++ libffiName <.> "a")
 
