@@ -51,7 +51,8 @@ install:
     - ( cd ghc/shake-build && cabal install --only-dependencies )
 
     - ( cd ghc && ./boot )
-    - ( cd ghc && ./configure )
+    - if [ $TRAVIS_OS_NAME == osx ]; then ( cd ghc && ./configure --with-gcc="$(which clang)"); fi
+    - if [ $TRAVIS_OS_NAME == linux ]; then ( cd ghc && ./configure ); fi
 
 script:
     - ./ghc/shake-build/build.sh -j --no-progress
