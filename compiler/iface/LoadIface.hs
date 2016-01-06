@@ -19,7 +19,7 @@ module LoadIface (
         loadInterfaceForName, loadInterfaceForModule,
 
         -- IfM functions
-        loadInterface, loadWiredInHomeIface,
+        loadInterface,
         loadSysInterface, loadUserInterface, loadPluginInterface,
         findAndReadIface, readIface,    -- Used when reading the module's old interface
         loadDecls,      -- Should move to TcIface and be renamed
