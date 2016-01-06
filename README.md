@@ -31,9 +31,6 @@ git submodule update --init
 git clone git://github.com/snowleopard/shaking-up-ghc shake-build
 ./boot
 ./configure
-# or if you want to use clang (e.g. building on OS X)
-./configure --with-gcc=$(which clang) # See #26
-
 ```
 
 Now you have a couple of options:
