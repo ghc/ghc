@@ -35,12 +35,14 @@ includesDependencies = ("includes" -/-) <$>
     , "ghcplatform.h"
     , "ghcversion.h" ]
 
-integerGmpDependencies :: [FilePath]
-integerGmpDependencies = [integerGmpLibraryH]
-
 defaultDependencies :: [FilePath]
 defaultDependencies =
     includesDependencies ++ libffiDependencies ++ integerGmpDependencies
+
+ghcPrimDependencies :: Stage -> [FilePath]
+ghcPrimDependencies stage = ((targetPath stage ghcPrim -/- "build") -/-) <$>
+       [ "GHC/PrimopWrappers.hs"
+       , "autogen/GHC/Prim.hs" ]
 
 derivedConstantsDependencies :: [FilePath]
 derivedConstantsDependencies = (derivedConstantsPath -/-) <$>
@@ -72,10 +74,11 @@ compilerDependencies stage =
 
 generatedDependencies :: Stage -> Package -> [FilePath]
 generatedDependencies stage pkg
-    | pkg == compiler = compilerDependencies stage
-    | pkg == rts = derivedConstantsDependencies
-    | stage == Stage0 = defaultDependencies
-    | otherwise = []
+    | pkg   == compiler = compilerDependencies stage
+    | pkg   == ghcPrim  = ghcPrimDependencies stage
+    | pkg   == rts      = derivedConstantsDependencies
+    | stage == Stage0   = defaultDependencies
+    | otherwise         = []
 
 -- The following generators and corresponding source extensions are supported:
 knownGenerators :: [ (Builder, String) ]

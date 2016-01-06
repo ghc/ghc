@@ -6,6 +6,7 @@ import GHC
 import Oracles
 import Predicates (registerPackage)
 import Rules.Actions
+import Rules.Generate
 import Rules.Resources
 import Settings
 import Settings.Builders.Common
@@ -19,6 +20,10 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
         dataFile  = pkgDataFile stage pkg
 
     dataFile %> \mk -> do
+        -- The first thing we do with any package is make sure all generated
+        -- dependencies are in place before proceeding.
+        orderOnly $ generatedDependencies stage pkg
+
         -- GhcCabal may run the configure script, so we depend on it
         -- We don't know who built the configure script from configure.ac
         whenM (doesFileExist $ configure <.> "ac") $ need [configure]
@@ -104,11 +109,11 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
                      , "includes/ghcplatform.h" ]
                 build $ fullTarget target HsCpp [rtsConfIn] [rtsConf]
 
-                let fixRtsConf = unlines 
+                let fixRtsConf = unlines
                                . map
                                ( replace "\"\"" ""
                                . replace "rts/dist/build" "rts/stage1/build" )
-                               . filter (not . null) 
+                               . filter (not . null)
                                . lines
 
                 fixFile rtsConf fixRtsConf

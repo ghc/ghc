@@ -1,4 +1,6 @@
-module Rules.IntegerGmp (integerGmpRules, integerGmpObjects, integerGmpLibraryH) where
+module Rules.IntegerGmp (
+    integerGmpRules, integerGmpObjects, integerGmpLibraryH, integerGmpDependencies
+    ) where
 
 import Base
 import Expression
@@ -27,6 +29,9 @@ integerGmpLibraryH = pkgPath integerGmp -/- "include/ghc-gmp.h"
 
 integerGmpLibraryFakeH :: FilePath
 integerGmpLibraryFakeH = integerGmpBase -/- "ghc-gmp.h"
+
+integerGmpDependencies :: [FilePath]
+integerGmpDependencies = [integerGmpLibraryH]
 
 -- relative to integerGmpBuild
 integerGmpPatch :: FilePath
