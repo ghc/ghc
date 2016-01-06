@@ -1,4 +1,4 @@
-clone_folder: "C:\msys64\home\ghc\shake-build"
+clone_folder: "C:\\msys64\\home\\ghc\\shake-build"
 
 install:
     - set MSYSTEM=MINGW64
