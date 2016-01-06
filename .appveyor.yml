@@ -12,12 +12,12 @@ install:
     - bash -lc "mkdir -p /usr/local/bin"
     - bash -lc "curl -LsS https://www.haskell.org/cabal/release/cabal-install-1.22.0.0/cabal-1.22.0.0-i386-unknown-mingw32.tar.gz | tar -xz -C /usr/local/bin"
     - bash -lc "mv /usr/local/bin/cabal-1.22.0.0-i386-unknown-mingw32.exe /usr/local/bin/cabal.exe"
-    - cabal update -v3
-    - cabal install -j --prefix=/usr/local alex happy
+    - bash -lc "cabal update -v3"
+    - bash -lc "cabal install -j --prefix=/usr/local alex happy"
     - git clone --recursive git://git.haskell.org/ghc.git C:\msys64\mingw64\home\ghc\tmp
     - bash -lc "mv /home/ghc/tmp/* /home/ghc"
     - cd C:\msys64\mingw64\home\ghc\shake-build
-    - cabal install --only-dependencies
+    - bash -lc "cd /home/ghc/shake-build && cabal install --only-dependencies"
 
 build_script:
     - bash -lc "cd /home/ghc && ./boot"
