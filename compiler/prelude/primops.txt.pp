@@ -1940,33 +1940,8 @@ Consider this example, which comes from GHC.IO.Handle.Internals:
 The outer case just decides whether to mask exceptions, but we don't want
 thereby to hide the strictness in 'ma'!  Hence the use of strictApply1Dmd.
 
-For catch, we know that the first branch will be evaluated, but not
-necessarily the second.  Hence strictApply1Dmd and lazyApply1Dmd
-
-Howver, consider
-    catch# (\st -> case x of ...) (..handler..) st
-We'll see that the entire thing is strict in 'x', so 'x' may be evaluated
-before the catch#.  So if evaluting 'x' causes a divide-by-zero exception,
-it won't be caught.  This seems acceptable:
-
-  - x might be evaluated somewhere else outside the catch# anyway
-  - It's an imprecise eception anyway.  Synchronous exceptions (in the
-    IO monad) will never move in this way.
-
-Unfortunately, there is a tricky wrinkle here, as pointed out in #10712.
-Consider,
-
-    let r = \st -> raiseIO# blah st
-    in catch (\st -> ...(r st)..) handler st
-
-If we give the first argument of catch a strict signature, we'll get
-a demand 'C(S)' for 'r'; that is, 'r' is definitely called with one
-argument, which indeed it is. The trouble comes when we feed 'C(S)'
-into 'r's RHS as the demand of the body as this will lead us to conclude that
-the whole 'let' will diverge; clearly this isn't right.
-
-There's something very special about catch: it turns divergence into
-non-divergence.
+For catch, we must be extra careful; see
+Note [Exceptions and strictness] in Demand
 -}
 
 primop  CatchOp "catch#" GenPrimOp
@@ -1975,7 +1950,9 @@ primop  CatchOp "catch#" GenPrimOp
        -> State# RealWorld
        -> (# State# RealWorld, a #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [lazyApply1Dmd,lazyApply2Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [ catchArgDmd
+                                                 , lazyApply2Dmd
+                                                 , topDmd] topRes }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -1984,8 +1961,8 @@ primop  RaiseOp "raise#" GenPrimOp
    b -> o
       -- NB: the type variable "o" is "a", but with OpenKind
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
-      -- NB: result is bottom
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] exnRes }
+      -- NB: result is ThrowsExn
    out_of_line = True
    has_side_effects = True
      -- raise# certainly throws a Haskell exception and hence has_side_effects
@@ -2006,7 +1983,7 @@ primop  RaiseOp "raise#" GenPrimOp
 primop  RaiseIOOp "raiseIO#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, b #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] botRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] exnRes }
    out_of_line = True
    has_side_effects = True
 
@@ -2079,7 +2056,9 @@ primop  CatchRetryOp "catchRetry#" GenPrimOp
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [lazyApply1Dmd,lazyApply1Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [ catchArgDmd
+                                                 , lazyApply1Dmd
+                                                 , topDmd ] topRes }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -2089,7 +2068,9 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
    -> (b -> State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [lazyApply1Dmd,lazyApply2Dmd,topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [ catchArgDmd
+                                                 , lazyApply2Dmd
+                                                 , topDmd ] topRes }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True

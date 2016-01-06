@@ -140,8 +140,9 @@ exprBotStrictness_maybe e
         Just ar -> Just (ar, sig ar)
   where
     env    = AE { ae_ped_bot = True, ae_cheap_fn = \ _ _ -> False }
-    sig ar = mkClosedStrictSig (replicate ar topDmd) botRes
+    sig ar = mkClosedStrictSig (replicate ar topDmd) exnRes
                   -- For this purpose we can be very simple
+                  -- exnRes is a bit less aggressive than botRes
 
 {-
 Note [exprArity invariant]

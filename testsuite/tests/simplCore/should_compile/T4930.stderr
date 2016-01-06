@@ -34,7 +34,7 @@ Rec {
 -- RHS size: {terms: 23, types: 6, coercions: 0}
 T4930.$wfoo [InlPrag=[0], Occ=LoopBreaker]
   :: GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <L,U>]
+[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,U>]
 T4930.$wfoo =
   \ (ww :: GHC.Prim.Int#) ->
     case case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# ww 5#)
@@ -53,7 +53,7 @@ foo [InlPrag=INLINE[0]] :: Int -> Int
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=DmdType <S,1*U(U)>m,
+ Str=DmdType <S(S),1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)

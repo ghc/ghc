@@ -32,7 +32,7 @@ Roman.$trModule =
 
 -- RHS size: {terms: 2, types: 2, coercions: 0}
 Roman.foo3 :: Int
-[GblId, Str=DmdType b]
+[GblId, Str=DmdType x]
 Roman.foo3 =
   Control.Exception.Base.patError
     @ 'GHC.Types.Lifted

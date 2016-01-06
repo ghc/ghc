@@ -755,8 +755,8 @@ pc_bottoming_Id1 name ty
         -- any pc_bottoming_Id will itself have CafRefs, which bloats
         -- SRTs.
 
-    strict_sig = mkClosedStrictSig [evalDmd] botRes
-    -- These "bottom" out, no matter what their arguments
+    strict_sig = mkClosedStrictSig [evalDmd] exnRes
+                 -- exnRes: these throw an exception, not just diverge
 
 pc_bottoming_Id2 :: Name -> Type -> Id
 -- Same but arity two
@@ -765,4 +765,5 @@ pc_bottoming_Id2 name ty
  where
     bottoming_info = vanillaIdInfo `setStrictnessInfo` strict_sig
                                    `setArityInfo`      2
-    strict_sig = mkClosedStrictSig [evalDmd, evalDmd] botRes
+    strict_sig = mkClosedStrictSig [evalDmd, evalDmd] exnRes
+                 -- exnRes: these throw an exception, not just diverge
