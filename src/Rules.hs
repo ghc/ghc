@@ -11,7 +11,7 @@ import Rules.Resources
 import Settings
 
 allStages :: [Stage]
-allStages = [Stage0 ..]
+allStages = [minBound ..]
 
 -- TODO: not all program targets should be needed explicitly
 -- | 'need' all top-level build targets

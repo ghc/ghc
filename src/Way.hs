@@ -19,6 +19,8 @@ import Oracles
 
 -- Note: order of constructors is important for compatibility with the old build
 -- system, e.g. we want "thr_p", not "p_thr" (see instance Show Way).
+-- | A 'WayUnit' is a single way of building source code, for example with
+-- profiling enabled, or dynamically linked.
 data WayUnit = Threaded
              | Debug
              | Profiling
@@ -26,7 +28,7 @@ data WayUnit = Threaded
              | Dynamic
              | Parallel
              | GranSim
-             deriving (Eq, Enum)
+             deriving (Eq, Enum, Bounded)
 
 -- TODO: get rid of non-derived Show instances
 instance Show WayUnit where
@@ -40,16 +42,22 @@ instance Show WayUnit where
         GranSim   -> "gm"
 
 instance Read WayUnit where
-    readsPrec _ s = [(unit, "") | unit <- [Threaded ..], show unit == s]
+    readsPrec _ s = [(unit, "") | unit <- [minBound ..], show unit == s]
 
+-- | Collection of 'WayUnit's that stands for the different ways source code
+-- is to be built.
 newtype Way = Way IntSet
 
+-- | Construct a 'Way' from multiple 'WayUnit's. Inverse of 'wayToUnits'.
 wayFromUnits :: [WayUnit] -> Way
 wayFromUnits = Way . Set.fromList . map fromEnum
 
+-- | Split a 'Way' into its 'WayUnit' building blocks.
+-- Inverse of 'wayFromUnits'.
 wayToUnits :: Way -> [WayUnit]
 wayToUnits (Way set) = map toEnum . Set.elems $ set
 
+-- | Check whether a 'Way' contains a certain 'WayUnit'.
 wayUnit :: WayUnit -> Way -> Bool
 wayUnit unit (Way set) = fromEnum unit `Set.member` set
 
@@ -72,11 +80,23 @@ instance Read Way where
 instance Eq Way where
     Way a == Way b = a == b
 
-vanilla, profiling, logging, parallel, granSim :: Way
+-- | Build with no 'WayUnit's at all.
+vanilla :: Way
 vanilla   = wayFromUnits []
+
+-- | Build with profiling.
+profiling :: Way
 profiling = wayFromUnits [Profiling]
+
+-- | Build with logging.
+logging :: Way
 logging   = wayFromUnits [Logging]
+
+-- | Build in parallel.
+parallel :: Way
 parallel  = wayFromUnits [Parallel]
+
+granSim :: Way
 granSim   = wayFromUnits [GranSim]
 
 -- RTS only ways
@@ -135,11 +155,12 @@ libsuf way @ (Way set) =
         -- e.g., p_ghc7.11.20141222.dll (the result)
         return $ prefix ++ "ghc" ++ version ++ extension
 
--- Detect way from a given filename. Returns Nothing if there is no match:
--- * safeDetectWay "foo/bar.hi"                == Just vanilla
--- * safeDetectWay "baz.thr_p_o"               == Just threadedProfiling
--- * safeDetectWay "qwe.ph_i"                  == Nothing (expected "qwe.p_hi")
--- * safeDetectWay "xru.p_ghc7.11.20141222.so" == Just profiling
+-- | Detect way from a given 'FilePath'. Returns 'Nothing' if there is no match.
+--
+-- * @'safeDetectWay' "foo/bar.hi"           '==' 'Just' vanilla@
+-- * @'safeDetectWay' "baz.thr_p_o"          '==' 'Just' threadedProfiling@
+-- * @'safeDetectWay' "qwe.ph_i"             '==' 'Nothing' (expected "qwe.p_hi")@
+-- * @'safeDetectWay' "xru.p_ghc7.11.123.so" '==' 'Just' profiling@
 safeDetectWay :: FilePath -> Maybe Way
 safeDetectWay file = case reads prefix of
     [(way, "")] -> Just way

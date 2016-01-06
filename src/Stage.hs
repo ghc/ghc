@@ -22,7 +22,7 @@ import GHC.Generics (Generic)
 --   Since it serves no other purpose than that, the stage 3 build is usually
 --   omitted in the build process.
 data Stage = Stage0 | Stage1 | Stage2 | Stage3
-           deriving (Show, Eq, Ord, Enum, Generic)
+           deriving (Show, Eq, Ord, Enum, Generic, Bounded)
 
 -- | Prettyprint a 'Stage'.
 stageString :: Stage -> String
