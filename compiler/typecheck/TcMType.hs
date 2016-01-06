@@ -1216,8 +1216,8 @@ mkTypeErrorThingArgs ty num_args
 zonkTidyOrigin :: TidyEnv -> CtOrigin -> TcM (TidyEnv, CtOrigin)
 zonkTidyOrigin env (GivenOrigin skol_info)
   = do { skol_info1 <- zonkSkolemInfo skol_info
-       ; let (env1, skol_info2) = tidySkolemInfo env skol_info1
-       ; return (env1, GivenOrigin skol_info2) }
+       ; let skol_info2 = tidySkolemInfo env skol_info1
+       ; return (env, GivenOrigin skol_info2) }
 zonkTidyOrigin env orig@(TypeEqOrigin { uo_actual   = act
                                       , uo_expected = exp
                                       , uo_thing    = m_thing })
@@ -1276,25 +1276,9 @@ tidyEvVar :: TidyEnv -> EvVar -> EvVar
 tidyEvVar env var = setVarType var (tidyType env (varType var))
 
 ----------------
-tidySkolemInfo :: TidyEnv -> SkolemInfo -> (TidyEnv, SkolemInfo)
-tidySkolemInfo env (SigSkol cx ty)
-  = (env', SigSkol cx ty')
-  where
-    (env', ty') = tidyOpenType env ty
-
-tidySkolemInfo env (InferSkol ids)
-  = (env', InferSkol ids')
-  where
-    (env', ids') = mapAccumL do_one env ids
-    do_one env (name, ty) = (env', (name, ty'))
-       where
-         (env', ty') = tidyOpenType env ty
-
-tidySkolemInfo env (UnifyForAllSkol skol_tvs ty)
-  = (env1, UnifyForAllSkol skol_tvs' ty')
-  where
-    env1 = tidyFreeTyCoVars env (tyCoVarsOfType ty `delVarSetList` skol_tvs)
-    (env2, skol_tvs') = tidyTyCoVarBndrs env1 skol_tvs
-    ty'               = tidyType env2 ty
-
-tidySkolemInfo env info = (env, info)
+tidySkolemInfo :: TidyEnv -> SkolemInfo -> SkolemInfo
+tidySkolemInfo env (DerivSkol ty)       = DerivSkol (tidyType env ty)
+tidySkolemInfo env (SigSkol cx ty)      = SigSkol cx (tidyType env ty)
+tidySkolemInfo env (InferSkol ids)      = InferSkol (mapSnd (tidyType env) ids)
+tidySkolemInfo env (UnifyForAllSkol ty) = UnifyForAllSkol (tidyType env ty)
+tidySkolemInfo _   info                 = info

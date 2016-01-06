@@ -301,11 +301,11 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
   where
     insoluble    = isInsolubleStatus status
     (env1, tvs') = mapAccumL tidyTyCoVarBndr (cec_tidy ctxt) tvs
-    (env2, info') = tidySkolemInfo env1 info
+    info'        = tidySkolemInfo env1 info
     implic' = implic { ic_skols = tvs'
-                     , ic_given = map (tidyEvVar env2) given
+                     , ic_given = map (tidyEvVar env1) given
                      , ic_info  = info' }
-    ctxt' = ctxt { cec_tidy     = env2
+    ctxt' = ctxt { cec_tidy     = env1
                  , cec_encl     = implic' : cec_encl ctxt
                  , cec_suppress = insoluble  -- Suppress inessential errors if there
                                              -- are are insolubles anywhere in the

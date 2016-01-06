@@ -3065,7 +3065,7 @@ deferTcSForAllEq role loc kind_cos (bndrs1,body1) (bndrs2,body2)
       ; (subst, skol_tvs) <- wrapTcS $ TcM.tcInstSkolTyVars tvs1
       ; let phi1  = Type.substTyUnchecked subst body1
             phi2  = Type.substTyUnchecked subst body2'
-            skol_info = UnifyForAllSkol skol_tvs phi1
+            skol_info = UnifyForAllSkol phi1
 
       ; (ctev, hole_co) <- newWantedEq loc role phi1 phi2
       ; env <- getLclEnv
