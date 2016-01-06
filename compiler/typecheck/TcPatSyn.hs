@@ -257,7 +257,7 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details
        -- Solve the constraints now, because we are about to make a PatSyn,
        -- which should not contain unification variables and the like (Trac #10997)
        -- Since all the inputs are implications the returned bindings will be empty
-       ; _ <- simplifyTop (emptyWC `addImplics` implics)
+       ; _ <- simplifyTop (mkImplicWC implics)
 
        -- ToDo: in the bidirectional case, check that the ex_tvs' are all distinct
        -- Otherwise we may get a type error when typechecking the builder,

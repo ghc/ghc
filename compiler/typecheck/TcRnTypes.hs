@@ -79,7 +79,8 @@ module TcRnTypes(
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         toDerivedWC,
-        andWC, unionsWC, addSimples, addImplics, mkSimpleWC, addInsols,
+        andWC, unionsWC, mkSimpleWC, mkImplicWC,
+        addInsols, addSimples, addImplics,
         tyCoVarsOfWC, dropDerivedWC, dropDerivedSimples, dropDerivedInsols,
         isDroppableDerivedLoc, insolubleImplic,
         arisesFromGivens,
@@ -1836,6 +1837,10 @@ mkSimpleWC cts
        , wc_impl = emptyBag
        , wc_insol = emptyBag }
 
+mkImplicWC :: Bag Implication -> WantedConstraints
+mkImplicWC implic
+  = WC { wc_simple = emptyBag, wc_impl = implic, wc_insol = emptyBag }
+
 isEmptyWC :: WantedConstraints -> Bool
 isEmptyWC (WC { wc_simple = f, wc_impl = i, wc_insol = n })
   = isEmptyBag f && isEmptyBag i && isEmptyBag n
@@ -2482,6 +2487,9 @@ data SkolemInfo
 
   | ClsSkol Class       -- Bound at a class decl
 
+  | DerivSkol Type      -- Bound by a 'deriving' clause;
+                        -- the type is the instance we are trying to derive
+
   | InstSkol            -- Bound at an instance decl
   | InstSC TypeSize     -- A "given" constraint obtained by superclass selection.
                         -- If (C ty1 .. tyn) is the largest class from
@@ -2526,6 +2534,7 @@ pprSkolInfo (SigSkol ctxt ty) = pprSigSkolInfo ctxt ty
 pprSkolInfo (IPSkol ips)      = ptext (sLit "the implicit-parameter binding") <> plural ips <+> ptext (sLit "for")
                                 <+> pprWithCommas ppr ips
 pprSkolInfo (ClsSkol cls)     = ptext (sLit "the class declaration for") <+> quotes (ppr cls)
+pprSkolInfo (DerivSkol pred)  = ptext (sLit "the deriving clause for") <+> quotes (ppr pred)
 pprSkolInfo InstSkol          = ptext (sLit "the instance declaration")
 pprSkolInfo (InstSC n)        = ptext (sLit "the instance declaration") <> ifPprDebug (parens (ppr n))
 pprSkolInfo DataSkol          = ptext (sLit "a data type declaration")
