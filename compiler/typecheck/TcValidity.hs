@@ -1022,7 +1022,7 @@ It checks for three things
     Note that 'b' isn't a parameter of T.  This gives rise to all sorts of
     problems; in particular, it's hard to compare solutions for equality
     when finding the fixpoint, and that means the inferContext loop does
-   not converge.  See Trac #5287.
+    not converge.  See Trac #5287.
 
 Note [Equality class instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
