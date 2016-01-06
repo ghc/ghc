@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 
 module TcSimplify(
-       simplifyInfer, solveTopConstraints,
+       simplifyInfer,
        growThetaTyVars,
        simplifyAmbiguityCheck,
        simplifyDefault,
@@ -186,14 +186,6 @@ defaultCallStacks wanteds
   defaultCallStack ct
     = return (Just ct)
 
-
--- | Type-check a thing, returning the result and any EvBinds produced
--- during solving. Emits errors -- but does not fail -- if there is trouble.
-solveTopConstraints :: TcM a -> TcM (a, Bag EvBind)
-solveTopConstraints thing_inside
-  = do { (result, wanted) <- captureConstraints thing_inside
-       ; ev_binds <- simplifyTop wanted
-       ; return (result, ev_binds) }
 
 {-
 Note [When to do type-class defaulting]

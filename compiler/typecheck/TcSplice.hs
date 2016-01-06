@@ -528,7 +528,8 @@ tcTopSpliceExpr isTypedSplice tc_action
                    -- is expected (Trac #7276)
     setStage (Splice isTypedSplice) $
     do {    -- Typecheck the expression
-         (expr', const_binds) <- solveTopConstraints tc_action
+         (expr', wanted) <- captureConstraints tc_action
+       ; const_binds     <- simplifyTop wanted
 
           -- Zonk it and tie the knot of dictionary bindings
        ; zonkTopLExpr (mkHsDictLet (EvBinds const_binds) expr') }
