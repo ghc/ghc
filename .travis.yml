@@ -5,19 +5,17 @@ os:
     - osx
 
 env:
-    - CABALVER=1.22
-    - GHCVER=7.10.3
+    - CABALVER=1.22 GHCVER=7.10.3
 
 addons:
-    linux:
-        apt:
-            packages:
-                - ghc-7.10.3,
-                - alex-3.1.4,
-                - happy-1.19.5,
-                - cabal-install-1.22,
-                - zlib1g-dev
-            sources: hvr-ghc
+    apt:
+        packages:
+            - ghc-7.10.3,
+            - alex-3.1.4,
+            - happy-1.19.5,
+            - cabal-install-1.22,
+            - zlib1g-dev
+        sources: hvr-ghc
 
 before_install:
 
