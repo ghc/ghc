@@ -18,6 +18,8 @@ matrix:
               - PATH="/opt/cabal/$CABALVER/bin:$PATH"
               - PATH="$HOME/.cabal/bin:$PATH"
               - export PATH
+              - cabal update
+
         - os: osx
           before_install:
               - brew update
@@ -27,15 +29,14 @@ matrix:
               - PATH="$HOME/.cabal/bin:$PATH"
               - export PATH
 
-before_install:
+
+install:
+
     - env
     - ghc --version
     - cabal --version
     - alex --version
     - happy --version
-    - cabal update
-
-install:
 
     - travis_retry git clone git://git.haskell.org/ghc --recurse-submodules
 
