@@ -23,7 +23,7 @@ module TcEnv(
         lookupGlobal,
 
         -- Local environment
-        tcExtendKindEnv, tcExtendKindEnv2,
+        tcExtendKindEnv2,
         tcExtendTyVarEnv, tcExtendTyVarEnv2,
         tcExtendLetEnv, tcExtendLetEnvIds,
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2,
@@ -367,16 +367,13 @@ getInLocalScope = do { lcl_env <- getLclTypeEnv
 
 tcExtendKindEnv2 :: [(Name, TcTyThing)] -> TcM r -> TcM r
 -- Used only during kind checking, for TcThings that are
---      AThing or APromotionErr
+--      ATcTyCon or APromotionErr
 -- No need to update the global tyvars, or tcl_th_bndrs, or tcl_rdr
 tcExtendKindEnv2 things thing_inside
-  = updLclEnv upd_env thing_inside
+  = do { traceTc "txExtendKindEnv" (ppr things)
+       ; updLclEnv upd_env thing_inside }
   where
     upd_env env = env { tcl_env = extendNameEnvList (tcl_env env) things }
-
-tcExtendKindEnv :: [(Name, TcKind)] -> TcM r -> TcM r
-tcExtendKindEnv nks
-  = tcExtendKindEnv2 $ mapSnd AThing nks
 
 -----------------------
 -- Scoped type and kind variables
@@ -517,7 +514,7 @@ tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
     get_tvs (_, ATyVar _ tv) tvs          -- See Note [Global TyVars]
       = tvs `unionVarSet` tyCoVarsOfType (tyVarKind tv) `extendVarSet` tv
 
-    get_tvs (_, AThing k) tvs = tvs `unionVarSet` tyCoVarsOfType k
+    get_tvs (_, ATcTyCon tc) tvs = tvs `unionVarSet` tyCoVarsOfType (tyConKind tc)
 
     get_tvs (_, AGlobal {})       tvs = tvs
     get_tvs (_, APromotionErr {}) tvs = tvs

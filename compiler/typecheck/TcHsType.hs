@@ -999,12 +999,12 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
        ; case thing of
            ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)
 
-           AThing kind -> do { data_kinds <- xoptM LangExt.DataKinds
-                             ; unless (isTypeLevel (mode_level mode) ||
-                                       data_kinds) $
-                               promotionErr name NoDataKinds
-                             ; tc <- get_loopy_tc name
-                             ; return (mkNakedTyConApp tc [], kind) }
+           ATcTyCon tc_tc -> do { data_kinds <- xoptM LangExt.DataKinds
+                                ; unless (isTypeLevel (mode_level mode) ||
+                                          data_kinds) $
+                                  promotionErr name NoDataKinds
+                                ; tc <- get_loopy_tc name tc_tc
+                                ; return (mkNakedTyConApp tc [], tyConKind tc_tc) }
                              -- mkNakedTyConApp: see Note [Type-checking inside the knot]
                  -- NB: we really should check if we're at the kind level
                  -- and if the tycon is promotable if -XNoTypeInType is set.
@@ -1041,17 +1041,23 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
 
            _  -> wrongThingErr "type" thing name }
   where
-    get_loopy_tc name
+    get_loopy_tc :: Name -> TyCon -> TcM TyCon
+    -- Return the knot-tied global TyCon if there is one
+    -- Otherwise the local TcTyCon; we must be doing kind checking
+    -- but we still want to return a TyCon of some sort to use in
+    -- error messages
+    get_loopy_tc name tc_tc
       = do { env <- getGblEnv
            ; case lookupNameEnv (tcg_type_env env) name of
                 Just (ATyCon tc) -> return tc
-                _                -> return (aThingErr "tcTyVar" name) }
+                _                -> do { traceTc "lk1 (loopy)" (ppr name)
+                                       ; return tc_tc } }
 
 tcClass :: Name -> TcM (Class, TcKind)
 tcClass cls     -- Must be a class
   = do { thing <- tcLookup cls
        ; case thing of
-           AThing kind -> return (aThingErr "tcClass" cls, kind)
+           ATcTyCon tc -> return (aThingErr "tcClass" cls, tyConKind tc)
            AGlobal (ATyCon tc)
              | Just cls <- tyConClass_maybe tc
              -> return (cls, tyConKind tc)
@@ -1651,7 +1657,7 @@ kcLookupKind :: Name -> TcM Kind
 kcLookupKind nm
   = do { tc_ty_thing <- tcLookup nm
        ; case tc_ty_thing of
-           AThing k            -> return k
+           ATcTyCon tc         -> return (tyConKind tc)
            AGlobal (ATyCon tc) -> return (tyConKind tc)
            _                   -> pprPanic "kcLookupKind" (ppr tc_ty_thing) }
 

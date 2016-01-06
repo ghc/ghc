@@ -875,9 +875,10 @@ data TcTyThing
                                 -- for error-message purposes; it is the corresponding
                                 -- Name in the domain of the envt
 
-  | AThing  TcKind   -- Used temporarily, during kind checking, for the
+  | ATcTyCon TyCon   -- Used temporarily, during kind checking, for the
                      -- tycons and clases in this recursive group
-                     -- Can be a mono-kind or a poly-kind; in TcTyClsDcls see
+                     -- The TyCon is always a TcTyCon.  Its kind
+                     -- can be a mono-kind or a poly-kind; in TcTyClsDcls see
                      -- Note [Type checking recursive type and class declarations]
 
   | APromotionErr PromotionErr
@@ -905,7 +906,7 @@ instance Outputable TcTyThing where     -- Debugging only
                                  <> ppr (varType (tct_id elt)) <> comma
                                  <+> ppr (tct_closed elt))
    ppr (ATyVar n tv)    = text "Type variable" <+> quotes (ppr n) <+> equals <+> ppr tv
-   ppr (AThing k)       = text "AThing" <+> ppr k
+   ppr (ATcTyCon tc)    = text "ATcTyCon" <+> ppr tc
    ppr (APromotionErr err) = text "APromotionErr" <+> ppr err
 
 instance Outputable PromotionErr where
@@ -922,7 +923,7 @@ pprTcTyThingCategory :: TcTyThing -> SDoc
 pprTcTyThingCategory (AGlobal thing)    = pprTyThingCategory thing
 pprTcTyThingCategory (ATyVar {})        = ptext (sLit "Type variable")
 pprTcTyThingCategory (ATcId {})         = ptext (sLit "Local identifier")
-pprTcTyThingCategory (AThing {})        = ptext (sLit "Kinded thing")
+pprTcTyThingCategory (ATcTyCon {})     = ptext (sLit "Local tycon")
 pprTcTyThingCategory (APromotionErr pe) = pprPECategory pe
 
 pprPECategory :: PromotionErr -> SDoc
