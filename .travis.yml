@@ -59,3 +59,16 @@ script:
 cache:
     directories:
         - $HOME/.cabal
+        - $HOME/.ghc
+
+notifications:
+    irc:
+        on_success: always # always/never/change
+        on_failure: always
+        channels:
+            - "chat.freenode.net#shaking-up-ghc"
+        template:
+            - "#%{build_number} finished in %{duration}. %{message}"
+            - "Repo: %{repository_slug}, branch: %{branch}"
+            - "%{author}: %{commit_subject}"
+            - "Build details: %{build_url}"
