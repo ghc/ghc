@@ -2,38 +2,41 @@ sudo: false
 
 matrix:
     include:
-        - env:
-            CABALVER=1.22
-            GHCVER=7.10.3
+        - os: linux
+          env: CABALVER=1.22 GHCVER=7.10.3
+          addons:
+              apt:
+                  packages:
+                      - ghc-7.10.3
+                      - alex-3.1.4
+                      - happy-1.19.5
+                      - cabal-install-1.22
+                      - zlib1g-dev
+                  sources: hvr-ghc
+          before_install:
+              - PATH="/opt/ghc/$GHCVER/bin:$PATH"
+              - PATH="/opt/cabal/$CABALVER/bin:$PATH"
+              - PATH="$HOME/.cabal/bin:$PATH"
+              - export PATH
+              - cabal update
 
-          addons: {
-              apt: {
-                  packages: [
-                      ghc-7.10.3,
-                      alex-3.1.4,
-                      happy-1.19.5,
-                      cabal-install-1.22,
-                      zlib1g-dev
-                  ],
-                  sources: [hvr-ghc]
-              }
-          }
+        - os: osx
+          before_install:
+              - brew update
+              - brew install ghc cabal-install
+              - cabal update
+              - cabal install alex happy
+              - PATH="$HOME/.cabal/bin:$PATH"
+              - export PATH
 
-before_install:
 
-    - PATH="$HOME/.cabal/bin:$PATH"
-    - PATH="/opt/ghc/$GHCVER/bin:$PATH"
-    - PATH="/opt/cabal/$CABALVER/bin:$PATH"
-    - export PATH
+install:
 
     - env
     - ghc --version
     - cabal --version
     - alex --version
     - happy --version
-    - cabal update
-
-install:
 
     - travis_retry git clone git://git.haskell.org/ghc --recurse-submodules
 
