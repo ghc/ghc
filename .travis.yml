@@ -4,28 +4,30 @@ matrix:
     include:
         - os: linux
           env: CABALVER=1.22 GHCVER=7.10.3
+          addons:
+              apt:
+                  packages:
+                      - ghc-7.10.3
+                      - alex-3.1.4
+                      - happy-1.19.5
+                      - cabal-install-1.22
+                      - zlib1g-dev
+                  sources: hvr-ghc
+          before_install:
+              - PATH="/opt/ghc/$GHCVER/bin:$PATH"
+              - PATH="/opt/cabal/$CABALVER/bin:$PATH"
+              - PATH="$HOME/.cabal/bin:$PATH"
+              - export PATH
         - os: osx
-
-addons:
-    apt:
-        packages:
-            - ghc-7.10.3
-            - alex-3.1.4
-            - happy-1.19.5
-            - cabal-install-1.22
-            - zlib1g-dev
-        sources: hvr-ghc
+          before_install:
+              - brew update
+              - brew install ghc cabal-install
+              - cabal update
+              - cabal install alex happy
+              - PATH="$HOME/.cabal/bin:$PATH"
+              - export PATH
 
 before_install:
-    - if [ $TRAVIS_OS_NAME == osx ]; then brew update; fi
-    - if [ $TRAVIS_OS_NAME == osx ]; then brew install ghc cabal-install; fi
-    - if [ $TRAVIS_OS_NAME == osx ]; then cabal update; fi
-    - if [ $TRAVIS_OS_NAME == osx ]; then cabal install alex happy; fi
-    - if [ $TRAVIS_OS_NAME == linux ]; then PATH="/opt/ghc/$GHCVER/bin:$PATH"; fi
-    - if [ $TRAVIS_OS_NAME == linux ]; then PATH="/opt/cabal/$CABALVER/bin:$PATH"; fi
-    - PATH="$HOME/.cabal/bin:$PATH"
-    - export PATH
-
     - env
     - ghc --version
     - cabal --version
