@@ -48,6 +48,7 @@ The highlights, since the 7.10 branch, are:
 
 - The reworked users guide you are now reading
 
+- Support for Windows XP and earlier has been dropped.
 
 Full details
 ------------
