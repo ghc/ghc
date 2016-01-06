@@ -116,7 +116,8 @@ integerGmpRules = do
             putBuild "| No GMP framework detected; in tree GMP will be built"
             runMake integerGmpBuild ["MAKEFLAGS='LIBTOOL=bash\\ libtool'"]
 
-            copyFile integerGmpLibraryInTreeH integerGmpLibraryH
+            copyFile (integerGmpBuild -/- "gmp.h") integerGmpLibraryInTreeH
+            copyFile (integerGmpBuild -/- "gmp.h") integerGmpLibraryH
             -- TODO: why copy library, can we move it instead?
             copyFile (integerGmpBuild -/- ".libs/libgmp.a") integerGmpLibrary
 
@@ -126,3 +127,5 @@ integerGmpRules = do
             runBuilder Ranlib [integerGmpLibrary]
 
         putSuccess "| Successfully built custom library 'integer-gmp'"
+
+    integerGmpLibraryInTreeH %> \_ -> need [integerGmpLibraryH]
