@@ -353,14 +353,15 @@ mkHashFun hsc_env eps
       let
         mod = ASSERT2( isExternalName name, ppr name ) nameModule name
         occ = nameOccName name
-        iface = lookupIfaceByModule (hsc_dflags hsc_env) hpt pit mod `orElse`
+        iface = lookupIfaceByModule dflags hpt pit mod `orElse`
                    pprPanic "lookupVers2" (ppr mod <+> ppr occ)
       in
         snd (mi_hash_fn iface occ `orElse`
                   pprPanic "lookupVers1" (ppr mod <+> ppr occ))
   where
-      hpt = hsc_HPT hsc_env
-      pit = eps_PIT eps
+      dflags = hsc_dflags hsc_env
+      hpt    = hsc_HPT hsc_env
+      pit    = eps_PIT eps
 
 -- ---------------------------------------------------------------------------
 -- Compute fingerprints for the interface
