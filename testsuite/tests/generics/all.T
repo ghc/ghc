@@ -35,7 +35,7 @@ test('GenDerivOutput1_1', normal, compile, ['-dsuppress-uniques'])
 
 test('T7878', extra_clean(['T7878A.o'     ,'T7878A.hi'
                           ,'T7878A.o-boot','T7878A.hi-boot'
-                          ,'T7878B.o'     ,'T7878B.hi']), 
+                          ,'T7878B.o'     ,'T7878B.hi']),
               multimod_compile, ['T7878', '-v0'])
 
 test('T8468', normal, compile_fail, [''])
@@ -44,3 +44,4 @@ test('T9563', normal, compile, [''])
 test('T10030', normal, compile_and_run, [''])
 test('T10361a', normal, compile, [''])
 test('T10361b', normal, compile, [''])
+test('T11358', normal, compile_and_run, [''])
