@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 module Oracles.WindowsRoot (
-    windowsRoot, fixAbsolutePathOnWindows, topDirectory, windowsRootOracle
+    windowsRoot, fixAbsolutePathOnWindows, lookupInPath, topDirectory, windowsRootOracle
     ) where
 
 import Data.Char (isSpace)
@@ -36,6 +36,15 @@ fixAbsolutePathOnWindows path = do
             root <- windowsRoot
             return . unifyPath $ root ++ drop 1 path
     else
+        return path
+
+-- | Lookup a @command@ in @PATH@ environment.
+lookupInPath :: FilePath -> Action FilePath
+lookupInPath command
+    | command /= takeFileName command = return command
+    | otherwise = do
+        Stdout out <- quietly $ cmd ["which", command]
+        let path = dropWhileEnd isSpace out
         return path
 
 -- Oracle for windowsRoot. This operation requires caching as looking up
