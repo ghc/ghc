@@ -236,6 +236,59 @@ import qualified GHC.LanguageExtensions as LangExt
 -- have effect, and annotate it accordingly. For Flags use defFlag, defGhcFlag,
 -- defGhciFlag, and for FlagSpec use flagSpec or flagGhciSpec.
 
+-- Note [Adding a language extension]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- There are a few steps to adding (or removing) a language extension,
+--
+--  * Adding the extension to GHC.LanguageExtensions
+--
+--    The LangExt type in libraries/ghc-boot/GHC/LanguageExtensions.hs is
+--    the canonical list of language extensions known by GHC.
+--
+--  * Adding a flag to DynFlags.xFlags
+--
+--    This is fairly self-explanatory. The name should be concise, memorable,
+--    and consistent with any previous implementations of the similar idea in
+--    other Haskell compilers.
+--
+--  * Adding the flag to the documentation
+--
+--    This is the same as any other flag. See
+--    Note [Updating flag description in the User's Guide]
+--
+--  * Adding the flag to Cabal
+--
+--    The Cabal library has its own list of all language extensions supported
+--    by all major compilers. This is the list that user code being uploaded
+--    to Hackage is checked against to ensure language extension validity.
+--    Consequently, it is very important that this list remains up-to-date.
+--
+--    To this end, there is a testsuite test (testsuite/tests/driver/T4437.hs)
+--    whose job it is to ensure these GHC's extensions are consistent with
+--    Cabal.
+--
+--    The recommended workflow is,
+--
+--     1. Temporarily add your new language extension to the
+--        expectedGhcOnlyExtensions list in T4437 to ensure the test doesn't
+--        break while Cabal is updated.
+--
+--     2. After your GHC change is accepted, submit a Cabal pull request adding
+--        your new extension to Cabal's list (found in
+--        Cabal/Language/Haskell/Extension.hs).
+--
+--     3. After your Cabal change is accepted, let the GHC developers know so
+--        they can update the Cabal submodule and remove the extensions from
+--        expectedGhcOnlyExtensions.
+--
+--  * Adding the flag to the GHC Wiki
+--
+--    There is a change log tracking language extension additions and removals
+--    on the GHC wiki:  https://ghc.haskell.org/trac/ghc/wiki/LanguagePragmaHistory
+--
+--  See Trac #4437 and #8176.
+
 -- -----------------------------------------------------------------------------
 -- DynFlags
 
@@ -3108,6 +3161,7 @@ xFlags :: [FlagSpec LangExt.Extension]
 xFlags = [
 -- See Note [Updating flag description in the User's Guide]
 -- See Note [Supporting CLI completion]
+-- See Note [Adding a language extension]
 -- Please keep the list of flags below sorted alphabetically
   flagSpec "AllowAmbiguousTypes"              LangExt.AllowAmbiguousTypes,
   flagSpec "AlternativeLayoutRule"            LangExt.AlternativeLayoutRule,

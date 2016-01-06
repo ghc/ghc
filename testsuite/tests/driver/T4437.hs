@@ -1,3 +1,8 @@
+-- | A test for ensuring that GHC's supporting language extensions remains in
+-- sync with Cabal's own extension list.
+--
+-- If you have ended up here due to a test failure, please see
+-- Note [Adding a language extension] in compiler/main/DynFlags.hs.
 
 module Main (main) where
 
@@ -29,6 +34,7 @@ check title expected got
          showProblems "Unexpected flags" unexpected
          showProblems "Missing flags" missing
 
+-- See Note [Adding a language extension] in compiler/main/DynFlags.hs.
 expectedGhcOnlyExtensions :: [String]
 expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "AlternativeLayoutRule",
