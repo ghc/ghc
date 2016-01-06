@@ -1,5 +1,7 @@
 module Main (main) where
 
+import Development.Shake
+
 import qualified Base             as B
 import qualified Rules            as R
 import qualified Rules.Cabal      as RCabal
@@ -24,6 +26,6 @@ main = shakeArgs options rules
         , ROracle.oracleRules
         , R.packageRules ]
     options = shakeOptions
-        { shakeFiles    = shakeFilesPath
+        { shakeFiles    = B.shakeFilesPath
         , shakeProgress = progressSimple
         , shakeTimings  = True }
