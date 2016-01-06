@@ -392,8 +392,9 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
                     -- The arity is set by the simplifier using exprEtaExpandArity
                     -- So it may be more than the number of top-level-visible lambdas
 
-    work_res_info | isBotRes res_info = botRes  -- Cpr stuff done by wrapper
-                  | otherwise         = topRes
+    work_res_info = case returnsCPR_maybe res_info of
+                       Just _  -> topRes    -- Cpr stuff done by wrapper; kill it here
+                       Nothing -> res_info  -- Preserve exception/divergence
 
     one_shots = get_one_shots rhs
 

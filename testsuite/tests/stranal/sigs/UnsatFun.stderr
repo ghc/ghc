@@ -1,8 +1,8 @@
 
 ==================== Strictness signatures ====================
 UnsatFun.$trModule: m
-UnsatFun.f: <B,1*U(U)><B,A>b
-UnsatFun.g: <B,1*U(U)>b
+UnsatFun.f: <B,1*U(U)><B,A>x
+UnsatFun.g: <B,1*U(U)>x
 UnsatFun.g': <L,1*U(U)>
 UnsatFun.g3: <L,U(U)>m
 UnsatFun.h: <C(S),1*C1(U(U))>

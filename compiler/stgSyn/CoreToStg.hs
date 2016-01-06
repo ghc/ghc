@@ -41,7 +41,7 @@ import FastString
 import Util
 import DynFlags
 import ForeignCall
-import Demand           ( isSingleUsed )
+import Demand           ( isUsedOnce )
 import PrimOp           ( PrimCall(..) )
 
 import Data.Maybe    (isJust)
@@ -833,8 +833,8 @@ mkStgRhs' con_updateable rhs_fvs srt bndr binder_info rhs
 
     (_, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
 
-    upd_flag | isSingleUsed (idDemandInfo bndr)  = SingleEntry
-             | otherwise                         = Updatable
+    upd_flag | isUsedOnce (idDemandInfo bndr) = SingleEntry
+             | otherwise                      = Updatable
 
   {-
     SDM: disabled.  Eval/Apply can't handle functions with arity zero very

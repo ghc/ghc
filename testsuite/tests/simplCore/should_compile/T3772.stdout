@@ -16,7 +16,7 @@ end Rec }
 
 -- RHS size: {terms: 14, types: 5, coercions: 0}
 foo [InlPrag=NOINLINE] :: Int -> ()
-[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U(U)>]
+[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S(S),1*U(U)>]
 foo =
   \ (n :: Int) ->
     case n of _ [Occ=Dead] { GHC.Types.I# y ->
