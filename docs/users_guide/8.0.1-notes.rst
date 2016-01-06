@@ -16,25 +16,26 @@ The highlights, since the 7.10 branch, are:
 
 - nokinds
 
-- Record pattern synonyms
+- Support for :ref:`record pattern synonyms <record-patsyn>`
 
-- ``-XDeriveAnyClass``
+- ``-XDeriveAnyClass`` to conveniently derive default instances (see :ref:`derive-any-class`)
 
 - More reliable DWARF debugging information
 
-- Injective type classes
+- Support for :ref:`injective type classes :ref:`injective-ty-fams`
 
-- Applicative ``do`` notation
+- Applicative ``do`` notation (see :ref:`applicative-do`)
 
 - Support for wildcards in data and type family instances
 
 - ``Strict`` and ``StrictData`` extensions, allowing modules to be compiled with
-   strict-by-default bindings.
+   strict-by-default bindings (see :ref:`strict-haskell`)
 
 - ``DuplicateRecordFields``, allowing multiple datatypes to declare the same
-  record field names provided they are used unambiguously
+  record field names provided they are used unambiguously (see :ref:`duplicate-record-fields`)
 
-- Support for implicit parameters providing light-weight callstacks and source locations
+- Support for implicit parameters providing light-weight
+  :ref:`callstacks and source locations <implicit-callstacks>`
 
 - User-defined error messages for type errors
 
@@ -460,7 +461,8 @@ See ``changelog.md`` in the ``base`` package for full release notes.
   ``zipWithM`` and ``replicateM_`` (see :ghc-ticket:`10168`).
 
 - Add ``GHC.TypeLits.TypeError`` and ``ErrorMessage`` to allow users
-  to define custom compile-time error messages.
+  to define custom compile-time error messages. (see :ref:`custom-errors` and
+  the original :ghc-wiki:`proposal <Proposal/CustomTypeErrors>`).
 
 - The ``Generic`` instance for ``Proxy`` is now poly-kinded (see :ghc-ticket:`10775`)
 
