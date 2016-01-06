@@ -94,7 +94,11 @@ runConfigure :: FilePath -> [CmdOption] -> [String] -> Action ()
 runConfigure dir opts args = do
     need [dir -/- "configure"]
     putBuild $ "| Run configure in " ++ dir ++ "..."
-    quietly $ cmd Shell (EchoStdout False) [Cwd dir] "bash configure" opts args
+    quietly $ cmd Shell (EchoStdout False) [Cwd dir] "bash configure" opts' args
+    where
+        -- Always configure with bash.
+        -- This also injects /bin/bash into `libtool`, instead of /bin/sh
+        opts' = opts ++ [AddEnv "CONFIG_SHELL" "/bin/bash"]
 
 runMake :: FilePath -> [String] -> Action ()
 runMake dir args = do
