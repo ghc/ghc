@@ -25,7 +25,6 @@ import Module           ( Module, moduleName, moduleNameFS
                         , moduleUnitId, unitIdFS )
 import IfaceEnv         ( newGlobalBinder )
 import Name      hiding ( varName )
-import NameEnv ( lookupNameEnv )
 import RdrName
 import BasicTypes
 import TysPrim
@@ -574,18 +573,15 @@ tc_mkRepTy gk_ tycon =
                               else promotedFalseDataCon
 
         ctName = mkStrLitTy . occNameFS . nameOccName . dataConName
-        ctFix c = case myLookupFixity fix_env (dataConName c) of
-                    Just (Fixity n InfixL) -> buildFix n pLA
-                    Just (Fixity n InfixR) -> buildFix n pRA
-                    Just (Fixity n InfixN) -> buildFix n pNA
-                    Nothing                -> mkTyConTy pPrefix
+        ctFix c
+            | dataConIsInfix c
+            = case lookupFixity fix_env (dataConName c) of
+                   Fixity n InfixL -> buildFix n pLA
+                   Fixity n InfixR -> buildFix n pRA
+                   Fixity n InfixN -> buildFix n pNA
+            | otherwise = mkTyConTy pPrefix
         buildFix n assoc = mkTyConApp pInfix [ mkTyConTy assoc
                                              , mkNumLitTy (fromIntegral n)]
-
-        myLookupFixity :: FixityEnv -> Name -> Maybe Fixity
-        myLookupFixity env n = case lookupNameEnv env n of
-                                 Just (FixItem _ fix) -> Just fix
-                                 Nothing              -> Nothing
 
         isRec c = mkTyConTy $ if length (dataConFieldLabels c) > 0
                               then promotedTrueDataCon
