@@ -1513,10 +1513,12 @@ addInertSafehask _ item
   = pprPanic "addInertSafehask: can't happen! Inserting " $ ppr item
 
 insertSafeOverlapFailureTcS :: Ct -> TcS ()
+-- See Note [Safe Haskell Overlapping Instances Implementation] in TcSimplify
 insertSafeOverlapFailureTcS item
   = updInertCans (\ics -> addInertSafehask ics item)
 
 getSafeOverlapFailures :: TcS Cts
+-- See Note [Safe Haskell Overlapping Instances Implementation] in TcSimplify
 getSafeOverlapFailures
  = do { IC { inert_safehask = safehask } <- getInertCans
       ; return $ foldDicts consCts safehask emptyCts }
@@ -3027,7 +3029,7 @@ deferTcSForAllEq role loc kind_cos (bndrs1,body1) (bndrs2,body2)
       ; (subst, skol_tvs) <- wrapTcS $ TcM.tcInstSkolTyVars tvs1
       ; let phi1  = Type.substTy subst body1
             phi2  = Type.substTy subst body2'
-            skol_info = UnifyForAllSkol skol_tvs phi1
+            skol_info = UnifyForAllSkol phi1
 
       ; (ctev, hole_co) <- newWantedEq loc role phi1 phi2
       ; env <- getLclEnv
