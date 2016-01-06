@@ -8,10 +8,14 @@ install:
     - bash -lc "mkdir /usr/local"
     - bash -lc "mkdir /usr/local/bin"
     - bash -lc "curl -LsS https://www.haskell.org/cabal/release/cabal-install-1.22.0.0/cabal-1.22.0.0-i386-unknown-mingw32.tar.gz | tar -xz -C /usr/local/bin"
+    - ren C:\msys64\usr\local\bin\cabal-1.22.0.0-i386-unknown-mingw32.exe C:\msys64\usr\local\bin\cabal.exe
     - bash -lc "cabal update"
     - bash -lc "cabal install -j --prefix=/usr/local alex happy"
+    - bash -lc "git clone --recursive git://git.haskell.org/ghc.git /home/ghc"
 
 build_script:
-    - echo "test"
+    - bash -lc "cd /home/ghc && ./boot"
+    - bash -lc "cd /home/ghc && ./configure --enable-tarballs-autodownload"
+    - bash -lc "cd /home/ghc && ./shake-build/build.bat"
 
 test: off
