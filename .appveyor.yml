@@ -1,22 +1,23 @@
 clone_folder: "C:\\msys64\\home\\ghc\\shake-build"
 
 cache:
-    - "C:\\msys64\\home\\ghc\\.cabal"
+    - "C:\\msys64\\home\\cabal"
 
 install:
     - set MSYSTEM=MINGW64
     - set PATH=C:\msys64\mingw64\bin;C:\msys64\usr\local\bin;C:\msys64\usr\bin;%PATH%
     - bash -lc "pacman -S --noconfirm git binutils p7zip gcc"
     - bash -lc "curl -LsS http://www.haskell.org/ghc/dist/7.10.1/ghc-7.10.1-x86_64-unknown-mingw32.tar.xz | tar -xJ -C /mingw64 --strip-components=1"
-    - bash -lc "mkdir -p /home/ghc/.cabal"
+    - bash -lc "mkdir -p /home/cabal"
+    - bash -lc "chmod -R 777 /home/cabal"
     - bash -lc "mkdir -p /usr/local"
     - bash -lc "mkdir -p /usr/local/bin"
     - bash -lc "curl -LsS https://www.haskell.org/cabal/release/cabal-install-1.22.0.0/cabal-1.22.0.0-i386-unknown-mingw32.tar.gz | tar -xz -C /usr/local/bin"
     - bash -lc "mv /usr/local/bin/cabal-1.22.0.0-i386-unknown-mingw32.exe /usr/local/bin/cabal.exe"
-    - bash -lc "cabal --config-file=/home/ghc/.cabal update"
-    - bash -lc "cabal --config-file=/home/ghc/.cabal install -j --prefix=/usr/local alex happy"
+    - bash -lc "cabal --config-file=/home/cabal update"
+    - bash -lc "cabal --config-file=/home/cabal install -j --prefix=/usr/local alex happy"
     - bash -lc "git clone --recursive git://git.haskell.org/ghc.git /home/ghc"
-    - bash -lc "cd /home/ghc/shake-build && cabal --config-file=/home/ghc/.cabal install --only-dependencies"
+    - bash -lc "cd /home/ghc/shake-build && cabal --config-file=/home/cabal install --only-dependencies"
 
 build_script:
     - bash -lc "cd /home/ghc && ./boot"
