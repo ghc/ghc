@@ -4,24 +4,20 @@ os:
     - linux
     - osx
 
-matrix:
-    include:
-        - env:
-            CABALVER=1.22
-            GHCVER=7.10.3
+env:
+    - CABALVER=1.22
+    - GHCVER=7.10.3
 
-          addons: {
-              apt: {
-                  packages: [
-                      ghc-7.10.3,
-                      alex-3.1.4,
-                      happy-1.19.5,
-                      cabal-install-1.22,
-                      zlib1g-dev
-                  ],
-                  sources: [hvr-ghc]
-              }
-          }
+addons:
+    linux:
+        apt:
+            packages:
+                - ghc-7.10.3,
+                - alex-3.1.4,
+                - happy-1.19.5,
+                - cabal-install-1.22,
+                - zlib1g-dev
+            sources: hvr-ghc
 
 before_install:
 
