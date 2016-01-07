@@ -1,26 +1,26 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
-module Oracles.AbsoluteCommand (
-    lookupInPathOracle, absoluteCommandOracle
+module Oracles.LookupInPath (
+    lookupInPath, lookupInPathOracle
     ) where
 
 import Base
 
-newtype AbsoluteCommand = AbsoluteCommand String
+newtype LookupInPath = LookupInPath String
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
 -- | Fetches the absolute FilePath to a given FilePath from the
 -- Oracle.
-absoluteCommand :: FilePath -> Action FilePath
-absoluteCommand = askOracle . AbsoluteCommand
+commandPath :: FilePath -> Action FilePath
+commandPath = askOracle . LookupInPath
 
 -- | Lookup a @command@ in @PATH@ environment.
-lookupInPathOracle :: FilePath -> Action FilePath
-lookupInPathOracle c
+lookupInPath :: FilePath -> Action FilePath
+lookupInPath c
     | c /= takeFileName c = return c
-    | otherwise           = absoluteCommand c
+    | otherwise           = commandPath c
 
-absoluteCommandOracle :: Rules ()
-absoluteCommandOracle = do
+lookupInPathOracle :: Rules ()
+lookupInPathOracle = do
     o <- newCache $ \c -> do
         envPaths <- wordsWhen (== ':') <$> getEnvWithDefault "" "PATH"
         let candidates = map (-/- c) envPaths
@@ -28,5 +28,5 @@ absoluteCommandOracle = do
         fullCommand <- head <$> filterM doesFileExist candidates
         putOracle $ "Found '" ++ c ++ "' at " ++ "'" ++ fullCommand ++ "'"
         return fullCommand
-    _ <- addOracle $ \(AbsoluteCommand c) -> o c
+    _ <- addOracle $ \(LookupInPath c) -> o c
     return ()

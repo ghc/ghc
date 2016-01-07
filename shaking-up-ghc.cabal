@@ -22,12 +22,12 @@ executable ghc-shake
                        , Expression
                        , GHC
                        , Oracles
-                       , Oracles.AbsoluteCommand
                        , Oracles.ArgsHash
                        , Oracles.Config
                        , Oracles.Config.Flag
                        , Oracles.Config.Setting
                        , Oracles.Dependencies
+                       , Oracles.LookupInPath
                        , Oracles.ModuleFiles
                        , Oracles.PackageData
                        , Oracles.PackageDeps
