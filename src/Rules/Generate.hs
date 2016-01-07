@@ -76,7 +76,7 @@ generatedDependencies :: Stage -> Package -> [FilePath]
 generatedDependencies stage pkg
     | pkg   == compiler = compilerDependencies stage
     | pkg   == ghcPrim  = ghcPrimDependencies stage
-    | pkg   == rts      = derivedConstantsDependencies
+    | pkg   == rts      = includesDependencies ++ derivedConstantsDependencies
     | stage == Stage0   = defaultDependencies
     | otherwise         = []
 

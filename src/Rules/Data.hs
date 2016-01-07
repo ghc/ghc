@@ -104,9 +104,8 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
                     fullTarget target (GhcPkg stage) [rtsConf] []
 
             rtsConf %> \_ -> do
-                need [ rtsConfIn
-                     , "includes/ghcautoconf.h"
-                     , "includes/ghcplatform.h" ]
+                orderOnly $ generatedDependencies stage pkg
+                need [ rtsConfIn ]
                 build $ fullTarget target HsCpp [rtsConfIn] [rtsConf]
 
                 let fixRtsConf = unlines
