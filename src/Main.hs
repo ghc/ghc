@@ -9,15 +9,15 @@ import Rules.Oracles
 
 main :: IO ()
 main = shakeArgs options $ do
-    Rules.Cabal.cabalRules
-    Rules.Config.configRules
-    Rules.Generate.copyRules
-    Rules.generateTargets
-    Rules.Generate.generateRules
-    Rules.Libffi.libffiRules
-    Rules.IntegerGmp.integerGmpRules
-    Rules.Oracles.oracleRules
-    Rules.packageRules
+    cabalRules      -- see Rules.Cabal
+    configRules     -- see Rules.Config
+    copyRules       -- see Rules.Generate
+    generateTargets -- see Rules
+    generateRules   -- see Rules.Generate
+    libffiRules     -- see Rules.Libffi
+    integerGmpRules -- see Rules.IntegerGmp
+    oracleRules     -- see Rules.Oracles
+    packageRules    -- see Rules
   where
     options = shakeOptions
         { shakeFiles    = shakeFilesPath
