@@ -45,8 +45,8 @@ lookupInPath c
     | c /= takeFileName c = return c
     | otherwise = do
         envPaths <- splitOn ":" <$> getEnvWithDefault "" "PATH"
-        let candidates = map (-/- c) envPaths in
-        mapM_ putStrLn candidates
+        let candidates = map (-/- c) envPaths
+        liftIO $ mapM_ putStrLn candidates
         -- this will crash if we do not find any valid candidate.
         head <$> filterM doesFileExist candidates
 
