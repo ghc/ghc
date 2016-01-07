@@ -61,6 +61,8 @@ notStage0 = notM stage0
 notPackage :: Package -> Predicate
 notPackage = notM . package
 
--- | TODO: Actually, we don't register compiler in some circumstances -- fix.
+-- TODO: Actually, we don't register compiler in some circumstances -- fix.
+-- | Do we need to run @ghc-pkg update@ on the currently built package?
+-- See "Rules.Data".
 registerPackage :: Predicate
 registerPackage = return True

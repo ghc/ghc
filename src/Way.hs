@@ -82,7 +82,7 @@ instance Eq Way where
 
 -- | Build with no 'WayUnit's at all.
 vanilla :: Way
-vanilla   = wayFromUnits []
+vanilla = wayFromUnits []
 
 -- | Build with profiling.
 profiling :: Way
@@ -90,14 +90,14 @@ profiling = wayFromUnits [Profiling]
 
 -- | Build with logging.
 logging :: Way
-logging   = wayFromUnits [Logging]
+logging = wayFromUnits [Logging]
 
 -- | Build in parallel.
 parallel :: Way
-parallel  = wayFromUnits [Parallel]
+parallel = wayFromUnits [Parallel]
 
 granSim :: Way
-granSim   = wayFromUnits [GranSim]
+granSim = wayFromUnits [GranSim]
 
 -- RTS only ways
 -- TODO: do we need to define *only* these? Shall we generalise/simplify?
