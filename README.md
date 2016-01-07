@@ -42,7 +42,7 @@ uses `src/Settings/User.hs` for build specification.
 ### Building GHC using `shaking-up-ghc`
 
 ```bash
-./shake-build/build.sh       # linux / os x: to run the script directly. You'll need to have `shake` installed globally.
+./shake-build/build.sh       # linux / os x: to run the script directly.
 ./shake-build/build.cabal.sh # linux / os x: OR to install the build system in a Cabal sandbox and then run it.
 shake-build/build.bat        # windows
 ```
