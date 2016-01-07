@@ -10,8 +10,9 @@ install:
     - bash -lc "curl -LsS http://www.haskell.org/ghc/dist/7.10.1/ghc-7.10.1-x86_64-unknown-mingw32.tar.xz | tar -xJ -C /mingw64 --strip-components=1"
     - bash -lc "mkdir -p /usr/local"
     - bash -lc "mkdir -p /usr/local/bin"
-    - bash -lc "curl -LsS https://www.haskell.org/cabal/release/cabal-install-1.22.0.0/cabal-1.22.0.0-i386-unknown-mingw32.tar.gz | tar -xz -C /usr/local/bin"
-    - bash -lc "mv /usr/local/bin/cabal-1.22.0.0-i386-unknown-mingw32.exe /usr/local/bin/cabal.exe"
+    # - bash -lc "curl -LsS https://www.haskell.org/cabal/release/cabal-install-1.22.0.0/cabal-1.22.0.0-i386-unknown-mingw32.tar.gz | tar -xz -C /usr/local/bin"
+    # - bash -lc "mv /usr/local/bin/cabal-1.22.0.0-i386-unknown-mingw32.exe /usr/local/bin/cabal.exe"
+    - bash -lc "curl -LsS https://www.haskell.org/cabal/release/cabal-install-1.20.0.3/cabal-1.20.0.3-i386-unknown-mingw32.tar.gz | tar -xz -C /usr/local/bin"
     - bash -lc "cabal update -v3"
     - bash -lc "cabal install -j --prefix=/usr/local alex happy"
     - git clone --recursive git://git.haskell.org/ghc.git C:\msys64\mingw64\home\ghc\tmp
