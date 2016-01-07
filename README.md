@@ -1,7 +1,8 @@
 Shaking up GHC
 ==============
 
-[![Build Status](https://travis-ci.org/snowleopard/shaking-up-ghc.svg)](https://travis-ci.org/snowleopard/shaking-up-ghc)
+[![Build Status](https://travis-ci.org/snowleopard/shaking-up-ghc.svg)](https://travis-ci.org/snowleopard/shaking-up-ghc) [![Build status](https://ci.appveyor.com/api/projects/status/9er74sbnrkco98gb?svg=true&pendingText=Windows&passingText=Windows&failingText=Windows)](https://ci.appveyor.com/project/snowleopard/shaking-up-ghc)
+
 
 As part of my 6-month research secondment to Microsoft Research in Cambridge
 I am taking up the challenge of migrating the current [GHC][ghc] build system
