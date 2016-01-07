@@ -3,7 +3,7 @@ sudo: false
 matrix:
     include:
         - os: linux
-          env: CABALVER=1.22 GHCVER=7.10.3
+          env: CABALVER=1.22 GHCVER=7.10.3 TARGET=
           addons:
               apt:
                   packages:
@@ -21,6 +21,7 @@ matrix:
               - cabal update
 
         - os: osx
+          env: TARGET=libraries/base/stage1/build/libHSbase-4.9.0.0.a
           before_install:
               - brew update
               - brew install ghc cabal-install
@@ -54,7 +55,7 @@ install:
     - ( cd ghc && ./configure )
 
 script:
-    - ./ghc/shake-build/build.sh -j --no-progress
+    - ./ghc/shake-build/build.sh -j --no-progress $TARGET
 
 cache:
     directories:
