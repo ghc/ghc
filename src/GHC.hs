@@ -15,11 +15,11 @@ import Base
 import Package
 import Stage
 
--- These are all GHC packages we know about. Build rules will be generated for
+-- | These are all GHC packages we know about. Build rules will be generated for
 -- all of them. However, not all of these packages will be built. For example,
--- package 'win32' is built only on Windows.
--- Settings/Packages.hs defines default conditions for building each package,
--- which can be overridden in Settings/User.hs.
+-- package /win32/ is built only on Windows.
+-- "Packages" defines default conditions for building each package, which can
+-- be overridden in "User".
 defaultKnownPackages :: [Package]
 defaultKnownPackages =
     [ array, base, binary, bytestring, cabal, compiler, containers, compareSizes
@@ -30,7 +30,7 @@ defaultKnownPackages =
     , primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time
     , touchy, transformers, unix, win32, xhtml ]
 
--- Package definitions (see Package.hs)
+-- Package definitions (see "Package")
 array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
     deepseq, deriveConstants, directory, dllSplit, filepath, genapply,
     genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim, ghcTags,
@@ -95,16 +95,17 @@ xhtml           = library  "xhtml"
 -- completion, count_lines, coverity, debugNGC, describe-unexpected, genargs,
 -- lndir, mkdirhier, testremove, vagrant
 
--- GHC build results will be placed into target directories with the following
--- typical structure:
--- * build/          : contains compiled object code
--- * doc/            : produced by haddock
--- * package-data.mk : contains output of ghc-cabal applied to pkgCabal
+-- | GHC build results will be placed into target directories with the
+-- following typical structure:
+
+-- * @build/@ contains compiled object code
+-- * @doc/@ is produced by haddock
+-- * @package-data.mk@ contains output of ghc-cabal applied to pkgCabal
 defaultTargetDirectory :: Stage -> Package -> FilePath
 defaultTargetDirectory stage _ = stageString stage
 
 -- TODO: simplify, add programInplaceLibPath
--- | Returns a relative path to the program executable
+-- | The relative path to the program executable
 defaultProgramPath :: Stage -> Package -> Maybe FilePath
 defaultProgramPath stage pkg
     | pkg == ghc = Just . inplaceProgram $ "ghc-stage" ++ show (fromEnum stage + 1)

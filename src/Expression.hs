@@ -12,7 +12,7 @@ module Expression (
     -- ** Common expressions
     Args, Ways, Packages,
     -- ** Targets
-    Target, PartialTarget (..), fromPartial, fullTarget, fullTargetWithWay,
+    Target, PartialTarget (..), unsafeFromPartial, fullTarget, fullTargetWithWay,
 
     -- * Convenient accessors
     getStage, getPackage, getBuilder, getOutputs, getInputs, getWay,
@@ -150,7 +150,7 @@ interpret :: Target -> Expr a -> Action a
 interpret = flip runReaderT
 
 interpretPartial :: PartialTarget -> Expr a -> Action a
-interpretPartial = interpret . fromPartial
+interpretPartial = interpret . unsafeFromPartial
 
 interpretWithStage :: Stage -> Expr a -> Action a
 interpretWithStage s = interpretPartial $

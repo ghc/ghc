@@ -1,25 +1,30 @@
-import Base
-import Rules
-import Rules.Cabal
-import Rules.Config
-import Rules.Generate
-import Rules.Libffi
-import Rules.IntegerGmp
-import Rules.Oracles
+module Main (main) where
+
+import Development.Shake
+
+import qualified Base
+import qualified Rules
+import qualified Rules.Cabal
+import qualified Rules.Config
+import qualified Rules.Generate
+import qualified Rules.IntegerGmp
+import qualified Rules.Libffi
+import qualified Rules.Oracles
 
 main :: IO ()
-main = shakeArgs options $ do
-    cabalRules      -- see Rules.Cabal
-    configRules     -- see Rules.Config
-    copyRules       -- see Rules.Generate
-    generateTargets -- see Rules
-    generateRules   -- see Rules.Generate
-    libffiRules     -- see Rules.Libffi
-    integerGmpRules -- see Rules.IntegerGmp
-    oracleRules     -- see Rules.Oracles
-    packageRules    -- see Rules
+main = shakeArgs options rules
   where
+    rules = mconcat
+        [ Rules.Cabal.cabalRules
+        , Rules.Config.configRules
+        , Rules.Generate.copyRules
+        , Rules.Generate.generateRules
+        , Rules.generateTargets
+        , Rules.IntegerGmp.integerGmpRules
+        , Rules.Libffi.libffiRules
+        , Rules.Oracles.oracleRules
+        , Rules.packageRules ]
     options = shakeOptions
-        { shakeFiles    = shakeFilesPath
+        { shakeFiles    = Base.shakeFilesPath
         , shakeProgress = progressSimple
         , shakeTimings  = True }

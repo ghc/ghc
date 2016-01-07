@@ -7,49 +7,60 @@ module Predicates (
 import Base
 import Expression
 
--- Basic predicates
+-- | Is the build currently in the provided stage?
 stage :: Stage -> Predicate
 stage s = fmap (s ==) getStage
 
+-- | Is a particular package being built?
 package :: Package -> Predicate
 package p = fmap (p ==) getPackage
 
--- For unstaged builders, e.g. GhcCabal
+-- | Is an unstaged builder is being used such as /GhcCabal/?
 builder :: Builder -> Predicate
 builder b = fmap (b ==) getBuilder
 
--- For staged builders, e.g. Ghc Stage
+-- | Is a certain builder used in the current stage?
 stagedBuilder :: (Stage -> Builder) -> Predicate
-stagedBuilder sb = (builder . sb) =<< getStage
+stagedBuilder stageBuilder = do
+    s <- getStage
+    builder (stageBuilder s)
 
+-- | Are we building with GCC?
 builderGcc :: Predicate
 builderGcc = stagedBuilder Gcc ||^ stagedBuilder GccM
 
+-- | Are we building with GHC?
 builderGhc :: Predicate
 builderGhc = stagedBuilder Ghc ||^ stagedBuilder GhcM
 
+-- | Does any of the output files match a given pattern?
 file :: FilePattern -> Predicate
 file f = fmap (any (f ?==)) getOutputs
 
+-- | Is the current build 'Way' equal to a certain value?
 way :: Way -> Predicate
 way w = fmap (w ==) getWay
 
--- Derived predicates
+-- | Is the build currently in stage 0?
 stage0 :: Predicate
 stage0 = stage Stage0
 
+-- | Is the build currently in stage 1?
 stage1 :: Predicate
 stage1 = stage Stage1
 
+-- | Is the build currently in stage 2?
 stage2 :: Predicate
 stage2 = stage Stage2
 
+-- | Is the build /not/ in stage 0 right now?
 notStage0 :: Predicate
 notStage0 = notM stage0
 
+-- | Is a certain package /not/ built right now?
 notPackage :: Package -> Predicate
 notPackage = notM . package
 
--- TODO: Actually, we don't register compiler in some circumstances -- fix.
+-- | TODO: Actually, we don't register compiler in some circumstances -- fix.
 registerPackage :: Predicate
 registerPackage = return True

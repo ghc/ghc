@@ -180,7 +180,16 @@ putError msg = do
     putColoured Red msg
     error $ "GHC build system error: " ++ msg
 
--- | Render the given set of lines in a nice box of ASCII
+-- | Render the given set of lines in a nice box of ASCII.
+--
+-- The minimum width and whether to use Unicode symbols are hardcoded in the
+-- function's body.
+--
+-- >>> renderBox (words "lorem ipsum")
+-- /----------\
+-- | lorem    |
+-- | ipsum    |
+-- \----------/
 renderBox :: [String] -> String
 renderBox ls = tail $ concatMap ('\n' :) (boxTop : map renderLine ls ++ [boxBot])
   where
@@ -215,11 +224,13 @@ renderBox ls = tail $ concatMap ('\n' :) (boxTop : map renderLine ls ++ [boxBot]
         -- +1 for each non-dash (= corner) char
         dashes = replicate (boxContentWidth + 2) dash
 
--- Depending on Data.Bifunctor only for this function seems an overkill
+-- Explicit definition to avoid dependency on Data.Bifunctor
+-- | Bifunctor bimap.
 bimap :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
 bimap f g (x, y) = (f x, g y)
 
--- Depending on Data.List.Ordered only for these two functions seems an overkill
+-- Explicit definition to avoid dependency on Data.List.Ordered
+-- | Difference of two ordered lists.
 minusOrd :: Ord a => [a] -> [a] -> [a]
 minusOrd [] _  = []
 minusOrd xs [] = xs
@@ -228,6 +239,8 @@ minusOrd (x:xs) (y:ys) = case compare x y of
     EQ ->     minusOrd xs ys
     GT ->     minusOrd (x:xs) ys
 
+-- Explicit definition to avoid dependency on Data.List.Ordered
+-- | Intersection of two ordered lists by a predicate.
 intersectOrd :: (a -> b -> Ordering) -> [a] -> [b] -> [a]
 intersectOrd cmp = loop
   where

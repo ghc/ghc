@@ -50,11 +50,13 @@ install:
     - ( cd ghc/shake-build && git reset --hard HEAD )
 
     - ( cd ghc/shake-build && cabal install --only-dependencies )
+    - ( cd ghc/shake-build && cabal configure )
 
     - ( cd ghc && ./boot )
     - ( cd ghc && ./configure )
 
 script:
+    - ( cd ghc/shake-build && cabal haddock --internal )
     - ./ghc/shake-build/build.sh -j --no-progress $TARGET
 
 cache:
