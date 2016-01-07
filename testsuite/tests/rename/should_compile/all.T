@@ -232,3 +232,4 @@ test('T11164',
      multimod_compile, ['T11164', '-v0'])
 test('T11167', normal, compile, [''])
 test('T11167_ambig', normal, compile, [''])
+test('T10625', normal, compile, [''])
