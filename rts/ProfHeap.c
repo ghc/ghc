@@ -311,15 +311,11 @@ nextEra( void )
 FILE *hp_file;
 static char *hp_filename;
 
-void initProfiling (void)
-{
-}
-
 void freeProfiling (void)
 {
 }
 
-void initProfiling2 (void)
+void initProfiling (void)
 {
     char *prog;
 

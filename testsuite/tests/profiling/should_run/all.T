@@ -4,9 +4,16 @@ extra_prof_ways = ['prof', 'prof_hc_hb', 'prof_hb', 'prof_hd', 'prof_hy', 'prof_
 
 test('heapprof001',
      [only_ways(prof_ways),
-      extra_ways(extra_prof_ways),
-      req_profiling,
+      when(have_profiling(), extra_ways(extra_prof_ways)),
       extra_run_opts('7')],
+     compile_and_run, [''])
+
+test('heapprof002',
+     [ pre_cmd('cp heapprof001.hs heapprof002.hs')
+     , extra_clean(['heapprof002.hs'])
+     , extra_ways(['prof_h'])
+     , extra_run_opts('7')
+     ],
      compile_and_run, [''])
 
 test('T2592',
