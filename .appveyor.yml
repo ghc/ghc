@@ -3,7 +3,7 @@ clone_folder: "C:\\msys64\\home\\ghc\\shake-build"
 install:
     - set MSYSTEM=MINGW64
     - set PATH=C:\msys64\mingw64\bin;C:\msys64\usr\local\bin;C:\msys64\usr\bin;%PATH%
-    - curl -ostack.zip -L --insecure http://www.stackage.org/stack/windows-i386
+    - curl -ostack.zip -LsS --insecure https://www.stackage.org/stack/windows-x86_64
     - 7z x stack.zip stack.exe
     - bash -lc "curl -LsS http://www.haskell.org/ghc/dist/7.10.3/ghc-7.10.3-x86_64-unknown-mingw32.tar.xz | tar -xJ -C /mingw64 --strip-components=1"
     - stack exec -- pacman -S --noconfirm gcc binutils p7zip git
