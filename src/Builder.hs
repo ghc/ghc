@@ -106,7 +106,7 @@ specified = fmap (not . null) . builderPath
 -- If 'laxDependencies' is True then we do not rebuild GHC even if it is out of
 -- date (can save a lot of build time when changing GHC).
 needBuilder :: Bool -> Builder -> Action ()
-needBuilder laxDependencies builder = do
+needBuilder laxDependencies builder = whenM (specified builder) $ do
     path <- builderPath builder
     if laxDependencies && allowOrderOnlyDependency builder
     then orderOnly [path]
