@@ -1,10 +1,9 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 module Oracles.WindowsRoot (
-    windowsRoot, fixAbsolutePathOnWindows, lookupInPath, topDirectory, windowsRootOracle
+    windowsRoot, fixAbsolutePathOnWindows, topDirectory, windowsRootOracle
     ) where
 
 import Data.Char (isSpace)
-import Data.List.Split (splitOn)
 import Base
 import Oracles.Config.Setting
 
@@ -38,16 +37,6 @@ fixAbsolutePathOnWindows path = do
             return . unifyPath $ root ++ drop 1 path
     else
         return path
-
--- | Lookup a @command@ in @PATH@ environment.
-lookupInPath :: FilePath -> Action FilePath
-lookupInPath c
-    | c /= takeFileName c = return c
-    | otherwise = do
-        envPaths <- splitOn ":" <$> getEnvWithDefault "" "PATH"
-        let candidates = map (-/- c) envPaths
-        -- this will crash if we do not find any valid candidate.
-        head <$> filterM doesFileExist candidates
 
 -- Oracle for windowsRoot. This operation requires caching as looking up
 -- the root is slow (at least the current implementation).

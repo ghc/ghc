@@ -1,4 +1,5 @@
 module Oracles (
+    module Oracles.AbsoluteCommand,
     module Oracles.Config,
     module Oracles.Config.Flag,
     module Oracles.Config.Setting,
@@ -8,6 +9,7 @@ module Oracles (
     module Oracles.WindowsRoot
     ) where
 
+import Oracles.AbsoluteCommand
 import Oracles.Config
 import Oracles.Config.Flag
 import Oracles.Config.Setting
