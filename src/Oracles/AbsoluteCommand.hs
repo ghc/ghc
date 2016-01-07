@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 module Oracles.AbsoluteCommand (
-    lookupInPath, absoluteCommandOracle
+    lookupInPathOracle, absoluteCommandOracle
     ) where
 
 import Base
@@ -8,24 +8,16 @@ import Base
 newtype AbsoluteCommand = AbsoluteCommand String
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
-absoluteCommand :: String -> Action String
+-- | Fetches the absolute FilePath to a given FilePath from the
+-- Oracle.
+absoluteCommand :: FilePath -> Action FilePath
 absoluteCommand = askOracle . AbsoluteCommand
 
 -- | Lookup a @command@ in @PATH@ environment.
-lookupInPath :: FilePath -> Action FilePath
-lookupInPath c
+lookupInPathOracle :: FilePath -> Action FilePath
+lookupInPathOracle c
     | c /= takeFileName c = return c
     | otherwise           = absoluteCommand c
-
--- | Split function. Splits a string @s@ into chunks
--- when the predicate @p@ holds. See: http://stackoverflow.com/a/4981265
-wordsWhen :: (Char -> Bool) -> String -> [String]
-wordsWhen p s =
-    case dropWhile p s of
-        "" -> []
-        s' -> w : wordsWhen p s''
-            where (w, s'') = break p s'
-
 
 absoluteCommandOracle :: Rules ()
 absoluteCommandOracle = do

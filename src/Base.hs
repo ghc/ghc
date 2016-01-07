@@ -24,7 +24,7 @@ module Base (
     -- * Miscellaneous utilities
     bimap, minusOrd, intersectOrd, replaceEq, replace, quote, chunksOfSize,
     replaceSeparators, decodeModule, encodeModule, unifyPath, (-/-),
-    versionToInt, removeFileIfExists, removeDirectoryIfExists
+    versionToInt, removeFileIfExists, removeDirectoryIfExists, wordsWhen
     ) where
 
 import Control.Applicative
@@ -238,3 +238,12 @@ removeFileIfExists f = liftIO . whenM (IO.doesFileExist f) $ IO.removeFile f
 removeDirectoryIfExists :: FilePath -> Action ()
 removeDirectoryIfExists d =
     liftIO . whenM (IO.doesDirectoryExist d) $ IO.removeDirectoryRecursive d
+
+-- | Split function. Splits a string @s@ into chunks
+-- when the predicate @p@ holds. See: http://stackoverflow.com/a/4981265
+wordsWhen :: (Char -> Bool) -> String -> [String]
+wordsWhen p s =
+    case dropWhile p s of
+        "" -> []
+        s' -> w : wordsWhen p s''
+            where (w, s'') = break p s'

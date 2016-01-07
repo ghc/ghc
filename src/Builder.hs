@@ -98,7 +98,7 @@ builderPath builder = do
     case (path, windows) of
         ("", _)    -> return path
         (p, True)  -> fixAbsolutePathOnWindows (p -<.> exe)
-        (p, False) -> lookupInPath (p -<.> exe)
+        (p, False) -> lookupInPathOracle (p -<.> exe)
 
 getBuilderPath :: Builder -> ReaderT a Action FilePath
 getBuilderPath = lift . builderPath
