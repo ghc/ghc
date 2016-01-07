@@ -81,14 +81,14 @@ packageConfigurationInitialised stage =
 -- Utility functions
 -- | Find and replace all occurrences of a value in a list
 replaceEq :: Eq a => a -> a -> [a] -> [a]
-replaceEq from = replaceIf (== from)
+replaceEq from = replaceWhen (== from)
 
 -- | Find and replace all occurrences of path separators in a String with a Char
 replaceSeparators :: Char -> String -> String
-replaceSeparators = replaceIf isPathSeparator
+replaceSeparators = replaceWhen isPathSeparator
 
-replaceIf :: (a -> Bool) -> a -> [a] -> [a]
-replaceIf p to = map (\from -> if p from then to else from)
+replaceWhen :: (a -> Bool) -> a -> [a] -> [a]
+replaceWhen p to = map (\from -> if p from then to else from)
 
 -- | Find all occurrences of substring 'from' and replace them to 'to' in a
 -- given string. Not very efficient, but simple and fast enough for our purposes
@@ -100,6 +100,27 @@ replace from to = go
     go s @ (x : xs)
         | from `isPrefixOf` s = to ++ go (skipFrom s)
         | otherwise           = x  :  go xs
+
+-- | Split a list into chunks in places where the predicate @p@ holds.
+-- See: http://stackoverflow.com/a/4981265
+wordsWhen :: Eq a => (a -> Bool) -> [a] -> [[a]]
+wordsWhen p list =
+    case dropWhile p list of
+        [] -> []
+        l  -> w : wordsWhen p rest where (w, rest) = break p l
+
+-- | @chunksOfSize size strings@ splits a given list of strings into chunks not
+-- exceeding the given @size@.
+chunksOfSize :: Int -> [String] -> [[String]]
+chunksOfSize _    [] = []
+chunksOfSize size strings = reverse chunk : chunksOfSize size rest
+  where
+    (chunk, rest) = go [] 0 strings
+    go res _         []     = (res, [])
+    go res chunkSize (s:ss) =
+        if newSize > size then (res, s:ss) else go (s:res) newSize ss
+      where
+        newSize = chunkSize + length s
 
 -- | Add quotes to a String
 quote :: String -> String
@@ -132,19 +153,6 @@ unifyPath = toStandard . normaliseEx
 a -/- b = unifyPath $ a </> b
 
 infixr 6 -/-
-
--- | @chunksOfSize size strings@ splits a given list of strings into chunks not
--- exceeding the given @size@.
-chunksOfSize :: Int -> [String] -> [[String]]
-chunksOfSize _    [] = []
-chunksOfSize size strings = reverse chunk : chunksOfSize size rest
-  where
-    (chunk, rest) = go [] 0 strings
-    go res _         []     = (res, [])
-    go res chunkSize (s:ss) =
-        if newSize > size then (res, s:ss) else go (s:res) newSize ss
-      where
-        newSize = chunkSize + length s
 
 -- | A more colourful version of Shake's putNormal
 putColoured :: Color -> String -> Action ()
@@ -238,12 +246,3 @@ removeFileIfExists f = liftIO . whenM (IO.doesFileExist f) $ IO.removeFile f
 removeDirectoryIfExists :: FilePath -> Action ()
 removeDirectoryIfExists d =
     liftIO . whenM (IO.doesDirectoryExist d) $ IO.removeDirectoryRecursive d
-
--- | Split function. Splits a string @s@ into chunks
--- when the predicate @p@ holds. See: http://stackoverflow.com/a/4981265
-wordsWhen :: Eq a => (a -> Bool) -> [a] -> [[a]]
-wordsWhen p s =
-    case dropWhile p s of
-        [] -> []
-        s' -> w : wordsWhen p s''
-            where (w, s'') = break p s'
