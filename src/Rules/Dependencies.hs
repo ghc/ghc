@@ -15,10 +15,11 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
         dropBuild = (pkgPath pkg ++) . drop (length buildPath)
         hDepFile  = buildPath -/- ".hs-dependencies"
     in do
-        [ buildPath ++ "//*.c.deps", buildPath ++ "//*.cmm.deps" ] |%> \out -> do
-            let srcFile = dropBuild . dropExtension $ out
-            need [srcFile]
-            build $ fullTarget target (GccM stage) [srcFile] [out]
+        fmap (buildPath++)
+            [ "//*.c.deps", "//*.cmm.deps", "//*.S.deps" ] |%> \out -> do
+                let srcFile = dropBuild . dropExtension $ out
+                need [srcFile]
+                build $ fullTarget target (GccM stage) [srcFile] [out]
 
         hDepFile %> \out -> do
             srcs <- interpretPartial target getPackageSources

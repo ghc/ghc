@@ -95,13 +95,18 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
                           ++ [ "posix" | not windows ]
                           ++ [ "win32" |     windows ]
                 -- TODO: rts/dist/build/sm/Evac_thr.c, rts/dist/build/sm/Scav_thr.c
-                -- TODO: adding cmm sources to C_SRCS is a hack; rethink after #18
+                -- TODO: adding cmm/S sources to C_SRCS is a hack; rethink after #18
                 cSrcs    <- getDirectoryFiles (pkgPath pkg) (map (-/- "*.c") dirs)
                 cmmSrcs  <- getDirectoryFiles (pkgPath pkg) ["*.cmm"]
-                let extraSrcs = [ targetDirectory Stage1 rts -/- "build/AutoApply.cmm" ]
+                buildAdjustor   <- anyTargetArch ["i386", "powerpc", "powerpc64"]
+                buildStgCRunAsm <- anyTargetArch ["powerpc64le"]
+                let sSrcs = [ "AdjustorAsm.S" | buildAdjustor   ]
+                         ++ [ "StgCRunAsm.S"  | buildStgCRunAsm ]
+                    extraSrcs = [ targetDirectory Stage1 rts -/- "build/AutoApply.cmm" ]
                 includes <- interpretPartial target $ fromDiffExpr includesArgs
                 let contents = unlines $ map (prefix++)
-                        [ "C_SRCS = "   ++ unwords (cSrcs ++ cmmSrcs ++ extraSrcs)
+                        [ "C_SRCS = "
+                          ++ unwords (cSrcs ++ cmmSrcs ++ sSrcs ++ extraSrcs)
                         , "CC_OPTS = "  ++ unwords includes
                         , "COMPONENT_ID = " ++ "rts" ]
                 writeFileChanged mk contents
