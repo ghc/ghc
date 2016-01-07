@@ -915,7 +915,7 @@ finishTH = do
         Just fhv -> do
           liftIO $ withForeignRef fhv $ \rhv ->
             writeIServ i (putMessage (FinishTH rhv))
-          () <- runRemoteTH i
+          () <- runRemoteTH i []
           writeTcRef (tcg_th_remote_state tcg) Nothing
 
 runTHExp :: ForeignHValue -> TcM TH.Exp
@@ -949,22 +949,68 @@ runTH ty fhv = do
           withForeignRef rstate $ \state_hv ->
           withForeignRef fhv $ \q_hv ->
             writeIServ i (putMessage (RunTH state_hv q_hv ty (Just loc)))
-        bs <- runRemoteTH i
+        bs <- runRemoteTH i []
         return $! runGet get (LB.fromStrict bs)
 
 -- | communicate with a remotely-running TH computation until it
 -- finishes and returns a result.
-runRemoteTH :: Binary a => IServ -> TcM a
-runRemoteTH iserv = do
+runRemoteTH
+  :: Binary a
+  => IServ
+  -> [Messages]   --  saved from nested calls to qRecover
+  -> TcM a
+runRemoteTH iserv recovers = do
   Msg msg <- liftIO $ readIServ iserv getMessage
   case msg of
     QDone -> liftIO $ readIServ iserv get
     QException str -> liftIO $ throwIO (ErrorCall str)
     QFail str -> fail str
+    StartRecover -> do -- Note [TH recover with -fexternal-interpreter]
+      v <- getErrsVar
+      msgs <- readTcRef v
+      writeTcRef v emptyMessages
+      runRemoteTH iserv (msgs : recovers)
+    EndRecover caught_error -> do
+      v <- getErrsVar
+      let (prev_msgs, rest) = case recovers of
+             [] -> panic "EndRecover"
+             a : b -> (a,b)
+      if caught_error
+        then writeTcRef v prev_msgs
+        else updTcRef v (unionMessages prev_msgs)
+      runRemoteTH iserv rest
     _other -> do
       r <- handleTHMessage msg
       liftIO $ writeIServ iserv (put r)
-      runRemoteTH iserv
+      runRemoteTH iserv recovers
+
+{- Note [TH recover with -fexternal-interpreter]
+
+Recover is slightly tricky to implement.
+
+The meaning of "recover a b" is
+ - Do a
+   - If it finished successfully, then keep the messages it generated
+   - If it failed, discard any messages it generated, and do b
+
+The messages are managed by GHC in the TcM monad, whereas the
+exception-handling is done in the ghc-iserv process, so we have to
+coordinate between the two.
+
+On the server:
+  - emit a StartRecover message
+  - run "a" inside a catch
+    - if it finishes, emit EndRecover False
+    - if it fails, emit EndRecover True, then run "b"
+
+Back in GHC, when we receive:
+
+  StartRecover
+    save the current messages and start with an empty set.
+  EndRecover caught_error
+    Restore the previous messages,
+    and merge in the new messages if caught_error is false.
+-}
 
 getTHState :: IServ -> TcM (ForeignRef (IORef QState))
 getTHState i = do

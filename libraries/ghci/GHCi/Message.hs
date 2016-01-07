@@ -191,6 +191,9 @@ data Message a where
   IsExtEnabled :: Extension -> Message (THResult Bool)
   ExtsEnabled :: Message (THResult [Extension])
 
+  StartRecover :: Message ()
+  EndRecover :: Bool -> Message ()
+
   -- Template Haskell return values
 
   -- | RunTH finished successfully; return value follows
@@ -347,8 +350,10 @@ getMessage = do
       43 -> Msg <$> AddTopDecls <$> get
       44 -> Msg <$> (IsExtEnabled <$> get)
       45 -> Msg <$> return ExtsEnabled
-      46 -> Msg <$> return QDone
-      47 -> Msg <$> QException <$> get
+      46 -> Msg <$> return StartRecover
+      47 -> Msg <$> EndRecover <$> get
+      48 -> Msg <$> return QDone
+      49 -> Msg <$> QException <$> get
       _  -> Msg <$> QFail <$> get
 
 putMessage :: Message a -> Put
@@ -399,9 +404,11 @@ putMessage m = case m of
   AddTopDecls a               -> putWord8 43 >> put a
   IsExtEnabled a              -> putWord8 44 >> put a
   ExtsEnabled                 -> putWord8 45
-  QDone                       -> putWord8 46
-  QException a                -> putWord8 47 >> put a
-  QFail a                     -> putWord8 48 >> put a
+  StartRecover                -> putWord8 46
+  EndRecover a                -> putWord8 47 >> put a
+  QDone                       -> putWord8 48
+  QException a                -> putWord8 49 >> put a
+  QFail a                     -> putWord8 50 >> put a
 
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages
