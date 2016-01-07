@@ -46,8 +46,9 @@ lookupInPath c
     | otherwise = do
         envPaths <- splitOn ":" <$> getEnvWithDefault "" "PATH"
         let candidates = map (-/- c) envPaths in
-            -- this will crash if we do not find any valid candidate.
-            head <$> filterM doesFileExist candidates
+        mapM_ putStrLn candidates
+        -- this will crash if we do not find any valid candidate.
+        head <$> filterM doesFileExist candidates
 
 -- Oracle for windowsRoot. This operation requires caching as looking up
 -- the root is slow (at least the current implementation).
