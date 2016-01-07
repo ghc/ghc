@@ -95,8 +95,10 @@ builderPath builder = do
             putError $ "\nCannot find path to '" ++ (builderKey builder)
                      ++ "' in configuration files."
     windows <- windowsHost
-    let path' = if null path then "" else path -<.> exe in
-        (if windows then fixAbsolutePathOnWindows else lookupInPath) path'
+    case (path, windows) of
+        ("", _)    -> return path
+        (p, True)  -> fixAbsolutePathOnWindows (p -<.> exe)
+        (p, False) -> lookupInPath (p -<.> exe)
 
 getBuilderPath :: Builder -> ReaderT a Action FilePath
 getBuilderPath = lift . builderPath
