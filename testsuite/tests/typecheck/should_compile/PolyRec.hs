@@ -24,6 +24,6 @@ f (Y x) = g maybeToInt x
 -- g :: Functor f => (f Int -> b) -> f (Y Maybe) -> b
 g h x = h $ fmap f x
 
--- 'test' checks that g's type is polymophic enough
+-- 'test' checks that g's type is polymorphic enough
 test :: Functor f => (f Int -> b) -> f (Y Maybe) -> b
 test = g

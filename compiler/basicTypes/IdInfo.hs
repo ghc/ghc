@@ -146,7 +146,7 @@ data IdDetails
                                 -- e.g. $trModule, or $tcT
 
   | PatSynId                    -- ^ A top-level Id to support pattern synonyms;
-                                -- the builder or matcher for the patern synonym
+                                -- the builder or matcher for the pattern synonym
 
 data RecSelParent = RecSelData TyCon | RecSelPatSyn PatSyn deriving Eq
   -- Either `TyCon` or `PatSyn` depending

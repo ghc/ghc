@@ -667,7 +667,7 @@ rnFamInstDecl doc mb_cls tycon (HsIB { hsib_body = pats }) payload rnPayload
                      (L loc _ : ps) -> combineSrcSpans loc (getLoc (last ps))
 
        ; pat_kity_vars_with_dups <- extractHsTysRdrTyVarsDups pats
-             -- Use the "...Dups" form becuase it's needed
+             -- Use the "...Dups" form because it's needed
              -- below to report unsed binder on the LHS
        ; var_names <- mapM (newTyVarNameRn mb_cls . L loc . unLoc) $
                       freeKiTyVarsAllVars $

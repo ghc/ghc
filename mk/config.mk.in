@@ -440,7 +440,7 @@ SRC_HC_OPTS_STAGE0 =
 SRC_HC_OPTS_STAGE1 =
 SRC_HC_OPTS_STAGE2 =
 
-# Warning supression flags. See mk/warnings.mk.
+# Warning suppression flags. See mk/warnings.mk.
 SRC_CC_WARNING_OPTS =
 SRC_HC_WARNING_OPTS =
 

@@ -593,7 +593,7 @@ we keep?  More subtle than you might think!
         8% performance improvement in nofib cryptarithm2, compared to
         just rolling the dice.  I didn't investigate why.
 
-  * Constaints coming from the same level (i.e. same implication)
+  * Constraints coming from the same level (i.e. same implication)
 
        - Always get rid of InstSC ones if possible, since they are less
          useful for solving.  If both are InstSC, choose the one with

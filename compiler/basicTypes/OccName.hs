@@ -549,7 +549,7 @@ a user-written type or function name
    $f...        Dict-fun identifiers (from inst decls)
    $dmop        Default method for 'op'
    $pnC         n'th superclass selector for class C
-   $wf          Worker for functtoin 'f'
+   $wf          Worker for function 'f'
    $sf..        Specialised version of f
    T:C          Tycon for dictionary for class C
    D:C          Data constructor for dictionary for class C

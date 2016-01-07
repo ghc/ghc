@@ -123,10 +123,10 @@ GhcBootLibExtraHcOpts += -fno-warn-deprecated-flags
 #   * Most .cabal files specify -Wall. But not all, and not all building we
 #   do relies on .cabal files. So we have to add -Wall ourselves somewhere.
 #
-#   * Some .cabal also specify warning supression flags. Because -Wall
-#   overrides any warning supression flags that come before it, we have to
-#   make sure -Wall comes before any warning supression flags. So we add it
+#   * Some .cabal also specify warning suppression flags. Because -Wall
+#   overrides any warning suppression flags that come before it, we have to
+#   make sure -Wall comes before any warning suppression flags. So we add it
 #   to SRC_HC_OPTS.
 #
-#   * Similarly, our own warning supression should come after the -Wall from
+#   * Similarly, our own warning suppression should come after the -Wall from
 #   the .cabal files, so we do *not* add them to SRC_HC_OPTS.

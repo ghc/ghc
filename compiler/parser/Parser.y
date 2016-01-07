@@ -1773,9 +1773,9 @@ varids0 :: { Located [Located RdrName] }
 Note [Parsing ~]
 ~~~~~~~~~~~~~~~~
 
-Due to parsing conflicts between lazyness annotations in data type
+Due to parsing conflicts between laziness annotations in data type
 declarations (see strict_mark) and equality types ~'s are always
-parsed as lazyness annotations, and turned into HsEqTy's in the
+parsed as laziness annotations, and turned into HsEqTy's in the
 correct places using RdrHsSyn.splitTilde.
 
 Since strict_mark is parsed as part of atype which is part of type,

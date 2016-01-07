@@ -8770,7 +8770,7 @@ monomorphic type (one with no foralls). For example,
 
 The definition of ``foo`` is rejected because one would have to
 instantiate ``id``\'s type with ``b := (forall s. ST s a) -> a``, and
-that is not allowed. Instanting polymorpic type variables with
+that is not allowed. Instantiating polymorphic type variables with
 polymorphic types is called *impredicative polymorphism*.
 
 GHC has extremely flaky support for *impredicative polymorphism*,
