@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, NondecreasingIndentation, TupleSections #-}
+{-# LANGUAGE CPP, NondecreasingIndentation, TupleSections, RecordWildCards #-}
 {-# OPTIONS_GHC -fno-cse #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -496,7 +496,10 @@ linkExpr hsc_env span root_ul_bco
 
      -- Link the necessary packages and linkables
 
-   ; [(_,root_hvref)] <- linkSomeBCOs hsc_env ie ce [root_ul_bco]
+   ; let nobreakarray = error "no break array"
+         bco_ix = mkNameEnv [(unlinkedBCOName root_ul_bco, 0)]
+   ; resolved <- linkBCO hsc_env ie ce bco_ix nobreakarray root_ul_bco
+   ; [root_hvref] <- iservCmd hsc_env (CreateBCOs [resolved])
    ; fhv <- mkFinalizedHValue hsc_env root_hvref
    ; return (pls, fhv)
    }}}
@@ -703,7 +706,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
   ********************************************************************* -}
 
 linkDecls :: HscEnv -> SrcSpan -> CompiledByteCode -> IO ()
-linkDecls hsc_env span (ByteCode unlinkedBCOs itblEnv _) = do
+linkDecls hsc_env span cbc@CompiledByteCode{..} = do
     -- Initialise the linker (if it's not been done already)
     initDynLinker hsc_env
 
@@ -717,17 +720,17 @@ linkDecls hsc_env span (ByteCode unlinkedBCOs itblEnv _) = do
       else do
 
     -- Link the expression itself
-    let ie = plusNameEnv (itbl_env pls) itblEnv
+    let ie = plusNameEnv (itbl_env pls) bc_itbls
         ce = closure_env pls
 
     -- Link the necessary packages and linkables
-    new_bindings <- linkSomeBCOs hsc_env ie ce unlinkedBCOs
+    new_bindings <- linkSomeBCOs hsc_env ie ce [cbc]
     nms_fhvs <- makeForeignNamedHValueRefs hsc_env new_bindings
     let pls2 = pls { closure_env = extendClosureEnv ce nms_fhvs
                    , itbl_env    = ie }
     return (pls2, ())
   where
-    free_names =  concatMap (nameSetElems . bcoFreeNames) unlinkedBCOs
+    free_names =  concatMap (nameSetElems . bcoFreeNames) bc_bcos
 
     needed_mods :: [Module]
     needed_mods = [ nameModule n | n <- free_names,
@@ -914,12 +917,11 @@ dynLinkBCOs hsc_env pls bcos = do
             cbcs      = map byteCodeOfObject unlinkeds
 
 
-            ul_bcos    = [b | ByteCode bs _ _  <- cbcs, b <- bs]
-            ies        = [ie | ByteCode _ ie _ <- cbcs]
+            ies        = map bc_itbls cbcs
             gce       = closure_env pls
             final_ie  = foldr plusNameEnv (itbl_env pls) ies
 
-        names_and_refs <- linkSomeBCOs hsc_env final_ie gce ul_bcos
+        names_and_refs <- linkSomeBCOs hsc_env final_ie gce cbcs
 
         -- We only want to add the external ones to the ClosureEnv
         let (to_add, to_drop) = partition (isExternalName.fst) names_and_refs
@@ -929,28 +931,36 @@ dynLinkBCOs hsc_env pls bcos = do
         -- Wrap finalizers on the ones we want to keep
         new_binds <- makeForeignNamedHValueRefs hsc_env to_add
 
-        let pls2 = pls1 { closure_env = extendClosureEnv gce new_binds,
-                          itbl_env    = final_ie }
-
-        return pls2
+        return pls1 { closure_env = extendClosureEnv gce new_binds,
+                      itbl_env    = final_ie }
 
 -- Link a bunch of BCOs and return references to their values
 linkSomeBCOs :: HscEnv
              -> ItblEnv
              -> ClosureEnv
-             -> [UnlinkedBCO]
+             -> [CompiledByteCode]
              -> IO [(Name,HValueRef)]
                         -- The returned HValueRefs are associated 1-1 with
                         -- the incoming unlinked BCOs.  Each gives the
                         -- value of the corresponding unlinked BCO
 
-linkSomeBCOs _ _ _ [] = return []
-linkSomeBCOs hsc_env ie ce ul_bcos = do
-  let names = map unlinkedBCOName ul_bcos
-      bco_ix = mkNameEnv (zip names [0..])
-  resolved <- mapM (linkBCO hsc_env ie ce bco_ix) ul_bcos
-  hvrefs <- iservCmd hsc_env (CreateBCOs resolved)
-  return (zip names hvrefs)
+linkSomeBCOs hsc_env ie ce mods = foldr fun do_link mods []
+ where
+  fun CompiledByteCode{..} inner accum =
+    case bc_breaks of
+      Nothing -> inner ((panic "linkSomeBCOs: no break array", bc_bcos) : accum)
+      Just mb -> withForeignRef (modBreaks_flags mb) $ \breakarray ->
+                   inner ((breakarray, bc_bcos) : accum)
+
+  do_link [] = return []
+  do_link mods = do
+    let flat = [ (breakarray, bco) | (breakarray, bcos) <- mods, bco <- bcos ]
+        names = map (unlinkedBCOName . snd) flat
+        bco_ix = mkNameEnv (zip names [0..])
+    resolved <- sequence [ linkBCO hsc_env ie ce bco_ix breakarray bco
+                         | (breakarray, bco) <- flat ]
+    hvrefs <- iservCmd hsc_env (CreateBCOs resolved)
+    return (zip names hvrefs)
 
 -- | Useful to apply to the result of 'linkSomeBCOs'
 makeForeignNamedHValueRefs

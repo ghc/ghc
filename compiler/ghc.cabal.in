@@ -306,7 +306,6 @@ Library
         TcIface
         FlagChecker
         Annotations
-        BreakArray
         CmdLineParser
         CodeOutput
         Config

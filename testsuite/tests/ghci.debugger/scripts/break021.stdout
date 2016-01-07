@@ -55,7 +55,7 @@ _result :: m () = _
                           ^^^^^^^
 7                         line2 0
 Stopped in Main.line1, break020.hs:3:11-19
-_result :: m () = _
+_result :: IO () = _
 2  
 3  line1 _ = return ()
              ^^^^^^^^^
@@ -67,7 +67,7 @@ _result :: m () = _
                           ^^^^^^^
 8  
 Stopped in Main.line2, break020.hs:4:11-19
-_result :: m () = _
+_result :: IO () = _
 3  line1 _ = return ()
 4  line2 _ = return ()
              ^^^^^^^^^

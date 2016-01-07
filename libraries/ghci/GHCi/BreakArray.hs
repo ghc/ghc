@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 {-# LANGUAGE CPP, MagicHash, UnboxedTuples #-}
 
 -------------------------------------------------------------------------------
@@ -15,22 +16,17 @@
 --
 -------------------------------------------------------------------------------
 
-module BreakArray
+module GHCi.BreakArray
     (
       BreakArray
-#ifdef GHCI
           (BA) -- constructor is exported only for ByteCodeGen
-#endif
     , newBreakArray
-#ifdef GHCI
     , getBreak
     , setBreakOn
     , setBreakOff
     , showBreakArray
-#endif
     ) where
 
-#ifdef GHCI
 import Control.Monad
 import Data.Word
 import GHC.Word
@@ -116,17 +112,3 @@ readBA# array i = IO $ \s ->
 
 readBreakArray :: BreakArray -> Int -> IO Word8
 readBreakArray (BA array) (I# i) = readBA# array i
-
-#else /* !GHCI */
-
--- stub implementation to make main/, etc., code happier.
--- IOArray and IOUArray are increasingly non-portable,
--- still don't have quite the same interface, and (for GHCI)
--- presumably have a different representation.
-data BreakArray = Unspecified
-
-newBreakArray :: Int -> IO BreakArray
-newBreakArray _ = return Unspecified
-
-#endif /* GHCI */
-

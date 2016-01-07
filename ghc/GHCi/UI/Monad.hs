@@ -118,7 +118,7 @@ data GHCiState = GHCiState
         noBuffering :: ForeignHValue
      }
 
-type TickArray = Array Int [(BreakIndex,RealSrcSpan)]
+type TickArray = Array Int [(GHC.BreakIndex,RealSrcSpan)]
 
 -- | A GHCi command
 data Command

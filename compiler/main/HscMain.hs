@@ -1284,7 +1284,7 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
 hscInteractive :: HscEnv
                -> CgGuts
                -> ModSummary
-               -> IO (Maybe FilePath, CompiledByteCode, ModBreaks)
+               -> IO (Maybe FilePath, CompiledByteCode)
 #ifdef GHCI
 hscInteractive hsc_env cgguts mod_summary = do
     let dflags = hsc_dflags hsc_env
@@ -1311,7 +1311,7 @@ hscInteractive hsc_env cgguts mod_summary = do
     ------------------ Create f-x-dynamic C-side stuff ---
     (_istub_h_exists, istub_c_exists)
         <- outputForeignStubs dflags this_mod location foreign_stubs
-    return (istub_c_exists, comp_bc, mod_breaks)
+    return (istub_c_exists, comp_bc)
 #else
 hscInteractive _ _ = panic "GHC not compiled with interpreter"
 #endif
@@ -1705,7 +1705,7 @@ mkModGuts mod safe binds =
         mg_warns        = NoWarnings,
         mg_anns         = [],
         mg_hpc_info     = emptyHpcInfo False,
-        mg_modBreaks    = emptyModBreaks,
+        mg_modBreaks    = Nothing,
         mg_vect_info    = noVectInfo,
         mg_inst_env     = emptyInstEnv,
         mg_fam_inst_env = emptyFamInstEnv,

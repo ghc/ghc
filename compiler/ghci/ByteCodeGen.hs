@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, MagicHash #-}
+{-# LANGUAGE CPP, MagicHash, RecordWildCards #-}
 --
 --  (c) The University of Glasgow 2002-2006
 --
@@ -44,6 +44,7 @@ import StgCmmLayout     ( ArgRep(..), toArgRep, argRepSizeW )
 import SMRep
 import Bitmap
 import OrdList
+import Maybes
 
 import Data.List
 import Foreign
@@ -51,16 +52,17 @@ import Control.Monad
 import Data.Char
 
 import UniqSupply
-import BreakArray
-import Data.Maybe
 import Module
 import Control.Arrow ( second )
 
 import Data.Array
 import Data.Map (Map)
+import Data.IntMap (IntMap)
 import qualified Data.Map as Map
+import qualified Data.IntMap as IntMap
 import qualified FiniteMap as Map
 import Data.Ord
+import GHC.Stack.CCS
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -69,9 +71,9 @@ byteCodeGen :: HscEnv
             -> Module
             -> CoreProgram
             -> [TyCon]
-            -> ModBreaks
+            -> Maybe ModBreaks
             -> IO CompiledByteCode
-byteCodeGen hsc_env this_mod binds tycs modBreaks
+byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
    = do let dflags = hsc_dflags hsc_env
         showPass dflags "ByteCodeGen"
 
@@ -79,8 +81,9 @@ byteCodeGen hsc_env this_mod binds tycs modBreaks
                         | (bndr, rhs) <- flattenBinds binds]
 
         us <- mkSplitUniqSupply 'y'
-        (BcM_State _hsc_env _us _this_mod _final_ctr ffis _, proto_bcos)
-           <- runBc hsc_env us this_mod modBreaks (mapM schemeTopBind flatBinds)
+        (BcM_State{..}, proto_bcos) <-
+           runBc hsc_env us this_mod mb_modBreaks $
+             mapM schemeTopBind flatBinds
 
         when (notNull ffis)
              (panic "ByteCodeGen.byteCodeGen: missing final emitBc?")
@@ -89,12 +92,14 @@ byteCodeGen hsc_env this_mod binds tycs modBreaks
            "Proto-BCOs" (vcat (intersperse (char ' ') (map ppr proto_bcos)))
 
         assembleBCOs hsc_env proto_bcos tycs
+          (case modBreaks of
+             Nothing -> Nothing
+             Just mb -> Just mb{ modBreaks_breakInfo = breakInfo })
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for an expression
 
--- Returns: (the root BCO for this expression,
---           a list of auxilary BCOs resulting from compiling closures)
+-- Returns: the root BCO for this expression
 coreExprToBCOs :: HscEnv
                -> Module
                -> CoreExpr
@@ -111,8 +116,8 @@ coreExprToBCOs hsc_env this_mod expr
       -- the uniques are needed to generate fresh variables when we introduce new
       -- let bindings for ticked expressions
       us <- mkSplitUniqSupply 'y'
-      (BcM_State _dflags _us _this_mod _final_ctr mallocd _ , proto_bco)
-         <- runBc hsc_env us this_mod emptyModBreaks $
+      (BcM_State _dflags _us _this_mod _final_ctr mallocd _ _ , proto_bco)
+         <- runBc hsc_env us this_mod Nothing $
               schemeTopBind (invented_id, simpleFreeVars expr)
 
       when (notNull mallocd)
@@ -331,22 +336,18 @@ schemeER_wrk :: Word -> BCEnv -> AnnExpr' Id DVarSet -> BcM BCInstrList
 schemeER_wrk d p rhs
   | AnnTick (Breakpoint tick_no fvs) (_annot, newRhs) <- rhs
   = do  code <- schemeE (fromIntegral d) 0 p newRhs
-        flag_arr <- getBreakArray
         cc_arr <- getCCArray
-        this_mod <- getCurrentModule
+        this_mod <- moduleName <$> getCurrentModule
         let idOffSets = getVarOffSets d p fvs
-        let breakInfo = BreakInfo
-                        { breakInfo_module = this_mod
-                        , breakInfo_number = tick_no
-                        , breakInfo_vars = idOffSets
-                        , breakInfo_resty = exprType (deAnnotate' newRhs)
+        let breakInfo = CgBreakInfo
+                        { cgb_vars = idOffSets
+                        , cgb_resty = exprType (deAnnotate' newRhs)
                         }
+        newBreakInfo tick_no breakInfo
         dflags <- getDynFlags
         let cc | interpreterProfiled dflags = cc_arr ! tick_no
                | otherwise = toRemotePtr nullPtr
-        let breakInstr = case flag_arr of
-                         BA arr# ->
-                             BRK_FUN arr# (fromIntegral tick_no) breakInfo cc
+        let breakInstr = BRK_FUN (fromIntegral tick_no) (getUnique this_mod) cc
         return $ breakInstr `consOL` code
    | otherwise = schemeE (fromIntegral d) 0 p rhs
 
@@ -1642,7 +1643,8 @@ data BcM_State
         , nextlabel   :: Word16          -- for generating local labels
         , ffis        :: [FFIInfo]       -- ffi info blocks, to free later
                                          -- Should be free()d when it is GCd
-        , modBreaks :: ModBreaks         -- info about breakpoints
+        , modBreaks   :: Maybe ModBreaks -- info about breakpoints
+        , breakInfo   :: IntMap CgBreakInfo
         }
 
 newtype BcM r = BcM (BcM_State -> IO (BcM_State, r))
@@ -1652,10 +1654,10 @@ ioToBc io = BcM $ \st -> do
   x <- io
   return (st, x)
 
-runBc :: HscEnv -> UniqSupply -> Module -> ModBreaks -> BcM r
+runBc :: HscEnv -> UniqSupply -> Module -> Maybe ModBreaks -> BcM r
       -> IO (BcM_State, r)
 runBc hsc_env us this_mod modBreaks (BcM m)
-   = m (BcM_State hsc_env us this_mod 0 [] modBreaks)
+   = m (BcM_State hsc_env us this_mod 0 [] modBreaks IntMap.empty)
 
 thenBc :: BcM a -> (a -> BcM b) -> BcM b
 thenBc (BcM expr) cont = BcM $ \st0 -> do
@@ -1695,7 +1697,7 @@ emitBc :: ([FFIInfo] -> ProtoBCO Name) -> BcM (ProtoBCO Name)
 emitBc bco
   = BcM $ \st -> return (st{ffis=[]}, bco (ffis st))
 
-recordFFIBc :: RemotePtr -> BcM ()
+recordFFIBc :: RemotePtr C_ffi_cif -> BcM ()
 recordFFIBc a
   = BcM $ \st -> return (st{ffis = FFIInfo a : ffis st}, ())
 
@@ -1711,11 +1713,15 @@ getLabelsBc n
   = BcM $ \st -> let ctr = nextlabel st
                  in return (st{nextlabel = ctr+n}, [ctr .. ctr+n-1])
 
-getBreakArray :: BcM BreakArray
-getBreakArray = BcM $ \st -> return (st, modBreaks_flags (modBreaks st))
+getCCArray :: BcM (Array BreakIndex (RemotePtr CostCentre))
+getCCArray = BcM $ \st ->
+  let breaks = expectJust "ByteCodeGen.getCCArray" $ modBreaks st in
+  return (st, modBreaks_ccs breaks)
 
-getCCArray :: BcM (Array BreakIndex RemotePtr {- CCostCentre -})
-getCCArray = BcM $ \st -> return (st, modBreaks_ccs (modBreaks st))
+
+newBreakInfo :: BreakIndex -> CgBreakInfo -> BcM ()
+newBreakInfo ix info = BcM $ \st ->
+  return (st{breakInfo = IntMap.insert ix info (breakInfo st)}, ())
 
 newUnique :: BcM Unique
 newUnique = BcM $

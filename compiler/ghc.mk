@@ -454,7 +454,6 @@ compiler_stage2_dll0_MODULES = \
 	BasicTypes \
 	Binary \
 	BooleanFormula \
-	BreakArray \
 	BufWrite \
 	Class \
 	CmdLineParser \

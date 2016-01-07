@@ -913,7 +913,7 @@ finishTH = do
       case th_state of
         Nothing -> return () -- TH was not started, nothing to do
         Just fhv -> do
-          liftIO $ withForeignHValue fhv $ \rhv ->
+          liftIO $ withForeignRef fhv $ \rhv ->
             writeIServ i (putMessage (FinishTH rhv))
           () <- runRemoteTH i
           writeTcRef (tcg_th_remote_state tcg) Nothing
@@ -946,8 +946,8 @@ runTH ty fhv = do
         rstate <- getTHState i
         loc <- TH.qLocation
         liftIO $
-          withForeignHValue rstate $ \state_hv ->
-          withForeignHValue fhv $ \q_hv ->
+          withForeignRef rstate $ \state_hv ->
+          withForeignRef fhv $ \q_hv ->
             writeIServ i (putMessage (RunTH state_hv q_hv ty (Just loc)))
         bs <- runRemoteTH i
         return $! runGet get (LB.fromStrict bs)
@@ -966,7 +966,7 @@ runRemoteTH iserv = do
       liftIO $ writeIServ iserv (put r)
       runRemoteTH iserv
 
-getTHState :: IServ -> TcM ForeignHValue
+getTHState :: IServ -> TcM (ForeignRef (IORef QState))
 getTHState i = do
   tcg <- getGblEnv
   th_state <- readTcRef (tcg_th_remote_state tcg)

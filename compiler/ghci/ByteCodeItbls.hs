@@ -11,7 +11,6 @@ module ByteCodeItbls ( mkITbls ) where
 
 import ByteCodeTypes
 import GHCi
-import GHCi.RemoteTypes
 import DynFlags
 import HscTypes
 import Name             ( Name, getName )
@@ -70,4 +69,4 @@ make_constr_itbls hsc_env cons =
          descr = dataConIdentity dcon
 
      r <- iservCmd hsc_env (MkConInfoTable  ptrs' nptrs_really conNo descr)
-     return (getName dcon, ItblPtr (fromRemotePtr r))
+     return (getName dcon, ItblPtr r)

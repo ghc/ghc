@@ -42,6 +42,7 @@ library
         UnboxedTuples
 
     exposed-modules:
+        GHCi.BreakArray
         GHCi.Message
         GHCi.ResolvedBCO
         GHCi.RemoteTypes

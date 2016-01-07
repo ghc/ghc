@@ -25,7 +25,7 @@ mkConInfoTable
    -> Int     -- non-ptr words
    -> Int     -- constr tag
    -> [Word8]  -- con desc
-   -> IO (Ptr ())
+   -> IO (Ptr StgInfoTable)
       -- resulting info table is allocated with allocateExec(), and
       -- should be freed with freeExec().
 

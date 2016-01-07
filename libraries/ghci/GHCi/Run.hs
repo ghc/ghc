@@ -16,6 +16,7 @@ import GHCi.Message
 import GHCi.ObjLink
 import GHCi.RemoteTypes
 import GHCi.TH
+import GHCi.BreakArray
 
 import Control.Concurrent
 import Control.DeepSeq
@@ -50,16 +51,26 @@ run m = case m of
   ResolveObjs -> resolveObjs
   FindSystemLibrary str -> findSystemLibrary str
   CreateBCOs bco -> createBCOs bco
-  FreeHValueRefs rs -> mapM_ freeHValueRef rs
+  FreeHValueRefs rs -> mapM_ freeRemoteRef rs
   EvalStmt opts r -> evalStmt opts r
   ResumeStmt opts r -> resumeStmt opts r
   AbandonStmt r -> abandonStmt r
   EvalString r -> evalString r
   EvalStringToString r s -> evalStringToString r s
   EvalIO r -> evalIO r
-  MkCostCentre name mod src ->
-    toRemotePtr <$> mkCostCentre (fromRemotePtr name) mod src
+  MkCostCentre mod name src ->
+    toRemotePtr <$> mkCostCentre (fromRemotePtr mod) name src
   CostCentreStackInfo ptr -> ccsToStrings (fromRemotePtr ptr)
+  NewBreakArray sz -> mkRemoteRef =<< newBreakArray sz
+  EnableBreakpoint ref ix b -> do
+    arr <- localRef ref
+    _ <- if b then setBreakOn arr ix else setBreakOff arr ix
+    return ()
+  BreakpointStatus ref ix -> do
+    arr <- localRef ref; r <- getBreak arr ix
+    case r of
+      Nothing -> return False
+      Just w -> return (w /= 0)
   MallocData bs -> mkString bs
   PrepFFI conv args res -> toRemotePtr <$> prepForeignCall conv args res
   FreeFFI p -> freeForeignCallInfo (fromRemotePtr p)
@@ -73,9 +84,9 @@ evalStmt opts expr = do
   io <- mkIO expr
   sandboxIO opts $ do
     rs <- unsafeCoerce io :: IO [HValue]
-    mapM mkHValueRef rs
+    mapM mkRemoteRef rs
  where
-  mkIO (EvalThis href) = localHValueRef href
+  mkIO (EvalThis href) = localRef href
   mkIO (EvalApp l r) = do
     l' <- mkIO l
     r' <- mkIO r
@@ -83,19 +94,19 @@ evalStmt opts expr = do
 
 evalIO :: HValueRef -> IO (EvalResult ())
 evalIO r = do
-  io <- localHValueRef r
+  io <- localRef r
   tryEval (unsafeCoerce io :: IO ())
 
 evalString :: HValueRef -> IO (EvalResult String)
 evalString r = do
-  io <- localHValueRef r
+  io <- localRef r
   tryEval $ do
     r <- unsafeCoerce io :: IO String
     evaluate (force r)
 
 evalStringToString :: HValueRef -> String -> IO (EvalResult String)
 evalStringToString r str = do
-  io <- localHValueRef r
+  io <- localRef r
   tryEval $ do
     r <- (unsafeCoerce io :: String -> IO String) str
     evaluate (force r)
@@ -232,17 +243,17 @@ withBreakAction opts breakMVar statusMVar act
         -- might be a bit surprising.  The exception flag is turned off
         -- as soon as it is hit, or in resetBreakAction below.
 
-   onBreak is_exception info apStack = do
+   onBreak :: BreakpointCallback
+   onBreak ix# uniq# is_exception apStack = do
      tid <- myThreadId
      let resume = ResumeContext
            { resumeBreakMVar = breakMVar
            , resumeStatusMVar = statusMVar
            , resumeThreadId = tid }
-     resume_r <- mkHValueRef (unsafeCoerce resume)
-     apStack_r <- mkHValueRef apStack
-     info_r <- mkHValueRef info
+     resume_r <- mkRemoteRef resume
+     apStack_r <- mkRemoteRef apStack
      ccs <- toRemotePtr <$> getCCSOf apStack
-     putMVar statusMVar $ EvalBreak is_exception apStack_r info_r resume_r ccs
+     putMVar statusMVar $ EvalBreak is_exception apStack_r (I# ix#) (I# uniq#) resume_r ccs
      takeMVar breakMVar
 
    resetBreakAction stablePtr = do
@@ -251,15 +262,11 @@ withBreakAction opts breakMVar statusMVar act
      resetStepFlag
      freeStablePtr stablePtr
 
-data ResumeContext a = ResumeContext
-  { resumeBreakMVar :: MVar ()
-  , resumeStatusMVar :: MVar (EvalStatus a)
-  , resumeThreadId :: ThreadId
-  }
-
-resumeStmt :: EvalOpts -> HValueRef -> IO (EvalStatus [HValueRef])
+resumeStmt
+  :: EvalOpts -> RemoteRef (ResumeContext [HValueRef])
+  -> IO (EvalStatus [HValueRef])
 resumeStmt opts hvref = do
-  ResumeContext{..} <- unsafeCoerce (localHValueRef hvref)
+  ResumeContext{..} <- localRef hvref
   withBreakAction opts resumeBreakMVar resumeStatusMVar $
     mask_ $ do
       putMVar resumeBreakMVar () -- this awakens the stopped thread...
@@ -277,9 +284,9 @@ resumeStmt opts hvref = do
 --          step is necessary to prevent race conditions with
 --          -fbreak-on-exception (see #5975).
 --  See test break010.
-abandonStmt :: HValueRef -> IO ()
+abandonStmt :: RemoteRef (ResumeContext [HValueRef]) -> IO ()
 abandonStmt hvref = do
-  ResumeContext{..} <- unsafeCoerce (localHValueRef hvref)
+  ResumeContext{..} <- localRef hvref
   killThread resumeThreadId
   putMVar resumeBreakMVar ()
   _ <- takeMVar resumeStatusMVar
@@ -293,35 +300,35 @@ setStepFlag = poke stepFlag 1
 resetStepFlag :: IO ()
 resetStepFlag = poke stepFlag 0
 
-foreign import ccall "&rts_breakpoint_io_action"
-   breakPointIOAction :: Ptr (StablePtr (Bool -> HValue -> HValue -> IO ()))
+type BreakpointCallback = Int# -> Int# -> Bool -> HValue -> IO ()
 
-noBreakStablePtr :: StablePtr (Bool -> HValue -> HValue -> IO ())
+foreign import ccall "&rts_breakpoint_io_action"
+   breakPointIOAction :: Ptr (StablePtr BreakpointCallback)
+
+noBreakStablePtr :: StablePtr BreakpointCallback
 noBreakStablePtr = unsafePerformIO $ newStablePtr noBreakAction
 
-noBreakAction :: Bool -> HValue -> HValue -> IO ()
-noBreakAction False _ _ = putStrLn "*** Ignoring breakpoint"
-noBreakAction True  _ _ = return () -- exception: just continue
+noBreakAction :: BreakpointCallback
+noBreakAction _ _ False _ = putStrLn "*** Ignoring breakpoint"
+noBreakAction _ _ True  _ = return () -- exception: just continue
 
 -- Malloc and copy the bytes.  We don't have any way to monitor the
 -- lifetime of this memory, so it just leaks.
-mkString :: ByteString -> IO RemotePtr
+mkString :: ByteString -> IO (RemotePtr ())
 mkString bs = B.unsafeUseAsCStringLen bs $ \(cstr,len) -> do
   ptr <- mallocBytes len
   copyBytes ptr cstr len
-  return (toRemotePtr ptr)
+  return (castRemotePtr (toRemotePtr ptr))
 
-data CCostCentre
-
-mkCostCentre :: Ptr CChar -> String -> String -> IO (Ptr CCostCentre)
+mkCostCentre :: Ptr CChar -> String -> String -> IO (Ptr CostCentre)
 #if defined(PROFILING)
-mkCostCentre c_module srcspan decl_path = do
+mkCostCentre c_module decl_path srcspan = do
   c_name <- newCString decl_path
   c_srcspan <- newCString srcspan
   c_mkCostCentre c_name c_module c_srcspan
 
 foreign import ccall unsafe "mkCostCentre"
-  c_mkCostCentre :: Ptr CChar -> Ptr CChar -> Ptr CChar -> IO (Ptr CCostCentre)
+  c_mkCostCentre :: Ptr CChar -> Ptr CChar -> Ptr CChar -> IO (Ptr CostCentre)
 #else
 mkCostCentre _ _ _ = return nullPtr
 #endif

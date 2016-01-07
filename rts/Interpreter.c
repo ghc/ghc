@@ -928,7 +928,7 @@ run_BCO:
         /* check for a breakpoint on the beginning of a let binding */
         case bci_BRK_FUN:
         {
-            int arg1_brk_array, arg2_array_index, arg3_freeVars;
+            int arg1_brk_array, arg2_array_index, arg3_module_uniq;
 #ifdef PROFILING
             int arg4_cc;
 #endif
@@ -946,7 +946,7 @@ run_BCO:
 
             arg1_brk_array      = BCO_GET_LARGE_ARG;
             arg2_array_index    = BCO_NEXT;
-            arg3_freeVars       = BCO_GET_LARGE_ARG;
+            arg3_module_uniq    = BCO_GET_LARGE_ARG;
 #ifdef PROFILING
             arg4_cc             = BCO_GET_LARGE_ARG;
 #else
@@ -1002,20 +1002,31 @@ run_BCO:
                      new_aps->payload[i] = (StgClosure *)Sp[i-2];
                   }
 
-                  // prepare the stack so that we can call the
-                  // rts_breakpoint_io_action and ensure that the stack is
-                  // in a reasonable state for the GC and so that
-                  // execution of this BCO can continue when we resume
-                  ioAction = (StgClosure *) deRefStablePtr (rts_breakpoint_io_action);
-                  Sp -= 8;
-                  Sp[7] = (W_)obj;
-                  Sp[6] = (W_)&stg_apply_interp_info;
-                  Sp[5] = (W_)new_aps;                 // the AP_STACK
-                  Sp[4] = (W_)BCO_PTR(arg3_freeVars);  // the info about local vars of the breakpoint
-                  Sp[3] = (W_)False_closure;            // True <=> a breakpoint
-                  Sp[2] = (W_)&stg_ap_pppv_info;
-                  Sp[1] = (W_)ioAction;                // apply the IO action to its two arguments above
-                  Sp[0] = (W_)&stg_enter_info;         // get ready to run the IO action
+                  // Arrange the stack to call the breakpoint IO action, and
+                  // continue execution of this BCO when the IO action returns.
+                  //
+                  // ioAction :: Bool        -- exception?
+                  //          -> HValue      -- the AP_STACK, or exception
+                  //          -> Int         -- the breakpoint index (arg2)
+                  //          -> Int         -- the module uniq (arg3)
+                  //          -> IO ()
+                  //
+                  ioAction = (StgClosure *) deRefStablePtr (
+                      rts_breakpoint_io_action);
+
+                  Sp -= 11;
+                  Sp[10] = (W_)obj;
+                  Sp[9]  = (W_)&stg_apply_interp_info;
+                  Sp[8]  = (W_)new_aps;
+                  Sp[7]  = (W_)False_closure;         // True <=> a breakpoint
+                  Sp[6]  = (W_)&stg_ap_ppv_info;
+                  Sp[5]  = (W_)BCO_LIT(arg3_module_uniq);
+                  Sp[4]  = (W_)&stg_ap_n_info;
+                  Sp[3]  = (W_)arg2_array_index;
+                  Sp[2]  = (W_)&stg_ap_n_info;
+                  Sp[1]  = (W_)ioAction;
+                  Sp[0]  = (W_)&stg_enter_info;
+
                   // set the flag in the TSO to say that we are now
                   // stopping at a breakpoint so that when we resume
                   // we don't stop on the same breakpoint that we
