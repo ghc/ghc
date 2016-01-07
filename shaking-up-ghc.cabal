@@ -90,6 +90,7 @@ executable ghc-shake
                        , Settings.Packages.IservBin
                        , Settings.Packages.Rts
                        , Settings.Packages.RunGhc
+                       , Settings.Packages.Touchy
                        , Settings.TargetDirectory
                        , Settings.User
                        , Settings.Ways
