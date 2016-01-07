@@ -24,8 +24,8 @@ packagesStage0 = mconcat
     [ append [ binary, cabal, compiler, ghc, ghcBoot, ghcCabal, ghcPkg
              , hsc2hs, hoopl, hpc, templateHaskell, transformers ]
     -- the stage0 predicate makes sure these packages are built only in Stage0
-    , stage0 ? append [ deriveConstants, dllSplit, genapply, genprimopcode
-                      , hp2ps, touchy ]
+    , stage0 ? append [deriveConstants, dllSplit, genapply, genprimopcode, hp2ps]
+    , stage0 ? windowsHost ? append [touchy]
     , notM windowsHost ? notM (anyHostOs ["ios"]) ? append [terminfo] ]
 
 packagesStage1 :: Packages
