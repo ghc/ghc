@@ -7,12 +7,10 @@ install:
     - 7z x stack.zip stack.exe
     - bash -lc "curl -LsS http://www.haskell.org/ghc/dist/7.10.3/ghc-7.10.3-x86_64-unknown-mingw32.tar.xz | tar -xJ -C /mingw64 --strip-components=1"
     - stack exec -- pacman -S --noconfirm gcc binutils p7zip git
-    - stack install alex happy
+    - stack install alex happy shake ansi-terminal mtl
     - set PATH=%PATH%;C:\Users\appveyor\AppData\Roaming\local\bin\
     - git clone --recursive git://git.haskell.org/ghc.git C:\msys64\home\ghc\tmp
     - bash -lc "mv /home/ghc/tmp/* /home/ghc"
-    - cd C:\msys64\home\ghc\shake-build
-    - stack install --only-dependencies
 
 build_script:
     - bash -lc "cd /home/ghc && ./boot"
