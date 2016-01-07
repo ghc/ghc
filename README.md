@@ -1,7 +1,7 @@
 Shaking up GHC
 ==============
 
-[![Build Status](https://travis-ci.org/snowleopard/shaking-up-ghc.svg)](https://travis-ci.org/snowleopard/shaking-up-ghc) [![Build status](https://ci.appveyor.com/api/projects/status/9er74sbnrkco98gb?svg=true&pendingText=Windows&passingText=Windows&failingText=Windows)](https://ci.appveyor.com/project/snowleopard/shaking-up-ghc)
+[![Linux & OS X status](https://img.shields.io/travis/snowleopard/shaking-up-ghc.svg?label=Linux%20%26%20OS%20X)](https://travis-ci.org/snowleopard/shaking-up-ghc) [![Windows status](https://img.shields.io/appveyor/ci/snowleopard/shaking-up-ghc.svg?label=Windows)](https://ci.appveyor.com/project/snowleopard/shaking-up-ghc)
 
 
 As part of my 6-month research secondment to Microsoft Research in Cambridge
