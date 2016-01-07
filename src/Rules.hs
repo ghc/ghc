@@ -3,7 +3,7 @@ module Rules (generateTargets, packageRules) where
 import Base
 import Expression
 import GHC
-import Rules.Copy
+import Rules.Generate
 import Rules.Package
 import Rules.Resources
 import Settings

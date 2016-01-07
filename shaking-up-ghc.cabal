@@ -39,7 +39,6 @@ executable ghc-shake
                        , Rules.Cabal
                        , Rules.Compile
                        , Rules.Config
-                       , Rules.Copy
                        , Rules.Data
                        , Rules.Dependencies
                        , Rules.Documentation

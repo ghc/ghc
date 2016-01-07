@@ -1,6 +1,7 @@
 module Rules.Generate (
     generatePackageCode, generateRules,
-    derivedConstantsPath, generatedDependencies
+    derivedConstantsPath, generatedDependencies,
+    installTargets, copyRules
     ) where
 
 import Base
@@ -19,6 +20,11 @@ import Rules.Libffi
 import Rules.Resources (Resources)
 import Settings
 import Settings.Builders.DeriveConstants
+
+installTargets :: [FilePath]
+installTargets = [ "inplace/lib/template-hsc.h"
+                 , "inplace/lib/platformConstants"
+                 , "inplace/lib/settings" ]
 
 primopsSource :: FilePath
 primopsSource = "compiler/prelude/primops.txt.pp"
@@ -45,7 +51,7 @@ ghcPrimDependencies stage = ((targetPath stage ghcPrim -/- "build") -/-) <$>
        , "autogen/GHC/Prim.hs" ]
 
 derivedConstantsDependencies :: [FilePath]
-derivedConstantsDependencies = (derivedConstantsPath -/-) <$>
+derivedConstantsDependencies = installTargets ++ fmap (derivedConstantsPath -/-)
     [ "DerivedConstants.h"
     , "GHCConstantsHaskellType.hs"
     , "GHCConstantsHaskellWrappers.hs"
@@ -149,6 +155,14 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
             when (pkg == runGhc) $ buildPath -/- "Main.hs" %> \file -> do
                 copyFileChanged (pkgPath pkg -/- "runghc.hs") file
                 putSuccess $ "| Successfully generated '" ++ file ++ "'."
+
+copyRules :: Rules ()
+copyRules = do
+    "inplace/lib/template-hsc.h"    <~ pkgPath hsc2hs
+    "inplace/lib/platformConstants" <~ derivedConstantsPath
+    "inplace/lib/settings"          <~ "."
+  where
+    file <~ dir = file %> \_ -> copyFile (dir -/- takeFileName file) file
 
 generateRules :: Rules ()
 generateRules = do
