@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MagicHash, RecordWildCards #-}
 --
 --  (c) The University of Glasgow 2002-2006
 --
@@ -8,43 +8,55 @@ module ByteCodeTypes
   ( CompiledByteCode(..), FFIInfo(..)
   , UnlinkedBCO(..), BCOPtr(..), BCONPtr(..)
   , ItblEnv, ItblPtr(..)
-  , BreakInfo(..)
+  , CgBreakInfo(..)
+  , ModBreaks (..), BreakIndex, emptyModBreaks
+  , CCostCentre
   ) where
 
 import FastString
 import Id
-import Module
 import Name
 import NameEnv
 import Outputable
 import PrimOp
 import SizedSeq
 import Type
+import SrcLoc
+import GHCi.BreakArray
 import GHCi.RemoteTypes
+import GHCi.FFI
+import GHCi.InfoTable
 
 import Foreign
+import Data.Array
 import Data.Array.Base  ( UArray(..) )
 import Data.ByteString (ByteString)
-import GHC.Exts
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
+import GHC.Stack.CCS
 
+-- -----------------------------------------------------------------------------
+-- Compiled Byte Code
 
-data CompiledByteCode
-  = ByteCode [UnlinkedBCO] -- Bunch of interpretable bindings
-             ItblEnv       -- A mapping from DataCons to their itbls
-             [FFIInfo]     -- ffi blocks we allocated
+data CompiledByteCode = CompiledByteCode
+  { bc_bcos   :: [UnlinkedBCO]  -- Bunch of interpretable bindings
+  , bc_itbls  :: ItblEnv        -- A mapping from DataCons to their itbls
+  , bc_ffis   :: [FFIInfo]      -- ffi blocks we allocated
+  , bc_breaks :: Maybe ModBreaks -- breakpoint info (Nothing if we're not
+                                 -- creating breakpoints, for some reason)
+  }
                 -- ToDo: we're not tracking strings that we malloc'd
-
-newtype FFIInfo = FFIInfo RemotePtr
+newtype FFIInfo = FFIInfo (RemotePtr C_ffi_cif)
   deriving Show
 
 instance Outputable CompiledByteCode where
-  ppr (ByteCode bcos _ _) = ppr bcos
+  ppr CompiledByteCode{..} = ppr bc_bcos
 
 type ItblEnv = NameEnv (Name, ItblPtr)
         -- We need the Name in the range so we know which
         -- elements to filter out when unloading a module
 
-newtype ItblPtr = ItblPtr (Ptr ()) deriving Show
+newtype ItblPtr = ItblPtr (RemotePtr StgInfoTable) deriving Show
 
 data UnlinkedBCO
    = UnlinkedBCO {
@@ -60,8 +72,7 @@ data BCOPtr
   = BCOPtrName   Name
   | BCOPtrPrimOp PrimOp
   | BCOPtrBCO    UnlinkedBCO
-  | BCOPtrBreakInfo  BreakInfo
-  | BCOPtrArray (MutableByteArray# RealWorld)
+  | BCOPtrBreakArray  -- a pointer to this module's BreakArray
 
 data BCONPtr
   = BCONPtrWord  Word
@@ -69,12 +80,11 @@ data BCONPtr
   | BCONPtrItbl  Name
   | BCONPtrStr   ByteString
 
-data BreakInfo
-   = BreakInfo
-   { breakInfo_module :: Module
-   , breakInfo_number :: {-# UNPACK #-} !Int
-   , breakInfo_vars   :: [(Id,Word16)]
-   , breakInfo_resty  :: Type
+-- | Information about a breakpoint that we know at code-generation time
+data CgBreakInfo
+   = CgBreakInfo
+   { cgb_vars   :: [(Id,Word16)]
+   , cgb_resty  :: Type
    }
 
 instance Outputable UnlinkedBCO where
@@ -83,9 +93,46 @@ instance Outputable UnlinkedBCO where
              ppr (sizeSS lits), text "lits",
              ppr (sizeSS ptrs), text "ptrs" ]
 
-instance Outputable BreakInfo where
-   ppr info = text "BreakInfo" <+>
-              parens (ppr (breakInfo_module info) <+>
-                      ppr (breakInfo_number info) <+>
-                      ppr (breakInfo_vars info) <+>
-                      ppr (breakInfo_resty info))
+instance Outputable CgBreakInfo where
+   ppr info = text "CgBreakInfo" <+>
+              parens (ppr (cgb_vars info) <+>
+                      ppr (cgb_resty info))
+
+-- -----------------------------------------------------------------------------
+-- Breakpoints
+
+-- | Breakpoint index
+type BreakIndex = Int
+
+-- | C CostCentre type
+data CCostCentre
+
+-- | All the information about the breakpoints for a module
+data ModBreaks
+   = ModBreaks
+   { modBreaks_flags :: ForeignRef BreakArray
+        -- ^ The array of flags, one per breakpoint,
+        -- indicating which breakpoints are enabled.
+   , modBreaks_locs :: !(Array BreakIndex SrcSpan)
+        -- ^ An array giving the source span of each breakpoint.
+   , modBreaks_vars :: !(Array BreakIndex [OccName])
+        -- ^ An array giving the names of the free variables at each breakpoint.
+   , modBreaks_decls :: !(Array BreakIndex [String])
+        -- ^ An array giving the names of the declarations enclosing each breakpoint.
+   , modBreaks_ccs :: !(Array BreakIndex (RemotePtr CostCentre))
+        -- ^ Array pointing to cost centre for each breakpoint
+   , modBreaks_breakInfo :: IntMap CgBreakInfo
+        -- ^ info about each breakpoint from the bytecode generator
+   }
+
+-- | Construct an empty ModBreaks
+emptyModBreaks :: ModBreaks
+emptyModBreaks = ModBreaks
+   { modBreaks_flags = error "ModBreaks.modBreaks_array not initialised"
+         -- ToDo: can we avoid this?
+   , modBreaks_locs  = array (0,-1) []
+   , modBreaks_vars  = array (0,-1) []
+   , modBreaks_decls = array (0,-1) []
+   , modBreaks_ccs = array (0,-1) []
+   , modBreaks_breakInfo = IntMap.empty
+   }

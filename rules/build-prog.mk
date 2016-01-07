@@ -278,10 +278,10 @@ endif # $1_$2_PROG_NEEDS_C_WRAPPER
 ifneq "$$(CLEANING)" "YES"
 ifneq "$3" "0"
 ifneq "$$($1_$2_HS_SRCS)" ""
-ifeq "$$(strip $$(ALL_STAGE1_LIBS))" ""
-$$(error ordering failure in $1 ($2): ALL_STAGE1_LIBS is empty)
+ifeq "$$(strip $$(ALL_STAGE1_$$($1_$2_PROGRAM_WAY)_LIBS))" ""
+$$(error ordering failure in $1 ($2): ALL_STAGE1_$$($1_$2_PROGRAM_WAY)_LIBS is empty)
 endif
-$1/$2/build/tmp/$$($1_$2_PROG) : $$(ALL_STAGE1_LIBS) $$(ALL_RTS_LIBS) $$(OTHER_LIBS)
+$1/$2/build/tmp/$$($1_$2_PROG) : $$(ALL_STAGE1_$$($1_$2_PROGRAM_WAY)_LIBS) $$(ALL_RTS_LIBS)
 endif
 endif
 endif

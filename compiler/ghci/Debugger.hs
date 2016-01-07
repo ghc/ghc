@@ -119,7 +119,7 @@ bindSuspensions t = do
       let ids = [ mkVanillaGlobal name ty
                 | (name,ty) <- zip names tys]
           new_ic = extendInteractiveContextWithIds ictxt ids
-      fhvs <- liftIO $ mapM (mkFinalizedHValue hsc_env <=< mkHValueRef) hvals
+      fhvs <- liftIO $ mapM (mkFinalizedHValue hsc_env <=< mkRemoteRef) hvals
       liftIO $ extendLinkEnv (zip names fhvs)
       modifySession $ \_ -> hsc_env {hsc_IC = new_ic }
       return t'
@@ -173,7 +173,7 @@ showTerm term = do
            let noop_log _ _ _ _ _ = return ()
                expr = "show " ++ showPpr dflags bname
            _ <- GHC.setSessionDynFlags dflags{log_action=noop_log}
-           fhv <- liftIO $ mkFinalizedHValue hsc_env =<< mkHValueRef val
+           fhv <- liftIO $ mkFinalizedHValue hsc_env =<< mkRemoteRef val
            txt_ <- withExtendedLinkEnv [(bname, fhv)]
                                        (GHC.compileExpr expr)
            let myprec = 10 -- application precedence. TODO Infix constructors

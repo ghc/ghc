@@ -564,7 +564,10 @@ BOOT_PKG_CONSTRAINTS := \
             --constraint "$p == $(shell grep -i "^Version:" libraries/$d/$p.cabal | sed "s/[^0-9.]//g")"))
 
 # The actual .a and .so/.dll files: needed for dependencies.
-ALL_STAGE1_LIBS  = $(foreach lib,$(PACKAGES_STAGE1),$(libraries/$(lib)_dist-install_v_LIB))
+$(foreach way,$(GhcLibWays),$(eval ALL_STAGE1_$(way)_LIBS = $$(foreach lib,$$(PACKAGES_STAGE1),$$(libraries/$$(lib)_dist-install_$(way)_LIB))))
+
+ALL_STAGE1_LIBS = $(ALL_STAGE1_v_LIBS)
+
 ifeq "$(BuildSharedLibs)" "YES"
 ALL_STAGE1_LIBS += $(foreach lib,$(PACKAGES_STAGE1),$(libraries/$(lib)_dist-install_dyn_LIB))
 endif

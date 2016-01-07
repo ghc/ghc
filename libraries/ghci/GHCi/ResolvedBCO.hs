@@ -6,6 +6,7 @@ module GHCi.ResolvedBCO
 
 import SizedSeq
 import GHCi.RemoteTypes
+import GHCi.BreakArray
 
 import Data.Array.Unboxed
 import Data.Binary
@@ -32,31 +33,14 @@ instance Binary ResolvedBCO
 data ResolvedBCOPtr
   = ResolvedBCORef Int
       -- ^ reference to the Nth BCO in the current set
-  | ResolvedBCOPtr HValueRef
+  | ResolvedBCOPtr (RemoteRef HValue)
       -- ^ reference to a previously created BCO
-  | ResolvedBCOStaticPtr RemotePtr
+  | ResolvedBCOStaticPtr (RemotePtr ())
       -- ^ reference to a static ptr
   | ResolvedBCOPtrBCO ResolvedBCO
       -- ^ a nested BCO
-  | ResolvedBCOPtrLocal HValue
-      -- ^ something local, cannot be serialized
+  | ResolvedBCOPtrBreakArray (RemoteRef BreakArray)
+      -- ^ Resolves to the MutableArray# inside the BreakArray
   deriving (Generic, Show)
 
--- Manual Binary instance is needed because we cannot serialize
--- ResolvedBCOPtrLocal.  This will go away once we have support for
--- remote breakpoints.
-instance Binary ResolvedBCOPtr where
-  put (ResolvedBCORef a) = putWord8 0 >> put a
-  put (ResolvedBCOPtr a) = putWord8 1 >> put a
-  put (ResolvedBCOStaticPtr a) = putWord8 2 >> put a
-  put (ResolvedBCOPtrBCO a) = putWord8 3 >> put a
-  put (ResolvedBCOPtrLocal _) =
-    error "Cannot serialize a local pointer.  Use -fno-external-interpreter?"
-
-  get = do
-    w <- getWord8
-    case w of
-      0 -> ResolvedBCORef <$> get
-      1 -> ResolvedBCOPtr <$> get
-      2 -> ResolvedBCOStaticPtr <$> get
-      _ -> ResolvedBCOPtrBCO <$> get
+instance Binary ResolvedBCOPtr

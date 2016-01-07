@@ -12,6 +12,7 @@
 module GHCi.FFI
   ( FFIType(..)
   , FFIConv(..)
+  , C_ffi_cif
   , prepForeignCall
   , freeForeignCallInfo
   ) where
@@ -47,7 +48,7 @@ prepForeignCall
     :: FFIConv
     -> [FFIType]          -- arg types
     -> FFIType            -- result type
-    -> IO (Ptr ())        -- token for making calls (must be freed by caller)
+    -> IO (Ptr C_ffi_cif) -- token for making calls (must be freed by caller)
 
 prepForeignCall cconv arg_types result_type = do
   let n_args = length arg_types
@@ -60,7 +61,7 @@ prepForeignCall cconv arg_types result_type = do
      then throwIO (ErrorCall ("prepForeignCallFailed: " ++ show r))
      else return (castPtr cif)
 
-freeForeignCallInfo :: Ptr () -> IO ()
+freeForeignCallInfo :: Ptr C_ffi_cif -> IO ()
 freeForeignCallInfo p = do
   free ((#ptr ffi_cif, arg_types) p)
   free p

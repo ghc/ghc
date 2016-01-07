@@ -176,6 +176,7 @@ import qualified Control.Monad.Fail as MonadFail
 import Data.Map      ( Map )
 import Data.Dynamic  ( Dynamic )
 import Data.Typeable ( TypeRep )
+import GHCi.Message
 import GHCi.RemoteTypes
 
 import qualified Language.Haskell.TH as TH
@@ -495,7 +496,7 @@ data TcGblEnv
         -- ^ Template Haskell module finalizers
 
         tcg_th_state :: TcRef (Map TypeRep Dynamic),
-        tcg_th_remote_state :: TcRef (Maybe ForeignHValue),
+        tcg_th_remote_state :: TcRef (Maybe (ForeignRef (IORef QState))),
         -- ^ Template Haskell state
 #endif /* GHCI */
 

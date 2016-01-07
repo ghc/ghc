@@ -28,18 +28,6 @@ import qualified Language.Haskell.TH        as TH
 import qualified Language.Haskell.TH.Syntax as TH
 import Unsafe.Coerce
 
-data QState = QState
-  { qsMap        :: Map TypeRep Dynamic
-       -- ^ persistent data between splices in a module
-  , qsFinalizers :: [TH.Q ()]
-       -- ^ registered finalizers (in reverse order)
-  , qsLocation   :: Maybe TH.Loc
-       -- ^ location for current splice, if any
-  , qsPipe :: Pipe
-       -- ^ pipe to communicate with GHC
-  }
-instance Show QState where show _ = "<QState>"
-
 initQState :: Pipe -> QState
 initQState p = QState M.empty [] Nothing p
 
@@ -134,41 +122,41 @@ instance TH.Quasi GHCiQ where
   qIsExtEnabled x = ghcCmd (IsExtEnabled x)
   qExtsEnabled = ghcCmd ExtsEnabled
 
-startTH :: IO HValueRef
+startTH :: IO (RemoteRef (IORef QState))
 startTH = do
   r <- newIORef (initQState (error "startTH: no pipe"))
-  mkHValueRef (unsafeCoerce r)
+  mkRemoteRef r
 
-finishTH :: Pipe -> HValueRef -> IO ()
+finishTH :: Pipe -> RemoteRef (IORef QState) -> IO ()
 finishTH pipe rstate = do
-  qstateref <- unsafeCoerce <$> localHValueRef rstate
+  qstateref <- localRef rstate
   qstate <- readIORef qstateref
   _ <- runGHCiQ runModFinalizers qstate { qsPipe = pipe }
-  freeHValueRef rstate
+  freeRemoteRef rstate
   return ()
 
 runTH
-  :: Pipe -> HValueRef -> HValueRef
+  :: Pipe -> RemoteRef (IORef QState) -> HValueRef
   -> THResultType
   -> Maybe TH.Loc
   -> IO ByteString
 runTH pipe rstate rhv ty mb_loc = do
-  hv <- localHValueRef rhv
+  hv <- localRef rhv
   case ty of
     THExp -> runTHQ pipe rstate mb_loc (unsafeCoerce hv :: TH.Q TH.Exp)
     THPat -> runTHQ pipe rstate mb_loc (unsafeCoerce hv :: TH.Q TH.Pat)
     THType -> runTHQ pipe rstate mb_loc (unsafeCoerce hv :: TH.Q TH.Type)
     THDec -> runTHQ pipe rstate mb_loc (unsafeCoerce hv :: TH.Q [TH.Dec])
     THAnnWrapper -> do
-      hv <- unsafeCoerce <$> localHValueRef rhv
+      hv <- unsafeCoerce <$> localRef rhv
       case hv :: AnnotationWrapper of
         AnnotationWrapper thing ->
           return $! LB.toStrict (runPut (put (toSerialized serializeWithData thing)))
 
-runTHQ :: Binary a => Pipe -> HValueRef -> Maybe TH.Loc -> TH.Q a
+runTHQ :: Binary a => Pipe -> RemoteRef (IORef QState) -> Maybe TH.Loc -> TH.Q a
        -> IO ByteString
 runTHQ pipe@Pipe{..} rstate mb_loc ghciq = do
-  qstateref <- unsafeCoerce <$> localHValueRef rstate
+  qstateref <- localRef rstate
   qstate <- readIORef qstateref
   let st = qstate { qsLocation = mb_loc, qsPipe = pipe }
   (r,new_state) <- runGHCiQ (TH.runQ ghciq) st

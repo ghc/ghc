@@ -52,7 +52,7 @@ lookupClosure str = do
   case m of
     Nothing -> return Nothing
     Just (Ptr addr) -> case addrToAny# addr of
-      (# a #) -> Just <$> mkHValueRef (HValue a)
+      (# a #) -> Just <$> mkRemoteRef (HValue a)
 
 prefixUnderscore :: String -> String
 prefixUnderscore

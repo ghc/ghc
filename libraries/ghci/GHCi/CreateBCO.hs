@@ -14,6 +14,7 @@ module GHCi.CreateBCO (createBCOs) where
 
 import GHCi.ResolvedBCO
 import GHCi.RemoteTypes
+import GHCi.BreakArray
 import SizedSeq
 
 import System.IO (fixIO)
@@ -31,7 +32,7 @@ createBCOs bcos = do
   hvals <- fixIO $ \hvs -> do
      let arr = listArray (0, n_bcos-1) hvs
      mapM (createBCO arr) bcos
-  mapM mkHValueRef hvals
+  mapM mkRemoteRef hvals
 
 createBCO :: Array Int HValue -> ResolvedBCO -> IO HValue
 createBCO arr bco
@@ -85,15 +86,16 @@ mkPtrsArray arr n_ptrs ptrs = do
     fill (ResolvedBCORef n) i =
       writePtrsArrayHValue i (arr ! n) marr  -- must be lazy!
     fill (ResolvedBCOPtr r) i = do
-      hv <- localHValueRef r
+      hv <- localRef r
       writePtrsArrayHValue i hv marr
     fill (ResolvedBCOStaticPtr r) i = do
       writePtrsArrayPtr i (fromRemotePtr r)  marr
     fill (ResolvedBCOPtrBCO bco) i = do
       BCO bco# <- linkBCO' arr bco
       writePtrsArrayBCO i bco# marr
-    fill (ResolvedBCOPtrLocal hv) i = do
-      writePtrsArrayHValue i hv marr
+    fill (ResolvedBCOPtrBreakArray r) i = do
+      BA mba <- localRef r
+      writePtrsArrayMBA i mba marr
   zipWithM_ fill ptrs [0..]
   return marr
 
@@ -122,6 +124,10 @@ writePtrsArrayBCO (I# i) bco (PtrsArr arr) = IO $ \s ->
   case (unsafeCoerce# writeArray#) arr i bco s of s' -> (# s', () #)
 
 data BCO = BCO BCO#
+
+writePtrsArrayMBA :: Int -> MutableByteArray# s -> PtrsArr -> IO ()
+writePtrsArrayMBA (I# i) mba (PtrsArr arr) = IO $ \s ->
+  case (unsafeCoerce# writeArray#) arr i mba s of s' -> (# s', () #)
 
 newBCO :: ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> IO BCO
 newBCO instrs lits ptrs arity bitmap = IO $ \s ->
