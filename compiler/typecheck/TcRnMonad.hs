@@ -722,18 +722,17 @@ warnIf True  msg = addWarn msg
 warnIf False _   = return ()
 
 addMessages :: Messages -> TcRn ()
-addMessages (m_warns, m_errs)
+addMessages msgs1
   = do { errs_var <- getErrsVar ;
-         (warns, errs) <- readTcRef errs_var ;
-         writeTcRef errs_var (warns `unionBags` m_warns,
-                               errs  `unionBags` m_errs) }
+         msgs0 <- readTcRef errs_var ;
+         writeTcRef errs_var (unionMessages msgs0 msgs1) }
 
 discardWarnings :: TcRn a -> TcRn a
 -- Ignore warnings inside the thing inside;
 -- used to ignore-unused-variable warnings inside derived code
 discardWarnings thing_inside
   = do  { errs_var <- getErrsVar
-        ; (old_warns, _) <- readTcRef errs_var ;
+        ; (old_warns, _) <- readTcRef errs_var
 
         ; result <- thing_inside
 
