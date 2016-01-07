@@ -11,8 +11,8 @@ install:
     - set PATH=%PATH%;C:\Users\appveyor\AppData\Roaming\local\bin\
     - git clone --recursive git://git.haskell.org/ghc.git C:\msys64\home\ghc\tmp
     - bash -lc "mv /home/ghc/tmp/* /home/ghc"
-    - bash -lc "mkdir -p /home/ghc/ghc-tarballs"
-    - bash -lc "cd /home/ghc && ./mk/get-win32-tarballs.sh download x86_64"
+    - cd C:\msys64\home\ghc
+    - stack exec -- mk/get-win32-tarballs.sh download x86_64
 
 build_script:
     - bash -lc "cd /home/ghc && ./boot"
