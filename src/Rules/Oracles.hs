@@ -10,6 +10,7 @@ oracleRules = do
     argsHashOracle     -- see Oracles.ArgsHash
     configOracle       -- see Oracles.Config
     dependenciesOracle -- see Oracles.Dependencies
+    lookupInPathOracle -- see Oracles.LookupInPath
     moduleFilesOracle  -- see Oracles.ModuleFiles
     packageDataOracle  -- see Oracles.PackageData
     packageDepsOracle  -- see Oracles.PackageDeps

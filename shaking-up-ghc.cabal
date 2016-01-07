@@ -27,6 +27,7 @@ executable ghc-shake
                        , Oracles.Config.Flag
                        , Oracles.Config.Setting
                        , Oracles.Dependencies
+                       , Oracles.LookupInPath
                        , Oracles.ModuleFiles
                        , Oracles.PackageData
                        , Oracles.PackageDeps
