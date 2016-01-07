@@ -114,6 +114,7 @@ executable ghc-shake
                        , extra >= 1.4
                        , mtl >= 2.2
                        , shake >= 0.15
+                       , split >= 0.2
                        , transformers >= 0.4
                        , unordered-containers >= 0.2
     default-language:    Haskell2010

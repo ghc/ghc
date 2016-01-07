@@ -4,6 +4,7 @@ module Oracles.WindowsRoot (
     ) where
 
 import Data.Char (isSpace)
+import Data.List.Split (splitOn)
 import Base
 import Oracles.Config.Setting
 
@@ -40,12 +41,13 @@ fixAbsolutePathOnWindows path = do
 
 -- | Lookup a @command@ in @PATH@ environment.
 lookupInPath :: FilePath -> Action FilePath
-lookupInPath command
-    | command /= takeFileName command = return command
+lookupInPath c
+    | c /= takeFileName c = return c
     | otherwise = do
-        Stdout out <- quietly $ cmd ["which", command]
-        let path = dropWhileEnd isSpace out
-        return path
+        envPaths <- splitOn ":" <$> getEnvWithDefault "" "PATH"
+        let candidates = map (-/- c) envPaths in
+            -- this will crash if we do not find any valid candidate.
+            head <$> filterM doesFileExist candidates
 
 -- Oracle for windowsRoot. This operation requires caching as looking up
 -- the root is slow (at least the current implementation).
