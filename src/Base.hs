@@ -241,9 +241,9 @@ removeDirectoryIfExists d =
 
 -- | Split function. Splits a string @s@ into chunks
 -- when the predicate @p@ holds. See: http://stackoverflow.com/a/4981265
-wordsWhen :: (Char -> Bool) -> String -> [String]
+wordsWhen :: Eq a => (a -> Bool) -> [a] -> [[a]]
 wordsWhen p s =
     case dropWhile p s of
-        "" -> []
+        [] -> []
         s' -> w : wordsWhen p s''
             where (w, s'') = break p s'
