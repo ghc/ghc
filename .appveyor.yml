@@ -14,5 +14,5 @@ install:
 
 build_script:
     - bash -lc "cd /home/ghc && ./boot"
-    - bash -lc "cd /home/ghc && echo "" | ./configure --enable-tarballs-autodownload"
+    - bash -lc "cd /home/ghc && echo \"\" | ./configure --enable-tarballs-autodownload"
     - bash -lc "cd /home/ghc && ./shake-build/build.bat -j --no-progress"
