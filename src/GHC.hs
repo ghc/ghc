@@ -6,7 +6,7 @@ module GHC (
     haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
     integerSimple, iservBin, libffi, mkUserGuidePart, parallel, pretty,
     primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time,
-    transformers, unix, win32, xhtml,
+    touchy, transformers, unix, win32, xhtml,
 
     defaultKnownPackages, defaultTargetDirectory, defaultProgramPath
     ) where
@@ -28,7 +28,7 @@ defaultKnownPackages =
     , ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp
     , integerSimple, iservBin, libffi, mkUserGuidePart, parallel, pretty
     , primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time
-    , transformers, unix, win32, xhtml ]
+    , touchy, transformers, unix, win32, xhtml ]
 
 -- Package definitions (see Package.hs)
 array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
@@ -37,7 +37,7 @@ array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
     haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
     integerSimple, iservBin, libffi, mkUserGuidePart, parallel, pretty,
     primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time,
-    transformers, unix, win32, xhtml :: Package
+    touchy, transformers, unix, win32, xhtml :: Package
 
 array           = library  "array"
 base            = library  "base"
@@ -83,6 +83,7 @@ stm             = library  "stm"
 templateHaskell = library  "template-haskell"
 terminfo        = library  "terminfo"
 time            = library  "time"
+touchy          = utility  "touchy"
 transformers    = library  "transformers"
 unix            = library  "unix"
 win32           = library  "Win32"
@@ -92,7 +93,7 @@ xhtml           = library  "xhtml"
 -- TODO: The following utils are not included into the build system because
 -- they seem to be unused or unrelated to the build process: checkUniques,
 -- completion, count_lines, coverity, debugNGC, describe-unexpected, genargs,
--- lndir, mkdirhier, testremove, touchy, vagrant
+-- lndir, mkdirhier, testremove, vagrant
 
 -- GHC build results will be placed into target directories with the following
 -- typical structure:
@@ -102,13 +103,16 @@ xhtml           = library  "xhtml"
 defaultTargetDirectory :: Stage -> Package -> FilePath
 defaultTargetDirectory stage _ = stageString stage
 
--- TODO: simplify
+-- TODO: simplify, add programInplaceLibPath
 -- | Returns a relative path to the program executable
 defaultProgramPath :: Stage -> Package -> Maybe FilePath
 defaultProgramPath stage pkg
     | pkg == ghc = Just . inplaceProgram $ "ghc-stage" ++ show (fromEnum stage + 1)
     | pkg == haddock || pkg == ghcTags = case stage of
         Stage2 -> Just . inplaceProgram $ pkgNameString pkg
+        _      -> Nothing
+    | pkg == touchy = case stage of
+        Stage0 -> Just $ "inplace/lib/bin" -/- pkgNameString pkg <.> exe
         _      -> Nothing
     | isProgram pkg = case stage of
         Stage0 -> Just . inplaceProgram $ pkgNameString pkg

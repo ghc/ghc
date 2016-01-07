@@ -30,6 +30,7 @@ import Settings.Packages.IntegerGmp
 import Settings.Packages.IservBin
 import Settings.Packages.Rts
 import Settings.Packages.RunGhc
+import Settings.Packages.Touchy
 import Settings.User
 
 getArgs :: Expr [String]
@@ -75,4 +76,5 @@ defaultPackageArgs = mconcat
     , integerGmpPackageArgs
     , iservBinPackageArgs
     , rtsPackageArgs
-    , runGhcPackageArgs ]
+    , runGhcPackageArgs
+    , touchyPackageArgs ]

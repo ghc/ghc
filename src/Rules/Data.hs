@@ -67,6 +67,14 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
             writeFileChanged mk contents
             putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 
+        when (pkg == touchy) $ dataFile %> \mk -> do
+            let prefix = "utils_touchy_" ++ stageString stage ++ "_"
+                contents = unlines $ map (prefix++)
+                    [ "PROGNAME = touchy"
+                    , "C_SRCS = touchy.c" ]
+            writeFileChanged mk contents
+            putSuccess $ "| Successfully generated '" ++ mk ++ "'."
+
         -- Bootstrapping `ghcCabal`: although `ghcCabal` is a proper cabal
         -- package, we cannot generate the corresponding `package-data.mk` file
         -- by running by running `ghcCabal`, because it has not yet been built.
