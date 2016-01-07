@@ -23,36 +23,30 @@ identical to those for the `make` build system. This means that you don't need
 to adjust anything if you are already familiar with building ghc using the `make`
 build system.
 
-### Linux / Mac OS X
-
-```bash
-git clone git://git.haskell.org/ghc
-cd ghc
-git submodule update --init
-git clone git://github.com/snowleopard/shaking-up-ghc shake-build
-./boot
-./configure
-```
-
-Now you have a couple of options:
-
-- `./shake-build/build.sh` to run the script directly. You'll need to have
-  `shake` installed globally.
-- `./shake-build/build.cabal.sh` to install the build system in a Cabal sandbox
-  and then run it.
-
-
-
-### Windows
+### Getting the source and configuring GHC
 
 ```bash
 git clone --recursive git://git.haskell.org/ghc.git
 cd ghc
 git clone git://github.com/snowleopard/shaking-up-ghc shake-build
 ./boot
-./configure --enable-tarballs-autodownload
-shake-build/build.bat
+./configure                                # on linux / os x
+./configure --enable-tarballs-autodownload # on windows
 ```
+
+### Configuring the build process
+
+`ghc` uses `mk/build.mk` to configure the build process. `shaking-up-ghc`
+uses `src/Settings/User.hs` for build specification.
+
+### Building GHC using `shaking-up-ghc`
+
+```bash
+./shake-build/build.sh       # linux / os x: to run the script directly. You'll need to have `shake` installed globally.
+./shake-build/build.cabal.sh # linux / os x: OR to install the build system in a Cabal sandbox and then run it.
+shake-build/build.bat        # windows
+```
+
 Also see the [Building GHC on Windows guide][ghc-windows-building-guide].
 
 ### Resetting the build
