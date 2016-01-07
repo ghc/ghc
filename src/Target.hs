@@ -37,7 +37,7 @@ instance Monoid a => Monoid (ReaderT Target Action a) where
     mempty  = return mempty
     mappend = liftM2 mappend
 
--- A partially constructed Target with fields 'Stage' and 'Package' only.
+-- | A partially constructed Target with fields 'Stage' and 'Package' only.
 -- 'PartialTarget's are used for generating build rules.
 data PartialTarget = PartialTarget Stage Package deriving (Eq, Show)
 
@@ -83,7 +83,6 @@ fullTargetWithWay ::
     -> Target
 fullTargetWithWay pt b w srcs fs = (fullTarget pt b srcs fs) { way = w }
 
--- Instances for storing in the Shake database
 instance Binary Target
 instance NFData Target
 instance Hashable Target
