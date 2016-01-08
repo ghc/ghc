@@ -1102,6 +1102,53 @@ The ``-interactive-print`` flag can also be used when running GHC in
     % ghc -e "[1,2,3]" -interactive-print=SpecPrinter.sprint SpecPrinter
     [1,2,3]!
 
+.. _ghci-stack-traces:
+
+Stack Traces in GHCi
+~~~~~~~~~~~~~~~~~~~~
+
+.. index::
+  simple: stack trace; in GHCi
+
+[ This is an experimental feature enabled by the new
+``-fexternal-interpreter`` flag that was introduced in GHC 8.0.1.  It
+is currently not supported on Windows.]
+
+GHCi can use the profiling system to collect stack trace information
+when running interpreted code.  To gain access to stack traces, start
+GHCi like this:
+
+.. code-block:: none
+
+    ghci -fexternal-interpreter -prof
+
+This runs the interpreted code in a separate process (see
+:ref:`external-interpreter`) and runs it in profiling mode to collect
+call stack information.  Note that because we're running the
+interpreted code in profiling mode, all packages that you use must be
+compiled for profiling.  The ``-prof`` flag to GHCi only works in
+conjunction with ``-fexternal-interpreter``.
+
+There are three ways to get access to the current call stack.
+
+- ``error`` and ``undefined`` automatically attach the current stack
+  to the error message.  This often complements the implicit stack
+  stack (see :ref:`implicit-callstacks`), so both call stacks are
+  shown.
+
+- ``Debug.Trace.traceStack`` is a version of ``Debug.Trace.trace``
+  that also prints the current call stack.
+
+- Functions in the module ``GHC.Stack`` can be used to get the current
+  stack and render it.
+
+You don't need to use ``-fprof-auto`` for interpreted modules,
+annotations are automatically added at a granularity fine enough to
+distinguish individual call sites.  However, you won't see any call
+stack information for compiled code unless it was compiled with
+``-fprof-auto`` or has explicit ``SCC`` annotations (see
+:ref:`scc-pragma`).
+
 .. _ghci-debugger:
 
 The GHCi Debugger
@@ -2942,12 +2989,14 @@ using messages over a pipe.
 
 Why might we want to do this?  The main reason is that the RTS running
 the interpreted code can be a different flavour (profiling or
-dynamically-linked) from GHC itself.  So for example, when compiling
-Template Haskell code with ``-prof``, we don't need to compile the
-modules without ``-prof`` first (see :ref:`th-profiling`) because we
-can run the profiled object code in the interpreter.  GHCi can also
-load and run profiled object code when run with
-``-fexternal-interpreter`` and ``-prof``.
+dynamically-linked) from GHC itself.  So for example:
+
+- We can use the profiler to collect stack traces when using GHCi (see
+  :ref:`ghci-stack-traces`).
+
+- When compiling Template Haskell code with ``-prof`` we don't need to
+  compile the modules without ``-prof`` first (see :ref:`th-profiling`)
+  because we can run the profiled object code in the interpreter.
 
 This feature is experimental in GHC 8.0.x, but it may become the
 default in future releases.
