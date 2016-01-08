@@ -6,8 +6,6 @@ dnl
 
 AC_INIT([The Glorious Glasgow Haskell Compilation System], [@ProjectVersion@], [glasgow-haskell-bugs@haskell.org], [ghc])
 
-FP_FIND_ROOT
-
 dnl--------------------------------------------------------------------
 dnl * Deal with arguments telling us gmp is somewhere odd
 dnl--------------------------------------------------------------------
@@ -16,6 +14,9 @@ FP_GMP
 
 bootstrap_target=@TargetPlatform@
 FPTOOLS_SET_PLATFORM_VARS
+
+# Requires FPTOOLS_SET_PLATFORM_VARS to be run first.
+FP_FIND_ROOT
 
 # ToDo: if Stage1Only=YES, should be YES
 CrossCompiling=NO

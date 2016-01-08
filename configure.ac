@@ -26,8 +26,6 @@ AC_INIT([The Glorious Glasgow Haskell Compilation System], [8.1], [glasgow-haske
 # checkout), then we ship a file 'VERSION' containing the full version
 # when the source distribution was created.
 
-FP_FIND_ROOT
-
 if test ! -f mk/config.h.in; then
    echo "mk/config.h.in doesn't exist: perhaps you haven't run 'perl boot'?"
    exit 1
@@ -259,6 +257,9 @@ AC_ARG_WITH(hc,
 [WithHc=$WithGhc]
 )
 AC_SUBST(WithHc)
+
+# Requires FPTOOLS_SET_PLATFORM_VARS to be run first.
+FP_FIND_ROOT
 
 fail() {
     echo >&2
