@@ -6,7 +6,7 @@ module GHC (
     haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
     integerSimple, iservBin, libffi, mkUserGuidePart, parallel, pretty,
     primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time,
-    touchy, transformers, unix, win32, xhtml,
+    touchy, transformers, unlit, unix, win32, xhtml,
 
     defaultKnownPackages, defaultTargetDirectory, defaultProgramPath
     ) where
@@ -28,7 +28,7 @@ defaultKnownPackages =
     , ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp
     , integerSimple, iservBin, libffi, mkUserGuidePart, parallel, pretty
     , primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time
-    , touchy, transformers, unix, win32, xhtml ]
+    , touchy, transformers, unlit, unix, win32, xhtml ]
 
 -- Package definitions (see "Package")
 array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
@@ -37,7 +37,7 @@ array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
     haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
     integerSimple, iservBin, libffi, mkUserGuidePart, parallel, pretty,
     primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time,
-    touchy, transformers, unix, win32, xhtml :: Package
+    touchy, transformers, unlit, unix, win32, xhtml :: Package
 
 array           = library  "array"
 base            = library  "base"
@@ -85,11 +85,12 @@ terminfo        = library  "terminfo"
 time            = library  "time"
 touchy          = utility  "touchy"
 transformers    = library  "transformers"
+unlit           = utility  "unlit"
 unix            = library  "unix"
 win32           = library  "Win32"
 xhtml           = library  "xhtml"
 
--- TODO: The following utils are not implemented yet: unlit, driver/ghc-split
+-- TODO: The following utils are not implemented yet: driver/ghc-split
 -- TODO: The following utils are not included into the build system because
 -- they seem to be unused or unrelated to the build process: checkUniques,
 -- completion, count_lines, coverity, debugNGC, describe-unexpected, genargs,
@@ -112,8 +113,11 @@ defaultProgramPath stage pkg
     | pkg == haddock || pkg == ghcTags = case stage of
         Stage2 -> Just . inplaceProgram $ pkgNameString pkg
         _      -> Nothing
-    | pkg == touchy = case stage of
+    |  pkg == touchy = case stage of
         Stage0 -> Just $ "inplace/lib/bin" -/- pkgNameString pkg <.> exe
+        _      -> Nothing
+    | pkg == unlit = case stage of
+        Stage0 -> Just $ "inplace/lib" -/- pkgNameString pkg <.> exe
         _      -> Nothing
     | isProgram pkg = case stage of
         Stage0 -> Just . inplaceProgram $ pkgNameString pkg

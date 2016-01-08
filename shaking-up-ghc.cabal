@@ -91,6 +91,7 @@ executable ghc-shake
                        , Settings.Packages.Rts
                        , Settings.Packages.RunGhc
                        , Settings.Packages.Touchy
+                       , Settings.Packages.Unlit                       
                        , Settings.TargetDirectory
                        , Settings.User
                        , Settings.Ways
