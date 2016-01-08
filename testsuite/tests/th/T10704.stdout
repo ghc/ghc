@@ -1,16 +1,16 @@
-Fixity 0 InfixR
-Fixity 9 InfixL
-Fixity 9 InfixL
-Fixity 6 InfixL
-Fixity 9 InfixL
-Fixity 9 InfixL
-Fixity 9 InfixL
-Fixity 9 InfixL
-Fixity 0 InfixR
-Fixity 0 InfixR
-Fixity 1 InfixL
-Fixity 2 InfixL
-Fixity 3 InfixN
-Fixity 4 InfixN
-Fixity 5 InfixR
-Fixity 6 InfixR
+Just (Fixity 0 InfixR)
+Nothing
+Nothing
+Just (Fixity 6 InfixL)
+Nothing
+Nothing
+Nothing
+Nothing
+Just (Fixity 0 InfixR)
+Just (Fixity 0 InfixR)
+Just (Fixity 1 InfixL)
+Just (Fixity 2 InfixL)
+Just (Fixity 3 InfixN)
+Just (Fixity 4 InfixN)
+Just (Fixity 5 InfixR)
+Just (Fixity 6 InfixR)

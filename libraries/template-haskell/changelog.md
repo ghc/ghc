@@ -37,6 +37,12 @@
   * Add `reifyConStrictness` to query a data constructor's `DecidedStrictness`
     values for its fields (#10697)
 
+  * The `ClassOpI`, `DataConI`, and `VarI` constructors no longer have a
+    `Fixity` field. Instead, all `Fixity` information for a given `Name` is
+    now determined through the `reifyFixity` function, which returns `Just` the
+    fixity if there is an explicit fixity declaration for that `Name`, and
+    `Nothing` otherwise (#10704 and #11345)
+
   * TODO: document API changes and important bugfixes
 
 

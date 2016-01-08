@@ -66,7 +66,7 @@ instance Ppr Info where
               case mb_d of { Nothing -> empty; Just d -> ppr d }]
 
 ppr_sig :: Name -> Type -> Doc
-ppr_sig v ty = ppr v <+> dcolon <+> ppr ty
+ppr_sig v ty = pprName' Applied v <+> dcolon <+> ppr ty
 
 pprFixity :: Name -> Fixity -> Doc
 pprFixity _ f | f == defaultFixity = empty
@@ -507,20 +507,24 @@ instance Ppr Con where
                          <+> pprBangType st2
 
     ppr (ForallC ns ctxt (GadtC c sts ty))
-        = commaSep c <+> dcolon <+> pprForall ns ctxt <+> pprGadtRHS sts ty
+        = commaSepApplied c <+> dcolon <+> pprForall ns ctxt
+      <+> pprGadtRHS sts ty
 
     ppr (ForallC ns ctxt (RecGadtC c vsts ty))
-        = commaSep c <+> dcolon <+> pprForall ns ctxt
+        = commaSepApplied c <+> dcolon <+> pprForall ns ctxt
       <+> pprRecFields vsts ty
 
     ppr (ForallC ns ctxt con)
         = pprForall ns ctxt <+> ppr con
 
     ppr (GadtC c sts ty)
-        = commaSep c <+> dcolon <+> pprGadtRHS sts ty
+        = commaSepApplied c <+> dcolon <+> pprGadtRHS sts ty
 
     ppr (RecGadtC c vsts ty)
-        = commaSep c <+> dcolon <+> pprRecFields vsts ty
+        = commaSepApplied c <+> dcolon <+> pprRecFields vsts ty
+
+commaSepApplied :: [Name] -> Doc
+commaSepApplied = commaSepWith (pprName' Applied)
 
 pprForall :: [TyVarBndr] -> Cxt -> Doc
 pprForall ns ctxt
@@ -731,7 +735,12 @@ instance Ppr Loc where
 -- Takes a list of printable things and prints them separated by commas followed
 -- by space.
 commaSep :: Ppr a => [a] -> Doc
-commaSep = sep . punctuate comma . map ppr
+commaSep = commaSepWith ppr
+
+-- Takes a list of things and prints them with the given pretty-printing
+-- function, separated by commas followed by space.
+commaSepWith :: (a -> Doc) -> [a] -> Doc
+commaSepWith pprFun = sep . punctuate comma . map pprFun
 
 -- Takes a list of printable things and prints them separated by semicolons
 -- followed by space.
