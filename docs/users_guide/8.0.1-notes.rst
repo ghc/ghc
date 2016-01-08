@@ -45,6 +45,9 @@ The highlights, since the 7.10 branch, are:
   :ref:`external-interpreter`), and the interpreter can now run profiled
   code.
 
+- GHCi now provides access to stack traces when used with
+  ``-fexternal-interpreter`` and ``-prof`` (see :ref:`ghci-stack-traces`).
+
 - The reworked users guide you are now reading
 
 - Support for Windows XP and earlier has been dropped.
