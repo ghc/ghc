@@ -23,7 +23,7 @@ config.compile_ways       = ['normal', 'hpc']
 config.run_ways           = ['normal', 'hpc']
 
 # ways that are not enabled by default, but can always be invoked explicitly
-config.other_ways         = ['prof', 'prof_h',
+config.other_ways         = ['prof', 'normal_h',
                              'prof_hc_hb','prof_hb',
                              'prof_hd','prof_hy','prof_hr',
                              'threaded1_ls', 'threaded2_hT',
@@ -85,6 +85,7 @@ config.clean_only       = clean_only
 
 config.way_flags = lambda name : {
     'normal'       : [],
+    'normal_h'     : [],
     'g1'           : [],
     'optasm'       : ['-O', '-fasm'],
     'llvm'         : ['-fllvm'],
@@ -99,7 +100,6 @@ config.way_flags = lambda name : {
     'threaded2'    : ['-O', '-threaded', '-eventlog'],
     'threaded2_hT' : ['-O', '-threaded'],
     'hpc'          : ['-O', '-fhpc', '-hpcdir', '.hpc.' + name ],
-    'prof_h'       : [],
     'prof_hc_hb'   : ['-O', '-prof', '-static', '-auto-all'],
     'prof_hb'      : ['-O', '-prof', '-static', '-auto-all'],
     'prof_hd'      : ['-O', '-prof', '-static', '-auto-all'],
@@ -117,6 +117,7 @@ config.way_flags = lambda name : {
 
 config.way_rts_flags = {
     'normal'       : [],
+    'normal_h'     : ['-h'], # works without -prof
     'g1'           : ['-G1'],
     'optasm'       : [],
     'llvm'         : [],
@@ -131,7 +132,6 @@ config.way_rts_flags = {
     'threaded2'    : ['-N2 -ls'],
     'threaded2_hT' : ['-N2', '-hT'],
     'hpc'          : [],
-    'prof_h'       : ['-h'], # works without -prof
     'prof_hc_hb'   : ['-hc -hbvoid'],
     'prof_hb'      : ['-hb'],
     'prof_hd'      : ['-hd'],

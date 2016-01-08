@@ -11,7 +11,7 @@ test('heapprof001',
 test('heapprof002',
      [ pre_cmd('cp heapprof001.hs heapprof002.hs')
      , extra_clean(['heapprof002.hs'])
-     , extra_ways(['prof_h'])
+     , extra_ways(['normal_h'])
      , extra_run_opts('7')
      ],
      compile_and_run, [''])
