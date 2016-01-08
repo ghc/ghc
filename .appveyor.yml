@@ -14,8 +14,8 @@ install:
     - bash -lc "mv /home/ghc/tmp/* /home/ghc"
     - cd C:\msys64\home\ghc
     - stack exec -- perl boot
-    - mingw64_shell.bat "cd /home/ghc; exec 0</dev/null; ./configure --enable-tarballs-autodownload"
-    # - bash -lc "cd /home/ghc; exec 0</dev/null; ./configure --enable-tarballs-autodownload"
+    - bash -lc "cd /home/ghc; ./mk/get-win32-tarballs.sh download x86_64"
+    - bash -lc "cd /home/ghc; exec 0</dev/null; ./configure"
     - ghc   --version
     - stack --version
     - alex  --version
