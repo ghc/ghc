@@ -1,6 +1,6 @@
 clone_folder: "C:\\msys64\\home\\ghc\\shake-build"
 
-init: 
+install:
     - cd
     - set MSYSTEM=MINGW64
     - set PATH=C:\msys64\mingw64\bin;C:\msys64\usr\local\bin;C:\msys64\usr\bin;%PATH%
@@ -12,9 +12,6 @@ init:
     - echo "" | stack --no-terminal install alex happy shake ansi-terminal mtl
     - git clone --recursive git://git.haskell.org/ghc.git C:\msys64\home\ghc\tmp
     - bash -lc "mv /home/ghc/tmp/* /home/ghc"
-
-install:
-    - cd C:\msys64\home\ghc
     - stack exec -- mk/get-win32-tarballs.sh download x86_64
     - ghc   --version
     - stack --version
