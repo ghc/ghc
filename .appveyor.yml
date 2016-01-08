@@ -9,12 +9,16 @@ init:
     - bash -lc "curl -LsS http://www.haskell.org/ghc/dist/7.10.3/ghc-7.10.3-x86_64-unknown-mingw32.tar.xz | tar -xJ -C /mingw64 --strip-components=1"
     - stack exec -- pacman -S --noconfirm gcc binutils p7zip git
     - echo "" | stack --no-terminal install alex happy shake ansi-terminal mtl
-    - set PATH=%PATH%;C:\Users\appveyor\AppData\Roaming\local\bin\
+    - set PATH=%PATH%;C:\Users\appveyor\AppData\Roaming\local\bin\;%APPVEYOR_BUILD_FOLDER%
     - git clone --recursive git://git.haskell.org/ghc.git C:\msys64\home\ghc
 
 install:
     - cd C:\msys64\home\ghc
-    - shake-build\stack.exe exec -- mk/get-win32-tarballs.sh download x86_64
+    - stack exec -- mk/get-win32-tarballs.sh download x86_64
+    - ghc   --version
+    - stack --version
+    - alex  --version
+    - happy --version
 
 build_script:
     - bash -lc "./boot"
