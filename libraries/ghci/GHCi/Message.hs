@@ -179,7 +179,7 @@ data Message a where
   Report :: Bool -> String -> Message (THResult ())
   LookupName :: Bool -> String -> Message (THResult (Maybe TH.Name))
   Reify :: TH.Name -> Message (THResult TH.Info)
-  ReifyFixity :: TH.Name -> Message (THResult TH.Fixity)
+  ReifyFixity :: TH.Name -> Message (THResult (Maybe TH.Fixity))
   ReifyInstances :: TH.Name -> [TH.Type] -> Message (THResult [TH.Dec])
   ReifyRoles :: TH.Name -> Message (THResult [TH.Role])
   ReifyAnnotations :: TH.AnnLookup -> TypeRep -> Message (THResult [ByteString])

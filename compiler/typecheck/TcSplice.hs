@@ -1412,7 +1412,10 @@ reifyDataCon isGadtDataCon tys dc
                   ; return $ TH.RecGadtC [name]
                                      (zip3 (map (reifyName . flSelector) fields)
                                       dcdBangs r_arg_tys) res_ty }
-              | dataConIsInfix dc ->
+                -- We need to check not isGadtDataCon here because GADT
+                -- constructors can be declared infix.
+                -- See Note [Infix GADT constructors] in TcTyClsDecls.
+              | dataConIsInfix dc && not isGadtDataCon ->
                   ASSERT( length arg_tys == 2 )
                   return $ TH.InfixC (s1,r_a1) name (s2,r_a2)
               | isGadtDataCon -> do
@@ -1805,10 +1808,28 @@ reifySelector id tc
       Nothing -> pprPanic "reifySelector: missing field" (ppr id $$ ppr tc)
 
 ------------------------------
-reifyFixity :: Name -> TcM TH.Fixity
+reifyFixity :: Name -> TcM (Maybe TH.Fixity)
 reifyFixity name
-  = do  { fix <- lookupFixityRn name
-        ; return (conv_fix fix) }
+  = do { -- Repeat much of lookupFixityRn, because if we don't find a
+         -- user-supplied fixity declaration, we want to return Nothing
+         -- instead of defaultFixity
+       ; env <- getFixityEnv
+       ; case lookupNameEnv env name of
+              Just (FixItem _ fix) -> return (Just (conv_fix fix))
+              Nothing ->
+                do { this_mod <- getModule
+                   ; if nameIsLocalOrFrom this_mod name
+                        then return Nothing
+                        else
+                          -- Do NOT use mi_fix_fn to look up the fixity,
+                          -- because if there is a cache miss, it will return
+                          -- defaultFixity, which we want to avoid
+                          do { let doc = ptext (sLit "Checking fixity for")
+                                           <+> ppr name
+                             ; iface <- loadInterfaceForName doc name
+                             ; return . fmap conv_fix
+                                      . lookup (nameOccName name)
+                                      $ mi_fixities iface } } }
     where
       conv_fix (BasicTypes.Fixity i d) = TH.Fixity i (conv_dir d)
       conv_dir BasicTypes.InfixR = TH.InfixR

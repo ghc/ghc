@@ -1992,8 +1992,10 @@ repConstr (InfixCon st1 st2) Nothing [con]
          arg2 <- repBangTy st2
          rep2 infixCName [unC arg1, unC con, unC arg2]
 
-repConstr (InfixCon {}) (Just _) _ = panic "repConstr: infix GADT constructor?"
-repConstr _ _ _                    = panic "repConstr: invariant violated"
+repConstr (InfixCon {}) (Just _) _ =
+    panic "repConstr: infix GADT constructor should be in a PrefixCon"
+repConstr _ _ _ =
+    panic "repConstr: invariant violated"
 
 ------------ Types -------------------
 
