@@ -24,4 +24,4 @@ install:
 
 build_script:
     - cd
-    - bash -lc "./shake-build/build.bat -j --no-progress"
+    - bash -lc "cd /home/ghc; ./shake-build/build.bat -j --no-progress"
