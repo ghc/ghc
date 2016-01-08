@@ -14,7 +14,7 @@ install:
     - bash -lc "mv /home/ghc/tmp/* /home/ghc"
     - cd C:\msys64\home\ghc
     - stack exec -- perl boot
-    - stack exec -- ./configure --enable-tarballs-autodownload
+    - stack exec -- bash -lc "./configure --enable-tarballs-autodownload"
     - ghc   --version
     - stack --version
     - alex  --version
