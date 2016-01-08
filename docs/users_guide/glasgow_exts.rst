@@ -7022,7 +7022,25 @@ Injective type families
 Starting with GHC 8.0 type families can be annotated with injectivity
 information. This information is then used by GHC during type checking
 to resolve type ambiguities in situations where a type variable appears
-only under type family applications.
+only under type family applications. Consider this contrived example:
+
+::
+
+    type family Id a
+    type instance Id Int = Int
+    type instance Id Bool = Bool
+
+    id :: Id t -> Id t
+    id x = x
+
+Here the definition of ``id`` will be rejected because type variable ``t``
+appears only under type family applications and is thus ambiguous.  But this
+code will be accepted if we tell GHC that ``Id`` is injective, which means it
+will be possible to infer ``t`` at call sites from the type of the argument:
+
+::
+
+    type family Id a = r | r -> a
 
 For full details on injective type families refer to Haskell Symposium
 2015 paper `Injective type families for
