@@ -1,6 +1,4 @@
 T10603.hs:5:18-68: Splicing expression
-    [| case Just 'a' of {
-         Just a_atn -> Just ((\ x_ato -> x_ato) a_atn) } |]
+    [| case Just 'a' of { Just a -> Just ((\ x -> x) a) } |]
   ======>
-    case Just 'a' of {
-      Just a_a4uM -> Just ((\ x_a4uN -> x_a4uN) a_a4uM) }
+    case Just 'a' of { Just a -> Just ((\ x -> x) a) }
