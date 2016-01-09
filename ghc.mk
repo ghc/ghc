@@ -428,11 +428,11 @@ PACKAGES_STAGE1 += deepseq
 PACKAGES_STAGE1 += bytestring
 PACKAGES_STAGE1 += containers
 
-ifeq "$(Windows_Host)" "YES"
+ifeq "$(Windows_Target)" "YES"
 PACKAGES_STAGE1 += Win32
 endif
 PACKAGES_STAGE1 += time
-ifeq "$(Windows_Host)" "NO"
+ifeq "$(Windows_Target)" "NO"
 PACKAGES_STAGE1 += unix
 endif
 
