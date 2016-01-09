@@ -17,6 +17,6 @@
                %*
 
 @rem Unset GHC_PACKAGE_PATH variable, as otherwise ghc-cabal complains
-@if defined GHC_PACKAGE_PATH ( set GHC_PACKAGE_PATH )
+@set GHC_PACKAGE_PATH=
 
 @ghc %ghcArgs% && .shake\build %shakeArgs%
