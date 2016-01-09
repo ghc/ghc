@@ -148,6 +148,8 @@ import DynFlags
 import ErrUtils
 
 import Outputable
+import UniqFM
+import NameEnv
 import HscStats         ( ppSourceStats )
 import HscTypes
 import FastString
@@ -199,11 +201,36 @@ newHscEnv dflags = do
 
 
 allKnownKeyNames :: [Name]      -- Put here to avoid loops involving DsMeta,
-allKnownKeyNames =              -- where templateHaskellNames are defined
-    knownKeyNames
+allKnownKeyNames                -- where templateHaskellNames are defined
+  | debugIsOn
+  , not (isNullUFM badNamesEnv)
+  = panic ("badAllKnownKeyNames:\n" ++ badNamesStr)
+       -- NB: We can't use ppr here, because this is sometimes evaluated in a
+       -- context where there are no DynFlags available, leading to a cryptic
+       -- "<<details unavailable>>" error. (This seems to happen only in the
+       -- stage 2 compiler, for reasons I [Richard] have no clue of.)
+
+  | otherwise
+  = all_names
+  where
+    all_names = knownKeyNames
 #ifdef GHCI
-        ++ templateHaskellNames
+                ++ templateHaskellNames
 #endif
+
+    namesEnv      = foldl (\m n -> extendNameEnv_Acc (:) singleton m n n)
+                          emptyUFM all_names
+    badNamesEnv   = filterNameEnv (\ns -> length ns > 1) namesEnv
+    badNamesPairs = nameEnvUniqueElts badNamesEnv
+    badNamesStrs  = map pairToStr badNamesPairs
+    badNamesStr   = unlines badNamesStrs
+
+    pairToStr (uniq, ns) = "        " ++
+                           show uniq ++
+                           ": [" ++
+                           intercalate ", " (map (occNameString . nameOccName) ns) ++
+                           "]"
+
 
 -- -----------------------------------------------------------------------------
 
