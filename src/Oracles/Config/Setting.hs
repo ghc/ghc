@@ -1,9 +1,9 @@
 module Oracles.Config.Setting (
     Setting (..), SettingList (..),
     setting, settingList, getSetting, getSettingList,
-    anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs, windowsHost,
+    anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
     ghcWithInterpreter, ghcEnableTablesNextToCode, useLibFFIForAdjustors,
-    ghcCanonVersion, cmdLineLengthLimit, osxHost
+    ghcCanonVersion, cmdLineLengthLimit, iosHost, osxHost, windowsHost
     ) where
 
 import Control.Monad.Trans.Reader
@@ -122,11 +122,14 @@ anyTargetArch = matchSetting TargetArch
 anyHostOs :: [String] -> Action Bool
 anyHostOs = matchSetting HostOs
 
-windowsHost :: Action Bool
-windowsHost = anyHostOs ["mingw32", "cygwin32"]
+iosHost :: Action Bool
+iosHost = anyHostOs ["ios"]
 
 osxHost :: Action Bool
 osxHost = anyHostOs ["darwin"]
+
+windowsHost :: Action Bool
+windowsHost = anyHostOs ["mingw32", "cygwin32"]
 
 ghcWithInterpreter :: Action Bool
 ghcWithInterpreter = do

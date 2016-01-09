@@ -26,7 +26,7 @@ packagesStage0 = mconcat
     -- the stage0 predicate makes sure these packages are built only in Stage0
     , stage0 ? append [deriveConstants, dllSplit, genapply, genprimopcode, hp2ps]
     , stage0 ? windowsHost ? append [touchy]
-    , notM windowsHost ? notM (anyHostOs ["ios"]) ? append [terminfo] ]
+    , notM windowsHost ? iosHost ? append [terminfo] ]
 
 packagesStage1 :: Packages
 packagesStage1 = mconcat
