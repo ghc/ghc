@@ -717,8 +717,10 @@ cvtl e = wrapL (cvt e)
     cvt (LitE l)
       | overloadedLit l = do { l' <- cvtOverLit l; return $ HsOverLit l' }
       | otherwise       = do { l' <- cvtLit l;     return $ HsLit l' }
-
-    cvt (AppE x y)     = do { x' <- cvtl x; y' <- cvtl y; return $ HsApp x' y' }
+    cvt (AppE x@(LamE _ _) y) = do { x' <- cvtl x; y' <- cvtl y
+                              ; return $ HsApp (mkLHsPar x') y' }
+    cvt (AppE x y)            = do { x' <- cvtl x; y' <- cvtl y
+                              ; return $ HsApp x' y' }
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
                             ; return $ HsLam (mkMatchGroup FromSource [mkSimpleMatch ps' e']) }
     cvt (LamCaseE ms)  = do { ms' <- mapM cvtMatch ms
