@@ -132,7 +132,6 @@ putInfo (Target.Target {..}) = putBuild $ renderBox
   where
     stageInfo = if isStaged builder then "" else "stage = " ++ show stage ++ ", "
     wayInfo   = if way == vanilla   then "" else ", way = " ++ show way
-    digest list = case list of
-        []  -> "none"
-        [x] -> x
-        xs  -> head xs ++ " (and " ++ show (length xs - 1) ++ " more)"
+    digest [] = "none"
+    digest [x] = x
+    digest (x:xs) = x ++ " (and " ++ show (length xs) ++ " more)"
