@@ -18,7 +18,8 @@ The highlights, since the 7.10 branch, are:
 
 - Support for :ref:`record pattern synonyms <record-patsyn>`
 
-- The ``-XDeriveAnyClass`` extension learned to derive instances for classes with associated types (see :ref:`derive-any-class`)
+- The :ghc-flag:`-XDeriveAnyClass` extension learned to derive instances for
+  classes with associated types (see :ref:`derive-any-class`)
 
 - More reliable DWARF debugging information
 
@@ -28,10 +29,10 @@ The highlights, since the 7.10 branch, are:
 
 - Support for wildcards in data and type family instances
 
-- ``Strict`` and ``StrictData`` extensions, allowing modules to be compiled with
-  strict-by-default bindings (see :ref:`strict-haskell`)
+- :ghc-flag:`-XStrict` and :ghc-flag:`-XStrictData` extensions, allowing modules
+  to be compiled with strict-by-default bindings (see :ref:`strict-haskell`)
 
-- ``DuplicateRecordFields``, allowing multiple datatypes to declare the same
+- :ghc-flag:`-XDuplicateRecordFields`, allowing multiple datatypes to declare the same
   record field names provided they are used unambiguously (see :ref:`duplicate-record-fields`)
 
 - Support for implicit parameters providing light-weight
@@ -46,7 +47,8 @@ The highlights, since the 7.10 branch, are:
   code.
 
 - GHCi now provides access to stack traces when used with
-  ``-fexternal-interpreter`` and ``-prof`` (see :ref:`ghci-stack-traces`).
+  :ghc-flag:`-fexternal-interpreter` and :ghc-flag:`-prof` (see
+  :ref:`ghci-stack-traces`).
 
 - The reworked users guide you are now reading
 
@@ -67,7 +69,7 @@ Language
             -- | Just a normal sum
             Sum :: Int -> Int -> Expr Int
 
--  Implicit parameters of the new ``base`` type ``GHC.Stack.CallStack``
+-  Implicit parameters of the new ``base`` type :base-ref:`GHC.Stack.CallStack <GHC-Stack.html>`
    are treated specially in function calls, the solver automatically
    appends the source location of the call to the ``CallStack`` in
    the environment. For example ::
@@ -109,7 +111,7 @@ Language
    :ref:`injective-ty-fams` for details.
 
 -  Due to a :ghc-ticket:`security issue <10826>`, Safe Haskell now forbids
-   annotations in programs marked as ``-XSafe``.
+   annotations in programs marked as :ghc-flag:`-XSafe`.
 
 -  Generic instances can be derived for data types whose constructors have
    arguments with certain unlifted types. See :ref:`generic-programming` for
@@ -118,7 +120,7 @@ Language
 -  GHC generics can now provide strictness information for fields in a data
    constructor via the ``Selector`` type class.
 
--  The ``-XDeriveAnyClass`` extension now fills in associated type family
+-  The :ghc-flag:`-XDeriveAnyClass` extension now fills in associated type family
    default instances when deriving a class that contains them.
 
 -  Users can now define record pattern synonyms. This allows pattern synonyms
@@ -184,76 +186,76 @@ Compiler
    compilers. The old ``-f``-based warning flags will remain functional for
    the forseeable future.
 
--  Added the option ``-dth-dec-file``. This dumps out a .th.hs file of
+-  Added the option :ghc-flag:`-dth-dec-file`. This dumps out a .th.hs file of
    all Template Haskell declarations in a corresponding .hs file. The
    idea is that application developers can check this into their
    repository so that they can grep for identifiers used elsewhere that
    were defined in Template Haskell. This is similar to using
-   ``-ddump-to-file`` with ``-ddump-splices`` but it always generates a
-   file instead of being coupled to ``-ddump-to-file`` and only outputs
+   :ghc-flag:`-ddump-to-file` with :ghc-flag:`-ddump-splices` but it always generates a
+   file instead of being coupled to :ghc-flag:`-ddump-to-file` and only outputs
    code that does not exist in the .hs file and a comment for the splice
    location in the original file.
 
--  Added the option ``-fprint-expanded-types``. When enabled, GHC also
+-  Added the option :ghc-flag:`-fprint-expanded-types`. When enabled, GHC also
    prints type-synonym-expanded types in type errors.
 
--  Added the option ``-fcpr-anal``. When enabled, the demand analyser
-   performs CPR analysis. It is implied by ``-O``. Consequently,
-   ``-fcpr-off`` is now removed, run with ``-fno-cpr-anal`` to get the
-   old ``-fcpr-off`` behaviour.
+-  Added the option :ghc-flag:`-fcpr-anal`. When enabled, the demand analyser
+   performs CPR analysis. It is implied by :ghc-flag:`-O`. Consequently,
+   :ghc-flag:`-fcpr-off` is now removed, run with :ghc-flag:`-fno-cpr-anal` to get the
+   old :ghc-flag:`-fcpr-off` behaviour.
 
--  Added the option ``-fworker-wrapper``. When enabled, the worker-wrapper
+-  Added the option :ghc-flag:`-fworker-wrapper`. When enabled, the worker-wrapper
    transformation is performed after a strictness analysis pass. It is implied
-   by ``-O`` and by ``-fstrictness``. It is disabled by ``-fno-strictness``.
-   Enabling ``-fworker-wrapper`` while strictness analysis is disabled (by
-   ``-fno-strictness``) has no effect.
+   by :ghc-flag:`-O` and by :ghc-flag:`-fstrictness`. It is disabled by :ghc-flag:`-fno-strictness`.
+   Enabling :ghc-flag:`-fworker-wrapper` while strictness analysis is disabled (by
+   :ghc-flag:`-fno-strictness`) has no effect.
 
--  Added the options ``-Wmissed-specialisations`` and
-   ``-Wall-missed-specialisations``. When enabled, the simplifier will
+-  Added the options :ghc-flag:`-Wmissed-specialisations` and
+   :ghc-flag:`-Wall-missed-specialisations`. When enabled, the simplifier will
    produce a warning when a overloaded imported function cannot be
    specialised (typically due to a missing ``INLINEABLE`` pragma). This
    is intended to alert users to cases where they apply ``INLINEABLE`` but
    may not get the speed-up they expect.
 
--  Added the option ``-Wnoncanonical-monad-instances`` which helps
+-  Added the option :ghc-flag:`-Wnoncanonical-monad-instances` which helps
    detect noncanonical ``Applicative``/``Monad`` instance definitions.
    See flag description in :ref:`options-sanity` for more details.
 
 -  When printing an out-of-scope error message, GHC will give helpful advice if
    the error might be caused by too restrictive imports.
 
--  Added the ``-Wcompat`` warning group, along with its opposite
-   ``-Wno-compat``. Turns on warnings that will be enabled by default in the
+-  Added the :ghc-flag:`-Wcompat` warning group, along with its opposite
+   :ghc-flag:`-Wno-compat`. Turns on warnings that will be enabled by default in the
    future, but remain off in normal compilations for the time being. This
    allows library authors eager to make their code future compatible to adapt
    to new features before they even generate warnings.
 
--  Added the ``-Wmissing-monadfail-instance`` flag. When enabled, this
+-  Added the :ghc-flag:`-Wmissing-monadfail-instance` flag. When enabled, this
    will issue a warning if a failable pattern is used in a context that does
    not have a ``MonadFail`` constraint. This flag represents phase 1 of the
    `MonadFail Proposal (MFP)
    <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
 
--  Added the ``-Wsemigroup`` flag. When enabled, this
+-  Added the :ghc-flag:`-Wsemigroup` flag. When enabled, this
    will issue a warning if a type is an instance of ``Monoid`` but not
    ``Semigroup``, and when a custom definition ``(<>)`` is made. Fixing these
    warnings makes sure the definition of ``Semigroup`` as a superclass of
    ``Monoid`` does not break any code.
 
--  Added the ``-Wmissing-pat-syn-sigs`` flag. When enabled, this will issue
+-  Added the :ghc-flag:`-Wmissing-pat-syn-sigs` flag. When enabled, this will issue
    a warning when a pattern synonym definition doesn't have a type signature.
-   It is turned off by default but enabled by ``-Wall``.
+   It is turned off by default but enabled by :ghc-flag:`-Wall`.
 
--  Changed the ``-fwarn-unused-matches`` flag to report unused type variables
+-  Changed the :ghc-flag:`-fwarn-unused-matches` flag to report unused type variables
    in data and type families in addition to its previous behaviour.
    To avoid warnings, unused type variables should be prefixed or replaced with
    underscores.
 
--  Added the ``-Wtoo-many-guards`` flag. When enabled, this will issue a
+-  Added the :ghc-flag:`-Wtoo-many-guards` flag. When enabled, this will issue a
    warning if a pattern match contains too many guards (over 20 at the
    moment). Makes a difference only if pattern match checking is also enabled.
 
--  Added the ``-ffull-guard-reasoning`` flag. When enabled, pattern match
+-  Added the :ghc-flag:`-ffull-guard-reasoning` flag. When enabled, pattern match
    checking tries its best to reason about guards. Since the additional
    expressivity may come with a high price in terms of compilation time and
    memory consumption, it is turned off by default.
@@ -264,20 +266,20 @@ GHCi
 -  ``Main`` with an explicit module header but without ``main`` is now
    an error (:ghc-ticket:`7765`).
 
--  The ``:back`` and ``:forward`` commands now take an optional count
+-  The :ghci-cmd:`:back` and :ghci-cmd:`:forward` commands now take an optional count
    allowing the user to move forward or backward in history several
    steps at a time.
 
--  Added commands ``:load!`` and ``:reload!``, effectively setting
-   "-fdefer-type-errors" before loading a module and unsetting it after
-   loading if it has not been set before (:ghc-ticket:`8353`).
+-  Added commands :ghci-cmd:`:load! <:load>` and :ghci-cmd:`:reload! <:reload>`,
+   effectively setting :ghc-flag:`-fdefer-type-errors` before loading a module and
+   unsetting it after loading if it has not been set before (:ghc-ticket:`8353`).
 
--  ``ghci -e`` now behaves like ``ghc -e`` (:ghc-ticket:`9360`).
+-  ``ghci -e`` now behaves like :ghc-flag:`ghc -e <-e>` (:ghc-ticket:`9360`).
 
 -  Added support for top-level function declarations (:ghc-ticket:`7253`).
 
--  The new commands ``:all-types``, ``:loc-at``, ``:type-at``, and
-   ``:uses`` designed for editor-integration
+-  The new commands :ghci-cmd:`:all-types`, :ghci-cmd:`:loc-at`, :ghci-cmd:`:type-at`, and
+   :ghci-cmd:`:uses` designed for editor-integration
    (such as Emacs' ``haskell-mode``) originally premiered by ``ghci-ng``
    have been integrated into GHCi (:ghc-ticket:`10874`).
 
@@ -289,31 +291,31 @@ GHCi
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
--  The new ``-XTemplateHaskellQuotes`` flag allows to use the
+-  The new :ghc-flag:`-XTemplateHaskellQuotes` flag allows to use the
    quotes (not quasi-quotes) subset of ``TemplateHaskell``.  This is
    particularly useful for use with a stage 1 compiler (i.e. GHC
-   without interpreter support). Also, ``-XTemplateHaskellQuotes`` is
+   without interpreter support). Also, :ghc-flag:`-XTemplateHaskellQuotes` is
    considered safe under Safe Haskell.
 
 -  The ``__GLASGOW_HASKELL_TH__`` CPP constant denoting support for
-   ``-XTemplateHaskell`` introduced in GHC 7.10.1 has been changed to
+   :ghc-flag:`-XTemplateHaskell` introduced in GHC 7.10.1 has been changed to
    use the values ``1``/``0`` instead of the previous ``YES``/``NO``
    values.
 
 -  Partial type signatures can now be used in splices, see
    :ref:`pts-where`.
 
--  ``Template Haskell`` now fully supports typed holes and quoting unbound
+-  Template Haskell now fully supports typed holes and quoting unbound
    variables.  This means it is now possible to use pattern splices nested
    inside quotation brackets.
 
--  ``Template Haskell`` now supports the use of ``UInfixT`` in types to
+-  Template Haskell now supports the use of ``UInfixT`` in types to
    resolve infix operator fixities, in the same vein as ``UInfixP`` and
    ``UInfixE`` in patterns and expressions. ``ParensT`` and ``InfixT``
    have also been introduced, serving the same functions as their
    pattern and expression counterparts.
 
-- ``Template Haskell`` has now explicit support for representing GADTs.  Until
+- Template Haskell has now explicit support for representing GADTs.  Until
   now GADTs were encoded using ``NormalC``, ``RecC`` (record syntax) and
   ``ForallC`` constructors.  Two new constructors - ``GadtC`` and ``RecGadtC`` -
   are now supported during quoting, splicing and reification.
@@ -333,7 +335,7 @@ Template Haskell
    implementation, and is now recognized and documented in
    :ref:`th-syntax`.
 
--  The ``Lift`` class is now derivable via the ``-XDeriveLift`` extension. See
+-  The ``Lift`` class is now derivable via the :ghc-flag:`-XDeriveLift` extension. See
    :ref:`deriving-lift` for more information.
 
 -  The ``FamilyD`` data constructor and ``FamFlavour`` data type have
@@ -354,15 +356,17 @@ Template Haskell
 
 -  One can now reify the strictness information of a constructors' fields using
    Template Haskell's ``reifyConStrictness`` function, which takes into account
-   whether flags such as `-XStrictData` or `-funbox-strict-fields` are enabled.
+   whether flags such as :ghc-flag:`-XStrictData` or
+   :ghc-flag:`-funbox-strict-fields` are enabled.
 
 Runtime system
 ~~~~~~~~~~~~~~
 
--  Support for performance monitoring with PAPI has been dropped.
+- Support for performance monitoring with PAPI has been dropped.
 
--  ``-maxN⟨x⟩`` flag added to complement ``-N``. It will choose to use at most
-   ⟨x⟩ capabilities, limited by the number of processors as ``-N`` is.
+- :rts-flag:`-maxN⟨x⟩ <-maxN>` flag added to complement :rts-flag:`-N`. It will
+  choose to use at most ⟨x⟩ capabilities, limited by the number of processors
+  as :rts-flag:`-N` is.
 
 Build system
 ~~~~~~~~~~~~
@@ -377,14 +381,16 @@ Package system
 hsc2hs
 ~~~~~~
 
--  ``hsc2hs`` now supports the ``#alignment`` macro, which can be used to
-    calculate the alignment of a struct in bytes. Previously, ``#alignment``
-    had to be implemented manually via a ``#let`` directive, e.g., ::
+- :command:`hsc2hs` now supports the ``#alignment`` macro, which can be used to
+  calculate the alignment of a struct in bytes. Previously, ``#alignment``
+  had to be implemented manually via a ``#let`` directive, e.g., ::
 
       #let alignment t = "%lu", (unsigned long)offsetof(struct {char x__; t (y__); }, y__)
 
-    As a result, if you have the above directive in your code, it will now emit
-    a warning when compiled with GHC 8.0. ::
+  As a result, if you have the above directive in your code, it will now emit
+  a warning when compiled with GHC 8.0.
+
+  .. code-block:: none
 
       Module.hsc:24:0: warning: "hsc_alignment" redefined [enabled by default]
       In file included from dist/build/Module_hsc_make.c:1:0:
@@ -392,9 +398,9 @@ hsc2hs
        #define hsc_alignment(t...) \
        ^
 
-    To make your code free of warnings on GHC 8.0 and still support earlier
-    versions, surround the directive with a pragma checking for the right GHC
-    version. ::
+  To make your code free of warnings on GHC 8.0 and still support earlier
+  versions, surround the directive with a pragma checking for the right GHC
+  version. ::
 
       #if __GLASGOW_HASKELL__ < 800
       #let alignment t = "%lu", (unsigned long)offsetof(struct {char x__; t (y__); }, y__)
@@ -418,13 +424,14 @@ See ``changelog.md`` in the ``base`` package for full release notes.
 
 -  Version number 4.9.0.0 (was 4.7.0.0)
 
--  ``GHC.Stack`` exports two new types ``SrcLoc`` and ``CallStack``. A
+-  :base-ref:`GHC.Stack <GHC-Stack.html>` exports two new types ``SrcLoc`` and ``CallStack``. A
    ``SrcLoc`` contains package, module, and file names, as well as start
    and end positions. A ``CallStack`` is essentially a ``[(String, SrcLoc)]``,
    sorted by most-recent call.
 
 -  ``error`` and ``undefined`` will now report a partial stack-trace
-   using the new ``CallStack`` feature (and the ``-prof`` stack if available).
+   using the new ``CallStack`` feature (and the :ghc-flag:`-prof` stack if
+   available).
 
 -  A new function, ``interruptible``, was added to ``GHC.IO`` allowing
    an ``IO`` action to be run such that it can be interrupted by an
@@ -438,7 +445,7 @@ See ``changelog.md`` in the ``base`` package for full release notes.
 -  Per-thread allocation counters (``setAllocationCounter`` and
    ``getAllocationCounter``) and limits (``enableAllocationLimit``,
    ``disableAllocationLimit`` are now available from ``System.Mem``. Previously
-   this functionality was only available from ``GHC.Conc``.
+   this functionality was only available from :base-ref:`GHC.Conc <GHC-Stack.html>`.
 
 - ``forever``, ``filterM``, ``mapAndUnzipM``, ``zipWithM``, ``zipWithM_``,
   ``replicateM``, and ``replicateM`` were generalized from ``Monad`` to
@@ -446,8 +453,8 @@ See ``changelog.md`` in the ``base`` package for full release notes.
   implementation of ``(*>)`` match that of ``(>>)``.
 
 - Add ``URec``, ``UAddr``, ``UChar``, ``UDouble``, ``UFloat``, ``UInt``, and ``UWord`` to
-  ``GHC.Generics`` as part of making GHC generics capable of handling unlifted
-  types (:ghc-ticket:`10868`)
+  :base-ref:`GHC.Generics <GHC-Generics.html>` as part of making GHC generics
+  capable of handling unlifted types (:ghc-ticket:`10868`)
 
 - Expand ``Floating`` class to include operations that allow for better
   precision: ``log1p``, ``expm1``, ``log1pexp`` and ``log1mexp``. These are not
