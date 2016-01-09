@@ -23,4 +23,5 @@ install:
     - happy --version
 
 build_script:
-    - stack exec -- C:\msys64\home\ghc\shake-build\build.bat -j --no-progress
+    - cd C:\msys64\home\ghc\shake-build
+    - stack exec -- build.bat -j --no-progress
