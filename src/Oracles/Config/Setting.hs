@@ -3,7 +3,7 @@ module Oracles.Config.Setting (
     setting, settingList, getSetting, getSettingList,
     anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs, windowsHost,
     ghcWithInterpreter, ghcEnableTablesNextToCode, useLibFFIForAdjustors,
-    ghcCanonVersion, cmdLineLengthLimit
+    ghcCanonVersion, cmdLineLengthLimit, osxHost
     ) where
 
 import Control.Monad.Trans.Reader
@@ -125,6 +125,9 @@ anyHostOs = matchSetting HostOs
 windowsHost :: Action Bool
 windowsHost = anyHostOs ["mingw32", "cygwin32"]
 
+osxHost :: Action Bool
+osxHost = anyHostOs ["darwin"]
+
 ghcWithInterpreter :: Action Bool
 ghcWithInterpreter = do
     goodOs <- anyTargetOs [ "mingw32", "cygwin32", "linux", "solaris2"
@@ -156,6 +159,10 @@ ghcCanonVersion = do
 cmdLineLengthLimit :: Action Int
 cmdLineLengthLimit = do
     windows <- windowsHost
-    return $ if windows
-             then 31000
-             else 4194304 -- Cabal needs a bit more than 2MB!
+    osx     <- osxHost
+    return $ case (windows, osx) of
+        -- windows
+        (True, False) -> 31000
+        -- osx 262144 is ARG_MAX, 33166 experimentally determined
+        (False, True) -> 262144 - 33166
+        _             -> 4194304 -- Cabal needs a bit more than 2MB!
