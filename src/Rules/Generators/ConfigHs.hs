@@ -5,13 +5,11 @@ import Expression
 import GHC
 import Oracles
 import Settings
+import Rules.Generators.Common
 
--- TODO: do we need ghc-split? Always or is it platform specific?
--- TODO: add tracking by moving these functions to separate tracked files
 generateConfigHs :: Expr String
 generateConfigHs = do
-    when trackBuildSystem . lift $
-        need [sourcePath -/- "Rules/Generators/ConfigHs.hs"]
+    trackSource "Rules/Generators/ConfigHs.hs"
     cProjectName        <- getSetting ProjectName
     cProjectGitCommitId <- getSetting ProjectGitCommitId
     cProjectVersion     <- getSetting ProjectVersion
@@ -24,7 +22,6 @@ generateConfigHs = do
                             | integerLibrary == integerSimple = "IntegerSimple"
                             | otherwise = error $ "Unknown integer library: "
                                           ++ show integerLibrary ++ "."
-        yesNo = lift . fmap (\x -> if x then "YES" else "NO")
     cSupportsSplitObjs         <- yesNo supportsSplitObjects
     cGhcWithInterpreter        <- yesNo ghcWithInterpreter
     cGhcWithNativeCodeGen      <- yesNo ghcWithNativeCodeGen
@@ -32,7 +29,6 @@ generateConfigHs = do
     cGhcEnableTablesNextToCode <- yesNo ghcEnableTablesNextToCode
     cLeadingUnderscore         <- yesNo $ flag LeadingUnderscore
     cGHC_UNLIT_PGM             <- fmap takeFileName $ getBuilderPath Unlit
-    let cGHC_SPLIT_PGM         = "ghc-split"
     cLibFFI                    <- lift useLibFFIForAdjustors
     rtsWays                    <- getRtsWays
     cGhcRtsWithLibdw           <- getFlag WithLibdw
@@ -93,7 +89,7 @@ generateConfigHs = do
         , "cGHC_UNLIT_PGM        :: String"
         , "cGHC_UNLIT_PGM        = " ++ quote cGHC_UNLIT_PGM
         , "cGHC_SPLIT_PGM        :: String"
-        , "cGHC_SPLIT_PGM        = " ++ quote cGHC_SPLIT_PGM
+        , "cGHC_SPLIT_PGM        = " ++ quote "ghc-split"
         , "cLibFFI               :: Bool"
         , "cLibFFI               = " ++ show cLibFFI
         , "cGhcThreaded :: Bool"

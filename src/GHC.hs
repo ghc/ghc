@@ -3,7 +3,7 @@ module GHC (
     array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
     deepseq, deriveConstants, directory, dllSplit, filepath, genapply,
     genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim, ghcTags,
-    haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
+    ghcSplit, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
     integerSimple, iservBin, libffi, mkUserGuidePart, parallel, pretty,
     primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time,
     touchy, transformers, unlit, unix, win32, xhtml,
@@ -90,7 +90,11 @@ unix            = library  "unix"
 win32           = library  "Win32"
 xhtml           = library  "xhtml"
 
--- TODO: The following utils are not implemented yet: driver/ghc-split
+-- | ghc-split is a perl script used by GHC with @-split-objs@ flag. It is
+-- generated in "Rules.Generators.GhcSplit".
+ghcSplit :: FilePath
+ghcSplit = "inplace/lib/bin/ghc-split"
+
 -- TODO: The following utils are not included into the build system because
 -- they seem to be unused or unrelated to the build process: checkUniques,
 -- completion, count_lines, coverity, debugNGC, describe-unexpected, genargs,

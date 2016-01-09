@@ -1,7 +1,6 @@
 module Rules.Generate (
-    generate, generateExec, generatePackageCode, generateRules,
-    derivedConstantsPath, emptyTarget, generatedDependencies,
-    installTargets, copyRules
+    generatePackageCode, generateRules, installTargets, copyRules,
+    derivedConstantsPath, generatedDependencies
     ) where
 
 import Base
@@ -11,6 +10,7 @@ import Rules.Generators.ConfigHs
 import Rules.Generators.GhcAutoconfH
 import Rules.Generators.GhcBootPlatformH
 import Rules.Generators.GhcPlatformH
+import Rules.Generators.GhcSplit
 import Rules.Generators.GhcVersionH
 import Rules.Generators.VersionHs
 import Oracles.ModuleFiles
@@ -106,13 +106,6 @@ generate file target expr = do
     writeFileChanged file contents
     putSuccess $ "| Successfully generated '" ++ file ++ "'."
 
--- | Generates @file@ for @target@ and marks it as executable.
-generateExec :: FilePath -> PartialTarget -> Expr String -> Action ()
-generateExec file target expr = do
-    generate file target expr
-    unit $ cmd "chmod +x " [file]
-    putSuccess $ "| Made '" ++ file ++ "' executable."
-
 generatePackageCode :: Resources -> PartialTarget -> Rules ()
 generatePackageCode _ target @ (PartialTarget stage pkg) =
     let buildPath   = targetPath stage pkg -/- "build"
@@ -178,6 +171,10 @@ generateRules = do
     "includes/ghcautoconf.h" <~ generateGhcAutoconfH
     "includes/ghcplatform.h" <~ generateGhcPlatformH
     "includes/ghcversion.h"  <~ generateGhcVersionH
+
+    ghcSplit %> \_ -> do
+        generate ghcSplit emptyTarget generateGhcSplit
+        makeExecutable ghcSplit
 
     -- TODO: simplify
     derivedConstantsPath ++ "//*" %> \file -> do

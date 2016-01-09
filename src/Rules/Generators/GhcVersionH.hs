@@ -1,14 +1,12 @@
 module Rules.Generators.GhcVersionH (generateGhcVersionH) where
 
-import Base
 import Expression
 import Oracles
-import Settings.User
+import Rules.Generators.Common
 
 generateGhcVersionH :: Expr String
 generateGhcVersionH = do
-    when trackBuildSystem . lift $
-        need [sourcePath -/- "Rules/Generators/GhcVersionH.hs"]
+    trackSource "Rules/Generators/GhcVersionH.hs"
     version     <- getSetting ProjectVersionInt
     patchLevel1 <- getSetting ProjectPatchLevel1
     patchLevel2 <- getSetting ProjectPatchLevel2
