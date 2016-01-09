@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE InjectiveTypeFamilies #-}
 
 module T6018a where
 

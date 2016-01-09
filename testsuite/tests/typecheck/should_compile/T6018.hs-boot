@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, PolyKinds #-}
+{-# LANGUAGE InjectiveTypeFamilies, PolyKinds #-}
 
 module T6018 where
 

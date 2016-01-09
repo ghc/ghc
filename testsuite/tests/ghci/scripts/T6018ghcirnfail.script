@@ -1,4 +1,4 @@
-:set -XTypeFamilies
+:set -XInjectiveTypeFamilies
 :set -XDataKinds
 :set -XUndecidableInstances
 :set -XPolyKinds

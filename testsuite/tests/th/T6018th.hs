@@ -1,5 +1,5 @@
-{-# LANGUAGE TypeFamilies, DataKinds, UndecidableInstances, PolyKinds #-}
-
+{-# LANGUAGE InjectiveTypeFamilies, DataKinds, UndecidableInstances,
+             PolyKinds #-}
 module T6018th where
 
 import Language.Haskell.TH

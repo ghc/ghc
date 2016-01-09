@@ -1328,7 +1328,7 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
                         -> CoAxBranch      -- current branch
                         -> TcM [CoAxBranch]-- current branch : previous branches
     -- Check for
-    --   (a) this banch is dominated by previous ones
+    --   (a) this branch is dominated by previous ones
     --   (b) failure of injectivity
     check_branch_compat prev_branches cur_branch
       | cur_branch `isDominatedBy` prev_branches
