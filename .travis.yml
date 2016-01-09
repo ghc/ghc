@@ -21,7 +21,7 @@ matrix:
               - cabal update
 
         - os: osx
-          env: TARGET=libraries/base/stage1/build/libHSbase-4.9.0.0.a
+          env: TARGET=inplace/bin/ghc-stage1.exe
           before_install:
               - brew update
               - brew install ghc cabal-install
