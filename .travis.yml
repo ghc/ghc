@@ -39,7 +39,12 @@ install:
     - alex --version
     - happy --version
 
-    - travis_retry git clone git://git.haskell.org/ghc --recurse-submodules
+    - git config --global url."git://github.com/ghc/packages-".insteadOf     git://github.com/ghc/packages/
+    - git config --global url."http://github.com/ghc/packages-".insteadOf    http://github.com/ghc/packages/
+    - git config --global url."https://github.com/ghc/packages-".insteadOf   https://github.com/ghc/packages/
+    - git config --global url."ssh://git@github.com/ghc/packages-".insteadOf ssh://git@github.com/ghc/packages/
+    - git config --global url."git@github.com:/ghc/packages-".insteadOf      git@github.com:/ghc/packages/
+    - travis_retry git clone https://github.com/ghc/ghc --recurse-submodules --depth 1
 
     # Travis clones the project into ".", but we need it as a child directory
     # of "ghc/". For this reason, we - rather hackily - move the GHC-Shake
