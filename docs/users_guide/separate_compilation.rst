@@ -75,7 +75,7 @@ The interface file, which normally ends in a ``.hi`` suffix, contains
 the information that GHC needs in order to compile further modules that
 depend on this module. It contains things like the types of exported
 functions, definitions of data types, and so on. It is stored in a
-binary format, so don't try to read one; use the ``--show-iface`` option
+binary format, so don't try to read one; use the :ghc-flag:`--show-iface` option
 instead (see :ref:`hi-options`).
 
 You should think of the object file and the interface file as a pair,
@@ -105,8 +105,8 @@ changed with the ``-osuf`` option).
 
 The name of the interface file is derived using the same rules, except
 that the suffix is ⟨hisuf⟩ (``.hi`` by default) instead of ⟨osuf⟩, and
-the relevant options are ``-hidir`` and ``-hisuf`` instead of ``-odir``
-and ``-osuf`` respectively.
+the relevant options are :ghc-flag:`-hidir` and :ghc-flag:`-hisuf` instead of
+:ghc-flag:`-odir` and :ghc-flag:`-osuf` respectively.
 
 For example, if GHC compiles the module ``A.B.C`` in the file
 ``src/A/B/C.hs``, with no ``-odir`` or ``-hidir`` flags, the interface
@@ -126,8 +126,8 @@ is therefore possible to have several ``Main`` modules in separate
 source files in the same directory, and GHC will not get confused.
 
 In batch compilation mode, the name of the object file can also be
-overridden using the ``-o`` option, and the name of the interface file
-can be specified directly using the ``-ohi`` option.
+overridden using the :ghc-flag:`-o` option, and the name of the interface file
+can be specified directly using the :ghc-flag:`-ohi` option.
 
 .. _search-path:
 
@@ -140,8 +140,8 @@ The search path
    single: finding interface files
 
 In your program, you import a module ``Foo`` by saying ``import Foo``.
-In ``--make`` mode or GHCi, GHC will look for a source file for ``Foo``
-and arrange to compile it first. Without ``--make``, GHC will look for
+In :ghc-flag:`--make` mode or GHCi, GHC will look for a source file for ``Foo``
+and arrange to compile it first. Without :ghc-flag:`--make`, GHC will look for
 the interface file for ``Foo``, which should have been created by an
 earlier compilation of ``Foo``. GHC uses the same strategy in each of
 these cases for finding the appropriate file.
@@ -152,10 +152,10 @@ search path. For each of these directories, it tries appending
 file exists. The value of ⟨basename⟩ is the module name with dots
 replaced by the directory separator ("``/``" or "``\\"``, depending on the
 system), and ⟨extension⟩ is a source extension (``hs``, ``lhs``) if we
-are in ``--make`` mode or GHCi, or ⟨hisuf⟩ otherwise.
+are in :ghc-flag:`--make` mode or GHCi, or ⟨hisuf⟩ otherwise.
 
 For example, suppose the search path contains directories ``d1``,
-``d2``, and ``d3``, and we are in ``--make`` mode looking for the source
+``d2``, and ``d3``, and we are in :ghc-flag:`--make` mode looking for the source
 file for a module ``A.B.C``. GHC will look in ``d1/A/B/C.hs``,
 ``d1/A/B/C.lhs``, ``d2/A/B/C.hs``, and so on.
 
@@ -163,14 +163,15 @@ The search path by default contains a single directory: "``.``" (i.e. the
 current directory). The following options can be used to add to or change the
 contents of the search path:
 
-``-i⟨dir⟩[:⟨dir⟩]*``
+.. ghc-flag:: -i⟨dir⟩[:⟨dir⟩]*
+
     .. index::
-       single: -idirs; GHC option
+       single: search path; source code
 
     This flag appends a colon-separated list of ``dirs`` to
     the search path.
 
-``-i``
+.. ghc-flag:: -i
     resets the search path back to nothing.
 
 This isn't the whole story: GHC also looks for modules in pre-compiled
@@ -186,9 +187,7 @@ Redirecting the compilation output(s)
    single: output-directing options
    single: redirecting compilation output
 
-``-o ⟨file⟩``
-    .. index::
-       single: -o; GHC option
+.. ghc-flag:: -o ⟨file⟩
 
     GHC's compiled output normally goes into a ``.hc``, ``.o``, etc.,
     file, depending on the last-run compilation phase. The option
@@ -202,7 +201,7 @@ Redirecting the compilation output(s)
     This option is most often used when creating an executable file, to
     set the filename of the executable. For example:
 
-    ::
+    .. code-block:: none
 
         ghc -o prog --make Main
 
@@ -213,7 +212,7 @@ Redirecting the compilation output(s)
     "``.exe``" is added if the specified filename does not already have
     an extension. Thus
 
-    ::
+    .. code-block:: none
 
         ghc -o foo Main.hs
 
@@ -225,25 +224,23 @@ Redirecting the compilation output(s)
     containing the module ``Main``. Note that with GHC the ``Main``
     module doesn't have to be put in file ``Main.hs``. Thus both
 
-    ::
+    .. code-block:: none
 
         ghc --make Prog
 
     and
 
-    ::
+    .. code-block:: none
 
         ghc --make Prog.hs
 
     will produce ``Prog`` (or ``Prog.exe`` if you are on Windows).
 
-``-odir ⟨dir⟩``
-    .. index::
-       single: -odir; GHC option
+.. ghc-flag:: -odir ⟨dir⟩
 
     Redirects object files to directory ⟨dir⟩. For example:
 
-    ::
+    .. code-block:: none
 
         $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `uname -m`
 
@@ -256,9 +253,7 @@ Redirecting the compilation output(s)
     example, they would still be put in ``parse/Foo.hi``,
     ``parse/Bar.hi``, and ``gurgle/Bumble.hi``.
 
-``-ohi ⟨file⟩``
-    .. index::
-       single: -ohi; GHC option
+.. ghc-flag:: -ohi ⟨file⟩
 
     The interface output may be directed to another file
     ``bar2/Wurble.iface`` with the option ``-ohi bar2/Wurble.iface``
@@ -275,16 +270,12 @@ Redirecting the compilation output(s)
     to redirect the interface into the bit bucket: ``-ohi /dev/null``,
     for example.
 
-``-hidir ⟨dir⟩``
-    .. index::
-       single: -hidir; GHC option
+.. ghc-flag:: -hidir ⟨dir⟩
 
     Redirects all generated interface files into ⟨dir⟩, instead of the
     default.
 
-``-stubdir ⟨dir⟩``
-    .. index::
-       single: -stubdir
+.. ghc-flag:: -stubdir ⟨dir⟩
 
     Redirects all generated FFI stub files into ⟨dir⟩. Stub files are
     generated when the Haskell source contains a ``foreign export`` or
@@ -293,29 +284,19 @@ Redirecting the compilation output(s)
     exactly the same way as ``-odir`` and ``-hidir`` with respect to
     hierarchical modules.
 
-``-dumpdir ⟨dir⟩``
-    .. index::
-       single: -dumpdir
+.. ghc-flag:: -dumpdir ⟨dir⟩
 
     Redirects all dump files into ⟨dir⟩. Dump files are generated when
     ``-ddump-to-file`` is used with other ``-ddump-*`` flags.
 
-``-outputdir ⟨dir⟩``
-    .. index::
-       single: -outputdir
+.. ghc-flag:: -outputdir ⟨dir⟩
 
     The ``-outputdir`` option is shorthand for the combination of
-    ``-odir``, ``-hidir``, ``-stubdir`` and ``-dumpdir``.
+    :ghc-flag:`-odir`, :ghc-flag:`-hidir`, :ghc-flag:`-stubdir` and :ghc-flag:`-dumpdir`.
 
-``-osuf ⟨suffix⟩; \ ``-hisuf``\ ⟨suffix⟩; \ ``-hcsuf``\ ⟨suffix⟩``
-    .. index::
-       single: -osuf
-
-    .. index::
-       single: -hisuf
-
-    .. index::
-       single: -hcsuf
+.. ghc-flag:: -osuf ⟨suffix⟩
+              -hisuf ⟨suffix⟩
+              -hcsuf ⟨suffix⟩
 
     The ``-osuf`` ⟨suffix⟩ will change the ``.o`` file suffix for object
     files to whatever you specify. We use this when compiling libraries,
@@ -332,13 +313,13 @@ Redirecting the compilation output(s)
     compile a program both with and without profiling, in the same
     directory. You can say:
 
-    ::
+    .. code-block:: none
 
         ghc ...
 
     to get the ordinary version, and
 
-    ::
+    .. code-block:: none
 
         ghc ... -osuf prof.o -hisuf prof.hi -prof -auto-all
 
@@ -358,35 +339,26 @@ Keeping Intermediate Files
 The following options are useful for keeping certain intermediate files
 around, when normally GHC would throw these away after compilation:
 
-``-keep-hc-file``
-    .. index::
-       single: -keep-hc-file
-       single: -keep-hc-files
+.. ghc-flag:: -keep-hc-file
 
     Keep intermediate ``.hc`` files when doing ``.hs``-to-``.o``
     compilations via :ref:`C <c-code-gen>` (Note: ``.hc`` files are only
     generated by :ref:`unregisterised <unreg>` compilers).
 
-``-keep-llvm-file``
-    .. index::
-       single: -keep-llvm-file
-       single: -keep-llvm-files
+.. ghc-flag:: -keep-llvm-file
 
     Keep intermediate ``.ll`` files when doing ``.hs``-to-``.o``
     compilations via :ref:`LLVM <llvm-code-gen>` (Note: ``.ll`` files
     aren't generated when using the native code generator, you may need
-    to use ``-fllvm`` to force them to be produced).
+    to use :ghc-flag:`-fllvm` to force them to be produced).
 
-``-keep-s-file``
-    .. index::
-       single: -keep-s-file
-       single: -keep-s-files
+.. ghc-flag:: -keep-s-file
 
     Keep intermediate ``.s`` files.
 
-``-keep-tmp-files``
+.. ghc-flag:: -keep-tmp-files
+
     .. index::
-       single: -keep-tmp-files
        single: temporary files; keeping
 
     Instructs the GHC driver not to delete any of its temporary files,
@@ -402,9 +374,7 @@ Redirecting temporary files
 .. index::
    single: temporary files; redirecting
 
-``-tmpdir``
-    .. index::
-       single: -tmpdir
+.. ghc-flag:: -tmpdir
 
     If you have trouble because of running out of space in ``/tmp`` (or
     wherever your installation thinks temporary files should go), you
@@ -412,13 +382,15 @@ Redirecting temporary files
     alternate directory. For example, ``-tmpdir .`` says to put temporary files
     in the current working directory.
 
-    Alternatively, use your ``TMPDIR`` environment variable.TMPDIR
-    environment variable Set it to the name of the directory where
-    temporary files should be put. GCC and other programs will honour
-    the ``TMPDIR`` variable as well.
+    .. index::
+        single: TMPDIR environment variable
 
-    Even better idea: Set the ``DEFAULT_TMPDIR`` make variable when
-    building GHC, and never worry about ``TMPDIR`` again. (see the build
+    Alternatively, use your :envvar:`TMPDIR` environment variable. Set it to the
+    name of the directory where temporary files should be put. GCC and other
+    programs will honour the :envvar:`TMPDIR` variable as well.
+
+    Even better idea: Set the :envvar:`DEFAULT_TMPDIR` :command:`make` variable when
+    building GHC, and never worry about :envvar:`TMPDIR` again. (see the build
     documentation).
 
 .. _hi-options:
@@ -429,41 +401,33 @@ Other options related to interface files
 .. index::
    single: interface files, options
 
-``-ddump-hi``
-    .. index::
-       single: -ddump-hi
+.. ghc-flag:: -ddump-hi
 
     Dumps the new interface to standard output.
 
-``-ddump-hi-diffs``
-    .. index::
-       single: -ddump-hi-diffs
+.. ghc-flag:: -ddump-hi-diffs
 
     The compiler does not overwrite an existing ``.hi`` interface file
     if the new one is the same as the old one; this is friendly to
-    ``make``. When an interface does change, it is often enlightening to
-    be informed. The ``-ddump-hi-diffs`` option will make GHC report the
+    :command:`make`. When an interface does change, it is often enlightening to
+    be informed. The :ghc-flag:`-ddump-hi-diffs` option will make GHC report the
     differences between the old and new ``.hi`` files.
 
-``-ddump-minimal-imports``
-    .. index::
-       single: -ddump-minimal-imports
+.. ghc-flag:: -ddump-minimal-imports
 
-    Dump to the file ``M.imports`` (where ⟨M⟩ is the name of the module
+    Dump to the file :file:`{M}.imports` (where ⟨M⟩ is the name of the module
     being compiled) a "minimal" set of import declarations. The
     directory where the ``.imports`` files are created can be controlled
-    via the ``-dumpdir`` option.
+    via the :ghc-flag:`-dumpdir` option.
 
-    You can safely replace all the import declarations in ``M.hs`` with
+    You can safely replace all the import declarations in :file:`{M}.hs` with
     those found in its respective ``.imports`` file. Why would you want
     to do that? Because the "minimal" imports (a) import everything
     explicitly, by name, and (b) import nothing that is not required. It
     can be quite painful to maintain this property by hand, so this flag
     is intended to reduce the labour.
 
-``--show-iface ⟨file⟩``
-    .. index::
-       single: --show-iface
+.. ghc-flag:: --show-iface ⟨file⟩
 
     where ⟨file⟩ is the name of an interface file, dumps the contents of
     that interface in a human-readable format. See :ref:`modes`.
@@ -476,10 +440,7 @@ The recompilation checker
 .. index::
    single: recompilation checker
 
-``-fforce-recomp``
-    .. index::
-       single: -fforce-recomp
-       single: -fno-force-recomp
+.. ghc-flag:: -fforce-recomp
 
     Turn off recompilation checking (which is on by default).
     Recompilation checking normally stops compilation early, leaving an
@@ -530,9 +491,7 @@ explains how.
 
 Every cycle in the module import graph must be broken by a ``hs-boot``
 file. Suppose that modules ``A.hs`` and ``B.hs`` are Haskell source
-files, thus:
-
-::
+files, thus: ::
 
     module A where
         import B( TB(..) )
@@ -558,16 +517,14 @@ import graph must be acyclic if ``{-# SOURCE #-}`` imports are ignored.
 
 For every module ``A.hs`` that is ``{-# SOURCE #-}``-imported in this
 way there must exist a source file ``A.hs-boot``. This file contains an
-abbreviated version of ``A.hs``, thus:
-
-::
+abbreviated version of ``A.hs``, thus: ::
 
     module A where
         newtype TA = MkTA Int
 
 To compile these three files, issue the following commands:
 
-::
+.. code-block:: none
 
       ghc -c A.hs-boot    -- Produces A.hi-boot, A.o-boot
       ghc -c B.hs         -- Consumes A.hi-boot, produces B.hi, B.o
@@ -583,7 +540,7 @@ There are several points to note here:
 
 -  A ``hs-boot`` file is compiled by GHC, just like a ``hs`` file:
 
-   ::
+   .. code-block:: none
 
          ghc -c A.hs-boot
 
@@ -630,9 +587,7 @@ A hs-boot file is written in a subset of Haskell:
    mention a non-Prelude type or class, you must import it.
 
 -  There must be no value declarations, but there can be type signatures
-   for values. For example:
-
-   ::
+   for values. For example: ::
 
         double :: Int -> Int
 
@@ -643,9 +598,7 @@ A hs-boot file is written in a subset of Haskell:
 -  Open type and data family declarations are exactly as in Haskell.
 
 -  A closed type family may optionally omit its equations, as in the
-   following example:
-
-   ::
+   following example: ::
 
         type family ClosedFam a where ..
 
@@ -657,9 +610,7 @@ A hs-boot file is written in a subset of Haskell:
 
 -  A data type declaration can either be given in full, exactly as in
    Haskell, or it can be given abstractly, by omitting the '=' sign and
-   everything that follows. For example:
-
-   ::
+   everything that follows. For example: ::
 
         data T a b
 
@@ -674,9 +625,7 @@ A hs-boot file is written in a subset of Haskell:
    annotation (:ref:`kinding`), to tell GHC the kind of the type
    variable, if it is not "\*". (In source files, this is worked out
    from the way the type variable is used in the constructors.) For
-   example:
-
-   ::
+   example: ::
 
         data R (x :: * -> *) y
 
@@ -710,9 +659,7 @@ Interfaces <http://plv.mpi-sws.org/backpack/>`__. Signature files are
 somewhat similar to ``hs-boot`` files, but have the ``hsig`` extension
 and behave slightly differently.
 
-Suppose that I have modules ``String.hs`` and ``A.hs``, thus:
-
-::
+Suppose that I have modules ``String.hs`` and ``A.hs``, thus: ::
 
     module Text where
         data Text = Text String
@@ -730,10 +677,8 @@ Suppose that I have modules ``String.hs`` and ``A.hs``, thus:
 Presently, module ``A`` depends explicitly on a concrete implementation
 of ``Text``. What if we wanted to a signature ``Text``, so we could vary
 the implementation with other possibilities (e.g. packed UTF-8 encoded
-bytestrings)? To do this, we can write a signature ``TextSig.hsig``, and
-modify ``A`` to include the signature instead:
-
-::
+bytestrings)? To do this, we can write a signature :file:`TextSig.hsig`, and
+modify ``A`` to include the signature instead: ::
 
     module TextSig where
         data Text
@@ -746,10 +691,10 @@ modify ``A`` to include the signature instead:
 
 To compile these two files, we need to specify what module we would like
 to use to implement the signature. This can be done by compiling the
-implementation, and then using the ``-sig-of`` flag to specify the
+implementation, and then using the :ghc-flag:`-sig-of` flag to specify the
 implementation backing a signature:
 
-::
+.. code-block:: none
 
     ghc -c Text.hs
     ghc -c TextSig.hsig -sig-of "TextSig is main:Text"
@@ -761,6 +706,11 @@ of all home modules, even in one-shot compilation mode. At the moment,
 you must specify the full module name (unit ID, colon, and then
 module name), although in the future we may support more user-friendly
 syntax.
+
+.. ghc-flag:: -sig-of "<sig> is <package>:<module>"
+
+    Specify the module to be used at the implementation for the 
+    given signature.
 
 To just type-check an interface file, no ``-sig-of`` is necessary;
 instead, just pass the options ``-fno-code -fwrite-interface``. ``hsig``
@@ -792,7 +742,7 @@ Using ``make``
 It is reasonably straightforward to set up a ``Makefile`` to use with
 GHC, assuming you name your source files the same as your modules. Thus:
 
-::
+.. code-block:: makefile
 
     HC      = ghc
     HC_OPTS = -cpp $(EXTRA_HC_OPTS)
@@ -830,11 +780,11 @@ GHC, assuming you name your source files the same as your modules. Thus:
     Main.o Main.hc Main.s : Foo.hi Baz.hi   # Main imports Foo and Baz
 
 .. note::
-    Sophisticated ``make`` variants may achieve some of the above more
-    elegantly. Notably, ``gmake``\'s pattern rules let you write the more
+    Sophisticated :command:`make` variants may achieve some of the above more
+    elegantly. Notably, :command:`gmake`\'s pattern rules let you write the more
     comprehensible:
 
-    ::
+    .. code-block:: make
 
         %.o : %.lhs
                 $(HC) -c $< $(HC_OPTS)
@@ -852,7 +802,7 @@ Haskell source files, and once for ``hs-boot`` files (see
 Note also the inter-module dependencies at the end of the Makefile,
 which take the form
 
-::
+.. code-block:: make
 
     Foo.o Foo.hc Foo.s    : Baz.hi          # Foo imports Baz
 
@@ -877,7 +827,7 @@ Putting inter-dependencies of the form ``Foo.o : Bar.hi`` into your
 for automatically generating the required dependencies. Add the
 following to your ``Makefile``:
 
-::
+.. code-block:: make
 
     depend :
             ghc -M $(HC_OPTS) $(SRCS)
@@ -893,7 +843,7 @@ Makefile:
 -  A line recording the dependence of the object file on the source
    file.
 
-   ::
+   .. code-block:: make
 
        M.o : M.hs
 
@@ -902,14 +852,14 @@ Makefile:
 -  For each import declaration ``import X`` in ``M``, a line recording
    the dependence of ``M`` on ``X``:
 
-   ::
+   .. code-block:: make
 
        M.o : X.hi
 
 -  For each import declaration ``import {-# SOURCE #-} X`` in ``M``, a
    line recording the dependence of ``M`` on ``X``:
 
-   ::
+   .. code-block:: make
 
        M.o : X.hi-boot
 
@@ -946,23 +896,28 @@ The dependency generation phase of GHC can take some additional options,
 which you may find useful. The options which affect dependency
 generation are:
 
-``-ddump-mod-cycles``
+.. ghc-flag:: -ddump-mod-cycles
+
     Display a list of the cycles in the module graph. This is useful
     when trying to eliminate such cycles.
 
-``-v2``
+.. ghc-flag:: -v2
+    :noindex:
+
     Print a full list of the module dependencies to stdout. (This is the
     standard verbosity flag, so the list will also be displayed with
-    ``-v3`` and ``-v4``; :ref:`options-help`.)
+    ``-v3`` and ``-v4``; see :ref:`options-help`.)
 
-``-dep-makefile ⟨file⟩``
+.. ghc-flag:: -dep-makefile ⟨file⟩
+
     Use ⟨file⟩ as the makefile, rather than ``makefile`` or
     ``Makefile``. If ⟨file⟩ doesn't exist, ``mkdependHS`` creates it. We
     often use ``-dep-makefile .depend`` to put the dependencies in
     ``.depend`` and then ``include`` the file ``.depend`` into
     ``Makefile``.
 
-``-dep-suffix <suf>``
+.. ghc-flag:: -dep-suffix <suf>
+
     Make extra dependencies that declare that files with suffix
     ``.<suf>_<osuf>`` depend on interface files with suffix
     ``.<suf>_hi``, or (for ``{-# SOURCE #-}`` imports) on ``.hi-boot``.
@@ -971,11 +926,13 @@ generation are:
     on ``.hi``, ``.a_hs`` on ``.a_hi``, and ``.b_hs`` on ``.b_hi``.
     (Useful in conjunction with NoFib "ways".)
 
-``--exclude-module=<file>``
+.. ghc-flag:: --exclude-module=<file>
+
     Regard ``<file>`` as "stable"; i.e., exclude it from having
     dependencies on it.
 
-``-include-pkg-deps``
+.. ghc-flag:: -include-pkg-deps
+
     Regard modules imported from packages as unstable, i.e., generate
     dependencies on any imported package modules (including ``Prelude``,
     and all other standard Haskell libraries). Dependencies are not
@@ -1000,9 +957,7 @@ be clever.
 In particular, if an instance declaration is in the same module as the
 definition of any type or class mentioned in the *head* of the instance
 declaration (the part after the "``=>``"; see :ref:`instance-rules`), then GHC
-has to visit that interface file anyway. Example:
-
-::
+has to visit that interface file anyway. Example: ::
 
       module A where
         instance C a => D (T a) where ...
@@ -1012,32 +967,26 @@ The instance declaration is only relevant if the type ``T`` is in use, and
 if so, GHC will have visited ``A``\'s interface file to find ``T``\'s definition.
 
 The only problem comes when a module contains an instance declaration
-and GHC has no other reason for visiting the module. Example:
-
-::
+and GHC has no other reason for visiting the module. Example: ::
 
       module Orphan where
         instance C a => D (T a) where ...
         class C a where ...
 
 Here, neither ``D`` nor ``T`` is declared in module ``Orphan``. We call such modules
-“orphan modules”. GHC identifies orphan modules, and visits the
+"orphan modules". GHC identifies orphan modules, and visits the
 interface file of every orphan module below the module being compiled.
 This is usually wasted work, but there is no avoiding it. You should
 therefore do your best to have as few orphan modules as possible.
 
-Functional dependencies complicate matters. Suppose we have:
-
-::
+Functional dependencies complicate matters. Suppose we have: ::
 
       module B where
         instance E T Int where ...
         data T = ...
 
 Is this an orphan module? Apparently not, because ``T`` is declared in
-the same module. But suppose class ``E`` had a functional dependency:
-
-::
+the same module. But suppose class ``E`` had a functional dependency: ::
 
       module Lib where
         class E x y | y -> x where ...
@@ -1071,13 +1020,13 @@ module:
    of the variables, type constructors, or classes that are free in the
    left hand side of the rule are declared in ``M``.
 
-If you use the flag ``-Worphans``, GHC will warn you if you are
+If you use the flag :ghc-flag:`-Worphans`, GHC will warn you if you are
 creating an orphan module. Like any warning, you can switch the warning
-off with ``-Wno-orphans``, and ``-Werror`` will make the
-compilation fail if the warning is issued.
+off with :ghc-flag:`-Wno-orphans <-Worphans>`, and :ghc-flag:`-Werror` will make
+the compilation fail if the warning is issued.
 
 You can identify an orphan module by looking in its interface file,
-``M.hi``, using the ``--show-iface`` :ref:`mode <modes>`. If there is a
+``M.hi``, using the :ghc-flag:`--show-iface` :ref:`mode <modes>`. If there is a
 ``[orphan module]`` on the first line, GHC considers it an orphan
 module.
 

@@ -38,7 +38,7 @@ Using Packages
 GHC only knows about packages that are *installed*. To see which
 packages are installed, use the ``ghc-pkg list`` command:
 
-::
+.. code-block:: none
 
     $ ghc-pkg list
     /usr/lib/ghc-6.12.1/package.conf.d:
@@ -109,7 +109,7 @@ when compiling code using GHC's Safe Haskell feature (see
 To see which modules are provided by a package use the ``ghc-pkg``
 command (see :ref:`package-management`):
 
-::
+.. code-block:: none
 
     $ ghc-pkg field network exposed-modules
     exposed-modules: Network.BSD,
@@ -120,25 +120,23 @@ command (see :ref:`package-management`):
 
 The GHC command line options that control packages are:
 
-``-package ⟨pkg⟩``
-    .. index::
-       single: -package
+.. ghc-flag:: -package ⟨pkg⟩
 
     This option causes the installed package ⟨pkg⟩ to be exposed. The
     package ⟨pkg⟩ can be specified in full with its version number (e.g.
     ``network-1.0``) or the version number can be omitted if there is
     only one version of the package installed. If there are multiple
-    versions of ⟨pkg⟩ installed and ``-hide-all-packages`` was not
-    specified, then all other versions will become hidden. ``-package``
+    versions of ⟨pkg⟩ installed and :ghc-flag:`-hide-all-packages` was not
+    specified, then all other versions will become hidden. :ghc-flag:`-package`
     supports thinning and renaming described in
     :ref:`package-thinning-and-renaming`.
 
     The ``-package ⟨pkg⟩`` option also causes package ⟨pkg⟩ to be linked into
     the resulting executable or shared object. Whether a packages'
     library is linked statically or dynamically is controlled by the
-    flag pair ``-static``/``-dynamic``.
+    flag pair :ghc-flag:`-static`\/ :ghc-flag:`-dynamic`.
 
-    In ``--make`` mode and ``--interactive`` mode (see :ref:`modes`),
+    In :ghc-flag:`--make` mode and :ghc-flag:`--interactive` mode (see :ref:`modes`),
     the compiler normally determines which packages are required by the
     current Haskell modules, and links only those. In batch mode
     however, the dependency information isn't available, and explicit
@@ -152,47 +150,41 @@ The GHC command line options that control packages are:
     ``Main.o``, where we made use of the ``network`` package, we need to
     give GHC the ``-package`` flag thus:
 
-    ::
+    .. code-block:: sh
 
         $ ghc -o myprog Foo.o Main.o -package network
 
     The same flag is necessary even if we compiled the modules from
     source, because GHC still reckons it's in batch mode:
 
-    ::
+    .. code-block:: sh
 
         $ ghc -o myprog Foo.hs Main.hs -package network
 
-``-package-id ⟨pkg-id⟩``
-    .. index::
-       single: -package-id
+.. ghc-flag:: -package-id ⟨pkg-id⟩
 
-    Exposes a package like ``-package``, but the package is named by its
+    Exposes a package like :ghc-flag:`-package`, but the package is named by its
     installed package ID rather than by name. This is a more robust way
     to name packages, and can be used to select packages that would
     otherwise be shadowed. Cabal passes ``-package-id`` flags to GHC.
     ``-package-id`` supports thinning and renaming described in
     :ref:`package-thinning-and-renaming`.
 
-``-hide-all-packages``
-    .. index::
-       single: -hide-all-packages
+.. ghc-flag:: -hide-all-packages
 
     Ignore the exposed flag on installed packages, and hide them all by
     default. If you use this flag, then any packages you require
     (including ``base``) need to be explicitly exposed using
-    ``-package`` options.
+    :ghc-flag:`-package` options.
 
     This is a good way to insulate your program from differences in the
     globally exposed packages, and being explicit about package
     dependencies is a Good Thing. Cabal always passes the
     ``-hide-all-packages`` flag to GHC, for exactly this reason.
 
-``-hide-package ⟨pkg⟩``
-    .. index::
-       single: -hide-package
+.. ghc-flag:: -hide-package ⟨pkg⟩
 
-    This option does the opposite of ``-package``: it causes the
+    This option does the opposite of :ghc-flag:`-package`: it causes the
     specified package to be hidden, which means that none of its modules
     will be available for import by Haskell ``import`` directives.
 
@@ -200,37 +192,29 @@ The GHC command line options that control packages are:
     program, if it is a dependency (direct or indirect) of another
     exposed package.
 
-``-ignore-package ⟨pkg⟩``
-    .. index::
-       single: -ignore-package
+.. ghc-flag:: -ignore-package ⟨pkg⟩
 
     Causes the compiler to behave as if package ⟨pkg⟩, and any packages
     that depend on ⟨pkg⟩, are not installed at all.
 
-    Saying ``-ignore-package ⟨pkg⟩`` is the same as giving ``-hide-package``
+    Saying ``-ignore-package ⟨pkg⟩`` is the same as giving :ghc-flag:`-hide-package`
     flags for ⟨pkg⟩ and all the packages that depend on ⟨pkg⟩. Sometimes
     we don't know ahead of time which packages will be installed that
-    depend on ⟨pkg⟩, which is when the ``-ignore-package`` flag can be
+    depend on ⟨pkg⟩, which is when the :ghc-flag:`-ignore-package` flag can be
     useful.
 
-``-no-auto-link-packages``
-    .. index::
-       single: -no-auto-link-packages
+.. ghc-flag:: -no-auto-link-packages
 
     By default, GHC will automatically link in the ``base`` and ``rts``
     packages. This flag disables that behaviour.
 
-``-this-package-key ⟨pkg-key⟩``
-    .. index::
-       single: -this-package-key
+.. ghc-flag:: -this-package-key ⟨pkg-key⟩
 
     Tells GHC the the module being compiled forms part of unit ID
     ⟨pkg-key⟩; internally, these keys are used to determine type equality
     and linker symbols.
 
-``-library-name ⟨hash⟩``
-    .. index::
-       single: -library-name
+.. ghc-flag:: -library-name ⟨hash⟩
 
     Tells GHC that the source of a Backpack file and its textual
     dependencies is uniquely identified by ⟨hash⟩. Library names are
@@ -239,36 +223,30 @@ The GHC command line options that control packages are:
     version hashes of all its textual dependencies. GHC will then use
     this library name to generate more unit IDs.
 
-``-trust ⟨pkg⟩``
-    .. index::
-       single: -trust
+.. ghc-flag:: -trust ⟨pkg⟩
 
     This option causes the install package ⟨pkg⟩ to be both exposed and
     trusted by GHC. This command functions in the in a very similar way
-    to the ``-package`` command but in addition sets the selected
+    to the :ghc-flag:`-package` command but in addition sets the selected
     packaged to be trusted by GHC, regardless of the contents of the
     package database. (see :ref:`safe-haskell`).
 
-``-distrust ⟨pkg⟩``
-    .. index::
-       single: -distrust
+.. ghc-flag:: -distrust ⟨pkg⟩
 
     This option causes the install package ⟨pkg⟩ to be both exposed and
     distrusted by GHC. This command functions in the in a very similar
-    way to the ``-package`` command but in addition sets the selected
+    way to the :ghc-flag:`-package` command but in addition sets the selected
     packaged to be distrusted by GHC, regardless of the contents of the
     package database. (see :ref:`safe-haskell`).
 
-``-distrust-all``
-    .. index::
-       single: -distrust-all
+.. ghc-flag:: -distrust-all
 
     Ignore the trusted flag on installed packages, and distrust them by
     default. If you use this flag and Safe Haskell then any packages you
     require to be trusted (including ``base``) need to be explicitly
-    trusted using ``-trust`` options. This option does not change the
+    trusted using :ghc-flag:`-trust` options. This option does not change the
     exposed/hidden status of a package, so it isn't equivalent to
-    applying ``-distrust`` to all packages on the system. (see
+    applying :ghc-flag:`-distrust` to all packages on the system. (see
     :ref:`safe-haskell`).
 
 .. _package-main:
@@ -277,11 +255,11 @@ The ``main`` package
 --------------------
 
 Every complete Haskell program must define ``main`` in module ``Main``
-in package ``main``. Omitting the ``-this-package-key`` flag compiles
+in package ``main``. Omitting the :ghc-flag:`-this-package-key` flag compiles
 code for package ``main``. Failure to do so leads to a somewhat obscure
 link-time error of the form:
 
-::
+.. code-block:: none
 
     /usr/bin/ld: Undefined symbols:
     _ZCMain_main_closure
@@ -318,7 +296,7 @@ When incorporating packages from multiple sources, you may end up in a
 situation where multiple packages publish modules with the same name.
 Previously, the only way to distinguish between these modules was to use
 :ref:`package-qualified-imports`. However, since GHC 7.10, the
-``-package`` flags (and their variants) have been extended to allow a
+:ghc-flag:`-package` flags (and their variants) have been extended to allow a
 user to explicitly control what modules a package brings into scope, by
 analogy to the import lists that users can attach to module imports.
 
@@ -360,9 +338,9 @@ Package Databases
 A package database is where the details about installed packages are
 stored. It is a directory, usually called ``package.conf.d``, that
 contains a file for each package, together with a binary cache of the
-package data in the file ``package.cache``. Normally you won't need to
+package data in the file :file:`package.cache`. Normally you won't need to
 look at or modify the contents of a package database directly; all
-management of package databases can be done through the ``ghc-pkg`` tool
+management of package databases can be done through the :command:`ghc-pkg` tool
 (see :ref:`package-management`).
 
 GHC knows about two package databases in particular:
@@ -379,7 +357,7 @@ GHC knows about two package databases in particular:
 
 When GHC starts up, it reads the contents of these two package
 databases, and builds up a list of the packages it knows about. You can
-see GHC's package table by running GHC with the ``-v`` flag.
+see GHC's package table by running GHC with the :ghc-flag:`-v` flag.
 
 Package databases may overlap, and they are arranged in a stack
 structure. Packages closer to the top of the stack will override
@@ -389,51 +367,39 @@ global and the user's package databases, in that order.
 You can control GHC's package database stack using the following
 options:
 
-``-package-db ⟨file⟩``
-    .. index::
-       single: -package-db
+.. ghc-flag:: -package-db ⟨file⟩
 
     Add the package database ⟨file⟩ on top of the current stack.
     Packages in additional databases read this way will override those
     in the initial stack and those in previously specified databases.
 
-``-no-global-package-db``
-    .. index::
-       single: -no-global-package-db
+.. ghc-flag:: -no-global-package-db
 
     Remove the global package database from the package database stack.
 
-``-no-user-package-db``
-    .. index::
-       single: -no-user-package-db
+.. ghc-flag:: -no-user-package-db
 
     Prevent loading of the user's local package database in the initial
     stack.
 
-``-clear-package-db``
-    .. index::
-       single: -clear-package-db
+.. ghc-flag:: -clear-package-db
 
     Reset the current package database stack. This option removes every
     previously specified package database (including those read from the
-    ``GHC_PACKAGE_PATH`` environment variable) from the package database
+    :envvar:`GHC_PACKAGE_PATH` environment variable) from the package database
     stack.
 
-``-global-package-db``
-    .. index::
-       single: -global-package-db
+.. ghc-flag:: -global-package-db
 
     Add the global package database on top of the current stack. This
-    option can be used after ``-no-global-package-db`` to specify the
+    option can be used after :ghc-flag:`-no-global-package-db` to specify the
     position in the stack where the global package database should be
     loaded.
 
-``-user-package-db``
-    .. index::
-       single: -user-package-db
+.. ghc-flag:: -user-package-db
 
     Add the user's package database on top of the current stack. This
-    option can be used after ``-no-user-package-db`` to specify the
+    option can be used after :ghc-flag:`-no-user-package-db` to specify the
     position in the stack where the user's package database should be
     loaded.
 
@@ -442,32 +408,30 @@ options:
 The ``GHC_PACKAGE_PATH`` environment variable
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. index::
-   single: Environment variable; ``GHC_PACKAGE_PATH``
-   single: GHC_PACKAGE_PATH
+.. envvar:: GHC_PACKAGE_PATH
 
-The ``GHC_PACKAGE_PATH`` environment variable may be set to a
-``:``\-separated (``;``\-separated on Windows) list of files containing
-package databases. This list of package databases is used by GHC and
-ghc-pkg, with earlier databases in the list overriding later ones. This
-order was chosen to match the behaviour of the ``PATH`` environment
-variable; think of it as a list of package databases that are searched
-left-to-right for packages.
+    The :envvar:`GHC_PACKAGE_PATH` environment variable may be set to a
+    ``:``\-separated (``;``\-separated on Windows) list of files containing
+    package databases. This list of package databases is used by GHC and
+    ghc-pkg, with earlier databases in the list overriding later ones. This
+    order was chosen to match the behaviour of the :envvar:`PATH` environment
+    variable; think of it as a list of package databases that are searched
+    left-to-right for packages.
 
-If ``GHC_PACKAGE_PATH`` ends in a separator, then the default package
-database stack (i.e. the user and global package databases, in that
-order) is appended. For example, to augment the usual set of packages
-with a database of your own, you could say (on Unix):
+    If :envvar:`GHC_PACKAGE_PATH` ends in a separator, then the default package
+    database stack (i.e. the user and global package databases, in that
+    order) is appended. For example, to augment the usual set of packages
+    with a database of your own, you could say (on Unix):
 
-::
+    .. code-block:: none
 
-     $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:
+        $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:
 
-(use ``;`` instead of ``:`` on Windows).
+    (use ``;`` instead of ``:`` on Windows).
 
-To check whether your ``GHC_PACKAGE_PATH`` setting is doing the right
-thing, ``ghc-pkg list`` will list all the databases in use, in the
-reverse order they are searched.
+    To check whether your :envvar:`GHC_PACKAGE_PATH` setting is doing the right
+    thing, ``ghc-pkg list`` will list all the databases in use, in the
+    reverse order they are searched.
 
 .. _package-ids:
 
@@ -479,7 +443,7 @@ ID"), which distinguishes it from all other installed packages on the
 system. To see the installed package IDs associated with each installed
 package, use ``ghc-pkg list -v``:
 
-::
+.. code-block:: none
 
     $ ghc-pkg list -v
     using cache: /usr/lib/ghc-6.12.1/package.conf.d/package.cache
@@ -497,7 +461,7 @@ between packages are expressed in terms of installed package IDs, rather
 than just packages and versions. For example, take a look at the
 dependencies of the ``haskell98`` package:
 
-::
+.. code-block:: none
 
     $ ghc-pkg field haskell98 depends
     depends: array-0.2.0.1-9cbf76a576b6ee9c1f880cf171a0928d
@@ -522,7 +486,7 @@ in red (if possible) or otherwise surrounded by braces. In the following
 example, we have recompiled and reinstalled the ``filepath`` package,
 and this has caused various dependencies including ``Cabal`` to break:
 
-::
+.. code-block:: none
 
     $ ghc-pkg list
     WARNING: there are broken packages.  Run 'ghc-pkg check' for more details.
@@ -536,7 +500,7 @@ Additionally, ``ghc-pkg list`` reminds you that there are broken
 packages and suggests ``ghc-pkg check``, which displays more information
 about the nature of the failure:
 
-::
+.. code-block:: none
 
     $ ghc-pkg check
     There are problems in package ghc-6.12.1:
@@ -580,11 +544,11 @@ Package management (the ``ghc-pkg`` command)
 .. index::
    single: packages; management
 
-The ``ghc-pkg`` tool is for querying and modifying package databases. To
+The :command:`ghc-pkg` tool is for querying and modifying package databases. To
 see what package databases are in use, use ``ghc-pkg list``. The stack
-of databases that ``ghc-pkg`` knows about can be modified using the
-``GHC_PACKAGE_PATH`` environment variable (see :ref:`ghc-package-path`,
-and using ``--package-db`` options on the ``ghc-pkg`` command line.
+of databases that :command:`ghc-pkg` knows about can be modified using the
+:envvar:`GHC_PACKAGE_PATH` environment variable (see :ref:`ghc-package-path`,
+and using :ghc-flag:`-package-db` options on the :command:`ghc-pkg` command line.
 
 When asked to modify a database, ``ghc-pkg`` modifies the global
 database by default. Specifying ``--user`` causes it to act on the user
@@ -597,7 +561,7 @@ dot) operate on the list of databases specified by the flags ``--user``,
 ``--global``, and ``--package-db``. If none of these flags are given,
 the default is ``--global --user``.
 
-If the environment variable ``GHC_PACKAGE_PATH`` is set, and its value
+If the environment variable :envvar:`GHC_PACKAGE_PATH` is set, and its value
 does not end in a separator (``:`` on Unix, ``;`` on Windows), then the
 last database is considered to be the global database, and will be
 modified by default by ``ghc-pkg``. The intention here is that
@@ -867,9 +831,9 @@ should make an inter-shared-object call rather than an
 intra-shared-object-call call (inter-shared-object calls require an
 extra indirection).
 
--  Building a static library is done by using the ``ar`` tool, like so:
+-  Building a static library is done by using the :command:`ar` tool, like so:
 
-   ::
+   .. code-block:: sh
 
        ar cqs libHSfoo-1.0.a A.o B.o C.o ...
 
@@ -883,9 +847,9 @@ extra indirection).
    ``HSfoo.o`` file that has been pre-linked. Loading the ``.o`` file is
    slightly quicker, but at the expense of having another copy of the
    compiled package. The rule of thumb is that if the modules of the
-   package were compiled with ``-split-objs`` then building the
+   package were compiled with :ghc-flag:`-split-objs` then building the
    ``HSfoo.o`` is worthwhile because it saves time when loading the
-   package into GHCi. Without ``-split-objs``, there is not much
+   package into GHCi. Without :ghc-flag:`-split-objs`, there is not much
    difference in load time between the ``.o`` and ``.a`` libraries, so
    it is better to save the disk space and only keep the ``.a`` around.
    In a GHC distribution we provide ``.o`` files for most packages
@@ -895,7 +859,7 @@ extra indirection).
    ``--disable-library-for-ghci`` to disable it. To build one manually,
    the following GNU ``ld`` command can be used:
 
-   ::
+   .. code-block:: sh
 
        ld -r --whole-archive -o HSfoo.o libHSfoo.a
 
@@ -911,10 +875,10 @@ extra indirection).
    versions of GHC and that therefore are most likely incompatible with
    respect to calling conventions, (2) it must be different from the
    static name otherwise we would not be able to control the linker as
-   precisely as necessary to make the ``-static``/``-dynamic`` flags
-   work, see :ref:`options-linker`.
+   precisely as necessary to make the :ghc-flag:`-static`\/:ghc-flag:`-dynamic`
+   flags work, see :ref:`options-linker`.
 
-   ::
+   .. code-block:: sh
 
        ghc -shared libHSfoo-1.0-ghcGHCVersion.so A.o B.o C.o
 
@@ -957,7 +921,7 @@ functions ``parseInstalledPackageInfo`` and ``showInstalledPackageInfo``
 read and write this syntax respectively. Here's an example of the
 ``InstalledPackageInfo`` for the ``unix`` package:
 
-::
+.. code-block:: none
 
     $ ghc-pkg describe unix
     name: unix
@@ -1320,7 +1284,7 @@ They are intended to be managed by build/package tools, to enable ``ghc`` and
 The file contains package IDs and optionally package databases, one directive
 per line:
 
-::
+.. code-block:: none
 
     clear-package-db
     global-package-db
@@ -1334,7 +1298,7 @@ per line:
 If such a package environment is found, it is equivalent to passing these
 command line arguments to ``ghc``:
 
-::
+.. code-block:: none
 
     -hide-all-packages
     -clear-package-db
@@ -1346,9 +1310,9 @@ command line arguments to ``ghc``:
     ...
     -package-id id_n
 
-Note the implicit ``-hide-all-packages`` and the fact that it is
-``-package-id``, not ``-package``. This is because the environment specifies
-precisely which packages should be visible.
+Note the implicit :ghc-flag:`-hide-all-packages` and the fact that it is
+:ghc-flag:`-package-id`, not :ghc-flag:`-package`. This is because the
+environment specifies precisely which packages should be visible.
 
 Note that for the ``package-db`` directive, if a relative path is given it
 must be relative to the location of the package environment file.

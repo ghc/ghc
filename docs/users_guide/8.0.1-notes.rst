@@ -22,14 +22,14 @@ The highlights, since the 7.10 branch, are:
 
 - More reliable DWARF debugging information
 
-- Support for :ref:`injective type classes :ref:`injective-ty-fams`
+- Support for :ref:`injective type classes <injective-ty-fams>`
 
 - Applicative ``do`` notation (see :ref:`applicative-do`)
 
 - Support for wildcards in data and type family instances
 
 - ``Strict`` and ``StrictData`` extensions, allowing modules to be compiled with
-   strict-by-default bindings (see :ref:`strict-haskell`)
+  strict-by-default bindings (see :ref:`strict-haskell`)
 
 - ``DuplicateRecordFields``, allowing multiple datatypes to declare the same
   record field names provided they are used unambiguously (see :ref:`duplicate-record-fields`)

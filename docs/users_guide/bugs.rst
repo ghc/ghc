@@ -26,9 +26,9 @@ Divergence from Haskell 98 and Haskell 2010
 
 By default, GHC mainly aims to behave (mostly) like a Haskell 2010
 compiler, although you can tell it to try to behave like a particular
-version of the language with the ``-XHaskell98`` and ``-XHaskell2010``
-flags. The known deviations from the standards are described below.
-Unless otherwise stated, the deviation applies in Haskell 98,
+version of the language with the :ghc-flag:`-XHaskell98` and
+:ghc-flag:`-XHaskell2010` flags. The known deviations from the standards are
+described below. Unless otherwise stated, the deviation applies in Haskell 98,
 Haskell 2010 and the default modes.
 
 .. _infelicities-lexical:
@@ -54,9 +54,7 @@ Context-free syntax
    relaxed to allow the nested context to be at the same level as the
    enclosing context, if the enclosing context is a ``do`` expression.
 
-   For example, the following code is accepted by GHC:
-
-   ::
+   For example, the following code is accepted by GHC: ::
 
        main = do args <- getArgs
                  if null args then return [] else do
@@ -69,15 +67,11 @@ Context-free syntax
 -  GHC doesn't do the fixity resolution in expressions during parsing as
    required by Haskell 98 (but not by Haskell 2010). For example,
    according to the Haskell 98 report, the following expression is
-   legal:
-
-   ::
+   legal: ::
 
            let x = 42 in x == 42 == True
 
-   and parses as:
-
-   ::
+   and parses as: ::
 
            (let x = 42 in x == 42) == True
 
@@ -85,11 +79,10 @@ Context-free syntax
    far to the right as possible”. Since it can't extend past the second
    equals sign without causing a parse error (``==`` is non-fix), the
    ``let``\-expression must terminate there. GHC simply gobbles up the
-   whole expression, parsing like this:
-
-   ::
+   whole expression, parsing like this: ::
 
            (let x = 42 in x == 42 == True)
+
 -  The Haskell Report allows you to put a unary ``-`` preceding certain
    expressions headed by keywords, allowing constructs like ``- case x of ...``
    or ``- do { ... }``. GHC does not allow this. Instead, unary ``-`` is allowed
@@ -102,9 +95,7 @@ Expressions and patterns
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 In its default mode, GHC makes some programs slightly more defined than
-they should be. For example, consider
-
-::
+they should be. For example, consider ::
 
     f :: [a] -> b -> b
     f [] = error "urk"
@@ -188,9 +179,7 @@ Numbers, basic types, and built-in classes
         in ``Bits`` instances.
 
 Extra instances
-    The following extra instances are defined:
-
-    ::
+    The following extra instances are defined: ::
 
         instance Functor ((->) r)
         instance Monad ((->) r)
@@ -199,9 +188,7 @@ Extra instances
         instance Monad (Either e)
 
 Multiply-defined array elements not checked
-    This code fragment should elicit a fatal error, but it does not:
-
-    ::
+    This code fragment should elicit a fatal error, but it does not: ::
 
         main = print (array (1,1) [(1,2), (1,3)])
 
@@ -223,31 +210,23 @@ Arbitrary-sized tuples
     stuck on it.
 
 ``splitAt`` semantics
-    ``Data.List.splitAt`` is stricter than specified in the Report.
-    Specifically, the Report specifies that
-
-    ..
+    ``Data.List.splitAt`` is more strict than specified in the Report.
+    Specifically, the Report specifies that ::
 
        splitAt n xs = (take n xs, drop n xs)
 
-    which implies that
-
-    ..
+    which implies that ::
 
        splitAt undefined undefined = (undefined, undefined)
 
-    but GHC's implementation is strict in its first argument, so
+    but GHC's implementation is strict in its first argument, so ::
 
-    ..
-
-        splitAt undefined [] = undefined
+       splitAt undefined [] = undefined
 
 ``Read``\ ing integers
     GHC's implementation of the ``Read`` class for integral types
     accepts hexadecimal and octal literals (the code in the Haskell 98
-    report doesn't). So, for example,
-
-    ::
+    report doesn't). So, for example, ::
 
         read "0xf00" :: Int
 
@@ -258,9 +237,7 @@ Arbitrary-sized tuples
     too.
 
 ``isAlpha``
-    The Haskell 98 definition of ``isAlpha`` is:
-
-    ::
+    The Haskell 98 definition of ``isAlpha`` is: ::
 
         isAlpha c = isUpper c || isLower c
 
@@ -377,17 +354,17 @@ Bugs in GHC
    for further discussion.
 
    If you are hit by this, you may want to compile the affected module
-   with ``-fno-omit-yields`` (see :ref:`options-f`). This flag ensures that
-   yield points are inserted at every function entrypoint (at the expense of a
-   bit of performance).
+   with :ghc-flag:`-fno-omit-yields <-fomit-yields>` (see :ref:`options-f`).
+   This flag ensures that yield points are inserted at every function entrypoint
+   (at the expense of a bit of performance).
 
 -  GHC's updated exhaustiveness and coverage checker (see
    :ref:`options-sanity`) is quite expressive but with a rather high
    performance cost (in terms of both time and memory consumption), mainly
    due to guards. Two flags have been introduced to give more control to
-   the user over guard reasoning: ``-Wtoo-many-guards``
-   and ``-ffull-guard-reasoning`` (see :ref:`options-sanity`).
-   When ``-ffull-guard-reasoning`` is on, pattern match checking for guards
+   the user over guard reasoning: :ghc-flag:`-Wtoo-many-guards`
+   and :ghc-flag:`-ffull-guard-reasoning` (see :ref:`options-sanity`).
+   When :ghc-flag:`-ffull-guard-reasoning` is on, pattern match checking for guards
    runs in full power, which may run out of memory/substantially increase
    compilation time.
 
@@ -426,7 +403,7 @@ Bugs in GHC
 
    The non-termination is reported like this:
 
-   ::
+   .. code-block:: none
 
        ghc: panic! (the 'impossible' happened)
          (GHC version 7.10.1 for x86_64-unknown-linux):
@@ -435,7 +412,7 @@ Bugs in GHC
          To increase the limit, use -fsimpl-tick-factor=N (default 100)
 
    with the panic being reported no matter how high a
-   ``-fsimpl-tick-factor`` you supply.
+   :ghc-flag:`-fsimpl-tick-factor` you supply.
 
    We have never found another class of programs, other than this
    contrived one, that makes GHC diverge, and fixing the problem would
@@ -444,7 +421,7 @@ Bugs in GHC
    inliner <http://research.microsoft.com/~simonpj/Papers/inlining/>`__.
 
 -  On 32-bit x86 platforms when using the native code generator, the
-   ``-fexcess-precision``\ ``-fexcess-precision`` option is always on.
+   :ghc-flag:`-fexcess-precision` option is always on.
    This means that floating-point calculations are non-deterministic,
    because depending on how the program is compiled (optimisation
    settings, for example), certain calculations might be done at 80-bit
@@ -457,8 +434,8 @@ Bugs in GHC
    .. index::
       single: -msse2 option
 
-   One workaround is to use the ``-msse2`` option (see
-   :ref:`options-platform`, which generates code to use the SSE2
+   One workaround is to use the :ghc-flag:`-msse2` option (see
+   :ref:`options-platform`), which generates code to use the SSE2
    instruction set instead of the x87 instruction set. SSE2 code uses
    the correct precision for all floating-point operations, and so gives
    deterministic results. However, note that this only works with
@@ -490,7 +467,7 @@ Bugs in GHCi (the interactive GHC)
    files that have more than 0xffff relocations. When GHCi tries to load
    a package affected by this bug, you get an error message of the form
 
-   ::
+   .. code-block:: none
 
        Loading package javavm ... linking ... WARNING: Overflown relocation field (# relocs found: 30765)
 

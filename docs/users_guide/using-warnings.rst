@@ -11,77 +11,76 @@ GHC has a number of options that select which types of non-fatal error
 messages, otherwise known as warnings, can be generated during
 compilation. By default, you get a standard set of warnings which are
 generally likely to indicate bugs in your program. These are:
-``-Woverlapping-patterns``, ``-Wwarnings-deprecations``,
-``-Wdeprecated-flags``, ``-Wunrecognised-pragmas``,
-``-Wmissed-specialisations``, ``-Wduplicate-constraints``,
-``-Wduplicate-exports``, ``-Woverflowed-literals``,
-``-Wempty-enumerations``, ``-Wmissing-fields``,
-``-Wmissing-methods``, ``-Wwrong-do-bind``,
-``-Wunsupported-calling-conventions``,
-``-Wdodgy-foreign-imports``, ``-Winline-rule-shadowing``,
-``-Wunsupported-llvm-version`` and ``-Wtabs``. The following flags are
-simple ways to select standard “packages” of warnings:
 
-``-W``
-    .. index::
-       single: -W option
+.. hlist::
+    :columns: 3
 
-    Provides the standard warnings plus ``-Wunused-binds``,
-    ``-Wunused-matches``, ``-Wunused-imports``,
-    ``-Wincomplete-patterns``, ``-Wdodgy-exports``, and
-    ``-Wdodgy-imports``.
+    * :ghc-flag:`-Woverlapping-patterns`
+    * :ghc-flag:`-Wwarnings-deprecations`
+    * :ghc-flag:`-Wdeprecated-flags`
+    * :ghc-flag:`-Wunrecognised-pragmas`
+    * :ghc-flag:`-Wmissed-specialisations`
+    * :ghc-flag:`-Wduplicate-constraints`
+    * :ghc-flag:`-Wduplicate-exports`
+    * :ghc-flag:`-Woverflowed-literals`
+    * :ghc-flag:`-Wempty-enumerations`
+    * :ghc-flag:`-Wmissing-fields`
+    * :ghc-flag:`-Wmissing-methods`
+    * :ghc-flag:`-Wwrong-do-bind`
+    * :ghc-flag:`-Wunsupported-calling-conventions`
+    * :ghc-flag:`-Wdodgy-foreign-imports`
+    * :ghc-flag:`-Winline-rule-shadowing`
+    * :ghc-flag:`-Wunsupported-llvm-version`
+    * :ghc-flag:`-Wtabs`
 
-``-Wall``
-    .. index::
-       single: -Wall
+The following flags are simple ways to select standard "packages" of warnings:
+
+.. ghc-flag:: -W
+
+    Provides the standard warnings plus :ghc-flag:`-Wunused-binds`,
+    :ghc-flag:`-Wunused-matches`, :ghc-flag:`-Wunused-imports`,
+    :ghc-flag:`-Wincomplete-patterns`, :ghc-flag:`-Wdodgy-exports`, and
+    :ghc-flag:`-Wdodgy-imports`.
+
+.. ghc-flag:: -Wall
 
     Turns on all warning options that indicate potentially suspicious
-    code. The warnings that are *not* enabled by ``-Wall`` are
-    ``-Wincomplete-uni-patterns``,
-    ``-Wincomplete-record-updates``,
-    ``-Wmonomorphism-restriction``,
-    ``-Wimplicit-prelude``, ``-Wmissing-local-sigs``,
-    ``-Wmissing-exported-sigs``, ``-Wmissing-import-lists``
-    and ``-Widentities``.
+    code. The warnings that are *not* enabled by :ghc-flag:`-Wall` are
+    :ghc-flag:`-Wincomplete-uni-patterns`,
+    :ghc-flag:`-Wincomplete-record-updates`,
+    :ghc-flag:`-Wmonomorphism-restriction`,
+    :ghc-flag:`-Wimplicit-prelude`, :ghc-flag:`-Wmissing-local-sigs`,
+    :ghc-flag:`-Wmissing-exported-sigs`, :ghc-flag:`-Wmissing-import-lists`
+    and :ghc-flag:`-Widentities`.
 
-``-Wcompat``
-    .. index::
-       single: -Wcompat
+.. ghc-flag:: -Wcompat
 
     Turns on warnings that will be enabled by default in the future, but remain
     off in normal compilations for the time being. This allows library authors
     eager to make their code future compatible to adapt to new features before
     they even generate warnings.
 
-    This currently enables ``-Wmissing-monadfail-instance``,
-    ``-Wsemigroup``, and ``-Wnoncanonical-monoid-instances``.
+    This currently enables :ghc-flag:`-Wmissing-monadfail-instance`,
+    :ghc-flag:`-Wsemigroup`, and :ghc-flag:`-Wnoncanonical-monoid-instances`.
 
-``-Wno-compat``
-    .. index::
-       single: -Wno-compat
+.. ghc-flag:: -Wno-compat
 
-    Disables all warnings enabled by ``-Wcompat``.
+    Disables all warnings enabled by :ghc-flag:`-Wcompat`.
 
-``-w``
-    .. index::
-       single: -w
+.. ghc-flag:: -w
 
     Turns off all warnings, including the standard ones and those that
-    ``-Wall`` doesn't enable.
+    :ghc-flag:`-Wall` doesn't enable.
 
-``-Werror``
-    .. index::
-       single: -Werror
+.. ghc-flag:: -Werror
 
     Makes any warning into a fatal error. Useful so that you don't miss
     warnings when doing batch compilation.
 
-``-Wwarn``
-    .. index::
-       single: -Wwarn
+.. ghc-flag:: -Wwarn
 
     Warnings are treated only as warnings, not as errors. This is the
-    default, but can be useful to negate a ``-Werror`` flag.
+    default, but can be useful to negate a :ghc-flag:`-Werror` flag.
 
 The full set of warning options is described below. To turn off any
 warning, simply give the corresponding ``-Wno-...`` option on the
@@ -89,10 +88,7 @@ command line. For backwards compatibility with GHC versions prior to 8.0,
 all these warnings can still be controlled with ``-f(no-)warn-*`` instead
 of ``-W(no-)*``.
 
-``-Wtyped-holes``
-    .. index::
-       single: -Wtyped-holes
-       single: warnings
+.. ghc-flag:: -Wtyped-holes
 
     Determines whether the compiler reports typed holes warnings. Has no
     effect unless typed holes errors are deferred until runtime. See
@@ -100,20 +96,14 @@ of ``-W(no-)*``.
 
     This warning is on by default.
 
-``-Wtype-errors``
-    .. index::
-       single: -Wtype-errors
-       single: warnings
+.. ghc-flag:: -Wtype-errors
 
     Causes a warning to be reported when a type error is deferred until
     runtime. See :ref:`defer-type-errors`
 
     This warning is on by default.
 
-``-fdefer-type-errors``
-    .. index::
-       single: -fdefer-type-errors
-       single: warnings
+.. ghc-flag:: -fdefer-type-errors
 
     Defer as many type errors as possible until runtime. At compile time
     you get a warning (instead of an error). At runtime, if you use a
@@ -121,47 +111,34 @@ of ``-W(no-)*``.
     can run any type-correct parts of your code just fine. See
     :ref:`defer-type-errors`
 
-``-fdefer-typed-holes``
-    .. index::
-       single: -fdefer-typed-holes
-       single: warnings
+.. ghc-flag:: -fdefer-typed-holes
 
     Defer typed holes errors until runtime. This will turn the errors
     produced by :ref:`typed holes <typed-holes>` into warnings. Using a value
     that depends on a typed hole produces a runtime error, the same as
-    ``-fdefer-type-errors`` (which implies this option). See :ref:`typed-holes`
+    :ghc-flag:`-fdefer-type-errors` (which implies this option). See :ref:`typed-holes`
     and :ref:`defer-type-errors`.
 
-    Implied by ``-fdefer-type-errors``. See also ``-Wtyped-holes``.
+    Implied by :ghc-flag:`-fdefer-type-errors`. See also :ghc-flag:`-Wtyped-holes`.
 
-``-Wpartial-type-signatures``
-    .. index::
-       single: -Wpartial-type-signatures
-       single: warnings
+.. ghc-flag:: -Wpartial-type-signatures
 
     Determines whether the compiler reports holes in partial type
     signatures as warnings. Has no effect unless
-    ``-XPartialTypeSignatures`` is enabled, which controls whether
+    :ghc-flag:`-XPartialTypeSignatures` is enabled, which controls whether
     errors should be generated for holes in types or not. See
     :ref:`partial-type-signatures`.
 
     This warning is on by default.
 
-``-fhelpful-errors``
-    .. index::
-       single: -fhelpful-errors
-       single: warnings
+.. ghc-flag:: -fhelpful-errors
 
     When a name or package is not found in scope, make suggestions for
     the name or package you might have meant instead.
 
     This option is on by default.
 
-``-Wunrecognised-pragmas``
-    .. index::
-       single: -Wunrecognised-pragmas
-       single: warnings
-       single: pragmas
+.. ghc-flag:: -Wunrecognised-pragmas
 
     Causes a warning to be emitted when a pragma that GHC doesn't
     recognise is used. As well as pragmas that GHC itself uses, GHC also
@@ -170,12 +147,8 @@ of ``-W(no-)*``.
 
     This option is on by default.
 
-``-Wmissed-specialisations``, ``-Wall-missed-specialisations``
-    .. index::
-       single: -Wmissed-specialisations
-       single: -Wall-missed-specialisations
-       single: warnings
-       single: pragmas
+.. ghc-flag:: -Wmissed-specialisations
+              -Wall-missed-specialisations
 
     Emits a warning if GHC cannot specialise an overloaded function, usually
     because the function needs an ``INLINEABLE`` pragma. The "all" form reports
@@ -188,11 +161,10 @@ of ``-W(no-)*``.
 
     These options are both off by default.
 
-``-Wwarnings-deprecations``
+.. ghc-flag:: -Wwarnings-deprecations
+
     .. index::
-       single: -Wwarnings-deprecations
-       single: warnings
-       single: deprecations
+       pair: deprecations; warnings
 
     Causes a warning to be emitted when a module, function or type with
     a ``WARNING`` or ``DEPRECATED pragma`` is used. See
@@ -200,9 +172,9 @@ of ``-W(no-)*``.
 
     This option is on by default.
 
-``-Wamp``
+.. ghc-flag:: -Wamp
+
     .. index::
-       single: -Wamp
        single: AMP
        single: Applicative-Monad Proposal
 
@@ -211,9 +183,7 @@ of ``-W(no-)*``.
     Caused a warning to be emitted when a definition was in conflict with
     the AMP (Applicative-Monad proosal).
 
-``-Wnoncanonical-monad-instances``
-    .. index::
-       single: -Wnoncanonical-monad-instances
+.. ghc-flag:: -Wnoncanonical-monad-instances
 
     Warn if noncanonical ``Applicative`` or ``Monad`` instances
     declarations are detected.
@@ -233,9 +203,7 @@ of ``-W(no-)*``.
 
     This option is off by default.
 
-``-Wnoncanonical-monoid-instances``
-    .. index::
-       single: -Wnoncanonical-monoid-instances
+.. ghc-flag:: -Wnoncanonical-monoid-instances
 
     Warn if noncanonical ``Semigroup`` or ``Monoid`` instances
     declarations are detected.
@@ -253,70 +221,62 @@ of ``-W(no-)*``.
      * Warn if ``(<>)`` is defined backwards (i.e. ``(<>) = mappend``).
 
     This warning is off by default. However, it is part of the
-    ``-Wcompat`` option group.
+    :ghc-flag:`-Wcompat` option group.
 
-``-Wmissing-monadfail-instance``
+.. ghc-flag:: -Wmissing-monadfail-instance
+
     .. index::
-       single: -Wmissing-monadfail-instance
        single: MFP
        single: MonadFail Proposal
 
     Warn when a failable pattern is used in a do-block that does not have a
     ``MonadFail`` instance.
 
-    Being part of the ``-Wcompat`` option group, this warning is off by
+    Being part of the :ghc-flag:`-Wcompat` option group, this warning is off by
     default, but will be switched on in a future GHC release, as part of
     the `MonadFail Proposal (MFP)
     <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
 
-``-Wsemigroup``
+.. ghc-flag:: -Wsemigroup
+
     .. index::
-       single: -Wsemigroup
-       single: semigroup
+       single: semigroup; warning
 
     Warn when definitions are in conflict with the future inclusion of
     ``Semigroup`` into the standard typeclasses.
 
-        1. Instances of ``Monoid`` should also be instances of ``Semigroup``
-        2. The ``Semigroup`` operator ``(<>)`` will be in ``Prelude``, which
-           clashes with custom local definitions of such an operator
+     1. Instances of ``Monoid`` should also be instances of ``Semigroup``
+     2. The ``Semigroup`` operator ``(<>)`` will be in ``Prelude``, which
+        clashes with custom local definitions of such an operator
 
-    Being part of the ``-Wcompat`` option group, this warning is off by
+    Being part of the :ghc-flag:`-Wcompat` option group, this warning is off by
     default, but will be switched on in a future GHC release.
 
-``-Wdeprecated-flags``
+.. ghc-flag:: -Wdeprecated-flags
+
     .. index::
-       single: -Wdeprecated-flags
-       single: deprecated-flags
+       single: deprecated flags
 
     Causes a warning to be emitted when a deprecated command-line flag
     is used.
 
     This option is on by default.
 
-``-Wunsupported-calling-conventions``
-    .. index::
-       single: -Wunsupported-calling-conventions
+.. ghc-flag:: -Wunsupported-calling-conventions
 
     Causes a warning to be emitted for foreign declarations that use
     unsupported calling conventions. In particular, if the ``stdcall``
     calling convention is used on an architecture other than i386 then
     it will be treated as ``ccall``.
 
-``-Wdodgy-foreign-imports``
-    .. index::
-       single: -Wdodgy-foreign-imports
+.. ghc-flag:: -Wdodgy-foreign-imports
 
     Causes a warning to be emitted for foreign imports of the following
-    form:
-
-    ::
+    form: ::
 
         foreign import "f" f :: FunPtr t
 
-    on the grounds that it probably should be
-
-    ::
+    on the grounds that it probably should be ::
 
         foreign import "&f" f :: FunPtr t
 
@@ -327,9 +287,7 @@ of ``-W(no-)*``.
     that is hard to debug because it results in a crash, hence this
     warning.
 
-``-Wdodgy-exports``
-    .. index::
-       single: -Wdodgy-exports
+.. ghc-flag:: -Wdodgy-exports
 
     Causes a warning to be emitted when a datatype ``T`` is exported
     with all constructors, i.e. ``T(..)``, but is it just a type
@@ -338,9 +296,7 @@ of ``-W(no-)*``.
     Also causes a warning to be emitted when a module is re-exported,
     but that module exports nothing.
 
-``-Wdodgy-imports``
-    .. index::
-       single: -Wdodgy-imports
+.. ghc-flag:: -Wdodgy-imports
 
     Causes a warning to be emitted in the following cases:
 
@@ -350,54 +306,44 @@ of ``-W(no-)*``.
     -  When an ``import`` statement hides an entity that is not
        exported.
 
-``-Woverflowed-literals``
-    .. index::
-       single: -Woverflowed-literals
+.. ghc-flag:: -Woverflowed-literals
 
     Causes a warning to be emitted if a literal will overflow, e.g.
     ``300 :: Word8``.
 
-``-Wempty-enumerations``
-    .. index::
-       single: -Wempty-enumerations
+.. ghc-flag:: -Wempty-enumerations
 
     Causes a warning to be emitted if an enumeration is empty, e.g.
     ``[5 .. 3]``.
 
-``-Wlazy-unlifted-bindings``
-    .. index::
-       single: -Wlazy-unlifted-bindings
+.. ghc-flag:: -Wlazy-unlifted-bindings
 
     This flag is a no-op, and will be removed in GHC 7.10.
 
-``-Wduplicate-constraints``
+.. ghc-flag:: -Wduplicate-constraints
+
     .. index::
-       single: -Wduplicate-constraints
        single: duplicate constraints, warning
 
     Have the compiler warn about duplicate constraints in a type
-    signature. For example
-
-    ::
+    signature. For example ::
 
         f :: (Eq a, Show a, Eq a) => a -> a
 
     The warning will indicate the duplicated ``Eq a`` constraint.
 
     This option is now deprecated in favour of
-    ``-Wredundant-constraints``.
+    :ghc-flag:`-Wredundant-constraints`.
 
-``-Wredundant-constraints``
+.. ghc-flag:: -Wredundant-constraints
+
     .. index::
-       single: -Wredundant-constraints
        single: redundant constraints, warning
 
     Have the compiler warn about redundant constraints in a type
     signature. In particular:
 
-    -  A redundant constraint within the type signature itself:
-
-       ::
+    -  A redundant constraint within the type signature itself: ::
 
             f :: (Eq a, Ord a) => a -> a
 
@@ -405,9 +351,7 @@ of ``-W(no-)*``.
        is subsumed by the ``Ord a`` constraint.
 
     -  A constraint in the type signature is not used in the code it
-       covers:
-
-       ::
+       covers: ::
 
             f :: Eq a => a -> a -> Bool
             f x y = True
@@ -419,14 +363,12 @@ of ``-W(no-)*``.
     declaration.
 
     This option is on by default. As usual you can suppress it on a
-    per-module basis with ``-Wno-redundant-constraints``.
+    per-module basis with :ghc-flag:`-Wno-redundant-constraints`.
     Occasionally you may specifically want a function to have a more
     constrained signature than necessary, perhaps to leave yourself
     wiggle-room for changing the implementation without changing the
     API. In that case, you can suppress the warning on a per-function
-    basis, using a call in a dead binding. For example:
-
-    ::
+    basis, using a call in a dead binding. For example: ::
 
         f :: Eq a => a -> a -> Bool
         f x y = True
@@ -436,9 +378,9 @@ of ``-W(no-)*``.
     Here the call to ``(==)`` makes GHC think that the ``(Eq a)``
     constraint is needed, so no warning is issued.
 
-``-Wduplicate-exports``
+.. ghc-flag:: -Wduplicate-exports
+
     .. index::
-       single: -Wduplicate-exports
        single: duplicate exports, warning
        single: export lists, duplicates
 
@@ -449,37 +391,35 @@ of ``-W(no-)*``.
 
     This option is on by default.
 
-``-Whi-shadowing``
+.. ghc-flag:: -Whi-shadowing
+
     .. index::
-       single: -Whi-shadowing
        single: shadowing; interface files
 
     Causes the compiler to emit a warning when a module or interface
     file in the current directory is shadowing one with the same module
     name in a library or other directory.
 
-``-Widentities``
-    .. index::
-       single: -Widentities
+.. ghc-flag:: -Widentities
 
     Causes the compiler to emit a warning when a Prelude numeric
-    conversion converts a type T to the same type T; such calls are
+    conversion converts a type ``T`` to the same type ``T``; such calls are
     probably no-ops and can be omitted. The functions checked for are:
     ``toInteger``, ``toRational``, ``fromIntegral``, and ``realToFrac``.
 
-``-Wimplicit-prelude``
+.. ghc-flag:: -Wimplicit-prelude
+
     .. index::
-       single: -Wimplicit-prelude
        single: implicit prelude, warning
 
     Have the compiler warn if the Prelude is implicitly imported. This
     happens unless either the Prelude module is explicitly imported with
     an ``import ... Prelude ...`` line, or this implicit import is
-    disabled (either by ``-XNoImplicitPrelude`` or a
+    disabled (either by :ghc-flag:`-XNoImplicitPrelude` or a
     ``LANGUAGE NoImplicitPrelude`` pragma).
 
     Note that no warning is given for syntax that implicitly refers to
-    the Prelude, even if ``-XNoImplicitPrelude`` would change whether it
+    the Prelude, even if :ghc-flag:`-XNoImplicitPrelude` would change whether it
     refers to the Prelude. For example, no warning is given when ``368``
     means ``Prelude.fromInteger (368::Prelude.Integer)`` (where
     ``Prelude`` refers to the actual Prelude module, regardless of the
@@ -487,47 +427,41 @@ of ``-W(no-)*``.
 
     This warning is off by default.
 
-``-Wincomplete-patterns``, ``-Wincomplete-uni-patterns``
+.. ghc-flag:: -Wincomplete-patterns
+              -Wincomplete-uni-patterns
+
     .. index::
-       single: -Wincomplete-patterns
-       single: -Wincomplete-uni-patterns
        single: incomplete patterns, warning
        single: patterns, incomplete
 
-    The option ``-Wincomplete-patterns`` warns about places where a
+    The option :ghc-flag:`-Wincomplete-patterns` warns about places where a
     pattern-match might fail at runtime. The function ``g`` below will
     fail when applied to non-empty lists, so the compiler will emit a
-    warning about this when ``-Wincomplete-patterns`` is enabled.
-
-    ::
+    warning about this when :ghc-flag:`-Wincomplete-patterns` is enabled. ::
 
         g [] = 2
 
     This option isn't enabled by default because it can be a bit noisy,
     and it doesn't always indicate a bug in the program. However, it's
     generally considered good practice to cover all the cases in your
-    functions, and it is switched on by ``-W``.
+    functions, and it is switched on by :ghc-flag:`-W`.
 
-    The flag ``-Wincomplete-uni-patterns`` is similar, except that
+    The flag :ghc-flag:`-Wincomplete-uni-patterns` is similar, except that
     it applies only to lambda-expressions and pattern bindings,
-    constructs that only allow a single pattern:
-
-    ::
+    constructs that only allow a single pattern: ::
 
         h = \[] -> 2
         Just k = f y
 
-``-Wincomplete-record-updates``
+.. ghc-flag:: -Wincomplete-record-updates
+
     .. index::
-       single: -Wincomplete-record-updates
        single: incomplete record updates, warning
        single: record updates, incomplete
 
     The function ``f`` below will fail when applied to ``Bar``, so the
     compiler will emit a warning about this when
-    ``-Wincomplete-record-updates`` is enabled.
-
-    ::
+    :ghc-flag:`-Wincomplete-record-updates` is enabled. ::
 
         data Foo = Foo { x :: Int }
                  | Bar
@@ -538,40 +472,41 @@ of ``-W(no-)*``.
     This option isn't enabled by default because it can be very noisy,
     and it often doesn't indicate a bug in the program.
 
-``-Wtoo-many-guards``
+.. ghc-flag:: -Wtoo-many-guards
+              -Wno-too-many-guards
+
     .. index::
-       single: -Wtoo-many-guards
        single: too many guards, warning
 
-    The option ``-Wtoo-many-guards`` warns about places where a
+    The option :ghc-flag:`-Wtoo-many-guards` warns about places where a
     pattern match contains too many guards (over 20 at the moment).
     It has an effect only if any form of exhaustivness/overlapping
     checking is enabled (one of
-    ``-Wincomplete-patterns``,
-    ``-Wincomplete-uni-patterns``,
-    ``-Wincomplete-record-updates``,
-    ``-Woverlapping-patterns``). When enabled, the warning can be
-    suppressed by enabling either ``-Wno-too-many-guards``, which just
-    hides the warning, or ``-ffull-guard-reasoning`` which runs the
+    :ghc-flag:`-Wincomplete-patterns`,
+    :ghc-flag:`-Wincomplete-uni-patterns`,
+    :ghc-flag:`-Wincomplete-record-updates`,
+    :ghc-flag:`-Woverlapping-patterns`). When enabled, the warning can be
+    suppressed by enabling either :ghc-flag:`-Wno-too-many-guards`, which just
+    hides the warning, or :ghc-flag:`-ffull-guard-reasoning` which runs the
     full check, independently of the number of guards.
 
-``-ffull-guard-reasoning``
+.. ghc-flag:: -ffull-guard-reasoning
+
     .. index::
-       single: -ffull-guard-reasoning
        single: guard reasoning, warning
 
-    The option ``-ffull-guard-reasoning`` forces pattern match checking
+    The option :ghc-flag:`-ffull-guard-reasoning` forces pattern match checking
     to run in full. This gives more precise warnings concerning pattern
     guards but in most cases increases memory consumption and
     compilation time. Hence, it is off by default. Enabling
-    ``-ffull-guard-reasoning`` also implies ``-Wno-too-many-guards``.
-    Note that (like ``-Wtoo-many-guards``) ``-ffull-guard-reasoning``
+    :ghc-flag:`-ffull-guard-reasoning` also implies :ghc-flag:`-Wno-too-many-guards`.
+    Note that (like :ghc-flag:`-Wtoo-many-guards`) :ghc-flag:`-ffull-guard-reasoning`
     makes a difference only if pattern match checking is already
     enabled.
 
-``-Wmissing-fields``
+.. ghc-flag:: -Wmissing-fields
+
     .. index::
-       single: -Wmissing-fields
        single: missing fields, warning
        single: fields, missing
 
@@ -581,17 +516,15 @@ of ``-W(no-)*``.
     fields are initialised with bottoms), it is often an indication of a
     programmer error.
 
-``-Wmissing-import-lists``
+.. ghc-flag:: -Wmissing-import-lists
+
     .. index::
-       single: -Wimport-lists
        single: missing import lists, warning
        single: import lists, missing
 
     This flag warns if you use an unqualified ``import`` declaration
     that does not explicitly list the entities brought into scope. For
-    example
-
-    ::
+    example ::
 
         module M where
           import X( f )
@@ -599,15 +532,15 @@ of ``-W(no-)*``.
           import qualified Z
           p x = f x x
 
-    The ``-Wimport-lists`` flag will warn about the import of ``Y``
-    but not ``X`` If module ``Y`` is later changed to export (say)
-    ``f``, then the reference to ``f`` in ``M`` will become ambiguous.
-    No warning is produced for the import of ``Z`` because extending
-    ``Z``\'s exports would be unlikely to produce ambiguity in ``M``.
+    The :ghc-flag:`-Wmissing-import-lists` flag will warn about the import of
+    ``Y`` but not ``X`` If module ``Y`` is later changed to export (say) ``f``,
+    then the reference to ``f`` in ``M`` will become ambiguous. No warning is
+    produced for the import of ``Z`` because extending ``Z``\'s exports would be
+    unlikely to produce ambiguity in ``M``.
 
-``-Wmissing-methods``
+.. ghc-flag:: -Wmissing-methods
+
     .. index::
-       single: -Wmissing-methods
        single: missing methods, warning
        single: methods, missing
 
@@ -616,9 +549,7 @@ of ``-W(no-)*``.
     class declaration has no default declaration for them.
 
     The warning is suppressed if the method name begins with an
-    underscore. Here's an example where this is useful:
-
-    ::
+    underscore. Here's an example where this is useful: ::
 
         class C a where
             _simpleFn :: a -> String
@@ -633,51 +564,51 @@ of ``-W(no-)*``.
     methods will be required for instances of a particular class. See
     :ref:`minimal-pragma`.
 
-``-Wmissing-signatures``
+.. ghc-flag:: -Wmissing-signatures
+
     .. index::
-       single: -Wmissing-signatures
        single: type signatures, missing
 
     If you would like GHC to check that every top-level function/value
-    has a type signature, use the ``-Wmissing-signatures`` option.
+    has a type signature, use the :ghc-flag:`-Wmissing-signatures` option.
     As part of the warning GHC also reports the inferred type. The
     option is off by default.
 
-``-Wmissing-exported-sigs``
+.. ghc-flag:: -Wmissing-exported-sigs
+
     .. index::
-       single: -Wmissing-exported-sigs
        single: type signatures, missing
 
     If you would like GHC to check that every exported top-level
     function/value has a type signature, but not check unexported
-    values, use the ``-Wmissing-exported-sigs`` option. This option
-    takes precedence over ``-Wmissing-signatures``. As part of the
+    values, use the :ghc-flag:`-Wmissing-exported-sigs` option. This option
+    takes precedence over :ghc-flag:`-Wmissing-signatures`. As part of the
     warning GHC also reports the inferred type. The option is off by
     default.
 
-``-Wmissing-local-sigs``
+.. ghc-flag:: -Wmissing-local-sigs
+
     .. index::
-       single: -Wmissing-local-sigs
        single: type signatures, missing
 
-    If you use the ``-Wmissing-local-sigs`` flag GHC will warn you
+    If you use the :ghc-flag:`-Wmissing-local-sigs` flag GHC will warn you
     about any polymorphic local bindings. As part of the warning GHC
     also reports the inferred type. The option is off by default.
 
-``-Wmissing-pat-syn-sigs``
-  .. index ::
-       single: -Wmissing-pat-syn-sigs
-       single: type signatures, missing, pattern synonyms
+.. ghc-flag:: -Wmissing-pat-syn-sigs
 
-  If you would like GHC to check that every pattern synonym has a type
-  signature, use the ``-Wmissing-pat-syn-sigs`` option. If this option is
-  used in conjunction with ``-Wmissing-exported-sigs`` then only
-  exported pattern synonyms must have a type signature. GHC also reports the
-  inferred type. This option is off by default.
-
-``-Wname-shadowing``
     .. index::
-       single: -Wname-shadowing
+         single: type signatures, missing, pattern synonyms
+
+    If you would like GHC to check that every pattern synonym has a type
+    signature, use the :ghc-flag:`-Wmissing-pat-syn-sigs` option. If this option is
+    used in conjunction with :ghc-flag:`-Wmissing-exported-sigs` then only
+    exported pattern synonyms must have a type signature. GHC also reports the
+    inferred type. This option is off by default.
+
+.. ghc-flag:: -Wname-shadowing
+
+    .. index::
        single: shadowing, warning
 
     This option causes a warning to be emitted whenever an inner-scope
@@ -688,15 +619,13 @@ of ``-W(no-)*``.
     ``f = ... let f = id in ... f ...``.
 
     The warning is suppressed for names beginning with an underscore.
-    For example
-
-    ::
+    For example ::
 
         f x = do { _ignore <- this; _ignore <- that; return (the other) }
 
-``-Worphans``
+.. ghc-flag:: -Worphans
+
     .. index::
-       single: -Worphans
        single: orphan instances, warning
        single: orphan rules, warning
 
@@ -713,19 +642,17 @@ of ``-W(no-)*``.
     or rules play a role, whether or not the module's interface would
     otherwise be of any use. See :ref:`orphan-modules` for details.
 
-    The flag ``-Worphans`` warns about user-written orphan rules or
+    The flag :ghc-flag:`-Worphans` warns about user-written orphan rules or
     instances.
 
-``-Woverlapping-patterns``
+.. ghc-flag:: -Woverlapping-patterns
+
     .. index::
-       single: -Woverlapping-patterns
        single: overlapping patterns, warning
        single: patterns, overlapping
 
     By default, the compiler will warn you if a set of patterns are
-    overlapping, e.g.,
-
-    ::
+    overlapping, e.g., ::
 
         f :: String -> Int
         f []     = 0
@@ -736,16 +663,16 @@ of ``-W(no-)*``.
     second pattern overlaps it. More often than not, redundant patterns
     is a programmer mistake/error, so this option is enabled by default.
 
-``-Wtabs``
+.. ghc-flag:: -Wtabs
+
     .. index::
-       single: -Wtabs
        single: tabs, warning
 
     Have the compiler warn if there are tabs in your source file.
 
-``-Wtype-defaults``
+.. ghc-flag:: -Wtype-defaults
+
     .. index::
-       single: -Wtype-defaults
        single: defaulting mechanism, warning
 
     Have the compiler warn/inform you where in your source the Haskell
@@ -759,9 +686,9 @@ of ``-W(no-)*``.
 
     This warning is off by default.
 
-``-Wmonomorphism-restriction``
+.. ghc-flag:: -Wmonomorphism-restriction
+
     .. index::
-       single: -Wmonomorphism-restriction
        single: monomorphism restriction, warning
 
     Have the compiler warn/inform you where in your source the Haskell
@@ -771,17 +698,19 @@ of ``-W(no-)*``.
 
     This warning is off by default.
 
-``-Wunticked-promoted-constructors``
+.. ghc-flag:: -Wunsupported-llvm-version
+
+    Warn when using :ghc-flag:`-fllvm` with an unsupported version of LLVM.
+
+.. ghc-flag:: -Wunticked-promoted-constructors
+
     .. index::
-       single: -Wunticked-promoted-constructors
        single: promoted constructor, warning
 
     Warn if a promoted data constructor is used without a tick preceding
     its name.
 
-    For example:
-
-    ::
+    For example: ::
 
         data Nat = Succ Nat | Zero
 
@@ -792,24 +721,24 @@ of ``-W(no-)*``.
     Will raise two warnings because ``Zero`` and ``Succ`` are not
     written as ``'Zero`` and ``'Succ``.
 
-    This warning is is enabled by default in ``-Wall`` mode.
+    This warning is is enabled by default in :ghc-flag:`-Wall` mode.
 
-``-Wunused-binds``
+.. ghc-flag:: -Wunused-binds
+
     .. index::
-       single: -Wunused-binds
        single: unused binds, warning
        single: binds, unused
 
     Report any function definitions (and local bindings) which are
     unused. An alias for
 
-    -  ``-Wunused-top-binds``
-    -  ``-Wunused-local-binds``
-    -  ``-Wunused-pattern-binds``
+    -  :ghc-flag:`-Wunused-top-binds`
+    -  :ghc-flag:`-Wunused-local-binds`
+    -  :ghc-flag:`-Wunused-pattern-binds`
 
-``-Wunused-top-binds``
+.. ghc-flag:: -Wunused-top-binds
+
     .. index::
-       single: -Wunused-top-binds
        single: unused binds, warning
        single: binds, unused
 
@@ -827,9 +756,7 @@ of ``-W(no-)*``.
     -  It appears in the right hand side of a binding that binds at
        least one used variable that is used
 
-    For example
-
-    ::
+    For example: ::
 
         module A (f) where
         f = let (p,q) = rhs1 in t p  -- No warning: q is unused, but is locally bound
@@ -839,30 +766,26 @@ of ``-W(no-)*``.
                                      -- right-hand side of another unused binding
         _w = True                    -- No warning: _w starts with an underscore
 
-``-Wunused-local-binds``
+.. ghc-flag:: -Wunused-local-binds
+
     .. index::
-       single: -Wunused-local-binds
        single: unused binds, warning
        single: binds, unused
 
-    Report any local definitions which are unused. For example
-
-    ::
+    Report any local definitions which are unused. For example: ::
 
         module A (f) where
         f = let (p,q) = rhs1 in t p  -- Warning: q is unused
         g = h x                      -- No warning: g is unused, but is a top-level binding
 
-``-Wunused-pattern-binds``
+.. ghc-flag:: -Wunused-pattern-binds
+
     .. index::
-       single: -Wunused-pattern-binds
        single: unused binds, warning
        single: binds, unused
 
     Warn if a pattern binding binds no variables at all, unless it is a
-    lone, possibly-banged, wild-card pattern. For example:
-
-    ::
+    lone, possibly-banged, wild-card pattern. For example: ::
 
         Just _ = rhs3    -- Warning: unused pattern binding
         (_, _) = rhs4    -- Warning: unused pattern binding
@@ -875,9 +798,9 @@ of ``-W(no-)*``.
     lone banged wild-card pattern is useful as an alternative (to
     ``seq``) way to force evaluation.
 
-``-Wunused-imports``
+.. ghc-flag:: -Wunused-imports
+
     .. index::
-       single: -Wunused-imports
        single: unused imports, warning
        single: imports, unused
 
@@ -886,9 +809,9 @@ of ``-W(no-)*``.
     import, because it is a useful idiom for importing instance
     declarations, which are anonymous in Haskell.
 
-``-Wunused-matches``
+.. ghc-flag:: -Wunused-matches
+
     .. index::
-       single: -Wunused-matches
        single: unused matches, warning
        single: matches, unused
 
@@ -896,15 +819,13 @@ of ``-W(no-)*``.
     including patterns consisting of a single variable. This includes
     unused type variables in type family instances. For instance
     ``f x y = []`` would report ``x`` and ``y`` as unused. The warning
-    is suppressed if the variable name begins with an underscore, thus:
-
-    ::
+    is suppressed if the variable name begins with an underscore, thus: ::
 
         f _x = True
 
-``-Wunused-do-bind``
+.. ghc-flag:: -Wunused-do-bind
+
     .. index::
-       single: -Wunused-do-bind
        single: unused do binding, warning
        single: do binding, unused
 
@@ -915,21 +836,17 @@ of ``-W(no-)*``.
     ``StackM [Int]`` and not ``StackM ()``, but that ``[Int]`` value is
     not bound to anything. The warning is suppressed by explicitly
     mentioning in the source code that your program is throwing
-    something away:
-
-    ::
+    something away: ::
 
         do { _ <- mapM popInt xs ; return 10 }
 
-    Of course, in this particular situation you can do even better:
-
-    ::
+    Of course, in this particular situation you can do even better: ::
 
         do { mapM_ popInt xs ; return 10 }
 
-``-Wwrong-do-bind``
+.. ghc-flag:: -Wwrong-do-bind
+
     .. index::
-       single: -Wwrong-do-bind
        single: apparently erroneous do binding, warning
        single: do binding, apparently erroneous
 
@@ -941,28 +858,22 @@ of ``-W(no-)*``.
     of the same monad constructor), but which is not then "unpacked" by
     binding the result. The warning is suppressed by explicitly
     mentioning in the source code that your program is throwing
-    something away:
-
-    ::
+    something away: ::
 
         do { _ <- return (popInt 10) ; return 10 }
 
     For almost all sensible programs this will indicate a bug, and you
-    probably intended to write:
-
-    ::
+    probably intended to write: ::
 
         do { popInt 10 ; return 10 }
 
-``-Winline-rule-shadowing``
-    .. index::
-       single: -Winline-rule-shadowing
+.. ghc-flag:: -Winline-rule-shadowing
 
     Warn if a rewrite RULE might fail to fire because the function might
     be inlined before the rule has a chance to fire. See
     :ref:`rules-inline`.
 
-If you're feeling really paranoid, the ``-dcore-lint`` option is a good choice.
+If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
 sanity, not yours.)
 

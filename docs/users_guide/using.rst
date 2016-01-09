@@ -18,25 +18,29 @@ quick introduction to the basic usage of GHC for compiling a Haskell
 program, before the following sections dive into the full syntax.
 
 Let's create a Hello World program, and compile and run it. First,
-create a file ``hello.hs`` containing the Haskell code: ::
+create a file :file:`hello.hs` containing the Haskell code: ::
 
     main = putStrLn "Hello, World!"
 
-To compile the program, use GHC like this: ::
+To compile the program, use GHC like this:
+
+.. code-block:: sh
 
     $ ghc hello.hs
 
 (where ``$`` represents the prompt: don't type it). GHC will compile the
-source file ``hello.hs``, producing an object file ``hello.o`` and an
-interface file ``hello.hi``, and then it will link the object file to
+source file :file:`hello.hs`, producing an object file :file:`hello.o` and an
+interface file :file:`hello.hi`, and then it will link the object file to
 the libraries that come with GHC to produce an executable called
-``hello`` on Unix/Linux/Mac, or ``hello.exe`` on Windows.
+:file:`hello` on Unix/Linux/Mac, or :file:`hello.exe` on Windows.
 
 By default GHC will be very quiet about what it is doing, only printing
 error messages. If you want to see in more detail what's going on behind
-the scenes, add ``-v`` to the command line.
+the scenes, add :ghc-flag:`-v` to the command line.
 
-Then we can run the program like this: ::
+Then we can run the program like this:
+
+.. code-block:: sh
 
     $ ./hello
     Hello World!
@@ -66,7 +70,9 @@ Command-line arguments
    single: command-line; arguments
    single: arguments; command-line
 
-An invocation of GHC takes the following form: ::
+An invocation of GHC takes the following form:
+
+.. code-block:: none
 
     ghc [argument...]
 
@@ -116,14 +122,14 @@ if you try to glob etc. inside ``OPTIONS_GHC``.
 
 It is not recommended to move all the contents of your Makefiles into
 your source files, but in some circumstances, the ``OPTIONS_GHC`` pragma
-is the Right Thing. (If you use ``-keep-hc-file`` and have ``OPTION`` flags in
+is the Right Thing. (If you use :ghc-flag:`-keep-hc-file` and have ``OPTION`` flags in
 your module, the ``OPTIONS_GHC`` will get put into the generated ``.hc`` file).
 
 Setting options in GHCi
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Options may also be modified from within GHCi, using the ``:set``
-command. See :ref:`ghci-set` for more details.
+Options may also be modified from within GHCi, using the :ghci-cmd:`:set`
+command.
 
 .. _static-dynamic-flags:
 
@@ -138,13 +144,13 @@ Static, Dynamic, and Mode options
 Each of GHC's command line options is classified as static, dynamic or
 mode:
 
-    For example, ``--make`` or ``-E``. There may only be a single mode
+    For example, :ghc-flag:`--make` or :ghc-flag:`-E`. There may only be a single mode
     flag on the command line. The available modes are listed in
     :ref:`modes`.
 
     Most non-mode flags fall into this category. A dynamic flag may be
     used on the command line, in a ``OPTIONS_GHC`` pragma in a source
-    file, or set using ``:set`` in GHCi.
+    file, or set using :ghci-cmd:`:set` in GHCi.
 
     A few flags are "static", which means they can only be used on the
     command-line, and remain in force over the entire GHC/GHCi run.
@@ -153,7 +159,7 @@ The flag reference tables (:ref:`flag-reference`) lists the status of
 each flag.
 
 There are a few flags that are static except that they can also be used
-with GHCi's ``:set`` command; these are listed as “static/\ ``:set``\ ”
+with GHCi's :ghci-cmd:`:set` command; these are listed as “static/\ ``:set``\ ”
 in the table.
 
 .. _file-suffixes:
@@ -216,39 +222,45 @@ Modes of operation
 
 GHC's behaviour is firstly controlled by a mode flag. Only one of these
 flags may be given, but it does not necessarily need to be the first
-option on the command-line.
+option on the command-line. For instance,
 
-If no mode flag is present, then GHC will enter make mode
+.. code-block:: none
+
+    $ ghc Main.hs --make -o my-application
+
+If no mode flag is present, then GHC will enter :ghc-flag:`--make` mode
 (:ref:`make-mode`) if there are any Haskell source files given on the
 command line, or else it will link the objects named on the command line
 to produce an executable.
 
 The available mode flags are:
 
-``ghc --interactive``
+.. ghc-flag:: --interactive
+
     .. index::
        single: interactive mode
        single: GHCi
 
-    Interactive mode, which is also available as ``ghci``. Interactive
+    Interactive mode, which is also available as :program:`ghci`. Interactive
     mode is described in more detail in :ref:`ghci`.
 
-``ghc --make``
+.. ghc-flag:: --make
+
     .. index::
        single: make mode; of GHC
-       single: --make
 
     In this mode, GHC will build a multi-module Haskell program
     automatically, figuring out dependencies for itself. If you have a
     straightforward Haskell program, this is likely to be much easier,
-    and faster, than using ``make``. Make mode is described in
+    and faster, than using :command:`make`. Make mode is described in
     :ref:`make-mode`.
 
     This mode is the default if there are any Haskell source files
-    mentioned on the command line, and in this case the ``--make``
+    mentioned on the command line, and in this case the :ghc-flag:`--make`
     option can be omitted.
 
-``ghc -e`` ⟨expr⟩
+.. ghc-flag:: -e ⟨expr⟩
+
     .. index::
        single: eval mode; of GHC
 
@@ -257,18 +269,17 @@ The available mode flags are:
     which is given on the command line. See :ref:`eval-mode` for more
     details.
 
-``ghc -E`` ``ghc -C`` ``ghc -S`` ``ghc -c``
-    .. index::
-       single: -E; GHC option
-       single: -C; GHC option
-       single: -S; GHC option
-       single: -c; GHC option
+.. ghc-flag:: -E
+              -C
+              -S
+              -c
 
     This is the traditional batch-compiler mode, in which GHC can
     compile source files one at a time, or link objects together into an
     executable. See :ref:`options-order`.
 
-``ghc -M``
+.. ghc-flag:: -M
+
     .. index::
        single: dependency-generation mode; of GHC
 
@@ -276,62 +287,50 @@ The available mode flags are:
     generate dependency information suitable for use in a ``Makefile``.
     See :ref:`makefile-dependencies`.
 
-``ghc --mk-dll``
+.. ghc-flag:: --mk-dll
+
     .. index::
        single: DLL-creation mode
 
     DLL-creation mode (Windows only). See :ref:`win32-dlls-create`.
 
-``ghc --help``, ``ghc -?``
-    .. index::
-       single: --help; GHC option
+.. ghc-flag:: --help
+              -?
 
     Cause GHC to spew a long usage message to standard output and then
     exit.
 
-``ghc --show-iface ⟨file⟩``
-    .. index::
-       single: --show-iface; GHC option
+.. ghc-flag:: --show-iface ⟨file⟩
 
     Read the interface in ⟨file⟩ and dump it as text to ``stdout``. For
     example ``ghc --show-iface M.hi``.
 
-``ghc --supported-extensions``, ``ghc --supported-languages``
-    .. index::
-       single: --supported-extensions; GHC option
-       single: --supported-languages; GHC option
+.. ghc-flag:: --supported-extensions
+              --supported-languages
 
     Print the supported language extensions.
 
-``ghc --show-options``
-    .. index::
-       single: --show-options; GHC option
+.. ghc-flag:: --show-options
 
     Print the supported command line options. This flag can be used for
     autocompletion in a shell.
 
-``ghc --info``
-    .. index::
-       single: --info
+.. ghc-flag:: --info
 
     Print information about the compiler.
 
-``ghc --version``, ``ghc -V``
-    .. index::
-       single: -V
-       single: --version
+.. ghc-flag:: --version
+              -V
 
     Print a one-line string including GHC's version number.
 
-``ghc --numeric-version``
-    .. index::
-       single: --numeric-version
+.. ghc-flag:: --numeric-version
 
     Print GHC's numeric version number only.
 
-``ghc --print-libdir``
+.. ghc-flag:: --print-libdir
+
     .. index::
-       single: --print-libdir
        single: libdir
 
     Print the path to GHC's library directory. This is the top of the
@@ -351,14 +350,18 @@ Using ``ghc`` ``--make``
 
 In this mode, GHC will build a multi-module Haskell program by following
 dependencies from one or more root modules (usually just ``Main``). For
-example, if your ``Main`` module is in a file called ``Main.hs``, you
-could compile and link the program like this: ::
+example, if your ``Main`` module is in a file called :file:`Main.hs`, you
+could compile and link the program like this:
+
+.. code-block:: none
 
     ghc --make Main.hs
 
 In fact, GHC enters make mode automatically if there are any Haskell
 source files on the command line and no other mode is specified, so in
-this case we could just type ::
+this case we could just type
+
+.. code-block:: none
 
     ghc Main.hs
 
@@ -384,7 +387,7 @@ The main advantages to using ``ghc --make`` over traditional
 -  GHC re-calculates the dependencies each time it is invoked, so the
    dependencies never get out of sync with the source.
 
--  Using the ``-j`` flag, you can compile modules in parallel. Specify
+-  Using the :ghc-flag:`-j` flag, you can compile modules in parallel. Specify
    ``-j⟨N⟩`` to compile ⟨N⟩ jobs in parallel.
 
 Any of the command-line options described in the rest of this chapter
@@ -398,7 +401,7 @@ auxiliary C code), then the object files can be given on the command
 line and GHC will include them when linking the executable.
 
 For backward compatibility with existing make scripts, when used in
-combination with ``-c``, the linking phase is omitted (same as
+combination with :ghc-flag:`-c`, the linking phase is omitted (same as
 ``--make -no-link``).
 
 Note that GHC can only follow dependencies if it has the source file
@@ -408,8 +411,14 @@ module, then GHC will complain. The exception to this rule is for
 package modules, which may or may not have source files.
 
 The source files for the program don't all need to be in the same
-directory; the ``-i`` option can be used to add directories to the
+directory; the :ghc-flag:`-i` option can be used to add directories to the
 search path (see :ref:`search-path`).
+
+.. ghc-flag:: -j <N>
+
+    Perform compilation in parallel when possible. GHC will use up to ⟨N⟩
+    threads during compilation. Note that compilation of a module may not
+    begin until its dependencies have been built.
 
 .. _eval-mode:
 
@@ -418,7 +427,9 @@ Expression evaluation mode
 
 This mode is very similar to interactive mode, except that there is a
 single expression to evaluate which is specified on the command line as
-an argument to the ``-e`` option: ::
+an argument to the ``-e`` option:
+
+.. code-block:: none
 
     ghc -e expr
 
@@ -427,12 +438,16 @@ loaded exactly as in interactive mode. The expression is evaluated in
 the context of the loaded modules.
 
 For example, to load and run a Haskell program containing a module
-``Main``, we might say ::
+``Main``, we might say:
+
+.. code-block:: none
 
     ghc -e Main.main Main.hs
 
 or we can just use this mode to evaluate expressions in the context of
-the ``Prelude``: ::
+the ``Prelude``:
+
+.. code-block:: none
 
     $ ghc -e "interact (unlines.map reverse.lines)"
     hello
@@ -474,7 +489,7 @@ go all the way through to linking. This table summarises:
 
 Thus, a common invocation would be:
 
-::
+.. code-block:: none
 
     ghc -c Foo.hs
 
@@ -486,15 +501,15 @@ to compile the Haskell source file ``Foo.hs`` to an object file
    code generator is used. See :ref:`code-generators` for more details.
 
 .. note::
-   Pre-processing is optional, the ``-cpp``\ ``-cpp`` flag turns it
+   Pre-processing is optional, the :ghc-flag:`-cpp` flag turns it
    on. See :ref:`c-pre-processor` for more details.
 
 .. note::
-   The option ``-E`` runs just the pre-processing passes of
+   The option :ghc-flag:`-E` runs just the pre-processing passes of
    the compiler, dumping the result in a file.
 
 .. note::
-   The option ``-C`` is only available when GHC is built in
+   The option :ghc-flag:`-C` is only available when GHC is built in
    unregisterised mode. See :ref:`unreg` for more details.
 
 .. _overriding-suffixes:
@@ -503,11 +518,9 @@ Overriding the default behaviour for a file
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 As described above, the way in which a file is processed by GHC depends
-on its suffix. This behaviour can be overridden using the ``-x`` option:
+on its suffix. This behaviour can be overridden using the :ghc-flag:`-x` option:
 
-``-x``\ ⟨suffix⟩
-    .. index::
-       single: -x
+.. ghc-flag:: -x <suffix>
 
     Causes all files following this option on the command line to be
     processed as if they had the suffix ⟨suffix⟩. For example, to
@@ -525,11 +538,9 @@ Verbosity options
 See also the ``--help``, ``--version``, ``--numeric-version``, and
 ``--print-libdir`` modes in :ref:`modes`.
 
-``-v``
-    .. index::
-       single: -v
+.. ghc-flag:: -v
 
-    The ``-v`` option makes GHC *verbose*: it reports its version number
+    The :ghc-flag:`-v` option makes GHC *verbose*: it reports its version number
     and shows (on stderr) exactly how it invokes each phase of the
     compilation system. Moreover, it passes the ``-v`` flag to most
     phases; each reports its version number (and possibly some other
@@ -539,9 +550,8 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
     Knowing that you ran the right bits in the right order is always the
     first thing we want to verify.
 
-``-v⟨n⟩``
-    .. index::
-       single: -v
+.. ghc-flag:: -v ⟨n⟩
+    :noindex:
 
     To provide more control over the compiler's verbosity, the ``-v``
     flag takes an optional numeric argument. Specifying ``-v`` on its
@@ -569,26 +579,24 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
         representation after each compilation phase is also printed
         (excluding preprocessed and C/assembly files).
 
-``--fprint-potential-instances``
-    .. index::
-       single: -fprint-potential-instances
+.. ghc-flag:: --fprint-potential-instances
 
     When GHC can't find an instance for a class, it displays a short
     list of some in the instances it knows about. With this flag it
     prints *all* the instances it knows about.
 
-``-fprint-explicit-foralls, -fprint-explicit-kinds, -fprint-unicode-syntax, -fprint-explicit-coercions, -fprint-equality-relations``
-    .. index::
-       single: -fprint-explicit-foralls
-       single: -fprint-explicit-kinds
-       single: -fprint-unicode-syntax
-       single: -fprint-explicit-coercions
-       single: -fprint-equality-relations
+.. ghc-flag:: -fprint-explicit-foralls
+              -fprint-explicit-kinds
+              -fprint-unicode-syntax
+              -fprint-explicit-coercions
+              -fprint-equality-relations
 
-    These three flags control the way in which GHC displays types, in
-    error messages and in GHCi. Using ``-fprint-explicit-foralls`` makes
+    These flags control the way in which GHC displays types, in
+    error messages and in GHCi. Using :ghc-flag:`-fprint-explicit-foralls` makes
     GHC print explicit ``forall`` quantification at the top level of a
-    type; normally this is suppressed. For example, in GHCi: ::
+    type; normally this is suppressed. For example, in GHCi:
+
+    .. code-block:: none
 
         ghci> let f x = x
         ghci> :t f
@@ -600,13 +608,17 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
     However, regardless of the flag setting, the quantifiers are printed
     under these circumstances:
 
-    -  For nested ``foralls``, e.g. ::
+    -  For nested ``foralls``, e.g.
+
+       .. code-block:: none
 
            ghci> :t GHC.ST.runST
            GHC.ST.runST :: (forall s. GHC.ST.ST s a) -> a
 
     -  If any of the quantified type variables has a kind that mentions
-       a kind variable, e.g. ::
+       a kind variable, e.g.
+
+       .. code-block:: none
 
            ghci> :i Data.Type.Equality.sym
            Data.Type.Equality.sym ::
@@ -614,9 +626,11 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
              (a Data.Type.Equality.:~: b) -> b Data.Type.Equality.:~: a
                    -- Defined in Data.Type.Equality
 
-    Using ``-fprint-explicit-kinds`` makes GHC print kind arguments in
+    Using :ghc-flag:`-fprint-explicit-kinds` makes GHC print kind arguments in
     types, which are normally suppressed. This can be important when you
-    are using kind polymorphism. For example: ::
+    are using kind polymorphism. For example:
+
+    .. code-block:: none
 
         ghci> :set -XPolyKinds
         ghci> data T a = MkT
@@ -626,32 +640,32 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
         ghci> :t MkT
         MkT :: forall (k :: BOX) (a :: k). T k a
 
-    When ``-fprint-unicode-syntax`` is enabled, GHC prints type
+    When :ghc-flag:`-fprint-unicode-syntax` is enabled, GHC prints type
     signatures using the unicode symbols from the ``-XUnicodeSyntax``
-    extension. ::
+    extension.
+
+    .. code-block:: none
 
         ghci> :set -fprint-unicode-syntax
         ghci> :t (>>)
         (>>) :: ∀ (m :: * → *) a b. Monad m ⇒ m a → m b → m b
 
-    Using ``-fprint-explicit-coercions`` makes GHC print coercions in
+    Using :ghc-flag:`-fprint-explicit-coercions` makes GHC print coercions in
     types. When trying to prove the equality between types of different
     kinds, GHC uses type-level coercions. Users will rarely need to
     see these, as they are meant to be internal.
 
-    Using ``-fprint-equality-relations`` tells GHC to distinguish between
+    Using :ghc-flag:`-fprint-equality-relations` tells GHC to distinguish between
     its equality relations when printing. For example, ``~`` is homogeneous
     lifted equality (the kinds of its arguments are the same) while
     ``~~`` is heterogeneous lifted equality (the kinds of its arguments
     might be different) and ``~#`` is heterogeneous unlifted equality,
     the internal equality relation used in GHC's solver. Generally,
     users should not need to worry about the subtleties here; ``~`` is
-    probably what you want. Without ``-fprint-equality-relations``, GHC
+    probably what you want. Without :ghc-flag:`-fprint-equality-relations`, GHC
     prints all of these as ``~``.
 
-``-fprint-expanded-synonyms``
-    .. index::
-       single: -fprint-expanded-synonyms
+.. ghc-flag:: -fprint-expanded-synonyms
 
     When enabled, GHC also prints type-synonym-expanded types in type
     errors. For example, with this type synonyms: ::
@@ -660,13 +674,17 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
         type Bar = Bool
         type MyBarST s = ST s Bar
 
-    This error message: ::
+    This error message:
+
+    .. code-block:: none
 
         Couldn't match type 'Int' with 'Bool'
         Expected type: ST s Foo
           Actual type: MyBarST s
 
-    Becomes this: ::
+    Becomes this:
+
+    .. code-block:: none
 
         Couldn't match type 'Int' with 'Bool'
         Expected type: ST s Foo
@@ -675,9 +693,7 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
         Expected type: ST s Int
           Actual type: ST s Bool
 
-``-fprint-typechecker-elaboration``
-    .. index::
-       single: -fprint-typechecker-elaboration
+.. ghc-flag:: -fprint-typechecker-elaboration
 
     When enabled, GHC also prints extra information from the typechecker in
     warnings. For example: ::
@@ -687,14 +703,18 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
           return $ let a = "hello" in a
           return ()
 
-    This warning message: ::
+    This warning message:
+
+    .. code-block:: none
 
         A do-notation statement discarded a result of type ‘[Char]’
         Suppress this warning by saying
           ‘_ <- ($) return let a = "hello" in a’
         or by using the flag -fno-warn-unused-do-bind
 
-    Becomes this: ::
+    Becomes this:
+
+    .. code-block:: none
 
         A do-notation statement discarded a result of type ‘[Char]’
         Suppress this warning by saying
@@ -710,23 +730,27 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
                   in a’
         or by using the flag -fno-warn-unused-do-bind
 
-``-ferror-spans``
-    .. index::
-       single: -ferror-spans
+.. ghc-flag:: -ferror-spans
 
     Causes GHC to emit the full source span of the syntactic entity
     relating to an error message. Normally, GHC emits the source
     location of the start of the syntactic entity only.
 
-    For example: ::
+    For example:
+
+    .. code-block:: none
 
         test.hs:3:6: parse error on input `where'
 
-    becomes: ::
+    becomes:
+
+    .. code-block:: none
 
         test296.hs:3:6-10: parse error on input `where'
 
-    And multi-line spans are possible too: ::
+    And multi-line spans are possible too:
+
+    .. code-block:: none
 
         test.hs:(5,4)-(6,7):
             Conflicting definitions for `a'
@@ -738,16 +762,12 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
     start at zero. This choice was made to follow existing convention
     (i.e. this is how Emacs does it).
 
-``-H⟨size⟩``
-    .. index::
-       single: -H
+.. ghc-flag:: -H <size>
 
     Set the minimum size of the heap to ⟨size⟩. This option is
     equivalent to ``+RTS -Hsize``, see :ref:`rts-options-gc`.
 
-``-Rghc-timing``
-    .. index::
-       single: -Rghc-timing
+.. ghc-flag:: -Rghc-timing
 
     Prints a one-line summary of timing statistics for the GHC run. This
     option is equivalent to ``+RTS -tstderr``, see
@@ -765,7 +785,8 @@ Platform-specific Flags
 
 Some flags only make sense for particular target platforms.
 
-``-msse2``
+.. ghc-flag:: -msse2
+
     (x86 only, added in GHC 7.0.1) Use the SSE2 registers and
     instruction set to implement floating point operations when using
     the :ref:`native code generator <native-code-gen>`. This gives a
@@ -778,7 +799,9 @@ Some flags only make sense for particular target platforms.
 
     SSE2 is unconditionally used on x86-64 platforms.
 
-``-msse4.2``
+.. ghc-flag:: -msse4.2
+    :noindex:
+
     (x86 only, added in GHC 7.4.1) Use the SSE4.2 instruction set to
     implement some floating point and bit operations when using the
     :ref:`native code generator <native-code-gen>`. The resulting compiled

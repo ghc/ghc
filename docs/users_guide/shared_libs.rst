@@ -43,9 +43,9 @@ Building programs that use shared libraries
 -------------------------------------------
 
 To build a simple program and have it use shared libraries for the
-runtime system and the base libraries use the ``-dynamic`` flag:
+runtime system and the base libraries use the :ghc-flag:`-dynamic` flag:
 
-::
+.. code-block:: none
 
     ghc --make -dynamic Main.hs
 
@@ -81,7 +81,7 @@ shared library (or main executable binary) differently from references
 to symbols *between* different shared libraries. GHC needs to know for
 each imported module if that module lives locally in the same shared lib
 or in a separate shared lib. The way it does this is by using packages.
-When using ``-dynamic``, a module from a separate package is assumed to
+When using :ghc-flag:`-dynamic`, a module from a separate package is assumed to
 come from a separate shared lib, while modules from the same package (or
 the default "main" package) are assumed to be within the same shared lib
 (or main executable binary).
@@ -90,7 +90,7 @@ Most of the conventions GHC expects when using packages are described in
 :ref:`building-packages`. In addition note that GHC expects the ``.hi``
 files to use the extension ``.dyn_hi``. The other requirements are the
 same as for C libraries and are described below, in particular the use
-of the flags ``-dynamic``, ``-fPIC`` and ``-shared``.
+of the flags :ghc-flag:`-dynamic`, :ghc-flag:`-fPIC` and :ghc-flag:`-shared`.
 
 Shared libraries that export a C API
 ------------------------------------
@@ -111,9 +111,9 @@ function from your shared library to initialise the plugin before any
 Haskell functions are called.
 
 To build Haskell modules that export a C API into a shared library use
-the ``-dynamic``, ``-fPIC`` and ``-shared`` flags:
+the :ghc-flag:`-dynamic`, :ghc-flag:`-fPIC` and :ghc-flag:`-shared` flags:
 
-::
+.. code-block:: none
 
     ghc --make -dynamic -shared -fPIC Foo.hs -o libfoo.so
 
@@ -124,16 +124,16 @@ library. The ``-shared`` flag specifies to make a shared library rather
 than a program. To make this clearer we can break this down into
 separate compilation and link steps:
 
-::
+.. code-block:: none
 
     ghc -dynamic -fPIC -c Foo.hs
     ghc -dynamic -shared Foo.o -o libfoo.so
 
-In principle you can use ``-shared`` without ``-dynamic`` in the link
-step. That means to statically link the rts all the base libraries into
+In principle you can use :ghc-flag:`-shared` without :ghc-flag:`-dynamic` in the
+link step. That means to statically link the rts all the base libraries into
 your new shared library. This would make a very big, but standalone
 shared library. On most platforms however that would require all the
-static libraries to have been built with ``-fPIC`` so that the code is
+static libraries to have been built with :ghc-flag:`-fPIC` so that the code is
 suitable to include into a shared library and we do not do that at the
 moment.
 
@@ -172,7 +172,7 @@ find shared libraries at runtime. There are currently two modes:
 
 ``sysdep``
     A system-dependent mode. This is also the default mode. On Unix ELF
-    systems this embeds ``RPATH``/``RUNPATH`` entries into the shared
+    systems this embeds :envvar:`RPATH`\/:envvar:`RUNPATH` entries into the shared
     library or executable. In particular it uses absolute paths to where
     the shared libraries for the rts and each package can be found. This
     means the program can immediately be run and it will be able to find
@@ -183,12 +183,12 @@ find shared libraries at runtime. There are currently two modes:
 ``deploy``
     This does not embed any runtime paths. It relies on the shared
     libraries being available in a standard location or in a directory
-    given by the ``LD_LIBRARY_PATH`` environment variable.
+    given by the :envvar:`LD_LIBRARY_PATH` environment variable.
 
 To use relative paths for dependent libraries on Linux and Solaris you
 can pass a suitable ``-rpath`` flag to the linker:
 
-::
+.. code-block:: none
 
     ghc -dynamic Main.hs -o main -lfoo -L. -optl-Wl,-rpath,'$ORIGIN'
 
@@ -220,7 +220,7 @@ that subsequently link against it (even if it hasn't been installed yet)
 will pick up that path as their runtime search location for it. When
 compiling with ghc directly, the install name is set by default to the
 location where it is built. You can override this with the
-``-dylib-install-name`` option (which passes ``-install_name`` to the
+:ghc-flag:`-dylib-install-name` option (which passes ``-install_name`` to the
 Apple linker). Cabal does this for you. It automatically sets the
 install name for dynamic libraries to the absolute path of the ultimate
 install location.

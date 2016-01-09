@@ -25,259 +25,188 @@ Dumping out compiler intermediate structures
     need a short form…). You can get all of these at once (*lots* of
     output) by using ``-v5``, or most of them with ``-v4``. You can
     prevent them from clogging up your standard output by passing
-    ``-ddump-to-file``. Some of the most useful ones are:
+    :ghc-flag:`-ddump-to-file`. Some of the most useful ones are:
 
-    ``-ddump-parsed``
-        .. index::
-           single: -ddump-parsed
+    .. ghc-flag:: -ddump-to-file
+
+        Causes the output from all of the flags listed below to be dumped
+        to a file. The file name depends upon the output produced; for instance,
+        output from :ghc-flag:`-ddump-simpl` will end up in
+        :file:`{module}.dump-simpl`.
+
+    .. ghc-flag:: -ddump-parsed
 
         Dump parser output
 
-    ``-ddump-rn``
-        .. index::
-           single: -ddump-rn
+    .. ghc-flag:: -ddump-rn
 
         Dump renamer output
 
-    ``-ddump-tc``
-        .. index::
-           single: -ddump-tc
+    .. ghc-flag:: -ddump-tc
 
         Dump typechecker output
 
-    ``-ddump-splices``
-        .. index::
-           single: -ddump-splices
+    .. ghc-flag:: -ddump-splices
 
         Dump Template Haskell expressions that we splice in, and what
         Haskell code the expression evaluates to.
 
-    ``-ddump-types``
-        .. index::
-           single: -ddump-types
+    .. ghc-flag:: -ddump-types
 
         Dump a type signature for each value defined at the top level of
         the module. The list is sorted alphabetically. Using
-        ``-dppr-debug`` dumps a type signature for all the imported and
+        :ghc-flag:`-dppr-debug` dumps a type signature for all the imported and
         system-defined things as well; useful for debugging the
         compiler.
 
-    ``-ddump-deriv``
-        .. index::
-           single: -ddump-deriv
+    .. ghc-flag:: -ddump-deriv
 
         Dump derived instances
 
-    ``-ddump-ds``
-        .. index::
-           single: -ddump-ds
+    .. ghc-flag:: -ddump-ds
 
         Dump desugarer output
 
-    ``-ddump-spec``
-        .. index::
-           single: -ddump-spec
+    .. ghc-flag:: -ddump-spec
 
         Dump output of specialisation pass
 
-    ``-ddump-rules``
-        .. index::
-           single: -ddump-rules
+    .. ghc-flag:: -ddump-rules
 
         Dumps all rewrite rules specified in this module; see
         :ref:`controlling-rules`.
 
-    ``-ddump-rule-firings``
-        .. index::
-           single: -ddump-rule-firings
+    .. ghc-flag:: -ddump-rule-firings
 
         Dumps the names of all rules that fired in this module
 
-    ``-ddump-rule-rewrites``
-        .. index::
-           single: -ddump-rule-rewrites
+    .. ghc-flag:: -ddump-rule-rewrites
 
         Dumps detailed information about all rules that fired in this
         module
 
-    ``-ddump-vect``
-        .. index::
-           single: -ddump-vect
+    .. ghc-flag:: -ddump-vect
 
         Dumps the output of the vectoriser.
 
-    ``-ddump-simpl``
-        .. index::
-           single: -ddump-simpl
+    .. ghc-flag:: -ddump-simpl
 
         Dump simplifier output (Core-to-Core passes)
 
-    ``-ddump-inlinings``
-        .. index::
-           single: -ddump-inlinings
+    .. ghc-flag:: -ddump-inlinings
 
         Dumps inlining info from the simplifier
 
-    ``-ddump-stranal``
-        .. index::
-           single: -ddump-stranal
+    .. ghc-flag:: -ddump-stranal
 
         Dump strictness analyser output
 
-    ``-ddump-strsigs``
-        .. index::
-           single: -ddump-strsigs
+    .. ghc-flag:: -ddump-strsigs
 
         Dump strictness signatures
 
-    ``-ddump-cse``
-        .. index::
-           single: -ddump-cse
+    .. ghc-flag:: -ddump-cse
 
         Dump common subexpression elimination (CSE) pass output
 
-    ``-ddump-worker-wrapper``
-        .. index::
-           single: -ddump-worker-wrapper
+    .. ghc-flag:: -ddump-worker-wrapper
 
         Dump worker/wrapper split output
 
-    ``-ddump-occur-anal``
-        .. index::
-           single: -ddump-occur-anal
+    .. ghc-flag:: -ddump-occur-anal
 
         Dump "occurrence analysis" output
 
-    ``-ddump-prep``
-        .. index::
-           single: -ddump-prep
+    .. ghc-flag:: -ddump-prep
 
         Dump output of Core preparation pass
 
-    ``-ddump-stg``
-        .. index::
-           single: -ddump-stg
+    .. ghc-flag:: -ddump-stg
 
         Dump output of STG-to-STG passes
 
-    ``-ddump-cmm``
-        .. index::
-           single: -ddump-cmm
+    .. ghc-flag:: -ddump-cmm
 
         Print the C-- code out.
 
-    ``-ddump-opt-cmm``
-        .. index::
-           single: -ddump-opt-cmm
+    .. ghc-flag:: -ddump-opt-cmm
 
         Dump the results of C-- to C-- optimising passes.
 
-    ``-ddump-asm``
-        .. index::
-           single: -ddump-asm
+    .. ghc-flag:: -ddump-asm
 
         Dump assembly language produced by the :ref:`native code
         generator <native-code-gen>`
 
-    ``-ddump-llvm``
-        .. index::
-           single: -ddump-llvm
+    .. ghc-flag:: -ddump-llvm
 
         LLVM code from the :ref:`LLVM code generator <llvm-code-gen>`
 
-    ``-ddump-bcos``
-        .. index::
-           single: -ddump-bcos
+    .. ghc-flag:: -ddump-bcos
 
         Dump byte-code compiler output
 
-    ``-ddump-foreign``
-        .. index::
-           single: -ddump-foreign
+    .. ghc-flag:: -ddump-foreign
 
         dump foreign export stubs
 
-``-ddump-simpl-iterations``
-    .. index::
-       single: -ddump-simpl-iterations
+.. ghc-flag:: -ddump-simpl-iterations
 
     Show the output of each *iteration* of the simplifier (each run of
     the simplifier has a maximum number of iterations, normally 4). This
     outputs even more information than ``-ddump-simpl-phases``.
 
-``-ddump-simpl-stats``
-    .. index::
-       single: -ddump-simpl-stats option
+.. ghc-flag:: -ddump-simpl-stats
 
     Dump statistics about how many of each kind of transformation too
     place. If you add ``-dppr-debug`` you get more detailed information.
 
-``-ddump-if-trace``
-    .. index::
-       single: -ddump-if-trace
+.. ghc-flag:: -ddump-if-trace
 
     Make the interface loader be *real* chatty about what it is up to.
 
-``-ddump-tc-trace``
-    .. index::
-       single: -ddump-tc-trace
+.. ghc-flag:: -ddump-tc-trace
 
     Make the type checker be *real* chatty about what it is up to.
 
-``-ddump-vt-trace``
-    .. index::
-       single: -ddump-tv-trace
+.. ghc-flag:: -ddump-vt-trace
 
     Make the vectoriser be *real* chatty about what it is up to.
 
-``-ddump-rn-trace``
-    .. index::
-       single: -ddump-rn-trace
+.. ghc-flag:: -ddump-rn-trace
 
     Make the renamer be *real* chatty about what it is up to.
 
-``-ddump-rn-stats``
-    .. index::
-       single: -dshow-rn-stats
+.. ghc-flag:: -ddump-rn-stats
 
     Print out summary of what kind of information the renamer had to
     bring in.
 
-``-dverbose-core2core``, ``-dverbose-stg2stg``
-    .. index::
-       single: -dverbose-core2core
-       single: -dverbose-stg2stg
+.. ghc-flag:: -dverbose-core2core
+              -dverbose-stg2stg
 
     Show the output of the intermediate Core-to-Core and STG-to-STG
     passes, respectively. (*lots* of output!) So: when we're really
     desperate:
 
-    ::
+    .. code-block:: sh
 
         % ghc -noC -O -ddump-simpl -dverbose-core2core -dcore-lint Foo.hs
 
-``-dshow-passes``
-    .. index::
-       single: -dshow-passes
+.. ghc-flag:: -dshow-passes
 
     Print out each pass name as it happens.
 
-``-ddump-core-stats``
-    .. index::
-       single: -ddump-core-stats
+.. ghc-flag:: -ddump-core-stats
 
     Print a one-line summary of the size of the Core program at the end
     of the optimisation pipeline.
 
-``-dfaststring-stats``
-    .. index::
-       single: -dfaststring-stats
+.. ghc-flag:: -dfaststring-stats
 
     Show statistics on the usage of fast strings by the compiler.
 
-``-dppr-debug``
-    .. index::
-       single: -dppr-debug
+.. ghc-flag:: -dppr-debug
 
     Debugging output is in one of several "styles." Take the printing of
     types, for example. In the "user" style (the default), the
@@ -342,63 +271,47 @@ Core dumps contain a large amount of information. Depending on what you
 are doing, not all of it will be useful. Use these flags to suppress the
 parts that you are not interested in.
 
-``-dsuppress-all``
-    .. index::
-       single: -dsuppress-all
+.. ghc-flag:: -dsuppress-all
 
     Suppress everything that can be suppressed, except for unique ids as
     this often makes the printout ambiguous. If you just want to see the
     overall structure of the code, then start here.
 
-``-dsuppress-uniques``
-    .. index::
-       single: -dsuppress-uniques
+.. ghc-flag:: -dsuppress-uniques
 
     Suppress the printing of uniques. This may make the printout
     ambiguous (e.g. unclear where an occurrence of 'x' is bound), but it
     makes the output of two compiler runs have many fewer gratuitous
     differences, so you can realistically apply ``diff``. Once ``diff``
     has shown you where to look, you can try again without
-    ``-dsuppress-uniques``
+    :ghc-flag:`-dsuppress-uniques`
 
-``-dsuppress-idinfo``
-    .. index::
-       single: -dsuppress-idinfo
+.. ghc-flag:: -dsuppress-idinfo
 
     Suppress extended information about identifiers where they are
     bound. This includes strictness information and inliner templates.
     Using this flag can cut the size of the core dump in half, due to
     the lack of inliner templates
 
-``-dsuppress-unfoldings``
-    .. index::
-       single: -dsuppress-unfoldings
+.. ghc-flag:: -dsuppress-unfoldings
 
     Suppress the printing of the stable unfolding of a variable at its
     binding site.
 
-``-dsuppress-module-prefixes``
-    .. index::
-       single: -dsuppress-module-prefixes
+.. ghc-flag:: -dsuppress-module-prefixes
 
     Suppress the printing of module qualification prefixes. This is the
     ``Data.List`` in ``Data.List.length``.
 
-``-dsuppress-type-signatures``
-    .. index::
-       single: -dsuppress-type-signatures
+.. ghc-flag:: -dsuppress-type-signatures
 
     Suppress the printing of type signatures.
 
-``-dsuppress-type-applications``
-    .. index::
-       single: -dsuppress-type-applications
+.. ghc-flag:: -dsuppress-type-applications
 
     Suppress the printing of type applications.
 
-``-dsuppress-coercions``
-    .. index::
-       single: -dsuppress-coercions
+.. ghc-flag:: -dsuppress-coercions
 
     Suppress the printing of type coercions.
 
@@ -411,22 +324,16 @@ Checking for consistency
    single: consistency checks
    single: lint
 
-``-dcore-lint``
-    .. index::
-       single: -dcore-lint
+.. ghc-flag:: -dcore-lint
 
     Turn on heavyweight intra-pass sanity-checking within GHC, at Core
     level. (It checks GHC's sanity, not yours.)
 
-``-dstg-lint``
-    .. index::
-       single: -dstg-lint
+.. ghc-flag:: -dstg-lint
 
     Ditto for STG level. (note: currently doesn't work).
 
-``-dcmm-lint``
-    .. index::
-       single: -dcmm-lint
+.. ghc-flag:: -dcmm-lint
 
     Ditto for C-- level.
 
@@ -438,19 +345,15 @@ Checking for determinism
 .. index::
    single: deterministic builds
 
-``-dinitial-unique=⟨s⟩``
-    .. index::
-       single: -dinitial-unique
+.. ghc-flag:: -dinitial-unique=⟨s⟩
 
     Start ``UniqSupply`` allocation from ⟨s⟩.
 
-``-dunique-increment=⟨i⟩``
-    .. index::
-       single: -dunique-increment
+.. ghc-flag:: -dunique-increment=⟨i⟩
 
     Set the increment for the generated ``Unique``'s to ⟨i⟩.
 
-    This is useful in combination with ``-dinitial-unique`` to test if the
+    This is useful in combination with :ghc-flag:`-dinitial-unique` to test if the
     generated files depend on the order of ``Unique``'s.
 
     Some interesting values:
