@@ -466,3 +466,4 @@ test('T10970', normal, compile_and_run, ['-hide-all-packages -package base -pack
 test('T10970a', normal, compile_and_run, [''])
 test('T4931', normal, compile_and_run, [''])
 test('T11182', normal, compile_and_run, [''])
+test('T11381', normal, compile_fail, [''])

@@ -831,7 +831,11 @@ tcInjectivity _ Nothing
   -- reason is that the implementation would not be straightforward.)
 tcInjectivity tvs (Just (L loc (InjectivityAnn _ lInjNames)))
   = setSrcSpan loc $
-    do { inj_tvs <- mapM (tcLookupTyVar . unLoc) lInjNames
+    do { dflags <- getDynFlags
+       ; checkTc (xopt LangExt.InjectiveTypeFamilies dflags)
+                 (text "Illegal injectivity annotation" $$
+                  text "Use InjectiveTypeFamilies to allow this")
+       ; inj_tvs <- mapM (tcLookupTyVar . unLoc) lInjNames
        ; let inj_ktvs = filterVarSet isTyVar $  -- no injective coercion vars
                         closeOverKinds (mkVarSet inj_tvs)
        ; let inj_bools = map (`elemVarSet` inj_ktvs) tvs

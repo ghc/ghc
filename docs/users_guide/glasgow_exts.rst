@@ -6764,6 +6764,9 @@ will be possible to infer ``t`` at call sites from the type of the argument: ::
 
     type family Id a = r | r -> a
 
+Injective type families are enabled with ``-XInjectiveTypeFamilies`` language
+extension.  This extension implies ``-XTypeFamilies``.
+
 For full details on injective type families refer to Haskell Symposium
 2015 paper `Injective type families for
 Haskell <http://ics.p.lodz.pl/~stolarek/_media/pl:research:stolarek_peyton-jones_eisenberg_injectivity_extended.pdf>`__.
