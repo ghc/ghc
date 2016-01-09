@@ -23,8 +23,5 @@ install:
     - happy --version
 
 build_script:
-    - set GHC_PACKAGE_PATH
-    - set GHC_PACKAGE_PATH=
-    - set GHC_PACKAGE_PATH
     - cd C:\msys64\home\ghc\shake-build
     - echo "" | stack --no-terminal exec -- build.bat -j --no-progress
