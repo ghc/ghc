@@ -1,6 +1,6 @@
 module Rules.Generate (
-    generatePackageCode, generateRules,
-    derivedConstantsPath, generatedDependencies,
+    generate, generateExec, generatePackageCode, generateRules,
+    derivedConstantsPath, emptyTarget, generatedDependencies,
     installTargets, copyRules
     ) where
 
@@ -77,6 +77,7 @@ compilerDependencies stage =
        , "primop-vector-tys-exports.hs-incl"
        , "primop-vector-tycons.hs-incl"
        , "primop-vector-tys.hs-incl" ]
+    ++ ["inplace/lib/bin/ghc-split"]
 
 generatedDependencies :: Stage -> Package -> [FilePath]
 generatedDependencies stage pkg
@@ -103,6 +104,13 @@ generate file target expr = do
     contents <- interpretPartial target expr
     writeFileChanged file contents
     putSuccess $ "| Successfully generated '" ++ file ++ "'."
+
+-- | Generates @file@ for @target@ and marks it as executable.
+generateExec :: FilePath -> PartialTarget -> Expr String -> Action ()
+generateExec file target expr = do
+    generate file target expr
+    unit $ cmd "chmod +x " [file]
+    putSuccess $ "| Made '" ++ file ++ "' executable."
 
 generatePackageCode :: Resources -> PartialTarget -> Rules ()
 generatePackageCode _ target @ (PartialTarget stage pkg) =

@@ -28,8 +28,7 @@ derive-constants = inplace/bin/deriveConstants
 hs-cpp           = @HaskellCPPCmd@
 hs-cpp-args      = @HaskellCPPArgs@
 
-unlit            = inplace/lib/unlit
-ghc-split        = inplace/lib/ghc-split
+unlit            = inplace/lib/bin/unlit
 
 alex             = @AlexCmd@
 ar               = @ArCmd@
@@ -40,6 +39,7 @@ nm               = @NmCmd@
 objdump          = @ObjdumpCmd@
 ranlib           = @REAL_RANLIB_CMD@
 tar              = @TarCmd@
+perl             = @PerlCmd@
 
 # Information about builders:
 #============================

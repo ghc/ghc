@@ -9,6 +9,7 @@ module Settings.User (
 import GHC
 import Expression
 import Predicates
+import Settings.Default
 
 -- Control user-specific settings
 userArgs :: Args
@@ -59,7 +60,7 @@ validating = False
 
 -- To switch off split objects change to 'return False'
 splitObjects :: Predicate
-splitObjects = return False -- FIXME: should be defaultSplitObjects, see #84.
+splitObjects = defaultSplitObjects
 
 dynamicGhcPrograms :: Bool
 dynamicGhcPrograms = False

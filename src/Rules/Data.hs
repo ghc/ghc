@@ -68,6 +68,17 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
             writeFileChanged mk contents
             putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 
+        when (pkg == unlit) $ dataFile %> \mk -> do
+            let prefix  = "utils_unlit_" ++ stageString stage ++ "_"
+                contents = unlines $ map (prefix++)
+                    [ "PROGNAME = unlit"
+                    , "C_SRCS = unlit.c"
+                    , "INSTALL = YES"
+                    , "INSTALL_INPLACE = YES"
+                    , "SYNOPSIS = Literate script filter." ]
+            writeFileChanged mk contents
+            putSuccess $ "| Successfully generated '" ++ mk ++ "'."
+
         when (pkg == touchy) $ dataFile %> \mk -> do
             let prefix = "utils_touchy_" ++ stageString stage ++ "_"
                 contents = unlines $ map (prefix++)

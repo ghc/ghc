@@ -32,7 +32,6 @@ data Builder = Alex
              | GhcCabalHsColour
              | GhcM Stage
              | GhcPkg Stage
-             | GhcSplit
              | Haddock
              | Happy
              | HsColour
@@ -41,6 +40,7 @@ data Builder = Alex
              | Ld
              | Nm
              | Objdump
+             | Perl
              | Ranlib
              | Tar
              | Unlit
@@ -74,7 +74,6 @@ builderKey builder = case builder of
     GhcCabalHsColour -> builderKey $ GhcCabal -- synonym for 'GhcCabal hscolour'
     GhcPkg Stage0    -> "system-ghc-pkg"
     GhcPkg _         -> "ghc-pkg"
-    GhcSplit         -> "ghc-split"
     Happy            -> "happy"
     Haddock          -> "haddock"
     HsColour         -> "hscolour"
@@ -83,6 +82,7 @@ builderKey builder = case builder of
     Ld               -> "ld"
     Nm               -> "nm"
     Objdump          -> "objdump"
+    Perl             -> "perl"
     Ranlib           -> "ranlib"
     Tar              -> "tar"
     Unlit            -> "unlit"

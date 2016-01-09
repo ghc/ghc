@@ -31,6 +31,7 @@ import Settings.Packages.IservBin
 import Settings.Packages.Rts
 import Settings.Packages.RunGhc
 import Settings.Packages.Touchy
+import Settings.Packages.Unlit
 import Settings.User
 
 getArgs :: Expr [String]
@@ -77,4 +78,5 @@ defaultPackageArgs = mconcat
     , iservBinPackageArgs
     , rtsPackageArgs
     , runGhcPackageArgs
-    , touchyPackageArgs ]
+    , touchyPackageArgs
+    , unlitPackageArgs ]
