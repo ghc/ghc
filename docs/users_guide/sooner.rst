@@ -14,11 +14,11 @@ Sooner: producing a program more quickly
    single: compiling faster
    single: faster compiling
 
-Don't use ``-O`` or (especially) ``-O2``:
+Don't use :ghc-flag:`-O` or (especially) :ghc-flag:`-O2`:
     By using them, you are telling GHC that you are willing to suffer
     longer compilation times for better-quality code.
 
-    GHC is surprisingly zippy for normal compilations without ``-O``!
+    GHC is surprisingly zippy for normal compilations without :ghc-flag:`-O`!
 
 Use more memory:
     Within reason, more memory for heap space means less garbage
@@ -31,10 +31,10 @@ Use more memory:
        single: -H; RTS option
 
     If it says you're using more than 20% of total time in garbage
-    collecting, then more memory might help: use the ``-H⟨size⟩``
-    option. Increasing the default allocation area size used by the
-    compiler's RTS might also help: use the ``+RTS -A⟨size⟩ -RTS``
-    option.
+    collecting, then more memory might help: use the ``-H⟨size⟩`` (see
+    :rts-flag:`-H`) option. Increasing the default allocation area size used by
+    the compiler's RTS might also help: use the ``+RTS -A⟨size⟩ -RTS``
+    option (see :rts-flag:`-A`).
 
     .. index::
        single: -A⟨size⟩; RTS option
@@ -47,7 +47,7 @@ Don't use too much memory!
     machine) start using more than the *real memory* on your machine,
     and the machine starts “thrashing,” *the party is over*. Compile
     times will be worse than terrible! Use something like the csh
-    builtin ``time`` command to get a report on how many page faults
+    builtin :command:`time` command to get a report on how many page faults
     you're getting.
 
     If you don't know what virtual memory, thrashing, and page faults
@@ -118,8 +118,8 @@ Compile via LLVM:
     generator <native-code-gen>`. This is not universal and depends
     on the code. Numeric heavy code seems to show the best improvement
     when compiled via LLVM. You can also experiment with passing
-    specific flags to LLVM with the ``-optlo`` and ``-optlc`` flags. Be
-    careful though as setting these flags stops GHC from setting its
+    specific flags to LLVM with the :ghc-flag:`-optlo` and :ghc-flag:`-optlc`
+    flags. Be careful though as setting these flags stops GHC from setting its
     usual flags for the LLVM optimiser and compiler.
 
 Overloaded functions are not your friend:
@@ -130,7 +130,7 @@ Overloaded functions are not your friend:
 Give explicit type signatures:
     Signatures are the basic trick; putting them on exported, top-level
     functions is good software-engineering practice, anyway. (Tip: using
-    ``-Wmissing-signatures``-Wmissing-signatures option can
+    the :ghc-flag:`-Wmissing-signatures` option can
     help enforce good signature-practice).
 
     The automatic specialisation of overloaded functions (with ``-O``)
@@ -149,11 +149,11 @@ Use ``SPECIALIZE`` pragmas:
 "But how do I know where overloading is creeping in?"
     A low-tech way: grep (search) your interface files for overloaded
     type signatures. You can view interface files using the
-    ``--show-iface`` option (see :ref:`hi-options`).
+    :ghc-flag:`--show-iface` option (see :ref:`hi-options`).
 
-    ::
+    .. code-block:: sh
 
-                    % ghc --show-iface Foo.hi | egrep '^[a-z].*::.*=>'
+        $ ghc --show-iface Foo.hi | egrep '^[a-z].*::.*=>'
 
 Strict functions are your dear friends:
     And, among other things, lazy pattern-matching is your enemy.
@@ -166,9 +166,9 @@ Strict functions are your dear friends:
 
     ::
 
-                    f (Wibble x y) =  ... # strict
+        f (Wibble x y) =  ... # strict
 
-                    f arg = let { (Wibble x y) = arg } in ... # lazy
+        f arg = let { (Wibble x y) = arg } in ... # lazy
 
     The former will result in far better code.
 
@@ -177,17 +177,17 @@ Strict functions are your dear friends:
 
     ::
 
-                    f (Wibble x y)  # beautiful but slow
-                    = let
+        f (Wibble x y)  # beautiful but slow
+              = let
                     (a1, b1, c1) = unpackFoo x
                     (a2, b2, c2) = unpackFoo y
-                    in ...
+                in ...
 
-                    f (Wibble x y)  # ugly, and proud of it
-                    = case (unpackFoo x) of { (a1, b1, c1) ->
+        f (Wibble x y)  # ugly, and proud of it
+              = case (unpackFoo x) of { (a1, b1, c1) ->
                     case (unpackFoo y) of { (a2, b2, c2) ->
-                    ...
-                    }}
+                        ...
+              }}
 
 GHC loves single-constructor data-types:
     It's all the better if a function is strict in a single-constructor
@@ -215,7 +215,7 @@ Newtypes are better than datatypes:
     components (lazy in the first, strict in the second \\& third).”
 
     If the function isn't exported, just compile with the extra flag
-    ``-ddump-simpl``; next to the signature for any binder, it will
+    :ghc-flag:`-ddump-simpl`; next to the signature for any binder, it will
     print the self-same pragmatic information as would be put in an
     interface file. (Besides, Core syntax is fun to look at!)
 
@@ -236,7 +236,7 @@ Explicit ``export`` list:
 
 Look at the Core syntax!
     (The form in which GHC manipulates your code.) Just run your
-    compilation with ``-ddump-simpl`` (don't forget the ``-O``).
+    compilation with :ghc-flag:`-ddump-simpl` (don't forget the :ghc-flag:`-O`).
 
     If profiling has pointed the finger at particular functions, look at
     their Core code. ``lets`` are bad, ``cases`` are good, dictionaries
@@ -251,16 +251,16 @@ Use strictness annotations:
     space leaks.
 
     It can also help in a third way: when used with
-    ``-funbox-strict-fields`` (see :ref:`options-f`), a strict field can
+    :ghc-flag:`-funbox-strict-fields` (see :ref:`options-f`), a strict field can
     be unpacked or unboxed in the constructor, and one or more levels of
     indirection may be removed. Unpacking only happens for
     single-constructor datatypes (``Int`` is a good candidate, for
     example).
 
-    Using ``-funbox-strict-fields`` is only really a good idea in
-    conjunction with ``-O``, because otherwise the extra packing and
+    Using :ghc-flag:`-funbox-strict-fields` is only really a good idea in
+    conjunction with :ghc-flag:`-O`, because otherwise the extra packing and
     unpacking won't be optimised away. In fact, it is possible that
-    ``-funbox-strict-fields`` may worsen performance even *with* ``-O``,
+    :ghc-flag:`-funbox-strict-fields` may worsen performance even *with* :ghc-flag:`-O`,
     but this is unlikely (let us know if it happens to you).
 
 Use unboxed types (a GHC extension):
@@ -269,7 +269,7 @@ Use unboxed types (a GHC extension):
     information about using unboxed types.
 
     Before resorting to explicit unboxed types, try using strict
-    constructor fields and ``-funbox-strict-fields`` first (see above).
+    constructor fields and :ghc-flag:`-funbox-strict-fields` first (see above).
     That way, your code stays portable.
 
 Use ``foreign import`` (a GHC extension) to plug into fast libraries:
@@ -303,12 +303,12 @@ Use unboxed arrays (``UArray``)
     ``Data.Array`` library.
 
 Use a bigger heap!
-    If your program's GC stats (``-S`` RTS option) indicate that
+    If your program's GC stats (:rts-flag:`-S` RTS option) indicate that
     it's doing lots of garbage-collection (say, more than 20% of execution
     time), more memory might help — with the ``-H⟨size⟩`` or ``-A⟨size⟩`` RTS
     options (see :ref:`rts-options-gc`). As a rule of thumb, try setting
     ``-H⟨size⟩`` to the amount of memory you're willing to let your process
-    consume, or perhaps try passing ``-H`` without any argument to let GHC
+    consume, or perhaps try passing :ghc-flag:`-H` without any argument to let GHC
     calculate a value based on the amount of live data.
 
 .. _smaller:
@@ -320,7 +320,7 @@ Smaller: producing a program that is smaller
    single: smaller programs, how to produce
    single: -funfolding-use-threshold0 option
 
-Decrease the “go-for-it” threshold for unfolding smallish expressions.
+Decrease the "go-for-it" threshold for unfolding smallish expressions.
 Give a ``-funfolding-use-threshold0`` option for the extreme case.
 (“Only unfoldings with zero cost should proceed.”) Warning: except in
 certain specialised cases (like Happy parsers) this is likely to
@@ -329,7 +329,7 @@ generally enables extra simplifying optimisations to be performed.
 
 Avoid ``Read``.
 
-Use ``strip`` on your executables.
+Use :command:`strip` on your executables.
 
 .. _thriftier:
 
@@ -344,8 +344,8 @@ Thriftier: producing a program that gobbles less heap space
 "I think I have a space leak..."
 
 Re-run your program with ``+RTS -S``, and remove all doubt! (You'll see the
-heap usage get bigger and bigger...) [Hmmm... this might be even easier with
-the ``-G1`` RTS option; so... ``./a.out +RTS -S -G1``...]
+heap usage get bigger and bigger...) (Hmmm... this might be even easier with
+the ``-G1`` RTS option; so... ``./a.out +RTS -S -G1``)
 
 .. index::
     single: -G RTS option

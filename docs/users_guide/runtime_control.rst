@@ -32,10 +32,10 @@ There are four ways to set RTS options:
 -  on the command line between ``+RTS ... -RTS``, when running the
    program (:ref:`rts-opts-cmdline`)
 
--  at compile-time, using ``--with-rtsopts``
+-  at compile-time, using :ghc-flag:`-with-rtsopts`
    (:ref:`rts-opts-compile-time`)
 
--  with the environment variable ``GHCRTS``
+-  with the environment variable :envvar:`GHCRTS`
    (:ref:`rts-options-environment`)
 
 -  by overriding "hooks" in the runtime system (:ref:`rts-hooks`)
@@ -50,14 +50,14 @@ Setting RTS options on the command line
    single: -RTS
    single: --RTS
 
-If you set the ``-rtsopts`` flag appropriately when linking (see
+If you set the :ghc-flag:`-rtsopts` flag appropriately when linking (see
 :ref:`options-linker`), you can give RTS options on the command line
 when running your program.
 
 When your Haskell program starts up, the RTS extracts command-line
 arguments bracketed between ``+RTS`` and ``-RTS`` as its own. For example:
 
-::
+.. code-block:: none
 
     $ ghc prog.hs -rtsopts
     [1 of 1] Compiling Main             ( prog.hs, prog.o )
@@ -71,7 +71,7 @@ calls ``System.Environment.getArgs``.
 No ``-RTS`` option is required if the runtime-system options extend to
 the end of the command line, as in this example:
 
-::
+.. code-block:: none
 
     % hls -ltr /usr/etc +RTS -A5m
 
@@ -115,18 +115,20 @@ Setting RTS options with the ``GHCRTS`` environment variable
    single: environment variable; for setting RTS options
    single: GHCRTS environment variable
 
-If the ``-rtsopts`` flag is set to something other than ``none`` when
-linking, RTS options are also taken from the environment variable
-``GHCRTS``. For example, to set the maximum heap size to 2G
-for all GHC-compiled programs (using an ``sh``\-like shell):
+.. envvar:: GHCRTS
 
-::
+    If the ``-rtsopts`` flag is set to something other than ``none`` when
+    linking, RTS options are also taken from the environment variable
+    :envvar:`GHCRTS`. For example, to set the maximum heap size to 2G
+    for all GHC-compiled programs (using an ``sh``\-like shell):
 
-    GHCRTS='-M2G'
-    export GHCRTS
+    .. code-block:: sh
 
-RTS options taken from the ``GHCRTS`` environment variable can be
-overridden by options given on the command line.
+        GHCRTS='-M2G'
+        export GHCRTS
+
+    RTS options taken from the :envvar:`GHCRTS` environment variable can be
+    overridden by options given on the command line.
 
 .. tip::
     Setting something like ``GHCRTS=-M2G`` in your environment is a
@@ -180,9 +182,7 @@ e.g., on stack overflow. The hooks for these are as follows:
 Miscellaneous RTS options
 -------------------------
 
-``-Vsecs``
-    .. index::
-       single: -V; RTS option
+.. rts-flag:: -V <secs>
 
     Sets the interval that the RTS clock ticks at. The runtime uses a
     single timer signal to count ticks; this timer signal is used to
@@ -191,10 +191,10 @@ Miscellaneous RTS options
     profiler uses the RTS timer signal directly to record time profiling
     samples.
 
-    Normally, setting the ``-V`` option directly is not necessary: the
-    resolution of the RTS timer is adjusted automatically if a short
-    interval is requested with the ``-C`` or ``-i`` options. However,
-    setting ``-V`` is required in order to increase the resolution of
+    Normally, setting the :rts-flag:`-V` option directly is not necessary: the
+    resolution of the RTS timer is adjusted automatically if a short interval is
+    requested with the :rts-flag:`-C` or :rts-flag:`-i` options. However,
+    setting :rts-flag:`-V` is required in order to increase the resolution of
     the time profiler.
 
     Using a value of zero disables the RTS clock completely, and has the
@@ -204,9 +204,7 @@ Miscellaneous RTS options
     Disabling the interval timer is useful for debugging, because it
     eliminates a source of non-determinism at runtime.
 
-``--install-signal-handlers=yes|no``
-    .. index::
-       single: --install-signal-handlers; RTS option
+.. rts-flag:: --install-signal-handlers=<yes|no>
 
     If yes (the default), the RTS installs signal handlers to catch
     things like ctrl-C. This option is primarily useful for when you are
@@ -219,14 +217,17 @@ Miscellaneous RTS options
     capabilities. To disable the timer signal, use the ``-V0`` RTS
     option (see above).
 
-``-xmaddress``
+.. rts-flag:: -xm <address>
+
     .. index::
        single: -xm; RTS option
 
-    WARNING: this option is for working around memory allocation
-    problems only. Do not use unless GHCi fails with a message like
-    “\ ``failed to mmap() memory below 2Gb``\ ”. If you need to use this
-    option to get GHCi working on your machine, please file a bug.
+    .. warning::
+
+        This option is for working around memory allocation
+        problems only. Do not use unless GHCi fails with a message like
+        “\ ``failed to mmap() memory below 2Gb``\ ”. If you need to use this
+        option to get GHCi working on your machine, please file a bug.
 
     On 64-bit machines, the RTS needs to allocate memory in the low 2Gb
     of the address space. Support for this across different operating
@@ -238,12 +239,11 @@ Miscellaneous RTS options
     support for allocating memory in the low 2Gb if available (e.g.
     ``mmap`` with ``MAP_32BIT`` on Linux), or otherwise ``-xm40000000``.
 
-``-xqsize``
-    .. index::
-       single: -xq; RTS option
+.. rts-flag:: -xq <size>
 
-    [Default: 100k] This option relates to allocation limits; for more
-    about this see
+    :default: 100k
+
+    This option relates to allocation limits; for more about this see
     :base-ref:`enableAllocationLimit <GHC-Conc.html#v%3AenableAllocationLimit>`.
     When a thread hits its allocation limit, the RTS throws an exception
     to the thread, and the thread gets an additional quota of allocation
@@ -265,42 +265,46 @@ collection. Hopefully, you won't need any of these in normal operation,
 but there are several things that can be tweaked for maximum
 performance.
 
-``-A ⟨size⟩``
+.. rts-flag:: -A ⟨size⟩
+
+    :default: 512k
+
     .. index::
-       single: -A; RTS option
        single: allocation area, size
 
-    [Default: 512k] Set the allocation area size used by the garbage
+    Set the allocation area size used by the garbage
     collector. The allocation area (actually generation 0 step 0) is
-    fixed and is never resized (unless you use ``-H``, below).
+    fixed and is never resized (unless you use :rts-flag:`-H`, below).
 
     Increasing the allocation area size may or may not give better
     performance (a bigger allocation area means worse cache behaviour
     but fewer garbage collections and less promotion).
 
-    With only 1 generation (``-G1``) the ``-A`` option specifies the
-    minimum allocation area, since the actual size of the allocation
-    area will be resized according to the amount of data in the heap
-    (see ``-F``, below).
+    With only 1 generation (e.g. ``-G1``, see :rts-flag:`-G`) the ``-A`` option
+    specifies the minimum allocation area, since the actual size of the
+    allocation area will be resized according to the amount of data in the heap
+    (see :rts-flag:`-F`, below).
 
-``-O ⟨size⟩``
+.. rts-flag:: -O ⟨size⟩
+
+    :default: 1m
+
     .. index::
-       single: -O; RTS option
        single: old generation, size
 
-    [Default: 1m] Set the minimum size of the old generation. The old
+    Set the minimum size of the old generation. The old
     generation is collected whenever it grows to this size or the value
-    of the ``-F`` option multiplied by the size of the live data at the
+    of the :rts-flag:`-F` option multiplied by the size of the live data at the
     previous major collection, whichever is larger.
 
-``-n ⟨size⟩``
-    .. index::
-       single: -n; RTS option
+.. rts-flag:: -n ⟨size⟩
+
+    :default: 0
 
     .. index::
        single: allocation area, chunk size
 
-    [Default: 0, Example: ``-n4m``\ ] When set to a non-zero value, this
+    [Example: ``-n4m``\ ] When set to a non-zero value, this
     option divides the allocation area (``-A`` value) into chunks of the
     specified size. During execution, when a processor exhausts its
     current chunk, it is given another chunk from the pool until the
@@ -322,14 +326,10 @@ performance.
     values, for example ``-A64m -n4m`` is a useful combination on larger core
     counts (8+).
 
-``-c``
-    .. index::
-       single: -c; RTS option
+.. rts-flag:: -c
 
     .. index::
        single: garbage collection; compacting
-
-    .. index::
        single: compacting garbage collection
 
     Use a compacting algorithm for collecting the oldest generation. By
@@ -338,7 +338,7 @@ performance.
     The compaction algorithm is slower than the copying algorithm, but
     the savings in memory use can be considerable.
 
-    For a given heap size (using the ``-H`` option), compaction can in
+    For a given heap size (using the :ghc-flag:`-H` option), compaction can in
     fact reduce the GC cost by allowing fewer GCs to be performed. This
     is more likely when the ratio of live data to heap size is high, say
     greater than 30%.
@@ -347,19 +347,25 @@ performance.
        Compaction doesn't currently work when a single generation is
        requested using the ``-G1`` option.
 
-``-c ⟨n⟩``
-    [Default: 30] Automatically enable compacting collection when the
-    live data exceeds ⟨n⟩% of the maximum heap size (see the ``-M``
+.. rts-flag:: -c ⟨n⟩
+    :noindex:
+
+    :default: 30
+
+    Automatically enable compacting collection when the
+    live data exceeds ⟨n⟩% of the maximum heap size (see the :rts-flag:`-M`
     option). Note that the maximum heap size is unlimited by default, so
     this option has no effect unless the maximum heap size is set with
     ``-M ⟨size⟩.``
 
-``-F ⟨factor⟩``
+.. rts-flag:: -F ⟨factor⟩
+
+    :default: 2
+
     .. index::
-       single: -F; RTS option
        single: heap size, factor
 
-    [Default: 2] This option controls the amount of memory reserved for
+    This option controls the amount of memory reserved for
     the older generations (and in the case of a two space collector the
     size of the allocation area) as a factor of the amount of live data.
     For example, if there was 2M of live data in the oldest generation
@@ -367,19 +373,21 @@ performance.
     to 4M before collecting it again.
 
     The default seems to work well here. If you have plenty of memory,
-    it is usually better to use ``-H ⟨size⟩`` than to increase
-    ``-F ⟨factor⟩.``
+    it is usually better to use ``-H ⟨size⟩`` (see :rts-flag:`-H`) than to
+    increase ``-F ⟨factor⟩.``
 
     The ``-F`` setting will be automatically reduced by the garbage
-    collector when the maximum heap size (the ``-M ⟨size⟩`` setting) is
-    approaching.
+    collector when the maximum heap size (the ``-M ⟨size⟩`` setting, see
+    :rts-flag:`-M`) is approaching.
 
-``-G ⟨generations⟩``
+.. rts-flag:: -G ⟨generations⟩
+
+    :default: 2
+
     .. index::
-       single: -G; RTS option
        single: generations, number of
 
-    [Default: 2] Set the number of generations used by the garbage
+    Set the number of generations used by the garbage
     collector. The default of 2 seems to be good, but the garbage
     collector can support any number of generations. Anything larger
     than about 4 is probably not a good idea unless your program runs
@@ -387,19 +395,19 @@ performance.
     get collected.
 
     Specifying 1 generation with ``+RTS -G1`` gives you a simple 2-space
-    collector, as you would expect. In a 2-space collector, the ``-A``
-    option (see above) specifies the *minimum* allocation area size,
-    since the allocation area will grow with the amount of live data in
-    the heap. In a multi-generational collector the allocation area is a
-    fixed size (unless you use the ``-H`` option, see below).
+    collector, as you would expect. In a 2-space collector, the :rts-flag:`-A`
+    option specifies the *minimum* allocation area size, since the allocation
+    area will grow with the amount of live data in the heap. In a
+    multi-generational collector the allocation area is a fixed size (unless you
+    use the :rts-flag:`-H` option).
 
-``-qggen``
-    .. index::
-       single: -qg; RTS option
+.. rts-flag:: -qg <gen>
 
-    [New in GHC 6.12.1] [Default: 0] Use parallel GC in generation ⟨gen⟩
-    and higher. Omitting ⟨gen⟩ turns off the parallel GC completely,
-    reverting to sequential GC.
+    :default: 0
+    :since: 6.12.1
+
+    Use parallel GC in generation ⟨gen⟩ and higher. Omitting ⟨gen⟩ turns off the
+    parallel GC completely, reverting to sequential GC.
 
     The default parallel GC settings are usually suitable for parallel
     programs (i.e. those using ``par``, Strategies, or with multiple
@@ -407,17 +415,17 @@ performance.
     GC for a single-threaded sequential program too, especially if the
     program has a large amount of heap data and GC is a significant
     fraction of runtime. To use the parallel GC in a sequential program,
-    enable the parallel runtime with a suitable ``-N`` option, and
+    enable the parallel runtime with a suitable :rts-flag:`-N` option, and
     additionally it might be beneficial to restrict parallel GC to the
     old generation with ``-qg1``.
 
-``-qbgen``
-    .. index::
-       single: -qb; RTS option
+.. rts-flag:: -qb <gen>
 
-    [New in GHC 6.12.1] [Default: 1] Use load-balancing in the parallel
-    GC in generation ⟨gen⟩ and higher. Omitting ⟨gen⟩ disables
-    load-balancing entirely.
+    :default: 1
+    :since: 6.12.1
+
+    Use load-balancing in the parallel GC in generation ⟨gen⟩ and higher.
+    Omitting ⟨gen⟩ disables load-balancing entirely.
 
     Load-balancing shares out the work of GC between the available
     cores. This is a good idea when the heap is large and we need to
@@ -429,13 +437,15 @@ performance.
     program it is sometimes beneficial to disable load-balancing
     entirely with ``-qb``.
 
-``-H [⟨size⟩]``
+.. rts-flag:: -H [⟨size⟩]
+
+    :default: 0
+
     .. index::
-       single: -H; RTS option
        single: heap size, suggested
 
-    [Default: 0] This option provides a “suggested heap size” for the
-    garbage collector. Think of ``-Hsize`` as a variable ``-A`` option.
+    This option provides a "suggested heap size" for the
+    garbage collector. Think of ``-Hsize`` as a variable :rts-flag:`-A` option.
     It says: I want to use at least ⟨size⟩ bytes, so use whatever is
     left over to increase the ``-A`` value.
 
@@ -449,13 +459,15 @@ performance.
     the default small ``-A`` value is suboptimal, as it can be in
     programs that create large amounts of long-lived data.
 
-``-I ⟨seconds⟩``
+.. rts-flag:: -I ⟨seconds⟩
+
+    :default: 0.3 seconds
+
     .. index::
-       single: -I; RTS option
        single: idle GC
 
-    (default: 0.3) In the threaded and SMP versions of the RTS (see
-    ``-threaded``, :ref:`options-linker`), a major GC is automatically
+    In the threaded and SMP versions of the RTS (see
+    :ghc-flag:`-threaded`, :ref:`options-linker`), a major GC is automatically
     performed if the runtime has been idle (no Haskell computation has
     been running) for a period of time. The amount of idle time which
     must pass before a GC is performed is set by the ``-I ⟨seconds⟩``
@@ -474,12 +486,14 @@ performance.
     This is an experimental feature, please let us know if it causes
     problems and/or could benefit from further tuning.
 
-``-ki ⟨size⟩``
+.. rts-flag:: -ki ⟨size⟩
+
+    :default: 1k
+
     .. index::
-       single: -k; RTS option
        single: stack, initial size
 
-    [Default: 1k] Set the initial stack size for new threads.
+    Set the initial stack size for new threads.
 
     Thread stacks (including the main thread's stack) live on the heap.
     As the stack grows, new stack chunks are added as required; if the
@@ -494,14 +508,16 @@ performance.
         GHC 7.2.1. The old name is still accepted for backwards
         compatibility, but that may be removed in a future version.
 
-``-kc ⟨size⟩``
+.. rts-flag:: -kc ⟨size⟩
+
+    :default: 32k
+
     .. index::
-       single: -kc; RTS option
        single: stack; chunk size
 
-    [Default: 32k] Set the size of “stack chunks”. When a thread's
+    Set the size of "stack chunks". When a thread's
     current stack overflows, a new stack chunk is created and added to
-    the thread's stack, until the limit set by ``-K`` is reached.
+    the thread's stack, until the limit set by :rts-flag:`-K` is reached.
 
     The advantage of smaller stack chunks is that the garbage collector
     can avoid traversing stack chunks if they are known to be unmodified
@@ -512,28 +528,32 @@ performance.
     overflow/underflow between chunks. The default setting of 32k
     appears to be a reasonable compromise in most cases.
 
-``-kb ⟨size⟩``
+.. rts-flag:: -kb ⟨size⟩
+
+    :default: 1k
+
     .. index::
-       single: -kc; RTS option
        single: stack; chunk buffer size
 
-    [Default: 1k] Sets the stack chunk buffer size. When a stack chunk
+    Sets the stack chunk buffer size. When a stack chunk
     overflows and a new stack chunk is created, some of the data from
     the previous stack chunk is moved into the new chunk, to avoid an
     immediate underflow and repeated overflow/underflow at the boundary.
     The amount of stack moved is set by the ``-kb`` option.
 
     Note that to avoid wasting space, this value should typically be
-    less than 10% of the size of a stack chunk (``-kc``), because in a
+    less than 10% of the size of a stack chunk (:rts-flag:`-kc`), because in a
     chain of stack chunks, each chunk will have a gap of unused space of
     this size.
 
-``-K ⟨size⟩``
+.. rts-flag:: -K ⟨size⟩
+
+    :default: 80% of physical memory
+
     .. index::
-       single: -K; RTS option
        single: stack, maximum size
 
-    [Default: 80% physical memory size] Set the maximum stack size for
+    Set the maximum stack size for
     an individual thread to ⟨size⟩ bytes. If the thread attempts to
     exceed this limit, it will be sent the ``StackOverflow`` exception.
     The limit can be disabled entirely by specifying a size of zero.
@@ -541,20 +561,23 @@ performance.
     This option is there mainly to stop the program eating up all the
     available memory in the machine if it gets into an infinite loop.
 
-``-m ⟨n⟩``
+.. rts-flag:: -m ⟨n⟩
+
+    :default: 3%
+
     .. index::
-       single: -m; RTS option
        single: heap, minimum free
 
-    Minimum % ⟨n⟩ of heap which must be available for allocation. The
-    default is 3%.
+    Minimum % ⟨n⟩ of heap which must be available for allocation.
 
-``-M ⟨size⟩``
+.. rts-flag:: -M ⟨size⟩
+
+    :default: unlimited
+
     .. index::
-       single: -M; RTS option
        single: heap size, maximum
 
-    [Default: unlimited] Set the maximum heap size to ⟨size⟩ bytes. The
+    Set the maximum heap size to ⟨size⟩ bytes. The
     heap normally grows and shrinks according to the memory requirements
     of the program. The only reason for having this option is to stop
     the heap growing without bound and filling up all the available swap
@@ -573,13 +596,11 @@ performance.
 RTS options to produce runtime statistics
 -----------------------------------------
 
-``-T``, ``-t [⟨file⟩]``, ``-s [⟨file⟩]``, ``-S [⟨file⟩]``, ``--machine-readable``
-    .. index::
-       single: -T; RTS option
-       single: -t; RTS option
-       single: -s; RTS option
-       single: -S; RTS option
-       single: --machine-readable; RTS option
+.. rts-flag:: -T
+              -t [<file>]
+              -s [<file>]
+              -S [<file>]
+              --machine-readable
 
     These options produce runtime-system statistics, such as the amount
     of time spent executing the program and in the garbage collector,
@@ -600,7 +621,7 @@ RTS options to produce runtime statistics
     If you use the ``-t`` flag then, when your program finishes, you
     will see something like this:
 
-    ::
+    .. code-block:: none
 
         <<ghc: 36169392 bytes, 69 GCs, 603392/1065272 avg/max bytes residency (2 samples), 3M in use, 0.00 INIT (0.00 elapsed), 0.02 MUT (0.02 elapsed), 0.07 GC (0.07 elapsed) :ghc>>
 
@@ -648,7 +669,7 @@ RTS options to produce runtime statistics
     on what sort of RTS you have, e.g. you will only see profiling data
     if your RTS is compiled for profiling):
 
-    ::
+    .. code-block:: none
 
               36,169,392 bytes allocated in the heap
                4,057,632 bytes copied during GC
@@ -727,7 +748,7 @@ RTS options to produce runtime statistics
     The ``-S`` flag, as well as giving the same output as the ``-s``
     flag, prints information about each GC as it happens:
 
-    ::
+    .. code-block:: none
 
             Alloc    Copied     Live    GC    GC     TOT     TOT  Page Flts
             bytes     bytes     bytes  user  elap    user    elap
@@ -774,12 +795,10 @@ program for profiling (see :ref:`prof-compiler-options`, and
 one profiling option that is available for ordinary non-profiled
 executables:
 
-``-hT``
-    .. index::
-       single: -hT; RTS option
+.. rts-flag:: -hT
 
     (can be shortened to ``-h``.) Generates a basic heap profile, in the
-    file ``prog.hp``. To produce the heap profile graph, use ``hp2ps``
+    file :file:`prog.hp`. To produce the heap profile graph, use :command:`hp2ps`
     (see :ref:`hp2ps`). The basic heap profile is broken down by data
     constructor, with other types of closures (functions, thunks, etc.)
     grouped into broad categories (e.g. ``FUN``, ``THUNK``). To get a
@@ -796,22 +815,20 @@ Tracing
    single: events
    single: eventlog files
 
-When the program is linked with the ``-eventlog`` option
+When the program is linked with the :ghc-flag:`-eventlog` option
 (:ref:`options-linker`), runtime events can be logged in two ways:
 
 -  In binary format to a file for later analysis by a variety of tools.
    One such tool is
-   `ThreadScope <http://www.haskell.org/haskellwiki/ThreadScope>`__\ ThreadScope,
+   `ThreadScope <http://www.haskell.org/haskellwiki/ThreadScope>`__,
    which interprets the event log to produce a visual parallel execution
    profile of the program.
 
 -  As text to standard output, for debugging purposes.
 
-``-lflags``
-    .. index::
-       single: -l; RTS option
+.. rts-flag:: -l <flags>
 
-    Log events in binary format to the file ``program.eventlog``.
+    Log events in binary format to the file :file:`{program}.eventlog`.
     Without any ⟨flags⟩ specified, this logs a default set of events,
     suitable for use with tools like ThreadScope.
 
@@ -859,9 +876,7 @@ When the program is linked with the ``-eventlog`` option
     `ghc-events <http://hackage.haskell.org/package/ghc-events>`__
     package.
 
-``-v [⟨flags⟩]``
-    .. index::
-       single: -v; RTS option
+.. rts-flag:: -v [⟨flags⟩]
 
     Log events as text to standard output, instead of to the
     ``.eventlog`` file. The ⟨flags⟩ are the same as for ``-l``, with the
@@ -886,9 +901,7 @@ These RTS options might be used (a) to avoid a GHC bug, (b) to see
 "what's really happening", or (c) because you feel like it. Not
 recommended for everyday use!
 
-``-B``
-    .. index::
-       single: -B; RTS option
+.. rts-flag:: -B
 
     Sound the bell at the start of each (major) garbage collection.
 
@@ -900,37 +913,33 @@ recommended for everyday use!
     [the program] is in by the beep pattern. But the major use is for
     annoying others in the same office…”
 
-``-D ⟨x⟩``
-    .. index::
-       single: -D; RTS option
+.. rts-flag:: -D ⟨x⟩
 
     An RTS debugging flag; only available if the program was linked with
-    the ``-debug`` option. Various values of ⟨x⟩ are provided to enable
+    the :ghc-flag:`-debug` option. Various values of ⟨x⟩ are provided to enable
     debug messages and additional runtime sanity checks in different
     subsystems in the RTS, for example ``+RTS -Ds -RTS`` enables debug
     messages from the scheduler. Use ``+RTS -?`` to find out which debug
     flags are supported.
 
     Debug messages will be sent to the binary event log file instead of
-    stdout if the ``-l`` option is added. This might be useful for
+    stdout if the :rts-flag:`-l` option is added. This might be useful for
     reducing the overhead of debug tracing.
 
-``-r ⟨file⟩``
+.. rts-flag:: -r ⟨file⟩
+
     .. index::
-       single: -r; RTS option
        single: ticky ticky profiling
        single: profiling; ticky ticky
 
     Produce "ticky-ticky" statistics at the end of the program run (only
-    available if the program was linked with ``-debug``). The ⟨file⟩
-    business works just like on the ``-S`` RTS option, above.
+    available if the program was linked with :ghc-flag:`-debug`). The ⟨file⟩
+    business works just like on the :rts-flag:`-S` RTS option, above.
 
     For more information on ticky-ticky profiling, see
     :ref:`ticky-ticky`.
 
-``-xc``
-    .. index::
-       single: -xc; RTS option
+.. rts-flag:: -xc
 
     (Only available when the program is compiled for profiling.) When an
     exception is raised in the program, this option causes a stack trace
@@ -939,14 +948,15 @@ recommended for everyday use!
     This can be particularly useful for debugging: if your program is
     complaining about a ``head []`` error and you haven't got a clue
     which bit of code is causing it, compiling with
-    ``-prof -fprof-auto`` and running with ``+RTS -xc -RTS`` will tell
-    you exactly the call stack at the point the error was raised.
+    ``-prof -fprof-auto`` (see :ghc-flag:`-prof`) and running with ``+RTS -xc
+    -RTS`` will tell you exactly the call stack at the point the error was
+    raised.
 
     The output contains one report for each exception raised in the
     program (the program might raise and catch several exceptions during
     its execution), where each report looks something like this:
 
-    ::
+    .. code-block:: none
 
         *** Exception raised (reporting due to +RTS -xc), stack trace:
           GHC.List.CAF
@@ -977,9 +987,7 @@ recommended for everyday use!
     See also the function ``traceStack`` in the module ``Debug.Trace``
     for another way to view call stacks.
 
-``-Z``
-    .. index::
-       single: -Z; RTS option
+.. rts-flag:: -Z
 
     Turn *off* "update-frame squeezing" at garbage-collection time.
     (There's no particularly good reason to turn it off, except to
@@ -994,77 +1002,79 @@ Getting information about the RTS
 .. index::
    single: RTS
 
-It is possible to ask the RTS to give some information about itself. To
-do this, use the ``--info`` flag, e.g.
+.. rts-flag:: --info
 
-::
+    It is possible to ask the RTS to give some information about itself. To
+    do this, use the :rts-flag:`--info` flag, e.g.
 
-    $ ./a.out +RTS --info
-     [("GHC RTS", "YES")
-     ,("GHC version", "6.7")
-     ,("RTS way", "rts_p")
-     ,("Host platform", "x86_64-unknown-linux")
-     ,("Host architecture", "x86_64")
-     ,("Host OS", "linux")
-     ,("Host vendor", "unknown")
-     ,("Build platform", "x86_64-unknown-linux")
-     ,("Build architecture", "x86_64")
-     ,("Build OS", "linux")
-     ,("Build vendor", "unknown")
-     ,("Target platform", "x86_64-unknown-linux")
-     ,("Target architecture", "x86_64")
-     ,("Target OS", "linux")
-     ,("Target vendor", "unknown")
-     ,("Word size", "64")
-     ,("Compiler unregisterised", "NO")
-     ,("Tables next to code", "YES")
-     ]
+    .. code-block:: none
 
-The information is formatted such that it can be read as a of type
-``[(String, String)]``. Currently the following fields are present:
+        $ ./a.out +RTS --info
+        [("GHC RTS", "YES")
+        ,("GHC version", "6.7")
+        ,("RTS way", "rts_p")
+        ,("Host platform", "x86_64-unknown-linux")
+        ,("Host architecture", "x86_64")
+        ,("Host OS", "linux")
+        ,("Host vendor", "unknown")
+        ,("Build platform", "x86_64-unknown-linux")
+        ,("Build architecture", "x86_64")
+        ,("Build OS", "linux")
+        ,("Build vendor", "unknown")
+        ,("Target platform", "x86_64-unknown-linux")
+        ,("Target architecture", "x86_64")
+        ,("Target OS", "linux")
+        ,("Target vendor", "unknown")
+        ,("Word size", "64")
+        ,("Compiler unregisterised", "NO")
+        ,("Tables next to code", "YES")
+        ]
 
-``GHC RTS``
-    Is this program linked against the GHC RTS? (always "YES").
+    The information is formatted such that it can be read as a of type
+    ``[(String, String)]``. Currently the following fields are present:
 
-``GHC version``
-    The version of GHC used to compile this program.
+    ``GHC RTS``
+        Is this program linked against the GHC RTS? (always "YES").
 
-``RTS way``
-    The variant (“way”) of the runtime. The most common values are
-    ``rts_v`` (vanilla), ``rts_thr`` (threaded runtime, i.e. linked
-    using the ``-threaded`` option) and ``rts_p`` (profiling runtime,
-    i.e. linked using the ``-prof`` option). Other variants include
-    ``debug`` (linked using ``-debug``), and ``dyn`` (the RTS is linked
-    in dynamically, i.e. a shared library, rather than statically linked
-    into the executable itself). These can be combined, e.g. you might
-    have ``rts_thr_debug_p``.
+    ``GHC version``
+        The version of GHC used to compile this program.
 
-``Target platform``\ ``Target architecture``\ ``Target OS``\ ``Target vendor``
-    These are the platform the program is compiled to run on.
+    ``RTS way``
+        The variant (“way”) of the runtime. The most common values are
+        ``rts_v`` (vanilla), ``rts_thr`` (threaded runtime, i.e. linked
+        using the :ghc-flag:`-threaded` option) and ``rts_p`` (profiling runtime,
+        i.e. linked using the :ghc-flag:`-prof` option). Other variants include
+        ``debug`` (linked using :ghc-flag:`-debug`), and ``dyn`` (the RTS is linked
+        in dynamically, i.e. a shared library, rather than statically linked
+        into the executable itself). These can be combined, e.g. you might
+        have ``rts_thr_debug_p``.
 
-``Build platform``\ ``Build architecture``\ ``Build OS``\ ``Build vendor``
-    These are the platform where the program was built on. (That is, the
-    target platform of GHC itself.) Ordinarily this is identical to the
-    target platform. (It could potentially be different if
-    cross-compiling.)
+    ``Target platform``\ ``Target architecture``\ ``Target OS``\ ``Target vendor``
+        These are the platform the program is compiled to run on.
 
-``Host platform``\ ``Host architecture``\ ``Host OS``\ ``Host vendor``
-    These are the platform where GHC itself was compiled. Again, this
-    would normally be identical to the build and target platforms.
+    ``Build platform``\ ``Build architecture``\ ``Build OS``\ ``Build vendor``
+        These are the platform where the program was built on. (That is, the
+        target platform of GHC itself.) Ordinarily this is identical to the
+        target platform. (It could potentially be different if
+        cross-compiling.)
 
-``Word size``
-    Either ``"32"`` or ``"64"``, reflecting the word size of the target
-    platform.
+    ``Host platform``\ ``Host architecture``\ ``Host OS``\ ``Host vendor``
+        These are the platform where GHC itself was compiled. Again, this
+        would normally be identical to the build and target platforms.
 
-``Compiler unregistered``
-    Was this program compiled with an :ref:`"unregistered" <unreg>`
-    version of GHC? (I.e., a version of GHC that has no
-    platform-specific optimisations compiled in, usually because this is
-    a currently unsupported platform.) This value will usually be no,
-    unless you're using an experimental build of GHC.
+    ``Word size``
+        Either ``"32"`` or ``"64"``, reflecting the word size of the target
+        platform.
 
-``Tables next to code``
-    Putting info tables directly next to entry code is a useful
-    performance optimisation that is not available on all platforms.
-    This field tells you whether the program has been compiled with this
-    optimisation. (Usually yes, except on unusual platforms.)
+    ``Compiler unregistered``
+        Was this program compiled with an :ref:`"unregistered" <unreg>`
+        version of GHC? (I.e., a version of GHC that has no
+        platform-specific optimisations compiled in, usually because this is
+        a currently unsupported platform.) This value will usually be no,
+        unless you're using an experimental build of GHC.
+
+    ``Tables next to code``
+        Putting info tables directly next to entry code is a useful
+        performance optimisation that is not available on all platforms.
+        This field tells you whether the program has been compiled with this
+        optimisation. (Usually yes, except on unusual platforms.)

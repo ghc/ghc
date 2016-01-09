@@ -151,7 +151,7 @@ exists, and it may contain any module you like. This is particularly
 convenient if you have several ``Main`` modules in the same directory
 and you can't call them all ``Main.hs``.
 
-The search path for finding source files is specified with the ``-i``
+The search path for finding source files is specified with the :ghc-flag:`-i`
 option on the GHCi command line, like so:
 
 .. code-block:: none
@@ -170,9 +170,9 @@ even if there are object and interface files for the module, you'll get
 an error message.
 
 .. [4]
-   Note that in GHCi, and ``--make`` mode, the ``-i`` option is used to
+   Note that in GHCi, and :ghc-flag:`--make` mode, the :ghc-flag:`-i` option is used to
    specify the search path for *source* files, whereas in standard
-   batch-compilation mode the ``-i`` option is used to specify the
+   batch-compilation mode the :ghc-flag:`-i` option is used to specify the
    search path for interface files, see :ref:`search-path`.
 
 
@@ -240,7 +240,7 @@ In the messages from the compiler, we see that there is no line for
 source and everything it depends on is unchanged since the last
 compilation.
 
-Note the ``-dynamic`` flag to GHC: GHCi uses dynamically-linked object
+Note the :ghc-flag:`-dynamic` flag to GHC: GHCi uses dynamically-linked object
 code (if you are on a platform that supports it), and so in order to use
 compiled code with GHCi it must be compiled for dynamic linking.
 
@@ -329,7 +329,7 @@ to be interpreted too, because compiled modules cannot depend on
 interpreted ones).
 
 To always compile everything to object code and never use the
-interpreter, use the ``-fobject-code`` option (see :ref:`ghci-obj`).
+interpreter, use the :ghc-flag:`-fobject-code` option (see :ref:`ghci-obj`).
 
 .. hint::
     Since GHCi will only use a compiled object file if it can be sure
@@ -424,17 +424,16 @@ The statement ``x <- return 42`` means “execute ``return 42`` in the
 ``IO`` monad, and bind the result to ``x``\ ”. We can then use ``x`` in
 future statements, for example to print it as we did above.
 
-If ``-fprint-bind-result`` is set then GHCi will print the result of a
-statement if and only if:
+.. ghc-flag:: -fprint-bind-result
 
--  The statement is not a binding, or it is a monadic binding
-   (``p <- e``) that binds exactly one variable.
+    If :ghc-flag:`-fprint-bind-result` is set then GHCi will print the result of a
+    statement if and only if:
 
--  The variable's type is not polymorphic, is not ``()``, and is an
-   instance of ``Show``.
+    - The statement is not a binding, or it is a monadic binding
+      (``p <- e``) that binds exactly one variable.
 
-.. index::
-   single: -fprint-bind-result
+    - The variable's type is not polymorphic, is not ``()``, and is an
+      instance of ``Show``.
 
 Of course, you can also bind normal non-IO expressions using the
 ``let``\-statement:
@@ -502,7 +501,7 @@ not to replace module loading but to make definitions in .ghci-files
 Any exceptions raised during the evaluation or execution of the
 statement are caught and printed by the GHCi command line interface (for
 more information on exceptions, see the module ``Control.Exception`` in
-the libraries documentation).
+the libraries :base-ref:`documentation <Control-Exception.html>`).
 
 Every new binding shadows any existing bindings of the same name,
 including entities that are in scope in the current module context.
@@ -858,7 +857,7 @@ You can add a module to the scope (via :ghci-cmd:`:module` or ``import``) only
 if either (a) it is loaded, or (b) it is a module from a package that
 GHCi knows about. Using :ghci-cmd:`:module` or ``import`` to try bring into
 scope a non-loaded module may result in the message
-“\ ``module M is not loaded``\ ”.
+``module M is not loaded``.
 
 The ``:main`` and ``:run`` commands
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1008,7 +1007,7 @@ and defaults the type variable if
 
 3. At least one of the classes ``Ci`` is numeric.
 
-At the GHCi prompt, or with GHC if the ``-XExtendedDefaultRules`` flag
+At the GHCi prompt, or with GHC if the :ghc-flag:`-XExtendedDefaultRules` flag
 is given, the following additional differences apply:
 
 -  Rule 2 above is relaxed thus: *All* of the classes ``Ci`` are
@@ -1060,12 +1059,17 @@ IO ()``, and it works by converting the value to ``String`` using ``show``.
 This is not ideal in certain cases, like when the output is long, or
 contains strings with non-ascii characters.
 
-The ``-interactive-print`` flag allows to specify any function of type
+The :ghc-flag:`-interactive-print` flag allows to specify any function of type
 ``C a => a -> IO ()``, for some constraint ``C``, as the function for
 printing evaluated expressions. The function can reside in any loaded
 module or any registered package, but only when it resides in a registered
 package will it survive a :ghci-cmd:`:cd`, :ghci-cmd:`:add`, :ghci-cmd:`:load`,
 :ghci-cmd:`:reload` or, :ghci-cmd:`:set`.
+
+.. ghc-flag:: -interactive-print <expr>
+
+    Set the function used by GHCi to print evaluation results. Expression
+    must be of type ``C a => a -> IO ()``.
 
 As an example, suppose we have following special printing module: ::
 
@@ -1094,7 +1098,7 @@ will start an interactive session where values with be printed using
 A custom pretty printing function can be used, for example, to format
 tree-like and nested structures in a more readable way.
 
-The ``-interactive-print`` flag can also be used when running GHC in
+The :ghc-flag:`-interactive-print` flag can also be used when running GHC in
 ``-e mode``:
 
 .. code-block:: none
@@ -1304,7 +1308,7 @@ triggered (see :ref:`nested-breakpoints`). Rather than forcing thunks,
 :ghci-cmd:`:print` binds each thunk to a fresh variable beginning with an
 underscore, in this case ``_t1``.
 
-The flag ``-fprint-evld-with-show`` instructs :ghci-cmd:`:print` to reuse
+The flag :ghc-flag:`-fprint-evld-with-show` instructs :ghci-cmd:`:print` to reuse
 available ``Show`` instances when possible. This happens only when the
 contents of the variable being inspected are completely evaluated.
 
@@ -1412,7 +1416,7 @@ breakpoint. Note: GHC considers the TAB character to have a width of 1,
 wherever it occurs; in other words it counts characters, rather than
 columns. This matches what some editors do, and doesn't match others.
 The best advice is to avoid tab characters in your source code
-altogether (see ``-Wtabs`` in :ref:`options-sanity`).
+altogether (see :ghc-flag:`-Wtabs` in :ref:`options-sanity`).
 
 If the module is omitted, then the most recently-loaded module is used.
 
@@ -1469,10 +1473,10 @@ example:
     Stopped at qsort.hs:5:7-47
     _result :: IO ()
 
-The command :ghci-cmd:`:step expr` begins the evaluation of ⟨expr⟩ in
+The command :ghci-cmd:`:step expr <:step>` begins the evaluation of ⟨expr⟩ in
 single-stepping mode. If ⟨expr⟩ is omitted, then it single-steps from
-the current breakpoint. :ghci-cmd:`:steplocal` and :ghci-cmd:`:stepmodule` work
-similarly.
+the current breakpoint. :ghci-cmd:`:steplocal` and :ghci-cmd:`:stepmodule`
+commands work similarly.
 
 The :ghci-cmd:`:list` command is particularly useful when single-stepping, to
 see where you currently are:
@@ -1649,11 +1653,13 @@ just like :ghci-cmd:`:step`.
 
 The history is only available when using :ghci-cmd:`:trace`; the reason for this
 is we found that logging each breakpoint in the history cuts performance
-by a factor of 2 or more. By default, GHCi remembers the last 50 steps
-in the history, but this can be changed with the ``-fghci-hist-size=n`` option).
+by a factor of 2 or more.
 
-.. index::
-   single: -fghci-hist-size
+.. ghc-flag:: -fghci-hist-size
+
+    :default: 50
+
+    Modify the depth of the evaluation history tracked by GHCi.
 
 .. _ghci-debugger-exceptions:
 
@@ -1666,7 +1672,7 @@ exception come from?". Exceptions such as those raised by ``error`` or
 particular call to ``head`` in your program resulted in the error can be
 a painstaking process, usually involving ``Debug.Trace.trace``, or
 compiling with profiling and using ``Debug.Trace.traceStack`` or
-``+RTS -xc`` (see :ref:`prof-time-options`).
+``+RTS -xc`` (see :rts-flag:`-xc`).
 
 The GHCi debugger offers a way to hopefully shed some light on these
 errors quickly and without modifying or recompiling the source code. One
@@ -1674,8 +1680,8 @@ way would be to set a breakpoint on the location in the source code that
 throws the exception, and then use :ghci-cmd:`:trace` and :ghci-cmd:`:history` to
 establish the context. However, ``head`` is in a library and we can't
 set a breakpoint on it directly. For this reason, GHCi provides the
-flags ``-fbreak-on-exception`` which causes the evaluator to stop when
-an exception is thrown, and ``-fbreak-on-error``, which works similarly
+flags :ghc-flag:`-fbreak-on-exception` which causes the evaluator to stop when
+an exception is thrown, and :ghc-flag:`-fbreak-on-error`, which works similarly
 but stops only on uncaught exceptions. When stopping at an exception,
 GHCi will act just as it does when a breakpoint is hit, with the
 deviation that it will not show you any source code location. Due to
@@ -1712,6 +1718,14 @@ The exception itself is bound to a new variable, ``_exception``.
 Breaking on exceptions is particularly useful for finding out what your
 program was doing when it was in an infinite loop. Just hit Control-C,
 and examine the history to find out what was going on.
+
+.. ghc-flag:: -fbreak-on-exception
+              -fbreak-on-error
+
+    Causes GHCi to halt evaluation and return to the interactive prompt
+    in the event of an exception. While :ghc-flag:`-fbreak-on-exception` breaks
+    on all exceptions, :ghc-flag:`-fbreak-on-error` breaks on only those which
+    would otherwise be uncaught.
 
 Example: inspecting functions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1838,7 +1852,7 @@ Invoking GHCi
 GHCi is invoked with the command ``ghci`` or ``ghc --interactive``. One
 or more modules or filenames can also be specified on the command line;
 this instructs GHCi to load the specified modules or filenames (and all
-the modules they depend on), just as if you had said :ghci-cmd:`:load modules`
+the modules they depend on), just as if you had said ``:load modules``
 at the GHCi prompt (see :ref:`ghci-commands`). For example, to start
 GHCi and load the program whose topmost module is in the file
 ``Main.hs``, we could say:
@@ -1862,7 +1876,7 @@ to specify any extra flags at all: they will be automatically loaded the
 first time they are needed.
 
 For hidden packages, however, you need to request the package be loaded
-by using the ``-package`` flag:
+by using the :ghc-flag:`-package` flag:
 
 .. code-block:: none
 
@@ -1900,10 +1914,10 @@ On systems with ``.so``-style shared libraries, the actual library
 loaded will the ``liblib.so``. GHCi searches the following places for
 libraries, in this order:
 
--  Paths specified using the ``-Lpath`` command-line option,
+-  Paths specified using the :ghc-flag:`-L` command-line option,
 
 -  the standard library search path for your system, which on some
-   systems may be overridden by setting the ``LD_LIBRARY_PATH``
+   systems may be overridden by setting the :envvar:`LD_LIBRARY_PATH`
    environment variable.
 
 On systems with ``.dll``-style shared libraries, the actual library
@@ -2022,8 +2036,8 @@ commonly used commands.
 
     Changes the current working directory to ⟨dir⟩. A "``~``" symbol
     at the beginning of ⟨dir⟩ will be replaced by the contents of the
-    environment variable ``HOME``. See also the :ghci-cmd:`:show paths` command
-    for showing the current working directory.
+    environment variable :envvar:`HOME`. See also the :ghci-cmd:`:show paths`
+    command for showing the current working directory.
 
     Note: changing directories causes all currently loaded modules to be
     unloaded. This is because the search path is usually expressed using
@@ -2179,8 +2193,8 @@ commonly used commands.
     Opens an editor to edit the file ⟨file⟩, or the most recently loaded
     module if ⟨file⟩ is omitted. If there were errors during the last
     loading, the cursor will be positioned at the line of the first
-    error. The editor to invoke is taken from the ``EDITOR`` environment
-    variable, or a default editor on your system if ``EDITOR`` is not
+    error. The editor to invoke is taken from the :envvar:`EDITOR` environment
+    variable, or a default editor on your system if :envvar:`EDITOR` is not
     set. You can change the editor using :ghci-cmd:`:set editor`.
 
 .. ghci-cmd:: :etags
@@ -2202,6 +2216,7 @@ commonly used commands.
     :ghci-cmd:`:trace`, :ghci-cmd:`:history`, :ghci-cmd:`:back`.
 
 .. ghci-cmd:: :help
+              :?
 
     Displays a list of the available commands.
 
@@ -2217,7 +2232,7 @@ commonly used commands.
     Display the history of evaluation steps. With a number, displays
     that many steps (default: 20). For use with :ghci-cmd:`:trace`; see
     :ref:`tracing`. To set the number of history entries stored by GHCi,
-    use ``-fghci-hist-size=n``.
+    use the :ghc-flag:`-fghci-hist-size` flag.
 
 .. ghci-cmd:: :info;[!] ⟨name⟩
 
@@ -2715,7 +2730,7 @@ Setting GHC command-line options in GHCi
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Normal GHC command-line options may also be set using :ghci-cmd:`:set`. For
-example, to turn on ``-Wmissing-signatures``, you would say:
+example, to turn on :ghc-flag:`-Wmissing-signatures`, you would say:
 
 .. code-block:: none
 
@@ -2735,9 +2750,9 @@ option, you can set the reverse option:
 :ref:`flag-reference` lists the reverse for each option where
 applicable.
 
-Certain static options (``-package``, ``-I``, ``-i``, and ``-l`` in
-particular) will also work, but some may not take effect until the next
-reload.
+Certain static options (:ghc-flag:`-package`, :ghc-flag:`-I`, :ghc-flag:`-i`,
+and :ghc-flag:`-l` in particular) will also work, but some may not take effect
+until the next reload.
 
 .. index::
    single: static; options
@@ -2765,7 +2780,7 @@ that option apply to loaded modules too. For example
 
     :seti -XMonoLocalBinds
 
-It would be undesirable if ``-XMonoLocalBinds`` were to apply to loaded
+It would be undesirable if :ghc-flag:`-XMonoLocalBinds` were to apply to loaded
 modules too: that might cause a compilation error, but more commonly it
 will cause extra recompilation, because GHC will think that it needs to
 recompile the module because the flags have changed.
@@ -2816,7 +2831,7 @@ The ``.ghci`` files
    single: .ghci; file
    single: startup; files, GHCi
 
-When it starts, unless the ``-ignore-dot-ghci`` flag is given, GHCi
+When it starts, unless the :ghc-flag:`-ignore-dot-ghci` flag is given, GHCi
 reads and executes commands from the following files, in this order, if
 they exist:
 
@@ -2842,14 +2857,14 @@ useful way to set certain project-wide options so you don't have to type
 them every time you start GHCi: eg. if your project uses multi-parameter
 type classes, scoped type variables, and CPP, and has source files in
 three subdirectories A, B and C, you might put the following lines in
-``.ghci``:
+:file:`.ghci`:
 
 .. code-block:: none
 
     :set -XMultiParamTypeClasses -XScopedTypeVariables -cpp
     :set -iA:B:C
 
-(Note that strictly speaking the ``-i`` flag is a static one, but in
+(Note that strictly speaking the :ghc-flag:`-i` flag is a static one, but in
 fact it works to set it using :ghci-cmd:`:set` like this. The changes won't take
 effect until the next :ghci-cmd:`:load`, though.)
 
@@ -2866,22 +2881,18 @@ With this macro defined in your ``.ghci`` file, you can use
 contribute!-) other suggestions for ``.ghci`` files on this Haskell wiki
 page: `GHC/GHCi <http://haskell.org/haskellwiki/GHC/GHCi>`__
 
-Additionally, any files specified with ``-ghci-script`` flags will be
+Additionally, any files specified with :ghc-flag:`-ghci-script` flags will be
 read after the standard files, allowing the use of custom .ghci files.
 
 Two command-line options control whether the startup files files are
 read:
 
-``-ignore-dot-ghci``
-    .. index::
-       single: -ignore-dot-ghci
+.. ghc-flag:: -ignore-dot-ghci
 
-    Don't read either ``./.ghci`` or the other startup files when
+    Don't read either :file:`./.ghci` or the other startup files when
     starting up.
 
-``-ghci-script``
-    .. index::
-       single: -ghci-script
+.. ghc-flag:: -ghci-script
 
     Read a specific file after the usual startup files. Maybe be
     specified repeatedly for multiple inputs.
@@ -2941,15 +2952,15 @@ Compiling to object code inside GHCi
 
 By default, GHCi compiles Haskell source code into byte-code that is
 interpreted by the runtime system. GHCi can also compile Haskell code to
-object code: to turn on this feature, use the ``-fobject-code`` flag
-either on the command line or with :ghci-cmd:`:set` (the option ``-fbyte-code``
+object code: to turn on this feature, use the :ghc-flag:`-fobject-code` flag
+either on the command line or with :ghci-cmd:`:set` (the option :ghc-flag:`-fbyte-code`
 restores byte-code compilation again). Compiling to object code takes
 longer, but typically the code will execute 10-20 times faster than
 byte-code.
 
 Compiling to object code inside GHCi is particularly useful if you are
 developing a compiled application, because the :ghci-cmd:`:reload` command
-typically runs much faster than restarting GHC with ``--make`` from the
+typically runs much faster than restarting GHC with :ghc-flag:`--make` from the
 command-line, because all the interface files are already cached in
 memory.
 
@@ -2965,26 +2976,26 @@ Running the interpreter in a separate process
 
 Normally GHCi runs the interpreted code in the same process as GHC
 itself, on top of the same RTS and sharing the same heap.  However, if
-the flag ``-fexternal-interpreter`` is given, then GHC will spawn a
+the flag :ghc-flag:`-fexternal-interpreter` is given, then GHC will spawn a
 separate process for running interpreted code, and communicate with it
 using messages over a pipe.
 
-``-fexternal-interpreter``
-    .. index::
-       single: -fexternal-interpreter
+.. ghc-flag:: -fexternal-interpreter
+
+    :since: 8.0.1
 
     Run interpreted code (for GHCi, Template Haskell, Quasi-quoting,
     or Annotations) in a separate process.  The interpreter will run
-    in profiling mode if ``-prof`` is in effect, and in
-    dynamically-linked mode if ``-dynamic`` is in effect.
+    in profiling mode if :ghc-flag:`-prof` is in effect, and in
+    dynamically-linked mode if :ghc-flag:`-dynamic` is in effect.
 
     There are a couple of caveats that will hopefully be removed in
     the future: this option is currently not implemented on Windows
     (it is a no-op), and the external interpreter does not support the
     GHCi debugger, so breakpoints and single-stepping don't work with
-    ``-fexternal-interpreter``.
+    :ghc-flag:`-fexternal-interpreter`.
 
-    See also the ``-pgmi`` (:ref:`replacing-phases`) and ``-opti``
+    See also the :ghc-flag:`-pgmi` (:ref:`replacing-phases`) and :ghc-flag:`-opti`
     (:ref:`forcing-options-through`) flags.
 
 Why might we want to do this?  The main reason is that the RTS running
@@ -2994,8 +3005,8 @@ dynamically-linked) from GHC itself.  So for example:
 - We can use the profiler to collect stack traces when using GHCi (see
   :ref:`ghci-stack-traces`).
 
-- When compiling Template Haskell code with ``-prof`` we don't need to
-  compile the modules without ``-prof`` first (see :ref:`th-profiling`)
+- When compiling Template Haskell code with :ghc-flag:`-prof` we don't need to
+  compile the modules without :ghc-flag:`-prof` first (see :ref:`th-profiling`)
   because we can run the profiled object code in the interpreter.
 
 This feature is experimental in GHC 8.0.x, but it may become the
@@ -3010,9 +3021,10 @@ The interpreter can't load modules with foreign export declarations!
     Unfortunately not. We haven't implemented it yet. Please compile any
     offending modules by hand before loading them into GHCi.
 
-``-O`` doesn't work with GHCi!
+:ghc-flag:`-O` doesn't work with GHCi!
+
     .. index::
-       single: -O
+       single: optimization; and GHCi
 
     For technical reasons, the bytecode compiler doesn't interact well
     with one of the optimisation passes, so we have disabled
@@ -3024,12 +3036,12 @@ The interpreter can't load modules with foreign export declarations!
 Unboxed tuples don't work with GHCi
     That's right. You can always compile a module that uses unboxed
     tuples and load it into GHCi, however. (Incidentally the previous
-    point, namely that ``-O`` is incompatible with GHCi, is because the
+    point, namely that :ghc-flag:`-O` is incompatible with GHCi, is because the
     bytecode compiler can't deal with unboxed tuples).
 
 Concurrent threads don't carry on running when GHCi is waiting for input.
     This should work, as long as your GHCi was built with the
-    ``-threaded`` switch, which is the default. Consult whoever supplied
+    :ghc-flag:`-threaded` switch, which is the default. Consult whoever supplied
     your GHCi installation.
 
 

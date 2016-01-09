@@ -15,7 +15,7 @@ starts ``ghci``.
 Be aware of that ``ghc`` and ``ghci`` do require filenames containing
 spaces to be escaped using quotes:
 
-::
+.. code-block:: none
 
     c:\ghc\bin\ghci "c:\\Program Files\\Haskell\\Project.hs"
 
@@ -70,7 +70,7 @@ window, use the flag ``-optl-mwindows`` in the link step.
    using the ordinary Haskell input/output functions will cause your
    program to fail with an IO exception, such as:
 
-   ::
+   .. code-block:: none
 
         Fail: <stdout>: hPutChar: failed (Bad file descriptor)
 
@@ -166,7 +166,7 @@ Things to do
    escaping ``\\`` in paths. Apart from the banner and the startup time,
    something like this would also do:
 
-   ::
+   .. code-block:: none
 
          $ echo "Directory.getCurrentDirectory >>= putStrLn . init . tail . show " | ghci
 
@@ -204,7 +204,7 @@ Creating a Win32 DLL -shared Sealing up your Haskell library inside a
 DLL is straightforward; compile up the object files that make up the
 library, and then build the DLL by issuing a command of the form:
 
-::
+.. code-block:: none
 
     ghc -shared -o foo.dll bar.o baz.o wibble.a -lfooble
 
@@ -219,7 +219,7 @@ A couple of things to notice:
    this, you can specify the *module definition file* to use on the
    command line as follows:
 
-   ::
+   .. code-block:: none
 
        ghc -shared -o .... MyDef.def
 
@@ -227,7 +227,7 @@ A couple of things to notice:
    simply lists what entry points you want to export. Here's one that's
    suitable when building a Haskell COM server DLL:
 
-   ::
+   .. code-block:: none
 
        EXPORTS
         DllCanUnloadNow     = DllCanUnloadNow@0
@@ -239,7 +239,7 @@ A couple of things to notice:
    import library. The import library name is derived from the name of
    the DLL, as follows:
 
-   ::
+   .. code-block:: none
 
        DLL: HScool.dll  ==> import lib: libHScool.dll.a
 
@@ -278,7 +278,7 @@ to call from the outside. For example:
 
 Add some helper code that starts up and shuts down the Haskell RTS:
 
-::
+.. code-block:: c
 
     // StartEnd.c
     #include <Rts.h>
@@ -302,7 +302,7 @@ Here, ``Adder`` is the name of the root module in the module tree (as
 mentioned above, there must be a single root module, and hence a single
 module tree in the DLL). Compile everything up:
 
-::
+.. code-block:: none
 
     ghc -c Adder.hs
     ghc -c StartEnd.c
@@ -327,7 +327,7 @@ Using from VBA
 
 An example of using ``Adder.dll`` from VBA is:
 
-::
+.. code-block:: none
 
     Private Declare Function Adder Lib "Adder.dll" Alias "adder@8" _
           (ByVal x As Long, ByVal y As Long) As Long
@@ -347,7 +347,7 @@ An example of using ``Adder.dll`` from VBA is:
     MsgBox "12 + 5 = " & Adder(12, 5)
     End Sub
 
-This example uses the ``Document_Open``/``Close`` functions of Microsoft
+This example uses the ``Document_Open``\/``Close`` functions of Microsoft
 Word, but provided ``HsStart`` is called before the first function, and
 ``HsEnd`` after the last, then it will work fine.
 
@@ -358,7 +358,7 @@ Using from C++
 
 An example of using ``Adder.dll`` from C++ is:
 
-::
+.. code-block:: c
 
     // Tester.cpp
     #include "HsFFI.h"
@@ -381,7 +381,7 @@ An example of using ``Adder.dll`` from C++ is:
 
 This can be compiled and run with:
 
-::
+.. code-block:: none
 
     $ ghc -o tester Tester.cpp Adder.dll.a
     $ tester
