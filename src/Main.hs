@@ -19,6 +19,7 @@ main = shakeArgs options rules
         , Rules.Config.configRules
         , Rules.Generate.copyRules
         , Rules.Generate.generateRules
+        , Rules.Generate.generateScripts
         , Rules.generateTargets
         , Rules.IntegerGmp.integerGmpRules
         , Rules.Libffi.libffiRules

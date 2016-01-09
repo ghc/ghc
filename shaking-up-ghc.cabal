@@ -47,6 +47,7 @@ executable ghc-shake
                        , Rules.Generators.GhcAutoconfH
                        , Rules.Generators.GhcBootPlatformH
                        , Rules.Generators.GhcPlatformH
+                       , Rules.Generators.GhcSplit
                        , Rules.Generators.GhcVersionH
                        , Rules.Generators.VersionHs
                        , Rules.IntegerGmp
@@ -91,7 +92,7 @@ executable ghc-shake
                        , Settings.Packages.Rts
                        , Settings.Packages.RunGhc
                        , Settings.Packages.Touchy
-                       , Settings.Packages.Unlit                       
+                       , Settings.Packages.Unlit
                        , Settings.TargetDirectory
                        , Settings.User
                        , Settings.Ways

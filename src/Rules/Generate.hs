@@ -1,5 +1,5 @@
 module Rules.Generate (
-    generatePackageCode, generateRules,
+    generatePackageCode, generateRules, generateScripts,
     derivedConstantsPath, generatedDependencies,
     installTargets, copyRules
     ) where
@@ -11,6 +11,7 @@ import Rules.Generators.ConfigHs
 import Rules.Generators.GhcAutoconfH
 import Rules.Generators.GhcBootPlatformH
 import Rules.Generators.GhcPlatformH
+import Rules.Generators.GhcSplit
 import Rules.Generators.GhcVersionH
 import Rules.Generators.VersionHs
 import Oracles.ModuleFiles
@@ -80,7 +81,7 @@ compilerDependencies stage =
 
 generatedDependencies :: Stage -> Package -> [FilePath]
 generatedDependencies stage pkg
-    | pkg   == compiler = compilerDependencies stage
+    | pkg   == compiler = compilerDependencies stage ++ ["inplace/lib/bin/ghc-split"]
     | pkg   == ghcPrim  = ghcPrimDependencies stage
     | pkg   == rts      = includesDependencies ++ derivedConstantsDependencies
     | stage == Stage0   = defaultDependencies
@@ -103,6 +104,13 @@ generate file target expr = do
     contents <- interpretPartial target expr
     writeFileChanged file contents
     putSuccess $ "| Successfully generated '" ++ file ++ "'."
+
+-- | Generates @file@ for @target@ and marks it as executable.
+generateExec :: FilePath -> PartialTarget -> Expr String -> Action ()
+generateExec file target expr = do
+    generate file target expr
+    unit $ cmd "chmod +x " [file]
+    putSuccess $ "| Made '" ++ file ++ "' executable."
 
 generatePackageCode :: Resources -> PartialTarget -> Rules ()
 generatePackageCode _ target @ (PartialTarget stage pkg) =
@@ -176,6 +184,31 @@ generateRules = do
 
   where
     file <~ gen = file %> \out -> generate out emptyTarget gen
+
+-- | Generate scripts the build system requires. For now we generate the
+-- @ghc-split@ script from it's literate perl source.
+generateScripts :: Rules ()
+generateScripts = do
+    -- how to translate literate perl to perl.
+    -- this is a hack :-/
+    "//*.prl" %> \out -> do
+        let src = out -<.> "lprl"
+        path <- builderPath Unlit
+        need [path]
+        unit $ cmd [path] [src] [out]
+
+    -- ghc-split is only a perl script.
+    let ghcSplit = "inplace/lib/ghc-split" -- See system.config
+    let ghcSplitBin = "inplace/lib/bin/ghc-split" -- See ConfigHs.hs
+
+    ghcSplit <~ generateGhcSplit
+
+    ghcSplitBin %> \out -> do
+        need [ghcSplit]
+        copyFileChanged ghcSplit out
+
+  where
+    file <~ gen = file %> \out -> generateExec out emptyTarget gen
 
 -- TODO: Use the Types, Luke! (drop partial function)
 -- We sometimes need to evaluate expressions that do not require knowing all
