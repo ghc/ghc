@@ -24,4 +24,4 @@ install:
 
 build_script:
     - cd C:\msys64\home\ghc\shake-build
-    - stack exec -- build.bat -j --no-progress
+    - echo "" | stack --no-terminal exec -- build.bat -j --no-progress inplace/bin/ghc-stage1.exe
