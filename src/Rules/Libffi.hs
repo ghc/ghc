@@ -2,6 +2,7 @@ module Rules.Libffi (libffiRules, libffiDependencies) where
 
 import Base
 import Expression
+import Extra (replace)
 import GHC
 import Oracles
 import Rules.Actions
