@@ -1,4 +1,10 @@
 clone_folder: "C:\\msys64\\home\\ghc\\shake-build"
+environment:
+  global:
+    STACK_ROOT: "c:\\sr"
+
+cache:
+    - c:\\sr
 
 install:
     - cd
@@ -24,4 +30,4 @@ install:
 
 build_script:
     - cd C:\msys64\home\ghc\shake-build
-    - echo "" | stack --no-terminal exec -- build.bat -j --no-progress inplace/bin/ghc-stage1.exe
+    - echo "" | stack --no-terminal exec -- build.bat -j --no-progress inplace/bin/ghc-cabal.exe
