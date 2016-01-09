@@ -1,0 +1,3 @@
+:set -XTypeInType
+data Proxy1 k (a :: k) = Proxy1
+:kind Proxy1
