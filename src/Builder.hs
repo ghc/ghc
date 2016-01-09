@@ -41,6 +41,7 @@ data Builder = Alex
              | Ld
              | Nm
              | Objdump
+             | Perl
              | Ranlib
              | Tar
              | Unlit
@@ -83,6 +84,7 @@ builderKey builder = case builder of
     Ld               -> "ld"
     Nm               -> "nm"
     Objdump          -> "objdump"
+    Perl             -> "perl"
     Ranlib           -> "ranlib"
     Tar              -> "tar"
     Unlit            -> "unlit"
