@@ -18,7 +18,7 @@ The highlights, since the 7.10 branch, are:
 
 - Support for :ref:`record pattern synonyms <record-patsyn>`
 
-- ``-XDeriveAnyClass`` to conveniently derive default instances (see :ref:`derive-any-class`)
+- The ``-XDeriveAnyClass`` extension learned to derive instances for classes with associated types (see :ref:`derive-any-class`)
 
 - More reliable DWARF debugging information
 

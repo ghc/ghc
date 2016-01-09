@@ -13,7 +13,8 @@ of major features and numerous bug fixes. These include,
 
  * Support for record pattern synonyms
 
- * The DeriveAnyClass extension to conveniently derive default instances
+ * The -XDeriveAnyClass extension learned to derive instances for classes with
+   associated types
 
  * More reliable DWARF debugging information
 
