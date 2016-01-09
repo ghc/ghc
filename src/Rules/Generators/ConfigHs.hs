@@ -32,7 +32,7 @@ generateConfigHs = do
     cGhcEnableTablesNextToCode <- yesNo ghcEnableTablesNextToCode
     cLeadingUnderscore         <- yesNo $ flag LeadingUnderscore
     cGHC_UNLIT_PGM             <- fmap takeFileName $ getBuilderPath Unlit
-    cGHC_SPLIT_PGM             <- fmap takeBaseName $ getBuilderPath GhcSplit
+    let cGHC_SPLIT_PGM         = "ghc-split"
     cLibFFI                    <- lift useLibFFIForAdjustors
     rtsWays                    <- getRtsWays
     cGhcRtsWithLibdw           <- getFlag WithLibdw

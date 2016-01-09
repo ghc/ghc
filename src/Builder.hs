@@ -32,7 +32,6 @@ data Builder = Alex
              | GhcCabalHsColour
              | GhcM Stage
              | GhcPkg Stage
-             | GhcSplit
              | Haddock
              | Happy
              | HsColour
@@ -75,7 +74,6 @@ builderKey builder = case builder of
     GhcCabalHsColour -> builderKey $ GhcCabal -- synonym for 'GhcCabal hscolour'
     GhcPkg Stage0    -> "system-ghc-pkg"
     GhcPkg _         -> "ghc-pkg"
-    GhcSplit         -> "ghc-split"
     Happy            -> "happy"
     Haddock          -> "haddock"
     HsColour         -> "hscolour"
