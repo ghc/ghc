@@ -43,6 +43,7 @@ executable ghc-shake
                        , Rules.Dependencies
                        , Rules.Documentation
                        , Rules.Generate
+                       , Rules.Generators.Common
                        , Rules.Generators.ConfigHs
                        , Rules.Generators.GhcAutoconfH
                        , Rules.Generators.GhcBootPlatformH
