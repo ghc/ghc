@@ -397,3 +397,4 @@ test('T11341', normal, compile, ['-v0 -dsuppress-uniques'])
 test('T11345', normal, compile_and_run, ['-v0 -dsuppress-uniques'])
 
 test('TH_finalizer', normal, compile, ['-v0'])
+test('T10603', expect_broken(10603), compile, ['-ddump-splices'])
