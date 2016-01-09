@@ -225,6 +225,7 @@ test('T10466', normal, ghci_script, ['T10466.script'])
 test('T10501', normal, ghci_script, ['T10501.script'])
 test('T10508', normal, ghci_script, ['T10508.script'])
 test('T10520', normal, ghci_script, ['T10520.script'])
+test('T10663', normal, ghci_script, ['T10663.script'])
 test('T10989',
     [
       extra_clean(['dummy.hs', 'dummy.lhs', 'dummy.tags'])

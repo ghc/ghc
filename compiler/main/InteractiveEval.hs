@@ -14,7 +14,7 @@ module InteractiveEval (
         Resume(..), History(..),
         execStmt, ExecOptions(..), execOptions, ExecResult(..), resumeExec,
         runDecls, runDeclsWithLocation,
-        isStmt, isImport, isDecl,
+        isStmt, hasImport, isImport, isDecl,
         parseImportDecl, SingleStep(..),
         resume,
         abandon, abandonAll,
@@ -89,7 +89,7 @@ import Outputable
 import FastString
 import Bag
 import qualified Lexer (P (..), ParseResult(..), unP, mkPState)
-import qualified Parser (parseStmt, parseModule, parseDeclaration)
+import qualified Parser (parseStmt, parseModule, parseDeclaration, parseImport)
 
 import System.Directory
 import Data.Dynamic
@@ -821,14 +821,21 @@ isStmt dflags stmt =
     Lexer.POk _ _ -> True
     Lexer.PFailed _ _ -> False
 
--- | Returns @True@ if passed string is an import declaration.
-isImport :: DynFlags -> String -> Bool
-isImport dflags stmt =
+-- | Returns @True@ if passed string has an import declaration.
+hasImport :: DynFlags -> String -> Bool
+hasImport dflags stmt =
   case parseThing Parser.parseModule dflags stmt of
     Lexer.POk _ thing -> hasImports thing
     Lexer.PFailed _ _ -> False
   where
     hasImports = not . null . hsmodImports . unLoc
+
+-- | Returns @True@ if passed string is an import declaration.
+isImport :: DynFlags -> String -> Bool
+isImport dflags stmt =
+  case parseThing Parser.parseImport dflags stmt of
+    Lexer.POk _ _ -> True
+    Lexer.PFailed _ _ -> False
 
 -- | Returns @True@ if passed string is a declaration but __/not a splice/__.
 isDecl :: DynFlags -> String -> Bool
