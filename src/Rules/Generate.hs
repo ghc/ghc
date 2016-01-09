@@ -42,8 +42,10 @@ includesDependencies = ("includes" -/-) <$>
     , "ghcversion.h" ]
 
 defaultDependencies :: [FilePath]
-defaultDependencies =
-    includesDependencies ++ libffiDependencies ++ integerGmpDependencies
+defaultDependencies = concat
+    [ includesDependencies
+    , libffiDependencies
+    , integerGmpDependencies ]
 
 ghcPrimDependencies :: Stage -> [FilePath]
 ghcPrimDependencies stage = ((targetPath stage ghcPrim -/- "build") -/-) <$>
@@ -77,7 +79,6 @@ compilerDependencies stage =
        , "primop-vector-tys-exports.hs-incl"
        , "primop-vector-tycons.hs-incl"
        , "primop-vector-tys.hs-incl" ]
-    ++ ["inplace/lib/bin/ghc-split"]
 
 generatedDependencies :: Stage -> Package -> [FilePath]
 generatedDependencies stage pkg

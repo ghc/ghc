@@ -26,13 +26,18 @@ ghcBuilderArgs = stagedBuilder Ghc ? do
             , notStage0 ? arg "-O2"
             , arg "-Wall"
             , arg "-fwarn-tabs"
-            , splitObjects ? arg "-split-objs"
+            , splitObjectsArgs
             , not buildObj ? arg "-no-auto-link-packages"
             , not buildObj ? append [ "-optl-l" ++ lib | lib <- libs    ]
             , not buildObj ? append [ "-optl-L" ++ dir | dir <- libDirs ]
             , buildObj ? arg "-c"
             , append =<< getInputs
             , arg "-o", arg =<< getOutput ]
+
+splitObjectsArgs :: Args
+splitObjectsArgs = splitObjects ? do
+    lift $ need ["inplace/lib/bin/ghc-split"]
+    arg "-split-objs"
 
 ghcMBuilderArgs :: Args
 ghcMBuilderArgs = stagedBuilder GhcM ? do
