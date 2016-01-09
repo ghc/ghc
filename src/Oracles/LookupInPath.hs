@@ -4,6 +4,7 @@ module Oracles.LookupInPath (
     ) where
 
 import Base
+import Extra (wordsBy)
 
 newtype LookupInPath = LookupInPath String
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
@@ -22,7 +23,7 @@ lookupInPath c
 lookupInPathOracle :: Rules ()
 lookupInPathOracle = do
     o <- newCache $ \c -> do
-        envPaths <- wordsWhen (== ':') <$> getEnvWithDefault "" "PATH"
+        envPaths <- wordsBy (== ':') <$> getEnvWithDefault "" "PATH"
         let candidates = map (-/- c) envPaths
         -- this will crash if we do not find any valid candidate.
         fullCommand <- head <$> filterM doesFileExist candidates

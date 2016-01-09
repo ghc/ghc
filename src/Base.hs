@@ -22,9 +22,9 @@ module Base (
     putColoured, putOracle, putBuild, putSuccess, putError, renderBox,
 
     -- * Miscellaneous utilities
-    bimap, minusOrd, intersectOrd, replaceEq, replace, quote, chunksOfSize,
+    bimap, minusOrd, intersectOrd, replaceEq, quote, chunksOfSize,
     replaceSeparators, decodeModule, encodeModule, unifyPath, (-/-),
-    versionToInt, removeFileIfExists, removeDirectoryIfExists, wordsWhen
+    versionToInt, removeFileIfExists, removeDirectoryIfExists
     ) where
 
 import Control.Applicative
@@ -89,25 +89,6 @@ replaceSeparators = replaceWhen isPathSeparator
 
 replaceWhen :: (a -> Bool) -> a -> [a] -> [a]
 replaceWhen p to = map (\from -> if p from then to else from)
-
--- | Find all occurrences of substring 'from' and replace them to 'to' in a
--- given string. Not very efficient, but simple and fast enough for our purposes
-replace :: Eq a => [a] -> [a] -> [a] -> [a]
-replace from to = go
-  where
-    skipFrom = drop $ length from
-    go [] = []
-    go s @ (x : xs)
-        | from `isPrefixOf` s = to ++ go (skipFrom s)
-        | otherwise           = x  :  go xs
-
--- | Split a list into chunks in places where the predicate @p@ holds.
--- See: http://stackoverflow.com/a/4981265
-wordsWhen :: Eq a => (a -> Bool) -> [a] -> [[a]]
-wordsWhen p list =
-    case dropWhile p list of
-        [] -> []
-        l  -> w : wordsWhen p rest where (w, rest) = break p l
 
 -- | @chunksOfSize size strings@ splits a given list of strings into chunks not
 -- exceeding the given @size@.
