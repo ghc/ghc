@@ -291,6 +291,7 @@ checkValidType :: UserTypeCtxt -> Type -> TcM ()
 checkValidType ctxt ty
   = do { traceTc "checkValidType" (ppr ty <+> text "::" <+> ppr (typeKind ty))
        ; rankn_flag  <- xoptM LangExt.RankNTypes
+       ; impred_flag <- xoptM LangExt.ImpredicativeTypes
        ; let gen_rank :: Rank -> Rank
              gen_rank r | rankn_flag = ArbitraryRank
                         | otherwise  = r
@@ -310,7 +311,12 @@ checkValidType ctxt ty
                  TySynCtxt _    -> rank0
 
                  ExprSigCtxt    -> rank1
-                 TypeAppCtxt    -> rank0
+                 TypeAppCtxt | impred_flag -> ArbitraryRank
+                             | otherwise   -> tyConArgMonoType
+                    -- Normally, ImpredicativeTypes is handled in check_arg_type,
+                    -- but visible type applications don't go through there.
+                    -- So we do this check here.
+
                  FunSigCtxt {}  -> rank1
                  InfSigCtxt _   -> ArbitraryRank        -- Inferred type
                  ConArgCtxt _   -> rank1 -- We are given the type of the entire
