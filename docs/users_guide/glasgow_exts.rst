@@ -2546,7 +2546,7 @@ Existentially quantified data constructors
 
 .. ghc-flag:: -XExistentialQuantification
 
-    Allow the use of ``forall`` syntax.
+    Allow existentially quantified type variables in types.
 
 The idea of using existential quantification in data type declarations
 was suggested by Perry, and implemented in Hope+ (Nigel Perry, *The
@@ -4957,6 +4957,8 @@ Relaxed rules for the instance head
     Allow definition of type class instances for type synonyms.
 
 .. ghc-flag:: -XFlexibleInstances
+
+    :implies: :ghc-flag:`-XTypeSynonymInstances`
 
     Allow definition of type class instances with arbitrary nested types in the
     instance head.
@@ -8442,6 +8444,8 @@ Lexically scoped type variables
 -------------------------------
 
 .. ghc-flag:: -XScopedTypeVariables
+
+    :implies: :ghc-flag:`-XRelaxedPolyRec`
 
     Enable lexical scoping of type variables explicitly introduced with
     ``forall``.
@@ -12516,6 +12520,8 @@ Strict-by-default pattern bindings
 ----------------------------------
 
 .. ghc-flag:: -XStrict
+
+    :implies: :ghc-flag:`-XStrictData`
 
     Make bindings in the current module strict by default.
 

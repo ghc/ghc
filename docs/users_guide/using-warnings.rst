@@ -105,6 +105,8 @@ of ``-W(no-)*``.
 
 .. ghc-flag:: -fdefer-type-errors
 
+    :implies: :ghc-flag:`-fdefer-typed-holes`
+
     Defer as many type errors as possible until runtime. At compile time
     you get a warning (instead of an error). At runtime, if you use a
     value that depends on a type error, you get a runtime error; but you
@@ -491,6 +493,8 @@ of ``-W(no-)*``.
     full check, independently of the number of guards.
 
 .. ghc-flag:: -ffull-guard-reasoning
+
+    :implies: :ghc-flag:`-Wno-too-many-guards`
 
     .. index::
        single: guard reasoning, warning
