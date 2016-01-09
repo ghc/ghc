@@ -113,11 +113,8 @@ defaultProgramPath stage pkg
     | pkg == haddock || pkg == ghcTags = case stage of
         Stage2 -> Just . inplaceProgram $ pkgNameString pkg
         _      -> Nothing
-    |  pkg == touchy = case stage of
+    | pkg `elem` [touchy, unlit] = case stage of
         Stage0 -> Just $ "inplace/lib/bin" -/- pkgNameString pkg <.> exe
-        _      -> Nothing
-    | pkg == unlit = case stage of
-        Stage0 -> Just $ "inplace/lib" -/- pkgNameString pkg <.> exe
         _      -> Nothing
     | isProgram pkg = case stage of
         Stage0 -> Just . inplaceProgram $ pkgNameString pkg

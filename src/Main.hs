@@ -10,6 +10,7 @@ import qualified Rules.Generate
 import qualified Rules.IntegerGmp
 import qualified Rules.Libffi
 import qualified Rules.Oracles
+import qualified Rules.Perl
 
 main :: IO ()
 main = shakeArgs options rules
@@ -19,7 +20,7 @@ main = shakeArgs options rules
         , Rules.Config.configRules
         , Rules.Generate.copyRules
         , Rules.Generate.generateRules
-        , Rules.Generate.generateScripts
+        , Rules.Perl.perlScriptRules
         , Rules.generateTargets
         , Rules.IntegerGmp.integerGmpRules
         , Rules.Libffi.libffiRules

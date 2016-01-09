@@ -1,6 +1,6 @@
 module Rules.Generate (
-    generatePackageCode, generateRules, generateScripts,
-    derivedConstantsPath, generatedDependencies,
+    generate, generateExec, generatePackageCode, generateRules,
+    derivedConstantsPath, emptyTarget, generatedDependencies,
     installTargets, copyRules
     ) where
 
@@ -11,7 +11,6 @@ import Rules.Generators.ConfigHs
 import Rules.Generators.GhcAutoconfH
 import Rules.Generators.GhcBootPlatformH
 import Rules.Generators.GhcPlatformH
-import Rules.Generators.GhcSplit
 import Rules.Generators.GhcVersionH
 import Rules.Generators.VersionHs
 import Oracles.ModuleFiles
@@ -78,10 +77,11 @@ compilerDependencies stage =
        , "primop-vector-tys-exports.hs-incl"
        , "primop-vector-tycons.hs-incl"
        , "primop-vector-tys.hs-incl" ]
+    ++ ["inplace/lib/bin/ghc-split"]
 
 generatedDependencies :: Stage -> Package -> [FilePath]
 generatedDependencies stage pkg
-    | pkg   == compiler = compilerDependencies stage ++ ["inplace/lib/bin/ghc-split"]
+    | pkg   == compiler = compilerDependencies stage
     | pkg   == ghcPrim  = ghcPrimDependencies stage
     | pkg   == rts      = includesDependencies ++ derivedConstantsDependencies
     | stage == Stage0   = defaultDependencies
@@ -184,31 +184,6 @@ generateRules = do
 
   where
     file <~ gen = file %> \out -> generate out emptyTarget gen
-
--- | Generate scripts the build system requires. For now we generate the
--- @ghc-split@ script from it's literate perl source.
-generateScripts :: Rules ()
-generateScripts = do
-    -- how to translate literate perl to perl.
-    -- this is a hack :-/
-    "//*.prl" %> \out -> do
-        let src = out -<.> "lprl"
-        path <- builderPath Unlit
-        need [path]
-        unit $ cmd [path] [src] [out]
-
-    -- ghc-split is only a perl script.
-    let ghcSplit = "inplace/lib/ghc-split" -- See system.config
-    let ghcSplitBin = "inplace/lib/bin/ghc-split" -- See ConfigHs.hs
-
-    ghcSplit <~ generateGhcSplit
-
-    ghcSplitBin %> \out -> do
-        need [ghcSplit]
-        copyFileChanged ghcSplit out
-
-  where
-    file <~ gen = file %> \out -> generateExec out emptyTarget gen
 
 -- TODO: Use the Types, Luke! (drop partial function)
 -- We sometimes need to evaluate expressions that do not require knowing all

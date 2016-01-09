@@ -9,7 +9,7 @@ generateGhcSplit :: Expr String
 generateGhcSplit = do
     let yesNo = lift . fmap (\x -> if x then "YES" else "NO")
     perl <- getBuilderPath Perl
-    let script = "driver" -/- "split" -/- "ghc-split.prl"
+    let script = "driver/split/ghc-split.prl"
     when trackBuildSystem . lift $
         need [sourcePath -/- "Rules" -/- "Generators" -/- "GhcSplit.hs"]
     lift $ need [script]

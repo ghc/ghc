@@ -55,6 +55,7 @@ executable ghc-shake
                        , Rules.Library
                        , Rules.Oracles
                        , Rules.Package
+                       , Rules.Perl
                        , Rules.Program
                        , Rules.Resources
                        , Rules.Wrappers.Ghc
