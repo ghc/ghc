@@ -933,12 +933,21 @@ enqueueCommands cmds = do
 runStmt :: String -> SingleStep -> GHCi (Maybe GHC.ExecResult)
 runStmt stmt step = do
   dflags <- GHC.getInteractiveDynFlags
-  if | GHC.isStmt dflags stmt   -> run_stmt
-     | GHC.isImport dflags stmt -> run_imports
-     | otherwise                -> run_decl
+  if | GHC.isStmt dflags stmt    -> run_stmt
+     | GHC.isImport dflags stmt  -> run_import
+     -- Every import declaration should be handled by `run_import`. As GHCi
+     -- in general only accepts one command at a time, we simply throw an
+     -- exception when the input contains multiple commands of which at least
+     -- one is an import command (see #10663).
+     | GHC.hasImport dflags stmt -> throwGhcException
+       (CmdLineError "error: expecting a single import declaration")
+     -- Note: `GHC.isDecl` returns False on input like
+     -- `data Infix a b = a :@: b; infixl 4 :@:`
+     -- and should therefore not be used here.
+     | otherwise                 -> run_decl
 
   where
-    run_imports = do
+    run_import = do
       addImportToContext stmt
       return (Just (GHC.ExecComplete (Right []) 0))
 
