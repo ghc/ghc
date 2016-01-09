@@ -661,10 +661,10 @@ In summary, Safe Haskell consists of the following three language flags:
     <safe-overlapping-instances>`. It also allows the use of the safe import
     keyword.
 
-    - *Module Truste*  — Yes.
-    - *Module Truste*  (:ghc-flag:`-fpackage-trust` enabled) — Yes but only if the package
-       the module resides in is also trusted.
-    - *Haskell Languag*  — Unrestricted, except only safe overlapping instances
+    - *Module Trusted*  — Yes.
+    - *Module Trusted*  (:ghc-flag:`-fpackage-trust` enabled) — Yes but only if the package
+      the module resides in is also trusted.
+    - *Haskell Language*  — Unrestricted, except only safe overlapping instances
       allowed.
     - *Imported Modules* — Under control of module author which ones must be
       trusted.
