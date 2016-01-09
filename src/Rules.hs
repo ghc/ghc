@@ -2,7 +2,6 @@ module Rules (generateTargets, packageRules) where
 
 import Base
 import Data.Foldable
-import Data.Traversable
 import Expression
 import GHC
 import Rules.Generate
@@ -25,7 +24,7 @@ targetsForStage :: Stage -> Action [String]
 targetsForStage stage = do
     pkgs <- interpretWithStage stage getPackages
     let libPkgs = filter isLibrary pkgs \\ [rts, libffi]
-    libTargets <- fmap concat . for libPkgs $ \pkg -> do
+    libTargets <- fmap concat . forM libPkgs $ \pkg -> do
         let target = PartialTarget stage pkg
         needHaddock <- interpretPartial target buildHaddock
         return [ pkgHaddockFile pkg | needHaddock && stage == Stage1 ]
