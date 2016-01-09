@@ -22,9 +22,9 @@ module Base (
     putColoured, putOracle, putBuild, putSuccess, putError, renderBox,
 
     -- * Miscellaneous utilities
-    bimap, minusOrd, intersectOrd, replaceEq, quote, chunksOfSize,
-    replaceSeparators, decodeModule, encodeModule, unifyPath, (-/-),
-    versionToInt, removeFileIfExists, removeDirectoryIfExists
+    bimap, minusOrd, intersectOrd, replaceEq, quote, replaceSeparators,
+    decodeModule, encodeModule, unifyPath, (-/-), versionToInt,
+    removeFileIfExists, removeDirectoryIfExists
     ) where
 
 import Control.Applicative
@@ -89,19 +89,6 @@ replaceSeparators = replaceWhen isPathSeparator
 
 replaceWhen :: (a -> Bool) -> a -> [a] -> [a]
 replaceWhen p to = map (\from -> if p from then to else from)
-
--- | @chunksOfSize size strings@ splits a given list of strings into chunks not
--- exceeding the given @size@.
-chunksOfSize :: Int -> [String] -> [[String]]
-chunksOfSize _    [] = []
-chunksOfSize size strings = reverse chunk : chunksOfSize size rest
-  where
-    (chunk, rest) = go [] 0 strings
-    go res _         []     = (res, [])
-    go res chunkSize (s:ss) =
-        if newSize > size then (res, s:ss) else go (s:res) newSize ss
-      where
-        newSize = chunkSize + length s
 
 -- | Add quotes to a String
 quote :: String -> String

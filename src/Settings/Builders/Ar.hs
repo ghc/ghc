@@ -5,6 +5,7 @@ import Expression
 import Oracles
 import Predicates (builder)
 
+-- | Default arguments for 'Ar' builder
 arBuilderArgs :: Args
 arBuilderArgs = builder Ar ? mconcat [ arg "q"
                                      , arg =<< getOutput
@@ -15,10 +16,15 @@ arBuilderArgs = builder Ar ? mconcat [ arg "q"
 arFlagsCount :: Int
 arFlagsCount = 2
 
--- Ar needs to be invoked in a special way: we pass the list of files to be
--- archived via a temporary file as otherwise Ar (or rather Windows command
--- line) chokes up. Alternatively, we split argument list into chunks and call
--- ar multiple times (when passing files via a separate file is not supported).
+-- | Invoke 'Ar' builder given a path to it and a list of arguments. Take care
+-- not to exceed the limit on command line length, which differs across
+-- supported operating systems (see 'cmdLineLengthLimit'). 'Ar' needs to be
+-- handled in a special way because we sometimes need to archive __a lot__ of
+-- files (in Cabal package, for example, command line length can reach 2MB!).
+-- To work around the limit on the command line length we pass the list of files
+-- to be archived via a temporary file, or alternatively, we split argument list
+-- into chunks and call 'Ar' multiple times (when passing arguments via a
+-- temporary file is not supported).
 arCmd :: FilePath -> [String] -> Action ()
 arCmd path argList = do
     arSupportsAtFile <- flag ArSupportsAtFile
@@ -38,3 +44,17 @@ useSuccessiveInvocations path flagArgs fileArgs = do
     maxChunk <- cmdLineLengthLimit
     forM_ (chunksOfSize maxChunk fileArgs) $ \argsChunk ->
         unit . cmd [path] $ flagArgs ++ argsChunk
+
+-- | @chunksOfSize size strings@ splits a given list of strings into chunks not
+-- exceeding the given @size@.
+chunksOfSize :: Int -> [String] -> [[String]]
+chunksOfSize _    [] = []
+chunksOfSize size strings = reverse chunk : chunksOfSize size rest
+  where
+    (chunk, rest) = go [] 0 strings
+    go res _         []     = (res, [])
+    go res chunkSize (s:ss) =
+        if newSize > size then (res, s:ss) else go (s:res) newSize ss
+      where
+        newSize = chunkSize + length s
+
