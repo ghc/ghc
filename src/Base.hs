@@ -3,7 +3,7 @@ module Base (
     module Control.Applicative,
     module Control.Monad.Extra,
     module Data.Function,
-    module Data.List,
+    module Data.List.Extra,
     module Data.Maybe,
     module Data.Monoid,
     MonadTrans(lift),
@@ -31,7 +31,7 @@ import Control.Applicative
 import Control.Monad.Extra
 import Control.Monad.Reader
 import Data.Function
-import Data.List
+import Data.List.Extra
 import Data.Maybe
 import Data.Monoid
 import Development.Shake hiding (unit, (*>))
