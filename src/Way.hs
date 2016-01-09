@@ -72,7 +72,7 @@ instance Read Way where
         uniqueReads token = case reads token of
             [(unit, "")] -> Just unit
             _            -> Nothing
-        units  = map uniqueReads . words . replaceEq '_' ' ' $ s
+        units  = map uniqueReads . splitOn "_" $ s
         result = if Nothing `elem` units
                  then []
                  else [(wayFromUnits . map fromJust $ units, "")]
