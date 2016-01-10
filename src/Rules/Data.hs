@@ -4,7 +4,6 @@ import qualified System.Directory as IO
 
 import Base
 import Expression
-import Extra (replace)
 import GHC
 import Oracles
 import Predicates (registerPackage)

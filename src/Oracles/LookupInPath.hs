@@ -2,7 +2,6 @@
 module Oracles.LookupInPath (lookupInPath, lookupInPathOracle) where
 
 import Base
-import Extra (wordsBy)
 
 newtype LookupInPath = LookupInPath String
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)

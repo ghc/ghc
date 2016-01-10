@@ -204,7 +204,7 @@ getOutput = do
 
 getSingleton :: Expr [a] -> String -> Expr a
 getSingleton expr msg = do
-    list <- expr
-    case list of
+    xs <- expr
+    case xs of
         [res] -> return res
         _     -> lift $ putError msg

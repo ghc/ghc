@@ -1,7 +1,9 @@
+@cd %~dp0
 @mkdir .shake 2> nul
 
 @set ghcArgs=--make            ^
              -Wall             ^
+             -fno-warn-name-shadowing ^
              src/Main.hs       ^
              -isrc             ^
              -rtsopts          ^
