@@ -1,2 +1,2 @@
-:set -Wall -isrc
+:set -Wall -fno-warn-name-shadowing -isrc
 :load Main

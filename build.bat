@@ -2,6 +2,7 @@
 
 @set ghcArgs=--make            ^
              -Wall             ^
+             -fno-warn-name-shadowing ^
              src/Main.hs       ^
              -isrc             ^
              -rtsopts          ^
