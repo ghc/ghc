@@ -14,8 +14,7 @@ import qualified System.Directory as IO
 
 buildPackageLibrary :: Resources -> PartialTarget -> Rules ()
 buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
-    let path      = targetPath stage pkg
-        buildPath = path -/- "build"
+    let buildPath = targetPath stage pkg -/- "build"
 
     -- TODO: handle dynamic libraries
     matchBuildResult buildPath "a" ?> \a -> do
@@ -24,8 +23,11 @@ buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
         cSrcs <- cSources target
         hSrcs <- hSources target
 
+        -- TODO: simplify handling of AutoApply.cmm
         let way   = detectWay a -- TODO: eliminate differences below
-            cObjs = [ buildPath -/- src -<.> osuf way | src <- cSrcs ]
+            cObjs = [ buildPath -/- src -<.> osuf way | src <- cSrcs
+                    , not ("//AutoApply.cmm" ?== src) ]
+                 ++ [ src -<.> osuf way | src <- cSrcs, "//AutoApply.cmm" ?== src ]
             hObjs = [ buildPath -/- src  <.> osuf way | src <- hSrcs ]
 
         -- This will create split objects if required (we don't track them
@@ -56,13 +58,16 @@ buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
               ++ "' (" ++ show stage ++ ", way "++ show way ++ ")."
             , "Library synopsis: " ++ dropWhileEnd isPunctuation synopsis ++ "." ]
 
+    -- TODO: simplify handling of AutoApply.cmm
     -- TODO: this looks fragile as haskell objects can match this rule if their
     -- names start with "HS" and they are on top of the module hierarchy.
     -- This happens with hsc2hs, which has top-level file HSCParser.hs.
     when (pkg /= hsc2hs) $ priority 2 $ (buildPath -/- "HS*.o") %> \obj -> do
         cSrcs <- cSources target
         hSrcs <- hSources target
-        let cObjs = [ buildPath -/- src -<.> "o" | src <- cSrcs ]
+        let cObjs = [ buildPath -/- src -<.> "o" | src <- cSrcs
+                    , not ("//AutoApply.cmm" ?== src) ]
+                 ++ [ src -<.> "o" | src <- cSrcs, "//AutoApply.cmm" ?== src ]
             hObjs = [ buildPath -/- src  <.> "o" | src <- hSrcs ]
         need $ cObjs ++ hObjs
         build $ fullTarget target Ld (cObjs ++ hObjs) [obj]

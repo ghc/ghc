@@ -1,4 +1,4 @@
-module Rules.Libffi (libffiRules, libffiDependencies) where
+module Rules.Libffi (rtsBuildPath, libffiRules, libffiDependencies) where
 
 import Base
 import Expression
@@ -18,7 +18,7 @@ libffiDependencies :: [FilePath]
 libffiDependencies = (rtsBuildPath -/-) <$> [ "ffi.h", "ffitarget.h" ]
 
 libffiBuild :: FilePath
-libffiBuild = "libffi/build"
+libffiBuild = buildRootPath -/- "stage0/libffi"
 
 libffiLibrary :: FilePath
 libffiLibrary = libffiBuild -/- "inst/lib/libffi.a"
@@ -61,12 +61,14 @@ configureArguments :: Action [String]
 configureArguments = do
     top            <- topDirectory
     targetPlatform <- setting TargetPlatform
-    return [ "--prefix=" ++ top ++ "/libffi/build/inst"
-           , "--libdir=" ++ top ++ "/libffi/build/inst/lib"
+    return [ "--prefix=" ++ top -/- libffiBuild -/- "inst"
+           , "--libdir=" ++ top -/- libffiBuild -/- "inst/lib"
            , "--enable-static=yes"
            , "--enable-shared=no" -- TODO: add support for yes
            , "--host=" ++ targetPlatform ]
 
+-- TODO: remove code duplication (need sourcePath)
+-- TODO: split into multiple rules
 libffiRules :: Rules ()
 libffiRules = do
     libffiDependencies &%> \_ -> do

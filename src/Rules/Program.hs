@@ -14,6 +14,7 @@ import Rules.Wrappers.GhcPkg
 import Settings
 import Settings.Builders.GhcCabal
 
+-- TODO: move to buildRootPath, see #113
 -- Directory for wrapped binaries
 programInplaceLibPath :: FilePath
 programInplaceLibPath = "inplace/lib/bin"
@@ -68,8 +69,7 @@ buildWrapper target @ (PartialTarget stage pkg) wrapper wrapperPath binPath = do
 -- TODO: Do we need to consider other ways when building programs?
 buildBinary :: PartialTarget -> FilePath -> Action ()
 buildBinary target @ (PartialTarget stage pkg) bin = do
-    let path       = targetPath stage pkg
-        buildPath  = path -/- "build"
+    let buildPath = targetPath stage pkg -/- "build"
     cSrcs <- cSources target -- TODO: remove code duplication (Library.hs)
     hSrcs <- hSources target
     let cObjs = [ buildPath -/- src -<.> osuf vanilla | src <- cSrcs   ]

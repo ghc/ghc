@@ -9,6 +9,7 @@ import Oracles.Config.Setting
 import Rules.Actions
 import Settings.User
 
+-- TODO: move build artefacts to buildRootPath, see #113
 integerGmpBase :: FilePath
 integerGmpBase = "libraries/integer-gmp/gmp"
 

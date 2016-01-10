@@ -15,7 +15,7 @@ targetDirectory = userTargetDirectory
 
 -- Path to the target directory from GHC source root
 targetPath :: Stage -> Package -> FilePath
-targetPath stage pkg = pkgPath pkg -/- targetDirectory stage pkg
+targetPath stage pkg = buildRootPath -/- targetDirectory stage pkg -/- pkgPath pkg
 
 pkgDataFile :: Stage -> Package -> FilePath
 pkgDataFile stage pkg = targetPath stage pkg -/- "package-data.mk"
@@ -28,7 +28,7 @@ pkgHaddockFile pkg =
   where name = pkgNameString pkg
 
 -- Relative path to a package library file, e.g.:
--- "libraries/array/dist-install/build/libHSarray-0.5.1.0.a"
+-- "libraries/array/stage2/build/libHSarray-0.5.1.0.a"
 -- TODO: remove code duplication for computing buildPath
 pkgLibraryFile :: Stage -> Package -> String -> Way -> Action FilePath
 pkgLibraryFile stage pkg componentId way = do
