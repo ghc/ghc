@@ -4181,6 +4181,8 @@ ocRunInit_PEi386 ( ObjectCode *oc )
 #  define ELF_64BIT
 #elif defined(ia64_HOST_ARCH)
 #  define ELF_64BIT
+#elif defined(aarch64_HOST_ARCH)
+#  define ELF_64BIT
 #endif
 
 #if !defined(openbsd_HOST_OS)
