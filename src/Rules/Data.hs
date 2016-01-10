@@ -54,7 +54,17 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
         -- ghc-pkg produces inplace-pkg-config when run on packages with
         -- library components only
         when (isLibrary pkg) .
-            whenM (interpretPartial target registerPackage) .
+            whenM (interpretPartial target registerPackage) $ do
+
+                -- Post-process inplace-pkg-config. TODO: remove, see #113, #148
+                let fixPkgConf = unlines
+                               . map (replace oldPath (targetPath stage pkg)
+                               . replace (replaceSeparators '\\' $ oldPath)
+                                         (targetPath stage pkg) )
+                               . lines
+
+                fixFile (oldPath -/- "inplace-pkg-config") fixPkgConf
+
                 buildWithResources [(resGhcPkg rs, 1)] $
                     fullTarget target (GhcPkg stage) [cabalFile] []
 
