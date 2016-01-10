@@ -59,7 +59,8 @@ allocNew(nat n) {
         rec=0;
         if (GetLastError() == ERROR_NOT_ENOUGH_MEMORY) {
 
-            errorBelch("out of memory");
+            errorBelch("Out of memory");
+            stg_exit(EXIT_HEAPOVERFLOW);
         } else {
             sysErrorBelch(
                 "getMBlocks: VirtualAlloc MEM_RESERVE %d blocks failed", n);
@@ -177,7 +178,7 @@ commitBlocks(char* base, W_ size) {
         temp = VirtualAlloc(base, size_delta, MEM_COMMIT, PAGE_READWRITE);
         if(temp==0) {
             sysErrorBelch("getMBlocks: VirtualAlloc MEM_COMMIT failed");
-            stg_exit(EXIT_FAILURE);
+            stg_exit(EXIT_HEAPOVERFLOW);
         }
         size-=size_delta;
         base+=size_delta;

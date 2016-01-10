@@ -23,21 +23,20 @@
 
 // this should be in <excpt.h>, but it's been removed from MinGW distributions
 #ifndef EH_UNWINDING
-#define EH_UNWINDING   0x02 
+#define EH_UNWINDING   0x02
 #endif /* EH_UNWINDING */
 
 // Registered exception handler
 PVOID __hs_handle = NULL;
 
 long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
-{        
+{
     long action = EXCEPTION_CONTINUE_SEARCH;
 
     // When the system unwinds the VEH stack after having handled an excn,
     // return immediately.
     if ((exception_data->ExceptionRecord->ExceptionFlags & EH_UNWINDING) == 0)
     {
-
         // Error handling cases covered by this implementation.
         switch (exception_data->ExceptionRecord->ExceptionCode) {
             case EXCEPTION_FLT_DIVIDE_BY_ZERO:
@@ -62,7 +61,7 @@ long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
         if (EXCEPTION_CONTINUE_EXECUTION == action)
         {
             fflush(stdout);
-            stg_exit(1);
+            stg_exit(EXIT_FAILURE);
         }
     }
 
@@ -88,7 +87,7 @@ void __unregister_hs_exception_handler( void )
 {
     if (__hs_handle != NULL)
     {
-        // Should the return value be checked? we're terminating anyway. 
+        // Should the return value be checked? we're terminating anyway.
         RemoveVectoredExceptionHandler(__hs_handle);
         __hs_handle = NULL;
     }
