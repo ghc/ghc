@@ -35,6 +35,7 @@ primopsTxt stage = targetPath stage compiler -/- "build/primops.txt"
 platformH :: Stage -> FilePath
 platformH stage = targetPath stage compiler -/- "ghc_boot_platform.h"
 
+-- TODO: move generated files to buildRootPath, see #113
 includesDependencies :: [FilePath]
 includesDependencies = ("includes" -/-) <$>
     [ "ghcautoconf.h"
@@ -84,7 +85,8 @@ generatedDependencies :: Stage -> Package -> [FilePath]
 generatedDependencies stage pkg
     | pkg   == compiler = compilerDependencies stage
     | pkg   == ghcPrim  = ghcPrimDependencies stage
-    | pkg   == rts      = includesDependencies ++ derivedConstantsDependencies
+    | pkg   == rts      = libffiDependencies ++ includesDependencies
+                       ++ derivedConstantsDependencies
     | stage == Stage0   = defaultDependencies
     | otherwise         = []
 
@@ -126,7 +128,7 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
             build $ fullTarget target builder [src] [file]
             let srcBoot = src -<.> "hs-boot"
             whenM (doesFileExist srcBoot) $
-                copyFileChanged srcBoot $ file -<.> "hs-boot"
+                copyFile srcBoot $ file -<.> "hs-boot"
 
         -- TODO: needing platformH is ugly and fragile
         when (pkg == compiler) $ primopsTxt stage %> \file -> do

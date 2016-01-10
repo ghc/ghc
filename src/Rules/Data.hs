@@ -7,6 +7,7 @@ import Oracles
 import Predicates (registerPackage)
 import Rules.Actions
 import Rules.Generate
+import Rules.Libffi
 import Rules.Resources
 import Settings
 import Settings.Builders.Common
@@ -19,7 +20,7 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
         configure = pkgPath pkg -/- "configure"
         dataFile  = pkgDataFile stage pkg
 
-    dataFile %> \mk -> do
+    dataFile %> \_ -> do
         -- The first thing we do with any package is make sure all generated
         -- dependencies are in place before proceeding.
         orderOnly $ generatedDependencies stage pkg
@@ -34,24 +35,45 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
         let depPkgs = matchPackageNames (sort pkgs) deps
         orderOnly $ map (pkgDataFile stage) depPkgs
 
+        -- TODO: get rid of this, see #113
+        let oldPath  = pkgPath pkg -/- targetDirectory stage pkg
+            inTreeMk = oldPath -/- takeFileName dataFile
+
         need [cabalFile]
         buildWithResources [(resGhcCabal rs, 1)] $
-            fullTarget target GhcCabal [cabalFile] [mk]
+            fullTarget target GhcCabal [cabalFile] [inTreeMk]
+
+        -- TODO: get rid of this, see #113
+        copyFile inTreeMk dataFile
+        autogenFiles <- getDirectoryFiles oldPath ["build/autogen/*"]
+        createDirectory $ targetPath stage pkg -/- "build/autogen"
+        forM_ autogenFiles $ \file -> do
+            copyFile (oldPath -/- file) (targetPath stage pkg -/- file)
 
         -- ghc-pkg produces inplace-pkg-config when run on packages with
         -- library components only
         when (isLibrary pkg) .
-            whenM (interpretPartial target registerPackage) .
+            whenM (interpretPartial target registerPackage) $ do
+
+                -- Post-process inplace-pkg-config. TODO: remove, see #113, #148
+                let fixPkgConf = unlines
+                               . map (replace oldPath (targetPath stage pkg)
+                               . replace (replaceSeparators '\\' $ oldPath)
+                                         (targetPath stage pkg) )
+                               . lines
+
+                fixFile (oldPath -/- "inplace-pkg-config") fixPkgConf
+
                 buildWithResources [(resGhcPkg rs, 1)] $
                     fullTarget target (GhcPkg stage) [cabalFile] []
 
-        postProcessPackageData dataFile
+        postProcessPackageData stage pkg dataFile
 
     -- TODO: PROGNAME was $(CrossCompilePrefix)hp2ps
     priority 2.0 $ do
         when (pkg == hp2ps) $ dataFile %> \mk -> do
             includes <- interpretPartial target $ fromDiffExpr includesArgs
-            let prefix = "utils_hp2ps_" ++ stageString stage ++ "_"
+            let prefix = fixKey (targetPath stage pkg) ++ "_"
                 cSrcs  = [ "AreaBelow.c", "Curves.c", "Error.c", "Main.c"
                          , "Reorder.c", "TopTwenty.c", "AuxFile.c"
                          , "Deviation.c", "HpFile.c", "Marks.c", "Scale.c"
@@ -60,26 +82,22 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = hp2ps"
                     , "C_SRCS = " ++ unwords cSrcs
-                    , "INSTALL = YES"
-                    , "INSTALL_INPLACE = YES"
                     , "DEP_EXTRA_LIBS = m"
                     , "CC_OPTS = " ++ unwords includes ]
             writeFileChanged mk contents
             putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 
         when (pkg == unlit) $ dataFile %> \mk -> do
-            let prefix  = "utils_unlit_" ++ stageString stage ++ "_"
+            let prefix   = fixKey (targetPath stage pkg) ++ "_"
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = unlit"
                     , "C_SRCS = unlit.c"
-                    , "INSTALL = YES"
-                    , "INSTALL_INPLACE = YES"
                     , "SYNOPSIS = Literate script filter." ]
             writeFileChanged mk contents
             putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 
         when (pkg == touchy) $ dataFile %> \mk -> do
-            let prefix = "utils_touchy_" ++ stageString stage ++ "_"
+            let prefix   = fixKey (targetPath stage pkg) ++ "_"
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = touchy"
                     , "C_SRCS = touchy.c" ]
@@ -90,18 +108,20 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
         -- package, we cannot generate the corresponding `package-data.mk` file
         -- by running by running `ghcCabal`, because it has not yet been built.
         when (pkg == ghcCabal && stage == Stage0) $ dataFile %> \mk -> do
-            let contents = unlines
-                    [ "utils_ghc-cabal_stage0_PROGNAME = ghc-cabal"
-                    , "utils_ghc-cabal_stage0_MODULES = Main"
-                    , "utils_ghc-cabal_stage0_SYNOPSIS = Bootstrapped ghc-cabal utility."
-                    , "utils_ghc-cabal_stage0_HS_SRC_DIRS = ." ]
+            let prefix   = fixKey (targetPath stage pkg) ++ "_"
+                contents = unlines $ map (prefix++)
+                    [ "PROGNAME = ghc-cabal"
+                    , "MODULES = Main"
+                    , "SYNOPSIS = Bootstrapped ghc-cabal utility."
+                    , "HS_SRC_DIRS = ." ]
             writeFileChanged mk contents
             putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 
         when (pkg == rts && stage == Stage1) $ do
             dataFile %> \mk -> do
+                orderOnly $ generatedDependencies stage pkg
                 windows <- windowsHost
-                let prefix = "rts_" ++ stageString stage ++ "_"
+                let prefix = fixKey (targetPath stage pkg) ++ "_"
                     dirs   = [ ".", "hooks", "sm", "eventlog" ]
                           ++ [ "posix" | not windows ]
                           ++ [ "win32" |     windows ]
@@ -113,7 +133,7 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
                 buildStgCRunAsm <- anyTargetArch ["powerpc64le"]
                 let sSrcs = [ "AdjustorAsm.S" | buildAdjustor   ]
                          ++ [ "StgCRunAsm.S"  | buildStgCRunAsm ]
-                    extraSrcs = [ targetDirectory Stage1 rts -/- "build/AutoApply.cmm" ]
+                    extraSrcs = [ rtsBuildPath -/- "AutoApply.cmm" ]
                 includes <- interpretPartial target $ fromDiffExpr includesArgs
                 let contents = unlines $ map (prefix++)
                         [ "C_SRCS = "
@@ -135,7 +155,7 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
                 let fixRtsConf = unlines
                                . map
                                ( replace "\"\"" ""
-                               . replace "rts/dist/build" "rts/stage1/build" )
+                               . replace "rts/dist/build" rtsBuildPath )
                                . filter (not . null)
                                . lines
 
@@ -150,10 +170,18 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
 -- For example libraries/deepseq/dist-install_VERSION = 1.4.0.0
 -- is replaced by libraries_deepseq_dist-install_VERSION = 1.4.0.0
 -- Reason: Shake's built-in makefile parser doesn't recognise slashes
-postProcessPackageData :: FilePath -> Action ()
-postProcessPackageData file = fixFile file fixPackageData
+postProcessPackageData :: Stage -> Package -> FilePath -> Action ()
+postProcessPackageData stage pkg file = fixFile file fixPackageData
   where
-    fixPackageData = unlines . map processLine . filter ('$' `notElem`) . lines
-    processLine line = replaceSeparators '_' prefix ++ suffix
+    fixPackageData = unlines . map processLine . filter (not . null) . filter ('$' `notElem`) . lines
+    processLine line = fixKey fixedPrefix ++ suffix
       where
         (prefix, suffix) = break (== '=') line
+        -- Change pkg/path/targetDir to takeDirectory file
+        -- This is a temporary hack until we get rid of ghc-cabal
+        fixedPrefix = takeDirectory file ++ drop len prefix
+        len         = length (pkgPath pkg -/- targetDirectory stage pkg)
+
+-- TODO: remove, see #113
+fixKey :: String -> String
+fixKey = replaceSeparators '_'

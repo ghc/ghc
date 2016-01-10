@@ -9,8 +9,7 @@ import Settings
 
 compilePackage :: Resources -> PartialTarget -> Rules ()
 compilePackage _ target @ (PartialTarget stage pkg) = do
-    let path      = targetPath stage pkg
-        buildPath = path -/- "build"
+    let buildPath = targetPath stage pkg -/- "build"
 
     matchBuildResult buildPath "hi" ?> \hi ->
         need [ hi -<.> osuf (detectWay hi) ]

@@ -2,6 +2,7 @@ module Settings.Builders.Ghc (ghcBuilderArgs, ghcMBuilderArgs, commonGhcArgs) wh
 
 import Base
 import Expression
+import GHC
 import Oracles
 import Predicates hiding (way, stage)
 import Settings
@@ -36,7 +37,7 @@ ghcBuilderArgs = stagedBuilder Ghc ? do
 
 splitObjectsArgs :: Args
 splitObjectsArgs = splitObjects ? do
-    lift $ need ["inplace/lib/bin/ghc-split"]
+    lift $ need [ghcSplit]
     arg "-split-objs"
 
 ghcMBuilderArgs :: Args

@@ -1,15 +1,12 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
-module Oracles.LookupInPath (
-    lookupInPath, lookupInPathOracle
-    ) where
+module Oracles.LookupInPath (lookupInPath, lookupInPathOracle) where
 
 import Base
 
 newtype LookupInPath = LookupInPath String
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
--- | Fetches the absolute FilePath to a given FilePath from the
--- Oracle.
+-- | Fetches the absolute FilePath to a given FilePath using the oracle.
 commandPath :: FilePath -> Action FilePath
 commandPath = askOracle . LookupInPath
 
@@ -21,12 +18,12 @@ lookupInPath c
 
 lookupInPathOracle :: Rules ()
 lookupInPathOracle = do
-    o <- newCache $ \c -> do
+    answer <- newCache $ \query -> do
         envPaths <- wordsBy (== ':') <$> getEnvWithDefault "" "PATH"
-        let candidates = map (-/- c) envPaths
+        let candidates = map (-/- query) envPaths
         -- this will crash if we do not find any valid candidate.
         fullCommand <- head <$> filterM doesFileExist candidates
-        putOracle $ "Found '" ++ c ++ "' at " ++ "'" ++ fullCommand ++ "'"
+        putOracle $ "Found '" ++ query ++ "' at " ++ "'" ++ fullCommand ++ "'"
         return fullCommand
-    _ <- addOracle $ \(LookupInPath c) -> o c
+    _ <- addOracle $ \(LookupInPath query) -> answer query
     return ()

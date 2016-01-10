@@ -1,4 +1,10 @@
 clone_folder: "C:\\msys64\\home\\ghc\\shake-build"
+environment:
+  global:
+    STACK_ROOT: "c:\\sr"
+
+cache:
+    - "c:\\sr"
 
 install:
     - cd

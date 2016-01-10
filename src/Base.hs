@@ -59,6 +59,7 @@ configPath = shakePath -/- "cfg"
 sourcePath :: FilePath
 sourcePath = shakePath -/- "src"
 
+-- TODO: move to buildRootPath, see #113
 programInplacePath :: FilePath
 programInplacePath = "inplace/bin"
 
@@ -68,6 +69,7 @@ bootPackageConstraints = shakeFilesPath -/- "boot-package-constraints"
 packageDependencies :: FilePath
 packageDependencies = shakeFilesPath -/- "package-dependencies"
 
+-- TODO: move to buildRootPath, see #113
 packageConfiguration :: Stage -> FilePath
 packageConfiguration Stage0 = "libraries/bootstrapping.conf"
 packageConfiguration _      = "inplace/lib/package.conf.d"

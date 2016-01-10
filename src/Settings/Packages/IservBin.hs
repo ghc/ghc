@@ -6,5 +6,4 @@ import Predicates (builderGhc, package)
 
 iservBinPackageArgs :: Args
 iservBinPackageArgs = package iservBin ? do
-    mconcat [ builderGhc ?
-              mconcat [ arg "-no-hs-main" ]]
+    mconcat [ builderGhc ? arg "-no-hs-main" ]

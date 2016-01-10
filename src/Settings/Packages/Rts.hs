@@ -14,8 +14,9 @@ import Settings.Builders.Common
 rtsConfIn :: FilePath
 rtsConfIn = pkgPath rts -/- "package.conf.in"
 
+-- TODO: move to buildRootPath, see #113
 rtsConf :: FilePath
-rtsConf = targetPath Stage1 rts -/- "package.conf.inplace"
+rtsConf = pkgPath rts -/- targetDirectory Stage1 rts -/- "package.conf.inplace"
 
 rtsLibffiLibraryName :: Action FilePath
 rtsLibffiLibraryName = do
@@ -80,7 +81,7 @@ rtsPackageArgs = package rts ? do
         , builderGhc ? (arg "-Irts" <> includesArgs)
 
         , builder (GhcPkg Stage1) ? mconcat
-          [ remove [path -/- "inplace-pkg-config"]
+          [ remove ["rts/stage1/inplace-pkg-config"] -- TODO: fix, see #113
           , arg $ rtsConf ]
 
         , builder HsCpp ? mconcat

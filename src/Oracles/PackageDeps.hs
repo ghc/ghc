@@ -22,7 +22,7 @@ packageDepsOracle = do
     deps <- newCache $ \_ -> do
         putOracle $ "Reading package dependencies..."
         contents <- readFileLines packageDependencies
-        return . Map.fromList
-               $ [ (head ps, tail ps) | line <- contents, let ps = map PackageName $ words line ]
+        return . Map.fromList $
+            [ (head ps, tail ps) | line <- contents, let ps = map PackageName $ words line ]
     _ <- addOracle $ \(PackageDepsKey pkg) -> Map.lookup pkg <$> deps ()
     return ()

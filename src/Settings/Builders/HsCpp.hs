@@ -1,9 +1,11 @@
 module Settings.Builders.HsCpp (hsCppBuilderArgs) where
 
 import Expression
+import GHC
 import Oracles
 import Predicates (builder)
 import Settings.Builders.GhcCabal
+import Settings.TargetDirectory
 
 hsCppBuilderArgs :: Args
 hsCppBuilderArgs = builder HsCpp ? do
@@ -11,7 +13,7 @@ hsCppBuilderArgs = builder HsCpp ? do
     mconcat [ append =<< getSettingList HsCppArgs
             , arg "-P"
             , cppArgs
-            , arg $ "-Icompiler/" ++ stageString stage
+            , arg $ "-I" ++ targetPath stage compiler
             , arg "-x"
             , arg "c"
             , arg =<< getInput ]

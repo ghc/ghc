@@ -5,6 +5,7 @@ import Expression
 import GHC (integerGmp)
 import Predicates (builder, builderGcc, package)
 
+-- TODO: move build artefacts to buildRootPath, see #113
 -- TODO: Is this needed?
 -- ifeq "$(GMP_PREFER_FRAMEWORK)" "YES"
 -- libraries/integer-gmp_CONFIGURE_OPTS += --with-gmp-framework-preferred
