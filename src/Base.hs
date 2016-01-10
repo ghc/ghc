@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-dodgy-imports #-}
+
 module Base (
     -- * General utilities
     module Control.Applicative,
@@ -34,7 +36,7 @@ import Data.Function
 import Data.List.Extra
 import Data.Maybe
 import Data.Monoid
-import Development.Shake hiding (unit, (*>))
+import Development.Shake hiding (parallel, unit, (*>))
 import Development.Shake.Classes
 import Development.Shake.FilePath
 import System.Console.ANSI
