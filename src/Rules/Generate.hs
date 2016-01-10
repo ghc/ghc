@@ -15,7 +15,7 @@ import Rules.Generators.GhcVersionH
 import Rules.Generators.VersionHs
 import Oracles.ModuleFiles
 import Rules.Actions
-import Rules.IntegerGmp
+import Rules.Gmp
 import Rules.Libffi
 import Rules.Resources (Resources)
 import Settings
@@ -46,7 +46,7 @@ defaultDependencies :: [FilePath]
 defaultDependencies = concat
     [ includesDependencies
     , libffiDependencies
-    , integerGmpDependencies ]
+    , gmpDependencies ]
 
 ghcPrimDependencies :: Stage -> [FilePath]
 ghcPrimDependencies stage = ((targetPath stage ghcPrim -/- "build") -/-) <$>

@@ -7,7 +7,7 @@ import qualified Rules
 import qualified Rules.Cabal
 import qualified Rules.Config
 import qualified Rules.Generate
-import qualified Rules.IntegerGmp
+import qualified Rules.Gmp
 import qualified Rules.Libffi
 import qualified Rules.Oracles
 import qualified Rules.Perl
@@ -22,7 +22,7 @@ main = shakeArgs options rules
         , Rules.Generate.generateRules
         , Rules.Perl.perlScriptRules
         , Rules.generateTargets
-        , Rules.IntegerGmp.integerGmpRules
+        , Rules.Gmp.gmpRules
         , Rules.Libffi.libffiRules
         , Rules.Oracles.oracleRules
         , Rules.packageRules ]

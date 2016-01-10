@@ -7,7 +7,7 @@ import Expression
 import GHC
 import Oracles
 import Rules.Actions
-import Rules.IntegerGmp
+import Rules.Gmp
 import Rules.Resources
 import Settings
 import qualified System.Directory as IO
@@ -84,6 +84,6 @@ hSources target = do
 extraObjects :: PartialTarget -> Action [FilePath]
 extraObjects (PartialTarget _ pkg)
     | pkg == integerGmp = do
-        need [integerGmpLibraryH]
-        getDirectoryFiles "" [integerGmpObjects -/- "*.o"]
+        orderOnly [gmpLibraryH] -- TODO: move this dependency elsewhere, #113?
+        getDirectoryFiles "" [gmpObjects -/- "*.o"]
     | otherwise         = return []

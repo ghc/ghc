@@ -7,7 +7,7 @@ import Base
 import Expression
 import Settings.User
 
--- TODO: move to Settings.hs?
+-- TODO: rename to Settings.Paths as part of #113
 
 -- User can override the default target directory settings given below
 targetDirectory :: Stage -> Package -> FilePath

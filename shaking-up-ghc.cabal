@@ -51,7 +51,7 @@ executable ghc-shake
                        , Rules.Generators.GhcSplit
                        , Rules.Generators.GhcVersionH
                        , Rules.Generators.VersionHs
-                       , Rules.IntegerGmp
+                       , Rules.Gmp
                        , Rules.Libffi
                        , Rules.Library
                        , Rules.Oracles

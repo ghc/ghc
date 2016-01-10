@@ -1,5 +1,7 @@
 module Rules.Data (buildPackageData) where
 
+import qualified System.Directory as IO
+
 import Base
 import Expression
 import Extra (replace)
@@ -20,8 +22,9 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
     let cabalFile = pkgCabalFile pkg
         configure = pkgPath pkg -/- "configure"
         dataFile  = pkgDataFile stage pkg
+        oldPath   = pkgPath pkg -/- targetDirectory stage pkg -- TODO: remove, #113
 
-    dataFile %> \_ -> do
+    [dataFile, oldPath -/- "package-data.mk"] &%> \_ -> do
         -- The first thing we do with any package is make sure all generated
         -- dependencies are in place before proceeding.
         orderOnly $ generatedDependencies stage pkg
@@ -37,15 +40,14 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
         orderOnly $ map (pkgDataFile stage) depPkgs
 
         -- TODO: get rid of this, see #113
-        let oldPath  = pkgPath pkg -/- targetDirectory stage pkg
-            inTreeMk = oldPath -/- takeFileName dataFile
+        let inTreeMk = oldPath -/- takeFileName dataFile
 
         need [cabalFile]
         buildWithResources [(resGhcCabal rs, 1)] $
             fullTarget target GhcCabal [cabalFile] [inTreeMk]
 
         -- TODO: get rid of this, see #113
-        copyFile inTreeMk dataFile
+        liftIO $ IO.copyFile inTreeMk dataFile
         autogenFiles <- getDirectoryFiles oldPath ["build/autogen/*"]
         createDirectory $ targetPath stage pkg -/- "build/autogen"
         forM_ autogenFiles $ \file -> do
