@@ -1,3 +1,4 @@
+@cd %~dp0
 @mkdir .shake 2> nul
 
 @set ghcArgs=--make            ^
