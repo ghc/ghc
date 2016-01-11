@@ -12,3 +12,5 @@ test('TypeLevelVec',normal,compile, [''])
 test('T9632', normal, compile, [''])
 test('dynamic-paper', normal, compile, [''])
 test('T11311', normal, compile, [''])
+test('T11405', expect_broken(11405), compile, [''])
+
