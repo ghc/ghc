@@ -452,12 +452,17 @@ check_type env ctxt rank ty
                 -- but not   type T = ?x::Int
 
         ; check_type env' ctxt rank tau      -- Allow foralls to right of arrow
-        ; checkTcM (not (any (`elemVarSet` tyCoVarsOfType tau_kind) tvs))
+        ; checkTcM (not (any (`elemVarSet` tyCoVarsOfType phi_kind) tvs))
                    (forAllEscapeErr env' ty tau_kind)
         }
   where
     (tvs, theta, tau) = tcSplitSigmaTy ty
     tau_kind          = typeKind tau
+
+    phi_kind | null theta = tau_kind
+             | otherwise  = liftedTypeKind
+        -- If there are any constraints, the kind is *. (#11405)
+
     (env', _)         = tidyTyCoVarBndrs env tvs
 
 check_type _ _ _ (TyVarTy _) = return ()
