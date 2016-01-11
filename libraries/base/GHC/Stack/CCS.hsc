@@ -116,4 +116,5 @@ whoCreated obj = do
   ccsToStrings ccs
 
 renderStack :: [String] -> String
-renderStack strs = "Stack trace:" ++ concatMap ("\n  "++) (reverse strs)
+renderStack strs =
+  "CallStack (from -prof):" ++ concatMap ("\n  "++) (reverse strs)

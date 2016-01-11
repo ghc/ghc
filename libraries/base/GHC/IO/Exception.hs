@@ -51,6 +51,8 @@ import GHC.Show
 import GHC.Read
 import GHC.Exception
 import GHC.IO.Handle.Types
+import GHC.OldList ( intercalate )
+import {-# SOURCE #-} GHC.Stack.CCS
 import Foreign.C.Types
 
 import Data.Typeable ( cast )
@@ -355,9 +357,13 @@ instance Show IOException where
 assertError :: (?callStack :: CallStack) => Bool -> a -> a
 assertError predicate v
   | predicate = lazy v
-  | otherwise = throw (AssertionFailed
-                        ("Assertion failed\n"
-                         ++ prettyCallStack ?callStack))
+  | otherwise = unsafeDupablePerformIO $ do
+    ccsStack <- currentCallStack
+    let
+      implicitParamCallStack = prettyCallStackLines ?callStack
+      ccsCallStack = showCCSStack ccsStack
+      stack = intercalate "\n" $ implicitParamCallStack ++ ccsCallStack
+    throwIO (AssertionFailed ("Assertion failed\n" ++ stack))
 
 unsupportedOperation :: IOError
 unsupportedOperation =
