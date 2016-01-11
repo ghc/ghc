@@ -166,6 +166,9 @@ cmdLineLengthLimit = do
     return $ case (windows, osx) of
         -- windows
         (True, False) -> 31000
-        -- osx 262144 is ARG_MAX, 33166 experimentally determined
-        (False, True) -> 262144 - 33166
+        -- osx 262144 is ARG_MAX
+        -- yet when using `xargs` on osx this is reduced by over 20 000.
+        -- 200 000 seems like a sensible limit.
+        (False, True) -> 200000
+        -- On all other systems, we try this:
         _             -> 4194304 -- Cabal needs a bit more than 2MB!
