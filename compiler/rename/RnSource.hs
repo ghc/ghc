@@ -746,7 +746,7 @@ rnTyFamDefltEqn :: Name
 rnTyFamDefltEqn cls (TyFamEqn { tfe_tycon = tycon
                               , tfe_pats  = tyvars
                               , tfe_rhs   = rhs })
-  = bindHsQTyVars ctx (Just cls) [] tyvars $ \ tyvars' ->
+  = bindHsQTyVars ctx Nothing (Just cls) [] tyvars $ \ tyvars' ->
     do { tycon'      <- lookupFamInstName (Just cls) tycon
        ; (rhs', fvs) <- rnLHsType ctx rhs
        ; return (TyFamEqn { tfe_tycon = tycon'
@@ -1194,7 +1194,7 @@ rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars, tcdRhs = rhs })
        ; kvs <- freeKiTyVarsKindVars <$> extractHsTyRdrTyVars rhs
        ; let doc = TySynCtx tycon
        ; traceRn (text "rntycl-ty" <+> ppr tycon <+> ppr kvs)
-       ; ((tyvars', rhs'), fvs) <- bindHsQTyVars doc Nothing kvs tyvars $
+       ; ((tyvars', rhs'), fvs) <- bindHsQTyVars doc Nothing Nothing kvs tyvars $
                                     \ tyvars' ->
                                     do { (rhs', fvs) <- rnTySyn doc rhs
                                        ; return ((tyvars', rhs'), fvs) }
@@ -1208,7 +1208,7 @@ rnTyClDecl (DataDecl { tcdLName = tycon, tcdTyVars = tyvars, tcdDataDefn = defn 
        ; kvs <- extractDataDefnKindVars defn
        ; let doc = TyDataCtx tycon
        ; traceRn (text "rntycl-data" <+> ppr tycon <+> ppr kvs)
-       ; ((tyvars', defn'), fvs) <- bindHsQTyVars doc Nothing kvs tyvars $ \ tyvars' ->
+       ; ((tyvars', defn'), fvs) <- bindHsQTyVars doc Nothing Nothing kvs tyvars $ \ tyvars' ->
                                     do { (defn', fvs) <- rnDataDefn doc defn
                                        ; return ((tyvars', defn'), fvs) }
        ; return (DataDecl { tcdLName = tycon', tcdTyVars = tyvars'
@@ -1225,7 +1225,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
 
         -- Tyvars scope over superclass context and method signatures
         ; ((tyvars', context', fds', ats'), stuff_fvs)
-            <- bindHsQTyVars cls_doc Nothing kvs tyvars $ \ tyvars' -> do
+            <- bindHsQTyVars cls_doc Nothing Nothing kvs tyvars $ \ tyvars' -> do
                   -- Checks for distinct tyvars
              { (context', cxt_fvs) <- rnContext cls_doc context
              ; fds'  <- rnFds fds
@@ -1391,7 +1391,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
   = do { tycon' <- lookupLocatedTopBndrRn tycon
        ; kvs <- extractRdrKindSigVars res_sig
        ; ((tyvars', res_sig', injectivity'), fv1) <-
-            bindHsQTyVars doc mb_cls kvs tyvars $
+            bindHsQTyVars doc Nothing mb_cls kvs tyvars $
             \ tyvars'@(HsQTvs { hsq_implicit = rn_kvs }) ->
             do { let rn_sig = rnFamResultSig doc rn_kvs
                ; (res_sig', fv_kind) <- wrapLocFstM rn_sig res_sig
@@ -1655,7 +1655,8 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_qvars = qtvs
         ; mb_doc'      <- rnMbLHsDoc mb_doc
         ; (kvs, qtvs') <- get_con_qtvs (hsConDeclArgTys details)
 
-        ; bindHsQTyVars doc Nothing kvs qtvs' $ \new_tyvars -> do
+        ; bindHsQTyVars doc (Just $ inHsDocContext doc) Nothing kvs qtvs' $
+          \new_tyvars -> do
         { (new_context, fvs1) <- case mcxt of
                              Nothing   -> return (Nothing,emptyFVs)
                              Just lcxt -> do { (lctx',fvs) <- rnContext doc lcxt
@@ -1667,8 +1668,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_qvars = qtvs
              , text "qtvs:" <+> ppr qtvs
              , text "qtvs':" <+> ppr qtvs' ])
         ; let all_fvs = fvs1 `plusFV` fvs2 `plusFV` fvs3
-        ; warnUnusedForAlls (inHsDocContext doc) (hsQTvExplicit new_tyvars) all_fvs
-        ; let new_tyvars' = case qtvs of
+              new_tyvars' = case qtvs of
                 Nothing -> Nothing
                 Just _ -> Just new_tyvars
         ; return (decl { con_name = new_name, con_qvars = new_tyvars'

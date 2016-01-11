@@ -23,7 +23,7 @@ module RnTypes (
         checkPrecMatch, checkSectionPrec,
 
         -- Binding related stuff
-        warnUnusedForAlls, bindLHsTyVarBndr,
+        bindLHsTyVarBndr,
         bindSigTyVarsFV, bindHsQTyVars, bindLRdrNames,
         extractHsTyRdrTyVars, extractHsTysRdrTyVars,
         extractHsTysRdrTyVarsDups, rmDupsInRdrTyVars,
@@ -143,9 +143,9 @@ rnWcSigTy :: RnTyKiEnv -> LHsType RdrName
 -- on a qualified type, and return info on any extra-constraints
 -- wildcard.  Some code duplication, but no big deal.
 rnWcSigTy env (L loc hs_ty@(HsForAllTy { hst_bndrs = tvs, hst_body = hs_tau }))
-  = bindLHsTyVarBndrs (rtke_ctxt env) Nothing [] tvs $ \ _ tvs' ->
+  = bindLHsTyVarBndrs (rtke_ctxt env) (Just $ inTypeDoc hs_ty)
+                      Nothing [] tvs $ \ _ tvs' ->
     do { (hs_tau', fvs) <- rnWcSigTy env hs_tau
-       ; warnUnusedForAlls (inTypeDoc hs_ty) tvs' fvs
        ; let hs_ty' = HsForAllTy { hst_bndrs = tvs', hst_body = hswc_body hs_tau' }
        ; return ( hs_tau' { hswc_body = L loc hs_ty' }, fvs) }
 
@@ -455,9 +455,9 @@ rnHsTyKi :: RnTyKiEnv -> HsType RdrName -> RnM (HsType Name, FreeVars)
 
 rnHsTyKi env ty@(HsForAllTy { hst_bndrs = tyvars, hst_body  = tau })
   = do { checkTypeInType env ty
-       ; bindLHsTyVarBndrs (rtke_ctxt env) Nothing [] tyvars $ \ _ tyvars' ->
+       ; bindLHsTyVarBndrs (rtke_ctxt env) (Just $ inTypeDoc ty)
+                           Nothing [] tyvars $ \ _ tyvars' ->
     do { (tau',  fvs) <- rnLHsTyKi env tau
-       ; warnUnusedForAlls (inTypeDoc ty) tyvars' fvs
        ; return ( HsForAllTy { hst_bndrs = tyvars', hst_body =  tau' }
                 , fvs) } }
 
@@ -836,6 +836,8 @@ bindLRdrNames rdrs thing_inside
 ---------------
 bindHsQTyVars :: forall a b.
                  HsDocContext
+              -> Maybe SDoc         -- if we are to check for unused tvs,
+                                    -- a phrase like "in the type ..."
               -> Maybe a                 -- Just _  => an associated type decl
               -> [Located RdrName]       -- Kind variables from scope, in l-to-r
                                          -- order, but not from ...
@@ -846,14 +848,17 @@ bindHsQTyVars :: forall a b.
 --     both (i)  passed in (kv_bndrs)
 --     and  (ii) mentioned in the kinds of tv_bndrs
 -- (b) Bring type variables into scope
-bindHsQTyVars doc mb_assoc kv_bndrs tv_bndrs thing_inside
-  = do { bindLHsTyVarBndrs doc mb_assoc kv_bndrs (hsQTvExplicit tv_bndrs) $
+bindHsQTyVars doc mb_in_doc mb_assoc kv_bndrs tv_bndrs thing_inside
+  = do { bindLHsTyVarBndrs doc mb_in_doc
+                           mb_assoc kv_bndrs (hsQTvExplicit tv_bndrs) $
          \ rn_kvs rn_bndrs ->
          thing_inside (HsQTvs { hsq_implicit = rn_kvs
                               , hsq_explicit = rn_bndrs }) }
 
 bindLHsTyVarBndrs :: forall a b.
                      HsDocContext
+                  -> Maybe SDoc         -- if we are to check for unused tvs,
+                                        -- a phrase like "in the type ..."
                   -> Maybe a            -- Just _  => an associated type decl
                   -> [Located RdrName]  -- Unbound kind variables from scope,
                                         -- in l-to-r order, but not from ...
@@ -862,7 +867,7 @@ bindLHsTyVarBndrs :: forall a b.
                       -> [LHsTyVarBndr Name]
                       -> RnM (b, FreeVars))
                   -> RnM (b, FreeVars)
-bindLHsTyVarBndrs doc mb_assoc kv_bndrs tv_bndrs thing_inside
+bindLHsTyVarBndrs doc mb_in_doc mb_assoc kv_bndrs tv_bndrs thing_inside
   = do { when (isNothing mb_assoc) (checkShadowedRdrNames tv_names_w_loc)
        ; go [] [] emptyNameSet emptyNameSet tv_bndrs }
   where
@@ -876,11 +881,14 @@ bindLHsTyVarBndrs doc mb_assoc kv_bndrs tv_bndrs thing_inside
        -> RnM (b, FreeVars)
     go rn_kvs rn_tvs kv_names tv_names (tv_bndr : tv_bndrs)
       = bindLHsTyVarBndr doc mb_assoc kv_names tv_names tv_bndr $
-        \ kv_nms tv_bndr' -> go (reverse kv_nms ++ rn_kvs)
-                                (tv_bndr' : rn_tvs)
-                                (kv_names `extendNameSetList` kv_nms)
-                                (tv_names `extendNameSet` hsLTyVarName tv_bndr')
-                                tv_bndrs
+        \ kv_nms tv_bndr' ->
+        do { (b, fvs) <- go (reverse kv_nms ++ rn_kvs)
+                            (tv_bndr' : rn_tvs)
+                            (kv_names `extendNameSetList` kv_nms)
+                            (tv_names `extendNameSet` hsLTyVarName tv_bndr')
+                            tv_bndrs
+           ; warn_unused tv_bndr' fvs
+           ; return (b, fvs) }
 
     go rn_kvs rn_tvs _kv_names tv_names []
       = -- still need to deal with the kv_bndrs passed in originally
@@ -892,6 +900,10 @@ bindLHsTyVarBndrs doc mb_assoc kv_bndrs tv_bndrs thing_inside
                                                ppr all_rn_kvs $$
                                                ppr all_rn_tvs))
            ; thing_inside all_rn_kvs all_rn_tvs }
+
+    warn_unused tv_bndr fvs = case mb_in_doc of
+      Just in_doc -> warnUnusedForAll in_doc tv_bndr fvs
+      Nothing     -> return ()
 
 bindLHsTyVarBndr :: HsDocContext
                  -> Maybe a   -- associated class
@@ -1386,16 +1398,13 @@ dataKindsErr env thing
 inTypeDoc :: HsType RdrName -> SDoc
 inTypeDoc ty = ptext (sLit "In the type") <+> quotes (ppr ty)
 
-warnUnusedForAlls :: SDoc -> [LHsTyVarBndr Name] -> FreeVars -> TcM ()
-warnUnusedForAlls in_doc bound_names used_names
+warnUnusedForAll :: SDoc -> LHsTyVarBndr Name -> FreeVars -> TcM ()
+warnUnusedForAll in_doc (L loc tv) used_names
   = whenWOptM Opt_WarnUnusedMatches $
-    mapM_ add_warn bound_names
-  where
-    add_warn (L loc tv)
-      = unless (hsTyVarName tv `elemNameSet` used_names) $
-        addWarnAt loc $
-        vcat [ ptext (sLit "Unused quantified type variable") <+> quotes (ppr tv)
-             , in_doc ]
+    unless (hsTyVarName tv `elemNameSet` used_names) $
+    addWarnAt loc $
+    vcat [ ptext (sLit "Unused quantified type variable") <+> quotes (ppr tv)
+         , in_doc ]
 
 opTyErr :: Outputable a => RdrName -> a -> SDoc
 opTyErr op overall_ty
