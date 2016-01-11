@@ -2237,6 +2237,15 @@ Here are the details:
   will have its type variables
   ordered as ``m, a, b, c``.
 
+- If any of the variables depend on other variables (that is, if some
+  of the variables are *kind* variables), the variables are reordered
+  so that kind variables come before type variables, preserving the
+  left-to-right order as much as possible. That is, GHC performs a
+  stable topological sort on the variables.
+
+  For example: if we have ``bar :: Proxy (a :: (j, k)) -> b``, then
+  the variables are ordered ``j``, ``k``, ``a``, ``b``.
+
 - Class methods' type arguments include the class type
   variables, followed by any variables an individual method is polymorphic
   in. So, ``class Monad m where return :: a -> m a`` means
