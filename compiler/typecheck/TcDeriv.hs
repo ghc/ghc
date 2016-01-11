@@ -1567,18 +1567,15 @@ mkNewTypeEqn dflags overlap_mode tvs
                 -- we are gong to get all the methods for the newtype
                 -- dictionary
 
-
         -- Next we figure out what superclass dictionaries to use
         -- See Note [Newtype deriving superclasses] above
-
         cls_tyvars = classTyVars cls
-        dfun_tvs = tyCoVarsOfTypes inst_tys
-        inst_ty = mkTyConApp tycon tc_args
-        inst_tys = cls_tys ++ [inst_ty]
-        sc_theta =
-            mkThetaOrigin DerivOrigin TypeLevel $
-            substTheta (zipOpenTCvSubst cls_tyvars inst_tys) (classSCTheta cls)
-
+        dfun_tvs   = tyCoVarsOfTypes inst_tys
+        inst_ty    = mkTyConApp tycon tc_args
+        inst_tys   = cls_tys ++ [inst_ty]
+        sc_theta   = mkThetaOrigin DerivOrigin TypeLevel $
+                     substTheta (zipOpenTCvSubst cls_tyvars inst_tys) $
+                     classSCTheta cls
 
         -- Next we collect Coercible constraints between
         -- the Class method types, instantiated with the representation and the
