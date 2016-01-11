@@ -5,7 +5,7 @@ import Base
 import Oracles.PackageData
 import Package
 import Stage
-import Settings.TargetDirectory
+import Settings.Paths
 
 newtype ModuleFilesKey = ModuleFilesKey ([String], [FilePath])
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)

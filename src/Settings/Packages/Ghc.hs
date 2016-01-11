@@ -4,7 +4,7 @@ import Expression
 import GHC (ghc, compiler)
 import Oracles.Config.Setting
 import Predicates (builder, builderGhc, package, notStage0)
-import Settings.TargetDirectory
+import Settings.Paths
 
 ghcPackageArgs :: Args
 ghcPackageArgs = package ghc ? do

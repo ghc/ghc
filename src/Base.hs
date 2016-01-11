@@ -18,7 +18,6 @@ module Base (
     -- * Paths
     shakeFilesPath, configPath, sourcePath, programInplacePath,
     bootPackageConstraints, packageDependencies,
-    packageConfiguration, packageConfigurationInitialised,
 
     -- * Output
     putColoured, putOracle, putBuild, putSuccess, putError, renderBox,
@@ -44,7 +43,6 @@ import qualified System.Directory as IO
 import System.IO
 
 -- TODO: reexport Stage, etc.?
-import Stage
 
 -- Build system files and paths
 shakePath :: FilePath
@@ -70,17 +68,6 @@ bootPackageConstraints = shakeFilesPath -/- "boot-package-constraints"
 
 packageDependencies :: FilePath
 packageDependencies = shakeFilesPath -/- "package-dependencies"
-
--- TODO: move to buildRootPath, see #113
-packageConfiguration :: Stage -> FilePath
-packageConfiguration Stage0 = "libraries/bootstrapping.conf"
-packageConfiguration _      = "inplace/lib/package.conf.d"
-
--- StageN, N > 0, share the same packageConfiguration (see above)
-packageConfigurationInitialised :: Stage -> FilePath
-packageConfigurationInitialised stage =
-    shakeFilesPath -/- "package-configuration-initialised-"
-    ++ stageString (min stage Stage1)
 
 -- Utility functions
 -- | Find and replace all occurrences of a value in a list

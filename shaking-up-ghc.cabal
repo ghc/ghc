@@ -95,7 +95,7 @@ executable ghc-shake
                        , Settings.Packages.RunGhc
                        , Settings.Packages.Touchy
                        , Settings.Packages.Unlit
-                       , Settings.TargetDirectory
+                       , Settings.Paths
                        , Settings.User
                        , Settings.Ways
                        , Stage

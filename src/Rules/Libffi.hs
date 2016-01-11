@@ -7,7 +7,7 @@ import Oracles
 import Rules.Actions
 import Settings.Builders.Common
 import Settings.Packages.Rts
-import Settings.TargetDirectory
+import Settings.Paths
 import Settings.User
 
 -- TODO: this should be moved elsewhere

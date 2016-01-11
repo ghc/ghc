@@ -1,6 +1,6 @@
 module Settings (
     module Settings.Packages,
-    module Settings.TargetDirectory,
+    module Settings.Paths,
     module Settings.User,
     module Settings.Ways,
     getPkgData, getPkgDataList, getTopDirectory, programPath, isLibrary,
@@ -12,7 +12,7 @@ import Expression
 import Oracles
 import Oracles.ModuleFiles
 import Settings.Packages
-import Settings.TargetDirectory
+import Settings.Paths
 import Settings.User
 import Settings.Ways
 

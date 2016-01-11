@@ -5,7 +5,7 @@ import GHC
 import Oracles
 import Predicates (builder)
 import Settings.Builders.GhcCabal
-import Settings.TargetDirectory
+import Settings.Paths
 
 hsCppBuilderArgs :: Args
 hsCppBuilderArgs = builder HsCpp ? do
