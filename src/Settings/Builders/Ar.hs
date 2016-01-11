@@ -46,7 +46,7 @@ useSuccessiveInvocations path flagArgs fileArgs = do
         unit . cmd [path] $ flagArgs ++ argsChunk
 
 -- | @chunksOfSize size strings@ splits a given list of strings into chunks not
--- exceeding the given @size@.
+-- exceeding the given @size@. If that is impossible, it uses singleton chunks.
 chunksOfSize :: Int -> [String] -> [[String]]
 chunksOfSize n = repeatedly f
     where f xs = splitAt (max 1 $ length $ takeWhile (<= n) $ scanl1 (+) $ map length xs) xs
