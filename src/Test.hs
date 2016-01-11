@@ -16,4 +16,8 @@ instance Arbitrary WayUnit where
 testRules :: Rules ()
 testRules =
     phony "selftest" $ do
-        liftIO $ quickCheck $ \(x :: Way) -> read (show x) == x
+        test $ \(x :: Way) -> read (show x) == x
+
+
+test :: Testable a => a -> Action ()
+test = liftIO . quickCheck
