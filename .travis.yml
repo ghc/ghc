@@ -72,7 +72,7 @@ cache:
 
 notifications:
     irc:
-        on_success: always # always/never/change
+        on_success: change # always/never/change
         on_failure: always
         channels:
             - "chat.freenode.net#shaking-up-ghc"
