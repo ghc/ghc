@@ -48,13 +48,5 @@ useSuccessiveInvocations path flagArgs fileArgs = do
 -- | @chunksOfSize size strings@ splits a given list of strings into chunks not
 -- exceeding the given @size@.
 chunksOfSize :: Int -> [String] -> [[String]]
-chunksOfSize _    [] = []
-chunksOfSize size strings = reverse chunk : chunksOfSize size rest
-  where
-    (chunk, rest) = go [] 0 strings
-    go res _         []     = (res, [])
-    go res chunkSize (s:ss) =
-        if newSize > size then (res, s:ss) else go (s:res) newSize ss
-      where
-        newSize = chunkSize + length s
-
+chunksOfSize n = repeatedly f
+    where f xs = splitAt (max 1 $ length $ takeWhile (<= n) $ scanl1 (+) $ map length xs) xs
