@@ -1,5 +1,5 @@
 module Way (
-    WayUnit (..), Way, wayUnit,
+    WayUnit (..), Way, wayUnit, wayFromUnits,
 
     vanilla, profiling, logging, parallel, granSim,
     threaded, threadedProfiling, threadedLogging,

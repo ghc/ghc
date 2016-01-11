@@ -100,6 +100,7 @@ executable ghc-shake
                        , Settings.Ways
                        , Stage
                        , Target
+                       , Test
                        , Way
 
     default-extensions:  BangPatterns
@@ -111,6 +112,7 @@ executable ghc-shake
                        , FlexibleInstances
                        , OverloadedStrings
                        , RecordWildCards
+                       , ScopedTypeVariables
     build-depends:       base
                        , ansi-terminal >= 0.6
                        , Cabal >= 1.22
@@ -118,6 +120,7 @@ executable ghc-shake
                        , directory >= 1.2
                        , extra >= 1.4
                        , mtl >= 2.2
+                       , QuickCheck >= 2.6
                        , shake >= 0.15
                        , transformers >= 0.4
                        , unordered-containers >= 0.2

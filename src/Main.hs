@@ -11,6 +11,7 @@ import qualified Rules.Gmp
 import qualified Rules.Libffi
 import qualified Rules.Oracles
 import qualified Rules.Perl
+import qualified Test
 
 main :: IO ()
 main = shakeArgs options rules
@@ -25,7 +26,8 @@ main = shakeArgs options rules
         , Rules.Gmp.gmpRules
         , Rules.Libffi.libffiRules
         , Rules.Oracles.oracleRules
-        , Rules.packageRules ]
+        , Rules.packageRules
+        , Test.testRules ]
     options = shakeOptions
         { shakeFiles    = Base.shakeFilesPath
         , shakeProgress = progressSimple
