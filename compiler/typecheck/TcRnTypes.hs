@@ -1773,7 +1773,9 @@ instance Outputable Ct where
          CTyEqCan {}      -> text "CTyEqCan"
          CFunEqCan {}     -> text "CFunEqCan"
          CNonCanonical {} -> text "CNonCanonical"
-         CDictCan {}      -> text "CDictCan"
+         CDictCan { cc_pend_sc = pend_sc }
+            | pend_sc   -> text "CDictCan(psc)"
+            | otherwise -> text "CDictCan"
          CIrredEvCan {}   -> text "CIrredEvCan"
          CHoleCan { cc_occ = occ } -> text "CHoleCan:" <+> ppr occ
 

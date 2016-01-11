@@ -13,7 +13,8 @@ module TcSMonad (
     updWorkListTcS,
 
     -- The TcS monad
-    TcS, runTcS, runTcSDeriveds, runTcSWithEvBinds, failTcS,
+    TcS, runTcS, runTcSDeriveds, runTcSWithEvBinds,
+    failTcS, warnTcS,
     runTcSEqualities,
     nestTcS, nestImplicTcS,
 
@@ -2319,7 +2320,9 @@ wrapWarnTcS :: TcM a -> TcS a
 wrapWarnTcS = wrapTcS
 
 failTcS, panicTcS :: SDoc -> TcS a
+warnTcS           :: SDoc -> TcS ()
 failTcS      = wrapTcS . TcM.failWith
+warnTcS      = wrapTcS . TcM.addWarn
 panicTcS doc = pprPanic "TcCanonical" doc
 
 traceTcS :: String -> SDoc -> TcS ()
