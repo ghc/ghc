@@ -1033,7 +1033,7 @@ simpl_loop n limit floated_eqs no_new_scs
   = return wc  -- Done!
 
   | n `intGtLimit` limit
-  = failTcS (hang (ptext (sLit "solveWanteds: too many iterations")
+  = do { warnTcS (hang (ptext (sLit "solveWanteds: too many iterations")
                    <+> parens (ptext (sLit "limit =") <+> ppr limit))
                 2 (vcat [ ptext (sLit "Unsolved:") <+> ppr wc
                         , ppUnless (isEmptyBag floated_eqs) $
@@ -1042,6 +1042,7 @@ simpl_loop n limit floated_eqs no_new_scs
                           ptext (sLit "New superclasses found")
                         , ptext (sLit "Set limit with -fconstraint-solver-iterations=n; n=0 for no limit")
                   ]))
+       ; return wc }
 
   | otherwise
   = do { traceTcS "simpl_loop, iteration" (int n)
