@@ -122,4 +122,4 @@ executable ghc-shake
                        , transformers >= 0.4
                        , unordered-containers >= 0.2
     default-language:    Haskell2010
-    ghc-options:         -Wall -rtsopts -with-rtsopts=-I0 -j
+    ghc-options:         -Wall -fno-warn-name-shadowing -rtsopts -with-rtsopts=-I0 -j
