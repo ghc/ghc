@@ -568,7 +568,7 @@ data TyCon
         primTyConRep  :: PrimRep,-- ^ Many primitive tycons are unboxed, but
                                  -- some are boxed (represented by
                                  -- pointers). This 'PrimRep' holds that
-                                 -- information.  Only relevant if tyConKind = *
+                                 -- information.  Only relevant if tyConKind = #
 
         isUnLifted   :: Bool,    -- ^ Most primitive tycons are unlifted (may
                                  -- not contain bottom) but other are lifted,
@@ -1203,7 +1203,8 @@ mkKindTyCon :: Name -> Kind -> [Role] -> Name -> TyCon
 mkKindTyCon name kind roles rep_nm
   = tc
   where
-    tc = mkPrimTyCon' name kind roles VoidRep False (Just rep_nm)
+    tc = mkPrimTyCon' name kind roles PtrRep False (Just rep_nm)
+      -- PtrRep because kinds have kind *.
 
 -- | Create a lifted primitive 'TyCon' such as @RealWorld@
 mkLiftedPrimTyCon :: Name  -> Kind -> [Role] -> PrimRep -> TyCon
