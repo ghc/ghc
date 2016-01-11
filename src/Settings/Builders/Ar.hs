@@ -1,4 +1,4 @@
-module Settings.Builders.Ar (arBuilderArgs, arCmd) where
+module Settings.Builders.Ar (arBuilderArgs, arCmd, chunksOfSize) where
 
 import Base
 import Expression
