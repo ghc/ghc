@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-dodgy-imports #-} -- for Development.Shake.parallel
+{-# LANGUAGE LambdaCase #-}
 
 module Base (
     -- * General utilities
@@ -20,7 +21,8 @@ module Base (
     bootPackageConstraints, packageDependencies,
 
     -- * Output
-    putColoured, putOracle, putBuild, putSuccess, putError, renderBox,
+    putColoured, putOracle, putBuild, putSuccess, putError, renderAction,
+    renderLibrary, renderProgram,
 
     -- * Miscellaneous utilities
     bimap, minusOrd, intersectOrd, replaceEq, quote, replaceSeparators,
@@ -35,12 +37,13 @@ import Data.Function
 import Data.List.Extra
 import Data.Maybe
 import Data.Monoid
-import Development.Shake hiding (parallel, unit, (*>))
+import Development.Shake hiding (parallel, unit, (*>), Normal)
 import Development.Shake.Classes
 import Development.Shake.FilePath
 import System.Console.ANSI
 import qualified System.Directory as IO
 import System.IO
+import Oracles.Config.CmdLineFlag (buildInfo, BuildInfoFlag(..))
 
 -- TODO: reexport Stage, etc.?
 
@@ -138,6 +141,26 @@ putError :: String -> Action a
 putError msg = do
     putColoured Red msg
     error $ "GHC build system error: " ++ msg
+
+renderAction :: String -> String -> String -> Action String
+renderAction what input output = buildInfo >>= return . \case
+    Normal -> renderBox [ what
+                        , "     input:" ++ input
+                        , " => output:" ++ output ]
+    Brief  -> "> " ++ what ++ ": " ++ input ++ " => " ++ output
+    Pony   -> " *** PONY NOT YET SUPPORTED ***"
+    Dot    -> "."
+    None   -> ""
+
+renderProgram :: String -> String -> String -> Action String
+renderProgram name bin synopsis = return $ renderBox [ "Successfully built program " ++ name
+                                                     , "Executable: " ++ bin
+                                                     , "Program synopsis: " ++ synopsis ++ "."]
+
+renderLibrary :: String -> String -> String -> Action String
+renderLibrary name lib synopsis = return $ renderBox [ "Successfully built library " ++ name
+                                                     , "Library: " ++ lib
+                                                     , "Library synopsis: " ++ synopsis ++ "."]
 
 -- | Render the given set of lines in a nice box of ASCII.
 --

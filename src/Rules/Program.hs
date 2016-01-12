@@ -100,8 +100,7 @@ buildBinary target @ (PartialTarget stage pkg) bin = do
     need $ binDeps ++ libs
     build $ fullTargetWithWay target (Ghc stage) vanilla binDeps [bin]
     synopsis <- interpretPartial target $ getPkgData Synopsis
-    putSuccess $ renderBox
-        [ "Successfully built program '"
-          ++ pkgNameString pkg ++ "' (" ++ show stage ++ ")."
-        , "Executable: " ++ bin
-        , "Program synopsis: " ++ dropWhileEnd isPunctuation synopsis ++ "." ]
+    putSuccess =<< renderProgram
+        ("'" ++ pkgNameString pkg ++ "' (" ++ show stage ++ ").")
+        bin
+        (dropWhileEnd isPunctuation synopsis)
