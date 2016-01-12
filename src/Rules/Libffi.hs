@@ -28,11 +28,11 @@ libffiLibrary :: FilePath
 libffiLibrary = libffiBuild -/- "inst/lib/libffi.a"
 
 fixLibffiMakefile :: String -> String
-fixLibffiMakefile = unlines . map
-    ( replace "-MD" "-MMD"
+fixLibffiMakefile =
+      replace "-MD" "-MMD"
     . replace "@toolexeclibdir@" "$(libdir)"
     . replace "@INSTALL@" "$(subst ../install-sh,C:/msys/home/chEEtah/ghc/install-sh,@INSTALL@)"
-    ) . lines
+
 
 -- TODO: remove code duplication (see Settings/Builders/GhcCabal.hs)
 configureEnvironment :: Action [CmdOption]
