@@ -12,7 +12,7 @@ on the [wiki page][ghc-shake-wiki] and in this [blog post][shake-blog-post].
 
 This is supposed to go into the `shake-build` directory of the GHC source tree.
 
-[Join us on #shaking-up-ghc on Freenode](irc://chat.freenode.net/#shaking-up-ghc)
+[Join us on #shaking-up-ghc on Freenode](irc://chat.freenode.net/#shaking-up-ghc).
 
 Trying it
 ---------
@@ -22,6 +22,9 @@ for general preparation. The preparation steps for the `shake` build system are
 identical to those for the `make` build system. This means that you don't need
 to adjust anything if you are already familiar with building ghc using the `make`
 build system.
+
+Furthermore, we depend on the following packages which need to be installed:
+`ansi-terminal`, `mtl`, `shake`, `quickcheck`.
 
 ### Getting the source and configuring GHC
 
@@ -51,7 +54,7 @@ Also see the [Building GHC on Windows guide][ghc-windows-building-guide].
 
 ### Resetting the build
 
-To reset the new build system run the build script with `-B` flag. This forces Shake to rerun all rules, even if results of the previous build are still in the GHC tree. This is a temporary solution; we are working on a proper reset functionality (see [#32](https://github.com/snowleopard/shaking-up-ghc/issues/32)).
+To reset the new build system run the build script with `-B` flag. This forces Shake to rerun all rules, even if results of the previous build are still in the GHC tree. This is a temporary solution; we are working on a proper reset functionality (#131).
 
 
 How to contribute
