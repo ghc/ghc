@@ -677,8 +677,10 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       = inst_and_unify
          -- It's still possible that ty_actual has nested foralls. Instantiate
          -- these, as there's no way unification will succeed with them in.
-         -- See typecheck/should_compiler/T11350 for an example of when this
-         -- is important.
+         -- See typecheck/should_compile/T11305 for an example of when this
+         -- is important. The problem is that we're checking something like
+         --  a -> forall b. b -> b     <=   alpha beta gamma
+         -- where we end up with alpha := (->)
 
     inst_and_unify = do { (wrap, rho_a) <- deeplyInstantiate inst_orig ty_actual
 
@@ -688,15 +690,10 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
                            -- instantiation. If we *have* recurred through
                            -- an arrow, it's better not to update.
                         ; let eq_orig' = case eq_orig of
-                                TypeEqOrigin { uo_actual   = orig_ty_actual
-                                             , uo_expected = orig_ty_expected
-                                             , uo_thing    = thing }
+                                TypeEqOrigin { uo_actual   = orig_ty_actual }
                                   |  orig_ty_actual `tcEqType` ty_actual
                                   ,  not (isIdHsWrapper wrap)
-                                  -> TypeEqOrigin
-                                       { uo_actual = rho_a
-                                       , uo_expected = orig_ty_expected
-                                       , uo_thing    = thing }
+                                  -> eq_orig { uo_actual = rho_a }
                                 _ -> eq_orig
 
                         ; cow <- uType eq_orig' TypeLevel rho_a ty_expected
