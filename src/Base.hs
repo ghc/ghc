@@ -142,25 +142,51 @@ putError msg = do
     putColoured Red msg
     error $ "GHC build system error: " ++ msg
 
+-- | Render an action.
 renderAction :: String -> String -> String -> Action String
 renderAction what input output = buildInfo >>= return . \case
     Normal -> renderBox [ what
                         , "     input:" ++ input
                         , " => output:" ++ output ]
     Brief  -> "> " ++ what ++ ": " ++ input ++ " => " ++ output
-    Pony   -> " *** PONY NOT YET SUPPORTED ***"
+    Pony   -> renderPony [ what
+                         , "     input:" ++ input
+                         , " => output:" ++ output ]
     Dot    -> "."
     None   -> ""
 
+-- | Render the successful build of a program
 renderProgram :: String -> String -> String -> Action String
 renderProgram name bin synopsis = return $ renderBox [ "Successfully built program " ++ name
                                                      , "Executable: " ++ bin
                                                      , "Program synopsis: " ++ synopsis ++ "."]
 
+-- | Render the successful built of a library
 renderLibrary :: String -> String -> String -> Action String
 renderLibrary name lib synopsis = return $ renderBox [ "Successfully built library " ++ name
                                                      , "Library: " ++ lib
                                                      , "Library synopsis: " ++ synopsis ++ "."]
+
+-- | Render the given set of lines next to our favorit unicorn Robert.
+renderPony :: [String] -> String
+renderPony ls =
+    unlines $ take (max (length ponyLines) (length boxLines)) $
+        zipWith (++) (ponyLines ++ repeat ponyPadding) (boxLines ++ repeat "")
+  where
+    ponyLines :: [String]
+    ponyLines = [ "                   ,;,,;'"
+                , "                  ,;;'(    Robert the spitting unicorn"
+                , "       __       ,;;' ' \\   wants you to know"
+                , "     /'  '\\'~~'~' \\ /'\\.)  that a task      "
+                , "  ,;(      )    /  |.  /   just finished!   "
+                , " ,;' \\    /-.,,(   ) \\                      "
+                , " ^    ) /       ) / )|     Almost there!    "
+                , "      ||        ||  \\)                      "
+                , "      (_\\       (_\\                         " ]
+    ponyPadding :: String
+    ponyPadding = "                                            "
+    boxLines :: [String]
+    boxLines = ["", "", ""] ++ (lines . renderBox $ ls)
 
 -- | Render the given set of lines in a nice box of ASCII.
 --
