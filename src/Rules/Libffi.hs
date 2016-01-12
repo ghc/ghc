@@ -28,11 +28,11 @@ libffiLibrary :: FilePath
 libffiLibrary = libffiBuild -/- "inst/lib/libffi.a"
 
 fixLibffiMakefile :: String -> String
-fixLibffiMakefile = unlines . map
-    ( replace "-MD" "-MMD"
+fixLibffiMakefile =
+      replace "-MD" "-MMD"
     . replace "@toolexeclibdir@" "$(libdir)"
     . replace "@INSTALL@" "$(subst ../install-sh,C:/msys/home/chEEtah/ghc/install-sh,@INSTALL@)"
-    ) . lines
+
 
 -- TODO: remove code duplication (see Settings/Builders/GhcCabal.hs)
 configureEnvironment :: Action [CmdOption]
@@ -71,7 +71,7 @@ libffiRules :: Rules ()
 libffiRules = do
     libffiDependencies &%> \_ -> do
         when trackBuildSystem $ need [sourcePath -/- "Rules/Libffi.hs"]
-        liftIO $ removeFiles libffiBuild ["//*"]
+        removeDirectory libffiBuild
         createDirectory $ buildRootPath -/- stageString Stage0
 
         tarballs <- getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
@@ -82,9 +82,11 @@ libffiRules = do
         need tarballs
         let libname = dropExtension . dropExtension . takeFileName $ head tarballs
 
-        build $ fullTarget libffiTarget Tar tarballs [buildRootPath]
-        actionFinally (moveDirectory (buildRootPath -/- libname) libffiBuild) $
-            removeFiles buildRootPath [libname <//> "*"]
+        removeDirectory (buildRootPath -/- libname)
+        actionFinally (do
+            build $ fullTarget libffiTarget Tar tarballs [buildRootPath]
+            moveDirectory (buildRootPath -/- libname) libffiBuild) $
+                removeFiles buildRootPath [libname <//> "*"]
 
         fixFile (libffiBuild -/- "Makefile.in") fixLibffiMakefile
 
