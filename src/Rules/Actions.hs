@@ -105,7 +105,7 @@ runMake dir args = do
     need [dir -/- "Makefile"]
     let note = if null args then "" else " (" ++ intercalate ", " args ++ ")"
     putBuild $ "| Run make" ++ note ++ " in " ++ dir ++ "..."
-    quietly $ cmd Shell (EchoStdout False) "make" ["-C", dir] args
+    quietly $ cmd Shell (EchoStdout False) makeCommand ["-C", dir] args
 
 runBuilder :: Builder -> [String] -> Action ()
 runBuilder builder args = do
