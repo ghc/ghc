@@ -52,7 +52,7 @@ buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
         else build $ fullTarget target Ar objs [a]
 
         synopsis <- interpretPartial target $ getPkgData Synopsis
-        unless isLib0 . putSuccess =<< renderLibrary
+        unless isLib0 . putSuccess $ renderLibrary
             ("'" ++ pkgNameString pkg ++ "' (" ++ show stage ++ ", way "++ show way ++ ").")
             a
             (dropWhileEnd isPunctuation synopsis)

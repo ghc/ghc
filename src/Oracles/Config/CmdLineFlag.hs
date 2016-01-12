@@ -1,33 +1,23 @@
-{-# LANGUAGE DeriveGeneric, DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
-module Oracles.Config.CmdLineFlag (buildInfo, cmdLineOracle, flags, BuildInfoFlag(..)) where
+module Oracles.Config.CmdLineFlag (putOptions, buildInfo, flags, BuildInfoFlag(..)) where
 
-import GHC.Generics (Generic)
-
-import Development.Shake hiding (Normal)
-import Development.Shake.Classes
 import Data.Char (toLower)
 import System.Console.GetOpt
 
+import System.IO.Unsafe (unsafePerformIO)
+import Data.IORef
+
 -- Flags
 
-data BuildInfoFlag = Normal | Brief | Pony | Dot | None deriving (Eq, Show, Generic)
-
-instance Hashable BuildInfoFlag
-instance NFData BuildInfoFlag
-instance Binary BuildInfoFlag
+data BuildInfoFlag = Normal | Brief | Pony | Dot | None deriving (Eq, Show)
 
 data CmdLineOptions = CmdLineOptions {
     flagBuildInfo :: BuildInfoFlag
-} deriving (Eq, Show, Generic)
+} deriving (Eq, Show)
 
 defaultCmdLineOptions :: CmdLineOptions
 defaultCmdLineOptions = CmdLineOptions {
     flagBuildInfo = Normal
 }
-
-instance Hashable CmdLineOptions
-instance NFData CmdLineOptions
-instance Binary CmdLineOptions
 
 readBuildInfoFlag :: Maybe String -> Either String (CmdLineOptions -> CmdLineOptions)
 readBuildInfoFlag ms =
@@ -47,18 +37,20 @@ readBuildInfoFlag ms =
 flags :: [OptDescr (Either String (CmdLineOptions -> CmdLineOptions))]
 flags = [Option [] ["build-info"] (OptArg readBuildInfoFlag "") "Build Info Style (Normal, Brief, Pony, Dot, or None)"]
 
--- Oracles
+-- IO -- We use IO here instead of Oracles, as Oracles form part of shakes cache
+-- hence, changing command line arguments, would cause a full rebuild.  And we
+-- likely do *not* want to rebuild everything if only the @--build-info@ flag
+-- was changed.
+{-# NOINLINE cmdLineOpts #-}
+cmdLineOpts :: IORef CmdLineOptions
+cmdLineOpts = unsafePerformIO $ newIORef defaultCmdLineOptions
 
-newtype CmdLineFlags = CmdLineFlags ()
-    deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
+putOptions :: [CmdLineOptions -> CmdLineOptions] -> IO ()
+putOptions opts = modifyIORef cmdLineOpts (\o -> foldl (flip id) o opts)
 
-buildInfo :: Action BuildInfoFlag
-buildInfo = do
-    opts <- askOracle $ CmdLineFlags ()
-    return $ flagBuildInfo opts
+{-# NOINLINE getOptions #-}
+getOptions :: CmdLineOptions
+getOptions = unsafePerformIO $ readIORef cmdLineOpts
 
-cmdLineOracle :: [CmdLineOptions -> CmdLineOptions] -> Rules ()
-cmdLineOracle opts = do
-    cache <- newCache $ \_ -> return $ foldl (flip id) defaultCmdLineOptions opts
-    _ <- addOracle $ \CmdLineFlags{} -> cache ()
-    return ()
+buildInfo :: BuildInfoFlag
+buildInfo = flagBuildInfo getOptions
