@@ -71,7 +71,7 @@ data Arch = ArchSPARC
 platform :: Arch
 platform =
 #if defined(sparc_HOST_ARCH)
-       ArchSparc
+       ArchSPARC
 #elif defined(powerpc_HOST_ARCH)
        ArchPPC
 #elif defined(i386_HOST_ARCH)
