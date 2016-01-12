@@ -19,7 +19,6 @@ import Rules.Gmp
 import Rules.Libffi
 import Rules.Resources (Resources)
 import Settings
-import Settings.Builders.DeriveConstants
 
 installTargets :: [FilePath]
 installTargets = [ "inplace/lib/template-hsc.h"
@@ -52,6 +51,9 @@ ghcPrimDependencies :: Stage -> [FilePath]
 ghcPrimDependencies stage = ((targetPath stage ghcPrim -/- "build") -/-) <$>
        [ "GHC/PrimopWrappers.hs"
        , "autogen/GHC/Prim.hs" ]
+
+derivedConstantsPath :: FilePath
+derivedConstantsPath = "includes/dist-derivedconstants/header"
 
 derivedConstantsDependencies :: [FilePath]
 derivedConstantsDependencies = installTargets ++ fmap (derivedConstantsPath -/-)
@@ -178,9 +180,10 @@ generateRules = do
         generate ghcSplit emptyTarget generateGhcSplit
         makeExecutable ghcSplit
 
-    -- TODO: simplify
+    -- TODO: simplify, get rid of fake rts target
     derivedConstantsPath ++ "//*" %> \file -> do
-        build $ fullTarget (PartialTarget Stage1 rts) DeriveConstants [] [file]
+        withTempDir $ \dir -> build $
+            fullTarget (PartialTarget Stage1 rts) DeriveConstants [] [file, dir]
 
   where
     file <~ gen = file %> \out -> generate out emptyTarget gen
