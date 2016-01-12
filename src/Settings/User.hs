@@ -62,9 +62,9 @@ trackBuildSystem = True
 validating :: Bool
 validating = False
 
--- To switch off split objects change to 'return False'
+-- To switch on split objects use 'splitObjects = defaultSplitObjects', see #153
 splitObjects :: Predicate
-splitObjects = defaultSplitObjects
+splitObjects = return False
 
 dynamicGhcPrograms :: Bool
 dynamicGhcPrograms = False
