@@ -1178,7 +1178,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
     ty_app_err ty arg
       = do { (_, ty) <- zonkTidyTcType emptyTidyEnv ty
            ; failWith $
-               text "Cannot not apply expression of type" <+> quotes (ppr ty) $$
+               text "Cannot apply expression of type" <+> quotes (ppr ty) $$
                text "to a visible type argument" <+> quotes (ppr arg) }
 
 ----------------
