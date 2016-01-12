@@ -82,9 +82,10 @@ libffiRules = do
         need tarballs
         let libname = dropExtension . dropExtension . takeFileName $ head tarballs
 
-        build $ fullTarget libffiTarget Tar tarballs [buildRootPath]
-        actionFinally (moveDirectory (buildRootPath -/- libname) libffiBuild) $
-            removeFiles buildRootPath [libname <//> "*"]
+        actionFinally (do
+            build $ fullTarget libffiTarget Tar tarballs [buildRootPath]
+            moveDirectory (buildRootPath -/- libname) libffiBuild) $
+                removeFiles buildRootPath [libname <//> "*"]
 
         fixFile (libffiBuild -/- "Makefile.in") fixLibffiMakefile
 
