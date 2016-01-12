@@ -64,9 +64,7 @@ captureStdout target path argList = do
 
 copyFile :: FilePath -> FilePath -> Action ()
 copyFile source target = do
-    putBuild $ renderBox [ "Copy file"
-                         , "    input: " ++ source
-                         , "=> output: " ++ target ]
+    putBuild $ renderAction "Copy file" source target
     copyFileChanged source target
 
 createDirectory :: FilePath -> Action ()
@@ -77,9 +75,7 @@ createDirectory dir = do
 -- Note, the source directory is untracked
 moveDirectory :: FilePath -> FilePath -> Action ()
 moveDirectory source target = do
-    putBuild $ renderBox [ "Move directory"
-                         , "    input: " ++ source
-                         , "=> output: " ++ target ]
+    putBuild $ renderAction "Move directory" source target
     liftIO $ IO.renameDirectory source target
 
 -- Transform a given file by applying a function to its contents
@@ -122,13 +118,11 @@ makeExecutable file = do
 
 -- Print out key information about the command being executed
 putInfo :: Target.Target -> Action ()
-putInfo (Target.Target {..}) = putBuild $ renderBox
-    [ "Run " ++ show builder
-      ++ " (" ++ stageInfo
-      ++ "package = " ++ pkgNameString package
-      ++ wayInfo ++ ")"
-    , "    input: " ++ digest inputs
-    , "=> output: " ++ digest outputs ]
+putInfo Target.Target {..} = putBuild $ renderAction
+    ("Run " ++ show builder ++ " (" ++ stageInfo
+    ++ "package = " ++ pkgNameString package ++ wayInfo ++ ")")
+    (digest inputs)
+    (digest outputs)
   where
     stageInfo = if isStaged builder then "" else "stage = " ++ show stage ++ ", "
     wayInfo   = if way == vanilla   then "" else ", way = " ++ show way

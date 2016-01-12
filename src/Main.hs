@@ -12,10 +12,15 @@ import qualified Rules.Libffi
 import qualified Rules.Oracles
 import qualified Rules.Perl
 import qualified Test
+import Oracles.Config.CmdLineFlag (putOptions, flags)
 
 main :: IO ()
-main = shakeArgs options rules
+main = shakeArgsWith options flags $ \cmdLineFlags targets -> do
+    putOptions cmdLineFlags
+    return . Just $ if null targets then rules else want targets
+        >> withoutActions rules
   where
+    rules :: Rules ()
     rules = mconcat
         [ Rules.Cabal.cabalRules
         , Rules.Config.configRules

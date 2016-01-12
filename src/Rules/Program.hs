@@ -92,7 +92,7 @@ buildBinary target @ (PartialTarget stage pkg) bin = do
             libFile  <- pkgLibraryFile libStage dep compId           way
             lib0File <- pkgLibraryFile libStage dep (compId ++ "-0") way
             dll0     <- needDll0 libStage dep
-            return $ [ libFile ] ++ [ lib0File | dll0 ]
+            return $ libFile : [ lib0File | dll0 ]
         return $ libFiles ++ [ pkgGhciLibraryFile libStage dep compId | ghci ]
     let binDeps = if pkg == ghcCabal && stage == Stage0
                   then [ pkgPath pkg -/- src <.> "hs" | src <- hSrcs ]
@@ -100,8 +100,7 @@ buildBinary target @ (PartialTarget stage pkg) bin = do
     need $ binDeps ++ libs
     build $ fullTargetWithWay target (Ghc stage) vanilla binDeps [bin]
     synopsis <- interpretPartial target $ getPkgData Synopsis
-    putSuccess $ renderBox
-        [ "Successfully built program '"
-          ++ pkgNameString pkg ++ "' (" ++ show stage ++ ")."
-        , "Executable: " ++ bin
-        , "Program synopsis: " ++ dropWhileEnd isPunctuation synopsis ++ "." ]
+    putSuccess $ renderProgram
+        ("'" ++ pkgNameString pkg ++ "' (" ++ show stage ++ ").")
+        bin
+        (dropWhileEnd isPunctuation synopsis)

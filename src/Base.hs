@@ -20,7 +20,8 @@ module Base (
     bootPackageConstraints, packageDependencies,
 
     -- * Output
-    putColoured, putOracle, putBuild, putSuccess, putError, renderBox,
+    putColoured, putOracle, putBuild, putSuccess, putError, renderAction,
+    renderLibrary, renderProgram,
 
     -- * Miscellaneous utilities
     bimap, minusOrd, intersectOrd, replaceEq, quote, replaceSeparators,
@@ -35,12 +36,13 @@ import Data.Function
 import Data.List.Extra
 import Data.Maybe
 import Data.Monoid
-import Development.Shake hiding (parallel, unit, (*>))
+import Development.Shake hiding (parallel, unit, (*>), Normal)
 import Development.Shake.Classes
 import Development.Shake.FilePath
 import System.Console.ANSI
 import qualified System.Directory as IO
 import System.IO
+import Oracles.Config.CmdLineFlag (buildInfo, BuildInfoFlag(..))
 
 -- TODO: reexport Stage, etc.?
 
@@ -138,6 +140,52 @@ putError :: String -> Action a
 putError msg = do
     putColoured Red msg
     error $ "GHC build system error: " ++ msg
+
+-- | Render an action.
+renderAction :: String -> String -> String -> String
+renderAction what input output = case buildInfo of
+    Normal -> renderBox [ what
+                        , "     input:" ++ input
+                        , " => output:" ++ output ]
+    Brief  -> "> " ++ what ++ ": " ++ input ++ " => " ++ output
+    Pony   -> renderPony [ what
+                         , "     input:" ++ input
+                         , " => output:" ++ output ]
+    Dot    -> "."
+    None   -> ""
+
+-- | Render the successful build of a program
+renderProgram :: String -> String -> String -> String
+renderProgram name bin synopsis = renderBox [ "Successfully built program " ++ name
+                                            , "Executable: " ++ bin
+                                            , "Program synopsis: " ++ synopsis ++ "."]
+
+-- | Render the successful built of a library
+renderLibrary :: String -> String -> String -> String
+renderLibrary name lib synopsis = renderBox [ "Successfully built library " ++ name
+                                            , "Library: " ++ lib
+                                            , "Library synopsis: " ++ synopsis ++ "."]
+
+-- | Render the given set of lines next to our favorit unicorn Robert.
+renderPony :: [String] -> String
+renderPony ls =
+    unlines $ take (max (length ponyLines) (length boxLines)) $
+        zipWith (++) (ponyLines ++ repeat ponyPadding) (boxLines ++ repeat "")
+  where
+    ponyLines :: [String]
+    ponyLines = [ "                   ,;,,;'"
+                , "                  ,;;'(    Robert the spitting unicorn"
+                , "       __       ,;;' ' \\   wants you to know"
+                , "     /'  '\\'~~'~' \\ /'\\.)  that a task      "
+                , "  ,;(      )    /  |.  /   just finished!   "
+                , " ,;' \\    /-.,,(   ) \\                      "
+                , " ^    ) /       ) / )|     Almost there!    "
+                , "      ||        ||  \\)                      "
+                , "      (_\\       (_\\                         " ]
+    ponyPadding :: String
+    ponyPadding = "                                            "
+    boxLines :: [String]
+    boxLines = ["", "", ""] ++ (lines . renderBox $ ls)
 
 -- | Render the given set of lines in a nice box of ASCII.
 --
