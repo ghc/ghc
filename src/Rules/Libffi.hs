@@ -75,6 +75,8 @@ libffiRules = do
     libffiDependencies &%> \_ -> do
         when trackBuildSystem $ need [sourcePath -/- "Rules/Libffi.hs"]
         liftIO $ removeFiles libffiBuild ["//*"]
+        createDirectory $ buildRootPath -/- "stage0"
+
         tarballs <- getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
         when (length tarballs /= 1) $
             putError $ "libffiRules: exactly one libffi tarball expected"
