@@ -77,7 +77,7 @@ createDirectory dir = do
 removeDirectory :: FilePath -> Action ()
 removeDirectory dir = do
     putBuild $ "| Remove directory " ++ dir
-    liftIO $ IO.removeDirectoryRecursive dir
+    removeDirectoryIfExists dir
 
 -- Note, the source directory is untracked
 moveDirectory :: FilePath -> FilePath -> Action ()
