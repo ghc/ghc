@@ -27,9 +27,6 @@ libffiBuild = buildRootPath -/- "stage0/libffi"
 libffiLibrary :: FilePath
 libffiLibrary = libffiBuild -/- "inst/lib/libffi.a"
 
-libffiMakefile :: FilePath
-libffiMakefile = libffiBuild -/- "Makefile.in"
-
 fixLibffiMakefile :: String -> String
 fixLibffiMakefile = unlines . map
     ( replace "-MD" "-MMD"
@@ -75,7 +72,7 @@ libffiRules = do
     libffiDependencies &%> \_ -> do
         when trackBuildSystem $ need [sourcePath -/- "Rules/Libffi.hs"]
         liftIO $ removeFiles libffiBuild ["//*"]
-        createDirectory $ buildRootPath -/- "stage0"
+        createDirectory $ buildRootPath -/- stageString Stage0
 
         tarballs <- getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
         when (length tarballs /= 1) $
@@ -85,12 +82,11 @@ libffiRules = do
         need tarballs
         let libname = dropExtension . dropExtension . takeFileName $ head tarballs
 
-        withTempDir $ \tmpDir -> do
-            let unifiedTmpDir = unifyPath tmpDir
-            build $ fullTarget libffiTarget Tar tarballs [unifiedTmpDir]
-            moveDirectory (unifiedTmpDir -/- libname) libffiBuild
+        build $ fullTarget libffiTarget Tar tarballs [buildRootPath]
+        actionFinally (moveDirectory (buildRootPath -/- libname) libffiBuild) $
+            removeFiles buildRootPath [libname <//> "*"]
 
-        fixFile libffiMakefile fixLibffiMakefile
+        fixFile (libffiBuild -/- "Makefile.in") fixLibffiMakefile
 
         forM_ ["config.guess", "config.sub"] $ \file ->
             copyFile file (libffiBuild -/- file)
