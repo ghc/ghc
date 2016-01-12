@@ -71,7 +71,7 @@ libffiRules :: Rules ()
 libffiRules = do
     libffiDependencies &%> \_ -> do
         when trackBuildSystem $ need [sourcePath -/- "Rules/Libffi.hs"]
-        liftIO $ removeFiles libffiBuild ["//*"]
+        removeDirectory libffiBuild
         createDirectory $ buildRootPath -/- stageString Stage0
 
         tarballs <- getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
