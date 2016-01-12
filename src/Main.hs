@@ -11,11 +11,8 @@ import qualified Rules.Gmp
 import qualified Rules.Libffi
 import qualified Rules.Oracles
 import qualified Rules.Perl
-<<<<<<< HEAD
-import Oracles.Config.CmdLineFlag (cmdLineOracle, flags)
-=======
 import qualified Test
->>>>>>> master
+import Oracles.Config.CmdLineFlag (cmdLineOracle, flags)
 
 main :: IO ()
 main = shakeArgsWith options flags $ \cmdLineFlags targets ->
