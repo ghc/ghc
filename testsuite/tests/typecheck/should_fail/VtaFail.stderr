@@ -1,6 +1,6 @@
 
 VtaFail.hs:7:16: error:
-    • Cannot not apply expression of type ‘t1 -> t0 -> (t1, t0)’
+    • Cannot apply expression of type ‘t1 -> t0 -> (t1, t0)’
       to a visible type argument ‘Int’
     • In the expression: pairup_nosig @Int @Bool 5 True
       In an equation for ‘answer_nosig’:
@@ -13,14 +13,14 @@ VtaFail.hs:12:26: error:
           answer_constraint_fail = addOne @Bool 5
 
 VtaFail.hs:14:17: error:
-    • Cannot not apply expression of type ‘r0 -> r0’
+    • Cannot apply expression of type ‘r0 -> r0’
       to a visible type argument ‘Int’
     • In the expression: (\ x -> x) @Int 12
       In an equation for ‘answer_lambda’:
           answer_lambda = (\ x -> x) @Int 12
 
 VtaFail.hs:19:5: error:
-    • Cannot not apply expression of type ‘Int -> (a0, Int)’
+    • Cannot apply expression of type ‘Int -> (a0, Int)’
       to a visible type argument ‘Bool’
     • In the expression: pair 3 @Int @Bool True
       In an equation for ‘a’: a = pair 3 @Int @Bool True
@@ -55,31 +55,31 @@ VtaFail.hs:41:27: error:
           threeWorse = too @(->) (T :: Three Either)
 
 VtaFail.hs:46:5: error:
-    • Cannot not apply expression of type ‘Int -> Int -> Int’
+    • Cannot apply expression of type ‘Int -> Int -> Int’
       to a visible type argument ‘Int’
     • In the expression: plus @Int 5 7
       In an equation for ‘b’: b = plus @Int 5 7
 
 VtaFail.hs:47:5: error:
-    • Cannot not apply expression of type ‘Int -> Int -> Int’
+    • Cannot apply expression of type ‘Int -> Int -> Int’
       to a visible type argument ‘Rational’
     • In the expression: plus @Rational 5 10
       In an equation for ‘c’: c = plus @Rational 5 10
 
 VtaFail.hs:48:5: error:
-    • Cannot not apply expression of type ‘Int -> Int -> Int’
+    • Cannot apply expression of type ‘Int -> Int -> Int’
       to a visible type argument ‘Int’
     • In the expression: (+) @Int @Int @Int 12 14
       In an equation for ‘d’: d = (+) @Int @Int @Int 12 14
 
 VtaFail.hs:51:5: error:
-    • Cannot not apply expression of type ‘Int -> String’
+    • Cannot apply expression of type ‘Int -> String’
       to a visible type argument ‘Float’
     • In the expression: show @Int @Float (read "5")
       In an equation for ‘e’: e = show @Int @Float (read "5")
 
 VtaFail.hs:52:11: error:
-    • Cannot not apply expression of type ‘String -> Int’
+    • Cannot apply expression of type ‘String -> Int’
       to a visible type argument ‘Bool’
     • In the first argument of ‘show’, namely
         ‘(read @Int @Bool @Float "3")’
