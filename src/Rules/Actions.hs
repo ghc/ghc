@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 module Rules.Actions (
-    build, buildWithResources, copyFile, createDirectory, moveDirectory,
+    build, buildWithResources, copyFile, createDirectory, removeDirectory, moveDirectory,
     fixFile, runConfigure, runMake, runBuilder, makeExecutable
     ) where
 
@@ -73,6 +73,11 @@ createDirectory :: FilePath -> Action ()
 createDirectory dir = do
     putBuild $ "| Create directory " ++ dir
     liftIO $ IO.createDirectoryIfMissing True dir
+
+removeDirectory :: FilePath -> Action ()
+removeDirectory dir = do
+    putBuild $ "| Remove directory " ++ dir
+    liftIO $ IO.removeDirectoryRecursive dir
 
 -- Note, the source directory is untracked
 moveDirectory :: FilePath -> FilePath -> Action ()
