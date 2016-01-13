@@ -24,7 +24,7 @@ to adjust anything if you are already familiar with building ghc using the `make
 build system.
 
 Furthermore, we depend on the following packages which need to be installed:
-`ansi-terminal`, `mtl`, `shake`, `quickcheck`.
+`ansi-terminal`, `mtl`, `shake`, `QuickCheck`.
 
 ### Getting the source and configuring GHC
 
