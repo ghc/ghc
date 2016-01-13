@@ -18,6 +18,7 @@ module GHCi
   , newBreakArray
   , enableBreakpoint
   , breakpointStatus
+  , getBreakpointVar
 
   -- * The object-code linker
   , initObjLinker
@@ -276,6 +277,11 @@ breakpointStatus hsc_env ref ix = do
   withForeignRef ref $ \breakarray ->
     iservCmd hsc_env (BreakpointStatus breakarray ix)
 
+getBreakpointVar :: HscEnv -> ForeignHValue -> Int -> IO (Maybe ForeignHValue)
+getBreakpointVar hsc_env ref ix =
+  withForeignRef ref $ \apStack -> do
+    mb <- iservCmd hsc_env (GetBreakpointVar apStack ix)
+    mapM (mkFinalizedHValue hsc_env) mb
 
 -- -----------------------------------------------------------------------------
 -- Interface to the object-code linker
@@ -454,36 +460,36 @@ HValue is a direct reference to an value in the local heap.  Obviously
 we cannot use this to refer to things in the external process.
 
 
-HValueRef
+RemoteRef
 ---------
 
-HValueRef is a StablePtr to a heap-resident value.  When
+RemoteRef is a StablePtr to a heap-resident value.  When
 -fexternal-interpreter is used, this value resides in the external
-process's heap.  HValueRefs are mostly used to send pointers in
+process's heap.  RemoteRefs are mostly used to send pointers in
 messages between GHC and iserv.
 
-An HValueRef must be explicitly freed when no longer required, using
+A RemoteRef must be explicitly freed when no longer required, using
 freeHValueRefs, or by attaching a finalizer with mkForeignHValue.
 
-To get from an HValueRef to an HValue you can use 'wormholeRef', which
+To get from a RemoteRef to an HValue you can use 'wormholeRef', which
 fails with an error message if -fexternal-interpreter is in use.
 
-ForeignHValue
--------------
+ForeignRef
+----------
 
-A ForeignHValue is an HValueRef with a finalizer that will free the
-'HValueRef' when it is gargabe collected.  We mostly use ForeignHValue
+A ForeignRef is a RemoteRef with a finalizer that will free the
+'RemoteRef' when it is gargabe collected.  We mostly use ForeignHValue
 on the GHC side.
 
-The finalizer adds the HValueRef to the iservPendingFrees list in the
-IServ record.  The next call to iservCmd will free any HValueRefs in
+The finalizer adds the RemoteRef to the iservPendingFrees list in the
+IServ record.  The next call to iservCmd will free any RemoteRefs in
 the list.  It was done this way rather than calling iservCmd directly,
 because I didn't want to have arbitrary threads calling iservCmd.  In
 principle it would probably be ok, but it seems less hairy this way.
 -}
 
--- | Creates a 'ForeignHValue' that will automatically release the
--- 'HValueRef' when it is no longer referenced.
+-- | Creates a 'ForeignRef' that will automatically release the
+-- 'RemoteRef' when it is no longer referenced.
 mkFinalizedHValue :: HscEnv -> RemoteRef a -> IO (ForeignRef a)
 mkFinalizedHValue HscEnv{..} rref = mkForeignRef rref free
  where
@@ -504,15 +510,15 @@ freeHValueRefs :: HscEnv -> [HValueRef] -> IO ()
 freeHValueRefs _ [] = return ()
 freeHValueRefs hsc_env refs = iservCmd hsc_env (FreeHValueRefs refs)
 
--- | Convert a 'ForeignHValue' to an 'HValue' directly.  This only works
--- when the interpreter is running in the same process as the compiler,
--- so it fails when @-fexternal-interpreter@ is on.
+-- | Convert a 'ForeignRef' to the value it references directly.  This
+-- only works when the interpreter is running in the same process as
+-- the compiler, so it fails when @-fexternal-interpreter@ is on.
 wormhole :: DynFlags -> ForeignRef a -> IO a
 wormhole dflags r = wormholeRef dflags (unsafeForeignRefToRemoteRef r)
 
--- | Convert an 'HValueRef' to an 'HValue' directly.  This only works
--- when the interpreter is running in the same process as the compiler,
--- so it fails when @-fexternal-interpreter@ is on.
+-- | Convert an 'RemoteRef' to the value it references directly.  This
+-- only works when the interpreter is running in the same process as
+-- the compiler, so it fails when @-fexternal-interpreter@ is on.
 wormholeRef :: DynFlags -> RemoteRef a -> IO a
 wormholeRef dflags r
   | gopt Opt_ExternalInterpreter dflags
