@@ -525,6 +525,7 @@ runGHCi paths maybe_exprs = do
              do runInputTWithPrefs defaultPrefs defaultSettings $
                           runCommands $ fileLoop hdl
                 liftIO (hClose hdl `catchIO` \_ -> return ())
+                liftIO $ putStrLn ("Loaded GHCi configuration from " ++ file)
 
   --
 
@@ -533,12 +534,13 @@ runGHCi paths maybe_exprs = do
   dot_cfgs <- if ignore_dot_ghci then return [] else do
     dot_files <- catMaybes <$> sequence [ current_dir, app_user_dir, home_dir ]
     liftIO $ filterM checkFileAndDirPerms dot_files
+  mdot_cfgs <- liftIO $ mapM canonicalizePath' dot_cfgs
+
   let arg_cfgs = reverse $ ghciScripts dflags
     -- -ghci-script are collected in reverse order
-  mcfgs <- liftIO $ mapM canonicalizePath' $ dot_cfgs ++ arg_cfgs
     -- We don't require that a script explicitly added by -ghci-script
     -- is owned by the current user. (#6017)
-  mapM_ sourceConfigFile $ nub $ catMaybes mcfgs
+  mapM_ sourceConfigFile $ nub $ (catMaybes mdot_cfgs) ++ arg_cfgs
     -- nub, because we don't want to read .ghci twice if the CWD is $HOME.
 
   -- Perform a :load for files given on the GHCi command line
