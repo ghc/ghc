@@ -61,14 +61,9 @@ configureIntGmpArguments :: Action [String]
 configureIntGmpArguments = do
     includes      <- settingList GmpIncludeDirs
     libs          <- settingList GmpLibDirs
-    return ([]
-            ++ (if (not (null includes))
-                then map ((++) "--with-gmp-includes=") includes
-                else [])
-            ++ (if (not (null libs))
-                then map ((++) "--with-gmp-libraries=") libs
-                else [])
-           )
+    return $ map ("--with-gmp-includes=" ++) includes
+               ++ map ("--with-gmp-libraries=" ++) libs
+
 
 -- TODO: we rebuild gmp every time.
 gmpRules :: Rules ()
