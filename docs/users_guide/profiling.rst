@@ -335,7 +335,7 @@ for all modules in a program.
 
     Adds an automatic ``SCC`` annotation to all *call sites*. This is
     particularly useful when using profiling for the purposes of
-    generating stack traces; see the function ``traceStack`` in the
+    generating stack traces; see the function :base-ref:`traceStack <Debug-Trace.html#traceShow>` in the
     module ``Debug.Trace``, or the :rts-flag:`-xc` RTS flag
     (:ref:`rts-options-debugging`) for more details.
 
