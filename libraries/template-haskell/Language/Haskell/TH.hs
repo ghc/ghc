@@ -125,6 +125,7 @@ module Language.Haskell.TH(
     -- **** Strictness
     noSourceUnpackedness, sourceNoUnpack, sourceUnpack,
     noSourceStrictness, sourceLazy, sourceStrict,
+    isStrict, notStrict, unpacked,
     bang, bangType, varBangType, strictType, varStrictType,
     -- **** Class Contexts
     cxt, classP, equalP,
