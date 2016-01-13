@@ -386,7 +386,7 @@ module GHC.Generics  (
 -- @
 -- class Encode a where
 --   encode :: a -> [Bool]
---   default encode :: ('Generic' a) => a -> [Bool]
+--   default encode :: (Generic a, Encode' (Rep a)) => a -> [Bool]
 --   encode x = encode' ('from' x)
 -- @
 --
