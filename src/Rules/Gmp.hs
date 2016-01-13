@@ -126,26 +126,23 @@ gmpRules = do
         -- this is indicated by line "HaveFrameworkGMP = YES" in `config.mk`
         configMk <- liftIO . readFile $ gmpBase -/- "config.mk"
         if "HaveFrameworkGMP = YES" `isInfixOf` configMk
+               || "HaveLibGmp = YES" `isInfixOf` configMk
         then do
-            putBuild "| GMP framework detected and will be used"
+            putBuild "| GMP library/framework detected and will be used"
             copyFile gmpLibraryFakeH gmpLibraryH
-        else if "HaveLibGmp = YES" `isInfixOf` configMk
-             then do
-               putBuild "| GMP detected and will be used"
-               copyFile gmpLibraryFakeH gmpLibraryH
-             else do
-               putBuild "| No GMP framework detected; in tree GMP will be built"
-               runMake libPath ["MAKEFLAGS="]
+        else do
+          putBuild "| No GMP library/framework detected; in tree GMP will be built"
+          runMake libPath ["MAKEFLAGS="]
 
-               copyFile (libPath -/- "gmp.h") gmpLibraryInTreeH
-               copyFile (libPath -/- "gmp.h") gmpLibraryH
-               -- TODO: why copy library, can we move it instead?
-               copyFile (libPath -/- ".libs/libgmp.a") gmpLibrary
+          copyFile (libPath -/- "gmp.h") gmpLibraryInTreeH
+          copyFile (libPath -/- "gmp.h") gmpLibraryH
+           -- TODO: why copy library, can we move it instead?
+          copyFile (libPath -/- ".libs/libgmp.a") gmpLibrary
 
-               createDirectory gmpObjects
-               build $ fullTarget gmpTarget Ar [gmpLibrary] [gmpObjects]
+          createDirectory gmpObjects
+          build $ fullTarget gmpTarget Ar [gmpLibrary] [gmpObjects]
 
-               runBuilder Ranlib [gmpLibrary]
+          runBuilder Ranlib [gmpLibrary]
 
         putSuccess "| Successfully built custom library 'integer-gmp'"
 
