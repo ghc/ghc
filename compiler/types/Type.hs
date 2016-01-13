@@ -707,7 +707,10 @@ isStrLitTy _                    = Nothing
 -- If so, give us the kind and the error message.
 userTypeError_maybe :: Type -> Maybe Type
 userTypeError_maybe t
-  = do { (tc, [_kind, msg]) <- splitTyConApp_maybe t
+  = do { (tc, _kind : msg : _) <- splitTyConApp_maybe t
+          -- There may be more than 2 arguments, if the type error is
+          -- used as a type constructor (e.g. at kind `Type -> Type`).
+
        ; guard (tyConName tc == errorMessageTypeErrorFamName)
        ; return msg }
 

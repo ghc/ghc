@@ -1733,9 +1733,9 @@ isTypeHoleCt (CHoleCan { cc_hole = TypeHole }) = True
 isTypeHoleCt _ = False
 
 -- | The following constraints are considered to be a custom type error:
---    1. TypeError msg
---    2. TypeError msg ~ Something  (and the other way around)
---    3. C (TypeError msg)          (for any parameter of class constraint)
+--    1. TypeError msg a b c
+--    2. TypeError msg a b c ~ Something (and the other way around)
+--    4. C (TypeError msg a b c)         (for any parameter of class constraint)
 getUserTypeErrorMsg :: Ct -> Maybe Type
 getUserTypeErrorMsg ct
   | Just (_,t1,t2) <- getEqPredTys_maybe ctT    = oneOf [t1,t2]
