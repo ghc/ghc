@@ -18,8 +18,7 @@ module BuildTyCl (
 
 import IfaceEnv
 import FamInstEnv( FamInstEnvs, mkNewTypeCoAxiom )
-import TysWiredIn( isCTupleTyConName )
-import PrelNames( tyConRepModOcc )
+import TysWiredIn( isCTupleTyConName, tyConRepModOcc )
 import DataCon
 import PatSyn
 import Var

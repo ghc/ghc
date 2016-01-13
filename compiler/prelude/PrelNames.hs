@@ -823,29 +823,6 @@ mkSpecialTyConRepName fs tc_name
                    (mkVarOccFS fs)
                    wiredInSrcSpan
 
--- | Make a 'Name' for the 'Typeable' representation of the given wired-in type
-mkPrelTyConRepName :: Name -> Name
--- See Note [Grand plan for Typeable] in 'TcTypeable' in TcTypeable.
-mkPrelTyConRepName tc_name  -- Prelude tc_name is always External,
-                            -- so nameModule will work
-  = mkExternalName rep_uniq rep_mod rep_occ (nameSrcSpan tc_name)
-  where
-    name_occ  = nameOccName tc_name
-    name_mod  = nameModule  tc_name
-    name_uniq = nameUnique  tc_name
-    rep_uniq | isTcOcc name_occ = tyConRepNameUnique   name_uniq
-             | otherwise        = dataConRepNameUnique name_uniq
-    (rep_mod, rep_occ) = tyConRepModOcc name_mod name_occ
-
--- | TODO
--- See Note [Grand plan for Typeable] in 'TcTypeable' in TcTypeable.
-tyConRepModOcc :: Module -> OccName -> (Module, OccName)
-tyConRepModOcc tc_module tc_occ
-  | tc_module == gHC_TYPES
-  = (tYPEABLE_INTERNAL, mkTyConRepUserOcc tc_occ)
-  | otherwise
-  = (tc_module,         mkTyConRepSysOcc tc_occ)
-
 wildCardName :: Name
 wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
 
