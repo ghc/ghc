@@ -1096,15 +1096,24 @@ warnPprTrace True   file  line  msg x
   where
     heading = hsep [text "WARNING: file", text file <> comma, text "line", int line]
 
+-- | Panic with an assertation failure, recording the given file and
+-- line number. Should typically be accessed with the ASSERT family of macros
+#if __GLASGOW_HASKELL__ > 710
+assertPprPanic :: (?callStack :: CallStack) => String -> Int -> SDoc -> a
+assertPprPanic _file _line msg
+  = pprPanic "ASSERT failed!" doc
+  where
+    doc = sep [ text (prettyCallStack ?callStack)
+              , msg ]
+#else
 assertPprPanic :: String -> Int -> SDoc -> a
--- ^ Panic with an assertation failure, recording the given file and line number.
--- Should typically be accessed with the ASSERT family of macros
 assertPprPanic file line msg
   = pprPanic "ASSERT failed!" doc
   where
     doc = sep [ hsep [ text "file", text file
                      , text "line", int line ]
               , msg ]
+#endif
 
 pprDebugAndThen :: DynFlags -> (String -> a) -> SDoc -> SDoc -> a
 pprDebugAndThen dflags cont heading pretty_msg
