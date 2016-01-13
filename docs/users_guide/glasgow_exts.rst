@@ -12239,7 +12239,7 @@ package on Hackage.
 More information
 ----------------
 
-For more details please refer to the `HaskellWiki
+For more details please refer to the `Haskell Wiki
 page <http://www.haskell.org/haskellwiki/GHC.Generics>`__ or the
 original paper [Generics2010]_.
 
