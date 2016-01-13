@@ -147,11 +147,18 @@ ppr_expr add_par expr@(Lam _ _)
          2 (pprCoreExpr body)
 
 ppr_expr add_par expr@(App {})
-  = case collectArgs expr of { (fun, args) ->
+  = sdocWithDynFlags $ \dflags ->
+    case collectArgs expr of { (fun, args) ->
     let
         pp_args     = sep (map pprArg args)
         val_args    = dropWhile isTypeArg args   -- Drop the type arguments for tuples
         pp_tup_args = pprWithCommas pprCoreExpr val_args
+        args'
+          | gopt Opt_SuppressTypeApplications dflags = val_args
+          | otherwise = args
+        parens
+          | null args' = id
+          | otherwise  = add_par
     in
     case fun of
         Var f -> case isDataConWorkId_maybe f of
@@ -164,9 +171,9 @@ ppr_expr add_par expr@(App {})
                              tc        = dataConTyCon dc
                              saturated = val_args `lengthIs` idArity f
 
-                   _ -> add_par (hang (ppr f) 2 pp_args)
+                   _ -> parens (hang (ppr f) 2 pp_args)
 
-        _ -> add_par (hang (pprParendExpr fun) 2 pp_args)
+        _ -> parens (hang (pprParendExpr fun) 2 pp_args)
     }
 
 ppr_expr add_par (Case expr var ty [(con,args,rhs)])
