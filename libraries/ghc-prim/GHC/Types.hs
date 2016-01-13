@@ -43,6 +43,10 @@ import GHC.Prim
 
 infixr 5 :
 
+-- Take note: All types defined here must have associated type representations
+-- defined in Data.Typeable.Internal.
+-- See Note [Representation of types defined in GHC.Types] below.
+
 {- *********************************************************************
 *                                                                      *
                   Kinds
@@ -366,6 +370,10 @@ Note [Representations of types defined in GHC.Types]
 
 The representations for the types defined in GHC.Types are
 defined in GHC.Typeable.Internal.
+
+Any types defined here must also have a corresponding TyCon representation
+defined in Data.Typeable.Internal. Also, if the type is promotable it must also
+have a TyCon for each promoted data constructor.
 
 -}
 

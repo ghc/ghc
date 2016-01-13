@@ -49,6 +49,7 @@ module TysWiredIn (
         listTyCon, listTyCon_RDR, listTyConName, listTyConKey,
         nilDataCon, nilDataConName, nilDataConKey,
         consDataCon_RDR, consDataCon, consDataConName,
+        promotedNilDataCon, promotedConsDataCon,
 
         mkListTy,
 
@@ -96,7 +97,10 @@ module TysWiredIn (
         levityTy, levityTyCon, liftedDataCon, unliftedDataCon,
         liftedPromDataCon, unliftedPromDataCon,
         liftedDataConTy, unliftedDataConTy,
-        liftedDataConName, unliftedDataConName
+        liftedDataConName, unliftedDataConName,
+
+        -- * Helpers for building type representations
+        tyConRepModOcc
     ) where
 
 #include "HsVersions.h"
@@ -137,6 +141,48 @@ alpha_tyvar = [alphaTyVar]
 
 alpha_ty :: [Type]
 alpha_ty = [alphaTy]
+
+-- * Some helpers for generating type representations
+
+-- | Make a 'Name' for the 'Typeable' representation of the given wired-in type
+mkPrelTyConRepName :: Name -> Name
+-- See Note [Grand plan for Typeable] in 'TcTypeable' in TcTypeable.
+-- This doesn't really belong here but a refactoring of this code eliminating
+-- these manually-defined representations is imminent
+mkPrelTyConRepName tc_name  -- Prelude tc_name is always External,
+                            -- so nameModule will work
+  = mkExternalName rep_uniq rep_mod rep_occ (nameSrcSpan tc_name)
+  where
+    name_occ  = nameOccName tc_name
+    name_mod  = nameModule  tc_name
+    name_uniq = nameUnique  tc_name
+    rep_uniq | isTcOcc name_occ = tyConRepNameUnique   name_uniq
+             | otherwise        = dataConRepNameUnique name_uniq
+    (rep_mod, rep_occ) = tyConRepModOcc name_mod name_occ
+
+-- | The name (and defining module) for the Typeable representation (TyCon) of a
+-- type constructor.
+--
+-- See Note [Grand plan for Typeable] in 'TcTypeable' in TcTypeable.
+tyConRepModOcc :: Module -> OccName -> (Module, OccName)
+tyConRepModOcc tc_module tc_occ
+  -- The list type is defined in GHC.Types and therefore must have its
+  -- representations defined manually in Data.Typeable.Internal.
+  -- However, $tc': isn't a valid Haskell identifier, so we override the derived
+  -- name here.
+  | is_wired_in promotedConsDataCon
+  = (tYPEABLE_INTERNAL, mkOccName varName "tc'Cons")
+  | is_wired_in promotedNilDataCon
+  = (tYPEABLE_INTERNAL, mkOccName varName "tc'Nil")
+
+  | tc_module == gHC_TYPES
+  = (tYPEABLE_INTERNAL, mkTyConRepUserOcc tc_occ)
+  | otherwise
+  = (tc_module,         mkTyConRepSysOcc tc_occ)
+  where
+    is_wired_in :: TyCon -> Bool
+    is_wired_in tc =
+      tc_module == gHC_TYPES && tc_occ == nameOccName (tyConName tc)
 
 {-
 ************************************************************************
@@ -1062,6 +1108,11 @@ promotedLTDataCon
 promotedLTDataCon     = promoteDataCon ltDataCon
 promotedEQDataCon     = promoteDataCon eqDataCon
 promotedGTDataCon     = promoteDataCon gtDataCon
+
+-- Promoted List
+promotedConsDataCon, promotedNilDataCon :: TyCon
+promotedConsDataCon   = promoteDataCon consDataCon
+promotedNilDataCon    = promoteDataCon nilDataCon
 
 {-
 Note [The Implicit Parameter class]

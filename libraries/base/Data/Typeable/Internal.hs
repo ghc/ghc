@@ -41,11 +41,13 @@ module Data.Typeable.Internal (
     mkTyCon3, mkTyCon3#,
     rnfTyCon,
 
+    -- ** Representations for wired-in types
     tcBool, tc'True, tc'False,
     tcOrdering, tc'LT, tc'EQ, tc'GT,
     tcChar, tcInt, tcWord, tcFloat, tcDouble, tcFun,
     tcIO, tcSPEC, tcTyCon, tcModule, tcTrName,
-    tcCoercible, tcList, tcHEq,
+    tcCoercible, tcHEq, tcSymbol, tcNat,
+    tcList, tc'Nil, tc'Cons,
     tcConstraint,
     tcTYPE, tcLevity, tc'Lifted, tc'Unlifted,
 
@@ -401,11 +403,15 @@ mkGhcTypesTyCon :: Addr# -> TyCon
 {-# INLINE mkGhcTypesTyCon #-}
 mkGhcTypesTyCon name = mkTyCon3# "ghc-prim"# "GHC.Types"# name
 
+mkGhcPrimTyCon :: Addr# -> TyCon
+{-# INLINE mkGhcPrimTyCon #-}
+mkGhcPrimTyCon name = mkTyCon3# "ghc-prim"# "GHC.Prim"# name
+
 tcBool, tc'True, tc'False,
   tcOrdering, tc'GT, tc'EQ, tc'LT,
   tcChar, tcInt, tcWord, tcFloat, tcDouble, tcFun,
   tcIO, tcSPEC, tcTyCon, tcModule, tcTrName,
-  tcCoercible, tcHEq, tcList :: TyCon
+  tcCoercible, tcHEq, tcNat, tcSymbol :: TyCon
 
 tcBool      = mkGhcTypesTyCon "Bool"#      -- Bool is promotable
 tc'True     = mkGhcTypesTyCon "'True"#
@@ -415,26 +421,34 @@ tc'GT       = mkGhcTypesTyCon "'GT"#
 tc'EQ       = mkGhcTypesTyCon "'EQ"#
 tc'LT       = mkGhcTypesTyCon "'LT"#
 
--- None of the rest are promotable (see TysWiredIn)
+-- Most of the rest are promotable (see TysWiredIn)
 tcChar       = mkGhcTypesTyCon "Char"#
 tcInt        = mkGhcTypesTyCon "Int"#
 tcWord       = mkGhcTypesTyCon "Word"#
 tcFloat      = mkGhcTypesTyCon "Float"#
 tcDouble     = mkGhcTypesTyCon "Double"#
+tcNat        = mkGhcTypesTyCon "Nat"#
+tcSymbol     = mkGhcTypesTyCon "Symbol"#
 tcSPEC       = mkGhcTypesTyCon "SPEC"#
 tcIO         = mkGhcTypesTyCon "IO"#
+tcCoercible  = mkGhcTypesTyCon "Coercible"#
 tcTyCon      = mkGhcTypesTyCon "TyCon"#
 tcModule     = mkGhcTypesTyCon "Module"#
 tcTrName     = mkGhcTypesTyCon "TrName"#
-tcCoercible  = mkGhcTypesTyCon "Coercible"#
 
-tcFun       = mkGhcTypesTyCon "->"#
-tcList      = mkGhcTypesTyCon "[]"#   -- Type rep for the list type constructor
+tcFun       = mkGhcPrimTyCon "->"#
 tcHEq       = mkGhcTypesTyCon "~~"#   -- Type rep for the (~~) type constructor
+
+tcList, tc'Nil, tc'Cons :: TyCon
+tcList      = mkGhcTypesTyCon "[]"#   -- Type rep for the list type constructor
+-- note that, because tc': isn't a valid identifier, we override the names of
+-- these representations in TysWiredIn.tyConRepModOcc.
+tc'Nil      = mkGhcTypesTyCon "'[]"#
+tc'Cons     = mkGhcTypesTyCon "':"#
 
 tcConstraint, tcTYPE, tcLevity, tc'Lifted, tc'Unlifted :: TyCon
 tcConstraint   = mkGhcTypesTyCon "Constraint"#
-tcTYPE         = mkGhcTypesTyCon "TYPE"#
+tcTYPE         = mkGhcPrimTyCon "TYPE"#
 tcLevity       = mkGhcTypesTyCon "Levity"#
 tc'Lifted      = mkGhcTypesTyCon "'Lifted"#
 tc'Unlifted    = mkGhcTypesTyCon "'Unlifted"#
