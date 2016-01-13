@@ -1,4 +1,5 @@
-{-# LANGUAGE GADTs, RecordWildCards, MagicHash, ScopedTypeVariables, CPP #-}
+{-# LANGUAGE GADTs, RecordWildCards, MagicHash, ScopedTypeVariables, CPP,
+    UnboxedTuples #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 -- |
@@ -71,6 +72,9 @@ run m = case m of
     case r of
       Nothing -> return False
       Just w -> return (w /= 0)
+  GetBreakpointVar ref ix -> do
+    aps <- localRef ref
+    mapM mkRemoteRef =<< getIdValFromApStack aps ix
   MallocData bs -> mkString bs
   PrepFFI conv args res -> toRemotePtr <$> prepForeignCall conv args res
   FreeFFI p -> freeForeignCallInfo (fromRemotePtr p)
@@ -332,3 +336,13 @@ foreign import ccall unsafe "mkCostCentre"
 #else
 mkCostCentre _ _ _ = return nullPtr
 #endif
+
+getIdValFromApStack :: HValue -> Int -> IO (Maybe HValue)
+getIdValFromApStack apStack (I# stackDepth) = do
+   case getApStackVal# apStack (stackDepth +# 1#) of
+                                -- The +1 is magic!  I don't know where it comes
+                                -- from, but this makes things line up.  --SDM
+        (# ok, result #) ->
+            case ok of
+              0# -> return Nothing -- AP_STACK not found
+              _  -> return (Just (unsafeCoerce# result))
