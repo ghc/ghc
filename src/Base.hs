@@ -145,12 +145,12 @@ putError msg = do
 renderAction :: String -> String -> String -> String
 renderAction what input output = case buildInfo of
     Normal -> renderBox [ what
-                        , "     input:" ++ input
-                        , " => output:" ++ output ]
+                        , "     input: " ++ input
+                        , " => output: " ++ output ]
     Brief  -> "> " ++ what ++ ": " ++ input ++ " => " ++ output
     Pony   -> renderPony [ what
-                         , "     input:" ++ input
-                         , " => output:" ++ output ]
+                         , "     input: " ++ input
+                         , " => output: " ++ output ]
     Dot    -> "."
     None   -> ""
 
