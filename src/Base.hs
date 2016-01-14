@@ -152,7 +152,6 @@ renderAction what input output = case buildInfo of
                          , "     input:" ++ input
                          , " => output:" ++ output ]
     Dot    -> "."
-    None   -> ""
 
 -- | Render the successful build of a program
 renderProgram :: String -> String -> String -> String

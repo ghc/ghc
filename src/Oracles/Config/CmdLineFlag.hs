@@ -8,7 +8,7 @@ import Data.IORef
 
 -- Flags
 
-data BuildInfoFlag = Normal | Brief | Pony | Dot | None deriving (Eq, Show)
+data BuildInfoFlag = Normal | Brief | Pony | Dot deriving (Eq, Show)
 
 data CmdLineOptions = CmdLineOptions {
     flagBuildInfo :: BuildInfoFlag
@@ -29,7 +29,6 @@ readBuildInfoFlag ms =
     go "brief"  = Just Brief
     go "pony"   = Just Pony
     go "dot"    = Just Dot
-    go "none"   = Just None
     go _        = Nothing -- Left "no parse"
     mkClosure :: BuildInfoFlag -> CmdLineOptions -> CmdLineOptions
     mkClosure flag opts = opts { flagBuildInfo = flag }
