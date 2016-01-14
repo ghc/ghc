@@ -639,6 +639,8 @@ In summary, Safe Haskell consists of the following three language flags:
 
 .. ghc-flag:: -XSafe
 
+    :since: 7.2.1
+
     Restricts the module to the safe language. All of the module's
     direct imports must be trusted, but the module itself need not
     reside in a trusted package, because the compiler vouches for its
@@ -651,6 +653,8 @@ In summary, Safe Haskell consists of the following three language flags:
     - *Imported Modules* — All forced to be safe imports, all must be trusted.
 
 .. ghc-flag:: -XTrustworthy
+
+    :since: 7.2.1
 
     This establishes that the module is trusted, but the guarantee is
     provided by the module's author. A client of this module then
@@ -670,6 +674,8 @@ In summary, Safe Haskell consists of the following three language flags:
       trusted.
 
 .. ghc-flag:: -XUnsafe
+
+    :since: 7.4.1
 
     Mark a module as unsafe so that it can't be imported by code
     compiled with :ghc-flag:`-XSafe`. Also enable the Safe Import extension so that a
