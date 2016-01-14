@@ -778,6 +778,7 @@ collect_bind _ (AbsBinds { abs_exports = dbinds }) acc = map abe_poly dbinds ++ 
         -- I don't think we want the binders from the abe_binds
         -- The only time we collect binders from a typechecked
         -- binding (hence see AbsBinds) is in zonking in TcHsSyn
+collect_bind _ (AbsBindsSig { abs_sig_export = poly }) acc = poly : acc
 collect_bind omitPatSyn (PatSynBind (PSB { psb_id = L _ ps })) acc =
     if omitPatSyn then acc else ps : acc
 

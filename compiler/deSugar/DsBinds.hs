@@ -154,8 +154,8 @@ dsHsBind dflags
 
         -- A common case: one exported variable, only non-strict binds
         -- Non-recursive bindings come through this way
-        -- So do self-recursive bindings, and recursive bindings
-        -- that have been chopped up with type signatures
+        -- So do self-recursive bindings
+        -- Bindings with complete signatures are AbsBindsSigs, below
 dsHsBind dflags
          (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                    , abs_exports = [export]
@@ -286,6 +286,44 @@ dsHsBind dflags
                      ,abe_wrap = WpHole
                      ,abe_inst_wrap = WpHole
                      ,abe_prags = SpecPrags []})
+
+-- this is a combination of AbsBinds and FunBind
+dsHsBind dflags (AbsBindsSig { abs_tvs = tyvars, abs_ev_vars = dicts
+                             , abs_sig_export  = global
+                             , abs_sig_prags   = prags
+                             , abs_sig_ev_bind = ev_bind
+                             , abs_sig_bind    = bind })
+  | L bind_loc FunBind { fun_matches = matches
+                       , fun_co_fn   = co_fn
+                       , fun_tick    = tick } <- bind
+  = putSrcSpanDs bind_loc $
+    addDictsDs (toTcTypeBag (listToBag dicts)) $
+    do { (args, body) <- matchWrapper (FunRhs (idName global)) Nothing matches
+       ; let body' = mkOptTickBox tick body
+       ; fun_rhs <- dsHsWrapper co_fn $
+                    mkLams args body'
+       ; let force_vars
+               | xopt LangExt.Strict dflags
+               , matchGroupArity matches == 0 -- no need to force lambdas
+               = [global]
+               | otherwise
+               = []
+
+       ; ds_binds <- dsTcEvBinds ev_bind
+       ; let rhs = mkLams tyvars $
+                   mkLams dicts $
+                   mkCoreLets ds_binds $
+                   fun_rhs
+
+       ; (spec_binds, rules) <- dsSpecs rhs prags
+       ; let global' = addIdSpecialisations global rules
+             main_bind = makeCorePair dflags global' (isDefaultMethod prags)
+                                      (dictArity dicts) rhs
+
+       ; return (force_vars, main_bind : fromOL spec_binds) }
+
+  | otherwise
+  = pprPanic "dsHsBind: AbsBindsSig" (ppr bind)
 
 dsHsBind _ (PatSynBind{}) = panic "dsHsBind: PatSynBind"
 

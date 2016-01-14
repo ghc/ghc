@@ -446,6 +446,26 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
                         , abe_mono = zonkIdOcc env mono_id
                         , abe_prags = new_prags })
 
+zonk_bind env (AbsBindsSig { abs_tvs         = tyvars
+                           , abs_ev_vars     = evs
+                           , abs_sig_export  = poly
+                           , abs_sig_prags   = prags
+                           , abs_sig_ev_bind = ev_bind
+                           , abs_sig_bind    = bind })
+  = ASSERT( all isImmutableTyVar tyvars )
+    do { (env0, new_tyvars)  <- zonkTyBndrsX env  tyvars
+       ; (env1, new_evs)     <- zonkEvBndrsX env0 evs
+       ; (env2, new_ev_bind) <- zonkTcEvBinds env1 ev_bind
+       ; new_val_bind        <- zonk_lbind env2 bind
+       ; new_poly_id         <- zonkIdBndr env2 poly
+       ; new_prags           <- zonkSpecPrags env2 prags
+       ; return (AbsBindsSig { abs_tvs         = new_tyvars
+                             , abs_ev_vars     = new_evs
+                             , abs_sig_export  = new_poly_id
+                             , abs_sig_prags   = new_prags
+                             , abs_sig_ev_bind = new_ev_bind
+                             , abs_sig_bind    = new_val_bind  }) }
+
 zonk_bind env (PatSynBind bind@(PSB { psb_id = L loc id
                                     , psb_args = details
                                     , psb_def = lpat

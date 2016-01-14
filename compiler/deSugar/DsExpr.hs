@@ -143,6 +143,15 @@ dsUnliftedBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
        ; ds_binds <- dsTcEvBinds_s ev_binds
        ; return (mkCoreLets ds_binds body2) }
 
+dsUnliftedBind (AbsBindsSig { abs_tvs         = []
+                            , abs_ev_vars     = []
+                            , abs_sig_export  = poly
+                            , abs_sig_ev_bind = ev_bind
+                            , abs_sig_bind    = L _ bind }) body
+  = do { ds_binds <- dsTcEvBinds ev_bind
+       ; body' <- dsUnliftedBind (bind { fun_id = noLoc poly }) body
+       ; return (mkCoreLets ds_binds body') }
+
 dsUnliftedBind (FunBind { fun_id = L _ fun
                         , fun_matches = matches
                         , fun_co_fn = co_fn
@@ -172,6 +181,8 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 unliftedMatchOnly :: HsBind Id -> Bool
 unliftedMatchOnly (AbsBinds { abs_binds = lbinds })
   = anyBag (unliftedMatchOnly . unLoc) lbinds
+unliftedMatchOnly (AbsBindsSig { abs_sig_bind = L _ bind })
+  = unliftedMatchOnly bind
 unliftedMatchOnly (PatBind { pat_lhs = lpat, pat_rhs_ty = rhs_ty })
   =  isUnLiftedType rhs_ty
   || isUnliftedLPat lpat
