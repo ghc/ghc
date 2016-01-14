@@ -45,7 +45,7 @@ data Extension
    | UnboxedTuples
    | BangPatterns
    | TypeFamilies
-   | InjectiveTypeFamilies
+   | TypeFamilyDependencies
    | TypeInType
    | OverloadedStrings
    | OverloadedLists

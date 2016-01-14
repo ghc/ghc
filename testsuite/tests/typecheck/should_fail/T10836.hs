@@ -1,4 +1,4 @@
-{-# LANGUAGE InjectiveTypeFamilies #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 module T10836 where
 
 type family Foo a = r | r -> a where
