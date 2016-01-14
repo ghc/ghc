@@ -57,6 +57,14 @@ configureArguments = do
            , "--host=" ++ hostPlatform
            , "--build=" ++ buildPlatform]
 
+configureIntGmpArguments :: Action [String]
+configureIntGmpArguments = do
+    includes      <- settingList GmpIncludeDirs
+    libs          <- settingList GmpLibDirs
+    return $ map ("--with-gmp-includes=" ++) includes
+               ++ map ("--with-gmp-libraries=" ++) libs
+
+
 -- TODO: we rebuild gmp every time.
 gmpRules :: Rules ()
 gmpRules = do
@@ -105,29 +113,31 @@ gmpRules = do
         runConfigure libPath envs args
 
         -- TODO: currently we configure integerGmp package twice -- optimise
-        runConfigure (pkgPath integerGmp) [] []
+        intGmpArgs <- configureIntGmpArguments
+        runConfigure (pkgPath integerGmp) envs intGmpArgs
 
         createDirectory $ takeDirectory gmpLibraryH
         -- check whether we need to build in tree gmp
         -- this is indicated by line "HaveFrameworkGMP = YES" in `config.mk`
         configMk <- liftIO . readFile $ gmpBase -/- "config.mk"
         if "HaveFrameworkGMP = YES" `isInfixOf` configMk
+               || "HaveLibGmp = YES" `isInfixOf` configMk
         then do
-            putBuild "| GMP framework detected and will be used"
+            putBuild "| GMP library/framework detected and will be used"
             copyFile gmpLibraryFakeH gmpLibraryH
         else do
-            putBuild "| No GMP framework detected; in tree GMP will be built"
-            runMake libPath ["MAKEFLAGS="]
+          putBuild "| No GMP library/framework detected; in tree GMP will be built"
+          runMake libPath ["MAKEFLAGS="]
 
-            copyFile (libPath -/- "gmp.h") gmpLibraryInTreeH
-            copyFile (libPath -/- "gmp.h") gmpLibraryH
-            -- TODO: why copy library, can we move it instead?
-            copyFile (libPath -/- ".libs/libgmp.a") gmpLibrary
+          copyFile (libPath -/- "gmp.h") gmpLibraryInTreeH
+          copyFile (libPath -/- "gmp.h") gmpLibraryH
+           -- TODO: why copy library, can we move it instead?
+          copyFile (libPath -/- ".libs/libgmp.a") gmpLibrary
 
-            createDirectory gmpObjects
-            build $ fullTarget gmpTarget Ar [gmpLibrary] [gmpObjects]
+          createDirectory gmpObjects
+          build $ fullTarget gmpTarget Ar [gmpLibrary] [gmpObjects]
 
-            runBuilder Ranlib [gmpLibrary]
+          runBuilder Ranlib [gmpLibrary]
 
         putSuccess "| Successfully built custom library 'integer-gmp'"
 
