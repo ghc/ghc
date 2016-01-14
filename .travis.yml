@@ -59,6 +59,7 @@ install:
 
     - ( cd ghc && ./boot )
     - ( cd ghc && ./configure )
+    - cat ghc/shake-build/cfg/system.config
 
 script:
     - ( cd ghc/shake-build && cabal haddock --internal )
