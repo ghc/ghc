@@ -73,7 +73,6 @@ gmpRules = do
     gmpLibraryH %> \_ -> do
         when trackBuildSystem $ need [sourcePath -/- "Rules/Gmp.hs"]
 
-        -- Do we need this step?
         liftIO $ removeFiles gmpBuildPath ["//*"]
 
         -- Note: We use a tarball like gmp-4.2.4-nodoc.tar.bz2, which is
@@ -86,17 +85,14 @@ gmpRules = do
                      ++ "(found: " ++ show tarballs ++ ")."
 
         need tarballs
-
         createDirectory gmpBuildPath
         build $ fullTarget gmpTarget Tar tarballs [gmpBuildPath]
 
-        -- TODO: replace "patch" with PATCH_CMD
         forM_ gmpPatches $ \src -> do
             let patch     = takeFileName src
                 patchPath = gmpBuildPath -/- patch
             copyFile src patchPath
-            putBuild $ "| Apply " ++ patchPath
-            unit . quietly $ cmd Shell (EchoStdout False) [Cwd gmpBuildPath] "patch -p0 <" [patch]
+            applyPatch gmpBuildPath patch
 
         -- TODO: What's `chmod +x libraries/integer-gmp/gmp/ln` for?
 
