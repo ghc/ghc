@@ -717,7 +717,7 @@ dsExpr (HsBinTick ixT ixF e) = do
        mkBinaryTickBox ixT ixF e2
      }
 
-dsExpr (HsTickPragma _ _ expr) = do
+dsExpr (HsTickPragma _ _ _ expr) = do
   dflags <- getDynFlags
   if gopt Opt_Hpc dflags
     then panic "dsExpr:HsTickPragma"

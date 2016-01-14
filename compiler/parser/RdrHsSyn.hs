@@ -1207,9 +1207,9 @@ cmdStmtFail loc e = parseErrorSDoc loc
 ---------------------------------------------------------------------------
 -- Miscellaneous utilities
 
-checkPrecP :: Located Int -> P (Located Int)
-checkPrecP (L l i)
- | 0 <= i && i <= maxPrecedence = return (L l i)
+checkPrecP :: Located (SourceText,Int) -> P (Located (SourceText,Int))
+checkPrecP (L l (src,i))
+ | 0 <= i && i <= maxPrecedence = return (L l (src,i))
  | otherwise
     = parseErrorSDoc l (text ("Precedence out of range: " ++ show i))
 

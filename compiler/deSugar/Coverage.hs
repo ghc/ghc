@@ -622,7 +622,7 @@ addTickHsExpr (HsTick t e) =
 addTickHsExpr (HsBinTick t0 t1 e) =
         liftM (HsBinTick t0 t1) (addTickLHsExprNever e)
 
-addTickHsExpr (HsTickPragma _ _ (L pos e0)) = do
+addTickHsExpr (HsTickPragma _ _ _ (L pos e0)) = do
     e2 <- allocTickBox (ExpBox False) False False pos $
                 addTickHsExpr e0
     return $ unLoc e2

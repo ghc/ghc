@@ -152,10 +152,10 @@ rnExpr (OpApp e1 op  _ e2)
         -- more, so I've removed the test.  Adding HsPars in TcGenDeriv
         -- should prevent bad things happening.
         ; fixity <- case op' of
-                      L _ (HsVar (L _ n)) -> lookupFixityRn n
-                      L _ (HsRecFld f)    -> lookupFieldFixityRn f
-                      _ -> return (Fixity minPrecedence InfixL)
-                           -- c.f. lookupFixity for unbound
+              L _ (HsVar (L _ n)) -> lookupFixityRn n
+              L _ (HsRecFld f)    -> lookupFieldFixityRn f
+              _ -> return (Fixity (show minPrecedence) minPrecedence InfixL)
+                   -- c.f. lookupFixity for unbound
 
         ; final_e <- mkOpAppRn e1' op' fixity e2'
         ; return (final_e, fv_e1 `plusFV` fv_op `plusFV` fv_e2) }
@@ -202,9 +202,9 @@ rnExpr (HsCoreAnn src ann expr)
 rnExpr (HsSCC src lbl expr)
   = do { (expr', fvs_expr) <- rnLExpr expr
        ; return (HsSCC src lbl expr', fvs_expr) }
-rnExpr (HsTickPragma src info expr)
+rnExpr (HsTickPragma src info srcInfo expr)
   = do { (expr', fvs_expr) <- rnLExpr expr
-       ; return (HsTickPragma src info expr', fvs_expr) }
+       ; return (HsTickPragma src info srcInfo expr', fvs_expr) }
 
 rnExpr (HsLam matches)
   = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLExpr matches

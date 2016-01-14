@@ -758,10 +758,10 @@ impspec :: { Located (Bool, Located [LIE RdrName]) }
 -----------------------------------------------------------------------------
 -- Fixity Declarations
 
-prec    :: { Located Int }
-        : {- empty -}           { noLoc 9 }
+prec    :: { Located (SourceText,Int) }
+        : {- empty -}           { noLoc ("",9) }
         | INTEGER
-                 {% checkPrecP (sL1 $1 (fromInteger (getINTEGER $1))) }
+                 {% checkPrecP (sL1 $1 (getINTEGERs $1,fromInteger (getINTEGER $1))) }
 
 infix   :: { Located FixityDirection }
         : 'infix'                               { sL1 $1 InfixN  }
@@ -1363,9 +1363,9 @@ rule_activation :: { ([AddAnn],Maybe Activation) }
 rule_explicit_activation :: { ([AddAnn]
                               ,Activation) }  -- In brackets
         : '[' INTEGER ']'       { ([mos $1,mj AnnVal $2,mcs $3]
-                                  ,ActiveAfter  (fromInteger (getINTEGER $2))) }
+                                  ,ActiveAfter  (getINTEGERs $2) (fromInteger (getINTEGER $2))) }
         | '[' '~' INTEGER ']'   { ([mos $1,mj AnnTilde $2,mj AnnVal $3,mcs $4]
-                                  ,ActiveBefore (fromInteger (getINTEGER $3))) }
+                                  ,ActiveBefore (getINTEGERs $3) (fromInteger (getINTEGER $3))) }
         | '[' '~' ']'           { ([mos $1,mj AnnTilde $2,mcs $3]
                                   ,NeverActive) }
 
@@ -2056,7 +2056,7 @@ sigdecl :: { LHsDecl RdrName }
         | infix prec ops
               {% ams (sLL $1 $> $ SigD
                         (FixSig (FixitySig (fromOL $ unLoc $3)
-                                (Fixity (unLoc $2) (unLoc $1)))))
+                                (Fixity (fst $ unLoc $2) (snd $ unLoc $2) (unLoc $1)))))
                      [mj AnnInfix $1,mj AnnVal $2] }
 
         | pattern_synonym_sig   { sLL $1 $> . SigD . unLoc $ $1 }
@@ -2096,10 +2096,10 @@ activation :: { ([AddAnn],Maybe Activation) }
 
 explicit_activation :: { ([AddAnn],Activation) }  -- In brackets
         : '[' INTEGER ']'       { ([mj AnnOpenS $1,mj AnnVal $2,mj AnnCloseS $3]
-                                  ,ActiveAfter  (fromInteger (getINTEGER $2))) }
+                                  ,ActiveAfter  (getINTEGERs $2) (fromInteger (getINTEGER $2))) }
         | '[' '~' INTEGER ']'   { ([mj AnnOpenS $1,mj AnnTilde $2,mj AnnVal $3
                                                  ,mj AnnCloseS $4]
-                                  ,ActiveBefore (fromInteger (getINTEGER $3))) }
+                                  ,ActiveBefore (getINTEGERs $3) (fromInteger (getINTEGER $3))) }
 
 -----------------------------------------------------------------------------
 -- Expressions
@@ -2184,8 +2184,9 @@ exp10 :: { LHsExpr RdrName }
         | scc_annot exp        {% ams (sLL $1 $> $ HsSCC (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
                                       (fst $ fst $ unLoc $1) }
 
-        | hpc_annot exp        {% ams (sLL $1 $> $ HsTickPragma (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
-                                      (fst $ fst $ unLoc $1) }
+        | hpc_annot exp        {% ams (sLL $1 $> $ HsTickPragma (snd $ fst $ fst $ unLoc $1)
+                                                                (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
+                                      (fst $ fst $ fst $ unLoc $1) }
 
         | 'proc' aexp '->' exp
                        {% checkPattern empty $2 >>= \ p ->
@@ -2214,9 +2215,11 @@ scc_annot :: { Located (([AddAnn],SourceText),StringLiteral) }
                                          ,mc $3],getSCC_PRAGs $1)
                                         ,(StringLiteral (unpackFS $ getVARID $2) (getVARID $2))) }
 
-hpc_annot :: { Located (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,Int))) }
+hpc_annot :: { Located ( (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,Int))),
+                         ((SourceText,SourceText),(SourceText,SourceText))
+                       ) }
       : '{-# GENERATED' STRING INTEGER ':' INTEGER '-' INTEGER ':' INTEGER '#-}'
-                                      { sLL $1 $> $ (([mo $1,mj AnnVal $2
+                                      { sLL $1 $> $ ((([mo $1,mj AnnVal $2
                                               ,mj AnnVal $3,mj AnnColon $4
                                               ,mj AnnVal $5,mj AnnMinus $6
                                               ,mj AnnVal $7,mj AnnColon $8
@@ -2230,6 +2233,12 @@ hpc_annot :: { Located (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,Int)
                                                 , fromInteger $ getINTEGER $9
                                                 )
                                                ))
+                                             , (( getINTEGERs $3
+                                                , getINTEGERs $5
+                                                )
+                                               ,( getINTEGERs $7
+                                                , getINTEGERs $9
+                                                )))
                                          }
 
 fexp    :: { LHsExpr RdrName }

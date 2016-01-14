@@ -755,21 +755,25 @@ instance Binary Activation where
             putByte bh 0
     put_ bh AlwaysActive = do
             putByte bh 1
-    put_ bh (ActiveBefore aa) = do
+    put_ bh (ActiveBefore src aa) = do
             putByte bh 2
+            put_ bh src
             put_ bh aa
-    put_ bh (ActiveAfter ab) = do
+    put_ bh (ActiveAfter src ab) = do
             putByte bh 3
+            put_ bh src
             put_ bh ab
     get bh = do
             h <- getByte bh
             case h of
               0 -> do return NeverActive
               1 -> do return AlwaysActive
-              2 -> do aa <- get bh
-                      return (ActiveBefore aa)
-              _ -> do ab <- get bh
-                      return (ActiveAfter ab)
+              2 -> do src <- get bh
+                      aa <- get bh
+                      return (ActiveBefore src aa)
+              _ -> do src <- get bh
+                      ab <- get bh
+                      return (ActiveAfter src ab)
 
 instance Binary InlinePragma where
     put_ bh (InlinePragma s a b c d) = do
@@ -859,13 +863,15 @@ instance Binary FixityDirection where
               _ -> do return InfixN
 
 instance Binary Fixity where
-    put_ bh (Fixity aa ab) = do
+    put_ bh (Fixity src aa ab) = do
+            put_ bh src
             put_ bh aa
             put_ bh ab
     get bh = do
+          src <- get bh
           aa <- get bh
           ab <- get bh
-          return (Fixity aa ab)
+          return (Fixity src aa ab)
 
 instance Binary WarningTxt where
     put_ bh (WarningTxt s w) = do

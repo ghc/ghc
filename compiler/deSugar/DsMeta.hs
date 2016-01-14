@@ -531,7 +531,7 @@ repSafety PlayInterruptible = rep2 interruptibleName []
 repSafety PlaySafe = rep2 safeName []
 
 repFixD :: LFixitySig Name -> DsM [(SrcSpan, Core TH.DecQ)]
-repFixD (L loc (FixitySig names (Fixity prec dir)))
+repFixD (L loc (FixitySig names (Fixity _ prec dir)))
   = do { MkC prec' <- coreIntLit prec
        ; let rep_fn = case dir of
                         InfixL -> infixLDName
@@ -778,11 +778,11 @@ repRuleMatch ConLike = dataCon conLikeDataConName
 repRuleMatch FunLike = dataCon funLikeDataConName
 
 repPhases :: Activation -> DsM (Core TH.Phases)
-repPhases (ActiveBefore i) = do { MkC arg <- coreIntLit i
-                                ; dataCon' beforePhaseDataConName [arg] }
-repPhases (ActiveAfter i)  = do { MkC arg <- coreIntLit i
-                                ; dataCon' fromPhaseDataConName [arg] }
-repPhases _                = dataCon allPhasesDataConName
+repPhases (ActiveBefore _ i) = do { MkC arg <- coreIntLit i
+                                  ; dataCon' beforePhaseDataConName [arg] }
+repPhases (ActiveAfter _ i)  = do { MkC arg <- coreIntLit i
+                                  ; dataCon' fromPhaseDataConName [arg] }
+repPhases _                  = dataCon allPhasesDataConName
 
 -------------------------------------------------------
 --                      Types
