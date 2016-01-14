@@ -330,6 +330,8 @@ Negative literals
 
 .. ghc-flag:: -XNegativeLiterals
 
+    :since: 7.8.1
+
     Enable the use of un-parenthesized negative numeric literals.
 
 The literal ``-123`` is, according to Haskell98 and Haskell 2010,
@@ -349,6 +351,8 @@ Fractional looking integer literals
 
 .. ghc-flag:: -XNumDecimals
 
+    :since: 7.8.1
+
     Allow the use of floating-point literal syntax for integral types.
 
 Haskell 2010 and Haskell 98 define floating literals with the syntax
@@ -364,6 +368,8 @@ Binary integer literals
 -----------------------
 
 .. ghc-flag:: -XBinaryLiterals
+
+    :since: 7.10.1
 
     Allow the use of binary notation in integer literals.
 
@@ -653,6 +659,8 @@ Pattern synonyms
 ----------------
 
 .. ghc-flag:: -XPatternSynonyms
+
+    :since: 7.8.1
 
     Allow the definition of pattern synonyms.
 
@@ -1289,6 +1297,8 @@ Applicative do-notation
 
 .. ghc-flag:: -XApplicativeDo
 
+    :since: 8.0.1
+
     Allow use of ``Applicative`` ``do`` notation.
 
 The language option :ghc-flag:`-XApplicativeDo` enables an alternative translation for
@@ -1745,6 +1755,8 @@ New monadic failure desugaring mechanism
 
 .. ghc-flag:: -XMonadFailDesugaring
 
+    :since: 8.0.1
+
     Use the ``MonadFail.fail`` instead of the legacy ``Monad.fail`` function
     when desugaring refutable patterns in ``do`` blocks.
 
@@ -1776,6 +1788,7 @@ must not conflict with any Prelude module.)
 .. ghc-flag:: -XRebindableSyntax
 
     :implies: :ghc-flag:`-XNoImplicitPrelude`
+    :since: 7.0.1
 
     Enable rebinding of a variety of usually-built-in operations.
 
@@ -1911,6 +1924,8 @@ Lambda-case
 
 .. ghc-flag:: -XLambdaCase
 
+    :since: 7.6.1
+
     Allow the use of lambda-case syntax.
 
 The :ghc-flag:`-XLambdaCase` flag enables expressions of the form ::
@@ -1934,6 +1949,8 @@ Empty case alternatives
 -----------------------
 
 .. ghc-flag:: -XEmptyCase
+
+    :since: 7.8.1
 
     Allow empty case expressions.
 
@@ -1980,6 +1997,8 @@ Multi-way if-expressions
 ------------------------
 
 .. ghc-flag:: -XMultiWayIf
+
+    :since: 7.6.1
 
     Allow the use of multi-way-``if`` syntax.
 
@@ -2148,6 +2167,8 @@ Explicit namespaces in import/export
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XExplicitNamespaces
+
+    :since: 7.6.1
 
     Enable use of explicit namespaces in module export lists.
 
@@ -2351,6 +2372,8 @@ Data type contexts
 ------------------
 
 .. ghc-flag:: -XDatatypeContexts
+
+    :since: 7.0.1
 
     Allow contexts on ``data`` types.
 
@@ -3196,6 +3219,8 @@ Traditional record syntax
 
 .. ghc-flag:: -XNoTraditionalRecordSyntax
 
+    :since: 7.4.1
+
     Disallow use of record syntax.
 
 Traditional record syntax, such as ``C {f = x}``, is enabled by default.
@@ -3280,6 +3305,7 @@ Duplicate record fields
 .. ghc-flag:: -XDuplicateRecordFields
 
     :implies: :ghc-flag:`-XDisambiguateRecordFields`
+    :since: 8.0.1
 
     Allow definition of record types with identically-named fields.
 
@@ -4098,6 +4124,8 @@ Deriving ``Lift`` instances
 
 .. ghc-flag:: -XDeriveLift
 
+    :since: 8.0.1
+
     Enable automatic deriving of instances for the ``Lift`` typeclass for
     Template Haskell.
 
@@ -4347,6 +4375,8 @@ Deriving any other class
 
 .. ghc-flag:: -XDeriveAnyClass
 
+    :since: 7.10.1
+
     Allow use of any typeclass in ``deriving`` clauses.
 
 With :ghc-flag:`-XDeriveAnyClass` you can derive any other class. The compiler
@@ -4593,6 +4623,8 @@ Nullary type classes
 ~~~~~~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XNullaryTypeClasses
+
+    :since: 7.8.1
 
     Allows the use definition of type classes with no parameters. This flag
     has been replaced by :ghc-flag:`-XMultiParamTypeClasses`.
@@ -5452,6 +5484,8 @@ Instance signatures: type signatures in instance declarations
 
 .. ghc-flag:: -XInstanceSigs
 
+    :since: 7.6.1
+
     Allow type signatures for members in instance definitions.
 
 In Haskell, you can't write a type signature in an instance declaration,
@@ -5587,6 +5621,8 @@ Overloaded labels
 
 .. ghc-flag:: -XOverloadedLabels
 
+    :since: 8.0.1
+
     Enable use of the ``#foo`` overloaded label syntax.
 
 GHC supports *overloaded labels*, a form of identifier whose interpretation may
@@ -5671,6 +5707,8 @@ Overloaded lists
 ----------------
 
 .. ghc-flag:: -XOverloadedLists
+
+    :since: 7.8.1
 
     Enable overloaded list syntax (e.g. desugaring of lists via the
     ``IsList`` class).
@@ -5836,6 +5874,8 @@ Undecidable (or recursive) superclasses
 ---------------------------------------
 
 .. ghc-flag:: -XUndecidableSuperClasses
+
+    :since: 8.0.1
 
     Allow all superclass constraints, including those that may result in
     non-termination of the typechecker.
@@ -6756,6 +6796,7 @@ Injective type families
 .. ghc-flag:: -XTypeFamilyDependencies
 
     :implies: :ghc-flag:`-XTypeFamilies`
+    :since: 8.0.1
 
     Allow functional dependency annotations on type families. This allows one to
     define injective type families.
@@ -6883,6 +6924,7 @@ Kind polymorphism
 .. ghc-flag:: -XPolyKinds
 
     :implies: :ghc-flag:`-XKindSignatures`
+    :since: 7.4.1
 
     Allow kind polymorphic types.
 
@@ -7198,6 +7240,8 @@ Datatype promotion
 ==================
 
 .. ghc-flag:: -XDataKinds
+
+    :since: 7.4.1
 
     Allow promotion of data types to kind level.
 
@@ -7582,6 +7626,8 @@ The ``Constraint`` kind
 
 .. ghc-flag:: -XConstraintKinds
 
+    :since: 7.4.1
+
     Allow types of kind ``Constraint`` to be used in contexts.
 
 Normally, *constraints* (which appear in types to the left of the ``=>``
@@ -7706,6 +7752,8 @@ Ambiguous types and the ambiguity check
 ---------------------------------------
 
 .. ghc-flag:: -XAllowAmbiguousTypes
+
+    :since: 7.8.1
 
     Allow type signatures which appear that they would result in
     an unusable binding.
@@ -8960,6 +9008,8 @@ Partial Type Signatures
 
 .. ghc-flag:: -XPartialTypeSignatures
 
+    :since: 7.10.1
+
     Type checker will allow inferred types for holes.
 
 A partial type signature is a type signature containing special
@@ -9063,6 +9113,8 @@ Named Wildcards
 ~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XNamedWildCards
+
+    :since: 7.10.1
 
     Allow naming of wildcards (e.g. ``_x``) in type signatures.
 
@@ -9439,6 +9491,7 @@ Syntax
 .. ghc-flag:: -XTemplateHaskell
 
     :implies: :ghc-flag:`-XTemplateHaskellQuotes`
+    :since: 8.0.1
 
     Enable Template Haskell's splice and quotation syntax.
 
@@ -10692,6 +10745,8 @@ Static pointers
    single: Static pointers
 
 .. ghc-flag:: -XStaticPointers
+
+    :since: 7.10.1
 
     Allow use of static pointer syntax.
 
@@ -12420,6 +12475,8 @@ Role annotations
 
 .. ghc-flag:: -XRoleAnnotations
 
+    :since: 7.8.1
+
     Allow role annotation syntax.
 
 Sometimes the programmer wants to constrain the inference process. For
@@ -12518,6 +12575,8 @@ Strict-by-default data types
 
 .. ghc-flag:: -XStrictData
 
+    :since: 8.0.1
+
     Make fields of data types defined in the current module strict by default.
 
 Informally the ``StrictData`` language extension switches data type
@@ -12545,6 +12604,7 @@ Strict-by-default pattern bindings
 .. ghc-flag:: -XStrict
 
     :implies: :ghc-flag:`-XStrictData`
+    :since: 8.0.1
 
     Make bindings in the current module strict by default.
 
