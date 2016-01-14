@@ -2187,7 +2187,8 @@ Visible type application
 
 .. ghc-flag:: -XTypeApplications
 
-    :since: 8.0
+    :implies: :ghc-flag:`-XAllowAmbiguousTypes`
+    :since: 8.0.1
 
     Allow the use of type application syntax.
 
@@ -2421,6 +2422,8 @@ Type operators
 
 .. ghc-flag:: -XTypeOperators
 
+    :implies: :ghc-flag:`-XExplicitNamespaces`
+
     Allow the use and definition of types with operator names.
 
 In types, an operator symbol like ``(+)`` is normally treated as a type
@@ -2469,6 +2472,8 @@ Liberalised type synonyms
 -------------------------
 
 .. ghc-flag:: -XLiberalTypeSynonyms
+
+    :implies: :ghc-flag:`-XExplicitForAll`
 
     Relax many of the Haskell 98 rules on type synonym definitions.
 
@@ -2545,6 +2550,8 @@ Existentially quantified data constructors
 ------------------------------------------
 
 .. ghc-flag:: -XExistentialQuantification
+
+    :implies: :ghc-flag:`-XExplicitForAll`
 
     Allow existentially quantified type variables in types.
 
@@ -3050,7 +3057,7 @@ Generalised Algebraic Data Types (GADTs)
 
 .. ghc-flag:: -XGADTs
 
-    :implies: :ghc-flag:`-XMonoLocalBinds`
+    :implies: :ghc-flag:`-XMonoLocalBinds`, :ghc-flag:`-XGADTSyntax`
 
     Allow use of Generalised Algebraic Data Types (GADTs).
 
@@ -3271,6 +3278,8 @@ Duplicate record fields
 -----------------------
 
 .. ghc-flag:: -XDuplicateRecordFields
+
+    :implies: :ghc-flag:`-XDisambiguateRecordFields`
 
     Allow definition of record types with identically-named fields.
 
@@ -3690,8 +3699,6 @@ Deriving instances of extra classes (``Data``, etc.)
     Allow automatic deriving of instances for the ``Functor`` typeclass.
 
 .. ghc-flag:: -XDeriveFoldable
-
-    :implies: :ghc-flag:`-XDeriveFunctor`
 
     Allow automatic deriving of instances for the ``Foldable`` typeclass.
 
@@ -4456,6 +4463,8 @@ Multi-parameter type classes
 
 .. ghc-flag:: -XMultiParamTypeClasses
 
+    :implies: :ghc-flag:`-XConstrainedClassMethods`
+
     Allow the definition of typeclasses with more than one parameter. 
 
 Multi-parameter type classes are permitted, with flag
@@ -4618,6 +4627,8 @@ Functional dependencies
 -----------------------
 
 .. ghc-flag:: -XFunctionalDependencies
+
+    :implies: :ghc-flag:`-XMultiParamTypeClasses`
 
     Allow use of functional dependencies in class declarations.
 
@@ -5882,7 +5893,8 @@ Type families
 
 .. ghc-flag:: -XTypeFamilies
 
-    :implies: :ghc-flag:`-XMonoLocalBinds`
+    :implies: :ghc-flag:`-XMonoLocalBinds`, :ghc-flag:`-XKindSignatures`,
+              :ghc-flag:`-XExplicitNamespaces`
 
     Allow use and definition of indexed type and data families.
 
@@ -6742,6 +6754,8 @@ Injective type families
 -----------------------
 
 .. ghc-flag:: -XTypeFamilyDependencies
+
+    :implies: :ghc-flag:`-XTypeFamilies`
 
     Allow functional dependency annotations on type families. This allows one to
     define injective type families.
@@ -8398,6 +8412,8 @@ Impredicative polymorphism
 
 .. ghc-flag:: -XImpredicativeTypes
 
+    :implies: :ghc-flag:`RankNTypes`
+
     Allow impredicative polymorphic types.
 
 In general, GHC will only instantiate a polymorphic function at a
@@ -8450,6 +8466,7 @@ Lexically scoped type variables
 .. ghc-flag:: -XScopedTypeVariables
 
     :implies: :ghc-flag:`-XRelaxedPolyRec`
+    :implies: :ghc-flag:`-XExplicitForAll`
 
     Enable lexical scoping of type variables explicitly introduced with
     ``forall``.
@@ -9420,6 +9437,8 @@ Syntax
 ------
 
 .. ghc-flag:: -XTemplateHaskell
+
+    :implies: :ghc-flag:`-XTemplateHaskellQuotes`
 
     Enable Template Haskell's splice and quotation syntax.
 
