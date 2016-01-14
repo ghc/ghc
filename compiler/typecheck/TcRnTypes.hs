@@ -758,9 +758,15 @@ data TcIdBinder
        TopLevelFlag    -- Tells whether the bindind is syntactically top-level
                        -- (The monomorphic Ids for a recursive group count
                        --  as not-top-level for this purpose.)
+  | TcIdBndr_ExpType  -- Variant that allows the type to be specified as
+                      -- an ExpType
+       Name
+       ExpType
+       TopLevelFlag
 
 instance Outputable TcIdBinder where
-   ppr (TcIdBndr id top_lvl) = ppr id <> brackets (ppr top_lvl)
+   ppr (TcIdBndr id top_lvl)           = ppr id <> brackets (ppr top_lvl)
+   ppr (TcIdBndr_ExpType id _ top_lvl) = ppr id <> brackets (ppr top_lvl)
 
 ---------------------------
 -- Template Haskell stages and levels
@@ -2496,8 +2502,8 @@ mkGivenLoc tclvl skol_info env
 mkKindLoc :: TcType -> TcType   -- original *types* being compared
           -> CtLoc -> CtLoc
 mkKindLoc s1 s2 loc = setCtLocOrigin (toKindLoc loc)
-                        (KindEqOrigin s1 s2 (ctLocOrigin loc)
-                                            (ctLocTypeOrKind_maybe loc))
+                        (KindEqOrigin s1 (Just s2) (ctLocOrigin loc)
+                                      (ctLocTypeOrKind_maybe loc))
 
 -- | Take a CtLoc and moves it to the kind level
 toKindLoc :: CtLoc -> CtLoc
@@ -2555,7 +2561,7 @@ pushErrCtxtSameOrigin err loc@(CtLoc { ctl_env = lcl })
 --   b) an implication constraint is generated
 data SkolemInfo
   = SigSkol UserTypeCtxt        -- A skolem that is created by instantiating
-            Type                -- a programmer-supplied type signature
+            ExpType             -- a programmer-supplied type signature
                                 -- Location of the binding site is on the TyVar
 
   | ClsSkol Class       -- Bound at a class decl
@@ -2627,7 +2633,7 @@ pprSkolInfo (UnifyForAllSkol ty) = text "the type" <+> ppr ty
 -- For Insts, these cases should not happen
 pprSkolInfo UnkSkol = WARN( True, text "pprSkolInfo: UnkSkol" ) text "UnkSkol"
 
-pprSigSkolInfo :: UserTypeCtxt -> Type -> SDoc
+pprSigSkolInfo :: UserTypeCtxt -> ExpType -> SDoc
 pprSigSkolInfo ctxt ty
   = case ctxt of
        FunSigCtxt f _ -> pp_sig f
@@ -2671,13 +2677,13 @@ data CtOrigin
                                    -- function or instance
 
   | TypeEqOrigin { uo_actual   :: TcType
-                 , uo_expected :: TcType
+                 , uo_expected :: ExpType
                  , uo_thing    :: Maybe ErrorThing
                                   -- ^ The thing that has type "actual"
                  }
 
   | KindEqOrigin
-      TcType TcType             -- A kind equality arising from unifying these two types
+      TcType (Maybe TcType)     -- A kind equality arising from unifying these two types
       CtOrigin                  -- originally arising from this
       (Maybe TypeOrKind)        -- the level of the eq this arises from
 
@@ -2801,7 +2807,7 @@ exprCtOrigin (SectionL _ _)     = SectionOrigin
 exprCtOrigin (SectionR _ _)     = SectionOrigin
 exprCtOrigin (ExplicitTuple {}) = Shouldn'tHappenOrigin "explicit tuple"
 exprCtOrigin (HsCase _ matches) = matchesCtOrigin matches
-exprCtOrigin (HsIf (Just syn) _ _ _) = exprCtOrigin syn
+exprCtOrigin (HsIf (Just syn) _ _ _) = exprCtOrigin (syn_expr syn)
 exprCtOrigin (HsIf {})          = Shouldn'tHappenOrigin "if expression"
 exprCtOrigin (HsMultiIf _ rhs)  = lGRHSCtOrigin rhs
 exprCtOrigin (HsLet _ (L _ e))  = exprCtOrigin e
@@ -2884,9 +2890,13 @@ pprCtOrigin (FunDepOrigin2 pred1 orig1 pred2 loc2)
                , hang (text "instance" <+> quotes (ppr pred2))
                     2 (text "at" <+> ppr loc2) ])
 
-pprCtOrigin (KindEqOrigin t1 t2 _ _)
+pprCtOrigin (KindEqOrigin t1 (Just t2) _ _)
   = hang (ctoHerald <+> text "a kind equality arising from")
        2 (sep [ppr t1, char '~', ppr t2])
+
+pprCtOrigin (KindEqOrigin t1 Nothing _ _)
+  = hang (ctoHerald <+> text "a kind equality when matching")
+       2 (ppr t1)
 
 pprCtOrigin (UnboundOccurrenceOf name)
   = ctoHerald <+> text "an undeclared identifier" <+> quotes (ppr name)

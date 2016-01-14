@@ -12,7 +12,7 @@ module Match ( match, matchEquations, matchWrapper, matchSimply, matchSinglePat 
 
 #include "HsVersions.h"
 
-import {-#SOURCE#-} DsExpr (dsLExpr, dsExpr)
+import {-#SOURCE#-} DsExpr (dsLExpr, dsSyntaxExpr)
 
 import DynFlags
 import HsSyn
@@ -269,7 +269,9 @@ matchView (var:vars) ty (eqns@(eqn1:_))
                           map (decomposeFirstPat getViewPat) eqns
          -- compile the view expressions
         ; viewExpr' <- dsLExpr viewExpr
-        ; return (mkViewMatchResult var' viewExpr' var match_result) }
+        ; return (mkViewMatchResult var'
+                    (mkCoreAppDs (text "matchView") viewExpr' (Var var))
+                    match_result) }
 matchView _ _ _ = panic "matchView"
 
 matchOverloadedList :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
@@ -280,8 +282,8 @@ matchOverloadedList (var:vars) ty (eqns@(eqn1:_))
        ; var' <- newUniqueId var (mkListTy elt_ty)  -- we construct the overall type by hand
        ; match_result <- match (var':vars) ty $
                             map (decomposeFirstPat getOLPat) eqns -- getOLPat builds the pattern inside as a non-overloaded version of the overloaded list pattern
-       ; e' <- dsExpr e
-       ; return (mkViewMatchResult var' e' var match_result) }
+       ; e' <- dsSyntaxExpr e [Var var]
+       ; return (mkViewMatchResult var' e' match_result) }
 matchOverloadedList _ _ _ = panic "matchOverloadedList"
 
 -- decompose the first pattern and leave the rest alone
@@ -457,8 +459,8 @@ tidy1 _ (LitPat lit)
   = return (idDsWrapper, tidyLitPat lit)
 
 -- NPats: we *might* be able to replace these w/ a simpler form
-tidy1 _ (NPat (L _ lit) mb_neg eq)
-  = return (idDsWrapper, tidyNPat tidyLitPat lit mb_neg eq)
+tidy1 _ (NPat (L _ lit) mb_neg eq ty)
+  = return (idDsWrapper, tidyNPat tidyLitPat lit mb_neg eq ty)
 
 -- Everything else goes through unchanged...
 
@@ -939,7 +941,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     -- to ignore them?
     exp (OpApp l o _ ri) (OpApp l' o' _ ri') =
         lexp l l' && lexp o o' && lexp ri ri'
-    exp (NegApp e n) (NegApp e' n') = lexp e e' && exp n n'
+    exp (NegApp e n) (NegApp e' n') = lexp e e' && syn_exp n n'
     exp (SectionL e1 e2) (SectionL e1' e2') =
         lexp e1 e1' && lexp e2 e2'
     exp (SectionR e1 e2) (SectionR e1' e2') =
@@ -954,6 +956,18 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     -- But no need for HsLit, ExplicitList, ExplicitTuple,
     -- because they cannot be functions
     exp _ _  = False
+
+    ---------
+    syn_exp :: SyntaxExpr Id -> SyntaxExpr Id -> Bool
+    syn_exp (SyntaxExpr { syn_expr      = expr1
+                        , syn_arg_wraps = arg_wraps1
+                        , syn_res_wrap  = res_wrap1 })
+            (SyntaxExpr { syn_expr      = expr2
+                        , syn_arg_wraps = arg_wraps2
+                        , syn_res_wrap  = res_wrap2 })
+      = exp expr1 expr2 &&
+        and (zipWithEqual "viewLExprEq" wrap arg_wraps1 arg_wraps2) &&
+        wrap res_wrap1 res_wrap2
 
     ---------
     tup_arg (L _ (Present e1)) (L _ (Present e2)) = lexp e1 e2
@@ -998,8 +1012,8 @@ patGroup _ (ConPatOut { pat_con = L _ con
  | PatSynCon psyn <- con                = PgSyn psyn tys
 patGroup _ (WildPat {})                 = PgAny
 patGroup _ (BangPat {})                 = PgBang
-patGroup _ (NPat (L _ olit) mb_neg _)   = PgN   (hsOverLitKey olit (isJust mb_neg))
-patGroup _ (NPlusKPat _ (L _ olit) _ _) = PgNpK (hsOverLitKey olit False)
+patGroup _ (NPat (L _ olit) mb_neg _ _) = PgN   (hsOverLitKey olit (isJust mb_neg))
+patGroup _ (NPlusKPat _ (L _ olit) _ _ _ _)= PgNpK (hsOverLitKey olit False)
 patGroup _ (CoPat _ p _)                = PgCo  (hsPatType p) -- Type of innelexp pattern
 patGroup _ (ViewPat expr p _)           = PgView expr (hsPatType (unLoc p))
 patGroup _ (ListPat _ _ (Just _))       = PgOverloadedList

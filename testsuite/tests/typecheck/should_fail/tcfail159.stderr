@@ -1,7 +1,6 @@
 
 tcfail159.hs:9:11: error:
-    Couldn't match a lifted type with an unlifted type
-    When matching the kind of ‘(# Int, Int #)’
-    In the pattern: ~(# p, q #)
-    In a case alternative: ~(# p, q #) -> p
-    In the expression: case h x of { ~(# p, q #) -> p }
+    • Expecting a lifted type, but got an unlifted
+    • In the pattern: ~(# p, q #)
+      In a case alternative: ~(# p, q #) -> p
+      In the expression: case h x of { ~(# p, q #) -> p }

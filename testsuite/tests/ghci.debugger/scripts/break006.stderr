@@ -1,9 +1,9 @@
 
 <interactive>:4:1: error:
-    • No instance for (Show a2) arising from a use of ‘print’
-      Cannot resolve unknown runtime type ‘a2’
+    • No instance for (Show t) arising from a use of ‘print’
+      Cannot resolve unknown runtime type ‘t’
       Use :print or :force to determine these types
-      Relevant bindings include it :: a2 (bound at <interactive>:4:1)
+      Relevant bindings include it :: t (bound at <interactive>:4:1)
       These potential instances exist:
         instance (Show a, Show b) => Show (Either a b)
           -- Defined in ‘Data.Either’
@@ -15,10 +15,10 @@
     • In a stmt of an interactive GHCi command: print it
 
 <interactive>:6:1: error:
-    • No instance for (Show a2) arising from a use of ‘print’
-      Cannot resolve unknown runtime type ‘a2’
+    • No instance for (Show t) arising from a use of ‘print’
+      Cannot resolve unknown runtime type ‘t’
       Use :print or :force to determine these types
-      Relevant bindings include it :: a2 (bound at <interactive>:6:1)
+      Relevant bindings include it :: t (bound at <interactive>:6:1)
       These potential instances exist:
         instance (Show a, Show b) => Show (Either a b)
           -- Defined in ‘Data.Either’

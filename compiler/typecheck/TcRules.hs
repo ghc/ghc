@@ -76,7 +76,8 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                tcExtendIdEnv    id_bndrs $
                do { -- See Note [Solve order for RULES]
                     ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)
-                  ; (rhs', rhs_wanted) <- captureConstraints (tcMonoExpr rhs rule_ty)
+                  ; (rhs', rhs_wanted) <- captureConstraints $
+                                          tcMonoExpr rhs (mkCheckExpType rule_ty)
                   ; return (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty) }
 
        ; traceTc "tcRule 1" (vcat [ pprFullRuleName name

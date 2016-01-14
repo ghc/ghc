@@ -10,7 +10,7 @@ class Transformer t a | t -> a where
 data EL a = forall l. EL (l a)
 
 unEL :: EL a -> (forall l. l a -> b) -> b
-unEL = error "unEL"
+unEL _ _ = error "unEL"
 
 transform' :: (Transformer t a) => t -> EL a -> EL a
 transform' = error "transform'"

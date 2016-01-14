@@ -1279,7 +1279,7 @@ repLSts :: [LStmt Name (LHsExpr Name)] -> DsM ([GenSymBind], [Core TH.StmtQ])
 repLSts stmts = repSts (map unLoc stmts)
 
 repSts :: [Stmt Name (LHsExpr Name)] -> DsM ([GenSymBind], [Core TH.StmtQ])
-repSts (BindStmt p e _ _ : ss) =
+repSts (BindStmt p e _ _ _ : ss) =
    do { e2 <- repLE e
       ; ss1 <- mkGenSyms (collectPatBinders p)
       ; addBinds ss1 $ do {
@@ -1297,7 +1297,7 @@ repSts (BodyStmt e _ _ _ : ss) =
       ; z <- repNoBindSt e2
       ; (ss2,zs) <- repSts ss
       ; return (ss2, z : zs) }
-repSts (ParStmt stmt_blocks _ _ : ss) =
+repSts (ParStmt stmt_blocks _ _ _ : ss) =
    do { (ss_s, stmt_blocks1) <- mapAndUnzipM rep_stmt_block stmt_blocks
       ; let stmt_blocks2 = nonEmptyCoreList stmt_blocks1
             ss1 = concat ss_s
@@ -1463,7 +1463,7 @@ repP (BangPat p)       = do { p1 <- repLP p; repPbang p1 }
 repP (AsPat x p)       = do { x' <- lookupLBinder x; p1 <- repLP p; repPaspat x' p1 }
 repP (ParPat p)        = repLP p
 repP (ListPat ps _ Nothing)    = do { qs <- repLPs ps; repPlist qs }
-repP (ListPat ps ty1 (Just (_,e))) = do { p <- repP (ListPat ps ty1 Nothing); e' <- repE e; repPview e' p}
+repP (ListPat ps ty1 (Just (_,e))) = do { p <- repP (ListPat ps ty1 Nothing); e' <- repE (syn_expr e); repPview e' p}
 repP (TuplePat ps boxed _)
   | isBoxed boxed       = do { qs <- repLPs ps; repPtup qs }
   | otherwise           = do { qs <- repLPs ps; repPunboxedTup qs }
@@ -1483,9 +1483,9 @@ repP (ConPatIn dc details)
                           ; MkC p <- repLP (hsRecFieldArg fld)
                           ; rep2 fieldPatName [v,p] }
 
-repP (NPat (L _ l) Nothing _)  = do { a <- repOverloadedLiteral l; repPlit a }
+repP (NPat (L _ l) Nothing _ _) = do { a <- repOverloadedLiteral l; repPlit a }
 repP (ViewPat e p _) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }
-repP p@(NPat _ (Just _) _) = notHandled "Negative overloaded patterns" (ppr p)
+repP p@(NPat _ (Just _) _ _) = notHandled "Negative overloaded patterns" (ppr p)
 repP p@(SigPatIn {})  = notHandled "Type signatures in patterns" (ppr p)
         -- The problem is to do with scoped type variables.
         -- To implement them, we have to implement the scoping rules

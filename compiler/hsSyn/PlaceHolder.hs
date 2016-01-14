@@ -3,7 +3,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 module PlaceHolder where
 
@@ -14,7 +13,7 @@ import NameSet
 import RdrName
 import Var
 import Coercion
-import {-# SOURCE #-} ConLike (ConLike)
+import ConLike (ConLike)
 import FieldLabel
 import SrcLoc (Located)
 import TcEvidence ( HsWrapper )
@@ -31,18 +30,21 @@ import BasicTypes       (Fixity)
 %************************************************************************
 -}
 
+-- NB: These are intentionally open, allowing API consumers (like Haddock)
+-- to declare new instances
+
 -- | used as place holder in PostTc and PostRn values
 data PlaceHolder = PlaceHolder
   deriving (Data,Typeable)
 
 -- | Types that are not defined until after type checking
-type family PostTc it ty :: * -- Note [Pass sensitive types]
+type family PostTc id ty  -- Note [Pass sensitive types]
 type instance PostTc Id      ty = ty
 type instance PostTc Name    ty = PlaceHolder
 type instance PostTc RdrName ty = PlaceHolder
 
 -- | Types that are not defined until after renaming
-type family PostRn id ty :: * -- Note [Pass sensitive types]
+type family PostRn id ty  -- Note [Pass sensitive types]
 type instance PostRn Id      ty = ty
 type instance PostRn Name    ty = ty
 type instance PostRn RdrName ty = PlaceHolder
@@ -85,10 +87,6 @@ programming techniques. The problem is addressed by introducing
 pass-specific data types, implemented as a pair of open type families,
 one for PostTc and one for PostRn. These are then explicitly populated
 with a PlaceHolder value when they do not yet have meaning.
-
-Since the required bootstrap compiler at this stage does not have
-closed type families, an open type family had to be used, which
-unfortunately forces the requirement for UndecidableInstances.
 
 In terms of actual usage, we have the following
 

@@ -190,14 +190,22 @@ data Pat id
                     (Maybe (SyntaxExpr id))     -- Just (Name of 'negate') for negative
                                                 -- patterns, Nothing otherwise
                     (SyntaxExpr id)             -- Equality checker, of type t->t->Bool
+                    (PostTc id Type)            -- Overall type of pattern. Might be
+                                                -- different than the literal's type
+                                                -- if (==) or negate changes the type
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnVal' @'+'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | NPlusKPat       (Located id)        -- n+k pattern
                     (Located (HsOverLit id)) -- It'll always be an HsIntegral
-                    (SyntaxExpr id)     -- (>=) function, of type t->t->Bool
+                    (HsOverLit id)      -- See Note [NPlusK patterns] in TcPat
+                     -- NB: This could be (PostTc ...), but that induced a
+                     -- a new hs-boot file. Not worth it.
+
+                    (SyntaxExpr id)     -- (>=) function, of type t1->t2->Bool
                     (SyntaxExpr id)     -- Name of '-' (see RnEnv.lookupSyntaxName)
+                    (PostTc id Type)    -- Type of overall pattern
 
         ------------ Pattern type signatures ---------------
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
@@ -391,9 +399,9 @@ pprPat (AsPat name pat)       = hcat [pprPrefixOcc (unLoc name), char '@', pprPa
 pprPat (ViewPat expr pat _)   = hcat [pprLExpr expr, text " -> ", ppr pat]
 pprPat (ParPat pat)           = parens (ppr pat)
 pprPat (LitPat s)             = ppr s
-pprPat (NPat l Nothing  _)    = ppr l
-pprPat (NPat l (Just _) _)    = char '-' <> ppr l
-pprPat (NPlusKPat n k _ _)    = hcat [ppr n, char '+', ppr k]
+pprPat (NPat l Nothing  _ _)  = ppr l
+pprPat (NPat l (Just _) _ _)  = char '-' <> ppr l
+pprPat (NPlusKPat n k _ _ _ _)= hcat [ppr n, char '+', ppr k]
 pprPat (SplicePat splice)     = pprSplice splice
 pprPat (CoPat co pat _)       = pprHsWrapper (ppr pat) co
 pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty

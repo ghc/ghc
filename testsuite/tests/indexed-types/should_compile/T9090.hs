@@ -10,7 +10,7 @@ type instance F (Eq a) = Eq a
 
 -- checks
 f :: Eq b => (forall a. F (Eq a) => f a -> Bool) -> f b -> Bool
-f = error "urk" -- g x = g x
+f _ = error "urk" -- g x = g x
 
 -- checks
 f' :: Eq b => (forall a. Eq a => f a -> Bool) -> f b -> Bool

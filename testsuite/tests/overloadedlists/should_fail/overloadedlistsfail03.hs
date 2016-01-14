@@ -1,3 +1,3 @@
 {-# LANGUAGE OverloadedLists #-}
 
-main = print (length ['a',"b"])
+main = print (length (['a',"b"] :: [Char]))

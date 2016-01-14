@@ -6,7 +6,7 @@ type family H s
 type family F v
 
 bar :: (forall t. Maybe t -> a) -> H a -> Int
-bar = error "urk"
+bar _ = error "urk"
 
 call :: F Bool -> Int
 call x = bar (\_ -> x) (undefined :: H (F Bool))
@@ -29,4 +29,3 @@ fuv1 := fuv2
 
 alpha := F Bool
 -}
-

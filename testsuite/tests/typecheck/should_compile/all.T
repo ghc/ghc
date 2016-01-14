@@ -498,3 +498,7 @@ test('T11462',
            ('T11462.hs', '')],
       '-dynamic'])
 test('T11480', normal, compile, [''])
+test('RebindHR', normal, compile, [''])
+test('RebindNegate', normal, compile, [''])
+test('T11397', normal, compile, [''])
+test('T11458', normal, compile, [''])

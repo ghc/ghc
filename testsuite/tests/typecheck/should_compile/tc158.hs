@@ -9,4 +9,4 @@ type All u = forall x. x->u
 type All' u = u -> All u
 
 all1 :: All u -> (u -> All u) -> All u
-all1 = undefined
+all1 _ _ = undefined

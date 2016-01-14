@@ -1,6 +1,6 @@
 
 tcfail099.hs:9:20: error:
-    • Couldn't match expected type ‘a’ with actual type ‘r’
+    • Couldn't match expected type ‘a’ with actual type ‘t’
         because type variable ‘a’ would escape its scope
       This (rigid, skolem) type variable is bound by
         a pattern with constructor: C :: forall a. (a -> Int) -> DS,
@@ -10,6 +10,6 @@ tcfail099.hs:9:20: error:
       In the expression: f arg
       In an equation for ‘call’: call (C f) arg = f arg
     • Relevant bindings include
-        arg :: r (bound at tcfail099.hs:9:12)
+        arg :: t (bound at tcfail099.hs:9:12)
         f :: a -> Int (bound at tcfail099.hs:9:9)
-        call :: DS -> r -> Int (bound at tcfail099.hs:9:1)
+        call :: DS -> t -> Int (bound at tcfail099.hs:9:1)

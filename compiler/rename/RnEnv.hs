@@ -1562,21 +1562,23 @@ lookupIfThenElse
        ; if not rebindable_on
          then return (Nothing, emptyFVs)
          else do { ite <- lookupOccRn (mkVarUnqual (fsLit "ifThenElse"))
-                 ; return (Just (HsVar (noLoc ite)), unitFV ite) } }
+                 ; return ( Just (mkRnSyntaxExpr ite)
+                          , unitFV ite ) } }
 
 lookupSyntaxName :: Name                                -- The standard name
                  -> RnM (SyntaxExpr Name, FreeVars)     -- Possibly a non-standard name
 lookupSyntaxName std_name
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if not rebindable_on then
-           return (HsVar (noLoc std_name), emptyFVs)
+           return (mkRnSyntaxExpr std_name, emptyFVs)
          else
             -- Get the similarly named thing from the local environment
            do { usr_name <- lookupOccRn (mkRdrUnqual (nameOccName std_name))
-              ; return (HsVar (noLoc usr_name), unitFV usr_name) } }
+              ; return (mkRnSyntaxExpr usr_name, unitFV usr_name) } }
 
 lookupSyntaxNames :: [Name]                          -- Standard names
                   -> RnM ([HsExpr Name], FreeVars)   -- See comments with HsExpr.ReboundNames
+   -- this works with CmdTop, which wants HsExprs, not SyntaxExprs
 lookupSyntaxNames std_names
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if not rebindable_on then

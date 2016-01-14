@@ -2,7 +2,7 @@ module TcMatches where
 import HsSyn    ( GRHSs, MatchGroup, LHsExpr )
 import TcEvidence( HsWrapper )
 import Name     ( Name )
-import TcType   ( TcRhoType )
+import TcType   ( ExpRhoType, TcRhoType )
 import TcRnTypes( TcM, TcId )
 --import SrcLoc   ( Located )
 
@@ -12,5 +12,5 @@ tcGRHSsPat    :: GRHSs Name (LHsExpr Name)
 
 tcMatchesFun :: Name
              -> MatchGroup Name (LHsExpr Name)
-             -> TcRhoType
+             -> ExpRhoType
              -> TcM (HsWrapper, MatchGroup TcId (LHsExpr TcId))

@@ -1,19 +1,19 @@
 
 T7438.hs:6:14: error:
-    • Couldn't match expected type ‘r1’ with actual type ‘r’
-        ‘r1’ is untouchable
+    • Couldn't match expected type ‘t3’ with actual type ‘t2’
+        ‘t3’ is untouchable
           inside the constraints: t1 ~ t
           bound by a pattern with constructor:
                      Nil :: forall k (a :: k). Thrist a a,
                    in an equation for ‘go’
           at T7438.hs:6:4-6
-      ‘r1’ is a rigid type variable bound by
-        the inferred type of go :: Thrist t t1 -> r -> r1 at T7438.hs:6:1
-      ‘r’ is a rigid type variable bound by
-        the inferred type of go :: Thrist t t1 -> r -> r1 at T7438.hs:6:1
+      ‘t3’ is a rigid type variable bound by
+        the inferred type of go :: Thrist t t1 -> t2 -> t3 at T7438.hs:6:1
+      ‘t2’ is a rigid type variable bound by
+        the inferred type of go :: Thrist t t1 -> t2 -> t3 at T7438.hs:6:1
       Possible fix: add a type signature for ‘go’
     • In the expression: acc
       In an equation for ‘go’: go Nil acc = acc
     • Relevant bindings include
-        acc :: r (bound at T7438.hs:6:8)
-        go :: Thrist t t1 -> r -> r1 (bound at T7438.hs:6:1)
+        acc :: t2 (bound at T7438.hs:6:8)
+        go :: Thrist t t1 -> t2 -> t3 (bound at T7438.hs:6:1)

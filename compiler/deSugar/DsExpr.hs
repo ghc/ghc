@@ -8,7 +8,8 @@ Desugaring exporessions.
 
 {-# LANGUAGE CPP #-}
 
-module DsExpr ( dsExpr, dsLExpr, dsLocalBinds, dsValBinds, dsLit ) where
+module DsExpr ( dsExpr, dsLExpr, dsLocalBinds
+              , dsValBinds, dsLit, dsSyntaxExpr ) where
 
 #include "HsVersions.h"
 
@@ -221,7 +222,8 @@ dsExpr (HsWrap co_fn e)
        ; return wrapped_e }
 
 dsExpr (NegApp expr neg_expr)
-  = App <$> dsExpr neg_expr <*> dsLExpr expr
+  = do { expr' <- dsLExpr expr
+       ; dsSyntaxExpr neg_expr [expr'] }
 
 dsExpr (HsLam a_Match)
   = uncurry mkLams <$> matchWrapper LambdaExpr Nothing a_Match
@@ -354,8 +356,7 @@ dsExpr (HsIf mb_fun guard_expr then_expr else_expr)
        ; b1 <- dsLExpr then_expr
        ; b2 <- dsLExpr else_expr
        ; case mb_fun of
-           Just fun -> do { core_fun <- dsExpr fun
-                          ; return (mkCoreApps core_fun [pred,b1,b2]) }
+           Just fun -> dsSyntaxExpr fun [pred, b1, b2]
            Nothing  -> return $ mkIfThenElse pred b1 b2 }
 
 dsExpr (HsMultiIf res_ty alts)
@@ -398,10 +399,8 @@ dsExpr (ExplicitPArr ty xs) = do
 dsExpr (ArithSeq expr witness seq)
   = case witness of
      Nothing -> dsArithSeq expr seq
-     Just fl -> do {
-       ; fl' <- dsExpr fl
-       ; newArithSeq <- dsArithSeq expr seq
-       ; return (App fl' newArithSeq)}
+     Just fl -> do { newArithSeq <- dsArithSeq expr seq
+                   ; dsSyntaxExpr fl [newArithSeq] }
 
 dsExpr (PArrSeq expr (FromTo from to))
   = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, to]
@@ -741,6 +740,16 @@ dsExpr (HsRecFld      {})  = panic "dsExpr:HsRecFld"
 dsExpr (HsTypeOut {})
   = panic "dsExpr: tried to desugar a naked type application argument (HsTypeOut)"
 
+------------------------------
+dsSyntaxExpr :: SyntaxExpr Id -> [CoreExpr] -> DsM CoreExpr
+dsSyntaxExpr (SyntaxExpr { syn_expr      = expr
+                         , syn_arg_wraps = arg_wraps
+                         , syn_res_wrap  = res_wrap })
+             arg_exprs
+  = do { args <- zipWithM dsHsWrapper arg_wraps arg_exprs
+       ; fun  <- dsExpr expr
+       ; dsHsWrapper res_wrap $ mkApps fun args }
+
 findField :: [LHsRecField Id arg] -> Name -> [arg]
 findField rbinds sel
   = [hsRecFieldArg fld | L _ fld <- rbinds
@@ -832,10 +841,9 @@ dsExplicitList elt_ty Nothing xs
            ; return (foldr (App . App (Var c)) folded_suffix prefix) }
 
 dsExplicitList elt_ty (Just fln) xs
-  = do { fln' <- dsExpr fln
-       ; list <- dsExplicitList elt_ty Nothing xs
+  = do { list <- dsExplicitList elt_ty Nothing xs
        ; dflags <- getDynFlags
-       ; return (App (App fln' (mkIntExprInt dflags (length xs))) list) }
+       ; dsSyntaxExpr fln [mkIntExprInt dflags (length xs), list] }
 
 spanTail :: (a -> Bool) -> [a] -> ([a], [a])
 spanTail f xs = (reverse rejected, reverse satisfying)
@@ -882,25 +890,21 @@ dsDo stmts
     go _ (BodyStmt rhs then_expr _ _) stmts
       = do { rhs2 <- dsLExpr rhs
            ; warnDiscardedDoBindings rhs (exprType rhs2)
-           ; then_expr2 <- dsExpr then_expr
            ; rest <- goL stmts
-           ; return (mkApps then_expr2 [rhs2, rest]) }
+           ; dsSyntaxExpr then_expr [rhs2, rest] }
 
     go _ (LetStmt (L _ binds)) stmts
       = do { rest <- goL stmts
            ; dsLocalBinds binds rest }
 
-    go _ (BindStmt pat rhs bind_op fail_op) stmts
+    go _ (BindStmt pat rhs bind_op fail_op res1_ty) stmts
       = do  { body     <- goL stmts
             ; rhs'     <- dsLExpr rhs
-            ; bind_op' <- dsExpr bind_op
             ; var   <- selectSimpleMatchVarL pat
-            ; let bind_ty = exprType bind_op'   -- rhs -> (pat -> res1) -> res2
-                  res1_ty = funResultTy (funArgTy (funResultTy bind_ty))
             ; match <- matchSinglePat (Var var) (StmtCtxt DoExpr) pat
                                       res1_ty (cantFailMatchResult body)
             ; match_code <- handle_failure pat match fail_op
-            ; return (mkApps bind_op' [rhs', Lam var match_code]) }
+            ; dsSyntaxExpr bind_op [rhs', Lam var match_code] }
 
     go _ (ApplicativeStmt args mb_join body_ty) stmts
       = do {
@@ -915,7 +919,6 @@ dsDo stmts
                arg_tys = map hsLPatType pats
 
            ; rhss' <- sequence rhss
-           ; ops' <- mapM dsExpr (map fst args)
 
            ; let body' = noLoc $ HsDo DoExpr (noLoc stmts) body_ty
 
@@ -926,30 +929,30 @@ dsDo stmts
                       , mg_origin = Generated }
 
            ; fun' <- dsLExpr fun
-           ; let mk_ap_call l (op,r) = mkApps op [l,r]
-                 expr = foldl mk_ap_call fun' (zip ops' rhss')
+           ; let mk_ap_call l (op,r) = dsSyntaxExpr op [l,r]
+           ; expr <- foldlM mk_ap_call fun' (zip (map fst args) rhss')
            ; case mb_join of
                Nothing -> return expr
-               Just join_op ->
-                 do { join_op' <- dsExpr join_op
-                    ; return (App join_op' expr) } }
+               Just join_op -> dsSyntaxExpr join_op [expr] }
 
     go loc (RecStmt { recS_stmts = rec_stmts, recS_later_ids = later_ids
                     , recS_rec_ids = rec_ids, recS_ret_fn = return_op
                     , recS_mfix_fn = mfix_op, recS_bind_fn = bind_op
+                    , recS_bind_ty = bind_ty
                     , recS_rec_rets = rec_rets, recS_ret_ty = body_ty }) stmts
       = goL (new_bind_stmt : stmts)  -- rec_ids can be empty; eg  rec { print 'x' }
       where
         new_bind_stmt = L loc $ BindStmt (mkBigLHsPatTupId later_pats)
                                          mfix_app bind_op
                                          noSyntaxExpr  -- Tuple cannot fail
+                                         bind_ty
 
         tup_ids      = rec_ids ++ filterOut (`elem` rec_ids) later_ids
         tup_ty       = mkBigCoreTupTy (map idType tup_ids) -- Deals with singleton case
         rec_tup_pats = map nlVarPat tup_ids
         later_pats   = rec_tup_pats
         rets         = map noLoc rec_rets
-        mfix_app     = nlHsApp (noLoc mfix_op) mfix_arg
+        mfix_app     = nlHsSyntaxApps mfix_op [mfix_arg]
         mfix_arg     = noLoc $ HsLam
                            (MG { mg_alts = noLoc [mkSimpleMatch [mfix_pat] body]
                                , mg_arg_tys = [tup_ty], mg_res_ty = body_ty
@@ -957,7 +960,7 @@ dsDo stmts
         mfix_pat     = noLoc $ LazyPat $ mkBigLHsPatTupId rec_tup_pats
         body         = noLoc $ HsDo
                                 DoExpr (noLoc (rec_stmts ++ [ret_stmt])) body_ty
-        ret_app      = nlHsApp (noLoc return_op) (mkBigLHsTupId rets)
+        ret_app      = nlHsSyntaxApps return_op [mkBigLHsTupId rets]
         ret_stmt     = noLoc $ mkLastStmt ret_app
                      -- This LastStmt will be desugared with dsDo,
                      -- which ignores the return_op in the LastStmt,
@@ -971,10 +974,10 @@ handle_failure :: LPat Id -> MatchResult -> SyntaxExpr Id -> DsM CoreExpr
     -- the monadic 'fail' rather than throwing an exception
 handle_failure pat match fail_op
   | matchCanFail match
-  = do { fail_op' <- dsExpr fail_op
-       ; dflags <- getDynFlags
+  = do { dflags <- getDynFlags
        ; fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
-       ; extractMatchResult match (App fail_op' fail_msg) }
+       ; fail_expr <- dsSyntaxExpr fail_op [fail_msg]
+       ; extractMatchResult match fail_expr }
   | otherwise
   = extractMatchResult match (error "It can't fail")
 

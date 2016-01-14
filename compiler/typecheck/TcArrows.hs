@@ -77,15 +77,16 @@ Note that
 -}
 
 tcProc :: InPat Name -> LHsCmdTop Name          -- proc pat -> expr
-       -> TcRhoType                             -- Expected type of whole proc expression
+       -> ExpRhoType                            -- Expected type of whole proc expression
        -> TcM (OutPat TcId, LHsCmdTop TcId, TcCoercion)
 
 tcProc pat cmd exp_ty
   = newArrowScope $
-    do  { (co, (exp_ty1, res_ty)) <- matchExpectedAppTy exp_ty
+    do  { exp_ty <- expTypeToType exp_ty  -- no higher-rank stuff with arrows
+        ; (co, (exp_ty1, res_ty)) <- matchExpectedAppTy exp_ty
         ; (co1, (arr_ty, arg_ty)) <- matchExpectedAppTy exp_ty1
         ; let cmd_env = CmdEnv { cmd_arr = arr_ty }
-        ; (pat', cmd') <- tcPat ProcExpr pat arg_ty $
+        ; (pat', cmd') <- tcPat ProcExpr pat (mkCheckExpType arg_ty) $
                           tcCmdTop cmd_env cmd (unitTy, res_ty)
         ; let res_co = mkTcTransCo co
                          (mkTcAppCo co1 (mkTcNomReflCo res_ty))
@@ -144,15 +145,16 @@ tc_cmd env (HsCmdLet (L l binds) (L body_loc body)) res_ty
 tc_cmd env in_cmd@(HsCmdCase scrut matches) (stk, res_ty)
   = addErrCtxt (cmdCtxt in_cmd) $ do
       (scrut', scrut_ty) <- tcInferRho scrut
-      matches' <- tcMatchesCase match_ctxt scrut_ty matches res_ty
+      matches' <- tcMatchesCase match_ctxt scrut_ty matches (mkCheckExpType res_ty)
       return (HsCmdCase scrut' matches')
   where
     match_ctxt = MC { mc_what = CaseAlt,
                       mc_body = mc_body }
-    mc_body body res_ty' = tcCmd env body (stk, res_ty')
+    mc_body body res_ty' = do { res_ty' <- expTypeToType res_ty'
+                              ; tcCmd env body (stk, res_ty') }
 
 tc_cmd env (HsCmdIf Nothing pred b1 b2) res_ty    -- Ordinary 'if'
-  = do  { pred' <- tcMonoExpr pred boolTy
+  = do  { pred' <- tcMonoExpr pred (mkCheckExpType boolTy)
         ; b1'   <- tcCmd env b1 res_ty
         ; b2'   <- tcCmd env b2 res_ty
         ; return (HsCmdIf Nothing pred' b1' b2')
@@ -165,11 +167,13 @@ tc_cmd env (HsCmdIf (Just fun) pred b1 b2) res_ty -- Rebindable syntax for if
         -- the return value.
         ; (_, [r_tv]) <- tcInstSkolTyVars [alphaTyVar]
         ; let r_ty = mkTyVarTy r_tv
-        ; let if_ty = mkFunTys [pred_ty, r_ty, r_ty] r_ty
         ; checkTc (not (r_tv `elemVarSet` tyCoVarsOfType pred_ty))
                   (text "Predicate type of `ifThenElse' depends on result type")
-        ; fun'  <- tcSyntaxOp IfOrigin fun if_ty
-        ; pred' <- tcMonoExpr pred pred_ty
+        ; (pred', fun')
+            <- tcSyntaxOp IfOrigin fun (map synKnownType [pred_ty, r_ty, r_ty])
+                                       (mkCheckExpType r_ty) $ \ _ ->
+               tcMonoExpr pred (mkCheckExpType pred_ty)
+
         ; b1'   <- tcCmd env b1 res_ty
         ; b2'   <- tcCmd env b2 res_ty
         ; return (HsCmdIf (Just fun') pred' b1' b2')
@@ -195,9 +199,9 @@ tc_cmd env cmd@(HsCmdArrApp fun arg _ ho_app lr) (_, res_ty)
   = addErrCtxt (cmdCtxt cmd)    $
     do  { arg_ty <- newOpenFlexiTyVarTy
         ; let fun_ty = mkCmdArrTy env arg_ty res_ty
-        ; fun' <- select_arrow_scope (tcMonoExpr fun fun_ty)
+        ; fun' <- select_arrow_scope (tcMonoExpr fun (mkCheckExpType fun_ty))
 
-        ; arg' <- tcMonoExpr arg arg_ty
+        ; arg' <- tcMonoExpr arg (mkCheckExpType arg_ty)
 
         ; return (HsCmdArrApp fun' arg' fun_ty ho_app lr) }
   where
@@ -222,7 +226,7 @@ tc_cmd env cmd@(HsCmdApp fun arg) (cmd_stk, res_ty)
   = addErrCtxt (cmdCtxt cmd)    $
     do  { arg_ty <- newOpenFlexiTyVarTy
         ; fun'   <- tcCmd env fun (mkPairTy arg_ty cmd_stk, res_ty)
-        ; arg'   <- tcMonoExpr arg arg_ty
+        ; arg'   <- tcMonoExpr arg (mkCheckExpType arg_ty)
         ; return (HsCmdApp fun' arg') }
 
 -------------------------------------------
@@ -241,9 +245,9 @@ tc_cmd env
     do  { (co, arg_tys, cmd_stk') <- matchExpectedCmdArgs n_pats cmd_stk
 
                 -- Check the patterns, and the GRHSs inside
-        ; (pats', grhss') <- setSrcSpan mtch_loc                $
-                             tcPats LambdaExpr pats arg_tys     $
-                             tc_grhss grhss cmd_stk' res_ty
+        ; (pats', grhss') <- setSrcSpan mtch_loc                                 $
+                             tcPats LambdaExpr pats (map mkCheckExpType arg_tys) $
+                             tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
         ; let match' = L mtch_loc (Match NonFunBindMatch pats' Nothing grhss')
               arg_tys = map hsLPatType pats'
@@ -262,7 +266,8 @@ tc_cmd env
 
     tc_grhs stk_ty res_ty (GRHS guards body)
         = do { (guards', rhs') <- tcStmtsAndThen pg_ctxt tcGuardStmt guards res_ty $
-                                  \ res_ty -> tcCmd env body (stk_ty, res_ty)
+                                  \ res_ty -> tcCmd env body
+                                                (stk_ty, checkingExpType "tc_grhs" res_ty)
              ; return (GRHS guards' rhs') }
 
 -------------------------------------------
@@ -350,11 +355,11 @@ tcArrDoStmt env _ (BodyStmt rhs _ _ _) res_ty thing_inside
         ; thing          <- thing_inside res_ty
         ; return (BodyStmt rhs' noSyntaxExpr noSyntaxExpr elt_ty, thing) }
 
-tcArrDoStmt env ctxt (BindStmt pat rhs _ _) res_ty thing_inside
+tcArrDoStmt env ctxt (BindStmt pat rhs _ _ _) res_ty thing_inside
   = do  { (rhs', pat_ty) <- tc_arr_rhs env rhs
-        ; (pat', thing)  <- tcPat (StmtCtxt ctxt) pat pat_ty $
+        ; (pat', thing)  <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
                             thing_inside res_ty
-        ; return (mkBindStmt pat' rhs', thing) }
+        ; return (mkTcBindStmt pat' rhs', thing) }
 
 tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
                             , recS_rec_ids = rec_names }) res_ty thing_inside
@@ -365,7 +370,7 @@ tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
         { (stmts', tup_rets)
                 <- tcStmtsAndThen ctxt (tcArrDoStmt env) stmts res_ty   $ \ _res_ty' ->
                         -- ToDo: res_ty not really right
-                   zipWithM tcCheckId tup_names tup_elt_tys
+                   zipWithM tcCheckId tup_names (map mkCheckExpType tup_elt_tys)
 
         ; thing <- thing_inside res_ty
                 -- NB:  The rec_ids for the recursive things

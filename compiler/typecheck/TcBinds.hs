@@ -252,7 +252,7 @@ tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
        = do { ty <- newOpenFlexiTyVarTy
             ; let p = mkStrLitTy $ hsIPNameFS ip
             ; ip_id <- newDict ipClass [ p, ty ]
-            ; expr' <- tcMonoExpr expr ty
+            ; expr' <- tcMonoExpr expr (mkCheckExpType ty)
             ; let d = toDict ipClass p ty `fmap` expr'
             ; return (ip_id, (IPBind (Right ip_id) d)) }
     tc_ip_bind _ (IPBind (Right {}) _) = panic "tc_ip_bind"
@@ -585,7 +585,7 @@ tcPolyCheck rec_tc prag_fn
                       , sig_loc   = loc })
             bind
   = do { ev_vars <- newEvVars theta
-       ; let skol_info = SigSkol ctxt (mkPhiTy theta tau)
+       ; let skol_info = SigSkol ctxt (mkCheckExpType $ mkPhiTy theta tau)
              prag_sigs = lookupPragEnv prag_fn name
              skol_tvs  = map snd skol_prs
                  -- Find the location of the original source type sig, if
@@ -780,7 +780,7 @@ mkExport prag_fn qtvs theta
                                            -- an ambiguouse type and have AllowAmbiguousType
                                            -- e..g infer  x :: forall a. F a -> Int
                   else addErrCtxtM (mk_impedence_match_msg mono_info sel_poly_ty poly_ty) $
-                       tcSubType_NC sig_ctxt sel_poly_ty poly_ty
+                       tcSubType_NC sig_ctxt sel_poly_ty (mkCheckExpType poly_ty)
 
         ; warn_missing_sigs <- woptM Opt_WarnMissingLocalSigs
         ; when warn_missing_sigs $ localSigWarn poly_id mb_sig
@@ -1473,16 +1473,16 @@ tcMonoBinds is_rec sig_fn no_gen
         -- e.g.         f = \(x::forall a. a->a) -> <body>
         --      We want to infer a higher-rank type for f
     setSrcSpan b_loc    $
-    do  { (rhs_tv, _) <- newOpenReturnTyVar
-                         -- use ReturnTv to allow impredicativity
-        ; let rhs_ty = mkTyVarTy rhs_tv
-        ; mono_id <- newNoSigLetBndr no_gen name rhs_ty
+    do  { rhs_ty <- newOpenInferExpType
         ; (co_fn, matches')
-            <- tcExtendIdBndrs [TcIdBndr mono_id NotTopLevel] $
+            <- tcExtendIdBndrs [TcIdBndr_ExpType name rhs_ty NotTopLevel] $
                   -- We extend the error context even for a non-recursive
                   -- function so that in type error messages we show the
                   -- type of the thing whose rhs we are type checking
                tcMatchesFun name matches rhs_ty
+
+        ; rhs_ty  <- readExpType rhs_ty
+        ; mono_id <- newNoSigLetBndr no_gen name rhs_ty
 
         ; return (unitBag $ L b_loc $
                      FunBind { fun_id = L nm_loc mono_id,
@@ -1603,7 +1603,7 @@ tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
     tcExtendTyVarEnvForRhs mb_sig       $
     do  { traceTc "tcRhs: fun bind" (ppr mono_id $$ ppr (idType mono_id))
         ; (co_fn, matches') <- tcMatchesFun (idName mono_id)
-                                 matches (idType mono_id)
+                                 matches (mkCheckExpType $ idType mono_id)
         ; return ( FunBind { fun_id = L loc mono_id
                            , fun_matches = matches'
                            , fun_co_fn = co_fn

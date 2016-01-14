@@ -239,11 +239,11 @@ seqVar var body = Case (Var var) var (exprType body)
 mkCoLetMatchResult :: CoreBind -> MatchResult -> MatchResult
 mkCoLetMatchResult bind = adjustMatchResult (mkCoreLet bind)
 
--- (mkViewMatchResult var' viewExpr var mr) makes the expression
--- let var' = viewExpr var in mr
-mkViewMatchResult :: Id -> CoreExpr -> Id -> MatchResult -> MatchResult
-mkViewMatchResult var' viewExpr var =
-    adjustMatchResult (mkCoreLet (NonRec var' (mkCoreAppDs (text "mkView" <+> ppr var') viewExpr (Var var))))
+-- (mkViewMatchResult var' viewExpr mr) makes the expression
+-- let var' = viewExpr in mr
+mkViewMatchResult :: Id -> CoreExpr -> MatchResult -> MatchResult
+mkViewMatchResult var' viewExpr =
+    adjustMatchResult (mkCoreLet (NonRec var' viewExpr))
 
 mkEvalMatchResult :: Id -> Type -> MatchResult -> MatchResult
 mkEvalMatchResult var ty

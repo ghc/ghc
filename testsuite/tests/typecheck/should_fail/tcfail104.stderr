@@ -1,11 +1,13 @@
 
-tcfail104.hs:14:15: error:
-    • Couldn't match expected type ‘forall a. a -> a’
-                  with actual type ‘Char -> Char’
-    • When checking that the pattern signature: forall a. a -> a
-        fits the type of its context: Char -> Char
-      In the pattern: x :: forall a. a -> a
+tcfail104.hs:14:12: error:
+    • Couldn't match type ‘forall a. a -> a’ with ‘Char -> Char’
+      Expected type: (Char -> Char) -> Char -> Char
+        Actual type: (forall a. a -> a) -> Char -> Char
+    • When checking that: (forall a. a -> a) -> forall a. a -> a
+        is more polymorphic than: (Char -> Char) -> Char -> Char
       In the expression: (\ (x :: forall a. a -> a) -> x)
+      In the expression:
+        if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x)
 
 tcfail104.hs:22:15: error:
     • Couldn't match expected type ‘forall a. a -> a’

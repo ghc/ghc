@@ -8,9 +8,9 @@ newtype S n = S n
 class Nat n where
    caseNat :: (n ~ Z => r) -> (forall p. (n ~ S p, Nat p) => p -> r) -> n -> r
 instance Nat Z where
-   caseNat = error "urk1"
+   caseNat _ _ = error "urk1"
 instance Nat n => Nat (S n) where
-   caseNat = error "urk2"
+   caseNat _ _ = error "urk2"
 
 -- empty type
 newtype Naught = Naught (forall a. a)

@@ -1,7 +1,6 @@
 
-T5934.hs:12:7:
-    Couldn't match type ‘Integer’ with ‘(forall s. GenST s) -> Int’
-    Expected type: Integer -> (forall s. GenST s) -> Int
-      Actual type: Integer -> Integer
-    In the expression: 0
-    In an equation for ‘run’: run = 0
+T5934.hs:12:7: error:
+    • Couldn't match expected type ‘(forall s. GenST s) -> Int’
+                  with actual type ‘Integer’
+    • In the expression: 0
+      In an equation for ‘run’: run = 0
