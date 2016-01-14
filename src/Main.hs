@@ -41,14 +41,15 @@ main = shakeArgsWith options flags $ \cmdLineFlags targets -> do
         { shakeFiles    = Base.shakeFilesPath
         , shakeProgress = progressSimple
         , shakeTimings  = True
-        , shakeOutput   = const showMsg
+        , shakeOutput   = const putMsg
         }
 
-showMsg :: String -> IO ()
-showMsg msg | dropEscSequence msg == "." = BS.putStr . UTF8.fromString $ msg
-showMsg msg | dropEscSequence msg == ""  = return ()
-showMsg msg                              = BS.putStrLn . UTF8.fromString $ msg
+-- | Dynamic switch for @putStr@ and @putStrLn@ depending on the @msg@.
+putMsg :: String -> IO ()
+putMsg msg | dropEscSequence msg == "." = BS.putStr . UTF8.fromString $ msg
+putMsg msg                              = BS.putStrLn . UTF8.fromString $ msg
 
+-- | Drops ANSI Escape sequences from a string.
 dropEscSequence :: String -> String
 dropEscSequence = go
   where
