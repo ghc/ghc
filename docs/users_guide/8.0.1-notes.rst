@@ -7,6 +7,18 @@ The significant changes to the various parts of the compiler are listed
 in the following sections. There have also been numerous bug fixes and
 performance improvements over the 7.10 branch.
 
+.. warning::
+
+    Only Cabal versions 0.24 and newer will function properly with this release.
+    Consequently it will likely be necessary to recompile ``cabal-install``
+    before installing new packages.
+
+    The reason for this is a change in how packages are identified in GHC
+    8.0. While previous versions of Cabal identified packages to GHC with a
+    package key (with GHC's :ghc-flag:`-this-package-key` argument), GHC 8.0 and
+    later uses installed package IDs in place of package keys.
+
+
 Highlights
 ----------
 
