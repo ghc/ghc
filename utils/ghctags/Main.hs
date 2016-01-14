@@ -279,7 +279,8 @@ boundThings modname lbinding =
     FunBind { fun_id = id } -> [thing id]
     PatBind { pat_lhs = lhs } -> patThings lhs []
     VarBind { var_id = id } -> [FoundThing modname (getOccString id) (startOfLocated lbinding)]
-    AbsBinds { } -> [] -- nothing interesting in a type abstraction
+    AbsBinds { }    -> [] -- nothing interesting in a type abstraction
+    AbsBindsSig { } -> []
     PatSynBind PSB{ psb_id = id } -> [thing id]
   where thing = foundOfLName modname
         patThings lpat tl =

@@ -205,6 +205,20 @@ data HsBindLR idL idR
         abs_binds    :: LHsBinds idL
     }
 
+  | AbsBindsSig {  -- Simpler form of AbsBinds, used with a type sig
+                   -- in tcPolyCheck. Produces simpler desugaring and
+                   -- is necessary to avoid #11405, comment:3.
+        abs_tvs     :: [TyVar],
+        abs_ev_vars :: [EvVar],
+
+        abs_sig_export :: idL,  -- like abe_poly
+        abs_sig_prags  :: TcSpecPrags,
+
+        abs_sig_ev_bind :: TcEvBinds,  -- no list needed here
+        abs_sig_bind    :: LHsBind idL -- always only one, and it's always a
+                                       -- FunBind
+    }
+
   | PatSynBind (PatSynBind idL idR)
         -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
         --          'ApiAnnotation.AnnLarrow','ApiAnnotation.AnnEqual',
@@ -550,7 +564,7 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
                        , abs_exports = exports, abs_binds = val_binds
                        , abs_ev_binds = ev_binds })
   = sdocWithDynFlags $ \ dflags ->
-    if gopt Opt_PrintTypechekerElaboration dflags then
+    if gopt Opt_PrintTypecheckerElaboration dflags then
       -- Show extra information (bug number: #10662)
       hang (ptext (sLit "AbsBinds") <+> brackets (interpp'SP tyvars)
                                     <+> brackets (interpp'SP dictvars))
@@ -563,6 +577,19 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
       , ptext (sLit "Evidence:") <+> ppr ev_binds ]
     else
       pprLHsBinds val_binds
+ppr_monobind (AbsBindsSig { abs_tvs         = tyvars
+                          , abs_ev_vars     = dictvars
+                          , abs_sig_ev_bind = ev_bind
+                          , abs_sig_bind    = bind })
+  = sdocWithDynFlags $ \ dflags ->
+    if gopt Opt_PrintTypecheckerElaboration dflags then
+      hang (text "AbsBindsSig" <+> brackets (interpp'SP tyvars)
+                               <+> brackets (interpp'SP dictvars))
+         2 $ braces $ vcat
+      [ text "Bind:"     <+> ppr bind
+      , text "Evidence:" <+> ppr ev_bind ]
+    else
+      ppr bind
 
 instance (OutputableBndr id) => Outputable (ABExport id) where
   ppr (ABE { abe_wrap = wrap, abe_inst_wrap = inst_wrap

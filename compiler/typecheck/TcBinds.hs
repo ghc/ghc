@@ -593,7 +593,7 @@ tcPolyCheck rec_tc prag_fn
                  -- there is was one.  This will appear in messages like
                  -- "type variable x is bound by .. at <loc>"
              name = idName poly_id
-       ; (ev_binds, (binds', [mono_info]))
+       ; (ev_binds, (binds', _))
             <- setSrcSpan loc $
                checkConstraints skol_info skol_tvs ev_vars $
                tcMonoBinds rec_tc (\_ -> Just (TcIdSig sig)) LetLclBndr [bind]
@@ -601,15 +601,17 @@ tcPolyCheck rec_tc prag_fn
        ; spec_prags <- tcSpecPrags poly_id prag_sigs
        ; poly_id    <- addInlinePrags poly_id prag_sigs
 
-       ; let export = ABE { abe_wrap      = idHsWrapper
-                          , abe_inst_wrap = idHsWrapper
-                          , abe_poly      = poly_id
-                          , abe_mono      = mbi_mono_id mono_info
-                          , abe_prags     = SpecPrags spec_prags }
-             abs_bind = L loc $ AbsBinds
+       ; let bind' = case bagToList binds' of
+                       [b] -> b
+                       _   -> pprPanic "tcPolyCheck" (ppr binds')
+             abs_bind = L loc $ AbsBindsSig
                         { abs_tvs = skol_tvs
-                        , abs_ev_vars = ev_vars, abs_ev_binds = [ev_binds]
-                        , abs_exports = [export], abs_binds = binds' }
+                        , abs_ev_vars = ev_vars
+                        , abs_sig_export = poly_id
+                        , abs_sig_prags = SpecPrags spec_prags
+                        , abs_sig_ev_bind = ev_binds
+                        , abs_sig_bind    = bind' }
+
        ; return (unitBag abs_bind, [poly_id]) }
 
 tcPolyCheck _rec_tc _prag_fn sig _bind
@@ -1916,7 +1918,7 @@ data GeneralisationPlan
 
   | CheckGen (LHsBind Name) TcIdSigInfo
                         -- One binding with a signature
-                        -- Explicit generalisation; there is an AbsBinds
+                        -- Explicit generalisation; there is an AbsBindsSig
 
 -- A consequence of the no-AbsBinds choice (NoGen) is that there is
 -- no "polymorphic Id" and "monmomorphic Id"; there is just the one
@@ -2006,6 +2008,7 @@ decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
                                                            && no_sig (unLoc v)
     restricted (PatSynBind {}) = panic "isRestrictedGroup/unrestricted PatSynBind"
     restricted (AbsBinds {}) = panic "isRestrictedGroup/unrestricted AbsBinds"
+    restricted (AbsBindsSig {}) = panic "isRestrictedGroup/unrestricted AbsBindsSig"
 
     restricted_match (MG { mg_alts = L _ (L _ (Match _ [] _ _) : _ )}) = True
     restricted_match _                                                 = False
@@ -2064,6 +2067,8 @@ checkStrictBinds top_lvl rec_group orig_binds tc_binds poly_ids
           -- and we want to reject that.  See Trac #9140
 
     is_monomorphic (L _ (AbsBinds { abs_tvs = tvs, abs_ev_vars = evs }))
+                     = null tvs && null evs
+    is_monomorphic (L _ (AbsBindsSig { abs_tvs = tvs, abs_ev_vars = evs }))
                      = null tvs && null evs
     is_monomorphic _ = True
 
