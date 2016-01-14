@@ -18,7 +18,7 @@ of major features and numerous bug fixes. These include,
 
  * More reliable DWARF debugging information
 
- * Support for injective type classes
+ * Support for injective type families
 
  * Applicative do-notation
 
@@ -38,7 +38,9 @@ of major features and numerous bug fixes. These include,
  * A rewritten (and greatly improved) pattern exhaustiveness checker
 
  * GHCi can run the interpreter in a separate process, and the interpreter can
-   now run profiled code.
+   now run profiled code
+
+ * A native code generator for powerpc64 and powerpc64le architectures
 
  * and more!
 
