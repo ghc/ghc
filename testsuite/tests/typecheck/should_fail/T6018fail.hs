@@ -1,4 +1,4 @@
-{-# LANGUAGE InjectiveTypeFamilies, DataKinds, UndecidableInstances, PolyKinds,
+{-# LANGUAGE TypeFamilyDependencies, DataKinds, UndecidableInstances, PolyKinds,
              MultiParamTypeClasses, FlexibleInstances #-}
 
 module T6018fail where

@@ -3208,7 +3208,7 @@ xFlags = [
   flagSpec "ImpredicativeTypes"               LangExt.ImpredicativeTypes,
   flagSpec' "IncoherentInstances"             LangExt.IncoherentInstances
                                               setIncoherentInsts,
-  flagSpec "InjectiveTypeFamilies"            LangExt.InjectiveTypeFamilies,
+  flagSpec "TypeFamilyDependencies"           LangExt.TypeFamilyDependencies,
   flagSpec "InstanceSigs"                     LangExt.InstanceSigs,
   flagSpec "ApplicativeDo"                    LangExt.ApplicativeDo,
   flagSpec "InterruptibleFFI"                 LangExt.InterruptibleFFI,
@@ -3348,7 +3348,7 @@ impliedXFlags
     , (LangExt.FlexibleInstances,         turnOn, LangExt.TypeSynonymInstances)
     , (LangExt.FunctionalDependencies,    turnOn, LangExt.MultiParamTypeClasses)
     , (LangExt.MultiParamTypeClasses,     turnOn, LangExt.ConstrainedClassMethods)  -- c.f. Trac #7854
-    , (LangExt.InjectiveTypeFamilies,     turnOn, LangExt.TypeFamilies)
+    , (LangExt.TypeFamilyDependencies,    turnOn, LangExt.TypeFamilies)
 
     , (LangExt.RebindableSyntax, turnOff, LangExt.ImplicitPrelude)      -- NB: turn off!
 

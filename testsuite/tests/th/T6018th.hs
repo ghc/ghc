@@ -1,4 +1,4 @@
-{-# LANGUAGE InjectiveTypeFamilies, DataKinds, UndecidableInstances,
+{-# LANGUAGE TypeFamilyDependencies, DataKinds, UndecidableInstances,
              PolyKinds #-}
 module T6018th where
 

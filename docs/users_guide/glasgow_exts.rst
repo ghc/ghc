@@ -6741,9 +6741,10 @@ which implicitly defines an instance of the form ::
 Injective type families
 -----------------------
 
-.. ghc-flag:: -XInjectiveTypeFamilies
+.. ghc-flag:: -XTypeFamilyDependencies
 
-    Allow injectivity annotations on type families.
+    Allow functional dependency annotations on type families. This allows one to
+    define injective type families.
 
 Starting with GHC 8.0 type families can be annotated with injectivity
 information. This information is then used by GHC during type checking
@@ -6764,7 +6765,7 @@ will be possible to infer ``t`` at call sites from the type of the argument: ::
 
     type family Id a = r | r -> a
 
-Injective type families are enabled with ``-XInjectiveTypeFamilies`` language
+Injective type families are enabled with ``-XTypeFamilyDependencies`` language
 extension.  This extension implies ``-XTypeFamilies``.
 
 For full details on injective type families refer to Haskell Symposium
