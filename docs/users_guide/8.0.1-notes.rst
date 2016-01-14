@@ -23,7 +23,7 @@ The highlights, since the 7.10 branch, are:
 
 - More reliable DWARF debugging information
 
-- Support for :ref:`injective type classes <injective-ty-fams>`
+- Support for :ref:`injective type families <injective-ty-fams>`
 
 - Applicative ``do`` notation (see :ref:`applicative-do`)
 
@@ -49,6 +49,8 @@ The highlights, since the 7.10 branch, are:
 - GHCi now provides access to stack traces when used with
   :ghc-flag:`-fexternal-interpreter` and :ghc-flag:`-prof` (see
   :ref:`ghci-stack-traces`).
+
+- A native code generator for powerpc64 and powerpc64le architectures
 
 - The reworked users guide you are now reading
 
