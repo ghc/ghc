@@ -576,9 +576,9 @@ tc_mkRepTy gk_ tycon =
         ctFix c
             | dataConIsInfix c
             = case lookupFixity fix_env (dataConName c) of
-                   Fixity n InfixL -> buildFix n pLA
-                   Fixity n InfixR -> buildFix n pRA
-                   Fixity n InfixN -> buildFix n pNA
+                   Fixity _ n InfixL -> buildFix n pLA
+                   Fixity _ n InfixR -> buildFix n pRA
+                   Fixity _ n InfixN -> buildFix n pNA
             | otherwise = mkTyConTy pPrefix
         buildFix n assoc = mkTyConApp pInfix [ mkTyConTy assoc
                                              , mkNumLitTy (fromIntegral n)]

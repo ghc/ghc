@@ -477,6 +477,9 @@ data HsExpr id
      SourceText                       -- Note [Pragma source text] in BasicTypes
      (StringLiteral,(Int,Int),(Int,Int))
                                       -- external span for this tick
+     ((SourceText,SourceText),(SourceText,SourceText))
+        -- Source text for the four integers used in the span.
+        -- See note [Pragma source text] in BasicTypes
      (LHsExpr id)
 
   ---------------------------------------
@@ -798,7 +801,7 @@ ppr_expr (HsBinTick tickIdTrue tickIdFalse exp)
           ppr tickIdFalse,
           ptext (sLit ">("),
           ppr exp,ptext (sLit ")")]
-ppr_expr (HsTickPragma _ externalSrcLoc exp)
+ppr_expr (HsTickPragma _ externalSrcLoc _ exp)
   = pprTicks (ppr exp) $
     hcat [ptext (sLit "tickpragma<"),
           pprExternalSrcLoc externalSrcLoc,

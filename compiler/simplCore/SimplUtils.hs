@@ -700,8 +700,8 @@ updModeForStableUnfoldings inline_rule_act current_mode
                  -- For sm_rules, just inherit; sm_rules might be "off"
                  -- because of -fno-enable-rewrite-rules
   where
-    phaseFromActivation (ActiveAfter n) = Phase n
-    phaseFromActivation _               = InitialPhase
+    phaseFromActivation (ActiveAfter _ n) = Phase n
+    phaseFromActivation _                 = InitialPhase
 
 updModeForRules :: SimplifierMode -> SimplifierMode
 -- See Note [Simplifying rules]

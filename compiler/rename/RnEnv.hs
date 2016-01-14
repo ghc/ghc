@@ -1420,7 +1420,7 @@ lookupFixityRn_help' :: Name
                      -> RnM (Bool, Fixity)
 lookupFixityRn_help' name occ
   | isUnboundName name
-  = return (False, Fixity minPrecedence InfixL)
+  = return (False, Fixity (show minPrecedence) minPrecedence InfixL)
     -- Minimise errors from ubound names; eg
     --    a>0 `foo` b>0
     -- where 'foo' is not in scope, should not give an error (Trac #7937)
@@ -1499,7 +1499,7 @@ lookupFieldFixityRn (Ambiguous   (L _ rdr) _) = get_ambiguous_fixity rdr
         [] -> panic "get_ambiguous_fixity: no candidates for a given RdrName"
         [ (_, fix):_ ] -> return fix
         ambigs -> addErr (ambiguous_fixity_err rdr_name ambigs)
-                  >> return (Fixity minPrecedence InfixL)
+                  >> return (Fixity(show minPrecedence) minPrecedence InfixL)
 
     lookup_gre_fixity gre = lookupFixityRn' (gre_name gre) (greOccName gre)
 

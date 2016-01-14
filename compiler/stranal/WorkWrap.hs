@@ -364,7 +364,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
                                 -- Set the arity so that the Core Lint check that the
                                 -- arity is consistent with the demand type goes through
 
-            wrap_act  = ActiveAfter 0
+            wrap_act  = ActiveAfter "0" 0
             wrap_rhs  = wrap_fn work_id
             wrap_prag = InlinePragma { inl_src = "{-# INLINE"
                                      , inl_inline = Inline

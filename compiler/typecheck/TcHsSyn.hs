@@ -725,9 +725,9 @@ zonkExpr env (HsSCC src lbl expr)
   = do new_expr <- zonkLExpr env expr
        return (HsSCC src lbl new_expr)
 
-zonkExpr env (HsTickPragma src info expr)
+zonkExpr env (HsTickPragma src info srcInfo expr)
   = do new_expr <- zonkLExpr env expr
-       return (HsTickPragma src info new_expr)
+       return (HsTickPragma src info srcInfo new_expr)
 
 -- hdaume: core annotations
 zonkExpr env (HsCoreAnn src lbl expr)

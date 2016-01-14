@@ -350,7 +350,8 @@ gen_hs_source (Info defaults entries) =
            escape = concatMap (\c -> if c `elem` special then '\\':c:[] else c:[])
                 where special = "/'`\"@<"
 
-           pprFixity (Fixity i d) n = pprFixityDir d ++ " " ++ show i ++ " " ++ n
+           pprFixity (Fixity _ i d) n
+             = pprFixityDir d ++ " " ++ show i ++ " " ++ n
 
 {- Note [Placeholder declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -495,7 +496,7 @@ gen_latex_doc (Info defaults entries)
                Nothing -> "" 
 
            mk_fixity o = case lookup_attrib "fixity" o of
-             Just (OptionFixity (Just (Fixity i d)))
+             Just (OptionFixity (Just (Fixity _ i d)))
                -> pprFixityDir d ++ " " ++ show i
              _ -> ""
 

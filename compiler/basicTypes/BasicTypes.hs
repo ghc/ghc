@@ -312,14 +312,15 @@ pprRuleName rn = doubleQuotes (ftext rn)
 -}
 
 ------------------------
-data Fixity = Fixity Int FixityDirection
+data Fixity = Fixity SourceText Int FixityDirection
+  -- Note [Pragma source text]
   deriving (Data, Typeable)
 
 instance Outputable Fixity where
-    ppr (Fixity prec dir) = hcat [ppr dir, space, int prec]
+    ppr (Fixity _ prec dir) = hcat [ppr dir, space, int prec]
 
 instance Eq Fixity where -- Used to determine if two fixities conflict
-  (Fixity p1 dir1) == (Fixity p2 dir2) = p1==p2 && dir1 == dir2
+  (Fixity _ p1 dir1) == (Fixity _ p2 dir2) = p1==p2 && dir1 == dir2
 
 ------------------------
 data FixityDirection = InfixL | InfixR | InfixN
@@ -336,12 +337,12 @@ maxPrecedence = 9
 minPrecedence = 0
 
 defaultFixity :: Fixity
-defaultFixity = Fixity maxPrecedence InfixL
+defaultFixity = Fixity (show maxPrecedence) maxPrecedence InfixL
 
 negateFixity, funTyFixity :: Fixity
 -- Wired-in fixities
-negateFixity = Fixity 6 InfixL  -- Fixity of unary negate
-funTyFixity  = Fixity 0 InfixR  -- Fixity of '->'
+negateFixity = Fixity "6" 6 InfixL  -- Fixity of unary negate
+funTyFixity  = Fixity "0" 0 InfixR  -- Fixity of '->'
 
 {-
 Consider
@@ -356,7 +357,7 @@ whether there's an error.
 compareFixity :: Fixity -> Fixity
               -> (Bool,         -- Error please
                   Bool)         -- Associate to the right: a op1 (b op2 c)
-compareFixity (Fixity prec1 dir1) (Fixity prec2 dir2)
+compareFixity (Fixity _ prec1 dir1) (Fixity _ prec2 dir2)
   = case prec1 `compare` prec2 of
         GT -> left
         LT -> right
@@ -889,11 +890,15 @@ instance Outputable CompilerPhase where
    ppr (Phase n)    = int n
    ppr InitialPhase = ptext (sLit "InitialPhase")
 
+-- See note [Pragma source text]
 data Activation = NeverActive
                 | AlwaysActive
-                | ActiveBefore PhaseNum -- Active only *strictly before* this phase
-                | ActiveAfter PhaseNum  -- Active in this phase and later
-                deriving( Eq, Data, Typeable )  -- Eq used in comparing rules in HsDecls
+                | ActiveBefore SourceText PhaseNum
+                  -- Active only *strictly before* this phase
+                | ActiveAfter SourceText PhaseNum
+                  -- Active in this phase and later
+                deriving( Eq, Data, Typeable )
+                  -- Eq used in comparing rules in HsDecls
 
 data RuleMatchInfo = ConLike                    -- See Note [CONLIKE pragma]
                    | FunLike
@@ -1051,10 +1056,10 @@ setInlinePragmaRuleMatchInfo :: InlinePragma -> RuleMatchInfo -> InlinePragma
 setInlinePragmaRuleMatchInfo prag info = prag { inl_rule = info }
 
 instance Outputable Activation where
-   ppr AlwaysActive     = brackets (ptext (sLit "ALWAYS"))
-   ppr NeverActive      = brackets (ptext (sLit "NEVER"))
-   ppr (ActiveBefore n) = brackets (char '~' <> int n)
-   ppr (ActiveAfter n)  = brackets (int n)
+   ppr AlwaysActive       = brackets (ptext (sLit "ALWAYS"))
+   ppr NeverActive        = brackets (ptext (sLit "NEVER"))
+   ppr (ActiveBefore _ n) = brackets (char '~' <> int n)
+   ppr (ActiveAfter  _ n) = brackets (int n)
 
 instance Outputable RuleMatchInfo where
    ppr ConLike = ptext (sLit "CONLIKE")
@@ -1087,10 +1092,10 @@ isActive InitialPhase _                 = False
 isActive (Phase p)    act               = isActiveIn p act
 
 isActiveIn :: PhaseNum -> Activation -> Bool
-isActiveIn _ NeverActive      = False
-isActiveIn _ AlwaysActive     = True
-isActiveIn p (ActiveAfter n)  = p <= n
-isActiveIn p (ActiveBefore n) = p >  n
+isActiveIn _ NeverActive        = False
+isActiveIn _ AlwaysActive       = True
+isActiveIn p (ActiveAfter _ n)  = p <= n
+isActiveIn p (ActiveBefore _ n) = p >  n
 
 competesWith :: Activation -> Activation -> Bool
 -- See Note [Activation competition]
@@ -1098,13 +1103,13 @@ competesWith NeverActive       _                = False
 competesWith _                 NeverActive      = False
 competesWith AlwaysActive      _                = True
 
-competesWith (ActiveBefore {}) AlwaysActive      = True
-competesWith (ActiveBefore {}) (ActiveBefore {}) = True
-competesWith (ActiveBefore a)  (ActiveAfter b)   = a < b
+competesWith (ActiveBefore {})  AlwaysActive      = True
+competesWith (ActiveBefore {})  (ActiveBefore {}) = True
+competesWith (ActiveBefore _ a) (ActiveAfter _ b) = a < b
 
 competesWith (ActiveAfter {})  AlwaysActive      = False
 competesWith (ActiveAfter {})  (ActiveBefore {}) = False
-competesWith (ActiveAfter a)   (ActiveAfter b)   = a >= b
+competesWith (ActiveAfter _ a) (ActiveAfter _ b) = a >= b
 
 {- Note [Competing activations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

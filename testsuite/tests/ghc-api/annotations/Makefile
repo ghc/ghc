@@ -7,6 +7,7 @@ clean:
 	rm -f annotations comments parseTree
 	rm -f listcomps
 	rm -f stringSource
+	rm -f t11430
 
 .PHONY: annotations
 annotations:
@@ -118,3 +119,9 @@ T11321:
 .PHONY: T11332
 T11332:
 	$(CHECK_API_ANNOTATIONS) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test11332
+
+.PHONY: T11430
+T11430:
+	rm -f t11430.o t11430.hi t11430
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc t11430
+	./t11430 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test11430

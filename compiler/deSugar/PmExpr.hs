@@ -263,7 +263,7 @@ hsExprToPmExpr e@(RecordCon   _ _ _ _) = PmExprOther e
 
 hsExprToPmExpr (HsTick            _ e) = lhsExprToPmExpr e
 hsExprToPmExpr (HsBinTick       _ _ e) = lhsExprToPmExpr e
-hsExprToPmExpr (HsTickPragma    _ _ e) = lhsExprToPmExpr e
+hsExprToPmExpr (HsTickPragma  _ _ _ e) = lhsExprToPmExpr e
 hsExprToPmExpr (HsSCC           _ _ e) = lhsExprToPmExpr e
 hsExprToPmExpr (HsCoreAnn       _ _ e) = lhsExprToPmExpr e
 hsExprToPmExpr (ExprWithTySig     e _) = lhsExprToPmExpr e

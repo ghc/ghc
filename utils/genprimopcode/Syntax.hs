@@ -96,7 +96,9 @@ instance Show TyCon where
 
 -- Follow definitions of Fixity and FixityDirection in GHC
 
-data Fixity = Fixity Int FixityDirection
+-- The String exists so that it matches the SourceText field in
+-- BasicTypes.Fixity
+data Fixity = Fixity String Int FixityDirection
   deriving (Eq, Show)
 
 data FixityDirection = InfixN | InfixL | InfixR

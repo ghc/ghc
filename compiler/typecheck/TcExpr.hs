@@ -172,9 +172,9 @@ tcExpr (HsSCC src lbl expr) res_ty
   = do { expr' <- tcMonoExpr expr res_ty
        ; return (HsSCC src lbl expr') }
 
-tcExpr (HsTickPragma src info expr) res_ty
+tcExpr (HsTickPragma src info srcInfo expr) res_ty
   = do { expr' <- tcMonoExpr expr res_ty
-       ; return (HsTickPragma src info expr') }
+       ; return (HsTickPragma src info srcInfo expr') }
 
 tcExpr (HsCoreAnn src lbl expr) res_ty
   = do  { expr' <- tcMonoExpr expr res_ty

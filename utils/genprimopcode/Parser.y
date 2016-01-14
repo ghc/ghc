@@ -77,9 +77,9 @@ pOption : lowerName '=' false               { OptionFalse  $1 }
         | fixity    '=' pInfix              { OptionFixity $3 }
 
 pInfix :: { Maybe Fixity }
-pInfix : infix  integer { Just $ Fixity $2 InfixN }
-       | infixl integer { Just $ Fixity $2 InfixL }
-       | infixr integer { Just $ Fixity $2 InfixR }
+pInfix : infix  integer { Just $ Fixity (show $2) $2 InfixN }
+       | infixl integer { Just $ Fixity (show $2) $2 InfixL }
+       | infixr integer { Just $ Fixity (show $2) $2 InfixR }
        | nothing        { Nothing }
 
 

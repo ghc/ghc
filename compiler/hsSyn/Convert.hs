@@ -664,8 +664,8 @@ cvtRuleMatch TH.FunLike = Hs.FunLike
 
 cvtPhases :: TH.Phases -> Activation -> Activation
 cvtPhases AllPhases       dflt = dflt
-cvtPhases (FromPhase i)   _    = ActiveAfter i
-cvtPhases (BeforePhase i) _    = ActiveBefore i
+cvtPhases (FromPhase i)   _    = ActiveAfter (show i) i
+cvtPhases (BeforePhase i) _    = ActiveBefore (show i) i
 
 cvtRuleBndr :: TH.RuleBndr -> CvtM (Hs.LRuleBndr RdrName)
 cvtRuleBndr (RuleVar n)
@@ -1267,7 +1267,7 @@ cvtInjectivityAnnotation (TH.InjectivityAnn annLHS annRHS)
 
 -----------------------------------------------------------
 cvtFixity :: TH.Fixity -> Hs.Fixity
-cvtFixity (TH.Fixity prec dir) = Hs.Fixity prec (cvt_dir dir)
+cvtFixity (TH.Fixity prec dir) = Hs.Fixity (show prec) prec (cvt_dir dir)
    where
      cvt_dir TH.InfixL = Hs.InfixL
      cvt_dir TH.InfixR = Hs.InfixR

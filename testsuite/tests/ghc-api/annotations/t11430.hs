@@ -7,7 +7,7 @@
 module Main where
 
 -- import Data.Generics
-import Data.Data
+import Data.Data hiding (Fixity)
 import Data.List
 import System.IO
 import GHC
@@ -44,48 +44,33 @@ testOneFile libdir fileName = do
 
        let tupArgs = gq (pm_parsed_source p)
 
-       putStrLn (pp tupArgs)
+       putStrLn (intercalate "\n" $ map show tupArgs)
+       -- putStrLn (pp tupArgs)
        -- putStrLn (intercalate "\n" [showAnns anns])
 
     where
-     gq ast = everything (++) ([] `mkQ` doWarningTxt
-                               `extQ` doImportDecl
-                               `extQ` doCType
+     gq ast = everything (++) ([] `mkQ` doFixity
                                `extQ` doRuleDecl
-                               `extQ` doCCallTarget
                                `extQ` doHsExpr
+                               `extQ` doInline
                               ) ast
 
-     doWarningTxt :: WarningTxt -> [(String,[Located (SourceText,FastString)])]
-     doWarningTxt ((WarningTxt _ ss))    = [("w",map conv ss)]
-     doWarningTxt ((DeprecatedTxt _ ss)) = [("d",map conv ss)]
-
-     doImportDecl :: ImportDecl RdrName
-                  -> [(String,[Located (SourceText,FastString)])]
-     doImportDecl (ImportDecl _ _ Nothing _ _ _ _ _ _) = []
-     doImportDecl (ImportDecl _ _ (Just ss) _ _ _ _ _ _)
-                                                     = [("i",[conv (noLoc ss)])]
-
-     doCType :: CType -> [(String,[Located (SourceText,FastString)])]
-     doCType (CType src (Just (Header hs hf)) c)
-                                    = [("c",[noLoc (hs,hf),noLoc c])]
-     doCType (CType src Nothing  c) = [("c",[noLoc c])]
+     doFixity :: Fixity -> [(String,[String])]
+     doFixity (Fixity ss _ _) = [("f",[ss])]
 
      doRuleDecl :: RuleDecl RdrName
-                -> [(String,[Located (SourceText,FastString)])]
-     doRuleDecl (HsRule ss _ _ _ _ _ _) = [("r",[ss])]
+                -> [(String,[String])]
+     doRuleDecl (HsRule _ (ActiveBefore ss _) _ _ _ _ _) = [("rb",[ss])]
+     doRuleDecl (HsRule _ (ActiveAfter ss _) _ _ _ _ _) = [("ra",[ss])]
+     doRuleDecl (HsRule _ _ _ _ _ _ _) = []
 
-     doCCallTarget :: CCallTarget
-                   -> [(String,[Located (SourceText,FastString)])]
-     doCCallTarget (StaticTarget s f _ _) = [("st",[(noLoc (s,f))])]
-
-     doHsExpr :: HsExpr RdrName -> [(String,[Located (SourceText,FastString)])]
-     doHsExpr (HsCoreAnn src ss _) = [("co",[conv (noLoc ss)])]
-     doHsExpr (HsSCC     src ss _) = [("sc",[conv (noLoc ss)])]
-     doHsExpr (HsTickPragma src (ss,_,_) _ss2 _) = [("tp",[conv (noLoc ss)])]
+     doHsExpr :: HsExpr RdrName -> [(String,[String])]
+     doHsExpr (HsTickPragma src (_,_,_) ss _) = [("tp",[show ss])]
      doHsExpr _ = []
 
-     conv (GHC.L l (StringLiteral st fs)) = GHC.L l (st,fs)
+     doInline (InlinePragma _ _ _ (ActiveBefore ss _) _) = [("ib",[ss])]
+     doInline (InlinePragma _ _ _ (ActiveAfter ss _) _) = [("ia",[ss])]
+     doInline (InlinePragma _ _ _ _ _ ) = []
 
 showAnns anns = "[\n" ++ (intercalate "\n"
    $ map (\((s,k),v)
