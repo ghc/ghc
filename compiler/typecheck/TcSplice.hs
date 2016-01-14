@@ -1400,9 +1400,6 @@ reifyDataCon isGadtDataCon tys dc
 
        ; r_arg_tys <- reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)
 
-       ; let [r_a1, r_a2] = r_arg_tys
-             [s1,   s2]   = dcdBangs
-
        ; main_con <-
            if | not (null fields) && not isGadtDataCon ->
                   return $ TH.RecC name (zip3 (map reifyFieldLabel fields)
@@ -1416,8 +1413,10 @@ reifyDataCon isGadtDataCon tys dc
                 -- constructors can be declared infix.
                 -- See Note [Infix GADT constructors] in TcTyClsDecls.
               | dataConIsInfix dc && not isGadtDataCon ->
-                  ASSERT( length arg_tys == 2 )
-                  return $ TH.InfixC (s1,r_a1) name (s2,r_a2)
+                  ASSERT( length arg_tys == 2 ) do
+                  { let [r_a1, r_a2] = r_arg_tys
+                        [s1,   s2]   = dcdBangs
+                  ; return $ TH.InfixC (s1,r_a1) name (s2,r_a2) }
               | isGadtDataCon -> do
                   { res_ty <- reifyType g_res_ty
                   ; return $ TH.GadtC [name] (dcdBangs `zip` r_arg_tys) res_ty }
