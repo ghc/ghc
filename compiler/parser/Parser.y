@@ -2840,7 +2840,7 @@ oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
         | '(' qtyconsym ')'             {% ams (sLL $1 $> (unLoc $2))
                                                [mop $1,mj AnnVal $2,mcp $3] }
         | '(' '~' ')'                   {% ams (sLL $1 $> $ eqTyCon_RDR)
-                                               [mop $1,mj AnnTilde $2,mcp $3] }
+                                               [mop $1,mj AnnVal $2,mcp $3] }
 
 oqtycon_no_varcon :: { Located RdrName }  -- Type constructor which cannot be mistaken
                                           -- for variable constructor in export lists
