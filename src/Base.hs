@@ -115,11 +115,16 @@ a -/- b = unifyPath $ a </> b
 
 infixr 6 -/-
 
+-- | A wrapper around shakes @putNormal@ that substitutes
+-- any message for a fullstop if @buildInfo@ is @Dot@.
+putNormal' :: String -> Action ()
+putNormal' = if buildInfo == Dot then putNormal . const "." else putNormal
+
 -- | A more colourful version of Shake's putNormal
 putColoured :: Color -> String -> Action ()
 putColoured colour msg = do
     liftIO $ setSGR [SetColor Foreground Vivid colour]
-    putNormal msg
+    putNormal' msg
     liftIO $ setSGR []
     liftIO $ hFlush stdout
 
