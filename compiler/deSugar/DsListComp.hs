@@ -12,7 +12,7 @@ module DsListComp ( dsListComp, dsPArrComp, dsMonadComp ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLocalBinds )
+import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLocalBinds, dsSyntaxExpr )
 
 import HsSyn
 import TcHsSyn
@@ -233,11 +233,11 @@ deListComp (stmt@(TransStmt {}) : quals) list = do
     (inner_list_expr, pat) <- dsTransStmt stmt
     deBindComp pat inner_list_expr quals list
 
-deListComp (BindStmt pat list1 _ _ : quals) core_list2 = do -- rule A' above
+deListComp (BindStmt pat list1 _ _ _ : quals) core_list2 = do -- rule A' above
     core_list1 <- dsLExpr list1
     deBindComp pat core_list1 quals core_list2
 
-deListComp (ParStmt stmtss_w_bndrs _ _ : quals) list
+deListComp (ParStmt stmtss_w_bndrs _ _ _ : quals) list
   = do { exps_and_qual_tys <- mapM dsInnerListComp stmtss_w_bndrs
        ; let (exps, qual_tys) = unzip exps_and_qual_tys
 
@@ -339,7 +339,7 @@ dfListComp c_id n_id (stmt@(TransStmt {}) : quals) = do
     -- Anyway, we bind the newly grouped list via the generic binding function
     dfBindComp c_id n_id (pat, inner_list_expr) quals
 
-dfListComp c_id n_id (BindStmt pat list1 _ _ : quals) = do
+dfListComp c_id n_id (BindStmt pat list1 _ _ _ : quals) = do
     -- evaluate the two lists
     core_list1 <- dsLExpr list1
 
@@ -476,7 +476,7 @@ dsPArrComp :: [ExprStmt Id]
             -> DsM CoreExpr
 
 -- Special case for parallel comprehension
-dsPArrComp (ParStmt qss _ _ : quals) = dePArrParComp qss quals
+dsPArrComp (ParStmt qss _ _ _ : quals) = dePArrParComp qss quals
 
 -- Special case for simple generators:
 --
@@ -487,7 +487,7 @@ dsPArrComp (ParStmt qss _ _ : quals) = dePArrParComp qss quals
 --  <<[:e' | p <- e, qs:]>> =
 --    <<[:e' | qs:]>> p (filterP (\x -> case x of {p -> True; _ -> False}) e)
 --
-dsPArrComp (BindStmt p e _ _ : qs) = do
+dsPArrComp (BindStmt p e _ _ _ : qs) = do
     filterP <- dsDPHBuiltin filterPVar
     ce <- dsLExpr e
     let ety'ce  = parrElemType ce
@@ -546,7 +546,7 @@ dePArrComp (BodyStmt b _ _ _ : qs) pa cea = do
 --    in
 --    <<[:e' | qs:]>> (pa, p) (crossMapP ea ef)
 --
-dePArrComp (BindStmt p e _ _ : qs) pa cea = do
+dePArrComp (BindStmt p e _ _ _ : qs) pa cea = do
     filterP <- dsDPHBuiltin filterPVar
     crossMapP <- dsDPHBuiltin crossMapPVar
     ce <- dsLExpr e
@@ -679,8 +679,7 @@ dsMcStmt :: ExprStmt Id -> [ExprLStmt Id] -> DsM CoreExpr
 dsMcStmt (LastStmt body _ ret_op) stmts
   = ASSERT( null stmts )
     do { body' <- dsLExpr body
-       ; ret_op' <- dsExpr ret_op
-       ; return (App ret_op' body') }
+       ; dsSyntaxExpr ret_op [body'] }
 
 --   [ .. | let binds, stmts ]
 dsMcStmt (LetStmt (L _ binds)) stmts
@@ -688,9 +687,9 @@ dsMcStmt (LetStmt (L _ binds)) stmts
        ; dsLocalBinds binds rest }
 
 --   [ .. | a <- m, stmts ]
-dsMcStmt (BindStmt pat rhs bind_op fail_op) stmts
+dsMcStmt (BindStmt pat rhs bind_op fail_op bind_ty) stmts
   = do { rhs' <- dsLExpr rhs
-       ; dsMcBindStmt pat rhs' bind_op fail_op stmts }
+       ; dsMcBindStmt pat rhs' bind_op fail_op bind_ty stmts }
 
 -- Apply `guard` to the `exp` expression
 --
@@ -698,11 +697,9 @@ dsMcStmt (BindStmt pat rhs bind_op fail_op) stmts
 --
 dsMcStmt (BodyStmt exp then_exp guard_exp _) stmts
   = do { exp'       <- dsLExpr exp
-       ; guard_exp' <- dsExpr guard_exp
-       ; then_exp'  <- dsExpr then_exp
        ; rest       <- dsMcStmts stmts
-       ; return $ mkApps then_exp' [ mkApps guard_exp' [exp']
-                                   , rest ] }
+       ; guard_exp' <- dsSyntaxExpr guard_exp [exp']
+       ; dsSyntaxExpr then_exp [guard_exp', rest] }
 
 -- Group statements desugar like this:
 --
@@ -721,6 +718,7 @@ dsMcStmt (BodyStmt exp then_exp guard_exp _) stmts
 dsMcStmt (TransStmt { trS_stmts = stmts, trS_bndrs = bndrs
                     , trS_by = by, trS_using = using
                     , trS_ret = return_op, trS_bind = bind_op
+                    , trS_bind_arg_ty = n_tup_ty'  -- n (a,b,c)
                     , trS_fmap = fmap_op, trS_form = form }) stmts_rest
   = do { let (from_bndrs, to_bndrs) = unzip bndrs
 
@@ -742,10 +740,7 @@ dsMcStmt (TransStmt { trS_stmts = stmts, trS_bndrs = bndrs
        -- Generate the expressions to build the grouped list
        -- Build a pattern that ensures the consumer binds into the NEW binders,
        -- which hold monads rather than single values
-       ; bind_op' <- dsExpr bind_op
-       ; let bind_ty'  = exprType bind_op'    -- m2 (n (a,b,c)) -> (n (a,b,c) -> r1) -> r2
-             n_tup_ty' = funArgTy $ funArgTy $ funResultTy bind_ty'   -- n (a,b,c)
-             tup_n_ty' = mkBigCoreVarTupTy to_bndrs
+       ; let tup_n_ty' = mkBigCoreVarTupTy to_bndrs
 
        ; body        <- dsMcStmts stmts_rest
        ; n_tup_var'  <- newSysLocalDs n_tup_ty'
@@ -755,7 +750,7 @@ dsMcStmt (TransStmt { trS_stmts = stmts, trS_bndrs = bndrs
        ; let rhs'  = mkApps usingExpr' usingArgs'
              body' = mkTupleCase us to_bndrs body tup_n_var' tup_n_expr'
 
-       ; return (mkApps bind_op' [rhs', Lam n_tup_var' body']) }
+       ; dsSyntaxExpr bind_op [rhs', Lam n_tup_var' body'] }
 
 -- Parallel statements. Use `Control.Monad.Zip.mzip` to zip parallel
 -- statements, for example:
@@ -768,7 +763,7 @@ dsMcStmt (TransStmt { trS_stmts = stmts, trS_bndrs = bndrs
 --   mzip :: forall a b. m a -> m b -> m (a,b)
 -- NB: we need a polymorphic mzip because we call it several times
 
-dsMcStmt (ParStmt blocks mzip_op bind_op) stmts_rest
+dsMcStmt (ParStmt blocks mzip_op bind_op bind_ty) stmts_rest
  = do  { exps_w_tys  <- mapM ds_inner blocks   -- Pairs (exp :: m ty, ty)
        ; mzip_op'    <- dsExpr mzip_op
 
@@ -782,7 +777,7 @@ dsMcStmt (ParStmt blocks mzip_op bind_op) stmts_rest
                                   mkBoxedTupleTy [t1,t2]))
                                exps_w_tys
 
-       ; dsMcBindStmt pat rhs bind_op noSyntaxExpr stmts_rest }
+       ; dsMcBindStmt pat rhs bind_op noSyntaxExpr bind_ty stmts_rest }
   where
     ds_inner (ParStmtBlock stmts bndrs return_op)
        = do { exp <- dsInnerMonadComp stmts bndrs return_op
@@ -806,28 +801,26 @@ dsMcBindStmt :: LPat Id
              -> CoreExpr        -- ^ the desugared rhs of the bind statement
              -> SyntaxExpr Id
              -> SyntaxExpr Id
+             -> Type            -- ^ S in (>>=) :: Q -> (R -> S) -> T
              -> [ExprLStmt Id]
              -> DsM CoreExpr
-dsMcBindStmt pat rhs' bind_op fail_op stmts
+dsMcBindStmt pat rhs' bind_op fail_op res1_ty stmts
   = do  { body     <- dsMcStmts stmts
-        ; bind_op' <- dsExpr bind_op
         ; var      <- selectSimpleMatchVarL pat
-        ; let bind_ty = exprType bind_op'       -- rhs -> (pat -> res1) -> res2
-              res1_ty = funResultTy (funArgTy (funResultTy bind_ty))
         ; match <- matchSinglePat (Var var) (StmtCtxt DoExpr) pat
                                   res1_ty (cantFailMatchResult body)
         ; match_code <- handle_failure pat match fail_op
-        ; return (mkApps bind_op' [rhs', Lam var match_code]) }
+        ; dsSyntaxExpr bind_op [rhs', Lam var match_code] }
 
   where
     -- In a monad comprehension expression, pattern-match failure just calls
     -- the monadic `fail` rather than throwing an exception
     handle_failure pat match fail_op
       | matchCanFail match
-        = do { fail_op' <- dsExpr fail_op
-             ; dflags <- getDynFlags
+        = do { dflags <- getDynFlags
              ; fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
-             ; extractMatchResult match (App fail_op' fail_msg) }
+             ; fail_expr <- dsSyntaxExpr fail_op [fail_msg]
+             ; extractMatchResult match fail_expr }
       | otherwise
         = extractMatchResult match (error "It can't fail")
 
@@ -842,8 +835,8 @@ dsMcBindStmt pat rhs' bind_op fail_op stmts
 --       [ (a,b,c) | quals ]
 
 dsInnerMonadComp :: [ExprLStmt Id]
-                 -> [Id]        -- Return a tuple of these variables
-                 -> HsExpr Id   -- The monomorphic "return" operator
+                 -> [Id]            -- Return a tuple of these variables
+                 -> SyntaxExpr Id   -- The monomorphic "return" operator
                  -> DsM CoreExpr
 dsInnerMonadComp stmts bndrs ret_op
   = dsMcStmts (stmts ++ [noLoc (LastStmt (mkBigLHsVarTupId bndrs) False ret_op)])
@@ -860,7 +853,7 @@ dsInnerMonadComp stmts bndrs ret_op
 --       , fmap (selN2 :: (t1, t2) -> t2) ys )
 
 mkMcUnzipM :: TransForm
-           -> SyntaxExpr TcId   -- fmap
+           -> HsExpr TcId       -- fmap
            -> Id                -- Of type n (a,b,c)
            -> [Type]            -- [a,b,c]
            -> DsM CoreExpr      -- Of type (n a, n b, n c)

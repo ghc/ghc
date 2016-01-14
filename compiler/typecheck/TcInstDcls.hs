@@ -1379,7 +1379,8 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                              meth_ty = idType local_meth_id
                        ; tc_sig  <- instTcTySig ctxt lhs_ty sig_ty (idName local_meth_id)
                        ; hs_wrap <- addErrCtxtM (methSigCtxt sel_name sig_ty meth_ty) $
-                                    tcSubType ctxt (Just global_meth_id) sig_ty meth_ty
+                                    tcSubType ctxt (Just global_meth_id) sig_ty
+                                              (mkCheckExpType meth_ty)
                        ; return (tc_sig, hs_wrap) }
                    ; Nothing ->
                      do { tc_sig <- instTcTySigFromId local_meth_id

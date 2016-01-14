@@ -11,4 +11,5 @@ data KCC where
 f :: C Char [a] => a -> a
 f = undefined
 
+bar :: KCC -> a -> a
 bar (KCC _) = f

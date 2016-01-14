@@ -2,27 +2,27 @@ TYPE SIGNATURES
   test1 ::
     forall (f :: * -> *). Applicative f => (Int -> f Int) -> f Int
   test2 ::
-    forall (f :: * -> *) b a.
-    (Applicative f, Num a, Num b) =>
-    (a -> f b) -> f b
+    forall (f :: * -> *) b t.
+    (Applicative f, Num t, Num b) =>
+    (t -> f b) -> f b
   test3 ::
-    forall (m :: * -> *) a a1 a2.
-    (Num a2, Monad m) =>
-    (a2 -> m a1) -> (a1 -> a1 -> m a) -> m a
+    forall (m :: * -> *) a t t1.
+    (Num t, Monad m) =>
+    (t -> m t1) -> (t1 -> t1 -> m a) -> m a
   test4 ::
-    forall (m :: * -> *) a a1 a2.
-    (Num a2, Monad m) =>
-    (a2 -> m a1) -> (a1 -> a1 -> m a) -> m a
+    forall (m :: * -> *) a a1 t.
+    (Num t, Monad m) =>
+    (t -> m a1) -> (a1 -> a1 -> m a) -> m a
   test5 ::
-    forall (m :: * -> *) a a1 a2.
-    (Num a2, Monad m) =>
-    (a2 -> m a1) -> (a1 -> a1 -> m a) -> m a
+    forall (m :: * -> *) a a1 t.
+    (Num t, Monad m) =>
+    (t -> m a1) -> (a1 -> a1 -> m a) -> m a
   test6 ::
-    forall r (m :: * -> *) a.
+    forall t (m :: * -> *) a.
     (Num (m a), Monad m) =>
-    (m a -> m (m a)) -> r -> m a
+    (m a -> m (m a)) -> t -> m a
 TYPE CONSTRUCTORS
 COERCION AXIOMS
 Dependent modules: []
 Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
-                     integer-gmp-1.0.0.0]
+                     integer-gmp-1.0.0.1]

@@ -1270,7 +1270,7 @@ captureConstraints thing_inside
 pushLevelAndCaptureConstraints :: TcM a -> TcM (TcLevel, WantedConstraints, a)
 pushLevelAndCaptureConstraints thing_inside
   = do { env <- getLclEnv
-       ; lie_var <- newTcRef emptyWC ;
+       ; lie_var <- newTcRef emptyWC
        ; let tclvl' = pushTcLevel (tcl_tclvl env)
        ; res <- setLclEnv (env { tcl_tclvl = tclvl'
                                , tcl_lie   = lie_var })
@@ -1279,7 +1279,7 @@ pushLevelAndCaptureConstraints thing_inside
        ; return (tclvl', lie, res) }
 
 pushTcLevelM_ :: TcM a -> TcM a
-pushTcLevelM_ = updLclEnv (\ env -> env { tcl_tclvl = pushTcLevel (tcl_tclvl env) })
+pushTcLevelM_ x = updLclEnv (\ env -> env { tcl_tclvl = pushTcLevel (tcl_tclvl env) }) x
 
 pushTcLevelM :: TcM a -> TcM (a, TcLevel)
 pushTcLevelM thing_inside

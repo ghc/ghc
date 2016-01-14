@@ -2446,7 +2446,7 @@ flattenedpquals :: { Located [LStmt RdrName (LHsExpr RdrName)] }
 
                     qss -> sL1 $1 [sL1 $1 $ ParStmt [ParStmtBlock qs [] noSyntaxExpr |
                                             qs <- qss]
-                                            noSyntaxExpr noSyntaxExpr]
+                                            noExpr noSyntaxExpr placeHolderType]
                     -- We actually found some actual parallel lists so
                     -- we wrap them into as a ParStmt
                 }

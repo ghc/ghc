@@ -1,13 +1,13 @@
 
 read014.hs:4:1: warning:
     Top-level binding with no type signature:
-      ng1 :: forall r a. Num a => r -> a -> a
+      ng1 :: forall t a. Num a => t -> a -> a
 
 read014.hs:4:5: warning: Defined but not used: ‘x’
 
 read014.hs:6:10: warning:
-    No explicit implementation for
-      ‘+’, ‘*’, ‘abs’, ‘signum’, and ‘fromInteger’
-    In the instance declaration for ‘Num (a, b)’
+    • No explicit implementation for
+        ‘+’, ‘*’, ‘abs’, ‘signum’, and ‘fromInteger’
+    • In the instance declaration for ‘Num (a, b)’
 
 read014.hs:8:53: warning: Defined but not used: ‘x’

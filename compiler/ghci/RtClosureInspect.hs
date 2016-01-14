@@ -1275,10 +1275,6 @@ quantifyType ty = ( filter isTyVar $
   where
     (_tvs, rho) = tcSplitForAllTys ty
 
-unlessM :: Monad m => m Bool -> m () -> m ()
-unlessM condM acc = condM >>= \c -> unless c acc
-
-
 -- Strict application of f at index i
 appArr :: Ix i => (e -> a) -> Array i e -> Int -> a
 appArr f a@(Array _ _ _ ptrs#) i@(I# i#)

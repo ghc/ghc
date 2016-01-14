@@ -1322,7 +1322,7 @@ gen_Data_binds dflags loc rep_tc
            | otherwise = prefix_RDR
 
         ------------ gfoldl
-    gfoldl_bind = mk_FunBind loc gfoldl_RDR (map gfoldl_eqn data_cons)
+    gfoldl_bind = mk_HRFunBind 2 loc gfoldl_RDR (map gfoldl_eqn data_cons)
 
     gfoldl_eqn con
       = ([nlVarPat k_RDR, nlVarPat z_RDR, nlConVarPat con_name as_needed],
@@ -1334,10 +1334,10 @@ gen_Data_binds dflags loc rep_tc
                      mk_k_app e v = nlHsPar (nlHsOpApp e k_RDR (nlHsVar v))
 
         ------------ gunfold
-    gunfold_bind = mk_FunBind loc
-                              gunfold_RDR
-                              [([k_Pat, z_Pat, if one_constr then nlWildPat else c_Pat],
-                                gunfold_rhs)]
+    gunfold_bind = mk_HRFunBind 2 loc
+                     gunfold_RDR
+                     [([k_Pat, z_Pat, if one_constr then nlWildPat else c_Pat],
+                       gunfold_rhs)]
 
     gunfold_rhs
         | one_constr = mk_unfold_rhs (head data_cons)   -- No need for case
@@ -2143,13 +2143,26 @@ mkParentType tc
 mk_FunBind :: SrcSpan -> RdrName
            -> [([LPat RdrName], LHsExpr RdrName)]
            -> LHsBind RdrName
-mk_FunBind loc fun pats_and_exprs
-  = mkRdrFunBind (L loc fun) matches
+mk_FunBind = mk_HRFunBind 0   -- by using mk_FunBind and not mk_HRFunBind,
+                              -- the caller says that the Void case needs no
+                              -- patterns
+
+-- | This variant of 'mk_FunBind' puts an 'Arity' number of wildcards before
+-- the "=" in the empty-data-decl case. This is necessary if the function
+-- has a higher-rank type, like foldl. (See deriving/should_compile/T4302)
+mk_HRFunBind :: Arity -> SrcSpan -> RdrName
+             -> [([LPat RdrName], LHsExpr RdrName)]
+             -> LHsBind RdrName
+mk_HRFunBind arity loc fun pats_and_exprs
+  = mkHRRdrFunBind arity (L loc fun) matches
   where
     matches = [mkMatch p e (noLoc emptyLocalBinds) | (p,e) <-pats_and_exprs]
 
 mkRdrFunBind :: Located RdrName -> [LMatch RdrName (LHsExpr RdrName)] -> LHsBind RdrName
-mkRdrFunBind fun@(L loc fun_rdr) matches = L loc (mkFunBind fun matches')
+mkRdrFunBind = mkHRRdrFunBind 0
+
+mkHRRdrFunBind :: Arity -> Located RdrName -> [LMatch RdrName (LHsExpr RdrName)] -> LHsBind RdrName
+mkHRRdrFunBind arity fun@(L loc fun_rdr) matches = L loc (mkFunBind fun matches')
  where
    -- Catch-all eqn looks like
    --     fmap = error "Void fmap"
@@ -2157,7 +2170,8 @@ mkRdrFunBind fun@(L loc fun_rdr) matches = L loc (mkFunBind fun matches')
    -- which can happen with -XEmptyDataDecls
    -- See Trac #4302
    matches' = if null matches
-              then [mkMatch [] (error_Expr str) (noLoc emptyLocalBinds)]
+              then [mkMatch (replicate arity nlWildPat)
+                            (error_Expr str) (noLoc emptyLocalBinds)]
               else matches
    str = "Void " ++ occNameString (rdrNameOcc fun_rdr)
 

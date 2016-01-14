@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE RankNTypes, LiberalTypeSynonyms #-}
 
--- This test checks that deep skolemisation and deep 
+-- This test checks that deep skolemisation and deep
 -- instanatiation work right.  A buggy prototype
 -- of GHC 7.0, where the type checker generated wrong
 -- code, sent applyTypeToArgs into a loop.
@@ -22,7 +22,7 @@ gzip f x y
     else Nothing
 
 gzipWithM :: Monad m => GenericQ (GenericM m) -> GenericQ (GenericM m)
-gzipWithM = error "urk"
+gzipWithM _ = error "urk"
 
 orElse :: Maybe a -> Maybe a -> Maybe a
 orElse = error "urk"

@@ -1001,25 +1001,28 @@ mkEqErr1 ctxt ct
             where
               t_or_k = ctLocTypeOrKind_maybe loc
 
-          KindEqOrigin cty1 cty2 sub_o sub_t_or_k
+          KindEqOrigin cty1 mb_cty2 sub_o sub_t_or_k
             -> (True, Nothing, msg1 $$ msg2)
             where
               sub_what = case sub_t_or_k of Just KindLevel -> text "kinds"
                                             _              -> text "types"
               msg1 = sdocWithDynFlags $ \dflags ->
-                     if not (gopt Opt_PrintExplicitCoercions dflags) &&
-                        (cty1 `pickyEqType` cty2)
-                     then text "When matching the kind of" <+> quotes (ppr cty1)
-                     else
-                     hang (text "When matching" <+> sub_what)
-                        2 (vcat [ ppr cty1 <+> dcolon <+> ppr (typeKind cty1)
-                                , ppr cty2 <+> dcolon <+> ppr (typeKind cty2) ])
+                     case mb_cty2 of
+                       Just cty2
+                         |  gopt Opt_PrintExplicitCoercions dflags
+                         || not (cty1 `pickyEqType` cty2)
+                         -> hang (text "When matching" <+> sub_what)
+                               2 (vcat [ ppr cty1 <+> dcolon <+>
+                                         ppr (typeKind cty1)
+                                       , ppr cty2 <+> dcolon <+>
+                                         ppr (typeKind cty2) ])
+                       _ -> text "When matching the kind of" <+> quotes (ppr cty1)
               msg2 = case sub_o of
-                       TypeEqOrigin {} ->
+                       TypeEqOrigin {}
+                         | Just cty2 <- mb_cty2 ->
                          thdOf3 (mkExpectedActualMsg cty1 cty2 sub_o sub_t_or_k
                                                      expandSyns)
-                       _ ->
-                         empty
+                       _ -> empty
           _ -> (True, Nothing, empty)
 
 -- | This function tries to reconstruct why a "Coercible ty1 ty2" constraint
@@ -1392,7 +1395,8 @@ mkExpectedActualMsg :: Type -> Type -> CtOrigin -> Maybe TypeOrKind -> Bool
                     -> (Bool, Maybe SwapFlag, SDoc)
 -- NotSwapped means (actual, expected), IsSwapped is the reverse
 -- First return val is whether or not to print a herald above this msg
-mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act, uo_expected = exp
+mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act
+                                          , uo_expected = Check exp
                                           , uo_thing = maybe_thing })
                     m_level printExpanded
   | KindLevel <- level, occurs_check_error       = (True, Nothing, empty)
@@ -2110,7 +2114,9 @@ pprSkol implics tv
   = case skol_info of
       UnkSkol         -> pp_tv <+> text "is an unknown type variable"
       SigSkol ctxt ty -> ppr_rigid (pprSigSkolInfo ctxt
-                                      (mkSpecForAllTys skol_tvs ty))
+                                      (mkCheckExpType $
+                                       mkSpecForAllTys skol_tvs
+                                         (checkingExpType "pprSkol" ty)))
       _               -> ppr_rigid (pprSkolInfo skol_info)
   where
     pp_tv = quotes (ppr tv)
@@ -2160,14 +2166,17 @@ relevantBindings want_filtering ctxt ct
              -- For *kind* errors, report the relevant bindings of the
              -- enclosing *type* equality, because that's more useful for the programmer
              extra_tvs = case tidy_orig of
-                             KindEqOrigin t1 t2 _ _ -> tyCoVarsOfTypes [t1,t2]
-                             _                      -> emptyVarSet
+                             KindEqOrigin t1 m_t2 _ _ -> tyCoVarsOfTypes $
+                                                         t1 : maybeToList m_t2
+                             _                        -> emptyVarSet
        ; traceTc "relevantBindings" $
            vcat [ ppr ct
                 , pprCtOrigin (ctLocOrigin loc)
                 , ppr ct_tvs
                 , pprWithCommas id [ ppr id <+> dcolon <+> ppr (idType id)
-                                   | TcIdBndr id _ <- tcl_bndrs lcl_env ] ]
+                                   | TcIdBndr id _ <- tcl_bndrs lcl_env ]
+                , pprWithCommas id
+                    [ ppr id | TcIdBndr_ExpType id _ _ <- tcl_bndrs lcl_env ] ]
 
        ; (tidy_env', docs, discards)
               <- go env1 ct_tvs (maxRelevantBinds dflags)
@@ -2204,34 +2213,49 @@ relevantBindings want_filtering ctxt ct
        -> TcM (TidyEnv, [SDoc], Bool)   -- The bool says if we filtered any out
                                         -- because of lack of fuel
     go tidy_env _ _ _ docs discards []
-       = return (tidy_env, reverse docs, discards)
-    go tidy_env ct_tvs n_left tvs_seen docs discards (TcIdBndr id top_lvl : tc_bndrs)
-       = do { (tidy_env', tidy_ty) <- zonkTidyTcType tidy_env (idType id)
-            ; traceTc "relevantBindings 1" (ppr id <+> dcolon <+> ppr tidy_ty)
-            ; let id_tvs = tyCoVarsOfType tidy_ty
-                  doc = sep [ pprPrefixOcc id <+> dcolon <+> ppr tidy_ty
-                            , nest 2 (parens (text "bound at"
-                                 <+> ppr (getSrcLoc id)))]
-                  new_seen = tvs_seen `unionVarSet` id_tvs
+      = return (tidy_env, reverse docs, discards)
+    go tidy_env ct_tvs n_left tvs_seen docs discards (tc_bndr : tc_bndrs)
+      = case tc_bndr of
+          TcIdBndr id top_lvl -> go2 (idName id) (idType id) top_lvl
+          TcIdBndr_ExpType name et top_lvl ->
+            do { mb_ty <- readExpType_maybe et
+                   -- et really should be filled in by now. But there's a chance
+                   -- it hasn't, if, say, we're reporting a kind error en route to
+                   -- checking a term. See test indexed-types/should_fail/T8129
+               ; ty <- case mb_ty of
+                   Just ty -> return ty
+                   Nothing -> do { traceTc "Defaulting an ExpType in relevantBindings"
+                                     (ppr et)
+                                 ; expTypeToType et }
+               ; go2 name ty top_lvl }
+      where
+        go2 id_name id_type top_lvl
+          = do { (tidy_env', tidy_ty) <- zonkTidyTcType tidy_env id_type
+               ; traceTc "relevantBindings 1" (ppr id_name <+> dcolon <+> ppr tidy_ty)
+               ; let id_tvs = tyCoVarsOfType tidy_ty
+                     doc = sep [ pprPrefixOcc id_name <+> dcolon <+> ppr tidy_ty
+                               , nest 2 (parens (text "bound at"
+                                    <+> ppr (getSrcLoc id_name)))]
+                     new_seen = tvs_seen `unionVarSet` id_tvs
 
-            ; if (want_filtering && not opt_PprStyle_Debug
-                                 && id_tvs `disjointVarSet` ct_tvs)
-                       -- We want to filter out this binding anyway
-                       -- so discard it silently
-              then go tidy_env ct_tvs n_left tvs_seen docs discards tc_bndrs
+               ; if (want_filtering && not opt_PprStyle_Debug
+                                    && id_tvs `disjointVarSet` ct_tvs)
+                          -- We want to filter out this binding anyway
+                          -- so discard it silently
+                 then go tidy_env ct_tvs n_left tvs_seen docs discards tc_bndrs
 
-              else if isTopLevel top_lvl && not (isNothing n_left)
-                       -- It's a top-level binding and we have not specified
-                       -- -fno-max-relevant-bindings, so discard it silently
-              then go tidy_env ct_tvs n_left tvs_seen docs discards tc_bndrs
+                 else if isTopLevel top_lvl && not (isNothing n_left)
+                          -- It's a top-level binding and we have not specified
+                          -- -fno-max-relevant-bindings, so discard it silently
+                 then go tidy_env ct_tvs n_left tvs_seen docs discards tc_bndrs
 
-              else if run_out n_left && id_tvs `subVarSet` tvs_seen
-                       -- We've run out of n_left fuel and this binding only
-                       -- mentions aleady-seen type variables, so discard it
-              then go tidy_env ct_tvs n_left tvs_seen docs True tc_bndrs
+                 else if run_out n_left && id_tvs `subVarSet` tvs_seen
+                          -- We've run out of n_left fuel and this binding only
+                          -- mentions aleady-seen type variables, so discard it
+                 then go tidy_env ct_tvs n_left tvs_seen docs True tc_bndrs
 
-                       -- Keep this binding, decrement fuel
-              else go tidy_env' ct_tvs (dec_max n_left) new_seen (doc:docs) discards tc_bndrs }
+                          -- Keep this binding, decrement fuel
+                 else go tidy_env' ct_tvs (dec_max n_left) new_seen (doc:docs) discards tc_bndrs }
 
 discardMsg :: SDoc
 discardMsg = text "(Some bindings suppressed;" <+>

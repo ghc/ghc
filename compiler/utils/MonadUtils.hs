@@ -22,7 +22,7 @@ module MonadUtils
         , anyM, allM, orM
         , foldlM, foldlM_, foldrM
         , maybeMapM
-        , whenM
+        , whenM, unlessM
         ) where
 
 -------------------------------------------------------------------------------
@@ -197,3 +197,8 @@ maybeMapM m (Just x) = liftM Just $ m x
 whenM :: Monad m => m Bool -> m () -> m ()
 whenM mb thing = do { b <- mb
                     ; when b thing }
+
+-- | Monadic version of @unless@, taking the condition in the monad
+unlessM :: Monad m => m Bool -> m () -> m ()
+unlessM condM acc = do { cond <- condM
+                       ; unless cond acc }

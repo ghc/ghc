@@ -9,7 +9,6 @@ module TcEvidence (
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpLams, mkWpLet, mkWpCastN, mkWpCastR,
   mkWpFun, mkWpFuns, idHsWrapper, isIdHsWrapper, pprHsWrapper,
-  symWrapper_maybe,
 
   -- Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
@@ -199,21 +198,25 @@ mkWpFun :: HsWrapper -> HsWrapper
         -> TcType    -- either type of the second wrapper (used only when the
                      -- second wrapper is the identity)
         -> HsWrapper
-        -- NB: These optimisations are important, because we need
-        -- symWrapper_maybe to work in TcUnify.matchExpectedFunTys
-        -- See that function for more info.
 mkWpFun WpHole       WpHole       _  _  = WpHole
 mkWpFun WpHole       (WpCast co2) t1 _  = WpCast (mkTcFunCo Representational (mkTcRepReflCo t1) co2)
 mkWpFun (WpCast co1) WpHole       _  t2 = WpCast (mkTcFunCo Representational (mkTcSymCo co1) (mkTcRepReflCo t2))
 mkWpFun (WpCast co1) (WpCast co2) _  _  = WpCast (mkTcFunCo Representational (mkTcSymCo co1) co2)
 mkWpFun co1          co2          t1 _  = WpFun co1 co2 t1
 
--- | @mkWpFuns arg_tys wrap@, where @wrap :: a "->" b@, gives a wrapper from
--- @arg_tys -> a@ to @arg_tys -> b@.
-mkWpFuns :: [TcType] -> HsWrapper -> HsWrapper
-mkWpFuns []                 res_wrap = res_wrap
-mkWpFuns (arg_ty : arg_tys) res_wrap
-  = WpFun idHsWrapper (mkWpFuns arg_tys res_wrap) arg_ty
+-- | @mkWpFuns [(ty1, wrap1), (ty2, wrap2)] ty_res wrap_res@,
+-- where @wrap1 :: ty1 "->" ty1'@ and @wrap2 :: ty2 "->" ty2'@,
+-- @wrap3 :: ty3 "->" ty3'@ and @ty_res@ is /either/ @ty3@ or @ty3'@,
+-- gives a wrapper @(ty1' -> ty2' -> ty3) "->" (ty1 -> ty2 -> ty3')@.
+-- Notice that the result wrapper goes the other way round to all
+-- the others. This is a result of sub-typing contravariance.
+mkWpFuns :: [(TcType, HsWrapper)] -> TcType -> HsWrapper -> HsWrapper
+mkWpFuns args res_ty res_wrap = snd $ go args res_ty res_wrap
+  where
+    go [] res_ty res_wrap = (res_ty, res_wrap)
+    go ((arg_ty, arg_wrap) : args) res_ty res_wrap
+      = let (tail_ty, tail_wrap) = go args res_ty res_wrap in
+        (arg_ty `mkFunTy` tail_ty, mkWpFun arg_wrap tail_wrap arg_ty tail_ty)
 
 mkWpCastR :: TcCoercionR -> HsWrapper
 mkWpCastR co
@@ -227,21 +230,6 @@ mkWpCastN co
   | otherwise     = ASSERT2(tcCoercionRole co == Nominal, ppr co)
                     WpCast (mkTcSubCo co)
     -- The mkTcSubCo converts Nominal to Representational
-
--- | In a few limited cases, it is possible to reverse the direction
--- of an HsWrapper. This tries to do so.
-symWrapper_maybe :: HsWrapper -> Maybe HsWrapper
-symWrapper_maybe = go
-  where
-    go WpHole              = return WpHole
-    go (WpCompose wp1 wp2) = WpCompose <$> go wp2 <*> go wp1
-    go (WpFun {})          = Nothing
-    go (WpCast co)         = return (WpCast (mkTcSymCo co))
-    go (WpEvLam {})        = Nothing
-    go (WpEvApp {})        = Nothing
-    go (WpTyLam {})        = Nothing
-    go (WpTyApp {})        = Nothing
-    go (WpLet {})          = Nothing
 
 mkWpTyApps :: [Type] -> HsWrapper
 mkWpTyApps tys = mk_co_app_fn WpTyApp tys

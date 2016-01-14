@@ -1,33 +1,19 @@
 
-T7848.hs:6:57: error:
+T7848.hs:6:1: error:
     • Occurs check: cannot construct the infinite type:
-        t2 ~ r0 -> t -> t1 -> A -> A -> A -> A -> t2
-    • In the expression: y
-      In an equation for ‘x’:
-          x (+) ((&)@z) ((:&&) a b) (c :&& d) (e `A` f) (A g h)
-            = y
-            where
-                infixl 3 `y`
-                y _ = (&)
-                {-# INLINE (&) #-}
-                {-# SPECIALIZE (&) :: a #-}
-                (&) = x
-    • Relevant bindings include
-        y :: forall r. r -> t -> t1 -> A -> A -> A -> A -> t2
-          (bound at T7848.hs:8:9)
-        (&) :: t -> t1 -> A -> A -> A -> A -> t2 (bound at T7848.hs:11:9)
-        z :: t1 (bound at T7848.hs:6:12)
-        (&) :: t1 (bound at T7848.hs:6:8)
-        (+) :: t (bound at T7848.hs:6:3)
-        x :: t -> t1 -> A -> A -> A -> A -> t2 (bound at T7848.hs:6:1)
+        t ~ t0 -> t1 -> A -> A -> A -> A -> t2 -> t
+    • When checking that:
+          t0 -> t1 -> A -> A -> A -> A -> forall t2. t2 -> t
+        is more polymorphic than: t
+    • Relevant bindings include x :: t (bound at T7848.hs:6:1)
 
 T7848.hs:10:9: error:
-    • Couldn't match expected type ‘t -> t1 -> A -> A -> A -> A -> t2’
-                  with actual type ‘a’
-      ‘a’ is a rigid type variable bound by
+    • Couldn't match expected type ‘t’ with actual type ‘a’
+        because type variable ‘a’ would escape its scope
+      This (rigid, skolem) type variable is bound by
         the type signature for:
-          (&) :: forall a. a
-        at T7848.hs:10:9
+          (&) :: a
+        at T7848.hs:10:9-35
     • In the SPECIALISE pragma {-# SPECIALIZE (&) :: a #-}
       In an equation for ‘x’:
           x (+) ((&)@z) ((:&&) a b) (c :&& d) (e `A` f) (A g h)
@@ -38,8 +24,4 @@ T7848.hs:10:9: error:
                 {-# INLINE (&) #-}
                 {-# SPECIALIZE (&) :: a #-}
                 (&) = x
-    • Relevant bindings include
-        z :: t1 (bound at T7848.hs:6:12)
-        (&) :: t1 (bound at T7848.hs:6:8)
-        (+) :: t (bound at T7848.hs:6:3)
-        x :: t -> t1 -> A -> A -> A -> A -> t2 (bound at T7848.hs:6:1)
+    • Relevant bindings include x :: t (bound at T7848.hs:6:1)

@@ -229,7 +229,7 @@ hsExprToPmExpr (HsOverLit  olit) = PmExprLit (PmOLit False olit)
 hsExprToPmExpr (HsLit       lit) = PmExprLit (PmSLit lit)
 
 hsExprToPmExpr e@(NegApp _ neg_e)
-  | PmExprLit (PmOLit False ol) <- hsExprToPmExpr neg_e
+  | PmExprLit (PmOLit False ol) <- synExprToPmExpr neg_e
   = PmExprLit (PmOLit True ol)
   | otherwise = PmExprOther e
 hsExprToPmExpr (HsPar (L _ e)) = hsExprToPmExpr e
@@ -269,6 +269,9 @@ hsExprToPmExpr (ExprWithTySig     e _) = lhsExprToPmExpr e
 hsExprToPmExpr (ExprWithTySigOut  e _) = lhsExprToPmExpr e
 hsExprToPmExpr (HsWrap            _ e) =  hsExprToPmExpr e
 hsExprToPmExpr e = PmExprOther e -- the rest are not handled by the oracle
+
+synExprToPmExpr :: SyntaxExpr Id -> PmExpr
+synExprToPmExpr = hsExprToPmExpr . syn_expr  -- ignore the wrappers
 
 {-
 %************************************************************************

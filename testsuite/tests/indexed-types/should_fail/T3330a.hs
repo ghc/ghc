@@ -44,5 +44,4 @@ collect = error "collect"
 
 hmapM :: (forall ix. phi ix -> r ix -> m (r' ix))
       -> phi ix -> f r ix -> m (f r' ix)
-hmapM = error "hmapM"
-
+hmapM _ = error "hmapM"

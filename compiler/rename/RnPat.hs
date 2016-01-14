@@ -385,22 +385,22 @@ rnPatAndThen mk (LitPat lit)
   where
     normal_lit = do { liftCps (rnLit lit); return (LitPat lit) }
 
-rnPatAndThen _ (NPat (L l lit) mb_neg _eq)
+rnPatAndThen _ (NPat (L l lit) mb_neg _eq _)
   = do { lit'    <- liftCpsFV $ rnOverLit lit
        ; mb_neg' <- liftCpsFV $ case mb_neg of
                       Nothing -> return (Nothing, emptyFVs)
                       Just _  -> do { (neg, fvs) <- lookupSyntaxName negateName
                                     ; return (Just neg, fvs) }
        ; eq' <- liftCpsFV $ lookupSyntaxName eqName
-       ; return (NPat (L l lit') mb_neg' eq') }
+       ; return (NPat (L l lit') mb_neg' eq' placeHolderType) }
 
-rnPatAndThen mk (NPlusKPat rdr (L l lit) _ _)
+rnPatAndThen mk (NPlusKPat rdr (L l lit) _ _ _ _)
   = do { new_name <- newPatName mk rdr
        ; lit'  <- liftCpsFV $ rnOverLit lit
        ; minus <- liftCpsFV $ lookupSyntaxName minusName
        ; ge    <- liftCpsFV $ lookupSyntaxName geName
        ; return (NPlusKPat (L (nameSrcSpan new_name) new_name)
-                           (L l lit') ge minus) }
+                           (L l lit') lit' ge minus placeHolderType) }
                 -- The Report says that n+k patterns must be in Integral
 
 rnPatAndThen mk (AsPat rdr pat)
@@ -784,7 +784,8 @@ rnOverLit origLit
             | otherwise       = origLit
           }
         ; let std_name = hsOverLitName val
-        ; (from_thing_name, fvs) <- lookupSyntaxName std_name
+        ; (SyntaxExpr { syn_expr = from_thing_name }, fvs)
+            <- lookupSyntaxName std_name
         ; let rebindable = case from_thing_name of
                                 HsVar (L _ v) -> v /= std_name
                                 _             -> panic "rnOverLit"

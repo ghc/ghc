@@ -9,14 +9,14 @@ tcfail140.hs:10:7: error:
     • Relevant bindings include bar :: t (bound at tcfail140.hs:10:1)
 
 tcfail140.hs:12:10: error:
-    • Couldn't match expected type ‘Integer -> t’
+    • Couldn't match expected type ‘Integer -> t1’
                   with actual type ‘Int’
     • The operator ‘f’ takes two arguments,
       but its type ‘Int -> Int’ has only one
       In the expression: 3 `f` 4
       In an equation for ‘rot’: rot xs = 3 `f` 4
     • Relevant bindings include
-        rot :: r -> t (bound at tcfail140.hs:12:1)
+        rot :: t -> t1 (bound at tcfail140.hs:12:1)
 
 tcfail140.hs:14:15: error:
     • Couldn't match expected type ‘t -> b’ with actual type ‘Int’
@@ -31,8 +31,9 @@ tcfail140.hs:14:15: error:
 tcfail140.hs:16:8: error:
     • The constructor ‘Just’ should have 1 argument, but has been given none
     • In the pattern: Just
+      The lambda expression ‘\ Just x -> x’ has two arguments,
+      but its type ‘Maybe a -> a’ has only one
       In the expression: (\ Just x -> x) :: Maybe a -> a
-      In the expression: ((\ Just x -> x) :: Maybe a -> a) (Just 1)
 
 tcfail140.hs:19:1: error:
     • Couldn't match expected type ‘Int’ with actual type ‘t0 -> Bool’

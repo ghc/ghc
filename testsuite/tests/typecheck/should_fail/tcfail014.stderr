@@ -1,9 +1,9 @@
 
 tcfail014.hs:5:33: error:
-    • Occurs check: cannot construct the infinite type: r8 ~ r8 -> r7
+    • Occurs check: cannot construct the infinite type: t7 ~ t7 -> t8
     • In the first argument of ‘z’, namely ‘z’
       In the expression: z z
       In an equation for ‘h’: h z = z z
     • Relevant bindings include
-        z :: r8 -> r7 (bound at tcfail014.hs:5:27)
-        h :: (r8 -> r7) -> r7 (bound at tcfail014.hs:5:25)
+        z :: t7 -> t8 (bound at tcfail014.hs:5:27)
+        h :: (t7 -> t8) -> t8 (bound at tcfail014.hs:5:25)

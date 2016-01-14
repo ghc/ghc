@@ -4,7 +4,7 @@ a :: Integer = 1
 left :: [Integer] = _
 right :: [Integer] = _
 Stopped in QSort.qsort, ../QSort.hs:5:17-26
-_result :: [a2] = _
-left :: [a2] = _
+_result :: [t] = _
+left :: [t] = _
 ()
 left = []

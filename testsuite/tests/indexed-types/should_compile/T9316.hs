@@ -54,7 +54,7 @@ withSomeSing :: SingKind ('KProxy :: KProxy k)
              => DemoteRep ('KProxy :: KProxy k)
              -> (forall (a :: k). Sing a -> r)
              -> r
-withSomeSing = error "urk"
+withSomeSing _ _ = error "urk"
 
 -----------------------------------
 

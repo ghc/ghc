@@ -18,7 +18,7 @@ module HsLit where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} HsExpr( SyntaxExpr, pprExpr )
+import {-# SOURCE #-} HsExpr( HsExpr, pprExpr )
 import BasicTypes ( FractionalLit(..),SourceText )
 import Type       ( Type )
 import Outputable
@@ -79,7 +79,7 @@ data HsOverLit id       -- An overloaded literal
   = OverLit {
         ol_val :: OverLitVal,
         ol_rebindable :: PostRn id Bool, -- Note [ol_rebindable]
-        ol_witness :: SyntaxExpr id,     -- Note [Overloaded literal witnesses]
+        ol_witness :: HsExpr id,     -- Note [Overloaded literal witnesses]
         ol_type :: PostTc id Type }
   deriving (Typeable)
 deriving instance (DataId id) => Data (HsOverLit id)
@@ -111,7 +111,7 @@ Equivalently it's True if
 
 Note [Overloaded literal witnesses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*Before* type checking, the SyntaxExpr in an HsOverLit is the
+*Before* type checking, the HsExpr in an HsOverLit is the
 name of the coercion function, 'fromInteger' or 'fromRational'.
 *After* type checking, it is a witness for the literal, such as
         (fromInteger 3) or lit_78

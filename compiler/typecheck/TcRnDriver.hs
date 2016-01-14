@@ -1476,7 +1476,8 @@ check_main dflags tcg_env explicit_mod_hdr
         ; main_expr
                 <- addErrCtxt mainCtxt    $
                    tcMonoExpr (L loc (HsVar (L loc main_name)))
-                                            (mkTyConApp ioTyCon [res_ty])
+                                            (mkCheckExpType $
+                                             mkTyConApp ioTyCon [res_ty])
 
                 -- See Note [Root-main Id]
                 -- Construct the binding
@@ -1791,12 +1792,13 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
               -- [it <- e]
               bind_stmt = L loc $ BindStmt (L loc (VarPat (L loc fresh_it)))
                                            (nlHsApp ghciStep rn_expr)
-                                           (HsVar (L loc bindIOName))
+                                           (mkRnSyntaxExpr bindIOName)
                                            noSyntaxExpr
+                                           PlaceHolder
 
               -- [; print it]
               print_it  = L loc $ BodyStmt (nlHsApp (nlHsVar interPrintName) (nlHsVar fresh_it))
-                                           (HsVar (L loc thenIOName))
+                                           (mkRnSyntaxExpr thenIOName)
                                                   noSyntaxExpr placeHolderType
 
         -- The plans are:
@@ -1842,8 +1844,8 @@ tcUserStmt rdr_stmt@(L loc _)
 
        ; ghciStep <- getGhciStepIO
        ; let gi_stmt
-               | (L loc (BindStmt pat expr op1 op2)) <- rn_stmt
-                           = L loc $ BindStmt pat (nlHsApp ghciStep expr) op1 op2
+               | (L loc (BindStmt pat expr op1 op2 ty)) <- rn_stmt
+                           = L loc $ BindStmt pat (nlHsApp ghciStep expr) op1 op2 ty
                | otherwise = rn_stmt
 
        ; opt_pr_flag <- goptM Opt_PrintBindResult
@@ -1866,7 +1868,7 @@ tcUserStmt rdr_stmt@(L loc _)
            ; return stuff }
       where
         print_v  = L loc $ BodyStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
-                                    (HsVar (L loc thenIOName)) noSyntaxExpr
+                                    (mkRnSyntaxExpr thenIOName) noSyntaxExpr
                                     placeHolderType
 
 -- | Typecheck the statements given and then return the results of the
@@ -1878,7 +1880,8 @@ tcGhciStmts stmts
         let {
             ret_ty      = mkListTy unitTy ;
             io_ret_ty   = mkTyConApp ioTyCon [ret_ty] ;
-            tc_io_stmts = tcStmtsAndThen GhciStmtCtxt tcDoStmt stmts io_ret_ty ;
+            tc_io_stmts = tcStmtsAndThen GhciStmtCtxt tcDoStmt stmts
+                                         (mkCheckExpType io_ret_ty) ;
             names = collectLStmtsBinders stmts ;
          } ;
 

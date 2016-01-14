@@ -187,12 +187,13 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
        ; tcCheckPatSynPat lpat
 
        ; let (arg_names, rec_fields, is_infix) = collectPatSynArgInfo details
-       ; (tclvl, wanted, (lpat', (args, pat_ty)))
+       ; (tclvl, wanted, ((lpat', args), pat_ty))
             <- pushLevelAndCaptureConstraints  $
-               do { pat_ty <- newOpenFlexiTyVarTy
-                  ; tcPat PatSyn lpat pat_ty $
-               do { args <- mapM tcLookupId arg_names
-                  ; return (args, pat_ty) } }
+               do { pat_ty <- newOpenInferExpType
+                  ; stuff <- tcPat PatSyn lpat pat_ty $
+                             mapM tcLookupId arg_names
+                  ; pat_ty <- readExpType pat_ty
+                  ; return (stuff, pat_ty) }
 
        ; let named_taus = (name, pat_ty) : map (\arg -> (getName arg, varType arg)) args
 
@@ -222,7 +223,8 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details
                       , patsig_arg_tys  = arg_tys,  patsig_body_ty = pat_ty }
   = addPatSynCtxt lname $
     do { let origin     = PatOrigin -- TODO
-             skol_info  = SigSkol (PatSynCtxt name) (mkFunTys arg_tys pat_ty)
+             skol_info  = SigSkol (PatSynCtxt name) (mkCheckExpType $
+                                                     mkFunTys arg_tys pat_ty)
              decl_arity = length arg_names
              ty_arity   = length arg_tys
              (arg_names, rec_fields, is_infix) = collectPatSynArgInfo details
@@ -241,9 +243,9 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details
        ; req_dicts <- newEvVars req_theta
        ; (tclvl, wanted, (lpat', (ex_tvs', prov_dicts, args'))) <-
            ASSERT2( equalLength arg_names arg_tys, ppr name $$ ppr arg_names $$ ppr arg_tys )
-           pushLevelAndCaptureConstraints $
-           tcExtendTyVarEnv univ_tvs      $
-           tcPat PatSyn lpat pat_ty $
+           pushLevelAndCaptureConstraints            $
+           tcExtendTyVarEnv univ_tvs                 $
+           tcPat PatSyn lpat (mkCheckExpType pat_ty) $
            do { (subst, ex_tvs') <- if   isUnidirectional dir
                                     then newMetaTyVars    ex_tvs
                                     else newMetaSigTyVars ex_tvs
@@ -830,8 +832,8 @@ tcPatToExpr args = go
                                            ; return $ ExplicitTuple
                                                 (map (noLoc . Present) exprs) box }
     go1   (LitPat lit)                = return $ HsLit lit
-    go1   (NPat (L _ n) Nothing _)    = return $ HsOverLit n
-    go1   (NPat (L _ n) (Just neg) _) = return $ noLoc neg `HsApp` noLoc (HsOverLit n)
+    go1   (NPat (L _ n) Nothing _ _)  = return $ HsOverLit n
+    go1   (NPat (L _ n) (Just neg) _ _)= return $ unLoc $ nlHsSyntaxApps neg [noLoc (HsOverLit n)]
     go1   (ConPatOut{})               = panic "ConPatOut in output of renamer"
     go1   (SigPatOut{})               = panic "SigPatOut in output of renamer"
     go1   (CoPat{})                   = panic "CoPat in output of renamer"
@@ -862,7 +864,7 @@ tcCollectEx pat = go pat
                                  goConDetails $ pat_args con
     go1 (SigPatOut p _)     = go p
     go1 (CoPat _ p _)       = go1 p
-    go1 (NPlusKPat n k geq subtract)
+    go1 (NPlusKPat n k _ geq subtract _)
       = pprPanic "TODO: NPlusKPat" $ ppr n $$ ppr k $$ ppr geq $$ ppr subtract
     go1 _                   = mempty
 

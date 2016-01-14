@@ -299,8 +299,8 @@ boundThings modname lbinding =
                ConPatIn _ conargs -> conArgs conargs tl
                ConPatOut{ pat_args = conargs } -> conArgs conargs tl
                LitPat _ -> tl
-               NPat _ _ _ -> tl -- form of literal pattern?
-               NPlusKPat id _ _ _ -> thing id : tl
+               NPat {} -> tl -- form of literal pattern?
+               NPlusKPat id _ _ _ _ _ -> thing id : tl
                SigPatIn p _ -> patThings p tl
                SigPatOut p _ -> patThings p tl
                _ -> error "boundThings"

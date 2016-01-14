@@ -25,7 +25,7 @@ import qualified HsUtils
 --     So WATCH OUT; check each use of split*Ty functions.
 -- Sigh.  This is a pain.
 
-import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLocalBinds )
+import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLocalBinds, dsSyntaxExpr )
 
 import TcType
 import TcEvidence
@@ -465,9 +465,8 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdIf mb_fun cond then_cmd else_cmd)
         core_right = mk_right_expr then_ty else_ty (buildEnvStack else_ids stack_id)
 
     core_if <- case mb_fun of
-       Just fun -> do { core_fun <- dsExpr fun
-                      ; matchEnvStack env_ids stack_id $
-                        mkCoreApps core_fun [core_cond, core_left, core_right] }
+       Just fun -> do { fun_apps <- dsSyntaxExpr fun [core_cond, core_left, core_right]
+                      ; matchEnvStack env_ids stack_id fun_apps }
        Nothing  -> matchEnvStack env_ids stack_id $
                    mkIfThenElse core_cond core_left core_right
 
@@ -782,7 +781,7 @@ dsCmdStmt ids local_vars out_ids (BodyStmt cmd _ _ c_ty) env_ids = do
 -- It would be simpler and more consistent to do this using second,
 -- but that's likely to be defined in terms of first.
 
-dsCmdStmt ids local_vars out_ids (BindStmt pat cmd _ _) env_ids = do
+dsCmdStmt ids local_vars out_ids (BindStmt pat cmd _ _ _) env_ids = do
     let pat_ty = hsLPatType pat
     (core_cmd, fv_cmd, env_ids1) <- dsfixCmd ids local_vars unitTy pat_ty cmd
     let pat_vars = mkVarSet (collectPatBinders pat)
@@ -1142,8 +1141,8 @@ collectl (L _ pat) bndrs
                                     collectEvBinders ds
                                     ++ foldr collectl bndrs (hsConPatArgs ps)
     go (LitPat _)                 = bndrs
-    go (NPat _ _ _)               = bndrs
-    go (NPlusKPat (L _ n) _ _ _)  = n : bndrs
+    go (NPat {})                  = bndrs
+    go (NPlusKPat (L _ n) _ _ _ _ _) = n : bndrs
 
     go (SigPatIn pat _)           = collectl pat bndrs
     go (SigPatOut pat _)          = collectl pat bndrs

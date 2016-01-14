@@ -5,7 +5,7 @@ import HsSyn    ( HsSplice, HsBracket, HsExpr, LHsExpr )
 import HsExpr   ( PendingRnSplice )
 import Name     ( Name )
 import TcRnTypes( TcM, TcId )
-import TcType   ( TcRhoType )
+import TcType   ( ExpRhoType )
 import Annotations ( Annotation, CoreAnnTarget )
 
 #ifdef GHCI
@@ -16,15 +16,15 @@ import qualified Language.Haskell.TH as TH
 #endif
 
 tcSpliceExpr :: HsSplice Name
-             -> TcRhoType
+             -> ExpRhoType
              -> TcM (HsExpr TcId)
 
 tcUntypedBracket :: HsBracket Name
                  -> [PendingRnSplice]
-                 -> TcRhoType
+                 -> ExpRhoType
                  -> TcM (HsExpr TcId)
 tcTypedBracket :: HsBracket Name
-               -> TcRhoType
+               -> ExpRhoType
                -> TcM (HsExpr TcId)
 
 runAnnotation     :: CoreAnnTarget -> LHsExpr Name -> TcM Annotation

@@ -1,14 +1,15 @@
 
 T9109.hs:8:13: error:
-    • Couldn't match expected type ‘r’ with actual type ‘Bool’
-        ‘r’ is untouchable
+    • Couldn't match expected type ‘t1’ with actual type ‘Bool’
+        ‘t1’ is untouchable
           inside the constraints: t ~ Bool
           bound by a pattern with constructor: GBool :: G Bool,
                    in an equation for ‘foo’
           at T9109.hs:8:5-9
-      ‘r’ is a rigid type variable bound by
-        the inferred type of foo :: G t -> r at T9109.hs:8:1
+      ‘t1’ is a rigid type variable bound by
+        the inferred type of foo :: G t -> t1 at T9109.hs:8:1
       Possible fix: add a type signature for ‘foo’
     • In the expression: True
       In an equation for ‘foo’: foo GBool = True
-    • Relevant bindings include foo :: G t -> r (bound at T9109.hs:8:1)
+    • Relevant bindings include
+        foo :: G t -> t1 (bound at T9109.hs:8:1)

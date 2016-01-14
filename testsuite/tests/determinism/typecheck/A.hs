@@ -39,7 +39,7 @@ instance Data Node where
   toConstr = toConstr
   dataTypeOf = dataTypeOf
 
-  dataCast1 = undefined
+  dataCast1 _ = undefined
   dataCast2 = dataCast2
 
   gmapT = gmapT

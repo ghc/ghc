@@ -24,6 +24,10 @@ module TcType (
   TcTyVar, TcTyVarSet, TcDTyVarSet, TcTyCoVarSet, TcDTyCoVarSet,
   TcKind, TcCoVar, TcTyCoVar, TcTyBinder,
 
+  ExpType(..), ExpSigmaType, ExpRhoType, mkCheckExpType,
+
+  SyntaxOpType(..), synKnownType, mkSynFunTys,
+
   -- TcLevel
   TcLevel(..), topTcLevel, pushTcLevel, isTopTcLevel,
   strictlyDeeperThan, sameDepthAs, fmvTcLevel,
@@ -35,7 +39,7 @@ module TcType (
   MetaDetails(Flexi, Indirect), MetaInfo(..), TauTvFlavour(..),
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   isSigTyVar, isOverlappableTyVar,  isTyConableTyVar,
-  isFskTyVar, isFmvTyVar, isFlattenTyVar, isReturnTyVar,
+  isFskTyVar, isFmvTyVar, isFlattenTyVar,
   isAmbiguousTyVar, metaTvRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
@@ -68,7 +72,7 @@ module TcType (
   -- Again, newtypes are opaque
   eqType, eqTypes, cmpType, cmpTypes, eqTypeX,
   pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck, tcEqTypeVis,
-  isSigmaTy, isRhoTy, isOverloadedTy,
+  isSigmaTy, isRhoTy, isRhoExpTy, isOverloadedTy,
   isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
@@ -274,6 +278,59 @@ type TcTyCoVarSet   = TyCoVarSet
 type TcDTyVarSet    = DTyVarSet
 type TcDTyCoVarSet  = DTyCoVarSet
 
+-- | An expected type to check against during type-checking.
+-- See Note [ExpType] in TcMType, where you'll also find manipulators.
+data ExpType = Check TcType
+             | Infer Unique  -- for debugging only
+                     TcLevel -- See Note [TcLevel of ExpType] in TcMType
+                     Kind
+                     (IORef (Maybe TcType))
+
+type ExpSigmaType = ExpType
+type ExpRhoType   = ExpType
+
+instance Outputable ExpType where
+  ppr (Check ty) = ppr ty
+  ppr (Infer u lvl ki _)
+    = parens (text "Infer" <> braces (ppr u <> comma <> ppr lvl)
+              <+> dcolon <+> ppr ki)
+
+-- | Make an 'ExpType' suitable for checking.
+mkCheckExpType :: TcType -> ExpType
+mkCheckExpType = Check
+
+-- | What to expect for an argument to a rebindable-syntax operator.
+-- Quite like 'Type', but allows for holes to be filled in by tcSyntaxOp.
+-- The callback called from tcSyntaxOp gets a list of types; the meaning
+-- of these types is determined by a left-to-right depth-first traversal
+-- of the 'SyntaxOpType' tree. So if you pass in
+--
+-- > SynAny `SynFun` (SynList `SynFun` SynType Int) `SynFun` SynAny
+--
+-- you'll get three types back: one for the first 'SynAny', the /element/
+-- type of the list, and one for the last 'SynAny'. You don't get anything
+-- for the 'SynType', because you've said positively that it should be an
+-- Int, and so it shall be.
+--
+-- This is defined here to avoid defining it in TcExpr.hs-boot.
+data SyntaxOpType
+  = SynAny     -- ^ Any type
+  | SynRho     -- ^ A rho type, deeply skolemised or instantiated as appropriate
+  | SynList    -- ^ A list type. You get back the element type of the list
+  | SynFun SyntaxOpType SyntaxOpType
+               -- ^ A function.
+  | SynType ExpType   -- ^ A known type.
+infixr 0 `SynFun`
+
+-- | Like 'SynType' but accepts a regular TcType
+synKnownType :: TcType -> SyntaxOpType
+synKnownType = SynType . mkCheckExpType
+
+-- | Like 'mkFunTys' but for 'SyntaxOpType'
+mkSynFunTys :: [SyntaxOpType] -> ExpType -> SyntaxOpType
+mkSynFunTys arg_tys res_ty = foldr SynFun (SynType res_ty) arg_tys
+
+
 {-
 Note [TcRhoType]
 ~~~~~~~~~~~~~~~~
@@ -312,35 +369,6 @@ Similarly consider
   data S (b:k2) = MkS (T b)
 When doing kind inference on {S,T} we don't want *skolems* for k1,k2,
 because they end up unifying; we want those SigTvs again.
-
-Note [ReturnTv]
-~~~~~~~~~~~~~~~
-We sometimes want to convert a checking algorithm into an inference
-algorithm. An easy way to do this is to "check" that a term has a
-metavariable as a type. But, we must be careful to allow that metavariable
-to unify with *anything*. (Well, anything that doesn't fail an occurs-check.)
-This is what ReturnTv means.
-
-For example, if we have
-
-  (undefined :: (forall a. TF1 a ~ TF2 a => a)) x
-
-we'll call (tcInfer . tcExpr) on the function expression. tcInfer will
-create a ReturnTv to represent the expression's type. We really need this
-ReturnTv to become set to (forall a. TF1 a ~ TF2 a => a) despite the fact
-that this type mentions type families and is a polytype.
-
-However, we must also be careful to make sure that the ReturnTvs really
-always do get unified with something -- we don't want these floating
-around in the solver. So, we check after running the checker to make
-sure the ReturnTv is filled. If it's not, we set it to a TauTv.
-
-We can't ASSERT that no ReturnTvs hit the solver, because they
-can if there's, say, a kind error that stops checkTauTvUpdate from
-working. This happens in test case typecheck/should_fail/T5570, for
-example.
-
-See also the commentary on #9404.
 
 Note [TyVars and TcTyVars]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -395,10 +423,6 @@ data MetaInfo
    = TauTv         -- This MetaTv is an ordinary unification variable
                    -- A TauTv is always filled in with a tau-type, which
                    -- never contains any ForAlls.
-
-   | ReturnTv      -- Can unify with *anything*. Used to convert a
-                   -- type "checking" algorithm into a type inference algorithm.
-                   -- See Note [ReturnTv]
 
    | SigTv         -- A variant of TauTv, except that it should not be
                    -- unified with a type, only with a type variable
@@ -607,7 +631,6 @@ pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
   = pp_info <> colon <> ppr tclvl
   where
     pp_info = case info of
-                ReturnTv   -> text "ret"
                 TauTv      -> text "tau"
                 SigTv      -> text "sig"
                 FlatMetaTv -> text "fuv"
@@ -835,7 +858,7 @@ isImmutableTyVar tv
 
 isTyConableTyVar, isSkolemTyVar, isOverlappableTyVar,
   isMetaTyVar, isAmbiguousTyVar,
-  isFmvTyVar, isFskTyVar, isFlattenTyVar, isReturnTyVar :: TcTyVar -> Bool
+  isFmvTyVar, isFskTyVar, isFlattenTyVar :: TcTyVar -> Bool
 
 isTyConableTyVar tv
         -- True of a meta-type variable that can be filled in
@@ -883,11 +906,6 @@ isMetaTyVar tv
         MetaTv {} -> True
         _         -> False
   | otherwise = False
-
-isReturnTyVar tv
-  = case tcTyVarDetails tv of
-      MetaTv { mtv_info = ReturnTv } -> True
-      _                              -> False
 
 -- isAmbiguousTyVar is used only when reporting type errors
 -- It picks out variables that are unbound, namely meta
@@ -1409,8 +1427,7 @@ occurCheckExpand :: DynFlags -> TcTyVar -> Type -> OccCheckResult Type
 -- See Note [Occurs check expansion]
 -- Check whether
 --   a) the given variable occurs in the given type.
---   b) there is a forall in the type (unless we have -XImpredicativeTypes
---                                     or it's a ReturnTv
+--   b) there is a forall in the type (unless we have -XImpredicativeTypes)
 --   c) if it's a SigTv, ty should be a tyvar
 --
 -- We may have needed to do some type synonym unfolding in order to
@@ -1558,7 +1575,6 @@ occurCheckExpand dflags tv ty
 canUnifyWithPolyType :: DynFlags -> TcTyVarDetails -> Bool
 canUnifyWithPolyType dflags details
   = case details of
-      MetaTv { mtv_info = ReturnTv } -> True   -- See Note [ReturnTv]
       MetaTv { mtv_info = SigTv }    -> False
       MetaTv { mtv_info = TauTv }    -> xopt LangExt.ImpredicativeTypes dflags
       _other                         -> True
@@ -1816,6 +1832,11 @@ isRhoTy ty | Just ty' <- coreView ty = isRhoTy ty'
 isRhoTy (ForAllTy (Named {}) _) = False
 isRhoTy (ForAllTy (Anon a) r)   = not (isPredTy a) && isRhoTy r
 isRhoTy _                       = True
+
+-- | Like 'isRhoTy', but also says 'True' for 'Infer' types
+isRhoExpTy :: ExpType -> Bool
+isRhoExpTy (Check ty) = isRhoTy ty
+isRhoExpTy (Infer {}) = True
 
 isOverloadedTy :: Type -> Bool
 -- Yes for a type of a function that might require evidence-passing

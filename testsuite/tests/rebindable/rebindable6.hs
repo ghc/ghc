@@ -3,6 +3,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Main where
 	{
@@ -88,7 +89,7 @@ module Main where
 		negate :: a;
 		};
 
-	instance HasNegate (a -> a) where
+	instance (b ~ (a -> a)) => HasNegate b where
 		{
 		negate a = a; -- don't actually negate
 		};
@@ -98,7 +99,7 @@ module Main where
 		(-) :: a;
 		};
 
-	instance HasMinus (a -> a -> a) where
+	instance (b ~ (a -> a -> a)) => HasMinus b where
 		{
 		(-) x y = y; -- changed function
 		};
