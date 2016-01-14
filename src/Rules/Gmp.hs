@@ -117,9 +117,11 @@ gmpRules = do
         runConfigure (pkgPath integerGmp) envs intGmpArgs
 
         createDirectory $ takeDirectory gmpLibraryH
-        -- check whether we need to build in tree gmp
+        -- We don't use system GMP on Windows. TODO: fix?
+        windows  <- windowsHost
         configMk <- liftIO . readFile $ gmpBase -/- "config.mk"
-        if any (`isInfixOf` configMk) ["HaveFrameworkGMP = YES", "HaveLibGmp = YES"]
+        if not windows && any (`isInfixOf` configMk) [ "HaveFrameworkGMP = YES"
+                                                     , "HaveLibGmp = YES" ]
         then do
             putBuild "| GMP library/framework detected and will be used"
             copyFile gmpLibraryFakeH gmpLibraryH
