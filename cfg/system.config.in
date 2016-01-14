@@ -1,5 +1,6 @@
-# Edit 'user.config' to override these settings.
-#===============================================
+# This file is processed by the configure script
+# See 'Settings/User.hs' for user-defined settings
+#=================================================
 
 # Paths to builders:
 #===================
