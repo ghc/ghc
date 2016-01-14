@@ -84,5 +84,8 @@ extraObjects :: PartialTarget -> Action [FilePath]
 extraObjects (PartialTarget _ pkg)
     | pkg == integerGmp = do
         orderOnly [gmpLibraryH] -- TODO: move this dependency elsewhere, #113?
-        getDirectoryFiles "" [gmpObjects -/- "*.o"]
+        exists <- doesDirectoryExist gmpObjects
+        if exists
+        then getDirectoryFiles "" [gmpObjects -/- "*.o"]
+        else return []
     | otherwise         = return []

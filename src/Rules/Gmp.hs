@@ -118,10 +118,8 @@ gmpRules = do
 
         createDirectory $ takeDirectory gmpLibraryH
         -- check whether we need to build in tree gmp
-        -- this is indicated by line "HaveFrameworkGMP = YES" in `config.mk`
         configMk <- liftIO . readFile $ gmpBase -/- "config.mk"
-        if "HaveFrameworkGMP = YES" `isInfixOf` configMk
-               || "HaveLibGmp = YES" `isInfixOf` configMk
+        if any (`isInfixOf` configMk) ["HaveFrameworkGMP = YES", "HaveLibGmp = YES"]
         then do
             putBuild "| GMP library/framework detected and will be used"
             copyFile gmpLibraryFakeH gmpLibraryH
