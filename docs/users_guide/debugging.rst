@@ -51,6 +51,10 @@ Dumping out compiler intermediate structures
         Dump Template Haskell expressions that we splice in, and what
         Haskell code the expression evaluates to.
 
+    .. ghc-flag:: -dth-dec-file=<file>
+
+        Dump expansions of all top-level Template Haskell splices into ⟨file⟩.
+
     .. ghc-flag:: -ddump-types
 
         Dump a type signature for each value defined at the top level of
@@ -226,32 +230,24 @@ Formatting dumps
 .. index::
    single: formatting dumps
 
-``-dppr-user-length``
-    .. index::
-       single: -dppr-user-length
+.. ghc-flag:: -dppr-user-length
 
     In error messages, expressions are printed to a certain "depth",
     with subexpressions beyond the depth replaced by ellipses. This flag
     sets the depth. Its default value is 5.
 
-``-dppr-colsNNN``
-    .. index::
-       single: -dppr-colsNNN
+.. ghc-flag:: -dppr-cols=N
 
     Set the width of debugging output. Use this if your code is wrapping
-    too much. For example: ``-dppr-cols200``.
+    too much. For example: ``-dppr-cols=200``.
 
-``-dppr-case-as-let``
-    .. index::
-       single: -dppr-case-as-let
+.. ghc-flag:: -dppr-case-as-let
 
     Print single alternative case expressions as though they were strict
     let expressions. This is helpful when your code does a lot of
     unboxing.
 
-``-dno-debug-output``
-    .. index::
-       single: -dno-debug-output
+.. ghc-flag:: -dno-debug-output
 
     Suppress any unsolicited debugging output. When GHC has been built
     with the ``DEBUG`` option it occasionally emits debug output of
