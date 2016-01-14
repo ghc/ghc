@@ -95,6 +95,76 @@ import qualified Data.Map as Map
 import qualified FiniteMap as Map
 import System.FilePath
 
+-- Note [The identifier lexicon]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Package keys, installed package IDs, ABI hashes, package names,
+-- versions, there are a *lot* of different identifiers for closely
+-- related things.  What do they all mean? Here's what.  (See also
+-- https://ghc.haskell.org/trac/ghc/wiki/Commentary/Packages/Concepts )
+--
+-- THE IMPORTANT ONES
+--
+-- ComponentId: An opaque identifier provided by Cabal, which should
+-- uniquely identify such things as the package name, the package
+-- version, the name of the component, the hash of the source code
+-- tarball, the selected Cabal flags, GHC flags, direct dependencies of
+-- the component.  These are very similar to InstalledPackageId, but
+-- an 'InstalledPackageId' implies that it identifies a package, while
+-- a package may install multiple components with different
+-- 'ComponentId's.
+--      - Same as Distribution.Package.ComponentId
+--
+-- UnitId: A ComponentId + a mapping from hole names (ModuleName) to
+-- Modules.  This is how the compiler identifies instantatiated
+-- components, and also is the main identifier by which GHC identifies
+-- things.
+--      - When Backpack is not being used, UnitId = ComponentId.
+--        this means a useful fiction for end-users is that there are
+--        only ever ComponentIds, and some ComponentIds happen to have
+--        more information (UnitIds).
+--      - Same as Language.Haskell.TH.Syntax:PkgName, see
+--          https://ghc.haskell.org/trac/ghc/ticket/10279
+--      - The same as PackageKey in GHC 7.10 (we renamed it because
+--        they don't necessarily identify packages anymore.)
+--      - Same as -this-package-key/-package-name flags
+--
+-- Module: A UnitId + ModuleName. This is how the compiler identifies
+-- modules (e.g. a Name is a Module + OccName)
+--      - Same as Language.Haskell.TH.Syntax:Module
+--
+-- THE LESS IMPORTANT ONES
+--
+-- PackageName: The "name" field in a Cabal file, something like "lens".
+--      - Same as Distribution.Package.PackageName
+--      - DIFFERENT FROM Language.Haskell.TH.Syntax:PkgName, see
+--          https://ghc.haskell.org/trac/ghc/ticket/10279
+--      - DIFFERENT FROM -package-name flag
+--      - DIFFERENT FROM the 'name' field in an installed package
+--        information.  This field could more accurately be described
+--        as a munged package name: when it's for the main library
+--        it is the same as the package name, but if it's an internal
+--        library it's a munged combination of the package name and
+--        the component name.
+--
+-- LEGACY ONES
+--
+-- InstalledPackageId: This is what we used to call ComponentId.
+-- It's a still pretty useful concept for packages that have only
+-- one library; in that case the logical InstalledPackageId =
+-- ComponentId.  Also, the Cabal nix-local-build continues to
+-- compute an InstalledPackageId which is then forcibly used
+-- for all components in a package.  This means that if a dependency
+-- from one component in a package changes, the InstalledPackageId
+-- changes: you don't get as fine-grained dependency tracking,
+-- but it means your builds are hermetic.  Eventually, Cabal will
+-- deal completely in components and we can get rid of this.
+--
+-- PackageKey: This is what we used to call UnitId.  We ditched
+-- "Package" from the name when we realized that you might want to
+-- assign different "PackageKeys" to components from the same package.
+-- (For a brief, non-released period of time, we also called these
+-- UnitKeys).
+
 {-
 ************************************************************************
 *                                                                      *
