@@ -464,7 +464,7 @@ mkPatSynMatchGroup :: Located RdrName
                    -> P (MatchGroup RdrName (LHsExpr RdrName))
 mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
     do { matches <- mapM fromDecl (fromOL decls)
-       ; when (length matches /= 1) (wrongNumberErr loc)
+       ; when (null matches) (wrongNumberErr loc)
        ; return $ mkMatchGroup FromSource matches }
   where
     fromDecl (L loc decl@(ValD (PatBind pat@(L _ (ConPatIn ln@(L _ name) details)) rhs _ _ _))) =
