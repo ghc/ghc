@@ -314,6 +314,9 @@ expandTypeSynonyms :: Type -> Type
 -- ^ Expand out all type synonyms.  Actually, it'd suffice to expand out
 -- just the ones that discard type variables (e.g.  type Funny a = Int)
 -- But we don't know which those are currently, so we just expand all.
+--
+-- 'expandTypeSynonyms' only expands out type synonyms mentioned in the type,
+-- not in the kinds of any TyCon or TyVar mentioned in the type.
 expandTypeSynonyms ty
   = go (mkEmptyTCvSubst (mkTyCoInScopeSet [ty] [])) ty
   where
