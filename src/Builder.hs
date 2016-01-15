@@ -38,6 +38,7 @@ data Builder = Alex
              | HsCpp
              | Hsc2Hs
              | Ld
+             | Make
              | Nm
              | Objdump
              | Patch
@@ -81,6 +82,7 @@ builderKey builder = case builder of
     Hsc2Hs           -> "hsc2hs"
     HsCpp            -> "hs-cpp"
     Ld               -> "ld"
+    Make             -> "make"
     Nm               -> "nm"
     Objdump          -> "objdump"
     Patch            -> "patch"

@@ -36,6 +36,7 @@ ar               = @ArCmd@
 happy            = @HappyCmd@
 hscolour         = @HSCOLOUR@
 ld               = @LdCmd@
+make             = @MakeCmd@
 nm               = @NmCmd@
 objdump          = @ObjdumpCmd@
 ranlib           = @REAL_RANLIB_CMD@
