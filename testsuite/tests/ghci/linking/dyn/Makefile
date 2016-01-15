@@ -39,6 +39,13 @@ compile_libAS:
 	'$(TEST_HC)' $(MY_TEST_HC_OPTS) -shared A.c -o $(call DLL,AS)
 	rm -f libAS*.a
 
+.PHONY: compile_libT10458
+compile_libT10458:
+	rm -rf T10458dir
+	mkdir T10458dir
+	'$(TEST_HC)' $(MY_TEST_HC_OPTS) -odir "T10458dir" -shared A.c -o "T10458dir/$(call DLL,AS)"
+	rm -f T10458dir/libAS*.a
+
 .PHONY: compile_libAB_dep
 compile_libAB_dep:
 	rm -rf bin_dep
