@@ -8,7 +8,7 @@ import Data.IORef
 
 -- Flags
 
-data BuildInfoFlag = Normal | Brief | Pony | Dot | None deriving (Eq, Show)
+data BuildInfoFlag = None | Brief | Normal | Unicorn deriving (Eq, Show)
 
 data CmdLineOptions = CmdLineOptions {
     flagBuildInfo :: BuildInfoFlag
@@ -25,17 +25,16 @@ readBuildInfoFlag ms =
         (go =<< fmap (map toLower) ms)
   where
     go :: String -> Maybe BuildInfoFlag
-    go "normal" = Just Normal
-    go "brief"  = Just Brief
-    go "pony"   = Just Pony
-    go "dot"    = Just Dot
-    go "none"   = Just None
-    go _        = Nothing -- Left "no parse"
+    go "none"    = Just None
+    go "brief"   = Just Brief
+    go "normal"  = Just Normal
+    go "unicorn" = Just Unicorn
+    go _         = Nothing -- Left "no parse"
     mkClosure :: BuildInfoFlag -> CmdLineOptions -> CmdLineOptions
     mkClosure flag opts = opts { flagBuildInfo = flag }
 
 flags :: [OptDescr (Either String (CmdLineOptions -> CmdLineOptions))]
-flags = [Option [] ["build-info"] (OptArg readBuildInfoFlag "") "Build Info Style (Normal, Brief, Pony, Dot, or None)"]
+flags = [Option [] ["progress-info"] (OptArg readBuildInfoFlag "") "Build Info Style (None, Brief, Normal, or Unicorn)"]
 
 -- IO -- We use IO here instead of Oracles, as Oracles form part of shakes cache
 -- hence, changing command line arguments, would cause a full rebuild.  And we

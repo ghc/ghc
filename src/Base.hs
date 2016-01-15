@@ -20,8 +20,7 @@ module Base (
     bootPackageConstraints, packageDependencies,
 
     -- * Output
-    putColoured, putOracle, putBuild, putSuccess, putError, renderAction,
-    renderLibrary, renderProgram,
+    putColoured, putOracle, putBuild, putSuccess, putError,
 
     -- * Miscellaneous utilities
     bimap, minusOrd, intersectOrd, replaceEq, quote, replaceSeparators,
@@ -42,7 +41,6 @@ import Development.Shake.FilePath
 import System.Console.ANSI
 import qualified System.Directory as IO
 import System.IO
-import Oracles.Config.CmdLineFlag (buildInfo, BuildInfoFlag(..))
 
 -- TODO: reexport Stage, etc.?
 
@@ -140,96 +138,6 @@ putError :: String -> Action a
 putError msg = do
     putColoured Red msg
     error $ "GHC build system error: " ++ msg
-
--- | Render an action.
-renderAction :: String -> String -> String -> String
-renderAction what input output = case buildInfo of
-    Normal -> renderBox [ what
-                        , "     input: " ++ input
-                        , " => output: " ++ output ]
-    Brief  -> "> " ++ what ++ ": " ++ input ++ " => " ++ output
-    Pony   -> renderPony [ what
-                         , "     input: " ++ input
-                         , " => output: " ++ output ]
-    Dot    -> "."
-    None   -> ""
-
--- | Render the successful build of a program
-renderProgram :: String -> String -> String -> String
-renderProgram name bin synopsis = renderBox [ "Successfully built program " ++ name
-                                            , "Executable: " ++ bin
-                                            , "Program synopsis: " ++ synopsis ++ "."]
-
--- | Render the successful built of a library
-renderLibrary :: String -> String -> String -> String
-renderLibrary name lib synopsis = renderBox [ "Successfully built library " ++ name
-                                            , "Library: " ++ lib
-                                            , "Library synopsis: " ++ synopsis ++ "."]
-
--- | Render the given set of lines next to our favorit unicorn Robert.
-renderPony :: [String] -> String
-renderPony ls =
-    unlines $ take (max (length ponyLines) (length boxLines)) $
-        zipWith (++) (ponyLines ++ repeat ponyPadding) (boxLines ++ repeat "")
-  where
-    ponyLines :: [String]
-    ponyLines = [ "                   ,;,,;'"
-                , "                  ,;;'(    Robert the spitting unicorn"
-                , "       __       ,;;' ' \\   wants you to know"
-                , "     /'  '\\'~~'~' \\ /'\\.)  that a task      "
-                , "  ,;(      )    /  |.  /   just finished!   "
-                , " ,;' \\    /-.,,(   ) \\                      "
-                , " ^    ) /       ) / )|     Almost there!    "
-                , "      ||        ||  \\)                      "
-                , "      (_\\       (_\\                         " ]
-    ponyPadding :: String
-    ponyPadding = "                                            "
-    boxLines :: [String]
-    boxLines = ["", "", ""] ++ (lines . renderBox $ ls)
-
--- | Render the given set of lines in a nice box of ASCII.
---
--- The minimum width and whether to use Unicode symbols are hardcoded in the
--- function's body.
---
--- >>> renderBox (words "lorem ipsum")
--- /----------\
--- | lorem    |
--- | ipsum    |
--- \----------/
-renderBox :: [String] -> String
-renderBox ls = tail $ concatMap ('\n' :) (boxTop : map renderLine ls ++ [boxBot])
-  where
-    -- Minimum total width of the box in characters
-    minimumBoxWidth = 32
-
-    -- FIXME: See Shake #364.
-    useUnicode = False
-
-    -- Characters to draw the box
-    (dash, pipe, topLeft, topRight, botLeft, botRight, padding)
-        | useUnicode = ('─', '│', '╭',  '╮', '╰', '╯', ' ')
-        | otherwise  = ('-', '|', '/', '\\', '\\', '/', ' ')
-
-    -- Box width, taking minimum desired length and content into account.
-    -- The -4 is for the beginning and end pipe/padding symbols, as
-    -- in "| xxx |".
-    boxContentWidth = (minimumBoxWidth - 4) `max` maxContentLength
-      where
-        maxContentLength = maximum (map length ls)
-
-    renderLine l = concat
-        [ [pipe, padding]
-        , padToLengthWith boxContentWidth padding l
-        , [padding, pipe] ]
-      where
-        padToLengthWith n filler x = x ++ replicate (n - length x) filler
-
-    (boxTop, boxBot) = ( topLeft : dashes ++ [topRight]
-                       , botLeft : dashes ++ [botRight] )
-      where
-        -- +1 for each non-dash (= corner) char
-        dashes = replicate (boxContentWidth + 2) dash
 
 -- Explicit definition to avoid dependency on Data.Bifunctor
 -- | Bifunctor bimap.
