@@ -164,7 +164,7 @@ ppFixities fs qual = foldr1 (+++) (map ppFix uniq_fs) +++ rightEdge
       _:[] -> const noHtml -- Don't display names for fixities on single names
       _    -> concatHtml . intersperse (stringToHtml ", ") . map (ppDocName qual Infix False)
 
-    uniq_fs = [ (n, the p, the d') | (n, Fixity p d) <- fs
+    uniq_fs = [ (n, the p, the d') | (n, Fixity _ p d) <- fs
                                    , let d' = ppDir d
                                    , then group by Down (p,d') using groupWith ]
 
