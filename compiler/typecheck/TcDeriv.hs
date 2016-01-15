@@ -2107,7 +2107,7 @@ getDataConFixityFun tc
                  ; return (lookupFixity fix_env) }
          else do { iface <- loadInterfaceForName doc name
                             -- Should already be loaded!
-                 ; return (mi_fix_fn iface . nameOccName) } }
+                 ; return (mi_fix iface . nameOccName) } }
   where
     name = tyConName tc
     doc = ptext (sLit "Data con fixities for") <+> ppr name

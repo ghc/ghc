@@ -70,7 +70,7 @@ module HscTypes (
 
         -- * Interfaces
         ModIface(..), mkIfaceWarnCache, mkIfaceHashCache, mkIfaceFixCache,
-        emptyIfaceWarnCache, mi_boot,
+        emptyIfaceWarnCache, mi_boot, mi_fix,
 
         -- * Fixity
         FixityEnv, FixItem(..), lookupFixity, emptyFixityEnv,
@@ -831,7 +831,7 @@ data ModIface
                 -- and are not put into the interface file
         mi_warn_fn   :: OccName -> Maybe WarningTxt,
                 -- ^ Cached lookup for 'mi_warns'
-        mi_fix_fn    :: OccName -> Fixity,
+        mi_fix_fn    :: OccName -> Maybe Fixity,
                 -- ^ Cached lookup for 'mi_fixities'
         mi_hash_fn   :: OccName -> Maybe (OccName, Fingerprint),
                 -- ^ Cached lookup for 'mi_decls'.
@@ -859,6 +859,11 @@ data ModIface
 -- file.
 mi_boot :: ModIface -> Bool
 mi_boot iface = mi_hsc_src iface == HsBootFile
+
+-- | Lookups up a (possibly cached) fixity from a 'ModIface'. If one cannot be
+-- found, 'defaultFixity' is returned instead.
+mi_fix :: ModIface -> OccName -> Fixity
+mi_fix iface name = mi_fix_fn iface name `orElse` defaultFixity
 
 instance Binary ModIface where
    put_ bh (ModIface {
@@ -2056,14 +2061,14 @@ plusWarns (WarnAll t) _ = WarnAll t
 plusWarns (WarnSome v1) (WarnSome v2) = WarnSome (v1 ++ v2)
 
 -- | Creates cached lookup for the 'mi_fix_fn' field of 'ModIface'
-mkIfaceFixCache :: [(OccName, Fixity)] -> OccName -> Fixity
+mkIfaceFixCache :: [(OccName, Fixity)] -> OccName -> Maybe Fixity
 mkIfaceFixCache pairs
-  = \n -> lookupOccEnv env n `orElse` defaultFixity
+  = \n -> lookupOccEnv env n
   where
    env = mkOccEnv pairs
 
-emptyIfaceFixCache :: OccName -> Fixity
-emptyIfaceFixCache _ = defaultFixity
+emptyIfaceFixCache :: OccName -> Maybe Fixity
+emptyIfaceFixCache _ = Nothing
 
 -- | Fixity environment mapping names to their fixities
 type FixityEnv = NameEnv FixItem

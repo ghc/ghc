@@ -21,7 +21,8 @@ module RnEnv (
         HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn,
         lookupSigCtxtOccRn,
 
-        lookupFixityRn, lookupFieldFixityRn, lookupTyFixityRn,
+        lookupFixityRn, lookupFixityRn_help,
+        lookupFieldFixityRn, lookupTyFixityRn,
         lookupInstDeclBndr, lookupRecFieldOcc, lookupFamInstName,
         lookupConstructorFields,
         lookupSyntaxName, lookupSyntaxNames, lookupIfThenElse,
@@ -1403,9 +1404,23 @@ lookupFixityRn :: Name -> RnM Fixity
 lookupFixityRn name = lookupFixityRn' name (nameOccName name)
 
 lookupFixityRn' :: Name -> OccName -> RnM Fixity
-lookupFixityRn' name occ
+lookupFixityRn' name = fmap snd . lookupFixityRn_help' name
+
+-- | 'lookupFixityRn_help' returns @(True, fixity)@ if it finds a 'Fixity'
+-- in a local environment or from an interface file. Otherwise, it returns
+-- @(False, fixity)@ (e.g., for unbound 'Name's or 'Name's without
+-- user-supplied fixity declarations).
+lookupFixityRn_help :: Name
+                    -> RnM (Bool, Fixity)
+lookupFixityRn_help name =
+    lookupFixityRn_help' name (nameOccName name)
+
+lookupFixityRn_help' :: Name
+                     -> OccName
+                     -> RnM (Bool, Fixity)
+lookupFixityRn_help' name occ
   | isUnboundName name
-  = return (Fixity minPrecedence InfixL)
+  = return (False, Fixity minPrecedence InfixL)
     -- Minimise errors from ubound names; eg
     --    a>0 `foo` b>0
     -- where 'foo' is not in scope, should not give an error (Trac #7937)
@@ -1413,14 +1428,14 @@ lookupFixityRn' name occ
   | otherwise
   = do { local_fix_env <- getFixityEnv
        ; case lookupNameEnv local_fix_env name of {
-           Just (FixItem _ fix) -> return fix ;
+           Just (FixItem _ fix) -> return (True, fix) ;
            Nothing ->
 
     do { this_mod <- getModule
        ; if nameIsLocalOrFrom this_mod name
                -- Local (and interactive) names are all in the
                -- fixity env, and don't have entries in the HPT
-         then return defaultFixity
+         then return (False, defaultFixity)
          else lookup_imported } } }
   where
     lookup_imported
@@ -1441,9 +1456,17 @@ lookupFixityRn' name occ
       -- loadInterfaceForName will find B.hi even if B is a hidden module,
       -- and that's what we want.
       = do { iface <- loadInterfaceForName doc name
-           ; traceRn (text "lookupFixityRn: looking up name in iface cache and found:" <+>
-                      vcat [ppr name, ppr $ mi_fix_fn iface occ])
-           ; return (mi_fix_fn iface occ) }
+           ; let mb_fix = mi_fix_fn iface occ
+           ; let msg = case mb_fix of
+                            Nothing ->
+                                  text "looking up name" <+> ppr name
+                              <+> text "in iface, but found no fixity for it."
+                              <+> text "Using default fixity instead."
+                            Just f ->
+                                  text "looking up name in iface and found:"
+                              <+> vcat [ppr name, ppr f]
+           ; traceRn (text "lookupFixityRn_either:" <+> msg)
+           ; return (maybe (False, defaultFixity) (\f -> (True, f)) mb_fix)  }
 
     doc = ptext (sLit "Checking fixity for") <+> ppr name
 

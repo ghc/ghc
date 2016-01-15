@@ -1808,26 +1808,8 @@ reifySelector id tc
 ------------------------------
 reifyFixity :: Name -> TcM (Maybe TH.Fixity)
 reifyFixity name
-  = do { -- Repeat much of lookupFixityRn, because if we don't find a
-         -- user-supplied fixity declaration, we want to return Nothing
-         -- instead of defaultFixity
-       ; env <- getFixityEnv
-       ; case lookupNameEnv env name of
-              Just (FixItem _ fix) -> return (Just (conv_fix fix))
-              Nothing ->
-                do { this_mod <- getModule
-                   ; if nameIsLocalOrFrom this_mod name
-                        then return Nothing
-                        else
-                          -- Do NOT use mi_fix_fn to look up the fixity,
-                          -- because if there is a cache miss, it will return
-                          -- defaultFixity, which we want to avoid
-                          do { let doc = ptext (sLit "Checking fixity for")
-                                           <+> ppr name
-                             ; iface <- loadInterfaceForName doc name
-                             ; return . fmap conv_fix
-                                      . lookup (nameOccName name)
-                                      $ mi_fixities iface } } }
+  = do { (found, fix) <- lookupFixityRn_help name
+       ; return (if found then Just (conv_fix fix) else Nothing) }
     where
       conv_fix (BasicTypes.Fixity i d) = TH.Fixity i (conv_dir d)
       conv_dir BasicTypes.InfixR = TH.InfixR
