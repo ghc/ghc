@@ -82,18 +82,19 @@ gmpRules = do
 
         createDirectory $ takeDirectory gmpLibraryH
         -- We don't use system GMP on Windows. TODO: fix?
+        -- TODO: we do not track "config.mk" and "integer-gmp.buildinfo", see #173
         windows <- windowsHost
         configMk <- liftIO . readFile $ gmpBase -/- "config.mk"
         if not windows && any (`isInfixOf` configMk) [ "HaveFrameworkGMP = YES", "HaveLibGmp = YES" ]
         then do
             putBuild "| GMP library/framework detected and will be used"
             copyFile gmpLibraryFakeH gmpLibraryH
-            buildInfo <- readFileLines $ pkgPath integerGmp -/- "integer-gmp.buildinfo"
+            buildInfo <- liftIO . readFile $ pkgPath integerGmp -/- "integer-gmp.buildinfo"
             let prefix = "extra-libraries: "
                 libs s = case stripPrefix prefix s of
                     Nothing    -> []
                     Just value -> words value
-            writeFileChanged gmpLibNameCache . unlines $ concatMap libs buildInfo
+            writeFileChanged gmpLibNameCache . unlines . concatMap libs $ lines buildInfo
         else do
             putBuild "| No GMP library/framework detected; in tree GMP will be built"
             writeFileChanged gmpLibNameCache ""
