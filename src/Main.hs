@@ -36,5 +36,4 @@ main = shakeArgsWith options flags $ \cmdLineFlags targets -> do
     options = shakeOptions
         { shakeFiles    = Base.shakeFilesPath
         , shakeProgress = progressSimple
-        , shakeTimings  = True
-        }
+        , shakeTimings  = True }
