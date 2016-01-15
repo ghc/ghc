@@ -109,7 +109,6 @@ gmpRules = do
                          ++ "(found: " ++ show tarballs ++ ")."
 
             need tarballs
-            createDirectory gmpBuildPath
             build $ fullTarget gmpTarget Tar tarballs [gmpBuildPath]
 
             forM_ gmpPatches $ \src -> do

@@ -6,17 +6,17 @@ module Rules.Actions (
     ) where
 
 import qualified System.Directory as IO
+import System.Console.ANSI
 
 import Base
 import Expression
 import Oracles
 import Oracles.ArgsHash
+import Oracles.Config.CmdLineFlag (buildInfo, BuildInfoFlag(..))
 import Settings
 import Settings.Args
 import Settings.Builders.Ar
 import qualified Target
-
-import Oracles.Config.CmdLineFlag (buildInfo, BuildInfoFlag(..))
 
 -- Build a given target using an appropriate builder and acquiring necessary
 -- resources. Force a rebuilt if the argument list has changed since the last
@@ -107,15 +107,26 @@ runConfigure dir opts args = do
 runMake :: FilePath -> [String] -> Action ()
 runMake dir args = do
     need [dir -/- "Makefile"]
+    path <- builderPath Make
+
+    -- FIXME: temporary safety net for those who are not on GHC HEAD, see #167
+    fixPath <- if path == "@MakeCmd@" <.> exe
+               then do
+                   putColoured Red $ "You are behind GHC HEAD, make autodetection is disabled."
+                   return "make"
+               else do
+                   needBuilder False Make
+                   return path
+
     let note = if null args then "" else " (" ++ intercalate ", " args ++ ")"
-    putBuild $ "| Run make" ++ note ++ " in " ++ dir ++ "..."
-    quietly $ cmd Shell (EchoStdout False) makeCommand ["-C", dir] args
+    putBuild $ "| Run " ++ fixPath ++ " " ++ note ++ " in " ++ dir ++ "..."
+    quietly $ cmd Shell (EchoStdout False) fixPath ["-C", dir] args
 
 applyPatch :: FilePath -> FilePath -> Action ()
 applyPatch dir patch = do
     let file = dir -/- patch
     need [file]
-    needBuilder False Patch
+    needBuilder False Patch -- TODO: add a specialised version ~needBuilderFalse?
     path <- builderPath Patch
     putBuild $ "| Apply patch " ++ file
     quietly $ cmd Shell (EchoStdout False) [Cwd dir] [path, "-p0 <", patch]
