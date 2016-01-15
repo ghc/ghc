@@ -9,7 +9,7 @@ performance improvements over the 7.10 branch.
 
 .. warning::
 
-    Only Cabal versions 0.24 and newer will function properly with this release.
+    Only Cabal versions 1.24 and newer will function properly with this release.
     Consequently it will likely be necessary to recompile ``cabal-install``
     before installing new packages.
 
