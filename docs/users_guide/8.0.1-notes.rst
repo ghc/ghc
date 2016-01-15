@@ -106,7 +106,7 @@ Language
    programmers to easily specify how type parameters should be
    instantiated when calling a function. See
    :ref:`visible-type-application` for the details.
-   
+
 -  To conform to the common case, the default role assigned to
    parameters of datatypes declared in ``hs-boot`` files is
    ``representational``. However, if the constructor(s) for the datatype
@@ -547,6 +547,14 @@ ghc
    ``GHC.Lemexe`` module of the ``ghc-boot`` library.
 
 -  Add ``isImport``, ``isDecl``, and ``isStmt`` functions.
+
+-  The `mi_fix_fn` field of `ModIface` had its type changed from
+   ``OccName -> Fixity`` to ``OccName -> Maybe Fixity``, where a returned value
+   of ``Nothing`` indicates a cache miss. As a result, the types of
+   ``mkIfaceFixCache`` and ``emptyIfaceFixCache`` were also changed to have a
+   return type of ``Maybe Fixity``, and a new ``mi_fix :: OccName -> Fixity``
+   function was introduced which invokes ``mi_fix_fn`` but returns
+   ``defaultFixity`` upon a cache miss.
 
 ghc-boot
 ~~~~~~~~
