@@ -41,7 +41,6 @@ where
 import CmmExpr
 
 import Outputable
-import FastString
 
 import Data.Maybe
 import Numeric ( fromRat )
@@ -102,12 +101,12 @@ pprExpr1 e = pprExpr7 e
 
 infixMachOp1, infixMachOp7, infixMachOp8 :: MachOp -> Maybe SDoc
 
-infixMachOp1 (MO_Eq     _) = Just (ptext (sLit "=="))
-infixMachOp1 (MO_Ne     _) = Just (ptext (sLit "!="))
-infixMachOp1 (MO_Shl    _) = Just (ptext (sLit "<<"))
-infixMachOp1 (MO_U_Shr  _) = Just (ptext (sLit ">>"))
-infixMachOp1 (MO_U_Ge   _) = Just (ptext (sLit ">="))
-infixMachOp1 (MO_U_Le   _) = Just (ptext (sLit "<="))
+infixMachOp1 (MO_Eq     _) = Just (text "==")
+infixMachOp1 (MO_Ne     _) = Just (text "!=")
+infixMachOp1 (MO_Shl    _) = Just (text "<<")
+infixMachOp1 (MO_U_Shr  _) = Just (text ">>")
+infixMachOp1 (MO_U_Ge   _) = Just (text ">=")
+infixMachOp1 (MO_U_Le   _) = Just (text "<=")
 infixMachOp1 (MO_U_Gt   _) = Just (char '>')
 infixMachOp1 (MO_U_Lt   _) = Just (char '<')
 infixMachOp1 _             = Nothing
@@ -255,24 +254,24 @@ pprGlobalReg gr
         FloatReg   n   -> char 'F' <> int n
         DoubleReg  n   -> char 'D' <> int n
         LongReg    n   -> char 'L' <> int n
-        XmmReg     n   -> ptext (sLit "XMM") <> int n
-        YmmReg     n   -> ptext (sLit "YMM") <> int n
-        ZmmReg     n   -> ptext (sLit "ZMM") <> int n
-        Sp             -> ptext (sLit "Sp")
-        SpLim          -> ptext (sLit "SpLim")
-        Hp             -> ptext (sLit "Hp")
-        HpLim          -> ptext (sLit "HpLim")
-        MachSp         -> ptext (sLit "MachSp")
-        UnwindReturnReg-> ptext (sLit "UnwindReturnReg")
-        CCCS           -> ptext (sLit "CCCS")
-        CurrentTSO     -> ptext (sLit "CurrentTSO")
-        CurrentNursery -> ptext (sLit "CurrentNursery")
-        HpAlloc        -> ptext (sLit "HpAlloc")
-        EagerBlackholeInfo -> ptext (sLit "stg_EAGER_BLACKHOLE_info")
-        GCEnter1       -> ptext (sLit "stg_gc_enter_1")
-        GCFun          -> ptext (sLit "stg_gc_fun")
-        BaseReg        -> ptext (sLit "BaseReg")
-        PicBaseReg     -> ptext (sLit "PicBaseReg")
+        XmmReg     n   -> text "XMM" <> int n
+        YmmReg     n   -> text "YMM" <> int n
+        ZmmReg     n   -> text "ZMM" <> int n
+        Sp             -> text "Sp"
+        SpLim          -> text "SpLim"
+        Hp             -> text "Hp"
+        HpLim          -> text "HpLim"
+        MachSp         -> text "MachSp"
+        UnwindReturnReg-> text "UnwindReturnReg"
+        CCCS           -> text "CCCS"
+        CurrentTSO     -> text "CurrentTSO"
+        CurrentNursery -> text "CurrentNursery"
+        HpAlloc        -> text "HpAlloc"
+        EagerBlackholeInfo -> text "stg_EAGER_BLACKHOLE_info"
+        GCEnter1       -> text "stg_gc_enter_1"
+        GCFun          -> text "stg_gc_fun"
+        BaseReg        -> text "BaseReg"
+        PicBaseReg     -> text "PicBaseReg"
 
 -----------------------------------------------------------------------------
 

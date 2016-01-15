@@ -387,8 +387,8 @@ data MetaDetails
   | Indirect TcType
 
 instance Outputable MetaDetails where
-  ppr Flexi         = ptext (sLit "Flexi")
-  ppr (Indirect ty) = ptext (sLit "Indirect") <+> ppr ty
+  ppr Flexi         = text "Flexi"
+  ppr (Indirect ty) = text "Indirect" <+> ppr ty
 
 data TauTvFlavour
   = VanillaTau
@@ -602,40 +602,40 @@ instance Outputable TcLevel where
 
 pprTcTyVarDetails :: TcTyVarDetails -> SDoc
 -- For debugging
-pprTcTyVarDetails (SkolemTv True)  = ptext (sLit "ssk")
-pprTcTyVarDetails (SkolemTv False) = ptext (sLit "sk")
-pprTcTyVarDetails (RuntimeUnk {})  = ptext (sLit "rt")
-pprTcTyVarDetails (FlatSkol {})    = ptext (sLit "fsk")
+pprTcTyVarDetails (SkolemTv True)  = text "ssk"
+pprTcTyVarDetails (SkolemTv False) = text "sk"
+pprTcTyVarDetails (RuntimeUnk {})  = text "rt"
+pprTcTyVarDetails (FlatSkol {})    = text "fsk"
 pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
   = pp_info <> colon <> ppr tclvl
   where
     pp_info = case info of
-                ReturnTv   -> ptext (sLit "ret")
-                TauTv      -> ptext (sLit "tau")
-                SigTv      -> ptext (sLit "sig")
-                FlatMetaTv -> ptext (sLit "fuv")
+                ReturnTv   -> text "ret"
+                TauTv      -> text "tau"
+                SigTv      -> text "sig"
+                FlatMetaTv -> text "fuv"
 
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
-pprUserTypeCtxt (FunSigCtxt n _)  = ptext (sLit "the type signature for") <+> quotes (ppr n)
-pprUserTypeCtxt (InfSigCtxt n)    = ptext (sLit "the inferred type for") <+> quotes (ppr n)
-pprUserTypeCtxt (RuleSigCtxt n)   = ptext (sLit "a RULE for") <+> quotes (ppr n)
-pprUserTypeCtxt ExprSigCtxt       = ptext (sLit "an expression type signature")
-pprUserTypeCtxt TypeAppCtxt       = ptext (sLit "a type argument")
-pprUserTypeCtxt (ConArgCtxt c)    = ptext (sLit "the type of the constructor") <+> quotes (ppr c)
-pprUserTypeCtxt (TySynCtxt c)     = ptext (sLit "the RHS of the type synonym") <+> quotes (ppr c)
-pprUserTypeCtxt (PatSynCtxt c)    = ptext (sLit "the type signature for pattern synonym") <+> quotes (ppr c)
-pprUserTypeCtxt ThBrackCtxt       = ptext (sLit "a Template Haskell quotation [t|...|]")
-pprUserTypeCtxt PatSigCtxt        = ptext (sLit "a pattern type signature")
-pprUserTypeCtxt ResSigCtxt        = ptext (sLit "a result type signature")
-pprUserTypeCtxt (ForSigCtxt n)    = ptext (sLit "the foreign declaration for") <+> quotes (ppr n)
-pprUserTypeCtxt DefaultDeclCtxt   = ptext (sLit "a type in a `default' declaration")
-pprUserTypeCtxt InstDeclCtxt      = ptext (sLit "an instance declaration")
-pprUserTypeCtxt SpecInstCtxt      = ptext (sLit "a SPECIALISE instance pragma")
-pprUserTypeCtxt GenSigCtxt        = ptext (sLit "a type expected by the context")
-pprUserTypeCtxt GhciCtxt          = ptext (sLit "a type in a GHCi command")
-pprUserTypeCtxt (ClassSCCtxt c)   = ptext (sLit "the super-classes of class") <+> quotes (ppr c)
-pprUserTypeCtxt SigmaCtxt         = ptext (sLit "the context of a polymorphic type")
-pprUserTypeCtxt (DataTyCtxt tc)   = ptext (sLit "the context of the data type declaration for") <+> quotes (ppr tc)
+pprUserTypeCtxt (FunSigCtxt n _)  = text "the type signature for" <+> quotes (ppr n)
+pprUserTypeCtxt (InfSigCtxt n)    = text "the inferred type for" <+> quotes (ppr n)
+pprUserTypeCtxt (RuleSigCtxt n)   = text "a RULE for" <+> quotes (ppr n)
+pprUserTypeCtxt ExprSigCtxt       = text "an expression type signature"
+pprUserTypeCtxt TypeAppCtxt       = text "a type argument"
+pprUserTypeCtxt (ConArgCtxt c)    = text "the type of the constructor" <+> quotes (ppr c)
+pprUserTypeCtxt (TySynCtxt c)     = text "the RHS of the type synonym" <+> quotes (ppr c)
+pprUserTypeCtxt (PatSynCtxt c)    = text "the type signature for pattern synonym" <+> quotes (ppr c)
+pprUserTypeCtxt ThBrackCtxt       = text "a Template Haskell quotation [t|...|]"
+pprUserTypeCtxt PatSigCtxt        = text "a pattern type signature"
+pprUserTypeCtxt ResSigCtxt        = text "a result type signature"
+pprUserTypeCtxt (ForSigCtxt n)    = text "the foreign declaration for" <+> quotes (ppr n)
+pprUserTypeCtxt DefaultDeclCtxt   = text "a type in a `default' declaration"
+pprUserTypeCtxt InstDeclCtxt      = text "an instance declaration"
+pprUserTypeCtxt SpecInstCtxt      = text "a SPECIALISE instance pragma"
+pprUserTypeCtxt GenSigCtxt        = text "a type expected by the context"
+pprUserTypeCtxt GhciCtxt          = text "a type in a GHCi command"
+pprUserTypeCtxt (ClassSCCtxt c)   = text "the super-classes of class" <+> quotes (ppr c)
+pprUserTypeCtxt SigmaCtxt         = text "the context of a polymorphic type"
+pprUserTypeCtxt (DataTyCtxt tc)   = text "the context of the data type declaration for" <+> quotes (ppr tc)
 
 pprSigCtxt :: UserTypeCtxt -> SDoc -> SDoc -> SDoc
 -- (pprSigCtxt ctxt <extra> <type>)
@@ -644,11 +644,11 @@ pprSigCtxt :: UserTypeCtxt -> SDoc -> SDoc -> SDoc
 -- The <extra> is either empty or "the ambiguity check for"
 pprSigCtxt ctxt extra pp_ty
   | Just n <- isSigMaybe ctxt
-  = vcat [ ptext (sLit "In") <+> extra <+> ptext (sLit "the type signature:")
+  = vcat [ text "In" <+> extra <+> ptext (sLit "the type signature:")
          , nest 2 (pprPrefixOcc n <+> dcolon <+> pp_ty) ]
 
   | otherwise
-  = hang (ptext (sLit "In") <+> extra <+> pprUserTypeCtxt ctxt <> colon)
+  = hang (text "In" <+> extra <+> pprUserTypeCtxt ctxt <> colon)
        2 pp_ty
 
   where
@@ -2113,8 +2113,8 @@ isFFIDynTy expected ty
     , eqType ty' expected
     = IsValid
     | otherwise
-    = NotValid (vcat [ ptext (sLit "Expected: Ptr/FunPtr") <+> pprParendType expected <> comma
-                     , ptext (sLit "  Actual:") <+> ppr ty ])
+    = NotValid (vcat [ text "Expected: Ptr/FunPtr" <+> pprParendType expected <> comma
+                     , text "  Actual:" <+> ppr ty ])
 
 isFFILabelTy :: Type -> Validity
 -- The type of a foreign label must be Ptr, FunPtr, or a newtype of either.
@@ -2123,7 +2123,7 @@ isFFILabelTy ty = checkRepTyCon ok ty
     ok tc | tc `hasKey` funPtrTyConKey || tc `hasKey` ptrTyConKey
           = IsValid
           | otherwise
-          = NotValid (ptext (sLit "A foreign-imported address (via &foo) must have type (Ptr a) or (FunPtr a)"))
+          = NotValid (text "A foreign-imported address (via &foo) must have type (Ptr a) or (FunPtr a)")
 
 isFFIPrimArgumentTy :: DynFlags -> Type -> Validity
 -- Checks for valid argument type for a 'foreign import prim'
@@ -2160,14 +2160,14 @@ checkRepTyCon check_tc ty
         | otherwise     -> case check_tc tc of
                              IsValid        -> IsValid
                              NotValid extra -> NotValid (msg $$ extra)
-      Nothing -> NotValid (quotes (ppr ty) <+> ptext (sLit "is not a data type"))
+      Nothing -> NotValid (quotes (ppr ty) <+> text "is not a data type")
   where
-    msg = quotes (ppr ty) <+> ptext (sLit "cannot be marshalled in a foreign call")
+    msg = quotes (ppr ty) <+> text "cannot be marshalled in a foreign call"
     mk_nt_reason tc tys
-      | null tys  = ptext (sLit "because its data constructor is not in scope")
-      | otherwise = ptext (sLit "because the data constructor for")
-                    <+> quotes (ppr tc) <+> ptext (sLit "is not in scope")
-    nt_fix = ptext (sLit "Possible fix: import the data constructor to bring it into scope")
+      | null tys  = text "because its data constructor is not in scope"
+      | otherwise = text "because the data constructor for"
+                    <+> quotes (ppr tc) <+> text "is not in scope"
+    nt_fix = text "Possible fix: import the data constructor to bring it into scope"
 
 {-
 Note [Foreign import dynamic]
@@ -2271,12 +2271,12 @@ legalFIPrimResultTyCon dflags tc
   = NotValid unlifted_only
 
 unlifted_only :: MsgDoc
-unlifted_only = ptext (sLit "foreign import prim only accepts simple unlifted types")
+unlifted_only = text "foreign import prim only accepts simple unlifted types"
 
 validIfUnliftedFFITypes :: DynFlags -> Validity
 validIfUnliftedFFITypes dflags
   | xopt LangExt.UnliftedFFITypes dflags =  IsValid
-  | otherwise = NotValid (ptext (sLit "To marshal unlifted types, use UnliftedFFITypes"))
+  | otherwise = NotValid (text "To marshal unlifted types, use UnliftedFFITypes")
 
 {-
 Note [Marshalling VoidRep]

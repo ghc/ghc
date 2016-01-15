@@ -54,7 +54,6 @@ import Coercion hiding          ( substCo, substCoVar, substCoVarBndr )
 import BasicTypes
 import MonadUtils
 import Outputable
-import FastString
 import Util
 
 import Data.List
@@ -126,10 +125,10 @@ type StaticEnv = SimplEnv       -- Just the static part is relevant
 pprSimplEnv :: SimplEnv -> SDoc
 -- Used for debugging; selective
 pprSimplEnv env
-  = vcat [ptext (sLit "TvSubst:") <+> ppr (seTvSubst env),
-          ptext (sLit "CvSubst:") <+> ppr (seCvSubst env),
-          ptext (sLit "IdSubst:") <+> ppr (seIdSubst env),
-          ptext (sLit "InScope:") <+> vcat (map ppr_one in_scope_vars)
+  = vcat [text "TvSubst:" <+> ppr (seTvSubst env),
+          text "CvSubst:" <+> ppr (seCvSubst env),
+          text "IdSubst:" <+> ppr (seIdSubst env),
+          text "InScope:" <+> vcat (map ppr_one in_scope_vars)
     ]
   where
    in_scope_vars = varEnvElts (getInScopeVars (seInScope env))
@@ -148,9 +147,9 @@ data SimplSR
            InExpr
 
 instance Outputable SimplSR where
-  ppr (DoneEx e) = ptext (sLit "DoneEx") <+> ppr e
-  ppr (DoneId v) = ptext (sLit "DoneId") <+> ppr v
-  ppr (ContEx _tv _cv _id e) = vcat [ptext (sLit "ContEx") <+> ppr e {-,
+  ppr (DoneEx e) = text "DoneEx" <+> ppr e
+  ppr (DoneId v) = text "DoneId" <+> ppr v
+  ppr (ContEx _tv _cv _id e) = vcat [text "ContEx" <+> ppr e {-,
                                 ppr (filter_env tv), ppr (filter_env id) -}]
         -- where
         -- fvs = exprFreeVars e
@@ -379,9 +378,9 @@ instance Outputable Floats where
   ppr (Floats binds ff) = ppr ff $$ ppr (fromOL binds)
 
 instance Outputable FloatFlag where
-  ppr FltLifted = ptext (sLit "FltLifted")
-  ppr FltOkSpec = ptext (sLit "FltOkSpec")
-  ppr FltCareful = ptext (sLit "FltCareful")
+  ppr FltLifted = text "FltLifted"
+  ppr FltOkSpec = text "FltOkSpec"
+  ppr FltCareful = text "FltCareful"
 
 andFF :: FloatFlag -> FloatFlag -> FloatFlag
 andFF FltCareful _          = FltCareful

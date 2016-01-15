@@ -167,21 +167,21 @@ pprCoreExprShort expr@(Lam _ _)
   = let
         (bndrs, _) = collectBinders expr
     in
-    char '\\' <+> sep (map (pprBndr LambdaBind) bndrs) <+> arrow <+> ptext (sLit "...")
+    char '\\' <+> sep (map (pprBndr LambdaBind) bndrs) <+> arrow <+> text "..."
 
 pprCoreExprShort (Case _expr var _ty _alts)
- = ptext (sLit "case of") <+> ppr var
+ = text "case of" <+> ppr var
 
-pprCoreExprShort (Let (NonRec x _) _) = ptext (sLit "let") <+> ppr x <+> ptext (sLit ("= ... in ..."))
-pprCoreExprShort (Let (Rec bs) _) = ptext (sLit "let {") <+> ppr (fst (head bs)) <+> ptext (sLit ("= ...; ... } in ..."))
+pprCoreExprShort (Let (NonRec x _) _) = text "let" <+> ppr x <+> ptext (sLit ("= ... in ..."))
+pprCoreExprShort (Let (Rec bs) _) = text "let {" <+> ppr (fst (head bs)) <+> ptext (sLit ("= ...; ... } in ..."))
 
 pprCoreExprShort (Tick t e) = ppr t <+> pprCoreExprShort e
-pprCoreExprShort (Cast e _) = pprCoreExprShort e <+> ptext (sLit "`cast` T")
+pprCoreExprShort (Cast e _) = pprCoreExprShort e <+> text "`cast` T"
 
 pprCoreExprShort e = pprCoreExpr e
 
 pprCoreAltShort :: CoreAlt -> SDoc
-pprCoreAltShort (con, args, expr) = ppr con <+> sep (map ppr args) <+> ptext (sLit "->") <+> pprCoreExprShort expr
+pprCoreAltShort (con, args, expr) = ppr con <+> sep (map ppr args) <+> text "->" <+> pprCoreExprShort expr
 
 instance Outputable BCInstr where
    ppr (STKCHECK n)          = text "STKCHECK" <+> ppr n

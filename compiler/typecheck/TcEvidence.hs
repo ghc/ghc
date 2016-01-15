@@ -656,7 +656,7 @@ Important Details:
 
 mkEvCast :: EvTerm -> TcCoercion -> EvTerm
 mkEvCast ev lco
-  | ASSERT2(tcCoercionRole lco == Representational, (vcat [ptext (sLit "Coercion of wrong role passed to mkEvCast:"), ppr ev, ppr lco]))
+  | ASSERT2(tcCoercionRole lco == Representational, (vcat [text "Coercion of wrong role passed to mkEvCast:", ppr ev, ppr lco]))
     isTcReflCo lco = ev
   | otherwise      = EvCast ev lco
 
@@ -729,7 +729,7 @@ evVarsOfTypeable ev =
 -}
 
 instance Outputable HsWrapper where
-  ppr co_fn = pprHsWrapper (ptext (sLit "<>")) co_fn
+  ppr co_fn = pprHsWrapper (text "<>") co_fn
 
 pprHsWrapper :: SDoc -> HsWrapper -> SDoc
 -- In debug mode, print the wrapper
@@ -745,15 +745,15 @@ pprHsWrapper doc wrap
     -- False <=> appears as body of let or lambda
     help it WpHole             = it
     help it (WpCompose f1 f2)  = help (help it f2) f1
-    help it (WpFun f1 f2 t1)   = add_parens $ ptext (sLit "\\(x") <> dcolon <> ppr t1 <> ptext (sLit ").") <+>
-                                              help (\_ -> it True <+> help (\_ -> ptext (sLit "x")) f1 True) f2 False
-    help it (WpCast co)   = add_parens $ sep [it False, nest 2 (ptext (sLit "|>")
+    help it (WpFun f1 f2 t1)   = add_parens $ text "\\(x" <> dcolon <> ppr t1 <> text ")." <+>
+                                              help (\_ -> it True <+> help (\_ -> text "x") f1 True) f2 False
+    help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
                                               <+> pprParendCo co)]
     help it (WpEvApp id)    = no_parens  $ sep [it True, nest 2 (ppr id)]
-    help it (WpTyApp ty)    = no_parens  $ sep [it True, ptext (sLit "@") <+> pprParendType ty]
-    help it (WpEvLam id)    = add_parens $ sep [ ptext (sLit "\\") <> pp_bndr id, it False]
-    help it (WpTyLam tv)    = add_parens $ sep [ptext (sLit "/\\") <> pp_bndr tv, it False]
-    help it (WpLet binds)   = add_parens $ sep [ptext (sLit "let") <+> braces (ppr binds), it False]
+    help it (WpTyApp ty)    = no_parens  $ sep [it True, text "@" <+> pprParendType ty]
+    help it (WpEvLam id)    = add_parens $ sep [ text "\\" <> pp_bndr id, it False]
+    help it (WpTyLam tv)    = add_parens $ sep [text "/\\" <> pp_bndr tv, it False]
+    help it (WpLet binds)   = add_parens $ sep [text "let" <+> braces (ppr binds), it False]
 
     pp_bndr v = pprBndr LambdaBind v <> dot
 
@@ -764,10 +764,10 @@ pprHsWrapper doc wrap
 
 instance Outputable TcEvBinds where
   ppr (TcEvBinds v) = ppr v
-  ppr (EvBinds bs)  = ptext (sLit "EvBinds") <> braces (vcat (map ppr (bagToList bs)))
+  ppr (EvBinds bs)  = text "EvBinds" <> braces (vcat (map ppr (bagToList bs)))
 
 instance Outputable EvBindsVar where
-  ppr (EvBindsVar _ u) = ptext (sLit "EvBindsVar") <> angleBrackets (ppr u)
+  ppr (EvBindsVar _ u) = text "EvBindsVar" <> angleBrackets (ppr u)
 
 instance Uniquable EvBindsVar where
   getUnique (EvBindsVar _ u) = u
@@ -782,15 +782,15 @@ instance Outputable EvBind where
 
 instance Outputable EvTerm where
   ppr (EvId v)              = ppr v
-  ppr (EvCast v co)         = ppr v <+> (ptext (sLit "`cast`")) <+> pprParendCo co
-  ppr (EvCoercion co)       = ptext (sLit "CO") <+> ppr co
-  ppr (EvSuperClass d n)    = ptext (sLit "sc") <> parens (ppr (d,n))
+  ppr (EvCast v co)         = ppr v <+> (text "`cast`") <+> pprParendCo co
+  ppr (EvCoercion co)       = text "CO" <+> ppr co
+  ppr (EvSuperClass d n)    = text "sc" <> parens (ppr (d,n))
   ppr (EvDFunApp df tys ts) = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
   ppr (EvLit l)             = ppr l
   ppr (EvCallStack cs)      = ppr cs
-  ppr (EvDelayedError ty msg) =     ptext (sLit "error")
+  ppr (EvDelayedError ty msg) =     text "error"
                                 <+> sep [ char '@' <> ppr ty, ppr msg ]
-  ppr (EvTypeable ty ev)      = ppr ev <+> dcolon <+> ptext (sLit "Typeable") <+> ppr ty
+  ppr (EvTypeable ty ev)      = ppr ev <+> dcolon <+> text "Typeable" <+> ppr ty
 
 instance Outputable EvLit where
   ppr (EvNum n) = integer n
@@ -798,14 +798,14 @@ instance Outputable EvLit where
 
 instance Outputable EvCallStack where
   ppr EvCsEmpty
-    = ptext (sLit "[]")
+    = text "[]"
   ppr (EvCsPushCall name loc tm)
-    = ppr (name,loc) <+> ptext (sLit ":") <+> ppr tm
+    = ppr (name,loc) <+> text ":" <+> ppr tm
 
 instance Outputable EvTypeable where
-  ppr (EvTypeableTyCon ts)    = ptext (sLit "TC") <+> ppr ts
+  ppr (EvTypeableTyCon ts)    = text "TC" <+> ppr ts
   ppr (EvTypeableTyApp t1 t2) = parens (ppr t1 <+> ppr t2)
-  ppr (EvTypeableTyLit t1)    = ptext (sLit "TyLit") <> ppr t1
+  ppr (EvTypeableTyLit t1)    = text "TyLit" <> ppr t1
 
 
 ----------------------------------------------------------------------

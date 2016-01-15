@@ -20,7 +20,6 @@ import CoreSyn
 import Outputable
 import VarEnv
 import BasicTypes
-import FastString
 import Data.List
 import DataCon
 import Id
@@ -1007,9 +1006,9 @@ type SigEnv = VarEnv (StrictSig, TopLevelFlag)
 
 instance Outputable AnalEnv where
   ppr (AE { ae_sigs = env, ae_virgin = virgin })
-    = ptext (sLit "AE") <+> braces (vcat
-         [ ptext (sLit "ae_virgin =") <+> ppr virgin
-         , ptext (sLit "ae_sigs =") <+> ppr env ])
+    = text "AE" <+> braces (vcat
+         [ text "ae_virgin =" <+> ppr virgin
+         , text "ae_sigs =" <+> ppr env ])
 
 emptyAnalEnv :: DynFlags -> FamInstEnvs -> AnalEnv
 emptyAnalEnv dflags fam_envs

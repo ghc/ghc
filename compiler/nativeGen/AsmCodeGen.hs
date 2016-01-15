@@ -436,7 +436,7 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap us
         -- used. Note that it is important that we generate these in
         -- ascending order, as Clang's 3.6 assembler complains.
         let newFileIds = sortBy (comparing snd) $ eltsUFM $ fileIds' `minusUFM` fileIds
-            pprDecl (f,n) = ptext (sLit "\t.file ") <> ppr n <+>
+            pprDecl (f,n) = text "\t.file " <> ppr n <+>
                             doubleQuotes (ftext f)
 
         emitNativeCode dflags h $ vcat $

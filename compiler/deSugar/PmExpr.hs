@@ -22,7 +22,6 @@ import TysWiredIn
 import Outputable
 import Util
 import SrcLoc
-import FastString -- sLit
 import VarSet
 
 #if __GLASGOW_HASKELL__ < 709
@@ -335,8 +334,8 @@ filterComplex = zipWith rename nameList . map mkGroup
 
     -- Try nice names p,q,r,s,t before using the (ugly) t_i
     nameList :: [SDoc]
-    nameList = map (ptext . sLit) ["p","q","r","s","t"] ++
-                 [ ptext (sLit ('t':show u)) | u <- [(0 :: Int)..] ]
+    nameList = map text ["p","q","r","s","t"] ++
+                 [ text ('t':show u) | u <- [(0 :: Int)..] ]
 
 -- ----------------------------------------------------------------------------
 

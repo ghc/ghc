@@ -142,9 +142,9 @@ warnAboutIdentities dflags (Var conv_fn) type_of_conv
   , idName conv_fn `elem` conversionNames
   , Just (arg_ty, res_ty) <- splitFunTy_maybe type_of_conv
   , arg_ty `eqType` res_ty  -- So we are converting  ty -> ty
-  = warnDs (vcat [ ptext (sLit "Call of") <+> ppr conv_fn <+> dcolon <+> ppr type_of_conv
-                 , nest 2 $ ptext (sLit "can probably be omitted")
-                 , parens (ptext (sLit "Use -fno-warn-identities to suppress this message"))
+  = warnDs (vcat [ text "Call of" <+> ppr conv_fn <+> dcolon <+> ppr type_of_conv
+                 , nest 2 $ text "can probably be omitted"
+                 , parens (text "Use -fno-warn-identities to suppress this message")
            ])
 warnAboutIdentities _ _ _ = return ()
 
@@ -176,9 +176,9 @@ warnAboutOverflowedLiterals dflags lit
     check :: forall a. (Bounded a, Integral a) => Integer -> Name -> a -> DsM ()
     check i tc _proxy
       = when (i < minB || i > maxB) $ do
-        warnDs (vcat [ ptext (sLit "Literal") <+> integer i
-                       <+> ptext (sLit "is out of the") <+> ppr tc <+> ptext (sLit "range")
-                       <+> integer minB <> ptext (sLit "..") <> integer maxB
+        warnDs (vcat [ text "Literal" <+> integer i
+                       <+> text "is out of the" <+> ppr tc <+> ptext (sLit "range")
+                       <+> integer minB <> text ".." <> integer maxB
                      , sug ])
       where
         minB = toInteger (minBound :: a)
@@ -186,7 +186,7 @@ warnAboutOverflowedLiterals dflags lit
         sug | minB == -i   -- Note [Suggest NegativeLiterals]
             , i > 0
             , not (xopt LangExt.NegativeLiterals dflags)
-            = ptext (sLit "If you are trying to write a large negative literal, use NegativeLiterals")
+            = text "If you are trying to write a large negative literal, use NegativeLiterals"
             | otherwise = Outputable.empty
 
 {-
@@ -212,7 +212,7 @@ warnAboutEmptyEnumerations dflags fromExpr mThnExpr toExpr
   , let check :: forall a. (Enum a, Num a) => a -> DsM ()
         check _proxy
           = when (null enumeration) $
-            warnDs (ptext (sLit "Enumeration is empty"))
+            warnDs (text "Enumeration is empty")
           where
             enumeration :: [a]
             enumeration = case mThn of

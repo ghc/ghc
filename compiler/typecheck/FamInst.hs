@@ -28,7 +28,6 @@ import DynFlags
 import Module
 import Outputable
 import UniqFM
-import FastString
 import Util
 import RdrName
 import DataCon ( dataConName )
@@ -192,7 +191,7 @@ getFamInsts hpt_fam_insts mod
                    ; return (expectJust "checkFamInstConsistency" $
                              lookupModuleEnv (eps_mod_fam_inst_env eps) mod) }
   where
-    doc = ppr mod <+> ptext (sLit "is a family-instance module")
+    doc = ppr mod <+> text "is a family-instance module"
 
 {-
 ************************************************************************

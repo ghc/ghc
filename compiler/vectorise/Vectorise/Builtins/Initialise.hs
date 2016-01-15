@@ -226,7 +226,7 @@ externalClass fs
   = do { tycon <- dsLookupDPHRdrEnv (mkClsOccFS fs) >>= dsLookupTyCon
        ; case tyConClass_maybe tycon of
            Nothing  -> pprPanic "Vectorise.Builtins.Initialise" $
-                         ptext (sLit "Data.Array.Parallel.Prim.") <>
-                         ftext fs <+> ptext (sLit "is not a type class")
+                         text "Data.Array.Parallel.Prim." <>
+                         ftext fs <+> text "is not a type class"
            Just cls -> return cls
        }

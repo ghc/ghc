@@ -81,21 +81,21 @@ check_instance ty cls
         ; return (isJust mb_res) }
 
 defaultDeclCtxt :: SDoc
-defaultDeclCtxt = ptext (sLit "When checking the types in a default declaration")
+defaultDeclCtxt = text "When checking the types in a default declaration"
 
 dupDefaultDeclErr :: [Located (DefaultDecl Name)] -> SDoc
 dupDefaultDeclErr (L _ (DefaultDecl _) : dup_things)
-  = hang (ptext (sLit "Multiple default declarations"))
+  = hang (text "Multiple default declarations")
        2 (vcat (map pp dup_things))
   where
-    pp (L locn (DefaultDecl _)) = ptext (sLit "here was another default declaration") <+> ppr locn
+    pp (L locn (DefaultDecl _)) = text "here was another default declaration" <+> ppr locn
 dupDefaultDeclErr [] = panic "dupDefaultDeclErr []"
 
 polyDefErr :: LHsType Name -> SDoc
 polyDefErr ty
-  = hang (ptext (sLit "Illegal polymorphic type in default declaration") <> colon) 2 (ppr ty)
+  = hang (text "Illegal polymorphic type in default declaration" <> colon) 2 (ppr ty)
 
 badDefaultTy :: Type -> [Class] -> SDoc
 badDefaultTy ty deflt_clss
-  = hang (ptext (sLit "The default type") <+> quotes (ppr ty) <+> ptext (sLit "is not an instance of"))
-       2 (foldr1 (\a b -> a <+> ptext (sLit "or") <+> b) (map (quotes. ppr) deflt_clss))
+  = hang (text "The default type" <+> quotes (ppr ty) <+> ptext (sLit "is not an instance of"))
+       2 (foldr1 (\a b -> a <+> text "or" <+> b) (map (quotes. ppr) deflt_clss))

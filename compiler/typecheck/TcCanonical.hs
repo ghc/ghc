@@ -37,7 +37,6 @@ import MonadUtils
 import Control.Monad
 import Data.List  ( zip4, foldl' )
 import BasicTypes
-import FastString
 
 #if __GLASGOW_HASKELL__ < 709
 bimap :: (a -> b) -> (c -> d) -> Either a c -> Either b d
@@ -1699,8 +1698,8 @@ instance Functor StopOrContinue where
   fmap _ (Stop ev s)      = Stop ev s
 
 instance Outputable a => Outputable (StopOrContinue a) where
-  ppr (Stop ev s)      = ptext (sLit "Stop") <> parens s <+> ppr ev
-  ppr (ContinueWith w) = ptext (sLit "ContinueWith") <+> ppr w
+  ppr (Stop ev s)      = text "Stop" <> parens s <+> ppr ev
+  ppr (ContinueWith w) = text "ContinueWith" <+> ppr w
 
 continueWith :: a -> TcS (StopOrContinue a)
 continueWith = return . ContinueWith

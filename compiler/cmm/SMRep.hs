@@ -498,44 +498,44 @@ instance Outputable SMRep where
    ppr (HeapRep static ps nps tyinfo)
      = hang (header <+> lbrace) 2 (ppr tyinfo <+> rbrace)
      where
-       header = ptext (sLit "HeapRep")
-                <+> if static then ptext (sLit "static") else empty
+       header = text "HeapRep"
+                <+> if static then text "static" else empty
                 <+> pp_n "ptrs" ps <+> pp_n "nonptrs" nps
        pp_n :: String -> Int -> SDoc
        pp_n _ 0 = empty
        pp_n s n = int n <+> text s
 
-   ppr (ArrayPtrsRep size _) = ptext (sLit "ArrayPtrsRep") <+> ppr size
+   ppr (ArrayPtrsRep size _) = text "ArrayPtrsRep" <+> ppr size
 
-   ppr (SmallArrayPtrsRep size) = ptext (sLit "SmallArrayPtrsRep") <+> ppr size
+   ppr (SmallArrayPtrsRep size) = text "SmallArrayPtrsRep" <+> ppr size
 
-   ppr (ArrayWordsRep words) = ptext (sLit "ArrayWordsRep") <+> ppr words
+   ppr (ArrayWordsRep words) = text "ArrayWordsRep" <+> ppr words
 
-   ppr (StackRep bs) = ptext (sLit "StackRep") <+> ppr bs
+   ppr (StackRep bs) = text "StackRep" <+> ppr bs
 
-   ppr (RTSRep ty rep) = ptext (sLit "tag:") <> ppr ty <+> ppr rep
+   ppr (RTSRep ty rep) = text "tag:" <> ppr ty <+> ppr rep
 
 instance Outputable ArgDescr where
-  ppr (ArgSpec n) = ptext (sLit "ArgSpec") <+> ppr n
-  ppr (ArgGen ls) = ptext (sLit "ArgGen") <+> ppr ls
+  ppr (ArgSpec n) = text "ArgSpec" <+> ppr n
+  ppr (ArgGen ls) = text "ArgGen" <+> ppr ls
 
 pprTypeInfo :: ClosureTypeInfo -> SDoc
 pprTypeInfo (Constr tag descr)
-  = ptext (sLit "Con") <+>
-    braces (sep [ ptext (sLit "tag:") <+> ppr tag
-                , ptext (sLit "descr:") <> text (show descr) ])
+  = text "Con" <+>
+    braces (sep [ text "tag:" <+> ppr tag
+                , text "descr:" <> text (show descr) ])
 
 pprTypeInfo (Fun arity args)
-  = ptext (sLit "Fun") <+>
-    braces (sep [ ptext (sLit "arity:") <+> ppr arity
+  = text "Fun" <+>
+    braces (sep [ text "arity:" <+> ppr arity
                 , ptext (sLit ("fun_type:")) <+> ppr args ])
 
 pprTypeInfo (ThunkSelector offset)
-  = ptext (sLit "ThunkSel") <+> ppr offset
+  = text "ThunkSel" <+> ppr offset
 
-pprTypeInfo Thunk     = ptext (sLit "Thunk")
-pprTypeInfo BlackHole = ptext (sLit "BlackHole")
-pprTypeInfo IndStatic = ptext (sLit "IndStatic")
+pprTypeInfo Thunk     = text "Thunk"
+pprTypeInfo BlackHole = text "BlackHole"
+pprTypeInfo IndStatic = text "IndStatic"
 
 -- XXX Does not belong here!!
 stringToWord8s :: String -> [Word8]

@@ -70,7 +70,7 @@ pprCs dflags cmms
  = pprCode CStyle (vcat $ map (\c -> split_marker $$ pprC c) cmms)
  where
    split_marker
-     | gopt Opt_SplitObjs dflags = ptext (sLit "__STG_SPLIT_MARKER")
+     | gopt Opt_SplitObjs dflags = text "__STG_SPLIT_MARKER"
      | otherwise                 = empty
 
 writeCs :: DynFlags -> Handle -> [RawCmmGroup] -> IO ()
@@ -116,13 +116,13 @@ pprTop (CmmProc infos clbl _ graph) =
 
 pprTop (CmmData _section (Statics lbl [CmmString str])) =
   hcat [
-    pprLocalness lbl, ptext (sLit "char "), ppr lbl,
-    ptext (sLit "[] = "), pprStringInCStyle str, semi
+    pprLocalness lbl, text "char ", ppr lbl,
+    text "[] = ", pprStringInCStyle str, semi
   ]
 
 pprTop (CmmData _section (Statics lbl [CmmUninitialised size])) =
   hcat [
-    pprLocalness lbl, ptext (sLit "char "), ppr lbl,
+    pprLocalness lbl, text "char ", ppr lbl,
     brackets (int size), semi
   ]
 
@@ -151,16 +151,16 @@ pprBBlock block =
 pprWordArray :: CLabel -> [CmmStatic] -> SDoc
 pprWordArray lbl ds
   = sdocWithDynFlags $ \dflags ->
-    hcat [ pprLocalness lbl, ptext (sLit "StgWord")
-         , space, ppr lbl, ptext (sLit "[] = {") ]
+    hcat [ pprLocalness lbl, text "StgWord"
+         , space, ppr lbl, text "[] = {" ]
     $$ nest 8 (commafy (pprStatics dflags ds))
-    $$ ptext (sLit "};")
+    $$ text "};"
 
 --
 -- has to be static, if it isn't globally visible
 --
 pprLocalness :: CLabel -> SDoc
-pprLocalness lbl | not $ externallyVisibleCLabel lbl = ptext (sLit "static ")
+pprLocalness lbl | not $ externallyVisibleCLabel lbl = text "static "
                  | otherwise = empty
 
 -- --------------------------------------------------------------------------
@@ -173,7 +173,7 @@ pprStmt stmt =
     sdocWithDynFlags $ \dflags ->
     case stmt of
     CmmEntry{}   -> empty
-    CmmComment _ -> empty -- (hang (ptext (sLit "/*")) 3 (ftext s)) $$ ptext (sLit "*/")
+    CmmComment _ -> empty -- (hang (text "/*") 3 (ftext s)) $$ ptext (sLit "*/")
                           -- XXX if the string contains "*/", we need to fix it
                           -- XXX we probably want to emit these comments when
                           -- some debugging option is on.  They can get quite
@@ -186,7 +186,7 @@ pprStmt stmt =
 
     CmmStore  dest src
         | typeWidth rep == W64 && wordWidth dflags /= W64
-        -> (if isFloatType rep then ptext (sLit "ASSIGN_DBL")
+        -> (if isFloatType rep then text "ASSIGN_DBL"
                                else ptext (sLit ("ASSIGN_Word64"))) <>
            parens (mkP_ <> pprExpr1 dest <> comma <> pprExpr src) <> semi
 
@@ -244,7 +244,7 @@ pprStmt stmt =
           -- We also need to cast mem primops to prevent conflicts with GCC
           -- builtins (see bug #5967).
           | Just _align <- machOpMemcpyishAlign op
-          = (ptext (sLit ";EF_(") <> fn <> char ')' <> semi) $$
+          = (text ";EF_(" <> fn <> char ')' <> semi) $$
             pprForeignCall fn cconv hresults hargs
           | otherwise
           = pprCall fn cconv hresults hargs
@@ -273,7 +273,7 @@ pprForeignCall fn cconv results args = fn_call
 pprCFunType :: SDoc -> CCallConv -> [Hinted CmmFormal] -> [Hinted CmmActual] -> SDoc
 pprCFunType ppr_fn cconv ress args
   = sdocWithDynFlags $ \dflags ->
-    let res_type [] = ptext (sLit "void")
+    let res_type [] = text "void"
         res_type [(one, hint)] = machRepHintCType (localRegType one) hint
         res_type _ = panic "pprCFunType: only void or 1 return value supported"
 
@@ -285,16 +285,16 @@ pprCFunType ppr_fn cconv ress args
 -- ---------------------------------------------------------------------
 -- unconditional branches
 pprBranch :: BlockId -> SDoc
-pprBranch ident = ptext (sLit "goto") <+> pprBlockId ident <> semi
+pprBranch ident = text "goto" <+> pprBlockId ident <> semi
 
 
 -- ---------------------------------------------------------------------
 -- conditional branches to local labels
 pprCondBranch :: CmmExpr -> BlockId -> BlockId -> SDoc
 pprCondBranch expr yes no
-        = hsep [ ptext (sLit "if") , parens(pprExpr expr) ,
-                        ptext (sLit "goto"), pprBlockId yes <> semi,
-                        ptext (sLit "else goto"), pprBlockId no <> semi ]
+        = hsep [ text "if" , parens(pprExpr expr) ,
+                        text "goto", pprBlockId yes <> semi,
+                        text "else goto", pprBlockId no <> semi ]
 
 -- ---------------------------------------------------------------------
 -- a local table branch
@@ -303,7 +303,7 @@ pprCondBranch expr yes no
 --
 pprSwitch :: DynFlags -> CmmExpr -> SwitchTargets -> SDoc
 pprSwitch dflags e ids
-  = (hang (ptext (sLit "switch") <+> parens ( pprExpr e ) <+> lbrace)
+  = (hang (text "switch" <+> parens ( pprExpr e ) <+> lbrace)
                 4 (vcat ( map caseify pairs ) $$ def)) $$ rbrace
   where
     (pairs, mbdef) = switchTargetsFallThrough ids
@@ -312,16 +312,16 @@ pprSwitch dflags e ids
     caseify (ix:ixs, ident) = vcat (map do_fallthrough ixs) $$ final_branch ix
         where
         do_fallthrough ix =
-                 hsep [ ptext (sLit "case") , pprHexVal ix (wordWidth dflags) <> colon ,
-                        ptext (sLit "/* fall through */") ]
+                 hsep [ text "case" , pprHexVal ix (wordWidth dflags) <> colon ,
+                        text "/* fall through */" ]
 
         final_branch ix =
-                hsep [ ptext (sLit "case") , pprHexVal ix (wordWidth dflags) <> colon ,
-                       ptext (sLit "goto") , (pprBlockId ident) <> semi ]
+                hsep [ text "case" , pprHexVal ix (wordWidth dflags) <> colon ,
+                       text "goto" , (pprBlockId ident) <> semi ]
 
     caseify (_     , _    ) = panic "pprSwitch: switch with no cases!"
 
-    def | Just l <- mbdef = ptext (sLit "default: goto") <+> pprBlockId l <> semi
+    def | Just l <- mbdef = text "default: goto" <+> pprBlockId l <> semi
         | otherwise       = empty
 
 -- ---------------------------------------------------------------------
@@ -364,8 +364,8 @@ pprExpr e = case e of
 pprLoad :: DynFlags -> CmmExpr -> CmmType -> SDoc
 pprLoad dflags e ty
   | width == W64, wordWidth dflags /= W64
-  = (if isFloatType ty then ptext (sLit "PK_DBL")
-                       else ptext (sLit "PK_Word64"))
+  = (if isFloatType ty then text "PK_DBL"
+                       else text "PK_Word64")
     <> parens (mkP_ <> pprExpr1 e)
 
   | otherwise
@@ -398,7 +398,7 @@ pprMachOpApp :: MachOp -> [CmmExpr] -> SDoc
 
 pprMachOpApp op args
   | isMulMayOfloOp op
-  = ptext (sLit "mulIntMayOflo") <> parens (commafy (map pprExpr args))
+  = text "mulIntMayOflo" <> parens (commafy (map pprExpr args))
   where isMulMayOfloOp (MO_U_MulMayOflo _) = True
         isMulMayOfloOp (MO_S_MulMayOflo _) = True
         isMulMayOfloOp _ = False
@@ -450,9 +450,9 @@ pprLit lit = case lit of
 
     CmmFloat f w       -> parens (machRep_F_CType w) <> str
         where d = fromRational f :: Double
-              str | isInfinite d && d < 0 = ptext (sLit "-INFINITY")
-                  | isInfinite d          = ptext (sLit "INFINITY")
-                  | isNaN d               = ptext (sLit "NAN")
+              str | isInfinite d && d < 0 = text "-INFINITY"
+                  | isInfinite d          = text "INFINITY"
+                  | isNaN d               = text "NAN"
                   | otherwise             = text (show d)
                 -- these constants come from <math.h>
                 -- see #1861
@@ -493,7 +493,7 @@ pprStatics dflags (CmmStaticLit (CmmFloat f W32) : rest)
   = pprPanic "pprStatics: float" (vcat (map ppr' rest))
     where ppr' (CmmStaticLit l) = sdocWithDynFlags $ \dflags ->
                                   ppr (cmmLitType dflags l)
-          ppr' _other           = ptext (sLit "bad static!")
+          ppr' _other           = text "bad static!"
 pprStatics dflags (CmmStaticLit (CmmFloat f W64) : rest)
   = map pprLit1 (doubleToWords dflags f) ++ pprStatics dflags rest
 pprStatics dflags (CmmStaticLit (CmmInt i W64) : rest)
@@ -540,8 +540,8 @@ pprMachOp_for_C mop = case mop of
         -- Integer operations
         MO_Add          _ -> char '+'
         MO_Sub          _ -> char '-'
-        MO_Eq           _ -> ptext (sLit "==")
-        MO_Ne           _ -> ptext (sLit "!=")
+        MO_Eq           _ -> text "=="
+        MO_Ne           _ -> text "!="
         MO_Mul          _ -> char '*'
 
         MO_S_Quot       _ -> char '/'
@@ -559,22 +559,22 @@ pprMachOp_for_C mop = case mop of
         MO_F_Quot       _ -> char '/'
 
         -- Signed comparisons
-        MO_S_Ge         _ -> ptext (sLit ">=")
-        MO_S_Le         _ -> ptext (sLit "<=")
+        MO_S_Ge         _ -> text ">="
+        MO_S_Le         _ -> text "<="
         MO_S_Gt         _ -> char '>'
         MO_S_Lt         _ -> char '<'
 
         -- & Unsigned comparisons
-        MO_U_Ge         _ -> ptext (sLit ">=")
-        MO_U_Le         _ -> ptext (sLit "<=")
+        MO_U_Ge         _ -> text ">="
+        MO_U_Le         _ -> text "<="
         MO_U_Gt         _ -> char '>'
         MO_U_Lt         _ -> char '<'
 
         -- & Floating-point comparisons
-        MO_F_Eq         _ -> ptext (sLit "==")
-        MO_F_Ne         _ -> ptext (sLit "!=")
-        MO_F_Ge         _ -> ptext (sLit ">=")
-        MO_F_Le         _ -> ptext (sLit "<=")
+        MO_F_Eq         _ -> text "=="
+        MO_F_Ne         _ -> text "!="
+        MO_F_Ge         _ -> text ">="
+        MO_F_Le         _ -> text "<="
         MO_F_Gt         _ -> char '>'
         MO_F_Lt         _ -> char '<'
 
@@ -584,9 +584,9 @@ pprMachOp_for_C mop = case mop of
         MO_Or           _ -> char '|'
         MO_Xor          _ -> char '^'
         MO_Not          _ -> char '~'
-        MO_Shl          _ -> ptext (sLit "<<")
-        MO_U_Shr        _ -> ptext (sLit ">>") -- unsigned shift right
-        MO_S_Shr        _ -> ptext (sLit ">>") -- signed shift right
+        MO_Shl          _ -> text "<<"
+        MO_U_Shr        _ -> text ">>" -- unsigned shift right
+        MO_S_Shr        _ -> text ">>" -- signed shift right
 
 -- Conversions.  Some of these will be NOPs, but never those that convert
 -- between ints and floats.
@@ -608,85 +608,85 @@ pprMachOp_for_C mop = case mop of
         MO_FS_Conv _from to -> parens (machRep_S_CType to)
 
         MO_S_MulMayOflo _ -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_S_MulMayOflo")
+                                (text "MO_S_MulMayOflo")
                                 (panic $ "PprC.pprMachOp_for_C: MO_S_MulMayOflo"
                                       ++ " should have been handled earlier!")
         MO_U_MulMayOflo _ -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_U_MulMayOflo")
+                                (text "MO_U_MulMayOflo")
                                 (panic $ "PprC.pprMachOp_for_C: MO_U_MulMayOflo"
                                       ++ " should have been handled earlier!")
 
         MO_V_Insert {}    -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_V_Insert")
+                                (text "MO_V_Insert")
                                 (panic $ "PprC.pprMachOp_for_C: MO_V_Insert"
                                       ++ " should have been handled earlier!")
         MO_V_Extract {}   -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_V_Extract")
+                                (text "MO_V_Extract")
                                 (panic $ "PprC.pprMachOp_for_C: MO_V_Extract"
                                       ++ " should have been handled earlier!")
 
         MO_V_Add {}       -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_V_Add")
+                                (text "MO_V_Add")
                                 (panic $ "PprC.pprMachOp_for_C: MO_V_Add"
                                       ++ " should have been handled earlier!")
         MO_V_Sub {}       -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_V_Sub")
+                                (text "MO_V_Sub")
                                 (panic $ "PprC.pprMachOp_for_C: MO_V_Sub"
                                       ++ " should have been handled earlier!")
         MO_V_Mul {}       -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_V_Mul")
+                                (text "MO_V_Mul")
                                 (panic $ "PprC.pprMachOp_for_C: MO_V_Mul"
                                       ++ " should have been handled earlier!")
 
         MO_VS_Quot {}     -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_VS_Quot")
+                                (text "MO_VS_Quot")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VS_Quot"
                                       ++ " should have been handled earlier!")
         MO_VS_Rem {}      -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_VS_Rem")
+                                (text "MO_VS_Rem")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VS_Rem"
                                       ++ " should have been handled earlier!")
         MO_VS_Neg {}      -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_VS_Neg")
+                                (text "MO_VS_Neg")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VS_Neg"
                                       ++ " should have been handled earlier!")
 
         MO_VU_Quot {}     -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_VU_Quot")
+                                (text "MO_VU_Quot")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VU_Quot"
                                       ++ " should have been handled earlier!")
         MO_VU_Rem {}      -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_VU_Rem")
+                                (text "MO_VU_Rem")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VU_Rem"
                                       ++ " should have been handled earlier!")
 
         MO_VF_Insert {}   -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_VF_Insert")
+                                (text "MO_VF_Insert")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Insert"
                                       ++ " should have been handled earlier!")
         MO_VF_Extract {}  -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_VF_Extract")
+                                (text "MO_VF_Extract")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Extract"
                                       ++ " should have been handled earlier!")
 
         MO_VF_Add {}      -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_VF_Add")
+                                (text "MO_VF_Add")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Add"
                                       ++ " should have been handled earlier!")
         MO_VF_Sub {}      -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_VF_Sub")
+                                (text "MO_VF_Sub")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Sub"
                                       ++ " should have been handled earlier!")
         MO_VF_Neg {}      -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_VF_Neg")
+                                (text "MO_VF_Neg")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Neg"
                                       ++ " should have been handled earlier!")
         MO_VF_Mul {}      -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_VF_Mul")
+                                (text "MO_VF_Mul")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Mul"
                                       ++ " should have been handled earlier!")
         MO_VF_Quot {}     -> pprTrace "offending mop:"
-                                (ptext $ sLit "MO_VF_Quot")
+                                (text "MO_VF_Quot")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Quot"
                                       ++ " should have been handled earlier!")
 
@@ -719,36 +719,36 @@ pprCallishMachOp_for_C :: CallishMachOp -> SDoc
 
 pprCallishMachOp_for_C mop
     = case mop of
-        MO_F64_Pwr      -> ptext (sLit "pow")
-        MO_F64_Sin      -> ptext (sLit "sin")
-        MO_F64_Cos      -> ptext (sLit "cos")
-        MO_F64_Tan      -> ptext (sLit "tan")
-        MO_F64_Sinh     -> ptext (sLit "sinh")
-        MO_F64_Cosh     -> ptext (sLit "cosh")
-        MO_F64_Tanh     -> ptext (sLit "tanh")
-        MO_F64_Asin     -> ptext (sLit "asin")
-        MO_F64_Acos     -> ptext (sLit "acos")
-        MO_F64_Atan     -> ptext (sLit "atan")
-        MO_F64_Log      -> ptext (sLit "log")
-        MO_F64_Exp      -> ptext (sLit "exp")
-        MO_F64_Sqrt     -> ptext (sLit "sqrt")
-        MO_F32_Pwr      -> ptext (sLit "powf")
-        MO_F32_Sin      -> ptext (sLit "sinf")
-        MO_F32_Cos      -> ptext (sLit "cosf")
-        MO_F32_Tan      -> ptext (sLit "tanf")
-        MO_F32_Sinh     -> ptext (sLit "sinhf")
-        MO_F32_Cosh     -> ptext (sLit "coshf")
-        MO_F32_Tanh     -> ptext (sLit "tanhf")
-        MO_F32_Asin     -> ptext (sLit "asinf")
-        MO_F32_Acos     -> ptext (sLit "acosf")
-        MO_F32_Atan     -> ptext (sLit "atanf")
-        MO_F32_Log      -> ptext (sLit "logf")
-        MO_F32_Exp      -> ptext (sLit "expf")
-        MO_F32_Sqrt     -> ptext (sLit "sqrtf")
-        MO_WriteBarrier -> ptext (sLit "write_barrier")
-        MO_Memcpy _     -> ptext (sLit "memcpy")
-        MO_Memset _     -> ptext (sLit "memset")
-        MO_Memmove _    -> ptext (sLit "memmove")
+        MO_F64_Pwr      -> text "pow"
+        MO_F64_Sin      -> text "sin"
+        MO_F64_Cos      -> text "cos"
+        MO_F64_Tan      -> text "tan"
+        MO_F64_Sinh     -> text "sinh"
+        MO_F64_Cosh     -> text "cosh"
+        MO_F64_Tanh     -> text "tanh"
+        MO_F64_Asin     -> text "asin"
+        MO_F64_Acos     -> text "acos"
+        MO_F64_Atan     -> text "atan"
+        MO_F64_Log      -> text "log"
+        MO_F64_Exp      -> text "exp"
+        MO_F64_Sqrt     -> text "sqrt"
+        MO_F32_Pwr      -> text "powf"
+        MO_F32_Sin      -> text "sinf"
+        MO_F32_Cos      -> text "cosf"
+        MO_F32_Tan      -> text "tanf"
+        MO_F32_Sinh     -> text "sinhf"
+        MO_F32_Cosh     -> text "coshf"
+        MO_F32_Tanh     -> text "tanhf"
+        MO_F32_Asin     -> text "asinf"
+        MO_F32_Acos     -> text "acosf"
+        MO_F32_Atan     -> text "atanf"
+        MO_F32_Log      -> text "logf"
+        MO_F32_Exp      -> text "expf"
+        MO_F32_Sqrt     -> text "sqrtf"
+        MO_WriteBarrier -> text "write_barrier"
+        MO_Memcpy _     -> text "memcpy"
+        MO_Memset _     -> text "memset"
+        MO_Memmove _    -> text "memmove"
         (MO_BSwap w)    -> ptext (sLit $ bSwapLabel w)
         (MO_PopCnt w)   -> ptext (sLit $ popCntLabel w)
         (MO_Clz w)      -> ptext (sLit $ clzLabel w)
@@ -780,17 +780,17 @@ pprCallishMachOp_for_C mop
 
 mkJMP_, mkFN_, mkIF_ :: SDoc -> SDoc
 
-mkJMP_ i = ptext (sLit "JMP_") <> parens i
-mkFN_  i = ptext (sLit "FN_")  <> parens i -- externally visible function
-mkIF_  i = ptext (sLit "IF_")  <> parens i -- locally visible
+mkJMP_ i = text "JMP_" <> parens i
+mkFN_  i = text "FN_"  <> parens i -- externally visible function
+mkIF_  i = text "IF_"  <> parens i -- locally visible
 
 -- from includes/Stg.h
 --
 mkC_,mkW_,mkP_ :: SDoc
 
-mkC_  = ptext (sLit "(C_)")        -- StgChar
-mkW_  = ptext (sLit "(W_)")        -- StgWord
-mkP_  = ptext (sLit "(P_)")        -- StgWord*
+mkC_  = text "(C_)"        -- StgChar
+mkW_  = text "(W_)"        -- StgWord
+mkP_  = text "(P_)"        -- StgWord*
 
 -- ---------------------------------------------------------------------
 --
@@ -823,8 +823,8 @@ pprAssign _ r1 r2
   | Just ty <- strangeRegType r1 = mkAssign (parens ty <> pprExpr1 r2)
   | otherwise                    = mkAssign (pprExpr r2)
     where mkAssign x = if r1 == CmmGlobal BaseReg
-                       then ptext (sLit "ASSIGN_BaseReg") <> parens x <> semi
-                       else pprReg r1 <> ptext (sLit " = ") <> x <> semi
+                       then text "ASSIGN_BaseReg" <> parens x <> semi
+                       else pprReg r1 <> text " = " <> x <> semi
 
 -- ---------------------------------------------------------------------
 -- Registers
@@ -873,10 +873,10 @@ isStrangeTypeGlobal BaseReg             = True
 isStrangeTypeGlobal r                   = isFixedPtrGlobalReg r
 
 strangeRegType :: CmmReg -> Maybe SDoc
-strangeRegType (CmmGlobal CCCS) = Just (ptext (sLit "struct CostCentreStack_ *"))
-strangeRegType (CmmGlobal CurrentTSO) = Just (ptext (sLit "struct StgTSO_ *"))
-strangeRegType (CmmGlobal CurrentNursery) = Just (ptext (sLit "struct bdescr_ *"))
-strangeRegType (CmmGlobal BaseReg) = Just (ptext (sLit "struct StgRegTable_ *"))
+strangeRegType (CmmGlobal CCCS) = Just (text "struct CostCentreStack_ *")
+strangeRegType (CmmGlobal CurrentTSO) = Just (text "struct StgTSO_ *")
+strangeRegType (CmmGlobal CurrentNursery) = Just (text "struct bdescr_ *")
+strangeRegType (CmmGlobal BaseReg) = Just (text "struct StgRegTable_ *")
 strangeRegType _ = Nothing
 
 -- pprReg just prints the register name.
@@ -888,30 +888,30 @@ pprReg r = case r of
 
 pprAsPtrReg :: CmmReg -> SDoc
 pprAsPtrReg (CmmGlobal (VanillaReg n gcp))
-  = WARN( gcp /= VGcPtr, ppr n ) char 'R' <> int n <> ptext (sLit ".p")
+  = WARN( gcp /= VGcPtr, ppr n ) char 'R' <> int n <> text ".p"
 pprAsPtrReg other_reg = pprReg other_reg
 
 pprGlobalReg :: GlobalReg -> SDoc
 pprGlobalReg gr = case gr of
-    VanillaReg n _ -> char 'R' <> int n  <> ptext (sLit ".w")
+    VanillaReg n _ -> char 'R' <> int n  <> text ".w"
         -- pprGlobalReg prints a VanillaReg as a .w regardless
         -- Example:     R1.w = R1.w & (-0x8UL);
         --              JMP_(*R1.p);
     FloatReg   n   -> char 'F' <> int n
     DoubleReg  n   -> char 'D' <> int n
     LongReg    n   -> char 'L' <> int n
-    Sp             -> ptext (sLit "Sp")
-    SpLim          -> ptext (sLit "SpLim")
-    Hp             -> ptext (sLit "Hp")
-    HpLim          -> ptext (sLit "HpLim")
-    CCCS           -> ptext (sLit "CCCS")
-    CurrentTSO     -> ptext (sLit "CurrentTSO")
-    CurrentNursery -> ptext (sLit "CurrentNursery")
-    HpAlloc        -> ptext (sLit "HpAlloc")
-    BaseReg        -> ptext (sLit "BaseReg")
-    EagerBlackholeInfo -> ptext (sLit "stg_EAGER_BLACKHOLE_info")
-    GCEnter1       -> ptext (sLit "stg_gc_enter_1")
-    GCFun          -> ptext (sLit "stg_gc_fun")
+    Sp             -> text "Sp"
+    SpLim          -> text "SpLim"
+    Hp             -> text "Hp"
+    HpLim          -> text "HpLim"
+    CCCS           -> text "CCCS"
+    CurrentTSO     -> text "CurrentTSO"
+    CurrentNursery -> text "CurrentNursery"
+    HpAlloc        -> text "HpAlloc"
+    BaseReg        -> text "BaseReg"
+    EagerBlackholeInfo -> text "stg_EAGER_BLACKHOLE_info"
+    GCEnter1       -> text "stg_gc_enter_1"
+    GCFun          -> text "stg_gc_fun"
     other          -> panic $ "pprGlobalReg: Unsupported register: " ++ show other
 
 pprLocalReg :: LocalReg -> SDoc
@@ -931,12 +931,12 @@ pprCall ppr_fn cconv results args
   where
      ppr_assign []           rhs = rhs
      ppr_assign [(one,hint)] rhs
-         = pprLocalReg one <> ptext (sLit " = ")
+         = pprLocalReg one <> text " = "
                  <> pprUnHint hint (localRegType one) <> rhs
      ppr_assign _other _rhs = panic "pprCall: multiple results"
 
      pprArg (expr, AddrHint)
-        = cCast (ptext (sLit "void *")) expr
+        = cCast (text "void *") expr
         -- see comment by machRepHintCType below
      pprArg (expr, SignedHint)
         = sdocWithDynFlags $ \dflags ->
@@ -985,8 +985,8 @@ pprExternDecl _in_srt lbl
         hcat [ visibility, label_type lbl,
                lparen, ppr lbl, text ");" ]
  where
-  label_type lbl | isCFunctionLabel lbl = ptext (sLit "F_")
-                 | otherwise            = ptext (sLit "I_")
+  label_type lbl | isCFunctionLabel lbl = text "F_"
+                 | otherwise            = text "I_"
 
   visibility
      | externallyVisibleCLabel lbl = char 'E'
@@ -996,7 +996,7 @@ pprExternDecl _in_srt lbl
   -- we must generate an appropriate prototype for it, so that the C compiler will
   -- add the @n suffix to the label (#2276)
   stdcall_decl sz = sdocWithDynFlags $ \dflags ->
-        ptext (sLit "extern __attribute__((stdcall)) void ") <> ppr lbl
+        text "extern __attribute__((stdcall)) void " <> ppr lbl
         <> parens (commafy (replicate (sz `quot` wORD_SIZE dflags) (machRep_U_CType (wordWidth dflags))))
         <> semi
 
@@ -1076,11 +1076,11 @@ cLoad :: CmmExpr -> CmmType -> SDoc
 cLoad expr rep
     = sdocWithPlatform $ \platform ->
       if bewareLoadStoreAlignment (platformArch platform)
-      then let decl = machRepCType rep <+> ptext (sLit "x") <> semi
-               struct = ptext (sLit "struct") <+> braces (decl)
-               packed_attr = ptext (sLit "__attribute__((packed))")
+      then let decl = machRepCType rep <+> text "x" <> semi
+               struct = text "struct" <+> braces (decl)
+               packed_attr = text "__attribute__((packed))"
                cast = parens (struct <+> packed_attr <> char '*')
-           in parens (cast <+> pprExpr1 expr) <> ptext (sLit "->x")
+           in parens (cast <+> pprExpr1 expr) <> text "->x"
       else char '*' <> parens (cCast (machRepPtrCType rep) expr)
     where -- On these platforms, unaligned loads are known to cause problems
           bewareLoadStoreAlignment ArchAlpha    = True
@@ -1102,14 +1102,14 @@ isCmmWordType dflags ty = not (isFloatType ty)
 -- argument, we always cast the argument to (void *), to avoid warnings from
 -- the C compiler.
 machRepHintCType :: CmmType -> ForeignHint -> SDoc
-machRepHintCType _   AddrHint   = ptext (sLit "void *")
+machRepHintCType _   AddrHint   = text "void *"
 machRepHintCType rep SignedHint = machRep_S_CType (typeWidth rep)
 machRepHintCType rep _other     = machRepCType rep
 
 machRepPtrCType :: CmmType -> SDoc
 machRepPtrCType r
  = sdocWithDynFlags $ \dflags ->
-   if isCmmWordType dflags r then ptext (sLit "P_")
+   if isCmmWordType dflags r then text "P_"
                              else machRepCType r <> char '*'
 
 machRepCType :: CmmType -> SDoc
@@ -1119,30 +1119,30 @@ machRepCType ty | isFloatType ty = machRep_F_CType w
                   w = typeWidth ty
 
 machRep_F_CType :: Width -> SDoc
-machRep_F_CType W32 = ptext (sLit "StgFloat") -- ToDo: correct?
-machRep_F_CType W64 = ptext (sLit "StgDouble")
+machRep_F_CType W32 = text "StgFloat" -- ToDo: correct?
+machRep_F_CType W64 = text "StgDouble"
 machRep_F_CType _   = panic "machRep_F_CType"
 
 machRep_U_CType :: Width -> SDoc
 machRep_U_CType w
  = sdocWithDynFlags $ \dflags ->
    case w of
-   _ | w == wordWidth dflags -> ptext (sLit "W_")
-   W8  -> ptext (sLit "StgWord8")
-   W16 -> ptext (sLit "StgWord16")
-   W32 -> ptext (sLit "StgWord32")
-   W64 -> ptext (sLit "StgWord64")
+   _ | w == wordWidth dflags -> text "W_"
+   W8  -> text "StgWord8"
+   W16 -> text "StgWord16"
+   W32 -> text "StgWord32"
+   W64 -> text "StgWord64"
    _   -> panic "machRep_U_CType"
 
 machRep_S_CType :: Width -> SDoc
 machRep_S_CType w
  = sdocWithDynFlags $ \dflags ->
    case w of
-   _ | w == wordWidth dflags -> ptext (sLit "I_")
-   W8  -> ptext (sLit "StgInt8")
-   W16 -> ptext (sLit "StgInt16")
-   W32 -> ptext (sLit "StgInt32")
-   W64 -> ptext (sLit "StgInt64")
+   _ | w == wordWidth dflags -> text "I_"
+   W8  -> text "StgInt8"
+   W16 -> text "StgInt16"
+   W32 -> text "StgInt32"
+   W64 -> text "StgInt64"
    _   -> panic "machRep_S_CType"
 
 
@@ -1218,8 +1218,8 @@ commafy xs = hsep $ punctuate comma xs
 pprHexVal :: Integer -> Width -> SDoc
 pprHexVal w rep
   | w < 0     = parens (char '-' <>
-                    ptext (sLit "0x") <> intToDoc (-w) <> repsuffix rep)
-  | otherwise =     ptext (sLit "0x") <> intToDoc   w  <> repsuffix rep
+                    text "0x" <> intToDoc (-w) <> repsuffix rep)
+  | otherwise =     text "0x" <> intToDoc   w  <> repsuffix rep
   where
         -- type suffix for literals:
         -- Integer literals are unsigned in Cmm/C.  We explicitly cast to
@@ -1229,8 +1229,8 @@ pprHexVal w rep
 
       repsuffix W64 = sdocWithDynFlags $ \dflags ->
                if cINT_SIZE       dflags == 8 then char 'U'
-          else if cLONG_SIZE      dflags == 8 then ptext (sLit "UL")
-          else if cLONG_LONG_SIZE dflags == 8 then ptext (sLit "ULL")
+          else if cLONG_SIZE      dflags == 8 then text "UL"
+          else if cLONG_LONG_SIZE dflags == 8 then text "ULL"
           else panic "pprHexVal: Can't find a 64-bit type"
       repsuffix _ = char 'U'
 

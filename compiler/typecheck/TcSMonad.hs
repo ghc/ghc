@@ -143,7 +143,6 @@ import VarSet
 import Outputable
 import Bag
 import UniqSupply
-import FastString
 import Util
 import TcRnTypes
 
@@ -317,15 +316,15 @@ instance Outputable WorkList where
           , wl_rest = rest, wl_implics = implics, wl_deriv = ders })
    = text "WL" <+> (braces $
      vcat [ ppUnless (null eqs) $
-            ptext (sLit "Eqs =") <+> vcat (map ppr eqs)
+            text "Eqs =" <+> vcat (map ppr eqs)
           , ppUnless (null feqs) $
-            ptext (sLit "Funeqs =") <+> vcat (map ppr feqs)
+            text "Funeqs =" <+> vcat (map ppr feqs)
           , ppUnless (null rest) $
-            ptext (sLit "Non-eqs =") <+> vcat (map ppr rest)
+            text "Non-eqs =" <+> vcat (map ppr rest)
           , ppUnless (null ders) $
-            ptext (sLit "Derived =") <+> vcat (map ppr ders)
+            text "Derived =" <+> vcat (map ppr ders)
           , ppUnless (isEmptyBag implics) $
-            ptext (sLit "Implics =") <+> vcat (map ppr (bagToList implics))
+            text "Implics =" <+> vcat (map ppr (bagToList implics))
           ])
 
 
@@ -1060,16 +1059,16 @@ instance Outputable InertCans where
           , inert_insols = insols, inert_count = count })
     = braces $ vcat
       [ ppUnless (isEmptyVarEnv eqs) $
-        ptext (sLit "Equalities:")
+        text "Equalities:"
           <+> pprCts (foldVarEnv (\eqs rest -> listToBag eqs `andCts` rest) emptyCts eqs)
       , ppUnless (isEmptyTcAppMap funeqs) $
-        ptext (sLit "Type-function equalities =") <+> pprCts (funEqsToBag funeqs)
+        text "Type-function equalities =" <+> pprCts (funEqsToBag funeqs)
       , ppUnless (isEmptyTcAppMap dicts) $
-        ptext (sLit "Dictionaries =") <+> pprCts (dictsToBag dicts)
+        text "Dictionaries =" <+> pprCts (dictsToBag dicts)
       , ppUnless (isEmptyTcAppMap safehask) $
-        ptext (sLit "Safe Haskell unsafe overlap =") <+> pprCts (dictsToBag safehask)
+        text "Safe Haskell unsafe overlap =" <+> pprCts (dictsToBag safehask)
       , ppUnless (isEmptyCts irreds) $
-        ptext (sLit "Irreds =") <+> pprCts irreds
+        text "Irreds =" <+> pprCts irreds
       , ppUnless (isEmptyCts insols) $
         text "Insolubles =" <+> pprCts insols
       , ppUnless (isEmptyVarEnv model) $
@@ -1185,7 +1184,7 @@ addInertEq ct@(CTyEqCan { cc_tyvar = tv })
        ; unless (isEmptyWorkList kicked_out) $
          do { updWorkListTcS (appendWorkList kicked_out)
             ; csTraceTcS $
-               hang (ptext (sLit "Kick out, tv =") <+> ppr tv)
+               hang (text "Kick out, tv =" <+> ppr tv)
                   2 (vcat [ text "n-kicked =" <+> int (workListSize kicked_out)
                           , ppr kicked_out ]) }
 
@@ -1237,8 +1236,8 @@ emitDerivedShadows IC { inert_eqs      = tv_eqs
   = return ()
   | otherwise
   = do { traceTcS "Emit derived shadows:" $
-         vcat [ ptext (sLit "tyvar =") <+> ppr new_tv
-              , ptext (sLit "shadows =") <+> vcat (map ppr shadows) ]
+         vcat [ text "tyvar =" <+> ppr new_tv
+              , text "shadows =" <+> vcat (map ppr shadows) ]
        ; emitWork shadows }
   where
     shadows = foldDicts  get_ct dicts    $
@@ -1475,7 +1474,7 @@ kickOutAfterUnification new_tv
 
        ; unless (isEmptyWorkList kicked_out) $
          csTraceTcS $
-         hang (ptext (sLit "Kick out (unify), tv =") <+> ppr new_tv)
+         hang (text "Kick out (unify), tv =" <+> ppr new_tv)
             2 (vcat [ text "n-kicked =" <+> int (workListSize kicked_out)
                     , text "kicked_out =" <+> ppr kicked_out
                     , text "Residual inerts =" <+> ppr ics2 ])
@@ -2356,7 +2355,7 @@ traceFireTcS ev doc
   = TcS $ \env -> csTraceTcM 1 $
     do { n <- TcM.readTcRef (tcs_count env)
        ; tclvl <- TcM.getTcLevel
-       ; return (hang (int n <> brackets (ptext (sLit "U:") <> ppr tclvl
+       ; return (hang (int n <> brackets (text "U:" <> ppr tclvl
                                           <> ppr (ctLocDepth (ctEvLoc ev)))
                        <+> doc <> colon)
                      4 (ppr ev)) }
@@ -2415,7 +2414,7 @@ runTcSWithEvBinds solve_deriveds ev_binds_var tcs
 
        ; count <- TcM.readTcRef step_count
        ; when (count > 0) $
-         csTraceTcM 0 $ return (ptext (sLit "Constraint solver steps =") <+> int count)
+         csTraceTcM 0 $ return (text "Constraint solver steps =" <+> int count)
 
 #ifdef DEBUG
        ; whenIsJust ev_binds_var $ \ebv ->
@@ -2701,7 +2700,7 @@ checkWellStagedDFun pred dfun_id loc
     do { use_stage <- TcM.getStage
        ; TcM.checkWellStaged pp_thing bind_lvl (thLevel use_stage) }
   where
-    pp_thing = ptext (sLit "instance for") <+> quotes (ppr pred)
+    pp_thing = text "instance for" <+> quotes (ppr pred)
     bind_lvl = TcM.topIdLvl dfun_id
 
 pprEq :: TcType -> TcType -> SDoc

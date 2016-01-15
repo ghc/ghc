@@ -141,7 +141,7 @@ mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
        ; let cxt = fromMaybe (noLoc []) mcxt
        ; (cls, tparams,ann) <- checkTyClHdr True tycl_hdr
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
-       ; tyvars <- checkTyVarsP (ptext (sLit "class")) whereDots cls tparams
+       ; tyvars <- checkTyVarsP (text "class") whereDots cls tparams
        ; at_defs <- mapM (eitherToP . mkATDefault) at_insts
        ; return (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls, tcdTyVars = tyvars
                                   , tcdFDs = snd (unLoc fds)
@@ -160,7 +160,7 @@ mkATDefault :: LTyFamInstDecl RdrName
 -- from Convert.hs
 mkATDefault (L loc (TyFamInstDecl { tfid_eqn = L _ e }))
       | TyFamEqn { tfe_tycon = tc, tfe_pats = pats, tfe_rhs = rhs } <- e
-      = do { tvs <- checkTyVars (ptext (sLit "default")) equalsDots tc (hsib_body pats)
+      = do { tvs <- checkTyVars (text "default") equalsDots tc (hsib_body pats)
            ; return (L loc (TyFamEqn { tfe_tycon = tc
                                      , tfe_pats = tvs
                                      , tfe_rhs = rhs })) }
@@ -206,7 +206,7 @@ mkTySynonym :: SrcSpan
 mkTySynonym loc lhs rhs
   = do { (tc, tparams,ann) <- checkTyClHdr False lhs
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
-       ; tyvars <- checkTyVarsP (ptext (sLit "type")) equalsDots tc tparams
+       ; tyvars <- checkTyVarsP (text "type") equalsDots tc tparams
        ; return (L loc (SynDecl { tcdLName = tc, tcdTyVars = tyvars
                                 , tcdRhs = rhs, tcdFVs = placeHolderNames })) }
 
@@ -663,17 +663,17 @@ checkTyVars pp_what equals_or_where tc tparms
         | isRdrTyVar tv    = return (L l (UserTyVar (L ltv tv)))
     chk t@(L loc _)
         = Left (loc,
-                vcat [ ptext (sLit "Unexpected type") <+> quotes (ppr t)
-                     , ptext (sLit "In the") <+> pp_what <+> ptext (sLit "declaration for") <+> quotes (ppr tc)
-                     , vcat[ (ptext (sLit "A") <+> pp_what <+> ptext (sLit "declaration should have form"))
+                vcat [ text "Unexpected type" <+> quotes (ppr t)
+                     , text "In the" <+> pp_what <+> ptext (sLit "declaration for") <+> quotes (ppr tc)
+                     , vcat[ (text "A" <+> pp_what <+> ptext (sLit "declaration should have form"))
                      , nest 2 (pp_what <+> ppr tc
                                        <+> hsep (map text (takeList tparms allNameStrings))
                                        <+> equals_or_where) ] ])
 
 whereDots, equalsDots :: SDoc
 -- Second argument to checkTyVars
-whereDots  = ptext (sLit "where ...")
-equalsDots = ptext (sLit "= ...")
+whereDots  = text "where ..."
+equalsDots = text "= ..."
 
 checkDatatypeContext :: Maybe (LHsContext RdrName) -> P ()
 checkDatatypeContext Nothing = return ()

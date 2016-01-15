@@ -51,7 +51,6 @@ import Util
 import ListSetOps
 import SrcLoc
 import Outputable
-import FastString
 import BasicTypes
 import Module
 import qualified GHC.LanguageExtensions as LangExt
@@ -210,9 +209,9 @@ checkAmbiguity ctxt ty
   = return ()
  where
    mk_msg allow_ambiguous
-     = vcat [ ptext (sLit "In the ambiguity check for") <+> what
+     = vcat [ text "In the ambiguity check for" <+> what
             , ppUnless allow_ambiguous ambig_msg ]
-   ambig_msg = ptext (sLit "To defer the ambiguity check to use sites, enable AllowAmbiguousTypes")
+   ambig_msg = text "To defer the ambiguity check to use sites, enable AllowAmbiguousTypes"
    what | Just n <- isSigMaybe ctxt = quotes (ppr n)
         | otherwise                 = pprUserTypeCtxt ctxt
 
@@ -415,9 +414,9 @@ data Rank = ArbitraryRank         -- Any rank ok
           | MustBeMonoType  -- Monotype regardless of flags
 
 rankZeroMonoType, tyConArgMonoType, synArgMonoType :: Rank
-rankZeroMonoType = MonoType (ptext (sLit "Perhaps you intended to use RankNTypes or Rank2Types"))
-tyConArgMonoType = MonoType (ptext (sLit "GHC doesn't yet support impredicative polymorphism"))
-synArgMonoType   = MonoType (ptext (sLit "Perhaps you intended to use LiberalTypeSynonyms"))
+rankZeroMonoType = MonoType (text "Perhaps you intended to use RankNTypes or Rank2Types")
+tyConArgMonoType = MonoType (text "GHC doesn't yet support impredicative polymorphism")
+synArgMonoType   = MonoType (text "Perhaps you intended to use LiberalTypeSynonyms")
 
 funArgResRank :: Rank -> (Rank, Rank)             -- Function argument and result
 funArgResRank (LimitedRank _ arg_rank) = (arg_rank, LimitedRank (forAllAllowed arg_rank) arg_rank)
@@ -583,11 +582,11 @@ check_arg_type env ctxt rank ty
 forAllTyErr :: TidyEnv -> Rank -> Type -> (TidyEnv, SDoc)
 forAllTyErr env rank ty
    = ( env
-     , vcat [ hang (ptext (sLit "Illegal polymorphic or qualified type:")) 2 (ppr_tidy env ty)
+     , vcat [ hang (text "Illegal polymorphic or qualified type:") 2 (ppr_tidy env ty)
             , suggestion ] )
   where
     suggestion = case rank of
-                   LimitedRank {} -> ptext (sLit "Perhaps you intended to use RankNTypes or Rank2Types")
+                   LimitedRank {} -> text "Perhaps you intended to use RankNTypes or Rank2Types"
                    MonoType d     -> d
                    _              -> Outputable.empty -- Polytype is always illegal
 
@@ -600,11 +599,11 @@ forAllEscapeErr env ty tau_kind
                  , text "of kind:" <+> ppr_tidy env tau_kind ]) )
 
 unliftedArgErr, ubxArgTyErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
-unliftedArgErr  env ty = (env, sep [ptext (sLit "Illegal unlifted type:"), ppr_tidy env ty])
-ubxArgTyErr     env ty = (env, sep [ptext (sLit "Illegal unboxed tuple type as function argument:"), ppr_tidy env ty])
+unliftedArgErr  env ty = (env, sep [text "Illegal unlifted type:", ppr_tidy env ty])
+ubxArgTyErr     env ty = (env, sep [text "Illegal unboxed tuple type as function argument:", ppr_tidy env ty])
 
 kindErr :: TidyEnv -> Kind -> (TidyEnv, SDoc)
-kindErr env kind = (env, sep [ptext (sLit "Expecting an ordinary type, but found a type of kind"), ppr_tidy env kind])
+kindErr env kind = (env, sep [text "Expecting an ordinary type, but found a type of kind", ppr_tidy env kind])
 
 {-
 Note [Liberal type synonyms]
@@ -826,7 +825,7 @@ okIPCtxt DefaultDeclCtxt   = False
 badIPPred :: TidyEnv -> PredType -> (TidyEnv, SDoc)
 badIPPred env pred
   = ( env
-    , ptext (sLit "Illegal implicit parameter") <+> quotes (ppr_tidy env pred) )
+    , text "Illegal implicit parameter" <+> quotes (ppr_tidy env pred) )
 
 {-
 Note [Kind polymorphic type classes]
@@ -852,38 +851,38 @@ Flexibility check:
 checkThetaCtxt :: UserTypeCtxt -> ThetaType -> TidyEnv -> TcM (TidyEnv, SDoc)
 checkThetaCtxt ctxt theta env
   = return ( env
-           , vcat [ ptext (sLit "In the context:") <+> pprTheta (tidyTypes env theta)
-                  , ptext (sLit "While checking") <+> pprUserTypeCtxt ctxt ] )
+           , vcat [ text "In the context:" <+> pprTheta (tidyTypes env theta)
+                  , text "While checking" <+> pprUserTypeCtxt ctxt ] )
 
 eqPredTyErr, predTupleErr, predIrredErr, predSuperClassErr :: TidyEnv -> PredType -> (TidyEnv, SDoc)
 eqPredTyErr  env pred
   = ( env
-    , ptext (sLit "Illegal equational constraint") <+> ppr_tidy env pred $$
-      parens (ptext (sLit "Use GADTs or TypeFamilies to permit this")) )
+    , text "Illegal equational constraint" <+> ppr_tidy env pred $$
+      parens (text "Use GADTs or TypeFamilies to permit this") )
 predTupleErr env pred
   = ( env
-    , hang (ptext (sLit "Illegal tuple constraint:") <+> ppr_tidy env pred)
+    , hang (text "Illegal tuple constraint:" <+> ppr_tidy env pred)
          2 (parens constraintKindsMsg) )
 predIrredErr env pred
   = ( env
-    , hang (ptext (sLit "Illegal constraint:") <+> ppr_tidy env pred)
+    , hang (text "Illegal constraint:" <+> ppr_tidy env pred)
          2 (parens constraintKindsMsg) )
 predSuperClassErr env pred
   = ( env
-    , hang (ptext (sLit "Illegal constraint") <+> quotes (ppr_tidy env pred)
-            <+> ptext (sLit "in a superclass context"))
+    , hang (text "Illegal constraint" <+> quotes (ppr_tidy env pred)
+            <+> text "in a superclass context")
          2 (parens undecidableMsg) )
 
 predTyVarErr :: PredType -> SDoc   -- type is already tidied!
 predTyVarErr pred
-  = vcat [ hang (ptext (sLit "Non type-variable argument"))
-              2 (ptext (sLit "in the constraint:") <+> ppr pred)
-         , parens (ptext (sLit "Use FlexibleContexts to permit this")) ]
+  = vcat [ hang (text "Non type-variable argument")
+              2 (text "in the constraint:" <+> ppr pred)
+         , parens (text "Use FlexibleContexts to permit this") ]
 
 constraintSynErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
 constraintSynErr env kind
   = ( env
-    , hang (ptext (sLit "Illegal constraint synonym of kind:") <+> quotes (ppr_tidy env kind))
+    , hang (text "Illegal constraint synonym of kind:" <+> quotes (ppr_tidy env kind))
          2 (parens constraintKindsMsg) )
 
 dupPredWarn :: TidyEnv -> [[PredType]] -> (TidyEnv, SDoc)
@@ -912,13 +911,13 @@ tyConArityErr tc tks
 
 arityErr :: Outputable a => String -> a -> Int -> Int -> SDoc
 arityErr what name n m
-  = hsep [ ptext (sLit "The") <+> text what, quotes (ppr name), ptext (sLit "should have"),
+  = hsep [ text "The" <+> text what, quotes (ppr name), text "should have",
            n_arguments <> comma, text "but has been given",
            if m==0 then text "none" else int m]
     where
-        n_arguments | n == 0 = ptext (sLit "no arguments")
-                    | n == 1 = ptext (sLit "1 argument")
-                    | True   = hsep [int n, ptext (sLit "arguments")]
+        n_arguments | n == 0 = text "no arguments"
+                    | n == 1 = text "1 argument"
+                    | True   = hsep [int n, text "arguments"]
 
 {-
 ************************************************************************
@@ -1007,7 +1006,7 @@ abstractClassKeys = [ heqTyConKey
 
 instTypeErr :: Class -> [Type] -> SDoc -> SDoc
 instTypeErr cls tys msg
-  = hang (hang (ptext (sLit "Illegal instance declaration for"))
+  = hang (hang (text "Illegal instance declaration for")
              2 (quotes (pprClassPred cls tys)))
        2 msg
 
@@ -1100,7 +1099,7 @@ checkValidInstance ctxt hs_type ty
         ; return (tvs, theta, clas, inst_tys) }
 
   | otherwise
-  = failWithTc (ptext (sLit "Malformed instance head:") <+> ppr tau)
+  = failWithTc (text "Malformed instance head:" <+> ppr tau)
   where
     (tvs, theta, tau) = tcSplitSigmaTy ty
 
@@ -1160,29 +1159,29 @@ checkInstTermination tys theta
      | pred_size >= head_size = addErrTc (smallerMsg what)
      | otherwise              = return ()
      where
-        what    = ptext (sLit "constraint") <+> quotes (ppr pred)
+        what    = text "constraint" <+> quotes (ppr pred)
         bad_tvs = fvType pred \\ head_fvs
 
 smallerMsg :: SDoc -> SDoc
 smallerMsg what
-  = vcat [ hang (ptext (sLit "The") <+> what)
-              2 (ptext (sLit "is no smaller than the instance head"))
+  = vcat [ hang (text "The" <+> what)
+              2 (text "is no smaller than the instance head")
          , parens undecidableMsg ]
 
 noMoreMsg :: [TcTyVar] -> SDoc -> SDoc
 noMoreMsg tvs what
-  = vcat [ hang (ptext (sLit "Variable") <> plural tvs <+> quotes (pprWithCommas ppr tvs)
-                <+> occurs <+> ptext (sLit "more often"))
-              2 (sep [ ptext (sLit "in the") <+> what
-                     , ptext (sLit "than in the instance head") ])
+  = vcat [ hang (text "Variable" <> plural tvs <+> quotes (pprWithCommas ppr tvs)
+                <+> occurs <+> text "more often")
+              2 (sep [ text "in the" <+> what
+                     , text "than in the instance head" ])
          , parens undecidableMsg ]
   where
-   occurs = if isSingleton tvs then ptext (sLit "occurs")
-                               else ptext (sLit "occur")
+   occurs = if isSingleton tvs then text "occurs"
+                               else text "occur"
 
 undecidableMsg, constraintKindsMsg :: SDoc
-undecidableMsg     = ptext (sLit "Use UndecidableInstances to permit this")
-constraintKindsMsg = ptext (sLit "Use ConstraintKinds to permit this")
+undecidableMsg     = text "Use UndecidableInstances to permit this"
+constraintKindsMsg = text "Use ConstraintKinds to permit this"
 
 {-
 Note [Associated type instances]
@@ -1307,14 +1306,14 @@ checkConsistentFamInst (Just (clas, mini_env)) fam_tc at_tvs at_tys
 
 badATErr :: Name -> Name -> SDoc
 badATErr clas op
-  = hsep [ptext (sLit "Class"), quotes (ppr clas),
-          ptext (sLit "does not have an associated type"), quotes (ppr op)]
+  = hsep [text "Class", quotes (ppr clas),
+          text "does not have an associated type", quotes (ppr op)]
 
 wrongATArgErr :: Type -> Type -> SDoc
 wrongATArgErr ty instTy =
-  sep [ ptext (sLit "Type indexes must match class instance head")
-      , ptext (sLit "Found") <+> quotes (ppr ty)
-        <+> ptext (sLit "but expected") <+> quotes (ppr instTy)
+  sep [ text "Type indexes must match class instance head"
+      , text "Found" <+> quotes (ppr ty)
+        <+> text "but expected" <+> quotes (ppr instTy)
       ]
 
 {-
@@ -1443,7 +1442,7 @@ checkFamInstRhs lhsTys famInsts
       | size <= sizeTypes tys     = Just (smallerMsg what)
       | otherwise                 = Nothing
       where
-        what    = ptext (sLit "type family application") <+> quotes (pprType (TyConApp tc tys))
+        what    = text "type family application" <+> quotes (pprType (TyConApp tc tys))
         bad_tvs = fvTypes tys \\ fvs
 
 checkValidFamPats :: TyCon -> [TyVar] -> [CoVar] -> [Type] -> TcM ()
@@ -1473,7 +1472,7 @@ checkValidFamPats fam_tc tvs cvs ty_pats
 
 wrongNumberOfParmsErr :: Arity -> SDoc
 wrongNumberOfParmsErr exp_arity
-  = ptext (sLit "Number of parameters must match family declaration; expected")
+  = text "Number of parameters must match family declaration; expected"
     <+> ppr exp_arity
 
 -- Ensure that no type family instances occur in a type.
@@ -1491,26 +1490,27 @@ isTyFamFree = null . tcTyFamInsts
 
 inaccessibleCoAxBranch :: CoAxiom br -> CoAxBranch -> SDoc
 inaccessibleCoAxBranch fi_ax cur_branch
-  = ptext (sLit "Type family instance equation is overlapped:") $$
+  = text "Type family instance equation is overlapped:" $$
     nest 2 (pprCoAxBranch fi_ax cur_branch)
 
 tyFamInstIllegalErr :: Type -> SDoc
 tyFamInstIllegalErr ty
-  = hang (ptext (sLit "Illegal type synonym family application in instance") <>
+  = hang (text "Illegal type synonym family application in instance" <>
          colon) 2 $
       ppr ty
 
 nestedMsg :: SDoc -> SDoc
 nestedMsg what
-  = sep [ ptext (sLit "Illegal nested") <+> what
+  = sep [ text "Illegal nested" <+> what
         , parens undecidableMsg ]
 
 famPatErr :: TyCon -> [TyVar] -> [Type] -> SDoc
 famPatErr fam_tc tvs pats
-  = hang (ptext (sLit "Family instance purports to bind type variable") <> plural tvs
+  = hang (text "Family instance purports to bind type variable" <> plural tvs
           <+> pprQuotedList tvs)
-       2 (hang (ptext (sLit "but the real LHS (expanding synonyms) is:"))
-             2 (pprTypeApp fam_tc (map expandTypeSynonyms pats) <+> ptext (sLit "= ...")))
+       2 (hang (text "but the real LHS (expanding synonyms) is:")
+             2 (pprTypeApp fam_tc (map expandTypeSynonyms pats) <+>
+                text "= ..."))
 
 {-
 ************************************************************************

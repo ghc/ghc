@@ -734,7 +734,7 @@ instance Outputable IfaceDeclExtras where
                                                  ppr_id_extras_s stuff]
 
 ppr_insts :: [IfaceInstABI] -> SDoc
-ppr_insts _ = ptext (sLit "<insts>")
+ppr_insts _ = text "<insts>"
 
 ppr_id_extras_s :: [IfaceIdExtras] -> SDoc
 ppr_id_extras_s stuff = vcat (map ppr_id_extras stuff)
@@ -1067,9 +1067,9 @@ checkFlagHash hsc_env iface = do
                                              (mi_module iface)
                                              putNameLiterally
     case old_hash == new_hash of
-        True  -> up_to_date (ptext $ sLit "Module flags unchanged")
+        True  -> up_to_date (text "Module flags unchanged")
         False -> out_of_date_hash "flags changed"
-                     (ptext $ sLit "  Module flags have changed")
+                     (text "  Module flags have changed")
                      old_hash new_hash
 
 -- If the direct imports of this module are resolved to targets that
@@ -1120,7 +1120,7 @@ needInterface :: Module -> (ModIface -> IfG RecompileRequired)
               -> IfG RecompileRequired
 needInterface mod continue
   = do  -- Load the imported interface if possible
-    let doc_str = sep [ptext (sLit "need version info for"), ppr mod]
+    let doc_str = sep [text "need version info for", ppr mod]
     traceHiDiffs (text "Checking usages for module" <+> ppr mod)
 
     mb_iface <- loadInterface doc_str mod ImportBySystem
@@ -1129,7 +1129,7 @@ needInterface mod continue
 
     case mb_iface of
       Failed _ -> do
-        traceHiDiffs (sep [ptext (sLit "Couldn't load interface for module"),
+        traceHiDiffs (sep [text "Couldn't load interface for module",
                            ppr mod])
         return MustCompile
                   -- Couldn't find or parse a module mentioned in the
@@ -1178,14 +1178,14 @@ checkModUsage this_pkg UsageHomeModule{
 
         -- CHECK EXPORT LIST
         checkMaybeHash reason maybe_old_export_hash new_export_hash
-            (ptext (sLit "  Export list changed")) $ do
+            (text "  Export list changed") $ do
 
         -- CHECK ITEMS ONE BY ONE
         recompile <- checkList [ checkEntityUsage reason new_decl_hash u
                                | u <- old_decl_hash]
         if recompileRequired recompile
           then return recompile     -- This one failed, so just bail out now
-          else up_to_date (ptext (sLit "  Great!  The bits I use are up to date"))
+          else up_to_date (text "  Great!  The bits I use are up to date")
 
 
 checkModUsage _this_pkg UsageFile{ usg_file_path = file,
@@ -1210,10 +1210,10 @@ checkModuleFingerprint :: String -> Fingerprint -> Fingerprint
                        -> IfG RecompileRequired
 checkModuleFingerprint reason old_mod_hash new_mod_hash
   | new_mod_hash == old_mod_hash
-  = up_to_date (ptext (sLit "Module fingerprint unchanged"))
+  = up_to_date (text "Module fingerprint unchanged")
 
   | otherwise
-  = out_of_date_hash reason (ptext (sLit "  Module fingerprint has changed"))
+  = out_of_date_hash reason (text "  Module fingerprint has changed")
                      old_mod_hash new_mod_hash
 
 ------------------------
@@ -1234,12 +1234,12 @@ checkEntityUsage reason new_hash (name,old_hash)
   = case new_hash name of
 
         Nothing       ->        -- We used it before, but it ain't there now
-                          out_of_date reason (sep [ptext (sLit "No longer exported:"), ppr name])
+                          out_of_date reason (sep [text "No longer exported:", ppr name])
 
         Just (_, new_hash)      -- It's there, but is it up to date?
           | new_hash == old_hash -> do traceHiDiffs (text "  Up to date" <+> ppr name <+> parens (ppr new_hash))
                                        return UpToDate
-          | otherwise            -> out_of_date_hash reason (ptext (sLit "  Out of date:") <+> ppr name)
+          | otherwise            -> out_of_date_hash reason (text "  Out of date:" <+> ppr name)
                                                      old_hash new_hash
 
 up_to_date :: SDoc -> IfG RecompileRequired
@@ -1250,7 +1250,7 @@ out_of_date reason msg = traceHiDiffs msg >> return (RecompBecause reason)
 
 out_of_date_hash :: String -> SDoc -> Fingerprint -> Fingerprint -> IfG RecompileRequired
 out_of_date_hash reason msg old_hash new_hash
-  = out_of_date reason (hsep [msg, ppr old_hash, ptext (sLit "->"), ppr new_hash])
+  = out_of_date reason (hsep [msg, ppr old_hash, text "->", ppr new_hash])
 
 ----------------------
 checkList :: [IfG RecompileRequired] -> IfG RecompileRequired

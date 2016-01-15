@@ -126,21 +126,21 @@ pprData (CmmString str)          = pprASCII str
 pprData (CmmUninitialised bytes) = keyword <> int bytes
     where keyword = sdocWithPlatform $ \platform ->
                     case platformOS platform of
-                    OSDarwin -> ptext (sLit ".space ")
-                    _        -> ptext (sLit ".skip ")
+                    OSDarwin -> text ".space "
+                    _        -> text ".skip "
 pprData (CmmStaticLit lit)       = pprDataItem lit
 
 pprGloblDecl :: CLabel -> SDoc
 pprGloblDecl lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = ptext (sLit ".globl ") <> ppr lbl
+  | otherwise = text ".globl " <> ppr lbl
 
 pprTypeAndSizeDecl :: CLabel -> SDoc
 pprTypeAndSizeDecl lbl
   = sdocWithPlatform $ \platform ->
     if platformOS platform == OSLinux && externallyVisibleCLabel lbl
-    then ptext (sLit ".type ") <>
-         ppr lbl <> ptext (sLit ", @object")
+    then text ".type " <>
+         ppr lbl <> text ", @object"
     else empty
 
 pprLabel :: CLabel -> SDoc
@@ -154,7 +154,7 @@ pprASCII str
   = vcat (map do1 str) $$ do1 0
     where
        do1 :: Word8 -> SDoc
-       do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
+       do1 w = text "\t.byte\t" <> int (fromIntegral w)
 
 
 -- -----------------------------------------------------------------------------
@@ -220,7 +220,7 @@ pprReg r
         _
          | i <= 31   -> int i      -- GPRs
          | i <= 63   -> int (i-32) -- FPRs
-         | otherwise -> ptext (sLit "very naughty powerpc register")
+         | otherwise -> text "very naughty powerpc register"
 
 
 
@@ -255,8 +255,8 @@ pprImm (ImmCLbl l)    = ppr l
 pprImm (ImmIndex l i) = ppr l <> char '+' <> int i
 pprImm (ImmLit s)     = s
 
-pprImm (ImmFloat _)  = ptext (sLit "naughty float immediate")
-pprImm (ImmDouble _) = ptext (sLit "naughty double immediate")
+pprImm (ImmFloat _)  = text "naughty float immediate"
+pprImm (ImmDouble _) = text "naughty double immediate"
 
 pprImm (ImmConstantSum a b) = pprImm a <> char '+' <> pprImm b
 pprImm (ImmConstantDiff a b) = pprImm a <> char '-'
@@ -295,7 +295,7 @@ pprImm (HIGHESTA i)
 
 pprAddr :: AddrMode -> SDoc
 pprAddr (AddrRegReg r1 r2)
-  = pprReg r1 <+> ptext (sLit ", ") <+> pprReg r2
+  = pprReg r1 <+> text ", " <+> pprReg r2
 
 pprAddr (AddrRegImm r1 (ImmInt i)) = hcat [ int i, char '(', pprReg r1, char ')' ]
 pprAddr (AddrRegImm r1 (ImmInteger i)) = hcat [ integer i, char '(', pprReg r1, char ')' ]
@@ -338,30 +338,30 @@ pprDataItem lit
         imm = litToImm lit
         archPPC_64 dflags = not $ target32Bit $ targetPlatform dflags
 
-        ppr_item II8   _ _ = [ptext (sLit "\t.byte\t") <> pprImm imm]
+        ppr_item II8   _ _ = [text "\t.byte\t" <> pprImm imm]
 
-        ppr_item II32  _ _ = [ptext (sLit "\t.long\t") <> pprImm imm]
+        ppr_item II32  _ _ = [text "\t.long\t" <> pprImm imm]
 
         ppr_item II64 _ dflags
-           | archPPC_64 dflags = [ptext (sLit "\t.quad\t") <> pprImm imm]
+           | archPPC_64 dflags = [text "\t.quad\t" <> pprImm imm]
 
 
         ppr_item FF32 (CmmFloat r _) _
            = let bs = floatToBytes (fromRational r)
-             in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm (ImmInt b)) bs
+             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
 
         ppr_item FF64 (CmmFloat r _) _
            = let bs = doubleToBytes (fromRational r)
-             in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm (ImmInt b)) bs
+             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
 
-        ppr_item II16 _ _      = [ptext (sLit "\t.short\t") <> pprImm imm]
+        ppr_item II16 _ _      = [text "\t.short\t" <> pprImm imm]
 
         ppr_item II64 (CmmInt x _) dflags
            | not(archPPC_64 dflags) =
-                [ptext (sLit "\t.long\t")
+                [text "\t.long\t"
                     <> int (fromIntegral
                         (fromIntegral (x `shiftR` 32) :: Word32)),
-                 ptext (sLit "\t.long\t")
+                 text "\t.long\t"
                     <> int (fromIntegral (fromIntegral x :: Word32))]
 
         ppr_item _ _ _
@@ -374,8 +374,8 @@ pprInstr (COMMENT _) = empty -- nuke 'em
 {-
 pprInstr (COMMENT s) =
      if platformOS platform == OSLinux
-     then ptext (sLit "# ") <> ftext s
-     else ptext (sLit "; ") <> ftext s
+     then text "# " <> ftext s
+     else text "; " <> ftext s
 -}
 pprInstr (DELTA d)
    = pprInstr (COMMENT (mkFastString ("\tdelta = " ++ show d)))
@@ -389,24 +389,24 @@ pprInstr (LDATA _ _)
 {-
 pprInstr (SPILL reg slot)
    = hcat [
-           ptext (sLit "\tSPILL"),
+           text "\tSPILL",
         char '\t',
         pprReg reg,
         comma,
-        ptext (sLit "SLOT") <> parens (int slot)]
+        text "SLOT" <> parens (int slot)]
 
 pprInstr (RELOAD slot reg)
    = hcat [
-           ptext (sLit "\tRELOAD"),
+           text "\tRELOAD",
         char '\t',
-        ptext (sLit "SLOT") <> parens (int slot),
+        text "SLOT" <> parens (int slot),
         comma,
         pprReg reg]
 -}
 
 pprInstr (LD fmt reg addr) = hcat [
         char '\t',
-        ptext (sLit "l"),
+        text "l",
         ptext (case fmt of
             II8  -> sLit "bz"
             II16 -> sLit "hz"
@@ -420,7 +420,7 @@ pprInstr (LD fmt reg addr) = hcat [
                      AddrRegReg _ _ -> char 'x',
         char '\t',
         pprReg reg,
-        ptext (sLit ", "),
+        text ", ",
         pprAddr addr
     ]
 pprInstr (LDFAR fmt reg (AddrRegImm source off)) =
@@ -434,7 +434,7 @@ pprInstr (LDFAR _ _ _) =
 
 pprInstr (LA fmt reg addr) = hcat [
         char '\t',
-        ptext (sLit "l"),
+        text "l",
         ptext (case fmt of
             II8  -> sLit "ba"
             II16 -> sLit "ha"
@@ -448,18 +448,18 @@ pprInstr (LA fmt reg addr) = hcat [
                      AddrRegReg _ _ -> char 'x',
         char '\t',
         pprReg reg,
-        ptext (sLit ", "),
+        text ", ",
         pprAddr addr
     ]
 pprInstr (ST fmt reg addr) = hcat [
         char '\t',
-        ptext (sLit "st"),
+        text "st",
         pprFormat fmt,
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
         char '\t',
         pprReg reg,
-        ptext (sLit ", "),
+        text ", ",
         pprAddr addr
     ]
 pprInstr (STFAR fmt reg (AddrRegImm source off)) =
@@ -472,29 +472,29 @@ pprInstr (STFAR _ _ _) =
    panic "PPC.Ppr.pprInstr STFAR: no match"
 pprInstr (STU fmt reg addr) = hcat [
         char '\t',
-        ptext (sLit "st"),
+        text "st",
         pprFormat fmt,
-        ptext (sLit "u\t"),
+        text "u\t",
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
         pprReg reg,
-        ptext (sLit ", "),
+        text ", ",
         pprAddr addr
     ]
 pprInstr (LIS reg imm) = hcat [
         char '\t',
-        ptext (sLit "lis"),
+        text "lis",
         char '\t',
         pprReg reg,
-        ptext (sLit ", "),
+        text ", ",
         pprImm imm
     ]
 pprInstr (LI reg imm) = hcat [
         char '\t',
-        ptext (sLit "li"),
+        text "li",
         char '\t',
         pprReg reg,
-        ptext (sLit ", "),
+        text ", ",
         pprImm imm
     ]
 pprInstr (MR reg1 reg2)
@@ -503,11 +503,11 @@ pprInstr (MR reg1 reg2)
         char '\t',
         sdocWithPlatform $ \platform ->
         case targetClassOfReg platform reg1 of
-            RcInteger -> ptext (sLit "mr")
-            _ -> ptext (sLit "fmr"),
+            RcInteger -> text "mr"
+            _ -> text "fmr",
         char '\t',
         pprReg reg1,
-        ptext (sLit ", "),
+        text ", ",
         pprReg reg2
     ]
 pprInstr (CMP fmt reg ri) = hcat [
@@ -515,12 +515,12 @@ pprInstr (CMP fmt reg ri) = hcat [
         op,
         char '\t',
         pprReg reg,
-        ptext (sLit ", "),
+        text ", ",
         pprRI ri
     ]
     where
         op = hcat [
-                ptext (sLit "cmp"),
+                text "cmp",
                 pprFormat fmt,
                 case ri of
                     RIReg _ -> empty
@@ -531,12 +531,12 @@ pprInstr (CMPL fmt reg ri) = hcat [
         op,
         char '\t',
         pprReg reg,
-        ptext (sLit ", "),
+        text ", ",
         pprRI ri
     ]
     where
         op = hcat [
-                ptext (sLit "cmpl"),
+                text "cmpl",
                 pprFormat fmt,
                 case ri of
                     RIReg _ -> empty
@@ -544,7 +544,7 @@ pprInstr (CMPL fmt reg ri) = hcat [
             ]
 pprInstr (BCC cond blockid) = hcat [
         char '\t',
-        ptext (sLit "b"),
+        text "b",
         pprCond cond,
         char '\t',
         ppr lbl
@@ -553,12 +553,12 @@ pprInstr (BCC cond blockid) = hcat [
 
 pprInstr (BCCFAR cond blockid) = vcat [
         hcat [
-            ptext (sLit "\tb"),
+            text "\tb",
             pprCond (condNegate cond),
-            ptext (sLit "\t$+8")
+            text "\t$+8"
         ],
         hcat [
-            ptext (sLit "\tb\t"),
+            text "\tb\t",
             ppr lbl
         ]
     ]
@@ -566,48 +566,48 @@ pprInstr (BCCFAR cond blockid) = vcat [
 
 pprInstr (JMP lbl) = hcat [ -- an alias for b that takes a CLabel
         char '\t',
-        ptext (sLit "b"),
+        text "b",
         char '\t',
         ppr lbl
     ]
 
 pprInstr (MTCTR reg) = hcat [
         char '\t',
-        ptext (sLit "mtctr"),
+        text "mtctr",
         char '\t',
         pprReg reg
     ]
 pprInstr (BCTR _ _) = hcat [
         char '\t',
-        ptext (sLit "bctr")
+        text "bctr"
     ]
 pprInstr (BL lbl _) = hcat [
-        ptext (sLit "\tbl\t"),
+        text "\tbl\t",
         ppr lbl
     ]
 pprInstr (BCTRL _) = hcat [
         char '\t',
-        ptext (sLit "bctrl")
+        text "bctrl"
     ]
 pprInstr (ADD reg1 reg2 ri) = pprLogic (sLit "add") reg1 reg2 ri
 pprInstr (ADDI reg1 reg2 imm) = hcat [
         char '\t',
-        ptext (sLit "addi"),
+        text "addi",
         char '\t',
         pprReg reg1,
-        ptext (sLit ", "),
+        text ", ",
         pprReg reg2,
-        ptext (sLit ", "),
+        text ", ",
         pprImm imm
     ]
 pprInstr (ADDIS reg1 reg2 imm) = hcat [
         char '\t',
-        ptext (sLit "addis"),
+        text "addis",
         char '\t',
         pprReg reg1,
-        ptext (sLit ", "),
+        text ", ",
         pprReg reg2,
-        ptext (sLit ", "),
+        text ", ",
         pprImm imm
     ]
 
@@ -626,34 +626,34 @@ pprInstr (DIVWU reg1 reg2 reg3) = pprLogic (sLit "divwu") reg1 reg2 (RIReg reg3)
 pprInstr (DIVDU reg1 reg2 reg3) = pprLogic (sLit "divdu") reg1 reg2 (RIReg reg3)
 
 pprInstr (MULLW_MayOflo reg1 reg2 reg3) = vcat [
-         hcat [ ptext (sLit "\tmullwo\t"), pprReg reg1, ptext (sLit ", "),
-                                          pprReg reg2, ptext (sLit ", "),
+         hcat [ text "\tmullwo\t", pprReg reg1, ptext (sLit ", "),
+                                          pprReg reg2, text ", ",
                                           pprReg reg3 ],
-         hcat [ ptext (sLit "\tmfxer\t"),  pprReg reg1 ],
-         hcat [ ptext (sLit "\trlwinm\t"), pprReg reg1, ptext (sLit ", "),
-                                          pprReg reg1, ptext (sLit ", "),
-                                          ptext (sLit "2, 31, 31") ]
+         hcat [ text "\tmfxer\t",  pprReg reg1 ],
+         hcat [ text "\trlwinm\t", pprReg reg1, ptext (sLit ", "),
+                                          pprReg reg1, text ", ",
+                                          text "2, 31, 31" ]
     ]
 pprInstr (MULLD_MayOflo reg1 reg2 reg3) = vcat [
-         hcat [ ptext (sLit "\tmulldo\t"), pprReg reg1, ptext (sLit ", "),
-                                          pprReg reg2, ptext (sLit ", "),
+         hcat [ text "\tmulldo\t", pprReg reg1, ptext (sLit ", "),
+                                          pprReg reg2, text ", ",
                                           pprReg reg3 ],
-         hcat [ ptext (sLit "\tmfxer\t"),  pprReg reg1 ],
-         hcat [ ptext (sLit "\trlwinm\t"), pprReg reg1, ptext (sLit ", "),
-                                          pprReg reg1, ptext (sLit ", "),
-                                          ptext (sLit "2, 31, 31") ]
+         hcat [ text "\tmfxer\t",  pprReg reg1 ],
+         hcat [ text "\trlwinm\t", pprReg reg1, ptext (sLit ", "),
+                                          pprReg reg1, text ", ",
+                                          text "2, 31, 31" ]
     ]
 
         -- for some reason, "andi" doesn't exist.
         -- we'll use "andi." instead.
 pprInstr (AND reg1 reg2 (RIImm imm)) = hcat [
         char '\t',
-        ptext (sLit "andi."),
+        text "andi.",
         char '\t',
         pprReg reg1,
-        ptext (sLit ", "),
+        text ", ",
         pprReg reg2,
-        ptext (sLit ", "),
+        text ", ",
         pprImm imm
     ]
 pprInstr (AND reg1 reg2 ri) = pprLogic (sLit "and") reg1 reg2 ri
@@ -663,33 +663,33 @@ pprInstr (XOR reg1 reg2 ri) = pprLogic (sLit "xor") reg1 reg2 ri
 
 pprInstr (ORIS reg1 reg2 imm) = hcat [
         char '\t',
-        ptext (sLit "oris"),
+        text "oris",
         char '\t',
         pprReg reg1,
-        ptext (sLit ", "),
+        text ", ",
         pprReg reg2,
-        ptext (sLit ", "),
+        text ", ",
         pprImm imm
     ]
 
 pprInstr (XORIS reg1 reg2 imm) = hcat [
         char '\t',
-        ptext (sLit "xoris"),
+        text "xoris",
         char '\t',
         pprReg reg1,
-        ptext (sLit ", "),
+        text ", ",
         pprReg reg2,
-        ptext (sLit ", "),
+        text ", ",
         pprImm imm
     ]
 
 pprInstr (EXTS fmt reg1 reg2) = hcat [
         char '\t',
-        ptext (sLit "exts"),
+        text "exts",
         pprFormat fmt,
         char '\t',
         pprReg reg1,
-        ptext (sLit ", "),
+        text ", ",
         pprReg reg2
     ]
 
@@ -738,15 +738,15 @@ pprInstr (SRA fmt reg1 reg2 ri) =
          in pprLogic (sLit op) reg1 reg2 (limitShiftRI fmt ri)
 
 pprInstr (RLWINM reg1 reg2 sh mb me) = hcat [
-        ptext (sLit "\trlwinm\t"),
+        text "\trlwinm\t",
         pprReg reg1,
-        ptext (sLit ", "),
+        text ", ",
         pprReg reg2,
-        ptext (sLit ", "),
+        text ", ",
         int sh,
-        ptext (sLit ", "),
+        text ", ",
         int mb,
-        ptext (sLit ", "),
+        text ", ",
         int me
     ]
 
@@ -758,12 +758,12 @@ pprInstr (FNEG reg1 reg2) = pprUnary (sLit "fneg") reg1 reg2
 
 pprInstr (FCMP reg1 reg2) = hcat [
         char '\t',
-        ptext (sLit "fcmpu\tcr0, "),
+        text "fcmpu\tcr0, ",
             -- Note: we're using fcmpu, not fcmpo
             -- The difference is with fcmpo, compare with NaN is an invalid operation.
             -- We don't handle invalid fp ops, so we don't care
         pprReg reg1,
-        ptext (sLit ", "),
+        text ", ",
         pprReg reg2
     ]
 
@@ -773,48 +773,48 @@ pprInstr (FCFID reg1 reg2) = pprUnary (sLit "fcfid") reg1 reg2
 pprInstr (FRSP reg1 reg2) = pprUnary (sLit "frsp") reg1 reg2
 
 pprInstr (CRNOR dst src1 src2) = hcat [
-        ptext (sLit "\tcrnor\t"),
+        text "\tcrnor\t",
         int dst,
-        ptext (sLit ", "),
+        text ", ",
         int src1,
-        ptext (sLit ", "),
+        text ", ",
         int src2
     ]
 
 pprInstr (MFCR reg) = hcat [
         char '\t',
-        ptext (sLit "mfcr"),
+        text "mfcr",
         char '\t',
         pprReg reg
     ]
 
 pprInstr (MFLR reg) = hcat [
         char '\t',
-        ptext (sLit "mflr"),
+        text "mflr",
         char '\t',
         pprReg reg
     ]
 
 pprInstr (FETCHPC reg) = vcat [
-        ptext (sLit "\tbcl\t20,31,1f"),
-        hcat [ ptext (sLit "1:\tmflr\t"), pprReg reg ]
+        text "\tbcl\t20,31,1f",
+        hcat [ text "1:\tmflr\t", pprReg reg ]
     ]
 
 pprInstr (FETCHTOC reg lab) = vcat [
-        hcat [ ptext (sLit "0:\taddis\t"), pprReg reg,
-               ptext (sLit ",12,.TOC.-0b@ha") ],
-        hcat [ ptext (sLit "\taddi\t"), pprReg reg,
+        hcat [ text "0:\taddis\t", pprReg reg,
+               text ",12,.TOC.-0b@ha" ],
+        hcat [ text "\taddi\t", pprReg reg,
                char ',', pprReg reg,
-               ptext (sLit ",.TOC.-0b@l") ],
-        hcat [ ptext (sLit "\t.localentry\t"),
+               text ",.TOC.-0b@l" ],
+        hcat [ text "\t.localentry\t",
                ppr lab,
-               ptext (sLit ",.-"),
+               text ",.-",
                ppr lab]
     ]
 
-pprInstr LWSYNC = ptext (sLit "\tlwsync")
+pprInstr LWSYNC = text "\tlwsync"
 
-pprInstr NOP = ptext (sLit "\tnop")
+pprInstr NOP = text "\tnop"
 
 pprInstr (UPDATE_SP fmt amount@(ImmInt offset))
    | fits16Bits offset = vcat [
@@ -844,9 +844,9 @@ pprLogic op reg1 reg2 ri = hcat [
             RIImm _ -> char 'i',
         char '\t',
         pprReg reg1,
-        ptext (sLit ", "),
+        text ", ",
         pprReg reg2,
-        ptext (sLit ", "),
+        text ", ",
         pprRI ri
     ]
 
@@ -857,7 +857,7 @@ pprUnary op reg1 reg2 = hcat [
         ptext op,
         char '\t',
         pprReg reg1,
-        ptext (sLit ", "),
+        text ", ",
         pprReg reg2
     ]
 
@@ -869,9 +869,9 @@ pprBinaryF op fmt reg1 reg2 reg3 = hcat [
         pprFFormat fmt,
         char '\t',
         pprReg reg1,
-        ptext (sLit ", "),
+        text ", ",
         pprReg reg2,
-        ptext (sLit ", "),
+        text ", ",
         pprReg reg3
     ]
 

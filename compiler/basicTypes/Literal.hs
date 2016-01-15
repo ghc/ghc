@@ -446,7 +446,7 @@ litTag (LitInteger  {})    = 11
 pprLiteral :: (SDoc -> SDoc) -> Literal -> SDoc
 pprLiteral _       (MachChar c)     = pprPrimChar c
 pprLiteral _       (MachStr s)      = pprHsBytes s
-pprLiteral _       (MachNullAddr)   = ptext (sLit "__NULL")
+pprLiteral _       (MachNullAddr)   = text "__NULL"
 pprLiteral _       (MachInt i)      = pprPrimInt i
 pprLiteral _       (MachInt64 i)    = pprPrimInt64 i
 pprLiteral _       (MachWord w)     = pprPrimWord w
@@ -454,7 +454,7 @@ pprLiteral _       (MachWord64 w)   = pprPrimWord64 w
 pprLiteral _       (MachFloat f)    = float (fromRat f) <> primFloatSuffix
 pprLiteral _       (MachDouble d)   = double (fromRat d) <> primDoubleSuffix
 pprLiteral add_par (LitInteger i _) = pprIntegerVal add_par i
-pprLiteral add_par (MachLabel l mb fod) = add_par (ptext (sLit "__label") <+> b <+> ppr fod)
+pprLiteral add_par (MachLabel l mb fod) = add_par (text "__label" <+> b <+> ppr fod)
     where b = case mb of
               Nothing -> pprHsString l
               Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))

@@ -1408,15 +1408,15 @@ isAnyPmCheckEnabled dflags (DsMatchContext kind _loc)
 warnManyGuards :: DsMatchContext -> DsM ()
 warnManyGuards (DsMatchContext kind loc)
   = putSrcSpanDs loc $ warnDs $ vcat
-      [ sep [ ptext (sLit "Too many guards in") <+> pprMatchContext kind
-            , ptext (sLit "Guard checking has been over-simplified") ]
-      , parens (ptext (sLit "Use:") <+> (opt_1 $$ opt_2)) ]
+      [ sep [ text "Too many guards in" <+> pprMatchContext kind
+            , text "Guard checking has been over-simplified" ]
+      , parens (text "Use:" <+> (opt_1 $$ opt_2)) ]
   where
-    opt_1 = hang (ptext (sLit "-Wno-too-many-guards")) 2 $
-      ptext (sLit "to suppress this warning")
-    opt_2 = hang (ptext (sLit "-ffull-guard-reasoning")) 2 $ vcat
-      [ ptext (sLit "to run the full checker (may increase")
-      , ptext (sLit "compilation time and memory consumption)") ]
+    opt_1 = hang (text "-Wno-too-many-guards") 2 $
+      text "to suppress this warning"
+    opt_2 = hang (text "-ffull-guard-reasoning") 2 $ vcat
+      [ text "to run the full checker (may increase"
+      , text "compilation time and memory consumption)" ]
 
 dsPmWarn :: DynFlags -> DsMatchContext -> DsM PmResult -> DsM ()
 dsPmWarn dflags ctx@(DsMatchContext kind loc) mPmResult
@@ -1438,15 +1438,15 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) mPmResult
     pprEqns qs text = pp_context ctx (ptext (sLit text)) $ \f ->
       vcat (map (ppr_eqn f kind) (take maximum_output qs)) $$ dots qs
 
-    pprEqnsU qs = pp_context ctx (ptext (sLit "are non-exhaustive")) $ \_ ->
+    pprEqnsU qs = pp_context ctx (text "are non-exhaustive") $ \_ ->
       case qs of -- See #11245
-           [([],_)] -> ptext (sLit "Guards do not cover entire pattern space")
+           [([],_)] -> text "Guards do not cover entire pattern space"
            _missing -> let us = map ppr_uncovered qs
-                       in  hang (ptext (sLit "Patterns not matched:")) 4
+                       in  hang (text "Patterns not matched:") 4
                                 (vcat (take maximum_output us) $$ dots us)
 
 dots :: [a] -> SDoc
-dots qs | qs `lengthExceeds` maximum_output = ptext (sLit "...")
+dots qs | qs `lengthExceeds` maximum_output = text "..."
         | otherwise                         = empty
 
 exhaustive :: DynFlags -> HsMatchContext id -> Bool
@@ -1467,8 +1467,8 @@ exhaustive _dflags (StmtCtxt {}) = False -- Don't warn about incomplete patterns
 
 pp_context :: DsMatchContext -> SDoc -> ((SDoc -> SDoc) -> SDoc) -> SDoc
 pp_context (DsMatchContext kind _loc) msg rest_of_msg_fun
-  = vcat [ptext (sLit "Pattern match(es)") <+> msg,
-          sep [ ptext (sLit "In") <+> ppr_match <> char ':'
+  = vcat [text "Pattern match(es)" <+> msg,
+          sep [ text "In" <+> ppr_match <> char ':'
               , nest 4 (rest_of_msg_fun pref)]]
   where
     (ppr_match, pref)
@@ -1478,20 +1478,20 @@ pp_context (DsMatchContext kind _loc) msg rest_of_msg_fun
 
 ppr_pats :: HsMatchContext Name -> [Pat Id] -> SDoc
 ppr_pats kind pats
-  = sep [sep (map ppr pats), matchSeparator kind, ptext (sLit "...")]
+  = sep [sep (map ppr pats), matchSeparator kind, text "..."]
 
 ppr_eqn :: (SDoc -> SDoc) -> HsMatchContext Name -> [LPat Id] -> SDoc
 ppr_eqn prefixF kind eqn = prefixF (ppr_pats kind (map unLoc eqn))
 
 ppr_constraint :: (SDoc,[PmLit]) -> SDoc
-ppr_constraint (var, lits) = var <+> ptext (sLit "is not one of")
+ppr_constraint (var, lits) = var <+> text "is not one of"
                                  <+> braces (pprWithCommas ppr lits)
 
 ppr_uncovered :: ([PmExpr], [ComplexEq]) -> SDoc
 ppr_uncovered (expr_vec, complex)
   | null cs   = fsep vec -- there are no literal constraints
   | otherwise = hang (fsep vec) 4 $
-                  ptext (sLit "where") <+> vcat (map ppr_constraint cs)
+                  text "where" <+> vcat (map ppr_constraint cs)
   where
     sdoc_vec = mapM pprPmExprWithParens expr_vec
     (vec,cs) = runPmPprM sdoc_vec (filterComplex complex)

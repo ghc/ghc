@@ -515,7 +515,7 @@ brackets d      = SDoc $ Pretty.brackets . runSDoc d
 quote d         = SDoc $ Pretty.quote . runSDoc d
 doubleQuotes d  = SDoc $ Pretty.doubleQuotes . runSDoc d
 angleBrackets d = char '<' <> d <> char '>'
-paBrackets d    = ptext (sLit "[:") <> d <> ptext (sLit ":]")
+paBrackets d    = text "[:" <> d <> text ":]"
 
 cparen :: Bool -> SDoc -> SDoc
 cparen b d = SDoc $ Pretty.maybeParens b . runSDoc d
@@ -539,15 +539,15 @@ semi, comma, colon, equals, space, dcolon, underscore, dot, vbar :: SDoc
 arrow, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt :: SDoc
 lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
 
-blankLine  = docToSDoc $ Pretty.ptext (sLit "")
-dcolon     = unicodeSyntax (char '∷') (docToSDoc $ Pretty.ptext (sLit "::"))
-arrow      = unicodeSyntax (char '→') (docToSDoc $ Pretty.ptext (sLit "->"))
-larrow     = unicodeSyntax (char '←') (docToSDoc $ Pretty.ptext (sLit "<-"))
-darrow     = unicodeSyntax (char '⇒') (docToSDoc $ Pretty.ptext (sLit "=>"))
-arrowt     = unicodeSyntax (char '⤚') (docToSDoc $ Pretty.ptext (sLit ">-"))
-larrowt    = unicodeSyntax (char '⤙') (docToSDoc $ Pretty.ptext (sLit "-<"))
-arrowtt    = unicodeSyntax (char '⤜') (docToSDoc $ Pretty.ptext (sLit ">>-"))
-larrowtt   = unicodeSyntax (char '⤛') (docToSDoc $ Pretty.ptext (sLit "-<<"))
+blankLine  = docToSDoc $ Pretty.text ""
+dcolon     = unicodeSyntax (char '∷') (docToSDoc $ Pretty.text "::")
+arrow      = unicodeSyntax (char '→') (docToSDoc $ Pretty.text "->")
+larrow     = unicodeSyntax (char '←') (docToSDoc $ Pretty.text "<-")
+darrow     = unicodeSyntax (char '⇒') (docToSDoc $ Pretty.text "=>")
+arrowt     = unicodeSyntax (char '⤚') (docToSDoc $ Pretty.text ">-")
+larrowt    = unicodeSyntax (char '⤙') (docToSDoc $ Pretty.text "-<")
+arrowtt    = unicodeSyntax (char '⤜') (docToSDoc $ Pretty.text ">>-")
+larrowtt   = unicodeSyntax (char '⤛') (docToSDoc $ Pretty.text "-<<")
 semi       = docToSDoc $ Pretty.semi
 comma      = docToSDoc $ Pretty.comma
 colon      = docToSDoc $ Pretty.colon
@@ -564,7 +564,7 @@ lbrace     = docToSDoc $ Pretty.lbrace
 rbrace     = docToSDoc $ Pretty.rbrace
 
 forAllLit :: SDoc
-forAllLit = unicodeSyntax (char '∀') (ptext (sLit "forall"))
+forAllLit = unicodeSyntax (char '∀') (text "forall")
 
 unicodeSyntax :: SDoc -> SDoc -> SDoc
 unicodeSyntax unicode plain = sdocWithDynFlags $ \dflags ->
@@ -705,8 +705,8 @@ instance Outputable Char where
     ppr c = text [c]
 
 instance Outputable Bool where
-    ppr True  = ptext (sLit "True")
-    ppr False = ptext (sLit "False")
+    ppr True  = text "True"
+    ppr False = text "False"
 
 instance Outputable Ordering where
     ppr LT = text "LT"
@@ -744,12 +744,12 @@ instance (Outputable a, Outputable b) => Outputable (a, b) where
     ppr (x,y) = parens (sep [ppr x <> comma, ppr y])
 
 instance Outputable a => Outputable (Maybe a) where
-    ppr Nothing = ptext (sLit "Nothing")
-    ppr (Just x) = ptext (sLit "Just") <+> ppr x
+    ppr Nothing  = text "Nothing"
+    ppr (Just x) = text "Just" <+> ppr x
 
 instance (Outputable a, Outputable b) => Outputable (Either a b) where
-    ppr (Left x)  = ptext (sLit "Left")  <+> ppr x
-    ppr (Right y) = ptext (sLit "Right") <+> ppr y
+    ppr (Left x)  = text "Left"  <+> ppr x
+    ppr (Right y) = text "Right" <+> ppr y
 
 -- ToDo: may not be used
 instance (Outputable a, Outputable b, Outputable c) => Outputable (a, b, c) where
@@ -813,7 +813,7 @@ instance Outputable a => Outputable (SCC a) where
    ppr (CyclicSCC vs) = text "REC" $$ (nest 3 (vcat (map ppr vs)))
 
 instance Outputable Serialized where
-    ppr (Serialized the_type bytes) = int (length bytes) <+> ptext (sLit "of type") <+> text (show the_type)
+    ppr (Serialized the_type bytes) = int (length bytes) <+> text "of type" <+> text (show the_type)
 
 {-
 ************************************************************************
@@ -939,12 +939,12 @@ quotedList xs = hsep (punctuate comma (map quotes xs))
 
 quotedListWithOr :: [SDoc] -> SDoc
 -- [x,y,z]  ==>  `x', `y' or `z'
-quotedListWithOr xs@(_:_:_) = quotedList (init xs) <+> ptext (sLit "or") <+> quotes (last xs)
+quotedListWithOr xs@(_:_:_) = quotedList (init xs) <+> text "or" <+> quotes (last xs)
 quotedListWithOr xs = quotedList xs
 
 quotedListWithNor :: [SDoc] -> SDoc
 -- [x,y,z]  ==>  `x', `y' nor `z'
-quotedListWithNor xs@(_:_:_) = quotedList (init xs) <+> ptext (sLit "nor") <+> quotes (last xs)
+quotedListWithNor xs@(_:_:_) = quotedList (init xs) <+> text "nor" <+> quotes (last xs)
 quotedListWithNor xs = quotedList xs
 
 {-
@@ -965,7 +965,7 @@ intWithCommas n
     (q,r) = n `quotRem` 1000
     zeroes | r >= 100  = empty
            | r >= 10   = char '0'
-           | otherwise = ptext (sLit "00")
+           | otherwise = text "00"
 
 -- | Converts an integer to a verbal index:
 --
@@ -973,12 +973,12 @@ intWithCommas n
 -- > speakNth 5 = text "fifth"
 -- > speakNth 21 = text "21st"
 speakNth :: Int -> SDoc
-speakNth 1 = ptext (sLit "first")
-speakNth 2 = ptext (sLit "second")
-speakNth 3 = ptext (sLit "third")
-speakNth 4 = ptext (sLit "fourth")
-speakNth 5 = ptext (sLit "fifth")
-speakNth 6 = ptext (sLit "sixth")
+speakNth 1 = text "first"
+speakNth 2 = text "second"
+speakNth 3 = text "third"
+speakNth 4 = text "fourth"
+speakNth 5 = text "fifth"
+speakNth 6 = text "sixth"
 speakNth n = hcat [ int n, text suffix ]
   where
     suffix | n <= 20       = "th"       -- 11,12,13 are non-std
@@ -995,13 +995,13 @@ speakNth n = hcat [ int n, text suffix ]
 -- > speakN 5 = text "five"
 -- > speakN 10 = text "10"
 speakN :: Int -> SDoc
-speakN 0 = ptext (sLit "none")  -- E.g.  "he has none"
-speakN 1 = ptext (sLit "one")   -- E.g.  "he has one"
-speakN 2 = ptext (sLit "two")
-speakN 3 = ptext (sLit "three")
-speakN 4 = ptext (sLit "four")
-speakN 5 = ptext (sLit "five")
-speakN 6 = ptext (sLit "six")
+speakN 0 = text "none"  -- E.g.  "he has none"
+speakN 1 = text "one"   -- E.g.  "he has one"
+speakN 2 = text "two"
+speakN 3 = text "three"
+speakN 4 = text "four"
+speakN 5 = text "five"
+speakN 6 = text "six"
 speakN n = int n
 
 -- | Converts an integer and object description to a statement about the
@@ -1011,8 +1011,8 @@ speakN n = int n
 -- > speakNOf 1 (text "melon") = text "one melon"
 -- > speakNOf 3 (text "melon") = text "three melons"
 speakNOf :: Int -> SDoc -> SDoc
-speakNOf 0 d = ptext (sLit "no") <+> d <> char 's'
-speakNOf 1 d = ptext (sLit "one") <+> d                 -- E.g. "one argument"
+speakNOf 0 d = text "no" <+> d <> char 's'
+speakNOf 1 d = text "one" <+> d                 -- E.g. "one argument"
 speakNOf n d = speakN n <+> d <> char 's'               -- E.g. "three arguments"
 
 -- | Determines the pluralisation suffix appropriate for the length of a list:
@@ -1026,21 +1026,21 @@ plural _   = char 's'
 
 -- | Determines the form of to be appropriate for the length of a list:
 --
--- > isOrAre [] = ptext (sLit "are")
--- > isOrAre ["Hello"] = ptext (sLit "is")
--- > isOrAre ["Hello", "World"] = ptext (sLit "are")
+-- > isOrAre [] = text "are"
+-- > isOrAre ["Hello"] = text "is"
+-- > isOrAre ["Hello", "World"] = text "are"
 isOrAre :: [a] -> SDoc
-isOrAre [_] = ptext (sLit "is")
-isOrAre _   = ptext (sLit "are")
+isOrAre [_] = text "is"
+isOrAre _   = text "are"
 
 -- | Determines the form of to do appropriate for the length of a list:
 --
--- > doOrDoes [] = ptext (sLit "do")
--- > doOrDoes ["Hello"] = ptext (sLit "does")
--- > doOrDoes ["Hello", "World"] = ptext (sLit "do")
+-- > doOrDoes [] = text "do"
+-- > doOrDoes ["Hello"] = text "does"
+-- > doOrDoes ["Hello", "World"] = text "do"
 doOrDoes :: [a] -> SDoc
-doOrDoes [_] = ptext (sLit "does")
-doOrDoes _   = ptext (sLit "do")
+doOrDoes [_] = text "does"
+doOrDoes _   = text "do"
 
 {-
 ************************************************************************

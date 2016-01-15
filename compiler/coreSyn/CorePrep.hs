@@ -996,13 +996,13 @@ instance Outputable FloatingBind where
   ppr (FloatTick t) = ppr t
 
 instance Outputable Floats where
-  ppr (Floats flag fs) = ptext (sLit "Floats") <> brackets (ppr flag) <+>
+  ppr (Floats flag fs) = text "Floats" <> brackets (ppr flag) <+>
                          braces (vcat (map ppr (fromOL fs)))
 
 instance Outputable OkToSpec where
-  ppr OkToSpec    = ptext (sLit "OkToSpec")
-  ppr IfUnboxedOk = ptext (sLit "IfUnboxedOk")
-  ppr NotOkToSpec = ptext (sLit "NotOkToSpec")
+  ppr OkToSpec    = text "OkToSpec"
+  ppr IfUnboxedOk = text "IfUnboxedOk"
+  ppr NotOkToSpec = text "NotOkToSpec"
 
 -- Can we float these binds out of the rhs of a let?  We cache this decision
 -- to avoid having to recompute it in a non-linear way when there are

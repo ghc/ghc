@@ -310,8 +310,8 @@ coreToTopStgRhs dflags this_mod scope_fv_info (bndr, rhs)
     id_arity  = idArity bndr
     mk_arity_msg stg_arity
         = vcat [ppr bndr,
-                ptext (sLit "Id arity:") <+> ppr id_arity,
-                ptext (sLit "STG arity:") <+> ppr stg_arity]
+                text "Id arity:" <+> ppr id_arity,
+                text "STG arity:" <+> ppr stg_arity]
 
 mkTopStgRhs :: DynFlags -> Module -> FreeVarsInfo
             -> SRT -> Id -> StgBinderInfo -> StgExpr
@@ -663,7 +663,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         -- we complain.
         -- We also want to check if a pointer is cast to a non-ptr etc
 
-    WARN( bad_args, ptext (sLit "Dangerous-looking argument. Probable cause: bad unsafeCoerce#") $$ ppr arg )
+    WARN( bad_args, text "Dangerous-looking argument. Probable cause: bad unsafeCoerce#" $$ ppr arg )
      return (stg_arg : stg_args, fvs, ticks ++ aticks)
 
 

@@ -227,13 +227,13 @@ tcHiBootIface hsc_src mod
                 -- The hi-boot file has mysteriously disappeared.
     }}}}
   where
-    need = ptext (sLit "Need the hi-boot interface for") <+> ppr mod
-                 <+> ptext (sLit "to compare against the Real Thing")
+    need = text "Need the hi-boot interface for" <+> ppr mod
+                 <+> text "to compare against the Real Thing"
 
-    moduleLoop = ptext (sLit "Circular imports: module") <+> quotes (ppr mod)
-                     <+> ptext (sLit "depends on itself")
+    moduleLoop = text "Circular imports: module" <+> quotes (ppr mod)
+                     <+> text "depends on itself"
 
-    elaborate err = hang (ptext (sLit "Could not find hi-boot interface for") <+>
+    elaborate err = hang (text "Could not find hi-boot interface for" <+>
                           quotes (ppr mod) <> colon) 4 err
 
 
@@ -356,7 +356,7 @@ tc_iface_decl _ _ (IfaceSynonym {ifName = occ_name, ifTyVars = tv_bndrs,
      ; let tycon = mkSynonymTyCon tc_name kind tyvars roles rhs
      ; return (ATyCon tycon) }
    where
-     mk_doc n = ptext (sLit "Type synonym") <+> ppr n
+     mk_doc n = text "Type synonym" <+> ppr n
 
 tc_iface_decl parent _ (IfaceFamily {ifName = occ_name, ifTyVars = tv_bndrs,
                                      ifFamFlav = fam_flav,
@@ -371,7 +371,7 @@ tc_iface_decl parent _ (IfaceFamily {ifName = occ_name, ifTyVars = tv_bndrs,
      ; let tycon = mkFamilyTyCon tc_name kind tyvars res_name rhs parent inj
      ; return (ATyCon tycon) }
    where
-     mk_doc n = ptext (sLit "Type synonym") <+> ppr n
+     mk_doc n = text "Type synonym" <+> ppr n
 
      tc_fam_flav :: Name -> IfaceFamTyConFlav -> IfL FamTyConFlav
      tc_fam_flav tc_name IfaceDataFamilyTyCon
@@ -451,9 +451,9 @@ tc_iface_decl _parent ignore_prags
                   -- e.g.   type AT a; type AT b = AT [b]   Trac #8002
           return (ATI tc mb_def)
 
-   mk_sc_doc pred = ptext (sLit "Superclass") <+> ppr pred
-   mk_at_doc tc = ptext (sLit "Associated type") <+> ppr tc
-   mk_op_doc op_name op_ty = ptext (sLit "Class op") <+> sep [ppr op_name, ppr op_ty]
+   mk_sc_doc pred = text "Superclass" <+> ppr pred
+   mk_at_doc tc = text "Associated type" <+> ppr tc
+   mk_op_doc op_name op_ty = text "Class op" <+> sep [ppr op_name, ppr op_ty]
 
    tc_fd (tvs1, tvs2) = do { tvs1' <- mapM tcIfaceTyVar tvs1
                            ; tvs2' <- mapM tcIfaceTyVar tvs2
@@ -484,7 +484,7 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = occ_name
                               , ifPatTy = pat_ty
                               , ifFieldLabels = field_labels })
   = do { name <- lookupIfaceTop occ_name
-       ; traceIf (ptext (sLit "tc_iface_decl") <+> ppr name)
+       ; traceIf (text "tc_iface_decl" <+> ppr name)
        ; matcher <- tc_pr if_matcher
        ; builder <- fmapMaybeM tc_pr if_builder
        ; bindIfaceTvBndrs univ_tvs $ \univ_tvs -> do
@@ -499,7 +499,7 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = occ_name
                                        arg_tys pat_ty field_labels }
        ; return $ AConLike . PatSynCon $ patsyn }}}
   where
-     mk_doc n = ptext (sLit "Pattern synonym") <+> ppr n
+     mk_doc n = text "Pattern synonym" <+> ppr n
      tc_pr :: (IfExtName, Bool) -> IfL (Id, Bool)
      tc_pr (nm, b) = do { id <- forkM (ppr nm) (tcIfaceExtId nm)
                         ; return (id, b) }
@@ -592,7 +592,7 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
                        arg_tys orig_res_ty tycon
         ; traceIf (text "Done interface-file tc_con_decl" <+> ppr dc_name)
         ; return con }
-    mk_doc con_name = ptext (sLit "Constructor") <+> ppr con_name
+    mk_doc con_name = text "Constructor" <+> ppr con_name
 
     tc_strict :: IfaceBang -> IfL HsImplBang
     tc_strict IfNoBang = return (HsLazy)
@@ -642,7 +642,7 @@ tcIfaceInst :: IfaceClsInst -> IfL ClsInst
 tcIfaceInst (IfaceClsInst { ifDFun = dfun_occ, ifOFlag = oflag
                           , ifInstCls = cls, ifInstTys = mb_tcs
                           , ifInstOrph = orph })
-  = do { dfun <- forkM (ptext (sLit "Dict fun") <+> ppr dfun_occ) $
+  = do { dfun <- forkM (text "Dict fun" <+> ppr dfun_occ) $
                  tcIfaceExtId dfun_occ
        ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
        ; return (mkImportedInstance cls mb_tcs' dfun oflag orph) }
@@ -650,7 +650,7 @@ tcIfaceInst (IfaceClsInst { ifDFun = dfun_occ, ifOFlag = oflag
 tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
 tcIfaceFamInst (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs
                              , ifFamInstAxiom = axiom_name } )
-    = do { axiom' <- forkM (ptext (sLit "Axiom") <+> ppr axiom_name) $
+    = do { axiom' <- forkM (text "Axiom" <+> ppr axiom_name) $
                      tcIfaceCoAxiom axiom_name
              -- will panic if branched, but that's OK
          ; let axiom'' = toUnbranchedAxiom axiom'
@@ -682,7 +682,7 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
                         ifRuleAuto = auto, ifRuleOrph = orph })
   = do  { ~(bndrs', args', rhs') <-
                 -- Typecheck the payload lazily, in the hope it'll never be looked at
-                forkM (ptext (sLit "Rule") <+> pprRuleName name) $
+                forkM (text "Rule" <+> pprRuleName name) $
                 bindIfaceBndrs bndrs                      $ \ bndrs' ->
                 do { args' <- mapM tcIfaceExpr args
                    ; rhs'  <- tcIfaceExpr rhs
@@ -781,11 +781,11 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
   where
     vectVarMapping name
       = do { vName <- lookupIfaceTop (mkLocalisedOccName mod mkVectOcc name)
-           ; var   <- forkM (ptext (sLit "vect var")  <+> ppr name)  $
+           ; var   <- forkM (text "vect var"  <+> ppr name)  $
                         tcIfaceExtId name
-           ; vVar  <- forkM (ptext (sLit "vect vVar [mod =") <+>
-                             ppr mod <> ptext (sLit "; nameModule =") <+>
-                             ppr (nameModule name) <> ptext (sLit "]") <+> ppr vName) $
+           ; vVar  <- forkM (text "vect vVar [mod =" <+>
+                             ppr mod <> text "; nameModule =" <+>
+                             ppr (nameModule name) <> text "]" <+> ppr vName) $
                        tcIfaceExtId vName
            ; return (var, (var, vVar))
            }
@@ -804,7 +804,7 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
       --   notAnIdErr = pprPanic "TcIface.tcIfaceVectInfo: not an id" (ppr name)
 
     vectVar name
-      = forkM (ptext (sLit "vect scalar var")  <+> ppr name)  $
+      = forkM (text "vect scalar var"  <+> ppr name)  $
           tcIfaceExtId name
 
     vectTyConVectMapping vars name
@@ -817,7 +817,7 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
 
     vectTyConMapping vars name vName
       = do { tycon  <- lookupLocalOrExternalTyCon name
-           ; vTycon <- forkM (ptext (sLit "vTycon of") <+> ppr vName) $
+           ; vTycon <- forkM (text "vTycon of" <+> ppr vName) $
                          lookupLocalOrExternalTyCon vName
 
                -- Map the data constructors of the original type constructor to those of the
@@ -1264,10 +1264,10 @@ tcPragExpr name expr
           Nothing       -> return ()
           Just fail_msg -> do { mod <- getIfModule
                               ; pprPanic "Iface Lint failure"
-                                  (vcat [ ptext (sLit "In interface for") <+> ppr mod
+                                  (vcat [ text "In interface for" <+> ppr mod
                                         , hang doc 2 fail_msg
                                         , ppr name <+> equals <+> ppr core_expr'
-                                        , ptext (sLit "Iface expr =") <+> ppr expr ]) }
+                                        , text "Iface expr =" <+> ppr expr ]) }
     return core_expr'
   where
     doc = text "Unfolding of" <+> ppr name

@@ -2276,8 +2276,8 @@ srcParseErr
   -> MsgDoc
 srcParseErr dflags buf len
   = if null token
-         then ptext (sLit "parse error (possibly incorrect indentation or mismatched brackets)")
-         else ptext (sLit "parse error on input") <+> quotes (text token)
+         then text "parse error (possibly incorrect indentation or mismatched brackets)"
+         else text "parse error on input" <+> quotes (text token)
               $$ ppWhen (not th_enabled && token == "$") -- #7396
                         (text "Perhaps you intended to use TemplateHaskell")
               $$ ppWhen (token == "<-")

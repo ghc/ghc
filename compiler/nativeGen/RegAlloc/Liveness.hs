@@ -52,7 +52,6 @@ import UniqFM
 import UniqSupply
 import Bag
 import State
-import FastString
 
 import Data.List
 import Data.Maybe
@@ -190,17 +189,17 @@ instance Outputable instr
 
         ppr (SPILL reg slot)
            = hcat [
-                ptext (sLit "\tSPILL"),
+                text "\tSPILL",
                 char ' ',
                 ppr reg,
                 comma,
-                ptext (sLit "SLOT") <> parens (int slot)]
+                text "SLOT" <> parens (int slot)]
 
         ppr (RELOAD slot reg)
            = hcat [
-                ptext (sLit "\tRELOAD"),
+                text "\tRELOAD",
                 char ' ',
-                ptext (sLit "SLOT") <> parens (int slot),
+                text "SLOT" <> parens (int slot),
                 comma,
                 ppr reg]
 
@@ -214,9 +213,9 @@ instance Outputable instr
          =  ppr instr
                 $$ (nest 8
                         $ vcat
-                        [ pprRegs (ptext (sLit "# born:    ")) (liveBorn live)
-                        , pprRegs (ptext (sLit "# r_dying: ")) (liveDieRead live)
-                        , pprRegs (ptext (sLit "# w_dying: ")) (liveDieWrite live) ]
+                        [ pprRegs (text "# born:    ") (liveBorn live)
+                        , pprRegs (text "# r_dying: ") (liveDieRead live)
+                        , pprRegs (text "# w_dying: ") (liveDieWrite live) ]
                     $+$ space)
 
          where  pprRegs :: SDoc -> RegSet -> SDoc

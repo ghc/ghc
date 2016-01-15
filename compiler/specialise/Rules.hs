@@ -421,10 +421,10 @@ findBest target (rule1,ans1) ((rule2,ans2):prs)
                         | otherwise          = doubleQuotes (ftext (ru_name rule))
                 in pprTrace "Rules.findBest: rule overlap (Rule 1 wins)"
                          (vcat [if opt_PprStyle_Debug then
-                                   ptext (sLit "Expression to match:") <+> ppr fn <+> sep (map ppr args)
+                                   text "Expression to match:" <+> ppr fn <+> sep (map ppr args)
                                 else empty,
-                                ptext (sLit "Rule 1:") <+> pp_rule rule1,
-                                ptext (sLit "Rule 2:") <+> pp_rule rule2]) $
+                                text "Rule 1:" <+> pp_rule rule1,
+                                text "Rule 2:" <+> pp_rule rule2]) $
                 findBest target (rule1,ans1) prs
   | otherwise = findBest target (rule1,ans1) prs
   where
@@ -575,11 +575,11 @@ matchN (in_scope, id_unf) rule_name tmpl_vars tmpl_es target_es
             = env
 
     unbound var = pprPanic "Template variable unbound in rewrite rule" $
-                  vcat [ ptext (sLit "Variable:") <+> ppr var
-                       , ptext (sLit "Rule") <+> pprRuleName rule_name
-                       , ptext (sLit "Rule bndrs:") <+> ppr tmpl_vars
-                       , ptext (sLit "LHS args:") <+> ppr tmpl_es
-                       , ptext (sLit "Actual args:") <+> ppr target_es ]
+                  vcat [ text "Variable:" <+> ppr var
+                       , text "Rule" <+> pprRuleName rule_name
+                       , text "Rule bndrs:" <+> ppr tmpl_vars
+                       , text "LHS args:" <+> ppr tmpl_es
+                       , text "Actual args:" <+> ppr target_es ]
 
 {- Note [Unbound template type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1185,9 +1185,9 @@ ruleAppCheck_help env fn args rules
                       rule_herald rule <> colon <+> rule_info dflags rule
 
     rule_herald (BuiltinRule { ru_name = name })
-        = ptext (sLit "Builtin rule") <+> doubleQuotes (ftext name)
+        = text "Builtin rule" <+> doubleQuotes (ftext name)
     rule_herald (Rule { ru_name = name })
-        = ptext (sLit "Rule") <+> doubleQuotes (ftext name)
+        = text "Rule" <+> doubleQuotes (ftext name)
 
     rule_info dflags rule
         | Just _ <- matchRule dflags (emptyInScopeSet, rc_id_unf env)

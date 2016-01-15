@@ -725,17 +725,17 @@ findWiredInPackages dflags pkgs vis_map = do
           where
                 notfound = do
                           debugTraceMsg dflags 2 $
-                            ptext (sLit "wired-in package ")
+                            text "wired-in package "
                                  <> text wired_pkg
-                                 <> ptext (sLit " not found.")
+                                 <> text " not found."
                           return Nothing
                 pick :: PackageConfig
                      -> IO (Maybe PackageConfig)
                 pick pkg = do
                         debugTraceMsg dflags 2 $
-                            ptext (sLit "wired-in package ")
+                            text "wired-in package "
                                  <> text wired_pkg
-                                 <> ptext (sLit " mapped to ")
+                                 <> text " mapped to "
                                  <> ppr (unitId pkg)
                         return (Just pkg)
 
@@ -804,7 +804,7 @@ type UnusablePackages = Map UnitId
 pprReason :: SDoc -> UnusablePackageReason -> SDoc
 pprReason pref reason = case reason of
   IgnoredWithFlag ->
-      pref <+> ptext (sLit "ignored due to an -ignore-package flag")
+      pref <+> text "ignored due to an -ignore-package flag"
   MissingDependencies is_shadowed deps ->
       pref <+> text "unusable due to"
            <+> (if is_shadowed then text "shadowed"
@@ -818,7 +818,7 @@ reportUnusable dflags pkgs = mapM_ report (Map.toList pkgs)
     report (ipid, (_, reason)) =
        debugTraceMsg dflags 2 $
          pprReason
-           (ptext (sLit "package") <+> ppr ipid <+> text "is") reason
+           (text "package" <+> ppr ipid <+> text "is") reason
 
 -- ----------------------------------------------------------------------------
 --
@@ -1448,12 +1448,12 @@ add_package pkg_db ps (p, mb_parent)
               = add_package pkg_db ps (key, Just p)
 
 missingPackageMsg :: Outputable pkgid => pkgid -> SDoc
-missingPackageMsg p = ptext (sLit "unknown package:") <+> ppr p
+missingPackageMsg p = text "unknown package:" <+> ppr p
 
 missingDependencyMsg :: Maybe UnitId -> SDoc
 missingDependencyMsg Nothing = Outputable.empty
 missingDependencyMsg (Just parent)
-  = space <> parens (ptext (sLit "dependency of") <+> ftext (unitIdFS parent))
+  = space <> parens (text "dependency of" <+> ftext (unitIdFS parent))
 
 -- -----------------------------------------------------------------------------
 

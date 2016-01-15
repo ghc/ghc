@@ -750,7 +750,7 @@ mk_absent_let dflags arg
   | arg_ty `eqType` voidPrimTy
   = Just (Let (NonRec arg (Var voidPrimId)))
   | otherwise
-  = WARN( True, ptext (sLit "No absent value for") <+> ppr arg_ty )
+  = WARN( True, text "No absent value for" <+> ppr arg_ty )
     Nothing
   where
     arg_ty  = idType arg

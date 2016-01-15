@@ -27,7 +27,6 @@ import Bag
 import Util
 import Maybes
 import Outputable
-import FastString
 import qualified Data.IntMap as M
 
 #include "HsVersions.h"
@@ -130,9 +129,9 @@ floatOutwards float_sws dflags us pgm
         let { (tlets, ntlets, lams) = get_stats (sum_stats fss) };
 
         dumpIfSet_dyn dflags Opt_D_dump_simpl_stats "FloatOut stats:"
-                (hcat [ int tlets,  ptext (sLit " Lets floated to top level; "),
-                        int ntlets, ptext (sLit " Lets floated elsewhere; from "),
-                        int lams,   ptext (sLit " Lambda groups")]);
+                (hcat [ int tlets,  text " Lets floated to top level; ",
+                        int ntlets, text " Lets floated elsewhere; from ",
+                        int lams,   text " Lambda groups"]);
 
         return (bagToList (unionManyBags binds_s'))
     }
@@ -481,9 +480,9 @@ data FloatBinds  = FB !(Bag FloatLet)           -- Destined for top level
 
 instance Outputable FloatBinds where
   ppr (FB fbs defs)
-      = ptext (sLit "FB") <+> (braces $ vcat
-           [ ptext (sLit "tops =")     <+> ppr fbs
-           , ptext (sLit "non-tops =") <+> ppr defs ])
+      = text "FB" <+> (braces $ vcat
+           [ text "tops ="     <+> ppr fbs
+           , text "non-tops =" <+> ppr defs ])
 
 flattenTopFloats :: FloatBinds -> Bag CoreBind
 flattenTopFloats (FB tops defs)

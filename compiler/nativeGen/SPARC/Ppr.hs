@@ -106,19 +106,19 @@ pprDatas (Statics lbl dats) = vcat (pprLabel lbl : map pprData dats)
 
 pprData :: CmmStatic -> SDoc
 pprData (CmmString str)          = pprASCII str
-pprData (CmmUninitialised bytes) = ptext (sLit ".skip ") <> int bytes
+pprData (CmmUninitialised bytes) = text ".skip " <> int bytes
 pprData (CmmStaticLit lit)       = pprDataItem lit
 
 pprGloblDecl :: CLabel -> SDoc
 pprGloblDecl lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = ptext (sLit ".global ") <> ppr lbl
+  | otherwise = text ".global " <> ppr lbl
 
 pprTypeAndSizeDecl :: CLabel -> SDoc
 pprTypeAndSizeDecl lbl
     = sdocWithPlatform $ \platform ->
       if platformOS platform == OSLinux && externallyVisibleCLabel lbl
-      then ptext (sLit ".type ") <> ppr lbl <> ptext (sLit ", @object")
+      then text ".type " <> ppr lbl <> ptext (sLit ", @object")
       else empty
 
 pprLabel :: CLabel -> SDoc
@@ -132,7 +132,7 @@ pprASCII str
   = vcat (map do1 str) $$ do1 0
     where
        do1 :: Word8 -> SDoc
-       do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
+       do1 w = text "\t.byte\t" <> int (fromIntegral w)
 
 
 -- -----------------------------------------------------------------------------
@@ -314,8 +314,8 @@ pprImm imm
 
         -- these should have been converted to bytes and placed
         --      in the data section.
-        ImmFloat _      -> ptext (sLit "naughty float immediate")
-        ImmDouble _     -> ptext (sLit "naughty double immediate")
+        ImmFloat _      -> text "naughty float immediate"
+        ImmDouble _     -> text "naughty double immediate"
 
 
 -- | Pretty print a section \/ segment header.
@@ -344,19 +344,19 @@ pprDataItem lit
     where
         imm = litToImm lit
 
-        ppr_item II8   _        = [ptext (sLit "\t.byte\t") <> pprImm imm]
-        ppr_item II32  _        = [ptext (sLit "\t.long\t") <> pprImm imm]
+        ppr_item II8   _        = [text "\t.byte\t" <> pprImm imm]
+        ppr_item II32  _        = [text "\t.long\t" <> pprImm imm]
 
         ppr_item FF32  (CmmFloat r _)
          = let bs = floatToBytes (fromRational r)
-           in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm (ImmInt b)) bs
+           in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
 
         ppr_item FF64 (CmmFloat r _)
          = let bs = doubleToBytes (fromRational r)
-           in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm (ImmInt b)) bs
+           in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
 
-        ppr_item II16  _        = [ptext (sLit "\t.short\t") <> pprImm imm]
-        ppr_item II64  _        = [ptext (sLit "\t.quad\t") <> pprImm imm]
+        ppr_item II16  _        = [text "\t.short\t" <> pprImm imm]
+        ppr_item II64  _        = [text "\t.quad\t" <> pprImm imm]
         ppr_item _ _            = panic "SPARC.Ppr.pprDataItem: no match"
 
 
@@ -384,7 +384,7 @@ pprInstr (LD FF64 _ reg)
 
 pprInstr (LD format addr reg)
         = hcat [
-               ptext (sLit "\tld"),
+               text "\tld",
                pprFormat format,
                char '\t',
                lbrack,
@@ -403,7 +403,7 @@ pprInstr (ST FF64 reg _)
 -- so we call a special-purpose pprFormat for ST..
 pprInstr (ST format reg addr)
         = hcat [
-               ptext (sLit "\tst"),
+               text "\tst",
                pprStFormat format,
                char '\t',
                pprReg reg,
@@ -415,7 +415,7 @@ pprInstr (ST format reg addr)
 
 pprInstr (ADD x cc reg1 ri reg2)
         | not x && not cc && riZero ri
-        = hcat [ ptext (sLit "\tmov\t"), pprReg reg1, comma, pprReg reg2 ]
+        = hcat [ text "\tmov\t", pprReg reg1, comma, pprReg reg2 ]
 
         | otherwise
         = pprRegRIReg (if x then sLit "addx" else sLit "add") cc reg1 ri reg2
@@ -423,10 +423,10 @@ pprInstr (ADD x cc reg1 ri reg2)
 
 pprInstr (SUB x cc reg1 ri reg2)
         | not x && cc && reg2 == g0
-        = hcat [ ptext (sLit "\tcmp\t"), pprReg reg1, comma, pprRI ri ]
+        = hcat [ text "\tcmp\t", pprReg reg1, comma, pprRI ri ]
 
         | not x && not cc && riZero ri
-        = hcat [ ptext (sLit "\tmov\t"), pprReg reg1, comma, pprReg reg2 ]
+        = hcat [ text "\tmov\t", pprReg reg1, comma, pprReg reg2 ]
 
         | otherwise
         = pprRegRIReg (if x then sLit "subx" else sLit "sub") cc reg1 ri reg2
@@ -437,7 +437,7 @@ pprInstr (ANDN b reg1 ri reg2) = pprRegRIReg (sLit "andn") b reg1 ri reg2
 
 pprInstr (OR b reg1 ri reg2)
         | not b && reg1 == g0
-        = let doit = hcat [ ptext (sLit "\tmov\t"), pprRI ri, comma, pprReg reg2 ]
+        = let doit = hcat [ text "\tmov\t", pprRI ri, comma, pprReg reg2 ]
           in  case ri of
                    RIReg rrr | rrr == reg2 -> empty
                    _                       -> doit
@@ -454,14 +454,14 @@ pprInstr (SLL reg1 ri reg2)    = pprRegRIReg (sLit "sll") False reg1 ri reg2
 pprInstr (SRL reg1 ri reg2)    = pprRegRIReg (sLit "srl") False reg1 ri reg2
 pprInstr (SRA reg1 ri reg2)    = pprRegRIReg (sLit "sra") False reg1 ri reg2
 
-pprInstr (RDY rd)              = ptext (sLit "\trd\t%y,") <> pprReg rd
+pprInstr (RDY rd)              = text "\trd\t%y," <> pprReg rd
 pprInstr (WRY reg1 reg2)
-        = ptext (sLit "\twr\t")
+        = text "\twr\t"
                 <> pprReg reg1
                 <> char ','
                 <> pprReg reg2
                 <> char ','
-                <> ptext (sLit "%y")
+                <> text "%y"
 
 pprInstr (SMUL b reg1 ri reg2) = pprRegRIReg (sLit "smul")  b reg1 ri reg2
 pprInstr (UMUL b reg1 ri reg2) = pprRegRIReg (sLit "umul")  b reg1 ri reg2
@@ -470,14 +470,14 @@ pprInstr (UDIV b reg1 ri reg2) = pprRegRIReg (sLit "udiv")  b reg1 ri reg2
 
 pprInstr (SETHI imm reg)
   = hcat [
-        ptext (sLit "\tsethi\t"),
+        text "\tsethi\t",
         pprImm imm,
         comma,
         pprReg reg
     ]
 
 pprInstr NOP
-        = ptext (sLit "\tnop")
+        = text "\tnop"
 
 pprInstr (FABS format reg1 reg2)
         = pprFormatRegReg (sLit "fabs") format reg1 reg2
@@ -509,7 +509,7 @@ pprInstr (FSUB format reg1 reg2 reg3)
 
 pprInstr (FxTOy format1 format2 reg1 reg2)
   = hcat [
-        ptext (sLit "\tf"),
+        text "\tf",
         ptext
         (case format1 of
             II32  -> sLit "ito"
@@ -529,7 +529,7 @@ pprInstr (FxTOy format1 format2 reg1 reg2)
 
 pprInstr (BI cond b blockid)
   = hcat [
-        ptext (sLit "\tb"), pprCond cond,
+        text "\tb", pprCond cond,
         if b then pp_comma_a else empty,
         char '\t',
         ppr (mkAsmTempLabel (getUnique blockid))
@@ -537,20 +537,20 @@ pprInstr (BI cond b blockid)
 
 pprInstr (BF cond b blockid)
   = hcat [
-        ptext (sLit "\tfb"), pprCond cond,
+        text "\tfb", pprCond cond,
         if b then pp_comma_a else empty,
         char '\t',
         ppr (mkAsmTempLabel (getUnique blockid))
     ]
 
-pprInstr (JMP addr) = ptext (sLit "\tjmp\t") <> pprAddr addr
+pprInstr (JMP addr) = text "\tjmp\t" <> pprAddr addr
 pprInstr (JMP_TBL op _ _)  = pprInstr (JMP op)
 
 pprInstr (CALL (Left imm) n _)
-  = hcat [ ptext (sLit "\tcall\t"), pprImm imm, comma, int n ]
+  = hcat [ text "\tcall\t", pprImm imm, comma, int n ]
 
 pprInstr (CALL (Right reg) n _)
-  = hcat [ ptext (sLit "\tcall\t"), pprReg reg, comma, int n ]
+  = hcat [ text "\tcall\t", pprReg reg, comma, int n ]
 
 
 -- | Pretty print a RI
@@ -566,8 +566,8 @@ pprFormatRegReg name format reg1 reg2
         char '\t',
         ptext name,
         (case format of
-            FF32 -> ptext (sLit "s\t")
-            FF64 -> ptext (sLit "d\t")
+            FF32 -> text "s\t"
+            FF64 -> text "d\t"
             _    -> panic "SPARC.Ppr.pprFormatRegReg: no match"),
 
         pprReg reg1,
@@ -583,8 +583,8 @@ pprFormatRegRegReg name format reg1 reg2 reg3
         char '\t',
         ptext name,
         (case format of
-            FF32  -> ptext (sLit "s\t")
-            FF64  -> ptext (sLit "d\t")
+            FF32  -> text "s\t"
+            FF64  -> text "d\t"
             _    -> panic "SPARC.Ppr.pprFormatRegReg: no match"),
         pprReg reg1,
         comma,
@@ -600,7 +600,7 @@ pprRegRIReg name b reg1 ri reg2
   = hcat [
         char '\t',
         ptext name,
-        if b then ptext (sLit "cc\t") else char '\t',
+        if b then text "cc\t" else char '\t',
         pprReg reg1,
         comma,
         pprRI ri,
@@ -614,7 +614,7 @@ pprRIReg name b ri reg1
   = hcat [
         char '\t',
         ptext name,
-        if b then ptext (sLit "cc\t") else char '\t',
+        if b then text "cc\t" else char '\t',
         pprRI ri,
         comma,
         pprReg reg1
@@ -623,7 +623,7 @@ pprRIReg name b ri reg1
 
 {-
 pp_ld_lbracket :: SDoc
-pp_ld_lbracket    = ptext (sLit "\tld\t[")
+pp_ld_lbracket    = text "\tld\t["
 -}
 
 pp_rbracket_comma :: SDoc

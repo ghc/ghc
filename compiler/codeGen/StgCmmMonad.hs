@@ -210,7 +210,7 @@ data CgIdInfo
 
 instance Outputable CgIdInfo where
   ppr (CgIdInfo { cg_id = id, cg_loc = loc })
-    = ppr id <+> ptext (sLit "-->") <+> ppr loc
+    = ppr id <+> text "-->" <+> ppr loc
 
 -- Sequel tells what to do with the result of this expression
 data Sequel
@@ -228,8 +228,8 @@ data Sequel
                         -- allocating primOp)
 
 instance Outputable Sequel where
-    ppr (Return b) = ptext (sLit "Return") <+> ppr b
-    ppr (AssignTo regs b) = ptext (sLit "AssignTo") <+> ppr regs <+> ppr b
+    ppr (Return b) = text "Return" <+> ppr b
+    ppr (AssignTo regs b) = text "AssignTo" <+> ppr regs <+> ppr b
 
 -- See Note [sharing continuations] below
 data ReturnKind

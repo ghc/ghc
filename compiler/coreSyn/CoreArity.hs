@@ -894,8 +894,8 @@ data EtaInfo = EtaVar Var       -- /\a. [],   [] a
              | EtaCo Coercion   -- [] |> co,  [] |> (sym co)
 
 instance Outputable EtaInfo where
-   ppr (EtaVar v) = ptext (sLit "EtaVar") <+> ppr v
-   ppr (EtaCo co) = ptext (sLit "EtaCo")  <+> ppr co
+   ppr (EtaVar v) = text "EtaVar" <+> ppr v
+   ppr (EtaCo co) = text "EtaCo"  <+> ppr co
 
 pushCoercion :: Coercion -> [EtaInfo] -> [EtaInfo]
 pushCoercion co1 (EtaCo co2 : eis)

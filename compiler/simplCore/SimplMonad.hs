@@ -201,14 +201,14 @@ checkedTick t
                          else let sc' = doSimplTick (st_flags st_env) t sc
                               in sc' `seq` return ((), us, sc'))
   where
-    msg sc = vcat [ ptext (sLit "When trying") <+> ppr t
-                  , ptext (sLit "To increase the limit, use -fsimpl-tick-factor=N (default 100)")
-                  , ptext (sLit "If you need to do this, let GHC HQ know, and what factor you needed")
+    msg sc = vcat [ text "When trying" <+> ppr t
+                  , text "To increase the limit, use -fsimpl-tick-factor=N (default 100)"
+                  , text "If you need to do this, let GHC HQ know, and what factor you needed"
                   , pp_details sc
                   , pprSimplCount sc ]
     pp_details sc
       | hasDetailedCounts sc = empty
-      | otherwise = ptext (sLit "To see detailed counts use -ddump-simpl-stats")
+      | otherwise = text "To see detailed counts use -ddump-simpl-stats"
 
 
 freeTick :: Tick -> SimplM ()

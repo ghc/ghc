@@ -1560,7 +1560,7 @@ warnUnnecessarySourceImports sccs = do
         warn :: DynFlags -> Located ModuleName -> WarnMsg
         warn dflags (L loc mod) =
            mkPlainErrMsg dflags loc
-                (ptext (sLit "Warning: {-# SOURCE #-} unnecessary in import of ")
+                (text "Warning: {-# SOURCE #-} unnecessary in import of "
                  <+> quotes (ppr mod))
 
 
@@ -2038,8 +2038,8 @@ cyclicModuleErr :: [ModSummary] -> SDoc
 cyclicModuleErr mss
   = ASSERT( not (null mss) )
     case findCycle graph of
-       Nothing   -> ptext (sLit "Unexpected non-cycle") <+> ppr mss
-       Just path -> vcat [ ptext (sLit "Module imports form a cycle:")
+       Nothing   -> text "Unexpected non-cycle" <+> ppr mss
+       Just path -> vcat [ text "Module imports form a cycle:"
                          , nest 2 (show_path path) ]
   where
     graph :: [Node NodeKey ModSummary]
@@ -2050,14 +2050,14 @@ cyclicModuleErr mss
                    [ (unLoc m, NotBoot) | m <- ms_home_imps    ms ])
 
     show_path []         = panic "show_path"
-    show_path [m]        = ptext (sLit "module") <+> ppr_ms m
-                           <+> ptext (sLit "imports itself")
-    show_path (m1:m2:ms) = vcat ( nest 7 (ptext (sLit "module") <+> ppr_ms m1)
-                                : nest 6 (ptext (sLit "imports") <+> ppr_ms m2)
+    show_path [m]        = text "module" <+> ppr_ms m
+                           <+> text "imports itself"
+    show_path (m1:m2:ms) = vcat ( nest 7 (text "module" <+> ppr_ms m1)
+                                : nest 6 (text "imports" <+> ppr_ms m2)
                                 : go ms )
        where
-         go []     = [ptext (sLit "which imports") <+> ppr_ms m1]
-         go (m:ms) = (ptext (sLit "which imports") <+> ppr_ms m) : go ms
+         go []     = [text "which imports" <+> ppr_ms m1]
+         go (m:ms) = (text "which imports" <+> ppr_ms m) : go ms
 
 
     ppr_ms :: ModSummary -> SDoc

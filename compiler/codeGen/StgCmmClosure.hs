@@ -74,7 +74,6 @@ import CLabel
 import Id
 import IdInfo
 import DataCon
-import FastString
 import Name
 import Type
 import TyCoRep
@@ -104,8 +103,8 @@ data CgLoc
         -- and branch to the block id
 
 instance Outputable CgLoc where
-  ppr (CmmLoc e)    = ptext (sLit "cmm") <+> ppr e
-  ppr (LneLoc b rs) = ptext (sLit "lne") <+> ppr b <+> ppr rs
+  ppr (CmmLoc e)    = text "cmm" <+> ppr e
+  ppr (LneLoc b rs) = text "lne" <+> ppr b <+> ppr rs
 
 type SelfLoopInfo = (Id, BlockId, [LocalReg])
 

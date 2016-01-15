@@ -544,7 +544,7 @@ cantFindErr :: LitString -> LitString -> DynFlags -> ModuleName -> FindResult
 cantFindErr _ multiple_found _ mod_name (FoundMultiple mods)
   | Just pkgs <- unambiguousPackages
   = hang (ptext multiple_found <+> quotes (ppr mod_name) <> colon) 2 (
-       sep [ptext (sLit "it was found in multiple packages:"),
+       sep [text "it was found in multiple packages:",
                 hsep (map ppr pkgs) ]
     )
   | otherwise
@@ -557,16 +557,16 @@ cantFindErr _ multiple_found _ mod_name (FoundMultiple mods)
         = Just (moduleUnitId m : xs)
     unambiguousPackage _ _ = Nothing
 
-    pprMod (m, o) = ptext (sLit "it is bound as") <+> ppr m <+>
-                                ptext (sLit "by") <+> pprOrigin m o
+    pprMod (m, o) = text "it is bound as" <+> ppr m <+>
+                                text "by" <+> pprOrigin m o
     pprOrigin _ ModHidden = panic "cantFindErr: bound by mod hidden"
     pprOrigin m (ModOrigin e res _ f) = sep $ punctuate comma (
       if e == Just True
-          then [ptext (sLit "package") <+> ppr (moduleUnitId m)]
+          then [text "package" <+> ppr (moduleUnitId m)]
           else [] ++
-      map ((ptext (sLit "a reexport in package") <+>)
+      map ((text "a reexport in package" <+>)
                 .ppr.packageConfigId) res ++
-      if f then [ptext (sLit "a package flag")] else []
+      if f then [text "a package flag"] else []
       )
 
 cantFindErr cannot_find _ dflags mod_name find_result
@@ -576,8 +576,8 @@ cantFindErr cannot_find _ dflags mod_name find_result
     more_info
       = case find_result of
             NoPackage pkg
-                -> ptext (sLit "no unit id matching") <+> quotes (ppr pkg) <+>
-                   ptext (sLit "was found") $$ looks_like_srcpkgid pkg
+                -> text "no unit id matching" <+> quotes (ppr pkg) <+>
+                   text "was found" $$ looks_like_srcpkgid pkg
 
             NotFound { fr_paths = files, fr_pkg = mb_pkg
                      , fr_mods_hidden = mod_hiddens, fr_pkgs_hidden = pkg_hiddens
@@ -589,7 +589,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
                 -> pp_suggestions suggest $$ tried_these files
 
                 | null files && null mod_hiddens && null pkg_hiddens
-                -> ptext (sLit "It is not a module in the current program, or in any known package.")
+                -> text "It is not a module in the current program, or in any known package."
 
                 | otherwise
                 -> vcat (map pkg_hidden pkg_hiddens) $$
@@ -606,26 +606,26 @@ cantFindErr cannot_find _ dflags mod_name find_result
             build = if build_tag == "p" then "profiling"
                                         else "\"" ++ build_tag ++ "\""
          in
-         ptext (sLit "Perhaps you haven't installed the ") <> text build <>
-         ptext (sLit " libraries for package ") <> quotes (ppr pkg) <> char '?' $$
+         text "Perhaps you haven't installed the " <> text build <>
+         text " libraries for package " <> quotes (ppr pkg) <> char '?' $$
          tried_these files
 
        | otherwise
-       = ptext (sLit "There are files missing in the ") <> quotes (ppr pkg) <>
-         ptext (sLit " package,") $$
-         ptext (sLit "try running 'ghc-pkg check'.") $$
+       = text "There are files missing in the " <> quotes (ppr pkg) <>
+         text " package," $$
+         text "try running 'ghc-pkg check'." $$
          tried_these files
 
     tried_these files
         | null files = Outputable.empty
         | verbosity dflags < 3 =
-              ptext (sLit "Use -v to see a list of the files searched for.")
+              text "Use -v to see a list of the files searched for."
         | otherwise =
-               hang (ptext (sLit "Locations searched:")) 2 $ vcat (map text files)
+               hang (text "Locations searched:") 2 $ vcat (map text files)
 
     pkg_hidden :: UnitId -> SDoc
     pkg_hidden pkgid =
-        ptext (sLit "It is a member of the hidden package")
+        text "It is a member of the hidden package"
         <+> quotes (ppr pkgid)
         --FIXME: we don't really want to show the unit id here we should
         -- show the source package id or installed package id if it's ambiguous
@@ -633,9 +633,9 @@ cantFindErr cannot_find _ dflags mod_name find_result
     cabal_pkg_hidden_hint pkgid
      | gopt Opt_BuildingCabalPackage dflags
         = let pkg = expectJust "pkg_hidden" (lookupPackage dflags pkgid)
-           in ptext (sLit "Perhaps you need to add") <+>
+           in text "Perhaps you need to add" <+>
               quotes (ppr (packageName pkg)) <+>
-              ptext (sLit "to the build-depends in your .cabal file.")
+              text "to the build-depends in your .cabal file."
      | otherwise = Outputable.empty
 
     looks_like_srcpkgid :: UnitId -> SDoc
@@ -651,12 +651,12 @@ cantFindErr cannot_find _ dflags mod_name find_result
      | otherwise = Outputable.empty
 
     mod_hidden pkg =
-        ptext (sLit "it is a hidden module in the package") <+> quotes (ppr pkg)
+        text "it is a hidden module in the package" <+> quotes (ppr pkg)
 
     pp_suggestions :: [ModuleSuggestion] -> SDoc
     pp_suggestions sugs
       | null sugs = Outputable.empty
-      | otherwise = hang (ptext (sLit "Perhaps you meant"))
+      | otherwise = hang (text "Perhaps you meant")
                        2 (vcat (map pp_sugg sugs))
 
     -- NB: Prefer the *original* location, and then reexports, and then
@@ -668,14 +668,14 @@ cantFindErr cannot_find _ dflags mod_name find_result
                                    fromExposedReexport = res,
                                    fromPackageFlag = f })
               | Just True <- e
-                 = parens (ptext (sLit "from") <+> ppr (moduleUnitId mod))
+                 = parens (text "from" <+> ppr (moduleUnitId mod))
               | f && moduleName mod == m
-                 = parens (ptext (sLit "from") <+> ppr (moduleUnitId mod))
+                 = parens (text "from" <+> ppr (moduleUnitId mod))
               | (pkg:_) <- res
-                 = parens (ptext (sLit "from") <+> ppr (packageConfigId pkg)
-                    <> comma <+> ptext (sLit "reexporting") <+> ppr mod)
+                 = parens (text "from" <+> ppr (packageConfigId pkg)
+                    <> comma <+> text "reexporting" <+> ppr mod)
               | f
-                 = parens (ptext (sLit "defined via package flags to be")
+                 = parens (text "defined via package flags to be"
                     <+> ppr mod)
               | otherwise = Outputable.empty
     pp_sugg (SuggestHidden m mod o) = ppr m <+> provenance o
@@ -683,9 +683,9 @@ cantFindErr cannot_find _ dflags mod_name find_result
             provenance (ModOrigin{ fromOrigPackage = e,
                                    fromHiddenReexport = rhs })
               | Just False <- e
-                 = parens (ptext (sLit "needs flag -package-key")
+                 = parens (text "needs flag -package-key"
                     <+> ppr (moduleUnitId mod))
               | (pkg:_) <- rhs
-                 = parens (ptext (sLit "needs flag -package-id")
+                 = parens (text "needs flag -package-id"
                     <+> ppr (packageConfigId pkg))
               | otherwise = Outputable.empty

@@ -141,11 +141,11 @@ importDecl name
             Nothing    -> return (Failed not_found_msg)
     }}}
   where
-    nd_doc = ptext (sLit "Need decl for") <+> ppr name
-    not_found_msg = hang (ptext (sLit "Can't find interface-file declaration for") <+>
+    nd_doc = text "Need decl for" <+> ppr name
+    not_found_msg = hang (text "Can't find interface-file declaration for" <+>
                                 pprNameSpace (occNameSpace (nameOccName name)) <+> ppr name)
-                       2 (vcat [ptext (sLit "Probable cause: bug in .hi-boot file, or inconsistent .hi file"),
-                                ptext (sLit "Use -ddump-if-trace to get an idea of which file caused the error")])
+                       2 (vcat [text "Probable cause: bug in .hi-boot file, or inconsistent .hi file",
+                                text "Use -ddump-if-trace to get an idea of which file caused the error"])
 
 
 {-
@@ -325,7 +325,7 @@ loadWiredInHomeIface name
   = ASSERT( isWiredInName name )
     do _ <- loadSysInterface doc (nameModule name); return ()
   where
-    doc = ptext (sLit "Need home interface for wired-in thing") <+> ppr name
+    doc = text "Need home interface for wired-in thing" <+> ppr name
 
 ------------------
 -- | Loads a system interface and throws an exception if it fails
@@ -520,8 +520,8 @@ wantHiBootFile dflags eps mod from
 
 badSourceImport :: Module -> SDoc
 badSourceImport mod
-  = hang (ptext (sLit "You cannot {-# SOURCE #-} import a module from another package"))
-       2 (ptext (sLit "but") <+> quotes (ppr mod) <+> ptext (sLit "is from package")
+  = hang (text "You cannot {-# SOURCE #-} import a module from another package")
+       2 (text "but" <+> quotes (ppr mod) <+> ptext (sLit "is from package")
           <+> quotes (ppr (moduleUnitId mod)))
 
 -----------------------------------------------------
@@ -637,7 +637,7 @@ loadDecl ignore_prags (_version, decl)
                       [(n, lookup n) | n <- implicit_names]
         }
   where
-    doc = ptext (sLit "Declaration for") <+> ppr (ifName decl)
+    doc = text "Declaration for" <+> ppr (ifName decl)
 
 bumpDeclStats :: Name -> IfL ()         -- Record that one more declaration has actually been used
 bumpDeclStats name
@@ -684,13 +684,13 @@ findAndReadIface :: SDoc -> Module
         -- sometimes it's ok to fail... see notes with loadInterface
 
 findAndReadIface doc_str mod hi_boot_file
-  = do traceIf (sep [hsep [ptext (sLit "Reading"),
+  = do traceIf (sep [hsep [text "Reading",
                            if hi_boot_file
-                             then ptext (sLit "[boot]")
+                             then text "[boot]"
                              else Outputable.empty,
-                           ptext (sLit "interface for"),
+                           text "interface for",
                            ppr mod <> semi],
-                     nest 4 (ptext (sLit "reason:") <+> doc_str)])
+                     nest 4 (text "reason:" <+> doc_str)])
 
        -- Check for GHC.Prim, and return its static interface
        if mod == gHC_PRIM
@@ -718,12 +718,12 @@ findAndReadIface doc_str mod hi_boot_file
                                    checkBuildDynamicToo r
                                    return r
                    err -> do
-                       traceIf (ptext (sLit "...not found"))
+                       traceIf (text "...not found")
                        dflags <- getDynFlags
                        return (Failed (cannotFindInterface dflags
                                            (moduleName mod) err))
     where read_file file_path = do
-              traceIf (ptext (sLit "readIFace") <+> text file_path)
+              traceIf (text "readIFace" <+> text file_path)
               read_result <- readIface mod file_path
               case read_result of
                 Failed err -> return (Failed (badIfaceFile file_path err))
@@ -866,11 +866,11 @@ showIface hsc_env filename = do
 pprModIface :: ModIface -> SDoc
 -- Show a ModIface
 pprModIface iface
- = vcat [ ptext (sLit "interface")
+ = vcat [ text "interface"
                 <+> ppr (mi_module iface) <+> pp_hsc_src (mi_hsc_src iface)
-                <+> (if mi_orphan iface then ptext (sLit "[orphan module]") else Outputable.empty)
-                <+> (if mi_finsts iface then ptext (sLit "[family instance module]") else Outputable.empty)
-                <+> (if mi_hpc    iface then ptext (sLit "[hpc]") else Outputable.empty)
+                <+> (if mi_orphan iface then text "[orphan module]" else Outputable.empty)
+                <+> (if mi_finsts iface then text "[family instance module]" else Outputable.empty)
+                <+> (if mi_hpc    iface then text "[hpc]" else Outputable.empty)
                 <+> integer hiVersion
         , nest 2 (text "interface hash:" <+> ppr (mi_iface_hash iface))
         , nest 2 (text "ABI hash:" <+> ppr (mi_mod_hash iface))
@@ -879,8 +879,8 @@ pprModIface iface
         , nest 2 (text "flag hash:" <+> ppr (mi_flag_hash iface))
         , nest 2 (text "sig of:" <+> ppr (mi_sig_of iface))
         , nest 2 (text "used TH splices:" <+> ppr (mi_used_th iface))
-        , nest 2 (ptext (sLit "where"))
-        , ptext (sLit "exports:")
+        , nest 2 (text "where")
+        , text "exports:"
         , nest 2 (vcat (map pprExport (mi_exports iface)))
         , pprDeps (mi_deps iface)
         , vcat (map pprUsage (mi_usages iface))
@@ -896,8 +896,8 @@ pprModIface iface
         , pprTrustPkg (mi_trust_pkg iface)
         ]
   where
-    pp_hsc_src HsBootFile = ptext (sLit "[boot]")
-    pp_hsc_src HsigFile = ptext (sLit "[hsig]")
+    pp_hsc_src HsBootFile = text "[boot]"
+    pp_hsc_src HsigFile = text "[hsig]"
     pp_hsc_src HsSrcFile = Outputable.empty
 
 {-
@@ -928,24 +928,24 @@ pprUsage usage@UsageHomeModule{}
         vcat [ ppr n <+> ppr v | (n,v) <- usg_entities usage ]
         )
 pprUsage usage@UsageFile{}
-  = hsep [ptext (sLit "addDependentFile"),
+  = hsep [text "addDependentFile",
           doubleQuotes (text (usg_file_path usage))]
 
 pprUsageImport :: Outputable a => Usage -> (Usage -> a) -> SDoc
 pprUsageImport usage usg_mod'
-  = hsep [ptext (sLit "import"), safe, ppr (usg_mod' usage),
+  = hsep [text "import", safe, ppr (usg_mod' usage),
                        ppr (usg_mod_hash usage)]
     where
-        safe | usg_safe usage = ptext $ sLit "safe"
-             | otherwise      = ptext $ sLit " -/ "
+        safe | usg_safe usage = text "safe"
+             | otherwise      = text " -/ "
 
 pprDeps :: Dependencies -> SDoc
 pprDeps (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs,
                 dep_finsts = finsts })
-  = vcat [ptext (sLit "module dependencies:") <+> fsep (map ppr_mod mods),
-          ptext (sLit "package dependencies:") <+> fsep (map ppr_pkg pkgs),
-          ptext (sLit "orphans:") <+> fsep (map ppr orphs),
-          ptext (sLit "family instance modules:") <+> fsep (map ppr finsts)
+  = vcat [text "module dependencies:" <+> fsep (map ppr_mod mods),
+          text "package dependencies:" <+> fsep (map ppr_pkg pkgs),
+          text "orphans:" <+> fsep (map ppr orphs),
+          text "family instance modules:" <+> fsep (map ppr finsts)
         ]
   where
     ppr_mod (mod_name, boot) = ppr mod_name <+> ppr_boot boot
@@ -956,7 +956,7 @@ pprDeps (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs,
 
 pprFixities :: [(OccName, Fixity)] -> SDoc
 pprFixities []    = Outputable.empty
-pprFixities fixes = ptext (sLit "fixities") <+> pprWithCommas pprFix fixes
+pprFixities fixes = text "fixities" <+> pprWithCommas pprFix fixes
                   where
                     pprFix (occ,fix) = ppr fix <+> ppr occ
 
@@ -968,32 +968,32 @@ pprVectInfo (IfaceVectInfo { ifaceVectInfoVar            = vars
                            , ifaceVectInfoParallelTyCons = parallelTyCons
                            }) =
   vcat
-  [ ptext (sLit "vectorised variables:") <+> hsep (map ppr vars)
-  , ptext (sLit "vectorised tycons:") <+> hsep (map ppr tycons)
-  , ptext (sLit "vectorised reused tycons:") <+> hsep (map ppr tyconsReuse)
-  , ptext (sLit "parallel variables:") <+> hsep (map ppr parallelVars)
-  , ptext (sLit "parallel tycons:") <+> hsep (map ppr parallelTyCons)
+  [ text "vectorised variables:" <+> hsep (map ppr vars)
+  , text "vectorised tycons:" <+> hsep (map ppr tycons)
+  , text "vectorised reused tycons:" <+> hsep (map ppr tyconsReuse)
+  , text "parallel variables:" <+> hsep (map ppr parallelVars)
+  , text "parallel tycons:" <+> hsep (map ppr parallelTyCons)
   ]
 
 pprTrustInfo :: IfaceTrustInfo -> SDoc
-pprTrustInfo trust = ptext (sLit "trusted:") <+> ppr trust
+pprTrustInfo trust = text "trusted:" <+> ppr trust
 
 pprTrustPkg :: Bool -> SDoc
-pprTrustPkg tpkg = ptext (sLit "require own pkg trusted:") <+> ppr tpkg
+pprTrustPkg tpkg = text "require own pkg trusted:" <+> ppr tpkg
 
 instance Outputable Warnings where
     ppr = pprWarns
 
 pprWarns :: Warnings -> SDoc
 pprWarns NoWarnings         = Outputable.empty
-pprWarns (WarnAll txt)  = ptext (sLit "Warn all") <+> ppr txt
-pprWarns (WarnSome prs) = ptext (sLit "Warnings")
+pprWarns (WarnAll txt)  = text "Warn all" <+> ppr txt
+pprWarns (WarnSome prs) = text "Warnings"
                         <+> vcat (map pprWarning prs)
     where pprWarning (name, txt) = ppr name <+> ppr txt
 
 pprIfaceAnnotation :: IfaceAnnotation -> SDoc
 pprIfaceAnnotation (IfaceAnnotation { ifAnnotatedTarget = target, ifAnnotatedValue = serialized })
-  = ppr target <+> ptext (sLit "annotated by") <+> ppr serialized
+  = ppr target <+> text "annotated by" <+> ppr serialized
 
 {-
 *********************************************************
@@ -1005,7 +1005,7 @@ pprIfaceAnnotation (IfaceAnnotation { ifAnnotatedTarget = target, ifAnnotatedVal
 
 badIfaceFile :: String -> SDoc -> SDoc
 badIfaceFile file err
-  = vcat [ptext (sLit "Bad interface file:") <+> text file,
+  = vcat [text "Bad interface file:" <+> text file,
           nest 4 err]
 
 hiModuleNameMismatchWarn :: Module -> Module -> MsgDoc
@@ -1015,20 +1015,20 @@ hiModuleNameMismatchWarn requested_mod read_mod =
   withPprStyle (mkUserStyle alwaysQualify AllTheWay) $
     -- we want the Modules below to be qualified with package names,
     -- so reset the PrintUnqualified setting.
-    hsep [ ptext (sLit "Something is amiss; requested module ")
+    hsep [ text "Something is amiss; requested module "
          , ppr requested_mod
-         , ptext (sLit "differs from name found in the interface file")
+         , text "differs from name found in the interface file"
          , ppr read_mod
          ]
 
 wrongIfaceModErr :: ModIface -> Module -> String -> SDoc
 wrongIfaceModErr iface mod_name file_path
-  = sep [ptext (sLit "Interface file") <+> iface_file,
-         ptext (sLit "contains module") <+> quotes (ppr (mi_module iface)) <> comma,
-         ptext (sLit "but we were expecting module") <+> quotes (ppr mod_name),
-         sep [ptext (sLit "Probable cause: the source code which generated"),
+  = sep [text "Interface file" <+> iface_file,
+         text "contains module" <+> quotes (ppr (mi_module iface)) <> comma,
+         text "but we were expecting module" <+> quotes (ppr mod_name),
+         sep [text "Probable cause: the source code which generated",
              nest 2 iface_file,
-             ptext (sLit "has an incompatible module name")
+             text "has an incompatible module name"
             ]
         ]
   where iface_file = doubleQuotes (text file_path)
@@ -1036,8 +1036,8 @@ wrongIfaceModErr iface mod_name file_path
 homeModError :: Module -> ModLocation -> SDoc
 -- See Note [Home module load error]
 homeModError mod location
-  = ptext (sLit "attempting to use module ") <> quotes (ppr mod)
+  = text "attempting to use module " <> quotes (ppr mod)
     <> (case ml_hs_file location of
            Just file -> space <> parens (text file)
            Nothing   -> Outputable.empty)
-    <+> ptext (sLit "which is not loaded")
+    <+> text "which is not loaded"

@@ -23,8 +23,6 @@ import TcRnMonad
 import SrcLoc
 import Outputable
 
-import FastString
-
 #ifndef GHCI
 
 tcAnnotations :: [LAnnDecl Name] -> TcM [Annotation]
@@ -32,8 +30,8 @@ tcAnnotations :: [LAnnDecl Name] -> TcM [Annotation]
 tcAnnotations [] = return []
 tcAnnotations anns@(L loc _ : _)
   = do { setSrcSpan loc $ addWarnTc $
-             (ptext (sLit "Ignoring ANN annotation") <> plural anns <> comma
-             <+> ptext (sLit "because this is a stage-1 compiler or doesn't support GHCi"))
+             (text "Ignoring ANN annotation" <> plural anns <> comma
+             <+> text "because this is a stage-1 compiler or doesn't support GHCi")
        ; return [] }
 
 #else
@@ -55,8 +53,8 @@ tcAnnotation (L loc ann@(HsAnnotation _ provenance expr)) = do
       when (safeLanguageOn dflags) $ failWithTc safeHsErr
       runAnnotation target expr
     where
-      safeHsErr = vcat [ ptext (sLit "Annotations are not compatible with Safe Haskell.")
-                  , ptext (sLit "See https://ghc.haskell.org/trac/ghc/ticket/10826") ]
+      safeHsErr = vcat [ text "Annotations are not compatible with Safe Haskell."
+                  , text "See https://ghc.haskell.org/trac/ghc/ticket/10826" ]
 
 annProvenanceToTarget :: Module -> AnnProvenance Name -> AnnTarget Name
 annProvenanceToTarget _   (ValueAnnProvenance (L _ name)) = NamedTarget name
@@ -66,4 +64,4 @@ annProvenanceToTarget mod ModuleAnnProvenance             = ModuleTarget mod
 
 annCtxt :: OutputableBndr id => AnnDecl id -> SDoc
 annCtxt ann
-  = hang (ptext (sLit "In the annotation:")) 2 (ppr ann)
+  = hang (text "In the annotation:") 2 (ppr ann)

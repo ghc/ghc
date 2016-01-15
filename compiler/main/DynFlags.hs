@@ -1111,9 +1111,9 @@ data GhcMode
   deriving Eq
 
 instance Outputable GhcMode where
-  ppr CompManager = ptext (sLit "CompManager")
-  ppr OneShot     = ptext (sLit "OneShot")
-  ppr MkDepend    = ptext (sLit "MkDepend")
+  ppr CompManager = text "CompManager"
+  ppr OneShot     = text "OneShot"
+  ppr MkDepend    = text "MkDepend"
 
 isOneShot :: GhcMode -> Bool
 isOneShot OneShot = True

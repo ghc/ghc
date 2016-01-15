@@ -154,7 +154,7 @@ tcRuleBndrs (L _ (RuleBndrSig (L _ name) rn_ty) : rule_bndrs)
         ; return (tvs ++ id : vars) }
 
 ruleCtxt :: FastString -> SDoc
-ruleCtxt name = ptext (sLit "When checking the transformation rule") <+>
+ruleCtxt name = text "When checking the transformation rule" <+>
                 doubleQuotes (ftext name)
 
 
@@ -325,7 +325,7 @@ simplifyRule name lhs_wanted rhs_wanted
                              bagToList zonked_lhs_simples
 
        ; traceTc "simplifyRule" $
-         vcat [ ptext (sLit "LHS of rule") <+> doubleQuotes (ftext name)
+         vcat [ text "LHS of rule" <+> doubleQuotes (ftext name)
               , text "lhs_wantd" <+> ppr lhs_wanted
               , text "rhs_wantd" <+> ppr rhs_wanted
               , text "zonked_lhs_simples" <+> ppr zonked_lhs_simples

@@ -102,7 +102,6 @@ import Module
 import TyCon
 import BasicTypes
 import DynFlags
-import FastString
 import Outputable
 import Util
 import SrcLoc     ( RealSrcSpan, containsSpan )
@@ -1318,7 +1317,7 @@ the occurrence info is wrong
 instance Outputable AltCon where
   ppr (DataAlt dc) = ppr dc
   ppr (LitAlt lit) = ppr lit
-  ppr DEFAULT      = ptext (sLit "__DEFAULT")
+  ppr DEFAULT      = text "__DEFAULT"
 
 cmpAlt :: (AltCon, a, b) -> (AltCon, a, b) -> Ordering
 cmpAlt (con1, _, _) (con2, _, _) = con1 `cmpAltCon` con2

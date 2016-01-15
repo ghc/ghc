@@ -26,7 +26,6 @@ import DynFlags( DynFlags )
 import Util
 import Bag
 import Pair
-import FastString
 import Control.Monad
 import MonadUtils ( zipWithAndUnzipM )
 import GHC.Exts ( inline )
@@ -1443,8 +1442,8 @@ unflatten tv_eqs funeqs
       ; tclvl    <- getTcLevel
 
       ; traceTcS "Unflattening" $ braces $
-        vcat [ ptext (sLit "Funeqs =") <+> pprCts funeqs
-             , ptext (sLit "Tv eqs =") <+> pprCts tv_eqs ]
+        vcat [ text "Funeqs =" <+> pprCts funeqs
+             , text "Tv eqs =" <+> pprCts tv_eqs ]
 
          -- Step 1: unflatten the CFunEqCans, except if that causes an occurs check
          -- Occurs check: consider  [W] alpha ~ [F alpha]

@@ -105,7 +105,6 @@ import Class
 import Outputable
 import Util
 import SrcLoc
-import FastString
 
 import Bag
 import Data.Maybe ( fromMaybe )
@@ -657,7 +656,7 @@ instance OutputableBndr name
 
     ppr (FamDecl { tcdFam = decl }) = ppr decl
     ppr (SynDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdRhs = rhs })
-      = hang (ptext (sLit "type") <+>
+      = hang (text "type" <+>
               pp_vanilla_decl_head ltycon tyvars [] <+> equals)
           4 (ppr rhs)
 
@@ -672,12 +671,12 @@ instance OutputableBndr name
       = top_matter
 
       | otherwise       -- Laid out
-      = vcat [ top_matter <+> ptext (sLit "where")
+      = vcat [ top_matter <+> text "where"
              , nest 2 $ pprDeclList (map (pprFamilyDecl NotTopLevel . unLoc) ats ++
                                      map ppr_fam_deflt_eqn at_defs ++
                                      pprLHsBindsForUser methods sigs) ]
       where
-        top_matter = ptext (sLit "class")
+        top_matter = text "class"
                      <+> pp_vanilla_decl_head lclas tyvars (unLoc context)
                      <+> pprFundeps (map unLoc fds)
 
@@ -695,8 +694,8 @@ pp_vanilla_decl_head thing tyvars context
  = hsep [pprHsContext context, pprPrefixOcc (unLoc thing), ppr tyvars]
 
 pprTyClDeclFlavour :: TyClDecl a -> SDoc
-pprTyClDeclFlavour (ClassDecl {})   = ptext (sLit "class")
-pprTyClDeclFlavour (SynDecl {})     = ptext (sLit "type")
+pprTyClDeclFlavour (ClassDecl {})   = text "class"
+pprTyClDeclFlavour (SynDecl {})     = text "type"
 pprTyClDeclFlavour (FamDecl { tcdFam = FamilyDecl { fdInfo = info }})
   = pprFlavour info <+> text "family"
 pprTyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_ND = nd } })
@@ -914,16 +913,16 @@ pprFamilyDecl top_level (FamilyDecl { fdInfo = info, fdLName = ltycon
                Nothing -> empty
     (pp_where, pp_eqns) = case info of
       ClosedTypeFamily mb_eqns ->
-        ( ptext (sLit "where")
+        ( text "where"
         , case mb_eqns of
-            Nothing   -> ptext (sLit "..")
+            Nothing   -> text ".."
             Just eqns -> vcat $ map ppr_fam_inst_eqn eqns )
       _ -> (empty, empty)
 
 pprFlavour :: FamilyInfo name -> SDoc
-pprFlavour DataFamily            = ptext (sLit "data")
-pprFlavour OpenTypeFamily        = ptext (sLit "type")
-pprFlavour (ClosedTypeFamily {}) = ptext (sLit "type")
+pprFlavour DataFamily            = text "data"
+pprFlavour OpenTypeFamily        = text "type"
+pprFlavour (ClosedTypeFamily {}) = text "type"
 
 instance Outputable (FamilyInfo name) where
   ppr info = pprFlavour info <+> text "family"
@@ -1105,21 +1104,21 @@ pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data, dd_ctxt = L _ context
                Just kind -> dcolon <+> ppr kind
     pp_derivings = case derivings of
                      Nothing -> empty
-                     Just (L _ ds) -> hsep [ ptext (sLit "deriving")
+                     Just (L _ ds) -> hsep [ text "deriving"
                                            , parens (interpp'SP ds)]
 
 instance OutputableBndr name => Outputable (HsDataDefn name) where
-   ppr d = pp_data_defn (\_ -> ptext (sLit "Naked HsDataDefn")) d
+   ppr d = pp_data_defn (\_ -> text "Naked HsDataDefn") d
 
 instance Outputable NewOrData where
-  ppr NewType  = ptext (sLit "newtype")
-  ppr DataType = ptext (sLit "data")
+  ppr NewType  = text "newtype"
+  ppr DataType = text "data"
 
 pp_condecls :: OutputableBndr name => [LConDecl name] -> SDoc
 pp_condecls cs@(L _ ConDeclGADT{} : _) -- In GADT syntax
-  = hang (ptext (sLit "where")) 2 (vcat (map ppr cs))
+  = hang (text "where") 2 (vcat (map ppr cs))
 pp_condecls cs                    -- In H98 syntax
-  = equals <+> sep (punctuate (ptext (sLit " |")) (map ppr cs))
+  = equals <+> sep (punctuate (text " |") (map ppr cs))
 
 instance (OutputableBndr name) => Outputable (ConDecl name) where
     ppr = pprConDecl
@@ -1316,10 +1315,10 @@ instance (OutputableBndr name) => Outputable (TyFamInstDecl name) where
 
 pprTyFamInstDecl :: OutputableBndr name => TopLevelFlag -> TyFamInstDecl name -> SDoc
 pprTyFamInstDecl top_lvl (TyFamInstDecl { tfid_eqn = eqn })
-   = ptext (sLit "type") <+> ppr_instance_keyword top_lvl <+> ppr_fam_inst_eqn eqn
+   = text "type" <+> ppr_instance_keyword top_lvl <+> ppr_fam_inst_eqn eqn
 
 ppr_instance_keyword :: TopLevelFlag -> SDoc
-ppr_instance_keyword TopLevel    = ptext (sLit "instance")
+ppr_instance_keyword TopLevel    = text "instance"
 ppr_instance_keyword NotTopLevel = empty
 
 ppr_fam_inst_eqn :: OutputableBndr name => LTyFamInstEqn name -> SDoc
@@ -1367,24 +1366,24 @@ instance (OutputableBndr name) => Outputable (ClsInstDecl name) where
       = top_matter
 
       | otherwise       -- Laid out
-      = vcat [ top_matter <+> ptext (sLit "where")
+      = vcat [ top_matter <+> text "where"
              , nest 2 $ pprDeclList $
                map (pprTyFamInstDecl NotTopLevel . unLoc)   ats ++
                map (pprDataFamInstDecl NotTopLevel . unLoc) adts ++
                pprLHsBindsForUser binds sigs ]
       where
-        top_matter = ptext (sLit "instance") <+> ppOverlapPragma mbOverlap
+        top_matter = text "instance" <+> ppOverlapPragma mbOverlap
                                              <+> ppr inst_ty
 
 ppOverlapPragma :: Maybe (Located OverlapMode) -> SDoc
 ppOverlapPragma mb =
   case mb of
     Nothing           -> empty
-    Just (L _ (NoOverlap _))    -> ptext (sLit "{-# NO_OVERLAP #-}")
-    Just (L _ (Overlappable _)) -> ptext (sLit "{-# OVERLAPPABLE #-}")
-    Just (L _ (Overlapping _))  -> ptext (sLit "{-# OVERLAPPING #-}")
-    Just (L _ (Overlaps _))     -> ptext (sLit "{-# OVERLAPS #-}")
-    Just (L _ (Incoherent _))   -> ptext (sLit "{-# INCOHERENT #-}")
+    Just (L _ (NoOverlap _))    -> text "{-# NO_OVERLAP #-}"
+    Just (L _ (Overlappable _)) -> text "{-# OVERLAPPABLE #-}"
+    Just (L _ (Overlapping _))  -> text "{-# OVERLAPPING #-}"
+    Just (L _ (Overlaps _))     -> text "{-# OVERLAPS #-}"
+    Just (L _ (Incoherent _))   -> text "{-# INCOHERENT #-}"
 
 
 instance (OutputableBndr name) => Outputable (InstDecl name) where
@@ -1428,7 +1427,7 @@ deriving instance (DataId name) => Data (DerivDecl name)
 
 instance (OutputableBndr name) => Outputable (DerivDecl name) where
     ppr (DerivDecl ty o)
-        = hsep [ptext (sLit "deriving instance"), ppOverlapPragma o, ppr ty]
+        = hsep [text "deriving instance", ppOverlapPragma o, ppr ty]
 
 {-
 ************************************************************************
@@ -1457,7 +1456,7 @@ instance (OutputableBndr name)
               => Outputable (DefaultDecl name) where
 
     ppr (DefaultDecl tys)
-      = ptext (sLit "default") <+> parens (interpp'SP tys)
+      = text "default" <+> parens (interpp'SP tys)
 
 {-
 ************************************************************************
@@ -1558,10 +1557,10 @@ data ForeignExport = CExport  (Located CExportSpec) -- contains the calling
 
 instance OutputableBndr name => Outputable (ForeignDecl name) where
   ppr (ForeignImport { fd_name = n, fd_sig_ty = ty, fd_fi = fimport })
-    = hang (ptext (sLit "foreign import") <+> ppr fimport <+> ppr n)
+    = hang (text "foreign import" <+> ppr fimport <+> ppr n)
          2 (dcolon <+> ppr ty)
   ppr (ForeignExport { fd_name = n, fd_sig_ty = ty, fd_fe = fexport }) =
-    hang (ptext (sLit "foreign export") <+> ppr fexport <+> ppr n)
+    hang (text "foreign export" <+> ppr fexport <+> ppr n)
        2 (dcolon <+> ppr ty)
 
 instance Outputable ForeignImport where
@@ -1574,15 +1573,15 @@ instance Outputable ForeignImport where
                Just (Header _ header) -> ftext header
 
       pprCEntity (CLabel lbl) =
-        ptext (sLit "static") <+> pp_hdr <+> char '&' <> ppr lbl
+        text "static" <+> pp_hdr <+> char '&' <> ppr lbl
       pprCEntity (CFunction (StaticTarget _ lbl _ isFun)) =
-            ptext (sLit "static")
+            text "static"
         <+> pp_hdr
-        <+> (if isFun then empty else ptext (sLit "value"))
+        <+> (if isFun then empty else text "value")
         <+> ppr lbl
       pprCEntity (CFunction (DynamicTarget)) =
-        ptext (sLit "dynamic")
-      pprCEntity (CWrapper) = ptext (sLit "wrapper")
+        text "dynamic"
+      pprCEntity (CWrapper) = text "wrapper"
 
 instance Outputable ForeignExport where
   ppr (CExport  (L _ (CExportStatic _ lbl cconv)) _) =
@@ -1879,11 +1878,11 @@ annProvenanceName_maybe (TypeAnnProvenance (L _ name))  = Just name
 annProvenanceName_maybe ModuleAnnProvenance       = Nothing
 
 pprAnnProvenance :: OutputableBndr name => AnnProvenance name -> SDoc
-pprAnnProvenance ModuleAnnProvenance       = ptext (sLit "ANN module")
+pprAnnProvenance ModuleAnnProvenance       = text "ANN module"
 pprAnnProvenance (ValueAnnProvenance (L _ name))
-  = ptext (sLit "ANN") <+> ppr name
+  = text "ANN" <+> ppr name
 pprAnnProvenance (TypeAnnProvenance (L _ name))
-  = ptext (sLit "ANN type") <+> ppr name
+  = text "ANN type" <+> ppr name
 
 {-
 ************************************************************************
@@ -1908,7 +1907,7 @@ data RoleAnnotDecl name
 
 instance OutputableBndr name => Outputable (RoleAnnotDecl name) where
   ppr (RoleAnnotDecl ltycon roles)
-    = ptext (sLit "type role") <+> ppr ltycon <+>
+    = text "type role" <+> ppr ltycon <+>
       hsep (map (pp_role . unLoc) roles)
     where
       pp_role Nothing  = underscore
