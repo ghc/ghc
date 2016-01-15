@@ -116,7 +116,6 @@ executable ghc-shake
                        , ScopedTypeVariables
     build-depends:       base
                        , ansi-terminal >= 0.6
-                       , bytestring >= 0.10.6
                        , Cabal >= 1.22
                        , containers >= 0.5
                        , directory >= 1.2
@@ -126,6 +125,5 @@ executable ghc-shake
                        , shake >= 0.15
                        , transformers >= 0.4
                        , unordered-containers >= 0.2
-                       , utf8-string >= 1.0.1
     default-language:    Haskell2010
     ghc-options:         -Wall -fno-warn-name-shadowing -rtsopts -with-rtsopts=-I0 -j

@@ -115,16 +115,11 @@ a -/- b = unifyPath $ a </> b
 
 infixr 6 -/-
 
--- | A wrapper around shakes @putNormal@ that substitutes
--- any message for a fullstop if @buildInfo@ is @Dot@.
-putNormal' :: String -> Action ()
-putNormal' = if buildInfo == Dot then putNormal . const "." else putNormal
-
 -- | A more colourful version of Shake's putNormal
 putColoured :: Color -> String -> Action ()
 putColoured colour msg = do
     liftIO $ setSGR [SetColor Foreground Vivid colour]
-    putNormal' msg
+    putNormal msg
     liftIO $ setSGR []
     liftIO $ hFlush stdout
 
@@ -134,7 +129,9 @@ putOracle = putColoured Blue
 
 -- | Make build output more distinguishable
 putBuild :: String -> Action ()
-putBuild = putColoured White
+putBuild = if buildInfo /= None
+    then putColoured White
+    else const (pure ())
 
 -- | A more colourful version of success message
 putSuccess :: String -> Action ()
@@ -149,14 +146,14 @@ putError msg = do
 -- | Render an action.
 renderAction :: String -> String -> String -> String
 renderAction what input output = case buildInfo of
-    Normal -> renderBox [ what
-                        , "     input:" ++ input
-                        , " => output:" ++ output ]
-    Brief  -> "> " ++ what ++ ": " ++ input ++ " => " ++ output
-    Pony   -> renderPony [ what
+    Normal  -> renderBox [ what
                          , "     input:" ++ input
                          , " => output:" ++ output ]
-    Dot    -> "."
+    Brief   -> "> " ++ what ++ ": " ++ input ++ " => " ++ output
+    Unicorn -> renderPony [ what
+                          , "     input:" ++ input
+                          , " => output:" ++ output ]
+    None    -> ""
 
 -- | Render the successful build of a program
 renderProgram :: String -> String -> String -> String
